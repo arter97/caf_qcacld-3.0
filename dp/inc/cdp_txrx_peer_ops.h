@@ -414,7 +414,7 @@ cdp_peer_add_last_real_peer(ol_txrx_soc_handle soc, uint8_t pdev_id,
  * restore last peer
  *
  * Return: true, restore success
- *         fasle, restore fail
+ *         false, restore fail
  */
 static inline bool
 cdp_peer_is_vdev_restore_last_peer(ol_txrx_soc_handle soc, uint8_t vdev_id,

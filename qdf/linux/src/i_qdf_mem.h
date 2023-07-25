@@ -49,6 +49,8 @@
  */
 #define GFP_KERNEL 0
 #define GFP_ATOMIC 0
+#define __GFP_KSWAPD_RECLAIM 0
+#define __GFP_DIRECT_RECLAIM 0
 #define kzalloc(size, flags) NULL
 #define vmalloc(size)        NULL
 #define kfree(buf)

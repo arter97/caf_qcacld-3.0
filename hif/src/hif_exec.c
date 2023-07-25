@@ -197,6 +197,7 @@ void hif_event_history_deinit(struct hif_opaque_softc *hif_ctx, uint8_t id)
 }
 #endif /* WLAN_FEATURE_DP_EVENT_HISTORY */
 
+#ifndef QCA_WIFI_WCN6450
 /**
  * hif_print_napi_latency_stats() - print NAPI scheduling latency stats
  * @hif_state: hif context
@@ -301,6 +302,97 @@ static void hif_get_poll_times_hist_str(struct qca_napi_stat *stats, char *buf,
 					   "%u|", stats->poll_time_buckets[i]);
 }
 
+void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
+{
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(hif_ctx);
+	struct hif_exec_context *hif_ext_group;
+	struct qca_napi_stat *napi_stats;
+	int i, j;
+
+	/*
+	 * Max value of uint_32 (poll_time_bucket) = 4294967295
+	 * Thus we need 10 chars + 1 space =11 chars for each bucket value.
+	 * +1 space for '\0'.
+	 */
+	char hist_str[(QCA_NAPI_NUM_BUCKETS * 11) + 1] = {'\0'};
+
+	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_INFO_HIGH,
+		  "NAPI[#]CPU[#] |scheds |polls  |comps  |dones  |t-lim  |max(us)|hist(500us buckets)");
+
+	for (i = 0;
+	     (i < hif_state->hif_num_extgroup && hif_state->hif_ext_group[i]);
+	     i++) {
+		hif_ext_group = hif_state->hif_ext_group[i];
+		for (j = 0; j < num_possible_cpus(); j++) {
+			napi_stats = &hif_ext_group->stats[j];
+			if (!napi_stats->napi_schedules)
+				continue;
+
+			hif_get_poll_times_hist_str(napi_stats,
+						    hist_str,
+						    sizeof(hist_str));
+			QDF_TRACE(QDF_MODULE_ID_HIF,
+				  QDF_TRACE_LEVEL_INFO_HIGH,
+				  "NAPI[%d]CPU[%d]: %7u %7u %7u %7u %7u %7llu %s",
+				  i, j,
+				  napi_stats->napi_schedules,
+				  napi_stats->napi_polls,
+				  napi_stats->napi_completes,
+				  napi_stats->napi_workdone,
+				  napi_stats->time_limit_reached,
+				  qdf_do_div(napi_stats->napi_max_poll_time,
+					     1000),
+				  hist_str);
+		}
+	}
+
+	hif_print_napi_latency_stats(hif_state);
+}
+
+qdf_export_symbol(hif_print_napi_stats);
+#else
+static inline
+void hif_get_poll_times_hist_str(struct qca_napi_stat *stats, char *buf,
+				 uint8_t buf_len)
+{
+}
+
+void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
+{
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(hif_ctx);
+	struct hif_exec_context *hif_ext_group;
+	struct qca_napi_stat *napi_stats;
+	int i, j;
+
+	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
+		"NAPI[#ctx]CPU[#] |schedules |polls |completes |workdone");
+
+	for (i = 0; i < hif_state->hif_num_extgroup; i++) {
+		if (hif_state->hif_ext_group[i]) {
+			hif_ext_group = hif_state->hif_ext_group[i];
+			for (j = 0; j < num_possible_cpus(); j++) {
+				napi_stats = &(hif_ext_group->stats[j]);
+				if (napi_stats->napi_schedules != 0)
+					QDF_TRACE(QDF_MODULE_ID_HIF,
+						QDF_TRACE_LEVEL_FATAL,
+						"NAPI[%2d]CPU[%d]: "
+						"%7d %7d %7d %7d ",
+						i, j,
+						napi_stats->napi_schedules,
+						napi_stats->napi_polls,
+						napi_stats->napi_completes,
+						napi_stats->napi_workdone);
+			}
+		}
+	}
+
+	hif_print_napi_latency_stats(hif_state);
+}
+qdf_export_symbol(hif_print_napi_stats);
+#endif /* WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT */
+#endif /* QCA_WIFI_WCN6450 */
+
+#ifdef WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT
 /**
  * hif_exec_fill_poll_time_histogram() - fills poll time histogram for a NAPI
  * @hif_ext_group: hif_ext_group of type NAPI
@@ -393,63 +485,7 @@ void hif_exec_update_service_start_time(struct hif_exec_context *hif_ext_group)
 	hif_ext_group->poll_start_time = qdf_time_sched_clock();
 }
 
-void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
-{
-	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(hif_ctx);
-	struct hif_exec_context *hif_ext_group;
-	struct qca_napi_stat *napi_stats;
-	int i, j;
-
-	/*
-	 * Max value of uint_32 (poll_time_bucket) = 4294967295
-	 * Thus we need 10 chars + 1 space =11 chars for each bucket value.
-	 * +1 space for '\0'.
-	 */
-	char hist_str[(QCA_NAPI_NUM_BUCKETS * 11) + 1] = {'\0'};
-
-	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "NAPI[#]CPU[#] |scheds |polls  |comps  |dones  |t-lim  |max(us)|hist(500us buckets)");
-
-	for (i = 0;
-	     (i < hif_state->hif_num_extgroup && hif_state->hif_ext_group[i]);
-	     i++) {
-		hif_ext_group = hif_state->hif_ext_group[i];
-		for (j = 0; j < num_possible_cpus(); j++) {
-			napi_stats = &hif_ext_group->stats[j];
-			if (!napi_stats->napi_schedules)
-				continue;
-
-			hif_get_poll_times_hist_str(napi_stats,
-						    hist_str,
-						    sizeof(hist_str));
-			QDF_TRACE(QDF_MODULE_ID_HIF,
-				  QDF_TRACE_LEVEL_INFO_HIGH,
-				  "NAPI[%d]CPU[%d]: %7u %7u %7u %7u %7u %7llu %s",
-				  i, j,
-				  napi_stats->napi_schedules,
-				  napi_stats->napi_polls,
-				  napi_stats->napi_completes,
-				  napi_stats->napi_workdone,
-				  napi_stats->time_limit_reached,
-				  qdf_do_div(napi_stats->napi_max_poll_time,
-					     1000),
-				  hist_str);
-		}
-	}
-
-	hif_print_napi_latency_stats(hif_state);
-}
-
-qdf_export_symbol(hif_print_napi_stats);
-
 #else
-
-static inline
-void hif_get_poll_times_hist_str(struct qca_napi_stat *stats, char *buf,
-				 uint8_t buf_len)
-{
-}
-
 static inline
 void hif_exec_update_service_start_time(struct hif_exec_context *hif_ext_group)
 {
@@ -459,39 +495,6 @@ static inline
 void hif_exec_fill_poll_time_histogram(struct hif_exec_context *hif_ext_group)
 {
 }
-
-void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
-{
-	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(hif_ctx);
-	struct hif_exec_context *hif_ext_group;
-	struct qca_napi_stat *napi_stats;
-	int i, j;
-
-	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
-		"NAPI[#ctx]CPU[#] |schedules |polls |completes |workdone");
-
-	for (i = 0; i < hif_state->hif_num_extgroup; i++) {
-		if (hif_state->hif_ext_group[i]) {
-			hif_ext_group = hif_state->hif_ext_group[i];
-			for (j = 0; j < num_possible_cpus(); j++) {
-				napi_stats = &(hif_ext_group->stats[j]);
-				if (napi_stats->napi_schedules != 0)
-					QDF_TRACE(QDF_MODULE_ID_HIF,
-						QDF_TRACE_LEVEL_FATAL,
-						"NAPI[%2d]CPU[%d]: "
-						"%7d %7d %7d %7d ",
-						i, j,
-						napi_stats->napi_schedules,
-						napi_stats->napi_polls,
-						napi_stats->napi_completes,
-						napi_stats->napi_workdone);
-			}
-		}
-	}
-
-	hif_print_napi_latency_stats(hif_state);
-}
-qdf_export_symbol(hif_print_napi_stats);
 #endif /* WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT */
 
 static void hif_exec_tasklet_schedule(struct hif_exec_context *ctx)
@@ -1101,7 +1104,7 @@ qdf_export_symbol(hif_register_ext_group);
 struct hif_exec_context *hif_exec_create(enum hif_exec_type type,
 						uint32_t scale)
 {
-	hif_debug("%s: create exec_type %d budget %d\n",
+	hif_debug("%s: create exec_type %d budget %d",
 		  __func__, type, QCA_NAPI_BUDGET * scale);
 
 	switch (type) {
@@ -1154,7 +1157,7 @@ void hif_deregister_exec_group(struct hif_opaque_softc *hif_ctx,
 		if (!hif_ext_group)
 			continue;
 
-		hif_debug("%s: Deregistering grp id %d name %s\n",
+		hif_debug("%s: Deregistering grp id %d name %s",
 			  __func__,
 			  hif_ext_group->grp_id,
 			  hif_ext_group->context_name);
@@ -1216,7 +1219,7 @@ QDF_STATUS hif_get_umac_reset_irq(struct hif_opaque_softc *hif_scn,
 			   "umac_reset", 0, umac_reset_irq);
 
 	if (ret) {
-		hif_err("umac reset get irq failed ret %d\n", ret);
+		hif_err("umac reset get irq failed ret %d", ret);
 		return QDF_STATUS_E_FAILURE;
 	}
 	return QDF_STATUS_SUCCESS;

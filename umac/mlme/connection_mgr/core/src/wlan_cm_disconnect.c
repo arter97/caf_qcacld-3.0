@@ -614,6 +614,7 @@ cm_handle_discon_req_in_non_connected_state(struct cnx_mgr *cm_ctx,
 					enum wlan_cm_sm_state cm_state_substate)
 {
 	enum wlan_cm_sm_state cur_state = cm_get_state(cm_ctx);
+	uint8_t vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
 
 	/*
 	 * South bound and peer disconnect requests are meant for only in
@@ -627,9 +628,9 @@ cm_handle_discon_req_in_non_connected_state(struct cnx_mgr *cm_ctx,
 	    (cm_req->req.source != CM_OSIF_DISCONNECT &&
 	    cm_req->req.source != CM_OSIF_CFG_DISCONNECT &&
 	    cm_req->req.source != CM_MLO_LINK_VDEV_DISCONNECT)) {
-		mlme_info("Vdev %d ignore disconnect req from source %d in state %d",
-			  wlan_vdev_get_id(cm_ctx->vdev), cm_req->req.source,
-			  cm_state_substate);
+		mlme_info(CM_PREFIX_FMT "ignore disconnect req from source %d in state %d",
+			  CM_PREFIX_REF(vdev_id, cm_req->cm_id),
+			  cm_req->req.source, cm_state_substate);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -713,12 +714,13 @@ cm_handle_discon_req_in_non_connected_state(struct cnx_mgr *cm_ctx,
 		 * So no need to do anything here, just return failure and drop
 		 * disconnect.
 		 */
-		mlme_info("vdev %d dropping disconnect req from source %d in INIT state",
-			  wlan_vdev_get_id(cm_ctx->vdev), cm_req->req.source);
+		mlme_info(CM_PREFIX_FMT "dropping disconnect req from source %d in INIT state",
+			  CM_PREFIX_REF(vdev_id, cm_req->cm_id),
+			  cm_req->req.source);
 		return QDF_STATUS_E_ALREADY;
 	default:
-		mlme_err("Vdev %d disconnect req in invalid state %d",
-			 wlan_vdev_get_id(cm_ctx->vdev),
+		mlme_err(CM_PREFIX_FMT "disconnect req in invalid state %d",
+			 CM_PREFIX_REF(vdev_id, cm_req->cm_id),
 			 cm_state_substate);
 		return QDF_STATUS_E_FAILURE;
 	};
@@ -786,6 +788,7 @@ QDF_STATUS cm_disconnect_start_req_sync(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	uint32_t timeout;
 	bool is_assoc_vdev = false;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 
 	cm_ctx = cm_get_cm_ctx(vdev);
 	if (!cm_ctx)
@@ -799,7 +802,8 @@ QDF_STATUS cm_disconnect_start_req_sync(struct wlan_objmgr_vdev *vdev,
 	qdf_event_reset(&cm_ctx->disconnect_complete);
 	status = cm_disconnect_start_req(vdev, req);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err("Disconnect failed with status %d", status);
+		mlme_err("vdev %d: Disconnect failed with status %d", vdev_id,
+			 status);
 		return status;
 	}
 
@@ -811,7 +815,8 @@ QDF_STATUS cm_disconnect_start_req_sync(struct wlan_objmgr_vdev *vdev,
 	status = qdf_wait_single_event(&cm_ctx->disconnect_complete,
 				       timeout);
 	if (QDF_IS_STATUS_ERROR(status))
-		mlme_err("Disconnect timeout with status %d", status);
+		mlme_err("vdev %d: Disconnect timeout with status %d", vdev_id,
+			 status);
 
 	return status;
 }
@@ -859,7 +864,7 @@ disconnect_complete:
 QDF_STATUS cm_bss_peer_delete_req(struct wlan_objmgr_vdev *vdev,
 				  struct qdf_mac_addr *peer_mac)
 {
-	mlme_debug("vdev-id %d, delete peer" QDF_MAC_ADDR_FMT,
+	mlme_debug("vdev %d: delete peer" QDF_MAC_ADDR_FMT,
 		   wlan_vdev_get_id(vdev), QDF_MAC_ADDR_REF(peer_mac->bytes));
 
 	return mlme_cm_bss_peer_delete_req(vdev);
@@ -867,7 +872,7 @@ QDF_STATUS cm_bss_peer_delete_req(struct wlan_objmgr_vdev *vdev,
 
 QDF_STATUS cm_vdev_down_req(struct wlan_objmgr_vdev *vdev, uint32_t status)
 {
-	mlme_debug("vdev id %d down req status %d",
+	mlme_debug("vdev %d: down req status %d",
 		   wlan_vdev_get_id(vdev), status);
 
 	return mlme_cm_vdev_down_req(vdev);

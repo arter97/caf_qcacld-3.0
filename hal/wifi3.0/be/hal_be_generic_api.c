@@ -454,6 +454,17 @@ void hal_rx_buf_cookie_rbm_get_be(uint32_t *buf_addr_info_hdl,
 }
 
 /**
+ * hal_rx_en_mcast_fp_data_filter_generic_be() - Is mcast filter pass enabled
+ *
+ * Return: true default for BE WIN
+ */
+static inline
+bool hal_rx_en_mcast_fp_data_filter_generic_be(void)
+{
+	return true;
+}
+
+/**
  * hal_rxdma_buff_addr_info_set_be() - set the buffer_addr_info of the
  *				    rxdma ring entry.
  * @rxdma_entry: descriptor entry
@@ -913,6 +924,11 @@ hal_reset_rx_reo_tid_q_be(struct hal_soc *hal_soc, void *hw_qdesc_vaddr,
 }
 #endif
 
+static inline uint8_t hal_rx_get_phy_ppdu_id_size_be(void)
+{
+	return sizeof(uint64_t);
+}
+
 void hal_hw_txrx_default_ops_attach_be(struct hal_soc *hal_soc)
 {
 	hal_soc->ops->hal_get_reo_qdesc_size = hal_get_reo_qdesc_size_be;
@@ -973,4 +989,8 @@ void hal_hw_txrx_default_ops_attach_be(struct hal_soc *hal_soc)
 					hal_set_reo_ent_desc_reo_dest_ind_be;
 	hal_soc->ops->hal_get_reo_ent_desc_qdesc_addr =
 					hal_get_reo_ent_desc_qdesc_addr_be;
+	hal_soc->ops->hal_rx_en_mcast_fp_data_filter =
+				hal_rx_en_mcast_fp_data_filter_generic_be;
+	hal_soc->ops->hal_rx_get_phy_ppdu_id_size =
+					hal_rx_get_phy_ppdu_id_size_be;
 }

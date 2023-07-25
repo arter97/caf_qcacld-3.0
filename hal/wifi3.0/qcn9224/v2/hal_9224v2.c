@@ -358,7 +358,7 @@ struct hal_hw_srng_config hw_srng_table_9224v2[] = {
 		.reg_size = {},
 		.max_size = HAL_RXDMA_MAX_RING_SIZE,
 	},
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
 	{ /* RXDMA_MONITOR_BUF */
 		.start_ring_id = HAL_SRNG_WMAC1_SW2RXDMA2_BUF,
 		.max_rings = 1,
@@ -388,7 +388,7 @@ struct hal_hw_srng_config hw_srng_table_9224v2[] = {
 		.reg_size = {},
 		.max_size = HAL_RXDMA_MAX_RING_SIZE,
 	},
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
 	{ /* RXDMA_MONITOR_DST */
 		.start_ring_id = HAL_SRNG_WMAC1_RXMON2SW0,
 		.max_rings = 2,
@@ -502,7 +502,7 @@ struct hal_hw_srng_config hw_srng_table_9224v2[] = {
 		HWIO_WBM_R0_PPE_RELEASE_RING_BASE_MSB_RING_SIZE_BMSK >>
 		HWIO_WBM_R0_PPE_RELEASE_RING_BASE_MSB_RING_SIZE_SHFT,
 	},
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 	{ /* TX_MONITOR_BUF */
 		.start_ring_id = HAL_SRNG_SW2TXMON_BUF0,
 		.max_rings = 1,
@@ -547,6 +547,7 @@ struct hal_hw_srng_config hw_srng_table_9224v2[] = {
 		.max_size = HAL_RXDMA_MAX_RING_SIZE_BE,
 		.dmac_cmn_ring = TRUE,
 	},
+	{ /* SW2RXDMA_LINK_RELEASE */ 0},
 };
 
 /**

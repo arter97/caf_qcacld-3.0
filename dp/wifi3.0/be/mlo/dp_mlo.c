@@ -321,12 +321,21 @@ static QDF_STATUS dp_mlo_add_ptnr_vdev(struct dp_vdev *vdev1,
 	struct dp_vdev_be *vdev2_be = dp_get_be_vdev_from_dp_vdev(vdev2);
 
 	/* return when valid entry  exists */
-	if (vdev2_be->partner_vdev_list[soc_be->mlo_chip_id][pdev_id] !=
+	if (vdev1->is_bridge_vdev) {
+		if (vdev2_be->bridge_vdev_list[soc_be->mlo_chip_id][pdev_id] !=
 							CDP_INVALID_VDEV_ID)
-		return QDF_STATUS_SUCCESS;
+			return QDF_STATUS_SUCCESS;
 
-	vdev2_be->partner_vdev_list[soc_be->mlo_chip_id][pdev_id] =
+		vdev2_be->bridge_vdev_list[soc_be->mlo_chip_id][pdev_id] =
 						vdev1->vdev_id;
+	} else {
+		if (vdev2_be->partner_vdev_list[soc_be->mlo_chip_id][pdev_id] !=
+							CDP_INVALID_VDEV_ID)
+			return QDF_STATUS_SUCCESS;
+
+		vdev2_be->partner_vdev_list[soc_be->mlo_chip_id][pdev_id] =
+						vdev1->vdev_id;
+	}
 
 	mlo_debug("Add vdev%d to vdev%d list, mlo_chip_id = %d pdev_id = %d\n",
 		  vdev1->vdev_id, vdev2->vdev_id, soc_be->mlo_chip_id, pdev_id);
@@ -451,13 +460,58 @@ void dp_clr_mlo_ptnr_list(struct dp_soc *soc, struct dp_vdev *vdev)
 
 			/* remove self vdev from partner list */
 			pr_vdev_be = dp_get_be_vdev_from_dp_vdev(pr_vdev);
-			pr_vdev_be->partner_vdev_list[soc_id][pdev_id] =
-				CDP_INVALID_VDEV_ID;
+			if (vdev->is_bridge_vdev)
+				pr_vdev_be->bridge_vdev_list[soc_id][pdev_id] =
+					CDP_INVALID_VDEV_ID;
+			else
+				pr_vdev_be->partner_vdev_list[soc_id][pdev_id] =
+					CDP_INVALID_VDEV_ID;
 
 			/* remove partner vdev from self list */
 			pr_pdev = pr_vdev->pdev;
 			vdev_be->partner_vdev_list[pr_soc_be->mlo_chip_id][pr_pdev->pdev_id] =
 				CDP_INVALID_VDEV_ID;
+
+			dp_vdev_unref_delete(pr_soc, pr_vdev, DP_MOD_ID_RX);
+		}
+	}
+
+	for (i = 0; i < WLAN_MAX_MLO_CHIPS; i++) {
+		for (j = 0; j < WLAN_MAX_MLO_LINKS_PER_SOC; j++) {
+			struct dp_vdev *pr_vdev = NULL;
+			struct dp_soc *pr_soc = NULL;
+			struct dp_soc_be *pr_soc_be = NULL;
+			struct dp_pdev *pr_pdev = NULL;
+			struct dp_vdev_be *pr_vdev_be = NULL;
+
+			if (vdev_be->bridge_vdev_list[i][j] ==
+			    CDP_INVALID_VDEV_ID)
+				continue;
+
+			pr_soc = dp_mlo_get_soc_ref_by_chip_id(dp_mlo, i);
+			if (!pr_soc)
+				continue;
+			pr_soc_be = dp_get_be_soc_from_dp_soc(pr_soc);
+			pr_vdev = dp_vdev_get_ref_by_id(
+						pr_soc,
+						vdev_be->bridge_vdev_list[i][j],
+						DP_MOD_ID_RX);
+			if (!pr_vdev)
+				continue;
+
+			/* remove self vdev from partner list */
+			pr_vdev_be = dp_get_be_vdev_from_dp_vdev(pr_vdev);
+			if (vdev->is_bridge_vdev)
+				pr_vdev_be->bridge_vdev_list[soc_id][pdev_id] =
+					CDP_INVALID_VDEV_ID;
+			else
+				pr_vdev_be->partner_vdev_list[soc_id][pdev_id] =
+					CDP_INVALID_VDEV_ID;
+
+			/* remove partner vdev from self list */
+			pr_pdev = pr_vdev->pdev;
+			vdev_be->bridge_vdev_list[pr_soc_be->mlo_chip_id][pr_pdev->pdev_id] =
+					CDP_INVALID_VDEV_ID;
 
 			dp_vdev_unref_delete(pr_soc, pr_vdev, DP_MOD_ID_RX);
 		}
@@ -544,34 +598,245 @@ static void dp_mlo_update_mlo_ts_offset(struct cdp_soc_t *soc_hdl,
 }
 
 #ifdef CONFIG_MLO_SINGLE_DEV
-static void dp_mlo_aggregate_mld_vdev_stats(struct dp_vdev_be *be_vdev,
-					    struct dp_vdev *ptnr_vdev,
-					    void *arg)
+/**
+ * dp_aggregate_vdev_basic_stats() - aggregate vdev basic stats
+ * @tgt_vdev_stats: target vdev buffer
+ * @src_vdev_stats: source vdev buffer
+ *
+ * return: void
+ */
+static inline
+void dp_aggregate_vdev_basic_stats(
+			struct cdp_vdev_stats *tgt_vdev_stats,
+			struct cdp_vdev_stats *src_vdev_stats)
 {
-	struct cdp_vdev_stats *tgt_vdev_stats = (struct cdp_vdev_stats *)arg;
-	struct cdp_vdev_stats *src_vdev_stats = &ptnr_vdev->stats;
+	DP_UPDATE_BASIC_STATS(tgt_vdev_stats, src_vdev_stats);
+}
 
+/**
+ * dp_aggregate_vdev_ingress_stats() - aggregate vdev ingress stats
+ * @tgt_vdev_stats: target vdev buffer
+ * @src_vdev_stats: source vdev buffer
+ *
+ * return: void
+ */
+static inline
+void dp_aggregate_vdev_ingress_stats(
+			struct cdp_vdev_stats *tgt_vdev_stats,
+			struct cdp_vdev_stats *src_vdev_stats)
+{
 	/* Aggregate vdev ingress stats */
 	DP_UPDATE_INGRESS_STATS(tgt_vdev_stats, src_vdev_stats);
+}
 
+/**
+ * dp_aggregate_vdev_stats_for_unmapped_peers() - aggregate unmap peer stats
+ * @tgt_vdev_stats: target vdev buffer
+ * @src_vdev_stats: source vdev buffer
+ *
+ * return: void
+ */
+static inline
+void dp_aggregate_vdev_stats_for_unmapped_peers(
+			struct cdp_vdev_stats *tgt_vdev_stats,
+			struct cdp_vdev_stats *src_vdev_stats)
+{
 	/* Aggregate unmapped peers stats */
-	DP_UPDATE_PER_PKT_STATS(tgt_vdev_stats, src_vdev_stats);
-	DP_UPDATE_EXTD_STATS(tgt_vdev_stats, src_vdev_stats);
+	DP_UPDATE_VDEV_STATS_FOR_UNMAPPED_PEERS(tgt_vdev_stats, src_vdev_stats);
+}
 
-	/* Aggregate associated peers stats */
-	dp_vdev_iterate_peer(ptnr_vdev, dp_update_vdev_stats, tgt_vdev_stats,
+/**
+ * dp_aggregate_all_vdev_stats() - aggregate vdev ingress and unmap peer stats
+ * @tgt_vdev_stats: target vdev buffer
+ * @src_vdev_stats: source vdev buffer
+ *
+ * return: void
+ */
+static inline
+void dp_aggregate_all_vdev_stats(
+			struct cdp_vdev_stats *tgt_vdev_stats,
+			struct cdp_vdev_stats *src_vdev_stats)
+{
+	dp_aggregate_vdev_ingress_stats(tgt_vdev_stats, src_vdev_stats);
+	dp_aggregate_vdev_stats_for_unmapped_peers(tgt_vdev_stats,
+						   src_vdev_stats);
+}
+
+/**
+ * dp_aggregate_interface_stats_based_on_peer_type() - aggregate stats at
+ * VDEV level based on peer type connected to vdev
+ * @vdev: DP VDEV handle
+ * @vdev_stats: target vdev stats pointer
+ * @peer_type: type of peer - MLO Link or Legacy peer
+ *
+ * return: void
+ */
+static
+void dp_aggregate_interface_stats_based_on_peer_type(
+					struct dp_vdev *vdev,
+					struct cdp_vdev_stats *vdev_stats,
+					enum dp_peer_type peer_type)
+{
+	struct cdp_vdev_stats *tgt_vdev_stats = NULL;
+	struct dp_vdev_be *be_vdev = NULL;
+
+	if (!vdev || !vdev->pdev)
+		return;
+
+	tgt_vdev_stats = vdev_stats;
+	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	if (!be_vdev)
+		return;
+
+	if (peer_type == DP_PEER_TYPE_LEGACY) {
+		dp_aggregate_all_vdev_stats(tgt_vdev_stats,
+					    &vdev->stats);
+	} else {
+		dp_aggregate_vdev_ingress_stats(tgt_vdev_stats,
+						&vdev->stats);
+		dp_aggregate_vdev_stats_for_unmapped_peers(
+						tgt_vdev_stats,
+						&be_vdev->mlo_stats);
+	}
+
+	/* Aggregate associated peer stats */
+	dp_vdev_iterate_specific_peer_type(vdev,
+					   dp_update_vdev_stats,
+					   vdev_stats,
+					   DP_MOD_ID_GENERIC_STATS,
+					   peer_type);
+}
+
+/**
+ * dp_aggregate_interface_stats() - aggregate stats at VDEV level
+ * @vdev: DP VDEV handle
+ * @vdev_stats: target vdev stats pointer
+ *
+ * return: void
+ */
+static
+void dp_aggregate_interface_stats(struct dp_vdev *vdev,
+				  struct cdp_vdev_stats *vdev_stats)
+{
+	struct dp_vdev_be *be_vdev = NULL;
+
+	if (!vdev || !vdev->pdev)
+		return;
+
+	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	if (!be_vdev)
+		return;
+
+	dp_aggregate_all_vdev_stats(vdev_stats, &be_vdev->mlo_stats);
+	dp_aggregate_all_vdev_stats(vdev_stats, &vdev->stats);
+
+	dp_vdev_iterate_peer(vdev, dp_update_vdev_stats, vdev_stats,
 			     DP_MOD_ID_GENERIC_STATS);
+
+	dp_update_vdev_rate_stats(vdev_stats, &vdev->stats);
+}
+
+/**
+ * dp_mlo_aggr_ptnr_iface_stats() - aggregate mlo partner vdev stats
+ * @be_vdev: vdev handle
+ * @ptnr_vdev: partner vdev handle
+ * @arg: target buffer for aggregation
+ *
+ * return: void
+ */
+static
+void dp_mlo_aggr_ptnr_iface_stats(struct dp_vdev_be *be_vdev,
+				  struct dp_vdev *ptnr_vdev,
+				  void *arg)
+{
+	struct cdp_vdev_stats *tgt_vdev_stats = (struct cdp_vdev_stats *)arg;
+
+	dp_aggregate_interface_stats(ptnr_vdev, tgt_vdev_stats);
+}
+
+/**
+ * dp_mlo_aggr_ptnr_iface_stats_mlo_links() - aggregate mlo partner vdev stats
+ * based on peer type
+ * @be_vdev: vdev handle
+ * @ptnr_vdev: partner vdev handle
+ * @arg: target buffer for aggregation
+ *
+ * return: void
+ */
+static
+void dp_mlo_aggr_ptnr_iface_stats_mlo_links(
+					struct dp_vdev_be *be_vdev,
+					struct dp_vdev *ptnr_vdev,
+					void *arg)
+{
+	struct cdp_vdev_stats *tgt_vdev_stats = (struct cdp_vdev_stats *)arg;
+
+	dp_aggregate_interface_stats_based_on_peer_type(ptnr_vdev,
+							tgt_vdev_stats,
+							DP_PEER_TYPE_MLO_LINK);
+}
+
+/**
+ * dp_aggregate_sta_interface_stats() - for sta mode aggregate vdev stats from
+ * all link peers
+ * @soc: soc handle
+ * @vdev: vdev handle
+ * @buf: target buffer for aggregation
+ *
+ * return: QDF_STATUS
+ */
+static QDF_STATUS
+dp_aggregate_sta_interface_stats(struct dp_soc *soc,
+				 struct dp_vdev *vdev,
+				 void *buf)
+{
+	struct dp_peer *vap_bss_peer = NULL;
+	struct dp_peer *mld_peer = NULL;
+	struct dp_peer *link_peer = NULL;
+	struct dp_mld_link_peers link_peers_info;
+	uint8_t i = 0;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	vap_bss_peer = dp_vdev_bss_peer_ref_n_get(soc, vdev,
+						  DP_MOD_ID_GENERIC_STATS);
+	if (!vap_bss_peer)
+		return QDF_STATUS_E_FAILURE;
+
+	mld_peer = DP_GET_MLD_PEER_FROM_PEER(vap_bss_peer);
+
+	if (!mld_peer) {
+		dp_peer_unref_delete(vap_bss_peer, DP_MOD_ID_GENERIC_STATS);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dp_get_link_peers_ref_from_mld_peer(soc, mld_peer, &link_peers_info,
+					    DP_MOD_ID_GENERIC_STATS);
+
+	for (i = 0; i < link_peers_info.num_links; i++) {
+		link_peer = link_peers_info.link_peers[i];
+		dp_update_vdev_stats(soc, link_peer, buf);
+		dp_aggregate_vdev_ingress_stats((struct cdp_vdev_stats *)buf,
+						&link_peer->vdev->stats);
+		dp_aggregate_vdev_basic_stats(
+					(struct cdp_vdev_stats *)buf,
+					&link_peer->vdev->stats);
+	}
+
+	dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_GENERIC_STATS);
+	dp_peer_unref_delete(vap_bss_peer, DP_MOD_ID_GENERIC_STATS);
+	return ret;
 }
 
 static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
-					    uint8_t vdev_id, void *buf)
+					    uint8_t vdev_id, void *buf,
+					    bool link_vdev_only)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct cdp_vdev_stats *vdev_stats;
 	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
 						     DP_MOD_ID_GENERIC_STATS);
 	struct dp_vdev_be *vdev_be = NULL;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
@@ -582,14 +847,63 @@ static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	vdev_stats = (struct cdp_vdev_stats *)buf;
+	if (vdev->opmode == wlan_op_mode_sta) {
+		ret = dp_aggregate_sta_interface_stats(soc, vdev, buf);
+		goto complete;
+	}
 
-	dp_aggregate_vdev_stats(vdev, buf);
+	if (DP_MLD_MODE_HYBRID_NONBOND == soc->mld_mode_ap &&
+	    vdev->opmode == wlan_op_mode_ap) {
+		dp_aggregate_interface_stats_based_on_peer_type(
+						vdev, buf,
+						DP_PEER_TYPE_MLO_LINK);
+		if (link_vdev_only)
+			goto complete;
 
-	/* Aggregate stats from partner vdevs */
-	dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
-			      dp_mlo_aggregate_mld_vdev_stats, buf,
-			      DP_MOD_ID_GENERIC_STATS);
+		/* Aggregate stats from partner vdevs */
+		dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
+				      dp_mlo_aggr_ptnr_iface_stats_mlo_links,
+				      buf,
+				      DP_MOD_ID_GENERIC_STATS,
+				      DP_ALL_VDEV_ITER);
+	} else {
+		dp_aggregate_interface_stats(vdev, buf);
+
+		if (link_vdev_only)
+			goto complete;
+
+		/* Aggregate stats from partner vdevs */
+		dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
+				      dp_mlo_aggr_ptnr_iface_stats, buf,
+				      DP_MOD_ID_GENERIC_STATS,
+				      DP_ALL_VDEV_ITER);
+	}
+
+complete:
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
+	return ret;
+}
+
+QDF_STATUS
+dp_get_interface_stats_be(struct cdp_soc_t *soc_hdl,
+			  uint8_t vdev_id,
+			  void *buf,
+			  bool is_aggregate)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+						     DP_MOD_ID_GENERIC_STATS);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	if (DP_MLD_MODE_HYBRID_NONBOND == soc->mld_mode_ap &&
+	    vdev->opmode == wlan_op_mode_ap) {
+		dp_aggregate_interface_stats_based_on_peer_type(
+						vdev, buf,
+						DP_PEER_TYPE_LEGACY);
+	} else {
+		dp_aggregate_interface_stats(vdev, buf);
+	}
 
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
 
@@ -822,7 +1136,7 @@ void dp_mlo_get_rx_hash_key(struct dp_soc *soc,
 }
 
 struct dp_soc *
-dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id)
+dp_rx_replenish_soc_get(struct dp_soc *soc, uint8_t chip_id)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_mlo_ctxt *mlo_ctxt = be_soc->ml_ctxt;
@@ -883,13 +1197,20 @@ void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			   struct dp_vdev_be *be_vdev,
 			   dp_ptnr_vdev_iter_func func,
 			   void *arg,
-			   enum dp_mod_id mod_id)
+			   enum dp_mod_id mod_id,
+			   uint8_t type)
 {
 	int i = 0;
 	int j = 0;
 	struct dp_mlo_ctxt *dp_mlo = be_soc->ml_ctxt;
 
-	for (i = 0; i < WLAN_MAX_MLO_CHIPS ; i++) {
+	if (type < DP_LINK_VDEV_ITER || type > DP_ALL_VDEV_ITER) {
+		dp_err("invalid iterate type");
+		return;
+	}
+
+	for (i = 0; (i < WLAN_MAX_MLO_CHIPS) &&
+	     IS_LINK_VDEV_ITER_REQUIRED(type); i++) {
 		struct dp_soc *ptnr_soc =
 				dp_mlo_get_soc_ref_by_chip_id(dp_mlo, i);
 
@@ -907,6 +1228,29 @@ void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			(*func)(be_vdev, ptnr_vdev, arg);
 			dp_vdev_unref_delete(ptnr_vdev->pdev->soc,
 					     ptnr_vdev,
+					     mod_id);
+		}
+	}
+
+	for (i = 0; (i < WLAN_MAX_MLO_CHIPS) &&
+	     IS_BRIDGE_VDEV_ITER_REQUIRED(type); i++) {
+		struct dp_soc *ptnr_soc =
+				dp_mlo_get_soc_ref_by_chip_id(dp_mlo, i);
+
+		if (!ptnr_soc)
+			continue;
+		for (j = 0 ; j < WLAN_MAX_MLO_LINKS_PER_SOC ; j++) {
+			struct dp_vdev *bridge_vdev;
+
+			bridge_vdev = dp_vdev_get_ref_by_id(
+					ptnr_soc,
+					be_vdev->bridge_vdev_list[i][j],
+					mod_id);
+			if (!bridge_vdev)
+				continue;
+			(*func)(be_vdev, bridge_vdev, arg);
+			dp_vdev_unref_delete(bridge_vdev->pdev->soc,
+					     bridge_vdev,
 					     mod_id);
 		}
 	}
@@ -1128,26 +1472,44 @@ void dp_umac_reset_complete_umac_recovery(struct dp_soc *soc)
 /**
  * dp_umac_reset_initiate_umac_recovery() - Initiate Umac reset session
  * @soc: dp soc handle
+ * @umac_reset_ctx: Umac reset context
+ * @rx_event: Rx event received
  * @is_target_recovery: Flag to indicate if it is triggered for target recovery
  *
- * Return: void
+ * Return: status
  */
-void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
-					  bool is_target_recovery)
+QDF_STATUS dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
+				struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+				enum umac_reset_rx_event rx_event,
+				bool is_target_recovery)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_mlo_ctxt *mlo_ctx = be_soc->ml_ctxt;
 	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!mlo_ctx)
-		return;
+		return dp_umac_reset_validate_n_update_state_machine_on_rx(
+					umac_reset_ctx, rx_event,
+					UMAC_RESET_STATE_WAIT_FOR_TRIGGER,
+					UMAC_RESET_STATE_DO_TRIGGER_RECEIVED);
 
 	grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
 	qdf_spin_lock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
 
 	if (grp_umac_reset_ctx->umac_reset_in_progress) {
 		qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
-		return;
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = dp_umac_reset_validate_n_update_state_machine_on_rx(
+					umac_reset_ctx, rx_event,
+					UMAC_RESET_STATE_WAIT_FOR_TRIGGER,
+					UMAC_RESET_STATE_DO_TRIGGER_RECEIVED);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+		return status;
 	}
 
 	grp_umac_reset_ctx->umac_reset_in_progress = true;
@@ -1160,6 +1522,8 @@ void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
 	grp_umac_reset_ctx->umac_reset_count++;
 
 	qdf_spin_unlock_bh(&grp_umac_reset_ctx->grp_ctx_lock);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -1380,4 +1744,68 @@ QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+enum cdp_umac_reset_state
+dp_get_umac_reset_in_progress_state(struct cdp_soc_t *psoc)
+{
+	struct dp_soc_umac_reset_ctx *umac_reset_ctx;
+	struct dp_soc *soc = (struct dp_soc *)psoc;
+	struct dp_soc_mlo_umac_reset_ctx *grp_umac_reset_ctx;
+	struct dp_soc_be *be_soc = NULL;
+	struct dp_mlo_ctxt *mlo_ctx = NULL;
+	enum cdp_umac_reset_state umac_reset_is_inprogress;
+
+	if (!soc) {
+		dp_umac_reset_err("DP SOC is null");
+		return CDP_UMAC_RESET_INVALID_STATE;
+	}
+
+	umac_reset_ctx = &soc->umac_reset_ctx;
+
+	be_soc = dp_get_be_soc_from_dp_soc(soc);
+	if (be_soc)
+		mlo_ctx = be_soc->ml_ctxt;
+
+	if (mlo_ctx) {
+		grp_umac_reset_ctx = &mlo_ctx->grp_umac_reset_ctx;
+		umac_reset_is_inprogress =
+			grp_umac_reset_ctx->umac_reset_in_progress;
+	} else {
+		umac_reset_is_inprogress = (umac_reset_ctx->current_state !=
+					    UMAC_RESET_STATE_WAIT_FOR_TRIGGER);
+	}
+
+	if (umac_reset_is_inprogress)
+		return CDP_UMAC_RESET_IN_PROGRESS;
+
+	/* Check if the umac reset was in progress during the buffer
+	 * window.
+	 */
+	umac_reset_is_inprogress =
+		((qdf_get_log_timestamp_usecs() -
+		  umac_reset_ctx->ts.post_reset_complete_done) <=
+		 (wlan_cfg_get_umac_reset_buffer_window_ms(soc->wlan_cfg_ctx) *
+		  1000));
+
+	return (umac_reset_is_inprogress ?
+			CDP_UMAC_RESET_IN_PROGRESS_DURING_BUFFER_WINDOW :
+			CDP_UMAC_RESET_NOT_IN_PROGRESS);
+}
 #endif
+
+struct dp_soc *
+dp_get_soc_by_chip_id_be(struct dp_soc *soc, uint8_t chip_id)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctxt = be_soc->ml_ctxt;
+	struct dp_soc *partner_soc;
+
+	if (!be_soc->mlo_enabled || !mlo_ctxt)
+		return soc;
+
+	if (be_soc->mlo_chip_id == chip_id)
+		return soc;
+
+	partner_soc = dp_mlo_get_soc_ref_by_chip_id(mlo_ctxt, chip_id);
+	return partner_soc;
+}

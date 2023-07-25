@@ -121,10 +121,13 @@
 #include "hal_be_rx_tlv.h"
 
 #include <hal_generic_api.h>
-#include <hal_be_generic_api.h>
 #include "hal_be_api_mon.h"
+#include <hal_be_generic_api.h>
 
 #define LINK_DESC_SIZE (NUM_OF_DWORDS_RX_MSDU_LINK << 2)
+
+/* For Berryllium sw2rxdma ring size increased to 20 bits */
+#define HAL_RXDMA_MAX_RING_SIZE_BE 0xFFFFF
 
 #ifdef QCA_GET_TSF_VIA_REG
 #define PCIE_PCIE_MHI_TIME_LOW 0xA28
@@ -2012,6 +2015,17 @@ static QDF_STATUS hal_rx_reo_ent_get_src_link_id_kiwi(hal_rxdma_desc_t rx_desc,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * hal_rx_en_mcast_fp_data_filter_kiwi() - Is mcast filter pass enabled
+ *
+ * Return: false for BE MCC
+ */
+static inline
+bool hal_rx_en_mcast_fp_data_filter_kiwi(void)
+{
+	return false;
+}
+
 #ifdef QCA_WIFI_KIWI_V2
 /**
  * hal_srng_dst_hw_init_misc_1_kiwi() - Function to initialize MISC_1 register
@@ -2343,6 +2357,18 @@ static void hal_hw_txrx_ops_attach_kiwi(struct hal_soc *hal_soc)
 #ifdef FEATURE_DIRECT_LINK
 	hal_soc->ops->hal_srng_set_msi_config = hal_srng_set_msi_config;
 #endif
+	hal_soc->ops->hal_rx_en_mcast_fp_data_filter =
+					hal_rx_en_mcast_fp_data_filter_kiwi;
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+	hal_soc->ops->hal_txmon_is_mon_buf_addr_tlv =
+				hal_txmon_is_mon_buf_addr_tlv_generic_be;
+	hal_soc->ops->hal_txmon_populate_packet_info =
+				hal_txmon_populate_packet_info_generic_be;
+	hal_soc->ops->hal_txmon_status_parse_tlv =
+				hal_txmon_status_parse_tlv_generic_be;
+	hal_soc->ops->hal_txmon_status_get_num_users =
+				hal_txmon_status_get_num_users_generic_be;
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 };
 
 struct hal_hw_srng_config hw_srng_table_kiwi[] = {
@@ -2763,9 +2789,39 @@ struct hal_hw_srng_config hw_srng_table_kiwi[] = {
 	{ /* REO2PPE */ 0},
 	{ /* PPE2TCL */ 0},
 	{ /* PPE_RELEASE */ 0},
-	{ /* TX_MONITOR_BUF */ 0},
-	{ /* TX_MONITOR_DST */ 0},
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+	{ /* TX_MONITOR_BUF */
+		.start_ring_id = HAL_SRNG_SW2TXMON_BUF0,
+		.max_rings = 1,
+		.entry_size = sizeof(struct mon_ingress_ring) >> 2,
+		.lmac_ring = TRUE,
+		.ring_dir = HAL_SRNG_SRC_RING,
+		/* reg_start is not set because LMAC rings are not accessed
+		 * from host
+		 */
+		.reg_start = {},
+		.reg_size = {},
+		.max_size = HAL_RXDMA_MAX_RING_SIZE_BE,
+	},
+	{ /* TX_MONITOR_DST */
+		.start_ring_id = HAL_SRNG_WMAC1_TXMON2SW0,
+		.max_rings = 2,
+		.entry_size = sizeof(struct mon_destination_ring) >> 2,
+		.lmac_ring = TRUE,
+		.ring_dir = HAL_SRNG_DST_RING,
+		/* reg_start is not set because LMAC rings are not accessed
+		 * from host
+		 */
+		.reg_start = {},
+		.reg_size = {},
+		.max_size = HAL_RXDMA_MAX_RING_SIZE_BE,
+	},
+#else
+	{0},
+	{0},
+#endif
 	{ /* SW2RXDMA_NEW */ 0},
+	{ /* SW2RXDMA_LINK_RELEASE */ 0},
 };
 
 /**

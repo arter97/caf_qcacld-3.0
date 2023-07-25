@@ -31,6 +31,8 @@
 #define DP_BLOCKMEM_SIZE 4096
 #define WBM2_SW_PPE_REL_RING_ID 6
 #define WBM2_SW_PPE_REL_MAP_ID 11
+#define DP_TX_PPEDS_POOL_ID 0xF
+
 /* Alignment for consistent memory for DP rings*/
 #define DP_RING_BASE_ALIGN 32
 
@@ -60,6 +62,11 @@
 #define DIRECT_LINK_REFILL_RING_IDX     2
 #endif
 #endif
+
+#define DP_MAX_VLAN_IDS 4096
+#define DP_VLAN_UNTAGGED 0
+#define DP_VLAN_TAGGED_MULTICAST 1
+#define DP_VLAN_TAGGED_UNICAST 2
 
 /**
  * struct htt_dbgfs_cfg - structure to maintain required htt data
@@ -670,6 +677,18 @@ static inline struct qdf_mem_multi_page_t*
 dp_monitor_get_link_desc_pages(struct dp_soc *soc, uint32_t mac_id)
 {
 	return NULL;
+}
+
+static inline struct dp_srng*
+dp_monitor_get_link_desc_ring(struct dp_soc *soc, uint32_t mac_id)
+{
+	return NULL;
+}
+
+static inline uint32_t
+dp_monitor_get_num_link_desc_ring_entries(struct dp_soc *soc)
+{
+	return 0;
 }
 
 static inline uint32_t *
@@ -1448,6 +1467,7 @@ bool dp_vdev_is_wds_ext_enabled(struct dp_vdev *vdev);
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 static inline void dp_wds_ext_peer_init(struct dp_txrx_peer *txrx_peer)
 {
+	txrx_peer->wds_ext.osif_peer = NULL;
 	txrx_peer->wds_ext.init = 0;
 }
 #else
@@ -1884,6 +1904,15 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 #define DP_UPDATE_11BE_STATS(_tgtobj, _srcobj)
 #endif
 
+#define DP_UPDATE_BASIC_STATS(_tgtobj, _srcobj) \
+	do { \
+		_tgtobj->tx.comp_pkt.num += _srcobj->tx.comp_pkt.num; \
+		_tgtobj->tx.comp_pkt.bytes += _srcobj->tx.comp_pkt.bytes; \
+		_tgtobj->tx.tx_failed += _srcobj->tx.tx_failed; \
+		_tgtobj->rx.to_stack.num += _srcobj->rx.to_stack.num; \
+		_tgtobj->rx.to_stack.bytes += _srcobj->rx.to_stack.bytes; \
+	} while (0)
+
 #define DP_UPDATE_PER_PKT_STATS(_tgtobj, _srcobj) \
 	do { \
 		uint8_t i; \
@@ -1997,6 +2026,10 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 			_tgtobj->rx.rcvd_reo[i].num += \
 					 _srcobj->rx.rcvd_reo[i].num; \
 			_tgtobj->rx.rcvd_reo[i].bytes += \
+					_srcobj->rx.rcvd_reo[i].bytes; \
+			_tgtobj->rx.rcvd.num += \
+					 _srcobj->rx.rcvd_reo[i].num; \
+			_tgtobj->rx.rcvd.bytes += \
 					_srcobj->rx.rcvd_reo[i].bytes; \
 		} \
 		for (i = 0; i < CDP_MAX_LMACS; i++) { \
@@ -2167,6 +2200,13 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 			_tgtobj->rx.bw[i] += _srcobj->rx.bw[i]; \
 		} \
 		DP_UPDATE_11BE_STATS(_tgtobj, _srcobj); \
+	} while (0)
+
+#define DP_UPDATE_VDEV_STATS_FOR_UNMAPPED_PEERS(_tgtobj, _srcobj) \
+	do { \
+		DP_UPDATE_BASIC_STATS(_tgtobj, _srcobj); \
+		DP_UPDATE_PER_PKT_STATS(_tgtobj, _srcobj); \
+		DP_UPDATE_EXTD_STATS(_tgtobj, _srcobj); \
 	} while (0)
 
 #define DP_UPDATE_INGRESS_STATS(_tgtobj, _srcobj) \
@@ -2700,12 +2740,16 @@ void dp_umac_reset_complete_umac_recovery(struct dp_soc *soc);
 /**
  * dp_umac_reset_initiate_umac_recovery() - Initiate Umac reset session
  * @soc: dp soc handle
+ * @umac_reset_ctx: Umac reset context
+ * @rx_event: Rx event received
  * @is_target_recovery: Flag to indicate if it is triggered for target recovery
  *
- * Return: void
+ * Return: status
  */
-void dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
-					  bool is_target_recovery);
+QDF_STATUS dp_umac_reset_initiate_umac_recovery(struct dp_soc *soc,
+				struct dp_soc_umac_reset_ctx *umac_reset_ctx,
+				enum umac_reset_rx_event rx_event,
+				bool is_target_recovery);
 
 /**
  * dp_umac_reset_handle_action_cb() - Function to call action callback
@@ -2779,11 +2823,27 @@ QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
  * Return: QDF_STATUS
  */
 QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc);
+
+/**
+ * dp_get_umac_reset_in_progress_state() - API to check umac reset in progress
+ * state
+ * @psoc: dp soc handle
+ *
+ * Return: umac reset state
+ */
+enum cdp_umac_reset_state
+dp_get_umac_reset_in_progress_state(struct cdp_soc_t *psoc);
 #else
 static inline
 QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline enum cdp_umac_reset_state
+dp_get_umac_reset_in_progress_state(struct cdp_soc_t *psoc)
+{
+	return CDP_UMAC_RESET_NOT_IN_PROGRESS;
 }
 #endif
 
@@ -2820,6 +2880,19 @@ uint32_t dp_reo_status_ring_handler(struct dp_intr *int_ctx,
  */
 void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 			     struct cdp_vdev_stats *vdev_stats);
+
+/**
+ * dp_txrx_get_vdev_stats() - Update buffer with cdp_vdev_stats
+ * @soc_hdl: CDP SoC handle
+ * @vdev_id: vdev Id
+ * @buf: buffer for vdev stats
+ * @is_aggregate: are aggregate stats being collected
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+		       void *buf, bool is_aggregate);
 
 /**
  * dp_rx_bar_stats_cb() - BAR received stats callback
@@ -3859,7 +3932,7 @@ struct cdp_soc_t *dp_soc_to_cdp_soc_t(struct dp_soc *psoc)
 	return (struct cdp_soc_t *)psoc;
 }
 
-#if defined(WLAN_SUPPORT_RX_FLOW_TAG) || defined(WLAN_SUPPORT_RX_FISA)
+#if defined(WLAN_SUPPORT_RX_FLOW_TAG)
 /**
  * dp_rx_flow_get_fse_stats() - Retrieve a flow's statistics
  * @pdev: pdev handle
@@ -3911,16 +3984,6 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev);
 void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev);
 
 /**
- * dp_rx_flow_send_fst_fw_setup() - Program FST parameters in FW/HW post-attach
- * @soc: SoC handle
- * @pdev: Pdev handle
- *
- * Return: Success when fst parameters are programmed in FW, error otherwise
- */
-QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
-					struct dp_pdev *pdev);
-
-/**
  * dp_mon_rx_update_rx_flow_tag_stats() - Update a mon flow's statistics
  * @pdev: pdev handle
  * @flow_id: flow index (truncated hash) in the Rx FST
@@ -3929,33 +3992,18 @@ QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
  */
 QDF_STATUS
 dp_mon_rx_update_rx_flow_tag_stats(struct dp_pdev *pdev, uint32_t flow_id);
+#endif
 
-#else /* !((WLAN_SUPPORT_RX_FLOW_TAG) || defined(WLAN_SUPPORT_RX_FISA)) */
-
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
 /**
- * dp_rx_fst_attach() - Initialize Rx FST and setup necessary parameters
+ * dp_rx_flow_send_fst_fw_setup() - Program FST parameters in FW/HW post-attach
  * @soc: SoC handle
  * @pdev: Pdev handle
  *
- * Return: Handle to flow search table entry
+ * Return: Success when fst parameters are programmed in FW, error otherwise
  */
-static inline
-QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * dp_rx_fst_detach() - De-initialize Rx FST
- * @soc: SoC handle
- * @pdev: Pdev handle
- *
- * Return: None
- */
-static inline
-void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
-{
-}
+QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
+					struct dp_pdev *pdev);
 #endif
 
 /**
@@ -4072,16 +4120,6 @@ void dp_update_num_mac_rings_for_dbs(struct dp_soc *soc,
 
 
 #if defined(WLAN_SUPPORT_RX_FISA)
-void dp_rx_dump_fisa_table(struct dp_soc *soc);
-
-/**
- * dp_print_fisa_stats() - Print FISA stats
- * @soc: DP soc handle
- *
- * Return: None
- */
-void dp_print_fisa_stats(struct dp_soc *soc);
-
 /**
  * dp_rx_fst_update_cmem_params() - Update CMEM FST params
  * @soc:		DP SoC context
@@ -4094,34 +4132,20 @@ void dp_print_fisa_stats(struct dp_soc *soc);
 void dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 				  uint32_t cmem_ba_lo, uint32_t cmem_ba_hi);
 
-void
-dp_rx_fst_update_pm_suspend_status(struct dp_soc *soc, bool suspended);
-
 /**
- * dp_rx_fst_requeue_wq() - Re-queue pending work queue tasks
- * @soc:		DP SoC context
- *
- * Return: None
+ * dp_fisa_config() - FISA config handler
+ * @cdp_soc: CDP SoC handle
+ * @pdev_id: PDEV ID
+ * @config_id: FISA config ID
+ * @cfg: FISA config msg data
  */
-void dp_rx_fst_requeue_wq(struct dp_soc *soc);
+QDF_STATUS dp_fisa_config(ol_txrx_soc_handle cdp_soc, uint8_t pdev_id,
+			  enum cdp_fisa_config_id config_id,
+			  union cdp_fisa_config *cfg);
 #else
 static inline void
 dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 			     uint32_t cmem_ba_lo, uint32_t cmem_ba_hi)
-{
-}
-
-static inline void
-dp_rx_fst_update_pm_suspend_status(struct dp_soc *soc, bool suspended)
-{
-}
-
-static inline void
-dp_rx_fst_requeue_wq(struct dp_soc *soc)
-{
-}
-
-static inline void dp_print_fisa_stats(struct dp_soc *soc)
 {
 }
 #endif /* WLAN_SUPPORT_RX_FISA */
@@ -4265,6 +4289,13 @@ static inline QDF_STATUS dp_soc_swlm_detach(struct dp_soc *soc)
 }
 #endif /* !WLAN_DP_FEATURE_SW_LATENCY_MGR */
 
+#ifndef WLAN_DP_PROFILE_SUPPORT
+static inline void wlan_dp_soc_cfg_sync_profile(struct cdp_soc_t *cdp_soc) {}
+
+static inline void wlan_dp_pdev_cfg_sync_profile(struct cdp_soc_t *cdp_soc,
+						 uint8_t pdev_id) {}
+#endif
+
 /**
  * dp_get_peer_id(): function to get peer id by mac
  * @soc: Datapath soc handle
@@ -4355,7 +4386,7 @@ void dp_context_free_mem(struct dp_soc *soc, enum dp_ctxt_type ctxt_type,
  * Return: None
  */
 void dp_desc_multi_pages_mem_alloc(struct dp_soc *soc,
-				   enum dp_desc_type desc_type,
+				   enum qdf_dp_desc_type desc_type,
 				   struct qdf_mem_multi_page_t *pages,
 				   size_t element_size,
 				   uint32_t element_num,
@@ -4377,7 +4408,7 @@ void dp_desc_multi_pages_mem_alloc(struct dp_soc *soc,
  * Return: None
  */
 void dp_desc_multi_pages_mem_free(struct dp_soc *soc,
-				  enum dp_desc_type desc_type,
+				  enum qdf_dp_desc_type desc_type,
 				  struct qdf_mem_multi_page_t *pages,
 				  qdf_dma_context_t memctxt,
 				  bool cacheable);
@@ -4399,7 +4430,7 @@ void dp_context_free_mem(struct dp_soc *soc, enum dp_ctxt_type ctxt_type,
 
 static inline
 void dp_desc_multi_pages_mem_alloc(struct dp_soc *soc,
-				   enum dp_desc_type desc_type,
+				   enum qdf_dp_desc_type desc_type,
 				   struct qdf_mem_multi_page_t *pages,
 				   size_t element_size,
 				   uint32_t element_num,
@@ -4412,7 +4443,7 @@ void dp_desc_multi_pages_mem_alloc(struct dp_soc *soc,
 
 static inline
 void dp_desc_multi_pages_mem_free(struct dp_soc *soc,
-				  enum dp_desc_type desc_type,
+				  enum qdf_dp_desc_type desc_type,
 				  struct qdf_mem_multi_page_t *pages,
 				  qdf_dma_context_t memctxt,
 				  bool cacheable)
@@ -5314,6 +5345,19 @@ void dp_get_peer_stats(struct dp_peer *peer,
 		       struct cdp_peer_stats *peer_stats);
 
 /**
+ * dp_get_per_link_peer_stats()- Get per link peer stats
+ * @peer: Datapath peer
+ * @peer_stats: buffer for peer stats
+ * @peer_type: Peer type
+ * @num_link: Number of ML links
+ *
+ * Return: status success/failure
+ */
+QDF_STATUS dp_get_per_link_peer_stats(struct dp_peer *peer,
+				      struct cdp_peer_stats *peer_stats,
+				      enum cdp_peer_type peer_type,
+				      uint8_t num_link);
+/**
  * dp_get_peer_hw_link_id() - get peer hardware link id
  * @soc: soc handle
  * @pdev: data path pdev
@@ -5329,4 +5373,24 @@ dp_get_peer_hw_link_id(struct dp_soc *soc,
 
 	return 0;
 }
+
+#ifdef QCA_MULTIPASS_SUPPORT
+/**
+ * dp_tx_remove_vlan_tag() - Remove 4 bytes of vlan tag
+ * @vdev: DP vdev handle
+ * @nbuf: network buffer
+ *
+ * Return: void
+ */
+void dp_tx_remove_vlan_tag(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
+#endif
+
+/**
+ * dp_print_per_link_stats() - Print per link peer stats.
+ * @soc_hdl: soc handle.
+ * @vdev_id: vdev_id.
+ *
+ * Return: None.
+ */
+void dp_print_per_link_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id);
 #endif /* #ifndef _DP_INTERNAL_H_ */

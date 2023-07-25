@@ -31,7 +31,9 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_public_structs.h"
 #endif
-
+#ifdef CONFIG_AFC_SUPPORT
+#include "wlan_reg_afc.h"
+#endif
 
 /**
  * struct wlan_psoc_hal_reg_capability - hal reg table in psoc
@@ -278,6 +280,7 @@ struct wlan_psoc_host_hw_mode_caps {
  * @eht_ppet5G: 5G EHT PPET info
  * @emlcap: EML Capabilities info
  * @mldcap: MLD Capabilities info
+ * @msdcap: Medium Synchronization Delay capabilities info
  */
 struct wlan_psoc_host_mac_phy_caps_ext2 {
 	uint32_t hw_mode_id;
@@ -300,6 +303,7 @@ struct wlan_psoc_host_mac_phy_caps_ext2 {
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct wlan_mlo_eml_cap emlcap;
 	struct wlan_mlo_mld_cap mldcap;
+	struct wlan_mlo_msd_cap msdcap;
 #endif
 };
 
@@ -455,6 +459,7 @@ struct wlan_psoc_host_service_ext_param {
  * @num_dbr_ring_caps: Number of direct buf rx ring capabilities
  * @chwidth_num_peer_caps: Peer limit for peer_chan_width_switch WMI cmd
  * @max_ndp_sessions: Max number of ndp session fw supports
+ * @max_nan_pairing_sessions: max number of PASN pairing session allowed on NAN
  * @preamble_puncture_bw_cap: Preamble Puncturing Tx support
  * @num_scan_radio_caps: Number of scan radio capabilities
  * @max_users_dl_ofdma: Max number of users per-PPDU for Downlink OFDMA
@@ -465,6 +470,7 @@ struct wlan_psoc_host_service_ext_param {
  * @sap_coex_fixed_chan_support: Indicates if fw supports coex SAP in
  *                               fixed chan config
  * @target_cap_flags: Rx peer metadata version number used by target
+ * @dp_peer_meta_data_ver: DP peer metadata version reported by target
  * @ul_mumimo_tx_2g: UL MUMIMO Tx support for 2GHz
  * @ul_mumimo_tx_5g: UL MUMIMO Tx support for 5GHz
  * @ul_mumimo_tx_6g: UL MUMIMO Tx support for 6GHz
@@ -474,6 +480,8 @@ struct wlan_psoc_host_service_ext_param {
  * @afc_dev_type: AFC deployment type
  * @num_msdu_idx_qtype_map: Number of HTT_MSDUQ_INDEX to HTT_MSDU_QTYPE
  *                          mapping
+ * @is_multipass_sap: Multipass sap flag
+ * @num_max_mlo_link_per_ml_bss_supp: max link number per MLD FW supports.
  */
 struct wlan_psoc_host_service_ext2_param {
 	uint8_t reg_db_version_major;
@@ -483,6 +491,7 @@ struct wlan_psoc_host_service_ext2_param {
 	uint32_t num_dbr_ring_caps;
 	uint32_t chwidth_num_peer_caps;
 	uint32_t max_ndp_sessions;
+	uint32_t max_nan_pairing_sessions;
 	uint32_t preamble_puncture_bw_cap;
 	uint8_t num_scan_radio_caps;
 	uint16_t max_users_dl_ofdma;
@@ -492,6 +501,7 @@ struct wlan_psoc_host_service_ext2_param {
 	uint32_t twt_ack_support_cap:1;
 	uint32_t sap_coex_fixed_chan_support:1;
 	uint32_t target_cap_flags;
+	uint8_t dp_peer_meta_data_ver;
 	uint8_t ul_mumimo_tx_2g:1,
 		ul_mumimo_tx_5g:1,
 		ul_mumimo_tx_6g:1,
@@ -502,6 +512,10 @@ struct wlan_psoc_host_service_ext2_param {
 	enum reg_afc_dev_deploy_type afc_dev_type;
 #endif
 	uint32_t num_msdu_idx_qtype_map;
+#ifdef QCA_MULTIPASS_SUPPORT
+	bool is_multipass_sap;
+#endif
+	uint32_t num_max_mlo_link_per_ml_bss_supp;
 };
 
 #endif /* _SERVICE_READY_PARAM_H_*/

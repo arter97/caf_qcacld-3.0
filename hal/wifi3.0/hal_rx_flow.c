@@ -363,7 +363,7 @@ hal_rx_fst_attach(hal_soc_handle_t hal_soc_hdl,
 
 	if (!fst) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  FL("hal fst allocation failed,"));
+			  FL("hal fst allocation failed"));
 		return NULL;
 	}
 

@@ -299,6 +299,21 @@ void mlo_mlme_peer_process_auth(struct mlpeer_auth_params *auth_param)
 }
 #endif
 
+void mlo_mlme_peer_reassoc(struct wlan_objmgr_vdev *vdev,
+			   struct wlan_mlo_peer_context *ml_peer,
+			   struct qdf_mac_addr *addr,
+			   qdf_nbuf_t frm_buf)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!mlo_ctx || !mlo_ctx->mlme_ops ||
+	    !mlo_ctx->mlme_ops->mlo_mlme_ext_peer_reassoc)
+		return;
+
+	mlo_ctx->mlme_ops->mlo_mlme_ext_peer_reassoc(vdev, ml_peer, addr,
+						     frm_buf);
+}
+
 uint8_t mlo_get_link_vdev_ix(struct wlan_mlo_dev_context *ml_dev,
 			     struct wlan_objmgr_vdev *vdev)
 {
@@ -802,14 +817,17 @@ static void ml_extract_link_state(struct wlan_objmgr_psoc *psoc,
 				  struct ml_link_state_info_event *event)
 {
 	QDF_STATUS status;
-	get_ml_link_state_cb resp_cb;
-	void *context;
+	get_ml_link_state_cb resp_cb = NULL;
+	void *context = NULL;
 	uint8_t vdev_id;
 
 	vdev_id = event->vdev_id;
 
 	status = mlo_get_link_state_context(psoc,
 					    &resp_cb, &context, vdev_id);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
 
 	if (resp_cb)
 		resp_cb(event, context);

@@ -38,22 +38,6 @@
 #include <wlan_mlo_mgr_setup.h>
 #endif
 
-static void osif_cm_free_wep_key_params(struct wlan_cm_connect_req *connect_req)
-{
-	if (connect_req->crypto.wep_keys.key) {
-		qdf_mem_zero(connect_req->crypto.wep_keys.key,
-			     connect_req->crypto.wep_keys.key_len);
-		qdf_mem_free(connect_req->crypto.wep_keys.key);
-		connect_req->crypto.wep_keys.key = NULL;
-	}
-	if (connect_req->crypto.wep_keys.seq) {
-		qdf_mem_zero(connect_req->crypto.wep_keys.seq,
-			     connect_req->crypto.wep_keys.seq_len);
-		qdf_mem_free(connect_req->crypto.wep_keys.seq);
-		connect_req->crypto.wep_keys.seq = NULL;
-	}
-}
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 static QDF_STATUS
 osif_cm_update_wep_seq_info(struct wlan_cm_connect_req *connect_req,
@@ -65,7 +49,7 @@ osif_cm_update_wep_seq_info(struct wlan_cm_connect_req *connect_req,
 		connect_req->crypto.wep_keys.seq =
 			qdf_mem_malloc(connect_req->crypto.wep_keys.seq_len);
 		if (!connect_req->crypto.wep_keys.seq) {
-			osif_cm_free_wep_key_params(connect_req);
+			ucfg_cm_free_wep_key_params(connect_req);
 			return QDF_STATUS_E_NOMEM;
 		}
 		qdf_mem_copy(connect_req->crypto.wep_keys.seq,
@@ -461,22 +445,6 @@ osif_cm_fill_connect_params(struct wlan_cm_connect_req *req,
 				 (struct qdf_mac_addr *)&params->prev_bssid);
 }
 
-static void osif_cm_free_connect_req(struct wlan_cm_connect_req *connect_req)
-{
-	if (connect_req->scan_ie.ptr) {
-		qdf_mem_free(connect_req->scan_ie.ptr);
-		connect_req->scan_ie.ptr = NULL;
-	}
-
-	if (connect_req->assoc_ie.ptr) {
-		qdf_mem_free(connect_req->assoc_ie.ptr);
-		connect_req->assoc_ie.ptr = NULL;
-	}
-
-	osif_cm_free_wep_key_params(connect_req);
-	qdf_mem_free(connect_req);
-}
-
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 static inline
@@ -536,6 +504,7 @@ QDF_STATUS osif_update_mlo_partner_info(
 	uint8_t tot_grp_socs, ml_grp_id;
 	struct wlan_objmgr_pdev *pdev = NULL;
 	struct wlan_objmgr_vdev *vdev_iter;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!vdev || !connect_req || !req)
 		return status;
@@ -550,6 +519,15 @@ QDF_STATUS osif_update_mlo_partner_info(
 		osif_debug("null pdev");
 		return QDF_STATUS_SUCCESS;
 	}
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	if (!psoc) {
+		osif_debug("null psoc");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!wlan_mlo_get_psoc_capable(psoc))
+		return QDF_STATUS_SUCCESS;
 
 	osif_debug("ML IE search start");
 	if (req->ie_len) {
@@ -714,7 +692,7 @@ int osif_cm_connect(struct net_device *dev, struct wlan_objmgr_vdev *vdev,
 	connect_req->ssid.length = req->ssid_len;
 	if (connect_req->ssid.length > WLAN_SSID_MAX_LEN) {
 		osif_err("Invalid ssid len %zu", req->ssid_len);
-		osif_cm_free_connect_req(connect_req);
+		ucfg_cm_free_connect_req(connect_req);
 		return -EINVAL;
 	}
 
@@ -764,7 +742,7 @@ int osif_cm_connect(struct net_device *dev, struct wlan_objmgr_vdev *vdev,
 		osif_err("Connect failed with status %d", status);
 
 connect_start_fail:
-	osif_cm_free_connect_req(connect_req);
+	ucfg_cm_free_connect_req(connect_req);
 
 	return qdf_status_to_os_return(status);
 }

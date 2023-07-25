@@ -286,14 +286,13 @@ enum hal_srng_ring_id {
 	/* LMAC rings - The following set will be replicated for each LMAC */
 	HAL_SRNG_LMAC1_ID_START = 184,
 	HAL_SRNG_WMAC1_SW2RXDMA0_BUF0 = HAL_SRNG_LMAC1_ID_START,
+	HAL_SRNG_WMAC1_SW2RXDMA1_BUF,
 #ifdef IPA_OFFLOAD
 	HAL_SRNG_WMAC1_SW2RXDMA0_BUF1,
-	HAL_SRNG_WMAC1_SW2RXDMA0_BUF2,
 #ifdef IPA_WDI3_VLAN_SUPPORT
-	HAL_SRNG_WMAC1_SW2RXDMA0_BUF3,
+	HAL_SRNG_WMAC1_SW2RXDMA0_BUF2,
 #endif
 #endif
-	HAL_SRNG_WMAC1_SW2RXDMA1_BUF,
 #ifdef FEATURE_DIRECT_LINK
 	HAL_SRNG_WMAC1_RX_DIRECT_LINK_SW_REFILL_RING,
 #endif
@@ -323,14 +322,13 @@ enum hal_srng_ring_id {
 enum hal_srng_ring_id {
 	HAL_SRNG_LMAC1_ID_START,
 	HAL_SRNG_WMAC1_SW2RXDMA0_BUF0 = HAL_SRNG_LMAC1_ID_START,
+	HAL_SRNG_WMAC1_SW2RXDMA1_BUF,
 #ifdef IPA_OFFLOAD
 	HAL_SRNG_WMAC1_SW2RXDMA0_BUF1,
-	HAL_SRNG_WMAC1_SW2RXDMA0_BUF2,
 #ifdef IPA_WDI3_VLAN_SUPPORT
-	HAL_SRNG_WMAC1_SW2RXDMA0_BUF3,
+	HAL_SRNG_WMAC1_SW2RXDMA0_BUF2,
 #endif
 #endif
-	HAL_SRNG_WMAC1_SW2RXDMA1_BUF,
 #ifdef FEATURE_DIRECT_LINK
 	HAL_SRNG_WMAC1_RX_DIRECT_LINK_SW_REFILL_RING,
 #endif
@@ -351,7 +349,8 @@ enum hal_srng_ring_id {
 #endif
 	HAL_SRNG_WMAC1_TXMON2SW0,
 	HAL_SRNG_SW2TXMON_BUF0,
-	HAL_SRNG_LMAC1_ID_END = (HAL_SRNG_SW2TXMON_BUF0 + 2),
+	HAL_SRNG_WMAC1_SW2RXDMA_LINK_RING = HAL_SRNG_SW2TXMON_BUF0 + 2,
+	HAL_SRNG_LMAC1_ID_END = HAL_SRNG_WMAC1_SW2RXDMA_LINK_RING,
 };
 
 #define HAL_SRNG_DMAC_CMN_ID_END 0
@@ -397,6 +396,7 @@ enum hal_ring_type {
 	TX_MONITOR_BUF,
 	TX_MONITOR_DST,
 	SW2RXDMA_NEW,
+	SW2RXDMA_LINK_RELEASE,
 	MAX_RING_TYPES
 };
 
@@ -875,7 +875,7 @@ struct hal_srng {
 	uint8_t pointer_num_threshold;
 #ifdef HAL_SRNG_REG_HIS_DEBUG
 	/* pointer register writing history for this srng */
-	struct hal_srng_reg_his_ctx reg_his_ctx;
+	struct hal_srng_reg_his_ctx *reg_his_ctx;
 #endif
 };
 
@@ -890,7 +890,7 @@ struct hal_srng {
 static inline
 void hal_srng_reg_his_init(struct hal_srng *srng)
 {
-	qdf_atomic_set(&srng->reg_his_ctx.current_idx, -1);
+	qdf_atomic_set(&srng->reg_his_ctx->current_idx, -1);
 }
 
 /**
@@ -907,10 +907,10 @@ void hal_srng_reg_his_add(struct hal_srng *srng, uint32_t reg_val)
 	uint32_t write_idx;
 	struct hal_srng_reg_his_entry *reg_his_entry;
 
-	write_idx = qdf_atomic_inc_return(&srng->reg_his_ctx.current_idx);
+	write_idx = qdf_atomic_inc_return(&srng->reg_his_ctx->current_idx);
 	write_idx = write_idx & (HAL_SRNG_REG_MAX_ENTRIES - 1);
 
-	reg_his_entry = &srng->reg_his_ctx.reg_his_arr[write_idx];
+	reg_his_entry = &srng->reg_his_ctx->reg_his_arr[write_idx];
 
 	reg_his_entry->write_time = qdf_get_log_timestamp();
 	reg_his_entry->write_value = reg_val;
@@ -1376,6 +1376,7 @@ struct hal_hw_txrx_ops {
 	uint8_t *(*hal_get_reo_ent_desc_qdesc_addr)(uint8_t *desc);
 	uint64_t (*hal_rx_get_qdesc_addr)(uint8_t *dst_ring_desc,
 					  uint8_t *buf);
+	uint8_t (*hal_rx_get_phy_ppdu_id_size)(void);
 	void (*hal_set_reo_ent_desc_reo_dest_ind)(uint8_t *desc,
 						  uint32_t dst_ind);
 	QDF_STATUS
@@ -1398,7 +1399,7 @@ struct hal_hw_txrx_ops {
 	void (*hal_txmon_populate_packet_info)(void *tx_tlv_hdr,
 					       void *pkt_info);
 	/* TX MONITOR */
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 	uint32_t (*hal_txmon_status_parse_tlv)(void *data_ppdu_info,
 					       void *prot_ppdu_info,
 					       void *data_status_info,
@@ -1408,7 +1409,7 @@ struct hal_hw_txrx_ops {
 	uint32_t (*hal_txmon_status_get_num_users)(void *tx_tlv_hdr,
 						   uint8_t *num_users);
 	void (*hal_txmon_get_word_mask)(void *wmask);
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 	QDF_STATUS (*hal_reo_shared_qaddr_setup)(hal_soc_handle_t hal_soc_hdl,
 						 struct reo_queue_ref_table
 						 *reo_qref);
@@ -1455,6 +1456,7 @@ struct hal_hw_txrx_ops {
 	uint32_t (*hal_tx_get_num_ppe_vp_search_idx_tbl_entries)(
 					hal_soc_handle_t hal_soc_hdl);
 	uint32_t (*hal_tx_ring_halt_get)(hal_soc_handle_t hal_soc_hdl);
+	bool (*hal_rx_en_mcast_fp_data_filter)(void);
 };
 
 /**

@@ -391,7 +391,7 @@ static int dfs_tlv_parse_frame(struct wlan_dfs *dfs,
 			 * (1) There may be multiple TLV
 			 * (2) We make false detection decision solely based on
 			 * the first TLV
-			 * (3) If the first TLV is a serch FFT report then we
+			 * (3) If the first TLV is a search FFT report then we
 			 * check the peak_mag value.
 			 * When RSSI is equal to dfs->wlan_dfs_false_rssI_thres
 			 * (default 50) and peak_mag is less than

@@ -334,6 +334,46 @@ static QDF_STATUS mlo_find_pdev_idx(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_E_FAILURE;
 }
 
+bool mlo_check_start_stop_inprogress(uint8_t grp_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!mlo_ctx)
+		return true;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return true;
+	}
+
+	return qdf_atomic_test_and_set_bit(
+			START_STOP_INPROGRESS_BIT,
+			&mlo_ctx->setup_info[grp_id].start_stop_inprogress);
+}
+
+qdf_export_symbol(mlo_check_start_stop_inprogress);
+
+void mlo_clear_start_stop_inprogress(uint8_t grp_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!mlo_ctx)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	qdf_atomic_clear_bit(
+			START_STOP_INPROGRESS_BIT,
+			&mlo_ctx->setup_info[grp_id].start_stop_inprogress);
+}
+
+qdf_export_symbol(mlo_clear_start_stop_inprogress);
+
 #define WLAN_SOC_ID_NOT_INITIALIZED -1
 bool mlo_vdevs_check_single_soc(struct wlan_objmgr_vdev **wlan_vdev_list,
 				uint8_t vdev_count)
@@ -434,6 +474,7 @@ void mlo_setup_init(uint8_t total_grp)
 	mlo_ctx->setup_info = setup_info;
 	mlo_ctx->setup_info[0].ml_grp_id = 0;
 	for (id = 0; id < total_grp; id++) {
+		mlo_ctx->setup_info[id].tsf_sync_enabled = true;
 		if (qdf_event_create(&mlo_ctx->setup_info[id].event) !=
 							QDF_STATUS_SUCCESS)
 			mlo_err("Unable to create teardown event");
@@ -562,7 +603,7 @@ void mlo_setup_update_soc_ready(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	struct mlo_setup_info *setup_info;
 	uint8_t chip_idx, tot_socs;
-	struct cdp_mlo_ctxt *dp_mlo_ctxt;
+	struct cdp_mlo_ctxt *dp_mlo_ctxt = NULL;
 
 	if (!mlo_ctx)
 		return;
@@ -604,9 +645,14 @@ void mlo_setup_update_soc_ready(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
 	if (setup_info->num_soc != tot_socs)
 		return;
 
-	dp_mlo_ctxt = cdp_mlo_ctxt_attach(wlan_psoc_get_dp_handle(psoc),
-			(struct cdp_ctrl_mlo_mgr *)mlo_ctx);
-	wlan_objmgr_set_dp_mlo_ctx(dp_mlo_ctxt, grp_id);
+	dp_mlo_ctxt = wlan_objmgr_get_dp_mlo_ctx(grp_id);
+
+	if (!dp_mlo_ctxt) {
+		dp_mlo_ctxt = cdp_mlo_ctxt_attach(
+				wlan_psoc_get_dp_handle(psoc),
+				(struct cdp_ctrl_mlo_mgr *)mlo_ctx);
+		wlan_objmgr_set_dp_mlo_ctx(dp_mlo_ctxt, grp_id);
+	}
 
 	for (chip_idx = 0; chip_idx < tot_socs; chip_idx++) {
 		struct wlan_objmgr_psoc *tmp_soc =
@@ -918,6 +964,8 @@ void mlo_link_teardown_complete(struct wlan_objmgr_pdev *pdev, uint8_t grp_id)
 
 	qdf_info("Teardown complete");
 
+	setup_info->trigger_umac_reset = false;
+
 	qdf_event_set(&setup_info->event);
 }
 
@@ -944,12 +992,105 @@ static void mlo_force_teardown(uint8_t grp_id)
 		setup_info->state[link_idx] = MLO_LINK_TEARDOWN;
 }
 
+static void mlo_send_teardown_req(struct wlan_objmgr_psoc *psoc,
+				  uint8_t grp_id, uint32_t reason)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct wlan_lmac_if_tx_ops *tx_ops;
+	struct wlan_objmgr_pdev *temp_pdev;
+	struct mlo_setup_info *setup_info;
+	uint8_t link_idx;
+	uint8_t tot_links;
+	bool umac_reset = 0;
+
+	if (!mlo_ctx)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
+	if (!tx_ops) {
+		mlo_err("Tx Ops is null for the psoc id %d",
+			wlan_psoc_get_id(psoc));
+		return;
+	}
+
+	setup_info = &mlo_ctx->setup_info[grp_id];
+	tot_links = setup_info->tot_links;
+
+	if (reason == WMI_MLO_TEARDOWN_REASON_MODE1_SSR) {
+		for (link_idx = 0; link_idx < tot_links; link_idx++) {
+			umac_reset = 0;
+			temp_pdev = setup_info->pdev_list[link_idx];
+			if (!temp_pdev)
+				continue;
+
+			if (!setup_info->trigger_umac_reset) {
+				if (psoc == wlan_pdev_get_psoc(temp_pdev)) {
+					umac_reset = 1;
+					setup_info->trigger_umac_reset = 1;
+				}
+			}
+
+			if (tx_ops && tx_ops->mops.target_if_mlo_teardown_req) {
+				mlo_info(
+				"Trigger Teardown  with Pdev %d Psoc id %d link idx %d Umac reset %d for Mode 1",
+				wlan_objmgr_pdev_get_pdev_id(temp_pdev),
+				wlan_psoc_get_id(wlan_pdev_get_psoc(temp_pdev)),
+				link_idx, umac_reset);
+				tx_ops->mops.target_if_mlo_teardown_req(
+						setup_info->pdev_list[link_idx],
+						reason, umac_reset);
+			}
+		}
+	} else {
+		for (link_idx = 0; link_idx < setup_info->tot_links; link_idx++)
+			if (tx_ops && tx_ops->mops.target_if_mlo_teardown_req) {
+				if (!setup_info->pdev_list[link_idx])
+					continue;
+				tx_ops->mops.target_if_mlo_teardown_req(
+						setup_info->pdev_list[link_idx],
+						reason, 0);
+			}
+	}
+}
+
+static bool mlo_grp_in_teardown(uint8_t grp_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_setup_info *setup_info;
+	uint8_t link_idx;
+
+	if (!mlo_ctx) {
+		mlo_err("MLO ctx null, teardown failed");
+		return true;
+	}
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return true;
+	}
+
+	setup_info = &mlo_ctx->setup_info[grp_id];
+
+	for (link_idx = 0; link_idx < setup_info->tot_links; link_idx++)
+		if (setup_info->pdev_list[link_idx] &&
+		    (setup_info->state[link_idx] == MLO_LINK_TEARDOWN))
+			return true;
+
+	return false;
+}
+
 #define MLO_MGR_TEARDOWN_TIMEOUT 3000
 QDF_STATUS mlo_link_teardown_link(struct wlan_objmgr_psoc *psoc,
 				  uint8_t grp_id,
 				  uint32_t reason)
 {
-	struct wlan_lmac_if_tx_ops *tx_ops;
 	QDF_STATUS status;
 	struct mlo_setup_info *setup_info;
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
@@ -974,17 +1115,14 @@ QDF_STATUS mlo_link_teardown_link(struct wlan_objmgr_psoc *psoc,
 	if (!setup_info->num_soc)
 		return QDF_STATUS_SUCCESS;
 
-	if (!mlo_check_all_pdev_state(psoc, grp_id, MLO_LINK_TEARDOWN))
+	if (mlo_grp_in_teardown(grp_id)) {
+		mlo_debug("Skip teardown: as teardown sent already, grp_id %d num_soc %d num_link %d",
+			  grp_id, setup_info->num_soc, setup_info->num_links);
 		return QDF_STATUS_SUCCESS;
-
-	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
-	/* Trigger MLO teardown */
-	if (tx_ops && tx_ops->mops.target_if_mlo_teardown_req) {
-		tx_ops->mops.target_if_mlo_teardown_req(
-				setup_info->pdev_list,
-				setup_info->num_links,
-				reason);
 	}
+
+	/* Trigger MLO teardown */
+	mlo_send_teardown_req(psoc, grp_id, reason);
 
 	if (reason == WMI_MLO_TEARDOWN_REASON_SSR) {
 		/* do not wait for teardown event completion here for SSR */
@@ -1004,4 +1142,23 @@ QDF_STATUS mlo_link_teardown_link(struct wlan_objmgr_psoc *psoc,
 }
 
 qdf_export_symbol(mlo_link_teardown_link);
+
+void mlo_update_tsf_sync_support(struct wlan_objmgr_psoc *psoc,
+				 bool tsf_sync_enab)
+{
+	uint8_t ml_grp_id;
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_setup_info *mlo_setup;
+
+	ml_grp_id = wlan_mlo_get_psoc_group_id(psoc);
+	if (ml_grp_id < 0) {
+		mlo_err("Invalid ML Grp ID %d", ml_grp_id);
+		return;
+	}
+
+	mlo_setup = &mlo_ctx->setup_info[ml_grp_id];
+	mlo_setup->tsf_sync_enabled &= tsf_sync_enab;
+}
+
+qdf_export_symbol(mlo_update_tsf_sync_support);
 #endif /*WLAN_MLO_MULTI_CHIP*/

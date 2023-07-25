@@ -53,6 +53,7 @@ const char *if_mgr_get_event_str(enum wlan_if_mgr_evt event)
 	CASE_RETURN_STRING(WLAN_IF_MGR_EV_AP_CSA_START);
 	CASE_RETURN_STRING(WLAN_IF_MGR_EV_AP_CSA_COMPLETE);
 	CASE_RETURN_STRING(WLAN_IF_MGR_EV_STA_CSA_COMPLETE);
+	CASE_RETURN_STRING(WLAN_IF_MGR_EV_CONNECT_ACTIVE);
 	default:
 		return "Unknown";
 	}
@@ -166,6 +167,10 @@ QDF_STATUS if_mgr_deliver_event(struct wlan_objmgr_vdev *vdev,
 	case WLAN_IF_MGR_EV_STA_CSA_COMPLETE:
 		status = if_mgr_sta_csa_complete(vdev, event_data);
 		break;
+	case WLAN_IF_MGR_EV_CONNECT_ACTIVE:
+		status = if_mgr_connect_active(vdev, event_data);
+		break;
+
 	default:
 		status = if_mgr_deliver_mbss_event(vdev, event, event_data);
 	}

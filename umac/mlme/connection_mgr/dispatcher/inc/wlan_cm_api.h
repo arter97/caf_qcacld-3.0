@@ -205,6 +205,30 @@ bool wlan_cm_is_vdev_disconnected(struct wlan_objmgr_vdev *vdev);
  */
 bool wlan_cm_is_vdev_roaming(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * wlan_cm_free_connect_req() - free up connect request and its sub memory
+ * @connect_req: Connect request
+ *
+ * Return: void
+ */
+void wlan_cm_free_connect_req(struct wlan_cm_connect_req *connect_req);
+
+/**
+ * wlan_cm_free_connect_resp() - free up connect response and its sub memory
+ * @connect_rsp: Connect response
+ *
+ * Return: void
+ */
+void wlan_cm_free_connect_resp(struct wlan_cm_connect_resp *connect_rsp);
+
+/**
+ * wlan_cm_free_connect_req_param() - free up connect request sub memory
+ * @req: Connect request
+ *
+ * Return: void
+ */
+void wlan_cm_free_connect_req_param(struct wlan_cm_connect_req *req);
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wlan_cm_is_vdev_roam_started() - check if vdev is in roaming state and
@@ -265,6 +289,51 @@ static inline
 bool wlan_cm_is_vdev_roam_reassoc_state(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
+}
+#endif
+
+/**
+ * wlan_cm_connect_resp_fill_mld_addr_from_cm_id() - API to get MLD of
+ * current candidate from connect request ID.
+ * @vdev: VDEV objmgr pointer.
+ * @cm_id: connect request ID.
+ * @rsp: connect resp pointer.
+ *
+ * This wrapper API fills MLD address in @rsp from connect request ID.
+ *
+ * Return: void
+ */
+void
+wlan_cm_connect_resp_fill_mld_addr_from_cm_id(struct wlan_objmgr_vdev *vdev,
+					      wlan_cm_id cm_id,
+					      struct wlan_cm_connect_resp *rsp);
+
+/**
+ * wlan_cm_connect_resp_fill_mld_addr_from_vdev_id() - API to get MLD
+ * from scan entry in join request.
+ * @psoc: PSOC objmgr pointer.
+ * @vdev_id: session ID.
+ * @entry: Scan entry of the candidate.
+ * @rsp: connect response pointer.
+ *
+ * This wrapper API gets VDEV from join request and fills MLD address
+ * in @rsp from the scan entry in join request.
+ *
+ * Return: void
+ */
+#ifdef WLAN_FEATURE_11BE_MLO
+void
+wlan_cm_connect_resp_fill_mld_addr_from_vdev_id(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						struct scan_cache_entry *entry,
+						struct wlan_cm_connect_resp *rsp);
+#else
+static inline void
+wlan_cm_connect_resp_fill_mld_addr_from_vdev_id(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						struct scan_cache_entry *entry,
+						struct wlan_cm_connect_resp *rsp)
+{
 }
 #endif
 
@@ -455,11 +524,12 @@ void wlan_cm_set_candidate_custom_sort_cb(
  * wlan_cm_get_rnr() - get rnr
  * @vdev:vdev
  * @cm_id: connect mgr id
+ * @rnr: pointer to copy rnr info
  *
- * Return: rnr pointer
+ * Return: QDF_STATUS
  */
-struct reduced_neighbor_report *wlan_cm_get_rnr(struct wlan_objmgr_vdev *vdev,
-						wlan_cm_id cm_id);
+QDF_STATUS wlan_cm_get_rnr(struct wlan_objmgr_vdev *vdev, wlan_cm_id cm_id,
+			   struct reduced_neighbor_report *rnr);
 
 /**
  * wlan_cm_disc_cont_after_rso_stop() - Continue disconnect after RSO stop

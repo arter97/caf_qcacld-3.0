@@ -317,7 +317,7 @@ dp_rx_defrag_fraglist_insert(struct dp_txrx_peer *txrx_peer, unsigned int tid,
 	rx_desc_info = qdf_nbuf_data(frag);
 	cur_fragno = dp_rx_frag_get_mpdu_frag_number(soc, rx_desc_info);
 
-	dp_debug("cur_fragno %d\n", cur_fragno);
+	dp_debug("cur_fragno %d", cur_fragno);
 	/* If this is the first fragment */
 	if (!(*head_addr)) {
 		*head_addr = *tail_addr = frag;
@@ -1307,8 +1307,10 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_txrx_peer *txrx_peer,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_ipa_handle_rx_buf_smmu_mapping(soc, head, rx_desc_pool->buf_size,
-					  true, __func__, __LINE__);
+	if (qdf_atomic_read(&soc->ipa_mapped))
+		dp_ipa_handle_rx_buf_smmu_mapping(soc, head,
+						  rx_desc_pool->buf_size, true,
+						  __func__, __LINE__);
 
 	dp_audio_smmu_map(soc->osdev,
 			  qdf_mem_paddr_from_dmaaddr(soc->osdev,
@@ -1498,8 +1500,6 @@ QDF_STATUS dp_rx_defrag(struct dp_txrx_peer *txrx_peer, unsigned int tid,
 			cur = tmp_next;
 		}
 
-		/* If success, increment header to be stripped later */
-		hdr_space += dp_f_ccmp.ic_header;
 		break;
 
 	case cdp_sec_type_wep40:
@@ -1518,8 +1518,6 @@ QDF_STATUS dp_rx_defrag(struct dp_txrx_peer *txrx_peer, unsigned int tid,
 			cur = tmp_next;
 		}
 
-		/* If success, increment header to be stripped later */
-		hdr_space += dp_f_wep.ic_header;
 		break;
 	case cdp_sec_type_aes_gcmp:
 	case cdp_sec_type_aes_gcmp_256:
@@ -1535,7 +1533,6 @@ QDF_STATUS dp_rx_defrag(struct dp_txrx_peer *txrx_peer, unsigned int tid,
 			cur = tmp_next;
 		}
 
-		hdr_space += dp_f_gcmp.ic_header;
 		break;
 	default:
 		break;
@@ -1849,8 +1846,8 @@ dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	uint32_t msdu_len;
 
 	if (qdf_nbuf_len(frag) > 0) {
-		dp_info("Dropping unexpected packet with skb_len: %d,"
-			"data len: %d, cookie: %d",
+		dp_info("Dropping unexpected packet with skb_len: %d "
+			"data len: %d cookie: %d",
 			(uint32_t)qdf_nbuf_len(frag), frag->data_len,
 			rx_desc->cookie);
 		DP_STATS_INC(soc, rx.rx_frag_err_len_error, 1);
@@ -1968,10 +1965,10 @@ dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	/* Check if the fragment is for the same sequence or a different one */
 	dp_debug("rx_tid %d", tid);
 	if (rx_reorder_array_elem->head) {
-		dp_debug("rxseq %d\n", rxseq);
+		dp_debug("rxseq %d", rxseq);
 		if (rxseq != rx_tid->curr_seq_num) {
 
-			dp_debug("mismatch cur_seq %d rxseq %d\n",
+			dp_debug("mismatch cur_seq %d rxseq %d",
 				 rx_tid->curr_seq_num, rxseq);
 			/* Drop stored fragments if out of sequence
 			 * fragment is received
@@ -1980,7 +1977,7 @@ dp_rx_defrag_store_fragment(struct dp_soc *soc,
 
 			DP_STATS_INC(soc, rx.rx_frag_oor, 1);
 
-			dp_debug("cur rxseq %d\n", rxseq);
+			dp_debug("cur rxseq %d", rxseq);
 			/*
 			 * The sequence number for this fragment becomes the
 			 * new sequence number to be processed
@@ -1995,7 +1992,7 @@ dp_rx_defrag_store_fragment(struct dp_soc *soc,
 			qdf_spin_unlock_bh(&rx_tid->defrag_tid_lock);
 			goto discard_frag;
 		}
-		dp_debug("cur rxseq %d\n", rxseq);
+		dp_debug("cur rxseq %d", rxseq);
 		/* Start of a new sequence */
 		dp_rx_defrag_cleanup(txrx_peer, tid);
 		rx_tid->curr_seq_num = rxseq;

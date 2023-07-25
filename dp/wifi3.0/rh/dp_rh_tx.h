@@ -164,4 +164,13 @@ void dp_tx_desc_pool_free_rh(struct dp_soc *soc, uint8_t pool_id);
  * Return: none
  */
 void dp_tx_compl_handler_rh(struct dp_soc *soc, qdf_nbuf_t htt_msg);
+
+/**
+ * dp_flush_tx_ring_rh() - flush tx ring write index
+ * @pdev: dp pdev handle
+ * @ring_id: Tx ring id
+ *
+ * Return: 0 on success and error code on failure
+ */
+int dp_flush_tx_ring_rh(struct dp_pdev *pdev, int ring_id);
 #endif

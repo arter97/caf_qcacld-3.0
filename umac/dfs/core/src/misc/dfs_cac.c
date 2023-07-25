@@ -87,6 +87,36 @@ static void dfs_clear_nol_history_for_curchan(struct wlan_dfs *dfs)
 				num_subchs, DFS_NOL_HISTORY_RESET);
 }
 
+#if defined(QCA_SUPPORT_DFS_CAC) && defined(WLAN_FEATURE_11BE)
+bool dfs_is_radar_on_punc_chan(struct wlan_dfs *dfs, struct dfs_channel *chan)
+{
+	qdf_freq_t sub_freq_list[MAX_20MHZ_SUBCHANS];
+	uint8_t n_subchans, i;
+	uint16_t radar_punc_bitmap = NO_SCHANS_PUNC;
+
+	if (!chan || !WLAN_IS_PRIMARY_OR_SECONDARY_CHAN_DFS(chan))
+		return false;
+
+	n_subchans = dfs_get_bonding_channel_without_seg_info_for_freq(
+				chan,
+				sub_freq_list);
+
+	for (i = 0; i < n_subchans; i++) {
+		if (wlan_reg_is_nol_for_freq(dfs->dfs_pdev_obj,
+					     sub_freq_list[i]))
+			radar_punc_bitmap |=  1 << i;
+	}
+	return ((radar_punc_bitmap & chan->dfs_ch_punc_pattern) ==
+		 radar_punc_bitmap);
+}
+#else
+static inline bool
+dfs_is_radar_on_punc_chan(struct wlan_dfs *dfs, struct dfs_channel *chan)
+{
+	return false;
+}
+#endif
+
 void dfs_process_cac_completion(struct wlan_dfs *dfs)
 {
 	enum phy_ch_width ch_width = CH_WIDTH_INVALID;
@@ -104,7 +134,8 @@ void dfs_process_cac_completion(struct wlan_dfs *dfs)
 	 * When radar is detected during a CAC we are woken up prematurely to
 	 * switch to a new channel. Check the channel to decide how to act.
 	 */
-	if (WLAN_IS_CHAN_RADAR(dfs, dfs->dfs_curchan)) {
+	if (WLAN_IS_CHAN_RADAR(dfs, dfs->dfs_curchan) &&
+	    !dfs_is_radar_on_punc_chan(dfs, dfs->dfs_curchan)) {
 		dfs_mlme_mark_dfs(dfs->dfs_pdev_obj,
 				  dfs_curchan->dfs_ch_ieee,
 				  dfs_curchan->dfs_ch_freq,
@@ -222,6 +253,19 @@ void dfs_cac_timer_detach(struct wlan_dfs *dfs)
 	qdf_timer_free(&dfs->dfs_cac_valid_timer);
 	dfs->dfs_cac_valid = 0;
 }
+
+#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
+void dfs_puncture_cac_timer_detach(struct wlan_dfs *dfs)
+{
+	uint8_t i;
+	struct dfs_punc_obj *dfs_punc_obj;
+
+	for (i = 0 ; i < N_MAX_PUNC_SM; i++) {
+		dfs_punc_obj = &dfs->dfs_punc_lst.dfs_punc_arr[i];
+		dfs_punc_cac_timer_detach(dfs_punc_obj);
+	}
+}
+#endif
 
 int dfs_is_ap_cac_timer_running(struct wlan_dfs *dfs)
 {

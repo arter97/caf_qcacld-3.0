@@ -100,6 +100,8 @@
 
 #define WLAN_CFG_TIME_CONTROL_BP 3000
 
+#define WLAN_CFG_QREF_CONTROL_SIZE 0
+
 #if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
 #define WLAN_CFG_PER_PDEV_RX_RING 0
 #define WLAN_CFG_PER_PDEV_LMAC_RING 0
@@ -177,6 +179,9 @@
 
 #define WLAN_CFG_TIME_CONTROL_BP_MIN 3000
 #define WLAN_CFG_TIME_CONTROL_BP_MAX 1800000
+
+#define WLAN_CFG_QREF_CONTROL_SIZE_MIN 0
+#define WLAN_CFG_QREF_CONTROL_SIZE_MAX 4000
 
 #define WLAN_CFG_TX_COMP_RING_SIZE_MIN 512
 #define WLAN_CFG_TX_COMP_RING_SIZE_MAX 0x80000
@@ -342,7 +347,7 @@
 #else
 #define WLAN_CFG_RXDMA_BUF_RING_SIZE_MIN 1024
 #endif
-#define WLAN_CFG_RXDMA_BUF_RING_SIZE_MAX 4096
+#define WLAN_CFG_RXDMA_BUF_RING_SIZE_MAX 8192
 
 #define WLAN_CFG_RXDMA_REFILL_RING_SIZE 4096
 #define WLAN_CFG_RXDMA_REFILL_RING_SIZE_MIN 16
@@ -403,6 +408,10 @@
 #define WLAN_CFG_RXDMA_MONITOR_DESC_RING_SIZE 4096
 #define WLAN_CFG_RXDMA_MONITOR_DESC_RING_SIZE_MIN 4096
 #define WLAN_CFG_RXDMA_MONITOR_DESC_RING_SIZE_MAX 16384
+
+#define WLAN_CFG_SW2RXDMA_LINK_RING_SIZE 1024
+#define WLAN_CFG_SW2RXDMA_LINK_RING_SIZE_MIN 256
+#define WLAN_CFG_SW2RXDMA_LINK_RING_SIZE_MAX 4096
 
 #define WLAN_CFG_RXDMA_ERR_DST_RING_SIZE 1024
 #define WLAN_CFG_RXDMA_ERR_DST_RING_SIZE_MIN 1024
@@ -518,6 +527,14 @@
 #define WLAN_CFG_SAWF_STATS_MIN 0x0
 #define WLAN_CFG_SAWF_STATS_MAX 0x7
 #endif
+
+#define WLAN_CFG_TX_CAPT_RBM_ID_MIN 0
+#define WLAN_CFG_TX_CAPT_RBM_ID_MAX 3
+#define WLAN_CFG_TX_CAPT_0_RBM_DEFAULT 0
+#define WLAN_CFG_TX_CAPT_1_RBM_DEFAULT 1
+#define WLAN_CFG_TX_CAPT_2_RBM_DEFAULT 2
+#define WLAN_CFG_TX_CAPT_3_RBM_DEFAULT 3
+
 /*
  * <ini>
  * "dp_tx_capt_max_mem_mb"- maximum memory used by Tx capture
@@ -539,6 +556,34 @@
 		WLAN_CFG_TX_CAPT_MAX_MEM_MAX, \
 		WLAN_CFG_TX_CAPT_MAX_MEM_DEFAULT, \
 			CFG_VALUE_OR_DEFAULT, "Max Memory (in MB) used by Tx Capture")
+
+#define CFG_DP_TX_CAPT_RADIO_0_RBM_ID \
+		CFG_INI_UINT("dp_tx_capt_pdev_0_rbm_id", \
+		WLAN_CFG_TX_CAPT_RBM_ID_MIN, \
+		WLAN_CFG_TX_CAPT_RBM_ID_MAX, \
+		WLAN_CFG_TX_CAPT_0_RBM_DEFAULT, \
+		CFG_VALUE_OR_DEFAULT, "RBM_ID used by pdev 0 Tx capture")
+
+#define CFG_DP_TX_CAPT_RADIO_1_RBM_ID \
+		CFG_INI_UINT("dp_tx_capt_pdev_1_rbm_id", \
+		WLAN_CFG_TX_CAPT_RBM_ID_MIN, \
+		WLAN_CFG_TX_CAPT_RBM_ID_MAX, \
+		WLAN_CFG_TX_CAPT_1_RBM_DEFAULT, \
+		CFG_VALUE_OR_DEFAULT, "RBM_ID used by pdev 1 Tx capture")
+
+#define CFG_DP_TX_CAPT_RADIO_2_RBM_ID \
+		CFG_INI_UINT("dp_tx_capt_pdev_2_rbm_id", \
+		WLAN_CFG_TX_CAPT_RBM_ID_MIN, \
+		WLAN_CFG_TX_CAPT_RBM_ID_MAX, \
+		WLAN_CFG_TX_CAPT_2_RBM_DEFAULT, \
+		CFG_VALUE_OR_DEFAULT, "RBM_ID used by pdev 2 Tx capture")
+
+#define CFG_DP_TX_CAPT_RADIO_3_RBM_ID \
+		CFG_INI_UINT("dp_tx_capt_pdev_3_rbm_id", \
+		WLAN_CFG_TX_CAPT_RBM_ID_MIN, \
+		WLAN_CFG_TX_CAPT_RBM_ID_MAX, \
+		WLAN_CFG_TX_CAPT_3_RBM_DEFAULT, \
+		CFG_VALUE_OR_DEFAULT, "RBM_ID used by pdev 3 Tx capture")
 
 /* DP INI Declarations */
 #define CFG_DP_HTT_PACKET_TYPE \
@@ -759,6 +804,13 @@
 		WLAN_CFG_TIME_CONTROL_BP,\
 		CFG_VALUE_OR_DEFAULT, "DP time control back pressure")
 
+#define CFG_DP_QREF_CONTROL_SIZE \
+		CFG_INI_UINT("dp_qref_control_size", \
+		WLAN_CFG_QREF_CONTROL_SIZE_MIN,\
+		WLAN_CFG_QREF_CONTROL_SIZE_MAX,\
+		WLAN_CFG_QREF_CONTROL_SIZE,\
+		CFG_VALUE_OR_DEFAULT, "DP array size for qref debug")
+
 #ifdef CONFIG_SAWF_STATS
 #define CFG_DP_SAWF_STATS \
 		CFG_INI_UINT("dp_sawf_stats", \
@@ -769,6 +821,31 @@
 #define CFG_DP_SAWF_STATS_CONFIG CFG(CFG_DP_SAWF_STATS)
 #else
 #define CFG_DP_SAWF_STATS_CONFIG
+#endif
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/*
+ * <ini>
+ * local_pkt_capture - Enable/Disable Local packet capture
+ * @Default: false
+ *
+ * This ini is used to enable/disable local packet capture.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DP_LOCAL_PKT_CAPTURE \
+		CFG_INI_BOOL( \
+		"local_packet_capture", \
+		true, \
+		"Local packet capture")
+
+#define CFG_DP_LOCAL_PKT_CAPTURE_CONFIG CFG(CFG_DP_LOCAL_PKT_CAPTURE)
+#else
+#define CFG_DP_LOCAL_PKT_CAPTURE_CONFIG
 #endif
 
 /*
@@ -823,6 +900,10 @@
 #define CFG_DP_RX_HASH \
 	CFG_INI_BOOL("dp_rx_hash", true, \
 	"DP Rx Hash")
+
+#define CFG_DP_RX_RR \
+	CFG_INI_BOOL("dp_rx_rr", true, \
+	"DP Rx Round Robin")
 
 #define CFG_DP_TSO \
 	CFG_INI_BOOL("TSOEnable", false, \
@@ -1262,6 +1343,13 @@
 		WLAN_CFG_RXDMA_MONITOR_DESC_RING_SIZE, \
 		CFG_VALUE_OR_DEFAULT, "DP RXDMA monitor destination ring")
 
+#define CFG_DP_SW2RXDMA_LINK_RING \
+		CFG_INI_UINT("dp_sw2rxdma_link_ring", \
+		WLAN_CFG_SW2RXDMA_LINK_RING_SIZE_MIN, \
+		WLAN_CFG_SW2RXDMA_LINK_RING_SIZE_MAX, \
+		WLAN_CFG_SW2RXDMA_LINK_RING_SIZE, \
+		CFG_VALUE_OR_DEFAULT, "DP SW2RXDMA link ring")
+
 #define CFG_DP_RXDMA_ERR_DST_RING \
 		CFG_INI_UINT("dp_rxdma_err_dst_ring", \
 		WLAN_CFG_RXDMA_ERR_DST_RING_SIZE_MIN, \
@@ -1363,48 +1451,6 @@
 	CFG_INI_UINT("dp_rx_ptr_num_threshold", \
 	0, 63, 0, \
 	CFG_VALUE_OR_DEFAULT, "RX pointer update entries number threshold")
-
-/*
- * <ini>
- * dp_rx_fisa_enable - Control Rx datapath FISA
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to enable DP Rx FISA feature
- *
- * Related: dp_rx_flow_search_table_size
- *
- * Supported Feature: STA,P2P and SAP IPA disabled terminating
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_RX_FISA_ENABLE \
-	CFG_INI_BOOL("dp_rx_fisa_enable", true, \
-		     "Enable/Disable DP Rx FISA")
-
-/*
- * <ini>
- * dp_rx_fisa_lru_del_enable - Control Rx datapath FISA
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to enable DP Rx FISA lru deletion feature
- *
- * Related: dp_rx_fisa_enable
- *
- * Supported Feature: STA,P2P and SAP IPA disabled terminating
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_DP_RX_FISA_LRU_DEL_ENABLE \
-	CFG_INI_BOOL("dp_rx_fisa_lru_del_enable", true, \
-		     "Enable/Disable DP Rx FISA LRU deletion")
 
 #define CFG_DP_RXDMA_MONITOR_RX_DROP_THRESHOLD \
 		CFG_INI_UINT("mon_drop_thresh", \
@@ -1510,6 +1556,10 @@
 #define CFG_DP_RX_REFILL_BUFF_POOL_ENABLE \
 	CFG_INI_BOOL("dp_rx_refill_buff_pool", false, \
 		     "Enable/Disable DP RX refill buffer pool support")
+
+#define CFG_DP_BUFS_PAGE_FRAG_ALLOCS \
+	CFG_INI_BOOL("dp_bufs_page_frag_allocs", true, \
+		     "Enable/Disable forced DP page frage buffer allocations")
 
 #define CFG_DP_POLL_MODE_ENABLE \
 		CFG_INI_BOOL("dp_poll_mode_enable", false, \
@@ -1716,7 +1766,7 @@
 
 #ifdef WLAN_SUPPORT_PPEDS
 #define WLAN_CFG_NUM_PPEDS_TX_DESC_MIN 16
-#define WLAN_CFG_NUM_PPEDS_TX_DESC_MAX 0x8000
+#define WLAN_CFG_NUM_PPEDS_TX_DESC_MAX 0xFA00
 #define WLAN_CFG_NUM_PPEDS_TX_DESC 0x8000
 
 #define WLAN_CFG_NUM_PPEDS_TX_CMP_NAPI_MIN 8
@@ -1785,6 +1835,10 @@
 #define CFG_DP_PPEDS_CONFIG
 #define WLAN_CFG_NUM_PPEDS_TX_DESC_MAX 0
 #endif
+
+#define WLAN_CFG_SPECIAL_MSK_MIN 0
+#define WLAN_CFG_SPECIAL_MSK_MAX 0xFFFFFFFF
+#define WLAN_CFG_SPECIAL_MSK 0xF
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 /*
@@ -1900,6 +1954,44 @@
 #define CFG_TX_PKT_INSPECT_FOR_ILP_CFG
 #endif
 
+/*
+ * <ini>
+ * special_frame_msk - frame mask to mark special frame type
+ * @Min: 0
+ * @Max: 0xFFFFFFFF
+ * @Default: 15
+ *
+ * This ini entry is used to set frame types to deliver to stack
+ * in error receive path
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SPECIAL_FRAME_MSK \
+		CFG_INI_UINT("special_frame_msk", \
+		WLAN_CFG_SPECIAL_MSK_MIN, \
+		WLAN_CFG_SPECIAL_MSK_MAX, \
+		WLAN_CFG_SPECIAL_MSK, \
+		CFG_VALUE_OR_DEFAULT, "special frame to deliver to stack")
+
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+#define CFG_DP_UMAC_RESET_BUFFER_WINDOW_MIN 100
+#define CFG_DP_UMAC_RESET_BUFFER_WINDOW_MAX 10000
+#define CFG_DP_UMAC_RESET_BUFFER_WINDOW_DEFAULT 1000
+
+#define CFG_DP_UMAC_RESET_BUFFER_WINDOW \
+	CFG_INI_UINT("umac_reset_buffer_window", \
+	CFG_DP_UMAC_RESET_BUFFER_WINDOW_MIN, \
+	CFG_DP_UMAC_RESET_BUFFER_WINDOW_MAX, \
+	CFG_DP_UMAC_RESET_BUFFER_WINDOW_DEFAULT, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Buffer time to check if umac reset was in progress during this window, configured time is in milliseconds")
+#define CFG_DP_UMAC_RESET_BUFFER_WINDOW_CFG CFG(CFG_DP_UMAC_RESET_BUFFER_WINDOW)
+#else
+#define CFG_DP_UMAC_RESET_BUFFER_WINDOW_CFG
+#endif /* DP_UMAC_HW_RESET_SUPPORT */
+
 #define CFG_DP \
 		CFG(CFG_DP_HTT_PACKET_TYPE) \
 		CFG(CFG_DP_INT_BATCH_THRESHOLD_OTHER) \
@@ -1930,8 +2022,10 @@
 		CFG(CFG_DP_NSS_COMP_RING_SIZE) \
 		CFG(CFG_DP_PDEV_LMAC_RING) \
 		CFG(CFG_DP_TIME_CONTROL_BP) \
+		CFG(CFG_DP_QREF_CONTROL_SIZE) \
 		CFG(CFG_DP_BASE_HW_MAC_ID) \
 		CFG(CFG_DP_RX_HASH) \
+		CFG(CFG_DP_RX_RR) \
 		CFG(CFG_DP_TSO) \
 		CFG(CFG_DP_LRO) \
 		CFG(CFG_DP_SG) \
@@ -1987,8 +2081,6 @@
 		CFG(CFG_DP_RX_MON_PROTOCOL_FLOW_TAG_ENABLE) \
 		CFG(CFG_DP_RXDMA_MONITOR_RX_DROP_THRESHOLD) \
 		CFG(CFG_DP_PKTLOG_BUFFER_SIZE) \
-		CFG(CFG_DP_RX_FISA_ENABLE) \
-		CFG(CFG_DP_RX_FISA_LRU_DEL_ENABLE) \
 		CFG(CFG_DP_FULL_MON_MODE) \
 		CFG(CFG_DP_REO_RINGS_MAP) \
 		CFG(CFG_DP_PEER_EXT_STATS) \
@@ -1996,6 +2088,7 @@
 		CFG(CFG_DP_PEER_LINK_STATS) \
 		CFG(CFG_DP_RX_BUFF_POOL_ENABLE) \
 		CFG(CFG_DP_RX_REFILL_BUFF_POOL_ENABLE) \
+		CFG(CFG_DP_BUFS_PAGE_FRAG_ALLOCS) \
 		CFG(CFG_DP_RX_PENDING_HL_THRESHOLD) \
 		CFG(CFG_DP_RX_PENDING_LO_THRESHOLD) \
 		CFG(CFG_DP_LEGACY_MODE_CSUM_DISABLE) \
@@ -2027,5 +2120,13 @@
 		CFG(CFG_DP_TXMON_SW_PEER_FILTERING) \
 		CFG_TX_PKT_INSPECT_FOR_ILP_CFG \
 		CFG(CFG_DP_POINTER_TIMER_THRESHOLD_RX) \
-		CFG(CFG_DP_POINTER_NUM_THRESHOLD_RX)
+		CFG(CFG_DP_POINTER_NUM_THRESHOLD_RX) \
+		CFG_DP_LOCAL_PKT_CAPTURE_CONFIG \
+		CFG(CFG_SPECIAL_FRAME_MSK) \
+		CFG(CFG_DP_SW2RXDMA_LINK_RING) \
+		CFG(CFG_DP_TX_CAPT_RADIO_0_RBM_ID) \
+		CFG(CFG_DP_TX_CAPT_RADIO_1_RBM_ID) \
+		CFG(CFG_DP_TX_CAPT_RADIO_2_RBM_ID) \
+		CFG(CFG_DP_TX_CAPT_RADIO_3_RBM_ID) \
+		CFG_DP_UMAC_RESET_BUFFER_WINDOW_CFG
 #endif /* _CFG_DP_H_ */

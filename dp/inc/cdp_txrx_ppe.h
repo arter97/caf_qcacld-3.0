@@ -126,6 +126,21 @@ void cdp_ppesds_entry_detach(struct cdp_soc_t *soc, uint8_t vdev_id,
 }
 
 /**
+ * cdp_ppeds_attached() - Check whether ppeds attached
+ * @soc: data path soc handle
+ *
+ * return: true for ppeds attached otherwise false.
+ */
+static inline
+QDF_STATUS cdp_ppeds_attached(struct cdp_soc_t *soc)
+{
+	if (!soc || !soc->ops || !soc->ops->ppeds_ops)
+		return false;
+
+	return true;
+}
+
+/**
  * cdp_ppesds_set_int_pri2tid() - Set the INT_PRI to TID
  * @soc: data path soc handle
  * @pri2tid: PRI2TID table

@@ -206,11 +206,13 @@ struct cdp_stats_cookie;
  * enum cdp_cfg_param_type - DP configuration parameters
  * @CDP_CFG_MAX_PEER_ID: Maximum peer id
  * @CDP_CFG_CCE_DISABLE: CCE disable
+ * @CDP_CFG_MLD_NETDEV_MODE_AP: Ap's mld netdev model
  * @CDP_CFG_NUM_PARAMS: Total number of params
  */
 enum cdp_cfg_param_type {
 	CDP_CFG_MAX_PEER_ID,
 	CDP_CFG_CCE_DISABLE,
+	CDP_CFG_MLD_NETDEV_MODE_AP,
 	CDP_CFG_NUM_PARAMS
 };
 
@@ -312,6 +314,7 @@ enum htt_cmn_dbg_stats_type {
  * @TXRX_SOC_REO_HW_DESC_DUMP: HW REO queue desc dump
  * @TXRX_SOC_WBM_IDLE_HPTP_DUMP: WBM idle link desc SRNG HP/TP dump
  * @TXRX_SRNG_USAGE_WM_STATS: SRNG usage watermark stats
+ * @TXRX_PEER_STATS: Per link peer stats
  * @TXRX_HOST_STATS_MAX:
  */
 enum cdp_host_txrx_stats {
@@ -334,6 +337,7 @@ enum cdp_host_txrx_stats {
 	TXRX_SOC_REO_HW_DESC_DUMP = 15,
 	TXRX_SOC_WBM_IDLE_HPTP_DUMP = 16,
 	TXRX_SRNG_USAGE_WM_STATS = 17,
+	TXRX_PEER_STATS   = 18,
 	TXRX_HOST_STATS_MAX,
 };
 
@@ -744,7 +748,9 @@ enum wlan_op_subtype {
  * @vdev_stats_id: Stats ID of the vdev
  * @op_mode: Operation mode of the vdev
  * @subtype: subtype of the vdev
+ * @qdf_opmode: Operation mode of the vdev
  * @mld_mac_addr: MLD mac addr of the current vdev.
+ * @is_bridge_vap: current vdev is bridge vap or not.
  */
 struct cdp_vdev_info {
 	uint8_t *vdev_mac_addr;
@@ -752,8 +758,12 @@ struct cdp_vdev_info {
 	uint8_t vdev_stats_id;
 	enum wlan_op_mode op_mode;
 	enum wlan_op_subtype subtype;
+	enum QDF_OPMODE qdf_opmode;
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t *mld_mac_addr;
+#ifdef WLAN_MLO_MULTI_CHIP
+	bool is_bridge_vap;
+#endif
 #endif
 };
 
@@ -1286,12 +1296,14 @@ struct cdp_soc_t {
  * @CDP_CONFIG_NAC: Enable nac
  * @CDP_CONFIG_ISOLATION: Enable isolation
  * @CDP_CONFIG_IN_TWT: In TWT session or not
+ * @CDP_CONFIG_MLD_PEER_VDEV: Change MLD peer's vdev
  */
 enum cdp_peer_param_type {
 	CDP_CONFIG_NAWDS,
 	CDP_CONFIG_NAC,
 	CDP_CONFIG_ISOLATION,
 	CDP_CONFIG_IN_TWT,
+	CDP_CONFIG_MLD_PEER_VDEV,
 };
 
 /**
@@ -1330,6 +1342,7 @@ enum cdp_peer_param_type {
  * @CDP_CONFIG_ENHANCED_STATS_ENABLE:
  * @CDP_ISOLATION: set isolation flag
  * @CDP_CONFIG_UNDECODED_METADATA_CAPTURE_ENABLE: Undecoded metadata capture
+ * @CDP_CONFIG_RXDMA_BUF_RING_SIZE: RXDMA buffer ring size configure
  */
 enum cdp_pdev_param_type {
 	CDP_CONFIG_DEBUG_SNIFFER,
@@ -1365,6 +1378,7 @@ enum cdp_pdev_param_type {
 	CDP_CONFIG_ENHANCED_STATS_ENABLE,
 	CDP_ISOLATION,
 	CDP_CONFIG_UNDECODED_METADATA_CAPTURE_ENABLE,
+	CDP_CONFIG_RXDMA_BUF_RING_SIZE,
 };
 
 /**
@@ -1434,7 +1448,6 @@ enum cdp_pdev_param_type {
  *
  * @cdp_psoc_param_en_rate_stats: set rate stats enable/disable
  * @cdp_psoc_param_en_nss_cfg: set nss cfg
- * @cdp_psoc_param_ppeds_enabled: PPE-DS feature enable
  * @cdp_ipa_enabled : set ipa mode
  * @cdp_psoc_param_vdev_stats_hw_offload: Configure HW vdev stats offload
  * @cdp_pdev_param_undecoded_metadata_enable: Undecoded metadata capture enable
@@ -1444,6 +1457,24 @@ enum cdp_pdev_param_type {
  * @cdp_skel_enable : Enable/Disable skeleton code for Umac reset debug
  * @cdp_drop_tx_mcast: Enable/Disable tx mcast drop
  * @cdp_vdev_tx_to_fw: Set to_fw bit for all tx packets for the vdev
+ * @cdp_peer_metadata_ver: DP rx peer metadata version configuration
+ * @hal_soc_hdl: DP HAL soc handle
+ * @cdp_tx_desc_num: DP TX desc number config
+ * @cdp_tx_ext_desc_num: number of TX EXT desc config
+ * @cdp_tx_ring_size: TX ring size config
+ * @cdp_tx_comp_ring_size: TX completion ring size config
+ * @cdp_rx_sw_desc_num: RX SW descriptor number config
+ * @cdp_reo_dst_ring_size: REO destination ring size config
+ * @cdp_rxdma_refill_ring_size: RXDMA refill ring size config
+ * @cdp_rx_refill_buf_pool_size: RX refill ring size config
+ * @cdp_rxdma_buf_ring_size: RXDMA buf ring size config
+ * @mac_addr: vdev mac address
+ * @new_vdev_id: New vdev id to which MLD peer is to be moved
+ * @fisa_params.fisa_fst_size: FISA table size
+ * @fisa_params.rx_flow_max_search: max FST entries
+ * @fisa_params.rx_toeplitz_hash_key: RX hash key
+ * @rx_pkt_tlv_size: RX packet TLV size
+ * @cdp_ast_indication_disable: AST indication disable
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1522,7 +1553,6 @@ typedef union cdp_config_param_t {
 	int cdp_psoc_param_en_nss_cfg;
 	int cdp_psoc_param_preferred_hw_mode;
 	bool cdp_psoc_param_pext_stats;
-	bool cdp_psoc_param_ppeds_enabled;
 
 	bool cdp_skip_bar_update;
 	bool cdp_ipa_enabled;
@@ -1535,6 +1565,28 @@ typedef union cdp_config_param_t {
 	bool cdp_umac_rst_skel;
 	bool cdp_drop_tx_mcast;
 	bool cdp_vdev_tx_to_fw;
+	uint8_t cdp_peer_metadata_ver;
+	void *hal_soc_hdl;
+
+	int cdp_tx_desc_num;
+	int cdp_tx_ext_desc_num;
+	int cdp_tx_ring_size;
+	int cdp_tx_comp_ring_size;
+	int cdp_rx_sw_desc_num;
+	int cdp_reo_dst_ring_size;
+	int cdp_rxdma_refill_ring_size;
+	int cdp_rx_refill_buf_pool_size;
+	int cdp_rxdma_buf_ring_size;
+
+	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t new_vdev_id;
+	struct {
+		uint32_t fisa_fst_size;
+		uint16_t rx_flow_max_search;
+		uint8_t *rx_toeplitz_hash_key;
+	} fisa_params;
+	uint16_t rx_pkt_tlv_size;
+	bool cdp_ast_indication_disable;
 } cdp_config_param_type;
 
 /**
@@ -1625,6 +1677,7 @@ enum cdp_pdev_bpr_param {
  * @CDP_ENABLE_WRAP: qwrap ap
  * @CDP_ENABLE_TRAFFIC_END_INDICATION: enable/disable traffic end indication
  * @CDP_VDEV_TX_TO_FW: Set to_fw bit for tx packets for the vdev
+ * @CDP_VDEV_SET_MAC_ADDR: Set mac address for vdev
  */
 enum cdp_vdev_param_type {
 	CDP_ENABLE_NAWDS,
@@ -1675,6 +1728,7 @@ enum cdp_vdev_param_type {
 #ifdef FEATURE_DIRECT_LINK
 	CDP_VDEV_TX_TO_FW,
 #endif
+	CDP_VDEV_SET_MAC_ADDR,
 };
 
 /**
@@ -1688,9 +1742,21 @@ enum cdp_vdev_param_type {
  * @CDP_CFG_VDEV_STATS_HW_OFFLOAD: HW Vdev stats config
  * @CDP_SAWF_ENABLE:
  * @CDP_UMAC_RST_SKEL_ENABLE: Enable Umac reset skeleton code for debug
- * @CDP_PPEDS_ENABLE: PPEDS is enabled or not
  * @CDP_SAWF_STATS: set SAWF stats config
  * @CDP_UMAC_RESET_STATS: UMAC reset stats
+ * @CDP_CFG_RX_PEER_METADATA_VER: RX peer metadata configuration
+ * @CDP_TXRX_HAL_SOC_HDL: HAL soc handle
+ * @CDP_CFG_TX_DESC_NUM: number of TX descriptors config
+ * @CDP_CFG_TX_EXT_DESC_NUM: number of TX EXT descriptors config
+ * @CDP_CFG_TX_RING_SIZE: TX ring size config param
+ * @CDP_CFG_TX_COMPL_RING_SIZE: TX completion ring size param
+ * @CDP_CFG_RX_SW_DESC_NUM: RX SW descriptor number
+ * @CDP_CFG_REO_DST_RING_SIZE: REO destination ring size config
+ * @CDP_CFG_RXDMA_REFILL_RING_SIZE: RXDMA refill ring size config
+ * @CDP_CFG_RX_REFILL_POOL_NUM: RX refill pool size config param
+ * @CDP_CFG_FISA_PARAMS: FISA params
+ * @CDP_RX_PKT_TLV_SIZE: RX pkt tlv size
+ * @CDP_CFG_AST_INDICATION_DISABLE: AST indication disable
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1701,10 +1767,31 @@ enum cdp_psoc_param_type {
 	CDP_CFG_VDEV_STATS_HW_OFFLOAD,
 	CDP_SAWF_ENABLE,
 	CDP_UMAC_RST_SKEL_ENABLE,
-	CDP_PPEDS_ENABLE,
 	CDP_SAWF_STATS,
 	CDP_UMAC_RESET_STATS,
+	CDP_CFG_RX_PEER_METADATA_VER,
+	CDP_TXRX_HAL_SOC_HDL,
+	CDP_CFG_TX_DESC_NUM,
+	CDP_CFG_TX_EXT_DESC_NUM,
+	CDP_CFG_TX_RING_SIZE,
+	CDP_CFG_TX_COMPL_RING_SIZE,
+	CDP_CFG_RX_SW_DESC_NUM,
+	CDP_CFG_REO_DST_RING_SIZE,
+	CDP_CFG_RXDMA_REFILL_RING_SIZE,
+#ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
+	CDP_CFG_RX_REFILL_POOL_NUM,
+#endif
+	CDP_CFG_FISA_PARAMS,
+	CDP_RX_PKT_TLV_SIZE,
+	CDP_CFG_AST_INDICATION_DISABLE,
 };
+
+#ifdef CONFIG_AP_PLATFORM
+/* RX peer metadata version if v1a_v1b is supported */
+#define CDP_RX_PEER_METADATA_V1_A_B 3
+#else
+#define CDP_RX_PEER_METADATA_V1_A_B 2
+#endif
 
 #define TXRX_FW_STATS_TXSTATS                     1
 #define TXRX_FW_STATS_RXSTATS                     2
@@ -2900,6 +2987,7 @@ struct cdp_monitor_filter {
  * @cfg_dp_disable_intra_bss_fwd: get intra bss fwd config
  * @cfg_dp_pktlog_buffer_size: get packet log buffer size config
  * @cfg_dp_wow_check_rx_pending: get wow rx pending frame check config
+ * @cfg_dp_local_pkt_capture: get local packet capture config
  */
 enum cdp_dp_cfg {
 	cfg_dp_enable_data_stall,
@@ -2924,6 +3012,7 @@ enum cdp_dp_cfg {
 	cfg_dp_disable_intra_bss_fwd,
 	cfg_dp_pktlog_buffer_size,
 	cfg_dp_wow_check_rx_pending,
+	cfg_dp_local_pkt_capture,
 };
 
 /**
@@ -2942,7 +3031,43 @@ struct cdp_peer_cookie {
 	uint8_t cookie;
 };
 
+/**
+ * enum cdp_fisa_stats_id - ID to query FISA stats
+ * @CDP_FISA_STATS_ID_ERR_STATS: FISA error stats
+ * @CDP_FISA_STATS_ID_DUMP_HW_FST: HW FST dump
+ * @CDP_FISA_STATS_ID_DUMP_SW_FST: SW FST dump
+ */
+enum cdp_fisa_stats_id {
+	CDP_FISA_STATS_ID_ERR_STATS,
+	CDP_FISA_STATS_ID_DUMP_HW_FST,
+	CDP_FISA_STATS_ID_DUMP_SW_FST,
+};
+
 #ifdef WLAN_SUPPORT_RX_FISA
+/**
+ * enum cdp_fisa_config_id - FISA config ID
+ * @CDP_FISA_HTT_RX_FISA_CFG: FISA config HTT message
+ * @CDP_FISA_HTT_RX_FSE_OP_CFG: FSE operation HTT message
+ * @CDP_FISA_HTT_RX_FSE_SETUP_CFG: FSE setup HTT message
+ */
+enum cdp_fisa_config_id {
+	CDP_FISA_HTT_RX_FISA_CFG,
+	CDP_FISA_HTT_RX_FSE_OP_CFG,
+	CDP_FISA_HTT_RX_FSE_SETUP_CFG,
+};
+
+/**
+ * union cdp_fisa_config - FISA HTT message data
+ * @fisa_config: FISA config HTT msg data
+ * @fse_op_cmd: FSE operation HTT msg data
+ * @fse_setup_info: FSE setup HTT msg data
+ */
+union cdp_fisa_config {
+	struct dp_htt_rx_fisa_cfg *fisa_config;
+	struct dp_htt_rx_flow_fst_operation *fse_op_cmd;
+	struct dp_htt_rx_flow_fst_setup *fse_setup_info;
+};
+
 struct cdp_flow_stats {
 	uint32_t aggr_count;
 	uint32_t curr_aggr_count;
@@ -3120,4 +3245,18 @@ struct cdp_txrx_peer_params_update {
 	uint8_t	pdev_id;
 };
 
+/**
+ * enum cdp_umac_reset_state - umac reset in progress state
+ * @CDP_UMAC_RESET_NOT_IN_PROGRESS: Umac reset is not in progress
+ * @CDP_UMAC_RESET_IN_PROGRESS: Umac reset is in progress
+ * @CDP_UMAC_RESET_IN_PROGRESS_DURING_BUFFER_WINDOW: Umac reset was in progress
+ *                                                   during this buffer window.
+ * @CDP_UMAC_RESET_INVALID_STATE: Umac reset invalid state
+ */
+enum cdp_umac_reset_state {
+	CDP_UMAC_RESET_NOT_IN_PROGRESS,
+	CDP_UMAC_RESET_IN_PROGRESS,
+	CDP_UMAC_RESET_IN_PROGRESS_DURING_BUFFER_WINDOW,
+	CDP_UMAC_RESET_INVALID_STATE
+};
 #endif

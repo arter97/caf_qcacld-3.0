@@ -108,6 +108,11 @@ static inline void ipa_disable_register_cb(void)
 {
 }
 
+static inline bool ipa_config_is_opt_wifi_dp_enabled(void)
+{
+	return false;
+}
+
 static inline bool wlan_ipa_config_is_enabled(void)
 {
 	return false;

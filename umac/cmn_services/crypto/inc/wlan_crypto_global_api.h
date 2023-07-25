@@ -870,6 +870,21 @@ void wlan_crypto_update_set_key_peer(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_crypto_validate_key_params(enum wlan_crypto_cipher_type cipher,
 					   uint8_t key_index, uint8_t key_len,
 					   uint8_t seq_len);
+/**
+ * wlan_crypto_save_ml_sta_key - Allocate memory for ml sta key
+ * @psoc: psoc handler
+ * @key_index: key index
+ * @crypto_key: crypto key
+ * @link_addr: link addr
+ * @link_id: link id
+ *
+ * Return: zero on success
+ */
+QDF_STATUS
+wlan_crypto_save_ml_sta_key(struct wlan_objmgr_psoc *psoc,
+			    uint8_t key_index,
+			    struct wlan_crypto_key *crypto_key,
+			    struct qdf_mac_addr *link_addr, int8_t link_id);
 
 /**
  * wlan_crypto_save_key() - Allocate memory for storing key

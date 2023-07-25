@@ -253,6 +253,8 @@ struct wlan_target_if_dcs_rx_ops {
  * @deinit_shmem_arena_ctx: De-initialize shmem arena context
  * @get_crash_reason_address: Get the address of the crash reason associated
  * with chip_id
+ * @get_recovery_mode_address: Get the address of the recovery mode associated
+ * with chip_id
  * @get_no_of_chips_from_crash_info: Get the number of chips participated in the
  * mlo from global shmem crash info
  */
@@ -267,6 +269,8 @@ struct wlan_lmac_if_global_shmem_local_ops {
 					     uint8_t recovery);
 	void *(*get_crash_reason_address)(uint8_t grp_id,
 					  uint8_t chip_id);
+	void *(*get_recovery_mode_address)(uint8_t grp_id,
+					   uint8_t chip_id);
 	uint8_t (*get_no_of_chips_from_crash_info)(uint8_t grp_id);
 };
 #endif
@@ -585,9 +589,8 @@ struct wlan_lmac_if_mlme_tx_ops {
 					      uint8_t grp_id);
 	QDF_STATUS (*target_if_mlo_ready)(struct wlan_objmgr_pdev **pdev,
 					  uint8_t num_pdevs);
-	QDF_STATUS (*target_if_mlo_teardown_req)(struct wlan_objmgr_pdev **pdev,
-						 uint8_t num_pdevs,
-						 uint32_t grp_id);
+	QDF_STATUS (*target_if_mlo_teardown_req)(struct wlan_objmgr_pdev *pdev,
+						 uint32_t grp_id, bool reset);
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 QDF_STATUS (*vdev_send_set_mac_addr)(struct qdf_mac_addr mac_addr,
@@ -673,7 +676,7 @@ struct wlan_lmac_if_p2p_tx_ops {
  * struct wlan_lmac_if_atf_tx_ops - ATF specific tx function pointers
  * @atf_enable_disable:           Set atf peer stats enable/disable
  * @atf_ssid_sched_policy:        Set ssid schedule policy
- * @atf_set:                      Set atf
+ * @atf_send_peer_list:           Send atf list of peers
  * @atf_set_grouping:             Set atf grouping
  * @atf_set_group_ac:             Set atf Group AC
  * @atf_send_peer_request:        Send peer requests
@@ -683,15 +686,19 @@ struct wlan_lmac_if_p2p_tx_ops {
  * @atf_register_event_handler:   ATF register wmi event handlers
  * @atf_unregister_event_handler: ATF unregister wmi event handlers
  * @atf_set_ppdu_stats:           ATF set ppdu stats to get ATF stats
+ * @atf_send_peer_list_v2:        Send atf list of peers with increased
+ *                                maximum peer support
+ * @atf_set_grouping_v2:          Set atf grouping with increased maximum
+ *                                peer support
  */
 struct wlan_lmac_if_atf_tx_ops {
 	int32_t (*atf_enable_disable)(struct wlan_objmgr_vdev *vdev,
 				      uint8_t value);
 	int32_t (*atf_ssid_sched_policy)(struct wlan_objmgr_vdev *vdev,
 					 uint8_t value);
-	int32_t (*atf_set)(struct wlan_objmgr_pdev *pdev,
-			   struct pdev_atf_req *atf_req,
-			   uint8_t atf_tput_based);
+	int32_t (*atf_send_peer_list)(struct wlan_objmgr_pdev *pdev,
+				      struct pdev_atf_req *atf_req,
+				      uint8_t atf_tput_based);
 	int32_t (*atf_set_grouping)(struct wlan_objmgr_pdev *pdev,
 				    struct pdev_atf_ssid_group_req *atf_grp_req,
 				    uint8_t atf_tput_based);
@@ -709,6 +716,12 @@ struct wlan_lmac_if_atf_tx_ops {
 	void (*atf_unregister_event_handler)(struct wlan_objmgr_psoc *psoc);
 	void (*atf_set_ppdu_stats)(struct wlan_objmgr_pdev *pdev,
 				   uint8_t value);
+#ifdef WLAN_ATF_INCREASED_STA
+	int32_t (*atf_send_peer_list_v2)(struct wlan_objmgr_pdev *pdev,
+					 struct pdev_atf_req_v2 *atf_req);
+	int32_t (*atf_set_grouping_v2)(struct wlan_objmgr_pdev *pdev,
+				       struct pdev_atf_ssid_group_req_v2 *req);
+#endif
 };
 #endif
 
@@ -1107,6 +1120,7 @@ struct wlan_lmac_if_ftm_rx_ops {
  * @register_afc_event_handler: pointer to register afc event handler
  * @unregister_afc_event_handler: pointer to unregister afc event handler
  * @trigger_acs_for_afc: pointer to trigger acs for afc
+ * @trigger_update_channel_list: pointer to trigger_update_channel_list
  * @reg_get_min_psd:
  * @is_chip_11be:
  * @register_rate2power_table_update_event_handler: pointer to register
@@ -1166,7 +1180,8 @@ struct wlan_lmac_if_reg_tx_ops {
 	QDF_STATUS (*unregister_afc_event_handler)
 				(struct wlan_objmgr_psoc *psoc, void *arg);
 	QDF_STATUS (*trigger_acs_for_afc)(struct wlan_objmgr_pdev *pdev);
-
+	QDF_STATUS (*trigger_update_channel_list)
+				(struct wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*reg_get_min_psd) (struct wlan_objmgr_pdev *pdev,
 				       qdf_freq_t primary_freq,
 				       qdf_freq_t cen320,
@@ -1293,6 +1308,7 @@ struct wlan_lmac_if_dfs_tx_ops {
  * @tgt_is_tgt_type_qcn6122: To check QCN6122 (Spruce) target type.
  * @tgt_is_tgt_type_qcn9160: To check QCN9160 target type.
  * @tgt_is_tgt_type_qcn7605: To check QCN7605 target type.
+ * @tgt_is_tgt_type_qcn6432: To check QCN6432 (Pebble) target type.
  * @tgt_get_tgt_type:        Get target type
  * @tgt_get_tgt_version:     Get target version
  * @tgt_get_tgt_revision:    Get target revision
@@ -1306,6 +1322,7 @@ struct wlan_lmac_if_target_tx_ops {
 	bool (*tgt_is_tgt_type_qcn6122)(uint32_t);
 	bool (*tgt_is_tgt_type_qcn9160)(uint32_t);
 	bool (*tgt_is_tgt_type_qcn7605)(uint32_t);
+	bool (*tgt_is_tgt_type_qcn6432)(uint32_t);
 	uint32_t (*tgt_get_tgt_type)(struct wlan_objmgr_psoc *psoc);
 	uint32_t (*tgt_get_tgt_version)(struct wlan_objmgr_psoc *psoc);
 	uint32_t (*tgt_get_tgt_revision)(struct wlan_objmgr_psoc *psoc);
@@ -1504,6 +1521,8 @@ struct wlan_lmac_if_son_rx_ops {
  * @shmem_local_ops: operations specific to WLAN_MLO_GLOBAL_SHMEM_SUPPORT
  * @send_tid_to_link_mapping: function to send T2LM command to FW
  * @send_link_removal_cmd: function to send MLO link removal command to FW
+ * @send_vdev_pause: function to send MLO vdev pause to FW
+ * @peer_ptqm_migrate_send: API to send peer ptqm migration request to FW
  */
 struct wlan_lmac_if_mlo_tx_ops {
 	QDF_STATUS (*register_events)(struct wlan_objmgr_psoc *psoc);
@@ -1522,6 +1541,13 @@ struct wlan_lmac_if_mlo_tx_ops {
 	QDF_STATUS (*send_link_removal_cmd)(
 		struct wlan_objmgr_psoc *psoc,
 		const struct mlo_link_removal_cmd_params *param);
+	QDF_STATUS (*send_vdev_pause)(struct wlan_objmgr_psoc *psoc,
+				      struct mlo_vdev_pause *info);
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+	QDF_STATUS (*peer_ptqm_migrate_send)(
+					struct wlan_objmgr_vdev *vdev,
+					struct peer_ptqm_migrate_params *param);
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
 };
 
 /**
@@ -1530,6 +1556,7 @@ struct wlan_lmac_if_mlo_tx_ops {
  * @process_mlo_vdev_tid_to_link_map_event:  function pointer to rx T2LM event
  * @mlo_link_removal_handler: function pointer for MLO link removal handler
  * @process_mlo_link_state_info_event: function pointer for mlo link state
+ * @mlo_link_disable_request_handler: function ptr for mlo link disable request
  */
 struct wlan_lmac_if_mlo_rx_ops {
 	QDF_STATUS
@@ -1544,6 +1571,9 @@ struct wlan_lmac_if_mlo_rx_ops {
 	QDF_STATUS (*process_mlo_link_state_info_event)(
 			struct wlan_objmgr_psoc *psoc,
 			struct ml_link_state_info_event *event);
+	QDF_STATUS (*mlo_link_disable_request_handler)(
+			struct wlan_objmgr_psoc *psoc,
+			void *evt_params);
 };
 #endif
 
@@ -1619,17 +1649,19 @@ struct wlan_lmac_if_twt_rx_ops {
 };
 #endif
 
-#if defined WLAN_FEATURE_SR
+#ifdef WLAN_FEATURE_SR
 struct wlan_lmac_if_spatial_reuse_tx_ops {
 	QDF_STATUS (*send_cfg)(struct wlan_objmgr_vdev *vdev, uint8_t sr_ctrl,
 			       uint8_t non_srg_max_pd_offset);
 	QDF_STATUS (*send_sr_prohibit_cfg)(struct wlan_objmgr_vdev *vdev,
 					   bool he_siga_val15_allowed);
-	QDF_STATUS(*target_if_set_sr_enable_disable)(
+	QDF_STATUS (*target_if_set_sr_enable_disable)(
 				struct wlan_objmgr_vdev *vdev,
 				struct wlan_objmgr_pdev *pdev,
 				bool is_sr_enable, int32_t srg_pd_threshold,
 				int32_t non_srg_pd_threshold);
+	QDF_STATUS (*target_if_sr_update)(struct wlan_objmgr_pdev *pdev,
+					  uint8_t vdev_id, uint32_t val);
 };
 #endif
 
@@ -1659,6 +1691,35 @@ struct wlan_lmac_if_coap_tx_ops {
 						  uint32_t req_id);
 	QDF_STATUS (*offload_cache_get)(struct wlan_objmgr_vdev *vdev,
 					uint32_t req_id);
+};
+#endif
+
+#ifdef CONFIG_SAWF
+/**
+ * struct wlan_lmac_if_sawf_tx_ops - Target function pointers for SAWF
+ *
+ * @sawf_svc_create_send: function pointer to send SAWF SVC create
+ * @sawf_svc_disable_send: function pointer to send SAWF SVC disable
+ * @sawf_ul_svc_update_send: function pointer to update
+ *                           peer uplink QoS parameters
+ * @sawf_update_ul_params: function pointer to update flow uplink QoS parameters
+ */
+struct wlan_lmac_if_sawf_tx_ops {
+	QDF_STATUS
+	(*sawf_svc_create_send)(struct wlan_objmgr_pdev *pdev, void *params);
+	QDF_STATUS
+	(*sawf_svc_disable_send)(struct wlan_objmgr_pdev *pdev, void *params);
+	QDF_STATUS
+	(*sawf_ul_svc_update_send)(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id, uint8_t *peer_mac,
+				   uint8_t ac, uint8_t add_or_sub,
+				   void *svc_params);
+	QDF_STATUS
+	(*sawf_update_ul_params)(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+				 uint8_t *peer_mac, uint8_t tid, uint8_t ac,
+				 uint32_t service_interval, uint32_t burst_size,
+				 uint32_t min_tput, uint32_t max_latency,
+				 uint8_t add_or_sub);
 };
 #endif
 
@@ -1695,6 +1756,7 @@ struct wlan_lmac_if_coap_tx_ops {
  * @twt_tx_ops: TWT tx ops
  * @spatial_reuse_tx_ops: Spatial Reuse tx ops
  * @coap_ops: COAP tx ops
+ * @sawf_tx_ops: SAWF tx ops
  *
  * Callback function tabled to be registered with umac.
  * umac will use the functional table to send events/frames to wmi
@@ -1800,6 +1862,9 @@ struct wlan_lmac_if_tx_ops {
 
 #ifdef WLAN_FEATURE_COAP
 	struct wlan_lmac_if_coap_tx_ops coap_ops;
+#endif
+#ifdef CONFIG_SAWF
+	struct wlan_lmac_if_sawf_tx_ops sawf_tx_ops;
 #endif
 };
 
@@ -2036,6 +2101,8 @@ struct wlan_lmac_if_p2p_rx_ops {
  * @atf_process_tx_ppdu_stats:         Process Tx PPDU stats to get ATF stats
  * @atf_process_rx_ppdu_stats:         Process Rx PPDU stats to get ATF stats
  * @atf_is_stats_enabled:              Check ATF stats enabled or not
+ * @atf_set_fw_max_client_512_support: Set Max Client Support based on WMI
+ *    service bit announcement from FW
  */
 struct wlan_lmac_if_atf_rx_ops {
 	uint32_t (*atf_get_fmcap)(struct wlan_objmgr_psoc *psoc);
@@ -2078,6 +2145,10 @@ struct wlan_lmac_if_atf_rx_ops {
 	void (*atf_process_rx_ppdu_stats)(struct wlan_objmgr_pdev *pdev,
 					  qdf_nbuf_t msg);
 	uint8_t (*atf_is_stats_enabled)(struct wlan_objmgr_pdev *pdev);
+#ifdef WLAN_ATF_INCREASED_STA
+	void (*atf_set_fw_max_client_512_support)(struct wlan_objmgr_psoc *psoc,
+						  uint8_t val);
+#endif
 };
 #endif
 

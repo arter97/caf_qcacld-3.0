@@ -321,6 +321,7 @@ uint32_t DEBUG_CE_DEST_RING_READ_IDX_GET(struct hif_softc *scn,
 	DRRI_FROM_DDR_ADDR(VADDR_FOR_CE(scn, CE_ctrl_addr))
 #endif
 
+#ifndef QCA_WIFI_WCN6450
 unsigned int hif_get_src_ring_read_index(struct hif_softc *scn,
 		uint32_t CE_ctrl_addr);
 unsigned int hif_get_dst_ring_read_index(struct hif_softc *scn,
@@ -330,6 +331,12 @@ unsigned int hif_get_dst_ring_read_index(struct hif_softc *scn,
 	hif_get_src_ring_read_index(scn, CE_ctrl_addr)
 #define CE_DEST_RING_READ_IDX_GET(scn, CE_ctrl_addr)\
 	hif_get_dst_ring_read_index(scn, CE_ctrl_addr)
+#else
+#define CE_SRC_RING_READ_IDX_GET(scn, CE_ctrl_addr)\
+	CE_SRC_RING_READ_IDX_GET_FROM_DDR(scn, CE_ctrl_addr)
+#define CE_DEST_RING_READ_IDX_GET(scn, CE_ctrl_addr)\
+	CE_DEST_RING_READ_IDX_GET_FROM_DDR(scn, CE_ctrl_addr)
+#endif
 #else
 #define CE_SRC_RING_READ_IDX_GET(scn, CE_ctrl_addr) \
 	CE_SRC_RING_READ_IDX_GET_FROM_REGISTER(scn, CE_ctrl_addr)
@@ -617,17 +624,29 @@ unsigned int hif_get_dst_ring_read_index(struct hif_softc *scn,
 #define NUM_SHADOW_REGISTERS 24
 u32 shadow_sr_wr_ind_addr(struct hif_softc *scn, u32 ctrl_addr);
 u32 shadow_dst_wr_ind_addr(struct hif_softc *scn, u32 ctrl_addr);
+
+#define CE_SRC_WR_IDX_OFFSET_GET(scn, CE_ctrl_addr) \
+	shadow_sr_wr_ind_addr(scn, CE_ctrl_addr)
+#define CE_DST_WR_IDX_OFFSET_GET(scn, CE_ctrl_addr) \
+	shadow_dst_wr_ind_addr(scn, CE_ctrl_addr)
+#else
+#define CE_SRC_WR_IDX_OFFSET_GET(scn, CE_ctrl_addr) \
+	CE_ctrl_addr + SR_WR_INDEX_ADDRESS
+#define CE_DST_WR_IDX_OFFSET_GET(scn, CE_ctrl_addr) \
+	CE_ctrl_addr + DST_WR_INDEX_ADDRESS
 #endif
 
-
-#ifdef ADRASTEA_SHADOW_REGISTERS
+#if defined(FEATURE_HIF_DELAYED_REG_WRITE)
+#define CE_SRC_RING_WRITE_IDX_SET(scn, CE_ctrl_addr, n) \
+	A_TARGET_DELAYED_REG_WRITE(scn, CE_ctrl_addr, n)
+#define CE_DEST_RING_WRITE_IDX_SET(scn, CE_ctrl_addr, n) \
+	A_TARGET_DELAYED_REG_WRITE(scn, CE_ctrl_addr, n)
+#elif defined(ADRASTEA_SHADOW_REGISTERS)
 #define CE_SRC_RING_WRITE_IDX_SET(scn, CE_ctrl_addr, n) \
 	A_TARGET_WRITE(scn, shadow_sr_wr_ind_addr(scn, CE_ctrl_addr), n)
 #define CE_DEST_RING_WRITE_IDX_SET(scn, CE_ctrl_addr, n) \
 	A_TARGET_WRITE(scn, shadow_dst_wr_ind_addr(scn, CE_ctrl_addr), n)
-
 #else
-
 #define CE_SRC_RING_WRITE_IDX_SET(scn, CE_ctrl_addr, n) \
 	A_TARGET_WRITE(scn, (CE_ctrl_addr) + SR_WR_INDEX_ADDRESS, (n))
 #define CE_DEST_RING_WRITE_IDX_SET(scn, CE_ctrl_addr, n) \

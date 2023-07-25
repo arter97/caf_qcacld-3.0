@@ -184,6 +184,92 @@ dp_tx_record_hw_desc_rh(uint8_t *hal_tx_desc_cached, struct dp_soc *soc)
 }
 #endif
 
+#if defined(FEATURE_RUNTIME_PM)
+static void dp_tx_update_write_index(struct dp_soc *soc,
+				     struct dp_tx_ep_info_rh *tx_ep_info,
+				     int coalesce)
+{
+	int ret;
+
+	/* Avoid runtime get and put APIs under high throughput scenarios */
+	if (dp_get_rtpm_tput_policy_requirement(soc)) {
+		ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+						    coalesce);
+		return;
+	}
+
+	ret = hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_DP);
+	if (QDF_IS_STATUS_SUCCESS(ret)) {
+		if (hif_system_pm_state_check(soc->hif_handle)) {
+			ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
+					  CE_RING_FLUSH_EVENT);
+			ce_ring_inc_flush_cnt(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring);
+		} else {
+			ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+							    coalesce);
+		}
+		hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP);
+	} else {
+		dp_runtime_get(soc);
+		ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
+				  CE_RING_FLUSH_EVENT);
+		ce_ring_inc_flush_cnt(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring);
+		qdf_atomic_inc(&soc->tx_pending_rtpm);
+		dp_runtime_put(soc);
+	}
+}
+#elif defined(DP_POWER_SAVE)
+static void dp_tx_update_write_index(struct dp_soc *soc,
+				     struct dp_tx_ep_info_rh *tx_ep_info)
+{
+	if (hif_system_pm_state_check(soc->hif_handle)) {
+		ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
+				  CE_RING_FLUSH_EVENT);
+		ce_ring_inc_flush_cnt(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring);
+	} else {
+		ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+						    coalesce);
+	}
+}
+#else
+static void dp_tx_update_write_index(struct dp_soc *soc,
+				     struct dp_tx_ep_info_rh *tx_ep_info)
+{
+	ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl,
+					    coalesce);
+}
+#endif
+
+/*
+ * dp_flush_tx_ring_rh() - flush tx ring write index
+ * @pdev: dp pdev handle
+ * @ring_id: Tx ring id
+ *
+ * Return: 0 on success and error code on failure
+ */
+int dp_flush_tx_ring_rh(struct dp_pdev *pdev, int ring_id)
+{
+	struct dp_pdev_rh *rh_pdev = dp_get_rh_pdev_from_dp_pdev(pdev);
+	struct dp_tx_ep_info_rh *tx_ep_info = &rh_pdev->tx_ep_info;
+	int ret;
+
+	ce_ring_aquire_lock(tx_ep_info->ce_tx_hdl);
+	ret = hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_DP);
+	if (ret) {
+		ce_ring_release_lock(tx_ep_info->ce_tx_hdl);
+		ce_ring_set_event(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring,
+				  CE_RING_FLUSH_EVENT);
+		ce_ring_inc_flush_cnt(((struct CE_state *)(tx_ep_info->ce_tx_hdl))->src_ring);
+		return ret;
+	}
+
+	ce_tx_ring_write_idx_update_wrapper(tx_ep_info->ce_tx_hdl, false);
+	ce_ring_release_lock(tx_ep_info->ce_tx_hdl);
+	hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP);
+
+	return ret;
+}
+
 QDF_STATUS
 dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 		    struct dp_tx_desc_s *tx_desc, uint16_t fw_metadata,
@@ -196,6 +282,7 @@ dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 	qdf_nbuf_t nbuf = tx_desc->nbuf;
 	uint8_t tid = msdu_info->tid;
 	uint32_t *hal_tx_desc_cached;
+	int coalesce = 0;
 	int ret;
 
 	/*
@@ -281,9 +368,11 @@ dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	dp_tx_fill_nbuf_data_attr_rh(nbuf);
 
-	ret = ce_send_fast(tx_ep_info->ce_tx_hdl, nbuf,
-			   tx_ep_info->tx_endpoint, download_len);
-	if (!ret) {
+	ce_ring_aquire_lock(tx_ep_info->ce_tx_hdl);
+	ret = ce_enqueue_desc(tx_ep_info->ce_tx_hdl, nbuf,
+			      tx_ep_info->tx_endpoint, download_len);
+	if (ret) {
+		ce_ring_release_lock(tx_ep_info->ce_tx_hdl);
 		dp_verbose_debug("CE tx ring full");
 		/* TODO: Should this be a separate ce_ring_full stat? */
 		DP_STATS_INC(soc, tx.tcl_ring_full[0], 1);
@@ -291,9 +380,16 @@ dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 		goto enqueue_fail;
 	}
 
+	coalesce = dp_tx_attempt_coalescing(soc, vdev, tx_desc, tid,
+					    msdu_info, 0);
+
+	dp_tx_update_write_index(soc, tx_ep_info, coalesce);
+	ce_ring_release_lock(tx_ep_info->ce_tx_hdl);
+
 	tx_desc->flags |= DP_TX_DESC_FLAG_QUEUED_TX;
 	dp_vdev_peer_stats_update_protocol_cnt_tx(vdev, nbuf);
 	DP_STATS_INC_PKT(vdev, tx_i.processed, 1, tx_desc->length);
+	dp_tx_update_stats(soc, tx_desc, 0);
 	status = QDF_STATUS_SUCCESS;
 
 	dp_tx_record_hw_desc_rh((uint8_t *)hal_tx_desc_cached, soc);
@@ -331,7 +427,7 @@ dp_tx_tcl_desc_pool_alloc_rh(struct dp_soc *soc, uint32_t num_elem,
 	/* Allocate tcl descriptors in coherent memory */
 	tcl_desc_pool = &rh_soc->tcl_desc_pool[pool_id];
 	memctx = qdf_get_dma_mem_context(tcl_desc_pool, memctx);
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_TCL_DESC_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, QDF_DP_TX_TCL_DESC_TYPE,
 				      &tcl_desc_pool->desc_pages,
 				      elem_size, num_elem, memctx, false);
 
@@ -344,7 +440,7 @@ dp_tx_tcl_desc_pool_alloc_rh(struct dp_soc *soc, uint32_t num_elem,
 	return status;
 
 err_alloc_fail:
-	dp_desc_multi_pages_mem_free(soc, DP_TX_TCL_DESC_TYPE,
+	dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_TCL_DESC_TYPE,
 				     &tcl_desc_pool->desc_pages,
 				     memctx, false);
 	return status;
@@ -368,7 +464,7 @@ static void dp_tx_tcl_desc_pool_free_rh(struct dp_soc *soc, uint8_t pool_id)
 	tcl_desc_pool = &rh_soc->tcl_desc_pool[pool_id];
 	memctx = qdf_get_dma_mem_context(tcl_desc_pool, memctx);
 
-	dp_desc_multi_pages_mem_free(soc, DP_TX_TCL_DESC_TYPE,
+	dp_desc_multi_pages_mem_free(soc, QDF_DP_TX_TCL_DESC_TYPE,
 				     &tcl_desc_pool->desc_pages,
 				     memctx, false);
 }
@@ -549,25 +645,25 @@ QDF_STATUS dp_tx_desc_pool_alloc_rh(struct dp_soc *soc, uint32_t num_elem,
 
 	status = dp_tx_tcl_desc_pool_alloc_rh(soc, num_elem, pool_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("failed to allocate tcl desc pool %d\n", pool_id);
+		dp_err("failed to allocate tcl desc pool %d", pool_id);
 		goto err_tcl_desc_pool;
 	}
 
 	status = dp_tx_ext_desc_pool_alloc_by_id(soc, num_elem, pool_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("failed to allocate tx ext desc pool %d\n", pool_id);
+		dp_err("failed to allocate tx ext desc pool %d", pool_id);
 		goto err_free_tcl_pool;
 	}
 
 	status = dp_tx_tso_desc_pool_alloc_by_id(soc, num_elem, pool_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("failed to allocate tso desc pool %d\n", pool_id);
+		dp_err("failed to allocate tso desc pool %d", pool_id);
 		goto err_free_tx_ext_pool;
 	}
 
 	status = dp_tx_tso_num_seg_pool_alloc_by_id(soc, num_elem, pool_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("failed to allocate tso num seg pool %d\n", pool_id);
+		dp_err("failed to allocate tso num seg pool %d", pool_id);
 		goto err_free_tso_pool;
 	}
 
@@ -638,7 +734,7 @@ void dp_tx_compl_handler_rh(struct dp_soc *soc, qdf_nbuf_t htt_msg)
 					   tx_desc->id);
 			tx_desc->flags |= DP_TX_DESC_FLAG_TX_COMP_ERR;
 			dp_tx_comp_free_buf(soc, tx_desc, false);
-			dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+			dp_tx_desc_release(soc, tx_desc, tx_desc->pool_id);
 			goto next_msdu;
 		}
 

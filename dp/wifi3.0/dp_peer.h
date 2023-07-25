@@ -48,6 +48,84 @@
 	__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP_PEER, ## params)
 #define dp_peer_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_PEER, params)
 
+void check_free_list_for_invalid_flush(struct dp_soc *soc);
+
+static inline
+void add_entry_alloc_list(struct dp_soc *soc, struct dp_rx_tid *rx_tid,
+			  struct dp_peer *peer, void *hw_qdesc_vaddr)
+{
+	uint32_t max_list_size;
+	unsigned long curr_ts = qdf_get_system_timestamp();
+	uint32_t qref_index = soc->free_addr_list_idx;
+
+	max_list_size = soc->wlan_cfg_ctx->qref_control_size;
+
+	if (max_list_size == 0)
+		return;
+
+	soc->list_qdesc_addr_alloc[qref_index].hw_qdesc_paddr =
+							 rx_tid->hw_qdesc_paddr;
+	soc->list_qdesc_addr_alloc[qref_index].ts_qdesc_mem_hdl = curr_ts;
+	soc->list_qdesc_addr_alloc[qref_index].hw_qdesc_vaddr_align =
+								 hw_qdesc_vaddr;
+	soc->list_qdesc_addr_alloc[qref_index].hw_qdesc_vaddr_unalign =
+					       rx_tid->hw_qdesc_vaddr_unaligned;
+	soc->list_qdesc_addr_alloc[qref_index].peer_id = peer->peer_id;
+	soc->list_qdesc_addr_alloc[qref_index].tid = rx_tid->tid;
+	soc->alloc_addr_list_idx++;
+
+	if (soc->alloc_addr_list_idx == max_list_size)
+		soc->alloc_addr_list_idx = 0;
+}
+
+static inline
+void add_entry_free_list(struct dp_soc *soc, struct dp_rx_tid *rx_tid)
+{
+	uint32_t max_list_size;
+	unsigned long curr_ts = qdf_get_system_timestamp();
+	uint32_t qref_index = soc->free_addr_list_idx;
+
+	max_list_size = soc->wlan_cfg_ctx->qref_control_size;
+
+	if (max_list_size == 0)
+		return;
+
+	soc->list_qdesc_addr_free[qref_index].ts_qdesc_mem_hdl = curr_ts;
+	soc->list_qdesc_addr_free[qref_index].hw_qdesc_paddr =
+							 rx_tid->hw_qdesc_paddr;
+	soc->list_qdesc_addr_free[qref_index].hw_qdesc_vaddr_align =
+						 rx_tid->hw_qdesc_vaddr_aligned;
+	soc->list_qdesc_addr_free[qref_index].hw_qdesc_vaddr_unalign =
+					       rx_tid->hw_qdesc_vaddr_unaligned;
+	soc->free_addr_list_idx++;
+
+	if (soc->free_addr_list_idx == max_list_size)
+		soc->free_addr_list_idx = 0;
+}
+
+static inline
+void add_entry_write_list(struct dp_soc *soc, struct dp_peer *peer,
+			  uint32_t tid)
+{
+	uint32_t max_list_size;
+	unsigned long curr_ts = qdf_get_system_timestamp();
+
+	max_list_size = soc->wlan_cfg_ctx->qref_control_size;
+
+	if (max_list_size == 0)
+		return;
+
+	soc->reo_write_list[soc->write_paddr_list_idx].ts_qaddr_del = curr_ts;
+	soc->reo_write_list[soc->write_paddr_list_idx].peer_id = peer->peer_id;
+	soc->reo_write_list[soc->write_paddr_list_idx].paddr =
+					       peer->rx_tid[tid].hw_qdesc_paddr;
+	soc->reo_write_list[soc->write_paddr_list_idx].tid = tid;
+	soc->write_paddr_list_idx++;
+
+	if (soc->write_paddr_list_idx == max_list_size)
+		soc->write_paddr_list_idx = 0;
+}
+
 #ifdef REO_QDESC_HISTORY
 enum reo_qdesc_event_type {
 	REO_QDESC_UPDATE_CB = 0,
@@ -635,6 +713,19 @@ void dp_rx_peer_unmap_handler(struct dp_soc *soc, uint16_t peer_id,
 			      uint8_t vdev_id, uint8_t *peer_mac_addr,
 			      uint8_t is_wds, uint32_t free_wds_count);
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(DP_MLO_LINK_STATS_SUPPORT)
+/**
+ * dp_rx_peer_ext_evt() - handle peer extended event from firmware
+ * @soc: DP soc handle
+ * @info: extended evt info
+ *
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+dp_rx_peer_ext_evt(struct dp_soc *soc, struct dp_peer_ext_evt_info *info);
+#endif
 #ifdef DP_RX_UDP_OVER_PEER_ROAM
 /**
  * dp_rx_reset_roaming_peer() - Reset the roamed peer in vdev
@@ -2330,6 +2421,51 @@ dp_peer_update_state(struct dp_soc *soc,
 		QDF_MAC_ADDR_REF(peer->mac_addr.raw));
 }
 
+/**
+ * dp_vdev_iterate_specific_peer_type() - API to iterate through vdev peer
+ * list based on type of peer (Legacy or MLD peer)
+ *
+ * @vdev: DP vdev context
+ * @func: function to be called for each peer
+ * @arg: argument need to be passed to func
+ * @mod_id: module_id
+ * @peer_type: type of peer - MLO Link Peer or Legacy Peer
+ *
+ * Return: void
+ */
+static inline void
+dp_vdev_iterate_specific_peer_type(struct dp_vdev *vdev,
+				   dp_peer_iter_func *func,
+				   void *arg, enum dp_mod_id mod_id,
+				   enum dp_peer_type peer_type)
+{
+	struct dp_peer *peer;
+	struct dp_peer *tmp_peer;
+	struct dp_soc *soc = NULL;
+
+	if (!vdev || !vdev->pdev || !vdev->pdev->soc)
+		return;
+
+	soc = vdev->pdev->soc;
+
+	qdf_spin_lock_bh(&vdev->peer_list_lock);
+	TAILQ_FOREACH_SAFE(peer, &vdev->peer_list,
+			   peer_list_elem,
+			   tmp_peer) {
+		if (dp_peer_get_ref(soc, peer, mod_id) ==
+					QDF_STATUS_SUCCESS) {
+			if ((peer_type == DP_PEER_TYPE_LEGACY &&
+			     (IS_DP_LEGACY_PEER(peer))) ||
+			    (peer_type == DP_PEER_TYPE_MLO_LINK &&
+			     (IS_MLO_DP_LINK_PEER(peer)))) {
+				(*func)(soc, peer, arg);
+			}
+			dp_peer_unref_delete(peer, mod_id);
+		}
+	}
+	qdf_spin_unlock_bh(&vdev->peer_list_lock);
+}
+
 #ifdef REO_SHARED_QREF_TABLE_EN
 void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
 					struct dp_peer *peer);
@@ -2356,4 +2492,23 @@ bool dp_peer_check_wds_ext_peer(struct dp_peer *peer);
  * Return: DP MLD peer id
  */
 uint16_t dp_gen_ml_peer_id(struct dp_soc *soc, uint16_t peer_id);
+
+#ifdef FEATURE_AST
+/**
+ * dp_peer_host_add_map_ast() - Add ast entry with HW AST Index
+ * @soc: SoC handle
+ * @peer_id: peer id from firmware
+ * @mac_addr: MAC address of ast node
+ * @hw_peer_id: HW AST Index returned by target in peer map event
+ * @vdev_id: vdev id for VAP to which the peer belongs to
+ * @ast_hash: ast hash value in HW
+ * @is_wds: flag to indicate peer map event for WDS ast entry
+ *
+ * Return: QDF_STATUS code
+ */
+QDF_STATUS dp_peer_host_add_map_ast(struct dp_soc *soc, uint16_t peer_id,
+				    uint8_t *mac_addr, uint16_t hw_peer_id,
+				    uint8_t vdev_id, uint16_t ast_hash,
+				    uint8_t is_wds);
+#endif
 #endif /* _DP_PEER_H_ */

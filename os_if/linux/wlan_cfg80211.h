@@ -175,8 +175,12 @@
  * @QCA_NL80211_VENDOR_SUBCMD_AFC_EVENT_INDEX: AFC Event index
  * @QCA_NL80211_VENDOR_SUBCMD_DOZED_AP_INDEX: Dozed AP event index
  * @QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS_INDEX: Roam stats index index
+ * @QCA_NL80211_VENDOR_SUBCMD_CONNECTED_CHANNEL_STATS_INDEX: Connected channel
+ * stats index
  * @QCA_NL80211_VENDOR_SUBCMD_DRIVER_DISCONNECT_REASON_INDEX:
  *	Driver disconnect reason index
+ * @QCA_NL80211_VENDOR_SUBCMD_TID_TO_LINK_MAP_INDEX: TID-to-link map index
+ * @QCA_NL80211_VENDOR_SUBCMD_LINK_RECONFIG_INDEX: link reconfig event index
  */
 
 enum qca_nl80211_vendor_subcmds_index {
@@ -302,6 +306,13 @@ enum qca_nl80211_vendor_subcmds_index {
 #endif
 #ifdef WLAN_FEATURE_ROAM_INFO_STATS
 	QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS_INDEX,
+#endif
+	QCA_NL80211_VENDOR_SUBCMD_CONNECTED_CHANNEL_STATS_INDEX,
+#if defined WLAN_FEATURE_11BE_MLO
+	QCA_NL80211_VENDOR_SUBCMD_TID_TO_LINK_MAP_INDEX,
+#if defined(CONN_MGR_ADV_FEATURE)
+	QCA_NL80211_VENDOR_SUBCMD_LINK_RECONFIG_INDEX,
+#endif
 #endif
 };
 
@@ -600,7 +611,7 @@ static inline void wlan_cfg80211_unregister_netdevice(struct net_device *dev)
 #endif
 
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
-#ifdef CFG80211_RU_PUNCT_NOTIFY
+#if defined(CFG80211_RU_PUNCT_NOTIFY) || defined(CFG80211_MLO_SINGLE_NETDEV_API)
 static inline
 void wlan_cfg80211_ch_switch_notify(struct net_device *dev,
 				    struct cfg80211_chan_def *chandef,

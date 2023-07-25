@@ -82,6 +82,13 @@ int64_t qdf_ktime_to_ns(qdf_ktime_t ktime)
 
 qdf_export_symbol(qdf_ktime_to_ns);
 
+qdf_ktime_t qdf_time_ktime_set(const s64 secs, const unsigned long nsecs)
+{
+	return __qdf_time_ktime_set(secs, nsecs);
+}
+
+qdf_export_symbol(qdf_time_ktime_set);
+
 qdf_time_t qdf_system_ticks(void)
 {
 	return __qdf_system_ticks();
@@ -210,7 +217,8 @@ uint64_t qdf_usecs_to_log_timestamp(uint64_t usecs)
 
 	ts = (usecs * QDF_LOG_TIMESTAMP_CYCLES_PER_10_US);
 
-	return do_div(ts, 10ul);
+	do_div(ts, 10ul);
+	return ts;
 }
 
 qdf_export_symbol(qdf_usecs_to_log_timestamp);
@@ -249,3 +257,31 @@ unsigned long long qdf_time_sched_clock(void)
 }
 
 qdf_export_symbol(qdf_time_sched_clock);
+
+void qdf_usleep_range(unsigned long min, unsigned long max)
+{
+	__qdf_usleep_range(min, max);
+}
+
+qdf_export_symbol(qdf_usleep_range);
+
+qdf_ktime_t qdf_ktime_get_ns(void)
+{
+	return __qdf_ktime_get_ns();
+}
+
+qdf_export_symbol(qdf_ktime_get_ns);
+
+qdf_ktime_t qdf_ktime_get_real_ns(void)
+{
+	return __qdf_ktime_get_real_ns();
+}
+
+qdf_export_symbol(qdf_ktime_get_real_ns);
+
+int qdf_ktime_compare(qdf_ktime_t ktime1, qdf_ktime_t ktime2)
+{
+	return __qdf_ktime_compare(ktime1, ktime2);
+}
+
+qdf_export_symbol(qdf_ktime_compare);

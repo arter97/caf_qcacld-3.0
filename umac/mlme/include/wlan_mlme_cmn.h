@@ -68,6 +68,9 @@
  * @pairwise: true if a pairwise key
  * @cipher_type: key cipher type
  *
+ * @mlme_cm_link_reconfig_notify_cb:
+ * @vdev: vdev object
+ *
  * @mlme_cm_roam_start_cb: Roam start callback
  * @vdev: vdev pointer
  *
@@ -98,6 +101,8 @@
  * @psoc: psoc pointer
  * @rsp: vendor handoff response pointer
  * @vendor_handoff_context: vendor handoff context
+ *
+ * @mlme_cm_perfd_reset_cpufreq_ctrl_cb: callback to reset CPU min freq
  */
 struct mlme_cm_ops {
 	QDF_STATUS (*mlme_cm_connect_complete_cb)(
@@ -124,6 +129,8 @@ struct mlme_cm_ops {
 	QDF_STATUS (*mlme_cm_send_keys_cb)(struct wlan_objmgr_vdev *vdev,
 					   uint8_t key_index, bool pairwise,
 					   enum wlan_crypto_cipher_type cipher_type);
+	QDF_STATUS (*mlme_cm_link_reconfig_notify_cb)(
+					struct wlan_objmgr_vdev *vdev);
 #endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	QDF_STATUS (*mlme_cm_roam_start_cb)(struct wlan_objmgr_vdev *vdev);
@@ -150,18 +157,24 @@ struct mlme_cm_ops {
 				struct wlan_objmgr_psoc *psoc,
 				void *vendor_handoff_context);
 #endif
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+	void (*mlme_cm_perfd_reset_cpufreq_ctrl_cb)(void);
+#endif
 };
 
 /**
  * struct mlme_vdev_mgr_ops - MLME VDEV mgr osif callbacks
  * @mlme_vdev_mgr_set_mac_addr_response: Callback to indicate set MAC address
  *                                       response to osif
+ * @mlme_vdev_mgr_send_scan_done_complete_cb: Callback to indicate scan done
+ *                                            complete to osif
  */
 struct mlme_vdev_mgr_ops {
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	QDF_STATUS (*mlme_vdev_mgr_set_mac_addr_response)(uint8_t vdev_id,
 							  uint8_t resp_status);
 #endif
+	void (*mlme_vdev_mgr_send_scan_done_complete_cb)(uint8_t vdev_id);
 };
 
 /**
@@ -310,6 +323,8 @@ struct mlme_twt_ops {
  * @mlme_cm_ext_rso_stop_cb:                callback to send rso stop to FW
  * @mlme_cm_ext_reassoc_req_cb:             callback for reassoc request to
  *                                          VDEV/PEER SM
+ * @mlme_psoc_ext_hdl_enable: to enable mlme ext param handler
+ * @mlme_psoc_ext_hdl_disable: to disable mlme ext param handler
  * @mlme_vdev_send_set_mac_addr:            callback to send set MAC address
  *                                          request to FW
  * @mlme_ext_get_acs_inprogress:            callback to determine if ACS is
@@ -385,6 +400,8 @@ struct mlme_ext_ops {
 	QDF_STATUS (*mlme_cm_ext_reassoc_req_cb)(
 				struct wlan_objmgr_vdev *vdev,
 				struct wlan_cm_vdev_reassoc_req *req);
+	QDF_STATUS (*mlme_psoc_ext_hdl_enable)(struct wlan_objmgr_psoc *psoc);
+	QDF_STATUS (*mlme_psoc_ext_hdl_disable)(struct wlan_objmgr_psoc *psoc);
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	QDF_STATUS (*mlme_vdev_send_set_mac_addr)(
 						struct qdf_mac_addr mac_addr,
@@ -446,6 +463,22 @@ QDF_STATUS mlme_psoc_ops_ext_hdl_create(struct psoc_mlme_obj *psoc_mlme);
  *         Else FAILURE
  */
 QDF_STATUS mlme_psoc_ops_ext_hdl_destroy(struct psoc_mlme_obj *psoc_mlme);
+
+/**
+ * mlme_psoc_ext_enable_cb() - to enable mlme ext param handler callback
+ * @psoc: psoc common object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_psoc_ext_enable_cb(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * mlme_psoc_ext_disable_cb() - to disable mlme ext param handler callback
+ * @psoc: psoc common object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_psoc_ext_disable_cb(struct wlan_objmgr_psoc *psoc);
 
 /**
  * mlme_pdev_ops_ext_hdl_create - Alloc PDEV mlme ext handle
@@ -900,6 +933,14 @@ QDF_STATUS mlme_cm_osif_pmksa_candidate_notify(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS mlme_cm_osif_send_keys(struct wlan_objmgr_vdev *vdev,
 				  uint8_t key_index, bool pairwise,
 				  enum wlan_crypto_cipher_type cipher_type);
+
+/**
+ * mlme_cm_osif_link_reconfig_notify() - notify link reconfig event
+ * @vdev: vdev pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_cm_osif_link_reconfig_notify(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 QDF_STATUS mlme_cm_osif_roam_sync_ind(struct wlan_objmgr_vdev *vdev)
@@ -911,6 +952,12 @@ static inline
 QDF_STATUS mlme_cm_osif_send_keys(struct wlan_objmgr_vdev *vdev,
 				  uint8_t key_index, bool pairwise,
 				  enum wlan_crypto_cipher_type cipher_type)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS mlme_cm_osif_link_reconfig_notify(struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -1058,6 +1105,14 @@ void mlme_set_osif_twt_cb(osif_twt_get_global_ops_cb twt_osif_ops);
  * Return: True if max chan switch is enabled else false
  */
 bool mlme_max_chan_switch_is_set(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * mlme_send_scan_done_complete_cb() - send scan done indication to upper layer
+ * @vdev_id: vdev id
+ *
+ * Return: none
+ */
+void mlme_send_scan_done_complete_cb(uint8_t vdev_id);
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 /**
@@ -1311,4 +1366,21 @@ void mlme_vdev_reconfig_timer_cb(void *arg);
  * Return: True if reassoc on mlo reconfig link add ie enable
  */
 bool mlme_mlo_is_reconfig_reassoc_enable(struct wlan_objmgr_psoc *psoc);
+
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+/**
+ * mlme_cm_osif_perfd_reset_cpufreq() - Function to reset CPU freq
+ *
+ * This function is to reset the CPU freq
+ *
+ * Return: None
+ */
+void mlme_cm_osif_perfd_reset_cpufreq(void);
+#else
+static inline
+void mlme_cm_osif_perfd_reset_cpufreq(void)
+{
+}
+#endif
+
 #endif

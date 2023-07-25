@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -114,6 +114,8 @@
 
 #define STREAMFS_NUM_SUBBUF_WAIKIKI  127
 
+#define MAX_AGC_GAIN_VALUE_WAIKIKI 64
+
 /* Max 4 users in MU case for Spruce */
 #define SPRUCE_CFR_MU_USERS 4
 
@@ -130,6 +132,43 @@
 	 SPRUCE_MAX_DATA_LENGTH_BYTES)
 
 #define STREAMFS_NUM_SUBBUF_SPRUCE 255
+
+/* Max 4 users in MU case for QCN6432 */
+#define QCN6432_CFR_MU_USERS 4
+
+#define QCN6432_MAX_HEADER_LENGTH_WORDS 22
+
+#define QCN6432_MAX_DATA_LENGTH_BYTES 8192
+
+/* Max size :
+ * sizeof(csi_cfr_header) + 88 bytes(cfr header) + 8192 bytes(cfr payload)
+ */
+#define STREAMFS_MAX_SUBBUF_QCN6432 \
+	(sizeof(struct csi_cfr_header) + \
+	 (QCN6432_MAX_HEADER_LENGTH_WORDS * 4) + \
+	 QCN6432_MAX_DATA_LENGTH_BYTES)
+
+#define STREAMFS_NUM_SUBBUF_QCN6432 255
+
+/* Max 4 users in MU case for QCA5332 */
+#define QCA5332_CFR_MU_USERS 4
+
+#define QCA5332_MAX_HEADER_LENGTH_WORDS 22
+
+#define QCA5332_MAX_DATA_LENGTH_BYTES 8192
+
+/* Max size :
+ * sizeof(csi_cfr_header) + 88 bytes(cfr header) + 8192 bytes(cfr payload)
+ * where cfr_header size = rtt upload header len + freeze_tlv len +
+ *                         uplink user setup info + alignment/reserved bytes
+ *                       = 16bytes + 32bytes + (8bytes * 4users) + 8bytes
+ */
+#define STREAMFS_MAX_SUBBUF_QCA5332 \
+	(sizeof(struct csi_cfr_header) + \
+	 (QCA5332_MAX_HEADER_LENGTH_WORDS * 4) + \
+	QCA5332_MAX_DATA_LENGTH_BYTES)
+
+#define STREAMFS_NUM_SUBBUF_QCA5332 255
 
 /* enum macrx_freeze_tlv_version: Reported by uCode in enh_dma_header
  * MACRX_FREEZE_TLV_VERSION_1: Single MU UL user info reported by MAC.

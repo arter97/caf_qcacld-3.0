@@ -63,6 +63,35 @@ u_int32_t snr_to_signal_strength(uint8_t snr)
 #endif
 
 /**
+ * tagret_if_snr_to_signal_strength() - wrapper API to snr_to_signal_strength to
+ *                                      consider target_type.
+ * @target_type: target type of the pdev
+ * @meta: pointer to CFR metadata
+ * @ppdu: rx ppdu having per chain rssi to be converted to dBm
+ *
+ * Return: none
+ */
+static inline
+void target_if_snr_to_signal_strength(uint32_t target_type,
+				      struct enh_cfr_metadata *meta,
+				      struct cdp_rx_indication_ppdu *ppdu)
+{
+	uint8_t i;
+
+	/* No need to add CMN_NOISE_FLOOR for york */
+	if (target_type == TARGET_TYPE_QCN9160) {
+		for (i = 0; i < MAX_CHAIN; i++) {
+			meta->chain_rssi[i] = (int8_t)ppdu->per_chain_rssi[i];
+		}
+	} else {
+		for (i = 0; i < MAX_CHAIN; i++) {
+			meta->chain_rssi[i] =
+				snr_to_signal_strength(ppdu->per_chain_rssi[i]);
+		}
+	}
+}
+
+/**
  * get_lut_entry() - Retrieve LUT entry using cookie number
  * @pcfr: PDEV CFR object
  * @offset: cookie number
@@ -734,6 +763,16 @@ static QDF_STATUS check_dma_length(struct look_up_table *lut,
 		    lut->payload_length <= WAIKIKI_MAX_DATA_LENGTH_BYTES) {
 			return QDF_STATUS_SUCCESS;
 		}
+	} else if (target_type == TARGET_TYPE_QCN6432) {
+		if (lut->header_length <= QCN6432_MAX_HEADER_LENGTH_WORDS &&
+		    lut->payload_length <= QCN6432_MAX_DATA_LENGTH_BYTES) {
+			return QDF_STATUS_SUCCESS;
+		}
+	} else if (target_type == TARGET_TYPE_QCA5332) {
+		if (lut->header_length <= QCA5332_MAX_HEADER_LENGTH_WORDS &&
+		    lut->payload_length <= QCA5332_MAX_DATA_LENGTH_BYTES) {
+			return QDF_STATUS_SUCCESS;
+		}
 	} else {
 		if (lut->header_length <= CYP_MAX_HEADER_LENGTH_WORDS &&
 		    lut->payload_length <= CYP_MAX_DATA_LENGTH_BYTES) {
@@ -869,6 +908,58 @@ done:
 }
 
 /**
+ * target_if_cfr_get_11be_support_flag(): check if target supports 11be
+ * @pdev_id: pdev id of the pdev
+ * @tgt_hdl: psoc info of pdev associated with pdev_id. Caller of this API to
+ *           ensure that tgt_hdl is not NULL
+ *
+ * Return: true if 11be supported, false otherwise
+ */
+#ifdef WLAN_FEATURE_11BE
+static inline
+bool target_if_cfr_get_11be_support_flag(uint8_t pdev_id,
+					 struct target_psoc_info *tgt_hdl)
+{
+	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap_arr, *mac_phy_cap;
+
+	mac_phy_cap_arr = target_psoc_get_mac_phy_cap(tgt_hdl);
+
+	if (!mac_phy_cap_arr)
+		return false;
+
+	mac_phy_cap = &mac_phy_cap_arr[pdev_id];
+	if (mac_phy_cap && mac_phy_cap->supports_11be)
+		return true;
+
+	return false;
+}
+#else
+static inline
+bool target_if_cfr_get_11be_support_flag(uint8_t pdev_id,
+					 struct target_psoc_info *tgt_hdl)
+{
+	return false;
+}
+#endif
+
+/**
+ * target_if_get_max_agc_gain(): Function to get the max agc gain supported
+ * based on the target_type
+ *
+ * @target_type: target type to which max agc gain needed
+ *
+ * Return: max agc gain value supported on target_type
+ */
+static inline
+uint32_t target_if_get_max_agc_gain(uint32_t target_type)
+{
+	if (target_type == TARGET_TYPE_QCN9224)
+		return MAX_AGC_GAIN_VALUE_WAIKIKI;
+	else
+		return MAX_AGC_GAIN;
+}
+
+/**
  * target_if_cfr_rx_tlv_process() - Process PPDU status TLVs and store info in
  * lookup table
  * @pdev: PDEV object
@@ -903,6 +994,11 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 	uint16_t pdelta, gain;
 	uint16_t gain_info[HOST_MAX_CHAINS];
 	bool invalid_gain_table_idx = false;
+	uint32_t target_max_agc_gain = 0;
+	bool supports_11be;
+	uint8_t pdev_id;
+	struct target_psoc_info *tgt_hdl;
+
 
 	if (qdf_unlikely(!pdev)) {
 		cfr_err("pdev is null\n");
@@ -941,6 +1037,17 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 		cfr_err("rx_ops is NULL");
 		goto relref;
 	}
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (qdf_unlikely(!tgt_hdl)) {
+		cfr_err("tgt_hdl is NULL");
+		goto relref;
+	}
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+
+	supports_11be = target_if_cfr_get_11be_support_flag(pdev_id, tgt_hdl);
+
 	target_type = target_if_cfr_get_target_type(psoc);
 	cfr_rx_ops = &rx_ops->cfr_rx_ops;
 	buf_addr_extn = cfr_info->rtt_che_buffer_pointer_high8 & 0xF;
@@ -1029,6 +1136,8 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 	gain_info[6] = get_u16_lsb(cfr_info->agc_gain_info3);
 	gain_info[7] = get_u16_msb(cfr_info->agc_gain_info3);
 
+	target_max_agc_gain = target_if_get_max_agc_gain(target_type);
+
 	for (i = 0; i < HOST_MAX_CHAINS; i++) {
 		meta->agc_gain[i] = get_gain_db(gain_info[i]);
 		meta->agc_gain_tbl_index[i] = get_gain_table_idx(gain_info[i]);
@@ -1040,8 +1149,8 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 			invalid_gain_table_idx = true;
 		}
 
-		if (meta->agc_gain[i] > MAX_AGC_GAIN)
-			meta->agc_gain[i] = MAX_AGC_GAIN;
+		if (meta->agc_gain[i] > target_max_agc_gain)
+			meta->agc_gain[i] = target_max_agc_gain;
 	}
 
 	/**
@@ -1064,7 +1173,15 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 				pdelta = pcfr->phase_delta[i][MAX_AGC_GAIN -
 							      1 -
 							      gain];
+			} else if (supports_11be &&
+				   gain < target_max_agc_gain) {
+				/**
+				 * 11be supports gain 62, 63 & gain 61's phase
+				 * delta need to be copied to 62 & 63
+				 */
+				pdelta = pcfr->phase_delta[i][0];
 			} else {
+				/* populate 0 for last gain index */
 				pdelta = 0;
 			}
 			/**
@@ -1123,9 +1240,7 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 	if (meta->num_mu_users > pcfr->max_mu_users)
 		meta->num_mu_users = pcfr->max_mu_users;
 
-	for (i = 0; i < MAX_CHAIN; i++)
-		meta->chain_rssi[i] =
-			snr_to_signal_strength(cdp_rx_ppdu->per_chain_rssi[i]);
+	target_if_snr_to_signal_strength(target_type, meta, cdp_rx_ppdu);
 
 	if (cdp_rx_ppdu->u.ppdu_type != CDP_RX_TYPE_SU) {
 		for (i = 0 ; i < meta->num_mu_users; i++) {
@@ -2234,13 +2349,24 @@ QDF_STATUS cfr_enh_init_pdev(struct wlan_objmgr_psoc *psoc,
 		   target_type == TARGET_TYPE_QCN9160) {
 		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_SPRUCE;
 		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_SPRUCE;
-		pcfr->chip_type = CFR_CAPTURE_RADIO_SPRUCE;
+		pcfr->chip_type = (target_type == TARGET_TYPE_QCN6122) ?
+			CFR_CAPTURE_RADIO_SPRUCE : CFR_CAPTURE_RADIO_YORK;
 		pcfr->max_mu_users = SPRUCE_CFR_MU_USERS;
 	} else if (target_type == TARGET_TYPE_QCN9224) {
 		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_WAIKIKI;
 		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_WAIKIKI;
 		pcfr->chip_type = CFR_CAPTURE_RADIO_WAIKIKI;
 		pcfr->max_mu_users = WAIKIKI_CFR_MU_USERS;
+	} else if (target_type == TARGET_TYPE_QCN6432) {
+		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_QCN6432;
+		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_QCN6432;
+		pcfr->chip_type = CFR_CAPTURE_RADIO_PEBBLE;
+		pcfr->max_mu_users = QCN6432_CFR_MU_USERS;
+	} else if (target_type == TARGET_TYPE_QCA5332) {
+		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_QCA5332;
+		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_QCA5332;
+		pcfr->chip_type = CFR_CAPTURE_RADIO_MIAMI;
+		pcfr->max_mu_users = QCA5332_CFR_MU_USERS;
 	} else {
 		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_CYP;
 		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_CYP;
@@ -2257,6 +2383,7 @@ QDF_STATUS cfr_enh_init_pdev(struct wlan_objmgr_psoc *psoc,
 	}
 
 	qdf_spinlock_create(&pcfr->lut_lock);
+	pcfr->lut_lock_initialised = true;
 
 	return status;
 }
@@ -2319,7 +2446,10 @@ QDF_STATUS cfr_enh_deinit_pdev(struct wlan_objmgr_psoc *psoc,
 	if (status != QDF_STATUS_SUCCESS)
 		cfr_err("Failed to unregister phase delta handler");
 
-	qdf_spinlock_destroy(&pcfr->lut_lock);
+	if (pcfr->lut_lock_initialised) {
+		qdf_spinlock_destroy(&pcfr->lut_lock);
+		pcfr->lut_lock_initialised = false;
+	}
 
 	return status;
 }

@@ -232,7 +232,7 @@ enum diag_tx_status wlan_get_diag_tx_status(enum qdf_dp_tx_rx_status tx_status);
 #define MAX_QDF_DP_TRACE_RECORDS       2000
 #endif
 
-#define QDF_DP_TRACE_RECORD_SIZE       50 /* bytes */
+#define QDF_DP_TRACE_RECORD_SIZE       66 /* bytes */
 #define INVALID_QDF_DP_TRACE_ADDR      0xffffffff
 #define QDF_DP_TRACE_VERBOSITY_HIGH		4
 #define QDF_DP_TRACE_VERBOSITY_MEDIUM		3
@@ -933,11 +933,13 @@ void qdf_dp_set_no_of_record(uint32_t val);
  * @skb: skb pointer
  * @dir: direction
  * @pdev_id: pdev_id
+ * @op_mode: Vdev Operation mode
  *
  * Return: true: some protocol was logged, false: no protocol was logged.
  */
 bool qdf_dp_trace_log_pkt(uint8_t vdev_id, struct sk_buff *skb,
-			  enum qdf_proto_dir dir, uint8_t pdev_id);
+			  enum qdf_proto_dir dir, uint8_t pdev_id,
+			  enum QDF_OPMODE op_mode);
 
 /**
  * qdf_dp_trace_init() - enables the DP trace
@@ -1134,13 +1136,15 @@ enum qdf_dp_tx_rx_status qdf_dp_get_status_from_a_status(uint8_t status);
  * @msdu_id: msdu_id
  * @buf_arg_status: return status
  * @qdf_tx_status: qdf tx rx status
+ * @op_mode: Vdev Operation mode
  *
  * Return: none
  */
 void qdf_dp_trace_ptr(qdf_nbuf_t nbuf, enum QDF_DP_TRACE_ID code,
 		      uint8_t pdev_id, uint8_t *data, uint8_t size,
 		      uint16_t msdu_id, uint16_t buf_arg_status,
-		      enum qdf_dp_tx_rx_status qdf_tx_status);
+		      enum qdf_dp_tx_rx_status qdf_tx_status,
+		      enum QDF_OPMODE op_mode);
 
 /**
  * qdf_dp_trace_throttle_live_mode() - Throttle DP Trace live mode
@@ -1358,7 +1362,8 @@ void qdf_dp_track_noack_check(qdf_nbuf_t nbuf, enum qdf_proto_subtype *subtype);
 #else
 static inline
 bool qdf_dp_trace_log_pkt(uint8_t vdev_id, struct sk_buff *skb,
-			  enum qdf_proto_dir dir, uint8_t pdev_id)
+			  enum qdf_proto_dir dir, uint8_t pdev_id,
+			  enum QDF_OPMODE op_mode)
 {
 	return false;
 }
@@ -1875,6 +1880,18 @@ int qdf_logging_set_flush_timer(uint32_t milliseconds);
  * Return: void
  */
 void qdf_logging_flush_logs(void);
+
+/**
+ * qdf_print_get_category_verbose() - Get category verbose information for the
+ *                                    print control object
+ *
+ * @idx: Index of print control object
+ * @category: Category information
+ *
+ * Return: Verbose value for the particular category
+ */
+QDF_TRACE_LEVEL qdf_print_get_category_verbose(unsigned int idx,
+					       QDF_MODULE_ID category);
 
 /**
  * qdf_print_is_category_enabled() - Get category information for the

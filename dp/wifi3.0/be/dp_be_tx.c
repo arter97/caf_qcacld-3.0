@@ -367,7 +367,7 @@ void dp_tx_process_htt_completion_be(struct dp_soc *soc,
 		dp_tx_comp_process_tx_status(soc, tx_desc, &ts, txrx_peer,
 					     ring_id);
 		dp_tx_comp_process_desc(soc, tx_desc, &ts, txrx_peer);
-		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+		dp_tx_desc_release(soc, tx_desc, tx_desc->pool_id);
 
 		if (qdf_likely(txrx_peer))
 			dp_txrx_peer_unref_delete(txrx_ref_handle,
@@ -407,7 +407,7 @@ void dp_tx_process_htt_completion_be(struct dp_soc *soc,
 
 release_tx_desc:
 	dp_tx_comp_free_buf(soc, tx_desc, false);
-	dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+	dp_tx_desc_release(soc, tx_desc, tx_desc->pool_id);
 	if (vdev)
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT_COMP);
 }
@@ -661,7 +661,8 @@ dp_tx_mlo_mcast_multipass_handler(struct dp_soc *soc,
 	if (mpass_buf.vlan_id == INVALID_VLAN_ID) {
 		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 				      dp_tx_mlo_mcast_multipass_lookup,
-				      &mpass_buf, DP_MOD_ID_TX);
+				      &mpass_buf, DP_MOD_ID_TX,
+				      DP_ALL_VDEV_ITER);
 		/*
 		 * Do not drop the frame when vlan_id doesn't match.
 		 * Send the frame as it is.
@@ -696,7 +697,8 @@ dp_tx_mlo_mcast_multipass_handler(struct dp_soc *soc,
 		/* send frame on partner vdevs */
 		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 				      dp_tx_mlo_mcast_multipass_send,
-				      &mpass_buf_copy, DP_MOD_ID_TX);
+				      &mpass_buf_copy, DP_MOD_ID_TX,
+				      DP_LINK_VDEV_ITER);
 
 		/* send frame on mcast primary vdev */
 		dp_tx_mlo_mcast_multipass_send(be_vdev, vdev, &mpass_buf_copy);
@@ -709,7 +711,7 @@ dp_tx_mlo_mcast_multipass_handler(struct dp_soc *soc,
 
 	dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 			      dp_tx_mlo_mcast_multipass_send,
-			      &mpass_buf, DP_MOD_ID_TX);
+			      &mpass_buf, DP_MOD_ID_TX, DP_LINK_VDEV_ITER);
 	dp_tx_mlo_mcast_multipass_send(be_vdev, vdev, &mpass_buf);
 
 	if (qdf_unlikely(be_vdev->seq_num > MAX_GSN_NUM))
@@ -759,6 +761,12 @@ dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
 				    &msdu_info, nbuf_clone, DP_INVALID_PEER);
 	}
 
+	if (qdf_unlikely(dp_tx_proxy_arp(ptnr_vdev, nbuf_clone) !=
+			 QDF_STATUS_SUCCESS)) {
+		qdf_nbuf_free(nbuf_clone);
+		return;
+	}
+
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 	dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
 	msdu_info.gsn = be_vdev->seq_num;
@@ -798,7 +806,7 @@ void dp_tx_mlo_mcast_handler_be(struct dp_soc *soc,
 	/* send frame on partner vdevs */
 	dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 			      dp_tx_mlo_mcast_pkt_send,
-			      nbuf, DP_MOD_ID_REINJECT);
+			      nbuf, DP_MOD_ID_REINJECT, DP_LINK_VDEV_ITER);
 
 	/* send frame on mcast primary vdev */
 	dp_tx_mlo_mcast_pkt_send(be_vdev, vdev, nbuf);
@@ -881,7 +889,8 @@ dp_tx_mlo_mcast_send_be(struct dp_soc *soc, struct dp_vdev *vdev,
 		if (qdf_unlikely(!dp_tx_mcast_enhance(vdev, nbuf))) {
 			dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 					      dp_tx_mlo_mcast_enhance_be,
-					      nbuf, DP_MOD_ID_TX);
+					      nbuf, DP_MOD_ID_TX,
+					      DP_ALL_VDEV_ITER);
 			qdf_nbuf_free(nbuf);
 			return NULL;
 		}
@@ -937,7 +946,6 @@ void dp_sawf_config_be(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 	if (!wlan_cfg_get_sawf_config(soc->wlan_cfg_ctx))
 		return;
 
-	dp_sawf_tcl_cmd(fw_metadata, nbuf);
 	q_id = dp_sawf_queue_id_get(nbuf);
 
 	if (q_id == DP_SAWF_DEFAULT_Q_INVALID)
@@ -945,6 +953,12 @@ void dp_sawf_config_be(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 	msdu_info->tid = (q_id & (CDP_DATA_TID_MAX - 1));
 	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached,
 				 (q_id & (CDP_DATA_TID_MAX - 1)));
+
+	if ((q_id >= DP_SAWF_DEFAULT_QUEUE_MIN) &&
+	    (q_id < DP_SAWF_DEFAULT_QUEUE_MAX))
+		return;
+
+	dp_sawf_tcl_cmd(fw_metadata, nbuf);
 	hal_tx_desc_set_flow_override_enable(hal_tx_desc_cached,
 					     DP_TX_FLOW_OVERRIDE_ENABLE);
 	hal_tx_desc_set_flow_override(hal_tx_desc_cached,
@@ -1026,6 +1040,7 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 	dp_txrx_ref_handle txrx_ref_handle = NULL;
 	struct dp_vdev *vdev = NULL;
 	struct dp_pdev *pdev = NULL;
+	struct dp_srng *srng;
 
 	if (qdf_unlikely(dp_srng_access_start(NULL, soc, hal_ring_hdl))) {
 		dp_err("HAL RING Access Failed -- %pK", hal_ring_hdl);
@@ -1041,6 +1056,14 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 
 	last_prefetch_hw_desc = dp_srng_dst_prefetch(hal_soc, hal_ring_hdl,
 						     num_avail_for_reap);
+
+	srng = &be_soc->ppeds_wbm_release_ring;
+
+	if (srng) {
+		hal_update_ring_util(soc->hal_soc, srng->hal_srng,
+				     WBM2SW_RELEASE,
+				     &be_soc->ppeds_wbm_release_ring.stats);
+	}
 
 	while (qdf_likely(num_avail_for_reap--)) {
 		tx_comp_hal_desc =  dp_srng_dst_get_next(soc, hal_ring_hdl);
@@ -1888,7 +1911,7 @@ ring_access_fail2:
 	return NULL;
 
 release_desc:
-	dp_tx_desc_release(tx_desc, desc_pool_id);
+	dp_tx_desc_release(soc, tx_desc, desc_pool_id);
 
 	return nbuf;
 }

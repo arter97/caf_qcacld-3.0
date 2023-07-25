@@ -85,6 +85,8 @@ enum reg_domain {
 	FCC17_WORLD = 0xEB,
 	FCC17_ETSIC = 0xEC,
 	FCC18_ETSIC = 0xED,
+	FCC20_FCCA = 0xEF,
+	FCC21_ETSIC = 0xD2,
 
 	ETSI1_WORLD = 0x37,
 	ETSI2_WORLD = 0x35,
@@ -109,6 +111,8 @@ enum reg_domain {
 	ETSI17_WORLD = 0x4B,
 	ETSI18_WORLD = 0x6E,
 	ETSI19_WORLD = 0x7B,
+	ETSI20_WORLD = 0x7C,
+	ETSI21_WORLD = 0x7D,
 
 	APL1_WORLD = 0x52,
 	APL1_ETSIC = 0x55,
@@ -142,6 +146,7 @@ enum reg_domain {
 	APL26_ETSIC = 0x72,
 	APL27_FCCA = 0x73,
 	APL28_ETSIC = 0x76,
+	APL29_ETSIC = 0x77,
 
 	WOR0_WORLD = 0x60,
 	WOR1_WORLD = 0x61,
@@ -191,6 +196,7 @@ enum reg_domain {
 	MKK11_MKKA2 = 0xD8,
 	MKK16_MKKC = 0xDF,
 	MKK17_MKKC = 0xE1,
+	MKK18_MKKC = 0xEE,
 
 	WORLD_60 = 0x60,
 	WORLD_61 = 0x61,
@@ -226,6 +232,8 @@ enum reg_domains_5g {
 	FCC16,
 	FCC17,
 	FCC18,
+	FCC20,
+	FCC21,
 
 	ETSI1,
 	ETSI2,
@@ -245,6 +253,8 @@ enum reg_domains_5g {
 	ETSI17,
 	ETSI18,
 	ETSI19,
+	ETSI20,
+	ETSI21,
 
 	APL1,
 	APL2,
@@ -271,12 +281,14 @@ enum reg_domains_5g {
 	APL26,
 	APL27,
 	APL28,
+	APL29,
 
 	MKK3,
 	MKK5,
 	MKK11,
 	MKK16,
 	MKK17,
+	MKK18,
 	MKK4,
 	MKK9,
 	MKK10,
@@ -648,7 +660,9 @@ struct reg_domain_pair {
  * @FCC2_6G_10: Super domain FCC1_6G_10 for Canada LPI &
  *		SP(VLP to be added later)
  * @APL4_6G_11: Super domain APL3_6G_11 for Costa Rica LPI and VLP
- * @APL5_6G_12: Super domain APL3_6G_12 for CHILE LPI and VLP
+ * @APL5_6G_12: Super domain for future purpose
+ * @APL7_6G_13: Super domain APL7_6G_13 for CHILE
+ * @FCC1_6G_14: Super domain FCC1_6G_14 for DOMINICAN REPUBLIC
  */
 enum reg_super_domain_6g {
 	FCC1_6G_01 = 0x01,
@@ -668,6 +682,8 @@ enum reg_super_domain_6g {
 	FCC2_6G_10 = 0x10,
 	APL4_6G_11 = 0x11,
 	APL5_6G_12 = 0x12,
+	APL7_6G_13 = 0x13,
+	FCC1_6G_14 = 0x14,
 };
 
 #if defined(COMPILE_REGDB_6G)

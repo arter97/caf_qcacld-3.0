@@ -776,7 +776,7 @@ static void hal_rx_print_pn_6122(uint8_t *buf)
 	uint32_t pn_95_64 = HAL_RX_MPDU_PN_95_64_GET(mpdu_info);
 	uint32_t pn_127_96 = HAL_RX_MPDU_PN_127_96_GET(mpdu_info);
 
-	hal_debug("PN number pn_127_96 0x%x pn_95_64 0x%x pn_63_32 0x%x pn_31_0 0x%x ",
+	hal_debug("PN number pn_127_96 0x%x pn_95_64 0x%x pn_63_32 0x%x pn_31_0 0x%x",
 		  pn_127_96, pn_95_64, pn_63_32, pn_31_0);
 }
 
@@ -2399,6 +2399,7 @@ struct hal_hw_srng_config hw_srng_table_6122[] = {
 	{ /* TX_MONITOR_BUF */ 0},
 	{ /* TX_MONITOR_DST */ 0},
 	{ /* SW2RXDMA_NEW */ 0},
+	{ /* SW2RXDMA_LINK_RELEASE */ 0},
 };
 
 /**

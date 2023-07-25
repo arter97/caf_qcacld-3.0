@@ -426,10 +426,19 @@ void mlo_ap_link_start_rsp_notify(struct wlan_objmgr_vdev *vdev)
 
 void mlo_ap_vdev_detach(struct wlan_objmgr_vdev *vdev)
 {
+	struct wlan_mlo_dev_context *dev_ctx;
+
 	if (!vdev || !vdev->mlo_dev_ctx) {
 		mlo_err("Invalid input");
 		return;
 	}
+
+	dev_ctx = vdev->mlo_dev_ctx;
+
+	mlo_dev_lock_acquire(dev_ctx);
+	dev_ctx->ap_ctx->num_ml_vdevs--;
+	mlo_dev_lock_release(dev_ctx);
+
 	wlan_vdev_mlme_clear_mlo_vdev(vdev);
 }
 
@@ -468,6 +477,16 @@ uint16_t mlo_ap_ml_peerid_alloc(void)
 
 	return mlo_peer_id;
 }
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+void mlo_ap_ml_ptqm_peerid_free(struct wlan_mlo_dev_context *ml_dev,
+				uint16_t mlo_peer_id)
+{
+	/* Free the bitmap for ptqm migration */
+	if (qdf_test_bit(mlo_peer_id, ml_dev->mlo_peer_id_bmap))
+		qdf_clear_bit(mlo_peer_id, ml_dev->mlo_peer_id_bmap);
+}
+#endif
 
 void mlo_ap_ml_peerid_free(uint16_t mlo_peer_id)
 {

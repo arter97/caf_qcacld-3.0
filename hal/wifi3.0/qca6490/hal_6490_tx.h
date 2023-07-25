@@ -108,7 +108,7 @@ static void hal_tx_set_dscp_tid_map_6490(struct hal_soc *hal_soc, uint8_t *map,
 		addr += 4;
 	}
 
-	/* Diasble read/write access */
+	/* Disable read/write access */
 	regval = HAL_REG_READ(soc, cmn_reg_addr);
 	regval &=
 	~(HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_DSCP_TID_MAP_PROGRAM_EN_BMSK);

@@ -99,6 +99,8 @@
 /* no subchannels punctured */
 #define NO_SCHANS_PUNC 0x0000
 
+#define REG_MIN_POWER -128
+
 /**
  * enum dfs_reg - DFS region
  * @DFS_UNINIT_REGION: un-initialized region
@@ -984,13 +986,14 @@ struct get_usable_chan_req_params {
  *                        subset of the channels belonging to that opclass
  *                        as inputs and expects the driver to disable/enable
  *                        the channels in the subset.
+ * @power_type: channel power type
  */
 struct regulatory_channel {
 	qdf_freq_t center_freq;
 	uint8_t chan_num;
 	enum channel_state state;
 	uint32_t chan_flags;
-	uint32_t tx_power;
+	int32_t tx_power;
 	uint16_t min_bw;
 	uint16_t max_bw;
 	uint8_t ant_gain;
@@ -1006,6 +1009,7 @@ struct regulatory_channel {
 #endif
 #ifdef CONFIG_REG_CLIENT
 	uint8_t is_static_punctured;
+	enum reg_6g_ap_type power_type;
 #endif
 #ifndef CONFIG_REG_CLIENT
 	bool opclass_chan_disable;
@@ -1395,7 +1399,7 @@ struct afc_freq_obj {
  */
 struct chan_eirp_obj {
 	uint8_t cfi;
-	uint16_t eirp_power;
+	int16_t eirp_power;
 };
 
 /**
@@ -1871,7 +1875,7 @@ enum reg_phymode {
  */
 struct chan_power_info {
 	qdf_freq_t chan_cfreq;
-	uint8_t tx_power;
+	int8_t tx_power;
 };
 
 /**
@@ -1885,10 +1889,11 @@ struct chan_power_info {
  * @frequency: Array of operating frequency
  * @tpe: TPE values processed from TPE IE
  * @chan_power_info: power info to send to FW
+ * @is_power_constraint_abs: is power constraint absolute or not
  */
 struct reg_tpc_power_info {
 	bool is_psd_power;
-	uint8_t eirp_power;
+	int8_t eirp_power;
 	uint8_t power_type_6g;
 	uint8_t num_pwr_levels;
 	uint8_t reg_max[MAX_NUM_PWR_LEVEL];
@@ -1896,6 +1901,7 @@ struct reg_tpc_power_info {
 	qdf_freq_t frequency[MAX_NUM_PWR_LEVEL];
 	uint8_t tpe[MAX_NUM_PWR_LEVEL];
 	struct chan_power_info chan_power_info[MAX_NUM_PWR_LEVEL];
+	bool is_power_constraint_abs;
 };
 
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
@@ -2280,11 +2286,14 @@ enum HOST_REGDMN_MODE {
 /**
  * enum reg_afc_cmd_type - Type of AFC command sent to FW
  * @REG_AFC_CMD_SERV_RESP_READY: Server response is ready
- * @REG_AFC_CMD_RESET_AFC: Indicate the target to reset AFC
+ * @REG_AFC_CMD_RESET_AFC: Ask the target to send an AFC expiry event
+ * @REG_AFC_CMD_CLEAR_AFC_PAYLOAD: Ask the target to clear AFC Payload.
+ * The target in response sends REG_AFC_EXPIRY_EVENT_STOP_TX to host.
  */
 enum reg_afc_cmd_type {
 	REG_AFC_CMD_SERV_RESP_READY = 1,
 	REG_AFC_CMD_RESET_AFC = 2,
+	REG_AFC_CMD_CLEAR_AFC_PAYLOAD = 3,
 };
 
 /**
@@ -2334,6 +2343,18 @@ typedef void
 (*afc_power_tx_evt_handler)(struct wlan_objmgr_pdev *pdev,
 			    struct reg_fw_afc_power_event *power_info,
 			    void *arg);
+
+/**
+ * typedef afc_payload_reset_tx_evt_handler() - Function prototype of AFC
+ * payload reset event sent handler
+ * @pdev: Pointer to pdev
+ * @arg: Pointer to void (opaque) argument object
+ *
+ * Return: void
+ */
+typedef void
+(*afc_payload_reset_tx_evt_handler)(struct wlan_objmgr_pdev *pdev,
+				    void *arg);
 #endif
 
 /**

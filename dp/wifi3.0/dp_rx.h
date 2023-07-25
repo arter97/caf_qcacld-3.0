@@ -57,10 +57,6 @@
 #endif
 
 #define RX_BUFFER_RESERVATION   0
-#ifdef BE_PKTLOG_SUPPORT
-#define BUFFER_RESIDUE 1
-#define RX_MON_MIN_HEAD_ROOM   64
-#endif
 
 #define DP_DEFAULT_NOISEFLOOR	(-96)
 
@@ -1224,7 +1220,7 @@ void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
 		qdf_nbuf_set_next((ptail), NULL);                     \
 	} while (0)
 
-#if defined(QCA_PADDR_CHECK_ON_3TH_PLATFORM)
+#if defined(QCA_PADDR_CHECK_ON_3RD_PARTY_PLATFORM)
 /*
  * on some third-party platform, the memory below 0x2000
  * is reserved for target use, so any memory allocated in this
@@ -1242,7 +1238,7 @@ void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
 #define DP_PHY_ADDR_RESERVED	0x50000000
 #endif
 
-#if defined(QCA_PADDR_CHECK_ON_3TH_PLATFORM) || defined(BUILD_X86)
+#if defined(QCA_PADDR_CHECK_ON_3RD_PARTY_PLATFORM) || defined(BUILD_X86)
 /**
  * dp_check_paddr() - check if current phy address is valid or not
  * @dp_soc: core txrx main context
@@ -2423,6 +2419,33 @@ dp_rx_peer_metadata_peer_id_get(struct dp_soc *soc, uint32_t peer_metadata)
 							     peer_metadata);
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(DP_MLO_LINK_STATS_SUPPORT)
+/**
+ * dp_rx_nbuf_set_link_id_from_tlv() - Set link id in nbuf cb
+ * @soc: SOC handle
+ * @tlv_hdr: rx tlv header
+ * @nbuf: nbuf pointer
+ *
+ * Return: None
+ */
+static inline void
+dp_rx_nbuf_set_link_id_from_tlv(struct dp_soc *soc, uint8_t *tlv_hdr,
+				qdf_nbuf_t nbuf)
+{
+	uint32_t peer_metadata = hal_rx_tlv_peer_meta_data_get(soc->hal_soc,
+								tlv_hdr);
+
+	if (soc->arch_ops.dp_rx_peer_set_link_id)
+		soc->arch_ops.dp_rx_peer_set_link_id(nbuf, peer_metadata);
+}
+#else
+static inline void
+dp_rx_nbuf_set_link_id_from_tlv(struct dp_soc *soc, uint8_t *tlv_hdr,
+				qdf_nbuf_t nbuf)
+{
+}
+#endif
+
 /**
  * dp_rx_desc_pool_init_generic() - Generic Rx descriptors initialization
  * @soc: SOC handle
@@ -2719,9 +2742,10 @@ void dp_rx_nbuf_unmap(struct dp_soc *soc,
 			    QDF_NBUF_CB_PADDR(rx_desc->nbuf),
 			    rx_desc_pool->buf_size);
 
-	dp_ipa_handle_rx_buf_smmu_mapping(soc, rx_desc->nbuf,
-					  rx_desc_pool->buf_size,
-					  false, __func__, __LINE__);
+	if (qdf_atomic_read(&soc->ipa_mapped))
+		dp_ipa_handle_rx_buf_smmu_mapping(soc, rx_desc->nbuf,
+						  rx_desc_pool->buf_size,
+						  false, __func__, __LINE__);
 
 	qdf_nbuf_unmap_nbytes_single(soc->osdev, rx_desc->nbuf,
 				     QDF_DMA_FROM_DEVICE,
@@ -2737,8 +2761,10 @@ void dp_rx_nbuf_unmap_pool(struct dp_soc *soc,
 {
 	dp_audio_smmu_unmap(soc->osdev, QDF_NBUF_CB_PADDR(nbuf),
 			    rx_desc_pool->buf_size);
-	dp_ipa_handle_rx_buf_smmu_mapping(soc, nbuf, rx_desc_pool->buf_size,
-					  false, __func__, __LINE__);
+	if (qdf_atomic_read(&soc->ipa_mapped))
+		dp_ipa_handle_rx_buf_smmu_mapping(soc, nbuf,
+						  rx_desc_pool->buf_size,
+						  false, __func__, __LINE__);
 	qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf, QDF_DMA_FROM_DEVICE,
 				     rx_desc_pool->buf_size);
 }
@@ -3504,7 +3530,7 @@ static inline uint8_t
 dp_rx_get_stats_arr_idx_from_link_id(qdf_nbuf_t nbuf,
 				     struct dp_txrx_peer *txrx_peer)
 {
-	return 0;
+	return QDF_NBUF_CB_RX_LOGICAL_LINK_ID(nbuf);
 }
 #else
 static inline uint8_t

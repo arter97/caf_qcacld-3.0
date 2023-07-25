@@ -25,18 +25,6 @@
 #define DMA_LENGTH_128B 2
 #define DMA_LENGTH_256B 4
 
-/* rx hdr tlv dma lengths */
-enum dp_rx_hdr_dma_length {
-	/* default dma length(128B) */
-	DEFAULT_RX_HDR_DMA_LENGTH = 0,
-	/* dma length 64 bytes */
-	RX_HDR_DMA_LENGTH_64B = 1,
-	/* dma length 128 bytes */
-	RX_HDR_DMA_LENGTH_128B = 2,
-	/* dma length 256 bytes */
-	RX_HDR_DMA_LENGTH_256B = 3,
-};
-
 /* fwd declarations */
 struct dp_mon_pdev_be;
 
@@ -48,15 +36,6 @@ struct dp_mon_pdev_be;
 void
 dp_rx_mon_enable_set(uint32_t *msg_word,
 		     struct htt_rx_ring_tlv_filter *tlv_filter);
-
-/**
- * dp_rx_mon_hdr_length_set() - Setup rx monitor hdr tlv length
- * @msg_word: msg word
- * @tlv_filter: rx ring filter configuration
- */
-void
-dp_rx_mon_hdr_length_set(uint32_t *msg_word,
-			 struct htt_rx_ring_tlv_filter *tlv_filter);
 
 /**
  * dp_rx_mon_packet_length_set() - Setup rx monitor per packet type length
@@ -323,5 +302,25 @@ void dp_mon_filter_reset_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev);
  * Return: Null
  */
 void dp_mon_filter_setup_tx_lite_mon(struct dp_pdev *pdev);
+#endif
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * dp_mon_filter_setup_local_pkt_capture_tx() - Setup local packet capture
+ *     tx monitor filter
+ * @pdev: physical device handle
+ *
+ * Return: void
+ */
+void dp_mon_filter_setup_local_pkt_capture_tx(struct dp_pdev *pdev);
+
+/**
+ * dp_mon_filter_reset_local_pkt_capture_tx() - Reset local packet capture
+ *     tx monitor filter
+ * @pdev: physical device handle
+ *
+ * Return: void
+ */
+void dp_mon_filter_reset_local_pkt_capture_tx(struct dp_pdev *pdev);
 #endif
 #endif /* _DP_MON_FILTER_2_0_H_ */

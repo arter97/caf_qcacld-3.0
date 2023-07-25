@@ -970,6 +970,7 @@ tgt_if_register_afc_callback(struct wlan_lmac_if_reg_tx_ops *reg_ops)
 {
 	reg_ops->send_afc_ind = tgt_if_regulatory_send_afc_cmd;
 	reg_ops->reg_get_min_psd = NULL;
+	reg_ops->trigger_update_channel_list = NULL;
 }
 #else
 static void

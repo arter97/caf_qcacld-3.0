@@ -104,6 +104,41 @@ static inline ktime_t __qdf_ktime_real_get(void)
 }
 
 /**
+ * __qdf_ktime_get_ns() - Gets the current time nano seconds
+ *
+ * Return: ktime in nano sec
+ */
+static inline ktime_t __qdf_ktime_get_ns(void)
+{
+	return ktime_get_ns();
+}
+
+/**
+ * __qdf_ktime_get_real_ns() - Gets the current time in ns using UTC
+ *
+ * Return: ktime in nano sec
+ */
+static inline ktime_t __qdf_ktime_get_real_ns(void)
+{
+	return ktime_get_real_ns();
+}
+
+/**
+ * __qdf_ktime_compare - compare two qdf_ktime_t objects
+ * @ktime1: time as qdf_ktime_t object
+ * @ktime2: time as qdf_ktime_t object
+ *
+ * Return:
+ * * ktime1  < ktime2 - return <0
+ * * ktime1 == ktime2 - return 0
+ * * ktime1  > ktime2 - return >0
+ */
+static inline int __qdf_ktime_compare(ktime_t ktime1, ktime_t ktime2)
+{
+	return ktime_compare(ktime1, ktime2);
+}
+
+/**
  * __qdf_ktime_add_ns() - Adds ktime object and nanoseconds value and
  *                        returns the ktime object
  * @ktime: time as ktime object
@@ -138,7 +173,6 @@ static inline int64_t __qdf_ktime_to_ms(ktime_t ktime)
 	return ktime_to_ms(ktime);
 }
 
-
 /**
  * __qdf_system_ticks() - get system ticks
  *
@@ -150,7 +184,6 @@ static inline __qdf_time_t __qdf_system_ticks(void)
 }
 
 #define __qdf_system_ticks_per_sec HZ
-
 /**
  * __qdf_system_ticks_to_msecs() - convert system ticks into milli seconds
  * @ticks: System ticks
@@ -304,7 +337,6 @@ static inline uint64_t __qdf_get_monotonic_boottime(void)
 }
 
 #if defined (MSM_PLATFORM)
-
 /**
  * __qdf_get_log_timestamp() - get msm timer ticks
  *
@@ -474,4 +506,8 @@ static inline void __qdf_time_ktime_get_real_time(__qdf_timespec_t *ts)
 }
 #endif
 
+static inline void __qdf_usleep_range(unsigned long min, unsigned long max)
+{
+	usleep_range(min, max);
+}
 #endif

@@ -18,8 +18,7 @@
 #ifndef _DP_IPA_H_
 #define _DP_IPA_H_
 
-#if defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_KIWI_V2) || \
-	defined(QCA_WIFI_QCN9224)
+#if defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_KIWI_V2)
 /* Index into soc->tcl_data_ring[] */
 #define IPA_TCL_DATA_RING_IDX	3
 #else
@@ -47,6 +46,9 @@
 #if defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_KIWI_V2)
 /* Index into soc->tcl_data_ring[] and soc->tx_comp_ring[] */
 #define IPA_TX_ALT_RING_IDX 4
+#define IPA_TX_ALT_COMP_RING_IDX IPA_TX_ALT_RING_IDX
+#elif defined(QCA_WIFI_QCN9224)
+#define IPA_TX_ALT_RING_IDX 3
 #define IPA_TX_ALT_COMP_RING_IDX IPA_TX_ALT_RING_IDX
 #else /* !KIWI */
 #define IPA_TX_ALT_RING_IDX 1
@@ -103,7 +105,7 @@ struct dp_ipa_uc_rx_hdr {
  * @psoc: control psoc object
  * @pdev_id: pdev id
  *
- * IPA componenet will return the IPA handle based on pdev_id
+ * IPA component will return the IPA handle based on pdev_id
  *
  * Return: IPA handle
  */
@@ -407,7 +409,6 @@ QDF_STATUS dp_ipa_handle_rx_buf_smmu_mapping(struct dp_soc *soc,
 					     bool create,
 					     const char *func,
 					     uint32_t line);
-
 /**
  * dp_ipa_tx_buf_smmu_mapping() - Create SMMU mappings for IPA
  *				  allocated TX buffers
@@ -435,6 +436,13 @@ QDF_STATUS dp_ipa_tx_buf_smmu_mapping(struct cdp_soc_t *soc_hdl,
 QDF_STATUS dp_ipa_tx_buf_smmu_unmapping(struct cdp_soc_t *soc_hdl,
 					uint8_t pdev_id, const char *func,
 					uint32_t line);
+QDF_STATUS dp_ipa_rx_buf_pool_smmu_mapping(struct cdp_soc_t *soc_hdl,
+					   uint8_t pdev_id,
+					   bool create,
+					   const char *func,
+					   uint32_t line);
+QDF_STATUS dp_ipa_set_smmu_mapped(struct cdp_soc_t *soc, int val);
+int dp_ipa_get_smmu_mapped(struct cdp_soc_t *soc);
 
 #ifndef QCA_OL_DP_SRNG_LOCK_LESS_ACCESS
 static inline void
@@ -673,6 +681,26 @@ static inline QDF_STATUS dp_ipa_tx_buf_smmu_unmapping(struct cdp_soc_t *soc_hdl,
 						      uint8_t pdev_id,
 						      const char *func,
 						      uint32_t line)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS dp_ipa_rx_buf_pool_smmu_mapping(
+						      struct cdp_soc_t *soc_hdl,
+						      uint8_t pdev_id,
+						      bool create,
+						      const char *func,
+						      uint32_t line)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS dp_ipa_set_smmu_mapped(struct cdp_soc_t *soc, int val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline int dp_ipa_get_smmu_mapped(struct cdp_soc_t *soc)
 {
 	return QDF_STATUS_SUCCESS;
 }

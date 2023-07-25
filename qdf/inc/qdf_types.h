@@ -37,8 +37,15 @@
 /* Preprocessor definitions and constants */
 #define QDF_MAX_SGLIST 4
 
+/*
+ * Add more levels here based on the number of perf clusters in SoC
+ * Also modify hif_get_perf_cluster_bitmap
+ */
 #define CPU_CLUSTER_TYPE_LITTLE 0
 #define CPU_CLUSTER_TYPE_PERF 1
+#if defined(NUM_SOC_PERF_CLUSTER) && (NUM_SOC_PERF_CLUSTER > 1)
+#define CPU_CLUSTER_TYPE_PERF2 2
+#endif
 
 /**
  * struct qdf_sglist - scatter-gather list
@@ -57,6 +64,9 @@ typedef struct qdf_sglist {
 
 #define QDF_MAX_SCATTER __QDF_MAX_SCATTER
 #define QDF_NSEC_PER_MSEC __QDF_NSEC_PER_MSEC
+#define QDF_NSEC_PER_USEC __QDF_NSEC_PER_USEC
+#define QDF_USEC_PER_MSEC __QDF_USEC_PER_MSEC
+#define QDF_NSEC_PER_SEC __QDF_NSEC_PER_SEC
 
 /**
  * QDF_SWAP_U16 - swap input u16 value
@@ -449,8 +459,13 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_SCS: SCS module ID
  * @QDF_MODULE_ID_COAP: Constrained Application Protocol module ID
  * @QDF_MODULE_ID_QMI: QMI module ID
- * @QDF_MODULE_ID_ANY: anything
  * @QDF_MODULE_ID_SOUNDING: txbf SOUNDING
+ * @QDF_MODULE_ID_SAWF: SAWF module ID
+ * @QDF_MODULE_ID_EPCS: EPCS module ID
+ * @QDF_MODULE_ID_LL_SAP: LL SAP module ID
+ * @QDF_MODULE_ID_ANY: anything
+ * @QDF_MODULE_ID_COHOSTED_BSS : Co-hosted BSS module ID
+ * @QDF_MODULE_ID_TELEMETRY_AGENT: Telemetry Agent Module ID
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  *
  * New module ID needs to be added in qdf trace along with this enum.
@@ -616,6 +631,11 @@ typedef enum {
 	QDF_MODULE_ID_COAP,
 	QDF_MODULE_ID_QMI,
 	QDF_MODULE_ID_SOUNDING,
+	QDF_MODULE_ID_SAWF,
+	QDF_MODULE_ID_EPCS,
+	QDF_MODULE_ID_LL_SAP,
+	QDF_MODULE_ID_COHOSTED_BSS,
+	QDF_MODULE_ID_TELEMETRY_AGENT,
 	QDF_MODULE_ID_ANY,
 	QDF_MODULE_ID_MAX,
 } QDF_MODULE_ID;
@@ -1327,7 +1347,7 @@ struct qdf_tso_frag_t {
  * @syn: syn
  * @rst: reset
  * @psh: push
- * @ack: aknowledge
+ * @ack: acknowledge
  * @urg: urg
  * @ece: ece
  * @cwr: cwr
@@ -1783,4 +1803,42 @@ enum qdf_iommu_attr {
 	QDF_DOMAIN_ATTR_MAX,
 };
 
+/**
+ * enum qdf_dp_desc_type - source type for multiple pages allocation
+ * @QDF_DP_TX_DESC_TYPE: DP SW TX descriptor
+ * @QDF_DP_TX_PPEDS_DESC_TYPE: DP PPE-DS Tx descriptor
+ * @QDF_DP_TX_EXT_DESC_TYPE: DP TX msdu extension descriptor
+ * @QDF_DP_TX_EXT_DESC_LINK_TYPE: DP link descriptor for msdu ext_desc
+ * @QDF_DP_TX_TSO_DESC_TYPE: DP TX TSO descriptor
+ * @QDF_DP_TX_TSO_NUM_SEG_TYPE: DP TX number of segments
+ * @QDF_DP_RX_DESC_BUF_TYPE: DP RX SW descriptor
+ * @QDF_DP_RX_DESC_STATUS_TYPE: DP RX SW descriptor for monitor status
+ * @QDF_DP_HW_LINK_DESC_TYPE: DP HW link descriptor
+ * @QDF_DP_HW_CC_SPT_PAGE_TYPE: DP pages for HW CC secondary page table
+ * @QDF_DP_TX_TCL_DESC_TYPE: DP TCL descriptor
+ * @QDF_DP_TX_DIRECT_LINK_CE_BUF_TYPE: DP tx direct link CE source ring buf
+ *  pages
+ * @QDF_DP_TX_DIRECT_LINK_BUF_TYPE: DP tx direct link buffer pages
+ * @QDF_DP_RX_DIRECT_LINK_CE_BUF_TYPE: DP RX direct link CE dest ring buf pages
+ * @QDF_DP_DESC_TYPE_MAX: DP max desc type
+ */
+enum qdf_dp_desc_type {
+	QDF_DP_TX_DESC_TYPE,
+	QDF_DP_TX_PPEDS_DESC_TYPE,
+	QDF_DP_TX_EXT_DESC_TYPE,
+	QDF_DP_TX_EXT_DESC_LINK_TYPE,
+	QDF_DP_TX_TSO_DESC_TYPE,
+	QDF_DP_TX_TSO_NUM_SEG_TYPE,
+	QDF_DP_RX_DESC_BUF_TYPE,
+	QDF_DP_RX_DESC_STATUS_TYPE,
+	QDF_DP_HW_LINK_DESC_TYPE,
+	QDF_DP_HW_CC_SPT_PAGE_TYPE,
+	QDF_DP_TX_TCL_DESC_TYPE,
+#ifdef FEATURE_DIRECT_LINK
+	QDF_DP_TX_DIRECT_LINK_CE_BUF_TYPE,
+	QDF_DP_TX_DIRECT_LINK_BUF_TYPE,
+	QDF_DP_RX_DIRECT_LINK_CE_BUF_TYPE,
+#endif
+	QDF_DP_DESC_TYPE_MAX
+};
 #endif /* __QDF_TYPES_H */

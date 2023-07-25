@@ -313,6 +313,7 @@ wlan_mgmt_rx_reo_get_pkt_ctr_delta_thresh(struct wlan_objmgr_psoc *psoc)
 	return cfg_get(psoc, CFG_MGMT_RX_REO_PKT_CTR_DELTA_THRESH);
 }
 
+#ifdef WLAN_MGMT_RX_REO_DEBUG_SUPPORT
 uint16_t
 wlan_mgmt_rx_reo_get_ingress_frame_debug_list_size(struct wlan_objmgr_psoc *psoc)
 {
@@ -345,6 +346,7 @@ wlan_mgmt_rx_reo_get_scheduler_debug_list_size(struct wlan_objmgr_psoc *psoc)
 
 	return cfg_get(psoc, CFG_MGMT_RX_REO_SCHEDULER_DEBUG_LIST_SIZE);
 }
+#endif /* WLAN_MGMT_RX_REO_DEBUG_SUPPORT */
 
 #ifndef WLAN_MGMT_RX_REO_SIM_SUPPORT
 bool

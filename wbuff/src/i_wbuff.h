@@ -52,11 +52,11 @@
 /* Allocation of size 2048 bytes */
 #define WBUFF_POOL_3_MAX 32
 
-#define WBUFF_MSLOT_SHIFT 4
-#define WBUFF_MSLOT_BITMASK 0xF0
+#define WBUFF_MODULE_ID_SHIFT 4
+#define WBUFF_MODULE_ID_BITMASK 0xF0
 
-#define WBUFF_PSLOT_SHIFT 1
-#define WBUFF_PSLOT_BITMASK 0xE
+#define WBUFF_POOL_ID_SHIFT 1
+#define WBUFF_POOL_ID_BITMASK 0xE
 
 /* Comparison array for maximum allocation per pool*/
 uint16_t wbuff_alloc_max[WBUFF_MAX_POOLS] = {WBUFF_POOL_0_MAX,
@@ -77,7 +77,7 @@ struct wbuff_handle {
  * @registered: To identify whether module is registered
  * @pending_returns: Number of buffers pending to be returned to
  * wbuff by the module
- * @lock: Lock for accessing per module buffer slots
+ * @lock: Lock for accessing per module buffer pools
  * @handle: wbuff handle for the registered module
  * @reserve: nbuf headroom to start with
  * @align: alignment for the nbuf

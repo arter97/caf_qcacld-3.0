@@ -129,6 +129,18 @@ QDF_STATUS wmi_extract_mlo_link_state_info_event(
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS wmi_extract_mlo_link_disable_request_evt(
+		struct wmi_unified *wmi,
+		void *buf,
+		struct mlo_link_disable_request_evt_params *params)
+{
+	if (wmi->ops->extract_mlo_link_disable_request_evt_param)
+		return wmi->ops->extract_mlo_link_disable_request_evt_param(
+							wmi, buf, params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 #endif /* WLAN_FEATURE_11BE */
 
 QDF_STATUS
@@ -148,6 +160,15 @@ QDF_STATUS wmi_send_mlo_link_removal_cmd(
 {
 	if (wmi->ops->send_mlo_link_removal_cmd)
 		return wmi->ops->send_mlo_link_removal_cmd(wmi, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_send_mlo_vdev_pause(wmi_unified_t wmi,
+				   struct mlo_vdev_pause *info)
+{
+	if (wmi->ops->send_mlo_vdev_pause)
+		return wmi->ops->send_mlo_vdev_pause(wmi, info);
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -190,3 +211,42 @@ QDF_STATUS wmi_extract_mgmt_rx_mlo_link_removal_info(
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+QDF_STATUS wmi_unified_peer_ptqm_migrate_send(
+					wmi_unified_t wmi_hdl,
+					struct peer_ptqm_migrate_params *param)
+{
+	if (wmi_hdl->ops->send_peer_ptqm_migrate_cmd)
+		return wmi_hdl->ops->send_peer_ptqm_migrate_cmd(wmi_hdl, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_peer_ptqm_migrate_event(
+		wmi_unified_t wmi, void *evt_buf,
+		struct peer_ptqm_migrate_event_params *resp)
+{
+	if (wmi->ops->extract_peer_ptqm_migrate_event) {
+		return wmi->ops->extract_peer_ptqm_migrate_event(wmi,
+								 evt_buf,
+								 resp);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_peer_ptqm_entry_param(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		uint32_t index,
+		struct peer_entry_ptqm_migrate_event_params *entry)
+{
+	if (wmi_handle->ops->extract_peer_entry_ptqm_migrate_event)
+		return wmi_handle->ops->extract_peer_entry_ptqm_migrate_event(
+			wmi_handle, evt_buf,
+			index, entry);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */

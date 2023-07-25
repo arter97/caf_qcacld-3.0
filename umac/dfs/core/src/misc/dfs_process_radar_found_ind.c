@@ -978,6 +978,9 @@ uint16_t dfs_generate_radar_bitmap(struct wlan_dfs *dfs,
 		bits <<= 1;
 	}
 
+	if (!dfs_radar_bitmap)
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS, "Radar bitmap is zero");
+
 	return dfs_radar_bitmap;
 }
 #endif
@@ -1057,18 +1060,6 @@ dfs_process_radar_ind_on_home_chan(struct wlan_dfs *dfs,
 							freq_list,
 							freq_center);
 
-	if (dfs->dfs_use_puncture) {
-		bool is_ignore_radar_puncture = false;
-
-		dfs_handle_radar_puncturing(dfs,
-					    &dfs_radar_bitmap,
-					    freq_list,
-					    num_channels,
-					    &is_ignore_radar_puncture);
-		if (is_ignore_radar_puncture)
-			goto exit;
-	}
-
 	if (!dfs->dfs_use_nol) {
 		if (!dfs->dfs_is_offload_enabled)
 			dfs_disable_radar_and_flush_pulses(dfs);
@@ -1080,6 +1071,18 @@ dfs_process_radar_ind_on_home_chan(struct wlan_dfs *dfs,
 
 	dfs_reset_bangradar(dfs);
 
+	if (dfs->dfs_use_puncture && !dfs->dfs_is_stadfs_enabled) {
+		bool is_ignore_radar_puncture = false;
+
+		dfs_handle_radar_puncturing(dfs,
+					    &dfs_radar_bitmap,
+					    freq_list,
+					    num_channels,
+					    &is_ignore_radar_puncture);
+		if (is_ignore_radar_puncture)
+			goto exit;
+	}
+
 	status = dfs_radar_add_channel_list_to_nol_for_freq(dfs,
 							    freq_list,
 							    nol_freq_list,
@@ -1089,6 +1092,8 @@ dfs_process_radar_ind_on_home_chan(struct wlan_dfs *dfs,
 			"radar event received on invalid channel");
 		goto exit;
 	}
+
+	dfs_mlme_set_tx_flag(dfs->dfs_pdev_obj, false);
 
 	/*
 	 * If precac is running and the radar found in secondary

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -110,6 +110,23 @@ bool ucfg_cm_is_vdev_disconnected(struct wlan_objmgr_vdev *vdev);
  * Return: bool
  */
 bool ucfg_cm_is_vdev_roaming(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_cm_free_wep_key_params() - free up connect request wep key params
+ * sub memory
+ * @req: connect req
+ *
+ * Return: void
+ */
+void ucfg_cm_free_wep_key_params(struct wlan_cm_connect_req *req);
+
+/**
+ * ucfg_cm_free_connect_req() - free up connect request and its sub memory.
+ * @req: connect req
+ *
+ * Return: void
+ */
+void ucfg_cm_free_connect_req(struct wlan_cm_connect_req *req);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**

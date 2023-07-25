@@ -54,6 +54,12 @@
 
 #define HAL_RX_TLV64_HDR_SIZE			8
 
+#ifdef CONFIG_4_BYTES_TLV_TAG
+#define HAL_RX_TLV_HDR_SIZE HAL_RX_TLV32_HDR_SIZE
+#else
+#define HAL_RX_TLV_HDR_SIZE HAL_RX_TLV64_HDR_SIZE
+#endif
+
 #define HAL_RX_GET_USER_TLV64_TYPE(rx_status_tlv_ptr) \
 		((qdf_le64_to_cpu(*((uint64_t *)(rx_status_tlv_ptr))) & \
 		HAL_RX_USER_TLV64_TYPE_MASK) >> \
@@ -185,7 +191,11 @@
 #define HAL_RX_MAX_MPDU_H_PER_STATUS_BUFFER 16
 
 /* Max pilot count */
+#ifdef QCA_MONITOR_2_0_SUPPORT
+#define HAL_RX_MAX_SU_EVM_COUNT 256
+#else
 #define HAL_RX_MAX_SU_EVM_COUNT 32
+#endif
 
 #define HAL_RX_FRAMECTRL_TYPE_MASK 0x0C
 #define HAL_RX_GET_FRAME_CTRL_TYPE(fc)\
@@ -305,7 +315,7 @@ struct hal_rx_mon_mpdu_info {
  * @msdu_count:              msdu count
  * @end_of_ppdu:             end of ppdu
  * @link_desc:               msdu link descriptor address
- * @status_buf:              for a PPDU, status buffers can span acrosss
+ * @status_buf:              for a PPDU, status buffers can span across
  *                           multiple buffers, status_buf points to first
  *                           status buffer address of PPDU
  * @drop_ppdu:               flag to indicate current destination
@@ -683,7 +693,7 @@ struct hal_rx_ppdu_common_info {
  */
 struct hal_rx_msdu_payload_info {
 	uint8_t *first_msdu_payload;
-	uint8_t payload_len;
+	uint16_t payload_len;
 };
 
 /**
@@ -1316,7 +1326,7 @@ struct hal_rx_ppdu_info {
 	struct hal_rx_mon_mpdu_info mpdu_info[HAL_MAX_UL_MU_USERS];
 	 /* placeholder to hold packet buffer info */
 	struct hal_mon_packet_info packet_info;
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
 	 /* per user per MPDU queue */
 	qdf_nbuf_queue_t mpdu_q[HAL_MAX_UL_MU_USERS];
 #endif
@@ -1444,7 +1454,7 @@ hal_clear_rx_status_done(uint8_t *rx_tlv)
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 /**
  * struct hal_txmon_word_mask_config - hal tx monitor word mask filter setting
  * @pcu_ppdu_setup_init: PCU_PPDU_SETUP TLV word mask
@@ -1477,5 +1487,5 @@ struct hal_txmon_word_mask_config {
  * typedef hal_txmon_word_mask_config_t - handle for tx monitor word mask
  */
 typedef struct hal_txmon_word_mask_config hal_txmon_word_mask_config_t;
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 #endif

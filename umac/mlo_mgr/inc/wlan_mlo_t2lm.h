@@ -107,12 +107,18 @@ enum wlan_link_band_caps {
  *  list.
  *  Bit 0-15: Each bit maps to the corresponding Link ID
  *  Bit 16-31: Reserved
+ * @qualifier_flags: u32 flags to check that link order is
+ * for TLT or link preference. Bit definition for the flags.
+ * Bit 0: TLT bit
+ * Bit 1: Preferred Link bit
+ * Bit 2-31: Reserved
  */
 struct wlan_link_preference {
 	uint8_t num_pref_links;
 	uint8_t pref_order[MAX_PREFERRED_LINKS];
 	uint32_t timeout[WIFI_AC_MAX];
 	uint32_t tlt_characterization_params;
+	uint32_t qualifier_flags;
 };
 
 /**
@@ -364,13 +370,14 @@ struct wlan_mlo_dev_context;
 /**
  * typedef wlan_mlo_t2lm_link_update_handler - T2LM handler API to notify the
  * link update.
- * @mldev: Pointer to mlo_dev_context
- * @arg: ieee_link_map
+ * @vdev: Pointer to vdev context
+ * @t2lm: Pointer to wlan_t2lm_info
  *
  * Return: QDF_STATUS
  */
 typedef QDF_STATUS (*wlan_mlo_t2lm_link_update_handler)(
-		struct wlan_mlo_dev_context *mldev, void *arg);
+					struct wlan_objmgr_vdev *vdev,
+					struct wlan_t2lm_info *t2lm);
 
 /**
  * struct wlan_t2lm_context - T2LM IE information
@@ -532,12 +539,14 @@ void wlan_unregister_t2lm_link_update_notify_handler(
 /**
  * wlan_mlo_dev_t2lm_notify_link_update() - API to call the registered handlers
  * when there is a link update happens using T2LM
- * @mldev: Pointer to mlo context
+ * @vdev: Pointer to vdev
+ * @t2lm: Pointer to T2LM info
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_mlo_dev_t2lm_notify_link_update(
-		struct wlan_mlo_dev_context *mldev);
+		struct wlan_objmgr_vdev *vdev,
+		struct wlan_t2lm_info *t2lm);
 
 /**
  * wlan_mlo_parse_t2lm_ie() - API to parse the T2LM IE
@@ -711,6 +720,29 @@ QDF_STATUS wlan_process_bcn_prbrsp_t2lm_ie(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					 struct wlan_t2lm_info *t2lm);
+
+/**
+ * wlan_get_t2lm_mapping_status() - API to get T2LM info
+ * @vdev: Pointer to vdev
+ * @t2lm: T2LM info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_get_t2lm_mapping_status(struct wlan_objmgr_vdev *vdev,
+					struct wlan_t2lm_info *t2lm);
+
+/**
+ * wlan_send_peer_level_tid_to_link_mapping() - API to send peer level T2LM info
+ * negotiated using action frames to FW.
+ *
+ * @vdev: Pointer to vdev
+ * @peer: pointer to peer
+ *
+ * Return QDF_STATUS
+ */
+QDF_STATUS
+wlan_send_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
+					 struct wlan_objmgr_peer *peer);
 #else
 static inline QDF_STATUS wlan_mlo_parse_t2lm_ie(
 	struct wlan_t2lm_onging_negotiation_info *t2lm, uint8_t *ie)
@@ -822,7 +854,8 @@ void wlan_unregister_t2lm_link_update_notify_handler(
 }
 
 static inline QDF_STATUS wlan_mlo_dev_t2lm_notify_link_update(
-		struct wlan_mlo_dev_context *mldev)
+		struct wlan_objmgr_vdev *vdev,
+		struct wlan_t2lm_info *t2lm)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -833,5 +866,50 @@ QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline QDF_STATUS
+wlan_send_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
+					 struct wlan_objmgr_peer *peer)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_FEATURE_11BE */
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_11BE_MLO_ADV_FEATURE)
+/**
+ * wlan_clear_peer_level_tid_to_link_mapping() - API to clear peer level T2LM
+ * info negotiated using action frames to FW.
+ *
+ * @vdev: Pointer to vdev
+ *
+ * Return: none
+ */
+void
+wlan_clear_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlo_link_disable_request_handler() - API to handle mlo link disable
+ * request handler.
+ *
+ * @psoc: Pointer to psoc
+ * @evt_params: MLO Link disable request params
+ *
+ * Return QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlo_link_disable_request_handler(struct wlan_objmgr_psoc *psoc,
+				      void *evt_params);
+#else
+static inline void
+wlan_clear_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline QDF_STATUS
+wlan_mlo_link_disable_request_handler(struct wlan_objmgr_psoc *psoc,
+				      void *evt_params)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif /* _WLAN_MLO_T2LM_H_ */

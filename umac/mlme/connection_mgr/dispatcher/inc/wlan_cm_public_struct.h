@@ -293,7 +293,6 @@ struct wlan_cm_vdev_connect_req {
 /**
  * struct wlan_cm_roam_req - roam req from requester
  * @forced_roaming: Roaming to be done without giving bssid, and channel.
- * @self_reassoc: used to determine self reassoc in host roaming
  * @vdev_id: vdev id
  * @source: source of the req
  * @bssid: bssid given
@@ -301,8 +300,7 @@ struct wlan_cm_vdev_connect_req {
  * @chan_freq: channel of the AP
  */
 struct wlan_cm_roam_req {
-	uint8_t forced_roaming:1,
-		self_reassoc:1;
+	uint8_t forced_roaming:1;
 	uint8_t vdev_id;
 	enum wlan_cm_source source;
 	struct qdf_mac_addr bssid;
@@ -315,14 +313,12 @@ struct wlan_cm_roam_req {
  * vdev mgr
  * @vdev_id: vdev id
  * @cm_id: Connect manager id
- * @self_reassoc: if self reassoc
  * @prev_bssid: previous BSSID
  * @bss: scan entry for the candidate
  */
 struct wlan_cm_vdev_reassoc_req {
 	uint8_t vdev_id;
 	wlan_cm_id cm_id;
-	bool self_reassoc;
 	struct qdf_mac_addr prev_bssid;
 	struct scan_cache_node *bss;
 };
@@ -378,7 +374,7 @@ struct wlan_cm_vdev_discon_req {
  * @CM_VALID_CANDIDATE_CHECK_FAIL: Valid Candidate Check fail
  */
 enum wlan_cm_connect_fail_reason {
-	CM_NO_CANDIDATE_FOUND,
+	CM_NO_CANDIDATE_FOUND = 1,
 	CM_ABORT_DUE_TO_NEW_REQ_RECVD,
 	CM_BSS_SELECT_IND_FAILED,
 	CM_PEER_CREATE_FAILED,
@@ -514,6 +510,7 @@ struct wlan_roam_sync_info {
  * @connect_ies: connect related IE required by osif to send to kernel
  * @roaming_info: roam sync info received
  * @is_fils_connection: is fils connection
+ * @mld_addr: MLD address of the ML AP
  * @ml_parnter_info: ml partner link info
  */
 struct wlan_cm_connect_resp {
@@ -540,6 +537,7 @@ struct wlan_cm_connect_resp {
 	bool is_fils_connection;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
+	struct qdf_mac_addr mld_addr;
 	struct mlo_partner_info ml_parnter_info;
 #endif
 };

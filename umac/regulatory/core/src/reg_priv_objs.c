@@ -346,6 +346,7 @@ QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 	pdev_priv_obj->pdev_ptr = pdev;
 	pdev_priv_obj->dfs_enabled = psoc_priv_obj->dfs_enabled;
 	pdev_priv_obj->set_fcc_channel = psoc_priv_obj->set_fcc_channel;
+	pdev_priv_obj->keep_6ghz_sta_cli_connection = false;
 	pdev_priv_obj->band_capability = psoc_priv_obj->band_capability;
 	pdev_priv_obj->indoor_chan_enabled =
 		psoc_priv_obj->indoor_chan_enabled;
@@ -472,6 +473,7 @@ reg_free_afc_pwr_info(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 		qdf_mem_free(power_info->afc_chan_info);
 
 	qdf_mem_free(power_info);
+	pdev_priv_obj->power_info = NULL;
 }
 #endif
 

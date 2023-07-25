@@ -71,6 +71,8 @@ static void hif_initialize_default_ops(struct hif_softc *hif_sc)
 #ifdef FEATURE_IRQ_AFFINITY
 	bus_ops->hif_set_grp_intr_affinity = &hif_dummy_set_grp_intr_affinity;
 #endif
+	bus_ops->hif_affinity_mgr_set_affinity =
+		&hif_dummy_affinity_mgr_set_affinity;
 }
 
 #define NUM_OPS (sizeof(struct hif_bus_ops) / sizeof(void *))
@@ -474,6 +476,9 @@ int hif_apps_irqs_disable(struct hif_opaque_softc *hif_ctx)
 	if (!scn)
 		return -EINVAL;
 
+	if (pld_is_one_msi(scn->qdf_dev->dev))
+		return 0;
+
 	/* if the wake_irq is shared, don't disable it twice */
 	for (i = 0; i < scn->ce_count; ++i) {
 		int irq = scn->bus_ops.hif_map_ce_to_irq(scn, i);
@@ -494,6 +499,9 @@ int hif_apps_irqs_enable(struct hif_opaque_softc *hif_ctx)
 	scn = HIF_GET_SOFTC(hif_ctx);
 	if (!scn)
 		return -EINVAL;
+
+	if (pld_is_one_msi(scn->qdf_dev->dev))
+		return 0;
 
 	/* if the wake_irq is shared, don't enable it twice */
 	for (i = 0; i < scn->ce_count; ++i) {
@@ -717,3 +725,16 @@ void hif_set_grp_intr_affinity(struct hif_opaque_softc *scn,
 						  perf);
 }
 #endif
+
+void hif_affinity_mgr_set_affinity(struct hif_opaque_softc *scn)
+{
+	struct hif_softc *hif_sc = HIF_GET_SOFTC(scn);
+
+	if (!hif_sc)
+		return;
+
+	if (!hif_sc->bus_ops.hif_affinity_mgr_set_affinity)
+		return;
+
+	hif_sc->bus_ops.hif_affinity_mgr_set_affinity(hif_sc);
+}

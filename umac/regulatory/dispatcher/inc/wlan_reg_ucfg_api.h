@@ -116,6 +116,28 @@ void ucfg_reg_restore_cached_channels(struct wlan_objmgr_pdev *pdev)
 #endif
 
 /**
+ * ucfg_reg_get_keep_6ghz_sta_cli_connection() - Get keep 6ghz sta cli
+ *                                               connection flag
+ * @pdev: The physical pdev to get keep_6ghz_sta_cli_connection
+ *
+ * Return: Return true if keep 6ghz sta cli connection set else return flase
+ */
+bool ucfg_reg_get_keep_6ghz_sta_cli_connection(
+					struct wlan_objmgr_pdev *pdev);
+
+/**
+ * ucfg_reg_set_keep_6ghz_sta_cli_connection() - Set keep 6ghz sta cli
+ *                                               connection flag
+ * @pdev: The physical pdev to get keep_6ghz_sta_cli_connection
+ * @keep_6ghz_sta_cli_connection: Parameter to set
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS ucfg_reg_set_keep_6ghz_sta_cli_connection(
+					struct wlan_objmgr_pdev *pdev,
+					bool keep_6ghz_sta_cli_connection);
+/**
  * ucfg_reg_set_fcc_constraint() - apply fcc constraints on channels 12/13
  * @pdev: The physical pdev to reduce tx power for
  * @fcc_constraint: true to apply the constraint, false to remove it
@@ -389,6 +411,32 @@ ucfg_reg_register_afc_power_event_callback(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 ucfg_reg_unregister_afc_power_event_callback(struct wlan_objmgr_pdev *pdev,
 					     afc_power_tx_evt_handler cbf);
+
+/**
+ * ucfg_reg_register_afc_payload_reset_event_callback() - Add AFC payload reset
+ * event received callback
+ * @pdev: Pointer to pdev
+ * @cbf: Pointer to callback function
+ * @arg: Pointer to opaque argument
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_reg_register_afc_payload_reset_event_callback(
+		struct wlan_objmgr_pdev *pdev,
+		afc_payload_reset_tx_evt_handler cbf,
+		void *arg);
+
+/**
+ * ucfg_reg_unregister_afc_payload_reset_event_callback() - Remove AFC payload
+ * reset event received callback
+ * @pdev: Pointer to pdev
+ * @cbf: Pointer to callback function
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_reg_unregister_afc_payload_reset_event_callback(
+		struct wlan_objmgr_pdev *pdev,
+		afc_payload_reset_tx_evt_handler cbf);
 #endif
 
 /**
@@ -560,13 +608,18 @@ void ucfg_reg_set_afc_no_action(struct wlan_objmgr_psoc *psoc, bool value)
 }
 #endif
 
+#ifdef TARGET_11D_SCAN
 /**
  * ucfg_reg_11d_vdev_delete_update() - update vdev delete to regulatory
- * @vdev: vdev ptr
+ * @psoc: psoc pointer
+ * @op_mode: Operating mode of the deleted vdev
+ * @vdev_id: Vdev id of the deleted vdev
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_psoc *psoc,
+					   enum QDF_OPMODE op_mode,
+					   uint32_t vdev_id);
 
 /**
  * ucfg_reg_11d_vdev_created_update() - update vdev create to regulatory
@@ -575,6 +628,21 @@ QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_vdev *vdev);
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_reg_11d_vdev_created_update(struct wlan_objmgr_vdev *vdev);
+#else
+static inline
+QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_psoc *psoc,
+					   enum QDF_OPMODE op_mode,
+					   uint32_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS ucfg_reg_11d_vdev_created_update(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * ucfg_reg_get_hal_reg_cap() - return hal reg cap
@@ -720,6 +788,19 @@ QDF_STATUS ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
 						 uint8_t *ieee_chan_list,
 						 uint8_t chan_list_size,
 						 bool global_tbl_lookup);
+
+static inline
+bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+
+static inline
+bool ucfg_reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
+
 #else
 static inline QDF_STATUS
 ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
@@ -731,6 +812,22 @@ ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
-#endif
 
+/**
+ * ucfg_reg_is_user_country_set_allowed() - Checks whether user country is
+ * allowed to set
+ * @psoc: psoc ptr
+ *
+ * Return: bool
+ */
+bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_reg_is_fcc_constraint_set() - Check if fcc constraint is set
+ * @pdev: pointer to pdev
+ *
+ * Return: Return true if fcc constraint is set
+ */
+bool ucfg_reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev);
+#endif
 #endif

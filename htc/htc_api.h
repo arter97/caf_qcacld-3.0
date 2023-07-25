@@ -54,7 +54,8 @@ typedef void (*HTC_TARGET_FAILURE)(void *Instance, QDF_STATUS Status);
 struct htc_init_info {
 	void *pContext;         /* context for target notifications */
 	void (*TargetFailure)(void *Instance, QDF_STATUS Status);
-	void (*TargetSendSuspendComplete)(void *ctx, bool is_nack);
+	void (*TargetSendSuspendComplete)(void *ctx, bool is_nack,
+					  uint16_t reason_code);
 	void (*target_initial_wakeup_cb)(void *cb_ctx);
 	void *target_psoc;
 	uint32_t cfg_wmi_credit_cnt;
@@ -299,7 +300,7 @@ struct htc_endpoint_credit_dist {
 #define IS_EP_ACTIVE(epDist)  ((epDist)->DistFlags & HTC_EP_ACTIVE)
 #define SET_EP_ACTIVE(epDist) (epDist)->DistFlags |= HTC_EP_ACTIVE
 
-/* credit distribution code that is passed into the distrbution function,
+/* credit distribution code that is passed into the distribution function,
  * there are mandatory and optional codes that must be handled
  */
 enum htc_credit_dist_reason {

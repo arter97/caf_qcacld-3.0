@@ -516,11 +516,17 @@ enum twt_actioncode {
  * @EHT_T2LM_REQUEST: T2LM request action frame
  * @EHT_T2LM_RESPONSE: T2LM response action frame
  * @EHT_T2LM_TEARDOWN: T2LM teardown action frame
+ * @EHT_EPCS_REQUEST: EPCS request action frame
+ * @EHT_EPCS_RESPONSE: EPCS response action frame
+ * @EHT_EPCS_TEARDOWN: EPCS teardown action frame
  */
 enum eht_actioncode {
 	EHT_T2LM_REQUEST = 0,
 	EHT_T2LM_RESPONSE = 1,
 	EHT_T2LM_TEARDOWN = 2,
+	EHT_EPCS_REQUEST = 3,
+	EHT_EPCS_RESPONSE = 4,
+	EHT_EPCS_TEARDOWN = 5,
 };
 
 /**
@@ -665,6 +671,9 @@ struct action_frm_hdr {
  * @MGMT_ACTION_EHT_T2LM_REQUEST: T2LM request frame
  * @MGMT_ACTION_EHT_T2LM_RESPONSE: T2LM response frame
  * @MGMT_ACTION_EHT_T2LM_TEARDOWN: T2LM teardown frame
+ * @MGMT_ACTION_EHT_EPCS_REQUEST: EPCS request frame
+ * @MGMT_ACTION_EHT_EPCS_RESPONSE: EPCS response frame
+ * @MGMT_ACTION_EHT_EPCS_TEARDOWN: EPCS teardown frame
  * @MGMT_ACTION_FTM_REQUEST: FTM request frame
  * @MGMT_ACTION_FTM_RESPONSE: FTM response frame
  * @MGMT_ACTION_FILS_DISCOVERY: FILS Discovery frame
@@ -800,6 +809,9 @@ enum mgmt_frame_type {
 	MGMT_ACTION_EHT_T2LM_REQUEST,
 	MGMT_ACTION_EHT_T2LM_RESPONSE,
 	MGMT_ACTION_EHT_T2LM_TEARDOWN,
+	MGMT_ACTION_EHT_EPCS_REQUEST,
+	MGMT_ACTION_EHT_EPCS_RESPONSE,
+	MGMT_ACTION_EHT_EPCS_TEARDOWN,
 	MGMT_ACTION_FTM_REQUEST,
 	MGMT_ACTION_FTM_RESPONSE,
 	MGMT_ACTION_FILS_DISCOVERY,
@@ -881,6 +893,16 @@ struct mlo_bcast_t2lm_info {
 	uint8_t num_vdevs;
 	uint8_t vdev_id[MAX_AP_MLDS_PER_LINK];
 	uint32_t expected_duration[MAX_AP_MLDS_PER_LINK];
+};
+
+/**
+ * struct mlo_vdev_pause - ML vdev pause info
+ * @vdev_id: vdev id of vdev to be paused
+ * @vdev_pause_duration: vdev pause duration
+ */
+struct mlo_vdev_pause {
+	uint16_t vdev_id;
+	uint32_t vdev_pause_duration;
 };
 #endif
 

@@ -743,9 +743,6 @@ struct dfs_channel {
 	 */
 	uint16_t       dfs_ch_punc_pattern;
 #endif
-#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
-	uint16_t       dfs_internal_radar_pattern;
-#endif
 };
 
 /**
@@ -981,6 +978,23 @@ struct dfs_rcac_params {
 	qdf_freq_t rcac_pri_freq;
 	struct ch_params rcac_ch_params;
 };
+
+/**
+ * struct adfs_completion_params - Agile DFS completion parameters
+ * @ocac_status:   Off channel CAC completion status
+ * @center_freq1:  For 20/40/80/160Mhz, it is the center of the corresponding
+ *                 segment. For 80P80/165MHz, it is the center of the left
+ *                 80MHz.
+ * @center_freq2:  It is valid and non-zero only for 80P80/165MHz. It indicates
+ *                 the Center Frequency of the right 80MHz segment.
+ * @chan_width:    Channel Width
+ */
+struct adfs_completion_params {
+	enum ocac_status_type ocac_status;
+	uint32_t center_freq1;
+	uint32_t center_freq2;
+	uint32_t chan_width;
+};
 #endif
 
 #ifdef WLAN_DISP_CHAN_INFO
@@ -1044,6 +1058,7 @@ enum dfs_punc_sm_state {
  * @dfs_punc_sm_hdl:       The handle for the state machine.
  * @dfs_punc_sm_cur_state: Current state of the Puncturing State Machine.
  * @dfs_punc_sm_lock:      Puncturing state machine lock.
+ * @dfs_is_unpunctured:    Denotes the SM is unpunctured or not.
  */
 struct dfs_punc_obj {
 	qdf_freq_t punc_low_freq;
@@ -1053,6 +1068,7 @@ struct dfs_punc_obj {
 	struct wlan_sm *dfs_punc_sm_hdl;
 	enum dfs_punc_sm_state dfs_punc_sm_cur_state;
 	qdf_spinlock_t dfs_punc_sm_lock;
+	bool dfs_is_unpunctured;
 };
 
 /**
@@ -1188,6 +1204,7 @@ struct dfs_punc_unpunc {
  * @dfs_pdev_obj:                    DFS pdev object.
  * @dfs_soc_obj:                     DFS soc object.
  * @dfs_psoc_idx:                    DFS psoc index
+ * @adfs_completion_status:          Agile DFS completion parameters object.
  * @dfs_agile_precac_freq_mhz:       Freq in MHZ configured on Agile DFS engine.
  * @dfs_is_offload_enabled:          Set if DFS offload enabled.
  * @dfs_is_bangradar_320_supported:  Set if DFS 320MHZ enabled.
@@ -1371,6 +1388,7 @@ struct wlan_dfs {
 	struct dfs_soc_priv_obj *dfs_soc_obj;
 #if defined(QCA_SUPPORT_AGILE_DFS) || defined(ATH_SUPPORT_ZERO_CAC_DFS)
 	uint8_t dfs_psoc_idx;
+	struct adfs_completion_params adfs_completion_status;
 #endif
 #ifdef CONFIG_CHAN_FREQ_API
 	uint16_t       dfs_agile_precac_freq_mhz;
@@ -1481,7 +1499,7 @@ struct dfs_soc_priv_obj {
 	qdf_hrtimer_data_t    dfs_precac_timer;
 	uint8_t dfs_precac_timer_running;
 	bool precac_state_started;
-	bool ocac_status;
+	enum ocac_status_type ocac_status;
 #endif
 	struct dfsreq_nolinfo *dfs_psoc_nolinfo;
 #ifdef QCA_SUPPORT_ADFS_RCAC
@@ -2390,6 +2408,19 @@ void dfs_cac_timer_reset(struct wlan_dfs *dfs);
 void dfs_cac_timer_detach(struct wlan_dfs *dfs);
 
 /**
+ * dfs_puncture_cac_timer_detach() - Free puncture cac timers.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+#if defined(QCA_DFS_BW_PUNCTURE) && !defined(CONFIG_REG_CLIENT)
+void dfs_puncture_cac_timer_detach(struct wlan_dfs *dfs);
+#else
+static inline
+void dfs_puncture_cac_timer_detach(struct wlan_dfs *dfs)
+{
+}
+#endif
+
+/**
  * dfs_deliver_cac_state_events() - Deliver the DFS CAC events namely
  * WLAN_EV_CAC_STARTED on cac started channel(current channel) and
  * WLAN_EV_CAC_RESET on previous dfs channel.
@@ -2498,6 +2529,12 @@ static inline
 void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 {
 }
+
+static inline
+void dfs_puncture_cac_timer_detach(struct wlan_dfs *dfs)
+{
+}
+
 #endif
 /**
  * dfs_set_update_nol_flag() - Sets update_nol flag.
@@ -2911,6 +2948,34 @@ static inline
 void dfs_set_rcsa_flags(struct wlan_dfs *dfs, bool is_rcsa_ie_sent,
 			bool is_nol_ie_sent)
 {
+}
+#endif
+
+/**
+ * dfs_get_radar_bitmap_from_nolie() - Read the NOL IE bitmap of the RCSA
+ * frame, puncture the nol infected channels and formulate the radar puncture
+ * bitmap.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @phymode: Phymode of enum wlan_phymode.
+ * @nol_ie_start_freq: NOL IE start frequency
+ * @nol_ie_bitmap: NOL bitmap
+ *
+ * Return: radar puncture bitmap
+ */
+#if defined(WLAN_FEATURE_11BE) && defined(QCA_DFS_BW_PUNCTURE) && \
+	defined(QCA_DFS_RCSA_SUPPORT)
+uint16_t
+dfs_get_radar_bitmap_from_nolie(struct wlan_dfs *dfs,
+				enum wlan_phymode phymode,
+				qdf_freq_t nol_ie_start_freq,
+				uint8_t nol_ie_bitmap);
+#else
+static inline uint16_t
+dfs_get_radar_bitmap_from_nolie(struct wlan_dfs *dfs, enum wlan_phymode phymode,
+				qdf_freq_t nol_ie_start_freq,
+				uint8_t nol_ie_bitmap)
+{
+	return NO_SCHANS_PUNC;
 }
 #endif
 

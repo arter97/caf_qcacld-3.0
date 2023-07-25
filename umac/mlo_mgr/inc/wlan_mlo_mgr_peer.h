@@ -159,6 +159,16 @@ struct wlan_objmgr_peer *wlan_mlo_peer_get_assoc_peer(
 					struct wlan_mlo_peer_context *ml_peer);
 
 /**
+ * wlan_mlo_peer_get_bridge_peer() - get bridge peer
+ * @ml_peer: MLO peer
+ *
+ * This function returns bridge peer of MLO peer
+ *
+ * Return: bridge peer, if it is found, otherwise NULL
+ */
+struct wlan_objmgr_peer *wlan_mlo_peer_get_bridge_peer(
+					struct wlan_mlo_peer_context *ml_peer);
+/**
  * mlo_peer_is_assoc_peer() - check whether the peer is assoc peer
  * @ml_peer: MLO peer
  * @peer: Link peer
@@ -184,6 +194,18 @@ bool wlan_mlo_peer_is_assoc_peer(struct wlan_mlo_peer_context *ml_peer,
 				 struct wlan_objmgr_peer *peer);
 
 /**
+ * wlan_mlo_peer_is_link_peer() - check whether the peer is link peer
+ * @ml_peer: MLO peer
+ * @peer: Link peer
+ *
+ * This function checks whether the peer is link peer of MLO peer
+ *
+ * Return: true, if it is link peer
+ */
+bool wlan_mlo_peer_is_link_peer(struct wlan_mlo_peer_context *ml_peer,
+				struct wlan_objmgr_peer *peer);
+
+/**
  * wlan_mlo_partner_peer_assoc_post() - Notify partner peer assoc
  * @assoc_peer: Link peer
  *
@@ -192,6 +214,30 @@ bool wlan_mlo_peer_is_assoc_peer(struct wlan_mlo_peer_context *ml_peer,
  * Return: void
  */
 void wlan_mlo_partner_peer_assoc_post(struct wlan_objmgr_peer *assoc_peer);
+
+/**
+ * wlan_mlo_link_peer_assoc_set() - Set Peer assoc sent flag
+ * @peer: Link peer
+ * @is_sent: indicates whether peer assoc is queued to FW
+ *
+ * This function updates that the Peer assoc commandis sent for the link peer
+ *
+ * Return: void
+ */
+void wlan_mlo_link_peer_assoc_set(struct wlan_objmgr_peer *peer, bool is_sent);
+
+/**
+ * wlan_mlo_peer_get_del_hw_bitmap() - Gets peer del hw bitmap for link peer
+ * @peer: Link peer
+ * @hw_link_id_bitmap: WMI peer delete HW link bitmap
+ *
+ * This function gets hw bitmap for peer delete command, which includes
+ * hw link id of partner links for which peer assoc was not sent to FW
+ *
+ * Return: void
+ */
+void wlan_mlo_peer_get_del_hw_bitmap(struct wlan_objmgr_peer *peer,
+				     uint32_t *hw_link_id_bitmap);
 
 /**
  * wlan_mlo_peer_deauth_init() - Initiate Deauth of MLO peer
@@ -249,6 +295,23 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 				uint16_t aid);
 
 /**
+ * wlan_mlo_peer_asreq() - MLO peer process assoc req
+ * @vdev: Link VDEV
+ * @link_peer: Link peer
+ * @ml_info: ML links info
+ * @frm_buf: Assoc req buffer
+ *
+ * This function process assoc req on existing MLO peer and notifies other
+ * partner peers to process assoc request
+ *
+ * Return: SUCCESS, if MLO peer is successfully processed
+ */
+QDF_STATUS wlan_mlo_peer_asreq(struct wlan_objmgr_vdev *vdev,
+			       struct wlan_objmgr_peer *link_peer,
+			       struct mlo_partner_info *ml_info,
+			       qdf_nbuf_t frm_buf);
+
+/**
  * mlo_peer_cleanup() - Free MLO peer
  * @ml_peer: MLO peer
  *
@@ -301,6 +364,20 @@ static inline void wlan_mlo_peer_release_ref(
 QDF_STATUS wlan_mlo_link_peer_attach(struct wlan_mlo_peer_context *ml_peer,
 				     struct wlan_objmgr_peer *peer,
 				     qdf_nbuf_t frm_buf);
+
+/**
+ * wlan_mlo_link_asresp_attach() - MLO link peer assoc resp attach
+ * @ml_peer: MLO peer
+ * @peer: Link peer
+ * @frm_buf: Assoc resp buffer of non-assoc link
+ *
+ * This function attaches assoc resp of link peer to MLO peer
+ *
+ * Return: SUCCESS, if peer is successfully attached to MLO peer
+ */
+QDF_STATUS wlan_mlo_link_asresp_attach(struct wlan_mlo_peer_context *ml_peer,
+				       struct wlan_objmgr_peer *peer,
+				       qdf_nbuf_t frm_buf);
 
 /**
  * wlan_mlo_link_peer_delete() - MLO link peer delete
@@ -663,6 +740,16 @@ mlo_peer_free_auth_param(struct mlpeer_auth_params *auth_params)
  */
 bool wlan_mlo_partner_peer_delete_is_allowed(struct wlan_objmgr_peer *src_peer);
 
+/**
+ * wlan_mlo_validate_reassocreq() - Checks MLO peer reassoc processing
+ * @ml_peer: ML peer
+ *
+ * This function checks whether Reassoc from MLO peer is processed successfully
+ *
+ * Return: SUCCESS, if Reassoc processing is done
+ */
+QDF_STATUS wlan_mlo_validate_reassocreq(struct wlan_mlo_peer_context *ml_peer);
+
 #ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
 /**
  * wlan_objmgr_mlo_update_primary_info() - Update is_primary flag
@@ -674,4 +761,20 @@ bool wlan_mlo_partner_peer_delete_is_allowed(struct wlan_objmgr_peer *src_peer);
  */
 void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer);
 #endif
+
+/**
+ * wlan_mld_get_best_primary_umac_w_rssi() - API to get primary umac using rssi
+ * @ml_peer: ml peer object
+ * @link_vdevs: list of vdevs from which new primary link is to be selected
+ * @allow_all_links: Flag to allow all links to be able to get selected as
+ * primary. This flag will be used to override primary_umac_skip ini
+ *
+ * API to get primary umac using rssi
+ *
+ * Return: primary umac psoc id
+ */
+uint8_t
+wlan_mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
+				      struct wlan_objmgr_vdev *link_vdevs[],
+				      bool allow_all_links);
 #endif

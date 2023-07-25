@@ -25,6 +25,7 @@
 #include "wlan_mlo_mgr_public_structs.h"
 #include <wlan_cm_ucfg_api.h>
 #include <wlan_objmgr_vdev_obj.h>
+#include <wlan_mlo_epcs.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 
@@ -410,9 +411,12 @@ util_get_bvmlie_mldcap(uint8_t *mlieseq, qdf_size_t mlieseqlen,
  * profile is found, or if none of the per-STA profiles includes a MAC address
  * in the STA Info field (assuming no errors are encountered).
  *
- * Get partner link information in the per-STA profiles present in a Basic
- * variant Multi-Link element. The partner link information is returned only for
- * those per-STA profiles which have a MAC address in the STA Info field.
+ * Get partner link information and NSTR capability information in the
+ * per-STA profiles present in a Basic variant Multi-Link element.
+ * The partner link information is returned only for those per-STA profiles
+ * which have a MAC address in the STA Info field.
+ * The NSTR capability information is returned only for those per-STA profiles
+ * which are Complete per-STA profiles.
  *
  * Return: QDF_STATUS_SUCCESS in the case of success, QDF_STATUS value giving
  * the reason for error in the case of failure
@@ -480,6 +484,7 @@ util_get_prvmlie_persta_link_id(uint8_t *mlieseq,
  * fragment sequence
  * @mldmacaddr: Pointer to the location where the MLD MAC address should be
  * updated. This should be ignored by the caller if the function returns error.
+ * @is_mldmacaddr_found: mld address found or not
  *
  * Get the MLD MAC address from a given Reconfig variant Multi-Link element
  * or element fragment sequence.
@@ -489,7 +494,8 @@ util_get_prvmlie_persta_link_id(uint8_t *mlieseq,
  */
 QDF_STATUS
 util_get_rvmlie_mldmacaddr(uint8_t *mlieseq, qdf_size_t mlieseqlen,
-			   struct qdf_mac_addr *mldmacaddr);
+			   struct qdf_mac_addr *mldmacaddr,
+			   bool *is_mldmacaddr_found);
 
 /**
  * util_get_rvmlie_persta_link_info() - Get per-STA reconfig link information
@@ -515,6 +521,24 @@ util_get_rvmlie_persta_link_info(uint8_t *mlieseq,
 				 qdf_size_t mlieseqlen,
 				 struct ml_rv_info *reconfig_info);
 
+/**
+ * util_get_pav_mlie_link_info() - Get priority access link information
+ *
+ * @mlieseq: Starting address of the Multi-Link element or Multi-Link element
+ * fragment sequence
+ * @mlieseqlen: Total length of the Multi-Link element or Multi-Link element
+ * fragment sequence
+ * @pa_info: Pointer to the location where the priority access multi link
+ * information is stored.
+ *
+ * Get EPCS priority access information from Priority Access Multi-Link element.
+ *
+ * Return: QDF_STATUS_SUCCESS in the case of success, QDF_STATUS value giving
+ * the reason for error in the case of failure.
+ */
+QDF_STATUS util_get_pav_mlie_link_info(uint8_t *mlieseq,
+				       qdf_size_t mlieseqlen,
+				       struct ml_pa_info *pa_info);
 #else
 static inline QDF_STATUS
 util_gen_link_assoc_req(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
@@ -629,7 +653,8 @@ util_get_prvmlie_mldid(uint8_t *mlieseq, qdf_size_t mlieseqlen,
 
 static inline QDF_STATUS
 util_get_rvmlie_mldmacaddr(uint8_t *mlieseq, qdf_size_t mlieseqlen,
-			   struct qdf_mac_addr *mldmacaddr)
+			   struct qdf_mac_addr *mldmacaddr,
+			   bool *is_mldmacaddr_found)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -641,5 +666,14 @@ util_get_rvmlie_persta_link_info(uint8_t *mlieseq,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline
+QDF_STATUS util_get_pav_mlie_link_info(uint8_t *mlieseq,
+				       qdf_size_t mlieseqlen,
+				       struct ml_pa_info *pa_info)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* _WLAN_UTILS_MLO_H_ */

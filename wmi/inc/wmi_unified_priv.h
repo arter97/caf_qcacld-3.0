@@ -371,13 +371,13 @@ enum WMI_RECORD_TYPE {
 
 #endif /*WMI_INTERFACE_EVENT_LOGGING */
 
-#ifdef WLAN_OPEN_SOURCE
+#ifdef WLAN_DBGLOG_DEBUGFS
 struct fwdebug {
 	struct sk_buff_head fwlog_queue;
 	struct completion fwlog_completion;
 	A_BOOL fwlog_open;
 };
-#endif /* WLAN_OPEN_SOURCE */
+#endif /* WLAN_DBGLOG_DEBUGFS */
 
 /**
  * struct wmi_wq_dbg_info - WMI WQ debug info
@@ -1396,6 +1396,10 @@ QDF_STATUS (*send_peer_update_wds_entry_cmd)(wmi_unified_t wmi_handle,
 		struct peer_update_wds_entry_params *param);
 #endif
 
+QDF_STATUS (*send_peer_vlan_config_cmd)(wmi_unified_t wmi,
+					uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
+					struct peer_vlan_config_param *param);
+
 #ifdef WMI_AP_SUPPORT
 
 QDF_STATUS (*send_set_ctl_table_cmd)(wmi_unified_t wmi_handle,
@@ -1501,10 +1505,6 @@ QDF_STATUS
 QDF_STATUS (*set_rx_pkt_type_routing_tag_cmd)(
 	wmi_unified_t wmi_hdl, struct wmi_rx_pkt_protocol_routing_info *param);
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
-
-QDF_STATUS (*send_peer_vlan_config_cmd)(wmi_unified_t wmi,
-					uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
-					struct peer_vlan_config_param *param);
 
 #ifdef WLAN_SUPPORT_FILS
 QDF_STATUS (*extract_swfda_vdev_id)(wmi_unified_t wmi_handle, void *evt_buf,
@@ -1789,8 +1789,8 @@ QDF_STATUS (*send_periodic_chan_stats_config_cmd)(wmi_unified_t wmi_handle,
 			struct periodic_chan_stats_params *param);
 
 #ifdef WLAN_ATF_ENABLE
-QDF_STATUS (*send_set_atf_cmd)(wmi_unified_t wmi_handle,
-			       struct set_atf_params *param);
+QDF_STATUS (*send_atf_peer_list_cmd)(wmi_unified_t wmi_handle,
+				     struct set_atf_params *param);
 
 QDF_STATUS
 (*send_atf_peer_request_cmd)(wmi_unified_t wmi_handle,
@@ -1811,6 +1811,14 @@ QDF_STATUS (*extract_atf_peer_stats_ev)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_atf_token_info_ev)(wmi_unified_t wmi_handle,
 					void *evt_buf, uint8_t idx,
 					wmi_host_atf_peer_stats_info *atf_info);
+
+#ifdef WLAN_ATF_INCREASED_STA
+QDF_STATUS (*send_atf_peer_list_cmd_v2)(wmi_unified_t wmi_handle,
+					struct atf_peer_params_v2 *param);
+QDF_STATUS
+(*send_set_atf_grouping_cmd_v2)(wmi_unified_t wmi_handle,
+				struct atf_grouping_params_v2 *param);
+#endif
 #endif
 
 QDF_STATUS (*send_get_user_position_cmd)(wmi_unified_t wmi_handle,
@@ -3100,6 +3108,10 @@ QDF_STATUS
 				struct mlo_link_set_active_param *param);
 
 QDF_STATUS
+(*send_mlo_vdev_pause)(wmi_unified_t wmi_handle,
+		       struct mlo_vdev_pause *info);
+
+QDF_STATUS
 (*extract_mlo_link_set_active_resp)(wmi_unified_t wmi_handle,
 				    void *evt_buf,
 				    struct mlo_link_set_active_resp *resp);
@@ -3127,6 +3139,11 @@ QDF_STATUS (*extract_mgmt_rx_mlo_link_removal_info)(
 		void *buf,
 		struct mgmt_rx_mlo_link_removal_info *link_removal_info,
 		int num_link_removal_info);
+
+QDF_STATUS (*extract_mlo_link_disable_request_evt_param)(
+		struct wmi_unified *wmi_handle,
+		void *buf,
+		struct mlo_link_disable_request_evt_params *params);
 #endif
 
 #ifdef WLAN_FEATURE_SON
@@ -3146,7 +3163,9 @@ QDF_STATUS (*extract_update_mac_address_event)(wmi_unified_t wmi_handle,
 QDF_STATUS
 (*send_soc_tqm_reset_enable_disable_cmd)(wmi_unified_t wmi_handle,
 					 uint32_t enable);
-
+QDF_STATUS
+(*send_set_peer_disable_mode)(wmi_unified_t wmi_handle, uint8_t *peer_mac,
+			      uint8_t pdev_id, uint32_t disabled_modes);
 #ifdef CONFIG_SAWF_DEF_QUEUES
 QDF_STATUS
 (*send_set_rate_upper_cap_cmd)(wmi_unified_t wmi_handle, uint8_t pdev_id,
@@ -3283,6 +3302,12 @@ QDF_STATUS (*extract_sap_coex_cap_service_ready_ext2)(
 QDF_STATUS
 (*send_wmi_tdma_schedule_request_cmd)(wmi_unified_t wmi_handle,
 				      struct wlan_tdma_sched_cmd_param *param);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS
+(*send_wmi_link_recommendation_cmd)(wmi_unified_t wmi_handle,
+				    struct wlan_link_recmnd_param *param);
+#endif
 #endif
 
 QDF_STATUS
@@ -3294,6 +3319,22 @@ QDF_STATUS
 (*extract_csa_ie_received_ev_params)(wmi_unified_t wmi_handle,
 				     void *evt_buf, uint8_t *vdev_id,
 				     struct csa_offload_params *csa_event);
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+QDF_STATUS (*send_peer_ptqm_migrate_cmd)(
+				wmi_unified_t wmi,
+				struct peer_ptqm_migrate_params *param);
+
+QDF_STATUS (*extract_peer_ptqm_migrate_event)(
+		struct wmi_unified *wmi_handle,
+		uint8_t *buf,
+		struct peer_ptqm_migrate_event_params *params);
+
+QDF_STATUS (*extract_peer_entry_ptqm_migrate_event)(
+		struct wmi_unified *wmi_handle,
+		uint8_t *buf,
+		uint32_t index,
+		struct peer_entry_ptqm_migrate_event_params *entry);
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
 };
 
 /* Forward declaration for psoc*/
@@ -3360,10 +3401,10 @@ struct wmi_unified {
 	struct wmi_host_abi_version final_abi_vers;
 	uint32_t num_of_diag_events_logs;
 	uint32_t *events_logs_list;
-#ifdef WLAN_OPEN_SOURCE
+#ifdef WLAN_DBGLOG_DEBUGFS
 	struct fwdebug dbglog;
 	struct dentry *debugfs_phy;
-#endif /* WLAN_OPEN_SOURCE */
+#endif /* WLAN_DBGLOG_DEBUGFS */
 
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 	struct wmi_debug_log_info log_info;
@@ -3379,6 +3420,7 @@ struct wmi_unified {
 	qdf_atomic_t runtime_pm_inprogress;
 #endif
 	qdf_atomic_t is_wow_bus_suspended;
+	qdf_atomic_t is_wow_enable_ack_failed;
 	bool tag_crash_inject;
 	bool tgt_force_assert_enable;
 	enum wmi_target_type target_type;
@@ -3898,4 +3940,13 @@ static inline void wmi_coap_attach_tlv(wmi_unified_t wmi_handle)
  * Return: host channel width, enum phy_ch_width
  */
 enum phy_ch_width wmi_map_ch_width(A_UINT32 wmi_width);
+
+/**
+ * wmi_host_to_fw_phymode() - convert host to fw phymode
+ * @host_phymode: phymode to convert
+ *
+ * Return: one of the values defined in enum WMI_HOST_WLAN_PHY_MODE;
+ *         or WMI_HOST_MODE_UNKNOWN if the conversion fails
+ */
+WMI_HOST_WLAN_PHY_MODE wmi_host_to_fw_phymode(enum wlan_phymode host_phymode);
 #endif

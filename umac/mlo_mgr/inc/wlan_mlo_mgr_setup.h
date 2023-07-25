@@ -46,6 +46,24 @@ void mlo_setup_deinit(void);
 bool mlo_is_ml_soc(struct wlan_objmgr_psoc *psoc, uint8_t grp_id);
 
 /**
+ * mlo_check_start_stop_inprogress() - API to set  ML group
+ * start or stop in progress bit and return last value
+ * @grp_id: ID of the required mlo group to be checked
+ *
+ * Return: true if mlo group is in start/stop, or else return false
+ */
+bool mlo_check_start_stop_inprogress(uint8_t grp_id);
+
+/**
+ * mlo_clear_start_stop_inprogress() - API to clear the value of ML group
+ *                                   start or stop in progress bit
+ * @grp_id: ID of the required mlo group to be set
+ *
+ * Return: none
+ */
+void mlo_clear_start_stop_inprogress(uint8_t grp_id);
+
+/**
  * mlo_get_soc_list() - API to get the list of SOCs participating in MLO
  * @soc_list: list where ML participating SOCs need to be populated
  * @grp_id: ID of the required mlo group
@@ -220,6 +238,18 @@ bool mlo_vdevs_check_single_soc(struct wlan_objmgr_vdev **wlan_vdev_list,
 QDF_STATUS mlo_check_all_pdev_state(struct wlan_objmgr_psoc *psoc,
 				    uint8_t grp_id,
 				    enum MLO_LINK_STATE state);
+
+/**
+ * mlo_update_tsf_sync_support() - API to update TSF sync support per MLO
+ *				   group.
+ *
+ * @psoc: Pointer to psoc object
+ * @tsf_sync_enab: Indicates TSF sync is to be enabled or not
+ *
+ * Return: None
+ */
+void mlo_update_tsf_sync_support(struct wlan_objmgr_psoc *psoc,
+				 bool tsf_sync_enab);
 #else
 static inline void mlo_setup_init(uint8_t total_grp)
 {
@@ -247,6 +277,12 @@ static inline
 bool mlo_psoc_get_grp_id(struct wlan_objmgr_psoc *psoc, uint8_t *grp_id)
 {
 	return 0;
+}
+
+static inline
+void mlo_update_tsf_sync_support(struct wlan_objmgr_psoc *psoc,
+				 bool tsf_sync_enab)
+{
 }
 #endif /* WLAN_MLO_MULTI_CHIP */
 #endif /* _WLAN_MLO_MGR_SETUP_H_ */

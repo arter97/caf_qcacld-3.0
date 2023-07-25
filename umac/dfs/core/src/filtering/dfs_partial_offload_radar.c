@@ -636,7 +636,7 @@ void dfs_get_po_radars(struct wlan_dfs *dfs)
 
 		/*
 		 * So far we have treated Korea as part of ETSI and did not
-		 * support any radar patters specific to Korea other than
+		 * support any radar patterns specific to Korea other than
 		 * standard ETSI radar patterns. Ideally we would want to
 		 * treat Korea as a different domain. This is something that
 		 * we will address in the future. However, for now override

@@ -463,22 +463,6 @@ void mlo_peer_assign_primary_umac(
 		struct wlan_mlo_peer_context *ml_peer,
 		struct wlan_mlo_link_peer_entry *peer_entry);
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
-/**
- * mlo_peer_overwrite_primary_umac() - Overwrite Primary UMAC config
- * @psoc_id: PSOC ID
- * @ml_peer: MLO peer object
- *
- * This function overwrites previous primary UMAC configuration
- * with given PSOC.
- *
- * Return: QDF_STATUS_SUCCESS if it overwrites successfully.
- * QDF_STATUS_E_FAILURE otherwise.
- */
-QDF_STATUS mlo_peer_overwrite_primary_umac(uint8_t psoc_id,
-					   struct wlan_mlo_peer_context *ml_peer);
-#endif
-
 /**
  * mlo_peer_allocate_primary_umac() - Allocate Primary UMAC
  * @ml_dev: MLO DEV context
@@ -595,4 +579,21 @@ QDF_STATUS mlo_peer_create_get_frm_buf(
  */
 uint16_t wlan_mlo_ap_get_active_links(struct wlan_objmgr_vdev *vdev);
 
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+/**
+ * mlo_ap_ml_ptqm_peerid_free() - API to clear ml peer id bmap set for
+ * ptqm migration
+ * @ml_dev: ML dev pointer
+ * @mlo_peer_id: MLO peer id
+ *
+ * Return: none
+ */
+void mlo_ap_ml_ptqm_peerid_free(struct wlan_mlo_dev_context *ml_dev,
+				uint16_t mlo_peer_id);
+#else
+static inline
+void mlo_ap_ml_ptqm_peerid_free(struct wlan_mlo_dev_context *ml_dev,
+				uint16_t mlo_peer_id)
+{ }
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
 #endif

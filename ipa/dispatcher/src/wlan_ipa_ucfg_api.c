@@ -25,7 +25,6 @@
 #include "cfg_ucfg_api.h"
 #include "qdf_module.h"
 
-#ifdef IPA_OFFLOAD
 void ucfg_ipa_set_pld_enable(bool flag)
 {
 	ipa_set_pld_enable(flag);
@@ -159,7 +158,7 @@ void ucfg_ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 
 qdf_export_symbol(ucfg_ipa_reg_send_to_nw_cb);
 
-#ifdef QCA_CONFIG_RPS
+#if defined(QCA_CONFIG_RPS) && !defined(MDM_PLATFORM)
 void ucfg_ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
 				wlan_ipa_rps_enable cb)
 {
@@ -362,4 +361,3 @@ bool ucfg_ipa_is_wds_enabled(void)
 }
 
 qdf_export_symbol(ucfg_ipa_is_wds_enabled);
-#endif

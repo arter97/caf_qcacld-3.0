@@ -185,7 +185,7 @@ static void hal_tx_set_dscp_tid_map_9224(struct hal_soc *hal_soc, uint8_t *map,
 		addr += 4;
 	}
 
-	/* Diasble read/write access */
+	/* Disable read/write access */
 	regval = HAL_REG_READ(soc, cmn_reg_addr);
 	regval &=
 	~(HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_DSCP_TID_MAP_PROGRAM_EN_BMSK);
@@ -266,7 +266,7 @@ static void hal_tx_update_dscp_tid_9224(struct hal_soc *soc, uint8_t tid,
 			     HWIO_TCL_R0_DSCP_TID_MAP_n_RMSK));
 	}
 
-	/* Diasble read/write access */
+	/* Disable read/write access */
 	regval = HAL_REG_READ(soc, cmn_reg_addr);
 	regval &=
 	~(HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_DSCP_TID_MAP_PROGRAM_EN_BMSK);
@@ -350,7 +350,7 @@ hal_tx_init_cmd_credit_ring_9224(hal_soc_handle_t hal_soc_hdl,
 }
 
 /* TX MONITOR */
-#if defined(QCA_MONITOR_2_0_SUPPORT) && defined(TX_MONITOR_WORD_MASK)
+#if defined(WLAN_PKT_CAPTURE_TX_2_0) && defined(TX_MONITOR_WORD_MASK)
 
 #define TX_FES_SETUP_MASK 0x3
 typedef struct tx_fes_setup_compact_9224 hal_tx_fes_setup_t;

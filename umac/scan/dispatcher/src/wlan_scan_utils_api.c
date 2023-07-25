@@ -552,8 +552,7 @@ util_scan_get_chan_from_he_6g_params(struct wlan_objmgr_pdev *pdev,
 						he_6g_params->primary_channel,
 						band_mask);
 	if (scan_obj->drop_bcn_on_invalid_freq &&
-	    wlan_reg_is_disable_for_pwrmode(pdev, *chan_freq,
-					    REG_BEST_PWR_MODE)) {
+	    !wlan_reg_is_freq_enabled(pdev, *chan_freq, REG_BEST_PWR_MODE)) {
 		scm_debug_rl(QDF_MAC_ADDR_FMT": Drop as invalid channel %d freq %d in HE 6Ghz params",
 			     QDF_MAC_ADDR_REF(scan_params->bssid.bytes),
 			     he_6g_params->primary_channel, *chan_freq);
@@ -955,7 +954,7 @@ util_scan_parse_chan_switch_wrapper_ie(struct scan_cache_entry *scan_params,
 			break;
 #ifdef WLAN_FEATURE_11BE
 		case WLAN_EXTN_ELEMID_BW_IND:
-			if (sub_ie->ie_len < WLAN_BW_IND_IE_MIN_LEN)
+			if (sub_ie->ie_len > WLAN_BW_IND_IE_MAX_LEN)
 				return QDF_STATUS_E_INVAL;
 			scan_params->ie_list.bw_ind = (uint8_t *)sub_ie;
 			break;
@@ -1132,10 +1131,9 @@ util_scan_parse_rnr_ie(struct scan_cache_entry *scan_entry,
 		tbtt_count = neighbor_ap_info->tbtt_header.tbtt_info_count;
 		tbtt_length = neighbor_ap_info->tbtt_header.tbtt_info_length;
 		fieldtype = neighbor_ap_info->tbtt_header.tbbt_info_fieldtype;
-		scm_debug("channel number %d, op class %d",
+		scm_debug("chan %d, opclass %d tbtt_cnt %d, tbtt_len %d, fieldtype %d",
 			  neighbor_ap_info->channel_number,
-			  neighbor_ap_info->operting_class);
-		scm_debug("tbtt_count %d, tbtt_length %d, fieldtype %d",
+			  neighbor_ap_info->operting_class,
 			  tbtt_count, tbtt_length, fieldtype);
 		data += sizeof(struct neighbor_ap_info_field);
 
@@ -1482,8 +1480,9 @@ util_scan_populate_bcn_ie_list(struct wlan_objmgr_pdev *pdev,
 								band_mask);
 			/* Drop if invalid freq */
 			if (scan_obj->drop_bcn_on_invalid_freq &&
-			    !wlan_reg_is_freq_present_in_cur_chan_list(pdev,
-								*chan_freq)) {
+			    !wlan_reg_is_freq_enabled(pdev,
+						      *chan_freq,
+						      REG_CURRENT_PWR_MODE)) {
 				scm_debug(QDF_MAC_ADDR_FMT": Drop as invalid chan %d in DS IE, freq %d, band_mask %d",
 					  QDF_MAC_ADDR_REF(
 						  scan_params->bssid.bytes),
@@ -1581,9 +1580,9 @@ util_scan_populate_bcn_ie_list(struct wlan_objmgr_pdev *pdev,
 								band_mask);
 			/* Drop if invalid freq */
 			if (scan_obj->drop_bcn_on_invalid_freq &&
-			    wlan_reg_is_disable_for_pwrmode(
-						pdev, *chan_freq,
-						REG_CURRENT_PWR_MODE)) {
+			    !wlan_reg_is_freq_enabled(pdev,
+						      *chan_freq,
+						      REG_CURRENT_PWR_MODE)) {
 				scm_debug_rl(QDF_MAC_ADDR_FMT": Drop as invalid channel %d freq %d in HT_INFO IE",
 					     QDF_MAC_ADDR_REF(scan_params->bssid.bytes),
 					     chan_idx, *chan_freq);
@@ -1689,7 +1688,8 @@ util_scan_populate_bcn_ie_list(struct wlan_objmgr_pdev *pdev,
 err:
 	status = QDF_STATUS_E_INVAL;
 err_status:
-	scm_debug("failed to parse IE - id: %d, len: %d",
+	scm_debug(QDF_MAC_ADDR_FMT ": failed to parse IE - id: %d, len: %d",
+		  QDF_MAC_ADDR_REF(scan_params->bssid.bytes),
 		  ie->ie_id, ie->ie_len);
 
 	return status;
@@ -2444,8 +2444,6 @@ util_scan_gen_scan_entry(struct wlan_objmgr_pdev *pdev,
 	status = util_scan_populate_bcn_ie_list(pdev, scan_entry, &chan_freq,
 						band_mask);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		scm_debug(QDF_MAC_ADDR_FMT": failed to parse beacon IE",
-			  QDF_MAC_ADDR_REF(scan_entry->bssid.bytes));
 		qdf_mem_free(scan_entry->raw_frame.ptr);
 		qdf_mem_free(scan_entry);
 		return QDF_STATUS_E_FAILURE;
@@ -2746,6 +2744,14 @@ static void util_parse_noninheritance_list(uint8_t *extn_elem,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static bool util_is_ml_ie(uint8_t *pos)
+{
+	if (pos[PAYLOAD_START_POS] == WLAN_EXTN_ELEMID_MULTI_LINK)
+		return true;
+
+	return false;
+}
+
 /**
  * util_handle_rnr_ie_for_mbssid() - parse and modify RNR IE for MBSSID feature
  * @rnr: The pointer to RNR IE
@@ -2891,6 +2897,11 @@ static int util_handle_rnr_ie_for_mbssid(const uint8_t *rnr,
 	return rnr_len;
 }
 #else
+static bool util_is_ml_ie(uint8_t *pos)
+{
+	return false;
+}
+
 static int util_handle_rnr_ie_for_mbssid(const uint8_t *rnr,
 					 uint8_t bssid_index, uint8_t *pos)
 {
@@ -3013,8 +3024,13 @@ static uint32_t util_gen_new_ie(uint8_t *ie, uint32_t ielen,
 				;
 			} else if (tmp_old[0] == WLAN_ELEMID_EXTN_ELEM) {
 				if (tmp_old[PAYLOAD_START_POS] ==
-				    tmp[PAYLOAD_START_POS]) {
-					/* same ie, copy from subelement */
+				    tmp[PAYLOAD_START_POS] &&
+				    !util_is_ml_ie(tmp)) {
+					/* same ie, copy from subelement
+					 * but multi link IE is exception,
+					 * it needs to copy from main frame
+					 * for full info.
+					 */
 					if ((pos + tmp[1] + MIN_IE_LEN) <=
 					    (new_ie + ielen)) {
 						qdf_mem_copy(pos, tmp,

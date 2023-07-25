@@ -1560,7 +1560,8 @@ wlan_sap_update_tpc_on_channel(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		return;
 
 	if (wlan_reg_decide_6ghz_power_within_bw_for_freq(
-		pdev, freq, bw, &is_psd, &tx_power, &psd_eirp, &power_type) !=
+		pdev, freq, bw, &is_psd, &tx_power, &psd_eirp, &power_type,
+		REG_CURRENT_PWR_MODE, NO_SCHANS_PUNC) !=
 	    QDF_STATUS_SUCCESS)
 		return;
 

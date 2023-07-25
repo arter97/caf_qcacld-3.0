@@ -58,6 +58,9 @@ QDF_STATUS utils_dfs_reset(struct wlan_objmgr_pdev *pdev)
 	dfs_reset_precaclists(dfs);
 	dfs_init_chan_state_array(pdev);
 
+	if (dfs->dfs_use_puncture && !dfs->dfs_is_stadfs_enabled)
+		dfs_punc_sm_stop_all(dfs);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -810,6 +813,7 @@ static void utils_dfs_get_channel_list(struct wlan_objmgr_pdev *pdev,
 	uint32_t conn_count = 0;
 	enum policy_mgr_con_mode mode;
 	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
+	enum QDF_OPMODE op_mode;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
@@ -822,9 +826,10 @@ static void utils_dfs_get_channel_list(struct wlan_objmgr_pdev *pdev,
 	weight_len = QDF_ARRAY_SIZE(weight_list);
 
 	if (vdev) {
-		mode = policy_mgr_convert_device_mode_to_qdf_type(
-				wlan_vdev_mlme_get_opmode(vdev));
 		vdev_id = wlan_vdev_get_id(vdev);
+		op_mode = wlan_vdev_mlme_get_opmode(vdev);
+		mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode,
+							    vdev_id);
 	} else {
 		mode = PM_SAP_MODE;
 	}
@@ -1594,3 +1599,112 @@ QDF_STATUS utils_dfs_radar_enable(struct wlan_objmgr_pdev *pdev)
 {
 	return tgt_dfs_radar_enable(pdev, 0, 0, true);
 }
+
+#ifdef WLAN_FEATURE_11BE
+enum phy_ch_width
+utils_dfs_convert_wlan_phymode_to_chwidth(enum wlan_phymode phymode)
+{
+		switch (phymode) {
+		case WLAN_PHYMODE_11NA_HT20:
+		case WLAN_PHYMODE_11NG_HT20:
+		case WLAN_PHYMODE_11AC_VHT20:
+		case WLAN_PHYMODE_11AC_VHT20_2G:
+		case WLAN_PHYMODE_11AXA_HE20:
+		case WLAN_PHYMODE_11AXG_HE20:
+		case WLAN_PHYMODE_11BEG_EHT20:
+		case WLAN_PHYMODE_11BEA_EHT20:
+			return CH_WIDTH_20MHZ;
+		case WLAN_PHYMODE_11NA_HT40:
+		case WLAN_PHYMODE_11NG_HT40PLUS:
+		case WLAN_PHYMODE_11NG_HT40MINUS:
+		case WLAN_PHYMODE_11NG_HT40:
+		case WLAN_PHYMODE_11AC_VHT40:
+		case WLAN_PHYMODE_11AC_VHT40PLUS_2G:
+		case WLAN_PHYMODE_11AC_VHT40MINUS_2G:
+		case WLAN_PHYMODE_11AC_VHT40_2G:
+		case WLAN_PHYMODE_11AXG_HE40PLUS:
+		case WLAN_PHYMODE_11AXG_HE40MINUS:
+		case WLAN_PHYMODE_11AXG_HE40:
+		case WLAN_PHYMODE_11BEA_EHT40:
+		case WLAN_PHYMODE_11BEG_EHT40PLUS:
+		case WLAN_PHYMODE_11BEG_EHT40MINUS:
+		case WLAN_PHYMODE_11BEG_EHT40:
+			return CH_WIDTH_40MHZ;
+		case WLAN_PHYMODE_11AC_VHT80:
+		case WLAN_PHYMODE_11AC_VHT80_2G:
+		case WLAN_PHYMODE_11AXA_HE80:
+		case WLAN_PHYMODE_11AXG_HE80:
+		case WLAN_PHYMODE_11BEA_EHT80:
+			return CH_WIDTH_80MHZ;
+		case WLAN_PHYMODE_11AC_VHT160:
+		case WLAN_PHYMODE_11AXA_HE160:
+		case WLAN_PHYMODE_11BEA_EHT160:
+			return CH_WIDTH_160MHZ;
+		case WLAN_PHYMODE_11AC_VHT80_80:
+		case WLAN_PHYMODE_11AXA_HE80_80:
+			return CH_WIDTH_80P80MHZ;
+		case WLAN_PHYMODE_11BEA_EHT320:
+			return CH_WIDTH_320MHZ;
+		default:
+			return CH_WIDTH_INVALID;
+		}
+}
+#else
+enum phy_ch_width
+utils_dfs_convert_wlan_phymode_to_chwidth(enum wlan_phymode phymode)
+{
+		switch (phymode) {
+		case WLAN_PHYMODE_11NA_HT20:
+		case WLAN_PHYMODE_11NG_HT20:
+		case WLAN_PHYMODE_11AC_VHT20:
+		case WLAN_PHYMODE_11AC_VHT20_2G:
+		case WLAN_PHYMODE_11AXA_HE20:
+		case WLAN_PHYMODE_11AXG_HE20:
+			return CH_WIDTH_20MHZ;
+		case WLAN_PHYMODE_11NA_HT40:
+		case WLAN_PHYMODE_11NG_HT40PLUS:
+		case WLAN_PHYMODE_11NG_HT40MINUS:
+		case WLAN_PHYMODE_11NG_HT40:
+		case WLAN_PHYMODE_11AC_VHT40:
+		case WLAN_PHYMODE_11AC_VHT40PLUS_2G:
+		case WLAN_PHYMODE_11AC_VHT40MINUS_2G:
+		case WLAN_PHYMODE_11AC_VHT40_2G:
+		case WLAN_PHYMODE_11AXG_HE40PLUS:
+		case WLAN_PHYMODE_11AXG_HE40MINUS:
+		case WLAN_PHYMODE_11AXG_HE40:
+			return CH_WIDTH_40MHZ;
+		case WLAN_PHYMODE_11AC_VHT80:
+		case WLAN_PHYMODE_11AC_VHT80_2G:
+		case WLAN_PHYMODE_11AXA_HE80:
+		case WLAN_PHYMODE_11AXG_HE80:
+			return CH_WIDTH_80MHZ;
+		case WLAN_PHYMODE_11AC_VHT160:
+		case WLAN_PHYMODE_11AXA_HE160:
+			return CH_WIDTH_160MHZ;
+		case WLAN_PHYMODE_11AC_VHT80_80:
+		case WLAN_PHYMODE_11AXA_HE80_80:
+			return CH_WIDTH_80P80MHZ;
+		default:
+			return CH_WIDTH_INVALID;
+		}
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BE) && defined(QCA_DFS_BW_EXPAND) && \
+	defined(QCA_DFS_RCSA_SUPPORT)
+uint16_t
+utils_dfs_get_radar_bitmap_from_nolie(struct wlan_objmgr_pdev *pdev,
+				      enum wlan_phymode phy_mode,
+				      qdf_freq_t nol_ie_start_freq,
+				      uint8_t nol_ie_bitmap)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+	if (!dfs)
+		return 0;
+
+	return dfs_get_radar_bitmap_from_nolie(dfs, phy_mode, nol_ie_start_freq,
+					       nol_ie_bitmap);
+}
+#endif

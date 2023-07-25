@@ -48,6 +48,7 @@
 void dp_tx_nawds_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 			 struct dp_tx_msdu_info_s *msdu_info,
 			 qdf_nbuf_t nbuf, uint16_t sa_peer_id);
+int dp_tx_proxy_arp(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
 /*
  * DP_TX_DESC_FLAG_FRAG flags should always be defined to 0x1
  * please do not change this flag's definition
@@ -286,6 +287,7 @@ qdf_nbuf_t dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc,
 
 /**
  * dp_tx_desc_release() - Release Tx Descriptor
+ * @soc: Soc handle
  * @tx_desc: Tx Descriptor
  * @desc_pool_id: Descriptor Pool ID
  *
@@ -294,7 +296,8 @@ qdf_nbuf_t dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc,
  *
  * Return:
  */
-void dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id);
+void dp_tx_desc_release(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
+			uint8_t desc_pool_id);
 
 /**
  * dp_tx_compute_delay() - Compute and fill in all timestamps
@@ -767,15 +770,6 @@ bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
 void dp_tx_vdev_multipass_deinit(struct dp_vdev *vdev);
 
 /**
- * dp_tx_remove_vlan_tag() - Remove 4 bytes of vlan tag
- * @vdev: DP vdev handle
- * @nbuf: network buffer
- *
- * Return: void
- */
-void dp_tx_remove_vlan_tag(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
-
-/**
  * dp_tx_add_groupkey_metadata() - Add group key in metadata
  * @vdev: DP vdev handle
  * @msdu_info: MSDU info to be setup in MSDU descriptor
@@ -829,6 +823,19 @@ static inline enum qdf_dp_tx_rx_status dp_tx_hw_to_qdf(uint16_t status)
  */
 #ifdef QCA_OL_TX_MULTIQ_SUPPORT
 #if defined(IPA_OFFLOAD) && defined(QCA_IPA_LL_TX_FLOW_CONTROL)
+#ifdef IPA_WDI3_TX_TWO_PIPES
+static inline void dp_tx_get_queue(struct dp_vdev *vdev,
+				   qdf_nbuf_t nbuf, struct dp_tx_queue *queue)
+{
+	queue->ring_id = qdf_get_cpu();
+	if (vdev->pdev->soc->wlan_cfg_ctx->ipa_enabled)
+		if ((queue->ring_id == IPA_TCL_DATA_RING_IDX) ||
+		    (queue->ring_id == IPA_TX_ALT_RING_IDX))
+			queue->ring_id = 0;
+
+	queue->desc_pool_id = queue->ring_id;
+}
+#else
 static inline void dp_tx_get_queue(struct dp_vdev *vdev,
 				   qdf_nbuf_t nbuf, struct dp_tx_queue *queue)
 {
@@ -839,6 +846,19 @@ static inline void dp_tx_get_queue(struct dp_vdev *vdev,
 
 	queue->desc_pool_id = queue->ring_id;
 }
+#endif
+#else
+#ifdef WLAN_TX_PKT_CAPTURE_ENH
+static inline void dp_tx_get_queue(struct dp_vdev *vdev,
+				   qdf_nbuf_t nbuf, struct dp_tx_queue *queue)
+{
+	if (qdf_unlikely(vdev->is_override_rbm_id))
+		queue->ring_id = vdev->rbm_id;
+	else
+		queue->ring_id = qdf_get_cpu();
+
+	queue->desc_pool_id = queue->ring_id;
+}
 #else
 static inline void dp_tx_get_queue(struct dp_vdev *vdev,
 				   qdf_nbuf_t nbuf, struct dp_tx_queue *queue)
@@ -846,6 +866,8 @@ static inline void dp_tx_get_queue(struct dp_vdev *vdev,
 	queue->ring_id = qdf_get_cpu();
 	queue->desc_pool_id = queue->ring_id;
 }
+
+#endif
 #endif
 
 /**
@@ -1667,6 +1689,26 @@ is_dp_spl_tx_limit_reached(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 	return true;
 }
 
+static inline bool
+__dp_tx_limit_check(struct dp_soc *soc)
+{
+	struct dp_global_context *dp_global;
+	uint32_t global_tx_desc_allowed;
+	uint32_t global_tx_desc_reg_allowed;
+	uint32_t global_tx_desc_spcl_allowed;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+	global_tx_desc_allowed =
+		wlan_cfg_get_num_global_tx_desc(soc->wlan_cfg_ctx);
+	global_tx_desc_spcl_allowed =
+		wlan_cfg_get_num_global_spcl_tx_desc(soc->wlan_cfg_ctx);
+	global_tx_desc_reg_allowed = global_tx_desc_allowed -
+					global_tx_desc_spcl_allowed;
+
+	return (dp_tx_get_global_desc_in_use(dp_global) >=
+					global_tx_desc_reg_allowed);
+}
+
 /**
  * dp_tx_limit_check - Check if allocated tx descriptors reached
  * global max reg limit and pdev max reg limit for regular packets. Also check
@@ -1683,20 +1725,8 @@ dp_tx_limit_check(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
-	struct dp_global_context *dp_global;
-	uint32_t global_tx_desc_allowed;
-	uint32_t global_tx_desc_reg_allowed;
-	uint32_t global_tx_desc_spcl_allowed;
 
-	dp_global = wlan_objmgr_get_global_ctx();
-	global_tx_desc_allowed =
-		wlan_cfg_get_num_global_tx_desc(soc->wlan_cfg_ctx);
-	global_tx_desc_spcl_allowed =
-		wlan_cfg_get_num_global_spcl_tx_desc(soc->wlan_cfg_ctx);
-	global_tx_desc_reg_allowed = global_tx_desc_allowed -
-					global_tx_desc_spcl_allowed;
-
-	if (dp_tx_get_global_desc_in_use(dp_global) >= global_tx_desc_reg_allowed) {
+	if (__dp_tx_limit_check(soc)) {
 		if (is_dp_spl_tx_limit_reached(vdev, nbuf)) {
 			dp_tx_info("queued packets are more than max tx, drop the frame");
 			DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
@@ -1748,6 +1778,13 @@ is_dp_spl_tx_limit_reached(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 	return true;
 }
 
+static inline bool
+__dp_tx_limit_check(struct dp_soc *soc)
+{
+	return (qdf_atomic_read(&soc->num_tx_outstanding) >=
+					soc->num_reg_tx_allowed);
+}
+
 /**
  * dp_tx_limit_check - Check if allocated tx descriptors reached
  * soc max reg limit and pdev max reg limit for regular packets. Also check if
@@ -1765,8 +1802,7 @@ dp_tx_limit_check(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
 
-	if (qdf_atomic_read(&soc->num_tx_outstanding) >=
-			soc->num_reg_tx_allowed) {
+	if (__dp_tx_limit_check(soc)) {
 		if (is_dp_spl_tx_limit_reached(vdev, nbuf)) {
 			dp_tx_info("queued packets are more than max tx, drop the frame");
 			DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
@@ -1813,6 +1849,16 @@ dp_tx_exception_limit_check(struct dp_vdev *vdev)
 }
 
 #ifdef QCA_SUPPORT_DP_GLOBAL_CTX
+static inline void
+__dp_tx_outstanding_inc(struct dp_soc *soc)
+{
+	struct dp_global_context *dp_global;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+
+	qdf_atomic_inc(&dp_global->global_descriptor_in_use);
+}
+
 /**
  * dp_tx_outstanding_inc - Inc outstanding tx desc values on global and pdev
  * @pdev: DP pdev handle
@@ -1822,15 +1868,20 @@ dp_tx_exception_limit_check(struct dp_vdev *vdev)
 static inline void
 dp_tx_outstanding_inc(struct dp_pdev *pdev)
 {
-	struct dp_global_context *dp_global;
-
-	dp_global = wlan_objmgr_get_global_ctx();
-
-	qdf_atomic_inc(&dp_global->global_descriptor_in_use);
+	__dp_tx_outstanding_inc(pdev->soc);
 	qdf_atomic_inc(&pdev->num_tx_outstanding);
 	dp_update_tx_desc_stats(pdev);
 }
 
+static inline void
+__dp_tx_outstanding_dec(struct dp_soc *soc)
+{
+	struct dp_global_context *dp_global;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+
+	qdf_atomic_dec(&dp_global->global_descriptor_in_use);
+}
 /**
  * dp_tx_outstanding_dec - Dec outstanding tx desc values on global and pdev
  * @pdev: DP pdev handle
@@ -1840,16 +1891,20 @@ dp_tx_outstanding_inc(struct dp_pdev *pdev)
 static inline void
 dp_tx_outstanding_dec(struct dp_pdev *pdev)
 {
-	struct dp_global_context *dp_global;
+	struct dp_soc *soc = pdev->soc;
 
-	dp_global = wlan_objmgr_get_global_ctx();
-
-	qdf_atomic_dec(&dp_global->global_descriptor_in_use);
+	__dp_tx_outstanding_dec(soc);
 	qdf_atomic_dec(&pdev->num_tx_outstanding);
 	dp_update_tx_desc_stats(pdev);
 }
 
 #else
+
+static inline void
+__dp_tx_outstanding_inc(struct dp_soc *soc)
+{
+	qdf_atomic_inc(&soc->num_tx_outstanding);
+}
 /**
  * dp_tx_outstanding_inc - Increment outstanding tx desc values on pdev and soc
  * @pdev: DP pdev handle
@@ -1861,9 +1916,15 @@ dp_tx_outstanding_inc(struct dp_pdev *pdev)
 {
 	struct dp_soc *soc = pdev->soc;
 
+	__dp_tx_outstanding_inc(soc);
 	qdf_atomic_inc(&pdev->num_tx_outstanding);
-	qdf_atomic_inc(&soc->num_tx_outstanding);
 	dp_update_tx_desc_stats(pdev);
+}
+
+static inline void
+__dp_tx_outstanding_dec(struct dp_soc *soc)
+{
+	qdf_atomic_dec(&soc->num_tx_outstanding);
 }
 
 /**
@@ -1877,13 +1938,19 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 {
 	struct dp_soc *soc = pdev->soc;
 
+	__dp_tx_outstanding_dec(soc);
 	qdf_atomic_dec(&pdev->num_tx_outstanding);
-	qdf_atomic_dec(&soc->num_tx_outstanding);
 	dp_update_tx_desc_stats(pdev);
 }
 #endif /* QCA_SUPPORT_DP_GLOBAL_CTX */
 
 #else //QCA_TX_LIMIT_CHECK
+static inline bool
+__dp_tx_limit_check(struct dp_soc *soc)
+{
+	return false;
+}
+
 static inline bool
 dp_tx_limit_check(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
@@ -1897,10 +1964,20 @@ dp_tx_exception_limit_check(struct dp_vdev *vdev)
 }
 
 static inline void
+__dp_tx_outstanding_inc(struct dp_soc *soc)
+{
+}
+
+static inline void
 dp_tx_outstanding_inc(struct dp_pdev *pdev)
 {
 	qdf_atomic_inc(&pdev->num_tx_outstanding);
 	dp_update_tx_desc_stats(pdev);
+}
+
+static inline void
+__dp_tx_outstanding_dec(struct dp_soc *soc)
+{
 }
 
 static inline void
@@ -1930,6 +2007,19 @@ static inline uint32_t dp_tx_get_pkt_len(struct dp_tx_desc_s *tx_desc)
 {
 	return tx_desc->frm_type == dp_tx_frm_tso ?
 		tx_desc->msdu_ext_desc->tso_desc->seg.total_len :
-		qdf_nbuf_len(tx_desc->nbuf);
+		tx_desc->length;
 }
+
+#ifdef FEATURE_RUNTIME_PM
+static inline int dp_get_rtpm_tput_policy_requirement(struct dp_soc *soc)
+{
+	return qdf_atomic_read(&soc->rtpm_high_tput_flag) &&
+		(hif_rtpm_get_state() <= HIF_RTPM_STATE_ON);
+}
+#else
+static inline int dp_get_rtpm_tput_policy_requirement(struct dp_soc *soc)
+{
+	return 0;
+}
+#endif
 #endif

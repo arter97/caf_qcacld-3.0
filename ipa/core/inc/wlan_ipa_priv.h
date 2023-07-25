@@ -25,6 +25,8 @@
 #ifndef _WLAN_IPA_PRIV_STRUCT_H_
 #define _WLAN_IPA_PRIV_STRUCT_H_
 
+#ifdef IPA_OFFLOAD
+
 #include <linux/version.h>
 #include <linux/kernel.h>
 
@@ -46,7 +48,6 @@
 #include "cdp_txrx_ipa.h"
 #endif
 
-#ifdef IPA_OFFLOAD
 #define WLAN_IPA_RX_INACTIVITY_MSEC_DELAY   1000
 #define WLAN_IPA_UC_WLAN_8023_HDR_SIZE      14
 
@@ -63,7 +64,7 @@
 #define WLAN_IPA_CLIENT_MAX_IFACE           MAX_IPA_IFACE
 #define WLAN_IPA_MAX_SYSBAM_PIPE            4
 
-#ifdef IPA_WDS_EASYMESH_FEATURE
+#if defined(IPA_WDS_EASYMESH_FEATURE) || defined(QCA_WIFI_QCN9224)
 #define WLAN_IPA_MAX_SESSION                MAX_IPA_IFACE //7
 #else
 #define WLAN_IPA_MAX_SESSION                5
@@ -75,7 +76,7 @@
 #define WLAN_IPA_MAX_STA_COUNT              41
 #endif
 
-#define WLAN_IPA_RX_PIPE                    WLAN_IPA_MAX_IFACE
+#define WLAN_IPA_RX_PIPE                    (WLAN_IPA_MAX_SYSBAM_PIPE - 1)
 #define WLAN_IPA_ENABLE_MASK                BIT(0)
 #define WLAN_IPA_PRE_FILTER_ENABLE_MASK     BIT(1)
 #define WLAN_IPA_IPV6_ENABLE_MASK           BIT(2)
@@ -89,9 +90,18 @@
 #ifdef QCA_IPA_LL_TX_FLOW_CONTROL
 #define WLAN_IPA_MAX_BANDWIDTH              4800
 #define WLAN_IPA_MAX_BANDWIDTH_2G           1400
-#else
+#else /* !QCA_IPA_LL_TX_FLOW_CONTROL */
+
 #define WLAN_IPA_MAX_BANDWIDTH              800
+
+#if defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_KIWI_V2)
+/* Iaeeb22a75f00d023e0e0972db330a48e9b250408 defines nominal vote bandwidth */
+#define WLAN_IPA_MAX_BW_NOMINAL 4800
+#else
+#define WLAN_IPA_MAX_BW_NOMINAL WLAN_IPA_MAX_BANDWIDTH
 #endif
+
+#endif /* QCA_IPA_LL_TX_FLOW_CONTROL */
 
 #define WLAN_IPA_MAX_PENDING_EVENT_COUNT    20
 
@@ -111,6 +121,10 @@
  * @WLAN_IPA_UC_OPCODE_QUOTA_RSP: IPA UC quota response
  * @WLAN_IPA_UC_OPCODE_QUOTA_IND: IPA UC quota indication
  * @WLAN_IPA_UC_OPCODE_UC_READY: IPA UC ready indication
+ * @WLAN_IPA_FILTER_RSV_NOTIFY: OPT WIFI DP filter reserve notification
+ * @WLAN_IPA_FILTER_REL_NOTIFY: OPT WIFI DP filter release notification
+ * @WLAN_IPA_SMMU_MAP: IPA SMMU map call
+ * @WLAN_IPA_SMMU_UNMAP: IPA SMMU unmap call
  * @WLAN_IPA_UC_OPCODE_MAX: IPA UC max operation code
  */
 enum wlan_ipa_uc_op_code {
@@ -125,6 +139,10 @@ enum wlan_ipa_uc_op_code {
 	WLAN_IPA_UC_OPCODE_QUOTA_IND = 7,
 #endif
 	WLAN_IPA_UC_OPCODE_UC_READY = 8,
+	WLAN_IPA_FILTER_RSV_NOTIFY = 9,
+	WLAN_IPA_FILTER_REL_NOTIFY = 10,
+	WLAN_IPA_SMMU_MAP = 11,
+	WLAN_IPA_SMMU_UNMAP = 12,
 	/* keep this last */
 	WLAN_IPA_UC_OPCODE_MAX
 };
@@ -750,7 +768,7 @@ struct wlan_ipa_priv {
 	wlan_ipa_softap_xmit softap_xmit;
 	wlan_ipa_send_to_nw send_to_nw;
 
-#ifdef QCA_CONFIG_RPS
+#if defined(QCA_CONFIG_RPS) && !defined(MDM_PLATFORM)
 	/*Callback to enable RPS for STA in STA+SAP scenario*/
 	wlan_ipa_rps_enable rps_enable;
 #endif
@@ -770,6 +788,7 @@ struct wlan_ipa_priv {
 #ifdef IPA_OPT_WIFI_DP
 	struct wifi_dp_flt_setup dp_cce_super_rule_flt_param;
 	qdf_event_t ipa_flt_evnt;
+	qdf_wake_lock_t opt_dp_wake_lock;
 #endif
 };
 

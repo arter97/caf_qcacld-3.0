@@ -102,7 +102,31 @@ int64_t qdf_ktime_to_us(qdf_ktime_t ktime);
 int64_t qdf_ktime_to_ns(qdf_ktime_t ktime);
 
 /**
- * qdf_system_ticks() - Count the number of ticks elapsed from the time when
+ * qdf_time_ktime_set() - Set a ktime_t variable from a seconds/nanoseconds
+ * value
+ * @secs: seconds to set
+ * @nsecs: nanoseconds to set
+ *
+ * Return: The qdf_ktime_t representation of the value.
+ */
+qdf_ktime_t qdf_time_ktime_set(const s64 secs, const unsigned long nsecs);
+
+/**
+ * qdf_ktime_get_real_ns() - Gets the current time in ns using UTC
+ *
+ * Return: qdf_ktime_t in nano sec
+ */
+qdf_ktime_t qdf_ktime_get_real_ns(void);
+
+/**
+ * qdf_ktime_get_ns() - Gets the current time nano seconds
+ *
+ * Return: qdf_ktime_t in nano sec
+ */
+qdf_ktime_t qdf_ktime_get_ns(void);
+
+/**
+ * qdf_system_ticks - Count the number of ticks elapsed from the time when
  * the system booted
  *
  * Return: ticks
@@ -261,6 +285,11 @@ uint64_t qdf_get_log_timestamp(void);
 uint64_t qdf_get_log_timestamp_usecs(void);
 
 /**
+ * qdf_get_log_timestamp_lightweight() - get time stamp for logging
+ */
+#define qdf_get_log_timestamp_lightweight() qdf_get_log_timestamp()
+
+/**
  * qdf_get_monotonic_boottime() - get monotonic kernel boot time
  * This API is similar to qdf_get_system_boottime but it includes
  * time spent in suspend.
@@ -283,49 +312,79 @@ void qdf_time_ktime_get_real_time(qdf_timespec_t *ts);
  * Return: current time in nanosec units.
  */
 unsigned long long qdf_time_sched_clock(void);
-#else
 
+/**
+ * qdf_usleep_range - introduce sleep with min and max time
+ * @min: Minimum time in usecs to sleep
+ * @max: Maximum time in usecs to sleep
+ *
+ * Return: none
+ */
+void qdf_usleep_range(unsigned long min, unsigned long max);
+
+/**
+ *  qdf_ktime_compare - compare two qdf_ktime_t objects
+ *  @ktime1: time as qdf_ktime_t object
+ *  @ktime2: time as qdf_ktime_t object
+ *
+ *  Return:
+ * * ktime1  < ktime2 - return <0
+ * * ktime1 == ktime2 - return 0
+ * * ktime1  > ktime2 - return >0
+ */
+int qdf_ktime_compare(qdf_ktime_t ktime1, qdf_ktime_t ktime2);
+
+#else
 static inline qdf_ktime_t qdf_ns_to_ktime(uint64_t ns)
 {
 	return __qdf_ns_to_ktime(ns);
 }
-
 
 static inline qdf_ktime_t qdf_ktime_add(qdf_ktime_t ktime1, qdf_ktime_t ktime2)
 {
 	return __qdf_ktime_add(ktime1, ktime2);
 }
 
-
 static inline qdf_ktime_t qdf_ktime_get(void)
 {
 	return __qdf_ktime_get();
 }
-
 
 static inline qdf_ktime_t qdf_ktime_real_get(void)
 {
 	return __qdf_ktime_real_get();
 }
 
+static inline qdf_ktime_t qdf_ktime_get_real_ns(void)
+{
+	return __qdf_ktime_get_real_ns();
+}
+
+static inline uint64_t qdf_ktime_get_ns(void)
+{
+	return __qdf_ktime_get_ns();
+}
+
+static inline qdf_ktime_t qdf_ktime_compare(qdf_ktime_t ktime1,
+					    qdf_ktime_t ktime2)
+{
+	return __qdf_ktime_compare(ktime1, ktime2);
+}
 
 static inline qdf_ktime_t qdf_ktime_add_ns(qdf_ktime_t ktime, int64_t ns)
 {
 	return __qdf_ktime_add_ns(ktime, ns);
 }
 
-
 static inline int64_t qdf_ktime_to_ms(qdf_ktime_t ktime)
 {
 	return __qdf_ktime_to_ms(ktime);
 }
 
-
 static inline int64_t qdf_ktime_to_us(qdf_ktime_t ktime)
 {
 	return __qdf_time_ktime_to_us(ktime);
 }
-
 
 static inline int64_t qdf_ktime_to_ns(qdf_ktime_t ktime)
 {
@@ -338,7 +397,6 @@ static inline qdf_time_t qdf_system_ticks(void)
 }
 
 #define qdf_system_ticks_per_sec __qdf_system_ticks_per_sec
-
 static inline uint32_t qdf_system_ticks_to_msecs(unsigned long clock_ticks)
 {
 	return __qdf_system_ticks_to_msecs(clock_ticks);
@@ -353,7 +411,6 @@ static inline qdf_time_t qdf_get_system_uptime(void)
 {
 	return __qdf_get_system_uptime();
 }
-
 
 static inline uint64_t qdf_get_bootbased_boottime_ns(void)
 {
@@ -510,6 +567,10 @@ static inline unsigned long long qdf_time_sched_clock(void)
 {
 	return __qdf_time_sched_clock();
 }
-#endif
 
+static inline void qdf_usleep_range(unsigned long min, unsigned long max)
+{
+	__qdf_usleep_range(min, max);
+}
+#endif
 #endif

@@ -55,6 +55,8 @@ struct mlo_all_link_rssi {
 #define ML_INVALID_PRIMARY_TQM   0xff
 /* Congestion value */
 #define ML_PRIMARY_TQM_CONGESTION 30
+/* PTQM migration timeout value in ms */
+#define ML_PRIMARY_TQM_MIGRATRION_TIMEOUT 4000
 
 static void wlan_mlo_peer_get_rssi(struct wlan_objmgr_psoc *psoc,
 				   void *obj, void *args)
@@ -78,12 +80,25 @@ static void wlan_mlo_peer_get_rssi(struct wlan_objmgr_psoc *psoc,
 	if (!mlo_peer_ctx)
 		return;
 
-	/* If this psoc is not primary UMAC, don't account RSSI */
-	if (mlo_peer_ctx->primary_umac_psoc_id != rssi_data->current_psoc_id)
+	/* If this psoc is new primary UMAC after migration,
+	 * account RSSI on new link
+	 */
+	if (mlo_peer_ctx->migrate_primary_umac_psoc_id ==
+			rssi_data->current_psoc_id) {
+		tqm_params->total_rssi += mlo_peer_ctx->avg_link_rssi;
+		tqm_params->num_ml_peers += 1;
 		return;
+	}
 
-	tqm_params->total_rssi += mlo_peer_ctx->avg_link_rssi;
-	tqm_params->num_ml_peers += 1;
+	/* If this psoc is not primary UMAC or if TQM migration is happening
+	 * from current primary psoc, don't account RSSI
+	 */
+	if (mlo_peer_ctx->primary_umac_psoc_id == rssi_data->current_psoc_id &&
+	    mlo_peer_ctx->migrate_primary_umac_psoc_id ==
+	    ML_INVALID_PRIMARY_TQM) {
+		tqm_params->total_rssi += mlo_peer_ctx->avg_link_rssi;
+		tqm_params->num_ml_peers += 1;
+	}
 }
 
 static void wlan_get_rssi_data_each_psoc(struct wlan_objmgr_psoc *psoc,
@@ -117,9 +132,10 @@ static QDF_STATUS mld_get_link_rssi(struct mlo_all_link_rssi *rssi_data)
 	return QDF_STATUS_SUCCESS;
 }
 
-static void
-mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
-				 struct wlan_objmgr_vdev *link_vdevs[])
+uint8_t
+wlan_mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
+				      struct wlan_objmgr_vdev *link_vdevs[],
+				      bool allow_all_links)
 {
 	struct mlo_all_link_rssi rssi_data;
 	uint8_t i;
@@ -128,12 +144,11 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 	int32_t diff_low;
 	bool mld_sta_links[WLAN_OBJMGR_MAX_DEVICES] = {0};
 	bool mld_no_sta[WLAN_OBJMGR_MAX_DEVICES] = {0};
-	struct wlan_objmgr_peer *assoc_peer = NULL;
-	uint8_t prim_link, id;
+	uint8_t prim_link, id, prim_link_hi;
 	uint8_t num_psocs;
 	struct mlpeer_data *tqm_params = NULL;
 	struct wlan_channel *channel;
-	enum phy_ch_width chwidth;
+	enum phy_ch_width sec_hi_bw, hi_bw;
 	uint8_t cong = ML_PRIMARY_TQM_CONGESTION;
 	uint16_t mld_ml_sta_count[WLAN_OBJMGR_MAX_DEVICES] = {0};
 	enum phy_ch_width mld_ch_width[WLAN_OBJMGR_MAX_DEVICES];
@@ -173,7 +188,7 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 		if (id >= WLAN_OBJMGR_MAX_DEVICES)
 			continue;
 
-		if (wlan_vdev_skip_pumac(link_vdevs[i])) {
+		if (!allow_all_links && wlan_vdev_skip_pumac(link_vdevs[i])) {
 			mlo_err("Skip Radio for Primary MLO umac");
 			mld_sta_links[id] = false;
 			continue;
@@ -226,25 +241,42 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 			}
 		}
 	} else if (psoc_w_nosta > 1) {
-		chwidth = CH_WIDTH_INVALID;
+		hi_bw = CH_WIDTH_INVALID;
+		sec_hi_bw = CH_WIDTH_INVALID;
 		for (i = 0; i < WLAN_OBJMGR_MAX_DEVICES; i++) {
 			if (!mld_no_sta[i])
 				continue;
 
-			if (chwidth == CH_WIDTH_INVALID) {
-				prim_link = i;
-				chwidth = mld_ch_width[i];
+			if (hi_bw == CH_WIDTH_INVALID) {
+				prim_link_hi = i;
+				hi_bw = mld_ch_width[i];
 				continue;
 			}
-
+			/* if bw is 320MHZ mark it as highest ch width */
+			if (mld_ch_width[i] == CH_WIDTH_320MHZ) {
+				prim_link = prim_link_hi;
+				sec_hi_bw = hi_bw;
+				hi_bw = mld_ch_width[i];
+				prim_link_hi = i;
+			}
 			/* If bw is less than or equal to 160 MHZ
-			 * and chwidth is less than other link
+			 * and chwidth is greater than than other link
 			 * Mark this link as primary link
 			 */
-			if ((mld_ch_width[i] <= CH_WIDTH_160MHZ) &&
-			    (chwidth > mld_ch_width[i])) {
-				prim_link = i;
-				chwidth = mld_ch_width[i];
+			if (mld_ch_width[i] <= CH_WIDTH_160MHZ) {
+				if (hi_bw < mld_ch_width[i]) {
+					/* move high bw to second high bw */
+					prim_link = prim_link_hi;
+					sec_hi_bw = hi_bw;
+
+					hi_bw = mld_ch_width[i];
+					prim_link_hi = i;
+				} else if ((sec_hi_bw == CH_WIDTH_INVALID) ||
+					   (sec_hi_bw < mld_ch_width[i])) {
+					/* update sec high bw */
+					sec_hi_bw = mld_ch_width[i];
+					prim_link = i;
+				}
 			}
 		}
 	} else {
@@ -299,19 +331,26 @@ mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 		}
 	}
 
-	if (prim_link != ML_INVALID_PRIMARY_TQM) {
-		ml_peer->primary_umac_psoc_id = prim_link;
-	} else {
-		assoc_peer = wlan_mlo_peer_get_assoc_peer(ml_peer);
-		if (!assoc_peer) {
-			mlo_err(QDF_MAC_ADDR_FMT ":Assoc peer is NULL",
-				QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
-			QDF_BUG(0);
-			return;
+	if (prim_link != ML_INVALID_PRIMARY_TQM)
+		return prim_link;
+
+	/* If primary link id is not found, return id of 1st available link */
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!link_vdevs[i])
+			continue;
+
+		if (!allow_all_links && wlan_vdev_skip_pumac(link_vdevs[i])) {
+			mlo_debug("Skip Radio for Primary MLO umac");
+			continue;
 		}
-		ml_peer->primary_umac_psoc_id =
-			wlan_peer_get_psoc_id(assoc_peer);
+		id = wlan_vdev_get_psoc_id(link_vdevs[i]);
+		if (id >= WLAN_OBJMGR_MAX_DEVICES)
+			continue;
+
+		return wlan_vdev_get_psoc_id(link_vdevs[i]);
 	}
+
+	return ML_INVALID_PRIMARY_TQM;
 }
 
 void mlo_peer_assign_primary_umac(
@@ -535,22 +574,6 @@ static QDF_STATUS mlo_set_3_link_primary_umac(
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
-QDF_STATUS mlo_peer_overwrite_primary_umac(uint8_t psoc_id,
-					   struct wlan_mlo_peer_context *ml_peer)
-{
-	if (psoc_id >= WLAN_OBJMGR_MAX_DEVICES)
-		return QDF_STATUS_E_FAILURE;
-	if (!ml_peer)
-		return QDF_STATUS_E_FAILURE;
-
-	ml_peer->primary_umac_psoc_id = psoc_id;
-	mlo_peer_assign_primary_umac(ml_peer, &ml_peer->peer_list[0]);
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 QDF_STATUS mlo_peer_allocate_primary_umac(
 		struct wlan_mlo_dev_context *ml_dev,
 		struct wlan_mlo_peer_context *ml_peer,
@@ -584,11 +607,33 @@ QDF_STATUS mlo_peer_allocate_primary_umac(
 	 * 1) for single link MLO connection
 	 * 2) if MLD is single chip MLO
 	 */
+	if ((mlo_ctx->force_non_assoc_prim_umac) &&
+	    (ml_peer->max_links >= 1)) {
+		for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+			if (!link_vdevs[i])
+				continue;
+
+			if (wlan_peer_get_vdev(assoc_peer) == link_vdevs[i])
+				continue;
+			psoc_id = wlan_vdev_get_psoc_id(link_vdevs[i]);
+			ml_peer->primary_umac_psoc_id = psoc_id;
+			break;
+		}
+
+		mlo_peer_assign_primary_umac(ml_peer, peer_entry);
+		mlo_info("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT
+			 " primary umac soc %d ", ml_dev->mld_id,
+			 QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
+			 ml_peer->primary_umac_psoc_id);
+
+		return QDF_STATUS_SUCCESS;
+	}
+
 	if ((ml_peer->max_links == 1) ||
 	    (mlo_vdevs_check_single_soc(link_vdevs, ml_peer->max_links))) {
 		mlo_peer_assign_primary_umac(ml_peer, peer_entry);
-		mlo_info("MLD ID %d Assoc peer " QDF_MAC_ADDR_FMT " primary umac soc %d ",
-			 ml_dev->mld_id,
+		mlo_info("MLD ID %d Assoc peer " QDF_MAC_ADDR_FMT
+			 " primary umac soc %d ", ml_dev->mld_id,
 			 QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
 			 ml_peer->primary_umac_psoc_id);
 
@@ -641,7 +686,8 @@ QDF_STATUS mlo_peer_allocate_primary_umac(
 	mlo_peer_calculate_avg_rssi(ml_dev, ml_peer, rssi,
 				    wlan_peer_get_vdev(assoc_peer));
 
-	mld_get_best_primary_umac_w_rssi(ml_peer, link_vdevs);
+	ml_peer->primary_umac_psoc_id =
+		wlan_mld_get_best_primary_umac_w_rssi(ml_peer, link_vdevs, false);
 
 	mlo_peer_assign_primary_umac(ml_peer, peer_entry);
 
@@ -685,4 +731,692 @@ void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer)
 }
 
 qdf_export_symbol(wlan_objmgr_mlo_update_primary_info);
-#endif
+
+void mlo_mlme_ptqm_migrate_timer_cb(void *arg)
+{
+	struct wlan_mlo_dev_context *ml_dev = (struct wlan_mlo_dev_context *)arg;
+	struct wlan_mlo_peer_context *ml_peer = NULL;
+	uint16_t i = 0;
+
+	if (!ml_dev)
+		return;
+
+	/* Check for pending bitmaps and issue disconnect */
+	for (i = 0; i < MAX_MLO_PEER_ID; i++) {
+		if (qdf_test_bit(i, ml_dev->mlo_peer_id_bmap)) {
+			ml_peer = wlan_mlo_get_mlpeer_by_ml_peerid(ml_dev, i);
+			if (ml_peer && ml_peer->primary_umac_migration_in_progress) {
+				ml_peer->primary_umac_migration_in_progress = false;
+				mlo_err("Issue disconnect for ml peer with ml peer id:%d", i);
+				wlan_mlo_peer_deauth_init(ml_peer,
+							  NULL, 0);
+			}
+			qdf_clear_bit(i, ml_dev->mlo_peer_id_bmap);
+		}
+	}
+}
+
+/**
+ * mlo_ptqm_list_peek_head() - Returns the head of linked list
+ *
+ * @ptqm_list: Pointer to the list of peer ptqm migrate entries
+ *
+ * API to retrieve the head from the list of peer ptqm migrate entries
+ *
+ * Return: Pointer to peer ptqm migrate entry
+ */
+static
+struct peer_ptqm_migrate_list_entry *mlo_ptqm_list_peek_head(
+					qdf_list_t *ptqm_list)
+{
+	struct peer_ptqm_migrate_list_entry *peer_entry;
+	qdf_list_node_t *peer_node = NULL;
+
+	if (qdf_list_peek_front(ptqm_list, &peer_node) != QDF_STATUS_SUCCESS)
+		return NULL;
+
+	peer_entry = qdf_container_of(peer_node,
+				      struct peer_ptqm_migrate_list_entry,
+				      node);
+
+	return peer_entry;
+}
+
+/**
+ * mlo_get_next_peer_ctx() - Return next peer ptqm entry from the list
+ *
+ * @peer_list:  Pointer to the list of peer ptqm migrate entries
+ * @peer_cur: Pointer to the current peer ptqm entry
+ *
+ * API to retrieve the next node from the list of peer ptqm migrate entries
+ *
+ * Return: Pointer to peer ptqm migrate entry
+ */
+static
+struct peer_ptqm_migrate_list_entry *mlo_get_next_peer_ctx(
+				qdf_list_t *peer_list,
+				struct peer_ptqm_migrate_list_entry *peer_cur)
+{
+	struct peer_ptqm_migrate_list_entry *peer_next;
+	qdf_list_node_t *node = &peer_cur->node;
+	qdf_list_node_t *next_node = NULL;
+
+	/* This API is invoked with lock acquired, do not add log prints */
+	if (!node)
+		return NULL;
+
+	if (qdf_list_peek_next(peer_list, node, &next_node) !=
+						QDF_STATUS_SUCCESS)
+		return NULL;
+
+	peer_next = qdf_container_of(next_node,
+				     struct peer_ptqm_migrate_list_entry,
+				     node);
+	return peer_next;
+}
+
+/**
+ * wlan_mlo_send_ptqm_migrate_cmd() - API to send WMI to trigger ptqm migration
+ * @vdev: objmgr vdev object
+ * @list: peer list to be migrated
+ * @num_peers_failed: number of peers for which wmi cmd is failed.
+ * This value is expected to be used only in case failure is returned by WMI
+ *
+ * API to send WMI to trigger ptqm migration
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_mlo_send_ptqm_migrate_cmd(struct wlan_objmgr_vdev *vdev,
+			       struct peer_migrate_ptqm_multi_entries *list,
+			       uint16_t *num_peers_failed)
+{
+	struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops;
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status;
+	struct peer_ptqm_migrate_params param = {0};
+	struct peer_ptqm_migrate_entry *peer_list = NULL;
+	struct peer_ptqm_migrate_list_entry *peer_entry, *next_entry;
+	struct wlan_mlo_dev_context *ml_dev = NULL;
+	uint16_t i = 0;
+
+	ml_dev = vdev->mlo_dev_ctx;
+	if (!ml_dev)
+		return QDF_STATUS_E_FAILURE;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlo_err("null psoc");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlo_tx_ops = &psoc->soc_cb.tx_ops->mlo_ops;
+	if (!mlo_tx_ops || !mlo_tx_ops->peer_ptqm_migrate_send) {
+		mlo_err("mlo_tx_ops is null!");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	param.vdev_id = wlan_vdev_get_id(vdev);
+	param.num_peers = list->num_entries;
+
+	param.peer_list = qdf_mem_malloc(sizeof(struct peer_ptqm_migrate_entry) *
+					 list->num_entries);
+	if (!param.peer_list) {
+		mlo_err("Failed to allocate memory for ptqm migration command");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	peer_list = param.peer_list;
+
+	peer_entry = mlo_ptqm_list_peek_head(&list->peer_list);
+	while (peer_entry) {
+		peer_list[i].ml_peer_id = peer_entry->mlo_peer_id;
+		peer_list[i].hw_link_id = peer_entry->new_hw_link_id;
+
+		qdf_set_bit(peer_entry->mlo_peer_id,
+			    ml_dev->mlo_peer_id_bmap);
+
+		mlo_debug("idx:%d, ml_peer_id:%d, hw_link_id:%d",
+			  i, peer_list[i].ml_peer_id,
+			  peer_list[i].hw_link_id);
+		i++;
+		next_entry = mlo_get_next_peer_ctx(&list->peer_list,
+						   peer_entry);
+		peer_entry = next_entry;
+	}
+
+	status = mlo_tx_ops->peer_ptqm_migrate_send(vdev, &param);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("Failed to send WMI for ptqm migration");
+		*num_peers_failed = param.num_peers_failed;
+		qdf_mem_free(param.peer_list);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Set timeout equal to peer delete timeout as requested by FW.
+	 * Timeout value to be optimized later. Timeout value will be
+	 * updated later based on stress testings.
+	 */
+	qdf_timer_mod(&ml_dev->ptqm_migrate_timer,
+		      ML_PRIMARY_TQM_MIGRATRION_TIMEOUT);
+
+	qdf_mem_free(param.peer_list);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_mlo_get_new_ptqm_id() - API to get new ptqm ID
+ * @curr_vdev: objmgr vdev object for current primary link
+ * @ml_peer: ml peer object
+ * @new_primary_link_id: new primary link id
+ * @new_hw_link_id: hw link id for new primary TQM
+ * @force_mig: allow migration to vdevs which are disabled to be pumac
+ * using primary_umac_skip ini
+ *
+ * API to get new ptqm ID
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_mlo_get_new_ptqm_id(struct wlan_objmgr_vdev *curr_vdev,
+			 struct wlan_mlo_peer_context *ml_peer,
+			 uint8_t new_primary_link_id,
+			 uint16_t *new_hw_link_id,
+			 bool force_mig)
+{
+	uint8_t current_primary_link_id = WLAN_LINK_ID_INVALID;
+	struct wlan_objmgr_vdev *tmp_vdev = NULL;
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = { NULL };
+	struct wlan_objmgr_vdev *tmp_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = { NULL };
+	struct wlan_mlo_link_peer_entry *peer_entry;
+	uint8_t psoc_ids[WLAN_UMAC_MLO_MAX_VDEVS];
+	struct wlan_objmgr_vdev *link_vdev = NULL;
+	QDF_STATUS status;
+	uint8_t i = 0, idx = 0, j = 0, tmp_cnt = 0;
+
+	if (wlan_vdev_mlme_get_opmode(curr_vdev) == QDF_SAP_MODE &&
+	    QDF_IS_STATUS_ERROR(wlan_mlo_peer_is_assoc_done(ml_peer))) {
+		mlo_err("ML peer " QDF_MAC_ADDR_FMT " is not associated",
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*new_hw_link_id = INVALID_HW_LINK_ID;
+	current_primary_link_id =
+		wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer(ml_peer);
+	if (current_primary_link_id == WLAN_LINK_ID_INVALID) {
+		mlo_err("ML peer " QDF_MAC_ADDR_FMT "current primary link id is invalid",
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (current_primary_link_id == new_primary_link_id) {
+		mlo_err("current and requested link_id are same");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (new_primary_link_id != WLAN_LINK_ID_INVALID) {
+		link_vdev = mlo_get_vdev_by_link_id(curr_vdev,
+						    new_primary_link_id);
+		if (!link_vdev) {
+			mlo_err("links vdev not found for link id %d",
+				new_primary_link_id);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		if (wlan_vdev_read_skip_pumac_cnt(link_vdev) > 0) {
+			mlo_err("Selected new ptqm link not allowed for migration");
+			mlo_release_vdev_ref(link_vdev);
+			return QDF_STATUS_E_PERM;
+		}
+		mlo_release_vdev_ref(link_vdev);
+	}
+
+	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
+		peer_entry = &ml_peer->peer_list[i];
+		if (!peer_entry || !peer_entry->link_peer)
+			continue;
+
+		if (wlan_peer_get_peer_type(peer_entry->link_peer) ==
+					WLAN_PEER_MLO_BRIDGE)
+			goto exit;
+
+		psoc_ids[j++] = wlan_vdev_get_psoc_id(
+				wlan_peer_get_vdev(peer_entry->link_peer));
+	}
+
+	/* For some 3 link RDPs, there is restriction on primary umac */
+	if (j == 3) {
+		if (mlo_get_central_umac_id(psoc_ids) != -1) {
+			mlo_err("ML peer " QDF_MAC_ADDR_FMT "migration not supported",
+				QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+			goto exit;
+		}
+	}
+
+	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
+		peer_entry = &ml_peer->peer_list[i];
+		if (!peer_entry || !peer_entry->link_peer)
+			continue;
+
+		tmp_vdev = wlan_peer_get_vdev(peer_entry->link_peer);
+		if (!tmp_vdev || tmp_vdev == curr_vdev)
+			continue;
+
+		status = wlan_objmgr_vdev_try_get_ref(tmp_vdev,
+						      WLAN_MLME_SB_ID);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlo_err("failed to get vdev ref");
+			continue;
+		}
+
+		if (wlan_vdev_read_skip_pumac_cnt(tmp_vdev) > 0) {
+			mlo_debug("Vdev not allowed for migration, skip this vdev");
+			wlan_objmgr_vdev_release_ref(tmp_vdev,
+						     WLAN_MLME_SB_ID);
+			continue;
+		}
+
+		/* Store vdevs which cannot be selected as primary in a temp
+		 * list. force_mig flag will be used to allow migration to vdevs
+		 * which are not allowed to be selected as primary by using the
+		 * primary_umac_skip ini config. This will be helpful in scenarios
+		 * where if the current primary link is going down and peer ptqm
+		 * needs to be migrated but the partner links ofthat mld are
+		 * the user disabled links for ptqm.
+		 */
+		if (wlan_vdev_skip_pumac(tmp_vdev)) {
+			mlo_debug("Vdev cannot be selected as primary");
+			tmp_vdev_list[tmp_cnt++] = tmp_vdev;
+			continue;
+		}
+		wlan_vdev_list[idx++] = tmp_vdev;
+	}
+
+	if (new_primary_link_id == WLAN_LINK_ID_INVALID) {
+		mlo_debug("Invalid link id provided, select new link id");
+		/* If there are no vdevs present in wlan_vdev_list, means none
+		 * of the partner vdevs of current MLD are eligible to become
+		 * primary umac. In that case if user has requested force
+		 * migration and there are some vdevs present in temp_vdev_list,
+		 * select new primary umac from those vdev. If no vdevs are
+		 * prenset in any of the list, return failure.
+		 */
+		if (idx == 0) {
+			if (!force_mig || tmp_cnt == 0) {
+				mlo_err("No link available to be selected as primary");
+				goto exit;
+			} else {
+				ml_peer->migrate_primary_umac_psoc_id =
+					wlan_mld_get_best_primary_umac_w_rssi(
+							ml_peer,
+							tmp_vdev_list,
+							true);
+				if (ml_peer->migrate_primary_umac_psoc_id ==
+						ML_PRIMARY_UMAC_ID_INVAL) {
+					mlo_err("Unable to fetch new primary link id for ml peer " QDF_MAC_ADDR_FMT,
+						QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+					goto exit;
+				}
+
+				for (i = 0; i < tmp_cnt; i++) {
+					if (ml_peer->migrate_primary_umac_psoc_id ==
+							wlan_vdev_get_psoc_id(tmp_vdev_list[i])) {
+						*new_hw_link_id = wlan_mlo_get_pdev_hw_link_id(
+								wlan_vdev_get_pdev(tmp_vdev_list[i]));
+						break;
+					}
+				}
+			}
+		} else {
+			ml_peer->migrate_primary_umac_psoc_id =
+				wlan_mld_get_best_primary_umac_w_rssi(
+							ml_peer,
+							wlan_vdev_list,
+							false);
+			if (ml_peer->migrate_primary_umac_psoc_id ==
+					ML_PRIMARY_UMAC_ID_INVAL) {
+				mlo_err("Unable to fetch new primary link id for ml peer " QDF_MAC_ADDR_FMT,
+					QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+				goto exit;
+			}
+			for (i = 0; i < idx; i++) {
+				if (ml_peer->migrate_primary_umac_psoc_id ==
+						wlan_vdev_get_psoc_id(wlan_vdev_list[i])) {
+					*new_hw_link_id = wlan_mlo_get_pdev_hw_link_id(
+							wlan_vdev_get_pdev(wlan_vdev_list[i]));
+					break;
+				}
+			}
+		}
+	} else {
+		/* check if provided link id is part of current ml peer links */
+		for (i = 0; i < idx; i++) {
+			if (new_primary_link_id == wlan_vdev_get_link_id(wlan_vdev_list[i])) {
+				*new_hw_link_id = wlan_mlo_get_pdev_hw_link_id(
+							wlan_vdev_get_pdev(wlan_vdev_list[i]));
+				ml_peer->migrate_primary_umac_psoc_id =
+						wlan_vdev_get_psoc_id(wlan_vdev_list[i]);
+				break;
+			}
+		}
+		if (*new_hw_link_id == INVALID_HW_LINK_ID && force_mig) {
+			for (i = 0; i < tmp_cnt; i++) {
+				if (new_primary_link_id ==
+				    wlan_vdev_get_link_id(tmp_vdev_list[i])) {
+					*new_hw_link_id = wlan_mlo_get_pdev_hw_link_id(
+								wlan_vdev_get_pdev(tmp_vdev_list[i]));
+					ml_peer->migrate_primary_umac_psoc_id =
+							wlan_vdev_get_psoc_id(tmp_vdev_list[i]);
+					break;
+				}
+			}
+		}
+	}
+
+	if (*new_hw_link_id == INVALID_HW_LINK_ID) {
+		mlo_err("New primary link id not found for ml peer " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		goto exit;
+	}
+
+	for (i = 0; i < idx; i++)
+		wlan_objmgr_vdev_release_ref(wlan_vdev_list[i],
+					     WLAN_MLME_SB_ID);
+
+	for (i = 0; i < tmp_cnt; i++)
+		wlan_objmgr_vdev_release_ref(tmp_vdev_list[i],
+					     WLAN_MLME_SB_ID);
+	return QDF_STATUS_SUCCESS;
+
+exit:
+	ml_peer->migrate_primary_umac_psoc_id = ML_PRIMARY_UMAC_ID_INVAL;
+
+	for (i = 0; i < idx; i++)
+		wlan_objmgr_vdev_release_ref(wlan_vdev_list[i],
+					     WLAN_MLME_SB_ID);
+
+	for (i = 0; i < tmp_cnt; i++)
+		wlan_objmgr_vdev_release_ref(tmp_vdev_list[i],
+					     WLAN_MLME_SB_ID);
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * wlan_mlo_free_ptqm_migrate_list() - API to free peer ptqm migration list
+ * @list: peer ptqm migration list
+ *
+ * API to free peer ptqm migration list
+ *
+ * Return: void
+ */
+static void wlan_mlo_free_ptqm_migrate_list(
+			struct peer_migrate_ptqm_multi_entries *list)
+{
+	struct peer_ptqm_migrate_list_entry *peer_entry, *next_entry;
+
+	peer_entry = mlo_ptqm_list_peek_head(&list->peer_list);
+	while (peer_entry) {
+		list->num_entries--;
+		next_entry = mlo_get_next_peer_ctx(&list->peer_list,
+						   peer_entry);
+		if (peer_entry->peer)
+			wlan_objmgr_peer_release_ref(peer_entry->peer,
+						     WLAN_MLME_SB_ID);
+		qdf_list_remove_node(&list->peer_list, &peer_entry->node);
+		qdf_mem_free(peer_entry);
+		peer_entry = next_entry;
+	}
+	qdf_list_destroy(&list->peer_list);
+}
+
+/**
+ * wlan_mlo_reset_ptqm_migrate_list() - API to reset peer ptqm migration list
+ * @ml_dev: MLO dev context
+ * @list: peer ptqm migration list
+ * @num_peers_failed: number of peers for which wmi cmd is failed.
+ *
+ * API to reset peer ptqm migration list
+ *
+ * Return: void
+ */
+static void wlan_mlo_reset_ptqm_migrate_list(
+			struct wlan_mlo_dev_context *ml_dev,
+			struct peer_migrate_ptqm_multi_entries *list,
+			uint16_t num_peers_failed)
+{
+	struct peer_ptqm_migrate_list_entry *peer_entry, *next_entry;
+	uint16_t count = 0;
+
+	if (!ml_dev)
+		return;
+
+	peer_entry = mlo_ptqm_list_peek_head(&list->peer_list);
+	while (peer_entry) {
+		/* Reset the flags only for entries for which wmi
+		 * command trigger is failed
+		 */
+		if (count < list->num_entries - num_peers_failed) {
+			count++;
+			next_entry = mlo_get_next_peer_ctx(&list->peer_list,
+							   peer_entry);
+			peer_entry = next_entry;
+			continue;
+		}
+		if (peer_entry->peer) {
+			qdf_clear_bit(peer_entry->mlo_peer_id, ml_dev->mlo_peer_id_bmap);
+			peer_entry->peer->mlo_peer_ctx->primary_umac_migration_in_progress = false;
+			peer_entry->peer->mlo_peer_ctx->migrate_primary_umac_psoc_id =
+							ML_PRIMARY_UMAC_ID_INVAL;
+		}
+		next_entry = mlo_get_next_peer_ctx(&list->peer_list,
+						   peer_entry);
+		peer_entry = next_entry;
+	}
+}
+
+/**
+ * wlan_mlo_build_ptqm_migrate_list() - API to build peer ptqm migration list
+ * @vdev: objmgr vdev list
+ * @object: peer object
+ * @arg: list pointer
+ *
+ * API to build peer ptqm migration list
+ *
+ * Return: void
+ */
+static void wlan_mlo_build_ptqm_migrate_list(struct wlan_objmgr_vdev *vdev,
+					     void *object, void *arg)
+{
+	struct wlan_objmgr_peer *peer = (struct wlan_objmgr_peer *)object;
+	struct peer_migrate_ptqm_multi_entries *list =
+				(struct peer_migrate_ptqm_multi_entries *)arg;
+	struct peer_ptqm_migrate_list_entry *peer_entry;
+	struct wlan_mlo_peer_context *ml_peer;
+	uint16_t new_hw_link_id = INVALID_HW_LINK_ID;
+	uint8_t current_primary_link_id = WLAN_LINK_ID_INVALID;
+	QDF_STATUS status;
+
+	if (!wlan_peer_is_mlo(peer) || !peer->mlo_peer_ctx)
+		return;
+
+	ml_peer = peer->mlo_peer_ctx;
+
+	if (ml_peer->link_peer_cnt == 1)
+		return;
+
+	if (ml_peer->primary_umac_migration_in_progress) {
+		mlo_err("peer " QDF_MAC_ADDR_FMT " primary umac migration already in progress",
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		return;
+	}
+
+	current_primary_link_id = wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer(ml_peer);
+	if (current_primary_link_id == WLAN_LINK_ID_INVALID ||
+	    current_primary_link_id != wlan_vdev_get_link_id(vdev)) {
+		mlo_debug("peer " QDF_MAC_ADDR_FMT " not having primary on current vdev",
+			  QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		return;
+	}
+
+	status = wlan_mlo_get_new_ptqm_id(vdev, ml_peer,
+					  WLAN_LINK_ID_INVALID,
+					  &new_hw_link_id, true);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("peer " QDF_MAC_ADDR_FMT " unable to get new ptqm id",
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		return;
+	}
+	ml_peer->primary_umac_migration_in_progress = true;
+
+	peer_entry = (struct peer_ptqm_migrate_list_entry *)
+			qdf_mem_malloc(sizeof(struct peer_ptqm_migrate_list_entry));
+	if (!peer_entry) {
+		mlo_err("peer " QDF_MAC_ADDR_FMT " unable to allocate peer entry",
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		return;
+	}
+
+	status = wlan_objmgr_peer_try_get_ref(peer, WLAN_MLME_SB_ID);
+	peer_entry->peer = peer;
+	peer_entry->new_hw_link_id = new_hw_link_id;
+	peer_entry->mlo_peer_id = ml_peer->mlo_peer_id;
+	qdf_list_insert_back(&list->peer_list, &peer_entry->node);
+	list->num_entries++;
+}
+
+/**
+ * wlan_mlo_trigger_link_ptqm_migration() - API to trigger ptqm migration
+ * for a link
+ * @vdev: objmgr vdev object
+ *
+ * API to trigger ptqm migration of all peers having primary on given link
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS wlan_mlo_trigger_link_ptqm_migration(
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct peer_migrate_ptqm_multi_entries migrate_list = {0};
+	QDF_STATUS status;
+	uint16_t num_peers_failed = 0;
+
+	qdf_list_create(&migrate_list.peer_list, MAX_MLO_PEER_ID);
+	wlan_objmgr_iterate_peerobj_list(vdev,
+					 wlan_mlo_build_ptqm_migrate_list,
+					 &migrate_list, WLAN_MLME_NB_ID);
+
+	/* trigger WMI */
+	if (migrate_list.num_entries == 0) {
+		mlo_err("No peer found");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	status = wlan_mlo_send_ptqm_migrate_cmd(vdev, &migrate_list,
+						&num_peers_failed);
+	if (QDF_IS_STATUS_ERROR(status))
+		wlan_mlo_reset_ptqm_migrate_list(vdev->mlo_dev_ctx,
+						 &migrate_list,
+						 num_peers_failed);
+	wlan_mlo_free_ptqm_migrate_list(&migrate_list);
+	return status;
+}
+
+QDF_STATUS wlan_mlo_set_ptqm_migration(struct wlan_objmgr_vdev *vdev,
+				       struct wlan_mlo_peer_context *ml_peer,
+				       bool link_migration,
+				       uint32_t link_id, bool force_mig)
+{
+	uint16_t new_hw_link_id = INVALID_HW_LINK_ID;
+	struct peer_migrate_ptqm_multi_entries migrate_list = {0};
+	struct peer_ptqm_migrate_list_entry *peer_entry;
+	struct wlan_objmgr_vdev *curr_vdev = NULL;
+	uint8_t current_primary_link_id = WLAN_LINK_ID_INVALID;
+	uint16_t num_peers_failed = 0;
+	QDF_STATUS status;
+
+	if (!vdev) {
+		mlo_err("Vdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (link_migration == false && !ml_peer) {
+		mlo_err("ML peer is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (link_migration) {
+		mlo_err("Trigger migration for full link");
+		// trigger full link migration
+		status = wlan_mlo_trigger_link_ptqm_migration(vdev);
+		if (QDF_IS_STATUS_ERROR(status))
+			mlo_err("Failed to trigger link migration");
+		return status;
+	}
+
+	if (ml_peer->link_peer_cnt == 1) {
+		mlo_err("peer " QDF_MAC_ADDR_FMT " is SLO",
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (ml_peer->primary_umac_migration_in_progress) {
+		mlo_err("peer " QDF_MAC_ADDR_FMT " primary umac migration already in progress",
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	current_primary_link_id = wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer(ml_peer);
+	if (current_primary_link_id == WLAN_LINK_ID_INVALID) {
+		mlo_err("Current primary link id is invalid");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	curr_vdev = mlo_get_vdev_by_link_id(vdev, current_primary_link_id);
+	if (!curr_vdev) {
+		mlo_err("Unable to get current primary vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wlan_mlo_get_new_ptqm_id(curr_vdev, ml_peer,
+					  link_id, &new_hw_link_id, force_mig);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("peer " QDF_MAC_ADDR_FMT " unable to get new ptqm id",
+			QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		goto exit;
+	}
+	ml_peer->primary_umac_migration_in_progress = true;
+
+	peer_entry = (struct peer_ptqm_migrate_list_entry *)
+				qdf_mem_malloc(sizeof(struct peer_ptqm_migrate_list_entry));
+	if (!peer_entry) {
+		mlo_err("Failed to allocate peer entry");
+		goto exit;
+	}
+
+	peer_entry->new_hw_link_id = new_hw_link_id;
+	peer_entry->mlo_peer_id = ml_peer->mlo_peer_id;
+	qdf_list_create(&migrate_list.peer_list, MAX_MLO_PEER_ID);
+	qdf_list_insert_back(&migrate_list.peer_list, &peer_entry->node);
+	migrate_list.num_entries = 1;
+
+	//trigger WMI
+	status = wlan_mlo_send_ptqm_migrate_cmd(curr_vdev, &migrate_list,
+						&num_peers_failed);
+	if (QDF_IS_STATUS_ERROR(status))
+		wlan_mlo_reset_ptqm_migrate_list(curr_vdev->mlo_dev_ctx,
+						 &migrate_list,
+						 num_peers_failed);
+	wlan_mlo_free_ptqm_migrate_list(&migrate_list);
+
+	mlo_release_vdev_ref(curr_vdev);
+
+	return status;
+
+exit:
+	if (curr_vdev)
+		mlo_release_vdev_ref(curr_vdev);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */

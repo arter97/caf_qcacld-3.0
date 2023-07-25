@@ -66,7 +66,8 @@ struct hif_ipci_stats {
 #define FORCE_WAKE_DELAY_MS 5
 #endif /* FORCE_WAKE */
 
-#ifdef FEATURE_HAL_DELAYED_REG_WRITE
+#if defined(FEATURE_HAL_DELAYED_REG_WRITE) || \
+	defined(FEATURE_HIF_DELAYED_REG_WRITE)
 #define EP_VOTE_POLL_TIME_US  50
 #define EP_VOTE_POLL_TIME_CNT 3
 #ifdef HAL_CONFIG_SLUB_DEBUG_ON
@@ -102,7 +103,8 @@ struct hif_ipci_softc {
 
 	void (*hif_ipci_get_soc_info)(struct hif_ipci_softc *sc,
 				      struct device *dev);
-#ifdef FEATURE_HAL_DELAYED_REG_WRITE
+#if defined(FEATURE_HAL_DELAYED_REG_WRITE) || \
+	defined(FEATURE_HIF_DELAYED_REG_WRITE)
 	uint32_t ep_awake_reset_fail;
 	uint32_t prevent_l1_fail;
 	uint32_t ep_awake_set_fail;

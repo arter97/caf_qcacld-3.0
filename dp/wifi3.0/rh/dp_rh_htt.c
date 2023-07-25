@@ -76,7 +76,7 @@ dp_htt_flow_pool_map_handler_rh(struct dp_soc *soc, uint8_t flow_id,
 	status = dp_tx_flow_pool_map_handler(pdev, flow_id, flow_type,
 					     flow_pool_id, flow_pool_size);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("failed to create tx flow pool %d\n", flow_pool_id);
+		dp_err("failed to create tx flow pool %d", flow_pool_id);
 		goto err_out;
 	}
 

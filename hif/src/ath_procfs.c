@@ -118,6 +118,7 @@ static ssize_t ath_procfs_diag_read_legacy(struct file *file,
 	     (tgt_info->target_type == TARGET_TYPE_QCN9224) ||
 	     (tgt_info->target_type == TARGET_TYPE_QCN6122) ||
 	     (tgt_info->target_type == TARGET_TYPE_QCN9160) ||
+	     (tgt_info->target_type == TARGET_TYPE_QCN6432) ||
 	     (tgt_info->target_type == TARGET_TYPE_QCA5018) ||
 	     (tgt_info->target_type == TARGET_TYPE_QCA5332) ||
 	     (tgt_info->target_type == TARGET_TYPE_QCA6018) ||
@@ -204,6 +205,7 @@ static ssize_t ath_procfs_diag_write_legacy(struct file *file,
 	      (tgt_info->target_type == TARGET_TYPE_QCN9224) ||
 	      (tgt_info->target_type == TARGET_TYPE_QCN6122) ||
 	      (tgt_info->target_type == TARGET_TYPE_QCN9160) ||
+	      (tgt_info->target_type == TARGET_TYPE_QCN6432) ||
 	      (tgt_info->target_type == TARGET_TYPE_QCA5018) ||
 	      (tgt_info->target_type == TARGET_TYPE_QCA5332) ||
 	      (tgt_info->target_type == TARGET_TYPE_QCA6018) ||

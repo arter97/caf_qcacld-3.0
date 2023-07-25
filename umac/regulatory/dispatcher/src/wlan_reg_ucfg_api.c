@@ -157,6 +157,30 @@ QDF_STATUS ucfg_reg_set_default_country(struct wlan_objmgr_psoc *psoc,
 {
 	return reg_set_default_country(psoc, country);
 }
+
+bool ucfg_reg_get_keep_6ghz_sta_cli_connection(
+					struct wlan_objmgr_pdev *pdev)
+{
+	return reg_get_keep_6ghz_sta_cli_connection(pdev);
+}
+
+QDF_STATUS ucfg_reg_set_keep_6ghz_sta_cli_connection(
+					struct wlan_objmgr_pdev *pdev,
+					bool keep_6ghz_sta_cli_connection)
+{
+	return reg_set_keep_6ghz_sta_cli_connection(pdev,
+						keep_6ghz_sta_cli_connection);
+}
+
+bool ucfg_reg_is_user_country_set_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return reg_is_user_country_set_allowed(psoc);
+}
+
+bool ucfg_reg_is_fcc_constraint_set(struct wlan_objmgr_pdev *pdev)
+{
+	return reg_is_fcc_constraint_set(pdev);
+}
 #endif
 
 QDF_STATUS ucfg_reg_get_default_country(struct wlan_objmgr_psoc *psoc,
@@ -229,6 +253,23 @@ ucfg_reg_unregister_afc_power_event_callback(struct wlan_objmgr_pdev *pdev,
 	return reg_unregister_afc_power_event_callback(pdev, cbf);
 }
 
+QDF_STATUS
+ucfg_reg_register_afc_payload_reset_event_callback(
+		struct wlan_objmgr_pdev *pdev,
+		afc_payload_reset_tx_evt_handler cbf,
+		void *arg) {
+	return reg_register_afc_payload_reset_event_callback(pdev, cbf, arg);
+}
+
+qdf_export_symbol(ucfg_reg_register_afc_payload_reset_event_callback);
+
+QDF_STATUS ucfg_reg_unregister_afc_payload_reset_event_callback(
+		struct wlan_objmgr_pdev *pdev,
+		afc_payload_reset_tx_evt_handler cbf)
+{
+	return reg_unregister_afc_payload_reset_event_callback(pdev, cbf);
+}
+
 QDF_STATUS ucfg_reg_get_afc_req_info(struct wlan_objmgr_pdev *pdev,
 				     struct wlan_afc_host_request **afc_req,
 				     uint64_t req_id)
@@ -277,15 +318,19 @@ void ucfg_reg_ch_avoid_ext(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_vdev *vdev)
+#ifdef TARGET_11D_SCAN
+QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_psoc *psoc,
+					   enum QDF_OPMODE op_mode,
+					   uint32_t vdev_id)
 {
-	return reg_11d_vdev_delete_update(vdev);
+	return reg_11d_vdev_delete_update(psoc, op_mode, vdev_id);
 }
 
 QDF_STATUS ucfg_reg_11d_vdev_created_update(struct wlan_objmgr_vdev *vdev)
 {
 	return reg_11d_vdev_created_update(vdev);
 }
+#endif
 
 struct wlan_psoc_host_hal_reg_capabilities_ext *ucfg_reg_get_hal_reg_cap(
 				struct wlan_objmgr_psoc *psoc)

@@ -100,6 +100,25 @@ struct ctry_change_cbk_entry {
 	reg_ctry_change_callback cbk;
 };
 
+/**
+ * typedef reg_is_chan_connected_callback() - Regulatory callback to check if
+ *                                            channel is connected
+ * @psoc: Pointer to psoc object
+ * @opmode: vdev operating mode
+ * @freq: Frequency
+ */
+typedef bool (*reg_is_chan_connected_callback)(
+		struct wlan_objmgr_psoc *psoc,
+		enum QDF_OPMODE opmode,
+		uint32_t      freq);
+
+/* struct is_chan_connected_cbk_entry - Is channel connected callback entry
+ * @cbk: Callback
+ */
+struct is_chan_connected_cbk_entry {
+	reg_is_chan_connected_callback cbk;
+};
+
 #ifdef CONFIG_REG_CLIENT
 #define MAX_INDOOR_LIST_SIZE 3
 
@@ -160,6 +179,7 @@ struct indoor_concurrency_list {
  * @cbk_list:
  * @num_chan_change_cbks:
  * @cc_cbk:
+ * @conn_chan_cb:
  * @ch_avoid_ind:
  * @unsafe_chan_list:
  * @avoid_freq_list:
@@ -238,6 +258,7 @@ struct wlan_regulatory_psoc_priv_obj {
 	bool user_ctry_priority;
 	bool user_ctry_set;
 	struct chan_change_cbk_entry cbk_list[REG_MAX_CHAN_CHANGE_CBKS];
+	struct is_chan_connected_cbk_entry conn_chan_cb;
 	uint8_t num_chan_change_cbks;
 	struct ctry_change_cbk_entry cc_cbk;
 	uint8_t ch_avoid_ind;
@@ -344,6 +365,8 @@ struct wlan_regulatory_psoc_priv_obj {
  * @afc_cb_obj: The object containing the callback function and opaque argument
  * @afc_pow_evt_cb_obj: The object containing the callback function and opaque
  * argument for the AFC power event
+ * @afc_payload_reset_evt_cb_obj: The object containing the callback function
+ * and opaque argument for the AFC payload reset event
  * @afc_request_id: The last AFC request id received from FW/halphy
  * @is_6g_afc_power_event_received: indicates if the AFC power event is
  * received
@@ -355,13 +378,16 @@ struct wlan_regulatory_psoc_priv_obj {
  * @power_info: pointer to AFC power information received from the AFC event
  * sent by the target
  * @is_reg_noaction_on_afc_pwr_evt: indicates whether regulatory needs to
- * take action when AFC Power event is received
+ * take action when AFC Power event is received. This variable is supposed to
+ * be set in the enterprise mode where ACS is not called upon receiving AFC
+ * event.
  * @reg_afc_dev_deployment_type: AFC device deployment type from BDF
  * @sta_sap_scc_on_indoor_channel: Value of sap+sta scc on indoor support
  * @p2p_indoor_ch_support: Allow P2P GO in indoor channels
  * @fcc_rules_ptr : Value of fcc channel frequency and tx_power list received
  * from firmware
  * @indoor_list: List of current indoor station interfaces
+ * @keep_6ghz_sta_cli_connection: Keep current STA/P2P client connection
  */
 struct wlan_regulatory_pdev_priv_obj {
 	struct regulatory_channel cur_chan_list[NUM_CHANNELS];
@@ -429,6 +455,7 @@ struct wlan_regulatory_pdev_priv_obj {
 	qdf_spinlock_t afc_cb_lock;
 	struct afc_cb_handler afc_cb_obj;
 	struct afc_pow_evt_cb_handler afc_pow_evt_cb_obj;
+	struct afc_payload_reset_evt_cb_handler afc_payload_reset_evt_cb_obj;
 	uint64_t afc_request_id;
 	bool is_6g_afc_power_event_received;
 	bool is_6g_afc_expiry_event_received;
@@ -444,6 +471,7 @@ struct wlan_regulatory_pdev_priv_obj {
 	struct cur_fcc_rule fcc_rules_ptr[MAX_NUM_FCC_RULES];
 	struct indoor_concurrency_list indoor_list[MAX_INDOOR_LIST_SIZE];
 #endif
+	bool keep_6ghz_sta_cli_connection;
 };
 
 /**

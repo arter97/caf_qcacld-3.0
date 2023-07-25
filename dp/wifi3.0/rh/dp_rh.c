@@ -27,6 +27,8 @@
 #include "dp_peer.h"
 #include <wlan_utility.h>
 #include <dp_rings.h>
+#include <ce_api.h>
+#include <ce_internal.h>
 
 static QDF_STATUS
 dp_srng_init_rh(struct dp_soc *soc, struct dp_srng *srng, int ring_type,
@@ -269,16 +271,13 @@ static QDF_STATUS dp_soc_detach_rh(struct dp_soc *soc)
 static QDF_STATUS dp_soc_deinit_rh(struct dp_soc *soc)
 {
 	struct htt_soc *htt_soc = soc->htt_handle;
-	struct dp_mon_ops *mon_ops;
 
 	qdf_atomic_set(&soc->cmn_init_done, 0);
 
 	/*Degister RX offload flush handlers*/
 	hif_offld_flush_cb_deregister(soc->hif_handle);
 
-	mon_ops = dp_mon_ops_get(soc);
-	if (mon_ops && mon_ops->mon_soc_deinit)
-		mon_ops->mon_soc_deinit(soc);
+	dp_monitor_soc_deinit(soc);
 
 	/* free peer tables & AST tables allocated during peer_map_attach */
 	if (soc->peer_map_attach_success) {
@@ -330,7 +329,6 @@ static void *dp_soc_init_rh(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	struct htt_soc *htt_soc = (struct htt_soc *)soc->htt_handle;
 	bool is_monitor_mode = false;
 	uint8_t i;
-	struct dp_mon_ops *mon_ops;
 
 	wlan_minidump_log(soc, sizeof(*soc), soc->ctrl_psoc,
 			  WLAN_MD_DP_SOC, "dp_soc");
@@ -422,9 +420,7 @@ static void *dp_soc_init_rh(struct dp_soc *soc, HTC_HANDLE htc_handle,
 		wlan_cfg_get_defrag_timeout_check(soc->wlan_cfg_ctx);
 	qdf_spinlock_create(&soc->rx.defrag.defrag_lock);
 
-	mon_ops = dp_mon_ops_get(soc);
-	if (mon_ops && mon_ops->mon_soc_init)
-		mon_ops->mon_soc_init(soc);
+	dp_monitor_soc_init(soc);
 
 	qdf_atomic_set(&soc->cmn_init_done, 1);
 
@@ -740,39 +736,22 @@ static QDF_STATUS dp_txrx_set_vdev_param_rh(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
-static struct dp_peer *dp_find_peer_by_destmac_rh(struct dp_soc *soc,
-						  uint8_t *dest_mac,
-						  uint8_t vdev_id)
-{
-	struct dp_peer *peer = NULL;
-	struct dp_ast_entry *ast_entry = NULL;
-	uint16_t peer_id;
-
-	qdf_spin_lock_bh(&soc->ast_lock);
-	ast_entry = dp_peer_ast_hash_find_by_vdevid(soc, dest_mac, vdev_id);
-
-	if (!ast_entry) {
-		qdf_spin_unlock_bh(&soc->ast_lock);
-		dp_err("NULL ast entry");
-		return NULL;
-	}
-
-	peer_id = ast_entry->peer_id;
-	qdf_spin_unlock_bh(&soc->ast_lock);
-
-	if (peer_id == HTT_INVALID_PEER)
-		return NULL;
-
-	peer = dp_peer_get_ref_by_id(soc, peer_id,
-				     DP_MOD_ID_SAWF);
-	return peer;
-}
-
 static void dp_get_rx_hash_key_rh(struct dp_soc *soc,
 				  struct cdp_lro_hash_config *lro_hash)
 {
 	dp_get_rx_hash_key_bytes(lro_hash);
 }
+
+#if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
+static void dp_update_ring_hptp_rh(struct dp_soc *soc, bool force_flush)
+{
+	struct dp_pdev_rh *rh_pdev =
+			dp_get_rh_pdev_from_dp_pdev(soc->pdev_list[0]);
+	struct dp_tx_ep_info_rh *tx_ep_info = &rh_pdev->tx_ep_info;
+
+	ce_flush_tx_ring_write_idx(tx_ep_info->ce_tx_hdl, force_flush);
+}
+#endif
 
 void dp_initialize_arch_ops_rh(struct dp_arch_ops *arch_ops)
 {
@@ -821,9 +800,12 @@ void dp_initialize_arch_ops_rh(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_print_peer_stats = dp_print_peer_txrx_stats_rh;
 	arch_ops->dp_peer_rx_reorder_queue_setup =
 					dp_peer_rx_reorder_queue_setup_rh;
-	arch_ops->dp_find_peer_by_destmac = dp_find_peer_by_destmac_rh;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_rh;
 	arch_ops->reo_remap_config = dp_reo_remap_config_rh;
 	arch_ops->txrx_peer_setup = dp_peer_setup_rh;
 	arch_ops->txrx_srng_init = dp_srng_init_rh;
+#if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
+	arch_ops->dp_update_ring_hptp = dp_update_ring_hptp_rh;
+#endif
+	arch_ops->dp_flush_tx_ring = dp_flush_tx_ring_rh;
 }

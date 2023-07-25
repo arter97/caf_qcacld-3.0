@@ -36,6 +36,23 @@
 int wlan_cfg80211_set_default_key(struct wlan_objmgr_vdev *vdev,
 				  uint8_t key_index,
 				  struct qdf_mac_addr *bssid);
+
+/**
+ * wlan_cfg80211_translate_ml_sta_key - Translate the cfg80211 keys
+ * to internal for ml sta key
+ * @key_index: key index
+ * @key_type: key type
+ * @mac_addr: mac addr
+ * @params: params
+ * @crypto_key: crypto keys
+ *
+ * Return: None
+ */
+void wlan_cfg80211_translate_ml_sta_key(uint8_t key_index,
+					enum wlan_crypto_key_type key_type,
+					const u8 *mac_addr,
+					struct key_params *params,
+					struct wlan_crypto_key *crypto_key);
 /**
  * wlan_cfg80211_translate_key() - Translate the cfg80211 keys to
  * internal

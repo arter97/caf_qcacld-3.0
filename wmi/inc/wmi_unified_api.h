@@ -738,6 +738,34 @@ static inline bool wmi_get_runtime_pm_inprogress(wmi_unified_t wmi_handle)
 #endif
 
 /**
+ * wmi_set_wow_enable_ack_failed() - set wow enable ack failed status
+ *     if wow enable ack failed, which means host and fw have some problem
+ *     to exchange wmi cmd. set indication here and block wmi cmds.
+ *     the cmds can be sent again after wmi re-init in subsystem recovery.
+ * @wmi_handle: wmi context
+ *
+ * return: none
+ */
+void wmi_set_wow_enable_ack_failed(wmi_unified_t wmi_handle);
+
+/**
+ * wmi_clear_wow_enable_ack_failed() - clear wow enable ack failed status
+ *     explicitly clear this status when wmi close of SSR
+ * @wmi_handle: wmi context
+ *
+ * return: none
+ */
+void wmi_clear_wow_enable_ack_failed(wmi_unified_t wmi_handle);
+
+/**
+ * wmi_has_wow_enable_ack_failed() - get wow enable ack failed status
+ * @wmi_handle: wmi context
+ *
+ * Return: true if wow enable ack already failed. other false
+ */
+bool wmi_has_wow_enable_ack_failed(wmi_unified_t wmi_handle);
+
+/**
  * wmi_unified_get_soc_handle: Get WMI SoC handle
  * @wmi_handle: WMI context got from wmi_attach
  *
@@ -2016,7 +2044,7 @@ QDF_STATUS wmi_unified_send_apf_read_work_memory_cmd(wmi_unified_t wmi,
  * @evt_buf: Pointer to the event buffer
  * @read_mem_evt: pointer to memory to extract event parameters into
  *
- * This function exctracts read mem response event into the given structure ptr
+ * This function extracts read mem response event into the given structure ptr
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */

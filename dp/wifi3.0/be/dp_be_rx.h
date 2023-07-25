@@ -190,18 +190,25 @@ dp_rx_desc_sw_cc_check(struct dp_soc *soc,
 
 #define DP_PEER_METADATA_OFFLOAD_GET_BE(_peer_metadata)		(0)
 
+#define HTT_RX_PEER_META_DATA_FIELD_GET(_var, _field_s, _field_m) \
+	(((_var) & (_field_m)) >> (_field_s))
+
 #ifdef DP_USE_REDUCED_PEER_ID_FIELD_WIDTH
 static inline uint16_t
 dp_rx_peer_metadata_peer_id_get_be(struct dp_soc *soc, uint32_t peer_metadata)
 {
-	struct htt_rx_peer_metadata_v1 *metadata =
-			(struct htt_rx_peer_metadata_v1 *)&peer_metadata;
+	uint8_t ml_peer_valid;
 	uint16_t peer_id;
 
-	peer_id = metadata->peer_id |
-		  (metadata->ml_peer_valid << soc->peer_id_shift);
+	peer_id = HTT_RX_PEER_META_DATA_FIELD_GET(peer_metadata,
+						  soc->htt_peer_id_s,
+						  soc->htt_peer_id_m);
+	ml_peer_valid = HTT_RX_PEER_META_DATA_FIELD_GET(
+						peer_metadata,
+						soc->htt_mld_peer_valid_s,
+						soc->htt_mld_peer_valid_m);
 
-	return peer_id;
+	return (peer_id | (ml_peer_valid << soc->peer_id_shift));
 }
 #else
 /* Combine ml_peer_valid and peer_id field */
@@ -219,10 +226,10 @@ dp_rx_peer_metadata_peer_id_get_be(struct dp_soc *soc, uint32_t peer_metadata)
 static inline uint16_t
 dp_rx_peer_metadata_vdev_id_get_be(struct dp_soc *soc, uint32_t peer_metadata)
 {
-	struct htt_rx_peer_metadata_v1 *metadata =
-			(struct htt_rx_peer_metadata_v1 *)&peer_metadata;
 
-	return metadata->vdev_id;
+	return HTT_RX_PEER_META_DATA_FIELD_GET(peer_metadata,
+					       soc->htt_vdev_id_s,
+					       soc->htt_vdev_id_m);
 }
 
 static inline uint8_t
@@ -259,7 +266,7 @@ uint32_t dp_rx_nf_process(struct dp_intr *int_ctx,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 struct dp_soc *
-dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id);
+dp_rx_replenish_soc_get(struct dp_soc *soc, uint8_t chip_id);
 
 struct dp_soc *
 dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id);
@@ -267,7 +274,7 @@ dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id);
 uint8_t dp_soc_get_num_soc_be(struct dp_soc *soc);
 #else
 static inline struct dp_soc *
-dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id)
+dp_rx_replenish_soc_get(struct dp_soc *soc, uint8_t chip_id)
 {
 	return soc;
 }
@@ -436,11 +443,10 @@ void dp_rx_prefetch_nbuf_data_be(qdf_nbuf_t nbuf, qdf_nbuf_t next)
 		qdf_prefetch(next);
 		/* skb->cb spread across 2 cache lines hence below prefetch */
 		qdf_prefetch(&next->_skb_refdst);
-		qdf_prefetch(&next->len);
 		qdf_prefetch(&next->protocol);
+		qdf_prefetch(&next->data);
 		qdf_prefetch(next->data);
 		qdf_prefetch(next->data + 64);
-		qdf_prefetch(next->data + 128);
 	}
 }
 #else
@@ -637,14 +643,28 @@ dp_rx_set_msdu_lmac_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
 #endif
 
 #ifndef CONFIG_NBUF_AP_PLATFORM
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(DP_MLO_LINK_STATS_SUPPORT)
+static inline uint8_t
+dp_rx_peer_mdata_link_id_get_be(uint32_t peer_mdata)
+{
+	uint8_t link_id;
+
+	link_id = HTT_RX_PEER_META_DATA_V1A_LOGICAL_LINK_ID_GET(peer_mdata) + 1;
+	if (link_id > DP_MAX_MLO_LINKS)
+		link_id = 0;
+
+	return link_id;
+}
+#else
 static inline uint8_t
 dp_rx_peer_mdata_link_id_get_be(uint32_t peer_metadata)
 {
 	return 0;
 }
+#endif /* DP_MLO_LINK_STATS_SUPPORT */
 
 static inline void
-dp_rx_set_msdu_hw_link_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
+dp_rx_set_link_id_be(qdf_nbuf_t nbuf, uint32_t peer_mdata)
 {
 	uint8_t logical_link_id;
 
@@ -701,7 +721,7 @@ static inline uint8_t dp_rx_copy_desc_info_in_nbuf_cb(struct dp_soc *soc,
 	QDF_NBUF_CB_RX_VDEV_ID(nbuf) =
 		dp_rx_peer_metadata_vdev_id_get_be(soc, peer_mdata);
 	dp_rx_set_msdu_lmac_id(nbuf, peer_mdata);
-	dp_rx_set_msdu_hw_link_id(nbuf, peer_mdata);
+	dp_rx_set_link_id_be(nbuf, peer_mdata);
 
 	/* to indicate whether this msdu is rx offload */
 	pkt_capture_offload =
@@ -765,7 +785,7 @@ dp_rx_wbm_err_msdu_continuation_get(struct dp_soc *soc,
 }
 #else
 static inline void
-dp_rx_set_msdu_hw_link_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
+dp_rx_set_link_id_be(qdf_nbuf_t nbuf, uint32_t peer_mdata)
 {
 }
 
@@ -834,13 +854,15 @@ dp_rx_wbm_err_msdu_continuation_get(struct dp_soc *soc,
  * @soc: pointer to Soc structure
  * @ring_desc: wbm dest ring descriptor
  * @nbuf: nbuf to save descriptor information
+ * @pool_id: pool id part of wbm error info
  *
  * Return: wbm error information details
  */
 static inline uint32_t
 dp_rx_wbm_err_copy_desc_info_in_nbuf(struct dp_soc *soc,
 				     hal_ring_desc_t ring_desc,
-				     qdf_nbuf_t nbuf)
+				     qdf_nbuf_t nbuf,
+				     uint8_t pool_id)
 {
 	uint32_t mpdu_desc_info = 0;
 	uint32_t msdu_desc_info = 0;
@@ -854,6 +876,7 @@ dp_rx_wbm_err_copy_desc_info_in_nbuf(struct dp_soc *soc,
 					     &msdu_desc_info,
 					     &peer_mdata);
 
+	wbm_err.info_bit.pool_id = pool_id;
 	dp_rx_set_mpdu_msdu_desc_info_in_nbuf(nbuf,
 					      mpdu_desc_info,
 					      peer_mdata,
@@ -861,4 +884,15 @@ dp_rx_wbm_err_copy_desc_info_in_nbuf(struct dp_soc *soc,
 	dp_rx_set_wbm_err_info_in_nbuf(soc, nbuf, wbm_err);
 	return wbm_err.info;
 }
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+struct dp_soc *
+dp_get_soc_by_chip_id_be(struct dp_soc *soc, uint8_t chip_id);
+#else
+static inline struct dp_soc *
+dp_get_soc_by_chip_id_be(struct dp_soc *soc, uint8_t chip_id)
+{
+	return soc;
+}
+#endif
 #endif

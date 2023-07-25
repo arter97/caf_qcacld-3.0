@@ -49,6 +49,10 @@ mlo_allocate_and_copy_ies(struct wlan_cm_connect_req *target,
 {
 	target->assoc_ie.ptr = NULL;
 	target->scan_ie.ptr = NULL;
+	target->crypto.wep_keys.key = NULL;
+	target->crypto.wep_keys.seq = NULL;
+	target->crypto.wep_keys.key_len = 0;
+	target->crypto.wep_keys.seq_len = 0;
 
 	if (source->scan_ie.ptr) {
 		target->scan_ie.ptr = qdf_mem_malloc(source->scan_ie.len);
@@ -66,20 +70,6 @@ mlo_allocate_and_copy_ies(struct wlan_cm_connect_req *target,
 		else
 			qdf_mem_copy(target->assoc_ie.ptr, source->assoc_ie.ptr,
 				     source->assoc_ie.len);
-	}
-}
-
-void
-mlo_free_connect_ies(struct wlan_cm_connect_req *connect_req)
-{
-	if (connect_req->scan_ie.ptr) {
-		qdf_mem_free(connect_req->scan_ie.ptr);
-		connect_req->scan_ie.ptr = NULL;
-	}
-
-	if (connect_req->assoc_ie.ptr) {
-		qdf_mem_free(connect_req->assoc_ie.ptr);
-		connect_req->assoc_ie.ptr = NULL;
 	}
 }
 
@@ -310,8 +300,7 @@ static void mlo_free_copied_conn_req(struct wlan_mlo_sta *sta_ctx)
 		mlo_debug("enter");
 		copied_conn_req_lock_acquire(sta_ctx);
 		if (sta_ctx->copied_conn_req) {
-			mlo_free_connect_ies(sta_ctx->copied_conn_req);
-			qdf_mem_free(sta_ctx->copied_conn_req);
+			wlan_cm_free_connect_req(sta_ctx->copied_conn_req);
 			sta_ctx->copied_conn_req = NULL;
 		}
 		copied_conn_req_lock_release(sta_ctx);
@@ -525,8 +514,7 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 			return QDF_STATUS_E_FAILURE;
 
 		if (sta_ctx->connect_req) {
-			mlo_free_connect_ies(sta_ctx->connect_req);
-			qdf_mem_free(sta_ctx->connect_req);
+			wlan_cm_free_connect_req(sta_ctx->connect_req);
 			sta_ctx->connect_req = NULL;
 		}
 
@@ -746,7 +734,7 @@ QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
 			sta_ctx->copied_conn_req = qdf_mem_malloc(
 					sizeof(struct wlan_cm_connect_req));
 		else
-			mlo_free_connect_ies(sta_ctx->copied_conn_req);
+			wlan_cm_free_connect_req_param(sta_ctx->copied_conn_req);
 
 		mlo_debug("storing orig connect req");
 		if (sta_ctx->copied_conn_req) {
@@ -852,7 +840,7 @@ mlo_prepare_and_send_connect(struct wlan_objmgr_vdev *vdev,
 	req.crypto.auth_type = 0;
 
 	wlan_cm_start_connect(vdev, &req);
-	mlo_free_connect_ies(&req);
+	wlan_cm_free_connect_req_param(&req);
 }
 
 /**
@@ -1310,8 +1298,7 @@ static QDF_STATUS mlo_disconnect_req(struct wlan_objmgr_vdev *vdev,
 		mlo_dev_lock_acquire(mlo_dev_ctx);
 		if (sta_ctx && sta_ctx->connect_req &&
 		    source != CM_INTERNAL_DISCONNECT) {
-			mlo_free_connect_ies(sta_ctx->connect_req);
-			qdf_mem_free(sta_ctx->connect_req);
+			wlan_cm_free_connect_req(sta_ctx->connect_req);
 			sta_ctx->connect_req = NULL;
 		}
 
@@ -1367,9 +1354,15 @@ QDF_STATUS mlo_sync_disconnect(struct wlan_objmgr_vdev *vdev,
 		sta_ctx = mlo_dev_ctx->sta_ctx;
 	if (mlo_dev_ctx && wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		if (sta_ctx && sta_ctx->connect_req) {
-			mlo_free_connect_ies(sta_ctx->connect_req);
-			qdf_mem_free(sta_ctx->connect_req);
+			wlan_cm_free_connect_req(sta_ctx->connect_req);
 			sta_ctx->connect_req = NULL;
+		}
+
+		status = mlo_validate_disconn_req(vdev, source,
+						  reason_code, bssid);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlo_err("Connect in progress, deferring disconnect");
+			return status;
 		}
 
 		status = mlo_send_link_disconnect_sync(mlo_dev_ctx, source,
@@ -1450,7 +1443,7 @@ static QDF_STATUS ml_activate_connect_req_sched_cb(struct scheduler_msg *msg)
 	}
 
 	sta_ctx = mlo_dev_ctx->sta_ctx;
-	if (!sta_ctx) {
+	if (!sta_ctx || !sta_ctx->connect_req) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -1478,8 +1471,7 @@ static QDF_STATUS ml_activate_connect_req_sched_cb(struct scheduler_msg *msg)
 	}
 
 	mlo_connect(vdev, sta_ctx->connect_req);
-	mlo_free_connect_ies(sta_ctx->connect_req);
-	qdf_mem_free(sta_ctx->connect_req);
+	wlan_cm_free_connect_req(sta_ctx->connect_req);
 	sta_ctx->connect_req = NULL;
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
@@ -1522,8 +1514,7 @@ void mlo_sta_link_handle_pending_connect(struct wlan_objmgr_vdev *vdev)
 			vdev,
 			WLAN_MLO_MGR_ID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
-		mlo_free_connect_ies(sta_ctx->connect_req);
-		qdf_mem_free(sta_ctx->connect_req);
+		wlan_cm_free_connect_req(sta_ctx->connect_req);
 		sta_ctx->connect_req = NULL;
 		return;
 	}
@@ -1535,8 +1526,7 @@ void mlo_sta_link_handle_pending_connect(struct wlan_objmgr_vdev *vdev)
 				     QDF_MODULE_ID_MLME,
 				     QDF_MODULE_ID_MLME, &msg);
 	if (QDF_IS_STATUS_ERROR(ret)) {
-		mlo_free_connect_ies(sta_ctx->connect_req);
-		qdf_mem_free(sta_ctx->connect_req);
+		wlan_cm_free_connect_req(sta_ctx->connect_req);
 		sta_ctx->connect_req = NULL;
 		wlan_objmgr_vdev_release_ref(vdev,
 					     WLAN_MLO_MGR_ID);
@@ -2055,8 +2045,7 @@ void mlo_internal_disconnect_links(struct wlan_objmgr_vdev *vdev)
 	}
 
 	if (sta_ctx->connect_req) {
-		mlo_free_connect_ies(sta_ctx->connect_req);
-		qdf_mem_free(sta_ctx->connect_req);
+		wlan_cm_free_connect_req(sta_ctx->connect_req);
 		sta_ctx->connect_req = NULL;
 	}
 
@@ -2267,9 +2256,6 @@ static void mlo_process_link_remove(struct wlan_objmgr_vdev *vdev,
 	if (!vdev_mlme)
 		return;
 
-	if (vdev_mlme->ml_reconfig_started == true)
-		return;
-
 	bss_peer = wlan_vdev_get_bsspeer(vdev);
 	if (!bss_peer)
 		return;
@@ -2277,7 +2263,7 @@ static void mlo_process_link_remove(struct wlan_objmgr_vdev *vdev,
 	/* Link delete triggered from AP,
 	 * start timer with tbtt count * beacon interval
 	 */
-	tbtt_count = link_info->delete_timer;
+	tbtt_count = link_info->ap_removal_timer;
 	bcn_int = mlo_get_bcn_interval_by_bssid(
 			wlan_vdev_get_pdev(vdev),
 			wlan_peer_get_macaddr(bss_peer));
@@ -2499,4 +2485,31 @@ mlo_get_link_state_context(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+void
+wlan_mlo_send_vdev_pause(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev,
+			 uint16_t session_id,
+			 uint16_t vdev_pause_dur)
+{
+	struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops;
+	struct mlo_vdev_pause vdev_pause_info;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	mlo_tx_ops = &psoc->soc_cb.tx_ops->mlo_ops;
+	if (!mlo_tx_ops) {
+		mlo_err("tx_ops is null!");
+		return;
+	}
+
+	if (!mlo_tx_ops->send_vdev_pause) {
+		mlo_err("send_vdev_pause is null");
+		return;
+	}
+
+	vdev_pause_info.vdev_id = session_id;
+	vdev_pause_info.vdev_pause_duration = vdev_pause_dur;
+	status = mlo_tx_ops->send_vdev_pause(psoc, &vdev_pause_info);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlo_err("Failed to send vdev pause to FW");
+}
 #endif

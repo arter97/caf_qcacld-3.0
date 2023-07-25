@@ -118,11 +118,11 @@ cdp_update_mon_mac_filter(ol_txrx_soc_handle soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!soc->ops->ctrl_ops ||
-	    !soc->ops->ctrl_ops->txrx_update_mon_mac_filter)
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->txrx_update_mon_mac_filter)
 		return QDF_STATUS_E_FAILURE;
 
-	return soc->ops->ctrl_ops->txrx_update_mon_mac_filter
+	return soc->ops->mon_ops->txrx_update_mon_mac_filter
 			(soc, vdev_id, cmd);
 }
 
@@ -1408,4 +1408,73 @@ QDF_STATUS cdp_txrx_get_pdev_phyrx_error_mask(ol_txrx_soc_handle soc,
 }
 #endif
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * cdp_get_umac_reset_in_progress_state() - API to get the umac reset in
+ *                                          progress state
+ * @soc: opaque soc handle
+ *
+ * Return: Umac reset in progress state
+ */
+static inline enum cdp_umac_reset_state
+cdp_get_umac_reset_in_progress_state(ol_txrx_soc_handle soc)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid soc or soc->ops:");
+		return CDP_UMAC_RESET_INVALID_STATE;
+	}
+
+	if (!soc->ops->ctrl_ops ||
+	    !soc->ops->ctrl_ops->get_umac_reset_in_progress_state)
+		return CDP_UMAC_RESET_INVALID_STATE;
+
+	return soc->ops->ctrl_ops->get_umac_reset_in_progress_state(soc);
+}
+
+/**
+ * cdp_umac_reset_is_inprogress() - API to check if umac reset is in progress
+ * @soc: opaque soc handle
+ *
+ * Return: true if umac reset is in progress, else false.
+ */
+static inline bool
+cdp_umac_reset_is_inprogress(ol_txrx_soc_handle soc)
+{
+	enum cdp_umac_reset_state state;
+
+	state = cdp_get_umac_reset_in_progress_state(soc);
+
+	if (state == CDP_UMAC_RESET_IN_PROGRESS ||
+	    state == CDP_UMAC_RESET_IN_PROGRESS_DURING_BUFFER_WINDOW)
+		return true;
+	else
+		return false;
+}
+#else
+static inline bool
+cdp_umac_reset_is_inprogress(ol_txrx_soc_handle soc)
+{
+	return false;
+}
+#endif
+
+#ifdef WLAN_SUPPORT_RX_FISA
+static inline
+QDF_STATUS cdp_txrx_fisa_config(struct cdp_soc_t *soc, uint8_t pdev_id,
+				enum cdp_fisa_config_id config_id,
+				union cdp_fisa_config *cfg)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance:");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->ctrl_ops || !soc->ops->ctrl_ops->txrx_fisa_config)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->ctrl_ops->txrx_fisa_config(soc, pdev_id, config_id,
+						    cfg);
+}
+#endif
 #endif /* _CDP_TXRX_CTRL_H_ */

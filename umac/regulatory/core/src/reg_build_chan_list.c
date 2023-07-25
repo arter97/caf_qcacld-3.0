@@ -445,6 +445,64 @@ static void reg_modify_chan_list_for_dfs_channels(
 	}
 }
 
+#ifdef CONFIG_BAND_6GHZ
+#ifdef CONFIG_REG_CLIENT
+/**
+ * reg_is_6ghz_chan_connected() - Check if given 6 GHz channel is in connected
+ *                                channel list
+ * @pdev_priv_obj: Pdev privect object pointer
+ * @chn_idx: Channel Index
+ *
+ * Return: True if channel present in connected channel list else false
+ */
+static bool
+reg_is_6ghz_chan_connected(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
+			   uint16_t chn_idx)
+{
+	qdf_freq_t freq;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+	reg_is_chan_connected_callback callback = NULL;
+
+	freq = pdev_priv_obj->cur_chan_list[chn_idx].center_freq;
+
+	pdev = pdev_priv_obj->pdev_ptr;
+	if (!pdev) {
+		reg_err("pdev is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+	if (!psoc_priv_obj) {
+		reg_err("reg psoc private obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_spin_lock_bh(&psoc_priv_obj->cbk_list_lock);
+	if (psoc_priv_obj->conn_chan_cb.cbk)
+		callback = psoc_priv_obj->conn_chan_cb.cbk;
+	qdf_spin_unlock_bh(&psoc_priv_obj->cbk_list_lock);
+
+	if (callback) {
+		if (callback(psoc, QDF_STA_MODE, freq) ||
+		    callback(psoc, QDF_P2P_CLIENT_MODE, freq))
+			return true;
+	}
+
+	return false;
+}
+#else
+static inline bool
+reg_is_6ghz_chan_connected(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
+			   uint16_t chn_idx)
+{
+	return false;
+}
+#endif
+#endif
+
 #if defined(CONFIG_BAND_6GHZ) && defined(CONFIG_REG_CLIENT)
 /**
  * reg_is_lpi_cli_supp_pwr_mode() - Check if the input supported power mode is a
@@ -511,7 +569,8 @@ static void reg_modify_super_chan_list_for_indoor_channels(
 static void
 reg_dis_6g_chan_in_super_chan_list(struct wlan_objmgr_pdev *pdev,
 				   struct super_chan_info *chan_info,
-				   enum supported_6g_pwr_types pwr_type)
+				   enum supported_6g_pwr_types pwr_type,
+				   uint16_t chn_idx)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	uint32_t band_bitmap;
@@ -529,7 +588,10 @@ reg_dis_6g_chan_in_super_chan_list(struct wlan_objmgr_pdev *pdev,
 	pdev_priv_obj = reg_get_pdev_obj(pdev);
 	band_bitmap = pdev_priv_obj->band_capability;
 
-	if (!(band_bitmap & BIT(REG_BAND_6G)))
+	if (!(band_bitmap & BIT(REG_BAND_6G)) &&
+	    !(pdev_priv_obj->keep_6ghz_sta_cli_connection &&
+	     reg_is_6ghz_chan_connected(pdev_priv_obj,
+					chn_idx + MIN_6GHZ_CHANNEL)))
 		reg_dis_chan_state_and_flags(
 					&chan_info->state_arr[pwr_type],
 					&chan_info->chan_flags_arr[pwr_type]);
@@ -552,7 +614,8 @@ reg_modify_super_chan_list_for_indoor_channels(
 static inline void
 reg_dis_6g_chan_in_super_chan_list(struct wlan_objmgr_pdev *pdev,
 				   struct super_chan_info *chan_info,
-				   enum supported_6g_pwr_types pwr_type)
+				   enum supported_6g_pwr_types pwr_type,
+				   uint16_t chn_idx)
 {
 }
 #endif /* CONFIG_BAND_6GHZ && CONFIG_REG_CLIENT */
@@ -669,22 +732,59 @@ static void reg_modify_chan_list_for_indoor_concurrency(
 #endif
 
 #ifdef CONFIG_BAND_6GHZ
+/**
+ * reg_modify_chan_list_for_band_6G() - Modify 6 GHz band channels
+ * @pdev_priv_obj: pointer to pdev privet object
+ * @chan_list: pointer to channel list
+ *
+ * Return: None
+ */
 static void reg_modify_chan_list_for_band_6G(
-					struct regulatory_channel *chan_list)
+		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
+		struct regulatory_channel *chan_list)
 {
 	enum channel_enum chan_enum;
 
 	reg_debug("disabling 6G");
 	for (chan_enum = MIN_6GHZ_CHANNEL;
 	     chan_enum <= MAX_6GHZ_CHANNEL; chan_enum++) {
+		if (pdev_priv_obj->keep_6ghz_sta_cli_connection &&
+		    reg_is_6ghz_chan_connected(pdev_priv_obj,
+					       chan_enum))
+			continue;
 		chan_list[chan_enum].chan_flags |=
 			REGULATORY_CHAN_DISABLED;
 		chan_list[chan_enum].state = CHANNEL_STATE_DISABLE;
 	}
 }
+
+#ifdef CONFIG_REG_CLIENT
+/**
+ * reg_modify_secondary_cur_chan_list() - Disable secondary current channel
+ * 6 GHz channels if 6 GHz band is disabled
+ *
+ * @pdev_priv_obj: pointer to pdev private object
+ *
+ * Return: None
+ */
+static void reg_modify_secondary_cur_chan_list(
+		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
+{
+	uint32_t band_bitmap;
+
+	band_bitmap = pdev_priv_obj->band_capability;
+	if (!band_bitmap)
+		return;
+
+	if (!(band_bitmap & BIT(REG_BAND_6G)))
+		reg_modify_chan_list_for_band_6G(pdev_priv_obj,
+				pdev_priv_obj->secondary_cur_chan_list);
+}
+#endif
 #else
 static inline void reg_modify_chan_list_for_band_6G(
-					struct regulatory_channel *chan_list)
+			struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
+			struct regulatory_channel *chan_list)
 {
 }
 #endif
@@ -692,16 +792,22 @@ static inline void reg_modify_chan_list_for_band_6G(
 /**
  * reg_modify_chan_list_for_band() - Based on the input band bitmap, either
  * disable 2GHz, 5GHz, or 6GHz channels.
- * @chan_list: Pointer to regulatory channel list.
- * @band_bitmap: Input bitmap of reg_wifi_band values.
+ * @pdev_priv_obj: pointer to pdev private object
+ *
+ * Return: None
  */
-static void reg_modify_chan_list_for_band(struct regulatory_channel *chan_list,
-					  uint32_t band_bitmap)
+static void reg_modify_chan_list_for_band(
+		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 {
 	enum channel_enum chan_enum;
+	struct regulatory_channel *chan_list;
+	uint32_t band_bitmap;
 
+	band_bitmap = pdev_priv_obj->band_capability;
 	if (!band_bitmap)
 		return;
+
+	chan_list = pdev_priv_obj->cur_chan_list;
 
 	if (!(band_bitmap & BIT(REG_BAND_5G))) {
 		reg_debug("disabling 5G");
@@ -724,7 +830,7 @@ static void reg_modify_chan_list_for_band(struct regulatory_channel *chan_list,
 	}
 
 	if (!(band_bitmap & BIT(REG_BAND_6G)))
-		reg_modify_chan_list_for_band_6G(chan_list);
+		reg_modify_chan_list_for_band_6G(pdev_priv_obj, chan_list);
 
 }
 
@@ -1067,6 +1173,7 @@ static void reg_propagate_6g_mas_channel_list(
 				mas_chan_params->unspecified_ap_usable;
 	pdev_priv_obj->is_6g_channel_list_populated =
 		mas_chan_params->is_6g_channel_list_populated;
+	reg_set_afc_power_event_received(pdev_priv_obj->pdev_ptr, false);
 	pdev_priv_obj->reg_6g_superid =
 		mas_chan_params->reg_6g_superid;
 	pdev_priv_obj->reg_6g_thresh_priority_freq =
@@ -1074,10 +1181,19 @@ static void reg_propagate_6g_mas_channel_list(
 	reg_set_ap_pwr_type(pdev_priv_obj);
 }
 
-#ifdef CONFIG_AFC_SUPPORT
+#if defined(CONFIG_AFC_SUPPORT) && !defined(CONFIG_REG_CLIENT)
 void reg_set_ap_pwr_type(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 {
 	uint8_t  *num_rules = pdev_priv_obj->reg_rules.num_of_6g_ap_reg_rules;
+	bool is_6ghz_pdev;
+
+	is_6ghz_pdev = reg_is_range_overlap_6g(pdev_priv_obj->range_5g_low,
+					       pdev_priv_obj->range_5g_high);
+
+	if (!is_6ghz_pdev) {
+		reg_debug("Not setting 6g_pwr_type for a non 6 GHz pdev");
+		return;
+	}
 
 	if (pdev_priv_obj->reg_afc_dev_deployment_type ==
 	    AFC_DEPLOYMENT_OUTDOOR) {
@@ -1499,10 +1615,35 @@ reg_append_mas_chan_list_for_6g_sp(struct wlan_regulatory_pdev_priv_obj
 		     sizeof(struct regulatory_channel));
 }
 #else
-static inline void
+static void
 reg_append_mas_chan_list_for_6g_sp(struct wlan_regulatory_pdev_priv_obj
 			       *pdev_priv_obj)
 {
+	struct regulatory_channel *master_chan_list_6g_client_sp;
+	uint8_t i, j;
+
+	if (!pdev_priv_obj->reg_rules.num_of_6g_client_reg_rules[REG_STANDARD_POWER_AP]) {
+		reg_debug("No SP reg rules");
+		return;
+	}
+
+	master_chan_list_6g_client_sp =
+		pdev_priv_obj->mas_chan_list_6g_client[REG_STANDARD_POWER_AP]
+			[pdev_priv_obj->reg_cur_6g_client_mobility_type];
+
+	for (i = MIN_6GHZ_CHANNEL, j = 0;
+	     i <= MAX_6GHZ_CHANNEL && j < NUM_6GHZ_CHANNELS; i++, j++) {
+		if (pdev_priv_obj->mas_chan_list[i].state ==
+		    CHANNEL_STATE_DISABLE ||
+		    pdev_priv_obj->mas_chan_list[i].chan_flags &
+		    REGULATORY_CHAN_DISABLED) {
+			qdf_mem_copy(&pdev_priv_obj->mas_chan_list[i],
+				     &master_chan_list_6g_client_sp[j],
+				     sizeof(struct regulatory_channel));
+			pdev_priv_obj->mas_chan_list[i].power_type =
+							REG_STANDARD_POWER_AP;
+		}
+	}
 }
 #endif
 
@@ -1540,6 +1681,8 @@ reg_append_mas_chan_list_for_6g_lpi(struct wlan_regulatory_pdev_priv_obj
 			qdf_mem_copy(&pdev_priv_obj->mas_chan_list[i],
 				     &master_chan_list_6g_client_lpi[j],
 				     sizeof(struct regulatory_channel));
+			pdev_priv_obj->mas_chan_list[i].power_type =
+							REG_INDOOR_AP;
 		}
 	}
 }
@@ -1578,6 +1721,8 @@ reg_append_mas_chan_list_for_6g_vlp(struct wlan_regulatory_pdev_priv_obj
 			qdf_mem_copy(&pdev_priv_obj->mas_chan_list[i],
 				     &master_chan_list_6g_client_vlp[j],
 				     sizeof(struct regulatory_channel));
+			pdev_priv_obj->mas_chan_list[i].power_type =
+							REG_VERY_LOW_POWER_AP;
 		}
 	}
 }
@@ -1598,7 +1743,6 @@ reg_append_mas_chan_list_for_6g(struct wlan_regulatory_pdev_priv_obj
 	 * given to AFC power type and then second priority is decided based on
 	 * gindoor_channel_support ini value
 	 */
-	reg_append_mas_chan_list_for_6g_sp(pdev_priv_obj);
 
 	if (pdev_priv_obj->indoor_chan_enabled) {
 		reg_append_mas_chan_list_for_6g_lpi(pdev_priv_obj);
@@ -1607,6 +1751,8 @@ reg_append_mas_chan_list_for_6g(struct wlan_regulatory_pdev_priv_obj
 		reg_append_mas_chan_list_for_6g_vlp(pdev_priv_obj);
 		reg_append_mas_chan_list_for_6g_lpi(pdev_priv_obj);
 	}
+
+	reg_append_mas_chan_list_for_6g_sp(pdev_priv_obj);
 }
 
 /**
@@ -1782,6 +1928,8 @@ reg_populate_secondary_cur_chan_list(struct wlan_regulatory_pdev_priv_obj
 		     chan_list,
 		     len_6ghz);
 	qdf_mem_free(chan_list);
+
+	reg_modify_secondary_cur_chan_list(pdev_priv_obj);
 	reg_dump_valid_6ghz_cur_chan_list(pdev_priv_obj);
 }
 #else /* CONFIG_REG_CLIENT */
@@ -2846,7 +2994,7 @@ static void reg_update_sup_ch_entry_for_mode(
 						       supp_pwr_mode);
 
 	reg_dis_6g_chan_in_super_chan_list(pdev, &super_chan_list[chn_idx],
-					   supp_pwr_mode);
+					   supp_pwr_mode, chn_idx);
 
 	reg_dis_6g_edge_chan_in_enh_chan(pdev, &super_chan_list[chn_idx],
 					 chn_idx, supp_pwr_mode);
@@ -2936,6 +3084,34 @@ reg_disable_enable_opclass_channels(struct wlan_regulatory_pdev_priv_obj *pdev_p
 }
 #endif
 
+#ifdef CONFIG_REG_CLIENT
+/*
+ * reg_modify_sp_channels() - Mark 6 GHz channels NO_IR and set state DFS
+ * if power type is SP
+ * @chan_list: Pdev current channel list
+ *
+ * Return: None
+ */
+static
+void reg_modify_sp_channels(struct regulatory_channel *chan_list)
+{
+	int i;
+
+	for (i = MIN_6GHZ_CHANNEL; i <= MAX_6GHZ_CHANNEL ; i++) {
+		if (chan_list[i].power_type == REG_STANDARD_POWER_AP &&
+		    chan_list[i].state != CHANNEL_STATE_DISABLE) {
+			chan_list[i].state = CHANNEL_STATE_DFS;
+			chan_list[i].chan_flags |= REGULATORY_CHAN_NO_IR;
+		}
+	}
+}
+#else
+static inline
+void reg_modify_sp_channels(struct regulatory_channel *chan_list)
+{
+}
+#endif
+
 void reg_compute_pdev_current_chan_list(struct wlan_regulatory_pdev_priv_obj
 					*pdev_priv_obj)
 {
@@ -2948,14 +3124,14 @@ void reg_compute_pdev_current_chan_list(struct wlan_regulatory_pdev_priv_obj
 	qdf_mem_copy(pdev_priv_obj->cur_chan_list, pdev_priv_obj->mas_chan_list,
 		     NUM_CHANNELS * sizeof(struct regulatory_channel));
 
+	reg_modify_sp_channels(pdev_priv_obj->cur_chan_list);
 	reg_modify_chan_list_for_freq_range(pdev_priv_obj->cur_chan_list,
 					    pdev_priv_obj->range_2g_low,
 					    pdev_priv_obj->range_2g_high,
 					    pdev_priv_obj->range_5g_low,
 					    pdev_priv_obj->range_5g_high);
 
-	reg_modify_chan_list_for_band(pdev_priv_obj->cur_chan_list,
-				      pdev_priv_obj->band_capability);
+	reg_modify_chan_list_for_band(pdev_priv_obj);
 
 	reg_modify_disable_chan_list_for_unii1_and_unii2a(pdev_priv_obj);
 
@@ -3039,6 +3215,11 @@ static int reg_get_num_reg_rules(
 	struct reg_rule_info *pdev_reg_rules;
 
 	cur_6g_ap_pwr_type = pdev_priv_obj->reg_cur_6g_ap_pwr_type;
+	if (cur_6g_ap_pwr_type > REG_MAX_SUPP_AP_TYPE) {
+		reg_err("Unsupported 6G AP power type");
+		return 0;
+	}
+
 	pdev_reg_rules = &pdev_priv_obj->reg_rules;
 
 	return (pdev_reg_rules->num_of_reg_rules +
@@ -3059,18 +3240,30 @@ static void reg_append_6g_reg_rules_in_pdev(
 			struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 {
 	struct reg_rule_info *pdev_reg_rules;
-	enum reg_6g_ap_type cur_pwr_type = REG_INDOOR_AP;
+	enum reg_6g_ap_type cur_pwr_type;
 	uint8_t num_reg_rules;
+	uint8_t *num_6ghz_reg_rules;
 
 	pdev_reg_rules = &pdev_priv_obj->reg_rules;
 
 	num_reg_rules = pdev_reg_rules->num_of_reg_rules;
+	num_6ghz_reg_rules = pdev_reg_rules->num_of_6g_client_reg_rules;
+
+	if (num_6ghz_reg_rules[REG_INDOOR_AP])
+		cur_pwr_type = REG_INDOOR_AP;
+	else if (num_6ghz_reg_rules[REG_VERY_LOW_POWER_AP])
+		cur_pwr_type = REG_VERY_LOW_POWER_AP;
+	else if (num_6ghz_reg_rules[REG_STANDARD_POWER_AP])
+		cur_pwr_type = REG_STANDARD_POWER_AP;
+	else
+		return;
+
 	pdev_reg_rules->num_of_reg_rules +=
 		pdev_reg_rules->num_of_6g_client_reg_rules[cur_pwr_type];
 
 	qdf_mem_copy(&pdev_reg_rules->reg_rules[num_reg_rules],
 		     pdev_reg_rules->reg_rules_6g_client[cur_pwr_type],
-		     pdev_reg_rules->num_of_6g_client_reg_rules[cur_pwr_type] *
+		     num_6ghz_reg_rules[cur_pwr_type] *
 		     sizeof(struct cur_reg_rule));
 }
 #else /* CONFIG_REG_CLIENT */
@@ -3091,6 +3284,11 @@ static void reg_append_6g_reg_rules_in_pdev(
 	uint8_t num_reg_rules;
 
 	cur_pwr_type = pdev_priv_obj->reg_cur_6g_ap_pwr_type;
+	if (cur_pwr_type > REG_MAX_SUPP_AP_TYPE) {
+		reg_err("Unsupported 6G AP power type");
+		return;
+	}
+
 	pdev_reg_rules = &pdev_priv_obj->reg_rules;
 
 	num_reg_rules = pdev_reg_rules->num_of_reg_rules;
@@ -3358,7 +3556,7 @@ reg_copy_from_super_chan_info_to_reg_channel(struct regulatory_channel *chan,
 	chan->psd_eirp = sc_entry.reg_chan_pwr[in_6g_pwr_mode].psd_eirp;
 }
 
-static QDF_STATUS
+QDF_STATUS
 reg_get_6g_pwrmode_chan_list(struct wlan_regulatory_pdev_priv_obj
 			     *pdev_priv_obj,
 			     struct regulatory_channel *chan_list,
@@ -3391,15 +3589,6 @@ reg_populate_6g_band_channels(struct cur_reg_rule *reg_rule_5g,
 			      uint16_t min_bw_5g,
 			      struct regulatory_channel *mas_chan_list)
 {
-}
-
-static inline QDF_STATUS
-reg_get_6g_pwrmode_chan_list(struct wlan_regulatory_pdev_priv_obj
-			     *pdev_priv_obj,
-			     struct regulatory_channel *chan_list,
-			     enum supported_6g_pwr_types in_6g_pwr_mode)
-{
-	return QDF_STATUS_E_INVAL;
 }
 #endif /* CONFIG_BAND_6GHZ */
 
@@ -4541,8 +4730,20 @@ reg_process_afc_expiry_event(struct afc_regulatory_info *afc_info)
 		break;
 	case REG_AFC_EXPIRY_EVENT_SWITCH_TO_LPI:
 	case REG_AFC_EXPIRY_EVENT_STOP_TX:
+		/*
+		 * Invalidate the AFC response-payload and associated
+		 * driver memory
+		 */
+		reg_free_afc_pwr_info(pdev_priv_obj);
 		reg_reset_chan_list_and_power_event(pdev_priv_obj);
 		reg_client_afc_populate_channels(psoc, pdev);
+		reg_send_afc_payload_reset_event(pdev);
+		if (wlan_reg_is_noaction_on_afc_pwr_evt(pdev)) {
+			if (tx_ops->trigger_update_channel_list)
+				tx_ops->trigger_update_channel_list(pdev);
+			break;
+		}
+
 		if (tx_ops->trigger_acs_for_afc)
 			tx_ops->trigger_acs_for_afc(pdev);
 		break;

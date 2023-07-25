@@ -274,7 +274,7 @@ struct htt_soc {
 	HTT_TX_MUTEX_TYPE htt_tx_mutex;
 };
 
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 /**
  * struct dp_tx_mon_downstream_tlv_config - Enable/Disable TxMon
  * downstream TLVs
@@ -596,7 +596,7 @@ struct htt_tx_ring_tlv_filter {
 		 data_mpdu_log:1;
 	uint8_t  enable:1;
 };
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 
 /**
  * struct htt_rx_ring_tlv_filter - Rx ring TLV filter
@@ -706,8 +706,9 @@ struct htt_rx_ring_tlv_filter {
 	u_int32_t phy_err_mask;
 	u_int32_t phy_err_mask_cont;
 #endif
-#if defined(QCA_MONITOR_2_0_SUPPORT) || defined(CONFIG_WORD_BASED_TLV) || \
-	defined(CONFIG_MON_WORD_BASED_TLV)
+#if defined(WLAN_PKT_CAPTURE_RX_2_0) || defined(CONFIG_WORD_BASED_TLV) || \
+	defined(CONFIG_MON_WORD_BASED_TLV) || \
+	defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
 	uint32_t rx_mpdu_start_wmask;
 	uint16_t rx_mpdu_end_wmask;
 	uint32_t rx_msdu_end_wmask;
@@ -782,10 +783,12 @@ struct dp_htt_rx_flow_fst_operation {
  * struct dp_htt_rx_fisa_cfg - Rx fisa config
  * @pdev_id: DP Pdev identifier
  * @fisa_timeout: fisa aggregation timeout
+ * @max_aggr_supported: FISA max MSDU aggregation supported
  */
 struct dp_htt_rx_fisa_cfg {
 	uint8_t pdev_id;
 	uint32_t fisa_timeout;
+	uint8_t max_aggr_supported;
 };
 
 /**
@@ -1205,10 +1208,14 @@ QDF_STATUS htt_h2t_rx_cce_super_rule_setup(struct htt_soc *htt_soc,
  * struct dp_peer_info - Primary Peer information
  * @primary_peer_id: Primary peer id
  * @chip_id: Chip id of primary peer
+ * @hw_peer_id: ast hash index
+ * @ast_hash: ast hash value
  */
 struct dp_peer_info {
 	uint16_t primary_peer_id;
 	uint8_t chip_id;
+	uint16_t hw_peer_id;
+	uint16_t ast_hash;
 };
 
 /**

@@ -214,7 +214,7 @@ void dp_tx_process_htt_completion_li(struct dp_soc *soc,
 		dp_tx_comp_process_tx_status(soc, tx_desc, &ts, txrx_peer,
 					     ring_id);
 		dp_tx_comp_process_desc(soc, tx_desc, &ts, txrx_peer);
-		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+		dp_tx_desc_release(soc, tx_desc, tx_desc->pool_id);
 
 		if (qdf_likely(txrx_peer))
 			dp_txrx_peer_unref_delete(txrx_ref_handle,
@@ -254,7 +254,7 @@ void dp_tx_process_htt_completion_li(struct dp_soc *soc,
 
 release_tx_desc:
 	dp_tx_comp_free_buf(soc, tx_desc, false);
-	dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+	dp_tx_desc_release(soc, tx_desc, tx_desc->pool_id);
 	if (vdev)
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT_COMP);
 }
@@ -387,7 +387,7 @@ void dp_sawf_config_li(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 		       qdf_nbuf_t nbuf, struct dp_tx_msdu_info_s *msdu_info)
 {
 	uint8_t q_id = 0;
-	uint32_t search_index;
+	uint32_t flow_idx = 0;
 
 	if (!wlan_cfg_get_sawf_config(soc->wlan_cfg_ctx))
 		return;
@@ -396,17 +396,25 @@ void dp_sawf_config_li(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 	if (q_id == DP_SAWF_DEFAULT_Q_INVALID)
 		return;
 
-	dp_sawf_tcl_cmd(fw_metadata, nbuf);
-
-	search_index = dp_sawf_get_search_index(soc, nbuf, vdev_id,
-						q_id);
 	msdu_info->tid = (q_id & (CDP_DATA_TID_MAX - 1));
 	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached,
 				 (q_id & (CDP_DATA_TID_MAX - 1)));
+
+	if ((q_id >= DP_SAWF_DEFAULT_QUEUE_MIN) &&
+	    (q_id < DP_SAWF_DEFAULT_QUEUE_MAX))
+		return;
+
+	dp_sawf_tcl_cmd(fw_metadata, nbuf);
+
+	/* For SAWF, q_id starts from DP_SAWF_Q_MAX */
+	if (!dp_sawf_get_search_index(soc, nbuf, vdev_id,
+				      q_id, &flow_idx))
+		hal_tx_desc_set_to_fw(hal_tx_desc_cached, true);
+
 	hal_tx_desc_set_search_type_li(soc->hal_soc, hal_tx_desc_cached,
 				       HAL_TX_ADDR_INDEX_SEARCH);
 	hal_tx_desc_set_search_index_li(soc->hal_soc, hal_tx_desc_cached,
-					search_index);
+					flow_idx);
 }
 #else
 static inline

@@ -51,6 +51,7 @@
  * @WLAN_IF_MGR_EV_AP_CSA_START: Event to handle CSA start
  * @WLAN_IF_MGR_EV_AP_CSA_COMPLETE: Event to handle csa complete
  * @WLAN_IF_MGR_EV_STA_CSA_COMPLETE: Event to handle STA/P2P_CLI CSA completion
+ * @WLAN_IF_MGR_EV_CONNECT_ACTIVE:Event to handle connect active request
  * @WLAN_IF_MGR_EV_MAX: Max event
  */
 enum wlan_if_mgr_evt {
@@ -74,7 +75,8 @@ enum wlan_if_mgr_evt {
 	WLAN_IF_MGR_EV_AP_CSA_START = 17,
 	WLAN_IF_MGR_EV_AP_CSA_COMPLETE = 18,
 	WLAN_IF_MGR_EV_STA_CSA_COMPLETE = 19,
-	WLAN_IF_MGR_EV_MAX = 20,
+	WLAN_IF_MGR_EV_CONNECT_ACTIVE = 20,
+	WLAN_IF_MGR_EV_MAX = 21,
 };
 
 /**

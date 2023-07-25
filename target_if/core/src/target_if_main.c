@@ -479,6 +479,9 @@ static void target_if_target_tx_ops_register(
 	target_tx_ops->tgt_is_tgt_type_qcn9160 =
 		target_is_tgt_type_qcn9160;
 
+	target_tx_ops->tgt_is_tgt_type_qcn6432 =
+		target_is_tgt_type_qcn6432;
+
 	target_tx_ops->tgt_is_tgt_type_qcn7605 =
 		target_is_tgt_type_qcn7605;
 
@@ -839,6 +842,11 @@ bool target_is_tgt_type_qcn6122(uint32_t target_type)
 bool target_is_tgt_type_qcn9160(uint32_t target_type)
 {
 	return target_type == TARGET_TYPE_QCN9160;
+}
+
+bool target_is_tgt_type_qcn6432(uint32_t target_type)
+{
+	return target_type == TARGET_TYPE_QCN6432;
 }
 
 bool target_is_tgt_type_qcn7605(uint32_t target_type)
@@ -1218,9 +1226,10 @@ QDF_STATUS target_if_mlo_ready(struct wlan_objmgr_pdev **pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS
-target_if_mlo_teardown_send(struct wlan_objmgr_pdev *pdev,
-			    enum wmi_mlo_teardown_reason reason)
+QDF_STATUS
+target_if_mlo_teardown_req(struct wlan_objmgr_pdev *pdev,
+			   enum wmi_mlo_teardown_reason reason,
+			   bool reset)
 {
 	wmi_unified_t wmi_handle;
 	struct wmi_mlo_teardown_params params = {0};
@@ -1231,19 +1240,8 @@ target_if_mlo_teardown_send(struct wlan_objmgr_pdev *pdev,
 
 	params.pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 	params.reason = reason;
+	params.umac_reset = reset;
 
 	return wmi_mlo_teardown_cmd_send(wmi_handle, &params);
-}
-
-QDF_STATUS target_if_mlo_teardown_req(struct wlan_objmgr_pdev **pdev,
-				      uint8_t num_pdevs,
-				      enum wmi_mlo_teardown_reason reason)
-{
-	uint8_t idx;
-
-	for (idx = 0; idx < num_pdevs; idx++)
-		target_if_mlo_teardown_send(pdev[idx], reason);
-
-	return QDF_STATUS_SUCCESS;
 }
 #endif /*WLAN_FEATURE_11BE_MLO && WLAN_MLO_MULTI_CHIP*/

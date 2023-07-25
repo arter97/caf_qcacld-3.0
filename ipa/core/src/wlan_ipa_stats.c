@@ -23,7 +23,6 @@
 #include "cdp_txrx_ipa.h"
 #include "qdf_platform.h"
 
-#ifdef IPA_OFFLOAD
 /**
  * wlan_ipa_uc_rt_debug_host_fill - fill rt debug buffer
  * @ctext: pointer to ipa context.
@@ -197,8 +196,8 @@ void wlan_ipa_uc_rt_debug_init(struct wlan_ipa_priv *ipa_ctx)
 }
 
 /**
- * wlan_ipa_dump_ipa_ctx() - dump entries in IPA IPA struct
- * @ipa_ctx: IPA context
+ * wlan_ipa_dump_ipa_ctx() - Dump entries in IPA private context structure
+ * @ipa_ctx: IPA private context structure
  *
  * Dump entries in struct ipa_ctx
  *
@@ -349,8 +348,8 @@ static void wlan_ipa_dump_ipa_ctx(struct wlan_ipa_priv *ipa_ctx)
 }
 
 /**
- * wlan_ipa_dump_sys_pipe() - dump IPA IPA SYS Pipe struct
- * @ipa_ctx: IPA IPA struct
+ * wlan_ipa_dump_sys_pipe() - Dump IPA system pipe
+ * @ipa_ctx: IPA private context structure
  *
  * Dump entire struct wlan_ipa_sys_pipe
  *
@@ -408,8 +407,8 @@ static void wlan_ipa_dump_sys_pipe(struct wlan_ipa_priv *ipa_ctx)
 }
 
 /**
- * wlan_ipa_dump_iface_context() - dump IPA IPA Interface Context struct
- * @ipa_ctx: IPA IPA struct
+ * wlan_ipa_dump_iface_context() - Dump IPA interface context structure
+ * @ipa_ctx: IPA private context structure
  *
  * Dump entire struct wlan_ipa_iface_context
  *
@@ -557,8 +556,8 @@ static void wlan_ipa_print_session_info(struct wlan_ipa_priv *ipa_ctx)
 }
 
 /**
- * wlan_ipa_print_txrx_stats - Print IPA IPA TX/RX stats
- * @ipa_ctx: IPA context
+ * wlan_ipa_print_txrx_stats - Print IPA TX/RX stats
+ * @ipa_ctx: IPA private context structure
  *
  * Return: None
  */
@@ -1033,4 +1032,3 @@ void wlan_ipa_wdi_meter_notifier_cb(qdf_ipa_wdi_meter_evt_type_t evt,
 	qdf_op_unprotect(op_sync);
 }
 #endif /* FEATURE_METERING */
-#endif /* IPA_OFFLOAD */

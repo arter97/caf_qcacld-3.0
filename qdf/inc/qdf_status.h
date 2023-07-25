@@ -58,7 +58,7 @@
  * @QDF_STATUS_E_PROTO: protocol error
  * @QDF_STATUS_NOT_INITIALIZED: resource not initialized
  * @QDF_STATUS_E_NULL_VALUE: request is null
- * @QDF_STATUS_HEARTBEAT_TMOUT: hearbeat timeout error
+ * @QDF_STATUS_HEARTBEAT_TMOUT: heartbeat timeout error
  * @QDF_STATUS_NTH_BEACON_DELIVERY: Nth beacon delivery
  * @QDF_STATUS_CSR_WRONG_STATE: csr in wrong state
  * @QDF_STATUS_FT_PREAUTH_KEY_SUCCESS: ft preauth key success

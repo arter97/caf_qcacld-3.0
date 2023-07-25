@@ -311,6 +311,16 @@ QDF_STATUS wlan_reg_get_superchan_entry(
 		struct wlan_objmgr_pdev *pdev,
 		enum channel_enum chan_enum,
 		const struct super_chan_info **p_sup_chan_entry);
+/**
+ * wlan_reg_is_6ghz_unii5_chan_freq() - Check if the given 6GHz channel freq
+ * is UNII-5 band or not.
+ * @freq: Channel frequency
+ *
+ * Return: true if given 6GHz channel frequency is UNII-5 band, else false
+ */
+bool wlan_reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq);
+#define WLAN_REG_IS_6GHZ_UNII5_CHAN_FREQ(freq) \
+	wlan_reg_is_6ghz_unii5_chan_freq(freq)
 #else
 
 #define WLAN_REG_IS_6GHZ_CHAN_FREQ(freq) (false)
@@ -389,6 +399,12 @@ static inline
 const char *wlan_reg_get_power_string(enum reg_6g_ap_type power_type)
 {
 	return "INVALID";
+}
+
+#define WLAN_REG_IS_6GHZ_UNII5_CHAN_FREQ(freq) (false)
+static inline bool wlan_reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq)
+{
+	return false;
 }
 #endif /* CONFIG_BAND_6GHZ */
 
@@ -573,6 +589,22 @@ bool wlan_reg_is_regdb_offloaded(struct wlan_objmgr_psoc *psoc);
  */
 bool wlan_reg_get_fcc_constraint(struct wlan_objmgr_pdev *pdev, uint32_t freq);
 
+/**
+ * wlan_reg_is_6ghz_band_set - Check if 6 GHz band set
+ * @pdev: Pointer to pdev
+ *
+ * Return: True if 6 GHz band set else return flase
+ */
+bool wlan_reg_is_6ghz_band_set(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_reg_get_keep_6ghz_sta_cli_connection() - Get keep 6ghz sta cli
+ *                                               connection flag
+ * @pdev: Pointer to pdev
+ *
+ * Return: Return true if keep 6ghz sta cli connection set else return false
+ */
+bool wlan_reg_get_keep_6ghz_sta_cli_connection(struct wlan_objmgr_pdev *pdev);
 #ifdef CONFIG_REG_CLIENT
 /**
  * wlan_reg_read_current_country() - Read the current country for the regdomain
@@ -586,24 +618,22 @@ QDF_STATUS wlan_reg_read_current_country(struct wlan_objmgr_psoc *psoc,
 
 #ifdef CONFIG_REG_CLIENT
 /**
- * wlan_reg_get_6g_power_type_for_ctry() - Return power type for 6G based
- * on country IE
+ * wlan_reg_get_best_6g_power_type() - Return best power type for 6GHz
+ * connection
  * @psoc: pointer to psoc
  * @pdev: pointer to pdev
- * @ap_ctry: pointer to country string in country IE
- * @sta_ctry: pointer to sta programmed country
  * @pwr_type_6g: pointer to 6G power type
- * @ctry_code_match: Check for country IE and sta country code match
  * @ap_pwr_type: AP's power type for 6G as advertised in HE ops IE
+ * @chan_freq: Connection channel frequency
+ *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_reg_get_6g_power_type_for_ctry(struct wlan_objmgr_psoc *psoc,
-				    struct wlan_objmgr_pdev *pdev,
-				    uint8_t *ap_ctry, uint8_t *sta_ctry,
-				    enum reg_6g_ap_type *pwr_type_6g,
-				    bool *ctry_code_match,
-				    enum reg_6g_ap_type ap_pwr_type);
+wlan_reg_get_best_6g_power_type(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_pdev *pdev,
+				enum reg_6g_ap_type *pwr_type_6g,
+				enum reg_6g_ap_type ap_pwr_type,
+				uint32_t chan_freq);
 #endif
 
 #ifdef CONFIG_CHAN_FREQ_API
@@ -1715,6 +1745,7 @@ static inline
 QDF_STATUS wlan_reg_extract_puncture_by_bw(enum phy_ch_width ori_bw,
 					   uint16_t ori_puncture_bitmap,
 					   qdf_freq_t freq,
+					   qdf_freq_t cen320_freq,
 					   enum phy_ch_width new_bw,
 					   uint16_t *new_puncture_bitmap)
 {
@@ -1752,7 +1783,7 @@ uint16_t wlan_reg_find_nearest_puncture_pattern(enum phy_ch_width bw,
 
 #ifdef CONFIG_REG_6G_PWRMODE
 /**
- * wlan_reg_set_channel_params_for_pwrmode() - Sets channel parameteres for
+ * wlan_reg_set_channel_params_for_pwrmode() - Sets channel parameters for
  * given bandwidth
  * @pdev: The physical dev to program country code or regdomain
  * @freq: channel center frequency.
@@ -2666,12 +2697,12 @@ wlan_reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
  *
  * Return: EIRP power
  */
-uint8_t wlan_reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
-			      qdf_freq_t cen320, uint16_t bw,
-			      enum reg_6g_ap_type ap_pwr_type,
-			      uint16_t in_punc_pattern,
-			      bool is_client_list_lookup_needed,
-			      enum reg_6g_client_type client_type);
+int8_t wlan_reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			     qdf_freq_t cen320, uint16_t bw,
+			     enum reg_6g_ap_type ap_pwr_type,
+			     uint16_t in_punc_pattern,
+			     bool is_client_list_lookup_needed,
+			     enum reg_6g_client_type client_type);
 #else
 static inline
 qdf_freq_t wlan_reg_get_thresh_priority_freq(struct wlan_objmgr_pdev *pdev)
@@ -2704,7 +2735,7 @@ static inline QDF_STATUS wlan_reg_eirp_2_psd(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_E_FAILURE;
 }
 
-static inline uint8_t
+static inline int8_t
 wlan_reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev,
 		      qdf_freq_t freq,
 		      qdf_freq_t cen320, uint16_t bw,
@@ -2861,4 +2892,51 @@ wlan_reg_display_super_chan_list(struct wlan_objmgr_pdev *pdev)
 uint8_t
 wlan_reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
 				      enum reg_6g_ap_type ap_pwr_type);
+
+/**
+ * wlan_reg_register_is_chan_connected_callback() - Register callback to check
+ *                                                  if channel is connected.
+ * @psoc: Pointer to global psoc structure.
+ * @cbk: Pointer to callback function.
+ *
+ * Return: None
+ */
+void
+wlan_reg_register_is_chan_connected_callback(struct wlan_objmgr_psoc *psoc,
+					     void *cbk);
+
+/**
+ * wlan_reg_unregister_is_chan_connected_callback() - Unregister callback to
+ * check if channel is connected.
+ * @psoc: Pointer to global psoc structure.
+ * @cbk: Pointer to callback function.
+ *
+ * Return: None
+ */
+void
+wlan_reg_unregister_is_chan_connected_callback(struct wlan_objmgr_psoc *psoc,
+					       void *cbk);
+
+/**
+ * wlan_reg_get_endchan_cen_from_bandstart() - Get the end channel frequency
+ * from the band start frequency.
+ * @band_start: Band start frequency in MHz
+ * @bw: Bandwidth in MHz
+ *
+ * Return: End frequency in MHz
+ */
+qdf_freq_t
+wlan_reg_get_endchan_cen_from_bandstart(qdf_freq_t band_start,
+					uint16_t bw);
+
+/**
+ * wlan_reg_get_opclass_from_map() - Get op class from map.
+ * @map: Pointer to reg_dmn_op_class_map_t.
+ * @is_global_op_table_needed: Whether to lookup global op class tbl.
+ *
+ * Return: QDF_STATUS_SUCCESS if success, else return QDF_STATUS_FAILURE.
+ */
+QDF_STATUS
+wlan_reg_get_opclass_from_map(const struct reg_dmn_op_class_map_t **map,
+			      bool is_global_op_table_needed);
 #endif

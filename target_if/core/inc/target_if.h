@@ -584,6 +584,14 @@ bool target_is_tgt_type_qcn6122(uint32_t target_type);
 bool target_is_tgt_type_qcn9160(uint32_t target_type);
 
 /**
+ * target_is_tgt_type_qcn6432() - Check if the target type is QCN6432 (Pebble)
+ * @target_type: target type to be checked.
+ *
+ * Return: true if the target_type is QCN6432, else false.
+ */
+bool target_is_tgt_type_qcn6432(uint32_t target_type);
+
+/**
  * target_is_tgt_type_qcn7605() - Check if the target type is QCN7605
  * @target_type: target type to be checked.
  *
@@ -608,6 +616,24 @@ static inline void target_psoc_set_wlan_init_status
 
 	psoc_info->info.wlan_init_status = wlan_init_status;
 }
+
+#ifdef QCA_MULTIPASS_SUPPORT
+/**
+ * target_is_multipass_sap() - Get multipass sap capabilities
+ * @psoc_info: pointer to structure target_psoc_info
+ *
+ * Return: True is FW support multipass SAP.
+ */
+static inline bool target_is_multipass_sap(struct target_psoc_info *psoc_info)
+{
+	return psoc_info->info.service_ext2_param.is_multipass_sap;
+}
+#else
+static inline bool target_is_multipass_sap(struct target_psoc_info *psoc_info)
+{
+	return false;
+}
+#endif
 
 /**
  * target_psoc_get_wlan_init_status() - get info wlan_init_status
@@ -2487,6 +2513,38 @@ static inline int32_t target_psoc_get_num_hw_modes
 	return tgt_hdl->info.service_ext_param.num_hw_modes;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline
+uint32_t target_psoc_get_num_max_mlo_link(struct target_psoc_info *tgt_hdl)
+{
+	if (!tgt_hdl)
+		return 0;
+
+	return tgt_hdl->info.service_ext2_param.num_max_mlo_link_per_ml_bss_supp;
+}
+
+static inline
+uint16_t target_if_res_cfg_get_num_max_mlo_link(struct target_psoc_info *tgt_hdl)
+{
+	if (!tgt_hdl)
+		return 0;
+
+	return tgt_hdl->info.wlan_res_cfg.num_max_mlo_link_per_ml_bss;
+}
+#else
+static inline
+uint32_t target_psoc_get_num_max_mlo_link(struct target_psoc_info *tgt_hdl)
+{
+	return 0;
+}
+
+static inline
+uint16_t target_if_res_cfg_get_num_max_mlo_link(struct target_psoc_info *tgt_hdl)
+{
+	return 0;
+}
+#endif
+
 #ifdef WLAN_SUPPORT_TWT
 #ifdef WLAN_TWT_AP_PDEV_COUNT_NUM_PHY
 static inline void target_if_set_twt_ap_pdev_count
@@ -2821,6 +2879,22 @@ static inline uint32_t target_psoc_get_target_cap_flags
 	return psoc_info->info.service_ext2_param.target_cap_flags;
 }
 
+/**
+ * target_psoc_get_target_dp_peer_meta_data_ver() - Get DP RX peer metadata
+ *                                                  version reported by target
+ * @psoc_info:  pointer to structure target_psoc_info
+ *
+ * Return: value of DP RX peer metadata version
+ */
+static inline uint8_t target_psoc_get_target_dp_peer_meta_data_ver(
+				struct target_psoc_info *psoc_info)
+{
+	if (!psoc_info)
+		return 0;
+
+	return psoc_info->info.service_ext2_param.dp_peer_meta_data_ver;
+}
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 #define PDEV_INVALID_HW_LINK_ID 0xFFFF
 
@@ -2869,14 +2943,14 @@ QDF_STATUS target_if_mlo_ready(struct wlan_objmgr_pdev **pdev,
 
 /**
  * target_if_mlo_teardown_req() - API to trigger MLO teardown sequence
- * @pdev: Array of pointers to pdev object that are part of ML group
- * @num_pdevs: Number of pdevs in above array
+ * @pdev: Pointer to pdev object
  * @reason: Reason for triggering teardown
+ * @reset: UMAC reset for mode1 SSR
  *
  * Return: QDF_STATUS codes
  */
-QDF_STATUS target_if_mlo_teardown_req(struct wlan_objmgr_pdev **pdev,
-				      uint8_t num_pdevs, uint32_t reason);
+QDF_STATUS target_if_mlo_teardown_req(struct wlan_objmgr_pdev *pdev,
+				      uint32_t reason, bool reset);
 #endif /*WLAN_FEATURE_11BE_MLO && WLAN_MLO_MULTI_CHIP*/
 
 /**
@@ -2903,7 +2977,8 @@ static inline void target_if_set_reo_shared_qref_feature(struct wlan_objmgr_psoc
 	}
 
 	if (target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCN9224 ||
-	    target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCA5332)
+	    target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCA5332 ||
+	    target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCN6432)
 		info->wlan_res_cfg.reo_qdesc_shared_addr_table_enabled = true;
 	else
 		info->wlan_res_cfg.reo_qdesc_shared_addr_table_enabled = false;
@@ -2918,4 +2993,40 @@ static inline void target_if_set_reo_shared_qref_feature(struct wlan_objmgr_psoc
 }
 #endif
 
+/**
+ * target_if_wmi_chan_width_to_phy_ch_width() - convert channel width from
+ * wmi_host_channel_width to phy_ch_width
+ *
+ * @ch_width: wmi_host_channel_width
+ *
+ * return: phy_ch_width
+ */
+enum phy_ch_width
+target_if_wmi_chan_width_to_phy_ch_width(wmi_host_channel_width ch_width);
+
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static inline void target_if_set_num_max_mlo_link(struct wlan_objmgr_psoc *psoc,
+						  struct tgt_info *info)
+{
+	struct target_psoc_info *tgt_hdl;
+	uint16_t value;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl)
+		return;
+
+	if (!target_psoc_get_num_max_mlo_link(tgt_hdl))
+		value = WLAN_MAX_ML_DEFAULT_LINK;
+	else
+		value = QDF_MIN(target_psoc_get_num_max_mlo_link(tgt_hdl),
+				info->wlan_res_cfg.num_max_mlo_link_per_ml_bss);
+
+	info->wlan_res_cfg.num_max_mlo_link_per_ml_bss = value;
+}
+#else
+static inline void target_if_set_num_max_mlo_link(struct wlan_objmgr_psoc *psoc,
+						  struct tgt_info *info)
+{
+}
+#endif
 #endif

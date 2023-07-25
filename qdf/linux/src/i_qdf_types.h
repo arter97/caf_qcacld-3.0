@@ -142,6 +142,9 @@ typedef unsigned long __sgtable_t;
  */
 #define __QDF_MAX_SCATTER        1
 #define __QDF_NSEC_PER_MSEC NSEC_PER_MSEC
+#define __QDF_NSEC_PER_USEC NSEC_PER_USEC
+#define __QDF_USEC_PER_MSEC USEC_PER_MSEC
+#define __QDF_NSEC_PER_SEC NSEC_PER_SEC
 
 #if defined(__LITTLE_ENDIAN_BITFIELD)
 #define QDF_LITTLE_ENDIAN_MACHINE

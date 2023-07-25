@@ -225,7 +225,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_vdev_obj_create(
 
 	/* peer count to 0 */
 	vdev->vdev_objmgr.wlan_peer_count = 0;
-	wlan_objmgr_vdev_set_ml_peer_count(vdev, 0);
+	wlan_objmgr_vdev_init_ml_peer_count(vdev);
 	qdf_atomic_init(&vdev->vdev_objmgr.ref_cnt);
 	vdev->vdev_objmgr.print_cnt = 0;
 	wlan_objmgr_vdev_get_ref(vdev, WLAN_OBJMGR_ID);
@@ -236,6 +236,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_vdev_obj_create(
 		vdev->vdev_objmgr.max_peer_count =
 				wlan_pdev_get_max_peer_count(pdev);
 
+	wlan_vdev_init_skip_pumac_cnt(vdev);
 	if (params->legacy_osif)
 		vdev->vdev_nif.osdev->legacy_osif_priv = params->legacy_osif;
 
@@ -1422,6 +1423,16 @@ void wlan_objmgr_vdev_peer_freed_notify(struct wlan_objmgr_vdev *vdev)
 	}
 }
 
+QDF_STATUS
+wlan_vdev_get_bss_peer_mac_for_pmksa(struct wlan_objmgr_vdev *vdev,
+				     struct qdf_mac_addr *bss_peer_mac)
+{
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return wlan_vdev_get_bss_peer_mld_mac(vdev, bss_peer_mac);
+
+	return wlan_vdev_get_bss_peer_mac(vdev, bss_peer_mac);
+}
+
 QDF_STATUS wlan_vdev_get_bss_peer_mac(struct wlan_objmgr_vdev *vdev,
 				      struct qdf_mac_addr *bss_peer_mac)
 {
@@ -1518,6 +1529,47 @@ bool wlan_vdev_mlme_is_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 
 qdf_export_symbol(wlan_vdev_mlme_is_mlo_vdev);
 
+void wlan_vdev_mlme_set_epcs_flag(struct wlan_objmgr_vdev *vdev, bool flag)
+{
+	if (!vdev) {
+		obj_mgr_err("vdev is NULL");
+		return;
+	}
+
+	vdev->vdev_mlme.epcs_enable = flag;
+}
+
+bool wlan_vdev_mlme_get_epcs_flag(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev) {
+		obj_mgr_err("vdev is NULL");
+		return false;
+	}
+
+	return vdev->vdev_mlme.epcs_enable;
+}
+
+void wlan_vdev_mlme_set_user_dis_eht_flag(struct wlan_objmgr_vdev *vdev,
+					  bool flag)
+{
+	if (!vdev) {
+		obj_mgr_err("vdev is NULL");
+		return;
+	}
+
+	vdev->vdev_mlme.user_disable_eht = flag;
+}
+
+bool wlan_vdev_mlme_get_user_dis_eht_flag(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev) {
+		obj_mgr_err("vdev is NULL");
+		return false;
+	}
+
+	return vdev->vdev_mlme.user_disable_eht;
+}
+
 void wlan_vdev_mlme_set_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_pdev *pdev;
@@ -1544,6 +1596,7 @@ void wlan_vdev_mlme_set_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 	wlan_pdev_inc_mlo_vdev_count(pdev);
 
 	wlan_release_vdev_mlo_lock(vdev);
+	obj_mgr_debug("Set MLO flag: vdev_id: %d", wlan_vdev_get_id(vdev));
 }
 
 void wlan_vdev_mlme_clear_mlo_vdev(struct wlan_objmgr_vdev *vdev)
@@ -1572,6 +1625,7 @@ void wlan_vdev_mlme_clear_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 	wlan_pdev_dec_mlo_vdev_count(pdev);
 
 	wlan_release_vdev_mlo_lock(vdev);
+	obj_mgr_debug("Clear MLO flag: vdev_id: %d", wlan_vdev_get_id(vdev));
 }
 
 void wlan_vdev_mlme_set_mlo_link_vdev(struct wlan_objmgr_vdev *vdev)
@@ -1591,6 +1645,7 @@ void wlan_vdev_mlme_set_mlo_link_vdev(struct wlan_objmgr_vdev *vdev)
 	wlan_vdev_mlme_feat_ext2_cap_set(vdev, WLAN_VDEV_FEXT2_MLO_STA_LINK);
 
 	wlan_release_vdev_mlo_lock(vdev);
+	obj_mgr_debug("Set MLO link flag: vdev_id: %d", wlan_vdev_get_id(vdev));
 }
 
 void wlan_vdev_mlme_clear_mlo_link_vdev(struct wlan_objmgr_vdev *vdev)
@@ -1610,5 +1665,7 @@ void wlan_vdev_mlme_clear_mlo_link_vdev(struct wlan_objmgr_vdev *vdev)
 	wlan_vdev_mlme_feat_ext2_cap_clear(vdev, WLAN_VDEV_FEXT2_MLO_STA_LINK);
 
 	wlan_release_vdev_mlo_lock(vdev);
+	obj_mgr_debug("Clear MLO link flag: vdev_id: %d",
+		      wlan_vdev_get_id(vdev));
 }
 #endif /* WLAN_FEATURE_11BE_MLO */

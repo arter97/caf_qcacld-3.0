@@ -118,7 +118,7 @@
 #define CDP_MAX_TX_COMP_PPE_RING (CDP_MAX_TX_COMP_RINGS - 1)
 #define CDP_MAX_RX_WBM_RINGS 1 /* max rx wbm rings */
 
-#define CDP_MAX_TX_TQM_STATUS 9  /* max tx tqm completion status */
+#define CDP_MAX_TX_TQM_STATUS 15  /* max tx tqm completion status */
 #define CDP_MAX_TX_HTT_STATUS 7  /* max tx htt completion status */
 
 #define CDP_DMA_CODE_MAX 14 /* max rxdma error */
@@ -190,7 +190,11 @@
 #define CDP_SNR_UPDATE_AVG(x, y) x = CDP_SNR_AVG((x), CDP_SNR_IN((y)))
 
 /*Max SU EVM count */
+#ifdef QCA_MONITOR_2_0_SUPPORT
+#define DP_RX_MAX_SU_EVM_COUNT 256
+#else
 #define DP_RX_MAX_SU_EVM_COUNT 32
+#endif
 
 #define WDI_EVENT_BASE 0x100
 
@@ -1245,7 +1249,7 @@ struct cdp_delay_tid_stats {
  * @bytes: total no of bytes
  */
 struct cdp_pkt_info {
-	uint32_t num;
+	uint64_t num;
 	uint64_t bytes;
 };
 
@@ -1549,6 +1553,7 @@ struct protocol_trace_count {
  * @wme_ac_type_bytes: Wireless Multimedia Type Bytes Count
  * @tx_ucast_total: Total tx unicast count
  * @tx_ucast_success: Total tx unicast success count
+* @fragment_count: Fragment packet count
  */
 struct cdp_tx_stats {
 	struct cdp_pkt_info comp_pkt;
@@ -1674,12 +1679,14 @@ struct cdp_tx_stats {
 	uint64_t wme_ac_type_bytes[WME_AC_MAX];
 	struct cdp_pkt_info tx_ucast_total;
 	struct cdp_pkt_info tx_ucast_success;
+	uint32_t fragment_count;
 };
 
 /**
  * struct cdp_rx_stats - rx Level Stats
  * @to_stack: Total packets sent up the stack
  * @rcvd_reo:  Packets received on the reo ring
+ * @rcvd: Total packets received
  * @rx_lmac: Packets received on which lmac
  * @unicast: Total unicast packets
  * @multicast: Total multicast packets
@@ -1767,10 +1774,13 @@ struct cdp_tx_stats {
  * @inval_link_id_pkt_cnt: Counter to capture Invalid Link Id
  * @wme_ac_type_bytes: Wireless Multimedia type Byte Count
  * @rx_total: Total rx count
+ * @duplicate_count: Duplicate packets count
+ * @fragment_count: Fragment packet count
  */
 struct cdp_rx_stats {
 	struct cdp_pkt_info to_stack;
 	struct cdp_pkt_info rcvd_reo[CDP_MAX_RX_RINGS];
+	struct cdp_pkt_info rcvd;
 	struct cdp_pkt_info rx_lmac[CDP_MAX_LMACS];
 	struct cdp_pkt_info unicast;
 	struct cdp_pkt_info multicast;
@@ -1864,6 +1874,8 @@ struct cdp_rx_stats {
 #ifdef IPA_OFFLOAD
 	struct cdp_pkt_info rx_total;
 #endif
+	uint32_t duplicate_count;
+	uint32_t fragment_count;
 };
 
 /**
@@ -2075,10 +2087,12 @@ struct cdp_calibr_stats_intf {
 
 /**
  * struct cdp_peer_stats - peer stats structure
+ * @mac_addr: MAC address
  * @tx: cdp tx stats
  * @rx: cdp rx stats
  */
 struct cdp_peer_stats {
+	struct qdf_mac_addr mac_addr;
 	struct cdp_tx_stats tx;
 	struct cdp_rx_stats rx;
 };
@@ -3166,6 +3180,7 @@ struct cdp_pdev_deter_stats {
  * @peer_unauth_rx_pkt_drop: stats counter for drops due to unauthorized peer
  * @telemetry_stats: pdev telemetry stats
  * @deter_stats:
+ * @invalid_msdu_cnt: Invalid MSDU count received counter
  */
 struct cdp_pdev_stats {
 	struct {
@@ -3263,6 +3278,7 @@ struct cdp_pdev_stats {
 	struct cdp_pdev_telemetry_stats telemetry_stats;
 	struct cdp_pdev_deter_stats deter_stats;
 #endif
+	uint32_t invalid_msdu_cnt;
 };
 
 /**

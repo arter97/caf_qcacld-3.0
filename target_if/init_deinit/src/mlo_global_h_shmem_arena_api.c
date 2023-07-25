@@ -143,6 +143,8 @@ void global_shmem_register_target_recovery_ops(
 
 	shmem_local_ops->get_crash_reason_address =
 		mlo_glb_h_shmem_arena_get_crash_reason_address;
+	shmem_local_ops->get_recovery_mode_address =
+		mlo_glb_h_shmem_arena_get_recovery_mode_address;
 	shmem_local_ops->get_no_of_chips_from_crash_info =
 		mlo_glb_h_shmem_arena_get_no_of_chips_from_crash_info;
 }

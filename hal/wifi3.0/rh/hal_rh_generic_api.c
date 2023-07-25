@@ -806,6 +806,11 @@ hal_rx_tlv_get_is_decrypted_rh(uint8_t *buf)
 	return is_decrypt;
 }
 
+static inline uint8_t hal_rx_get_phy_ppdu_id_size_rh(void)
+{
+	return sizeof(uint32_t);
+}
+
 /**
  * hal_hw_txrx_default_ops_attach_rh() - Attach the default hal ops for
  *		Rh arch chipsets.
@@ -905,4 +910,6 @@ void hal_hw_txrx_default_ops_attach_rh(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_set_reo_ent_desc_reo_dest_ind =
 				hal_set_reo_ent_desc_reo_dest_ind_rh;
 	hal_soc->ops->hal_get_idle_link_bm_id = hal_get_idle_link_bm_id_rh;
+	hal_soc->ops->hal_rx_get_phy_ppdu_id_size =
+					hal_rx_get_phy_ppdu_id_size_rh;
 }

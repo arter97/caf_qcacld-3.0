@@ -49,8 +49,7 @@ qdf_declare_param(qdf_log_flush_timer_period, uint);
 #include "qdf_mc_timer.h"
 #include <host_diag_core_log.h>
 
-#if defined(WLAN_FEATURE_CONNECTIVITY_LOGGING) || \
-	defined(CONNECTIVITY_DIAG_EVENT)
+#ifdef CONNECTIVITY_DIAG_EVENT
 #include <wlan_connectivity_logging.h>
 #include "i_host_diag_core_event.h"
 #endif
@@ -1722,14 +1721,19 @@ uint8_t qdf_eapol_get_key_type(uint8_t *data, enum qdf_proto_subtype subtype)
  * @type: Protocol type
  * @subtype: Protocol subtype
  * @dir: Rx or Tx
+ * @op_mode: Vdev Operation mode
  *
  * Return: true or false
  */
 static inline
 bool qdf_skip_wlan_connectivity_log(enum qdf_proto_type type,
 				    enum qdf_proto_subtype subtype,
-				    enum qdf_proto_dir dir)
+				    enum qdf_proto_dir dir,
+				    enum QDF_OPMODE op_mode)
 {
+	if (op_mode != QDF_STA_MODE)
+		return true;
+
 	if (dir == QDF_RX && type == QDF_PROTO_TYPE_DHCP &&
 	    (subtype == QDF_PROTO_DHCP_DISCOVER ||
 	     subtype == QDF_PROTO_DHCP_REQUEST))
@@ -1744,6 +1748,7 @@ bool qdf_skip_wlan_connectivity_log(enum qdf_proto_type type,
  * @subtype: Protocol subtype
  * @dir: Rx or Tx
  * @qdf_tx_status: Tx completion status
+ * @op_mode: Vdev Operation mode
  * @vdev_id: DP vdev ID
  * @data: skb data pointer
  *
@@ -1754,13 +1759,14 @@ void qdf_fill_wlan_connectivity_log(enum qdf_proto_type type,
 				    enum qdf_proto_subtype subtype,
 				    enum qdf_proto_dir dir,
 				    enum qdf_dp_tx_rx_status qdf_tx_status,
+				    enum QDF_OPMODE op_mode,
 				    uint8_t vdev_id, uint8_t *data)
 {
 	uint8_t pkt_type;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
 
-	if (qdf_skip_wlan_connectivity_log(type, subtype, dir))
+	if (qdf_skip_wlan_connectivity_log(type, subtype, dir, op_mode))
 		return;
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
@@ -1807,152 +1813,13 @@ void qdf_fill_wlan_connectivity_log(enum qdf_proto_type type,
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_CONN_DP);
 }
 
-#elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
-/**
- * qdf_subtype_to_wlan_main_tag() - Convert qdf subtype to wlan main tag
- * @subtype: EAPoL key subtype
- *
- * Return: Wlan main tag subtype
- */
-static int qdf_subtype_to_wlan_main_tag(enum qdf_proto_subtype subtype)
-{
-	switch (subtype) {
-	case QDF_PROTO_DHCP_DISCOVER:
-		return WLAN_DHCP_DISCOVER;
-	case QDF_PROTO_DHCP_REQUEST:
-		return WLAN_DHCP_REQUEST;
-	case QDF_PROTO_DHCP_OFFER:
-		return WLAN_DHCP_OFFER;
-	case QDF_PROTO_DHCP_ACK:
-		return WLAN_DHCP_ACK;
-	case QDF_PROTO_DHCP_NACK:
-		return WLAN_DHCP_NACK;
-	case QDF_PROTO_EAPOL_M1:
-		return WLAN_EAPOL_M1;
-	case QDF_PROTO_EAPOL_M2:
-		return WLAN_EAPOL_M2;
-	case QDF_PROTO_EAPOL_M3:
-		return WLAN_EAPOL_M3;
-	case QDF_PROTO_EAPOL_M4:
-		return WLAN_EAPOL_M4;
-	default:
-		return WLAN_TAG_MAX;
-	}
-}
-
-/**
- * qdf_get_wlan_eap_code() - Get EAP code
- * @data: skb data pointer
- *
- * Return: EAP code value
- */
-static int qdf_get_wlan_eap_code(uint8_t *data)
-{
-	uint8_t code = *(data + EAP_CODE_OFFSET);
-
-	switch (code) {
-	case QDF_EAP_REQUEST:
-		return WLAN_EAP_REQUEST;
-	case QDF_EAP_RESPONSE:
-		return WLAN_EAP_RESPONSE;
-	case QDF_EAP_SUCCESS:
-		return WLAN_EAP_SUCCESS;
-	case QDF_EAP_FAILURE:
-		return WLAN_EAP_FAILURE;
-	default:
-		return WLAN_TAG_MAX;
-	}
-}
-
-/**
- * qdf_eapol_get_key_type() - Get EAPOL key type
- * @data: skb data pointer
- * @subtype: EAPoL key subtype
- *
- * Return: EAPOL key type
- */
-static
-uint8_t qdf_eapol_get_key_type(uint8_t *data, enum qdf_proto_subtype subtype)
-{
-	uint16_t key_info = *(uint16_t *)(data + EAPOL_KEY_INFO_OFFSET);
-
-	/* If key type is PTK, key type will be set in EAPOL Key info */
-	if (key_info & EAPOL_KEY_TYPE_MASK)
-		return qdf_subtype_to_wlan_main_tag(subtype);
-	else if (key_info & EAPOL_KEY_ENCRYPTED_MASK)
-		return WLAN_GTK_M1;
-	else
-		return WLAN_GTK_M2;
-}
-
-/**
- * qdf_skip_wlan_connectivity_log() - Check if connectivity log need to skip
- * @type: Protocol type
- * @subtype: Protocol subtype
- * @dir: Rx or Tx
- *
- * Return: true or false
- */
-static inline
-bool qdf_skip_wlan_connectivity_log(enum qdf_proto_type type,
-				    enum qdf_proto_subtype subtype,
-				    enum qdf_proto_dir dir)
-{
-	if ((dir == QDF_RX) && (type == QDF_PROTO_TYPE_DHCP) &&
-	    ((subtype == QDF_PROTO_DHCP_DISCOVER) ||
-	     (subtype == QDF_PROTO_DHCP_REQUEST)))
-		return true;
-	return false;
-}
-
-static
-void qdf_fill_wlan_connectivity_log(enum qdf_proto_type type,
-				    enum qdf_proto_subtype subtype,
-				    enum qdf_proto_dir dir,
-				    enum qdf_dp_tx_rx_status qdf_tx_status,
-				    uint8_t vdev_id, uint8_t *data)
-{
-	struct wlan_log_record log_buf = {0};
-	uint8_t pkt_type;
-
-	if (qdf_skip_wlan_connectivity_log(type, subtype, dir))
-		return;
-
-	log_buf.timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
-	log_buf.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
-	log_buf.vdev_id = vdev_id;
-	if (type == QDF_PROTO_TYPE_DHCP) {
-		log_buf.log_subtype = qdf_subtype_to_wlan_main_tag(subtype);
-	} else if (type == QDF_PROTO_TYPE_EAPOL) {
-		pkt_type = *(data + EAPOL_PACKET_TYPE_OFFSET);
-		if (pkt_type == EAPOL_PACKET_TYPE_EAP) {
-			log_buf.log_subtype = qdf_get_wlan_eap_code(data);
-			log_buf.pkt_info.eap_type = *(data + EAP_TYPE_OFFSET);
-			log_buf.pkt_info.eap_len =
-			   qdf_ntohs(*(uint16_t *)(data + EAP_LENGTH_OFFSET));
-		} else if (pkt_type == EAPOL_PACKET_TYPE_KEY) {
-			log_buf.log_subtype = qdf_eapol_get_key_type(data,
-								     subtype);
-		} else {
-			return;
-		}
-	} else {
-		return;
-	}
-
-	/*Tx completion status needs to be logged*/
-	if (dir == QDF_TX)
-		log_buf.pkt_info.tx_status = qdf_tx_status;
-
-	wlan_connectivity_log_enqueue(&log_buf);
-}
-
 #else
 static inline
 void qdf_fill_wlan_connectivity_log(enum qdf_proto_type type,
 				    enum qdf_proto_subtype subtype,
 				    enum qdf_proto_dir dir,
 				    enum qdf_dp_tx_rx_status qdf_tx_status,
+					enum QDF_OPMODE op_mode,
 				    uint8_t vdev_id, uint8_t *data)
 {
 }
@@ -1964,11 +1831,13 @@ void qdf_fill_wlan_connectivity_log(enum qdf_proto_type type,
  * @skb: skb pointer
  * @dir: direction
  * @pdev_id: ID of the pdev
+ * @op_mode: Vdev Operation mode
  *
  * Return: true/false
  */
 static bool qdf_log_eapol_pkt(uint8_t vdev_id, struct sk_buff *skb,
-			      enum qdf_proto_dir dir, uint8_t pdev_id)
+			      enum qdf_proto_dir dir, uint8_t pdev_id,
+				  enum QDF_OPMODE op_mode)
 {
 	enum qdf_proto_subtype subtype;
 	uint32_t dp_eap_trace;
@@ -1995,7 +1864,8 @@ static bool qdf_log_eapol_pkt(uint8_t vdev_id, struct sk_buff *skb,
 					  QDF_TRACE_DEFAULT_MSDU_ID,
 					  QDF_TX_RX_STATUS_INVALID);
 		qdf_fill_wlan_connectivity_log(QDF_PROTO_TYPE_EAPOL, subtype,
-					       QDF_RX, 0, vdev_id, skb->data);
+					       QDF_RX, 0, op_mode,
+					       vdev_id, skb->data);
 	}
 
 	if (dp_eap_trace) {
@@ -2042,11 +1912,13 @@ static bool qdf_log_eapol_pkt(uint8_t vdev_id, struct sk_buff *skb,
  * @skb: skb pointer
  * @dir: direction
  * @pdev_id: ID of the pdev
+ * @op_mode: Vdev Operation mode
  *
  * Return: true/false
  */
 static bool qdf_log_dhcp_pkt(uint8_t vdev_id, struct sk_buff *skb,
-			     enum qdf_proto_dir dir, uint8_t pdev_id)
+			     enum qdf_proto_dir dir, uint8_t pdev_id,
+				 enum QDF_OPMODE op_mode)
 {
 	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
 	uint32_t dp_dhcp_trace;
@@ -2073,7 +1945,7 @@ static bool qdf_log_dhcp_pkt(uint8_t vdev_id, struct sk_buff *skb,
 					  QDF_TRACE_DEFAULT_MSDU_ID,
 					  QDF_TX_RX_STATUS_INVALID);
 		qdf_fill_wlan_connectivity_log(QDF_PROTO_TYPE_DHCP, subtype,
-					       QDF_RX, 0, vdev_id, 0);
+					       QDF_RX, 0, op_mode, vdev_id, 0);
 	}
 
 	if (dp_dhcp_trace) {
@@ -2165,15 +2037,16 @@ static bool qdf_log_arp_pkt(uint8_t vdev_id, struct sk_buff *skb,
 
 
 bool qdf_dp_trace_log_pkt(uint8_t vdev_id, struct sk_buff *skb,
-			  enum qdf_proto_dir dir, uint8_t pdev_id)
+			  enum qdf_proto_dir dir, uint8_t pdev_id,
+			  enum QDF_OPMODE op_mode)
 {
 	if (!qdf_dp_get_proto_bitmap() && !qdf_dp_get_proto_event_bitmap())
 		return false;
 	if (qdf_log_arp_pkt(vdev_id, skb, dir, pdev_id))
 		return true;
-	if (qdf_log_dhcp_pkt(vdev_id, skb, dir, pdev_id))
+	if (qdf_log_dhcp_pkt(vdev_id, skb, dir, pdev_id, op_mode))
 		return true;
-	if (qdf_log_eapol_pkt(vdev_id, skb, dir, pdev_id))
+	if (qdf_log_eapol_pkt(vdev_id, skb, dir, pdev_id, op_mode))
 		return true;
 	if (qdf_log_icmp_pkt(vdev_id, skb, dir, pdev_id))
 		return true;
@@ -2560,7 +2433,8 @@ qdf_export_symbol(qdf_dp_get_status_from_a_status);
 void qdf_dp_trace_ptr(qdf_nbuf_t nbuf, enum QDF_DP_TRACE_ID code,
 		uint8_t pdev_id, uint8_t *data, uint8_t size,
 		uint16_t msdu_id, uint16_t buf_arg_status,
-		enum qdf_dp_tx_rx_status qdf_tx_status)
+		enum qdf_dp_tx_rx_status qdf_tx_status,
+		enum QDF_OPMODE op_mode)
 {
 	struct qdf_dp_trace_ptr_buf buf;
 	int buf_size = sizeof(struct qdf_dp_trace_ptr_buf);
@@ -2577,7 +2451,7 @@ void qdf_dp_trace_ptr(qdf_nbuf_t nbuf, enum QDF_DP_TRACE_ID code,
 					 pkt_type, subtype,
 					 QDF_TX, msdu_id, qdf_tx_status);
 		qdf_fill_wlan_connectivity_log(pkt_type, subtype,
-					       QDF_TX, qdf_tx_status,
+					       QDF_TX, qdf_tx_status, op_mode,
 					       QDF_NBUF_CB_TX_VDEV_CTX(nbuf),
 					       nbuf->data);
 	}
@@ -3428,6 +3302,11 @@ struct category_name_info g_qdf_category_name[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_CDP] =  {"CDP"},
 	[QDF_MODULE_ID_QMI] = {"QMI"},
 	[QDF_MODULE_ID_SOUNDING] = {"SOUNDING"},
+	[QDF_MODULE_ID_SAWF] = {"SAWF"},
+	[QDF_MODULE_ID_EPCS] = {"EPCS"},
+	[QDF_MODULE_ID_LL_SAP] = {"LL_SAP"},
+	[QDF_MODULE_ID_COHOSTED_BSS] = {"COHOSTED_BSS"},
+	[QDF_MODULE_ID_TELEMETRY_AGENT] = {"TELEMETRY_AGENT"},
 	[QDF_MODULE_ID_ANY] = {"ANY"},
 };
 qdf_export_symbol(g_qdf_category_name);
@@ -4000,6 +3879,11 @@ static void set_default_trace_levels(struct category_info *cinfo)
 		[QDF_MODULE_ID_TARGET] = QDF_TRACE_LEVEL_NONE,
 		[QDF_MODULE_ID_QMI] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_SOUNDING] = QDF_TRACE_LEVEL_ERROR,
+		[QDF_MODULE_ID_SAWF] = QDF_TRACE_LEVEL_INFO,
+		[QDF_MODULE_ID_EPCS] = QDF_TRACE_LEVEL_INFO,
+		[QDF_MODULE_ID_LL_SAP] = QDF_TRACE_LEVEL_NONE,
+		[QDF_MODULE_ID_COHOSTED_BSS] = QDF_TRACE_LEVEL_INFO,
+		[QDF_MODULE_ID_TELEMETRY_AGENT] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_ANY] = QDF_TRACE_LEVEL_INFO,
 	};
 
@@ -4177,10 +4061,9 @@ void qdf_log_dump_at_kernel_level(bool enable)
 
 qdf_export_symbol(qdf_log_dump_at_kernel_level);
 
-bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
+QDF_TRACE_LEVEL qdf_print_get_category_verbose(unsigned int idx,
+					       QDF_MODULE_ID category)
 {
-	QDF_TRACE_LEVEL verbose_mask;
-
 	/* Check if index passed is valid */
 	if (idx < 0 || idx >= MAX_PRINT_CONFIG_SUPPORTED) {
 		pr_info("%s: Invalid index - %d\n", __func__, idx);
@@ -4199,14 +4082,23 @@ bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
 		return false;
 	}
 
-	verbose_mask =
-		print_ctrl_obj[idx].cat_info[category].category_verbose_mask;
+	return print_ctrl_obj[idx].cat_info[category].category_verbose_mask;
+}
+
+qdf_export_symbol(qdf_print_get_category_verbose);
+
+bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
+{
+	QDF_TRACE_LEVEL verbose_mask;
+
+	verbose_mask = qdf_print_get_category_verbose(idx, category);
 
 	if (verbose_mask == QDF_TRACE_LEVEL_NONE)
 		return false;
 	else
 		return true;
 }
+
 qdf_export_symbol(qdf_print_is_category_enabled);
 
 bool qdf_print_is_verbose_enabled(unsigned int idx, QDF_MODULE_ID category,

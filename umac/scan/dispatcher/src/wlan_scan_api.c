@@ -408,8 +408,7 @@ QDF_STATUS wlan_scan_start(struct scan_start_request *req)
 
 	if (!req || !req->vdev) {
 		scm_err("req or vdev within req is NULL");
-		if (req)
-			scm_scan_free_scan_request_mem(req);
+		scm_scan_free_scan_request_mem(req);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
@@ -875,6 +874,14 @@ wlan_scan_get_entry_by_bssid(struct wlan_objmgr_pdev *pdev,
 			     struct qdf_mac_addr *bssid)
 {
 	return scm_scan_get_entry_by_bssid(pdev, bssid);
+}
+
+QDF_STATUS
+wlan_scan_get_mld_addr_by_link_addr(struct wlan_objmgr_pdev *pdev,
+				    struct qdf_mac_addr *link_addr,
+				    struct qdf_mac_addr *mld_mac_addr)
+{
+	return scm_get_mld_addr_by_link_addr(pdev, link_addr, mld_mac_addr);
 }
 
 QDF_STATUS

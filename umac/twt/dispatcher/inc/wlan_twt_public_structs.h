@@ -364,7 +364,7 @@ struct twt_ack_complete_event_param {
  * @peer_mac: MAC address of node
  * @event_type: Indicates TWT session type (SETUP/TEARDOWN/UPDATE)
  * @flow_id: TWT flow identifier established with TWT peer
- * @bcast:  If this is a broacast TWT session
+ * @bcast:  If this is a broadcast TWT session
  * @trig: If the TWT session is trigger enabled
  * @announ: If the flow type is announced/unannounced
  * @protection: If the TWT protection field is set

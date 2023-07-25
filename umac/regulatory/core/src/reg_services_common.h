@@ -193,6 +193,17 @@ struct afc_pow_evt_cb_handler {
 };
 
 /**
+ * struct afc_payload_reset_evt_cb_handler - Structure for afc payload reset
+ * event  handler call back function and argument
+ * @func: handler function pointer
+ * @arg: argument to handler function
+ */
+struct afc_payload_reset_evt_cb_handler {
+	afc_payload_reset_tx_evt_handler func;
+	void *arg;
+};
+
+/**
  * reg_init_freq_range() - Initialize a freq_range object
  * @left: The left frequency range
  * @right: The right frequency range
@@ -664,6 +675,16 @@ uint16_t reg_min_6ghz_chan_freq(void);
  * Return: Maximum 6GHz channel center frequency
  */
 uint16_t reg_max_6ghz_chan_freq(void);
+
+/**
+ * reg_is_6ghz_unii5_chan_freq() - Check if the given 6GHz channel frequency is
+ * uinii5 band frequency or not.
+ * @freq: Channel frequency
+ *
+ * Return: true if given 6GHz channel frequency is uinii5 band frequency
+ * frequency, else false
+ */
+bool reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq);
 #else
 static inline bool reg_is_6ghz_chan_freq(uint16_t freq)
 {
@@ -720,6 +741,12 @@ static inline uint16_t reg_max_6ghz_chan_freq(void)
 {
 	return 0;
 }
+
+static inline bool reg_is_6ghz_unii5_chan_freq(qdf_freq_t freq)
+{
+	return false;
+}
+
 #endif /* CONFIG_BAND_6GHZ */
 
 /**
@@ -1802,6 +1829,32 @@ reg_unregister_afc_power_event_callback(struct wlan_objmgr_pdev *pdev,
 					afc_power_tx_evt_handler cbf);
 
 /**
+ * reg_register_afc_payload_reset_event_callback() - Add AFC payload reset
+ * event received callback
+ * @pdev: Pointer to pdev
+ * @cbf: Pointer to callback function
+ * @arg: Pointer to opaque argument
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_register_afc_payload_reset_event_callback(
+		struct wlan_objmgr_pdev *pdev,
+		afc_payload_reset_tx_evt_handler cbf,
+		void *arg);
+
+/**
+ * reg_unregister_afc_payload_reset_event_callback() - Remove AFC payload
+ * reset event received callback
+ * @pdev: Pointer to pdev
+ * @cbf: Pointer to callback function
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_unregister_afc_payload_reset_event_callback(
+		struct wlan_objmgr_pdev *pdev,
+		afc_payload_reset_tx_evt_handler cbf);
+
+/**
  * reg_send_afc_power_event() - Send AFC power event to registered
  * recipient
  * @pdev: Pointer to pdev
@@ -1811,6 +1864,15 @@ reg_unregister_afc_power_event_callback(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS reg_send_afc_power_event(struct wlan_objmgr_pdev *pdev,
 				    struct reg_fw_afc_power_event *power_info);
+
+/**
+ * reg_send_afc_payload_reset_event() - Send AFC payload reset event to
+ * registered recipient
+ * @pdev: Pointer to pdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_send_afc_payload_reset_event(struct wlan_objmgr_pdev *pdev);
 
 /**
  * reg_get_afc_dev_deploy_type() - Get AFC device deployment type
@@ -1963,8 +2025,8 @@ bool reg_is_6g_psd_power(struct wlan_objmgr_pdev *pdev);
  */
 QDF_STATUS reg_get_6g_chan_ap_power(struct wlan_objmgr_pdev *pdev,
 				    qdf_freq_t chan_freq, bool *is_psd,
-				    uint16_t *tx_power,
-				    uint16_t *eirp_psd_power);
+				    int16_t *tx_power,
+				    int16_t *eirp_psd_power);
 
 /**
  * reg_get_client_power_for_connecting_ap() - Find the channel information when
@@ -2039,7 +2101,7 @@ QDF_STATUS reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 reg_get_6g_chan_psd_eirp_power(qdf_freq_t freq,
 			       struct regulatory_channel *mas_chan_list,
-			       uint16_t *reg_psd);
+			       int16_t *reg_psd);
 
 /**
  * reg_find_txpower_from_6g_list() - For a given frequency, get the max EIRP
@@ -2053,7 +2115,7 @@ reg_get_6g_chan_psd_eirp_power(qdf_freq_t freq,
 QDF_STATUS
 reg_find_txpower_from_6g_list(qdf_freq_t freq,
 			      struct regulatory_channel *chan_list,
-			      uint16_t *reg_eirp);
+			      int16_t *reg_eirp);
 #else
 static inline QDF_STATUS
 reg_set_cur_6g_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
@@ -2117,8 +2179,8 @@ bool reg_is_6g_psd_power(struct wlan_objmgr_pdev *pdev)
 static inline
 QDF_STATUS reg_get_6g_chan_ap_power(struct wlan_objmgr_pdev *pdev,
 				    qdf_freq_t chan_freq, bool *is_psd,
-				    uint16_t *tx_power,
-				    uint16_t *eirp_psd_power)
+				    int16_t *tx_power,
+				    int16_t *eirp_psd_power)
 {
 	*is_psd = false;
 	*eirp_psd_power = 0;
@@ -2162,7 +2224,7 @@ QDF_STATUS reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
 static inline QDF_STATUS
 reg_get_6g_chan_psd_eirp_power(qdf_freq_t freq,
 			       struct regulatory_channel *mas_chan_list,
-			       uint16_t *eirp_psd_power)
+			       int16_t *eirp_psd_power)
 {
 	*eirp_psd_power = 0;
 	return QDF_STATUS_E_NOSUPPORT;
@@ -2171,7 +2233,7 @@ reg_get_6g_chan_psd_eirp_power(qdf_freq_t freq,
 static inline QDF_STATUS
 reg_find_txpower_from_6g_list(qdf_freq_t freq,
 			      struct regulatory_channel *chan_list,
-			      uint16_t *reg_eirp)
+			      int16_t *reg_eirp)
 {
 	*reg_eirp = 0;
 	return QDF_STATUS_E_NOSUPPORT;
@@ -2665,12 +2727,12 @@ enum reg_6g_ap_type reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev,
  *
  * Return: EIRP power
  */
-uint8_t reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
-			 qdf_freq_t cen320,
-			 uint16_t bw, enum reg_6g_ap_type ap_pwr_type,
-			 uint16_t in_punc_pattern,
-			 bool is_client_list_lookup_needed,
-			 enum reg_6g_client_type client_type);
+int8_t reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			qdf_freq_t cen320,
+			uint16_t bw, enum reg_6g_ap_type ap_pwr_type,
+			uint16_t in_punc_pattern,
+			bool is_client_list_lookup_needed,
+			enum reg_6g_client_type client_type);
 #endif /* CONFIG_BAND_6GHZ */
 
 /**
@@ -3002,4 +3064,16 @@ reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS reg_process_r2p_table_update_response(struct wlan_objmgr_psoc *psoc,
 						 uint32_t pdev_id);
+
+/**
+ * reg_get_endchan_cen_from_bandstart() - Get the center frequency of the
+ * end channel given the bandstart frequency.
+ * @band_start: Frequency band start in MHz
+ * @bw: Bandwidth in MHz
+ *
+ * Return: End frequency in MHz
+ */
+qdf_freq_t
+reg_get_endchan_cen_from_bandstart(qdf_freq_t band_start,
+				   uint16_t bw);
 #endif

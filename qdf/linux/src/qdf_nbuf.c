@@ -555,6 +555,16 @@ skb_alloc:
 }
 #else
 
+#ifdef QCA_DP_NBUF_FAST_RECYCLE_CHECK
+struct sk_buff *__qdf_nbuf_alloc(qdf_device_t osdev, size_t size, int reserve,
+				 int align, int prio, const char *func,
+				 uint32_t line)
+{
+	return __qdf_nbuf_frag_alloc(osdev, size, reserve, align, prio, func,
+				     line);
+}
+
+#else
 struct sk_buff *__qdf_nbuf_alloc(qdf_device_t osdev, size_t size, int reserve,
 				 int align, int prio, const char *func,
 				 uint32_t line)
@@ -562,6 +572,81 @@ struct sk_buff *__qdf_nbuf_alloc(qdf_device_t osdev, size_t size, int reserve,
 	struct sk_buff *skb;
 	unsigned long offset;
 	int flags = GFP_KERNEL;
+
+	if (align)
+		size += (align - 1);
+
+	if (in_interrupt() || irqs_disabled() || in_atomic()) {
+		flags = GFP_ATOMIC;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+		/*
+		 * Observed that kcompactd burns out CPU to make order-3 page.
+		 *__netdev_alloc_skb has 4k page fallback option just in case of
+		 * failing high order page allocation so we don't need to be
+		 * hard. Make kcompactd rest in piece.
+		 */
+		flags = flags & ~__GFP_KSWAPD_RECLAIM;
+#endif
+	}
+
+	skb =  alloc_skb(size, flags);
+
+	if (skb)
+		goto skb_alloc;
+
+	skb = pld_nbuf_pre_alloc(size);
+
+	if (!skb) {
+		qdf_rl_nofl_err("NBUF alloc failed %zuB @ %s:%d",
+				size, func, line);
+		__qdf_nbuf_start_replenish_timer();
+		return NULL;
+	}
+
+	__qdf_nbuf_stop_replenish_timer();
+
+skb_alloc:
+	memset(skb->cb, 0x0, sizeof(skb->cb));
+	skb->dev = NULL;
+	/*
+	 * The default is for netbuf fragments to be interpreted
+	 * as wordstreams rather than bytestreams.
+	 */
+	QDF_NBUF_CB_TX_EXTRA_FRAG_WORDSTR_EFRAG(skb) = 1;
+	QDF_NBUF_CB_TX_EXTRA_FRAG_WORDSTR_NBUF(skb) = 1;
+
+	/*
+	 * XXX:how about we reserve first then align
+	 * Align & make sure that the tail & data are adjusted properly
+	 */
+
+	if (align) {
+		offset = ((unsigned long)skb->data) % align;
+		if (offset)
+			skb_reserve(skb, align - offset);
+	}
+
+	/*
+	 * NOTE:alloc doesn't take responsibility if reserve unaligns the data
+	 * pointer
+	 */
+	skb_reserve(skb, reserve);
+	qdf_nbuf_count_inc(skb);
+
+	return skb;
+}
+#endif
+
+#endif
+qdf_export_symbol(__qdf_nbuf_alloc);
+
+struct sk_buff *__qdf_nbuf_frag_alloc(qdf_device_t osdev, size_t size,
+				      int reserve, int align, int prio,
+				      const char *func, uint32_t line)
+{
+	struct sk_buff *skb;
+	unsigned long offset;
+	int flags = GFP_KERNEL & ~__GFP_DIRECT_RECLAIM;
 
 	if (align)
 		size += (align - 1);
@@ -591,13 +676,12 @@ struct sk_buff *__qdf_nbuf_alloc(qdf_device_t osdev, size_t size, int reserve,
 				size, func, line);
 		__qdf_nbuf_start_replenish_timer();
 		return NULL;
-	} else {
-		__qdf_nbuf_stop_replenish_timer();
 	}
+
+	__qdf_nbuf_stop_replenish_timer();
 
 skb_alloc:
 	memset(skb->cb, 0x0, sizeof(skb->cb));
-
 	/*
 	 * The default is for netbuf fragments to be interpreted
 	 * as wordstreams rather than bytestreams.
@@ -625,8 +709,8 @@ skb_alloc:
 
 	return skb;
 }
-#endif
-qdf_export_symbol(__qdf_nbuf_alloc);
+
+qdf_export_symbol(__qdf_nbuf_frag_alloc);
 
 __qdf_nbuf_t __qdf_nbuf_alloc_no_recycler(size_t size, int reserve, int align,
 					  const char *func, uint32_t line)
@@ -1133,6 +1217,7 @@ void qdf_nbuf_unmap_nbytes_single_paddr_debug(qdf_device_t osdev,
 					      const char *func, uint32_t line)
 {
 	qdf_nbuf_untrack_map(buf, func, line);
+	__qdf_record_nbuf_nbytes(__qdf_nbuf_get_end_offset(buf), dir, false);
 	__qdf_mem_unmap_nbytes_single(osdev, phy_addr, dir, nbytes);
 	qdf_net_buf_debug_update_unmap_node(buf, func, line);
 }
@@ -1760,16 +1845,34 @@ bool __qdf_nbuf_data_is_ipv4_dhcp_pkt(uint8_t *data)
 }
 qdf_export_symbol(__qdf_nbuf_data_is_ipv4_dhcp_pkt);
 
+/**
+ * qdf_is_eapol_type() - check if packet is EAPOL
+ * @type: Packet type
+ *
+ * This api is to check if frame is EAPOL packet type.
+ *
+ * Return: true if it is EAPOL frame
+ *         false otherwise.
+ */
+#ifdef BIG_ENDIAN_HOST
+static inline bool qdf_is_eapol_type(uint16_t type)
+{
+	return (type == QDF_NBUF_TRAC_EAPOL_ETH_TYPE);
+}
+#else
+static inline bool qdf_is_eapol_type(uint16_t type)
+{
+	return (type == QDF_SWAP_U16(QDF_NBUF_TRAC_EAPOL_ETH_TYPE));
+}
+#endif
+
 bool __qdf_nbuf_data_is_ipv4_eapol_pkt(uint8_t *data)
 {
 	uint16_t ether_type;
 
 	ether_type = __qdf_nbuf_get_ether_type(data);
 
-	if (ether_type == QDF_SWAP_U16(QDF_NBUF_TRAC_EAPOL_ETH_TYPE))
-		return true;
-	else
-		return false;
+	return qdf_is_eapol_type(ether_type);
 }
 qdf_export_symbol(__qdf_nbuf_data_is_ipv4_eapol_pkt);
 
@@ -2669,13 +2772,29 @@ bool qdf_nbuf_fast_xmit(qdf_nbuf_t nbuf)
 {
 	return nbuf->fast_xmit;
 }
+
+qdf_export_symbol(qdf_nbuf_fast_xmit);
+
+void qdf_nbuf_set_fast_xmit(qdf_nbuf_t nbuf, int value)
+{
+	nbuf->fast_xmit = value;
+}
+
+qdf_export_symbol(qdf_nbuf_set_fast_xmit);
 #else
 bool qdf_nbuf_fast_xmit(qdf_nbuf_t nbuf)
 {
 	return false;
 }
-#endif
+
 qdf_export_symbol(qdf_nbuf_fast_xmit);
+
+void qdf_nbuf_set_fast_xmit(qdf_nbuf_t nbuf, int value)
+{
+}
+
+qdf_export_symbol(qdf_nbuf_set_fast_xmit);
+#endif
 
 #ifdef NBUF_MEMORY_DEBUG
 
@@ -3359,6 +3478,33 @@ qdf_nbuf_t qdf_nbuf_alloc_debug(qdf_device_t osdev, qdf_size_t size,
 	return nbuf;
 }
 qdf_export_symbol(qdf_nbuf_alloc_debug);
+
+qdf_nbuf_t qdf_nbuf_frag_alloc_debug(qdf_device_t osdev, qdf_size_t size,
+				     int reserve, int align, int prio,
+				     const char *func, uint32_t line)
+{
+	qdf_nbuf_t nbuf;
+
+	if (is_initial_mem_debug_disabled)
+		return __qdf_nbuf_frag_alloc(osdev, size,
+					reserve, align,
+					prio, func, line);
+
+	nbuf = __qdf_nbuf_frag_alloc(osdev, size, reserve, align, prio,
+				     func, line);
+
+	/* Store SKB in internal QDF tracking table */
+	if (qdf_likely(nbuf)) {
+		qdf_net_buf_debug_add_node(nbuf, size, func, line);
+		qdf_nbuf_history_add(nbuf, func, line, QDF_NBUF_ALLOC);
+	} else {
+		qdf_nbuf_history_add(nbuf, func, line, QDF_NBUF_ALLOC_FAILURE);
+	}
+
+	return nbuf;
+}
+
+qdf_export_symbol(qdf_nbuf_frag_alloc_debug);
 
 qdf_nbuf_t qdf_nbuf_alloc_no_recycler_debug(size_t size, int reserve, int align,
 					    const char *func, uint32_t line)
@@ -5331,7 +5477,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 
 	/* update tx flags for pkt capture*/
 	if (rx_status->add_rtap_ext) {
-		rthdr->it_present |=
+		it_present_val |=
 			cpu_to_le32(1 << IEEE80211_RADIOTAP_TX_FLAGS);
 		rtap_len = qdf_nbuf_update_radiotap_tx_flags(rx_status,
 							     rtap_buf,

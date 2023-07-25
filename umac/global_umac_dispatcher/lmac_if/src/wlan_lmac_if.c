@@ -180,6 +180,20 @@ wlan_target_if_dcs_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 #endif /* DCS_INTERFERENCE_DETECTION */
 
 #ifdef WLAN_ATF_ENABLE
+#ifdef WLAN_ATF_INCREASED_STA
+static void
+wlan_lmac_if_atf_rx_ops_max_clients(struct wlan_lmac_if_atf_rx_ops *atf_rx_ops)
+{
+	atf_rx_ops->atf_set_fw_max_client_512_support =
+				tgt_atf_set_fw_cap_max_client_512_support;
+}
+#else
+static void
+wlan_lmac_if_atf_rx_ops_max_clients(struct wlan_lmac_if_atf_rx_ops *atf_rx_ops)
+{
+}
+#endif /* WLAN_ATF_INCREASED_STA */
+
 /**
  * wlan_lmac_if_atf_rx_ops_register() - Function to register ATF RX ops.
  * @rx_ops: Pointer to wlan_lmac_if_rx_ops
@@ -220,6 +234,7 @@ wlan_lmac_if_atf_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 	atf_rx_ops->atf_process_tx_ppdu_stats = tgt_atf_process_tx_ppdu_stats;
 	atf_rx_ops->atf_process_rx_ppdu_stats = tgt_atf_process_rx_ppdu_stats;
 	atf_rx_ops->atf_is_stats_enabled = tgt_atf_is_stats_enabled;
+	wlan_lmac_if_atf_rx_ops_max_clients(atf_rx_ops);
 }
 #else
 static void
@@ -978,7 +993,8 @@ wlan_lmac_if_mlo_mgr_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 		wlan_mlo_vdev_tid_to_link_map_event;
 	rx_ops->mlo_rx_ops.process_mlo_link_state_info_event =
 		wlan_handle_ml_link_state_info_event;
-
+	rx_ops->mlo_rx_ops.mlo_link_disable_request_handler =
+		wlan_mlo_link_disable_request_handler;
 }
 #else
 static void

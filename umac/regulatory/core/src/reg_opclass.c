@@ -37,6 +37,10 @@
 #include "reg_opclass.h"
 #include "reg_services_common.h"
 #include <wlan_objmgr_pdev_obj.h>
+#ifdef QCA_SUPPORT_DFS_CHAN_POSTNOL
+#include <dfs_postnol_ucfg.h>
+#include <wlan_reg_channel_api.h>
+#endif
 
 #ifdef HOST_OPCLASS
 static struct reg_dmn_supp_op_classes reg_dmn_curr_supp_opp_classes = { 0 };
@@ -874,7 +878,7 @@ QDF_STATUS reg_dmn_get_6g_opclasses_and_channels(struct wlan_objmgr_pdev *pdev,
 		op_class_tbl++;
 	}
 
-	/* Calculate total alloction size for the array */
+	/* Calculate total allocation size for the array */
 	total_alloc_size = 0;
 	for (i = 0; i < *num_opclasses; i++)
 		total_alloc_size += l_chansize_lst[i] * sizeof(uint8_t *);
@@ -1592,6 +1596,62 @@ static inline qdf_freq_t reg_get_nearest_primary_freq(uint16_t bw,
 	return pri_freq;
 }
 
+#if defined(QCA_DFS_BW_PUNCTURE) && defined(WLAN_FEATURE_11BE) && \
+	!defined(CONFIG_REG_CLIENT)
+/**
+ * reg_get_radar_puncture_bmap() - If DFS puncturing feature is enabled,
+ * puncture the NOL channels and retrieve the radar puncture bitmap.
+ * For non-puncturable bandwidths (bandwidths less than 80), puncturing is not
+ * applicable.
+ * @pdev: Pointer to struct wlan_objmgr_pdev
+ * @pri_freq: Primary frequency in MHz
+ * @ch_width: channel width
+ * @center_320: 320 MHz center frequency
+ */
+static uint16_t
+reg_get_radar_puncture_bmap(struct wlan_objmgr_pdev *pdev,
+			    qdf_freq_t pri_freq,
+			    enum phy_ch_width ch_width,
+			    qdf_freq_t center_320)
+{
+	const struct bonded_channel_freq *bonded_chan_ptr;
+	uint16_t chan_cfreq, radar_punc_bitmap = NO_SCHANS_PUNC;
+	uint8_t i = 0;
+	bool is_dfs_punc_en, is_5g_freq_and_punc_en;
+	bool is_chanwidth_puncturable = ch_width > CH_WIDTH_40MHZ ? true : false;
+
+	ucfg_dfs_get_dfs_puncture(pdev, &is_dfs_punc_en);
+	is_5g_freq_and_punc_en = reg_is_5ghz_ch_freq(pri_freq) && is_dfs_punc_en;
+
+	if (!(is_5g_freq_and_punc_en && is_chanwidth_puncturable))
+		return radar_punc_bitmap;
+
+	bonded_chan_ptr = reg_get_bonded_chan_entry(pri_freq, ch_width,
+						    center_320);
+	if (!bonded_chan_ptr)
+		return radar_punc_bitmap;
+
+	chan_cfreq = bonded_chan_ptr->start_freq;
+	while (chan_cfreq <= bonded_chan_ptr->end_freq) {
+		if (wlan_reg_is_nol_for_freq(pdev, chan_cfreq))
+			radar_punc_bitmap |=  1 << i;
+		i++;
+		chan_cfreq = chan_cfreq + BW_20_MHZ;
+	}
+
+	return radar_punc_bitmap;
+}
+#else
+static inline uint16_t
+reg_get_radar_puncture_bmap(struct wlan_objmgr_pdev *pdev,
+			    qdf_freq_t pri_freq,
+			    enum phy_ch_width ch_width,
+			    qdf_freq_t center_320)
+{
+	return NO_SCHANS_PUNC;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * reg_is_chan_supported()- Check if given channel is supported based on its
@@ -1613,11 +1673,22 @@ static bool reg_is_chan_supported(struct wlan_objmgr_pdev *pdev,
 	struct reg_channel_list chan_list = {0};
 	qdf_freq_t center_320;
 	struct ch_params ch_params = {0};
+	uint16_t radar_punc_bitmap;
 
 	center_320 = (ch_width == CH_WIDTH_320MHZ) ? cfi_freq : 0;
+
+	/* Determine if there are any NOL subchannels in the given freq/BW
+	 * combination and if so, calculate the dfs puncture pattern and then
+	 * invoke reg_fill_channel_list.
+	 */
+	radar_punc_bitmap = reg_get_radar_puncture_bmap(pdev, pri_freq,
+							ch_width,
+							center_320);
+	chan_list.chan_param[0].input_punc_bitmap = radar_punc_bitmap;
 	reg_fill_channel_list_for_pwrmode(pdev, pri_freq, 0,
-					  ch_width, center_320, &chan_list,
-					  in_6g_pwr_mode, true);
+					  ch_width, center_320,
+					  &chan_list, in_6g_pwr_mode,
+					  true);
 	ch_params = chan_list.chan_param[0];
 
 	if (ch_params.ch_width == ch_width)
@@ -2272,4 +2343,16 @@ QDF_STATUS reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_E_INVAL;
 }
 #endif /* #ifndef CONFIG_REG_CLIENT */
+
+QDF_STATUS reg_get_opclass_from_map(const struct reg_dmn_op_class_map_t **map,
+				    bool is_global_op_table_needed)
+{
+	if (is_global_op_table_needed)
+		*map = global_op_class;
+	else
+		reg_get_op_class_tbl_by_chan_map(map);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif

@@ -206,6 +206,7 @@
  * @QCN_ATTRIB_HE_240_MHZ_SUPP: HE 240 MHZ support
  * @QCN_ATTRIB_ECSA_SUPP: ECSA support
  * @QCN_ATTRIB_EDCA_PIFS_PARAM: EDCA PIFS param
+ * @QCN_ATTRIB_ECSA_TARGET_TSF_INFO: ECSA Target TSF information
  * @QCN_ATTRIB_MAX: Maximum attribute
  */
 enum qcn_attribute_id {
@@ -222,7 +223,8 @@ enum qcn_attribute_id {
 	QCN_ATTRIB_HE_240_MHZ_SUPP          = 0X0B,
 	QCN_ATTRIB_ECSA_SUPP                = 0X0C,
 	QCN_ATTRIB_EDCA_PIFS_PARAM          = 0X0D,
-	QCN_ATTRIB_MAX                      = 0x0E
+	QCN_ATTRIB_ECSA_TARGET_TSF_INFO     = 0x0E,
+	QCN_ATTRIB_MAX                      = 0x0F
 };
 
 /* Extender vendor specific IE */
@@ -312,8 +314,22 @@ enum qcn_attribute_id {
 #define WLAN_TPE_IE_MAX_LEN                      9
 
 #ifdef WLAN_FEATURE_11BE
-/* Bandwidth indication element IE minimum length */
-#define WLAN_BW_IND_IE_MIN_LEN              3
+/* Bandwidth indication element IE maximum length */
+#define WLAN_BW_IND_IE_MAX_LEN              9
+
+/* header length is id(1) + length(1)*/
+#define WLAN_IE_HDR_LEN                     2
+
+/* 20MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_20              0
+/* 40MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_40              1
+/* 80MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_80              2
+/* 160 MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_160             3
+/* 320 MHz Operating Channel width */
+#define IEEE80211_11BEOP_CHWIDTH_320             4
 #endif
 
 /* Max channel switch time IE length */
@@ -1010,6 +1026,28 @@ enum wlan_reason_code {
  * listen interval is too large.
  * @STATUS_INVALID_FT_ACTION_FRAME_COUNT: Invalid FT Action frame count.
  * @STATUS_INVALID_PMKID: Invalid pairwise master key identifier (PMKID).
+ * @STATUS_DENIED_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOC: Association
+ * denied because the requesting STA is affiliated with a non-AP MLD that is
+ * associated with the AP MLD.
+ * @STATUS_EPCS_DENIED_UNAUTHORIZED: EPCS priority access denied because the
+ * non-AP MLD is not authorized to use the service.
+ * @STATUS_EPCS_DENIED_OTHER_REASON: EPCS priority access denied due to a
+ * reason outside the scope of this standard.
+ * @STATUS_DENIED_TID_TO_LINK_MAPPING: Request denied because the requested
+ * TID-to-link mapping is unacceptable.
+ * @STATUS_PREFERRED_TID_TO_LINK_MAPPING_SUGGESTED: Preferred TID-to-link
+ * mapping suggested.
+ * @STATUS_DENIED_EHT_NOT_SUPPORTED: Association denied because the requesting
+ * STA does not support EHT features.
+ * @STATUS_DENIED_LINK_ON_WHICH_THE_ASSOC_FRAME_IS_TXED_NOT_ACCEPTED: Link not
+ * accepted because the link on which the (Re)Association Request frame is
+ * transmitted is not accepted.
+ * @STATUS_EPCS_DENIED_VERIFICATION_FAILURE: EPCS priority access is
+ * temporarily denied because the receiving AP MLD is unable to verify that the
+ * non-AP MLD is authorized for an unspecified reason.
+ * @STATUS_DENIED_OPERATION_PARAMETER_UPDATE: Operation parameter update denied
+ * because the requested operation parameters or capabilities are not
+ * acceptable.
  *
  * Internal status codes: Add any internal status code just after
  * STATUS_PROP_START and decrease the value of STATUS_PROP_START
@@ -1071,6 +1109,15 @@ enum wlan_status_code {
 	STATUS_ASSOC_DENIED_LISTEN_INT_TOO_LARGE = 51,
 	STATUS_INVALID_FT_ACTION_FRAME_COUNT = 52,
 	STATUS_INVALID_PMKID = 53,
+	STATUS_DENIED_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOC = 130,
+	STATUS_EPCS_DENIED_UNAUTHORIZED = 131,
+	STATUS_EPCS_DENIED_OTHER_REASON = 132,
+	STATUS_DENIED_TID_TO_LINK_MAPPING = 133,
+	STATUS_PREFERRED_TID_TO_LINK_MAPPING_SUGGESTED = 134,
+	STATUS_DENIED_EHT_NOT_SUPPORTED = 135,
+	STATUS_DENIED_LINK_ON_WHICH_THE_ASSOC_FRAME_IS_TXED_NOT_ACCEPTED = 139,
+	STATUS_EPCS_DENIED_VERIFICATION_FAILURE = 140,
+	STATUS_DENIED_OPERATION_PARAMETER_UPDATE = 141,
 
 	/* Error STATUS code for intenal usage*/
 	STATUS_PROP_START = 65528,
@@ -1420,6 +1467,65 @@ struct erp_ie {
 } qdf_packed;
 
 /**
+ * struct ac_param_record: AC Parameter Record
+ * @aci_aifsn: ACI/AIFSN field
+ * @ecw_min_max: ECWmin/ECWmax field
+ * @txop_limit: TXOP Limit
+ */
+struct ac_param_record {
+	uint8_t aci_aifsn;
+	uint8_t ecw_min_max;
+	uint16_t txop_limit;
+} qdf_packed;
+
+/* Max number of access catogeries */
+#define MAX_NUM_AC 4
+
+/**
+ * struct edca_ie: EDCA Parameter Set element
+ * @ie: EDCA Element id
+ * @len: EDCA IE length
+ * @qos_info: QOS information
+ * @update_edca_info: Update EDCA Info
+ * @ac_record: AC Parameter Record
+ */
+struct edca_ie {
+	uint8_t ie;
+	uint8_t len;
+	uint8_t qos_info;
+	uint8_t update_edca_info;
+	struct ac_param_record ac_record[MAX_NUM_AC];
+} qdf_packed;
+
+/**
+ * struct muac_param_record: MU AC Parameter Record
+ * @aci_aifsn: ACI/AIFSN field
+ * @ecw_min_max: ECWmin/ECWmax field
+ * @mu_edca_timer: MU EDCA Timer
+ */
+struct muac_param_record {
+	uint8_t aci_aifsn;
+	uint8_t ecw_min_max;
+	uint8_t mu_edca_timer;
+} qdf_packed;
+
+/**
+ * struct muedca_ie: MU EDCA Parameter Set element
+ * @elem_id: MU EDCA Element id
+ * @elem_len: MU EDCA IE length
+ * @elem_id_extn: MU EDCA extension element id
+ * @qos_info: QoS Info
+ * @mu_record: MU AC Parameter Record
+ */
+struct muedca_ie {
+	uint8_t elem_id;
+	uint8_t elem_len;
+	uint8_t elem_id_extn;
+	uint8_t qos_info;
+	struct muac_param_record mu_record[MAX_NUM_AC];
+} qdf_packed;
+
+/**
  * struct htcap_cmn_ie: HT common IE info
  * @hc_cap: HT capabilities
  * @ampdu_param: ampdu params
@@ -1448,6 +1554,27 @@ struct htcap_ie {
 	uint8_t len;
 	struct htcap_cmn_ie ie;
 } qdf_packed;
+
+/*
+ * Definitions for Neighbor AP Information field of Reduced
+ * Neighbor Report element.
+ */
+
+/* HDR FIELD TYPE */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_FIELD_TYPE_IDX                   0
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_FIELD_TYPE_BITS                  2
+/* HDR FILTERED NEIGHBOR CNT */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_FILTERED_NBR_AP_IDX              2
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_FILTERED_NBR_AP_BITS             1
+/* HDR RESERVED */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_RESERVED_IDX                     3
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_RESERVED_BITS                    1
+/* HDR INFO CNT */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_CNT_IDX                          4
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_CNT_BITS                         4
+/* HDR INFO LEN */
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_LEN_IDX                          8
+#define WLAN_RNR_NBR_AP_INFO_HDR_INFO_LEN_BITS                         8
 
 /**
  * struct tbtt_information_header - TBTT information header
@@ -1867,6 +1994,12 @@ struct subelem_header {
 #define EHTOP_INFO_CHAN_WIDTH_IDX          0
 #define EHTOP_INFO_CHAN_WIDTH_BITS         3
 
+#define BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_IDX       1
+#define BW_IND_PARAM_DISABLED_SC_BITMAP_PRESENT_BITS      1
+
+#define BW_IND_CHAN_WIDTH_IDX              0
+#define BW_IND_CHAN_WIDTH_BITS             3
+
 #define EHTOP_RX_MCS_NSS_MAP_IDX                       0
 #define EHTOP_RX_MCS_NSS_MAP_BITS                      4
 #define EHTOP_TX_MCS_NSS_MAP_IDX                       4
@@ -2268,6 +2401,52 @@ enum wlan_ml_bv_cinfo_emlcap_emlmrdelay {
 	WLAN_ML_BV_CINFO_EMLCAP_EMLMRDELAY_INVALIDSTART,
 };
 
+#ifdef WLAN_SUPPORT_11BE_D3_0
+/**
+ * enum wlan_ml_bv_cinfo_emlcap_transtimeout - Encoding for Transition Timeout
+ * sub-sub field in EML Capabilities subfield in Basic variant Multi-Link
+ * element Common Info field.
+ * Note: a) In case of holes in the enumeration, scheme for invalid value
+ * determination should be changed. b) A mathematical formula could have been
+ * used instead of an enumeration. However, the standard explicitly lists out
+ * values instead of using a formula, and we reflect this accordingly using an
+ * enumeration.
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_0TU: Transition Timeout value of 0 TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128MU: Transition Timeout value of
+ *                                              128μs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_256MU: Transition Timeout value of
+ *                                              256μs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_512MU: Transition Timeout value of
+ *                                              512μs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_1TU: Transition Timeout value of 1 TU
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_2TU: Transition Timeout value of 2 TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_4TU: Transition Timeout value of 4 TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_8TU: Transition Timeout value of 8 TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_16TU: Transition Timeout value of 16
+ *                                             TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_32TU: Transition Timeout value of 32
+ *                                             TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_64TU: Transition Timeout value of 64
+ *                                             TUs
+ * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_INVALIDSTART: Start of invalid value
+ *                                                     range
+ */
+enum wlan_ml_bv_cinfo_emlcap_transtimeout {
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_0TU = 0,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128MU = 1,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_256MU = 2,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_512MU = 3,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_1TU = 4,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_2TU = 5,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_4TU = 6,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_8TU = 7,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_16TU = 8,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_32TU = 9,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_64TU = 10,
+	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_INVALIDSTART,
+};
+
+#else
 /**
  * enum wlan_ml_bv_cinfo_emlcap_transtimeout - Encoding for Transition Timeout
  * sub-sub field in EML Capabilities subfield in Basic variant Multi-Link
@@ -2295,7 +2474,7 @@ enum wlan_ml_bv_cinfo_emlcap_emlmrdelay {
  * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_64TU: Transition Timeout value of 64
  *                                             TUs
  * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128TU: Transition Timeout value of 128
- *                                              TUs
+ *                                             TUs
  * @WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_INVALIDSTART: Start of invalid value
  *                                                     range
  */
@@ -2314,6 +2493,7 @@ enum wlan_ml_bv_cinfo_emlcap_transtimeout {
 	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_128TU = 11,
 	WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_INVALIDSTART,
 };
+#endif /* WLAN_SUPPORT_11BE_D3_0 */
 
 /* Size in octets of MLD Capabilities and operation subfield in Basic variant
  * Multi-Link element Common Info field as per IEEE P802.11be/D1.5.
@@ -2552,7 +2732,7 @@ struct wlan_ml_prv_linfo_perstaprof {
 /* End of definitions related to Probe Request variant Multi-Link element. */
 
 /* Definitions related to Reconfiguration variant Multi-Link element (per
- * IEEE802.11be D2.1.1)
+ * IEEE802.11be D3.0)
  */
 
 /* Definitions for bits in the Presence Bitmap subfield in Reconfiguration
@@ -2569,6 +2749,13 @@ struct wlan_ml_prv_linfo_perstaprof {
  * Reconfiguration variant Multi-Link element.
  */
 #define WLAN_ML_RV_CINFO_LENGTH_SIZE                               1
+
+/* Max value in octets of Common Info Length subfield of Common Info field in
+ * Reconfiguration variant Multi-Link element
+ */
+#define WLAN_ML_RV_CINFO_LENGTH_MAX \
+	(WLAN_ML_RV_CINFO_LENGTH_SIZE + \
+	 QDF_MAC_ADDR_SIZE)
 
 /* End of definitions related to Reconfiguration variant Multi-Link element
  * Common Info field.
@@ -2610,12 +2797,32 @@ struct wlan_ml_rv_linfo_perstaprof {
 /* Complete Profile */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_IDX           4
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_BITS          1
-/* MAC Address Present */
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_MACADDRP_IDX            5
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_MACADDRP_BITS           1
-/* Delete Timer Present */
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_DELTIMERP_IDX           6
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_DELTIMERP_BITS          1
+/* STA MAC Address Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_STAMACADDRP_IDX         5
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_STAMACADDRP_BITS        1
+/* AP Removal Timer Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_APREMOVALTIMERP_IDX     6
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_APREMOVALTIMERP_BITS    1
+/* Operation Update Type */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPUPDATETYPE_IDX        7
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPUPDATETYPE_BITS       4
+/* Operation Parameters Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPPARAMSP_IDX           11
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPPARAMSP_BITS          1
+
+/**
+ * enum wlan_ml_operation_update_type - Encoding for the Operation Update Type
+ * subfield in STA Control field of Per-STA Profile subelement in
+ * Reconfiguration variant Multi-Link element Link Info field. Note: In case of
+ * future holes in the enumeration, scheme for reserved value determination
+ * should be changed.
+ * @WLAN_ML_OPERATION_UPDATE_TYPE_OPPARAMUPDATE: Operation Parameter Update
+ * @WLAN_ML_OPERATION_UPDATE_TYPE_RESERVEDSTART: Start of reserved value range
+ */
+enum wlan_ml_operation_update_type {
+	WLAN_ML_OPERATION_UPDATE_TYPE_OPPARAMUPDATE = 0,
+	WLAN_ML_OPERATION_UPDATE_TYPE_RESERVEDSTART,
+};
 
 /* Definitions for subfields in STA Info field of Per-STA Profile subelement
  * in Reconfiguration variant Multi-Link element Link Info field.
@@ -2624,11 +2831,40 @@ struct wlan_ml_rv_linfo_perstaprof {
 /* STA Info Length */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE             1
 
-/* Size in octets of the Delete Timer subfield in STA info field of Per-STA
+/* Size in octets of the AP Removal Timer subfield in STA info field of Per-STA
  * Profile subelement in Reconfiguration variant Multi-Link element Link Info
  * field.
  */
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_DELTIMER_SIZE           2
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_APREMOVALTIMER_SIZE     2
+
+/**
+ * struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams - Operation Parameters in
+ * STA info in Per-STA Profile subelement in Reconfiguration variant Multi-Link
+ * element Link Info field.
+ * @presence_ind: Presence Indication
+ * @opparam_info: Operation Parameter Info
+ */
+struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams {
+	uint8_t presence_ind;
+	uint16_t opparam_info;
+} qdf_packed;
+
+/* Definitions for bits in the Presence Indication subfield in Operation
+ * Parameters in STA info in Per-STA Profile subelement in Reconfiguration
+ * variant Multi-Link element Link Info field. Any unused bits are reserved.
+ */
+/* Maximum MPDU Length Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_OPPARAMS_PIND_MAXMPDULEN_P  \
+	((uint8_t)BIT(0))
+/* Maximum A-MSDU Length Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_OPPARAMS_PIND_MAXAMSDULEN_P  \
+	((uint8_t)BIT(1))
+
+/* Note: The contents are variable in the Operation Parameter Info subfield in
+ * Operation Parameters in STA info in Per-STA Profile subelement in
+ * Reconfiguration variant Multi-Link element Link Info field. Please refer to
+ * the IEEE802.11be standard.
+ */
 
 /* Max value in octets of STA Info Length in STA Info field of Per-STA Profile
  * subelement in Reconfiguration variant Multi-Link element Link Info field.
@@ -2636,7 +2872,8 @@ struct wlan_ml_rv_linfo_perstaprof {
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_MAX \
 	(WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE + \
 	 QDF_MAC_ADDR_SIZE + \
-	 WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_DELTIMER_SIZE)
+	 WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_APREMOVALTIMER_SIZE + \
+	 sizeof(struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams))
 
 /* End of definitions related to Reconfiguration variant Multi-Link element Link
  * Info field.
@@ -2674,6 +2911,67 @@ struct wlan_ml_rv_linfo_perstaprof {
  * End of definitions related to MLO specific aspects of Reduced Neighbor Report
  * element.
  */
+
+/* Definitions related to Priority access variant Multi-Link element
+ * Common Info field
+ */
+
+/* Size in octets of Common Info Length subfield of Common Info field in
+ * Priority access variant Multi-Link element.
+ */
+/* Common Info Length  */
+#define WLAN_ML_PAV_CINFO_LENGTH_SIZE                               1
+
+/* Max value in octets of Common Info Length subfield of Common Info field in
+ * Priority access variant Multi-Link element
+ */
+#define WLAN_ML_PAV_CINFO_LENGTH_MAX \
+	(WLAN_ML_PAV_CINFO_LENGTH_SIZE + \
+	 QDF_MAC_ADDR_SIZE)
+
+/**
+ * struct wlan_ml_pav_linfo_perstaprof - Fixed fields of Per-STA Profile
+ * subelement in Priority access variant Multi-Link element Link Info field
+ * @subelem_id: Subelement ID
+ * @subelem_len: Subelement length
+ * @stacontrol: STA Control
+ */
+struct wlan_ml_pav_linfo_perstaprof {
+	uint8_t subelem_id;
+	uint8_t subelem_len;
+	uint16_t stacontrol;
+} qdf_packed;
+
+/* The above fixed fields may be followed by:
+ * STA profile (variable size)
+ */
+
+/* Size in octets of STA Control field of Per-STA Profile subelement in
+ * Priority access variant Multi-Link element Link Info field.
+ */
+#define WLAN_ML_PAV_LINFO_PERSTAPROF_STACTRL_SIZE                   2
+
+/* Definitions for subfields in STA Control field of Per-STA Profile subelement
+ * in Priority access variant Multi-Link element Link Info field. Any unused
+ * bits are reserved.
+ */
+
+/* Link ID */
+#define WLAN_ML_PAV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX              0
+#define WLAN_ML_PAV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS             4
+
+/* End of definitions related to priority access variant Multi-Link element Link
+ * Info field.
+ */
+
+/* Maximum size of IEs present in sta profile for a link
+ * EDCA IE and MU EDCA IE are part of this.
+ */
+#define WLAN_ML_PAV_LINFO_STAPROF_MAXSIZE \
+	(sizeof(struct edca_ie) + sizeof(struct muedca_ie))
+
+/* End of definitions related to priority access variant Multi-Link element. */
+
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* WLAN_FEATURE_11BE */
 
@@ -2753,13 +3051,13 @@ struct wlan_ie_multi_link_traffic_indication {
 /**
  * struct wlan_action_frame - Generic action frame format
  * @category: Action frame category
- * @action: action
+ * @action: action (valid values from 0 to 255)
  *
  * Reference IEEE Std 802.11-2020 9.4.1.11 Action field
  */
 struct wlan_action_frame {
 	int8_t category;
-	int8_t action;
+	uint8_t action;
 } __packed;
 
 /**

@@ -401,6 +401,7 @@ wlan_mgmt_rx_reo_is_scheduler_enabled_at_pdev(struct wlan_objmgr_pdev *pdev);
 uint16_t
 wlan_mgmt_rx_reo_get_pkt_ctr_delta_thresh(struct wlan_objmgr_psoc *psoc);
 
+#ifdef WLAN_MGMT_RX_REO_DEBUG_SUPPORT
 /**
  * wlan_mgmt_rx_reo_get_ingress_frame_debug_list_size() - Get the size of
  * ingress  frame debug list
@@ -432,6 +433,25 @@ wlan_mgmt_rx_reo_get_egress_frame_debug_list_size
  */
 uint16_t
 wlan_mgmt_rx_reo_get_scheduler_debug_list_size(struct wlan_objmgr_psoc *psoc);
+#else
+static inline uint16_t
+wlan_mgmt_rx_reo_get_ingress_frame_debug_list_size(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint16_t
+wlan_mgmt_rx_reo_get_egress_frame_debug_list_size(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint16_t
+wlan_mgmt_rx_reo_get_scheduler_debug_list_size(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+#endif /* WLAN_MGMT_RX_REO_DEBUG_SUPPORT */
 
 /**
  * wlan_mgmt_rx_reo_is_simulation_in_progress() - API to check whether
@@ -579,6 +599,8 @@ wlan_mgmt_rx_reo_psoc_obj_create_notification(struct wlan_objmgr_psoc *psoc)
 static inline QDF_STATUS
 wlan_mgmt_rx_reo_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc)
 {
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
 	return QDF_STATUS_SUCCESS;
 }
 

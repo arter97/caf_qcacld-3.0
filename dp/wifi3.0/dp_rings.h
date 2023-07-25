@@ -26,6 +26,23 @@
 #include <dp_mon.h>
 #endif
 
+#ifdef WLAN_FEATURE_DP_EVENT_HISTORY
+static inline bool dp_is_mon_mask_valid(struct dp_soc *soc,
+					struct dp_intr *intr_ctx)
+{
+	if (intr_ctx->rx_mon_ring_mask)
+		return true;
+
+	return false;
+}
+#else
+static inline bool dp_is_mon_mask_valid(struct dp_soc *soc,
+					struct dp_intr *intr_ctx)
+{
+	return false;
+}
+#endif
+
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 
 /**
@@ -369,43 +386,24 @@ dp_dump_wbm_idle_hptp(struct dp_soc *soc, struct dp_pdev *pdev);
 void dp_display_srng_info(struct cdp_soc_t *soc_hdl);
 
 #if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
-/**
- * dp_flush_ring_hptp() - Update ring shadow
- *			  register HP/TP address when runtime
- *                        resume
- * @soc: DP soc context
- * @hal_srng: HAL srng context
- *
- * Return: None
- */
-void dp_flush_ring_hptp(struct dp_soc *soc, hal_ring_handle_t hal_srng);
-
 void dp_drain_txrx(struct cdp_soc_t *soc_handle);
 
-#ifdef FEATURE_RUNTIME_PM
-/**
- * dp_runtime_suspend() - ensure DP is ready to runtime suspend
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
- *
- * DP is ready to runtime suspend if there are no pending TX packets.
- *
- * Return: QDF_STATUS
+/*
+ * dp_update_ring_hptp() - update dp rings hptp
+ * @soc: dp soc handler
+ * @force_flush_tx: force flush the Tx ring hp
  */
-QDF_STATUS dp_runtime_suspend(struct cdp_soc_t *soc_hdl, uint8_t pdev_id);
+void dp_update_ring_hptp(struct dp_soc *soc, bool force_flush_tx);
+#endif
 
-/**
- * dp_runtime_resume() - ensure DP is ready to runtime resume
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
+/*
+ * dp_flush_tcl_ring() - flush TCL ring hp
+ * @pdev: dp pdev
+ * @ring_id: TCL ring id
  *
- * Resume DP for runtime PM.
- *
- * Return: QDF_STATUS
+ * Return: 0 on success and error code on failure
  */
-QDF_STATUS dp_runtime_resume(struct cdp_soc_t *soc_hdl, uint8_t pdev_id);
-#endif
-#endif
+int dp_flush_tcl_ring(struct dp_pdev *pdev, int ring_id);
 
 #ifdef WLAN_FEATURE_STATS_EXT
 /**
@@ -679,10 +677,23 @@ static inline QDF_STATUS dp_soc_srng_alloc(struct dp_soc *soc)
 static inline QDF_STATUS dp_soc_attach_poll(struct cdp_soc_t *txrx_soc)
 {
 	struct dp_soc *soc = (struct dp_soc *)txrx_soc;
+	uint32_t lmac_id = 0;
+	int i;
 
 	qdf_mem_set(&soc->mon_intr_id_lmac_map,
 		    sizeof(soc->mon_intr_id_lmac_map), DP_MON_INVALID_LMAC_ID);
 	soc->intr_mode = DP_INTR_POLL;
+
+	for (i = 0; i < wlan_cfg_get_num_contexts(soc->wlan_cfg_ctx); i++) {
+		soc->intr_ctx[i].rx_mon_ring_mask =
+				wlan_cfg_get_rx_mon_ring_mask(soc->wlan_cfg_ctx, i);
+
+		if (dp_is_mon_mask_valid(soc, &soc->intr_ctx[i])) {
+			hif_event_history_init(soc->hif_handle, i);
+			soc->mon_intr_id_lmac_map[lmac_id] = i;
+			lmac_id++;
+		}
+	}
 
 	qdf_timer_init(soc->osdev, &soc->int_timer,
 		       dp_interrupt_timer, (void *)soc,
@@ -719,55 +730,9 @@ static inline void dp_display_srng_info(struct cdp_soc_t *soc_hdl)
 }
 
 #if defined(DP_POWER_SAVE) || defined(FEATURE_RUNTIME_PM)
-/**
- * dp_flush_ring_hptp() - Update ring shadow
- *			  register HP/TP address when runtime
- *                        resume
- * @soc: DP soc context
- * @hal_srng: HAL srng context
- *
- * Return: None
- */
-static inline void
-dp_flush_ring_hptp(struct dp_soc *soc, hal_ring_handle_t hal_srng)
-{
-}
-
 static inline void dp_drain_txrx(struct cdp_soc_t *soc_handle)
 {
 }
-
-#ifdef FEATURE_RUNTIME_PM
-/**
- * dp_runtime_suspend() - ensure DP is ready to runtime suspend
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
- *
- * DP is ready to runtime suspend if there are no pending TX packets.
- *
- * Return: QDF_STATUS
- */
-static inline
-QDF_STATUS dp_runtime_suspend(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * dp_runtime_resume() - ensure DP is ready to runtime resume
- * @soc_hdl: Datapath soc handle
- * @pdev_id: id of data path pdev handle
- *
- * Resume DP for runtime PM.
- *
- * Return: QDF_STATUS
- */
-static inline
-QDF_STATUS dp_runtime_resume(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 #endif
 #endif /* WLAN_SOFTUMAC_SUPPORT */
 

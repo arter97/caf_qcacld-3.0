@@ -205,6 +205,7 @@ void register_dfs_callbacks(void)
 		mlme_release_radar_mode_switch_lock;
 	tmp_dfs_to_mlme->mlme_mark_dfs =
 		mlme_dfs_mark_dfs;
+	tmp_dfs_to_mlme->mlme_set_tx_flag = mlme_dfs_set_tx_flag;
 	/*
 	 * Register precac auto channel switch feature related callbacks
 	 */
@@ -266,7 +267,7 @@ static QDF_STATUS dfs_psoc_obj_create_notification(struct wlan_objmgr_psoc *psoc
 	dfs_agile_sm_create(dfs_soc_obj);
 
 	dfs_debug(NULL, WLAN_DEBUG_DFS1,
-		"DFS obj attach to psoc successfully");
+		  "DFS obj attach to psoc successfully");
 
 	return status;
 }
@@ -478,7 +479,7 @@ QDF_STATUS wlan_dfs_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev,
 
 	if (!is_5ghz) {
 		pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
-		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		dfs_info(dfs, WLAN_DEBUG_DFS,
 				"Do not allocate DFS object for 2G, pdev_id = %d",
 				pdev_id);
 		return QDF_STATUS_SUCCESS;

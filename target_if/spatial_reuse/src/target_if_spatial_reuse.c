@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -199,7 +199,7 @@ spatial_reuse_set_sr_enable_disable(struct wlan_objmgr_vdev *vdev,
 
 	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
 	if ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
-	    (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
+	     (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
 	    (sr_ctrl & SRG_INFO_PRESENT)) {
 		if (is_sr_enable) {
 			wlan_mlme_update_sr_data(vdev, &val, srg_pd_threshold,
@@ -245,4 +245,6 @@ void target_if_spatial_reuse_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 					spatial_reuse_send_sr_prohibit_cfg;
 	tx_ops->spatial_reuse_tx_ops.target_if_set_sr_enable_disable =
 					spatial_reuse_set_sr_enable_disable;
+	tx_ops->spatial_reuse_tx_ops.target_if_sr_update =
+					spatial_reuse_send_pd_threshold;
 }
