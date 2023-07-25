@@ -210,7 +210,8 @@ dp_tx_rx_collect_connectivity_stats_info(qdf_nbuf_t nbuf, void *context,
 		enum connectivity_stats_pkt_status action, uint8_t *pkt_type)
 {
 	uint32_t pkt_type_bitmap;
-	struct wlan_dp_intf *dp_intf =  (struct  wlan_dp_intf *)context;
+	struct wlan_dp_link *dp_link = (struct wlan_dp_link *)context;
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 
 	/* ARP tracking is done already. */
 	pkt_type_bitmap = dp_intf->pkt_type_bitmap;
@@ -827,6 +828,7 @@ void dp_sta_notify_tx_comp_cb(qdf_nbuf_t nbuf, void *ctx, uint16_t flag)
 QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 {
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
 	QDF_STATUS status;
 	qdf_nbuf_t nbuf;
 	qdf_nbuf_t nbuf_next;
@@ -839,7 +841,12 @@ QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_intf = (struct wlan_dp_intf *)context;
+	dp_link = (struct wlan_dp_link *)context;
+	dp_intf = dp_link->dp_intf;
+	if (!dp_intf) {
+		dp_err("dp_intf is NULL for dp_link %pK", dp_link);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	cpu_index = qdf_get_cpu();
 	stats = &dp_intf->dp_stats.tx_rx_stats;
@@ -1320,16 +1327,19 @@ static inline void dp_tsf_timestamp_rx(struct wlan_dp_psoc_context *dp_ctx,
 #endif
 
 QDF_STATUS
-dp_rx_thread_gro_flush_ind_cbk(void *intf_ctx, int rx_ctx_id)
+dp_rx_thread_gro_flush_ind_cbk(void *link_ctx, int rx_ctx_id)
 {
-	struct wlan_dp_intf *dp_intf = intf_ctx;
+	struct wlan_dp_link *dp_link = link_ctx;
+	struct wlan_dp_intf *dp_intf;
 	enum dp_rx_gro_flush_code gro_flush_code = DP_RX_GRO_NORMAL_FLUSH;
 
-	if (qdf_unlikely((!dp_intf) || (!dp_intf->dp_ctx))) {
+	if (qdf_unlikely((!dp_link) || (!dp_link->dp_intf) ||
+			 (!dp_link->dp_intf->dp_ctx))) {
 		dp_err("Null params being passed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	dp_intf = dp_link->dp_intf;
 	if (dp_intf->runtime_disable_rx_thread)
 		return QDF_STATUS_SUCCESS;
 

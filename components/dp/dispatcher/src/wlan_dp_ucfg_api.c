@@ -1050,7 +1050,7 @@ static QDF_STATUS wlan_dp_get_tsf_time(void *dp_link_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 #else
-static QDF_STATUS wlan_dp_get_tsf_time(void *dp_intf_ctx,
+static QDF_STATUS wlan_dp_get_tsf_time(void *dp_link_ctx,
 				       uint64_t input_time,
 				       uint64_t *tsf_time)
 {
