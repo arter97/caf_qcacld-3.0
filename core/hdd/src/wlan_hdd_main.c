@@ -3608,14 +3608,7 @@ int hdd_set_11ax_rate(struct hdd_adapter *adapter, int set_value,
 
 int hdd_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 {
-	int set_value;
-
-	if (sme_is_feature_supported_by_fw(DOT11AX))
-		set_value = WMI_ASSEMBLE_RATECODE_V1(rate, nss, preamble);
-	else
-		set_value = (preamble << 6) | (nss << 4) | rate;
-
-	return set_value;
+	return ucfg_mlme_assemble_rate_code(preamble, nss, rate);
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH

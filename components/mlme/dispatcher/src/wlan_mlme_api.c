@@ -37,6 +37,7 @@
 #include "target_if.h"
 #include "wlan_vdev_mgr_tgt_if_tx_api.h"
 #include "wmi_unified_vdev_api.h"
+#include "wlan_mlme_api.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -7153,4 +7154,17 @@ wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 err:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 	return status;
+}
+
+uint32_t
+wlan_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
+{
+	uint32_t set_value;
+
+	if (wma_get_fw_wlan_feat_caps(DOT11AX))
+		set_value = ASSEMBLE_RATECODE_V1(preamble, nss, rate);
+	else
+		set_value = (preamble << 6) | (nss << 4) | rate;
+
+	return set_value;
 }
