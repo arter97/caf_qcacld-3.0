@@ -2696,6 +2696,7 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		break;
 	case eWNI_SME_NEIGHBOR_REPORT_IND:
 	case eWNI_SME_BEACON_REPORT_REQ_IND:
+	case eWNI_SME_CHAN_LOAD_REQ_IND:
 		if (pMsg->bodyptr) {
 			status = sme_rrm_msg_processor(mac, pMsg->type,
 						       pMsg->bodyptr);

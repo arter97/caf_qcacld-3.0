@@ -1160,6 +1160,22 @@ QDF_STATUS wlan_mlme_get_bssid_vdev_id(struct wlan_objmgr_pdev *pdev,
 				       struct qdf_mac_addr *bss_peer_mac);
 
 /**
+ * mlme_update_freq_in_scan_start_req() - Fill frequencies in wide
+ * band scan req for mlo connection
+ * @vdev: vdev common object
+ * @req: pointer to scan request
+ * @scan_ch_width: Channel width for which to trigger a wide band scan
+ * @scan_freq: frequency for which to trigger a wide band RRM scan
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
+				   struct scan_start_request *req,
+				   enum phy_ch_width scan_ch_width,
+				   qdf_freq_t scan_freq);
+
+/**
  * wlan_get_operation_chan_freq() - get operating chan freq of
  * given vdev
  * @vdev: vdev

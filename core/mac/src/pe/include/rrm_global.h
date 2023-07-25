@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2012, 2014-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -50,6 +50,32 @@ struct sir_channel_info {
 	uint8_t reg_class;
 	uint8_t chan_num;
 	uint32_t chan_freq;
+};
+
+/**
+ * struct ch_load_ind - Contains info for channel load request received from AP
+ * @message_type: message type eWNI_SME_CHAN_LOAD_REQ_IND
+ * @length: size of struct chan_load_req_ind
+ * @measurement_idx: measurement index for channel load request
+ * @peer_addr: connected peer mac address
+ * @dialog_token: dialog token
+ * @msg_source: message source of type enum tRrmMsgReqSource
+ * @op_class: regulatory class
+ * @channel: channel number
+ * @randomization_intv: Random interval in ms
+ * @meas_duration: measurement duration in ms
+ */
+struct ch_load_ind {
+	uint16_t message_type;
+	uint16_t length;
+	uint8_t measurement_idx;
+	struct qdf_mac_addr peer_addr;
+	uint16_t dialog_token;
+	tRrmMsgReqSource msg_source;
+	uint8_t op_class;
+	uint8_t channel;
+	uint16_t randomization_intv;
+	uint16_t meas_duration;
 };
 
 typedef struct sSirBeaconReportReqInd {

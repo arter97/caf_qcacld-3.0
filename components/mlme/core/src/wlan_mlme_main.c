@@ -362,19 +362,11 @@ wlan_scan_get_scan_phy_mode(struct wlan_objmgr_vdev *vdev, qdf_freq_t op_freq,
 	return scan_phymode;
 }
 
-/**
- * mlme_update_freq_in_scan_start_req() - Fill frequencies in wide
- * band scan req for mlo connection
- * @vdev: vdev common object
- * @req: pointer to scan request
- * @associated_ch_width: channel width at the time of initial connection
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
+QDF_STATUS
 mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 				   struct scan_start_request *req,
-				   enum phy_ch_width associated_ch_width)
+				   enum phy_ch_width scan_ch_width,
+				   qdf_freq_t scan_freq)
 {
 	const struct bonded_channel_freq *range;
 	uint8_t num_chan;
@@ -383,14 +375,18 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 	uint8_t vdev_id;
 
 	vdev_id = vdev->vdev_objmgr.vdev_id;
-	op_freq = wlan_get_operation_chan_freq(vdev);
 
-	mlme_debug("vdev %d : fill ch list for op_freq:%d, assoc_ch_width: %d",
-		   vdev_id, op_freq, associated_ch_width);
+	if (scan_freq != INVALID_CHANNEL)
+		op_freq = scan_freq;
+	else
+		op_freq = wlan_get_operation_chan_freq(vdev);
 
-	if (associated_ch_width == CH_WIDTH_320MHZ) {
+	mlme_debug("vdev %d : fill ch list for op_freq:%d, scan_ch_width: %d",
+		   vdev_id, op_freq, scan_ch_width);
+
+	if (scan_ch_width == CH_WIDTH_320MHZ) {
 		range = wlan_reg_get_bonded_chan_entry(op_freq,
-						       associated_ch_width, 0);
+						       scan_ch_width, 0);
 		if (!range) {
 			mlme_debug("vdev %d : range is null for freq %d",
 				   vdev_id, op_freq);
@@ -494,7 +490,8 @@ mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
 			}
 
 			status = mlme_update_freq_in_scan_start_req(mlo_vdev,
-						req, associated_ch_width);
+						req, associated_ch_width,
+						INVALID_CHANNEL);
 			if (QDF_IS_STATUS_ERROR(status))
 				return QDF_STATUS_E_FAILURE;
 		}
@@ -552,7 +549,8 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 	}
 
 	status = mlme_update_freq_in_scan_start_req(vdev, req,
-						    associated_ch_width);
+						    associated_ch_width,
+						    INVALID_CHANNEL);
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_FAILURE;
 

@@ -1058,6 +1058,213 @@ static uint8_t *sme_rrm_get_meas_mode_string(uint8_t meas_mode)
 }
 
 /**
+ * sme_rrm_fill_freq_list_for_channel_load() : Trigger wide band scan request
+ * to measure channel load
+ * @mac_ctx: global mac structure
+ * @sme_rrm_ctx: pointer to sme rrm context structure
+ * @vdev: vdev common object
+ * @req: scan request config
+ *
+ * Return : QDF_STATUS
+ */
+static QDF_STATUS
+sme_rrm_fill_freq_list_for_channel_load(struct mac_context *mac_ctx,
+					tpRrmSMEContext sme_rrm_ctx,
+					struct wlan_objmgr_vdev *vdev,
+					struct scan_start_request *req)
+{
+	uint16_t chan_space = 0;
+	uint8_t country_code[REG_ALPHA2_LEN + 1];
+	enum phy_ch_width chan_width = CH_WIDTH_INVALID;
+	qdf_freq_t scan_freq;
+	uint8_t channel = sme_rrm_ctx->chan_load_req_info.channel;
+
+	rrm_get_country_code_from_connected_profile(mac_ctx,
+						    wlan_vdev_get_id(vdev),
+						    country_code);
+	scan_freq = wlan_reg_country_chan_opclass_to_freq(mac_ctx->pdev,
+							  country_code,
+							  channel,
+							  sme_rrm_ctx->regClass,
+							  false);
+	if (!scan_freq) {
+		sme_debug("invalid scan freq");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	sme_debug("opclass: %d, channel: %d freq:%d, country code %c%c 0x%x",
+		  sme_rrm_ctx->regClass, channel, scan_freq,
+		  country_code[0], country_code[1], country_code[2]);
+	if (wlan_reg_is_6ghz_op_class(mac_ctx->pdev, sme_rrm_ctx->regClass))
+		chan_space = wlan_reg_get_op_class_width
+			(mac_ctx->pdev, sme_rrm_ctx->regClass, true);
+	else
+		chan_space = wlan_reg_dmn_get_chanwidth_from_opclass_auto(
+							country_code, channel,
+							sme_rrm_ctx->regClass);
+	switch (chan_space) {
+	case 320:
+		fallthrough;
+	case 160:
+		chan_width = CH_WIDTH_160MHZ;
+		break;
+	case 80:
+		chan_width = CH_WIDTH_80MHZ;
+		break;
+	case 40:
+		chan_width = CH_WIDTH_40MHZ;
+		break;
+	case 20:
+	case 25:
+		chan_width = CH_WIDTH_20MHZ;
+		break;
+	default:
+		sme_err("invalid chan_space: %d", chan_space);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return mlme_update_freq_in_scan_start_req(vdev, req, chan_width,
+						  scan_freq);
+}
+
+/**
+ * sme_rrm_issue_chan_load_measurement_scan() : Trigger wide band scan request
+ * to measure channel load
+ * @mac_ctx: global mac structure
+ * @idx: measurement request index
+ *
+ * Return : QDF_STATUS
+ */
+static QDF_STATUS
+sme_rrm_issue_chan_load_measurement_scan(struct mac_context *mac_ctx,
+					 uint8_t idx)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	tpRrmSMEContext sme_rrm_ctx = &mac_ctx->rrm.rrmSmeContext[idx];
+	uint32_t max_chan_time;
+	struct scan_start_request *req;
+	struct wlan_objmgr_vdev *vdev;
+	uint32_t vdev_id;
+
+	status = csr_roam_get_session_id_from_bssid(mac_ctx,
+						    &sme_rrm_ctx->sessionBssId,
+						    &vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("sme session ID not found for bssid "QDF_MAC_ADDR_FMT"",
+			QDF_MAC_ADDR_REF(sme_rrm_ctx->sessionBssId.bytes));
+		goto send_ind;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("VDEV is null %d", vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto send_ind;
+	}
+
+	req = qdf_mem_malloc(sizeof(*req));
+	if (!req) {
+		status = QDF_STATUS_E_NOMEM;
+		goto error_handle;
+	}
+
+	status = wlan_scan_init_default_params(vdev, req);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error_handle;
+
+	req->scan_req.scan_id = wlan_scan_get_scan_id(mac_ctx->psoc);
+	sme_rrm_ctx->scan_id = req->scan_req.scan_id;
+	req->scan_req.vdev_id = wlan_vdev_get_id(vdev);
+	req->scan_req.scan_req_id = sme_rrm_ctx->req_id;
+	req->scan_req.scan_f_passive = true;
+	max_chan_time = sme_rrm_ctx->duration[0];
+	req->scan_req.dwell_time_passive = max_chan_time;
+	req->scan_req.dwell_time_passive_6g = max_chan_time;
+	req->scan_req.adaptive_dwell_time_mode = SCAN_DWELL_MODE_STATIC;
+	req->scan_req.scan_type = SCAN_TYPE_RRM;
+	req->scan_req.scan_f_wide_band = true;
+	/*
+	 * FW report CCA busy for each possible 20Mhz subbands of the
+	 * wideband scan channel if below flag is true
+	 */
+	req->scan_req.scan_f_report_cca_busy_for_each_20mhz = true;
+
+	status = sme_rrm_fill_freq_list_for_channel_load(mac_ctx, sme_rrm_ctx,
+							 vdev, req);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error_handle;
+	sme_debug("vdev:%d, rrm_idx:%d scan_id:%d num chan: %d dwell_time: %d",
+		  req->scan_req.vdev_id, sme_rrm_ctx->measurement_idx,
+		  sme_rrm_ctx->scan_id,
+		  req->scan_req.chan_list.num_chan,
+		  req->scan_req.dwell_time_passive);
+	/* store jiffies to send it in channel load report */
+	sme_rrm_ctx->chan_load_req_info.rrm_scan_tsf =
+				(uint32_t)qdf_system_ticks();
+	status = wlan_scan_start(req);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error_handle;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+	return status;
+error_handle:
+	qdf_mem_free(req);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+send_ind:
+	//TODO: Send channel load report xmit indication and free current req
+	return status;
+}
+
+/**
+ * sme_rrm_process_chan_load_req_ind() -Process beacon report request
+ * @mac: Global Mac structure
+ * @msg_buf: a pointer to a buffer that maps to various structures base
+ * on the message type.The beginning of the buffer can always
+ * map to tSirSmeRsp.
+ *
+ * This is called to process the channel load report request from peer AP
+ * forwarded through PE .
+ *
+ * Return : QDF_STATUS_SUCCESS - Validation is successful.
+ */
+static QDF_STATUS sme_rrm_process_chan_load_req_ind(struct mac_context *mac,
+						    void *msg_buf)
+{
+	struct ch_load_ind *chan_load;
+	tpRrmSMEContext sme_rrm_ctx;
+	uint32_t num_chan = 0;
+	tpRrmPEContext rrm_ctx;
+
+	chan_load = (struct ch_load_ind *)msg_buf;
+	sme_rrm_ctx = &mac->rrm.rrmSmeContext[chan_load->measurement_idx];
+	rrm_ctx = &mac->rrm.rrmPEContext;
+	qdf_mem_copy(sme_rrm_ctx->sessionBssId.bytes,
+		     chan_load->peer_addr.bytes, sizeof(struct qdf_mac_addr));
+	sme_rrm_ctx->channelList.numOfChannels = num_chan;
+	sme_rrm_ctx->token = chan_load->dialog_token;
+	sme_rrm_ctx->regClass = chan_load->op_class;
+	sme_rrm_ctx->randnIntvl = QDF_MAX(chan_load->randomization_intv,
+			mac->rrm.rrmConfig.max_randn_interval);
+	sme_rrm_ctx->currentIndex = 0;
+	qdf_mem_copy((uint8_t *)&sme_rrm_ctx->duration,
+		     (uint8_t *)&chan_load->meas_duration,
+		     SIR_ESE_MAX_MEAS_IE_REQS);
+	sme_rrm_ctx->measurement_type = RRM_CHANNEL_LOAD;
+	sme_rrm_ctx->chan_load_req_info.channel = chan_load->channel;
+	sme_debug("idx:%d, token: %d randnIntvl: %d meas_duration %d, rrm_ctx dur %d reg_class: %d, type: %d, channel: %d",
+		  chan_load->measurement_idx, sme_rrm_ctx->token,
+		  sme_rrm_ctx->randnIntvl,
+		  chan_load->meas_duration,
+		  sme_rrm_ctx->duration[0], sme_rrm_ctx->regClass,
+		  sme_rrm_ctx->measurement_type,
+		  sme_rrm_ctx->chan_load_req_info.channel);
+
+	return sme_rrm_issue_chan_load_measurement_scan(mac,
+						chan_load->measurement_idx);
+}
+
+/**
  * sme_rrm_process_beacon_report_req_ind() -Process beacon report request
  * @mac:- Global Mac structure
  * @msg_buf:- a pointer to a buffer that maps to various structures base
@@ -1653,6 +1860,10 @@ QDF_STATUS sme_rrm_msg_processor(struct mac_context *mac, uint16_t msg_type,
 
 	case eWNI_SME_BEACON_REPORT_REQ_IND:
 		sme_rrm_process_beacon_report_req_ind(mac, msg_buf);
+		break;
+
+	case eWNI_SME_CHAN_LOAD_REQ_IND:
+		sme_rrm_process_chan_load_req_ind(mac, msg_buf);
 		break;
 
 	default:
