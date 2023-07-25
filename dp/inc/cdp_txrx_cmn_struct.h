@@ -3110,13 +3110,13 @@ struct cdp_pdev_attach_params {
 /*
  * cdp_txrx_peer_params_update
  *
- * @osif_vdev: Handle for OS shim virtual device
+ * @vdev_id: VDEV ID
  * @peer_mac: Peer mac address
  * @chip_id: CHIP ID
  * @pdev_id: PDEV ID
  */
 struct cdp_txrx_peer_params_update {
-	void	*osif_vdev;
+	uint8_t vdev_id;
 	uint8_t	*peer_mac;
 	uint8_t	chip_id;
 	uint8_t	pdev_id;

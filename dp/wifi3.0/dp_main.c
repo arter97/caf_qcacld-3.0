@@ -8030,7 +8030,7 @@ static QDF_STATUS dp_txrx_peer_detach(struct dp_soc *soc, struct dp_peer *peer)
 		peer->txrx_peer = NULL;
 		pdev = txrx_peer->vdev->pdev;
 
-		params.osif_vdev = (void *)peer->vdev->osif_vdev;
+		params.vdev_id = peer->vdev->vdev_id;
 		params.peer_mac = peer->mac_addr.raw;
 
 		dp_wdi_event_handler(WDI_EVENT_PEER_DELETE, soc,
@@ -8123,7 +8123,7 @@ static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 	dp_txrx_peer_attach_add(soc, peer, txrx_peer);
 
 	params.peer_mac = peer->mac_addr.raw;
-	params.osif_vdev = (void *)peer->vdev->osif_vdev;
+	params.vdev_id = peer->vdev->vdev_id;
 	params.chip_id = dp_mlo_get_chip_id(soc);
 	params.pdev_id = peer->vdev->pdev->pdev_id;
 
@@ -8421,7 +8421,7 @@ QDF_STATUS dp_peer_mlo_setup(
 
 			params.chip_id = dp_mlo_get_chip_id(soc);
 			params.pdev_id = peer->vdev->pdev->pdev_id;
-			params.osif_vdev = peer->vdev->osif_vdev;
+			params.vdev_id = peer->vdev->vdev_id;
 
 			dp_wdi_event_handler(
 					WDI_EVENT_STA_PRIMARY_UMAC_UPDATE,
@@ -8455,7 +8455,7 @@ QDF_STATUS dp_peer_mlo_setup(
 
 		params.chip_id = dp_mlo_get_chip_id(soc);
 		params.pdev_id = peer->vdev->pdev->pdev_id;
-		params.osif_vdev = peer->vdev->osif_vdev;
+		params.vdev_id = peer->vdev->vdev_id;
 
 		dp_wdi_event_handler(
 				WDI_EVENT_STA_PRIMARY_UMAC_UPDATE,
@@ -8513,7 +8513,7 @@ QDF_STATUS dp_peer_mlo_setup(
 					soc, mld_peer, prev_vdev,
 					mld_peer->vdev);
 
-			params.osif_vdev = (void *)peer->vdev->osif_vdev;
+			params.vdev_id = peer->vdev->vdev_id;
 			params.peer_mac = mld_peer->mac_addr.raw;
 			params.chip_id = dp_mlo_get_chip_id(soc);
 			params.pdev_id = peer->vdev->pdev->pdev_id;

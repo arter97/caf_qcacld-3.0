@@ -3104,7 +3104,7 @@ dp_rx_peer_unmap_handler(struct dp_soc *soc, uint16_t peer_id,
 	if (peer->txrx_peer) {
 		struct cdp_txrx_peer_params_update params = {0};
 
-		params.osif_vdev = (void *)vdev->osif_vdev;
+		params.vdev_id = vdev->vdev_id;
 		params.peer_mac = peer->mac_addr.raw;
 		params.chip_id = dp_mlo_get_chip_id(soc);
 		params.pdev_id = vdev->pdev->pdev_id;

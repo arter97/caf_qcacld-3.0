@@ -2271,7 +2271,7 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 
 		params.chip_id = be_soc->mlo_chip_id;
 		params.pdev_id = be_vdev->vdev.pdev->pdev_id;
-		params.osif_vdev = be_vdev->vdev.osif_vdev;
+		params.vdev_id = vdev->vdev_id;
 		dp_wdi_event_handler(
 				WDI_EVENT_MCAST_PRIMARY_UPDATE,
 				be_vdev->vdev.pdev->soc,
@@ -2316,7 +2316,7 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 
 		params.chip_id = be_soc->mlo_chip_id;
 		params.pdev_id = vdev->pdev->pdev_id;
-		params.osif_vdev = vdev->osif_vdev;
+		params.vdev_id = vdev->vdev_id;
 		dp_wdi_event_handler(
 				WDI_EVENT_MCAST_PRIMARY_UPDATE,
 				vdev->pdev->soc,
@@ -2906,7 +2906,7 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 			 DP_MOD_ID_CHILD);
 	mld_peer->txrx_peer->vdev = mld_peer->vdev;
 
-	params.osif_vdev = (void *)new_primary_peer->vdev->osif_vdev;
+	params.vdev_id = new_primary_peer->vdev->vdev_id;
 	params.peer_mac = mld_peer->mac_addr.raw;
 	params.chip_id = pr_peer_info->chip_id;
 	params.pdev_id = new_primary_peer->vdev->pdev->pdev_id;
