@@ -76,15 +76,17 @@ QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
 					bool is_link_switch);
 
 /**
- * ucfg_dp_update_inf_mac() - update DP interface MAC address
+ * ucfg_dp_update_intf_mac() - update DP interface MAC address
  * @psoc: psoc handle
  * @cur_mac: Current MAC address
  * @new_mac: new MAC address
+ * @vdev: objmgr vdev handle to set the def_link in dp_intf
  *
  */
-void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
-			    struct qdf_mac_addr *cur_mac,
-			    struct qdf_mac_addr *new_mac);
+void ucfg_dp_update_intf_mac(struct wlan_objmgr_psoc *psoc,
+			     struct qdf_mac_addr *cur_mac,
+			     struct qdf_mac_addr *new_mac,
+			     struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_dp_destroy_intf() - DP module interface deletion

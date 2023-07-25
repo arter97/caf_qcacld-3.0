@@ -21609,8 +21609,9 @@ hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter)
 		if (!link_adapter)
 			continue;
 
-		ucfg_dp_update_inf_mac(hdd_ctx->psoc, &link_adapter->mac_addr,
-				       &link_addr[i]);
+		ucfg_dp_update_intf_mac(hdd_ctx->psoc, &link_adapter->mac_addr,
+					&link_addr[i],
+					link_adapter->deflink->vdev);
 		qdf_copy_macaddr(&link_adapter->mac_addr, &link_addr[i]);
 	}
 	qdf_copy_macaddr(&adapter->link_info[i].link_addr, &link_addr[i]);

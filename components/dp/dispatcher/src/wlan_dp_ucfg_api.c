@@ -103,11 +103,13 @@ QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
-			    struct qdf_mac_addr *cur_mac,
-			    struct qdf_mac_addr *new_mac)
+void ucfg_dp_update_intf_mac(struct wlan_objmgr_psoc *psoc,
+			     struct qdf_mac_addr *cur_mac,
+			     struct qdf_mac_addr *new_mac,
+			     struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
 	struct wlan_dp_psoc_context *dp_ctx;
 
 	dp_ctx =  dp_psoc_get_priv(psoc);
@@ -125,6 +127,21 @@ void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
 		QDF_MAC_ADDR_REF(new_mac->bytes));
 
 	qdf_copy_macaddr(&dp_intf->mac_addr, new_mac);
+
+	/*
+	 * update of dp_intf mac address happens only during dynamic mac
+	 * address update. This is a special case, where the connection
+	 * can change without vdevs getting deleted.
+	 * Hence its expected to reset the def_link in dp_intf to the
+	 * def_link used by UMAC, for the next connection.
+	 */
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	dp_info("Try def_link update for dp_intf %pK from %pK to %pK (intf %pK id %d)",
+		dp_intf, dp_intf->def_link, dp_link,
+		dp_link ? dp_link->dp_intf : NULL,
+		dp_link ? dp_link->link_id : 255);
+	if (dp_link && dp_link->dp_intf == dp_intf)
+		dp_intf->def_link = dp_link;
 
 	wlan_dp_set_vdev_direct_link_cfg(psoc, dp_intf);
 }

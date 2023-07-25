@@ -428,8 +428,9 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 
 		/* Update DP intf and new link address in link adapter
 		 */
-		ucfg_dp_update_inf_mac(hdd_ctx->psoc, &link_adapter->mac_addr,
-				       &link_addrs[i]);
+		ucfg_dp_update_intf_mac(hdd_ctx->psoc, &link_adapter->mac_addr,
+					&link_addrs[i],
+					link_adapter->deflink->vdev);
 		qdf_copy_macaddr(&link_adapter->mac_addr, &link_addrs[i]);
 		qdf_copy_macaddr(&adapter->link_info[i].link_addr,
 				 &link_addrs[i]);
