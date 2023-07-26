@@ -481,13 +481,17 @@ ml_nlink_get_standby_link_info(struct wlan_objmgr_psoc *psoc,
 			}
 
 			if ((flag & NLINK_EXCLUDE_REMOVED_LINK) &&
-			    link_info->link_status_flags) {
+			    qdf_atomic_test_bit(
+					LS_F_AP_REMOVAL_BIT,
+					&link_info->link_status_flags)) {
 				mlo_debug("standby link %d is removed",
 					  link_info->link_id);
 				continue;
 			}
 			if ((flag & NLINK_INCLUDE_REMOVED_LINK_ONLY) &&
-			    !link_info->link_status_flags) {
+			    !qdf_atomic_test_bit(
+					LS_F_AP_REMOVAL_BIT,
+					&link_info->link_status_flags)) {
 				continue;
 			}
 
