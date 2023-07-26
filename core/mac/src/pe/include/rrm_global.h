@@ -78,6 +78,34 @@ struct ch_load_ind {
 	uint16_t meas_duration;
 };
 
+/**
+ * struct chan_load_xmit_ind - Contains info for channel load xmit indication
+ * @message_type: message type eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND
+ * @length: size of struct chan_load_req_ind
+ * @measurement_idx: measurement index for channel load request
+ * @peer_addr: MAC address of the BSS
+ * @dialog_token: dialog token
+ * @op_class: regulatory class
+ * @channel: channel number
+ * @duration: measurement duration in ms
+ * @chan_load: channel utilization measurement
+ * @rrm_scan_tsf: time at which driver triggers rrm scan for channel load
+ * @is_report_success: need to send failure report or not
+ */
+struct chan_load_xmit_ind {
+	uint16_t messageType;
+	uint16_t length;
+	uint8_t measurement_idx;
+	struct qdf_mac_addr peer_addr;
+	uint16_t dialog_token;
+	uint8_t op_class;
+	uint8_t channel;
+	uint16_t duration;
+	uint8_t chan_load;
+	qdf_time_t rrm_scan_tsf;
+	bool is_report_success;
+};
+
 typedef struct sSirBeaconReportReqInd {
 	uint16_t messageType;   /* eWNI_SME_BEACON_REPORT_REQ_IND */
 	uint16_t length;

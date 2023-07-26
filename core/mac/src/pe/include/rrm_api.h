@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2012, 2014-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -89,6 +90,17 @@ rrm_process_neighbor_report_req(struct mac_context *mac,
 QDF_STATUS
 rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 			       tpSirBeaconReportXmitInd beacon_xmit_ind);
+
+/**
+ * rrm_process_chan_load_report_xmit() - process channel load report xmit
+ * @mac_ctx: Mac context
+ * @chan_load_ind: channel load xmit structure
+ *
+ * Return: None
+ */
+void
+rrm_process_chan_load_report_xmit(struct mac_context *mac_ctx,
+				  struct chan_load_xmit_ind *chan_load_ind);
 
 /**
  * rrm_get_country_code_from_connected_profile() - get country code

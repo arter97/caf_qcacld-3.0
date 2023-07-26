@@ -1755,6 +1755,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_CHNG_MCC_BEACON_INTERVAL:
 	case eWNI_SME_NEIGHBOR_REPORT_REQ_IND:
 	case eWNI_SME_BEACON_REPORT_RESP_XMIT_IND:
+	case eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND:
 #if defined FEATURE_WLAN_ESE
 	case eWNI_SME_ESE_ADJACENT_AP_REPORT:
 #endif

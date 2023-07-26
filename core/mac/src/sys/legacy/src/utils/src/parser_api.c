@@ -7061,6 +7061,31 @@ QDF_STATUS populate_dot11f_wfatpc(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 }
 
+void
+populate_dot11f_chan_load_report(struct mac_context *mac,
+				 tDot11fIEMeasurementReport *dot11f,
+				 struct chan_load_report *channel_load_report)
+{
+	dot11f->report.channel_load_report.op_class =
+					channel_load_report->op_class;
+	dot11f->report.channel_load_report.channel =
+					channel_load_report->channel;
+	qdf_mem_copy(dot11f->report.channel_load_report.meas_start_time,
+		&channel_load_report->rrm_scan_tsf,
+		sizeof(dot11f->report.channel_load_report.meas_start_time));
+	dot11f->report.channel_load_report.meas_duration =
+				channel_load_report->meas_duration;
+	dot11f->report.channel_load_report.chan_load =
+				channel_load_report->chan_load;
+
+	pe_debug("regClass %d chan %d meas_time %d meas_dur %d, chan_load %d",
+		 dot11f->report.channel_load_report.op_class,
+		 dot11f->report.channel_load_report.channel,
+		 channel_load_report->rrm_scan_tsf,
+		 dot11f->report.channel_load_report.meas_duration,
+		 dot11f->report.channel_load_report.chan_load);
+}
+
 QDF_STATUS
 populate_dot11f_beacon_report(struct mac_context *mac,
 			      tDot11fIEMeasurementReport *pDot11f,

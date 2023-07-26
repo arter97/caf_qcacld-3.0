@@ -832,6 +832,19 @@ populate_dot11f_beacon_report(struct mac_context *mac,
 			bool is_last_frame);
 
 /**
+ * populate_dot11f_chan_load_report() - populate the chan load Report IE
+ * @mac: pointer to the global MAC context
+ * @dot11f: pointer to the measurement report structure
+ * @channel_load_report: pointer to the chan load Report structure
+ *
+ * Return: none
+ */
+void
+populate_dot11f_chan_load_report(struct mac_context *mac,
+				 tDot11fIEMeasurementReport *dot11f,
+				 struct chan_load_report *channel_load_report);
+
+/**
  * \brief Populate a tDot11fIEExtSuppRates
  *
  *

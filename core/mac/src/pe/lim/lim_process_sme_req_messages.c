@@ -8018,6 +8018,9 @@ static void __lim_process_report_message(struct mac_context *mac,
 	case eWNI_SME_BEACON_REPORT_RESP_XMIT_IND:
 		rrm_process_beacon_report_xmit(mac, pMsg->bodyptr);
 		break;
+	case eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND:
+		rrm_process_chan_load_report_xmit(mac, pMsg->bodyptr);
+		break;
 	default:
 		pe_err("Invalid msg type: %d", pMsg->type);
 	}
@@ -8731,6 +8734,7 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 
 	case eWNI_SME_NEIGHBOR_REPORT_REQ_IND:
 	case eWNI_SME_BEACON_REPORT_RESP_XMIT_IND:
+	case eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND:
 		__lim_process_report_message(mac, pMsg);
 		break;
 	case eWNI_SME_FT_AGGR_QOS_REQ:

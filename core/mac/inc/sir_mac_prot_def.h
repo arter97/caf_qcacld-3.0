@@ -1347,6 +1347,22 @@ typedef struct sSirMacBeaconReport {
 
 } tSirMacBeaconReport, *tpSirMacBeaconReport;
 
+/**
+ * struct chan_load_report - channel load Report Structure
+ * @op_class: Regulatory Class
+ * @channel: Channel for which the current report is being sent
+ * @rrm_scan_tsf: RRM scan start time for this report
+ * @meas_duration: Scan duration for the current channel
+ * @chan_load: channel utilization measurement
+ */
+struct chan_load_report {
+	uint8_t op_class;
+	uint8_t channel;
+	qdf_time_t rrm_scan_tsf;
+	uint8_t meas_duration;
+	uint8_t chan_load;
+};
+
 typedef struct sSirMacRadioMeasureReport {
 	uint8_t token;
 	uint8_t refused;
@@ -1354,6 +1370,7 @@ typedef struct sSirMacRadioMeasureReport {
 	uint8_t type;
 	union {
 		tSirMacBeaconReport beaconReport;
+		struct chan_load_report channel_load_report;
 	} report;
 
 } tSirMacRadioMeasureReport, *tpSirMacRadioMeasureReport;

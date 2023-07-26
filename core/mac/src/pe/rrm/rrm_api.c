@@ -1524,6 +1524,95 @@ cleanup:
 	rrm_cleanup(mac, index);
 }
 
+void
+rrm_process_chan_load_report_xmit(struct mac_context *mac_ctx,
+				  struct chan_load_xmit_ind *chan_load_ind)
+{
+	tSirMacRadioMeasureReport *report = NULL;
+	struct chan_load_report *channel_load_report;
+	tpRRMReq curr_req;
+	struct pe_session *session_entry;
+	uint8_t session_id, idx;
+	struct qdf_mac_addr sessionBssId;
+
+	if (!chan_load_ind) {
+		pe_err("Received chan_load_xmit_ind is NULL in PE");
+		return;
+	}
+
+	idx = chan_load_ind->measurement_idx;
+
+	if (idx >= QDF_ARRAY_SIZE(mac_ctx->rrm.rrmPEContext.pCurrentReq)) {
+		pe_err("Received measurement_idx is out of range: %u - %zu",
+		       idx,
+		       QDF_ARRAY_SIZE(mac_ctx->rrm.rrmPEContext.pCurrentReq));
+		return;
+	}
+
+	curr_req = mac_ctx->rrm.rrmPEContext.pCurrentReq[idx];
+	if (!curr_req) {
+		pe_err("no request pending in PE");
+		goto end;
+	}
+
+	pe_debug("Received chan load report xmit indication on idx:%d", idx);
+
+	sessionBssId = mac_ctx->rrm.rrmSmeContext[idx].sessionBssId;
+
+	session_entry = pe_find_session_by_bssid(mac_ctx, sessionBssId.bytes,
+						 &session_id);
+	if (!session_entry) {
+		pe_err("NULL session for bssId "QDF_MAC_ADDR_FMT"",
+		       QDF_MAC_ADDR_REF(sessionBssId.bytes));
+		goto end;
+	}
+
+	if (!chan_load_ind->is_report_success) {
+		rrm_process_chan_load_request_failure(mac_ctx, session_entry,
+						      sessionBssId.bytes,
+						      eRRM_REFUSED, idx);
+		return;
+	}
+
+	report = qdf_mem_malloc(sizeof(*report));
+	if (!report)
+		goto end;
+
+	/* Prepare the channel load report and send it to the peer.*/
+	report->token = chan_load_ind->dialog_token;
+	report->refused = 0;
+	report->incapable = 0;
+	report->type = SIR_MAC_RRM_CHANNEL_LOAD_TYPE;
+
+	channel_load_report = &report[0].report.channel_load_report;
+	channel_load_report->op_class = chan_load_ind->op_class;
+	channel_load_report->channel = chan_load_ind->channel;
+	channel_load_report->rrm_scan_tsf = chan_load_ind->rrm_scan_tsf;
+	channel_load_report->meas_duration = chan_load_ind->duration;
+	channel_load_report->chan_load = chan_load_ind->chan_load;
+
+	pe_err("send chan load report for bssId:"QDF_MAC_ADDR_FMT" reg_class:%d, channel:%d, measStartTime:%llu, measDuration:%d, chan_load:%d",
+	       QDF_MAC_ADDR_REF(sessionBssId.bytes),
+	       channel_load_report->op_class,
+	       channel_load_report->channel,
+	       channel_load_report->rrm_scan_tsf,
+	       channel_load_report->meas_duration,
+	       channel_load_report->chan_load);
+
+	lim_send_radio_measure_report_action_frame(mac_ctx,
+						   curr_req->dialog_token, 1,
+						   true, &report[0],
+						   sessionBssId.bytes,
+						   session_entry);
+
+end:
+	pe_debug("Measurement done idx:%d", idx);
+	rrm_cleanup(mac_ctx, idx);
+	qdf_mem_free(report);
+
+	return;
+}
+
 /**
  * rrm_process_chan_load_req() - process channel load request
  * @mac_ctx: Global pointer to MAC context
@@ -1870,18 +1959,21 @@ void rrm_cleanup(struct mac_context *mac, uint8_t idx)
 	tpRRMReq cur_rrm_req = NULL;
 
 	mac->rrm.rrmPEContext.num_active_request--;
-	pe_debug("Beacon report cleanup idx:%d, num_active_request:%d",
-		 idx, mac->rrm.rrmPEContext.num_active_request);
 	cur_rrm_req = mac->rrm.rrmPEContext.pCurrentReq[idx];
 	if (!cur_rrm_req)
 		return;
 
-	qdf_mem_free(cur_rrm_req->request.Beacon.reqIes.pElementIds);
-	cur_rrm_req->request.Beacon.reqIes.pElementIds = NULL;
-	cur_rrm_req->request.Beacon.reqIes.num = 0;
+	if (cur_rrm_req->request.Beacon.reqIes.num) {
+		qdf_mem_free(cur_rrm_req->request.Beacon.reqIes.pElementIds);
+		cur_rrm_req->request.Beacon.reqIes.pElementIds = NULL;
+		cur_rrm_req->request.Beacon.reqIes.num = 0;
+	}
 
 	qdf_mem_free(cur_rrm_req);
 	mac->rrm.rrmPEContext.pCurrentReq[idx] = NULL;
+
+	pe_debug("cleanup rrm req idx:%d, num_active_request:%d",
+		 idx, mac->rrm.rrmPEContext.num_active_request);
 }
 
 /**

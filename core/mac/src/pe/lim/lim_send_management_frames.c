@@ -5676,6 +5676,16 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 				pRRMReport[i].refused;
 			frm->MeasurementReport[i].present = 1;
 			break;
+		case SIR_MAC_RRM_CHANNEL_LOAD_TYPE:
+			populate_dot11f_chan_load_report(mac,
+				&frm->MeasurementReport[i],
+				&pRRMReport[i].report.channel_load_report);
+			frm->MeasurementReport[i].incapable =
+				pRRMReport[i].incapable;
+			frm->MeasurementReport[i].refused =
+				pRRMReport[i].refused;
+			frm->MeasurementReport[i].present = 1;
+			break;
 		default:
 			frm->MeasurementReport[i].incapable =
 				pRRMReport[i].incapable;
@@ -5751,14 +5761,12 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 						 wlan_vdev_get_id(pe_session->vdev));
 	}
 
-	pe_nofl_info("TX: %s seq_no:%d dialog_token:%d no. of APs:%d is_last_rpt:%d num_report: %d peer:"QDF_MAC_ADDR_FMT,
-		     frm->MeasurementReport[0].type == SIR_MAC_RRM_BEACON_TYPE ?
-		     "[802.11 BCN_RPT]" : "[802.11 RRM]",
+	pe_nofl_info("TX: type:%d seq_no:%d dialog_token:%d no. of APs:%d is_last_rpt:%d num_report:%d peer:"QDF_MAC_ADDR_FMT,
+		     frm->MeasurementReport[0].type,
 		     (pMacHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET |
 		     pMacHdr->seqControl.seqNumLo),
 		     dialog_token, frm->num_MeasurementReport,
-		     is_last_report, num_report,
-		     QDF_MAC_ADDR_REF(peer));
+		     is_last_report, num_report, QDF_MAC_ADDR_REF(peer));
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -5775,7 +5783,7 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 			 pe_session->peSessionId, qdf_status));
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		pe_nofl_err("TX: [802.11 RRM] Send FAILED! err_status [%d]",
-		       qdf_status);
+			    qdf_status);
 		status_code = QDF_STATUS_E_FAILURE;
 		/* Pkt will be freed up by the callback */
 	}

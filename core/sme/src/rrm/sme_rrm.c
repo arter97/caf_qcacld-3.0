@@ -41,6 +41,7 @@
 #include <wlan_utility.h>
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include "rrm_api.h"
+#include "wlan_cp_stats_mc_ucfg_api.h"
 
 /* Roam score for a neighbor AP will be calculated based on the below
  * definitions. The calculated roam score will be used to select the
@@ -713,12 +714,58 @@ end:
 	return qdf_status;
 }
 
+/**
+ * sme_rrm_send_chan_load_report_xmit_ind() -Sends the chan load report xmit
+ * to PE
+ * @mac: global mac context
+ * @rrm_sme_ctx: SME rrm context for measurement request
+ * @vdev_id: vdev id
+ * @is_report_success: need to send failure report or not
+ *
+ * The sme module calls this function once it finish the scan request
+ * and this function send the chan load report xmit to PE.
+ *
+ * Return : None
+ */
+static void
+sme_rrm_send_chan_load_report_xmit_ind(struct mac_context *mac,
+				       tpRrmSMEContext rrm_sme_ctx,
+				       uint8_t vdev_id,
+				       bool is_report_success)
+{
+	uint8_t measurement_index = rrm_sme_ctx->measurement_idx;
+	struct chan_load_xmit_ind *chan_load_resp;
+	uint16_t length;
+	tpRrmSMEContext rrm_ctx = &mac->rrm.rrmSmeContext[measurement_index];
+
+	length = sizeof(struct chan_load_xmit_ind);
+	chan_load_resp = qdf_mem_malloc(length);
+	if (!chan_load_resp)
+		return;
+
+	chan_load_resp->messageType = eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND;
+	chan_load_resp->is_report_success = is_report_success;
+	chan_load_resp->length = length;
+	chan_load_resp->measurement_idx = measurement_index;
+	chan_load_resp->dialog_token = rrm_ctx->token;
+	chan_load_resp->duration = rrm_ctx->duration[0];
+	chan_load_resp->op_class = rrm_ctx->regClass;
+	chan_load_resp->channel = rrm_ctx->chan_load_req_info.channel;
+	chan_load_resp->rrm_scan_tsf = rrm_ctx->chan_load_req_info.rrm_scan_tsf;
+	wlan_cp_stats_get_rx_clear_count(mac->psoc, vdev_id,
+					 rrm_ctx->chan_load_req_info.channel,
+					 &chan_load_resp->chan_load);
+
+	sme_debug("SME Sending CHAN_LOAD_REPORT_RESP_XMIT_IND to PE");
+	umac_send_mb_message_to_mac(chan_load_resp);
+}
+
 static void sme_rrm_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 			struct scan_event *event, void *arg)
 {
 	struct mac_context *mac_ctx;
 	uint32_t scan_id;
-	uint8_t session_id, i;
+	uint8_t vdev_id, i;
 	eCsrScanStatus scan_status = eCSR_SCAN_FAILURE;
 	bool success = false;
 	tpRrmSMEContext smerrmctx;
@@ -729,7 +776,7 @@ static void sme_rrm_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	session_id = wlan_vdev_get_id(vdev);
+	vdev_id = wlan_vdev_get_id(vdev);
 	scan_id = event->scan_id;
 
 	qdf_mtrace(QDF_MODULE_ID_SCAN, QDF_MODULE_ID_SME, event->type,
@@ -750,10 +797,24 @@ static void sme_rrm_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 			return;
 	}
 
-	sme_debug("Scan completed for scan_id:%d measurement_idx:%d",
-		  scan_id, smerrmctx->measurement_idx);
-	sme_rrm_scan_request_callback(mac_ctx, smerrmctx, session_id,
-				      scan_id, scan_status);
+	sme_debug("vdev: %d : Scan completed for scan_id:%d idx:%d, type:%d",
+		  vdev_id, scan_id, smerrmctx->measurement_idx,
+		  smerrmctx->measurement_type);
+
+	switch (smerrmctx->measurement_type) {
+	case RRM_CHANNEL_LOAD:
+		sme_rrm_send_chan_load_report_xmit_ind(mac_ctx, smerrmctx,
+						       vdev_id, true);
+		break;
+	case RRM_BEACON_REPORT:
+		sme_rrm_scan_request_callback(mac_ctx, smerrmctx, vdev_id,
+					      scan_id, scan_status);
+		break;
+	default:
+		sme_err("Unknown measurement_type: %d",
+			smerrmctx->measurement_type);
+		break;
+	}
 }
 
 #define RRM_CHAN_WEIGHT_CHAR_LEN 5
@@ -1212,7 +1273,9 @@ error_handle:
 	qdf_mem_free(req);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 send_ind:
-	//TODO: Send channel load report xmit indication and free current req
+	sme_rrm_send_chan_load_report_xmit_ind(mac_ctx, sme_rrm_ctx,
+					       vdev_id, false);
+	rrm_cleanup(mac_ctx, idx);
 	return status;
 }
 
@@ -1491,11 +1554,14 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 		     (uint8_t *)&beacon_req->measurementDuration,
 		     SIR_ESE_MAX_MEAS_IE_REQS);
 
-	sme_debug("token: %d randnIntvl: %d msgSource: %d measurementduration %d, rrm_ctx duration %d Meas_mode: %s",
+	sme_rrm_ctx->measurement_type = RRM_BEACON_REPORT;
+
+	sme_debug("token: %d randnIntvl: %d msgSource: %d measurementduration %d, rrm_ctx duration %d Meas_mode: %s, type: %d",
 		  sme_rrm_ctx->token, sme_rrm_ctx->randnIntvl,
 		  sme_rrm_ctx->msgSource, beacon_req->measurementDuration[0],
 		  sme_rrm_ctx->duration[0],
-		  sme_rrm_get_meas_mode_string(sme_rrm_ctx->measMode[0]));
+		  sme_rrm_get_meas_mode_string(sme_rrm_ctx->measMode[0]),
+		  sme_rrm_ctx->measurement_type);
 
 	return sme_rrm_issue_scan_req(mac, beacon_req->measurement_idx);
 
