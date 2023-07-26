@@ -1409,7 +1409,8 @@ __wlan_hdd_cfg80211_oem_data_handler(struct wiphy *wiphy,
 		int skb_len = 0;
 
 		adapter->oem_data_in_progress = true;
-
+		qdf_runtime_pm_prevent_suspend(
+					&hdd_ctx->runtime_context.oem_data_cmd);
 		request = osif_request_alloc(&params);
 		if (!request) {
 			hdd_err("request allocation failure");
@@ -1470,6 +1471,7 @@ err:
 		osif_request_put(request);
 	adapter->oem_data_in_progress = false;
 	adapter->response_expected = false;
+	qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.oem_data_cmd);
 
 	return ret;
 
