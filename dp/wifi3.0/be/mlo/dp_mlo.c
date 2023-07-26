@@ -1237,6 +1237,24 @@ dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id)
 }
 
 #ifdef WLAN_MLO_MULTI_CHIP
+static void dp_print_mlo_partner_list(struct dp_vdev_be *be_vdev,
+				      struct dp_vdev *partner_vdev,
+				      void *arg)
+{
+	struct dp_vdev_be *partner_vdev_be = NULL;
+	struct dp_soc_be *partner_soc_be = NULL;
+
+	partner_vdev_be = dp_get_be_vdev_from_dp_vdev(partner_vdev);
+	partner_soc_be = dp_get_be_soc_from_dp_soc(partner_vdev->pdev->soc);
+
+	DP_PRINT_STATS("is_bridge_vap = %s, mcast_primary = %s,  vdev_id = %d, pdev_id = %d, chip_id = %d",
+		       partner_vdev->is_bridge_vdev ? "true" : "false",
+		       partner_vdev_be->mcast_primary ? "true" : "false",
+		       partner_vdev->vdev_id,
+		       partner_vdev->pdev->pdev_id,
+		       partner_soc_be->mlo_chip_id);
+}
+
 void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			   struct dp_vdev_be *be_vdev,
 			   dp_ptnr_vdev_iter_func func,
@@ -1301,6 +1319,27 @@ void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 }
 
 qdf_export_symbol(dp_mlo_iter_ptnr_vdev);
+
+void dp_mlo_debug_print_ptnr_info(struct dp_vdev *vdev)
+{
+	struct dp_vdev_be *be_vdev = NULL;
+	struct dp_soc_be *be_soc = NULL;
+
+	be_soc = dp_get_be_soc_from_dp_soc(vdev->pdev->soc);
+	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+
+	DP_PRINT_STATS("self vdev is_bridge_vap = %s, mcast_primary = %s, vdev = %d, pdev_id = %d, chip_id = %d",
+		       vdev->is_bridge_vdev ? "true" : "false",
+		       be_vdev->mcast_primary ? "true" : "false",
+		       vdev->vdev_id,
+		       vdev->pdev->pdev_id,
+		       dp_mlo_get_chip_id(vdev->pdev->soc));
+
+	dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+			      dp_print_mlo_partner_list,
+			      NULL, DP_MOD_ID_GENERIC_STATS,
+			      DP_ALL_VDEV_ITER);
+}
 #endif
 
 #ifdef WLAN_MCAST_MLO

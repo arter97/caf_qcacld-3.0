@@ -2776,6 +2776,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	dp_initialize_arch_ops_be_mlo(arch_ops);
 #ifdef WLAN_MLO_MULTI_CHIP
 	arch_ops->dp_get_soc_by_chip_id = dp_get_soc_by_chip_id_be;
+	arch_ops->dp_mlo_print_ptnr_info = dp_mlo_debug_print_ptnr_info;
 #endif
 	arch_ops->dp_soc_get_num_soc = dp_soc_get_num_soc_be;
 	arch_ops->dp_peer_rx_reorder_queue_setup =
