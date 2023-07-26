@@ -1144,20 +1144,57 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 			  legacy_intf_freq1);
 		return;
 	}
-	/* handle standby link */
+
+	if (force_inactive_link_bitmap)
+		force_cmd->force_inactive_bitmap = force_inactive_link_bitmap;
+}
+
+static void
+ml_nlink_handle_standby_link_3_ports(
+		struct wlan_objmgr_psoc *psoc,
+		struct wlan_objmgr_vdev *vdev,
+		struct ml_link_force_state *force_cmd,
+		uint8_t num_legacy_vdev,
+		uint8_t *vdev_lst,
+		qdf_freq_t *freq_lst,
+		enum policy_mgr_con_mode *mode_lst)
+{
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint32_t force_inactive_link_bitmap = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t i, j;
+
+	if (num_legacy_vdev < 2)
+		return;
+
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	if (ml_num_link < 2)
+		return;
 	for (i = 0; i < ml_num_link; i++) {
-		if (ml_vdev_lst[i] == WLAN_INVALID_VDEV_ID) {
-			/*standby link will be forced inactive if mcc with
-			 * legacy sta
-			 */
-			if (ml_freq_lst[i] != legacy_intf_freq1)
+		if (ml_vdev_lst[i] != WLAN_INVALID_VDEV_ID)
+			continue;
+		/* standby link will be forced inactive if mcc with
+		 * legacy interface
+		 */
+		for (j = 0; j < num_legacy_vdev; j++) {
+			if (ml_freq_lst[i] != freq_lst[j] &&
+			    policy_mgr_are_2_freq_on_same_mac(
+					psoc, ml_freq_lst[i], freq_lst[j]))
 				force_inactive_link_bitmap |=
 						1 << ml_linkid_lst[i];
 		}
 	}
 
 	if (force_inactive_link_bitmap)
-		force_cmd->force_inactive_bitmap = force_inactive_link_bitmap;
+		force_cmd->force_inactive_bitmap |= force_inactive_link_bitmap;
 }
 
 /**
@@ -1256,7 +1293,7 @@ ml_nlink_handle_legacy_intf(struct wlan_objmgr_psoc *psoc,
 	case PM_P2P_GO_MODE:
 		if (!policy_mgr_is_vdev_high_tput_or_low_latency(
 					psoc, vdev_lst[0]))
-			return;
+			break;
 		fallthrough;
 	case PM_STA_MODE:
 		ml_nlink_handle_legacy_intf_3_ports(
@@ -1272,6 +1309,11 @@ ml_nlink_handle_legacy_intf(struct wlan_objmgr_psoc *psoc,
 		mlo_debug("unexpected legacy intf mode %d", mode_lst[0]);
 		return;
 	}
+	ml_nlink_handle_standby_link_3_ports(psoc, vdev, force_cmd,
+					     num_legacy_vdev,
+					     vdev_lst,
+					     freq_lst,
+					     mode_lst);
 	ml_nlink_dump_force_state(force_cmd, "");
 }
 
@@ -1353,6 +1395,14 @@ ml_nlink_handle_dynamic_inactive(struct wlan_objmgr_psoc *psoc,
 				continue;
 			if (policy_mgr_2_freq_always_on_same_mac(
 				psoc, freq_lst[j], ml_freq_lst[i])) {
+				force_inactive_link_bitmap |=
+					1 << ml_linkid_lst[i];
+				mlo_debug("force dynamic inactive link id %d freq %d for sap freq %d",
+					  ml_linkid_lst[i], ml_freq_lst[i],
+					  freq_lst[j]);
+			} else if (num > 1 &&
+				   policy_mgr_are_2_freq_on_same_mac(
+					psoc, freq_lst[j], ml_freq_lst[i])) {
 				force_inactive_link_bitmap |=
 					1 << ml_linkid_lst[i];
 				mlo_debug("force dynamic inactive link id %d freq %d for sap freq %d",
