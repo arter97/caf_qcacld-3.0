@@ -138,10 +138,8 @@ struct dp_pdev_tx_capture {
 	uint32_t ppdu_stats_defer_queue_depth;
 	qdf_spinlock_t msdu_comp_q_list_lock;
 	qdf_timer_t work_q_timer;
-	uint32_t missed_ppdu_id;
 	uint32_t last_msdu_id;
 	uint16_t last_peer_id;
-	qdf_event_t miss_ppdu_event;
 	uint32_t ppdu_dropped;
 	uint32_t pend_ppdu_dropped;
 	qdf_nbuf_queue_t ctl_mgmt_q[TXCAP_MAX_TYPE][TXCAP_MAX_SUBTYPE];
