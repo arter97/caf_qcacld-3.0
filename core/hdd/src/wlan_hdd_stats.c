@@ -677,7 +677,7 @@ static bool put_wifi_peer_rates(struct wifi_peer_info *stats,
 	return true;
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * wlan_hdd_update_mlo_iface_stats_info() - update mlo per link iface stats info
  * @hdd_ctx: Pointer to hdd_context
@@ -1350,7 +1350,7 @@ static void hdd_link_layer_process_peer_stats(struct hdd_adapter *adapter,
 	wlan_cfg80211_vendor_cmd_reply(skb);
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * hdd_cache_ll_iface_stats() - Caches ll_stats received from fw
  * @hdd_ctx: Pointer to hdd_context
@@ -7456,7 +7456,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 #define WLAN_INVALID_RSSI_VALUE -128
 /**
  * wlan_hdd_copy_hdd_stats_to_sinfo() - Copy hdd station stats info to sinfo

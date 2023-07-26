@@ -1802,11 +1802,6 @@ lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 		eht_config->bw_320_tx_max_nss_for_mcs_12_and_13 = tx_nss;
 	}
 }
-#else
-void
-lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
-{
-}
 #endif
 
 static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
