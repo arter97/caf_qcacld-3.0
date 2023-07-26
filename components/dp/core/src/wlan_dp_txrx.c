@@ -619,7 +619,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 
 	/* track connectivity stats */
 	if (dp_intf->pkt_type_bitmap)
-		dp_tx_rx_collect_connectivity_stats_info(nbuf, dp_intf,
+		dp_tx_rx_collect_connectivity_stats_info(nbuf, dp_link,
 							 PKT_TYPE_REQ,
 							 &pkt_type);
 
@@ -702,7 +702,7 @@ drop_pkt:
 
 	/* track connectivity stats */
 	if (dp_intf->pkt_type_bitmap)
-		dp_tx_rx_collect_connectivity_stats_info(nbuf, dp_intf,
+		dp_tx_rx_collect_connectivity_stats_info(nbuf, dp_link,
 							 PKT_TYPE_TX_DROPPED,
 							 &pkt_type);
 	qdf_dp_trace_data_pkt(nbuf, QDF_TRACE_DEFAULT_PDEV_ID,
@@ -1718,7 +1718,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 
 		/* track connectivity stats */
 		if (dp_intf->pkt_type_bitmap)
-			dp_tx_rx_collect_connectivity_stats_info(nbuf, dp_intf,
+			dp_tx_rx_collect_connectivity_stats_info(nbuf, dp_link,
 								 PKT_TYPE_RSP,
 								 &pkt_type);
 
@@ -1832,7 +1832,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 			/* track connectivity stats */
 			if (dp_intf->pkt_type_bitmap)
 				dp_tx_rx_collect_connectivity_stats_info(
-					nbuf, dp_intf,
+					nbuf, dp_link,
 					PKT_TYPE_RX_DELIVERED,
 					&pkt_type);
 		} else {
@@ -1850,7 +1850,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 			/* track connectivity stats */
 			if (dp_intf->pkt_type_bitmap)
 				dp_tx_rx_collect_connectivity_stats_info(
-					nbuf, dp_intf,
+					nbuf, dp_link,
 					PKT_TYPE_RX_REFUSED,
 					&pkt_type);
 		}
