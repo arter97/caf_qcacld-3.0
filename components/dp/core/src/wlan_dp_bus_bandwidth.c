@@ -2132,6 +2132,9 @@ static void __dp_bus_bw_compute_timer_start(struct wlan_objmgr_psoc *psoc)
 	if (QDF_GLOBAL_FTM_MODE == cds_get_conparam())
 		return;
 
+	if (QDF_GLOBAL_EPPING_MODE == cds_get_conparam())
+		return;
+
 	qdf_periodic_work_start(&dp_ctx->bus_bw_work,
 				dp_ctx->dp_cfg.bus_bw_compute_interval);
 	dp_ctx->bw_vote_time = qdf_get_log_timestamp();
@@ -2175,6 +2178,9 @@ static void __dp_bus_bw_compute_timer_stop(struct wlan_objmgr_psoc *psoc)
 	bool is_any_adapter_conn;
 
 	if (QDF_GLOBAL_FTM_MODE == cds_get_conparam())
+		return;
+
+	if (QDF_GLOBAL_EPPING_MODE == cds_get_conparam())
 		return;
 
 	if (!dp_ctx || !soc)
