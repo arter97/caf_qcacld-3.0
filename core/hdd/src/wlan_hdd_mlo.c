@@ -255,6 +255,8 @@ void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
 static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_update_bss_info = hdd_cm_save_connected_links_info,
 	.mlo_mgr_osif_update_mac_addr = hdd_link_switch_vdev_mac_addr_update,
+	.mlo_mgr_osif_link_switch_notification =
+					hdd_adapter_link_switch_notification,
 };
 
 QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
@@ -269,6 +271,51 @@ QDF_STATUS hdd_mlo_mgr_unregister_osif_ops(void)
 	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
 
 	return wlan_mlo_mgr_unregister_osif_ext_ops(mlo_mgr_ctx);
+}
+
+QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
+						uint8_t non_trans_vdev_id)
+{
+	int errno;
+	bool found = false;
+	struct hdd_adapter *adapter;
+	struct vdev_osif_priv *osif_priv;
+	struct wlan_hdd_link_info *link_info, *iter_link_info;
+	struct osif_vdev_sync *vdev_sync;
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv) {
+		hdd_err("Invalid osif priv");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	link_info = osif_priv->legacy_osif_priv;
+	adapter = link_info->adapter;
+
+	if (link_info->vdev_id != adapter->deflink->vdev_id) {
+		hdd_err("Default VDEV %d not equal", adapter->deflink->vdev_id);
+		QDF_ASSERT(0);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	errno = osif_vdev_sync_trans_start_wait(adapter->dev, &vdev_sync);
+	if (errno)
+		return QDF_STATUS_E_FAILURE;
+
+	osif_vdev_sync_wait_for_ops(vdev_sync);
+	hdd_adapter_for_each_link_info(adapter, iter_link_info) {
+		if (non_trans_vdev_id == iter_link_info->vdev_id) {
+			adapter->deflink = iter_link_info;
+			found = true;
+			break;
+		}
+	}
+	osif_vdev_sync_trans_stop(vdev_sync);
+
+	if (!found)
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

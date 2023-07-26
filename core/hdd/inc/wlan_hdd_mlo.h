@@ -250,6 +250,17 @@ struct hdd_adapter *hdd_get_ml_adapter(struct hdd_context *hdd_ctx)
 void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter);
 
 /**
+ * hdd_adapter_link_switch_notification() - Get HDD notification on link switch
+ * start.
+ * @vdev: VDEV on which link switch will happen
+ * @non_trans_vdev_id: VDEV not part of link switch.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
+						uint8_t non_trans_vdev_id);
+
+/**
  * hdd_mlo_t2lm_register_callback() - Register T2LM callback
  * @vdev: Pointer to vdev
  *
