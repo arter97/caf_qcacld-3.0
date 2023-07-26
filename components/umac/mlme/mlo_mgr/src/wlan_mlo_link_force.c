@@ -433,6 +433,8 @@ bool ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc)
 #define NLINK_INCLUDE_REMOVED_LINK_ONLY 0x02
 /* Exclude QUITE link */
 #define NLINK_EXCLUDE_QUIET_LINK	0x04
+/* Exclude standby link information */
+#define NLINK_EXCLUDE_STANDBY_LINK	0x08
 
 static void
 ml_nlink_get_standby_link_info(struct wlan_objmgr_psoc *psoc,
@@ -616,7 +618,7 @@ static void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 		num_link++;
 	}
 	/* Add standby link only if mlo sta is connected */
-	if (connected)
+	if (connected && !(flag & NLINK_EXCLUDE_STANDBY_LINK))
 		ml_nlink_get_standby_link_info(psoc, vdev, flag,
 					       ml_num_link_sz,
 					       ml_link_info,
@@ -1082,6 +1084,58 @@ ml_nlink_handle_legacy_p2p_intf(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ml_nlink_handle_3_port_specific_scenario() - Check some specific corner
+ * case that can't be handled general logic in
+ * ml_nlink_handle_legacy_intf_3_ports.
+ * @psoc: PSOC object information
+ * @legacy_intf_freq1: legacy interface 1 channel frequency
+ * @legacy_intf_freq2: legacy interface 2 channel frequency
+ * @ml_num_link: number of ML STA links
+ * @ml_freq_lst: ML STA link channel frequency list
+ * @ml_linkid_lst: ML STA link ids
+ *
+ * Return: link force inactive bitmap
+ */
+static uint32_t
+ml_nlink_handle_3_port_specific_scenario(struct wlan_objmgr_psoc *psoc,
+					 qdf_freq_t legacy_intf_freq1,
+					 qdf_freq_t legacy_intf_freq2,
+					 uint8_t ml_num_link,
+					 qdf_freq_t *ml_freq_lst,
+					 uint8_t *ml_linkid_lst)
+{
+	uint32_t force_inactive_link_bitmap = 0;
+
+	if (ml_num_link < 2)
+		return 0;
+
+	/* special case handling:
+	 * LL P2P on 2.4G, ML STA 5G+6G, SAP on 6G, then
+	 * inactive 5G link.
+	 * LL P2P on 2.4G, ML STA 5G+6G, SAP on 5G, then
+	 * inactive 6G link.
+	 */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(legacy_intf_freq1) &&
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[0]) &&
+	    policy_mgr_are_sbs_chan(psoc, ml_freq_lst[0], ml_freq_lst[1]) &&
+	    policy_mgr_2_freq_always_on_same_mac(psoc, ml_freq_lst[0],
+						 legacy_intf_freq2))
+		force_inactive_link_bitmap |= 1 << ml_linkid_lst[1];
+	else if (WLAN_REG_IS_24GHZ_CH_FREQ(legacy_intf_freq1) &&
+		 !WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[1]) &&
+		 policy_mgr_are_sbs_chan(psoc, ml_freq_lst[0],
+					 ml_freq_lst[1]) &&
+		 policy_mgr_2_freq_always_on_same_mac(psoc, ml_freq_lst[1],
+						      legacy_intf_freq2))
+		force_inactive_link_bitmap |= 1 << ml_linkid_lst[0];
+
+	if (force_inactive_link_bitmap)
+		mlo_debug("force inactive 0x%x", force_inactive_link_bitmap);
+
+	return force_inactive_link_bitmap;
+}
+
+/**
  * ml_nlink_handle_legacy_intf_3_ports() - Check force inactive needed
  * with 2 legacy interfaces
  * @psoc: PSOC object information
@@ -1090,10 +1144,15 @@ ml_nlink_handle_legacy_p2p_intf(struct wlan_objmgr_psoc *psoc,
  * @legacy_intf_freq1: legacy interface frequency
  * @legacy_intf_freq2: legacy interface frequency
  *
- * If legacy interface is mcc with any link based on current hw mode, then
- * force inactive the link.
+ * If legacy interface 1 (which channel frequency legacy_intf_freq1) is
+ * mcc with any link based on current hw mode, then force inactive the link.
  * And if standby link is mcc with legacy interface, then disable standby
  * link as well.
+ * In 3 Port case, at present only legacy interface 1(which channel frequency
+ * legacy_intf_freq1) MCC avoidance requirement can be met. The assignment of
+ * legacy_intf_freq1 and legacy_intf_freq2 is based on priority of Port type,
+ * check policy_mgr_get_legacy_conn_info for detail.
+ * Cornor cases will be handled in ml_nlink_handle_3_port_specific_scenario.
  *
  * Return: void
  */
@@ -1136,6 +1195,15 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 		} else if (policy_mgr_are_2_freq_on_same_mac(
 				psoc, ml_freq_lst[i], legacy_intf_freq1)) {
 			force_inactive_link_bitmap |= 1 << ml_linkid_lst[i];
+		} else if (i == 1) {
+			force_inactive_link_bitmap |=
+			ml_nlink_handle_3_port_specific_scenario(
+							psoc,
+							legacy_intf_freq1,
+							legacy_intf_freq2,
+							ml_num_link,
+							ml_freq_lst,
+							ml_linkid_lst);
 		}
 	}
 	/* usually it can't happen in 3 Port */
@@ -1442,7 +1510,8 @@ static bool ml_nlink_sta_inactivity_allowed_with_quiet(
 	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
 
 	ml_nlink_get_link_info(psoc, vdev, (NLINK_EXCLUDE_REMOVED_LINK |
-					    NLINK_EXCLUDE_QUIET_LINK),
+					    NLINK_EXCLUDE_QUIET_LINK |
+					    NLINK_EXCLUDE_STANDBY_LINK),
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
 			       ml_link_info, ml_freq_lst, ml_vdev_lst,
 			       ml_linkid_lst, &ml_num_link,
