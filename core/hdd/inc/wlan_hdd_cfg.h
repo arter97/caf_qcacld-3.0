@@ -206,6 +206,7 @@ struct hdd_config {
 #ifdef FEATURE_RUNTIME_PM
 	uint16_t cpu_cxpc_threshold;
 #endif
+	bool exclude_selftx_from_cca_busy;
 };
 
 /**
