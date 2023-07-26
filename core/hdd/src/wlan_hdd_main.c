@@ -4622,7 +4622,7 @@ static int hdd_set_pcie_params(struct hdd_context *hdd_ctx,
 			       uint8_t index, struct dev_set_param *param)
 {
 	int ret = 0;
-	bool check_value = false;
+	uint8_t check_value = 0;
 
 	ret = ucfg_fwol_get_pcie_config(hdd_ctx->psoc, &check_value);
 	if (QDF_IS_STATUS_SUCCESS(ret)) {
