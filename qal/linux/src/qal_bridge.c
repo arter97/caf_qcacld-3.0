@@ -116,3 +116,27 @@ qal_bridge_fdb_update_unregister_notify(qal_notify_blk_t nb)
 }
 
 qdf_export_symbol(qal_bridge_fdb_update_unregister_notify);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
+QDF_STATUS
+qal_bridge_fdb_add_or_refresh_by_netdev(qal_netdev_t dev,
+					const unsigned char *addr,
+					uint16_t vid,
+					uint16_t state)
+{
+	int ret;
+
+	ret = br_fdb_add_or_refresh_by_netdev(dev, addr, vid, state);
+	return qdf_status_from_os_return(ret);
+}
+#else
+QDF_STATUS
+qal_bridge_fdb_add_or_refresh_by_netdev(qal_netdev_t dev,
+					const unsigned char *addr,
+					uint16_t vid,
+					uint16_t state)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+qdf_export_symbol(qal_bridge_fdb_add_or_refresh_by_netdev);
