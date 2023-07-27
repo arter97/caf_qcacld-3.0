@@ -139,7 +139,7 @@ qdf_export_symbol(qca_multi_link_tbl_find_sta_or_ap);
 QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, uint8_t *addr,
 							qca_multi_link_entry_type_t entry_type)
 {
-	int status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint16_t state = NUD_NONE;
 
 	if (entry_type == QCA_MULTI_LINK_ENTRY_USER_ADDED) {
@@ -150,11 +150,8 @@ QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, u
 		state = NUD_NOARP;
 	}
 
-	status = br_fdb_add_or_refresh_by_netdev(net_dev, addr, 0, state);
-	if (status < 0) {
-		return QDF_STATUS_E_FAILURE;
-	}
-	return QDF_STATUS_SUCCESS;
+	status = qal_bridge_fdb_add_or_refresh_by_netdev(net_dev, addr, 0, state);
+	return status;
 }
 qdf_export_symbol(qca_multi_link_tbl_add_or_refresh_entry);
 
