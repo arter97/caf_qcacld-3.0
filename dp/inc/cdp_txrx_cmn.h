@@ -3190,4 +3190,134 @@ cdp_get_tqm_offset(ol_txrx_soc_handle soc, uint64_t *value)
 
 	soc->ops->cmn_drv_ops->txrx_get_tqm_offset(soc, value);
 }
+
+#if defined(WLAN_FEATURE_11BE_MLO)
+/*
+ * cdp_mlo_dev_ctxt_create - DP MLO Device context create
+ * @soc: soc handle
+ * @mld_mac_addr: MLD MAC Address
+ *
+ * return: QDF_STATUS
+ */
+static inline
+QDF_STATUS cdp_mlo_dev_ctxt_create(ol_txrx_soc_handle soc,
+				   uint8_t *mld_mac_addr)
+{
+	if (!soc || !soc->ops) {
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->cmn_mlo_ops ||
+	    !soc->ops->cmn_mlo_ops->mlo_dev_ctxt_create)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->cmn_mlo_ops->mlo_dev_ctxt_create(soc, mld_mac_addr);
+}
+
+/*
+ * cdp_mlo_dev_ctxt_destroy - DP MLO Device context destroy
+ * @soc: soc handle
+ * @mld_mac_addr: MLD MAC Address
+ *
+ * return: QDF_STATUS
+ */
+static inline
+QDF_STATUS cdp_mlo_dev_ctxt_destroy(ol_txrx_soc_handle soc,
+				    uint8_t *mld_mac_addr)
+{
+	if (!soc || !soc->ops) {
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->cmn_mlo_ops ||
+	    !soc->ops->cmn_mlo_ops->mlo_dev_ctxt_destroy)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->cmn_mlo_ops->mlo_dev_ctxt_destroy(soc, mld_mac_addr);
+}
+
+/*
+ * cdp_mlo_dev_ctxt_attach - DP MLO Device context attach vdev
+ * @soc: soc handle
+ * @vdev_id: vdev id
+ * @mld_mac_addr: MLD MAC Address
+ *
+ * return: QDF_STATUS
+ */
+static inline
+QDF_STATUS cdp_mlo_dev_ctxt_attach(ol_txrx_soc_handle soc,
+				   uint8_t vdev_id,
+				   uint8_t *mld_mac_addr)
+{
+	if (!soc || !soc->ops) {
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->cmn_mlo_ops ||
+	    !soc->ops->cmn_mlo_ops->mlo_dev_ctxt_attach)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->cmn_mlo_ops->mlo_dev_ctxt_attach(soc, vdev_id,
+							  mld_mac_addr);
+}
+
+/*
+ * cdp_mlo_dev_ctxt_detach - DP MLO Device context detach vdev
+ * @soc: soc handle
+ * @vdev_id: vdev id
+ * @mld_mac_addr: MLD MAC Address
+ *
+ * return: QDF_STATUS
+ */
+static inline
+QDF_STATUS cdp_mlo_dev_ctxt_detach(ol_txrx_soc_handle soc,
+				   uint8_t vdev_id,
+				   uint8_t *mld_mac_addr)
+{
+	if (!soc || !soc->ops) {
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->cmn_mlo_ops ||
+	    !soc->ops->cmn_mlo_ops->mlo_dev_ctxt_detach)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->cmn_mlo_ops->mlo_dev_ctxt_detach(soc, vdev_id,
+							  mld_mac_addr);
+}
+#else
+static inline
+QDF_STATUS cdp_mlo_dev_ctxt_create(ol_txrx_soc_handle soc,
+				   uint8_t *mld_mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS cdp_mlo_dev_ctxt_destroy(ol_txrx_soc_handle soc,
+				    uint8_t *mld_mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS cdp_mlo_dev_ctxt_attach(ol_txrx_soc_handle soc,
+				   uint8_t vdev_id,
+				   uint8_t *mld_mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS cdp_mlo_dev_ctxt_detach(ol_txrx_soc_handle soc,
+				   uint8_t vdev_id,
+				   uint8_t *mld_mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* _CDP_TXRX_CMN_H_ */
