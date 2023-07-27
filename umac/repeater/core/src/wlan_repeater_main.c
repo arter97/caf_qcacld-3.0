@@ -1094,6 +1094,7 @@ void wlan_rptr_vdev_detach(
 		}
 	}
 #endif
+	dp_wrap_vdev_detach(vdev);
 }
 #endif
 
