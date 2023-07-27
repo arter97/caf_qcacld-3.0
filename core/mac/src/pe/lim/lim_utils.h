@@ -284,6 +284,17 @@ QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
  */
 void lim_strip_mlo_ie(struct mac_context *mac_ctx,
 		      uint8_t *add_ie, uint16_t *add_ielen);
+
+/**
+ * lim_set_emlsr_caps() - This API will set EMLSR caps in vdev obj if ELMSR is
+ * supported.
+ * @mac: mac context
+ * @pe_session: session entry
+ *
+ * Return: Void
+ */
+void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+			struct pe_session *session);
 #else
 static inline uint16_t lim_assign_mlo_conn_idx(struct mac_context *mac,
 					       struct pe_session *pe_session,
@@ -323,6 +334,11 @@ QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
 				uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+				      struct pe_session *session)
+{
 }
 #endif
 

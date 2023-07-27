@@ -4393,8 +4393,7 @@ static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 	pe_join_req->assoc_link_id = req->assoc_link_id;
 }
 
-static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
-			       struct pe_session *session)
+void lim_set_emlsr_caps(struct mac_context *mac_ctx, struct pe_session *session)
 {
 	bool emlsr_cap, emlsr_allowed, emlsr_band_check, emlsr_enabled = false;
 
@@ -4426,11 +4425,6 @@ static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
 #else
 static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 			     struct join_req *pe_join_req)
-{
-}
-
-static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
-			       struct pe_session *session)
 {
 }
 #endif

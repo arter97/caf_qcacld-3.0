@@ -9357,49 +9357,54 @@ void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,
 				 struct bss_params *add_bss,
 				 tpSirAssocRsp assoc_rsp)
 {
-	struct wlan_mlo_peer_context *mlo_peer_ctx;
-	struct wlan_objmgr_peer *peer;
+	struct wlan_mlo_sta *sta_ctx;
+	struct wlan_objmgr_vdev *vdev = session->vdev;
+	struct emlsr_capability *ml_emlcap;
 
-	peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc, add_bss->bssId,
-					   WLAN_LEGACY_MAC_ID);
-	if (!peer) {
-		pe_err("peer is null");
+	wlan_objmgr_vdev_get_ref(vdev, WLAN_MLME_NB_ID);
+	if (!vdev) {
+		pe_err("vdev is null");
 		return;
 	}
 
-	mlo_peer_ctx = peer->mlo_peer_ctx;
-	if (!mlo_peer_ctx) {
-		pe_err("mlo peer ctx is null");
-		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
-		return;
+	if (!vdev->mlo_dev_ctx) {
+		pe_err("mlo dev ctx is null");
+		goto end;
 	}
 
-	if (!wlan_vdev_mlme_cap_get(session->vdev, WLAN_VDEV_C_EMLSR_CAP)) {
+	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx) {
+		pe_err("sta ctx is null");
+		goto end;
+	}
+
+	ml_emlcap = &sta_ctx->emlsr_cap;
+
+	if (!wlan_vdev_mlme_cap_get(vdev, WLAN_VDEV_C_EMLSR_CAP)) {
 		add_bss->staContext.emlsr_support = false;
-		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
-		return;
+		goto end;
 	}
 
 	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev)) {
-		add_bss->staContext.emlsr_support =
-				mlo_peer_ctx->mlpeer_emlcap.emlsr_supp;
+		add_bss->staContext.emlsr_support = ml_emlcap->emlsr_supp;
 		add_bss->staContext.emlsr_trans_timeout =
-				mlo_peer_ctx->mlpeer_emlcap.trans_timeout;
+						ml_emlcap->trans_timeout;
 	} else {
 		add_bss->staContext.emlsr_support = true;
 		add_bss->staContext.emlsr_trans_timeout =
-			assoc_rsp->mlo_ie.mlo_ie.eml_capabilities_info.transition_timeout;
+		assoc_rsp->mlo_ie.mlo_ie.eml_capabilities_info.transition_timeout;
 
-		mlo_peer_ctx->mlpeer_emlcap.emlsr_supp =
-				add_bss->staContext.emlsr_support;
-		mlo_peer_ctx->mlpeer_emlcap.trans_timeout =
-				add_bss->staContext.emlsr_trans_timeout;
+		ml_emlcap->emlsr_supp = add_bss->staContext.emlsr_support;
+		ml_emlcap->trans_timeout =
+					add_bss->staContext.emlsr_trans_timeout;
 	}
 
-	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+end:
 	pe_debug("emlsr support: %d, transition timeout:%d",
 		 add_bss->staContext.emlsr_support,
 		 add_bss->staContext.emlsr_trans_timeout);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 }
 
 #define MAX_MSD_OFDM_ED_THRESHOLD 10
