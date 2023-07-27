@@ -22589,7 +22589,7 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 
 	mlo_link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
-	     link_info_iter++) {
+	     link_info_iter++, mlo_link_info++) {
 		if (qdf_is_macaddr_zero(&mlo_link_info->ap_link_addr) ||
 		    mlo_link_info->link_id == 0xFF)
 			continue;
@@ -22602,7 +22602,6 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 				(uint8_t *)mlo_link_info->ap_link_addr.bytes,
 				params, &mlo_link_info->link_addr,
 				mlo_link_info->link_id);
-			mlo_link_info++;
 	}
 }
 
