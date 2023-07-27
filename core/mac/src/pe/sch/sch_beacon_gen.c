@@ -17,6 +17,12 @@
  */
 
 /*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+/*
  * This file sch_beacon_gen.cc contains beacon generation related
  * functions
  *

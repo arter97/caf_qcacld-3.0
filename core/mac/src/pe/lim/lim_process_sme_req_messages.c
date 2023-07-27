@@ -17,6 +17,12 @@
  */
 
 /*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+/*
  * This file lim_process_sme_req_messages.cc contains the code
  * for processing SME request messages.
  * Author:        Chandra Modumudi
