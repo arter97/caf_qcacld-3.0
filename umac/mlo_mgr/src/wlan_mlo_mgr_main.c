@@ -701,6 +701,7 @@ static inline void mlo_epcs_ctx_init(struct wlan_mlo_dev_context *ml_dev)
 
 	epcs_ctx = &ml_dev->epcs_ctx;
 	qdf_mem_zero(epcs_ctx, sizeof(struct wlan_epcs_context));
+	epcs_dev_lock_create(epcs_ctx);
 }
 
 static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
@@ -815,6 +816,18 @@ static inline void mlo_t2lm_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 	wlan_mlo_t2lm_timer_deinit(vdev);
 }
 
+/**
+ * mlo_epcs_ctx_deinit() - API to deinitialize the epcs context with the default
+ * values.
+ * @mlo_dev_ctx: MLO dev context pointer
+ *
+ * Return: None
+ */
+static inline void mlo_epcs_ctx_deinit(struct wlan_mlo_dev_context *mlo_dev_ctx)
+{
+	epcs_dev_lock_destroy(&mlo_dev_ctx->epcs_ctx);
+}
+
 static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_mlo_dev_context *ml_dev;
@@ -892,6 +905,7 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 
 		mlo_ptqm_migration_deinit(ml_dev);
 		mlo_t2lm_ctx_deinit(vdev);
+		mlo_epcs_ctx_deinit(ml_dev);
 		tsf_recalculation_lock_destroy(ml_dev);
 		mlo_dev_lock_destroy(ml_dev);
 		qdf_mem_free(ml_dev);
