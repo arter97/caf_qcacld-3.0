@@ -161,6 +161,10 @@ struct rptr_ext_cbacks {
 	void (*nss_prep_mac_db_store_stavap)(struct wlan_objmgr_vdev *vdev,
 					     u8 num_sta);
 #endif
+#ifdef CONFIG_AFC_SUPPORT
+	bool (*vdev_is_6g_txable_chan_available)(struct wlan_objmgr_vdev *vdev,
+						 u8 pwr_mode);
+#endif
 };
 
 /**

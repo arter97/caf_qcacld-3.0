@@ -1512,6 +1512,10 @@ QDF_STATUS wlan_repeater_init(void)
 	rptr_ext_cbacks.nss_prep_mac_db_store_stavap =
 		wlan_nss_prep_mac_db_store_stavap;
 #endif
+#ifdef CONFIG_AFC_SUPPORT
+	rptr_ext_cbacks.vdev_is_6g_txable_chan_available =
+		wlan_is_6g_txable_chan_available;
+#endif
 	wlan_rptr_core_register_ext_cb(&rptr_ext_cbacks);
 	qdf_spinlock_create(&gp_rptr_ctx->rptr_global_lock);
 
