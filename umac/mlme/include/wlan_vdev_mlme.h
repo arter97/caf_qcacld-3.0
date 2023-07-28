@@ -486,6 +486,7 @@ struct vdev_mlme_inactivity_params {
  * @WLAN_VDEV_RATEMASK_TYPE_HT: phy type ht
  * @WLAN_VDEV_RATEMASK_TYPE_VHT: phy type vht
  * @WLAN_VDEV_RATEMASK_TYPE_HE: phy type he
+ * @WLAN_VDEV_RATEMASK_TYPE_EHT: phy type eht
  * @WLAN_VDEV_RATEMASK_TYPE_MAX: Maximum enumeration
  */
 enum vdev_ratemask_type {
@@ -493,6 +494,7 @@ enum vdev_ratemask_type {
 	WLAN_VDEV_RATEMASK_TYPE_HT,
 	WLAN_VDEV_RATEMASK_TYPE_VHT,
 	WLAN_VDEV_RATEMASK_TYPE_HE,
+	WLAN_VDEV_RATEMASK_TYPE_EHT,
 	WLAN_VDEV_RATEMASK_TYPE_MAX,
 };
 
