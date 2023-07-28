@@ -22605,6 +22605,29 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 	}
 }
 
+static bool
+wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
+			    struct wlan_objmgr_vdev *vdev,
+			    struct qdf_mac_addr *mac_address)
+{
+	if (!adapter)
+		return false;
+
+	if (!vdev)
+		return false;
+
+	if ((adapter->device_mode == QDF_STA_MODE) &&
+	    ((!wlan_cm_is_vdev_connected(vdev)) ||
+	    (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
+	     mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
+					       wlan_vdev_get_id(vdev))))) {
+		hdd_debug("MLO:Defer set keys for vdev %d", wlan_vdev_get_id(vdev));
+		return true;
+	}
+
+	return false;
+}
+
 #else
 
 static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
@@ -22613,6 +22636,15 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 					       struct key_params *params)
 {
 }
+
+static bool
+wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
+			    struct wlan_objmgr_vdev *vdev,
+			    struct qdf_mac_addr *mac_address)
+{
+	return false;
+}
+
 #endif
 
 static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
@@ -22707,6 +22739,9 @@ done:
 					WLAN_CRYPTO_KEY_TYPE_GROUP),
 					mac_address.bytes, params);
 	}
+
+	if (wlan_hdd_mlo_defer_set_keys(adapter, vdev, &mac_address))
+		return 0;
 
 	cipher_cap = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_CIPHER_CAP);
 	if (errno)
