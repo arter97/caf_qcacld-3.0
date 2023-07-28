@@ -4493,8 +4493,10 @@ ccflags-y += -DWLAN_MAX_VDEVS=$(CONFIG_WLAN_MAX_VDEVS)
 
 ifdef CONFIG_WLAN_FEATURE_11BE_MLO
 CONFIG_WLAN_MAX_MLD ?= 2
-ccflags-y += -DWLAN_MAX_MLD=$(CONFIG_WLAN_MAX_MLD)
+else
+CONFIG_WLAN_MAX_MLD ?= 1
 endif
+ccflags-y += -DWLAN_MAX_MLD=$(CONFIG_WLAN_MAX_MLD)
 
 #Maximum pending commands for a vdev is calculated in vdev create handler
 #by WLAN_SER_MAX_PENDING_CMDS/WLAN_SER_MAX_VDEVS. For SAP case, we will need
