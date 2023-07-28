@@ -1638,6 +1638,11 @@ config WLAN_TSF_UPLINK_DELAY
 	depends on WLAN_TSF_AUTO_REPORT
 	default n
 
+config WLAN_TX_LATENCY_STATS
+	bool "Enable WLAN_TX_LATENCY_STATS"
+	depends on WLAN_TSF_AUTO_REPORT
+	default n
+
 config WLAN_TWT_CONVERGED
 	bool "Enable WLAN_TWT_CONVERGED"
 	default n

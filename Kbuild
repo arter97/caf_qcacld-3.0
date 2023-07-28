@@ -4130,6 +4130,12 @@ ccflags-y += -DWLAN_FEATURE_TSF_UPLINK_DELAY
 CONFIG_WLAN_TSF_AUTO_REPORT := y
 endif
 
+# Enable tx latency stats feature
+ifeq ($(CONFIG_WLAN_TX_LATENCY_STATS), y)
+ccflags-y += -DWLAN_FEATURE_TX_LATENCY_STATS
+CONFIG_WLAN_TSF_AUTO_REPORT := y
+endif
+
 # Enable TSF auto report feature
 ccflags-$(CONFIG_WLAN_TSF_AUTO_REPORT) += -DWLAN_FEATURE_TSF_AUTO_REPORT
 

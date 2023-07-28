@@ -1284,6 +1284,7 @@ struct wlan_hdd_tx_power {
  * @deflink: Default link pointing to the 0th index of the linkinfo array
  * @link_info: Data structure to hold link specific information
  * @tx_power: Structure to hold connection tx Power info
+ * @tx_latency_cfg: configuration for per-link transmit latency statistics
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1474,6 +1475,9 @@ struct hdd_adapter {
 	struct wlan_hdd_link_info *deflink;
 	struct wlan_hdd_link_info link_info[WLAN_MAX_ML_BSS_LINKS];
 	struct wlan_hdd_tx_power tx_power;
+#ifdef WLAN_FEATURE_TX_LATENCY_STATS
+	struct cdp_tx_latency_config tx_latency_cfg;
+#endif
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)

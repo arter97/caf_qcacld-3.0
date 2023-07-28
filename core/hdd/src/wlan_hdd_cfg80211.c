@@ -2171,6 +2171,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_AUDIO_TRANSPORT_SWITCH,
 	},
 
+	FEATURE_TX_LATENCY_STATS_EVENTS
 };
 
 /**
@@ -20575,6 +20576,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_ML_LINK_STATE_COMMANDS
 	FEATURE_AFC_VENDOR_COMMANDS
 	FEATURE_LL_LT_SAP_VENDOR_COMMANDS
+	FEATURE_TX_LATENCY_STATS_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)

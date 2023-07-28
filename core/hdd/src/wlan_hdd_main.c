@@ -5786,6 +5786,7 @@ status_ret:
 	/* Update FW WoW pattern with new MAC address */
 	ucfg_pmo_del_wow_pattern(vdev);
 	ucfg_pmo_register_wow_default_patterns(vdev);
+	hdd_tx_latency_restore_config(link_info);
 
 allow_suspend:
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE);
@@ -15389,6 +15390,8 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 	uint8_t index = 0;
 
 	cdp_register_pause_cb(soc, wlan_hdd_txrx_pause_cb);
+	hdd_tx_latency_register_cb(soc);
+
 	/* Register HL netdev flow control callback */
 	cdp_hl_fc_register(soc, OL_TXRX_PDEV_ID, wlan_hdd_txrx_pause_cb);
 	/* Register rx mic error indication handler */
