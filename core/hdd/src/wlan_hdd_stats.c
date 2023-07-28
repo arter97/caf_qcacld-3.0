@@ -8735,19 +8735,98 @@ return_cached_value:
 	return ret;
 }
 
+static uint32_t
+wlan_hdd_get_per_link_speed(struct wlan_hdd_link_info *link_info)
+{
+	uint32_t link_speed;
+	struct qdf_mac_addr bssid;
+
+	if (!hdd_cm_is_vdev_associated(link_info)) {
+		/* we are not connected so we don't have a classAstats */
+		hdd_debug("Not connected");
+		return 0;
+	}
+	qdf_copy_macaddr(&bssid,
+			 &link_info->session.station.conn_info.bssid);
+
+	if (wlan_hdd_get_linkspeed_for_peermac(link_info,
+					       &bssid, &link_speed)) {
+		hdd_err("Unable to retrieve SME linkspeed");
+		return 0;
+	}
+	hdd_debug("linkspeed = %d", link_speed);
+	return link_speed;
+}
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+#ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+static uint32_t
+wlan_hdd_get_mlo_link_speed(struct hdd_adapter *adapter)
+{
+	struct hdd_adapter *ml_adapter = NULL;
+	struct hdd_adapter *link_adapter = NULL;
+	struct hdd_mlo_adapter_info *mlo_adapter_info = NULL;
+	uint32_t link_speed = 0;
+	uint32_t per_speed;
+	uint8_t link_id;
+
+	ml_adapter = adapter;
+	if (hdd_adapter_is_link_adapter(ml_adapter))
+		ml_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
+
+	mlo_adapter_info = &ml_adapter->mlo_adapter_info;
+	for (link_id = 0; link_id < WLAN_MAX_MLD; link_id++) {
+		link_adapter = mlo_adapter_info->link_adapter[link_id];
+		if (qdf_unlikely(!link_adapter)) {
+			hdd_err("link_adapter[%d] is Null", link_id);
+			continue;
+		}
+		per_speed = wlan_hdd_get_per_link_speed(ml_adapter->deflink);
+		link_speed += per_speed;
+		hdd_debug("Link%d speed=%d, total speed=%d",
+			  link_id, per_speed, link_speed);
+	}
+	return link_speed;
+}
+#else
+static uint32_t
+wlan_hdd_get_mlo_link_speed(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info = NULL;
+	uint32_t link_speed = 0;
+	uint32_t per_speed;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		per_speed = wlan_hdd_get_per_link_speed(link_info);
+		link_speed += per_speed;
+		hdd_debug("per_speed=%d, link_speed=%d", per_speed, link_speed);
+	}
+	return link_speed;
+}
+#endif
+
+#else
+static uint32_t
+wlan_hdd_get_mlo_link_speed(struct hdd_adapter *adapter)
+{
+	uint32_t link_speed = wlan_hdd_get_per_link_speed(adapter->deflink);
+
+	hdd_debug("Not support MLO, linkspeed = %d", link_speed);
+	return link_speed;
+}
+#endif
+
 int wlan_hdd_get_link_speed(struct wlan_hdd_link_info *link_info,
 			    uint32_t *link_speed)
 {
 	struct hdd_adapter *adapter =  link_info->adapter;
 	struct hdd_context *hddctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *hdd_stactx;
 	int ret;
 
 	ret = wlan_hdd_validate_context(hddctx);
 	if (ret)
 		return ret;
 
-	hdd_stactx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	/* Linkspeed is allowed for CLIENT/STA mode */
 	if (adapter->device_mode != QDF_P2P_CLIENT_MODE &&
 	    adapter->device_mode != QDF_STA_MODE) {
@@ -8757,23 +8836,13 @@ int wlan_hdd_get_link_speed(struct wlan_hdd_link_info *link_info,
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_cm_is_vdev_associated(link_info)) {
-		/* we are not connected so we don't have a classAstats */
-		*link_speed = 0;
-	} else {
-		struct qdf_mac_addr bssid;
+	if (wlan_hdd_is_mlo_connection(link_info))
+		*link_speed = wlan_hdd_get_mlo_link_speed(adapter);
+	else
+		*link_speed = wlan_hdd_get_per_link_speed(link_info);
 
-		qdf_copy_macaddr(&bssid, &hdd_stactx->conn_info.bssid);
-
-		ret = wlan_hdd_get_linkspeed_for_peermac(link_info,
-							 &bssid, link_speed);
-		if (ret) {
-			hdd_err("Unable to retrieve SME linkspeed");
-			return ret;
-		}
-		/* linkspeed in units of 500 kbps */
-		*link_speed = (*link_speed) / 500;
-	}
+	/* linkspeed in units of 500 kbps */
+	*link_speed = (*link_speed) / 500;
 	return 0;
 }
 
