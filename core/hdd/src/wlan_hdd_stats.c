@@ -3195,9 +3195,14 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 		stats =  qdf_container_of(ll_node, struct hdd_ll_stats,
 					  ll_stats_node);
 		wlan_hdd_handle_ll_stats(link_info, stats, ret);
-		if (stats->result_param_id == WMI_LINK_STATS_ALL_PEER)
+		if (stats->result_param_id == WMI_LINK_STATS_ALL_PEER) {
+			if (mlo_stats) {
+				hdd_err("Received Multiple peers stats");
+				qdf_mem_free(mlo_stats);
+			}
 			mlo_stats = wlan_hdd_mlo_peer_stats(link_info,
 							    stats);
+		}
 		qdf_mem_free(stats->result);
 		qdf_mem_free(stats);
 		qdf_spin_lock(&priv->ll_stats_lock);
