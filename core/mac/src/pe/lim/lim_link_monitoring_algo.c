@@ -99,14 +99,16 @@ static void lim_delete_sta_util(struct mac_context *mac_ctx, tpDeleteStaContext 
 						mac_ctx,
 						REASON_PREV_AUTH_NOT_VALID,
 						stads->staAddr,
-						session_entry, false);
+						session_entry, true);
+				stads->is_disassoc_deauth_in_progress = 1;
 			} else {
 				lim_send_disassoc_mgmt_frame(
 					mac_ctx,
 					REASON_DISASSOC_DUE_TO_INACTIVITY,
 					stads->staAddr, session_entry, false);
+				lim_trigger_sta_deletion(mac_ctx, stads,
+							 session_entry);
 			}
-			lim_trigger_sta_deletion(mac_ctx, stads, session_entry);
 		}
 	} else {
 #ifdef FEATURE_WLAN_TDLS

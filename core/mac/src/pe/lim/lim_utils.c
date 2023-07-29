@@ -487,7 +487,7 @@ void lim_deactivate_timers(struct mac_context *mac_ctx)
 
 	if (tx_timer_running(&lim_timer->gLimDeauthAckTimer)) {
 		pe_err("Deauth timer running call the timeout API");
-		lim_timer_handler(mac_ctx, SIR_LIM_DEAUTH_ACK_TIMEOUT);
+		lim_process_deauth_ack_timeout(mac_ctx, WLAN_INVALID_VDEV_ID);
 	}
 	tx_timer_deactivate(&lim_timer->gLimDeauthAckTimer);
 
