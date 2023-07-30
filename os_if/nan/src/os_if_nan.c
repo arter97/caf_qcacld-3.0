@@ -716,7 +716,7 @@ static int os_if_nan_process_ndp_initiator_req(struct wlan_objmgr_psoc *psoc,
 					       struct nlattr **tb)
 {
 	struct net_device *net_dev;
-	struct osif_vdev_sync *vdev_sync;
+	struct osif_vdev_sync *vdev_sync = NULL;
 	char *ifname;
 	int errno;
 
@@ -729,7 +729,7 @@ static int os_if_nan_process_ndp_initiator_req(struct wlan_objmgr_psoc *psoc,
 		return errno;
 
 	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
-	if (errno)
+	if (errno || (vdev_sync == NULL))
 		return errno;
 
 	errno = __os_if_nan_process_ndp_initiator_req(psoc, ifname, tb);
@@ -905,7 +905,7 @@ static int os_if_nan_process_ndp_responder_req(struct wlan_objmgr_psoc *psoc,
 					       struct nlattr **tb)
 {
 	struct net_device *net_dev;
-	struct osif_vdev_sync *vdev_sync;
+	struct osif_vdev_sync *vdev_sync = NULL;
 	char *ifname;
 	int errno;
 
@@ -918,7 +918,7 @@ static int os_if_nan_process_ndp_responder_req(struct wlan_objmgr_psoc *psoc,
 		return errno;
 
 	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
-	if (errno)
+	if (errno || (vdev_sync == NULL))
 		return errno;
 
 	errno = __os_if_nan_process_ndp_responder_req(psoc, ifname, tb);
@@ -993,7 +993,7 @@ static int os_if_nan_process_ndp_end_req(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct net_device *net_dev;
-	struct osif_vdev_sync *vdev_sync;
+	struct osif_vdev_sync *vdev_sync = NULL;
 	int errno;
 
 	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NDI_MODE,
@@ -1009,7 +1009,7 @@ static int os_if_nan_process_ndp_end_req(struct wlan_objmgr_psoc *psoc,
 		return errno;
 
 	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
-	if (errno)
+	if (errno || (vdev_sync == NULL))
 		return errno;
 
 	errno = __os_if_nan_process_ndp_end_req(psoc, tb);
