@@ -2746,7 +2746,7 @@ int hdd_son_deliver_assoc_disassoc_event(struct hdd_adapter *adapter,
 	return ret;
 }
 
-void hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
+void hdd_son_deliver_peer_authorize_event(struct wlan_hdd_link_info *link_info,
 					  uint8_t *peer_mac)
 {
 	struct wlan_objmgr_peer *peer;
@@ -2754,11 +2754,11 @@ void hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_psoc *psoc;
 
-	if (!adapter || adapter->device_mode != QDF_SAP_MODE) {
+	if (link_info->adapter->device_mode != QDF_SAP_MODE) {
 		hdd_err("Non SAP vdev");
 		return;
 	}
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_SON_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_SON_ID);
 	if (!vdev) {
 		hdd_err("null vdev");
 		return;

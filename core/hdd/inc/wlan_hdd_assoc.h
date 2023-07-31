@@ -354,15 +354,16 @@ hdd_indicate_ese_bcn_report_no_results(const struct hdd_adapter *adapter,
 
 /**
  * hdd_change_peer_state() - change peer state
- * @adapter: HDD adapter
+ * @link_info: Link info pointer of VDEV in adapter
  * @peer_mac_addr: Peer MAC address
  * @sta_state: peer state
  *
  * Return: QDF status
  */
-QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
+QDF_STATUS hdd_change_peer_state(struct wlan_hdd_link_info *link_info,
 				 uint8_t *peer_mac_addr,
 				 enum ol_txrx_peer_state sta_state);
+
 /**
  * hdd_update_dp_vdev_flags() - update datapath vdev flags
  * @cbk_data: callback data

@@ -185,7 +185,7 @@ void hdd_cm_set_peer_authenticate(struct wlan_hdd_link_info *link_info,
 		  QDF_MAC_ADDR_REF(bssid->bytes),
 		  is_auth_required ? "CONNECTED" : "AUTHENTICATED");
 
-	hdd_change_peer_state(link_info->adapter, bssid->bytes,
+	hdd_change_peer_state(link_info, bssid->bytes,
 			      is_auth_required ?
 			      OL_TXRX_PEER_STATE_CONN :
 			      OL_TXRX_PEER_STATE_AUTH);
