@@ -9064,7 +9064,6 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	enum QDF_OPMODE mode;
 	struct wlan_hdd_link_info *link_info;
-	union iwreq_data wrqu;
 
 	mode = adapter->device_mode;
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
@@ -9089,11 +9088,6 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
 		hdd_vdev_destroy(link_info);
 	}
-
-	memset(&wrqu, '\0', sizeof(wrqu));
-	wrqu.ap_addr.sa_family = ARPHRD_ETHER;
-	memset(wrqu.ap_addr.sa_data, '\0', ETH_ALEN);
-	hdd_wext_send_event(adapter->dev, SIOCGIWAP, &wrqu, NULL);
 
 	hdd_disable_nan_active_disc(adapter);
 	hdd_adapter_deregister_fc(adapter);
