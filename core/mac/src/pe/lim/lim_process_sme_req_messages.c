@@ -3128,6 +3128,11 @@ static void lim_reset_self_ocv_caps(struct pe_session *session)
 
 	pe_debug("self RSN cap: %d", self_rsn_cap);
 	self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED;
+
+	/* Update the new rsn caps */
+	wlan_crypto_set_vdev_param(session->vdev, WLAN_CRYPTO_PARAM_RSN_CAP,
+				   self_rsn_cap);
+
 }
 
 QDF_STATUS
