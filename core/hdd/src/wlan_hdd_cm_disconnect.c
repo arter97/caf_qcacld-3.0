@@ -300,7 +300,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 	hdd_handle_disassociation_event(adapter, &rsp->req.req.bssid);
 
-	hdd_ipa_set_tx_flow_info();
+	wlan_hdd_set_tx_flow_info();
 
 	return QDF_STATUS_SUCCESS;
 }

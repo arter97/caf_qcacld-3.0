@@ -41,7 +41,7 @@
  *  be called when config is updated.
  */
 struct coex_psoc_obj {
-	uint8_t btc_chain_mode;
+	enum coex_btc_chain_mode btc_chain_mode;
 	update_coex_cb coex_config_updated[COEX_CONFIG_TYPE_MAX];
 };
 
@@ -144,7 +144,8 @@ QDF_STATUS wlan_coex_psoc_destroyed_notification(struct wlan_objmgr_psoc *psoc,
  * Return : status of operation
  */
 QDF_STATUS
-wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc, uint8_t val);
+wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode val);
 
 /**
  * wlan_coex_psoc_get_btc_chain_mode() - private API to get BT coex chain mode
@@ -155,6 +156,7 @@ wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc, uint8_t val);
  * Return : status of operation
  */
 QDF_STATUS
-wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc, uint8_t *val);
+wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode *val);
 #endif
 #endif
