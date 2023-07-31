@@ -3116,7 +3116,7 @@ struct cdp_pdev_attach_params {
  * @pdev_id: PDEV ID
  */
 struct cdp_txrx_peer_params_update {
-	uint8_t vdev_id;
+	uint8_t	vdev_id;
 	uint8_t	*peer_mac;
 	uint8_t	chip_id;
 	uint8_t	pdev_id;

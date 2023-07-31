@@ -8030,12 +8030,14 @@ static QDF_STATUS dp_txrx_peer_detach(struct dp_soc *soc, struct dp_peer *peer)
 		peer->txrx_peer = NULL;
 		pdev = txrx_peer->vdev->pdev;
 
-		params.vdev_id = peer->vdev->vdev_id;
-		params.peer_mac = peer->mac_addr.raw;
+		if (!peer->bss_peer) {
+			params.vdev_id = peer->vdev->vdev_id;
+			params.peer_mac = peer->mac_addr.raw;
 
-		dp_wdi_event_handler(WDI_EVENT_PEER_DELETE, soc,
-				     (void *)&params, peer->peer_id,
-				     WDI_NO_VAL, pdev->pdev_id);
+			dp_wdi_event_handler(WDI_EVENT_PEER_DELETE, soc,
+					     (void *)&params, peer->peer_id,
+					     WDI_NO_VAL, pdev->pdev_id);
+		}
 
 		dp_peer_defrag_rx_tids_deinit(txrx_peer);
 		/*
@@ -8121,6 +8123,9 @@ static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 		dp_warn("peer sawf stats alloc failed");
 
 	dp_txrx_peer_attach_add(soc, peer, txrx_peer);
+
+	if (peer->bss_peer)
+		return QDF_STATUS_SUCCESS;
 
 	params.peer_mac = peer->mac_addr.raw;
 	params.vdev_id = peer->vdev->vdev_id;
