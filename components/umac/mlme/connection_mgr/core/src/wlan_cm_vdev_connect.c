@@ -44,6 +44,7 @@
 #include "wlan_mlo_t2lm.h"
 #include "wlan_mlo_link_force.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_dp_api.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
@@ -1054,7 +1055,9 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 		mlme_err("vdev_id: %d psoc not found", req->vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
-	if (policy_mgr_is_sta_mon_concurrency(psoc))
+
+	if (!wlan_dp_is_local_pkt_capture_enabled(psoc) &&
+	    policy_mgr_is_sta_mon_concurrency(psoc))
 		return QDF_STATUS_E_NOSUPPORT;
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
