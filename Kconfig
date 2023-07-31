@@ -1747,10 +1747,6 @@ config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"
 	default \"wlan\"
 
-config QCA_WIFI_FTM_IOCTL
-	bool "Enable CONFIG_QCA_WIFI_FTM_IOCTL"
-	default n
-
 config LL_DP_SUPPORT_NON_LITH
 	bool "ENABLE CONFIG_LL_DP_SUPPORT_NON_LITH"
 	default n
