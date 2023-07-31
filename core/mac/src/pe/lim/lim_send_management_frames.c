@@ -91,6 +91,7 @@ static void lim_add_mgmt_seq_num(struct mac_context *mac, tpSirMacMgmtHdr pMacHd
 	pMacHdr->seqControl.seqNumLo = (mac->mgmtSeqNum & LOW_SEQ_NUM_MASK);
 	pMacHdr->seqControl.seqNumHi =
 		((mac->mgmtSeqNum & HIGH_SEQ_NUM_MASK) >> HIGH_SEQ_NUM_OFFSET);
+	pMacHdr->seqControl.fragNum = 0;
 }
 
 /**
@@ -141,9 +142,9 @@ void lim_populate_mac_header(struct mac_context *mac_ctx, uint8_t *buf,
 
 	/* Prepare sequence number */
 	lim_add_mgmt_seq_num(mac_ctx, mac_hdr);
-	pe_debug("seqNumLo=%d, seqNumHi=%d, mgmtSeqNum=%d",
-		mac_hdr->seqControl.seqNumLo,
-		mac_hdr->seqControl.seqNumHi, mac_ctx->mgmtSeqNum);
+	pe_debug("seqNumLo=%d, seqNumHi=%d, mgmtSeqNum=%d, fragNum=%d",
+		 mac_hdr->seqControl.seqNumLo, mac_hdr->seqControl.seqNumHi,
+		 mac_ctx->mgmtSeqNum, mac_hdr->seqControl.fragNum);
 }
 
 /**
