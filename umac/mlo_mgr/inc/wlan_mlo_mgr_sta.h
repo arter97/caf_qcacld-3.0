@@ -174,6 +174,33 @@ int8_t mlo_get_central_umac_id(uint8_t *psoc_ids);
 QDF_STATUS mlo_check_topology(struct wlan_objmgr_pdev *pdev,
 			      struct wlan_objmgr_vdev *vdev,
 			      uint8_t aplinks);
+/**
+ * mlo_update_partner_bridge_info() - Update parter info of bridge vap
+ * @ml_dev: ML dev context
+ * @partner_info: partner info that needs to be updated
+ *
+ * Return: none
+ */
+
+void mlo_update_partner_bridge_info(struct wlan_mlo_dev_context *ml_dev,
+				    struct mlo_partner_info *partner_info);
+
+/**
+ * mlo_is_sta_bridge_vdev() - Check if the vdev is sta bridge vdev
+ * @vdev: vdev pointer
+ *
+ * Return: True if STA bridge vdev else false
+ */
+
+bool mlo_is_sta_bridge_vdev(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlo_sta_bridge_exists() - Check if bridge vdev exists in a STA MLD
+ * @vdev: vdev pointer
+ *
+ * Return: True if Bridge Vdev exists else false
+ */
+bool mlo_sta_bridge_exists(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlo_get_total_links() - get total links supported by device
