@@ -9449,10 +9449,10 @@ static void csr_roam_join_rsp_processor(struct mac_context *mac,
 	 * If connection fails with Single PMK bssid, clear this pmk
 	 * entry, Flush in case if we are not trying again with same AP
 	 */
-	qdf_mem_copy(&pmk_cache.BSSID.bytes,
-		     &pCommand->u.roamCmd.pLastRoamBss->bssId,
-		     sizeof(pmk_cache.BSSID.bytes));
 	if (!use_same_bss && pCommand && pCommand->u.roamCmd.pLastRoamBss) {
+		qdf_mem_copy(&pmk_cache.BSSID.bytes,
+				&pCommand->u.roamCmd.pLastRoamBss->bssId,
+				sizeof(pmk_cache.BSSID.bytes));
 		csr_delete_current_bss_sae_single_pmk_entry(
 			mac, pCommand->u.roamCmd.pLastRoamBss,
 			pSmeJoinRsp->sessionId);
@@ -18333,7 +18333,8 @@ csr_issue_del_sta_for_session_req(struct mac_context *mac_ctx, uint32_t session_
 
 void csr_cleanup_session(struct mac_context *mac, uint32_t sessionId)
 {
-	if (CSR_IS_SESSION_VALID(mac, sessionId)) {
+
+	if (mac && CSR_IS_SESSION_VALID(mac, sessionId)) {
 		struct csr_roam_session *pSession = CSR_GET_SESSION(mac,
 								sessionId);
 

@@ -4470,6 +4470,9 @@ uint8_t csr_construct_wapi_ie(struct mac_context *mac, uint32_t sessionId,
 
 		pWapi = (uint8_t *) (&pWapiIe->AuthOui[1]);
 
+		if (!pWapi)
+			break;
+
 		*pWapi = (uint16_t) 1;  /* cUnicastCyphers */
 		pWapi += 2;
 		qdf_mem_copy(pWapi, UnicastCypher, sizeof(UnicastCypher));
