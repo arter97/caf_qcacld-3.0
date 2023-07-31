@@ -821,11 +821,13 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_11be_rate_create(adapter);
 	hdd_sysfs_bmiss_create(adapter);
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
+	hdd_sysfs_direct_link_ut_cmd_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
 	hdd_sysfs_bmiss_destroy(adapter);
 	hdd_sysfs_11be_rate_destroy(adapter);
