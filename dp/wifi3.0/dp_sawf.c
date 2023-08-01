@@ -593,8 +593,11 @@ static struct dp_peer *dp_find_peer_by_destmac(struct dp_soc *soc,
 		uint16_t peer_id;
 
 		qdf_spin_lock_bh(&soc->ast_lock);
-		ast_entry = dp_peer_ast_hash_find_by_vdevid(soc, dest_mac,
-				vdev_id);
+		if (vdev_id == DP_VDEV_ALL)
+			ast_entry = dp_peer_ast_hash_find_soc(soc, dest_mac);
+		else
+			ast_entry = dp_peer_ast_hash_find_by_vdevid
+					(soc, dest_mac, vdev_id);
 
 		if (!ast_entry) {
 			qdf_spin_unlock_bh(&soc->ast_lock);
@@ -610,8 +613,13 @@ static struct dp_peer *dp_find_peer_by_destmac(struct dp_soc *soc,
 
 		return dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
 	} else {
-		return dp_peer_find_hash_find(soc, dest_mac, 0, vdev_id,
-				DP_MOD_ID_SAWF);
+		struct cdp_peer_info peer_info = {0};
+
+		DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, dest_mac, false,
+					 CDP_WILD_PEER_TYPE);
+
+		return dp_peer_hash_find_wrapper(soc, &peer_info,
+						 DP_MOD_ID_SAWF);
 	}
 }
 
