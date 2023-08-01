@@ -950,6 +950,38 @@ cm_update_scan_db_on_roam_success(struct wlan_objmgr_vdev *vdev,
 				    SCAN_ENTRY_CON_STATE_ASSOC);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+cm_roam_ml_clear_prev_ap_keys(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev;
+	struct mlo_link_info *link_info;
+	uint8_t i;
+
+	ml_dev = vdev->mlo_dev_ctx;
+	if (!ml_dev || !ml_dev->link_ctx)
+		return;
+
+	link_info = &ml_dev->link_ctx->links_info[0];
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
+			continue;
+
+		if (qdf_is_macaddr_zero(&link_info->link_addr))
+			continue;
+
+		wlan_crypto_free_key_by_link_id(wlan_vdev_get_psoc(vdev),
+						&link_info->link_addr,
+						link_info->link_id);
+		link_info++;
+	}
+}
+#else
+static void
+cm_roam_ml_clear_prev_ap_keys(struct wlan_objmgr_vdev *vdev)
+{}
+#endif
+
 QDF_STATUS
 cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			    struct roam_offload_synch_ind *roam_synch_data)
@@ -994,6 +1026,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   roam_synch_data->bssid.bytes, 0, 0);
 
 	cm_roam_update_mlo_mgr_info(vdev, roam_synch_data);
+	cm_roam_ml_clear_prev_ap_keys(vdev);
 
 	cm_id = roam_req->cm_id;
 	rsp = qdf_mem_malloc(sizeof(struct cm_vdev_join_rsp));
