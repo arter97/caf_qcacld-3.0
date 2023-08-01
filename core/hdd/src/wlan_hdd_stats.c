@@ -795,6 +795,32 @@ wlan_hdd_put_mlo_peer_link_id(struct sk_buff *vendor_event,
 	return true;
 }
 
+static bool
+wlan_hdd_is_mlo_peer_stats_valid(struct hdd_context *hdd_ctx,
+				 const uint8_t *bssid)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	if (!hdd_ctx) {
+		hdd_err("Invalid hdd_ctx");
+		return false;
+	}
+
+	link_info = hdd_get_link_info_by_bssid(hdd_ctx, bssid);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return false;
+	}
+
+	if (link_info->adapter->device_mode != QDF_STA_MODE) {
+		hdd_err("Peer stats received for %s mode",
+			qdf_opmode_str(link_info->adapter->device_mode));
+		return false;
+	}
+
+	return true;
+}
+
 /**
  * wlan_hdd_mlo_peer_stats() - Pointer to mlo peer stats
  * @link_info: Link info pointer in HDD adapter
@@ -812,6 +838,7 @@ static void
 	struct wifi_peer_stat *peer_stat = NULL;
 	struct wifi_peer_info *peer_info = NULL;
 	void *mlo_stats;
+	uint8_t *mac;
 	u64 num_rate = 0, peers, rates;
 	size_t stats_size = 0;
 	int i;
@@ -832,6 +859,11 @@ static void
 	}
 
 	peer_info = (struct wifi_peer_info *)peer_stat->peer_info;
+	mac = peer_info->peer_macaddr.bytes;
+
+	if (!wlan_hdd_is_mlo_peer_stats_valid(hdd_ctx, (const uint8_t *)mac))
+		return NULL;
+
 	for (i = 1; i <= peer_stat->num_peers; i++) {
 		num_rate += peer_info->num_rate;
 		peer_info = (struct wifi_peer_info *)((uint8_t *)
@@ -1791,7 +1823,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		goto err;
 	}
 
-	hdd_debug("WMI_MLO_LINK_STATS_IFACE Data");
+	hdd_debug("WMI_MLO_LINK_STATS_IFACE Data. Num_peers = %u", num_peers);
 
 	if (!hdd_get_interface_info(link_info, &cumulative_if_stat.info)) {
 		hdd_err("hdd_get_interface_info get fail for ml_adapter");
@@ -3195,14 +3227,10 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 		stats =  qdf_container_of(ll_node, struct hdd_ll_stats,
 					  ll_stats_node);
 		wlan_hdd_handle_ll_stats(link_info, stats, ret);
-		if (stats->result_param_id == WMI_LINK_STATS_ALL_PEER) {
-			if (mlo_stats) {
-				hdd_err("Received Multiple peers stats");
-				qdf_mem_free(mlo_stats);
-			}
-			mlo_stats = wlan_hdd_mlo_peer_stats(link_info,
-							    stats);
-		}
+		if (stats->result_param_id == WMI_LINK_STATS_ALL_PEER)
+			if (!mlo_stats)
+				mlo_stats = wlan_hdd_mlo_peer_stats(link_info,
+								    stats);
 		qdf_mem_free(stats->result);
 		qdf_mem_free(stats);
 		qdf_spin_lock(&priv->ll_stats_lock);
