@@ -40,6 +40,43 @@ static inline uint8_t qca_scs_fetch_soc_id_frm_rule_id(uint32_t rule_id)
 	return ((rule_id & QCA_SCS_RULE_SOC_ID_MASK) >> QCA_SCS_RULE_SOC_ID_SHIFT);
 }
 
+/* qca_scs_get_vdev() - Fetch vdev from netdev
+ *
+ * @netdev : Netdevice
+ *
+ * Return: Pointer to struct wlan_objmgr_vdev
+ */
+static struct wlan_objmgr_vdev *qca_scs_get_vdev(struct net_device *netdev)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	osif_dev *osdev = NULL;
+
+	osdev = ath_netdev_priv(netdev);
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
+		osif_peer_dev *osifp = NULL;
+		osif_dev *parent_osdev = NULL;
+
+		osifp = ath_netdev_priv(netdev);
+		if (!osifp->parent_netdev)
+			return NULL;
+
+		parent_osdev = ath_netdev_priv(osifp->parent_netdev);
+		osdev = parent_osdev;
+	}
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_MLO) {
+		qdf_nofl_err("ERROR: MLO netdev is not supported\n");
+		return NULL;
+	}
+#endif
+
+	vdev = osdev->ctrl_vdev;
+	return vdev;
+}
+
 /**
  * qca_scs_peer_lookup_n_rule_match() - Find peer using dst mac addr and check
  *     if peer is SCS capable and rule matches for that peer or not
@@ -72,10 +109,35 @@ bool qca_scs_peer_lookup_n_rule_match(uint32_t rule_id, uint8_t *dst_mac_addr)
 }
 
 bool qca_scs_peer_lookup_n_rule_match_v2(
-				struct qca_scs_peer_lookup_n_rule_match *params)
+		struct qca_scs_peer_lookup_n_rule_match *params)
 {
-	return qca_scs_peer_lookup_n_rule_match(params->rule_id,
-						params->dst_mac_addr);
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	ol_txrx_soc_handle soc_txrx_handle;
+	osif_dev *osdev = NULL;
+
+	if (!params->dst_dev->ieee80211_ptr)
+		return QDF_STATUS_E_FAILURE;
+
+	vdev = qca_scs_get_vdev(params->dst_dev);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+	osdev = ath_netdev_priv(params->dst_dev);
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
+		osif_peer_dev *osifp = NULL;
+
+		osifp = ath_netdev_priv(params->dst_dev);
+		params->dst_mac_addr = osifp->peer_mac_addr;
+	}
+#endif
+	return cdp_scs_peer_lookup_n_rule_match(soc_txrx_handle,
+					params->rule_id, params->dst_mac_addr);
 }
 #else
 bool qca_scs_peer_lookup_n_rule_match(uint32_t rule_id, uint8_t *dst_mac_addr)
