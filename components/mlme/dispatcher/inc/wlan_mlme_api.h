@@ -2821,6 +2821,26 @@ QDF_STATUS
 wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 					 uint8_t value);
 
+/**
+ * wlan_mlme_get_eht_mld_id() - Get the MLD ID of the requested BSS
+ * @psoc: psoc context
+ *
+ * Return: MLD ID of the requested BSS
+ */
+uint8_t
+wlan_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_eht_mld_id() - Set MLD ID of the requested BSS information
+ * within the ML probe request.
+ * @psoc: psoc context
+ * @value: MLD ID
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+wlan_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc, uint8_t value);
+
 /*
  * wlan_mlme_get_mlo_prefer_percentage() - get MLO preference percentage
  * @psoc: pointer to psoc object
@@ -2884,6 +2904,18 @@ wlan_mlme_get_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc)
 static inline QDF_STATUS
 wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 					 uint8_t value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline uint8_t
+wlan_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc, uint8_t value)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

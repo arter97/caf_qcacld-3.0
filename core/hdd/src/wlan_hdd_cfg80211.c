@@ -8617,6 +8617,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_STR_TX] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ] = {
+			.type = NLA_U8},
 };
 
 /**
@@ -14249,7 +14251,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 							mac_handle,
 							vdev_id, cfg_val);
 				if (ret_val)
-					sme_err("Failed to send vdev pause");
+					hdd_err("Failed to send vdev pause");
 			}
 		}
 	}
@@ -14266,7 +14268,16 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 						 0x48, 2, arg);
 
 		if (ret_val)
-			sme_err("Failed to send STR TX indication");
+			hdd_err("Failed to send STR TX indication");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("MLD ID in ML probe request: %d", cfg_val);
+		ret_val = wlan_mlme_set_eht_mld_id(hdd_ctx->psoc, cfg_val);
+		if (ret_val)
+			hdd_err("Failed to set MLD ID");
 	}
 
 	if (update_sme_cfg)

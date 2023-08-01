@@ -15331,6 +15331,7 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	sme_set_per_link_ba_mode(mac_handle, ba_mode_auto);
 	sme_set_mcs_15_tx_rx_disable(vdev_id);
 	wlan_mlme_set_btm_abridge_flag(mac_ctx->psoc, false);
+	wlan_mlme_set_eht_mld_id(mac_ctx->psoc, 0);
 }
 
 void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t vdev_id,
