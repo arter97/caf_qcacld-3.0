@@ -2242,6 +2242,7 @@ enum dp_context_type {
  * @txrx_soc_ppeds_service_status_update:
  * @txrx_soc_ppeds_enabled_check:
  * @txrx_soc_ppeds_txdesc_pool_reset:
+ * @dp_mlo_print_ptnr_info: print partner vdev info
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -2488,6 +2489,7 @@ struct dp_arch_ops {
 	void (*txrx_soc_ppeds_txdesc_pool_reset)(struct dp_soc *soc,
 						 qdf_nbuf_t *nbuf_list);
 #endif
+	void (*dp_mlo_print_ptnr_info)(struct dp_vdev *vdev);
 };
 
 /**

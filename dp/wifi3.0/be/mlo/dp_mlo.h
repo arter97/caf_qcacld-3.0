@@ -217,4 +217,12 @@ int32_t dp_mlo_get_delta_tqm_wrt_mlo_offset(struct dp_soc *soc);
 QDF_STATUS
 dp_get_interface_stats_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			  void *buf, bool is_aggregate);
+
+/*
+ * dp_mlo_debug_print_ptnr_info() - print partner info
+ * @vdev: DP VDEV
+ *
+ * Return: none
+ */
+void dp_mlo_debug_print_ptnr_info(struct dp_vdev *vdev);
 #endif /* __DP_MLO_H */

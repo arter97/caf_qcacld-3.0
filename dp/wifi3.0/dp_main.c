@@ -7685,7 +7685,6 @@ static void dp_vdev_flush_peers(struct cdp_vdev *vdev_handle,
 	struct dp_peer *peer;
 	uint32_t i = 0;
 
-
 	if (!unmap_only) {
 		if (!mlo_peers_only)
 			dp_vdev_iterate_peer_lock_safe(vdev,
@@ -10601,6 +10600,8 @@ dp_print_host_stats(struct dp_vdev *vdev,
 		dp_print_ast_stats(pdev->soc);
 		dp_print_mec_stats(pdev->soc);
 		dp_print_peer_table(vdev);
+		if (soc->arch_ops.dp_mlo_print_ptnr_info)
+			soc->arch_ops.dp_mlo_print_ptnr_info(vdev);
 		break;
 	case TXRX_SRNG_PTR_STATS:
 		dp_print_ring_stats(pdev);
