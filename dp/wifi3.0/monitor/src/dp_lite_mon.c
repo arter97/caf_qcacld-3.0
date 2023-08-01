@@ -269,7 +269,7 @@ dp_lite_mon_disable_tx(struct dp_pdev *pdev)
 	qdf_spin_lock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
 	/* reset filters */
 	dp_mon_filter_reset_tx_lite_mon(be_mon_pdev);
-	status = dp_mon_filter_update(pdev);
+	status = dp_tx_mon_filter_update(pdev);
 	if (status != QDF_STATUS_SUCCESS)
 		dp_mon_err("Failed to reset tx lite mon filters");
 
