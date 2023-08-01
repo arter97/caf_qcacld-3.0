@@ -8544,11 +8544,9 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 	}
 
 	hdd_adapter_init_link_info(adapter);
+	hdd_adapter_enable_links(adapter, params);
 
 	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (eht_capab)
-		hdd_adapter_enable_links(adapter, params);
-
 	if (params->is_ml_adapter && eht_capab) {
 		hdd_adapter_set_ml_adapter(adapter);
 		if (params->is_single_link)
