@@ -1978,6 +1978,70 @@ uint8_t wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer(
 
 qdf_export_symbol(wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer);
 
+#ifdef WLAN_MLO_MULTI_CHIP
+void wlan_mlo_peer_get_str_capability(struct wlan_objmgr_peer *peer,
+				      uint8_t *str_capability)
+{
+	struct wlan_mlo_peer_context *ml_peer;
+	uint8_t i;
+
+	if (!str_capability)
+		return;
+
+	*str_capability = 1;
+	if (!peer)
+		return;
+	ml_peer = peer->mlo_peer_ctx;
+	if (!ml_peer)
+		return;
+
+	mlo_peer_lock_acquire(ml_peer);
+	if ((ml_peer->mlpeer_state != ML_PEER_CREATED) &&
+	    (ml_peer->mlpeer_state != ML_PEER_ASSOC_DONE)) {
+		mlo_peer_lock_release(ml_peer);
+		return;
+	}
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (ml_peer->mlpeer_nstrinfo[i].link_id >= MAX_MLO_LINKS)
+			continue;
+		if (ml_peer->mlpeer_nstrinfo[i].nstr_lp_present) {
+			*str_capability = 0;
+			break;
+		}
+	}
+	mlo_peer_lock_release(ml_peer);
+}
+
+void wlan_mlo_peer_get_eml_capability(struct wlan_objmgr_peer *peer,
+				      uint8_t *is_emlsr_capable,
+				      uint8_t *is_emlmr_capable)
+{
+	struct wlan_mlo_peer_context *ml_peer;
+
+	if (!is_emlsr_capable || !is_emlmr_capable)
+		return;
+
+	*is_emlsr_capable = 0;
+	*is_emlmr_capable = 0;
+	if (!peer)
+		return;
+	ml_peer = peer->mlo_peer_ctx;
+	if (!ml_peer)
+		return;
+
+	mlo_peer_lock_acquire(ml_peer);
+	if ((ml_peer->mlpeer_state != ML_PEER_CREATED) &&
+	    (ml_peer->mlpeer_state != ML_PEER_ASSOC_DONE)) {
+		mlo_peer_lock_release(ml_peer);
+		return;
+	}
+	*is_emlsr_capable = ml_peer->mlpeer_emlcap.emlsr_supp;
+	*is_emlmr_capable = ml_peer->mlpeer_emlcap.emlmr_supp;
+	mlo_peer_lock_release(ml_peer);
+}
+#endif
+
 void wlan_mlo_peer_get_partner_links_info(struct wlan_objmgr_peer *peer,
 					  struct mlo_partner_info *ml_links)
 {

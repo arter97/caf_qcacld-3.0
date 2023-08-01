@@ -487,6 +487,34 @@ uint8_t wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer(
 void wlan_mlo_peer_get_partner_links_info(struct wlan_objmgr_peer *peer,
 					  struct mlo_partner_info *ml_links);
 
+#ifdef WLAN_MLO_MULTI_CHIP
+/**
+ * wlan_mlo_peer_get_str_capability() - get STR capability of non-AP MLD
+ * @peer: Link peer
+ * @max_simult_links: Pointer to fill maximum simultaneous links
+ *
+ * This function retrieves maximum simultaneous links from connected ml peer,
+ *
+ * Return: void
+ */
+void wlan_mlo_peer_get_str_capability(struct wlan_objmgr_peer *peer,
+				      uint8_t *max_simult_links);
+
+/**
+ * wlan_mlo_peer_get_eml_capability() - get EML capability
+ * @peer: Link peer
+ * @is_emlsr_capable: Pointer to fill EMLSR capability
+ * @is_emlmr_capable: Pointer to fill EMLMR capability
+ *
+ * This function retrieves EML capability from connected ml peer,
+ *
+ * Return: void
+ */
+void wlan_mlo_peer_get_eml_capability(struct wlan_objmgr_peer *peer,
+				      uint8_t *is_emlsr_capable,
+				      uint8_t *is_emlmr_capable);
+#endif
+
 /*
  * APIs to operations on ML peer object
  */
