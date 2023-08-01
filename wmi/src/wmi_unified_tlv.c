@@ -9346,6 +9346,11 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 		WMI_RSRC_CFG_FLAGS2_RF_PATH_MODE_SET(
 			resource_cfg->flags2, tgt_res_cfg->rf_path);
 
+	if (tgt_res_cfg->fw_ast_indication_disable) {
+		WMI_RSRC_CFG_FLAGS2_DISABLE_WDS_PEER_MAP_UNMAP_EVENT_SET
+			(resource_cfg->flags2,
+			 tgt_res_cfg->fw_ast_indication_disable);
+	}
 }
 
 #ifdef FEATURE_SET
