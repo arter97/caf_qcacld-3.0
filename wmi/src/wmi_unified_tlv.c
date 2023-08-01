@@ -441,6 +441,8 @@ static const uint32_t pdev_param_tlv[] = {
 		  PDEV_PARAM_SET_SCAN_BLANKING_MODE),
 	PARAM_MAP(pdev_param_set_conc_low_latency_mode,
 		  PDEV_PARAM_SET_CONC_LOW_LATENCY_MODE),
+	PARAM_MAP(pdev_param_rtt_11az_rsid_range,
+		  PDEV_PARAM_RTT_11AZ_RSID_RANGE),
 	PARAM_MAP(pdev_param_probe_resp_retry_limit,
 		  PDEV_PARAM_PROBE_RESP_RETRY_LIMIT),
 	PARAM_MAP(pdev_param_cts_timeout, PDEV_PARAM_CTS_TIMEOUT),
