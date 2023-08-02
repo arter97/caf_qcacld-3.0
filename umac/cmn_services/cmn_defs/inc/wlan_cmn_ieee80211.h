@@ -2218,6 +2218,8 @@ enum wlan_ml_linfo_subelementid {
 #define WLAN_ML_BV_CTRL_PBM_MLDCAPANDOP_P              ((uint16_t)BIT(4))
 /* MLD ID Present */
 #define WLAN_ML_BV_CTRL_PBM_MLDID_P                    ((uint16_t)BIT(5))
+/* Extended MLD Capabilities and Operations Present */
+#define WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P          ((uint16_t)BIT(6))
 
 /* Definitions related to Basic variant Multi-Link element Common Info field */
 
@@ -2432,6 +2434,22 @@ enum wlan_ml_bv_cinfo_emlcap_transtimeout {
  */
 #define WLAN_ML_BV_CINFO_MLDID_SIZE                                      1
 
+/* Size in octets of Extended MLD Capabilities And Operations subfield in Basic
+ * variant Multi-Link element Common Info field as per IEEE P802.11be/D4.0.
+ */
+#define WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE                            2
+
+/* Definitions for sub-sub fields in Extended MLD Capabilities And Operations
+ * subfield in Basic variant Multi-Link element Common Info field. Any unused
+ * bits are reserved.
+ */
+/* Operation Parameter Update Support */
+#define WLAN_ML_BV_CINFO_EXTMLDCAPINFO_OP_PARAM_SUPP_IDX                 0
+#define WLAN_ML_BV_CINFO_EXTMLDCAPINFO_OP_PARAM_SUPP_BITS                1
+/* Recommended Max Simultaneous Links */
+#define WLAN_ML_BV_CINFO_EXTMLDCAPINFO_RECOM_MAX_SIMULT_LINKS_IDX        1
+#define WLAN_ML_BV_CINFO_EXTMLDCAPINFO_RECOM_MAX_SIMULT_LINKS_BITS       4
+
 /* Max value in octets of Common Info Length subfield of Common Info field in
  * Basic variant Multi-Link element
  */
@@ -2443,7 +2461,8 @@ enum wlan_ml_bv_cinfo_emlcap_transtimeout {
 	 WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_SIZE + \
 	 WLAN_ML_BV_CINFO_EMLCAP_SIZE + \
 	 WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE + \
-	 WLAN_ML_BV_CINFO_MLDID_SIZE)
+	 WLAN_ML_BV_CINFO_MLDID_SIZE + \
+	 WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE)
 
 /* End of definitions related to Basic variant Multi-Link element Common Info
  * field.

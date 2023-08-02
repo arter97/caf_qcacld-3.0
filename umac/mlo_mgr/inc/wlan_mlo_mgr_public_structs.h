@@ -52,6 +52,16 @@
 #define WLAN_UMAC_MLO_MAX_DEV 2
 #endif
 
+/* MAX MLO Assoc Links per MLD */
+#ifndef WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS
+#define WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS 1
+#endif
+
+/* Default Initialization value for Max Recommended Simultaneous Links */
+#ifndef WLAN_UMAC_MLO_RECOM_MAX_SIMULT_LINKS_DEFAULT
+#define WLAN_UMAC_MLO_RECOM_MAX_SIMULT_LINKS_DEFAULT 2
+#endif
+
 /* Max PEER support */
 #define MAX_MLO_PEER 512
 
@@ -474,6 +484,8 @@ struct wlan_mlo_peer_list {
  * NB: Not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
  * @epcs_ctx: EPCS related information
+ * @link_ctx: link related information
+ * @mlo_max_recom_simult_links: Max Recommended Simultaneous Links
  */
 struct wlan_mlo_dev_context {
 	qdf_list_node_t node;
@@ -505,6 +517,8 @@ struct wlan_mlo_dev_context {
 	qdf_bitmap(mlo_peer_id_bmap, MAX_MLO_PEER_ID);
 #endif
 	struct wlan_epcs_context epcs_ctx;
+	struct mlo_link_switch_context *link_ctx;
+	uint8_t mlo_max_recom_simult_links;
 };
 
 /**

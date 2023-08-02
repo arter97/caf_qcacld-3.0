@@ -1123,6 +1123,9 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_NOMEM;
 	}
 
+	ml_dev->mlo_max_recom_simult_links =
+		WLAN_UMAC_MLO_RECOM_MAX_SIMULT_LINKS_DEFAULT;
+
 	mlo_dev_mlpeer_list_init(ml_dev);
 
 	ml_link_lock_acquire(g_mlo_ctx);
