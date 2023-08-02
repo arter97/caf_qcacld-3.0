@@ -342,6 +342,7 @@ struct wlan_srng_cfg {
  * @umac_reset_buffer_window: Buffer time to check if umac reset was in progress
  *                            during this window, configured time is in
  *                            milliseconds.
+ * @fw_ast_indication_disable: Disable AST
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -547,6 +548,7 @@ struct wlan_cfg_dp_soc_ctxt {
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 	uint32_t umac_reset_buffer_window;
 #endif
+	bool fw_ast_indication_disable;
 };
 
 /**
@@ -2532,4 +2534,24 @@ wlan_cfg_get_umac_reset_buffer_window_ms(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return 0;
 }
 #endif /* DP_UMAC_HW_RESET_SUPPORT */
+
+/**
+ * wlan_cfg_set_ast_indication_disable - Set AST disable
+ *
+ * @cfg: soc configuration context
+ * @val: value to be set
+ *
+ * Return: void
+ */
+void wlan_cfg_set_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg,
+					 bool val);
+
+/**
+ * wlan_cfg_get_ast_indication_disable - Get AST disable
+ *
+ * @cfg: soc configuration context
+ *
+ * Return: true or false
+ */
+bool wlan_cfg_get_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg);
 #endif /*__WLAN_CFG_H*/
