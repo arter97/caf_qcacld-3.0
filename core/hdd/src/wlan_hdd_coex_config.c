@@ -48,6 +48,8 @@ config_type_to_wmi_tbl[QCA_WLAN_VENDOR_ATTR_COEX_CONFIG_TYPE_MAX] = {
 		WMI_COEX_CONFIG_THREE_WAY_COEX_RESET,
 	[QCA_WLAN_VENDOR_ATTR_COEX_CONFIG_THREE_WAY_COEX_START] =
 		WMI_COEX_CONFIG_THREE_WAY_COEX_START,
+	[QCA_WLAN_VENDOR_ATTR_COEX_CONFIG_SET_BT_RX_PER_THRESHOLD] =
+		WMI_COEX_CONFIG_BT_RX_PER_THRESHOLD,
 };
 
 /**
@@ -116,10 +118,12 @@ static int __wlan_hdd_cfg80211_set_coex_config(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 	coex_cfg_params.config_type = config_type_to_wmi_tbl[config_type];
-	if (coex_cfg_params.config_type <
-	    WMI_COEX_CONFIG_THREE_WAY_DELAY_PARA ||
-	    coex_cfg_params.config_type >
-	    WMI_COEX_CONFIG_THREE_WAY_COEX_START) {
+	if (coex_cfg_params.config_type !=
+	    WMI_COEX_CONFIG_THREE_WAY_DELAY_PARA &&
+	    coex_cfg_params.config_type !=
+	    WMI_COEX_CONFIG_THREE_WAY_COEX_START &&
+	    coex_cfg_params.config_type !=
+	    WMI_COEX_CONFIG_BT_RX_PER_THRESHOLD) {
 		hdd_err("config_type_wmi val error %d",
 			coex_cfg_params.config_type);
 		return -EINVAL;
@@ -135,6 +139,17 @@ static int __wlan_hdd_cfg80211_set_coex_config(struct wiphy *wiphy,
 	coex_cfg_params.config_arg1 = nla_get_u32(
 		tb[QCA_VENDOR_ATTR_COEX_CONFIG_THREE_WAY_PRIORITY_1]);
 
+	if (coex_cfg_params.config_type ==
+	    WMI_COEX_CONFIG_BT_RX_PER_THRESHOLD) {
+		if (!cfg_in_range(CFG_BT_RX_PER_THRESHOLD,
+		    coex_cfg_params.config_arg1)) {
+			hdd_err("BT RX PER threshold value %d is out of range (Min: %d Max: %d)",
+				coex_cfg_params.config_arg1,
+				cfg_min(CFG_BT_RX_PER_THRESHOLD),
+				cfg_max(CFG_BT_RX_PER_THRESHOLD));
+			return -EINVAL;
+		}
+	}
 	hdd_debug("priority1 0x%x", coex_cfg_params.config_arg1);
 
 	if (!tb[QCA_VENDOR_ATTR_COEX_CONFIG_THREE_WAY_PRIORITY_2]) {

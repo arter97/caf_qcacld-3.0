@@ -92,6 +92,8 @@ fwol_init_coex_config_in_cfg(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_WLAN_LOW_RSSI_THRESHOLD);
 	coex_config->bt_low_rssi_threshold =
 				cfg_get(psoc, CFG_BT_LOW_RSSI_THRESHOLD);
+	coex_config->bt_rx_per_threshold =
+				cfg_get(psoc, CFG_BT_RX_PER_THRESHOLD);
 	coex_config->bt_interference_low_ll =
 				cfg_get(psoc, CFG_BT_INTERFERENCE_LOW_LL);
 	coex_config->bt_interference_low_ul =

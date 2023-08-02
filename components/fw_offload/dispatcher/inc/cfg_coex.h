@@ -125,6 +125,25 @@
 
 /*
  * <ini>
+ * gSetBtRxPerThreshold - Set BT RX PER threshold
+ * @Min: 1
+ * @Max: 100
+ * @Default: 15
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_BT_RX_PER_THRESHOLD CFG_INI_UINT( \
+			"gSetBtRxPerThreshold", \
+			1, \
+			100, \
+			15, \
+			CFG_VALUE_OR_DEFAULT, \
+			"BT RX PER Threshold")
+
+/*
+ * <ini>
  * gSetBtInterferenceLowLL - Set lower limit of low level BT interference
  * @Min: -100
  * @Max: 100
@@ -407,6 +426,7 @@
 	CFG(CFG_MAX_TX_POWER_FOR_BTC) \
 	CFG(CFG_WLAN_LOW_RSSI_THRESHOLD) \
 	CFG(CFG_BT_LOW_RSSI_THRESHOLD) \
+	CFG(CFG_BT_RX_PER_THRESHOLD) \
 	CFG(CFG_BT_INTERFERENCE_LOW_LL) \
 	CFG(CFG_BT_INTERFERENCE_LOW_UL) \
 	CFG(CFG_BT_INTERFERENCE_MEDIUM_LL) \
