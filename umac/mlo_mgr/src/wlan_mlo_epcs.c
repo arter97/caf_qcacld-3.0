@@ -387,6 +387,7 @@ wlan_mlo_peer_rcv_cmd(struct wlan_mlo_peer_context *ml_peer,
 
 	*updparam = false;
 
+	epcs_dev_peer_lock_acquire(&ml_peer->epcs_info);
 	cur_state = ml_peer->epcs_info.state;
 	switch (ml_peer->epcs_info.state) {
 	case EPCS_DOWN:
@@ -427,6 +428,8 @@ wlan_mlo_peer_rcv_cmd(struct wlan_mlo_peer_context *ml_peer,
 		   cur_state, new_state, epcs->cat,
 		   epcs->dialog_token, epcs->status);
 
+	epcs_dev_peer_lock_release(&ml_peer->epcs_info);
+
 	return status;
 }
 
@@ -448,6 +451,7 @@ wlan_mlo_peer_rcv_action_frame(struct wlan_mlo_peer_context *ml_peer,
 	*respond = false;
 	*updparam = false;
 
+	epcs_dev_peer_lock_acquire(&ml_peer->epcs_info);
 	cur_state = ml_peer->epcs_info.state;
 	switch (ml_peer->epcs_info.state) {
 	case EPCS_DOWN:
@@ -499,6 +503,8 @@ wlan_mlo_peer_rcv_action_frame(struct wlan_mlo_peer_context *ml_peer,
 	epcs_debug("action:old state %d new state %d ev cat %d dialog token %d status %d",
 		   cur_state, new_state, epcs->cat,
 		   epcs->dialog_token, epcs->status);
+
+	epcs_dev_peer_lock_release(&ml_peer->epcs_info);
 
 	return status;
 }
