@@ -762,6 +762,16 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 			return QDF_STATUS_E_NOMEM;
 		}
 		copied_conn_req_lock_create(ml_dev->sta_ctx);
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+		ml_dev->bridge_sta_ctx = qdf_mem_malloc(sizeof(struct wlan_mlo_bridge_sta));
+		if (!ml_dev->bridge_sta_ctx) {
+			tsf_recalculation_lock_destroy(ml_dev);
+			mlo_dev_lock_destroy(ml_dev);
+			qdf_mem_free(ml_dev->sta_ctx);
+			qdf_mem_free(ml_dev);
+			return QDF_STATUS_E_NOMEM;
+		}
+#endif
 	} else if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) {
 		if (mlo_ap_ctx_init(ml_dev) != QDF_STATUS_SUCCESS) {
 			tsf_recalculation_lock_destroy(ml_dev);
@@ -899,6 +909,9 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 			copied_conn_req_lock_destroy(ml_dev->sta_ctx);
 
 			qdf_mem_free(ml_dev->sta_ctx);
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+			qdf_mem_free(ml_dev->bridge_sta_ctx);
+#endif
 		}
 		else if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE)
 			qdf_mem_free(ml_dev->ap_ctx);

@@ -1083,7 +1083,7 @@ wlan_mlo_peer_initialize_epcs_info(struct wlan_mlo_peer_context *ml_peer)
 #endif /* WLAN_FEATURE_11BE */
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
-static struct wlan_objmgr_vdev*
+struct wlan_objmgr_vdev*
 mlo_get_link_vdev_from_psoc_id(struct wlan_mlo_dev_context *ml_dev,
 			       uint8_t psoc_id)
 {
