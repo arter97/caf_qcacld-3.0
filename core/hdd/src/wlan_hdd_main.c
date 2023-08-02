@@ -13095,6 +13095,25 @@ static void hdd_sar_cfg_update(struct hdd_config *config,
 	config->config_sar_safety_sleep_index =
 			cfg_get(psoc, CFG_CONFIG_SAR_SAFETY_SLEEP_MODE_INDEX);
 }
+
+void hdd_set_sar_init_index(struct hdd_context *hdd_ctx)
+{
+	uint32_t index, enable = 0;
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx NULL");
+		return;
+	}
+	if (hdd_ctx->sar_version == SAR_VERSION_1) {
+		hdd_nofl_debug("FW SAR version: %d", hdd_ctx->sar_version);
+		return;
+	}
+
+	enable = hdd_ctx->config->enable_sar_safety;
+	index = hdd_ctx->config->sar_safety_index;
+	if (enable & SAR_SAFETY_ENABLED_INIT)
+		hdd_configure_sar_index(hdd_ctx, index);
+}
 #else
 static void hdd_sar_cfg_update(struct hdd_config *config,
 			       struct wlan_objmgr_psoc *psoc)

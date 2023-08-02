@@ -4968,4 +4968,16 @@ static inline void wlan_hdd_link_speed_update(struct wlan_objmgr_psoc *psoc,
  */
 void hdd_update_multicast_list(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * hdd_set_sar_init_index() - Set SAR safety index at init.
+ * @hdd_ctx: HDD context
+ *
+ */
+#ifdef SAR_SAFETY_FEATURE
+void hdd_set_sar_init_index(struct hdd_context *hdd_ctx);
+#else
+static inline void hdd_set_sar_init_index(struct hdd_context *hdd_ctx)
+{}
+#endif
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
