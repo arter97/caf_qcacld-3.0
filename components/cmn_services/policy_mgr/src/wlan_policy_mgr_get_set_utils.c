@@ -3231,6 +3231,35 @@ uint32_t policy_mgr_mode_specific_connection_count(
 	return count;
 }
 
+uint32_t policy_mgr_get_sap_mode_count(struct wlan_objmgr_psoc *psoc,
+				       uint32_t *list)
+{
+	uint32_t count;
+
+	count = policy_mgr_mode_specific_connection_count(psoc, PM_SAP_MODE,
+							  list);
+
+	count += policy_mgr_mode_specific_connection_count(
+						psoc,
+						PM_LL_LT_SAP_MODE,
+						list ? &list[count] : NULL);
+	return count;
+}
+
+uint32_t policy_mgr_get_beaconing_mode_count(struct wlan_objmgr_psoc *psoc,
+					     uint32_t *list)
+{
+	uint32_t count;
+
+	count = policy_mgr_get_sap_mode_count(psoc, list);
+
+	count += policy_mgr_mode_specific_connection_count(
+						psoc,
+						PM_P2P_GO_MODE,
+						list ? &list[count] : NULL);
+	return count;
+}
+
 QDF_STATUS policy_mgr_check_conn_with_mode_and_vdev_id(
 		struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode,
 		uint32_t vdev_id)
@@ -5339,6 +5368,38 @@ uint32_t policy_mgr_get_mode_specific_conn_info(
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
+	return count;
+}
+
+uint32_t policy_mgr_get_sap_mode_info(struct wlan_objmgr_psoc *psoc,
+				      uint32_t *ch_freq_list, uint8_t *vdev_id)
+{
+	uint32_t count;
+
+	count = policy_mgr_get_mode_specific_conn_info(psoc, ch_freq_list,
+						       vdev_id, PM_SAP_MODE);
+
+	count += policy_mgr_get_mode_specific_conn_info(
+				psoc,
+				ch_freq_list ? &ch_freq_list[count] : NULL,
+				vdev_id ? &vdev_id[count] : NULL,
+				PM_LL_LT_SAP_MODE);
+	return count;
+}
+
+uint32_t policy_mgr_get_beaconing_mode_info(struct wlan_objmgr_psoc *psoc,
+					    uint32_t *ch_freq_list,
+					    uint8_t *vdev_id)
+{
+	uint32_t count;
+
+	count = policy_mgr_get_sap_mode_info(psoc, ch_freq_list, vdev_id);
+
+	count += policy_mgr_get_mode_specific_conn_info(
+				psoc,
+				ch_freq_list ? &ch_freq_list[count] : NULL,
+				vdev_id ? &vdev_id[count] : NULL,
+				PM_P2P_GO_MODE);
 	return count;
 }
 

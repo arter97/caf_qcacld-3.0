@@ -5478,4 +5478,54 @@ bool policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS
 policy_mgr_reset_sap_mandatory_channels(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_sap_mode_count() - Get SAP interface counts
+ * @psoc: psoc object
+ * @list: To provide the indices on pm_conc_connection_list
+ *	(optional)
+ *
+ * Return: No of SAP interface counts
+ */
+uint32_t policy_mgr_get_sap_mode_count(struct wlan_objmgr_psoc *psoc,
+				       uint32_t *list);
+
+/**
+ * policy_mgr_get_beaconing_mode_count() - Get Beaconing interface counts
+ * @psoc: psoc object
+ * @list: To provide the indices on pm_conc_connection_list
+ *	(optional)
+ *
+ * Return: No of Beaconing interface counts
+ */
+uint32_t policy_mgr_get_beaconing_mode_count(struct wlan_objmgr_psoc *psoc,
+					     uint32_t *list);
+
+/**
+ * policy_mgr_get_sap_mode_info() - Get active SAP channels and vdev ids
+ * @psoc: PSOC object information
+ * @ch_freq_list: Mode specific channel freq list
+ * @vdev_id: Mode specific vdev id (list)
+ *
+ * Get active SAP channel and vdev id
+ *
+ * Return: number of SAP connections found
+ */
+uint32_t policy_mgr_get_sap_mode_info(struct wlan_objmgr_psoc *psoc,
+				      uint32_t *ch_freq_list, uint8_t *vdev_id);
+
+/**
+ * policy_mgr_get_beaconing_mode_info() - Get active beaconing entity
+ * channels and vdev ids
+ * @psoc: PSOC object information
+ * @ch_freq_list: Mode specific channel freq list
+ * @vdev_id: Mode specific vdev id (list)
+ *
+ * Get active beaconing entity channels and vdev ids
+ *
+ * Return: number of beaconing entities found
+ */
+uint32_t policy_mgr_get_beaconing_mode_info(struct wlan_objmgr_psoc *psoc,
+					    uint32_t *ch_freq_list,
+					    uint8_t *vdev_id);
 #endif /* __WLAN_POLICY_MGR_API_H */
