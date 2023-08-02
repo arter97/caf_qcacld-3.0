@@ -36,6 +36,24 @@
 #include <dp_rx_mon_2.0.h>
 #include <dp_rx_mon.h>
 
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+static inline QDF_STATUS
+dp_lite_mon_check_if_coexist_with_tx_full(struct dp_mon_pdev_be *be_mon_pdev)
+{
+	 /* Check if full monitor is enabled */
+	if (be_mon_pdev->tx_mon_mode)
+		return QDF_STATUS_E_INVAL;
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS
+dp_lite_mon_check_if_coexist_with_tx_full(struct dp_mon_pdev_be *be_mon_pdev)
+{
+	return QDF_STATUS_E_INVAL;
+}
+#endif
+
 /**
  * dp_lite_mon_free_peers - free peers
  * @pdev: dp pdev context
@@ -502,9 +520,10 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 				   "level mpdu/ppdu and data full pkt");
 			return QDF_STATUS_E_INVAL;
 		}
-		/* Check if full monitor is enabled */
-		if (be_mon_pdev->tx_mon_mode) {
-			dp_mon_err("Lite monitor mode cannot be enabled when full monitor mode is enabled");
+		/* Return error if can coexist with full monitor */
+		if (dp_lite_mon_check_if_coexist_with_tx_full(be_mon_pdev) !=
+				QDF_STATUS_SUCCESS) {
+			dp_mon_err("Lite monitor mode cannot be enabled .");
 			return QDF_STATUS_E_INVAL;
 		}
 
