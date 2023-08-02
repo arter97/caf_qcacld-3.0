@@ -35,6 +35,44 @@ enum qca_mscs_peer_lookup_status {
 	QCA_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND,
 };
 
+
+/* qca_mscs_get_vdev() - Fetch vdev from netdev
+ *
+ * @netdev : Netdevice
+ *
+ * Return: Pointer to struct wlan_objmgr_vdev
+ */
+static struct wlan_objmgr_vdev *qca_mscs_get_vdev(struct net_device *netdev)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	osif_dev *osdev = NULL;
+
+	osdev = ath_netdev_priv(netdev);
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
+		osif_peer_dev *osifp = NULL;
+		osif_dev *parent_osdev = NULL;
+
+		osifp = ath_netdev_priv(netdev);
+		if (!osifp->parent_netdev)
+			return NULL;
+
+		parent_osdev = ath_netdev_priv(osifp->parent_netdev);
+		osdev = parent_osdev;
+	}
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_MLO) {
+		qdf_nofl_err("ERROR: MLO netdev is not supported\n");
+		return NULL;
+	}
+#endif
+
+	vdev = osdev->ctrl_vdev;
+	return vdev;
+}
+
 /**
  * qca_mscs_peer_lookup_n_get_priority() - Find MSCS enabled peer and priority
  * @src_mac - src mac address to be used for peer lookup
@@ -93,11 +131,35 @@ int qca_mscs_peer_lookup_n_get_priority(uint8_t *src_mac, uint8_t *dst_mac, stru
 qdf_export_symbol(qca_mscs_peer_lookup_n_get_priority);
 
 int qca_mscs_peer_lookup_n_get_priority_v2(
-				    struct qca_mscs_get_priority_param *params)
+		struct qca_mscs_get_priority_param *params)
 {
-	return qca_mscs_peer_lookup_n_get_priority(params->src_mac,
-						   params->dst_mac,
-						   params->skb);
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	ol_txrx_soc_handle soc_txrx_handle;
+	osif_dev *osdev = NULL;
+
+	if (!params->src_dev->ieee80211_ptr)
+		return QDF_STATUS_E_FAILURE;
+
+	vdev = qca_mscs_get_vdev(params->src_dev);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+	osdev = ath_netdev_priv(params->src_dev);
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
+		osif_peer_dev *osifp = NULL;
+
+		osifp = ath_netdev_priv(params->src_dev);
+		params->src_mac = osifp->peer_mac_addr;
+	}
+#endif
+	return cdp_mscs_peer_lookup_n_get_priority(soc_txrx_handle,
+			params->src_mac, params->dst_mac, params->skb);
 }
 
 qdf_export_symbol(qca_mscs_peer_lookup_n_get_priority_v2);
