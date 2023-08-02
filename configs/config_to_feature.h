@@ -1159,6 +1159,10 @@
 #define WLAN_DP_FEATURE_DEFERRED_REO_QDESC_DESTROY (1)
 #endif
 
+#ifdef CONFIG_WDI2_IPA_HW_V4
+#define IPA_WDI2_HW_V4 (1)
+#endif
+
 #ifdef CONFIG_ARCH_SDX20
 #define SYNC_IPA_READY (1)
 #endif

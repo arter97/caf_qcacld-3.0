@@ -594,6 +594,10 @@ config IPA_SET_RESET_TX_DB_PA
 	bool "Enable IPA_SET_RESET_TX_DB_PA"
 	default n
 
+config IPA_WDI2_HW_V4
+	bool "Enable IPA_WDI2_HW_V4"
+	default n
+
 config KIWI_HEADERS_DEF
 	bool "Enable KIWI_HEADERS_DEF"
 	default n
