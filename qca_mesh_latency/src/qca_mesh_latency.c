@@ -28,10 +28,12 @@ extern ol_ath_soc_softc_t *ol_global_soc[GLOBAL_SOC_SIZE];
 /* qca_mesh_get_vdev() - Fetch vdev from netdev
  *
  * @netdev : Netdevice
+ * @mac_addr : MAC address
  *
  * Return: Pointer to struct wlan_objmgr_vdev
  */
-static struct wlan_objmgr_vdev *qca_mesh_get_vdev(struct net_device *netdev)
+static struct wlan_objmgr_vdev *
+qca_mesh_get_vdev(struct net_device *netdev, uint8_t *mac_addr)
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
 	osif_dev *osdev = NULL;
@@ -53,8 +55,19 @@ static struct wlan_objmgr_vdev *qca_mesh_get_vdev(struct net_device *netdev)
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	if (osdev->dev_type == OSIF_NETDEV_TYPE_MLO) {
-		qdf_nofl_err("ERROR: MLO netdev is not supported\n");
-		return NULL;
+		struct osif_mldev *mldev;
+
+		mldev = ath_netdev_priv(netdev);
+		if (!mldev) {
+			qdf_err("Invalid mldev");
+			return NULL;
+		}
+
+		osdev = osifp_peer_find_hash_find_osdev(mldev, mac_addr);
+		if (!osdev) {
+			qdf_err("Invalid link osdev");
+			return NULL;
+		}
 	}
 #endif
 
@@ -116,7 +129,7 @@ int qca_mesh_latency_update_peer_parameter_v2(
 	if (!params->dst_dev->ieee80211_ptr)
 		return QDF_STATUS_E_FAILURE;
 
-	vdev = qca_mesh_get_vdev(params->dst_dev);
+	vdev = qca_mesh_get_vdev(params->dst_dev, params->dest_mac);
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 	psoc = wlan_vdev_get_psoc(vdev);
