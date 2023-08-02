@@ -3305,18 +3305,20 @@ void
 lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id);
 
 /*
- * lim_is_chan_connected_for_mode() - Check if frequency is connected
- *                                    for given opmode.
+ * lim_get_connected_chan_for_mode() - Get connected channel for given opmode
+ *                                     in given frequency range.
+ *
  * @psoc: Pointer to psoc object
  * @opmode: Vdev opmode
  * @freq: Frequency
  *
- * Return: Return true if frequency is connected for given opmode.
+ * Return: Return connected channel in given frequcy range for given opmode.
  */
-bool
-lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
-			       enum QDF_OPMODE opmode,
-			       qdf_freq_t freq);
+struct wlan_channel *
+lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
+				enum QDF_OPMODE opmode,
+				qdf_freq_t start_freq,
+				qdf_freq_t end_freq);
 
 /**
  * lim_convert_vht_chwidth_to_phy_chwidth() - Convert VHT operation

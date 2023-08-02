@@ -11536,9 +11536,11 @@ lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 	lim_set_tpc_power(mac_ctx, session);
 }
 
-bool lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
-				    enum QDF_OPMODE device_mode,
-				    qdf_freq_t chan_freq)
+struct wlan_channel *
+lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
+				enum QDF_OPMODE device_mode,
+				qdf_freq_t start_freq,
+				qdf_freq_t end_freq)
 {
 	struct wlan_channel *des_chan;
 	struct wlan_objmgr_vdev *vdev;
@@ -11554,23 +11556,26 @@ bool lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
 		if (vdev->vdev_mlme.vdev_opmode != device_mode)
 			goto next;
 
-		if (!wlan_cm_is_vdev_connected(vdev))
+		if ((device_mode == QDF_STA_MODE ||
+		     device_mode == QDF_P2P_CLIENT_MODE) &&
+		     !wlan_cm_is_vdev_connected(vdev))
 			goto next;
 
 		des_chan = vdev->vdev_mlme.des_chan;
 		if (!des_chan)
 			goto next;
 
-		if (des_chan->ch_freq != chan_freq)
+		if (des_chan->ch_freq < start_freq ||
+		    des_chan->ch_freq > end_freq)
 			goto next;
 
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-		return true;
+		return des_chan;
 next:
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 	}
 
-	return false;
+	return NULL;
 }
 
 enum phy_ch_width
