@@ -2878,6 +2878,7 @@ struct roam_scan_candidate_frame {
  * roaming related commands
  * @roam_sync_event: RX ops function pointer for roam sync event
  * @roam_sync_frame_event: Rx ops function pointer for roam sync frame event
+ * @roam_sync_key_event: Rx ops function pointer for roam sych key event
  * @roam_event_rx: Rx ops function pointer for roam info event
  * @btm_denylist_event: Rx ops function pointer for btm denylist event
  * @vdev_disconnect_event: Rx ops function pointer for vdev disconnect event
@@ -2895,6 +2896,9 @@ struct wlan_cm_roam_rx_ops {
 				      struct roam_offload_synch_ind *sync_ind);
 	QDF_STATUS (*roam_sync_frame_event)(struct wlan_objmgr_psoc *psoc,
 					    struct roam_synch_frame_ind *frm);
+	QDF_STATUS (*roam_sync_key_event)(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_crypto_key_entry *keys,
+					  uint8_t num_keys);
 	QDF_STATUS (*roam_event_rx)(struct roam_offload_roam_event *roam_event);
 	QDF_STATUS (*btm_denylist_event)(struct wlan_objmgr_psoc *psoc,
 					 struct roam_denylist_event *list);
