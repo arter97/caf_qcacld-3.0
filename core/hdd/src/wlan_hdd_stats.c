@@ -7449,6 +7449,8 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 
 	hdd_wlan_fill_per_chain_rssi_stats(sinfo, link_info);
 
+	hdd_nofl_debug("Sending station stats for link " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(mac));
 	hdd_exit();
 
 	return 0;
@@ -7738,7 +7740,8 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 		}
 
 		if (!wlan_hdd_send_mlo_aggregated_stats(link_info, mac)) {
-			hdd_debug("Sending Assoc Link stats");
+			hdd_nofl_debug("Station stats requested for vdev_[%u]",
+				       link_info->vdev_id);
 			return wlan_hdd_get_sta_stats(link_info,
 						      mac, sinfo);
 		}
