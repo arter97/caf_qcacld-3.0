@@ -858,6 +858,7 @@ enum {
 #ifdef WLAN_FEATURE_11BE_MLO
 	IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE = 813, /* Vendor Flags for WMI Interface */
 #endif
+	IEEE80211_PARAM_RSNXCAPS = 814, /*RSNXE Capabilities*/
 };
 
 enum {
