@@ -40,7 +40,8 @@ struct qdf_vbus_rstctl;
 struct qdf_dev_clk;
 struct qdf_pfm_hndl;
 struct qdf_pfm_drv;
-
+struct qdf_device_node;
+typedef enum of_gpio_flags __qdf_of_gpio_flags;
 /**
  * __qal_vbus_get_iorsc() - acquire io resource
  * @devnum: Device Number
@@ -317,4 +318,22 @@ __qal_vbus_rcu_read_unlock(void)
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * __qal_vbus_of_get_named_gpio_flags() - Get a GPIO descriptor and flags
+ * for GPIO API
+ * @np: device node to get GPIO from
+ * @list_name: property name containing gpio specifier(s)
+ * @index: index of the GPIO
+ * @flags: a flags pointer to fill in
+ *
+ * The global GPIO number for the GPIO specified by its descriptor.
+ */
+static inline int
+__qal_vbus_of_get_named_gpio_flags(struct qdf_device_node *np,
+				   const char *list_name,
+				   int index, __qdf_of_gpio_flags *flags)
+{
+	return of_get_named_gpio_flags((struct device_node *)np,
+				       list_name, index, flags);
+}
 #endif /* __I_QAL_VBUS_DEV_H */
