@@ -2192,6 +2192,35 @@ error:
 	return bcn_int;
 }
 
+#ifdef QCA_SUPPORT_PRIMARY_LINK_MIGRATE
+static QDF_STATUS
+mlo_sta_handle_ptqm_migration(struct wlan_objmgr_vdev *removal_vdev)
+{
+	struct wlan_objmgr_peer *bss_peer;
+
+	if (!wlan_cm_is_vdev_connected(removal_vdev))
+		return QDF_STATUS_E_INVAL;
+
+	bss_peer = wlan_vdev_get_bsspeer(removal_vdev);
+	if (!bss_peer)
+		return QDF_STATUS_E_INVAL;
+
+	/* Invoke migration only if the link being removed is the primary */
+	if (wlan_mlo_peer_get_primary_peer_link_id(bss_peer)
+		!= wlan_vdev_get_link_id(removal_vdev))
+		return QDF_STATUS_SUCCESS;
+
+	return wlan_mlo_set_ptqm_migration(removal_vdev, bss_peer->mlo_peer_ctx,
+					   false, WLAN_LINK_ID_INVALID, true);
+}
+#else
+static QDF_STATUS
+mlo_sta_handle_ptqm_migration(struct wlan_objmgr_vdev *removal_vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static void mlo_process_link_remove(struct wlan_objmgr_vdev *vdev,
 				    struct ml_rv_partner_link_info *link_info)
 {
@@ -2226,6 +2255,10 @@ static void mlo_process_link_remove(struct wlan_objmgr_vdev *vdev,
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 	}
+
+	/* Handle PTQM migration upon seeing AP removal for the first time */
+	if (!vdev_mlme->ml_reconfig_started)
+		mlo_sta_handle_ptqm_migration(vdev);
 
 	vdev_mlme->ml_reconfig_started = true;
 	qdf_timer_mod(&vdev_mlme->ml_reconfig_timer,
