@@ -451,11 +451,13 @@ struct wlan_mlo_dev_context {
 /**
  * struct wlan_mlo_bridge_sta - MLO bridge sta context
  * @bridge_umac_id: umac id for bridge
+ * @bridge_link_id: link id used by bridge vdev
  * @is_force_central_primary: Flag to tell if bridge should be primary umac
  * @bridge_vap_exists: If there is bridge vap
  */
 struct wlan_mlo_bridge_sta {
 	uint8_t bridge_umac_id;
+	uint8_t bridge_link_id;
 	bool is_force_central_primary;
 	bool bridge_vap_exists;
 };

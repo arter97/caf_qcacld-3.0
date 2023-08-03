@@ -35,6 +35,7 @@
 #include <wlan_objmgr_peer_obj.h>
 #include <wlan_scan_api.h>
 #include <wlan_mlo_mgr_peer.h>
+#include <qdf_module.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static QDF_STATUS mlo_disconnect_req(struct wlan_objmgr_vdev *vdev,
@@ -1520,6 +1521,7 @@ bool mlo_is_mld_sta(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 
+qdf_export_symbol(mlo_is_mld_sta);
 #ifndef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 struct wlan_objmgr_vdev *
 mlo_get_ml_vdev_by_mac(struct wlan_objmgr_vdev *vdev,
