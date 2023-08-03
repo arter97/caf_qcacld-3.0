@@ -799,6 +799,7 @@ enum {
 	IEEE80211_PARAM_VAP_PROFILE_CONFIG         = 737,   /* Per vap resource profile size for EMA non tx vap */
 	IEEE80211_PARAM_SWITCH_RTT_ROLE            = 743, /* Switch between RTT intiator/responder modes for a single vap
 							     without the vap restart */
+	IEEE80211_PARAM_PURE_11AX_ENABLE           = 744,
 };
 
 enum {
@@ -2343,6 +2344,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"max_auth_fail",          IEEE80211_PARAM_AP_MAX_AUTH_FAIL, SET_PARAM, 1},
 	{"g_max_auth_fail",        IEEE80211_PARAM_AP_MAX_AUTH_FAIL, GET_PARAM, 0},
 	{"vap_resource_profile ",     IEEE80211_PARAM_VAP_PROFILE_CONFIG, SET_PARAM, 2},
+	{"pure_11ax",             IEEE80211_PARAM_PURE_11AX_ENABLE, SET_PARAM, 1},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
