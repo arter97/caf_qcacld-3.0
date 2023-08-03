@@ -1939,6 +1939,7 @@ void dp_lite_mon_rx_dealloc(struct dp_pdev_be *be_pdev)
 		dp_lite_mon_disable_rx(&be_pdev->pdev);
 		qdf_spinlock_destroy(&be_mon_pdev->lite_mon_rx_config->lite_mon_rx_lock);
 		qdf_mem_free(be_mon_pdev->lite_mon_rx_config);
+		be_mon_pdev->lite_mon_rx_config = NULL;
 	}
 }
 
@@ -1959,6 +1960,7 @@ void dp_lite_mon_tx_dealloc(struct dp_pdev_be *be_pdev)
 		dp_lite_mon_disable_tx(&be_pdev->pdev);
 		qdf_spinlock_destroy(&be_mon_pdev->lite_mon_tx_config->lite_mon_tx_lock);
 		qdf_mem_free(be_mon_pdev->lite_mon_tx_config);
+		be_mon_pdev->lite_mon_tx_config = NULL;
 	}
 }
 
