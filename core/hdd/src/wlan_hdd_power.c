@@ -2355,6 +2355,7 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	}
 
 	ucfg_pmo_notify_system_resume(hdd_ctx->psoc);
+	wlan_hdd_resume_pmo_twt(hdd_ctx);
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_RESUME_WLAN,
@@ -2625,6 +2626,8 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 		hdd_err("Some components not ready to suspend!");
 		return -EAGAIN;
 	}
+
+	wlan_hdd_suspend_pmo_twt(hdd_ctx);
 
 	/*
 	 * Suspend IPA early before proceeding to suspend other entities like

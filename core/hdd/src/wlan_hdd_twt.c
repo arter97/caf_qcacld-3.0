@@ -82,7 +82,8 @@ QDF_STATUS hdd_send_twt_responder_enable_cmd(struct hdd_context *hdd_ctx)
 
 void wlan_twt_concurrency_update(struct hdd_context *hdd_ctx)
 {
-	qdf_sched_work(0, &hdd_ctx->twt_en_dis_work);
+	if (wlan_hdd_is_twt_pmo_allowed(hdd_ctx))
+		qdf_sched_work(0, &hdd_ctx->twt_en_dis_work);
 }
 
 void hdd_twt_update_work_handler(void *data)
@@ -5055,5 +5056,25 @@ int wlan_hdd_cfg80211_wifi_twt_config(struct wiphy *wiphy,
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
+}
+
+void wlan_hdd_resume_pmo_twt(struct hdd_context *hdd_ctx)
+{
+	wlan_twt_concurrency_update(hdd_ctx);
+}
+
+void wlan_hdd_suspend_pmo_twt(struct hdd_context *hdd_ctx)
+{
+	qdf_flush_work(&hdd_ctx->twt_en_dis_work);
+}
+
+bool wlan_hdd_is_twt_pmo_allowed(struct hdd_context *hdd_ctx)
+{
+	bool twt_pmo_allowed = false;
+
+	twt_pmo_allowed = ucfg_twt_get_pmo_allowed(hdd_ctx->psoc);
+	hdd_debug("twt_disabled_allowed %d ", twt_pmo_allowed);
+
+	return twt_pmo_allowed;
 }
 
