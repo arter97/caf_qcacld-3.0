@@ -595,6 +595,16 @@ wlan_t2lm_clear_all_tid_mapping(struct wlan_objmgr_vdev *vdev)
 		     sizeof(struct wlan_mlo_t2lm_ie));
 	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
 
+	t2lm_debug("Clear the T2LM info received in assoc rsp");
+	t2lm_ctx = &vdev->mlo_dev_ctx->sta_ctx->copied_t2lm_ie_assoc_rsp;
+
+	qdf_mem_zero(&t2lm_ctx->established_t2lm,
+		     sizeof(struct wlan_mlo_t2lm_ie));
+	t2lm_ctx->established_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
+	qdf_mem_zero(&t2lm_ctx->upcoming_t2lm,
+		     sizeof(struct wlan_mlo_t2lm_ie));
+	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
+
 	wlan_t2lm_clear_peer_negotiation(peer);
 	wlan_t2lm_clear_ongoing_negotiation(peer);
 	wlan_mlo_t2lm_timer_stop(vdev);
