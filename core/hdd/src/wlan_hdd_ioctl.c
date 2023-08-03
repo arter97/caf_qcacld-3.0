@@ -2646,11 +2646,11 @@ static int drv_cmd_set_wmmps(struct wlan_hdd_link_info *link_info,
 	return hdd_wmmps_helper(link_info->adapter, command);
 }
 
-static inline int drv_cmd_country(struct wlan_hdd_link_info *link_info,
-				  struct hdd_context *hdd_ctx,
-				  uint8_t *command,
-				  uint8_t command_len,
-				  struct hdd_priv_data *priv_data)
+static inline int __drv_cmd_country(struct wlan_hdd_link_info *link_info,
+				    struct hdd_context *hdd_ctx,
+				    uint8_t *command,
+				    uint8_t command_len,
+				    struct hdd_priv_data *priv_data)
 {
 	char *country_code;
 
@@ -2675,6 +2675,26 @@ static inline int drv_cmd_country(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 
 	return hdd_reg_set_country(hdd_ctx, country_code);
+}
+
+static inline int drv_cmd_country(struct wlan_hdd_link_info *link_info,
+				  struct hdd_context *hdd_ctx,
+				  uint8_t *command,
+				  uint8_t command_len,
+				  struct hdd_priv_data *priv_data)
+{
+	struct osif_psoc_sync *psoc_sync;
+	int errno;
+
+	errno = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy), &psoc_sync);
+	if (errno)
+		return errno;
+	errno = __drv_cmd_country(link_info, hdd_ctx, command, command_len,
+				  priv_data);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno;
 }
 
 /**
