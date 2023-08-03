@@ -135,6 +135,7 @@ struct basic_vdev_data {
 struct basic_vdev_ctrl {
 	struct basic_vdev_ctrl_tx *tx;
 	struct basic_vdev_ctrl_rx *rx;
+	struct basic_vdev_ctrl_link *link;
 };
 
 /* Basic pdev data stats holder */
@@ -338,6 +339,7 @@ struct advance_vdev_data {
 struct advance_vdev_ctrl {
 	struct advance_vdev_ctrl_tx *tx;
 	struct advance_vdev_ctrl_rx *rx;
+	struct advance_vdev_ctrl_link *link;
 };
 
 /* Advance pdev data stats holder */
@@ -400,6 +402,7 @@ struct debug_vdev_ctrl {
 	struct debug_vdev_ctrl_tx *tx;
 	struct debug_vdev_ctrl_rx *rx;
 	struct debug_vdev_ctrl_wmi *wmi;
+	struct debug_vdev_ctrl_link *link;
 };
 
 /* Debug pdev data stats holder */

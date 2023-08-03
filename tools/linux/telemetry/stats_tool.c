@@ -753,6 +753,11 @@ void print_basic_vap_ctrl_rx(struct basic_vdev_ctrl_rx *rx)
 	STATS_64(stdout, "Rx Security Failure", rx->cs_rx_security_failure);
 }
 
+void print_basic_vap_ctrl_link(struct basic_vdev_ctrl_link *link)
+{
+	STATS_16(stdout, "Number of connected clients", link->cs_peer_count);
+}
+
 void print_basic_radio_data_tx(struct basic_pdev_data_tx *tx)
 {
 	struct pkt_info *pkt = NULL;
@@ -804,6 +809,7 @@ void print_basic_radio_ctrl_link(struct basic_pdev_ctrl_link *link)
 	STATS_32(stdout, "Channel Tx Power", link->cs_chan_tx_pwr);
 	STATS_16_SIGNED(stdout, "Channel NF", link->cs_chan_nf);
 	STATS_16_SIGNED(stdout, "Channel NF Sec80", link->cs_chan_nf_sec80);
+	STATS_16(stdout, "Number of connected clients", link->cs_peer_count);
 }
 
 void print_basic_ap_data_tx(struct basic_psoc_data_tx *tx)
@@ -1782,6 +1788,11 @@ void print_advance_vap_ctrl_rx(struct advance_vdev_ctrl_rx *rx)
 	STATS_64(stdout, "Connections refuse Vap limit", rx->cs_sta_xceed_vlim);
 }
 
+void print_advance_vap_ctrl_link(struct advance_vdev_ctrl_link *link)
+{
+	print_basic_vap_ctrl_link(&link->b_link);
+}
+
 void print_advance_radio_data_me(struct advance_pdev_data_me *me)
 {
 	STATS_64(stdout, "Multicast Packets", me->mcast_pkt.num);
@@ -2151,6 +2162,10 @@ void print_basic_vap_ctrl(struct stats_obj *vap)
 		STATS_PRINT("Rx Stats\n");
 		print_basic_vap_ctrl_rx(ctrl->rx);
 	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_basic_vap_ctrl_link(ctrl->link);
+	}
 }
 
 void print_basic_radio_data(struct stats_obj *radio)
@@ -2377,6 +2392,10 @@ void print_advance_vap_ctrl(struct stats_obj *vap)
 	if (ctrl->rx) {
 		STATS_PRINT("Rx Stats\n");
 		print_advance_vap_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_advance_vap_ctrl_link(ctrl->link);
 	}
 }
 
@@ -3071,6 +3090,11 @@ void print_debug_vap_ctrl_wmi(struct debug_vdev_ctrl_wmi *wmi)
 	STATS_64(stdout, "Peer delete all resp", wmi->cs_peer_delete_all_resp);
 }
 
+void print_debug_vap_ctrl_link(struct debug_vdev_ctrl_link *link)
+{
+	print_basic_vap_ctrl_link(&link->b_link);
+}
+
 void print_debug_vap_data(struct stats_obj *vap)
 {
 	struct debug_vdev_data *data = vap->stats;
@@ -3116,6 +3140,10 @@ void print_debug_vap_ctrl(struct stats_obj *vap)
 	if (ctrl->wmi) {
 		STATS_PRINT("WMI Stats\n");
 		print_debug_vap_ctrl_wmi(ctrl->wmi);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_debug_vap_ctrl_link(ctrl->link);
 	}
 }
 

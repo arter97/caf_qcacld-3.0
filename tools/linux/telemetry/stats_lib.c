@@ -857,6 +857,10 @@ static void parse_basic_vap(struct nlattr *rattr, struct stats_obj *obj)
 				(void **)&ctrl->rx,
 				sizeof(struct basic_vdev_ctrl_rx));
 
+		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK],
+				(void **)&ctrl->link,
+				sizeof(struct basic_vdev_ctrl_link));
+
 		obj->stats = ctrl;
 		break;
 	}
@@ -1137,6 +1141,10 @@ static void parse_advance_vap(struct nlattr *rattr, struct stats_obj *obj)
 		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX],
 				(void **)&ctrl->rx,
 				sizeof(struct advance_vdev_ctrl_rx));
+
+		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK],
+				(void **)&ctrl->link,
+				sizeof(struct advance_vdev_ctrl_link));
 
 		obj->stats = ctrl;
 		break;
@@ -1750,6 +1758,10 @@ static void parse_debug_vap(struct nlattr *rattr, struct stats_obj *obj)
 		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_WMI],
 				(void **)&ctrl->wmi,
 				sizeof(struct debug_vdev_ctrl_wmi));
+
+		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK],
+				(void **)&ctrl->link,
+				sizeof(struct debug_vdev_ctrl_link));
 
 		obj->stats = ctrl;
 		break;
@@ -2917,6 +2929,8 @@ static void free_basic_vap(struct stats_obj *vap)
 				free(ctrl->tx);
 			if (ctrl->rx)
 				free(ctrl->rx);
+			if (ctrl->link)
+				free(ctrl->link);
 		}
 		break;
 	default:
@@ -3109,6 +3123,8 @@ static void free_advance_vap(struct stats_obj *vap)
 				free(ctrl->tx);
 			if (ctrl->rx)
 				free(ctrl->rx);
+			if (ctrl->link)
+				free(ctrl->link);
 		}
 		break;
 	default:
@@ -3292,6 +3308,8 @@ static void free_debug_vap(struct stats_obj *vap)
 				free(ctrl->rx);
 			if (ctrl->wmi)
 				free(ctrl->wmi);
+			if (ctrl->link)
+				free(ctrl->link);
 		}
 		break;
 	default:
