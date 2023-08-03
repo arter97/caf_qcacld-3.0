@@ -1034,6 +1034,9 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			 CM_PREFIX_REF(vdev_id, cm_id));
 		goto error;
 	}
+
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		mlo_roam_update_connected_links(vdev, connect_rsp);
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
 
