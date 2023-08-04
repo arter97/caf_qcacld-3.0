@@ -1697,6 +1697,11 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			rsp->freq);
 
 	if (QDF_IS_STATUS_SUCCESS(rsp->connect_status)) {
+		if (rsp->cm_id & CM_ID_LSWITCH_BIT)
+			ml_nlink_conn_change_notify(
+				psoc, vdev_id,
+				ml_nlink_link_switch_pre_completion_evt, NULL);
+
 		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
 								false))
 			policy_mgr_move_vdev_from_connection_to_disabled_tbl(

@@ -6513,6 +6513,66 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	return ret;
 }
 
+QDF_STATUS
+policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_mlo_link_switch_req *req)
+{
+	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t vdev_id = req->vdev_id;
+	uint8_t curr_ieee_link_id = req->curr_ieee_link_id;
+	uint8_t new_ieee_link_id = req->new_ieee_link_id;
+	uint32_t new_primary_freq = req->new_primary_freq;
+	QDF_STATUS status;
+	union conc_ext_flag conc_ext_flags;
+	struct policy_mgr_conc_connection_info
+			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	uint8_t num_del = 0;
+	struct ml_nlink_change_event data;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	policy_mgr_debug("target link %d freq %d curr link %d vdev %d",
+			 new_ieee_link_id, new_primary_freq,
+			 curr_ieee_link_id, vdev_id);
+	qdf_mem_zero(&data, sizeof(data));
+	data.evt.link_switch.curr_ieee_link_id = curr_ieee_link_id;
+	data.evt.link_switch.new_ieee_link_id = new_ieee_link_id;
+	data.evt.link_switch.new_primary_freq = new_primary_freq;
+	status = ml_nlink_conn_change_notify(psoc, vdev_id,
+					     ml_nlink_link_switch_start_evt,
+					     &data);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	policy_mgr_store_and_del_conn_info_by_vdev_id(
+		psoc, vdev_id, info, &num_del);
+	conc_ext_flags.value =
+	policy_mgr_get_conc_ext_flags(vdev, true);
+	if (!policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
+					       new_primary_freq,
+					       HW_MODE_20_MHZ,
+					       conc_ext_flags.value,
+					       NULL)) {
+		status = QDF_STATUS_E_INVAL;
+		policy_mgr_debug("target link %d freq %d not allowed by conc rule",
+				 new_ieee_link_id, new_primary_freq);
+	}
+
+	if (num_del > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, info, num_del);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return status;
+}
+
 bool policy_mgr_is_non_ml_sta_present(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t conn_index = 0;

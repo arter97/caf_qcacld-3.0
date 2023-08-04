@@ -787,6 +787,20 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 #ifdef WLAN_FEATURE_11BE_MLO
 void
 policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx);
+
+/**
+ * policy_mgr_link_switch_notifier_cb() - link switch notifier callback
+ * @vdev: vdev object
+ * @req: link switch request
+ *
+ * This API will be registered to mlo link switch, to be invoked before
+ * do link switch process.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_mlo_link_switch_req *req);
 #else
 static inline void
 policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}
