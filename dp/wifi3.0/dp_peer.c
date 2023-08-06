@@ -370,8 +370,12 @@ struct dp_peer *dp_find_peer_by_macaddr(struct dp_soc *soc, uint8_t *mac_addr,
 		uint16_t peer_id;
 
 		qdf_spin_lock_bh(&soc->ast_lock);
-		ast_entry = dp_peer_ast_hash_find_by_vdevid(soc, mac_addr,
-							    vdev_id);
+
+		if (vdev_id == DP_VDEV_ALL)
+			ast_entry = dp_peer_ast_hash_find_soc(soc, mac_addr);
+		else
+			ast_entry = dp_peer_ast_hash_find_by_vdevid
+						(soc, mac_addr, vdev_id);
 
 		if (!ast_entry) {
 			qdf_spin_unlock_bh(&soc->ast_lock);
