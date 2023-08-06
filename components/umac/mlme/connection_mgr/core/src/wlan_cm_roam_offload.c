@@ -3032,6 +3032,7 @@ cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
 		   struct wlan_roam_start_config *start_req)
 {
 	struct wlan_roam_mlo_config *roam_mlo_params;
+	struct rso_config *rso_cfg;
 
 	roam_mlo_params = &start_req->roam_mlo_params;
 	roam_mlo_params->vdev_id = wlan_vdev_get_id(vdev);
@@ -3039,6 +3040,18 @@ cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
 		wlan_mlme_get_sta_mlo_conn_max_num(psoc);
 	roam_mlo_params->support_link_band =
 		wlan_mlme_get_sta_mlo_conn_band_bmp(psoc);
+
+	/*
+	 * Update the supported link band based on roam_band_bitmap
+	 * Roam band bitmap is modified during NCHO mode enable, disable and
+	 * regulatory supported band changes.
+	 */
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg)
+		return;
+
+	roam_mlo_params->support_link_band &=
+					rso_cfg->roam_band_bitmask;
 }
 #else
 static void

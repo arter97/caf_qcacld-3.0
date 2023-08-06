@@ -1943,9 +1943,7 @@ enum roam_rt_stats_params {
  * @support_link_num: Configure max number of link mlo connection supports.
  *  Invalid value or 0 will use max supported value by fw.
  * @support_link_band: Configure the band bitmap of mlo connection supports
- *  Bit 0: 2G band support if 1
- *  Bit 1: 5G band support if 1
- *  Bit 2: 6G band support if 1
+ * The bits of the bitmap are defined by the enum reg_wifi_band
  */
 struct wlan_roam_mlo_config {
 	uint8_t vdev_id;
