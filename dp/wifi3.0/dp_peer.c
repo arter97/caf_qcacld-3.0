@@ -350,6 +350,50 @@ QDF_STATUS dp_peer_ast_table_attach(struct dp_soc *soc)
 }
 
 /**
+ * dp_find_peer_by_macaddr() - Finding the peer from mac address provided.
+ * @soc: soc handle
+ * @mac_addr: MAC address to be used to find peer
+ * @vdev_id: VDEV id
+ * @mod_id: MODULE ID
+ *
+ * Return: struct dp_peer
+ */
+struct dp_peer *dp_find_peer_by_macaddr(struct dp_soc *soc, uint8_t *mac_addr,
+					uint8_t vdev_id, enum dp_mod_id mod_id)
+{
+	bool ast_ind_disable = wlan_cfg_get_ast_indication_disable(
+							    soc->wlan_cfg_ctx);
+	struct cdp_peer_info peer_info = {0};
+
+	if ((!soc->ast_offload_support) || (!ast_ind_disable)) {
+		struct dp_ast_entry *ast_entry = NULL;
+		uint16_t peer_id;
+
+		qdf_spin_lock_bh(&soc->ast_lock);
+		ast_entry = dp_peer_ast_hash_find_by_vdevid(soc, mac_addr,
+							    vdev_id);
+
+		if (!ast_entry) {
+			qdf_spin_unlock_bh(&soc->ast_lock);
+			dp_err("NULL ast entry");
+			return NULL;
+		}
+
+		peer_id = ast_entry->peer_id;
+		qdf_spin_unlock_bh(&soc->ast_lock);
+
+		if (peer_id == HTT_INVALID_PEER)
+			return NULL;
+
+		return dp_peer_get_ref_by_id(soc, peer_id, mod_id);
+	}
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, mac_addr, false,
+				 CDP_WILD_PEER_TYPE);
+	return dp_peer_hash_find_wrapper(soc, &peer_info, mod_id);
+}
+
+/**
  * dp_peer_find_map_attach() - allocate memory for peer_id_to_obj_map
  * @soc: soc handle
  *
