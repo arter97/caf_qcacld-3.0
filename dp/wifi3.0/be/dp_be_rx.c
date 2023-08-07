@@ -2227,9 +2227,23 @@ dp_rx_null_q_desc_handle_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		if (peer) {
 			rx_tid = &peer->rx_tid[tid];
 			qdf_spin_lock_bh(&rx_tid->tid_lock);
-			if (!peer->rx_tid[tid].hw_qdesc_vaddr_unaligned)
-				dp_rx_tid_setup_wifi3(peer, tid, 1,
-						      IEEE80211_SEQ_MAX);
+			if (!peer->rx_tid[tid].hw_qdesc_vaddr_unaligned) {
+			/* For Mesh peer, if on one of the mesh AP the
+			 * mesh peer is not deleted, the new addition of mesh
+			 * peer on other mesh AP doesn't do BA negotiation
+			 * leading to mismatch in BA windows.
+			 * To avoid this send max BA window during init.
+			 */
+				if (qdf_unlikely(vdev->mesh_vdev) ||
+				    qdf_unlikely(txrx_peer->nawds_enabled))
+					dp_rx_tid_setup_wifi3(
+						peer, tid,
+						hal_get_rx_max_ba_window(soc->hal_soc,tid),
+						IEEE80211_SEQ_MAX);
+				else
+					dp_rx_tid_setup_wifi3(peer, tid, 1,
+							      IEEE80211_SEQ_MAX);
+			}
 			qdf_spin_unlock_bh(&rx_tid->tid_lock);
 			/* IEEE80211_SEQ_MAX indicates invalid start_seq */
 			dp_peer_unref_delete(peer, DP_MOD_ID_RX_ERR);
