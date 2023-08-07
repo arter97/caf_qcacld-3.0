@@ -1657,9 +1657,6 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 	struct sk_buff *skb;
 	struct wlan_hdd_link_info *link_info;
 
-	if (!wlan_hdd_is_mlo_connection(adapter->deflink))
-		return;
-
 	if (wlan_hdd_validate_context(hdd_ctx)) {
 		hdd_err("Invalid hdd context");
 		return;
@@ -3239,7 +3236,8 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 	}
 	qdf_list_destroy(&priv->ll_stats_q);
 
-	if (req->reqId != DEBUGFS_LLSTATS_REQID) {
+	if (wlan_hdd_is_mlo_connection(link_info) &&
+	    req->reqId != DEBUGFS_LLSTATS_REQID) {
 		wlan_hdd_send_mlo_ll_iface_stats(adapter);
 		wlan_hdd_send_mlo_ll_peer_stats(hdd_ctx,
 					(struct wifi_peer_stat *)mlo_stats);
