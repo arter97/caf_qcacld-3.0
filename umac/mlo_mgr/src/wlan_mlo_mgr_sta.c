@@ -1280,6 +1280,37 @@ QDF_STATUS mlo_disconnect(struct wlan_objmgr_vdev *vdev,
 	return mlo_disconnect_req(vdev, source, reason_code, bssid, true);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+/**
+ * mlo_wait_for_mld_disconnection - API to wait for sync mld disconnection
+ * @vdev: pointer to vdev
+ *
+ * Return: none
+ */
+static inline
+void mlo_wait_for_mld_disconnection(struct wlan_objmgr_vdev *vdev)
+{ }
+#else
+#define ML_DISCONNECT_CMD_TIMEOUT 1000
+#define ML_DISCONNECT_CMD_TIMEOUT_CNT 30 /* 30*1000 ms */
+
+static void mlo_wait_for_mld_disconnection(struct wlan_objmgr_vdev *vdev)
+{
+	int waitcnt = 0;
+	qdf_event_t wait_event;
+
+	qdf_mem_zero(&wait_event, sizeof(wait_event));
+	qdf_event_create(&wait_event);
+	qdf_event_reset(&wait_event);
+
+	while (!mlo_is_mld_disconnected(vdev) &&
+	       waitcnt < ML_DISCONNECT_CMD_TIMEOUT_CNT) {
+		qdf_wait_single_event(&wait_event, ML_DISCONNECT_CMD_TIMEOUT);
+		waitcnt++;
+	}
+	qdf_event_destroy(&wait_event);
+}
+#endif
 QDF_STATUS mlo_sync_disconnect(struct wlan_objmgr_vdev *vdev,
 			       enum wlan_cm_source source,
 			       enum wlan_reason_code reason_code,
@@ -1311,8 +1342,10 @@ QDF_STATUS mlo_sync_disconnect(struct wlan_objmgr_vdev *vdev,
 
 		status = mlo_send_link_disconnect_sync(mlo_dev_ctx, source,
 						       reason_code, bssid);
-		if (QDF_IS_STATUS_SUCCESS(status))
+		if (QDF_IS_STATUS_SUCCESS(status)) {
 			mlo_free_copied_conn_req(sta_ctx);
+			mlo_wait_for_mld_disconnection(vdev);
+		}
 
 		return status;
 	}
