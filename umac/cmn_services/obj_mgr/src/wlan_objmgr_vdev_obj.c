@@ -1497,6 +1497,16 @@ bool wlan_vdev_mlme_is_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 
 qdf_export_symbol(wlan_vdev_mlme_is_mlo_vdev);
 
+#ifdef WLAN_MLO_MULTI_CHIP
+bool wlan_vdev_mlme_is_mlo_bridge_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev)
+		return false;
+
+	return vdev->vdev_objmgr.mlo_bridge_vdev;
+}
+#endif
+
 void wlan_vdev_mlme_set_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_pdev *pdev;

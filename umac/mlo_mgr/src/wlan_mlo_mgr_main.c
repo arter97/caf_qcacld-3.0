@@ -704,6 +704,86 @@ static inline void mlo_epcs_ctx_init(struct wlan_mlo_dev_context *ml_dev)
 	epcs_dev_lock_create(epcs_ctx);
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+static QDF_STATUS
+mlo_add_to_bridge_vdev_list(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev;
+	struct qdf_mac_addr *mld_addr;
+	uint8_t id = 0;
+
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+	ml_dev = wlan_mlo_get_mld_ctx_by_mldaddr(mld_addr);
+
+	if (ml_dev) {
+		mlo_dev_lock_acquire(ml_dev);
+		while (id < WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS) {
+			if (ml_dev->wlan_bridge_vdev_list[id]) {
+				id++;
+				continue;
+			}
+
+			ml_dev->wlan_bridge_vdev_list[id] = vdev;
+			vdev->mlo_dev_ctx = ml_dev;
+			break;
+		}
+		mlo_dev_lock_release(ml_dev);
+
+		if (id == WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS)
+			return QDF_STATUS_E_FAILURE;
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+mld_delete_from_bridge_vdev_list(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev;
+	struct qdf_mac_addr *mld_addr;
+	uint8_t id = 0;
+
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+	ml_dev = wlan_mlo_get_mld_ctx_by_mldaddr(mld_addr);
+
+	if (ml_dev) {
+		mlo_dev_lock_acquire(ml_dev);
+		while (id < WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS) {
+			if (ml_dev->wlan_bridge_vdev_list[id] == vdev) {
+				vdev->mlo_dev_ctx = NULL;
+				ml_dev->wlan_bridge_vdev_list[id] = NULL;
+				break;
+			}
+			id++;
+		}
+		mlo_dev_lock_release(ml_dev);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+#else
+static QDF_STATUS
+mlo_add_to_bridge_vdev_list(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+mld_delete_from_bridge_vdev_list(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_mlo_dev_context *ml_dev;
@@ -711,6 +791,13 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 	struct qdf_mac_addr *mld_addr;
 	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	uint8_t id = 0;
+
+	if (wlan_vdev_mlme_is_mlo_bridge_vdev(vdev)) {
+		status = mlo_add_to_bridge_vdev_list(vdev);
+		if (!QDF_IS_STATUS_SUCCESS(status))
+			mlo_err("Failed to init bridge vap ctx");
+		return status;
+	}
 
 	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
 	ml_dev = wlan_mlo_get_mld_ctx_by_mldaddr(mld_addr);
@@ -861,6 +948,14 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 
 	mlo_debug("deleting vdev from MLD device ctx "QDF_MAC_ADDR_FMT,
 		  QDF_MAC_ADDR_REF(mld_addr->bytes));
+
+	if (wlan_vdev_mlme_is_mlo_bridge_vdev(vdev)) {
+		status = mld_delete_from_bridge_vdev_list(vdev);
+		if (!QDF_IS_STATUS_SUCCESS(status))
+			mlo_err("Failed to deinit bridge vap ctx");
+		return status;
+	}
+
 	mlo_dev_lock_acquire(ml_dev);
 	while (id < WLAN_UMAC_MLO_MAX_VDEVS) {
 		if (ml_dev->wlan_vdev_list[id] == vdev) {

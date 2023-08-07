@@ -260,6 +260,66 @@ vdev_mgr_start_param_update_mlo_mcast(struct wlan_objmgr_vdev *vdev,
 #define vdev_mgr_start_param_update_mlo_mcast(vdev, param)
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+static QDF_STATUS
+mlo_ap_append_bridge_vdevs(struct wlan_objmgr_vdev *vdev,
+			   struct mlo_vdev_start_partner_links *mlo_ptr,
+			   uint8_t p_idx)
+{
+	struct wlan_objmgr_vdev *bridge_vdev_list[WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS] = {NULL};
+	struct wlan_objmgr_pdev *pdev;
+	uint16_t num_links = 0;
+	uint8_t i = 0;
+
+	if (!vdev || !mlo_ptr)
+		return QDF_STATUS_E_FAILURE;
+
+	if (p_idx >= WLAN_UMAC_MLO_MAX_VDEVS)
+		return QDF_STATUS_E_FAILURE;
+
+	mlo_ap_get_bridge_vdev_list(vdev, &num_links, bridge_vdev_list);
+	if (!num_links)
+		return QDF_STATUS_SUCCESS;
+
+	if (num_links > QDF_ARRAY_SIZE(bridge_vdev_list)) {
+		mlme_err("Invalid number of VDEVs under AP-MLD num_links:%u",
+			 num_links);
+		for (i = 0; i < QDF_ARRAY_SIZE(bridge_vdev_list); i++)
+			mlo_release_vdev_ref(bridge_vdev_list[i]);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS; i++) {
+		if (bridge_vdev_list[i] == vdev) {
+			mlo_release_vdev_ref(bridge_vdev_list[i]);
+			continue;
+		}
+
+		pdev = wlan_vdev_get_pdev(bridge_vdev_list[i]);
+		mlo_ptr->partner_info[p_idx].vdev_id =
+			wlan_vdev_get_id(bridge_vdev_list[i]);
+		mlo_ptr->partner_info[p_idx].hw_mld_link_id =
+			wlan_mlo_get_pdev_hw_link_id(pdev);
+		qdf_mem_copy(mlo_ptr->partner_info[p_idx].mac_addr,
+			     wlan_vdev_mlme_get_macaddr(bridge_vdev_list[i]),
+			     QDF_MAC_ADDR_SIZE);
+		mlo_release_vdev_ref(bridge_vdev_list[i]);
+		p_idx++;
+	}
+	mlo_ptr->num_links = p_idx;
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS
+mlo_ap_append_bridge_vdevs(struct wlan_objmgr_vdev *vdev,
+			   struct mlo_vdev_start_partner_links *mlo_ptr,
+			   uint8_t p_idx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static void
 vdev_mgr_start_param_update_mlo_partner(struct wlan_objmgr_vdev *vdev,
 					struct vdev_start_params *param)
@@ -269,8 +329,13 @@ vdev_mgr_start_param_update_mlo_partner(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_vdev *vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
 	uint16_t num_links = 0;
 	uint8_t i = 0, p_idx = 0;
+	QDF_STATUS status;
 
-	mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
+	if (wlan_vdev_mlme_is_mlo_bridge_vdev(vdev))
+		mlo_ap_get_vdev_list_no_flag(vdev, &num_links, vdev_list);
+	else
+		mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
+
 	if (!num_links) {
 		mlme_err("No VDEVs under AP-MLD");
 		return;
@@ -302,6 +367,10 @@ vdev_mgr_start_param_update_mlo_partner(struct wlan_objmgr_vdev *vdev,
 		p_idx++;
 	}
 	mlo_ptr->num_links = p_idx;
+
+	status = mlo_ap_append_bridge_vdevs(vdev, mlo_ptr, p_idx);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlo_err("failed to append bridge vdev to partner link list");
 }
 
 static void
@@ -316,7 +385,8 @@ vdev_mgr_start_param_update_mlo(struct vdev_mlme_obj *mlme_obj,
 		return;
 	}
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_vdev_mlme_is_mlo_bridge_vdev(vdev))
 		return;
 
 	param->mlo_flags.mlo_enabled = 1;

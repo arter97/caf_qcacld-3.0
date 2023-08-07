@@ -414,8 +414,10 @@ struct wlan_objmgr_vdev_objmgr {
 	uint16_t wlan_peer_count;
 #ifdef WLAN_FEATURE_11BE_MLO
 	qdf_atomic_t wlan_ml_peer_count;
+#ifdef WLAN_MLO_MULTI_CHIP
 	bool mlo_bridge_vdev;
 	bool mlo_central_vdev;
+#endif
 #endif
 	uint16_t max_peer_count;
 	uint32_t c_flags;
@@ -1645,6 +1647,24 @@ static inline bool wlan_vdev_mlme_is_ap(struct wlan_objmgr_vdev *vdev)
  * Return: True if it is MLO, otherwise false.
  */
 bool wlan_vdev_mlme_is_mlo_vdev(struct wlan_objmgr_vdev *vdev);
+
+#ifdef WLAN_MLO_MULTI_CHIP
+/**
+ * wlan_vdev_mlme_is_mlo_bridge_vdev() - check if it is bridge vdev
+ * @vdev: Object manager VDEV object
+ *
+ * API to get if given vdev is bridge vdev or not
+ *
+ * Return: True if it is bridge vdev, otherwise false.
+ */
+bool wlan_vdev_mlme_is_mlo_bridge_vdev(struct wlan_objmgr_vdev *vdev);
+#else
+static inline bool
+wlan_vdev_mlme_is_mlo_bridge_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif
 
 /**
  * wlan_vdev_mlme_is_mlo_ap() - whether it is mlo ap or not
