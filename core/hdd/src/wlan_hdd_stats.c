@@ -5724,6 +5724,43 @@ static void hdd_get_max_rate_vht(struct hdd_station_info *stainfo,
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
+#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
+static bool hdd_fill_eht_bw_mcs(struct rate_info *rate_info,
+				enum tx_rate_info rate_flags,
+				uint8_t mcsidx,
+				uint8_t nss,
+				uint8_t rate_info_flag)
+{
+	if (rate_info_flag == RATE_INFO_FLAGS_EHT_MCS) {
+		rate_info->nss = nss;
+		rate_info->mcs = mcsidx;
+		rate_info->flags |= RATE_INFO_FLAGS_EHT_MCS;
+		if (rate_flags & TX_RATE_EHT320)
+			rate_info->bw = RATE_INFO_BW_320;
+		else if (rate_flags & TX_RATE_EHT160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_EHT80)
+			rate_info->bw = RATE_INFO_BW_80;
+		else if (rate_flags & TX_RATE_EHT40)
+			rate_info->bw = RATE_INFO_BW_40;
+		else if (rate_flags & TX_RATE_EHT20)
+			rate_info->bw = RATE_INFO_BW_20;
+
+		return true;
+	}
+
+	return false;
+}
+#else
+static inline bool hdd_fill_eht_bw_mcs(struct rate_info *rate_info,
+				       enum tx_rate_info rate_flags,
+				       uint8_t mcsidx,
+				       uint8_t nss,
+				       uint8_t rate_info_flag)
+{
+	return false;
+}
+#endif
 /**
  * hdd_fill_bw_mcs() - fill ch width and mcs flags
  * @rate_info: pointer to struct rate_info
@@ -5742,21 +5779,11 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    uint8_t nss,
 			    uint8_t rate_info_flag)
 {
-	if (rate_info_flag == RATE_INFO_FLAGS_EHT_MCS) {
-		rate_info->nss = nss;
-		rate_info->mcs = mcsidx;
-		rate_info->flags |= RATE_INFO_FLAGS_EHT_MCS;
-		if (rate_flags & TX_RATE_EHT320)
-			rate_info->bw = RATE_INFO_BW_320;
-		else if (rate_flags & TX_RATE_EHT160)
-			rate_info->bw = RATE_INFO_BW_160;
-		else if (rate_flags & TX_RATE_EHT80)
-			rate_info->bw = RATE_INFO_BW_80;
-		else if (rate_flags & TX_RATE_EHT40)
-			rate_info->bw = RATE_INFO_BW_40;
-		else if (rate_flags & TX_RATE_EHT20)
-			rate_info->bw = RATE_INFO_BW_20;
-	} else if (rate_info_flag == RATE_INFO_FLAGS_HE_MCS) {
+	if (hdd_fill_eht_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+				rate_info_flag))
+		return;
+
+	if (rate_info_flag == RATE_INFO_FLAGS_HE_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_HE_MCS;
@@ -5827,6 +5854,30 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
+static void hdd_fill_sinfo_eht_rate_info(struct rate_info *rate_info,
+					 uint32_t rate_flags, uint8_t mcsidx,
+					 uint8_t nss)
+{
+	if (rate_flags &
+			(TX_RATE_EHT320 |
+			 TX_RATE_EHT160 |
+			 TX_RATE_EHT80 |
+			 TX_RATE_EHT40 |
+			 TX_RATE_EHT20)) {
+		hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+				RATE_INFO_FLAGS_EHT_MCS);
+	}
+}
+#else
+static inline void hdd_fill_sinfo_eht_rate_info(struct rate_info *rate_info,
+						uint32_t rate_flags,
+						uint8_t mcsidx,
+						uint8_t nss)
+{
+}
+#endif
+
 /**
  * hdd_fill_sinfo_rate_info() - fill rate info of sinfo struct
  * @sinfo: pointer to struct station_info
@@ -5859,15 +5910,9 @@ static void hdd_fill_sinfo_rate_info(struct station_info *sinfo,
 		rate_info->legacy = rate;
 	} else {
 		/* must be MCS */
-		if (rate_flags &
-				(TX_RATE_EHT320 |
-				 TX_RATE_EHT160 |
-				 TX_RATE_EHT80 |
-				 TX_RATE_EHT40 |
-				 TX_RATE_EHT20)) {
-			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
-					RATE_INFO_FLAGS_EHT_MCS);
-		}
+		hdd_fill_sinfo_eht_rate_info(rate_info, rate_flags, mcsidx,
+					     nss);
+
 		if (rate_flags &
 				(TX_RATE_HE160 |
 				 TX_RATE_HE80 |
