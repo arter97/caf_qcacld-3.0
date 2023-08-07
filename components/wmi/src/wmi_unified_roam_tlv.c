@@ -3488,6 +3488,48 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+static QDF_STATUS
+extract_peer_oper_mode_event_tlv(wmi_unified_t wmi_handle, uint8_t *event,
+				 uint32_t len,
+				 struct peer_oper_mode_event *data)
+{
+	WMI_PEER_OPER_MODE_CHANGE_EVENTID_param_tlvs *param_buf = NULL;
+	wmi_peer_oper_mode_change_event_fixed_param *params = NULL;
+
+	if (!event || !len) {
+		wmi_debug("Empty operating mode change event");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	param_buf = (WMI_PEER_OPER_MODE_CHANGE_EVENTID_param_tlvs *)event;
+	if (!param_buf) {
+		wmi_err("Received null buf from target");
+		return -EINVAL;
+	}
+
+	params =
+		(wmi_peer_oper_mode_change_event_fixed_param *)param_buf->fixed_param;
+
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&params->peer_mac_address,
+				   data->peer_mac_address.bytes);
+	data->ind_type = params->ind_type;
+	data->new_rxnss = params->new_rxnss;
+	data->new_bw = params->new_bw;
+	data->new_txnss = params->new_txnss;
+	data->new_disablemu = params->new_disablemu;
+
+	wmi_debug("peer_mac_addr: " QDF_MAC_ADDR_FMT " ind_type: %d new_rxnss: %d new_bw: %d new_txnss: %d new_disablemu: %d",
+		  QDF_MAC_ADDR_REF(data->peer_mac_address.bytes),
+		  data->ind_type,
+		  data->new_rxnss,
+		  data->new_bw,
+		  data->new_txnss,
+		  data->new_disablemu);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 /**
  * convert_roam_vendor_control_param() - Function to convert
@@ -4125,6 +4167,7 @@ void wmi_roam_offload_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_vdev_set_pcl_cmd = send_vdev_set_pcl_cmd_tlv;
 	ops->send_set_roam_trigger_cmd = send_set_roam_trigger_cmd_tlv;
 	ops->extract_roam_candidate_frame = extract_roam_candidate_frame_tlv;
+	ops->extract_peer_oper_mode_event = extract_peer_oper_mode_event_tlv;
 	wmi_roam_offload_attach_vendor_handoff_tlv(ops);
 	wmi_roam_offload_attach_mlo_tlv(ops);
 }

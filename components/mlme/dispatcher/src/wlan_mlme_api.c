@@ -5525,6 +5525,88 @@ wlan_mlme_get_self_bss_roam(struct wlan_objmgr_psoc *psoc,
 #endif
 
 QDF_STATUS
+wlan_mlme_get_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
+				      struct peer_oper_mode_event *data)
+{
+	struct wlan_objmgr_peer *peer;
+	struct peer_mlme_priv_obj *peer_priv;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!data) {
+		mlme_err("Data params is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, data->peer_mac_address.bytes,
+					   WLAN_MLME_NB_ID);
+	if (!peer) {
+		mlme_err("peer not found for mac: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(data->peer_mac_address.bytes));
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_MLME);
+	if (!peer_priv) {
+		mlme_err("peer priv not found for mac: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(peer->macaddr));
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto done;
+	}
+
+	if (peer_priv->peer_ind_bw == CH_WIDTH_INVALID) {
+		status = QDF_STATUS_E_INVAL;
+		goto done;
+	}
+
+	data->new_bw = peer_priv->peer_ind_bw;
+
+done:
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
+
+	return status;
+}
+
+QDF_STATUS
+wlan_mlme_set_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
+				      struct peer_oper_mode_event *data)
+{
+	struct wlan_objmgr_peer *peer;
+	struct peer_mlme_priv_obj *peer_priv;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!data) {
+		mlme_err("Data params is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, data->peer_mac_address.bytes,
+					   WLAN_MLME_NB_ID);
+	if (!peer) {
+		mlme_err("peer not found for mac: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(data->peer_mac_address.bytes));
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_MLME);
+	if (!peer_priv) {
+		mlme_err("peer priv not found for mac: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(peer->macaddr));
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto done;
+	}
+
+	peer_priv->peer_ind_bw =
+			target_if_wmi_chan_width_to_phy_ch_width(data->new_bw);
+
+done:
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
+
+	return status;
+}
+
+QDF_STATUS
 wlan_mlme_set_ft_over_ds(struct wlan_objmgr_psoc *psoc,
 			 uint8_t ft_over_ds_enable)
 {

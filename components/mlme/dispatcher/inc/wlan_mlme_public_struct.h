@@ -3030,4 +3030,34 @@ struct sap_sel_ch_info {
 	struct sap_ch_info *ch_info;
 	uint8_t num_ch;
 };
+
+/**
+ * enum mlme_peer_oper_mode_ind - Peer mode indication type
+ * @mlme_peer_ind_smps: spatial multiplexing power save
+ * @mlme_peer_ind_omn: Operating mode notification
+ * @mlme_peer_ind_omi: Operating mode indication
+ */
+enum mlme_peer_oper_mode_ind {
+	mlme_peer_ind_smps,
+	mlme_peer_ind_omn,
+	mlme_peer_ind_omi,
+};
+
+/**
+ * struct peer_oper_mode_event - structure for peer oper mode indication data
+ * @peer_mac_address: mac address of peer
+ * @ind_type: indication type of type @enum mlme_peer_oper_mode_ind
+ * @new_rxnss: New Rx NSS
+ * @new_bw: New bandwidth
+ * @new_txnss: New Tx NSS, valid only for mlme_peer_ind_omi
+ * @new_disablemu: Disabled MU mode, valid only for mlme_peer_ind_omi
+ */
+struct peer_oper_mode_event {
+	struct qdf_mac_addr peer_mac_address;
+	uint32_t ind_type;
+	uint32_t new_rxnss;
+	uint32_t new_bw;
+	uint32_t new_txnss;
+	uint32_t new_disablemu;
+};
 #endif

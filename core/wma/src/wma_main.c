@@ -3580,6 +3580,8 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 
 	wlan_mlme_set_assoc_sta_limit(psoc, cds_cfg->max_station);
 
+	wlan_mlme_register_common_events(psoc);
+
 	/* initialize default target config */
 	wlan_res_cfg = target_psoc_get_wlan_res_cfg(tgt_psoc_info);
 	if (!wlan_res_cfg) {

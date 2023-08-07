@@ -120,10 +120,21 @@ struct peer_disconnect_stats_param {
 };
 
 /**
+ * struct wlan_mlme_rx_ops  - structure of tx function pointers for
+ * roaming related commands
+ * @peer_oper_mode_eventid : Rx ops function pointer for operating mode event
+ */
+struct wlan_mlme_rx_ops {
+	QDF_STATUS (*peer_oper_mode_eventid)(struct wlan_objmgr_psoc *psoc,
+					     struct peer_oper_mode_event *data);
+};
+
+/**
  * struct wlan_mlme_psoc_ext_obj -MLME ext psoc priv object
  * @cfg:     cfg items
  * @rso_tx_ops: Roam Tx ops to send roam offload commands to firmware
  * @rso_rx_ops: Roam Rx ops to receive roam offload events from firmware
+ * @mlme_rx_ops: mlme Rx ops to receive events from firmware
  * @wfa_testcmd: WFA config tx ops to send to FW
  * @disconnect_stats_param: Peer disconnect stats related params for SAP case
  * @scan_requester_id: mlme scan requester id
@@ -132,6 +143,7 @@ struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
 	struct wlan_cm_roam_tx_ops rso_tx_ops;
 	struct wlan_cm_roam_rx_ops rso_rx_ops;
+	struct wlan_mlme_rx_ops mlme_rx_ops;
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
 	struct peer_disconnect_stats_param disconnect_stats_param;
 	wlan_scan_requester scan_requester_id;
@@ -175,6 +187,7 @@ struct sae_auth_retry {
  * @peer_set_key_runtime_wakelock: runtime pm wakelock for set key
  * @is_key_wakelock_set: flag to check if key wakelock is pending to release
  * @assoc_rsp: assoc rsp IE received during connection
+ * @peer_ind_bw: peer indication channel bandwidth
  */
 struct peer_mlme_priv_obj {
 	uint8_t last_pn_valid;
@@ -194,6 +207,7 @@ struct peer_mlme_priv_obj {
 	qdf_runtime_lock_t peer_set_key_runtime_wakelock;
 	bool is_key_wakelock_set;
 	struct element_info assoc_rsp;
+	enum phy_ch_width peer_ind_bw;
 };
 
 /**
@@ -1829,4 +1843,61 @@ static inline int mlme_sr_is_enable(struct wlan_objmgr_vdev *vdev)
 	return 0;
 }
 #endif /* WLAN_FEATURE_SR */
+
+/**
+ * mlme_peer_oper_mode_change_event_handler() - Handle peer oper mode event
+ * @scn: handle
+ * @event: Event data received from firmware
+ * @len: Event data length received from firmware
+ */
+int mlme_peer_oper_mode_change_event_handler(ol_scn_t scn, uint8_t *event,
+					     uint32_t len);
+
+/**
+ * wmi_extract_peer_oper_mode_event() - Extract the peer operating
+ * mode change event and update the new bandwidth
+ * @wmi_handle: wmi handle
+ * @event: Event data received from firmware
+ * @len: Event data length received from firmware
+ * @data: Extract the event and fill in data
+ */
+QDF_STATUS
+wmi_extract_peer_oper_mode_event(wmi_unified_t wmi_handle,
+				 uint8_t *event,
+				 uint32_t len,
+				 struct peer_oper_mode_event *data);
+
+/**
+ * wlan_mlme_register_rx_ops - Target IF mlme API to register mlme
+ * related rx op.
+ * @rx_ops: Pointer to rx ops fp struct
+ *
+ * Return: none
+ */
+void wlan_mlme_register_rx_ops(struct wlan_mlme_rx_ops *rx_ops);
+
+/**
+ * mlme_get_rx_ops - Get mlme rx ops from psoc
+ * @psoc: psoc
+ *
+ * Return: Pointer to rx ops fp struct
+ */
+struct wlan_mlme_rx_ops *
+mlme_get_rx_ops(struct wlan_objmgr_psoc *psoc);
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * wlan_mlme_register_common_events - Wrapper to register common events
+ * @psoc: psoc
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_register_common_events(struct wlan_objmgr_psoc *psoc);
+#else
+static inline QDF_STATUS
+wlan_mlme_register_common_events(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif

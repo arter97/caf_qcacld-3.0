@@ -37,12 +37,37 @@
 #include "wlan_scan_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_vdev_mgr_utils_api.h"
+#include <wmi_unified_priv.h>
+#include <target_if.h>
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
 /* Time to passive scan dwell for scan to get channel stats, in milliseconds */
 #define MLME_GET_CHAN_STATS_PASSIVE_SCAN_TIME 40
 #define MLME_GET_CHAN_STATS_WIDE_BAND_PASSIVE_SCAN_TIME 110
+
+struct wlan_mlme_rx_ops *
+mlme_get_rx_ops(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *psoc_ext_priv;
+
+	if (!psoc) {
+		mlme_err("psoc object is NULL");
+		return NULL;
+	}
+	psoc_ext_priv = wlan_psoc_mlme_get_ext_hdl(psoc);
+	if (!psoc_ext_priv) {
+		mlme_err("psoc legacy private object is NULL");
+		return NULL;
+	}
+
+	return &psoc_ext_priv->mlme_rx_ops;
+}
+
+void wlan_mlme_register_rx_ops(struct wlan_mlme_rx_ops *rx_ops)
+{
+	rx_ops->peer_oper_mode_eventid = wlan_mlme_set_peer_indicated_ch_width;
+}
 
 struct wlan_mlme_psoc_ext_obj *mlme_get_psoc_ext_obj_fl(
 			       struct wlan_objmgr_psoc *psoc,
@@ -898,6 +923,7 @@ mlme_peer_object_created_notification(struct wlan_objmgr_peer *peer,
 	qdf_wake_lock_create(&peer_priv->peer_set_key_wakelock, "peer_set_key");
 	qdf_runtime_lock_init(&peer_priv->peer_set_key_runtime_wakelock);
 	peer_priv->is_key_wakelock_set = false;
+	peer_priv->peer_ind_bw = CH_WIDTH_INVALID;
 
 	return status;
 }
@@ -5330,3 +5356,85 @@ QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+QDF_STATUS
+wmi_extract_peer_oper_mode_event(wmi_unified_t wmi_handle,
+				 uint8_t *event,
+				 uint32_t len,
+				 struct peer_oper_mode_event *data)
+{
+	if (wmi_handle->ops->extract_peer_oper_mode_event)
+		return wmi_handle->ops->extract_peer_oper_mode_event(wmi_handle,
+								     event,
+								     len, data);
+	return QDF_STATUS_E_FAILURE;
+}
+
+int mlme_peer_oper_mode_change_event_handler(ol_scn_t scn,
+					      uint8_t *event,
+					      uint32_t len)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wmi_unified *wmi_handle;
+	struct peer_oper_mode_event data = {0};
+	struct wlan_mlme_rx_ops *mlme_rx_ops;
+	QDF_STATUS qdf_status;
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		target_if_err("psoc is null");
+		return -EINVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mlme_err("wmi_handle is null");
+		return -EINVAL;
+	}
+
+	qdf_status = wmi_extract_peer_oper_mode_event(wmi_handle, event,
+						      len, &data);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		mlme_err("parsing of event failed, %d", qdf_status);
+		return -EINVAL;
+	}
+
+	mlme_rx_ops = mlme_get_rx_ops(psoc);
+	if (!mlme_rx_ops || !mlme_rx_ops->peer_oper_mode_eventid) {
+		mlme_err("No valid roam rx ops");
+		return -EINVAL;
+	}
+
+	qdf_status = mlme_rx_ops->peer_oper_mode_eventid(psoc, &data);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		mlme_err("peer_oper_mode_change_event Failed");
+		return -EINVAL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_register_common_events(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS ret;
+	wmi_unified_t handle = get_wmi_unified_hdl_from_psoc(psoc);
+
+	if (!handle) {
+		mlme_err("handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Register for peer operating mode change devent */
+	ret = wmi_unified_register_event_handler(handle,
+				wmi_peer_oper_mode_change_event_id,
+				mlme_peer_oper_mode_change_event_handler,
+				WMI_RX_SERIALIZER_CTX);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		mlme_err("wmi event(%u) registration failed, ret: %d",
+			      wmi_peer_oper_mode_change_event_id, ret);
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif

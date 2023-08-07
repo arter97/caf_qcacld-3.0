@@ -3525,6 +3525,28 @@ wlan_mlme_get_roaming_offload(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * wlan_mlme_set_peer_indicated_ch_width() - Set peer indicated channel width
+ * @psoc: pointer to psoc object
+ * @data: Pointer to peer operating mode change event status
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
+				      struct peer_oper_mode_event *data);
+
+/**
+ * wlan_mlme_get_peer_indicated_ch_width() - Get peer indicated channel width
+ * @psoc: pointer to psoc object
+ * @data: Pointer to peer operating mode change event status
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
+				      struct peer_oper_mode_event *data);
+
+/**
  * wlan_mlme_set_ft_over_ds() - Update ft_over_ds
  * @psoc: pointer to psoc object
  * @ft_over_ds_enable: value of ft_over_ds
