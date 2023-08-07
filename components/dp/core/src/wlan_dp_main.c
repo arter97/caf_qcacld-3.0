@@ -953,7 +953,6 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 {
 	struct wlan_dp_intf *dp_intf;
-	uint8_t vdev_id;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	dp_info("DP VDEV OBJ destroy notification");
@@ -982,7 +981,6 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		}
 	}
 	qdf_mem_zero(&dp_intf->conn_info, sizeof(struct wlan_dp_conn_info));
-	vdev_id = dp_intf->intf_id;
 	dp_intf->intf_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_spin_lock_bh(&dp_intf->vdev_lock);
 	dp_intf->vdev = NULL;
@@ -994,7 +992,6 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		dp_err("Failed to detach dp_intf with vdev");
 		return status;
 	}
-	dp_send_destroy_ind(dp_intf, vdev_id);
 
 	return status;
 }
@@ -1262,13 +1259,6 @@ void dp_send_rps_ind(struct wlan_dp_intf *dp_intf)
 err:
 	dp_info("Wrong RPS configuration. enabling rx_thread");
 	cds_cfg->rps_enabled = false;
-}
-
-void dp_send_destroy_ind(struct wlan_dp_intf *dp_intf, uint8_t vdev_id)
-{
-	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
-
-	dp_ctx->dp_ops.dp_send_destroy_ind(vdev_id);
 }
 
 void dp_try_send_rps_ind(struct wlan_objmgr_vdev *vdev)

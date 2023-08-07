@@ -116,7 +116,7 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 					struct stats_event *ev,
 					bool is_station_stats)
 {
-	int32_t max_pwr;
+	int32_t max_pwr = 0;
 	uint8_t pdev_id;
 	uint8_t mac_id = 0;
 	QDF_STATUS status;
