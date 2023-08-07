@@ -13,12 +13,12 @@ $(strip \
 )
 endef
 
+LOCAL_MODULE_DDK_BUILD := false
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := false
+
+ifeq ($(TARGET_BOARD_PLATFORM), pineapple)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
-
-ifeq ($(shell test $(PLATFORM_VERSION) -lt 14; echo $$?),0)
-    LOCAL_MODULE_DDK_BUILD := false
-    LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := false
 endif
 
 LOCAL_PATH := $(call my-dir)
