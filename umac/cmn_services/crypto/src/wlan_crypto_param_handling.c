@@ -169,6 +169,15 @@ QDF_STATUS wlan_crypto_set_rsn_cap(
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS wlan_crypto_set_rsnx_cap(
+				struct wlan_crypto_params *crypto_params,
+				uint32_t value)
+{
+	crypto_params->rsnx_caps = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 int32_t wlan_crypto_get_rsn_cap(struct wlan_crypto_params *crypto_params)
 {
 	return crypto_params->rsn_caps;

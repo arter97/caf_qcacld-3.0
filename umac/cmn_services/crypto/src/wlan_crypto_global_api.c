@@ -176,6 +176,9 @@ static QDF_STATUS wlan_crypto_set_param(struct wlan_crypto_params *crypto_params
 	case WLAN_CRYPTO_PARAM_RSN_CAP:
 		status = wlan_crypto_set_rsn_cap(crypto_params,	value);
 		break;
+	case WLAN_CRYPTO_PARAM_RSNX_CAP:
+		status = wlan_crypto_set_rsnx_cap(crypto_params, value);
+		break;
 	case WLAN_CRYPTO_PARAM_KEY_MGMT:
 		status = wlan_crypto_set_key_mgmt(crypto_params, value);
 		break;
@@ -2692,6 +2695,22 @@ wlan_crypto_store_akm_list_in_order(struct wlan_crypto_params *crypto_params,
 {
 }
 #endif
+
+void wlan_crypto_rsnxie_check(struct wlan_crypto_params *crypto_params,
+			      const uint8_t *rsnxe)
+{
+	uint8_t i = 0, len = rsnxe[1];
+
+	for (; len > 0 ; len--) {
+		((uint8_t *)(&crypto_params->rsnx_caps))[i] = rsnxe[2 + i];
+		i++;
+	}
+	/*First 4bits of RSNX capabilitities field is the length of
+	 *the Extended RSN capabilities field -1
+	 *Hence Ignoring them
+	 */
+	((uint8_t *)(&crypto_params->rsnx_caps))[0] &= 0xf0;
+}
 
 QDF_STATUS wlan_crypto_rsnie_check(struct wlan_crypto_params *crypto_params,
 				   const uint8_t *frm)

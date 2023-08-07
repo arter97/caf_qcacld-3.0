@@ -150,6 +150,18 @@ int32_t wlan_crypto_get_cipher_cap(struct wlan_crypto_params *crypto_params);
  */
 QDF_STATUS wlan_crypto_set_rsn_cap(struct wlan_crypto_params *crypto_params,
 					uint32_t ciphers);
+/**
+ * wlan_crypto_set_rsnx_cap() - called by ucfg to configure
+ *                                        RSNXE cap in vdev
+ * @crypto_params: crypto parameters
+ * @value: RSNXE Capabilities
+ *
+ * This function is used to configure RSNXE capabilities in vdev
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS wlan_crypto_set_rsnx_cap(struct wlan_crypto_params *crypto_params,
+				    uint32_t value);
 
 /**
  * wlan_crypto_get_rsn_cap() - called by ucfg to get rsn caps from vdev

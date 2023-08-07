@@ -318,6 +318,18 @@ QDF_STATUS wlan_crypto_rsnie_check(struct wlan_crypto_params *crypto_params,
 				   const uint8_t *frm);
 
 /**
+ * wlan_crypto_rsnxie_check() - called by mlme to parse rsnx capabilities
+ * @crypto_params: crypto params
+ * @rsnxe: rsnx ie buffer
+ *
+ * This function gets called by mlme to extract rsnx capabilities
+ *
+ * Return: None
+ */
+void wlan_crypto_rsnxie_check(struct wlan_crypto_params *crypto_params,
+			      const uint8_t *rsnxe);
+
+/**
  * wlan_crypto_build_wpaie() - called by mlme to build wpaie
  * @vdev: vdev
  * @iebuf: ie buffer
