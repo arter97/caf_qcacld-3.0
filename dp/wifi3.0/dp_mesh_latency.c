@@ -97,7 +97,7 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 		/*
 		 * No VAP found with this peer mac
 		 */
-		dp_peer_unref_delete(peer, DP_MOD_ID_AST);
+		dp_peer_unref_delete(peer, DP_MOD_ID_MESH);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -125,7 +125,7 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 	/*
 	 * Unref the peer
 	 */
-	dp_peer_unref_delete(peer, DP_MOD_ID_AST);
+	dp_peer_unref_delete(peer, DP_MOD_ID_MESH);
 	return status;
 }
 
