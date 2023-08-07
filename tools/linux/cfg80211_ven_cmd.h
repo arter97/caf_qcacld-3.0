@@ -859,6 +859,7 @@ enum {
 	IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE = 813, /* Vendor Flags for WMI Interface */
 #endif
 	IEEE80211_PARAM_RSNXCAPS = 814, /*RSNXE Capabilities*/
+	IEEE80211_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY = 815,
 };
 
 enum {
@@ -2566,6 +2567,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_vendor_peer_mesh_override_flag",
 		IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE, GET_PARAM, 0},
 #endif
+	{"tb_max_sess_expiry", IEEE80211_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY,
+	 SET_PARAM, 1},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
