@@ -231,6 +231,7 @@ static const uint32_t pdev_param_non_tlv[] = {
 	[wmi_pdev_param_enable_peer_retry_stats] =
 		WMI_PDEV_PARAM_ENABLE_PEER_RETRY_STATS,
 	[wmi_pdev_param_en_probe_all_bw] = WMI_UNAVAILABLE_PARAM,
+	[wmi_pdev_param_rtt_11az_rsid_range] = WMI_UNAVAILABLE_PARAM,
 };
 
 /**
