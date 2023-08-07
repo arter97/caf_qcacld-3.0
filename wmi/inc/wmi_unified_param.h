@@ -5985,6 +5985,8 @@ typedef enum {
 		   VDEV_PARAM_SET_DISABLED_SCHED_MODES),
 	VDEV_PARAM(vdev_param_set_sap_ps_with_twt,
 		   VDEV_PARAM_SET_SAP_PS_WITH_TWT),
+	VDEV_PARAM(vdev_param_rtt_11az_tb_max_session_expiry,
+		   VDEV_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY),
 	vdev_param_max,
 } wmi_conv_vdev_param_id;
 
