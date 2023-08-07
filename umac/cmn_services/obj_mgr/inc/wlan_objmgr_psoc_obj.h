@@ -253,6 +253,9 @@
 /* Restricted TWT */
 #define WLAN_SOC_F_RESTRICTED_TWT           0x00000080
 
+/* 11AZ Trigger based ranging Responder support */
+#define WLAN_RTT_11AZ_TB_RSTA_SUPPORT 0x00000200
+
 /* PSOC op flags */
 
 	/* Invalid VHT cap */
