@@ -73,8 +73,12 @@
 /* Max vdev_id */
 #define WLAN_UMAC_VDEV_ID_MAX 0xFF
 
+/* Number of AID values to be reserved for 11az TBR RSTA ranging*/
+#define WLAN_RTT_11AZ_NUM_RSID 16
+
 /* MAX AID */
-#define WLAN_UMAC_MAX_AID 2008
+/* Reserving AID value 1992-2007 from AID pool for 11az TBR RSTA ranging. */
+#define WLAN_UMAC_MAX_AID (2008 - WLAN_RTT_11AZ_NUM_RSID - 1)
 
 /* Invalid pdev_id */
 #define WLAN_INVALID_PDEV_ID 0xFFFFFFFF
