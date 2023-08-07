@@ -4679,8 +4679,21 @@ cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
 	enum roam_offload_state cur_state = mlme_get_roam_state(psoc, vdev_id);
 
 	if (reason != REASON_ROAM_HANDOFF_DONE &&
-	    reason != REASON_ROAM_ABORT)
+	    reason != REASON_ROAM_ABORT &&
+	    reason != REASON_ROAM_LINK_SWITCH_ASSOC_VDEV_CHANGE) {
+		mlo_debug("CM_RSO: link vdev:%d state switch received with invalid reason:%d",
+			  vdev_id, reason);
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	/*
+	 * change roam state to deinit for assoc vdev that has now changed to
+	 * link vdev
+	 */
+	if (reason == REASON_ROAM_LINK_SWITCH_ASSOC_VDEV_CHANGE) {
+		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
+		return QDF_STATUS_SUCCESS;
+	}
 
 	switch (cur_state) {
 	case WLAN_ROAM_DEINIT:
@@ -4691,8 +4704,8 @@ cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
 		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
 		break;
 	default:
-		mlme_err("ROAM: MLO Roam synch not allowed in [%d] state",
-			 cur_state);
+		mlme_err("ROAM: vdev:%d MLO Roam synch not allowed in [%d] state reason:%d",
+			 vdev_id, cur_state, reason);
 		return QDF_STATUS_E_FAILURE;
 	}
 
