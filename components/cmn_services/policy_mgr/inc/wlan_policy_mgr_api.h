@@ -5518,4 +5518,16 @@ uint32_t policy_mgr_get_sap_mode_info(struct wlan_objmgr_psoc *psoc,
 uint32_t policy_mgr_get_beaconing_mode_info(struct wlan_objmgr_psoc *psoc,
 					    uint32_t *ch_freq_list,
 					    uint8_t *vdev_id);
+
+/**
+ * policy_mgr_is_freq_on_mac_id() - Check if given freq belongs to given mac id
+ * @freq_range: Frequency range pointer
+ * @freq: Frequency which needs to be checked
+ * @mac_id: MAC id on which this frequency needs to be checked
+ *
+ * Return: True if given frequency belongs to the given MAC id
+ */
+bool policy_mgr_is_freq_on_mac_id(struct policy_mgr_freq_range *freq_range,
+				  qdf_freq_t freq, uint8_t mac_id);
+
 #endif /* __WLAN_POLICY_MGR_API_H */

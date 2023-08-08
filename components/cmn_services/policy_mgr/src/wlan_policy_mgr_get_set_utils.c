@@ -12095,3 +12095,8 @@ policy_mgr_reset_sap_mandatory_channels(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 
+bool policy_mgr_is_freq_on_mac_id(struct policy_mgr_freq_range *freq_range,
+				  qdf_freq_t freq, uint8_t mac_id)
+{
+	return IS_FREQ_ON_MAC_ID(freq_range, freq, mac_id);
+}

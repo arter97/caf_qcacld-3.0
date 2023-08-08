@@ -1394,6 +1394,45 @@ static inline bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 	return false;
 }
 #endif
+
+static bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return false;
+
+	return (policy_mgr_is_hw_sbs_capable(psoc) &&
+		policy_mgr_can_2ghz_share_low_high_5ghz_sbs(pm_ctx));
+}
+
+/**
+ * policy_mgr_is_sbs_mac0_freq() - Check if the given frequency is
+ * sbs frequency on mac0.
+ * @psoc: psoc pointer
+ * @freq: Frequency which needs to be checked.
+ *
+ * Return: true/false.
+ */
+static bool policy_mgr_is_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
+					qdf_freq_t freq)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_freq_range *freq_range;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return false;
+
+	freq_range = pm_ctx->hw_mode.freq_range_caps[MODE_SBS];
+
+	if (policy_mgr_is_freq_on_mac_id(freq_range, freq, 0))
+		return true;
+
+	return false;
+}
+
 static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
@@ -1403,6 +1442,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	uint32_t pcl_list[NUM_CHANNELS], orig_len = *len;
 	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t i, pcl_len = 0;
+	bool is_dynamic_sbs_enabled;
+	bool sbs_mac0_modified_pcl;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1410,6 +1451,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	is_dynamic_sbs_enabled = policy_mgr_is_dynamic_sbs_enabled(psoc);
 	policy_mgr_pcl_modification_for_sap(
 		psoc, pcl_channels, pcl_weight, len, weight_len);
 
@@ -1424,6 +1466,13 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 		    !policy_mgr_is_6G_chan_valid_for_ll_sap(pcl_channels[i]))
 			continue;
 
+		/* Remove mac0 frequencies for static SBS case */
+		if (!is_dynamic_sbs_enabled &&
+		    policy_mgr_is_sbs_mac0_freq(psoc, pcl_channels[i])) {
+			sbs_mac0_modified_pcl = true;
+			continue;
+		}
+
 		pcl_list[pcl_len] = pcl_channels[i];
 		weight_list[pcl_len++] = pcl_weight[i];
 	}
@@ -1437,7 +1486,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
 	*len = pcl_len;
 
-	policy_mgr_debug("PCL after ll sap modification");
+	policy_mgr_debug("sbs_mac0_modified_pcl %d, PCL after ll sap modification",
+			 sbs_mac0_modified_pcl);
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 
 	return QDF_STATUS_SUCCESS;
