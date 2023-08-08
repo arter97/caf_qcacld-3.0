@@ -385,8 +385,13 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 
 	cur_freq = pm_conc_connection_list[conn_index].freq;
 
-	mode = policy_mgr_get_mode(psoc, conn_table_entry.type,
-				   conn_table_entry.sub_type, vdev_id);
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(
+					psoc,
+					wlan_get_opmode_from_vdev_id(
+								pm_ctx->pdev,
+								vdev_id),
+					vdev_id);
+
 	ch_freq = conn_table_entry.mhz;
 	status = policy_mgr_get_nss_for_vdev(psoc, mode, &nss_2g, &nss_5g);
 	if (QDF_IS_STATUS_SUCCESS(status)) {

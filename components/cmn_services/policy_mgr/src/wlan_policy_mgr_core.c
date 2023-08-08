@@ -2105,59 +2105,6 @@ uint32_t policy_mgr_get_connection_for_vdev_id(struct wlan_objmgr_psoc *psoc,
 	return conn_index;
 }
 
-enum policy_mgr_con_mode policy_mgr_get_mode(struct wlan_objmgr_psoc *psoc,
-					     uint8_t type, uint8_t subtype,
-					     uint32_t vdev_id)
-
-{
-	enum policy_mgr_con_mode mode = PM_MAX_NUM_OF_MODE;
-
-	if (type == WMI_VDEV_TYPE_AP) {
-		switch (subtype) {
-		case 0:
-	/*
-	 * This feature flag is added on temporary basis, once LL_LT_SAP is
-	 * enabled, this feature flag will be removed.
-	 */
-#ifdef WLAN_FEATURE_LL_LT_SAP
-			if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
-				mode = PM_LL_LT_SAP_MODE;
-			else
-#endif
-				mode = PM_SAP_MODE;
-			break;
-		case WMI_UNIFIED_VDEV_SUBTYPE_P2P_GO:
-			mode = PM_P2P_GO_MODE;
-			break;
-		default:
-			policy_mgr_err("Unknown subtype %d for type %d",
-				subtype, type);
-			break;
-		}
-	} else if (type == WMI_VDEV_TYPE_STA) {
-		switch (subtype) {
-		case 0:
-			mode = PM_STA_MODE;
-			break;
-		case WMI_UNIFIED_VDEV_SUBTYPE_P2P_CLIENT:
-			mode = PM_P2P_CLIENT_MODE;
-			break;
-		default:
-			policy_mgr_err("Unknown subtype %d for type %d",
-				subtype, type);
-			break;
-		}
-	} else if (type == WMI_VDEV_TYPE_NAN) {
-		mode = PM_NAN_DISC_MODE;
-	} else if (type == WMI_VDEV_TYPE_NDI) {
-		mode = PM_NDI_MODE;
-	} else {
-		policy_mgr_err("Unknown type %d", type);
-	}
-
-	return mode;
-}
-
 /**
  * policy_mgr_get_bw() - Get channel bandwidth type used by WMI
  * @chan_width: channel bandwidth type defined by host
