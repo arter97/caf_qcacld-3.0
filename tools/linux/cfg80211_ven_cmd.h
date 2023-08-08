@@ -865,6 +865,9 @@ enum {
 #ifdef ASSOC_REJECT_SUPPORT_ENABLED
 	IEEE80211_PARAM_ASSOC_REJECT = 818,
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* MLO Max Simultaneous Active links */
+#endif
 };
 
 enum {
@@ -2597,6 +2600,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 #ifdef ASSOC_REJECT_SUPPORT_ENABLED
 	{"assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, SET_PARAM, 2},
 	{"g_assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, GET_PARAM, 0},
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
+		SET_PARAM, 1},
+	{"g_max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
+		GET_PARAM, 0},
 #endif
 };
 
