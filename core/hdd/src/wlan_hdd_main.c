@@ -5431,13 +5431,15 @@ static int hdd_send_coex_config_params(struct hdd_context *hdd_ctx,
 {
 	struct coex_config_params coex_cfg_params = {0};
 	struct wlan_fwol_coex_config config = {0};
-	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is invalid");
 		goto err;
 	}
+
+	psoc = hdd_ctx->psoc;
 
 	if (!adapter) {
 		hdd_err("adapter is invalid");

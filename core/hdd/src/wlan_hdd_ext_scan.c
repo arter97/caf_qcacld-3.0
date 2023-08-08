@@ -3640,8 +3640,8 @@ hdd_extscan_epno_fill_network(struct nlattr *network,
 	ssid_len = nla_len(tb[id]);
 
 	/* nla_parse will detect overflow but not underflow */
-	if (0 == ssid_len) {
-		hdd_err("zero ssid length");
+	if (0 == ssid_len || (ssid_len > WMI_MAC_MAX_SSID_LENGTH)) {
+		hdd_err("Invalid ssid length %d", ssid_len);
 		return -EINVAL;
 	}
 

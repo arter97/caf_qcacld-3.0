@@ -680,6 +680,10 @@ ol_rx_defrag(ol_txrx_pdev_handle pdev,
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
 	struct ol_txrx_peer_t *peer_head = NULL;
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
+
+	if (!peer || !peer->vdev)
+		return;
+
 	vdev = peer->vdev;
 
 	/* bypass defrag for safe mode */
