@@ -434,6 +434,17 @@ void reg_set_afc_noaction(struct wlan_objmgr_psoc *psoc, bool value);
 #endif
 
 /**
+ * reg_update_hal_cap_wireless_modes() - update wireless modes
+ * @psoc: psoc ptr
+ * @modes: modes to set to
+ * @phy_id: phy id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_update_hal_cap_wireless_modes(struct wlan_objmgr_psoc *psoc,
+					  uint64_t modes, uint8_t phy_id);
+
+/**
  * reg_get_hal_reg_cap() - Get HAL REG capabilities
  * @psoc: psoc for country information
  *
@@ -456,15 +467,22 @@ QDF_STATUS reg_set_hal_reg_cap(
 		uint16_t phy_cnt);
 
 /**
- * reg_update_hal_reg_cap() - Update HAL REG capabilities
+ * reg_update_hal_reg_range_caps() - Update HAL REG frequency ranges
  * @psoc: psoc pointer
- * @wireless_modes: 11AX wireless modes
+ * @lo_2g_chan: low 2g channel
+ * @hi_2g_chan: high 2g channel
+ * @lo_5g_chan: low 5g channel
+ * @hi_5g_chan: high 2g channel
  * @phy_id: phy id
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS reg_update_hal_reg_cap(struct wlan_objmgr_psoc *psoc,
-				  uint64_t wireless_modes, uint8_t phy_id);
+QDF_STATUS reg_update_hal_reg_range_caps(struct wlan_objmgr_psoc *psoc,
+					 uint32_t lo_2g_chan,
+					 uint32_t hi_2g_chan,
+					 uint32_t lo_5g_chan,
+					 uint32_t hi_5g_chan,
+					 uint8_t phy_id);
 
 /**
  * reg_chan_in_range() - Check if the given channel is in pdev's channel range
