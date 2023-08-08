@@ -196,21 +196,18 @@ bbm_get_bus_bw_level_vote(struct wlan_dp_intf *dp_intf,
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
 		if (!cb_obj->wlan_dp_sta_get_dot11mode(ctx,
-						       dp_intf->intf_id,
+						       dp_intf->dev,
 						       &dot11_mode))
 			break;
 
-		if (dot11_mode >= QCA_WLAN_802_11_MODE_INVALID) {
-			dp_err("invalid STA/P2P-CLI dot11 modei %d",
-			       dot11_mode);
+		if (dot11_mode >= QCA_WLAN_802_11_MODE_INVALID)
 			break;
-		}
 
 		return (*lkp_table)[dot11_mode][tput_level];
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
 		if (!cb_obj->wlan_dp_get_ap_client_count(ctx,
-							 dp_intf->intf_id,
+							 dp_intf->dev,
 							 client_count))
 			break;
 
@@ -224,7 +221,7 @@ bbm_get_bus_bw_level_vote(struct wlan_dp_intf *dp_intf,
 		return vote_lvl;
 	case QDF_NDI_MODE:
 		if (!cb_obj->wlan_dp_sta_ndi_connected(ctx,
-						       dp_intf->intf_id))
+						       dp_intf->dev))
 			break;
 
 		/*
@@ -240,12 +237,6 @@ bbm_get_bus_bw_level_vote(struct wlan_dp_intf *dp_intf,
 	}
 
 	return vote_lvl;
-}
-
-static inline bool bbm_validate_intf_id(uint8_t intf_id)
-{
-	return !!(intf_id == WLAN_UMAC_VDEV_ID_MAX ||
-				intf_id >= WLAN_MAX_VDEVS);
 }
 
 /**
@@ -285,10 +276,9 @@ bbm_apply_tput_policy(struct wlan_dp_psoc_context *dp_ctx,
 	}
 
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
-		if (!dp_intf)
+		if (dp_intf->num_links == 0)
 			continue;
-		if (bbm_validate_intf_id(dp_intf->intf_id))
-			continue;
+
 		tmp_vote = bbm_get_bus_bw_level_vote(dp_intf, tput_level);
 		if (tmp_vote > next_vote)
 			next_vote = tmp_vote;
@@ -1091,10 +1081,11 @@ static void wlan_dp_display_txrx_stats(struct wlan_dp_psoc_context *dp_ctx)
 		total_tx_orphaned = 0;
 		stats = &dp_intf->dp_stats.tx_rx_stats;
 
-		if (dp_intf->intf_id == WLAN_INVALID_VDEV_ID)
+		if (!dp_intf->num_links)
 			continue;
 
-		dp_info("dp_intf: %u", dp_intf->intf_id);
+		dp_info("dp_intf: " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes));
 		for (i = 0; i < NUM_CPUS; i++) {
 			total_rx_pkt += stats->per_cpu[i].rx_packets;
 			total_rx_dropped += stats->per_cpu[i].rx_dropped;
@@ -1119,7 +1110,8 @@ static void wlan_dp_display_txrx_stats(struct wlan_dp_psoc_context *dp_ctx)
 			total_tx_pkt, total_tx_dropped,
 			total_tx_orphaned);
 
-		dp_ctx->dp_ops.wlan_dp_display_tx_multiq_stats(ctx, dp_intf->intf_id);
+		dp_ctx->dp_ops.wlan_dp_display_tx_multiq_stats(ctx,
+							       dp_intf->dev);
 
 		for (i = 0; i < NUM_CPUS; i++) {
 			if (stats->per_cpu[i].rx_packets == 0)
@@ -1778,6 +1770,7 @@ dp_link_monitoring(struct wlan_dp_psoc_context *dp_ctx,
 	uint32_t link_speed;
 	struct wlan_objmgr_psoc *psoc;
 	struct link_monitoring link_mon;
+	struct wlan_dp_link *def_link = dp_intf->def_link;
 
 	/*
 	 *  If throughput is high, link speed should be good,  don't check it
@@ -1804,7 +1797,7 @@ dp_link_monitoring(struct wlan_dp_psoc_context *dp_ctx,
 		if (no_rx_times >= NO_RX_PKT_LINK_SPEED_AGEOUT_COUNT) {
 			no_rx_times = 0;
 			dp_ctx->dp_ops.link_monitoring_cb(psoc,
-							  dp_intf->intf_id,
+							  def_link->link_id,
 							  false);
 			dp_intf->link_monitoring.is_rx_linkspeed_good = false;
 
@@ -1815,13 +1808,19 @@ dp_link_monitoring(struct wlan_dp_psoc_context *dp_ctx,
 	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
 	if (!peer_stats)
 		return;
-	bss_peer = wlan_vdev_get_bsspeer(dp_intf->vdev);
+
+	/* TODO - Temp WAR, check what to do here */
+	/* Peer stats for any link peer is going to return the
+	 * stats from MLD peer, so its okay to query deflink
+	 */
+	bss_peer = wlan_vdev_get_bsspeer(def_link->vdev);
 	if (!bss_peer) {
 		dp_debug("Invalid bss peer");
 		qdf_mem_free(peer_stats);
 		return;
 	}
-	status = cdp_host_get_peer_stats(soc, dp_intf->intf_id,
+
+	status = cdp_host_get_peer_stats(soc, def_link->link_id,
 					 bss_peer->macaddr,
 					 peer_stats);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1840,17 +1839,17 @@ dp_link_monitoring(struct wlan_dp_psoc_context *dp_ctx,
 	 * driver will send rx link speed poor state to firmware.
 	 */
 	if (!link_mon.rx_linkspeed_threshold) {
-		dp_ctx->dp_ops.link_monitoring_cb(psoc, dp_intf->intf_id,
+		dp_ctx->dp_ops.link_monitoring_cb(psoc, def_link->link_id,
 						  false);
 		dp_intf->link_monitoring.is_rx_linkspeed_good = false;
 	} else if (link_speed > link_mon.rx_linkspeed_threshold &&
 	     !link_mon.is_rx_linkspeed_good) {
-		dp_ctx->dp_ops.link_monitoring_cb(psoc, dp_intf->intf_id,
+		dp_ctx->dp_ops.link_monitoring_cb(psoc, def_link->link_id,
 						  true);
 		dp_intf->link_monitoring.is_rx_linkspeed_good = true;
 	} else if (link_speed < link_mon.rx_linkspeed_threshold &&
 		   link_mon.is_rx_linkspeed_good) {
-		dp_ctx->dp_ops.link_monitoring_cb(psoc, dp_intf->intf_id,
+		dp_ctx->dp_ops.link_monitoring_cb(psoc, def_link->link_id,
 						  false);
 		dp_intf->link_monitoring.is_rx_linkspeed_good = false;
 	}
@@ -1871,8 +1870,11 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_dp_intf *dp_intf = NULL, *con_sap_dp_intf = NULL;
 	struct wlan_dp_intf *dp_intf_next = NULL;
+	struct wlan_dp_link *dp_link = NULL;
+	struct wlan_dp_link *dp_link_next;
 	uint64_t tx_packets = 0, rx_packets = 0, tx_bytes = 0;
 	uint64_t fwd_tx_packets = 0, fwd_rx_packets = 0;
+	uint64_t fwd_tx_packets_temp = 0, fwd_rx_packets_temp = 0;
 	uint64_t fwd_tx_packets_diff = 0, fwd_rx_packets_diff = 0;
 	uint64_t total_tx = 0, total_rx = 0;
 	A_STATUS ret;
@@ -1898,7 +1900,8 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 	dp_ctx->bw_vote_time = curr_time_us;
 
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
-		vdev = dp_objmgr_get_vdev_by_user(dp_intf, WLAN_DP_ID);
+		vdev = dp_objmgr_get_vdev_by_user(dp_intf->def_link,
+						  WLAN_DP_ID);
 		if (!vdev)
 			continue;
 
@@ -1912,7 +1915,7 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 		if ((dp_intf->device_mode == QDF_SAP_MODE ||
 		     dp_intf->device_mode == QDF_P2P_GO_MODE) &&
 		     !dp_ctx->dp_ops.dp_is_ap_active(ctx,
-						     dp_intf->intf_id)) {
+						     dp_intf->dev)) {
 			dp_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 			continue;
 		}
@@ -1933,25 +1936,40 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 		if (dp_intf->device_mode == QDF_STA_MODE &&
 		    wlan_cm_is_vdev_active(vdev)) {
 			dp_ctx->dp_ops.dp_send_mscs_action_frame(ctx,
-							dp_intf->intf_id);
+							dp_intf->dev);
 			if (dp_intf->link_monitoring.enabled)
 				dp_link_monitoring(dp_ctx, dp_intf);
 		}
+
+		ret = A_ERROR;
+		fwd_tx_packets = 0;
+		fwd_rx_packets = 0;
 		if (dp_intf->device_mode == QDF_SAP_MODE ||
 		    dp_intf->device_mode == QDF_P2P_GO_MODE ||
 		    dp_intf->device_mode == QDF_NDI_MODE) {
-			ret = cdp_get_intra_bss_fwd_pkts_count(
-				cds_get_context(QDF_MODULE_ID_SOC),
-				dp_intf->intf_id,
-				&fwd_tx_packets, &fwd_rx_packets);
-			if (ret == A_OK) {
-				fwd_tx_packets_diff += DP_BW_GET_DIFF(
-					fwd_tx_packets,
-					dp_intf->prev_fwd_tx_packets);
-				fwd_rx_packets_diff += DP_BW_GET_DIFF(
-					fwd_tx_packets,
-					dp_intf->prev_fwd_rx_packets);
+			dp_for_each_link_held_safe(dp_intf, dp_link,
+						   dp_link_next) {
+				ret = cdp_get_intra_bss_fwd_pkts_count(
+					cds_get_context(QDF_MODULE_ID_SOC),
+					dp_link->link_id,
+					&fwd_tx_packets_temp,
+					&fwd_rx_packets_temp);
+				if (ret == A_OK) {
+					fwd_tx_packets += fwd_tx_packets_temp;
+					fwd_rx_packets += fwd_rx_packets_temp;
+				} else {
+					break;
+				}
 			}
+		}
+
+		if (ret == A_OK) {
+			fwd_tx_packets_diff += DP_BW_GET_DIFF(
+				fwd_tx_packets,
+				dp_intf->prev_fwd_tx_packets);
+			fwd_rx_packets_diff += DP_BW_GET_DIFF(
+				fwd_rx_packets,
+				dp_intf->prev_fwd_rx_packets);
 		}
 
 		if (dp_intf->device_mode == QDF_SAP_MODE) {
@@ -1964,11 +1982,13 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 			sta_tx_bytes =
 				qdf_net_stats_get_tx_bytes(&dp_intf->stats);
 
-		dp_set_driver_del_ack_enable(dp_intf->intf_id, dp_ctx,
-					     rx_packets);
+		dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
+			dp_set_driver_del_ack_enable(dp_link->link_id, dp_ctx,
+						     rx_packets);
 
-		dp_set_vdev_bundle_require_flag(dp_intf->intf_id, dp_ctx,
-						tx_bytes);
+			dp_set_vdev_bundle_require_flag(dp_link->link_id,
+							dp_ctx, tx_bytes);
+		}
 
 		total_rx += qdf_net_stats_get_rx_pkts(&dp_intf->stats);
 		total_tx += qdf_net_stats_get_tx_pkts(&dp_intf->stats);
@@ -2213,12 +2233,19 @@ void dp_bus_bw_compute_timer_try_stop(struct wlan_objmgr_psoc *psoc)
 void dp_bus_bw_compute_prev_txrx_stats(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
-
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 
+	if (!dp_link) {
+		dp_err("No dp_link for objmgr vdev %pK", vdev);
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
 	if (!dp_intf) {
-		dp_err("Unable to get DP interface");
+		dp_err("Invalid dp_intf for dp_link %pK (" QDF_MAC_ADDR_FMT ")",
+		       dp_link, QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		return;
 	}
 
@@ -2230,8 +2257,12 @@ void dp_bus_bw_compute_prev_txrx_stats(struct wlan_objmgr_vdev *vdev)
 	dp_intf->prev_rx_packets = qdf_net_stats_get_rx_pkts(&dp_intf->stats);
 	dp_intf->prev_tx_bytes = qdf_net_stats_get_tx_bytes(&dp_intf->stats);
 
+	/*
+	 * TODO - Should the prev_fwd_tx_packets and
+	 * such stats be per link ??
+	 */
 	cdp_get_intra_bss_fwd_pkts_count(cds_get_context(QDF_MODULE_ID_SOC),
-					 dp_intf->intf_id,
+					 dp_link->link_id,
 					 &dp_intf->prev_fwd_tx_packets,
 					 &dp_intf->prev_fwd_rx_packets);
 	qdf_spin_unlock_bh(&dp_ctx->bus_bw_lock);
@@ -2240,13 +2271,22 @@ void dp_bus_bw_compute_prev_txrx_stats(struct wlan_objmgr_vdev *vdev)
 void dp_bus_bw_compute_reset_prev_txrx_stats(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 
-	if (!dp_intf) {
-		dp_err("Unable to get DP interface");
+	if (!dp_link) {
+		dp_err("No dp_link for objmgr vdev %pK", vdev);
 		return;
 	}
+
+	dp_intf = dp_link->dp_intf;
+	if (!dp_intf) {
+		dp_err("Invalid dp_intf for dp_link %pK (" QDF_MAC_ADDR_FMT ")",
+		       dp_link, QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
+		return;
+	}
+
 	if (QDF_GLOBAL_FTM_MODE == cds_get_conparam())
 		return;
 

@@ -87,6 +87,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_mlme_main.h"
 #include "wlan_mlme_ucfg_api.h"
+#include "wlan_mlme_twt_api.h"
 #include <wlan_dfs_utils_api.h>
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wlan_utility.h"
@@ -5611,7 +5612,7 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 		wma_add_sta_req_ap_mode(wma, add_sta);
 		break;
 	case BSS_OPERATIONAL_MODE_NDI:
-		wma_add_sta_ndi_mode(wma, add_sta);
+		status = wma_add_sta_ndi_mode(wma, add_sta);
 		break;
 	}
 
@@ -6377,7 +6378,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
 	return QDF_STATUS_SUCCESS;
 }
 
-#define MAX_VDEV_CREATE_PARAMS 20
+#define MAX_VDEV_CREATE_PARAMS 21
 /* params being sent:
  * 1.wmi_vdev_param_wmm_txop_enable
  * 2.wmi_vdev_param_disconnect_th
@@ -6399,6 +6400,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
  * 18.wmi_vdev_param_bmiss_first_bcnt
  * 19.wmi_vdev_param_bmiss_final_bcnt
  * 20.wmi_vdev_param_set_sap_ps_with_twt
+ * 21.wmi_vdev_param_disable_2g_twt
  */
 
 QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
@@ -6414,6 +6416,7 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 	uint32_t hemu_mode;
 	struct dev_set_param setparam[MAX_VDEV_CREATE_PARAMS];
 	uint8_t index = 0;
+	bool is_24ghz_twt_enabled;
 	enum QDF_OPMODE opmode;
 
 	if (!mac)
@@ -6663,6 +6666,16 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 			wma_debug("failed to set wmi_vdev_param_set_sap_ps_with_twt");
 			goto error;
 		}
+	}
+
+	is_24ghz_twt_enabled = mlme_is_24ghz_twt_enabled(mac->psoc);
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_disable_2g_twt,
+					   !is_24ghz_twt_enabled,
+					   index++, MAX_VDEV_CREATE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_debug("failed to set wmi_vdev_param_disable_2g_twt");
+		goto error;
 	}
 
 	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,

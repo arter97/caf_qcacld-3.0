@@ -132,6 +132,8 @@
 #define HDD_80211_MODE_AC 1
 /* Defines the BIT position of 11ax support mode field of stainfo */
 #define HDD_80211_MODE_AX 2
+/* Defines the BIT position of 11be support mode field of stainfo */
+#define HDD_80211_MODE_BE 4
 
 #define HDD_MAX_CUSTOM_START_EVENT_SIZE 64
 
@@ -497,7 +499,7 @@ static int __hdd_hostapd_open(struct net_device *dev)
 		return ret;
 	}
 
-	ret = hdd_start_adapter(adapter);
+	ret = hdd_start_adapter(adapter, true);
 	if (ret) {
 		hdd_err("Error Initializing the AP mode: %d", ret);
 		return ret;
@@ -806,7 +808,8 @@ static int __hdd_hostapd_set_mac_address(struct net_device *dev, void *addr)
 
 	/* Currently for SL-ML-SAP use same MAC for both MLD and link */
 	hdd_update_dynamic_mac(hdd_ctx, &adapter->mac_addr, &mac_addr);
-	ucfg_dp_update_inf_mac(hdd_ctx->psoc, &adapter->mac_addr, &mac_addr);
+	ucfg_dp_update_intf_mac(hdd_ctx->psoc, &adapter->mac_addr, &mac_addr,
+				adapter->deflink->vdev);
 	memcpy(&adapter->mac_addr, psta_mac_addr->sa_data, ETH_ALEN);
 	qdf_net_update_net_device_dev_addr(dev, psta_mac_addr->sa_data,
 					   ETH_ALEN);
@@ -1517,6 +1520,8 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 					event->ht_caps.present))
 		is_dot11_mode_abgn = false;
 
+	stainfo->support_mode |=
+				(event->eht_caps_present << HDD_80211_MODE_BE);
 	stainfo->support_mode |= is_dot11_mode_abgn << HDD_80211_MODE_ABGN;
 	/* Initialize DHCP info */
 	stainfo->dhcp_phase = DHCP_PHASE_ACK;
@@ -2873,8 +2878,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			return QDF_STATUS_E_NOMEM;
 
 		snprintf(unknownSTAEvent, IW_CUSTOM_MAX,
-			 "JOIN_UNKNOWN_STA-"QDF_FULL_MAC_FMT,
-			 QDF_FULL_MAC_REF(sap_event->sapevt.sapUnknownSTAJoin.macaddr.bytes));
+			 "JOIN_UNKNOWN_STA-"QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(sap_event->sapevt.sapUnknownSTAJoin.macaddr.bytes));
 		we_event = IWEVCUSTOM;  /* Discovered a new node (AP mode). */
 		wrqu.data.pointer = unknownSTAEvent;
 		wrqu.data.length = strlen(unknownSTAEvent);
@@ -2888,10 +2893,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			return QDF_STATUS_E_NOMEM;
 
 		snprintf(maxAssocExceededEvent, IW_CUSTOM_MAX,
-			 "Peer "QDF_FULL_MAC_FMT" denied"
+			 "Peer "QDF_MAC_ADDR_FMT" denied"
 			 " assoc due to Maximum Mobile Hotspot connections reached. Please disconnect"
 			 " one or more devices to enable the new device connection",
-			 QDF_FULL_MAC_REF(sap_event->sapevt.sapMaxAssocExceeded.macaddr.bytes));
+			 QDF_MAC_ADDR_REF(sap_event->sapevt.sapMaxAssocExceeded.macaddr.bytes));
 		we_event = IWEVCUSTOM;  /* Discovered a new node (AP mode). */
 		wrqu.data.pointer = maxAssocExceededEvent;
 		wrqu.data.length = strlen(maxAssocExceededEvent);
@@ -4240,7 +4245,9 @@ hdd_indicate_peers_deleted(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	hdd_sap_indicate_disconnect_for_sta(link_info->adapter);
 }
 
-QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
+QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
+			    bool reinit,
+			    bool rtnl_held)
 {
 	struct hdd_hostapd_state *phostapdBuf;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -4373,7 +4380,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	return status;
 
 error_release_softap_tx_rx:
-	hdd_unregister_wext(adapter->dev);
+	hdd_wext_unregister(adapter->dev, rtnl_held);
 error_deinit_sap_session:
 	hdd_hostapd_deinit_sap_session(adapter->deflink);
 error_release_vdev:
@@ -6143,7 +6150,8 @@ static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 
 	is_ml_ap = wlan_vdev_mlme_is_mlo_ap(link_info->vdev);
 	if (!policy_mgr_is_mlo_sap_concurrency_allowed(hdd_ctx->psoc,
-						       is_ml_ap)) {
+						       is_ml_ap,
+						       wlan_vdev_get_id(link_info->vdev))) {
 		hdd_err("MLO SAP concurrency check fails");
 		return QDF_STATUS_E_INVAL;
 	}

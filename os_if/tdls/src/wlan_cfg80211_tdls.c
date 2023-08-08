@@ -1225,6 +1225,13 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 	if (!vdev)
 		return -EINVAL;
 
+	/* STA should be connected before sending any TDLS frame */
+	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
+		osif_err("STA is not connected");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
+		return -EAGAIN;
+	}
+
 	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
 	if (is_mlo_vdev) {
 		tdls_link_vdev =

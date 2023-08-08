@@ -173,6 +173,18 @@ struct wma_tgt_vht_cap {
 };
 
 /**
+ * struct wma_tgt_aux_dev_caps - aux capability in wma layer
+ * @supported_modes_bitmap: each bit define in WMI_AUX_DEV_CAPS_SUPPORTED_MODE
+ * @listen_pdev_id_map: define which AUX MAC can listen/scan for the HW mode
+ * @emlsr_pdev_id_map: define which AUX MAC can perform eMLSR for the HW mode
+ */
+struct wma_tgt_aux_dev_caps {
+	uint32_t supported_modes_bitmap;
+	uint32_t listen_pdev_id_map;
+	uint32_t emlsr_pdev_id_map;
+};
+
+/**
  * struct board_info - Structure for board related information
  * @bdf_version: board file version
  * @ref_design_id: reference design id
@@ -278,5 +290,6 @@ struct wma_tgt_cfg {
 	tDot11fIEeht_cap eht_cap_2g;
 	tDot11fIEeht_cap eht_cap_5g;
 #endif
+	struct wma_tgt_aux_dev_caps wma_aux0_dev_caps[WMI_HOST_HW_MODE_MAX];
 };
 #endif /* WMA_TGT_CFG_H */

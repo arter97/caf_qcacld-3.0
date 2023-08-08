@@ -207,6 +207,32 @@ void lim_process_gen_probe_rsp_frame(struct mac_context *mac_ctx,
 	qdf_mem_free(probe_rsp);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static
+void lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
+				 struct pe_session *session_entry,
+				 struct qdf_mac_addr *mac_addr,
+				 tpSirProbeRespBeacon probe_rsp)
+{
+	if (!(session_entry->lim_join_req &&
+	      session_entry->lim_join_req->is_ml_probe_req_sent &&
+	      probe_rsp->mlo_ie.mlo_ie_present))
+		return;
+
+	lim_update_mlo_mgr_info(mac_ctx, session_entry->vdev, mac_addr,
+				session_entry->lim_join_req->assoc_link_id,
+				probe_rsp->chan_freq);
+}
+#else
+static inline
+void lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
+				 struct pe_session *session_entry,
+				 struct qdf_mac_addr *mac_addr,
+				 tpSirProbeRespBeacon probe_rsp)
+{
+}
+#endif
+
 /**
  * lim_process_probe_rsp_frame() - processes received Probe Response frame
  * @mac_ctx: Pointer to Global MAC structure
@@ -276,6 +302,10 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 	}
 	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, body,
 			   frame_len);
+
+	lim_update_mlo_mgr_prb_info(mac_ctx, session_entry,
+				    (struct qdf_mac_addr *)header->bssId,
+				    probe_rsp);
 
 	lim_process_bcn_prb_rsp_t2lm(mac_ctx, session_entry, probe_rsp);
 	lim_gen_link_specific_probe_rsp(mac_ctx, session_entry,

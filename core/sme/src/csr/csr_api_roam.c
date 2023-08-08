@@ -3307,7 +3307,8 @@ void csr_roam_joined_state_msg_processor(struct mac_context *mac, void *msg_buf)
 					pUpperLayerAssocCnf->capability_info;
 		roam_info->he_caps_present =
 					pUpperLayerAssocCnf->he_caps_present;
-
+		roam_info->eht_caps_present =
+			pUpperLayerAssocCnf->eht_caps_present;
 		if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 			if (pUpperLayerAssocCnf->ies_len > 0) {
 				roam_info->assocReqLength =
@@ -3891,6 +3892,7 @@ csr_send_assoc_ind_to_upper_layer_cnf_msg(struct mac_context *mac,
 		cnf->vht_caps = ind->VHTCaps;
 	cnf->capability_info = ind->capability_info;
 	cnf->he_caps_present = ind->he_caps_present;
+	cnf->eht_caps_present = ind->eht_caps_present;
 	if (ind->assocReqPtr) {
 		if (ind->assocReqLength < MAX_ASSOC_REQ_IE_LEN) {
 			cnf->ies = qdf_mem_malloc(ind->assocReqLength);
@@ -4015,7 +4017,7 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 			     sizeof(tDot11fIEVHTCaps));
 	roam_info->capability_info = pAssocInd->capability_info;
 	roam_info->he_caps_present = pAssocInd->he_caps_present;
-
+	roam_info->eht_caps_present = pAssocInd->eht_caps_present;
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		if (wlan_is_open_wep_cipher(mac_ctx->pdev, sessionId)) {
 			csr_issue_set_context_req_helper(mac_ctx, sessionId,
@@ -5848,6 +5850,8 @@ QDF_STATUS cm_csr_handle_diconnect_req(struct wlan_objmgr_vdev *vdev,
 			/* Unknown reason code */
 			break;
 		}
+	} else if (req->req.source == CM_MLO_LINK_SWITCH_DISCONNECT) {
+		/* Do not update any stats as session is going to be deleted*/
 	} else {
 		session->disconnect_stats.disconnection_by_app++;
 	}

@@ -30,6 +30,7 @@
 #include <wlan_mlme_api.h>
 #include <wlan_mlme_main.h>
 #include "wma_tgt_cfg.h"
+#include "wlan_mlme_vdev_mgr_interface.h"
 
 /**
  * ucfg_mlme_init() - initialize mlme_ctx context.
@@ -282,6 +283,30 @@ ucfg_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
 	return wlan_mlme_peer_config_vlan(vdev, macaddr);
 }
 
+/**
+ * ucfg_mlme_get_tdls_prohibited() - get if TDLS prohibited is advertised by
+ * the connected AP.
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+static inline
+bool ucfg_mlme_get_tdls_prohibited(struct wlan_objmgr_vdev *vdev)
+{
+	return mlme_get_tdls_prohibited(vdev);
+}
+
+/**
+ * ucfg_mlme_get_tdls_chan_switch_prohibited() - get tdls chan switch prohibited
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+static inline
+bool ucfg_mlme_get_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev)
+{
+	return mlme_get_tdls_chan_switch_prohibited(vdev);
+}
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**
  * ucfg_mlme_get_wlm_multi_client_ll_caps() - Get multi client latency level
@@ -4677,6 +4702,18 @@ ucfg_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 }
 
 #endif
+
+/**
+ * ucfg_mlme_set_vdev_wifi_std()  - Set vdev wifi standard support
+ * @psoc: pointer to psoc object
+ * @vdev_id: Vdev id
+ * @wifi_std: wifi standard version
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_mlme_set_vdev_wifi_std(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    WMI_HOST_WIFI_STANDARD wifi_std);
 
 /**
  * ucfg_mlme_set_vdev_traffic_low_latency()  - Set/clear vdev low latency

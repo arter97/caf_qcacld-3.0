@@ -34,6 +34,14 @@
 
 #if defined(WLAN_SUPPORT_RX_FISA)
 
+/*
+ * Below is different types of max MSDU aggregation supported in FISA.
+ * Host should send one value less so that F.W will increment one
+ * and program in RXOLE reg
+ */
+#define DP_RX_FISA_MAX_AGGR_COUNT_DEFAULT	(16 - 1)
+#define	DP_RX_FISA_MAX_AGGR_COUNT_1		(32 - 1)
+
 #define FSE_CACHE_FLUSH_TIME_OUT	5 /* milliSeconds */
 #define FISA_UDP_MAX_DATA_LEN		1470 /* udp max data length */
 #define FISA_UDP_HDR_LEN		8 /* udp header length */
@@ -118,18 +126,6 @@ QDF_STATUS dp_rx_fisa_flush_by_ctx_id(struct dp_soc *soc, int napi_id);
  * Return: Success on flushing the flows for the vdev
  */
 QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id);
-
-/**
- * dp_set_fisa_disallowed_for_vdev() - Set fisa disallowed flag for vdev
- * @cdp_soc: core txrx main context
- * @vdev_id: Vdev id
- * @rx_ctx_id: rx context id
- * @val: value to be set
- *
- * Return: None
- */
-void dp_set_fisa_disallowed_for_vdev(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
-				     uint8_t rx_ctx_id, uint8_t val);
 
 /**
  * dp_fisa_rx_fst_update_work() - Work functions for FST updates
@@ -224,6 +220,15 @@ void dp_fisa_cfg_init(struct wlan_dp_psoc_cfg *config,
  * Return: None
  */
 void dp_set_fst_in_cmem(bool fst_in_cmem);
+
+/**
+ * dp_set_fisa_dynamic_aggr_size_support() - Set flag to indicate dynamic
+ *					     aggregation size support
+ * @dynamic_aggr_size_support: Flag to indicate dynamic aggregation support
+ *
+ * Return: None
+ */
+void dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support);
 #else
 static inline void
 dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
@@ -241,6 +246,11 @@ static inline void dp_fisa_cfg_init(struct wlan_dp_psoc_cfg *config,
 }
 
 static inline void dp_set_fst_in_cmem(bool fst_in_cmem)
+{
+}
+
+static inline void
+dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support)
 {
 }
 #endif

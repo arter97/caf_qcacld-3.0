@@ -144,6 +144,83 @@ dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 struct wlan_dp_intf*
 dp_get_intf_by_netdev(struct wlan_dp_psoc_context *dp_ctx, qdf_netdev_t dev);
 
+/**
+ * dp_get_front_link_no_lock() - Get the first link from the dp links list
+ * This API does not use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @dp_intf: DP interface handle
+ * @out_link: double pointer to pass the next link
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_get_front_link_no_lock(struct wlan_dp_intf *dp_intf,
+			  struct wlan_dp_link **out_link);
+
+/**
+ * dp_get_next_link_no_lock() - Get the next link from the link list
+ * This API does not use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @dp_intf: DP interface handle
+ * @cur_link: pointer to the currentlink
+ * @out_link: double pointer to pass the nextlink
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_get_next_link_no_lock(struct wlan_dp_intf *dp_intf,
+			 struct wlan_dp_link *cur_link,
+			 struct wlan_dp_link **out_link);
+
+/**
+ * __dp_take_ref_and_fetch_front_link_safe - Helper macro to lock, fetch
+ * front and next link, take ref and unlock.
+ * @dp_intf: DP interface handle
+ * @dp_link: an dp_link pointer to use as a cursor
+ * @dp_link_next: dp_link pointer to nextlink
+ */
+#define __dp_take_ref_and_fetch_front_link_safe(dp_intf, dp_link, \
+						dp_link_next) \
+	qdf_spin_lock_bh(&(dp_intf)->dp_link_list_lock), \
+	dp_get_front_link_no_lock(dp_intf, &(dp_link)), \
+	dp_get_next_link_no_lock(dp_intf, dp_link, &(dp_link_next)), \
+	qdf_spin_unlock_bh(&(dp_intf)->dp_link_list_lock)
+
+/**
+ * __dp_take_ref_and_fetch_next_link_safe - Helper macro to lock, fetch next
+ * interface, take ref and unlock.
+ * @dp_intf: DP interface handle
+ * @dp_link: dp_link pointer to use as a cursor
+ * @dp_link_next: dp_link pointer to next link
+ */
+#define __dp_take_ref_and_fetch_next_link_safe(dp_intf, dp_link, \
+					       dp_link_next) \
+	qdf_spin_lock_bh(&(dp_intf)->dp_link_list_lock), \
+	dp_link = dp_link_next, \
+	dp_get_next_link_no_lock(dp_intf, dp_link, &(dp_link_next)), \
+	qdf_spin_unlock_bh(&(dp_intf)->dp_link_list_lock)
+
+/**
+ * __dp_is_link_valid - Helper macro to return true/false for valid interface.
+ * @_dp_link: an dp_link pointer to use as a cursor
+ */
+#define __dp_is_link_valid(_dp_link) !!(_dp_link)
+
+/**
+ * dp_for_each_link_held_safe - Interface iterator called
+ *                                      in a delete safe manner
+ * @dp_intf: DP interface handle
+ * @dp_link: an dp_link pointer to use as a cursor
+ * @dp_link_next: dp_link pointer to the next interface
+ *
+ */
+#define dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) \
+	for (__dp_take_ref_and_fetch_front_link_safe(dp_intf, dp_link, \
+						     dp_link_next); \
+	     __dp_is_link_valid(dp_link); \
+	     __dp_take_ref_and_fetch_next_link_safe(dp_intf, dp_link, \
+						    dp_link_next))
+
 /* MAX iteration count to wait for dp packet process to complete */
 #define DP_TASK_MAX_WAIT_CNT  100
 /* Milli seconds to wait when packet is getting processed */
@@ -250,6 +327,19 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc);
  */
 QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
 				    int force);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * dp_link_switch_notification() - DP notifier for MLO link switch
+ * @vdev: Objmgr vdev handle
+ * @lswitch_req: Link switch request params
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_link_switch_notification(struct wlan_objmgr_vdev *vdev,
+			    struct wlan_mlo_link_switch_req *lswitch_req);
+#endif
 
 /**
  * dp_peer_obj_create_notification(): dp peer create handler
@@ -397,10 +487,18 @@ static inline void
 dp_add_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
 
+	if (!dp_link) {
+		dp_err("No dp_link for objmgr vdev %pK", vdev);
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
 	if (!dp_intf) {
-		dp_err("Unable to get DP interface");
+		dp_err("Invalid dp_intf for dp_link %pK (" QDF_MAC_ADDR_FMT ")",
+		       dp_link, QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		return;
 	}
 
@@ -410,9 +508,9 @@ dp_add_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 		qdf_atomic_inc(&dp_intf->dp_ctx->num_latency_critical_clients);
 
 		dp_debug("Adding latency critical connection for vdev %d",
-			 dp_intf->intf_id);
+			 dp_link->link_id);
 		cdp_vdev_inform_ll_conn(cds_get_context(QDF_MODULE_ID_SOC),
-					dp_intf->intf_id,
+					dp_link->link_id,
 					CDP_VDEV_LL_CONN_ADD);
 		break;
 	default:
@@ -435,10 +533,18 @@ static inline void
 dp_del_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
-	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
 
+	if (!dp_link) {
+		dp_err("No dp_link for objmgr vdev %pK", vdev);
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
 	if (!dp_intf) {
-		dp_err("Unable to get DP interface");
+		dp_err("Invalid dp_intf for dp_link %pK (" QDF_MAC_ADDR_FMT ")",
+		       dp_link, QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		return;
 	}
 
@@ -448,9 +554,9 @@ dp_del_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 		qdf_atomic_dec(&dp_intf->dp_ctx->num_latency_critical_clients);
 
 		dp_info("Removing latency critical connection for vdev %d",
-			dp_intf->intf_id);
+			dp_link->link_id);
 		cdp_vdev_inform_ll_conn(cds_get_context(QDF_MODULE_ID_SOC),
-					dp_intf->intf_id,
+					dp_link->link_id,
 					CDP_VDEV_LL_CONN_DEL);
 		break;
 	default:
@@ -467,6 +573,16 @@ dp_del_latency_critical_client(struct wlan_objmgr_vdev *vdev,
  * Return: non zero value on interface valid
  */
 int is_dp_intf_valid(struct wlan_dp_intf *dp_intf);
+
+/**
+ * is_dp_link_valid() - check if DP link is valid
+ * @dp_link: DP link handle
+ *
+ * API to check whether DP link is valid
+ *
+ * Return: true if dp_link is valid, else false.
+ */
+bool is_dp_link_valid(struct wlan_dp_link *dp_link);
 
 /**
  * dp_send_rps_ind() - send rps indication to daemon
@@ -768,7 +884,6 @@ void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx, bool is_ssr);
 QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 				 bool config_direct_link,
 				 bool enable_low_latency);
-
 #else
 static inline
 QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)

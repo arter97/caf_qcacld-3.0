@@ -1852,7 +1852,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_REASSOC_FAIL_TIMEOUT:
 	case SIR_LIM_FT_PREAUTH_RSP_TIMEOUT:
 	case SIR_LIM_DISASSOC_ACK_TIMEOUT:
-	case SIR_LIM_DEAUTH_ACK_TIMEOUT:
 	case SIR_LIM_AUTH_RETRY_TIMEOUT:
 	case SIR_LIM_AUTH_SAE_TIMEOUT:
 		/* These timeout messages are handled by MLM sub module */

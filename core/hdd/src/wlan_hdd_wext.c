@@ -9845,17 +9845,6 @@ void hdd_register_wext(struct net_device *dev)
 	hdd_exit();
 }
 
-void hdd_unregister_wext(struct net_device *dev)
-{
-	hdd_enter_dev(dev);
-
-	rtnl_lock();
-	dev->wireless_handlers = NULL;
-	rtnl_unlock();
-
-	hdd_exit();
-}
-
 void hdd_wext_unregister(struct net_device *dev,
 			 bool rtnl_held)
 {

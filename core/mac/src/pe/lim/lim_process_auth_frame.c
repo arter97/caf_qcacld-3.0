@@ -968,7 +968,8 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 				QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(
 					pMlmDeauthReq->peer_macaddr.bytes));
-			lim_process_deauth_ack_timeout(mac_ctx);
+			lim_process_deauth_ack_timeout(mac_ctx,
+						       pe_session->vdev_id);
 			is_connected = false;
 		}
 

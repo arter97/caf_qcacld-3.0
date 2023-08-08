@@ -402,16 +402,15 @@ void hdd_get_tx_resource(uint8_t vdev_id,
 }
 
 unsigned int
-hdd_get_tx_flow_low_watermark(hdd_cb_handle cb_ctx, uint8_t intf_id)
+hdd_get_tx_flow_low_watermark(hdd_cb_handle cb_ctx, qdf_netdev_t netdev)
 {
-	struct hdd_context *hdd_ctx = hdd_cb_handle_to_context(cb_ctx);
-	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *adapter;
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, intf_id);
-	if (!link_info)
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter)
 		return 0;
 
-	return link_info->adapter->tx_flow_low_watermark;
+	return adapter->tx_flow_low_watermark;
 }
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 
@@ -729,17 +728,16 @@ void hdd_tsf_timestamp_rx(hdd_cb_handle ctx, qdf_nbuf_t netbuf)
 	hdd_rx_timestamp(netbuf, ktime_to_us(netbuf->tstamp));
 }
 
-void hdd_get_tsf_time_cb(uint8_t vdev_id, uint64_t input_time,
+void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t input_time,
 			 uint64_t *tsf_time)
 {
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *adapter;
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info)
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter)
 		return;
 
-	hdd_get_tsf_time(link_info->adapter, input_time, tsf_time);
+	hdd_get_tsf_time(adapter, input_time, tsf_time);
 }
 #endif
 

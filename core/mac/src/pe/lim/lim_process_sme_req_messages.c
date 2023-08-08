@@ -646,6 +646,31 @@ void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
 }
 #endif
 
+#ifdef FEATURE_WLAN_WAPI
+
+void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
+				     struct pe_session *session)
+{
+	struct add_ie_params *add_ie = &session->add_ie_params;
+	uint8_t wapiie_buff[DOT11F_IE_WAPIOPAQUE_MAX_LEN + 2];
+	QDF_STATUS status;
+
+	qdf_mem_zero(wapiie_buff, sizeof(wapiie_buff));
+
+	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
+			      &add_ie->probeRespBCNDataLen,
+			      DOT11F_EID_WAPIOPAQUE, ONE_BYTE,
+			      NULL, 0,
+			      wapiie_buff, DOT11F_IE_WAPIOPAQUE_MAX_LEN);
+	if (status != QDF_STATUS_SUCCESS)
+		pe_debug("Failed to strip WAPI IE status: %d", status);
+}
+#else
+void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
+				     struct pe_session *session)
+{
+}
+#endif
 /**
  * lim_set_ldpc_exception() - to set allow any LDPC exception permitted
  * @mac_ctx: Pointer to mac context
@@ -1699,7 +1724,7 @@ lim_update_he_caps_htc(struct pe_session *session,  bool val)
 #endif
 
 #ifdef WLAN_FEATURE_11BE
-static void
+void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 {
 	uint8_t tx_nss = 0;
@@ -1778,7 +1803,7 @@ lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 	}
 }
 #else
-static void
+void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 {
 }
@@ -1972,6 +1997,54 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 }
 
 static enum mlme_dot11_mode
+lim_get_user_dot11_mode(struct wlan_objmgr_vdev *vdev)
+{
+	WMI_HOST_WIFI_STANDARD wifi_std;
+
+	wifi_std = mlme_get_vdev_wifi_std(vdev);
+
+	switch (wifi_std) {
+	case WMI_HOST_WIFI_STANDARD_4:
+		return MLME_DOT11_MODE_11N;
+	case WMI_HOST_WIFI_STANDARD_5:
+		return MLME_DOT11_MODE_11AC;
+	case WMI_HOST_WIFI_STANDARD_6:
+	case WMI_HOST_WIFI_STANDARD_6E:
+		return MLME_DOT11_MODE_11AX;
+	case WMI_HOST_WIFI_STANDARD_7:
+	default:
+		return MLME_DOT11_MODE_11BE;
+	}
+}
+
+static enum mlme_dot11_mode
+lim_intersect_user_dot11_mode(struct mac_context *mac_ctx,
+			      enum QDF_OPMODE opmode, uint8_t vdev_id,
+			      enum mlme_dot11_mode self_mode)
+{
+	struct wlan_objmgr_vdev *vdev;
+	enum mlme_dot11_mode user_mode;
+
+	switch (opmode) {
+	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
+		break;
+	default:
+		return self_mode;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac_ctx->pdev, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev)
+		return self_mode;
+
+	user_mode = lim_get_user_dot11_mode(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+
+	return user_mode > self_mode ? self_mode : user_mode;
+}
+
+static enum mlme_dot11_mode
 lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode,
 			uint8_t vdev_id)
 {
@@ -2033,9 +2106,23 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 			      struct bss_description *bss_desc,
 			      tDot11fBeaconIEs *ie_struct)
 {
+	struct scan_cache_entry *scan_entry;
+	bool is_eht_allowed;
+
 	if (!ie_struct->eht_cap.present)
 		return false;
 
+	scan_entry = scm_scan_get_entry_by_bssid(mac_ctx->pdev,
+						 (struct qdf_mac_addr *)
+						 bss_desc->bssId);
+
+	if (scan_entry) {
+		is_eht_allowed =
+			cm_is_eht_allowed_for_current_security(scan_entry);
+		util_scan_free_cache_entry(scan_entry);
+		if (!is_eht_allowed)
+			return false;
+	}
 	return mlme_get_bss_11be_allowed(
 			mac_ctx->psoc,
 			(struct qdf_mac_addr *)&bss_desc->bssId,
@@ -2675,6 +2762,13 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 
 	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, session->opmode,
 						  session->vdev_id);
+
+	/* if user set dot11 mode by cmd, need to do intersect first */
+	self_dot11_mode =
+		   lim_intersect_user_dot11_mode(mac_ctx, session->opmode,
+						 session->vdev_id,
+						 self_dot11_mode);
+
 	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
 
 	pe_debug("vdev id %d opmode %d self dot11mode %d bss_dot11 mode %d",
@@ -3265,6 +3359,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		session->ch_center_freq_seg0 = 0;
 		session->ch_width = CH_WIDTH_20MHZ;
 	}
+	session->ap_ch_width = session->ch_width;
 
 	if (IS_DOT11_MODE_HE(session->dot11mode)) {
 		lim_update_session_he_capable(mac_ctx, session);
@@ -4655,6 +4750,8 @@ static void lim_prepare_and_send_disassoc(struct mac_context *mac_ctx,
 		disassoc_req.doNotSendOverTheAir = 1;
 		disassoc_req.reasonCode =
 					REASON_AUTHORIZED_ACCESS_LIMIT_REACHED;
+	} else if (req->req.reason_code == CM_MLO_LINK_SWITCH_DISCONNECT) {
+		disassoc_req.doNotSendOverTheAir = 1;
 	}
 
 	msg.bodyptr = &disassoc_req;
@@ -4802,7 +4899,8 @@ lim_cm_handle_disconnect_req(struct wlan_cm_vdev_discon_req *req)
 	}
 
 	if (req->req.source == CM_PEER_DISCONNECT ||
-	    req->req.source == CM_SB_DISCONNECT)
+	    req->req.source == CM_SB_DISCONNECT ||
+	    req->req.source == CM_MLO_LINK_SWITCH_DISCONNECT)
 		lim_process_sb_disconnect_req(mac_ctx, pe_session, req);
 	else
 		lim_process_nb_disconnect_req(mac_ctx, pe_session, req);
@@ -5305,6 +5403,11 @@ lim_fill_preauth_req_dot11_mode(struct mac_context *mac_ctx,
 
 	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, QDF_STA_MODE,
 						  vdev_id);
+	/* if user set dot11 mode by cmd, need to do intersect first */
+	self_dot11_mode =
+		   lim_intersect_user_dot11_mode(mac_ctx, QDF_STA_MODE,
+						 vdev_id, self_dot11_mode);
+
 	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,

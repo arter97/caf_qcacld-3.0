@@ -328,5 +328,11 @@ bool mlme_is_flexible_twt_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
+
+static inline bool
+mlme_is_24ghz_twt_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif /* WLAN_SUPPORT_TWT */
 #endif /* _WLAN_MLME_TWT_API_H_ */

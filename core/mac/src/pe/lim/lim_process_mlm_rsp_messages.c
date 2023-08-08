@@ -828,6 +828,7 @@ lim_fill_sme_assoc_ind_params(
 		sme_assoc_ind->VHTCaps = assoc_ind->vht_caps;
 	sme_assoc_ind->capability_info = assoc_ind->capabilityInfo;
 	sme_assoc_ind->he_caps_present = assoc_ind->he_caps_present;
+	sme_assoc_ind->eht_caps_present = assoc_ind->eht_caps_present;
 	sme_assoc_ind->is_sae_authenticated = assoc_ind->is_sae_authenticated;
 }
 
@@ -2845,7 +2846,7 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 		     QDF_MAC_ADDR_SIZE);
 
 	pe_err("sta_link_addr" QDF_MAC_ADDR_FMT,
-	       QDF_MAC_ADDR_REF(&sta_link_addr));
+	       QDF_MAC_ADDR_REF(&sta_link_addr.bytes[0]));
 
 	if (assoc_rsp.len) {
 		struct element_info link_assoc_rsp;

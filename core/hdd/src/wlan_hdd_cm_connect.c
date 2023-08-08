@@ -185,7 +185,7 @@ void hdd_cm_set_peer_authenticate(struct wlan_hdd_link_info *link_info,
 		  QDF_MAC_ADDR_REF(bssid->bytes),
 		  is_auth_required ? "CONNECTED" : "AUTHENTICATED");
 
-	hdd_change_peer_state(link_info->adapter, bssid->bytes,
+	hdd_change_peer_state(link_info, bssid->bytes,
 			      is_auth_required ?
 			      OL_TXRX_PEER_STATE_CONN :
 			      OL_TXRX_PEER_STATE_AUTH);
@@ -199,9 +199,22 @@ void hdd_cm_update_rssi_snr_by_bssid(struct wlan_hdd_link_info *link_info)
 	struct hdd_station_ctx *sta_ctx;
 	int8_t snr = 0;
 	struct hdd_adapter *adapter = link_info->adapter;
+	mac_handle_t mac_handle;
+
+	if (!adapter) {
+		hdd_err_rl("null hdd_adapter pointer");
+		return;
+	}
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+
+	if (!mac_handle) {
+		hdd_err_rl("null mac_handle pointer");
+		return;
+	}
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	hdd_get_rssi_snr_by_bssid(hdd_adapter_get_mac_handle(adapter),
+	hdd_get_rssi_snr_by_bssid(mac_handle,
 				  sta_ctx->conn_info.bssid.bytes,
 				  &link_info->rssi, &snr);
 
@@ -313,6 +326,53 @@ void hdd_cm_save_connect_status(struct wlan_hdd_link_info *link_info,
 	hdd_sta_ctx->conn_info.assoc_status_code = reason_code;
 	hdd_sta_ctx->cache_conn_info.assoc_status_code = reason_code;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS hdd_cm_save_connected_links_info(struct qdf_mac_addr *self_mac,
+					    struct qdf_mac_addr *bssid,
+					    int32_t link_id)
+{
+	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_station_ctx *sta_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("HDD context NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	link_info = hdd_get_link_info_by_link_addr(hdd_ctx, self_mac);
+	if (!link_info) {
+		hdd_err("No link info with MAC: " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(self_mac->bytes));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	hdd_cm_set_ieee_link_id(link_info, link_id);
+	qdf_copy_macaddr(&sta_ctx->conn_info.bssid, bssid);
+	return QDF_STATUS_SUCCESS;
+}
+
+void
+hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id)
+{
+	struct hdd_station_ctx *sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	sta_ctx->conn_info.ieee_link_id = link_id;
+}
+
+void
+hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_station_ctx *sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
+}
+#endif
 
 #ifdef FEATURE_WLAN_WAPI
 static bool hdd_cm_is_wapi_sta(enum csr_akm_type auth_type)
@@ -518,11 +578,18 @@ hdd_get_sap_adapter_of_dfs(struct hdd_context *hdd_ctx)
 			    hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS)
 				continue;
 
+			wlan_objmgr_vdev_get_ref(link_info->vdev,
+						 WLAN_HDD_ID_OBJ_MGR);
 			chan = wlan_vdev_get_active_channel(link_info->vdev);
 			if (!chan) {
 				hdd_debug("Can not get active channel");
+				wlan_objmgr_vdev_release_ref(link_info->vdev,
+							   WLAN_HDD_ID_OBJ_MGR);
 				continue;
 			}
+
+			wlan_objmgr_vdev_release_ref(link_info->vdev,
+						     WLAN_HDD_ID_OBJ_MGR);
 
 			if (!wlan_reg_is_5ghz_ch_freq(chan->ch_freq))
 				continue;
@@ -868,6 +935,8 @@ hdd_cm_connect_failure_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	struct hdd_station_ctx *hdd_sta_ctx;
 	uint32_t time_buffer_size;
 	struct wlan_hdd_link_info *link_info;
+	bool is_link_switch =
+			wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -886,7 +955,14 @@ hdd_cm_connect_failure_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	qdf_mem_zero(hdd_sta_ctx->conn_info.connect_time, time_buffer_size);
 	hdd_init_scan_reject_params(hdd_ctx);
 	hdd_cm_save_connect_status(link_info, rsp->status_code);
-	hdd_conn_remove_connect_info(hdd_sta_ctx);
+	if (!is_link_switch) {
+		/* For link switch connection failure, do not clear existing
+		 * connection info in OSIF.
+		 */
+		hdd_conn_remove_connect_info(hdd_sta_ctx);
+		hdd_adapter_reset_station_ctx(adapter);
+	}
+
 	ucfg_dp_remove_conn_info(vdev);
 	hdd_cm_update_rssi_snr_by_bssid(link_info);
 	hdd_cm_rec_connect_info(rsp);

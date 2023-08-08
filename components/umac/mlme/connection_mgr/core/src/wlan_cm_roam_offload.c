@@ -49,6 +49,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlme_api.h"
 #include "wlan_policy_mgr_api.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 
 #ifdef WLAN_FEATURE_SAE
@@ -2193,6 +2194,47 @@ cm_update_rso_freq_list(struct rso_config *rso_cfg,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static void cm_update_rso_freq_list_from_partner_link(
+				struct wlan_objmgr_vdev *vdev,
+				struct wlan_mlme_psoc_ext_obj *mlme_obj,
+				struct wlan_roam_scan_channel_list *chan_info)
+{
+	struct mlo_link_info *mlo_link_info;
+	uint8_t link_info_iter = 0;
+	qdf_freq_t chan_freq;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return;
+
+	mlo_link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
+	     link_info_iter++, mlo_link_info++) {
+		if (qdf_is_macaddr_zero(&mlo_link_info->ap_link_addr) ||
+		    mlo_link_info->link_id == WLAN_INVALID_LINK_ID)
+			continue;
+		chan_freq = mlo_link_info->link_chan_info->ch_freq;
+		if (wlan_is_channel_present_in_list(chan_info->chan_freq_list,
+						    chan_info->chan_count,
+						    chan_freq))
+			continue;
+		chan_info->chan_freq_list[chan_info->chan_count++] =
+								chan_freq;
+		mlme_debug("link_id: %d added freq:%d ",
+			   mlo_link_info->link_id,
+			   mlo_link_info->link_chan_info->ch_freq);
+	}
+}
+
+#else
+static void cm_update_rso_freq_list_from_partner_link(
+			struct wlan_objmgr_vdev *vdev,
+			struct wlan_mlme_psoc_ext_obj *mlme_obj,
+			struct wlan_roam_scan_channel_list *chan_info)
+{
+}
+#endif
+
 static void
 cm_fill_rso_channel_list(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev,
@@ -2242,6 +2284,12 @@ cm_fill_rso_channel_list(struct wlan_objmgr_psoc *psoc,
 			 */
 			cm_add_ch_lst_from_roam_scan_list(vdev, mlme_obj,
 							  chan_info, rso_cfg);
+
+			/*
+			 * update channel list for non assoc link
+			 */
+			cm_update_rso_freq_list_from_partner_link(
+						vdev, mlme_obj, chan_info);
 
 			/*
 			 * update the roam channel list on the top of entries

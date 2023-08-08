@@ -574,3 +574,21 @@ QDF_STATUS pmo_set_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS pmo_core_get_listen_interval(struct wlan_objmgr_vdev *vdev,
+					uint32_t *listen_interval)
+{
+	struct pmo_vdev_priv_obj *vdev_ctx;
+
+	if (!vdev || !listen_interval) {
+		pmo_err("vdev NULL or NULL ptr");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev_ctx = pmo_vdev_get_priv(vdev);
+	qdf_spin_lock_bh(&vdev_ctx->pmo_vdev_lock);
+	*listen_interval = vdev_ctx->dyn_listen_interval;
+	qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
+
+	return QDF_STATUS_SUCCESS;
+}

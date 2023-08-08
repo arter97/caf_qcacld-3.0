@@ -937,30 +937,6 @@ enum policy_mgr_conc_next_action
 		policy_mgr_get_current_pref_hw_mode_dual_dbs(
 		struct wlan_objmgr_psoc *psoc);
 
-/**
- * policy_mgr_reset_sap_mandatory_channels() - Reset the SAP mandatory channels
- * @pm_ctx: policy mgr context
- *
- * Resets the SAP mandatory channel list and the length of the list
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS policy_mgr_reset_sap_mandatory_channels(
-		struct policy_mgr_psoc_priv_obj *pm_ctx);
-
-/**
- * policy_mgr_dump_freq_range_per_mac() - Function to print frequency range
- * for both MAC 0 and MAC1 for given Hw mode
- *
- * @freq_range: Policy Mgr context
- * @hw_mode: HW mode
- *
- * This Function will print frequency range for both MAC 0 and MAC1 for given
- * Hw mode
- *
- * Return: void
- *
- */
 void
 policy_mgr_dump_freq_range_per_mac(struct policy_mgr_freq_range *freq_range,
 				   enum policy_mgr_mode hw_mode);

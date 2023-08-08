@@ -1255,12 +1255,19 @@ void policy_mgr_move_vdev_from_connection_to_disabled_tbl(
  * disabled during connection.
  * @psoc: psoc
  * @vdev: vdev
+ * @peer_assoc: check peer assoc command
+ *
+ * Check the vdev need to be moved to disabled policy mgr table.
+ * If peer_assoc = false, the API will check the forced inactive link bitmap
+ * as well. Vdev will be disabled if vdev's link id is forced inactive(includes
+ * dynamic inactive)
  *
  * Return: true if STA link is need to be disabled else false.
  */
 bool
 policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_objmgr_vdev *vdev);
+					    struct wlan_objmgr_vdev *vdev,
+					    bool peer_assoc);
 
 /**
  * policy_mgr_is_set_link_in_progress() - Check set link in progress or not
@@ -1328,7 +1335,8 @@ policy_mgr_move_vdev_from_disabled_to_connection_tbl(
 
 static inline bool
 policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_objmgr_vdev *vdev)
+					    struct wlan_objmgr_vdev *vdev,
+					    bool peer_assoc)
 {
 	return false;
 }
@@ -3989,6 +3997,23 @@ QDF_STATUS policy_mgr_get_updated_scan_and_fw_mode_config(
 bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 				uint32_t ch_freq);
 
+#ifdef FEATURE_WLAN_CH_AVOID_EXT
+/**
+ * policy_mgr_restrict_sap_on_unsafe_chan() - Check if need check unsafe
+ * channel if SAP start on fixed channel.
+ * @psoc: PSOC object information
+ *
+ * Return: true for success, else false
+ */
+bool policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
+
 /**
  * policy_mgr_is_sap_freq_allowed - Check if the channel is allowed for sap
  * @psoc: PSOC object information
@@ -4911,6 +4936,7 @@ void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev);
  *                                               concurrency combination
  * @psoc: PSOC object information
  * @is_new_vdev_mlo: Is new vdev a mlo device or not
+ * @new_vdev_id: new vdev id which need concurrency check
  *
  * When a new connection is about to come up check if current
  * concurrency combination including the new connection is
@@ -4919,7 +4945,8 @@ void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev);
  * Return: True if concurrency is supported, otherwise false.
  */
 bool policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
-					       bool is_new_vdev_mlo);
+					       bool is_new_vdev_mlo,
+					       uint8_t new_vdev_id);
 
 /**
  * policy_mgr_get_conc_ext_flags() - get extended flags for concurrency check
@@ -5118,7 +5145,8 @@ QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 
 static inline bool policy_mgr_is_mlo_sap_concurrency_allowed(
 			struct wlan_objmgr_psoc *psoc,
-			bool is_new_vdev_mlo)
+			bool is_new_vdev_mlo,
+			uint8_t new_vdev_id)
 {
 	return true;
 }
@@ -5440,4 +5468,14 @@ bool policy_mgr_is_beaconing_mode(enum policy_mgr_con_mode mode);
 
 bool policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * policy_mgr_reset_sap_mandatory_channels() - Reset the SAP mandatory channels
+ * @psoc: psoc object
+ *
+ * Resets the SAP mandatory channel list and the length of the list
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_reset_sap_mandatory_channels(struct wlan_objmgr_psoc *psoc);
 #endif /* __WLAN_POLICY_MGR_API_H */

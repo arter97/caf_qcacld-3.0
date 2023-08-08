@@ -662,6 +662,52 @@ wlan_mlme_update_cfg_with_tgt_caps(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.gen.ocv_support = tgt_caps->ocv_support;
 }
 
+void
+wlan_mlme_update_aux_dev_caps(
+		struct wlan_objmgr_psoc *psoc,
+		struct wlan_mlme_aux_dev_caps wlan_mlme_aux_dev_caps[])
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	qdf_mem_copy(&mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps[0],
+		     &wlan_mlme_aux_dev_caps[0],
+		     sizeof(mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps));
+}
+
+bool wlan_mlme_cfg_get_aux_supported_modes(
+			struct wlan_objmgr_psoc *psoc,
+			uint32_t aux_index,
+			enum wlan_mlme_hw_mode_config_type hw_mode_id,
+			uint32_t *supported_modes_bitmap)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_mlme_aux_dev_caps *wlan_mlme_aux0_dev_caps;
+
+	if (aux_index != 0) {
+		mlme_err("current only support aux0");
+		return false;
+	}
+
+	if (hw_mode_id >= WLAN_MLME_HW_MODE_MAX) {
+		mlme_err("invalid hw mode id %d.", hw_mode_id);
+		return false;
+	}
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_err("MLME obj is NULL");
+		return false;
+	}
+	wlan_mlme_aux0_dev_caps = mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps;
+	*supported_modes_bitmap =
+		wlan_mlme_aux0_dev_caps[hw_mode_id].supported_modes_bitmap;
+	return true;
+}
+
 #ifdef WLAN_FEATURE_11AX
 QDF_STATUS wlan_mlme_cfg_get_he_ul_mumimo(struct wlan_objmgr_psoc *psoc,
 					  uint32_t *value)
@@ -1358,10 +1404,58 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
 
-	mlme_obj->cfg.sta.mlo_support_link_num = value;
+	if (!value)
+		mlme_obj->cfg.sta.mlo_support_link_num =
+					  cfg_default(CFG_MLO_SUPPORT_LINK_NUM);
+	else
+		mlme_obj->cfg.sta.mlo_support_link_num = value;
+
 	mlme_legacy_debug("mlo_support_link_num %d", value);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
+					   uint8_t value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.sta.user_set_link_num = value;
+	mlme_legacy_debug("user_set_link_num %d", value);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void wlan_mlme_restore_user_set_link_num(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	if (!mlme_obj->cfg.sta.user_set_link_num)
+		return;
+
+	mlme_obj->cfg.sta.mlo_support_link_num =
+				mlme_obj->cfg.sta.user_set_link_num;
+	mlme_legacy_debug("restore mlo_support_link_num %d",
+			  mlme_obj->cfg.sta.user_set_link_num);
+}
+
+void wlan_mlme_clear_user_set_link_num(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	mlme_obj->cfg.sta.user_set_link_num = 0;
 }
 
 uint8_t wlan_mlme_get_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc)

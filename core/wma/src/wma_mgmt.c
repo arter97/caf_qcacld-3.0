@@ -1135,9 +1135,55 @@ static void wma_populate_peer_puncture(struct peer_assoc_params *peer,
 	peer->puncture_bitmap = des_chan->puncture_bitmap;
 	wma_debug("Peer EHT puncture bitmap %d", peer->puncture_bitmap);
 }
+
+static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
+				      tpAddStaParams params)
+{
+	struct peer_assoc_ml_partner_links *ml_links;
+	struct peer_assoc_mlo_params *mlo_params;
+	struct peer_ml_info *ml_info;
+	uint8_t i;
+
+	ml_info = &params->ml_info;
+	mlo_params = &peer->mlo_params;
+	ml_links = &peer->ml_links;
+
+	/* Assoc link info */
+	mlo_params->vdev_id = ml_info->vdev_id;
+	mlo_params->ieee_link_id = ml_info->link_id;
+	qdf_mem_copy(&mlo_params->chan, &ml_info->channel_info,
+		     sizeof(struct wlan_channel));
+	qdf_mem_copy(&mlo_params->bssid, &ml_info->link_addr,
+		     QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(&mlo_params->mac_addr, &ml_info->self_mac_addr,
+		     QDF_MAC_ADDR_SIZE);
+
+	/* Fill partner link info */
+	ml_links->num_links = ml_info->num_links;
+	for (i = 0; i < ml_links->num_links; i++) {
+		ml_links->partner_info[i].vdev_id =
+					ml_info->partner_info[i].vdev_id;
+		ml_links->partner_info[i].link_id =
+					ml_info->partner_info[i].link_id;
+		qdf_mem_copy(&ml_links->partner_info[i].chan,
+			     &ml_info->partner_info[i].channel_info,
+			     sizeof(struct wlan_channel));
+		qdf_mem_copy(&ml_links->partner_info[i].bssid,
+			     &ml_info->partner_info[i].link_addr,
+			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(&ml_links->partner_info[i].mac_addr,
+			     &ml_info->partner_info[i].self_mac_addr,
+			     QDF_MAC_ADDR_SIZE);
+	}
+}
 #else
 static void wma_populate_peer_puncture(struct peer_assoc_params *peer,
 				       struct wlan_channel *des_chan)
+{
+}
+
+static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
+				      tpAddStaParams params)
 {
 }
 #endif
@@ -1301,7 +1347,8 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 		req->mlo_params.mlo_assoc_link =
 					wlan_peer_mlme_is_assoc_peer(peer);
 		WLAN_ADDR_COPY(req->mlo_params.mld_mac, peer->mldaddr);
-		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev) ||
+		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
+								true) ||
 		    policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
 			req->mlo_params.mlo_force_link_inactive = 1;
 			link_id_bitmap = 1 << params->link_id;
@@ -1327,6 +1374,8 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 				params->msd_caps.med_sync_ofdm_ed_thresh;
 		req->mlo_params.medium_sync_max_txop_num =
 				params->msd_caps.med_sync_max_txop_num;
+		req->mlo_params.link_switch_in_progress =
+			wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
 	} else {
 		wma_debug("Peer MLO context is NULL");
 		req->mlo_params.mlo_enabled = false;
@@ -1334,10 +1383,23 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 	}
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
 }
+
+static void wma_set_mlo_assoc_vdev(struct wlan_objmgr_vdev *vdev,
+				   struct peer_assoc_params *req)
+{
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		req->is_assoc_vdev = true;
+}
 #else
 static inline void wma_set_mlo_capability(tp_wma_handle wma,
 					  struct wlan_objmgr_vdev *vdev,
 					  tpAddStaParams params,
+					  struct peer_assoc_params *req)
+{
+}
+
+static inline void wma_set_mlo_assoc_vdev(struct wlan_objmgr_vdev *vdev,
 					  struct peer_assoc_params *req)
 {
 }
@@ -1683,6 +1745,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 
 	wma_set_mlo_capability(wma, intr->vdev, params, cmd);
 
+	wma_set_mlo_assoc_vdev(intr->vdev, cmd);
+
 	wma_debug("rx_max_rate %d, rx_mcs %x, tx_max_rate %d, tx_mcs: %x num rates %d need 4 way %d",
 		  cmd->rx_max_rate, cmd->rx_mcs_set, cmd->tx_max_rate,
 		  cmd->tx_mcs_set, peer_ht_rates.num_rates,
@@ -1700,6 +1764,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	wma_populate_peer_he_cap(cmd, params);
 	wma_populate_peer_eht_cap(cmd, params);
 	wma_populate_peer_puncture(cmd, des_chan);
+	wma_populate_peer_mlo_cap(cmd, params);
 	if (!wma_is_vdev_in_ap_mode(wma, params->smesessionId))
 		intr->nss = cmd->peer_nss;
 	wma_objmgr_set_peer_mlme_nss(wma, cmd->peer_mac, cmd->peer_nss);

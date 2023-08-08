@@ -528,8 +528,8 @@ int wlan_son_deliver_opmode(struct wlan_objmgr_vdev *vdev,
 	opmode.num_streams = nss;
 	qdf_mem_copy(opmode.macaddr, addr, QDF_MAC_ADDR_SIZE);
 
-	son_debug("bw %d, nss %d, addr " QDF_FULL_MAC_FMT,
-		  bw, nss, QDF_FULL_MAC_REF(addr));
+	son_debug("bw %d, nss %d, addr " QDF_MAC_ADDR_FMT,
+		  bw, nss, QDF_MAC_ADDR_REF(addr));
 
 	if (!g_son_mlme_deliver_cbs.deliver_opmode) {
 		son_err("invalid deliver opmode cb");
@@ -560,8 +560,8 @@ int wlan_son_deliver_smps(struct wlan_objmgr_vdev *vdev,
 	smps.is_static = is_static;
 	qdf_mem_copy(smps.macaddr, addr, QDF_MAC_ADDR_SIZE);
 
-	son_debug("is_static %d, addr" QDF_FULL_MAC_FMT,
-		  is_static, QDF_FULL_MAC_REF(addr));
+	son_debug("is_static %d, addr" QDF_MAC_ADDR_FMT,
+		  is_static, QDF_MAC_ADDR_REF(addr));
 
 	if (!g_son_mlme_deliver_cbs.deliver_smps) {
 		son_err("invalid deliver smps cb");
@@ -643,9 +643,9 @@ int wlan_son_deliver_rrm_rpt(struct wlan_objmgr_vdev *vdev,
 
 	rrm_info.data.rrm_data.num_meas_rpts = total_bcnrpt_count;
 
-	son_debug("Sta: " QDF_FULL_MAC_FMT
+	son_debug("Sta: " QDF_MAC_ADDR_FMT
 		  "Category %d Action %d Num_Report %d Rptlen %d",
-		  QDF_FULL_MAC_REF(mac_addr),
+		  QDF_MAC_ADDR_REF(mac_addr),
 		  ACTION_CATEGORY_RRM,
 		  RRM_RADIO_MEASURE_RPT,
 		  total_bcnrpt_count,

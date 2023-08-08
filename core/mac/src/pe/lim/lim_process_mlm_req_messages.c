@@ -188,9 +188,6 @@ void lim_process_mlm_req_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_DISASSOC_ACK_TIMEOUT:
 		lim_process_disassoc_ack_timeout(mac_ctx);
 		break;
-	case SIR_LIM_DEAUTH_ACK_TIMEOUT:
-		lim_process_deauth_ack_timeout(mac_ctx);
-		break;
 	case SIR_LIM_AUTH_RETRY_TIMEOUT:
 		lim_process_auth_retry_timer(mac_ctx);
 		break;
@@ -1257,7 +1254,8 @@ void lim_clean_up_disassoc_deauth_req(struct mac_context *mac_ctx,
 			     (uint8_t *) &mlm_deauth_req->peer_macaddr.bytes,
 			     QDF_MAC_ADDR_SIZE))) {
 		if (clean_rx_path) {
-			lim_process_deauth_ack_timeout(mac_ctx);
+			lim_process_deauth_ack_timeout(mac_ctx,
+						       mlm_deauth_req->sessionId);
 		} else {
 			if (tx_timer_running(
 				&mac_ctx->lim.lim_timers.gLimDeauthAckTimer)) {
@@ -1569,16 +1567,19 @@ end:
  * lim_process_deauth_ack_timeout() - wrapper function around
  * lim_send_deauth_cnf
  *
- * @mac_ctx:        mac_ctx
+ * @pMacGlobal:     mac_ctx
+ * @vdev_id:        vdev id
  *
  * wrapper function around lim_send_deauth_cnf
  *
  * Return: void
  */
-void lim_process_deauth_ack_timeout(struct mac_context *mac_ctx)
+void lim_process_deauth_ack_timeout(void *pMacGlobal, uint32_t vdev_id)
 {
-	pe_debug("Deauth Ack timeout");
-	lim_send_deauth_cnf(mac_ctx);
+	struct mac_context *mac_ctx = (struct mac_context *)pMacGlobal;
+
+	pe_debug("Deauth Ack timeout for vdev id %d", vdev_id);
+	lim_send_deauth_cnf(mac_ctx, vdev_id);
 }
 
 /*

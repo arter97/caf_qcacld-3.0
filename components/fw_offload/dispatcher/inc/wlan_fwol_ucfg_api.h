@@ -227,7 +227,7 @@ QDF_STATUS ucfg_fwol_get_ani_enabled(struct wlan_objmgr_psoc *psoc,
  * Return: QDF Status
  */
 QDF_STATUS ucfg_fwol_get_pcie_config(struct wlan_objmgr_psoc *psoc,
-				     bool *pcie_config);
+				     uint8_t *pcie_config);
 
 /**
  * ucfg_get_enable_rts_sifsbursting() - Assigns the enable_rts_sifsbursting
@@ -894,7 +894,7 @@ ucfg_fwol_get_ani_enabled(struct wlan_objmgr_psoc *psoc,
 
 static inline QDF_STATUS
 ucfg_fwol_get_pcie_config(struct wlan_objmgr_psoc *psoc,
-			  bool *pcie_config)
+			  uint8_t *pcie_config)
 {
 	return QDF_STATUS_E_FAILURE;
 }

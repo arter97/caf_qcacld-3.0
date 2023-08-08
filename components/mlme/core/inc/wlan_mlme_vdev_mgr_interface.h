@@ -441,6 +441,14 @@ void mlme_set_notify_co_located_ap_update_rnr(struct wlan_objmgr_vdev *vdev,
 bool wlan_is_vdev_traffic_ll_ht(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlme_get_vdev_wifi_std() - get the wifi std version for the vdev
+ * @vdev: vdev pointer
+ *
+ * Return: WMI_HOST_WIFI_STANDARD
+ */
+WMI_HOST_WIFI_STANDARD mlme_get_vdev_wifi_std(struct wlan_objmgr_vdev *vdev);
+
+/**
  * mlme_get_assoc_type() - get associate type
  * @vdev: vdev pointer
  *

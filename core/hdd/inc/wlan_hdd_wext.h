@@ -166,16 +166,6 @@ typedef enum {
 
 #ifdef WLAN_WEXT_SUPPORT_ENABLE
 /**
- * hdd_unregister_wext() - unregister wext context
- * @dev: net device handle
- *
- * Unregisters wext interface context for a given net device
- *
- * Returns: None
- */
-void hdd_unregister_wext(struct net_device *dev);
-
-/**
  * hdd_register_wext() - register wext context
  * @dev: net device handle
  *
@@ -338,11 +328,6 @@ static inline
 void hdd_set_dump_dp_trace(uint16_t cmd_type, uint16_t count) {}
 #endif
 #else /* WLAN_WEXT_SUPPORT_ENABLE */
-
-static inline void hdd_unregister_wext(struct net_device *dev)
-{
-}
-
 static inline void hdd_register_wext(struct net_device *dev)
 {
 }

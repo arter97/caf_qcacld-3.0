@@ -1274,12 +1274,12 @@ validation_done:
 
 	/*
 	 * Don't check if the frequency is allowed or not if SAP is started
-	 * in fixed channel and coex fixed channel SAP is supported.
+	 * in fixed channel, or WLAN CH AVOID EXT feature explicit restrict
+	 * SAP start on unsafe channel.
 	 */
 
 	if ((sap_context->acs_cfg->acs_mode ||
-	     !target_psoc_get_sap_coex_fixed_chan_cap(
-			wlan_psoc_get_tgt_if_handle(mac_ctx->psoc))) &&
+	     policy_mgr_restrict_sap_on_unsafe_chan(mac_ctx->psoc)) &&
 	    !policy_mgr_is_sap_freq_allowed(mac_ctx->psoc,
 					    sap_context->chan_freq)) {
 		sap_warn("Abort SAP start due to unsafe channel");
@@ -2611,6 +2611,8 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 			reassoc_complete->vht_caps = csr_roaminfo->vht_caps;
 		reassoc_complete->he_caps_present =
 						csr_roaminfo->he_caps_present;
+		reassoc_complete->eht_caps_present =
+						csr_roaminfo->eht_caps_present;
 		reassoc_complete->capability_info =
 						csr_roaminfo->capability_info;
 
@@ -3706,8 +3708,9 @@ static void sap_fsm_validate_and_change_channel(struct mac_context *mac_ctx,
 	enum phy_ch_width target_bw = sap_ctx->ch_params.ch_width;
 
 	if (((!sap_ctx->acs_cfg || !sap_ctx->acs_cfg->acs_mode) &&
-	     target_psoc_get_sap_coex_fixed_chan_cap(
-				wlan_psoc_get_tgt_if_handle(mac_ctx->psoc))) ||
+	     (!policy_mgr_restrict_sap_on_unsafe_chan(mac_ctx->psoc) ||
+	      target_psoc_get_sap_coex_fixed_chan_cap(
+		      wlan_psoc_get_tgt_if_handle(mac_ctx->psoc)))) ||
 	    (policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, sap_ctx->chan_freq) &&
 	     !wlan_reg_is_disable_for_pwrmode(mac_ctx->pdev, sap_ctx->chan_freq,
 					      REG_CURRENT_PWR_MODE)))

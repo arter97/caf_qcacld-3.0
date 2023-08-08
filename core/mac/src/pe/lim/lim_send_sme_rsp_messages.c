@@ -169,6 +169,37 @@ lim_get_he_rate_info_flag(tpDphHashNode sta_ds)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * lim_get_eht_rate_info_flag() - Get eht tx rate info flag
+ * @sta_ds: Pointer to station ds structure
+ *
+ * This function is called to get the eht tx rate info.
+ *
+ * Return: Returns eht tx rate flag
+ */
+static enum tx_rate_info
+lim_get_eht_rate_info_flag(tpDphHashNode sta_ds)
+{
+	if (sta_ds->eht_config.support_320mhz_6ghz)
+		return  TX_RATE_EHT320;
+	else if (sta_ds->ch_width == CH_WIDTH_160MHZ)
+		return  TX_RATE_EHT160;
+	else if (sta_ds->ch_width == CH_WIDTH_80MHZ)
+		return TX_RATE_EHT80;
+	else if (sta_ds->ch_width == CH_WIDTH_40MHZ)
+		return TX_RATE_EHT40;
+	else
+		return TX_RATE_EHT20;
+}
+#else
+static enum tx_rate_info
+lim_get_eht_rate_info_flag(tpDphHashNode sta_ds)
+{
+	return TX_RATE_LEGACY;
+}
+#endif
+
 /**
  * lim_get_max_rate_flags() - Get rate flags
  * @mac_ctx: Pointer to global MAC structure
@@ -189,12 +220,15 @@ uint32_t lim_get_max_rate_flags(struct mac_context *mac_ctx, tpDphHashNode sta_d
 		return rate_flags;
 	}
 
-	if (!sta_ds->mlmStaContext.htCapability &&
+	if (!lim_is_sta_eht_capable(sta_ds) &&
+	    !sta_ds->mlmStaContext.htCapability &&
 	    !sta_ds->mlmStaContext.vhtCapability &&
 	    !lim_is_sta_he_capable(sta_ds)) {
 		rate_flags |= TX_RATE_LEGACY;
 	} else {
-		if (lim_is_sta_he_capable(sta_ds)) {
+		if (lim_is_sta_eht_capable(sta_ds)) {
+			rate_flags |= lim_get_eht_rate_info_flag(sta_ds);
+		} else if (lim_is_sta_he_capable(sta_ds)) {
 			rate_flags |= lim_get_he_rate_info_flag(sta_ds);
 		} else if (sta_ds->mlmStaContext.vhtCapability) {
 			if (WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ ==

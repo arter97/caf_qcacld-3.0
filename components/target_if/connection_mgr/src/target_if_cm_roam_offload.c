@@ -519,17 +519,6 @@ target_if_cm_roam_rssi_diff_6ghz(struct wlan_objmgr_vdev *vdev,
 #endif
 
 /**
- * target_if_is_vdev_valid - vdev id is valid or not
- * @vdev_id: vdev id
- *
- * Return: true or false
- */
-static bool target_if_is_vdev_valid(uint8_t vdev_id)
-{
-	return (vdev_id < WLAN_MAX_VDEVS ? true : false);
-}
-
-/**
  * target_if_vdev_set_param() - set per vdev params in fw
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id

@@ -1069,6 +1069,18 @@ void lim_strip_eht_ies_from_add_ies(struct mac_context *mac_ctx,
 				    struct pe_session *session);
 
 /**
+ * lim_strip_wapi_ies_from_add_ies() - This function strip WAPI IE from add_ie
+ * @mac_ctx: pointer to mac context
+ * @pe_session: pointer to PE session
+ *
+ * This API is to strip WAPI IE from add_ie
+ *
+ * Return: none
+ */
+void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
+				     struct pe_session *session);
+
+/**
  * lim_del_pmf_sa_query_timer() - This function deletes SA query timer
  * @mac_ctx: pointer to mac context
  * @pe_session: pointer to PE session
@@ -2301,6 +2313,18 @@ void lim_extract_per_link_id(struct pe_session *session,
 			     tpSirAssocRsp assoc_rsp);
 
 /**
+ * lim_extract_ml_info() - Extract ML info and send with FW
+ * @session: pointer to PE session
+ * @add_bss: pointer to ADD BSS params
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_extract_ml_info(struct pe_session *session,
+			 struct bss_params *add_bss,
+			 tpSirAssocRsp assoc_rsp);
+
+/**
  * lim_intersect_ap_emlsr_caps() - Intersect AP and self STA EML capabilities
  * @mac_ctx: Global MAC context
  * @session: pointer to PE session
@@ -2333,6 +2357,13 @@ static inline void
 lim_extract_per_link_id(struct pe_session *session,
 			struct bss_params *add_bss,
 			tpSirAssocRsp assoc_rsp)
+{
+}
+
+static inline void
+lim_extract_ml_info(struct pe_session *session,
+		    struct bss_params *add_bss,
+		    tpSirAssocRsp assoc_rsp)
 {
 }
 
@@ -3266,4 +3297,16 @@ lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
  */
 enum phy_ch_width
 lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40);
+
+/**
+ * lim_update_eht_caps_mcs() - update eht caps
+ *
+ * @mac: Pointer to Global mac structure
+ * @session: Session pointer of the interface
+ *
+ * Return: None
+ */
+void lim_update_eht_caps_mcs(struct mac_context *mac,
+			     struct pe_session *session);
+
 #endif /* __LIM_UTILS_H */

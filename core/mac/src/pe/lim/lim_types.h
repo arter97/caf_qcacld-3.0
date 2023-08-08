@@ -260,6 +260,7 @@ typedef struct sLimMlmAssocInd {
 	tDot11fIEHTCaps ht_caps;
 	tDot11fIEVHTCaps vht_caps;
 	bool he_caps_present;
+	bool eht_caps_present;
 	bool is_sae_authenticated;
 #ifdef WLAN_FEATURE_11BE_MLO
 	tSirMacAddr peer_mld_addr;
@@ -1351,9 +1352,9 @@ void lim_wpspbc_close(struct mac_context *mac, struct pe_session *pe_session);
 #define LIM_WPS_OVERLAP_TIMER_MS                 10000
 
 void lim_process_disassoc_ack_timeout(struct mac_context *mac);
-void lim_process_deauth_ack_timeout(struct mac_context *mac);
+void lim_process_deauth_ack_timeout(void *pMacGlobal, uint32_t vdev_id);
 QDF_STATUS lim_send_disassoc_cnf(struct mac_context *mac);
-QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac);
+QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac, uint8_t vdev_id);
 
 /**
  * lim_disassoc_tx_complete_cnf() - callback to indicate Tx completion
