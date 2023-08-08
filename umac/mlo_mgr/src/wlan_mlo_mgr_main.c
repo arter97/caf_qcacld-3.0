@@ -82,6 +82,26 @@ static void mlo_global_ctx_init(void)
 	mlo_msgq_init();
 }
 
+/**
+ * wlan_mlo_check_psoc_capable() - Check if psoc is mlo capable
+ * @psoc: psoc pointer
+ *
+ * API to check if psoc is mlo capable
+ *
+ * Return: bool, true if capable else false
+ */
+#ifdef WLAN_MLO_MULTI_CHIP
+static bool wlan_mlo_check_psoc_capable(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlo_get_psoc_capable(psoc);
+}
+#else
+static bool wlan_mlo_check_psoc_capable(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+#endif
+
 QDF_STATUS wlan_mlo_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops;
@@ -90,6 +110,9 @@ QDF_STATUS wlan_mlo_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		mlo_err("psoc is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	if (!wlan_mlo_check_psoc_capable(psoc))
+		return QDF_STATUS_SUCCESS;
 
 	mlo_tx_ops = target_if_mlo_get_tx_ops(psoc);
 	if (!mlo_tx_ops) {
