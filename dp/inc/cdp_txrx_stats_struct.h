@@ -1931,6 +1931,9 @@ struct cdp_rx_stats {
  * @cce_classified_raw:Number of raw packets classified by CCE
  * @sniffer_rcvd: Number of packets received with ppdu cookie
  * @tso_stats:
+ * @mlo_mcast: mlo mcast packet counters
+ * @mlo_mcast.send_pkt_count: MLO mcast send packet counter
+ * @mlo_mcast.fail_pkt_count: MLO mcast failed packet counter
  */
 struct cdp_tx_ingress_stats {
 	struct cdp_pkt_info rcvd;
@@ -1999,6 +2002,12 @@ struct cdp_tx_ingress_stats {
 	uint32_t cce_classified_raw;
 	struct cdp_pkt_info sniffer_rcvd;
 	struct cdp_tso_stats tso_stats;
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MCAST_MLO)
+	struct {
+		uint32_t send_pkt_count;
+		uint32_t fail_pkt_count;
+	} mlo_mcast;
+#endif
 };
 
 /**

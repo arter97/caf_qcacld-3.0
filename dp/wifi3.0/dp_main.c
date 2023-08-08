@@ -10631,6 +10631,7 @@ dp_print_host_stats(struct dp_vdev *vdev,
 		dp_print_pdev_tx_stats(pdev);
 		dp_print_soc_tx_stats(pdev->soc);
 		dp_print_global_desc_count();
+		dp_print_vdev_mlo_mcast_tx_stats(vdev);
 		break;
 	case TXRX_RX_HOST_STATS:
 		dp_print_pdev_rx_stats(pdev);

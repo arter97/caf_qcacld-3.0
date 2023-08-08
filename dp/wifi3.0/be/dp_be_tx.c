@@ -778,7 +778,10 @@ dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 	dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
 	msdu_info.gsn = be_vdev->mlo_dev_ctxt->seq_num;
+	msdu_info.xmit_type = qdf_nbuf_get_vdev_xmit_type(nbuf_clone);
 
+	DP_STATS_INC(ptnr_vdev,
+		     tx_i[msdu_info.xmit_type].mlo_mcast.send_pkt_count, 1);
 	nbuf_clone = dp_tx_send_msdu_single(
 					ptnr_vdev,
 					nbuf_clone,
@@ -786,6 +789,9 @@ dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
 					DP_MLO_MCAST_REINJECT_PEER_ID,
 					NULL);
 	if (qdf_unlikely(nbuf_clone)) {
+		DP_STATS_INC(ptnr_vdev,
+			     tx_i[msdu_info.xmit_type].mlo_mcast.fail_pkt_count,
+			     1);
 		dp_info("pkt send failed");
 		qdf_nbuf_free(nbuf_clone);
 		return;
