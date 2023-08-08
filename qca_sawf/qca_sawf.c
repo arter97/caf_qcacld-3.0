@@ -59,6 +59,13 @@ static struct wlan_objmgr_vdev *qca_sawf_get_vdev(struct net_device *netdev)
 		osdev = parent_osdev;
 	}
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_MLO) {
+			qdf_nofl_err("ERROR: MLO netdev is not supported\n");
+			return NULL;
+	}
+#endif
+
 	vdev = osdev->ctrl_vdev;
 	return vdev;
 }
@@ -148,21 +155,27 @@ static void qca_sawf_psoc_ul_cb(struct wlan_objmgr_psoc *psoc, void *cbd,
 {
 	ol_txrx_soc_handle soc_txrx_handle;
 	struct psoc_sawf_ul_itr *param = (struct psoc_sawf_ul_itr *)cbd;
+	uint16_t peer_id = HTT_INVALID_PEER;
 
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 	cdp_sawf_peer_config_ul(soc_txrx_handle,
 				param->mac_addr, param->tid,
 				param->service_interval, param->burst_size,
 				param->min_tput, param->max_latency,
-				param->add_or_sub);
+				param->add_or_sub, peer_id);
 }
 
 static inline
-void qca_sawf_peer_config_ul(uint8_t *mac_addr, uint8_t tid,
-			     uint32_t service_interval, uint32_t burst_size,
-			     uint32_t min_tput, uint32_t max_latency,
-			     uint8_t add_or_sub)
+void qca_sawf_peer_config_ul(struct net_device *netdev, uint8_t *mac_addr,
+			     uint8_t tid, uint32_t service_interval,
+			     uint32_t burst_size, uint32_t min_tput,
+			     uint32_t max_latency, uint8_t add_or_sub)
 {
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	uint16_t peer_id = HTT_INVALID_PEER;
+	ol_txrx_soc_handle soc_txrx_handle;
+	osif_dev *osdev = NULL;
 	struct psoc_sawf_ul_itr param = {
 		.mac_addr = mac_addr,
 		.service_interval = service_interval,
@@ -173,8 +186,36 @@ void qca_sawf_peer_config_ul(uint8_t *mac_addr, uint8_t tid,
 		.add_or_sub = add_or_sub
 	};
 
-	wlan_objmgr_iterate_psoc_list(qca_sawf_psoc_ul_cb, &param,
-				      WLAN_SAWF_ID);
+	if (!netdev) {
+		wlan_objmgr_iterate_psoc_list(qca_sawf_psoc_ul_cb, &param,
+					      WLAN_SAWF_ID);
+		return;
+	}
+
+	if (!netdev->ieee80211_ptr)
+		return;
+
+	vdev = qca_sawf_get_vdev(netdev);
+	if (!vdev)
+		return;
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+	osdev = ath_netdev_priv(netdev);
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
+		osif_peer_dev *osifp = NULL;
+
+		osifp = ath_netdev_priv(netdev);
+		peer_id = osifp->peer_id;
+	}
+
+	cdp_sawf_peer_config_ul(soc_txrx_handle,
+				mac_addr, tid,
+				service_interval, burst_size,
+				min_tput, max_latency,
+				add_or_sub, peer_id);
 }
 
 struct psoc_sawf_dl_itr {
@@ -191,18 +232,26 @@ qca_sawf_psoc_flow_count_cb(struct wlan_objmgr_psoc *psoc, void *cbd,
 {
 	ol_txrx_soc_handle soc_txrx_handle;
 	struct psoc_sawf_dl_itr *param = (struct psoc_sawf_dl_itr *)cbd;
+	uint16_t peer_id = HTT_INVALID_PEER;
 
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 	cdp_sawf_peer_flow_count(soc_txrx_handle, param->mac_addr,
 				 param->svc_id, param->direction,
 				 param->start_or_stop,
-				 param->peer_mac_addr);
+				 param->peer_mac_addr, peer_id);
 }
 
-static inline
-void qca_sawf_peer_dl_flow_count(uint8_t *mac_addr, uint8_t svc_id,
-				 uint8_t start_or_stop)
+void qca_sawf_peer_dl_flow_count(struct net_device *netdev, uint8_t *mac_addr,
+				 uint8_t svc_id, uint8_t start_or_stop)
 {
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	uint8_t direction = 1;			/* Down Link*/
+	uint16_t peer_id = HTT_INVALID_PEER;
+	ol_txrx_soc_handle soc_txrx_handle;
+	osif_dev *osdev = NULL;
+	uint8_t peer_mac_addr[QDF_MAC_ADDR_SIZE];
+
 	struct psoc_sawf_dl_itr param = {
 		.mac_addr = mac_addr,
 		.svc_id = svc_id,
@@ -210,13 +259,41 @@ void qca_sawf_peer_dl_flow_count(uint8_t *mac_addr, uint8_t svc_id,
 		.start_or_stop = start_or_stop,
 	};
 
-	wlan_objmgr_iterate_psoc_list(qca_sawf_psoc_flow_count_cb, &param,
-				      WLAN_SAWF_ID);
+	if (!netdev) {
+		wlan_objmgr_iterate_psoc_list(qca_sawf_psoc_flow_count_cb, &param,
+					      WLAN_SAWF_ID);
+		return;
+	}
+
+	if (!netdev->ieee80211_ptr)
+		return;
+
+	vdev = qca_sawf_get_vdev(netdev);
+	if (!vdev)
+		return;
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+	osdev = ath_netdev_priv(netdev);
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
+		osif_peer_dev *osifp = NULL;
+
+		osifp = ath_netdev_priv(netdev);
+		peer_id = osifp->peer_id;
+	}
+
+	cdp_sawf_peer_flow_count(soc_txrx_handle, mac_addr,
+				 svc_id, direction, start_or_stop,
+				 peer_mac_addr, peer_id);
 }
 
-void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
-			uint8_t fw_service_id, uint8_t rv_service_id,
-			uint8_t add_or_sub)
+static void
+_qca_sawf_config_ul(struct net_device *dst_dev, struct net_device *src_dev,
+		    uint8_t *dst_mac, uint8_t *src_mac,
+		    uint8_t fw_service_id, uint8_t rv_service_id,
+		    uint8_t add_or_sub)
 {
 	uint32_t svc_interval = 0, burst_size = 0;
 	uint32_t min_tput = 0, max_latency = 0;
@@ -234,7 +311,7 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 							      &min_tput,
 							      &max_latency))) {
 		if (svc_interval && burst_size)
-			qca_sawf_peer_config_ul(src_mac, tid,
+			qca_sawf_peer_config_ul(src_dev, src_mac, tid,
 						svc_interval, burst_size,
 						min_tput, max_latency,
 						add_or_sub);
@@ -250,24 +327,34 @@ void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 							      &min_tput,
 							      &max_latency))) {
 		if (svc_interval && burst_size)
-			qca_sawf_peer_config_ul(dst_mac, tid,
+			qca_sawf_peer_config_ul(dst_dev, dst_mac, tid,
 						svc_interval, burst_size,
 						min_tput, max_latency,
 						add_or_sub);
 	}
 
 	if (wlan_service_id_valid(fw_service_id))
-		qca_sawf_peer_dl_flow_count(dst_mac, fw_service_id, add_or_sub);
+		qca_sawf_peer_dl_flow_count(dst_dev, dst_mac, fw_service_id,
+					    add_or_sub);
 
 	if (wlan_service_id_valid(rv_service_id))
-		qca_sawf_peer_dl_flow_count(src_mac, rv_service_id, add_or_sub);
+		qca_sawf_peer_dl_flow_count(src_dev, src_mac, rv_service_id,
+					    add_or_sub);
+}
+
+void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
+			uint8_t fw_service_id, uint8_t rv_service_id,
+			uint8_t add_or_sub)
+{
+	_qca_sawf_config_ul(NULL, NULL, dst_mac, src_mac,
+			    fw_service_id, rv_service_id, add_or_sub);
 }
 
 void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *params)
 {
-	qca_sawf_config_ul(params->dst_mac, params->src_mac,
-			   params->fw_service_id, params->rv_service_id,
-			   params->start_or_stop);
+	_qca_sawf_config_ul(params->dst_dev, params->src_dev, params->dst_mac,
+			    params->src_mac, params->fw_service_id,
+			    params->rv_service_id, params->start_or_stop);
 }
 #else
 
