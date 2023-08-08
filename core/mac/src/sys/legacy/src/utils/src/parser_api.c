@@ -2925,10 +2925,8 @@ sir_convert_probe_frame2_t2lm_struct(tDot11fProbeResponse *pr,
 		     sizeof(struct wlan_t2lm_info));
 	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
 
-	if (!pr->num_t2lm_ie) {
-		pe_debug("T2LM IEs not present");
+	if (!pr->num_t2lm_ie)
 		return status;
-	}
 
 	pe_debug("Number of T2LM IEs in probe rsp %d", pr->num_t2lm_ie);
 	for (i = 0; i < pr->num_t2lm_ie; i++) {
