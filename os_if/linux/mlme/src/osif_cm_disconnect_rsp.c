@@ -160,11 +160,20 @@ osif_cm_indicate_disconnect(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (ucfg_mlo_is_mld_disconnected(vdev)) {
+		/**
+		 * Kernel maintains some extra state on the assoc netdev.
+		 * If the assoc vdev exists, send disconnected event on the
+		 * assoc netdev so that kernel cleans up the extra state.
+		 * If the assoc vdev was already removed, kernel would have
+		 * already cleaned up the extra state while processing the
+		 * disconnected event sent as part of the link removal.
+		 */
 		assoc_vdev = ucfg_mlo_get_assoc_link_vdev(vdev);
-		if (!assoc_vdev)
-			return;
-		osif_priv  = wlan_vdev_get_ospriv(assoc_vdev);
-		netdev = osif_priv->wdev->netdev;
+		if (assoc_vdev) {
+			osif_priv = wlan_vdev_get_ospriv(assoc_vdev);
+			netdev = osif_priv->wdev->netdev;
+		}
+
 		osif_cm_indicate_disconnect_result(
 				netdev, reason,
 				ie, ie_len,
