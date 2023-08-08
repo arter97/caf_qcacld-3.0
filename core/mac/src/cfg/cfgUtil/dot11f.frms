@@ -2983,6 +2983,7 @@ const SUB_EID_REQ_MAC_ADDR = 2;
 const SUB_EID_TGT_MAC_ADDR = 3;
 const SUB_EID_MAX_AGE = 4;
 const SUB_EID_NEIGHBOR_RPT = 52;
+//const SUB_EID_TRIGGERED_REPORTING = 1;
 
 IE BeaconReporting (EID_RRM_BEACON_REPORTING)
 {
@@ -3120,6 +3121,15 @@ IE MeasurementRequest (EID_MEAS_REQUEST)  // 7.3.2.21
 
           OPTIE neighbor_rpt;
           OPTIE max_age;
+       }
+       sta_stats (measurement_type IS 7)
+       {
+          peer_mac_addr[6];
+          randomization,     2;
+          meas_duration,     2;
+          group_identity,    1;
+          //OPTIE triggered_reporting;
+         //OPTIONAL vendor_specific;
        }
 
     };
