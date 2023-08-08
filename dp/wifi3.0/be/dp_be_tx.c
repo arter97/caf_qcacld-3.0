@@ -1817,7 +1817,6 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 
 	/* Initialize the SW tx descriptor */
 	tx_desc->nbuf = nbuf;
-	tx_desc->shinfo_addr = skb_end_pointer(nbuf);
 	tx_desc->frm_type = dp_tx_frm_std;
 	tx_desc->tx_encap_type = vdev->tx_encap_type;
 	tx_desc->vdev_id = vdev_id;
@@ -1825,6 +1824,8 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	tx_desc->pkt_offset = 0;
 	tx_desc->length = pkt_len;
 	tx_desc->flags |= DP_TX_DESC_FLAG_SIMPLE;
+	if (soc->hw_txrx_stats_en)
+		tx_desc->flags |= DP_TX_DESC_FLAG_FASTPATH_SIMPLE;
 	tx_desc->nbuf->fast_recycled = 1;
 
 	if (nbuf->is_from_recycler && nbuf->fast_xmit)

@@ -663,7 +663,6 @@ struct dp_tx_ext_desc_pool_s {
  * @frm_type: Frame Type - ToDo check if this is redundant
  * @pkt_offset: Offset from which the actual packet data starts
  * @pool_id: Pool ID - used when releasing the descriptor
- * @shinfo_addr:
  * @msdu_ext_desc: MSDU extension descriptor
  * @timestamp:
  * @comp:
@@ -676,7 +675,7 @@ struct dp_tx_desc_s {
 	uint32_t magic;
 	uint64_t timestamp_tick;
 #endif
-	uint16_t flags;
+	uint32_t flags;
 	uint32_t id;
 	qdf_dma_addr_t dma_addr;
 	uint8_t vdev_id;
@@ -689,7 +688,6 @@ struct dp_tx_desc_s {
 	uint8_t frm_type;
 	uint8_t pkt_offset;
 	uint8_t  pool_id;
-	unsigned char *shinfo_addr;
 	struct dp_tx_ext_desc_elem_s *msdu_ext_desc;
 	qdf_ktime_t timestamp;
 	struct hal_tx_desc_comp_s comp;
@@ -2727,6 +2725,8 @@ struct dp_soc {
 
 	/* VDEVs on this SOC */
 	struct dp_vdev *vdev_id_map[MAX_VDEV_CNT];
+
+	uint8_t hw_txrx_stats_en:1;
 
 	/* Tx H/W queues lock */
 	qdf_spinlock_t tx_queue_lock[MAX_TX_HW_QUEUES];
