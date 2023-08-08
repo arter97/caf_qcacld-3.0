@@ -8178,7 +8178,7 @@ void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 	if (active_vdev_cnt &&
 	    policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
 		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
-		goto done;
+		goto ref_release;
 	}
 
 	/*
@@ -8198,7 +8198,7 @@ void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 					    MLO_LINK_FORCE_REASON_DISCONNECT,
 					    MLO_LINK_FORCE_MODE_ACTIVE,
 					    active_vdev_cnt, active_vdev_lst);
-
+ref_release:
 	for (idx = 0; idx < ml_vdev_cnt; idx++)
 		mlo_release_vdev_ref(tmp_vdev_lst[idx]);
 done:
