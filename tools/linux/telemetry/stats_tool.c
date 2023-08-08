@@ -532,7 +532,7 @@ const char *stats_if_fw_to_hw_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 	"500 to 750 us", "750 to 1000 us",
 	"1000 to 1500 us", "1500 to 2000 us",
 	"2000 to 2500 us", "2500 to 5000 us",
-	"5000 to 6000 us", "6000 to 7000 ms",
+	"5000 to 6000 us", "6000 to 7000 us",
 	"7000 to 8000 us", "8000 to 9000 us", "9000+ us"
 };
 
@@ -541,7 +541,7 @@ const char *stats_if_sw_enq_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 	"500 to 750 us", "750 to 1000 us",
 	"1000 to 1500 us", "1500 to 2000 us",
 	"2000 to 2500 us", "2500 to 5000 us",
-	"5000 to 6000 us", "6000 to 7000 ms",
+	"5000 to 6000 us", "6000 to 7000 us",
 	"7000 to 8000 us", "8000 to 9000 us", "9000+ us"
 };
 #endif
@@ -560,7 +560,7 @@ const char *stats_if_hw_tx_comp_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 	"500 to 750 us", "750 to 1000 us",
 	"1000 to 1500 us", "1500 to 2000 us",
 	"2000 to 2500 us", "2500 to 5000 us",
-	"5000 to 6000 us", "6000 to 7000 ms",
+	"5000 to 6000 us", "6000 to 7000 us",
 	"7000 to 8000 us", "8000 to 9000 us", "9000+ us"
 };
 
@@ -1436,9 +1436,9 @@ static void print_advance_hist_stats(struct stats_if_hist_stats *hstats,
 		}
 	}
 
-	STATS_PRINT("Min = %d\n", hstats->min);
-	STATS_PRINT("Max = %d\n", hstats->max);
-	STATS_PRINT("Avg = %d\n", hstats->avg);
+	STATS_PRINT("Min = %d us\n", hstats->min);
+	STATS_PRINT("Max = %d us\n", hstats->max);
+	STATS_PRINT("Avg = %d us\n", hstats->avg);
 }
 
 static void print_advance_sta_data_delay(struct advance_peer_data_delay *delay)
@@ -1500,11 +1500,11 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 		STATS_PRINT("\nDelay Bins\n");
 		print_advance_hist_stats(&data->delay[0][0].delay_hist,
 					 STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY);
-		STATS_PRINT("NwDelay Moving average = %u\n",
+		STATS_PRINT("NwDelay Moving average = %u us\n",
 			    data->delay[0][0].nwdelay_avg);
-		STATS_PRINT("SwDelay Moving average = %u\n",
+		STATS_PRINT("SwDelay Moving average = %u us\n",
 			    data->delay[0][0].swdelay_avg);
-		STATS_PRINT("HwDelay Moving average = %u\n",
+		STATS_PRINT("HwDelay Moving average = %u us\n",
 			    data->delay[0][0].hwdelay_avg);
 		STATS_PRINT("Delay bound success = %ju \n",
 			    data->delay[0][0].delay_bound_success);
@@ -1525,13 +1525,13 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 				STATS_PRINT("\nDelay Bins\n");
 				print_advance_hist_stats(&dly->delay_hist,
 							 hw_comp);
-				STATS_PRINT("NwDelay Moving average = %u\n",
+				STATS_PRINT("NwDelay Moving average = %u us\n",
 					    data->delay[tidx][queues].
 					    nwdelay_avg);
-				STATS_PRINT("SwDelay Moving average = %u\n",
+				STATS_PRINT("SwDelay Moving average = %u us\n",
 					    data->delay[tidx][queues].
 					    swdelay_avg);
-				STATS_PRINT("HwDelay Moving average = %u\n",
+				STATS_PRINT("HwDelay Moving average = %u us\n",
 					    data->delay[tidx][queues].
 					    hwdelay_avg);
 				STATS_PRINT("Delay bound success = %ju\n",
