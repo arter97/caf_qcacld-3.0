@@ -6201,7 +6201,7 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 	wlan_diag_event.trigger_sub_reason =
 		cm_get_diag_roam_sub_reason(data->trigger_sub_reason);
 
-	wlan_diag_event.version = DIAG_ROAM_SCAN_START_VERSION;
+	wlan_diag_event.version = DIAG_ROAM_SCAN_START_VERSION_V2;
 
 	/*
 	 * Get the current AP rssi & CU load from the
@@ -6234,6 +6234,7 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 	}
 
 	wlan_diag_event.is_full_scan = is_full_scan;
+	wlan_diag_event.band = scan_data->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_ROAM_SCAN_START);
@@ -6262,7 +6263,7 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 		wlan_diag_event.subtype =
 					WLAN_CONN_DIAG_ROAM_SCORE_CAND_AP_EVENT;
 
-	wlan_diag_event.version = DIAG_ROAM_CAND_VERSION;
+	wlan_diag_event.version = DIAG_ROAM_CAND_VERSION_V2;
 	wlan_diag_event.rssi = (-1) * ap->rssi;
 	wlan_diag_event.cu_load = ap->cu_load;
 	wlan_diag_event.total_score = ap->total_score;
@@ -6276,6 +6277,7 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 
 	wlan_diag_event.idx = cand_ap_idx;
 	wlan_diag_event.freq = ap->freq;
+	wlan_diag_event.is_mlo = ap->is_mlo;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_ROAM_CAND_INFO);

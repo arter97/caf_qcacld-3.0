@@ -530,6 +530,7 @@ struct wlan_diag_bcn_rpt {
 } qdf_packed;
 
 #define DIAG_ROAM_CAND_VERSION 1
+#define DIAG_ROAM_CAND_VERSION_V2 2
 
 /**
  * struct wlan_diag_roam_candidate_info  - Roam candidate information for
