@@ -1363,6 +1363,102 @@ struct chan_load_report {
 	uint8_t chan_load;
 };
 
+/**
+ * sta_statistics_group_id - RRM STA STATISTICS TYPE related Refer IEEE
+ * P802.11-REVme/D2.1, January 2023, Table 9-144
+ * @STA_STAT_GROUP_ID_COUNTER_STATS: group id for counter stats
+ * @STA_STAT_GROUP_ID_MAC_STATS: group id for mac stats
+ * @STA_STAT_GROUP_ID_QOS_STATS: group id for qos stats
+ * @STA_STAT_GROUP_ID_DELAY_STATS: group id delay stats
+ */
+enum sta_statistics_group_id {
+	STA_STAT_GROUP_ID_COUNTER_STATS = 0,
+	STA_STAT_GROUP_ID_MAC_STATS = 1,
+	STA_STAT_GROUP_ID_QOS_STATS = 2,
+	STA_STAT_GROUP_ID_DELAY_STATS = 10,
+};
+
+/**
+ * counter_stats - structure to hold stats of group id 0
+ * @transmitted_fragment_count: transmitted fragment count
+ * @group_transmitted_frame_count: group transmitted frame count
+ * @failed_count: failed count
+ * @group_received_frame_count: group received frame count
+ * @fcs_error_count: face error count
+ * @transmitted_frame_count: transmitted frame count
+ * @received_fragment_count: received fragment count
+ */
+struct counter_stats {
+	uint32_t transmitted_fragment_count;
+	uint32_t group_transmitted_frame_count;
+	uint32_t failed_count;
+	uint32_t group_received_frame_count;
+	uint32_t fcs_error_count;
+	uint32_t transmitted_frame_count;
+	uint32_t received_fragment_count;
+};
+
+/**
+ * mac_stats - struct to hold group id 1 stats
+ * @retry_count: retry count
+ * @multiple_retry_count: multiple retry count
+ * @frame_duplicate_count: frame duplicate count
+ * @rts_success_count: rts success count
+ * @rts_failure_count: rts failure count
+ * @ack_failure_count: ack failure count
+ */
+struct mac_stats {
+	uint32_t retry_count;
+	uint32_t multiple_retry_count;
+	uint32_t frame_duplicate_count;
+	uint32_t rts_success_count;
+	uint32_t rts_failure_count;
+	uint32_t ack_failure_count;
+};
+
+/**
+ * struct access_delay_stats - struct for group id 10 stats
+ * @ap_average_access_delay: ap average access delay
+ * @average_access_delay_besteffort: access delay best effort
+ * @average_access_delay_background: average access delay background
+ * @average_access_delay_video: average access delay video
+ * @average_access_delay_voice: average access delay voice
+ * station_count: station count
+ * channel_utilization: channel utilization
+ */
+struct access_delay_stats {
+	uint8_t ap_average_access_delay;
+	uint8_t average_access_delay_besteffort;
+	uint8_t average_access_delay_background;
+	uint8_t average_access_delay_video;
+	uint8_t average_access_delay_voice;
+	uint16_t station_count;
+	uint8_t channel_utilization;
+};
+
+/**
+ * union stats_group_data - stats data for provided group id
+ * @counter stats - stats for group id 0
+ * @mac_stats - stats for group id 1
+ */
+union stats_group_data {
+	struct counter_stats counter_stats;
+	struct mac_stats mac_stats;
+	struct access_delay_stats access_delay_stats;
+};
+
+/**
+ * struct statistics_report - To store sta statistics report
+ * @meas_duration: measurement duration
+ * @group id: stats group id
+ * @group stats: stats data
+ */
+struct statistics_report {
+	uint8_t meas_duration;
+	uint8_t group_id;
+	union stats_group_data group_stats;
+};
+
 typedef struct sSirMacRadioMeasureReport {
 	uint8_t token;
 	uint8_t refused;
@@ -1371,6 +1467,7 @@ typedef struct sSirMacRadioMeasureReport {
 	union {
 		tSirMacBeaconReport beaconReport;
 		struct chan_load_report channel_load_report;
+		struct statistics_report statistics_report;
 	} report;
 
 } tSirMacRadioMeasureReport, *tpSirMacRadioMeasureReport;

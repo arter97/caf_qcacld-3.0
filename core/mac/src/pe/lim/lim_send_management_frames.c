@@ -5686,6 +5686,16 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 				pRRMReport[i].refused;
 			frm->MeasurementReport[i].present = 1;
 			break;
+		case SIR_MAC_RRM_STA_STATISTICS_TYPE:
+			populate_dot11f_rrm_sta_stats_report(
+				mac, &frm->MeasurementReport[i],
+				&pRRMReport[i].report.statistics_report);
+			frm->MeasurementReport[i].incapable =
+				pRRMReport[i].incapable;
+			frm->MeasurementReport[i].refused =
+				pRRMReport[i].refused;
+			frm->MeasurementReport[i].present = 1;
+			break;
 		default:
 			frm->MeasurementReport[i].incapable =
 				pRRMReport[i].incapable;

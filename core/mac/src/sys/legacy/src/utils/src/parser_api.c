@@ -7087,6 +7087,15 @@ populate_dot11f_chan_load_report(struct mac_context *mac,
 }
 
 QDF_STATUS
+populate_dot11f_rrm_sta_stats_report(
+		struct mac_context *mac, tDot11fIEMeasurementReport *pdot11f,
+		struct statistics_report *statistics_report)
+{
+	/* TODO: populate measurement report */
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 populate_dot11f_beacon_report(struct mac_context *mac,
 			      tDot11fIEMeasurementReport *pDot11f,
 			      tSirMacBeaconReport *pBeaconReport,

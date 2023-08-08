@@ -133,4 +133,44 @@ QDF_STATUS rrm_reject_req(tpSirMacRadioMeasureReport *radiomes_report,
 			  uint8_t measurement_type);
 
 void lim_update_rrm_capability(struct mac_context *mac_ctx);
+
+#ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
+/**
+ * rrm_send_sta_stats_req - Send RRM STA STATS request
+ * @mac: mac context
+ * @session: pe session
+ * @peer_mac: peer mac
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+rrm_send_sta_stats_req(struct mac_context *mac,
+		       struct pe_session *session,
+		       tSirMacAddr peer_mac);
+#else
+static inline QDF_STATUS
+rrm_send_sta_stats_req(struct mac_context *mac,
+		       struct pe_session *session,
+		       tSirMacAddr peer_mac)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+/**
+ * rrm_process_rrm_sta_stats_request_failure: send RRM STA Stats report with
+ * failure
+ * @mac: mac context
+ * @pe_session: pe session
+ * @peer: peer mac
+ * @status: failure status
+ * @index: index of report
+ *
+ * Return: void
+ */
+void
+rrm_process_rrm_sta_stats_request_failure(struct mac_context *mac,
+					  struct pe_session *pe_session,
+					  tSirMacAddr peer,
+					  tRrmRetStatus status, uint8_t index);
 #endif

@@ -823,7 +823,7 @@ populate_dot11f_ext_supp_rates(struct mac_context *mac,
  * @pBeaconReport: Pointer to the Beacon Report structure
  * @is_last_frame: is the current report last or more reports to follow
  *
- * Return: Ret Status
+ * Return: QDF Status
  */
 QDF_STATUS
 populate_dot11f_beacon_report(struct mac_context *mac,
@@ -843,6 +843,19 @@ void
 populate_dot11f_chan_load_report(struct mac_context *mac,
 				 tDot11fIEMeasurementReport *dot11f,
 				 struct chan_load_report *channel_load_report);
+
+/**
+ * populate_dot11f_rrm_sta_stats_report() - Populate RRM STA STATS Report IE
+ * @mac: Pointer to the global MAC context
+ * @pdot11f: Pointer to the measurement report structure
+ * @statistics_report: Pointer to the RRM STA STATS Report structure
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+populate_dot11f_rrm_sta_stats_report(
+		struct mac_context *mac, tDot11fIEMeasurementReport *pdot11f,
+		struct statistics_report *statistics_report);
 
 /**
  * \brief Populate a tDot11fIEExtSuppRates

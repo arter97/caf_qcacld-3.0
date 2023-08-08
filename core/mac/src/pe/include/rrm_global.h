@@ -259,6 +259,22 @@ typedef struct sRRMCaps {
 	uint8_t reserved:4;
 } tRRMCaps, *tpRRMCaps;
 
+/**
+ * struct rrm_sta_stats - RRM sta stats structure
+ * @rrm_report: rrm_report
+ * @peer: peer address
+ * @index: current req index
+ * @rrm_sta_stats_res_count: sta stats response count
+ * @vdev_id: vdev_id
+ */
+struct rrm_sta_stats {
+	tSirMacRadioMeasureReport rrm_report;
+	tSirMacAddr peer;
+	uint8_t index;
+	uint8_t rrm_sta_stats_res_count;
+	uint8_t vdev_id;
+};
+
 typedef struct sRrmPEContext {
 	uint8_t rrmEnable;
 	/*
@@ -279,6 +295,7 @@ typedef struct sRrmPEContext {
 	tpRRMReq pCurrentReq[MAX_MEASUREMENT_REQUEST];
 	uint32_t beacon_rpt_chan_list[MAX_NUM_CHANNELS];
 	uint8_t beacon_rpt_chan_num;
+	struct rrm_sta_stats rrm_sta_stats;
 } tRrmPEContext, *tpRrmPEContext;
 
 /* 2008 11k spec reference: 18.4.8.5 RCPI Measurement */

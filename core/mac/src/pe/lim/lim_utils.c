@@ -496,8 +496,13 @@ void lim_deactivate_timers(struct mac_context *mac_ctx)
 		/* Cleanup as if SAE auth timer expired */
 		lim_timer_handler(mac_ctx, SIR_LIM_AUTH_SAE_TIMEOUT);
 	}
-
 	tx_timer_deactivate(&lim_timer->sae_auth_timer);
+
+	if (tx_timer_running(&lim_timer->rrm_sta_stats_resp_timer)) {
+		pe_err("sta stats resp timer running call the timeout API");
+		lim_timer_handler(mac_ctx, SIR_LIM_RRM_STA_STATS_RSP_TIMEOUT);
+	}
+	tx_timer_deactivate(&lim_timer->rrm_sta_stats_resp_timer);
 }
 
 void lim_deactivate_timers_for_vdev(struct mac_context *mac_ctx,
@@ -663,6 +668,7 @@ void lim_cleanup_mlm(struct mac_context *mac_ctx)
 		tx_timer_delete(&lim_timer->gLimDeauthAckTimer);
 
 		tx_timer_delete(&lim_timer->sae_auth_timer);
+		tx_timer_delete(&lim_timer->rrm_sta_stats_resp_timer);
 
 		mac_ctx->lim.gLimTimersCreated = 0;
 	}

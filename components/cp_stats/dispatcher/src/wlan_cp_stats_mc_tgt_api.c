@@ -672,8 +672,8 @@ tgt_mc_infra_cp_stats_extract_twt_stats(struct wlan_objmgr_psoc *psoc,
 					struct infra_cp_stats_event *ev)
 {
 	QDF_STATUS status;
-	get_infra_cp_stats_cb resp_cb;
-	void *context;
+	get_infra_cp_stats_cb resp_cb = NULL;
+	void *context = NULL;
 
 	status = wlan_cp_stats_infra_cp_get_context(psoc, &resp_cb, &context);
 	if (QDF_IS_STATUS_ERROR(status)) {
