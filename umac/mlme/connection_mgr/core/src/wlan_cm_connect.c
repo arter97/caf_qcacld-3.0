@@ -555,6 +555,7 @@ cm_candidate_mlo_update(struct scan_cache_entry *scan_entry,
 	validate_bss_info->is_mlo = !!scan_entry->ie_list.multi_link_bv;
 	validate_bss_info->scan_entry = scan_entry;
 }
+
 #else
 static inline
 void cm_set_vdev_link_id(struct cnx_mgr *cm_ctx,
@@ -596,6 +597,20 @@ static void cm_create_bss_peer(struct cnx_mgr *cm_ctx,
 		mlme_err("invalid cm_ctx");
 		return;
 	}
+
+	if (mlo_is_sta_bridge_vdev(cm_ctx->vdev) && req) {
+		/* Acquire lock as required by wlan_vdev_mlme_get_mldaddr() */
+		wlan_vdev_obj_lock(cm_ctx->vdev);
+		bssid = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(cm_ctx->vdev);
+		wlan_vdev_obj_unlock(cm_ctx->vdev);
+		mld_mac = mlo_get_sta_ctx_bss_mld_addr(cm_ctx->vdev);
+		status = mlme_cm_bss_peer_create_req(cm_ctx->vdev,
+						     bssid,
+						     mld_mac,
+						     is_assoc_link);
+		goto peer_create_fail;
+	}
+
 	if (!req || !req->cur_candidate || !req->cur_candidate->entry) {
 		mlme_err("invalid req");
 		return;
@@ -607,12 +622,14 @@ static void cm_create_bss_peer(struct cnx_mgr *cm_ctx,
 		cm_set_vdev_link_id(cm_ctx, req);
 		wlan_mlo_init_cu_bpcc(cm_ctx->vdev);
 		mld_mac = cm_get_bss_peer_mld_addr(req);
+		mlo_set_sta_ctx_bss_mld_addr(cm_ctx->vdev, mld_mac);
 		is_assoc_link = cm_bss_peer_is_assoc_peer(req);
 	}
 
 	bssid = &req->cur_candidate->entry->bssid;
 	status = mlme_cm_bss_peer_create_req(cm_ctx->vdev, bssid,
 					     mld_mac, is_assoc_link);
+peer_create_fail:
 	if (QDF_IS_STATUS_ERROR(status)) {
 		struct wlan_cm_connect_resp *resp;
 		uint8_t vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
@@ -1558,6 +1575,15 @@ QDF_STATUS cm_connect_start(struct cnx_mgr *cm_ctx,
 		}
 	}
 
+	if (mlo_is_sta_bridge_vdev(cm_ctx->vdev)) {
+		status = cm_ser_connect_req(pdev, cm_ctx, cm_req);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			reason = CM_SER_FAILURE;
+			goto connect_err;
+		}
+
+		return QDF_STATUS_SUCCESS;
+	}
 	status = cm_connect_get_candidates(pdev, cm_ctx, cm_req);
 
 	/* In case of status pending connect will continue after scan */
@@ -1907,7 +1933,11 @@ QDF_STATUS cm_connect_active(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 	cm_fill_vdev_crypto_params(cm_ctx, req);
 	cm_store_wep_key(cm_ctx, &req->crypto, *cm_id);
 
-	status = cm_get_valid_candidate(cm_ctx, cm_req, NULL, NULL);
+	if (mlo_is_sta_bridge_vdev(cm_ctx->vdev))
+		status = QDF_STATUS_SUCCESS;
+	else
+		status = cm_get_valid_candidate(cm_ctx, cm_req, NULL, NULL);
+
 	if (QDF_IS_STATUS_ERROR(status))
 		goto connect_err;
 
@@ -2150,12 +2180,34 @@ cm_resume_connect_after_peer_create(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 	struct security_info *neg_sec_info;
 	uint8_t country_code[REG_ALPHA2_LEN + 1] = {0};
 	struct wlan_objmgr_psoc *psoc;
+	struct cm_connect_req *conn_req = NULL;
 
 	psoc = wlan_pdev_get_psoc(wlan_vdev_get_pdev(cm_ctx->vdev));
 
 	cm_req = cm_get_req_by_cm_id(cm_ctx, *cm_id);
 	if (!cm_req)
 		return QDF_STATUS_E_FAILURE;
+
+	conn_req = &cm_req->connect_req;
+	/* Handle WDS bridge vdev */
+	if (mlo_is_sta_bridge_vdev(cm_ctx->vdev) && conn_req) {
+		req.vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
+		req.cm_id = *cm_id;
+		req.force_rsne_override = conn_req->req.force_rsne_override;
+		req.is_wps_connection = conn_req->req.is_wps_connection;
+		req.is_osen_connection = conn_req->req.is_osen_connection;
+		req.assoc_ie = conn_req->req.assoc_ie;
+		req.scan_ie = conn_req->req.scan_ie;
+		cm_copy_fils_info(&req, cm_req);
+		req.ht_caps = conn_req->req.ht_caps;
+		req.ht_caps_mask = conn_req->req.ht_caps_mask;
+		req.vht_caps = conn_req->req.vht_caps;
+		req.vht_caps_mask = conn_req->req.vht_caps_mask;
+		req.is_non_assoc_link = conn_req->req.is_non_assoc_link;
+		cm_update_ml_partner_info(&conn_req->req, &req);
+		wlan_reg_get_cc_and_src(psoc, country_code);
+		goto connect_req;
+	}
 
 	/*
 	 * As keymgmt and ucast cipher can be multiple.
@@ -2199,7 +2251,7 @@ cm_resume_connect_after_peer_create(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 		       req.is_osen_connection, req.force_rsne_override,
 		       country_code[0],
 		       country_code[1]);
-
+connect_req:
 	status = mlme_cm_connect_req(cm_ctx->vdev, &req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err(CM_PREFIX_FMT "connect request failed",

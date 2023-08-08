@@ -728,8 +728,12 @@ void mlo_update_partner_bridge_info(struct wlan_mlo_dev_context *ml_dev,
 
 bool mlo_is_sta_bridge_vdev(struct wlan_objmgr_vdev *vdev)
 {
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
-	struct wlan_mlo_dev_context *ml_dev = vdev->mlo_dev_ctx;
+	struct wlan_mlo_dev_context *ml_dev = NULL;
+
+	if (!vdev)
+		return false;
+
+	ml_dev = vdev->mlo_dev_ctx;
 
 	if (!ml_dev || !ml_dev->bridge_sta_ctx)
 		return false;
@@ -737,7 +741,7 @@ bool mlo_is_sta_bridge_vdev(struct wlan_objmgr_vdev *vdev)
 	if (vdev->vdev_objmgr.mlo_central_vdev &&
 	    ml_dev->bridge_sta_ctx->bridge_vap_exists)
 		return true;
-#endif
+
 	return false;
 }
 
@@ -745,19 +749,43 @@ qdf_export_symbol(mlo_is_sta_bridge_vdev);
 
 bool mlo_sta_bridge_exists(struct wlan_objmgr_vdev *vdev)
 {
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
-	struct wlan_mlo_dev_context *ml_dev = vdev->mlo_dev_ctx;
+	struct wlan_mlo_dev_context *ml_dev = NULL;
+
+	if (!vdev)
+		return false;
+
+	ml_dev = vdev->mlo_dev_ctx;
 
 	if (!ml_dev || !ml_dev->bridge_sta_ctx)
 		return false;
 
 	if (ml_dev->bridge_sta_ctx->bridge_vap_exists)
 		return true;
-#endif
+
 	return false;
 }
 
 qdf_export_symbol(mlo_sta_bridge_exists);
+
+bool mlo_is_force_central_primary(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev = NULL;
+
+	if (!vdev)
+		return false;
+
+	ml_dev = vdev->mlo_dev_ctx;
+
+	if (!ml_dev || !ml_dev->bridge_sta_ctx)
+		return false;
+
+	if (ml_dev->bridge_sta_ctx->is_force_central_primary)
+		return true;
+
+	return false;
+}
+
+qdf_export_symbol(mlo_is_force_central_primary);
 
 uint8_t mlo_get_total_links(struct wlan_objmgr_pdev *pdev)
 {

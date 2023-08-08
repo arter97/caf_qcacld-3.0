@@ -806,6 +806,7 @@ struct mlo_tgt_partner_info {
  * @is_force_central_primary: Flag to tell if bridge should be primary umac
  * @bridge_vap_exists: If there is bridge vap
  * @bridge_node_auth: Is bridge node auth done
+ * @bss_mld_addr: MLD address of the BSS
  */
 struct wlan_mlo_bridge_sta {
 	struct mlo_partner_info bridge_partners;
@@ -815,6 +816,7 @@ struct wlan_mlo_bridge_sta {
 	bool is_force_central_primary;
 	bool bridge_vap_exists;
 	bool bridge_node_auth;
+	struct qdf_mac_addr bss_mld_addr;
 };
 
 /**
