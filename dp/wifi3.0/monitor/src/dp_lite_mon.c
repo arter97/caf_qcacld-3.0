@@ -376,7 +376,7 @@ dp_lite_mon_set_rx_config(struct dp_pdev_be *be_pdev,
 	struct dp_lite_mon_rx_config *lite_mon_rx_config;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	if (!be_mon_pdev)
+	if (!be_mon_pdev || !be_mon_pdev->lite_mon_rx_config)
 		return QDF_STATUS_E_FAILURE;
 
 	lite_mon_rx_config = be_mon_pdev->lite_mon_rx_config;
@@ -483,7 +483,7 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint16_t num_of_buffers;
 
-	if (!be_mon_pdev)
+	if (!be_mon_pdev || !be_mon_pdev->lite_mon_tx_config)
 		return QDF_STATUS_E_FAILURE;
 
 	soc_cfg_ctx = soc->wlan_cfg_ctx;
@@ -629,12 +629,18 @@ dp_lite_mon_get_config(struct cdp_soc_t *soc_hdl,
 
 	if (config->direction == CDP_LITE_MON_DIRECTION_RX) {
 		lite_mon_rx_config = be_mon_pdev->lite_mon_rx_config;
+		if (!lite_mon_rx_config)
+			return QDF_STATUS_E_FAILURE;
+
 		qdf_spin_lock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 		dp_lite_mon_copy_config(&lite_mon_rx_config->rx_config,
 					config);
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 	} else if (config->direction == CDP_LITE_MON_DIRECTION_TX) {
 		lite_mon_tx_config = be_mon_pdev->lite_mon_tx_config;
+		if (!lite_mon_tx_config)
+			return QDF_STATUS_E_FAILURE;
+
 		qdf_spin_lock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
 		dp_lite_mon_copy_config(&lite_mon_tx_config->tx_config,
 					config);
@@ -1018,10 +1024,14 @@ bool dp_lite_mon_get_filter_ucast_data(struct cdp_pdev *pdev_handle)
 {
 	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev((struct dp_pdev *)pdev_handle);
 	struct dp_mon_pdev_be *be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
-	struct dp_lite_mon_config mon_config = be_mon_pdev->lite_mon_rx_config->rx_config;
+	struct dp_lite_mon_config *mon_config;
 
-	if ((mon_config.data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_UCAST) ||
-	    (mon_config.data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_UCAST))
+	if (!be_mon_pdev->lite_mon_rx_config)
+		return false;
+
+	mon_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+	if ((mon_config->data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_UCAST) ||
+	    (mon_config->data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_UCAST))
 		return true;
 
 	return false;
@@ -1037,10 +1047,14 @@ bool dp_lite_mon_get_filter_mcast_data(struct cdp_pdev *pdev_handle)
 {
 	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev((struct dp_pdev *)pdev_handle);
 	struct dp_mon_pdev_be *be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
-	struct dp_lite_mon_config mon_config = be_mon_pdev->lite_mon_rx_config->rx_config;
+	struct dp_lite_mon_config *mon_config;
 
-	if ((mon_config.data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_MCAST) ||
-	    (mon_config.data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_MCAST))
+	if (!be_mon_pdev->lite_mon_rx_config)
+		return false;
+
+	mon_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+	if ((mon_config->data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_MCAST) ||
+	    (mon_config->data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_MCAST))
 		return true;
 
 	return false;
@@ -1056,12 +1070,16 @@ bool dp_lite_mon_get_filter_non_data(struct cdp_pdev *pdev_handle)
 {
 	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev((struct dp_pdev *)pdev_handle);
 	struct dp_mon_pdev_be *be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
-	struct dp_lite_mon_config mon_config = be_mon_pdev->lite_mon_rx_config->rx_config;
+	struct dp_lite_mon_config *mon_config;
 
-	if ((mon_config.mgmt_filter[LITE_MON_MODE_FILTER_FP] & FILTER_MGMT_ALL) ||
-	    (mon_config.mgmt_filter[LITE_MON_MODE_FILTER_MO] & FILTER_MGMT_ALL)) {
-		if ((mon_config.ctrl_filter[LITE_MON_MODE_FILTER_FP] & FILTER_CTRL_ALL) ||
-		    (mon_config.ctrl_filter[LITE_MON_MODE_FILTER_MO] & FILTER_CTRL_ALL)) {
+	if (!be_mon_pdev->lite_mon_rx_config)
+		return false;
+
+	mon_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+	if ((mon_config->mgmt_filter[LITE_MON_MODE_FILTER_FP] & FILTER_MGMT_ALL) ||
+	    (mon_config->mgmt_filter[LITE_MON_MODE_FILTER_MO] & FILTER_MGMT_ALL)) {
+		if ((mon_config->ctrl_filter[LITE_MON_MODE_FILTER_FP] & FILTER_CTRL_ALL) ||
+		    (mon_config->ctrl_filter[LITE_MON_MODE_FILTER_MO] & FILTER_CTRL_ALL)) {
 			return true;
 		}
 	}
@@ -1078,13 +1096,14 @@ bool dp_lite_mon_get_filter_non_data(struct cdp_pdev *pdev_handle)
 int dp_lite_mon_is_level_msdu(struct dp_mon_pdev *mon_pdev)
 {
 	struct dp_mon_pdev_be *be_mon_pdev;
-	struct dp_lite_mon_config *rx_config;
 
 	if (!mon_pdev)
 		return 0;
 
 	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
-	rx_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+	if (!be_mon_pdev->lite_mon_rx_config)
+		return 0;
+
 	if (be_mon_pdev->lite_mon_rx_config->rx_config.level ==
 						CDP_LITE_MON_LEVEL_MSDU)
 		return 1;
@@ -1106,6 +1125,8 @@ int dp_lite_mon_is_rx_enabled(struct dp_mon_pdev *mon_pdev)
 		return 0;
 
 	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	if (!be_mon_pdev->lite_mon_rx_config)
+		return 0;
 
 	return be_mon_pdev->lite_mon_rx_config->rx_config.enable;
 }
@@ -1124,6 +1145,8 @@ int dp_lite_mon_is_tx_enabled(struct dp_mon_pdev *mon_pdev)
 		return 0;
 
 	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	if (!be_mon_pdev->lite_mon_tx_config)
+		return 0;
 
 	return be_mon_pdev->lite_mon_tx_config->tx_config.enable;
 }
@@ -1172,19 +1195,21 @@ dp_lite_mon_get_legacy_feature_enabled(struct cdp_soc_t *soc_hdl,
 						   pdev_id);
 	struct dp_mon_pdev_be *be_mon_pdev;
 
-	if (!pdev)
-		return 0;
-
-	if (!pdev->monitor_pdev)
+	if (!pdev || !pdev->monitor_pdev)
 		return 0;
 
 	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(pdev->monitor_pdev);
+	if (direction == CDP_LITE_MON_DIRECTION_RX) {
+		if (!be_mon_pdev->lite_mon_rx_config)
+			return 0;
 
-	if (direction == CDP_LITE_MON_DIRECTION_RX)
 		return be_mon_pdev->lite_mon_rx_config->rx_config.legacy_filter_enabled;
-	else if (direction == CDP_LITE_MON_DIRECTION_TX)
+	} else if (direction == CDP_LITE_MON_DIRECTION_TX) {
+		if (!be_mon_pdev->lite_mon_tx_config)
+			return 0;
+
 		return be_mon_pdev->lite_mon_tx_config->tx_config.legacy_filter_enabled;
-	else
+	} else
 		return 0;
 }
 
@@ -1219,8 +1244,8 @@ dp_lite_mon_config_nac_peer(struct cdp_soc_t *soc_hdl,
 
 	be_pdev = dp_get_be_pdev_from_dp_pdev(vdev->pdev);
 	be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
-	if (!be_mon_pdev) {
-		dp_mon_err("Invalid mon pdev");
+	if (!be_mon_pdev || !be_mon_pdev->lite_mon_rx_config) {
+		dp_mon_err("mon pdev or rx config is null");
 		goto fail;
 	}
 
@@ -1329,8 +1354,8 @@ dp_lite_mon_get_nac_peer_rssi(struct cdp_soc_t *soc_hdl,
 
 	be_pdev = dp_get_be_pdev_from_dp_pdev(vdev->pdev);
 	be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
-	if (!be_mon_pdev) {
-		dp_mon_err("Invalid mon pdev");
+	if (!be_mon_pdev || !be_mon_pdev->lite_mon_rx_config) {
+		dp_mon_err("mon pdev or rx config is null");
 		return status;
 	}
 
