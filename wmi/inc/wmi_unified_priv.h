@@ -3295,6 +3295,12 @@ QDF_STATUS (*extract_peer_entry_ptqm_migrate_event)(
 		uint32_t index,
 		struct peer_entry_ptqm_migrate_event_params *entry);
 #endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
+
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+QDF_STATUS (*extract_aoa_caps_service_ready_ext2)
+		(struct wmi_unified *wmi_handle, uint8_t *buf,
+		 struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 *aoa_cap);
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
 };
 
 /* Forward declaration for psoc*/
