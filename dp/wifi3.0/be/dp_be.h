@@ -647,6 +647,27 @@ dp_get_mlo_dev_list_obj(struct dp_soc_be *be_soc)
 }
 #endif
 
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
+static inline
+struct dp_hw_cookie_conversion_t *dp_get_tx_cookie_t(struct dp_soc *soc,
+						     uint8_t pool_id)
+{
+	struct dp_global_context *dp_global = NULL;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+	return dp_global->tx_cc_ctx[pool_id];
+}
+#else
+static inline
+struct dp_hw_cookie_conversion_t *dp_get_tx_cookie_t(struct dp_soc *soc,
+						     uint8_t pool_id)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	return &be_soc->tx_cc_ctx[pool_id];
+}
+#endif
+
 /**
  * dp_mlo_peer_find_hash_attach_be() - API to initialize ML peer hash table
  * @mld_hash_obj: Peer has object

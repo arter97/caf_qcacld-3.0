@@ -1623,8 +1623,8 @@ QDF_STATUS dp_tx_desc_pool_init_be(struct dp_soc *soc,
 	}
 
 	be_soc = dp_get_be_soc_from_dp_soc(soc);
-	tx_desc_pool = &soc->tx_desc[pool_id];
-	cc_ctx  = &be_soc->tx_cc_ctx[pool_id];
+	tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
+	cc_ctx  = dp_get_tx_cookie_t(soc, pool_id);
 
 	tx_desc = tx_desc_pool->freelist;
 	page_desc = &cc_ctx->page_desc_base[0];
@@ -1666,7 +1666,7 @@ void dp_tx_desc_pool_deinit_be(struct dp_soc *soc,
 	struct dp_hw_cookie_conversion_t *cc_ctx;
 
 	be_soc = dp_get_be_soc_from_dp_soc(soc);
-	cc_ctx  = &be_soc->tx_cc_ctx[pool_id];
+	cc_ctx  = dp_get_tx_cookie_t(soc, pool_id);
 
 	for (i = 0; i < cc_ctx->total_page_num; i++) {
 		page_desc = &cc_ctx->page_desc_base[i];

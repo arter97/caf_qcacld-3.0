@@ -5693,8 +5693,9 @@ dp_tx_comp_process_desc_list_fast(struct dp_soc *soc,
 				  uint8_t ring_id,
 				  uint32_t fast_desc_count)
 {
-	struct dp_tx_desc_pool_s *pool = &soc->tx_desc[head_desc->pool_id];
+	struct dp_tx_desc_pool_s *pool = NULL;
 
+	pool = dp_get_tx_desc_pool(soc, head_desc->pool_id);
 	dp_tx_outstanding_sub(head_desc->pdev, fast_desc_count);
 	dp_tx_desc_free_list(pool, head_desc, tail_desc, fast_desc_count);
 }
@@ -5764,7 +5765,6 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 							      false);
 			qdf_assert(pdev);
 			dp_tx_outstanding_dec(pdev);
-
 			/*
 			 * Calling a QDF WRAPPER here is creating significant
 			 * performance impact so avoided the wrapper call here
@@ -6367,11 +6367,14 @@ static inline void
 dp_tx_desc_reset_vdev(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
 		      uint8_t desc_pool_id)
 {
-	TX_DESC_LOCK_LOCK(&soc->tx_desc[desc_pool_id].lock);
+	struct dp_tx_desc_pool_s *pool = NULL;
+
+	pool = dp_get_tx_desc_pool(soc, desc_pool_id);
+	TX_DESC_LOCK_LOCK(&pool->lock);
 
 	tx_desc->vdev_id = DP_INVALID_VDEV_ID;
 
-	TX_DESC_LOCK_UNLOCK(&soc->tx_desc[desc_pool_id].lock);
+	TX_DESC_LOCK_UNLOCK(&pool->lock);
 }
 
 void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
@@ -6394,7 +6397,7 @@ void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
 	num_pool = wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
 
 	for (i = 0; i < num_pool; i++) {
-		tx_desc_pool = &soc->tx_desc[i];
+		tx_desc_pool = dp_get_tx_desc_pool(soc, i);
 		if (!tx_desc_pool->desc_pages.cacheable_pages)
 			continue;
 
@@ -6467,16 +6470,23 @@ static QDF_STATUS dp_tx_alloc_static_pools(struct dp_soc *soc, int num_pool,
 					   uint32_t num_desc)
 {
 	uint8_t i, count;
+	struct dp_global_context *dp_global;
+
+	dp_global = wlan_objmgr_get_global_ctx();
 
 	/* Allocate software Tx descriptor pools */
-	for (i = 0; i < num_pool; i++) {
-		if (dp_tx_desc_pool_alloc(soc, i, num_desc)) {
+
+	if (dp_global->tx_desc_pool_alloc_cnt == 0) {
+		for (i = 0; i < num_pool; i++) {
+			if (dp_tx_desc_pool_alloc(soc, i, num_desc)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				  FL("Tx Desc Pool alloc %d failed %pK"),
 				  i, soc);
-			goto fail;
+				goto fail;
+			}
 		}
 	}
+	dp_global->tx_desc_pool_alloc_cnt++;
 	return QDF_STATUS_SUCCESS;
 
 fail:
@@ -6490,33 +6500,52 @@ static QDF_STATUS dp_tx_init_static_pools(struct dp_soc *soc, int num_pool,
 					  uint32_t num_desc)
 {
 	uint8_t i;
-	for (i = 0; i < num_pool; i++) {
-		if (dp_tx_desc_pool_init(soc, i, num_desc)) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				  FL("Tx Desc Pool init %d failed %pK"),
-				  i, soc);
-			return QDF_STATUS_E_NOMEM;
+	struct dp_global_context *dp_global;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+
+	if (dp_global->tx_desc_pool_init_cnt == 0) {
+		for (i = 0; i < num_pool; i++) {
+			if (dp_tx_desc_pool_init(soc, i, num_desc)) {
+				QDF_TRACE(QDF_MODULE_ID_DP,
+					  QDF_TRACE_LEVEL_ERROR,
+					  FL("Tx Desc Pool init %d failed %pK"),
+					  i, soc);
+				return QDF_STATUS_E_NOMEM;
+			}
 		}
 	}
+	dp_global->tx_desc_pool_init_cnt++;
 	return QDF_STATUS_SUCCESS;
 }
 
 static void dp_tx_deinit_static_pools(struct dp_soc *soc, int num_pool)
 {
 	uint8_t i;
+	struct dp_global_context *dp_global;
 
-	for (i = 0; i < num_pool; i++)
-		dp_tx_desc_pool_deinit(soc, i);
+	dp_global = wlan_objmgr_get_global_ctx();
+
+	dp_global->tx_desc_pool_init_cnt--;
+	if (dp_global->tx_desc_pool_init_cnt == 0) {
+		for (i = 0; i < num_pool; i++)
+			dp_tx_desc_pool_deinit(soc, i);
+	}
 }
 
 static void dp_tx_delete_static_pools(struct dp_soc *soc, int num_pool)
 {
 	uint8_t i;
+	struct dp_global_context *dp_global;
 
-	for (i = 0; i < num_pool; i++)
-		dp_tx_desc_pool_free(soc, i);
+	dp_global = wlan_objmgr_get_global_ctx();
+
+	dp_global->tx_desc_pool_alloc_cnt--;
+	if (dp_global->tx_desc_pool_alloc_cnt == 0) {
+		for (i = 0; i < num_pool; i++)
+			dp_tx_desc_pool_free(soc, i);
+	}
 }
-
 #endif /* !QCA_LL_TX_FLOW_CONTROL_V2 */
 
 /**
