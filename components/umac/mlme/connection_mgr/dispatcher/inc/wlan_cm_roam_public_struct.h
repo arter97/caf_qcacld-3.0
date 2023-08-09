@@ -2125,6 +2125,8 @@ enum roam_offload_state {
  *  @timestamp:     This timestamp indicates the time when btm rsp is sent
  *  @btm_resp_dialog_token: Dialog token
  *  @btm_delay: BTM bss termination delay
+ *  @is_mlo: Flag to check if the current connection is a MLO connection
+ *  @band: Band of the link that is involved in frame exchange
  */
 struct roam_btm_response_data {
 	bool present;
@@ -2134,6 +2136,8 @@ struct roam_btm_response_data {
 	uint32_t timestamp;
 	uint16_t btm_resp_dialog_token;
 	uint8_t btm_delay;
+	bool is_mlo;
+	uint8_t band;
 };
 
 /**

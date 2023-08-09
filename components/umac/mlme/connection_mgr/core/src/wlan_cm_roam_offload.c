@@ -6659,9 +6659,10 @@ cm_roam_btm_query_event(struct wmi_neighbor_report_data *btm_data,
 			  (uint64_t)btm_data->timestamp, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_QUERY_EVENT;
-	wlan_diag_event.version = DIAG_BTM_VERSION;
+	wlan_diag_event.version = DIAG_BTM_VERSION_2;
 	wlan_diag_event.token = btm_data->btm_query_token;
 	wlan_diag_event.reason = btm_data->btm_query_reason;
+	wlan_diag_event.band = btm_data->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BTM);
 
@@ -6777,11 +6778,12 @@ cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
 			  (uint64_t)trigger_info->timestamp,
 			  &btm_data->target_bssid);
 
-	wlan_diag_event.version = DIAG_BTM_VERSION;
+	wlan_diag_event.version = DIAG_BTM_VERSION_2;
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_RESP_EVENT;
 	wlan_diag_event.token = btm_data->btm_resp_dialog_token;
 	wlan_diag_event.status = btm_data->btm_status;
 	wlan_diag_event.delay = btm_data->btm_delay;
+	wlan_diag_event.band = btm_data->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BTM);
 
@@ -6837,7 +6839,7 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 			  NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_REQ_EVENT;
-	wlan_diag_event.version = DIAG_BTM_VERSION;
+	wlan_diag_event.version = DIAG_BTM_VERSION_2;
 	wlan_diag_event.token = btm_data->token;
 	wlan_diag_event.mode = btm_data->btm_request_mode;
 	/*
@@ -6849,6 +6851,7 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 	wlan_diag_event.validity_timer =
 					btm_data->validity_interval / 1000;
 	wlan_diag_event.cand_lst_cnt = btm_data->candidate_list_count;
+	wlan_diag_event.band = btm_data->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BTM);
 

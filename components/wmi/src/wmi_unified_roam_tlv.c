@@ -1879,6 +1879,9 @@ extract_roam_btm_response_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	dst->timestamp = src_data->timestamp;
 	dst->btm_resp_dialog_token = src_data->btm_resp_dialog_token;
 	dst->btm_delay = src_data->btm_resp_bss_termination_delay;
+	dst->band = WMI_ROAM_BTM_RESP_MLO_BAND_INFO_GET(src_data->info);
+	if (dst->band != WMI_MLO_BAND_NO_MLO)
+		dst->is_mlo = true;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3010,9 +3013,10 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 {
 	QDF_STATUS status;
 	uint8_t vdev_id = stats_info->vdev_id;
+	uint8_t band = stats_info->scan[0].band;
 
 	status = wmi_unified_extract_roam_11kv_stats(
-			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0);
+			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0, band);
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Roam 11kv stats extract failed vdev %d", vdev_id);
 
@@ -3058,6 +3062,7 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	uint8_t num_trigger_reason = 0;
 	uint32_t rem_len;
 	QDF_STATUS status;
+	uint8_t band;
 
 	param_buf = (WMI_ROAM_STATS_EVENTID_param_tlvs *)evt_buf;
 	if (!param_buf) {
@@ -3244,12 +3249,14 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 			}
 		}
 
+		band = stats_info->scan[i].band;
+
 		/* BTM req/resp or Neighbor report/response info */
 		status = wmi_unified_extract_roam_11kv_stats(
 				      wmi_handle,
 				      evt_buf,
 				      &stats_info->data_11kv[i],
-				      i, num_rpt);
+				      i, num_rpt, band);
 		if (QDF_IS_STATUS_ERROR(status))
 			wmi_debug_rl("Roam 11kv stats extract fail vdev %d iter %d",
 				     vdev_id, i);
