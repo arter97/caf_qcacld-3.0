@@ -396,4 +396,16 @@ QDF_STATUS
 reg_quick_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
 					  enum reg_6g_ap_type ap_pwr_type);
 
+/**
+ * reg_is_freq_txable() - Check if the given frequency is tx-able.
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in MHz
+ * @in_6ghz_pwr_mode: Input AP power type
+ *
+ * Return: True if the frequency is tx-able, else false.
+ */
+bool
+reg_is_freq_txable(struct wlan_objmgr_pdev *pdev,
+		   qdf_freq_t freq,
+		   enum supported_6g_pwr_types in_6ghz_pwr_mode);
 #endif /* __REG_CHANNEL_H_ */

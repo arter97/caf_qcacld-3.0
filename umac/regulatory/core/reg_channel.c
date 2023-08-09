@@ -1762,3 +1762,88 @@ reg_quick_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+/**
+ * reg_is_non_6g_freq_txable() - Check if the given non-6 GHz frequency is
+ * tx-able.
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in MHz
+ * @in_6ghz_pwr_mode: Input AP power type
+ *
+ * As long as the frequency is enabled in regulatory, a non-6 GHz frequency is
+ * always tx-able.
+ *
+ * Return: True if the frequency is tx-able, else false.
+ */
+static inline bool
+reg_is_non_6g_freq_txable(struct wlan_objmgr_pdev *pdev,
+			  qdf_freq_t freq,
+			  enum supported_6g_pwr_types in_6ghz_pwr_mode)
+{
+	return reg_is_freq_enabled(pdev, freq, in_6ghz_pwr_mode);
+}
+
+/**
+ * reg_is_6g_freq_txable() - Check if the given 6 GHz frequency is tx-able.
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in MHz
+ * @in_6ghz_pwr_mode: Input AP power type
+ *
+ * For outdoor mode, an SP channel is tx-able if the channel is present in the
+ * AFC response. In case of indoor mode, a channel is always tx-able (Assuming
+ * it is enabled by regulatory).
+ *
+ * Return: True if the frequency is tx-able, else false.
+ */
+static bool
+reg_is_6g_freq_txable(struct wlan_objmgr_pdev *pdev,
+		      qdf_freq_t freq,
+		      enum supported_6g_pwr_types in_6ghz_pwr_mode)
+{
+	bool is_freq_enabled;
+	enum reg_afc_dev_deploy_type reg_afc_deploy_type;
+
+	is_freq_enabled = reg_is_freq_enabled(pdev, freq, in_6ghz_pwr_mode);
+	/* If the frequency is not enabled, then return. */
+	if (!is_freq_enabled)
+		return false;
+
+	reg_get_afc_dev_deploy_type(pdev, &reg_afc_deploy_type);
+
+	/* Outdoor deployment requires additional checks if power mode is SP.
+	 * If the deployment is indoor, return if the frequency is enabled or
+	 * or not.
+	 */
+	if (reg_afc_deploy_type != AFC_DEPLOYMENT_OUTDOOR)
+		return is_freq_enabled;
+
+	if (in_6ghz_pwr_mode == REG_BEST_PWR_MODE) {
+		in_6ghz_pwr_mode = reg_get_best_6g_pwr_type(pdev, freq);
+	} else if (in_6ghz_pwr_mode == REG_CURRENT_PWR_MODE) {
+		enum reg_6g_ap_type cur_6g_ap_pwr_mode;
+
+		reg_get_cur_6g_ap_pwr_type(pdev, &cur_6g_ap_pwr_mode);
+		in_6ghz_pwr_mode = reg_conv_6g_ap_type_to_supported_6g_pwr_types(cur_6g_ap_pwr_mode);
+	}
+
+	/* If the power mode is VLP in outdoor, then return if the frequency is
+	 * enabled or not.
+	 */
+	if (in_6ghz_pwr_mode == REG_AP_VLP)
+		return is_freq_enabled;
+
+	/* If power mode is SP, check if AFC is done. */
+	return reg_is_sup_chan_entry_afc_done(pdev, freq, in_6ghz_pwr_mode);
+}
+
+bool
+reg_is_freq_txable(struct wlan_objmgr_pdev *pdev,
+		   qdf_freq_t freq,
+		   enum supported_6g_pwr_types in_6ghz_pwr_mode)
+{
+	if (!reg_is_6ghz_chan_freq(freq))
+		return reg_is_non_6g_freq_txable(pdev, freq, in_6ghz_pwr_mode);
+
+	return reg_is_6g_freq_txable(pdev, freq, in_6ghz_pwr_mode);
+}
+
