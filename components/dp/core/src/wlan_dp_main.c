@@ -1881,6 +1881,10 @@ wlan_dp_rx_fisa_attach_target(struct wlan_dp_psoc_context *dp_ctx)
 		return status;
 	}
 
+	/* return success to let init process go */
+	if (status == QDF_STATUS_E_NOSUPPORT)
+		return QDF_STATUS_SUCCESS;
+
 	if (status == QDF_STATUS_SUCCESS) {
 		status = dp_rx_fisa_config(dp_ctx);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -2147,7 +2151,7 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
 	struct cdp_pdev_attach_params pdev_params = { 0 };
 	QDF_STATUS qdf_status;
 
-	dp_ctx =  dp_get_context();
+	dp_ctx = dp_get_context();
 
 	pdev_params.htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
 	pdev_params.qdf_osdev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
@@ -2161,6 +2165,10 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
 	/* FISA Attach */
 	qdf_status = wlan_dp_rx_fisa_attach(dp_ctx);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		/* return success to let init process go */
+		if (qdf_status == QDF_STATUS_E_NOSUPPORT)
+			return QDF_STATUS_SUCCESS;
+
 		wlan_dp_txrx_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC),
 					 OL_TXRX_PDEV_ID, false);
 		return qdf_status;
