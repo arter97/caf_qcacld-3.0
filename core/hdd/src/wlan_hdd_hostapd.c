@@ -5641,10 +5641,11 @@ hdd_check_and_disconnect_sta_on_invalid_channel(struct hdd_context *hdd_ctx,
  * @adapter: SAP adapter
  * @sap_config: sap config
  *
- * In SAP+GO concurrency, if GO is started on 2G and SAP is doing ACS
- * with 2G preferred channel list, then we will move GO to 5G band.
- * The purpose is to have more selection for SAP instead of starting on
- * GO home channel for SCC.
+ * In GO+STA+SAP concurrency, if GO is started on 2G and SAP is doing ACS
+ * with 2G preferred channel list, then we will move GO to 2G SCC
+ * channel of STA if present.
+ * The purpose is to avoid SAP start failure on 2G because we don't
+ * support 3 home channels in same mac.
  *
  * Return: void
  */
@@ -5666,8 +5667,9 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 	uint8_t sta_vdev_num;
 	struct hdd_hostapd_state *hostapd_state;
 	uint8_t go_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
-	qdf_freq_t go_ch_freq = 0, go_new_ch_freq;
+	qdf_freq_t go_ch_freq = 0, go_new_ch_freq = 0;
 	struct wlan_hdd_link_info *go_link_info;
+	enum phy_ch_width go_bw;
 
 	if (adapter->device_mode != QDF_SAP_MODE)
 		return;
@@ -5682,7 +5684,7 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq_list[i]))
 			return;
 
-	/* Move existing GO interface to 5G band */
+	/* Move existing GO interface to SCC channel of 2G STA */
 	vdev_num = policy_mgr_get_mode_specific_conn_info(
 			psoc, freq_list, vdev_id_list,
 			PM_P2P_GO_MODE);
@@ -5700,19 +5702,15 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 	sta_vdev_num = policy_mgr_get_mode_specific_conn_info(
 			psoc, sta_freq_list, sta_vdev_id_list,
 			PM_STA_MODE);
-	for (i = 0; i < sta_vdev_num; i++)
+	for (i = 0; i < sta_vdev_num; i++) {
 		if (go_ch_freq == sta_freq_list[i])
 			return;
-
-	go_new_ch_freq =
-		policy_mgr_get_alternate_channel_for_sap(psoc,
-							 go_vdev_id,
-							 go_ch_freq,
-							 REG_BAND_UNKNOWN);
-	if (!go_new_ch_freq || WLAN_REG_IS_24GHZ_CH_FREQ(go_new_ch_freq)) {
-		hdd_err("no available 5G channel");
-		return;
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(sta_freq_list[i]))
+			go_new_ch_freq = sta_freq_list[i];
 	}
+
+	if (!go_new_ch_freq)
+		return;
 
 	go_link_info = hdd_get_link_info_by_vdev(adapter->hdd_ctx, go_vdev_id);
 	if (!go_link_info || hdd_validate_adapter(go_link_info->adapter))
@@ -5722,9 +5720,9 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 				    CSA_REASON_SAP_ACS);
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
-
+	go_bw = wlansap_get_chan_width(WLAN_HDD_GET_SAP_CTX_PTR(go_link_info));
 	ret = hdd_softap_set_channel_change(go_link_info->adapter->dev,
-					    go_new_ch_freq, CH_WIDTH_80MHZ,
+					    go_new_ch_freq, go_bw,
 					    false);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d", go_new_ch_freq, ret);
