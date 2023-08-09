@@ -1063,6 +1063,11 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 		return;
 	}
 
+	if (hdd_ctx->is_wiphy_suspended) {
+		hdd_err_rl("system/cfg80211 is already suspend");
+		return;
+	}
+
 	hdd_debug("country: %c%c, initiator %d, dfs_region: %d",
 		  request->alpha2[0],
 		  request->alpha2[1],
