@@ -50,6 +50,7 @@
 #include "../../core/src/wlan_cp_stats_defs.h"
 #include "cdp_txrx_host_stats.h"
 #include "utils_mlo.h"
+#include "wlan_mlo_mgr_sta.h"
 
 #define MAX_CTRL_STAT_VDEV_ENTRIES 1
 #define MAX_CTRL_STAT_MAC_ADDR_ENTRIES 1
@@ -581,24 +582,28 @@ void rrm_get_country_code_from_connected_profile(struct mac_context *mac,
  * @chan: channel number
  * @req_mode: Request mode
  * @duration: The duration over which the Beacon report was measured
- * @vdev_id: vdev Id
+ * @pe_session: pe session pointer
  */
 static void
 wlan_diag_log_beacon_rpt_req_event(uint8_t token, uint8_t mode,
 				   uint8_t op_class, uint8_t chan,
 				   uint8_t req_mode, uint32_t duration,
-				   uint8_t vdev_id)
+				   struct pe_session *pe_session)
 {
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_bcn_rpt);
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
-	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
+	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(pe_session->vdev);
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us =  qdf_ktime_to_us(qdf_ktime_get());
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BCN_RPT_REQ_EVENT;
-	wlan_diag_event.version = DIAG_BCN_RPT_VERSION;
+	wlan_diag_event.version = DIAG_BCN_RPT_VERSION_2;
+
+	if (mlo_is_mld_sta(pe_session->vdev))
+		wlan_diag_event.band =
+			wlan_convert_freq_to_diag_band(pe_session->curr_op_freq);
 
 	wlan_diag_event.meas_token = token;
 	wlan_diag_event.mode = mode;
@@ -614,7 +619,7 @@ static void
 wlan_diag_log_beacon_rpt_req_event(uint8_t token, uint8_t mode,
 				   uint8_t op_class, uint8_t chan,
 				   uint8_t req_mode, uint32_t duration,
-				   uint8_t vdev_id)
+				   struct pe_session *pe_session)
 {
 }
 #endif
@@ -1241,7 +1246,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 					   pBeaconReq->measurement_request.Beacon.meas_mode,
 					   pBeaconReq->measurement_request.Beacon.regClass,
 					   pBeaconReq->measurement_request.Beacon.channel,
-					   req_mode, measDuration, wlan_vdev_get_id(pe_session->vdev));
+					   req_mode, measDuration, pe_session);
 
 	if (measDuration == 0 &&
 	    pBeaconReq->measurement_request.Beacon.meas_mode !=

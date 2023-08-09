@@ -6681,8 +6681,9 @@ cm_roam_neigh_rpt_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 			  (uint64_t)neigh_rpt->timestamp, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_NBR_RPT_REQ_EVENT;
-	wlan_diag_event.version = DIAG_NBR_RPT_VERSION;
+	wlan_diag_event.version = DIAG_NBR_RPT_VERSION_2;
 	wlan_diag_event.token = neigh_rpt->req_token;
+	wlan_diag_event.band = neigh_rpt->band;
 
 	wlan_vdev_mlme_get_ssid(vdev, wlan_diag_event.ssid,
 				(uint8_t *)&wlan_diag_event.ssid_len);
@@ -6704,7 +6705,7 @@ cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 			  (uint64_t)neigh_rpt->timestamp, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_NBR_RPT_RESP_EVENT;
-	wlan_diag_event.version = DIAG_NBR_RPT_VERSION;
+	wlan_diag_event.version = DIAG_NBR_RPT_VERSION_2;
 	wlan_diag_event.token = neigh_rpt->resp_token;
 	wlan_diag_event.num_freq = neigh_rpt->num_freq;
 
@@ -6712,6 +6713,7 @@ cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 		wlan_diag_event.freq[i] = neigh_rpt->freq[i];
 
 	wlan_diag_event.num_rpt = neigh_rpt->num_rpt;
+	wlan_diag_event.band = neigh_rpt->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_NBR_RPT);
 }

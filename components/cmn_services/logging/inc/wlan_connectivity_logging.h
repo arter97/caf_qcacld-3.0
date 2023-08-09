@@ -1205,7 +1205,24 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev);
+#else
+static inline void
+wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
 
+/**
+ * wlan_populate_vsie() - Populate VSIE field for logging
+ * @vdev: vdev pointer
+ * @data: Diag packet info data
+ * @is_tx: flag to indicate whether packet transmitted or received
+ *
+ * Return: None
+ */
+void
+wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
+		   struct wlan_diag_packet_info *data, bool is_tx);
 /**
  * wlan_convert_freq_to_diag_band() - API to convert frequency to band value
  * mentioned in enum wlan_diag_wifi_band
@@ -1216,12 +1233,6 @@ void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev);
 enum wlan_diag_wifi_band
 wlan_convert_freq_to_diag_band(uint16_t ch_freq);
 
-#else
-static inline
-void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
-{
-}
-#endif
 static inline void wlan_connectivity_logging_stop(void)
 {}
 
@@ -1323,6 +1334,28 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id);
+
+/**
+ * wlan_convert_freq_to_diag_band() - API to convert frequency to band value
+ * mentioned in enum wlan_diag_wifi_band
+ * @ch_freq: Frequency(in MHz)
+ *
+ * Return: Band specified in enum wlan_diag_wifi_band
+ */
+enum wlan_diag_wifi_band
+wlan_convert_freq_to_diag_band(uint16_t ch_freq);
+
+/**
+ * wlan_populate_vsie() - Populate VSIE field for logging
+ * @vdev: vdev pointer
+ * @data: Diag packet info data
+ * @is_tx: flag to indicate whether packet transmitted or received
+ *
+ * Return: None
+ */
+void
+wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
+		   struct wlan_diag_packet_info *data, bool is_tx);
 #else
 static inline
 void wlan_connectivity_logging_start(struct wlan_objmgr_psoc *psoc,
@@ -1359,6 +1392,12 @@ static inline void
 wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 		   struct wlan_diag_packet_info *data, bool is_tx)
 {
+}
+
+static inline enum wlan_diag_wifi_band
+wlan_convert_freq_to_diag_band(uint16_t ch_freq)
+{
+	return WLAN_INVALID_BAND;
 }
 
 static inline void
