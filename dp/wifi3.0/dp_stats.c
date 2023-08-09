@@ -35,7 +35,7 @@
 #ifdef IPA_OFFLOAD
 #include "dp_ipa.h"
 #endif
-#define DP_MAX_STRING_LEN 500
+#define DP_MAX_STRING_LEN 1000
 #define DP_HTT_TX_RX_EXPECTED_TLVS (((uint64_t)1 << HTT_STATS_TX_PDEV_CMN_TAG) |\
 	((uint64_t)1 << HTT_STATS_TX_PDEV_UNDERRUN_TAG) |\
 	((uint64_t)1 << HTT_STATS_TX_PDEV_SIFS_TAG) |\
@@ -4127,8 +4127,7 @@ static void dp_print_rx_pdev_fw_stats_tlv(uint32_t *tag_buf)
 		(htt_rx_pdev_fw_stats_tlv *)tag_buf;
 	uint8_t i;
 	uint16_t index = 0;
-	char fw_ring_mgmt_subtype[DP_MAX_STRING_LEN];
-	char fw_ring_ctrl_subtype[DP_MAX_STRING_LEN];
+	char fw_ring_subtype_buf[DP_MAX_STRING_LEN];
 
 	DP_PRINT_STATS("HTT_RX_PDEV_FW_STATS_TLV:");
 	DP_PRINT_STATS("mac_id__word = %u",
@@ -4150,22 +4149,24 @@ static void dp_print_rx_pdev_fw_stats_tlv(uint32_t *tag_buf)
 	DP_PRINT_STATS("fw_ring_mpdu_ind = %u",
 		       dp_stats_buf->fw_ring_mpdu_ind);
 
+	qdf_mem_zero(fw_ring_subtype_buf, DP_MAX_STRING_LEN);
 	for (i = 0; i <  DP_HTT_FW_RING_MGMT_SUBTYPE_LEN; i++) {
-		index += qdf_snprint(&fw_ring_mgmt_subtype[index],
+		index += qdf_snprint(&fw_ring_subtype_buf[index],
 				DP_MAX_STRING_LEN - index,
 				" %u:%u,", i,
 				dp_stats_buf->fw_ring_mgmt_subtype[i]);
 	}
-	DP_PRINT_STATS("fw_ring_mgmt_subtype = %s ", fw_ring_mgmt_subtype);
+	DP_PRINT_STATS("fw_ring_mgmt_subtype = %s ", fw_ring_subtype_buf);
 
 	index = 0;
+	qdf_mem_zero(fw_ring_subtype_buf, DP_MAX_STRING_LEN);
 	for (i = 0; i <  DP_HTT_FW_RING_CTRL_SUBTYPE_LEN; i++) {
-		index += qdf_snprint(&fw_ring_ctrl_subtype[index],
+		index += qdf_snprint(&fw_ring_subtype_buf[index],
 				DP_MAX_STRING_LEN - index,
 				" %u:%u,", i,
 				dp_stats_buf->fw_ring_ctrl_subtype[i]);
 	}
-	DP_PRINT_STATS("fw_ring_ctrl_subtype = %s ", fw_ring_ctrl_subtype);
+	DP_PRINT_STATS("fw_ring_ctrl_subtype = %s ", fw_ring_subtype_buf);
 	DP_PRINT_STATS("fw_ring_mcast_data_msdu = %u",
 		       dp_stats_buf->fw_ring_mcast_data_msdu);
 	DP_PRINT_STATS("fw_ring_bcast_data_msdu = %u",
