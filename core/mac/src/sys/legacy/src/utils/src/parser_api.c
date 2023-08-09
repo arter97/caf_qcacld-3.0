@@ -7086,12 +7086,158 @@ populate_dot11f_chan_load_report(struct mac_context *mac,
 		 dot11f->report.channel_load_report.chan_load);
 }
 
+static void
+populate_dot11f_rrm_counter_stats(tDot11fIEMeasurementReport *pdot11f,
+				  struct counter_stats *counter_stats,
+				  bool *reporting_reason_present)
+{
+	tDot11fIEreporting_reason *reporting_reason;
+
+	reporting_reason = &pdot11f->report.sta_stats.reporting_reason;
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.transmitted_fragment_count =
+		counter_stats->transmitted_fragment_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.group_transmitted_frame_count =
+		counter_stats->group_transmitted_frame_count;
+
+	if (counter_stats->failed_count) {
+		reporting_reason->failed_count = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.failed_count =
+			counter_stats->failed_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.received_fragment_count =
+		counter_stats->received_fragment_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.group_received_frame_count =
+		counter_stats->group_received_frame_count;
+
+	if (counter_stats->fcs_error_count) {
+		reporting_reason->fcs_error = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.fcs_error_count =
+			counter_stats->fcs_error_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.transmitted_frame_count =
+			counter_stats->transmitted_frame_count;
+}
+
+static void
+populate_dot11f_rrm_mac_stats(tDot11fIEMeasurementReport *pdot11f,
+			      struct mac_stats *mac_stats,
+			      bool *reporting_reason_present)
+{
+	tDot11fIEreporting_reason *reporting_reason;
+
+	reporting_reason = &pdot11f->report.sta_stats.reporting_reason;
+	if (mac_stats->retry_count) {
+		reporting_reason->retry = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.retry_count =
+			mac_stats->retry_count;
+
+	if (mac_stats->multiple_retry_count) {
+		reporting_reason->multiple_retry = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.multiple_retry_count =
+			mac_stats->multiple_retry_count;
+
+	if (mac_stats->frame_duplicate_count) {
+		reporting_reason->frame_duplicate = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.frame_duplicate_count =
+			mac_stats->frame_duplicate_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.rts_success_count =
+			mac_stats->rts_success_count;
+
+	if (mac_stats->rts_failure_count) {
+		reporting_reason->rts_failure = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.rts_failure_count =
+			mac_stats->rts_failure_count;
+
+	if (mac_stats->ack_failure_count) {
+		reporting_reason->ack_failure = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.ack_failure_count =
+			mac_stats->ack_failure_count;
+}
+
+static void
+populate_dot11f_rrm_access_delay_stats(
+				tDot11fIEMeasurementReport *pdot11f,
+				struct access_delay_stats *access_delay_stats)
+{
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.ap_average_access_delay =
+		access_delay_stats->ap_average_access_delay;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_besteffort =
+		access_delay_stats->average_access_delay_besteffort;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_background =
+		access_delay_stats->average_access_delay_background;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_video =
+		access_delay_stats->average_access_delay_video;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_voice =
+		access_delay_stats->average_access_delay_voice;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.station_count =
+		access_delay_stats->station_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.channel_utilization =
+		access_delay_stats->channel_utilization;
+}
+
 QDF_STATUS
 populate_dot11f_rrm_sta_stats_report(
 		struct mac_context *mac, tDot11fIEMeasurementReport *pdot11f,
 		struct statistics_report *statistics_report)
 {
-	/* TODO: populate measurement report */
+	struct counter_stats counter_stats;
+	struct mac_stats mac_stats;
+	struct access_delay_stats access_delay_stats;
+	bool reporting_reason_present = false;
+
+	counter_stats = statistics_report->group_stats.counter_stats;
+	mac_stats = statistics_report->group_stats.mac_stats;
+	access_delay_stats = statistics_report->group_stats.access_delay_stats;
+
+	pdot11f->report.sta_stats.meas_duration =
+					statistics_report->meas_duration;
+	pdot11f->report.sta_stats.group_id = statistics_report->group_id;
+	pdot11f->report.sta_stats.reporting_reason.present = 0;
+
+	switch (statistics_report->group_id) {
+	case STA_STAT_GROUP_ID_COUNTER_STATS:
+		populate_dot11f_rrm_counter_stats(pdot11f, &counter_stats,
+						  &reporting_reason_present);
+		break;
+	case STA_STAT_GROUP_ID_MAC_STATS:
+		populate_dot11f_rrm_mac_stats(pdot11f, &mac_stats,
+					      &reporting_reason_present);
+		break;
+	case STA_STAT_GROUP_ID_DELAY_STATS:
+		populate_dot11f_rrm_access_delay_stats(pdot11f,
+						       &access_delay_stats);
+		break;
+	default:
+		pe_err("group id not supported %d",
+		       statistics_report->group_id);
+		return QDF_STATUS_SUCCESS;
+	}
+	if (reporting_reason_present)
+		pdot11f->report.sta_stats.reporting_reason.present = 1;
+
 	return QDF_STATUS_SUCCESS;
 }
 
