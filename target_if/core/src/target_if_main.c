@@ -771,10 +771,31 @@ QDF_STATUS target_if_alloc_psoc_tgt_info(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS target_if_psoc_tgt_info_mem_free(
+		struct target_psoc_info *tgt_psoc_info)
+{
+	struct wlan_psoc_host_service_ext_param *ext_param;
+
+	if (!tgt_psoc_info) {
+		target_if_err("tgt_psoc_info is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* reminder to move this into init_deinit_chainmask_table_free */
+	ext_param = target_psoc_get_service_ext_param(tgt_psoc_info);
+	if (ext_param)
+		init_deinit_chainmask_table_free(ext_param);
+
+	init_deinit_dbr_ring_cap_free(tgt_psoc_info);
+	init_deinit_spectral_scaling_params_free(tgt_psoc_info);
+	init_deinit_scan_radio_cap_free(tgt_psoc_info);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS target_if_free_psoc_tgt_info(struct wlan_objmgr_psoc *psoc)
 {
 	struct target_psoc_info *tgt_psoc_info;
-	struct wlan_psoc_host_service_ext_param *ext_param;
 
 	if (!psoc) {
 		target_if_err("psoc is null");
@@ -783,16 +804,7 @@ QDF_STATUS target_if_free_psoc_tgt_info(struct wlan_objmgr_psoc *psoc)
 
 	tgt_psoc_info = wlan_psoc_get_tgt_if_handle(psoc);
 
-	ext_param = target_psoc_get_service_ext_param(tgt_psoc_info);
-	if (!ext_param) {
-		target_if_err("tgt_psoc_info is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-	init_deinit_chainmask_table_free(ext_param);
-	init_deinit_dbr_ring_cap_free(tgt_psoc_info);
-	init_deinit_spectral_scaling_params_free(tgt_psoc_info);
-	init_deinit_scan_radio_cap_free(tgt_psoc_info);
-
+	target_if_psoc_tgt_info_mem_free(tgt_psoc_info);
 	qdf_event_destroy(&tgt_psoc_info->info.event);
 
 	wlan_psoc_set_tgt_if_handle(psoc, NULL);

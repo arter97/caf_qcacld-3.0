@@ -514,6 +514,18 @@ QDF_STATUS target_if_free_pdev_tgt_info(struct wlan_objmgr_pdev *pdev);
 QDF_STATUS target_if_alloc_psoc_tgt_info(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * target_if_psoc_tgt_info_mem_free() - free memory which attached in
+ *                                      psoc tgt info
+ * @tgt_psoc_info: target psoc info object
+ *
+ * API to free allocated memory for target_psoc_info
+ *
+ * Return: SUCCESS on successful memory deallocation or Failure
+ */
+QDF_STATUS target_if_psoc_tgt_info_mem_free(
+		struct target_psoc_info *tgt_psoc_info);
+
+/**
  * target_if_free_psoc_tgt_info() - free psoc tgt info
  * @psoc: pointer to psoc
  *
