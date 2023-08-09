@@ -205,6 +205,7 @@ struct target_version_info {
  * @device_mode: Global Device mode
  * @sbs_lower_band_end_freq: sbs lower band end frequency
  * @health_mon_params: health monitor params
+ * @aoa_caps: aoa capabilities from target
  */
 struct tgt_info {
 	struct host_fw_ver version;
@@ -243,6 +244,9 @@ struct tgt_info {
 #ifdef HEALTH_MON_SUPPORT
 	struct wmi_health_mon_params health_mon_param;
 #endif /* HEALTH_MON_SUPPORT */
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+	struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 *aoa_caps;
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
 };
 
 /**
@@ -1437,6 +1441,26 @@ static inline uint32_t target_psoc_get_num_dbr_ring_caps
 
 	return psoc_info->info.service_ext2_param.num_dbr_ring_caps;
 }
+
+/**
+ * target_psoc_get_aoa_caps() - get aoa_caps
+ * @psoc_info:  pointer to structure target_psoc_info
+ *
+ * API to get aoa_caps
+ *
+ * Return: structure pointer to wlan_psoc_host_rcc_enh_aoa_caps_ext2
+ */
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+static inline
+struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 *target_psoc_get_aoa_caps
+		(struct target_psoc_info *psoc_info)
+{
+	if (!psoc_info)
+		return NULL;
+
+	return psoc_info->info.aoa_caps;
+}
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
 
 /**
  * target_psoc_get_num_scan_radio_caps() - get no of scan_radio_caps

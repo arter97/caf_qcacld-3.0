@@ -561,6 +561,66 @@ exit:
 }
 #endif
 
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+int init_deinit_populate_rcc_aoa_cap_ext2(struct wlan_objmgr_psoc *psoc,
+					  wmi_unified_t handle,
+					  uint8_t *event,
+					  struct tgt_info *info)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	info->aoa_caps = qdf_mem_malloc(
+		sizeof(struct wlan_psoc_host_rcc_enh_aoa_caps_ext2));
+
+	if (!info->aoa_caps) {
+		target_if_err("Mem alloc for aoa cap failed");
+		return -EINVAL;
+	}
+
+	status = wmi_extract_aoa_caps_service_ready_ext2(
+				handle, event,
+				info->aoa_caps);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("Extraction of aoa caps failed");
+		goto free_and_return;
+	}
+
+	return 0;
+
+free_and_return:
+	qdf_mem_free(info->aoa_caps);
+	info->aoa_caps = NULL;
+
+	return qdf_status_to_os_return(status);
+}
+
+QDF_STATUS init_deinit_rcc_aoa_cap_ext2_free(
+		struct target_psoc_info *tgt_psoc_info)
+{
+	qdf_mem_free(tgt_psoc_info->info.aoa_caps);
+	tgt_psoc_info->info.aoa_caps = NULL;
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+int init_deinit_populate_rcc_aoa_cap_ext2(struct wlan_objmgr_psoc *psoc,
+					  wmi_unified_t handle,
+					  uint8_t *event,
+					  struct tgt_info *info)
+{
+	return 0;
+}
+
+QDF_STATUS init_deinit_rcc_aoa_cap_ext2_free(
+		struct target_psoc_info *tgt_psoc_info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
+
+qdf_export_symbol(init_deinit_rcc_aoa_cap_ext2_free);
+
 int init_deinit_populate_dbs_or_sbs_cap_ext2(struct wlan_objmgr_psoc *psoc,
 					     wmi_unified_t handle,
 					     uint8_t *event,
