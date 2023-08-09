@@ -491,6 +491,7 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool mcc_mode;
+	enum hw_mode_bandwidth max_bw;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -534,6 +535,13 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 
 		if (pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb)
 			pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb(mcc_mode);
+
+		if (pm_ctx->dp_cbacks.hdd_ipa_set_perf_level_bw) {
+			max_bw = policy_mgr_get_connection_max_channel_width(
+					psoc);
+			policy_mgr_debug("max channel width %d", max_bw);
+			pm_ctx->dp_cbacks.hdd_ipa_set_perf_level_bw(max_bw);
+		}
 	}
 
 	if (pm_ctx->conc_cbacks.connection_info_update)

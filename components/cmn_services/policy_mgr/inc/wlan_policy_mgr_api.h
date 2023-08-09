@@ -2253,6 +2253,7 @@ struct policy_mgr_cdp_cbacks {
  * @hdd_ipa_set_mcc_mode_cb: Callback to set mcc mode for ipa module
  * @hdd_v2_flow_pool_map: Callback to create vdev flow pool
  * @hdd_v2_flow_pool_unmap: Callback to delete vdev flow pool
+ * @hdd_ipa_set_perf_level_bw: Callback to set ipa perf level based on BW
  */
 struct policy_mgr_dp_cbacks {
 	void (*hdd_disable_rx_ol_in_concurrency)(bool);
@@ -2260,6 +2261,7 @@ struct policy_mgr_dp_cbacks {
 	void (*hdd_ipa_set_mcc_mode_cb)(bool);
 	void (*hdd_v2_flow_pool_map)(int);
 	void (*hdd_v2_flow_pool_unmap)(int);
+	void (*hdd_ipa_set_perf_level_bw)(enum hw_mode_bandwidth bw);
 };
 
 /**

@@ -1183,4 +1183,17 @@ policy_mgr_set_freq_restriction_mask(struct policy_mgr_psoc_priv_obj *pm_ctx,
 {
 }
 #endif
+
+/**
+ * policy_mgr_get_connection_max_channel_width() - Get max channel width
+ * among vdevs in use
+ * @psoc: PSOC object pointer
+ *
+ * This function returns max channel width among in-use vdevs
+ *
+ * Return: enum hw_mode_bandwidth
+ */
+enum hw_mode_bandwidth
+policy_mgr_get_connection_max_channel_width(struct wlan_objmgr_psoc *psoc);
+
 #endif

@@ -436,4 +436,24 @@ QDF_STATUS hdd_ipa_get_tx_pipe(struct hdd_context *hdd_ctx,
 }
 #endif /* IPA_WDI3_TX_TWO_PIPES */
 
+void hdd_ipa_set_perf_level_bw(enum hw_mode_bandwidth bw)
+{
+	struct hdd_context *hdd_ctx;
+	enum wlan_ipa_bw_level lvl;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return;
+
+	if (bw == HW_MODE_320_MHZ)
+		lvl = WLAN_IPA_BW_LEVEL_HIGH;
+	else if (bw == HW_MODE_160_MHZ)
+		lvl = WLAN_IPA_BW_LEVEL_MEDIUM;
+	else
+		lvl = WLAN_IPA_BW_LEVEL_LOW;
+
+	hdd_debug("Vote IPA perf level to %d", lvl);
+	ucfg_ipa_set_perf_level_bw(hdd_ctx->pdev, lvl);
+}
+
 #endif

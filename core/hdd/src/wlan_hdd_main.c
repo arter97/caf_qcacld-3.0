@@ -16436,6 +16436,8 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 	dp_cbs.hdd_ipa_set_mcc_mode_cb = hdd_ipa_set_mcc_mode;
 	dp_cbs.hdd_v2_flow_pool_map = hdd_v2_flow_pool_map;
 	dp_cbs.hdd_v2_flow_pool_unmap = hdd_v2_flow_pool_unmap;
+	if (ucfg_ipa_set_perf_level_bw_enabled(hdd_ctx->pdev))
+		dp_cbs.hdd_ipa_set_perf_level_bw = hdd_ipa_set_perf_level_bw;
 	status = policy_mgr_register_dp_cb(hdd_ctx->psoc, &dp_cbs);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_debug("Failed to register DP cb with Policy Manager");
