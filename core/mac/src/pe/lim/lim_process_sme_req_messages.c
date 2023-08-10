@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1980,13 +1980,13 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 	if (!ie_struct->eht_cap.present)
 		return false;
 
-	scan_entry = scm_scan_get_entry_by_bssid(mac_ctx->pdev,
-						 (struct qdf_mac_addr *)
-						 bss_desc->bssId);
+	scan_entry = wlan_scan_get_entry_by_bssid(mac_ctx->pdev,
+						  (struct qdf_mac_addr *)
+						  bss_desc->bssId);
 
 	if (scan_entry) {
 		is_eht_allowed =
-			cm_is_eht_allowed_for_current_security(scan_entry);
+			wlan_cm_is_eht_allowed_for_current_security(scan_entry);
 		util_scan_free_cache_entry(scan_entry);
 		if (!is_eht_allowed)
 			return false;
