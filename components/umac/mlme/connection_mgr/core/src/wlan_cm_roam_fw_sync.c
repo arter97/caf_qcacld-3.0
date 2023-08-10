@@ -1069,9 +1069,6 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	 */
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
 		cm_inform_dlm_connect_complete(cm_ctx->vdev, connect_rsp);
-		wlan_tdls_notify_sta_connect(vdev_id,
-					mlme_get_tdls_chan_switch_prohibited(vdev),
-					mlme_get_tdls_prohibited(vdev), vdev);
 		wlan_p2p_status_connect(vdev);
 
 		if (!cm_csr_is_ss_wait_for_key(vdev_id)) {
@@ -1088,6 +1085,9 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 	cm_connect_info(vdev, true, &connect_rsp->bssid, &connect_rsp->ssid,
 			connect_rsp->freq);
+	wlan_tdls_notify_sta_connect(vdev_id,
+				     mlme_get_tdls_chan_switch_prohibited(vdev),
+				     mlme_get_tdls_prohibited(vdev), vdev);
 
 	cm_update_associated_ch_info(vdev, true);
 
