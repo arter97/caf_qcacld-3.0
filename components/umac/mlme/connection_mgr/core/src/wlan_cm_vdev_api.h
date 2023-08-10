@@ -756,13 +756,15 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * cm_get_ml_partner_info() - Fill ML partner info from scan entry
+ * @pdev: PDEV object
  * @scan_entry: Scan entry
  * @partner_info: Partner info to be filled
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
+cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
+		       struct scan_cache_entry *scan_entry,
 		       struct mlo_partner_info *partner_info);
 #endif
 #endif /* __WLAN_CM_VDEV_API_H__ */
