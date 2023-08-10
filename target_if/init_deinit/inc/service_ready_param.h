@@ -354,6 +354,36 @@ struct wlan_psoc_host_spectral_scaling_params {
 	uint32_t default_agc_max_gain;
 };
 
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+/**
+ * struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 - aoa capabilities
+ * @max_agc_gain_tbls: max number of AGC gain tables supported
+ * @max_agc_gain_per_tbl_2g: max AGC gain value per each table on 2GHz band.
+ *                           Each entry in max_agc_gain_per_table indicates
+ *                           max AGC gain value corresponding AGC gain table
+ *                           index.
+ * @max_agc_gain_per_tbl_5g: max AGC gain value per each table on 5GHz band.
+ *                           Each entry in max_agc_gain_per_table indicates
+ *                           max AGC gain value corresponding AGC gain table
+ *                           index.
+ * @max_agc_gain_per_tbl_6g: max AGC gain value per each table on 5GHz band.
+ *                           Each entry in max_agc_gain_per_table indicates
+ *                           max AGC gain value corresponding AGC gain table
+ *                           index.
+ * @max_bdf_entries_per_tbl: max entries in phase_array and gain_array per
+ *                           each gain table index. Each entry in this array
+ *                           indicates max entries used to store required data
+ *                           for corresponding AGC gain table index.
+ */
+struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 {
+	uint32_t max_agc_gain_tbls;
+	uint16_t max_agc_gain_per_tbl_2g[PSOC_MAX_NUM_AGC_GAIN_TBLS];
+	uint16_t max_agc_gain_per_tbl_5g[PSOC_MAX_NUM_AGC_GAIN_TBLS];
+	uint16_t max_agc_gain_per_tbl_6g[PSOC_MAX_NUM_AGC_GAIN_TBLS];
+	uint8_t max_bdf_entries_per_tbl[PSOC_MAX_NUM_AGC_GAIN_TBLS];
+};
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
+
 /**
  * struct wlan_psoc_host_chainmask_capabilities - chain mask capabilities list
  * @supports_chan_width_20: channel width 20 support for this chain mask.

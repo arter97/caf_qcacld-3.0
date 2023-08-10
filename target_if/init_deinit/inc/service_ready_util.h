@@ -291,6 +291,33 @@ int init_deinit_populate_mac_phy_cap_ext2(wmi_unified_t handle, uint8_t *event,
 					  struct tgt_info *info);
 
 /**
+ * init_deinit_populate_rcc_aoa_cap_ext2() - populate aoa capabilities from
+ * service ready ext2 event
+ * @psoc: PSOC object
+ * @handle: WMI handle pointer
+ * @event: event buffer received from FW
+ * @info: tgt_info object
+ *
+ * API to populate aoa capability from service ready ext2 event.
+ *
+ * Return: zero on successful population of aoa capability or failure
+ */
+int init_deinit_populate_rcc_aoa_cap_ext2(struct wlan_objmgr_psoc *psoc,
+					  wmi_unified_t handle, uint8_t *event,
+					  struct tgt_info *info);
+
+/**
+ * init_deinit_rcc_aoa_cap_ext2_free() - free aoa capability
+ * @tgt_psoc_info: target psoc info object
+ *
+ * API to free aoa capability
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS init_deinit_rcc_aoa_cap_ext2_free(
+				struct target_psoc_info *tgt_psoc_info);
+
+/**
  * init_deinit_populate_scan_radio_cap_ext2() - populate scan radio capabilities
  * from service ready ext2 event
  * @handle: WMI handle pointer
