@@ -21631,6 +21631,10 @@ static void populate_tlv_events_id(WMI_EVT_ID *event_ids)
 	event_ids[wmi_vdev_standalone_sound_complete_eventid] =
 		WMI_VDEV_STANDALONE_SOUND_COMPLETE_EVENTID;
 #endif
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+	event_ids[wmi_pdev_enhanced_aoa_phasedelta_eventid] =
+			WMI_PDEV_ENHANCED_AOA_PHASEDELTA_EVENTID;
+#endif
 }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
