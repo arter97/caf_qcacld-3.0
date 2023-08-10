@@ -183,6 +183,13 @@ static void fill_basic_vdev_ctrl_rx(struct basic_vdev_ctrl_rx *ctrl,
 				       cp_stats->mcast_stats.cs_rx_wpimic;
 }
 
+static void fill_basic_vdev_ctrl_link(struct basic_vdev_ctrl_link *ctrl,
+				      struct wlan_objmgr_vdev *vdev)
+{
+	/* Deduct 1 for BSS peer */
+	ctrl->cs_peer_count = wlan_vdev_get_peer_count(vdev) - 1;
+}
+
 static void fill_basic_pdev_data_tx(struct basic_pdev_data_tx *data,
 				    struct cdp_pdev_stats *pdev_stats)
 {
@@ -240,11 +247,14 @@ static void fill_basic_pdev_ctrl_rx(struct basic_pdev_ctrl_rx *ctrl,
 }
 
 static void fill_basic_pdev_ctrl_link(struct basic_pdev_ctrl_link *ctrl,
-				      struct pdev_ic_cp_stats *cp_stats)
+				      struct pdev_ic_cp_stats *cp_stats,
+				      struct wlan_objmgr_pdev *pdev)
 {
 	ctrl->cs_chan_tx_pwr = cp_stats->stats.cs_chan_tx_pwr;
 	ctrl->cs_chan_nf = cp_stats->stats.cs_chan_nf;
 	ctrl->cs_chan_nf_sec80 = cp_stats->stats.cs_chan_nf_sec80;
+	ctrl->cs_peer_count = wlan_pdev_get_peer_count(pdev) -
+				wlan_pdev_get_vdev_count(pdev);
 }
 
 static void fill_basic_psoc_data_tx(struct basic_psoc_data_tx *data,
@@ -529,6 +539,28 @@ static QDF_STATUS get_basic_vdev_ctrl_rx(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS get_basic_vdev_ctrl_link(struct unified_stats *stats,
+					   struct wlan_objmgr_vdev *vdev)
+{
+	struct basic_vdev_ctrl_link *ctrl;
+
+	if (!stats || !vdev) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+	ctrl = qdf_mem_malloc(sizeof(struct basic_vdev_ctrl_link));
+	if (!ctrl) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	fill_basic_vdev_ctrl_link(ctrl, vdev);
+
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct basic_vdev_ctrl_link);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS get_basic_pdev_data_tx(struct unified_stats *stats,
 					 struct cdp_pdev_stats *pdev_stats)
 {
@@ -618,11 +650,12 @@ static QDF_STATUS get_basic_pdev_ctrl_rx(struct unified_stats *stats,
 }
 
 static QDF_STATUS get_basic_pdev_ctrl_link(struct unified_stats *stats,
-					   struct pdev_ic_cp_stats *cp_stats)
+					   struct pdev_ic_cp_stats *cp_stats,
+					   struct wlan_objmgr_pdev *pdev)
 {
 	struct basic_pdev_ctrl_link *ctrl = NULL;
 
-	if (!stats || !cp_stats) {
+	if (!stats || !cp_stats || !pdev) {
 		qdf_err("Invalid Input");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -631,7 +664,7 @@ static QDF_STATUS get_basic_pdev_ctrl_link(struct unified_stats *stats,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_pdev_ctrl_link(ctrl, cp_stats);
+	fill_basic_pdev_ctrl_link(ctrl, cp_stats, pdev);
 
 	stats->feat[INX_FEAT_LINK] = ctrl;
 	stats->size[INX_FEAT_LINK] = sizeof(struct basic_pdev_ctrl_link);
@@ -1068,6 +1101,13 @@ static QDF_STATUS get_basic_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		else
 			stats_collected = true;
 	}
+	if (feat & STATS_FEAT_FLG_LINK) {
+		ret = get_basic_vdev_ctrl_link(stats, vdev);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch vdev Basic LINK stats!");
+		else
+			stats_collected = true;
+	}
 
 get_failed:
 	qdf_mem_free(cp_stats);
@@ -1275,7 +1315,7 @@ static QDF_STATUS get_basic_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 	if (feat & STATS_FEAT_FLG_LINK) {
-		ret = get_basic_pdev_ctrl_link(stats, pdev_cp_stats);
+		ret = get_basic_pdev_ctrl_link(stats, pdev_cp_stats, pdev);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch pdev Basic LINK stats!");
 		else
@@ -2725,6 +2765,28 @@ static QDF_STATUS get_advance_vdev_ctrl_rx(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS get_advance_vdev_ctrl_link(struct unified_stats *stats,
+					     struct wlan_objmgr_vdev *vdev)
+{
+	struct advance_vdev_ctrl_link *ctrl;
+
+	if (!stats || !vdev) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+	ctrl = qdf_mem_malloc(sizeof(struct advance_vdev_ctrl_link));
+	if (!ctrl) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	fill_basic_vdev_ctrl_link(&ctrl->b_link, vdev);
+
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct advance_vdev_ctrl_link);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS get_advance_vdev_data(struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_vdev *vdev,
 					struct unified_stats *stats,
@@ -2895,6 +2957,13 @@ static QDF_STATUS get_advance_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		ret = get_advance_vdev_ctrl_rx(stats, cp_stats);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch vdev Advance RX Stats!");
+		else
+			stats_collected = true;
+	}
+	if (feat & STATS_FEAT_FLG_LINK) {
+		ret = get_advance_vdev_ctrl_link(stats, vdev);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch vdev Advance LINK Stats!");
 		else
 			stats_collected = true;
 	}
@@ -3350,11 +3419,12 @@ static QDF_STATUS get_advance_pdev_ctrl_rx(struct unified_stats *stats,
 }
 
 static QDF_STATUS get_advance_pdev_ctrl_link(struct unified_stats *stats,
-					     struct pdev_ic_cp_stats *cp_stats)
+					     struct pdev_ic_cp_stats *cp_stats,
+					     struct wlan_objmgr_pdev *pdev)
 {
 	struct advance_pdev_ctrl_link *ctrl = NULL;
 
-	if (!stats || !cp_stats) {
+	if (!stats || !cp_stats || !pdev) {
 		qdf_err("Invalid Input");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -3363,7 +3433,7 @@ static QDF_STATUS get_advance_pdev_ctrl_link(struct unified_stats *stats,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_pdev_ctrl_link(&ctrl->b_link, cp_stats);
+	fill_basic_pdev_ctrl_link(&ctrl->b_link, cp_stats, pdev);
 
 	ctrl->dcs_ap_tx_util = cp_stats->stats.chan_stats.dcs_ap_tx_util;
 	ctrl->dcs_ap_rx_util = cp_stats->stats.chan_stats.dcs_ap_rx_util;
@@ -3606,7 +3676,7 @@ static QDF_STATUS get_advance_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 	if (feat & STATS_FEAT_FLG_LINK) {
-		ret = get_advance_pdev_ctrl_link(stats, pdev_cp_stats);
+		ret = get_advance_pdev_ctrl_link(stats, pdev_cp_stats, pdev);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch pdev Advance LINK Stats!");
 		else
@@ -4778,6 +4848,28 @@ static QDF_STATUS get_debug_vdev_ctrl_wmi(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS get_debug_vdev_ctrl_link(struct unified_stats *stats,
+					   struct wlan_objmgr_vdev *vdev)
+{
+	struct debug_vdev_ctrl_link *ctrl;
+
+	if (!stats || !vdev) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+	ctrl = qdf_mem_malloc(sizeof(struct debug_vdev_ctrl_link));
+	if (!ctrl) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	fill_basic_vdev_ctrl_link(&ctrl->b_link, vdev);
+
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct debug_vdev_ctrl_link);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 				      struct unified_stats *stats,
 				      uint32_t feat, bool mld_req)
@@ -4849,6 +4941,13 @@ static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		ret = get_debug_vdev_ctrl_wmi(stats, cp_stats);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch vdev Debug WMI Stats!");
+		else
+			stats_collected = true;
+	}
+	if (feat & STATS_FEAT_FLG_LINK) {
+		ret = get_debug_vdev_ctrl_link(stats, vdev);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch vdev Debug LINK Stats!");
 		else
 			stats_collected = true;
 	}
@@ -5324,11 +5423,12 @@ static QDF_STATUS get_debug_pdev_ctrl_wmi(struct unified_stats *stats,
 }
 
 static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
-					   struct pdev_ic_cp_stats *cp_stats)
+					   struct pdev_ic_cp_stats *cp_stats,
+					   struct wlan_objmgr_pdev *pdev)
 {
 	struct debug_pdev_ctrl_link *ctrl = NULL;
 
-	if (!stats || !cp_stats) {
+	if (!stats || !cp_stats || !pdev) {
 		qdf_err("Invalid Input");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -5337,7 +5437,7 @@ static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_pdev_ctrl_link(&ctrl->b_link, cp_stats);
+	fill_basic_pdev_ctrl_link(&ctrl->b_link, cp_stats, pdev);
 
 	stats->feat[INX_FEAT_LINK] = ctrl;
 	stats->size[INX_FEAT_LINK] = sizeof(struct debug_pdev_ctrl_link);
@@ -5672,7 +5772,7 @@ static QDF_STATUS get_debug_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 			stats_collected = true;
 	}
 	if (feat & STATS_FEAT_FLG_LINK) {
-		ret = get_debug_pdev_ctrl_link(stats, pdev_cp_stats);
+		ret = get_debug_pdev_ctrl_link(stats, pdev_cp_stats, pdev);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch pdev Debug LINK Stats!");
 		else

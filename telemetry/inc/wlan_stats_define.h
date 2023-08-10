@@ -69,7 +69,9 @@
 	(STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX |       \
 	 STATS_FEAT_FLG_LINK)
 #define STATS_BASIC_RADIO_DATA_MASK    (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
-#define STATS_BASIC_VAP_CTRL_MASK      (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
+#define STATS_BASIC_VAP_CTRL_MASK                      \
+	(STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX |       \
+	 STATS_FEAT_FLG_LINK)
 #define STATS_BASIC_VAP_DATA_MASK      (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
 #define STATS_BASIC_STA_CTRL_MASK                      \
 	(STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX |       \
@@ -317,6 +319,10 @@ struct basic_vdev_ctrl_rx {
 	u_int64_t cs_rx_security_failure;
 };
 
+struct basic_vdev_ctrl_link {
+	uint16_t cs_peer_count;
+};
+
 /* Basic Pdev Data */
 struct basic_pdev_data_tx {
 	struct basic_data_tx_stats tx;
@@ -349,6 +355,7 @@ struct basic_pdev_ctrl_link {
 	u_int32_t cs_chan_tx_pwr;
 	int16_t cs_chan_nf;
 	int16_t cs_chan_nf_sec80;
+	uint16_t cs_peer_count;
 };
 
 /* Basic psoc Data */
@@ -778,6 +785,10 @@ struct advance_vdev_ctrl_rx {
 	u_int64_t cs_wc_probe_req_drops;
 	u_int64_t cs_sta_xceed_rlim;
 	u_int64_t cs_sta_xceed_vlim;
+};
+
+struct advance_vdev_ctrl_link {
+	struct basic_vdev_ctrl_link b_link;
 };
 
 /* Advance Pdev Data */
@@ -1347,6 +1358,10 @@ struct debug_vdev_ctrl_wmi {
 	uint64_t cs_peer_delete_resp;
 	uint64_t cs_peer_delete_all_req;
 	uint64_t cs_peer_delete_all_resp;
+};
+
+struct debug_vdev_ctrl_link {
+	struct basic_vdev_ctrl_link b_link;
 };
 
 /* Debug Radio data */
