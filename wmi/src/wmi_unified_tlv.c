@@ -5533,6 +5533,99 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+static void
+populate_per_band_aoa_caps(struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 *aoa_cap,
+			   wmi_enhanced_aoa_per_band_caps_param per_band_cap)
+{
+	uint8_t tbl_idx;
+	uint16_t *gain_array = NULL;
+
+	if (per_band_cap.band_info == WMI_AOA_2G)
+		gain_array = aoa_cap->max_agc_gain_per_tbl_2g;
+	else if (per_band_cap.band_info == WMI_AOA_5G)
+		gain_array = aoa_cap->max_agc_gain_per_tbl_5g;
+	else if (per_band_cap.band_info == WMI_AOA_6G)
+		gain_array = aoa_cap->max_agc_gain_per_tbl_6g;
+
+	if (!gain_array) {
+		wmi_debug("unhandled AOA BAND TYPE!! fix it");
+		return;
+	}
+
+	for (tbl_idx = 0; tbl_idx < aoa_cap->max_agc_gain_tbls; tbl_idx++)
+		WMI_AOA_MAX_AGC_GAIN_GET(per_band_cap.max_agc_gain,
+					 tbl_idx,
+					 gain_array[tbl_idx]);
+}
+
+static void
+populate_aoa_caps(struct wmi_unified *wmi_handle,
+		  struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 *aoa_cap,
+		  wmi_enhanced_aoa_caps_param *aoa_caps_param)
+{
+	uint8_t tbl_idx;
+
+	aoa_cap->max_agc_gain_tbls = aoa_caps_param->max_agc_gain_tbls;
+	if (aoa_cap->max_agc_gain_tbls > PSOC_MAX_NUM_AGC_GAIN_TBLS) {
+		wmi_err("Num gain table > PSOC_MAX_NUM_AGC_GAIN_TBLS cap");
+		aoa_cap->max_agc_gain_tbls = PSOC_MAX_NUM_AGC_GAIN_TBLS;
+	}
+
+	if (aoa_cap->max_agc_gain_tbls > WMI_AGC_MAX_GAIN_TABLE_IDX) {
+		wmi_err("num gain table > WMI_AGC_MAX_GAIN_TABLE_IDX cap");
+		aoa_cap->max_agc_gain_tbls = WMI_AGC_MAX_GAIN_TABLE_IDX;
+	}
+
+	for (tbl_idx = 0; tbl_idx < aoa_cap->max_agc_gain_tbls; tbl_idx++) {
+		WMI_AOA_MAX_BDF_ENTRIES_GET
+			(aoa_caps_param->max_bdf_gain_entries,
+			 tbl_idx, aoa_cap->max_bdf_entries_per_tbl[tbl_idx]);
+	}
+}
+
+/**
+ * extract_aoa_caps_tlv() - extract aoa cap tlv
+ * @wmi_handle: wmi handle
+ * @event: pointer to event buffer
+ * @aoa_cap: pointer to structure where capability needs to extracted
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+static QDF_STATUS
+extract_aoa_caps_tlv(struct wmi_unified *wmi_handle, uint8_t *event,
+		     struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 *aoa_cap)
+{
+	int8_t band;
+
+	WMI_SERVICE_READY_EXT2_EVENTID_param_tlvs *param_buf;
+
+	param_buf = (WMI_SERVICE_READY_EXT2_EVENTID_param_tlvs *)event;
+	if (!param_buf) {
+		wmi_err("NULL param buf");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!param_buf->aoa_caps_param) {
+		wmi_debug("NULL aoa_caps_param");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!param_buf->num_aoa_per_band_caps_param ||
+	    !param_buf->aoa_per_band_caps_param) {
+		wmi_debug("No aoa_per_band_caps_param");
+		return QDF_STATUS_SUCCESS;
+	}
+	populate_aoa_caps(wmi_handle, aoa_cap, param_buf->aoa_caps_param);
+
+	for (band = 0; band < param_buf->num_aoa_per_band_caps_param; band++)
+		populate_per_band_aoa_caps
+			(aoa_cap, param_buf->aoa_per_band_caps_param[band]);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
+
 /**
  * send_probe_rsp_tmpl_send_cmd_tlv() - send probe response template to fw
  * @wmi_handle: wmi handle
@@ -21016,6 +21109,10 @@ struct wmi_ops tlv_ops =  {
 	.extract_sap_coex_cap_service_ready_ext2 =
 			extract_sap_coex_fix_chan_caps,
 	.extract_tgtr2p_table_event = extract_tgtr2p_table_event_tlv,
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+	.extract_aoa_caps_service_ready_ext2 =
+			extract_aoa_caps_tlv,
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO
