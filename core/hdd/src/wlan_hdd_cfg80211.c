@@ -22789,7 +22789,8 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 done:
 	wlan_hdd_mlo_link_free_keys(hdd_ctx->psoc, adapter, vdev, pairwise);
 	if (pairwise && adapter->device_mode == QDF_STA_MODE &&
-	    wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+	    wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_vdev_mlme_is_tdls_vdev(vdev)) {
 		wlan_hdd_mlo_link_add_pairwise_key(vdev, hdd_ctx, key_index,
 						   pairwise, params);
 
