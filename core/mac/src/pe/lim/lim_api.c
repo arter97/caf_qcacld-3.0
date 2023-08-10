@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3978,7 +3978,7 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mlo_partner_info *partner_info;
 	uint16_t join_req_freq = 0;
-	struct scan_cache_entry cache_entry;
+	struct scan_cache_entry *cache_entry;
 
 	if (!session_entry) {
 		pe_err("session entry is NULL");
@@ -4014,19 +4014,19 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 
 	join_req_freq = lim_join_req->bssDescription.chan_freq;
 
-	status = wlan_scan_get_scan_entry_by_mac_freq(pdev,
-						      &qdf_bssid,
-						      join_req_freq,
-						      &cache_entry);
-
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
+	cache_entry = wlan_scan_get_scan_entry_by_mac_freq(pdev,
+							   &qdf_bssid,
+							   join_req_freq);
+	if (!cache_entry) {
 		pe_err("failed to get partner link info by mac addr");
 		status = QDF_STATUS_E_FAILURE;
 		goto free_mem;
 	}
 
-	qdf_mem_copy(partner_link, cache_entry.ml_info.link_info,
+	qdf_mem_copy(partner_link, cache_entry->ml_info.link_info,
 		     sizeof(struct partner_link_info) * (MLD_MAX_LINKS - 1));
+
+	util_scan_free_cache_entry(cache_entry);
 
 	partner_info = &lim_join_req->partner_info;
 
