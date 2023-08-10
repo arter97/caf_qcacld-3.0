@@ -1903,11 +1903,13 @@ enum cdp_stats {
  * @UPDATE_PEER_STATS: update peer stats
  * @UPDATE_VDEV_STATS: update vdev stats
  * @UPDATE_PDEV_STATS: Update pdev stats
+ * @UPDATE_VDEV_STATS_MLD: Update mld vdev stats
  */
 enum cdp_stat_update_type {
 	UPDATE_PEER_STATS = 0,
 	UPDATE_VDEV_STATS = 1,
 	UPDATE_PDEV_STATS = 2,
+	UPDATE_VDEV_STATS_MLD = 3,
 };
 
 /**
