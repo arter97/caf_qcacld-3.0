@@ -525,11 +525,48 @@ wlan_hdd_is_per_link_stats_supported(struct hdd_context *hdd_ctx)
 	hdd_debug("mlo per link stats is not supported by FW");
 	return false;
 }
+
+/**
+ * wlan_hdd_get_bss_peer_mld_mac() - get bss peer mld mac address
+ * @link_info: Link info pointer in HDD adapter
+ * @mld_mac: pointer to mld mac address
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_hdd_get_bss_peer_mld_mac(struct wlan_hdd_link_info *link_info,
+			      struct qdf_mac_addr *mld_mac)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info,
+					   WLAN_OSIF_STATS_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wlan_vdev_get_bss_peer_mld_mac(vdev, mld_mac);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+	return status;
+}
+
 #else
 static inline bool
 wlan_hdd_is_per_link_stats_supported(struct hdd_context *hdd_ctx)
 {
 	return false;
+}
+
+static inline QDF_STATUS
+wlan_hdd_get_bss_peer_mld_mac(struct wlan_hdd_link_info *link_info,
+			      struct qdf_mac_addr *mld_mac)
+{
+	return QDF_STATUS_E_FAILURE;
 }
 #endif
 
@@ -1385,41 +1422,6 @@ hdd_cache_ll_iface_stats(struct hdd_context *hdd_ctx,
 }
 
 /**
- * wlan_hdd_get_mld_peer() - get mld_peer mac address
- * @link_info: Link info pointer in HDD adapter
- * @mld_mac: mld mac address of the STA
- * @bssid: bssid of the link
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
-wlan_hdd_get_mld_peer(struct wlan_hdd_link_info *link_info,
-		      struct qdf_mac_addr *mld_mac,
-		      struct qdf_mac_addr *bssid)
-{
-	struct wlan_objmgr_vdev *vdev;
-	QDF_STATUS status;
-	struct qdf_mac_addr *netdev_addr;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info,
-					   WLAN_OSIF_STATS_ID);
-	if (!vdev)
-		return QDF_STATUS_E_INVAL;
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	netdev_addr = hdd_adapter_get_netdev_mac_addr(link_info->adapter);
-	qdf_copy_macaddr(mld_mac, netdev_addr);
-
-	status = wlan_vdev_get_bss_peer_mld_mac(vdev, bssid);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-	return status;
-}
-
-/**
  * wlan_hdd_get_iface_stats() - Get ll_iface stats info from link_info
  * @link_info: Link info pointer of STA adapter
  * @if_stat: Pointer to wifi_interface_stats structure
@@ -1656,6 +1658,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 	struct nlattr *ml_iface_stats;
 	struct sk_buff *skb;
 	struct wlan_hdd_link_info *link_info;
+	struct qdf_mac_addr *netdev_addr;
 
 	if (wlan_hdd_validate_context(hdd_ctx)) {
 		hdd_err("Invalid hdd context");
@@ -1730,11 +1733,13 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 						 update_stats);
 	}
 
-	status = wlan_hdd_get_mld_peer(ml_adapter->deflink,
-				       &cumulative_if_stat.info.macAddr,
-				       &cumulative_if_stat.info.bssid);
+	netdev_addr = hdd_adapter_get_netdev_mac_addr(ml_adapter);
+	qdf_copy_macaddr(&cumulative_if_stat.info.macAddr, netdev_addr);
+
+	status = wlan_hdd_get_bss_peer_mld_mac(ml_adapter->deflink,
+					       &cumulative_if_stat.info.bssid);
 	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err_rl("Update mld_mac failed for mlo iface stats");
+		hdd_err_rl("mlo_iface_stats: failed to get bss peer_mld_mac");
 
 	if (!put_wifi_iface_stats(&cumulative_if_stat, num_peers, skb)) {
 		hdd_err("put_wifi_iface_stats fail");
@@ -1794,6 +1799,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 	struct nlattr *ml_iface_stats;
 	struct sk_buff *skb;
 	struct wlan_hdd_link_info *link_info;
+	struct qdf_mac_addr *netdev_addr;
 
 	if (!wlan_hdd_is_mlo_connection(adapter->deflink))
 		return;
@@ -1850,11 +1856,13 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		i++;
 	}
 
-	status = wlan_hdd_get_mld_peer(adapter->deflink,
-				       &cumulative_if_stat.info.macAddr,
-				       &cumulative_if_stat.info.bssid);
+	netdev_addr = hdd_adapter_get_netdev_mac_addr(adapter);
+	qdf_copy_macaddr(&cumulative_if_stat.info.macAddr, netdev_addr);
+
+	status = wlan_hdd_get_bss_peer_mld_mac(adapter->deflink,
+					       &cumulative_if_stat.info.bssid);
 	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err_rl("Update mld_mac failed for mlo iface stats");
+		hdd_err_rl("mlo_iface_stats: failed to get bss peer_mld_mac");
 
 	if (!put_wifi_iface_stats(&cumulative_if_stat, num_peers, skb)) {
 		hdd_err("put_wifi_iface_stats fail");
@@ -7685,7 +7693,8 @@ wlan_hdd_send_mlo_aggregated_stats(struct wlan_hdd_link_info *link_info,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	bool is_mld_req = false;
 	bool per_link_stats_cap = false;
-	struct qdf_mac_addr *netdev_addr;
+	struct qdf_mac_addr peer_mld_mac;
+	QDF_STATUS status;
 
 	if (!link_info) {
 		hdd_err("Invalid link_info");
@@ -7697,13 +7706,18 @@ wlan_hdd_send_mlo_aggregated_stats(struct wlan_hdd_link_info *link_info,
 		return false;
 	}
 
-	netdev_addr = hdd_adapter_get_netdev_mac_addr(link_info->adapter);
-	is_mld_req = qdf_is_macaddr_equal(netdev_addr,
+	status = wlan_hdd_get_bss_peer_mld_mac(link_info, &peer_mld_mac);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("mlo_vdev_stats: failed to get bss peer mld mac");
+		return false;
+	}
+
+	is_mld_req = qdf_is_macaddr_equal(&peer_mld_mac,
 					  (struct qdf_mac_addr *)mac);
 	per_link_stats_cap = wlan_hdd_is_per_link_stats_supported(hdd_ctx);
 
 	if (is_mld_req && per_link_stats_cap) {
-		hdd_debug("Fetching Aggregated station stats");
+		hdd_debug_rl("Fetching Aggregated station stats");
 		return true;
 	}
 
@@ -7942,13 +7956,12 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 
 		qdf_mem_copy(mac, dev->dev_addr, QDF_MAC_ADDR_SIZE);
 
-		if (!wlan_hdd_send_mlo_aggregated_stats(adapter->deflink,
-							mac)) {
-			hdd_debug("Sending Assoc Link stats");
-			return wlan_hdd_get_sta_stats(adapter->deflink,
-						      mac, sinfo);
-		}
-		errno = wlan_hdd_get_mlo_sta_stats(adapter, mac, sinfo);
+		if (wlan_hdd_is_mlo_connection(adapter->deflink) &&
+		    wlan_hdd_is_per_link_stats_supported(hdd_ctx))
+			return wlan_hdd_get_mlo_sta_stats(adapter, mac, sinfo);
+
+		hdd_debug("Sending Assoc Link stats");
+		errno = wlan_hdd_get_sta_stats(adapter->deflink, mac, sinfo);
 	}
 	return errno;
 }
