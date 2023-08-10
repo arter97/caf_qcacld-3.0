@@ -3124,7 +3124,8 @@ stopbss:
 				ucfg_ipa_uc_disconnect_ap(hdd_ctx->pdev,
 							  adapter->dev);
 				ucfg_ipa_cleanup_dev_iface(hdd_ctx->pdev,
-							   adapter->dev);
+							   adapter->dev,
+							   link_info->vdev_id);
 			}
 		}
 

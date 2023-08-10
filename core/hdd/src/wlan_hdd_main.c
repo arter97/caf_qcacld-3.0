@@ -8896,11 +8896,15 @@ static inline
 void hdd_ipa_ap_disconnect_evt(struct hdd_context *hdd_ctx,
 			       struct hdd_adapter *adapter)
 {
+	struct wlan_hdd_link_info *link_info;
+
+	link_info = adapter->deflink;
 	if (ucfg_ipa_is_enabled()) {
 		ucfg_ipa_uc_disconnect_ap(hdd_ctx->pdev,
 					  adapter->dev);
 		ucfg_ipa_cleanup_dev_iface(hdd_ctx->pdev,
-					   adapter->dev);
+					   adapter->dev,
+					   link_info->vdev_id);
 	}
 }
 
@@ -9103,7 +9107,8 @@ hdd_sta_disconnect_and_cleanup(struct wlan_hdd_link_info *link_info)
 	status = wlan_hdd_cm_issue_disconnect(link_info, reason, true);
 	if (QDF_IS_STATUS_ERROR(status) && ucfg_ipa_is_enabled()) {
 		hdd_err("STA disconnect failed");
-		ucfg_ipa_uc_cleanup_sta(adapter->hdd_ctx->pdev, adapter->dev);
+		ucfg_ipa_uc_cleanup_sta(adapter->hdd_ctx->pdev, adapter->dev,
+					link_info->vdev_id);
 	}
 }
 
