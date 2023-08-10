@@ -569,15 +569,19 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_mld_mac(
  * mlo_get_link_vdev_from_psoc_id() - Get link vdev from psoc id
  * @ml_dev: MLO DEV object
  * @psoc_id: psoc_id
+ * @get_bridge_vdev: Flag to indicate bridge vdev search is needed
  *
- * API to get vdev using psoc_id
+ * API to get vdev using psoc_id. When get_bridg_vdev flag is passed as true,
+ * this API searches vdev from bridge vdev list. If there are no bridge
+ * vdevs present, then it searches in actual vdev list. If flag is
+ * passed as false, vdev search will be directly from actual vdev list.
  *
  * Return: Pointer to vdev, if it is found
  *         otherwise, returns NULL
  */
 struct wlan_objmgr_vdev *mlo_get_link_vdev_from_psoc_id(
 				struct wlan_mlo_dev_context *ml_dev,
-				uint8_t psoc_id);
+				uint8_t psoc_id, bool get_bridge_vdev);
 
 /**
  * wlan_mlo_get_mlpeer_by_peer_mladdr() - Get ML peer from the list of MLD's
