@@ -20217,6 +20217,7 @@ static void hdd_update_hif_config(struct hdd_context *hdd_ctx)
 		ucfg_dp_get_rx_softirq_yield_duration(hdd_ctx->psoc);
 
 	hif_init_ini_config(scn, &cfg);
+	hif_set_enable_rpm(scn);
 
 	if (prevent_link_down)
 		hif_vote_link_up(scn);
