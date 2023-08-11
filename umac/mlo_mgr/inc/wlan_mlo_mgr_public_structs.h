@@ -449,20 +449,6 @@ struct wlan_mlo_dev_context {
 };
 
 /**
- * struct wlan_mlo_bridge_sta - MLO bridge sta context
- * @bridge_umac_id: umac id for bridge
- * @bridge_link_id: link id used by bridge vdev
- * @is_force_central_primary: Flag to tell if bridge should be primary umac
- * @bridge_vap_exists: If there is bridge vap
- */
-struct wlan_mlo_bridge_sta {
-	uint8_t bridge_umac_id;
-	uint8_t bridge_link_id;
-	bool is_force_central_primary;
-	bool bridge_vap_exists;
-};
-
-/**
  * struct wlan_mlo_link_peer_entry - Link peer entry
  * @link_peer: Object manager peer
  * @link_addr: MAC address of link peer
@@ -809,6 +795,26 @@ struct mlo_tgt_link_info {
 struct mlo_tgt_partner_info {
 	uint8_t num_partner_links;
 	struct mlo_tgt_link_info link_info[WLAN_UMAC_MLO_MAX_VDEVS];
+};
+
+/**
+ * struct wlan_mlo_bridge_sta - MLO bridge sta context
+ * @bridge_partners: mlo_partner_info of partners of a bridge
+ * @bridge_ml_links: mlo_tgt_partner_info of partners of bridge
+ * @bridge_umac_id: umac id for bridge
+ * @bridge_link_id: link id used by bridge vdev
+ * @is_force_central_primary: Flag to tell if bridge should be primary umac
+ * @bridge_vap_exists: If there is bridge vap
+ * @bridge_node_auth: Is bridge node auth done
+ */
+struct wlan_mlo_bridge_sta {
+	struct mlo_partner_info bridge_partners;
+	struct mlo_tgt_partner_info bridge_ml_links;
+	uint8_t bridge_umac_id;
+	uint8_t bridge_link_id;
+	bool is_force_central_primary;
+	bool bridge_vap_exists;
+	bool bridge_node_auth;
 };
 
 /**
