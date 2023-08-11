@@ -2763,9 +2763,15 @@ lim_process_switch_channel_join_mlo(struct pe_session *session_entry,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mlo_partner_info *partner_info;
-	struct element_info assoc_rsp;
+	struct element_info assoc_rsp, link_assoc_rsp;
+	tLimMlmJoinCnf mlm_join_cnf;
+	tLimMlmAssocCnf assoc_cnf;
+	uint8_t *frame_ie_buf, *mlie;
+	qdf_size_t frame_ie_len, mlie_len;
+	bool link_id_found = false;
 	struct qdf_mac_addr sta_link_addr;
-	uint8_t link_id = 0;
+	uint8_t assoc_link_id, link_id;
+	struct wlan_frame_hdr *link_frame_hdr;
 
 	assoc_rsp.len = 0;
 	mlo_get_assoc_rsp(session_entry->vdev, &assoc_rsp);
@@ -2780,59 +2786,101 @@ lim_process_switch_channel_join_mlo(struct pe_session *session_entry,
 	qdf_mem_copy(&sta_link_addr, session_entry->self_mac_addr,
 		     QDF_MAC_ADDR_SIZE);
 
-	if (assoc_rsp.len) {
-		struct element_info link_assoc_rsp;
-		tLimMlmJoinCnf mlm_join_cnf;
-		tLimMlmAssocCnf assoc_cnf;
+	if (!assoc_rsp.len)
+		return status;
 
-		mlm_join_cnf.resultCode = eSIR_SME_SUCCESS;
-		mlm_join_cnf.protStatusCode = STATUS_SUCCESS;
-		/* Update PE sessionId */
-		mlm_join_cnf.sessionId = session_entry->peSessionId;
-		lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
-				     (uint32_t *)&mlm_join_cnf);
+	mlm_join_cnf.resultCode = eSIR_SME_SUCCESS;
+	mlm_join_cnf.protStatusCode = STATUS_SUCCESS;
+	/* Update PE sessionId */
+	mlm_join_cnf.sessionId = session_entry->peSessionId;
+	lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
+			     (uint32_t *)&mlm_join_cnf);
 
-		session_entry->limSmeState = eLIM_SME_WT_ASSOC_STATE;
-		assoc_rsp.len += SIR_MAC_HDR_LEN_3A;
-		pe_debug("MLO:assoc rsp len + hdr %d ", assoc_rsp.len);
+	session_entry->limSmeState = eLIM_SME_WT_ASSOC_STATE;
+	assoc_rsp.len += SIR_MAC_HDR_LEN_3A;
+	pe_debug("MLO:assoc rsp len + hdr %d ", assoc_rsp.len);
 
-		link_assoc_rsp.ptr = qdf_mem_malloc(assoc_rsp.len);
-		if (!link_assoc_rsp.ptr)
-			return QDF_STATUS_E_NOMEM;
+	link_assoc_rsp.ptr = qdf_mem_malloc(assoc_rsp.len);
+	if (!link_assoc_rsp.ptr)
+		return QDF_STATUS_E_NOMEM;
 
-		link_assoc_rsp.len = assoc_rsp.len + 24;
-		session_entry->limMlmState = eLIM_MLM_WT_ASSOC_RSP_STATE;
+	link_assoc_rsp.len = assoc_rsp.len + 24;
+	session_entry->limMlmState = eLIM_MLM_WT_ASSOC_RSP_STATE;
 
-		link_id = wlan_vdev_get_link_id(session_entry->vdev);
-		pe_debug("MLO: Generate and process assoc rsp for link vdev %d",
-			 link_id);
-		status = util_gen_link_assoc_rsp(assoc_rsp.ptr,
-						 assoc_rsp.len - 24,
-						 false, link_id, sta_link_addr,
-						 link_assoc_rsp.ptr,
-						 assoc_rsp.len,
-						 (qdf_size_t *)&link_assoc_rsp.len);
-		if (QDF_IS_STATUS_SUCCESS(status)) {
-			pe_debug("MLO: process assoc rsp for link vdev");
-			lim_process_assoc_rsp_frame(mac_ctx,
-					    link_assoc_rsp.ptr,
-					    (link_assoc_rsp.len - SIR_MAC_HDR_LEN_3A),
-					    LIM_ASSOC,
-					    session_entry);
-		} else {
-			pe_debug("MLO: link vdev assoc rsp generation failed");
-			assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
-			assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
-			/* Update PE sessionId */
-			assoc_cnf.sessionId = session_entry->peSessionId;
-			lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
-					(uint32_t *)&assoc_cnf);
+	link_id = wlan_vdev_get_link_id(session_entry->vdev);
+	pe_debug("MLO: Generate and process assoc rsp for link vdev %d",
+		 link_id);
+
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(session_entry->vdev)) {
+		frame_ie_buf = assoc_rsp.ptr + WLAN_ASSOC_RSP_IES_OFFSET;
+		frame_ie_len = assoc_rsp.len - 24 - WLAN_ASSOC_RSP_IES_OFFSET;
+
+		status = util_find_mlie(frame_ie_buf, frame_ie_len,
+					&mlie, &mlie_len);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("ML IE not found");
+			goto rsp_gen_fail;
 		}
 
-		qdf_mem_free(link_assoc_rsp.ptr);
-		link_assoc_rsp.ptr = NULL;
-		link_assoc_rsp.len = 0;
+		status = util_get_bvmlie_primary_linkid(mlie, mlie_len,
+							&link_id_found,
+							&assoc_link_id);
+		if (QDF_IS_STATUS_ERROR(status) || !link_id_found) {
+			pe_debug("Assoc link ID not found");
+			goto rsp_gen_fail;
+		}
+
+		if (assoc_link_id != link_id)
+			goto gen_link_assoc_rsp;
+
+		pe_debug("Skip assoc rsp gen for link %d", link_id);
+		link_frame_hdr = (struct wlan_frame_hdr *)link_assoc_rsp.ptr;
+		qdf_ether_addr_copy(link_frame_hdr->i_addr3,
+				    session_entry->bssId);
+		qdf_ether_addr_copy(link_frame_hdr->i_addr2,
+				    session_entry->bssId);
+		qdf_ether_addr_copy(link_frame_hdr->i_addr1,
+				    &sta_link_addr.bytes[0]);
+		link_frame_hdr->i_fc[0] = MLO_LINKSPECIFIC_ASSOC_RESP_FC0;
+		link_frame_hdr->i_fc[1] = MLO_LINKSPECIFIC_ASSOC_RESP_FC1;
+
+		qdf_mem_copy(link_assoc_rsp.ptr + SIR_MAC_HDR_LEN_3A,
+			     assoc_rsp.ptr, assoc_rsp.len - SIR_MAC_HDR_LEN_3A);
+
+		goto process_assoc_rsp;
 	}
+
+gen_link_assoc_rsp:
+	status = util_gen_link_assoc_rsp(assoc_rsp.ptr,
+					 assoc_rsp.len - 24,
+					 false, link_id, sta_link_addr,
+					 link_assoc_rsp.ptr,
+					 assoc_rsp.len,
+					 (qdf_size_t *)&link_assoc_rsp.len);
+process_assoc_rsp:
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		pe_debug("MLO: process assoc rsp for link vdev");
+		lim_process_assoc_rsp_frame(mac_ctx,
+				    link_assoc_rsp.ptr,
+				    (link_assoc_rsp.len - SIR_MAC_HDR_LEN_3A),
+				    LIM_ASSOC,
+				    session_entry);
+		goto mem_free;
+	}
+
+rsp_gen_fail:
+	pe_debug("MLO: link vdev assoc rsp generation failed");
+	assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
+	assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
+	/* Update PE sessionId */
+	assoc_cnf.sessionId = session_entry->peSessionId;
+	lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
+			(uint32_t *)&assoc_cnf);
+
+mem_free:
+	qdf_mem_free(link_assoc_rsp.ptr);
+	link_assoc_rsp.ptr = NULL;
+	link_assoc_rsp.len = 0;
 
 	return status;
 }
