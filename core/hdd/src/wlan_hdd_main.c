@@ -14625,6 +14625,9 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	hdd_register_hl_netdev_fc_timer(adapter,
 					hdd_tx_resume_timer_expired_handler);
 
+	if (cds_is_driver_recovering())
+		hdd_medium_assess_ssr_reinit();
+
 	hdd_exit();
 	return 0;
 
@@ -18016,8 +18019,6 @@ void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 	}
 	hdd_info("SAP Start Success");
 
-	if (reinit)
-		hdd_medium_assess_init();
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	set_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 	if (hostapd_state->bss_state == BSS_START) {
@@ -20773,7 +20774,6 @@ void hdd_restart_sap(struct wlan_hdd_link_info *link_info)
 		}
 		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 		hdd_err("SAP Start Success");
-		hdd_medium_assess_init();
 		set_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 		if (hapd_state->bss_state == BSS_START) {
 			policy_mgr_incr_active_session(hdd_ctx->psoc,

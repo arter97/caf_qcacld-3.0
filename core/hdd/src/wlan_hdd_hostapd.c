@@ -2372,8 +2372,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		if (QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_medium_assess_stop_timer(pdev_id, hdd_ctx);
 
-		hdd_medium_assess_deinit();
-
 		/* clear the reason code in case BSS is stopped
 		 * in another place
 		 */
@@ -6967,7 +6965,6 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	hdd_set_connection_in_progress(false);
 	policy_mgr_process_force_scc_for_nan(hdd_ctx->psoc);
 	ret = 0;
-	hdd_medium_assess_init();
 	goto free;
 
 error:
@@ -7148,7 +7145,6 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 				hdd_place_marker(adapter, "STOP with FAILURE",
 						 NULL);
 				hdd_sap_indicate_disconnect_for_sta(adapter);
-				hdd_medium_assess_deinit();
 				QDF_ASSERT(0);
 			}
 		}
