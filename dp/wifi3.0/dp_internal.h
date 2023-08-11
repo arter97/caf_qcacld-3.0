@@ -2335,6 +2335,13 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		_tgtobj->rx_i.routed_eapol_pkt.bytes += \
 					_srcobj->rx_i.routed_eapol_pkt.bytes; \
 	} while (0)
+
+#define DP_UPDATE_VDEV_STATS(_tgtobj, _srcobj) \
+	do { \
+		DP_UPDATE_INGRESS_STATS(_tgtobj, _srcobj); \
+		DP_UPDATE_VDEV_STATS_FOR_UNMAPPED_PEERS(_tgtobj, _srcobj); \
+	} while (0)
+
 /**
  * dp_peer_find_attach() - Allocates memory for peer objects
  * @soc: SoC handle
