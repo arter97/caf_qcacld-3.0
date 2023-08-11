@@ -5608,13 +5608,13 @@ extract_aoa_caps_tlv(struct wmi_unified *wmi_handle, uint8_t *event,
 
 	if (!param_buf->aoa_caps_param) {
 		wmi_debug("NULL aoa_caps_param");
-		return QDF_STATUS_SUCCESS;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	if (!param_buf->num_aoa_per_band_caps_param ||
 	    !param_buf->aoa_per_band_caps_param) {
 		wmi_debug("No aoa_per_band_caps_param");
-		return QDF_STATUS_SUCCESS;
+		return QDF_STATUS_E_INVAL;
 	}
 	populate_aoa_caps(wmi_handle, aoa_cap, param_buf->aoa_caps_param);
 
