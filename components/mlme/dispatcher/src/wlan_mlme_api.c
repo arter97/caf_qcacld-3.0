@@ -353,6 +353,33 @@ wlan_mlme_convert_ap_policy_config(
 	}
 }
 
+void wlan_mlme_ll_lt_sap_send_oce_flags_fw(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc = NULL;
+	uint8_t vdev_id;
+	uint8_t updated_fw_value = 0;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return;
+
+	updated_fw_value = mlme_obj->cfg.oce.feature_bitmap;
+	vdev_id = wlan_vdev_get_id(vdev);
+	wma_debug("Disable FILS discovery for vdev %d",
+		  vdev_id);
+	updated_fw_value &= ~(WMI_VDEV_OCE_FILS_DISCOVERY_FRAME_FEATURE_BITMAP);
+	if (wma_cli_set_command(vdev_id,
+				wmi_vdev_param_enable_disable_oce_features,
+				updated_fw_value, VDEV_CMD))
+		mlme_legacy_err("Failed to send OCE update to FW");
+}
+
 QDF_STATUS wlan_mlme_set_ap_policy(struct wlan_objmgr_vdev *vdev,
 				   enum host_concurrent_ap_policy ap_cfg_policy)
 

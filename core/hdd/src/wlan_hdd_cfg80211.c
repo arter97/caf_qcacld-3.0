@@ -15846,6 +15846,10 @@ static int __wlan_hdd_cfg80211_ap_policy(struct hdd_adapter *adapter,
 		hdd_err("failed to set MLME ap config");
 		return -EINVAL;
 	}
+
+	wlan_mlme_ll_lt_sap_send_oce_flags_fw(adapter->deflink->vdev);
+	wlan_vdev_mlme_feat_ext_cap_clear(adapter->deflink->vdev,
+					  WLAN_VDEV_FEXT_FILS_DISC_6G_SAP);
 	return 0;
 }
 
