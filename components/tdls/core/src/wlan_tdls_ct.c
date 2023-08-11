@@ -108,6 +108,11 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 	if (!tdls_soc)
 		return;
 
+	/* timer_cnt is reset when link switch happens */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    qdf_atomic_read(&tdls_soc->timer_cnt) == 0)
+		return;
+
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 	    qdf_atomic_dec_and_test(&tdls_soc->timer_cnt)) {
 		tdls_process_mlo_cal_tdls_link_score(vdev);
