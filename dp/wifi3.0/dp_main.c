@@ -8035,7 +8035,8 @@ static QDF_STATUS dp_txrx_peer_detach(struct dp_soc *soc, struct dp_peer *peer)
 		peer->txrx_peer = NULL;
 		pdev = txrx_peer->vdev->pdev;
 
-		if (!peer->bss_peer) {
+		if ((peer->vdev->opmode != wlan_op_mode_sta) &&
+		    !peer->bss_peer) {
 			params.vdev_id = peer->vdev->vdev_id;
 			params.peer_mac = peer->mac_addr.raw;
 
@@ -8129,7 +8130,7 @@ static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 
 	dp_txrx_peer_attach_add(soc, peer, txrx_peer);
 
-	if (peer->bss_peer)
+	if ((peer->vdev->opmode == wlan_op_mode_sta) || peer->bss_peer)
 		return QDF_STATUS_SUCCESS;
 
 	params.peer_mac = peer->mac_addr.raw;
