@@ -29,6 +29,7 @@
 #include <wlan_dp_main.h>
 #include <wlan_dp_fisa_rx.h>
 #include <cdp_txrx_ctrl.h>
+#include "qdf_ssr_driver_dump.h"
 
 /* Timeout in milliseconds to wait for CMEM FST HTT response */
 #define DP_RX_FST_CMEM_RESP_TIMEOUT 2000
@@ -500,6 +501,11 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 		  "Rx FST attach successful, #entries:%d\n",
 		  fst->max_entries);
 
+	qdf_ssr_driver_dump_register_region("dp_fisa", fst, sizeof(*fst));
+	qdf_ssr_driver_dump_register_region("dp_fisa_sw_fse_table", fst->base,
+					    DP_RX_GET_SW_FT_ENTRY_SIZE *
+						   fst->max_entries);
+
 	return QDF_STATUS_SUCCESS;
 
 timer_init_fail:
@@ -614,6 +620,8 @@ void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx)
 
 	dp_fst = dp_ctx->rx_fst;
 	if (qdf_likely(dp_fst)) {
+		qdf_ssr_driver_dump_unregister_region("dp_fisa_sw_fse_table");
+		qdf_ssr_driver_dump_unregister_region("dp_fisa");
 		qdf_timer_sync_cancel(&dp_fst->fse_cache_flush_timer);
 		if (dp_fst->fst_in_cmem)
 			dp_rx_fst_cmem_deinit(dp_fst);
