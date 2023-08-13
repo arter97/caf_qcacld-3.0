@@ -3137,6 +3137,22 @@ static QDF_STATUS wlan_hdd_stats_request_needed(struct hdd_adapter *adapter)
 }
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 
+static void wlan_hdd_send_mlo_ll_stats(struct wlan_hdd_link_info *link_info,
+				       void *mlo_peer_stats)
+{
+	if (!link_info) {
+		hdd_err("Invalid link_info");
+		return;
+	}
+
+	if (!wlan_hdd_is_mlo_connection(link_info))
+		return;
+
+	wlan_hdd_send_mlo_ll_iface_stats(link_info->adapter);
+	wlan_hdd_send_mlo_ll_peer_stats(link_info->adapter->hdd_ctx,
+					(struct wifi_peer_stat *)mlo_peer_stats);
+}
+
 static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 				      tSirLLStatsGetReq *req)
 {
@@ -3244,14 +3260,11 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 	}
 	qdf_list_destroy(&priv->ll_stats_q);
 
-	if (wlan_hdd_is_mlo_connection(link_info) &&
-	    req->reqId != DEBUGFS_LLSTATS_REQID) {
-		wlan_hdd_send_mlo_ll_iface_stats(adapter);
-		wlan_hdd_send_mlo_ll_peer_stats(hdd_ctx,
-					(struct wifi_peer_stat *)mlo_stats);
-	}
+	if (!ret && req->reqId != DEBUGFS_LLSTATS_REQID)
+		wlan_hdd_send_mlo_ll_stats(link_info, mlo_stats);
 
 	qdf_mem_free(mlo_stats);
+
 exit:
 	qdf_atomic_set(&adapter->is_ll_stats_req_pending, 0);
 	wlan_hdd_reset_station_stats_request_pending(hdd_ctx->psoc, adapter);
