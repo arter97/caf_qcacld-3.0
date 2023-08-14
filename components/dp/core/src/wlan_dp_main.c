@@ -1011,13 +1011,22 @@ dp_change_def_link(struct wlan_dp_intf *dp_intf,
 
 QDF_STATUS
 dp_link_switch_notification(struct wlan_objmgr_vdev *vdev,
-			    struct wlan_mlo_link_switch_req *lswitch_req)
+			    struct wlan_mlo_link_switch_req *lswitch_req,
+			    enum wlan_mlo_link_switch_notify_reason notify_reason)
 {
 	/* Add prints to string and print it at last, so we have only 1 print */
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	/*
+	 * Currently DP handles link switch notification only if the command
+	 * is in serialization's active queue.
+	 * Return success for other notify reasons which are not handled in DP.
+	 */
+	if (notify_reason != MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_POST_SER)
+		return QDF_STATUS_SUCCESS;
 
 	dp_ctx = dp_get_context();
 

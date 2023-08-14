@@ -792,6 +792,7 @@ policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx);
  * policy_mgr_link_switch_notifier_cb() - link switch notifier callback
  * @vdev: vdev object
  * @req: link switch request
+ * @notify_reason: Reason for notification
  *
  * This API will be registered to mlo link switch, to be invoked before
  * do link switch process.
@@ -800,7 +801,8 @@ policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx);
  */
 QDF_STATUS
 policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
-				   struct wlan_mlo_link_switch_req *req);
+				   struct wlan_mlo_link_switch_req *req,
+				   enum wlan_mlo_link_switch_notify_reason notify_reason);
 #else
 static inline void
 policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}

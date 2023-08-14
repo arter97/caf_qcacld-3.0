@@ -1489,7 +1489,7 @@ static void hdd_son_deauth_sta(struct wlan_objmgr_vdev *vdev,
 		  QDF_MAC_ADDR_REF(peer_mac), ignore_frame);
 
 	status = hdd_softap_sta_deauth(link_info->adapter, &param);
-	if (QDF_STATUS_IS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Error in deauthenticating peer");
 }
 

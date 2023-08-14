@@ -6536,7 +6536,8 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
-				   struct wlan_mlo_link_switch_req *req)
+				   struct wlan_mlo_link_switch_req *req,
+				   enum wlan_mlo_link_switch_notify_reason notify_reason)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -6550,6 +6551,9 @@ policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
 	uint8_t num_del = 0;
 	struct ml_nlink_change_event data;
+
+	if (notify_reason != MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_POST_SER)
+		return QDF_STATUS_SUCCESS;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
