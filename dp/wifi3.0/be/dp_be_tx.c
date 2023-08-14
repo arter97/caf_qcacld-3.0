@@ -1607,11 +1607,11 @@ void dp_tx_update_bank_profile(struct dp_soc_be *be_soc,
 
 QDF_STATUS dp_tx_desc_pool_init_be(struct dp_soc *soc,
 				   uint32_t num_elem,
-				   uint8_t pool_id)
+				   uint8_t pool_id,
+				   bool spcl_tx_desc)
 {
 	struct dp_tx_desc_pool_s *tx_desc_pool;
 	struct dp_hw_cookie_conversion_t *cc_ctx;
-	struct dp_soc_be *be_soc;
 	struct dp_spt_page_desc *page_desc;
 	struct dp_tx_desc_s *tx_desc;
 	uint32_t ppt_idx = 0;
@@ -1622,10 +1622,13 @@ QDF_STATUS dp_tx_desc_pool_init_be(struct dp_soc *soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	be_soc = dp_get_be_soc_from_dp_soc(soc);
-	tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
-	cc_ctx  = dp_get_tx_cookie_t(soc, pool_id);
-
+	if (spcl_tx_desc) {
+		tx_desc_pool = dp_get_spcl_tx_desc_pool(soc, pool_id);
+		cc_ctx  = dp_get_spcl_tx_cookie_t(soc, pool_id);
+	} else {
+		tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);;
+		cc_ctx  = dp_get_tx_cookie_t(soc, pool_id);
+	}
 	tx_desc = tx_desc_pool->freelist;
 	page_desc = &cc_ctx->page_desc_base[0];
 	while (tx_desc) {
@@ -1658,15 +1661,16 @@ QDF_STATUS dp_tx_desc_pool_init_be(struct dp_soc *soc,
 
 void dp_tx_desc_pool_deinit_be(struct dp_soc *soc,
 			       struct dp_tx_desc_pool_s *tx_desc_pool,
-			       uint8_t pool_id)
+			       uint8_t pool_id, bool spcl_tx_desc)
 {
 	struct dp_spt_page_desc *page_desc;
-	struct dp_soc_be *be_soc;
 	int i = 0;
 	struct dp_hw_cookie_conversion_t *cc_ctx;
 
-	be_soc = dp_get_be_soc_from_dp_soc(soc);
-	cc_ctx  = dp_get_tx_cookie_t(soc, pool_id);
+	if (spcl_tx_desc)
+		cc_ctx  = dp_get_spcl_tx_cookie_t(soc, pool_id);
+	else
+		cc_ctx  = dp_get_tx_cookie_t(soc, pool_id);
 
 	for (i = 0; i < cc_ctx->total_page_num; i++) {
 		page_desc = &cc_ctx->page_desc_base[i];

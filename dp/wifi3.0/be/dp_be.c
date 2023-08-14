@@ -800,6 +800,16 @@ static void dp_soc_tx_cookie_detach_be(struct dp_soc *soc)
 			qdf_mem_free(dp_global->tx_cc_ctx[i]);
 		}
 	}
+
+	dp_global->spcl_tx_cookie_ctx_alloc_cnt--;
+	if (dp_global->spcl_tx_cookie_ctx_alloc_cnt == 0) {
+		for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+			dp_hw_cookie_conversion_detach(
+					be_soc,
+					dp_global->spcl_tx_cc_ctx[i]);
+			qdf_mem_free(dp_global->spcl_tx_cc_ctx[i]);
+		}
+	}
 }
 
 static QDF_STATUS dp_soc_tx_cookie_attach_be(struct dp_soc *soc)
@@ -807,6 +817,7 @@ static QDF_STATUS dp_soc_tx_cookie_attach_be(struct dp_soc *soc)
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_hw_cookie_conversion_t *cc_ctx;
 	struct dp_global_context *dp_global;
+	struct dp_hw_cookie_conversion_t *spcl_cc_ctx;
 	uint32_t num_entries;
 	int i = 0;
 	QDF_STATUS qdf_status;
@@ -831,6 +842,26 @@ static QDF_STATUS dp_soc_tx_cookie_attach_be(struct dp_soc *soc)
 		}
 	}
 	dp_global->tx_cookie_ctx_alloc_cnt++;
+
+	if (dp_global->spcl_tx_cookie_ctx_alloc_cnt == 0) {
+		for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+			dp_global->spcl_tx_cc_ctx[i] =
+				qdf_mem_malloc(
+				sizeof(struct dp_hw_cookie_conversion_t));
+			spcl_cc_ctx = dp_global->spcl_tx_cc_ctx[i];
+			num_entries =
+				wlan_cfg_get_num_tx_spl_desc(soc->wlan_cfg_ctx);
+			qdf_status =
+				dp_hw_cookie_conversion_attach(
+						be_soc,
+						spcl_cc_ctx,
+						num_entries,
+						DP_TX_SPCL_DESC_TYPE, i);
+			if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+				return QDF_STATUS_E_FAILURE;
+		}
+	}
+	dp_global->spcl_tx_cookie_ctx_alloc_cnt++;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -846,6 +877,10 @@ static void dp_soc_tx_cookie_deinit_be(struct dp_soc *soc)
 		dp_hw_cookie_conversion_deinit(
 				be_soc,
 				dp_global->tx_cc_ctx[i]);
+	for (i = 0; i < MAX_TXDESC_POOLS; i++)
+		dp_hw_cookie_conversion_deinit(
+				be_soc,
+				dp_global->spcl_tx_cc_ctx[i]);
 }
 
 static QDF_STATUS dp_soc_tx_cookie_init_be(struct dp_soc *soc)
@@ -853,6 +888,7 @@ static QDF_STATUS dp_soc_tx_cookie_init_be(struct dp_soc *soc)
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_global_context *dp_global;
 	struct dp_hw_cookie_conversion_t *cc_ctx;
+	struct dp_hw_cookie_conversion_t *spcl_cc_ctx;
 	QDF_STATUS qdf_status;
 	int i = 0;
 
@@ -861,7 +897,15 @@ static QDF_STATUS dp_soc_tx_cookie_init_be(struct dp_soc *soc)
 		cc_ctx = dp_global->tx_cc_ctx[i];
 		qdf_status =
 			dp_hw_cookie_conversion_init(be_soc,
-					cc_ctx);
+						     cc_ctx);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+			return QDF_STATUS_E_FAILURE;
+	}
+	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+		spcl_cc_ctx = dp_global->spcl_tx_cc_ctx[i];
+		qdf_status =
+			dp_hw_cookie_conversion_init(be_soc,
+						     spcl_cc_ctx);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			return QDF_STATUS_E_FAILURE;
 	}

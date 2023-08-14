@@ -1491,10 +1491,27 @@ struct dp_tx_desc_pool_s *dp_get_tx_desc_pool(struct dp_soc *soc,
 	dp_global = wlan_objmgr_get_global_ctx();
 	return dp_global->tx_desc[pool_id];
 }
+
+static inline
+struct dp_tx_desc_pool_s *dp_get_spcl_tx_desc_pool(struct dp_soc *soc,
+						   uint8_t pool_id)
+{
+	struct dp_global_context *dp_global = NULL;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+	return dp_global->spcl_tx_desc[pool_id];
+}
 #else
 static inline
 struct dp_tx_desc_pool_s *dp_get_tx_desc_pool(struct dp_soc *soc,
 					      uint8_t pool_id)
+{
+	return &soc->tx_desc[pool_id];
+}
+
+static inline
+struct dp_tx_desc_pool_s *dp_get_spcl_tx_desc_pool(struct dp_soc *soc,
+						   uint8_t pool_id)
 {
 	return &soc->tx_desc[pool_id];
 }

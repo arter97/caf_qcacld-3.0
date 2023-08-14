@@ -137,9 +137,26 @@ enum CMEM_MEM_CLIENTS {
 	((WLAN_CFG_NUM_TX_DESC_MAX / DP_CC_SPT_PAGE_MAX_ENTRIES) * \
 	 DP_CC_PPT_ENTRY_SIZE_4K_ALIGNED)
 
+#ifndef QCA_SUPPORT_DP_GLOBAL_CTX
 /* Offset of rx descripotor pool */
 #define DP_RX_DESC_CMEM_OFFSET \
 	DP_TX_DESC_CMEM_OFFSET + (MAX_TXDESC_POOLS * DP_TX_DESC_POOL_CMEM_SIZE)
+
+#else
+/* tx special descriptor are programmed after tx desc CMEM region*/
+#define DP_TX_SPCL_DESC_CMEM_OFFSET \
+	DP_TX_DESC_CMEM_OFFSET + (MAX_TXDESC_POOLS * DP_TX_DESC_POOL_CMEM_SIZE)
+
+/* size of CMEM needed for a tx special desc pool*/
+#define DP_TX_SPCL_DESC_POOL_CMEM_SIZE \
+	((WLAN_CFG_NUM_TX_SPL_DESC_MAX / DP_CC_SPT_PAGE_MAX_ENTRIES) * \
+	 DP_CC_PPT_ENTRY_SIZE_4K_ALIGNED)
+
+/* Offset of rx descripotor pool */
+#define DP_RX_DESC_CMEM_OFFSET \
+	DP_TX_SPCL_DESC_CMEM_OFFSET + (MAX_TXDESC_POOLS * \
+	DP_TX_SPCL_DESC_POOL_CMEM_SIZE)
+#endif
 
 /* size of CMEM needed for a rx desc pool */
 #define DP_RX_DESC_POOL_CMEM_SIZE \
@@ -657,10 +674,29 @@ struct dp_hw_cookie_conversion_t *dp_get_tx_cookie_t(struct dp_soc *soc,
 	dp_global = wlan_objmgr_get_global_ctx();
 	return dp_global->tx_cc_ctx[pool_id];
 }
+
+static inline
+struct dp_hw_cookie_conversion_t *dp_get_spcl_tx_cookie_t(struct dp_soc *soc,
+							  uint8_t pool_id)
+{
+	struct dp_global_context *dp_global = NULL;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+	return dp_global->spcl_tx_cc_ctx[pool_id];
+}
 #else
 static inline
 struct dp_hw_cookie_conversion_t *dp_get_tx_cookie_t(struct dp_soc *soc,
 						     uint8_t pool_id)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	return &be_soc->tx_cc_ctx[pool_id];
+}
+
+static inline
+struct dp_hw_cookie_conversion_t *dp_get_spcl_tx_cookie_t(struct dp_soc *soc,
+							  uint8_t pool_id)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
@@ -978,6 +1014,21 @@ _dp_srng_test_and_update_nf_params(struct dp_soc *soc,
 }
 #endif
 
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
+static inline
+uint32_t dp_desc_pool_get_spcl_cmem_base(uint8_t desc_pool_id)
+{
+	return (DP_TX_SPCL_DESC_CMEM_OFFSET +
+		(desc_pool_id * DP_TX_SPCL_DESC_POOL_CMEM_SIZE));
+}
+#else
+static inline
+uint32_t dp_desc_pool_get_spcl_cmem_base(uint8_t desc_pool_id)
+{
+	QDF_BUG(0);
+	return 0;
+}
+#endif
 static inline
 uint32_t dp_desc_pool_get_cmem_base(uint8_t chip_id, uint8_t desc_pool_id,
 				    enum dp_desc_type desc_type)
@@ -986,6 +1037,8 @@ uint32_t dp_desc_pool_get_cmem_base(uint8_t chip_id, uint8_t desc_pool_id,
 	case DP_TX_DESC_TYPE:
 		return (DP_TX_DESC_CMEM_OFFSET +
 			(desc_pool_id * DP_TX_DESC_POOL_CMEM_SIZE));
+	case DP_TX_SPCL_DESC_TYPE:
+		return dp_desc_pool_get_spcl_cmem_base(desc_pool_id);
 	case DP_RX_DESC_BUF_TYPE:
 		return (DP_RX_DESC_CMEM_OFFSET +
 			((chip_id * MAX_RXDESC_POOLS) + desc_pool_id) *

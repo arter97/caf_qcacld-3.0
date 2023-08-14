@@ -341,15 +341,15 @@ struct dp_tx_desc_pool_s *dp_tx_create_flow_pool(struct dp_soc *soc,
 		return pool;
 	}
 
-	if (dp_tx_desc_pool_alloc(soc, flow_pool_id, flow_pool_size)) {
+	if (dp_tx_desc_pool_alloc(soc, flow_pool_id, flow_pool_size, false)) {
 		qdf_spin_unlock_bh(&pool->flow_pool_lock);
 		dp_err("dp_tx_desc_pool_alloc failed flow_pool_id: %d",
 			flow_pool_id);
 		return NULL;
 	}
 
-	if (dp_tx_desc_pool_init(soc, flow_pool_id, flow_pool_size)) {
-		dp_tx_desc_pool_free(soc, flow_pool_id);
+	if (dp_tx_desc_pool_init(soc, flow_pool_id, flow_pool_size, false)) {
+		dp_tx_desc_pool_free(soc, flow_pool_id, false);
 		qdf_spin_unlock_bh(&pool->flow_pool_lock);
 		dp_err("dp_tx_desc_pool_init failed flow_pool_id: %d",
 			flow_pool_id);
@@ -490,8 +490,8 @@ int dp_tx_delete_flow_pool(struct dp_soc *soc, struct dp_tx_desc_pool_s *pool,
 	}
 
 	/* We have all the descriptors for the pool, we can delete the pool */
-	dp_tx_desc_pool_deinit(soc, pool->flow_pool_id);
-	dp_tx_desc_pool_free(soc, pool->flow_pool_id);
+	dp_tx_desc_pool_deinit(soc, pool->flow_pool_id, false);
+	dp_tx_desc_pool_free(soc, pool->flow_pool_id, false);
 	qdf_spin_unlock_bh(&pool->flow_pool_lock);
 	return 0;
 }
@@ -683,8 +683,8 @@ static inline void dp_tx_desc_pool_dealloc(struct dp_soc *soc)
 		if (!tx_desc_pool->desc_pages.num_pages)
 			continue;
 
-		dp_tx_desc_pool_deinit(soc, i);
-		dp_tx_desc_pool_free(soc, i);
+		dp_tx_desc_pool_deinit(soc, i, false);
+		dp_tx_desc_pool_free(soc, i, false);
 	}
 }
 

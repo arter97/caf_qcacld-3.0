@@ -56,7 +56,8 @@ dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 
 QDF_STATUS dp_tx_desc_pool_init_rh(struct dp_soc *soc,
 				   uint32_t num_elem,
-				   uint8_t pool_id)
+				   uint8_t pool_id,
+				   bool spcl_tx_desc)
 {
 	uint32_t id, count, page_id, offset, pool_id_32;
 	struct dp_tx_desc_s *tx_desc;
@@ -86,7 +87,7 @@ QDF_STATUS dp_tx_desc_pool_init_rh(struct dp_soc *soc,
 
 void dp_tx_desc_pool_deinit_rh(struct dp_soc *soc,
 			       struct dp_tx_desc_pool_s *tx_desc_pool,
-			       uint8_t pool_id)
+			       uint8_t pool_id, bool spcl_tx_desc)
 {
 }
 

@@ -202,23 +202,26 @@ void dp_tx_update_bank_profile(struct dp_soc_be *be_soc,
  * @soc: Handle to DP Soc structure
  * @num_elem: number of descriptor in pool
  * @pool_id: pool ID to allocate
+ * @spcl_tx_desc: if special desc
  *
  * Return: QDF_STATUS_SUCCESS - success, others - failure
  */
 QDF_STATUS dp_tx_desc_pool_init_be(struct dp_soc *soc,
 				   uint32_t num_elem,
-				   uint8_t pool_id);
+				   uint8_t pool_id,
+				   bool spcl_tx_desc);
 /**
  * dp_tx_desc_pool_deinit_be() - De-initialize Tx Descriptor pool(s)
  * @soc: Handle to DP Soc structure
  * @tx_desc_pool: Tx descriptor pool handler
  * @pool_id: pool ID to deinit
+ * @spcl_tx_desc: if special desc
  *
  * Return: None
  */
 void dp_tx_desc_pool_deinit_be(struct dp_soc *soc,
 			       struct dp_tx_desc_pool_s *tx_desc_pool,
-			       uint8_t pool_id);
+			       uint8_t pool_id, bool spcl_tx_desc);
 
 #ifdef WLAN_SUPPORT_PPEDS
 /**

@@ -169,11 +169,16 @@ struct dp_global_context {
 	struct dp_rx_fst *fst_ctx;
 	struct dp_tx_desc_pool_s *tx_desc[4];
 	struct dp_hw_cookie_conversion_t *tx_cc_ctx[4];
+	struct dp_tx_desc_pool_s *spcl_tx_desc[4];
+	struct dp_hw_cookie_conversion_t *spcl_tx_cc_ctx[4];
 	qdf_atomic_t rx_fst_ref_cnt;
 	qdf_atomic_t global_descriptor_in_use;
 	int tx_cookie_ctx_alloc_cnt;
 	int tx_desc_pool_alloc_cnt;
 	int tx_desc_pool_init_cnt;
+	int spcl_tx_cookie_ctx_alloc_cnt;
+	int spcl_tx_desc_pool_alloc_cnt;
+	int spcl_tx_desc_pool_init_cnt;
 };
 
 /**
@@ -197,6 +202,7 @@ static inline QDF_STATUS cdp_global_ctx_init(void)
 	if (!dp_global)
 		return QDF_STATUS_E_FAILURE;
 
+	qdf_mem_zero(dp_global, sizeof(*dp_global));
 	wlan_objmgr_set_global_ctx(dp_global);
 	qdf_atomic_set(&dp_global->global_descriptor_in_use, 0);
 	dp_global->fst_ctx = NULL;

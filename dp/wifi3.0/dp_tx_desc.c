@@ -99,7 +99,7 @@ void dp_tx_desc_pool_cleanup(struct dp_soc *soc, qdf_nbuf_t *nbuf_list)
 {
 	int i;
 	struct dp_tx_desc_pool_s *tx_desc_pool = NULL;
-	uint32_t num_pool = wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
+	uint8_t num_pool = wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
 
 	for (i = 0; i < num_pool; i++) {
 		tx_desc_pool = dp_get_tx_desc_pool(soc, i);
@@ -115,18 +115,62 @@ void dp_tx_desc_pool_cleanup(struct dp_soc *soc, qdf_nbuf_t *nbuf_list)
 }
 #endif
 
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
+static void dp_tx_desc_pool_alloc_mem(int8_t pool_id, bool spcl_tx_desc)
+{
+	struct dp_global_context *dp_global = NULL;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+
+	if (spcl_tx_desc) {
+		dp_global->spcl_tx_desc[pool_id] =
+			qdf_mem_malloc(sizeof(struct dp_tx_desc_pool_s));
+	} else {
+		dp_global->tx_desc[pool_id] =
+			qdf_mem_malloc(sizeof(struct dp_tx_desc_pool_s));
+	}
+}
+
+static void dp_tx_desc_pool_free_mem(int8_t pool_id, bool spcl_tx_desc)
+{
+	struct dp_global_context *dp_global = NULL;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+	if (spcl_tx_desc)
+		qdf_mem_free(dp_global->spcl_tx_desc[pool_id]);
+	else
+		qdf_mem_free(dp_global->tx_desc[pool_id]);
+}
+#else
+static void dp_tx_desc_pool_alloc_mem(int8_t pool_id, bool spcl_tx_desc)
+{
+}
+
+static void dp_tx_desc_pool_free_mem(int8_t pool_id, bool spcl_tx_desc)
+{
+}
+#endif
+
 QDF_STATUS dp_tx_desc_pool_alloc(struct dp_soc *soc, uint8_t pool_id,
-				 uint32_t num_elem)
+				 uint32_t num_elem, bool spcl_tx_desc)
 {
 	uint32_t desc_size;
 	struct dp_tx_desc_pool_s *tx_desc_pool;
+	enum dp_desc_type desc_type = DP_TX_DESC_TYPE;
 
 	desc_size = DP_TX_DESC_SIZE(sizeof(struct dp_tx_desc_s));
 
-	tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
+	dp_tx_desc_pool_alloc_mem(pool_id, spcl_tx_desc);
+	if (spcl_tx_desc) {
+		tx_desc_pool = dp_get_spcl_tx_desc_pool(soc, pool_id);
+		desc_type = DP_TX_SPCL_DESC_TYPE;
+	} else {
+		tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
+		desc_type = DP_TX_DESC_TYPE;
+	}
 
 	tx_desc_pool->desc_pages.page_size = DP_BLOCKMEM_SIZE;
-	dp_desc_multi_pages_mem_alloc(soc, DP_TX_DESC_TYPE,
+	dp_desc_multi_pages_mem_alloc(soc, desc_type,
 				      &tx_desc_pool->desc_pages,
 				      desc_size, num_elem,
 				      0, true);
@@ -138,27 +182,39 @@ QDF_STATUS dp_tx_desc_pool_alloc(struct dp_soc *soc, uint8_t pool_id,
 	return QDF_STATUS_SUCCESS;
 }
 
-void dp_tx_desc_pool_free(struct dp_soc *soc, uint8_t pool_id)
+void dp_tx_desc_pool_free(struct dp_soc *soc, uint8_t pool_id,
+			  bool spcl_tx_desc)
 {
 	struct dp_tx_desc_pool_s *tx_desc_pool;
+	enum dp_desc_type desc_type = DP_TX_DESC_TYPE;
 
-	tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
+	if (spcl_tx_desc) {
+		tx_desc_pool = dp_get_spcl_tx_desc_pool(soc, pool_id);
+		desc_type = DP_TX_SPCL_DESC_TYPE;
+	} else {
+		tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
+		desc_type = DP_TX_DESC_TYPE;
+	}
 
 	if (tx_desc_pool->desc_pages.num_pages)
-		dp_desc_multi_pages_mem_free(soc, DP_TX_DESC_TYPE,
+		dp_desc_multi_pages_mem_free(soc, desc_type,
 					     &tx_desc_pool->desc_pages, 0,
 					     true);
 }
 
 QDF_STATUS dp_tx_desc_pool_init(struct dp_soc *soc, uint8_t pool_id,
-				uint32_t num_elem)
+				uint32_t num_elem, bool spcl_tx_desc)
 {
 	struct dp_tx_desc_pool_s *tx_desc_pool = NULL;
 	uint32_t desc_size;
 
 	desc_size = DP_TX_DESC_SIZE(sizeof(struct dp_tx_desc_s));
 
-	tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
+	if (spcl_tx_desc) {
+		tx_desc_pool = dp_get_spcl_tx_desc_pool(soc, pool_id);
+	} else {
+		tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
+	}
 	if (qdf_mem_multi_page_link(soc->osdev,
 				    &tx_desc_pool->desc_pages,
 				    desc_size, num_elem, true)) {
@@ -170,7 +226,8 @@ QDF_STATUS dp_tx_desc_pool_init(struct dp_soc *soc, uint8_t pool_id,
 		*tx_desc_pool->desc_pages.cacheable_pages;
 	/* Set unique IDs for each Tx descriptor */
 	if (QDF_STATUS_SUCCESS != soc->arch_ops.dp_tx_desc_pool_init(
-						soc, num_elem, pool_id)) {
+						soc, num_elem,
+						pool_id, spcl_tx_desc)) {
 		dp_err("initialization per target failed");
 		return QDF_STATUS_E_FAULT;
 	}
@@ -183,12 +240,17 @@ QDF_STATUS dp_tx_desc_pool_init(struct dp_soc *soc, uint8_t pool_id,
 	return QDF_STATUS_SUCCESS;
 }
 
-void dp_tx_desc_pool_deinit(struct dp_soc *soc, uint8_t pool_id)
+void dp_tx_desc_pool_deinit(struct dp_soc *soc, uint8_t pool_id,
+			    bool spcl_tx_desc)
 {
 	struct dp_tx_desc_pool_s *tx_desc_pool;
 
-	tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
-	soc->arch_ops.dp_tx_desc_pool_deinit(soc, tx_desc_pool, pool_id);
+	if (spcl_tx_desc)
+		tx_desc_pool = dp_get_spcl_tx_desc_pool(soc, pool_id);
+	else
+		tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
+	soc->arch_ops.dp_tx_desc_pool_deinit(soc, tx_desc_pool,
+					     pool_id, spcl_tx_desc);
 	TX_DESC_POOL_MEMBER_CLEAN(tx_desc_pool);
 	TX_DESC_LOCK_DESTROY(&tx_desc_pool->lock);
 }
