@@ -681,7 +681,6 @@ static void sme_state_info_dump(char **buf_ptr, uint16_t *size)
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
 	if (!mac_handle) {
-		QDF_ASSERT(0);
 		return;
 	}
 

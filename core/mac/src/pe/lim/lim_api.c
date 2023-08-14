@@ -509,7 +509,6 @@ static void lim_state_info_dump(char **buf_ptr, uint16_t *size)
 
 	mac = cds_get_context(QDF_MODULE_ID_PE);
 	if (!mac) {
-		QDF_ASSERT(0);
 		return;
 	}
 
