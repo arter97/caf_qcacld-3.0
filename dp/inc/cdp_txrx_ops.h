@@ -148,8 +148,6 @@ enum cdp_peer_txq_flush_policy {
  * struct cdp_mlo_ops - MLO ops for multichip
  * @mlo_soc_setup: setup DP mlo for SOC
  * @mlo_soc_teardown: teardown DP mlo for SOC
- * @update_mlo_ptnr_list:
- * @clear_mlo_ptnr_list:
  * @mlo_setup_complete: indication to DP that all SOCs mlo is setup
  * @mlo_update_delta_tsf2: update delta tsf2 for link
  * @mlo_update_delta_tqm: update delta tqm for SOC
@@ -164,11 +162,6 @@ struct cdp_mlo_ops {
 	void (*mlo_soc_teardown)(struct cdp_soc_t *cdp_soc,
 				 struct cdp_mlo_ctxt *mlo_ctxt,
 				 bool is_force_down);
-	QDF_STATUS (*update_mlo_ptnr_list)(struct cdp_soc_t *soc_hdl,
-					   int8_t *vdev_ids, uint8_t num_vdevs,
-					   uint8_t vdev_id);
-	QDF_STATUS (*clear_mlo_ptnr_list)(struct cdp_soc_t *soc_hdl,
-					  uint8_t vdev_id);
 	void (*mlo_setup_complete)(struct cdp_mlo_ctxt *mlo_ctxt);
 	struct cdp_mlo_ctxt *(*mlo_ctxt_attach)(struct cdp_ctrl_mlo_mgr *m_ctx);
 	void (*mlo_ctxt_detach)(struct cdp_mlo_ctxt *mlo_ctxt);

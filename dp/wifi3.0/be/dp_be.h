@@ -415,8 +415,6 @@ struct dp_vdev_be {
 	int8_t bank_id;
 	uint8_t vdev_id_check_en;
 #ifdef WLAN_MLO_MULTI_CHIP
-	uint8_t partner_vdev_list[WLAN_MAX_MLO_CHIPS][WLAN_MAX_MLO_LINKS_PER_SOC];
-	uint8_t bridge_vdev_list[WLAN_MAX_MLO_CHIPS][WLAN_MAX_MLO_LINKS_PER_SOC];
 	struct cdp_vdev_stats mlo_stats;
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_MCAST_MLO
@@ -540,8 +538,6 @@ dp_mlo_get_peer_hash_obj(struct dp_soc *soc)
 	return be_soc->ml_ctxt;
 }
 
-void  dp_clr_mlo_ptnr_list(struct dp_soc *soc, struct dp_vdev *vdev);
-
 /**
  * dp_get_mlo_dev_list_obj() - return the container struct of MLO Dev list
  * @be_soc: be soc handle
@@ -553,6 +549,7 @@ dp_get_mlo_dev_list_obj(struct dp_soc_be *be_soc)
 {
 	return be_soc->ml_ctxt;
 }
+
 #if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * dp_mlo_partner_chips_map() - Map MLO peers to partner SOCs
@@ -628,11 +625,6 @@ static inline dp_mld_peer_hash_obj_t
 dp_mlo_get_peer_hash_obj(struct dp_soc *soc)
 {
 	return dp_get_be_soc_from_dp_soc(soc);
-}
-
-static inline void  dp_clr_mlo_ptnr_list(struct dp_soc *soc,
-					 struct dp_vdev *vdev)
-{
 }
 
 static inline dp_mlo_dev_obj_t
