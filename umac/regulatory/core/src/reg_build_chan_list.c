@@ -4411,6 +4411,44 @@ reg_process_afc_expiry_event(struct afc_regulatory_info *afc_info)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * reg_find_afc_max_bw_from_chip_cap() - Find the maximum AFC BW based on the
+ * chip capabilities.
+ *
+ * @pdev: Pointer to PDEV object.
+ *
+ * Return:
+ * AFC_BW_320 if the chip supports 11BE, else return AFC_BW_160.
+ */
+static uint16_t
+reg_find_afc_max_bw_from_chip_cap(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_reg_tx_ops *reg_ops;
+	uint8_t phy_id, pdev_id;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	reg_ops = reg_get_psoc_tx_ops(psoc);
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	if (reg_ops->get_phy_id_from_pdev_id)
+		reg_ops->get_phy_id_from_pdev_id(psoc, pdev_id, &phy_id);
+	else
+		phy_id = pdev_id;
+
+	if (reg_ops->is_chip_11be && reg_ops->is_chip_11be(psoc, phy_id))
+		return AFC_BW_320;
+
+	return AFC_BW_160;
+}
+#else
+static inline uint16_t
+reg_find_afc_max_bw_from_chip_cap(struct wlan_objmgr_pdev *pdev)
+{
+	return AFC_BW_160;
+}
+#endif
+
 /**
  * reg_fill_min_max_bw_for_afc_list() - Fill min and max bw in afc list from
  * from the SP AFC list
@@ -4425,10 +4463,12 @@ reg_fill_min_max_bw_for_afc_list(
 		struct regulatory_channel *afc_chan_list)
 {
 	uint8_t chan_idx;
+	uint16_t afc_max_bw;
 
+	afc_max_bw = reg_find_afc_max_bw_from_chip_cap(pdev_priv_obj->pdev_ptr);
 	for (chan_idx = 0; chan_idx < NUM_6GHZ_CHANNELS; chan_idx++) {
 		afc_chan_list[chan_idx].min_bw = MIN_AFC_BW;
-		afc_chan_list[chan_idx].max_bw = MAX_AFC_BW;
+		afc_chan_list[chan_idx].max_bw = afc_max_bw;
 	}
 }
 

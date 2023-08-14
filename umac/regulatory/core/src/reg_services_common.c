@@ -5176,6 +5176,25 @@ reg_get_chan_state_for_320(struct wlan_objmgr_pdev *pdev,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
+#ifdef CONFIG_REG_CLIENT
+static void
+reg_verify_punc_for_320_and_set_channel_state(uint16_t punc_bitmap,
+					      enum channel_state *chan_state,
+					      enum channel_state update_state)
+{
+	if (reg_is_punc_bitmap_valid(CH_WIDTH_320MHZ, punc_bitmap)) {
+		*chan_state = update_state;
+	}
+}
+#else /* CONFIG_REG_CLIENT */
+static inline void
+reg_verify_punc_for_320_and_set_channel_state(uint16_t punc_bitmap,
+					      enum channel_state *chan_state,
+					      enum channel_state update_state)
+{
+}
+#endif /* CONFIG_REG_CLIENT */
+
 enum channel_state
 reg_get_320_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 					     qdf_freq_t freq,
@@ -5230,9 +5249,9 @@ reg_get_320_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 	}
 
 	/* Validate puncture bitmap. Update channel state. */
-	if (reg_is_punc_bitmap_valid(CH_WIDTH_320MHZ, *out_punc_bitmap)) {
-		chan_state = update_state;
-	}
+	reg_verify_punc_for_320_and_set_channel_state(*out_punc_bitmap,
+						      &chan_state,
+						      update_state);
 
 	prim_chan_state =
 		reg_get_20mhz_channel_state_based_on_nol(pdev, freq,
