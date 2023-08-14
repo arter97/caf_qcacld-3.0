@@ -47,6 +47,8 @@
  * @rx_fst: pointer to rx_fst handle
  * @rx_fst_ref_cnt: ref count of rx_fst
  * @grp_umac_reset_ctx: UMAC reset context at mlo group level
+ * @mlo_dev_list: list of MLO device context
+ * @mlo_dev_list_lock: lock to protect MLO device ctxt
  */
 struct dp_mlo_ctxt {
 	struct cdp_ctrl_mlo_mgr *ctrl_ctxt;
@@ -68,6 +70,9 @@ struct dp_mlo_ctxt {
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 	struct dp_soc_mlo_umac_reset_ctx grp_umac_reset_ctx;
 #endif
+	/* MLO device ctxt list */
+	TAILQ_HEAD(, dp_mlo_dev_ctxt) mlo_dev_list;
+	qdf_spinlock_t mlo_dev_list_lock;
 };
 
 /**
