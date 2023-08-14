@@ -1114,13 +1114,11 @@ dp_set_hybrid_pktlog_enable(struct dp_pdev *pdev,
 	struct dp_mon_ops *mon_ops = NULL;
 	uint16_t num_buffers;
 
-	if (mon_pdev->mvdev) {
-		/* Nothing needs to be done if monitor mode is
-		 * enabled
-		 */
-		mon_pdev->pktlog_hybrid_mode = true;
+	/* Nothing needs to be done if monitor mode is
+	 * enabled
+	 */
+	if (mon_pdev->mvdev)
 		return false;
-	}
 
 	mon_ops = dp_mon_ops_get(pdev->soc);
 	if (!mon_ops) {

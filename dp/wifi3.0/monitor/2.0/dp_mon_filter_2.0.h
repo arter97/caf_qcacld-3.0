@@ -69,11 +69,14 @@ dp_rx_mon_packet_length_set(uint32_t *msg_word,
 
 /**
  * dp_rx_mon_word_mask_subscribe() - Setup rx monitor word mask subscription
+ * @soc: soc handle
  * @msg_word: msg word
+ * @pdev_id: id of dp pdev handle
  * @tlv_filter: rx ring filter configuration
  */
 void
-dp_rx_mon_word_mask_subscribe(uint32_t *msg_word,
+dp_rx_mon_word_mask_subscribe(struct dp_soc *soc,
+			      uint32_t *msg_word, int pdev_id,
 			      struct htt_rx_ring_tlv_filter *tlv_filter);
 
 /**
