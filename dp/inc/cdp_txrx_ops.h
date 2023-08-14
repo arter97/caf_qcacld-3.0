@@ -185,6 +185,28 @@ struct cdp_mlo_ops {
 };
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * struct cdp_cmn_mlo_ops - CDP common MLO ops
+ * @mlo_dev_ctxt_create: MLO device context create
+ * @mlo_dev_ctxt_attach: MLO device context attach
+ * @mlo_dev_ctxt_detach: MLO device context detach
+ * @mlo_dev_ctxt_destroy: MLO device context destroy
+ */
+struct cdp_cmn_mlo_ops {
+	QDF_STATUS (*mlo_dev_ctxt_create)(struct cdp_soc_t *soc,
+					  uint8_t *mld_mac_addr);
+	QDF_STATUS (*mlo_dev_ctxt_attach)(struct cdp_soc_t *soc,
+					  uint8_t vdev_id,
+					  uint8_t *mld_mac_addr);
+	QDF_STATUS (*mlo_dev_ctxt_detach)(struct cdp_soc_t *soc,
+					  uint8_t vdev_id,
+					  uint8_t *mld_mac_addr);
+	QDF_STATUS (*mlo_dev_ctxt_destroy)(struct cdp_soc_t *soc,
+					   uint8_t *mld_mac_addr);
+};
+#endif
+
 /******************************************************************************
  *
  * Control Interface (A Interface)
@@ -2496,6 +2518,9 @@ struct cdp_ops {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 	struct cdp_mlo_ops  *mlo_ops;
+#endif
+#if defined(WLAN_FEATURE_11BE_MLO)
+	struct cdp_cmn_mlo_ops  *cmn_mlo_ops;
 #endif
 #ifdef CONFIG_SAWF_DEF_QUEUES
 	struct cdp_sawf_ops  *sawf_ops;
