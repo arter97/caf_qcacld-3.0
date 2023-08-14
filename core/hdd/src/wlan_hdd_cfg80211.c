@@ -3817,6 +3817,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	bool is_vendor_unsafe_ch_present = false;
 	bool sap_force_11n_for_11ac = 0;
 	bool go_force_11n_for_11ac = 0;
+	bool is_ll_lt_sap = false;
+	bool sap_force_11n;
 	bool go_11ac_override = 0;
 	bool sap_11ac_override = 0;
 	uint8_t vht_ch_width;
@@ -3848,6 +3850,12 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					    &go_force_11n_for_11ac);
 	ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc,
 					    &channel_bonding_mode_2g);
+
+	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id))
+		is_ll_lt_sap = true;
+
+	if (is_ll_lt_sap || sap_force_11n_for_11ac)
+		sap_force_11n = true;
 
 	if (!((adapter->device_mode == QDF_SAP_MODE) ||
 	      (adapter->device_mode == QDF_P2P_GO_MODE))) {
@@ -3915,7 +3923,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	sap_config->acs_cfg.master_acs_cfg.eht = eht_enabled;
 
 	if (((adapter->device_mode == QDF_SAP_MODE) &&
-	      sap_force_11n_for_11ac) ||
+	      sap_force_11n) ||
 	    ((adapter->device_mode == QDF_P2P_GO_MODE) &&
 	      go_force_11n_for_11ac)) {
 		vht_enabled = 0;
@@ -3951,6 +3959,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		else
 			ch_width = 20;
 	}
+	if (is_ll_lt_sap)
+		ch_width = 20;
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_LAST_SCAN_AGEOUT_TIME])
 		last_scan_ageout_time =
@@ -4148,7 +4158,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	    sap_config->acs_cfg.end_ch_freq >=
 		WLAN_REG_CH_TO_FREQ(CHAN_ENUM_5180) &&
 	    ((adapter->device_mode == QDF_SAP_MODE &&
-	      !sap_force_11n_for_11ac &&
+	      !sap_force_11n &&
 	      sap_11ac_override) ||
 	      (adapter->device_mode == QDF_P2P_GO_MODE &&
 	      !go_force_11n_for_11ac &&

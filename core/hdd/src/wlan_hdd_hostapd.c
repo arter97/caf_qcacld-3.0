@@ -6221,6 +6221,17 @@ wlan_hdd_set_multipass(struct wlan_objmgr_vdev *vdev)
 }
 #endif
 
+static void wlan_hdd_update_ll_lt_sap_configs(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      struct sap_config *config)
+{
+	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+		return;
+
+	config->SapHw_mode = eCSR_DOT11_MODE_11n;
+	config->ch_width_orig = CH_WIDTH_20MHZ;
+}
+
 /**
  * wlan_hdd_cfg80211_start_bss() - start bss
  * @link_info: Link info pointer in HDD adapter
@@ -6755,6 +6766,9 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		    config->SapHw_mode == eCSR_DOT11_MODE_11ac_ONLY)
 			config->SapHw_mode = eCSR_DOT11_MODE_11n;
 	}
+
+	wlan_hdd_update_ll_lt_sap_configs(hdd_ctx->psoc,
+					  link_info->vdev_id, config);
 
 	config->sap_orig_hw_mode = config->SapHw_mode;
 	reg_phy_mode = csr_convert_to_reg_phy_mode(config->SapHw_mode,
