@@ -456,6 +456,7 @@ int register_telemetry_agent_ops(struct telemetry_agent_ops *agent_ops)
 	g_agent_ops->agent_get_psoc_info = wifi_driver_get_psoc_info;
 	g_agent_ops->agent_get_pdev_info = wifi_driver_get_pdev_info;
 	g_agent_ops->agent_get_peer_info = wifi_driver_get_peer_info;
+	g_agent_ops->agent_get_psoc_stats = wifi_driver_get_psoc_stats;
 	g_agent_ops->agent_get_pdev_stats = wifi_driver_get_pdev_stats;
 	g_agent_ops->agent_get_peer_stats = wifi_driver_get_peer_stats;
 	g_agent_ops->agent_get_emesh_pdev_stats = wifi_driver_get_emesh_pdev_stats;
