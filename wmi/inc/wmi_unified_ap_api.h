@@ -961,6 +961,20 @@ wmi_unified_txbf_sounding_trig_info_cmd_send(struct wmi_unified *wmi_handle,
 					     *sounding_params);
 #endif
 
+#ifdef WLAN_WSI_STATS_SUPPORT
+/**
+ * wmi_unified_config_wsi_stats_info_cmd_send() - send WSI stats info for PDEV
+ * @wmi_handle: wmi_handle
+ * @param: pointer to hold ingress and egress information
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_config_wsi_stats_info_cmd_send(
+		wmi_unified_t wmi_hdl,
+		struct wmi_wsi_stats_info_params
+		*param);
+#endif
+
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 /**
  * wmi_unified_config_trigger_ulofdma_su_cmd_send() - trig ulofdma for SU

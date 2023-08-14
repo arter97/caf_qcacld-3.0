@@ -1219,6 +1219,20 @@ struct wmi_peer_latency_config_params {
 };
 #endif
 
+#ifdef WLAN_WSI_STATS_SUPPORT
+/**
+ * struct wmi_wsi_stats_info_params - WSI stats info
+ * @pdev_id: PDEV ID
+ * @wsi_ingress_load_info: Ingress count for the PSOC
+ * @wsi_egress_load_info: Egress count for the PSOC
+ */
+struct wmi_wsi_stats_info_params {
+	uint32_t pdev_id;
+	uint32_t wsi_ingress_load_info;
+	uint32_t wsi_egress_load_info;
+};
+#endif
+
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 /**
  * struct wmi_trigger_ul_ofdma_su_params - SU manual trigger ul_ofdma info

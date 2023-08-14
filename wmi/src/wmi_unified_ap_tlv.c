@@ -3902,6 +3902,59 @@ config_txbf_sounding_trig_info_cmd_tlv(wmi_unified_t wmi,
 }
 #endif
 
+#ifdef WLAN_WSI_STATS_SUPPORT
+/**
+ * send_wsi_stats_info_cmd_tlv() - send WSI stats info command
+ * @wmi_handle: wmi handle
+ * @param: WSI stats information
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static
+QDF_STATUS send_wsi_stats_info_cmd_tlv(wmi_unified_t wmi_handle,
+				       struct wmi_wsi_stats_info_params *param)
+{
+	wmi_pdev_wsi_stats_info_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	QDF_STATUS retval;
+	uint32_t len = 0;
+	uint8_t *buf_ptr = 0;
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_pdev_wsi_stats_info_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_pdev_wsi_stats_info_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+			wmi_pdev_wsi_stats_info_cmd_fixed_param));
+
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+							wmi_handle,
+							param->pdev_id);
+	cmd->wsi_ingress_load_info = param->wsi_ingress_load_info;
+	cmd->wsi_egress_load_info = param->wsi_egress_load_info;
+
+	wmi_mtrace(WMI_PDEV_WSI_STATS_INFO_CMDID, cmd->pdev_id, 0);
+	retval = wmi_unified_cmd_send(
+			wmi_handle, buf, len,
+			WMI_PDEV_WSI_STATS_INFO_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(retval)) {
+		wmi_err("WMI WMI_PDEV_WSI_STATS_INFO_CMDID Failed");
+		wmi_buf_free(buf);
+	}
+
+	return retval;
+}
+#endif
+
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 /**
  * trigger_ulofdma_su_cmd_tlv() - trigger SU ulofdma config command
@@ -4514,6 +4567,9 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #endif
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 	ops->config_txbf_sounding_trig_info_cmd = config_txbf_sounding_trig_info_cmd_tlv;
+#endif
+#ifdef WLAN_WSI_STATS_SUPPORT
+	ops->send_wsi_stats_info_cmd = send_wsi_stats_info_cmd_tlv;
 #endif
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 	ops->trigger_ulofdma_su_cmd = trigger_ulofdma_su_cmd_tlv;
