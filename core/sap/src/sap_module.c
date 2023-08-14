@@ -3909,7 +3909,7 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		*csa_reason = CSA_REASON_BAND_RESTRICTED;
 	} else if (sap_band == REG_BAND_2G && (band & BIT(REG_BAND_5G))) {
 		if (sap_ctx->chan_freq_before_switch_band) {
-			if (wlan_reg_is_enable_in_secondary_list_for_freq(
+			if (!wlan_reg_is_disable_in_secondary_list_for_freq(
 			    mac->pdev,
 			    sap_ctx->chan_freq_before_switch_band)) {
 				restart_freq =
