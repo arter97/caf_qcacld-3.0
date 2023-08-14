@@ -1247,7 +1247,7 @@ static inline void hal_rx_dump_pkt_hdr_tlv_9224(struct rx_pkt_tlvs *pkt_tlvs,
 	hal_verbose_debug("\n---------------\n"
 			  "rx_pkt_hdr_tlv\n"
 			  "---------------\n"
-			  "phy_ppdu_id %llu ",
+			  "phy_ppdu_id 0x%x ",
 			  pkt_hdr_tlv->phy_ppdu_id);
 
 	hal_verbose_hex_dump(pkt_hdr_tlv->rx_pkt_hdr,
@@ -1731,12 +1731,12 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_mpdu_get_addr4 = hal_rx_mpdu_get_addr4_be;
 	hal_soc->ops->hal_rx_hw_desc_get_ppduid_get =
 		hal_rx_hw_desc_get_ppduid_get_be;
-	hal_soc->ops->hal_rx_get_ppdu_id = hal_rx_get_ppdu_id_be;
 	hal_soc->ops->hal_rx_tlv_phy_ppdu_id_get =
 					hal_rx_attn_phy_ppdu_id_get_be;
 	hal_soc->ops->hal_rx_get_filter_category =
 						hal_rx_get_filter_category_be;
 #endif
+	hal_soc->ops->hal_rx_get_ppdu_id = hal_rx_get_ppdu_id_be;
 	hal_soc->ops->hal_rx_tlv_msdu_len_set =
 					hal_rx_msdu_start_msdu_len_set_be;
 	hal_soc->ops->hal_rx_tlv_sgi_get = hal_rx_tlv_sgi_get_be;
