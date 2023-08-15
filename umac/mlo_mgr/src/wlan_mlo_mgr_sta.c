@@ -228,8 +228,8 @@ mlo_send_link_disconnect(struct wlan_objmgr_vdev *vdev,
 		mlo_release_vdev_ref(wlan_vdev_list[i]);
 	}
 
-	wlan_cm_disconnect(assoc_vdev,
-			   source, reason_code, NULL);
+	if (assoc_vdev)
+		wlan_cm_disconnect(assoc_vdev, source, reason_code, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -451,8 +451,6 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 			return QDF_STATUS_E_FAILURE;
 
 		assoc_vdev = mlo_get_assoc_link_vdev(mlo_dev_ctx);
-		if (!assoc_vdev)
-			return QDF_STATUS_E_FAILURE;
 
 		if (sta_ctx->connect_req) {
 			mlo_free_connect_ies(sta_ctx->connect_req);
@@ -480,8 +478,9 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 						   NULL);
 		}
 
-		wlan_cm_disconnect(assoc_vdev,
-				   source, reason_code, NULL);
+		if (assoc_vdev)
+			wlan_cm_disconnect(assoc_vdev, source,
+					   reason_code, NULL);
 	}
 
 	return status;
@@ -1195,28 +1194,33 @@ mlo_send_link_disconnect_sync(struct wlan_mlo_dev_context *mlo_dev_ctx,
 			      struct qdf_mac_addr *bssid)
 {
 	uint8_t i;
-	struct wlan_objmgr_vdev *assoc_vdev =
-			mlo_get_assoc_link_vdev(mlo_dev_ctx);
-
-	if (!assoc_vdev)
-		return QDF_STATUS_E_FAILURE;
+	struct wlan_objmgr_vdev *sync_vdev =
+		mlo_get_assoc_link_vdev(mlo_dev_ctx);
 
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		if (!mlo_dev_ctx->wlan_vdev_list[i])
 			continue;
 
-		/*
-		 * To initiate disconnect on all links at once, no need to use
-		 * sync API for link Vdev
+		/**
+		 * If the assoc vdev isn't present, use the first link dev as
+		 * sync candidate.
 		 */
-		if (mlo_dev_ctx->wlan_vdev_list[i] !=
-		    mlo_get_assoc_link_vdev(mlo_dev_ctx))
-			wlan_cm_disconnect(mlo_dev_ctx->wlan_vdev_list[i],
-					   source, reason_code, NULL);
+		if (!sync_vdev) {
+			sync_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+			continue;
+		}
+
+		/**
+		 * To initiate disconnect on all links at once, no need to use
+		 * sync API for all link vdevs.
+		 */
+		wlan_cm_disconnect(mlo_dev_ctx->wlan_vdev_list[i],
+				   source, reason_code, NULL);
 	}
 
-	wlan_cm_disconnect_sync(assoc_vdev,
-				source, reason_code);
+	if (sync_vdev)
+		wlan_cm_disconnect_sync(sync_vdev, source, reason_code);
+
 	return QDF_STATUS_SUCCESS;
 }
 
