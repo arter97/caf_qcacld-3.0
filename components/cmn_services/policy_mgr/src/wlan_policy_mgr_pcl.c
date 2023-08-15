@@ -1763,6 +1763,8 @@ enum policy_mgr_one_connection_mode
 			index = PM_NAN_DISC_24_1x1;
 		else
 			index = PM_NAN_DISC_24_2x2;
+	} else if (PM_LL_LT_SAP_MODE == pm_conc_connection_list[0].mode) {
+		index = PM_LL_LT_SAP_5_2x2;
 	}
 
 	policy_mgr_debug("mode:%d freq:%d chain:%d index:%d",

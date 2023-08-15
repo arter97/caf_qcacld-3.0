@@ -9524,6 +9524,7 @@ enum QDF_OPMODE policy_mgr_get_qdf_mode_from_pm(
 		mode = QDF_STA_MODE;
 		break;
 	case PM_SAP_MODE:
+	case PM_LL_LT_SAP_MODE:
 		mode = QDF_SAP_MODE;
 		break;
 	case PM_P2P_CLIENT_MODE:
