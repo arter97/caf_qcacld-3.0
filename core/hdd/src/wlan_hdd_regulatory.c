@@ -1596,7 +1596,7 @@ hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
 	ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
 				       cur_chan_list);
 
-	width = hdd_get_adapter_width(adapter);
+	width = hdd_get_link_info_width(adapter->deflink);
 	org_bw = wlan_reg_get_bw_value(width);
 
 	for (i = 0; i < NUM_CHANNELS; i++) {
@@ -1648,7 +1648,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
 		width_changed = false;
-		oper_freq = hdd_get_adapter_home_channel(adapter);
+		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
 		if (oper_freq)
 			freq_changed = wlan_reg_is_disable_for_pwrmode(
 							pdev,
@@ -1677,7 +1677,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 								    adapter,
 								    oper_freq);
 
-			if (hdd_is_vdev_in_conn_state(adapter)) {
+			if (hdd_is_vdev_in_conn_state(adapter->deflink)) {
 				if (phy_changed || freq_changed ||
 				    width_changed) {
 					hdd_debug("changed: phy %d, freq %d, width %d",
@@ -1728,7 +1728,7 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 		sap_config->SapHw_mode = csr_phy_mode;
 		hdd_err("Can't restart AP because it is not started");
@@ -1797,7 +1797,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		oper_freq = hdd_get_adapter_home_channel(adapter);
+		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
 
 		switch (adapter->device_mode) {
 		case QDF_P2P_GO_MODE:
@@ -1806,7 +1806,7 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 			break;
 		case QDF_SAP_MODE:
 			if (!test_bit(SOFTAP_INIT_DONE,
-				      &adapter->event_flags)) {
+				      &adapter->deflink->link_flags)) {
 				hdd_info("AP is not started yet");
 				break;
 			}

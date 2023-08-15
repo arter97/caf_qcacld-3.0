@@ -39,6 +39,13 @@ QDF_STATUS ucfg_ll_sap_init(void);
  */
 QDF_STATUS ucfg_ll_sap_deinit(void);
 
+/**
+ * ucfg_is_ll_lt_sap_supported() - Check if ll_lt_sap is supported or not
+ *
+ * Return: True/False
+ */
+bool ucfg_is_ll_lt_sap_supported(void);
+
 #else
 static inline QDF_STATUS ucfg_ll_sap_init(void)
 {
@@ -48,6 +55,11 @@ static inline QDF_STATUS ucfg_ll_sap_init(void)
 static inline QDF_STATUS ucfg_ll_sap_deinit(void)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool ucfg_is_ll_lt_sap_supported(void)
+{
+	return false;
 }
 
 #endif /* WLAN_FEATURE_LL_LT_SAP */

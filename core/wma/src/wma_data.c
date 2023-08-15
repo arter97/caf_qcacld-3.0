@@ -644,7 +644,7 @@ static QDF_STATUS wma_encode_mc_rate(uint32_t shortgi, uint32_t chwidth,
 	wma_debug("Input: nss = %d, mbpsx10 = 0x%x, chwidth = %d, shortgi = %d",
 		  nss, mbpsx10_rate, chwidth, shortgi);
 	if ((mbpsx10_rate & 0x40000000) && nss > 0) {
-		/* bit 30 indicates user inputed nss,
+		/* bit 30 indicates user inputted nss,
 		 * bit 28 and 29 used to encode nss
 		 */
 		uint8_t user_nss = (mbpsx10_rate & 0x30000000) >> 28;

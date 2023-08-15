@@ -85,7 +85,7 @@ mlme_fill_freq_in_scan_start_request(struct wlan_objmgr_vdev *vdev,
 	enum phy_ch_width associated_ch_width;
 	uint8_t i;
 	struct chan_list *scan_chan_list;
-	uint16_t first_freq, operation_chan_freq;
+	qdf_freq_t first_freq, operation_chan_freq, sec_2g_freq;
 	char *chan_buff = NULL;
 	uint32_t buff_len, buff_num = 0, chan_count = 0;
 
@@ -94,7 +94,8 @@ mlme_fill_freq_in_scan_start_request(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 
 	operation_chan_freq = wlan_get_operation_chan_freq(vdev);
-	associated_ch_width = mlme_priv->connect_info.ch_width_orig;
+	associated_ch_width =
+			mlme_priv->connect_info.chan_info_orig.ch_width_orig;
 	if (associated_ch_width == CH_WIDTH_INVALID) {
 		mlme_debug("vdev %d : Invalid associated ch width for freq %d",
 			   req->scan_req.vdev_id, operation_chan_freq);
@@ -112,6 +113,30 @@ mlme_fill_freq_in_scan_start_request(struct wlan_objmgr_vdev *vdev,
 			   associated_ch_width);
 		req->scan_req.chan_list.num_chan = 1;
 		req->scan_req.chan_list.chan[0].freq = operation_chan_freq;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (wlan_reg_is_24ghz_ch_freq(operation_chan_freq) &&
+	    associated_ch_width == CH_WIDTH_40MHZ) {
+		sec_2g_freq =
+			mlme_priv->connect_info.chan_info_orig.sec_2g_freq;
+		if (!sec_2g_freq) {
+			mlme_debug("vdev %d : Invalid sec 2g freq for freq: %d",
+				   req->scan_req.vdev_id, operation_chan_freq);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		if (operation_chan_freq > sec_2g_freq) {
+			req->scan_req.chan_list.chan[0].freq = sec_2g_freq;
+			req->scan_req.chan_list.chan[1].freq =
+							operation_chan_freq;
+		} else {
+			req->scan_req.chan_list.chan[0].freq =
+							operation_chan_freq;
+			req->scan_req.chan_list.chan[1].freq = sec_2g_freq;
+		}
+
+		req->scan_req.chan_list.num_chan = 2;
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -489,7 +514,8 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 	if (!mlme_priv)
 		return QDF_STATUS_E_FAILURE;
 
-	associated_ch_width = mlme_priv->connect_info.ch_width_orig;
+	associated_ch_width =
+		mlme_priv->connect_info.chan_info_orig.ch_width_orig;
 	if (associated_ch_width == CH_WIDTH_INVALID) {
 		mlme_debug("vdev %d :Invalid associated ch_width",
 			   req->scan_req.vdev_id);
@@ -671,6 +697,22 @@ QDF_STATUS mlme_init_rate_config(struct vdev_mlme_obj *vdev_mlme)
 	mlme_priv->mcs_rate_set.max_len =
 		QDF_MIN(CFG_SUPPORTED_MCS_SET_LEN, CFG_STR_DATA_LEN);
 	mlme_priv->mcs_rate_set.len = 0;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS mlme_init_connect_chan_info_config(struct vdev_mlme_obj *vdev_mlme)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = vdev_mlme->ext_vdev_ptr;
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->connect_info.chan_info_orig.ch_width_orig = CH_WIDTH_INVALID;
+	mlme_priv->connect_info.chan_info_orig.sec_2g_freq = 0;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2338,6 +2380,8 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_SUPPORT_LINK_BAND);
 	sta->mlo_max_simultaneous_links =
 		cfg_default(CFG_MLO_MAX_SIMULTANEOUS_LINKS);
+	sta->mlo_prefer_percentage =
+		cfg_get(psoc, CFG_MLO_PREFER_PERCENTAGE);
 }
 
 static bool
@@ -2952,14 +2996,6 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 
 	lfr->roam_inactive_data_packet_count =
 		cfg_get(psoc, CFG_ROAM_INACTIVE_COUNT);
-
-	if (val)
-		lfr->roam_scan_period_after_inactivity =
-			cfg_get(psoc, CFG_ROAM_SCAN_SECOND_TIMER) * 1000;
-
-	else
-		lfr->roam_scan_period_after_inactivity =
-			cfg_get(psoc, CFG_POST_INACTIVITY_ROAM_SCAN_PERIOD);
 
 	lfr->fw_akm_bitmap = 0;
 	lfr->enable_ft_im_roaming = cfg_get(psoc, CFG_FT_IM_ROAMING);
@@ -4420,9 +4456,19 @@ wlan_get_op_chan_freq_info_vdev_id(struct wlan_objmgr_pdev *pdev,
 	if (!chan)
 		goto rel_ref;
 
+	/* If operating mode is STA / P2P-CLI then get the channel width
+	 * from phymode. This is due the reason where actual operating
+	 * channel width is configured as part of WMI_PEER_ASSOC_CMDID
+	 * which could be downgraded while the peer associated.
+	 * If there is a failure or operating mode is not STA / P2P-CLI
+	 * then get channel width from wlan_channel.
+	 */
+	status = wlan_mlme_get_sta_ch_width(vdev, ch_width);
+	if (QDF_IS_STATUS_ERROR(status))
+		*ch_width = chan->ch_width;
+
 	*op_freq = chan->ch_freq;
 	*freq_seg_0 = chan->ch_cfreq1;
-	*ch_width = chan->ch_width;
 	status = QDF_STATUS_SUCCESS;
 
 rel_ref:

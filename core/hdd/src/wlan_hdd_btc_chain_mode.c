@@ -93,7 +93,7 @@ wlan_hdd_btc_chain_mode_handler(struct wlan_objmgr_vdev *vdev)
 	}
 
 	sme_update_he_cap_nss(mac_handle, link_info->vdev_id, nss);
-	freq = hdd_get_adapter_home_channel(adapter);
+	freq = hdd_get_link_info_home_channel(link_info);
 
 	/*
 	 * BT coex chain mode is for COEX between BT and WiFi-2.4G.

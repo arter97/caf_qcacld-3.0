@@ -113,6 +113,7 @@
 #include "target_if_vdev_mgr_tx_ops.h"
 #include "wlan_fwol_ucfg_api.h"
 #include "wlan_vdev_mgr_utils_api.h"
+#include "target_if.h"
 
 /*
  * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
@@ -1001,6 +1002,7 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	uint16_t puncture_bitmap = 0;
 	uint16_t new_puncture_bitmap = 0;
 	uint32_t bw_puncture = 0;
+	enum phy_ch_width new_bw;
 
 	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_SELF)
 		return;
@@ -1045,14 +1047,17 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	max_ch_width_supported =
 		wmi_get_ch_width_from_phy_mode(wma->wmi_handle,
 					       fw_phymode);
+	new_bw =
+	target_if_wmi_chan_width_to_phy_ch_width(max_ch_width_supported);
+
 	if (is_eht) {
 		wlan_reg_extract_puncture_by_bw(vdev_chan->ch_width,
 						puncture_bitmap,
 						vdev_chan->ch_freq,
 						vdev_chan->ch_freq_seg2,
-						max_ch_width_supported,
+						new_bw,
 						&new_puncture_bitmap);
-		QDF_SET_BITS(bw_puncture, 0, 8, max_ch_width_supported);
+		QDF_SET_BITS(bw_puncture, 0, 8, new_bw);
 		QDF_SET_BITS(bw_puncture, 8, 16, new_puncture_bitmap);
 		wlan_util_vdev_peer_set_param_send(vdev, peer_mac_addr,
 						   WLAN_MLME_PEER_BW_PUNCTURE,
@@ -1061,7 +1066,7 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 		wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_CHWIDTH,
 				   max_ch_width_supported, vdev_id);
 	}
-	wma_debug("FW phymode %d old phymode %d new phymode %d bw %d punct: %d macaddr " QDF_MAC_ADDR_FMT,
+	wma_debug("FW phymode %d old phymode %d new phymode %d bw %d punct: 0x%x macaddr " QDF_MAC_ADDR_FMT,
 		  fw_phymode, old_peer_phymode, new_phymode,
 		  max_ch_width_supported, new_puncture_bitmap,
 		  QDF_MAC_ADDR_REF(peer_mac_addr));
@@ -1345,6 +1350,16 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 		wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
 		wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
 							    iface->mac_id, rsp);
+	}
+
+	if (iface->type == WMI_VDEV_TYPE_STA &&
+	    rsp->resp_type == WMI_VDEV_START_RESP_EVENT) {
+		wma_debug("BA mode: %d", mac_ctx->ba_mode);
+		if (wma_cli_set_command(rsp->vdev_id,
+					wmi_vdev_param_set_ba_mode,
+					mac_ctx->ba_mode, VDEV_CMD))
+			wma_err("Set BA opmode failed for vdev: %d",
+				rsp->vdev_id);
 	}
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE

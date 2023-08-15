@@ -1852,7 +1852,7 @@ sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 	uint8_t i, j;
 	tSapSpectChInfo *pSpectInfo;
 	uint8_t minIdx;
-	struct ch_params acs_ch_params;
+	struct ch_params acs_ch_params = {0};
 	int8_t center_freq_diff;
 	uint32_t combined_weight;
 	uint32_t min_ch_weight;
@@ -2027,7 +2027,6 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 	tSapSpectChInfo *pSpectInfo;
 	uint8_t minIdx;
 	struct ch_params acs_ch_params = {0};
-	int32_t center_freq_diff;
 	uint32_t combined_weight;
 	uint32_t min_ch_weight;
 	uint32_t valid_chans = 0;
@@ -2054,19 +2053,12 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 			continue;
 		}
 
-		center_freq_diff = acs_ch_params.mhz_freq_seg1 -
-				   pSpectInfo[j].chan_freq;
-
-		/* This channel frequency does not have all channels */
-		if (center_freq_diff != 150) {
+		/* no other freq left for 320 Mhz operation in spectrum */
+		if (j + 15 > pSpectInfoParams->numSpectChans) {
 			pSpectInfo[j].weight = SAP_ACS_WEIGHT_MAX * 16;
 			pSpectInfo[j].weight_calc_done = true;
 			continue;
 		}
-
-		/* no other freq left for 320 Mhz operation in spectrum */
-		if (j + 15 > pSpectInfoParams->numSpectChans)
-			continue;
 
 		/* Check whether all frequencies are present for 160 Mhz */
 

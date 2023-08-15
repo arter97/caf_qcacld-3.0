@@ -149,6 +149,10 @@ HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_wext.o \
 	    $(HDD_SRC_DIR)/wlan_hdd_hostapd_wext.o
 endif
 
+ifeq ($(CONFIG_AFC_SUPPORT), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_afc.o
+endif
+
 ifeq ($(CONFIG_DCS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_dcs.o
 endif
@@ -1337,6 +1341,7 @@ MLO_MGR_TARGET_IF_DIR := $(WLAN_COMMON_ROOT)/target_if/mlo_mgr
 
 UMAC_MLO_MGR_CLD_DIR := components/umac/mlme/mlo_mgr
 UMAC_MLO_MGR_CLD_INC := -I$(WLAN_ROOT)/$(UMAC_MLO_MGR_CLD_DIR)/inc \
+			-I$(WLAN_ROOT)/$(UMAC_MLO_MGR_CLD_DIR)/dispatcher/inc \
 
 UMAC_MLO_MGR_INC := -I$(WLAN_COMMON_INC)/umac/mlo_mgr/inc \
 		    -I$(WLAN_COMMON_INC)/target_if/mlo_mgr/inc
@@ -1357,6 +1362,9 @@ UMAC_MLO_MGR_OBJS := $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_main.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_mlo_mgr_roam.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_t2lm_api.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_t2lm.o \
+			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_epcs_api.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_epcs.o \
+			  $(UMAC_MLO_MGR_CLD_DIR)/dispatcher/src/wlan_mlo_epcs_ucfg_api.o \
 
 $(call add-wlan-objs,umac_mlomgr,$(UMAC_MLO_MGR_OBJS))
 endif
@@ -2481,6 +2489,23 @@ endif
 
 $(call add-wlan-objs,dcs,$(DCS_OBJS))
 
+####### AFC ######
+AFC_CMN_OSIF_SRC  := $(WLAN_COMMON_ROOT)/os_if/linux/afc/src
+AFC_CMN_CORE_SRC  := $(WLAN_COMMON_ROOT)/umac/afc/core/src
+AFC_CMN_DISP_SRC  := $(WLAN_COMMON_ROOT)/umac/afc/dispatcher/src
+
+AFC_CMN_OSIF_INC  := -I$(WLAN_COMMON_INC)/os_if/linux/afc/inc
+AFC_CMN_DISP_INC  := -I$(WLAN_COMMON_INC)/umac/afc/dispatcher/inc
+AFC_CMN_CORE_INC  := -I$(WLAN_COMMON_INC)/umac/afc/core/inc
+
+ifeq ($(CONFIG_AFC_SUPPORT), y)
+AFC_OBJS := $(AFC_CMN_OSIF_SRC)/wlan_cfg80211_afc.o \
+	    $(AFC_CMN_CORE_SRC)/wlan_afc_main.o \
+	    $(AFC_CMN_DISP_SRC)/wlan_afc_ucfg_api.o
+endif
+
+$(call add-wlan-objs,afc,$(AFC_OBJS))
+
 ###### INTEROP ISSUES AP ########
 INTEROP_ISSUES_AP_OS_IF_SRC      := os_if/interop_issues_ap/src
 INTEROP_ISSUES_AP_TGT_SRC        := components/target_if/interop_issues_ap/src
@@ -3176,6 +3201,10 @@ INCS +=		$(TWT_CONV_INCS)
 ################ Dynamic ACS ####################
 INCS +=		$(DCS_TGT_IF_INC)
 INCS +=		$(DCS_DISP_INC)
+################ AFC #################
+INCS +=		$(AFC_CMN_OSIF_INC)
+INCS +=		$(AFC_CMN_DISP_INC)
+INCS +=		$(AFC_CMN_CORE_INC)
 ################ INTEROP ISSUES AP ################
 INCS +=		$(INTEROP_ISSUES_AP_OS_IF_INC)
 INCS +=		$(INTEROP_ISSUES_AP_TGT_INC)
@@ -3283,7 +3312,7 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_LINK_STA_PARAMS_PRESENT
 endif
 
-found = $(shell if grep -qF "NL80211_EXT_FEATURE_PUNCT" $(srctree)/include/net/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
+found = $(shell if grep -qF "NL80211_EXT_FEATURE_PUNCT" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DNL80211_EXT_FEATURE_PUNCT_SUPPORT
 endif
@@ -3417,6 +3446,9 @@ ifeq ($(CONFIG_DP_USE_REDUCED_PEER_ID_FIELD_WIDTH), y)
 ccflags-y += -DDP_USE_REDUCED_PEER_ID_FIELD_WIDTH
 endif
 endif
+ccflags-$(CONFIG_DP_MULTIPASS_SUPPORT) += -DQCA_MULTIPASS_SUPPORT
+ccflags-$(CONFIG_DP_MULTIPASS_SUPPORT) += -DWLAN_REPEATER_NOT_SUPPORTED
+ccflags-$(CONFIG_DP_MULTIPASS_SUPPORT) += -DQCA_SUPPORT_PEER_ISOLATION
 
 ifdef CONFIG_WLAN_TWT_SAP_STA_COUNT
 WLAN_TWT_SAP_STA_COUNT ?= 32
@@ -4215,6 +4247,7 @@ ccflags-$(CONFIG_WLAN_DP_DISABLE_TCL_STATUS_SRNG) += -DWLAN_DP_DISABLE_TCL_STATU
 ccflags-$(CONFIG_DP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE) += -DDP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE
 ccflags-$(CONFIG_WLAN_DP_SRNG_USAGE_WM_TRACKING) += -DWLAN_DP_SRNG_USAGE_WM_TRACKING
 ccflags-$(CONFIG_WLAN_FEATURE_DP_CFG_EVENT_HISTORY) += -DWLAN_FEATURE_DP_CFG_EVENT_HISTORY
+ccflags-$(CONFIG_WLAN_DP_VDEV_NO_SELF_PEER) += -DWLAN_DP_VDEV_NO_SELF_PEER
 
 # Enable Low latency
 ccflags-$(CONFIG_WLAN_FEATURE_LL_MODE) += -DWLAN_FEATURE_LL_MODE

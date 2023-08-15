@@ -368,8 +368,18 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 #endif
 
 const struct nla_policy
+ml_link_state_config_policy [QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG_LINK_ID] =  {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG_STATE] =    {.type = NLA_U32},
+};
+
+const struct nla_policy
 ml_link_state_request_policy[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_LINK_STATE_OP_TYPE] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG] = {.type = NLA_NESTED},
+	[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MIXED_MODE_ACTIVE_NUM_LINKS] = {
+							.type = NLA_U8},
 };
 
 static int
@@ -387,12 +397,15 @@ __wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 	if (hdd_validate_adapter(adapter))
 		return -EINVAL;
 
+	if (adapter->device_mode != QDF_STA_MODE)
+		return -EINVAL;
+
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 
 	if (!vdev)
 		return -EINVAL;
 
-	wlan_handle_mlo_link_state_operation(wiphy, vdev, data, data_len);
+	ret = wlan_handle_mlo_link_state_operation(wiphy, vdev, data, data_len);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
@@ -620,49 +633,305 @@ free_event:
 	return status;
 }
 
-QDF_STATUS
+#define MLD_MAX_SUPPORTED_LINKS 2
+
+int
 wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 				     struct wlan_objmgr_vdev *vdev,
 				     const void *data, int data_len)
 {
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX + 1];
+	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG_MAX + 1];
 	enum qca_wlan_vendor_link_state_op_types ml_link_op;
-	struct nlattr *link_oper_attr;
-	uint32_t id;
-	int ret = 0;
+	struct nlattr *link_oper_attr, *mode_attr, *curr_attr, *num_link_attr;
+	int rem_len = 0, rc = 0;
+	uint32_t attr_id, ml_config_state = 0;
+	uint8_t ml_active_num_links = 0, ml_link_control_mode = 0;
+	uint8_t ml_config_link_id = 0, num_links = 0;
+	uint8_t vdev_id = vdev->vdev_objmgr.vdev_id;
+	uint8_t link_id_list[MLD_MAX_SUPPORTED_LINKS] = {0};
+	uint32_t config_state_list[MLD_MAX_SUPPORTED_LINKS] = {0};
 
 	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX,
 				    data,
 				    data_len,
 				    ml_link_state_request_policy)) {
-		hdd_err_rl("invalid twt attr");
+		hdd_debug("vdev %d: invalid mlo link state attr", vdev_id);
 		return -EINVAL;
 	}
 
-	id = QCA_WLAN_VENDOR_ATTR_LINK_STATE_OP_TYPE;
-	link_oper_attr = tb[id];
+	attr_id = QCA_WLAN_VENDOR_ATTR_LINK_STATE_OP_TYPE;
+	link_oper_attr = tb[attr_id];
 	if (!link_oper_attr) {
-		hdd_err_rl("link state operation NOT specified");
+		hdd_debug("vdev %d: link state op not specified", vdev_id);
 		return -EINVAL;
 	}
-
 	ml_link_op = nla_get_u8(link_oper_attr);
-
-	hdd_debug("ml link state request:%d", ml_link_op);
 	switch (ml_link_op) {
 	case QCA_WLAN_VENDOR_LINK_STATE_OP_GET:
-		ret = wlan_hdd_link_state_request(wiphy, vdev);
-		break;
+		return wlan_hdd_link_state_request(wiphy, vdev);
 	case QCA_WLAN_VENDOR_LINK_STATE_OP_SET:
-		hdd_debug_rl("ml link SET state not supported");
 		break;
 	default:
-		hdd_err_rl("Invalid link state operation");
-		ret = -EINVAL;
-		break;
+		hdd_debug("vdev %d: Invalid op type:%d", vdev_id, ml_link_op);
+		return -EINVAL;
 	}
 
-	return ret;
+	attr_id = QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE;
+	mode_attr = tb[attr_id];
+	if (!mode_attr) {
+		hdd_debug("vdev %d: ml links control mode attr not present",
+			  vdev_id);
+		return -EINVAL;
+	}
+	ml_link_control_mode = nla_get_u8(mode_attr);
+
+	switch (ml_link_control_mode) {
+	case QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_DEFAULT:
+		/* TODO: restore mlo link(s) state as per driver */
+		break;
+	case QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_USER:
+		attr_id = QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG;
+		if (!tb[attr_id]) {
+			hdd_debug("vdev %d: state config attr not present",
+				  vdev_id);
+			return -EINVAL;
+		}
+
+		nla_for_each_nested(curr_attr, tb[attr_id], rem_len) {
+			rc = wlan_cfg80211_nla_parse_nested(
+				tb2, QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG_MAX,
+				curr_attr,
+				ml_link_state_config_policy);
+			if (rc) {
+				hdd_debug("vdev %d: nested attr not present",
+					     vdev_id);
+				return -EINVAL;
+			}
+
+			attr_id =
+				QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG_LINK_ID;
+			if (!tb2[attr_id]) {
+				hdd_debug("vdev %d: link id attr not present",
+					  vdev_id);
+				return -EINVAL;
+			}
+
+			ml_config_link_id = nla_get_u8(tb2[attr_id]);
+
+			attr_id = QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONFIG_STATE;
+			if (!tb2[attr_id]) {
+				hdd_debug("vdev %d: config attr not present",
+					  vdev_id);
+				return -EINVAL;
+			}
+
+			ml_config_state = nla_get_u32(tb2[attr_id]);
+			hdd_debug("vdev %d: ml_link_id %d, ml_link_state:%d",
+				  vdev_id, ml_config_link_id, ml_config_state);
+			link_id_list[num_links] = ml_config_link_id;
+			config_state_list[num_links] = ml_config_state;
+			num_links++;
+
+			if (num_links >= MLD_MAX_SUPPORTED_LINKS)
+				break;
+		}
+		/* TODO: send link(s) enable/disable command to FW */
+		break;
+	case QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_MIXED:
+		attr_id =
+		   QCA_WLAN_VENDOR_ATTR_LINK_STATE_MIXED_MODE_ACTIVE_NUM_LINKS;
+		num_link_attr = tb[attr_id];
+		if (!num_link_attr) {
+			hdd_debug("number of active state links not specified");
+			return -EINVAL;
+		}
+		ml_active_num_links = nla_get_u8(num_link_attr);
+		hdd_debug("vdev %d: ml_active_num_links: %d", vdev_id,
+			  ml_active_num_links);
+		if (ml_active_num_links > MLD_MAX_SUPPORTED_LINKS)
+			return -EINVAL;
+		/* TODO: Send num link(s) as per user space request to FW */
+		break;
+	default:
+		hdd_debug("vdev %d: invalid ml_link_control_mode: %d", vdev_id,
+			  ml_link_control_mode);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
+static uint32_t
+hdd_get_t2lm_setup_event_len(void)
+{
+	uint32_t len = 0;
+	uint32_t info_len = 0;
+
+	len = NLMSG_HDRLEN;
+
+	/* QCA_WLAN_VENDOR_ATTR_TID_TO_LINK_MAP_AP_MLD_ADDR */
+	len += nla_total_size(QDF_MAC_ADDR_SIZE);
+
+	/* nest */
+	info_len = NLA_HDRLEN;
+	/* QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_UPLINK */
+	info_len += NLA_HDRLEN + sizeof(u16);
+	/* QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_DOWNLINK */
+	info_len += NLA_HDRLEN + sizeof(u16);
+
+	/* QCA_WLAN_VENDOR_ATTR_TID_TO_LINK_MAP_STATUS */
+	len += NLA_HDRLEN + (info_len * T2LM_MAX_NUM_TIDS);
+
+	return len;
+}
+
+static QDF_STATUS
+hdd_t2lm_pack_nl_response(struct sk_buff *skb,
+			  struct wlan_objmgr_vdev *vdev,
+			  struct wlan_t2lm_info *t2lm,
+			  struct qdf_mac_addr mld_addr)
+{
+	struct nlattr *config_attr, *config_params;
+	uint32_t i = 0, attr, attr1;
+	int errno;
+	uint32_t value;
+	uint8_t tid_num;
+
+	attr = QCA_WLAN_VENDOR_ATTR_TID_TO_LINK_MAP_AP_MLD_ADDR;
+	if (nla_put(skb, attr, QDF_MAC_ADDR_SIZE, mld_addr.bytes)) {
+		hdd_err("Failed to put mac_addr");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (t2lm->default_link_mapping) {
+		hdd_debug("update mld addr for default mapping");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	attr = QCA_WLAN_VENDOR_ATTR_TID_TO_LINK_MAP_STATUS;
+	config_attr = nla_nest_start(skb, attr);
+	if (!config_attr) {
+		hdd_err("nla_nest_start error");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	switch (t2lm->direction) {
+	case WLAN_T2LM_UL_DIRECTION:
+		for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++) {
+			config_params = nla_nest_start(skb, tid_num + 1);
+			if (!config_params)
+				return -EINVAL;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_UPLINK;
+			value = t2lm->ieee_link_map_tid[i];
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_DOWNLINK;
+			value = 0;
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+			nla_nest_end(skb, config_params);
+		}
+		break;
+	case WLAN_T2LM_DL_DIRECTION:
+		for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++) {
+			config_params = nla_nest_start(skb, tid_num + 1);
+			if (!config_params)
+				return -EINVAL;
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_DOWNLINK;
+			value = t2lm->ieee_link_map_tid[i];
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_UPLINK;
+			value = 0;
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+			nla_nest_end(skb, config_params);
+		}
+		break;
+	case WLAN_T2LM_BIDI_DIRECTION:
+		for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++) {
+			config_params = nla_nest_start(skb, tid_num + 1);
+			if (!config_params)
+				return -EINVAL;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_UPLINK;
+			value = t2lm->ieee_link_map_tid[i];
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+
+			attr1 = QCA_WLAN_VENDOR_ATTR_LINK_TID_MAP_STATUS_DOWNLINK;
+			value = t2lm->ieee_link_map_tid[i];
+			errno = nla_put_u16(skb, attr1, value);
+			if (errno)
+				return errno;
+			nla_nest_end(skb, config_params);
+		}
+		break;
+	default:
+		return -EINVAL;
+	}
+	nla_nest_end(skb, config_attr);
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
+				    struct wlan_t2lm_info *t2lm)
+{
+	struct sk_buff *skb;
+	size_t data_len;
+	QDF_STATUS status;
+	struct qdf_mac_addr mld_addr;
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
+
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_TID_TO_LINK_MAP_INDEX;
+
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	if (!link_info) {
+		hdd_err("Invalid VDEV");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	adapter = link_info->adapter;
+	data_len = hdd_get_t2lm_setup_event_len();
+	skb = wlan_cfg80211_vendor_event_alloc(adapter->hdd_ctx->wiphy,
+					       NULL,
+					       data_len,
+					       index, GFP_KERNEL);
+	if (!skb) {
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
+		return -EINVAL;
+	}
+
+	/* get mld addr */
+	status = wlan_vdev_get_bss_peer_mld_mac(vdev, &mld_addr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get mld address");
+		goto free_skb;
+	}
+
+	status = hdd_t2lm_pack_nl_response(skb, vdev, t2lm, mld_addr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to pack nl response");
+		goto free_skb;
+	}
+
+	wlan_cfg80211_vendor_event(skb, GFP_KERNEL);
+
+	return status;
+free_skb:
+	wlan_cfg80211_vendor_free_skb(skb);
+
+	return status;
+}
 #endif

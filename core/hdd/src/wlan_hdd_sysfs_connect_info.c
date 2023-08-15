@@ -334,7 +334,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		return buf_avail_len;
 	}
 
-	if (hdd_cm_is_vdev_roaming(adapter)) {
+	if (hdd_cm_is_vdev_roaming(adapter->deflink)) {
 		ret_val = scnprintf(buf + length, buf_avail_len - length,
 				    "Roaming is in progress");
 		if (ret_val <= 0)

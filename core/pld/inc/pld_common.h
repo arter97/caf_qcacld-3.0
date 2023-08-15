@@ -1004,8 +1004,8 @@ static inline int pld_get_driver_load_cnt(struct device *dev)
  * @dev: device
  * @vote: 0 for enable PCIE PC, 1 for disable PCIE PC
  *
- * This is for PCIE power collaps control during suspend/resume.
- * When PCIE power collaps is disabled, WLAN FW can access memory
+ * This is for PCIE power collapse control during suspend/resume.
+ * When PCIE power collapse is disabled, WLAN FW can access memory
  * through PCIE when system is suspended.
  *
  * Return: 0 for success
@@ -1838,6 +1838,23 @@ const char *pld_bus_width_type_to_str(enum pld_bus_width_type level);
 int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 			  int mon_id);
 
+/**
+ * pld_set_tsf_sync_period() - Set TSF sync period
+ * @dev: device
+ * @val: TSF sync time value
+ *
+ * Return: void
+ */
+void pld_set_tsf_sync_period(struct device *dev, u32 val);
+
+/**
+ * pld_reset_tsf_sync_period() - Reset TSF sync period
+ * @dev: device
+ *
+ * Return: void
+ */
+void pld_reset_tsf_sync_period(struct device *dev);
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 /**
  * pld_is_ipa_offload_disabled() - Check if IPA offload is enabled or not
@@ -1892,6 +1909,43 @@ static inline int pld_nbuf_pre_alloc_free(struct sk_buff *skb)
 	return 0;
 }
 #endif
+
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * pld_send_buffer_to_afcmem() - Send afc data to afc memory
+ * @dev: The device structure
+ * @afcdb: Pointer to afc data buffer
+ * @len: Length of afc data
+ * @slotid: Slot id of afc memory
+ *
+ * Return: Non-zero code for error; zero for success
+ */
+int pld_send_buffer_to_afcmem(struct device *dev, const uint8_t *afcdb,
+			      uint32_t len, uint8_t slotid);
+
+/**
+ * pld_reset_afcmem() - Reset afc data in afc memory
+ * @dev: The device structure
+ * @slotid: Slot id of afc memory
+ *
+ * Return: Non-zero code for error; zero for success
+ */
+int pld_reset_afcmem(struct device *dev, uint8_t slotid);
+#else
+static inline
+int pld_send_buffer_to_afcmem(struct device *dev, const uint8_t *afcdb,
+			      uint32_t len, uint8_t slotid)
+{
+	return -EINVAL;
+}
+
+static inline
+int pld_reset_afcmem(struct device *dev, uint8_t slotid)
+{
+	return -EINVAL;
+}
+#endif
+
 /**
  * pld_get_bus_type() - Bus type of the device
  * @dev: device

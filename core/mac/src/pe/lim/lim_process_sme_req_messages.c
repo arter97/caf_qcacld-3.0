@@ -72,6 +72,7 @@
 #include <spatial_reuse_api.h>
 #include "wlan_psoc_mlme_api.h"
 #include "wma_he.h"
+#include "wlan_mlo_mgr_sta.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_peer.h>
 #endif
@@ -3247,7 +3248,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev,
 				&power_type_6g,
-				session->ap_defined_power_type_6g);
+				session->ap_defined_power_type_6g,
+				bss_desc->chan_freq);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			status = QDF_STATUS_E_NOSUPPORT;
 			goto send;
@@ -3281,6 +3283,21 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		session->maxTxPower = lim_get_max_tx_power(mac_ctx, mlme_obj);
 		session->def_max_tx_pwr = session->maxTxPower;
 	}
+
+	/*
+	 * for mdm platform which QCA_NL80211_VENDOR_SUBCMD_LL_STATS_GET
+	 * will not call from android framework every 3 seconds, and tx
+	 * power will never update. So we use iw dev get tx power need
+	 * set maxTxPower non-zero value, that firmware can calc a non-zero
+	 * tx power, and update to host driver.
+	 */
+	if (LIM_IS_STA_ROLE(session) && session->maxTxPower == 0) {
+		session->maxTxPower =
+			wlan_reg_get_channel_reg_power_for_freq(mac_ctx->pdev,
+							session->curr_op_freq);
+		pe_debug("session->maxTxPower %u", session->maxTxPower);
+	}
+
 	session->limRFBand = lim_get_rf_band(session->curr_op_freq);
 
 	/* Initialize 11h Enable Flag */
@@ -4188,7 +4205,11 @@ static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 		pe_err("Partner link info not present");
 		return;
 	}
+
 	num_links = req->partner_info.num_partner_links;
+	if (num_links > WLAN_UMAC_MLO_MAX_VDEVS)
+		num_links = WLAN_UMAC_MLO_MAX_VDEVS;
+
 	partner_info->num_partner_links = num_links;
 	pe_debug("MLO: num_links:%d", num_links);
 
@@ -4411,7 +4432,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	}
 
 	wlan_psoc_mlme_get_11be_capab(mac_ctx->psoc, &eht_capab);
-	if (eht_capab)
+	if (eht_capab && wlan_vdev_mlme_is_mlo_vdev(session->vdev))
 		lim_fill_ml_info(req, pe_join_req);
 
 	return QDF_STATUS_SUCCESS;
@@ -7491,6 +7512,36 @@ lim_process_sme_cfg_action_frm_in_tb_ppdu(struct mac_context *mac_ctx,
 	lim_send_action_frm_tb_ppdu_cfg(mac_ctx, msg->vdev_id, msg->cfg);
 }
 
+static void
+lim_process_sme_send_vdev_pause(struct mac_context *mac_ctx,
+				struct sme_vdev_pause *msg)
+{
+	struct pe_session *session;
+	uint16_t vdev_pause_dur_ms;
+
+	if (!msg) {
+		pe_err("Buffer is NULL");
+		return;
+	}
+
+	session = pe_find_session_by_vdev_id(mac_ctx, msg->session_id);
+	if (!session) {
+		pe_warn("Session does not exist for given BSSID");
+		return;
+	}
+
+	if (!(wlan_vdev_mlme_get_opmode(session->vdev) == QDF_STA_MODE) &&
+	    wlan_vdev_mlme_is_mlo_vdev(session->vdev)) {
+		pe_err("vdev is not ML STA");
+		return;
+	}
+
+	vdev_pause_dur_ms = session->beaconParams.beaconInterval *
+						msg->vdev_pause_duration;
+	wlan_mlo_send_vdev_pause(mac_ctx->psoc, session->vdev,
+				 msg->session_id, vdev_pause_dur_ms);
+}
+
 static void lim_process_sme_update_config(struct mac_context *mac_ctx,
 					  struct update_config *msg)
 {
@@ -7755,7 +7806,7 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 				eHT_CHANNEL_WIDTH_20MHZ : eHT_CHANNEL_WIDTH_40MHZ;
 			qdf_mem_copy(pHtOpMode->peer_mac, &sta->staAddr,
 				     sizeof(tSirMacAddr));
-			pHtOpMode->smesessionId = sessionId;
+			pHtOpMode->smesessionId = pe_session->smeSessionId;
 
 			msg.type = WMA_UPDATE_OP_MODE;
 			msg.reserved = 0;
@@ -8608,6 +8659,10 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 	case WNI_SME_CFG_ACTION_FRM_HE_TB_PPDU:
 		lim_process_sme_cfg_action_frm_in_tb_ppdu(mac,
 				(struct  sir_cfg_action_frm_tb_ppdu *)msg_buf);
+		break;
+	case eWNI_SME_VDEV_PAUSE_IND:
+		lim_process_sme_send_vdev_pause(mac,
+					(struct sme_vdev_pause *)msg_buf);
 		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);

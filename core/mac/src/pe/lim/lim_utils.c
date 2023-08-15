@@ -6978,12 +6978,6 @@ static void lim_intersect_he_caps(tDot11fIEhe_cap *rcvd_he,
 	else
 		peer_he->tb_ppdu_tx_stbc_gt_80mhz = 0;
 
-	if (session_he->htc_he && peer_he->htc_he)
-		peer_he->htc_he = 1;
-	else
-		peer_he->htc_he = 0;
-	pe_debug("intersected htc he is: %d", peer_he->htc_he);
-
 	/* Tx Doppler is first bit and Rx Doppler is second bit */
 	if (session_he->doppler) {
 		val = 0;
@@ -7044,11 +7038,37 @@ void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
 			mac_ctx->mlme_cfg->he_caps.he_mcs_12_13_supp_5g;
 }
 
-void lim_intersect_ap_he_caps(struct pe_session *session, struct bss_params *add_bss,
-		tSchBeaconStruct *beacon, tpSirAssocRsp assoc_rsp)
+static bool
+lim_is_vendor_htc_he_ap(struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr;
+	uint16_t ie_len;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+
+	return wlan_get_vendor_ie_ptr_from_oui(SIR_MAC_BAD_HTC_HE_VENDOR_OUI1,
+					       SIR_MAC_BAD_HTC_HE_VENDOR_OUI_LEN,
+					       vendor_ap_search_attr.ie_data,
+					       ie_len) &&
+					       wlan_get_vendor_ie_ptr_from_oui(
+					       SIR_MAC_BAD_HTC_HE_VENDOR_OUI2,
+					       SIR_MAC_BAD_HTC_HE_VENDOR_OUI_LEN,
+					       vendor_ap_search_attr.ie_data,
+					       ie_len);
+}
+
+void lim_intersect_ap_he_caps(struct pe_session *session,
+			      struct bss_params *add_bss,
+			      tSchBeaconStruct *beacon,
+			      tpSirAssocRsp assoc_rsp,
+			      struct bss_description *bss_desc)
 {
 	tDot11fIEhe_cap *rcvd_he;
 	tDot11fIEhe_cap *peer_he = &add_bss->staContext.he_config;
+	bool vendor_ap_present = false;
 
 	if (assoc_rsp && assoc_rsp->he_cap.present)
 		rcvd_he = &assoc_rsp->he_cap;
@@ -7056,6 +7076,18 @@ void lim_intersect_ap_he_caps(struct pe_session *session, struct bss_params *add
 		rcvd_he = &beacon->he_cap;
 
 	lim_intersect_he_caps(rcvd_he, peer_he, session);
+	peer_he->htc_he = rcvd_he->htc_he;
+	vendor_ap_present = lim_is_vendor_htc_he_ap(bss_desc);
+	if (vendor_ap_present) {
+		if (session->he_config.htc_he && peer_he->htc_he)
+			peer_he->htc_he = 1;
+		else
+			peer_he->htc_he = 0;
+		pe_debug("intersected htc he is: %d", peer_he->htc_he);
+	}
+
+	pe_debug("HTC HE: self: %d recvd: %d, peer: %d",
+		 session->he_config.htc_he, rcvd_he->htc_he, peer_he->htc_he);
 	add_bss->staContext.he_capable = true;
 }
 
@@ -7717,7 +7749,8 @@ void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
 
-	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_cap);
+	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_cap,
+					session);
 	lim_log_he_cap(mac, &dot11_cap);
 	ie = wlan_get_ext_ie_ptr_from_ext_id(HE_CAP_OUI_TYPE,
 			HE_CAP_OUI_SIZE, ie_start, num_bytes);
@@ -8645,6 +8678,9 @@ void lim_copy_bss_eht_cap(struct pe_session *session)
 
 	qdf_mem_copy(&session->eht_config, &mlme_priv->eht_config,
 		     sizeof(session->eht_config));
+
+	if (!wlan_epcs_get_config(session->vdev))
+		session->eht_config.epcs_pri_access = 0;
 }
 
 void lim_copy_join_req_eht_cap(struct pe_session *session)
@@ -8899,7 +8935,8 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 		is_band_2g = true;
 
 	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap);
-	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap);
+	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
+					session);
 	lim_log_eht_cap(mac, &dot11_cap);
 
 	if (is_band_2g) {

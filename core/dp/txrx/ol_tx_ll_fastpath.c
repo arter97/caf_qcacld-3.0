@@ -358,14 +358,6 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 		 * pointer before the ce_send call.
 		 */
 		next = qdf_nbuf_next(msdu);
-		/*
-		 * Increment the skb->users count here, for this SKB, to make
-		 * sure it will be freed only after receiving Tx completion
-		 * of the last segment.
-		 * Decrement skb->users count before sending last segment
-		 */
-		if (qdf_nbuf_is_tso(msdu) && segments)
-			qdf_nbuf_inc_users(msdu);
 
 		/* init the current segment to the 1st segment in the list */
 		while (segments) {
@@ -406,19 +398,9 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 			if (qdf_likely(tx_desc)) {
 				struct qdf_tso_seg_elem_t *next_seg;
 
-				/*
-				 * if this is a jumbo nbuf, then increment the
-				 * number of nbuf users for each additional
-				 * segment of the msdu. This will ensure that
-				 * the skb is freed only after receiving tx
-				 * completion for all segments of an nbuf.
-				 */
-				if (segments !=
-					(msdu_info.tso_info.num_segs - 1))
-					qdf_nbuf_inc_users(msdu);
-
 				ol_tx_trace_pkt(msdu, tx_desc->id,
-						vdev->vdev_id);
+						vdev->vdev_id,
+						vdev->qdf_opmode);
 				/*
 				 * If debug display is enabled, show the meta
 				 * data being downloaded to the target via the
@@ -432,16 +414,18 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 						sent_to_target = 1;
 					next_seg = msdu_info.tso_info.
 						curr_seg->next;
+					/*
+					 * If this is a jumbo nbuf, then increment the
+					 * number of nbuf users for each additional
+					 * segment of the msdu. This will ensure that
+					 * the skb is freed only after receiving tx
+					 * completion for all segments of an nbuf
+					 */
+					if (next_seg)
+						qdf_nbuf_inc_users(msdu);
 				} else {
 					next_seg = NULL;
 				}
-
-				/* Decrement the skb-users count if segment
-				 * is the last segment or the only segment
-				 */
-				if (tx_desc->pkt_type == OL_TX_FRM_TSO &&
-				    segments == 0)
-					qdf_nbuf_tx_free(msdu, 0);
 
 				if ((ce_send_fast(pdev->ce_tx_hdl, msdu,
 						  ep_id,
@@ -457,9 +441,12 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 						tso_info->curr_seg = next_seg;
 						ol_free_remaining_tso_segs(vdev,
 							&msdu_info, true);
-						if (segments ==
-						    (msdu_info.tso_info.num_segs
-						     - 1))
+						/*
+						 * Revert the nbuf users
+						 * increment done for the
+						 * current segment
+						 */
+						if (next_seg)
 							qdf_nbuf_tx_free(
 							msdu,
 							QDF_NBUF_PKT_ERROR);
@@ -489,14 +476,9 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 				 * If TSO packet, free associated
 				 * remaining TSO segment descriptors
 				 */
-				if (qdf_nbuf_is_tso(msdu)) {
+				if (qdf_nbuf_is_tso(msdu))
 					ol_free_remaining_tso_segs(vdev,
 							&msdu_info, true);
-					if (segments ==
-					    (msdu_info.tso_info.num_segs - 1))
-						qdf_nbuf_tx_free(msdu,
-							 QDF_NBUF_PKT_ERROR);
-				}
 				TXRX_STATS_MSDU_LIST_INCR(
 					pdev, tx.dropped.host_reject, msdu);
 				/* the list of unaccepted MSDUs */
@@ -568,9 +550,10 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 				QDF_TRACE_DEFAULT_PDEV_ID,
 				qdf_nbuf_data_addr(msdu),
 				sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
-				vdev->vdev_id, 0));
+				vdev->vdev_id, 0, vdev->qdf_opmode));
 
-			ol_tx_trace_pkt(msdu, tx_desc->id, vdev->vdev_id);
+			ol_tx_trace_pkt(msdu, tx_desc->id, vdev->vdev_id,
+					vdev->qdf_opmode);
 			/*
 			 * If debug display is enabled, show the meta-data being
 			 * downloaded to the target via the HTT tx descriptor.

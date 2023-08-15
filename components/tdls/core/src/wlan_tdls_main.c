@@ -1092,13 +1092,13 @@ tdls_process_policy_mgr_notification(struct wlan_objmgr_psoc *psoc)
 	QDF_STATUS status;
 
 	if (!psoc) {
-		tdls_err("psoc: %pK", psoc);
+		tdls_err("psoc is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	tdls_vdev = tdls_get_vdev(psoc, WLAN_TDLS_NB_ID);
 	if (!tdls_vdev) {
-		tdls_err("No TDLS vdev");
+		tdls_debug("No TDLS vdev");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 

@@ -1585,6 +1585,8 @@ struct wlan_mlme_cfg_twt {
  * @obss_detection_offload_enabled:       Enable OBSS detection offload
  * @obss_color_collision_offload_enabled: Enable obss color collision
  * @bss_color_collision_det_sta: STA BSS color collision detection offload
+ * @bss_color_collision_det_tgt_support: STA BSS color collision detection
+ * target support
  */
 struct wlan_mlme_obss_ht40 {
 	uint32_t active_dwelltime;
@@ -1598,6 +1600,7 @@ struct wlan_mlme_obss_ht40 {
 	bool obss_detection_offload_enabled;
 	bool obss_color_collision_offload_enabled;
 	bool bss_color_collision_det_sta;
+	bool bss_color_collision_det_tgt_support;
 };
 
 /**
@@ -1723,6 +1726,7 @@ enum station_prefer_bw {
  * @mlo_support_link_num:           max number of links that sta mlo supports
  * @mlo_support_link_band:          band bitmap that sta mlo supports
  * @mlo_max_simultaneous_links:     number of simultaneous links
+ * @mlo_prefer_percentage:          percentage to boost/reduce mlo scoring
  * @usr_disable_eht:                user disable the eht for STA
  */
 struct wlan_mlme_sta_cfg {
@@ -1755,6 +1759,7 @@ struct wlan_mlme_sta_cfg {
 	uint8_t mlo_support_link_num;
 	uint8_t mlo_support_link_band;
 	uint8_t mlo_max_simultaneous_links;
+	int8_t mlo_prefer_percentage;
 #endif
 #ifdef WLAN_FEATURE_11BE
 	bool usr_disable_eht;
@@ -1954,8 +1959,6 @@ struct fw_scan_channels {
  * milliseconds for which the device is considered to be inactive.
  * @roam_inactive_data_packet_count: Maximum allowed data packets count
  * during roam_scan_inactivity_time.
- * @roam_scan_period_after_inactivity: Roam scan period after device was in
- * inactive state
  * @fw_akm_bitmap: Supported Akm suites of firmware
  * @roam_full_scan_period: Idle period in seconds between two successive
  * full channel roam scans
@@ -2088,7 +2091,6 @@ struct wlan_mlme_lfr_cfg {
 	bool roaming_scan_policy;
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
-	uint32_t roam_scan_period_after_inactivity;
 	uint32_t fw_akm_bitmap;
 	uint32_t roam_full_scan_period;
 	struct fw_scan_channels saved_freq_list;

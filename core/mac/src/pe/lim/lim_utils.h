@@ -1185,11 +1185,15 @@ QDF_STATUS lim_strip_ie(struct mac_context *mac_ctx,
  * @add_bss: pointer to ADD BSS params
  * @beacon: pointer to beacon
  * @assoc_rsp: pointer to assoc response
+ * @bss_desc: pointer to BSS description
  *
  * Return: None
  */
-void lim_intersect_ap_he_caps(struct pe_session *session, struct bss_params *add_bss,
-		tSchBeaconStruct *pBeaconStruct, tpSirAssocRsp assoc_rsp);
+void lim_intersect_ap_he_caps(struct pe_session *session,
+			      struct bss_params *add_bss,
+			      tSchBeaconStruct *pBeaconStruct,
+			      tpSirAssocRsp assoc_rsp,
+			      struct bss_description *bss_desc);
 
 /**
  * lim_intersect_sta_he_caps() - Intersect STA capability with SAP capability
@@ -1608,8 +1612,10 @@ static inline void lim_update_he_6gop_assoc_resp(
 }
 
 static inline void lim_intersect_ap_he_caps(struct pe_session *session,
-		struct bss_params *add_bss,	tSchBeaconStruct *pBeaconStruct,
-		tpSirAssocRsp assoc_rsp)
+					    struct bss_params *add_bss,
+					    tSchBeaconStruct *pBeaconStruct,
+					    tpSirAssocRsp assoc_rsp,
+					    struct bss_description *bss_desc)
 {
 	return;
 }

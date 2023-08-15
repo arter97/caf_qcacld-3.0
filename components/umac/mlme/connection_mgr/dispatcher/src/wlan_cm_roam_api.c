@@ -128,29 +128,55 @@ wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 #endif
 
-void cm_update_associated_ch_width(struct wlan_objmgr_vdev *vdev,
-				   bool is_update)
+void
+cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 {
 	struct mlme_legacy_priv *mlme_priv;
 	struct wlan_channel *des_chan;
+	struct connect_chan_info *chan_info_orig;
+	enum phy_ch_width ch_width;
+	QDF_STATUS status;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
 		return;
 
+	chan_info_orig = &mlme_priv->connect_info.chan_info_orig;
 	if (!is_update) {
-		mlme_priv->connect_info.ch_width_orig = CH_WIDTH_INVALID;
-		goto print;
+		chan_info_orig->ch_width_orig = CH_WIDTH_INVALID;
+		return;
 	}
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
 		return;
-	mlme_priv->connect_info.ch_width_orig = des_chan->ch_width;
 
-print:
-	mlme_debug("update associated ch width :%d, is_update:%d",
-		   mlme_priv->connect_info.ch_width_orig, is_update);
+	/* If operating mode is STA / P2P-CLI then get the channel width
+	 * from phymode. This is due the reason where actual operating
+	 * channel width is configured as part of WMI_PEER_ASSOC_CMDID
+	 * which could be downgraded while the peer associated.
+	 * If there is a failure or operating mode is not STA / P2P-CLI
+	 * then get channel width from wlan_channel.
+	 */
+	status = wlan_mlme_get_sta_ch_width(vdev, &ch_width);
+	if (QDF_IS_STATUS_ERROR(status))
+		chan_info_orig->ch_width_orig = des_chan->ch_width;
+	else
+		chan_info_orig->ch_width_orig = ch_width;
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq) &&
+	    des_chan->ch_width == CH_WIDTH_40MHZ) {
+		if (des_chan->ch_cfreq1 == des_chan->ch_freq + BW_10_MHZ)
+			chan_info_orig->sec_2g_freq =
+					des_chan->ch_freq + BW_20_MHZ;
+		if (des_chan->ch_cfreq1 == des_chan->ch_freq - BW_10_MHZ)
+			chan_info_orig->sec_2g_freq =
+					des_chan->ch_freq - BW_20_MHZ;
+	}
+
+	mlme_debug("ch width :%d, ch_freq:%d, ch_cfreq1:%d, sec_2g_freq:%d",
+		   chan_info_orig->ch_width_orig, des_chan->ch_freq,
+		   des_chan->ch_cfreq1, chan_info_orig->sec_2g_freq);
 }
 
 char *cm_roam_get_requestor_string(enum wlan_cm_rso_control_requestor requestor)
@@ -1291,7 +1317,6 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		rso_cfg->roam_control_enable = src_config->bool_value;
 		if (!rso_cfg->roam_control_enable)
 			break;
-		dst_cfg->roam_scan_period_after_inactivity = 0;
 		dst_cfg->roam_inactive_data_packet_count = 0;
 		dst_cfg->roam_scan_inactivity_time = 0;
 		if (mlme_obj->cfg.lfr.roam_scan_offload_enabled)
@@ -1403,16 +1428,13 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	return status;
 }
 
-void wlan_roam_reset_roam_params(struct wlan_objmgr_psoc *psoc)
+void wlan_roam_reset_roam_params(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-	struct rso_config_params *rso_usr_cfg;
+	struct rso_user_config *rso_usr_cfg;
 
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj)
+	rso_usr_cfg = wlan_cm_get_rso_user_config(vdev);
+	if (!rso_usr_cfg)
 		return;
-
-	rso_usr_cfg = &mlme_obj->cfg.lfr.rso_user_config;
 
 	/*
 	 * clear all the allowlist parameters and remaining
@@ -1535,8 +1557,6 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 		mlme_obj->cfg.lfr.roam_scan_inactivity_time;
 	cfg_params->roam_inactive_data_packet_count =
 		mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
-	cfg_params->roam_scan_period_after_inactivity =
-		mlme_obj->cfg.lfr.roam_scan_period_after_inactivity;
 
 	chan_info = &cfg_params->specific_chan_info;
 	chan_info->num_chan =
@@ -1626,6 +1646,24 @@ struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
 		return NULL;
 
 	return &cm_ext_obj->rso_cfg;
+}
+
+struct rso_user_config *
+wlan_cm_get_rso_user_config_fl(struct wlan_objmgr_vdev *vdev,
+			       const char *func, uint32_t line)
+{
+	struct cm_ext_obj *cm_ext_obj;
+	enum QDF_OPMODE op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	/* get only for CLI and STA */
+	if (op_mode != QDF_STA_MODE && op_mode != QDF_P2P_CLIENT_MODE)
+		return NULL;
+
+	cm_ext_obj = cm_get_ext_hdl_fl(vdev, func, line);
+	if (!cm_ext_obj)
+		return NULL;
+
+	return &cm_ext_obj->rso_usr_cfg;
 }
 
 QDF_STATUS cm_roam_acquire_lock(struct wlan_objmgr_vdev *vdev)
@@ -2118,31 +2156,37 @@ QDF_STATUS wlan_cm_update_fils_ft(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-enum phy_ch_width
-wlan_cm_get_associated_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+void wlan_cm_get_associated_ch_info(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
+				    struct connect_chan_info *chan_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *mlme_priv;
-	enum phy_ch_width ch_width = CH_WIDTH_INVALID;
+
+	chan_info->ch_width_orig = CH_WIDTH_INVALID;
+	chan_info->sec_2g_freq = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_NB_ID);
 
 	if (!vdev) {
 		mlme_err("vdev%d: vdev object is NULL", vdev_id);
-		goto ret;
+		return;
 	}
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
 		goto release;
 
-	ch_width = mlme_priv->connect_info.ch_width_orig;
-	mlme_debug("vdev %d: associated_ch_width:%d", vdev_id, ch_width);
+	chan_info->ch_width_orig =
+			mlme_priv->connect_info.chan_info_orig.ch_width_orig;
+	chan_info->sec_2g_freq =
+			mlme_priv->connect_info.chan_info_orig.sec_2g_freq;
+
+	mlme_debug("vdev %d: associated_ch_width:%d, sec_2g_freq:%d", vdev_id,
+		   chan_info->ch_width_orig, chan_info->sec_2g_freq);
 release:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-ret:
-	return ch_width;
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD

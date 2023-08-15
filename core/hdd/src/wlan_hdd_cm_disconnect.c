@@ -238,10 +238,10 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 }
 
 #ifdef WLAN_FEATURE_MSCS
-void reset_mscs_params(struct hdd_adapter *adapter)
+void reset_mscs_params(struct wlan_hdd_link_info *link_info)
 {
-	mlme_set_is_mscs_req_sent(adapter->deflink->vdev, false);
-	adapter->mscs_counter = 0;
+	mlme_set_is_mscs_req_sent(link_info->vdev, false);
+	link_info->mscs_counter = 0;
 }
 #endif
 
@@ -259,7 +259,7 @@ QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 	hdd_place_marker(adapter, "TRY TO DISCONNECT", NULL);
-	reset_mscs_params(adapter);
+	reset_mscs_params(adapter->deflink);
 	hdd_conn_set_authenticated(adapter, false);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -495,11 +495,13 @@ static inline enum eSirMacHTChannelWidth get_max_bw(void)
 static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 				    struct hdd_adapter *adapter)
 {
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct mlme_legacy_priv *mlme_priv;
 	enum eSirMacHTChannelWidth max_bw;
 	struct wlan_channel *des_chan;
 	int ret;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	enum phy_ch_width ch_width_orig;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
@@ -509,11 +511,12 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	if (!des_chan)
 		return;
 
-	if (mlme_priv->connect_info.ch_width_orig == CH_WIDTH_INVALID ||
-	    mlme_priv->connect_info.ch_width_orig == des_chan->ch_width)
+	ch_width_orig = mlme_priv->connect_info.chan_info_orig.ch_width_orig;
+	if (!ucfg_mlme_is_chwidth_with_notify_supported(hdd_ctx->psoc) ||
+	    ch_width_orig == CH_WIDTH_INVALID)
 		return;
 
-	cm_update_associated_ch_width(vdev, false);
+	cm_update_associated_ch_info(vdev, false);
 
 	max_bw = get_max_bw();
 	ret = hdd_set_mac_chan_width(adapter, max_bw);

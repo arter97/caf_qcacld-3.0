@@ -217,16 +217,16 @@ QDF_STATUS hdd_cm_cckm_preauth_complete(struct wlan_objmgr_vdev *vdev,
 #ifdef WLAN_FEATURE_MSCS
 /**
  * reset_mscs_params() - Reset mscs parameters
- * @adapter: pointer to adapter structure
+ * @link_info: pointer to link_info struct in adapter
  *
  * Reset mscs parameters whils disconnection
  *
  * Return: None
  */
-void reset_mscs_params(struct hdd_adapter *adapter);
+void reset_mscs_params(struct wlan_hdd_link_info *link_info);
 #else
 static inline
-void reset_mscs_params(struct hdd_adapter *adapter)
+void reset_mscs_params(struct wlan_hdd_link_info *link_info)
 {
 	return;
 }
@@ -336,35 +336,35 @@ bool hdd_cm_is_vdev_associated(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_vdev_connected() - Checks if vdev is connected or not
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link_info structure
  *
  * Returns: True if vdev is connected else false
  */
-bool hdd_cm_is_vdev_connected(struct hdd_adapter *adapter);
+bool hdd_cm_is_vdev_connected(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_connecting() - Function to check connection in progress
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link_info structure
  *
  * Return: true if connecting, false otherwise
  */
-bool hdd_cm_is_connecting(struct hdd_adapter *adapter);
+bool hdd_cm_is_connecting(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_disconnected() - Function to check if vdev is disconnected or not
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link_info structure
  *
  * Return: true if disconnected, false otherwise
  */
-bool hdd_cm_is_disconnected(struct hdd_adapter *adapter);
+bool hdd_cm_is_disconnected(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_is_vdev_roaming() - Function to check roaming in progress
- * @adapter: pointer to the adapter structure
+ * @link_info: pointer to the link_info structure
  *
  * Return: true if roaming, false otherwise
  */
-bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter);
+bool hdd_cm_is_vdev_roaming(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_cm_get_scan_ie_params() - to get scan ie params

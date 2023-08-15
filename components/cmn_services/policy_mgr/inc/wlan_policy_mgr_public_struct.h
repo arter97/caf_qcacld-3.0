@@ -236,6 +236,9 @@ enum policy_mgr_pcl_group_id {
  * 5G low band i.e 5G freq < sbs cutoff freq
  * @POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH: 5G High SCC frequency followed by
  * 5G High band i.e 5G freq > sbs cutoff freq
+ * @POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW: 5 GHz High SCC
+ * frequency followed by 5G High band i.e 5G freq > sbs cutoff freq, add 5 GHz
+ * Low SCC frequency
  *
  * Order in which the PCL is requested
  */
@@ -247,6 +250,7 @@ enum policy_mgr_pcl_channel_order {
 	POLICY_MGR_PCL_ORDER_5G,
 	POLICY_MGR_PCL_ORDER_SCC_5G_LOW_5G_LOW,
 	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH,
+	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW,
 };
 
 /**
@@ -405,6 +409,11 @@ enum policy_mgr_mac_use {
  * 5 GHz low frequencies, add 2.4 GHz if its shared with 5 GHz low
  * @PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G: 5GHZ high SCC channel followed by
  * 5 GHz high frequencies, add 2.4 GHZ if its shared with 5GHz high
+ * @PM_SBS_CH_MCC_CH: SBS channels followed by MCC channels
+ * @PM_SBS_5G_MCC_24G: SBS channels, 5G MCC channels and 2.4GHz channels
+ * @PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G: 5GHZ high SCC
+ * channel followed by 5 GHz high frequencies and 5 GHz low SCC channel,
+ * add 2.4 GHZ if its shared with 5GHz high
  *
  * @PM_MAX_PCL_TYPE: Max place holder
  *
@@ -449,6 +458,10 @@ enum policy_mgr_pcl_type {
 	PM_SBS_CH_2G,
 	PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
 	PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G,
+	PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G,
+
+	PM_SBS_CH_MCC_CH,
+	PM_SBS_5G_MCC_24G,
 
 	PM_MAX_PCL_TYPE
 };
@@ -479,6 +492,8 @@ enum policy_mgr_pcl_type {
  * @PM_NDI_24_2x2:  NAN Datapath using 2x2@2.4 Ghz
  * @PM_NDI_5_1x1:  NAN Datapath using 1x1@5 Ghz
  * @PM_NDI_5_2x2:  NAN Datapath using 2x2@5 Ghz
+ * @PM_LL_LT_SAP_5_1x1: Low latency low throughput SAP using 1x1@5 Ghz
+ * @PM_LL_LT_SAP_5_2x2: Low latency low throughput SAP using 2x2@5 Ghz
  * @PM_MAX_ONE_CONNECTION_MODE: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -507,6 +522,8 @@ enum policy_mgr_one_connection_mode {
 	PM_NDI_24_2x2,
 	PM_NDI_5_1x1,
 	PM_NDI_5_2x2,
+	PM_LL_LT_SAP_5_1x1,
+	PM_LL_LT_SAP_5_2x2 = PM_LL_LT_SAP_5_1x1,
 
 	PM_MAX_ONE_CONNECTION_MODE
 };

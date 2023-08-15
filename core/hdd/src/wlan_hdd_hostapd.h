@@ -477,13 +477,13 @@ wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * wlan_hdd_mlo_reset() - reset mlo configuration if start bss fails
- * @adapter: Pointer to hostapd adapter
+ * @link_info: Pointer to link_info in hostapd adapter
  *
  * Return: void
  */
-void wlan_hdd_mlo_reset(struct hdd_adapter *adapter);
+void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info);
 #else
-static inline void wlan_hdd_mlo_reset(struct hdd_adapter *adapter)
+static inline void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif /* end WLAN_FEATURE_11BE_MLO */

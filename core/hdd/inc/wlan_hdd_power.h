@@ -200,21 +200,25 @@ void hdd_handle_cached_commands(void);
 /**
  * hdd_enable_arp_offload() - API to enable ARP offload
  * @adapter: Adapter context for which ARP offload is to be configured
+ * @vdev: VDEV objmgr pointer
  * @trigger: trigger reason for request
  *
  * Return: None
  */
 void hdd_enable_arp_offload(struct hdd_adapter *adapter,
+			    struct wlan_objmgr_vdev *vdev,
 			    enum pmo_offload_trigger trigger);
 
 /**
  * hdd_disable_arp_offload() - API to disable ARP offload
  * @adapter: Adapter context for which ARP offload is to be configured
+ * @vdev: VDEV objmgr pointer
  * @trigger: trigger reason for request
  *
  * Return: None
  */
 void hdd_disable_arp_offload(struct hdd_adapter *adapter,
+			     struct wlan_objmgr_vdev *vdev,
 			     enum pmo_offload_trigger trigger);
 
 /**
@@ -242,10 +246,10 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 			       enum pmo_offload_trigger trigger);
 
 /**
- * hdd_set_grat_arp_keepalive() - Enable grat APR keepalive
+ * hdd_set_grat_arp_keepalive() - Enable gratuitous ARP keepalive
  * @adapter: the HDD adapter to configure
  *
- * This configures gratuitous APR keepalive based on the adapter's current
+ * This configures gratuitous ARP keepalive based on the adapter's current
  * connection information, specifically IPv4 address and BSSID
  *
  * return: zero for success, non-zero for failure
@@ -338,31 +342,37 @@ void hdd_ipv4_notifier_work_queue(struct work_struct *work);
 /**
  * hdd_enable_ns_offload() - enable NS offload
  * @adapter: pointer to the adapter
+ * @vdev: VDEV objmgr pointer
  * @trigger: trigger reason to enable ns offload
  *
  * Return: nothing
  */
 void hdd_enable_ns_offload(struct hdd_adapter *adapter,
+			   struct wlan_objmgr_vdev *vdev,
 			   enum pmo_offload_trigger trigger);
 
 /**
  * hdd_disable_ns_offload() - disable NS offload
  * @adapter: pointer to the adapter
+ * @vdev: VDEV objmgr pointer
  * @trigger: trigger reason to enable ns offload
  *
  * Return: nothing
  */
 void hdd_disable_ns_offload(struct hdd_adapter *adapter,
-	enum pmo_offload_trigger trigger);
+			    struct wlan_objmgr_vdev *vdev,
+			    enum pmo_offload_trigger trigger);
 #else /* WLAN_NS_OFFLOAD */
 static inline
 void hdd_enable_ns_offload(struct hdd_adapter *adapter,
+			   struct wlan_objmgr_vdev *vdev,
 			   enum pmo_offload_trigger trigger)
 {
 }
 
 static inline
 void hdd_disable_ns_offload(struct hdd_adapter *adapter,
+			    struct wlan_objmgr_vdev *vdev,
 			    enum pmo_offload_trigger trigger)
 {
 }
@@ -644,15 +654,18 @@ QDF_STATUS wlan_hdd_get_ani_level(struct hdd_adapter *adapter,
 /**
  * hdd_enable_icmp_offload() - API to enable ICMP offload
  * @adapter: Adapter context for which ICMP offload is to be configured
+ * @vdev: VDEV ojgmgr pointer
  * @trigger: trigger reason for request
  *
  * Return: None
  */
 void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
+			     struct wlan_objmgr_vdev *vdev,
 			     enum pmo_offload_trigger trigger);
 #else
 static inline
 void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
+			     struct wlan_objmgr_vdev *vdev,
 			     enum pmo_offload_trigger trigger)
 {}
 #endif /* FEATURE_ICMP_OFFLOAD */

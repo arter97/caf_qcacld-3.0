@@ -209,15 +209,27 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev);
  * @data_len: length of @data
  *
  * Based on the data get or set the mlo link state
- * Return: QDF_STATUS
+ *
+ * Return: 0 on success and error number otherwise.
  */
-QDF_STATUS
+int
 wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 				     struct wlan_objmgr_vdev *vdev,
 				     const void *data, int data_len);
 
 extern const struct nla_policy
 ml_link_state_request_policy[QCA_WLAN_VENDOR_ATTR_LINK_STATE_MAX + 1];
+
+/**
+ * wlan_hdd_send_t2lm_event() - Send t2lm info to userspace
+ * @vdev: vdev handler
+ * @t2lm: tid to link mapping info
+ *
+ * This function is called when driver needs to send vendor specific
+ * t2lm info to userspace
+ */
+QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
+				    struct wlan_t2lm_info *t2lm);
 
 /**
  * wlan_hdd_cfg80211_process_ml_link_state() - process ml link state
@@ -307,12 +319,12 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev)
 {
 }
 
-static inline QDF_STATUS
+static inline int
 wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 				     struct wlan_objmgr_vdev *vdev,
 				     const void *data, int data_len)
 {
-	return QDF_STATUS_SUCCESS;
+	return 0;
 }
 
 static inline
@@ -327,6 +339,13 @@ static inline
 QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
 					    struct qdf_mac_addr *link_addr_list,
 					    uint8_t max_idx)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
+				    struct wlan_t2lm_info *t2lm)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

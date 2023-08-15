@@ -257,23 +257,29 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
 /**
  * enum hdd_adapter_flags - event bitmap flags registered net device
  * @NET_DEVICE_REGISTERED: Adapter is registered with the kernel
- * @SME_SESSION_OPENED: Firmware vdev has been created
  * @WMM_INIT_DONE: Adapter is initialized
- * @SOFTAP_BSS_STARTED: Software Access Point (SAP) is running
  * @DEVICE_IFACE_OPENED: Adapter has been "opened" via the kernel
- * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
- * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
  * @WDEV_ONLY_REGISTERED: Only WDEV is registered
  */
 enum hdd_adapter_flags {
 	NET_DEVICE_REGISTERED,
-	SME_SESSION_OPENED,
 	WMM_INIT_DONE,
-	SOFTAP_BSS_STARTED,
 	DEVICE_IFACE_OPENED,
+	WDEV_ONLY_REGISTERED,
+};
+
+/**
+ * enum hdd_link_flags - Event bitmap flags specific to per link
+ * @SME_SESSION_OPENED: Firmware vdev has been created
+ * @SOFTAP_BSS_STARTED: Software Access Point (SAP) is running
+ * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
+ * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
+ */
+enum hdd_link_flags {
+	SME_SESSION_OPENED,
+	SOFTAP_BSS_STARTED,
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
-	WDEV_ONLY_REGISTERED,
 };
 
 /**
@@ -807,6 +813,7 @@ struct hdd_fw_txrx_stats {
  * @vendor_acs_timer_initialized: Is @vendor_acs_timer initialized?
  * @bss_stop_reason: Reason why the BSS was stopped
  * @acs_in_progress: In progress acs flag for an adapter
+ * @ch_switch_in_progress: channel change in progress or not
  * @client_count: client count per dot11_mode
  * @country_ie_updated: country ie is updated or not by hdd hostapd
  * @during_auth_offload: auth mgmt frame is offloading to hostapd
@@ -828,6 +835,7 @@ struct hdd_ap_ctx {
 	bool vendor_acs_timer_initialized;
 	enum bss_stop_reason bss_stop_reason;
 	qdf_atomic_t acs_in_progress;
+	qdf_atomic_t ch_switch_in_progress;
 	uint16_t client_count[QCA_WLAN_802_11_MODE_INVALID];
 	bool country_ie_updated;
 	bool during_auth_offload;
@@ -1011,6 +1019,7 @@ enum udp_qos_upgrade {
  * @session: union of @ap and @station specific structs
  * @session.station: station mode information
  * @session.ap: ap mode specific information
+ * @acs_complete_event: acs complete event
  * @rssi: The signal strength (dBm)
  * @snr: SNR measured from @rssi
  * @rssi_on_disconnect: Rssi at disconnection time in STA mode
@@ -1018,6 +1027,10 @@ enum udp_qos_upgrade {
  * @is_mlo_vdev_active: is the mlo vdev currently active
  * @estimated_linkspeed: estimated link speed
  * @hdd_stats: HDD statistics
+ * @ll_iface_stats: Link Layer interface stats
+ * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
+ * @mscs_counter: Counter on MSCS action frames sent
+ * @link_flags: a bitmap of hdd_link_flags
  */
 struct wlan_hdd_link_info {
 	struct hdd_adapter *adapter;
@@ -1031,6 +1044,8 @@ struct wlan_hdd_link_info {
 		struct hdd_ap_ctx ap;
 	} session;
 
+	qdf_event_t acs_complete_event;
+
 	int8_t rssi;
 	uint8_t snr;
 	int32_t rssi_on_disconnect;
@@ -1040,6 +1055,16 @@ struct wlan_hdd_link_info {
 	bool is_mlo_vdev_active;
 	uint32_t estimated_linkspeed;
 	struct hdd_stats hdd_stats;
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+	struct wifi_interface_stats ll_iface_stats;
+#endif
+
+#ifdef WLAN_FEATURE_MSCS
+	unsigned long mscs_prev_tx_vo_pkts;
+	uint32_t mscs_counter;
+#endif /* WLAN_FEATURE_MSCS */
+
+	unsigned long link_flags;
 };
 
 /**
@@ -1089,10 +1114,9 @@ struct wlan_hdd_tx_power {
  * @cache_sta_count: number of currently cached stations
  * @wapi_info:
  * @sap_stop_bss_work:
- * @ch_switch_in_progress:
- * @acs_complete_event: acs complete event
  * @tsf: structure containing tsf related information
- * @mc_addr_list:
+ * @mc_addr_list: multicast address list
+ * @mc_list_lock: spin lock for multicast list
  * @addr_filter_pattern:
  * @scan_info:
  * @psb_changed: Flag to ensure PSB is configured through framework
@@ -1100,8 +1124,6 @@ struct wlan_hdd_tx_power {
  * @scan_block_work:
  * @blocked_scan_request_q:
  * @blocked_scan_request_q_lock:
- * @mscs_prev_tx_vo_pkts:
- * @mscs_counter:
  * @tx_flow_control_timer:
  * @tx_flow_timer_initialized:
  * @tx_flow_low_watermark:
@@ -1170,7 +1192,6 @@ struct wlan_hdd_tx_power {
  * @big_data_stats:
  * @mon_adapter: hdd_adapter of monitor mode.
  * @mlo_adapter_info:
- * @ll_iface_stats:
  * @set_mac_addr_req_ctx: Set MAC address command request context
  * @delta_qtime: delta between host qtime and monotonic time
  * @traffic_end_ind_en: traffic end indication feature enable/disable
@@ -1239,13 +1260,11 @@ struct hdd_adapter {
 
 	struct work_struct  sap_stop_bss_work;
 
-	qdf_atomic_t ch_switch_in_progress;
-	qdf_event_t acs_complete_event;
-
 #ifdef WLAN_FEATURE_TSF
 	struct hdd_vdev_tsf tsf;
 #endif
 	struct hdd_multicast_addr_list mc_addr_list;
+	qdf_spinlock_t mc_list_lock;
 	uint8_t addr_filter_pattern;
 
 	struct hdd_scan_info scan_info;
@@ -1256,12 +1275,6 @@ struct hdd_adapter {
 	struct work_struct scan_block_work;
 	qdf_list_t blocked_scan_request_q;
 	qdf_mutex_t blocked_scan_request_q_lock;
-
-
-#ifdef WLAN_FEATURE_MSCS
-	unsigned long mscs_prev_tx_vo_pkts;
-	uint32_t mscs_counter;
-#endif /* WLAN_FEATURE_MSCS */
 
 #if  defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
 				defined(QCA_HL_NETDEV_FLOW_CONTROL)
@@ -1360,7 +1373,6 @@ struct hdd_adapter {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 	struct hdd_mlo_adapter_info mlo_adapter_info;
-	struct wifi_interface_stats ll_iface_stats;
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	void *set_mac_addr_req_ctx;
@@ -1909,6 +1921,7 @@ enum wlan_state_ctrl_str_id {
  * @last_pagefault_ssr_time: Time when last recovery was triggered because of
  * @host wakeup from fw with reason as pagefault
  * @bridgeaddr: Bridge MAC address
+ * @is_mlo_per_link_stats_supported: Per link mlo stats is supported or not
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2185,6 +2198,9 @@ struct hdd_context {
 #endif
 	qdf_time_t last_pagefault_ssr_time;
 	uint8_t bridgeaddr[QDF_MAC_ADDR_SIZE];
+#ifdef WLAN_FEATURE_11BE_MLO
+	bool is_mlo_per_link_stats_supported;
+#endif
 };
 
 /**
@@ -2690,26 +2706,26 @@ struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 					       tSirMacAddr mac_addr);
 
 /**
- * hdd_get_adapter_home_channel() - return home channel of adapter
- * @adapter: hdd adapter of vdev
+ * hdd_get_link_info_home_channel() - return home channel of adapter
+ * @link_info: Pointer of link_info in @adapter
  *
  * This function returns operation channel of station/p2p-cli if
  * connected, returns operation channel of sap/p2p-go if started.
  *
  * Return: home channel if connected/started or invalid channel 0
  */
-uint32_t hdd_get_adapter_home_channel(struct hdd_adapter *adapter);
+uint32_t hdd_get_link_info_home_channel(struct wlan_hdd_link_info *link_info);
 
 /**
- * hdd_get_adapter_width() - return current bandwidth of adapter
- * @adapter: hdd adapter of vdev
+ * hdd_get_link_info_width() - return current bandwidth of adapter
+ * @link_info: Pointer of link_info in @adapter
  *
  * This function returns current bandwidth of station/p2p-cli if
  * connected, returns current bandwidth of sap/p2p-go if started.
  *
  * Return: bandwidth if connected/started or invalid bandwidth 0
  */
-enum phy_ch_width hdd_get_adapter_width(struct hdd_adapter *adapter);
+enum phy_ch_width hdd_get_link_info_width(struct wlan_hdd_link_info *link_info);
 
 /*
  * hdd_get_adapter_by_rand_macaddr() - find Random mac adapter
@@ -2728,14 +2744,14 @@ hdd_get_adapter_by_rand_macaddr(struct hdd_context *hdd_ctx,
 /**
  * hdd_is_vdev_in_conn_state() - Check whether the vdev is in
  * connected/started state.
- * @adapter: hdd adapter of the vdev
+ * @link_info: Pointer to link_info in adapter
  *
  * This function will give whether the vdev in the adapter is in
  * connected/started state.
  *
  * Return: True/false
  */
-bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter);
+bool hdd_is_vdev_in_conn_state(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_vdev_create() - Create the vdev in the firmware
@@ -3244,7 +3260,7 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason);
 
 /**
  * hdd_switch_sap_channel() - Move SAP to the given channel
- * @adapter: AP adapter
+ * @link_info: Pointer of link_info in adapter
  * @channel: Channel
  * @forced: Force to switch channel, ignore SCC/MCC check
  *
@@ -3253,8 +3269,8 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
-				  bool forced);
+QDF_STATUS hdd_switch_sap_channel(struct wlan_hdd_link_info *link_info,
+				  uint8_t channel, bool forced);
 
 /**
  * hdd_switch_sap_chan_freq() - Move SAP to the given channel
@@ -4697,14 +4713,14 @@ static inline bool hdd_nbuf_dst_addr_is_self_addr(struct hdd_adapter *adapter,
 
 /**
  * hdd_cleanup_conn_info() - Cleanup connectin info
- * @adapter: Adapter upon which the command was received
+ * @link_info: pointer to link_info struct in adapter
  *
  * This function frees the memory allocated for the connection
  * info structure
  *
  * Return: none
  */
-void hdd_cleanup_conn_info(struct hdd_adapter *adapter);
+void hdd_cleanup_conn_info(struct wlan_hdd_link_info *link_info);
 
 #ifdef FEATURE_WLAN_RESIDENT_DRIVER
 extern char *country_code;
@@ -4971,5 +4987,13 @@ static inline void wlan_hdd_link_speed_update(struct wlan_objmgr_psoc *psoc,
 					      bool is_link_speed_good)
 {}
 #endif
+
+/**
+ * hdd_update_multicast_list() - update the multicast list
+ * @vdev: pointer to VDEV object
+ *
+ * Return: none
+ */
+void hdd_update_multicast_list(struct wlan_objmgr_vdev *vdev);
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

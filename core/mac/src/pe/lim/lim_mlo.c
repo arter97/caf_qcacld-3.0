@@ -1256,9 +1256,9 @@ QDF_STATUS lim_add_frag_ie_for_sta_profile(uint8_t *data, uint16_t *len)
 }
 
 uint16_t
-lim_send_assoc_req_mgmt_frame_mlo(struct mac_context *mac_ctx,
-				  struct pe_session *session,
-				  tDot11fAssocRequest *frm)
+lim_fill_assoc_req_mlo_ie(struct mac_context *mac_ctx,
+			  struct pe_session *session,
+			  tDot11fAssocRequest *frm)
 {
 	QDF_STATUS status;
 

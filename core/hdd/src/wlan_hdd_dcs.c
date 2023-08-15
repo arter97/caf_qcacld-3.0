@@ -116,7 +116,8 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 					    tgt_freq, tgt_width);
 		break;
 	case QDF_SAP_MODE:
-		if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))
+		if (!test_bit(SOFTAP_BSS_STARTED,
+			      &adapter->deflink->link_flags))
 			return QDF_STATUS_E_INVAL;
 
 		/* stop sap if got invalid freq or width */
@@ -379,7 +380,7 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 	uint8_t mac_id;
 	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint32_t conn_index, count;
+	uint32_t conn_idx, count;
 	struct wlan_hdd_link_info *link_info;
 	uint32_t dcs_ch = wlan_reg_freq_to_chan(hdd_ctx->pdev, dcs_ch_freq);
 
@@ -397,12 +398,11 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 	 * Set vdev starting for every vdev before doing csa.
 	 * The CSA triggered by DCS will be done in serial.
 	 */
-	for (conn_index = 0; conn_index < count; conn_index++) {
-		link_info =
-			hdd_get_link_info_by_vdev(hdd_ctx, list[conn_index]);
+	for (conn_idx = 0; conn_idx < count; conn_idx++) {
+		link_info = hdd_get_link_info_by_vdev(hdd_ctx, list[conn_idx]);
 		if (!link_info) {
 			hdd_err("vdev_id %u does not exist with host",
-				list[conn_index]);
+				list[conn_idx]);
 			return QDF_STATUS_E_INVAL;
 		}
 
@@ -413,12 +413,11 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 		else
 			wlansap_dcs_set_vdev_starting(sap_ctx, false);
 	}
-	for (conn_index = 0; conn_index < count; conn_index++) {
-		link_info =
-			hdd_get_link_info_by_vdev(hdd_ctx, list[conn_index]);
+	for (conn_idx = 0; conn_idx < count; conn_idx++) {
+		link_info = hdd_get_link_info_by_vdev(hdd_ctx, list[conn_idx]);
 		if (!link_info) {
 			hdd_err("vdev_id %u does not exist with host",
-				list[conn_index]);
+				list[conn_idx]);
 			return QDF_STATUS_E_INVAL;
 		}
 
@@ -431,8 +430,7 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 			  ap_ctx->operating_chan_freq, dcs_ch_freq);
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
 					    link_info->vdev_id, CSA_REASON_DCS);
-		status = hdd_switch_sap_channel(link_info->adapter,
-						dcs_ch, true);
+		status = hdd_switch_sap_channel(link_info, dcs_ch, true);
 		if (status == QDF_STATUS_SUCCESS)
 			status = QDF_STATUS_E_PENDING;
 		return status;

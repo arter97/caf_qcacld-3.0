@@ -85,27 +85,25 @@ bool hdd_cm_is_vdev_associated(struct wlan_hdd_link_info *link_info)
 	return is_vdev_active;
 }
 
-bool hdd_cm_is_vdev_connected(struct hdd_adapter *adapter)
+bool hdd_cm_is_vdev_connected(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool is_vdev_connected;
-	enum QDF_OPMODE opmode;
 	struct hdd_station_ctx *sta_ctx;
+	enum QDF_OPMODE opmode = link_info->adapter->device_mode;
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (adapter->device_mode == QDF_NDI_MODE)
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	if (opmode == QDF_NDI_MODE)
 		return (sta_ctx->conn_info.conn_state ==
 			eConnectionState_NdiConnected);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
+	if (opmode != QDF_STA_MODE && opmode != QDF_P2P_CLIENT_MODE)
+		return false;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
-	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	if (opmode != QDF_STA_MODE && opmode != QDF_P2P_CLIENT_MODE) {
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
-		return false;
-	}
 	is_vdev_connected = ucfg_cm_is_vdev_connected(vdev);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
@@ -113,13 +111,13 @@ bool hdd_cm_is_vdev_connected(struct hdd_adapter *adapter)
 	return is_vdev_connected;
 }
 
-bool hdd_cm_is_connecting(struct hdd_adapter *adapter)
+bool hdd_cm_is_connecting(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool is_vdev_connecting;
 	enum QDF_OPMODE opmode;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
@@ -135,13 +133,13 @@ bool hdd_cm_is_connecting(struct hdd_adapter *adapter)
 	return is_vdev_connecting;
 }
 
-bool hdd_cm_is_disconnected(struct hdd_adapter *adapter)
+bool hdd_cm_is_disconnected(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool is_vdev_disconnected;
 	enum QDF_OPMODE opmode;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
@@ -157,13 +155,13 @@ bool hdd_cm_is_disconnected(struct hdd_adapter *adapter)
 	return is_vdev_disconnected;
 }
 
-bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter)
+bool hdd_cm_is_vdev_roaming(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool is_vdev_roaming;
 	enum QDF_OPMODE opmode;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (!vdev)
 		return false;
 
@@ -509,8 +507,9 @@ static struct hdd_adapter
 		 * sap is not in started state and also not under doing CAC,
 		 * so it is fine to go ahead with sta.
 		 */
-		if (!test_bit(SOFTAP_BSS_STARTED, &(adapter)->event_flags) &&
-		    (hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS))
+		if (!test_bit(SOFTAP_BSS_STARTED,
+			      &adapter->deflink->link_flags) &&
+		    hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS)
 			goto loop_next;
 
 		chan = wlan_vdev_get_active_channel(adapter->deflink->vdev);
@@ -1044,7 +1043,7 @@ static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 	 */
 	if (adapter->device_mode == QDF_STA_MODE) {
 		/* Cleanup already existing he info */
-		hdd_cleanup_conn_info(adapter);
+		hdd_cleanup_conn_info(adapter->deflink);
 
 		/* Cache last connection info */
 		qdf_mem_copy(&hdd_sta_ctx->cache_conn_info,

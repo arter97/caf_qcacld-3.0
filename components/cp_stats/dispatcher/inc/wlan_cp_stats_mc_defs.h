@@ -21,7 +21,7 @@
  * DOC: wlan_cp_stats_mc_defs.h
  *
  * This file provide definition for structure/enums/defines related to control
- * path stats componenet
+ * path stats component
  */
 
 #ifndef __WLAN_CP_STATS_MC_DEFS_H__

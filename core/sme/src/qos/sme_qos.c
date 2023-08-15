@@ -3984,7 +3984,7 @@ static QDF_STATUS sme_qos_process_del_ts_ind(struct mac_context *mac,
 	search_key.key.ac_type = ac;
 	search_key.index = SME_QOS_SEARCH_KEY_INDEX_2;
 	search_key.sessionId = sessionId;
-	/* find all Flows on the perticular AC & delete them, also send HDD
+	/* find all Flows on the particular AC & delete them, also send HDD
 	 * indication through the callback it registered per request
 	 */
 	if (!QDF_IS_STATUS_SUCCESS
@@ -5849,7 +5849,7 @@ static QDF_STATUS sme_qos_delete_existing_flows(struct mac_context *mac,
 
 	pEntry = csr_ll_peek_head(&sme_qos_cb.flow_list, true);
 	if (!pEntry) {
-		sme_err("Flow List empty, nothing to delete");
+		sme_debug("Flow List empty, nothing to delete");
 		return QDF_STATUS_E_FAILURE;
 	}
 	while (pEntry) {
@@ -6214,7 +6214,7 @@ static QDF_STATUS sme_qos_modify_fnp(struct mac_context *mac, tListElem *pEntry)
 
 /*
  * sme_qos_del_ts_ind_fnp() - Utility function (pointer) to find all Flows on
- *  the perticular AC & delete them, also send HDD indication through the
+ *  the particular AC & delete them, also send HDD indication through the
  * callback it registered per request
  *
  * mac - Pointer to the global MAC parameter structure.
@@ -7064,7 +7064,7 @@ enum sme_qos_statustype sme_qos_re_request_add_ts(struct mac_context *mac_ctx,
 	case SME_QOS_LINK_UP:
 	default:
 		/* print error msg, */
-		sme_err("ReAdd request in unexpected state = %d",
+		sme_err("Re-Add request in unexpected state = %d",
 			ac_info->curr_state);
 		break;
 	}

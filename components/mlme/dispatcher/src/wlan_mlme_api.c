@@ -1215,7 +1215,59 @@ void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.sta.usr_disable_eht = disable;
 }
 
+enum phy_ch_width wlan_mlme_get_max_bw(void)
+{
+	uint32_t max_bw = wma_get_eht_ch_width();
+
+	if (max_bw == WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ)
+		return CH_WIDTH_320MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		return CH_WIDTH_160MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+		return CH_WIDTH_80P80MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+		return CH_WIDTH_80MHZ;
+	else
+		return CH_WIDTH_40MHZ;
+}
+#else
+enum phy_ch_width wlan_mlme_get_max_bw(void)
+{
+	uint32_t max_bw = wma_get_vht_ch_width();
+
+	if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		return CH_WIDTH_160MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+		return CH_WIDTH_80P80MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+		return CH_WIDTH_80MHZ;
+	else
+		return CH_WIDTH_40MHZ;
+}
 #endif
+
+QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
+				      enum phy_ch_width *ch_width)
+{
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct wlan_objmgr_peer *peer;
+	enum wlan_phymode phymode;
+	enum QDF_OPMODE op_mode;
+
+	peer = wlan_vdev_get_bsspeer(vdev);
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (ch_width && peer &&
+	    (op_mode == QDF_STA_MODE ||
+	     op_mode == QDF_P2P_CLIENT_MODE)) {
+		wlan_peer_obj_lock(peer);
+		phymode = wlan_peer_get_phymode(peer);
+		wlan_peer_obj_unlock(peer);
+		*ch_width = wlan_mlme_get_ch_width_from_phymode(phymode);
+	}
+
+	return  status;
+}
 
 #ifdef WLAN_FEATURE_11BE_MLO
 uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc)
@@ -1295,6 +1347,22 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 	mlme_legacy_debug("mlo_support_link_conn band %d", value);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void
+wlan_mlme_get_mlo_prefer_percentage(struct wlan_objmgr_psoc *psoc,
+				    int8_t *mlo_prefer_percentage)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("invalid mlo object");
+		return;
+	}
+
+	*mlo_prefer_percentage = mlme_obj->cfg.sta.mlo_prefer_percentage;
+	mlme_legacy_debug("mlo_prefer_percentage %d", *mlo_prefer_percentage);
 }
 #endif
 
@@ -6032,6 +6100,19 @@ bool mlme_get_user_ps(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	return usr_ps_enable;
 }
 
+bool wlan_mlme_is_multipass_sap(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *info;
+
+	info = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!info) {
+		mlme_legacy_err("target_psoc_info is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return target_is_multipass_sap(info);
+}
+
 QDF_STATUS wlan_mlme_get_phy_max_freq_range(struct wlan_objmgr_psoc *psoc,
 					    uint32_t *low_2ghz_chan,
 					    uint32_t *high_2ghz_chan,
@@ -6734,6 +6815,7 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	uint16_t curr_op_freq;
 	struct ch_params ch_params = {0};
 	struct wlan_objmgr_pdev *pdev;
+	QDF_STATUS status;
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
@@ -6762,6 +6844,12 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	des_chan->ch_cfreq1 = ch_params.mhz_freq_seg0;
 	des_chan->ch_cfreq2 = ch_params.mhz_freq_seg1;
 
+	status = wlan_update_peer_phy_mode(des_chan, vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to update phymode");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	qdf_mem_copy(bss_chan, des_chan, sizeof(struct wlan_channel));
 
 	mlme_legacy_debug("vdev id %d freq %d seg0 %d seg1 %d ch_width %d mhz seg0 %d mhz seg1 %d",
@@ -6781,6 +6869,11 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	enum phy_ch_width associated_ch_width;
 	struct wlan_channel *des_chan;
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return QDF_STATUS_E_INVAL;
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
@@ -6792,8 +6885,10 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
-	associated_ch_width = wlan_cm_get_associated_ch_width(psoc, vdev_id);
-	if (ch_width > associated_ch_width) {
+	associated_ch_width =
+		mlme_priv->connect_info.chan_info_orig.ch_width_orig;
+	if (associated_ch_width == CH_WIDTH_INVALID ||
+	    ch_width > associated_ch_width) {
 		mlme_debug("vdev %d: Invalid new chwidth:%d, assoc ch_width:%d",
 			   vdev_id, ch_width, associated_ch_width);
 		return QDF_STATUS_E_INVAL;

@@ -160,6 +160,13 @@ static const struct nla_policy
 };
 
 const struct nla_policy
+	wlan_hdd_tdls_disc_rsp_policy
+	[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_MAX + 1] = {
+		[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_TX_LINK] = {
+						.type = NLA_U8},
+};
+
+const struct nla_policy
 	wlan_hdd_tdls_mode_configuration_policy
 	[QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_MAX + 1] = {
 		[QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TRIGGER_MODE] = {
@@ -197,6 +204,55 @@ __wlan_hdd_cfg80211_exttdls_get_status(struct wiphy *wiphy,
 {
 	/* TODO */
 	return 0;
+}
+
+static int
+__wlan_hdd_cfg80211_exttdls_set_link_id(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data,
+					int data_len)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_MAX + 1];
+	int ret;
+	uint32_t link_id;
+
+	hdd_enter_dev(dev);
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return -EINVAL;
+
+	if (!adapter)
+		return -EINVAL;
+
+	if (wlan_cfg80211_nla_parse(tb,
+				    QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_MAX,
+				    data, data_len,
+				    wlan_hdd_tdls_disc_rsp_policy)) {
+		hdd_err("Invalid attribute");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_TX_LINK]) {
+		hdd_err("attr tdls link id failed");
+		return -EINVAL;
+	}
+
+	link_id =
+		nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_TDLS_DISC_RSP_EXT_TX_LINK]);
+	hdd_debug("TDLS link id %d", link_id);
+
+	ret = cfg_tdls_set_link_id(hdd_ctx->psoc, link_id);
+
+	return ret;
 }
 
 /**
@@ -320,6 +376,26 @@ int wlan_hdd_cfg80211_exttdls_get_status(struct wiphy *wiphy,
 	return errno;
 }
 
+int wlan_hdd_cfg80211_exttdls_set_link_id(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  const void *data,
+					  int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_exttdls_set_link_id(wiphy, wdev,
+							data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 /**
  * __wlan_hdd_cfg80211_exttdls_enable() - enable an externally controllable
  *                                      TDLS peer and set parameters
@@ -422,6 +498,22 @@ int wlan_hdd_cfg80211_exttdls_disable(struct wiphy *wiphy,
 }
 
 #ifdef TDLS_MGMT_VERSION5
+static int wlan_hdd_get_tdls_link_id(struct hdd_context *hdd_ctx, int id)
+{
+	return id;
+}
+#else
+static int wlan_hdd_get_tdls_link_id(struct hdd_context *hdd_ctx, int id)
+{
+	int link_id;
+
+	link_id = cfg_tdls_get_link_id(hdd_ctx->psoc);
+
+	return link_id;
+}
+#endif
+
+#ifdef TDLS_MGMT_VERSION5
 /**
  * __wlan_hdd_cfg80211_tdls_mgmt() - handle management actions on a given peer
  * @wiphy: wiphy
@@ -510,6 +602,7 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 	if (hdd_ctx->tdls_umac_comp_active) {
 		int ret;
 
+		link_id = wlan_hdd_get_tdls_link_id(hdd_ctx, link_id);
 		ret = wlan_cfg80211_tdls_mgmt_mlo(adapter, peer,
 						  action_code, dialog_token,
 						  status_code, peer_capability,

@@ -464,6 +464,7 @@ void sme_cleanup_session(mac_handle_t mac_handle, uint8_t vdev_id);
  * @mac_handle: Opaque handle to the global MAC context
  * @vdev_id:                  vdev ID
  * @src_rso_config:           The source to copy
+ * @src_rso_usr_cfg:          The source to copy
  * @update_param:             Type of parameter to be updated
  *
  * Return: Return the status of the updation.
@@ -471,6 +472,7 @@ void sme_cleanup_session(mac_handle_t mac_handle, uint8_t vdev_id);
 QDF_STATUS sme_update_roam_params(mac_handle_t mac_handle,
 				  uint8_t vdev_id,
 				  struct rso_config_params *src_rso_config,
+				  struct rso_user_config *src_rso_usr_cfg,
 				  int update_param);
 QDF_STATUS sme_update_config(mac_handle_t mac_handle,
 			     struct sme_config_params *pSmeConfigParams);
@@ -1331,6 +1333,13 @@ QDF_STATUS sme_update_add_ie(mac_handle_t mac_handle,
 		tSirUpdateIE *pUpdateIE, eUpdateIEsType updateType);
 QDF_STATUS sme_update_connect_debug(mac_handle_t mac_handle,
 				    uint32_t set_value);
+
+/**
+ * sme_bss_type_to_string() - converts bss type to string.
+ * @bss_type: bss type enum
+ *
+ * Return: printable string for bss type
+ */
 const char *sme_bss_type_to_string(const uint8_t bss_type);
 QDF_STATUS sme_ap_disable_intra_bss_fwd(mac_handle_t mac_handle,
 					uint8_t sessionId,
@@ -1791,7 +1800,7 @@ bool sme_is_any_session_in_connected_state(mac_handle_t mac_handle);
 QDF_STATUS sme_pdev_set_hw_mode(struct policy_mgr_hw_mode msg);
 
 /**
- * sme_nss_update_request() - Send beacon templete update to FW with new
+ * sme_nss_update_request() - Send beacon template update to FW with new
  * nss value
  * @mac_handle: Handle returned by macOpen
  * @vdev_id: the session id
@@ -3032,6 +3041,17 @@ int sme_set_auto_rate_ldpc(mac_handle_t mac_handle, uint8_t session_id,
 int sme_set_auto_rate_he_ltf(mac_handle_t mac_handle, uint8_t session_id,
 			     uint8_t cfg_val);
 
+/**
+ * sme_set_ba_opmode() - sets the BA op mode
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: SME session id
+ * @cfg_val: BA mode
+ *
+ * Return: None
+ */
+void sme_set_ba_opmode(mac_handle_t mac_handle, uint8_t session_id,
+		       bool cfg_val);
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * sme_update_tgt_eht_cap() - sets the EHT caps to pmac
@@ -3114,6 +3134,23 @@ int sme_update_eht_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
 	return 0;
 }
 #endif
+
+struct omi_ctrl_tx {
+	uint32_t omi_in_vht:1;
+	uint32_t omi_in_he:1;
+	uint32_t a_ctrl_id:4;
+	uint32_t rx_nss:3;
+	uint32_t ch_bw:2;
+	uint32_t ul_mu_dis:1;
+	uint32_t tx_nsts:3;
+	uint32_t er_su_dis:1;
+	uint32_t dl_mu_mimo_resound:1;
+	uint32_t ul_mu_data_dis:1;
+	uint32_t eht_rx_nss_ext:1;
+	uint32_t eht_ch_bw_ext:1;
+	uint32_t eht_tx_nss_ext:1;
+	uint32_t reserved:11;
+};
 
 #ifdef WLAN_FEATURE_11AX
 /**
@@ -3213,19 +3250,6 @@ int sme_update_he_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
 			       uint8_t cfg_val);
 
 #define A_CTRL_ID_OMI 0x1
-struct omi_ctrl_tx {
-	uint32_t omi_in_vht:1;
-	uint32_t omi_in_he:1;
-	uint32_t a_ctrl_id:4;
-	uint32_t rx_nss:3;
-	uint32_t ch_bw:2;
-	uint32_t ul_mu_dis:1;
-	uint32_t tx_nsts:3;
-	uint32_t er_su_dis:1;
-	uint32_t dl_mu_mimo_resound:1;
-	uint32_t ul_mu_data_dis:1;
-	uint32_t reserved:14;
-};
 
 void sme_reset_he_om_ctrl(mac_handle_t mac_handle);
 
@@ -3244,10 +3268,12 @@ int sme_config_action_tx_in_tb_ppdu(mac_handle_t mac_handle, uint8_t session_id,
  * sme_send_he_om_ctrl_update() - Send HE OM ctrl Tx cmd to FW
  * @mac_handle: Pointer to mac handle
  * @session_id: SME session id
+ * @omi_data: OMI control data
  *
  * Return: 0 on success else err code
  */
-int sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id);
+int sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id,
+			       struct omi_ctrl_tx *omi_data);
 
 /**
  * sme_set_he_om_ctrl_param() - Update HE OM control params for OMI Tx
@@ -3443,7 +3469,8 @@ static inline int sme_update_he_htc_he_supp(mac_handle_t mac_handle,
 }
 
 static inline int
-sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id)
+sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id,
+			   struct omi_ctrl_tx *omi_data)
 {
 	return 0;
 }
@@ -3758,6 +3785,17 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
 			uint8_t cfg_val, enum sme_eht_tx_bfee_cap_type cap_type,
 			enum QDF_OPMODE op_mode);
+/**
+ * sme_send_vdev_pause_for_bcn_period() - Send vdev pause indication to FW
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: SME session id
+ * @cfg_val: Set vdev pause duration
+ *
+ * Return: 0 on success otherwise error code
+ */
+int sme_send_vdev_pause_for_bcn_period(mac_handle_t mac_handle,
+				       uint8_t session_id,
+				       uint8_t cfg_val);
 #else
 static inline void sme_set_eht_testbed_def(mac_handle_t mac_handle,
 					   uint8_t vdev_id)
@@ -3793,6 +3831,21 @@ int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
 			enum QDF_OPMODE op_mode)
 {
 	return 0;
+}
+
+static inline
+int sme_send_vdev_pause_for_bcn_period(mac_handle_t mac_handle,
+				       uint8_t session_id,
+				       uint8_t cfg_val)
+{
+	return 0;
+}
+
+static inline
+void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
+			    uint8_t num_links,
+			    struct qdf_mac_addr active_link_addr[2])
+{
 }
 #endif
 

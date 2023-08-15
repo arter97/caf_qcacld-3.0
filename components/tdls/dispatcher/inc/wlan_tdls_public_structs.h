@@ -505,6 +505,7 @@ enum tdls_feature_bit {
  * @tdls_scan_enable: tdls scan enable
  * @tdls_sleep_sta_enable: tdls sleep sta enable
  * @tdls_support_enable: tdls support enable
+ * @tdls_link_id: mlo link id
  */
 struct tdls_user_config {
 	uint32_t tdls_tx_states_period;
@@ -538,6 +539,7 @@ struct tdls_user_config {
 	bool tdls_scan_enable;
 	bool tdls_sleep_sta_enable;
 	bool tdls_support_enable;
+	int tdls_link_id;
 };
 
 /**

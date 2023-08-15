@@ -131,7 +131,7 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 		switch (adapter->device_mode) {
 		case QDF_P2P_GO_MODE:
 			if (test_bit(SOFTAP_BSS_STARTED,
-				     &adapter->event_flags)) {
+				     &adapter->deflink->link_flags)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -143,7 +143,7 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			if (hdd_cm_is_vdev_associated(adapter->deflink) ||
-			    hdd_cm_is_connecting(adapter)) {
+			    hdd_cm_is_connecting(adapter->deflink)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -172,7 +172,7 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 		case QDF_P2P_GO_MODE:
 		case QDF_SAP_MODE:
 			if (test_bit(SOFTAP_BSS_STARTED,
-				     &adapter->event_flags)) {
+				     &adapter->deflink->link_flags)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -184,7 +184,7 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
 			if (hdd_cm_is_vdev_associated(adapter->deflink) ||
-			    hdd_cm_is_connecting(adapter)) {
+			    hdd_cm_is_connecting(adapter->deflink)) {
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -1235,11 +1235,11 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 
 	hdd_delete_peer(sta_ctx, peer_mac_addr);
 
+	ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc, link_info->vdev,
+				    peer_mac_addr);
+
 	if (last_peer) {
 		hdd_debug("No more ndp peers.");
-		ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc,
-					    link_info->vdev,
-					    peer_mac_addr);
 		hdd_cleanup_ndi(hdd_ctx, adapter);
 		qdf_event_set(&adapter->peer_cleanup_done);
 		/*
