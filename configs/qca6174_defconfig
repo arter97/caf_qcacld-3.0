@@ -756,3 +756,5 @@ endif
 
 #Enable thermal throttle
 CONFIG_FW_THERMAL_THROTTLE := y
+
+CONFIG_ALLOC_CONTIGUOUS_MULTI_PAGE := y
