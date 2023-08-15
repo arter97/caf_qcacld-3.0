@@ -41,6 +41,8 @@
 #include "cfg_ucfg_api.h"
 #include "cdp_txrx_bus.h"
 #include "wlan_pmo_ucfg_api.h"
+#include "hif.h"
+#include "target_type.h"
 
 /**
  * pmo_core_get_vdev_dtim_period() - Get vdev dtim period
@@ -480,6 +482,8 @@ static QDF_STATUS pmo_core_psoc_configure_suspend(struct wlan_objmgr_psoc *psoc,
 						  bool is_runtime_pm)
 {
 	struct pmo_psoc_priv_obj *psoc_ctx;
+	struct hif_target_info *tgt_info;
+	struct hif_opaque_softc *hif_ctx;
 
 	pmo_enter();
 
@@ -488,9 +492,17 @@ static QDF_STATUS pmo_core_psoc_configure_suspend(struct wlan_objmgr_psoc *psoc,
 	if (is_runtime_pm)
 		pmo_core_enable_runtime_pm_offloads(psoc);
 
+	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
+	if (!hif_ctx) {
+		pmo_err("Invalid hif ctx");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	tgt_info = hif_get_target_info_handle(hif_ctx);
+
 	if ((is_runtime_pm) ||
 	    (psoc_ctx->psoc_cfg.suspend_mode == PMO_SUSPEND_WOW &&
-	    pmo_core_is_wow_applicable(psoc))) {
+	    ((tgt_info->target_type == TARGET_TYPE_QCA6490) ||
+	    pmo_core_is_wow_applicable(psoc)))) {
 		pmo_debug("WOW Suspend");
 		pmo_core_apply_lphb(psoc);
 		/*
