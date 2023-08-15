@@ -1410,19 +1410,13 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			qdf_ret_status =
 				sap_signal_hdd_event(sap_ctx, csr_roam_info,
 						     eSAP_CHANNEL_CHANGE_RESP,
-						   (void *)QDF_STATUS_SUCCESS);
+						   (void *)eSAP_STATUS_SUCCESS);
 		break;
 	case eCSR_ROAM_RESULT_CHANNEL_CHANGE_FAILURE:
-		/* This is much more serious issue, we have to vacate the
-		 * channel due to the presence of radar but our channel change
-		 * failed, stop the BSS operation completely and inform hostapd
-		 */
-		qdf_ret_status = wlansap_stop_bss(sap_ctx);
-
 		qdf_ret_status =
 			sap_signal_hdd_event(sap_ctx, csr_roam_info,
 					     eSAP_CHANNEL_CHANGE_RESP,
-					     (void *)QDF_STATUS_E_FAILURE);
+					     (void *)eSAP_STATUS_FAILURE);
 		break;
 	case eCSR_ROAM_EXT_CHG_CHNL_UPDATE_IND:
 		qdf_status = sap_signal_hdd_event(sap_ctx, csr_roam_info,

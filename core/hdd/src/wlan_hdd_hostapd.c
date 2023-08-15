@@ -1772,10 +1772,15 @@ static QDF_STATUS hdd_hostapd_chan_change(struct wlan_hdd_link_info *link_info,
 	bool legacy_phymode;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct sap_ch_selected_s *sap_chan_selected =
-			&sap_event->sapevt.sap_ch_selected;
+	struct sap_ch_selected_s *sap_chan_selected;
 	struct sap_config *sap_config =
 				&link_info->session.ap.sap_config;
+
+	if (sap_event->sapHddEventCode == eSAP_CHANNEL_CHANGE_RESP)
+		sap_chan_selected =
+			&sap_event->sapevt.sap_chan_cng_rsp.sap_ch_selected;
+	else
+		sap_chan_selected = &sap_event->sapevt.sap_ch_selected;
 
 	sap_ch_param.ch_width = sap_chan_selected->ch_width;
 	sap_ch_param.mhz_freq_seg0 =
@@ -2356,6 +2361,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 
 		/* Invalidate the channel info. */
 		ap_ctx->operating_chan_freq = 0;
+
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 
 		/* reset the dfs_cac_status and dfs_cac_block_tx flag only when
 		 * the last BSS is stopped
@@ -3076,7 +3083,20 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_err("qdf_event_set failed! status: %d",
 				qdf_status);
-		return hdd_hostapd_chan_change(link_info, sap_event);
+		if (sap_event->sapevt.sap_chan_cng_rsp.ch_change_rsp_status !=
+		    eSAP_STATUS_SUCCESS) {
+			/* This is much more serious issue, we have to vacate
+			 * the channel due to the presence of radar or coex
+			 * but our channel change failed, stop the BSS operation
+			 * completely and inform hostapd
+			 */
+			hdd_debug("SAP[vdev%d] channel switch fail, will stop",
+				  link_info->vdev_id);
+			schedule_work(&adapter->sap_stop_bss_work);
+			return QDF_STATUS_SUCCESS;
+		} else {
+			return hdd_hostapd_chan_change(link_info, sap_event);
+		}
 	default:
 		hdd_debug("SAP message is not handled");
 		goto stopbss;

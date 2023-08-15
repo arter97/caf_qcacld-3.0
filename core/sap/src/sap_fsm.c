@@ -2787,7 +2787,10 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 
 	case eSAP_CHANNEL_CHANGE_RESP:
 		sap_ap_event->sapHddEventCode = eSAP_CHANNEL_CHANGE_RESP;
-		acs_selected = &sap_ap_event->sapevt.sap_ch_selected;
+		sap_ap_event->sapevt.sap_chan_cng_rsp.ch_change_rsp_status =
+					(eSapStatus)context;
+		acs_selected =
+			&sap_ap_event->sapevt.sap_chan_cng_rsp.sap_ch_selected;
 		acs_selected->pri_ch_freq = sap_ctx->chan_freq;
 		acs_selected->ht_sec_ch_freq = sap_ctx->sec_ch_freq;
 		acs_selected->ch_width =
