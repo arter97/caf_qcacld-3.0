@@ -569,27 +569,27 @@
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /*
- * <cfg>
+ * <ini>
  * mlo_support_link_num - Set number of link mlo connection supports for sta
  * @Min: 1
  * @Max: 3
- * @Default: 3
+ * @Default: 2
  *
- * This cfg is used to configure the number of link mlo connection supports
+ * This ini is used to configure the number of link mlo connection supports
  *
  * Related: None
  *
  * Supported Feature: STA
  *
- * Usage: Internal
+ * Usage: Internal/External
  *
- * </cfg>
+ * </ini>
  */
-#define CFG_MLO_SUPPORT_LINK_NUM CFG_UINT( \
+#define CFG_MLO_SUPPORT_LINK_NUM CFG_INI_UINT( \
 			"mlo_support_link_num", \
 			1, \
 			3, \
-			3, \
+			2, \
 			CFG_VALUE_OR_DEFAULT, \
 			"supported mlo link number")
 

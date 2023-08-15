@@ -2398,7 +2398,7 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 				  struct wlan_mlme_sta_cfg *sta)
 {
 	sta->mlo_support_link_num =
-		cfg_default(CFG_MLO_SUPPORT_LINK_NUM);
+		cfg_get(psoc, CFG_MLO_SUPPORT_LINK_NUM);
 	sta->mlo_support_link_band =
 		cfg_default(CFG_MLO_SUPPORT_LINK_BAND);
 	sta->mlo_max_simultaneous_links =
