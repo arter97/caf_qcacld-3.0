@@ -3094,6 +3094,16 @@ static void lim_process_switch_channel_join_req(
 		goto error;
 	}
 
+	if (lim_connect_skip_join_for_gc(session_entry)) {
+		join_cnf.resultCode = eSIR_SME_SUCCESS;
+		join_cnf.protStatusCode = STATUS_SUCCESS;
+		join_cnf.sessionId = session_entry->peSessionId;
+		lim_post_sme_message(mac_ctx,
+				     LIM_MLM_JOIN_CNF,
+				     (uint32_t *)&join_cnf.resultCode);
+		return;
+	}
+
 	bss = &session_entry->lim_join_req->bssDescription;
 	nontx_bss_id = bss->mbssid_info.profile_num;
 
