@@ -116,6 +116,7 @@
 #include "wlan_osif_features.h"
 #include "wlan_pre_cac_ucfg_api.h"
 #include <wlan_dp_ucfg_api.h>
+#include "wlan_twt_ucfg_ext_cfg.h"
 #include "wlan_twt_ucfg_ext_api.h"
 #include "wlan_twt_ucfg_api.h"
 #include "wlan_vdev_mgr_ucfg_api.h"
@@ -7657,11 +7658,16 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 				      bool twt_responder)
 {
-	bool twt_res_svc_cap, enable_twt;
+	bool twt_res_svc_cap, enable_twt, twt_res_cfg;
 	uint32_t reason;
 
 	enable_twt = ucfg_twt_cfg_is_twt_enabled(hdd_ctx->psoc);
 	ucfg_twt_get_responder(hdd_ctx->psoc, &twt_res_svc_cap);
+	ucfg_twt_cfg_get_responder(hdd_ctx->psoc, &twt_res_cfg);
+	if (!twt_res_cfg && !twt_responder) {
+		hdd_debug("TWT responder already disable, skip");
+		return;
+	}
 	ucfg_twt_cfg_set_responder(hdd_ctx->psoc,
 				   QDF_MIN(twt_res_svc_cap,
 					   (enable_twt &&
