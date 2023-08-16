@@ -6377,7 +6377,8 @@ free_net_dev:
 	return NULL;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+	(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static int
 hdd_register_netdevice(struct hdd_adapter *adapter, struct net_device *dev,
 		       struct hdd_adapter_create_param *params)
@@ -7279,7 +7280,8 @@ static void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+	(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static void
 hdd_unregister_netdevice(struct hdd_adapter *adapter, struct net_device *dev)
 {
