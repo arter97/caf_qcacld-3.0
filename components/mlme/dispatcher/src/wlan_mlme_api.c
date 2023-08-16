@@ -6933,7 +6933,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	wlan_mlme_get_sap_max_peers(psoc, &sap_max_num_clients);
 	mlme_feature_set->sap_max_num_clients = sap_max_num_clients;
 	mlme_feature_set->vendor_req_1_version =
-					WMI_HOST_VENDOR1_REQ1_VERSION_3_40;
+					WMI_HOST_VENDOR1_REQ1_VERSION_4_00;
 	roam_triggers = wlan_mlme_get_roaming_triggers(psoc);
 
 	wlan_mlme_get_bss_load_enabled(psoc, &is_bss_load_enabled);
@@ -6966,7 +6966,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	mlme_feature_set->roaming_ctrl_get_cu = true;
 
 	mlme_feature_set->vendor_req_2_version =
-					WMI_HOST_VENDOR1_REQ2_VERSION_3_20;
+					WMI_HOST_VENDOR1_REQ2_VERSION_3_50;
 	mlme_feature_set->sta_dual_p2p_support =
 				wlan_mlme_get_p2p_p2p_host_conc_support();
 	wlan_mlme_get_vht_enable2x2(psoc, &mlme_feature_set->enable2x2);
