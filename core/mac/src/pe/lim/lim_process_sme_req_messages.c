@@ -4708,6 +4708,17 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 	lim_dump_he_info(mac_ctx, pe_session);
 	lim_dump_eht_info(pe_session);
 
+	if (lim_connect_skip_join_for_gc(pe_session)) {
+		pe_session->beacon =
+			qdf_mem_malloc(util_scan_entry_frame_len(req->entry));
+		if (!pe_session->beacon)
+			goto fail;
+		pe_session->bcnLen = util_scan_entry_frame_len(req->entry);
+		qdf_mem_copy(pe_session->beacon,
+			     util_scan_entry_frame_ptr(req->entry),
+			     pe_session->bcnLen);
+	}
+
 	status = lim_send_connect_req_to_mlm(pe_session);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to send mlm req vdev id %d",
