@@ -560,7 +560,8 @@ static struct dp_peer *dp_sawf_get_peer_from_wds_ext_dev(
 	 * Get the private structure of AP vlan dev.
 	 */
 	osifp = ath_netdev_priv(netdev);
-	if (!osifp->parent_netdev) {
+	parent_osdev = osif_wds_ext_get_parent_osif(osifp);
+	if (!parent_osdev) {
 		qdf_debug("Parent dev cannot be NULL");
 		return NULL;
 	}
@@ -568,7 +569,6 @@ static struct dp_peer *dp_sawf_get_peer_from_wds_ext_dev(
 	/*
 	 * Vdev ctx are valid only in parent netdev.
 	 */
-	parent_osdev = ath_netdev_priv(osifp->parent_netdev);
 	vdev = parent_osdev->ctrl_vdev;
 	*soc = (struct dp_soc *)wlan_psoc_get_dp_handle
 	      (wlan_pdev_get_psoc(wlan_vdev_get_pdev(vdev)));

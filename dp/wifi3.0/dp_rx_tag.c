@@ -734,10 +734,7 @@ wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	case OSIF_NETDEV_TYPE_WDS_EXT:
 		osifp = (osif_peer_dev *)(osdev);
-		if (!osifp->parent_netdev)
-			return NULL;
-
-		osdev = ath_netdev_priv(osifp->parent_netdev);
+		osdev = osif_wds_ext_get_parent_osif(osifp);
 		if (!osdev)
 			return NULL;
 
