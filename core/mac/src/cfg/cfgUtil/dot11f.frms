@@ -1730,6 +1730,14 @@ IE MeasurementReport (EID_MEAS_REPORT)    // 7.3.2.22
             rpi6_density,    1;
             rpi7_density,    1;
         }
+        channel_load_report (type IS 3)
+        {
+            op_class,          1;
+            channel,           1;
+            meas_start_time,   8;
+            meas_duration,     2;
+            chan_load,         1;
+        }
        Beacon (type IS 5)
        {
            regClass,               1;
@@ -2975,7 +2983,7 @@ IE dh_parameter_element (EID_EXTN_ID_ELEMENT) OUI ( 0x20 )
     public_key[0..255];
 }
 
-const EID_RRM_BEACON_REPORTING     = 1;
+const EID_RRM_REPORTING     = 1;
 const EID_RRM_BCN_REPORTING_DETAIL = 2;
 
 const SUB_EID_AZIMUTH_REQ = 1;
@@ -2985,10 +2993,10 @@ const SUB_EID_MAX_AGE = 4;
 const SUB_EID_NEIGHBOR_RPT = 52;
 //const SUB_EID_TRIGGERED_REPORTING = 1;
 
-IE BeaconReporting (EID_RRM_BEACON_REPORTING)
+IE rrm_reporting (EID_RRM_REPORTING)
 {
-     reportingCondition, 1;
-     threshold,          1;
+     reporting_condition, 1;
+     threshold,           1;
 }
 
 IE BcnReportingDetail (EID_RRM_BCN_REPORTING_DETAIL)
@@ -3090,6 +3098,14 @@ IE MeasurementRequest (EID_MEAS_REQUEST)  // 7.3.2.21
            meas_start_time[8];
            meas_duration,    2;
        }
+       channel_load (measurement_type IS 3)
+       {
+           op_class,                1;
+           channel,                 1;
+           randomization_intv,      2;
+           meas_duration,           2;
+           OPTIE rrm_reporting;
+       }
        Beacon (measurement_type IS 5)
        {
           regClass,          1;
@@ -3099,7 +3115,7 @@ IE MeasurementRequest (EID_MEAS_REQUEST)  // 7.3.2.21
           meas_mode,         1;
           BSSID[6];
           OPTIE SSID;
-          OPTIE BeaconReporting;
+          OPTIE rrm_reporting;
           OPTIE BcnReportingDetail;
           OPTIE RequestedInfo;
           OPTIE APChannelReport[0..2];
