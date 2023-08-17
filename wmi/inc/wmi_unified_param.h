@@ -7205,6 +7205,8 @@ typedef enum {
  * @WMI_HOST_PEER_PARAM_ENABLE_FT: Notify FT roam
  * @WMI_HOST_PEER_CHWIDTH_PUNCTURE_20MHZ_BITMAP: Peer channel bandwidth and
  *                                         puncture bitmap
+ * @WMI_HOST_PEER_FT_ROAMING_PEER_UPDATE: Reset PN value on
+ *                                        every roam event
  */
 enum {
 	PEER_PARAM(PEER_MIMO_PS_STATE),
@@ -7238,6 +7240,8 @@ enum {
 	PEER_PARAM(PEER_PARAM_OFDMA_ENABLE),
 	PEER_PARAM(PEER_PARAM_ENABLE_FT),
 	PEER_PARAM(PEER_CHWIDTH_PUNCTURE_20MHZ_BITMAP),
+	PEER_PARAM(PEER_FT_ROAMING_PEER_UPDATE),
+
 };
 #define WMI_HOST_PEER_MIMO_PS_NONE	0x0
 #define WMI_HOST_PEER_MIMO_PS_STATIC	0x1
