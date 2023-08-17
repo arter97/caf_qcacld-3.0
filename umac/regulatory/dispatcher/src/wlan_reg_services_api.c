@@ -181,16 +181,6 @@ wlan_reg_get_6g_afc_mas_chan_list(struct wlan_objmgr_pdev *pdev,
 }
 
 qdf_export_symbol(wlan_reg_get_6g_afc_mas_chan_list);
-
-bool
-wlan_reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
-			     qdf_freq_t freq,
-			     enum supported_6g_pwr_types in_6ghz_pwr_mode)
-{
-	return reg_is_6ghz_freq_txable(pdev, freq, in_6ghz_pwr_mode);
-}
-
-qdf_export_symbol(wlan_reg_is_6ghz_freq_txable);
 #endif
 
 uint16_t wlan_reg_get_bw_value(enum phy_ch_width bw)
