@@ -100,11 +100,11 @@ QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	bs_ctx = ll_sap_obj->bearer_switch_ctx;
-
 	bs_ctx = qdf_mem_malloc(sizeof(struct bearer_switch_info));
 	if (!bs_ctx)
 		return QDF_STATUS_E_NOMEM;
+
+	ll_sap_obj->bearer_switch_ctx = bs_ctx;
 
 	qdf_atomic_init(&bs_ctx->request_id);
 
@@ -424,27 +424,25 @@ release_mem:
 	return status;
 }
 
-QDF_STATUS ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
-				struct wlan_bearer_switch_request *bs_request)
+qdf_freq_t ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id)
 {
-	return bs_sm_deliver_event(psoc, WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN,
-				   sizeof(*bs_request), bs_request);
-}
+	struct wlan_ll_lt_sap_freq_list freq_list;
 
-QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
-					enum bearer_switch_req_type req_type)
-{
-	/*
-	 * return status as QDF_STATUS_SUCCESS or failure based on the current
-	 * pending requests of the transport switch
-	 */
-	if (req_type == WLAN_BS_REQ_TO_NON_WLAN) {
-		ll_sap_debug("request SWITCH_TYPE_NON_WLAN accepted");
-		return QDF_STATUS_SUCCESS;
-	} else if (req_type == WLAN_BS_REQ_TO_WLAN) {
-		ll_sap_debug("request SWITCH_TYPE_WLAN accepted");
-		return QDF_STATUS_SUCCESS;
-	}
+	ll_lt_sap_get_freq_list(psoc, &freq_list, vdev_id);
 
-	return QDF_STATUS_E_RESOURCES;
+	if (freq_list.standalone_mac.freq_5GHz_low)
+		return freq_list.standalone_mac.freq_5GHz_low;
+	if (freq_list.shared_mac.freq_5GHz_low)
+		return freq_list.shared_mac.freq_5GHz_low;
+	if (freq_list.standalone_mac.freq_6GHz)
+		return freq_list.standalone_mac.freq_6GHz;
+	if (freq_list.standalone_mac.freq_5GHz_high)
+		return freq_list.standalone_mac.freq_5GHz_high;
+	if (freq_list.shared_mac.freq_6GHz)
+		return freq_list.shared_mac.freq_6GHz;
+	if (freq_list.shared_mac.freq_5GHz_high)
+		return freq_list.shared_mac.freq_5GHz_high;
+
+	return freq_list.best_freq;
 }

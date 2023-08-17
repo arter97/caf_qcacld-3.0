@@ -47,6 +47,7 @@
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_mlo_link_force.h"
 #include "wlan_connectivity_logging.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 /* invalid channel id. */
 #define INVALID_CHANNEL_ID 0
@@ -11703,6 +11704,13 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("Invalid psoc");
 		return false;
 	}
+
+	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
+		if (policy_mgr_is_ll_lt_sap_restart_required(psoc))
+			return true;
+		return false;
+	}
+
 	if (scc_mode == QDF_MCC_TO_SCC_SWITCH_DISABLE) {
 		policy_mgr_debug("No scc required");
 		return false;
