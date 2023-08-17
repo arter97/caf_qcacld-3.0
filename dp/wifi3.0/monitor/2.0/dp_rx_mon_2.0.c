@@ -198,6 +198,7 @@ dp_rx_mon_shift_pf_tag_in_headroom(qdf_nbuf_t nbuf, struct dp_soc *soc,
 	if (qdf_unlikely(!soc)) {
 		dp_mon_err("Soc[%pK] Null. Can't update pftag to nbuf headroom",
 			   soc);
+		return;
 	}
 
 	if (!wlan_cfg_is_rx_mon_protocol_flow_tag_enabled(soc->wlan_cfg_ctx))
@@ -265,7 +266,7 @@ dp_rx_mon_pf_tag_to_buf_headroom_2_0(void *nbuf,
 	if (qdf_unlikely(!soc)) {
 		dp_mon_err("Soc[%pK] Null. Can't update pftag to nbuf headroom",
 			   soc);
-		qdf_assert_always(0);
+		return;
 	}
 
 	if (!wlan_cfg_is_rx_mon_protocol_flow_tag_enabled(soc->wlan_cfg_ctx))
@@ -1503,7 +1504,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 							    DP_MON_DATA_BUFFER_SIZE, true);
 			if (qdf_unlikely(status != QDF_STATUS_SUCCESS)) {
 				dp_mon_err("num_frags exceeding MAX frags");
-				qdf_assert_always(0);
+				return num_buf_reaped;
 			}
 			ppdu_info->mpdu_info[ppdu_info->user_id].mpdu_start_received = true;
 			ppdu_info->mpdu_info[user_id].first_rx_hdr_rcvd = true;
@@ -2136,8 +2137,9 @@ dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 	uint32_t work_done = 0;
 	struct hal_rx_ppdu_info *ppdu_info = NULL;
 	QDF_STATUS status;
-	if (!pdev) {
-		dp_mon_err("%pK: pdev is null for mac_id = %d", soc, mac_id);
+	if (!pdev || !hal_soc) {
+		dp_mon_err("%pK: pdev or hal_soc is null, mac_id = %d",
+			   soc, mac_id);
 		return work_done;
 	}
 
@@ -2150,10 +2152,6 @@ dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 			   soc, mon_dst_srng);
 		return work_done;
 	}
-
-	hal_soc = soc->hal_soc;
-
-	qdf_assert((hal_soc && pdev));
 
 	qdf_spin_lock_bh(&mon_pdev->mon_lock);
 
