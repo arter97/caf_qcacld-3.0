@@ -41,6 +41,8 @@
 #include "target_if.h"
 #include "wlan_cm_api.h"
 #include "wlan_mlo_link_force.h"
+#include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -2479,7 +2481,7 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
  * @psoc: PSOC object information
  *
  * This function will check connection table and find any STA/CLI
- * in transition state such as disconnecting, or roaming.
+ * in transition state such as disconnecting, link switch or roaming.
  *
  * Return: true if there is one STA/CLI in transition state.
  */
@@ -2491,6 +2493,7 @@ policy_mgr_is_any_conn_in_transition(struct wlan_objmgr_psoc *psoc)
 	struct policy_mgr_conc_connection_info *conn_info;
 	struct wlan_objmgr_vdev *vdev;
 	bool non_connected = false;
+	bool in_link_switch = false;
 	uint8_t vdev_id;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -2515,16 +2518,26 @@ policy_mgr_is_any_conn_in_transition(struct wlan_objmgr_psoc *psoc)
 		}
 
 		non_connected = !wlan_cm_is_vdev_connected(vdev);
+
+		if (mlo_is_mld_sta(vdev) &&
+		    mlo_mgr_is_link_switch_in_progress(vdev))
+			in_link_switch = true;
+
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 		if (non_connected) {
 			policy_mgr_debug("vdev %d: is in transition state",
 					 vdev_id);
 			break;
 		}
+		if (in_link_switch) {
+			policy_mgr_debug("vdev %d: sta mld is in link switch state",
+					 vdev_id);
+			break;
+		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	return non_connected;
+	return non_connected || in_link_switch;
 }
 
 static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
@@ -2604,6 +2617,8 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 	 */
 	if (policy_mgr_is_any_conn_in_transition(pm_ctx->psoc)) {
 		policy_mgr_debug("defer sap conc check to a later time due to another sta/cli dicon/roam pending");
+		qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
+				       SAP_CONC_CHECK_DEFER_TIMEOUT_MS);
 		goto end;
 	}
 

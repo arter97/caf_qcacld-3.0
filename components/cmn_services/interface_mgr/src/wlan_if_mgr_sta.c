@@ -35,11 +35,10 @@
 #include <wlan_cm_roam_api.h>
 #include "wlan_nan_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
-#ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_sta.h>
-#endif
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_tdls_api.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 				struct if_mgr_event_data *event_data)
@@ -249,9 +248,9 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 		ifmgr_err("Failed to enable roaming after p2p disconnect");
 		return status;
 	}
-
-	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
-				wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev));
+	if (!mlo_is_mld_sta(vdev) || !mlo_mgr_is_link_switch_in_progress(vdev))
+		policy_mgr_check_concurrent_intf_and_restart_sap(
+			psoc, wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev));
 
 	status = if_mgr_enable_roaming_on_connected_sta(pdev, vdev);
 	if (status) {

@@ -1774,6 +1774,47 @@ ml_nlink_update_force_active_num(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static bool
+ml_nlink_all_links_ready_for_state_change(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_objmgr_vdev *vdev,
+					  enum ml_nlink_change_event_type evt)
+{
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+
+	if (!mlo_check_if_all_links_up(vdev))
+		return false;
+
+	if (mlo_mgr_is_link_switch_in_progress(vdev) &&
+	    evt != ml_nlink_connect_completion_evt) {
+		mlo_debug("mlo vdev %d link switch in progress!",
+			  wlan_vdev_get_id(vdev));
+		return false;
+	}
+	/* For initial connecting to 2 or 3 links ML ap, assoc link and
+	 * non assoc link connected one by one, avoid changing link state
+	 * before link vdev connect completion, to check connected link count.
+	 * If < 2, means non assoc link connect is not completed, disallow
+	 * link state change.
+	 */
+	if (!mlo_mgr_is_link_switch_in_progress(vdev) &&
+	    evt == ml_nlink_connect_completion_evt) {
+		ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_STANDBY_LINK,
+				       QDF_ARRAY_SIZE(ml_linkid_lst),
+				       ml_link_info, ml_freq_lst, ml_vdev_lst,
+				       ml_linkid_lst, &ml_num_link,
+				       &ml_link_bitmap);
+		if (ml_num_link < 2)
+			return false;
+	}
+
+	return true;
+}
+
 /**
  * ml_nlink_state_change() - Handle ML STA link force
  * with concurrency internal function
@@ -1822,14 +1863,8 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 	vdev = ml_nlink_get_affect_ml_sta(psoc);
 	if (!vdev)
 		goto end;
-	if (!mlo_check_if_all_links_up(vdev))
+	if (!ml_nlink_all_links_ready_for_state_change(psoc, vdev, evt))
 		goto end;
-	if (mlo_mgr_is_link_switch_in_progress(vdev) &&
-	    evt != ml_nlink_connect_completion_evt) {
-		mlo_debug("mlo vdev %d link switch in progress!",
-			  wlan_vdev_get_id(vdev));
-		goto end;
-	}
 
 	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
 

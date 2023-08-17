@@ -4060,7 +4060,12 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 						       cc_mode, vdev_id);
 	if (intf_ch_freq)
 		restart_freq = intf_ch_freq;
-	sap_debug("vdev: %d, CSA target freq: %d", vdev_id, restart_freq);
+	if (restart_freq == sap_ctx->chan_freq)
+		restart_freq = 0;
+
+	if (restart_freq)
+		sap_debug("vdev: %d, CSA target freq: %d", vdev_id,
+			  restart_freq);
 
 	return restart_freq;
 }
