@@ -69,13 +69,9 @@ int dp_tx_proxy_arp(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
 #define DP_TX_DESC_FLAG_FLUSH		0x2000
 #define DP_TX_DESC_FLAG_TRAFFIC_END_IND	0x4000
 #define DP_TX_DESC_FLAG_RMNET		0x8000
-/*
- * Since the Tx descriptor flag is of only 16-bit and no more bit is free for
- * any new flag, therefore for time being overloading PPEDS flag with that of
- * FLUSH flag and FLAG_FAST with TDLS which is not enabled for WIN.
- */
-#define DP_TX_DESC_FLAG_PPEDS		0x2000
-#define DP_TX_DESC_FLAG_FAST		0x100
+#define DP_TX_DESC_FLAG_FASTPATH_SIMPLE 0x10000
+#define DP_TX_DESC_FLAG_PPEDS		0x20000
+#define DP_TX_DESC_FLAG_FAST		0x40000
 
 #define DP_TX_EXT_DESC_FLAG_METADATA_VALID 0x1
 
@@ -273,6 +269,26 @@ void dp_tx_deinit_pair_by_index(struct dp_soc *soc, int index);
 void
 dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			     struct dp_tx_desc_s *comp_head, uint8_t ring_id);
+
+/**
+ * dp_tx_comp_process_desc_list_fast() - Tx complete fast sw descriptor handler
+ * @soc: core txrx main context
+ * @head_desc: software descriptor head pointer
+ * @tail_desc: software descriptor tail pointer
+ * @ring_id: ring number
+ * @fast_desc_count: Total descriptor count in the list
+ *
+ * This function will process batch of descriptors reaped by dp_tx_comp_handler
+ * and append the list of descriptors to the freelist
+ *
+ * Return: none
+ */
+void
+dp_tx_comp_process_desc_list_fast(struct dp_soc *soc,
+				  struct dp_tx_desc_s *head_desc,
+				  struct dp_tx_desc_s *tail_desc,
+				  uint8_t ring_id,
+				  uint32_t fast_desc_count);
 
 /**
  * dp_tx_comp_free_buf() - Free nbuf associated with the Tx Descriptor
@@ -1871,6 +1887,40 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 	dp_update_tx_desc_stats(pdev);
 }
 
+/**
+ * __dp_tx_outstanding_sub - Sub outstanding tx desc values from global list
+ * @soc: DP soc handle
+ * @count: count of descs to subtract from outstanding
+ *
+ * Return: void
+ */
+static inline void
+__dp_tx_outstanding_sub(struct dp_soc *soc, uint32_t count)
+{
+	struct dp_global_context *dp_global;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+
+	qdf_atomic_sub(count, &dp_global->global_descriptor_in_use);
+}
+
+/**
+ * dp_tx_outstanding_sub - Subtract outstanding tx desc values on pdev
+ * @pdev: DP pdev handle
+ * @count: count of descs to subtract from outstanding
+ *
+ * Return: void
+ */
+static inline void
+dp_tx_outstanding_sub(struct dp_pdev *pdev, uint32_t count)
+{
+	struct dp_soc *soc = pdev->soc;
+
+	__dp_tx_outstanding_sub(soc, count);
+	qdf_atomic_sub(count, &pdev->num_tx_outstanding);
+	dp_update_tx_desc_stats(pdev);
+}
+
 #else
 
 static inline void
@@ -1915,6 +1965,36 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 	qdf_atomic_dec(&pdev->num_tx_outstanding);
 	dp_update_tx_desc_stats(pdev);
 }
+
+/**
+ * __dp_tx_outstanding_sub - Sub outstanding tx desc values from soc
+ * @soc: DP soc handle
+ * @count: count of descs to subtract from outstanding
+ *
+ * Return: void
+ */
+static inline void
+__dp_tx_outstanding_sub(struct dp_soc *soc, uint32_t count)
+{
+	qdf_atomic_sub(count, &soc->num_tx_outstanding);
+}
+
+/**
+ * dp_tx_outstanding_sub - Subtract outstanding tx desc values on pdev
+ * @pdev: DP pdev handle
+ * @count: count of descs to subtract from outstanding
+ *
+ * Return: void
+ */
+static inline void
+dp_tx_outstanding_sub(struct dp_pdev *pdev, uint32_t count)
+{
+	struct dp_soc *soc = pdev->soc;
+
+	__dp_tx_outstanding_sub(soc, count);
+	qdf_atomic_sub(count, &pdev->num_tx_outstanding);
+	dp_update_tx_desc_stats(pdev);
+}
 #endif /* QCA_SUPPORT_DP_GLOBAL_CTX */
 
 #else //QCA_TX_LIMIT_CHECK
@@ -1957,6 +2037,25 @@ static inline void
 dp_tx_outstanding_dec(struct dp_pdev *pdev)
 {
 	qdf_atomic_dec(&pdev->num_tx_outstanding);
+	dp_update_tx_desc_stats(pdev);
+}
+
+static inline void
+__dp_tx_outstanding_sub(struct dp_soc *soc, uint32_t count)
+{
+}
+
+/**
+ * dp_tx_outstanding_sub - Subtract outstanding tx desc values on pdev
+ * @pdev: DP pdev handle
+ * @count: count of descs to subtract from outstanding
+ *
+ * Return: void
+ */
+static inline void
+dp_tx_outstanding_sub(struct dp_pdev *pdev, uint32_t count)
+{
+	qdf_atomic_sub(count, &pdev->num_tx_outstanding);
 	dp_update_tx_desc_stats(pdev);
 }
 #endif //QCA_TX_LIMIT_CHECK
