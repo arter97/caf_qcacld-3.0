@@ -25,6 +25,7 @@
 
 #define QCA_SCS_RULE_SOC_ID_MASK  0xF0000000
 #define QCA_SCS_RULE_SOC_ID_SHIFT 28
+#define QCA_SCS_RULE_ID_INVALID   0xFFFF
 
 extern ol_ath_soc_softc_t *ol_global_soc[GLOBAL_SOC_SIZE];
 
@@ -104,6 +105,12 @@ bool qca_scs_peer_lookup_n_rule_match(uint32_t rule_id, uint8_t *dst_mac_addr)
 	uint8_t soc_id = 0;
 	ol_ath_soc_softc_t *soc = NULL;
 	ol_txrx_soc_handle soc_txrx_handle = NULL;
+
+	/* rule_id is received as QCA_SCS_RULE_ID_INVALID when networking
+	   entity takes care of rule match against peer, hence return true
+	   in that case */
+	if (rule_id == QCA_SCS_RULE_ID_INVALID)
+		return true;
 
 	/* Fetch soc_id from scs rule_id*/
 	soc_id = qca_scs_fetch_soc_id_frm_rule_id(rule_id);
