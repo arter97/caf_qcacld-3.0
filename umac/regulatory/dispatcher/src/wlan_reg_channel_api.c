@@ -351,3 +351,12 @@ wlan_quick_reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
 	return reg_quick_set_ap_pwr_and_update_chan_list(pdev, ap_pwr_type);
 }
 
+bool
+wlan_reg_is_freq_txable(struct wlan_objmgr_pdev *pdev,
+			qdf_freq_t freq,
+			enum supported_6g_pwr_types in_6ghz_pwr_mode)
+{
+	return reg_is_freq_txable(pdev, freq, in_6ghz_pwr_mode);
+}
+
+qdf_export_symbol(wlan_reg_is_freq_txable);
