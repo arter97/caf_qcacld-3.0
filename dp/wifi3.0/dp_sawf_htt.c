@@ -44,7 +44,7 @@ dp_htt_sawf_get_host_queue(struct dp_soc *soc, uint32_t *msg_word,
 	hlos_tid = HTT_T2H_SAWF_MSDUQ_INFO_HTT_HLOS_TID_GET(*msg_word);
 	ast_idx = HTT_T2H_SAWF_MSDUQ_INFO_HTT_AST_LIST_IDX_GET(*msg_word);
 
-	if ((hlos_tid <= 0) || (hlos_tid >= DP_SAWF_TID_MAX)) {
+	if (hlos_tid > DP_SAWF_TID_MAX - 1) {
 		wlan_cfg_set_sawf_config(soc->wlan_cfg_ctx, 0);
 		qdf_err("Invalid HLOS TID:%u, Disable sawf.", hlos_tid);
 		return QDF_STATUS_E_FAILURE;
