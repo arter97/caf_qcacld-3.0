@@ -277,12 +277,10 @@ QDF_STATUS hdd_mlo_mgr_unregister_osif_ops(void)
 QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 						uint8_t non_trans_vdev_id)
 {
-	int errno;
 	bool found = false;
 	struct hdd_adapter *adapter;
 	struct vdev_osif_priv *osif_priv;
 	struct wlan_hdd_link_info *link_info, *iter_link_info;
-	struct osif_vdev_sync *vdev_sync;
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (!osif_priv) {
@@ -299,11 +297,6 @@ QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	errno = osif_vdev_sync_trans_start_wait(adapter->dev, &vdev_sync);
-	if (errno)
-		return QDF_STATUS_E_FAILURE;
-
-	osif_vdev_sync_wait_for_ops(vdev_sync);
 	hdd_adapter_for_each_link_info(adapter, iter_link_info) {
 		if (non_trans_vdev_id == iter_link_info->vdev_id) {
 			adapter->deflink = iter_link_info;
@@ -311,7 +304,6 @@ QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 			break;
 		}
 	}
-	osif_vdev_sync_trans_stop(vdev_sync);
 
 	if (!found)
 		return QDF_STATUS_E_FAILURE;
