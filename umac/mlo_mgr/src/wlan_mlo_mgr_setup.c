@@ -144,6 +144,7 @@ static void mlo_set_soc_list(uint8_t grp_id, struct wlan_objmgr_psoc *psoc)
 		if (mlo_ctx->setup_info[grp_id].soc_id_list[idx] ==
 				psoc->soc_objmgr.psoc_id) {
 			mlo_ctx->setup_info[grp_id].soc_list[idx] = psoc;
+			mlo_wsi_link_info_update_soc(psoc, grp_id);
 		}
 	}
 }

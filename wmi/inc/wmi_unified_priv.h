@@ -3010,6 +3010,14 @@ QDF_STATUS (*config_peer_latency_info_cmd)(
 				*param);
 #endif
 #endif
+
+#ifdef WLAN_WSI_STATS_SUPPORT
+QDF_STATUS (*send_wsi_stats_info_cmd)(
+				wmi_unified_t wmi,
+				struct wmi_wsi_stats_info_params
+				*param);
+#endif
+
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 QDF_STATUS
 (*trigger_ulofdma_su_cmd)(wmi_unified_t wmi,

@@ -1519,6 +1519,7 @@ struct wlan_lmac_if_son_rx_ops {
  * @send_tid_to_link_mapping: function to send T2LM command to FW
  * @send_link_removal_cmd: function to send MLO link removal command to FW
  * @peer_ptqm_migrate_send: API to send peer ptqm migration request to FW
+ * @send_wsi_link_info_cmd: send WSI link stats to FW
  */
 struct wlan_lmac_if_mlo_tx_ops {
 	QDF_STATUS (*register_events)(struct wlan_objmgr_psoc *psoc);
@@ -1538,6 +1539,9 @@ struct wlan_lmac_if_mlo_tx_ops {
 					struct wlan_objmgr_vdev *vdev,
 					struct peer_ptqm_migrate_params *param);
 #endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
+	QDF_STATUS (*send_wsi_link_info_cmd)(
+				struct wlan_objmgr_pdev *pdev,
+				struct mlo_wsi_link_stats *param);
 };
 
 /**
