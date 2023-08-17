@@ -530,4 +530,21 @@ wlan_reg_get_max_reg_eirp_from_list(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 wlan_quick_reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
 					       enum reg_6g_ap_type ap_pwr_type);
+
+/**
+ * wlan_reg_is_freq_txable() - Check if the given frequency is tx-able.
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in MHz
+ * @in_6ghz_pwr_mode: Input AP power type
+ *
+ * An SP channel is tx-able if the channel is present in the AFC response.
+ * In case of non-OUTDOOR mode a channel is always tx-able (Assuming it is
+ * enabled by regulatory).
+ *
+ * Return: True if the frequency is tx-able, else false.
+ */
+bool
+wlan_reg_is_freq_txable(struct wlan_objmgr_pdev *pdev,
+			qdf_freq_t freq,
+			enum supported_6g_pwr_types in_6ghz_pwr_mode);
 #endif /* __WLAN_REG_CHANNEL_API_H */
