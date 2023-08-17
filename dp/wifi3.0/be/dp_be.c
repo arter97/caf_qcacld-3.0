@@ -88,6 +88,31 @@ static void dp_ppeds_rings_status(struct dp_soc *soc)
 				    WBM2SW_RELEASE);
 }
 
+#ifdef GLOBAL_ASSERT_AVOIDANCE
+void dp_ppeds_print_assert_war_stats(struct dp_soc_be *be_soc)
+{
+	DP_PRINT_STATS("PPE-DS Tx WAR stats: [%u] [%u] [%u]",
+		       be_soc->ppeds_stats.tx.tx_comp_buf_src,
+		       be_soc->ppeds_stats.tx.tx_comp_desc_null,
+		       be_soc->ppeds_stats.tx.tx_comp_invalid_flag);
+}
+
+static void dp_ppeds_clear_assert_war_stats(struct dp_soc_be *be_soc)
+{
+	be_soc->ppeds_stats.tx.tx_comp_buf_src = 0;
+	be_soc->ppeds_stats.tx.tx_comp_desc_null = 0;
+	be_soc->ppeds_stats.tx.tx_comp_invalid_flag = 0;
+}
+#else
+static void dp_ppeds_print_assert_war_stats(struct dp_soc_be *be_soc)
+{
+}
+
+static void dp_ppeds_clear_assert_war_stats(struct dp_soc_be *be_soc)
+{
+}
+#endif
+
 static void dp_ppeds_inuse_desc(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
@@ -98,6 +123,8 @@ static void dp_ppeds_inuse_desc(struct dp_soc *soc)
 
 	DP_PRINT_STATS("PPE-DS Tx desc alloc failed %u",
 		       be_soc->ppeds_stats.tx.desc_alloc_failed);
+
+	dp_ppeds_print_assert_war_stats(be_soc);
 }
 
 static void dp_ppeds_clear_stats(struct dp_soc *soc)
@@ -105,6 +132,7 @@ static void dp_ppeds_clear_stats(struct dp_soc *soc)
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
 	be_soc->ppeds_stats.tx.desc_alloc_failed = 0;
+	dp_ppeds_clear_assert_war_stats(be_soc);
 }
 #endif
 
@@ -3212,7 +3240,6 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_wbm_get_rx_desc_from_hal_desc =
 				dp_wbm_get_rx_desc_from_hal_desc_be;
 	arch_ops->dp_tx_compute_hw_delay = dp_tx_compute_tx_delay_be;
-	arch_ops->dp_rx_chain_msdus = dp_rx_chain_msdus_be;
 	arch_ops->dp_rx_wbm_err_reap_desc = dp_rx_wbm_err_reap_desc_be;
 	arch_ops->dp_rx_null_q_desc_handle = dp_rx_null_q_desc_handle_be;
 #endif

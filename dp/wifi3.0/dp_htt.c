@@ -3478,20 +3478,20 @@ dp_rx_mlo_timestamp_ind_handler(struct dp_soc *soc,
 static void dp_htt_mlo_peer_map_handler(struct htt_soc *soc,
 					uint32_t *msg_word)
 {
-	qdf_assert_always(0);
+	dp_alert("Unexpected event");
 }
 
 static void dp_htt_mlo_peer_unmap_handler(struct htt_soc *soc,
 					 uint32_t *msg_word)
 {
-	qdf_assert_always(0);
+	dp_alert("Unexpected event");
 }
 
 static void
 dp_rx_mlo_timestamp_ind_handler(void *soc_handle,
 				uint32_t *msg_word)
 {
-	qdf_assert_always(0);
+	dp_alert("Unexpected event");
 }
 
 static void dp_htt_t2h_primary_link_migration(struct htt_soc *soc,

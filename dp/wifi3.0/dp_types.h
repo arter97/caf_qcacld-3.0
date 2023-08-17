@@ -1386,6 +1386,16 @@ struct dp_soc_stats {
 			uint32_t defrag_ad1_invalid;
 			/* decrypt error drop */
 			uint32_t decrypt_err_drop;
+#ifdef GLOBAL_ASSERT_AVOIDANCE
+			/* rx_desc NULL war count*/
+			uint32_t rx_desc_null;
+			/* wbm err invalid release buffer type */
+			uint32_t wbm_err_buf_rel_type;
+			/* Reo entry rx desc null */
+			uint32_t reo_err_rx_desc_null;
+			/* Invalid chip id received in intrabss path */
+			uint64_t intra_bss_bad_chipid;
+#endif
 		} err;
 
 		/* packet count per core - per ring */

@@ -28,6 +28,7 @@
 #include "qdf_nbuf.h"
 #include "dp_rx_defrag.h"
 #include "dp_ipa.h"
+#include "dp_internal.h"
 #ifdef WIFI_MONITOR_SUPPORT
 #include "dp_htt.h"
 #include <dp_mon.h>
@@ -1065,7 +1066,10 @@ more_msdu_link_desc:
 						soc,
 						msdu_list.sw_cookie[i]);
 
-		qdf_assert_always(rx_desc);
+		if (dp_assert_always_internal_stat(rx_desc, soc,
+						   rx.err.reo_err_rx_desc_null))
+			continue;
+
 		nbuf = rx_desc->nbuf;
 
 		/*
@@ -1604,7 +1608,6 @@ dp_rx_err_route_hdl(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		/* Set length in nbuf */
 		qdf_nbuf_set_pktlen(
 			nbuf, qdf_min(pkt_len, (uint32_t)RX_DATA_BUFFER_SIZE));
-		qdf_assert_always(nbuf->data == rx_tlv_hdr);
 	}
 
 	/*
@@ -2566,7 +2569,7 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 				dp_rx_err_alert("invalid reo push reason %u",
 						wbm_err_info.reo_psh_rsn);
 				dp_rx_nbuf_free(nbuf);
-				qdf_assert_always(0);
+				dp_assert_always_internal(0);
 			}
 		} else if (wbm_err_info.wbm_err_src ==
 					HAL_RX_WBM_ERR_SRC_RXDMA) {
@@ -2692,7 +2695,7 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 				dp_rx_err_alert("invalid rxdma push reason %u",
 						wbm_err_info.rxdma_psh_rsn);
 				dp_rx_nbuf_free(nbuf);
-				qdf_assert_always(0);
+				dp_assert_always_internal(0);
 			}
 		} else {
 			/* Should not come here */

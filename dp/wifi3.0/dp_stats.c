@@ -7994,6 +7994,20 @@ void dp_print_soc_interrupt_stats(struct dp_soc *soc)
 	}
 }
 
+#ifdef GLOBAL_ASSERT_AVOIDANCE
+static void dp_print_assert_war_stats(struct dp_soc *soc)
+{
+	DP_PRINT_STATS("Rx WAR stats: [%d] [%d] [%d] [%d]",
+		       soc->stats.rx.err.rx_desc_null,
+		       soc->stats.rx.err.wbm_err_buf_rel_type,
+		       soc->stats.rx.err.reo_err_rx_desc_null,
+		       soc->stats.rx.err.intra_bss_bad_chipid);
+}
+#else
+static void dp_print_assert_war_stats(struct dp_soc *soc)
+{
+}
+#endif
 void
 dp_print_soc_rx_stats(struct dp_soc *soc)
 {
@@ -8135,6 +8149,7 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 		       soc->stats.rx.err.defrag_ad1_invalid);
 	DP_PRINT_STATS("Rx decrypt error frame for valid peer:%d",
 		       soc->stats.rx.err.decrypt_err_drop);
+	dp_print_assert_war_stats(soc);
 }
 
 #ifdef FEATURE_TSO_STATS

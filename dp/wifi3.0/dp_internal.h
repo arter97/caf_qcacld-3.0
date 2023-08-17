@@ -195,6 +195,34 @@ static const enum cdp_packet_type hal_2_dp_pkt_type_map[HAL_DOT11_MAX] = {
 	[HAL_DOT11N_GF] = DOT11_MAX,
 };
 
+#ifdef GLOBAL_ASSERT_AVOIDANCE
+#define dp_assert_always_internal_stat(_expr, _handle, _field) \
+	(qdf_unlikely(!(_expr)) ? ((_handle)->stats._field++, true) : false)
+
+#define dp_assert_always_internal_ds_stat(_expr, _handle, _field) \
+				((_handle)->ppeds_stats._field++)
+
+static inline bool dp_assert_always_internal(bool expr)
+{
+	return !expr;
+}
+#else
+static inline bool __dp_assert_always_internal(bool expr)
+{
+	qdf_assert_always(expr);
+
+	return false;
+}
+
+#define dp_assert_always_internal(_expr) __dp_assert_always_internal(_expr)
+
+#define dp_assert_always_internal_stat(_expr, _handle, _field) \
+				dp_assert_always_internal(_expr)
+
+#define dp_assert_always_internal_ds_stat(_expr, _handle, _field) \
+				dp_assert_always_internal(_expr)
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * dp_get_mcs_array_index_by_pkt_type_mcs() - get the destination mcs index

@@ -26,6 +26,7 @@
 #include <hal_be_api.h>
 #include <hal_be_tx.h>
 #include <dp_htt.h>
+#include "dp_internal.h"
 #ifdef FEATURE_WDS
 #include "dp_txrx_wds.h"
 #endif
@@ -219,7 +220,7 @@ void dp_tx_process_mec_notify_be(struct dp_soc *soc, uint8_t *status)
 	uint8_t vdev_id;
 	uint32_t *htt_desc = (uint32_t *)status;
 
-	qdf_assert_always(!soc->mec_fw_offload);
+	dp_assert_always_internal(soc->mec_fw_offload);
 
 	/*
 	 * Get vdev id from HTT status word in case of MEC
@@ -1076,7 +1077,9 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 				 buf_src != HAL_TX_COMP_RELEASE_SOURCE_FW)) {
 			dp_err("Tx comp release_src != TQM | FW but from %d",
 			       buf_src);
-			qdf_assert_always(0);
+			dp_assert_always_internal_ds_stat(0, be_soc,
+							  tx.tx_comp_buf_src);
+			continue;
 		}
 
 		dp_tx_comp_get_params_from_hal_desc_be(soc, tx_comp_hal_desc,
@@ -1084,14 +1087,16 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 
 		if (!tx_desc) {
 			dp_err("unable to retrieve tx_desc!");
-			qdf_assert_always(0);
+			dp_assert_always_internal_ds_stat(0, be_soc,
+							  tx.tx_comp_desc_null);
 			continue;
 		}
 
 		if (qdf_unlikely(!(tx_desc->flags &
 				   DP_TX_DESC_FLAG_ALLOCATED) ||
 				 !(tx_desc->flags & DP_TX_DESC_FLAG_PPEDS))) {
-			qdf_assert_always(0);
+			dp_assert_always_internal_ds_stat(0, be_soc,
+						tx.tx_comp_invalid_flag);
 			continue;
 		}
 
@@ -1425,7 +1430,7 @@ QDF_STATUS dp_tx_init_bank_profiles(struct dp_soc_be *be_soc)
 
 	num_tcl_banks = hal_tx_get_num_tcl_banks(be_soc->soc.hal_soc);
 
-	qdf_assert_always(num_tcl_banks);
+	dp_assert_always_internal(num_tcl_banks);
 	be_soc->num_bank_profiles = num_tcl_banks;
 
 	be_soc->bank_profiles = qdf_mem_malloc(num_tcl_banks *
