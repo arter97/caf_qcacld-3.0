@@ -211,7 +211,6 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 
 	fdb_entry = qal_bridge_fdb_has_entry(net_dev, addr, vlan_id);
 	if (!fdb_entry) {
-		qdf_err("fdb_entry is null for ifname:%s with mac:%pM\n", net_dev->name, addr);
 		return QDF_STATUS_E_FAILURE;
 	}
 
