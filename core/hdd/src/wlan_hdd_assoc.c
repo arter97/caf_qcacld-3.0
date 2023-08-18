@@ -1578,6 +1578,9 @@ hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
 	uint8_t *mac_addr;
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx;
+	QDF_STATUS status;
+	bool alt_pipe;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
@@ -1587,13 +1590,22 @@ hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
 	    adapter->device_mode == QDF_STA_MODE &&
 	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_NONE &&
 	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_OPEN_SYSTEM &&
-	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_SHARED_KEY)
+	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_SHARED_KEY) {
+
+		hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+		status = hdd_ipa_get_tx_pipe(hdd_ctx, link_info, &alt_pipe);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_debug("Failed to get alternate pipe for vdev %d",
+				  link_info->vdev_id);
+			alt_pipe = false;
+		}
+
 		ucfg_ipa_wlan_evt(adapter->hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
 				  link_info->vdev_id,
 				  WLAN_IPA_STA_CONNECT, mac_addr,
-				  WLAN_REG_IS_24GHZ_CH_FREQ(
-					sta_ctx->conn_info.chan_freq));
+				  alt_pipe);
+	}
 
 	hdd_cm_set_peer_authenticate(link_info,
 				     &sta_ctx->conn_info.bssid, false);
