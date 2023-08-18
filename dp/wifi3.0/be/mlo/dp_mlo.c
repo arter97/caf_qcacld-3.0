@@ -925,6 +925,9 @@ static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 				      DP_LINK_VDEV_ITER);
 	}
 
+	/* Aggregate vdev stats from MLO ctx for detached MLO Links */
+	dp_update_mlo_ctxt_stats(buf, &vdev_be->mlo_dev_ctxt->stats);
+
 complete:
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_GENERIC_STATS);
 	return ret;

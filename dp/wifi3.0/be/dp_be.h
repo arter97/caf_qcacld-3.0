@@ -808,6 +808,22 @@ static inline uintptr_t dp_cc_desc_find(struct dp_soc *soc,
 				spt_va_id * DP_CC_HW_READ_BYTES)));
 }
 
+/**
+ * dp_update_mlo_ctxt_stats() - aggregate stats from mlo ctx
+ * @buf: vdev stats buf
+ * @mlo_ctxt_stats: mlo ctxt stats
+ *
+ * return: void
+ */
+static inline
+void dp_update_mlo_ctxt_stats(void *buf,
+			      struct cdp_vdev_stats *mlo_ctxt_stats)
+{
+	struct cdp_vdev_stats *tgt_vdev_stats = (struct cdp_vdev_stats *)buf;
+
+	DP_UPDATE_VDEV_STATS(tgt_vdev_stats, mlo_ctxt_stats);
+}
+
 #ifdef WLAN_FEATURE_NEAR_FULL_IRQ
 /**
  * enum dp_srng_near_full_levels - SRNG Near FULL levels
