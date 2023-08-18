@@ -337,3 +337,28 @@ bool ucfg_policy_mgr_is_fw_supports_dbs(struct wlan_objmgr_psoc *psoc)
 {
 	return policy_mgr_find_if_fw_supports_dbs(psoc);
 }
+
+uint32_t ucfg_policy_mgr_get_connection_count(struct wlan_objmgr_psoc *psoc)
+{
+	return policy_mgr_get_connection_count(psoc);
+}
+
+bool ucfg_policy_mgr_is_hw_sbs_capable(struct wlan_objmgr_psoc *psoc)
+{
+	return policy_mgr_is_hw_dbs_capable(psoc);
+}
+
+bool ucfg_policy_mgr_get_vdev_same_freq_new_conn(struct wlan_objmgr_psoc *psoc,
+						 uint32_t new_freq,
+						 uint8_t *vdev_id)
+{
+	return policy_mgr_get_vdev_same_freq_new_conn(psoc, new_freq, vdev_id);
+}
+
+bool ucfg_policy_mgr_get_vdev_diff_freq_new_conn(struct wlan_objmgr_psoc *psoc,
+						 uint32_t new_freq,
+						 uint8_t *vdev_id)
+{
+	return policy_mgr_get_vdev_diff_freq_new_conn(psoc, new_freq, vdev_id);
+}
+

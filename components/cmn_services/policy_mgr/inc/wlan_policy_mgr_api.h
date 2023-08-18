@@ -5567,4 +5567,43 @@ policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
 			       enum policy_mgr_conc_next_action next_action,
 			       enum policy_mgr_conn_update_reason reason,
 			       uint8_t conc_vdev_id, uint32_t request_id);
+
+/*
+ * policy_mgr_get_vdev_same_freq_new_conn() - Get vdev_id of the first
+ *					      connection that has same
+ *					      channel frequency as new_freq
+ * @psoc: psoc object pointer
+ * @new_freq: channel frequency for the new connection
+ * @vdev_id: Output parameter to return vdev id of the first existing connection
+ *	     that has same channel frequency as @new_freq
+ *
+ * This function is to return the first connection that has same
+ * channel frequency as @new_freq.
+ *
+ * Return: true if connection that has same channel frequency as
+ *	   @new_freq exists. Otherwise false.
+ */
+bool policy_mgr_get_vdev_same_freq_new_conn(struct wlan_objmgr_psoc *psoc,
+					    uint32_t new_freq,
+					    uint8_t *vdev_id);
+
+/*
+ * policy_mgr_get_vdev_diff_freq_new_conn() - Get vdev id of the first
+ *					      connection that has different
+ *					      channel freq from new_freq
+ * @psoc: psoc object pointer
+ * @new_freq: channel frequency for the new connection
+ * @vdev_id: Output parameter to return vdev id of the first existing connection
+ *	     that has different channel frequency from @new_freq
+ *
+ * This function is to return the first connection that has different
+ * channel frequency from @new_freq.
+ *
+ * Return: true if connection that has different channel frequency from
+ *	   @new_freq exists. Otherwise false.
+ */
+bool policy_mgr_get_vdev_diff_freq_new_conn(struct wlan_objmgr_psoc *psoc,
+					    uint32_t new_freq,
+					    uint8_t *vdev_id);
+
 #endif /* __WLAN_POLICY_MGR_API_H */
