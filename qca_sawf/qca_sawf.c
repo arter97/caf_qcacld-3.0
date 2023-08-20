@@ -82,10 +82,10 @@ static struct wlan_objmgr_vdev *qca_sawf_get_vdev(struct net_device *netdev,
 		osif_dev *parent_osdev = NULL;
 
 		osifp = ath_netdev_priv(netdev);
-		if (!osifp->parent_netdev)
+		parent_osdev = osif_wds_ext_get_parent_osif(osifp);
+		if (!parent_osdev)
 			return NULL;
 
-		parent_osdev = ath_netdev_priv(osifp->parent_netdev);
 		osdev = parent_osdev;
 	}
 #endif

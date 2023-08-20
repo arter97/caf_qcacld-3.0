@@ -60,12 +60,12 @@ struct wlan_objmgr_psoc *qca_fse_get_psoc_from_dev(struct net_device *dev)
 		osif_dev *parent_osdev;
 
 		osifp = ath_netdev_priv(dev);
-		if (!osifp->parent_netdev) {
+		parent_osdev = osif_wds_ext_get_parent_osif(osifp);
+		if (!parent_osdev) {
 			qdf_err("%p: No osdev found for dev", dev);
 			return false;
 		}
 
-		parent_osdev = ath_netdev_priv(osifp->parent_netdev);
 		osdev = parent_osdev;
 	}
 #endif
