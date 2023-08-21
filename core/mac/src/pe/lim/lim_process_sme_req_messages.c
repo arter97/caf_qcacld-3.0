@@ -5589,12 +5589,18 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	qdf_freq_t curr_op_freq, curr_freq;
 	enum reg_6g_client_type client_mobility_type;
 	struct ch_params ch_params = {0};
-	tDot11fIEtransmit_power_env single_tpe;
+	tDot11fIEtransmit_power_env single_tpe, local_tpe, reg_tpe;
 	/*
 	 * PSD is power spectral density, incoming TPE could contain
 	 * non PSD info, or PSD info, or both, so need to keep track of them
 	 */
 	bool use_local_tpe, non_psd_set = false, psd_set = false;
+	bool both_tpe_present = false;
+	bool local_eirp_set = false, local_psd_set = false;
+	bool reg_eirp_set = false, reg_psd_set = false;
+	uint8_t local_eirp_idx = 0, local_psd_idx = 0;
+	uint8_t reg_eirp_idx = 0, reg_psd_idx = 0;
+	uint8_t min_count = 0;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!vdev_mlme)
@@ -5632,34 +5638,35 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	else if (!local_tpe_count)
 		use_local_tpe = false;
 	else
-		use_local_tpe = wlan_mlme_is_local_tpe_pref(mac->psoc);
+		both_tpe_present = true;
 
 	for (i = 0; i < num_tpe_ies; i++) {
 		single_tpe = tpe_ies[i];
 		if (single_tpe.present &&
 		    (single_tpe.max_tx_pwr_category == client_mobility_type)) {
-			if (use_local_tpe) {
-				if (single_tpe.max_tx_pwr_interpret ==
-				    LOCAL_EIRP) {
-					non_psd_index = i;
-					non_psd_set = true;
-				}
-				if (single_tpe.max_tx_pwr_interpret ==
-				    LOCAL_EIRP_PSD) {
-					psd_index = i;
-					psd_set = true;
-				}
-			} else {
-				if (single_tpe.max_tx_pwr_interpret ==
-				    REGULATORY_CLIENT_EIRP) {
-					non_psd_index = i;
-					non_psd_set = true;
-				}
-				if (single_tpe.max_tx_pwr_interpret ==
-				    REGULATORY_CLIENT_EIRP_PSD) {
-					psd_index = i;
-					psd_set = true;
-				}
+			if (single_tpe.max_tx_pwr_interpret == LOCAL_EIRP) {
+				non_psd_index = i;
+				non_psd_set = true;
+				local_eirp_idx = non_psd_index;
+				local_eirp_set = non_psd_set;
+			} else if (single_tpe.max_tx_pwr_interpret ==
+				   LOCAL_EIRP_PSD) {
+				psd_index = i;
+				psd_set = true;
+				local_psd_idx = psd_index;
+				local_psd_set = psd_set;
+			} else if (single_tpe.max_tx_pwr_interpret ==
+				   REGULATORY_CLIENT_EIRP) {
+				non_psd_index = i;
+				non_psd_set = true;
+				reg_eirp_idx = non_psd_index;
+				reg_eirp_set = non_psd_set;
+			} else if (single_tpe.max_tx_pwr_interpret ==
+				   REGULATORY_CLIENT_EIRP_PSD) {
+				psd_index = i;
+				psd_set = true;
+				reg_psd_idx = psd_index;
+				reg_psd_set = psd_set;
 			}
 		}
 	}
@@ -5760,6 +5767,35 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		vdev_mlme->reg_tpc_obj.eirp_power =
 			single_tpe.tx_power[single_tpe.max_tx_pwr_count];
 		vdev_mlme->reg_tpc_obj.is_psd_power = false;
+	}
+
+	if (both_tpe_present) {
+		pe_debug("Local: eirp: %d psd: %d, Regulatory: eirp: %d psd %d",
+			 local_eirp_set, local_psd_set, reg_eirp_set,
+			 reg_psd_set);
+		if (local_eirp_set && reg_eirp_set) {
+			local_tpe = tpe_ies[local_eirp_idx];
+			reg_tpe = tpe_ies[reg_eirp_idx];
+		} else if (local_psd_set && reg_psd_set) {
+			local_tpe = tpe_ies[local_psd_idx];
+			reg_tpe = tpe_ies[reg_psd_idx];
+		} else {
+			return;
+		}
+
+		min_count = QDF_MIN(local_tpe.max_tx_pwr_count,
+				    reg_tpe.max_tx_pwr_count);
+		for (i = 0; i < min_count + 1; i++) {
+			if (vdev_mlme->reg_tpc_obj.tpe[i] !=
+			    QDF_MIN(local_tpe.tx_power[i], reg_tpe.tx_power[i]))
+				*has_tpe_updated = true;
+			vdev_mlme->reg_tpc_obj.tpe[i] =
+						QDF_MIN(local_tpe.tx_power[i],
+							reg_tpe.tx_power[i]);
+			pe_debug("TPE: Local: %d, Reg: %d, power updated: %d",
+				 local_tpe.tx_power[i], reg_tpe.tx_power[i],
+				 *has_tpe_updated);
+		}
 	}
 }
 

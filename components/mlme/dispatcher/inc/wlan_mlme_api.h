@@ -4023,16 +4023,6 @@ mlme_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
 #endif /* WLAN_SUPPORT_TWT */
 
 /**
- * wlan_mlme_is_local_tpe_pref() - Get preference to use local TPE or
- * regulatory TPE values
- * @psoc: pointer to psoc object
- *
- * Return: True if there is local preference, false if there is regulatory
- * preference
- */
-bool wlan_mlme_is_local_tpe_pref(struct wlan_objmgr_psoc *psoc);
-
-/**
  * wlan_mlme_skip_tpe() - Get preference to not consider TPE in 2G/5G case
  *
  * @psoc: pointer to psoc object
