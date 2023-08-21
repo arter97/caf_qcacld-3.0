@@ -3833,8 +3833,8 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 		return;
 	}
 
-	if (wlan_cm_is_vdev_roaming(pe_session->vdev)) {
-		pe_err("Roaming is in progress");
+	if (!wlan_cm_is_vdev_connected(pe_session->vdev)) {
+		pe_err("vdev not connected, ignore HT IE BW update");
 		return;
 	}
 
