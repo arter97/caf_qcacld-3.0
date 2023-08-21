@@ -1162,16 +1162,7 @@ QDF_STATUS wlan_mlo_mgr_mld_vdev_attach(struct wlan_objmgr_vdev *vdev,
 
 QDF_STATUS wlan_mlo_mgr_mld_vdev_detach(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_mlo_dev_context *ml_dev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	ml_dev = vdev->mlo_dev_ctx;
-	/*
-	 * Atleast one VAP should be part of MLD for dynamic link vap
-	 * addition and deletion, so rejecting VDEV detach
-	 */
-	if (ml_dev->wlan_vdev_count <= 1)
-		return QDF_STATUS_E_FAILURE;
 
 	status = mlo_dev_ctx_deinit(vdev);
 
