@@ -338,6 +338,20 @@ void mlo_roam_free_copied_reassoc_rsp(struct wlan_objmgr_vdev *vdev);
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /**
+ * mlo_mgr_roam_update_ap_link_info() - Update AP links information
+ * @vdev: Object Manager vdev
+ * @src_link_info: Source link setup information
+ * @channel: Channel information
+ *
+ * Update AP link information for each link of AP MLD
+ *
+ * Return: None
+ */
+void mlo_mgr_roam_update_ap_link_info(struct wlan_objmgr_vdev *vdev,
+				      struct ml_setup_link_param *src_link_info,
+				      struct wlan_channel *channel);
+
+/**
  * mlo_cm_roam_sync_cb - Callback function from CM to MLO mgr
  *
  * @vdev: vdev pointer
@@ -480,6 +494,13 @@ mlo_roam_get_link_id(uint8_t vdev_id,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+/**
+ * mlo_cm_roam_sync_cb() - MLO callback to handle roam synch event
+ * for MLO vdev
+ * @vdev: Pointer to objmgr vdev
+ * @event: Pointer to event
+ * @event_data_len: event data length
+ */
 QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 			       void *event, uint32_t event_data_len);
 #else
@@ -607,6 +628,12 @@ mlo_get_link_mac_addr_from_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline
+void mlo_mgr_roam_update_ap_link_info(struct wlan_objmgr_vdev *vdev,
+				      struct ml_setup_link_param *src_info,
+				      struct wlan_channel *channel)
+{}
 
 static inline uint32_t
 mlo_roam_get_link_freq_from_mac_addr(struct roam_offload_synch_ind *sync_ind,

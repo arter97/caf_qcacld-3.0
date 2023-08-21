@@ -441,13 +441,17 @@ cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 	for (i = 0; i < roam_synch_data->num_setup_links; i++) {
 		ml_link = &roam_synch_data->ml_link[i];
 
+		qdf_mem_zero(&channel, sizeof(channel));
+
 		channel.ch_freq = ml_link->channel.mhz;
 		channel.ch_cfreq1 = ml_link->channel.band_center_freq1;
 		channel.ch_cfreq1 = ml_link->channel.band_center_freq2;
 
-		mlo_mgr_roam_update_ap_link_info(vdev, ml_link->link_id,
-						 ml_link->link_addr.bytes,
-						 channel);
+		/*
+		 * Update Link switch context for each vdev with roamed AP link
+		 * address and self link address for each vdev
+		 */
+		mlo_mgr_roam_update_ap_link_info(vdev, ml_link, &channel);
 	}
 }
 

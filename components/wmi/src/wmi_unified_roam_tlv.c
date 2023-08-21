@@ -2270,10 +2270,13 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 
 			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->link_addr,
 						   link->link_addr.bytes);
-			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT,
+			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->self_link_addr,
+						   link->self_link_addr.bytes);
+			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT "self_addr:" QDF_MAC_ADDR_FMT,
 				  link->link_id, link->vdev_id,
 				  link->flags,
-				  QDF_MAC_ADDR_REF(link->link_addr.bytes));
+				  QDF_MAC_ADDR_REF(link->link_addr.bytes),
+				  QDF_MAC_ADDR_REF(link->self_link_addr.bytes));
 			wmi_debug("channel: %u mhz center_freq1: %u center_freq2: %u",
 				  link->channel.mhz,
 				  link->channel.band_center_freq1,
