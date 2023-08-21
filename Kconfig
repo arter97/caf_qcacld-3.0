@@ -1895,4 +1895,8 @@ config QCA_WIFI_PEACH
 config BCN_RATECODE_ENABLE
 	bool "enable CONFIG_BCN_RATECODE_ENABLE"
 	default n
+
+config WLAN_SYSFS_RF_TEST_MODE
+	bool "enable CONFIG_WLAN_SYSFS_RF_TEST_MODE"
+	default n
 endif # QCA_CLD_WLAN
