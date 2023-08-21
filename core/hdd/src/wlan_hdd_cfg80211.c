@@ -18510,9 +18510,6 @@ hdd_fill_usable_channels_data(struct sk_buff *skb, struct nlattr **tb,
 			return -EINVAL;
 		j++;
 		bw = hdd_convert_phy_bw_to_nl_bw(res_msg[i].bw);
-		hdd_debug("populating chan_params freq %d bw %d iface mode %d, seg0 %d",
-			  res_msg[i].freq, bw, res_msg[i].iface_mode_mask,
-			  res_msg[i].seg0_freq);
 		if (nla_put_u32(skb,
 				QCA_WLAN_VENDOR_ATTR_CHAN_INFO_PRIMARY_FREQ,
 				res_msg[i].freq) ||
