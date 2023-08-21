@@ -1586,6 +1586,12 @@ enum qdf_suspend_type {
  * @QDF_FLUSH_LOGS : Recovery needed when sending flush completion to userspace
  * @QDF_WMI_CMD_SENT_DURING_SUSPEND: WMI command is received when target is
  * suspended
+ * @QDF_MGMT_RX_REO_INCONSISTENT_SNAPSHOT: Inconsistent management Rx reorder
+ * snapshots
+ * @QDF_MGMT_RX_REO_OUT_OF_ORDER_PKT: Reception of management packet with out
+ * of order packet counter values
+ * @QDF_MGMT_RX_REO_ZERO_DURATION_PKT: Reception of management packet with zero
+ * packet duration
  */
 enum qdf_hang_reason {
 	QDF_REASON_UNSPECIFIED,
@@ -1623,6 +1629,9 @@ enum qdf_hang_reason {
 	QDF_DEL_SELF_STA_FAILED,
 	QDF_FLUSH_LOGS,
 	QDF_WMI_CMD_SENT_DURING_SUSPEND,
+	QDF_MGMT_RX_REO_INCONSISTENT_SNAPSHOT,
+	QDF_MGMT_RX_REO_OUT_OF_ORDER_PKT,
+	QDF_MGMT_RX_REO_ZERO_DURATION_PKT,
 };
 
 /**
