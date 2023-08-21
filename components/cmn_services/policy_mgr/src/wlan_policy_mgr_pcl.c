@@ -41,6 +41,7 @@
 #include "wlan_cm_roam_api.h"
 #include "wlan_scan_api.h"
 #include "wlan_nan_api.h"
+#include "wlan_mlo_link_force.h"
 
 /*
  * first_connection_pcl_table - table which provides PCL for the
@@ -467,7 +468,9 @@ void policy_mgr_decr_session_set_pcl(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
-	policy_mgr_handle_ml_sta_links_on_vdev_down(psoc, mode, session_id);
+	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE)
+		ml_nlink_conn_change_notify(
+			psoc, session_id, ml_nlink_ap_stopped_evt, NULL);
 }
 
 /**
@@ -1080,6 +1083,7 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t sta_gc_6ghz_freq = 0;
 	uint32_t ap_pwr_type_6g = 0;
 	bool indoor_ch_support = false;
+	bool keep_6ghz_sta_cli_conn;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1127,10 +1131,12 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("STA power type : %d", ap_pwr_type_6g);
 
 	ucfg_mlme_get_indoor_channel_support(psoc, &indoor_ch_support);
-
+	keep_6ghz_sta_cli_conn = wlan_reg_get_keep_6ghz_sta_cli_connection(
+								pm_ctx->pdev);
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl_list_org[i])) {
-			if (!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]))
+			if (!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]) ||
+			    keep_6ghz_sta_cli_conn)
 				continue;
 			if (ap_pwr_type_6g == REG_VERY_LOW_POWER_AP)
 				goto add_freq;
@@ -4390,7 +4396,7 @@ policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
 }
 
 bool
-policy_mgr_is_vdev_ht_ll_sap(struct wlan_objmgr_psoc *psoc,
+policy_mgr_is_vdev_ll_ht_sap(struct wlan_objmgr_psoc *psoc,
 			     uint32_t vdev_id)
 {
 	return _policy_mgr_is_vdev_ll_sap(psoc, vdev_id, LL_AP_TYPE_HT);

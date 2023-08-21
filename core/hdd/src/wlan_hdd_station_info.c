@@ -139,6 +139,8 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_BEACON_IES
 #define ASSOC_REQ_IES \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_REQ_IES
+#define REMOTE_CH_WIDTH_V2\
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_CH_WIDTH_V2
 
 /*
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
@@ -146,6 +148,11 @@
  * feature, if it is 0 it indicates FW doesn't support this feature
  */
 #define HDD_STATION_INFO_RX_MC_BC_COUNT (1 << 31)
+
+/*
+ * Use this macro to check channel bandwidth 160MHZ
+ */
+#define MAX_CHANNEL_BW_160 160
 
 const struct nla_policy
 hdd_get_station_policy[STATION_MAX + 1] = {
@@ -1147,7 +1154,7 @@ static int32_t hdd_add_sta_info_sap(struct sk_buff *skb, int8_t rssi,
 		goto fail;
 
 	if (nla_put_u8(skb, NL80211_STA_INFO_SIGNAL,
-		       rssi - HDD_NOISE_FLOOR_DBM)) {
+		       rssi)) {
 		hdd_err("put fail");
 		goto fail;
 	}
@@ -1298,7 +1305,7 @@ fail:
  *
  * Returns: decoded channel band width.
  */
-static uint8_t hdd_decode_ch_width(tSirMacHTChannelWidth ch_width)
+static uint16_t hdd_decode_ch_width(tSirMacHTChannelWidth ch_width)
 {
 	switch (ch_width) {
 	case 0:
@@ -1310,6 +1317,8 @@ static uint8_t hdd_decode_ch_width(tSirMacHTChannelWidth ch_width)
 	case 3:
 	case 4:
 		return 160;
+	case 5:
+		return 320;
 	default:
 		hdd_debug("invalid enum: %d", ch_width);
 		return 20;
@@ -1335,6 +1344,8 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 	struct sk_buff *skb = NULL;
 	uint32_t nl_buf_len = NLMSG_HDRLEN;
 	uint8_t channel_width;
+	uint16_t channel_width_v2;
+
 
 	stainfo = hdd_get_sta_info_by_mac(&adapter->cache_sta_info_list,
 					  mac_addr.bytes,
@@ -1381,11 +1392,16 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 	}
 
 	/* upper layer expects decoded channel BW */
-	channel_width = hdd_decode_ch_width(stainfo->ch_width);
+	channel_width_v2 = hdd_decode_ch_width(stainfo->ch_width);
+	if (channel_width_v2 > MAX_CHANNEL_BW_160)
+		channel_width = MAX_CHANNEL_BW_160;
+	else
+		channel_width = channel_width_v2;
 
 	if (nla_put_u32(skb, REMOTE_SUPPORTED_MODE,
 			stainfo->support_mode) ||
-	    nla_put_u8(skb, REMOTE_CH_WIDTH, channel_width)) {
+	    nla_put_u8(skb, REMOTE_CH_WIDTH, channel_width) ||
+	    nla_put_u16(skb, REMOTE_CH_WIDTH_V2, channel_width_v2)) {
 		hdd_err("remote ch put fail");
 		goto fail;
 	}
@@ -1403,7 +1419,6 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 		hdd_err("dot11 mode put fail");
 		goto fail;
 	}
-
 	if (!(stainfo->rx_mc_bc_cnt & HDD_STATION_INFO_RX_MC_BC_COUNT)) {
 		hdd_debug("rx mc bc count is not supported by FW");
 	} else if (nla_put_u32(skb, REMOTE_RX_BC_MC_COUNT,
@@ -1442,7 +1457,7 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 		"Remote STA Info:: freq:%d, RSSI:%d, Tx NSS:%d, Reason code:%d,"
 		"capability:0x%x, Supported mode:%d, chan_width:%d, Tx rate:%d,"
 		"Rx rate:%d, dot11mode:%d",
-		stainfo->freq, stainfo->rssi - HDD_NOISE_FLOOR_DBM,
+		stainfo->freq, stainfo->rssi,
 		stainfo->nss, stainfo->reason_code, stainfo->capability,
 		stainfo->support_mode, channel_width, stainfo->tx_rate,
 		stainfo->rx_rate, stainfo->dot11_mode);

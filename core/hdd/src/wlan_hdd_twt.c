@@ -41,6 +41,7 @@
 #include <target_if.h>
 #include "wlan_hdd_object_manager.h"
 #include "osif_twt_ext_req.h"
+#include "wlan_mlo_mgr_sta.h"
 #include "wlan_twt_ucfg_ext_api.h"
 #include "wlan_twt_ucfg_ext_cfg.h"
 #include "osif_twt_internal.h"
@@ -81,7 +82,8 @@ QDF_STATUS hdd_send_twt_responder_enable_cmd(struct hdd_context *hdd_ctx)
 
 void wlan_twt_concurrency_update(struct hdd_context *hdd_ctx)
 {
-	qdf_sched_work(0, &hdd_ctx->twt_en_dis_work);
+	if (wlan_hdd_is_twt_pmo_allowed(hdd_ctx))
+		qdf_sched_work(0, &hdd_ctx->twt_en_dis_work);
 }
 
 void hdd_twt_update_work_handler(void *data)
@@ -3558,14 +3560,20 @@ hdd_twt_pack_get_capabilities_resp(struct hdd_adapter *adapter)
 
 	/*
 	 * Userspace will query the TWT get capabilities before
-	 * issuing a get capabilities request. If the STA is
-	 * connected, then check the "enable_twt_24ghz" ini
-	 * value to advertise the TWT requestor capability.
+	 * issuing a get capabilities request. For legacy connection,
+	 * if the STA is connected, then check the "enable_twt_24ghz"
+	 * ini value to advertise the TWT requestor capability.
+	 * For MLO connection, TWT requestor capabilities are advertised
+	 * irrespective of connected band.
 	 */
-	connected_band = hdd_conn_get_connected_band(adapter->deflink);
-	if (connected_band == BAND_2G &&
-	    !ucfg_mlme_is_24ghz_twt_enabled(hdd_ctx->psoc))
-		is_twt_24ghz_allowed = false;
+	if (!mlo_is_mld_sta(adapter->deflink->vdev)) {
+		connected_band = hdd_conn_get_connected_band(adapter->deflink);
+		if (connected_band == BAND_2G &&
+		    !ucfg_mlme_is_24ghz_twt_enabled(hdd_ctx->psoc))
+			is_twt_24ghz_allowed = false;
+	} else {
+		is_twt_24ghz_allowed = true;
+	}
 
 	/* fill the self_capability bitmap  */
 	ucfg_mlme_get_twt_requestor(hdd_ctx->psoc, &twt_req);
@@ -5048,5 +5056,25 @@ int wlan_hdd_cfg80211_wifi_twt_config(struct wiphy *wiphy,
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
+}
+
+void wlan_hdd_resume_pmo_twt(struct hdd_context *hdd_ctx)
+{
+	wlan_twt_concurrency_update(hdd_ctx);
+}
+
+void wlan_hdd_suspend_pmo_twt(struct hdd_context *hdd_ctx)
+{
+	qdf_flush_work(&hdd_ctx->twt_en_dis_work);
+}
+
+bool wlan_hdd_is_twt_pmo_allowed(struct hdd_context *hdd_ctx)
+{
+	bool twt_pmo_allowed = false;
+
+	twt_pmo_allowed = ucfg_twt_get_pmo_allowed(hdd_ctx->psoc);
+	hdd_debug("twt_disabled_allowed %d ", twt_pmo_allowed);
+
+	return twt_pmo_allowed;
 }
 

@@ -431,6 +431,16 @@ dp_rx_fisa_setup_cmem_fse(struct dp_rx_fst *fisa_hdl, uint32_t hashed_flow_idx,
 					  &flow);
 }
 
+static inline
+struct wlan_dp_intf *dp_fisa_rx_get_dp_intf_for_vdev(struct dp_vdev *vdev)
+{
+	struct wlan_dp_link *dp_link =
+				(struct wlan_dp_link *)vdev->osif_vdev;
+
+	/* dp_link cannot be invalid if vdev is present */
+	return dp_link->dp_intf;
+}
+
 /**
  * dp_rx_fisa_update_sw_ft_entry() - Helper function to update few SW FT entry
  * @sw_ft_entry: Pointer to softerware flow table entry
@@ -450,6 +460,7 @@ static void dp_rx_fisa_update_sw_ft_entry(struct dp_fisa_rx_sw_ft *sw_ft_entry,
 	sw_ft_entry->flow_hash = flow_hash;
 	sw_ft_entry->flow_id = flow_id;
 	sw_ft_entry->vdev = vdev;
+	sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 	sw_ft_entry->dp_ctx = dp_ctx;
 }
 
@@ -578,6 +589,8 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 		if (is_same_flow(&sw_ft_entry->rx_flow_tuple_info,
 				 &rx_flow_tuple_info)) {
 			sw_ft_entry->vdev = vdev;
+			sw_ft_entry->dp_intf =
+					dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 			dp_fisa_debug("It is same flow fse entry idx %d",
 				      hashed_flow_idx);
 			/* Incoming flow tuple matches with existing
@@ -788,7 +801,6 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	struct cdp_rx_flow_tuple_info *rx_flow_tuple_info;
 	uint32_t skid_count = 0, max_skid_length;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
-	/* TODO - Make this better */
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
 	bool is_fst_updated = false;
@@ -1087,6 +1099,7 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 
 	if (!fisa_hdl->flow_deletion_supported) {
 		sw_ft_entry->vdev = vdev;
+		sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 		return sw_ft_entry;
 	}
 
@@ -1100,6 +1113,7 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 		return NULL;
 
 	sw_ft_entry->vdev = vdev;
+	sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 	return sw_ft_entry;
 }
 
@@ -1426,6 +1440,84 @@ static qdf_nbuf_t dp_fisa_rx_linear_skb(struct dp_vdev *vdev,
 	return NULL;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static inline struct dp_vdev *
+dp_fisa_rx_get_flow_flush_vdev_ref(ol_txrx_soc_handle cdp_soc,
+				   struct dp_fisa_rx_sw_ft *fisa_flow)
+{
+	struct dp_vdev *fisa_flow_head_skb_vdev;
+	uint8_t vdev_id;
+
+	vdev_id = QDF_NBUF_CB_RX_VDEV_ID(fisa_flow->head_skb);
+
+get_new_vdev_ref:
+	fisa_flow_head_skb_vdev = dp_vdev_get_ref_by_id(
+						cdp_soc_t_to_dp_soc(cdp_soc),
+						vdev_id, DP_MOD_ID_RX);
+	if (qdf_unlikely(!fisa_flow_head_skb_vdev)) {
+		qdf_nbuf_free(fisa_flow->head_skb);
+		goto out;
+	}
+
+	if (qdf_unlikely(fisa_flow_head_skb_vdev != fisa_flow->vdev)) {
+		/*
+		 * vdev_id may mismatch in case of MLO link switch.
+		 * Check if the vdevs belong to same MLD,
+		 * if yes, then submit the flow else drop the packets.
+		 */
+		if (qdf_unlikely(qdf_mem_cmp(
+				fisa_flow->vdev->mld_mac_addr.raw,
+				fisa_flow_head_skb_vdev->mld_mac_addr.raw,
+				QDF_MAC_ADDR_SIZE) != 0)) {
+			qdf_nbuf_free(fisa_flow->head_skb);
+			goto out;
+		} else {
+			fisa_flow->same_mld_vdev_mismatch++;
+			/* Continue with aggregation */
+
+			/* Release ref to old vdev */
+			dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+					     fisa_flow_head_skb_vdev,
+					     DP_MOD_ID_RX);
+			/*
+			 * Update vdev_id and let it loop to find this
+			 * vdev by ref.
+			 */
+			vdev_id = fisa_flow->vdev->vdev_id;
+			goto get_new_vdev_ref;
+		}
+	}
+
+out:
+	return fisa_flow_head_skb_vdev;
+}
+#else
+static inline struct dp_vdev *
+dp_fisa_rx_get_flow_flush_vdev_ref(ol_txrx_soc_handle cdp_soc,
+				   struct dp_fisa_rx_sw_ft *fisa_flow)
+{
+	struct dp_vdev *fisa_flow_head_skb_vdev;
+
+	fisa_flow_head_skb_vdev = dp_vdev_get_ref_by_id(
+				cdp_soc_t_to_dp_soc(cdp_soc),
+				QDF_NBUF_CB_RX_VDEV_ID(fisa_flow->head_skb),
+				DP_MOD_ID_RX);
+	if (qdf_unlikely(!fisa_flow_head_skb_vdev ||
+			 (fisa_flow_head_skb_vdev != fisa_flow->vdev))) {
+		qdf_nbuf_free(fisa_flow->head_skb);
+		goto out;
+	}
+
+	return fisa_flow_head_skb_vdev;
+
+out:
+	dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+			     fisa_flow_head_skb_vdev,
+			     DP_MOD_ID_RX);
+	return NULL;
+}
+#endif
+
 /**
  * dp_rx_fisa_flush_udp_flow() - Flush all aggregated nbuf of the udp flow
  * @vdev: handle to dp_vdev
@@ -1520,15 +1612,10 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 
 	hex_dump_skb_data(fisa_flow->head_skb, false);
 
-	fisa_flow_vdev = dp_vdev_get_ref_by_id(
-				cdp_soc_t_to_dp_soc(cdp_soc),
-				QDF_NBUF_CB_RX_VDEV_ID(fisa_flow->head_skb),
-				DP_MOD_ID_RX);
-	if (qdf_unlikely(!fisa_flow_vdev ||
-			 (fisa_flow_vdev != fisa_flow->vdev))) {
-		qdf_nbuf_free(fisa_flow->head_skb);
-		goto out;
-	}
+	fisa_flow_vdev = dp_fisa_rx_get_flow_flush_vdev_ref(cdp_soc, fisa_flow);
+	if (!fisa_flow_vdev)
+		goto vdev_ref_get_fail;
+
 	dp_fisa_debug("fisa_flow->curr_aggr %d", fisa_flow->cur_aggr);
 	linear_skb = dp_fisa_rx_linear_skb(vdev, fisa_flow->head_skb, 24000);
 	if (linear_skb) {
@@ -1560,6 +1647,8 @@ out:
 		dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
 				     fisa_flow_vdev,
 				     DP_MOD_ID_RX);
+
+vdev_ref_get_fail:
 	fisa_flow->head_skb = NULL;
 	fisa_flow->last_skb = NULL;
 
@@ -1889,17 +1978,15 @@ static bool dp_is_nbuf_bypass_fisa(qdf_nbuf_t nbuf)
 }
 
 /**
- * dp_rx_fisa_flush_by_vdev_ctx_id() - Flush fisa aggregates per vdev and rx
- *  context id
- * @soc: core txrx main context
- * @vdev: Handle DP vdev
+ * dp_rx_fisa_flush_by_intf_ctx_id() - Flush fisa aggregates per dp_interface
+ *				       and rx context id
+ * @dp_intf: DP interface handle
  * @rx_ctx_id: Rx context id
  *
  * Return: Success on flushing the flows for the vdev and rx ctx id
  */
 static
-QDF_STATUS dp_rx_fisa_flush_by_vdev_ctx_id(struct dp_soc *soc,
-					   struct dp_vdev *vdev,
+QDF_STATUS dp_rx_fisa_flush_by_intf_ctx_id(struct wlan_dp_intf *dp_intf,
 					   uint8_t rx_ctx_id)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
@@ -1912,10 +1999,10 @@ QDF_STATUS dp_rx_fisa_flush_by_vdev_ctx_id(struct dp_soc *soc,
 	dp_rx_fisa_acquire_ft_lock(fisa_hdl, rx_ctx_id);
 	for (i = 0; i < ft_size; i++) {
 		if (sw_ft_entry[i].is_populated &&
-		    vdev == sw_ft_entry[i].vdev &&
+		    dp_intf == sw_ft_entry[i].dp_intf &&
 		    sw_ft_entry[i].napi_id == rx_ctx_id) {
-			dp_fisa_debug("flushing %d %pk vdev %pK napi id:%d", i,
-				      &sw_ft_entry[i], vdev, rx_ctx_id);
+			dp_fisa_debug("flushing %d %pk dp_intf %pK napi id:%d",
+				      i, &sw_ft_entry[i], dp_intf, rx_ctx_id);
 			dp_rx_fisa_flush_flow_wrap(&sw_ft_entry[i]);
 		}
 	}
@@ -1936,15 +2023,18 @@ static bool dp_fisa_disallowed_for_vdev(struct dp_soc *soc,
 					struct dp_vdev *vdev,
 					uint8_t rx_ctx_id)
 {
-	if (!vdev->fisa_disallowed[rx_ctx_id]) {
-		if (vdev->fisa_force_flushed[rx_ctx_id])
-			vdev->fisa_force_flushed[rx_ctx_id] = 0;
+	struct wlan_dp_intf *dp_intf;
+
+	dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
+	if (!dp_intf->fisa_disallowed[rx_ctx_id]) {
+		if (dp_intf->fisa_force_flushed[rx_ctx_id])
+			dp_intf->fisa_force_flushed[rx_ctx_id] = 0;
 		return false;
 	}
 
-	if (!vdev->fisa_force_flushed[rx_ctx_id]) {
-		dp_rx_fisa_flush_by_vdev_ctx_id(soc, vdev, rx_ctx_id);
-		vdev->fisa_force_flushed[rx_ctx_id] = 1;
+	if (!dp_intf->fisa_force_flushed[rx_ctx_id]) {
+		dp_rx_fisa_flush_by_intf_ctx_id(dp_intf, rx_ctx_id);
+		dp_intf->fisa_force_flushed[rx_ctx_id] = 1;
 	}
 
 	return true;
@@ -2133,20 +2223,6 @@ QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id)
 	return QDF_STATUS_SUCCESS;
 }
 
-void dp_set_fisa_disallowed_for_vdev(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
-				     uint8_t rx_ctx_id, uint8_t val)
-{
-	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
-	struct dp_vdev *vdev;
-
-	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_RX);
-	if (qdf_unlikely(!vdev))
-		return;
-
-	vdev->fisa_disallowed[rx_ctx_id] = val;
-	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_RX);
-}
-
 void dp_suspend_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct dp_rx_fst *dp_fst;
@@ -2172,4 +2248,11 @@ void dp_resume_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx)
 	}
 
 	dp_info("fse cache flush resumed");
+}
+
+void dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	dp_ctx->fisa_dynamic_aggr_size_support = dynamic_aggr_size_support;
 }

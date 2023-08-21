@@ -42,6 +42,7 @@
  * @en_tdls_11ax_support: Get TDLS ax support
  * @en_tdls_6g_support: Get TDLS 6g fw capability
  * @en_tdls_mlo_support: Get TDLS mlo fw support
+ * @en_n_link_mlo_support: Get N-Link mlo fw support
  * @en_roam_offload: enable roam offload
  * @en_11ax: enable 11ax
  * @is_fw_mawc_capable: Motion Aided Wireless Connectivity feature
@@ -84,6 +85,7 @@ struct wma_tgt_services {
 #endif
 #ifdef WLAN_FEATURE_11BE
 	bool en_tdls_mlo_support;
+	bool en_n_link_mlo_support;
 #endif
 #endif /* FEATURE_WLAN_TDLS */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -168,6 +170,18 @@ struct wma_tgt_vht_cap {
 	uint32_t vht_max_ampdu_len_exp;
 	uint32_t vht_txop_ps;
 	uint32_t vht_mcs_10_11_supp;
+};
+
+/**
+ * struct wma_tgt_aux_dev_caps - aux capability in wma layer
+ * @supported_modes_bitmap: each bit define in WMI_AUX_DEV_CAPS_SUPPORTED_MODE
+ * @listen_pdev_id_map: define which AUX MAC can listen/scan for the HW mode
+ * @emlsr_pdev_id_map: define which AUX MAC can perform eMLSR for the HW mode
+ */
+struct wma_tgt_aux_dev_caps {
+	uint32_t supported_modes_bitmap;
+	uint32_t listen_pdev_id_map;
+	uint32_t emlsr_pdev_id_map;
 };
 
 /**
@@ -276,5 +290,6 @@ struct wma_tgt_cfg {
 	tDot11fIEeht_cap eht_cap_2g;
 	tDot11fIEeht_cap eht_cap_5g;
 #endif
+	struct wma_tgt_aux_dev_caps wma_aux0_dev_caps[WMI_HOST_HW_MODE_MAX];
 };
 #endif /* WMA_TGT_CFG_H */

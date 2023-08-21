@@ -286,6 +286,7 @@ typedef enum {
 #define WIFI_TDLS_SUPPORT			BIT(0)
 #define WIFI_TDLS_EXTERNAL_CONTROL_SUPPORT	BIT(1)
 #define WIFI_TDLS_OFFCHANNEL_SUPPORT		BIT(2)
+#define WIFI_TDLS_WIDER_BW_SUPPORT		BIT(3)
 
 #define CFG_NON_AGG_RETRY_MAX                  (64)
 #define CFG_AGG_RETRY_MAX                      (64)
@@ -1121,6 +1122,15 @@ QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/** hdd_set_vdev_phy_mode() - Set vdev phy mode
+ * @adapter: adapter pointer
+ * @vendor_phy_mode: vendor phy mode
+ *
+ * Return: 0 for success
+ */
+int hdd_set_vdev_phy_mode(struct hdd_adapter *adapter,
+			  enum qca_wlan_vendor_phy_mode vendor_phy_mode);
 
 #if defined(WLAN_FEATURE_11BE_MLO) && \
 	defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)

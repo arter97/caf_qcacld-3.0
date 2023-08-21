@@ -380,6 +380,19 @@ ucfg_mlme_is_chwidth_with_notify_supported(struct wlan_objmgr_psoc *psoc)
 				WLAN_VDEV_PARAM_CHWIDTH_WITH_NOTIFY_SUPPORT);
 }
 
+QDF_STATUS ucfg_mlme_update_bss_rate_flags(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id,
+					   enum phy_ch_width ch_width,
+					   uint8_t eht_present,
+					   uint8_t he_present,
+					   uint8_t vht_present,
+					   uint8_t ht_present)
+{
+	return wlan_mlme_update_bss_rate_flags(psoc, vdev_id, ch_width,
+					       eht_present, he_present,
+					       vht_present, ht_present);
+}
+
 QDF_STATUS
 ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id,
@@ -413,6 +426,41 @@ release:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return status;
+}
+
+QDF_STATUS
+ucfg_mlme_set_vdev_wifi_std(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    WMI_HOST_WIFI_STANDARD wifi_std)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_legacy_err("vdev %d: vdev not found",
+				vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev %d: vmlme_priv is null", vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->wifi_std = wifi_std;
+	mlme_priv->is_user_std_set = true;
+
+	if (wifi_std < WMI_HOST_WIFI_STANDARD_7)
+		wlan_vdev_mlme_set_user_dis_eht_flag(vdev, true);
+	else
+		wlan_vdev_mlme_set_user_dis_eht_flag(vdev, false);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS

@@ -125,26 +125,17 @@ __hdd_nud_failure_work(struct hdd_adapter *adapter)
 	hdd_exit();
 }
 
-void hdd_nud_failure_work(hdd_cb_handle context, uint8_t vdev_id)
+void hdd_nud_failure_work(hdd_cb_handle context, qdf_netdev_t netdev)
 {
-	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
-	struct wlan_hdd_link_info *link_info;
 	struct osif_vdev_sync *vdev_sync;
 
-	hdd_ctx = hdd_cb_handle_to_context(context);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter) {
+		hdd_err("adapter is null");
 		return;
 	}
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("Invalid vdev");
-		return;
-	}
-
-	adapter = link_info->adapter;
 	if (osif_vdev_sync_op_start(adapter->dev, &vdev_sync))
 		return;
 

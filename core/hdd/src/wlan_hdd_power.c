@@ -628,7 +628,19 @@ out:
 static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter)
 {
 	struct wlan_hdd_link_info *link_info;
-	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+	mac_handle_t mac_handle;
+
+	if (!adapter) {
+		hdd_err_rl("null hdd_adapter pointer");
+		return;
+	}
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+
+	if (!mac_handle) {
+		hdd_err_rl("null mac_handle pointer");
+		return;
+	}
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info)
 		sme_ps_update(mac_handle, link_info->vdev_id);
@@ -639,7 +651,19 @@ static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter)
 	int i;
 	struct hdd_adapter *link_adapter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
-	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+	mac_handle_t mac_handle;
+
+	if (!adapter) {
+		hdd_err_rl("null hdd_adapter pointer");
+		return;
+	}
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+
+	if (!mac_handle) {
+		hdd_err_rl("null mac_handle pointer");
+		return;
+	}
 
 	mlo_adapter_info = &adapter->mlo_adapter_info;
 	for (i = 0; i < WLAN_MAX_MLD; i++) {
@@ -2135,7 +2159,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 				WLAN_SVC_FW_CRASHED_IND, NULL, 0);
 
 	/* Restart all adapters */
-	hdd_start_all_adapters(hdd_ctx);
+	hdd_start_all_adapters(hdd_ctx, false);
 
 	hdd_init_scan_reject_params(hdd_ctx);
 	hdd_ctx->bt_coex_mode_set = false;
@@ -2331,6 +2355,7 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	}
 
 	ucfg_pmo_notify_system_resume(hdd_ctx->psoc);
+	wlan_hdd_resume_pmo_twt(hdd_ctx);
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_RESUME_WLAN,
@@ -2601,6 +2626,8 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 		hdd_err("Some components not ready to suspend!");
 		return -EAGAIN;
 	}
+
+	wlan_hdd_suspend_pmo_twt(hdd_ctx);
 
 	/*
 	 * Suspend IPA early before proceeding to suspend other entities like
@@ -3373,9 +3400,31 @@ int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	return errno;
 }
 
+/**
+ * hdd_convert_opm_mode() - convert opm with equivalent wma opm
+ * @opm_mode: Optimized power management mode
+ *
+ * Return: enum wma_sta_ps_scheme_cfg
+ */
+static enum wma_sta_ps_scheme_cfg
+hdd_convert_opm_mode(enum qca_wlan_vendor_opm_mode opm_mode)
+{
+	switch (opm_mode) {
+	case QCA_WLAN_VENDOR_OPM_MODE_DISABLE:
+		return WMA_STA_PS_OPM_CONSERVATIVE;
+	case QCA_WLAN_VENDOR_OPM_MODE_ENABLE:
+		return WMA_STA_PS_OPM_AGGRESSIVE;
+	case QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED:
+		return WMA_STA_PS_USER_DEF;
+	default:
+		hdd_err("Invalid opm_mode: %d", opm_mode);
+		return WMA_STA_PS_OPM_CONSERVATIVE;
+	}
+}
+
 int hdd_set_power_config(struct hdd_context *hddctx,
 			 struct hdd_adapter *adapter,
-			 uint8_t power)
+			 enum qca_wlan_vendor_opm_mode *opm_mode)
 {
 	QDF_STATUS status;
 
@@ -3386,29 +3435,48 @@ int hdd_set_power_config(struct hdd_context *hddctx,
 		return -EINVAL;
 	}
 
-	if (power > PMO_PS_ADVANCED_POWER_SAVE_ENABLE ||
-	    power < PMO_PS_ADVANCED_POWER_SAVE_DISABLE) {
-		hdd_err("invalid power value: %d", power);
+	if (*opm_mode > QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED ||
+	    *opm_mode < QCA_WLAN_VENDOR_OPM_MODE_DISABLE) {
+		hdd_err("invalid power value: %d", *opm_mode);
 		return -EINVAL;
 	}
 
 	if (ucfg_pmo_get_max_ps_poll(hddctx->psoc)) {
 		hdd_info("Disable advanced power save since max ps poll is enabled");
-		power = PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
+		*opm_mode = QCA_WLAN_VENDOR_OPM_MODE_DISABLE;
 	}
 
-	status = wma_set_power_config(adapter->deflink->vdev_id, power);
+	status = wma_set_power_config(adapter->deflink->vdev_id,
+				      hdd_convert_opm_mode(*opm_mode));
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("failed to configure power: %d", status);
 		return -EINVAL;
 	}
 
-	/* cache latest userspace power save config to reapply after SSR */
-	ucfg_pmo_set_power_save_mode(hddctx->psoc, power);
-
 	return 0;
 }
 
+int hdd_set_power_config_params(struct hdd_context *hddctx,
+				struct hdd_adapter *adapter,
+				uint16_t ps_ito, uint16_t spec_wake)
+{
+	QDF_STATUS status;
+
+	status = wma_set_power_config_ito(adapter->deflink->vdev_id, ps_ito);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("failed to configure power ito: %d", status);
+		return -EINVAL;
+	}
+
+	status = wma_set_power_config_spec_wake(adapter->deflink->vdev_id,
+						spec_wake);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("failed to configure power spec wake: %d", status);
+		return -EINVAL;
+	}
+
+	return 0;
+}
 
 #ifdef WLAN_SUSPEND_RESUME_TEST
 static struct net_device *g_dev;

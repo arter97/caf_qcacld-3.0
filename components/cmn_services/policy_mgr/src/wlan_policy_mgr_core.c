@@ -4741,17 +4741,6 @@ policy_mgr_get_current_pref_hw_mode_dual_dbs(
 	return next_action;
 }
 
-QDF_STATUS policy_mgr_reset_sap_mandatory_channels(
-		struct policy_mgr_psoc_priv_obj *pm_ctx)
-{
-	pm_ctx->sap_mandatory_channels_len = 0;
-	qdf_mem_zero(pm_ctx->sap_mandatory_channels,
-		     QDF_ARRAY_SIZE(pm_ctx->sap_mandatory_channels) *
-		     sizeof(*pm_ctx->sap_mandatory_channels));
-
-	return QDF_STATUS_SUCCESS;
-}
-
 void policy_mgr_add_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
 				       uint32_t ch_freq)
 {

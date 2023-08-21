@@ -81,6 +81,8 @@
 #include <wlan_cm_api.h>
 #include <wlan_vdev_mgr_utils_api.h>
 #include "parser_api.h"
+#include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_epcs_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -485,7 +487,7 @@ void lim_deactivate_timers(struct mac_context *mac_ctx)
 
 	if (tx_timer_running(&lim_timer->gLimDeauthAckTimer)) {
 		pe_err("Deauth timer running call the timeout API");
-		lim_timer_handler(mac_ctx, SIR_LIM_DEAUTH_ACK_TIMEOUT);
+		lim_process_deauth_ack_timeout(mac_ctx, WLAN_INVALID_VDEV_ID);
 	}
 	tx_timer_deactivate(&lim_timer->gLimDeauthAckTimer);
 
@@ -8685,11 +8687,13 @@ void lim_copy_bss_eht_cap(struct pe_session *session)
 	 * Disable unsupported capabilities per mode.
 	 */
 	lim_revise_req_eht_cap_per_mode(mlme_priv, session);
-
+	lim_update_eht_caps_mcs(session->mac_ctx, session);
 	qdf_mem_copy(&session->eht_config, &mlme_priv->eht_config,
 		     sizeof(session->eht_config));
 
-	if (!wlan_epcs_get_config(session->vdev))
+	if (wlan_epcs_get_config(session->vdev))
+		session->eht_config.epcs_pri_access = 1;
+	else
 		session->eht_config.epcs_pri_access = 0;
 }
 
@@ -8929,7 +8933,8 @@ void lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
 }
 
 void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band)
+		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band,
+		      uint8_t vdev_id)
 {
 	const uint8_t *ie = NULL;
 	uint8_t offset = 0;
@@ -8940,6 +8945,7 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 	struct wlan_eht_cap_info eht_mcs_cap;
 	bool is_band_2g = false;
 	uint32_t cbm_24ghz;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
@@ -8966,7 +8972,16 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 		/* convert from unpacked to packed structure */
 		eht_cap = (struct wlan_eht_cap_info *)&ie[2 + EHT_CAP_OUI_SIZE];
 
-		eht_cap->epcs_pri_access = dot11_cap.epcs_pri_access;
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+							    WLAN_MLME_CM_ID);
+		if (wlan_epcs_get_config(vdev))
+			eht_cap->epcs_pri_access = 1;
+		else
+			eht_cap->epcs_pri_access = 0;
+
+		if (vdev)
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
 		eht_cap->eht_om_ctl = dot11_cap.eht_om_ctl;
 		eht_cap->triggered_txop_sharing_mode1 =
 			dot11_cap.triggered_txop_sharing_mode1;
@@ -9191,7 +9206,7 @@ QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 	qdf_mem_copy(&eht_caps_2g[2], EHT_CAP_OUI_TYPE, EHT_CAP_OUI_SIZE);
 
 	lim_set_eht_caps(mac_ctx, session, eht_caps_2g, eht_cap_total_len,
-			 CDS_BAND_2GHZ);
+			 CDS_BAND_2GHZ, vdev_id);
 	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_EHT_CAP,
 				CDS_BAND_2GHZ, &eht_caps_2g[2],
 				eht_caps_2g[1] + 1);
@@ -9202,7 +9217,7 @@ QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 	qdf_mem_copy(&eht_caps_5g[2], EHT_CAP_OUI_TYPE, EHT_CAP_OUI_SIZE);
 
 	lim_set_eht_caps(mac_ctx, session, eht_caps_5g, eht_cap_total_len,
-			 CDS_BAND_5GHZ);
+			 CDS_BAND_5GHZ, vdev_id);
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_EHT_CAP,
 				CDS_BAND_5GHZ, &eht_caps_5g[2],
 				eht_caps_5g[1] + 1);
@@ -9281,54 +9296,115 @@ void lim_extract_per_link_id(struct pe_session *session,
 	pe_debug("vdev: %d, link id: %d", vdev_id, add_bss->staContext.link_id);
 }
 
+void lim_extract_ml_info(struct pe_session *session,
+			 struct bss_params *add_bss,
+			 tpSirAssocRsp assoc_rsp)
+{
+	uint8_t i, link_id, partner_idx = 0;
+	struct mlo_partner_info *ml_partner_info;
+	struct mlo_link_info *link_info;
+	struct peer_ml_info *ml_link;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(session->vdev))
+		return;
+
+	ml_link = &add_bss->staContext.ml_info;
+	ml_partner_info = &session->ml_partner_info;
+
+	ml_link->vdev_id = wlan_vdev_get_id(session->vdev);
+	ml_link->link_id = wlan_vdev_get_link_id(session->vdev);
+	link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev,
+						   ml_link->link_id);
+	if (!link_info)
+		return;
+
+	qdf_mem_copy(&ml_link->channel_info, link_info->link_chan_info,
+		     sizeof(ml_link->channel_info));
+	qdf_mem_copy(&ml_link->link_addr, &link_info->ap_link_addr,
+		     QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(&ml_link->self_mac_addr, &link_info->link_addr,
+		     QDF_MAC_ADDR_SIZE);
+
+	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev))
+		return;
+
+	for (i = 0; i < ml_partner_info->num_partner_links; i++) {
+		link_id = ml_partner_info->partner_link_info[i].link_id;
+		link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev,
+							   link_id);
+		if (!link_info)
+			continue;
+
+		ml_link->partner_info[partner_idx].vdev_id = link_info->vdev_id;
+		ml_link->partner_info[partner_idx].link_id = link_info->link_id;
+		qdf_mem_copy(&ml_link->partner_info[partner_idx].channel_info,
+			     link_info->link_chan_info,
+			     sizeof(ml_link->partner_info[partner_idx].channel_info));
+		qdf_mem_copy(&ml_link->partner_info[partner_idx].link_addr,
+			     &link_info->ap_link_addr, QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(&ml_link->partner_info[partner_idx].self_mac_addr,
+			     &link_info->link_addr, QDF_MAC_ADDR_SIZE);
+
+		partner_idx++;
+	}
+
+	ml_link->num_links = partner_idx;
+	pe_debug("Num of partner links: %d", ml_link->num_links);
+}
+
 void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,
 				 struct pe_session *session,
 				 struct bss_params *add_bss,
 				 tpSirAssocRsp assoc_rsp)
 {
-	struct wlan_mlo_peer_context *mlo_peer_ctx;
-	struct wlan_objmgr_peer *peer;
+	struct wlan_mlo_sta *sta_ctx;
+	struct wlan_objmgr_vdev *vdev = session->vdev;
+	struct emlsr_capability *ml_emlcap;
 
-	peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc, add_bss->bssId,
-					   WLAN_LEGACY_MAC_ID);
-	if (!peer) {
-		pe_err("peer is null");
+	wlan_objmgr_vdev_get_ref(vdev, WLAN_MLME_NB_ID);
+	if (!vdev) {
+		pe_err("vdev is null");
 		return;
 	}
 
-	mlo_peer_ctx = peer->mlo_peer_ctx;
-	if (!mlo_peer_ctx) {
-		pe_err("mlo peer ctx is null");
-		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
-		return;
+	if (!vdev->mlo_dev_ctx) {
+		pe_err("mlo dev ctx is null");
+		goto end;
 	}
 
-	if (!wlan_vdev_mlme_cap_get(session->vdev, WLAN_VDEV_C_EMLSR_CAP)) {
+	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx) {
+		pe_err("sta ctx is null");
+		goto end;
+	}
+
+	ml_emlcap = &sta_ctx->emlsr_cap;
+
+	if (!wlan_vdev_mlme_cap_get(vdev, WLAN_VDEV_C_EMLSR_CAP)) {
 		add_bss->staContext.emlsr_support = false;
-		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
-		return;
+		goto end;
 	}
 
 	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev)) {
-		add_bss->staContext.emlsr_support =
-				mlo_peer_ctx->mlpeer_emlcap.emlsr_supp;
+		add_bss->staContext.emlsr_support = ml_emlcap->emlsr_supp;
 		add_bss->staContext.emlsr_trans_timeout =
-				mlo_peer_ctx->mlpeer_emlcap.trans_timeout;
+						ml_emlcap->trans_timeout;
 	} else {
 		add_bss->staContext.emlsr_support = true;
 		add_bss->staContext.emlsr_trans_timeout =
-			assoc_rsp->mlo_ie.mlo_ie.eml_capabilities_info.transition_timeout;
+		assoc_rsp->mlo_ie.mlo_ie.eml_capabilities_info.transition_timeout;
 
-		mlo_peer_ctx->mlpeer_emlcap.emlsr_supp =
-				add_bss->staContext.emlsr_support;
-		mlo_peer_ctx->mlpeer_emlcap.trans_timeout =
-				add_bss->staContext.emlsr_trans_timeout;
+		ml_emlcap->emlsr_supp = add_bss->staContext.emlsr_support;
+		ml_emlcap->trans_timeout =
+					add_bss->staContext.emlsr_trans_timeout;
 	}
 
-	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+end:
 	pe_debug("emlsr support: %d, transition timeout:%d",
 		 add_bss->staContext.emlsr_support,
 		 add_bss->staContext.emlsr_trans_timeout);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 }
 
 #define MAX_MSD_OFDM_ED_THRESHOLD 10
@@ -10788,7 +10864,7 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 		return QDF_STATUS_E_FAILURE;
 	}
 	/* Till conversion is not done in WMI we need to fill fw phy mode */
-	mlme_obj->mgmt.generic.phy_mode = wma_host_to_fw_phymode(chan_mode);
+	mlme_obj->mgmt.generic.phy_mode = wmi_host_to_fw_phymode(chan_mode);
 	des_chan->ch_phymode = chan_mode;
 
 	return QDF_STATUS_SUCCESS;
@@ -11092,10 +11168,8 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 	 * Do not update the channel bonding mode if channel bonding
 	 * mode is disabled in INI.
 	 */
-	if (cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) {
-		pe_debug("channel bonding disabled");
+	if (cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
 		return false;
-	}
 
 	if (sta_ptr->htSupportedChannelWidthSet) {
 		if (sta_ptr->vhtSupportedChannelWidthSet >
@@ -11462,9 +11536,11 @@ lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 	lim_set_tpc_power(mac_ctx, session);
 }
 
-bool lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
-				    enum QDF_OPMODE device_mode,
-				    qdf_freq_t chan_freq)
+struct wlan_channel *
+lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
+				enum QDF_OPMODE device_mode,
+				qdf_freq_t start_freq,
+				qdf_freq_t end_freq)
 {
 	struct wlan_channel *des_chan;
 	struct wlan_objmgr_vdev *vdev;
@@ -11480,23 +11556,26 @@ bool lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
 		if (vdev->vdev_mlme.vdev_opmode != device_mode)
 			goto next;
 
-		if (!wlan_cm_is_vdev_connected(vdev))
+		if ((device_mode == QDF_STA_MODE ||
+		     device_mode == QDF_P2P_CLIENT_MODE) &&
+		     !wlan_cm_is_vdev_connected(vdev))
 			goto next;
 
 		des_chan = vdev->vdev_mlme.des_chan;
 		if (!des_chan)
 			goto next;
 
-		if (des_chan->ch_freq != chan_freq)
+		if (des_chan->ch_freq < start_freq ||
+		    des_chan->ch_freq > end_freq)
 			goto next;
 
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-		return true;
+		return des_chan;
 next:
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 	}
 
-	return false;
+	return NULL;
 }
 
 enum phy_ch_width

@@ -968,7 +968,8 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 				QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(
 					pMlmDeauthReq->peer_macaddr.bytes));
-			lim_process_deauth_ack_timeout(mac_ctx);
+			lim_process_deauth_ack_timeout(mac_ctx,
+						       pe_session->vdev_id);
 			is_connected = false;
 		}
 
@@ -1230,6 +1231,21 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 		pe_warn("received Auth frame2 from unexpected peer"
 			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
+	}
+
+	if (LIM_IS_STA_ROLE(pe_session) &&
+	    wlan_vdev_mlme_is_mlo_vdev(pe_session->vdev)) {
+		if (!rx_auth_frm_body->is_mlo_ie_present) {
+			pe_err("MLO IE not present in auth frame from peer, abort connection");
+			lim_send_deauth_mgmt_frame(
+				mac_ctx, REASON_UNSPEC_FAILURE,
+				pe_session->bssId, pe_session, false);
+			lim_restore_from_auth_state(mac_ctx,
+						    eSIR_SME_INVALID_PARAMETERS,
+						    REASON_UNSPEC_FAILURE,
+						    pe_session);
+			return;
+		}
 	}
 
 	if (rx_auth_frm_body->authStatusCode ==
@@ -2050,21 +2066,6 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			rx_auth_frm_body)) {
 		pe_err("Received invalid FILS auth packet");
 		goto free;
-	}
-
-	if (LIM_IS_STA_ROLE(pe_session) &&
-	    wlan_vdev_mlme_is_mlo_vdev(pe_session->vdev)) {
-		if (!rx_auth_frm_body->is_mlo_ie_present) {
-			pe_err("MLO IE not present in auth frame from peer, abort connection");
-			lim_send_deauth_mgmt_frame(
-				mac_ctx, REASON_UNSPEC_FAILURE,
-				pe_session->bssId, pe_session, false);
-			lim_restore_from_auth_state(mac_ctx,
-						    eSIR_SME_INVALID_PARAMETERS,
-						    REASON_UNSPEC_FAILURE,
-						    pe_session);
-			goto free;
-		}
 	}
 
 	/*

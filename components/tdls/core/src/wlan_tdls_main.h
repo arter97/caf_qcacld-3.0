@@ -197,6 +197,7 @@ struct tdls_set_state_info {
  * @bss_sta_power_type: bss sta power type
  * @timer_cnt: used for mlo tdls to monitor discovery response
  * @fw_tdls_wideband_capability: bool for tdls wideband fw capability
+ * @is_user_tdls_enable: bool to check whether TDLS enable through userspace
  */
 struct tdls_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -256,6 +257,7 @@ struct tdls_soc_priv_obj {
 #endif
 	qdf_atomic_t timer_cnt;
 	bool fw_tdls_wideband_capability;
+	bool is_user_tdls_enable;
 };
 
 /**
@@ -577,6 +579,15 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 		      struct wlan_objmgr_vdev *vdev);
 
 /**
+ * tdls_set_user_tdls_enable()- Set the tdls enable from userspace
+ * @vdev: Pointer to vdev object
+ * @is_user_tdls_enable: true if tdls is enable from userspace
+ *
+ * return: NONE
+ */
+void tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
+			       bool is_user_tdls_enable);
+/**
  * tdls_set_operation_mode() - set tdls operating mode
  * @tdls_set_mode: tdls mode set params
  *
@@ -602,7 +613,7 @@ QDF_STATUS tdls_notify_sta_connect(struct tdls_sta_notify_params *notify);
  * connection tracker
  * @vdev: Pointer to vdev object
  *
- * Return: None
+ * Return: void
  */
 void tdls_process_enable_for_vdev(struct wlan_objmgr_vdev *vdev);
 
@@ -671,7 +682,7 @@ void tdls_notify_decrement_session(struct wlan_objmgr_psoc *psoc);
  * bits set in Ext Cap IE in received Assoc/Re-assoc response
  * from AP.
  *
- * Return: None.
+ * Return: void
  */
 void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 			    struct tdls_soc_priv_obj *tdls_soc_obj,
@@ -715,6 +726,14 @@ uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
  * Return: true or false
  */
 bool tdls_is_6g_freq_allowed(struct wlan_objmgr_vdev *vdev, qdf_freq_t freq);
+
+/**
+ * tdls_check_is_user_tdls_enable() - Check is tdls enabled or not
+ * @tdls_soc_obj: TDLS soc object
+ *
+ * Return: true or false
+ */
+bool tdls_check_is_user_tdls_enable(struct tdls_soc_priv_obj *tdls_soc_obj);
 
 /**
  * tdls_check_is_tdls_allowed() - check is tdls allowed or not

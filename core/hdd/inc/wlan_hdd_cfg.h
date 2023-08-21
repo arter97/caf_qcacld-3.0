@@ -379,6 +379,16 @@ hdd_vendor_mode_to_bonding_mode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 				uint32_t *bonding_mode);
 
 /**
+ * hdd_phymode_to_dot11_mode() - Mapping phymode to dot11mode
+ * @phymode: phy mode
+ * @dot11_mode: dot11 mode
+ *
+ * Return: 0 on success, negative errno value on error
+ */
+int hdd_phymode_to_dot11_mode(eCsrPhyMode phymode,
+			      enum hdd_dot11_mode *dot11_mode);
+
+/**
  * hdd_update_phymode() - update the PHY mode of the adapter
  * @adapter: adapter being modified
  * @phymode: new PHY mode for the adapter

@@ -92,6 +92,8 @@
 #include <wlan_hdd_sysfs_runtime_pm.h>
 #include <wlan_hdd_sysfs_log_buffer.h>
 #include <wlan_hdd_sysfs_dfsnol.h>
+#include <wlan_hdd_sysfs_wds_mode.h>
+#include <wlan_hdd_sysfs_roam_trigger_bitmap.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -821,11 +823,13 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_11be_rate_create(adapter);
 	hdd_sysfs_bmiss_create(adapter);
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
+	hdd_sysfs_direct_link_ut_cmd_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
 	hdd_sysfs_bmiss_destroy(adapter);
 	hdd_sysfs_11be_rate_destroy(adapter);
@@ -955,12 +959,16 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_dp_pkt_add_ts_create(driver_kobject);
 		hdd_sysfs_runtime_pm_create(driver_kobject);
 		hdd_sysfs_log_buffer_create(driver_kobject);
+		hdd_sysfs_wds_mode_create(driver_kobject);
+		hdd_sysfs_roam_trigger_bitmap_create(driver_kobject);
 	}
 }
 
 void hdd_destroy_sysfs_files(void)
 {
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_roam_trigger_bitmap_destroy(driver_kobject);
+		hdd_sysfs_wds_mode_destroy(driver_kobject);
 		hdd_sysfs_log_buffer_destroy(driver_kobject);
 		hdd_sysfs_runtime_pm_destroy(driver_kobject);
 		hdd_sysfs_dp_pkt_add_ts_destroy(driver_kobject);
@@ -987,6 +995,12 @@ void hdd_destroy_sysfs_files(void)
 	hdd_sysfs_destroy_driver_root_obj();
 }
 
+static
+void hdd_sysfs_create_ftm_adapter_root_obj(struct hdd_adapter *adapter)
+{
+	hdd_sysfs_unit_test_target_create(adapter);
+}
+
 void hdd_create_adapter_sysfs_files(struct hdd_adapter *adapter)
 {
 	int device_mode = adapter->device_mode;
@@ -1009,9 +1023,18 @@ void hdd_create_adapter_sysfs_files(struct hdd_adapter *adapter)
 	case QDF_MONITOR_MODE:
 		hdd_sysfs_create_monitor_adapter_root_obj(adapter);
 		break;
+	case QDF_FTM_MODE:
+		hdd_sysfs_create_ftm_adapter_root_obj(adapter);
+		break;
 	default:
 		break;
 	}
+}
+
+static
+void hdd_sysfs_destroy_ftm_adapter_root_obj(struct hdd_adapter *adapter)
+{
+	hdd_sysfs_unit_test_target_destroy(adapter);
 }
 
 void hdd_destroy_adapter_sysfs_files(struct hdd_adapter *adapter)
@@ -1034,6 +1057,9 @@ void hdd_destroy_adapter_sysfs_files(struct hdd_adapter *adapter)
 		break;
 	case QDF_MONITOR_MODE:
 		hdd_sysfs_destroy_monitor_adapter_root_obj(adapter);
+		break;
+	case QDF_FTM_MODE:
+		hdd_sysfs_destroy_ftm_adapter_root_obj(adapter);
 		break;
 	default:
 		break;

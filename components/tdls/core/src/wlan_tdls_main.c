@@ -346,6 +346,13 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		if (QDF_TIMER_STATE_STOPPED !=
+		    qdf_mc_timer_get_current_state(
+					&tdls_vdev_obj->peer_discovery_timer))
+			qdf_mc_timer_stop(&tdls_vdev_obj->peer_discovery_timer);
+	}
+
 	qdf_event_destroy(&tdls_vdev_obj->tdls_teardown_comp);
 	tdls_vdev_deinit(tdls_vdev_obj);
 
@@ -920,6 +927,11 @@ uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+bool tdls_check_is_user_tdls_enable(struct tdls_soc_priv_obj *tdls_soc_obj)
+{
+	return tdls_soc_obj->is_user_tdls_enable;
+}
+
 bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 {
 	struct tdls_vdev_priv_obj *tdls_vdev_obj;
@@ -948,6 +960,11 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 
 	if (wlan_nan_is_disc_active(tdls_soc_obj->soc)) {
 		tdls_err("NAN active. NAN+TDLS not supported");
+		goto exit;
+	}
+
+	if (!tdls_check_is_user_tdls_enable(tdls_soc_obj)) {
+		tdls_err("TDLS Disabled from userspace");
 		goto exit;
 	}
 
@@ -1081,6 +1098,31 @@ set_state:
 		   wlan_vdev_get_id(vdev),
 		   tdls_soc_obj->enable_tdls_connection_tracker,
 		   tdls_soc_obj->tdls_current_mode, tdls_feature_flags);
+}
+
+void tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
+			       bool is_user_tdls_enable)
+{
+	QDF_STATUS status;
+	struct tdls_vdev_priv_obj *tdls_vdev_obj;
+	struct tdls_soc_priv_obj *tdls_soc_obj;
+
+	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	status = tdls_get_vdev_objects(vdev, &tdls_vdev_obj, &tdls_soc_obj);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("Failed to get TDLS objects");
+		goto exit;
+	}
+
+	tdls_soc_obj->is_user_tdls_enable = is_user_tdls_enable;
+	tdls_debug("TDLS enable:%d via userspace",
+		   tdls_soc_obj->is_user_tdls_enable);
+
+exit:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
 }
 
 QDF_STATUS

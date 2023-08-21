@@ -619,7 +619,7 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 		/* Connections that do not need Upper layer auth,
 		 * transition TL directly to 'Authenticated' state.
 		 */
-		qdf_status = hdd_change_peer_state(adapter,
+		qdf_status = hdd_change_peer_state(link_info,
 						   txrx_desc.peer_addr.bytes,
 						   OL_TXRX_PEER_STATE_AUTH);
 
@@ -634,7 +634,7 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 			  ".  Changing TL state to CONNECTED at Join time",
 			 QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
 
-		qdf_status = hdd_change_peer_state(adapter,
+		qdf_status = hdd_change_peer_state(link_info,
 						   txrx_desc.peer_addr.bytes,
 						   OL_TXRX_PEER_STATE_CONN);
 
@@ -774,7 +774,7 @@ static QDF_STATUS hdd_softap_change_per_sta_state(struct hdd_adapter *adapter,
 		qdf_mem_copy(&mac_addr, sta_mac, QDF_MAC_ADDR_SIZE);
 
 	qdf_status =
-		hdd_change_peer_state(adapter, mac_addr.bytes, state);
+		hdd_change_peer_state(adapter->deflink, mac_addr.bytes, state);
 	hdd_debug("Station " QDF_MAC_ADDR_FMT " changed to state %d",
 		  QDF_MAC_ADDR_REF(mac_addr.bytes), state);
 

@@ -1567,7 +1567,6 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 		session->parsedAssocReq[sta_ds->assocId] = assoc_req;
 		*assoc_req_copied = true;
 	}
-
 	if (!assoc_req->wmeInfoPresent) {
 		sta_ds->mlmStaContext.htCapability = 0;
 		sta_ds->mlmStaContext.vhtCapability = 0;
@@ -3358,6 +3357,7 @@ bool lim_fill_lim_assoc_ind_params(
 		 assoc_ind->chan_info.info,
 		 assoc_ind->chan_info.band_center_freq1);
 	assoc_ind->he_caps_present = assoc_req->he_cap.present;
+	assoc_ind->eht_caps_present = assoc_req->eht_cap.present;
 	assoc_ind->is_sae_authenticated =
 				assoc_req->is_sae_authenticated;
 	/* updates HE bandwidth in assoc indication */

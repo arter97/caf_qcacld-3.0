@@ -30,6 +30,7 @@
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "wlan_osif_request_manager.h"
 #include "wlan_hdd_object_manager.h"
+#include <wlan_osif_priv.h>
 
 /*max time in ms, caller may wait for link state request get serviced */
 #define WLAN_WAIT_TIME_LINK_STATE 800
@@ -165,17 +166,21 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 
 void hdd_wlan_register_mlo_interfaces(struct hdd_context *hdd_ctx)
 {
+	int i = 0;
 	QDF_STATUS status;
 	struct hdd_adapter *ml_adapter;
+	struct wlan_hdd_link_info *link_info;
 	struct hdd_adapter_create_param params = {0};
-	struct qdf_mac_addr link_addr[WLAN_MAX_MLD] = {0};
+	struct qdf_mac_addr link_addr[WLAN_MAX_ML_BSS_LINKS] = {0};
 
 	ml_adapter = hdd_get_ml_adapter(hdd_ctx);
 	if (!ml_adapter)
 		return;
 
-	status = hdd_derive_link_address_from_mld(&ml_adapter->mld_addr,
-						  &link_addr[0], WLAN_MAX_MLD);
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &ml_adapter->mld_addr,
+						  &link_addr[0],
+						  WLAN_MAX_ML_BSS_LINKS);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -193,8 +198,14 @@ void hdd_wlan_register_mlo_interfaces(struct hdd_context *hdd_ctx)
 	/* if target supports MLO create a new dev */
 	status = hdd_open_adapter_no_trans(hdd_ctx, QDF_STA_MODE, "null",
 					   link_addr[1].bytes, &params);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to register link adapter:%d", status);
+	} else {
+		hdd_adapter_for_each_link_info(ml_adapter, link_info) {
+			qdf_copy_macaddr(&link_info->link_addr,
+					 &link_addr[i++]);
+		}
+	}
 }
 
 void
@@ -241,6 +252,72 @@ void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
 {
 	adapter->mlo_adapter_info.is_ml_adapter = true;
 }
+
+static struct mlo_osif_ext_ops mlo_osif_ops = {
+	.mlo_mgr_osif_update_bss_info = hdd_cm_save_connected_links_info,
+	.mlo_mgr_osif_update_mac_addr = hdd_link_switch_vdev_mac_addr_update,
+	.mlo_mgr_osif_link_switch_notification =
+					hdd_adapter_link_switch_notification,
+};
+
+QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
+{
+	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
+
+	return wlan_mlo_mgr_register_osif_ext_ops(mlo_mgr_ctx, &mlo_osif_ops);
+}
+
+QDF_STATUS hdd_mlo_mgr_unregister_osif_ops(void)
+{
+	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
+
+	return wlan_mlo_mgr_unregister_osif_ext_ops(mlo_mgr_ctx);
+}
+
+QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
+						uint8_t non_trans_vdev_id)
+{
+	int errno;
+	bool found = false;
+	struct hdd_adapter *adapter;
+	struct vdev_osif_priv *osif_priv;
+	struct wlan_hdd_link_info *link_info, *iter_link_info;
+	struct osif_vdev_sync *vdev_sync;
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv) {
+		hdd_err("Invalid osif priv");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	link_info = osif_priv->legacy_osif_priv;
+	adapter = link_info->adapter;
+
+	if (link_info->vdev_id != adapter->deflink->vdev_id) {
+		hdd_err("Default VDEV %d not equal", adapter->deflink->vdev_id);
+		QDF_ASSERT(0);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	errno = osif_vdev_sync_trans_start_wait(adapter->dev, &vdev_sync);
+	if (errno)
+		return QDF_STATUS_E_FAILURE;
+
+	osif_vdev_sync_wait_for_ops(vdev_sync);
+	hdd_adapter_for_each_link_info(adapter, iter_link_info) {
+		if (non_trans_vdev_id == iter_link_info->vdev_id) {
+			adapter->deflink = iter_link_info;
+			found = true;
+			break;
+		}
+	}
+	osif_vdev_sync_trans_stop(vdev_sync);
+
+	if (!found)
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 void hdd_mlo_t2lm_register_callback(struct wlan_objmgr_vdev *vdev)
@@ -261,16 +338,17 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev)
 	wlan_unregister_t2lm_link_update_notify_handler(vdev->mlo_dev_ctx, 0);
 }
 
-QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+QDF_STATUS hdd_derive_link_address_from_mld(struct wlan_objmgr_psoc *psoc,
+					    struct qdf_mac_addr *mld_addr,
 					    struct qdf_mac_addr *link_addr_list,
 					    uint8_t max_idx)
 {
-	uint8_t last_byte, temp_byte, idx;
+	uint8_t last_byte, temp_byte, idx, start_idx = 0;
 	struct qdf_mac_addr new_addr;
 	struct qdf_mac_addr *link_addr;
 
-	if (!mld_addr || !link_addr_list || !max_idx ||
-	    max_idx > WLAN_MAX_MLD || qdf_is_macaddr_zero(mld_addr)) {
+	if (!psoc || !mld_addr || !link_addr_list || !max_idx ||
+	    max_idx > WLAN_MAX_ML_BSS_LINKS || qdf_is_macaddr_zero(mld_addr)) {
 		hdd_err("Invalid values");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -281,9 +359,16 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
 
 	link_addr = link_addr_list;
 	last_byte = mld_addr->bytes[5];
-	hdd_debug("MLD addr: " QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mld_addr));
+	hdd_debug("MLD addr: " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(mld_addr->bytes));
 
-	for (idx = 0; idx < max_idx; idx++) {
+	if (wlan_mlme_get_sta_same_link_mld_addr(psoc)) {
+		qdf_copy_macaddr(link_addr, mld_addr);
+		link_addr++;
+		start_idx++;
+	}
+
+	for (idx = start_idx; idx < max_idx; idx++) {
 		temp_byte = ((last_byte >> 4 & INTF_MACADDR_MASK) + idx) &
 			     INTF_MACADDR_MASK;
 		new_addr.bytes[5] = last_byte + temp_byte;
@@ -300,16 +385,86 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 #ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+static void hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter)
+{
+	int i;
+	unsigned long link_flags;
+	uint8_t vdev_id, cur_link_idx, temp_link_idx;
+	struct vdev_osif_priv *osif_priv;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *temp_link_info, *link_info;
+
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		cur_link_idx = hdd_adapter_get_index_of_link_info(link_info);
+		/* If the current index matches the current pos in mapping
+		 * then the link info is in same position
+		 */
+		if (adapter->curr_link_info_map[cur_link_idx] == cur_link_idx)
+			continue;
+
+		/* Find the index where current link info is moved to perform
+		 * VDEV info swap.
+		 */
+		for (i = cur_link_idx + 1; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+			if (adapter->curr_link_info_map[i] == cur_link_idx) {
+				temp_link_idx = i;
+				break;
+			}
+		}
+
+		if (i == WLAN_MAX_ML_BSS_LINKS)
+			continue;
+
+		temp_link_info = &adapter->link_info[temp_link_idx];
+
+		/* Move VDEV info from current link info */
+		qdf_spin_lock_bh(&temp_link_info->vdev_lock);
+		vdev = temp_link_info->vdev;
+		vdev_id = temp_link_info->vdev_id;
+		temp_link_info->vdev = link_info->vdev;
+		temp_link_info->vdev_id = link_info->vdev_id;
+		qdf_spin_unlock_bh(&temp_link_info->vdev_lock);
+
+		/* Fill current link info's actual VDEV info */
+		qdf_spin_lock_bh(&link_info->vdev_lock);
+		link_info->vdev = vdev;
+		link_info->vdev_id = vdev_id;
+		qdf_spin_unlock_bh(&link_info->vdev_lock);
+
+		/* Swap link flags */
+		link_flags = temp_link_info->link_flags;
+		temp_link_info->link_flags = link_info->link_flags;
+		link_info->link_flags = link_flags;
+
+		/* Update VDEV-OSIF priv pointer to new link info. */
+		if (!vdev)
+			continue;
+
+		osif_priv = wlan_vdev_get_ospriv(vdev);
+		if (!osif_priv)
+			continue;
+		osif_priv->legacy_osif_priv = link_info;
+
+		/* Update the mapping, current link info's mapping will be
+		 * set to be proper.
+		 */
+		adapter->curr_link_info_map[temp_link_idx] =
+				adapter->curr_link_info_map[cur_link_idx];
+		adapter->curr_link_info_map[cur_link_idx] = cur_link_idx;
+	}
+	hdd_adapter_disable_all_links(adapter);
+}
+
 int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 				struct qdf_mac_addr mac_addr)
 {
-	int i = 0, ret = 0;
+	int idx, i, ret = 0;
 	bool eht_capab, update_self_peer;
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_hdd_link_info *link_info;
-	uint8_t *addr_list[WLAN_MAX_MLD + 2] = {0};
-	struct qdf_mac_addr link_addrs[WLAN_MAX_MLD] = {0};
+	uint8_t *addr_list[WLAN_MAX_ML_BSS_LINKS + 1] = {0};
+	struct qdf_mac_addr link_addrs[WLAN_MAX_ML_BSS_LINKS] = {0};
 
 	/* This API is only called with is ml adapter set for STA mode adapter.
 	 * For SAP mode, hdd_hostapd_set_mac_address() is the entry point for
@@ -324,15 +479,19 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		return ret;
 	}
 
-	status = hdd_derive_link_address_from_mld(&mac_addr, &link_addrs[0],
-						  WLAN_MAX_MLD);
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &mac_addr, &link_addrs[0],
+						  WLAN_MAX_ML_BSS_LINKS);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
 
+	hdd_adapter_restore_link_vdev_map(adapter);
+
+	i = 0;
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
-		addr_list[i] = &link_addrs[i].bytes[0];
-		i++;
+		idx = hdd_adapter_get_index_of_link_info(link_info);
+		addr_list[i++] = &link_addrs[idx].bytes[0];
 	}
 
 	status = sme_check_for_duplicate_session(hdd_ctx->mac_handle,
@@ -341,16 +500,22 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		return qdf_status_to_os_return(status);
 
 	i = 0;
+	hdd_adapter_for_each_link_info(adapter, link_info)
+		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[i++]);
+
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		idx = hdd_adapter_get_index_of_link_info(link_info);
 		update_self_peer =
 			(link_info == adapter->deflink) ? true : false;
-		ret = hdd_dynamic_mac_address_set(link_info, link_addrs[i],
+		ret = hdd_dynamic_mac_address_set(link_info, link_addrs[idx],
 						  mac_addr, update_self_peer);
 		if (ret)
 			return ret;
 
-		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[i++]);
+		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[idx]);
 	}
+
+	hdd_adapter_update_mlo_mgr_mac_addr(adapter);
 	return ret;
 }
 #else
@@ -363,8 +528,8 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	struct hdd_adapter *link_adapter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
-	struct qdf_mac_addr link_addrs[WLAN_MAX_MLD] = {0};
 	uint8_t *addr_list[WLAN_MAX_MLD + 1] = {0};
+	struct qdf_mac_addr link_addrs[WLAN_MAX_ML_BSS_LINKS] = {0};
 
 	/* This API is only called with is ml adapter set for STA mode adapter.
 	 * For SAP mode, hdd_hostapd_set_mac_address() is the entry point for
@@ -379,8 +544,9 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		return ret;
 	}
 
-	status = hdd_derive_link_address_from_mld(&mac_addr, &link_addrs[0],
-						  WLAN_MAX_MLD);
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &mac_addr, &link_addrs[0],
+						  WLAN_MAX_ML_BSS_LINKS);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
@@ -412,10 +578,16 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 
 		/* Update DP intf and new link address in link adapter
 		 */
-		ucfg_dp_update_inf_mac(hdd_ctx->psoc, &link_adapter->mac_addr,
-				       &link_addrs[i]);
+		ucfg_dp_update_intf_mac(hdd_ctx->psoc, &link_adapter->mac_addr,
+					&link_addrs[i],
+					link_adapter->deflink->vdev);
 		qdf_copy_macaddr(&link_adapter->mac_addr, &link_addrs[i]);
+		qdf_copy_macaddr(&adapter->link_info[i].link_addr,
+				 &link_addrs[i]);
 	}
+
+	qdf_copy_macaddr(&adapter->link_info[i].link_addr, &link_addrs[i]);
+	hdd_adapter_update_mlo_mgr_mac_addr(adapter);
 
 	return ret;
 }

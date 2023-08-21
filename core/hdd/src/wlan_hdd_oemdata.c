@@ -423,7 +423,7 @@ void hdd_update_channel_bw_info(struct hdd_context *hdd_ctx,
 		 */
 		phy_mode = WLAN_PHYMODE_AUTO;
 
-	fw_phy_mode = wma_host_to_fw_phymode(phy_mode);
+	fw_phy_mode = wmi_host_to_fw_phymode(phy_mode);
 
 	hdd_debug("chan %d dot11_mode %d ch_width %d sec offset %d freq_seg0 %d phy_mode %d fw_phy_mode %d",
 		  chan_freq, wni_dot11_mode, ch_params.ch_width,
@@ -1409,7 +1409,8 @@ __wlan_hdd_cfg80211_oem_data_handler(struct wiphy *wiphy,
 		int skb_len = 0;
 
 		adapter->oem_data_in_progress = true;
-
+		qdf_runtime_pm_prevent_suspend(
+					&hdd_ctx->runtime_context.oem_data_cmd);
 		request = osif_request_alloc(&params);
 		if (!request) {
 			hdd_err("request allocation failure");
@@ -1470,6 +1471,7 @@ err:
 		osif_request_put(request);
 	adapter->oem_data_in_progress = false;
 	adapter->response_expected = false;
+	qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.oem_data_cmd);
 
 	return ret;
 

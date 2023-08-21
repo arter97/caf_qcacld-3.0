@@ -87,6 +87,7 @@
 #include "wlan_mlo_mgr_peer.h"
 #include <wlan_twt_api.h>
 #include "wlan_tdls_api.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -865,7 +866,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 					lim_update_tx_pwr_on_ctry_change_cb);
 
 	wlan_reg_register_is_chan_connected_callback(mac->psoc,
-					lim_is_chan_connected_for_mode);
+					lim_get_connected_chan_for_mode);
 
 	if (mac->mlme_cfg->edca_params.enable_edca_params)
 		lim_register_policy_mgr_callback(mac->psoc);
@@ -915,7 +916,7 @@ QDF_STATUS pe_close(struct mac_context *mac)
 					lim_update_tx_pwr_on_ctry_change_cb);
 
 	wlan_reg_unregister_is_chan_connected_callback(mac->psoc,
-					lim_is_chan_connected_for_mode);
+					lim_get_connected_chan_for_mode);
 
 	if (mac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq) {
 		qdf_mem_free(mac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq);
@@ -2653,7 +2654,7 @@ lim_mlo_roam_copy_partner_info_to_session(struct pe_session *session,
 					  struct roam_offload_synch_ind *sync_ind)
 {
 	mlo_roam_copy_partner_info(&session->ml_partner_info,
-				   sync_ind, sync_ind->roamed_vdev_id);
+				   sync_ind, sync_ind->roamed_vdev_id, false);
 }
 
 static QDF_STATUS
@@ -2748,15 +2749,35 @@ void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev,
 	uint8_t non_srg_pd_offset = 0;
 	uint8_t srg_max_pd_offset = 0;
 	uint8_t srg_min_pd_offset = 0;
-	uint8_t sr_ctrl;
+	uint8_t sr_ctrl, sr_enable_modes;
 	bool is_pd_threshold_present = false;
 	struct wlan_objmgr_pdev *pdev;
 	enum sr_status_of_roamed_ap sr_status;
 	enum sr_osif_operation sr_op;
+	enum QDF_OPMODE opmode;
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
+	if (!mac) {
+		pe_err("mac ctx is null");
+		return;
+	}
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		pe_err("invalid pdev");
+		return;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	/* If SR is disabled in INI for the session-operating mode
+	 * Then return.
+	 */
+	wlan_mlme_get_sr_enable_modes(mac->psoc, &sr_enable_modes);
+	if (!(sr_enable_modes & (1 << opmode))) {
+		pe_debug("SR is disabled in INI for mode: %d", opmode);
+		return;
+	}
+	if (!wlan_vdev_mlme_get_he_spr_enabled(vdev)) {
+		pe_debug("SR is not enabled");
 		return;
 	}
 	non_srg_pd_offset = wlan_vdev_mlme_get_non_srg_pd_offset(vdev);
@@ -3091,9 +3112,17 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 	/* Cleanup the old session */
 	session_ptr->limSmeState = eLIM_SME_IDLE_STATE;
+
+	/*
+	 * Delete the ml_peer only if DUT is roamed to a non-11BE candidate.
+	 * ml_peer is already cleaned up in wma_delete_all_peers() at the
+	 * beginning of roam_sync handling for 11BE candidates.
+	 */
 	if (sta_ds) {
-		lim_mlo_notify_peer_disconn(session_ptr, sta_ds);
-		lim_mlo_roam_delete_link_peer(session_ptr, sta_ds);
+		if (!wlan_vdev_mlme_is_mlo_vdev(session_ptr->vdev)) {
+			lim_mlo_notify_peer_disconn(session_ptr, sta_ds);
+			lim_mlo_roam_delete_link_peer(session_ptr, sta_ds);
+		}
 		lim_cleanup_rx_path(mac_ctx, sta_ds, session_ptr, false);
 		lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr, aid,
 					  session_ptr);
@@ -3985,6 +4014,48 @@ free_cache_entry:
 	qdf_mem_free(cache_entry);
 	return status;
 }
+
+QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
+				   struct wlan_objmgr_vdev *vdev,
+				   struct qdf_mac_addr *link_addr,
+				   uint8_t link_id, uint16_t freq)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct scan_cache_entry *cache_entry;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct wlan_channel channel;
+
+	pdev = mac_ctx->pdev;
+	if (!pdev) {
+		pe_err("pdev is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	cache_entry = qdf_mem_malloc(sizeof(struct scan_cache_entry));
+	if (!cache_entry)
+		return QDF_STATUS_E_FAILURE;
+
+	status = wlan_scan_get_scan_entry_by_mac_freq(pdev, link_addr, freq,
+						      cache_entry);
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		status = QDF_STATUS_E_FAILURE;
+		goto free_cache_entry;
+	}
+
+	channel.ch_freq = cache_entry->channel.chan_freq;
+	channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);
+	channel.ch_phymode = cache_entry->phy_mode;
+	channel.ch_cfreq1 = cache_entry->channel.cfreq0;
+	channel.ch_cfreq2 = cache_entry->channel.cfreq1;
+
+	mlo_mgr_update_ap_channel_info(vdev, link_id, (uint8_t *)link_addr,
+				       channel);
+
+free_cache_entry:
+	qdf_mem_free(cache_entry);
+	return status;
+}
 #else
 static inline void
 lim_clear_ml_partner_info(struct pe_session *session_entry)
@@ -4159,6 +4230,22 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 
 				goto end;
 			}
+
+			status = lim_update_mlo_mgr_info(mac_ctx,
+							 session_entry->vdev,
+							 &link_info->link_addr,
+							 link_info->link_id,
+							 link_info->chan_freq);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				pe_err("failed to update mlo_mgr %d", status);
+				status =
+				   lim_check_scan_db_for_join_req_partner_info(
+					session_entry, mac_ctx);
+				if (QDF_IS_STATUS_ERROR(status))
+					lim_clear_ml_partner_info(session_entry);
+
+				goto end;
+			}
 		}
 	} else if (session_entry->lim_join_req->is_ml_probe_req_sent &&
 		   !rcvd_probe_resp->mlo_ie.mlo_ie_present) {
@@ -4238,14 +4325,14 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 	}
 
 	if (!probe_rsp->mlo_ie.mlo_ie_present)
-		goto done;
+		goto err1;
 
 	/* Add received ml bcn/probe rsp to scan db */
 	src_addr = wlan_mlme_get_src_addr_from_frame(&frame);
 	if (!src_addr) {
 		pe_err("MLO: Failed to fetch src address");
 		status = QDF_STATUS_E_FAILURE;
-		goto done;
+		goto err1;
 	}
 	freq = mlo_roam_get_link_freq_from_mac_addr(roam_sync_ind,
 						    src_addr);
@@ -4261,7 +4348,7 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 	if (!freq) {
 		pe_debug("MLO: Failed to fetch freq");
 		status = QDF_STATUS_E_FAILURE;
-		goto done;
+		goto err1;
 	}
 	lim_add_bcn_probe(session->vdev, frame.ptr, frame.len,
 			  freq, roam_sync_ind->rssi);
@@ -4282,9 +4369,8 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 
 	gen_probe_rsp.ptr = qdf_mem_malloc(gen_frame_len);
 	if (!gen_probe_rsp.ptr) {
-		qdf_mem_free(probe_rsp);
 		status = QDF_STATUS_E_NOMEM;
-		goto done;
+		goto err1;
 	}
 
 	/*
@@ -4302,7 +4388,7 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 						    &ml_probe_link_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_debug("Invalid link id for mac_addr: " QDF_MAC_ADDR_FMT,
-			 src_addr);
+			 QDF_MAC_ADDR_REF(src_addr));
 		goto done;
 	}
 	for (idx = 0; idx < roam_sync_ind->num_setup_links; idx++) {
@@ -4333,6 +4419,14 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 			status = QDF_STATUS_E_FAILURE;
 			goto done;
 		}
+
+		if (gen_probe_rsp.len > gen_frame_len) {
+			pe_err("MLO: gen probe rsp len %u larger than buffer size: %u",
+			       gen_probe_rsp.len, gen_frame_len);
+			status = QDF_STATUS_E_FAILURE;
+			goto done;
+		}
+
 		lim_add_bcn_probe(session->vdev, gen_probe_rsp.ptr,
 				  gen_probe_rsp.len,
 				  mlo_roam_get_link_freq_from_mac_addr(
@@ -4342,6 +4436,7 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 
 done:
 	qdf_mem_free(gen_probe_rsp.ptr);
+err1:
 	qdf_mem_free(probe_rsp);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -4372,6 +4467,7 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	uint8_t bpcc, aui;
 	bool cu_flag = false;
 	const uint8_t *rnr;
+	bool msd_cap_found = false;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	vdev = session->vdev;
@@ -4390,6 +4486,13 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Mlo ie not found in Probe response");
 		return status;
+	}
+
+	util_get_bvmlie_msd_cap(ml_ie, ml_ie_total_len, &msd_cap_found,
+				NULL);
+	if (msd_cap_found) {
+		wlan_vdev_mlme_cap_clear(vdev, WLAN_VDEV_C_EMLSR_CAP);
+		pe_debug("EMLSR not supported with D2.0 AP");
 	}
 
 	status = util_get_bvmlie_persta_partner_info(ml_ie,

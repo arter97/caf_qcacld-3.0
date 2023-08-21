@@ -1793,6 +1793,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	struct hdd_context *hdd_ctx;
 	uint64_t tsf_sync_qtime, host_time, reg_qtime, qtime, target_time;
 	ssize_t size;
+	uint8_t *mac;
 
 	struct net_device *net_dev = container_of(dev, struct net_device, dev);
 
@@ -1826,18 +1827,20 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		mac = hdd_sta_ctx->conn_info.bssid.bytes;
 		size = scnprintf(buf, PAGE_SIZE,
-				 "%s%llu %llu %pM %llu %llu %llu\n",
+				 "%s%llu %llu " QDF_MAC_ADDR_FMT "%llu %llu %llu\n",
 				 buf, adapter->tsf.last_target_time,
 				 tsf_sync_qtime,
-				 hdd_sta_ctx->conn_info.bssid.bytes,
+				 QDF_MAC_ADDR_REF(mac),
 				 qtime, host_time, target_time);
 	} else {
+		mac = adapter->mac_addr.bytes;
 		size = scnprintf(buf, PAGE_SIZE,
-				 "%s%llu %llu %pM %llu %llu %llu\n",
+				 "%s%llu %llu " QDF_MAC_ADDR_FMT "%llu %llu %llu\n",
 				 buf, adapter->tsf.last_target_time,
 				 tsf_sync_qtime,
-				 adapter->mac_addr.bytes,
+				 QDF_MAC_ADDR_REF(mac),
 				 qtime, host_time, target_time);
 	}
 
@@ -1957,6 +1960,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	struct hdd_context *hdd_ctx;
 	ssize_t size;
 	uint64_t host_time, target_time;
+	uint8_t *mac;
 
 	struct net_device *net_dev = container_of(dev, struct net_device, dev);
 
@@ -1986,13 +1990,17 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	} else {
 		if (adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-			size = scnprintf(buf, PAGE_SIZE, "%s%llu %llu %pM\n",
+			mac = hdd_sta_ctx->conn_info.bssid.bytes;
+			size = scnprintf(buf, PAGE_SIZE,
+					 "%s%llu %llu " QDF_MAC_ADDR_FMT "\n",
 					 buf, target_time, host_time,
-					 hdd_sta_ctx->conn_info.bssid.bytes);
+					 QDF_MAC_ADDR_REF(mac));
 		} else {
-			size = scnprintf(buf, PAGE_SIZE, "%s%llu %llu %pM\n",
+			mac = adapter->mac_addr.bytes;
+			size = scnprintf(buf, PAGE_SIZE,
+					 "%s%llu %llu " QDF_MAC_ADDR_FMT "\n",
 					 buf, target_time, host_time,
-					 adapter->mac_addr.bytes);
+					 QDF_MAC_ADDR_REF(mac));
 		}
 	}
 
@@ -3401,29 +3409,33 @@ void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx)
 	if (!hdd_ctx)
 		return;
 
-	if (qdf_atomic_inc_return(&hdd_ctx->tsf.tsf_ready_flag) > 1)
+	if (qdf_atomic_inc_return(&hdd_ctx->tsf.tsf_ready_flag) > 1) {
+		hdd_err("TSF ready flag already set");
 		return;
+	}
 
 	qdf_atomic_init(&hdd_ctx->tsf.cap_tsf_flag);
+
+	status = qdf_event_create(&tsf_sync_get_completion_evt);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to create tsf_sync_get_completion_evt");
+		goto fail;
+	}
 
 	status = hdd_tsf_set_gpio(hdd_ctx);
 
 	if (QDF_STATUS_SUCCESS != status) {
-		hdd_debug("set tsf GPIO failed, status: %d", status);
+		hdd_err("set tsf GPIO failed, status: %d", status);
 		goto fail;
 	}
 
-	if (wlan_hdd_tsf_plus_init(hdd_ctx) != HDD_TSF_OP_SUCC)
+	if (wlan_hdd_tsf_plus_init(hdd_ctx) != HDD_TSF_OP_SUCC) {
+		hdd_err("TSF plus init  failed");
 		goto fail;
+	}
 
 	if (hdd_tsf_is_ptp_enabled(hdd_ctx))
 		wlan_hdd_phc_init(hdd_ctx);
-
-	status = qdf_event_create(&tsf_sync_get_completion_evt);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_debug("failed to create tsf_sync_get_completion_evt");
-		goto fail;
-	}
 
 	return;
 
@@ -3438,12 +3450,14 @@ void wlan_hdd_tsf_deinit(struct hdd_context *hdd_ctx)
 	if (!hdd_ctx)
 		return;
 
-	if (!qdf_atomic_read(&hdd_ctx->tsf.tsf_ready_flag))
-		return;
-
 	status = qdf_event_destroy(&tsf_sync_get_completion_evt);
 	if (QDF_IS_STATUS_ERROR(status))
-		hdd_debug("failed to destroy tsf_sync_get_completion_evt");
+		hdd_err("failed to destroy tsf_sync_get_completion_evt");
+
+	if (!qdf_atomic_read(&hdd_ctx->tsf.tsf_ready_flag)) {
+		hdd_err("ready flag not set");
+		return;
+	}
 
 	if (hdd_tsf_is_ptp_enabled(hdd_ctx))
 		wlan_hdd_phc_deinit(hdd_ctx);

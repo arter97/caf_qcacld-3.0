@@ -62,15 +62,31 @@ ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc)
 #endif
 
 /**
- * ucfg_dp_update_inf_mac() - update DP interface MAC address
+ * ucfg_dp_update_link_mac_addr() - Update the dp_link mac address, during MLO
+ *				    link switch.
+ * @vdev: Objmgr vdev corresponding to the dp_link
+ * @new_mac_addr: New mac address of the dp_link
+ * @is_link_switch: Flag to indicate if the link mac addr update is as a part
+ *		    of MLO link switch.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *new_mac_addr,
+					bool is_link_switch);
+
+/**
+ * ucfg_dp_update_intf_mac() - update DP interface MAC address
  * @psoc: psoc handle
  * @cur_mac: Current MAC address
  * @new_mac: new MAC address
+ * @vdev: objmgr vdev handle to set the def_link in dp_intf
  *
  */
-void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
-			    struct qdf_mac_addr *cur_mac,
-			    struct qdf_mac_addr *new_mac);
+void ucfg_dp_update_intf_mac(struct wlan_objmgr_psoc *psoc,
+			     struct qdf_mac_addr *cur_mac,
+			     struct qdf_mac_addr *new_mac,
+			     struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_dp_destroy_intf() - DP module interface deletion
@@ -924,12 +940,12 @@ bool ucfg_dp_get_dad_value(struct wlan_objmgr_vdev *vdev);
 bool ucfg_dp_get_con_status_value(struct wlan_objmgr_vdev *vdev);
 
 /**
- * ucfg_dp_get_intf_id() - Get intf_id
+ * ucfg_dp_get_link_id() - Get link_id
  * @vdev: vdev context
  *
- * Return: intf_id
+ * Return: link_id
  */
-uint8_t ucfg_dp_get_intf_id(struct wlan_objmgr_vdev *vdev);
+uint8_t ucfg_dp_get_link_id(struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_dp_get_arp_stats() - Get ARP stats
@@ -1414,13 +1430,13 @@ void ucfg_dp_wfds_del_server(void);
 
 /**
  * ucfg_dp_config_direct_link() - Set direct link config for vdev
- * @vdev: objmgr Vdev handle
+ * @dev: netdev
  * @config_direct_link: Flag to enable direct link path
  * @enable_low_latency: Flag to enable low link latency
  *
  * Return: QDF Status
  */
-QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
+QDF_STATUS ucfg_dp_config_direct_link(qdf_netdev_t dev,
 				      bool config_direct_link,
 				      bool enable_low_latency);
 #else
@@ -1457,7 +1473,7 @@ static inline void ucfg_dp_wfds_del_server(void)
 #endif
 
 static inline
-QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
+QDF_STATUS ucfg_dp_config_direct_link(qdf_netdev_t dev,
 				      bool config_direct_link,
 				      bool enable_low_latency)
 {
@@ -1605,5 +1621,16 @@ ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
+
+/**
+ * ucfg_dp_get_vdev_stats () - API to get vdev stats
+ * @soc: dp soc object
+ * @vdev_id: Vdev ID of vdev for which stats is requested
+ * @buf: Pointer to buffer in which stats need to be updated
+ *
+ * Return: QDF_STATUS_SUCCESS on success else error code
+ */
+QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				  struct cdp_vdev_stats *buf);
 
 #endif /* _WLAN_DP_UCFG_API_H_ */

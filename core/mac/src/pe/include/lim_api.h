@@ -621,6 +621,23 @@ lim_fill_pe_session(struct mac_context *mac_ctx,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
+ * lim_update_mlo_mgr_info() - API to update mlo_mgr link info
+ * @mac_ctx: Pointer to mac context
+ * @vdev: vdev
+ * @link_addr: link address
+ * @link_id: Link id
+ * @freq: chan freq
+ *
+ * This api will update link sp[ecific info into mlo_mgr
+ *
+ * Return: qdf_status
+ */
+QDF_STATUS
+lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
+			struct wlan_objmgr_vdev *vdev,
+			struct qdf_mac_addr *link_addr, uint8_t link_id,
+			uint16_t freq);
+/**
  * lim_gen_link_specific_probe_rsp() - Generate link specific prb response
  * @mac_ctx: Pointer to mac context
  * @session_entry: pe session
@@ -680,6 +697,15 @@ lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
 			    struct pe_session *session_entry,
 			    struct roam_offload_synch_ind *roam_sync_ind);
 #else
+static inline QDF_STATUS
+lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
+			struct wlan_objmgr_vdev *vdev,
+			struct qdf_mac_addr *link_addr, uint8_t link_id,
+			uint16_t freq)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline QDF_STATUS
 lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 				struct pe_session *session_entry,

@@ -726,11 +726,31 @@ lim_fill_sme_assoc_ind_mlo_mld_addr_copy(struct assoc_ind *sme_assoc_ind,
 	qdf_mem_copy(sme_assoc_ind->peer_mld_addr, assoc_ind->peer_mld_addr,
 		     num_bytes);
 }
+
+/**
+ * lim_update_connected_links() - Update connected mlo links bmap
+ * @session: Pointer to pe session
+ *
+ * Update connected mlo links bmap for all vdev taking
+ * part in association
+ *
+ * Return: None
+ */
+static void lim_update_connected_links(struct pe_session *session)
+{
+	mlo_update_connected_links(session->vdev, 1);
+	mlo_update_connected_links_bmap(session->vdev->mlo_dev_ctx,
+					session->ml_partner_info);
+}
 #else /* WLAN_FEATURE_11BE_MLO */
 static inline void
 lim_fill_sme_assoc_ind_mlo_mld_addr_copy(struct assoc_ind *sme_assoc_ind,
 					 tpLimMlmAssocInd assoc_ind,
 					 uint32_t num_bytes)
+{
+}
+
+static void lim_update_connected_links(struct pe_session *session)
 {
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
@@ -828,6 +848,7 @@ lim_fill_sme_assoc_ind_params(
 		sme_assoc_ind->VHTCaps = assoc_ind->vht_caps;
 	sme_assoc_ind->capability_info = assoc_ind->capabilityInfo;
 	sme_assoc_ind->he_caps_present = assoc_ind->he_caps_present;
+	sme_assoc_ind->eht_caps_present = assoc_ind->eht_caps_present;
 	sme_assoc_ind->is_sae_authenticated = assoc_ind->is_sae_authenticated;
 }
 
@@ -1394,6 +1415,8 @@ void lim_handle_sme_join_result(struct mac_context *mac_ctx,
 	}
 
 	if (result_code == eSIR_SME_SUCCESS) {
+		if (wlan_vdev_mlme_is_mlo_vdev(session->vdev))
+			lim_update_connected_links(session);
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_START_SUCCESS,
 					      0, NULL);
@@ -2845,7 +2868,7 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 		     QDF_MAC_ADDR_SIZE);
 
 	pe_err("sta_link_addr" QDF_MAC_ADDR_FMT,
-	       QDF_MAC_ADDR_REF(&sta_link_addr));
+	       QDF_MAC_ADDR_REF(&sta_link_addr.bytes[0]));
 
 	if (assoc_rsp.len) {
 		struct element_info link_assoc_rsp;

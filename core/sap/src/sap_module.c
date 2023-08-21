@@ -810,6 +810,7 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	}
 
 	sap_ctx->fsm_state = SAP_INIT;
+	sap_debug("sap_fsm: vdev %d:  => SAP_INIT", sap_ctx->vdev_id);
 
 	qdf_status = wlan_set_vdev_crypto_prarams_from_ie(
 			sap_ctx->vdev,
@@ -1623,8 +1624,7 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 	mac_handle = MAC_HANDLE(mac);
 
 	if (((sap_ctx->acs_cfg && sap_ctx->acs_cfg->acs_mode) ||
-	     !target_psoc_get_sap_coex_fixed_chan_cap(
-			wlan_psoc_get_tgt_if_handle(mac->psoc)) ||
+	     policy_mgr_restrict_sap_on_unsafe_chan(mac->psoc) ||
 	     sap_ctx->csa_reason != CSA_REASON_USER_INITIATED) &&
 	    !policy_mgr_is_sap_freq_allowed(mac->psoc, target_chan_freq)) {
 		sap_err("%u is unsafe channel freq", target_chan_freq);
@@ -3746,11 +3746,111 @@ uint32_t wlansap_get_safe_channel_from_pcl_for_sap(struct sap_context *sap_ctx)
 	return wlansap_get_2g_first_safe_chan_freq(sap_ctx);
 }
 
+int wlansap_update_sap_chan_list(struct sap_config *sap_config,
+				 qdf_freq_t *freq_list, uint16_t count)
+{
+	uint32_t *acs_cfg_freq_list;
+	uint32_t *master_freq_list;
+
+	acs_cfg_freq_list = qdf_mem_malloc(count * sizeof(uint32_t));
+	if (!acs_cfg_freq_list)
+		return -ENOMEM;
+	if (sap_config->acs_cfg.ch_list_count) {
+		qdf_mem_free(sap_config->acs_cfg.freq_list);
+		sap_config->acs_cfg.freq_list = NULL;
+		sap_config->acs_cfg.ch_list_count = 0;
+	}
+	sap_config->acs_cfg.freq_list = acs_cfg_freq_list;
+
+	master_freq_list = qdf_mem_malloc(count * sizeof(uint32_t));
+	if (!master_freq_list)
+		return -ENOMEM;
+
+	if (sap_config->acs_cfg.master_ch_list_count) {
+		qdf_mem_free(sap_config->acs_cfg.master_freq_list);
+		sap_config->acs_cfg.master_freq_list = NULL;
+		sap_config->acs_cfg.master_ch_list_count = 0;
+	}
+	sap_config->acs_cfg.master_freq_list = master_freq_list;
+
+	qdf_mem_copy(sap_config->acs_cfg.freq_list, freq_list,
+		     sizeof(freq_list[0]) * count);
+	qdf_mem_copy(sap_config->acs_cfg.master_freq_list, freq_list,
+		     sizeof(freq_list[0]) * count);
+	sap_config->acs_cfg.master_ch_list_count = count;
+	sap_config->acs_cfg.ch_list_count = count;
+	sap_dump_acs_channel(&sap_config->acs_cfg);
+
+	return 0;
+}
+
+/**
+ * wlansap_get_valid_freq() - To get valid freq for sap csa
+ * @psoc: psoc object
+ * @sap_ctx: sap context
+ * @freq: pointer to valid freq
+ *
+ * Return: None
+ */
+static
+void wlansap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
+			    struct sap_context *sap_ctx,
+			    qdf_freq_t *freq)
+{
+	uint8_t i, j;
+	struct mac_context *mac;
+	struct sir_pcl_list pcl = {0};
+	uint32_t *pcl_freqs;
+	QDF_STATUS status;
+	uint32_t pcl_len = 0;
+
+	pcl_freqs =  qdf_mem_malloc(NUM_CHANNELS * sizeof(uint32_t));
+	if (!pcl_freqs)
+		return;
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		goto done;
+	}
+	status = policy_mgr_reset_sap_mandatory_channels(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_err("failed to reset mandatory channels");
+		goto done;
+	}
+	status = policy_mgr_get_pcl_for_vdev_id(mac->psoc, PM_SAP_MODE,
+						pcl_freqs, &pcl_len,
+						pcl.weight_list,
+						NUM_CHANNELS,
+						sap_ctx->sessionId);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_err("Get PCL failed for session %d", sap_ctx->sessionId);
+		goto done;
+	}
+	for (i = 0; i < pcl_len; i++) {
+		for (j = 0; j < sap_ctx->acs_cfg->master_ch_list_count; j++) {
+			/*
+			 * To keep valid freq list order same as pcl weightage
+			 * order pcl list index is compared with all the freq
+			 * provided by set wifi config.
+			 */
+			if (sap_ctx->acs_cfg->master_freq_list[j] ==
+			    pcl_freqs[i]) {
+				*freq = pcl_freqs[i];
+				goto done;
+			}
+		}
+	}
+done:
+	qdf_mem_free(pcl_freqs);
+	pcl_freqs = NULL;
+}
+
 qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 					  enum sap_csa_reason_code *csa_reason)
 {
 	uint32_t restart_freq;
-	enum phy_ch_width restart_ch_width;
 	uint16_t intf_ch_freq;
 	uint32_t phy_mode;
 	struct mac_context *mac;
@@ -3759,6 +3859,8 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 	enum reg_wifi_band sap_band;
 	enum band_info band;
 	bool sta_sap_scc_on_indoor_channel;
+	qdf_freq_t freq = 0;
+	struct ch_params ch_params = {0};
 
 	if (!sap_ctx) {
 		sap_err("sap_ctx NULL parameter");
@@ -3781,7 +3883,6 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		sap_err("Failed to get current band config");
 		return 0;
 	}
-
 	sta_sap_scc_on_indoor_channel =
 		policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(mac->psoc);
 	sap_band = wlan_reg_freq_to_band(sap_ctx->chan_freq);
@@ -3805,41 +3906,50 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 			sap_debug("use default chan 6");
 			restart_freq = TWOG_CHAN_6_IN_MHZ;
 		}
-		restart_ch_width = sap_ctx->ch_params.ch_width;
-		if (restart_ch_width > CH_WIDTH_40MHZ) {
-			sap_debug("set 40M when switch SAP to 2G");
-			restart_ch_width = CH_WIDTH_40MHZ;
-		}
 		*csa_reason = CSA_REASON_BAND_RESTRICTED;
-	} else if (sap_band == REG_BAND_2G && (band & BIT(REG_BAND_5G)) &&
-		   sap_ctx->chan_freq_before_switch_band) {
-		if (wlan_reg_is_enable_in_secondary_list_for_freq(
-				mac->pdev,
-				sap_ctx->chan_freq_before_switch_band)) {
-			restart_freq = sap_ctx->chan_freq_before_switch_band;
-			restart_ch_width = sap_ctx->chan_width_before_switch_band;
-			sap_debug("Restore chan freq: %d, width: %d",
-				  restart_freq, restart_ch_width);
-			*csa_reason = CSA_REASON_BAND_RESTRICTED;
-		} else {
-			enum reg_wifi_band pref_band;
+	} else if (sap_band == REG_BAND_2G && (band & BIT(REG_BAND_5G))) {
+		if (sap_ctx->chan_freq_before_switch_band) {
+			if (wlan_reg_is_enable_in_secondary_list_for_freq(
+			    mac->pdev,
+			    sap_ctx->chan_freq_before_switch_band)) {
+				restart_freq =
+					sap_ctx->chan_freq_before_switch_band;
+				sap_debug("Restore chan freq: %d",
+					  restart_freq);
+				*csa_reason = CSA_REASON_BAND_RESTRICTED;
+			} else {
+				enum reg_wifi_band pref_band;
 
-			pref_band = wlan_reg_freq_to_band(
+				pref_band =
+					wlan_reg_freq_to_band(
 					sap_ctx->chan_freq_before_switch_band);
-			restart_freq =
+				restart_freq =
 				policy_mgr_get_alternate_channel_for_sap(
 							mac->psoc,
 							sap_ctx->sessionId,
 							sap_ctx->chan_freq,
 							pref_band);
-			if (restart_freq) {
-				sap_debug("restart SAP on freq %d", restart_freq);
-				*csa_reason = CSA_REASON_BAND_RESTRICTED;
-			} else {
-				sap_debug("Did not get valid freq for band %d remain on same channel",
-					  pref_band);
+				if (restart_freq) {
+					sap_debug("restart SAP on freq %d",
+						  restart_freq);
+					*csa_reason =
+						CSA_REASON_BAND_RESTRICTED;
+				} else {
+					sap_debug("Did not get valid freq for band %d remain on same channel",
+						  pref_band);
+					return 0;
+				}
+			}
+		} else {
+			wlansap_get_valid_freq(mac->psoc, sap_ctx, &freq);
+			if (!freq) {
+				sap_debug("no valid freq found");
 				return 0;
 			}
+			restart_freq = freq;
+			sap_debug("restart SAP on freq %d",
+				  restart_freq);
+			*csa_reason = CSA_REASON_BAND_RESTRICTED;
 		}
 	} else if (wlan_reg_is_disable_for_pwrmode(mac->pdev,
 						   sap_ctx->chan_freq,
@@ -3865,11 +3975,26 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
 		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx,
 								       NULL);
+	} else if (sap_band == REG_BAND_6G &&
+		   wlan_reg_get_keep_6ghz_sta_cli_connection(mac->pdev)) {
+		ch_params.ch_width = sap_ctx->ch_params.ch_width;
+		wlan_reg_set_channel_params_for_pwrmode(mac->pdev,
+						sap_ctx->chan_freq,
+						0, &ch_params,
+						REG_CURRENT_PWR_MODE);
+		if (sap_ctx->ch_params.ch_width != ch_params.ch_width) {
+			sap_debug("Bonded 6GHz channels are disabled");
+			*csa_reason = CSA_REASON_BAND_RESTRICTED;
+			return wlansap_get_safe_channel_from_pcl_and_acs_range(
+								sap_ctx, NULL);
+		} else {
+			sap_debug("No need switch SAP/Go channel");
+			return 0;
+		}
 	} else {
 		sap_debug("No need switch SAP/Go channel");
 		return 0;
 	}
-
 	cc_mode = sap_ctx->cc_switch_mode;
 	phy_mode = sap_ctx->phyMode;
 	vdev_id = wlan_vdev_get_id(sap_ctx->vdev);

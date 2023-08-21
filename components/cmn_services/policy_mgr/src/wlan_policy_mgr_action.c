@@ -40,6 +40,7 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "target_if.h"
 #include "wlan_cm_api.h"
+#include "wlan_mlo_link_force.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -412,8 +413,6 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 
 	/* do we need to change the HW mode */
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
-	policy_mgr_handle_ml_sta_links_on_vdev_up_csa(psoc,
-				policy_mgr_get_qdf_mode_from_pm(mode), vdev_id);
 
 	if (policy_mgr_is_conc_sap_present_on_sta_freq(psoc, mode, cur_freq) &&
 	    policy_mgr_update_indoor_concurrency(psoc, vdev_id, 0,
@@ -425,6 +424,8 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	else if (wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev))
 		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
 
+	ml_nlink_conn_change_notify(
+		psoc, vdev_id, ml_nlink_connection_updated_evt, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1579,6 +1580,22 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 
 	return is_safe;
 }
+
+bool policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	unsigned long restriction_mask;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return false;
+	}
+
+	restriction_mask =
+		(unsigned long)policy_mgr_get_freq_restriction_mask(pm_ctx);
+	return qdf_test_bit(QDF_SAP_MODE, &restriction_mask);
+}
 #else
 bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 				uint32_t ch_freq)
@@ -1729,8 +1746,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		}
 
 		if ((is_acs_mode ||
-		     !target_psoc_get_sap_coex_fixed_chan_cap(
-					wlan_psoc_get_tgt_if_handle(psoc))) &&
+		     policy_mgr_restrict_sap_on_unsafe_chan(psoc)) &&
 		    sta_sap_scc_on_lte_coex_chan &&
 		    !policy_mgr_is_safe_channel(psoc, op_ch_freq_list[i]) &&
 		    pm_ctx->last_disconn_sta_freq == op_ch_freq_list[i]) {

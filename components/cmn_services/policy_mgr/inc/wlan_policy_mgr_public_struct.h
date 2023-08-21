@@ -129,11 +129,14 @@ enum sap_csa_reason_code {
  * @link_ctrl_f_dynamic_force_link_num: indicate fw to use force link number
  * instead of force link bitmaps. Used with MLO_LINK_FORCE_MODE_ACTIVE_NUM.
  * MLO_LINK_FORCE_MODE_INACTIVE_NUM, MLO_LINK_FORCE_MODE_NO_FORCE.
+ * @link_ctrl_f_post_re_evaluate: run link state check again after command
+ * response handled.
  */
 enum link_control_flags {
 	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
 	link_ctrl_f_overwrite_inactive_bitmap = 1 << 1,
 	link_ctrl_f_dynamic_force_link_num =    1 << 2,
+	link_ctrl_f_post_re_evaluate =          1 << 3,
 };
 
 /**
@@ -1728,6 +1731,23 @@ struct sta_ap_intf_check_work_ctx {
 	struct go_plus_go_force_scc go_plus_go_force_scc;
 	struct sap_plus_go_force_scc sap_plus_go_force_scc;
 	uint8_t nan_force_scc_in_progress;
+};
+
+/**
+ * union conc_ext_flag - extended flags for concurrency check
+ *
+ * @mlo: the new connection is MLO
+ * @mlo_link_assoc_connected: the new connection is secondary MLO link and
+ *  the corresponding assoc link is connected
+ * @value: uint32 value for extended flags
+ */
+union conc_ext_flag {
+	struct {
+		uint32_t mlo: 1;
+		uint32_t mlo_link_assoc_connected: 1;
+	};
+
+	uint32_t value;
 };
 
 /**

@@ -37,6 +37,7 @@
 #include "wlan_scan_api.h"
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline bool
@@ -168,6 +169,14 @@ if_mgr_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t vdev_id;
+
+	/*
+	 * When link switch is in progress, don't send RSO Enable before vdev
+	 * is up. RSO Enable will be sent as part of install keys once
+	 * link switch connect sequence is complete.
+	 */
+	if (mlo_mgr_is_link_switch_in_progress(vdev))
+		return QDF_STATUS_SUCCESS;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc)
@@ -786,6 +795,7 @@ if_mgr_get_conc_ext_flags(struct wlan_objmgr_vdev *vdev,
 }
 
 static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_vdev *vdev,
 				    struct validate_bss_data *candidate_info)
 {
 	struct scan_cache_entry *scan_entry = candidate_info->scan_entry;
@@ -796,8 +806,10 @@ static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
 
 	if (mlme_get_bss_11be_allowed(psoc, &candidate_info->peer_addr,
 				      util_scan_entry_ie_data(scan_entry),
-				      util_scan_entry_ie_len(scan_entry)))
+				      util_scan_entry_ie_len(scan_entry)) &&
+	    (!wlan_vdev_mlme_get_user_dis_eht_flag(vdev)))
 		return;
+
 	scan_entry->ie_list.multi_link_bv = NULL;
 	scan_entry->ie_list.ehtcap = NULL;
 	scan_entry->ie_list.ehtop = NULL;
@@ -813,6 +825,7 @@ if_mgr_get_conc_ext_flags(struct wlan_objmgr_vdev *vdev,
 }
 
 static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_vdev *vdev,
 				    struct validate_bss_data *candidate_info)
 {
 }
@@ -841,7 +854,7 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
 
-	if_mgr_update_candidate(psoc, candidate_info);
+	if_mgr_update_candidate(psoc, vdev, candidate_info);
 	/*
 	 * Do not allow STA to connect on 6Ghz or indoor channel for non dbs
 	 * hardware if SAP and skip_6g_and_indoor_freq_scan ini are present

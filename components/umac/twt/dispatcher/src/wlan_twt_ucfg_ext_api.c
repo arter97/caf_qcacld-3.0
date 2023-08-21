@@ -241,3 +241,9 @@ void ucfg_twt_get_work_params(
 {
 	return wlan_twt_get_work_params(vdev, params, next_action);
 }
+
+bool ucfg_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_twt_get_pmo_allowed(psoc);
+}
+

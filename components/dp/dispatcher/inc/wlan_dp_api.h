@@ -64,4 +64,31 @@ void wlan_dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id);
  * Return: None
  */
 void wlan_dp_set_fst_in_cmem(bool fst_in_cmem);
+
+/**
+ * wlan_dp_set_fisa_dynamic_aggr_size_support - Set flag to indicate dynamic
+ *						MSDU aggregation size programming supported
+ * @dynamic_aggr_size_support: Flag to indicate dynamic aggregation size support
+ *
+ * Return: None
+ */
+void wlan_dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support);
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * wlan_dp_is_local_pkt_capture_enabled() - Get local packet capture config
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if local packet capture is enabled from ini
+ *         false otherwise
+ */
+bool
+wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 #endif

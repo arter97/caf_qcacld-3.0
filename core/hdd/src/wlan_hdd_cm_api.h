@@ -255,13 +255,13 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 /**
  * __hdd_cm_disconnect_handler_post_user_update() - Handle disconnect indication
  * after updating to user space
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @vdev: vdev ptr
  *
  * Return: None
  */
 void
-__hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
+__hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_info,
 					     struct wlan_objmgr_vdev *vdev);
 
 /**
@@ -379,4 +379,65 @@ QDF_STATUS
 hdd_cm_get_scan_ie_params(struct wlan_objmgr_vdev *vdev,
 			  struct element_info *scan_ie,
 			  enum dot11_mode_filter *dot11mode_filter);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * hdd_cm_save_connected_links_info() - Update connection info to station
+ * context.
+ * @self_mac: Self MAC address.
+ * @bssid: BSSID of link.
+ * @link_id: IEEE link id.
+ *
+ * It searches for link info pointer matching with @self_mac and updates
+ * the BSSID and link ID fields in station context's connection info.
+ * This will help to retrieve the link information using IEEE link ID or
+ * BSSID thereafter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_cm_save_connected_links_info(struct qdf_mac_addr *self_mac,
+					    struct qdf_mac_addr *bssid,
+					    int32_t link_id);
+
+/**
+ * hdd_cm_set_ieee_link_id() - Set IEEE link ID in station context conn info.
+ * @link_info: Link info pointer in HDD adapter
+ * @link_id: IEEE link ID
+ *
+ * Sets IEEE link ID in connection info of @link_info's station context.
+ *
+ * Return: void
+ */
+void
+hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id);
+
+/**
+ * hdd_cm_clear_ieee_link_id() - Clear IEEE link ID in station context
+ * conn info.
+ * @link_info: Link info pointer in HDD adapter
+ *
+ * Clear IEEE link ID in connection info of @link_info's station context.
+ *
+ * Return: void
+ */
+void hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info);
+#else
+static inline void
+hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id)
+{
+}
+
+static inline void
+hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info)
+{
+}
+
+static inline
+QDF_STATUS hdd_cm_save_connected_links_info(struct qdf_mac_addr *self_mac,
+					    struct qdf_mac_addr *bssid,
+					    int32_t link_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* __WLAN_HDD_CM_API_H */

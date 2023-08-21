@@ -456,8 +456,8 @@ void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev)
 
 	status = wlan_vdev_get_bss_peer_mac(vdev, &bssid);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("vdev id %d : failed to get bssid",
-		       wlan_vdev_get_id(vdev));
+		pe_debug("vdev id %d : failed to get bssid",
+			 wlan_vdev_get_id(vdev));
 		return;
 	}
 
@@ -1391,7 +1391,13 @@ bool lim_is_emlsr_band_supported(struct pe_session *session)
 	uint32_t freq;
 	struct mlo_partner_info *partner_info;
 
-	partner_info = &session->lim_join_req->partner_info;
+	if (!session->lim_join_req) {
+		/* Initial connection */
+		partner_info = &session->ml_partner_info;
+	} else {
+		/* Roaming */
+		partner_info = &session->lim_join_req->partner_info;
+	}
 
 	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
 		pe_debug("Pri link freq: %d, EMLSR mode not allowed",

@@ -250,6 +250,17 @@ struct hdd_adapter *hdd_get_ml_adapter(struct hdd_context *hdd_ctx)
 void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter);
 
 /**
+ * hdd_adapter_link_switch_notification() - Get HDD notification on link switch
+ * start.
+ * @vdev: VDEV on which link switch will happen
+ * @non_trans_vdev_id: VDEV not part of link switch.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
+						uint8_t non_trans_vdev_id);
+
+/**
  * hdd_mlo_t2lm_register_callback() - Register T2LM callback
  * @vdev: Pointer to vdev
  *
@@ -314,23 +325,70 @@ int wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 /**
  * hdd_derive_link_address_from_mld() - Function to derive link address from
  * MLD address which is passed as input argument.
+ * @psoc: PSOC object manager
  * @mld_addr: Input MLD address
  * @link_addr_list: Start index of array to hold derived MAC addresses
  * @max_idx: Number of addresses to derive
  *
  * The API will generate link addresses from the input MLD address and saves
- * each link address as an array in @link_addr_list. Caller can request upto
- * WLAN_MAX_MLD addresses.
+ * each link address as an array in @link_addr_list.
+ *
+ * If CFG_MLO_SAME_LINK_MLD_ADDR is enabled, then API will not derive first
+ * link address and will use MLD address in that place.
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+QDF_STATUS hdd_derive_link_address_from_mld(struct wlan_objmgr_psoc *psoc,
+					    struct qdf_mac_addr *mld_addr,
 					    struct qdf_mac_addr *link_addr_list,
 					    uint8_t max_idx);
+
+#ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+/**
+ * hdd_mlo_mgr_register_osif_ops() - Register OSIF ops with global MLO manager
+ * for callback to notify.
+ *
+ * The @ops contain callback functions which are triggered to update OSIF about
+ * necessary events from MLO manager.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_mlo_mgr_register_osif_ops(void);
+
+/**
+ * hdd_mlo_mgr_unregister_osif_ops() - Deregister OSIF ops with
+ * global MLO manager
+ *
+ * Deregister the calbacks registered with global MLO manager for OSIF
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_mlo_mgr_unregister_osif_ops(void);
+#else
+static inline QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS hdd_mlo_mgr_unregister_osif_ops(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #else
 static inline void
 hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
 {
+}
+
+static inline QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS hdd_mlo_mgr_unregister_osif_ops(void)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline
@@ -361,7 +419,8 @@ int wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 }
 
 static inline
-QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+QDF_STATUS hdd_derive_link_address_from_mld(struct wlan_objmgr_psoc *psoc,
+					    struct qdf_mac_addr *mld_addr,
 					    struct qdf_mac_addr *link_addr_list,
 					    uint8_t max_idx)
 {

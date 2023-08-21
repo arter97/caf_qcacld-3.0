@@ -810,6 +810,21 @@ QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev;
 	struct pdev_mc_cp_stats *pdev_mc_stats;
 	struct pdev_cp_stats *pdev_cp_stats_priv;
+	struct vdev_mc_cp_stats *vdev_mc_stats;
+	struct vdev_cp_stats *vdev_cp_stat;
+	uint32_t vdev_power = 0;
+
+	vdev_cp_stat = wlan_cp_stats_get_vdev_stats_obj(vdev);
+	if (vdev_cp_stat) {
+		wlan_cp_stats_vdev_obj_lock(vdev_cp_stat);
+		vdev_mc_stats = vdev_cp_stat->vdev_stats;
+		vdev_power = vdev_mc_stats->vdev_extd_stats.vdev_tx_power;
+		wlan_cp_stats_vdev_obj_unlock(vdev_cp_stat);
+		if (vdev_power) {
+			*dbm = vdev_power;
+			return QDF_STATUS_SUCCESS;
+		}
+	}
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);

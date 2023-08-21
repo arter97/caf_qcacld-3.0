@@ -775,8 +775,9 @@ int hdd_ndi_set_mode(const char *iface_name)
 			return -EFAULT;
 		}
 		ndi_mac_addr = &random_ndi_mac.bytes[0];
-		ucfg_dp_update_inf_mac(hdd_ctx->psoc, &adapter->mac_addr,
-				       (struct qdf_mac_addr *)ndi_mac_addr);
+		ucfg_dp_update_intf_mac(hdd_ctx->psoc, &adapter->mac_addr,
+					(struct qdf_mac_addr *)ndi_mac_addr,
+					adapter->deflink->vdev);
 		hdd_update_dynamic_mac(hdd_ctx, &adapter->mac_addr,
 				       (struct qdf_mac_addr *)ndi_mac_addr);
 		qdf_mem_copy(&adapter->mac_addr, ndi_mac_addr, ETH_ALEN);

@@ -714,7 +714,7 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 							REG_CURRENT_PWR_MODE);
 
 		if (CHANNEL_STATE_INVALID != ch_state &&
-		    CHANNEL_STATE_DFS != ch_state &&
+		    !wlan_reg_is_dfs_for_freq(pdev, ch_freq) &&
 		    !wlan_reg_is_dsrc_freq(ch_freq)) {
 			peer_param->peer_cap.peer_chan[num].ch_freq = ch_freq;
 			if (!wlan_reg_is_6ghz_chan_freq(ch_freq)) {

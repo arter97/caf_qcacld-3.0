@@ -2646,11 +2646,11 @@ static int drv_cmd_set_wmmps(struct wlan_hdd_link_info *link_info,
 	return hdd_wmmps_helper(link_info->adapter, command);
 }
 
-static inline int drv_cmd_country(struct wlan_hdd_link_info *link_info,
-				  struct hdd_context *hdd_ctx,
-				  uint8_t *command,
-				  uint8_t command_len,
-				  struct hdd_priv_data *priv_data)
+static inline int __drv_cmd_country(struct wlan_hdd_link_info *link_info,
+				    struct hdd_context *hdd_ctx,
+				    uint8_t *command,
+				    uint8_t command_len,
+				    struct hdd_priv_data *priv_data)
 {
 	char *country_code;
 
@@ -2675,6 +2675,26 @@ static inline int drv_cmd_country(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 
 	return hdd_reg_set_country(hdd_ctx, country_code);
+}
+
+static inline int drv_cmd_country(struct wlan_hdd_link_info *link_info,
+				  struct hdd_context *hdd_ctx,
+				  uint8_t *command,
+				  uint8_t command_len,
+				  struct hdd_priv_data *priv_data)
+{
+	struct osif_psoc_sync *psoc_sync;
+	int errno;
+
+	errno = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy), &psoc_sync);
+	if (errno)
+		return errno;
+	errno = __drv_cmd_country(link_info, hdd_ctx, command, command_len,
+				  priv_data);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno;
 }
 
 /**
@@ -5094,8 +5114,18 @@ static int drv_cmd_max_tx_power(struct wlan_hdd_link_info *link_info,
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
 		/* Assign correct self MAC address */
-		qdf_copy_macaddr(&bssid,
-				 &adapter->mac_addr);
+		if (adapter->device_mode == QDF_SAP_MODE ||
+		    adapter->device_mode == QDF_P2P_GO_MODE) {
+			qdf_copy_macaddr(&bssid, &adapter->mac_addr);
+		} else {
+			struct hdd_station_ctx *sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+
+			if (hdd_cm_is_vdev_associated(adapter->deflink))
+				qdf_copy_macaddr(&bssid,
+						 &sta_ctx->conn_info.bssid);
+		}
+
 		qdf_copy_macaddr(&selfmac,
 				 &adapter->mac_addr);
 
