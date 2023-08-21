@@ -9689,6 +9689,9 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
 
 	assoc_req = session->parsedAssocReq[sta->assocId];
+	if (!assoc_req)
+		goto no_partner;
+
 	for (link = 0; link < assoc_req->mlo_info.num_partner_links; link++) {
 		lle_mode = 0;
 		sta_pro = &mlo_ie->sta_profile[num_sta_pro];
@@ -10218,6 +10221,8 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 		lim_mlo_release_vdev_ref(link_session->vdev);
 		num_sta_pro++;
 	}
+
+no_partner:
 	mlo_ie->num_sta_profile = num_sta_pro;
 	mlo_ie->mld_capab_and_op_info.max_simultaneous_link_num = num_sta_pro;
 	return QDF_STATUS_SUCCESS;
