@@ -1075,7 +1075,10 @@ struct mgmt_rx_reo_frame_descriptor {
 static inline bool
 mgmt_rx_reo_list_overflowed(struct mgmt_rx_reo_list *reo_list)
 {
-	qdf_assert_always(reo_list);
+	if (!reo_list) {
+		mgmt_rx_reo_err("reo list is null");
+		return false;
+	}
 
 	return (qdf_list_size(&reo_list->list) > reo_list->max_list_size);
 }
@@ -1090,7 +1093,10 @@ mgmt_rx_reo_list_overflowed(struct mgmt_rx_reo_list *reo_list)
 static inline struct mgmt_rx_reo_context *
 mgmt_rx_reo_get_context_from_ingress_list
 		(const struct mgmt_rx_reo_ingress_list *ingress_list) {
-	qdf_assert_always(ingress_list);
+	if (!ingress_list) {
+		mgmt_rx_reo_err("ingress list is null");
+		return NULL;
+	}
 
 	return qdf_container_of(ingress_list, struct mgmt_rx_reo_context,
 				ingress_list);
@@ -1106,7 +1112,10 @@ mgmt_rx_reo_get_context_from_ingress_list
 static inline struct mgmt_rx_reo_context *
 mgmt_rx_reo_get_context_from_egress_list
 			(const struct mgmt_rx_reo_ingress_list *egress_list) {
-	qdf_assert_always(egress_list);
+	if (!egress_list) {
+		mgmt_rx_reo_err("Egress list is null");
+		return NULL;
+	}
 
 	return qdf_container_of(egress_list, struct mgmt_rx_reo_context,
 				egress_list);
@@ -1122,8 +1131,15 @@ mgmt_rx_reo_get_context_from_egress_list
 static inline uint32_t
 mgmt_rx_reo_get_global_ts(struct mgmt_rx_event_params *rx_params)
 {
-	qdf_assert_always(rx_params);
-	qdf_assert_always(rx_params->reo_params);
+	if (!rx_params) {
+		mgmt_rx_reo_err("rx params is null");
+		return 0;
+	}
+
+	if (!rx_params->reo_params) {
+		mgmt_rx_reo_err("reo params is null");
+		return 0;
+	}
 
 	return rx_params->reo_params->global_timestamp;
 }
@@ -1137,8 +1153,15 @@ mgmt_rx_reo_get_global_ts(struct mgmt_rx_event_params *rx_params)
 static inline uint32_t
 mgmt_rx_reo_get_start_ts(struct mgmt_rx_event_params *rx_params)
 {
-	qdf_assert_always(rx_params);
-	qdf_assert_always(rx_params->reo_params);
+	if (!rx_params) {
+		mgmt_rx_reo_err("rx params is null");
+		return 0;
+	}
+
+	if (!rx_params->reo_params) {
+		mgmt_rx_reo_err("reo params is null");
+		return 0;
+	}
 
 	return rx_params->reo_params->start_timestamp;
 }
@@ -1152,8 +1175,15 @@ mgmt_rx_reo_get_start_ts(struct mgmt_rx_event_params *rx_params)
 static inline uint32_t
 mgmt_rx_reo_get_end_ts(struct mgmt_rx_event_params *rx_params)
 {
-	qdf_assert_always(rx_params);
-	qdf_assert_always(rx_params->reo_params);
+	if (!rx_params) {
+		mgmt_rx_reo_err("rx params is null");
+		return 0;
+	}
+
+	if (!rx_params->reo_params) {
+		mgmt_rx_reo_err("reo params is null");
+		return 0;
+	}
 
 	return rx_params->reo_params->end_timestamp;
 }
@@ -1168,8 +1198,15 @@ mgmt_rx_reo_get_end_ts(struct mgmt_rx_event_params *rx_params)
 static inline uint32_t
 mgmt_rx_reo_get_duration_us(struct mgmt_rx_event_params *rx_params)
 {
-	qdf_assert_always(rx_params);
-	qdf_assert_always(rx_params->reo_params);
+	if (!rx_params) {
+		mgmt_rx_reo_err("rx params is null");
+		return 0;
+	}
+
+	if (!rx_params->reo_params) {
+		mgmt_rx_reo_err("reo params is null");
+		return 0;
+	}
 
 	return rx_params->reo_params->duration_us;
 }
@@ -1184,8 +1221,15 @@ mgmt_rx_reo_get_duration_us(struct mgmt_rx_event_params *rx_params)
 static inline uint16_t
 mgmt_rx_reo_get_pkt_counter(struct mgmt_rx_event_params *rx_params)
 {
-	qdf_assert_always(rx_params);
-	qdf_assert_always(rx_params->reo_params);
+	if (!rx_params) {
+		mgmt_rx_reo_err("rx params is null");
+		return 0;
+	}
+
+	if (!rx_params->reo_params) {
+		mgmt_rx_reo_err("reo params is null");
+		return 0;
+	}
 
 	return rx_params->reo_params->mgmt_pkt_ctr;
 }
@@ -1200,8 +1244,15 @@ mgmt_rx_reo_get_pkt_counter(struct mgmt_rx_event_params *rx_params)
 static inline uint8_t
 mgmt_rx_reo_get_link_id(struct mgmt_rx_event_params *rx_params)
 {
-	qdf_assert_always(rx_params);
-	qdf_assert_always(rx_params->reo_params);
+	if (!rx_params) {
+		mgmt_rx_reo_err("rx params is null");
+		return 0;
+	}
+
+	if (!rx_params->reo_params) {
+		mgmt_rx_reo_err("reo params is null");
+		return 0;
+	}
 
 	return rx_params->reo_params->link_id;
 }
@@ -1216,8 +1267,15 @@ mgmt_rx_reo_get_link_id(struct mgmt_rx_event_params *rx_params)
 static inline uint8_t
 mgmt_rx_reo_get_mlo_grp_id(struct mgmt_rx_event_params *rx_params)
 {
-	qdf_assert_always(rx_params);
-	qdf_assert_always(rx_params->reo_params);
+	if (!rx_params) {
+		mgmt_rx_reo_err("rx params is null");
+		return 0;
+	}
+
+	if (!rx_params->reo_params) {
+		mgmt_rx_reo_err("reo params is null");
+		return 0;
+	}
 
 	return rx_params->reo_params->mlo_grp_id;
 }
@@ -1232,8 +1290,15 @@ mgmt_rx_reo_get_mlo_grp_id(struct mgmt_rx_event_params *rx_params)
 static inline uint8_t
 mgmt_rx_reo_get_pdev_id(struct mgmt_rx_event_params *rx_params)
 {
-	qdf_assert_always(rx_params);
-	qdf_assert_always(rx_params->reo_params);
+	if (!rx_params) {
+		mgmt_rx_reo_err("rx params is null");
+		return 0;
+	}
+
+	if (!rx_params->reo_params) {
+		mgmt_rx_reo_err("reo params is null");
+		return 0;
+	}
 
 	return rx_params->reo_params->pdev_id;
 }

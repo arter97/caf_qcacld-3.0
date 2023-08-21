@@ -3975,6 +3975,11 @@ mgmt_rx_reo_update_egress_list(struct mgmt_rx_reo_egress_list *egress_list,
 		list_insertion_pos++;
 	}
 
+	if (!least_greater_entry_found) {
+		mgmt_rx_reo_err("Lest greater entry not found");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	ret = mgmt_rx_reo_update_wait_count(&new->wait_count,
 					    &least_greater->wait_count);
 
@@ -5256,8 +5261,10 @@ wlan_mgmt_rx_reo_algo_entry(struct wlan_objmgr_pdev *pdev,
 	qdf_spin_lock(&reo_ctx->reo_algo_entry_lock);
 
 	cur_link = mgmt_rx_reo_get_link_id(desc->rx_params);
-	if (desc->frame_type != IEEE80211_FC0_TYPE_MGT)
+	if (desc->frame_type != IEEE80211_FC0_TYPE_MGT) {
+		ret = QDF_STATUS_E_INVAL;
 		goto failure;
+	}
 
 	ret = log_ingress_frame_entry(reo_ctx, desc);
 	if (QDF_IS_STATUS_ERROR(ret))
