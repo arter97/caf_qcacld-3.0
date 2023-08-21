@@ -467,7 +467,12 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 		mgmt_rx_reo_err("Failed to get number of active MLO HW links");
 		return QDF_STATUS_E_FAILURE;
 	}
-	qdf_assert_always(num_active_links_shmem > 0);
+
+	if (num_active_links_shmem <= 0) {
+		mgmt_rx_reo_err("Invalid number of active links from shmem %d",
+				num_active_links_shmem);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
 		mgmt_rx_reo_err("Failed to get valid MLO Group id");
@@ -475,9 +480,17 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 	}
 
 	num_active_links = wlan_mlo_get_num_active_links(grp_id);
-	qdf_assert_always(num_active_links > 0);
+	if (num_active_links <= 0) {
+		mgmt_rx_reo_err("Invalid number of active links %d",
+				num_active_links);
+		return QDF_STATUS_E_INVAL;
+	}
 
-	qdf_assert_always(num_active_links_shmem == num_active_links);
+	if (num_active_links_shmem != num_active_links) {
+		mgmt_rx_reo_err("Mismatch in active links %d and %d",
+				num_active_links_shmem, num_active_links);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	status = tgt_mgmt_rx_reo_get_valid_hw_link_bitmap(psoc,
 							  &valid_link_bitmap_shmem);
@@ -485,12 +498,23 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 		mgmt_rx_reo_err("Failed to get valid MLO HW link bitmap");
 		return QDF_STATUS_E_INVAL;
 	}
-	qdf_assert_always(valid_link_bitmap_shmem != 0);
+
+	if (!valid_link_bitmap_shmem) {
+		mgmt_rx_reo_err("Valid link bitmap from shmem is 0");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	valid_link_bitmap = wlan_mlo_get_valid_link_bitmap(grp_id);
-	qdf_assert_always(valid_link_bitmap_shmem != 0);
+	if (!valid_link_bitmap) {
+		mgmt_rx_reo_err("Valid link bitmap is 0");
+		return QDF_STATUS_E_INVAL;
+	}
 
-	qdf_assert_always(valid_link_bitmap_shmem == valid_link_bitmap);
+	if (valid_link_bitmap_shmem != valid_link_bitmap) {
+		mgmt_rx_reo_err("Mismatch in valid link bit map 0x%x and 0x%x",
+				valid_link_bitmap_shmem, valid_link_bitmap);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -514,7 +538,10 @@ mgmt_rx_reo_is_valid_link(uint8_t link_id, uint8_t grp_id)
 	}
 
 	valid_hw_link_bitmap = wlan_mlo_get_valid_link_bitmap(grp_id);
-	qdf_assert_always(valid_hw_link_bitmap);
+	if (!valid_hw_link_bitmap) {
+		mgmt_rx_reo_err("Valid HW link bitmap is zero");
+		return false;
+	}
 
 	return (valid_hw_link_bitmap & (1 << link_id));
 }
