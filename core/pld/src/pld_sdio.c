@@ -226,7 +226,8 @@ static struct sdio_device_id pld_sdio_id_table[] = {
 	{},
 };
 
-#ifdef CONFIG_PLD_SDIO_CNSS2
+#if defined(CONFIG_PLD_SDIO_CNSS2) || defined(CONFIG_PLD_SDIO_CNSS)
+
 /**
  * pld_sdio_reinit() - SSR re-initialize function for SDIO device
  * @sdio_func: pointer to sdio device function
@@ -271,6 +272,7 @@ static void pld_sdio_crash_shutdown(struct sdio_func *sdio_func)
 	/* TODO */
 }
 
+#ifdef CONFIG_PLD_SDIO_CNSS2
 static void pld_sdio_uevent(struct sdio_func *sdio_func, uint32_t status)
 {
 	struct pld_context *pld_context;
@@ -298,6 +300,7 @@ static void pld_sdio_uevent(struct sdio_func *sdio_func, uint32_t status)
 out:
 	return;
 }
+#endif
 
 struct cnss_sdio_wlan_driver pld_sdio_ops = {
 	.name       = "pld_sdio",
@@ -307,7 +310,9 @@ struct cnss_sdio_wlan_driver pld_sdio_ops = {
 	.reinit     = pld_sdio_reinit,
 	.shutdown   = pld_sdio_shutdown,
 	.crash_shutdown = pld_sdio_crash_shutdown,
+#ifdef CONFIG_PLD_SDIO_CNSS2
 	.update_status  = pld_sdio_uevent,
+#endif
 #ifdef CONFIG_PM
 	.suspend    = pld_sdio_suspend,
 	.resume     = pld_sdio_resume,
@@ -334,6 +339,7 @@ void pld_sdio_unregister_driver(void)
 	cnss_sdio_wlan_unregister_driver(&pld_sdio_ops);
 }
 
+#ifdef CONFIG_PLD_SDIO_CNSS2
 /**
  * pld_sdio_wlan_enable() - Enable WLAN
  * @dev: device
@@ -366,7 +372,7 @@ int pld_sdio_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 	}
 	return cnss_wlan_enable(dev, &cfg, cnss_mode, host_version);
 }
-
+#endif
 #else
 
 #ifdef CONFIG_PM
