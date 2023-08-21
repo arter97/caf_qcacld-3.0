@@ -3014,8 +3014,11 @@ mgmt_rx_reo_release_egress_list_entries(struct mgmt_rx_reo_context *reo_context,
 	goto exit_unlock_frame_release_lock;
 
 exit_unlock_egress_list_lock:
-	qdf_assert_always(qdf_list_size(&reo_egress_list->list) <=
-					reo_egress_list->max_list_size);
+	if (qdf_list_size(&reo_egress_list->list) >
+	    reo_egress_list->max_list_size)
+		mgmt_rx_reo_err("Egress list overflow size =%u, max = %u",
+				qdf_list_size(&reo_egress_list->list),
+				reo_egress_list->max_list_size);
 	qdf_spin_unlock_bh(&reo_egress_list->list_lock);
 exit_unlock_frame_release_lock:
 	qdf_spin_unlock(&reo_context->frame_release_lock);
@@ -3295,52 +3298,75 @@ mgmt_rx_reo_move_entries_ingress_to_egress_list
 
 	/* Check if ingress list has at least one frame ready to be delivered */
 	if (num_frames_ready_to_deliver) {
-		qdf_list_t temp_list_frames_ready_to_deliver;
+		qdf_list_t temp_list_frames_to_deliver;
 
-		qdf_list_create(&temp_list_frames_ready_to_deliver,
+		qdf_list_create(&temp_list_frames_to_deliver,
 				INGRESS_TO_EGRESS_MOVEMENT_TEMP_LIST_MAX_SIZE);
 
-		status = qdf_list_split(&temp_list_frames_ready_to_deliver,
+		status = qdf_list_split(&temp_list_frames_to_deliver,
 					&reo_ingress_list->list,
 					&latest_frame_ready_to_deliver->node);
-		qdf_assert_always(QDF_IS_STATUS_SUCCESS(status));
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mgmt_rx_reo_err("Failed to split list");
+			qdf_list_destroy(&temp_list_frames_to_deliver);
+			goto exit_unlock_ingress_list;
+		}
 
-		qdf_assert_always(num_frames_ready_to_deliver ==
-			qdf_list_size(&temp_list_frames_ready_to_deliver));
+		if (num_frames_ready_to_deliver !=
+		    qdf_list_size(&temp_list_frames_to_deliver)) {
+			uint32_t list_size;
+
+			list_size = qdf_list_size(&temp_list_frames_to_deliver);
+			mgmt_rx_reo_err("Mismatch in frames ready %u and %u",
+					num_frames_ready_to_deliver,
+					list_size);
+			status = QDF_STATUS_E_INVAL;
+			qdf_list_destroy(&temp_list_frames_to_deliver);
+			goto exit_unlock_ingress_list;
+		}
 
 		qdf_spin_lock_bh(&reo_egress_list->list_lock);
 
 		status = qdf_list_join(&reo_egress_list->list,
-				       &temp_list_frames_ready_to_deliver);
-		qdf_assert_always(QDF_IS_STATUS_SUCCESS(status));
+				       &temp_list_frames_to_deliver);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mgmt_rx_reo_err("Failed to join lists");
+			qdf_list_destroy(&temp_list_frames_to_deliver);
+			goto exit_unlock_egress_and_ingress_list;
+		}
 
 		if (mgmt_rx_reo_list_overflowed(reo_egress_list)) {
 			status =
 			    mgmt_rx_reo_handle_egress_overflow(reo_egress_list);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				mgmt_rx_reo_err("Failed to handle overflow");
-				qdf_assert_always(0);
+				qdf_list_destroy(&temp_list_frames_to_deliver);
+				goto exit_unlock_egress_and_ingress_list;
 			}
 		}
-
-		qdf_assert_always(qdf_list_size(&reo_ingress_list->list) <=
-				  reo_ingress_list->max_list_size);
 
 		status = mgmt_rx_reo_check_sanity_lists(reo_egress_list,
 							reo_ingress_list);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mgmt_rx_reo_err("Sanity check of reo lists failed");
-			qdf_assert_always(0);
+			qdf_list_destroy(&temp_list_frames_to_deliver);
+			goto exit_unlock_egress_and_ingress_list;
 		}
 
 		qdf_spin_unlock_bh(&reo_egress_list->list_lock);
 
-		qdf_list_destroy(&temp_list_frames_ready_to_deliver);
+		qdf_list_destroy(&temp_list_frames_to_deliver);
 	}
 
+	status = QDF_STATUS_SUCCESS;
+	goto exit_unlock_ingress_list;
+
+exit_unlock_egress_and_ingress_list:
+	qdf_spin_unlock_bh(&reo_egress_list->list_lock);
+exit_unlock_ingress_list:
 	qdf_spin_unlock_bh(&reo_ingress_list->list_lock);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 /**
@@ -3596,8 +3622,15 @@ mgmt_rx_reo_update_wait_count(
 {
 	uint8_t link_id;
 
-	qdf_assert_always(wait_count_old_frame);
-	qdf_assert_always(wait_count_new_frame);
+	if (!wait_count_old_frame) {
+		mgmt_rx_reo_err("Pointer to old frame wait count is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!wait_count_new_frame) {
+		mgmt_rx_reo_err("Pointer to new frame wait count is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++) {
 		if (wait_count_old_frame->per_link_count[link_id]) {
