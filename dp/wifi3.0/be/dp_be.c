@@ -837,7 +837,6 @@ dp_mlo_mcast_init(struct dp_soc *soc, struct dp_vdev *vdev)
 	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
 
 	be_vdev->mcast_primary = false;
-	be_vdev->seq_num = 0;
 
 	hal_tx_mcast_mlo_reinject_routing_set(
 				soc->hal_soc,
@@ -855,7 +854,6 @@ dp_mlo_mcast_deinit(struct dp_soc *soc, struct dp_vdev *vdev)
 {
 	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
 
-	be_vdev->seq_num = 0;
 	be_vdev->mcast_primary = false;
 	vdev->mlo_vdev = 0;
 }
@@ -2739,6 +2737,7 @@ QDF_STATUS dp_mlo_dev_ctxt_create(struct cdp_soc_t *soc_hdl,
 	qdf_mem_set(mlo_dev_ctxt->bridge_vdev,
 		    WLAN_MAX_MLO_CHIPS * WLAN_MAX_MLO_LINKS_PER_SOC,
 		    CDP_INVALID_VDEV_ID);
+	mlo_dev_ctxt->seq_num = 0;
 
 	/* Add mlo_dev_ctxt to the global DP MLO list */
 	qdf_spin_lock_bh(&mlo_dev_obj->mlo_dev_list_lock);
