@@ -1149,6 +1149,12 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 				}
 			}
 		}
+
+		/*
+		 * Some frames like GAS_INITIAL_REQ are registered with
+		 * SME_SESSION_ID_ANY, and received without session.
+		 */
+		vdev_id = mgmt_frame->sessionId;
 		if (session_entry)
 			vdev_id = session_entry->vdev_id;
 
