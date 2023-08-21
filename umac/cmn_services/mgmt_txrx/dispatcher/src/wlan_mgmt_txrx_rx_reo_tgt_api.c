@@ -164,10 +164,15 @@ tgt_mgmt_rx_reo_enter_algo_without_buffer(
 
 	/* Enter the REO algorithm */
 	status = wlan_mgmt_rx_reo_algo_entry(pdev, &desc, &is_frm_queued);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
-	qdf_assert_always(!is_frm_queued);
+	if (is_frm_queued) {
+		mgmt_rx_reo_err("Frame is queued to reo list");
+		return QDF_STATUS_E_FAILURE;
+	}
 
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
@@ -203,7 +208,10 @@ psoc_get_hw_link_id_bmap(struct wlan_objmgr_psoc *psoc, void *obj, void *arg)
 	int8_t cur_link;
 
 	cur_link = wlan_get_mlo_link_id_from_pdev(pdev);
-	qdf_assert_always(cur_link >= 0 && cur_link < MAX_MLO_LINKS);
+	if (cur_link < 0 || cur_link >= MAX_MLO_LINKS) {
+		mgmt_rx_reo_err("Invalid link = %d", cur_link);
+		return;
+	}
 
 	*link_bitmap |= (1 << cur_link);
 }
@@ -380,7 +388,10 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 			goto cleanup;
 		}
 
-		qdf_assert_always(!is_queued);
+		if (is_queued) {
+			mgmt_rx_reo_err("Frame is queued to reo list");
+			return QDF_STATUS_E_FAILURE;
+		}
 
 		return tgt_mgmt_txrx_process_rx_frame(pdev, buf,
 						      mgmt_rx_params);
