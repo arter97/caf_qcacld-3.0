@@ -978,6 +978,28 @@ void wlan_mlo_update_action_frame_from_user(struct wlan_objmgr_vdev *vdev,
 void wlan_mlo_update_action_frame_to_user(struct wlan_objmgr_vdev *vdev,
 					  uint8_t *frame,
 					  uint32_t frame_len);
+
+/**
+ * wlan_mlo_mgr_mld_vdev_attach() - Attach VDEV to MLD
+ * @vdev: VDEV object
+ * @mld_addr: MLD address of MLD, where this VDEV should be attached
+ *
+ * API to set MLD MAC address and  Attaches VDEV to existing MLD.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlo_mgr_mld_vdev_attach(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mld_addr);
+
+/**
+ * wlan_mlo_mgr_mld_vdev_detach() - Detach VDEV from MLD
+ * @vdev: VDEV object
+ *
+ * API to reset MLD MAC address and  Detaches VDEV from its MLD.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlo_mgr_mld_vdev_detach(struct wlan_objmgr_vdev *vdev);
 #else
 static inline QDF_STATUS wlan_mlo_mgr_init(void)
 {
@@ -1022,5 +1044,19 @@ uint8_t wlan_mlo_get_sta_mld_ctx_count(void)
 {
 	return 0;
 }
+
+static inline
+QDF_STATUS wlan_mlo_mgr_mld_vdev_attach(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mld_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_mlo_mgr_mld_vdev_detach(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif
 #endif

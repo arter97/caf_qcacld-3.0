@@ -1145,3 +1145,40 @@ QDF_STATUS wlan_mlo_mgr_update_mld_addr(struct qdf_mac_addr *old_mac,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS wlan_mlo_mgr_mld_vdev_attach(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mld_addr)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	wlan_vdev_obj_lock(vdev);
+	wlan_vdev_mlme_set_mldaddr(vdev, (uint8_t *)&mld_addr->bytes[0]);
+	wlan_vdev_obj_unlock(vdev);
+
+	status = mlo_dev_ctx_init(vdev);
+
+	return status;
+}
+
+QDF_STATUS wlan_mlo_mgr_mld_vdev_detach(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	ml_dev = vdev->mlo_dev_ctx;
+	/*
+	 * Atleast one VAP should be part of MLD for dynamic link vap
+	 * addition and deletion, so rejecting VDEV detach
+	 */
+	if (ml_dev->wlan_vdev_count <= 1)
+		return QDF_STATUS_E_FAILURE;
+
+	status = mlo_dev_ctx_deinit(vdev);
+
+	wlan_vdev_obj_lock(vdev);
+	wlan_vdev_mlme_reset_mldaddr(vdev);
+	wlan_vdev_mlme_op_flags_clear(vdev, WLAN_VDEV_OP_MLO_REMOVE_LINK_VDEV);
+	wlan_vdev_obj_unlock(vdev);
+
+	return status;
+}
