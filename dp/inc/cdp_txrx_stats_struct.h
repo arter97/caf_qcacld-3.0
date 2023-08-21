@@ -3176,6 +3176,7 @@ struct cdp_pdev_stats {
 		/* Monitor mode related */
 		uint32_t mon_rx_drop;
 		uint32_t mon_radiotap_update_err;
+		uint32_t mon_ver_err;
 	} dropped;
 
 	struct {
