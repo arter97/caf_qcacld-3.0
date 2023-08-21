@@ -1198,16 +1198,6 @@ qdf_freq_t wlan_get_operation_chan_freq_vdev_id(struct wlan_objmgr_pdev *pdev,
 						uint8_t vdev_id);
 
 /**
- * wlan_get_opmode_vdev_id() - get operating mode of given vdev id
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- *
- * Return: opmode
- */
-enum QDF_OPMODE wlan_get_opmode_vdev_id(struct wlan_objmgr_pdev *pdev,
-					uint8_t vdev_id);
-
-/**
  * wlan_vdev_set_dot11mode - Set the dot11mode of the vdev
  * @mac_mlme_cfg: MAC's MLME config pointer
  * @device_mode: OPMODE of the vdev

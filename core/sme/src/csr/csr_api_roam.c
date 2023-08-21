@@ -2717,7 +2717,7 @@ void csr_roam_process_results_default(struct mac_context *mac_ctx,
 		sme_err("Invalid session id %d", session_id);
 		return;
 	}
-	opmode = wlan_get_opmode_vdev_id(mac_ctx->pdev, session_id);
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, session_id);
 	roam_info = qdf_mem_malloc(sizeof(*roam_info));
 	if (!roam_info)
 		return;
@@ -2794,7 +2794,7 @@ static void csr_roam_process_start_bss_success(struct mac_context *mac_ctx,
 	sme_debug("Start BSS success");
 	start_bss_rsp = (struct start_bss_rsp *)context;
 
-	opmode = wlan_get_opmode_vdev_id(mac_ctx->pdev, vdev_id);
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE)
 		session->connectState =
 				eCSR_ASSOC_STATE_TYPE_INFRA_DISCONNECTED;
@@ -3251,7 +3251,7 @@ void csr_roam_joined_state_msg_processor(struct mac_context *mac, void *msg_buf)
 				qdf_mem_free(pUpperLayerAssocCnf->ies);
 			return;
 		}
-		opmode = wlan_get_opmode_vdev_id(mac->pdev, sessionId);
+		opmode = wlan_get_opmode_from_vdev_id(mac->pdev, sessionId);
 		/* send the status code as Success */
 		roam_info->status_code = eSIR_SME_SUCCESS;
 		roam_info->staId = (uint8_t) pUpperLayerAssocCnf->aid;
@@ -3506,7 +3506,7 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		  pRsp->sessionId, pRsp->status_code,
 		  QDF_MAC_ADDR_REF(pRsp->peer_macaddr.bytes),
 		  mac_ctx->obss_scan_offload, chan_freq,
-		  wlan_get_opmode_vdev_id(mac_ctx->pdev, sessionId));
+		  wlan_get_opmode_from_vdev_id(mac_ctx->pdev, sessionId));
 
 	if (CSR_IS_WAIT_FOR_KEY(mac_ctx, sessionId)) {
 		/* We are done with authentication, whethere succeed or not */
@@ -3983,7 +3983,7 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	roam_info = qdf_mem_malloc(sizeof(*roam_info));
 	if (!roam_info)
 		return;
-	opmode = wlan_get_opmode_vdev_id(mac_ctx->pdev, sessionId);
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, sessionId);
 	/* Required for indicating the frames to upper layer */
 	roam_info->assocReqLength = pAssocInd->assocReqLength;
 	roam_info->assocReqPtr = pAssocInd->assocReqPtr;
@@ -4342,7 +4342,7 @@ csr_roam_chk_lnk_deauth_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		qdf_mem_free(roam_info);
 		return;
 	}
-	opmode = wlan_get_opmode_vdev_id(mac_ctx->pdev, sessionId);
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, sessionId);
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		qdf_copy_macaddr(&roam_info->peerMac,
 				 &pDeauthRsp->peer_macaddr);
@@ -4377,7 +4377,7 @@ csr_roam_chk_lnk_disassoc_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		qdf_mem_free(roam_info);
 		return;
 	}
-	opmode = wlan_get_opmode_vdev_id(mac_ctx->pdev, sessionId);
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, sessionId);
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		qdf_copy_macaddr(&roam_info->peerMac,
 				 &pDisassocRsp->peer_macaddr);
@@ -4818,7 +4818,7 @@ csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac_ctx,
 	if (dot11_cfg->bss_op_ch_freq)
 		opr_freq = dot11_cfg->bss_op_ch_freq;
 
-	opmode = wlan_get_opmode_vdev_id(mac_ctx->pdev, vdev_id);
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
 	is_ap = (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE);
 	cfg_dot11_mode =
 		csr_get_cfg_dot11_mode_from_csr_phy_mode(is_ap,
@@ -7986,7 +7986,7 @@ static bool csr_process_sap_results(struct mac_context *mac_ctx,
 	if (!roam_info)
 		return false;
 
-	opmode = wlan_get_opmode_vdev_id(mac_ctx->pdev, vdev_id);
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
 	sme_debug("SAP result : %d", result);
 
 	switch (result) {

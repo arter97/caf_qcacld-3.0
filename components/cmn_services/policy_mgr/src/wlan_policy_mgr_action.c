@@ -1504,7 +1504,7 @@ policy_mgr_con_mode_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 		return mode;
 	}
 
-	op_mode = wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id);
+	op_mode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
 	return policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
 }
 
@@ -2320,7 +2320,7 @@ policy_mgr_handle_sap_plus_go_force_scc(struct wlan_objmgr_psoc *psoc)
 
 	vdev_id = work_info->sap_plus_go_force_scc.initiator_vdev_id;
 	chan_freq = wlan_get_operation_chan_freq_vdev_id(pm_ctx->pdev, vdev_id);
-	opmode = wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id);
+	opmode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
 	vdev_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, opmode,
 							     vdev_id);
 
