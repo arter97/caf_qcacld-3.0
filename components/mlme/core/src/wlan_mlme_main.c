@@ -36,6 +36,7 @@
 #include "twt/core/src/wlan_twt_cfg.h"
 #include "wlan_scan_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
+#include "wlan_vdev_mgr_utils_api.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -5136,6 +5137,57 @@ wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
 }
 #endif
 
+QDF_STATUS wlan_mlme_get_sta_num_tx_chains(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev,
+					   uint8_t *tx_chains)
+{
+	bool dynamic_nss_chains_support;
+	struct wlan_mlme_nss_chains *dynamic_cfg;
+	enum band_info operating_band;
+	QDF_STATUS status;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	status = wlan_mlme_cfg_get_dynamic_nss_chains_support
+					(psoc, &dynamic_nss_chains_support);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to get dynamic_nss_chains_support");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_mlme =
+		wlan_objmgr_vdev_get_comp_private_obj(vdev,
+						      WLAN_UMAC_COMP_MLME);
+	if (!vdev_mlme) {
+		QDF_ASSERT(0);
+		return false;
+	}
+
+	if (dynamic_nss_chains_support) {
+		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
+		if (!dynamic_cfg) {
+			mlme_err("nss chain dynamic config NULL");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		operating_band = ucfg_cm_get_connected_band(vdev);
+		switch (operating_band) {
+		case BAND_2G:
+			*tx_chains =
+			dynamic_cfg->num_tx_chains[NSS_CHAINS_BAND_2GHZ];
+			break;
+		case BAND_5G:
+			*tx_chains =
+			dynamic_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ];
+			break;
+		default:
+			mlme_err("Band %d Not 2G or 5G", operating_band);
+			return QDF_STATUS_E_INVAL;
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint8_t *tx_nss)
@@ -5178,6 +5230,56 @@ QDF_STATUS wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
 			*tx_nss = proto_generic_nss;
 	} else {
 		*tx_nss = proto_generic_nss;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_get_sta_num_rx_chains(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev,
+					   uint8_t *rx_chains)
+{
+	bool dynamic_nss_chains_support;
+	struct wlan_mlme_nss_chains *dynamic_cfg;
+	enum band_info operating_band;
+	QDF_STATUS status;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	status = wlan_mlme_cfg_get_dynamic_nss_chains_support
+					(psoc, &dynamic_nss_chains_support);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to get dynamic_nss_chains_support");
+		return QDF_STATUS_E_INVAL;
+	}
+	vdev_mlme =
+		wlan_objmgr_vdev_get_comp_private_obj(vdev,
+						      WLAN_UMAC_COMP_MLME);
+	if (!vdev_mlme) {
+		QDF_ASSERT(0);
+		return false;
+	}
+
+	if (dynamic_nss_chains_support) {
+		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
+		if (!dynamic_cfg) {
+			mlme_err("nss chain dynamic config NULL");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		operating_band = ucfg_cm_get_connected_band(vdev);
+		switch (operating_band) {
+		case BAND_2G:
+			*rx_chains =
+			dynamic_cfg->num_rx_chains[NSS_CHAINS_BAND_2GHZ];
+			break;
+		case BAND_5G:
+			*rx_chains =
+			dynamic_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ];
+			break;
+		default:
+			mlme_err("Band %d Not 2G or 5G", operating_band);
+			return QDF_STATUS_E_INVAL;
+		}
 	}
 
 	return QDF_STATUS_SUCCESS;

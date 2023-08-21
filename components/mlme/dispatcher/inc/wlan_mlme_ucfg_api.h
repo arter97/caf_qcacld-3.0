@@ -2739,6 +2739,40 @@ ucfg_mlme_update_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_get_sta_num_tx_chains() - UCFG API to get station num tx chains
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @tx_chains : tx_chains out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_sta_num_tx_chains(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t *tx_chains)
+{
+	return wlan_mlme_get_sta_num_tx_chains(psoc, vdev, tx_chains);
+}
+
+/**
+ * ucfg_mlme_get_sta_num_rx_chains() - UCFG API to get station num rx chains
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @rx_chains : rx_chains out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_sta_num_rx_chains(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t *rx_chains)
+{
+	return wlan_mlme_get_sta_num_rx_chains(psoc, vdev, rx_chains);
+}
+
+/**
  * ucfg_mlme_get_sta_tx_nss() - UCFG API to get station tx NSS
  *
  * @psoc: psoc context

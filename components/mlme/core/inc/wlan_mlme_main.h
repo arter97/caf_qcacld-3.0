@@ -1683,6 +1683,20 @@ wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
 #endif
 
 /**
+ * wlan_mlme_get_sta_num_tx_chains() - API to get station num tx chains
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @tx_chains : tx_chains out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_num_tx_chains(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t *tx_chains);
+
+/**
  * wlan_mlme_get_sta_tx_nss() - API to get station tx NSS
  *
  * @psoc: psoc context
@@ -1695,6 +1709,20 @@ QDF_STATUS
 wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev,
 			 uint8_t *tx_nss);
+
+/**
+ * wlan_mlme_get_sta_num_rx_chains() - API to get station num rx chains
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @rx_chains : rx_chains out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_num_rx_chains(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t *rx_chains);
 
 /**
  * wlan_mlme_get_sta_rx_nss() - API to get station rx NSS

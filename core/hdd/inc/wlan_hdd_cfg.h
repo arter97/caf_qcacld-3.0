@@ -269,6 +269,19 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 			  uint8_t tx_nss, uint8_t rx_nss);
 
 /**
+ * hdd_get_num_chains() - Get the number of chains supported by the adapter
+ *
+ * @adapter: the pointer to adapter
+ * @num_chains: the number of chains supported by the adapter
+ *
+ * This function is used to get the number of chains supported by
+ * the adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_num_chains(struct hdd_adapter *adapter, uint8_t *num_chains);
+
+/**
  * hdd_get_nss() - Get the number of spatial streams supported by the adapter
  *
  * @adapter: the pointer to adapter
@@ -282,6 +295,20 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss);
 
 /**
+ * hdd_get_num_tx_chains() - Get the number of tx chains supported by the
+ * adapter
+ * @link_info: Link info pointer in HDD adapter
+ * @tx_chains: the number of Tx chains supported by the adapter
+ *
+ * This function is used to get the number of Tx chains supported by
+ * the adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_num_tx_chains(struct wlan_hdd_link_info *link_info,
+				 uint8_t *tx_chains);
+
+/**
  * hdd_get_tx_nss() - Get the number of spatial streams supported by the adapter
  * @link_info: Link info pointer in HDD adapter
  * @tx_nss: the number Tx of spatial streams supported by the adapter
@@ -293,6 +320,19 @@ QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss);
  */
 QDF_STATUS hdd_get_tx_nss(struct wlan_hdd_link_info *link_info,
 			  uint8_t *tx_nss);
+
+/**
+ * hdd_get_num_rx_chains() - Get the number of chains supported by the adapter
+ * @link_info: Link info pointer in HDD adapter
+ * @rx_chains: the number of Rx chains supported by the adapter
+ *
+ * This function is used to get the number of Rx chains supported by
+ * the adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_num_rx_chains(struct wlan_hdd_link_info *link_info,
+				 uint8_t *rx_chains);
 
 /**
  * hdd_get_rx_nss() - Get the number of spatial streams supported by the adapter

@@ -12242,6 +12242,43 @@ static int hdd_get_nss_config(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * hdd_get_num_tx_chains_config() - Get the number of tx chains supported by
+ * the adapter
+ * @link_info: Link info pointer in HDD adapter
+ * @skb: sk buffer to hold nl80211 attributes
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success; error number otherwise
+ */
+static int hdd_get_num_tx_chains_config(struct wlan_hdd_link_info *link_info,
+					struct sk_buff *skb,
+					const struct nlattr *attr)
+{
+	uint8_t tx_chains;
+	QDF_STATUS status;
+
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
+		hdd_err("Not in connected state");
+		return -EINVAL;
+	}
+
+	status = hdd_get_num_tx_chains(link_info, &tx_chains);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Failed to get num tx chains");
+		return -EINVAL;
+	}
+
+	hdd_debug("num_tx_chains %d", tx_chains);
+	if (nla_put_u8(skb,
+		       QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS, tx_chains)) {
+		hdd_err("nla_put failure");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * hdd_get_tx_nss_config() - Get the number of tx spatial streams supported by
  * the adapter
  * @link_info: Link info pointer in HDD adapter
@@ -12269,6 +12306,43 @@ static int hdd_get_tx_nss_config(struct wlan_hdd_link_info *link_info,
 
 	hdd_debug("tx_nss %d", tx_nss);
 	if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS, tx_nss)) {
+		hdd_err("nla_put failure");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * hdd_get_num_rx_chains_config() - Get the number of rx chains supported by
+ * the adapter
+ * @link_info: Link info pointer in HDD adapter
+ * @skb: sk buffer to hold nl80211 attributes
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success; error number otherwise
+ */
+static int hdd_get_num_rx_chains_config(struct wlan_hdd_link_info *link_info,
+					struct sk_buff *skb,
+					const struct nlattr *attr)
+{
+	uint8_t rx_chains;
+	QDF_STATUS status;
+
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
+		hdd_err("Not in connected state");
+		return -EINVAL;
+	}
+
+	status = hdd_get_num_rx_chains(link_info, &rx_chains);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Failed to get num rx chains");
+		return -EINVAL;
+	}
+
+	hdd_debug("num_rx_chains %d", rx_chains);
+	if (nla_put_u8(skb,
+		       QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS, rx_chains)) {
 		hdd_err("nla_put failure");
 		return -EINVAL;
 	}
@@ -12467,6 +12541,13 @@ static const struct config_getters config_getters[] = {
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL,
 	 sizeof(uint32_t),
 	 hdd_get_listen_interval_config},
+	 {QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS,
+	 sizeof(uint8_t),
+	 hdd_get_num_tx_chains_config},
+	 {QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS,
+	 sizeof(uint8_t),
+	 hdd_get_num_rx_chains_config},
+
 };
 
 /**
