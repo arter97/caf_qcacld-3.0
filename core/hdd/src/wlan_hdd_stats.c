@@ -555,6 +555,39 @@ wlan_hdd_get_bss_peer_mld_mac(struct wlan_hdd_link_info *link_info,
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static bool
+wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool ret = false;
+
+	if (!link_info) {
+		hdd_err_rl("Invalid link info");
+		return ret;
+	}
+
+	if (!wlan_hdd_is_mlo_connection(link_info))
+		return ret;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
+	if (!vdev) {
+		hdd_err("invalid vdev");
+		return ret;
+	}
+
+	ret = mlo_mgr_is_link_switch_in_progress(vdev);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+	return ret;
+}
+#else
+static inline bool
+wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BE_MLO_ADV_FEATURE */
 #else
 static inline bool
 wlan_hdd_is_per_link_stats_supported(struct hdd_context *hdd_ctx)
@@ -567,6 +600,12 @@ wlan_hdd_get_bss_peer_mld_mac(struct wlan_hdd_link_info *link_info,
 			      struct qdf_mac_addr *mld_mac)
 {
 	return QDF_STATUS_E_FAILURE;
+}
+
+static inline bool
+wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info)
+{
+	return false;
 }
 #endif
 
@@ -3362,6 +3401,11 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 
 	if (hdd_cm_is_vdev_roaming(link_info)) {
 		hdd_debug("Roaming in progress, cannot process the request");
+		return -EBUSY;
+	}
+
+	if (wlan_hdd_is_link_switch_in_progress(link_info)) {
+		hdd_debug("Link Switch in progress, can't process the request");
 		return -EBUSY;
 	}
 
@@ -7463,6 +7507,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 {
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_station_ctx *sta_ctx;
 	int32_t rcpi_value;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
@@ -7513,8 +7558,9 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 
 	hdd_wlan_fill_per_chain_rssi_stats(sinfo, link_info);
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	hdd_nofl_debug("Sending station stats for link " QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(mac));
+		       QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes));
 	hdd_exit();
 
 	return 0;
@@ -7694,32 +7740,27 @@ static int wlan_hdd_get_mlo_sta_stats(struct hdd_adapter *adapter,
 
 /*
  * wlan_hdd_send_mlo_aggregated_stats() - Whether to send aggregated stats
- * @link_info: Link info pointer of STA adapter
+ * @adapter: HDD adapter
  * @mac: mac address
  *
  * Return: True if req is on mld_mac and FW supports per link stats, else False
  */
 static bool
-wlan_hdd_send_mlo_aggregated_stats(struct wlan_hdd_link_info *link_info,
+wlan_hdd_send_mlo_aggregated_stats(struct hdd_adapter *adapter,
 				   const uint8_t *mac)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	bool is_mld_req = false;
 	bool per_link_stats_cap = false;
 	struct qdf_mac_addr peer_mld_mac;
 	QDF_STATUS status;
 
-	if (!link_info) {
-		hdd_err("Invalid link_info");
+	if (!hdd_ctx) {
+		hdd_err("invalid hdd_ctx");
 		return false;
 	}
 
-	if (!wlan_hdd_is_mlo_connection(link_info)) {
-		hdd_nofl_debug("Fetching station stats for legacy connection");
-		return false;
-	}
-
-	status = wlan_hdd_get_bss_peer_mld_mac(link_info, &peer_mld_mac);
+	status = wlan_hdd_get_bss_peer_mld_mac(adapter->deflink, &peer_mld_mac);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err_rl("mlo_vdev_stats: failed to get bss peer mld mac");
 		return false;
@@ -7735,6 +7776,42 @@ wlan_hdd_send_mlo_aggregated_stats(struct wlan_hdd_link_info *link_info,
 	}
 
 	return false;
+}
+
+/**
+ * wlan_hdd_send_mlo_station_stats() - send station stats to userspace
+ * @adapter: Pointer to hdd adapter
+ * @hdd_ctx: Pointer to hdd context
+ * @mac: mac address
+ * @sinfo: kernel station_info struct to populate
+ *
+ * Return: 0 on success; errno on failure
+ */
+static int wlan_hdd_send_mlo_station_stats(struct hdd_adapter *adapter,
+					   struct hdd_context *hdd_ctx,
+					   const uint8_t *mac,
+					   struct station_info *sinfo)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_nofl_debug("Station stats requested for bssid:" QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(mac));
+
+	if (!wlan_hdd_is_mlo_connection(adapter->deflink)) {
+		hdd_nofl_debug("Fetching station stats for legacy connection");
+		return wlan_hdd_get_sta_stats(adapter->deflink, mac, sinfo);
+	}
+
+	if (!wlan_hdd_send_mlo_aggregated_stats(adapter, mac)) {
+		link_info = hdd_get_link_info_by_bssid(hdd_ctx, mac);
+		if (!link_info) {
+			hdd_debug_rl("Invalid bssid. Sending Assoc link stats");
+			link_info = adapter->deflink;
+		}
+		return wlan_hdd_get_sta_stats(link_info, mac, sinfo);
+	}
+
+	return wlan_hdd_get_mlo_sta_stats(adapter, mac, sinfo);
 }
 
 /**
@@ -7801,24 +7878,9 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 				return 0;
 		}
 		return wlan_hdd_get_sap_stats(link_info, sinfo);
-	} else {
-		link_info = hdd_get_link_info_by_bssid(hdd_ctx, mac);
-		if (!link_info) {
-			adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-			link_info = adapter->deflink;
-			hdd_err_rl("the bssid is invalid");
-		}
-
-		if (!wlan_hdd_send_mlo_aggregated_stats(link_info, mac)) {
-			hdd_nofl_debug("Station stats requested for vdev_[%u]",
-				       link_info->vdev_id);
-			return wlan_hdd_get_sta_stats(link_info,
-						      mac, sinfo);
-		}
-
-		return wlan_hdd_get_mlo_sta_stats(link_info->adapter,
-						  mac, sinfo);
 	}
+
+	return wlan_hdd_send_mlo_station_stats(adapter, hdd_ctx, mac, sinfo);
 }
 
 /**
@@ -7847,6 +7909,11 @@ static int _wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
 		return errno;
+
+	if (wlan_hdd_is_link_switch_in_progress(adapter->deflink)) {
+		hdd_debug("Link Switch in progress, can't process request");
+		return -EBUSY;
+	}
 
 	status = wlan_hdd_stats_request_needed(adapter);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -7935,6 +8002,11 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 
 	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
+
+	if (wlan_hdd_is_link_switch_in_progress(adapter->deflink)) {
+		hdd_debug("Link Switch in progress, can't process request");
+		return -EBUSY;
+	}
 
 	if (adapter->device_mode == QDF_SAP_MODE ||
 	    adapter->device_mode == QDF_P2P_GO_MODE) {
