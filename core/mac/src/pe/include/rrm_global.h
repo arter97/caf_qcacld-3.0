@@ -199,9 +199,16 @@ typedef struct sSirNeighborReportInd {
 	tSirNeighborBssDescription sNeighborBssDescription[1];
 } tSirNeighborReportInd, *tpSirNeighborReportInd;
 
+typedef struct eid_ext_info {
+	uint8_t eid;
+	uint8_t num_eid_ext;
+	uint8_t eid_ext[255];
+} eid_ext_info;
+
 typedef struct sRRMBeaconReportRequestedIes {
 	uint8_t num;
 	uint8_t *pElementIds;
+	eid_ext_info ext_info;
 } tRRMBeaconReportRequestedIes, *tpRRMBeaconReportRequestedIes;
 
 /* Reporting detail defines. */
