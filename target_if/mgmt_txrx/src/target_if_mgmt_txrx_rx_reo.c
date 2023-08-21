@@ -218,7 +218,10 @@ target_if_mgmt_rx_reo_get_num_active_hw_links(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	qdf_assert_always(low_level_ops->implemented);
+	if (!low_level_ops->implemented) {
+		mgmt_rx_reo_err("Low level ops not implemented");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	*num_active_hw_links = low_level_ops->get_num_links(grp_id);
 
@@ -264,7 +267,10 @@ target_if_mgmt_rx_reo_get_valid_hw_link_bitmap(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	qdf_assert_always(low_level_ops->implemented);
+	if (!low_level_ops->implemented) {
+		mgmt_rx_reo_err("Low level ops not implemented");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	*valid_hw_link_bitmap = low_level_ops->get_valid_link_bitmap(grp_id);
 
@@ -407,7 +413,10 @@ target_if_mgmt_rx_reo_read_snapshot(
 	}
 
 	/* Make sure that function pointers are populated */
-	qdf_assert_always(low_level_ops->implemented);
+	if (!low_level_ops->implemented) {
+		mgmt_rx_reo_err("Low level ops not implemented");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	switch (id) {
 	case MGMT_RX_REO_SHARED_SNAPSHOT_MAC_HW:
@@ -552,10 +561,16 @@ target_if_mgmt_rx_reo_get_snapshot_info
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	qdf_assert_always(low_level_ops->implemented);
+	if (!low_level_ops->implemented) {
+		mgmt_rx_reo_err("Low level ops not implemented");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	link_id = wlan_get_mlo_link_id_from_pdev(pdev);
-	qdf_assert_always(link_id >= 0);
+	if (link_id < 0) {
+		mgmt_rx_reo_err("Invalid link id %d", link_id);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	snapshot_info->address =
 			low_level_ops->get_snapshot_address(grp_id,
