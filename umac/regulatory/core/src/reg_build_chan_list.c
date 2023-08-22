@@ -4097,9 +4097,15 @@ QDF_STATUS reg_process_master_chan_list_ext(
 		mas_chan_list_6g_ap[i] =
 			this_mchan_params->mas_chan_list_6g_ap[i];
 
-		for (j = 0; j < REG_MAX_CLIENT_TYPE; j++)
+		qdf_mem_zero(mas_chan_list_6g_ap[i],
+			     NUM_6GHZ_CHANNELS * sizeof(struct regulatory_channel));
+
+		for (j = 0; j < REG_MAX_CLIENT_TYPE; j++) {
 			mas_chan_list_6g_client[i][j] =
 				this_mchan_params->mas_chan_list_6g_client[i][j];
+			qdf_mem_zero(mas_chan_list_6g_client[i][j],
+				     NUM_6GHZ_CHANNELS * sizeof(struct regulatory_channel));
+		}
 	}
 
 	reg_init_channel_map(regulat_info->dfs_region);
