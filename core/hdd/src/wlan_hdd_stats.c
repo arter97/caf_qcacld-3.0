@@ -755,35 +755,6 @@ static bool put_wifi_peer_rates(struct wifi_peer_info *stats,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
- * wlan_hdd_update_mlo_iface_stats_info() - update mlo per link iface stats info
- * @hdd_ctx: Pointer to hdd_context
- * @info: Pointer to wlan_hdd_mlo_iface_stats_info
- * @vdev_id: vdev_id of the mlo link
- *
- * Return: 0 on success, error on failure
- */
-static int
-wlan_hdd_update_mlo_iface_stats_info(struct hdd_context *hdd_ctx,
-				     struct wlan_hdd_mlo_iface_stats_info *info,
-				     uint8_t vdev_id)
-{
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc, vdev_id,
-						    WLAN_OSIF_STATS_ID);
-	if (!vdev) {
-		hdd_err("vdev object is NULL for vdev %d", vdev_id);
-		return -EINVAL;
-	}
-
-	info->link_id = wlan_vdev_get_link_id(vdev);
-	info->freq = vdev->vdev_mlme.des_chan->ch_freq;
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-
-	return 0;
-}
-
-/**
  * wlan_hdd_put_mlo_link_iface_info() - Send per mlo link info to framework
  * @hdd_ctx: Pointer to hdd_context
  * @if_stat: Pointer to wifi_interface_stats
@@ -797,18 +768,26 @@ wlan_hdd_put_mlo_link_iface_info(struct hdd_context *hdd_ctx,
 				 struct sk_buff *skb)
 {
 	struct wlan_hdd_mlo_iface_stats_info info = {0};
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_station_ctx *sta_ctx;
 
 	if (!if_stat) {
 		hdd_err("invalid wifi interface stats");
 		return false;
 	}
 
-	if (wlan_hdd_update_mlo_iface_stats_info(hdd_ctx, &info,
-						 if_stat->vdev_id)) {
-		hdd_err("Unable to get mlo link iface info for vdev_id[%u]",
-			if_stat->vdev_id);
+	link_info = hdd_get_link_info_by_bssid(hdd_ctx,
+			(const uint8_t *)if_stat->info.bssid.bytes);
+
+	if (!link_info) {
+		hdd_err("invalid link_info");
 		return false;
 	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	info.link_id = sta_ctx->conn_info.ieee_link_id;
+	info.freq = sta_ctx->conn_info.chan_freq;
 
 	if (if_stat->info.state != WIFI_ASSOCIATED) {
 		hdd_debug_rl("vdev_id[%u] is not associated", if_stat->vdev_id);
@@ -844,7 +823,7 @@ wlan_hdd_put_mlo_peer_link_id(struct sk_buff *vendor_event,
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct wlan_hdd_link_info *link_info;
-	struct wlan_hdd_mlo_iface_stats_info info = {0};
+	struct hdd_station_ctx *sta_ctx;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return false;
@@ -856,16 +835,11 @@ wlan_hdd_put_mlo_peer_link_id(struct sk_buff *vendor_event,
 		return false;
 	}
 
-	if (wlan_hdd_update_mlo_iface_stats_info(hdd_ctx, &info,
-						 link_info->vdev_id)) {
-		hdd_err("Unable to get mlo link iface info for vdev_id[%u]",
-			link_info->vdev_id);
-		return false;
-	}
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	if (nla_put_u8(vendor_event,
 		       QCA_WLAN_VENDOR_ATTR_LL_STATS_MLO_LINK_ID,
-		       info.link_id))
+		       sta_ctx->conn_info.ieee_link_id))
 		return false;
 
 	return true;
@@ -1818,6 +1792,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 
 	wlan_cfg80211_vendor_cmd_reply(skb);
 	qdf_mem_free(link_if_stat);
+	hdd_debug_rl("Sent MLO interface stats to User Space");
 	return;
 err:
 	wlan_cfg80211_vendor_free_skb(skb);
@@ -1942,6 +1917,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 
 	wlan_cfg80211_vendor_cmd_reply(skb);
 	qdf_mem_free(link_if_stat);
+	hdd_debug_rl("Sent MLO interface stats to User Space");
 	return;
 err:
 	wlan_cfg80211_vendor_free_skb(skb);
