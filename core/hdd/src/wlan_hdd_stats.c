@@ -701,6 +701,22 @@ static void wlan_hdd_update_sinfo(struct station_info *sinfo,
 			HDD_INFO_RX_PACKETS | HDD_INFO_FCS_ERROR_COUNT |
 			HDD_INFO_RX_MPDUS;
 }
+
+static void
+wlan_hdd_get_mlo_peers_count(struct hdd_adapter *adapter, uint32_t *num_links)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_station_ctx *sta_ctx;
+	u32 num_peers = 0;
+
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		if (sta_ctx->conn_info.ieee_link_id != WLAN_INVALID_LINK_ID)
+			num_peers++;
+	}
+
+	*num_links = num_peers;
+}
 #else
 static inline bool
 wlan_hdd_is_per_link_stats_supported(struct hdd_context *hdd_ctx)
@@ -730,6 +746,11 @@ wlan_hdd_copy_sinfo_to_link_info(struct wlan_hdd_link_info *link_info,
 static inline void
 wlan_hdd_update_sinfo(struct station_info *sinfo,
 		      struct wlan_hdd_link_info *link_info)
+{
+}
+
+static inline void
+wlan_hdd_get_mlo_peers_count(struct hdd_adapter *adapter, uint8_t *num_links)
 {
 }
 #endif
@@ -1394,7 +1415,8 @@ bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 				QDF_MAC_ADDR_REF(mac->bytes));
 			info->state = WIFI_AUTHENTICATING;
 		}
-		if (hdd_cm_is_vdev_associated(link_info)) {
+		if (hdd_cm_is_vdev_associated(link_info) ||
+		    link_info->vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
 			info->state = WIFI_ASSOCIATED;
 			qdf_copy_macaddr(&info->bssid,
 					 &sta_ctx->conn_info.bssid);
@@ -1573,6 +1595,9 @@ static int wlan_hdd_get_iface_stats(struct wlan_hdd_link_info *link_info,
 		hdd_err("Invalid link_info or interface stats");
 		return -EINVAL;
 	}
+
+	if (link_info->vdev_id == WLAN_UMAC_VDEV_ID_MAX)
+		link_info->ll_iface_stats.vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 
 	qdf_mem_copy(if_stat, &link_info->ll_iface_stats,
 		     sizeof(link_info->ll_iface_stats));
@@ -1809,6 +1834,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 
 	link_info = ml_adapter->deflink;
 	rssi = link_info->rssi;
+	wlan_hdd_get_mlo_peers_count(adapter, &num_peers);
 	num_peers = hdd_ctx->num_mlo_peers;
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
@@ -1825,7 +1851,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		goto err;
 	}
 
-	hdd_debug("WMI_MLO_LINK_STATS_IFACE Data");
+	hdd_debug("WMI_MLO_LINK_STATS_IFACE Data. Num_peers = %u", num_peers);
 
 	if (!hdd_get_interface_info(link_info, &cumulative_if_stat.info)) {
 		hdd_err("hdd_get_interface_info get fail for ml_adapter");
@@ -1854,12 +1880,16 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 						     &link_if_stat[j]))
 				goto err;
 			j++;
+			if (j == num_peers)
+				break;
 			continue;
 		}
 
 		if (wlan_hdd_get_iface_stats(link_info, &link_if_stat[i]))
 			goto err;
 		j++;
+		if (j == num_peers)
+			break;
 
 		if (rssi <= link_info->rssi) {
 			rssi = link_info->rssi;
@@ -1917,7 +1947,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 
 	wlan_cfg80211_vendor_cmd_reply(skb);
 	qdf_mem_free(link_if_stat);
-	hdd_debug_rl("Sent MLO interface stats to User Space");
+	hdd_nofl_debug("Sent mlo interface stats to userspace");
 	return;
 err:
 	wlan_cfg80211_vendor_free_skb(skb);
@@ -1956,8 +1986,9 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		return;
 	}
 
-	link_info = adapter->deflink;
-	num_peers = hdd_ctx->num_mlo_peers;
+	wlan_hdd_get_mlo_peers_count(adapter, &num_peers);
+
+	hdd_debug("WMI_MLO_LINK_STATS_IFACE Data. Num_peers = %u", num_peers);
 
 	link_if_stat = qdf_mem_malloc(sizeof(*link_if_stat) * num_peers);
 	if (!link_if_stat) {
@@ -1965,21 +1996,15 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		goto err;
 	}
 
-	hdd_debug("WMI_MLO_LINK_STATS_IFACE Data. Num_peers = %u", num_peers);
-
-	if (!hdd_get_interface_info(link_info, &cumulative_if_stat.info)) {
+	if (!hdd_get_interface_info(adapter->deflink,
+				    &cumulative_if_stat.info)) {
 		hdd_err("hdd_get_interface_info get fail for ml_adapter");
 		goto err;
 	}
 
-	hdd_adapter_for_each_active_link_info(adapter, link_info) {
-		if (!hdd_cm_is_vdev_associated(link_info)) {
-			hdd_debug_rl("vdev_id[%u] is Not associated",
-				     link_info->vdev_id);
-			continue;
-		}
-
-		if (rssi <= link_info->rssi) {
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		if (link_info->rssi != 0 &&
+		    rssi <= link_info->rssi) {
 			rssi = link_info->rssi;
 			update_stats = true;
 		} else {
@@ -1989,10 +2014,17 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 		if (wlan_hdd_get_iface_stats(link_info, &link_if_stat[i]))
 			goto err;
 
+		if (link_info->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
+			qdf_mem_copy(&link_info->ll_iface_stats,
+				     &link_if_stat[i],
+				     sizeof(*link_if_stat));
+
 		wlan_hdd_update_iface_stats_info(link_info, &cumulative_if_stat,
 						 update_stats);
 
 		i++;
+		if (i == num_peers)
+			break;
 	}
 
 	netdev_addr = hdd_adapter_get_netdev_mac_addr(adapter);
@@ -2042,7 +2074,7 @@ static void wlan_hdd_send_mlo_ll_iface_stats(struct hdd_adapter *adapter)
 
 	wlan_cfg80211_vendor_cmd_reply(skb);
 	qdf_mem_free(link_if_stat);
-	hdd_debug_rl("Sent MLO interface stats to User Space");
+	hdd_nofl_debug("Sent mlo interface stats to userspace");
 	return;
 err:
 	wlan_cfg80211_vendor_free_skb(skb);
