@@ -1114,13 +1114,11 @@ dp_set_hybrid_pktlog_enable(struct dp_pdev *pdev,
 	struct dp_mon_ops *mon_ops = NULL;
 	uint16_t num_buffers;
 
-	if (mon_pdev->mvdev) {
-		/* Nothing needs to be done if monitor mode is
-		 * enabled
-		 */
-		mon_pdev->pktlog_hybrid_mode = true;
+	/* Nothing needs to be done if monitor mode is
+	 * enabled
+	 */
+	if (mon_pdev->mvdev)
 		return false;
-	}
 
 	mon_ops = dp_mon_ops_get(pdev->soc);
 	if (!mon_ops) {
@@ -3310,7 +3308,8 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 	if (mon_ops && mon_ops->mon_tx_stats_update)
 		mon_ops->mon_tx_stats_update(mon_peer, ppdu);
 
-	dp_tx_rate_stats_update(peer, ppdu);
+	if (!ppdu->fixed_rate_used)
+		dp_tx_rate_stats_update(peer, ppdu);
 	dp_pdev_telemetry_stats_update(pdev, ppdu);
 
 	dp_peer_stats_notify(pdev, peer);
@@ -3659,6 +3658,8 @@ dp_process_ppdu_stats_user_rate_tlv(struct dp_pdev *pdev,
 	uint32_t tlv_type = HTT_STATS_TLV_TAG_GET(*tag_buf);
 	uint8_t bw, ru_format;
 	uint16_t ru_size;
+	htt_ppdu_stats_user_rate_tlv *stats_buf =
+		(htt_ppdu_stats_user_rate_tlv *)tag_buf;
 
 	ppdu_desc =
 		(struct cdp_tx_completion_ppdu *)qdf_nbuf_data(ppdu_info->nbuf);
@@ -3746,6 +3747,7 @@ dp_process_ppdu_stats_user_rate_tlv(struct dp_pdev *pdev,
 	tag_buf += 2;
 	ppdu_user_desc->punc_pattern_bitmap =
 		HTT_PPDU_STATS_USER_RATE_TLV_PUNC_PATTERN_BITMAP_GET(*tag_buf);
+	ppdu_user_desc->fixed_rate_used = stats_buf->is_min_rate;
 }
 
 /**

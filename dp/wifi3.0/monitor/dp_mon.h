@@ -791,7 +791,8 @@ struct dp_mon_ops {
 				  struct htt_rx_ring_tlv_filter *tlv_filter);
 	void (*rx_packet_length_set)(uint32_t *msg_word,
 				     struct htt_rx_ring_tlv_filter *tlv_filter);
-	void (*rx_wmask_subscribe)(uint32_t *msg_word,
+	void (*rx_wmask_subscribe)(struct dp_soc *soc,
+				   uint32_t *msg_word, int pdev_id,
 				   struct htt_rx_ring_tlv_filter *tlv_filter);
 	void (*rx_pkt_tlv_offset)(uint32_t *msg_word,
 				  struct htt_rx_ring_tlv_filter *tlv_filter);
@@ -3838,7 +3839,8 @@ void dp_monitor_pdev_reset_scan_spcl_vap_stats_enable(struct dp_pdev *pdev,
 
 #if defined(CONFIG_MON_WORD_BASED_TLV)
 static inline void
-dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
+dp_mon_rx_wmask_subscribe(struct dp_soc *soc,
+			  uint32_t *msg_word, int pdev_id,
 			  struct htt_rx_ring_tlv_filter *tlv_filter)
 {
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
@@ -3856,11 +3858,12 @@ dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
 		return;
 	}
 
-	monitor_ops->rx_wmask_subscribe(msg_word, tlv_filter);
+	monitor_ops->rx_wmask_subscribe(soc, msg_word, pdev_id, tlv_filter);
 }
 #else
 static inline void
-dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
+dp_mon_rx_wmask_subscribe(struct dp_soc *soc,
+			  uint32_t *msg_word, int pdev_id,
 			  struct htt_rx_ring_tlv_filter *tlv_filter)
 {
 }

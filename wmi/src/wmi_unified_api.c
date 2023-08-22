@@ -2845,6 +2845,19 @@ QDF_STATUS wmi_extract_spectral_scaling_params_service_ready_ext(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+QDF_STATUS wmi_extract_aoa_caps_service_ready_ext2(
+			wmi_unified_t wmi_handle, uint8_t *evt_buf,
+			struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 *aoa_cap)
+{
+	if (wmi_handle->ops->extract_aoa_caps_service_ready_ext2)
+		return wmi_handle->ops->extract_aoa_caps_service_ready_ext2
+				(wmi_handle, evt_buf, aoa_cap);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
+
 QDF_STATUS wmi_extract_pdev_utf_event(wmi_unified_t wmi_handle,
 				      uint8_t *evt_buf,
 				      struct wmi_host_pdev_utf_event *param)

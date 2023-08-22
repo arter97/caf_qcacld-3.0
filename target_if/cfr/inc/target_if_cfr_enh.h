@@ -114,8 +114,6 @@
 
 #define STREAMFS_NUM_SUBBUF_WAIKIKI  127
 
-#define MAX_AGC_GAIN_VALUE_WAIKIKI 64
-
 /* Max 4 users in MU case for Spruce */
 #define SPRUCE_CFR_MU_USERS 4
 

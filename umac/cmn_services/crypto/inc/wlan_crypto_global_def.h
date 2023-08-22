@@ -196,6 +196,8 @@ typedef enum wlan_crypto_rsn_cap {
  * @WLAN_CRYPTO_RSNX_CAP_SAE_PK: SAE PK
  * @WLAN_CRYPTO_RSNX_CAP_SECURE_LTF: Secure LTF
  * @WLAN_CRYPTO_RSNX_CAP_SECURE_RTT: Secure RTT
+ * @WLAN_CRYPTO_RSNX_CAP_URNM_MFPR_X20: Unassociated Range
+ * Negotiation and Measurement MFP Required Exempt 20MHz
  * @WLAN_CRYPTO_RSNX_CAP_URNM_MFPR: Unassociated Range
  * Negotiation and Measurement MFP Required
  *
@@ -212,7 +214,26 @@ enum wlan_crypto_rsnx_cap {
 	WLAN_CRYPTO_RSNX_CAP_SAE_PK = 0x40,
 	WLAN_CRYPTO_RSNX_CAP_SECURE_LTF = 0x100,
 	WLAN_CRYPTO_RSNX_CAP_SECURE_RTT = 0x200,
+	WLAN_CRYPTO_RSNX_CAP_URNM_MFPR_X20 = 0x400,
 	WLAN_CRYPTO_RSNX_CAP_URNM_MFPR = 0x8000,
+};
+
+/**
+ * enum wlan_crypto_vdev_11az_security_capab  - 11az related vdev
+ * security capabilities
+ * @WLAN_CRYPTO_RSNX_URNM_MFPR: URNM MFP required bit from RSNXE
+ * @WLAN_CRYPTO_RSN_MFPC: MFP capable bit from RSN IE
+ * @WLAN_CRYPTO_RSN_MFPR: MFP required bit from RSN IE
+ * @WLAN_CRYPTO_RSNX_URNM_MFPR_X20: URNM_MFPR_X20 bit from RSNXE
+ * @WLAN_CRYPTO_RSNX_RSTA_EXTCAP_I2R_LMR_FB: I2R LMR FB Policy from
+ * Extended Capabilities
+ */
+enum wlan_crypto_vdev_11az_security_capab {
+	WLAN_CRYPTO_RSNX_URNM_MFPR,
+	WLAN_CRYPTO_RSN_MFPC,
+	WLAN_CRYPTO_RSN_MFPR,
+	WLAN_CRYPTO_RSNX_URNM_MFPR_X20,
+	WLAN_CRYPTO_RSNX_RSTA_EXTCAP_I2R_LMR_FB,
 };
 
 /**
@@ -355,6 +376,7 @@ struct key_mgmt_list {
  * @key_mgmt:           key mgmt
  * @pmksa:              pmksa
  * @rsn_caps:           rsn_capability
+ * @rsnx_caps:          rsnx capability
  * @akm_list:           order of AKM present in RSN IE of Beacon/Probe response
  *
  * This structure holds crypto params for peer or vdev
@@ -368,6 +390,7 @@ struct wlan_crypto_params {
 	uint32_t key_mgmt;
 	struct   wlan_crypto_pmksa *pmksa[WLAN_CRYPTO_MAX_PMKID];
 	uint16_t rsn_caps;
+	uint32_t rsnx_caps;
 #ifdef WLAN_ADAPTIVE_11R
 	struct key_mgmt_list akm_list[WLAN_CRYPTO_KEY_MGMT_MAX];
 #endif
@@ -398,6 +421,7 @@ typedef enum wlan_crypto_param_type {
 	WLAN_CRYPTO_PARAM_MGMT_CIPHER,
 	WLAN_CRYPTO_PARAM_CIPHER_CAP,
 	WLAN_CRYPTO_PARAM_RSN_CAP,
+	WLAN_CRYPTO_PARAM_RSNX_CAP,
 	WLAN_CRYPTO_PARAM_KEY_MGMT,
 	WLAN_CRYPTO_PARAM_PMKSA,
 } wlan_crypto_param_type;

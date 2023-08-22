@@ -73,8 +73,12 @@
 /* Max vdev_id */
 #define WLAN_UMAC_VDEV_ID_MAX 0xFF
 
+/* Number of AID values to be reserved for 11az TBR RSTA ranging*/
+#define WLAN_RTT_11AZ_NUM_RSID 16
+
 /* MAX AID */
-#define WLAN_UMAC_MAX_AID 2008
+/* Reserving AID value 1992-2007 from AID pool for 11az TBR RSTA ranging. */
+#define WLAN_UMAC_MAX_AID (2008 - WLAN_RTT_11AZ_NUM_RSID - 1)
 
 /* Invalid pdev_id */
 #define WLAN_INVALID_PDEV_ID 0xFFFFFFFF
@@ -712,6 +716,10 @@ struct wlan_ssid {
 #define PSOC_MAX_MAC_PHY_CAP (5)
 #define PSOC_MAX_PHY_REG_CAP (3)
 #define PSOC_MAX_CHAINMASK_TABLES (5)
+
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+#define PSOC_MAX_NUM_AGC_GAIN_TBLS 8
+#endif
 
 #ifdef WLAN_FEATURE_11BE
 #define PSOC_HOST_MAX_EHT_MAC_SIZE 1

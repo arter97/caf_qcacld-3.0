@@ -748,10 +748,12 @@ void dp_reo_shared_qaddr_detach(struct dp_soc *soc)
 static QDF_STATUS dp_soc_detach_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
 	int i = 0;
 
 	dp_soc_ppeds_detach_be(soc);
 	dp_reo_shared_qaddr_detach(soc);
+	dp_mlo_dev_ctxt_list_detach_wrapper(mlo_dev_obj);
 
 	for (i = 0; i < MAX_TXDESC_POOLS; i++)
 		dp_hw_cookie_conversion_detach(be_soc,
@@ -855,7 +857,7 @@ dp_mlo_mcast_deinit(struct dp_soc *soc, struct dp_vdev *vdev)
 
 	be_vdev->seq_num = 0;
 	be_vdev->mcast_primary = false;
-	vdev->mlo_vdev = false;
+	vdev->mlo_vdev = 0;
 }
 
 #else
@@ -876,6 +878,9 @@ static void dp_mlo_init_ptnr_list(struct dp_vdev *vdev)
 	qdf_mem_set(be_vdev->partner_vdev_list,
 		    WLAN_MAX_MLO_CHIPS * WLAN_MAX_MLO_LINKS_PER_SOC,
 		    CDP_INVALID_VDEV_ID);
+	qdf_mem_set(be_vdev->bridge_vdev_list,
+		    WLAN_MAX_MLO_CHIPS * WLAN_MAX_MLO_LINKS_PER_SOC,
+		    CDP_INVALID_VDEV_ID);
 }
 
 static void dp_get_rx_hash_key_be(struct dp_soc *soc,
@@ -883,6 +888,65 @@ static void dp_get_rx_hash_key_be(struct dp_soc *soc,
 {
 	dp_mlo_get_rx_hash_key(soc, lro_hash);
 }
+
+#ifdef WLAN_DP_MLO_DEV_CTX
+static inline void
+dp_attach_vdev_list_in_mlo_dev_ctxt(struct dp_soc_be *be_soc,
+				    struct dp_vdev *vdev,
+				    struct dp_mlo_dev_ctxt *mlo_dev_ctxt)
+{
+	uint8_t pdev_id = vdev->pdev->pdev_id;
+
+	qdf_spin_lock_bh(&mlo_dev_ctxt->vdev_list_lock);
+	if (vdev->is_bridge_vdev) {
+		if (mlo_dev_ctxt->bridge_vdev[be_soc->mlo_chip_id][pdev_id]
+		    != CDP_INVALID_VDEV_ID)
+			dp_alert("bridge vdevId in MLO dev ctx is not Invalid"
+				 "chip_id: %u, pdev_id: %u,"
+				 "existing vdev_id: %u, new vdev_id : %u",
+				 be_soc->mlo_chip_id, pdev_id,
+				 mlo_dev_ctxt->bridge_vdev[be_soc->mlo_chip_id][pdev_id],
+				 vdev->vdev_id);
+
+		mlo_dev_ctxt->bridge_vdev[be_soc->mlo_chip_id][pdev_id] =
+								vdev->vdev_id;
+		mlo_dev_ctxt->is_bridge_vdev_present = 1;
+	} else {
+		if (mlo_dev_ctxt->vdev_list[be_soc->mlo_chip_id][pdev_id]
+		    != CDP_INVALID_VDEV_ID)
+			dp_alert("vdevId in MLO dev ctx is not Invalid"
+				 "chip_id: %u, pdev_id: %u,"
+				 "existing vdev_id: %u, new vdev_id : %u",
+				 be_soc->mlo_chip_id, pdev_id,
+				 mlo_dev_ctxt->vdev_list[be_soc->mlo_chip_id][pdev_id],
+				 vdev->vdev_id);
+
+		mlo_dev_ctxt->vdev_list[be_soc->mlo_chip_id][pdev_id] =
+								vdev->vdev_id;
+	}
+	mlo_dev_ctxt->vdev_count++;
+	qdf_spin_unlock_bh(&mlo_dev_ctxt->vdev_list_lock);
+}
+
+static inline void
+dp_detach_vdev_list_in_mlo_dev_ctxt(struct dp_soc_be *be_soc,
+				    struct dp_vdev *vdev,
+				    struct dp_mlo_dev_ctxt *mlo_dev_ctxt)
+{
+	uint8_t pdev_id = vdev->pdev->pdev_id;
+
+	qdf_spin_lock_bh(&mlo_dev_ctxt->vdev_list_lock);
+	if (vdev->is_bridge_vdev) {
+		mlo_dev_ctxt->bridge_vdev[be_soc->mlo_chip_id][pdev_id] =
+							CDP_INVALID_VDEV_ID;
+	} else {
+		mlo_dev_ctxt->vdev_list[be_soc->mlo_chip_id][pdev_id] =
+							CDP_INVALID_VDEV_ID;
+	}
+	mlo_dev_ctxt->vdev_count--;
+	qdf_spin_unlock_bh(&mlo_dev_ctxt->vdev_list_lock);
+}
+#endif /* WLAN_DP_MLO_DEV_CTX */
 #else
 static inline void
 dp_mlo_mcast_init(struct dp_soc *soc, struct dp_vdev *vdev)
@@ -904,6 +968,21 @@ static void dp_get_rx_hash_key_be(struct dp_soc *soc,
 	dp_get_rx_hash_key_bytes(lro_hash);
 }
 
+#ifdef WLAN_DP_MLO_DEV_CTX
+static inline void
+dp_attach_vdev_list_in_mlo_dev_ctxt(struct dp_soc_be *be_soc,
+				    struct dp_vdev *vdev,
+				    struct dp_mlo_dev_ctxt *mlo_dev_ctxt)
+{
+}
+
+static inline void
+dp_detach_vdev_list_in_mlo_dev_ctxt(struct dp_soc_be *be_soc,
+				    struct dp_vdev *vdev,
+				    struct dp_mlo_dev_ctxt *mlo_dev_ctxt)
+{
+}
+#endif /* WLAN_DP_MLO_DEV_CTX */
 #endif
 
 static QDF_STATUS dp_soc_attach_be(struct dp_soc *soc,
@@ -914,6 +993,7 @@ static QDF_STATUS dp_soc_attach_be(struct dp_soc *soc,
 	uint32_t max_tx_rx_desc_num, num_spt_pages;
 	uint32_t num_entries;
 	int i = 0;
+	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
 
 	max_tx_rx_desc_num = WLAN_CFG_NUM_TX_DESC_MAX * MAX_TXDESC_POOLS +
 		WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX * MAX_RXDESC_POOLS +
@@ -937,6 +1017,12 @@ static QDF_STATUS dp_soc_attach_be(struct dp_soc *soc,
 		goto fail;
 
 	dp_soc_mlo_fill_params(soc, params);
+
+	/* Initialize common cdp mlo ops */
+	dp_soc_initialize_cdp_cmn_mlo_ops(soc);
+
+	/* Initialize MLO device ctxt list */
+	dp_mlo_dev_ctxt_list_attach_wrapper(mlo_dev_obj);
 
 	qdf_status = dp_soc_ppeds_attach_be(soc);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -1495,6 +1581,7 @@ dp_rxdma_ring_sel_cfg_be(struct dp_soc *soc)
 		htt_tlv_filter.rx_header_offset,
 		htt_tlv_filter.rx_packet_offset);
 
+	dp_rxdma_ring_wmask_cfg_be(soc, &htt_tlv_filter);
 	for (i = 0; i < MAX_PDEV_CNT; i++) {
 		struct dp_pdev *pdev = soc->pdev_list[i];
 
@@ -1980,6 +2067,14 @@ static QDF_STATUS dp_mlo_peer_find_hash_attach_wrapper(struct dp_soc *soc)
 static void dp_mlo_peer_find_hash_detach_wrapper(struct dp_soc *soc)
 {
 }
+
+void dp_mlo_dev_ctxt_list_attach_wrapper(dp_mlo_dev_obj_t mlo_dev_obj)
+{
+}
+
+void dp_mlo_dev_ctxt_list_detach_wrapper(dp_mlo_dev_obj_t mlo_dev_obj)
+{
+}
 #else
 static QDF_STATUS dp_mlo_peer_find_hash_attach_wrapper(struct dp_soc *soc)
 {
@@ -2003,6 +2098,16 @@ static void dp_mlo_peer_find_hash_detach_wrapper(struct dp_soc *soc)
 		return;
 
 	return dp_mlo_peer_find_hash_detach_be(mld_hash_obj);
+}
+
+void dp_mlo_dev_ctxt_list_attach_wrapper(dp_mlo_dev_obj_t mlo_dev_obj)
+{
+	dp_mlo_dev_ctxt_list_attach(mlo_dev_obj);
+}
+
+void dp_mlo_dev_ctxt_list_detach_wrapper(dp_mlo_dev_obj_t mlo_dev_obj)
+{
+	dp_mlo_dev_ctxt_list_detach(mlo_dev_obj);
 }
 #endif
 
@@ -2254,7 +2359,7 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 						be_vdev->vdev.pdev->soc);
 
 	be_vdev->mcast_primary = val.cdp_vdev_param_mcast_vdev;
-	vdev->mlo_vdev = true;
+	vdev->mlo_vdev = 1;
 
 	if (be_vdev->mcast_primary) {
 		struct cdp_txrx_peer_params_update params = {0};
@@ -2262,11 +2367,12 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 				      dp_mlo_mcast_reset_pri_mcast,
 				      (void *)&be_vdev->mcast_primary,
-				      DP_MOD_ID_TX_MCAST);
+				      DP_MOD_ID_TX_MCAST,
+				      DP_LINK_VDEV_ITER);
 
 		params.chip_id = be_soc->mlo_chip_id;
 		params.pdev_id = be_vdev->vdev.pdev->pdev_id;
-		params.osif_vdev = be_vdev->vdev.osif_vdev;
+		params.vdev_id = vdev->vdev_id;
 		dp_wdi_event_handler(
 				WDI_EVENT_MCAST_PRIMARY_UPDATE,
 				be_vdev->vdev.pdev->soc,
@@ -2295,7 +2401,7 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 						be_vdev->vdev.pdev->soc);
 
 	be_vdev->mcast_primary = val.cdp_vdev_param_mcast_vdev;
-	vdev->mlo_vdev = true;
+	vdev->mlo_vdev = 1;
 	hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
 				   vdev->vdev_id,
 				   HAL_TX_MCAST_CTRL_NO_SPECIAL);
@@ -2306,11 +2412,12 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 				      dp_mlo_mcast_reset_pri_mcast,
 				      (void *)&be_vdev->mcast_primary,
-				      DP_MOD_ID_TX_MCAST);
+				      DP_MOD_ID_TX_MCAST,
+				      DP_LINK_VDEV_ITER);
 
 		params.chip_id = be_soc->mlo_chip_id;
 		params.pdev_id = vdev->pdev->pdev_id;
-		params.osif_vdev = vdev->osif_vdev;
+		params.vdev_id = vdev->vdev_id;
 		dp_wdi_event_handler(
 				WDI_EVENT_MCAST_PRIMARY_UPDATE,
 				vdev->pdev->soc,
@@ -2327,7 +2434,7 @@ static void dp_txrx_reset_mlo_mcast_primary_vdev_param_be(
 	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
 
 	be_vdev->mcast_primary = false;
-	vdev->mlo_vdev = false;
+	vdev->mlo_vdev = 0;
 	hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
 				   vdev->vdev_id,
 				   HAL_TX_MCAST_CTRL_FW_EXCEPTION);
@@ -2494,46 +2601,344 @@ static QDF_STATUS dp_peer_map_attach_be(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
-static struct dp_peer *dp_find_peer_by_destmac_be(struct dp_soc *soc,
-						  uint8_t *dest_mac,
-						  uint8_t vdev_id)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_DP_MLO_DEV_CTX)
+
+void dp_mlo_dev_ctxt_list_attach(dp_mlo_dev_obj_t mlo_dev_obj)
 {
-	struct dp_peer *peer = NULL;
-	struct dp_peer *tgt_peer = NULL;
-	struct dp_ast_entry *ast_entry = NULL;
-	uint16_t peer_id;
+	TAILQ_INIT(&mlo_dev_obj->mlo_dev_list);
+	qdf_spinlock_create(&mlo_dev_obj->mlo_dev_list_lock);
+}
 
-	qdf_spin_lock_bh(&soc->ast_lock);
-	ast_entry = dp_peer_ast_hash_find_soc(soc, dest_mac);
-	if (!ast_entry) {
-		qdf_spin_unlock_bh(&soc->ast_lock);
-		dp_err("NULL ast entry");
-		return NULL;
+void dp_mlo_dev_ctxt_list_detach(dp_mlo_dev_obj_t mlo_dev_obj)
+{
+	struct dp_mlo_dev_ctxt *mld_ctxt = NULL;
+	struct dp_mlo_dev_ctxt *tmp_mld_ctxt = NULL;
+
+	if (!TAILQ_EMPTY(&mlo_dev_obj->mlo_dev_list)) {
+		dp_alert("DP MLO dev list is not empty");
+		qdf_spin_lock_bh(&mlo_dev_obj->mlo_dev_list_lock);
+		TAILQ_FOREACH_SAFE(mld_ctxt, &mlo_dev_obj->mlo_dev_list,
+				   ml_dev_list_elem, tmp_mld_ctxt) {
+			if (mld_ctxt) {
+				dp_alert("MLD MAC " QDF_MAC_ADDR_FMT " ",
+					 QDF_MAC_ADDR_REF(
+						&mld_ctxt->mld_mac_addr.raw));
+				qdf_mem_free(mld_ctxt);
+			}
+		}
+		qdf_spin_unlock_bh(&mlo_dev_obj->mlo_dev_list_lock);
 	}
 
-	peer_id = ast_entry->peer_id;
-	qdf_spin_unlock_bh(&soc->ast_lock);
+	qdf_spinlock_destroy(&mlo_dev_obj->mlo_dev_list_lock);
+}
 
-	if (peer_id == HTT_INVALID_PEER)
-		return NULL;
+void dp_mlo_dev_ctxt_unref_delete(struct dp_mlo_dev_ctxt *mlo_dev_ctxt,
+				  enum dp_mod_id mod_id)
+{
+	QDF_ASSERT(qdf_atomic_dec_return(&mlo_dev_ctxt->mod_refs[mod_id]) >= 0);
 
-	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
-	if (!peer) {
-		dp_err("NULL peer for peer_id:%d", peer_id);
+	/* Return if this is not the last reference*/
+	if (!qdf_atomic_dec_and_test(&mlo_dev_ctxt->ref_cnt))
+		return;
+
+	QDF_ASSERT(mlo_dev_ctxt->ref_delete_pending);
+	qdf_spinlock_destroy(&mlo_dev_ctxt->vdev_list_lock);
+	qdf_mem_free(mlo_dev_ctxt);
+}
+
+QDF_STATUS dp_mlo_dev_get_ref(struct dp_mlo_dev_ctxt *mlo_dev_ctxt,
+			      enum dp_mod_id mod_id)
+{
+	if (!qdf_atomic_inc_return(&mlo_dev_ctxt->ref_cnt))
+		return QDF_STATUS_E_INVAL;
+
+	qdf_atomic_inc(&mlo_dev_ctxt->mod_refs[mod_id]);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+struct dp_mlo_dev_ctxt *
+dp_get_mlo_dev_ctx_by_mld_mac_addr(struct dp_soc_be *be_soc,
+				   uint8_t *mldaddr,
+				   enum dp_mod_id mod_id)
+{
+	struct dp_mlo_dev_ctxt *mld_cur = NULL;
+	struct dp_mlo_dev_ctxt *tmp_mld_cur = NULL;
+	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
+
+	if (!mlo_dev_obj) {
+		dp_err("DP Global MLO Context is NULL");
 		return NULL;
 	}
-
-	tgt_peer = dp_get_tgt_peer_from_peer(peer);
 
 	/*
-	 * Once tgt_peer is obtained,
-	 * release the ref taken for original peer.
+	 * Iterate through ml dev list, till mldaddr matches with
+	 * entry of list
 	 */
-	dp_peer_get_ref(NULL, tgt_peer, DP_MOD_ID_SAWF);
-	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
-
-	return tgt_peer;
+	qdf_spin_lock_bh(&mlo_dev_obj->mlo_dev_list_lock);
+	TAILQ_FOREACH_SAFE(mld_cur, &mlo_dev_obj->mlo_dev_list,
+			   ml_dev_list_elem, tmp_mld_cur) {
+		if (!qdf_mem_cmp(&mld_cur->mld_mac_addr.raw, mldaddr,
+				 QDF_MAC_ADDR_SIZE)) {
+			if (dp_mlo_dev_get_ref(mld_cur, mod_id)
+			    == QDF_STATUS_SUCCESS) {
+				qdf_spin_unlock_bh(&mlo_dev_obj->mlo_dev_list_lock);
+				return mld_cur;
+			}
+		}
+	}
+	qdf_spin_unlock_bh(&mlo_dev_obj->mlo_dev_list_lock);
+	return NULL;
 }
+
+/**
+ * dp_mlo_dev_ctxt_create() - Allocate DP MLO dev context
+ * @soc_hdl: SOC handle
+ * @mld_mac_addr: MLD MAC address
+ *
+ * Return: QDF_STATUS
+ */
+static inline
+QDF_STATUS dp_mlo_dev_ctxt_create(struct cdp_soc_t *soc_hdl,
+				  uint8_t *mld_mac_addr)
+{
+	struct dp_mlo_dev_ctxt *mlo_dev_ctxt = NULL;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
+
+	if (!mlo_dev_obj) {
+		dp_err("DP Global MLO Context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* check if MLO dev ctx already available */
+	mlo_dev_ctxt = dp_get_mlo_dev_ctx_by_mld_mac_addr(be_soc,
+							  mld_mac_addr,
+							  DP_MOD_ID_MLO_DEV);
+	if (mlo_dev_ctxt) {
+		dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_MLO_DEV);
+		/* assert if we get two create request for same MLD MAC */
+		qdf_assert_always(0);
+	}
+
+	/* Allocate MLO dev ctx */
+	mlo_dev_ctxt = qdf_mem_malloc(sizeof(struct dp_mlo_dev_ctxt));
+
+	if (!mlo_dev_ctxt) {
+		dp_err("Failed to allocate DP MLO Dev Context");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_copy_macaddr((struct qdf_mac_addr *)&mlo_dev_ctxt->mld_mac_addr.raw[0],
+			 (struct qdf_mac_addr *)mld_mac_addr);
+
+	qdf_mem_set(mlo_dev_ctxt->vdev_list,
+		    WLAN_MAX_MLO_CHIPS * WLAN_MAX_MLO_LINKS_PER_SOC,
+		    CDP_INVALID_VDEV_ID);
+	qdf_mem_set(mlo_dev_ctxt->bridge_vdev,
+		    WLAN_MAX_MLO_CHIPS * WLAN_MAX_MLO_LINKS_PER_SOC,
+		    CDP_INVALID_VDEV_ID);
+
+	/* Add mlo_dev_ctxt to the global DP MLO list */
+	qdf_spin_lock_bh(&mlo_dev_obj->mlo_dev_list_lock);
+	TAILQ_INSERT_TAIL(&mlo_dev_obj->mlo_dev_list,
+			  mlo_dev_ctxt, ml_dev_list_elem);
+	qdf_spin_unlock_bh(&mlo_dev_obj->mlo_dev_list_lock);
+
+	/* Ref for MLO ctxt saved in global list */
+	dp_mlo_dev_get_ref(mlo_dev_ctxt, DP_MOD_ID_CONFIG);
+
+	mlo_dev_ctxt->ref_delete_pending = 0;
+	qdf_spinlock_create(&mlo_dev_ctxt->vdev_list_lock);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_mlo_dev_ctxt_destroy() - Destroy DP MLO dev context
+ * @soc_hdl: SOC handle
+ * @mld_mac_addr: MLD MAC address
+ *
+ * Return: QDF_STATUS
+ */
+static inline
+QDF_STATUS dp_mlo_dev_ctxt_destroy(struct cdp_soc_t *soc_hdl,
+				   uint8_t *mld_mac_addr)
+{
+	struct dp_mlo_dev_ctxt *mlo_dev_ctxt = NULL;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
+
+	if (!mlo_dev_obj) {
+		dp_err("DP Global MLO Context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* GET mlo_dev_ctxt from the global list */
+	mlo_dev_ctxt = dp_get_mlo_dev_ctx_by_mld_mac_addr(be_soc,
+							  mld_mac_addr,
+							  DP_MOD_ID_MLO_DEV);
+	if (!mlo_dev_ctxt) {
+		dp_err("Failed to get DP MLO Dev Context by MLD mac addr");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (mlo_dev_ctxt->vdev_count)
+		dp_alert("deleting MLO dev ctxt with non zero vdev count");
+
+	qdf_spin_lock_bh(&mlo_dev_obj->mlo_dev_list_lock);
+	TAILQ_REMOVE(&mlo_dev_obj->mlo_dev_list,
+		     mlo_dev_ctxt, ml_dev_list_elem);
+	qdf_spin_unlock_bh(&mlo_dev_obj->mlo_dev_list_lock);
+
+	/* unref for MLO ctxt ref released from Global list */
+	dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_CONFIG);
+
+	mlo_dev_ctxt->ref_delete_pending = 1;
+	dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_MLO_DEV);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_mlo_dev_ctxt_vdev_attach() - Attach vdev to DP MLO dev context
+ * @soc_hdl: SOC handle
+ * @vdev_id: vdev id for the vdev to be attached
+ * @mld_mac_addr: MLD MAC address
+ *
+ * Return: QDF_STATUS
+ */
+static inline
+QDF_STATUS dp_mlo_dev_ctxt_vdev_attach(struct cdp_soc_t *soc_hdl,
+				       uint8_t vdev_id,
+				       uint8_t *mld_mac_addr)
+{
+	struct dp_mlo_dev_ctxt *mlo_dev_ctxt = NULL;
+	struct dp_vdev *vdev = NULL;
+	struct dp_vdev_be *be_vdev = NULL;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_CDP);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+
+	/* GET mlo_dev_ctxt from the global list */
+	mlo_dev_ctxt = dp_get_mlo_dev_ctx_by_mld_mac_addr(be_soc,
+							  mld_mac_addr,
+							  DP_MOD_ID_MLO_DEV);
+	if (!mlo_dev_ctxt) {
+		dp_err("Failed to get MLO ctxt for " QDF_MAC_ADDR_FMT "",
+		       QDF_MAC_ADDR_REF(mld_mac_addr));
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_attach_vdev_list_in_mlo_dev_ctxt(be_soc, vdev, mlo_dev_ctxt);
+	be_vdev->mlo_dev_ctxt = mlo_dev_ctxt;
+
+	/* ref for holding MLO ctxt in be_vdev */
+	dp_mlo_dev_get_ref(mlo_dev_ctxt, DP_MOD_ID_CHILD);
+
+	/* unref for mlo ctxt taken at the start of this function */
+	dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_MLO_DEV);
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_mlo_dev_ctxt_vdev_detach() - Detach vdev from DP MLO dev context
+ * @soc_hdl: SOC handle
+ * @vdev_id: vdev id for the vdev to be attached
+ * @mld_mac_addr: MLD MAC address
+ *
+ * Return: QDF_STATUS
+ */
+static inline
+QDF_STATUS dp_mlo_dev_ctxt_vdev_detach(struct cdp_soc_t *soc_hdl,
+				       uint8_t vdev_id,
+				       uint8_t *mld_mac_addr)
+{
+	struct dp_vdev *vdev = NULL;
+	struct dp_vdev_be *be_vdev = NULL;
+	struct dp_mlo_dev_ctxt *mlo_dev_ctxt = NULL;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_CDP);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+
+	/* GET mlo_dev_ctxt from the global list */
+	mlo_dev_ctxt = dp_get_mlo_dev_ctx_by_mld_mac_addr(be_soc,
+							  mld_mac_addr,
+							  DP_MOD_ID_MLO_DEV);
+
+	if (!mlo_dev_ctxt) {
+		dp_err("Failed to get DP MLO Dev Context by MLD mac addr");
+		if (!be_vdev->mlo_dev_ctxt) {
+			dp_err("Failed to get DP MLO Dev Context from vdev");
+			dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+			return QDF_STATUS_E_INVAL;
+		}
+		mlo_dev_ctxt = be_vdev->mlo_dev_ctxt;
+	}
+
+	dp_detach_vdev_list_in_mlo_dev_ctxt(be_soc, vdev, mlo_dev_ctxt);
+	be_vdev->mlo_dev_ctxt = NULL;
+
+	/* unref for mlo ctxt removed from be_vdev*/
+	dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_CHILD);
+
+	/* unref for mlo ctxt taken at the start of this function */
+	dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_MLO_DEV);
+
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+	return QDF_STATUS_SUCCESS;
+}
+#else
+void dp_mlo_dev_ctxt_list_attach(dp_mlo_dev_obj_t mlo_dev_obj)
+{
+}
+
+void dp_mlo_dev_ctxt_list_detach(dp_mlo_dev_obj_t mlo_dev_obj)
+{
+}
+
+static inline
+QDF_STATUS dp_mlo_dev_ctxt_create(struct cdp_soc_t *soc_hdl,
+				  uint8_t *mld_mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_mlo_dev_ctxt_destroy(struct cdp_soc_t *soc_hdl,
+				   uint8_t *mld_mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_mlo_dev_ctxt_vdev_attach(struct cdp_soc_t *soc_hdl,
+				       uint8_t vdev_id,
+				       uint8_t *mld_mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_mlo_dev_ctxt_vdev_detach(struct cdp_soc_t *soc_hdl,
+				       uint8_t vdev_id,
+				       uint8_t *mld_mac_addr)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_DP_MLO_DEV_CTX */
 
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_MCAST_MLO
@@ -2586,6 +2991,18 @@ dp_initialize_arch_ops_be_mlo(struct dp_arch_ops *arch_ops)
 {
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
+
+static struct cdp_cmn_mlo_ops dp_cmn_mlo_ops = {
+	.mlo_dev_ctxt_create = dp_mlo_dev_ctxt_create,
+	.mlo_dev_ctxt_attach = dp_mlo_dev_ctxt_vdev_attach,
+	.mlo_dev_ctxt_detach = dp_mlo_dev_ctxt_vdev_detach,
+	.mlo_dev_ctxt_destroy = dp_mlo_dev_ctxt_destroy,
+};
+
+void dp_soc_initialize_cdp_cmn_mlo_ops(struct dp_soc *soc)
+{
+	soc->cdp_soc.ops->cmn_mlo_ops = &dp_cmn_mlo_ops;
+}
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 #define DP_LMAC_PEER_ID_MSB_LEGACY 2
@@ -2770,12 +3187,12 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	dp_initialize_arch_ops_be_mlo(arch_ops);
 #ifdef WLAN_MLO_MULTI_CHIP
 	arch_ops->dp_get_soc_by_chip_id = dp_get_soc_by_chip_id_be;
+	arch_ops->dp_mlo_print_ptnr_info = dp_mlo_debug_print_ptnr_info;
 #endif
 	arch_ops->dp_soc_get_num_soc = dp_soc_get_num_soc_be;
 	arch_ops->dp_peer_rx_reorder_queue_setup =
 					dp_peer_rx_reorder_queue_setup_be;
 	arch_ops->txrx_print_peer_stats = dp_print_peer_txrx_stats_be;
-	arch_ops->dp_find_peer_by_destmac = dp_find_peer_by_destmac_be;
 #if defined(DP_UMAC_HW_HARD_RESET) && defined(DP_UMAC_HW_RESET_SUPPORT)
 	arch_ops->dp_bank_reconfig = dp_bank_reconfig_be;
 	arch_ops->dp_reconfig_tx_vdev_mcast_ctrl =
@@ -2900,7 +3317,7 @@ dp_primary_link_migration(struct dp_soc *soc, void *cb_ctxt,
 			 DP_MOD_ID_CHILD);
 	mld_peer->txrx_peer->vdev = mld_peer->vdev;
 
-	params.osif_vdev = (void *)new_primary_peer->vdev->osif_vdev;
+	params.vdev_id = new_primary_peer->vdev->vdev_id;
 	params.peer_mac = mld_peer->mac_addr.raw;
 	params.chip_id = pr_peer_info->chip_id;
 	params.pdev_id = new_primary_peer->vdev->pdev->pdev_id;

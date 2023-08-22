@@ -841,23 +841,6 @@ wlan_reg_get_afc_dev_deploy_type(struct wlan_objmgr_pdev *pdev,
 bool
 wlan_reg_is_sta_connect_allowed(struct wlan_objmgr_pdev *pdev,
 				enum reg_6g_ap_type root_ap_pwr_mode);
-
-/**
- * wlan_reg_is_6ghz_freq_txable() - Check if the given frequency is tx-able.
- * @pdev: Pointer to pdev
- * @freq: Frequency in MHz
- * @in_6ghz_pwr_mode: Input AP power type
- *
- * An SP channel is tx-able if the channel is present in the AFC response.
- * In case of non-OUTDOOR mode a channel is always tx-able (Assuming it is
- * enabled by regulatory).
- *
- * Return: True if the frequency is tx-able, else false.
- */
-bool
-wlan_reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
-			     qdf_freq_t freq,
-			     enum supported_6g_pwr_types in_6ghz_pwr_mode);
 #else
 static inline bool
 wlan_reg_is_afc_power_event_received(struct wlan_objmgr_pdev *pdev)
@@ -883,14 +866,6 @@ wlan_reg_is_sta_connect_allowed(struct wlan_objmgr_pdev *pdev,
 				enum reg_6g_ap_type root_ap_pwr_mode)
 {
 	return true;
-}
-
-static inline bool
-wlan_reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
-			     qdf_freq_t freq,
-			     enum supported_6g_pwr_types in_6ghz_pwr_mode)
-{
-	return false;
 }
 #endif
 
@@ -2873,4 +2848,15 @@ wlan_reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
 qdf_freq_t
 wlan_reg_get_endchan_cen_from_bandstart(qdf_freq_t band_start,
 					uint16_t bw);
+
+/**
+ * wlan_reg_get_opclass_from_map() - Get op class from map.
+ * @map: Pointer to reg_dmn_op_class_map_t.
+ * @is_global_op_table_needed: Whether to lookup global op class tbl.
+ *
+ * Return: QDF_STATUS_SUCCESS if success, else return QDF_STATUS_FAILURE.
+ */
+QDF_STATUS
+wlan_reg_get_opclass_from_map(const struct reg_dmn_op_class_map_t **map,
+			      bool is_global_op_table_needed);
 #endif

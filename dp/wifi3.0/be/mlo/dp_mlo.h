@@ -47,6 +47,8 @@
  * @rx_fst: pointer to rx_fst handle
  * @rx_fst_ref_cnt: ref count of rx_fst
  * @grp_umac_reset_ctx: UMAC reset context at mlo group level
+ * @mlo_dev_list: list of MLO device context
+ * @mlo_dev_list_lock: lock to protect MLO device ctxt
  */
 struct dp_mlo_ctxt {
 	struct cdp_ctrl_mlo_mgr *ctrl_ctxt;
@@ -68,6 +70,9 @@ struct dp_mlo_ctxt {
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 	struct dp_soc_mlo_umac_reset_ctx grp_umac_reset_ctx;
 #endif
+	/* MLO device ctxt list */
+	TAILQ_HEAD(, dp_mlo_dev_ctxt) mlo_dev_list;
+	qdf_spinlock_t mlo_dev_list_lock;
 };
 
 /**
@@ -217,4 +222,12 @@ int32_t dp_mlo_get_delta_tqm_wrt_mlo_offset(struct dp_soc *soc);
 QDF_STATUS
 dp_get_interface_stats_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			  void *buf, bool is_aggregate);
+
+/*
+ * dp_mlo_debug_print_ptnr_info() - print partner info
+ * @vdev: DP VDEV
+ *
+ * Return: none
+ */
+void dp_mlo_debug_print_ptnr_info(struct dp_vdev *vdev);
 #endif /* __DP_MLO_H */

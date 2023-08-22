@@ -66,6 +66,7 @@
 #define CFR_MOD_PRD  10                 /* CFR period to be multiples of 10ms */
 
 #define MAX_AGC_GAIN 62
+#define INVALID_AGC_GAIN 0xFFFF
 
 enum cfrmetaversion {
 	CFR_META_VERSION_NONE,
@@ -573,8 +574,22 @@ struct nl_event_cb {
  * @max_aoa_chains: Indicate the max number of chains to which target supports
  * AoA data.
  * @phase_delta: per chain phase delta associated with 62 gain values reported
- * by FW via WMI_PDEV_AOA_PHASEDELTA_EVENTID.
+ * by FW via WMI_PDEV_AOA_PHASEDELTA_EVENTID. This is for the targets which
+ * supports only default gain table.
  * @ibf_cal_val: Per chain IBF cal value from FW.
+ * @is_enh_aoa_data: flag to indicate the pdev supports enhanced AoA.
+ * @max_agc_gain_tbls: Max rx AGC gain tables supported & advertised by target.
+ * @max_agc_gain_per_tbl_2g: Max possible rx AGC gain per table on 2GHz band.
+ * @max_agc_gain_per_tbl_5g: Max possible rx AGC gain per table on 5GHz band.
+ * @max_agc_gain_per_tbl_6g: Max possbile rx AGC gain per table on 6GHz band.
+ * @max_bdf_entries_per_tbl: Max entries per table in gain & phase array.
+ * @max_entries_all_table: Max entries across table in gain & phase array.
+ * @gain_stop_index_array: This array has optimized gain range values stored.
+ * @enh_phase_delta_array: This array has optimized phase delta values stored
+ * aligning with gain_stop_index_array.
+ * @start_ent: array where each entry indicates the offset index per table to be
+ * applied on gain_stop_index_array and enh_phase_delta_array
+ * @xbar_config: xbar config to be used to map bb to rf chainmask.
  */
 /*
  * To be extended if we get more capbality info
@@ -635,7 +650,20 @@ struct pdev_cfr {
 	uint32_t max_aoa_chains;
 	uint16_t phase_delta[HOST_MAX_CHAINS][MAX_AGC_GAIN];
 	uint32_t ibf_cal_val[HOST_MAX_CHAINS];
-#endif
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+	bool is_enh_aoa_data;
+	uint32_t max_agc_gain_tbls;
+	uint16_t max_agc_gain_per_tbl_2g[PSOC_MAX_NUM_AGC_GAIN_TBLS];
+	uint16_t max_agc_gain_per_tbl_5g[PSOC_MAX_NUM_AGC_GAIN_TBLS];
+	uint16_t max_agc_gain_per_tbl_6g[PSOC_MAX_NUM_AGC_GAIN_TBLS];
+	uint8_t max_bdf_entries_per_tbl[PSOC_MAX_NUM_AGC_GAIN_TBLS];
+	uint32_t max_entries_all_table;
+	uint16_t *gain_stop_index_array;
+	uint16_t *enh_phase_delta_array;
+	uint8_t start_ent[PSOC_MAX_NUM_AGC_GAIN_TBLS];
+	uint32_t xbar_config;
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
+#endif /* WLAN_ENH_CFR_ENABLE */
 };
 
 /**

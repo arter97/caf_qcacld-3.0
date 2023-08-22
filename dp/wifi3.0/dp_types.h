@@ -188,6 +188,12 @@ typedef void dp_ptnr_soc_iter_func(struct dp_soc *ptnr_soc, void *arg,
 #define DP_MLD_MODE_UNIFIED_BOND    1
 #define DP_MLD_MODE_HYBRID_NONBOND  2
 #define DP_MLD_MODE_MAX             DP_MLD_MODE_HYBRID_NONBOND
+
+#define DP_LINK_VDEV_ITER 1
+#define DP_BRIDGE_VDEV_ITER 2
+#define DP_ALL_VDEV_ITER 3
+#define IS_LINK_VDEV_ITER_REQUIRED(type) (type & DP_LINK_VDEV_ITER)
+#define IS_BRIDGE_VDEV_ITER_REQUIRED(type) (type & DP_BRIDGE_VDEV_ITER)
 #endif
 
 enum rx_pktlog_mode {
@@ -280,6 +286,7 @@ enum dp_peer_state {
  * @DP_MOD_ID_UMAC_RESET:
  * @DP_MOD_ID_TX_MCAST:
  * @DP_MOD_ID_DS:
+ * @DP_MOD_ID_MLO_DEV:
  * @DP_MOD_ID_MAX:
  */
 enum dp_mod_id {
@@ -313,6 +320,7 @@ enum dp_mod_id {
 	DP_MOD_ID_UMAC_RESET,
 	DP_MOD_ID_TX_MCAST,
 	DP_MOD_ID_DS,
+	DP_MOD_ID_MLO_DEV,
 	DP_MOD_ID_MAX,
 };
 
@@ -657,7 +665,6 @@ struct dp_tx_ext_desc_pool_s {
  * @frm_type: Frame Type - ToDo check if this is redundant
  * @pkt_offset: Offset from which the actual packet data starts
  * @pool_id: Pool ID - used when releasing the descriptor
- * @shinfo_addr:
  * @msdu_ext_desc: MSDU extension descriptor
  * @timestamp:
  * @comp:
@@ -670,7 +677,7 @@ struct dp_tx_desc_s {
 	uint32_t magic;
 	uint64_t timestamp_tick;
 #endif
-	uint16_t flags;
+	uint32_t flags;
 	uint32_t id;
 	qdf_dma_addr_t dma_addr;
 	uint8_t vdev_id;
@@ -683,7 +690,6 @@ struct dp_tx_desc_s {
 	uint8_t frm_type;
 	uint8_t pkt_offset;
 	uint8_t  pool_id;
-	unsigned char *shinfo_addr;
 	struct dp_tx_ext_desc_elem_s *msdu_ext_desc;
 	qdf_ktime_t timestamp;
 	struct hal_tx_desc_comp_s comp;
@@ -2207,7 +2213,6 @@ enum dp_context_type {
  * @dp_rx_fst_ref:
  * @txrx_print_peer_stats:
  * @dp_peer_rx_reorder_queue_setup: Dp peer reorder queue setup
- * @dp_find_peer_by_destmac:
  * @dp_bank_reconfig:
  * @dp_get_soc_by_chip_id: Get soc by chip id
  * @dp_soc_get_num_soc:
@@ -2236,6 +2241,7 @@ enum dp_context_type {
  * @txrx_soc_ppeds_service_status_update:
  * @txrx_soc_ppeds_enabled_check:
  * @txrx_soc_ppeds_txdesc_pool_reset:
+ * @dp_mlo_print_ptnr_info: print partner vdev info
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -2407,9 +2413,6 @@ struct dp_arch_ops {
 						     struct dp_peer *peer,
 						     int tid,
 						     uint32_t ba_window_size);
-	struct dp_peer *(*dp_find_peer_by_destmac)(struct dp_soc *soc,
-						   uint8_t *dest_mac_addr,
-						   uint8_t vdev_id);
 	void (*dp_bank_reconfig)(struct dp_soc *soc, struct dp_vdev *vdev);
 
 	struct dp_soc * (*dp_get_soc_by_chip_id)(struct dp_soc *soc,
@@ -2482,6 +2485,7 @@ struct dp_arch_ops {
 	void (*txrx_soc_ppeds_txdesc_pool_reset)(struct dp_soc *soc,
 						 qdf_nbuf_t *nbuf_list);
 #endif
+	void (*dp_mlo_print_ptnr_info)(struct dp_vdev *vdev);
 };
 
 /**
@@ -2723,6 +2727,8 @@ struct dp_soc {
 
 	/* VDEVs on this SOC */
 	struct dp_vdev *vdev_id_map[MAX_VDEV_CNT];
+
+	uint8_t hw_txrx_stats_en:1;
 
 	/* Tx H/W queues lock */
 	qdf_spinlock_t tx_queue_lock[MAX_TX_HW_QUEUES];
@@ -3048,7 +3054,8 @@ struct dp_soc {
 	uint8_t rxdma2sw_rings_not_supported:1,
 		wbm_sg_last_msdu_war:1,
 		mec_fw_offload:1,
-		multi_peer_grp_cmd_supported:1;
+		multi_peer_grp_cmd_supported:1,
+		umac_reset_supported:1;
 
 	/* Number of Rx refill rings */
 	uint8_t num_rx_refill_buf_rings;
@@ -3824,7 +3831,9 @@ struct dp_vdev {
 	/* MLO MAC address corresponding to vdev */
 	union dp_align_mac_addr mld_mac_addr;
 #if defined(WLAN_MLO_MULTI_CHIP) && defined(WLAN_MCAST_MLO)
-	bool mlo_vdev;
+	uint8_t mlo_vdev:1,
+		is_bridge_vdev:1,
+		reserved_1:6;
 #endif
 #endif
 

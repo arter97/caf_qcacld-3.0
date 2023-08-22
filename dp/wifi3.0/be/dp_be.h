@@ -317,6 +317,8 @@ struct dp_ppeds_napi {
  * @mlo_tstamp_offset: mlo timestamp offset
  * @mld_peer_hash_lock: lock to protect mld_peer_hash
  * @mld_peer_hash: peer hash table for ML peers
+ * @mlo_dev_list: list of MLO device context
+ * @mlo_dev_list_lock: lock to protect MLO device ctxt
  * @ipa_bank_id: TCL bank id used by IPA
  */
 struct dp_soc_be {
@@ -368,6 +370,10 @@ struct dp_soc_be {
 
 		TAILQ_HEAD(, dp_peer) * bins;
 	} mld_peer_hash;
+
+	/* MLO device ctxt list */
+	TAILQ_HEAD(, dp_mlo_dev_ctxt) mlo_dev_list;
+	qdf_spinlock_t mlo_dev_list_lock;
 #endif
 #endif
 #ifdef IPA_OFFLOAD
@@ -399,9 +405,11 @@ struct dp_pdev_be {
  * @bank_id: bank_id to be used for TX
  * @vdev_id_check_en: flag if HW vdev_id check is enabled for vdev
  * @partner_vdev_list: partner list used for Intra-BSS
+ * @bridge_vdev_list: partner bridge vdev list
  * @mlo_stats: structure to hold stats for mlo unmapped peers
  * @seq_num: DP MLO seq number
  * @mcast_primary: MLO Mcast primary vdev
+ * @mlo_dev_ctxt: MLO device context pointer
  */
 struct dp_vdev_be {
 	struct dp_vdev vdev;
@@ -409,6 +417,7 @@ struct dp_vdev_be {
 	uint8_t vdev_id_check_en;
 #ifdef WLAN_MLO_MULTI_CHIP
 	uint8_t partner_vdev_list[WLAN_MAX_MLO_CHIPS][WLAN_MAX_MLO_LINKS_PER_SOC];
+	uint8_t bridge_vdev_list[WLAN_MAX_MLO_CHIPS][WLAN_MAX_MLO_LINKS_PER_SOC];
 	struct cdp_vdev_stats mlo_stats;
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_MCAST_MLO
@@ -417,7 +426,44 @@ struct dp_vdev_be {
 #endif
 #endif
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct dp_mlo_dev_ctxt *mlo_dev_ctxt;
+#endif /* WLAN_FEATURE_11BE_MLO */
 };
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_DP_MLO_DEV_CTX)
+/**
+ * struct dp_mlo_dev_ctxt - Datapath MLO device context
+ *
+ * @ml_dev_list_elem: node in the ML dev list of Global MLO context
+ * @mld_mac_addr: MLO device MAC address
+ * @vdev_list: list of vdevs associated with this MLO connection
+ * @vdev_list_lock: lock to protect vdev list
+ * @bridge_vdev: list of bridge vdevs associated with this MLO connection
+ * @is_bridge_vdev_present: flag to check if bridge vdev is present
+ * @vdev_list_lock: lock to protect vdev list
+ * @vdev_count: number of elements in the vdev list
+ * @ref_cnt: reference count
+ * @mod_refs: module reference count
+ * @ref_delete_pending: flag to monitor last ref delete
+ * @stats: structure to store vdev stats of removed MLO Link
+ */
+struct dp_mlo_dev_ctxt {
+	TAILQ_ENTRY(dp_mlo_dev_ctxt) ml_dev_list_elem;
+	union dp_align_mac_addr mld_mac_addr;
+#ifdef WLAN_MLO_MULTI_CHIP
+	uint8_t vdev_list[WLAN_MAX_MLO_CHIPS][WLAN_MAX_MLO_LINKS_PER_SOC];
+	uint8_t bridge_vdev[WLAN_MAX_MLO_CHIPS][WLAN_MAX_MLO_LINKS_PER_SOC];
+	bool is_bridge_vdev_present;
+	qdf_spinlock_t vdev_list_lock;
+	uint16_t vdev_count;
+#endif
+	qdf_atomic_t ref_cnt;
+	qdf_atomic_t mod_refs[DP_MOD_ID_MAX];
+	uint8_t ref_delete_pending;
+	struct cdp_vdev_stats stats;
+};
+#endif /* WLAN_FEATURE_11BE_MLO */
 
 /**
  * struct dp_peer_be - Extended DP peer for BE targets
@@ -478,6 +524,7 @@ bool dp_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc, dp_ptnr_soc_iter_func func,
 
 #ifdef WLAN_MLO_MULTI_CHIP
 typedef struct dp_mlo_ctxt *dp_mld_peer_hash_obj_t;
+typedef struct dp_mlo_ctxt *dp_mlo_dev_obj_t;
 
 /**
  * dp_mlo_get_peer_hash_obj() - return the container struct of MLO hash table
@@ -495,6 +542,17 @@ dp_mlo_get_peer_hash_obj(struct dp_soc *soc)
 
 void  dp_clr_mlo_ptnr_list(struct dp_soc *soc, struct dp_vdev *vdev);
 
+/**
+ * dp_get_mlo_dev_list_obj() - return the container struct of MLO Dev list
+ * @be_soc: be soc handle
+ *
+ * return: MLO dev list object
+ */
+static inline dp_mlo_dev_obj_t
+dp_get_mlo_dev_list_obj(struct dp_soc_be *be_soc)
+{
+	return be_soc->ml_ctxt;
+}
 #if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * dp_mlo_partner_chips_map() - Map MLO peers to partner SOCs
@@ -516,6 +574,14 @@ void dp_mlo_partner_chips_map(struct dp_soc *soc,
 void dp_mlo_partner_chips_unmap(struct dp_soc *soc,
 				uint16_t peer_id);
 
+/**
+ * dp_soc_initialize_cdp_cmn_mlo_ops() - Initialize common CDP API's
+ * @soc: Soc handle
+ *
+ * Return: None
+ */
+void dp_soc_initialize_cdp_cmn_mlo_ops(struct dp_soc *soc);
+
 #ifdef WLAN_MLO_MULTI_CHIP
 typedef void dp_ptnr_vdev_iter_func(struct dp_vdev_be *be_vdev,
 				    struct dp_vdev *ptnr_vdev,
@@ -528,13 +594,15 @@ typedef void dp_ptnr_vdev_iter_func(struct dp_vdev_be *be_vdev,
  * @func: function to be called for each peer
  * @arg: argument need to be passed to func
  * @mod_id: module id
+ * @type: iterate type
  *
  * Return: None
  */
 void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			   struct dp_vdev_be *be_vdev,
 			   dp_ptnr_vdev_iter_func func, void *arg,
-			   enum dp_mod_id mod_id);
+			   enum dp_mod_id mod_id,
+			   uint8_t type);
 #endif
 
 #ifdef WLAN_MCAST_MLO
@@ -554,6 +622,7 @@ struct dp_vdev *dp_mlo_get_mcast_primary_vdev(struct dp_soc_be *be_soc,
 
 #else
 typedef struct dp_soc_be *dp_mld_peer_hash_obj_t;
+typedef struct dp_soc_be *dp_mlo_dev_obj_t;
 
 static inline dp_mld_peer_hash_obj_t
 dp_mlo_get_peer_hash_obj(struct dp_soc *soc)
@@ -564,6 +633,12 @@ dp_mlo_get_peer_hash_obj(struct dp_soc *soc)
 static inline void  dp_clr_mlo_ptnr_list(struct dp_soc *soc,
 					 struct dp_vdev *vdev)
 {
+}
+
+static inline dp_mlo_dev_obj_t
+dp_get_mlo_dev_list_obj(struct dp_soc_be *be_soc)
+{
+	return be_soc;
 }
 #endif
 
@@ -886,4 +961,87 @@ void dp_mlo_update_link_to_pdev_unmap(struct dp_soc *soc, struct dp_pdev *pdev)
 {
 }
 #endif
+
+/**
+ * dp_mlo_dev_ctxt_list_attach_wrapper() - Wrapper API for MLO dev list Init
+ *
+ * @mlo_dev_obj: MLO device object
+ *
+ * Return: void
+ */
+void dp_mlo_dev_ctxt_list_attach_wrapper(dp_mlo_dev_obj_t mlo_dev_obj);
+
+/**
+ * dp_mlo_dev_ctxt_list_detach_wrapper() - Wrapper API for MLO dev list de-Init
+ *
+ * @mlo_dev_obj: MLO device object
+ *
+ * Return: void
+ */
+void dp_mlo_dev_ctxt_list_detach_wrapper(dp_mlo_dev_obj_t mlo_dev_obj);
+
+/**
+ * dp_mlo_dev_ctxt_list_attach() - API to initialize MLO device List
+ *
+ * @mlo_dev_obj: MLO device object
+ *
+ * Return: void
+ */
+void dp_mlo_dev_ctxt_list_attach(dp_mlo_dev_obj_t mlo_dev_obj);
+
+/**
+ * dp_mlo_dev_ctxt_list_detach() - API to de-initialize MLO device List
+ *
+ * @mlo_dev_obj: MLO device object
+ *
+ * Return: void
+ */
+void dp_mlo_dev_ctxt_list_detach(dp_mlo_dev_obj_t mlo_dev_obj);
+
+/**
+ * dp_soc_initialize_cdp_cmn_mlo_ops() - API to initialize common CDP MLO ops
+ *
+ * @soc: Datapath soc handle
+ *
+ * Return: void
+ */
+void dp_soc_initialize_cdp_cmn_mlo_ops(struct dp_soc *soc);
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_DP_MLO_DEV_CTX)
+/**
+ * dp_mlo_dev_ctxt_unref_delete() - Releasing the ref for MLO device ctxt
+ *
+ * @mlo_dev_ctxt: MLO device context handle
+ * @mod_id: module id which is releasing the reference
+ *
+ * Return: void
+ */
+void dp_mlo_dev_ctxt_unref_delete(struct dp_mlo_dev_ctxt *mlo_dev_ctxt,
+				  enum dp_mod_id mod_id);
+
+/**
+ * dp_mlo_dev_get_ref() - Get the ref for MLO device ctxt
+ *
+ * @mlo_dev_ctxt: MLO device context handle
+ * @mod_id: module id which is requesting the reference
+ *
+ * Return: SUCCESS on acquiring the ref.
+ */
+QDF_STATUS
+dp_mlo_dev_get_ref(struct dp_mlo_dev_ctxt *mlo_dev_ctxt,
+		   enum dp_mod_id mod_id);
+
+/**
+ * dp_get_mlo_dev_ctx_by_mld_mac_addr() - Get MLO device ctx based on MLD MAC
+ *
+ * @be_soc: be soc handle
+ * @mldaddr: MLD MAC address
+ * @mod_id: module id which is requesting the reference
+ *
+ * Return: MLO device context Handle on success, NULL on failure
+ */
+struct dp_mlo_dev_ctxt *
+dp_get_mlo_dev_ctx_by_mld_mac_addr(struct dp_soc_be *be_soc,
+				   uint8_t *mldaddr, enum dp_mod_id mod_id);
+#endif /* WLAN_DP_MLO_DEV_CTX */
 #endif

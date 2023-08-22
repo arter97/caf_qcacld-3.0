@@ -650,7 +650,11 @@ struct ml_vdev_start_partner_info {
  */
 struct mlo_vdev_start_partner_links {
 	uint8_t num_links;
+#ifdef WLAN_MLO_MULTI_CHIP
+	struct ml_vdev_start_partner_info partner_info[WLAN_UMAC_MLO_MAX_VDEVS + WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS];
+#else
 	struct ml_vdev_start_partner_info partner_info[WLAN_UMAC_MLO_MAX_VDEVS];
+#endif
 };
 #endif
 /**

@@ -305,6 +305,21 @@ void dp_tx_tso_num_seg_pool_deinit(struct dp_soc *soc, uint8_t num_pool);
 void dp_tx_desc_pool_cleanup(struct dp_soc *soc, qdf_nbuf_t *nbuf_list);
 #endif
 
+/**
+ * dp_tx_desc_clear() - Clear contents of tx desc
+ * @tx_desc: descriptor to free
+ *
+ * Return: none
+ */
+static inline void
+dp_tx_desc_clear(struct dp_tx_desc_s *tx_desc)
+{
+	tx_desc->vdev_id = DP_INVALID_VDEV_ID;
+	tx_desc->nbuf = NULL;
+	tx_desc->flags = 0;
+	tx_desc->next = NULL;
+}
+
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
 void dp_tx_flow_control_init(struct dp_soc *);
 void dp_tx_flow_control_deinit(struct dp_soc *);
@@ -909,16 +924,28 @@ dp_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
 		uint8_t desc_pool_id)
 {
 	struct dp_tx_desc_pool_s *pool = NULL;
-	tx_desc->vdev_id = DP_INVALID_VDEV_ID;
-	tx_desc->nbuf = NULL;
-	tx_desc->flags = 0;
 
+	dp_tx_desc_clear(tx_desc);
 	pool = &soc->tx_desc[desc_pool_id];
 	TX_DESC_LOCK_LOCK(&pool->lock);
 	tx_desc->next = pool->freelist;
 	pool->freelist = tx_desc;
 	pool->num_allocated--;
 	pool->num_free++;
+	TX_DESC_LOCK_UNLOCK(&pool->lock);
+}
+
+static inline void
+dp_tx_desc_free_list(struct dp_tx_desc_pool_s *pool,
+		     struct dp_tx_desc_s *head_desc,
+		     struct dp_tx_desc_s *tail_desc,
+		     uint32_t fast_desc_count)
+{
+	TX_DESC_LOCK_LOCK(&pool->lock);
+	pool->num_allocated -= fast_desc_count;
+	pool->num_free += fast_desc_count;
+	tail_desc->next = pool->freelist;
+	pool->freelist = head_desc;
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
 }
 

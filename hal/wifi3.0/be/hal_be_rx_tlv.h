@@ -29,11 +29,24 @@
 
 #define HAL_RX_BE_PKT_HDR_TLV_LEN		112
 
+#ifndef BIG_ENDIAN_HOST
 struct rx_pkt_hdr_tlv {
 	uint64_t tag;					/* 8 B */
-	uint64_t phy_ppdu_id;				/* 8 B */
-	char rx_pkt_hdr[HAL_RX_BE_PKT_HDR_TLV_LEN];		/* 112 B */
+	uint32_t reserved_0				: 16, /* 4 B */
+		 phy_ppdu_id				: 16;
+	uint32_t reserved_1a;				/* 4 B */
+	char rx_pkt_hdr[HAL_RX_BE_PKT_HDR_TLV_LEN];	/* 112 B */
 };
+#else
+struct rx_pkt_hdr_tlv {
+	uint64_t tag;					/* 8 B */
+	uint32_t phy_ppdu_id				: 16, /* 4 B */
+		 reserved_0				: 16;
+	uint32_t reserved_1a;				/* 4 B */
+	char rx_pkt_hdr[HAL_RX_BE_PKT_HDR_TLV_LEN];	/* 112 B */
+};
+#endif
+
 
 #ifdef CONFIG_WORD_BASED_TLV
 #ifndef BIG_ENDIAN_HOST
@@ -384,6 +397,9 @@ struct rx_msdu_end_tlv {
 struct rx_pkt_tlvs {
 	struct rx_msdu_end_tlv   msdu_end_tlv;		/*  80 bytes */
 	struct rx_mpdu_start_tlv mpdu_start_tlv;	/*  48 bytes */
+#ifndef NO_RX_PKT_HDR_TLV
+	struct rx_pkt_hdr_tlv	pkt_hdr_tlv;		/* 128 bytes */
+#endif
 };
 
 #define HAL_RX_MSDU_END(_rx_pkt_tlv)		\
@@ -484,6 +500,14 @@ struct rx_pkt_tlvs {
 	HAL_RX_MPDU_START(_rx_pkt_tlv).sw_frame_group_id
 
 #endif /* CONFIG_WORD_BASED_TLV */
+
+#ifndef NO_RX_PKT_HDR_TLV
+#define HAL_RX_PKT_HDR_TLV(_rx_pkt_tlv)  \
+	(((struct rx_pkt_tlvs *)_rx_pkt_tlv)->pkt_hdr_tlv)
+
+#define HAL_RX_PKT_HDR_TLV_PHY_PPDU_ID_GET(_rx_pkt_tlv)   \
+	HAL_RX_PKT_HDR_TLV(_rx_pkt_tlv).phy_ppdu_id
+#endif
 
 /**
  * struct rx_mon_pkt_tlvs - RX packet data structure for DEST ring in the
@@ -1208,6 +1232,26 @@ static inline void hal_rx_tlv_get_pn_num_be(uint8_t *buf, uint64_t *pn_num)
 
 	pn_num[1] = HAL_RX_TLV_MPDU_PN_95_64_GET(pkt_tlvs);
 }
+
+#ifdef NO_RX_PKT_HDR_TLV
+static inline uint32_t
+hal_rx_get_ppdu_id_be(uint8_t *buf)
+{
+	/* If CONFIG_WORD_BASED_TLV and NO_RX_PKT_HDR_TLV are enabled
+	 * phy_ppdu_id is not available
+	 */
+	hal_alert_rl("PPDU_ID is not subscribed check build flags");
+	return 0;
+}
+#else
+static inline uint32_t
+hal_rx_get_ppdu_id_be(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *rx_pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+
+	return HAL_RX_PKT_HDR_TLV_PHY_PPDU_ID_GET(rx_pkt_tlvs);
+}
+#endif
 #endif
 
 /**

@@ -38,6 +38,13 @@
 #define WLAN_UMAC_MLO_MAX_VDEVS 2
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+/* Max bridge vdevs supported */
+#define WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS 2
+/* Max number of PSOC taking part in topology decision at a time*/
+#define WLAN_UMAC_MLO_MAX_PSOC_TOPOLOGY 3
+#endif
+
 #include <wlan_mlo_epcs.h>
 
 /* MAX instances of ML devices */
@@ -114,6 +121,11 @@ enum MLO_SOC_LIST {
 #define MAX_MLO_LINKS 6
 #define MAX_MLO_CHIPS 5
 #define MAX_ADJ_CHIPS 2
+
+/* MLO Bridge link */
+#define MLO_NUM_CHIPS_FOR_BRIDGE_LINK 4
+#define MLO_MAX_BRIDGE_LINKS_PER_MLD 2
+#define MLO_MAX_BRIDGE_LINKS_PER_RADIO 8
 
 /**
  * struct mlo_chip_info: MLO chip info per link
@@ -385,6 +397,8 @@ struct wlan_mlo_peer_list {
  * @mld_id: MLD id
  * @mld_addr: MLO device MAC address
  * @wlan_vdev_list: list of vdevs associated with this MLO connection
+ * @wlan_bridge_vdev_list: list of bridge vdevs associated with this MLO
+ * @bridge_sta_ctx: bridge sta context
  * @wlan_vdev_count: number of elements in the vdev list
  * @mlo_peer_list: list peers in this MLO connection
  * @wlan_max_mlo_peer_count: peer count across the links of specific MLO
@@ -408,6 +422,10 @@ struct wlan_mlo_dev_context {
 	uint8_t mld_id;
 	struct qdf_mac_addr mld_addr;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+	struct wlan_objmgr_vdev *wlan_bridge_vdev_list[WLAN_UMAC_MLO_MAX_BRIDGE_VDEVS];
+	struct wlan_mlo_bridge_sta *bridge_sta_ctx;
+#endif
 	uint16_t wlan_vdev_count;
 	struct wlan_mlo_peer_list mlo_peer_list;
 	uint16_t wlan_max_mlo_peer_count;
@@ -557,6 +575,20 @@ struct wlan_mlo_mld_cap {
 };
 
 /**
+ * struct mlo_nstr_info - MLO NSTR capability info
+ * @link_id: Lind Id
+ * @nstr_lp_present: Flag for NSTR link pair presence
+ * @nstr_bmp_size: NSTR Bitmap Size
+ * @nstr_lp_bitmap: NSTR link pair bitmap of link_id
+ */
+struct mlo_nstr_info {
+	uint8_t link_id;
+	bool nstr_lp_present;
+	uint8_t nstr_bmp_size;
+	uint16_t nstr_lp_bitmap;
+};
+
+/**
  * struct wlan_mlo_peer_context - MLO peer context
  *
  * @peer_node:     peer list node for ml_dev qdf list
@@ -588,6 +620,8 @@ struct wlan_mlo_mld_cap {
  * migration
  * @primary_umac_migration_in_progress: flag to indicate primary umac migration
  * in progress
+ * @mlpeer_mldcap: MLD Capability information for ML peer
+ * @mlpeer_nstrinfo: NSTR Capability info
  */
 struct wlan_mlo_peer_context {
 	qdf_list_node_t peer_node;
@@ -629,6 +663,8 @@ struct wlan_mlo_peer_context {
 #endif
 	uint8_t migrate_primary_umac_psoc_id;
 	bool primary_umac_migration_in_progress;
+	struct wlan_mlo_mld_cap mlpeer_mldcap;
+	struct mlo_nstr_info mlpeer_nstrinfo[WLAN_UMAC_MLO_MAX_VDEVS];
 };
 
 /**
@@ -660,12 +696,16 @@ struct mlo_link_info {
  * @num_partner_links: no. of partner links
  * @partner_link_info: per partner link info
  * @t2lm_enable_val: enum wlan_t2lm_enable
+ * @nstr_info: NSTR Capability info
+ * @num_nstr_info_links: No. of links for which NSTR info is present
  */
 struct mlo_partner_info {
 	uint8_t num_partner_links;
 	struct mlo_link_info partner_link_info[WLAN_UMAC_MLO_MAX_VDEVS];
 #ifdef WLAN_FEATURE_11BE
 	enum wlan_t2lm_enable t2lm_enable_val;
+	struct mlo_nstr_info nstr_info[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint8_t num_nstr_info_links;
 #endif
 };
 
@@ -725,6 +765,7 @@ struct ml_rv_info {
  * @emlsr_support: indicate if eMLSR supported
  * @emlmr_support: indicate if eMLMR supported
  * @msd_cap_support: indicate if MSD supported
+ * @mlo_bridge_peer: indicate if it is bridge peer
  * @unused: spare bits
  * @logical_link_index: Unique index for links of the mlo. Starts with Zero
  */
@@ -740,7 +781,8 @@ struct mlo_tgt_link_info {
 		 emlsr_support:1,
 		 emlmr_support:1,
 		 msd_cap_support:1,
-		 unused:23;
+		 mlo_bridge_peer:1,
+		 unused:22;
 	uint32_t logical_link_index;
 
 };
@@ -753,6 +795,26 @@ struct mlo_tgt_link_info {
 struct mlo_tgt_partner_info {
 	uint8_t num_partner_links;
 	struct mlo_tgt_link_info link_info[WLAN_UMAC_MLO_MAX_VDEVS];
+};
+
+/**
+ * struct wlan_mlo_bridge_sta - MLO bridge sta context
+ * @bridge_partners: mlo_partner_info of partners of a bridge
+ * @bridge_ml_links: mlo_tgt_partner_info of partners of bridge
+ * @bridge_umac_id: umac id for bridge
+ * @bridge_link_id: link id used by bridge vdev
+ * @is_force_central_primary: Flag to tell if bridge should be primary umac
+ * @bridge_vap_exists: If there is bridge vap
+ * @bridge_node_auth: Is bridge node auth done
+ */
+struct wlan_mlo_bridge_sta {
+	struct mlo_partner_info bridge_partners;
+	struct mlo_tgt_partner_info bridge_ml_links;
+	uint8_t bridge_umac_id;
+	uint8_t bridge_link_id;
+	bool is_force_central_primary;
+	bool bridge_vap_exists;
+	bool bridge_node_auth;
 };
 
 /**

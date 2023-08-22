@@ -1789,8 +1789,8 @@ QDF_STATUS (*send_periodic_chan_stats_config_cmd)(wmi_unified_t wmi_handle,
 			struct periodic_chan_stats_params *param);
 
 #ifdef WLAN_ATF_ENABLE
-QDF_STATUS (*send_set_atf_cmd)(wmi_unified_t wmi_handle,
-			       struct set_atf_params *param);
+QDF_STATUS (*send_atf_peer_list_cmd)(wmi_unified_t wmi_handle,
+				     struct set_atf_params *param);
 
 QDF_STATUS
 (*send_atf_peer_request_cmd)(wmi_unified_t wmi_handle,
@@ -1811,6 +1811,14 @@ QDF_STATUS (*extract_atf_peer_stats_ev)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_atf_token_info_ev)(wmi_unified_t wmi_handle,
 					void *evt_buf, uint8_t idx,
 					wmi_host_atf_peer_stats_info *atf_info);
+
+#ifdef WLAN_ATF_INCREASED_STA
+QDF_STATUS (*send_atf_peer_list_cmd_v2)(wmi_unified_t wmi_handle,
+					struct atf_peer_params_v2 *param);
+QDF_STATUS
+(*send_set_atf_grouping_cmd_v2)(wmi_unified_t wmi_handle,
+				struct atf_grouping_params_v2 *param);
+#endif
 #endif
 
 QDF_STATUS (*send_get_user_position_cmd)(wmi_unified_t wmi_handle,
@@ -3042,6 +3050,17 @@ QDF_STATUS
 (*extract_cfr_phase_param)(wmi_unified_t wmi_handle,
 			   void *evt_buf,
 			   struct wmi_cfr_phase_delta_param *param);
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+QDF_STATUS
+(*extract_cfr_enh_phase_data)(wmi_unified_t wmi_handle,
+			      void *evt_buf,
+			      struct wmi_cfr_enh_phase_delta_param *param);
+QDF_STATUS
+(*extract_cfr_enh_phase_fixed_param)(
+				wmi_unified_t wmi_handle,
+				void *evt_buf,
+				struct wmi_cfr_enh_phase_delta_param *param);
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
 #endif
 
 QDF_STATUS (*send_set_halphy_cal)(wmi_unified_t wmi_handle,
@@ -3287,6 +3306,12 @@ QDF_STATUS (*extract_peer_entry_ptqm_migrate_event)(
 		uint32_t index,
 		struct peer_entry_ptqm_migrate_event_params *entry);
 #endif /* QCA_SUPPORT_PRIMARY_LINK_MIGRATE */
+
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+QDF_STATUS (*extract_aoa_caps_service_ready_ext2)
+		(struct wmi_unified *wmi_handle, uint8_t *buf,
+		 struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 *aoa_cap);
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
 };
 
 /* Forward declaration for psoc*/

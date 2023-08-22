@@ -173,7 +173,8 @@ struct wlan_srng_cfg {
  * @int_timer_threshold_rx:
  * @int_batch_threshold_other:
  * @int_timer_threshold_other:
- * @int_timer_threshold_mon:
+ * @int_batch_threshold_mon_dest: Batch threshold counter for monitor dest
+ * @int_timer_threshold_mon_dest: Timer threshold counter for monitor dest
  * @tx_ring_size:
  * @time_control_bp:
  * @tx_comp_ring_size:
@@ -338,6 +339,10 @@ struct wlan_srng_cfg {
  * @pointer_timer_threshold_rx: RX REO2SW ring pointer update timer threshold
  * @pointer_num_threshold_rx: RX REO2SW ring pointer update entries threshold
  * @rx_rr: rx round robin enable / disable
+ * @umac_reset_buffer_window: Buffer time to check if umac reset was in progress
+ *                            during this window, configured time is in
+ *                            milliseconds.
+ * @fw_ast_indication_disable: Disable AST
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -369,7 +374,8 @@ struct wlan_cfg_dp_soc_ctxt {
 	int int_timer_threshold_rx;
 	int int_batch_threshold_other;
 	int int_timer_threshold_other;
-	int int_timer_threshold_mon;
+	int int_batch_threshold_mon_dest;
+	int int_timer_threshold_mon_dest;
 	int tx_ring_size;
 	int time_control_bp;
 	int tx_comp_ring_size;
@@ -539,6 +545,10 @@ struct wlan_cfg_dp_soc_ctxt {
 #ifdef WLAN_SUPPORT_RX_FLOW_TAG
 	bool rx_rr;
 #endif
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	uint32_t umac_reset_buffer_window;
+#endif
+	bool fw_ast_indication_disable;
 };
 
 /**
@@ -1495,12 +1505,22 @@ int wlan_cfg_get_int_batch_threshold_other(struct wlan_cfg_dp_soc_ctxt *cfg);
 int wlan_cfg_get_int_timer_threshold_other(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /**
- * wlan_cfg_get_int_timer_threshold_mon - Get int mitigation cfg for mon srngs
+ * wlan_cfg_get_int_batch_threshold_mon_dest - Get interrupt mitigation cfg for
+ * monitor destination srng
+ * @cfg: soc configuration context
+ *
+ * Return: Batch threshold
+ */
+int wlan_cfg_get_int_batch_threshold_mon_dest(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_get_int_timer_threshold_mon_dest - Get interrupt mitigation cfg for
+ * monitor destination srngs
  * @cfg: soc configuration context
  *
  * Return: Timer threshold
  */
-int wlan_cfg_get_int_timer_threshold_mon(struct wlan_cfg_dp_soc_ctxt *cfg);
+int wlan_cfg_get_int_timer_threshold_mon_dest(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /**
  * wlan_cfg_get_checksum_offload - Get checksum offload enable or disable status
@@ -2498,4 +2518,40 @@ wlan_cfg_get_pointer_timer_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg);
 uint8_t
 wlan_cfg_get_pointer_num_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg);
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * wlan_cfg_get_umac_reset_buffer_window_ms() - Get umac reset buffer window
+ * @cfg: soc configuration context
+ *
+ * Return: Umac reset buffer window in milliseconds
+ */
+uint32_t
+wlan_cfg_get_umac_reset_buffer_window_ms(struct wlan_cfg_dp_soc_ctxt *cfg);
+#else
+static inline uint32_t
+wlan_cfg_get_umac_reset_buffer_window_ms(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
+#endif /* DP_UMAC_HW_RESET_SUPPORT */
+
+/**
+ * wlan_cfg_set_ast_indication_disable - Set AST disable
+ *
+ * @cfg: soc configuration context
+ * @val: value to be set
+ *
+ * Return: void
+ */
+void wlan_cfg_set_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg,
+					 bool val);
+
+/**
+ * wlan_cfg_get_ast_indication_disable - Get AST disable
+ *
+ * @cfg: soc configuration context
+ *
+ * Return: true or false
+ */
+bool wlan_cfg_get_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg);
 #endif /*__WLAN_CFG_H*/

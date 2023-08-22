@@ -1266,6 +1266,47 @@ wlan_ipa_get_sap_client_auth(struct wlan_ipa_priv *ipa_ctx, uint8_t *peer_mac)
 	return false;
 }
 
+/**
+ * wlan_ipa_check_peer_auth() - Check whether peer is authenticated or not
+ * @dp_soc: soc handle
+ * @peer_mac: peer mac address
+ * @iface: wlan ipa iface context
+ *
+ * Return: true if peer is authenticated
+ */
+#ifdef QCA_WIFI_QCN9224
+static inline bool
+wlan_ipa_check_peer_auth(ol_txrx_soc_handle dp_soc,
+			 uint8_t *peer_mac,
+			 struct wlan_ipa_iface_context *iface)
+{
+	uint8_t is_authenticated = false;
+	struct cdp_ast_entry_info ast_info = {0};
+
+	cdp_peer_get_ast_info_by_soc(dp_soc, peer_mac,
+				     &ast_info);
+	peer_mac = &ast_info.peer_mac_addr[0];
+	is_authenticated = wlan_ipa_get_peer_state(dp_soc,
+						   iface->session_id,
+						   peer_mac);
+
+	return is_authenticated;
+}
+#else
+static inline bool
+wlan_ipa_check_peer_auth(ol_txrx_soc_handle dp_soc,
+			 uint8_t *peer_mac,
+			 struct wlan_ipa_iface_context *iface)
+{
+	uint8_t is_authenticated = false;
+
+	is_authenticated = wlan_ipa_get_peer_state(dp_soc, iface->session_id,
+						   peer_mac);
+
+	return is_authenticated;
+}
+#endif
+
 #ifdef IPA_WDS_EASYMESH_FEATURE
 static inline uint8_t
 wlan_ipa_get_peer_auth_state(ol_txrx_soc_handle dp_soc, uint8_t *peer_mac,
@@ -1294,12 +1335,8 @@ static inline uint8_t
 wlan_ipa_get_peer_auth_state(ol_txrx_soc_handle dp_soc, uint8_t *peer_mac,
 			     struct wlan_ipa_iface_context *iface)
 {
-	uint8_t is_authenticated = false;
 
-	is_authenticated = wlan_ipa_get_peer_state(dp_soc, iface->session_id,
-						   peer_mac);
-
-	return is_authenticated;
+	return wlan_ipa_check_peer_auth(dp_soc, peer_mac, iface);
 }
 #endif
 

@@ -747,6 +747,7 @@ enum wlan_op_subtype {
  * @op_mode: Operation mode of the vdev
  * @subtype: subtype of the vdev
  * @mld_mac_addr: MLD mac addr of the current vdev.
+ * @is_bridge_vap: current vdev is bridge vap or not.
  */
 struct cdp_vdev_info {
 	uint8_t *vdev_mac_addr;
@@ -756,6 +757,9 @@ struct cdp_vdev_info {
 	enum wlan_op_subtype subtype;
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t *mld_mac_addr;
+#ifdef WLAN_MLO_MULTI_CHIP
+	bool is_bridge_vap;
+#endif
 #endif
 };
 
@@ -1445,6 +1449,7 @@ enum cdp_pdev_param_type {
  * @cdp_skel_enable : Enable/Disable skeleton code for Umac reset debug
  * @cdp_drop_tx_mcast: Enable/Disable tx mcast drop
  * @cdp_vdev_tx_to_fw: Set to_fw bit for all tx packets for the vdev
+ * @cdp_ast_indication_disable: AST indication disable
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1535,6 +1540,7 @@ typedef union cdp_config_param_t {
 	bool cdp_umac_rst_skel;
 	bool cdp_drop_tx_mcast;
 	bool cdp_vdev_tx_to_fw;
+	bool cdp_ast_indication_disable;
 } cdp_config_param_type;
 
 /**
@@ -1690,6 +1696,7 @@ enum cdp_vdev_param_type {
  * @CDP_UMAC_RST_SKEL_ENABLE: Enable Umac reset skeleton code for debug
  * @CDP_SAWF_STATS: set SAWF stats config
  * @CDP_UMAC_RESET_STATS: UMAC reset stats
+ * @CDP_CFG_AST_INDICATION_DISABLE: AST indication disable
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1702,6 +1709,7 @@ enum cdp_psoc_param_type {
 	CDP_UMAC_RST_SKEL_ENABLE,
 	CDP_SAWF_STATS,
 	CDP_UMAC_RESET_STATS,
+	CDP_CFG_AST_INDICATION_DISABLE,
 };
 
 #define TXRX_FW_STATS_TXSTATS                     1
@@ -2168,7 +2176,8 @@ struct cdp_tx_completion_ppdu_user {
 	uint16_t phy_tx_time_us;
 	uint32_t mpdu_bytes;
 	uint8_t punc_mode;
-	uint16_t punc_pattern_bitmap;
+	uint32_t punc_pattern_bitmap:16,
+		fixed_rate_used:1;
 	uint32_t msduq_bitmap;
 	uint8_t mprot_type:3,
 		rts_success:1,
@@ -3106,16 +3115,30 @@ struct cdp_pdev_attach_params {
 /*
  * cdp_txrx_peer_params_update
  *
- * @osif_vdev: Handle for OS shim virtual device
+ * @vdev_id: VDEV ID
  * @peer_mac: Peer mac address
  * @chip_id: CHIP ID
  * @pdev_id: PDEV ID
  */
 struct cdp_txrx_peer_params_update {
-	void	*osif_vdev;
+	uint8_t	vdev_id;
 	uint8_t	*peer_mac;
 	uint8_t	chip_id;
 	uint8_t	pdev_id;
 };
 
+/**
+ * enum cdp_umac_reset_state - umac reset in progress state
+ * @CDP_UMAC_RESET_NOT_IN_PROGRESS: Umac reset is not in progress
+ * @CDP_UMAC_RESET_IN_PROGRESS: Umac reset is in progress
+ * @CDP_UMAC_RESET_IN_PROGRESS_DURING_BUFFER_WINDOW: Umac reset was in progress
+ *                                                   during this buffer window.
+ * @CDP_UMAC_RESET_INVALID_STATE: Umac reset invalid state
+ */
+enum cdp_umac_reset_state {
+	CDP_UMAC_RESET_NOT_IN_PROGRESS,
+	CDP_UMAC_RESET_IN_PROGRESS,
+	CDP_UMAC_RESET_IN_PROGRESS_DURING_BUFFER_WINDOW,
+	CDP_UMAC_RESET_INVALID_STATE
+};
 #endif

@@ -3872,6 +3872,29 @@ wlan_soc_tx_packet_inspect_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * wlan_soc_umac_reset_cfg_attach() - Update umac reset buffer window config
+ * @psoc: object manager psoc
+ * @wlan_cfg_ctx: dp soc cfg ctx
+ *
+ * Return: None
+ */
+static void
+wlan_soc_umac_reset_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
+			       struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
+{
+	wlan_cfg_ctx->umac_reset_buffer_window =
+		cfg_get(psoc, CFG_DP_UMAC_RESET_BUFFER_WINDOW);
+}
+#else
+static void
+wlan_soc_umac_reset_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
+			       struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
+{
+}
+#endif /* DP_UMAC_HW_RESET_SUPPORT */
+
 struct wlan_cfg_dp_soc_ctxt *
 wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 {
@@ -3926,6 +3949,10 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_DP_INT_BATCH_THRESHOLD_OTHER);
 	wlan_cfg_ctx->int_timer_threshold_other =
 		cfg_get(psoc, CFG_DP_INT_TIMER_THRESHOLD_OTHER);
+	wlan_cfg_ctx->int_batch_threshold_mon_dest =
+		cfg_get(psoc, CFG_DP_INT_BATCH_THRESHOLD_MON_DEST);
+	wlan_cfg_ctx->int_timer_threshold_mon_dest =
+		cfg_get(psoc, CFG_DP_INT_TIMER_THRESHOLD_MON_DEST);
 	wlan_cfg_ctx->int_batch_threshold_ppe2tcl =
 			cfg_get(psoc, CFG_DP_INT_BATCH_THRESHOLD_PPE2TCL);
 	wlan_cfg_ctx->int_timer_threshold_ppe2tcl =
@@ -4107,6 +4134,7 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 	wlan_cfg_ctx->pointer_num_threshold_rx =
 			cfg_get(psoc, CFG_DP_POINTER_NUM_THRESHOLD_RX);
 	wlan_soc_tx_packet_inspect_attach(psoc, wlan_cfg_ctx);
+	wlan_soc_umac_reset_cfg_attach(psoc, wlan_cfg_ctx);
 
 	return wlan_cfg_ctx;
 }
@@ -4775,9 +4803,14 @@ int wlan_cfg_get_int_timer_threshold_other(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return cfg->int_timer_threshold_other;
 }
 
-int wlan_cfg_get_int_timer_threshold_mon(struct wlan_cfg_dp_soc_ctxt *cfg)
+int wlan_cfg_get_int_batch_threshold_mon_dest(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
-	return cfg->int_timer_threshold_mon;
+	return cfg->int_batch_threshold_mon_dest;
+}
+
+int wlan_cfg_get_int_timer_threshold_mon_dest(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->int_timer_threshold_mon_dest;
 }
 
 int wlan_cfg_get_p2p_checksum_offload(struct wlan_cfg_dp_soc_ctxt *cfg)
@@ -4926,6 +4959,14 @@ wlan_cfg_get_reo_rings_mapping(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->reo_rings_mapping;
 }
+
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+uint32_t
+wlan_cfg_get_umac_reset_buffer_window_ms(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->umac_reset_buffer_window;
+}
+#endif
 
 bool
 wlan_cfg_get_dp_caps(struct wlan_cfg_dp_soc_ctxt *cfg,
@@ -5484,4 +5525,15 @@ uint8_t
 wlan_cfg_get_pointer_num_threshold_rx(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->pointer_num_threshold_rx;
+}
+
+void wlan_cfg_set_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg,
+					 bool val)
+{
+	cfg->fw_ast_indication_disable = val;
+}
+
+bool wlan_cfg_get_ast_indication_disable(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->fw_ast_indication_disable;
 }

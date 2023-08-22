@@ -98,6 +98,11 @@ init_deinit_update_wifi_pos_caps(struct wmi_unified *wmi_handle,
 					      WLAN_RTT_11AZ_TB_SUPPORT);
 
 	if (wmi_service_enabled(wmi_handle,
+				wmi_service_rtt_11az_tb_rsta_support))
+		wlan_psoc_nif_fw_ext2_cap_set(psoc,
+					      WLAN_RTT_11AZ_TB_RSTA_SUPPORT);
+
+	if (wmi_service_enabled(wmi_handle,
 				wmi_service_rtt_11az_mac_sec_support))
 		wlan_psoc_nif_fw_ext2_cap_set(psoc,
 					      WLAN_RTT_11AZ_MAC_SEC_SUPPORT);
@@ -528,6 +533,15 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 							    event);
 	if (err_code)
 		target_if_debug("failed to populate sap_coex_capability ext2");
+
+	if (wmi_service_enabled(wmi_handle,
+				wmi_service_aoa_for_rcc_supported)) {
+		err_code = init_deinit_populate_rcc_aoa_cap_ext2(psoc,
+								 wmi_handle,
+								 event, info);
+		if (err_code)
+			target_if_debug("failed to populate aoa cap ext2");
+	}
 
 	legacy_callback = target_if_get_psoc_legacy_service_ready_cb();
 	if (legacy_callback)

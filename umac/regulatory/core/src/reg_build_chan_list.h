@@ -39,10 +39,9 @@
 #ifdef CONFIG_AFC_SUPPORT
 #define MIN_AFC_BW 2
 #ifdef WLAN_FEATURE_11BE
-#define MAX_AFC_BW 320
-#else
-#define MAX_AFC_BW 160
+#define AFC_BW_320 320
 #endif
+#define AFC_BW_160 160
 #endif
 
 #define HALF_IEEE_CH_SEP  2

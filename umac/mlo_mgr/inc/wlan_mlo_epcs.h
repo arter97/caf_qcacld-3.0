@@ -106,10 +106,16 @@ enum peer_epcs_state {
 
 /**
  * struct wlan_mlo_peer_epcs_info - Peer EPCS information
+ * @epcs_dev_peer_lock: epcs dev peer lock
  * @state: EPCS state of peer
  * @self_gen_dialog_token: selfgenerated dialog token
  */
 struct wlan_mlo_peer_epcs_info {
+#ifdef WLAN_MLO_USE_SPINLOCK
+	qdf_spinlock_t epcs_dev_peer_lock;
+#else
+	qdf_mutex_t epcs_dev_peer_lock;
+#endif
 	enum peer_epcs_state state;
 	uint8_t self_gen_dialog_token;
 };
@@ -127,9 +133,15 @@ struct epcs_peer_authorize_info {
 
 /**
  * struct wlan_epcs_context - EPCS context if MLD
+ * @epcs_dev_lock: epcs dev context lock
  * @authorize_info: Array of Authorization info containing peer mac address
  */
 struct wlan_epcs_context {
+#ifdef WLAN_MLO_USE_SPINLOCK
+	qdf_spinlock_t epcs_dev_lock;
+#else
+	qdf_mutex_t epcs_dev_lock;
+#endif
 	struct epcs_peer_authorize_info
 			authorize_info[EPCS_MAX_AUTHORIZE_MAC_ADDR];
 };
@@ -182,6 +194,168 @@ struct epcs_frm {
 
 #define epcs_rl_debug(format, args...) \
 		QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_EPCS, format, ## args)
+
+#ifdef WLAN_MLO_USE_SPINLOCK
+/**
+ * epcs_dev_lock_create - Create EPCS device mutex/spinlock
+ * @epcs_ctx: EPCS context
+ *
+ * Creates mutex/spinlock
+ *
+ * Return: void
+ */
+static inline void
+epcs_dev_lock_create(struct wlan_epcs_context *epcs_ctx)
+{
+	qdf_spinlock_create(&epcs_ctx->epcs_dev_lock);
+}
+
+/**
+ * epcs_dev_lock_destroy - Destroy EPCS mutex/spinlock
+ * @epcs_ctx: EPCS context
+ *
+ * Destroy mutex/spinlock
+ *
+ * Return: void
+ */
+static inline void
+epcs_dev_lock_destroy(struct wlan_epcs_context *epcs_ctx)
+{
+	qdf_spinlock_destroy(&epcs_ctx->epcs_dev_lock);
+}
+
+/**
+ * epcs_dev_lock_acquire - acquire EPCS mutex/spinlock
+ * @epcs_ctx: EPCS context
+ *
+ * acquire mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void epcs_dev_lock_acquire(struct wlan_epcs_context *epcs_ctx)
+{
+	qdf_spin_lock_bh(&epcs_ctx->epcs_dev_lock);
+}
+
+/**
+ * epcs_dev_lock_release - release EPCS dev mutex/spinlock
+ * @epcs_ctx: EPCS context
+ *
+ * release mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void epcs_dev_lock_release(struct wlan_epcs_context *epcs_ctx)
+{
+	qdf_spin_unlock_bh(&epcs_ctx->epcs_dev_lock);
+}
+#else /* WLAN_MLO_USE_SPINLOCK */
+static inline
+void epcs_dev_lock_create(struct wlan_epcs_context *epcs_ctx)
+{
+	qdf_mutex_create(&epcs_ctx->epcs_dev_lock);
+}
+
+static inline
+void epcs_dev_lock_destroy(struct wlan_epcs_context *epcs_ctx)
+{
+	qdf_mutex_destroy(&epcs_ctx->epcs_dev_lock);
+}
+
+static inline void epcs_dev_lock_acquire(struct wlan_epcs_context *epcs_ctx)
+{
+	qdf_mutex_acquire(&epcs_ctx->epcs_dev_lock);
+}
+
+static inline void epcs_dev_lock_release(struct wlan_epcs_context *epcs_ctx)
+{
+	qdf_mutex_release(&epcs_ctx->epcs_dev_lock);
+}
+#endif
+
+#ifdef WLAN_MLO_USE_SPINLOCK
+/**
+ * epcs_dev_peer_lock_create - Create EPCS device mutex/spinlock
+ * @epcs_info: EPCS info
+ *
+ * Creates mutex/spinlock
+ *
+ * Return: void
+ */
+static inline
+void epcs_dev_peer_lock_create(struct wlan_mlo_peer_epcs_info *epcs_info)
+{
+	qdf_spinlock_create(&epcs_info->epcs_dev_peer_lock);
+}
+
+/**
+ * epcs_dev_peer_lock_destroy - Destroy EPCS mutex/spinlock
+ * @epcs_info: EPCS info
+ *
+ * Destroy mutex/spinlock
+ *
+ * Return: void
+ */
+static inline
+void epcs_dev_peer_lock_destroy(struct wlan_mlo_peer_epcs_info *epcs_info)
+{
+	qdf_spinlock_destroy(&epcs_info->epcs_dev_peer_lock);
+}
+
+/**
+ * epcs_dev_peer_lock_acquire - acquire EPCS mutex/spinlock
+ * @epcs_info: EPCS info
+ *
+ * acquire mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void epcs_dev_peer_lock_acquire(struct wlan_mlo_peer_epcs_info *epcs_info)
+{
+	qdf_spin_lock_bh(&epcs_info->epcs_dev_peer_lock);
+}
+
+/**
+ * epcs_dev_peer_lock_release - release EPCS dev mutex/spinlock
+ * @epcs_info: EPCS info
+ *
+ * release mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void epcs_dev_peer_lock_release(struct wlan_mlo_peer_epcs_info *epcs_info)
+{
+	qdf_spin_unlock_bh(&epcs_info->epcs_dev_peer_lock);
+}
+#else /* WLAN_MLO_USE_SPINLOCK */
+static inline
+void epcs_dev_peer_lock_create(struct wlan_mlo_peer_epcs_info *epcs_info)
+{
+	qdf_mutex_create(&epcs_info->epcs_dev_peer_lock);
+}
+
+static inline
+void epcs_dev_peer_lock_destroy(struct wlan_mlo_peer_epcs_info *epcs_info)
+{
+	qdf_mutex_destroy(&epcs_info->epcs_dev_peer_lock);
+}
+
+static inline
+void epcs_dev_peer_lock_acquire(struct wlan_mlo_peer_epcs_info *epcs_info)
+{
+	qdf_mutex_acquire(&epcs_info->epcs_dev_peer_lock);
+}
+
+static inline
+void epcs_dev_peer_lock_release(struct wlan_mlo_peer_epcs_info *epcs_info)
+{
+	qdf_mutex_release(&epcs_info->epcs_dev_peer_lock);
+}
+#endif
 
 /**
  * wlan_mlo_add_epcs_action_frame() - API to add EPCS action frame

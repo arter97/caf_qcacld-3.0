@@ -234,6 +234,8 @@ uint8_t *peer_create_add_mlo_params(uint8_t *buf_ptr,
 	mlo_params->mlo_flags.mlo_flags = 0;
 	WMI_MLO_FLAGS_SET_ENABLED(mlo_params->mlo_flags.mlo_flags,
 				  req->mlo_enabled);
+	WMI_MLO_FLAGS_SET_BRIDGE_PEER(mlo_params->mlo_flags.mlo_flags,
+				      req->mlo_bridge_peer);
 
 	return buf_ptr + sizeof(wmi_peer_create_mlo_params);
 }
@@ -275,6 +277,8 @@ uint8_t *peer_assoc_add_mlo_params(uint8_t *buf_ptr,
 					   req->mlo_params.mlo_logical_link_index_valid);
 	WMI_MLO_FLAGS_SET_PEER_ID_VALID(mlo_params->mlo_flags.mlo_flags,
 					req->mlo_params.mlo_peer_id_valid);
+	WMI_MLO_FLAGS_SET_BRIDGE_PEER(mlo_params->mlo_flags.mlo_flags,
+				      req->mlo_params.mlo_bridge_peer);
 	mlo_params->mlo_flags.emlsr_support = req->mlo_params.emlsr_support;
 
 	mlo_params->mlo_flags.mlo_force_link_inactive =
@@ -295,6 +299,15 @@ uint8_t *peer_assoc_add_mlo_params(uint8_t *buf_ptr,
 			req->mlo_params.medium_sync_ofdm_ed_thresh;
 	mlo_params->msd_max_num_txops =
 			req->mlo_params.medium_sync_max_txop_num;
+
+	mlo_params->max_num_simultaneous_links =
+			req->mlo_params.max_num_simultaneous_links;
+	mlo_params->mlo_flags.nstr_bitmap_present =
+			req->mlo_params.nstr_bitmap_present;
+	mlo_params->mlo_flags.nstr_bitmap_size =
+			req->mlo_params.nstr_bitmap_size;
+	mlo_params->nstr_indication_bitmap =
+		req->mlo_params.nstr_indication_bitmap;
 
 	return buf_ptr + sizeof(wmi_peer_assoc_mlo_params);
 }
@@ -327,6 +340,8 @@ uint8_t *peer_assoc_add_ml_partner_links(uint8_t *buf_ptr,
 					       partner_info[i].mlo_primary_umac);
 		WMI_MLO_FLAGS_SET_LINK_INDEX_VALID(ml_partner_link->mlo_flags.mlo_flags,
 						   partner_info[i].mlo_logical_link_index_valid);
+		WMI_MLO_FLAGS_SET_BRIDGE_PEER(ml_partner_link->mlo_flags.mlo_flags,
+					      partner_info[i].mlo_bridge_peer);
 		ml_partner_link->mlo_flags.emlsr_support = partner_info[i].emlsr_support;
 		ml_partner_link->logical_link_index = partner_info[i].logical_link_index;
 

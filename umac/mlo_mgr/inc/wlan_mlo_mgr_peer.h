@@ -159,6 +159,28 @@ struct wlan_objmgr_peer *wlan_mlo_peer_get_assoc_peer(
 					struct wlan_mlo_peer_context *ml_peer);
 
 /**
+ * wlan_mlo_peer_get_primary_link_vdev() - Get primary link vdev
+ * @ml_peer: MLO peer
+ *
+ * This function iterates through ml_peer to find primary link
+ * and returns VDEV to which primary link is attached.
+ *
+ * Return: Pointer to vdev, if primary link is found else NULL
+ */
+struct wlan_objmgr_vdev *
+wlan_mlo_peer_get_primary_link_vdev(struct wlan_mlo_peer_context *ml_peer);
+
+/**
+ * wlan_mlo_peer_get_bridge_peer() - get bridge peer
+ * @ml_peer: MLO peer
+ *
+ * This function returns bridge peer of MLO peer
+ *
+ * Return: bridge peer, if it is found, otherwise NULL
+ */
+struct wlan_objmgr_peer *wlan_mlo_peer_get_bridge_peer(
+					struct wlan_mlo_peer_context *ml_peer);
+/**
  * mlo_peer_is_assoc_peer() - check whether the peer is assoc peer
  * @ml_peer: MLO peer
  * @peer: Link peer
@@ -465,6 +487,34 @@ uint8_t wlan_mlo_peer_get_primary_peer_link_id_by_ml_peer(
 void wlan_mlo_peer_get_partner_links_info(struct wlan_objmgr_peer *peer,
 					  struct mlo_partner_info *ml_links);
 
+#ifdef WLAN_MLO_MULTI_CHIP
+/**
+ * wlan_mlo_peer_get_str_capability() - get STR capability of non-AP MLD
+ * @peer: Link peer
+ * @max_simult_links: Pointer to fill maximum simultaneous links
+ *
+ * This function retrieves maximum simultaneous links from connected ml peer,
+ *
+ * Return: void
+ */
+void wlan_mlo_peer_get_str_capability(struct wlan_objmgr_peer *peer,
+				      uint8_t *max_simult_links);
+
+/**
+ * wlan_mlo_peer_get_eml_capability() - get EML capability
+ * @peer: Link peer
+ * @is_emlsr_capable: Pointer to fill EMLSR capability
+ * @is_emlmr_capable: Pointer to fill EMLMR capability
+ *
+ * This function retrieves EML capability from connected ml peer,
+ *
+ * Return: void
+ */
+void wlan_mlo_peer_get_eml_capability(struct wlan_objmgr_peer *peer,
+				      uint8_t *is_emlsr_capable,
+				      uint8_t *is_emlmr_capable);
+#endif
+
 /*
  * APIs to operations on ML peer object
  */
@@ -514,6 +564,24 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_linkmac(
 struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_mld_mac(
 				struct wlan_mlo_dev_context *ml_dev,
 				struct qdf_mac_addr *mld_mac);
+
+/**
+ * mlo_get_link_vdev_from_psoc_id() - Get link vdev from psoc id
+ * @ml_dev: MLO DEV object
+ * @psoc_id: psoc_id
+ * @get_bridge_vdev: Flag to indicate bridge vdev search is needed
+ *
+ * API to get vdev using psoc_id. When get_bridg_vdev flag is passed as true,
+ * this API searches vdev from bridge vdev list. If there are no bridge
+ * vdevs present, then it searches in actual vdev list. If flag is
+ * passed as false, vdev search will be directly from actual vdev list.
+ *
+ * Return: Pointer to vdev, if it is found
+ *         otherwise, returns NULL
+ */
+struct wlan_objmgr_vdev *mlo_get_link_vdev_from_psoc_id(
+				struct wlan_mlo_dev_context *ml_dev,
+				uint8_t psoc_id, bool get_bridge_vdev);
 
 /**
  * wlan_mlo_get_mlpeer_by_peer_mladdr() - Get ML peer from the list of MLD's
@@ -756,6 +824,8 @@ void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer);
  * wlan_mld_get_best_primary_umac_w_rssi() - API to get primary umac using rssi
  * @ml_peer: ml peer object
  * @link_vdevs: list of vdevs from which new primary link is to be selected
+ * @allow_all_links: Flag to allow all links to be able to get selected as
+ * primary. This flag will be used to override primary_umac_skip ini
  *
  * API to get primary umac using rssi
  *
@@ -763,5 +833,6 @@ void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer);
  */
 uint8_t
 wlan_mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
-				      struct wlan_objmgr_vdev *link_vdevs[]);
+				      struct wlan_objmgr_vdev *link_vdevs[],
+				      bool allow_all_links);
 #endif

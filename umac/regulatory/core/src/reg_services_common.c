@@ -5176,6 +5176,25 @@ reg_get_chan_state_for_320(struct wlan_objmgr_pdev *pdev,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
+#ifdef CONFIG_REG_CLIENT
+static void
+reg_verify_punc_for_320_and_set_channel_state(uint16_t punc_bitmap,
+					      enum channel_state *chan_state,
+					      enum channel_state update_state)
+{
+	if (reg_is_punc_bitmap_valid(CH_WIDTH_320MHZ, punc_bitmap)) {
+		*chan_state = update_state;
+	}
+}
+#else /* CONFIG_REG_CLIENT */
+static inline void
+reg_verify_punc_for_320_and_set_channel_state(uint16_t punc_bitmap,
+					      enum channel_state *chan_state,
+					      enum channel_state update_state)
+{
+}
+#endif /* CONFIG_REG_CLIENT */
+
 enum channel_state
 reg_get_320_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 					     qdf_freq_t freq,
@@ -5230,9 +5249,9 @@ reg_get_320_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 	}
 
 	/* Validate puncture bitmap. Update channel state. */
-	if (reg_is_punc_bitmap_valid(CH_WIDTH_320MHZ, *out_punc_bitmap)) {
-		chan_state = update_state;
-	}
+	reg_verify_punc_for_320_and_set_channel_state(*out_punc_bitmap,
+						      &chan_state,
+						      update_state);
 
 	prim_chan_state =
 		reg_get_20mhz_channel_state_based_on_nol(pdev, freq,
@@ -8154,13 +8173,16 @@ QDF_STATUS reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!reg_get_num_rules_of_ap_pwr_type(pdev, ap_pwr_type))
-		return QDF_STATUS_E_FAILURE;
+	if (ap_pwr_type != REG_CURRENT_MAX_AP_TYPE) {
+		if (!reg_get_num_rules_of_ap_pwr_type(pdev, ap_pwr_type))
+			return QDF_STATUS_E_FAILURE;
 
-	status = reg_set_cur_6g_ap_pwr_type(pdev, ap_pwr_type);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		reg_debug("failed to set AP power type to %d", ap_pwr_type);
-		return status;
+		status = reg_set_cur_6g_ap_pwr_type(pdev, ap_pwr_type);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			reg_debug("failed to set AP power type to %d",
+				  ap_pwr_type);
+			return status;
+		}
 	}
 
 	reg_compute_pdev_current_chan_list(pdev_priv_obj);
@@ -9799,7 +9821,8 @@ static int8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 static enum reg_6g_ap_type
 reg_get_best_pwr_mode_from_eirp_list(int8_t *eirp_list, uint8_t size)
 {
-	int8_t max = 0, i;
+	int8_t max = 0;
+	uint8_t i;
 	enum reg_6g_ap_type best_pwr_mode = REG_CURRENT_MAX_AP_TYPE;
 
 	for (i = 0; i < size; i++) {
@@ -9908,24 +9931,6 @@ reg_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
 
 	return !(super_chan_ent->chan_flags_arr[in_6g_pwr_mode] &
 		 REGULATORY_CHAN_AFC_NOT_DONE);
-}
-
-bool
-reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
-			qdf_freq_t freq,
-			enum supported_6g_pwr_types in_6ghz_pwr_mode)
-{
-	bool is_freq_enabled;
-	enum reg_afc_dev_deploy_type reg_afc_deploy_type;
-
-	is_freq_enabled = reg_is_freq_enabled(pdev, freq, in_6ghz_pwr_mode);
-	if (!is_freq_enabled)
-		return false;
-
-	reg_get_afc_dev_deploy_type(pdev, &reg_afc_deploy_type);
-
-	return (reg_afc_deploy_type != AFC_DEPLOYMENT_OUTDOOR) ||
-		reg_is_afc_done(pdev, freq);
 }
 #endif
 

@@ -1196,7 +1196,6 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	tx_desc->msdu_ext_desc = NULL;
 	tx_desc->pkt_offset = 0;
 	tx_desc->length = qdf_nbuf_headlen(nbuf);
-	tx_desc->shinfo_addr = skb_end_pointer(nbuf);
 
 	dp_tx_trace_pkt(soc, nbuf, tx_desc->id, vdev->vdev_id);
 
@@ -2034,7 +2033,7 @@ is_nbuf_frm_rmnet(qdf_nbuf_t nbuf, struct dp_tx_msdu_info_s *msdu_info)
 		return false;
 
 	if ((ingress_dev->priv_flags & IFF_PHONY_HEADROOM)) {
-		dev_put(ingress_dev);
+		qdf_net_if_release_dev((struct qdf_net_if *)ingress_dev);
 		frag = &(skb_shinfo(nbuf)->frags[0]);
 		buf_len = skb_frag_size(frag);
 		payload_addr = (uint8_t *)skb_frag_address(frag);
@@ -2050,7 +2049,7 @@ is_nbuf_frm_rmnet(qdf_nbuf_t nbuf, struct dp_tx_msdu_info_s *msdu_info)
 
 		return true;
 	}
-	dev_put(ingress_dev);
+	qdf_net_if_release_dev((struct qdf_net_if *)ingress_dev);
 	return false;
 }
 
@@ -5642,6 +5641,19 @@ dp_tx_update_ppeds_tx_comp_stats(struct dp_soc *soc,
 #endif
 
 void
+dp_tx_comp_process_desc_list_fast(struct dp_soc *soc,
+				  struct dp_tx_desc_s *head_desc,
+				  struct dp_tx_desc_s *tail_desc,
+				  uint8_t ring_id,
+				  uint32_t fast_desc_count)
+{
+	struct dp_tx_desc_pool_s *pool = &soc->tx_desc[head_desc->pool_id];
+
+	dp_tx_outstanding_sub(head_desc->pdev, fast_desc_count);
+	dp_tx_desc_free_list(pool, head_desc, tail_desc, fast_desc_count);
+}
+
+void
 dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			     struct dp_tx_desc_s *comp_head, uint8_t ring_id)
 {
@@ -5821,13 +5833,17 @@ uint32_t dp_tx_comp_handler(struct dp_intr *int_ctx, struct dp_soc *soc,
 	struct dp_tx_desc_s *tx_desc = NULL;
 	struct dp_tx_desc_s *head_desc = NULL;
 	struct dp_tx_desc_s *tail_desc = NULL;
+	struct dp_tx_desc_s *fast_head_desc = NULL;
+	struct dp_tx_desc_s *fast_tail_desc = NULL;
 	uint32_t num_processed = 0;
+	uint32_t fast_desc_count = 0;
 	uint32_t count;
 	uint32_t num_avail_for_reap = 0;
 	bool force_break = false;
 	struct dp_srng *tx_comp_ring = &soc->tx_comp_ring[ring_id];
 	int max_reap_limit, ring_near_full;
 	uint32_t num_entries;
+	qdf_nbuf_queue_head_t h;
 
 	DP_HIST_INIT();
 
@@ -5861,6 +5877,8 @@ more_data:
 	last_prefetched_hw_desc = dp_srng_dst_prefetch_32_byte_desc(hal_soc,
 							    hal_ring_hdl,
 							    num_avail_for_reap);
+
+	dp_tx_nbuf_queue_head_init(&h);
 
 	/* Find head descriptor from completion ring */
 	while (qdf_likely(num_avail_for_reap--)) {
@@ -5928,7 +5946,8 @@ more_data:
 		}
 		tx_desc->buffer_src = buffer_src;
 
-		if (tx_desc->flags & DP_TX_DESC_FLAG_PPEDS)
+		if (tx_desc->flags & DP_TX_DESC_FLAG_FASTPATH_SIMPLE ||
+		    tx_desc->flags & DP_TX_DESC_FLAG_PPEDS)
 			goto add_to_pool2;
 
 		/*
@@ -5999,14 +6018,28 @@ add_to_pool:
 
 add_to_pool2:
 			/* First ring descriptor on the cycle */
-			if (!head_desc) {
-				head_desc = tx_desc;
+
+			if (tx_desc->flags & DP_TX_DESC_FLAG_FASTPATH_SIMPLE ||
+			    tx_desc->flags & DP_TX_DESC_FLAG_PPEDS) {
+				dp_tx_nbuf_dev_queue_free(&h, tx_desc);
+				fast_desc_count++;
+				if (!fast_head_desc) {
+					fast_head_desc = tx_desc;
+					fast_tail_desc = tx_desc;
+				}
+				fast_tail_desc->next = tx_desc;
+				fast_tail_desc = tx_desc;
+				dp_tx_desc_clear(tx_desc);
+			} else {
+				if (!head_desc) {
+					head_desc = tx_desc;
+					tail_desc = tx_desc;
+				}
+
+				tail_desc->next = tx_desc;
+				tx_desc->next = NULL;
 				tail_desc = tx_desc;
 			}
-
-			tail_desc->next = tx_desc;
-			tx_desc->next = NULL;
-			tail_desc = tx_desc;
 		}
 next_desc:
 		num_processed += !(count & DP_TX_NAPI_BUDGET_DIV_MASK);
@@ -6029,6 +6062,14 @@ next_desc:
 	}
 
 	dp_srng_access_end(int_ctx, soc, hal_ring_hdl);
+
+	/* Process the reaped descriptors that were sent via fast path */
+	if (fast_head_desc) {
+		dp_tx_comp_process_desc_list_fast(soc, fast_head_desc,
+						  fast_tail_desc, ring_id,
+						  fast_desc_count);
+		dp_tx_nbuf_dev_kfree_list(&h);
+	}
 
 	/* Process the reaped descriptors */
 	if (head_desc)

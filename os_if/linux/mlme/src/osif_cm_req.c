@@ -493,9 +493,15 @@ void osif_update_partner_vdev_info(struct wlan_objmgr_vdev *vdev,
 				   struct mlo_partner_info partner_info)
 {
 	struct wlan_objmgr_vdev *tmp_vdev;
+	struct wlan_mlo_dev_context *ml_dev = NULL;
 	uint8_t i;
+	uint8_t link_id;
 
 	if (!vdev)
+		return;
+
+	ml_dev = vdev->mlo_dev_ctx;
+	if (!ml_dev)
 		return;
 
 	for (i = 0; i < partner_info.num_partner_links; i++) {
@@ -506,9 +512,14 @@ void osif_update_partner_vdev_info(struct wlan_objmgr_vdev *vdev,
 			mlo_update_connect_req_links(tmp_vdev, 1);
 			wlan_vdev_mlme_set_mlo_vdev(tmp_vdev);
 			wlan_vdev_mlme_set_mlo_link_vdev(tmp_vdev);
-			wlan_vdev_set_link_id(
-				tmp_vdev,
-				partner_info.partner_link_info[i].link_id);
+			/* Set link id for bridge sta vap */
+			if (mlo_is_sta_bridge_vdev(tmp_vdev)) {
+				link_id = ml_dev->bridge_sta_ctx->bridge_link_id;
+				wlan_vdev_set_link_id(tmp_vdev, link_id);
+			} else
+				wlan_vdev_set_link_id(
+					tmp_vdev,
+					partner_info.partner_link_info[i].link_id);
 			osif_debug("link id %d",
 				   tmp_vdev->vdev_mlme.mlo_link_id);
 		}
@@ -528,20 +539,18 @@ QDF_STATUS osif_update_mlo_partner_info(
 	struct mlo_partner_info partner_info = {0};
 	bool ml_ie_found = false, linkidfound = false;
 	uint8_t linkid = 0;
+	uint8_t aplinks = 0;
 	enum wlan_ml_variant variant;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint8_t psoc_ids[WLAN_UMAC_MLO_MAX_VDEVS];
-	uint8_t i, idx = 0;
-	uint8_t central_umac_id;
-	uint8_t tot_grp_socs, ml_grp_id;
 	struct wlan_objmgr_pdev *pdev = NULL;
-	struct wlan_objmgr_vdev *vdev_iter;
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlo_dev_context *ml_dev = NULL;
 
 	if (!vdev || !connect_req || !req)
 		return status;
 
-	if (!vdev->mlo_dev_ctx) {
+	ml_dev = vdev->mlo_dev_ctx;
+	if (!ml_dev) {
 		osif_debug("ML ctx is NULL, ignore ML IE");
 		return QDF_STATUS_SUCCESS;
 	}
@@ -618,41 +627,21 @@ QDF_STATUS osif_update_mlo_partner_info(
 
 	qdf_mem_copy(&connect_req->ml_parnter_info,
 		     &partner_info, sizeof(struct mlo_partner_info));
-
+	/* Get total number of links in association */
+	aplinks = partner_info.num_partner_links + 1;
 	if (ml_ie_found) {
 		mlo_clear_connect_req_links_bmap(vdev);
-		mlo_update_connect_req_links(vdev, 1);
-		osif_update_partner_vdev_info(vdev, partner_info);
-
-		/* Incase of 4-LINK RDP in 3-LINK NON-AP MLD mode there is
-		 * restriction to have the primary umac and association
-		 * link to be same.
-		 * Note: It also means restriction on umac migration
-		 */
-		ml_grp_id = wlan_get_mlo_grp_id_from_pdev(pdev);
-		tot_grp_socs = mlo_setup_get_total_socs(ml_grp_id);
-		if (tot_grp_socs == WLAN_UMAC_MLO_MAX_VDEVS) {
-			for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-				vdev_iter = vdev->mlo_dev_ctx->wlan_vdev_list[i];
-				if (!vdev_iter)
-					continue;
-				/* Store the psoc_ids of the links */
-				psoc_ids[idx] = wlan_vdev_get_psoc_id(vdev_iter);
-				idx++;
-			}
-			/* Check if the primary umac and assoc links are same */
-			if (idx == WLAN_UMAC_MLO_ASSOC_MAX_SUPPORTED_LINKS) {
-				central_umac_id = mlo_get_central_umac_id(psoc_ids);
-				if (central_umac_id != -1) {
-					if (wlan_vdev_get_psoc_id(vdev) != central_umac_id) {
-						osif_err("Rejecting connection as primary umac soc %d and assoc link %d are different ",
-							 central_umac_id, wlan_vdev_get_psoc_id(vdev));
-						return QDF_STATUS_E_FAILURE;
-					}
-				}
-			}
+		/* Handle 4 LINK RDP Case*/
+		if (mlo_check_topology(pdev, vdev, aplinks) != QDF_STATUS_SUCCESS) {
+			osif_err("Topology check failed prevent association\n");
+			return QDF_STATUS_E_FAILURE;
 		}
 
+		if (mlo_sta_bridge_exists(vdev))
+			mlo_update_partner_bridge_info(ml_dev, &partner_info);
+
+		mlo_update_connect_req_links(vdev, 1);
+		osif_update_partner_vdev_info(vdev, partner_info);
 		mlo_mlme_sta_op_class(vdev, ml_ie);
 	}
 

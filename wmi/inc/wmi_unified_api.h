@@ -3874,6 +3874,21 @@ QDF_STATUS wmi_extract_spectral_scaling_params_service_ready_ext(
 			uint8_t *evt_buf, uint8_t idx,
 			struct wlan_psoc_host_spectral_scaling_params *param);
 
+#ifdef WLAN_RCC_ENHANCED_AOA_SUPPORT
+/**
+ * wmi_extract_aoa_caps_service_ready_ext2: Extract AoA capabilities received
+ *                                          through extended service ready event
+ * @wmi_handle: WMI handle
+ * @evt_buf: Event buffer
+ * @aoa_cap: Pointer to aoa cap
+ *
+ * Return: QDF status of operation
+ */
+QDF_STATUS wmi_extract_aoa_caps_service_ready_ext2(
+			wmi_unified_t wmi_handle, uint8_t *evt_buf,
+			struct wlan_psoc_host_rcc_enh_aoa_caps_ext2 *aoa_cap);
+#endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
+
 /**
  * wmi_extract_pdev_utf_event() -
  *       extract UTF data from pdev utf event
