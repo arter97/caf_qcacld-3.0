@@ -597,8 +597,7 @@ dp_tx_mlo_mcast_multipass_send(struct dp_vdev_be *be_vdev,
 	}
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 	dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
-	msdu_info.gsn = be_vdev->seq_num;
-	be_ptnr_vdev->seq_num = be_vdev->seq_num;
+	msdu_info.gsn = be_vdev->mlo_dev_ctxt->seq_num;
 
 	if (ptr->vlan_id == MULTIPASS_WITH_VLAN_ID) {
 		msdu_info.tid = HTT_TX_EXT_TID_INVALID;
@@ -703,10 +702,10 @@ dp_tx_mlo_mcast_multipass_handler(struct dp_soc *soc,
 		/* send frame on mcast primary vdev */
 		dp_tx_mlo_mcast_multipass_send(be_vdev, vdev, &mpass_buf_copy);
 
-		if (qdf_unlikely(be_vdev->seq_num > MAX_GSN_NUM))
-			be_vdev->seq_num = 0;
+		if (qdf_unlikely(be_vdev->mlo_dev_ctxt->seq_num > MAX_GSN_NUM))
+			be_vdev->mlo_dev_ctxt->seq_num = 0;
 		else
-			be_vdev->seq_num++;
+			be_vdev->mlo_dev_ctxt->seq_num++;
 	}
 
 	dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
@@ -714,10 +713,10 @@ dp_tx_mlo_mcast_multipass_handler(struct dp_soc *soc,
 			      &mpass_buf, DP_MOD_ID_TX, DP_LINK_VDEV_ITER);
 	dp_tx_mlo_mcast_multipass_send(be_vdev, vdev, &mpass_buf);
 
-	if (qdf_unlikely(be_vdev->seq_num > MAX_GSN_NUM))
-		be_vdev->seq_num = 0;
+	if (qdf_unlikely(be_vdev->mlo_dev_ctxt->seq_num > MAX_GSN_NUM))
+		be_vdev->mlo_dev_ctxt->seq_num = 0;
 	else
-		be_vdev->seq_num++;
+		be_vdev->mlo_dev_ctxt->seq_num++;
 
 	return true;
 }
@@ -769,8 +768,7 @@ dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
 
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 	dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
-	msdu_info.gsn = be_vdev->seq_num;
-	be_ptnr_vdev->seq_num = be_vdev->seq_num;
+	msdu_info.gsn = be_vdev->mlo_dev_ctxt->seq_num;
 
 	nbuf_clone = dp_tx_send_msdu_single(
 					ptnr_vdev,
@@ -811,10 +809,10 @@ void dp_tx_mlo_mcast_handler_be(struct dp_soc *soc,
 	/* send frame on mcast primary vdev */
 	dp_tx_mlo_mcast_pkt_send(be_vdev, vdev, nbuf);
 
-	if (qdf_unlikely(be_vdev->seq_num > MAX_GSN_NUM))
-		be_vdev->seq_num = 0;
+	if (qdf_unlikely(be_vdev->mlo_dev_ctxt->seq_num > MAX_GSN_NUM))
+		be_vdev->mlo_dev_ctxt->seq_num = 0;
 	else
-		be_vdev->seq_num++;
+		be_vdev->mlo_dev_ctxt->seq_num++;
 }
 
 bool dp_tx_mlo_is_mcast_primary_be(struct dp_soc *soc,
