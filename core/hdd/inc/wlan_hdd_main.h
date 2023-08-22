@@ -1078,6 +1078,7 @@ enum udp_qos_upgrade {
  * @hdd_stats: HDD statistics
  * @big_data_stats: Big data stats
  * @ll_iface_stats: Link Layer interface stats
+ * @hdd_sinfo: hdd vdev station stats that will be sent to userspace
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
@@ -1111,6 +1112,7 @@ struct wlan_hdd_link_info {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 	struct wifi_interface_stats ll_iface_stats;
+	struct wlan_hdd_station_stats_info hdd_sinfo;
 #endif
 
 #ifdef WLAN_FEATURE_MSCS
