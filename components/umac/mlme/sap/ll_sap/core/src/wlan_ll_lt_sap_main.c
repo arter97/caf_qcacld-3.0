@@ -17,6 +17,8 @@
 #include "wlan_ll_lt_sap_main.h"
 #include "wlan_scan_ucfg_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
+#include "wlan_ll_sap_main.h"
+#include "wlan_ll_lt_sap_bearer_switch.h"
 
 bool ll_lt_sap_is_supported(void)
 {
@@ -68,4 +70,46 @@ rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
 
 	return status;
+}
+
+QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev)
+{
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+
+	if (!ll_sap_obj) {
+		ll_sap_err("vdev %d ll_sap obj null",
+			   wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ll_sap_obj->bearer_switch_ctx =
+			qdf_mem_malloc(sizeof(struct bearer_switch_info));
+	if (!ll_sap_obj->bearer_switch_ctx)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_atomic_init(&ll_sap_obj->bearer_switch_ctx->request_id);
+	ll_sap_debug("vdev %d", wlan_vdev_get_id(vdev));
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev)
+{
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+
+	if (!ll_sap_obj) {
+		ll_sap_err("vdev %d ll_sap obj null",
+			   wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (ll_sap_obj->bearer_switch_ctx)
+		qdf_mem_free(ll_sap_obj->bearer_switch_ctx);
+	ll_sap_debug("vdev %d", wlan_vdev_get_id(vdev));
+
+	return QDF_STATUS_SUCCESS;
 }

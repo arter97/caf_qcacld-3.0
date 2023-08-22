@@ -2091,9 +2091,12 @@ _conditional_srcs = {
     },
     "CONFIG_WLAN_FEATURE_LL_LT_SAP": {
         True: [
+            "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_api.c",
             "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_ucfg_api.c",
+            "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_lt_sap_bearer_switch.c",
             "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_lt_sap_main.c",
             "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_sap_main.c",
+            "components/cmn_services/policy_mgr/src/wlan_policy_mgr_ll_sap.c",
         ],
     },
 }

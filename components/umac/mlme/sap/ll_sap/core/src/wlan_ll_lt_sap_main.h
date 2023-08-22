@@ -23,6 +23,9 @@
 
 #include "wlan_ll_sap_main.h"
 #include "wlan_mlme_public_struct.h"
+#include <i_qdf_types.h>
+#include <qdf_types.h>
+#include "wlan_ll_sap_main.h"
 
 /**
  * ll_lt_sap_is_supported() - Check if ll_lt_sap is supported or not
@@ -44,4 +47,21 @@ QDF_STATUS ll_lt_sap_get_sorted_user_config_acs_ch_list(
 					struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id,
 					struct sap_sel_ch_info *ch_info);
+/*
+ * ll_lt_sap_init() - Initialize ll_lt_sap infrastructure
+ * @vdev: Pointer to vdev
+ *
+ * Return: QDF_STATUS_SUCCESS if ll_lt_sap infra initialized successfully else
+ * error code
+ */
+QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ll_lt_sap_deinit() - De-initialize ll_lt_sap infrastructure
+ * @vdev: Pointer to vdev
+ *
+ * Return: QDF_STATUS_SUCCESS if ll_lt_sap infra de-initialized successfully
+ * else error code
+ */
+QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev);
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

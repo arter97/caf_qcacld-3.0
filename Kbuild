@@ -1643,8 +1643,10 @@ MLME_INC += $(LL_SAP_INC)
 
 ifeq ($(CONFIG_WLAN_FEATURE_LL_LT_SAP), y)
 MLME_OBJS += $(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_ucfg_api.o \
+		$(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_api.o \
 		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o \
-		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_main.o
+		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_main.o \
+		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_bearer_switch.o
 endif
 
 $(call add-wlan-objs,mlme,$(MLME_OBJS))
@@ -1844,7 +1846,10 @@ POLICY_MGR_OBJS := $(POLICY_MGR_DIR)/src/wlan_policy_mgr_action.o \
 	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_get_set_utils.o \
 	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_init_deinit.o \
 	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_ucfg.o \
-	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_pcl.o \
+	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_pcl.o
+ifeq ($(CONFIG_WLAN_FEATURE_LL_LT_SAP), y)
+POLICY_MGR_OBJS += $(POLICY_MGR_DIR)/src/wlan_policy_mgr_ll_sap.o
+endif
 
 $(call add-wlan-objs,policy_mgr,$(POLICY_MGR_OBJS))
 
