@@ -774,6 +774,7 @@ struct enhance_roam_info {
  * @bss_color_change_wakelock: wakelock to complete bss color change
  *				operation on bss color collision detection
  * @bss_color_change_runtime_lock: runtime lock to complete bss color change
+ * @disconnect_runtime_lock: runtime lock to complete disconnection
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -844,6 +845,7 @@ struct mlme_legacy_priv {
 #endif
 	qdf_wake_lock_t bss_color_change_wakelock;
 	qdf_runtime_lock_t bss_color_change_runtime_lock;
+	qdf_runtime_lock_t disconnect_runtime_lock;
 };
 
 /**
