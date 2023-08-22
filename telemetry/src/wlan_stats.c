@@ -54,6 +54,13 @@ static void fill_basic_data_tx_stats(struct basic_data_tx_stats *tx,
 			    cdp_tx->dropped.fw_reason3;
 }
 
+static void update_basic_peer_data_rx_stats(struct basic_data_rx_stats *rx,
+					    struct cdp_rx_stats *cdp_rx)
+{
+	rx->to_stack.num = cdp_rx->rx_success.num;
+	rx->to_stack.bytes = cdp_rx->rx_success.bytes;
+}
+
 static void fill_basic_data_rx_stats(struct basic_data_rx_stats *rx,
 				     struct cdp_rx_stats *cdp_rx)
 {
@@ -83,6 +90,9 @@ static void fill_basic_peer_data_rx(struct basic_peer_data_rx *data,
 				    struct cdp_rx_stats *rx)
 {
 	fill_basic_data_rx_stats(&data->rx, rx);
+
+	/* update to_stack with rx_success for link level support */
+	update_basic_peer_data_rx_stats(&data->rx, rx);
 }
 
 static void fill_basic_peer_ctrl_rx(struct basic_peer_ctrl_rx *ctrl,
