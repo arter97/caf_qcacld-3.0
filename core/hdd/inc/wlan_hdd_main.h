@@ -1095,7 +1095,6 @@ struct hdd_adapter {
 	 * in null pointer de-reference.
 	 */
 	struct completion vdev_destroy_event;
-	qdf_atomic_t vdev_destroy_pending_count;
 
 	/* QDF event for session open */
 	qdf_event_t qdf_session_open_event;
@@ -2826,7 +2825,6 @@ void hdd_context_destroy(struct hdd_context *hdd_ctx);
 int hdd_wlan_notify_modem_power_state(int state);
 
 void wlan_hdd_send_svc_nlink_msg(int radio, int type, void *data, int len);
-void wlan_hdd_send_dp_destroy_msg(uint8_t vdev_id);
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 void wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable);
 #else

@@ -5744,6 +5744,10 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 		status = mlme_get_fw_scan_channels(psoc, chan_freq, &num_chan);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto out;
+		if (num_chan > NUM_CHANNELS) {
+			mlme_err("unexpected num chan %d", num_chan);
+			goto out;
+		}
 
 		status = wlan_mlme_get_band_capability(psoc, &band_capability);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -5753,8 +5757,7 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_get_connected_roaming_vdev_band_mask(psoc,
 									vdev_id);
 
-		if (num_chan > WLAN_MAX_LOGGING_FREQ)
-			num_chan = WLAN_MAX_LOGGING_FREQ;
+		num_chan = QDF_MIN(WLAN_MAX_LOGGING_FREQ, NUM_CHANNELS);
 
 		for (i = 0; i < num_chan; i++) {
 			if (!wlan_is_valid_frequency(chan_freq[i],

@@ -634,7 +634,6 @@ struct wlan_dp_psoc_callbacks {
 					  uint8_t vdev_id);
 	bool (*dp_any_adapter_connected)(hdd_cb_handle context);
 	void (*dp_send_svc_nlink_msg)(int radio, int type, void *data, int len);
-	void (*dp_send_destroy_ind)(uint8_t vdev_id);
 
 	void
 	(*osif_dp_send_tcp_param_update_event)(struct wlan_objmgr_psoc *psoc,
