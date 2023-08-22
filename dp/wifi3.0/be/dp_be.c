@@ -2844,11 +2844,6 @@ QDF_STATUS dp_mlo_dev_ctxt_vdev_attach(struct cdp_soc_t *soc_hdl,
 
 	/* ref for holding MLO ctxt in be_vdev */
 	dp_mlo_dev_get_ref(mlo_dev_ctxt, DP_MOD_ID_CHILD);
-	/* Save vdev stats in MLO dev ctx */
-	dp_update_mlo_ctxt_stats(&mlo_dev_ctxt->stats, &vdev->stats);
-
-	/* reset vdev stats to zero */
-	qdf_mem_set(&vdev->stats, sizeof(struct cdp_vdev_stats), 0);
 
 	/* unref for mlo ctxt taken at the start of this function */
 	dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_MLO_DEV);
@@ -2905,6 +2900,12 @@ QDF_STATUS dp_mlo_dev_ctxt_vdev_detach(struct cdp_soc_t *soc_hdl,
 	}
 
 	be_vdev->mlo_dev_ctxt = NULL;
+
+	/* Save vdev stats in MLO dev ctx */
+	dp_update_mlo_ctxt_stats(&mlo_dev_ctxt->stats, &vdev->stats);
+
+	/* reset vdev stats to zero */
+	qdf_mem_set(&vdev->stats, sizeof(struct cdp_vdev_stats), 0);
 
 	/* unref for mlo ctxt removed from be_vdev*/
 	dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_CHILD);
