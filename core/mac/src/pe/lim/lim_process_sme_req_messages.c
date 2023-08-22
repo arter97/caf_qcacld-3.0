@@ -1954,6 +1954,18 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 		session->is_oui_auth_assoc_6mbps_2ghz_enable = true;
 	}
 
+	/* When connect to IoT AP with BW 160MHz and NSS 2,
+	 * disable Beamformee
+	 */
+	if (wlan_action_oui_search(mac_ctx->psoc,
+				   &vendor_ap_search_attr,
+				   ACTION_OUI_DISABLE_BFORMEE) &&
+	    session->nss == 2 && CH_WIDTH_160MHZ == session->ch_width) {
+		session->vht_config.su_beam_formee = 0;
+		session->vht_config.mu_beam_formee = 0;
+		pe_debug("IoT ap, NSS 2 BW 160, disable beamformee");
+	}
+
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
 	    !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band &&
 	    session->dot11mode == MLME_DOT11_MODE_11AC) {
@@ -3254,7 +3266,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	lim_join_req_update_ht_vht_caps(mac_ctx, session, bss_desc,
 					ie_struct);
 
-	lim_check_oui_and_update_session(mac_ctx, session, ie_struct);
 	ese_ver_present = ie_struct->ESEVersion.present;
 
 	/* Copying of bssId is already done, while creating session */
@@ -3397,6 +3408,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		&session->limCurrentBssQosCaps,
 		&session->gLimCurrentBssUapsd,
 		&local_power_constraint, session, &is_pwr_constraint);
+
+	lim_check_oui_and_update_session(mac_ctx, session, ie_struct);
 
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs =
 						!is_pwr_constraint;
