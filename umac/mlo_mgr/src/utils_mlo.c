@@ -228,8 +228,31 @@ util_parse_multi_link_ctrl(uint8_t *mlieseqpayload,
 		parsed_payload_len += WLAN_ML_BV_CINFO_MLDID_SIZE;
 	}
 
+	/* Check if Ext MLD CAP OP is present */
+	if (presence_bm & WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P) {
+		if (mlieseqpayloadlen <
+				(parsed_payload_len +
+				 WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE)) {
+			mlo_err_rl("ML seq payload len %zu insufficient for Ext MLD CAP OP size %u after parsed payload len %zu.",
+				   mlieseqpayloadlen,
+				   WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE,
+				   parsed_payload_len);
+			return QDF_STATUS_E_PROTO;
+		}
+
+		parsed_payload_len += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
+	}
+
 	exp_cinfo_len = parsed_payload_len - WLAN_ML_CTRL_SIZE;
-	if (cinfo_len != exp_cinfo_len) {
+	if (cinfo_len >= exp_cinfo_len) {
+		/* If common info length received is greater,
+		 *  skip through the additional bytes
+		 */
+		parsed_payload_len += (cinfo_len - exp_cinfo_len);
+		mlo_debug("ML seq common info len %u, parsed payload length %zu, expected common info len %u",
+			  cinfo_len, parsed_payload_len, exp_cinfo_len);
+	} else {
+		/* If cinfo_len < exp_cinfo_len return error */
 		mlo_err_rl("ML seq common info len %u doesn't match with expected common info len %u",
 			   cinfo_len, exp_cinfo_len);
 		return QDF_STATUS_E_PROTO;
