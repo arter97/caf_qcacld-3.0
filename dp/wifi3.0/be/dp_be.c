@@ -2282,8 +2282,15 @@ void dp_print_mlo_ast_stats_be(struct dp_soc *soc)
 	}
 	qdf_spin_unlock_bh(&mld_hash_obj->mld_peer_hash_lock);
 }
+#else /* WLAN_FEATURE_11BE_MLO */
+void dp_mlo_dev_ctxt_list_attach_wrapper(dp_mlo_dev_obj_t mlo_dev_obj)
+{
+}
 
-#endif
+void dp_mlo_dev_ctxt_list_detach_wrapper(dp_mlo_dev_obj_t mlo_dev_obj)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 
 #if defined(DP_UMAC_HW_HARD_RESET) && defined(DP_UMAC_HW_RESET_SUPPORT)
 static void dp_reconfig_tx_vdev_mcast_ctrl_be(struct dp_soc *soc,
@@ -2989,12 +2996,6 @@ dp_initialize_arch_ops_be_mlo(struct dp_arch_ops *arch_ops)
 	arch_ops->mlo_peer_find_hash_find = dp_mlo_peer_find_hash_find_be;
 	arch_ops->get_hw_link_id = dp_get_hw_link_id_be;
 }
-#else /* WLAN_FEATURE_11BE_MLO */
-static inline void
-dp_initialize_arch_ops_be_mlo(struct dp_arch_ops *arch_ops)
-{
-}
-#endif /* WLAN_FEATURE_11BE_MLO */
 
 static struct cdp_cmn_mlo_ops dp_cmn_mlo_ops = {
 	.mlo_dev_ctxt_create = dp_mlo_dev_ctxt_create,
@@ -3007,6 +3008,16 @@ void dp_soc_initialize_cdp_cmn_mlo_ops(struct dp_soc *soc)
 {
 	soc->cdp_soc.ops->cmn_mlo_ops = &dp_cmn_mlo_ops;
 }
+#else /* WLAN_FEATURE_11BE_MLO */
+static inline void
+dp_initialize_arch_ops_be_mlo(struct dp_arch_ops *arch_ops)
+{
+}
+
+void dp_soc_initialize_cdp_cmn_mlo_ops(struct dp_soc *soc)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 #define DP_LMAC_PEER_ID_MSB_LEGACY 2
