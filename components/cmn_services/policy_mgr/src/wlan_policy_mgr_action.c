@@ -3842,11 +3842,21 @@ QDF_STATUS policy_mgr_check_and_set_hw_mode_for_channel_switch(
 	uint8_t num_cxn_del = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	enum policy_mgr_conc_next_action next_action = PM_NOP;
+	bool eht_capab =  false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid context");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
+	if (eht_capab &&
+	    policy_mgr_mode_specific_connection_count(psoc,
+						      PM_SAP_MODE,
+						      NULL) == 1) {
+		policy_mgr_stop_opportunistic_timer(psoc);
+		goto ch_width_update;
 	}
 
 	if (!policy_mgr_is_hw_dbs_capable(psoc) ||
@@ -3865,6 +3875,7 @@ QDF_STATUS policy_mgr_check_and_set_hw_mode_for_channel_switch(
 	if (wlan_reg_freq_to_band(ch_freq) != REG_BAND_2G)
 		return QDF_STATUS_E_NOSUPPORT;
 
+ch_width_update:
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	/*
 	 * Store the connection's parameter and temporarily delete it

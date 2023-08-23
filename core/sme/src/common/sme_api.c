@@ -2713,7 +2713,11 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 	sme_debug("vdev %d reason %d status %d cm_id 0x%x",
 		  vdev_id, reason, param->status, request_id);
 
-	if (reason == POLICY_MGR_UPDATE_REASON_STA_CONNECT) {
+	if (reason == POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA) {
+		sme_debug("Continue channel switch for STA on vdev %d",
+			  vdev_id);
+		csr_sta_continue_csa(mac, vdev_id);
+	} else if (reason == POLICY_MGR_UPDATE_REASON_STA_CONNECT) {
 		sme_debug("Continue connect/reassoc on vdev %d reason %d status %d cm_id 0x%x",
 			  vdev_id, reason, param->status, request_id);
 		wlan_cm_handle_hw_mode_change_resp(mac->pdev, vdev_id,
