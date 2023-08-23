@@ -1492,6 +1492,10 @@ enum _ol_ath_param_t {
 #ifdef CONFIG_AFC_SUPPORT
 	OL_ATH_PARAM_AFC_SEND_CMD = 537,
 #endif /* CONFIG_AFC_SUPPORT */
+#if QCA_AIRTIME_FAIRNESS
+	OL_ATH_PARAM_ATF_VO_TIMESLOT = 538,
+	OL_ATH_PARAM_ATF_VI_TIMESLOT = 539,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3923,6 +3927,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 #ifdef QCA_R2P_UPDATE_ENABLED
 	{"hchan_r2p_restore_en",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_R2P_HCHAN_RESTORE, SET_PARAM, 1},
+#endif
+#if QCA_AIRTIME_FAIRNESS
+	{"atfvotimeslot", OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ATF_VO_TIMESLOT,
+		SET_PARAM, 1},
+	{"atfvitimeslot", OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ATF_VI_TIMESLOT,
+		SET_PARAM, 1},
 #endif
 };
 #endif
