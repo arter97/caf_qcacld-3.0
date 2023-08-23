@@ -48,9 +48,9 @@ bool mlo_ap_vdev_attach(struct wlan_objmgr_vdev *vdev,
 		return false;
 
 	dev_ctx = vdev->mlo_dev_ctx;
-	wlan_vdev_set_link_id(vdev, link_id);
 
 	if (!vdev->vdev_objmgr.mlo_bridge_vdev) {
+		wlan_vdev_set_link_id(vdev, link_id);
 		wlan_vdev_mlme_set_mlo_vdev(vdev);
 
 		/*
