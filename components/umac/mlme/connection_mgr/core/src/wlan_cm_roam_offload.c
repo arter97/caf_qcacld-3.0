@@ -6924,6 +6924,8 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
+	wlan_diag_event.supported_links = frame_data->band;
+
 	if (frame_data->type == ROAM_FRAME_INFO_FRAME_TYPE_EXT) {
 		wlan_diag_event.subtype =
 			(uint8_t)cm_roam_get_eapol_tag(frame_data->subtype);

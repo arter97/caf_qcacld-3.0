@@ -25,6 +25,7 @@
 #include "wlan_mlme_main.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlme_api.h"
+#include "cdp_txrx_ctrl.h"
 
 #ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 static struct wlan_connectivity_log_buf_data global_cl;
@@ -524,6 +525,20 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+void
+wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
+		       uint32_t freq, uint8_t vdev_id)
+{
+	ol_txrx_soc_handle soc_txrx_handle;
+	cdp_config_param_type val = {0};
+
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+	val.cdp_peer_param_freq = freq;
+	cdp_txrx_set_peer_param(soc_txrx_handle, vdev_id, peer_mac,
+				CDP_CONFIG_PEER_FREQ, val);
+}
 
 void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)

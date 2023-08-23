@@ -2078,6 +2078,9 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		dst_buf->assoc_id =
 			WMI_GET_ASSOC_ID(src_data->frame_info_ext);
 
+		dst_buf->band =
+			WMI_GET_MLO_BITMAP_BAND_INFO(src_data->frame_info_ext);
+
 		dst_buf++;
 		src_data++;
 	}

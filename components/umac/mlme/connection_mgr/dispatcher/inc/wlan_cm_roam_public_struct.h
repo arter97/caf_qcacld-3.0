@@ -2222,6 +2222,8 @@ enum roam_rt_stats_type {
  * @retry_count: Frame retry count
  * @assoc_id: Association id received in the association response/
  * reassociation response frame
+ * @band: Band on which the packet is transmitted or received. Refer
+ * enum wlan_diag_wifi_band
  */
 struct roam_frame_info {
 	bool present;
@@ -2237,6 +2239,7 @@ struct roam_frame_info {
 	int32_t rssi;
 	uint16_t retry_count;
 	uint16_t assoc_id;
+	uint8_t band;
 };
 
 /**

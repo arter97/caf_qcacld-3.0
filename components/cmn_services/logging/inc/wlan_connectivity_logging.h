@@ -1198,6 +1198,19 @@ void
 wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 		   struct wlan_diag_packet_info *data, bool is_tx);
 
+/**
+ * wlan_cdp_set_peer_freq() - API to set frequency to dp peer
+ * @psoc: psoc pointer
+ * @peer_mac: Bssid of peer
+ * @freq: frequency(in MHz)
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void
+wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
+		       uint32_t freq, uint8_t vdev_id);
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * wlan_connectivity_mlo_setup_event() - Fill and send MLO setup data
@@ -1406,6 +1419,20 @@ wlan_convert_freq_to_diag_band(uint16_t ch_freq);
 void
 wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 		   struct wlan_diag_packet_info *data, bool is_tx);
+
+/**
+ * wlan_cdp_set_peer_freq() - API to set frequency to dp peer
+ * @psoc: psoc pointer
+ * @peer_mac: Bssid of peer
+ * @freq: frequency(in MHz)
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void
+wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
+		       uint32_t freq, uint8_t vdev_id);
+
 #else
 static inline
 void wlan_connectivity_logging_start(struct wlan_objmgr_psoc *psoc,
@@ -1449,6 +1476,11 @@ wlan_convert_freq_to_diag_band(uint16_t ch_freq)
 {
 	return WLAN_INVALID_BAND;
 }
+
+static inline void
+wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
+		       uint32_t freq, uint8_t vdev_id)
+{}
 
 static inline void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,

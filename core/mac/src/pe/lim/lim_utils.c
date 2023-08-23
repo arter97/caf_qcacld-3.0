@@ -11058,6 +11058,11 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 	    !mlme_is_chan_switch_in_progress(mlme_obj->vdev))
 		lim_apply_puncture(mac, session, ch_params.mhz_freq_seg1);
 
+	if (LIM_IS_STA_ROLE(session))
+		wlan_cdp_set_peer_freq(mac->psoc, session->bssId,
+				       session->curr_op_freq,
+				       wlan_vdev_get_id(session->vdev));
+
 	if (IS_DOT11_MODE_EHT(session->dot11mode))
 		wlan_reg_set_create_punc_bitmap(&ch_params, true);
 

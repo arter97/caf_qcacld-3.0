@@ -754,6 +754,12 @@ wma_roam_update_vdev(tp_wma_handle wma,
 		return;
 	}
 
+	if (wlan_vdev_mlme_get_opmode(wma->interfaces[vdev_id].vdev) ==
+								QDF_STA_MODE)
+		wlan_cdp_set_peer_freq(wma->psoc, bssid,
+				       wma->interfaces[vdev_id].ch_freq,
+				       vdev_id);
+
 	is_assoc_peer = wlan_vdev_mlme_get_is_mlo_vdev(wma->psoc, vdev_id);
 	if (is_multi_link_roam(roam_synch_ind_ptr)) {
 		wma_create_peer(wma, mac_addr.bytes,
