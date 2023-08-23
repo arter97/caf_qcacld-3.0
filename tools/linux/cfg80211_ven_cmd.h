@@ -862,6 +862,9 @@ enum {
 	IEEE80211_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY = 815,
 	IEEE80211_PARAM_RTT_11AZ_NTB_MAX_TIME_BW_MEAS = 816,
 	IEEE80211_PARAM_RTT_11AZ_NTB_MIN_TIME_BW_MEAS = 817,
+#ifdef ASSOC_REJECT_SUPPORT_ENABLED
+	IEEE80211_PARAM_ASSOC_REJECT = 818,
+#endif
 };
 
 enum {
@@ -2575,6 +2578,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 	 SET_PARAM, 1},
 	{"ntb_min_time_bw_meas", IEEE80211_PARAM_RTT_11AZ_NTB_MIN_TIME_BW_MEAS,
 	 SET_PARAM, 1},
+#ifdef ASSOC_REJECT_SUPPORT_ENABLED
+	{"assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, SET_PARAM, 2},
+	{"g_assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, GET_PARAM, 0},
+#endif
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
