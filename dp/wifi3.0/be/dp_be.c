@@ -748,11 +748,13 @@ void dp_reo_shared_qaddr_detach(struct dp_soc *soc)
 static QDF_STATUS dp_soc_detach_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
+	dp_mlo_dev_obj_t mlo_dev_obj;
 	int i = 0;
 
 	dp_soc_ppeds_detach_be(soc);
 	dp_reo_shared_qaddr_detach(soc);
+
+	mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
 	dp_mlo_dev_ctxt_list_detach_wrapper(mlo_dev_obj);
 
 	for (i = 0; i < MAX_TXDESC_POOLS; i++)
@@ -926,12 +928,17 @@ dp_attach_vdev_list_in_mlo_dev_ctxt(struct dp_soc_be *be_soc,
 	qdf_spin_unlock_bh(&mlo_dev_ctxt->vdev_list_lock);
 }
 
-static inline void
+static inline QDF_STATUS
 dp_detach_vdev_list_in_mlo_dev_ctxt(struct dp_soc_be *be_soc,
 				    struct dp_vdev *vdev,
 				    struct dp_mlo_dev_ctxt *mlo_dev_ctxt)
 {
 	uint8_t pdev_id = vdev->pdev->pdev_id;
+
+	if (mlo_dev_ctxt->vdev_list[be_soc->mlo_chip_id][pdev_id] ==
+	    CDP_INVALID_VDEV_ID) {
+		return QDF_STATUS_E_INVAL;
+	}
 
 	qdf_spin_lock_bh(&mlo_dev_ctxt->vdev_list_lock);
 	if (vdev->is_bridge_vdev) {
@@ -943,6 +950,8 @@ dp_detach_vdev_list_in_mlo_dev_ctxt(struct dp_soc_be *be_soc,
 	}
 	mlo_dev_ctxt->vdev_count--;
 	qdf_spin_unlock_bh(&mlo_dev_ctxt->vdev_list_lock);
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_DP_MLO_DEV_CTX */
 #else
@@ -974,7 +983,7 @@ dp_attach_vdev_list_in_mlo_dev_ctxt(struct dp_soc_be *be_soc,
 {
 }
 
-static inline void
+static inline QDF_STATUS
 dp_detach_vdev_list_in_mlo_dev_ctxt(struct dp_soc_be *be_soc,
 				    struct dp_vdev *vdev,
 				    struct dp_mlo_dev_ctxt *mlo_dev_ctxt)
@@ -991,8 +1000,9 @@ static QDF_STATUS dp_soc_attach_be(struct dp_soc *soc,
 	uint32_t max_tx_rx_desc_num, num_spt_pages;
 	uint32_t num_entries;
 	int i = 0;
-	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
+	dp_mlo_dev_obj_t mlo_dev_obj;
 
+	mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
 	max_tx_rx_desc_num = WLAN_CFG_NUM_TX_DESC_MAX * MAX_TXDESC_POOLS +
 		WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX * MAX_RXDESC_POOLS +
 		WLAN_CFG_NUM_PPEDS_TX_DESC_MAX * MAX_PPE_TXDESC_POOLS;
@@ -2373,7 +2383,8 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 				      dp_mlo_mcast_reset_pri_mcast,
 				      (void *)&be_vdev->mcast_primary,
 				      DP_MOD_ID_TX_MCAST,
-				      DP_LINK_VDEV_ITER);
+				      DP_LINK_VDEV_ITER,
+				      DP_VDEV_ITERATE_SKIP_SELF);
 
 		params.chip_id = be_soc->mlo_chip_id;
 		params.pdev_id = be_vdev->vdev.pdev->pdev_id;
@@ -2418,7 +2429,8 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 				      dp_mlo_mcast_reset_pri_mcast,
 				      (void *)&be_vdev->mcast_primary,
 				      DP_MOD_ID_TX_MCAST,
-				      DP_LINK_VDEV_ITER);
+				      DP_LINK_VDEV_ITER,
+				      DP_VDEV_ITERATE_SKIP_SELF);
 
 		params.chip_id = be_soc->mlo_chip_id;
 		params.pdev_id = vdev->pdev->pdev_id;
@@ -2669,8 +2681,9 @@ dp_get_mlo_dev_ctx_by_mld_mac_addr(struct dp_soc_be *be_soc,
 {
 	struct dp_mlo_dev_ctxt *mld_cur = NULL;
 	struct dp_mlo_dev_ctxt *tmp_mld_cur = NULL;
-	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
+	dp_mlo_dev_obj_t mlo_dev_obj;
 
+	mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
 	if (!mlo_dev_obj) {
 		dp_err("DP Global MLO Context is NULL");
 		return NULL;
@@ -2710,8 +2723,9 @@ QDF_STATUS dp_mlo_dev_ctxt_create(struct cdp_soc_t *soc_hdl,
 	struct dp_mlo_dev_ctxt *mlo_dev_ctxt = NULL;
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
+	dp_mlo_dev_obj_t mlo_dev_obj;
 
+	mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
 	if (!mlo_dev_obj) {
 		dp_err("DP Global MLO Context is NULL");
 		return QDF_STATUS_E_FAILURE;
@@ -2774,8 +2788,9 @@ QDF_STATUS dp_mlo_dev_ctxt_destroy(struct cdp_soc_t *soc_hdl,
 	struct dp_mlo_dev_ctxt *mlo_dev_ctxt = NULL;
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	dp_mlo_dev_obj_t mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
+	dp_mlo_dev_obj_t mlo_dev_obj;
 
+	mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
 	if (!mlo_dev_obj) {
 		dp_err("DP Global MLO Context is NULL");
 		return QDF_STATUS_E_INVAL;
@@ -2899,7 +2914,13 @@ QDF_STATUS dp_mlo_dev_ctxt_vdev_detach(struct cdp_soc_t *soc_hdl,
 		mlo_dev_ctxt = be_vdev->mlo_dev_ctxt;
 	}
 
-	dp_detach_vdev_list_in_mlo_dev_ctxt(be_soc, vdev, mlo_dev_ctxt);
+	if (dp_detach_vdev_list_in_mlo_dev_ctxt(be_soc, vdev, mlo_dev_ctxt)
+	    != QDF_STATUS_SUCCESS) {
+		dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_MLO_DEV);
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+		return QDF_STATUS_SUCCESS;
+	}
+
 	be_vdev->mlo_dev_ctxt = NULL;
 
 	/* unref for mlo ctxt removed from be_vdev*/

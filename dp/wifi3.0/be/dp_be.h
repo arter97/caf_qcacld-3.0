@@ -595,6 +595,7 @@ typedef void dp_ptnr_vdev_iter_func(struct dp_vdev_be *be_vdev,
  * @arg: argument need to be passed to func
  * @mod_id: module id
  * @type: iterate type
+ * @include_self_vdev: flag to include/exclude self vdev in iteration
  *
  * Return: None
  */
@@ -602,7 +603,8 @@ void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			   struct dp_vdev_be *be_vdev,
 			   dp_ptnr_vdev_iter_func func, void *arg,
 			   enum dp_mod_id mod_id,
-			   uint8_t type);
+			   uint8_t type,
+			   bool include_self_vdev);
 #endif
 
 #ifdef WLAN_MCAST_MLO
