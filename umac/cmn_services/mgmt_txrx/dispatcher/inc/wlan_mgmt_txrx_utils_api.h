@@ -845,13 +845,39 @@ struct frm_conn_ap {
 };
 
 /**
+ * enum mgmt_rx_evt_ext_meta_id - Identifier to rx_params ext data
+ * @MGMT_RX_PARAMS_EXT_META_ADDBA: Tag id to indicate ADDBA meta info
+ * @MGMT_RX_PARAMS_EXT_META_TWT: Tag id to indicate TWT IE in meta info
+ */
+enum mgmt_rx_evt_ext_meta_id {
+	MGMT_RX_PARAMS_EXT_META_ADDBA,
+	MGMT_RX_PARAMS_EXT_META_TWT,
+};
+
+#define MAX_TWT_IE_RX_PARAMS_LEN 255
+/**
  * struct mgmt_rx_event_ext_params - Host mgmt extended params
- * @ba_win_size: Block-Ack window size
- * @reo_win_size: Reo win size
+ * @meta_id: Meta id to identify if this is ADDBA or TWT related info
+ * @add_ba_params: set for meta_id MGMT_RX_PARAMS_EXT_META_ADDBA
+ *     @ba_win_size: Block-Ack window size
+ *     @reo_win_size: Reo win size
+ * @twt_ie:  Set when meta_id is MGMT_RX_PARAMS_EXT_META_TWT
+ *     @ie_len: IE len of TWT IE from FW
+ *     @ie_data: IE data of TWT IE from FW
+ * @u: union of above two params as it is mutually exclusive.
  */
 struct mgmt_rx_event_ext_params {
-	uint16_t ba_win_size;
-	uint16_t reo_win_size;
+	enum mgmt_rx_evt_ext_meta_id meta_id;
+	union {
+		struct add_ba_params {
+			uint16_t ba_win_size;
+			uint16_t reo_win_size;
+		} addba;
+		struct twt_ie {
+			uint16_t ie_len;
+			uint8_t ie_data[MAX_TWT_IE_RX_PARAMS_LEN];
+		} twt;
+	} u;
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO

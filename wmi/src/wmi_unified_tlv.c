@@ -13000,6 +13000,12 @@ static QDF_STATUS extract_mgmt_rx_ext_params_tlv(wmi_unified_t wmi_handle,
 	WMI_MGMT_RX_EVENTID_param_tlvs *param_tlvs;
 	wmi_mgmt_rx_params_ext *ext_params_tlv;
 	wmi_mgmt_rx_hdr *ev_hdr;
+	wmi_mgmt_rx_params_ext_meta_t meta_id;
+	uint8_t *ie_data;
+
+	/* initialize to zero and set it only if tlv has valid meta data */
+	ext_params->u.addba.ba_win_size = 0;
+	ext_params->u.addba.reo_win_size = 0;
 
 	param_tlvs = (WMI_MGMT_RX_EVENTID_param_tlvs *) evt_buf;
 	if (!param_tlvs) {
@@ -13015,24 +13021,41 @@ static QDF_STATUS extract_mgmt_rx_ext_params_tlv(wmi_unified_t wmi_handle,
 
 	ext_params_tlv = param_tlvs->mgmt_rx_params_ext;
 	if (ext_params_tlv) {
-		ext_params->ba_win_size = WMI_RX_PARAM_EXT_BA_WIN_SIZE_GET(
-					ext_params_tlv->mgmt_rx_params_ext_dword1);
-		if (ext_params->ba_win_size > 1024) {
-			wmi_info("ba win size %d from TLV is Invalid",
-				 ext_params->ba_win_size);
-			return QDF_STATUS_E_INVAL;
-		}
+		meta_id = WMI_RX_PARAM_EXT_META_ID_GET(
+				ext_params_tlv->mgmt_rx_params_ext_dword0);
+		if (meta_id == WMI_RX_PARAMS_EXT_META_ADDBA) {
+			ext_params->meta_id = MGMT_RX_PARAMS_EXT_META_ADDBA;
+			ext_params->u.addba.ba_win_size =
+				WMI_RX_PARAM_EXT_BA_WIN_SIZE_GET(
+				ext_params_tlv->mgmt_rx_params_ext_dword1);
+			if (ext_params->u.addba.ba_win_size > 1024) {
+				wmi_info("ba win size %d from TLV is Invalid",
+					 ext_params->u.addba.ba_win_size);
+				return QDF_STATUS_E_INVAL;
+			}
 
-		ext_params->reo_win_size = WMI_RX_PARAM_EXT_REO_WIN_SIZE_GET(
-					ext_params_tlv->mgmt_rx_params_ext_dword1);
-		if (ext_params->reo_win_size > 2048) {
-			wmi_info("reo win size %d from TLV is Invalid",
-				 ext_params->reo_win_size);
-			return QDF_STATUS_E_INVAL;
+			ext_params->u.addba.reo_win_size =
+				WMI_RX_PARAM_EXT_REO_WIN_SIZE_GET(
+				ext_params_tlv->mgmt_rx_params_ext_dword1);
+			if (ext_params->u.addba.reo_win_size > 2048) {
+				wmi_info("reo win size %d from TLV is Invalid",
+					 ext_params->u.addba.reo_win_size);
+				return QDF_STATUS_E_INVAL;
+			}
 		}
-	} else {
-		ext_params->ba_win_size = 0;
-		ext_params->reo_win_size = 0;
+		if (meta_id == WMI_RX_PARAMS_EXT_META_TWT) {
+			ext_params->meta_id = MGMT_RX_PARAMS_EXT_META_TWT;
+			ext_params->u.twt.ie_len =
+				ext_params_tlv->twt_ie_buf_len;
+			ie_data = param_tlvs->ie_data;
+			if (ext_params->u.twt.ie_len &&
+			    (ext_params->u.twt.ie_len <
+					MAX_TWT_IE_RX_PARAMS_LEN)) {
+				qdf_mem_copy(ext_params->u.twt.ie_data,
+					     ie_data,
+					     ext_params_tlv->twt_ie_buf_len);
+			}
+		}
 	}
 
 	return QDF_STATUS_SUCCESS;
