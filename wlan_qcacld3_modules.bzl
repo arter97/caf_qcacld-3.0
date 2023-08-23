@@ -6,6 +6,10 @@ _target_chipset_map = {
     "pineapple": [
 	"kiwi-v2",
     ],
+    "sun": [
+        "peach",
+        "kiwi-v2",
+    ],
 }
 
 _chipset_hw_map = {
@@ -2108,11 +2112,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     feature_grep_map = [
         {
-            "pattern": "walt_get_cpus_taken",
-            "file": "kernel/sched/walt/walt.c",
-            "flag": "WALT_GET_CPU_TAKEN_SUPPORT",
-        },
-        {
             "pattern": "nl80211_validate_key_link_id",
             "file": "net/wireless/nl80211.c",
             "flag": "CFG80211_MLO_KEY_OPERATION_SUPPORT",
@@ -2163,6 +2162,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = cmd,
     )
 
+    copts.append("-Wno-format")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 
