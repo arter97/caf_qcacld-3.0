@@ -4929,6 +4929,7 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	uint8_t                  vdev_id = 0;
 	uint8_t                  ch_spacing;
 	tLimWiderBWChannelSwitchInfo *wide_bw_ie;
+	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
 	if (!session_entry) {
 		pe_err("Session entry is NULL!!!");
@@ -4947,9 +4948,9 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	frm.ext_chan_switch_ann_action.new_channel = new_channel;
 	frm.ext_chan_switch_ann_action.switch_count = count;
 
+	wlan_reg_read_current_country(mac_ctx->psoc, reg_cc);
 	ch_spacing = wlan_reg_dmn_get_chanwidth_from_opclass(
-			mac_ctx->scan.countryCodeCurrent, new_channel,
-			new_op_class);
+			reg_cc, new_channel, new_op_class);
 
 	if ((ch_spacing == 80) || (ch_spacing == 160)) {
 		wide_bw_ie = &session_entry->gLimWiderBWChannelSwitch;
@@ -6418,6 +6419,10 @@ lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("session not found for given vdev_id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
 	session_id = session->smeSessionId;
 
 	qdf_mem_zero((uint8_t *)&frm, sizeof(frm));

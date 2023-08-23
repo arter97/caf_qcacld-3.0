@@ -71,6 +71,7 @@
 #include "wlan_twt_cfg_ext_api.h"
 #include <spatial_reuse_api.h>
 #include "wlan_psoc_mlme_api.h"
+#include "wlan_mlo_mgr_sta.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_peer.h>
 #endif
@@ -3272,7 +3273,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev,
 				&power_type_6g,
-				session->ap_defined_power_type_6g);
+				session->ap_defined_power_type_6g,
+				bss_desc->chan_freq);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			status = QDF_STATUS_E_NOSUPPORT;
 			goto send;
@@ -5536,6 +5538,9 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 		case CH_WIDTH_160MHZ:
 			num_pwr_levels = 8;
 			break;
+		case CH_WIDTH_320MHZ:
+			num_pwr_levels = 16;
+			break;
 		default:
 			pe_err("Invalid channel width");
 			return 0;
@@ -5553,6 +5558,9 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 			break;
 		case CH_WIDTH_160MHZ:
 			num_pwr_levels = 4;
+			break;
+		case CH_WIDTH_320MHZ:
+			num_pwr_levels = 5;
 			break;
 		default:
 			pe_err("Invalid channel width");
@@ -7406,6 +7414,36 @@ lim_process_sme_cfg_action_frm_in_tb_ppdu(struct mac_context *mac_ctx,
 	lim_send_action_frm_tb_ppdu_cfg(mac_ctx, msg->vdev_id, msg->cfg);
 }
 
+static void
+lim_process_sme_send_vdev_pause(struct mac_context *mac_ctx,
+				struct sme_vdev_pause *msg)
+{
+	struct pe_session *session;
+	uint16_t vdev_pause_dur_ms;
+
+	if (!msg) {
+		pe_err("Buffer is NULL");
+		return;
+	}
+
+	session = pe_find_session_by_vdev_id(mac_ctx, msg->session_id);
+	if (!session) {
+		pe_warn("Session does not exist for given BSSID");
+		return;
+	}
+
+	if (!(wlan_vdev_mlme_get_opmode(session->vdev) == QDF_STA_MODE) &&
+	    wlan_vdev_mlme_is_mlo_vdev(session->vdev)) {
+		pe_err("vdev is not ML STA");
+		return;
+	}
+
+	vdev_pause_dur_ms = session->beaconParams.beaconInterval *
+						msg->vdev_pause_duration;
+	wlan_mlo_send_vdev_pause(mac_ctx->psoc, session->vdev,
+				 msg->session_id, vdev_pause_dur_ms);
+}
+
 static void lim_process_sme_update_config(struct mac_context *mac_ctx,
 					  struct update_config *msg)
 {
@@ -7670,7 +7708,7 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 				eHT_CHANNEL_WIDTH_20MHZ : eHT_CHANNEL_WIDTH_40MHZ;
 			qdf_mem_copy(pHtOpMode->peer_mac, &sta->staAddr,
 				     sizeof(tSirMacAddr));
-			pHtOpMode->smesessionId = sessionId;
+			pHtOpMode->smesessionId = pe_session->smeSessionId;
 
 			msg.type = WMA_UPDATE_OP_MODE;
 			msg.reserved = 0;
@@ -8523,6 +8561,10 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 	case WNI_SME_CFG_ACTION_FRM_HE_TB_PPDU:
 		lim_process_sme_cfg_action_frm_in_tb_ppdu(mac,
 				(struct  sir_cfg_action_frm_tb_ppdu *)msg_buf);
+		break;
+	case eWNI_SME_VDEV_PAUSE_IND:
+		lim_process_sme_send_vdev_pause(mac,
+					(struct sme_vdev_pause *)msg_buf);
 		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);
