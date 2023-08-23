@@ -7248,6 +7248,7 @@ typedef enum {
  *                                         puncture bitmap
  * @WMI_HOST_PEER_FT_ROAMING_PEER_UPDATE: Reset PN value on
  *                                        every roam event
+ * @WMI_HOST_PEER_PARAM_DMS_SUPPORT: Set DMS capability
  */
 enum {
 	PEER_PARAM(PEER_MIMO_PS_STATE),
@@ -7282,6 +7283,7 @@ enum {
 	PEER_PARAM(PEER_PARAM_ENABLE_FT),
 	PEER_PARAM(PEER_CHWIDTH_PUNCTURE_20MHZ_BITMAP),
 	PEER_PARAM(PEER_FT_ROAMING_PEER_UPDATE),
+	PEER_PARAM(PEER_PARAM_DMS_SUPPORT),
 
 };
 #define WMI_HOST_PEER_MIMO_PS_NONE	0x0
