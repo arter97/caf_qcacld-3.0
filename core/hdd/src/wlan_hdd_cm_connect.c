@@ -1151,6 +1151,11 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 	else
 		hdd_sta_ctx->conn_info.conn_flag.eht_present = false;
 
+	if (assoc_resp->eht_op.present)
+		hdd_sta_ctx->conn_info.conn_flag.eht_op_present = true;
+	else
+		hdd_sta_ctx->conn_info.conn_flag.eht_op_present = false;
+
 	/*
 	 * Cache connection info only in case of station
 	 */
@@ -1158,6 +1163,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 		/* Cleanup already existing he info */
 		hdd_cleanup_conn_info(link_info);
 
+		hdd_copy_eht_operation(hdd_sta_ctx, &assoc_resp->eht_op);
 		/* Cache last connection info */
 		qdf_mem_copy(&hdd_sta_ctx->cache_conn_info,
 			     &hdd_sta_ctx->conn_info,
