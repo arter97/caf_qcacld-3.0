@@ -4042,6 +4042,7 @@ QDF_STATUS lim_deauth_tx_complete_cnf(void *context,
 	pe_debug("tx_success: %d", tx_success);
 	if (mgmt_params)
 		vdev_id = mgmt_params->vdev_id;
+	qdf_mem_free(params);
 
 	return lim_send_deauth_cnf(mac_ctx, vdev_id);
 }
@@ -4092,6 +4093,7 @@ static QDF_STATUS lim_deauth_tx_complete_cnf_handler(void *context,
 	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 	struct wmi_mgmt_params *mgmt_params =
 			(struct wmi_mgmt_params *)params;
+	struct wmi_mgmt_params *msg_params = NULL;
 
 	if (params)
 		wlan_send_tx_complete_event(context, buf, params, tx_success,
@@ -4137,14 +4139,26 @@ static QDF_STATUS lim_deauth_tx_complete_cnf_handler(void *context,
 		session->deauth_retry.retry_cnt--;
 		return QDF_STATUS_SUCCESS;
 	}
+
+	msg_params = qdf_mem_malloc(sizeof(struct wmi_mgmt_params));
+	if (!msg_params) {
+		pe_err("malloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(msg_params, mgmt_params, sizeof(struct wmi_mgmt_params));
+
 	msg.type = (uint16_t) WMA_DEAUTH_TX_COMP;
-	msg.bodyptr = params;
+	msg.bodyptr = msg_params;
 	msg.bodyval = tx_success;
 
 	status_code = lim_post_msg_high_priority(mac_ctx, &msg);
-	if (status_code != QDF_STATUS_SUCCESS)
+	if (status_code != QDF_STATUS_SUCCESS) {
+		qdf_mem_free(msg_params);
 		pe_err("posting message: %X to LIM failed, reason: %d",
 		       msg.type, status_code);
+	}
+
 	return status_code;
 }
 
