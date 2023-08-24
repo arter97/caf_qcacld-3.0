@@ -7828,6 +7828,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
 
+	hdd_debug("Stats request on MAC: "QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac));
 	if (!mac || qdf_is_macaddr_zero((struct qdf_mac_addr *)mac)) {
 		hdd_err("Invalid MAC addr");
 		return -EINVAL;
