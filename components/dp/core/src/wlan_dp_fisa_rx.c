@@ -1470,6 +1470,10 @@ get_new_vdev_ref:
 				fisa_flow_head_skb_vdev->mld_mac_addr.raw,
 				QDF_MAC_ADDR_SIZE) != 0)) {
 			qdf_nbuf_free(fisa_flow->head_skb);
+			dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+					     fisa_flow_head_skb_vdev,
+					     DP_MOD_ID_RX);
+			fisa_flow_head_skb_vdev = NULL;
 			goto out;
 		} else {
 			fisa_flow->same_mld_vdev_mismatch++;
@@ -1511,9 +1515,10 @@ dp_fisa_rx_get_flow_flush_vdev_ref(ol_txrx_soc_handle cdp_soc,
 	return fisa_flow_head_skb_vdev;
 
 out:
-	dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
-			     fisa_flow_head_skb_vdev,
-			     DP_MOD_ID_RX);
+	if (fisa_flow_head_skb_vdev)
+		dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+				     fisa_flow_head_skb_vdev,
+				     DP_MOD_ID_RX);
 	return NULL;
 }
 #endif
