@@ -1560,6 +1560,8 @@ struct policy_mgr_freq_range {
  * @MODE_SBS_UPPER_SHARE:   Higher 5Ghz shared with 2.4Ghz
  * @MODE_SBS_LOWER_SHARE:   LOWER 5Ghz shared with 2.4Ghz
  * @MODE_EMLSR:             eMLSR mode
+ * @MODE_EMLSR_SINGLE:	    eMLSR split mode
+ * @MODE_EMLSR_SPLIT:	    eMLSR split mode
  * @MODE_HW_MAX: MAX
  */
 enum policy_mgr_mode {
@@ -1569,6 +1571,8 @@ enum policy_mgr_mode {
 	MODE_SBS_UPPER_SHARE,
 	MODE_SBS_LOWER_SHARE,
 	MODE_EMLSR,
+	MODE_EMLSR_SINGLE,
+	MODE_EMLSR_SPLIT,
 	MODE_HW_MAX,
 };
 

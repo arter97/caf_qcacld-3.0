@@ -1369,6 +1369,8 @@ policy_mgr_update_mac_freq_info(struct wlan_objmgr_psoc *psoc,
 
 		break;
 	case WMI_HW_MODE_EMLSR:
+	case WMI_HW_MODE_AUX_EMLSR_SINGLE:
+	case WMI_HW_MODE_AUX_EMLSR_SPLIT:
 		policy_mgr_update_freq_info(pm_ctx, mac_cap, MODE_EMLSR,
 					    phy_id);
 		break;
