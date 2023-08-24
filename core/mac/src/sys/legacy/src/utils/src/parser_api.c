@@ -9683,29 +9683,33 @@ QDF_STATUS populate_dot11f_eht_operation(struct mac_context *mac_ctx,
 					 struct pe_session *session,
 					 tDot11fIEeht_op *eht_op)
 {
+	enum phy_ch_width oper_ch_width;
+
 	qdf_mem_copy(eht_op, &session->eht_op, sizeof(*eht_op));
 
 	eht_op->present = 1;
 
 	eht_op->eht_op_information_present = 1;
-	if (session->ch_width == CH_WIDTH_320MHZ) {
+
+	oper_ch_width = wlan_mlme_get_ap_oper_ch_width(session->vdev);
+	if (oper_ch_width == CH_WIDTH_320MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_320;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = session->ch_center_freq_seg1;
-	} else if (session->ch_width == CH_WIDTH_160MHZ ||
-		   session->ch_width == CH_WIDTH_80P80MHZ) {
+	} else if (oper_ch_width == CH_WIDTH_160MHZ ||
+		   oper_ch_width == CH_WIDTH_80P80MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_160;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = session->ch_center_freq_seg1;
-	} else if (session->ch_width == CH_WIDTH_80MHZ) {
+	} else if (oper_ch_width == CH_WIDTH_80MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_80;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = 0;
-	} else if (session->ch_width == CH_WIDTH_40MHZ) {
+	} else if (oper_ch_width == CH_WIDTH_40MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_40;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = 0;
-	} else if (session->ch_width == CH_WIDTH_20MHZ) {
+	} else if (oper_ch_width == CH_WIDTH_20MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_20;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = 0;

@@ -11067,6 +11067,14 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 							&ch_params,
 							REG_CURRENT_PWR_MODE);
 		lim_update_ap_he_op(session, &ch_params);
+
+		wlan_mlme_set_ap_oper_ch_width(session->vdev,
+					       session->ch_width);
+		if (session->ch_width == CH_WIDTH_320MHZ &&
+		    policy_mgr_is_conn_lead_to_dbs_sbs(mac->psoc,
+						       session->curr_op_freq))
+			wlan_mlme_set_ap_oper_ch_width(session->vdev,
+						       CH_WIDTH_160MHZ);
 	}
 	mlme_obj->mgmt.generic.maxregpower = session->maxTxPower;
 	mlme_obj->proto.generic.beacon_interval =
