@@ -23,6 +23,7 @@
 #include "wlan_connectivity_logging.h"
 #include "wlan_cm_api.h"
 #include "wlan_mlme_main.h"
+#include "wlan_mlo_mgr_sta.h"
 
 #ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 static struct wlan_connectivity_log_buf_data global_cl;
@@ -299,6 +300,95 @@ wlan_cache_connectivity_log(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 #define WLAN_SAE_AUTH_ALGO_NUMBER 3
 #ifdef CONNECTIVITY_DIAG_EVENT
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static QDF_STATUS
+wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
+			struct wlan_diag_sta_info *wlan_diag_event)
+{
+	uint i = 0;
+	struct mlo_link_switch_context *link_ctx = vdev->mlo_dev_ctx->link_ctx;
+	struct wlan_channel *link_chan_info;
+
+	if (!link_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_chan_info = link_ctx->links_info[i].link_chan_info;
+
+		if (wlan_reg_is_24ghz_ch_freq(
+		    (qdf_freq_t)link_chan_info->ch_freq)) {
+			qdf_mem_copy(wlan_diag_event->mac_2g,
+				     link_ctx->links_info[i].link_addr.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		} else if (wlan_reg_is_5ghz_ch_freq(
+			   (qdf_freq_t)link_chan_info->ch_freq)) {
+			qdf_mem_copy(wlan_diag_event->mac_5g,
+				     link_ctx->links_info[i].link_addr.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		} else if (wlan_reg_is_6ghz_chan_freq(
+			   link_chan_info->ch_freq)) {
+			qdf_mem_copy(wlan_diag_event->mac_6g,
+				     link_ctx->links_info[i].link_addr.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
+			struct wlan_diag_sta_info *wlan_diag_event)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+void
+wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev = NULL;
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_sta_info);
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		logging_err_rl("Invalid vdev:%d", vdev_id);
+		return;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+		goto out;
+
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
+	wlan_diag_event.is_mlo = mlo_is_mld_sta(vdev);
+
+	if (wlan_diag_event.is_mlo) {
+		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
+			     wlan_vdev_mlme_get_mldaddr(vdev),
+			     QDF_MAC_ADDR_SIZE);
+		status = wlan_populate_link_addr(vdev, &wlan_diag_event);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			logging_err_rl("wlan_populate_link_addr failed");
+			goto out;
+		}
+	} else {
+		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
+			     wlan_vdev_mlme_get_macaddr(vdev),
+			     QDF_MAC_ADDR_SIZE);
+	}
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_STA_INFO);
+
+out:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+}
+
 void
 wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     struct wlan_frame_hdr *mac_hdr,

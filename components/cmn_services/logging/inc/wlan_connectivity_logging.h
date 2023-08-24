@@ -1187,6 +1187,15 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 static inline void wlan_connectivity_logging_stop(void)
 {}
 
+/**
+ * wlan_connectivity_sta_info_event() - APi to send STA info event
+ * @psoc: Pointer to global psoc object
+ * @vdev_id: Vdev id
+ */
+void
+wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
+
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
  * wlan_connectivity_logging_start()  - Initialize the connectivity/roaming
@@ -1255,6 +1264,15 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_algo, uint8_t auth_type,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag);
+
+/**
+ * wlan_connectivity_sta_info_event() - APi to send STA info event
+ * @psoc: Pointer to global psoc object
+ * @vdev_id: Vdev id
+ */
+void
+wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
 #else
 static inline
 void wlan_connectivity_logging_start(struct wlan_objmgr_psoc *psoc,
@@ -1286,5 +1304,10 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag)
 {}
+static inline void
+wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id)
+{
+}
 #endif
 #endif /* _WLAN_CONNECTIVITY_LOGGING_H_ */
