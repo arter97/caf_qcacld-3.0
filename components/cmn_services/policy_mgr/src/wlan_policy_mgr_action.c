@@ -1067,6 +1067,20 @@ policy_mgr_is_hw_mode_change_required(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
+static bool
+policy_mgr_is_ch_width_downgrade_required(struct wlan_objmgr_psoc *psoc,
+					  struct scan_cache_entry *entry,
+					  qdf_list_t *scan_list)
+
+{
+	if (policy_mgr_is_conn_lead_to_dbs_sbs(psoc,
+					       entry->channel.chan_freq) ||
+	    wlan_cm_bss_mlo_type(psoc, entry, scan_list))
+		return true;
+
+	return false;
+}
+
 static uint32_t
 policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 				    qdf_list_t *scan_list, uint8_t vdev_id)
@@ -1076,10 +1090,18 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
 	uint32_t ch_freq = 0;
 	struct scan_cache_entry *entry;
+	bool eht_capab =  false, check_sap_bw_downgrade = false;
 
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
 		policy_mgr_debug("HW mode selection offload is enabled");
-		goto end;
+		wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
+		if (eht_capab &&
+		    policy_mgr_mode_specific_connection_count(psoc,
+							      PM_SAP_MODE,
+							      NULL) == 1)
+			check_sap_bw_downgrade = true;
+		else
+			goto end;
 	}
 
 	if (!scan_list || !qdf_list_size(scan_list)) {
@@ -1091,6 +1113,9 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_debug("Driver isn't DBS capable");
 		goto end;
 	}
+
+	if (check_sap_bw_downgrade)
+		goto ch_width_update;
 
 	if (!policy_mgr_is_dbs_allowed_for_concurrency(psoc, QDF_STA_MODE)) {
 		policy_mgr_debug("DBS not allowed for concurrency combo");
@@ -1105,6 +1130,7 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
+ch_width_update:
 	qdf_list_peek_front(scan_list, &cur_node);
 
 	while (cur_node) {
@@ -1116,8 +1142,10 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 		ch_freq = entry->channel.chan_freq;
 
 		if (policy_mgr_is_hw_mode_change_required(psoc, ch_freq,
-							  vdev_id)) {
-			policy_mgr_debug("Scan list has BSS of freq %d hw mode required",
+							  vdev_id) ||
+		    policy_mgr_is_ch_width_downgrade_required(psoc, entry,
+							      scan_list)) {
+			policy_mgr_debug("Scan list has BSS of freq %d hw mode/ch_width update required",
 					 ch_freq);
 			break;
 		}

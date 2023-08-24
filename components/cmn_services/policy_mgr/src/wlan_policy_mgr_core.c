@@ -2057,7 +2057,8 @@ void pm_dbs_opportunistic_timer_handler(void *data)
 	enum policy_mgr_conc_next_action action = PM_NOP;
 	uint32_t session_id;
 	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)data;
-	enum policy_mgr_conn_update_reason reason;
+	enum policy_mgr_conn_update_reason reason =
+				POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC;
 	struct policy_mgr_psoc_priv_obj *pm_ctx = policy_mgr_get_context(psoc);
 
 	if (!psoc) {
