@@ -206,6 +206,7 @@ wlan_lmac_if_atf_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 	/* ATF rx ops */
 	atf_rx_ops->atf_get_fmcap = tgt_atf_get_fmcap;
 	atf_rx_ops->atf_get_mode = tgt_atf_get_mode;
+	atf_rx_ops->atf_is_enabled = tgt_atf_is_enabled;
 	atf_rx_ops->atf_get_msdu_desc = tgt_atf_get_msdu_desc;
 	atf_rx_ops->atf_get_max_vdevs = tgt_atf_get_max_vdevs;
 	atf_rx_ops->atf_get_peers = tgt_atf_get_peers;
