@@ -4662,4 +4662,26 @@ wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  */
 uint32_t
 wlan_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate);
+
+/**
+ * wlan_mlme_set_ap_oper_ch_width() - set SAP current operating ch_width
+ *
+ * @vdev: SAP VDEV object
+ * @ch_width: ch_width to be cached
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev,
+			       enum phy_ch_width ch_width);
+
+/**
+ * wlan_mlme_get_ap_oper_ch_width() - get SAP current operating ch_width
+ *
+ * @vdev: SAP VDEV object
+ *
+ * Return: Current SAP operating ch_width
+ */
+enum phy_ch_width
+wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev);
 #endif /* _WLAN_MLME_API_H_ */

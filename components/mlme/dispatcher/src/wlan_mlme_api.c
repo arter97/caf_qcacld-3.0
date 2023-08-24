@@ -7696,3 +7696,42 @@ wlan_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 
 	return set_value;
 }
+
+QDF_STATUS
+wlan_mlme_set_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev,
+			       enum phy_ch_width ch_width)
+
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev %d legacy private object is NULL",
+				wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->mlme_ap.oper_ch_width = ch_width;
+	mlme_debug("SAP oper ch_width: %d, vdev %d",
+		   mlme_priv->mlme_ap.oper_ch_width, wlan_vdev_get_id(vdev));
+
+	return QDF_STATUS_SUCCESS;
+}
+
+enum phy_ch_width
+wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev %d legacy private object is NULL",
+				wlan_vdev_get_id(vdev));
+		return CH_WIDTH_INVALID;
+	}
+
+	mlme_debug("SAP oper ch_width: %d, vdev %d",
+		   mlme_priv->mlme_ap.oper_ch_width, wlan_vdev_get_id(vdev));
+
+	return mlme_priv->mlme_ap.oper_ch_width;
+}
