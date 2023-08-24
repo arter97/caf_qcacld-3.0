@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -313,6 +313,13 @@ void ucfg_twt_get_work_params(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val);
+/**
+ * ucfg_twt_get_pmo_allowed() - Get twt allowed
+ * @psoc: psoc handler
+ *
+ * Return: QDF_STATUS_SUCCESS
+ */
+bool ucfg_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -431,5 +438,12 @@ bool ucfg_twt_cfg_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
+
+static inline
+bool ucfg_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
 #endif
 #endif

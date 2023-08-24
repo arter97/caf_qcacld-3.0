@@ -468,6 +468,25 @@ err:
 	return status;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_crypto_key_entry *keys,
+					  uint8_t num_keys)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t i;
+
+	for (i = 0; i < num_keys; i++) {
+		status = wlan_crypto_add_key_entry(psoc, &keys[i]);
+		if (QDF_IS_STATUS_ERROR(status))
+			mlme_err("Failed to add key entry for link:%d",
+				 keys[i].link_id);
+	}
+
+	return status;
+}
+#endif
+
 QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 					 uint8_t *event,
 					 uint32_t len)

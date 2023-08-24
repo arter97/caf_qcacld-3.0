@@ -1867,6 +1867,16 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_dfsnol.c",
         ],
     },
+    "CONFIG_WLAN_SYSFS_WDS_MODE": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_wds_mode.c",
+        ],
+    },
+    "CONFIG_WLAN_SYSFS_ROAM_TRIGGER_BITMAP": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_roam_trigger_bitmap.c",
+        ],
+    },
     "CONFIG_WLAN_SYSFS_DP_STATS": {
         True: [
             "core/hdd/src/wlan_hdd_sysfs_txrx_stats_console.c",

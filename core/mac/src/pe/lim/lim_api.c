@@ -866,7 +866,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 					lim_update_tx_pwr_on_ctry_change_cb);
 
 	wlan_reg_register_is_chan_connected_callback(mac->psoc,
-					lim_is_chan_connected_for_mode);
+					lim_get_connected_chan_for_mode);
 
 	if (mac->mlme_cfg->edca_params.enable_edca_params)
 		lim_register_policy_mgr_callback(mac->psoc);
@@ -916,7 +916,7 @@ QDF_STATUS pe_close(struct mac_context *mac)
 					lim_update_tx_pwr_on_ctry_change_cb);
 
 	wlan_reg_unregister_is_chan_connected_callback(mac->psoc,
-					lim_is_chan_connected_for_mode);
+					lim_get_connected_chan_for_mode);
 
 	if (mac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq) {
 		qdf_mem_free(mac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq);
@@ -2654,7 +2654,7 @@ lim_mlo_roam_copy_partner_info_to_session(struct pe_session *session,
 					  struct roam_offload_synch_ind *sync_ind)
 {
 	mlo_roam_copy_partner_info(&session->ml_partner_info,
-				   sync_ind, sync_ind->roamed_vdev_id);
+				   sync_ind, sync_ind->roamed_vdev_id, false);
 }
 
 static QDF_STATUS
@@ -2749,15 +2749,35 @@ void lim_handle_sr_cap(struct wlan_objmgr_vdev *vdev,
 	uint8_t non_srg_pd_offset = 0;
 	uint8_t srg_max_pd_offset = 0;
 	uint8_t srg_min_pd_offset = 0;
-	uint8_t sr_ctrl;
+	uint8_t sr_ctrl, sr_enable_modes;
 	bool is_pd_threshold_present = false;
 	struct wlan_objmgr_pdev *pdev;
 	enum sr_status_of_roamed_ap sr_status;
 	enum sr_osif_operation sr_op;
+	enum QDF_OPMODE opmode;
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
+	if (!mac) {
+		pe_err("mac ctx is null");
+		return;
+	}
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		pe_err("invalid pdev");
+		return;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	/* If SR is disabled in INI for the session-operating mode
+	 * Then return.
+	 */
+	wlan_mlme_get_sr_enable_modes(mac->psoc, &sr_enable_modes);
+	if (!(sr_enable_modes & (1 << opmode))) {
+		pe_debug("SR is disabled in INI for mode: %d", opmode);
+		return;
+	}
+	if (!wlan_vdev_mlme_get_he_spr_enabled(vdev)) {
+		pe_debug("SR is not enabled");
 		return;
 	}
 	non_srg_pd_offset = wlan_vdev_mlme_get_non_srg_pd_offset(vdev);
@@ -3092,9 +3112,17 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 	/* Cleanup the old session */
 	session_ptr->limSmeState = eLIM_SME_IDLE_STATE;
+
+	/*
+	 * Delete the ml_peer only if DUT is roamed to a non-11BE candidate.
+	 * ml_peer is already cleaned up in wma_delete_all_peers() at the
+	 * beginning of roam_sync handling for 11BE candidates.
+	 */
 	if (sta_ds) {
-		lim_mlo_notify_peer_disconn(session_ptr, sta_ds);
-		lim_mlo_roam_delete_link_peer(session_ptr, sta_ds);
+		if (!wlan_vdev_mlme_is_mlo_vdev(session_ptr->vdev)) {
+			lim_mlo_notify_peer_disconn(session_ptr, sta_ds);
+			lim_mlo_roam_delete_link_peer(session_ptr, sta_ds);
+		}
 		lim_cleanup_rx_path(mac_ctx, sta_ds, session_ptr, false);
 		lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr, aid,
 					  session_ptr);

@@ -176,6 +176,7 @@ QDF_STATUS mlo_enable_rso(struct wlan_objmgr_pdev *pdev,
  * @partner_info: Destination buffer to fill partner info from roam sync ind
  * @sync_ind: roam sync ind pointer
  * @skip_vdev_id: Skip to copy the link info corresponds to this vdev_id
+ * @fill_all_links: Fill all the links for connect response to userspace
  *
  * This api will be called to copy partner link info to connect response.
  *
@@ -183,7 +184,7 @@ QDF_STATUS mlo_enable_rso(struct wlan_objmgr_pdev *pdev,
  */
 void mlo_roam_copy_partner_info(struct mlo_partner_info *partner_info,
 				struct roam_offload_synch_ind *sync_ind,
-				uint8_t skip_vdev_id);
+				uint8_t skip_vdev_id, bool fill_all_links);
 
 /**
  * mlo_roam_init_cu_bpcc() - init cu bpcc per roam sync data
@@ -513,7 +514,7 @@ QDF_STATUS mlo_enable_rso(struct wlan_objmgr_pdev *pdev,
 static inline void
 mlo_roam_copy_partner_info(struct mlo_partner_info *partner_info,
 			   struct roam_offload_synch_ind *sync_ind,
-			   uint8_t skip_vdev_id)
+			   uint8_t skip_vdev_id, bool fill_all_links)
 {}
 
 static inline

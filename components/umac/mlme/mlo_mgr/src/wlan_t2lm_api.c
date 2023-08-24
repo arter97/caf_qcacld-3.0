@@ -48,7 +48,7 @@ const char *t2lm_get_event_str(enum wlan_t2lm_evt event)
 static
 bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
 				 struct wlan_t2lm_onging_negotiation_info *t2lm,
-				 uint8_t *valid_dir)
+				 enum wlan_t2lm_direction *valid_dir)
 {
 	uint8_t i, tid = 0;
 	enum wlan_t2lm_direction dir = WLAN_T2LM_INVALID_DIRECTION;
@@ -87,8 +87,10 @@ bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
 		    WLAN_T2LM_INVALID_DIRECTION)
 			continue;
 
-		if (t2lm->t2lm_info[dir].default_link_mapping) {
+		if (t2lm->t2lm_info[dir].default_link_mapping &&
+		    t2lm->t2lm_info[dir].direction == WLAN_T2LM_BIDI_DIRECTION) {
 			is_valid_link_mask = true;
+			*valid_dir = dir;
 			continue;
 		}
 
@@ -132,11 +134,12 @@ t2lm_gen_dialog_token(struct wlan_mlo_peer_t2lm_policy *t2lm_policy)
 
 QDF_STATUS t2lm_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 			      struct wlan_objmgr_peer *peer,
-			      void *event_data, uint8_t *token)
+			      void *event_data, uint32_t frame_len,
+			      uint8_t *token)
 {
 	struct wlan_t2lm_onging_negotiation_info t2lm_req = {0};
 	struct wlan_t2lm_info *t2lm_info;
-	uint8_t dir = WLAN_T2LM_MAX_DIRECTION;
+	enum wlan_t2lm_direction dir = WLAN_T2LM_MAX_DIRECTION;
 	bool valid_map = false;
 	QDF_STATUS status;
 	struct wlan_mlo_peer_context *ml_peer;
@@ -146,6 +149,7 @@ QDF_STATUS t2lm_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 
 	status = wlan_mlo_parse_t2lm_action_frame(&t2lm_req, event_data,
+						  frame_len,
 						  WLAN_T2LM_CATEGORY_REQUEST);
 	if (status != QDF_STATUS_SUCCESS) {
 		mlme_err("Unable to parse T2LM request action frame");
@@ -163,6 +167,11 @@ QDF_STATUS t2lm_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 	} else {
 		status = QDF_STATUS_E_FAILURE;
 		mlme_err("reject t2lm conf");
+	}
+
+	if (dir >= WLAN_T2LM_MAX_DIRECTION) {
+		mlme_err("Received T2LM IE has invalid direction");
+		status = QDF_STATUS_E_INVAL;
 	}
 
 	if (QDF_IS_STATUS_SUCCESS(status) &&
@@ -224,7 +233,8 @@ QDF_STATUS t2lm_handle_tx_req(struct wlan_objmgr_vdev *vdev,
 
 QDF_STATUS t2lm_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 			       struct wlan_objmgr_peer *peer,
-			       void *event_data, uint8_t *token)
+			       void *event_data, uint32_t frame_len,
+			       uint8_t *token)
 {
 	struct wlan_t2lm_onging_negotiation_info t2lm_rsp = {0};
 	struct wlan_t2lm_onging_negotiation_info *t2lm_req;
@@ -249,6 +259,7 @@ QDF_STATUS t2lm_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_SUCCESS;
 
 	status = wlan_mlo_parse_t2lm_action_frame(&t2lm_rsp, event_data,
+						  frame_len,
 						  WLAN_T2LM_CATEGORY_RESPONSE);
 	if (status != QDF_STATUS_SUCCESS) {
 		mlme_err("Unable to parse T2LM request action frame");
@@ -335,7 +346,8 @@ QDF_STATUS t2lm_handle_tx_teardown(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS t2lm_deliver_event(struct wlan_objmgr_vdev *vdev,
 			      struct wlan_objmgr_peer *peer,
 			      enum wlan_t2lm_evt event,
-			      void *event_data, uint8_t *token)
+			      void *event_data, uint32_t frame_len,
+			      uint8_t *token)
 {
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status;
@@ -349,7 +361,8 @@ QDF_STATUS t2lm_deliver_event(struct wlan_objmgr_vdev *vdev,
 
 	switch (event) {
 	case WLAN_T2LM_EV_ACTION_FRAME_RX_REQ:
-		status = t2lm_handle_rx_req(vdev, peer, event_data, token);
+		status = t2lm_handle_rx_req(vdev, peer, event_data,
+					    frame_len, token);
 		break;
 	case WLAN_T2LM_EV_ACTION_FRAME_TX_RESP:
 		status = t2lm_handle_tx_resp(vdev, event_data, token);
@@ -358,7 +371,8 @@ QDF_STATUS t2lm_deliver_event(struct wlan_objmgr_vdev *vdev,
 		status = t2lm_handle_tx_req(vdev, peer, event_data, token);
 		break;
 	case WLAN_T2LM_EV_ACTION_FRAME_RX_RESP:
-		status = t2lm_handle_rx_resp(vdev, peer, event_data, token);
+		status = t2lm_handle_rx_resp(vdev, peer, event_data,
+					     frame_len, token);
 		break;
 	case WLAN_T2LM_EV_ACTION_FRAME_RX_TEARDOWN:
 		status = t2lm_handle_rx_teardown(vdev, peer, event_data);
@@ -696,6 +710,7 @@ wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 	status = t2lm_deliver_event(vdev, peer,
 				    WLAN_T2LM_EV_ACTION_FRAME_TX_REQ,
 				    &t2lm_neg,
+				    0,
 				    &t2lm_neg.dialog_token);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
@@ -706,7 +721,9 @@ QDF_STATUS wlan_t2lm_deliver_event(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_objmgr_peer *peer,
 				   enum wlan_t2lm_evt event,
 				   void *event_data,
+				   uint32_t frame_len,
 				   uint8_t *dialog_token)
 {
-	return t2lm_deliver_event(vdev, peer, event, event_data, dialog_token);
+	return t2lm_deliver_event(vdev, peer, event, event_data,
+				  frame_len, dialog_token);
 }

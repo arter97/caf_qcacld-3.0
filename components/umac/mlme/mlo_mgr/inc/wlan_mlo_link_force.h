@@ -26,7 +26,7 @@
 /**
  * enum ml_nlink_change_event_type - Ml link state change trigger event
  * @ml_nlink_link_switch_start_evt: link switch start
- * @ml_nlink_link_switch_completion_evt: link switch done
+ * @ml_nlink_link_switch_pre_completion_evt: link switch pre-completion
  * @ml_nlink_roam_sync_start_evt: roam sync start
  * @ml_nlink_roam_sync_completion_evt: roam sync completion
  * @ml_nlink_connect_start_evt: STA/CLI connect start
@@ -39,7 +39,7 @@
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
-	ml_nlink_link_switch_completion_evt,
+	ml_nlink_link_switch_pre_completion_evt,
 	ml_nlink_roam_sync_start_evt,
 	ml_nlink_roam_sync_completion_evt,
 	ml_nlink_connect_start_evt,
@@ -54,8 +54,16 @@ enum ml_nlink_change_event_type {
 /**
  * struct ml_nlink_change_event - connection change event data struct
  * @evt: event parameters
+ * @link_switch: link switch start parameters
  */
 struct ml_nlink_change_event {
+	union {
+		struct {
+			uint8_t curr_ieee_link_id;
+			uint8_t new_ieee_link_id;
+			uint32_t new_primary_freq;
+		} link_switch;
+	} evt;
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -88,7 +96,7 @@ static inline const char *link_evt_to_string(uint32_t evt)
 {
 	switch (evt) {
 	CASE_RETURN_STRING(ml_nlink_link_switch_start_evt);
-	CASE_RETURN_STRING(ml_nlink_link_switch_completion_evt);
+	CASE_RETURN_STRING(ml_nlink_link_switch_pre_completion_evt);
 	CASE_RETURN_STRING(ml_nlink_roam_sync_start_evt);
 	CASE_RETURN_STRING(ml_nlink_roam_sync_completion_evt);
 	CASE_RETURN_STRING(ml_nlink_connect_start_evt);

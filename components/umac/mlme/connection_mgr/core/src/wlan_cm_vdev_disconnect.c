@@ -75,9 +75,10 @@ QDF_STATUS cm_disconnect_start_ind(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 	mlo_sta_stop_reconfig_timer(vdev);
-	ml_nlink_conn_change_notify(
-		psoc, wlan_vdev_get_id(vdev),
-		ml_nlink_disconnect_start_evt, NULL);
+	if (req->source != CM_MLO_LINK_SWITCH_DISCONNECT)
+		ml_nlink_conn_change_notify(
+			psoc, wlan_vdev_get_id(vdev),
+			ml_nlink_disconnect_start_evt, NULL);
 	if (cm_csr_is_ss_wait_for_key(req->vdev_id)) {
 		mlme_debug("Stop Wait for key timer");
 		cm_stop_wait_for_key_timer(psoc, req->vdev_id);
@@ -258,10 +259,12 @@ cm_disconnect_complete_ind(struct wlan_objmgr_vdev *vdev,
 	cm_disconnect_diag_event(vdev, rsp);
 	wlan_tdls_notify_sta_disconnect(vdev_id, false, false, vdev);
 	policy_mgr_decr_session_set_pcl(psoc, op_mode, vdev_id);
-	wlan_clear_mlo_sta_link_removed_flag(vdev);
-	ml_nlink_conn_change_notify(
-		psoc, vdev_id, ml_nlink_disconnect_completion_evt,
-		NULL);
+	if (rsp->req.req.source != CM_MLO_LINK_SWITCH_DISCONNECT) {
+		wlan_clear_mlo_sta_link_removed_flag(vdev);
+		ml_nlink_conn_change_notify(
+			psoc, vdev_id, ml_nlink_disconnect_completion_evt,
+			NULL);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }

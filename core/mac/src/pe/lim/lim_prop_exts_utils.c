@@ -415,6 +415,11 @@ void lim_update_eht_bw_cap_mcs(struct pe_session *session,
 			pe_debug("Session 6G 320M unsupported");
 			session->eht_config.support_320mhz_6ghz = 0;
 		}
+		if (!beacon->eht_cap.support_320mhz_6ghz ||
+		    !beacon->eht_cap.su_beamformer) {
+			pe_debug("Session 320 MHz Sounding Dimensions unsupported");
+			session->eht_config.num_sounding_dim_320mhz = 0;
+		}
 	}
 }
 #else

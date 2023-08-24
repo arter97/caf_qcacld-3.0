@@ -37,6 +37,7 @@
 #include "wlan_scan_api.h"
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline bool
@@ -168,6 +169,14 @@ if_mgr_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t vdev_id;
+
+	/*
+	 * When link switch is in progress, don't send RSO Enable before vdev
+	 * is up. RSO Enable will be sent as part of install keys once
+	 * link switch connect sequence is complete.
+	 */
+	if (mlo_mgr_is_link_switch_in_progress(vdev))
+		return QDF_STATUS_SUCCESS;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc)

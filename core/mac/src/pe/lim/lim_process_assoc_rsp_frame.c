@@ -994,6 +994,62 @@ lim_process_assoc_rsp_t2lm(struct pe_session *session,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_cache_emlsr_params() - cache the EMLSR parameters in ML STA context
+ * @session_entry: session entry
+ * @assoc_rsp: pointer to parsed associate response
+ *
+ * Return: None
+ */
+static void lim_cache_emlsr_params(struct pe_session *session_entry,
+				   tpSirAssocRsp assoc_rsp)
+{
+	struct wlan_mlo_sta *sta_ctx;
+	struct wlan_objmgr_vdev *vdev = session_entry->vdev;
+	struct emlsr_capability *ml_emlcap;
+
+	wlan_objmgr_vdev_get_ref(vdev, WLAN_MLME_SB_ID);
+	if (!vdev) {
+		pe_err("vdev is null");
+		return;
+	}
+
+	if (!vdev->mlo_dev_ctx) {
+		pe_err("mlo dev ctx is null");
+		goto end;
+	}
+
+	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx) {
+		pe_err("sta ctx is null");
+		goto end;
+	}
+
+	ml_emlcap = &sta_ctx->emlsr_cap;
+
+	if (wlan_vdev_mlme_cap_get(vdev,
+				   WLAN_VDEV_C_EMLSR_CAP)) {
+		ml_emlcap->emlsr_supp = true;
+		ml_emlcap->trans_timeout =
+		assoc_rsp->mlo_ie.mlo_ie.eml_capabilities_info.transition_timeout;
+	} else {
+		ml_emlcap->emlsr_supp = false;
+		ml_emlcap->trans_timeout = 0;
+	}
+
+	pe_debug("EML caps support%d timeout%d", ml_emlcap->emlsr_supp,
+		 ml_emlcap->trans_timeout);
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+}
+#else
+static inline void lim_cache_emlsr_params(struct pe_session *session_entry,
+					  tpSirAssocRsp assoc_rsp)
+{
+}
+#endif
+
 /**
  * lim_process_assoc_rsp_frame() - Processes assoc response
  * @mac_ctx: Pointer to Global MAC structure
@@ -1445,6 +1501,13 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				lim_add_ft_sta_self(mac_ctx,
 					(assoc_rsp->aid & 0x3FFF),
 					session_entry);
+			} else {
+				lim_set_emlsr_caps(mac_ctx, session_entry);
+				lim_objmgr_update_emlsr_caps(mac_ctx->psoc,
+							session_entry->vdev_id,
+							assoc_rsp);
+				lim_cache_emlsr_params(session_entry,
+						       assoc_rsp);
 			}
 			qdf_mem_free(beacon);
 			return;

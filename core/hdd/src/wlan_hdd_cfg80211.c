@@ -3574,7 +3574,7 @@ static bool wlan_hdd_check_is_acs_request_same(struct hdd_adapter *adapter,
 	if (sap_config->acs_cfg.master_acs_cfg.ch_width != ch_width)
 		return false;
 
-	if (nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_ACS_LAST_SCAN_AGEOUT_TIME])) {
+	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_LAST_SCAN_AGEOUT_TIME]) {
 		last_scan_ageout_time =
 		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_ACS_LAST_SCAN_AGEOUT_TIME]);
 	} else {
@@ -8254,6 +8254,9 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_NSS] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPTIMIZED_POWER_MANAGEMENT] = {
 		.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_ITO] = {.type = NLA_U16 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL] = {
+		.type = NLA_U16 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_UDP_QOS_UPGRADE] = {
 		.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS] = {.type = NLA_U8 },
@@ -9540,21 +9543,82 @@ hdd_config_udp_qos_upgrade_threshold(struct wlan_hdd_link_info *link_info,
 	return hdd_set_udp_qos_upgrade_config(adapter, priority);
 }
 
+static enum powersave_mode
+hdd_vendor_opm_to_pmo_opm(enum qca_wlan_vendor_opm_mode opm_mode)
+{
+	switch (opm_mode) {
+	case QCA_WLAN_VENDOR_OPM_MODE_DISABLE:
+		return PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
+	case QCA_WLAN_VENDOR_OPM_MODE_ENABLE:
+		return PMO_PS_ADVANCED_POWER_SAVE_ENABLE;
+	case QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED:
+		return PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED;
+	default:
+		hdd_debug("Invalid opm_mode: %d", opm_mode);
+		return PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
+	}
+}
+
 static int hdd_config_power(struct wlan_hdd_link_info *link_info,
-			    const struct nlattr *attr)
+			    struct nlattr *tb[])
 {
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	uint8_t power;
+	struct wlan_objmgr_vdev *vdev;
+	enum qca_wlan_vendor_opm_mode opm_mode;
+	struct pmo_ps_params ps_params = {0};
+	struct nlattr *power_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER];
+	struct nlattr *opm_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPTIMIZED_POWER_MANAGEMENT];
+	struct nlattr *ps_ito_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_ITO];
+	struct nlattr *spec_wake_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL];
+	int ret;
+
+	if (!power_attr && !opm_attr)
+		return 0;
+
+	if (power_attr && opm_attr) {
+		hdd_err_rl("Invalid OPM set attribute");
+		return -EINVAL;
+	}
 
 	if (!ucfg_pmo_get_default_power_save_mode(hdd_ctx->psoc)) {
 		hdd_err_rl("OPM power save is disabled in ini");
 		return -EINVAL;
 	}
 
-	power = nla_get_u8(attr);
+	opm_mode = power_attr ? nla_get_u8(power_attr) : nla_get_u8(opm_attr);
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED)
+		if (!ps_ito_attr || !spec_wake_attr) {
+			hdd_err_rl("Invalid User defined OPM attributes");
+			return -EINVAL;
+		}
 
-	return hdd_set_power_config(hdd_ctx, adapter, power);
+	ret = hdd_set_power_config(hdd_ctx, adapter, &opm_mode);
+	if (ret)
+		return ret;
+
+	ps_params.opm_mode = hdd_vendor_opm_to_pmo_opm(opm_mode);
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) {
+		ps_params.ps_ito = nla_get_u16(ps_ito_attr);
+		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
+		ret = hdd_set_power_config_params(hdd_ctx, adapter,
+						  ps_params.ps_ito,
+						  ps_params.spec_wake);
+		if (ret)
+			return ret;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_POWER_ID);
+	if (vdev) {
+		ucfg_pmo_set_ps_params(vdev, &ps_params);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	}
+
+	return 0;
 }
 
 static int hdd_config_stats_avg_factor(struct wlan_hdd_link_info *link_info,
@@ -11562,8 +11626,6 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_lro},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE,
 	 hdd_config_scan_enable},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER,
-	 hdd_config_power},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_STATS_AVG_FACTOR,
 	 hdd_config_stats_avg_factor},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_GUARD_TIME,
@@ -11630,8 +11692,6 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_dynamic_bw},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_NSS,
 	 hdd_set_nss},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_OPTIMIZED_POWER_MANAGEMENT,
-	 hdd_config_power},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_UDP_QOS_UPGRADE,
 	 hdd_config_udp_qos_upgrade_threshold},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_CONCURRENT_STA_PRIMARY,
@@ -12392,6 +12452,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_tx_rx_nss,
 	hdd_process_generic_set_cmd,
 	hdd_config_phy_mode,
+	hdd_config_power,
 };
 
 /**
@@ -21616,7 +21677,8 @@ hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter)
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct qdf_mac_addr link_addr[WLAN_MAX_ML_BSS_LINKS] = {0};
 
-	status = hdd_derive_link_address_from_mld(&adapter->mld_addr,
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &adapter->mld_addr,
 						  &link_addr[0],
 						  WLAN_MAX_ML_BSS_LINKS);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -22727,7 +22789,8 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 done:
 	wlan_hdd_mlo_link_free_keys(hdd_ctx->psoc, adapter, vdev, pairwise);
 	if (pairwise && adapter->device_mode == QDF_STA_MODE &&
-	    wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+	    wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_vdev_mlme_is_tdls_vdev(vdev)) {
 		wlan_hdd_mlo_link_add_pairwise_key(vdev, hdd_ctx, key_index,
 						   pairwise, params);
 

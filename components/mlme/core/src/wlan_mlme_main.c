@@ -2405,27 +2405,28 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_MAX_SIMULTANEOUS_LINKS);
 	sta->mlo_prefer_percentage =
 		cfg_get(psoc, CFG_MLO_PREFER_PERCENTAGE);
+	sta->mlo_same_link_mld_address =
+		cfg_default(CFG_MLO_SAME_LINK_MLD_ADDR);
 }
 
 static bool
 wlan_get_vdev_link_removed_flag(struct wlan_objmgr_vdev *vdev)
 {
-	struct mlme_legacy_priv *mlme_priv;
-	bool is_mlo_link_removed;
+	bool is_mlo_link_removed = false;
+	uint8_t link_id;
+	struct mlo_link_info *link_info;
 
 	if (!mlo_is_mld_sta(vdev))
 		return false;
 
-	wlan_vdev_obj_lock(vdev);
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		wlan_vdev_obj_unlock(vdev);
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return false;
-	}
-
-	is_mlo_link_removed = mlme_priv->is_mlo_sta_link_removed;
-	wlan_vdev_obj_unlock(vdev);
+	link_id = wlan_vdev_get_link_id(vdev);
+	link_info = mlo_mgr_get_ap_link_by_link_id(vdev, link_id);
+	if (link_info)
+		is_mlo_link_removed =
+			!!qdf_atomic_test_bit(LS_F_AP_REMOVAL_BIT,
+					      &link_info->link_status_flags);
+	else
+		mlme_legacy_err("link info null, id %d", link_id);
 
 	return is_mlo_link_removed;
 }
@@ -2452,7 +2453,9 @@ bool wlan_get_vdev_link_removed_flag_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 static QDF_STATUS
 wlan_set_vdev_link_removed_flag(struct wlan_objmgr_vdev *vdev, bool removed)
 {
-	struct mlme_legacy_priv *mlme_priv;
+	uint8_t link_id;
+	struct mlo_link_info *link_info;
+	bool is_mlo_link_removed;
 
 	if (!vdev) {
 		mlme_legacy_err("vdev NULL");
@@ -2464,23 +2467,26 @@ wlan_set_vdev_link_removed_flag(struct wlan_objmgr_vdev *vdev, bool removed)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wlan_vdev_obj_lock(vdev);
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		wlan_vdev_obj_unlock(vdev);
-		mlme_legacy_err("vdev legacy private object is NULL");
+	link_id = wlan_vdev_get_link_id(vdev);
+	link_info = mlo_mgr_get_ap_link_by_link_id(vdev, link_id);
+	if (!link_info) {
+		mlme_legacy_err("link info null, id %d", link_id);
 		return QDF_STATUS_E_INVAL;
 	}
-
-	if (removed == mlme_priv->is_mlo_sta_link_removed) {
-		wlan_vdev_obj_unlock(vdev);
+	is_mlo_link_removed =
+		!!qdf_atomic_test_bit(LS_F_AP_REMOVAL_BIT,
+				      &link_info->link_status_flags);
+	if (removed == is_mlo_link_removed)
 		return QDF_STATUS_SUCCESS;
-	}
 
-	mlme_legacy_debug("mlo sta vdev %d link removed flag %d",
-			  wlan_vdev_get_id(vdev), removed);
-	mlme_priv->is_mlo_sta_link_removed = removed;
-	wlan_vdev_obj_unlock(vdev);
+	mlme_legacy_debug("mlo sta vdev %d link %d link removed flag %d",
+			  wlan_vdev_get_id(vdev), link_id, removed);
+	if (removed)
+		qdf_atomic_set_bit(LS_F_AP_REMOVAL_BIT,
+				   &link_info->link_status_flags);
+	else
+		qdf_atomic_clear_bit(LS_F_AP_REMOVAL_BIT,
+				     &link_info->link_status_flags);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2514,31 +2520,19 @@ wlan_set_vdev_link_removed_flag_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 
 void wlan_clear_mlo_sta_link_removed_flag(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
-	uint16_t vdev_count = 0;
 	uint8_t i;
+	struct mlo_link_info *link_info;
 
 	if (!vdev || !mlo_is_mld_sta(vdev))
 		return;
 
-	mlo_get_ml_vdev_list(vdev, &vdev_count, wlan_vdev_list);
-	if (!vdev_count) {
-		mlme_legacy_err("vdev num 0 in mld dev");
+	link_info = mlo_mgr_get_ap_link(vdev);
+	if (!link_info)
 		return;
-	}
 
-	for (i = 0; i < vdev_count; i++) {
-		if (!wlan_vdev_list[i]) {
-			mlme_legacy_err("vdev is null in mld");
-			goto release_ref;
-		}
-
-		wlan_set_vdev_link_removed_flag(wlan_vdev_list[i], false);
-	}
-
-release_ref:
-	for (i = 0; i < vdev_count; i++)
-		mlo_release_vdev_ref(wlan_vdev_list[i]);
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++)
+		qdf_atomic_clear_bit(LS_F_AP_REMOVAL_BIT,
+				     &link_info[i].link_status_flags);
 }
 
 bool wlan_drop_mgmt_frame_on_link_removal(struct wlan_objmgr_vdev *vdev)

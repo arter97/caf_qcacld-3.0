@@ -294,7 +294,8 @@ static void wma_update_num_peers_tids(t_wma_handle *wma_handle,
 static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,
 					     target_resource_config *tgt_cfg)
 {
-	tgt_cfg->peer_map_unmap_v2 = cfg_get(psoc, CFG_WDS_MODE) ? true : false;
+	tgt_cfg->peer_map_unmap_v2 =
+			wlan_mlme_get_wds_mode(psoc) ? true : false;
 }
 #else
 static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,
@@ -3794,15 +3795,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 		goto err_dbglog_init;
 	}
 
-	/*
-	 * Update Powersave mode
-	 * 1 - Legacy Powersave + Deepsleep Disabled
-	 * 2 - QPower + Deepsleep Disabled
-	 * 3 - Legacy Powersave + Deepsleep Enabled
-	 * 4 - QPower + Deepsleep Enabled
-	 */
-	wma_handle->powersave_mode =
-			ucfg_pmo_power_save_offload_enabled(wma_handle->psoc);
 	wma_handle->staMaxLIModDtim = cds_cfg->sta_maxlimod_dtim;
 	wma_handle->sta_max_li_mod_dtim_ms = cds_cfg->sta_maxlimod_dtim_ms;
 	wma_handle->staModDtim = ucfg_pmo_get_sta_mod_dtim(wma_handle->psoc);

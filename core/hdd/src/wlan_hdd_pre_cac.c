@@ -232,19 +232,10 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	pre_cac_adapter = hdd_get_adapter_by_iface_name(hdd_ctx,
-							SAP_PRE_CAC_IFNAME);
-	if (!pre_cac_adapter) {
-		hdd_err("error opening the pre cac adapter");
-		return -EINVAL;
-	}
-
 	if (policy_mgr_get_connection_count(hdd_ctx->psoc) > 1) {
 		hdd_err("pre cac not allowed in concurrency");
 		return -EINVAL;
 	}
-
-	pre_cac_link_info = pre_cac_adapter->deflink;
 
 	ap_adapter = hdd_get_adapter(hdd_ctx, QDF_SAP_MODE);
 	if (!ap_adapter) {
@@ -322,6 +313,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		goto release_intf_addr_and_return_failure;
 	}
 
+	pre_cac_link_info = pre_cac_adapter->deflink;
 	pre_cac_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(pre_cac_link_info);
 	sap_clear_global_dfs_param(mac_handle, pre_cac_ap_ctx->sap_context);
 

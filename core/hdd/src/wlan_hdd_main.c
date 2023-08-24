@@ -8896,11 +8896,15 @@ static inline
 void hdd_ipa_ap_disconnect_evt(struct hdd_context *hdd_ctx,
 			       struct hdd_adapter *adapter)
 {
+	struct wlan_hdd_link_info *link_info;
+
+	link_info = adapter->deflink;
 	if (ucfg_ipa_is_enabled()) {
 		ucfg_ipa_uc_disconnect_ap(hdd_ctx->pdev,
 					  adapter->dev);
 		ucfg_ipa_cleanup_dev_iface(hdd_ctx->pdev,
-					   adapter->dev);
+					   adapter->dev,
+					   link_info->vdev_id);
 	}
 }
 
@@ -9103,7 +9107,8 @@ hdd_sta_disconnect_and_cleanup(struct wlan_hdd_link_info *link_info)
 	status = wlan_hdd_cm_issue_disconnect(link_info, reason, true);
 	if (QDF_IS_STATUS_ERROR(status) && ucfg_ipa_is_enabled()) {
 		hdd_err("STA disconnect failed");
-		ucfg_ipa_uc_cleanup_sta(adapter->hdd_ctx->pdev, adapter->dev);
+		ucfg_ipa_uc_cleanup_sta(adapter->hdd_ctx->pdev, adapter->dev,
+					link_info->vdev_id);
 	}
 }
 
@@ -13618,6 +13623,7 @@ void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
 void hdd_psoc_idle_timer_stop(struct hdd_context *hdd_ctx)
 {
 	qdf_delayed_work_stop_sync(&hdd_ctx->psoc_idle_timeout_work);
+	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_IFACE_CHANGE_TIMER);
 	hdd_debug("Stopped psoc idle timer");
 }
 
@@ -13639,6 +13645,8 @@ static int __hdd_psoc_idle_shutdown(struct hdd_context *hdd_ctx)
 	int errno;
 
 	hdd_enter();
+
+	hdd_reg_wait_for_country_change(hdd_ctx);
 
 	errno = osif_psoc_sync_trans_start(hdd_ctx->parent_dev, &psoc_sync);
 	if (errno) {
@@ -14327,7 +14335,8 @@ hdd_adapter_get_link_mac_addr(struct wlan_hdd_link_info *link_info)
 
 	adapter = link_info->adapter;
 	if (!hdd_adapter_is_ml_adapter(adapter) ||
-	    qdf_is_macaddr_zero(&link_info->link_addr))
+	    qdf_is_macaddr_zero(&link_info->link_addr) ||
+	    !wlan_vdev_mlme_is_mlo_vdev(link_info->vdev))
 		return &adapter->mac_addr;
 
 	return &link_info->link_addr;
@@ -14370,6 +14379,7 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 {
 	int i = 0;
 	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	enum QDF_OPMODE opmode = adapter->device_mode;
 	struct qdf_mac_addr link_addrs[WLAN_MAX_ML_BSS_LINKS] = {0};
 	struct wlan_hdd_link_info *link_info;
@@ -14386,7 +14396,8 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 	if (!hdd_adapter_is_ml_adapter(adapter))
 		return QDF_STATUS_SUCCESS;
 
-	status = hdd_derive_link_address_from_mld(&adapter->mac_addr,
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &adapter->mac_addr,
 						  &link_addrs[0],
 						  WLAN_MAX_ML_BSS_LINKS);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -14618,6 +14629,9 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 
 	hdd_register_hl_netdev_fc_timer(adapter,
 					hdd_tx_resume_timer_expired_handler);
+
+	if (cds_is_driver_recovering())
+		hdd_medium_assess_ssr_reinit();
 
 	hdd_exit();
 	return 0;
@@ -18010,8 +18024,6 @@ void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 	}
 	hdd_info("SAP Start Success");
 
-	if (reinit)
-		hdd_medium_assess_init();
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	set_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 	if (hostapd_state->bss_state == BSS_START) {
@@ -20210,6 +20222,7 @@ static void hdd_update_hif_config(struct hdd_context *hdd_ctx)
 		ucfg_dp_get_rx_softirq_yield_duration(hdd_ctx->psoc);
 
 	hif_init_ini_config(scn, &cfg);
+	hif_set_enable_rpm(scn);
 
 	if (prevent_link_down)
 		hif_vote_link_up(scn);
@@ -20767,7 +20780,6 @@ void hdd_restart_sap(struct wlan_hdd_link_info *link_info)
 		}
 		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 		hdd_err("SAP Start Success");
-		hdd_medium_assess_init();
 		set_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 		if (hapd_state->bss_state == BSS_START) {
 			policy_mgr_incr_active_session(hdd_ctx->psoc,

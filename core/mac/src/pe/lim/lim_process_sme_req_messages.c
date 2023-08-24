@@ -1802,11 +1802,6 @@ lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 		eht_config->bw_320_tx_max_nss_for_mcs_12_and_13 = tx_nss;
 	}
 }
-#else
-void
-lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
-{
-}
 #endif
 
 static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
@@ -3128,6 +3123,11 @@ static void lim_reset_self_ocv_caps(struct pe_session *session)
 
 	pe_debug("self RSN cap: %d", self_rsn_cap);
 	self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED;
+
+	/* Update the new rsn caps */
+	wlan_crypto_set_vdev_param(session->vdev, WLAN_CRYPTO_PARAM_RSN_CAP,
+				   self_rsn_cap);
+
 }
 
 QDF_STATUS
@@ -4388,8 +4388,7 @@ static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 	pe_join_req->assoc_link_id = req->assoc_link_id;
 }
 
-static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
-			       struct pe_session *session)
+void lim_set_emlsr_caps(struct mac_context *mac_ctx, struct pe_session *session)
 {
 	bool emlsr_cap, emlsr_allowed, emlsr_band_check, emlsr_enabled = false;
 
@@ -4421,11 +4420,6 @@ static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
 #else
 static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 			     struct join_req *pe_join_req)
-{
-}
-
-static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
-			       struct pe_session *session)
 {
 }
 #endif

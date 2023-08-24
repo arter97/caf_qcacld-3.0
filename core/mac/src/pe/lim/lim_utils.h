@@ -284,6 +284,17 @@ QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
  */
 void lim_strip_mlo_ie(struct mac_context *mac_ctx,
 		      uint8_t *add_ie, uint16_t *add_ielen);
+
+/**
+ * lim_set_emlsr_caps() - This API will set EMLSR caps in vdev obj if ELMSR is
+ * supported.
+ * @mac: mac context
+ * @pe_session: session entry
+ *
+ * Return: Void
+ */
+void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+			struct pe_session *session);
 #else
 static inline uint16_t lim_assign_mlo_conn_idx(struct mac_context *mac,
 					       struct pe_session *pe_session,
@@ -323,6 +334,11 @@ QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
 				uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+				      struct pe_session *session)
+{
 }
 #endif
 
@@ -2112,6 +2128,17 @@ void lim_update_stads_eht_bw_320mhz(struct pe_session *session,
  * Return: bool
  */
 bool lim_is_session_chwidth_320mhz(struct pe_session *session);
+
+/**
+ * lim_update_eht_caps_mcs() - update eht caps
+ *
+ * @mac: Pointer to Global mac structure
+ * @session: Session pointer of the interface
+ *
+ * Return: None
+ */
+void
+lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session);
 #else
 static inline
 void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
@@ -2296,6 +2323,11 @@ static inline bool
 lim_is_session_chwidth_320mhz(struct pe_session *session)
 {
 	return false;
+}
+
+static inline void
+lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
+{
 }
 #endif /* WLAN_FEATURE_11BE */
 
@@ -3273,18 +3305,20 @@ void
 lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id);
 
 /*
- * lim_is_chan_connected_for_mode() - Check if frequency is connected
- *                                    for given opmode.
+ * lim_get_connected_chan_for_mode() - Get connected channel for given opmode
+ *                                     in given frequency range.
+ *
  * @psoc: Pointer to psoc object
  * @opmode: Vdev opmode
  * @freq: Frequency
  *
- * Return: Return true if frequency is connected for given opmode.
+ * Return: Return connected channel in given frequcy range for given opmode.
  */
-bool
-lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
-			       enum QDF_OPMODE opmode,
-			       qdf_freq_t freq);
+struct wlan_channel *
+lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
+				enum QDF_OPMODE opmode,
+				qdf_freq_t start_freq,
+				qdf_freq_t end_freq);
 
 /**
  * lim_convert_vht_chwidth_to_phy_chwidth() - Convert VHT operation
@@ -3297,16 +3331,4 @@ lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
  */
 enum phy_ch_width
 lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40);
-
-/**
- * lim_update_eht_caps_mcs() - update eht caps
- *
- * @mac: Pointer to Global mac structure
- * @session: Session pointer of the interface
- *
- * Return: None
- */
-void lim_update_eht_caps_mcs(struct mac_context *mac,
-			     struct pe_session *session);
-
 #endif /* __LIM_UTILS_H */

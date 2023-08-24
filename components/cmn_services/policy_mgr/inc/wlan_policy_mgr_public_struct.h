@@ -129,11 +129,14 @@ enum sap_csa_reason_code {
  * @link_ctrl_f_dynamic_force_link_num: indicate fw to use force link number
  * instead of force link bitmaps. Used with MLO_LINK_FORCE_MODE_ACTIVE_NUM.
  * MLO_LINK_FORCE_MODE_INACTIVE_NUM, MLO_LINK_FORCE_MODE_NO_FORCE.
+ * @link_ctrl_f_post_re_evaluate: run link state check again after command
+ * response handled.
  */
 enum link_control_flags {
 	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
 	link_ctrl_f_overwrite_inactive_bitmap = 1 << 1,
 	link_ctrl_f_dynamic_force_link_num =    1 << 2,
+	link_ctrl_f_post_re_evaluate =          1 << 3,
 };
 
 /**

@@ -140,6 +140,49 @@ static void policy_mgr_vdev_obj_status_cb(struct wlan_objmgr_vdev *vdev,
 	return;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static QDF_STATUS policy_mgr_register_link_switch_notifier(void)
+{
+	QDF_STATUS status;
+
+	status = mlo_mgr_register_link_switch_notifier(
+			WLAN_UMAC_COMP_POLICY_MGR,
+			policy_mgr_link_switch_notifier_cb);
+	if (status == QDF_STATUS_E_NOSUPPORT) {
+		status = QDF_STATUS_SUCCESS;
+		policy_mgr_debug("Link switch not supported");
+	} else if (status != QDF_STATUS_SUCCESS) {
+		policy_mgr_err("Failed to register link switch notifier for policy mgr!");
+	}
+
+	return status;
+}
+
+static QDF_STATUS policy_mgr_unregister_link_switch_notifier(void)
+{
+	QDF_STATUS status;
+
+	status = mlo_mgr_unregister_link_switch_notifier(
+			WLAN_UMAC_COMP_POLICY_MGR);
+	if (status == QDF_STATUS_E_NOSUPPORT)
+		status = QDF_STATUS_SUCCESS;
+	else if (status != QDF_STATUS_SUCCESS)
+		policy_mgr_err("Failed to unregister link switch notifier for policy mgr!");
+
+	return status;
+}
+#else
+static QDF_STATUS policy_mgr_register_link_switch_notifier(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS policy_mgr_unregister_link_switch_notifier(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS policy_mgr_init(void)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -215,10 +258,20 @@ QDF_STATUS policy_mgr_init(void)
 		goto err_vdev_status;
 	}
 
+	status = policy_mgr_register_link_switch_notifier();
+	if (status != QDF_STATUS_SUCCESS) {
+		policy_mgr_err("Failed to register link switch cback");
+		goto err_link_switch;
+	}
+
 	policy_mgr_notice("Callbacks registered with obj mgr");
 
 	return QDF_STATUS_SUCCESS;
-
+err_link_switch:
+	wlan_objmgr_unregister_vdev_status_handler(
+				WLAN_UMAC_COMP_POLICY_MGR,
+				policy_mgr_vdev_obj_status_cb,
+				NULL);
 err_vdev_status:
 	wlan_objmgr_unregister_vdev_destroy_handler(WLAN_UMAC_COMP_POLICY_MGR,
 						policy_mgr_vdev_obj_destroy_cb,
@@ -254,6 +307,10 @@ err_psoc_create:
 QDF_STATUS policy_mgr_deinit(void)
 {
 	QDF_STATUS status;
+
+	status = policy_mgr_unregister_link_switch_notifier();
+	if (status != QDF_STATUS_SUCCESS)
+		policy_mgr_err("Failed to deregister link switch cback");
 
 	status = wlan_objmgr_unregister_psoc_status_handler(
 				WLAN_UMAC_COMP_POLICY_MGR,
