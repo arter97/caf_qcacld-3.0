@@ -266,6 +266,14 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 	if (cur_bw < CH_WIDTH_160MHZ)
 		return;
 
+	if (!ch_freq) {
+		if (policy_mgr_get_connection_count(psoc) == 1 ||
+		    (!policy_mgr_is_current_hwmode_dbs(psoc) &&
+		     !policy_mgr_is_current_hwmode_sbs(psoc)))
+			*next_action = PM_UPGRADE_BW;
+		return;
+	}
+
 	if (cur_bw == CH_WIDTH_320MHZ &&
 	    policy_mgr_is_conn_lead_to_dbs_sbs(psoc, ch_freq))
 		*next_action = PM_DOWNGRADE_BW;
@@ -287,6 +295,7 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
 		policy_mgr_debug("HW mode selection offload is enabled");
+		policy_mgr_get_sap_ch_width_update_action(psoc, 0, &upgrade);
 		return upgrade;
 	}
 
@@ -1523,9 +1532,15 @@ QDF_STATUS policy_mgr_next_actions(
 					session_id, request_id);
 		break;
 	case PM_DOWNGRADE_BW:
-	case PM_UPGRADE_BW:
 		policy_mgr_sap_ch_width_update(psoc, action, reason,
 					       session_id, request_id);
+		break;
+	case PM_UPGRADE_BW:
+		if (reason == POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC)
+			policy_mgr_sap_ch_width_update(psoc, action, reason,
+						       session_id, request_id);
+		else
+			policy_mgr_restart_opportunistic_timer(psoc, false);
 		break;
 	default:
 		policy_mgr_err("unexpected action value %d", action);
