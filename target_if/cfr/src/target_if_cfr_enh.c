@@ -1041,8 +1041,18 @@ void populate_enh_chain_phase(struct wlan_objmgr_vdev *vdev,
 		if ((!found) && (grp_stp_idx >= stop_ent))
 			phase_delta = 0;
 
-		meta->chain_phase[chain] = (pcfr->ibf_cal_val[rf_chain] +
-					    phase_delta) & 0x3FF;
+		/**
+		 * FW sets 0xFFFF as invalid phase delta in invalid cases.
+		 * Retain same in HOST as well. In case of valid phase, add the
+		 * ibf cal value to the delta & ensure the derived phase value
+		 * is in the range of 0 - 1024 indicating 0 - 360 degrees.
+		 */
+		if (phase_delta == INVALID_PHASE_DELTA)
+			meta->chain_phase[chain] = INVALID_PHASE_DELTA;
+		else
+			meta->chain_phase[chain] =
+				((pcfr->ibf_cal_val[rf_chain] + phase_delta) &
+				 0x3FF);
 	}
 }
 #else
