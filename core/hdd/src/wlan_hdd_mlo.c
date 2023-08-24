@@ -704,6 +704,7 @@ hdd_get_ml_link_state_response_len(const struct ml_link_state_info_event *event)
 
 static int
 hdd_ml_generate_link_state_resp_nlmsg(struct sk_buff *skb,
+				      struct wlan_objmgr_psoc *psoc,
 				      struct ml_link_state_info_event *params,
 				      uint32_t num_link_info)
 {
@@ -713,9 +714,7 @@ hdd_ml_generate_link_state_resp_nlmsg(struct sk_buff *skb,
 	uint32_t value;
 
 	attr = QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE;
-
-	/* Default control mode is only supported */
-	value = QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_DEFAULT;
+	value = ucfg_mlme_get_ml_link_control_mode(psoc, params->vdev_id);
 	errno = nla_put_u32(skb, attr, value);
 	if (errno)
 		return errno;
@@ -761,6 +760,7 @@ hdd_ml_generate_link_state_resp_nlmsg(struct sk_buff *skb,
 }
 
 static QDF_STATUS wlan_hdd_link_state_request(struct wiphy *wiphy,
+					      struct wlan_objmgr_psoc *psoc,
 					      struct wlan_objmgr_vdev *vdev)
 {
 	int errno;
@@ -838,7 +838,7 @@ static QDF_STATUS wlan_hdd_link_state_request(struct wiphy *wiphy,
 	}
 
 	status = hdd_ml_generate_link_state_resp_nlmsg(
-			reply_skb, link_state_event,
+			reply_skb, psoc, link_state_event,
 			link_state_event->num_mlo_vdev_link_info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to pack nl response");
@@ -894,7 +894,7 @@ int wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 	ml_link_op = nla_get_u8(link_oper_attr);
 	switch (ml_link_op) {
 	case QCA_WLAN_VENDOR_LINK_STATE_OP_GET:
-		return wlan_hdd_link_state_request(wiphy, vdev);
+		return wlan_hdd_link_state_request(wiphy, hdd_ctx->psoc, vdev);
 	case QCA_WLAN_VENDOR_LINK_STATE_OP_SET:
 		break;
 	default:
@@ -997,6 +997,9 @@ int wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 			  ml_link_control_mode);
 		return -EINVAL;
 	}
+
+	ucfg_mlme_set_ml_link_control_mode(hdd_ctx->psoc, vdev_id,
+					   ml_link_control_mode);
 
 	hdd_debug("vdev: %d, processed link state command successfully",
 		  vdev_id);

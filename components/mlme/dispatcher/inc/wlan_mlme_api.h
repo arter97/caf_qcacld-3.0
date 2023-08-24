@@ -4106,6 +4106,30 @@ QDF_STATUS wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
 					   uint8_t value);
 
 /**
+ * wlan_mlme_set_ml_link_control_mode() - set ml_link_control_mode
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ * @value: value to set
+ *
+ * API get call when host receives vendor command
+ * QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE to configure link control mode.
+ *
+ * Return: none
+ */
+void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value);
+
+/**
+ * wlan_mlme_get_ml_link_control_mode() - get ml_link_control_mode
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ *
+ * Return: value of ml_link_control_mode in success
+ */
+uint8_t wlan_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
+
+/**
  * wlan_mlme_restore_user_set_link_num() - restore link num when SSR happens
  * @psoc: pointer to psoc object
  *
@@ -4168,6 +4192,19 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
  */
 bool wlan_mlme_get_sta_same_link_mld_addr(struct wlan_objmgr_psoc *psoc);
 #else
+static inline
+void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value)
+{
+}
+
+static inline
+uint8_t wlan_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	return 0;
+}
+
 static inline QDF_STATUS
 wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
 				uint8_t value)

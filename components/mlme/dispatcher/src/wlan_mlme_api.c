@@ -1471,6 +1471,72 @@ QDF_STATUS wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_objmgr_vdev *vdev;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev)
+		return;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		mlme_legacy_debug("not mlo vdev");
+		goto release_ref;
+	}
+
+	if (!vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->sta_ctx) {
+		mlme_legacy_debug("mlo dev/sta ctx is null");
+		goto release_ref;
+	}
+
+	vdev->mlo_dev_ctx->sta_ctx->ml_link_control_mode = value;
+	mlme_legacy_debug("set ml_link_control_mode %d", value);
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+	return;
+}
+
+uint8_t wlan_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t value = 0;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return 0;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev)
+		return 0;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		mlme_legacy_debug("not mlo vdev");
+		goto release_ref;
+	}
+
+	if (!vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->sta_ctx) {
+		mlme_legacy_debug("mlo dev/sta ctx is null");
+		goto release_ref;
+	}
+
+	value = vdev->mlo_dev_ctx->sta_ctx->ml_link_control_mode;
+	mlme_legacy_debug("get ml_link_control_mode %d", value);
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+	return value;
+}
+
 void wlan_mlme_restore_user_set_link_num(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;

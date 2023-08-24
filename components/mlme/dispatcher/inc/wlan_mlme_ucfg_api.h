@@ -81,6 +81,30 @@ void ucfg_mlme_psoc_close(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS ucfg_mlme_pdev_open(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * ucfg_mlme_set_ml_link_control_mode() - set ml_link_control_mode
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ * @value: value to set
+ *
+ * API get call when host receives vendor command
+ * QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE to configure link control mode.
+ *
+ * Return: none
+ */
+void ucfg_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value);
+
+/**
+ * ucfg_mlme_get_ml_link_control_mode() - get ml_link_control_mode
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ *
+ * Return: value of ml_link_control_mode in success
+ */
+uint8_t ucfg_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
+
+/**
  * ucfg_mlme_pdev_close() - MLME component pdev close
  * @pdev: pointer to pdev object
  *
