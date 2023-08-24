@@ -5530,4 +5530,16 @@ uint32_t policy_mgr_get_beaconing_mode_info(struct wlan_objmgr_psoc *psoc,
 bool policy_mgr_is_freq_on_mac_id(struct policy_mgr_freq_range *freq_range,
 				  qdf_freq_t freq, uint8_t mac_id);
 
+/**
+ * policy_mgr_is_conn_lead_to_dbs_sbs() - New freq leads to DBS/SBS
+ * @psoc: PSOC object information
+ * @freq: New connection frequency
+ *
+ * This API loops through existing connections from policy_mgr connection table
+ *
+ * Return: True if new frequency causes DBS/SBS with existing connections
+ */
+bool
+policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
+				   uint32_t freq);
 #endif /* __WLAN_POLICY_MGR_API_H */

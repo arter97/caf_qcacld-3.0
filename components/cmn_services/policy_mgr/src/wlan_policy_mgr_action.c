@@ -845,6 +845,27 @@ policy_mgr_get_third_conn_action_table(
 	}
 }
 
+bool
+policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
+				   uint32_t freq)
+{
+	struct connection_info info[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint32_t connection_count, i;
+
+	if (policy_mgr_is_current_hwmode_dbs(psoc) ||
+	    policy_mgr_is_current_hwmode_sbs(psoc))
+		return true;
+
+	connection_count = policy_mgr_get_connection_info(psoc, info);
+
+	for (i = 0; i < connection_count; i++)
+		if (!policy_mgr_2_freq_always_on_same_mac(psoc, freq,
+							  info[i].ch_freq))
+			return true;
+
+	return false;
+}
+
 static QDF_STATUS
 policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 			   uint32_t session_id,
