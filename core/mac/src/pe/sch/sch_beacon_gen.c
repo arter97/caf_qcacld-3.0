@@ -833,6 +833,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		 */
 		lim_strip_he_ies_from_add_ies(mac_ctx, session);
 		lim_strip_eht_ies_from_add_ies(mac_ctx, session);
+		lim_strip_wapi_ies_from_add_ies(mac_ctx, session);
 
 		addn_ielen = session->add_ie_params.probeRespBCNDataLen;
 		addn_ie = qdf_mem_malloc(addn_ielen);
