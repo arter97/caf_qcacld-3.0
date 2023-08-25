@@ -869,17 +869,6 @@ dp_mlo_mcast_deinit(struct dp_soc *soc, struct dp_vdev *vdev)
 {
 }
 #endif
-static void dp_mlo_init_ptnr_list(struct dp_vdev *vdev)
-{
-	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
-
-	qdf_mem_set(be_vdev->partner_vdev_list,
-		    WLAN_MAX_MLO_CHIPS * WLAN_MAX_MLO_LINKS_PER_SOC,
-		    CDP_INVALID_VDEV_ID);
-	qdf_mem_set(be_vdev->bridge_vdev_list,
-		    WLAN_MAX_MLO_CHIPS * WLAN_MAX_MLO_LINKS_PER_SOC,
-		    CDP_INVALID_VDEV_ID);
-}
 
 static void dp_get_rx_hash_key_be(struct dp_soc *soc,
 				  struct cdp_lro_hash_config *lro_hash)
@@ -953,10 +942,6 @@ dp_mlo_mcast_init(struct dp_soc *soc, struct dp_vdev *vdev)
 
 static inline void
 dp_mlo_mcast_deinit(struct dp_soc *soc, struct dp_vdev *vdev)
-{
-}
-
-static void dp_mlo_init_ptnr_list(struct dp_vdev *vdev)
 {
 }
 
@@ -1185,7 +1170,6 @@ static QDF_STATUS dp_vdev_attach_be(struct dp_soc *soc, struct dp_vdev *vdev)
 	}
 
 	dp_mlo_mcast_init(soc, vdev);
-	dp_mlo_init_ptnr_list(vdev);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1202,7 +1186,6 @@ static QDF_STATUS dp_vdev_detach_be(struct dp_soc *soc, struct dp_vdev *vdev)
 		dp_mlo_mcast_deinit(soc, vdev);
 
 	dp_tx_put_bank_profile(be_soc, be_vdev);
-	dp_clr_mlo_ptnr_list(soc, vdev);
 
 	return QDF_STATUS_SUCCESS;
 }
