@@ -48,6 +48,7 @@ struct ctxt_switch_mgr {
  * @MLO_PEER_DEAUTH:  Initiate Deauth for ML connection
  * @MLO_PEER_PENDING_AUTH:  Initiate process of pending auth
  * @MLO_BRIDGE_PEER_CREATE:   Bridge peer create
+ * @MLO_PEER_REASSOC:  Partner peer reassoc
  */
 enum mlo_msg_type {
 	MLO_PEER_CREATE,
@@ -57,6 +58,7 @@ enum mlo_msg_type {
 	MLO_PEER_DEAUTH,
 	MLO_PEER_PENDING_AUTH,
 	MLO_BRIDGE_PEER_CREATE,
+	MLO_PEER_REASSOC,
 };
 
 /*
