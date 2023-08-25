@@ -3176,7 +3176,7 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 	struct hdd_ll_stats *stats = NULL;
 	struct osif_request *request;
 	qdf_list_node_t *ll_node;
-	QDF_STATUS status;
+	QDF_STATUS status, vdev_req_status;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	void *cookie;
@@ -3193,8 +3193,9 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
 
-	status = wlan_hdd_set_station_stats_request_pending(link_info, req);
-	if (QDF_IS_STATUS_ERROR(status))
+	vdev_req_status = wlan_hdd_set_station_stats_request_pending(link_info,
+								     req);
+	if (QDF_IS_STATUS_ERROR(vdev_req_status))
 		hdd_nofl_debug("Requesting LL_STATS only");
 
 	/*
@@ -3252,7 +3253,9 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 		sme_radio_tx_mem_free();
 		ret = -ETIMEDOUT;
 	} else {
-		hdd_update_station_stats_cached_timestamp(adapter);
+		if (QDF_IS_STATUS_SUCCESS(vdev_req_status))
+			hdd_update_station_stats_cached_timestamp(adapter);
+
 		adapter->ll_stats_failure_count = 0;
 	}
 
