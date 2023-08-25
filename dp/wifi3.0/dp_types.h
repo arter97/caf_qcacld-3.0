@@ -194,6 +194,8 @@ typedef void dp_ptnr_soc_iter_func(struct dp_soc *ptnr_soc, void *arg,
 #define DP_ALL_VDEV_ITER 3
 #define IS_LINK_VDEV_ITER_REQUIRED(type) (type & DP_LINK_VDEV_ITER)
 #define IS_BRIDGE_VDEV_ITER_REQUIRED(type) (type & DP_BRIDGE_VDEV_ITER)
+#define DP_VDEV_ITERATE_ALL 1
+#define DP_VDEV_ITERATE_SKIP_SELF 0
 #endif
 
 enum rx_pktlog_mode {

@@ -507,7 +507,8 @@ void dp_aggregate_interface_stats_based_on_peer_type(
 					      dp_mlo_vdev_stats_aggr_bridge_vap,
 					      (void *)vdev_stats,
 					      DP_MOD_ID_GENERIC_STATS,
-					      DP_BRIDGE_VDEV_ITER);
+					      DP_BRIDGE_VDEV_ITER,
+					      DP_VDEV_ITERATE_SKIP_SELF);
 		}
 		dp_aggregate_vdev_ingress_stats(tgt_vdev_stats,
 						&vdev->stats);
@@ -550,7 +551,8 @@ void dp_aggregate_interface_stats(struct dp_vdev *vdev,
 		dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 				      dp_mlo_vdev_stats_aggr_bridge_vap,
 				      (void *)vdev_stats, DP_MOD_ID_GENERIC_STATS,
-				      DP_BRIDGE_VDEV_ITER);
+				      DP_BRIDGE_VDEV_ITER,
+				      DP_VDEV_ITERATE_SKIP_SELF);
 	}
 
 	dp_aggregate_all_vdev_stats(vdev_stats, &be_vdev->mlo_stats);
@@ -691,7 +693,8 @@ static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 				      dp_mlo_aggr_ptnr_iface_stats_mlo_links,
 				      buf,
 				      DP_MOD_ID_GENERIC_STATS,
-				      DP_LINK_VDEV_ITER);
+				      DP_LINK_VDEV_ITER,
+				      DP_VDEV_ITERATE_SKIP_SELF);
 	} else {
 		dp_aggregate_interface_stats(vdev, buf);
 
@@ -702,7 +705,8 @@ static QDF_STATUS dp_mlo_get_mld_vdev_stats(struct cdp_soc_t *soc_hdl,
 		dp_mlo_iter_ptnr_vdev(be_soc, vdev_be,
 				      dp_mlo_aggr_ptnr_iface_stats, buf,
 				      DP_MOD_ID_GENERIC_STATS,
-				      DP_LINK_VDEV_ITER);
+				      DP_LINK_VDEV_ITER,
+				      DP_VDEV_ITERATE_SKIP_SELF);
 	}
 
 	/* Aggregate vdev stats from MLO ctx for detached MLO Links */
@@ -1043,15 +1047,23 @@ void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			   dp_ptnr_vdev_iter_func func,
 			   void *arg,
 			   enum dp_mod_id mod_id,
-			   uint8_t type)
+			   uint8_t type,
+			   bool include_self_vdev)
 {
 	int i = 0;
 	int j = 0;
 	struct dp_mlo_ctxt *dp_mlo = be_soc->ml_ctxt;
+	struct dp_vdev *self_vdev = &be_vdev->vdev;
 
 	if (type < DP_LINK_VDEV_ITER || type > DP_ALL_VDEV_ITER) {
 		dp_err("invalid iterate type");
 		return;
+	}
+
+	if (!be_vdev->mlo_dev_ctxt) {
+		if (!include_self_vdev)
+			return;
+		(*func)(be_vdev, self_vdev, arg);
 	}
 
 	for (i = 0; (i < WLAN_MAX_MLO_CHIPS) &&
@@ -1065,11 +1077,19 @@ void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			struct dp_vdev *ptnr_vdev;
 
 			ptnr_vdev = dp_vdev_get_ref_by_id(
-					ptnr_soc,
-					be_vdev->partner_vdev_list[i][j],
-					mod_id);
+				ptnr_soc,
+				be_vdev->mlo_dev_ctxt->vdev_list[i][j],
+				mod_id);
 			if (!ptnr_vdev)
 				continue;
+
+			if ((ptnr_vdev == self_vdev) && (!include_self_vdev)) {
+				dp_vdev_unref_delete(ptnr_vdev->pdev->soc,
+						     ptnr_vdev,
+						     mod_id);
+				continue;
+			}
+
 			(*func)(be_vdev, ptnr_vdev, arg);
 			dp_vdev_unref_delete(ptnr_vdev->pdev->soc,
 					     ptnr_vdev,
@@ -1088,11 +1108,22 @@ void dp_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
 			struct dp_vdev *bridge_vdev;
 
 			bridge_vdev = dp_vdev_get_ref_by_id(
-					ptnr_soc,
-					be_vdev->bridge_vdev_list[i][j],
-					mod_id);
+				ptnr_soc,
+				be_vdev->mlo_dev_ctxt->bridge_vdev[i][j],
+				mod_id);
+
 			if (!bridge_vdev)
 				continue;
+
+			if ((bridge_vdev == self_vdev) &&
+			    (!include_self_vdev)) {
+				dp_vdev_unref_delete(
+						bridge_vdev->pdev->soc,
+						bridge_vdev,
+						mod_id);
+				continue;
+			}
+
 			(*func)(be_vdev, bridge_vdev, arg);
 			dp_vdev_unref_delete(bridge_vdev->pdev->soc,
 					     bridge_vdev,
@@ -1121,7 +1152,8 @@ void dp_mlo_debug_print_ptnr_info(struct dp_vdev *vdev)
 	dp_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 			      dp_print_mlo_partner_list,
 			      NULL, DP_MOD_ID_GENERIC_STATS,
-			      DP_ALL_VDEV_ITER);
+			      DP_ALL_VDEV_ITER,
+			      DP_VDEV_ITERATE_SKIP_SELF);
 }
 #endif
 
@@ -1134,6 +1166,10 @@ struct dp_vdev *dp_mlo_get_mcast_primary_vdev(struct dp_soc_be *be_soc,
 	int j = 0;
 	struct dp_mlo_ctxt *dp_mlo = be_soc->ml_ctxt;
 	struct dp_vdev *vdev = (struct dp_vdev *)be_vdev;
+
+	if (!be_vdev->mlo_dev_ctxt) {
+		return NULL;
+	}
 
 	if (be_vdev->mcast_primary) {
 		if (dp_vdev_get_ref((struct dp_soc *)be_soc, vdev, mod_id) !=
@@ -1155,7 +1191,7 @@ struct dp_vdev *dp_mlo_get_mcast_primary_vdev(struct dp_soc_be *be_soc,
 
 			ptnr_vdev = dp_vdev_get_ref_by_id(
 					ptnr_soc,
-					be_vdev->partner_vdev_list[i][j],
+					be_vdev->mlo_dev_ctxt->vdev_list[i][j],
 					mod_id);
 			if (!ptnr_vdev)
 				continue;
