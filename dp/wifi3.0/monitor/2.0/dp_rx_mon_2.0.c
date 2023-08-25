@@ -198,7 +198,6 @@ dp_rx_mon_shift_pf_tag_in_headroom(qdf_nbuf_t nbuf, struct dp_soc *soc,
 	if (qdf_unlikely(!soc)) {
 		dp_mon_err("Soc[%pK] Null. Can't update pftag to nbuf headroom",
 			   soc);
-		qdf_assert_always(0);
 	}
 
 	if (!wlan_cfg_is_rx_mon_protocol_flow_tag_enabled(soc->wlan_cfg_ctx))
@@ -1883,7 +1882,6 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 	for (idx = 0; idx < status_buf_count; idx++) {
 		mon_desc = mon_pdev_be->status[idx];
 		if (!mon_desc) {
-			qdf_assert_always(0);
 			return NULL;
 		}
 
