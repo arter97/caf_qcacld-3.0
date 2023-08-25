@@ -64,6 +64,8 @@
 
 #define HDD_WMM_UP_TO_AC_MAP_SIZE 8
 #define DSCP(x)	x
+#define MIN_HANDLE_VALUE 5000
+#define MAX_HANDLE_VALUE 6000
 
 const uint8_t hdd_wmm_up_to_ac_map[] = {
 	SME_AC_BE,
@@ -2648,16 +2650,6 @@ bool hdd_wmm_is_acm_allowed(uint8_t vdev_id)
 	return true;
 }
 
-/**
- * hdd_wmm_addts() - Function which will add a traffic spec at the
- * request of an application
- *
- * @adapter  : [in]  pointer to adapter context
- * @handle    : [in]  handle to uniquely identify a TS
- * @tspec    : [in]  pointer to the traffic spec
- *
- * Return: HDD_WLAN_WMM_STATUS_*
- */
 hdd_wlan_wmm_status_e hdd_wmm_addts(struct hdd_adapter *adapter,
 				    uint32_t handle,
 				    struct sme_qos_wmmtspecinfo *tspec)
@@ -2751,6 +2743,7 @@ hdd_wlan_wmm_status_e hdd_wmm_addts(struct hdd_adapter *adapter,
 	}
 	qos_context->adapter = adapter;
 	qos_context->flow_id = 0;
+	qos_context->ts_id = tspec->ts_info.tid;
 	qos_context->magic = HDD_WMM_CTX_MAGIC;
 	qos_context->is_inactivity_timer_running = false;
 
@@ -2864,9 +2857,9 @@ hdd_wlan_wmm_status_e hdd_wmm_delts(struct hdd_adapter *adapter,
 	mutex_unlock(&adapter->hdd_wmm_status.mutex);
 
 	if (!qos_context) {
-		/* we didn't find the handle */
-		hdd_info("handle 0x%x not found", handle);
-		return HDD_WLAN_WMM_STATUS_RELEASE_FAILED_BAD_PARAM;
+		/* we didn't find the handle, tid is already freed */
+		hdd_info("tid already freed for handle 0x%x", handle);
+		return HDD_WLAN_WMM_STATUS_RELEASE_SUCCESS;
 	}
 
 	ac_type = qos_context->ac_type;
@@ -2972,6 +2965,33 @@ hdd_wlan_wmm_status_e hdd_wmm_checkts(struct hdd_adapter *adapter, uint32_t hand
 }
 
 /**
+ * hdd_get_handle_from_ts_id() - get handle from ts id
+ * @adapter : hdd adapter
+ * @ts_id: ts_id
+ * @del_tspec_handle: handle to delete the request
+ *
+ * Return: None
+ */
+static void
+hdd_get_handle_from_ts_id(struct hdd_adapter *adapter, uint8_t ts_id,
+			  uint32_t *del_tspec_handle)
+{
+	struct hdd_wmm_qos_context *cur_entry;
+
+	hdd_debug("Entered with ts_id 0x%x", ts_id);
+
+	mutex_lock(&adapter->hdd_wmm_status.mutex);
+	list_for_each_entry(cur_entry,
+			    &adapter->hdd_wmm_status.context_list, node) {
+		if (cur_entry->ts_id == ts_id) {
+			*del_tspec_handle = cur_entry->handle;
+			break;
+		}
+	}
+	mutex_unlock(&adapter->hdd_wmm_status.mutex);
+}
+
+/**
  * __wlan_hdd_cfg80211_config_tspec() - config tspec
  * @wiphy: pointer to wireless wiphy structure.
  * @wdev: pointer to wireless_dev structure.
@@ -2990,6 +3010,8 @@ static int __wlan_hdd_cfg80211_config_tspec(struct wiphy *wiphy,
 	struct sme_qos_wmmtspecinfo tspec;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TSPEC_MAX + 1];
 	uint8_t oper, ts_id;
+	static uint32_t add_tspec_handle = MIN_HANDLE_VALUE;
+	uint32_t del_tspec_handle = 0;
 	hdd_wlan_wmm_status_e status;
 	int ret;
 
@@ -3161,8 +3183,12 @@ static int __wlan_hdd_cfg80211_config_tspec(struct wiphy *wiphy,
 		if (tb[CONFIG_TSPEC_MINIMUM_PHY_RATE])
 			tspec.min_phy_rate = nla_get_u32(
 					     tb[CONFIG_TSPEC_MINIMUM_PHY_RATE]);
-
-		status = hdd_wmm_addts(adapter, ts_id, &tspec);
+		/*
+		 * ts_id send by upper layer is always same as handle and host
+		 * doesn't add new TS entry for same handle. To avoid this
+		 * issue host modifies handle internally.
+		 */
+		status = hdd_wmm_addts(adapter, add_tspec_handle, &tspec);
 		if (status == HDD_WLAN_WMM_STATUS_SETUP_FAILED ||
 		    status == HDD_WLAN_WMM_STATUS_SETUP_FAILED_BAD_PARAM ||
 		    status == HDD_WLAN_WMM_STATUS_SETUP_FAILED_NO_WMM ||
@@ -3174,11 +3200,23 @@ static int __wlan_hdd_cfg80211_config_tspec(struct wiphy *wiphy,
 			hdd_err_rl("hdd_wmm_addts failed %d", status);
 			return -EINVAL;
 		}
+
+		add_tspec_handle++;
+		if (add_tspec_handle >= MAX_HANDLE_VALUE)
+			add_tspec_handle = MIN_HANDLE_VALUE;
 		break;
 
 	case QCA_WLAN_TSPEC_DEL:
-
-		status = hdd_wmm_delts(adapter, ts_id);
+		/*
+		 * Host modifies handle internally. So, always
+		 * delete the entry for provided ts_id.
+		 */
+		hdd_get_handle_from_ts_id(adapter, ts_id, &del_tspec_handle);
+		if (!del_tspec_handle) {
+			hdd_err_rl("ts_id is already freed %d", ts_id);
+			break;
+		}
+		status = hdd_wmm_delts(adapter, del_tspec_handle);
 		if (status == HDD_WLAN_WMM_STATUS_RELEASE_FAILED ||
 		    status == HDD_WLAN_WMM_STATUS_RELEASE_FAILED_BAD_PARAM ||
 		    status == HDD_WLAN_WMM_STATUS_INTERNAL_FAILURE) {
