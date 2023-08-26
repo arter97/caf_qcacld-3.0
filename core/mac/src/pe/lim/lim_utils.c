@@ -9372,6 +9372,9 @@ void lim_extract_ml_info(struct pe_session *session,
 	ml_link->vdev_id = wlan_vdev_get_id(session->vdev);
 	ml_link->link_id = wlan_vdev_get_link_id(session->vdev);
 
+	ml_link->rec_max_simultaneous_links =
+	session->vdev->mlo_dev_ctx->mlo_max_recom_simult_links;
+
 	link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev->mlo_dev_ctx,
 						   ml_link->link_id);
 	if (!link_info)

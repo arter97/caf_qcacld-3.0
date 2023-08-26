@@ -1158,6 +1158,9 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 	qdf_mem_copy(&mlo_params->mac_addr, &ml_info->self_mac_addr,
 		     QDF_MAC_ADDR_SIZE);
 
+	mlo_params->rec_max_simultaneous_links =
+		ml_info->rec_max_simultaneous_links;
+
 	/* Fill partner link info */
 	ml_links->num_links = ml_info->num_links;
 	for (i = 0; i < ml_links->num_links; i++) {

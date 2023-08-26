@@ -5281,6 +5281,8 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t bpcc;
 	bool bpcc_found;
+	bool ext_mld_cap_found = false;
+	uint16_t ext_mld_cap = 0;
 
 	if (bcn_frm->mlo_ie.present) {
 		status = util_find_mlie(pframe + WLAN_BEACON_IES_OFFSET,
@@ -5304,6 +5306,17 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 						  ml_ie_total_len,
 						  &bcn_struct->mlo_ie.mlo_ie);
 
+			util_get_bvmlie_ext_mld_cap_op_info(ml_ie,
+							    ml_ie_total_len,
+							    &ext_mld_cap_found,
+							    &ext_mld_cap);
+			if (ext_mld_cap_found) {
+				bcn_struct->mlo_ie.mlo_ie.ext_mld_capab_and_op_info.rec_max_simultaneous_links =
+				QDF_GET_BITS(
+				ext_mld_cap,
+				WLAN_ML_BV_CINFO_EXTMLDCAPINFO_RECOM_MAX_SIMULT_LINKS_IDX,
+				WLAN_ML_BV_CINFO_EXTMLDCAPINFO_RECOM_MAX_SIMULT_LINKS_BITS);
+			}
 			util_get_bvmlie_bssparamchangecnt(ml_ie,
 							  ml_ie_total_len,
 							  &bpcc_found, &bpcc);

@@ -51,6 +51,9 @@
 #endif
 #include "wlan_t2lm_api.h"
 
+/*Invalid Recommended Max Simultaneous Links value */
+#define RESERVED_REC_LINK_VALUE 1
+
 #ifdef WLAN_FEATURE_11BE_MLO
 
 void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
@@ -82,6 +85,14 @@ void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
 	wlan_update_t2lm_mapping(vdev, &bcn_ptr->t2lm_ctx, t2lm_ctx->tsf);
 }
 
+static uint8_t valid_max_rec_links(uint8_t value)
+{
+	if (value > RESERVED_REC_LINK_VALUE &&
+	    value <= WLAN_DEFAULT_REC_LINK_VALUE)
+		return value;
+	return WLAN_DEFAULT_REC_LINK_VALUE;
+}
+
 void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    tSchBeaconStruct *bcn_ptr)
@@ -102,6 +113,7 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 	uint8_t is_sta_csa_synced;
 	struct mlo_link_info *link_info;
 	uint8_t sta_info_len = 0;
+	uint8_t tmp_rec_value;
 
 	if (!session || !bcn_ptr || !mac_ctx) {
 		pe_err("invalid input parameters");
@@ -126,6 +138,12 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		wlan_vdev_mlme_cap_clear(vdev, WLAN_VDEV_C_EMLSR_CAP);
 		pe_debug("EMLSR not supported with D2.0 AP");
 	}
+
+	/** max num of active links recommended by AP */
+	tmp_rec_value =
+	bcn_ptr->mlo_ie.mlo_ie.ext_mld_capab_and_op_info.rec_max_simultaneous_links;
+	mlo_ctx->mlo_max_recom_simult_links =
+		valid_max_rec_links(tmp_rec_value);
 
 	for (i = 0; i < bcn_ptr->mlo_ie.mlo_ie.num_sta_profile; i++) {
 		csa_ie = NULL;
