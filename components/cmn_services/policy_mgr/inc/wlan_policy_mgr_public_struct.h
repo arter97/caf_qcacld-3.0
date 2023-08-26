@@ -1228,8 +1228,9 @@ enum policy_mgr_band {
  *        to the other DBS mode. This reason code indicates such condition.
  * @POLICY_MGR_UPDATE_REASON_NAN_DISCOVERY: NAN Discovery related
  * @POLICY_MGR_UPDATE_REASON_NDP_UPDATE: NAN Datapath related update
- * @POLICY_MGR_UPDATE_REASON_LFR2_ROAM: Roaming
+ * @POLICY_MGR_UPDATE_REASON_LFR2_ROAM: LFR2 Roaming
  * @POLICY_MGR_UPDATE_REASON_STA_CONNECT: STA/CLI connection to peer
+ * @POLICY_MGR_UPDATE_REASON_LFR3_ROAM: LFR3 Roaming
  */
 enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN,
@@ -1246,6 +1247,7 @@ enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_NDP_UPDATE,
 	POLICY_MGR_UPDATE_REASON_LFR2_ROAM,
 	POLICY_MGR_UPDATE_REASON_STA_CONNECT,
+	POLICY_MGR_UPDATE_REASON_LFR3_ROAM,
 };
 
 /**
