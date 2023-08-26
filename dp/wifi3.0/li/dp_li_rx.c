@@ -1571,6 +1571,10 @@ dp_rx_null_q_desc_handle_li(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		qdf_nbuf_set_next(nbuf, NULL);
 		DP_PEER_TO_STACK_INCC_PKT(txrx_peer, 1, qdf_nbuf_len(nbuf),
 					  enh_flag);
+
+		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
+					      rx.rx_success, 1,
+					      qdf_nbuf_len(nbuf), 0);
 		/*
 		 * Update the protocol tag in SKB based on
 		 * CCE metadata

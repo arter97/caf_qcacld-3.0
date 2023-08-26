@@ -6992,10 +6992,11 @@ void dp_print_peer_stats(struct dp_peer *peer,
 			       peer_stats->tx.inval_link_id_pkt_cnt);
 
 	DP_PRINT_STATS("Node Rx Stats:");
-	DP_PRINT_STATS("Packets Sent To Stack = %d",
-		       peer_stats->rx.to_stack.num);
+
+	DP_PRINT_STATS("Packets Sent To Stack = %llu",
+		       peer_stats->rx.rx_success.num);
 	DP_PRINT_STATS("Bytes Sent To Stack = %llu",
-		       peer_stats->rx.to_stack.bytes);
+		       peer_stats->rx.rx_success.bytes);
 	for (i = 0; i <  CDP_MAX_RX_RINGS; i++) {
 		DP_PRINT_STATS("Ring Id = %d", i);
 		DP_PRINT_STATS("	Packets Received = %d",

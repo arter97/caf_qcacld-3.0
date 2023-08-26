@@ -1962,6 +1962,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		\
 		_tgtobj->rx.multicast.num += _srcobj->rx.multicast.num; \
 		_tgtobj->rx.multicast.bytes += _srcobj->rx.multicast.bytes; \
+		_tgtobj->rx.rx_success.num += _srcobj->rx.rx_success.num;\
+		_tgtobj->rx.rx_success.bytes += _srcobj->rx.rx_success.bytes;\
 		_tgtobj->rx.bcast.num += _srcobj->rx.bcast.num; \
 		_tgtobj->rx.bcast.bytes += _srcobj->rx.bcast.bytes; \
 		_tgtobj->rx.unicast.num += _srcobj->rx.unicast.num; \
