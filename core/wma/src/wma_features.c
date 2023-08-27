@@ -78,6 +78,9 @@
 #include "hif.h"
 #include "wlan_cmn_ieee80211.h"
 #include "wlan_mlo_mgr_cmn.h"
+#include "wlan_mlo_mgr_peer.h"
+#include "wlan_mlo_mgr_sta.h"
+
 /**
  * WMA_SET_VDEV_IE_SOURCE_HOST - Flag to identify the source of VDEV SET IE
  * command. The value is 0x0 for the VDEV SET IE WMI commands from mobile
@@ -752,10 +755,11 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 					phymode = WLAN_PHYMODE_11AXG_HE40;
 				break;
 			default:
-				phymode = wma_eht_chan_phy_mode(freq,
-								dot11_mode,
-								bw_val,
-								chan_width);
+				phymode = wma_eht_chan_phy_mode(
+							freq,
+							dot11_mode,
+							bw_val,
+							chan_width);
 				break;
 			}
 		}
@@ -811,10 +815,11 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 					phymode = WLAN_PHYMODE_11AXA_HE80_80;
 				break;
 			default:
-				phymode = wma_eht_chan_phy_mode(freq,
-								dot11_mode,
-								bw_val,
-								chan_width);
+				phymode = wma_eht_chan_phy_mode(
+							freq,
+							dot11_mode,
+							bw_val,
+							chan_width);
 				break;
 			}
 		}
@@ -1313,6 +1318,56 @@ QDF_STATUS wma_parse_bw_indication_ie(uint8_t *ie,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+static int fill_peer_mac_addr(wmi_csa_event_fixed_param *csa_event,
+			      uint8_t *bssid)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t link_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t link_id;
+	struct mlo_link_info *link_info;
+	struct wlan_mlo_dev_context *mldev;
+
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->mld_mac_address,
+				   &mld_addr[0]);
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->link_mac_address,
+				   &link_addr[0]);
+	wlan_mlo_get_mlpeer_by_peer_mladdr(
+				(struct qdf_mac_addr *)&mld_addr[0],
+				&mldev);
+	if (!mldev) {
+		wma_err("NULL ml dev ctx");
+		return -EINVAL;
+	}
+
+	link_id =  csa_event->link_id;
+	link_info = mlo_mgr_get_ap_link_by_link_id(mldev,
+						   link_id);
+	if (!link_info) {
+		wma_err("NULL link info ");
+		return -EINVAL;
+	}
+
+	qdf_copy_macaddr((struct qdf_mac_addr *)&bssid[0],
+			 &link_info->ap_link_addr);
+	wma_debug("csa event link id %d vdev id %d peer mld addr" QDF_MAC_ADDR_FMT "peer link addr" QDF_MAC_ADDR_FMT "host link info ap_link_addr" QDF_MAC_ADDR_FMT,
+		  link_id, link_info->vdev_id,
+		  QDF_MAC_ADDR_REF(&mld_addr[0]),
+		  QDF_MAC_ADDR_REF(&link_addr[0]),
+		  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes));
+
+	return status;
+}
+
+#else
+static int fill_peer_mac_addr(wmi_csa_event_fixed_param *csa_event,
+			      uint8_t *bssid)
+{
+	return 0;
+}
+#endif
+
 /**
  * wma_csa_offload_handler() - CSA event handler
  * @handle: wma handle
@@ -1349,7 +1404,17 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		return -EINVAL;
 	}
 	csa_event = param_buf->fixed_param;
-	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->i_addr2, &bssid[0]);
+
+	if (csa_event->link_id_present &&
+	    csa_event->mld_mac_address_present) {
+		status = fill_peer_mac_addr(csa_event, &bssid[0]);
+		if (status)
+			return -EINVAL;
+		/* check standby link and return zero */
+		} else {
+			WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->i_addr2,
+						   &bssid[0]);
+		}
 
 	peer = wlan_objmgr_get_peer_by_mac(wma->psoc,
 					   bssid, WLAN_LEGACY_WMA_ID);
