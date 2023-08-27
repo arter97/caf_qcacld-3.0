@@ -909,6 +909,9 @@ done:
 				  nbuf);
 		DP_PEER_STATS_FLAT_INC_PKT(txrx_peer, to_stack, 1,
 					   QDF_NBUF_CB_RX_PKT_LEN(nbuf));
+		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
+					      rx.rx_success, 1,
+					      QDF_NBUF_CB_RX_PKT_LEN(nbuf), 0);
 		if (qdf_unlikely(txrx_peer->in_twt))
 			DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer,
 						      rx.to_stack_twt, 1,
