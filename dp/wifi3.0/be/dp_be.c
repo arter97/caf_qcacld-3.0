@@ -2895,6 +2895,7 @@ QDF_STATUS dp_mlo_dev_ctxt_vdev_detach(struct cdp_soc_t *soc_hdl,
 			return QDF_STATUS_E_INVAL;
 		}
 		mlo_dev_ctxt = be_vdev->mlo_dev_ctxt;
+		dp_mlo_dev_get_ref(mlo_dev_ctxt, DP_MOD_ID_MLO_DEV);
 	}
 
 	if (dp_detach_vdev_list_in_mlo_dev_ctxt(be_soc, vdev, mlo_dev_ctxt)
