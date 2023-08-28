@@ -2325,7 +2325,7 @@ target_if_spectral_get_bin_count_after_len_adj(
 			/* No length adjustment */
 			break;
 		default:
-			qdf_assert_always(0);
+			return 0;
 		}
 
 		if (rpt_mode == 2 && swar->inband_fftbin_size_adj)
@@ -2355,9 +2355,11 @@ target_if_process_sfft_report_gen3(
 	int32_t peak_sidx = 0;
 	int32_t peak_mag;
 
-	qdf_assert_always(p_fft_report);
-	qdf_assert_always(p_sfft);
-	qdf_assert_always(rparams);
+	if (!p_fft_report || !p_sfft || !rparams) {
+		spectral_err("null params: p_fft_report %pK p_sfft %pK rparams %pK",
+			     p_fft_report, p_sfft, rparams);
+		return 1;
+	}
 
 	/*
 	 * For simplicity, everything is defined as uint32_t (except one).
@@ -2397,7 +2399,9 @@ target_if_process_sfft_report_gen3(
 							 8, 12);
 		break;
 	default:
-		qdf_assert_always(0);
+		spectral_err_rl("Invalid spectral report format: %d",
+				rparams->version);
+		return 1;
 	}
 
 	p_sfft->fft_peak_sidx = unsigned_to_signed(peak_sidx, 11);
@@ -2440,7 +2444,10 @@ target_if_dump_fft_report_gen3(struct target_if_spectral *spectral,
 	size_t fft_bin_len_inband_tfer = 0;
 	uint8_t tag, signature;
 
-	qdf_assert_always(spectral);
+	if (!spectral) {
+		spectral_err_rl("spectral pointer is null.");
+		return;
+	}
 
 	/* There won't be FFT report/bins in report mode 0, so return */
 	if (!spectral->params[smode].ss_rpt_mode)
@@ -2970,8 +2977,11 @@ QDF_STATUS target_if_byte_swap_spectral_headers_gen3(
 	uint32_t *ptr32;
 	size_t words32;
 
-	qdf_assert_always(data);
-	qdf_assert_always(spectral);
+	if (!data || !spectral) {
+		spectral_err_rl("null params: data %pK, spectral %pK.",
+				data, spectral);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	ptr32 = (uint32_t *)data;
 
@@ -3003,8 +3013,11 @@ QDF_STATUS target_if_byte_swap_spectral_fft_bins_gen3(
 	uint8_t num_bins_per_dword;
 	uint32_t *dword_ptr;
 
-	qdf_assert_always(bin_pwr_data);
-	qdf_assert_always(rparams);
+	if (!bin_pwr_data || !rparams) {
+		spectral_err_rl("null params, bin_pwr_data %pK, rparams %pK.",
+				bin_pwr_data, rparams);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	num_bins_per_dword = SPECTRAL_DWORD_SIZE / rparams->hw_fft_bin_width;
 	num_dwords = num_fftbins / num_bins_per_dword;
@@ -3106,7 +3119,9 @@ target_if_consume_sscan_summary_report_gen3(
 			SSCAN_SUMMARY_REPORT_HDR_C_GAINCHANGE_POS_GEN3_V2);
 		break;
 	default:
-		qdf_assert_always(0);
+		spectral_err_rl("Invalid spectral version: %d.",
+				spectral->rparams.version);
+		return QDF_STATUS_E_INVAL;
 	}
 
 	/* Advance buf pointer to the search fft report */
@@ -3303,7 +3318,9 @@ target_if_process_sfft_report_gen3(
 				FFT_REPORT_HDR_B_TOTAL_GAIN_POS_GEN3_V2);
 		break;
 	default:
-		qdf_assert_always(0);
+		spectral_err_rl("Invalid spectral version: %d.",
+				spectral->rparams.version);
+		return QDF_STATUS_E_INVAL;
 	}
 
 	p_sfft->fft_peak_sidx = unsigned_to_signed(peak_sidx,
@@ -3418,7 +3435,10 @@ target_if_spectral_populate_samp_params_gen3(
 		return QDF_STATUS_E_FAILURE;
 	}
 	vdev_rxchainmask = wlan_vdev_mlme_get_rxchainmask(vdev);
-	QDF_ASSERT(vdev_rxchainmask != 0);
+	if (vdev_rxchainmask == 0) {
+		spectral_err("Vdev rxchainmask is zero.");
+		return QDF_STATUS_E_FAILURE;
+	}
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_SPECTRAL_ID);
 
 	chn_idx_lowest_enabled =
@@ -3845,7 +3865,10 @@ target_if_consume_spectral_report_gen3(
 			return -EPERM;
 		}
 		vdev_rxchainmask = wlan_vdev_mlme_get_rxchainmask(vdev);
-		QDF_ASSERT(vdev_rxchainmask != 0);
+		if (vdev_rxchainmask == 0) {
+			spectral_err("Vdev rxchainmask is zero.");
+			goto fail;
+		}
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_SPECTRAL_ID);
 
 		chn_idx_lowest_enabled =
@@ -3873,10 +3896,15 @@ target_if_consume_spectral_report_gen3(
 			struct wlan_objmgr_psoc *psoc;
 			struct spectral_fft_bin_markers_160_165mhz *marker;
 
-			qdf_assert_always(spectral->pdev_obj);
+			if (!spectral->pdev_obj) {
+				spectral_err("pdev is null");
+				goto fail;
+			}
 			psoc = wlan_pdev_get_psoc(spectral->pdev_obj);
-			qdf_assert_always(psoc);
-
+			if (!psoc) {
+				spectral_err("psoc is null");
+				goto fail;
+			}
 			params.agc_total_gain_sec80 =
 				sscan_report_fields.sscan_agc_total_gain;
 			params.gainchange_sec80 =
@@ -4011,7 +4039,10 @@ target_if_consume_spectral_report_gen3(
 			return -EPERM;
 		}
 		vdev_rxchainmask = wlan_vdev_mlme_get_rxchainmask(vdev);
-		QDF_ASSERT(vdev_rxchainmask != 0);
+		if (vdev_rxchainmask == 0) {
+			spectral_err("Vdev rxchainmask is zero.");
+			goto fail;
+		}
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_SPECTRAL_ID);
 
 		chn_idx_lowest_enabled =
