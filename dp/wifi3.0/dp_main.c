@@ -9788,15 +9788,16 @@ void dp_rx_bar_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 }
 
 void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
-			     struct cdp_vdev_stats *vdev_stats)
+			     struct cdp_vdev_stats *vdev_stats,
+			     enum dp_pkt_xmit_type xmit_type)
 {
 	if (!vdev || !vdev->pdev)
 		return;
 
 	dp_update_vdev_ingress_stats(vdev);
 
-	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
-
+	dp_copy_vdev_stats_to_tgt_buf(vdev_stats,
+					    &vdev->stats, xmit_type);
 	dp_vdev_iterate_peer(vdev, dp_update_vdev_stats, vdev_stats,
 			     DP_MOD_ID_GENERIC_STATS);
 
@@ -9835,7 +9836,7 @@ void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 	qdf_spin_lock_bh(&pdev->vdev_list_lock);
 	TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {
 
-		dp_aggregate_vdev_stats(vdev, vdev_stats);
+		dp_aggregate_vdev_stats(vdev, vdev_stats, DP_XMIT_TOTAL);
 		dp_update_pdev_stats(pdev, vdev_stats);
 		dp_update_pdev_ingress_stats(pdev, vdev);
 	}
@@ -9880,7 +9881,7 @@ static QDF_STATUS dp_vdev_getstats(struct cdp_vdev *vdev_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_aggregate_vdev_stats(vdev, vdev_stats);
+	dp_aggregate_vdev_stats(vdev, vdev_stats, DP_XMIT_LINK);
 
 	stats->tx_packets = vdev_stats->tx.comp_pkt.num;
 	stats->tx_bytes = vdev_stats->tx.comp_pkt.bytes;
@@ -11662,11 +11663,12 @@ dp_txrx_get_pdev_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
  * dp_txrx_update_vdev_me_stats() - Update vdev ME stats sent from CDP
  * @vdev: DP vdev handle
  * @buf: buffer containing specific stats structure
+ * @xmit_type: xmit type of packet - MLD/Link
  *
  * Return: void
  */
 static void dp_txrx_update_vdev_me_stats(struct dp_vdev *vdev,
-					 void *buf)
+					 void *buf, uint8_t xmit_type)
 {
 	struct cdp_tx_ingress_stats *host_stats = NULL;
 
@@ -11676,20 +11678,20 @@ static void dp_txrx_update_vdev_me_stats(struct dp_vdev *vdev,
 	}
 	host_stats = (struct cdp_tx_ingress_stats *)buf;
 
-	DP_STATS_INC_PKT(vdev, tx_i.mcast_en.mcast_pkt,
+	DP_STATS_INC_PKT(vdev, tx_i[xmit_type].mcast_en.mcast_pkt,
 			 host_stats->mcast_en.mcast_pkt.num,
 			 host_stats->mcast_en.mcast_pkt.bytes);
-	DP_STATS_INC(vdev, tx_i.mcast_en.dropped_map_error,
+	DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.dropped_map_error,
 		     host_stats->mcast_en.dropped_map_error);
-	DP_STATS_INC(vdev, tx_i.mcast_en.dropped_self_mac,
+	DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.dropped_self_mac,
 		     host_stats->mcast_en.dropped_self_mac);
-	DP_STATS_INC(vdev, tx_i.mcast_en.dropped_send_fail,
+	DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.dropped_send_fail,
 		     host_stats->mcast_en.dropped_send_fail);
-	DP_STATS_INC(vdev, tx_i.mcast_en.ucast,
+	DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.ucast,
 		     host_stats->mcast_en.ucast);
-	DP_STATS_INC(vdev, tx_i.mcast_en.fail_seg_alloc,
+	DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.fail_seg_alloc,
 		     host_stats->mcast_en.fail_seg_alloc);
-	DP_STATS_INC(vdev, tx_i.mcast_en.clone_fail,
+	DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.clone_fail,
 		     host_stats->mcast_en.clone_fail);
 }
 
@@ -11697,11 +11699,12 @@ static void dp_txrx_update_vdev_me_stats(struct dp_vdev *vdev,
  * dp_txrx_update_vdev_igmp_me_stats() - Update vdev IGMP ME stats sent from CDP
  * @vdev: DP vdev handle
  * @buf: buffer containing specific stats structure
+ * @xmit_type: xmit type of packet -  MLD/Link
  *
  * Return: void
  */
 static void dp_txrx_update_vdev_igmp_me_stats(struct dp_vdev *vdev,
-					      void *buf)
+					      void *buf, uint8_t xmit_type)
 {
 	struct cdp_tx_ingress_stats *host_stats = NULL;
 
@@ -11711,9 +11714,9 @@ static void dp_txrx_update_vdev_igmp_me_stats(struct dp_vdev *vdev,
 	}
 	host_stats = (struct cdp_tx_ingress_stats *)buf;
 
-	DP_STATS_INC(vdev, tx_i.igmp_mcast_en.igmp_rcvd,
+	DP_STATS_INC(vdev, tx_i[xmit_type].igmp_mcast_en.igmp_rcvd,
 		     host_stats->igmp_mcast_en.igmp_rcvd);
-	DP_STATS_INC(vdev, tx_i.igmp_mcast_en.igmp_ucast_converted,
+	DP_STATS_INC(vdev, tx_i[xmit_type].igmp_mcast_en.igmp_ucast_converted,
 		     host_stats->igmp_mcast_en.igmp_ucast_converted);
 }
 
@@ -11723,13 +11726,15 @@ static void dp_txrx_update_vdev_igmp_me_stats(struct dp_vdev *vdev,
  * @vdev_id: id of DP vdev handle
  * @buf: buffer containing specific stats structure
  * @stats_id: stats type
+ * @xmit_type: xmit type of packet - MLD/Link
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS dp_txrx_update_vdev_host_stats(struct cdp_soc_t *soc_hdl,
 						 uint8_t vdev_id,
 						 void *buf,
-						 uint16_t stats_id)
+						 uint16_t stats_id,
+						 uint8_t xmit_type)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
@@ -11744,8 +11749,8 @@ static QDF_STATUS dp_txrx_update_vdev_host_stats(struct cdp_soc_t *soc_hdl,
 	case DP_VDEV_STATS_PKT_CNT_ONLY:
 		break;
 	case DP_VDEV_STATS_TX_ME:
-		dp_txrx_update_vdev_me_stats(vdev, buf);
-		dp_txrx_update_vdev_igmp_me_stats(vdev, buf);
+		dp_txrx_update_vdev_me_stats(vdev, buf, xmit_type);
+		dp_txrx_update_vdev_igmp_me_stats(vdev, buf, xmit_type);
 		break;
 	default:
 		qdf_info("Invalid stats_id %d", stats_id);
@@ -11935,9 +11940,10 @@ dp_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	vdev_stats = (struct cdp_vdev_stats *)buf;
 
 	if (is_aggregate) {
-		dp_aggregate_vdev_stats(vdev, buf);
+		dp_aggregate_vdev_stats(vdev, buf, DP_XMIT_LINK);
 	} else {
-		qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
+		dp_copy_vdev_stats_to_tgt_buf(vdev_stats,
+						    &vdev->stats, DP_XMIT_LINK);
 	}
 
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
@@ -15074,7 +15080,7 @@ static uint32_t dp_tx_get_success_ack_stats(struct cdp_soc_t *soc_hdl,
 		return 0;
 	}
 
-	dp_aggregate_vdev_stats(vdev, vdev_stats);
+	dp_aggregate_vdev_stats(vdev, vdev_stats, DP_XMIT_TOTAL);
 
 	tx_success = vdev_stats->tx.tx_success.num;
 	qdf_mem_free(vdev_stats);
