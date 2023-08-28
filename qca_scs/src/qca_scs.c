@@ -25,7 +25,7 @@
 
 #define QCA_SCS_RULE_SOC_ID_MASK  0xF0000000
 #define QCA_SCS_RULE_SOC_ID_SHIFT 28
-#define QCA_SCS_RULE_ID_INVALID   0xFFFF
+#define QCA_SCS_RULE_ID_INVALID   0xFFFFFFFF
 
 extern ol_ath_soc_softc_t *ol_global_soc[GLOBAL_SOC_SIZE];
 
