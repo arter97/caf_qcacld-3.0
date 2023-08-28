@@ -2380,15 +2380,50 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 	}
 }
 
-static
-void dp_get_vdev_stats_for_unmap_peer_be(struct dp_vdev *vdev,
-					 struct dp_peer *peer,
-					 struct cdp_vdev_stats **vdev_stats)
+static void dp_get_vdev_stats_for_unmap_peer_mlo(struct dp_vdev *vdev,
+						    struct dp_peer *peer)
 {
 	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	struct cdp_vdev_stats *vdev_stats = &be_vdev->mlo_stats;
+	struct dp_txrx_peer *txrx_peer = dp_get_txrx_peer(peer);
+	struct dp_pdev *pdev = vdev->pdev;
+	struct dp_soc *soc = vdev->pdev->soc;
+	uint8_t link_id = dp_get_peer_hw_link_id(soc, pdev);
+	struct dp_peer_per_pkt_stats *per_pkt_stats;
 
-	if (!IS_DP_LEGACY_PEER(peer))
-		*vdev_stats = &be_vdev->mlo_stats;
+	if (!txrx_peer)
+		goto link_stats;
+
+	dp_peer_aggregate_tid_stats(peer);
+
+	if (!IS_MLO_DP_LINK_PEER(peer)) {
+		per_pkt_stats = &txrx_peer->stats[0].per_pkt_stats;
+		dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
+		DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+	}
+
+	if (IS_MLO_DP_LINK_PEER(peer)) {
+		link_id = dp_get_peer_hw_link_id(soc, pdev);
+		if (link_id > 0) {
+			per_pkt_stats =
+				&txrx_peer->stats[link_id].per_pkt_stats;
+			DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
+		}
+	}
+
+link_stats:
+	dp_monitor_peer_get_stats(soc, peer, vdev_stats, UPDATE_VDEV_STATS_MLD);
+}
+
+static
+void dp_get_vdev_stats_for_unmap_peer_be(struct dp_vdev *vdev,
+					 struct dp_peer *peer)
+{
+
+	if (IS_DP_LEGACY_PEER(peer))
+		dp_get_vdev_stats_for_unmap_peer_legacy(vdev, peer);
+	else
+		dp_get_vdev_stats_for_unmap_peer_mlo(vdev, peer);
 }
 #else
 static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
@@ -2486,8 +2521,7 @@ QDF_STATUS dp_txrx_get_vdev_mcast_param_be(struct dp_soc *soc,
 
 static
 void dp_get_vdev_stats_for_unmap_peer_be(struct dp_vdev *vdev,
-					 struct dp_peer *peer,
-					 struct cdp_vdev_stats **vdev_stats)
+					 struct dp_peer *peer)
 {
 }
 #endif
@@ -2903,10 +2937,10 @@ QDF_STATUS dp_mlo_dev_ctxt_vdev_detach(struct cdp_soc_t *soc_hdl,
 	be_vdev->mlo_dev_ctxt = NULL;
 
 	/* Save vdev stats in MLO dev ctx */
-	dp_update_mlo_ctxt_stats(&mlo_dev_ctxt->stats, &vdev->stats);
+	dp_update_mlo_mld_vdev_ctxt_stats(&mlo_dev_ctxt->stats, &vdev->stats);
 
 	/* reset vdev stats to zero */
-	qdf_mem_set(&vdev->stats, sizeof(struct cdp_vdev_stats), 0);
+	qdf_mem_set(&vdev->stats, sizeof(struct dp_vdev_stats), 0);
 
 	/* unref for mlo ctxt removed from be_vdev*/
 	dp_mlo_dev_ctxt_unref_delete(mlo_dev_ctxt, DP_MOD_ID_CHILD);

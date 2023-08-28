@@ -459,7 +459,7 @@ struct dp_mlo_dev_ctxt {
 	qdf_atomic_t ref_cnt;
 	qdf_atomic_t mod_refs[DP_MOD_ID_MAX];
 	uint8_t ref_delete_pending;
-	struct cdp_vdev_stats stats;
+	struct dp_vdev_stats stats;
 };
 #endif /* WLAN_FEATURE_11BE_MLO */
 
@@ -803,19 +803,37 @@ static inline uintptr_t dp_cc_desc_find(struct dp_soc *soc,
 }
 
 /**
- * dp_update_mlo_ctxt_stats() - aggregate stats from mlo ctx
+ * dp_update_mlo_mld_vdev_ctxt_stats() - aggregate stats from mlo ctx
  * @buf: vdev stats buf
  * @mlo_ctxt_stats: mlo ctxt stats
  *
  * return: void
  */
 static inline
-void dp_update_mlo_ctxt_stats(void *buf,
-			      struct cdp_vdev_stats *mlo_ctxt_stats)
+void dp_update_mlo_mld_vdev_ctxt_stats(void *buf,
+				   struct dp_vdev_stats *mlo_ctxt_stats)
+{
+	struct dp_vdev_stats *tgt_vdev_stats = (struct dp_vdev_stats *)buf;
+
+	DP_UPDATE_TO_MLD_VDEV_STATS(tgt_vdev_stats, mlo_ctxt_stats,
+				    DP_XMIT_TOTAL);
+}
+
+/**
+ * dp_update_mlo_link_vdev_ctxt_stats() - aggregate stats from mlo ctx
+ * @buf: vdev stats buf
+ * @mlo_ctxt_stats: mlo ctxt stats
+ * @xmit_type: xmit type of packet - MLD/Link
+ * return: void
+ */
+static inline
+void dp_update_mlo_link_vdev_ctxt_stats(void *buf,
+					struct dp_vdev_stats *mlo_ctxt_stats,
+					enum dp_pkt_xmit_type xmit_type)
 {
 	struct cdp_vdev_stats *tgt_vdev_stats = (struct cdp_vdev_stats *)buf;
 
-	DP_UPDATE_VDEV_STATS(tgt_vdev_stats, mlo_ctxt_stats);
+	DP_UPDATE_TO_LINK_VDEV_STATS(tgt_vdev_stats, mlo_ctxt_stats, xmit_type);
 }
 
 #ifdef WLAN_FEATURE_NEAR_FULL_IRQ

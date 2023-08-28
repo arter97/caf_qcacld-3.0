@@ -6063,10 +6063,17 @@ void dp_mon_peer_get_stats(struct dp_peer *peer, void *arg,
 		DP_UPDATE_MON_STATS(peer_stats, mon_peer_stats);
 		break;
 	}
-	case UPDATE_VDEV_STATS:
+	case UPDATE_VDEV_STATS_MLD:
 	{
 		struct cdp_vdev_stats *vdev_stats =
 						(struct cdp_vdev_stats *)arg;
+		DP_UPDATE_MON_STATS(vdev_stats, mon_peer_stats);
+		break;
+	}
+	case UPDATE_VDEV_STATS:
+	{
+		struct dp_vdev_stats *vdev_stats =
+						(struct dp_vdev_stats *)arg;
 		DP_UPDATE_MON_STATS(vdev_stats, mon_peer_stats);
 		break;
 	}
