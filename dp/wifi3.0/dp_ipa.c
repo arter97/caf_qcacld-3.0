@@ -4064,7 +4064,7 @@ void dp_ipa_aggregate_vdev_stats(struct dp_vdev *vdev,
 
 	soc = vdev->pdev->soc;
 	dp_update_vdev_ingress_stats(vdev);
-	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
+	dp_copy_vdev_stats_to_tgt_buf(vdev_stats, &vdev->stats, DP_XMIT_LINK);
 	dp_vdev_iterate_peer(vdev, dp_ipa_update_vdev_stats, vdev_stats,
 			     DP_MOD_ID_GENERIC_STATS);
 	dp_update_vdev_rate_stats(vdev_stats, &vdev->stats);

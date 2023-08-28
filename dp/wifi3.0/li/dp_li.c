@@ -577,9 +577,9 @@ static uint8_t dp_get_hw_link_id_li(struct dp_pdev *pdev)
 
 static void dp_get_vdev_stats_for_unmap_peer_li(
 					struct dp_vdev *vdev,
-					struct dp_peer *peer,
-					struct cdp_vdev_stats **vdev_stats)
+					struct dp_peer *peer)
 {
+	dp_get_vdev_stats_for_unmap_peer_legacy(vdev, peer);
 }
 
 static struct
