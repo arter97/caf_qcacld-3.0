@@ -7330,6 +7330,11 @@ QDF_STATUS sme_set_wlm_latency_level(mac_handle_t mac_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (session_id == WLAN_INVALID_LINK_ID) {
+		sme_err("Invalid vdev_id[%u]", session_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	params.wlm_latency_level = latency_level;
 	params.wlm_latency_flags =
 		mac_ctx->mlme_cfg->wlm_config.latency_flags[latency_level];
