@@ -1068,8 +1068,16 @@ QDF_STATUS hdd_chan_change_notify(struct wlan_hdd_link_info *link_info,
 		dev = assoc_adapter->dev;
 	}
 
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		mutex_lock(&dev->ieee80211_ptr->mtx);
+
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id,
 				       puncture_bitmap);
+
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		mutex_unlock(&dev->ieee80211_ptr->mtx);
 
 	return QDF_STATUS_SUCCESS;
 }
