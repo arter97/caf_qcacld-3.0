@@ -93,4 +93,19 @@ QDF_STATUS wmi_extract_dbr_buf_cv_metadata(
 			wmi_unified_t wmi_handle,
 			uint8_t *evt_buf, uint8_t idx,
 			struct direct_buf_rx_cv_metadata *param);
+
+/**
+ * wmi_extract_dbr_buf_cqi_metadata: Extract direct buffer TxBF cqi metadata
+ *
+ * @wmi_handle: WMI handle
+ * @evt_buf: Event buffer
+ * @idx: Index of the module for which capability is received
+ * @param: Pointer to direct buffer cqi metadata
+ *
+ * Return: QDF status of operation
+ */
+QDF_STATUS wmi_extract_dbr_buf_cqi_metadata(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf, uint8_t idx,
+			struct direct_buf_rx_cqi_metadata *param);
 #endif /* _WMI_UNIFIED_DBR_API_H_ */

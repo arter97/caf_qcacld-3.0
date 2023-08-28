@@ -88,8 +88,10 @@ struct wlan_lmac_if_tx_ops;
  * @paddr: physical address of buffer corresponding to vaddr
  * @meta_data_valid: Indicates that metadata is valid
  * @cv_meta_data_valid: Indicates that CV upload metadata is valid
+ * @cqi_meta_data_valid: Indicates that CQI upload metadata is valid
  * @meta_data: Meta data
  * @cv_meta_data: TxBF CV Meta data
+ * @cqi_meta_data: TxBF CQI Meta data
  */
 struct direct_buf_rx_data {
 	size_t dbr_len;
@@ -98,9 +100,11 @@ struct direct_buf_rx_data {
 	qdf_dma_addr_t paddr;
 	bool meta_data_valid;
 	bool cv_meta_data_valid;
+	bool cqi_meta_data_valid;
 	union {
 		struct direct_buf_rx_metadata meta_data;
 		struct direct_buf_rx_cv_metadata cv_meta_data;
+		struct direct_buf_rx_cqi_metadata cqi_meta_data;
 	};
 };
 #endif

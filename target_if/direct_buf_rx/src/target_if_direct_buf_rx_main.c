@@ -2194,6 +2194,15 @@ static int target_if_direct_buf_rx_rsp_event_handler(ol_scn_t scn,
 		wlan_objmgr_pdev_release_ref(pdev, dbr_mod_id);
 		return QDF_STATUS_E_FAILURE;
 	}
+	if (dbr_rsp.num_cqi_meta_data_entry > dbr_rsp.num_buf_release_entry) {
+		direct_buf_rx_err("More than expected number of cqi metadata");
+		direct_buf_rx_err("meta_data_entry:%d cqi_meta_data_entry:%d buf_release_entry:%d",
+				  dbr_rsp.num_meta_data_entry,
+				  dbr_rsp.num_cqi_meta_data_entry,
+				  dbr_rsp.num_buf_release_entry);
+		wlan_objmgr_pdev_release_ref(pdev, dbr_mod_id);
+		return QDF_STATUS_E_FAILURE;
+	}
 	QDF_ASSERT(!(dbr_rsp.num_cv_meta_data_entry &&
 		     dbr_rsp.num_meta_data_entry));
 	for (i = 0; i < dbr_rsp.num_buf_release_entry; i++) {
@@ -2230,6 +2239,14 @@ static int target_if_direct_buf_rx_rsp_event_handler(ol_scn_t scn,
 				wmi_handle, data_buf, i,
 				&dbr_data.cv_meta_data) == QDF_STATUS_SUCCESS)
 				dbr_data.cv_meta_data_valid = true;
+		}
+
+		dbr_data.cqi_meta_data_valid = false;
+		if (i < dbr_rsp.num_cqi_meta_data_entry) {
+			if (wmi_extract_dbr_buf_cqi_metadata(
+				wmi_handle, data_buf, i,
+				&dbr_data.cqi_meta_data) == QDF_STATUS_SUCCESS)
+				dbr_data.cqi_meta_data_valid = true;
 		}
 
 		target_if_dbr_add_ring_debug_entry(pdev, dbr_rsp.mod_id,
