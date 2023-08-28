@@ -217,6 +217,15 @@
 #define PKT_BW_GAIN_320MHZ 12
 #endif
 
+/* Below indicates xmit path which can be taken by packet */
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+#define DP_INGRESS_STATS_MAX_SIZE 2
+#define DP_VDEV_XMIT_TYPE 1 /* Packet can take path as : MLD/MLO-VAP/WDS_EXT */
+#else
+#define DP_INGRESS_STATS_MAX_SIZE 1
+#define DP_VDEV_XMIT_TYPE 0
+#endif
+
 /**
  * enum cdp_wifi_error_code - Code describing the type of WIFI error detected
  *
