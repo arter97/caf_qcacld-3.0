@@ -430,9 +430,15 @@ target_if_spectral_get_vdev(struct target_if_spectral *spectral,
 	struct wlan_objmgr_pdev *pdev = NULL;
 	struct wlan_objmgr_vdev *first_vdev = NULL;
 
-	qdf_assert_always(spectral);
+	if (!spectral) {
+		spectral_err("spectral variable in null.");
+		return NULL;
+	}
 	pdev = spectral->pdev_obj;
-	qdf_assert_always(pdev);
+	if (!pdev) {
+		spectral_err("pdev variable in null.");
+		return NULL;
+	}
 
 	if (smode >= SPECTRAL_SCAN_MODE_MAX) {
 		spectral_err("Invalid Spectral mode %u", smode);
@@ -488,12 +494,13 @@ target_if_send_vdev_spectral_configure_cmd(struct target_if_spectral *spectral,
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct target_if_psoc_spectral *psoc_spectral;
 
-	qdf_assert_always(spectral);
-	qdf_assert_always(param);
+	if (!spectral || !param || !(spectral->pdev_obj)) {
+		spectral_err("null params: spectral %pK, spectral_config %pK, pdev: %pK.",
+			     spectral, param, pdev);
+		return qdf_status_to_os_return(QDF_STATUS_E_NULL_VALUE);
+	}
 
 	pdev = spectral->pdev_obj;
-
-	qdf_assert_always(pdev);
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
@@ -571,11 +578,17 @@ target_if_send_vdev_spectral_enable_cmd(struct target_if_spectral *spectral,
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct target_if_psoc_spectral *psoc_spectral;
 
-	qdf_assert_always(spectral);
+	if (!spectral) {
+		spectral_err("spectral is null");
+		return qdf_status_to_os_return(QDF_STATUS_E_NULL_VALUE);
+	}
 
 	pdev = spectral->pdev_obj;
 
-	qdf_assert_always(pdev);
+	if (!pdev) {
+		spectral_err("pdev is null");
+		return qdf_status_to_os_return(QDF_STATUS_E_NULL_VALUE);
+	}
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
@@ -1802,7 +1815,11 @@ target_if_spectral_get_extension_channel(void *arg,
 	struct wlan_objmgr_vdev *vdev = NULL;
 	uint16_t sec20chan_freq = 0;
 
-	qdf_assert_always(arg);
+	if (!arg) {
+		spectral_err("Null argument.");
+		return 0;
+	}
+
 	spectral = (struct target_if_spectral *)arg;
 
 	if (smode >= SPECTRAL_SCAN_MODE_MAX) {
@@ -1845,7 +1862,11 @@ target_if_spectral_get_current_channel(void *arg, enum spectral_scan_mode smode)
 	int16_t chan_freq = 0;
 	struct wlan_objmgr_vdev *vdev = NULL;
 
-	qdf_assert_always(arg);
+	if (!arg) {
+		spectral_err("Null argument.");
+		return 0;
+	}
+
 	spectral = (struct target_if_spectral *)arg;
 
 	if (smode >= SPECTRAL_SCAN_MODE_MAX) {
@@ -2247,7 +2268,10 @@ target_if_populate_supported_sscan_bws_be(struct target_if_spectral *spectral)
 	struct spectral_supported_bws *supported_bws;
 	QDF_STATUS status;
 
-	qdf_assert_always(spectral);
+	if (!spectral) {
+		spectral_err("spectral variable is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	/* 20MHz */
 	op_bw = CH_WIDTH_20MHZ;

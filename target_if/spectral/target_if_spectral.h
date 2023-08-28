@@ -2426,7 +2426,8 @@ clamp_fft_bin_value(uint16_t fft_bin_value, uint16_t pwr_format)
 		break;
 
 	default:
-		qdf_assert_always(0);
+		spectral_err_rl("Invalid pwr format: %d.", pwr_format);
+		return 0;
 	}
 
 	return clamped_fft_bin_value;
