@@ -1117,7 +1117,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 	} else {
 		hdd_sta_ctx->conn_info.conn_flag.ht_present = false;
 	}
-	if (hdd_is_roam_sync_in_progress(hdd_ctx, link_info->vdev_id))
+	if (rsp->is_reassoc)
 		hdd_sta_ctx->conn_info.roam_count++;
 
 	if (assoc_resp->HTInfo.present) {
