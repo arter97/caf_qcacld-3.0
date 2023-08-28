@@ -6836,21 +6836,35 @@ void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 	uint8_t num_mlo = 0;
 	uint8_t mlo_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	bool is_mlo_emlsr = false;
+	uint8_t num_disabled_ml_sta = 0;
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
-	is_mlo_emlsr = policy_mgr_is_mlo_in_mode_emlsr(psoc, mlo_vdev_lst,
-						       &num_mlo);
-
-	if (num_mlo < 2) {
-		policy_mgr_debug("conc_con_coming_up %d num mlo sta links %d",
-				 conc_con_coming_up, num_mlo);
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
 		return;
 	}
 
+	is_mlo_emlsr = policy_mgr_is_mlo_in_mode_emlsr(psoc, mlo_vdev_lst,
+						       &num_mlo);
 	policy_mgr_debug("num_mlo %d is_mlo_emlsr %d conc_con_coming_up: %d",
 			 num_mlo, is_mlo_emlsr, conc_con_coming_up);
 
 	if (!is_mlo_emlsr)
 		return;
+
+	if (num_mlo < 2) {
+		policy_mgr_debug("conc_con_coming_up %d num mlo sta links %d",
+				 conc_con_coming_up, num_mlo);
+		policy_mgr_get_ml_sta_info(pm_ctx, &num_mlo,
+					   &num_disabled_ml_sta,
+					   mlo_vdev_lst, ml_freq_lst,
+					   NULL, NULL, NULL);
+		if (policy_mgr_get_connection_count(psoc) != 1 ||
+		    !num_disabled_ml_sta)
+			return;
+	}
 
 	if (conc_con_coming_up ||
 	    (emlsr_sta_coming_up &&
