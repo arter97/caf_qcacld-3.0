@@ -6001,8 +6001,7 @@ wlan_hdd_refill_os_rateflags(struct rate_info *os_rate, uint8_t preamble)
 /**
  * wlan_hdd_refill_actual_rate() - Refill actual rates info stats
  * @sinfo: kernel station_info struct to populate
- * @link_info: pointer to link_info struct in adapter,
- *             where hdd_stats is located in this struct
+ * @adapter: The HDD adapter structure
  * @mac_handle: opaque handle to MAC context
  * @rate_flags: indicating phy mode and bandwidth
  * @fw_mcs_index: MCS from parsing rate_flags and fw_raw_rate
@@ -6022,12 +6021,12 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 			    uint8_t fw_mcs_index,
 			    uint16_t fw_rate, uint8_t nss_max)
 {
-	uint8_t preamble = link_info->hdd_stats.class_a_stat.rx_preamble;
+	uint8_t preamble = adapter->hdd_stats.class_a_stat.rx_preamble;
 
-	sinfo->rxrate.nss = link_info->hdd_stats.class_a_stat.rx_nss;
+	sinfo->rxrate.nss = adapter->hdd_stats.class_a_stat.rx_nss;
 	if (preamble == DOT11_A || preamble == DOT11_B) {
 		sinfo->rxrate.legacy =
-			link_info->hdd_stats.class_a_stat.rx_rate;
+			adapter->hdd_stats.class_a_stat.rx_rate;
 		hdd_debug("Reporting legacy rate %d", sinfo->rxrate.legacy);
 		return;
 	} else if (qdf_unlikely(preamble == INVALID_PREAMBLE)) {
@@ -6036,7 +6035,7 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 		 * a data frame since assoc or roaming so there is no rates
 		 * info. In this case, we report max rate with FW rates info.
 		 */
-		hdd_report_max_rate(link_info, mac_handle,
+		hdd_report_max_rate(adapter, mac_handle,
 				    &sinfo->rxrate,
 				    sinfo->signal,
 				    rate_flags,
@@ -6048,23 +6047,23 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 
 	wlan_hdd_refill_os_rateflags(&sinfo->rxrate, preamble);
 
-	sinfo->rxrate.mcs = link_info->hdd_stats.class_a_stat.rx_mcs_index;
+	sinfo->rxrate.mcs = adapter->hdd_stats.class_a_stat.rx_mcs_index;
 
 	wlan_hdd_refill_os_bw(&sinfo->rxrate,
-			      link_info->hdd_stats.class_a_stat.rx_bw);
+			      adapter->hdd_stats.class_a_stat.rx_bw);
 	/* Fill out gi and dcm in HE mode */
 	sinfo->rxrate.he_gi =
-		hdd_map_he_gi_to_os(link_info->hdd_stats.class_a_stat.rx_gi);
+		hdd_map_he_gi_to_os(adapter->hdd_stats.class_a_stat.rx_gi);
 	sinfo->rxrate.he_dcm = 0;
 
-	if (link_info->hdd_stats.class_a_stat.rx_gi == TXRATE_GI_0_4_US)
+	if (adapter->hdd_stats.class_a_stat.rx_gi == TXRATE_GI_0_4_US)
 		sinfo->rxrate.flags |= RATE_INFO_FLAGS_SHORT_GI;
 
 	hdd_debug("sgi=%d, preamble=%d, bw=%d, mcs=%d, nss=%d, rate_flag=0x%x",
-		  link_info->hdd_stats.class_a_stat.rx_gi, preamble,
-		  link_info->hdd_stats.class_a_stat.rx_bw,
-		  link_info->hdd_stats.class_a_stat.rx_mcs_index,
-		  link_info->hdd_stats.class_a_stat.rx_nss,
+		  adapter->hdd_stats.class_a_stat.rx_gi, preamble,
+		  adapter->hdd_stats.class_a_stat.rx_bw,
+		  adapter->hdd_stats.class_a_stat.rx_mcs_index,
+		  adapter->hdd_stats.class_a_stat.rx_nss,
 		  sinfo->rxrate.flags);
 }
 #else
@@ -6296,7 +6295,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 
 		/* Fill RX stats */
 		hdd_report_actual_rate(rx_rate_flags, my_rx_rate,
-					&sinfo->rxrate, rx_mcs_index,
+				       &sinfo->rxrate, rx_mcs_index,
 				       rx_nss, rx_dcm, rx_gi);
 
 		/* Using driver RX rate to replace the FW RX rate */

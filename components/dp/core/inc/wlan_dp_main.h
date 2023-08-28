@@ -408,18 +408,6 @@ void dp_send_rps_ind(struct wlan_dp_intf *dp_intf);
  */
 void dp_try_send_rps_ind(struct wlan_objmgr_vdev *vdev);
 
-
-/**
- * dp_send_destroy_ind() - notify dp_intf is deinitialized.
- * @dp_intf: DP interface
- * @vdev_id: vdev id that dp_intf was attached
- *
- * Callback function registered with HDD
- *
- * Return: none
- */
-void dp_send_destroy_ind(struct wlan_dp_intf *dp_intf, uint8_t vdev_id);
-
 /**
  * dp_send_rps_disable_ind() - send rps disable indication to daemon
  * @dp_intf: DP interface
