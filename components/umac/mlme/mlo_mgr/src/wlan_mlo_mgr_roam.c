@@ -808,6 +808,11 @@ mlo_check_if_all_links_up(struct wlan_objmgr_vdev *vdev)
 	}
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx->sta_ctx) {
+		mlo_err("mlo sta ctx is null");
+		return false;
+	}
+
 	sta_ctx = mlo_dev_ctx->sta_ctx;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		if (!mlo_dev_ctx->wlan_vdev_list[i])
@@ -848,6 +853,10 @@ mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 	}
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx->sta_ctx) {
+		mlo_err("mlo sta ctx is null");
+		return false;
+	}
 	sta_ctx = mlo_dev_ctx->sta_ctx;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		if (!mlo_dev_ctx->wlan_vdev_list[i])
