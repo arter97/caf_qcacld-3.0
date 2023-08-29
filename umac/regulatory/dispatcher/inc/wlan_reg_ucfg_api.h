@@ -592,6 +592,17 @@ QDF_STATUS ucfg_reg_11d_vdev_delete_update(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS ucfg_reg_11d_vdev_created_update(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * ucfg_reg_update_hal_cap_wireless_modes() - update wireless modes
+ * @psoc: psoc ptr
+ * @modes: value of modes to update
+ * @phy_id: phy id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_reg_update_hal_cap_wireless_modes(struct wlan_objmgr_psoc *psoc,
+					       uint64_t modes, uint8_t phy_id);
+
+/**
  * ucfg_reg_get_hal_reg_cap() - return hal reg cap
  * @psoc: psoc ptr
  *
@@ -613,15 +624,22 @@ QDF_STATUS ucfg_reg_set_hal_reg_cap(struct wlan_objmgr_psoc *psoc,
 			uint16_t phy_cnt);
 
 /**
- * ucfg_reg_update_hal_reg_cap() - update hal reg cap
+ * ucfg_reg_update_hal_reg_range_caps() - update hal reg frequency range fields
  * @psoc: psoc ptr
- * @wireless_modes: 11AX wireless modes
+ * @low_2g_chan: low 2g channel
+ * @high_2g_chan: high 2g channel
+ * @low_5g_chan: low 5g channel
+ * @high_5g_chan: high 2g channel
  * @phy_id: phy id
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ucfg_reg_update_hal_reg_cap(struct wlan_objmgr_psoc *psoc,
-				       uint64_t wireless_modes, uint8_t phy_id);
+QDF_STATUS ucfg_reg_update_hal_reg_range_caps(struct wlan_objmgr_psoc *psoc,
+					      uint32_t low_2g_chan,
+					      uint32_t high_2g_chan,
+					      uint32_t low_5g_chan,
+					      uint32_t high_5g_chan,
+					      uint8_t phy_id);
 
 /**
  * ucfg_set_ignore_fw_reg_offload_ind() - API to set ignore regdb offload ind

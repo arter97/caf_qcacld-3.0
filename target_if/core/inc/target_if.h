@@ -1423,6 +1423,24 @@ static inline struct wlan_psoc_host_service_ext_param
 }
 
 /**
+ * target_psoc_get_service_ext2_param() - get service_ext2_param
+ * @psoc_info:  pointer to structure target_psoc_info
+ *
+ * API to get service_ext2_param
+ *
+ * Return: structure pointer to wlan_psoc_host_service_ext2_param
+ */
+static inline struct wlan_psoc_host_service_ext2_param
+		*target_psoc_get_service_ext2_param
+		(struct target_psoc_info *psoc_info)
+{
+	if (!psoc_info)
+		return NULL;
+
+	return &psoc_info->info.service_ext2_param;
+}
+
+/**
  * target_psoc_get_num_dbr_ring_caps() - get no of dbr_ring_caps
  * @psoc_info:  pointer to structure target_psoc_info
  *

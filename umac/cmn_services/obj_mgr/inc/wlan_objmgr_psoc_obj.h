@@ -462,10 +462,18 @@ struct wlan_psoc_host_hal_reg_capabilities_ext {
  * from service ready ext2 event.
  * @phy_id: phy id starts with 0
  * @wireless_modes_ext: REGDMN MODE, see REGDMN_MODE_ enum
+ * @low_2ghz_chan_ext: 2 GHz channel low
+ * @high_2ghz_chan_ext: 2 GHz channel High
+ * @low_5ghz_chan_ext: 5 GHz channel low
+ * @high_5ghz_chan_ext: 5 GHz channel High
  */
 struct wlan_psoc_host_hal_reg_capabilities_ext2 {
 	uint32_t phy_id;
 	uint64_t wireless_modes_ext;
+	uint32_t low_2ghz_chan_ext;
+	uint32_t high_2ghz_chan_ext;
+	uint32_t low_5ghz_chan_ext;
+	uint32_t high_5ghz_chan_ext;
 };
 
 /*

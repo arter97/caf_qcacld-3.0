@@ -12788,6 +12788,10 @@ static QDF_STATUS extract_hal_reg_cap_ext2_tlv(
 	param->phy_id = reg_caps->phy_id;
 	param->wireless_modes_ext = convert_wireless_modes_ext_tlv(
 			reg_caps->wireless_modes_ext);
+	param->low_2ghz_chan_ext = reg_caps->low_2ghz_chan_ext;
+	param->high_2ghz_chan_ext = reg_caps->high_2ghz_chan_ext;
+	param->low_5ghz_chan_ext = reg_caps->low_5ghz_chan_ext;
+	param->high_5ghz_chan_ext = reg_caps->high_5ghz_chan_ext;
 
 	return QDF_STATUS_SUCCESS;
 }

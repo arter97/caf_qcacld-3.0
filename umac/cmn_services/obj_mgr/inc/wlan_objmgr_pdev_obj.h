@@ -115,6 +115,8 @@
 #define WLAN_PDEV_FEXT_WIFI_RADAR_ENABLE               0x00000200
 /* Scan blanking support enabled.valid only for scan radio supported pdevs */
 #define WLAN_PDEV_FEXT_SCAN_BLANKING_EN                0x00000400
+/* Overlapping frequency support */
+#define WLAN_PDEV_FEXT_OVERLAPPING_FREQ                0x00000800
 
 /* PDEV op flags */
    /* Enable htrate for wep and tkip */
