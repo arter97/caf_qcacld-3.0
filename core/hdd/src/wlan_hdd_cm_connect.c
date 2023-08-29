@@ -1000,10 +1000,18 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_clear_roam_profile_ie(adapter);
 	ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
 	hdd_wmm_dscp_initial_state(adapter);
-	hdd_debug("Disabling queues");
-	wlan_hdd_netif_queue_control(adapter,
-				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
-				     WLAN_CONTROL_PATH);
+
+	/*
+	 * If connect failure is due to link switch, do not disable the
+	 * netdev queues as it will lead to data stall/NUD failure.
+	 */
+	if (!(rsp->cm_id & CM_ID_LSWITCH_BIT)) {
+		hdd_debug("Disabling queues");
+		wlan_hdd_netif_queue_control(adapter,
+					     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
+					     WLAN_CONTROL_PATH);
+	}
+
 	ucfg_dp_periodic_sta_stats_start(vdev);
 	wlan_twt_concurrency_update(hdd_ctx);
 }
