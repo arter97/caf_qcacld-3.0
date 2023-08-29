@@ -5671,6 +5671,10 @@ typedef enum {
 		   PDEV_PARAM_PROBE_RESP_RETRY_LIMIT),
 	PDEV_PARAM(pdev_param_cts_timeout, PDEV_PARAM_CTS_TIMEOUT),
 	PDEV_PARAM(pdev_param_slot_time, PDEV_PARAM_SLOT_TIME),
+	PDEV_PARAM(pdev_param_atf_vo_dedicated_time,
+		   PDEV_PARAM_ATF_VO_DEDICATED_TIME),
+	PDEV_PARAM(pdev_param_atf_vi_dedicated_time,
+		   PDEV_PARAM_ATF_VI_DEDICATED_TIME),
 	pdev_param_max,
 } wmi_conv_pdev_params_id;
 
