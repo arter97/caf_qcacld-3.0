@@ -7202,7 +7202,8 @@ wlan_mlme_update_vdev_chwidth_with_notify(struct wlan_objmgr_psoc *psoc,
 
 static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 					    uint8_t vdev_id,
-					    enum phy_ch_width ch_width)
+					    enum phy_ch_width ch_width,
+					    qdf_freq_t sec_2g_freq)
 {
 	struct wlan_channel *des_chan;
 	struct wlan_channel *bss_chan;
@@ -7229,7 +7230,7 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	curr_op_freq = des_chan->ch_freq;
 
 	wlan_reg_set_channel_params_for_pwrmode(pdev, curr_op_freq,
-						0, &ch_params,
+						sec_2g_freq, &ch_params,
 						REG_CURRENT_PWR_MODE);
 
 	des_chan->ch_width = ch_width;
@@ -7451,6 +7452,7 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	enum phy_ch_width associated_ch_width;
 	struct wlan_channel *des_chan;
 	struct mlme_legacy_priv *mlme_priv;
+	qdf_freq_t sec_2g_freq = 0;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
@@ -7459,12 +7461,6 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
 		return QDF_STATUS_E_INVAL;
-
-	if (wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq)) {
-		mlme_debug("vdev %d: CW:%d update not supported for freq:%d",
-			   vdev_id, ch_width, des_chan->ch_freq);
-		return QDF_STATUS_E_NOSUPPORT;
-	}
 
 	associated_ch_width =
 		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
@@ -7475,8 +7471,22 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq)) {
+		if (ch_width == CH_WIDTH_40MHZ &&
+		    mlme_priv->connect_info.assoc_chan_info.sec_2g_freq) {
+			sec_2g_freq =
+			mlme_priv->connect_info.assoc_chan_info.sec_2g_freq;
+		} else if (ch_width != CH_WIDTH_20MHZ) {
+			mlme_debug("vdev %d: CW:%d update not supported for freq:%d sec_2g_freq %d",
+				   vdev_id, ch_width, des_chan->ch_freq,
+				   mlme_priv->connect_info.assoc_chan_info.sec_2g_freq);
+			return QDF_STATUS_E_NOSUPPORT;
+		}
+	}
+
 	/* update ch width to internal host structure */
-	status = wlan_mlme_update_ch_width(vdev, vdev_id, ch_width);
+	status = wlan_mlme_update_ch_width(vdev, vdev_id, ch_width,
+					   sec_2g_freq);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("vdev %d: Failed to update CW:%d to host, status:%d",
 			 vdev_id, ch_width, status);
