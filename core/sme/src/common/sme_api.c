@@ -10487,15 +10487,6 @@ int sme_update_tx_bfee_nsts(mac_handle_t mac_handle, uint8_t session_id,
 	return sme_update_he_tx_bfee_nsts(mac_handle, session_id, nsts_set_val);
 }
 
-void sme_set_ba_opmode(mac_handle_t mac_handle, uint8_t session_id,
-		       bool ba_opmode)
-{
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-
-	mac_ctx->ba_mode = ba_opmode;
-	sme_debug("BA mode %d", mac_ctx->ba_mode);
-}
-
 #ifdef WLAN_FEATURE_11BE
 void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 			    struct wma_tgt_cfg *cfg,
@@ -15112,12 +15103,38 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	ucfg_mlme_set_bss_color_collision_det_sta(mac_ctx->psoc, false);
 }
 
+void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	enum QDF_OPMODE op_mode;
+	uint8_t vdev_id;
+	int ret_val = 0;
+
+	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
+		op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
+		if (op_mode == QDF_STA_MODE) {
+			ret_val = wma_cli_set_command(
+						vdev_id,
+						wmi_vdev_param_set_ba_mode,
+						val, VDEV_CMD);
+
+		if (QDF_IS_STATUS_ERROR(ret_val))
+			sme_err("BA mode set failed for vdev: %d, ret %d",
+				vdev_id, ret_val);
+		else
+			sme_debug("vdev: %d ba mode: %d param id %d",
+				  vdev_id, val, wmi_vdev_param_set_ba_mode);
+		}
+	}
+}
+
 void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
 	bool val;
 	QDF_STATUS status;
+	uint8_t ba_mode_auto = 0;
 
 	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 
@@ -15145,6 +15162,7 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 							       &val);
 	if (QDF_IS_STATUS_SUCCESS(status))
 		ucfg_mlme_set_bss_color_collision_det_sta(mac_ctx->psoc, val);
+	sme_set_per_link_ba_mode(mac_handle, ba_mode_auto);
 }
 
 void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t vdev_id,

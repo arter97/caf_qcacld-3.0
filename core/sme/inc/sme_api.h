@@ -3040,17 +3040,6 @@ int sme_set_auto_rate_ldpc(mac_handle_t mac_handle, uint8_t session_id,
 int sme_set_auto_rate_he_ltf(mac_handle_t mac_handle, uint8_t session_id,
 			     uint8_t cfg_val);
 
-/**
- * sme_set_ba_opmode() - sets the BA op mode
- * @mac_handle: Opaque handle to the global MAC context
- * @session_id: SME session id
- * @cfg_val: BA mode
- *
- * Return: None
- */
-void sme_set_ba_opmode(mac_handle_t mac_handle, uint8_t session_id,
-		       bool cfg_val);
-
 #ifdef WLAN_FEATURE_11BE
 /**
  * sme_update_tgt_eht_cap() - sets the EHT caps to pmac
@@ -3795,6 +3784,15 @@ int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
 int sme_send_vdev_pause_for_bcn_period(mac_handle_t mac_handle,
 				       uint8_t session_id,
 				       uint8_t cfg_val);
+
+/**
+ * sme_set_per_link_ba_mode() - sets BA mode for each STA MLD link
+ * @mac_handle: Opaque handle to the global MAC context
+ * @val: BA mode
+ *
+ * Return: None
+ */
+void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val);
 #else
 static inline void sme_set_eht_testbed_def(mac_handle_t mac_handle,
 					   uint8_t vdev_id)
@@ -3846,6 +3844,10 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    struct qdf_mac_addr active_link_addr[2])
 {
 }
+
+static inline
+void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val)
+{}
 #endif
 
 /**

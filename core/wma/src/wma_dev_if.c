@@ -1352,16 +1352,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 							    iface->mac_id, rsp);
 	}
 
-	if (iface->type == WMI_VDEV_TYPE_STA &&
-	    rsp->resp_type == WMI_VDEV_START_RESP_EVENT) {
-		wma_debug("BA mode: %d", mac_ctx->ba_mode);
-		if (wma_cli_set_command(rsp->vdev_id,
-					wmi_vdev_param_set_ba_mode,
-					mac_ctx->ba_mode, VDEV_CMD))
-			wma_err("Set BA opmode failed for vdev: %d",
-				rsp->vdev_id);
-	}
-
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	if (rsp->status == QDF_STATUS_SUCCESS
 		&& mac_ctx->sap.sap_channel_avoidance)

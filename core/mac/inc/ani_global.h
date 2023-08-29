@@ -777,7 +777,6 @@ struct mac_context {
 #ifdef WLAN_FEATURE_CAL_FAILURE_TRIGGER
 	void (*cal_failure_event_cb)(uint8_t cal_type, uint8_t reason);
 #endif
-	uint8_t ba_mode;
 };
 
 #ifdef FEATURE_WLAN_TDLS
