@@ -759,8 +759,6 @@ QDF_STATUS __dp_pdev_rx_buffers_no_map_attach(struct dp_soc *soc,
 		if (!rxdma_ring_entry)
 			break;
 
-		qdf_assert_always(rxdma_ring_entry);
-
 		desc_list->rx_desc.nbuf = nbuf;
 		dp_rx_set_reuse_nbuf(&desc_list->rx_desc, nbuf);
 		desc_list->rx_desc.rx_buf_start = nbuf->data;

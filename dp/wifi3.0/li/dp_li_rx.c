@@ -1144,10 +1144,10 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 		/* XXX */
 		buf_type = HAL_RX_WBM_BUF_TYPE_GET(ring_desc);
 
-		/*
-		 * For WBM ring, expect only MSDU buffers
-		 */
-		qdf_assert_always(buf_type == HAL_RX_WBM_BUF_TYPE_REL_BUF);
+		if (dp_assert_always_internal_stat(
+				buf_type == HAL_RX_WBM_BUF_TYPE_REL_BUF,
+				soc, rx.err.wbm_err_buf_rel_type))
+			continue;
 
 		wbm_err_src = hal_rx_wbm_err_src_get(hal_soc, ring_desc);
 		qdf_assert((wbm_err_src == HAL_RX_WBM_ERR_SRC_RXDMA) ||
@@ -1160,7 +1160,9 @@ dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
 			continue;
 		}
 
-		qdf_assert_always(rx_desc);
+		if (dp_assert_always_internal_stat(rx_desc, soc,
+						   rx.err.rx_desc_null))
+			continue;
 
 		if (!dp_rx_desc_check_magic(rx_desc)) {
 			dp_rx_err_err("%pk: Invalid rx_desc %pk",
@@ -1366,7 +1368,6 @@ dp_rx_null_q_desc_handle_li(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		/* Set length in nbuf */
 		qdf_nbuf_set_pktlen(
 			nbuf, qdf_min(pkt_len, (uint32_t)RX_DATA_BUFFER_SIZE));
-		qdf_assert_always(nbuf->data == rx_tlv_hdr);
 	}
 
 	/*

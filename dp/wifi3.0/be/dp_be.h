@@ -357,6 +357,11 @@ struct dp_soc_be {
 	struct {
 		struct {
 			uint64_t desc_alloc_failed;
+#ifdef GLOBAL_ASSERT_AVOIDANCE
+			uint32_t tx_comp_buf_src;
+			uint32_t tx_comp_desc_null;
+			uint32_t tx_comp_invalid_flag;
+#endif
 		} tx;
 	} ppeds_stats;
 #endif
