@@ -1046,7 +1046,7 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 	} else {
 		if (__dp_tx_limit_check(&be_soc->soc)) {
 			TX_DESC_LOCK_UNLOCK(&pool->lock);
-			return NULL;
+			goto failed;
 		}
 
 		tx_desc = pool->freelist;
@@ -1058,7 +1058,7 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 			tx_desc = dp_tx_borrow_tx_desc(&be_soc->soc);
 			if (!tx_desc) {
 				TX_DESC_LOCK_UNLOCK(&pool->lock);
-				return NULL;
+				goto failed;
 			}
 		} else {
 			tx_desc->flags = 0;
@@ -1076,6 +1076,9 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
 
 	return tx_desc;
+failed:
+	be_soc->ppeds_stats.tx.desc_alloc_failed++;
+	return NULL;
 }
 
 /**
