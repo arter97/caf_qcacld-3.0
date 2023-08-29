@@ -985,9 +985,18 @@ static QDF_STATUS mlo_peer_detach_link_peer(
 			peer_entry->assoc_rsp_buf = NULL;
 		}
 		vdev =  wlan_peer_get_vdev(link_peer);
-		if (vdev)
+		if (vdev) {
 			qdf_atomic_dec(&vdev->vdev_objmgr.wlan_ml_peer_count);
-
+		} else {
+			mlo_err("vdev is null for ml_peer: " QDF_MAC_ADDR_FMT
+				"mld mac addr: " QDF_MAC_ADDR_FMT
+				"ml_peer_count: %d",
+				QDF_MAC_ADDR_REF(link_peer->macaddr),
+				QDF_MAC_ADDR_REF(link_peer->mldaddr),
+				qdf_atomic_read
+				(&vdev->vdev_objmgr.wlan_ml_peer_count));
+			qdf_assert_always(vdev);
+		}
 		wlan_objmgr_peer_release_ref(link_peer, WLAN_MLO_MGR_ID);
 		peer_entry->link_peer = NULL;
 		ml_peer->link_peer_cnt--;
