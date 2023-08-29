@@ -269,19 +269,6 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 			  uint8_t tx_nss, uint8_t rx_nss);
 
 /**
- * hdd_get_num_chains() - Get the number of chains supported by the adapter
- *
- * @adapter: the pointer to adapter
- * @num_chains: the number of chains supported by the adapter
- *
- * This function is used to get the number of chains supported by
- * the adapter.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS hdd_get_num_chains(struct hdd_adapter *adapter, uint8_t *num_chains);
-
-/**
  * hdd_get_nss() - Get the number of spatial streams supported by the adapter
  *
  * @adapter: the pointer to adapter
