@@ -675,7 +675,7 @@ void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
  * lim_set_ldpc_exception() - to set allow any LDPC exception permitted
  * @mac_ctx: Pointer to mac context
  * @vdev_mlme: vdev mlme
- * @channel: Given channel number where connection will go
+ * @ch_freq: Given channel frequency where connection will go
  *
  * This API will check if hardware allows LDPC to be enabled for provided
  * channel and user has enabled the RX LDPC selection
@@ -710,7 +710,7 @@ static QDF_STATUS lim_set_ldpc_exception(struct mac_context *mac_ctx,
 
 /**
  * lim_revise_req_vht_cap_per_band: Update vht cap based on band
- * session: Session pointer
+ * @session: Session pointer
  *
  * Return: None
  *
@@ -9246,6 +9246,69 @@ lim_is_puncture_bitmap_changed(struct pe_session *session,
 #endif
 
 /**
+ * lim_abort_channel_change() - Abort channel change
+ *
+ * @mac_ctx : Pointer to pe_session
+ * @vdev_id: vdev ID
+ *
+ * This function is called to abort channel change request after CSA
+ * countdown and allow SAP/GO to operate on current channel without
+ * vdev restart.
+ *
+ * Return: None
+ */
+static void lim_abort_channel_change(struct mac_context *mac_ctx,
+				     uint8_t vdev_id)
+{
+	struct qdf_mac_addr bssid;
+	struct pe_session *session_entry;
+	uint8_t session_id;
+	QDF_STATUS status;
+	struct scheduler_msg sch_msg = {0};
+	struct sSirChanChangeResponse *chan_change_rsp;
+
+	status = wlan_mlme_get_mac_vdev_id(mac_ctx->pdev, vdev_id, &bssid);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		pe_err("Failed to get vdev ID");
+		return;
+	}
+
+	session_entry = pe_find_session_by_bssid(mac_ctx, bssid.bytes,
+						 &session_id);
+	if (!session_entry) {
+		pe_err("Session does not exist for bssid " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(bssid.bytes));
+		return;
+	}
+
+	session_entry->channelChangeReasonCode = LIM_SWITCH_CHANNEL_SAP_DFS;
+	mac_ctx->sap.SapDfsInfo.target_chan_freq =
+					session_entry->curr_op_freq;
+	mac_ctx->sap.SapDfsInfo.new_chanWidth = session_entry->ch_width;
+	mac_ctx->sap.SapDfsInfo.new_ch_params.ch_width =
+						session_entry->ch_width;
+
+	wlan_vdev_mlme_sm_deliver_evt(session_entry->vdev,
+				      WLAN_VDEV_SM_EV_CHAN_SWITCH_DISABLED,
+				      sizeof(*session_entry), session_entry);
+
+	chan_change_rsp = qdf_mem_malloc(sizeof(struct sSirChanChangeResponse));
+	if (!chan_change_rsp) {
+		pe_err("Failed to allocate chan_change_rsp");
+		return;
+	}
+
+	chan_change_rsp->new_op_freq = session_entry->curr_op_freq;
+	chan_change_rsp->channelChangeStatus = QDF_STATUS_SUCCESS;
+	chan_change_rsp->sessionId = session_id;
+	sch_msg.type = eWNI_SME_CHANNEL_CHANGE_RSP;
+	sch_msg.bodyptr = (void *)chan_change_rsp;
+	sch_msg.bodyval = 0;
+
+	lim_sys_process_mmh_msg_api(mac_ctx, &sch_msg);
+}
+
+/**
  * lim_process_sme_channel_change_request() - process sme ch change req
  *
  * @mac_ctx: Pointer to Global MAC structure
@@ -9289,10 +9352,31 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		return;
 	}
 
-	if ((session_entry->curr_op_freq == target_freq &&
-	     session_entry->ch_width == ch_change_req->ch_width) &&
-	    (!IS_DOT11_MODE_EHT(session_entry->dot11mode) ||
-	     !lim_is_puncture_bitmap_changed(session_entry, ch_change_req))) {
+	/*
+	 * The scenario here is, existing SAP/GO is operating on non-DFS chan
+	 * and STA connects to a DFS AP which creates MCC. This will then
+	 * trigger SCC enforcement logic. Now during CSA countdown (before
+	 * GO/SAP actually moves to STA's channel), if STA disconnects, then
+	 * moving GO / SAP to DFS channel will lead to FCC violation if radar
+	 * detection is disabled
+	 *
+	 * Hence to handle this scenario, better to stop current GO/SAP's
+	 * movement to this DFS channel and allow to operate on current channel
+	 * only, STA associated to GO/SAP's will find that SAP/GO didn't beacon
+	 * on new channel so Heartbeat failure will happen and they will scan
+	 * and connect again.
+	 */
+
+	if (LIM_IS_AP_ROLE(session_entry) &&
+	    !policy_mgr_is_sap_allowed_on_dfs_freq(mac_ctx->pdev, session_id,
+						   target_freq)) {
+		lim_abort_channel_change(mac_ctx, ch_change_req->vdev_id);
+		return;
+	} else if ((session_entry->curr_op_freq == target_freq &&
+		    session_entry->ch_width == ch_change_req->ch_width) &&
+		   (!IS_DOT11_MODE_EHT(session_entry->dot11mode) ||
+		    !lim_is_puncture_bitmap_changed(session_entry,
+						    ch_change_req))) {
 		pe_err("Target channel and mode is same as current channel and mode channel freq %d and mode %d",
 		       session_entry->curr_op_freq, session_entry->ch_width);
 		return;
