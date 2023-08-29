@@ -15100,6 +15100,7 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 
 	if (mac_ctx->usr_cfg_disable_rsp_tx)
 		sme_set_cfg_disable_tx(mac_handle, vdev_id, 0);
+	mac_ctx->is_usr_cfg_amsdu_enabled = true;
 }
 #endif
 
