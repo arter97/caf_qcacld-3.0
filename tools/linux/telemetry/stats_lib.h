@@ -486,6 +486,7 @@ struct reply_buffer {
  * @sta_mac:   Station MAC address if Stats requested for STA object
  * @if_name:   Interface name on which Stats is requested
  * @reply:     Pointer to reply buffer provided by user
+ * @peer_type: type of peer
  */
 struct stats_command {
 	enum stats_level_e lvl;
@@ -498,6 +499,7 @@ struct stats_command {
 	u_int64_t feat_flag;
 	struct ether_addr sta_mac;
 	struct reply_buffer *reply;
+	enum stats_peer_type peer_type;
 	void (*async_callback)(struct stats_command *cmd, char *if_name);
 };
 
