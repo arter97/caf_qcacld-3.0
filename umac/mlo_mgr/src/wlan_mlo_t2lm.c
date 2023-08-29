@@ -26,6 +26,7 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include <qdf_util.h>
 #include <wlan_cm_api.h>
+#include <wlan_mlo_mgr_sta.h>
 
 QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
 				    struct wlan_t2lm_info *t2lm)
@@ -808,6 +809,12 @@ QDF_STATUS wlan_send_t2lm_info(struct wlan_objmgr_vdev *vdev,
 		co_mld_vdev = wlan_vdev_list[i];
 		if (!co_mld_vdev) {
 			t2lm_err("co_mld_vdev is null");
+			mlo_release_vdev_ref(co_mld_vdev);
+			continue;
+		}
+
+		if (mlo_is_sta_bridge_vdev(co_mld_vdev)) {
+			t2lm_debug("skip co_mld_vdev for bridge sta");
 			mlo_release_vdev_ref(co_mld_vdev);
 			continue;
 		}
