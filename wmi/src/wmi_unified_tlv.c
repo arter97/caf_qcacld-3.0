@@ -2533,6 +2533,54 @@ static QDF_STATUS send_pdev_set_hw_mode_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * send_pdev_set_rf_path_cmd_tlv() - Send WMI_PDEV_SET_RF_PATH_CMDID to FW
+ * @wmi_handle: wmi handle
+ * @rf_path_index: the rf path mode to be selected
+ * @pdev_id: pdev id
+ *
+ * Provides notification to the WLAN firmware that host driver is requesting a
+ * rf path change.
+ *
+ * Return: Success if the cmd is sent successfully to the firmware
+ */
+static QDF_STATUS send_pdev_set_rf_path_cmd_tlv(wmi_unified_t wmi_handle,
+						uint32_t rf_path_index,
+						uint8_t pdev_id)
+{
+	wmi_pdev_set_rf_path_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint32_t len;
+
+	len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_pdev_set_rf_path_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_pdev_set_rf_path_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+				wmi_pdev_set_rf_path_cmd_fixed_param));
+
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+							wmi_handle,
+							pdev_id);
+	cmd->rf_path = rf_path_index;
+	wmi_debug("HW mode index:%d", cmd->rf_path);
+
+	wmi_mtrace(WMI_PDEV_SET_RF_PATH_CMDID, NO_SESSION, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_PDEV_SET_RF_PATH_CMDID)) {
+		wmi_err("Failed to send WMI_PDEV_SET_RF_PATH_CMDID");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * send_suspend_cmd_tlv() - WMI suspend function
  * @wmi_handle: handle to WMI.
  * @param: pointer to hold suspend parameter
@@ -18508,6 +18556,37 @@ extract_hw_mode_resp_event_status_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * extract_rf_path_resp_tlv() - Extract RF path change status
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @cmd_status: status of RF path change request
+ *
+ * Return: QDF_STATUS_SUCCESS on success or proper error code.
+ */
+static QDF_STATUS
+extract_rf_path_resp_tlv(wmi_unified_t wmi_handle, void *evt_buf,
+			 uint32_t *cmd_status)
+{
+	WMI_PDEV_SET_RF_PATH_RESP_EVENTID_param_tlvs *param_buf;
+	wmi_pdev_set_rf_path_event_fixed_param *fixed_param;
+
+	param_buf = (WMI_PDEV_SET_RF_PATH_RESP_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		wmi_err("Invalid RF path event buffer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	fixed_param = param_buf->fixed_param;
+	if (!fixed_param) {
+		wmi_err("Invalid fixed param");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*cmd_status = fixed_param->status;
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 static QDF_STATUS send_ani_level_cmd_tlv(wmi_unified_t wmi_handle,
 					 uint32_t *freqs,
@@ -20649,6 +20728,7 @@ struct wmi_ops tlv_ops =  {
 	.send_pdev_param_cmd = send_pdev_param_cmd_tlv,
 	.send_multiple_pdev_param_cmd = send_multiple_pdev_param_cmd_tlv,
 	.send_pdev_set_hw_mode_cmd = send_pdev_set_hw_mode_cmd_tlv,
+	.send_pdev_set_rf_path_cmd = send_pdev_set_rf_path_cmd_tlv,
 	.send_suspend_cmd = send_suspend_cmd_tlv,
 	.send_resume_cmd = send_resume_cmd_tlv,
 	.send_wow_enable_cmd = send_wow_enable_cmd_tlv,
@@ -21117,6 +21197,7 @@ struct wmi_ops tlv_ops =  {
 	.extract_aoa_caps_service_ready_ext2 =
 			extract_aoa_caps_tlv,
 #endif /* WLAN_RCC_ENHANCED_AOA_SUPPORT */
+	.extract_rf_path_resp = extract_rf_path_resp_tlv,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -21639,6 +21720,8 @@ static void populate_tlv_events_id(WMI_EVT_ID *event_ids)
 	event_ids[wmi_pdev_enhanced_aoa_phasedelta_eventid] =
 			WMI_PDEV_ENHANCED_AOA_PHASEDELTA_EVENTID;
 #endif
+	event_ids[wmi_pdev_set_rf_path_resp_eventid] =
+		WMI_PDEV_SET_RF_PATH_RESP_EVENTID;
 }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS

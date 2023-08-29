@@ -789,6 +789,20 @@ QDF_STATUS wmi_unified_soc_set_hw_mode_cmd(wmi_unified_t wmi_handle,
 					   uint32_t hw_mode_index);
 
 /**
+ * wmi_unified_soc_set_rf_path_cmd() - WMI_PDEV_SET_RF_PATH_CMDID to FW
+ * @wmi_handle: wmi handle
+ * @rf_path_index: RF path index to switch to
+ * @pdev_id: pdev id
+ *
+ * Request RF path change to WLAN firmware
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_soc_set_rf_path_cmd(wmi_unified_t wmi_handle,
+					   uint32_t rf_path_index,
+					   uint8_t pdev_id);
+
+/**
  * wmi_unified_extract_hw_mode_resp() - Extract HW mode change response
  * @wmi: WMI handle
  * @evt_buf: Buffer holding event data
@@ -798,6 +812,19 @@ QDF_STATUS wmi_unified_soc_set_hw_mode_cmd(wmi_unified_t wmi_handle,
  */
 QDF_STATUS
 wmi_unified_extract_hw_mode_resp(wmi_unified_t wmi,
+				 void *evt_buf,
+				 uint32_t *cmd_status);
+
+/**
+ * wmi_unified_extract_rf_path_resp() - Extract RF path change response
+ * @wmi: WMI handle
+ * @evt_buf: Buffer holding event data
+ * @cmd_status: command status
+ *
+ * Return: QDF_STATUS_SUCCESS if success, else returns proper error code.
+ */
+QDF_STATUS
+wmi_unified_extract_rf_path_resp(wmi_unified_t wmi,
 				 void *evt_buf,
 				 uint32_t *cmd_status);
 

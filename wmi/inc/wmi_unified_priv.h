@@ -578,6 +578,10 @@ QDF_STATUS
 (*send_pdev_set_hw_mode_cmd)(wmi_unified_t wmi_handle,
 			     uint32_t hw_mode_index);
 
+QDF_STATUS
+(*send_pdev_set_rf_path_cmd)(wmi_unified_t wmi_handle,
+			     uint32_t hw_mode_index, uint8_t pdev_id);
+
 QDF_STATUS (*send_suspend_cmd)(wmi_unified_t wmi_handle,
 				struct suspend_params *param,
 				uint8_t mac_id);
@@ -2846,6 +2850,9 @@ QDF_STATUS (*send_rtt_pasn_deauth_cmd)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*extract_hw_mode_resp_event)(wmi_unified_t wmi_handle,
 					 void *evt_buf, uint32_t *cmd_status);
+
+QDF_STATUS (*extract_rf_path_resp)(wmi_unified_t wmi_handle,
+				   void *evt_buf, uint32_t *cmd_status);
 
 #ifdef WLAN_FEATURE_ELNA
 QDF_STATUS (*send_set_elna_bypass_cmd)(wmi_unified_t wmi_handle,
