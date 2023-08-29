@@ -686,12 +686,21 @@ wlan_hdd_copy_hdd_stats_to_sinfo(struct station_info *sinfo,
 static void wlan_hdd_update_sinfo(struct station_info *sinfo,
 				  struct wlan_hdd_link_info *link_info)
 {
+	uint8_t i;
+
 	if (!link_info) {
 		hdd_err("Invalid link_info");
 		return;
 	}
 
 	wlan_hdd_copy_hdd_stats_to_sinfo(sinfo, &link_info->hdd_sinfo);
+
+	if (link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
+		sinfo->signal = WLAN_INVALID_RSSI_VALUE;
+		sinfo->signal_avg = WLAN_INVALID_RSSI_VALUE;
+		for (i = 0; i < IEEE80211_MAX_CHAINS; i++)
+			sinfo->chain_signal_avg[i] = WLAN_INVALID_RSSI_VALUE;
+	}
 
 	sinfo->filled |= HDD_INFO_SIGNAL | HDD_INFO_SIGNAL_AVG |
 			HDD_INFO_CHAIN_SIGNAL_AVG | HDD_INFO_TX_PACKETS |
@@ -7844,9 +7853,6 @@ static int wlan_hdd_get_mlo_sta_stats(struct hdd_adapter *adapter,
 		if (sta_ctx->conn_info.ieee_link_id == WLAN_INVALID_LINK_ID)
 			continue;
 		wlan_hdd_get_sta_stats(link_info, mac, sinfo);
-		if (link_info->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
-			wlan_hdd_copy_hdd_stats_to_sinfo(sinfo,
-							 &link_info->hdd_sinfo);
 		wlan_hdd_update_mlo_sinfo(link_info, &hdd_sinfo, sinfo);
 	}
 
@@ -7868,15 +7874,15 @@ static int wlan_hdd_get_mlo_sta_stats(struct hdd_adapter *adapter,
 #endif
 
 /*
- * wlan_hdd_send_mlo_aggregated_stats() - Whether to send aggregated stats
+ * wlan_is_mlo_aggregated_stats_allowed() - Is aggregated stats requested
  * @adapter: HDD adapter
  * @mac: mac address
  *
  * Return: True if req is on mld_mac and FW supports per link stats, else False
  */
 static bool
-wlan_hdd_send_mlo_aggregated_stats(struct hdd_adapter *adapter,
-				   const uint8_t *mac)
+wlan_is_mlo_aggregated_stats_allowed(struct hdd_adapter *adapter,
+				     const uint8_t *mac)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	bool is_mld_req = false;
@@ -7928,12 +7934,13 @@ static int wlan_hdd_send_mlo_station_stats(struct hdd_adapter *adapter,
 		return wlan_hdd_get_sta_stats(adapter->deflink, mac, sinfo);
 	}
 
-	if (!wlan_hdd_send_mlo_aggregated_stats(adapter, mac)) {
+	if (!wlan_is_mlo_aggregated_stats_allowed(adapter, mac)) {
 		link_info = hdd_get_link_info_by_bssid(hdd_ctx, mac);
 		if (!link_info) {
 			hdd_debug_rl("Invalid bssid");
 			return -EINVAL;
 		}
+		return wlan_hdd_get_sta_stats(link_info, mac, sinfo);
 	}
 
 	return wlan_hdd_get_mlo_sta_stats(adapter, mac, sinfo);
