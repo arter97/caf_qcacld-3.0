@@ -398,6 +398,7 @@ struct wlan_mlo_peer_list {
  * @mld_addr: MLO device MAC address
  * @wlan_vdev_list: list of vdevs associated with this MLO connection
  * @wlan_bridge_vdev_list: list of bridge vdevs associated with this MLO
+ * @wlan_bridge_vdev_count: number of elements in the bridge vdev list
  * @bridge_sta_ctx: bridge sta context
  * @wlan_vdev_count: number of elements in the vdev list
  * @mlo_peer_list: list peers in this MLO connection
@@ -427,6 +428,7 @@ struct wlan_mlo_dev_context {
 	struct wlan_mlo_bridge_sta *bridge_sta_ctx;
 #endif
 	uint16_t wlan_vdev_count;
+	uint16_t wlan_bridge_vdev_count;
 	struct wlan_mlo_peer_list mlo_peer_list;
 	uint16_t wlan_max_mlo_peer_count;
 #ifdef WLAN_MLO_USE_SPINLOCK

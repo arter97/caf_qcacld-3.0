@@ -751,6 +751,7 @@ mlo_add_to_bridge_vdev_list(struct wlan_objmgr_vdev *vdev)
 			}
 
 			ml_dev->wlan_bridge_vdev_list[id] = vdev;
+			ml_dev->wlan_bridge_vdev_count++;
 			vdev->mlo_dev_ctx = ml_dev;
 			break;
 		}
@@ -784,6 +785,7 @@ mld_delete_from_bridge_vdev_list(struct wlan_objmgr_vdev *vdev)
 			if (ml_dev->wlan_bridge_vdev_list[id] == vdev) {
 				vdev->mlo_dev_ctx = NULL;
 				ml_dev->wlan_bridge_vdev_list[id] = NULL;
+				ml_dev->wlan_bridge_vdev_count--;
 				break;
 			}
 			id++;
@@ -1007,13 +1009,6 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 	mlo_debug("deleting vdev from MLD device ctx "QDF_MAC_ADDR_FMT,
 		  QDF_MAC_ADDR_REF(mld_addr->bytes));
 
-	if (wlan_vdev_mlme_is_mlo_bridge_vdev(vdev)) {
-		status = mld_delete_from_bridge_vdev_list(vdev);
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			mlo_err("Failed to deinit bridge vap ctx");
-		return status;
-	}
-
 	mlo_dev_lock_acquire(ml_dev);
 	while (id < WLAN_UMAC_MLO_MAX_VDEVS) {
 		if (ml_dev->wlan_vdev_list[id] == vdev) {
@@ -1030,8 +1025,14 @@ static QDF_STATUS mlo_dev_ctx_deinit(struct wlan_objmgr_vdev *vdev)
 	}
 	mlo_dev_lock_release(ml_dev);
 
+	if (wlan_vdev_mlme_is_mlo_bridge_vdev(vdev)) {
+		status = mld_delete_from_bridge_vdev_list(vdev);
+		if (!QDF_IS_STATUS_SUCCESS(status))
+			mlo_err("Failed to deinit bridge vap ctx");
+	}
+
 	ml_link_lock_acquire(g_mlo_ctx);
-	if (!ml_dev->wlan_vdev_count) {
+	if (!ml_dev->wlan_vdev_count && !ml_dev->wlan_bridge_vdev_count) {
 		if (ml_dev->ap_ctx)
 			mlo_ap_ctx_deinit(ml_dev);
 
