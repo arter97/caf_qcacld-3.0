@@ -2159,7 +2159,7 @@ dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 
 	qdf_spin_lock_bh(&mon_pdev->mon_lock);
 
-	if (qdf_unlikely(dp_srng_access_start(int_ctx, soc, mon_dst_srng))) {
+	if (qdf_unlikely(dp_rx_srng_access_start(int_ctx, soc, mon_dst_srng))) {
 		dp_mon_err("%s %d : HAL Mon Dest Ring access Failed -- %pK",
 			   __func__, __LINE__, mon_dst_srng);
 		qdf_spin_unlock_bh(&mon_pdev->mon_lock);
@@ -2275,7 +2275,7 @@ dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 
 		mon_pdev_be->desc_count = 0;
 	}
-	dp_srng_access_end(int_ctx, soc, mon_dst_srng);
+	dp_rx_srng_access_end(int_ctx, soc, mon_dst_srng);
 
 	qdf_spin_unlock_bh(&mon_pdev->mon_lock);
 	dp_mon_info("mac_id: %d, work_done:%d", mac_id, work_done);
