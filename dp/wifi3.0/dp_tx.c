@@ -4254,8 +4254,6 @@ static void dp_tx_update_peer_delay_stats(struct dp_txrx_peer *txrx_peer,
 	tid = ts->tid;
 	delay_stats = txrx_peer->delay_stats;
 
-	qdf_assert(ring < CDP_MAX_TXRX_CTX);
-
 	/*
 	 * For non-TID packets use the TID 9
 	 */
@@ -4435,10 +4433,12 @@ static void dp_tx_update_peer_jitter_stats(struct dp_txrx_peer *txrx_peer,
 	if (qdf_likely(!wlan_cfg_is_peer_jitter_stats_enabled(soc->wlan_cfg_ctx)))
 		return;
 
+	if (!txrx_peer->jitter_stats)
+		return;
+
 	tid = ts->tid;
 	jitter_stats = txrx_peer->jitter_stats;
-	qdf_assert_always(jitter_stats);
-	qdf_assert(ring < CDP_MAX_TXRX_CTX);
+
 	/*
 	 * For non-TID packets use the TID 9
 	 */
