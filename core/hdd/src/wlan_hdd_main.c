@@ -14901,6 +14901,7 @@ void hdd_adapter_reset_station_ctx(struct hdd_adapter *adapter)
 		qdf_mem_zero(&sta_ctx->conn_info.bssid, QDF_MAC_ADDR_SIZE);
 
 		hdd_cm_clear_ieee_link_id(link_info);
+		sta_ctx->user_cfg_chn_width = CH_WIDTH_INVALID;
 	}
 }
 
