@@ -2911,4 +2911,7 @@
 #define ENABLE_HAL_REG_WR_HISTORY (1)
 #endif
 
+#ifdef CONFIG_BCN_RATECODE_ENABLE
+#define WLAN_BCN_RATECODE_ENABLE (1)
+#endif
 #endif /* CONFIG_TO_FEATURE_H */
