@@ -147,23 +147,33 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			    WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
 			    WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS);
 
-		if (!mlo_is_sta_csa_synced(mlo_ctx, link_id)) {
-			csa_ie = (struct ieee80211_channelswitch_ie *)
-					wlan_get_ie_ptr_from_eid(
-						DOT11F_EID_CHANSWITCHANN,
-						sta_pro, sta_pro_len);
-			xcsa_ie = (struct ieee80211_extendedchannelswitch_ie *)
-					wlan_get_ie_ptr_from_eid(
-						DOT11F_EID_EXT_CHAN_SWITCH_ANN,
-						sta_pro, sta_pro_len);
+		csa_ie = (struct ieee80211_channelswitch_ie *)
+				wlan_get_ie_ptr_from_eid(
+					DOT11F_EID_CHANSWITCHANN,
+					sta_pro, sta_pro_len);
+		xcsa_ie = (struct ieee80211_extendedchannelswitch_ie *)
+				wlan_get_ie_ptr_from_eid(
+					DOT11F_EID_EXT_CHAN_SWITCH_ANN,
+					sta_pro, sta_pro_len);
+		is_sta_csa_synced = mlo_is_sta_csa_synced(mlo_ctx, link_id);
+		link_info = mlo_mgr_get_ap_link_by_link_id(mlo_ctx, link_id);
+		if (!link_info) {
+			mlo_err("link info null");
+			return;
 		}
+
 		if (csa_ie) {
 			csa_param.channel = csa_ie->newchannel;
 			csa_param.csa_chan_freq = wlan_reg_legacy_chan_to_freq(
 						pdev, csa_ie->newchannel);
 			csa_param.switch_mode = csa_ie->switchmode;
 			csa_param.ies_present_flag |= MLME_CSA_IE_PRESENT;
-			mlo_sta_csa_save_params(mlo_ctx, link_id, &csa_param);
+			mlo_sta_handle_csa_standby_link(mlo_ctx, link_id,
+							&csa_param, vdev);
+
+			if (!is_sta_csa_synced)
+				mlo_sta_csa_save_params(mlo_ctx, link_id,
+							&csa_param);
 		} else if (xcsa_ie) {
 			csa_param.channel = xcsa_ie->newchannel;
 			csa_param.switch_mode = xcsa_ie->switchmode;
@@ -178,7 +188,11 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 					wlan_reg_legacy_chan_to_freq(
 						pdev, xcsa_ie->newchannel);
 			csa_param.ies_present_flag |= MLME_XCSA_IE_PRESENT;
-			mlo_sta_csa_save_params(mlo_ctx, link_id, &csa_param);
+			mlo_sta_handle_csa_standby_link(mlo_ctx, link_id,
+							&csa_param, vdev);
+			if (!is_sta_csa_synced)
+				mlo_sta_csa_save_params(mlo_ctx, link_id,
+							&csa_param);
 		}
 	}
 }
