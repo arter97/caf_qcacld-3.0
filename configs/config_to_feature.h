@@ -1870,6 +1870,10 @@
 #define QCA_DP_TX_FW_METADATA_V2 (1)
 #endif
 
+#ifdef CONFIG_WLAN_MCAST_MLO_SAP
+#define WLAN_MCAST_MLO_SAP (1)
+#endif
+
 #ifdef CONFIG_FIX_TXDMA_LIMITATION
 #define FIX_TXDMA_LIMITATION (1)
 #endif
