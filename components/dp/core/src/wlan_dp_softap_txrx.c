@@ -467,13 +467,16 @@ void dp_wds_replace_peer_mac(void *soc, struct wlan_dp_link *dp_link,
 }
 #endif /* FEATURE_WDS*/
 
-static QDF_STATUS dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
-						qdf_nbuf_t nbuf)
+static QDF_STATUS
+dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
+			      qdf_nbuf_t nbuf,
+			      uint8_t *link_id)
 {
 	struct qdf_mac_addr *dest_mac_addr;
 	struct qdf_mac_addr mac_addr;
 	enum ol_txrx_peer_state peer_state;
 	void *soc;
+	struct cdp_peer_output_param peer_info = {0};
 
 	dest_mac_addr = (struct qdf_mac_addr *)(qdf_nbuf_data(nbuf) +
 						QDF_NBUF_DEST_MAC_OFFSET);
@@ -486,8 +489,11 @@ static QDF_STATUS dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 	soc = cds_get_context(QDF_MODULE_ID_SOC);
 	QDF_BUG(soc);
 	dp_wds_replace_peer_mac(soc, dp_link, mac_addr.bytes);
-	peer_state = cdp_peer_state_get(soc, dp_link->link_id,
-					mac_addr.bytes, false);
+
+	cdp_peer_get_info_by_peer_addr(soc, mac_addr.bytes, *link_id,
+				       &peer_info);
+	*link_id = peer_info.vdev_id;
+	peer_state = peer_info.state;
 
 	if (peer_state == OL_TXRX_PEER_STATE_INVALID) {
 		dp_debug_rl("Failed to find right station");
@@ -637,6 +643,99 @@ dp_softap_inspect_traffic_end_indication_pkt(struct wlan_dp_intf *dp_intf,
 {}
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_MULTI_LINK_SAP) && \
+	(defined(WLAN_MCAST_MLO) || defined(WLAN_MCAST_MLO_SAP))
+/**
+ * dp_softap_init_exception_metadata() - Update parameter for exception metadata
+ * @nbuf: skb buffer
+ * @param: pointer to exception metadata
+ *
+ * Return: None
+ */
+static inline void
+dp_softap_init_exception_metadata(qdf_nbuf_t nbuf,
+				  struct cdp_tx_exception_metadata *param)
+{
+	qdf_nbuf_set_tx_ftype(nbuf, CB_FTYPE_MLO_MCAST);
+	param->tx_encap_type = CDP_INVALID_TX_ENCAP_TYPE;
+	param->sec_type = CDP_INVALID_SEC_TYPE;
+	param->peer_id = CDP_INVALID_PEER;
+	param->tid = CDP_INVALID_TID;
+	param->is_mlo_mcast = 1;
+}
+
+/**
+ * dp_softap_is_exception_path() - Check if it is exception path or not
+ * @dp_link: DP link handle
+ * @nbuf: skb buffer
+ * @param: pointer to exception metadata
+ *
+ * Return: true if it is exception path otherwise false
+ */
+static inline bool
+dp_softap_is_exception_path(struct wlan_dp_link *dp_link,
+			    qdf_nbuf_t nbuf,
+			    struct cdp_tx_exception_metadata *param)
+{
+	bool is_mlo_vdev;
+
+	is_mlo_vdev = wlan_vdev_mlme_feat_ext2_cap_get(dp_link->vdev,
+						       WLAN_VDEV_FEXT2_MLO);
+
+	if (is_mlo_vdev) {
+		/* mlo sap broadcast/multicast case */
+		if (QDF_NBUF_CB_GET_IS_BCAST(nbuf) ||
+		    QDF_NBUF_CB_GET_IS_MCAST(nbuf)) {
+			dp_softap_init_exception_metadata(nbuf,
+							  param);
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * dp_link_override() - Look for correct dp link
+ * @dp_intf: pointer to DP interface
+ * @cur_dp_link: DP link handle
+ * @link_id: input link id
+ *
+ * Return: return dp link if it's link id match otherwise return
+ * default one.
+ */
+static inline
+struct wlan_dp_link *dp_link_override(struct wlan_dp_intf *dp_intf,
+				      struct wlan_dp_link *cur_dp_link,
+				      uint8_t link_id)
+{
+	struct wlan_dp_link *dp_link;
+	struct wlan_dp_link *dp_link_next;
+
+	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
+		if (dp_link->link_id == link_id)
+			return dp_link;
+	}
+	return cur_dp_link;
+}
+
+#else
+static inline bool
+dp_softap_is_exception_path(struct wlan_dp_link *dp_link,
+			    qdf_nbuf_t nbuf,
+			    struct cdp_tx_exception_metadata *param)
+{
+	return false;
+}
+
+static inline
+struct wlan_dp_link *dp_link_override(struct wlan_dp_intf *dp_intf,
+				      struct wlan_dp_link *cur_dp_link,
+				      uint8_t link_id)
+{
+	return cur_dp_link;
+}
+#endif
+
 /**
  * dp_softap_start_xmit() - Transmit a frame
  * @nbuf: pointer to Network buffer
@@ -653,6 +752,9 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 	uint32_t num_seg;
 	struct dp_tx_rx_stats *stats = &dp_intf->dp_stats.tx_rx_stats;
 	int cpu = qdf_get_smp_processor_id();
+	uint8_t link_id = dp_link->link_id;
+	struct cdp_tx_exception_metadata tx_exc_metadata = {0};
+	bool except;
 
 	dest_mac_addr = (struct qdf_mac_addr *)(qdf_nbuf_data(nbuf) +
 						QDF_NBUF_DEST_MAC_OFFSET);
@@ -664,8 +766,12 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 
 	wlan_dp_pkt_add_timestamp(dp_intf, QDF_PKT_TX_DRIVER_ENTRY, nbuf);
 
-	if (QDF_IS_STATUS_ERROR(dp_softap_validate_peer_state(dp_link, nbuf)))
+	if (QDF_IS_STATUS_ERROR(dp_softap_validate_peer_state(dp_link,
+							      nbuf,
+							      &link_id)))
 		goto drop_pkt;
+
+	dp_link = dp_link_override(dp_intf, dp_link, link_id);
 
 	dp_softap_get_tx_resource(dp_link, nbuf);
 
@@ -708,11 +814,26 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 		goto drop_pkt_and_release_skb;
 	}
 
-	if (dp_intf->txrx_ops.tx.tx(soc, dp_link->link_id, nbuf)) {
-		dp_debug("Failed to send packet to txrx for sta: "
-			 QDF_MAC_ADDR_FMT,
-			 QDF_MAC_ADDR_REF(dest_mac_addr->bytes));
-		goto drop_pkt_and_release_skb;
+	except = dp_softap_is_exception_path(dp_link, nbuf,
+					     &tx_exc_metadata);
+
+	if (qdf_likely(!except)) {
+		if (dp_intf->txrx_ops.tx.tx(soc, dp_link->link_id, nbuf)) {
+			dp_debug("Failed to send packet to txrx for sta: "
+				 QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(dest_mac_addr->bytes));
+			goto drop_pkt_and_release_skb;
+		}
+	} else {
+		if (dp_intf->txrx_ops.tx.tx_exception(soc,
+						      dp_link->link_id,
+						      nbuf,
+						      &tx_exc_metadata)) {
+			dp_err("Except path failed to send packet to txrx for sta: "
+				 QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(dest_mac_addr->bytes));
+			goto drop_pkt_and_release_skb;
+		}
 	}
 
 	return QDF_STATUS_SUCCESS;
