@@ -1516,6 +1516,62 @@ static void hdd_set_immediate_power_save(struct hdd_adapter *adapter,
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+static QDF_STATUS
+hdd_cm_mlme_send_standby_link_chn_width(struct hdd_adapter *adapter,
+					struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_station_ctx *sta_ctx;
+	uint8_t link_id = wlan_vdev_get_link_id(vdev);
+	uint8_t ch_width;
+	enum phy_ch_width connection_ch_width = CH_WIDTH_INVALID;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("Failed to get PSOC Object");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	link_info = hdd_get_link_info_by_ieee_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("Link info not found by linkid:%u", link_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	ch_width = sta_ctx->user_cfg_chn_width;
+
+	wlan_mlme_get_sta_ch_width(vdev, &connection_ch_width);
+
+	if (ch_width == CH_WIDTH_INVALID) {
+		hdd_debug("no cached bandwidth for the link %u", link_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (ch_width == connection_ch_width) {
+		hdd_debug("user config max bd same as connection ch bw:%u",
+			  ch_width);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	hdd_debug("send vdev id:%u, chwidth:%u", link_info->vdev_id,
+		  ch_width);
+
+	wlan_mlme_send_ch_width_update_with_notify(psoc, vdev,
+						   link_info->vdev_id,
+						   ch_width);
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+hdd_cm_mlme_send_standby_link_chn_width(struct hdd_adapter *adapter,
+					struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static void
 hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				       struct wlan_cm_connect_resp *rsp)
@@ -1537,7 +1593,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	struct hdd_adapter *assoc_link_adapter;
 	bool is_immediate_power_save;
 	struct wlan_hdd_link_info *link_info;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	bool alt_pipe;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
@@ -1604,6 +1660,11 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode, true);
 
 	hdd_cm_handle_assoc_event(vdev, rsp->bssid.bytes);
+
+	if (ucfg_cm_is_link_switch_connect_resp(rsp)) {
+		if (hdd_cm_mlme_send_standby_link_chn_width(adapter, vdev))
+			hdd_debug("send standby link chn width fail");
+	}
 
 	/*
 	 * check update hdd_send_update_beacon_ies_event,
