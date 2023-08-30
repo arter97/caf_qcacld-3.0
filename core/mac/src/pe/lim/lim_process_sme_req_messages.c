@@ -9934,6 +9934,9 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	QDF_STATUS status;
 	enum phy_ch_width ch_width;
 	uint32_t target_ch_freq;
+	bool is_vdev_ll_lt_sap = false;
+	uint8_t peer_count;
+	uint16_t max_wait_for_bcn_tx_complete;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -9964,8 +9967,6 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	target_ch_freq = dfs_csa_ie_req->target_chan_freq;
 	/* Channel switch announcement needs to be included in beacon */
 	session_entry->dfsIncludeChanSwIe = true;
-	session_entry->gLimChannelSwitch.switchCount =
-		 dfs_csa_ie_req->ch_switch_beacon_cnt;
 
 	wlan_reg_set_create_punc_bitmap(&dfs_csa_ie_req->ch_params, false);
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
@@ -9982,9 +9983,21 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	session_entry->gLimChannelSwitch.ch_width = ch_width;
 	session_entry->gLimChannelSwitch.sec_ch_offset =
 				 dfs_csa_ie_req->ch_params.sec_ch_offset;
-	if (mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch == false)
-		session_entry->gLimChannelSwitch.switchMode =
-			 dfs_csa_ie_req->ch_switch_mode;
+
+	is_vdev_ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(
+						mac_ctx->psoc,
+						session_entry->vdev_id);
+
+	if (is_vdev_ll_lt_sap) {
+		session_entry->gLimChannelSwitch.switchCount = 1;
+		session_entry->gLimChannelSwitch.switchMode = 0;
+	} else {
+		session_entry->gLimChannelSwitch.switchCount =
+			dfs_csa_ie_req->ch_switch_beacon_cnt;
+		if (!mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch)
+			session_entry->gLimChannelSwitch.switchMode =
+					dfs_csa_ie_req->ch_switch_mode;
+	}
 
 	/*
 	 * Validate if SAP is operating HT or VHT/HE mode and set the Channel
@@ -10059,11 +10072,23 @@ skip_vht:
 	session_entry->cac_duration_ms = dfs_csa_ie_req->new_chan_cac_ms;
 	wlan_util_vdev_mgr_set_cac_timeout_for_vdev(
 		session_entry->vdev, dfs_csa_ie_req->new_chan_cac_ms);
+
+	peer_count = wlan_vdev_get_peer_sta_count(session_entry->vdev);
+
+	if (is_vdev_ll_lt_sap && !peer_count) {
+		pe_debug("Peer count is 0 for LL_LT_SAP, continue CSA directly");
+		/* initiate vdev restart if no peer connected on XPAN */
+		lim_send_csa_tx_complete(session_entry->vdev_id);
+		/* Clear CSA IE count and update beacon */
+		lim_send_dfs_chan_sw_ie_update(mac_ctx, session_entry);
+		return;
+	}
+
 	/* Send CSA IE request from here */
 	lim_send_dfs_chan_sw_ie_update(mac_ctx, session_entry);
 
 	/*
-	 * Wait for MAX_WAIT_FOR_BCN_TX_COMPLETE ms for tx complete for beacon.
+	 * Wait for max_wait_for_bcn_tx_complete ms for tx complete for beacon.
 	 * If tx complete for beacon is received before this timer expire,
 	 * stop this timer and then this will be restarted for every beacon
 	 * interval until switchCount become 0 and bcn template with new
@@ -10074,8 +10099,14 @@ skip_vht:
 	 * become 0 and bcn template with new switchCount will be sent to
 	 * firmware.
 	 */
+	if (is_vdev_ll_lt_sap)
+		max_wait_for_bcn_tx_complete = MAX_WAIT_FOR_BCN_TX_COMPLETE_FOR_LL_SAP;
+	else
+		max_wait_for_bcn_tx_complete = MAX_WAIT_FOR_BCN_TX_COMPLETE;
+
 	status = qdf_mc_timer_start(&session_entry->ap_ecsa_timer,
-				    MAX_WAIT_FOR_BCN_TX_COMPLETE);
+				    max_wait_for_bcn_tx_complete);
+
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("cannot start ap_ecsa_timer");
 
@@ -10087,10 +10118,14 @@ skip_vht:
 		 session_entry->dfsIncludeChanWrapperIe,
 		 session_entry->gLimChannelSwitch.sec_ch_offset);
 
-	/* Send ECSA/CSA Action frame after updating the beacon */
+	/*
+	 * Send ECSA/CSA Action frame after updating the beacon.
+	 * For LL_LT_SAP, send ECSA action frame only
+	 */
 	if (CHAN_HOP_ALL_BANDS_ENABLE &&
 	    session_entry->lim_non_ecsa_cap_num &&
-	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(target_ch_freq))
+	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(target_ch_freq) &&
+	    !is_vdev_ll_lt_sap)
 		lim_send_chan_switch_action_frame
 			(mac_ctx,
 			 session_entry->gLimChannelSwitch.primaryChannel,
