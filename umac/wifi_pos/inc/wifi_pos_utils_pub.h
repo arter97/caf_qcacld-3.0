@@ -37,6 +37,12 @@
 #define WIFI_POS_RSP_V1_FLAT_MEMORY  0x00000001
 #define WIFI_POS_RSP_V2_NL  0x00000002
 
+#ifdef CNSS_GENL
+#define WIFI_POS_MAX_NUM_CHANNELS NUM_CHANNELS
+#else
+#define WIFI_POS_MAX_NUM_CHANNELS (NUM_CHANNELS * 2)
+#endif
+
 /**
  * enum wifi_pos_cmd_ids
  * @WIFI_POS_CMD_REGISTRATION: app registration
@@ -97,8 +103,8 @@ struct wifi_pos_channel_power {
  */
 struct qdf_packed wifi_pos_channel_list {
 	uint16_t num_channels;
-	struct wifi_pos_channel_power chan_info[NUM_CHANNELS];
-};
+	struct wifi_pos_channel_power chan_info[WIFI_POS_MAX_NUM_CHANNELS];
+} qdf_packed;
 
 /**
  * struct wifi_pos_driver_caps - OEM Data Capabilities

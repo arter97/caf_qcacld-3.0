@@ -507,7 +507,7 @@ static void wifi_pos_pdev_iterator(struct wlan_objmgr_psoc *psoc,
 	wifi_pos_ch = &chan_list->chan_info[chan_list->num_channels];
 
 	ch_info = (struct channel_power *)qdf_mem_malloc(
-			sizeof(*ch_info) * NUM_CHANNELS);
+			sizeof(*ch_info) * WIFI_POS_MAX_NUM_CHANNELS);
 	if (!ch_info) {
 		wifi_pos_err("ch_info is null");
 		return;
@@ -522,7 +522,8 @@ static void wifi_pos_pdev_iterator(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if ((chan_list->num_channels + num_channels) > NUM_CHANNELS) {
+	if ((chan_list->num_channels + num_channels) >
+			WIFI_POS_MAX_NUM_CHANNELS) {
 		wifi_pos_err("Invalid number of channels");
 		qdf_mem_free(ch_info);
 		return;
@@ -594,6 +595,27 @@ static void wifi_pos_get_ch_info(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef CNSS_GENL
+static bool wifi_pos_is_duplicate_freq(struct wifi_pos_ch_info_rsp *ch_info,
+				       int num_chans, qdf_freq_t freq)
+{
+	return false;
+}
+#else
+static bool wifi_pos_is_duplicate_freq(struct wifi_pos_ch_info_rsp *ch_info,
+				       int num_chans, qdf_freq_t freq)
+{
+	int k;
+
+	for (k = 0; k < num_chans; k++) {
+		if (freq == ch_info[k].mhz)
+			return true;
+	}
+
+	return false;
+}
+#endif
+
 static QDF_STATUS wifi_pos_process_ch_info_req(struct wlan_objmgr_psoc *psoc,
 					struct wifi_pos_req_msg *req)
 {
@@ -605,7 +627,7 @@ static QDF_STATUS wifi_pos_process_ch_info_req(struct wlan_objmgr_psoc *psoc,
 	uint8_t *channels = req->buf;
 	struct wlan_objmgr_pdev *pdev;
 	uint32_t num_ch = req->buf_len;
-	qdf_freq_t valid_channel_list[NUM_CHANNELS];
+	qdf_freq_t valid_channel_list[WIFI_POS_MAX_NUM_CHANNELS];
 	uint32_t num_valid_channels = 0;
 	struct wifi_pos_ch_info_rsp *ch_info;
 	struct wifi_pos_channel_list *ch_list = NULL;
@@ -613,6 +635,7 @@ static QDF_STATUS wifi_pos_process_ch_info_req(struct wlan_objmgr_psoc *psoc,
 					wifi_pos_get_psoc_priv_obj(psoc);
 	QDF_STATUS ret_val;
 	struct wifi_pos_channel_power *ch;
+	bool dup_freq = false;
 
 	if (!wifi_pos_obj) {
 		wifi_pos_err("wifi_pos priv obj is null");
@@ -628,13 +651,14 @@ static QDF_STATUS wifi_pos_process_ch_info_req(struct wlan_objmgr_psoc *psoc,
 		wifi_pos_err("pdev get API failed");
 		return QDF_STATUS_E_INVAL;
 	}
-	if (num_ch > NUM_CHANNELS) {
+	if (num_ch > WIFI_POS_MAX_NUM_CHANNELS) {
 		wifi_pos_err("Invalid number of channels");
 		ret_val = QDF_STATUS_E_INVAL;
 		goto cleanup;
 	}
 
-	chan_freqs = qdf_mem_malloc(NUM_CHANNELS * (sizeof(*chan_freqs)));
+	chan_freqs = qdf_mem_malloc(WIFI_POS_MAX_NUM_CHANNELS *
+				    (sizeof(*chan_freqs)));
 	if (!chan_freqs) {
 		ret_val = QDF_STATUS_E_NOMEM;
 		goto cleanup;
@@ -664,7 +688,7 @@ static QDF_STATUS wifi_pos_process_ch_info_req(struct wlan_objmgr_psoc *psoc,
 			num_valid_channels++;
 		}
 	} else {
-		for (i = 0; i < NUM_CHANNELS; i++)
+		for (i = 0; i < WIFI_POS_MAX_NUM_CHANNELS; i++)
 			chan_freqs[i] =
 			    wlan_reg_chan_band_to_freq(pdev, channels[i],
 						       BIT(REG_BAND_5G) |
@@ -700,27 +724,39 @@ static QDF_STATUS wifi_pos_process_ch_info_req(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/* First byte of message body will have num of channels */
-	buf[0] = num_valid_channels;
 	ch_info = (struct wifi_pos_ch_info_rsp *)&buf[1];
-	for (idx = 0; idx < num_valid_channels; idx++) {
-		ch_info[idx].reserved0 = 0;
-		ch_info[idx].chan_id = ch[idx].ch_power.chan_num;
-		ch_info[idx].mhz = ch[idx].ch_power.center_freq;
-		ch_info[idx].band_center_freq1 = ch[idx].band_center_freq1;
-		ch_info[idx].band_center_freq2 = 0;
-		ch_info[idx].info = 0;
+	for (idx = 0, i = 0; idx < num_valid_channels; idx++) {
+		dup_freq = wifi_pos_is_duplicate_freq(
+				ch_info, i, ch[idx].ch_power.center_freq);
+		if (dup_freq)
+			continue;
 
-		REG_SET_CHANNEL_REG_POWER(ch_info[idx].reg_info_1,
+		ch_info[i].reserved0 = 0;
+		ch_info[i].chan_id = ch[idx].ch_power.chan_num;
+		ch_info[i].mhz = ch[idx].ch_power.center_freq;
+		ch_info[i].band_center_freq1 = ch[idx].band_center_freq1;
+		ch_info[i].band_center_freq2 = 0;
+		ch_info[i].info = 0;
+
+		REG_SET_CHANNEL_REG_POWER(ch_info[i].reg_info_1,
 					  ch[idx].ch_power.tx_power);
-		REG_SET_CHANNEL_MAX_TX_POWER(ch_info[idx].reg_info_2,
+		REG_SET_CHANNEL_MAX_TX_POWER(ch_info[i].reg_info_2,
 					     ch[idx].ch_power.tx_power);
 
 		if (ch[idx].is_dfs_chan)
-			WIFI_POS_SET_DFS(ch_info[idx].info);
+			WIFI_POS_SET_DFS(ch_info[i].info);
 
 		if (ch[idx].phy_mode)
-			REG_SET_CHANNEL_MODE(&ch_info[idx], ch[idx].phy_mode);
+			REG_SET_CHANNEL_MODE(&ch_info[i], ch[idx].phy_mode);
+		wifi_pos_debug("i:%d chan_id:%d freq:%d cfreq1:%d reg_info_1:%x reg_info_2:%x is_dfs_chan:%d phymode:%d",
+			       i, ch_info[i].chan_id, ch_info[i].mhz,
+			       ch_info[i].band_center_freq1,
+			       ch_info[i].reg_info_1, ch_info[i].reg_info_2,
+			       ch[idx].is_dfs_chan, ch[idx].phy_mode);
+		i++;
 	}
+
+	buf[0] = i;
 
 	wifi_pos_obj->wifi_pos_send_rsp(psoc, wifi_pos_obj->app_pid,
 					WIFI_POS_CMD_GET_CH_INFO,
