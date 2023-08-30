@@ -206,9 +206,6 @@ mlo_send_link_disconnect(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!assoc_vdev)
-		return QDF_STATUS_E_FAILURE;
-
 	/*
 	 * Change the source for the link vdev to make sure it's handled as a
 	 * Northbound disconnect in VDEV/PEER state machine.
