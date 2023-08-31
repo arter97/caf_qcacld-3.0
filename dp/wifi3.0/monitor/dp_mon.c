@@ -16,6 +16,7 @@
  */
 #include <dp_types.h>
 #include "dp_rx.h"
+#include "dp_tx.h"
 #include "dp_peer.h"
 #include <dp_htt.h>
 #include <dp_mon_filter.h>
@@ -1786,6 +1787,11 @@ dp_enable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 
 	dp_mon_tx_enable_enhanced_stats(pdev);
 
+	/* reset the tx fast path flag, as enhanced stats are enabled */
+	pdev->tx_fast_flag &= ~DP_TX_DESC_FLAG_SIMPLE;
+	if (dp_soc->hw_txrx_stats_en)
+		pdev->tx_fast_flag &= ~DP_TX_DESC_FLAG_FASTPATH_SIMPLE;
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1819,6 +1825,7 @@ dp_disable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 	struct dp_pdev *pdev =
 		dp_get_pdev_from_soc_pdev_id_wifi3((struct dp_soc *)soc,
 						   pdev_id);
+	struct dp_soc *dp_soc = cdp_soc_t_to_dp_soc(soc);
 	struct dp_mon_pdev *mon_pdev;
 
 	if (!pdev || !pdev->monitor_pdev)
@@ -1840,6 +1847,11 @@ dp_disable_enhanced_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  FL("Failed to reset enhanced mode filters"));
 	}
+
+	/* set the tx fast path flag, as enhanced stats are disabled */
+	pdev->tx_fast_flag |= DP_TX_DESC_FLAG_SIMPLE;
+	if (dp_soc->hw_txrx_stats_en)
+		pdev->tx_fast_flag |= DP_TX_DESC_FLAG_FASTPATH_SIMPLE;
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -1576,7 +1576,8 @@ bool dp_tx_desc_set_ktimestamp(struct dp_vdev *vdev,
 	    qdf_unlikely(vdev->pdev->soc->wlan_cfg_ctx->pext_stats_enabled) ||
 	    qdf_unlikely(dp_tx_pkt_tracepoints_enabled()) ||
 	    qdf_unlikely(vdev->pdev->soc->peerstats_enabled) ||
-	    qdf_unlikely(dp_is_vdev_tx_delay_stats_enabled(vdev))) {
+	    qdf_unlikely(dp_is_vdev_tx_delay_stats_enabled(vdev)) ||
+	    qdf_unlikely(wlan_cfg_is_peer_jitter_stats_enabled(vdev->pdev->soc->wlan_cfg_ctx))) {
 		tx_desc->timestamp = qdf_ktime_real_get();
 		return true;
 	}
@@ -1590,7 +1591,8 @@ bool dp_tx_desc_set_ktimestamp(struct dp_vdev *vdev,
 	if (qdf_unlikely(vdev->pdev->delay_stats_flag) ||
 	    qdf_unlikely(vdev->pdev->soc->wlan_cfg_ctx->pext_stats_enabled) ||
 	    qdf_unlikely(dp_tx_pkt_tracepoints_enabled()) ||
-	    qdf_unlikely(vdev->pdev->soc->peerstats_enabled)) {
+	    qdf_unlikely(vdev->pdev->soc->peerstats_enabled) ||
+	    qdf_unlikely(wlan_cfg_is_peer_jitter_stats_enabled(vdev->pdev->soc->wlan_cfg_ctx))) {
 		tx_desc->timestamp = qdf_ktime_real_get();
 		return true;
 	}
