@@ -105,6 +105,9 @@ defined(QCA_SINGLE_WIFI_3_0)
 #endif
 
 #define RX_MON_MPDU_START_WMASK               0x07F0
+#define RX_MON_MPDU_END_WMASK                 0x7
+#define RX_MON_MPDU_START_WMASK_V2            0x007F0
+#define RX_MON_MPDU_END_WMASK_V2              0xFF
 #define RX_MON_MSDU_END_WMASK                 0x0AE1
 #define RX_MON_PPDU_END_USR_STATS_WMASK       0xB7E
 
