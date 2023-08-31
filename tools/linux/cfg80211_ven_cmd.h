@@ -883,6 +883,7 @@ enum {
 #ifdef ASSOC_REJECT_SUPPORT_ENABLED
 	IEEE80211_PARAM_ASSOC_REJECT = 818,
 #endif
+	IEEE80211_PARAM_VDEV_UP = 819, /* Flag to indicate if vdev is in UP State*/
 };
 
 enum {
@@ -2637,6 +2638,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, SET_PARAM, 2},
 	{"g_assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, GET_PARAM, 0},
 #endif
+	{"g_is_vdev_up", IEEE80211_PARAM_VDEV_UP, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
