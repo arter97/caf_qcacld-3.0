@@ -4344,15 +4344,17 @@ target_if_spectral_populate_chwidth(struct target_if_spectral *spectral,
  * @pdev: pointer to pdev
  * @cfreq1: center frequency 1
  * @cfreq2: center frequency 2
+ * @is_valid: Indicates weather the frequency is valid
  *
  * API to check whether given (cfreq1, cfreq2) pair forms a valid 80+80
  * combination
  *
- * Return: true or false
+ * Return: QDF_Status
  */
-static bool
+static QDF_STATUS
 target_if_spectral_is_valid_80p80_freq(struct wlan_objmgr_pdev *pdev,
-				       uint32_t cfreq1, uint32_t cfreq2)
+				       uint32_t cfreq1, uint32_t cfreq2,
+				       bool *is_valid)
 {
 	struct ch_params ch_params = {0};
 	enum channel_state chan_state1;
@@ -4360,16 +4362,29 @@ target_if_spectral_is_valid_80p80_freq(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct ch_params temp_params = {0};
 
-	qdf_assert_always(pdev);
+	if (!is_valid) {
+		spectral_err("Argument(is_valid) is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!pdev) {
+		spectral_err("pdev is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 	psoc = wlan_pdev_get_psoc(pdev);
-	qdf_assert_always(psoc);
+	if (!psoc) {
+		spectral_err("psoc is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	/* In restricted 80P80 MHz enabled, only one 80+80 MHz
 	 * channel is supported with cfreq=5690 and cfreq=5775.
 	 */
 	if (wlan_psoc_nif_fw_ext_cap_get(
-				psoc, WLAN_SOC_RESTRICTED_80P80_SUPPORT))
-		return CHAN_WITHIN_RESTRICTED_80P80(cfreq1, cfreq2);
+				psoc, WLAN_SOC_RESTRICTED_80P80_SUPPORT)) {
+		*is_valid = CHAN_WITHIN_RESTRICTED_80P80(cfreq1, cfreq2);
+		return QDF_STATUS_SUCCESS;
+	}
 
 	ch_params.center_freq_seg1 = wlan_reg_freq_to_chan(pdev, cfreq2);
 	ch_params.mhz_freq_seg1 = cfreq2;
@@ -4381,12 +4396,16 @@ target_if_spectral_is_valid_80p80_freq(struct wlan_objmgr_pdev *pdev,
 					&ch_params,
 					REG_CURRENT_PWR_MODE);
 
-	if (ch_params.ch_width != CH_WIDTH_80P80MHZ)
-		return false;
+	if (ch_params.ch_width != CH_WIDTH_80P80MHZ) {
+		*is_valid = false;
+		return QDF_STATUS_SUCCESS;
+	}
 
 	if (ch_params.mhz_freq_seg0 != cfreq1 ||
-	    ch_params.mhz_freq_seg1 != cfreq2)
-		return false;
+	    ch_params.mhz_freq_seg1 != cfreq2) {
+		*is_valid = false;
+		return QDF_STATUS_SUCCESS;
+	}
 
 	temp_params.ch_width = CH_WIDTH_80MHZ;
 	chan_state1 = wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
@@ -4395,8 +4414,10 @@ target_if_spectral_is_valid_80p80_freq(struct wlan_objmgr_pdev *pdev,
 				&temp_params,
 				REG_CURRENT_PWR_MODE);
 	if ((chan_state1 == CHANNEL_STATE_DISABLE) ||
-	    (chan_state1 == CHANNEL_STATE_INVALID))
-		return false;
+	    (chan_state1 == CHANNEL_STATE_INVALID)) {
+		*is_valid = false;
+		return QDF_STATUS_SUCCESS;
+	}
 
 	temp_params.ch_width = CH_WIDTH_80MHZ;
 	chan_state2 = wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
@@ -4405,14 +4426,19 @@ target_if_spectral_is_valid_80p80_freq(struct wlan_objmgr_pdev *pdev,
 				&temp_params,
 				REG_CURRENT_PWR_MODE);
 	if ((chan_state2 == CHANNEL_STATE_DISABLE) ||
-	    (chan_state2 == CHANNEL_STATE_INVALID))
-		return false;
+	    (chan_state2 == CHANNEL_STATE_INVALID)) {
+		*is_valid = false;
+		return QDF_STATUS_SUCCESS;
+	}
 
 	if (abs(ch_params.mhz_freq_seg0 - ch_params.mhz_freq_seg1) <=
-	    FREQ_OFFSET_80MHZ)
-		return false;
+	    FREQ_OFFSET_80MHZ) {
+		*is_valid = false;
+		return QDF_STATUS_SUCCESS;
+	}
 
-	return true;
+	*is_valid = true;
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -4693,10 +4719,14 @@ _target_if_set_spectral_config(struct target_if_spectral *spectral,
 		if (ch_width[smode] == CH_WIDTH_80P80MHZ) {
 			bool is_valid_80p80;
 
-			is_valid_80p80 = target_if_spectral_is_valid_80p80_freq(
+			status = target_if_spectral_is_valid_80p80_freq(
 						spectral->pdev_obj,
 						center_freq.cfreq1,
-						center_freq.cfreq2);
+						center_freq.cfreq2,
+						&is_valid_80p80);
+
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
 
 			if (!is_valid_80p80) {
 				spectral_err("Agile freq %u, %u is invalid 80+80 combination",
