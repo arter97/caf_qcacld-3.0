@@ -2348,7 +2348,10 @@ target_if_populate_supported_sscan_bws(struct target_if_spectral *spectral,
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status;
 
-	qdf_assert_always(spectral);
+	if (!spectral) {
+		spectral_err("spectral is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	if (is_spectral_arch_beryllium(target_type))
 		return target_if_populate_supported_sscan_bws_be(spectral);
@@ -2691,9 +2694,14 @@ target_if_spectral_init_byte_swap_funcs_gen3(
 	bool is_swap_required;
 	QDF_STATUS status;
 
-	qdf_assert_always(spectral);
-	qdf_assert_always(p_sops);
-
+	if (!spectral) {
+		spectral_err("spectral variable is null");
+		return;
+	}
+	if (!p_sops) {
+		spectral_err("spectral ops variable is null");
+		return;
+	}
 	status = spectral_is_host_byte_swap_required(spectral->pdev_obj,
 						     &is_swap_required);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -2717,7 +2725,10 @@ target_if_spectral_init_byte_swap_funcs_gen3(
 	struct target_if_spectral *spectral,
 	struct target_if_spectral_ops *p_sops)
 {
-	qdf_assert_always(p_sops);
+	if (!p_sops) {
+		spectral_err("spectral ops variable is null");
+		return;
+	}
 
 	/* Byte-swap is not required for little-endian Hosts */
 	p_sops->byte_swap_headers = NULL;
@@ -3268,8 +3279,6 @@ target_if_spectral_report_params_init(
 		rparams->fft_report_hdr_len =
 			FFT_REPORT_HEADER_LENGTH_GEN3_V2;
 		break;
-	default:
-		qdf_assert_always(0);
 	}
 
 	rparams->detid_mode_table[SPECTRAL_DETECTOR_ID_0] =
@@ -3338,7 +3347,10 @@ target_if_spectral_is_hw_mode_sbs(struct wlan_objmgr_pdev *pdev,
 	struct target_psoc_info *tgt_hdl;
 	enum wmi_host_hw_mode_config_type mode;
 
-	qdf_assert_always(is_hw_mode_sbs);
+	if (!is_hw_mode_sbs) {
+		spectral_err("is_hw_mode_sbs pointer is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
@@ -4156,7 +4168,7 @@ target_if_is_agile_span_overlap_with_operating_span
 	uint32_t cfreq2;
 
 	if (!spectral) {
-		spectral_err("Spectral object is NULL");
+		spectral_err("spectral object is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -4300,7 +4312,10 @@ target_if_spectral_populate_chwidth(struct target_if_spectral *spectral,
 {
 	enum spectral_scan_mode smode;
 
-	qdf_assert_always(spectral);
+	if (!spectral) {
+		spectral_err("Spectral variable is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	smode = SPECTRAL_SCAN_MODE_NORMAL;
 	for (; smode < SPECTRAL_SCAN_MODE_MAX; ++smode) {
@@ -5431,12 +5446,25 @@ target_if_is_aspectral_prohibited_by_adfs(struct wlan_objmgr_psoc *psoc,
 	bool is_agile_rcac_enabled_cur_pdev = false;
 	QDF_STATUS status;
 
-	qdf_assert_always(is_aspectral_prohibited);
+	if (!is_aspectral_prohibited) {
+		spectral_err("Arg(Indication flag for agile spectral prohibition) is null.");
+		return;
+	}
+
 	if (*is_aspectral_prohibited)
 		return;
 
-	qdf_assert_always(psoc);
-	qdf_assert_always(cur_pdev);
+	if (!psoc) {
+		spectral_err("psoc is null.");
+		*is_aspectral_prohibited = true;
+		return;
+	}
+
+	if (!cur_pdev) {
+		spectral_err("Current pdev is null.");
+		*is_aspectral_prohibited = true;
+		return;
+	}
 
 	status = ucfg_dfs_get_agile_precac_enable
 				(cur_pdev,
@@ -7841,8 +7869,15 @@ target_if_spectral_capabilities_event_handler(ol_scn_t scn, uint8_t *data_buf,
 	}
 
 	/* There should be atleast one capability */
-	qdf_assert(event_params.num_sscan_bw_caps > 0);
-	qdf_assert(event_params.num_fft_size_caps > 0);
+	if (!event_params.num_sscan_bw_caps) {
+		spectral_err("Number of spectral_scan_bw_capabilities is less than one.");
+		return qdf_status_to_os_return(QDF_STATUS_E_INVAL);
+	}
+
+	if (!event_params.num_fft_size_caps) {
+		spectral_err("Number of spectral_scan_fft_size_capabilities is less than one.");
+		return qdf_status_to_os_return(QDF_STATUS_E_INVAL);
+	}
 
 	bw_caps = qdf_mem_malloc(
 			sizeof(*bw_caps) * event_params.num_sscan_bw_caps);
