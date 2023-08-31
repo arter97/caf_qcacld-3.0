@@ -85,7 +85,11 @@ static inline void target_if_spectral_hexdump(unsigned char *_buf, int _len)
 
 		if (!mod) {
 			if (i) {
-				qdf_assert_always(loc < sizeof(hexdump_line));
+				if (loc >= sizeof(hexdump_line)) {
+					spectral_err("loc index is %u, greater than hexdump_line array size",
+						     loc);
+					return;
+				}
 				loc += snprintf(&hexdump_line[loc],
 						sizeof(hexdump_line) - loc,
 						"  %s", ascii);
@@ -96,7 +100,11 @@ static inline void target_if_spectral_hexdump(unsigned char *_buf, int _len)
 			}
 		}
 
-		qdf_assert_always(loc < sizeof(hexdump_line));
+		if (loc >= sizeof(hexdump_line)) {
+			spectral_err("loc index is %u, greater than hexdump_line array size",
+				     loc);
+			return;
+		}
 		loc += snprintf(&hexdump_line[loc], sizeof(hexdump_line) - loc,
 				" %02x", pc[i]);
 
@@ -108,13 +116,21 @@ static inline void target_if_spectral_hexdump(unsigned char *_buf, int _len)
 	}
 
 	while ((i % SPECTRAL_HEXDUMP_NUM_OCTETS_PER_LINE) != 0) {
-		qdf_assert_always(loc < sizeof(hexdump_line));
+		if (loc >= sizeof(hexdump_line)) {
+			spectral_err("loc index is %u, greater than hexdump_line array size",
+				     loc);
+			return;
+		}
 		loc += snprintf(&hexdump_line[loc], sizeof(hexdump_line) - loc,
 				"   ");
 		i++;
 	}
 
-	qdf_assert_always(loc < sizeof(hexdump_line));
+	if (loc >= sizeof(hexdump_line)) {
+		spectral_err("loc index is %u, greater than hexdump_line array size",
+			     loc);
+		return;
+	}
 	snprintf(&hexdump_line[loc], sizeof(hexdump_line) - loc, "  %s", ascii);
 	spectral_debug("%s", hexdump_line);
 }
@@ -2657,25 +2673,30 @@ target_if_160mhz_delivery_state_change(struct target_if_spectral *spectral,
  * target_if_get_detector_id_sscan_summary_report_gen3() - Get Spectral detector
  * ID from Spectral summary report
  * @data: Pointer to Spectral summary report
+ * @detector_id: Pointer to detector id
  *
- * Return: Detector ID
+ * Return: QDF_STATUS
  */
-static uint8_t
-target_if_get_detector_id_sscan_summary_report_gen3(uint8_t *data) {
+static QDF_STATUS
+target_if_get_detector_id_sscan_summary_report_gen3(uint8_t *data,
+						    uint8_t *detector_id)
+{
 	struct spectral_sscan_summary_report_gen3 *psscan_summary_report;
-	uint8_t detector_id;
 
-	qdf_assert_always(data);
+	if (!data) {
+		spectral_err("Argument(data) is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	psscan_summary_report =
 		(struct spectral_sscan_summary_report_gen3 *)data;
 
-	detector_id = get_bitfield(
+	*detector_id = get_bitfield(
 			psscan_summary_report->hdr_a,
 			SSCAN_SUMMARY_REPORT_HDR_A_DETECTOR_ID_SIZE_GEN3,
 			SSCAN_SUMMARY_REPORT_HDR_A_DETECTOR_ID_POS_GEN3);
 
-	return detector_id;
+	return QDF_STATUS_SUCCESS;
 }
 
 #ifndef OPTIMIZED_SAMP_MESSAGE
@@ -2697,9 +2718,11 @@ target_if_consume_sscan_summary_report_gen3(
 				struct spectral_report_params *rparams) {
 	struct spectral_sscan_summary_report_gen3 *psscan_summary_report;
 
-	qdf_assert_always(data);
-	qdf_assert_always(fields);
-	qdf_assert_always(rparams);
+	if (!data || !fields || !rparams) {
+		spectral_err("null arguments: data %pK, fields %pK, rparams %pK.",
+			     data, fields, rparams);
+		return;
+	}
 
 	psscan_summary_report =
 		(struct spectral_sscan_summary_report_gen3 *)data;
@@ -2731,7 +2754,9 @@ target_if_consume_sscan_summary_report_gen3(
 			SSCAN_SUMMARY_REPORT_HDR_C_GAINCHANGE_POS_GEN3_V2);
 		break;
 	default:
-		qdf_assert_always(0);
+		spectral_err("Invalid spectral report format version: %d.",
+			     rparams->version);
+		return;
 	}
 }
 #endif
@@ -2937,17 +2962,23 @@ static void target_if_spectral_verify_ts(struct target_if_spectral *spectral,
  * @raw_timestamp: Spectral time stamp reported by target
  * @reset_delay: Reset delay at target
  * @smode: Spectral scan mode
+ * @tstamp: Pointer to adjusted timestamp
  *
  * Correct time stamp to account for reset in time stamp due to target reset
  *
- * Return: Adjusted time stamp
+ * Return: QDF_STATUS
  */
-static uint32_t
+static QDF_STATUS
 target_if_spectral_get_adjusted_timestamp(struct spectral_timestamp_war *twar,
 					  uint32_t raw_timestamp,
 					  uint32_t reset_delay,
-					  enum spectral_scan_mode smode) {
-	qdf_assert_always(smode < SPECTRAL_SCAN_MODE_MAX);
+					  enum spectral_scan_mode smode,
+					  uint32_t *tstamp)
+{
+	if (smode >= SPECTRAL_SCAN_MODE_MAX) {
+		spectral_err("Invalid spectral scan mode: %d", smode);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	if (reset_delay) {
 		enum spectral_scan_mode m =
@@ -2965,7 +2996,9 @@ target_if_spectral_get_adjusted_timestamp(struct spectral_timestamp_war *twar,
 	}
 	twar->last_fft_timestamp[smode] = raw_timestamp;
 
-	return raw_timestamp + twar->timestamp_war_offset[smode];
+	*tstamp = raw_timestamp + twar->timestamp_war_offset[smode];
+
+	return QDF_STATUS_SUCCESS;
 }
 
 #ifdef BIG_ENDIAN_HOST
@@ -3043,7 +3076,7 @@ QDF_STATUS target_if_byte_swap_spectral_fft_bins_gen3(
  *
  * Consume Spectral summary report for gen3
  *
- * Return: Success/Failure
+ * Return: QDF_STATUS
  */
 static QDF_STATUS
 target_if_consume_sscan_summary_report_gen3(
@@ -3054,6 +3087,8 @@ target_if_consume_sscan_summary_report_gen3(
 	struct spectral_sscan_summary_report_gen3 *psscan_summary_report;
 	struct spectral_sscan_summary_report_padding_gen3_v2 *padding;
 	bool scan_radio_blanking;
+	QDF_STATUS ret;
+	uint8_t dtr_id;
 
 	if (!data) {
 		spectral_err_rl("Summary report buffer is null");
@@ -3078,8 +3113,12 @@ target_if_consume_sscan_summary_report_gen3(
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	fields->sscan_detector_id =
-		target_if_get_detector_id_sscan_summary_report_gen3(*data);
+	ret = target_if_get_detector_id_sscan_summary_report_gen3(*data,
+								  &dtr_id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		return QDF_STATUS_E_FAILURE;
+
+	fields->sscan_detector_id = dtr_id;
 	if (fields->sscan_detector_id >=
 	    spectral->rparams.num_spectral_detectors) {
 		spectral->diag_stats.spectral_invalid_detector_id++;
@@ -3184,6 +3223,7 @@ target_if_process_sfft_report_gen3(
 	int32_t peak_sidx = 0;
 	int32_t peak_mag;
 	int fft_hdr_length = 0;
+	uint32_t tstamp;
 	struct target_if_spectral_ops *p_sops;
 	enum spectral_scan_mode spectral_mode;
 	QDF_STATUS ret;
@@ -3265,11 +3305,17 @@ target_if_process_sfft_report_gen3(
 	p_sfft->timestamp = p_fft_report->fft_timestamp;
 	p_sfft->last_raw_timestamp = spectral->timestamp_war.
 					last_fft_timestamp[spectral_mode];
-	p_sfft->adjusted_timestamp = target_if_spectral_get_adjusted_timestamp(
+	ret = target_if_spectral_get_adjusted_timestamp(
 						&spectral->timestamp_war,
 						p_sfft->timestamp,
 						reset_delay,
-						spectral_mode);
+						spectral_mode,
+						&tstamp);
+
+	if (QDF_IS_STATUS_ERROR(ret))
+		return QDF_STATUS_E_FAILURE;
+
+	p_sfft->adjusted_timestamp =  tstamp;
 	/* Timestamp verification */
 	target_if_spectral_verify_ts(spectral, data,
 				     p_sfft->adjusted_timestamp,
@@ -3709,10 +3755,12 @@ target_if_consume_spectral_report_gen3(
 	uint8_t vdev_rxchainmask;
 	struct sscan_report_fields_gen3 sscan_report_fields = {0};
 	enum spectral_detector_id detector_id;
+	uint8_t dtr_id;
 	QDF_STATUS ret;
 	enum spectral_scan_mode spectral_mode = SPECTRAL_SCAN_MODE_INVALID;
 	uint8_t *temp;
 	bool finite_scan = false;
+	uint32_t tstamp;
 
 	/* Apply byte-swap on the headers */
 	if (p_sops->byte_swap_headers) {
@@ -3731,7 +3779,12 @@ target_if_consume_spectral_report_gen3(
 		goto fail;
 	}
 
-	detector_id = target_if_get_detector_id_sscan_summary_report_gen3(data);
+	ret = target_if_get_detector_id_sscan_summary_report_gen3(data,
+								  &dtr_id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		goto fail;
+
+	detector_id = dtr_id;
 	if (detector_id >= spectral->rparams.num_spectral_detectors) {
 		spectral->diag_stats.spectral_invalid_detector_id++;
 		spectral_err("Invalid detector id %u, expected is 0/1/2",
@@ -3835,10 +3888,14 @@ target_if_consume_spectral_report_gen3(
 				last_fft_timestamp[spectral_mode];
 		params.reset_delay = report->reset_delay;
 		params.raw_timestamp = p_sfft->timestamp;
-		params.tstamp = target_if_spectral_get_adjusted_timestamp(
+		ret = target_if_spectral_get_adjusted_timestamp(
 					&spectral->timestamp_war,
 					p_sfft->timestamp, report->reset_delay,
-					spectral_mode);
+					spectral_mode, &tstamp);
+		if (QDF_IS_STATUS_ERROR(ret))
+			goto fail;
+
+		params.tstamp = tstamp;
 		params.timestamp_war_offset = spectral->timestamp_war.
 				timestamp_war_offset[spectral_mode];
 		params.target_reset_count = spectral->timestamp_war.
