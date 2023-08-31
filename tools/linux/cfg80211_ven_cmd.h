@@ -1475,6 +1475,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_AFC_SEND_CMD = 536,
 #endif /* CONFIG_AFC_SUPPORT */
 	OL_ATH_PARAM_STANDBY_ACTIVE_MODE = 537,
+	OL_ATH_PARAM_SET_AWGN_EVENT = 538,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3887,6 +3888,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"atfvitimeslot", OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ATF_VI_TIMESLOT,
 		SET_PARAM, 1},
 #endif
+	{"set_awgn_event",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_AWGN_EVENT, SET_PARAM, 1},
 };
 #endif
 
