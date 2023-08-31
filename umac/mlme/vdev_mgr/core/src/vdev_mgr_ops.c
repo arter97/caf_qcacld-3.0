@@ -274,7 +274,7 @@ mlo_ap_append_bridge_vdevs(struct wlan_objmgr_vdev *vdev,
 	if (!vdev || !mlo_ptr)
 		return QDF_STATUS_E_FAILURE;
 
-	if (p_idx >= WLAN_UMAC_MLO_MAX_VDEVS)
+	if (p_idx > WLAN_UMAC_MLO_MAX_VDEVS)
 		return QDF_STATUS_E_FAILURE;
 
 	mlo_ap_get_bridge_vdev_list(vdev, &num_links, bridge_vdev_list);
