@@ -555,6 +555,7 @@ enum dp_ctxt_type {
 /**
  * enum dp_desc_type - source type for multiple pages allocation
  * @DP_TX_DESC_TYPE: DP SW TX descriptor
+ * @DP_TX_SPCL_DESC_TYPE: DP SW TX special descriptor
  * @DP_TX_PPEDS_DESC_TYPE: DP PPE-DS Tx descriptor
  * @DP_TX_EXT_DESC_TYPE: DP TX msdu extension descriptor
  * @DP_TX_EXT_DESC_LINK_TYPE: DP link descriptor for msdu ext_desc
@@ -567,6 +568,7 @@ enum dp_ctxt_type {
  */
 enum dp_desc_type {
 	DP_TX_DESC_TYPE,
+	DP_TX_SPCL_DESC_TYPE,
 	DP_TX_PPEDS_DESC_TYPE,
 	DP_TX_EXT_DESC_TYPE,
 	DP_TX_EXT_DESC_LINK_TYPE,
@@ -2333,11 +2335,13 @@ struct dp_arch_ops {
 
 	QDF_STATUS (*dp_tx_desc_pool_init)(struct dp_soc *soc,
 					   uint32_t num_elem,
-					   uint8_t pool_id);
+					   uint8_t pool_id,
+					   bool spcl_tx_desc);
 	void (*dp_tx_desc_pool_deinit)(
 				struct dp_soc *soc,
 				struct dp_tx_desc_pool_s *tx_desc_pool,
-				uint8_t pool_id);
+				uint8_t pool_id,
+				bool spcl_tx_desc);
 
 	QDF_STATUS (*dp_rx_desc_pool_init)(struct dp_soc *soc,
 					   struct rx_desc_pool *rx_desc_pool,
