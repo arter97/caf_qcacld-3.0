@@ -439,6 +439,7 @@ cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 	if (!is_multi_link_roam(roam_synch_data))
 		return;
 
+	mlo_mgr_reset_ap_link_info(vdev);
 	for (i = 0; i < roam_synch_data->num_setup_links; i++) {
 		ml_link = &roam_synch_data->ml_link[i];
 

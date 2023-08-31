@@ -307,30 +307,30 @@ void mlo_mgr_roam_update_ap_link_info(struct wlan_objmgr_vdev *vdev,
 				      struct wlan_channel *channel)
 {
 	struct mlo_link_info *link_info;
-	uint8_t iter, link_id;
+	uint8_t iter;
 
 	if (!vdev || !vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->link_ctx ||
 	    !src_link_info)
 		return;
 
-	link_id = src_link_info->link_id;
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
 		link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[iter];
-		if (link_id == link_info->link_id)
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
 			break;
 	}
 
 	if (iter == WLAN_MAX_ML_BSS_LINKS)
 		return;
 
-	qdf_mem_copy(&link_info->ap_link_addr,
-		     src_link_info->link_addr.bytes,
+	link_info->link_id = src_link_info->link_id;
+	link_info->vdev_id = src_link_info->vdev_id;
+	qdf_mem_copy(&link_info->ap_link_addr, src_link_info->link_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
 	qdf_mem_copy(&link_info->link_addr, src_link_info->self_link_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
 	qdf_mem_copy(link_info->link_chan_info, channel, sizeof(*channel));
 
-	mlo_debug("link_id: %d, vdev_id:%d freq:%d ap_link_addr:" QDF_MAC_ADDR_FMT " self_link_addr:" QDF_MAC_ADDR_FMT,
+	mlo_debug("link_id: %d, vdev_id:%d freq:%d ap_link_addr: "QDF_MAC_ADDR_FMT", self_link_addr: "QDF_MAC_ADDR_FMT,
 		  link_info->link_id, link_info->vdev_id,
 		  link_info->link_chan_info->ch_freq,
 		  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes),
