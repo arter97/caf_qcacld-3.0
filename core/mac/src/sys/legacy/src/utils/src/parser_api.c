@@ -9499,6 +9499,19 @@ populate_dot11f_rtwt_eht_cap(struct mac_context *mac,
 	eht_cap->restricted_twt = false;
 }
 #endif
+static void
+populate_dot11f_revise_eht_caps(struct pe_session *session,
+				tDot11fIEeht_cap *eht_cap)
+{
+	if (session->ch_width != CH_WIDTH_320MHZ)
+		eht_cap->support_320mhz_6ghz = 0;
+
+	if (wlan_epcs_get_config(session->vdev))
+		eht_cap->epcs_pri_access = 1;
+	else
+		eht_cap->epcs_pri_access = 0;
+}
+
 QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 				    struct pe_session *session,
 				    tDot11fIEeht_cap *eht_cap)
@@ -9514,13 +9527,7 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 
 	/** TODO: String items needs attention. **/
 	qdf_mem_copy(eht_cap, &session->eht_config, sizeof(*eht_cap));
-	if (session->ch_width != CH_WIDTH_320MHZ)
-		eht_cap->support_320mhz_6ghz = 0;
-
-	if (wlan_epcs_get_config(session->vdev))
-		eht_cap->epcs_pri_access = 1;
-	else
-		eht_cap->epcs_pri_access = 0;
+	populate_dot11f_revise_eht_caps(session, eht_cap);
 
 	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
 	return QDF_STATUS_SUCCESS;
@@ -9528,8 +9535,8 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 
 QDF_STATUS
 populate_dot11f_eht_caps_by_band(struct mac_context *mac_ctx,
-				 bool is_2g,
-				 tDot11fIEeht_cap *eht_cap)
+				 bool is_2g, tDot11fIEeht_cap *eht_cap,
+				 struct pe_session *session)
 {
 	pe_debug("is_2g %d", is_2g);
 	if (is_2g)
@@ -9540,6 +9547,8 @@ populate_dot11f_eht_caps_by_band(struct mac_context *mac_ctx,
 		qdf_mem_copy(eht_cap,
 			     &mac_ctx->eht_cap_5g,
 			     sizeof(tDot11fIEeht_cap));
+	if (session)
+		populate_dot11f_revise_eht_caps(session, eht_cap);
 
 	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
 	return QDF_STATUS_SUCCESS;
@@ -12367,7 +12376,8 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 			non_inher_ext_ie_lists[non_inher_ext_len++] =
 						WLAN_EXTN_ELEMID_HE_6G_CAP;
 		}
-		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps);
+		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps,
+						 pe_session);
 		if ((eht_caps.present && frm->eht_cap.present &&
 		     qdf_mem_cmp(&eht_caps, &frm->eht_cap, sizeof(eht_caps))) ||
 		     (eht_caps.present && !frm->eht_cap.present) ||

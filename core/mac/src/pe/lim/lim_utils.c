@@ -9008,7 +9008,7 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
 
-	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap);
+	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, session);
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
 					session);
 	lim_log_eht_cap(mac, &dot11_cap);

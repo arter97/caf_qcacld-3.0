@@ -1545,13 +1545,14 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
  * @mac_ctx: Global MAC context
  * @is_2g: is 2G band
  * @eht_cap: pointer to EHT capability IE
+ * @session: pe session
  *
  * Populate the EHT capability IE based on band.
  */
 QDF_STATUS
 populate_dot11f_eht_caps_by_band(struct mac_context *mac_ctx,
-				 bool is_2g,
-				 tDot11fIEeht_cap *eht_cap);
+				 bool is_2g, tDot11fIEeht_cap *eht_cap,
+				 struct pe_session *session);
 
 /**
  * populate_dot11f_eht_operation() - pouldate EHT Operation IE
@@ -1659,7 +1660,8 @@ populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 static inline QDF_STATUS
 populate_dot11f_eht_caps_by_band(struct mac_context *mac_ctx,
 				 bool is_2g,
-				 tDot11fIEeht_cap *eht_cap)
+				 tDot11fIEeht_cap *eht_cap,
+				 struct pe_session *session)
 {
 	return QDF_STATUS_SUCCESS;
 }
