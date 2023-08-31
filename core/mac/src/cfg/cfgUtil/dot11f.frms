@@ -2554,10 +2554,27 @@ IE transmit_power_env (EID_TRANSMIT_POWER_ENVELOPE)
     tx_power[1..8];
 }
 
+IE bw_ind_element (EID_EXTN_ID_ELEMENT) OUI (0x87)
+{
+   {
+       reserved: 1;
+       disabled_sub_chan_bitmap_present: 1;
+       reserved_1: 6;
+   }
+   {
+       channel_width: 3;
+       reserved_2: 5;
+   }
+   ccfs0, 1;
+   ccfs1, 1;
+   disabled_sub_chan_bitmap[2][0..1] COUNTIS disabled_sub_chan_bitmap_present;
+}
+
 IE ChannelSwitchWrapper (EID_CHANNEL_SWITCH_WRAPPER)
 {
     OPTIE IE  WiderBWChanSwitchAnn;
     OPTIE IE  transmit_power_env;
+    OPTIE IE  bw_ind_element;
 }
 
 IE reduced_neighbor_report (EID_RNR_IE)
@@ -4942,6 +4959,7 @@ FRAME ext_channel_switch_action_frame
     FF     ext_chan_switch_ann_action;
     OPTIE  WiderBWChanSwitchAnn;
     OPTIE  qcn_ie;
+    OPTIE  bw_ind_element;
 }
 
 FRAME p2p_oper_chan_change_confirm
