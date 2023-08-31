@@ -9357,6 +9357,7 @@ static int hdd_config_vdev_chains(struct wlan_hdd_link_info *link_info,
 	tx_chains = nla_get_u8(tx_attr);
 	rx_chains = nla_get_u8(rx_attr);
 
+	hdd_debug("tx_chains %d rx_chains %d", tx_chains, rx_chains);
 	if (hdd_ctx->dynamic_nss_chains_support)
 		return hdd_set_dynamic_antenna_mode(link_info,
 						    rx_chains, tx_chains);

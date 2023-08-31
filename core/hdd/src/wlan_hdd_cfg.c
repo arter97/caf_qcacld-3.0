@@ -1121,8 +1121,14 @@ static QDF_STATUS hdd_set_nss_params(struct wlan_hdd_link_info *link_info,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (tx_nss > wlan_vdev_mlme_get_nss(vdev) ||
-	    rx_nss > wlan_vdev_mlme_get_nss(vdev)) {
+	/* For STA tx/rx nss value is updated at the time of connection,
+	 * for SAP case nss values will not get update, so can skip check
+	 * for SAP/P2P_GO mode.
+	 */
+	if (adapter->device_mode != QDF_SAP_MODE &&
+	    adapter->device_mode != QDF_P2P_GO_MODE &&
+	    (tx_nss > wlan_vdev_mlme_get_nss(vdev) ||
+	    rx_nss > wlan_vdev_mlme_get_nss(vdev))) {
 		hdd_err("Given tx nss/rx nss is greater than intersected nss = %d",
 			wlan_vdev_mlme_get_nss(vdev));
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
@@ -1185,6 +1191,148 @@ static void hdd_set_sap_nss_params(struct wlan_hdd_link_info *link_info,
 	hdd_restart_sap(link_info);
 }
 
+/**
+ * hdd_get_sap_rx_nss() - get the sap rx nss
+ * @link_info: Pointer to link_info
+ * @rx_nss: pointer to rx_nss
+ *
+ * get the sap tx nss
+ *
+ * Return: None
+ */
+static QDF_STATUS
+hdd_get_sap_rx_nss(struct wlan_hdd_link_info *link_info, uint8_t *rx_nss)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_mlme_nss_chains *dynamic_cfg;
+	enum band_info operating_band;
+	mac_handle_t mac_handle;
+	uint8_t vdev_nss;
+
+	mac_handle = hdd_ctx->mac_handle;
+	if (!mac_handle) {
+		hdd_debug("NULL MAC handle");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	operating_band = hdd_get_sap_operating_band_by_link_info(link_info);
+	if (operating_band == BAND_UNKNOWN)
+		return QDF_STATUS_E_INVAL;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	sme_get_sap_vdev_type_nss(mac_handle, &vdev_nss, operating_band);
+	if (hdd_ctx->dynamic_nss_chains_support) {
+		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
+		if (!dynamic_cfg) {
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+			hdd_debug("nss chain dynamic config NULL");
+			return QDF_STATUS_E_INVAL;
+		}
+		switch (operating_band) {
+		case BAND_2G:
+			*rx_nss = dynamic_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ];
+			break;
+		case BAND_5G:
+			*rx_nss = dynamic_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ];
+			break;
+		default:
+			hdd_debug("Band %d Not 2G or 5G", operating_band);
+			break;
+		}
+	} else {
+		*rx_nss = vdev_nss;
+	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return  QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_get_sap_tx_nss() - get the sap tx nss
+ * @link_info: Pointer of link_info
+ * @tx_nss: pointer to tx_nss
+ *
+ * get the sap tx nss
+ *
+ * Return: None
+ */
+static QDF_STATUS
+hdd_get_sap_tx_nss(struct wlan_hdd_link_info *link_info, uint8_t *tx_nss)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_mlme_nss_chains *dynamic_cfg;
+	enum band_info operating_band;
+	mac_handle_t mac_handle;
+	uint8_t vdev_nss;
+
+	mac_handle = hdd_ctx->mac_handle;
+	if (!mac_handle) {
+		hdd_debug("NULL MAC handle");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	operating_band = hdd_get_sap_operating_band_by_link_info(link_info);
+	if (operating_band == BAND_UNKNOWN)
+		return QDF_STATUS_E_INVAL;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	sme_get_sap_vdev_type_nss(mac_handle, &vdev_nss, operating_band);
+	if (hdd_ctx->dynamic_nss_chains_support) {
+		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
+		if (!dynamic_cfg) {
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+			hdd_debug("nss chain dynamic config NULL");
+			return QDF_STATUS_E_INVAL;
+		}
+		switch (operating_band) {
+		case BAND_2G:
+			*tx_nss = dynamic_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ];
+			break;
+		case BAND_5G:
+			*tx_nss = dynamic_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ];
+			break;
+		default:
+			hdd_debug("Band %d Not 2G or 5G", operating_band);
+			break;
+		}
+	} else {
+		*tx_nss = vdev_nss;
+	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return  QDF_STATUS_SUCCESS;
+}
+
+static bool
+hdd_get_sap_restart_required_for_nss(struct wlan_hdd_link_info *link_info,
+				     uint8_t tx_nss, uint8_t rx_nss)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	uint8_t rx_prev, tx_prev;
+	bool restart_sap = 0;
+
+	ucfg_mlme_get_restart_sap_on_dynamic_nss_chains_cfg(hdd_ctx->psoc,
+							    &restart_sap);
+
+	if (!restart_sap)
+		return false;
+
+	hdd_get_sap_rx_nss(link_info, &rx_prev);
+	hdd_get_sap_tx_nss(link_info, &tx_prev);
+
+	if (rx_prev != rx_nss && tx_prev != tx_nss)
+		return true;
+	return false;
+}
+
 QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 			  uint8_t tx_nss, uint8_t rx_nss)
 {
@@ -1230,9 +1378,9 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 	 * and not the global param enable2x2
 	 */
 	if (hdd_ctx->dynamic_nss_chains_support) {
-		ucfg_mlme_get_restart_sap_on_dynamic_nss_chains_cfg(
-								hdd_ctx->psoc,
-								&restart_sap);
+		restart_sap =
+		hdd_get_sap_restart_required_for_nss(link_info, tx_nss, rx_nss);
+
 		if ((adapter->device_mode == QDF_SAP_MODE ||
 		     adapter->device_mode == QDF_P2P_GO_MODE) && restart_sap) {
 			if ((tx_nss == 2 && rx_nss == 2) ||
@@ -1477,66 +1625,6 @@ hdd_get_sap_num_tx_chains(struct wlan_hdd_link_info *link_info,
 }
 
 /**
- * hdd_get_sap_tx_nss() - get the sap tx nss
- * @link_info: Pointer of link_info
- * @tx_nss: pointer to tx_nss
- *
- * get the sap tx nss
- *
- * Return: None
- */
-static QDF_STATUS
-hdd_get_sap_tx_nss(struct wlan_hdd_link_info *link_info, uint8_t *tx_nss)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
-	struct wlan_objmgr_vdev *vdev;
-	struct wlan_mlme_nss_chains *dynamic_cfg;
-	enum band_info operating_band;
-	mac_handle_t mac_handle;
-	uint8_t vdev_nss;
-
-	mac_handle = hdd_ctx->mac_handle;
-	if (!mac_handle) {
-		hdd_debug("NULL MAC handle");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	operating_band = hdd_get_sap_operating_band_by_link_info(link_info);
-	if (operating_band == BAND_UNKNOWN)
-		return QDF_STATUS_E_INVAL;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return QDF_STATUS_E_INVAL;
-
-	sme_get_sap_vdev_type_nss(mac_handle, &vdev_nss, operating_band);
-	if (hdd_ctx->dynamic_nss_chains_support) {
-		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
-		if (!dynamic_cfg) {
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-			hdd_debug("nss chain dynamic config NULL");
-			return QDF_STATUS_E_INVAL;
-		}
-		switch (operating_band) {
-		case BAND_2G:
-			*tx_nss = dynamic_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ];
-			break;
-		case BAND_5G:
-			*tx_nss = dynamic_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ];
-			break;
-		default:
-			hdd_debug("Band %d Not 2G or 5G", operating_band);
-			break;
-		}
-	} else {
-		*tx_nss = vdev_nss;
-	}
-
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-	return  QDF_STATUS_SUCCESS;
-}
-
-/**
  * hdd_get_sta_num_tx_chains() - get the sta num tx chains
  * @link_info: Pointer of link_info
  * @tx_chains: pointer to tx_chains
@@ -1678,66 +1766,6 @@ hdd_get_sap_num_rx_chains(struct wlan_hdd_link_info *link_info,
 			hdd_debug("Band %d Not 2G or 5G", operating_band);
 			break;
 		}
-	}
-
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-	return  QDF_STATUS_SUCCESS;
-}
-
-/**
- * hdd_get_sap_rx_nss() - get the sap rx nss
- * @link_info: Pointer to link_info
- * @rx_nss: pointer to rx_nss
- *
- * get the sap tx nss
- *
- * Return: None
- */
-static QDF_STATUS
-hdd_get_sap_rx_nss(struct wlan_hdd_link_info *link_info, uint8_t *rx_nss)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
-	struct wlan_objmgr_vdev *vdev;
-	struct wlan_mlme_nss_chains *dynamic_cfg;
-	enum band_info operating_band;
-	mac_handle_t mac_handle;
-	uint8_t vdev_nss;
-
-	mac_handle = hdd_ctx->mac_handle;
-	if (!mac_handle) {
-		hdd_debug("NULL MAC handle");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	operating_band = hdd_get_sap_operating_band_by_link_info(link_info);
-	if (operating_band == BAND_UNKNOWN)
-		return QDF_STATUS_E_INVAL;
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return QDF_STATUS_E_INVAL;
-
-	sme_get_sap_vdev_type_nss(mac_handle, &vdev_nss, operating_band);
-	if (hdd_ctx->dynamic_nss_chains_support) {
-		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
-		if (!dynamic_cfg) {
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-			hdd_debug("nss chain dynamic config NULL");
-			return QDF_STATUS_E_INVAL;
-		}
-		switch (operating_band) {
-		case BAND_2G:
-			*rx_nss = dynamic_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ];
-			break;
-		case BAND_5G:
-			*rx_nss = dynamic_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ];
-			break;
-		default:
-			hdd_debug("Band %d Not 2G or 5G", operating_band);
-			break;
-		}
-	} else {
-		*rx_nss = vdev_nss;
 	}
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
