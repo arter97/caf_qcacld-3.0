@@ -582,7 +582,7 @@ QDF_STATUS dp_tx_desc_pool_init_li(struct dp_soc *soc,
 	struct dp_tx_desc_pool_s *tx_desc_pool;
 	uint16_t num_desc_per_page;
 
-	tx_desc_pool = &soc->tx_desc[pool_id];
+	tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
 	tx_desc = tx_desc_pool->freelist;
 	count = 0;
 	pool_id_32 = (uint32_t)pool_id;

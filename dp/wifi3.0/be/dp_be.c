@@ -783,6 +783,153 @@ void dp_reo_shared_qaddr_detach(struct dp_soc *soc)
 				soc->reo_qref.non_mlo_reo_qref_table_paddr, 0);
 }
 
+#ifdef QCA_SUPPORT_DP_GLOBAL_CTX
+static void dp_soc_tx_cookie_detach_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	int i = 0;
+	struct dp_global_context *dp_global;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+
+	dp_global->tx_cookie_ctx_alloc_cnt--;
+	if (dp_global->tx_cookie_ctx_alloc_cnt == 0) {
+		for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+			dp_hw_cookie_conversion_detach(be_soc,
+						       dp_global->tx_cc_ctx[i]);
+			qdf_mem_free(dp_global->tx_cc_ctx[i]);
+		}
+	}
+}
+
+static QDF_STATUS dp_soc_tx_cookie_attach_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_hw_cookie_conversion_t *cc_ctx;
+	struct dp_global_context *dp_global;
+	uint32_t num_entries;
+	int i = 0;
+	QDF_STATUS qdf_status;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+	if (dp_global->tx_cookie_ctx_alloc_cnt == 0) {
+		for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+			dp_global->tx_cc_ctx[i] =
+				qdf_mem_malloc(
+				sizeof(struct dp_hw_cookie_conversion_t));
+			cc_ctx = dp_global->tx_cc_ctx[i];
+			num_entries = wlan_cfg_get_num_tx_desc(
+					soc->wlan_cfg_ctx);
+			qdf_status =
+				dp_hw_cookie_conversion_attach(
+						be_soc,
+						cc_ctx,
+						num_entries,
+						DP_TX_DESC_TYPE, i);
+			if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+				return QDF_STATUS_E_FAILURE;
+		}
+	}
+	dp_global->tx_cookie_ctx_alloc_cnt++;
+	return QDF_STATUS_SUCCESS;
+}
+
+static void dp_soc_tx_cookie_deinit_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_global_context *dp_global;
+	int i = 0;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+
+	for (i = 0; i < MAX_TXDESC_POOLS; i++)
+		dp_hw_cookie_conversion_deinit(
+				be_soc,
+				dp_global->tx_cc_ctx[i]);
+}
+
+static QDF_STATUS dp_soc_tx_cookie_init_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_global_context *dp_global;
+	struct dp_hw_cookie_conversion_t *cc_ctx;
+	QDF_STATUS qdf_status;
+	int i = 0;
+
+	dp_global = wlan_objmgr_get_global_ctx();
+	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+		cc_ctx = dp_global->tx_cc_ctx[i];
+		qdf_status =
+			dp_hw_cookie_conversion_init(be_soc,
+					cc_ctx);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+			return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static void dp_soc_tx_cookie_detach_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	int i = 0;
+
+	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+		dp_hw_cookie_conversion_detach(
+				be_soc,
+				&be_soc->tx_cc_ctx[i]);
+	}
+}
+
+static QDF_STATUS dp_soc_tx_cookie_attach_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	uint32_t num_entries;
+	int i = 0;
+	QDF_STATUS qdf_status;
+
+	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+		num_entries = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
+		qdf_status =
+			dp_hw_cookie_conversion_attach(
+					be_soc,
+					&be_soc->tx_cc_ctx[i],
+					num_entries,
+					DP_TX_DESC_TYPE, i);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+			return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+static void dp_soc_tx_cookie_deinit_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	int i = 0;
+
+	for (i = 0; i < MAX_TXDESC_POOLS; i++)
+		dp_hw_cookie_conversion_deinit(
+				be_soc,
+				&be_soc->tx_cc_ctx[i]);
+}
+
+static QDF_STATUS dp_soc_tx_cookie_init_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	int i = 0;
+	QDF_STATUS qdf_status;
+
+	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+		qdf_status =
+			dp_hw_cookie_conversion_init(
+					be_soc,
+					&be_soc->tx_cc_ctx[i]);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+			return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static QDF_STATUS dp_soc_detach_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
@@ -794,10 +941,7 @@ static QDF_STATUS dp_soc_detach_be(struct dp_soc *soc)
 
 	mlo_dev_obj = dp_get_mlo_dev_list_obj(be_soc);
 	dp_mlo_dev_ctxt_list_detach_wrapper(mlo_dev_obj);
-
-	for (i = 0; i < MAX_TXDESC_POOLS; i++)
-		dp_hw_cookie_conversion_detach(be_soc,
-					       &be_soc->tx_cc_ctx[i]);
+	dp_soc_tx_cookie_detach_be(soc);
 
 	for (i = 0; i < MAX_RXDESC_POOLS; i++)
 		dp_hw_cookie_conversion_detach(be_soc,
@@ -849,6 +993,7 @@ static void dp_rx_fst_get_ref_be(void)
 	if (dp_global)
 		qdf_atomic_inc(&dp_global->rx_fst_ref_cnt);
 }
+
 #else
 static void dp_set_rx_fst_be(struct dp_rx_fst *fst)
 {
@@ -1059,16 +1204,9 @@ static QDF_STATUS dp_soc_attach_be(struct dp_soc *soc,
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 		goto fail;
 
-	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
-		num_entries = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
-		qdf_status =
-			dp_hw_cookie_conversion_attach(be_soc,
-						       &be_soc->tx_cc_ctx[i],
-						       num_entries,
-						       DP_TX_DESC_TYPE, i);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-			goto fail;
-	}
+	qdf_status = dp_soc_tx_cookie_attach_be(soc);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+		goto fail;
 
 	qdf_status = dp_get_cmem_allocation(soc, FISA_FST);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -1098,9 +1236,7 @@ static QDF_STATUS dp_soc_deinit_be(struct dp_soc *soc)
 	int i = 0;
 
 	dp_tx_deinit_bank_profiles(be_soc);
-	for (i = 0; i < MAX_TXDESC_POOLS; i++)
-		dp_hw_cookie_conversion_deinit(be_soc,
-					       &be_soc->tx_cc_ctx[i]);
+	dp_soc_tx_cookie_deinit_be(soc);
 
 	for (i = 0; i < MAX_RXDESC_POOLS; i++)
 		dp_hw_cookie_conversion_deinit(be_soc,
@@ -1119,13 +1255,9 @@ static QDF_STATUS dp_soc_init_be(struct dp_soc *soc)
 
 	dp_ppeds_init_soc_be(soc);
 
-	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
-		qdf_status =
-			dp_hw_cookie_conversion_init(be_soc,
-						     &be_soc->tx_cc_ctx[i]);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-			goto fail;
-	}
+	qdf_status = dp_soc_tx_cookie_init_be(soc);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+		goto fail;
 
 	for (i = 0; i < MAX_RXDESC_POOLS; i++) {
 		qdf_status =

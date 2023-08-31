@@ -7805,6 +7805,7 @@ void
 dp_print_soc_tx_stats(struct dp_soc *soc)
 {
 	uint8_t desc_pool_id;
+	struct dp_tx_desc_pool_s *tx_desc_pool;
 
 	soc->stats.tx.desc_in_use = 0;
 
@@ -7812,9 +7813,11 @@ dp_print_soc_tx_stats(struct dp_soc *soc)
 
 	for (desc_pool_id = 0;
 	     desc_pool_id < wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
-	     desc_pool_id++)
+	     desc_pool_id++) {
+		tx_desc_pool = dp_get_tx_desc_pool(soc, desc_pool_id);
 		soc->stats.tx.desc_in_use +=
-			soc->tx_desc[desc_pool_id].num_allocated;
+			tx_desc_pool->num_allocated;
+	}
 
 	DP_PRINT_STATS("Tx Descriptors In Use = %u",
 		       soc->stats.tx.desc_in_use);

@@ -840,7 +840,9 @@ static inline struct dp_tx_desc_s *dp_tx_desc_alloc(struct dp_soc *soc,
 						uint8_t desc_pool_id)
 {
 	struct dp_tx_desc_s *tx_desc = NULL;
-	struct dp_tx_desc_pool_s *pool = &soc->tx_desc[desc_pool_id];
+	struct dp_tx_desc_pool_s *pool = NULL;
+
+	pool = dp_get_tx_desc_pool(soc, desc_pool_id);
 
 	TX_DESC_LOCK_LOCK(&pool->lock);
 
@@ -880,7 +882,9 @@ static inline struct dp_tx_desc_s *dp_tx_desc_alloc_multiple(
 {
 	struct dp_tx_desc_s *c_desc = NULL, *h_desc = NULL;
 	uint8_t count;
-	struct dp_tx_desc_pool_s *pool = &soc->tx_desc[desc_pool_id];
+	struct dp_tx_desc_pool_s *pool = NULL;
+
+	pool = dp_get_tx_desc_pool(soc, desc_pool_id);
 
 	TX_DESC_LOCK_LOCK(&pool->lock);
 
@@ -924,9 +928,9 @@ dp_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
 		uint8_t desc_pool_id)
 {
 	struct dp_tx_desc_pool_s *pool = NULL;
-
+ 
 	dp_tx_desc_clear(tx_desc);
-	pool = &soc->tx_desc[desc_pool_id];
+	pool = dp_get_tx_desc_pool(soc, desc_pool_id);
 	TX_DESC_LOCK_LOCK(&pool->lock);
 	tx_desc->next = pool->freelist;
 	pool->freelist = tx_desc;
@@ -1071,7 +1075,9 @@ static inline void dp_tx_desc_update_fast_comp_flag(struct dp_soc *soc,
 static inline struct dp_tx_desc_s *dp_tx_desc_find(struct dp_soc *soc,
 		uint8_t pool_id, uint16_t page_id, uint16_t offset)
 {
-	struct dp_tx_desc_pool_s *tx_desc_pool = &soc->tx_desc[pool_id];
+	struct dp_tx_desc_pool_s *tx_desc_pool = NULL;
+
+	tx_desc_pool = dp_get_tx_desc_pool(soc, pool_id);
 
 	return tx_desc_pool->desc_pages.cacheable_pages[page_id] +
 		tx_desc_pool->elem_size * offset;
