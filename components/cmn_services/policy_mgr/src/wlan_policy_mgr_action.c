@@ -532,7 +532,8 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	else if (policy_mgr_update_indoor_concurrency(psoc, vdev_id, cur_freq,
 						SWITCH_WITHOUT_CONCURRENCY))
 		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
-	else if (wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev))
+	else if (wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev) &&
+		 (mode == PM_STA_MODE || mode == PM_P2P_CLIENT_MODE))
 		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
 
 	ml_nlink_conn_change_notify(
