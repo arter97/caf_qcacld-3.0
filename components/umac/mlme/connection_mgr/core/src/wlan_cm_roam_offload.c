@@ -6858,8 +6858,9 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 }
 
 QDF_STATUS
-cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
-			 struct wmi_roam_scan_data *scan_data, uint8_t vdev_id)
+cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
+			 struct roam_frame_info *frame_data,
+			 struct wmi_roam_scan_data *scan_data)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t i;
@@ -6869,11 +6870,11 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
-	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
+	populate_diag_cmn(&wlan_diag_event.diag_cmn, wlan_vdev_get_id(vdev),
 			  (uint64_t)frame_data->timestamp,
 			  &frame_data->bssid);
 
-	wlan_diag_event.version = DIAG_MGMT_VERSION;
+	wlan_diag_event.version = DIAG_MGMT_VERSION_V2;
 	wlan_diag_event.sn = frame_data->seq_num;
 	wlan_diag_event.auth_algo = frame_data->auth_algo;
 	wlan_diag_event.rssi = frame_data->rssi;
@@ -6918,6 +6919,10 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
 	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
 		wlan_diag_event.reason = frame_data->status_code;
+
+	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_DEAUTH_RX_EVENT ||
+	    wlan_diag_event.subtype == WLAN_CONN_DIAG_DISASSOC_RX_EVENT)
+		wlan_populate_vsie(vdev, &wlan_diag_event, false);
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
 

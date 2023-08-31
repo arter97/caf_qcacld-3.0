@@ -1184,6 +1184,18 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag);
 
+/**
+ * wlan_populate_vsie() - Populate VSIE field for logging
+ * @vdev: vdev pointer
+ * @data: Diag packet info data
+ * @is_tx: flag to indicate whether packet transmitted or received
+ *
+ * Return: None
+ */
+void
+wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
+		   struct wlan_diag_packet_info *data, bool is_tx);
+
 static inline void wlan_connectivity_logging_stop(void)
 {}
 
@@ -1266,6 +1278,18 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     enum wlan_main_tag tag);
 
 /**
+ * wlan_populate_vsie() - Populate VSIE field for logging
+ * @vdev: vdev pointer
+ * @data: Diag packet info data
+ * @is_tx: Flag to indicate whether the packet is transmitted or received
+ *
+ * Return: None
+ */
+void
+wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
+		   struct wlan_diag_packet_info *data, bool is_tx);
+
+/**
  * wlan_connectivity_sta_info_event() - APi to send STA info event
  * @psoc: Pointer to global psoc object
  * @vdev_id: Vdev id
@@ -1304,6 +1328,13 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag)
 {}
+
+static inline void
+wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
+		   struct wlan_diag_packet_info *data, bool is_tx)
+{
+}
+
 static inline void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id)
