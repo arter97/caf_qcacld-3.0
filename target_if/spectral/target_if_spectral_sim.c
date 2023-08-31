@@ -181,8 +181,9 @@ target_if_populate_report_static_gen2(
 		break;
 
 	default:
-		spectral_err("Unhandled width. Please correct. Asserting");
-		qdf_assert_always(0);
+		spectral_err("Unhandled width enum: %d. Please correct.",
+			     width);
+		goto bad;
 	}
 
 	return 0;
@@ -311,8 +312,9 @@ target_if_populate_report_static_gen3(
 		break;
 
 	default:
-		spectral_err("Unhandled width. Please correct. Asserting");
-		qdf_assert_always(0);
+		spectral_err("Unhandled width enum: %d. Please correct.",
+			     width);
+		goto bad;
 	}
 
 	return 0;
@@ -444,8 +446,9 @@ target_if_populate_reportset_static(
 		break;
 
 	default:
-		spectral_err("Unhandled width. Please rectify.");
-		qdf_assert_always(0);
+		spectral_err("Unhandled width enum: %d. Please correct.",
+			     width);
+		goto bad;
 	};
 
 	reportset->curr_report = reportset->headreport;
@@ -581,24 +584,42 @@ OS_TIMER_FUNC(target_if_spectral_sim_phyerrdelivery_handler)
 	struct target_if_spectral_ops *p_sops;
 
 	OS_GET_TIMER_ARG(spectral, struct target_if_spectral *);
-	qdf_assert_always(spectral);
+	if (!spectral) {
+		spectral_err("spectral pointer is null.");
+		return;
+	}
 
 	p_sops = GET_TARGET_IF_SPECTRAL_OPS(spectral);
-	qdf_assert_always(spectral);
+	if (!p_sops) {
+		spectral_err("p_sops pointer is null.");
+		return;
+	}
 
 	simctx = (struct spectralsim_context *)spectral->simctx;
-	qdf_assert_always(simctx);
+	if (!simctx) {
+		spectral_err("simctx pointer is null.");
+		return;
+	}
 
 	if (!simctx->is_active)
 		return;
 
 	curr_reportset = simctx->curr_reportset;
-	qdf_assert_always(curr_reportset);
+	if (!curr_reportset) {
+		spectral_err("curr_reportset pointer is null.");
+		return;
+	}
 
 	curr_report = curr_reportset->curr_report;
-	qdf_assert_always(curr_report);
+	if (!curr_report) {
+		spectral_err("curr_report pointer is null.");
+		return;
+	}
 
-	qdf_assert_always(curr_reportset->headreport);
+	if (!curr_reportset->headreport) {
+		spectral_err("curr_reportset->headreport pointer is null.");
+		return;
+	}
 
 	/*
 	 * We use a simulation TSF since in offload architectures we can't
@@ -685,10 +706,16 @@ target_if_spectral_sim_detach(struct target_if_spectral *spectral)
 {
 	struct spectralsim_context *simctx = NULL;
 
-	qdf_assert_always(spectral);
+	if (!spectral) {
+		spectral_err("spectral pointer is null.");
+		return;
+	}
 
 	simctx = (struct spectralsim_context *)spectral->simctx;
-	qdf_assert_always(simctx);
+	if (!simctx) {
+		spectral_err("simctx pointer is null.");
+		return;
+	}
 
 	qdf_timer_free(&simctx->ssim_pherrdelivery_timer);
 
