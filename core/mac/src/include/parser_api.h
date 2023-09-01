@@ -1566,6 +1566,18 @@ QDF_STATUS populate_dot11f_eht_operation(struct mac_context *mac_ctx,
 					 tDot11fIEeht_op *eht_op);
 
 /**
+ * populate_dot11f_bw_ind_element() - pouldate bandwidth ind element
+ * @mac_ctx: Global MAC context
+ * @session: PE session
+ * @bw_ind: pointer to bw ind element IE
+ *
+ * QDF_STATUS
+ */
+QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
+					  struct pe_session *session,
+					  tDot11fIEbw_ind_element *bw_ind);
+
+/**
  * lim_ieee80211_pack_ehtcap() - Pack EHT capabilities IE
  * @ie: output pointer for eht capabilities IE
  * @dot11f_eht_cap: dot11f EHT capabilities IE structure
@@ -1656,6 +1668,14 @@ static inline QDF_STATUS
 populate_dot11f_eht_operation(struct mac_context *mac_ctx,
 			      struct pe_session *session,
 			      tDot11fIEeht_op *eht_op)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
+					  struct pe_session *session,
+					  tDot11fIEbw_ind_element *bw_ind)
 {
 	return QDF_STATUS_SUCCESS;
 }

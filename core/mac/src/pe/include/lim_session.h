@@ -558,6 +558,8 @@ struct wlan_mlo_ie_info {
  * @chainMask:
  * @dfsIncludeChanSwIe: Flag to indicate Chan Sw announcement is required
  * @dfsIncludeChanWrapperIe: Flag to indicate Chan Wrapper Element is required
+ * @bw_update_include_ch_sw_ie: Flag to indicate chan switch Element is required
+ *                              due to bandwidth update
  * @cc_switch_mode:
  * @isCiscoVendorAP:
  * @add_ie_params:
@@ -867,6 +869,7 @@ struct pe_session {
 	uint8_t dfsIncludeChanSwIe;
 
 	uint8_t dfsIncludeChanWrapperIe;
+	uint8_t bw_update_include_ch_sw_ie;
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;

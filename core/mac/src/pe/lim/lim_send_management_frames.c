@@ -5095,6 +5095,10 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 			 frm.WiderBWChanSwitchAnn.newCenterChanFreq1);
 	}
 
+	if (lim_is_session_eht_capable(session_entry))
+		populate_dot11f_bw_ind_element(mac_ctx, session_entry,
+					       &frm.bw_ind_element);
+
 	status = dot11f_get_packed_ext_channel_switch_action_frame_size(mac_ctx,
 							    &frm, &n_payload);
 	if (DOT11F_FAILED(status)) {

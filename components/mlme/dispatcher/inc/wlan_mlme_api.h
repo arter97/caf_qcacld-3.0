@@ -1243,6 +1243,15 @@ enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						uint8_t channel_width);
 
 /**
+ * wlan_mlme_convert_phy_ch_width_to_eht_op_bw() - convert channel width to eht
+ *                                                 operation IE format
+ * @ch_width: phy_ch_width
+ *
+ * Return: channel width in eht operation IE
+ */
+uint8_t wlan_mlme_convert_phy_ch_width_to_eht_op_bw(enum phy_ch_width ch_width);
+
+/**
  * wlan_mlme_get_epcs_capability() - Get mlme epcs capability flag
  * @psoc: psoc object
  *

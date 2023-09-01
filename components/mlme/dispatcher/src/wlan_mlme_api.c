@@ -1281,6 +1281,22 @@ QDF_STATUS mlme_update_tgt_mlo_caps_in_cfg(struct wlan_objmgr_psoc *psoc)
 	return status;
 }
 
+uint8_t wlan_mlme_convert_phy_ch_width_to_eht_op_bw(enum phy_ch_width ch_width)
+{
+	switch (ch_width) {
+	case CH_WIDTH_320MHZ:
+		return WLAN_EHT_CHWIDTH_320;
+	case CH_WIDTH_160MHZ:
+		return WLAN_EHT_CHWIDTH_160;
+	case CH_WIDTH_80MHZ:
+		return WLAN_EHT_CHWIDTH_80;
+	case CH_WIDTH_40MHZ:
+		return WLAN_EHT_CHWIDTH_40;
+	default:
+		return WLAN_EHT_CHWIDTH_20;
+	}
+}
+
 enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						uint8_t channel_width)
 {

@@ -9719,6 +9719,31 @@ QDF_STATUS populate_dot11f_eht_operation(struct mac_context *mac_ctx,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+
+QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
+					  struct pe_session *session,
+					  tDot11fIEbw_ind_element *bw_ind)
+{
+	tLimChannelSwitchInfo *ch_switch;
+
+	ch_switch = &session->gLimChannelSwitch;
+	bw_ind->present = true;
+	bw_ind->channel_width =	wlan_mlme_convert_phy_ch_width_to_eht_op_bw(
+							ch_switch->ch_width);
+	if (ch_switch->puncture_bitmap) {
+		bw_ind->disabled_sub_chan_bitmap_present = 1;
+		bw_ind->disabled_sub_chan_bitmap[0][0] =
+				QDF_GET_BITS(ch_switch->puncture_bitmap, 0, 8);
+		bw_ind->disabled_sub_chan_bitmap[0][1] =
+				QDF_GET_BITS(ch_switch->puncture_bitmap, 8, 8);
+	}
+	bw_ind->ccfs0 = ch_switch->ch_center_freq_seg0;
+	bw_ind->ccfs1 = ch_switch->ch_center_freq_seg1;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif /* WLAN_FEATURE_11BE */
 
 #ifdef WLAN_FEATURE_11BE_MLO

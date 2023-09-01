@@ -8691,54 +8691,17 @@ static void lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 	__lim_process_sme_deauth_req(mac_ctx, (uint32_t *)msg->bodyptr);
 }
 
-/**
- * lim_nss_or_ch_width_update_rsp() - send NSS/ch_width update response to SME
- * @mac_ctx Pointer to Global MAC structure
- * @vdev_id: vdev id
- * @status: nss/ch_width update status
- * @reason: Indicates whether it's from NSS update or ch_width update
- *
- * Return: None
- */
-static void
-lim_nss_or_ch_width_update_rsp(struct mac_context *mac_ctx,
-			       uint8_t vdev_id, QDF_STATUS status,
-			       enum sir_bcn_update_reason reason)
-{
-	struct scheduler_msg msg = {0};
-	struct sir_bcn_update_rsp *rsp;
-	QDF_STATUS qdf_status = QDF_STATUS_E_INVAL;
-
-	rsp = qdf_mem_malloc(sizeof(*rsp));
-	if (!rsp)
-		return;
-
-	rsp->vdev_id = vdev_id;
-	rsp->status = status;
-	rsp->reason = reason;
-
-	if (rsp->reason == REASON_NSS_UPDATE)
-		msg.type = eWNI_SME_NSS_UPDATE_RSP;
-	else if (rsp->reason == REASON_CH_WIDTH_UPDATE)
-		msg.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
-	else
-		goto done;
-
-	msg.bodyptr = rsp;
-	msg.bodyval = 0;
-	qdf_status = scheduler_post_message(QDF_MODULE_ID_PE, QDF_MODULE_ID_SME,
-					    QDF_MODULE_ID_SME, &msg);
-done:
-	if (QDF_IS_STATUS_ERROR(qdf_status))
-		qdf_mem_free(rsp);
-}
-
 void lim_send_bcn_rsp(struct mac_context *mac_ctx, tpSendbeaconParams rsp)
 {
 	if (!rsp) {
 		pe_err("rsp is NULL");
 		return;
 	}
+
+	/* Success case response is sent from beacon_tx completion/timeout */
+	if (rsp->reason == REASON_CH_WIDTH_UPDATE &&
+	    QDF_IS_STATUS_SUCCESS(rsp->status))
+		return;
 
 	pe_debug("Send beacon resp status %d for reason %d",
 		 rsp->status, rsp->reason);
@@ -8759,6 +8722,12 @@ lim_update_bcn_with_new_ch_width(struct mac_context *mac_ctx,
 
 	pe_debug("ch width %d",
 		 session->gLimOperatingMode.chanWidth);
+
+	session->bw_update_include_ch_sw_ie = true;
+	status = qdf_mc_timer_start(&session->ap_ecsa_timer,
+				    MAX_WAIT_FOR_CH_WIDTH_UPDATE_COMPLETE);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("cannot start ap_ecsa_timer");
 
 	/* Send nss update request from here */
 	status = sch_set_fixed_beacon_fields(mac_ctx, session);
@@ -8845,6 +8814,8 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	uint8_t vdev_id;
 	struct sir_bcn_update_rsp *param;
 	struct scheduler_msg msg_return = {0};
+	uint8_t primary_channel;
+	struct ch_params ch_params = {0};
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -8863,6 +8834,26 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 		pe_err("Invalid opmode %d", session->opmode);
 		goto fail;
 	}
+
+	ch_params.ch_width = req->ch_width;
+	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+						session->curr_op_freq,
+						0,
+						&ch_params,
+						REG_CURRENT_PWR_MODE);
+
+	session->gLimChannelSwitch.switchCount = 1;
+	session->gLimChannelSwitch.sw_target_freq = session->curr_op_freq;
+	primary_channel = wlan_reg_freq_to_chan(mac_ctx->pdev,
+						session->curr_op_freq);
+	session->gLimChannelSwitch.primaryChannel = primary_channel;
+	session->gLimChannelSwitch.ch_width = req->ch_width;
+	session->gLimChannelSwitch.ch_center_freq_seg0 =
+						ch_params.center_freq_seg0;
+	session->gLimChannelSwitch.ch_center_freq_seg1 =
+						ch_params.center_freq_seg1;
+
+	wlan_mlme_set_ap_oper_ch_width(session->vdev, req->ch_width);
 
 	/* Send ECSA to the peers */
 	send_extended_chan_switch_action_frame(mac_ctx,

@@ -9976,8 +9976,26 @@ void lim_process_ap_ecsa_timeout(void *data)
 
 	mac_ctx = session->mac_ctx;
 
-	if (!session->dfsIncludeChanSwIe) {
-		pe_debug("session->dfsIncludeChanSwIe not set");
+	if (!session->dfsIncludeChanSwIe &&
+	    !session->bw_update_include_ch_sw_ie) {
+		pe_debug("session->dfsIncludeChanSwIe/chWidthUpdateIncludeChanSwIe not set");
+		return;
+	}
+
+	if (session->bw_update_include_ch_sw_ie) {
+		/* Stop the timer if already running */
+		qdf_mc_timer_stop(&session->ap_ecsa_timer);
+
+		lim_nss_or_ch_width_update_rsp(mac_ctx,
+					       session->vdev_id,
+					       QDF_STATUS_SUCCESS,
+					       REASON_CH_WIDTH_UPDATE);
+		session->gLimChannelSwitch.switchCount = 0;
+		session->bw_update_include_ch_sw_ie = false;
+
+		/* Clear CSA IE count and update beacon */
+		lim_send_dfs_chan_sw_ie_update(mac_ctx, session);
+
 		return;
 	}
 
