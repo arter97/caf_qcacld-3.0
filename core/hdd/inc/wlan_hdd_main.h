@@ -5246,6 +5246,14 @@ hdd_nl80211_chwidth_to_chwidth(uint8_t nl80211_chwidth);
 uint8_t hdd_chwidth_to_nl80211_chwidth(enum eSirMacHTChannelWidth chwidth);
 
 /**
+ * hdd_phy_chwidth_to_nl80211_chwidth() - Get nl chan width from phy chan width
+ * @chwidth: enum phy_ch_width
+ *
+ * Return: enum nl80211_chan_width or 0xFF for unsupported phy chan width
+ */
+uint8_t hdd_phy_chwidth_to_nl80211_chwidth(enum phy_ch_width chwidth);
+
+/**
  * wlan_hdd_get_channel_bw() - get channel bandwidth
  * @width: input channel width in nl80211_chan_width value
  *

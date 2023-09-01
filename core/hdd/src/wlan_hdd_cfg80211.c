@@ -10915,6 +10915,7 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	struct nlattr *curr_attr;
 	struct nlattr *chn_bd = NULL;
 	struct nlattr *mlo_link_id;
+	enum eSirMacHTChannelWidth chwidth;
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS])
 		goto skip_mlo;
@@ -10960,15 +10961,17 @@ skip_mlo:
 
 	nl80211_chwidth = nla_get_u8(chn_bd);
 
-	if (nl80211_chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
-	    nl80211_chwidth > eHT_MAX_CHANNEL_WIDTH) {
-		hdd_err("Invalid channel width");
+set_chan_width:
+	chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
+
+	if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
+	    chwidth > eHT_MAX_CHANNEL_WIDTH) {
+		hdd_err("Invalid channel width %u", chwidth);
 		return -EINVAL;
 	}
 
-set_chan_width:
 	return hdd_set_mac_chan_width(link_info->adapter,
-				      nl80211_chwidth, link_id);
+				      chwidth, link_id);
 }
 
 /**
@@ -12263,6 +12266,7 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	uint32_t link_id = 0;
 	struct wlan_objmgr_vdev *vdev, *link_vdev;
 	struct wlan_channel *bss_chan;
+	uint8_t nl80211_chwidth;
 
 	chwidth = wma_cli_get_command(link_info->vdev_id,
 				      wmi_vdev_param_chwidth, VDEV_CMD);
@@ -12275,14 +12279,7 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	if (!vdev)
 		return -EINVAL;
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
-
-		if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH,
-			       (uint8_t)bss_chan->ch_width)) {
-			hdd_err("nla_put chn width failure");
-		}
-	} else {
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		mlo_bd_info = nla_nest_start(skb, CONFIG_MLO_LINKS);
 		for (link_id = 0; link_id < WLAN_MAX_LINK_ID; link_id++) {
 			link_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
@@ -12310,8 +12307,9 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 				return -EINVAL;
 			}
 
+			nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(bss_chan->ch_width);
 			if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH,
-				       (uint8_t)bss_chan->ch_width)) {
+				       nl80211_chwidth)) {
 				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 				mlo_release_vdev_ref(link_vdev);
 				hdd_err("nla_put failure");

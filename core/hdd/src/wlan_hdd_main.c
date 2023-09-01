@@ -21389,6 +21389,20 @@ uint8_t hdd_chwidth_to_nl80211_chwidth(enum eSirMacHTChannelWidth chwidth)
 	return 0xFF;
 }
 
+uint8_t hdd_phy_chwidth_to_nl80211_chwidth(enum phy_ch_width chwidth)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chwidth_info); i++) {
+		if (chwidth_info[i].sir_chwidth_valid &&
+		    chwidth_info[i].phy_chwidth == chwidth)
+			return i;
+	}
+
+	hdd_err("Unsupported channel width %d", chwidth);
+	return 0xFF;
+}
+
 enum hw_mode_bandwidth wlan_hdd_get_channel_bw(enum nl80211_chan_width width)
 {
 	if (width >= ARRAY_SIZE(chwidth_info)) {
