@@ -1629,6 +1629,9 @@ static void wlan_vdev_down_pending(struct wlan_objmgr_pdev *pdev,
 	if (!psoc)
 		return;
 
+	if (wlan_vdev_mlme_is_mlo_bridge_vdev(vdev))
+		return;
+
 	cmd_type = wlan_serialization_get_vdev_active_cmd_type(vdev);
 	wlan_vdev_obj_lock(vdev);
 	if ((wlan_vdev_mlme_is_init_state(vdev) != QDF_STATUS_SUCCESS) ||
@@ -1659,6 +1662,9 @@ static void wlan_vdev_ap_down_pending(struct wlan_objmgr_pdev *pdev,
 		return;
 
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE)
+		return;
+
+	if (wlan_vdev_mlme_is_mlo_bridge_vdev(vdev))
 		return;
 
 	cmd_type = wlan_serialization_get_vdev_active_cmd_type(vdev);
