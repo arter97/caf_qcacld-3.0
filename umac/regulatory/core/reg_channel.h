@@ -54,6 +54,23 @@ bool reg_is_phymode_chwidth_allowed(
 		uint16_t input_puncture_bitmap);
 
 /**
+ * reg_get_max_channel_width() - Get the maximum channel width supported
+ * given a frequency and a global maximum channel width.
+ * @pdev: Pointer to PDEV object.
+ * @freq: Input frequency.
+ * @g_max_width: Global maximum channel width.
+ * @input_puncture_bitmap: Input puncture bitmap
+ *
+ * Return: Maximum channel width of type phy_ch_width.
+ */
+enum phy_ch_width
+reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
+			  qdf_freq_t freq,
+			  enum phy_ch_width g_max_width,
+			  enum supported_6g_pwr_types in_6g_pwr_mode,
+			  uint16_t input_puncture_bitmap);
+
+/**
  * reg_set_chan_blocked() - Set is_chan_hop_blocked to true for a frequency
  * in the current chan list.
  * @pdev: Pointer to pdev.
@@ -147,6 +164,16 @@ static inline bool reg_is_phymode_chwidth_allowed(
 		uint16_t input_puncture_bitmap)
 {
 	return false;
+}
+
+static inline enum phy_ch_width
+reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
+			  qdf_freq_t freq,
+			  enum phy_ch_width g_max_width,
+			  enum supported_6g_pwr_types in_6g_pwr_mode,
+			  uint16_t input_puncture_bitmap);
+{
+	return CH_WIDTH_INVALID;
 }
 
 static inline
