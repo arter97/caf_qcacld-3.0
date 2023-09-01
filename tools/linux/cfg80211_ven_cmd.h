@@ -1467,6 +1467,10 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_DOWNGRADE_320MHZ_OPCLASS = 532,
 #endif
 	OL_ATH_PARAM_RF_PATH_SWITCH = 533,
+#if QCA_AIRTIME_FAIRNESS
+	OL_ATH_PARAM_ATF_VO_TIMESLOT = 534,
+	OL_ATH_PARAM_ATF_VI_TIMESLOT = 535,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3866,6 +3870,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 #ifdef QCA_R2P_UPDATE_ENABLED
 	{"hchan_r2p_restore_en",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_R2P_HCHAN_RESTORE, SET_PARAM, 1},
+#endif
+#if QCA_AIRTIME_FAIRNESS
+	{"atfvotimeslot", OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ATF_VO_TIMESLOT,
+		SET_PARAM, 1},
+	{"atfvitimeslot", OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ATF_VI_TIMESLOT,
+		SET_PARAM, 1},
 #endif
 };
 #endif
