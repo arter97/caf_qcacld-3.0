@@ -8762,16 +8762,26 @@ lim_calculate_peer_ch_width(struct pe_session *session,
 			    uint8_t *mac_addr,
 			    enum phy_ch_width new_ch_width)
 {
-	enum phy_ch_width peer_org_bw;
+	enum phy_ch_width peer_org_bw, updated_bw;
+	struct peer_oper_mode_event data = {0};
+	QDF_STATUS status;
 
 	peer_org_bw = wlan_mlme_get_peer_ch_width(
 				wlan_vdev_get_psoc(session->vdev), mac_addr);
 
-	//TODO: Consider peer indicated bandwidth also to calculate final bw
-	pe_debug("Peer: " QDF_MAC_ADDR_FMT " original bw: %d, new bw: %d",
-		 QDF_MAC_ADDR_REF(mac_addr), peer_org_bw, new_ch_width);
+	updated_bw = new_ch_width;
 
-	return qdf_min(peer_org_bw, new_ch_width);
+	qdf_mem_copy(&data.peer_mac_address.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
+	status = wlan_mlme_get_peer_indicated_ch_width(
+				wlan_vdev_get_psoc(session->vdev), &data);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		updated_bw = data.new_bw;
+
+	pe_debug("Peer: " QDF_MAC_ADDR_FMT " original bw: %d, updated bw: %d, new bw: %d",
+		 QDF_MAC_ADDR_REF(mac_addr), peer_org_bw, updated_bw,
+		 new_ch_width);
+
+	return qdf_min(peer_org_bw, qdf_min(updated_bw, new_ch_width));
 }
 
 static void
