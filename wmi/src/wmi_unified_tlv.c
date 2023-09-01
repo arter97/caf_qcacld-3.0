@@ -22308,6 +22308,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	wmi_service[wmi_service_mlo_tsf_sync] = WMI_SERVICE_MLO_TSF_SYNC;
+	wmi_service[wmi_service_pdev_wsi_stats_info_support] =
+			WMI_SERVICE_PDEV_WSI_STATS_INFO_SUPPORT;
 #endif
 #ifdef WLAN_ATF_INCREASED_STA
 	wmi_service[wmi_service_atf_max_client_512_support] =

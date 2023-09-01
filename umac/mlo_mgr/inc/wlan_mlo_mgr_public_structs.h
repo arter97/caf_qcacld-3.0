@@ -158,6 +158,7 @@ struct mlo_chip_info {
  * @dp_handle: pointer to DP ML context
  * @chip_info: chip specific info of the soc
  * @tsf_sync_enabled: MLO TSF sync is enabled at FW or not
+ * @wsi_stats_info_support: WSI stats support at FW or not
  */
 struct mlo_setup_info {
 	uint8_t ml_grp_id;
@@ -177,6 +178,7 @@ struct mlo_setup_info {
 	struct cdp_mlo_ctxt *dp_handle;
 	struct mlo_chip_info chip_info;
 	bool tsf_sync_enabled;
+	uint8_t wsi_stats_info_support;
 };
 
 /**

@@ -186,6 +186,10 @@ init_deinit_update_vendor_handoff_control_caps(struct wmi_unified *wmi_handle,
 {}
 #endif
 
+static void
+init_deinit_pdev_wsi_stats_info_support(struct wmi_unified *wmi_handle,
+					struct wlan_objmgr_psoc *psoc);
+
 static void init_deinit_mlo_tsf_sync_support(struct wmi_unified *wmi_handle,
 					     struct wlan_objmgr_psoc *psoc);
 
@@ -343,6 +347,8 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 	init_deinit_update_roam_stats_cap(wmi_handle, psoc);
 
 	init_deinit_update_wifi_pos_caps(wmi_handle, psoc);
+
+	init_deinit_pdev_wsi_stats_info_support(wmi_handle, psoc);
 
 	init_deinit_mlo_tsf_sync_support(wmi_handle, psoc);
 
@@ -811,6 +817,26 @@ static void init_deinit_mlo_update_pdev_ready(struct wlan_objmgr_psoc *psoc,
 				     NULL, 0, WLAN_INIT_DEINIT_ID);
 }
 
+static void
+init_deinit_pdev_wsi_stats_info_support(struct wmi_unified *wmi_handle,
+					struct wlan_objmgr_psoc *psoc)
+{
+	bool wsi_stats_info_support = false;
+
+	if (!init_deinit_mlo_capable(psoc))
+		return;
+
+	if (wmi_service_enabled(wmi_handle,
+				wmi_service_pdev_wsi_stats_info_support)) {
+		target_if_err("wmi_service_pdev_wsi_stats_info_support is enabled for PSoc %d", wlan_psoc_get_id(psoc));
+		wsi_stats_info_support = true;
+	} else {
+		target_if_err("wmi_service_pdev_wsi_stats_info_support is not enabled for PSoc %d", wlan_psoc_get_id(psoc));
+	}
+
+	mlo_update_wsi_stats_info_support(psoc, wsi_stats_info_support);
+}
+
 static void init_deinit_mlo_tsf_sync_support(struct wmi_unified *wmi_handle,
 					     struct wlan_objmgr_psoc *psoc)
 {
@@ -830,6 +856,10 @@ static void init_deinit_mlo_update_soc_ready(struct wlan_objmgr_psoc *psoc)
 {}
 static void init_deinit_mlo_update_pdev_ready(struct wlan_objmgr_psoc *psoc,
 					      uint8_t num_radios)
+{}
+static void
+init_deinit_pdev_wsi_stats_info_support(struct wmi_unified *wmi_handle,
+					struct wlan_objmgr_psoc *psoc)
 {}
 static void init_deinit_mlo_tsf_sync_support(struct wmi_unified *wmi_handle,
 					     struct wlan_objmgr_psoc *psoc)

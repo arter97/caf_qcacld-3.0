@@ -6360,6 +6360,7 @@ typedef enum {
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	wmi_service_mlo_tsf_sync,
+	wmi_service_pdev_wsi_stats_info_support,
 #endif
 #ifdef WLAN_ATF_INCREASED_STA
 	wmi_service_atf_max_client_512_support,
