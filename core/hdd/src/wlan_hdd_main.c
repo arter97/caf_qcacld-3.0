@@ -1841,10 +1841,26 @@ static bool hdd_dot11Mode_support_11be(enum hdd_dot11_mode dot11Mode)
 
 	return true;
 }
+
+static void
+hdd_update_tid_to_link_supported(struct hdd_context *hdd_ctx,
+				 struct wma_tgt_services *cfg)
+{
+	if (!cfg->en_mlo_tid_to_link_support)
+		ucfg_mlme_set_t2lm_negotiation_supported(hdd_ctx->psoc,
+							 T2LM_NEGOTIATION_DISABLED);
+}
+
 #else
 static bool hdd_dot11Mode_support_11be(enum hdd_dot11_mode dot11Mode)
 {
 	return false;
+}
+
+static inline void
+hdd_update_tid_to_link_supported(struct hdd_context *hdd_ctx,
+				 struct wma_tgt_services *cfg)
+{
 }
 #endif
 
@@ -2975,6 +2991,7 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 		}
 	}
 
+	hdd_update_tid_to_link_supported(hdd_ctx, &cfg->services);
 	mac_handle = hdd_ctx->mac_handle;
 
 	hdd_debug("txBFCsnValue %d", value);

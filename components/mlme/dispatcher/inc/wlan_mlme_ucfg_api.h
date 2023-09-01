@@ -3190,6 +3190,24 @@ ucfg_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 /**
+ * ucfg_mlme_set_t2lm_negotiation_supported() - Enables/disables t2lm
+ * negotiation support value
+ * @psoc: psoc context
+ * @value: data to be set
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers to set the
+ * t2lm negotiation supported value
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
+					 bool value)
+{
+	return wlan_mlme_set_t2lm_negotiation_supported(psoc, value);
+}
+
+/**
  * ucfg_mlme_get_opr_rate() - Get operational rate set
  * @vdev: pointer to vdev object
  * @buf: buffer to get rates set

@@ -5147,6 +5147,7 @@ wma_get_n_link_mlo_support(struct wmi_unified *wmi_handle,
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_n_link_mlo_support);
 }
+
 #else
 static inline void
 wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
@@ -5239,6 +5240,32 @@ static inline void wma_get_dynamic_vdev_macaddr_support(
 #else
 static inline void wma_get_dynamic_vdev_macaddr_support(
 		  struct wmi_unified *wmi_handle, struct wma_tgt_services *cfg)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * wma_get_mlo_tid_to_link_mapping_support() - update tgt service with
+ * service tid to link mapping support
+ * @wmi_handle: Unified wmi handle
+ * @cfg: target services
+ *
+ * Return: none
+ */
+static inline void
+wma_get_mlo_tid_to_link_mapping_support(struct wmi_unified *wmi_handle,
+					struct wma_tgt_services *cfg)
+{
+	cfg->en_mlo_tid_to_link_support =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_mlo_tid_to_link_mapping_support);
+}
+
+#else
+static inline void
+wma_get_mlo_tid_to_link_mapping_support(struct wmi_unified *wmi_handle,
+					struct wma_tgt_services *cfg)
 {
 }
 #endif
@@ -5425,6 +5452,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);
 	wma_get_service_cap_per_link_mlo_stats(wmi_handle, cfg);
 	wma_get_n_link_mlo_support(wmi_handle, cfg);
+	wma_get_mlo_tid_to_link_mapping_support(wmi_handle, cfg);
 }
 
 /**
