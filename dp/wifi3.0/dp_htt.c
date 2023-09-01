@@ -2680,7 +2680,7 @@ static void dp_vdev_txrx_hw_stats_handler(struct htt_soc *soc,
 			break;
 		}
 		default:
-			qdf_assert(0);
+			dp_htt_err("Invalid tlv_type value:%d\n", tlv_type);
 		}
 invalid_vdev:
 		msg_word = (uint32_t *)((uint8_t *)tlv_buf + tlv_length);
