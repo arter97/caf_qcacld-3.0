@@ -1159,6 +1159,13 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 				continue;
 			}
 
+			/*
+			 * Reject the partner link that doesn’t pass the
+			 * security check and validate the next available
+			 * partner link. If none of the partner link passes
+			 * the security check, proceed connection with
+			 * single link.
+			 */
 			is_security_allowed =
 				wlan_cm_is_eht_allowed_for_current_security(
 							part_scan_entry);
@@ -1167,7 +1174,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 				mlme_debug("current security is not valid for partner link");
 				continue;
 			}
-
 			partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
 			partner_info->partner_link_info[j].link_id =

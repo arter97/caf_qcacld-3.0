@@ -1984,12 +1984,18 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 						  (struct qdf_mac_addr *)
 						  bss_desc->bssId);
 
+	/*
+	 * If AP advertises multiple AKMs(WPA2 PSK + WPA3), allow connection
+	 * in 11BE mode as our connection is going to be WPA3
+	 */
 	if (scan_entry) {
 		is_eht_allowed =
 			wlan_cm_is_eht_allowed_for_current_security(scan_entry);
 		util_scan_free_cache_entry(scan_entry);
-		if (!is_eht_allowed)
+		if (!is_eht_allowed) {
+			pe_debug("Downgrade to 11ax mode due to AP security validation failure");
 			return false;
+		}
 	}
 	return mlme_get_bss_11be_allowed(
 			mac_ctx->psoc,
