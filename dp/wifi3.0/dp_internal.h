@@ -3563,6 +3563,28 @@ void dp_print_peer_stats(struct dp_peer *peer,
 void
 dp_print_pdev_tx_stats(struct dp_pdev *pdev);
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MCAST_MLO)
+/**
+ * dp_print_vdev_mlo_mcast_tx_stats(): Print vdev level mlo mcast tx stats
+ * @vdev: DP_VDEV Handle
+ *
+ * Return:void
+ */
+void
+dp_print_vdev_mlo_mcast_tx_stats(struct dp_vdev *vdev);
+#else
+/**
+ * dp_print_vdev_mlo_mcast_tx_stats(): Print vdev level mlo mcast tx stats
+ * @vdev: DP_VDEV Handle
+ *
+ * Return:void
+ */
+static inline
+void dp_print_vdev_mlo_mcast_tx_stats(struct dp_vdev *vdev)
+{
+}
+#endif
+
 /**
  * dp_print_pdev_rx_stats(): Print Pdev level RX stats
  * @pdev: DP_PDEV Handle
