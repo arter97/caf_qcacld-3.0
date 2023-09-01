@@ -58,6 +58,20 @@ bool wlan_reg_is_phymode_chwidth_allowed(struct wlan_objmgr_pdev *pdev,
 					      input_puncture_bitmap);
 }
 
+enum phy_ch_width
+wlan_reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
+			  qdf_freq_t freq,
+			  enum phy_ch_width ch_width,
+			  enum supported_6g_pwr_types in_6g_pwr_mode,
+			  uint16_t input_puncture_bitmap)
+{
+	return reg_get_max_channel_width(pdev,
+					 freq,
+					 ch_width,
+					 in_6g_pwr_mode,
+					 input_puncture_bitmap);
+}
+
 QDF_STATUS wlan_reg_get_max_phymode_and_chwidth(struct wlan_objmgr_pdev *pdev,
 						enum reg_phymode *phy_in,
 						enum phy_ch_width *ch_width)

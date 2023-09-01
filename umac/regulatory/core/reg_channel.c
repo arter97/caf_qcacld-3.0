@@ -190,18 +190,8 @@ static uint16_t chwd_2_contbw_lst[CH_WIDTH_MAX + 1] = {
 
 };
 
-/**
- * reg_get_max_channel_width() - Get the maximum channel width supported
- * given a frequency and a global maximum channel width.
- * @pdev: Pointer to PDEV object.
- * @freq: Input frequency.
- * @g_max_width: Global maximum channel width.
- * @input_puncture_bitmap: Input puncture bitmap
- *
- * Return: Maximum channel width of type phy_ch_width.
- */
 #ifdef WLAN_FEATURE_11BE
-static enum phy_ch_width
+enum phy_ch_width
 reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 			  qdf_freq_t freq,
 			  enum phy_ch_width g_max_width,
@@ -233,7 +223,7 @@ reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 	return output_width;
 }
 #else
-static enum phy_ch_width
+enum phy_ch_width
 reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 			  qdf_freq_t freq,
 			  enum phy_ch_width g_max_width,
