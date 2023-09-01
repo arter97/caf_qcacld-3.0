@@ -2305,6 +2305,11 @@ QDF_STATUS (*extract_dbr_buf_cv_metadata)(
 			wmi_unified_t wmi_handle,
 			uint8_t *evt_buf, uint8_t idx,
 			struct direct_buf_rx_cv_metadata *param);
+
+QDF_STATUS (*extract_dbr_buf_cqi_metadata)(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf, uint8_t idx,
+			struct direct_buf_rx_cqi_metadata *param);
 #endif
 
 QDF_STATUS (*extract_pdev_utf_event)(wmi_unified_t wmi_hdl,
