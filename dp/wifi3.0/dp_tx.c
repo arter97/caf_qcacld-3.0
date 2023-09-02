@@ -424,7 +424,7 @@ dp_tx_desc_release(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
 		    tx_desc->id, comp_status,
 		    qdf_atomic_read(&pdev->num_tx_outstanding));
 
-	if (tx_desc->nbuf->protocol == QDF_NBUF_TRAC_EAPOL_ETH_TYPE)
+	if (tx_desc->flags & DP_TX_DESC_FLAG_SPECIAL)
 		dp_tx_spcl_desc_free(soc, tx_desc, desc_pool_id);
 	else
 		dp_tx_desc_free(soc, tx_desc, desc_pool_id);
@@ -5754,8 +5754,7 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			if (desc->pool_id != DP_TX_PPEDS_POOL_ID) {
 				nbuf = desc->nbuf;
 				dp_tx_nbuf_dev_queue_free_no_flag(&h, nbuf);
-				if (nbuf->protocol ==
-						QDF_NBUF_TRAC_EAPOL_ETH_TYPE)
+				if (desc->flags & DP_TX_DESC_FLAG_SPECIAL)
 					dp_tx_spcl_desc_free(soc, desc,
 							     desc->pool_id);
 				else

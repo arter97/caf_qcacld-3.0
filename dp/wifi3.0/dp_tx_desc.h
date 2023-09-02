@@ -918,6 +918,7 @@ static inline struct dp_tx_desc_s *dp_tx_spcl_desc_alloc(struct dp_soc *soc,
 	dp_tx_prefetch_desc(pool->freelist);
 
 	tx_desc->flags = DP_TX_DESC_FLAG_ALLOCATED;
+	tx_desc->flags |= DP_TX_DESC_FLAG_SPECIAL;
 
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
 
