@@ -542,6 +542,9 @@ QDF_STATUS sme_ser_handle_active_cmd(struct wlan_serialization_command *cmd)
 	case e_sme_command_set_antenna_mode:
 		csr_process_set_antenna_mode(mac_ctx, sme_cmd);
 		break;
+	case e_sme_command_sap_ch_width_update:
+		csr_process_sap_ch_width_update(mac_ctx, sme_cmd);
+		break;
 	default:
 		/* something is wrong */
 		sme_err("unknown command %d", sme_cmd->command);
@@ -1222,6 +1225,7 @@ QDF_STATUS sme_start(mac_handle_t mac_handle)
 		sme_cbacks.sme_rso_start_cb = sme_start_roaming;
 		sme_cbacks.sme_rso_stop_cb = sme_stop_roaming;
 		sme_cbacks.sme_change_sap_csa_count = sme_change_sap_csa_count;
+		sme_cbacks.sme_sap_update_ch_width = sme_sap_update_ch_width;
 		status = policy_mgr_register_sme_cb(mac->psoc, &sme_cbacks);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			sme_err("Failed to register sme cb with Policy Manager: %d",
@@ -2657,6 +2661,67 @@ static void sme_process_chan_info_event(struct mac_context *mac,
 	sme_indicate_chan_info_event(mac, chan_stats, vdev_id);
 }
 
+/**
+ * sme_process_sap_ch_width_update_rsp() - Process ch_width update response
+ * @mac: Global MAC pointer
+ * @msg: ch_width update response
+ *
+ * Processes the ch_width update response and invokes the HDD
+ * callback to process further
+ */
+static QDF_STATUS
+sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
+{
+	tListElem *entry = NULL;
+	tSmeCmd *command = NULL;
+	bool found;
+	struct sir_bcn_update_rsp *param;
+	enum policy_mgr_conn_update_reason reason;
+	uint32_t request_id;
+	uint8_t vdev_id;
+
+	param = (struct sir_bcn_update_rsp *)msg;
+	if (!param)
+		sme_err("ch_width update resp param is NULL");
+		/* Not returning. Need to check if active command list
+		 * needs to be freed
+		 */
+
+	if (param && param->reason != REASON_CH_WIDTH_UPDATE) {
+		sme_err("reason not ch_width update");
+		return QDF_STATUS_E_INVAL;
+	}
+	entry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+	if (!entry) {
+		sme_err("No cmd found in active list");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	command = GET_BASE_ADDR(entry, tSmeCmd, Link);
+	if (!command) {
+		sme_err("Base address is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (e_sme_command_sap_ch_width_update != command->command) {
+		sme_err("Command mismatch!");
+		return QDF_STATUS_E_FAILURE;
+	}
+	reason = command->u.bw_update_cmd.reason;
+	request_id = command->u.bw_update_cmd.request_id;
+	vdev_id = command->u.bw_update_cmd.conc_vdev_id;
+	sme_debug("vdev %d reason %d status %d cm_id 0x%x",
+		  vdev_id, reason, param->status, request_id);
+
+	found = csr_nonscan_active_ll_remove_entry(mac, entry, LL_ACCESS_LOCK);
+	if (found) {
+		/* Now put this command back on the available command list */
+		csr_release_command(mac, command);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -2981,6 +3046,11 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		break;
 	case eWNI_SME_CHAN_INFO_EVENT:
 		sme_process_chan_info_event(mac, pMsg->bodyptr, pMsg->bodyval);
+		qdf_mem_free(pMsg->bodyptr);
+		break;
+	case eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP:
+		status = sme_process_sap_ch_width_update_rsp(mac,
+							     pMsg->bodyptr);
 		qdf_mem_free(pMsg->bodyptr);
 		break;
 	default:
@@ -11703,6 +11773,48 @@ QDF_STATUS sme_nss_update_request(uint32_t vdev_id,
 		csr_queue_sme_command(mac, cmd, false);
 		sme_release_global_lock(&mac->sme);
 	}
+	return status;
+}
+
+QDF_STATUS
+sme_sap_update_ch_width(struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id,
+			enum phy_ch_width ch_width,
+			enum policy_mgr_conn_update_reason reason,
+			uint8_t conc_vdev_id, uint32_t request_id)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct mac_context *mac = sme_get_mac_context();
+	tSmeCmd *cmd = NULL;
+
+	if (!mac) {
+		sme_err("mac is null");
+		return status;
+	}
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	cmd = csr_get_command_buffer(mac);
+	if (!cmd) {
+		sme_err("Get command buffer failed");
+		sme_release_global_lock(&mac->sme);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	cmd->command = e_sme_command_sap_ch_width_update;
+	/* Sessionized modules may require this info */
+	cmd->vdev_id = vdev_id;
+	cmd->u.bw_update_cmd.ch_width = ch_width;
+	cmd->u.bw_update_cmd.vdev_id = vdev_id;
+	cmd->u.bw_update_cmd.reason = reason;
+	cmd->u.bw_update_cmd.request_id = request_id;
+	cmd->u.bw_update_cmd.conc_vdev_id = conc_vdev_id;
+
+	sme_debug("Queuing e_sme_command_sap_ch_width_update to CSR:vdev %d ch_width: %d reason: %d",
+		  vdev_id, ch_width, reason);
+	csr_queue_sme_command(mac, cmd, false);
+	sme_release_global_lock(&mac->sme);
+
 	return status;
 }
 

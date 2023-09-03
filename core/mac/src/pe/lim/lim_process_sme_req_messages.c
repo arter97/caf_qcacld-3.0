@@ -8692,6 +8692,210 @@ static void lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 }
 
 /**
+ * lim_nss_or_ch_width_update_rsp() - send NSS/ch_width update response to SME
+ * @mac_ctx Pointer to Global MAC structure
+ * @vdev_id: vdev id
+ * @status: nss/ch_width update status
+ * @reason: Indicates whether it's from NSS update or ch_width update
+ *
+ * Return: None
+ */
+static void
+lim_nss_or_ch_width_update_rsp(struct mac_context *mac_ctx,
+			       uint8_t vdev_id, QDF_STATUS status,
+			       enum sir_bcn_update_reason reason)
+{
+	struct scheduler_msg msg = {0};
+	struct sir_bcn_update_rsp *rsp;
+	QDF_STATUS qdf_status = QDF_STATUS_E_INVAL;
+
+	rsp = qdf_mem_malloc(sizeof(*rsp));
+	if (!rsp)
+		return;
+
+	rsp->vdev_id = vdev_id;
+	rsp->status = status;
+	rsp->reason = reason;
+
+	if (rsp->reason == REASON_NSS_UPDATE)
+		msg.type = eWNI_SME_NSS_UPDATE_RSP;
+	else if (rsp->reason == REASON_CH_WIDTH_UPDATE)
+		msg.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
+	else
+		goto done;
+
+	msg.bodyptr = rsp;
+	msg.bodyval = 0;
+	qdf_status = scheduler_post_message(QDF_MODULE_ID_PE, QDF_MODULE_ID_SME,
+					    QDF_MODULE_ID_SME, &msg);
+done:
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		qdf_mem_free(rsp);
+}
+
+void lim_send_bcn_rsp(struct mac_context *mac_ctx, tpSendbeaconParams rsp)
+{
+	if (!rsp) {
+		pe_err("rsp is NULL");
+		return;
+	}
+
+	pe_debug("Send beacon resp status %d for reason %d",
+		 rsp->status, rsp->reason);
+
+	lim_nss_or_ch_width_update_rsp(mac_ctx, rsp->vdev_id,
+				       rsp->status, rsp->reason);
+}
+
+static void
+lim_update_bcn_with_new_ch_width(struct mac_context *mac_ctx,
+				 struct pe_session *session,
+				 enum phy_ch_width ch_width)
+{
+	QDF_STATUS status;
+
+	session->gLimOperatingMode.present = 1;
+	session->gLimOperatingMode.chanWidth = ch_width;
+
+	pe_debug("ch width %d",
+		 session->gLimOperatingMode.chanWidth);
+
+	/* Send nss update request from here */
+	status = sch_set_fixed_beacon_fields(mac_ctx, session);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Unable to set op mode IE in beacon");
+		goto end;
+	}
+
+	status = lim_send_beacon_ind(mac_ctx, session,
+				     REASON_CH_WIDTH_UPDATE);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		return;
+
+	pe_err("Unable to send beacon");
+end:
+	/*
+	 * send resp only in case of failure,
+	 * success case response will be from wma.
+	 */
+	lim_nss_or_ch_width_update_rsp(mac_ctx, session->vdev_id, status,
+				       REASON_CH_WIDTH_UPDATE);
+}
+
+static enum phy_ch_width
+lim_calculate_peer_ch_width(struct pe_session *session,
+			    uint8_t *mac_addr,
+			    enum phy_ch_width new_ch_width)
+{
+	enum phy_ch_width peer_org_bw;
+
+	peer_org_bw = wlan_mlme_get_peer_ch_width(
+				wlan_vdev_get_psoc(session->vdev), mac_addr);
+
+	//TODO: Consider peer indicated bandwidth also to calculate final bw
+	pe_debug("Peer: " QDF_MAC_ADDR_FMT " original bw: %d, new bw: %d",
+		 QDF_MAC_ADDR_REF(mac_addr), peer_org_bw, new_ch_width);
+
+	return qdf_min(peer_org_bw, new_ch_width);
+}
+
+static void
+lim_update_new_ch_width_to_fw(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      enum phy_ch_width ch_bandwidth)
+{
+	uint8_t i;
+	tpDphHashNode psta;
+	tUpdateVHTOpMode params;
+
+	wlan_mlme_set_ap_oper_ch_width(session->vdev, ch_bandwidth);
+
+	for (i = 0; i <= mac_ctx->lim.max_sta_of_pe_session; i++) {
+		psta = session->dph.dphHashTable.pDphNodeArray + i;
+		if (!psta || !psta->added)
+			continue;
+
+		params.opMode = lim_calculate_peer_ch_width(session,
+					psta->staAddr, ch_bandwidth);
+		params.smesessionId = session->smeSessionId;
+		qdf_mem_copy(params.peer_mac, psta->staAddr,
+			     sizeof(tSirMacAddr));
+
+		lim_send_mode_update(mac_ctx, &params, session);
+	}
+}
+
+/**
+ * lim_process_sap_ch_width_update() - process sme nss update req
+ *
+ * @mac_ctx: Pointer to Global MAC structure
+ * @msg_buf: pointer to the SME message buffer
+ *
+ * This function processes SME request messages from HDD or upper layer
+ * application.
+ *
+ * Return: None
+ */
+static void
+lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
+				uint32_t *msg_buf)
+{
+	struct sir_sap_ch_width_update *req;
+	struct pe_session *session = NULL;
+	uint8_t vdev_id;
+	struct sir_bcn_update_rsp *param;
+	struct scheduler_msg msg_return = {0};
+
+	if (!msg_buf) {
+		pe_err("Buffer is Pointing to NULL");
+		return;
+	}
+
+	req = (struct sir_sap_ch_width_update *)msg_buf;
+	vdev_id = req->vdev_id;
+	session = pe_find_session_by_vdev_id(mac_ctx, req->vdev_id);
+	if (!session) {
+		pe_err("vdev %d session not found", req->vdev_id);
+		goto fail;
+	}
+
+	if (session->opmode != QDF_SAP_MODE) {
+		pe_err("Invalid opmode %d", session->opmode);
+		goto fail;
+	}
+
+	/* Send ECSA to the peers */
+	send_extended_chan_switch_action_frame(mac_ctx,
+				       session->curr_op_freq,
+				       req->ch_width, session);
+
+	/* Send beacon template to firmware */
+	lim_update_bcn_with_new_ch_width(mac_ctx, session, req->ch_width);
+	/* Send updated bw info of each peer to firmware */
+	lim_update_new_ch_width_to_fw(mac_ctx, session, req->ch_width);
+
+	/*
+	 * Release the SER command only after this, otherwise it may cause
+	 * out of sync issues if any other WMI commands go to fw
+	 */
+	return;
+
+fail:
+	param = qdf_mem_malloc(sizeof(*param));
+	if (!param)
+		return;
+
+	pe_err("vdev %d: send bandwidth update fail", vdev_id);
+	param->status = QDF_STATUS_E_FAILURE;
+	param->vdev_id = INVALID_VDEV_ID;
+	param->reason = REASON_CH_WIDTH_UPDATE;
+	msg_return.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
+	msg_return.bodyptr = param;
+	msg_return.bodyval = 0;
+	sys_process_mmh_msg(mac_ctx, &msg_return);
+}
+
+/**
  * lim_process_sme_req_messages()
  *
  ***FUNCTION:
@@ -8899,6 +9103,9 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 	case eWNI_SME_VDEV_PAUSE_IND:
 		lim_process_sme_send_vdev_pause(mac,
 					(struct sme_vdev_pause *)msg_buf);
+		break;
+	case eWNI_SME_SAP_CH_WIDTH_UPDATE_REQ:
+		lim_process_sap_ch_width_update(mac, msg_buf);
 		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);
@@ -9515,36 +9722,42 @@ void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	uint8_t op_class = 0;
 	uint8_t switch_mode = 0, i;
 	tpDphHashNode psta;
-	uint8_t switch_count;
 	uint8_t new_channel = 0;
+	enum phy_ch_width ch_width;
+	tLimChannelSwitchInfo *ch_switch = &session_entry->gLimChannelSwitch;
 
 	op_class =
 		lim_op_class_from_bandwidth(mac_ctx, new_channel_freq,
 					    ch_bandwidth,
-					    session_entry->gLimChannelSwitch.sec_ch_offset);
+					    ch_switch->sec_ch_offset);
 	new_channel = wlan_reg_freq_to_chan(mac_ctx->pdev, new_channel_freq);
 	if (LIM_IS_AP_ROLE(session_entry) &&
 		(mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch == false))
-		switch_mode = session_entry->gLimChannelSwitch.switchMode;
-
-	switch_count = session_entry->gLimChannelSwitch.switchCount;
+		switch_mode = ch_switch->switchMode;
 
 	if (LIM_IS_AP_ROLE(session_entry)) {
 		for (i = 0; i <= mac_ctx->lim.max_sta_of_pe_session; i++) {
 			psta =
 			  session_entry->dph.dphHashTable.pDphNodeArray + i;
-			if (psta && psta->added)
-				lim_send_extended_chan_switch_action_frame(
-					mac_ctx,
-					psta->staAddr,
+			if (!psta || !psta->added)
+				continue;
+			ch_width = lim_calculate_peer_ch_width(session_entry,
+							       psta->staAddr,
+							       ch_bandwidth);
+			op_class = lim_op_class_from_bandwidth(mac_ctx,
+						new_channel_freq, ch_width,
+						ch_switch->sec_ch_offset);
+			lim_send_extended_chan_switch_action_frame(
+					mac_ctx, psta->staAddr,
 					switch_mode, op_class, new_channel,
-					switch_count, session_entry);
+					ch_switch->switchCount, session_entry);
 		}
 	} else if (LIM_IS_STA_ROLE(session_entry)) {
 		lim_send_extended_chan_switch_action_frame(mac_ctx,
 					session_entry->bssId,
 					switch_mode, op_class, new_channel,
-					switch_count, session_entry);
+					ch_switch->switchCount,
+					session_entry);
 	}
 
 }
@@ -9823,52 +10036,6 @@ static void lim_process_ext_change_channel(struct mac_context *mac_ctx,
 }
 
 /**
- * lim_nss_update_rsp() - send NSS update response to SME
- * @mac_ctx Pointer to Global MAC structure
- * @vdev_id: vdev id
- * @status: nss update status
- *
- * Return: None
- */
-static void lim_nss_update_rsp(struct mac_context *mac_ctx,
-			       uint8_t vdev_id, QDF_STATUS status)
-{
-	struct scheduler_msg msg = {0};
-	struct sir_bcn_update_rsp *nss_rsp;
-	QDF_STATUS qdf_status;
-
-	nss_rsp = qdf_mem_malloc(sizeof(*nss_rsp));
-	if (!nss_rsp)
-		return;
-
-	nss_rsp->vdev_id = vdev_id;
-	nss_rsp->status = status;
-	nss_rsp->reason = REASON_NSS_UPDATE;
-
-	msg.type = eWNI_SME_NSS_UPDATE_RSP;
-	msg.bodyptr = nss_rsp;
-	msg.bodyval = 0;
-	qdf_status = scheduler_post_message(QDF_MODULE_ID_PE, QDF_MODULE_ID_SME,
-					    QDF_MODULE_ID_SME, &msg);
-	if (QDF_IS_STATUS_ERROR(qdf_status))
-		qdf_mem_free(nss_rsp);
-}
-
-void lim_send_bcn_rsp(struct mac_context *mac_ctx, tpSendbeaconParams rsp)
-{
-	if (!rsp) {
-		pe_err("rsp is NULL");
-		return;
-	}
-
-	pe_debug("Send beacon resp status %d for reason %d",
-		 rsp->status, rsp->reason);
-
-	if (rsp->reason == REASON_NSS_UPDATE)
-		lim_nss_update_rsp(mac_ctx, rsp->vdev_id, rsp->status);
-}
-
-/**
  * lim_process_nss_update_request() - process sme nss update req
  *
  * @mac_ctx: Pointer to Global MAC structure
@@ -9943,7 +10110,8 @@ end:
 	 * send resp only in case of failure,
 	 * success case response will be from wma.
 	 */
-	lim_nss_update_rsp(mac_ctx, vdev_id, status);
+	lim_nss_or_ch_width_update_rsp(mac_ctx, vdev_id, status,
+				       REASON_NSS_UPDATE);
 }
 
 /**

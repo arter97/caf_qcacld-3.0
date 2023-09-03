@@ -1163,6 +1163,8 @@ enum policy_mgr_three_connection_mode {
  * @PM_DBS2_DOWNGRADE: downgrade 5G beaconing entity to 1x1 and switch to DBS2.
  * @PM_UPGRADE_5G: upgrade 5g beaconing entity to 2x2.
  * @PM_UPGRADE_2G: upgrade 2g beaconing entity to 2x2.
+ * @PM_DOWNGRADE_BW: Downgrade SAP bandwidth.
+ * @PM_UPGRADE_BW: Upgrade SAP bandwidth.
  * @PM_MAX_CONC_NEXT_ACTION: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -1185,6 +1187,8 @@ enum policy_mgr_conc_next_action {
 	PM_DBS2_DOWNGRADE,
 	PM_UPGRADE_5G,
 	PM_UPGRADE_2G,
+	PM_DOWNGRADE_BW,
+	PM_UPGRADE_BW,
 
 	PM_MAX_CONC_NEXT_ACTION
 };

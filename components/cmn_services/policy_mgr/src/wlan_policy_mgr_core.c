@@ -4365,6 +4365,46 @@ static void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
 	return;
 }
 
+QDF_STATUS
+policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
+			       enum policy_mgr_conc_next_action next_action,
+			       enum policy_mgr_conn_update_reason reason,
+			       uint8_t conc_vdev_id, uint32_t request_id)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t freq;
+	uint8_t sap_vdev_id;
+	enum phy_ch_width target_bw;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return status;
+	}
+
+	policy_mgr_debug("action: %d reason: %d", next_action, reason);
+
+	policy_mgr_get_mode_specific_conn_info(psoc, &freq,
+					       &sap_vdev_id,
+					       PM_SAP_MODE);
+	if (next_action == PM_DOWNGRADE_BW)
+		target_bw = CH_WIDTH_160MHZ;
+	else
+		target_bw = CH_WIDTH_320MHZ;
+
+	status = pm_ctx->sme_cbacks.sme_sap_update_ch_width(psoc,
+							    sap_vdev_id,
+							    target_bw, reason,
+							    conc_vdev_id,
+							    request_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		policy_mgr_err("vdev %d failed to set BW to %d",
+			       sap_vdev_id, target_bw);
+
+	return status;
+}
+
 QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 		uint8_t  new_nss, uint8_t next_action,
 		enum policy_mgr_band band,

@@ -1822,6 +1822,24 @@ QDF_STATUS sme_nss_update_request(uint32_t vdev_id,
 				  uint32_t original_vdev_id,
 				  uint32_t request_id);
 
+/**
+ * sme_sap_update_ch_width() - Update SAP ch_width
+ * @psoc: Psoc object
+ * @vdev_id: the session id
+ * @ch_width: channel width to be updated
+ * @reason: Reason for ch_width update
+ * @conc_vdev_id: Concurrent connection vdev_id that is causing ch_width update
+ * @request_id: request id
+ *
+ * Return: QDF_STATUS_SUCCESS on successful posting
+ */
+QDF_STATUS
+sme_sap_update_ch_width(struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id,
+			enum phy_ch_width ch_width,
+			enum policy_mgr_conn_update_reason reason,
+			uint8_t conc_vdev_id, uint32_t request_id);
+
 QDF_STATUS sme_set_peer_authorized(uint8_t *peer_addr,
 				   uint32_t vdev_id);
 QDF_STATUS sme_soc_set_dual_mac_config(struct policy_mgr_dual_mac_config msg);

@@ -43,6 +43,7 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_psoc_mlme_api.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -220,6 +221,56 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * policy_mgr_get_sap_ch_width_update_action() - get SAP ch_width update action
+ * @psoc: Pointer to psoc
+ * @ch_freq: channel frequency of new connection
+ * @next_action: next action to happen in order to update bandwidth
+ *
+ * Check if current operating SAP needs a downgrade to 160MHz or an upgrade
+ * to 320MHz based on the new connection.
+ *
+ * return : None
+ */
+static void
+policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
+				uint32_t ch_freq,
+				enum policy_mgr_conc_next_action *next_action)
+{
+	struct wlan_objmgr_vdev *vdev;
+	enum phy_ch_width cur_bw;
+	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
+	bool eht_capab = false;
+
+	if (QDF_IS_STATUS_ERROR(wlan_psoc_mlme_get_11be_capab(psoc,
+							      &eht_capab)) ||
+	    !eht_capab ||
+	    policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
+						   &vdev_id_list[0],
+						   PM_SAP_MODE) != 1)
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id_list[0],
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev %d is NULL", vdev_id_list[0]);
+		return;
+	}
+
+	cur_bw = wlan_mlme_get_ap_oper_ch_width(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	if (cur_bw < CH_WIDTH_160MHZ)
+		return;
+
+	if (cur_bw == CH_WIDTH_320MHZ &&
+	    policy_mgr_is_conn_lead_to_dbs_sbs(psoc, ch_freq))
+		*next_action = PM_DOWNGRADE_BW;
+	else
+		*next_action = PM_UPGRADE_BW;
 }
 
 enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
@@ -890,6 +941,8 @@ policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
 		policy_mgr_debug("HW mode selection offload is enabled");
 		*next_action = PM_NOP;
+		policy_mgr_get_sap_ch_width_update_action(psoc, ch_freq,
+							  next_action);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -1468,6 +1521,11 @@ QDF_STATUS policy_mgr_next_actions(
 					psoc, POLICY_MGR_RX_NSS_2,
 					PM_NOP, POLICY_MGR_BAND_24, reason,
 					session_id, request_id);
+		break;
+	case PM_DOWNGRADE_BW:
+	case PM_UPGRADE_BW:
+		policy_mgr_sap_ch_width_update(psoc, action, reason,
+					       session_id, request_id);
 		break;
 	default:
 		policy_mgr_err("unexpected action value %d", action);

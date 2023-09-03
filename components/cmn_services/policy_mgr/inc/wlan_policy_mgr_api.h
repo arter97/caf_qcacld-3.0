@@ -2129,6 +2129,8 @@ typedef void (*policy_mgr_nss_update_cback)(struct wlan_objmgr_psoc *psoc,
  * @sme_rso_stop_cb: Disable roaming offload callback
  * @sme_change_sap_csa_count: Change CSA count for SAP/GO, only one
  *			      time, needs to set again if used once.
+ * @sme_sap_update_ch_width: Update sap ch_width to fw to handle SAP 320MHz
+ *                           concurrencies
  */
 struct policy_mgr_sme_cbacks {
 	void (*sme_get_nss_for_vdev)(enum QDF_OPMODE,
@@ -2150,6 +2152,11 @@ struct policy_mgr_sme_cbacks {
 		mac_handle_t mac_handle, uint8_t vdev_id,
 		uint8_t reason, enum wlan_cm_rso_control_requestor requestor);
 	QDF_STATUS (*sme_change_sap_csa_count)(uint8_t count);
+	QDF_STATUS (*sme_sap_update_ch_width)(struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id,
+			enum phy_ch_width ch_width,
+			enum policy_mgr_conn_update_reason reason,
+			uint8_t conc_vdev_id, uint32_t request_id);
 };
 
 /**
@@ -5542,4 +5549,22 @@ bool policy_mgr_is_freq_on_mac_id(struct policy_mgr_freq_range *freq_range,
 bool
 policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
 				   uint32_t freq);
+
+/**
+ * policy_mgr_sap_ch_width_update() - Update SAP ch_width
+ * @psoc: PSOC object information
+ * @next_action: next action to happen in order to update bandwidth
+ * @reason: reason for ch_width update
+ * @conc_vdev_id: Concurrent connection vdev_id that is causing ch_width update
+ * @request_id: request id for connection manager
+ *
+ * Update ch_width as per next_action
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
+			       enum policy_mgr_conc_next_action next_action,
+			       enum policy_mgr_conn_update_reason reason,
+			       uint8_t conc_vdev_id, uint32_t request_id);
 #endif /* __WLAN_POLICY_MGR_API_H */

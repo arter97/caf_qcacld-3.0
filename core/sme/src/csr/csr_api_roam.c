@@ -6801,6 +6801,9 @@ enum wlan_serialization_cmd_type csr_get_cmd_type(tSmeCmd *sme_cmd)
 	case e_sme_command_set_antenna_mode:
 		cmd_type = WLAN_SER_CMD_SET_ANTENNA_MODE;
 		break;
+	case e_sme_command_sap_ch_width_update:
+		cmd_type = WLAN_SER_CMD_SAP_BW_UPDATE;
+		break;
 	default:
 		break;
 	}
@@ -6845,6 +6848,7 @@ static void csr_fill_cmd_timeout(struct wlan_serialization_command *cmd)
 	case WLAN_SER_CMD_NSS_UPDATE:
 	case WLAN_SER_CMD_SET_DUAL_MAC_CONFIG:
 	case WLAN_SER_CMD_SET_ANTENNA_MODE:
+	case WLAN_SER_CMD_SAP_BW_UPDATE:
 		cmd->cmd_timeout_duration = SME_CMD_POLICY_MGR_CMD_TIMEOUT;
 		break;
 	default:
@@ -7662,6 +7666,67 @@ fail:
 	param->vdev_id = command->u.nss_update_cmd.session_id;
 	param->reason = REASON_NSS_UPDATE;
 	msg_return.type = eWNI_SME_NSS_UPDATE_RSP;
+	msg_return.bodyptr = param;
+	msg_return.bodyval = 0;
+	sys_process_mmh_msg(mac, &msg_return);
+}
+
+/**
+ * csr_process_sap_ch_width_update() - Update ch_width command to PE
+ * @mac: Globacl MAC pointer
+ * @command: Command received from SME
+ *
+ * Posts the ch_width update command to PE. This message passing
+ * through PE is required for PE's internal management
+ *
+ * Return: None
+ */
+void csr_process_sap_ch_width_update(struct mac_context *mac, tSmeCmd *command)
+{
+	uint32_t len;
+	struct sir_sap_ch_width_update *msg;
+	QDF_STATUS status;
+	struct scheduler_msg msg_return = {0};
+	struct sir_bcn_update_rsp *param;
+	struct csr_roam_session *session;
+
+	if (!CSR_IS_SESSION_VALID(mac, command->vdev_id)) {
+		sme_err("Invalid session id %d", command->vdev_id);
+		goto fail;
+	}
+	session = CSR_GET_SESSION(mac, command->vdev_id);
+
+	len = sizeof(*msg);
+	msg = qdf_mem_malloc(len);
+	if (!msg)
+		/* Probably the fail response is also fail during malloc.
+		 * Still proceeding to send response!
+		 */
+		goto fail;
+
+	msg->msgType = eWNI_SME_SAP_CH_WIDTH_UPDATE_REQ;
+	msg->msgLen = sizeof(*msg);
+
+	msg->ch_width = command->u.bw_update_cmd.ch_width;
+	msg->vdev_id = command->u.bw_update_cmd.vdev_id;
+
+	sme_debug("Posting eWNI_SME_SAP_CH_WIDTH_UPDATE_REQ to PE");
+
+	status = umac_send_mb_message_to_mac(msg);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		return;
+
+	sme_err("Posting to PE failed");
+fail:
+	param = qdf_mem_malloc(sizeof(*param));
+	if (!param)
+		return;
+
+	sme_err("Sending ch_width update fail response to SME");
+	param->status = QDF_STATUS_E_FAILURE;
+	param->vdev_id = command->u.bw_update_cmd.vdev_id;
+	param->reason = REASON_CH_WIDTH_UPDATE;
+	msg_return.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
 	msg_return.bodyptr = param;
 	msg_return.bodyval = 0;
 	sys_process_mmh_msg(mac, &msg_return);
