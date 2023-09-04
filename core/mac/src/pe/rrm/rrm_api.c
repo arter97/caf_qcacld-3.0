@@ -2049,6 +2049,9 @@ rrm_process_channel_load_req(struct mac_context *mac,
 	uint8_t op_class, channel, reporting_condition;
 	uint16_t randomization_intv, meas_duration, max_meas_duration;
 	bool present;
+	uint8_t country[WNI_CFG_COUNTRY_CODE_LEN];
+	qdf_freq_t chan_freq;
+	bool is_freq_enabled;
 
 	present = chan_load_req->measurement_request.channel_load.rrm_reporting.present;
 	reporting_condition = chan_load_req->measurement_request.channel_load.rrm_reporting.reporting_condition;
@@ -2072,13 +2075,41 @@ rrm_process_channel_load_req(struct mac_context *mac,
 			meas_duration = max_meas_duration;
 		}
 	}
-	pe_debug("RX:[802.11 CH_LOAD] seq:%d Token:%d op_c:%d ch:%d meas_dur:%d, rand intv: %d, max_dur:%d",
+	pe_debug("RX:[802.11 CH_LOAD] vdev :%d, seq:%d Token:%d op_c:%d ch:%d meas_dur:%d, rand intv: %d, max_dur:%d",
+		 pe_session->vdev_id,
 		 mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
 		 chan_load_req->measurement_token, op_class,
 		 channel, meas_duration, randomization_intv,
 		 max_meas_duration);
 	if (!meas_duration || meas_duration > RRM_SCAN_MAX_DWELL_TIME)
 		return eRRM_REFUSED;
+
+	if (!wlan_reg_is_6ghz_supported(mac->psoc) &&
+	    (wlan_reg_is_6ghz_op_class(mac->pdev, op_class))) {
+		pe_debug("RX: [802.11 CH_LOAD] Ch belongs to 6 ghz spectrum, abort");
+		return eRRM_INCAPABLE;
+	}
+
+	rrm_get_country_code_from_connected_profile(mac, pe_session->vdev_id,
+						    country);
+	chan_freq = wlan_reg_country_chan_opclass_to_freq(mac->pdev,
+							  country, channel,
+							  op_class, false);
+	if (!chan_freq) {
+		pe_debug("Invalid ch freq for country code %c%c 0x%x",
+			 country[0], country[1], country[2]);
+		return eRRM_INCAPABLE;
+	}
+
+	pe_debug("freq:%d, country code %c%c 0x%x", chan_freq, country[0],
+		 country[1], country[2]);
+
+	is_freq_enabled = wlan_reg_is_freq_enabled(mac->pdev, chan_freq,
+						   REG_CURRENT_PWR_MODE);
+	if (!is_freq_enabled) {
+		pe_debug("No channels populated with requested operation class and current country, Hence abort the rrm operation");
+		return eRRM_INCAPABLE;
+	}
 
 	/* Prepare the request to send to SME. */
 	load_ind = qdf_mem_malloc(sizeof(struct ch_load_ind));
