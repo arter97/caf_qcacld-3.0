@@ -12227,23 +12227,29 @@ static int hdd_get_rx_amsdu(struct wlan_hdd_link_info *link_info,
 static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
 				 struct sk_buff *skb, const struct nlattr *attr)
 {
-	enum eSirMacHTChannelWidth chwidth;
 	uint8_t nl80211_chwidth;
+	struct wlan_channel *bss_chan;
+	struct wlan_objmgr_vdev *vdev;
 
-	chwidth = wma_cli_get_command(link_info->vdev_id,
-				      wmi_vdev_param_chwidth, VDEV_CMD);
-	if (chwidth < 0) {
-		hdd_err("Failed to get chwidth");
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+
+	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
+	if (!bss_chan) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		hdd_err("get bss_chan failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(bss_chan->ch_width);
+	if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH, nl80211_chwidth)) {
+		hdd_err("nla_put chn width failure");
 		return -EINVAL;
 	}
 
-	nl80211_chwidth = hdd_chwidth_to_nl80211_chwidth(chwidth);
-	if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH,
-		       nl80211_chwidth)) {
-		hdd_err("nla_put failure");
-		return -EINVAL;
-	}
-
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return 0;
 }
 
