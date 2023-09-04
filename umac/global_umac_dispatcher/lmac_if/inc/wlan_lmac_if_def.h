@@ -2021,6 +2021,7 @@ struct wlan_lmac_if_p2p_rx_ops {
  * struct wlan_lmac_if_atf_rx_ops - ATF south bound rx function pointers
  * @atf_get_fmcap:                     Get firmware capability for ATF
  * @atf_get_mode:                      Get mode of ATF
+ * @atf_is_enabled:                    Check atf_mode, fwcap & atf_commit flags
  * @atf_get_msdu_desc:                 Get msdu desc for ATF
  * @atf_get_max_vdevs:                 Get maximum vdevs for a Radio
  * @atf_get_peers:                     Get number of peers for a radio
@@ -2054,6 +2055,8 @@ struct wlan_lmac_if_p2p_rx_ops {
 struct wlan_lmac_if_atf_rx_ops {
 	uint32_t (*atf_get_fmcap)(struct wlan_objmgr_psoc *psoc);
 	uint32_t (*atf_get_mode)(struct wlan_objmgr_psoc *psoc);
+	bool (*atf_is_enabled)(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_pdev *pdev);
 	uint32_t (*atf_get_msdu_desc)(struct wlan_objmgr_psoc *psoc);
 	uint32_t (*atf_get_max_vdevs)(struct wlan_objmgr_psoc *psoc);
 	uint32_t (*atf_get_peers)(struct wlan_objmgr_psoc *psoc);
