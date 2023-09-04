@@ -8172,6 +8172,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_EMLSR_MODE_SWITCH] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE] = {
+		.type = NLA_U8},
 };
 
 static const struct nla_policy
@@ -10882,6 +10884,42 @@ static int hdd_set_wfc_state(struct hdd_adapter *adapter,
 
 }
 
+/**
+ * hdd_set_coex_traffic_shaping_mode() - Configure coex traffic
+ * shaping mode
+ * @adapter: hdd adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+
+static int
+hdd_set_coex_traffic_shaping_mode(struct hdd_adapter *adapter,
+				  const struct nlattr *attr)
+{
+	uint8_t mode;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	int errno, ret;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno) {
+		hdd_err("Invalid HDD ctx, errno : %d", errno);
+		return errno;
+	}
+
+	mode = nla_get_u8(attr);
+	if (mode > QCA_COEX_TRAFFIC_SHAPING_MODE_ENABLE) {
+		hdd_err("Invalid traffic shaping mode : %d", mode);
+		return -EINVAL;
+	}
+
+	hdd_debug("Coex Traffic shaping mode : %d", mode);
+
+	ret = hdd_send_coex_traffic_shaping_mode(adapter->vdev_id, mode);
+
+	return ret;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static int hdd_test_config_emlsr_mode(struct hdd_context *hdd_ctx,
 				      bool cfg_val)
@@ -11342,6 +11380,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_emlsr_mode},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG,
 	 hdd_set_ul_mu_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE,
+	 hdd_set_coex_traffic_shaping_mode},
 };
 
 #ifdef WLAN_FEATURE_ELNA
