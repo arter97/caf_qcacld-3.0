@@ -1846,6 +1846,15 @@ dp_rx_mon_frag_restitch_mpdu_from_msdus(struct dp_soc *soc,
 	 * packet in RAW mode.
 	 */
 	if (buf_info.is_decap_raw == 1) {
+		if (qdf_unlikely(mon_pdev->ppdu_info.rx_status.rs_fcs_err)) {
+			hdr_desc = hal_rx_desc_get_80211_hdr(soc->hal_soc, rx_desc);
+			wh = (struct ieee80211_frame *)hdr_desc;
+			if ((wh->i_fc[0] & QDF_IEEE80211_FC0_VERSION_MASK) !=
+			    QDF_IEEE80211_FC0_VERSION_0) {
+				DP_STATS_INC(dp_pdev, dropped.mon_ver_err, 1);
+				return NULL;
+			}
+		}
 		dp_rx_mon_fraglist_prepare(head_msdu, tail_msdu);
 		goto mpdu_stitch_done;
 	}
