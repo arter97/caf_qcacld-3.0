@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1682,15 +1682,13 @@ static enum policy_mgr_pcl_type policy_mgr_get_pcl_4_port(
 		return PM_MAX_PCL_TYPE;
 	}
 
-	/* SAP and P2P Go have same result in 4th port pcl table */
-	if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE)
-		mode = PM_SAP_MODE;
-	else if (mode == PM_P2P_CLIENT_MODE)
+	/* P2P CLI and STA have same result in 4th port pcl table */
+	if (mode == PM_P2P_CLIENT_MODE)
 		mode = PM_STA_MODE;
 
 	if (mode != PM_STA_MODE && mode != PM_SAP_MODE &&
-	    mode != PM_NDI_MODE) {
-		policy_mgr_err("Can't start 4th port if not STA, SAP, NDI");
+	    mode != PM_NDI_MODE && mode != PM_P2P_GO_MODE) {
+		policy_mgr_err("Can't start 4th port if not STA, SAP, GO, NDI");
 		return PM_MAX_PCL_TYPE;
 	}
 
