@@ -476,6 +476,80 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
+ * mlme_update_freq_from_link_ctx() - This API updates scan request from
+ * link context
+ * @links_info: pointer to MLO link info
+ * @req: pointer to scan request
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+mlme_update_freq_from_link_ctx(struct mlo_link_info *links_info,
+			       struct scan_start_request *req)
+{
+	const struct bonded_channel_freq *range;
+	uint8_t num_chan;
+	qdf_freq_t op_freq, center_20_freq, start_freq, end_freq;
+	enum scan_phy_mode phymode;
+	enum phy_ch_width scan_ch_width;
+	struct wlan_channel *link_chan_info = links_info->link_chan_info;
+
+	if (!link_chan_info) {
+		mlme_err("link chan info is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	op_freq = link_chan_info->ch_freq;
+	phymode = wlan_scan_get_11be_scan_phy_mode(link_chan_info->ch_phymode);
+	if (phymode == SCAN_PHY_MODE_UNKNOWN) {
+		mlme_err("invalid scan phymode for freq %d", op_freq);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	scan_ch_width = wlan_mlme_get_ch_width_from_phymode(
+						link_chan_info->ch_phymode);
+
+	if (scan_ch_width == CH_WIDTH_320MHZ) {
+		range = wlan_reg_get_bonded_chan_entry(op_freq, scan_ch_width,
+						link_chan_info->ch_cfreq2);
+		if (!range) {
+			mlme_err("range is null for freq %d center freq %d",
+				 op_freq, link_chan_info->ch_cfreq2);
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+
+		start_freq = range->start_freq;
+		end_freq = range->end_freq;
+
+		/* fill connected 6 GHz ML link freq in wide band scan list */
+		center_20_freq = start_freq + (7 * BW_20_MHZ);
+		if (op_freq > center_20_freq)
+			end_freq = op_freq;
+		else
+			start_freq = op_freq;
+
+		mlme_debug("op_freq:%d, c_freq:%d, start_freq:%d, end_freq:%d",
+			   op_freq, center_20_freq, start_freq, end_freq);
+
+		num_chan = req->scan_req.chan_list.num_chan;
+		req->scan_req.chan_list.chan[num_chan].freq = start_freq;
+		req->scan_req.chan_list.chan[num_chan].phymode = phymode;
+		num_chan += 1;
+		req->scan_req.chan_list.chan[num_chan].freq = end_freq;
+		req->scan_req.chan_list.chan[num_chan].phymode = phymode;
+		num_chan += 1;
+		req->scan_req.chan_list.num_chan = num_chan;
+	} else {
+		num_chan = req->scan_req.chan_list.num_chan;
+		req->scan_req.chan_list.chan[num_chan].freq = op_freq;
+		req->scan_req.chan_list.chan[num_chan].phymode = phymode;
+		req->scan_req.chan_list.num_chan += 1;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * mlme_fill_freq_in_mlo_wide_band_scan_start_req() - Fill frequencies in wide
  * band scan req for mlo connection
  * @vdev: vdev common object
@@ -488,51 +562,30 @@ mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
 					struct scan_start_request *req)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	struct wlan_mlo_sta *sta_ctx = NULL;
 	uint8_t i;
 	QDF_STATUS status;
-	struct wlan_objmgr_vdev *mlo_vdev;
-	struct mlme_legacy_priv *mlme_priv;
-	enum phy_ch_width associated_ch_width = CH_WIDTH_INVALID;
-	struct assoc_channel_info *assoc_chan_info;
+	struct mlo_link_switch_context *link_ctx;
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	if (!mlo_dev_ctx) {
 		mlme_err("vdev %d :mlo_dev_ctx is NULL", req->scan_req.vdev_id);
-		return QDF_STATUS_E_FAILURE;
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	sta_ctx = mlo_dev_ctx->sta_ctx;
-	if (!sta_ctx) {
-		mlme_err("vdev %d :mlo_dev_ctx is NULL", req->scan_req.vdev_id);
-		return QDF_STATUS_E_FAILURE;
+	link_ctx = mlo_dev_ctx->link_ctx;
+	if (!link_ctx) {
+		mlme_err("vdev %d :mlo_link_ctx is NULL",
+			 req->scan_req.vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		if (!mlo_dev_ctx->wlan_vdev_list[i])
-			continue;
-		if (qdf_test_bit(i, sta_ctx->wlan_connected_links)) {
-			mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
-			mlme_priv = wlan_vdev_mlme_get_ext_hdl(mlo_vdev);
-			if (!mlme_priv) {
-				mlme_legacy_err("vdev legacy priv obj is NULL");
-				return QDF_STATUS_E_FAILURE;
-			}
-
-			assoc_chan_info =
-				&mlme_priv->connect_info.assoc_chan_info;
-			associated_ch_width = assoc_chan_info->assoc_ch_width;
-			if (associated_ch_width == CH_WIDTH_INVALID) {
-				mlme_debug("vdev %d :Invalid assoc ch_width",
-					   req->scan_req.vdev_id);
-				return QDF_STATUS_E_FAILURE;
-			}
-
-			status = mlme_update_freq_in_scan_start_req(mlo_vdev,
-						req, associated_ch_width,
-						INVALID_CHANNEL);
-			if (QDF_IS_STATUS_ERROR(status))
-				return QDF_STATUS_E_FAILURE;
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		status = mlme_update_freq_from_link_ctx(
+						&link_ctx->links_info[i], req);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_debug("freq update fails for link id %d",
+				   link_ctx->links_info[i].link_id);
+			return status;
 		}
 	}
 
