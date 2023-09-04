@@ -1212,6 +1212,16 @@ wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
 		       uint32_t freq, uint8_t vdev_id);
 
 #ifdef WLAN_FEATURE_11BE_MLO
+
+/**
+ * wlan_connectivity_mlo_reconfig_event() -API to log MLO reconfig event
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void
+wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev);
+
 /**
  * wlan_connectivity_mlo_setup_event() - Fill and send MLO setup data
  * @vdev: vdev pointer
@@ -1255,6 +1265,11 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      qdf_freq_t freq,
 				      bool is_rx, uint8_t subtype)
 {}
+
+static inline void
+wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
+{
+}
 #endif
 
 /**
@@ -1481,6 +1496,11 @@ static inline void
 wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
 		       uint32_t freq, uint8_t vdev_id)
 {}
+
+static inline void
+wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
+{
+}
 
 static inline void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,

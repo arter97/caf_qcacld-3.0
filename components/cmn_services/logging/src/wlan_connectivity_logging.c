@@ -334,6 +334,43 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				    EVENT_WLAN_MLO_T2LM_REQ_RESP);
 }
 
+void
+wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlo_link_info *link_info = NULL;
+	struct wlan_channel *chan_info = NULL;
+	uint8_t link_id;
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
+				 struct wlan_diag_mlo_reconfig);
+
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.version = DIAG_MLO_RECONFIG_VERSION;
+
+	link_id = wlan_vdev_get_link_id(vdev);
+	wlan_diag_event.mlo_cmn_info.link_id = link_id;
+
+	if (!vdev->mlo_dev_ctx)
+		return;
+
+	link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx, link_id);
+	if (!link_info) {
+		mlme_err("linl: %d Link info not found", link_id);
+		return;
+	}
+	chan_info = link_info->link_chan_info;
+	if (!chan_info) {
+		mlme_err("link: %d Chan info not found", link_id);
+		return;
+	}
+
+	wlan_diag_event.mlo_cmn_info.band =
+			wlan_convert_freq_to_diag_band(chan_info->ch_freq);
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_RECONFIG);
+}
+
 static QDF_STATUS
 wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 			struct wlan_diag_sta_info *wlan_diag_event)

@@ -46,6 +46,7 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_mlo_link_force.h"
+#include "wlan_connectivity_logging.h"
 
 /* invalid channel id. */
 #define INVALID_CHANNEL_ID 0
@@ -8067,6 +8068,9 @@ void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev)
 				 vdev_id);
 		return;
 	}
+
+	wlan_connectivity_mlo_reconfig_event(vdev);
+
 	/* mark link removed for vdev */
 	wlan_set_vdev_link_removed_flag_by_vdev_id(psoc, vdev_id,
 						   true);
