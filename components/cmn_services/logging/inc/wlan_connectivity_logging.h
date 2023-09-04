@@ -1197,6 +1197,31 @@ void
 wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 		   struct wlan_diag_packet_info *data, bool is_tx);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_connectivity_mlo_setup_event() - Fill and send MLO setup data
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_convert_freq_to_diag_band() - API to convert frequency to band value
+ * mentioned in enum wlan_diag_wifi_band
+ * @ch_freq: Frequency(in MHz)
+ *
+ * Return: Band specified in enum wlan_diag_wifi_band
+ */
+enum wlan_diag_wifi_band
+wlan_convert_freq_to_diag_band(uint16_t ch_freq);
+
+#else
+static inline
+void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
 static inline void wlan_connectivity_logging_stop(void)
 {}
 

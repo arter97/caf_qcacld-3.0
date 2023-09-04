@@ -6932,6 +6932,9 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 		wlan_populate_vsie(vdev, &wlan_diag_event, false);
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
+	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_REASSOC_RESP_EVENT ||
+	    wlan_diag_event.subtype == WLAN_CONN_DIAG_ASSOC_RESP_EVENT)
+		wlan_connectivity_mlo_setup_event(vdev);
 
 	return status;
 }

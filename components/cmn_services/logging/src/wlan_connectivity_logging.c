@@ -401,6 +401,82 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
+enum wlan_diag_wifi_band
+wlan_convert_freq_to_diag_band(uint16_t ch_freq)
+{
+	enum reg_wifi_band band;
+
+	band = wlan_reg_freq_to_band((qdf_freq_t)ch_freq);
+
+	switch (band) {
+	case REG_BAND_2G:
+		return WLAN_24GHZ_BAND;
+	case REG_BAND_5G:
+		return WLAN_5GHZ_BAND;
+	case REG_BAND_6G:
+		return WLAN_6GHZ_BAND;
+	default:
+		return WLAN_INVALID_BAND;
+	}
+}
+
+#define REJECTED_LINK_STATUS 1
+
+void
+wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
+{
+	uint i = 0;
+	struct mlo_link_switch_context *link_ctx = NULL;
+	struct wlan_channel *chan_info;
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
+				 struct wlan_diag_mlo_setup);
+
+	if (!mlo_is_mld_sta(vdev))
+		return;
+
+	qdf_mem_zero(&wlan_diag_event, sizeof(struct wlan_diag_mlo_setup));
+
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.version = DIAG_MLO_SETUP_VERSION;
+
+	if (!vdev->mlo_dev_ctx) {
+		logging_err("vdev: %d MLO dev ctx not found",
+			    wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	link_ctx = vdev->mlo_dev_ctx->link_ctx;
+	if (!link_ctx) {
+		logging_err("vdev: %d mlo link ctx not found",
+			    wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		wlan_diag_event.mlo_cmn_info[i].link_id =
+				link_ctx->links_info[i].link_id;
+		wlan_diag_event.mlo_cmn_info[i].vdev_id =
+				link_ctx->links_info[i].vdev_id;
+
+		qdf_mem_copy(wlan_diag_event.mlo_cmn_info[i].link_addr,
+			     link_ctx->links_info[i].ap_link_addr.bytes,
+			     QDF_MAC_ADDR_SIZE);
+
+		chan_info = link_ctx->links_info[i].link_chan_info;
+
+		wlan_diag_event.mlo_cmn_info[i].band =
+			wlan_convert_freq_to_diag_band(chan_info->ch_freq);
+
+		if (wlan_diag_event.mlo_cmn_info[i].band == WLAN_INVALID_BAND)
+			wlan_diag_event.mlo_cmn_info[i].status =
+							REJECTED_LINK_STATUS;
+	}
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_SETUP);
+}
+
 #else
 static QDF_STATUS
 wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
@@ -565,6 +641,8 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	else
 		WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MGMT);
 
+	if (tag == WLAN_ASSOC_RSP || tag == WLAN_REASSOC_RSP)
+		wlan_connectivity_mlo_setup_event(vdev);
 out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
