@@ -7535,6 +7535,31 @@ err:
 	return -EINVAL;
 }
 
+/**
+ * hdd_send_coex_traffic_shaping_mode() - Send coex traffic shaping mode
+ * to FW
+ * @vdev_id: vdev ID
+ * @mode: traffic shaping mode
+ *
+ * This function is used to send coex traffic shaping mode to FW
+ *
+ * Return: 0 on success and -EINVAL on failure
+ */
+int hdd_send_coex_traffic_shaping_mode(uint8_t vdev_id, uint8_t mode)
+{
+	struct coex_config_params coex_cfg_params = {0};
+
+	coex_cfg_params.config_type = WMI_COEX_SET_TRAFFIC_SHAPING_MODE;
+	coex_cfg_params.config_arg1 = mode;
+	coex_cfg_params.vdev_id     = vdev_id;
+
+	if (QDF_IS_STATUS_ERROR(sme_send_coex_config_cmd(&coex_cfg_params))) {
+		hdd_err_rl("Failed to send coex traffic shaping mode");
+		return -EINVAL;
+	}
+	return 0;
+}
+
 #define MAX_PDEV_SET_FW_PARAMS 7
 /* params being sent:
  * 1.wmi_pdev_param_dtim_synth
