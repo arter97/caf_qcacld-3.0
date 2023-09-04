@@ -822,6 +822,8 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 		soc->rx_fst = NULL;
 	}
 
+	if (soc->arch_ops.dp_set_rx_fst)
+		soc->arch_ops.dp_set_rx_fst(NULL);
 	dp_rx_ppe_fse_unregister();
 	if (qdf_likely(dp_fst)) {
 		hal_rx_fst_detach(soc->hal_soc, dp_fst->hal_rx_fst,
