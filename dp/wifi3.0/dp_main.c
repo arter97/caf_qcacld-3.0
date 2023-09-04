@@ -16069,7 +16069,7 @@ static inline void dp_soc_get_ap_mld_mode(struct dp_soc *soc)
 		soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
 					CDP_CFG_MLD_NETDEV_MODE_AP);
 	}
-	qdf_info("DP mld_mode_ap-%u\n", soc->mld_mode_ap);
+	dp_info("DP mld_mode_ap-%u\n", soc->mld_mode_ap);
 }
 #else
 static inline void dp_soc_get_ap_mld_mode(struct dp_soc *soc)
