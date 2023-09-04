@@ -2125,6 +2125,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 	struct hdd_context *hdd_ctx;
 	struct ieee80211_acs_dbg *acs_r = NULL;
 	struct sap_context *sap_ctx;
+	qdf_size_t not_copied;
 
 	if (!acs_report) {
 		hdd_err("null acs_report");
@@ -2210,7 +2211,9 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 				break;
 			}
 		}
-		copy_to_user(acs_report, acs_r, sizeof(*acs_r));
+		not_copied = copy_to_user(acs_report, acs_r, sizeof(*acs_r));
+		if (not_copied)
+			hdd_debug("%ul is not copied", not_copied);
 	} else if (acs_type == ACS_CHAN_NF_STATS) {
 	} else if (acs_type == ACS_NEIGHBOUR_GET_LIST_COUNT ||
 		   acs_type == ACS_NEIGHBOUR_GET_LIST) {
