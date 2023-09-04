@@ -1151,6 +1151,13 @@ QDF_STATUS wlan_mlo_mgr_mld_vdev_attach(struct wlan_objmgr_vdev *vdev,
 					struct qdf_mac_addr *mld_addr)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_psoc *psoc = NULL;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlo_err("Failed to get psoc");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	wlan_vdev_obj_lock(vdev);
 	wlan_vdev_mlme_set_mldaddr(vdev, (uint8_t *)&mld_addr->bytes[0]);
@@ -1158,14 +1165,44 @@ QDF_STATUS wlan_mlo_mgr_mld_vdev_attach(struct wlan_objmgr_vdev *vdev,
 
 	status = mlo_dev_ctx_init(vdev);
 
+	if (cdp_mlo_dev_ctxt_attach(wlan_psoc_get_dp_handle(psoc),
+				    wlan_vdev_get_id(vdev),
+				    (uint8_t *)mld_addr)
+				    != QDF_STATUS_SUCCESS) {
+		mlo_err("Failed to attach DP vdev  (" QDF_MAC_ADDR_FMT ") to"
+			" MLO Dev ctxt (" QDF_MAC_ADDR_FMT ")",
+			QDF_MAC_ADDR_REF(wlan_vdev_mlme_get_macaddr(vdev)),
+			QDF_MAC_ADDR_REF(mld_addr->bytes));
+	}
 	return status;
 }
 
 QDF_STATUS wlan_mlo_mgr_mld_vdev_detach(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct qdf_mac_addr *mld_addr;
+	struct wlan_objmgr_psoc *psoc = NULL;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlo_err("Failed to get psoc");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	status = mlo_dev_ctx_deinit(vdev);
+
+	/* Detach DP vdev from DP MLO Device Context */
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+
+	if (cdp_mlo_dev_ctxt_detach(wlan_psoc_get_dp_handle(psoc),
+				    wlan_vdev_get_id(vdev),
+				    (uint8_t *)mld_addr)
+				    != QDF_STATUS_SUCCESS) {
+		mlo_err("Failed to detach DP vdev (" QDF_MAC_ADDR_FMT ") from"
+			" MLO Dev ctxt (" QDF_MAC_ADDR_FMT ")",
+			QDF_MAC_ADDR_REF(wlan_vdev_mlme_get_macaddr(vdev)),
+			QDF_MAC_ADDR_REF(mld_addr->bytes));
+	}
 
 	wlan_vdev_obj_lock(vdev);
 	wlan_vdev_mlme_reset_mldaddr(vdev);
