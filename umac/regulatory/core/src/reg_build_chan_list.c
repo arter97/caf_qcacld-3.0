@@ -4515,6 +4515,40 @@ reg_fill_subchan_centers(uint8_t nchans, uint8_t cfi, uint8_t *subchannels)
 	}
 }
 
+struct opclass_nchans_pair {
+	uint8_t opclass;
+	uint8_t nchans;
+};
+
+static const struct opclass_nchans_pair opclass_nchans_map[] = {
+	{131, 1},
+	{136, 1},
+	{132, 2},
+	{133, 4},
+	{134, 8},
+#ifdef WLAN_FEATURE_11BE
+	{137, 16},
+#endif
+};
+
+/**
+ * reg_get_nsubchaneels_for_opclass() - Get the number of subchannels based on
+ * the operating class.
+ * @opclass: Operating class
+ *
+ * Return: Number of subchannels
+ */
+static uint8_t reg_get_nsubchaneels_for_opclass(uint8_t opclass)
+{
+	uint8_t  i, n_opclasses = QDF_ARRAY_SIZE(opclass_nchans_map);
+
+	for (i = 0; i < n_opclasses; i++)
+		if (opclass == opclass_nchans_map[i].opclass)
+			return opclass_nchans_map[i].nchans;
+
+	return 0;
+}
+
 /**
  * reg_get_subchannels_for_opclass() - Get the list of subchannels based on the
  * the channel frequency index and opclass.
@@ -4530,29 +4564,7 @@ uint8_t reg_get_subchannels_for_opclass(uint8_t cfi,
 {
 	uint8_t nchans;
 
-	switch (opclass) {
-	case 131:
-	case 136:
-		nchans = 1;
-		break;
-	case 132:
-		nchans = 2;
-		break;
-	case 133:
-		nchans = 4;
-		break;
-	case 134:
-		nchans = 8;
-		break;
-	case 137:
-		nchans = 16;
-		break;
-
-	default:
-		nchans = 0;
-		break;
-	}
-
+	nchans = reg_get_nsubchaneels_for_opclass(opclass);
 	reg_fill_subchan_centers(nchans, cfi, subchannels);
 
 	return nchans;
