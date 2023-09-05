@@ -1988,7 +1988,7 @@ QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	dp_rx_fst_update_pm_suspend_status(dp_ctx, true);
+	status = wlan_dp_fisa_suspend(dp_ctx);
 
 	return status;
 }
@@ -2003,7 +2003,7 @@ QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	dp_rx_fst_update_pm_suspend_status(dp_ctx, false);
+	status = wlan_dp_fisa_resume(dp_ctx);
 
 	return status;
 }
