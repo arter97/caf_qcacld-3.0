@@ -2019,7 +2019,7 @@ void hdd_disable_rx_ol_for_low_tput(struct hdd_context *hdd_ctx, bool disable)
 #else /* RECEIVE_OFFLOAD */
 int hdd_rx_ol_init(struct hdd_context *hdd_ctx)
 {
-	hdd_err("Rx_OL, LRO/GRO not supported");
+	hdd_warn("Rx_OL, LRO/GRO not supported");
 	return -EPERM;
 }
 
