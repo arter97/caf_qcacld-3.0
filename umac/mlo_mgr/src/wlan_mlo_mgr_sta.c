@@ -321,6 +321,7 @@ void mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev)
 		wlan_vdev_mlme_clear_mlo_vdev(mlo_dev_ctx->wlan_vdev_list[i]);
 		wlan_vdev_mlme_clear_mlo_link_vdev(mlo_dev_ctx->wlan_vdev_list[i]);
 	}
+	mlo_clear_bridge_sta_ctx(vdev);
 }
 
 void ucfg_mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev)
