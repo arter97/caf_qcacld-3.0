@@ -23,6 +23,7 @@
 #include <wlan_mlo_t2lm.h>
 #include "wlan_cm_api.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_connectivity_logging.h"
 
 #define T2LM_MIN_DIALOG_TOKEN         1
 #define T2LM_MAX_DIALOG_TOKEN         0xFF
@@ -186,6 +187,10 @@ QDF_STATUS t2lm_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 	}
 
 	*token = t2lm_req.dialog_token;
+	wlan_connectivity_t2lm_req_resp_event(
+			vdev, *token, 0, 0,
+			wlan_vdev_mlme_get_bss_chan(vdev)->ch_freq,
+			true, WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
 
 	return status;
 }

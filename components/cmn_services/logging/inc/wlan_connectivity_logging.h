@@ -1206,11 +1206,42 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_connectivity_t2lm_req_resp_event - API to send t2lm Req/resp
+ * event logs to userspace
+ * @vdev: vdev pointer
+ * @token: dialog Token
+ * @t2lm_status: T2LM response status code. Refer enum wlan_t2lm_resp_frm_type
+ * @tx_status: TX status
+ * @freq: Frame received/transmitted frequency
+ * @is_rx: Flag to inidcate packet being received
+ * @subtype: Determine whether the evnt sent is for t2lm request
+ * or t2lm response
+ *
+ * Return: None
+ */
+void
+wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
+				      uint8_t token,
+				      enum wlan_t2lm_resp_frm_type t2lm_status,
+				      enum qdf_dp_tx_rx_status tx_status,
+				      qdf_freq_t freq,
+				      bool is_rx, uint8_t subtype);
 #else
 static inline void
 wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 {
 }
+
+static inline void
+wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
+				      uint8_t token,
+				      enum wlan_t2lm_resp_frm_type status,
+				      enum qdf_dp_tx_rx_status tx_status,
+				      qdf_freq_t freq,
+				      bool is_rx, uint8_t subtype)
+{}
 #endif
 
 /**
@@ -1405,6 +1436,15 @@ wlan_convert_freq_to_diag_band(uint16_t ch_freq)
 static inline void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id)
+{}
+
+static inline void
+wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
+				      uint8_t token,
+				      enum wlan_t2lm_resp_frm_type status,
+				      enum qdf_dp_tx_rx_status tx_status,
+				      qdf_freq_t freq,
+				      bool is_rx, uint8_t subtype)
 {}
 #endif
 

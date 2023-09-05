@@ -302,6 +302,36 @@ wlan_cache_connectivity_log(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 #ifdef CONNECTIVITY_DIAG_EVENT
 
 #ifdef WLAN_FEATURE_11BE_MLO
+void
+wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
+				      uint8_t token,
+				      enum wlan_t2lm_resp_frm_type t2lm_status,
+				      enum qdf_dp_tx_rx_status tx_status,
+				      qdf_freq_t freq,
+				      bool is_rx, uint8_t subtype)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
+				 struct wlan_diag_mlo_t2lm_req_resp);
+
+	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+
+	wlan_diag_event.version = DIAG_MLO_T2LM_REQ_RESP_VERSION;
+
+	wlan_diag_event.token = token;
+	wlan_diag_event.subtype = subtype;
+
+	wlan_diag_event.status = t2lm_status;
+	wlan_diag_event.tx_status = wlan_get_diag_tx_status(tx_status);
+	wlan_diag_event.is_rx = is_rx;
+
+	wlan_diag_event.band = wlan_convert_freq_to_diag_band(freq);
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
+				    EVENT_WLAN_MLO_T2LM_REQ_RESP);
+}
+
 static QDF_STATUS
 wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 			struct wlan_diag_sta_info *wlan_diag_event)
