@@ -84,6 +84,7 @@
 #include "wlan_wifi_pos_interface.h"
 #include "wlan_cp_stats_mc_ucfg_api.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
+#include <wlan_mlo_link_force.h>
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -15453,8 +15454,14 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 		return;
 	}
 
-	policy_mgr_activate_mlo_links(mac_ctx->psoc, session_id, num_links,
-				      active_link_addr);
+	if (ml_is_nlink_service_supported(mac_ctx->psoc)) {
+		policy_mgr_activate_mlo_links_nlink(mac_ctx->psoc, session_id,
+						    num_links,
+						    active_link_addr);
+	} else {
+		policy_mgr_activate_mlo_links(mac_ctx->psoc, session_id,
+					      num_links, active_link_addr);
+	}
 }
 
 int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,

@@ -6085,22 +6085,24 @@ policy_mgr_mlo_sta_set_link_by_linkid(struct wlan_objmgr_psoc *psoc,
 	uint32_t vdev_bitmap2[MLO_VDEV_BITMAP_SZ];
 	uint8_t i, idx;
 	uint32_t link_control_flags = 0;
+	uint8_t vdev_per_bitmap = MLO_MAX_VDEV_COUNT_PER_BIMTAP_ELEMENT;
 
 	qdf_mem_zero(vdev_bitmap, sizeof(vdev_bitmap));
 	qdf_mem_zero(vdev_bitmap2, sizeof(vdev_bitmap2));
 
 	for (i = 0; i < num_mlo_vdev; i++) {
-		idx = mlo_vdev_lst[i] / 32;
+		idx = mlo_vdev_lst[i] / vdev_per_bitmap;
 		if (idx >= MLO_VDEV_BITMAP_SZ)
 			return QDF_STATUS_E_INVAL;
-		vdev_bitmap[idx] |= 1 << (mlo_vdev_lst[i] % 32);
+		vdev_bitmap[idx] |= 1 << (mlo_vdev_lst[i] % vdev_per_bitmap);
 	}
 
 	for (i = 0; i < num_mlo_inactive_vdev; i++) {
-		idx = mlo_inactive_vdev_lst[i] / 32;
+		idx = mlo_inactive_vdev_lst[i] / vdev_per_bitmap;
 		if (idx >= MLO_VDEV_BITMAP_SZ)
 			return QDF_STATUS_E_INVAL;
-		vdev_bitmap2[idx] |= 1 << (mlo_inactive_vdev_lst[i] % 32);
+		vdev_bitmap2[idx] |=
+			1 << (mlo_inactive_vdev_lst[i] % vdev_per_bitmap);
 	}
 
 	ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
@@ -6552,7 +6554,7 @@ policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 	uint8_t num_del = 0;
 	struct ml_nlink_change_event data;
 
-	if (notify_reason != MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_POST_SER)
+	if (notify_reason > MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_POST_SER)
 		return QDF_STATUS_SUCCESS;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -6561,13 +6563,15 @@ policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	policy_mgr_debug("target link %d freq %d curr link %d vdev %d",
+	policy_mgr_debug("target link %d freq %d curr link %d notify reason %d link switch reason %d vdev %d",
 			 new_ieee_link_id, new_primary_freq,
-			 curr_ieee_link_id, vdev_id);
+			 curr_ieee_link_id, notify_reason, req->reason,
+			 vdev_id);
 	qdf_mem_zero(&data, sizeof(data));
 	data.evt.link_switch.curr_ieee_link_id = curr_ieee_link_id;
 	data.evt.link_switch.new_ieee_link_id = new_ieee_link_id;
 	data.evt.link_switch.new_primary_freq = new_primary_freq;
+	data.evt.link_switch.reason = req->reason;
 	status = ml_nlink_conn_change_notify(psoc, vdev_id,
 					     ml_nlink_link_switch_start_evt,
 					     &data);
@@ -8218,6 +8222,105 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return restart_required;
+}
+
+void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
+					 uint8_t session_id, uint8_t num_links,
+					 struct qdf_mac_addr active_link_addr[2])
+{
+	uint8_t *link_mac_addr;
+	uint32_t link_ctrl_flags;
+	enum mlo_link_force_reason reason;
+	enum mlo_link_force_mode mode;
+	struct wlan_objmgr_vdev *vdev;
+	struct mlo_link_info *link_info;
+	bool active_link_present = false;
+	uint8_t iter, link, active_link_cnt = 0, inactive_link_cnt = 0;
+	uint32_t active_link_bitmap = 0;
+	uint32_t inactive_link_bitmap = 0;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, session_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev_id: %d vdev not found", session_id);
+		return;
+	}
+
+	if (!wlan_cm_is_vdev_connected(vdev)) {
+		policy_mgr_err("vdev is not in connected state");
+		goto done;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		policy_mgr_err("vdev is not mlo vdev");
+		goto done;
+	}
+
+	policy_mgr_debug("Num active links: %d", num_links);
+	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
+		if (link_info->link_id == WLAN_INVALID_LINK_ID) {
+			link_info++;
+			continue;
+		}
+
+		link_mac_addr = &link_info->link_addr.bytes[0];
+		policy_mgr_debug("link addr: " QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(link_mac_addr));
+
+		for (link = 0; link < num_links; link++) {
+			policy_mgr_debug("active addr: " QDF_MAC_ADDR_FMT,
+			   QDF_MAC_ADDR_REF(&active_link_addr[link].bytes[0]));
+			if (!qdf_mem_cmp(link_mac_addr,
+					 &active_link_addr[link].bytes[0],
+					 QDF_MAC_ADDR_SIZE)) {
+				active_link_bitmap |= 1 << link_info->link_id;
+				active_link_cnt++;
+				active_link_present = true;
+				policy_mgr_debug("Link address match");
+			}
+		}
+		if (!active_link_present) {
+			inactive_link_bitmap |= 1 << link_info->link_id;
+			inactive_link_cnt++;
+			policy_mgr_err("No link address match");
+		}
+		active_link_present = false;
+		link_info++;
+	}
+
+	policy_mgr_debug("active link cnt: %d, inactive link cnt: %d",
+			 active_link_cnt, inactive_link_cnt);
+
+	if (!active_link_cnt) {
+		goto done;
+	} else if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
+		goto done;
+	}
+
+	/*
+	 * If there are both active and inactive vdev count, then issue a
+	 * single WMI with force mode MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
+	 * else if there is only active vdev count, send single WMI for
+	 * all active vdevs with force mode MLO_LINK_FORCE_MODE_ACTIVE.
+	 */
+	if (inactive_link_cnt) {
+		reason = MLO_LINK_FORCE_REASON_CONNECT;
+		mode = MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE;
+		link_ctrl_flags = link_ctrl_f_overwrite_active_bitmap |
+					link_ctrl_f_overwrite_inactive_bitmap;
+	} else {
+		reason = MLO_LINK_FORCE_REASON_DISCONNECT;
+		mode = MLO_LINK_FORCE_MODE_ACTIVE;
+		link_ctrl_flags = link_ctrl_f_overwrite_active_bitmap;
+	}
+
+	policy_mgr_mlo_sta_set_nlink(psoc, vdev, reason, mode, 0,
+				     active_link_bitmap, inactive_link_bitmap,
+				     link_ctrl_flags);
+done:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 }
 
 void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,

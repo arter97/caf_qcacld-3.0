@@ -5095,8 +5095,22 @@ policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id);
 
 /**
+ * policy_mgr_activate_mlo_links_nlink() - Force active ML links based on user
+ * requested link mac address with link bitmap
+ * @psoc: objmgr psoc
+ * @session_id: session id
+ * @num_links: number of links to be forced active
+ * @active_link_addr: link mac address of links to be forced active
+ *
+ * Return: void
+ */
+void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
+					 uint8_t session_id, uint8_t num_links,
+					 struct qdf_mac_addr *active_link_addr);
+
+/**
  * policy_mgr_activate_mlo_links() - Force active ML links based on user
- * requested link mac address
+ * requested link mac address with vdev bitmap
  * @psoc: objmgr psoc
  * @session_id: session id
  * @num_links: number of links to be forced active

@@ -22,6 +22,7 @@
 
 #include <wlan_mlo_mgr_cmn.h>
 #include <wlan_mlo_mgr_public_structs.h>
+#include <wlan_mlo_mgr_link_switch.h>
 
 /**
  * enum ml_nlink_change_event_type - Ml link state change trigger event
@@ -62,6 +63,7 @@ struct ml_nlink_change_event {
 			uint8_t curr_ieee_link_id;
 			uint8_t new_ieee_link_id;
 			uint32_t new_primary_freq;
+			enum wlan_mlo_link_switch_reason reason;
 		} link_switch;
 	} evt;
 };
@@ -126,6 +128,8 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			    uint8_t vdev_id,
 			    enum ml_nlink_change_event_type evt,
 			    struct ml_nlink_change_event *data);
+
+#define MLO_MAX_VDEV_COUNT_PER_BIMTAP_ELEMENT (sizeof(uint32_t) * 8)
 
 /**
  * ml_nlink_convert_linkid_bitmap_to_vdev_bitmap() - convert link

@@ -45,6 +45,7 @@ ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
 	uint16_t link_id;
 	uint8_t vdev_id;
 	uint32_t associated_link_bitmap = 0;
+	uint8_t vdev_per_bitmap = MLO_MAX_VDEV_COUNT_PER_BIMTAP_ELEMENT;
 
 	*vdev_id_bitmap_sz = 0;
 	*vdev_id_num = 0;
@@ -85,10 +86,10 @@ ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
 		 */
 		if (!(link_bitmap & (1 << link_id)))
 			continue;
-		j = vdev_id / 32;
+		j = vdev_id / vdev_per_bitmap;
 		if (j >= MLO_VDEV_BITMAP_SZ)
 			break;
-		vdev_id_bitmap[j] |= 1 << (vdev_id % 32);
+		vdev_id_bitmap[j] |= 1 << (vdev_id % vdev_per_bitmap);
 		if (j + 1 > bitmap_sz)
 			bitmap_sz = j + 1;
 
@@ -124,6 +125,7 @@ ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
 	uint16_t link_id;
 	uint8_t vdev_id;
 	uint32_t associated_link_bitmap = 0;
+	uint8_t vdev_per_bitmap = MLO_MAX_VDEV_COUNT_PER_BIMTAP_ELEMENT;
 
 	*link_bitmap = 0;
 	if (associated_bitmap)
@@ -157,7 +159,7 @@ ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
 			continue;
 		}
 		associated_link_bitmap |= 1 << link_id;
-		j = vdev_id / 32;
+		j = vdev_id / vdev_per_bitmap;
 		if (j >= vdev_id_bitmap_sz) {
 			mlo_err("invalid vdev id %d", vdev_id);
 			continue;
@@ -165,7 +167,7 @@ ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
 		/* If the vdev_id is not interested one which is specified
 		 * in "vdev_id_bitmap", continue the search.
 		 */
-		if (!(vdev_id_bitmap[j] & (1 << (vdev_id % 32))))
+		if (!(vdev_id_bitmap[j] & (1 << (vdev_id % vdev_per_bitmap))))
 			continue;
 
 		*link_bitmap |= 1 << link_id;
@@ -2046,6 +2048,8 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 	enum QDF_OPMODE mode;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct ml_link_force_state curr_force_state = {0};
+	bool is_set_link_in_progress = policy_mgr_is_set_link_in_progress(psoc);
+	bool is_host_force;
 
 	mlo_debug("vdev %d %s(%d)", vdev_id, link_evt_to_string(evt),
 		  evt);
@@ -2059,6 +2063,34 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 
 	switch (evt) {
 	case ml_nlink_link_switch_start_evt:
+		if (data->evt.link_switch.reason ==
+		    MLO_LINK_SWITCH_REASON_HOST_FORCE) {
+			is_host_force = true;
+		} else {
+			is_host_force = false;
+		}
+
+		mlo_debug("set_link_in_prog %d reason %d",
+			  is_set_link_in_progress,
+			  data->evt.link_switch.reason);
+
+		if (is_set_link_in_progress) {
+			/* If set active is in progress then only accept host
+			 * force link switch requests from FW
+			 */
+			if (is_host_force)
+				status = QDF_STATUS_SUCCESS;
+			else
+				status = QDF_STATUS_E_INVAL;
+			break;
+		} else if (is_host_force) {
+			/* If set active is not in progress but FW sent host
+			 * force then reject the link switch
+			 */
+			status = QDF_STATUS_E_INVAL;
+			break;
+		}
+
 		ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
 		if ((1 << data->evt.link_switch.new_ieee_link_id) &
 		    curr_force_state.force_inactive_bitmap) {
