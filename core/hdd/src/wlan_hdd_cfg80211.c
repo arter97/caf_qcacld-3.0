@@ -3824,7 +3824,7 @@ hdd_remove_passive_dfs_acs_channel_for_ll_sap(struct sap_config *sap_config,
 #endif
 
 /* Stored ACS Frequency timeout in msec */
-#define STORED_ACS_FREQ_TIMEOUT 500
+#define STORED_ACS_FREQ_TIMEOUT 5000
 static bool
 wlan_hdd_is_prev_acs_freq_present_in_acs_config(struct sap_config *sap_cfg)
 {
