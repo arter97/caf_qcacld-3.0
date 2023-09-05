@@ -165,6 +165,8 @@ enum wlan_main_tag {
  * @WLAN_CONN_DIAG_NBR_RPT_RESP_EVENT: Neighbor report response
  * @WLAN_CONN_DIAG_BCN_RPT_REQ_EVENT: Beacon report request
  * @WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT: Beacon report response
+ * @WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT: MLO T2LM request
+ * @WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT: MLO T2LM response
  * @WLAN_CONN_DIAG_MAX: MAX tag
  */
 enum qca_conn_diag_log_event_type {
@@ -213,52 +215,57 @@ enum qca_conn_diag_log_event_type {
 	WLAN_CONN_DIAG_NBR_RPT_RESP_EVENT,
 	WLAN_CONN_DIAG_BCN_RPT_REQ_EVENT,
 	WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT,
+	WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT,
+	WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT,
 	WLAN_CONN_DIAG_MAX
 };
 
-/**
- * struct wlan_connectivity_log_diag_cmn - Structure for diag event
- * @bssid: bssid
- * @vdev_id: Vdev id
- * @timestamp_us: Timestamp(time of the day) in microseconds
- * @fw_timestamp: FW timestamp in microseconds
- * @ktime_us: Kernel Timestamp in microseconds
+/*
+ * enum wlan_diag_wifi_band - Enum describing wifi band
+ * @WLAN_INVALID_BAND: invalid band
+ * @WLAN_24GHZ_BAND: 2.4 GHz band
+ * @WLAN_5GHZ_BAND: 5 GHz band
+ * @WLAN_6GHZ_BAND: 6 GHz band
  */
-struct wlan_connectivity_log_diag_cmn {
-	uint8_t bssid[6];
-	uint16_t vdev_id;
-	uint64_t timestamp_us;
-	uint64_t fw_timestamp;
-	uint64_t ktime_us;
-} qdf_packed;
-
-#define DIAG_NBR_RPT_VERSION 1
+enum wlan_diag_wifi_band {
+	WLAN_INVALID_BAND = 0,
+	WLAN_24GHZ_BAND,
+	WLAN_5GHZ_BAND,
+	WLAN_6GHZ_BAND,
+};
 
 /**
- * struct wlan_diag_nbr_rpt - Neighbor report structure
- * @diag_cmn: Common diag info
- * @version: structure version
- * @num_rpt: the number of neighbor report elements in response frame.
- * @subtype: Event Subtype
- * @token: dialog token. Dialog Token is a nonzero value chosen by the STA
- * @num_freq: Number of frequency in response frame
- * @ssid_len: SSID length
- * @seq_num: Sequence number
- * @ssid: SSID
- * @freq: Frequency list in response frame
+ * enum wlan_diag_mlo_link_switch_reason - MLO link switch reason enumeration
+ * @LINK_STATE_SWITCH_REASON_VDEV_READY: Link switch when vdev is ready
+ * @LINK_STATE_SWITCH_REASON_ULL_MODE: Link switch due to ULL mode configuration
+ * @LINK_STATE_SWITCH_REASON_T2LM_ENABLE: Link switch due to T2LM enable
+ * @LINK_STATE_SWITCH_REASON_T2LM_DISABLE: Link switch due T2LM disable
+ * @LINK_STATE_SWITCH_REASON_FORCE_ENABLED: Link switch when link is
+ * forcibly enable
+ * @LINK_STATE_SWITCH_REASON_FORCE_DISABLED: Link switch when link is
+ * forcibly disable
+ * @LINK_STATE_SWITCH_REASON_LINK_QUALITY: Link switch due to
+ * poor link quality
+ * @LINK_STATE_SWITCH_REASON_LINK_CAPACITY: Link switch due to link capacity
+ * @LINK_STATE_SWITCH_REASON_RSSI: Link switch due to changes in rssi
+ * @LINK_STATE_SWITCH_REASON_BMISS: Link switch due to BMISS
+ * @LINK_STATE_SWITCH_REASON_BT_STATUS: Link switch due to BT status
+ * @LINK_STATE_SWITCH_REASON_MAX: Max value
  */
-struct wlan_diag_nbr_rpt {
-	struct wlan_connectivity_log_diag_cmn diag_cmn;
-	uint8_t version;
-	uint8_t num_rpt;
-	uint8_t subtype;
-	uint8_t token;
-	uint16_t num_freq;
-	uint16_t ssid_len;
-	uint32_t seq_num;
-	char ssid[WLAN_SSID_MAX_LEN];
-	uint32_t freq[WLAN_MAX_LOGGING_FREQ];
-} qdf_packed;
+enum wlan_diag_mlo_link_switch_reason {
+	LINK_STATE_SWITCH_REASON_VDEV_READY = 0,
+	LINK_STATE_SWITCH_REASON_ULL_MODE = 1,
+	LINK_STATE_SWITCH_REASON_T2LM_ENABLE = 2,
+	LINK_STATE_SWITCH_REASON_T2LM_DISABLE = 3,
+	LINK_STATE_SWITCH_REASON_FORCE_ENABLED = 4,
+	LINK_STATE_SWITCH_REASON_FORCE_DISABLED = 5,
+	LINK_STATE_SWITCH_REASON_LINK_QUALITY = 6,
+	LINK_STATE_SWITCH_REASON_LINK_CAPACITY = 7,
+	LINK_STATE_SWITCH_REASON_RSSI = 8,
+	LINK_STATE_SWITCH_REASON_BMISS = 9,
+	LINK_STATE_SWITCH_REASON_BT_STATUS = 10,
+	LINK_STATE_SWITCH_REASON_MAX,
+};
 
 /**
  * enum wlan_bcn_rpt_measurement_mode - Measurement mode enum.
@@ -275,7 +282,214 @@ enum wlan_bcn_rpt_measurement_mode {
 	MEASURE_MODE_RESERVED = 0xFF
 };
 
+/**
+ * struct wlan_connectivity_log_diag_cmn - Structure for diag event
+ * @bssid: bssid
+ * @vdev_id: Vdev id
+ * @timestamp_us: Timestamp(time of the day) in microseconds
+ * @fw_timestamp: FW timestamp in microseconds
+ * @ktime_us: Kernel Timestamp in microseconds
+ */
+struct wlan_connectivity_log_diag_cmn {
+	uint8_t bssid[QDF_MAC_ADDR_SIZE];
+	uint16_t vdev_id;
+	uint64_t timestamp_us;
+	uint64_t fw_timestamp;
+	uint64_t ktime_us;
+} qdf_packed;
+
+#define DIAG_STA_INFO_VERSION 1
+
+/**
+ * struct wlan_diag_sta_info - STA info structure
+ * @diag_cmn: Common diag info
+ * @version: structure version
+ * @is_mlo: MLO connection bit
+ * @mac_2g: 2.4 GHz link station mac address
+ * @mac_5g: 5 GHz link station mac address
+ * @mac_6g: 6 GHz link station mac address
+ */
+struct wlan_diag_sta_info {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint8_t version;
+	uint8_t is_mlo;
+	uint8_t mac_2g[QDF_MAC_ADDR_SIZE];
+	uint8_t mac_5g[QDF_MAC_ADDR_SIZE];
+	uint8_t mac_6g[QDF_MAC_ADDR_SIZE];
+} qdf_packed;
+
+/*
+ * struct wlan_diag_mlo_cmn_info - MLO common info
+ * @band: Indicates link on which mlo setup is initiated.
+ * Refer enum enum wlan_diag_wifi_band.
+ * @link_id: Link id of the link when link is accepted
+ * @vdev_id: vdev id associated with the link
+ * @tid_ul: TID-to-link mapping information on the uplink
+ * @tid_dl: TID-to-link mapping information on the downlink
+ * @link_addr: Link address of the link.
+ */
+struct wlan_diag_mlo_cmn_info {
+	uint8_t band;
+	uint8_t link_id;
+	uint8_t vdev_id;
+	uint8_t tid_ul;
+	uint8_t tid_dl;
+	uint8_t status;
+	uint8_t link_addr[QDF_MAC_ADDR_SIZE];
+};
+
+#define DIAG_MLO_SETUP_VERSION 1
+
+#define MAX_BANDS 3
+/**
+ * struct wlan_diag_mlo_setup - MLO setup structure
+ * @diag_cmn: Common diag info
+ * @version: structure version
+ * @reserved: Reserved field
+ * @status: status code of the link. Non-zero value when link is rejected
+ * @mlo_cmn_info: MLO common info
+ */
+struct wlan_diag_mlo_setup {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint32_t version:8;
+	uint32_t reserved:24;
+	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
+} qdf_packed;
+
+#define DIAG_MLO_RECONFIG_VERSION 1
+
+/**
+ * struct wlan_diag_mlo_reconfig - MLO reconfig diag event structure
+ * @diag_cmn: Common diag info
+ * @version: structure version
+ * @reserved: Reserved field
+ * @mlo_cmn_info: MLO common info
+ */
+struct wlan_diag_mlo_reconfig {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint32_t version:8;
+	uint32_t reserved:24;
+	struct wlan_diag_mlo_cmn_info mlo_cmn_info;
+} qdf_packed;
+
+#define DIAG_MLO_T2LM_STATUS_VERSION 1
+
+/**
+ * struct wlan_diag_mlo_t2lm_status - MLO T2LM status diag event structure
+ * @diag_cmn: Common diag info
+ * @version: structure version
+ * @reserved: Reserved field
+ * @mlo_cmn_info: MLO common info
+ */
+struct wlan_diag_mlo_t2lm_status {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint32_t version:8;
+	uint32_t reserved:24;
+	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
+} qdf_packed;
+
+#define DIAG_MLO_T2LM_REQ_RESP_VERSION 1
+
+/**
+ * struct wlan_diag_mlo_t2lm_req_resp - MLO T2LM Req/Resp diag event structure
+ * @diag_cmn: Common diag info
+ * @version: Structure version
+ * @band: Indicates the band of the link
+ * @status: status code of TID-to-Link mapping response frame
+ * @token: Dialog Token field of TID-To-Link Mapping Request/Response frame
+ * @is_rx: Indicates the direction of packet. 0 - TX and 1 - RX
+ * @tx_status: tx status of transmitted packet. Refer enum qdf_dp_tx_rx_status
+ * @subtype: Subtype of the event
+ * @reserved: Reserved field
+ */
+struct wlan_diag_mlo_t2lm_req_resp {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint8_t version;
+	uint8_t band;
+	uint8_t status;
+	uint8_t token;
+	uint8_t is_rx:1;
+	uint8_t tx_status:7;
+	uint8_t subtype;
+	uint16_t reserved;
+} qdf_packed;
+
+#define DIAG_MLO_T2LM_TEARDOWN_VERSION 1
+
+/**
+ * struct wlan_diag_mlo_t2lm_teardown - MLO T2LM Teardown diag event structure
+ * @diag_cmn: Common diag info
+ * @version: structure version
+ * @band: Indicates the band of the link. Refer enum wlan_diag_wifi_band
+ * @tx_status: tx status of transmitted packet. Refer enum qdf_dp_tx_rx_status
+ * @reserved: Reserved field
+ */
+struct wlan_diag_mlo_t2lm_teardown {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint8_t version;
+	uint8_t band;
+	uint8_t tx_status;
+	uint8_t reserved;
+} qdf_packed;
+
+#define DIAG_MLO_LINK_STATUS_VERSION 1
+/**
+ * struct wlan_diag_mlo_link_status - MLO Link status diag event structure
+ * @diag_cmn: Common diag info
+ * @version: structure version
+ * @active_link: List of current active links. BIT 0: 2.4GHz BIT 1: 5GHz
+ * BIT 2: 6GHz
+ * @prev_active_link: List of inactive links. BIT 0: 2.4GHz BIT 1: 5GHz
+ * BIT 2: 6GHz
+ * @reason: Reason for changed link status. Refer
+ * enum wlan_diag_mlo_link_switch_reason
+ * @reserved: Reserved field
+ */
+struct wlan_diag_mlo_link_status {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint8_t version;
+	uint8_t active_link:5;
+	uint8_t prev_active_link:5;
+	uint8_t reserved:6;
+	uint8_t reason;
+} qdf_packed;
+
+#define DIAG_NBR_RPT_VERSION 1
+#define DIAG_NBR_RPT_VERSION_2 2
+
+/**
+ * struct wlan_diag_nbr_rpt - Neighbor report structure
+ * @diag_cmn: Common diag info
+ * @version: structure version
+ * @num_rpt: the number of neighbor report elements in response frame.
+ * @subtype: Event Subtype
+ * @token: dialog token. Dialog Token is a nonzero value chosen by the STA
+ * @num_freq: Number of frequency in response frame
+ * @ssid_len: SSID length
+ * @seq_num: Sequence number
+ * @ssid: SSID
+ * @freq: Frequency list in response frame
+ * @band: Band on which packet was received or transmitted.
+ * Refer enum enum wlan_diag_wifi_band
+ * @reserved: Reserved field
+ */
+struct wlan_diag_nbr_rpt {
+	struct wlan_connectivity_log_diag_cmn diag_cmn;
+	uint8_t version;
+	uint8_t num_rpt;
+	uint8_t subtype;
+	uint8_t token;
+	uint16_t num_freq;
+	uint16_t ssid_len;
+	uint32_t seq_num;
+	char ssid[WLAN_SSID_MAX_LEN];
+	uint32_t freq[WLAN_MAX_LOGGING_FREQ];
+	uint32_t band:8;
+	uint32_t reserved:24;
+} qdf_packed;
+
 #define DIAG_BCN_RPT_VERSION 1
+#define DIAG_BCN_RPT_VERSION_2 2
 
 /**
  * struct wlan_diag_bcn_rpt - Beacon report structure
@@ -294,6 +508,9 @@ enum wlan_bcn_rpt_measurement_mode {
  * Std 802.11‐2020 Table 9-103.
  * @duration: The duration over which the Beacon report was measured.(in ms)
  * @seq_num: Sequence number.
+ * @band: Band on which packet was received or transmitted.
+ * Refer enum enum wlan_diag_wifi_band
+ * @reserved: Reserved field
  */
 struct wlan_diag_bcn_rpt {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
@@ -308,6 +525,8 @@ struct wlan_diag_bcn_rpt {
 	uint16_t mode;
 	uint16_t duration;
 	uint32_t seq_num;
+	uint32_t band:8;
+	uint32_t reserved:24;
 } qdf_packed;
 
 #define DIAG_ROAM_CAND_VERSION 1
@@ -318,6 +537,7 @@ struct wlan_diag_bcn_rpt {
  * @diag_cmn: Common diag info
  * @version: Structure Version
  * @is_current_ap: Is the entry candidate AP or connected AP
+ * @is_mlo: MLO connection indicator
  * @reserved: Reserved
  * @idx: Entry index
  * @cu_load: Channel utilization load of the AP in percentage
@@ -331,7 +551,8 @@ struct wlan_diag_roam_candidate_info {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint8_t version;
 	uint8_t is_current_ap:1;
-	uint8_t reserved:7;
+	uint8_t is_mlo:1;
+	uint8_t reserved:6;
 	uint16_t idx;
 	uint16_t cu_load;
 	uint16_t subtype;
@@ -383,6 +604,7 @@ struct wlan_diag_roam_result {
 } qdf_packed;
 
 #define DIAG_ROAM_SCAN_START_VERSION 1
+#define DIAG_ROAM_SCAN_START_VERSION_V2 2
 
 /**
  * struct wlan_diag_roam_scan_start - Structure to store roam scan trigger
@@ -391,7 +613,8 @@ struct wlan_diag_roam_result {
  * @version: Structure Version
  * @is_full_scan: True if the scan is Full scan. False if the roam scan is
  * partial channel map scan
- * @reserved: Reserved
+ * @band: Band involved in the roaming during a MLO connection.
+ * Refer enum enum wlan_diag_wifi_band
  * @cu:  Current connected channel load in percentage
  * @trigger_reason: Roam trigger reason defined by enum roam_trigger_reason
  * @trigger_sub_reason: Roam scan trigger sub reason indicating if
@@ -404,7 +627,7 @@ struct wlan_diag_roam_scan_start {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint8_t version;
 	uint8_t is_full_scan:1;
-	uint8_t reserved:7;
+	uint8_t band:7;
 	uint16_t cu;
 	uint32_t trigger_reason;
 	uint32_t trigger_sub_reason;
@@ -431,6 +654,7 @@ struct wlan_diag_btm_cand_info {
 } qdf_packed;
 
 #define DIAG_BTM_VERSION 1
+#define DIAG_BTM_VERSION_2 2
 
 /**
  * struct wlan_diag_btm_info - BTM frame related logging data
@@ -445,7 +669,8 @@ struct wlan_diag_btm_cand_info {
  * 802.11‐2020 Table 9-428—BTM status code definitions
  * @delay: BSS Termination Delay field
  * @is_disassoc_imminent: Disassociation imminent bit
- * @reserved: Reserved field
+ * @band: indicates the link involved in MLO conenection.
+ * Refer enum enum wlan_diag_wifi_band
  * @token: dialog token. Dialog Token is a nonzero value chosen by the STA
  * @wtc_duration: WTC duration field in minutes
  * while sending the BTM frame to identify the query/request/response
@@ -465,7 +690,7 @@ struct wlan_diag_btm_info {
 	uint8_t status;
 	uint8_t delay;
 	uint8_t is_disassoc_imminent:1;
-	uint8_t reserved:7;
+	uint8_t band:7;
 	uint8_t token;
 	uint8_t subtype;
 	uint16_t wtc_duration;
@@ -474,6 +699,8 @@ struct wlan_diag_btm_info {
 } qdf_packed;
 
 #define DIAG_MGMT_VERSION 1
+#define DIAG_MGMT_VERSION_V2 2
+#define MAX_VSIE_LEN 255
 
 /**
  * struct wlan_diag_packet_info - Data packets related info
@@ -490,6 +717,9 @@ struct wlan_diag_btm_info {
  * @reason: reason code defined in Table 9-49 Reason codes field’ from the
  * IEEE 802.11 standard document.
  * @is_retry_frame: Retry frame indicator
+ * @is_tx: Packet direction indicator. 0 - RX, 1 - TX
+ * @supported_links: link id bitmap indicates the links involved
+ * in MLO connection.
  * @reserved: Reserved field
  * @subtype: Diag event defined in  enum qca_conn_diag_log_event_type
  * @assoc_id: Association ID
@@ -498,6 +728,11 @@ struct wlan_diag_btm_info {
  * https://www.iana.org/assignments/eap-numbers
  * @sn: Frame sequence number
  * @rssi: Peer RSSI in dBm
+ * @tx_fail_reason: tx failure reason printed on TX_FAIL status.
+ * Refer enum qdf_dp_tx_rx_status
+ * @mld_addr: MLD mac address
+ * @vsie_len: VSIE length
+ * @vsie: VSIE
  */
 struct wlan_diag_packet_info {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
@@ -509,13 +744,18 @@ struct wlan_diag_packet_info {
 	uint8_t tx_status;
 	uint8_t reason;
 	uint8_t is_retry_frame:1;
-	uint8_t reserved:7;
+	uint8_t is_tx:1;
+	uint8_t supported_links:6;
 	uint16_t subtype;
 	uint16_t assoc_id;
 	uint16_t eap_len;
 	uint16_t eap_type;
 	uint32_t sn;
 	int32_t rssi;
+	uint8_t tx_fail_reason;
+	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t vsie_len;
+	uint8_t vsie[MAX_VSIE_LEN];
 } qdf_packed;
 
 #define DIAG_CONN_VERSION 1
@@ -947,6 +1187,15 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 static inline void wlan_connectivity_logging_stop(void)
 {}
 
+/**
+ * wlan_connectivity_sta_info_event() - APi to send STA info event
+ * @psoc: Pointer to global psoc object
+ * @vdev_id: Vdev id
+ */
+void
+wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
+
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
  * wlan_connectivity_logging_start()  - Initialize the connectivity/roaming
@@ -1015,6 +1264,15 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_algo, uint8_t auth_type,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag);
+
+/**
+ * wlan_connectivity_sta_info_event() - APi to send STA info event
+ * @psoc: Pointer to global psoc object
+ * @vdev_id: Vdev id
+ */
+void
+wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
 #else
 static inline
 void wlan_connectivity_logging_start(struct wlan_objmgr_psoc *psoc,
@@ -1046,5 +1304,10 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag)
 {}
+static inline void
+wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id)
+{
+}
 #endif
 #endif /* _WLAN_CONNECTIVITY_LOGGING_H_ */

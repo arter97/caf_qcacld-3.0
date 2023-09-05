@@ -421,6 +421,15 @@ enum host_concurrent_ap_policy
 wlan_mlme_get_ap_policy(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * wlan_mlme_ll_lt_sap_send_oce_flags_fw() - Send the oce flags to FW for
+ * ll_lt_sap
+ * @vdev: pointer to vdev object
+ *
+ * Return: void
+ */
+void wlan_mlme_ll_lt_sap_send_oce_flags_fw(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_mlme_get_prevent_link_down() - Get the prevent link down config
  * @psoc: pointer to psoc object
  * @prevent_link_down: Pointer to the variable from caller

@@ -1829,7 +1829,8 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
 		mac = hdd_sta_ctx->conn_info.bssid.bytes;
 		size = scnprintf(buf, PAGE_SIZE,
-				 "%s%llu %llu " QDF_MAC_ADDR_FMT "%llu %llu %llu\n",
+				 "%s%llu %llu " QDF_MAC_ADDR_FMT
+				 " %llu %llu %llu\n",
 				 buf, adapter->tsf.last_target_time,
 				 tsf_sync_qtime,
 				 QDF_MAC_ADDR_REF(mac),
@@ -1837,7 +1838,8 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	} else {
 		mac = adapter->mac_addr.bytes;
 		size = scnprintf(buf, PAGE_SIZE,
-				 "%s%llu %llu " QDF_MAC_ADDR_FMT "%llu %llu %llu\n",
+				 "%s%llu %llu " QDF_MAC_ADDR_FMT
+				 " %llu %llu %llu\n",
 				 buf, adapter->tsf.last_target_time,
 				 tsf_sync_qtime,
 				 QDF_MAC_ADDR_REF(mac),

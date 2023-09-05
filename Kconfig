@@ -1602,6 +1602,11 @@ config WLAN_SYSFS_WLAN_DBG
 	depends on WLAN_SYSFS
 	default n
 
+config WLAN_SYSFS_BITRATES
+	bool "enable WLAN_SYSFS_BITRATES"
+	depends on WLAN_SYSFS
+	default n
+
 config WLAN_THERMAL_CFG
 	bool "Enable WLAN_THERMAL_CFG"
 	default n
@@ -1741,10 +1746,6 @@ config FEATURE_PKTLOG_EN_NON_LEGACY
 config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"
 	default \"wlan\"
-
-config QCA_WIFI_FTM_IOCTL
-	bool "Enable CONFIG_QCA_WIFI_FTM_IOCTL"
-	default n
 
 config LL_DP_SUPPORT_NON_LITH
 	bool "ENABLE CONFIG_LL_DP_SUPPORT_NON_LITH"

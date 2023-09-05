@@ -1379,9 +1379,8 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 	sta_count = policy_mgr_mode_specific_connection_count(psoc,
 							      PM_STA_MODE,
 							      NULL);
-	sap_count = policy_mgr_mode_specific_connection_count(psoc,
-							      PM_SAP_MODE,
-							      NULL);
+	sap_count = policy_mgr_get_sap_mode_count(psoc, NULL);
+
 	twt_arg.psoc = psoc;
 
 	osif_debug("Total connection %d, sta_count %d, sap_count %d",

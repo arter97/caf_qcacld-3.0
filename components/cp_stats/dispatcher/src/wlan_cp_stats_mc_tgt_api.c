@@ -672,8 +672,8 @@ tgt_mc_infra_cp_stats_extract_twt_stats(struct wlan_objmgr_psoc *psoc,
 					struct infra_cp_stats_event *ev)
 {
 	QDF_STATUS status;
-	get_infra_cp_stats_cb resp_cb;
-	void *context;
+	get_infra_cp_stats_cb resp_cb = NULL;
+	void *context = NULL;
 
 	status = wlan_cp_stats_infra_cp_get_context(psoc, &resp_cb, &context);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -761,31 +761,34 @@ tgt_mc_cp_stats_extract_congestion_stats(struct wlan_objmgr_psoc *psoc,
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
 update_ml_vdev_id_from_stats_event(struct wlan_objmgr_psoc *psoc,
-				   struct stats_event *ev,
 				   struct request_info *req,
 				   uint8_t *vdev_id)
 {
-	uint8_t i, j, t_vdev_id;
+	uint8_t j, t_vdev_id;
 
-	if (!wlan_vdev_mlme_get_is_mlo_vdev(psoc, req->vdev_id)) {
+	if ((!wlan_vdev_mlme_get_is_mlo_vdev(psoc, req->vdev_id) &&
+	    !wlan_vdev_mlme_get_is_mlo_link(psoc, req->vdev_id)) ||
+	    !req->ml_vdev_info.ml_vdev_count) {
 		*vdev_id = req->vdev_id;
 		return;
 	}
 
-	for (i = 0; i < ev->num_summary_stats; i++) {
-		t_vdev_id = ev->vdev_summary_stats[i].vdev_id;
-		for (j = 0; j < req->ml_vdev_info.ml_vdev_count; j++) {
-			if (t_vdev_id == req->ml_vdev_info.ml_vdev_id[j]) {
-				*vdev_id = req->ml_vdev_info.ml_vdev_id[j];
-				break;
-			}
+	t_vdev_id = *vdev_id;
+	for (j = 0; j < req->ml_vdev_info.ml_vdev_count; j++) {
+		if (t_vdev_id == req->ml_vdev_info.ml_vdev_id[j]) {
+			*vdev_id = req->ml_vdev_info.ml_vdev_id[j];
+			return;
 		}
+	}
+
+	if (j == req->ml_vdev_info.ml_vdev_count) {
+		cp_stats_err("vdev[%u] not found", t_vdev_id);
+		*vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 	}
 }
 #else
 static void
 update_ml_vdev_id_from_stats_event(struct wlan_objmgr_psoc *psoc,
-				   struct stats_event *ev,
 				   struct request_info *req,
 				   uint8_t *vdev_id)
 {
@@ -893,8 +896,9 @@ static void tgt_mc_cp_stats_extract_vdev_summary_stats(
 	}
 
 	vdev_id = last_req.vdev_id;
-	update_ml_vdev_id_from_stats_event(psoc, ev, &last_req, &vdev_id);
 	for (i = 0; i < ev->num_summary_stats; i++) {
+		vdev_id = ev->vdev_summary_stats[i].vdev_id;
+		update_ml_vdev_id_from_stats_event(psoc, &last_req, &vdev_id);
 		if (ev->vdev_summary_stats[i].vdev_id == vdev_id)
 			break;
 	}
@@ -973,12 +977,11 @@ static void tgt_mc_cp_stats_extract_vdev_chain_rssi_stats(
 	}
 
 	for (i = 0; i < ev->num_chain_rssi_stats; i++) {
-		vdev_id = last_req.vdev_id;
-		if (vdev_id != ev->vdev_chain_rssi[i].vdev_id)
+		vdev_id = ev->vdev_chain_rssi[i].vdev_id;
+		update_ml_vdev_id_from_stats_event(psoc, &last_req, &vdev_id);
+		if (ev->vdev_chain_rssi[i].vdev_id != vdev_id)
 			continue;
 
-		update_ml_vdev_id_from_stats_event(psoc, ev,
-						   &last_req, &vdev_id);
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 							    WLAN_CP_STATS_ID);
 		if (!vdev) {

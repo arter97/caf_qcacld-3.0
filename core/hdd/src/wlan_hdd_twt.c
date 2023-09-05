@@ -4776,9 +4776,7 @@ void __hdd_twt_update_work_handler(struct hdd_context *hdd_ctx)
 	sta_count = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
 							      PM_STA_MODE,
 							      NULL);
-	sap_count = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-							      PM_SAP_MODE,
-							      NULL);
+	sap_count = policy_mgr_get_sap_mode_count(hdd_ctx->psoc, NULL);
 	twt_arg.hdd_ctx = hdd_ctx;
 
 	hdd_debug("Total connection %d, sta_count %d, sap_count %d",

@@ -71,6 +71,7 @@
 #include <lim_assoc_utils.h>
 #include "wlan_mlme_ucfg_api.h"
 #include "nan_ucfg_api.h"
+#include "wlan_twt_ucfg_ext_cfg.h"
 #ifdef WLAN_FEATURE_11BE
 #include "wma_eht.h"
 #endif
@@ -496,8 +497,13 @@ void lim_deactivate_timers(struct mac_context *mac_ctx)
 		/* Cleanup as if SAE auth timer expired */
 		lim_timer_handler(mac_ctx, SIR_LIM_AUTH_SAE_TIMEOUT);
 	}
-
 	tx_timer_deactivate(&lim_timer->sae_auth_timer);
+
+	if (tx_timer_running(&lim_timer->rrm_sta_stats_resp_timer)) {
+		pe_err("sta stats resp timer running call the timeout API");
+		lim_timer_handler(mac_ctx, SIR_LIM_RRM_STA_STATS_RSP_TIMEOUT);
+	}
+	tx_timer_deactivate(&lim_timer->rrm_sta_stats_resp_timer);
 }
 
 void lim_deactivate_timers_for_vdev(struct mac_context *mac_ctx,
@@ -663,6 +669,7 @@ void lim_cleanup_mlm(struct mac_context *mac_ctx)
 		tx_timer_delete(&lim_timer->gLimDeauthAckTimer);
 
 		tx_timer_delete(&lim_timer->sae_auth_timer);
+		tx_timer_delete(&lim_timer->rrm_sta_stats_resp_timer);
 
 		mac_ctx->lim.gLimTimersCreated = 0;
 	}
@@ -3827,8 +3834,8 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 		return;
 	}
 
-	if (wlan_cm_is_vdev_roaming(pe_session->vdev)) {
-		pe_err("Roaming is in progress");
+	if (!wlan_cm_is_vdev_connected(pe_session->vdev)) {
+		pe_err("vdev not connected, ignore HT IE BW update");
 		return;
 	}
 
@@ -7951,7 +7958,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 				   HE_CAP_80P80_MCS_MAP_LEN;
 	uint8_t num_ppe_th = 0;
 	bool nan_beamforming_supported;
-	bool disable_nan_tx_bf = false;
+	bool disable_nan_tx_bf = false, value = false;
 
 	/* Sending only minimal info(no PPET) to FW now, update if required */
 	qdf_mem_zero(he_caps, he_cap_total_len);
@@ -7994,6 +8001,24 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	if (he_cap->ppet_present)
 		num_ppe_th = lim_set_he_caps_ppet(mac_ctx, he_caps,
 						  CDS_BAND_5GHZ);
+
+	if ((device_mode == QDF_STA_MODE) ||
+	    (device_mode == QDF_P2P_CLIENT_MODE)) {
+		ucfg_twt_cfg_get_requestor(mac_ctx->psoc, &value);
+		if (!value) {
+			he_cap->twt_request = false;
+			he_cap->flex_twt_sched = false;
+		}
+		he_cap->twt_responder = false;
+	} else if ((device_mode == QDF_SAP_MODE) ||
+		    (device_mode == QDF_P2P_GO_MODE)) {
+		ucfg_twt_cfg_get_responder(mac_ctx->psoc, &value);
+		if (!value) {
+			he_cap->twt_responder = false;
+			he_cap->flex_twt_sched = false;
+		}
+		he_cap->twt_request = false;
+	}
 
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_HE_CAP,
 			CDS_BAND_5GHZ, &he_caps[2],
@@ -10368,9 +10393,8 @@ QDF_STATUS lim_ap_mlme_vdev_rnr_notify(struct pe_session *session)
 		return status;
 	pe_debug("vdev id %d non mlo 6G AP notify co-located AP to update RNR",
 		 wlan_vdev_get_id(session->vdev));
-	vdev_num = policy_mgr_get_mode_specific_conn_info(
-			mac_ctx->psoc, freq_list, vdev_id_list,
-			PM_SAP_MODE);
+	vdev_num = policy_mgr_get_sap_mode_info(mac_ctx->psoc, freq_list,
+						vdev_id_list);
 	for (i = 0; i < vdev_num; i++) {
 		if (vdev_id_list[i] == session->vdev_id)
 			continue;

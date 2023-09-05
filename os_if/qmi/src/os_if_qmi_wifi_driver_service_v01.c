@@ -570,11 +570,6 @@ struct qmi_elem_info wfds_ut_cmd_req_msg_v01_ei[] = {
 					   dest_mac),
 	},
 	{
-		.data_type      = QMI_EOTI,
-		.array_type       = NO_ARRAY,
-		.tlv_type       = QMI_COMMON_TLV_TYPE,
-	},
-	{
 		.data_type      = QMI_UNSIGNED_1_BYTE,
 		.elem_len       = 1,
 		.elem_size      = sizeof(u8),
@@ -623,5 +618,10 @@ struct qmi_elem_info wfds_ut_cmd_req_msg_v01_ei[] = {
 		.offset         = offsetof(struct
 					   wfds_ut_cmd_req_msg_v01,
 					   misc),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
 	},
 };

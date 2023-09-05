@@ -4042,6 +4042,7 @@ QDF_STATUS lim_deauth_tx_complete_cnf(void *context,
 	pe_debug("tx_success: %d", tx_success);
 	if (mgmt_params)
 		vdev_id = mgmt_params->vdev_id;
+	qdf_mem_free(params);
 
 	return lim_send_deauth_cnf(mac_ctx, vdev_id);
 }
@@ -4092,6 +4093,7 @@ static QDF_STATUS lim_deauth_tx_complete_cnf_handler(void *context,
 	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 	struct wmi_mgmt_params *mgmt_params =
 			(struct wmi_mgmt_params *)params;
+	struct wmi_mgmt_params *msg_params = NULL;
 
 	if (params)
 		wlan_send_tx_complete_event(context, buf, params, tx_success,
@@ -4137,14 +4139,26 @@ static QDF_STATUS lim_deauth_tx_complete_cnf_handler(void *context,
 		session->deauth_retry.retry_cnt--;
 		return QDF_STATUS_SUCCESS;
 	}
+
+	msg_params = qdf_mem_malloc(sizeof(struct wmi_mgmt_params));
+	if (!msg_params) {
+		pe_err("malloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(msg_params, mgmt_params, sizeof(struct wmi_mgmt_params));
+
 	msg.type = (uint16_t) WMA_DEAUTH_TX_COMP;
-	msg.bodyptr = params;
+	msg.bodyptr = msg_params;
 	msg.bodyval = tx_success;
 
 	status_code = lim_post_msg_high_priority(mac_ctx, &msg);
-	if (status_code != QDF_STATUS_SUCCESS)
+	if (status_code != QDF_STATUS_SUCCESS) {
+		qdf_mem_free(msg_params);
 		pe_err("posting message: %X to LIM failed, reason: %d",
 		       msg.type, status_code);
+	}
+
 	return status_code;
 }
 
@@ -5676,6 +5690,26 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 				pRRMReport[i].refused;
 			frm->MeasurementReport[i].present = 1;
 			break;
+		case SIR_MAC_RRM_CHANNEL_LOAD_TYPE:
+			populate_dot11f_chan_load_report(mac,
+				&frm->MeasurementReport[i],
+				&pRRMReport[i].report.channel_load_report);
+			frm->MeasurementReport[i].incapable =
+				pRRMReport[i].incapable;
+			frm->MeasurementReport[i].refused =
+				pRRMReport[i].refused;
+			frm->MeasurementReport[i].present = 1;
+			break;
+		case SIR_MAC_RRM_STA_STATISTICS_TYPE:
+			populate_dot11f_rrm_sta_stats_report(
+				mac, &frm->MeasurementReport[i],
+				&pRRMReport[i].report.statistics_report);
+			frm->MeasurementReport[i].incapable =
+				pRRMReport[i].incapable;
+			frm->MeasurementReport[i].refused =
+				pRRMReport[i].refused;
+			frm->MeasurementReport[i].present = 1;
+			break;
 		default:
 			frm->MeasurementReport[i].incapable =
 				pRRMReport[i].incapable;
@@ -5751,14 +5785,12 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 						 wlan_vdev_get_id(pe_session->vdev));
 	}
 
-	pe_nofl_info("TX: %s seq_no:%d dialog_token:%d no. of APs:%d is_last_rpt:%d num_report: %d peer:"QDF_MAC_ADDR_FMT,
-		     frm->MeasurementReport[0].type == SIR_MAC_RRM_BEACON_TYPE ?
-		     "[802.11 BCN_RPT]" : "[802.11 RRM]",
+	pe_nofl_info("TX: type:%d seq_no:%d dialog_token:%d no. of APs:%d is_last_rpt:%d num_report:%d peer:"QDF_MAC_ADDR_FMT,
+		     frm->MeasurementReport[0].type,
 		     (pMacHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET |
 		     pMacHdr->seqControl.seqNumLo),
 		     dialog_token, frm->num_MeasurementReport,
-		     is_last_report, num_report,
-		     QDF_MAC_ADDR_REF(peer));
+		     is_last_report, num_report, QDF_MAC_ADDR_REF(peer));
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -5775,7 +5807,7 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 			 pe_session->peSessionId, qdf_status));
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		pe_nofl_err("TX: [802.11 RRM] Send FAILED! err_status [%d]",
-		       qdf_status);
+			    qdf_status);
 		status_code = QDF_STATUS_E_FAILURE;
 		/* Pkt will be freed up by the callback */
 	}

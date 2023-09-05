@@ -818,8 +818,6 @@ policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}
 void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc);
 
 void pm_dbs_opportunistic_timer_handler(void *data);
-enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
-		uint8_t subtype);
 
 /**
  * policy_mgr_get_channel_list() - Get channel list based on PCL and mode

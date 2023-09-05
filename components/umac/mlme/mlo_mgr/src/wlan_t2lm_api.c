@@ -46,6 +46,31 @@ const char *t2lm_get_event_str(enum wlan_t2lm_evt event)
 }
 
 static
+uint16_t t2lm_get_connected_link_id(struct wlan_objmgr_vdev *vdev)
+{
+	uint16_t ieee_link_mask = 0;
+	uint8_t i, link_id;
+	struct mlo_link_info *link_info = NULL;
+
+	if (!vdev->mlo_dev_ctx) {
+		t2lm_err("MLO dev context failed");
+		return false;
+	}
+
+	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_id = link_info[i].link_id;
+		if (link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		ieee_link_mask |= BIT(link_id);
+	}
+
+	return ieee_link_mask;
+}
+
+static
 bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
 				 struct wlan_t2lm_onging_negotiation_info *t2lm,
 				 enum wlan_t2lm_direction *valid_dir)
@@ -55,31 +80,8 @@ bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
 	uint16_t ieee_link_mask = 0;
 	uint16_t provisioned_links = 0;
 	bool is_valid_link_mask = false;
-	struct wlan_objmgr_vdev *ml_vdev = NULL;
-	struct wlan_objmgr_vdev *ml_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
-	uint16_t ml_vdev_cnt = 0;
 
-	/* Get the valid hw_link_id map from ML vdev list */
-	mlo_get_ml_vdev_list(vdev, &ml_vdev_cnt, ml_vdev_list);
-	if (!ml_vdev_cnt) {
-		t2lm_err("Number of VDEVs under MLD is reported as 0");
-		return false;
-	}
-
-	for (i = 0; i < ml_vdev_cnt; i++) {
-		ml_vdev = ml_vdev_list[i];
-		if (!ml_vdev || !wlan_cm_is_vdev_connected(ml_vdev)) {
-			t2lm_err("ML vdev is null");
-			continue;
-		}
-
-		ieee_link_mask |= BIT(wlan_vdev_get_link_id(ml_vdev));
-	}
-
-	if (ml_vdev_cnt) {
-		for (i = 0; i < ml_vdev_cnt; i++)
-			mlo_release_vdev_ref(ml_vdev_list[i]);
-	}
+	ieee_link_mask = t2lm_get_connected_link_id(vdev);
 
 	/* Check if the configured hw_link_id map is valid */
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {

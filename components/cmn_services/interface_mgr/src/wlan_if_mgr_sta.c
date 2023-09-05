@@ -67,9 +67,9 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							 vdev_id_list,
 							 PM_STA_MODE);
-	sap_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
-							 &vdev_id_list[sta_cnt],
-							 PM_SAP_MODE);
+	sap_cnt = policy_mgr_get_sap_mode_info(psoc, NULL,
+					       &vdev_id_list[sta_cnt]);
+
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 
 	if (op_mode == QDF_STA_MODE || op_mode == QDF_P2P_CLIENT_MODE)
@@ -198,6 +198,7 @@ QDF_STATUS if_mgr_disconnect_start(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
+	struct mlme_legacy_priv *mlme_priv;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -207,7 +208,11 @@ QDF_STATUS if_mgr_disconnect_start(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
 
-	/* Leaving as stub to fill in later */
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_runtime_pm_prevent_suspend(&mlme_priv->disconnect_runtime_lock);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -217,6 +222,7 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
+	struct mlme_legacy_priv *mlme_priv;
 	QDF_STATUS status;
 
 	pdev = wlan_vdev_get_pdev(vdev);
@@ -226,6 +232,12 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_runtime_pm_allow_suspend(&mlme_priv->disconnect_runtime_lock);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE ||
 	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_CLIENT_MODE)

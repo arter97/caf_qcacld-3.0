@@ -46,6 +46,7 @@
  * @WFDS_START_WHC: Start WHC traffic
  * @WFDS_START_TSF: Start TSF handshake
  * @WFDS_CMD_MISC: Miscellaneous test
+ * @WFDS_CMD_MAX: Max test commands
  */
 enum os_if_qmi_wfds_ut_cmd_type {
 	WFDS_STOP_TRAFFIC,
@@ -54,6 +55,7 @@ enum os_if_qmi_wfds_ut_cmd_type {
 	WFDS_START_WHC,
 	WFDS_START_TSF,
 	WFDS_CMD_MISC,
+	WFDS_CMD_MAX,
 };
 
 /**

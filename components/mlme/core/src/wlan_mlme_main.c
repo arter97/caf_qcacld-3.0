@@ -36,6 +36,7 @@
 #include "twt/core/src/wlan_twt_cfg.h"
 #include "wlan_scan_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
+#include "wlan_vdev_mgr_utils_api.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -362,19 +363,11 @@ wlan_scan_get_scan_phy_mode(struct wlan_objmgr_vdev *vdev, qdf_freq_t op_freq,
 	return scan_phymode;
 }
 
-/**
- * mlme_update_freq_in_scan_start_req() - Fill frequencies in wide
- * band scan req for mlo connection
- * @vdev: vdev common object
- * @req: pointer to scan request
- * @associated_ch_width: channel width at the time of initial connection
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
+QDF_STATUS
 mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 				   struct scan_start_request *req,
-				   enum phy_ch_width associated_ch_width)
+				   enum phy_ch_width scan_ch_width,
+				   qdf_freq_t scan_freq)
 {
 	const struct bonded_channel_freq *range;
 	uint8_t num_chan;
@@ -383,14 +376,18 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 	uint8_t vdev_id;
 
 	vdev_id = vdev->vdev_objmgr.vdev_id;
-	op_freq = wlan_get_operation_chan_freq(vdev);
 
-	mlme_debug("vdev %d : fill ch list for op_freq:%d, assoc_ch_width: %d",
-		   vdev_id, op_freq, associated_ch_width);
+	if (scan_freq != INVALID_CHANNEL)
+		op_freq = scan_freq;
+	else
+		op_freq = wlan_get_operation_chan_freq(vdev);
 
-	if (associated_ch_width == CH_WIDTH_320MHZ) {
+	mlme_debug("vdev %d : fill ch list for op_freq:%d, scan_ch_width: %d",
+		   vdev_id, op_freq, scan_ch_width);
+
+	if (scan_ch_width == CH_WIDTH_320MHZ) {
 		range = wlan_reg_get_bonded_chan_entry(op_freq,
-						       associated_ch_width, 0);
+						       scan_ch_width, 0);
 		if (!range) {
 			mlme_debug("vdev %d : range is null for freq %d",
 				   vdev_id, op_freq);
@@ -494,7 +491,8 @@ mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
 			}
 
 			status = mlme_update_freq_in_scan_start_req(mlo_vdev,
-						req, associated_ch_width);
+						req, associated_ch_width,
+						INVALID_CHANNEL);
 			if (QDF_IS_STATUS_ERROR(status))
 				return QDF_STATUS_E_FAILURE;
 		}
@@ -552,7 +550,8 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 	}
 
 	status = mlme_update_freq_in_scan_start_req(vdev, req,
-						    associated_ch_width);
+						    associated_ch_width,
+						    INVALID_CHANNEL);
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_FAILURE;
 
@@ -4268,25 +4267,6 @@ qdf_freq_t wlan_get_operation_chan_freq_vdev_id(struct wlan_objmgr_pdev *pdev,
 	return chan_freq;
 }
 
-enum QDF_OPMODE wlan_get_opmode_vdev_id(struct wlan_objmgr_pdev *pdev,
-					uint8_t vdev_id)
-{
-	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
-	struct wlan_objmgr_vdev *vdev;
-
-	if (!pdev)
-		return opmode;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
-						    WLAN_LEGACY_MAC_ID);
-	if (!vdev)
-		return opmode;
-	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-
-	return opmode;
-}
-
 void wlan_vdev_set_dot11mode(struct wlan_mlme_cfg *mac_mlme_cfg,
 			     enum QDF_OPMODE device_mode,
 			     struct vdev_mlme_obj *vdev_mlme)
@@ -5157,6 +5137,57 @@ wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
 }
 #endif
 
+QDF_STATUS wlan_mlme_get_sta_num_tx_chains(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev,
+					   uint8_t *tx_chains)
+{
+	bool dynamic_nss_chains_support;
+	struct wlan_mlme_nss_chains *dynamic_cfg;
+	enum band_info operating_band;
+	QDF_STATUS status;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	status = wlan_mlme_cfg_get_dynamic_nss_chains_support
+					(psoc, &dynamic_nss_chains_support);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to get dynamic_nss_chains_support");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_mlme =
+		wlan_objmgr_vdev_get_comp_private_obj(vdev,
+						      WLAN_UMAC_COMP_MLME);
+	if (!vdev_mlme) {
+		QDF_ASSERT(0);
+		return false;
+	}
+
+	if (dynamic_nss_chains_support) {
+		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
+		if (!dynamic_cfg) {
+			mlme_err("nss chain dynamic config NULL");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		operating_band = ucfg_cm_get_connected_band(vdev);
+		switch (operating_band) {
+		case BAND_2G:
+			*tx_chains =
+			dynamic_cfg->num_tx_chains[NSS_CHAINS_BAND_2GHZ];
+			break;
+		case BAND_5G:
+			*tx_chains =
+			dynamic_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ];
+			break;
+		default:
+			mlme_err("Band %d Not 2G or 5G", operating_band);
+			return QDF_STATUS_E_INVAL;
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint8_t *tx_nss)
@@ -5199,6 +5230,56 @@ QDF_STATUS wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
 			*tx_nss = proto_generic_nss;
 	} else {
 		*tx_nss = proto_generic_nss;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_get_sta_num_rx_chains(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev,
+					   uint8_t *rx_chains)
+{
+	bool dynamic_nss_chains_support;
+	struct wlan_mlme_nss_chains *dynamic_cfg;
+	enum band_info operating_band;
+	QDF_STATUS status;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	status = wlan_mlme_cfg_get_dynamic_nss_chains_support
+					(psoc, &dynamic_nss_chains_support);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to get dynamic_nss_chains_support");
+		return QDF_STATUS_E_INVAL;
+	}
+	vdev_mlme =
+		wlan_objmgr_vdev_get_comp_private_obj(vdev,
+						      WLAN_UMAC_COMP_MLME);
+	if (!vdev_mlme) {
+		QDF_ASSERT(0);
+		return false;
+	}
+
+	if (dynamic_nss_chains_support) {
+		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
+		if (!dynamic_cfg) {
+			mlme_err("nss chain dynamic config NULL");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		operating_band = ucfg_cm_get_connected_band(vdev);
+		switch (operating_band) {
+		case BAND_2G:
+			*rx_chains =
+			dynamic_cfg->num_rx_chains[NSS_CHAINS_BAND_2GHZ];
+			break;
+		case BAND_5G:
+			*rx_chains =
+			dynamic_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ];
+			break;
+		default:
+			mlme_err("Band %d Not 2G or 5G", operating_band);
+			return QDF_STATUS_E_INVAL;
+		}
 	}
 
 	return QDF_STATUS_SUCCESS;

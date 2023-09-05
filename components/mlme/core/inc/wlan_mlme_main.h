@@ -774,6 +774,7 @@ struct enhance_roam_info {
  * @bss_color_change_wakelock: wakelock to complete bss color change
  *				operation on bss color collision detection
  * @bss_color_change_runtime_lock: runtime lock to complete bss color change
+ * @disconnect_runtime_lock: runtime lock to complete disconnection
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -844,6 +845,7 @@ struct mlme_legacy_priv {
 #endif
 	qdf_wake_lock_t bss_color_change_wakelock;
 	qdf_runtime_lock_t bss_color_change_runtime_lock;
+	qdf_runtime_lock_t disconnect_runtime_lock;
 };
 
 /**
@@ -1160,6 +1162,22 @@ QDF_STATUS wlan_mlme_get_bssid_vdev_id(struct wlan_objmgr_pdev *pdev,
 				       struct qdf_mac_addr *bss_peer_mac);
 
 /**
+ * mlme_update_freq_in_scan_start_req() - Fill frequencies in wide
+ * band scan req for mlo connection
+ * @vdev: vdev common object
+ * @req: pointer to scan request
+ * @scan_ch_width: Channel width for which to trigger a wide band scan
+ * @scan_freq: frequency for which to trigger a wide band RRM scan
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
+				   struct scan_start_request *req,
+				   enum phy_ch_width scan_ch_width,
+				   qdf_freq_t scan_freq);
+
+/**
  * wlan_get_operation_chan_freq() - get operating chan freq of
  * given vdev
  * @vdev: vdev
@@ -1178,16 +1196,6 @@ qdf_freq_t wlan_get_operation_chan_freq(struct wlan_objmgr_vdev *vdev);
  */
 qdf_freq_t wlan_get_operation_chan_freq_vdev_id(struct wlan_objmgr_pdev *pdev,
 						uint8_t vdev_id);
-
-/**
- * wlan_get_opmode_vdev_id() - get operating mode of given vdev id
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- *
- * Return: opmode
- */
-enum QDF_OPMODE wlan_get_opmode_vdev_id(struct wlan_objmgr_pdev *pdev,
-					uint8_t vdev_id);
 
 /**
  * wlan_vdev_set_dot11mode - Set the dot11mode of the vdev
@@ -1675,6 +1683,20 @@ wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
 #endif
 
 /**
+ * wlan_mlme_get_sta_num_tx_chains() - API to get station num tx chains
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @tx_chains : tx_chains out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_num_tx_chains(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t *tx_chains);
+
+/**
  * wlan_mlme_get_sta_tx_nss() - API to get station tx NSS
  *
  * @psoc: psoc context
@@ -1687,6 +1709,20 @@ QDF_STATUS
 wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev,
 			 uint8_t *tx_nss);
+
+/**
+ * wlan_mlme_get_sta_num_rx_chains() - API to get station num rx chains
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @rx_chains : rx_chains out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_num_rx_chains(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t *rx_chains);
 
 /**
  * wlan_mlme_get_sta_rx_nss() - API to get station rx NSS

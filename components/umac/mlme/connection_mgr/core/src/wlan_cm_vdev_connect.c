@@ -1125,12 +1125,16 @@ QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg)
 
 #ifdef WLAN_FEATURE_11BE_MLO
 QDF_STATUS
-cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
+cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
+		       struct scan_cache_entry *scan_entry,
 		       struct mlo_partner_info *partner_info)
 {
 	uint8_t i, j = 0;
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
+	struct scan_cache_entry *part_scan_entry = NULL;
+	bool is_security_allowed;
+	struct qdf_mac_addr *link_mac;
 
 	/* If ML IE is not present then return failure*/
 	if (!scan_entry->ie_list.multi_link_bv)
@@ -1140,9 +1144,9 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 	if (!scan_entry->ml_info.num_links)
 		return QDF_STATUS_SUCCESS;
 
-	psoc = wlan_objmgr_get_psoc_by_id(0, WLAN_MLME_CM_ID);
+	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
-		mlme_debug("psoc is NULL");
+		mlme_err("psoc is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1167,6 +1171,27 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 			break;
 
 		if (scan_entry->ml_info.link_info[i].is_valid_link) {
+			link_mac = &scan_entry->ml_info.link_info[i].link_addr;
+			part_scan_entry = wlan_scan_get_scan_entry_by_mac_freq(
+					pdev,
+					link_mac,
+					scan_entry->ml_info.link_info[i].freq);
+			if (!part_scan_entry) {
+				scm_debug("scan entry not found for link addr: "
+					  QDF_MAC_ADDR_FMT,
+					  QDF_MAC_ADDR_REF(link_mac->bytes));
+				continue;
+			}
+
+			is_security_allowed =
+				wlan_cm_is_eht_allowed_for_current_security(
+							part_scan_entry);
+			util_scan_free_cache_entry(part_scan_entry);
+			if (!is_security_allowed) {
+				mlme_debug("current security is not valid for partner link");
+				continue;
+			}
+
 			partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
 			partner_info->partner_link_info[j].link_id =
@@ -1182,7 +1207,6 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 
 	partner_info->num_partner_links = j;
 	mlme_debug("sta and ap integrate link num: %d", j);
-	wlan_objmgr_psoc_release_ref(psoc, WLAN_MLME_CM_ID);
 
 	return QDF_STATUS_SUCCESS;
 }

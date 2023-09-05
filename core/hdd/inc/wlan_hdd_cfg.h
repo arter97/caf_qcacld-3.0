@@ -191,7 +191,7 @@ struct hdd_config {
 	uint32_t sar_safety_req_resp_retry;
 	uint32_t sar_safety_index;
 	uint32_t sar_safety_sleep_index;
-	bool enable_sar_safety;
+	uint8_t enable_sar_safety;
 	bool config_sar_safety_sleep_index;
 #endif
 	uint8_t nb_commands_interval;
@@ -269,6 +269,19 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 			  uint8_t tx_nss, uint8_t rx_nss);
 
 /**
+ * hdd_get_num_chains() - Get the number of chains supported by the adapter
+ *
+ * @adapter: the pointer to adapter
+ * @num_chains: the number of chains supported by the adapter
+ *
+ * This function is used to get the number of chains supported by
+ * the adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_num_chains(struct hdd_adapter *adapter, uint8_t *num_chains);
+
+/**
  * hdd_get_nss() - Get the number of spatial streams supported by the adapter
  *
  * @adapter: the pointer to adapter
@@ -282,6 +295,20 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss);
 
 /**
+ * hdd_get_num_tx_chains() - Get the number of tx chains supported by the
+ * adapter
+ * @link_info: Link info pointer in HDD adapter
+ * @tx_chains: the number of Tx chains supported by the adapter
+ *
+ * This function is used to get the number of Tx chains supported by
+ * the adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_num_tx_chains(struct wlan_hdd_link_info *link_info,
+				 uint8_t *tx_chains);
+
+/**
  * hdd_get_tx_nss() - Get the number of spatial streams supported by the adapter
  * @link_info: Link info pointer in HDD adapter
  * @tx_nss: the number Tx of spatial streams supported by the adapter
@@ -293,6 +320,19 @@ QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss);
  */
 QDF_STATUS hdd_get_tx_nss(struct wlan_hdd_link_info *link_info,
 			  uint8_t *tx_nss);
+
+/**
+ * hdd_get_num_rx_chains() - Get the number of chains supported by the adapter
+ * @link_info: Link info pointer in HDD adapter
+ * @rx_chains: the number of Rx chains supported by the adapter
+ *
+ * This function is used to get the number of Rx chains supported by
+ * the adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_num_rx_chains(struct wlan_hdd_link_info *link_info,
+				 uint8_t *rx_chains);
 
 /**
  * hdd_get_rx_nss() - Get the number of spatial streams supported by the adapter
@@ -465,10 +505,11 @@ int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value);
  * @adapter: adapter being modified
  * @chwidth: new channel width of enum eSirMacHTChannelWidth
  * @bonding_mode: channel bonding mode of the new channel width
+ * @link_id: mlo link id
  *
  * Return: 0 on success, negative errno on failure
  */
 int hdd_update_channel_width(struct hdd_adapter *adapter,
 			     enum eSirMacHTChannelWidth chwidth,
-			     uint32_t bonding_mode);
+			     uint32_t bonding_mode, uint8_t link_id);
 #endif /* end #if !defined(HDD_CONFIG_H__) */

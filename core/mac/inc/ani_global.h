@@ -285,6 +285,8 @@ typedef struct sLimTimers {
 	/* SAE authentication related timer */
 	TX_TIMER sae_auth_timer;
 
+	/* RRM sta stats response related timer */
+	TX_TIMER rrm_sta_stats_resp_timer;
 /* ********************TIMER SECTION ENDS************************************************** */
 /* ALL THE FIELDS BELOW THIS CAN BE ZEROED OUT in lim_initialize */
 /* **************************************************************************************** */

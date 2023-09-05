@@ -4713,10 +4713,8 @@ cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
 }
 
 QDF_STATUS
-cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev,
-			       uint8_t *vdev_id,
-			       uint8_t reason,
-			       bool *is_rso_skip)
+cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
+			       uint8_t reason, bool *is_rso_skip)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *vdev;
@@ -4728,10 +4726,23 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev,
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 
+	/*
+	 * When link switch is in progress, the MLO link flag would be reset and
+	 * set back on assoc vdev, so avoid any state transition during link
+	 * switch.
+	 */
 	if (wlan_vdev_mlme_get_is_mlo_vdev(psoc, *vdev_id) &&
+	    mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlme_debug("MLO ROAM: Link switch in prog! skip RSO cmd on vdev %d",
+			   *vdev_id);
+		*is_rso_skip = true;
+		goto end;
+	}
+
+	if (wlan_vdev_mlme_get_is_mlo_vdev(psoc, *vdev_id) &&
+	    cm_is_vdev_disconnecting(vdev) &&
 	    (reason == REASON_DISCONNECTED ||
-	     reason == REASON_DRIVER_DISABLED) &&
-	    cm_is_vdev_disconnecting(vdev)) {
+	     reason == REASON_DRIVER_DISABLED)) {
 		/*
 		 * Processing disconnect on assoc vdev but roaming is still
 		 * enabled. It's either due to single ML usecase or failed to
@@ -4749,36 +4760,34 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 
-	if (wlan_vdev_mlme_get_is_mlo_link(wlan_pdev_get_psoc(pdev),
-					   *vdev_id)) {
-		if (reason == REASON_ROAM_HANDOFF_DONE ||
-		    reason == REASON_ROAM_ABORT) {
-			status = cm_mlo_roam_switch_for_link(pdev, *vdev_id,
-							     reason);
-			mlme_debug("MLO ROAM: update rso state on link vdev %d",
-				   *vdev_id);
-			*is_rso_skip = true;
-		} else if ((reason == REASON_DISCONNECTED ||
-			    reason == REASON_DRIVER_DISABLED) &&
-			   (cm_is_vdev_disconnecting(vdev))) {
-			assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+	if (!wlan_vdev_mlme_get_is_mlo_link(wlan_pdev_get_psoc(pdev),
+					    *vdev_id))
+		goto end;
 
-			if (!assoc_vdev) {
-				mlme_err("Assoc vdev is NULL");
-				status = QDF_STATUS_E_FAILURE;
-				goto end;
-			}
-			/* Update the vdev id to send RSO stop on assoc vdev */
-			*vdev_id = wlan_vdev_get_id(assoc_vdev);
-			*is_rso_skip = false;
-			mlme_debug("MLO ROAM: process RSO stop on assoc vdev %d",
-				   *vdev_id);
-			goto end;
-		} else {
-			mlme_debug("MLO ROAM: skip RSO cmd on link vdev %d",
-				   *vdev_id);
+	if (reason == REASON_ROAM_HANDOFF_DONE || reason == REASON_ROAM_ABORT) {
+		status = cm_mlo_roam_switch_for_link(pdev, *vdev_id, reason);
+		mlme_debug("MLO ROAM: update rso state on link vdev %d",
+			   *vdev_id);
 			*is_rso_skip = true;
+	} else if ((reason == REASON_DISCONNECTED ||
+		    reason == REASON_DRIVER_DISABLED) &&
+		   cm_is_vdev_disconnecting(vdev)) {
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+
+		if (!assoc_vdev) {
+			mlme_err("Assoc vdev is NULL");
+			status = QDF_STATUS_E_FAILURE;
+			goto end;
 		}
+		/* Update the vdev id to send RSO stop on assoc vdev */
+		*vdev_id = wlan_vdev_get_id(assoc_vdev);
+		*is_rso_skip = false;
+		mlme_debug("MLO ROAM: process RSO stop on assoc vdev %d",
+			   *vdev_id);
+		goto end;
+	} else {
+		mlme_debug("MLO ROAM: skip RSO cmd on link vdev %d", *vdev_id);
+		*is_rso_skip = true;
 	}
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);

@@ -1394,6 +1394,45 @@ static inline bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 	return false;
 }
 #endif
+
+static bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return false;
+
+	return (policy_mgr_is_hw_sbs_capable(psoc) &&
+		policy_mgr_can_2ghz_share_low_high_5ghz_sbs(pm_ctx));
+}
+
+/**
+ * policy_mgr_is_sbs_mac0_freq() - Check if the given frequency is
+ * sbs frequency on mac0.
+ * @psoc: psoc pointer
+ * @freq: Frequency which needs to be checked.
+ *
+ * Return: true/false.
+ */
+static bool policy_mgr_is_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
+					qdf_freq_t freq)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_freq_range *freq_range;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return false;
+
+	freq_range = pm_ctx->hw_mode.freq_range_caps[MODE_SBS];
+
+	if (policy_mgr_is_freq_on_mac_id(freq_range, freq, 0))
+		return true;
+
+	return false;
+}
+
 static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
@@ -1403,6 +1442,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	uint32_t pcl_list[NUM_CHANNELS], orig_len = *len;
 	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t i, pcl_len = 0;
+	bool is_dynamic_sbs_enabled;
+	bool sbs_mac0_modified_pcl;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1410,6 +1451,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	is_dynamic_sbs_enabled = policy_mgr_is_dynamic_sbs_enabled(psoc);
 	policy_mgr_pcl_modification_for_sap(
 		psoc, pcl_channels, pcl_weight, len, weight_len);
 
@@ -1424,6 +1466,13 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 		    !policy_mgr_is_6G_chan_valid_for_ll_sap(pcl_channels[i]))
 			continue;
 
+		/* Remove mac0 frequencies for static SBS case */
+		if (!is_dynamic_sbs_enabled &&
+		    policy_mgr_is_sbs_mac0_freq(psoc, pcl_channels[i])) {
+			sbs_mac0_modified_pcl = true;
+			continue;
+		}
+
 		pcl_list[pcl_len] = pcl_channels[i];
 		weight_list[pcl_len++] = pcl_weight[i];
 	}
@@ -1437,7 +1486,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
 	*len = pcl_len;
 
-	policy_mgr_debug("PCL after ll sap modification");
+	policy_mgr_debug("sbs_mac0_modified_pcl %d, PCL after ll sap modification",
+			 sbs_mac0_modified_pcl);
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 
 	return QDF_STATUS_SUCCESS;
@@ -1763,6 +1813,8 @@ enum policy_mgr_one_connection_mode
 			index = PM_NAN_DISC_24_1x1;
 		else
 			index = PM_NAN_DISC_24_2x2;
+	} else if (PM_LL_LT_SAP_MODE == pm_conc_connection_list[0].mode) {
+		index = PM_LL_LT_SAP_5_2x2;
 	}
 
 	policy_mgr_debug("mode:%d freq:%d chain:%d index:%d",
@@ -3479,7 +3531,7 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 	ch_weight_len = *ch_cnt;
 
 	/* check the channel avoidance list for beaconing entities */
-	if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE)
+	if (policy_mgr_is_beaconing_mode(mode))
 		policy_mgr_update_with_safe_channel_list(
 			psoc, ch_freq_list, ch_cnt, ch_weight_list,
 			ch_weight_len);
@@ -3930,10 +3982,7 @@ QDF_STATUS policy_mgr_get_valid_chan_weights(struct wlan_objmgr_psoc *psoc,
 		 * vdev is SAP/P2PGO/P2PGC.
 		 */
 		if ((mode == PM_P2P_GO_MODE || mode == PM_P2P_CLIENT_MODE) &&
-		    (policy_mgr_mode_specific_connection_count(
-						psoc, PM_SAP_MODE, NULL) ||
-		     policy_mgr_mode_specific_connection_count(
-						psoc, PM_P2P_GO_MODE, NULL) ||
+		    ((policy_mgr_get_beaconing_mode_count(psoc, NULL)) ||
 		     policy_mgr_mode_specific_connection_count(
 					psoc, PM_P2P_CLIENT_MODE, NULL)))
 			strict_follow_pcl = true;
@@ -4308,8 +4357,7 @@ bool policy_mgr_is_sta_chan_valid_for_connect_and_roam(
 	skip_6g_and_indoor_freq =
 		wlan_scan_cfg_skip_6g_and_indoor_freq(psoc);
 	sap_count =
-		policy_mgr_mode_specific_connection_count(psoc, PM_SAP_MODE,
-							  NULL);
+		policy_mgr_get_sap_mode_count(psoc, NULL);
 	/*
 	 * Do not allow STA to connect/roam on 6Ghz or indoor channel for
 	 * non-dbs hardware if SAP is present and skip_6g_and_indoor_freq_scan

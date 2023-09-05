@@ -353,6 +353,33 @@ wlan_mlme_convert_ap_policy_config(
 	}
 }
 
+void wlan_mlme_ll_lt_sap_send_oce_flags_fw(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc = NULL;
+	uint8_t vdev_id;
+	uint8_t updated_fw_value = 0;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return;
+
+	updated_fw_value = mlme_obj->cfg.oce.feature_bitmap;
+	vdev_id = wlan_vdev_get_id(vdev);
+	wma_debug("Disable FILS discovery for vdev %d",
+		  vdev_id);
+	updated_fw_value &= ~(WMI_VDEV_OCE_FILS_DISCOVERY_FRAME_FEATURE_BITMAP);
+	if (wma_cli_set_command(vdev_id,
+				wmi_vdev_param_enable_disable_oce_features,
+				updated_fw_value, VDEV_CMD))
+		mlme_legacy_err("Failed to send OCE update to FW");
+}
+
 QDF_STATUS wlan_mlme_set_ap_policy(struct wlan_objmgr_vdev *vdev,
 				   enum host_concurrent_ap_policy ap_cfg_policy)
 
@@ -820,7 +847,7 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tDot11fIEhe_cap *he_cap = &wma_cfg->he_cap;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	uint8_t value;
+	uint8_t value, twt_req, twt_resp;
 	uint16_t tx_mcs_map = 0;
 	uint16_t rx_mcs_map = 0;
 	uint8_t nss;
@@ -831,9 +858,13 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.he_caps.dot11_he_cap.present = 1;
 	mlme_obj->cfg.he_caps.dot11_he_cap.htc_he = he_cap->htc_he;
 
-	value = QDF_MIN(he_cap->twt_request,
-			mlme_obj->cfg.he_caps.dot11_he_cap.twt_request);
-	mlme_obj->cfg.he_caps.dot11_he_cap.twt_request = value;
+	twt_req = QDF_MIN(he_cap->twt_request,
+			  mlme_obj->cfg.he_caps.dot11_he_cap.twt_request);
+	mlme_obj->cfg.he_caps.dot11_he_cap.twt_request = twt_req;
+
+	twt_resp = QDF_MIN(he_cap->twt_responder,
+			   mlme_obj->cfg.he_caps.dot11_he_cap.twt_responder);
+	mlme_obj->cfg.he_caps.dot11_he_cap.twt_responder = twt_resp;
 
 	value = QDF_MIN(he_cap->fragmentation,
 			mlme_obj->cfg.he_caps.he_dynamic_fragmentation);
@@ -870,8 +901,16 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 			mlme_obj->cfg.he_caps.dot11_he_cap.broadcast_twt);
 	mlme_obj->cfg.he_caps.dot11_he_cap.broadcast_twt = value;
 
-	mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched =
-			he_cap->flex_twt_sched;
+	/*
+	 * As per 802.11ax spec, Flexible TWT capability can be set
+	 * independent of TWT Requestor/Responder capability.
+	 * But currently we don't have any such usecase and firmware
+	 * does not support it. Hence enabling Flexible TWT only when
+	 * either or both of the TWT Requestor/Responder capability
+	 * is set/enabled.
+	 */
+	value = QDF_MIN(he_cap->flex_twt_sched, (twt_req || twt_resp));
+	mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched = value;
 
 	mlme_obj->cfg.he_caps.dot11_he_cap.ba_32bit_bitmap =
 					he_cap->ba_32bit_bitmap;
@@ -6933,7 +6972,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	wlan_mlme_get_sap_max_peers(psoc, &sap_max_num_clients);
 	mlme_feature_set->sap_max_num_clients = sap_max_num_clients;
 	mlme_feature_set->vendor_req_1_version =
-					WMI_HOST_VENDOR1_REQ1_VERSION_3_40;
+					WMI_HOST_VENDOR1_REQ1_VERSION_4_00;
 	roam_triggers = wlan_mlme_get_roaming_triggers(psoc);
 
 	wlan_mlme_get_bss_load_enabled(psoc, &is_bss_load_enabled);
@@ -6966,7 +7005,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	mlme_feature_set->roaming_ctrl_get_cu = true;
 
 	mlme_feature_set->vendor_req_2_version =
-					WMI_HOST_VENDOR1_REQ2_VERSION_3_20;
+					WMI_HOST_VENDOR1_REQ2_VERSION_3_50;
 	mlme_feature_set->sta_dual_p2p_support =
 				wlan_mlme_get_p2p_p2p_host_conc_support();
 	wlan_mlme_get_vht_enable2x2(psoc, &mlme_feature_set->enable2x2);
@@ -6988,7 +7027,7 @@ static QDF_STATUS
 wlan_mlme_update_vdev_chwidth_with_notify(struct wlan_objmgr_psoc *psoc,
 					  struct wlan_objmgr_vdev *vdev,
 					  uint8_t vdev_id,
-					  enum phy_ch_width ch_width)
+					  wmi_host_channel_width ch_width)
 {
 	struct vdev_mlme_obj *vdev_mlme;
 	struct vdev_set_params param = {0};
@@ -7254,6 +7293,7 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 					   enum phy_ch_width ch_width)
 {
 	QDF_STATUS status;
+	wmi_host_channel_width wmi_chan_width;
 	enum phy_ch_width associated_ch_width;
 	struct wlan_channel *des_chan;
 	struct mlme_legacy_priv *mlme_priv;
@@ -7289,9 +7329,11 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
+	wmi_chan_width = target_if_phy_ch_width_to_wmi_chan_width(ch_width);
+
 	/* update ch width to fw */
 	status = wlan_mlme_update_vdev_chwidth_with_notify(psoc, vdev, vdev_id,
-							   ch_width);
+							   wmi_chan_width);
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("vdev %d: Failed to update CW:%d to fw, status:%d",
 			 vdev_id, ch_width, status);

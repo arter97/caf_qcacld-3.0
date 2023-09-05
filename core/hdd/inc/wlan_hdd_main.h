@@ -1078,6 +1078,7 @@ enum udp_qos_upgrade {
  * @hdd_stats: HDD statistics
  * @big_data_stats: Big data stats
  * @ll_iface_stats: Link Layer interface stats
+ * @hdd_sinfo: hdd vdev station stats that will be sent to userspace
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
@@ -1111,6 +1112,7 @@ struct wlan_hdd_link_info {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 	struct wifi_interface_stats ll_iface_stats;
+	struct wlan_hdd_station_stats_info hdd_sinfo;
 #endif
 
 #ifdef WLAN_FEATURE_MSCS
@@ -5396,5 +5398,17 @@ static inline void wlan_hdd_link_speed_update(struct wlan_objmgr_psoc *psoc,
  * Return: none
  */
 void hdd_update_multicast_list(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * hdd_set_sar_init_index() - Set SAR safety index at init.
+ * @hdd_ctx: HDD context
+ *
+ */
+#ifdef SAR_SAFETY_FEATURE
+void hdd_set_sar_init_index(struct hdd_context *hdd_ctx);
+#else
+static inline void hdd_set_sar_init_index(struct hdd_context *hdd_ctx)
+{}
+#endif
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

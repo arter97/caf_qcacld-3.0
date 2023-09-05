@@ -131,6 +131,8 @@ static inline const char *pcl_type_to_string(uint32_t idx)
 	CASE_RETURN_STRING(PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G);
 	CASE_RETURN_STRING(PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G);
 	CASE_RETURN_STRING(PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G);
+	CASE_RETURN_STRING(PM_SBS_CH_MCC_CH);
+	CASE_RETURN_STRING(PM_SBS_5G_MCC_24G);
 	default:
 		return "Unknown";
 	}
@@ -145,6 +147,7 @@ static inline const char *device_mode_to_string(uint32_t idx)
 	CASE_RETURN_STRING(PM_P2P_GO_MODE);
 	CASE_RETURN_STRING(PM_NDI_MODE);
 	CASE_RETURN_STRING(PM_NAN_DISC_MODE);
+	CASE_RETURN_STRING(PM_LL_LT_SAP_MODE);
 	default:
 		return "Unknown";
 	}
@@ -2408,19 +2411,6 @@ bool policy_mgr_is_mcc_on_any_sta_vdev(struct wlan_objmgr_psoc *psoc);
  */
 void policy_mgr_soc_set_dual_mac_cfg_cb(enum set_hw_mode_status status,
 		uint32_t scan_config, uint32_t fw_mode_config);
-
-/**
- * policy_mgr_map_concurrency_mode() - to map concurrency mode
- * between sme and hdd
- * @old_mode: sme provided adapter mode
- * @new_mode: hdd provided concurrency mode
- *
- * This routine will map concurrency mode between sme and hdd
- *
- * Return: true or false
- */
-bool policy_mgr_map_concurrency_mode(enum QDF_OPMODE *old_mode,
-				     enum policy_mgr_con_mode *new_mode);
 
 /**
  * policy_mgr_mode_specific_num_open_sessions() - to get number of open sessions
@@ -5528,4 +5518,16 @@ uint32_t policy_mgr_get_sap_mode_info(struct wlan_objmgr_psoc *psoc,
 uint32_t policy_mgr_get_beaconing_mode_info(struct wlan_objmgr_psoc *psoc,
 					    uint32_t *ch_freq_list,
 					    uint8_t *vdev_id);
+
+/**
+ * policy_mgr_is_freq_on_mac_id() - Check if given freq belongs to given mac id
+ * @freq_range: Frequency range pointer
+ * @freq: Frequency which needs to be checked
+ * @mac_id: MAC id on which this frequency needs to be checked
+ *
+ * Return: True if given frequency belongs to the given MAC id
+ */
+bool policy_mgr_is_freq_on_mac_id(struct policy_mgr_freq_range *freq_range,
+				  qdf_freq_t freq, uint8_t mac_id);
+
 #endif /* __WLAN_POLICY_MGR_API_H */

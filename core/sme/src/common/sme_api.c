@@ -681,7 +681,6 @@ static void sme_state_info_dump(char **buf_ptr, uint16_t *size)
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
 	if (!mac_handle) {
-		QDF_ASSERT(0);
 		return;
 	}
 
@@ -2696,6 +2695,7 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		break;
 	case eWNI_SME_NEIGHBOR_REPORT_IND:
 	case eWNI_SME_BEACON_REPORT_REQ_IND:
+	case eWNI_SME_CHAN_LOAD_REQ_IND:
 		if (pMsg->bodyptr) {
 			status = sme_rrm_msg_processor(mac, pMsg->type,
 						       pMsg->bodyptr);
@@ -7327,6 +7327,11 @@ QDF_STATUS sme_set_wlm_latency_level(mac_handle_t mac_handle,
 	}
 	if (!wma) {
 		sme_err("wma is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (session_id == WLAN_INVALID_LINK_ID) {
+		sme_err("Invalid vdev_id[%u]", session_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
