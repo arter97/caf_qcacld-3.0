@@ -52,6 +52,7 @@
 #include "wlan_t2lm_api.h"
 
 #ifdef WLAN_FEATURE_11BE_MLO
+
 void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
 				  struct pe_session *session,
 				  tpSirProbeRespBeacon bcn_ptr)
@@ -98,6 +99,9 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_mlo_dev_context *mlo_ctx;
+	uint8_t is_sta_csa_synced;
+	struct mlo_link_info *link_info;
+	uint8_t sta_info_len = 0;
 
 	if (!session || !bcn_ptr || !mac_ctx) {
 		pe_err("invalid input parameters");
@@ -128,12 +132,16 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		xcsa_ie = NULL;
 		qdf_mem_zero(&csa_param, sizeof(csa_param));
 		per_sta_pro = bcn_ptr->mlo_ie.mlo_ie.sta_profile[i].data;
-		per_sta_pro_len =
-			bcn_ptr->mlo_ie.mlo_ie.sta_profile[i].num_data;
-		stacontrol = *(uint16_t *)per_sta_pro;
-		/* IE ID + LEN + STA control */
-		sta_pro = per_sta_pro + MIN_IE_LEN + 2;
-		sta_pro_len = per_sta_pro_len - MIN_IE_LEN - 2;
+		/* Append one byte to get the element length  */
+		per_sta_pro_len = bcn_ptr->mlo_ie.mlo_ie.sta_profile[i].num_data;
+		stacontrol = *(uint16_t *)(per_sta_pro + sizeof(struct subelem_header));
+		sta_info_len = *(uint8_t *)(per_sta_pro +
+				sizeof(struct subelem_header) + WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE);
+		/* IE ID + LEN + STA control STA info len*/
+		sta_pro = per_sta_pro + sizeof(struct subelem_header) +
+			WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE + sta_info_len;
+		sta_pro_len = per_sta_pro_len - sizeof(struct subelem_header) -
+				WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE - sta_info_len;
 		link_id = QDF_GET_BITS(
 			    stacontrol,
 			    WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
