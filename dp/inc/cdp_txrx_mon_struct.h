@@ -448,6 +448,10 @@ enum cdp_mon_phyrx_abort_reason_code {
  * @end_of_ppdu_drop_cnt: Total end of ppdu drop count
  * @tlv_drop_cnt: TLV drop count
  * @rx_hdr_invalid_cnt: Rx header invalid count
+ * @null_status_desc: NULL packet desc count
+ * @null_pkt_desc: NULL packet desc count
+ * @desc_magic_mismatch: desc magic number mismatch count;
+ * @null_pkt_addr: NULL packet address count;
  */
 struct cdp_pdev_mon_stats {
 #ifndef REMOVE_MON_DBG_STATS
@@ -508,6 +512,10 @@ struct cdp_pdev_mon_stats {
 	uint32_t end_of_ppdu_drop_cnt;
 	uint32_t tlv_drop_cnt;
 	uint32_t rx_hdr_invalid_cnt;
+	uint32_t null_status_desc;
+	uint32_t null_pkt_desc;
+	uint32_t desc_magic_mismatch;
+	uint32_t null_pkt_addr;
 };
 
 #ifdef QCA_SUPPORT_LITE_MONITOR

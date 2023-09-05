@@ -434,7 +434,8 @@ void __dp_mon_add_to_free_desc_list(union dp_mon_desc_list_elem_t **head,
 				    struct dp_mon_desc *new,
 				    const char *func_name)
 {
-	qdf_assert(head && new);
+	if (!(head && new))
+		return;
 
 	new->buf_addr = NULL;
 	new->in_use = 0;
