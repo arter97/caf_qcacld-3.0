@@ -698,11 +698,30 @@ struct roam_scan_chn {
  * @num_channels: total number of channels scanned during roam scan
  * @roam_chn: each roam scan channel information
  * @total_scan_time: total scan time of all roam channel
+ * @original_bssid: connected AP before roam happens, regardless of
+ *  the roam resulting in success or failure.
+ *  For non-MLO scenario, it indicates the original connected AP BSSID.
+ *  For MLO scenario, it indicates the original BSSID of the link
+ *  for which the reassociation occurred during the roam.
+ * @candidate_bssid: roam candidate AP BSSID when roam failed.
+ *  If the firmware updates more than one candidate AP BSSID
+ *  to the driver, the driver only fills the last candidate AP BSSID.
+ *  For non-MLO scenario, it indicates the last candidate AP BSSID.
+ *  For MLO scenario, it indicates the AP BSSID which may be the primary
+ *  link BSSID or a nonprimary link BSSID.
+ * @roamed_bssid: roamed AP BSSID when roam succeeds.
+ *  For non-MLO case, it indicates new AP BSSID which has been
+ *  successfully roamed.
+ *  For MLO case, it indicates the new AP BSSID of the link on
+ *  which the reassociation occurred during the roam.
  */
 struct eroam_scan_info {
 	uint8_t num_channels;
 	struct roam_scan_chn roam_chn[MAX_ROAM_SCAN_CHAN];
 	uint32_t total_scan_time;
+	struct qdf_mac_addr original_bssid;
+	struct qdf_mac_addr candidate_bssid;
+	struct qdf_mac_addr roamed_bssid;
 };
 
 /**

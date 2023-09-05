@@ -4076,6 +4076,57 @@ wlan_cm_clear_current_roam_stats_info(struct mlme_legacy_priv *mlme_priv)
 }
 
 /**
+ * wlan_cm_update_roam_bssid() - API to get roam stats AP BSSID
+ * @mlme_priv: Pointer to Pointer to vdev mlme legacy priv struct
+ * @scan: Scan data from target_if wmi event
+ *
+ * get AP BSSID from roam stats info which keep in scan data.
+ *
+ * Return: void
+ */
+static void
+wlan_cm_update_roam_bssid(struct mlme_legacy_priv *mlme_priv,
+			  struct wmi_roam_scan_data *scan)
+{
+	struct enhance_roam_info *info;
+	int16_t i;
+	uint16_t index, scan_ap_idx;
+	struct wmi_roam_candidate_info *ap = NULL;
+
+	if (scan->num_ap == 0)
+		return;
+
+	scan_ap_idx = scan->num_ap - 1;
+	ap = &scan->ap[scan_ap_idx];
+
+	index = mlme_priv->roam_write_index;
+	info = &mlme_priv->roam_info[index];
+
+	/* For roam failed, we may get candidate ap list, and only
+	 * fetch the last candidate AP bssid.
+	 */
+
+	for (i = scan_ap_idx; i >= 0; i--) {
+		if (ap->type == WLAN_ROAM_SCAN_CURRENT_AP)
+			qdf_mem_copy(info->scan.original_bssid.bytes,
+				     ap->bssid.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		else if (ap->type == WLAN_ROAM_SCAN_CANDIDATE_AP &&
+			 qdf_is_macaddr_zero(&info->scan.candidate_bssid))
+			qdf_mem_copy(info->scan.candidate_bssid.bytes,
+				     ap->bssid.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		else if (ap->type == WLAN_ROAM_SCAN_ROAMED_AP)
+			qdf_mem_copy(info->scan.roamed_bssid.bytes,
+				     ap->bssid.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		else
+			mlme_debug("unknown type:%u of AP", ap->type);
+		ap--;
+	}
+}
+
+/**
  * wlan_cm_update_roam_stats_info() - API to update roam stats info
  * @psoc:    Pointer to psoc
  * @stats_info:  Roam stats event
@@ -4131,6 +4182,9 @@ wlan_cm_update_roam_stats_info(struct wlan_objmgr_psoc *psoc,
 		if (stats_info->frame_stats[index].num_frame)
 			wlan_cm_update_roam_frame_info(mlme_priv,
 						       &stats_info->frame_stats[index]);
+		if (stats_info->scan[index].present)
+			wlan_cm_update_roam_bssid(mlme_priv,
+						  &stats_info->scan[index]);
 
 		mlme_priv->roam_write_index += 1;
 		if (mlme_priv->roam_write_index == mlme_priv->roam_cache_num)

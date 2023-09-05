@@ -10349,6 +10349,26 @@ static int hdd_nla_put_roam_stats_info(struct sk_buff *skb,
 	}
 	nla_nest_end(skb, roam_frame_info);
 
+	if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ROAM_STATS_ORIGINAL_BSSID,
+		    QDF_MAC_ADDR_SIZE, info->scan.original_bssid.bytes)) {
+		hdd_err("roam original AP bssid put fail");
+		return -EINVAL;
+	}
+	if (info->trigger.roam_status) {
+		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ROAM_STATS_CANDIDATE_BSSID,
+			    QDF_MAC_ADDR_SIZE,
+			    info->scan.candidate_bssid.bytes)) {
+			hdd_err("roam candidate AP bssid put fail");
+			return -EINVAL;
+		}
+	} else {
+		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ROAM_STATS_ROAMED_BSSID,
+			    QDF_MAC_ADDR_SIZE, info->scan.roamed_bssid.bytes)) {
+			hdd_err("roam roamed AP bssid put fail");
+			return -EINVAL;
+		}
+	}
+
 	return 0;
 }
 
