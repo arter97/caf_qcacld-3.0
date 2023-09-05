@@ -4364,7 +4364,6 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 	bool acs_with_more_param = 0;
 	uint8_t enable_sifs_burst = 0;
 	bool is_6g_sap_fd_enabled = 0;
-	enum reg_6g_ap_type ap_pwr_type;
 	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
@@ -4396,9 +4395,6 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 
 	/* Allocate the Wireless Extensions state structure */
 	phostapdBuf = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
-
-	ap_pwr_type = wlan_reg_decide_6g_ap_pwr_type(hdd_ctx->pdev);
-	hdd_debug("selecting AP power type %d", ap_pwr_type);
 
 	/* Zero the memory.  This zeros the profile structure. */
 	memset(phostapdBuf, 0, sizeof(struct hdd_hostapd_state));

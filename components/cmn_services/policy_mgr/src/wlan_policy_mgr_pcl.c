@@ -546,7 +546,6 @@ policy_mgr_reg_chan_change_callback(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	wlan_reg_decide_6g_ap_pwr_type(pdev);
 	policy_mgr_update_valid_ch_freq_list(pm_ctx, chan_list, false);
 
 	if (!avoid_freq_ind) {
