@@ -485,7 +485,7 @@ const char *mu_reception_mode[STATS_IF_TXRX_TYPE_MU_MAX] = {
 };
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static const char *opt_string = "BADarvsdcf:i:m:t:RIMh?";
+static const char *opt_string = "BADarvsdcf:i:l:m:t:RIMh?";
 
 static const struct option long_opts[] = {
 	{ "basic", no_argument, NULL, 'B' },
@@ -499,6 +499,7 @@ static const struct option long_opts[] = {
 	{ "ctrl", no_argument, NULL, 'c' },
 	{ "feature", required_argument, NULL, 'f' },
 	{ "ifname", required_argument, NULL, 'i' },
+	{ "linkpeer", required_argument, NULL, 'l'},
 	{ "stamacaddr", required_argument, NULL, 'm' },
 	{ "serviceid", required_argument, NULL, 't' },
 	{ "recursive", no_argument, NULL, 'R' },
@@ -3889,6 +3890,8 @@ int main(int argc, char *argv[])
 	u_int8_t is_serviceid_set = 0;
 	u_int8_t is_option_selected = 0;
 	u_int8_t is_ipa_stats_set = 0;
+	u_int8_t is_peer_type_set = 0;
+	enum stats_peer_type peer_type = STATS_WILD_PEER_TYPE;
 	bool is_mld_link = false;
 	bool recursion_temp = false;
 	char feat_flags[128] = {'\0'};
@@ -4007,6 +4010,22 @@ int main(int argc, char *argv[])
 			is_stamacaddr_set  = 1;
 			is_option_selected = 1;
 			break;
+		case 'l':
+			if (is_peer_type_set) {
+				STATS_ERR("Multiple Feature flag Arguments\n");
+				display_help();
+				return -EINVAL;
+			}
+			if ((bool)atoi(optarg)) {
+				peer_type = STATS_LINK_PEER_TYPE;
+			} else if ((bool)atoi(optarg) == 0) {
+				peer_type = STATS_MLD_PEER_TYPE;
+			} else {
+				STATS_ERR("Invalid Argument Value\n");
+				return -EINVAL;
+			}
+			is_peer_type_set = 1;
+			break;
 		case 't':
 			if (is_serviceid_set) {
 				STATS_ERR("Multiple Serviceid Arguments\n");
@@ -4098,6 +4117,7 @@ int main(int argc, char *argv[])
 	cmd.recursive = recursion_temp;
 	cmd.serviceid = servid_temp;
 	cmd.mld_link = is_mld_link;
+	cmd.peer_type = peer_type;
 
 	strlcpy(cmd.if_name, ifname_temp, IFNAME_LEN);
 

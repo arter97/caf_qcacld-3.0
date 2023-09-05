@@ -730,7 +730,8 @@ static QDF_STATUS get_basic_peer_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
 				      uint8_t *peer_mac,
 				      struct unified_stats *stats,
-				      uint32_t feat)
+				      uint32_t feat,
+				      enum stats_peer_type peer_type)
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct cdp_peer_stats *peer_stats = NULL;
@@ -743,8 +744,9 @@ static QDF_STATUS get_basic_peer_data(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NOMEM;
 	}
 	vdev_id = wlan_vdev_get_id(vdev);
-	ret = cdp_host_get_peer_stats(wlan_psoc_get_dp_handle(psoc), vdev_id,
-				      peer_mac, peer_stats);
+	ret = cdp_host_get_peer_stats_based_on_peer_type(
+				wlan_psoc_get_dp_handle(psoc), vdev_id,
+				peer_mac, peer_stats, peer_type);
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to fetch stats!");
 		goto get_failed;
@@ -2291,8 +2293,9 @@ static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 			qdf_err("Failed allocation!");
 			return QDF_STATUS_E_NOMEM;
 		}
-		ret = cdp_host_get_peer_stats(dp_soc, vdev_id,
-					      peer_mac, peer_stats);
+		ret = cdp_host_get_peer_stats_based_on_peer_type(dp_soc,
+						vdev_id, peer_mac,
+						peer_stats, cfg->peer_type);
 		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch stats!");
 			goto get_failed;
@@ -4183,7 +4186,8 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
 				      uint8_t *peer_mac,
 				      struct unified_stats *stats,
-				      uint32_t feat)
+				      uint32_t feat,
+				      enum stats_peer_type peer_type)
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct cdp_peer_stats *peer_stats = NULL;
@@ -4201,8 +4205,9 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 			qdf_err("Failed allocation!");
 			return QDF_STATUS_E_NOMEM;
 		}
-		ret = cdp_host_get_peer_stats(dp_soc, vdev_id, peer_mac,
-					      peer_stats);
+		ret = cdp_host_get_peer_stats_based_on_peer_type(dp_soc,
+						vdev_id, peer_mac,
+						peer_stats, peer_type);
 		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch stats!");
 			goto get_failed;
@@ -6002,7 +6007,7 @@ QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
 	case STATS_LVL_BASIC:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_basic_peer_data(psoc, vdev, peer_mac, stats,
-						  cfg->feat);
+						  cfg->feat, cfg->peer_type);
 		else
 			ret = get_basic_peer_ctrl(psoc, peer_mac, stats,
 						  cfg->feat);
@@ -6021,7 +6026,7 @@ QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
 	case STATS_LVL_DEBUG:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_debug_peer_data(psoc, vdev, peer_mac, stats,
-						  cfg->feat);
+						  cfg->feat, cfg->peer_type);
 		else
 			ret = get_debug_peer_ctrl(psoc, peer_mac, stats,
 						  cfg->feat);

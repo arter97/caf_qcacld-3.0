@@ -662,6 +662,11 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 			STATS_ERR("failed to put serviceid\n");
 			return -EIO;
 		}
+		if (nla_put_u8(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_PEER_TYPE,
+			       cmd->peer_type)) {
+			STATS_ERR("failed to put p_link_peer flag\n");
+			return -EIO;
+		}
 	}
 
 	return ret;
@@ -2759,6 +2764,7 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	memcpy(&cmd, user_cmd, sizeof(struct stats_command));
 	cmd.recursive = user_cmd->recursive;
 	cmd.mld_link = user_cmd->mld_link;
+	cmd.peer_type = user_cmd->peer_type;
 	memset(&buffer, 0, sizeof(struct cfg80211_data));
 	buffer.data = &cmd;
 	buffer.length = sizeof(struct stats_command);

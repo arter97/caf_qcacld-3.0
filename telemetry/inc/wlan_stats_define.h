@@ -173,6 +173,20 @@ enum stats_object_e {
 };
 
 /**
+ * enum stats_peer_type - Peer type
+ * @STATS_INVALID_PEER_TYPE: invalid peer type
+ * @STATS_LINK_PEER_TYPE: legacy peer or link peer for MLO connection
+ * @STATS_MLD_PEER_TYPE: MLD peer for MLO connection
+ * @STATS_WILD_PEER_TYPE: used to set peer type for same mld/link mac addr
+ */
+enum stats_peer_type {
+	STATS_INVALID_PEER_TYPE,
+	STATS_LINK_PEER_TYPE,
+	STATS_MLD_PEER_TYPE,
+	STATS_WILD_PEER_TYPE,
+};
+
+/**
  * enum stats_type_e: Defines the Stats for specific category
  * @STATS_TYPE_DATA: Stats for Data frames
  * @STATS_TYPE_CTRL: Stats for Control/Management frames
