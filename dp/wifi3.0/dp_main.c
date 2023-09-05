@@ -11777,23 +11777,19 @@ static QDF_STATUS dp_txrx_update_vdev_host_stats(struct cdp_soc_t *soc_hdl,
 }
 
 /**
- * dp_txrx_get_peer_stats() - will return cdp_peer_stats
+ * dp_txrx_get_peer_stats_wrapper() - will get cdp_peer_stats
  * @soc: soc handle
- * @vdev_id: id of vdev handle
- * @peer_mac: mac of DP_PEER handle
- * @peer_stats: buffer to copy to
+ * @peer_stats: destination buffer to copy to
+ * @peer_info: peer info
  *
  * Return: status success/failure
  */
 static QDF_STATUS
-dp_txrx_get_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
-		       uint8_t *peer_mac, struct cdp_peer_stats *peer_stats)
+dp_txrx_get_peer_stats_wrapper(struct cdp_soc_t *soc,
+			       struct cdp_peer_stats *peer_stats,
+			       struct cdp_peer_info peer_info)
 {
 	struct dp_peer *peer = NULL;
-	struct cdp_peer_info peer_info = { 0 };
-
-	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac, false,
-				 CDP_WILD_PEER_TYPE);
 
 	peer = dp_peer_hash_find_wrapper((struct dp_soc *)soc, &peer_info,
 					 DP_MOD_ID_CDP);
@@ -11808,6 +11804,156 @@ dp_txrx_get_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_txrx_get_peer_stats() - will get cdp_peer_stats
+ * @soc: soc handle
+ * @vdev_id: id of vdev handle
+ * @peer_mac: peer mac address of DP_PEER handle
+ * @peer_stats: destination buffer to copy to
+ *
+ * Return: status success/failure
+ */
+static QDF_STATUS
+dp_txrx_get_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
+		       uint8_t *peer_mac, struct cdp_peer_stats *peer_stats)
+{
+	struct cdp_peer_info peer_info = { 0 };
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac, false,
+				 CDP_WILD_PEER_TYPE);
+
+	return dp_txrx_get_peer_stats_wrapper(soc, peer_stats, peer_info);
+}
+
+/**
+ * dp_txrx_get_peer_stats_based_on_peer_type() - get peer stats based on the
+ * peer type
+ * @soc: soc handle
+ * @vdev_id: id of vdev handle
+ * @peer_mac: mac of DP_PEER handle
+ * @peer_stats: buffer to copy to
+ * @peer_type: type of peer
+ *
+ * Return: status success/failure
+ */
+static QDF_STATUS
+dp_txrx_get_peer_stats_based_on_peer_type(struct cdp_soc_t *soc, uint8_t vdev_id,
+					  uint8_t *peer_mac,
+					  struct cdp_peer_stats *peer_stats,
+					  enum cdp_peer_type peer_type)
+{
+	struct cdp_peer_info peer_info = { 0 };
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac, false,
+				 peer_type);
+
+	return dp_txrx_get_peer_stats_wrapper(soc, peer_stats, peer_info);
+}
+
+#if defined WLAN_FEATURE_11BE_MLO && defined DP_MLO_LINK_STATS_SUPPORT
+/**
+ * dp_get_per_link_peer_stats() - Get per link stats
+ * @peer: DP peer
+ * @peer_stats: buffer to copy to
+ * @peer_type: Peer type
+ * @num_link: Number of ML links
+ *
+ * Return: status success/failure
+ */
+QDF_STATUS dp_get_per_link_peer_stats(struct dp_peer *peer,
+				      struct cdp_peer_stats *peer_stats,
+				      enum cdp_peer_type peer_type,
+				      uint8_t num_link)
+{
+	uint8_t i, index = 0;
+	struct dp_peer *link_peer;
+	struct dp_mld_link_peers link_peers_info;
+	struct cdp_peer_stats *stats;
+	struct dp_soc *soc = peer->vdev->pdev->soc;
+
+	dp_get_peer_calibr_stats(peer, peer_stats);
+	dp_get_peer_basic_stats(peer, peer_stats);
+	dp_get_peer_tx_per(peer_stats);
+
+	if (IS_MLO_DP_MLD_PEER(peer)) {
+		dp_get_link_peers_ref_from_mld_peer(soc, peer,
+						    &link_peers_info,
+						    DP_MOD_ID_GENERIC_STATS);
+		for (i = 0; i < link_peers_info.num_links; i++) {
+			link_peer = link_peers_info.link_peers[i];
+			if (qdf_unlikely(!link_peer))
+				continue;
+			if (index > num_link) {
+				dp_err("Request stats for %d link(s) is less than total link(s) %d",
+				       num_link, link_peers_info.num_links);
+				break;
+			}
+			stats = &peer_stats[index];
+			dp_get_peer_per_pkt_stats(link_peer, stats);
+			dp_get_peer_extd_stats(link_peer, stats);
+			index++;
+		}
+		dp_release_link_peers_ref(&link_peers_info,
+					  DP_MOD_ID_GENERIC_STATS);
+	} else {
+		dp_get_peer_per_pkt_stats(peer, peer_stats);
+		dp_get_peer_extd_stats(peer, peer_stats);
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#else
+QDF_STATUS dp_get_per_link_peer_stats(struct dp_peer *peer,
+				      struct cdp_peer_stats *peer_stats,
+				      enum cdp_peer_type peer_type,
+				      uint8_t num_link)
+{
+	dp_err("Per link stats not supported");
+	return QDF_STATUS_E_INVAL;
+}
+#endif
+
+/**
+ * dp_txrx_get_per_link_peer_stats() - Get per link peer stats
+ * @soc: soc handle
+ * @vdev_id: id of vdev handle
+ * @peer_mac: peer mac address
+ * @peer_stats: buffer to copy to
+ * @peer_type: Peer type
+ * @num_link: Number of ML links
+ *
+ * NOTE: For peer_type = CDP_MLD_PEER_TYPE peer_stats should point to
+ *       buffer of size = (sizeof(*peer_stats) * num_link)
+ *
+ * Return: status success/failure
+ */
+static QDF_STATUS
+dp_txrx_get_per_link_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
+				uint8_t *peer_mac,
+				struct cdp_peer_stats *peer_stats,
+				enum cdp_peer_type peer_type, uint8_t num_link)
+{
+	QDF_STATUS status;
+	struct dp_peer *peer = NULL;
+	struct cdp_peer_info peer_info = { 0 };
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac, false,
+				 peer_type);
+
+	peer = dp_peer_hash_find_wrapper((struct dp_soc *)soc, &peer_info,
+					 DP_MOD_ID_GENERIC_STATS);
+	if (!peer)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mem_zero(peer_stats, sizeof(struct cdp_peer_stats));
+
+	status = dp_get_per_link_peer_stats(peer, peer_stats, peer_type,
+					    num_link);
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_GENERIC_STATS);
+
+	return status;
 }
 
 /**
@@ -14716,6 +14862,8 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 	.txrx_stats_publish = dp_txrx_stats_publish,
 	.txrx_get_vdev_stats  = dp_txrx_get_vdev_stats,
 	.txrx_get_peer_stats = dp_txrx_get_peer_stats,
+	.txrx_get_peer_stats_based_on_peer_type =
+			dp_txrx_get_peer_stats_based_on_peer_type,
 	.txrx_get_soc_stats = dp_txrx_get_soc_stats,
 	.txrx_get_peer_stats_param = dp_txrx_get_peer_stats_param,
 	.txrx_reset_peer_stats = dp_txrx_reset_peer_stats,

@@ -542,6 +542,41 @@ cdp_host_get_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 							     peer_stats);
 }
 
+
+/**
+ * cdp_host_get_peer_stats_based_on_peer_type() - Fetch peer stats based on the
+ * peer type
+ * @soc: soc handle
+ * @vdev_id: vdev_id of vdev object
+ * @peer_mac: mac address of the peer
+ * @peer_stats: destination buffer
+ * @peer_type: type of peer
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+cdp_host_get_peer_stats_based_on_peer_type(ol_txrx_soc_handle soc, uint8_t vdev_id,
+					   uint8_t *peer_mac,
+					   struct cdp_peer_stats *peer_stats,
+					   enum cdp_peer_type peer_type)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->txrx_get_peer_stats_based_on_peer_type)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->host_stats_ops->txrx_get_peer_stats_based_on_peer_type(
+								soc, vdev_id,
+								peer_mac,
+								peer_stats,
+								peer_type);
+}
+
 /**
  * cdp_host_reset_peer_ald_stats() - Call to reset ald stats
  * @soc: soc handle
