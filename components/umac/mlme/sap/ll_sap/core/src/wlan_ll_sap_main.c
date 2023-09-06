@@ -91,6 +91,8 @@ static QDF_STATUS ll_sap_vdev_obj_destroyed_notification(
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE)
 		return QDF_STATUS_SUCCESS;
 
+	ll_lt_sap_deinit(vdev);
+
 	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
 
 	if (!ll_sap_obj) {
@@ -105,8 +107,6 @@ static QDF_STATUS ll_sap_vdev_obj_destroyed_notification(
 	if (QDF_IS_STATUS_ERROR(status))
 		ll_sap_err("vdev %d ll sap obj detach failed, status %d",
 			   wlan_vdev_get_id(vdev), status);
-
-	ll_lt_sap_deinit(vdev);
 
 	qdf_mem_free(ll_sap_obj);
 
