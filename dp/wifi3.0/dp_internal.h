@@ -1460,6 +1460,8 @@ static inline int dp_log2_ceil(unsigned int value)
 	unsigned int tmp = value;
 	int log2 = -1;
 
+	if (qdf_unlikely(value == 0))
+		return 0;
 	while (tmp) {
 		log2++;
 		tmp >>= 1;
