@@ -5269,18 +5269,19 @@ wma_update_sacn_channel_info_buf(wmi_unified_t wmi_handle,
 }
 
 static void
-wma_get_scan_rx_clear_count_average(wmi_cca_busy_subband_info *cca_info,
-				    uint32_t num_tlvs, uint32_t *rx_clear_count)
+wma_get_scan_max_rx_clear_count(wmi_cca_busy_subband_info *cca_info,
+				uint32_t num_tlvs, uint32_t *rx_clear_count)
 {
-	uint32_t i, total_rx_clear_count = 0;
+	uint32_t i, max_rx_clear_count = 0;
 
 	for (i = 0; i < num_tlvs && i < MAX_WIDE_BAND_SCAN_CHAN; i++) {
-		total_rx_clear_count += cca_info->rx_clear_count;
+		if (max_rx_clear_count < cca_info->rx_clear_count)
+			max_rx_clear_count = cca_info->rx_clear_count;
 		cca_info++;
 	}
 
-	*rx_clear_count = total_rx_clear_count / num_tlvs;
-	wma_debug("average rx_clear_count : %d", *rx_clear_count);
+	*rx_clear_count = max_rx_clear_count;
+	wma_debug("max rx_clear_count : %d", *rx_clear_count);
 }
 
 int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
@@ -5353,7 +5354,7 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	channel_status->noise_floor = event->noise_floor;
 
 	if (is_cca_busy_info && num_tlvs)
-		wma_get_scan_rx_clear_count_average(cca_info, num_tlvs,
+		wma_get_scan_max_rx_clear_count(cca_info, num_tlvs,
 					&channel_status->rx_clear_count);
 	else
 		channel_status->rx_clear_count = event->rx_clear_count;
