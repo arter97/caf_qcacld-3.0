@@ -1228,6 +1228,7 @@ static bool policy_mgr_channel_mcc_with_non_sap(struct wlan_objmgr_psoc *psoc,
  * @pcl_list_org: channel list to filter out
  * @weight_list_org: weight of channel list
  * @pcl_len_org: length of channel list
+ * @mode: Policy manager connection mode
  *
  * Return: QDF_STATUS
  */
@@ -1235,10 +1236,14 @@ static QDF_STATUS
 policy_mgr_modify_sap_pcl_filter_mcc(struct wlan_objmgr_psoc *psoc,
 				     uint32_t *pcl_list_org,
 				     uint8_t *weight_list_org,
-				     uint32_t *pcl_len_org)
+				     uint32_t *pcl_len_org,
+				     enum policy_mgr_con_mode mode)
 {
 	uint32_t i, pcl_len = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	if (mode == PM_LL_LT_SAP_MODE)
+		return QDF_STATUS_SUCCESS;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1323,7 +1328,8 @@ end:
 static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len, uint32_t weight_len)
+			uint32_t *len, uint32_t weight_len,
+			enum policy_mgr_con_mode mode)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -1420,7 +1426,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 
 	status = policy_mgr_modify_sap_pcl_filter_mcc(psoc,
 						      pcl_channels,
-						      pcl_weight, len);
+						      pcl_weight, len,
+						      mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to modify pcl for filter mcc");
 		return status;
@@ -1570,7 +1577,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 
 	is_dynamic_sbs_enabled = policy_mgr_is_dynamic_sbs_enabled(psoc);
 	policy_mgr_pcl_modification_for_sap(
-		psoc, pcl_channels, pcl_weight, len, weight_len);
+		psoc, pcl_channels, pcl_weight, len, weight_len,
+		PM_LL_LT_SAP_MODE);
 
 	for (i = 0; i < *len; i++) {
 		/* Remove passive/dfs/6G invalid channel for LL_LT_SAP */
@@ -1631,7 +1639,7 @@ static QDF_STATUS policy_mgr_mode_specific_modification_on_pcl(
 	switch (mode) {
 	case PM_SAP_MODE:
 		status = policy_mgr_pcl_modification_for_sap(
-			psoc, pcl_channels, pcl_weight, len, weight_len);
+			psoc, pcl_channels, pcl_weight, len, weight_len, mode);
 		break;
 	case PM_P2P_GO_MODE:
 		status = policy_mgr_pcl_modification_for_p2p_go(
