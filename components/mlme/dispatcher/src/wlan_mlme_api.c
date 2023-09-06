@@ -1420,7 +1420,7 @@ uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc)
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
-		return false;
+		return 0;
 
 	return mlme_obj->cfg.sta.mlo_max_simultaneous_links;
 }
@@ -1447,7 +1447,7 @@ uint8_t wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc)
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
-		return false;
+		return 0;
 
 	return mlme_obj->cfg.sta.mlo_support_link_num;
 }
@@ -1587,7 +1587,7 @@ uint8_t wlan_mlme_get_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc)
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
-		return false;
+		return 0;
 
 	return mlme_obj->cfg.sta.mlo_support_link_band;
 }
