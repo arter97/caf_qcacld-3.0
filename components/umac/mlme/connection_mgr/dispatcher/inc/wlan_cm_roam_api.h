@@ -2126,6 +2126,18 @@ wlan_cm_roaming_get_peer_link_addr(struct wlan_objmgr_vdev *vdev);
  */
 bool
 wlan_cm_roam_is_mlo_ap(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_cm_link_switch_notif_cb() - MLME CM link switch notifier callback
+ * @vdev: object manager vdev
+ * @req: Link switch request
+ * @notify_reason: Notify reason
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_link_switch_req *req,
+					enum wlan_mlo_link_switch_notify_reason notify_reason);
 #else
 static inline void
 wlan_cm_store_mlo_roam_peer_address(struct wlan_objmgr_pdev *pdev,
@@ -2149,6 +2161,14 @@ static inline bool
 wlan_cm_roam_is_mlo_ap(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
+}
+
+static inline
+QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_link_switch_req *req,
+					enum wlan_mlo_link_switch_notify_reason notify_reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_11BE_MLO && WLAN_FEATURE_ROAM_OFFLOAD */
 

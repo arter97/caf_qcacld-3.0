@@ -5239,3 +5239,33 @@ wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 }
 
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_link_switch_req *req,
+					enum wlan_mlo_link_switch_notify_reason notify_reason)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (notify_reason != MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_PRE_SER)
+		return status;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return status;
+
+	/* Only send RSO stop for assoc vdev */
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return status;
+
+	status = cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+				      wlan_vdev_get_id(vdev),
+				      WLAN_ROAM_RSO_STOPPED,
+				      REASON_DISCONNECTED, NULL, false);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_err("vdev:%d switch to RSO Stop failed",
+			 wlan_vdev_get_id(vdev));
+
+	return status;
+}
+#endif
+

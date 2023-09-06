@@ -89,12 +89,24 @@ QDF_STATUS mlme_register_mlme_ext_ops(void)
 #ifdef WLAN_FEATURE_11BE_MLO
 QDF_STATUS mlme_register_mlo_ext_ops(void)
 {
+	QDF_STATUS status;
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
-	if (mlo_ctx)
-		mlo_reg_mlme_ext_cb(mlo_ctx, &mlo_ext_ops);
+	if (!mlo_ctx)
+		return QDF_STATUS_E_FAILURE;
 
-	return QDF_STATUS_SUCCESS;
+	mlo_reg_mlme_ext_cb(mlo_ctx, &mlo_ext_ops);
+
+	status = mlo_mgr_register_link_switch_notifier(WLAN_UMAC_COMP_MLME,
+						       wlan_cm_link_switch_notif_cb);
+	if (status == QDF_STATUS_E_NOSUPPORT) {
+		status = QDF_STATUS_SUCCESS;
+		mlme_debug("Link switch not supported");
+	} else if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to register link switch notifier for mlme!");
+	}
+
+	return status;
 }
 
 QDF_STATUS mlme_unregister_mlo_ext_ops(void)
