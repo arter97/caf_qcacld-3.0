@@ -1033,6 +1033,159 @@ dp_mon_dest_srng_drop_for_mac(struct dp_pdev *pdev, uint32_t mac_id)
 
 	return reap_cnt;
 }
+#else
+#if defined(QCA_SUPPORT_FULL_MON) && defined(WIFI_MONITOR_SUPPORT)
+uint32_t
+dp_mon_dest_srng_drop_for_mac(struct dp_pdev *pdev, uint32_t mac_id)
+{
+	struct dp_soc *soc = pdev->soc;
+	hal_rxdma_desc_t rxdma_dst_ring_desc;
+	hal_soc_handle_t hal_soc;
+	void *mon_dst_srng;
+	union dp_rx_desc_list_elem_t *head = NULL;
+	union dp_rx_desc_list_elem_t *tail = NULL;
+	uint32_t rx_bufs_used = 0;
+	void *rx_msdu_link_desc;
+	uint16_t num_msdus;
+	struct hal_rx_msdu_list msdu_list;
+	qdf_nbuf_t nbuf = NULL;
+	uint32_t i;
+	uint8_t bm_action = HAL_BM_ACTION_PUT_IN_IDLE_LIST;
+	uint32_t rx_link_buf_info[HAL_RX_BUFFINFO_NUM_DWORDS];
+	struct rx_desc_pool *rx_desc_pool = NULL;
+	uint32_t reap_cnt = 0;
+	struct dp_mon_pdev *mon_pdev;
+	struct hal_rx_mon_desc_info *desc_info;
+
+	if (qdf_unlikely(!soc || !soc->hal_soc))
+		return reap_cnt;
+
+	mon_dst_srng = dp_rxdma_get_mon_dst_ring(pdev, mac_id);
+
+	if (qdf_unlikely(!mon_dst_srng || !hal_srng_initialized(mon_dst_srng)))
+		return reap_cnt;
+
+	hal_soc = soc->hal_soc;
+	mon_pdev = pdev->monitor_pdev;
+	desc_info = mon_pdev->mon_desc;
+
+	rx_desc_pool = dp_rx_get_mon_desc_pool(soc, mac_id, pdev->pdev_id);
+
+	while ((rxdma_dst_ring_desc =
+		hal_srng_dst_peek(hal_soc, mon_dst_srng))) {
+		qdf_mem_zero(desc_info, sizeof(struct hal_rx_mon_desc_info));
+		hal_rx_sw_mon_desc_info_get((struct hal_soc *)soc->hal_soc,
+					    (void *)rxdma_dst_ring_desc,
+					    (void *)desc_info);
+
+		if (desc_info->end_of_ppdu) {
+			rxdma_dst_ring_desc =
+				hal_srng_dst_get_next(hal_soc, mon_dst_srng);
+			continue;
+		}
+
+		do {
+			rx_msdu_link_desc =
+				dp_rx_cookie_2_mon_link_desc(pdev,
+							     &desc_info->
+							     link_desc,
+							     mac_id);
+
+			if (qdf_unlikely(!rx_msdu_link_desc)) {
+				mon_pdev->rx_mon_stats.mon_link_desc_invalid++;
+				goto next_entry;
+			}
+
+			hal_rx_msdu_list_get(soc->hal_soc, rx_msdu_link_desc,
+					     &msdu_list, &num_msdus);
+
+			for (i = 0; i < num_msdus; i++) {
+				struct dp_rx_desc *rx_desc;
+				qdf_dma_addr_t buf_paddr;
+
+				rx_desc =
+					dp_rx_get_mon_desc(soc, msdu_list.
+							   sw_cookie[i]);
+
+				if (qdf_unlikely(!rx_desc)) {
+					mon_pdev->rx_mon_stats.
+							mon_rx_desc_invalid++;
+					continue;
+				}
+
+				nbuf = DP_RX_MON_GET_NBUF_FROM_DESC(rx_desc);
+				buf_paddr =
+					 dp_rx_mon_get_paddr_from_desc(rx_desc);
+
+				if (qdf_unlikely(!rx_desc->in_use || !nbuf ||
+						 msdu_list.paddr[i] !=
+						 buf_paddr)) {
+					mon_pdev->rx_mon_stats.
+							mon_nbuf_sanity_err++;
+					continue;
+				}
+				rx_bufs_used++;
+
+				if (!rx_desc->unmapped) {
+					dp_rx_mon_buffer_unmap(soc, rx_desc,
+							       rx_desc_pool->
+							       buf_size);
+					rx_desc->unmapped = 1;
+				}
+
+				dp_rx_mon_buffer_free(rx_desc);
+				dp_rx_add_to_free_desc_list(&head, &tail,
+							    rx_desc);
+
+				if (!(msdu_list.msdu_info[i].msdu_flags &
+				      HAL_MSDU_F_MSDU_CONTINUATION))
+					desc_info->msdu_count--;
+			}
+
+			/*
+			 * Store the current link buffer into to the local
+			 * structure to be  used for release purpose.
+			 */
+			hal_rxdma_buff_addr_info_set(soc->hal_soc,
+						     rx_link_buf_info,
+						     desc_info->link_desc.paddr,
+						     desc_info->link_desc.
+						     sw_cookie,
+						     desc_info->link_desc.rbm);
+
+			hal_rx_mon_next_link_desc_get(soc->hal_soc,
+						      rx_msdu_link_desc,
+						      &desc_info->link_desc);
+			if (dp_rx_monitor_link_desc_return(pdev,
+							   (hal_buff_addrinfo_t)
+							   rx_link_buf_info,
+							   mac_id, bm_action) !=
+			    QDF_STATUS_SUCCESS)
+				dp_info_rl("monitor link desc return failed");
+		} while (desc_info->link_desc.paddr);
+
+next_entry:
+		reap_cnt++;
+		rxdma_dst_ring_desc = hal_srng_dst_get_next(hal_soc,
+							    mon_dst_srng);
+	}
+
+	if (rx_bufs_used) {
+		dp_rx_buffers_replenish(soc, mac_id,
+					dp_rxdma_get_mon_buf_ring(pdev, mac_id),
+					rx_desc_pool,
+					rx_bufs_used, &head, &tail, false);
+	}
+
+	return reap_cnt;
+}
+#else
+uint32_t
+dp_mon_dest_srng_drop_for_mac(struct dp_pdev *pdev, uint32_t mac_id)
+{
+	return 0;
+}
+#endif
 #endif
 
 static void

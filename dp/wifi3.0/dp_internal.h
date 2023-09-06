@@ -5859,4 +5859,42 @@ void dp_update_vdev_basic_stats(struct dp_txrx_peer *txrx_peer,
  */
 void dp_get_vdev_stats_for_unmap_peer_legacy(struct dp_vdev *vdev,
 					     struct dp_peer *peer);
+
+/**
+ * dp_get_ring_stats_from_hal(): get hal level ring pointer values
+ * @soc: DP_SOC handle
+ * @srng: DP_SRNG handle
+ * @ring_type: srng src/dst ring
+ * @_tailp: pointer to tail of ring
+ * @_headp: pointer to head of ring
+ * @_hw_headp: pointer to head of ring in HW
+ * @_hw_tailp: pointer to tail of ring in HW
+ *
+ * Return: void
+ */
+static inline void
+dp_get_ring_stats_from_hal(struct dp_soc *soc,  struct dp_srng *srng,
+			   enum hal_ring_type ring_type,
+			   uint32_t *_tailp, uint32_t *_headp,
+			   int32_t *_hw_headp, int32_t *_hw_tailp)
+{
+	uint32_t tailp;
+	uint32_t headp;
+	int32_t hw_headp = -1;
+	int32_t hw_tailp = -1;
+	struct hal_soc *hal_soc;
+
+	if (soc && srng && srng->hal_srng) {
+		hal_soc = (struct hal_soc *)soc->hal_soc;
+		hal_get_sw_hptp(soc->hal_soc, srng->hal_srng, &tailp, &headp);
+		*_headp = headp;
+		*_tailp = tailp;
+
+		hal_get_hw_hptp(soc->hal_soc, srng->hal_srng, &hw_headp,
+				&hw_tailp, ring_type);
+		*_hw_headp = hw_headp;
+		*_hw_tailp = hw_tailp;
+	}
+}
+
 #endif /* #ifndef _DP_INTERNAL_H_ */
