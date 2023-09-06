@@ -68,6 +68,11 @@ void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
 		return;
 	}
 
+	if (!wlan_mlme_get_t2lm_negotiation_supported(mac_ctx->psoc)) {
+		pe_err_rl("T2LM negotiation not supported");
+		return;
+	}
+
 	vdev = session->vdev;
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return;
