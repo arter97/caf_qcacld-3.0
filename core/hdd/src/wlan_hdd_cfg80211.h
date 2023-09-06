@@ -928,6 +928,16 @@ enum qca_wlan_802_11_mode
 hdd_convert_cfgdot11mode_to_80211mode(enum csr_cfgdot11mode mode);
 
 /**
+ * hdd_convert_phymode_to_80211mode() - Function to convert eCsrPhyMode
+ *					to 80211 mode
+ * @mode: eCsrPhyMode
+ *
+ * Return: 80211 mode
+ */
+enum qca_wlan_802_11_mode
+hdd_convert_phymode_to_80211mode(eCsrPhyMode mode);
+
+/**
  * hdd_send_update_owe_info_event - Send update OWE info event
  * @adapter: Pointer to adapter
  * @sta_addr: MAC address of peer STA

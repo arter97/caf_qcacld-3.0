@@ -27929,6 +27929,36 @@ hdd_convert_cfgdot11mode_to_80211mode(enum csr_cfgdot11mode mode)
 	}
 }
 
+enum qca_wlan_802_11_mode
+hdd_convert_phymode_to_80211mode(eCsrPhyMode mode)
+{
+	switch (mode) {
+	case eCSR_DOT11_MODE_11a:
+		return QCA_WLAN_802_11_MODE_11A;
+	case eCSR_DOT11_MODE_11b:
+		return QCA_WLAN_802_11_MODE_11B;
+	case eCSR_DOT11_MODE_11g:
+	case eCSR_DOT11_MODE_11g_ONLY:
+		return QCA_WLAN_802_11_MODE_11G;
+	case eCSR_DOT11_MODE_11n:
+	case eCSR_DOT11_MODE_11n_ONLY:
+		return QCA_WLAN_802_11_MODE_11N;
+	case eCSR_DOT11_MODE_11ac:
+	case eCSR_DOT11_MODE_11ac_ONLY:
+		return QCA_WLAN_802_11_MODE_11AC;
+	case eCSR_DOT11_MODE_11ax:
+	case eCSR_DOT11_MODE_11ax_ONLY:
+		return QCA_WLAN_802_11_MODE_11AX;
+	case eCSR_DOT11_MODE_11be:
+	case eCSR_DOT11_MODE_11be_ONLY:
+		return QCA_WLAN_802_11_MODE_11BE;
+	case eCSR_DOT11_MODE_abg:
+	case eCSR_DOT11_MODE_AUTO:
+	default:
+		return QCA_WLAN_802_11_MODE_INVALID;
+	}
+}
+
 bool hdd_is_legacy_connection(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_station_ctx *sta_ctx;
