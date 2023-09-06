@@ -789,6 +789,27 @@ QDF_STATUS wmi_unified_config_peer_latency_info_cmd_send(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef WLAN_WSI_STATS_SUPPORT
+/**
+ * wmi_unified_config_wsi_stats_info_cmd_send() - WMI WSI stats info send
+ * @wmi_hdl: wmi handle
+ * @param: pointer to hold the ingress and egress information
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_config_wsi_stats_info_cmd_send(
+		wmi_unified_t wmi_hdl,
+		struct wmi_wsi_stats_info_params *param)
+{
+	wmi_unified_t wmi_handle = wmi_hdl;
+
+	if (wmi_handle->ops->send_wsi_stats_info_cmd)
+		return wmi_handle->ops->send_wsi_stats_info_cmd(
+				wmi_handle, param);
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 /**
  * wmi_unified_config_trigger_ulofdma_su_cmd_send() - WMI SU ULOFDMA trigger
