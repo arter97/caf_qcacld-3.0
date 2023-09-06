@@ -7,6 +7,7 @@ _target_chipset_map = {
 	"kiwi-v2",
     ],
     "pineapple": [
+	"peach",
 	"kiwi-v2",
     ],
     "sun": [
