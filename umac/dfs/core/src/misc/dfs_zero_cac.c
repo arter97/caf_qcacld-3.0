@@ -1198,6 +1198,9 @@ bool dfs_is_rcac_done_on_subchan_list(struct wlan_dfs *dfs,
 {
 	uint8_t i;
 
+	if (n_subchans >= MAX_20MHZ_SUBCHANS)
+		return false;
+
 	for (i = 0; i < n_subchans; i++) {
 		if (!dfs_is_precac_done_on_non_80p80_chan_for_freq(dfs,
 							target_freq_list[i]))
@@ -1229,6 +1232,9 @@ bool dfs_is_rcac_cac_done(struct wlan_dfs *dfs,
 								 target_freq_list,
 								 cur_freq_list,
 								 &n_subchans);
+	if (subtract_chan_idx >= MAX_20MHZ_SUBCHANS)
+		return false;
+
 	return dfs_is_rcac_done_on_subchan_list(dfs,
 						&target_freq_list[subtract_chan_idx],
 						n_subchans);
