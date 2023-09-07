@@ -256,8 +256,7 @@ int mlme_sr_is_enable(struct wlan_objmgr_vdev *vdev)
 	uint8_t sr_ctrl;
 
 	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
-	return ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
-		(sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
+	return (!sr_ctrl || !(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) ||
 		(sr_ctrl & SRG_INFO_PRESENT));
 }
 
@@ -296,11 +295,6 @@ mlme_sr_handle_conc(struct wlan_objmgr_vdev *vdev,
 	}
 
 	sr_tx_ops = &tx_ops->spatial_reuse_tx_ops;
-	if (!sr_tx_ops) {
-		mlme_err("sr_tx_ops is NULL");
-		return;
-	}
-
 	if (en_sr_curr_vdev) {
 		wlan_vdev_mlme_set_sr_disable_due_conc(vdev, true);
 		wlan_vdev_mlme_set_sr_disable_due_conc(conc_vdev, true);
@@ -402,6 +396,7 @@ void mlme_sr_update(struct wlan_objmgr_vdev *vdev, bool enable)
 			wlan_mlme_update_sr_data(vdev, &val, 0, 0, true);
 		} else {
 			/* VDEV down, disable SR */
+			wlan_vdev_mlme_set_he_spr_enabled(vdev, false);
 			wlan_vdev_mlme_set_sr_ctrl(vdev, 0);
 			wlan_vdev_mlme_set_non_srg_pd_offset(vdev, 0);
 		}
