@@ -7306,6 +7306,31 @@ hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
 #endif
 
 static void
+hdd_vdev_configure_rtscts_enable(struct hdd_context *hdd_ctx,
+				 struct wlan_objmgr_vdev *vdev)
+{
+	int ret;
+	QDF_STATUS status;
+	uint16_t rts_profile = 0;
+
+	if (cds_get_conparam() == QDF_GLOBAL_FTM_MODE)
+		return;
+
+	status = ucfg_fwol_get_rts_profile(hdd_ctx->psoc, &rts_profile);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("FAILED TO GET RTSCTS Profile status:%d", status);
+		return;
+	}
+
+	ret = sme_cli_set_command(wlan_vdev_get_id(vdev),
+				  wmi_vdev_param_enable_rtscts,
+				  rts_profile,
+				  VDEV_CMD);
+	if (ret)
+		hdd_err("FAILED TO SET RTSCTS Profile ret:%d", ret);
+}
+
+static void
 hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 				 struct wlan_objmgr_vdev *vdev)
 {
@@ -7330,6 +7355,7 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 	ucfg_fwol_configure_vdev_params(psoc, vdev);
 	hdd_set_vdev_mlo_external_sae_auth_conversion(vdev, opmode);
 	hdd_store_nss_chains_cfg_in_vdev(hdd_ctx, vdev);
+	hdd_vdev_configure_rtscts_enable(hdd_ctx, vdev);
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
@@ -8101,7 +8127,7 @@ err:
 int hdd_set_fw_params(struct hdd_adapter *adapter)
 {
 	int ret;
-	uint16_t upper_brssi_thresh, lower_brssi_thresh, rts_profile;
+	uint16_t upper_brssi_thresh, lower_brssi_thresh;
 	bool enable_dtim_1chrx;
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx;
@@ -8279,19 +8305,6 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 					    adapter->deflink->vdev_id);
 	if (ret) {
 		hdd_err("wmi_pdev_param_hyst_en set failed %d", ret);
-		goto error;
-	}
-
-	status = ucfg_fwol_get_rts_profile(hdd_ctx->psoc, &rts_profile);
-	if (QDF_IS_STATUS_ERROR(status))
-		return -EINVAL;
-
-	ret = sme_cli_set_command(adapter->deflink->vdev_id,
-				  wmi_vdev_param_enable_rtscts,
-				  rts_profile,
-				  VDEV_CMD);
-	if (ret) {
-		hdd_err("FAILED TO SET RTSCTS Profile ret:%d", ret);
 		goto error;
 	}
 
