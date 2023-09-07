@@ -1553,7 +1553,6 @@ void hal_qca8074_attach(struct hal_soc *hal_soc);
  */
 void hal_kiwi_attach(struct hal_soc *hal_soc);
 
-void hal_qcn9224v1_attach(struct hal_soc *hal_soc);
 void hal_qcn9224v2_attach(struct hal_soc *hal_soc);
 
 /**

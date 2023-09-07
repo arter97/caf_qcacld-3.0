@@ -48,7 +48,6 @@ void hal_qca6490_attach(struct hal_soc *hal);
 void hal_qcn9000_attach(struct hal_soc *hal);
 #endif
 #ifdef QCA_WIFI_QCN9224
-void hal_qcn9224v1_attach(struct hal_soc *hal);
 void hal_qcn9224v2_attach(struct hal_soc *hal);
 #endif
 #if defined(QCA_WIFI_QCN6122) || defined(QCA_WIFI_QCN9160)
@@ -520,7 +519,7 @@ static void hal_target_based_configure(struct hal_soc *hal)
 		hal->use_register_windowing = true;
 		hal->static_window_map = true;
 		if (hal->version == 1)
-			hal_qcn9224v1_attach(hal);
+			qdf_assert_always(0);
 		else
 			hal_qcn9224v2_attach(hal);
 	break;
