@@ -1643,15 +1643,15 @@ wlan_hdd_send_mlo_ll_peer_stats_to_user(struct hdd_adapter *adapter)
 	}
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
+		wlan_hdd_get_connected_link_info(link_info, &info);
+		if (info.link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
 		peers = nla_nest_start(skb, i);
 		if (!peers) {
 			hdd_err("nla_nest_start failed");
 			goto exit;
 		}
-
-		wlan_hdd_get_connected_link_info(link_info, &info);
-		if (info.link_id == WLAN_INVALID_LINK_ID)
-			continue;
 
 		if (!wlan_hdd_put_mlo_peer_info(link_info, skb)) {
 			hdd_err("put_wifi_peer_info fail");
@@ -1966,15 +1966,15 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 	}
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
+		wlan_hdd_get_connected_link_info(link_info, &info);
+		if (info.link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
 		ml_iface_links = nla_nest_start(skb, i);
 		if (!ml_iface_links) {
 			hdd_err("per link mlo iface stats failed");
 			goto err;
 		}
-
-		wlan_hdd_get_connected_link_info(link_info, &info);
-		if (info.link_id == WLAN_INVALID_LINK_ID)
-			continue;
 
 		stats = &link_info->ll_iface_stats;
 		per_link_peers = stats->link_stats.num_peers;
