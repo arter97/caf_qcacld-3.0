@@ -116,11 +116,11 @@
 				0, \
 				"HE Ofdma Ra")
 
-#define CFG_HE_MAX_AMPDU_LEN CFG_UINT( \
+#define CFG_HE_MAX_AMPDU_LEN CFG_INI_UINT( \
 				"he_max_ampdu_len", \
 				0, \
 				3, \
-				0, \
+				3, \
 				CFG_VALUE_OR_DEFAULT, \
 				"HE Max Ampdu Len")
 
