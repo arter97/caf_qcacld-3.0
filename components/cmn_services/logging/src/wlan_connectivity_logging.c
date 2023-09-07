@@ -546,6 +546,130 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_SETUP);
 }
 
+#define IS_LINK_SET(link_bitmap, link_id) ((link_bitmap) & (BIT(link_id)))
+
+static QDF_STATUS
+wlan_popluatate_tid_link_id_bitmap(struct wlan_objmgr_vdev *vdev,
+				   struct mlo_link_info *link_info,
+				   struct wlan_diag_mlo_t2lm_status *buf,
+				   uint8_t bss_link)
+{
+	uint8_t link_id;
+	struct wlan_t2lm_info t2lm[WLAN_T2LM_MAX_DIRECTION] = {0};
+	uint8_t dir, i;
+	uint16_t freq;
+	QDF_STATUS status;
+
+	link_id = link_info->link_id;
+	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++)
+		t2lm[dir].direction = WLAN_T2LM_INVALID_DIRECTION;
+
+	status = wlan_get_t2lm_mapping_status(vdev, t2lm);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		logging_err("Unable to get t2lm_mapping");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	freq = link_info->link_chan_info->ch_freq;
+
+	buf->mlo_cmn_info[bss_link].band =
+		wlan_convert_freq_to_diag_band(freq);
+
+	buf->mlo_cmn_info[bss_link].vdev_id = wlan_vdev_get_id(vdev);
+
+	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
+		for (i = 0; i < T2LM_MAX_NUM_TIDS; i++) {
+			switch (t2lm[dir].direction) {
+			case WLAN_T2LM_DL_DIRECTION:
+				if (
+				IS_LINK_SET(
+				t2lm[dir].ieee_link_map_tid[i], link_id))
+					buf->mlo_cmn_info[bss_link].tid_dl |=
+									BIT(i);
+				break;
+			case WLAN_T2LM_UL_DIRECTION:
+				if (
+				IS_LINK_SET(
+				t2lm[dir].ieee_link_map_tid[i], link_id))
+					buf->mlo_cmn_info[bss_link].tid_ul |=
+									BIT(i);
+				break;
+			case WLAN_T2LM_BIDI_DIRECTION:
+				if (
+				IS_LINK_SET(
+				t2lm[dir].ieee_link_map_tid[i], link_id)) {
+					buf->mlo_cmn_info[bss_link].tid_dl |=
+									BIT(i);
+					buf->mlo_cmn_info[bss_link].tid_ul |=
+									BIT(i);
+				}
+				break;
+			default:
+				logging_debug("Invalid direction %d",
+					      t2lm[dir].direction);
+				break;
+			}
+		}
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+void
+wlan_connectivity_t2lm_status_event(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t i = 0;
+	QDF_STATUS status;
+	struct mlo_link_info *link_info;
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
+				 struct wlan_diag_mlo_t2lm_status);
+
+	if (!mlo_is_mld_sta(vdev))
+		return;
+
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.version = DIAG_MLO_T2LM_STATUS_VERSION;
+
+	if (!vdev->mlo_dev_ctx) {
+		logging_err("MLO dev ctx not found");
+		return;
+	}
+
+	link_info = mlo_mgr_get_ap_link(vdev);
+	if (!link_info) {
+		logging_err("link_info invalid");
+		return;
+	}
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS && i < MAX_BANDS; i++) {
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr) ||
+		    link_info->vdev_id == WLAN_INVALID_VDEV_ID)
+			continue;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+							psoc,
+							link_info->vdev_id,
+							WLAN_MLO_MGR_ID);
+		if (!vdev)
+			continue;
+		status =
+			wlan_popluatate_tid_link_id_bitmap(vdev,
+							   link_info,
+							   &wlan_diag_event,
+							   i);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto out;
+		link_info++;
+	}
+
+out:
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
+				    EVENT_WLAN_MLO_T2LM_STATUS);
+}
+
 #else
 static QDF_STATUS
 wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,

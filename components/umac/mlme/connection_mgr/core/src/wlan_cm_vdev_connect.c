@@ -1635,7 +1635,8 @@ static void cm_process_connect_complete(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static QDF_STATUS
-cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
+cm_update_tid_mapping(struct wlan_objmgr_psoc *psoc,
+		      struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_t2lm_context *t2lm_ctx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -1660,12 +1661,14 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("T2LM IE beacon process failed");
 	}
+	wlan_connectivity_t2lm_status_event(psoc, vdev);
 
 	return status;
 }
 #else
 static inline QDF_STATUS
-cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
+cm_update_tid_mapping(struct wlan_objmgr_psoc *psoc,
+		      struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -1778,7 +1781,7 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 					     mlme_get_tdls_prohibited(vdev),
 					     vdev);
 		wlan_p2p_status_connect(vdev);
-		cm_update_tid_mapping(vdev);
+		cm_update_tid_mapping(psoc, vdev);
 		cm_update_associated_ch_info(vdev, true);
 	}
 

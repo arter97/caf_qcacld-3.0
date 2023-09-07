@@ -1251,7 +1251,21 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      enum qdf_dp_tx_rx_status tx_status,
 				      qdf_freq_t freq,
 				      bool is_rx, uint8_t subtype);
+/**
+ * wlan_connectivity_t2lm_status_event() - Fill and send T2LM data
+ * @psoc: Pointer to global psoc object
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void wlan_connectivity_t2lm_status_event(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev);
 #else
+static inline void
+wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
+{
+}
+
 static inline void
 wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 {
@@ -1267,7 +1281,8 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 {}
 
 static inline void
-wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
+wlan_connectivity_t2lm_status_event(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif
