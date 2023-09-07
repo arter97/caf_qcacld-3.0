@@ -1792,6 +1792,7 @@ reg_is_6g_freq_txable(struct wlan_objmgr_pdev *pdev,
 {
 	bool is_freq_enabled;
 	enum reg_afc_dev_deploy_type reg_afc_deploy_type;
+	enum channel_enum chan_idx;
 
 	is_freq_enabled = reg_is_freq_enabled(pdev, freq, in_6ghz_pwr_mode);
 	/* If the frequency is not enabled, then return. */
@@ -1822,8 +1823,12 @@ reg_is_6g_freq_txable(struct wlan_objmgr_pdev *pdev,
 	if (in_6ghz_pwr_mode == REG_AP_VLP)
 		return is_freq_enabled;
 
+	chan_idx = reg_get_chan_enum_for_freq(freq);
+	if (reg_is_chan_enum_invalid(chan_idx))
+		return false;
+
 	/* If power mode is SP, check if AFC is done. */
-	return reg_is_sup_chan_entry_afc_done(pdev, freq, in_6ghz_pwr_mode);
+	return reg_is_sup_chan_entry_afc_done(pdev, chan_idx, in_6ghz_pwr_mode);
 }
 
 bool
