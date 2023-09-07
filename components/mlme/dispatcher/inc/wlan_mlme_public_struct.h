@@ -1387,6 +1387,18 @@ enum wlan_mlme_hw_mode_config_type {
 	WLAN_MLME_HW_MODE_MAX,
 };
 
+/**
+ * wlan_mlme_aux_caps_bit - Bit mapping for aux capability
+ * WLAN_MLME_AUX_MODE_SCAN_BIT: if set, aux scan is supported
+ * WLAN_MLME_AUX_MODE_LISTEN_BIT: if set, aux listen is supported
+ * WLAN_MLME_AUX_MODE_EMLSR_BIT: if set, aux emlsr is supported
+ */
+enum wlan_mlme_aux_caps_bit {
+	WLAN_MLME_AUX_MODE_SCAN_BIT = 0,
+	WLAN_MLME_AUX_MODE_LISTEN_BIT = 1,
+	WLAN_MLME_AUX_MODE_EMLSR_BIT = 2,
+};
+
 /* struct wlan_mlme_aux_dev_caps - wlan mlme aux dev capability
  *
  * @supported_modes_bitmap: indicate which mode this AUX supports for the

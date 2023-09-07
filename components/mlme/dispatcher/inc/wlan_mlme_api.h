@@ -1063,6 +1063,39 @@ bool wlan_mlme_cfg_get_aux_supported_modes(
 		enum wlan_mlme_hw_mode_config_type hw_mode_id,
 		uint32_t *supported_modes_bitmap);
 
+/**
+ * wlan_mlme_is_aux_scan_support() - check whether aux scan is supported.
+ * @psoc: pointer to psoc object
+ * @hw_mode_id: hw mode id
+ *
+ * Return: true if supporting, else false
+ */
+bool
+wlan_mlme_is_aux_scan_support(struct wlan_objmgr_psoc *psoc,
+			      enum wlan_mlme_hw_mode_config_type hw_mode_id);
+
+/**
+ * wlan_mlme_is_aux_listen_support() - check whether aux listen is supported.
+ * @psoc: pointer to psoc object
+ * @hw_mode_id: hw mode id
+ *
+ * Return: true if supporting, else false
+ */
+bool
+wlan_mlme_is_aux_listen_support(struct wlan_objmgr_psoc *psoc,
+				enum wlan_mlme_hw_mode_config_type hw_mode_id);
+
+/**
+ * wlan_mlme_is_aux_emlsr_support() - check whether aux emlsr is supported.
+ * @psoc: pointer to psoc object
+ * @hw_mode_id: hw mode id
+ *
+ * Return: true if supporting, else false
+ */
+bool
+wlan_mlme_is_aux_emlsr_support(struct wlan_objmgr_psoc *psoc,
+			       enum wlan_mlme_hw_mode_config_type hw_mode_id);
+
 #ifdef WLAN_FEATURE_11AX
 /**
  * wlan_mlme_cfg_get_he_ul_mumimo() - Get the HE Ul Mumio
