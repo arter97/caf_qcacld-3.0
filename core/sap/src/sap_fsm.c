@@ -1015,6 +1015,10 @@ sap_process_force_scc_with_go_start(struct wlan_objmgr_psoc *psoc,
 	uint32_t con_freq;
 	enum phy_ch_width ch_width;
 
+	if (sap_context->cc_switch_mode ==
+			QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)
+		return false;
+
 	existing_vdev_id =
 		policy_mgr_fetch_existing_con_info(psoc,
 						   sap_context->sessionId,

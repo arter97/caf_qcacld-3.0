@@ -1839,6 +1839,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	uint8_t num_cxn_del = 0;
 	QDF_STATUS status;
 	uint32_t sta_gc_present = 0;
+	bool go_5g_present = 0;
 	qdf_freq_t user_config_freq = 0;
 	tQDF_MCC_TO_SCC_SWITCH_MODE cc_mode =
 				policy_mgr_get_mcc_to_scc_switch_mode(psoc);
@@ -1867,6 +1868,13 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		cc_count += policy_mgr_get_mode_specific_conn_info(
 					psoc, &op_ch_freq_list[cc_count],
 					&vdev_id[cc_count], PM_P2P_GO_MODE);
+
+	for (i = go_index_start ; i < cc_count; i++) {
+		if (!WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[i])) {
+			go_5g_present = true;
+			break;
+		}
+	}
 
 	sta_gc_present =
 		policy_mgr_mode_specific_connection_count(psoc,
@@ -1942,11 +1950,18 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		 * currently not on the user configured frequency.
 		 * else move the SAP only when SAP is on 2.4 GHz band and user
 		 * configured frequency is on any other bands.
+		 * And for QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL, if GO
+		 * is on 5/6 GHz, SAP is not allowed to move back to 5/6 GHz.
+		 * If GO is not present on 5/6 GHz, SAP need to moved to
+		 * user configured frequency.
 		 */
 		if (!sta_gc_present && user_config_freq &&
 		    cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL &&
 		    !wlan_reg_is_same_band_freqs(user_config_freq,
 						 op_ch_freq_list[i])) {
+			if (go_5g_present &&
+			    !WLAN_REG_IS_24GHZ_CH_FREQ(user_config_freq))
+				continue;
 			curr_sap_freq = op_ch_freq_list[i];
 			policy_mgr_debug("Move sap to user configured freq: %d",
 					 user_config_freq);
@@ -2023,7 +2038,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		return true;
 
 	*intf_ch_freq = new_sap_freq;
-	policy_mgr_debug("Standalone SAP(vdev_id %d) is not allowed on DFS/Unsafe channel, Move it to channel %u",
+	policy_mgr_debug("Standalone SAP(vdev_id %d) will be moved to channel %u",
 			 sap_vdev_id, *intf_ch_freq);
 
 	return true;
@@ -2588,6 +2603,10 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("Invalid Context");
 		return QDF_STATUS_E_INVAL;
 	}
+	if (pm_ctx->cfg.mcc_to_scc_switch ==
+		QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)
+		return QDF_STATUS_SUCCESS;
+
 	if (!vdev) {
 		policy_mgr_err("vdev is null");
 		return QDF_STATUS_E_INVAL;
@@ -2828,10 +2847,40 @@ end:
 void policy_mgr_check_sta_ap_concurrent_ch_intf(void *data)
 {
 	struct qdf_op_sync *op_sync;
+	struct policy_mgr_psoc_priv_obj *pm_ctx = data;
+	int ret;
 
-	if (qdf_op_protect(&op_sync))
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
 		return;
+	}
 
+	ret = qdf_op_protect(&op_sync);
+	if (ret) {
+		if (ret == -EAGAIN) {
+			if (qdf_is_driver_unloading() ||
+			    qdf_is_recovering() ||
+			    qdf_is_driver_state_module_stop()) {
+				policy_mgr_debug("driver not ready");
+				return;
+			}
+
+			if (!pm_ctx->sta_ap_intf_check_work_info)
+				return;
+
+			pm_ctx->work_fail_count++;
+			policy_mgr_debug("qdf_op start fail, ret %d, work_fail_count %d",
+					 ret, pm_ctx->work_fail_count);
+			if (pm_ctx->work_fail_count > 1) {
+				pm_ctx->work_fail_count = 0;
+				return;
+			}
+			qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
+					       SAP_CONC_CHECK_DEFER_TIMEOUT_MS);
+		}
+		return;
+	}
+	pm_ctx->work_fail_count = 0;
 	__policy_mgr_check_sta_ap_concurrent_ch_intf(data);
 
 	qdf_op_unprotect(op_sync);

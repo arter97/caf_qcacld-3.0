@@ -350,6 +350,7 @@ struct policy_mgr_cfg {
  * @no_of_open_sessions: Number of active vdevs
  * @no_of_active_sessions: Number of active connections
  * @sta_ap_intf_check_work: delayed sap restart work
+ * @work_fail_count: sta_ap work schedule fail count
  * @nan_sap_conc_work: Info related to nan sap conc work
  * @num_dbs_hw_modes: Number of different HW modes supported
  * @hw_mode: List of HW modes supported
@@ -403,6 +404,7 @@ struct policy_mgr_psoc_priv_obj {
 	uint8_t no_of_open_sessions[QDF_MAX_NO_OF_MODE];
 	uint8_t no_of_active_sessions[QDF_MAX_NO_OF_MODE];
 	struct qdf_delayed_work sta_ap_intf_check_work;
+	uint8_t work_fail_count;
 	qdf_work_t nan_sap_conc_work;
 	uint32_t num_dbs_hw_modes;
 	struct dbs_hw_mode_info hw_mode;

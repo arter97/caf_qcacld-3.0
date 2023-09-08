@@ -11696,6 +11696,7 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	bool sap_found = false;
 	uint8_t num_mcc_conn = 0;
 	uint8_t num_scc_conn = 0;
+	uint8_t num_5_or_6_conn = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -11718,10 +11719,14 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 					      IEEE80211_CHAN_DFS_CFREQ2)))
 				sap_on_dfs = true;
 			sap_found = true;
-		} else if (connection[i].freq == freq) {
-			num_scc_conn++;
 		} else {
-			num_mcc_conn++;
+			if (connection[i].freq == freq)
+				num_scc_conn++;
+			else
+				num_mcc_conn++;
+
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(connection[i].freq))
+				num_5_or_6_conn++;
 		}
 	}
 	if (!sap_found) {
@@ -11751,10 +11756,23 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc);
 
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (!connection[i].in_use)
+			continue;
+
+		if (scc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL &&
+		    connection[i].mode == PM_P2P_GO_MODE &&
+		    connection[i].vdev_id != vdev_id &&
+		    policy_mgr_2_freq_always_on_same_mac(psoc, freq,
+							 connection[i].freq)) {
+			policy_mgr_debug("SAP:%d and GO:%d on same mac. Restart SAP ",
+					 freq, connection[i].freq);
+			restart_required = true;
+			break;
+		}
+
 		is_sta_p2p_cli =
-			connection[i].in_use &&
 			(connection[i].mode == PM_STA_MODE ||
-			connection[i].mode == PM_P2P_CLIENT_MODE);
+			 connection[i].mode == PM_P2P_CLIENT_MODE);
 		if (!is_sta_p2p_cli)
 			continue;
 
@@ -11828,6 +11846,17 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 							vdev_id, freq)) {
 			policy_mgr_debug("SAP in indoor freq: sta:%d sap:%d",
 					 connection[i].freq, freq);
+			restart_required = true;
+		}
+
+		if (scc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL &&
+		    connection[i].freq == freq &&
+		    WLAN_REG_IS_24GHZ_CH_FREQ(freq) &&
+		    !num_5_or_6_conn &&
+		    user_config_freq &&
+		    !WLAN_REG_IS_24GHZ_CH_FREQ(user_config_freq)) {
+			policy_mgr_debug("SAP move to user configure %d from %d",
+					 user_config_freq, freq);
 			restart_required = true;
 		}
 	}

@@ -1566,6 +1566,25 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id, uint8_t cc_mode);
 
 /**
+ * policy_mgr_handle_go_sap_fav_channel() - Get preferred force SCC
+ * channel frequency using favorite mandatory channel list for GO+SAP
+ * concurrency
+ * @psoc: Pointer to Psoc
+ * @vdev_id: vdev id
+ * @sap_ch_freq: sap/go channel starting channel frequency
+ * @intf_ch_freq: prefer force scc frequency
+ *
+ * SAP should move to 2.4 GHz if P2P GO is on 5G/6G. SAP should move to user
+ * configured channel after P2P GO is stopped
+ *
+ * Return: QDF_STATUS_SUCCESS if a valid favorite SAP channel is found
+ */
+QDF_STATUS
+policy_mgr_handle_go_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, qdf_freq_t sap_ch_freq,
+				     qdf_freq_t *intf_ch_freq);
+
+/**
  * policy_mgr_nan_sap_pre_enable_conc_check() - Check if NAN+SAP SCC is
  *                                              allowed in given ch
  * @psoc: PSOC object information

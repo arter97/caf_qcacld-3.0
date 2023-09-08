@@ -3822,6 +3822,10 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 	bool sta_sap_scc_on_5ghz_channel;
 	bool scc_on_indoor =
 		 policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc);
+	uint8_t go_count;
+	uint32_t go_op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t go_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t go_op_ch_freq_5g = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3855,12 +3859,24 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 	sta_sap_scc_on_5ghz_channel =
 		policy_mgr_is_connected_sta_5g(psoc, &sta_5GHz_freq);
 
+	go_count = policy_mgr_get_mode_specific_conn_info(
+				psoc, go_op_ch_freq_list,
+				go_vdev_id_list, PM_P2P_GO_MODE);
+	if (go_count && !WLAN_REG_IS_24GHZ_CH_FREQ(go_op_ch_freq_list[0])) {
+		go_op_ch_freq_5g = go_op_ch_freq_list[0];
+		policy_mgr_debug("go 5/6G present, SAP exclude 5/6G channels");
+	}
+
 	for (i = 0; i < *pcl_len_org; i++) {
 		found = false;
 		if (i >= NUM_CHANNELS) {
 			policy_mgr_debug("index is exceeding NUM_CHANNELS");
 			break;
 		}
+
+		if (go_op_ch_freq_5g &&
+		    !WLAN_REG_IS_24GHZ_CH_FREQ(pcl_list_org[i]))
+			continue;
 
 		if (scc_on_indoor && policy_mgr_is_force_scc(psoc) &&
 		    pcl_list_org[i] == indoor_sta_freq) {
@@ -3981,9 +3997,8 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 	mcc_to_scc_switch =
 		policy_mgr_get_mcc_to_scc_switch_mode(psoc);
 
-	sta_count =
-		policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
-							  NULL);
+	sta_count = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							      NULL);
 
 	if (!sta_count || mcc_to_scc_switch !=
 			QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)
@@ -4091,7 +4106,7 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 		if (user_config_freq && (pcl.pcl_list[i] == user_config_freq)) {
 			sap_new_freq = pcl.pcl_list[i];
 			policy_mgr_debug("Prefer starting SAP on user configured channel:%d",
-					 sap_ch_freq);
+					 sap_new_freq);
 			goto update_freq;
 		}
 	}
