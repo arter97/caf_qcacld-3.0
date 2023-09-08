@@ -1176,6 +1176,10 @@ config WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 	bool "Enable WLAN_HDD_MULTI_VDEV_SINGLE_NDEV"
 	default n
 
+config QCA_DP_TX_FW_METADATA_V2
+        bool "Enable QCA_DP_TX_FW_METADATA_V2"
+        default n
+
 config WLAN_FEATURE_11W
 	bool "Enable the WLAN 802.11w Protected Management Frames feature"
 	default n
