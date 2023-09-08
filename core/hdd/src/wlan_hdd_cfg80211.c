@@ -22884,6 +22884,8 @@ static int __wlan_hdd_cfg80211_change_bss(struct wiphy *wiphy,
 	mac_handle_t mac_handle;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	cdp_config_param_type vdev_param;
+	int link_id = -1;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
@@ -22891,13 +22893,16 @@ static int __wlan_hdd_cfg80211_change_bss(struct wiphy *wiphy,
 		hdd_err("Command not allowed in FTM mode");
 		return -EINVAL;
 	}
+	link_id = hdd_nb_get_link_id_from_params(params, NB_CHANGE_BSS);
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_CHANGE_BSS,
-		   adapter->deflink->vdev_id, params->ap_isolate);
+		   link_info->vdev_id, params->ap_isolate);
 
 	hdd_debug("Device_mode %s(%d), ap_isolate = %d",
 		  qdf_opmode_str(adapter->device_mode),
@@ -22922,18 +22927,18 @@ static int __wlan_hdd_cfg80211_change_bss(struct wiphy *wiphy,
 		mac_handle = hdd_ctx->mac_handle;
 		qdf_ret_status = sme_ap_disable_intra_bss_fwd(
 						mac_handle,
-						adapter->deflink->vdev_id,
+						link_info->vdev_id,
 						ap_ctx->disable_intrabss_fwd);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_ret_status))
 			ret = -EINVAL;
 
 		ucfg_ipa_set_ap_ibss_fwd(hdd_ctx->pdev,
-					 adapter->deflink->vdev_id,
+					 link_info->vdev_id,
 					 ap_ctx->disable_intrabss_fwd);
 
 		vdev_param.cdp_vdev_param_ap_brdg_en =
 			!ap_ctx->disable_intrabss_fwd;
-		cdp_txrx_set_vdev_param(soc, adapter->deflink->vdev_id,
+		cdp_txrx_set_vdev_param(soc, link_info->vdev_id,
 					CDP_ENABLE_AP_BRIDGE, vdev_param);
 	}
 
