@@ -26,6 +26,7 @@
 
 #include "wlan_logging_sock_svc.h"
 #include "wlan_cm_roam_public_struct.h"
+#include "wlan_mlo_mgr_public_structs.h"
 
 #define WLAN_MAX_LOGGING_FREQ 120
 
@@ -1245,6 +1246,7 @@ void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id);
 
+
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
  * wlan_connectivity_logging_start()  - Initialize the connectivity/roaming
@@ -1403,7 +1405,25 @@ wlan_convert_freq_to_diag_band(uint16_t ch_freq)
 static inline void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id)
-{
-}
+{}
 #endif
+
+#if defined(CONNECTIVITY_DIAG_EVENT) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * wlan_connectivity_mld_link_status_event() - Send connectivity logging
+ * ML Link Status event
+ * @psoc: Pointer to global PSOC object
+ * @src: Src parameters to be sent
+ *
+ * Return: None
+ */
+void
+wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
+					struct mlo_link_switch_params *src);
+#else
+static inline
+void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
+					     struct mlo_link_switch_params *src)
+{}
+#endif /* CONNECTIVITY_DIAG_EVENT && WLAN_FEATURE_11BE_MLO */
 #endif /* _WLAN_CONNECTIVITY_LOGGING_H_ */
