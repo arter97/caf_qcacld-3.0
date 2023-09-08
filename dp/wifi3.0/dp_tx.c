@@ -6511,7 +6511,7 @@ static QDF_STATUS dp_tx_alloc_static_pools(struct dp_soc *soc, int num_pool,
 
 	/* Allocate software Tx descriptor pools */
 
-	if (dp_global->tx_desc_pool_alloc_cnt == 0) {
+	if (dp_global->tx_desc_pool_alloc_cnt[soc->arch_id] == 0) {
 		for (i = 0; i < num_pool; i++) {
 			if (dp_tx_desc_pool_alloc(soc, i, num_desc, false)) {
 				QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -6521,7 +6521,7 @@ static QDF_STATUS dp_tx_alloc_static_pools(struct dp_soc *soc, int num_pool,
 			}
 		}
 	}
-	dp_global->tx_desc_pool_alloc_cnt++;
+	dp_global->tx_desc_pool_alloc_cnt[soc->arch_id]++;
 	return QDF_STATUS_SUCCESS;
 
 fail:
@@ -6540,7 +6540,7 @@ static QDF_STATUS dp_tx_spcl_alloc_static_pools(struct dp_soc *soc,
 	dp_global = wlan_objmgr_get_global_ctx();
 
 	/* Allocate software Tx descriptor pools */
-	if (dp_global->spcl_tx_desc_pool_alloc_cnt == 0) {
+	if (dp_global->spcl_tx_desc_pool_alloc_cnt[soc->arch_id] == 0) {
 		for (j = 0; j < num_pool; j++) {
 			if (dp_tx_desc_pool_alloc(soc, j, num_spcl_desc, true)) {
 				QDF_TRACE(QDF_MODULE_ID_DP,
@@ -6551,7 +6551,7 @@ static QDF_STATUS dp_tx_spcl_alloc_static_pools(struct dp_soc *soc,
 			}
 		}
 	}
-	dp_global->spcl_tx_desc_pool_alloc_cnt++;
+	dp_global->spcl_tx_desc_pool_alloc_cnt[soc->arch_id]++;
 	return QDF_STATUS_SUCCESS;
 
 fail:
@@ -6568,7 +6568,7 @@ static QDF_STATUS dp_tx_init_static_pools(struct dp_soc *soc, int num_pool,
 
 	dp_global = wlan_objmgr_get_global_ctx();
 
-	if (dp_global->tx_desc_pool_init_cnt == 0) {
+	if (dp_global->tx_desc_pool_init_cnt[soc->arch_id] == 0) {
 		for (i = 0; i < num_pool; i++) {
 			if (dp_tx_desc_pool_init(soc, i, num_desc, false)) {
 				QDF_TRACE(QDF_MODULE_ID_DP,
@@ -6579,7 +6579,7 @@ static QDF_STATUS dp_tx_init_static_pools(struct dp_soc *soc, int num_pool,
 			}
 		}
 	}
-	dp_global->tx_desc_pool_init_cnt++;
+	dp_global->tx_desc_pool_init_cnt[soc->arch_id]++;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -6591,7 +6591,7 @@ static QDF_STATUS dp_tx_spcl_init_static_pools(struct dp_soc *soc, int num_pool,
 
 	dp_global = wlan_objmgr_get_global_ctx();
 
-	if (dp_global->spcl_tx_desc_pool_init_cnt == 0) {
+	if (dp_global->spcl_tx_desc_pool_init_cnt[soc->arch_id] == 0) {
 		for (i = 0; i < num_pool; i++) {
 			if (dp_tx_desc_pool_init(soc, i, num_spcl_desc, true)) {
 				QDF_TRACE(QDF_MODULE_ID_DP,
@@ -6602,7 +6602,7 @@ static QDF_STATUS dp_tx_spcl_init_static_pools(struct dp_soc *soc, int num_pool,
 			}
 		}
 	}
-	dp_global->spcl_tx_desc_pool_init_cnt++;
+	dp_global->spcl_tx_desc_pool_init_cnt[soc->arch_id]++;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -6613,8 +6613,8 @@ static void dp_tx_deinit_static_pools(struct dp_soc *soc, int num_pool)
 
 	dp_global = wlan_objmgr_get_global_ctx();
 
-	dp_global->tx_desc_pool_init_cnt--;
-	if (dp_global->tx_desc_pool_init_cnt == 0) {
+	dp_global->tx_desc_pool_init_cnt[soc->arch_id]--;
+	if (dp_global->tx_desc_pool_init_cnt[soc->arch_id] == 0) {
 		for (i = 0; i < num_pool; i++)
 			dp_tx_desc_pool_deinit(soc, i, false);
 	}
@@ -6627,8 +6627,8 @@ static void dp_tx_spcl_deinit_static_pools(struct dp_soc *soc, int num_pool)
 
 	dp_global = wlan_objmgr_get_global_ctx();
 
-	dp_global->spcl_tx_desc_pool_init_cnt--;
-	if (dp_global->spcl_tx_desc_pool_init_cnt == 0) {
+	dp_global->spcl_tx_desc_pool_init_cnt[soc->arch_id]--;
+	if (dp_global->spcl_tx_desc_pool_init_cnt[soc->arch_id] == 0) {
 		for (i = 0; i < num_pool; i++)
 			dp_tx_desc_pool_deinit(soc, i, true);
 	}
@@ -6641,8 +6641,8 @@ static void dp_tx_delete_static_pools(struct dp_soc *soc, int num_pool)
 
 	dp_global = wlan_objmgr_get_global_ctx();
 
-	dp_global->tx_desc_pool_alloc_cnt--;
-	if (dp_global->tx_desc_pool_alloc_cnt == 0) {
+	dp_global->tx_desc_pool_alloc_cnt[soc->arch_id]--;
+	if (dp_global->tx_desc_pool_alloc_cnt[soc->arch_id] == 0) {
 		for (i = 0; i < num_pool; i++)
 			dp_tx_desc_pool_free(soc, i, false);
 	}
@@ -6655,8 +6655,8 @@ static void dp_tx_spcl_delete_static_pools(struct dp_soc *soc, int num_pool)
 
 	dp_global = wlan_objmgr_get_global_ctx();
 
-	dp_global->spcl_tx_desc_pool_alloc_cnt--;
-	if (dp_global->spcl_tx_desc_pool_alloc_cnt == 0) {
+	dp_global->spcl_tx_desc_pool_alloc_cnt[soc->arch_id]--;
+	if (dp_global->spcl_tx_desc_pool_alloc_cnt[soc->arch_id] == 0) {
 		for (i = 0; i < num_pool; i++)
 			dp_tx_desc_pool_free(soc, i, true);
 	}
