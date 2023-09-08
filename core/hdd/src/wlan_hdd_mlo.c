@@ -896,6 +896,12 @@ int wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 	case QCA_WLAN_VENDOR_LINK_STATE_OP_GET:
 		return wlan_hdd_link_state_request(wiphy, hdd_ctx->psoc, vdev);
 	case QCA_WLAN_VENDOR_LINK_STATE_OP_SET:
+		if (policy_mgr_is_set_link_in_progress(hdd_ctx->psoc)) {
+			hdd_debug("vdev %d: change link already in progress",
+				  vdev_id);
+			return -EBUSY;
+		}
+
 		break;
 	default:
 		hdd_debug("vdev %d: Invalid op type:%d", vdev_id, ml_link_op);

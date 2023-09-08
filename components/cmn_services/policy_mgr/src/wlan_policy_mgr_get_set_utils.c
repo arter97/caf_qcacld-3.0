@@ -4180,17 +4180,24 @@ policy_mgr_enable_disable_link_from_vdev_bitmask(struct wlan_objmgr_psoc *psoc,
 
 static void
 policy_mgr_set_link_in_progress(struct policy_mgr_psoc_priv_obj *pm_ctx,
-				bool value)
+				bool set_link_in_progress)
 {
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	pm_ctx->set_link_in_progress = value;
+	if (set_link_in_progress)
+		qdf_atomic_inc(&pm_ctx->link_in_progress);
+	else {
+		if (qdf_atomic_read(&pm_ctx->link_in_progress) > 0)
+			qdf_atomic_dec(&pm_ctx->link_in_progress);
+	}
+
 	/* if set link has started reset the event, else complete the event */
-	if (pm_ctx->set_link_in_progress)
+	if (qdf_atomic_read(&pm_ctx->link_in_progress))
 		qdf_event_reset(&pm_ctx->set_link_update_done_evt);
 	else
 		qdf_event_set(&pm_ctx->set_link_update_done_evt);
-	policy_mgr_debug("set_link_in_progress %d",
-			 pm_ctx->set_link_in_progress);
+
+	policy_mgr_debug("link_in_progress %d",
+			 qdf_atomic_read(&pm_ctx->link_in_progress));
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 }
 
@@ -4200,7 +4207,7 @@ policy_mgr_get_link_in_progress(struct policy_mgr_psoc_priv_obj *pm_ctx)
 	bool value;
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	value = pm_ctx->set_link_in_progress;
+	value = qdf_atomic_read(&pm_ctx->link_in_progress);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 	if (value)
 		policy_mgr_debug("set_link_in_progress %d", value);
@@ -8786,6 +8793,31 @@ QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 	}
 
 set_link:
+	/*
+	 * TODO: In all scenarios wherever host sends
+	 * MLO_LINK_FORCE_MODE_ACTIVE_NUM/MLO_LINK_FORCE_MODE_INACTIVE_NUM to
+	 * FW, Host need to send MLO_LINK_FORCE_MODE_NO_FORCE to FW.
+	 * So instead of two commands for serialization, take care of this in
+	 * single serialization active command.
+	 */
+
+	/*
+	 * send MLO_LINK_FORCE_MODE_NO_FORCE to FW to clear user mode setting
+	 * configured via QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE in FW
+	 */
+	status = policy_mgr_mlo_sta_set_link(psoc,
+				    MLO_LINK_FORCE_REASON_CONNECT,
+				    MLO_LINK_FORCE_MODE_NO_FORCE,
+				    num_ml_sta, ml_sta_vdev_lst);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_debug("fail to send no force cmd for num_links:%d",
+				 num_ml_sta);
+		goto release_vdev_ref;
+	} else {
+		policy_mgr_debug("clear force mode setting for num_links:%d",
+				 num_ml_sta);
+	}
+
 	status = policy_mgr_process_mlo_sta_dynamic_force_num_link(psoc,
 					     MLO_LINK_FORCE_REASON_CONNECT,
 					     MLO_LINK_FORCE_MODE_ACTIVE_NUM,

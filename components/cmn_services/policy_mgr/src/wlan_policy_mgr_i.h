@@ -377,7 +377,7 @@ struct policy_mgr_cfg {
  * @valid_ch_freq_list_count: number of valid frequencies
  * @dynamic_mcc_adaptive_sched: disable/enable mcc adaptive scheduler feature
  * @dynamic_dfs_master_disabled: current state of dynamic dfs master
- * @set_link_in_progress: To track if set link is in progress
+ * @link_in_progress: To track if set link is in progress
  * @set_link_update_done_evt: qdf event to synchronize set link
  * @active_vdev_bitmap: Active vdev id bitmap
  * @inactive_vdev_bitmap: Inactive vdev id bitmap
@@ -426,7 +426,7 @@ struct policy_mgr_psoc_priv_obj {
 	bool dynamic_mcc_adaptive_sched;
 	bool dynamic_dfs_master_disabled;
 #ifdef WLAN_FEATURE_11BE_MLO
-	bool set_link_in_progress;
+	qdf_atomic_t link_in_progress;
 	qdf_event_t set_link_update_done_evt;
 #endif
 	uint32_t active_vdev_bitmap;
