@@ -2618,6 +2618,8 @@ QDF_STATUS rrm_initialize(struct mac_context *mac)
 	pRRMCaps->APChanReport = 1;
 	pRRMCaps->fine_time_meas_rpt = 1;
 	pRRMCaps->lci_capability = 1;
+	pRRMCaps->ChannelLoad = 1;
+	pRRMCaps->statistics = 1;
 
 	pRRMCaps->operatingChanMax = 3;
 	pRRMCaps->nonOperatingChanMax = 3;
