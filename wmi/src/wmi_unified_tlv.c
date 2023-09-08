@@ -2829,6 +2829,8 @@ static QDF_STATUS send_crash_inject_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->delay_time_ms = param->delay_time_ms;
 
 	wmi_mtrace(WMI_FORCE_FW_HANG_CMDID, NO_SESSION, 0);
+	wmi_info("type:%d delay_time_ms:%d current_time:%ld",
+		 cmd->type, cmd->delay_time_ms, qdf_mc_timer_get_system_time());
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 		WMI_FORCE_FW_HANG_CMDID);
 	if (ret) {
@@ -15595,6 +15597,14 @@ static bool is_management_record_tlv(uint32_t cmd_id)
 	}
 }
 
+static bool is_force_fw_hang_cmd_tlv(uint32_t cmd_id)
+{
+	if (cmd_id == WMI_FORCE_FW_HANG_CMDID)
+		return true;
+
+	return false;
+}
+
 static bool is_diag_event_tlv(uint32_t event_id)
 {
 	if (WMI_DIAG_EVENTID == event_id)
@@ -20997,6 +21007,7 @@ struct wmi_ops tlv_ops =  {
 				send_wlan_profile_hist_intvl_cmd_tlv,
 	.is_management_record = is_management_record_tlv,
 	.is_diag_event = is_diag_event_tlv,
+	.is_force_fw_hang_cmd = is_force_fw_hang_cmd_tlv,
 #ifdef WLAN_FEATURE_ACTION_OUI
 	.send_action_oui_cmd = send_action_oui_cmd_tlv,
 #endif

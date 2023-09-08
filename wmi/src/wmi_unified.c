@@ -3511,6 +3511,11 @@ static void wmi_htc_tx_complete(void *ctx, HTC_PACKET *htc_pkt)
 			WMI_MGMT_COMMAND_TX_CMP_RECORD(wmi_handle, cmd_id,
 						       offset_ptr);
 		} else {
+			if (wmi_handle->ops->is_force_fw_hang_cmd(cmd_id)) {
+				wmi_info("Tx completion received for WMI_FORCE_FW_HANG_CMDID, current_time:%ld",
+					 qdf_mc_timer_get_system_time());
+			}
+
 			WMI_COMMAND_TX_CMP_RECORD(wmi_handle, cmd_id,
 						  offset_ptr, dma_addr,
 						  phy_addr);
