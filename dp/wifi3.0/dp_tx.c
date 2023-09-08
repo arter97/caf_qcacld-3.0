@@ -6348,7 +6348,8 @@ void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
 					 desc_pages.cacheable_pages)))
 				break;
 
-			tx_desc = dp_tx_desc_find(soc, i, page_id, offset);
+			tx_desc = dp_tx_desc_find(soc, i, page_id, offset,
+						  false);
 
 			if (dp_is_tx_desc_flush_match(pdev, vdev, tx_desc)) {
 				/*
@@ -6377,14 +6378,16 @@ void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
  * @soc: Handle to DP soc structure
  * @tx_desc: pointer of one TX desc
  * @desc_pool_id: TX Desc pool id
+ * @spcl_pool: Special pool
  */
 static inline void
 dp_tx_desc_reset_vdev(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
-		      uint8_t desc_pool_id)
+		      uint8_t desc_pool_id, bool spcl_pool)
 {
 	struct dp_tx_desc_pool_s *pool = NULL;
 
-	pool = dp_get_tx_desc_pool(soc, desc_pool_id);
+	pool = spcl_pool ? dp_get_spcl_tx_desc_pool(soc, desc_pool_id) :
+				dp_get_tx_desc_pool(soc, desc_pool_id);
 	TX_DESC_LOCK_LOCK(&pool->lock);
 
 	tx_desc->vdev_id = DP_INVALID_VDEV_ID;
@@ -6392,8 +6395,8 @@ dp_tx_desc_reset_vdev(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
 }
 
-void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
-		      bool force_free)
+void __dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
+			bool force_free, bool spcl_pool)
 {
 	uint8_t i, num_pool;
 	uint32_t j;
@@ -6408,11 +6411,14 @@ void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
 		return;
 	}
 
-	num_desc = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
+	num_desc = spcl_pool ? wlan_cfg_get_num_tx_spl_desc(soc->wlan_cfg_ctx) :
+			wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
+
 	num_pool = wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
 
 	for (i = 0; i < num_pool; i++) {
-		tx_desc_pool = dp_get_tx_desc_pool(soc, i);
+		tx_desc_pool = spcl_pool ? dp_get_spcl_tx_desc_pool(soc, i) :
+						dp_get_tx_desc_pool(soc, i);
 		if (!tx_desc_pool->desc_pages.cacheable_pages)
 			continue;
 
@@ -6421,7 +6427,8 @@ void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
 		for (j = 0; j < num_desc; j++) {
 			page_id = j / num_desc_per_page;
 			offset = j % num_desc_per_page;
-			tx_desc = dp_tx_desc_find(soc, i, page_id, offset);
+			tx_desc = dp_tx_desc_find(soc, i, page_id, offset,
+						  spcl_pool);
 
 			if (dp_is_tx_desc_flush_match(pdev, vdev, tx_desc)) {
 				if (force_free) {
@@ -6430,11 +6437,18 @@ void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
 					dp_tx_desc_release(soc, tx_desc, i);
 				} else {
 					dp_tx_desc_reset_vdev(soc, tx_desc,
-							      i);
+							      i, spcl_pool);
 				}
 			}
 		}
 	}
+}
+
+void dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
+		      bool force_free)
+{
+	__dp_tx_desc_flush(pdev, vdev, force_free, false);
+	__dp_tx_desc_flush(pdev, vdev, force_free, true);
 }
 #endif /* !QCA_LL_TX_FLOW_CONTROL_V2 */
 
