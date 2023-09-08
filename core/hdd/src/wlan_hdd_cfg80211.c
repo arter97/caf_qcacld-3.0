@@ -805,6 +805,25 @@ wlan_hdd_p2p_p2p_iface_limit[] = {
 	   .types = BIT(NL80211_IFTYPE_P2P_GO) | BIT(NL80211_IFTYPE_P2P_CLIENT)
 	},
 };
+#elif defined(WLAN_FEATURE_STA_SAP_P2P_CONCURRENCY)
+/* STA + AP + P2P combination */
+static const struct ieee80211_iface_limit
+wlan_hdd_sta_ap_p2p_iface_limit[] = {
+	{
+	   .max = 1,
+	   .types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+	   .max = 1,
+	   .types = BIT(NL80211_IFTYPE_P2P_GO) | BIT(NL80211_IFTYPE_P2P_CLIENT)
+	},
+#ifndef WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+	{
+	   .max = 1,
+	   .types = BIT(NL80211_IFTYPE_AP)
+	},
+#endif /* WLAN_FEATURE_NO_STA_SAP_CONCURRENCY */
+};
 #endif
 
 #ifndef WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
@@ -951,7 +970,23 @@ static struct ieee80211_iface_combination
 		.n_limits = ARRAY_SIZE(wlan_hdd_p2p_p2p_iface_limit),
 		.beacon_int_infra_match = true,
 	},
-#endif
+#elif defined(WLAN_FEATURE_STA_SAP_P2P_CONCURRENCY)
+	/* STA + P2P + SAP */
+	{
+		.limits = wlan_hdd_sta_ap_p2p_iface_limit,
+		/* we can allow 3 channels for three different persona
+		 * but due to firmware limitation, allow max 2 concrnt channels.
+		 */
+		.num_different_channels = 2,
+#ifndef WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+		.max_interfaces = 3,
+#else
+		.max_interfaces = 2,
+#endif /* WLAN_FEATURE_NO_STA_SAP_CONCURRENCY */
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_ap_p2p_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+#endif /* WLAN_FEATURE_NO_P2P_CONCURRENCY */
 	/* STA + P2P */
 	{
 		.limits = wlan_hdd_sta_p2p_iface_limit,
