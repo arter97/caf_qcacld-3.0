@@ -4492,7 +4492,8 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 
 	for (i = 0; i < partner_info.num_partner_links; i++) {
 		link_id = partner_info.partner_link_info[i].link_id;
-		partner_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
+		partner_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
+						       WLAN_LEGACY_MAC_ID);
 		if (!partner_vdev) {
 			pe_debug("No partner vdev for link id %d", link_id);
 			continue;
@@ -4501,26 +4502,19 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 		status = lim_cu_info_from_rnr_per_link_id(rnr, link_id,
 							  &bpcc, &aui);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wlan_objmgr_vdev_release_ref(partner_vdev,
-						     WLAN_MLO_MGR_ID);
 			pe_debug("no cu info in rnr for link id %d", link_id);
-			continue;
+			goto ref_rel;
 		}
 
 		cu_flag = lim_check_cu_happens(partner_vdev, bpcc);
-		if (!cu_flag) {
-			wlan_objmgr_vdev_release_ref(partner_vdev,
-						     WLAN_MLO_MGR_ID);
-			continue;
-		}
+		if (!cu_flag)
+			goto ref_rel;
 
 		vdev_id = wlan_vdev_get_id(partner_vdev);
 		session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 		if (!session) {
-			wlan_objmgr_vdev_release_ref(partner_vdev,
-						     WLAN_MLO_MGR_ID);
 			pe_debug("session is null for vdev id %d", vdev_id);
-			continue;
+			goto ref_rel;
 		}
 
 		qdf_mem_copy(&sta_link_addr, session->self_mac_addr,
@@ -4540,17 +4534,15 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("MLO: Link probe response generation failed %d",
 			       status);
-			wlan_objmgr_vdev_release_ref(partner_vdev,
-						     WLAN_MLO_MGR_ID);
-			continue;
+			goto ref_rel;
 		}
 
 		lim_process_gen_probe_rsp_frame(mac_ctx, session,
 						link_probe_rsp.ptr,
 						link_probe_rsp.len);
 
-		wlan_objmgr_vdev_release_ref(partner_vdev,
-					     WLAN_MLO_MGR_ID);
+ref_rel:
+		wlan_objmgr_vdev_release_ref(partner_vdev, WLAN_LEGACY_MAC_ID);
 	}
 
 	qdf_mem_free(link_probe_rsp.ptr);

@@ -12268,6 +12268,7 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_vdev *vdev, *link_vdev;
 	struct wlan_channel *bss_chan;
 	uint8_t nl80211_chwidth;
+	int8_t ret = 0;
 
 	chwidth = wma_cli_get_command(link_info->vdev_id,
 				      wmi_vdev_param_chwidth, VDEV_CMD);
@@ -12283,47 +12284,50 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		mlo_bd_info = nla_nest_start(skb, CONFIG_MLO_LINKS);
 		for (link_id = 0; link_id < WLAN_MAX_LINK_ID; link_id++) {
-			link_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
+			link_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
+							    WLAN_OSIF_ID);
 			if (!link_vdev)
 				continue;
 
 			mlo_bd = nla_nest_start(skb, i);
 			if (!mlo_bd) {
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-				mlo_release_vdev_ref(link_vdev);
 				hdd_err("nla_nest_start fail");
-				return -EINVAL;
+				ret = -EINVAL;
+				goto end;
 			}
 			bss_chan = wlan_vdev_mlme_get_bss_chan(link_vdev);
 			if (!bss_chan) {
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-				mlo_release_vdev_ref(link_vdev);
 				hdd_err("fail to get bss_chan info");
-				return QDF_STATUS_E_FAILURE;
+				ret = -EINVAL;
+				goto end;
 			}
 			if (nla_put_u8(skb, CONFIG_MLO_LINK_ID, link_id)) {
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-				mlo_release_vdev_ref(link_vdev);
 				hdd_err("nla_put failure");
-				return -EINVAL;
+				ret = -EINVAL;
+				goto end;
 			}
 
 			nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(bss_chan->ch_width);
 			if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH,
 				       nl80211_chwidth)) {
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-				mlo_release_vdev_ref(link_vdev);
 				hdd_err("nla_put failure");
-				return -EINVAL;
+				ret = -EINVAL;
+				goto end;
 			}
 			nla_nest_end(skb, mlo_bd);
 			i++;
-			mlo_release_vdev_ref(link_vdev);
+			hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 		}
 		nla_nest_end(skb, mlo_bd_info);
 	}
+
+end:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-	return 0;
+
+	if (ret)
+		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
+
+	return ret;
 }
 
 /**
@@ -22750,7 +22754,7 @@ struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return vdev;
 
-	link_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
+	link_vdev = mlo_get_vdev_by_link_id(vdev, link_id, id);
 	hdd_objmgr_put_vdev_by_user(vdev, id);
 
 	return link_vdev;
@@ -22764,7 +22768,7 @@ void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
 		return;
 	}
 
-	mlo_release_vdev_ref(link_vdev);
+	wlan_objmgr_vdev_release_ref(link_vdev, id);
 }
 #else
 struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
@@ -23156,14 +23160,14 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 		} else if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
 			   adapter->device_mode == QDF_STA_MODE) {
 			status = wlan_objmgr_vdev_try_get_ref(vdev,
-							      WLAN_MLO_MGR_ID);
+							      WLAN_OSIF_ID);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				hdd_err("Failed to get vdev ref");
 				return qdf_status_to_os_return(status);
 			}
 			status = wlan_hdd_mlo_copy_partner_addr_from_mlie(
 							vdev, &mac_address);
-			mlo_release_vdev_ref(vdev);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				hdd_err("Failed to get peer address from ML IEs");
 				return qdf_status_to_os_return(status);
