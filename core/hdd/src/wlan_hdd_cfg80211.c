@@ -13233,11 +13233,11 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_SEND_ADDBA_REQ]);
 		if (cfg_val) {
 			/*Auto BA mode*/
-			set_val = 0;
+			set_val = HDD_BA_MODE_AUTO;
 			hdd_debug("BA operating mode is set to auto");
 		} else {
 			/*Manual BA mode*/
-			set_val = 1;
+			set_val = HDD_BA_MODE_MANUAL;
 			hdd_debug("BA operating mode is set to Manual");
 		}
 
