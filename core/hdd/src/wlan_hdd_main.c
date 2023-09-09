@@ -550,6 +550,7 @@ static void
 wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter;
+	struct osif_vdev_sync *vdev_sync;
 	void *soc;
 	bool running;
 
@@ -574,9 +575,17 @@ wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx)
 	}
 
 	hdd_debug("lpc: Delete monitor interface");
+	vdev_sync = osif_vdev_sync_unregister(adapter->dev);
+	if (vdev_sync)
+		osif_vdev_sync_wait_for_ops(vdev_sync);
+
 	wlan_hdd_release_intf_addr(hdd_ctx, adapter->mac_addr.bytes);
 	hdd_stop_adapter(hdd_ctx, adapter);
+	hdd_deinit_adapter(hdd_ctx, adapter, true);
 	hdd_close_adapter(hdd_ctx, adapter, true);
+
+	if (vdev_sync)
+		osif_vdev_sync_destroy(vdev_sync);
 }
 #else
 static inline
@@ -18315,6 +18324,11 @@ static void __hdd_inform_wifi_off(void)
 		return;
 
 	ucfg_dlm_wifi_off(hdd_ctx->pdev);
+
+	if (rtnl_trylock()) {
+		wlan_hdd_lpc_del_monitor_interface(hdd_ctx);
+		rtnl_unlock();
+	}
 }
 
 static void hdd_inform_wifi_off(void)
