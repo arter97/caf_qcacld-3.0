@@ -373,3 +373,13 @@ bool dfs_mlme_is_opmode_sta(struct wlan_objmgr_pdev *pdev)
 
 	return global_dfs_to_mlme.mlme_is_opmode_sta(pdev);
 }
+
+void dfs_mlme_send_cfg80211_event(struct wlan_objmgr_pdev *pdev,
+				  struct wlan_channel *chan,
+				  QDF_RADAR_EVENT event)
+{
+	if (!global_dfs_to_mlme.mlme_send_dfs_cfg_event)
+		return;
+
+	global_dfs_to_mlme.mlme_send_dfs_cfg_event(pdev, chan, event);
+}
