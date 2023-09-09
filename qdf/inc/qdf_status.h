@@ -133,6 +133,23 @@ typedef enum {
 	QDF_STATUS_MAX
 } QDF_STATUS;
 
+/**
+ * typedef QDF_RADAR_EVENT - QDF DFS events sent to user space.
+ * @QDF_RADAR_DETECTED: Radar detection event.
+ * @QDF_RADAR_CAC_FINISHED: CAC completion event.
+ * @QDF_RADAR_CAC_ABORTED: CAC aborted event.
+ * @QDF_RADAR_NOP_FINISHED: Non-Occupancy Period finished a.k.a NOL completed
+ * event.
+ * @QDF_RADAR_CAC_STARTED: CAC started event.
+ */
+typedef enum {
+	QDF_RADAR_DETECTED,
+	QDF_RADAR_CAC_FINISHED,
+	QDF_RADAR_CAC_ABORTED,
+	QDF_RADAR_NOP_FINISHED,
+	QDF_RADAR_CAC_STARTED,
+} QDF_RADAR_EVENT;
+
 #define QDF_IS_STATUS_SUCCESS(status) (QDF_STATUS_SUCCESS == (status))
 #define QDF_IS_STATUS_ERROR(status) (QDF_STATUS_SUCCESS != (status))
 

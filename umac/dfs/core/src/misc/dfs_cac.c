@@ -122,20 +122,21 @@ void dfs_process_cac_completion(struct wlan_dfs *dfs)
 	enum phy_ch_width ch_width = CH_WIDTH_INVALID;
 	uint16_t primary_chan_freq = 0, sec_chan_freq = 0;
 	struct dfs_channel *dfs_curchan;
+	struct wlan_channel wlan_chan = {0};
 
 	dfs->dfs_cac_timer_running = 0;
 	dfs_curchan = dfs->dfs_curchan;
 
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "cac expired, chan %d cur time %d",
-		 dfs->dfs_curchan->dfs_ch_freq,
+		 dfs_curchan->dfs_ch_freq,
 		 (qdf_system_ticks_to_msecs(qdf_system_ticks()) / 1000));
 
 	/*
 	 * When radar is detected during a CAC we are woken up prematurely to
 	 * switch to a new channel. Check the channel to decide how to act.
 	 */
-	if (WLAN_IS_CHAN_RADAR(dfs, dfs->dfs_curchan) &&
-	    !dfs_is_radar_on_punc_chan(dfs, dfs->dfs_curchan)) {
+	if (WLAN_IS_CHAN_RADAR(dfs, dfs_curchan) &&
+	    !dfs_is_radar_on_punc_chan(dfs, dfs_curchan)) {
 		dfs_mlme_mark_dfs(dfs->dfs_pdev_obj,
 				  dfs_curchan->dfs_ch_ieee,
 				  dfs_curchan->dfs_ch_freq,
@@ -180,7 +181,11 @@ void dfs_process_cac_completion(struct wlan_dfs *dfs)
 						      ch_width);
 	}
 
-	dfs_update_cac_elements(dfs, NULL, 0, dfs->dfs_curchan, WLAN_EV_CAC_COMPLETED);
+	dfs_update_cac_elements(dfs, NULL, 0, dfs_curchan, WLAN_EV_CAC_COMPLETED);
+
+	dfs_conv_dfs_channel_to_wlan_channel(dfs_curchan, &wlan_chan);
+	dfs_mlme_send_cfg80211_event(dfs->dfs_pdev_obj, &wlan_chan,
+				     QDF_RADAR_CAC_FINISHED);
 
 	dfs_clear_cac_started_chan(dfs);
 
@@ -240,10 +245,15 @@ void dfs_cac_timer_attach(struct wlan_dfs *dfs)
 
 void dfs_cac_timer_reset(struct wlan_dfs *dfs)
 {
+	struct wlan_channel wlan_chan = {0};
+
 	qdf_hrtimer_cancel(&dfs->dfs_cac_timer);
 	dfs_get_override_cac_timeout(dfs,
 			&(dfs->dfs_cac_timeout_override));
 	dfs_update_cac_elements(dfs, NULL, 0, dfs->dfs_curchan, WLAN_EV_CAC_RESET);
+	dfs_conv_dfs_channel_to_wlan_channel(dfs->dfs_curchan, &wlan_chan);
+	dfs_mlme_send_cfg80211_event(dfs->dfs_pdev_obj, &wlan_chan,
+				     QDF_RADAR_CAC_ABORTED);
 	dfs_clear_cac_started_chan(dfs);
 }
 
@@ -277,6 +287,7 @@ void dfs_start_cac_timer(struct wlan_dfs *dfs)
 {
 	int cac_timeout = 0;
 	struct dfs_channel *chan = dfs->dfs_curchan;
+	struct wlan_channel wlan_chan = {0};
 
 	cac_timeout =
 	    dfs_mlme_get_cac_timeout_for_freq(dfs->dfs_pdev_obj,
@@ -296,13 +307,21 @@ void dfs_start_cac_timer(struct wlan_dfs *dfs)
 	qdf_hrtimer_start(&dfs->dfs_cac_timer,
 			  qdf_time_ms_to_ktime(cac_timeout * 1000),
 			  QDF_HRTIMER_MODE_REL);
+	dfs_conv_dfs_channel_to_wlan_channel(chan, &wlan_chan);
+	dfs_mlme_send_cfg80211_event(dfs->dfs_pdev_obj, &wlan_chan,
+				     QDF_RADAR_CAC_STARTED);
 	dfs->dfs_cac_aborted = 0;
 }
 #endif
 
 void dfs_cancel_cac_timer(struct wlan_dfs *dfs)
 {
+	struct wlan_channel wlan_chan = {0};
+
 	qdf_hrtimer_cancel(&dfs->dfs_cac_timer);
+	dfs_conv_dfs_channel_to_wlan_channel(&dfs->dfs_cac_started_chan, &wlan_chan);
+	dfs_mlme_send_cfg80211_event(dfs->dfs_pdev_obj, &wlan_chan,
+				     QDF_RADAR_CAC_ABORTED);
 	dfs_update_cac_elements(dfs, NULL, 0, dfs->dfs_curchan, WLAN_EV_CAC_RESET);
 	dfs_clear_cac_started_chan(dfs);
 }
@@ -337,6 +356,7 @@ void dfs_cac_stop(struct wlan_dfs *dfs)
 {
 	uint32_t phyerr;
 	struct dfs_channel *chan;
+	struct wlan_channel wlan_chan = {0};
 
 	chan = &dfs->dfs_cac_started_chan;
 	dfs_get_debug_info(dfs, (void *)&phyerr);
@@ -350,6 +370,9 @@ void dfs_cac_stop(struct wlan_dfs *dfs)
 
 	if (dfs->dfs_cac_timer_running)
 		dfs->dfs_cac_aborted = 1;
+	dfs_conv_dfs_channel_to_wlan_channel(chan, &wlan_chan);
+	dfs_mlme_send_cfg80211_event(dfs->dfs_pdev_obj, &wlan_chan,
+				     QDF_RADAR_CAC_ABORTED);
 	dfs_clear_cac_started_chan(dfs);
 	dfs->dfs_cac_timer_running = 0;
 }
