@@ -1672,12 +1672,12 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 static void
 cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_objmgr_peer *peer;
 	struct wlan_crypto_key *crypto_key;
 	enum QDF_OPMODE op_mode;
 	uint16_t i;
 	bool pairwise;
 	uint8_t vdev_id;
+	uint8_t link_id;
 	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
 				 WLAN_CRYPTO_MAXIGTKKEYIDX +
 				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
@@ -1691,9 +1691,11 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		return;
 
-	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLME_CM_ID);
-	if (!peer) {
-		mlo_err("Peer is null return");
+	link_id = wlan_vdev_get_link_id(vdev);
+
+	if (!mlo_is_set_key_defered(vdev, link_id) &&
+	    !mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlme_debug("keys are not deferred for link_id %d", link_id);
 		return;
 	}
 
@@ -1703,13 +1705,12 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 			continue;
 
 		pairwise = crypto_key->key_type ? WLAN_CRYPTO_KEY_TYPE_UNICAST : WLAN_CRYPTO_KEY_TYPE_GROUP;
-		mlo_debug("MLO:send keys for vdev_id %d, key_idx %d, pairwise %d",
-			  vdev_id, i, pairwise);
+		mlo_debug("MLO:send keys for vdev_id %d link_id %d , key_idx %d, pairwise %d",
+			  vdev_id, link_id, i, pairwise);
 		mlme_cm_osif_send_keys(vdev, i, pairwise,
 				       crypto_key->cipher_type);
 	}
-
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
+	mlo_defer_set_keys(vdev, link_id, false);
 }
 
 QDF_STATUS

@@ -23107,18 +23107,23 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 			    struct wlan_objmgr_vdev *vdev,
 			    struct qdf_mac_addr *mac_address)
 {
+	uint8_t link_id;
+
 	if (!adapter)
 		return false;
 
-	if (!vdev)
+	if (!vdev || !vdev->mlo_dev_ctx)
 		return false;
+
+	link_id = wlan_vdev_get_link_id(vdev);
 
 	if ((adapter->device_mode == QDF_STA_MODE) &&
 	    ((!wlan_cm_is_vdev_connected(vdev)) ||
 	    (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
 	     mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
 					       wlan_vdev_get_id(vdev))))) {
-		hdd_debug("MLO:Defer set keys for vdev %d", wlan_vdev_get_id(vdev));
+		hdd_debug("MLO:Defer set keys for link_id %d", link_id);
+		mlo_defer_set_keys(vdev, link_id, true);
 		return true;
 	}
 
@@ -23536,6 +23541,8 @@ static int wlan_add_key_standby_link(struct hdd_adapter *adapter,
 			params,
 			&mlo_link_info->link_addr,
 			link_id);
+	hdd_debug("ml defer set key link id %d", link_id);
+	mlo_defer_set_keys(vdev, link_id, true);
 	return errno;
 }
 
