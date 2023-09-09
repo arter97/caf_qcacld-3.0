@@ -742,5 +742,33 @@ void dfs_get_cac_nol_time(struct wlan_dfs *dfs, int8_t index,
 
 	*cac_comp_time = dfs_cacelems->cac_completed_time;
 }
-
 #endif
+
+#ifdef WLAN_FEATURE_11BE
+static inline void
+dfs_copy_punc_pattern_to_wlan_chan(struct dfs_channel *chan,
+				   struct wlan_channel *wlan_chan)
+{
+	wlan_chan->puncture_bitmap = chan->dfs_ch_punc_pattern;
+}
+#else
+static inline void
+dfs_copy_punc_pattern_to_wlan_chan(struct dfs_channel *chan,
+				   struct wlan_channel *wlan_chan)
+{
+}
+#endif
+
+void dfs_conv_dfs_channel_to_wlan_channel(struct dfs_channel *chan,
+					  struct wlan_channel *wlan_chan)
+{
+	wlan_chan->ch_freq      = chan->dfs_ch_freq;
+	wlan_chan->ch_flags     = chan->dfs_ch_flags;
+	wlan_chan->ch_flagext   = chan->dfs_ch_flagext;
+	wlan_chan->ch_ieee      = chan->dfs_ch_ieee;
+	wlan_chan->ch_freq_seg1 = chan->dfs_ch_vhtop_ch_freq_seg1;
+	wlan_chan->ch_freq_seg2 = chan->dfs_ch_vhtop_ch_freq_seg2;
+	wlan_chan->ch_cfreq1    = chan->dfs_ch_mhz_freq_seg1;
+	wlan_chan->ch_cfreq2    = chan->dfs_ch_mhz_freq_seg2;
+	dfs_copy_punc_pattern_to_wlan_chan(chan, wlan_chan);
+}
