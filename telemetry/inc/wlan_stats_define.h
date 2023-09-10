@@ -560,7 +560,7 @@ struct stats_if_sawf_fw_mpdu_stats {
 };
 
 struct stats_if_pkt_info {
-	uint32_t num;
+	uint64_t num;
 	uint64_t bytes;
 };
 
