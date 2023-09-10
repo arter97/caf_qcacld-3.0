@@ -10403,9 +10403,9 @@ static inline
 void dp_get_peer_tx_per(struct cdp_peer_stats *peer_stats)
 {
 	if (peer_stats->tx.tx_success.num + peer_stats->tx.retries > 0)
-		peer_stats->tx.per = (peer_stats->tx.retries * 100) /
+		peer_stats->tx.per = qdf_do_div((peer_stats->tx.retries * 100),
 				  (peer_stats->tx.tx_success.num +
-				   peer_stats->tx.retries);
+				   peer_stats->tx.retries));
 	else
 		peer_stats->tx.per = 0;
 }
@@ -12130,7 +12130,7 @@ static int dp_get_total_per(struct cdp_soc_t *soc, uint8_t pdev_id)
 	dp_aggregate_pdev_stats(pdev);
 	if ((pdev->stats.tx.tx_success.num + pdev->stats.tx.retries) == 0)
 		return 0;
-	return ((pdev->stats.tx.retries * 100) /
+	return qdf_do_div((pdev->stats.tx.retries * 100),
 		((pdev->stats.tx.tx_success.num) + (pdev->stats.tx.retries)));
 }
 
