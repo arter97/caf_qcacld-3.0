@@ -12187,8 +12187,10 @@ dp_txrx_stats_publish(struct cdp_soc_t *soc, uint8_t pdev_id,
 	if (!pdev)
 		return TXRX_STATS_LEVEL_OFF;
 
-	if (pdev->pending_fw_stats_response)
+	if (pdev->pending_fw_stats_response) {
+		dp_warn("pdev%d: prev req pending\n", pdev->pdev_id);
 		return TXRX_STATS_LEVEL_OFF;
+	}
 
 	dp_aggregate_pdev_stats(pdev);
 
@@ -12197,25 +12199,43 @@ dp_txrx_stats_publish(struct cdp_soc_t *soc, uint8_t pdev_id,
 	req.cookie_val = DBG_STATS_COOKIE_DP_STATS;
 	pdev->fw_stats_tlv_bitmap_rcvd = 0;
 	qdf_event_reset(&pdev->fw_stats_event);
-	dp_h2t_ext_stats_msg_send(pdev, req.stats, req.param0,
-				req.param1, req.param2, req.param3, 0,
-				req.cookie_val, 0);
-
-	req.stats = (enum cdp_stats)HTT_DBG_EXT_STATS_PDEV_RX;
-	req.cookie_val = DBG_STATS_COOKIE_DP_STATS;
-	dp_h2t_ext_stats_msg_send(pdev, req.stats, req.param0,
-				req.param1, req.param2, req.param3, 0,
-				req.cookie_val, 0);
-
-	status =
-		qdf_wait_single_event(&pdev->fw_stats_event, DP_MAX_SLEEP_TIME);
+	status = dp_h2t_ext_stats_msg_send(pdev, req.stats, req.param0,
+					   req.param1, req.param2, req.param3, 0,
+					   req.cookie_val, 0);
 
 	if (status != QDF_STATUS_SUCCESS) {
-		if (status == QDF_STATUS_E_TIMEOUT)
-			qdf_debug("TIMEOUT_OCCURS");
+		dp_warn("pdev%d: tx stats req failed\n", pdev->pdev_id);
 		pdev->pending_fw_stats_response = false;
 		return TXRX_STATS_LEVEL_OFF;
 	}
+
+	req.stats = (enum cdp_stats)HTT_DBG_EXT_STATS_PDEV_RX;
+	req.cookie_val = DBG_STATS_COOKIE_DP_STATS;
+	status = dp_h2t_ext_stats_msg_send(pdev, req.stats, req.param0,
+					   req.param1, req.param2, req.param3, 0,
+					   req.cookie_val, 0);
+	if (status != QDF_STATUS_SUCCESS) {
+		dp_warn("pdev%d: rx stats req failed\n", pdev->pdev_id);
+		pdev->pending_fw_stats_response = false;
+		return TXRX_STATS_LEVEL_OFF;
+	}
+
+	/* The event may have already been signaled. Wait only if it's pending */
+	if (!pdev->fw_stats_event.done) {
+		status =
+			qdf_wait_single_event(&pdev->fw_stats_event,
+					      DP_MAX_SLEEP_TIME);
+
+		if (status != QDF_STATUS_SUCCESS) {
+			if (status == QDF_STATUS_E_TIMEOUT)
+				dp_warn("pdev%d: fw stats timeout. TLVs rcvd 0x%llx\n",
+					     pdev->pdev_id,
+					     pdev->fw_stats_tlv_bitmap_rcvd);
+			pdev->pending_fw_stats_response = false;
+			return TXRX_STATS_LEVEL_OFF;
+		}
+	}
+
 	qdf_mem_copy(buf, &pdev->stats, sizeof(struct cdp_pdev_stats));
 	pdev->pending_fw_stats_response = false;
 
