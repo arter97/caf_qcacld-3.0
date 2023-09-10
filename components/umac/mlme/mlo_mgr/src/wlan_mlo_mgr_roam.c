@@ -55,7 +55,8 @@ mlo_check_connect_req_bmap(struct wlan_objmgr_vdev *vdev)
 			return qdf_test_bit(i, sta_ctx->wlan_connect_req_links);
 	}
 
-	mlo_err("vdev not found in ml dev ctx list");
+	mlo_err("vdev:%d not found in ml dev ctx list", wlan_vdev_get_id(vdev));
+
 	return false;
 }
 
@@ -122,7 +123,7 @@ mlo_update_vdev_after_roam(struct wlan_objmgr_psoc *psoc,
 						    vdev_id,
 						    WLAN_MLME_SB_ID);
 	if (!vdev) {
-		mlo_err("VDEV is null");
+		mlo_err("VDEV:%d is null", vdev_id);
 		return;
 	}
 
@@ -265,7 +266,8 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlo_debug("MLO_ROAM: Roamed to single link MLO");
 		mlo_set_single_link_ml_roaming(psoc, vdev_id, true);
 	} else {
-		mlo_debug("MLO_ROAM: Roamed to MLO");
+		mlo_debug("MLO_ROAM: Roamed to MLO with %d links",
+			  sync_ind->num_setup_links);
 		mlo_set_single_link_ml_roaming(psoc, vdev_id, false);
 	}
 
@@ -319,12 +321,16 @@ QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 		if (vdev_id == sync_ind->ml_link[i].vdev_id)
 			continue;
 
+		/* Standby Link */
+		if (sync_ind->ml_link[i].vdev_id == WLAN_INVALID_VDEV_ID)
+			continue;
+
 		link_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
 								 sync_ind->ml_link[i].vdev_id,
 								 WLAN_MLME_SB_ID);
-
 		if (!link_vdev) {
-			mlo_err("Link vdev is null");
+			mlo_err("Link vdev:%d is null",
+				sync_ind->ml_link[i].vdev_id);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -553,7 +559,7 @@ QDF_STATUS mlo_enable_rso(struct wlan_objmgr_pdev *pdev,
 void
 mlo_roam_copy_partner_info(struct mlo_partner_info *partner_info,
 			   struct roam_offload_synch_ind *sync_ind,
-			   uint8_t skip_vdev_id)
+			   uint8_t skip_vdev_id, bool fill_all_links)
 {
 	uint8_t i, j;
 	struct mlo_link_info *link;
@@ -562,8 +568,10 @@ mlo_roam_copy_partner_info(struct mlo_partner_info *partner_info,
 		return;
 
 	for (i = 0, j = 0; i < sync_ind->num_setup_links; i++) {
-		if (sync_ind->ml_link[i].vdev_id == skip_vdev_id)
+		if (!fill_all_links &&
+		    sync_ind->ml_link[i].vdev_id == skip_vdev_id)
 			continue;
+
 		link = &partner_info->partner_link_info[j];
 		link->link_id = sync_ind->ml_link[i].link_id;
 		link->vdev_id = sync_ind->ml_link[i].vdev_id;
@@ -577,7 +585,9 @@ mlo_roam_copy_partner_info(struct mlo_partner_info *partner_info,
 		j++;
 	}
 	partner_info->num_partner_links = j;
-	mlo_debug("num_setup_links %d", partner_info->num_partner_links);
+	mlo_debug("vdev_to_skip:%d num_setup_links %d fill_all_links:%d",
+		  skip_vdev_id, partner_info->num_partner_links,
+		  fill_all_links);
 }
 
 void mlo_roam_init_cu_bpcc(struct wlan_objmgr_vdev *vdev,

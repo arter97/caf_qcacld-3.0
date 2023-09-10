@@ -385,8 +385,13 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 
 	cur_freq = pm_conc_connection_list[conn_index].freq;
 
-	mode = policy_mgr_get_mode(conn_table_entry.type,
-					conn_table_entry.sub_type);
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(
+					psoc,
+					wlan_get_opmode_from_vdev_id(
+								pm_ctx->pdev,
+								vdev_id),
+					vdev_id);
+
 	ch_freq = conn_table_entry.mhz;
 	status = policy_mgr_get_nss_for_vdev(psoc, mode, &nss_2g, &nss_5g);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -1535,8 +1540,7 @@ static bool policy_mgr_is_sap_go_existed(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t ap_present, go_present;
 
-	ap_present = policy_mgr_mode_specific_connection_count(
-				psoc, PM_SAP_MODE, NULL);
+	ap_present = policy_mgr_get_sap_mode_count(psoc, NULL);
 	if (ap_present)
 		return true;
 
@@ -1579,6 +1583,22 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return is_safe;
+}
+
+bool policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	unsigned long restriction_mask;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return false;
+	}
+
+	restriction_mask =
+		(unsigned long)policy_mgr_get_freq_restriction_mask(pm_ctx);
+	return qdf_test_bit(QDF_SAP_MODE, &restriction_mask);
 }
 #else
 bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
@@ -1730,8 +1750,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		}
 
 		if ((is_acs_mode ||
-		     !target_psoc_get_sap_coex_fixed_chan_cap(
-					wlan_psoc_get_tgt_if_handle(psoc))) &&
+		     policy_mgr_restrict_sap_on_unsafe_chan(psoc)) &&
 		    sta_sap_scc_on_lte_coex_chan &&
 		    !policy_mgr_is_safe_channel(psoc, op_ch_freq_list[i]) &&
 		    pm_ctx->last_disconn_sta_freq == op_ch_freq_list[i]) {
@@ -1948,7 +1967,7 @@ policy_mgr_nan_sap_pre_enable_conc_check(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	if (!(mode == PM_SAP_MODE || mode == PM_NAN_DISC_MODE)) {
+	if (!policy_mgr_is_sap_mode(mode) || mode == PM_NAN_DISC_MODE) {
 		policy_mgr_debug("Not NAN or SAP mode");
 		return true;
 	}
@@ -1972,6 +1991,13 @@ policy_mgr_nan_sap_pre_enable_conc_check(struct wlan_objmgr_psoc *psoc,
 		sap_freq = policy_mgr_mode_specific_get_channel(pm_ctx->psoc,
 								PM_SAP_MODE);
 		policy_mgr_debug("FREQ SAP: %d NAN: %d", sap_freq, ch_freq);
+		if (!sap_freq) {
+			sap_freq = policy_mgr_mode_specific_get_channel(
+							pm_ctx->psoc,
+							PM_LL_LT_SAP_MODE);
+			policy_mgr_debug("FREQ LL_LT_SAP: %d NAN: %d",
+					 sap_freq, ch_freq);
+		}
 		if (ucfg_is_nan_dbs_supported(pm_ctx->psoc) &&
 		    !WLAN_REG_IS_SAME_BAND_FREQS(sap_freq, ch_freq))
 			return true;
@@ -1990,7 +2016,7 @@ policy_mgr_nan_sap_pre_enable_conc_check(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_debug("NAN+SAP unsafe ch SCC disabled");
 			return false;
 		}
-	} else if (mode == PM_SAP_MODE) {
+	} else if (policy_mgr_is_sap_mode(mode)) {
 		nan_2g_freq =
 			policy_mgr_mode_specific_get_channel(pm_ctx->psoc,
 							     PM_NAN_DISC_MODE);
@@ -2048,7 +2074,7 @@ policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		if (pm_conc_connection_list[i].mode == PM_SAP_MODE &&
+		if (policy_mgr_is_sap_mode(pm_conc_connection_list[i].mode) &&
 		    pm_conc_connection_list[i].in_use) {
 			sap_info = &pm_conc_connection_list[i];
 			break;
@@ -2556,9 +2582,10 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 	if (!policy_mgr_is_sap_go_existed(pm_ctx->psoc))
 		goto end;
 
-	cc_count = policy_mgr_get_mode_specific_conn_info(
-				pm_ctx->psoc, &op_ch_freq_list[cc_count],
-				&vdev_id[cc_count], PM_SAP_MODE);
+	cc_count = policy_mgr_get_sap_mode_info(pm_ctx->psoc,
+						&op_ch_freq_list[cc_count],
+						&vdev_id[cc_count]);
+
 	policy_mgr_debug("Number of concurrent SAP: %d", cc_count);
 	if (cc_count < MAX_NUMBER_OF_CONC_CONNECTIONS)
 		cc_count = cc_count +

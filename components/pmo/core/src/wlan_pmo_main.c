@@ -281,6 +281,8 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 	psoc_cfg->enable_sap_suspend = cfg_get(psoc, CFG_ENABLE_SAP_SUSPEND);
 	psoc_cfg->wow_data_inactivity_timeout =
 			cfg_get(psoc, CFG_PMO_WOW_DATA_INACTIVITY_TIMEOUT);
+	psoc_cfg->wow_spec_wake_interval =
+			cfg_get(psoc, CFG_PMO_WOW_SPEC_WAKE_INTERVAL);
 	psoc_cfg->active_uc_apf_mode =
 			cfg_get(psoc, CFG_ACTIVE_UC_APF_MODE);
 	psoc_cfg->active_mc_bc_apf_mode =
@@ -571,6 +573,24 @@ QDF_STATUS pmo_set_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
 
 	vdev_ctx = pmo_vdev_get_priv(vdev);
 	qdf_mem_copy(vdev_ctx->bridgeaddr, bridgeaddr->bytes, QDF_MAC_ADDR_SIZE);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS pmo_core_get_listen_interval(struct wlan_objmgr_vdev *vdev,
+					uint32_t *listen_interval)
+{
+	struct pmo_vdev_priv_obj *vdev_ctx;
+
+	if (!vdev || !listen_interval) {
+		pmo_err("vdev NULL or NULL ptr");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev_ctx = pmo_vdev_get_priv(vdev);
+	qdf_spin_lock_bh(&vdev_ctx->pmo_vdev_lock);
+	*listen_interval = vdev_ctx->dyn_listen_interval;
+	qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
 
 	return QDF_STATUS_SUCCESS;
 }

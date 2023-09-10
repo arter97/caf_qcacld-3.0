@@ -46,3 +46,17 @@ void wlan_dp_set_fst_in_cmem(bool fst_in_cmem)
 {
 	dp_set_fst_in_cmem(fst_in_cmem);
 }
+
+void wlan_dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support)
+{
+	dp_set_fisa_dynamic_aggr_size_support(dynamic_aggr_size_support);
+}
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+bool wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+}
+#endif

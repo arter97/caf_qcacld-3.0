@@ -59,6 +59,7 @@
 #include "wlan_epcs_api.h"
 #include <wlan_mlo_t2lm.h>
 #endif
+#include "wlan_mlo_mgr_link_switch.h"
 
 #define RSN_OUI_SIZE 4
 /* ////////////////////////////////////////////////////////////////////// */
@@ -2924,10 +2925,8 @@ sir_convert_probe_frame2_t2lm_struct(tDot11fProbeResponse *pr,
 		     sizeof(struct wlan_t2lm_info));
 	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
 
-	if (!pr->num_t2lm_ie) {
-		pe_debug("T2LM IEs not present");
+	if (!pr->num_t2lm_ie)
 		return status;
-	}
 
 	pe_debug("Number of T2LM IEs in probe rsp %d", pr->num_t2lm_ie);
 	for (i = 0; i < pr->num_t2lm_ie; i++) {
@@ -3755,6 +3754,34 @@ sir_convert_assoc_resp_frame2_eht_struct(tDot11fAssocResponse *ar,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static QDF_STATUS
+sir_convert_assoc_resp_to_partner_mlo_struct(struct pe_session *session_entry,
+					     struct mlo_partner_info *partner_info,
+					     struct mlo_partner_info *ml_partner_info)
+{
+	uint16_t i, partner_idx = 0, j, link_id;
+	struct mlo_link_info *link_info;
+
+	link_info = mlo_mgr_get_ap_link(session_entry->vdev);
+	if (!link_info)
+		return QDF_STATUS_E_FAILURE;
+
+	for (i = 1; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_id = link_info[i].link_id;
+		for (j = 0; j < partner_info->num_partner_links; j++) {
+			if (partner_info->partner_link_info[j].link_id == link_id) {
+				ml_partner_info->partner_link_info[partner_idx++] =
+							partner_info->partner_link_info[j];
+				break;
+			}
+		}
+	}
+
+	ml_partner_info->num_partner_links = partner_idx;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
 sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 					 uint8_t *frame,
 					 uint32_t frame_len,
@@ -3772,6 +3799,7 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 	uint16_t msd_cap;
 	struct qdf_mac_addr mld_mac_addr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mlo_partner_info partner_info;
 
 	if (ar->mlo_ie.present) {
 		status = util_find_mlie(frame + WLAN_ASSOC_RSP_IES_OFFSET,
@@ -3781,7 +3809,10 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 			ml_ie_info = &p_assoc_rsp->mlo_ie.mlo_ie;
 			util_get_bvmlie_persta_partner_info(ml_ie,
 					       ml_ie_total_len,
-					       &session_entry->ml_partner_info);
+					       &partner_info);
+			sir_convert_assoc_resp_to_partner_mlo_struct(session_entry,
+								     &partner_info,
+								     &session_entry->ml_partner_info);
 			if (!wlan_cm_is_roam_sync_in_progress(mac->psoc, session_entry->vdev_id)) {
 				session_entry->ml_partner_info.num_partner_links =
 				QDF_MIN(
@@ -3835,7 +3866,7 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 			}
 
 			ml_ie_info->num_sta_profile =
-			       session_entry->ml_partner_info.num_partner_links;
+			      session_entry->ml_partner_info.num_partner_links;
 			ml_ie_info->link_id_info_present = link_id_found;
 			ml_ie_info->link_id = link_id;
 			pe_debug("Partner link count: %d, Link id: %d, MLD mac addr: " QDF_MAC_ADDR_FMT,
@@ -3884,7 +3915,7 @@ sir_convert_assoc_resp_frame2_t2lm_struct(struct mac_context *mac,
 		ie[TAG_LEN_POS] = ar->t2lm_ie[i].num_data + 1;
 		ie[IDEXT_POS] = WLAN_EXTN_ELEMID_T2LM;
 		qdf_mem_copy(&ie[3], &ar->t2lm_ie[i].data[0],
-			     ar->t2lm_ie[i].num_data + 3);
+			     ar->t2lm_ie[i].num_data);
 		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   &ie[0], ar->t2lm_ie[i].num_data + 3);
 		status = wlan_mlo_parse_t2lm_info(&ie[0], &t2lm);
@@ -5207,7 +5238,7 @@ sir_convert_beacon_frame2_t2lm_struct(tDot11fBeacon *bcn_frm,
 		ie[TAG_LEN_POS] = bcn_frm->t2lm_ie[i].num_data + 1;
 		ie[IDEXT_POS] = WLAN_EXTN_ELEMID_T2LM;
 		qdf_mem_copy(&ie[3], &bcn_frm->t2lm_ie[i].data[0],
-			     bcn_frm->t2lm_ie[i].num_data + 3);
+			     bcn_frm->t2lm_ie[i].num_data);
 		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   &ie[0], bcn_frm->t2lm_ie[i].num_data + 3);
 		status = wlan_mlo_parse_t2lm_info(&ie[0], &t2lm);
@@ -7026,6 +7057,186 @@ QDF_STATUS populate_dot11f_wfatpc(struct mac_context *mac,
 	pDot11f->txPower = txPower;
 	pDot11f->linkMargin = linkMargin;
 	pDot11f->present = 1;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void
+populate_dot11f_chan_load_report(struct mac_context *mac,
+				 tDot11fIEMeasurementReport *dot11f,
+				 struct chan_load_report *channel_load_report)
+{
+	dot11f->report.channel_load_report.op_class =
+					channel_load_report->op_class;
+	dot11f->report.channel_load_report.channel =
+					channel_load_report->channel;
+	qdf_mem_copy(dot11f->report.channel_load_report.meas_start_time,
+		&channel_load_report->rrm_scan_tsf,
+		sizeof(dot11f->report.channel_load_report.meas_start_time));
+	dot11f->report.channel_load_report.meas_duration =
+				channel_load_report->meas_duration;
+	dot11f->report.channel_load_report.chan_load =
+				channel_load_report->chan_load;
+
+	pe_debug("regClass %d chan %d meas_time %d meas_dur %d, chan_load %d",
+		 dot11f->report.channel_load_report.op_class,
+		 dot11f->report.channel_load_report.channel,
+		 channel_load_report->rrm_scan_tsf,
+		 dot11f->report.channel_load_report.meas_duration,
+		 dot11f->report.channel_load_report.chan_load);
+}
+
+static void
+populate_dot11f_rrm_counter_stats(tDot11fIEMeasurementReport *pdot11f,
+				  struct counter_stats *counter_stats,
+				  bool *reporting_reason_present)
+{
+	tDot11fIEreporting_reason *reporting_reason;
+
+	reporting_reason = &pdot11f->report.sta_stats.reporting_reason;
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.transmitted_fragment_count =
+		counter_stats->transmitted_fragment_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.group_transmitted_frame_count =
+		counter_stats->group_transmitted_frame_count;
+
+	if (counter_stats->failed_count) {
+		reporting_reason->failed_count = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.failed_count =
+			counter_stats->failed_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.received_fragment_count =
+		counter_stats->received_fragment_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.group_received_frame_count =
+		counter_stats->group_received_frame_count;
+
+	if (counter_stats->fcs_error_count) {
+		reporting_reason->fcs_error = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.fcs_error_count =
+			counter_stats->fcs_error_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.transmitted_frame_count =
+			counter_stats->transmitted_frame_count;
+}
+
+static void
+populate_dot11f_rrm_mac_stats(tDot11fIEMeasurementReport *pdot11f,
+			      struct mac_stats *mac_stats,
+			      bool *reporting_reason_present)
+{
+	tDot11fIEreporting_reason *reporting_reason;
+
+	reporting_reason = &pdot11f->report.sta_stats.reporting_reason;
+	if (mac_stats->retry_count) {
+		reporting_reason->retry = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.retry_count =
+			mac_stats->retry_count;
+
+	if (mac_stats->multiple_retry_count) {
+		reporting_reason->multiple_retry = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.multiple_retry_count =
+			mac_stats->multiple_retry_count;
+
+	if (mac_stats->frame_duplicate_count) {
+		reporting_reason->frame_duplicate = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.frame_duplicate_count =
+			mac_stats->frame_duplicate_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.rts_success_count =
+			mac_stats->rts_success_count;
+
+	if (mac_stats->rts_failure_count) {
+		reporting_reason->rts_failure = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.rts_failure_count =
+			mac_stats->rts_failure_count;
+
+	if (mac_stats->ack_failure_count) {
+		reporting_reason->ack_failure = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.ack_failure_count =
+			mac_stats->ack_failure_count;
+}
+
+static void
+populate_dot11f_rrm_access_delay_stats(
+				tDot11fIEMeasurementReport *pdot11f,
+				struct access_delay_stats *access_delay_stats)
+{
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.ap_average_access_delay =
+		access_delay_stats->ap_average_access_delay;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_besteffort =
+		access_delay_stats->average_access_delay_besteffort;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_background =
+		access_delay_stats->average_access_delay_background;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_video =
+		access_delay_stats->average_access_delay_video;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_voice =
+		access_delay_stats->average_access_delay_voice;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.station_count =
+		access_delay_stats->station_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.channel_utilization =
+		access_delay_stats->channel_utilization;
+}
+
+QDF_STATUS
+populate_dot11f_rrm_sta_stats_report(
+		struct mac_context *mac, tDot11fIEMeasurementReport *pdot11f,
+		struct statistics_report *statistics_report)
+{
+	struct counter_stats counter_stats;
+	struct mac_stats mac_stats;
+	struct access_delay_stats access_delay_stats;
+	bool reporting_reason_present = false;
+
+	counter_stats = statistics_report->group_stats.counter_stats;
+	mac_stats = statistics_report->group_stats.mac_stats;
+	access_delay_stats = statistics_report->group_stats.access_delay_stats;
+
+	pdot11f->report.sta_stats.meas_duration =
+					statistics_report->meas_duration;
+	pdot11f->report.sta_stats.group_id = statistics_report->group_id;
+	pdot11f->report.sta_stats.reporting_reason.present = 0;
+
+	switch (statistics_report->group_id) {
+	case STA_STAT_GROUP_ID_COUNTER_STATS:
+		populate_dot11f_rrm_counter_stats(pdot11f, &counter_stats,
+						  &reporting_reason_present);
+		break;
+	case STA_STAT_GROUP_ID_MAC_STATS:
+		populate_dot11f_rrm_mac_stats(pdot11f, &mac_stats,
+					      &reporting_reason_present);
+		break;
+	case STA_STAT_GROUP_ID_DELAY_STATS:
+		populate_dot11f_rrm_access_delay_stats(pdot11f,
+						       &access_delay_stats);
+		break;
+	default:
+		pe_err("group id not supported %d",
+		       statistics_report->group_id);
+		return QDF_STATUS_SUCCESS;
+	}
+	if (reporting_reason_present)
+		pdot11f->report.sta_stats.reporting_reason.present = 1;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -11607,7 +11818,8 @@ QDF_STATUS populate_dot11f_auth_mlo_ie(struct mac_context *mac_ctx,
 	qdf_mem_copy(&mlo_ie->mld_mac_addr, mld_addr, QDF_MAC_ADDR_SIZE);
 	mlo_ie->common_info_length += QDF_MAC_ADDR_SIZE;
 
-	pe_debug("MLD mac addr: " QDF_MAC_ADDR_FMT, mld_addr);
+	pe_debug("MLD mac addr: " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(mld_addr->bytes));
 
 	mlo_ie->link_id_info_present = 0;
 	mlo_ie->bss_param_change_cnt_present = 0;
@@ -11656,7 +11868,6 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	struct mlo_partner_info *partner_info;
 	struct qdf_mac_addr *mld_addr;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	struct wlan_objmgr_vdev *vdev = NULL;
 	tSirMacRateSet b_rates;
 	tSirMacRateSet e_rates;
 	uint8_t non_inher_len;
@@ -11843,19 +12054,20 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	for (link = 0;
 	     link < total_sta_prof && total_sta_prof != num_sta_prof;
 	     link++) {
+		struct mlo_link_info *ml_link_info;
+
 		if (!partner_info->num_partner_links)
 			continue;
-
-		vdev = mlo_dev_ctx->wlan_vdev_list[1];
-		if (!vdev) {
-			pe_err("vdev is null");
-			return QDF_STATUS_E_NULL_VALUE;
-		}
 
 		sta_prof = &mlo_ie->sta_profile[num_sta_prof];
 		link_info = &partner_info->partner_link_info[link];
 		p_sta_prof = sta_prof->data;
 		len_remaining = sizeof(sta_prof->data);
+		ml_link_info =
+			mlo_mgr_get_ap_link_by_link_id(pe_session->vdev,
+						       link_info->link_id);
+		if (!ml_link_info)
+			continue;
 
 		/* subelement ID 0, length(sta_prof->num_data - 2) */
 		*p_sta_prof++ = WLAN_ML_LINFO_SUBELEMID_PERSTAPROFILE;
@@ -11895,13 +12107,13 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 			WLAN_ML_BV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE;
 
 		/* Copying sta mac address in sta info field */
-		qdf_mem_copy(p_sta_prof, vdev->vdev_mlme.macaddr,
+		qdf_mem_copy(p_sta_prof, ml_link_info->link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 		p_sta_prof += QDF_MAC_ADDR_SIZE;
 		len_remaining -= QDF_MAC_ADDR_SIZE;
 
 		pe_debug("Sta profile mac: " QDF_MAC_ADDR_FMT,
-			 vdev->vdev_mlme.macaddr);
+			 QDF_MAC_ADDR_REF(ml_link_info->link_addr.bytes));
 
 		/* TBD : populate beacon_interval, dtim_info
 		 * nstr_link_pair_present, nstr_bitmap_size

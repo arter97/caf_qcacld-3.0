@@ -145,7 +145,7 @@ static QDF_STATUS dp_rx_dump_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 				 tuple_str,
 				 sizeof(tuple_str));
 
-		dp_info("Flow[%d][%s][%s] ring %d msdu-aggr %d flushes %d bytes-agg %llu avg-bytes-aggr %llu",
+		dp_info("Flow[%d][%s][%s] ring %d msdu-aggr %d flushes %d bytes-agg %llu avg-bytes-aggr %llu same_mld_vdev_mismatch %llu",
 			sw_ft_entry->flow_id,
 			sw_ft_entry->is_flow_udp ? "udp" : "tcp",
 			tuple_str,
@@ -154,7 +154,8 @@ static QDF_STATUS dp_rx_dump_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 			sw_ft_entry->flush_count,
 			sw_ft_entry->bytes_aggregated,
 			qdf_do_div(sw_ft_entry->bytes_aggregated,
-				   sw_ft_entry->flush_count));
+				   sw_ft_entry->flush_count),
+			sw_ft_entry->same_mld_vdev_mismatch);
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -713,6 +714,20 @@ QDF_STATUS dp_rx_fst_target_config(struct wlan_dp_psoc_context *dp_ctx)
 	return status;
 }
 
+static uint8_t
+dp_rx_fisa_get_max_aggr_supported(struct wlan_dp_psoc_context *dp_ctx)
+{
+	if (!dp_ctx->fisa_dynamic_aggr_size_support)
+		return DP_RX_FISA_MAX_AGGR_COUNT_DEFAULT;
+
+	switch (hal_get_target_type(dp_ctx->hal_soc)) {
+	case TARGET_TYPE_WCN6450:
+		return DP_RX_FISA_MAX_AGGR_COUNT_1;
+	default:
+		return DP_RX_FISA_MAX_AGGR_COUNT_DEFAULT;
+	}
+}
+
 #define FISA_MAX_TIMEOUT 0xffffffff
 #define FISA_DISABLE_TIMEOUT 0
 QDF_STATUS dp_rx_fisa_config(struct wlan_dp_psoc_context *dp_ctx)
@@ -722,6 +737,8 @@ QDF_STATUS dp_rx_fisa_config(struct wlan_dp_psoc_context *dp_ctx)
 
 	fisa_config.pdev_id = 0;
 	fisa_config.fisa_timeout = FISA_MAX_TIMEOUT;
+	fisa_config.max_aggr_supported =
+		dp_rx_fisa_get_max_aggr_supported(dp_ctx);
 
 	cfg.fisa_config = &fisa_config;
 

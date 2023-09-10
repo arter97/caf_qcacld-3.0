@@ -165,36 +165,39 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 	hdd_place_marker(adapter, "DISCONNECTED", NULL);
 }
 
-void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
-						  struct wlan_objmgr_vdev *vdev)
+void
+__hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_info,
+					     struct wlan_objmgr_vdev *vdev)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx;
 	mac_handle_t mac_handle;
 	struct hdd_adapter *link_adapter;
 	struct hdd_station_ctx *link_sta_ctx;
+	bool is_link_switch =
+			wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
 
 	mac_handle = hdd_ctx->mac_handle;
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	/* update P2P connection status */
 	ucfg_p2p_status_disconnect(vdev);
-	hdd_cfr_disconnect(adapter->deflink->vdev);
+	hdd_cfr_disconnect(vdev);
 
 	hdd_wmm_adapter_clear(adapter);
 	ucfg_cm_ft_reset(vdev);
-	ucfg_cm_reset_key(hdd_ctx->pdev, adapter->deflink->vdev_id);
+	ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
 	hdd_clear_roam_profile_ie(adapter);
 
 	if (adapter->device_mode == QDF_STA_MODE)
 		wlan_crypto_reset_vdev_params(vdev);
 
 	hdd_remove_beacon_filter(adapter);
-	if (sme_is_beacon_report_started(mac_handle,
-					 adapter->deflink->vdev_id)) {
+	if (sme_is_beacon_report_started(mac_handle, link_info->vdev_id)) {
 		hdd_debug("Sending beacon pause indication to userspace");
 		hdd_beacon_recv_pause_indication((hdd_handle_t)hdd_ctx,
-						 adapter->deflink->vdev_id,
+						 link_info->vdev_id,
 						 SCAN_EVENT_TYPE_MAX, true);
 	}
 
@@ -208,13 +211,20 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 			hdd_conn_remove_connect_info(link_sta_ctx);
 		}
 	}
-	/* Clear saved connection information in HDD */
-	hdd_conn_remove_connect_info(sta_ctx);
+
+	if (!is_link_switch) {
+		/* Clear saved connection information in HDD */
+		hdd_conn_remove_connect_info(sta_ctx);
+		/* Reset the IEEE link ID to invalid when disconnect is not
+		 * due to link switch.
+		 */
+		hdd_adapter_reset_station_ctx(adapter);
+	}
 
 	ucfg_dp_remove_conn_info(vdev);
 
 	/* Setting the RTS profile to original value */
-	if (sme_cli_set_command(adapter->deflink->vdev_id,
+	if (sme_cli_set_command(link_info->vdev_id,
 				wmi_vdev_param_enable_rtscts,
 				cfg_get(hdd_ctx->psoc,
 					CFG_ENABLE_FW_RTS_PROFILE),
@@ -226,8 +236,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 
 	if ((QDF_STA_MODE == adapter->device_mode) ||
 	    (QDF_P2P_CLIENT_MODE == adapter->device_mode)) {
-		sme_ps_disable_auto_ps_timer(mac_handle,
-					     adapter->deflink->vdev_id);
+		sme_ps_disable_auto_ps_timer(mac_handle, link_info->vdev_id);
 		adapter->send_mode_change = true;
 	}
 	wlan_hdd_clear_link_layer_stats(adapter);
@@ -568,7 +577,7 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	 */
 	hdd_cm_restore_ch_width(vdev, adapter);
 	hdd_cm_set_default_wlm_mode(adapter);
-	__hdd_cm_disconnect_handler_post_user_update(adapter, vdev);
+	__hdd_cm_disconnect_handler_post_user_update(link_info, vdev);
 	wlan_twt_concurrency_update(hdd_ctx);
 	hdd_cm_reset_udp_qos_upgrade_config(adapter);
 

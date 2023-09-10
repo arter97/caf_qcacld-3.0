@@ -787,6 +787,20 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 #ifdef WLAN_FEATURE_11BE_MLO
 void
 policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx);
+
+/**
+ * policy_mgr_link_switch_notifier_cb() - link switch notifier callback
+ * @vdev: vdev object
+ * @req: link switch request
+ *
+ * This API will be registered to mlo link switch, to be invoked before
+ * do link switch process.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_mlo_link_switch_req *req);
 #else
 static inline void
 policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}
@@ -804,8 +818,6 @@ policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}
 void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc);
 
 void pm_dbs_opportunistic_timer_handler(void *data);
-enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
-		uint8_t subtype);
 
 /**
  * policy_mgr_get_channel_list() - Get channel list based on PCL and mode
@@ -937,30 +949,6 @@ enum policy_mgr_conc_next_action
 		policy_mgr_get_current_pref_hw_mode_dual_dbs(
 		struct wlan_objmgr_psoc *psoc);
 
-/**
- * policy_mgr_reset_sap_mandatory_channels() - Reset the SAP mandatory channels
- * @pm_ctx: policy mgr context
- *
- * Resets the SAP mandatory channel list and the length of the list
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS policy_mgr_reset_sap_mandatory_channels(
-		struct policy_mgr_psoc_priv_obj *pm_ctx);
-
-/**
- * policy_mgr_dump_freq_range_per_mac() - Function to print frequency range
- * for both MAC 0 and MAC1 for given Hw mode
- *
- * @freq_range: Policy Mgr context
- * @hw_mode: HW mode
- *
- * This Function will print frequency range for both MAC 0 and MAC1 for given
- * Hw mode
- *
- * Return: void
- *
- */
 void
 policy_mgr_dump_freq_range_per_mac(struct policy_mgr_freq_range *freq_range,
 				   enum policy_mgr_mode hw_mode);

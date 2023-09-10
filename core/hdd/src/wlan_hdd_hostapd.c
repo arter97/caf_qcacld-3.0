@@ -132,6 +132,8 @@
 #define HDD_80211_MODE_AC 1
 /* Defines the BIT position of 11ax support mode field of stainfo */
 #define HDD_80211_MODE_AX 2
+/* Defines the BIT position of 11be support mode field of stainfo */
+#define HDD_80211_MODE_BE 4
 
 #define HDD_MAX_CUSTOM_START_EVENT_SIZE 64
 
@@ -497,7 +499,7 @@ static int __hdd_hostapd_open(struct net_device *dev)
 		return ret;
 	}
 
-	ret = hdd_start_adapter(adapter);
+	ret = hdd_start_adapter(adapter, true);
 	if (ret) {
 		hdd_err("Error Initializing the AP mode: %d", ret);
 		return ret;
@@ -806,7 +808,8 @@ static int __hdd_hostapd_set_mac_address(struct net_device *dev, void *addr)
 
 	/* Currently for SL-ML-SAP use same MAC for both MLD and link */
 	hdd_update_dynamic_mac(hdd_ctx, &adapter->mac_addr, &mac_addr);
-	ucfg_dp_update_inf_mac(hdd_ctx->psoc, &adapter->mac_addr, &mac_addr);
+	ucfg_dp_update_intf_mac(hdd_ctx->psoc, &adapter->mac_addr, &mac_addr,
+				adapter->deflink->vdev);
 	memcpy(&adapter->mac_addr, psta_mac_addr->sa_data, ETH_ALEN);
 	qdf_net_update_net_device_dev_addr(dev, psta_mac_addr->sa_data,
 					   ETH_ALEN);
@@ -1517,6 +1520,8 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 					event->ht_caps.present))
 		is_dot11_mode_abgn = false;
 
+	stainfo->support_mode |=
+				(event->eht_caps_present << HDD_80211_MODE_BE);
 	stainfo->support_mode |= is_dot11_mode_abgn << HDD_80211_MODE_ABGN;
 	/* Initialize DHCP info */
 	stainfo->dhcp_phase = DHCP_PHASE_ACK;
@@ -2028,12 +2033,7 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 		return;
 	}
 
-	sap_cnt = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-							    PM_SAP_MODE,
-							    NULL);
-	sap_cnt += policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-							     PM_P2P_GO_MODE,
-							     NULL);
+	sap_cnt = policy_mgr_get_beaconing_mode_count(hdd_ctx->psoc, NULL);
 	if (sap_cnt > 1)
 		policy_mgr_check_concurrent_intf_and_restart_sap(
 				hdd_ctx->psoc,
@@ -2366,8 +2366,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 						    &pdev_id);
 		if (QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_medium_assess_stop_timer(pdev_id, hdd_ctx);
-
-		hdd_medium_assess_deinit();
 
 		/* clear the reason code in case BSS is stopped
 		 * in another place
@@ -2873,8 +2871,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			return QDF_STATUS_E_NOMEM;
 
 		snprintf(unknownSTAEvent, IW_CUSTOM_MAX,
-			 "JOIN_UNKNOWN_STA-"QDF_FULL_MAC_FMT,
-			 QDF_FULL_MAC_REF(sap_event->sapevt.sapUnknownSTAJoin.macaddr.bytes));
+			 "JOIN_UNKNOWN_STA-"QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(sap_event->sapevt.sapUnknownSTAJoin.macaddr.bytes));
 		we_event = IWEVCUSTOM;  /* Discovered a new node (AP mode). */
 		wrqu.data.pointer = unknownSTAEvent;
 		wrqu.data.length = strlen(unknownSTAEvent);
@@ -2888,10 +2886,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			return QDF_STATUS_E_NOMEM;
 
 		snprintf(maxAssocExceededEvent, IW_CUSTOM_MAX,
-			 "Peer "QDF_FULL_MAC_FMT" denied"
+			 "Peer "QDF_MAC_ADDR_FMT" denied"
 			 " assoc due to Maximum Mobile Hotspot connections reached. Please disconnect"
 			 " one or more devices to enable the new device connection",
-			 QDF_FULL_MAC_REF(sap_event->sapevt.sapMaxAssocExceeded.macaddr.bytes));
+			 QDF_MAC_ADDR_REF(sap_event->sapevt.sapMaxAssocExceeded.macaddr.bytes));
 		we_event = IWEVCUSTOM;  /* Discovered a new node (AP mode). */
 		wrqu.data.pointer = maxAssocExceededEvent;
 		wrqu.data.length = strlen(maxAssocExceededEvent);
@@ -3121,7 +3119,8 @@ stopbss:
 				ucfg_ipa_uc_disconnect_ap(hdd_ctx->pdev,
 							  adapter->dev);
 				ucfg_ipa_cleanup_dev_iface(hdd_ctx->pdev,
-							   adapter->dev);
+							   adapter->dev,
+							   link_info->vdev_id);
 			}
 		}
 
@@ -4054,7 +4053,7 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc,
 							ap_adapter->device_mode,
 							vdev_id);
-	if ((con_mode != PM_SAP_MODE && con_mode != PM_P2P_GO_MODE) ||
+	if (!policy_mgr_is_beaconing_mode(con_mode) ||
 	    !policy_mgr_is_6ghz_conc_mode_supported(psoc, con_mode)) {
 		hdd_err("unexpected device mode %d", ap_adapter->device_mode);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
@@ -4240,7 +4239,9 @@ hdd_indicate_peers_deleted(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	hdd_sap_indicate_disconnect_for_sta(link_info->adapter);
 }
 
-QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
+QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
+			    bool reinit,
+			    bool rtnl_held)
 {
 	struct hdd_hostapd_state *phostapdBuf;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -4373,7 +4374,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 	return status;
 
 error_release_softap_tx_rx:
-	hdd_unregister_wext(adapter->dev);
+	hdd_wext_unregister(adapter->dev, rtnl_held);
 error_deinit_sap_session:
 	hdd_hostapd_deinit_sap_session(adapter->deflink);
 error_release_vdev:
@@ -5634,10 +5635,11 @@ hdd_check_and_disconnect_sta_on_invalid_channel(struct hdd_context *hdd_ctx,
  * @adapter: SAP adapter
  * @sap_config: sap config
  *
- * In SAP+GO concurrency, if GO is started on 2G and SAP is doing ACS
- * with 2G preferred channel list, then we will move GO to 5G band.
- * The purpose is to have more selection for SAP instead of starting on
- * GO home channel for SCC.
+ * In GO+STA+SAP concurrency, if GO is started on 2G and SAP is doing ACS
+ * with 2G preferred channel list, then we will move GO to 2G SCC
+ * channel of STA if present.
+ * The purpose is to avoid SAP start failure on 2G because we don't
+ * support 3 home channels in same mac.
  *
  * Return: void
  */
@@ -5659,8 +5661,9 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 	uint8_t sta_vdev_num;
 	struct hdd_hostapd_state *hostapd_state;
 	uint8_t go_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
-	qdf_freq_t go_ch_freq = 0, go_new_ch_freq;
+	qdf_freq_t go_ch_freq = 0, go_new_ch_freq = 0;
 	struct wlan_hdd_link_info *go_link_info;
+	enum phy_ch_width go_bw;
 
 	if (adapter->device_mode != QDF_SAP_MODE)
 		return;
@@ -5675,7 +5678,7 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq_list[i]))
 			return;
 
-	/* Move existing GO interface to 5G band */
+	/* Move existing GO interface to SCC channel of 2G STA */
 	vdev_num = policy_mgr_get_mode_specific_conn_info(
 			psoc, freq_list, vdev_id_list,
 			PM_P2P_GO_MODE);
@@ -5693,19 +5696,15 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 	sta_vdev_num = policy_mgr_get_mode_specific_conn_info(
 			psoc, sta_freq_list, sta_vdev_id_list,
 			PM_STA_MODE);
-	for (i = 0; i < sta_vdev_num; i++)
+	for (i = 0; i < sta_vdev_num; i++) {
 		if (go_ch_freq == sta_freq_list[i])
 			return;
-
-	go_new_ch_freq =
-		policy_mgr_get_alternate_channel_for_sap(psoc,
-							 go_vdev_id,
-							 go_ch_freq,
-							 REG_BAND_UNKNOWN);
-	if (!go_new_ch_freq || WLAN_REG_IS_24GHZ_CH_FREQ(go_new_ch_freq)) {
-		hdd_err("no available 5G channel");
-		return;
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(sta_freq_list[i]))
+			go_new_ch_freq = sta_freq_list[i];
 	}
+
+	if (!go_new_ch_freq)
+		return;
 
 	go_link_info = hdd_get_link_info_by_vdev(adapter->hdd_ctx, go_vdev_id);
 	if (!go_link_info || hdd_validate_adapter(go_link_info->adapter))
@@ -5715,9 +5714,9 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 				    CSA_REASON_SAP_ACS);
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
-
+	go_bw = wlansap_get_chan_width(WLAN_HDD_GET_SAP_CTX_PTR(go_link_info));
 	ret = hdd_softap_set_channel_change(go_link_info->adapter->dev,
-					    go_new_ch_freq, CH_WIDTH_80MHZ,
+					    go_new_ch_freq, go_bw,
 					    false);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d", go_new_ch_freq, ret);
@@ -6143,7 +6142,8 @@ static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 
 	is_ml_ap = wlan_vdev_mlme_is_mlo_ap(link_info->vdev);
 	if (!policy_mgr_is_mlo_sap_concurrency_allowed(hdd_ctx->psoc,
-						       is_ml_ap)) {
+						       is_ml_ap,
+						       wlan_vdev_get_id(link_info->vdev))) {
 		hdd_err("MLO SAP concurrency check fails");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -6220,6 +6220,17 @@ wlan_hdd_set_multipass(struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif
+
+static void wlan_hdd_update_ll_lt_sap_configs(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      struct sap_config *config)
+{
+	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+		return;
+
+	config->SapHw_mode = eCSR_DOT11_MODE_11n;
+	config->ch_width_orig = CH_WIDTH_20MHZ;
+}
 
 /**
  * wlan_hdd_cfg80211_start_bss() - start bss
@@ -6756,6 +6767,9 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 			config->SapHw_mode = eCSR_DOT11_MODE_11n;
 	}
 
+	wlan_hdd_update_ll_lt_sap_configs(hdd_ctx->psoc,
+					  link_info->vdev_id, config);
+
 	config->sap_orig_hw_mode = config->SapHw_mode;
 	reg_phy_mode = csr_convert_to_reg_phy_mode(config->SapHw_mode,
 						   config->chan_freq);
@@ -6961,7 +6975,6 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	hdd_set_connection_in_progress(false);
 	policy_mgr_process_force_scc_for_nan(hdd_ctx->psoc);
 	ret = 0;
-	hdd_medium_assess_init();
 	goto free;
 
 error:
@@ -7142,7 +7155,6 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 				hdd_place_marker(adapter, "STOP with FAILURE",
 						 NULL);
 				hdd_sap_indicate_disconnect_for_sta(adapter);
-				hdd_medium_assess_deinit();
 				QDF_ASSERT(0);
 			}
 		}
@@ -7861,9 +7873,9 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	sta_cnt = policy_mgr_get_mode_specific_conn_info(hdd_ctx->psoc, NULL,
 							 vdev_id_list,
 							 PM_STA_MODE);
-	sap_cnt = policy_mgr_get_mode_specific_conn_info(hdd_ctx->psoc, NULL,
-							 &vdev_id_list[sta_cnt],
-							 PM_SAP_MODE);
+	sap_cnt = policy_mgr_get_sap_mode_info(hdd_ctx->psoc, NULL,
+					       &vdev_id_list[sta_cnt]);
+
 	/* Disable NAN Disc before starting P2P GO or STA+SAP or SAP+SAP */
 	if (adapter->device_mode == QDF_P2P_GO_MODE || sta_cnt ||
 	    (sap_cnt > (MAX_SAP_NUM_CONCURRENCY_WITH_NAN - 1))) {

@@ -242,12 +242,15 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
  * hdd_init_ap_mode() - to init the AP adaptor
  * @adapter: SAP/GO adapter
  * @reinit: true if re-init, otherwise initial init
+ * @rtnl_held: true if rtnl lock is taken, otherwise false
  *
  * This API can be called to open the SAP session as well as
  * to create and store the vdev object. It also initializes necessary
  * SAP adapter related params.
  */
-QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit);
+QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
+			    bool reinit,
+			    bool rtnl_held);
 
 /**
  * hdd_deinit_ap_mode() - to deinit the AP adaptor

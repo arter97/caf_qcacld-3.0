@@ -317,7 +317,7 @@ wlan_cm_get_rso_user_config_fl(struct wlan_objmgr_vdev *vdev,
 	wlan_cm_get_rso_config_fl(vdev, __func__, __LINE__)
 
 /**
- * wlan_cm_get_rso_config - get per vdev RSO userspace config
+ * wlan_cm_get_rso_user_config - get per vdev RSO userspace config
  * @vdev: vdev pointer
  *
  * Return: rso user space config pointer
@@ -1607,6 +1607,29 @@ wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * cm_roam_sync_key_event_handler() - Handle roam sync key event and
+ * store the keys in crypto module
+ * @psoc:  Pointer to psoc object
+ * @keys:  Pointer to the keys
+ * @num_keys: Number of links for which keys entries are available
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_crypto_key_entry *keys,
+					  uint8_t num_keys);
+#else
+static inline
+QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_crypto_key_entry *keys,
+					  uint8_t num_keys)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 
 #ifdef WLAN_FEATURE_FIPS
 /**

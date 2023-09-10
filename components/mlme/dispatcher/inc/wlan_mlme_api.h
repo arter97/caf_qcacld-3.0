@@ -87,6 +87,19 @@ void
 wlan_mlme_update_cfg_with_tgt_caps(struct wlan_objmgr_psoc *psoc,
 				   struct mlme_tgt_caps *tgt_caps);
 
+/**
+ * wlan_mlme_update_aux_dev_caps() - Update mlme aux capability
+ * @psoc: pointer to psoc object
+ * @wlan_mlme_aux_dev_caps:  array for aux dev capability
+ *
+ * Return: None
+ */
+
+void
+wlan_mlme_update_aux_dev_caps(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_mlme_aux_dev_caps
+			      wlan_mlme_aux_dev_caps[]);
+
 /*
  * mlme_get_wep_key() - get the wep key to process during auth frame
  * @vdev: VDEV object for which the wep key is being requested
@@ -406,6 +419,15 @@ wlan_mlme_set_ap_policy(struct wlan_objmgr_vdev *vdev,
  */
 enum host_concurrent_ap_policy
 wlan_mlme_get_ap_policy(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_ll_lt_sap_send_oce_flags_fw() - Send the oce flags to FW for
+ * ll_lt_sap
+ * @vdev: pointer to vdev object
+ *
+ * Return: void
+ */
+void wlan_mlme_ll_lt_sap_send_oce_flags_fw(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_mlme_get_prevent_link_down() - Get the prevent link down config
@@ -1002,6 +1024,23 @@ QDF_STATUS wlan_mlme_get_oce_sap_enabled_info(struct wlan_objmgr_psoc *psoc,
  */
 void wlan_mlme_update_oce_flags(struct wlan_objmgr_pdev *pdev);
 
+/**
+ * wlan_mlme_cfg_get_aux_supported_modes() - get supported mode of aux.
+ *             definition of bitmap refer WMI_AUX_DEV_CAPS_SUPPORTED_MODE.
+ *
+ * @psoc: pointer to psoc object
+ * @aux_index: aux index, current only support aux0.
+ * @hw_mode_id: hw mode id
+ * @supported_modes_bitmap: output for value
+ *
+ * Return: true for getting value. false for failure check.
+ */
+bool wlan_mlme_cfg_get_aux_supported_modes(
+		struct wlan_objmgr_psoc *psoc,
+		uint32_t aux_index,
+		enum wlan_mlme_hw_mode_config_type hw_mode_id,
+		uint32_t *supported_modes_bitmap);
+
 #ifdef WLAN_FEATURE_11AX
 /**
  * wlan_mlme_cfg_get_he_ul_mumimo() - Get the HE Ul Mumio
@@ -1126,6 +1165,27 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_objmgr_vdev *vdev,
 					   uint8_t vdev_id,
 					   enum phy_ch_width ch_width);
+
+/**
+ * wlan_mlme_update_bss_rate_flags() - update bss rate flag as per new channel
+ * width
+ * @psoc: pointer to psoc object
+ * @vdev_id: Vdev id
+ * @cw: channel width to update
+ * @eht_present: connected bss is eht capable or not
+ * @he_present: connected bss is he capable or not
+ * @vht_present: connected bss is vht capable or not
+ * @ht_present: connected bss is ht capable or not
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_update_bss_rate_flags(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id,
+					   enum phy_ch_width cw,
+					   uint8_t eht_present,
+					   uint8_t he_present,
+					   uint8_t vht_present,
+					   uint8_t ht_present);
 
 #ifdef WLAN_FEATURE_11BE
 /**
@@ -3281,6 +3341,16 @@ wlan_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 uint32_t wlan_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_mlme_set_roaming_triggers() - Set the roaming triggers bitmap
+ * @psoc: Pointer to PSOC object
+ * @trigger_bitmap: Roaming triggers bitmap to set
+ *
+ * Return: void
+ */
+void wlan_mlme_set_roaming_triggers(struct wlan_objmgr_psoc *psoc,
+				    uint32_t trigger_bitmap);
+
+/**
  * wlan_mlme_get_roaming_offload() - Get roaming offload setting
  * @psoc: pointer to psoc object
  * @val:  Pointer to enable/disable roaming offload
@@ -3405,6 +3475,12 @@ static inline
 uint32_t wlan_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
 {
 	return 0xFFFF;
+}
+
+static inline
+void wlan_mlme_set_roaming_triggers(struct wlan_objmgr_psoc *psoc,
+				    uint32_t trigger_bitmap)
+{
 }
 
 static inline QDF_STATUS
@@ -3906,11 +3982,26 @@ bool wlan_mlme_is_multipass_sap(struct wlan_objmgr_psoc *psoc);
  */
 enum wlan_wds_mode
 wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_wds_mode() - Set wds mode
+ * @psoc: pointer to psoc object
+ * @mode: wds mode to set
+ *
+ * Return: void
+ */
+void wlan_mlme_set_wds_mode(struct wlan_objmgr_psoc *psoc,
+			    enum wlan_wds_mode mode);
 #else
 static inline enum wlan_wds_mode
 wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return WLAN_WDS_MODE_DISABLED;
+}
+
+static inline void wlan_mlme_set_wds_mode(struct wlan_objmgr_psoc *psoc,
+					  enum wlan_wds_mode mode)
+{
 }
 #endif
 
@@ -3993,6 +4084,32 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 					      uint8_t value);
 
 /**
+ * wlan_mlme_set_user_set_link_num() - set number of links that config by user
+ * @psoc: pointer to psoc object
+ * @value: value to set
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
+					   uint8_t value);
+
+/**
+ * wlan_mlme_restore_user_set_link_num() - restore link num when SSR happens
+ * @psoc: pointer to psoc object
+ *
+ * Return: void
+ */
+void wlan_mlme_restore_user_set_link_num(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_clear_user_set_link_num() - clear user set link num
+ * @psoc: pointer to psoc object
+ *
+ * Return: void
+ */
+void wlan_mlme_clear_user_set_link_num(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mlme_get_sta_mlo_conn_band_bmp() - get band bitmap that sta mlo
  *                                         connection can support
  * @psoc: pointer to psoc object
@@ -4030,7 +4147,32 @@ uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 					       uint8_t value);
+
+/**
+ * wlan_mlme_get_sta_same_link_mld_addr() - check if mld/link use same address
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool to check if the mld/link use same mac address
+ */
+bool wlan_mlme_get_sta_same_link_mld_addr(struct wlan_objmgr_psoc *psoc);
 #else
+static inline QDF_STATUS
+wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
+				uint8_t value)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void wlan_mlme_restore_user_set_link_num(struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static inline
+void wlan_mlme_clear_user_set_link_num(struct wlan_objmgr_psoc *psoc)
+{
+}
+
 static inline QDF_STATUS
 wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 				   uint8_t value)

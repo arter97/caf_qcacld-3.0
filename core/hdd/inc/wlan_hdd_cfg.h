@@ -191,7 +191,7 @@ struct hdd_config {
 	uint32_t sar_safety_req_resp_retry;
 	uint32_t sar_safety_index;
 	uint32_t sar_safety_sleep_index;
-	bool enable_sar_safety;
+	uint8_t enable_sar_safety;
 	bool config_sar_safety_sleep_index;
 #endif
 	uint8_t nb_commands_interval;
@@ -377,6 +377,16 @@ int hdd_vendor_mode_to_band(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 int
 hdd_vendor_mode_to_bonding_mode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 				uint32_t *bonding_mode);
+
+/**
+ * hdd_phymode_to_dot11_mode() - Mapping phymode to dot11mode
+ * @phymode: phy mode
+ * @dot11_mode: dot11 mode
+ *
+ * Return: 0 on success, negative errno value on error
+ */
+int hdd_phymode_to_dot11_mode(eCsrPhyMode phymode,
+			      enum hdd_dot11_mode *dot11_mode);
 
 /**
  * hdd_update_phymode() - update the PHY mode of the adapter

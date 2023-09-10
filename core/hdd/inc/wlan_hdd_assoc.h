@@ -65,18 +65,22 @@ enum peer_status {
  * struct hdd_conn_flag - connection flags
  * @ht_present: ht element present or not
  * @vht_present: vht element present or not
+ * @eht_present: eht element present or not
  * @hs20_present: hs20 element present or not
  * @ht_op_present: ht operation present or not
  * @vht_op_present: vht operation present or not
+ * @he_present: he operation present or not
  * @reserved: reserved spare bits
  */
 struct hdd_conn_flag {
 	uint8_t ht_present:1;
 	uint8_t vht_present:1;
+	uint8_t eht_present:1;
 	uint8_t hs20_present:1;
 	uint8_t ht_op_present:1;
 	uint8_t vht_op_present:1;
-	uint8_t reserved:3;
+	uint8_t he_present:1;
+	uint8_t reserved:1;
 };
 
 /*defines for tx_BF_cap_info */
@@ -153,6 +157,7 @@ struct hdd_conn_flag {
  * @max_tx_bitrate: Max tx bitrate supported by the AP
  * to which currently sta is connected.
  * @prev_ap_bcn_ie: ap beacon IE information to which sta is currently connected
+ * @ieee_link_id: AP Link Id valid for MLO connection
  */
 struct hdd_connection_info {
 	eConnectionState conn_state;
@@ -193,6 +198,9 @@ struct hdd_connection_info {
 	enum phy_ch_width ch_width;
 	struct rate_info max_tx_bitrate;
 	struct element_info prev_ap_bcn_ie;
+#ifdef WLAN_FEATURE_11BE_MLO
+	int32_t ieee_link_id;
+#endif
 };
 
 /* Forward declarations */
@@ -348,15 +356,16 @@ hdd_indicate_ese_bcn_report_no_results(const struct hdd_adapter *adapter,
 
 /**
  * hdd_change_peer_state() - change peer state
- * @adapter: HDD adapter
+ * @link_info: Link info pointer of VDEV in adapter
  * @peer_mac_addr: Peer MAC address
  * @sta_state: peer state
  *
  * Return: QDF status
  */
-QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
+QDF_STATUS hdd_change_peer_state(struct wlan_hdd_link_info *link_info,
 				 uint8_t *peer_mac_addr,
 				 enum ol_txrx_peer_state sta_state);
+
 /**
  * hdd_update_dp_vdev_flags() - update datapath vdev flags
  * @cbk_data: callback data

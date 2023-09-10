@@ -67,9 +67,9 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							 vdev_id_list,
 							 PM_STA_MODE);
-	sap_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
-							 &vdev_id_list[sta_cnt],
-							 PM_SAP_MODE);
+	sap_cnt = policy_mgr_get_sap_mode_info(psoc, NULL,
+					       &vdev_id_list[sta_cnt]);
+
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 
 	if (op_mode == QDF_STA_MODE || op_mode == QDF_P2P_CLIENT_MODE)

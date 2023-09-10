@@ -45,6 +45,18 @@
 #include "rrm_api.h"
 #include "wlan_lmac_if_def.h"
 #include "wlan_reg_services_api.h"
+#include "wlan_cp_stats_utils_api.h"
+#include "../../core/src/wlan_cp_stats_obj_mgr_handler.h"
+#include "../../core/src/wlan_cp_stats_defs.h"
+#include "cdp_txrx_host_stats.h"
+
+#define MAX_CTRL_STAT_VDEV_ENTRIES 1
+#define MAX_CTRL_STAT_MAC_ADDR_ENTRIES 1
+#define MAX_RMM_STA_STATS_REQUESTED 2
+#define MAX_MEAS_DURATION_FOR_STA_STATS 10
+
+/* Max passive scan dwell for wide band rrm scan, in milliseconds */
+#define RRM_SCAN_MAX_DWELL_TIME 110
 
 /* -------------------------------------------------------------------- */
 /**
@@ -608,7 +620,548 @@ wlan_diag_log_beacon_rpt_req_event(uint8_t token, uint8_t mode,
 #endif
 
 #define ABS(x)      ((x < 0) ? -x : x)
+
+#ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
+/**
+ * rrm_update_mac_cp_stats: update stats of rrm structure of mac
+ * @ev: cp stats event
+ * @mac_ctx: mac context
+ *
+ * Return: None
+ */
+static inline void
+rrm_update_mac_cp_stats(struct infra_cp_stats_event *ev,
+			struct mac_context *mac_ctx)
+{
+	tpSirMacRadioMeasureReport rrm_report;
+	struct counter_stats *counter_stats;
+	struct group_id_0 ev_counter_stats;
+	struct mac_stats *mac_stats;
+	struct group_id_1 ev_mac_stats;
+
+	rrm_report = &mac_ctx->rrm.rrmPEContext.rrm_sta_stats.rrm_report;
+
+	counter_stats =
+		&rrm_report->report.statistics_report.group_stats.counter_stats;
+	mac_stats =
+		&rrm_report->report.statistics_report.group_stats.mac_stats;
+
+	ev_counter_stats = ev->sta_stats->group.counter_stats;
+	ev_mac_stats = ev->sta_stats->group.mac_stats;
+
+	switch (rrm_report->report.statistics_report.group_id) {
+	/*
+	 * Assign count diff in mac rrm sta stats report.
+	 * For first event callback stats will be same as
+	 * send by FW because memset is done for mac rrm sta
+	 * stats before sending rrm sta stats request to FW and
+	 * for second request stats will be the diff of stats send
+	 * by FW and previous stats.
+	 */
+	case STA_STAT_GROUP_ID_COUNTER_STATS:
+		counter_stats->group_transmitted_frame_count =
+			ev_counter_stats.group_transmitted_frame_count -
+			counter_stats->group_transmitted_frame_count;
+		counter_stats->failed_count =
+			ev_counter_stats.failed_count -
+			counter_stats->failed_count;
+		counter_stats->group_received_frame_count =
+			ev_counter_stats.group_received_frame_count -
+			counter_stats->group_received_frame_count;
+		counter_stats->fcs_error_count =
+			ev_counter_stats.fcs_error_count -
+			counter_stats->fcs_error_count;
+		counter_stats->transmitted_frame_count =
+			ev_counter_stats.transmitted_frame_count -
+			counter_stats->transmitted_frame_count;
+		break;
+	case STA_STAT_GROUP_ID_MAC_STATS:
+		mac_stats->rts_success_count =
+			ev_mac_stats.rts_success_count -
+			mac_stats->rts_success_count;
+		mac_stats->rts_failure_count =
+			ev_mac_stats.rts_failure_count -
+			mac_stats->rts_failure_count;
+		mac_stats->ack_failure_count =
+			ev_mac_stats.ack_failure_count -
+			mac_stats->ack_failure_count;
+		break;
+	default:
+		pe_debug("group id not supported");
+	}
+	pe_nofl_debug("counter stats: group frame count ( tx %d rx %d ) failed_count %d fcs_error %d tx frame count %d mac stats: rts success count %d rts fail count %d ack fail count %d",
+		      counter_stats->group_transmitted_frame_count,
+		      counter_stats->group_received_frame_count,
+		      counter_stats->failed_count,
+		      counter_stats->fcs_error_count,
+		      counter_stats->transmitted_frame_count,
+		      mac_stats->rts_success_count,
+		      mac_stats->rts_failure_count,
+		      mac_stats->ack_failure_count);
+}
+
+/**
+ * rmm_sta_stats_response_cb: RRM sta stats response callback
+ * @ev: cp stats event
+ * @cookie: NULL
+ *
+ * Return: None
+ */
+static inline
+void rmm_sta_stats_response_cb(struct infra_cp_stats_event *ev, void *cookie)
+{
+	struct mac_context *mac;
+	struct pe_session *session;
+	uint8_t vdev_id, index;
+	QDF_STATUS status;
+	tpRRMReq pcurrent_req;
+	tSirMacRadioMeasureReport *rrm_report;
+
+	mac = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac)
+		return;
+	index = mac->rrm.rrmPEContext.rrm_sta_stats.index;
+
+	/* Deregister callback registered in request */
+	status = wlan_cp_stats_infra_cp_deregister_resp_cb(mac->psoc);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("failed to deregister callback %d", status);
+
+	pcurrent_req = mac->rrm.rrmPEContext.pCurrentReq[index];
+	if (!pcurrent_req) {
+		pe_err("Current request is NULL");
+		qdf_mem_zero(&mac->rrm.rrmPEContext.rrm_sta_stats,
+			     sizeof(mac->rrm.rrmPEContext.rrm_sta_stats));
+		return;
+	}
+
+	vdev_id = mac->rrm.rrmPEContext.rrm_sta_stats.vdev_id;
+	session = pe_find_session_by_vdev_id(mac, vdev_id);
+	if (!session) {
+		pe_err("Session does not exist for given vdev id %d", vdev_id);
+		rrm_cleanup(mac, mac->rrm.rrmPEContext.rrm_sta_stats.index);
+		return;
+	}
+
+	rrm_report = &mac->rrm.rrmPEContext.rrm_sta_stats.rrm_report;
+	rrm_update_mac_cp_stats(ev, mac);
+
+	/* Update resp counter for every response to find second resp*/
+	mac->rrm.rrmPEContext.rrm_sta_stats.rrm_sta_stats_res_count++;
+	/* Send current stats if meas duration is 0. */
+	if (mac->rrm.rrmPEContext.rrm_sta_stats.rrm_sta_stats_res_count ==
+	    MAX_RMM_STA_STATS_REQUESTED ||
+	   !rrm_report->report.statistics_report.meas_duration) {
+		lim_send_radio_measure_report_action_frame(
+			mac, pcurrent_req->dialog_token, 1, true,
+			&mac->rrm.rrmPEContext.rrm_sta_stats.rrm_report,
+			mac->rrm.rrmPEContext.rrm_sta_stats.peer, session);
+
+		rrm_cleanup(mac, index);
+	}
+}
+
+/**
+ * rrm_update_vdev_stats: Update RRM stats from DP
+ * @rrm_report: RRM Measurement Report
+ * @vdev_id: vdev_id
+ *
+ * Return: QDF STATUS
+ */
+static QDF_STATUS
+rrm_update_vdev_stats(tpSirMacRadioMeasureReport rrm_report, uint8_t vdev_id)
+{
+	struct cdp_vdev_stats *stats;
+	QDF_STATUS status;
+	struct counter_stats *counter_stats;
+	struct mac_stats *mac_stats;
+
+	counter_stats =
+		&rrm_report->report.statistics_report.group_stats.counter_stats;
+	mac_stats =
+		&rrm_report->report.statistics_report.group_stats.mac_stats;
+
+	stats = qdf_mem_malloc(sizeof(*stats));
+	if (!stats)
+		return QDF_STATUS_E_NOMEM;
+
+	status =
+		cdp_host_get_vdev_stats(cds_get_context(QDF_MODULE_ID_SOC),
+					vdev_id, stats, true);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to get stats %d", status);
+		qdf_mem_free(stats);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pe_nofl_debug("counter stats count: fragment (tx: %d rx: %d) mac stats count: retry : %d multiple retry: %d frame duplicate %d",
+		      stats->tx.fragment_count, stats->rx.fragment_count,
+		      stats->tx.retry_count, stats->tx.multiple_retry_count,
+		      stats->rx.duplicate_count);
+
+	switch (rrm_report->report.statistics_report.group_id) {
+	case STA_STAT_GROUP_ID_COUNTER_STATS:
+		counter_stats->transmitted_fragment_count =
+			stats->tx.fragment_count -
+				counter_stats->transmitted_fragment_count;
+		counter_stats->received_fragment_count =
+			stats->rx.fragment_count -
+				counter_stats->received_fragment_count;
+		break;
+	case STA_STAT_GROUP_ID_MAC_STATS:
+		mac_stats->retry_count =
+			stats->tx.retry_count - mac_stats->retry_count;
+		mac_stats->multiple_retry_count =
+			stats->tx.multiple_retry_count -
+				mac_stats->multiple_retry_count;
+		mac_stats->frame_duplicate_count =
+			stats->rx.duplicate_count -
+				mac_stats->frame_duplicate_count;
+		break;
+	}
+	qdf_mem_free(stats);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+rrm_send_sta_stats_req(struct mac_context *mac,
+		       struct pe_session *session,
+		       tSirMacAddr peer_mac)
+{
+	struct infra_cp_stats_cmd_info info = {0};
+	get_infra_cp_stats_cb resp_cb = NULL;
+	void *context;
+	QDF_STATUS status;
+	tpSirMacRadioMeasureReport report;
+
+	status = wlan_cp_stats_infra_cp_get_context(mac->psoc, &resp_cb,
+						    &context);
+	if (resp_cb) {
+		pe_err("another request already in progress");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	info.request_cookie = NULL;
+	info.stats_id = TYPE_REQ_CTRL_PATH_RRM_STA_STAT;
+	info.action = ACTION_REQ_CTRL_PATH_STAT_GET;
+	info.infra_cp_stats_resp_cb = rmm_sta_stats_response_cb;
+	info.num_pdev_ids = 0;
+	info.num_vdev_ids = MAX_CTRL_STAT_VDEV_ENTRIES;
+	info.vdev_id[0] = wlan_vdev_get_id(session->vdev);
+	info.num_mac_addr_list = MAX_CTRL_STAT_MAC_ADDR_ENTRIES;
+	info.num_pdev_ids = 0;
+	/*
+	 * FW doesn't send vdev id in response path.
+	 * So, vdev id will be used to get session
+	 * in callback.
+	 */
+	mac->rrm.rrmPEContext.rrm_sta_stats.vdev_id =
+					wlan_vdev_get_id(session->vdev);
+	qdf_mem_copy(&info.peer_mac_addr[0], peer_mac, QDF_MAC_ADDR_SIZE);
+	report = &mac->rrm.rrmPEContext.rrm_sta_stats.rrm_report;
+
+	status = rrm_update_vdev_stats(report, wlan_vdev_get_id(session->vdev));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to register resp callback: %d", status);
+		return status;
+	}
+
+	status =  wlan_cp_stats_infra_cp_register_resp_cb(mac->psoc, &info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to register resp callback: %d", status);
+		return status;
+	}
+
+	status = wlan_cp_stats_send_infra_cp_req(mac->psoc, &info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to send stats request status: %d", status);
+		goto get_stats_fail;
+	}
+
+	return QDF_STATUS_SUCCESS;
+
+get_stats_fail:
+	status = wlan_cp_stats_infra_cp_deregister_resp_cb(mac->psoc);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("failed to deregister callback %d", status);
+	return status;
+}
+#endif
+
+/**
+ * rrm_process_sta_stats_report_req: Process RRM sta stats request
+ * @mac: mac context
+ * @pCurrentReq: Current RRM request
+ * @pStaStatsReq: RRM Measurement Request
+ * @pe_session: pe session
+ *
+ * Return: rrm status
+ */
+static tRrmRetStatus
+rrm_process_sta_stats_report_req(struct mac_context *mac,
+				 tpRRMReq pCurrentReq,
+				 tDot11fIEMeasurementRequest *sta_stats_req,
+				 struct pe_session *pe_session)
+{
+	QDF_STATUS status;
+	uint8_t meas_duration = 1;
+	struct rrm_sta_stats *rrm_sta_statistics;
+
+	if (sta_stats_req->measurement_request.sta_stats.meas_duration >
+	    MAX_MEAS_DURATION_FOR_STA_STATS) {
+		pe_err("Dropping req measurement duration > threshold %d",
+		       sta_stats_req->measurement_request.sta_stats.meas_duration);
+		return eRRM_INCAPABLE;
+	}
+
+	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)
+	    sta_stats_req->measurement_request.sta_stats.peer_mac_addr)) {
+		pe_err("Dropping req: broadcast address not supported");
+		return eRRM_INCAPABLE;
+	}
+
+	rrm_sta_statistics = &mac->rrm.rrmPEContext.rrm_sta_stats;
+	if (sta_stats_req->measurement_request.sta_stats.meas_duration)
+		meas_duration =
+		sta_stats_req->measurement_request.sta_stats.meas_duration;
+
+	rrm_sta_statistics->rrm_report.token = pCurrentReq->token;
+	rrm_sta_statistics->rrm_report.type = pCurrentReq->type;
+	rrm_sta_statistics->rrm_report.refused = 0;
+	rrm_sta_statistics->rrm_report.incapable = 0;
+	rrm_sta_statistics->rrm_report.report.statistics_report.group_id =
+	sta_stats_req->measurement_request.sta_stats.group_identity;
+	rrm_sta_statistics->rrm_report.report.statistics_report.meas_duration
+		= sta_stats_req->measurement_request.sta_stats.meas_duration;
+
+	switch  (sta_stats_req->measurement_request.sta_stats.group_identity) {
+	case STA_STAT_GROUP_ID_COUNTER_STATS:
+	case STA_STAT_GROUP_ID_MAC_STATS:
+		status =
+		rrm_send_sta_stats_req(
+		mac, pe_session,
+		sta_stats_req->measurement_request.sta_stats.peer_mac_addr);
+		if (!QDF_IS_STATUS_SUCCESS(status))
+			return eRRM_REFUSED;
+		mac->lim.lim_timers.rrm_sta_stats_resp_timer.sessionId =
+							pe_session->peSessionId;
+		/*
+		 * Start timer of 1 sec even if meas duration is 0.
+		 * To get stats from FW.
+		 */
+		tx_timer_change(&mac->lim.lim_timers.rrm_sta_stats_resp_timer,
+				SYS_MS_TO_TICKS(meas_duration * 1000), 0);
+		/* Activate sta stats resp timer */
+		if (tx_timer_activate(
+		    &mac->lim.lim_timers.rrm_sta_stats_resp_timer) !=
+		    TX_SUCCESS) {
+			pe_err("failed to start sta stats timer");
+			return eRRM_REFUSED;
+		}
+		break;
+	case STA_STAT_GROUP_ID_DELAY_STATS:
+		/* TODO: update access delay from scan IE */
+	default:
+		pe_nofl_err("group id %d not supported",
+		sta_stats_req->measurement_request.sta_stats.group_identity);
+		return eRRM_INCAPABLE;
+	}
+	return eRRM_SUCCESS;
+}
+
+void
+rrm_process_rrm_sta_stats_request_failure(struct mac_context *mac,
+					  struct pe_session *pe_session,
+					  tSirMacAddr peer,
+					  tRrmRetStatus status, uint8_t index)
+{
+	tpSirMacRadioMeasureReport p_report = NULL;
+	tpRRMReq p_current_req = mac->rrm.rrmPEContext.pCurrentReq[index];
+
+	if (!p_current_req) {
+		pe_err("Current request is NULL");
+		return;
+	}
+
+	p_report = qdf_mem_malloc(sizeof(tSirMacRadioMeasureReport));
+	if (!p_report)
+		return;
+	p_report->token = p_current_req->token;
+	p_report->type = SIR_MAC_RRM_STA_STATISTICS_TYPE;
+
+	pe_debug("Measurement index:%d status %d token %d", index, status,
+		 p_report->token);
+
+	switch (status) {
+	case eRRM_FAILURE: /* fallthrough */
+	case eRRM_REFUSED:
+		p_report->refused = 1;
+		break;
+	case eRRM_INCAPABLE:
+		p_report->incapable = 1;
+		break;
+	default:
+		pe_err("Invalid RRM status, failed to send report");
+		qdf_mem_free(p_report);
+		return;
+	}
+
+	lim_send_radio_measure_report_action_frame(mac,
+						   p_current_req->dialog_token,
+						   1, true,
+						   p_report, peer,
+						   pe_session);
+
+	qdf_mem_free(p_report);
+}
+
+/**
+ * rrm_check_other_sta_sats_req_in_progress: To check if any other sta stats req
+ * in progress
+ * @rrm_req: measurement request
+ *
+ * To avoid any conflict between multiple sta stats request at time of callback
+ * response from FW handle one sta stats request at a time.
+ *
+ * Return: true/false
+ */
+static bool
+rrm_check_other_sta_sats_req_in_progress(
+		tDot11fRadioMeasurementRequest *rrm_req)
+{
+	uint8_t count = 0, i = 0;
+
+	for (i = 0; i < MAX_MEASUREMENT_REQUEST; i++) {
+		if (rrm_req->MeasurementRequest[i].measurement_type ==
+		    SIR_MAC_RRM_STA_STATISTICS_TYPE)
+			count++;
+		if (count > 1)
+			return true;
+	}
+	return false;
+}
+
+/**
+ * rrm_process_sta_stats_req: Process RRM sta stats request
+ * @mac: mac context
+ * @session_entry: pe session
+ * @radiomes_report: measurement report
+ * @rrm_req: measurement request
+ * @num_report: no of reports
+ * @index: index of request
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS rrm_process_sta_stats_req(
+			struct mac_context *mac, tSirMacAddr peer,
+			struct pe_session *session_entry,
+			tpSirMacRadioMeasureReport *radiomes_report,
+			tDot11fRadioMeasurementRequest *rrm_req,
+			uint8_t *num_report, int index)
+{
+	tRrmRetStatus rrm_status = eRRM_SUCCESS;
+	tpRRMReq curr_req;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (index  >= MAX_MEASUREMENT_REQUEST) {
+		status = rrm_reject_req(radiomes_report,
+					rrm_req, num_report, index,
+					rrm_req->MeasurementRequest[0].
+					measurement_type);
+		return status;
+	}
+
+	if (rrm_check_other_sta_sats_req_in_progress(rrm_req)) {
+		pe_debug("another sta stats request already in progress");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	curr_req = qdf_mem_malloc(sizeof(*curr_req));
+	if (!curr_req) {
+		mac->rrm.rrmPEContext.pCurrentReq[index] = NULL;
+		qdf_mem_zero(&mac->rrm.rrmPEContext.rrm_sta_stats,
+			     sizeof(mac->rrm.rrmPEContext.rrm_sta_stats));
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	curr_req->dialog_token = rrm_req->DialogToken.token;
+	curr_req->token =
+		rrm_req->MeasurementRequest[index].measurement_token;
+	curr_req->measurement_idx = index;
+	curr_req->type = rrm_req->MeasurementRequest[index].measurement_type;
+
+
+	qdf_mem_set(&mac->rrm.rrmPEContext.rrm_sta_stats,
+		    sizeof(mac->rrm.rrmPEContext.rrm_sta_stats), 0);
+
+	mac->rrm.rrmPEContext.rrm_sta_stats.index = index;
+	mac->rrm.rrmPEContext.pCurrentReq[index] = curr_req;
+	mac->rrm.rrmPEContext.num_active_request++;
+	qdf_mem_copy(mac->rrm.rrmPEContext.rrm_sta_stats.peer,
+		     peer,
+		     QDF_MAC_ADDR_SIZE);
+
+	pe_debug("Processing sta stats Report req %d num_active_req:%d",
+		 index, mac->rrm.rrmPEContext.num_active_request);
+
+	rrm_status = rrm_process_sta_stats_report_req(mac, curr_req,
+		&rrm_req->MeasurementRequest[index], session_entry);
+	if (eRRM_SUCCESS != rrm_status)
+		goto failure;
+
+	return QDF_STATUS_SUCCESS;
+failure:
+	rrm_process_rrm_sta_stats_request_failure(
+			mac, session_entry, peer, rrm_status, index);
+
+	rrm_cleanup(mac, index);
+	return QDF_STATUS_E_FAILURE;
+}
+
 /* -------------------------------------------------------------------- */
+/**
+ * rrm_get_max_meas_duration() - calculate max measurement duration for a
+ * rrm req
+ * @mac: global mac context
+ * @pe_session: per vdev pe context
+ *
+ * Return: max measurement duration
+ */
+static uint16_t rrm_get_max_meas_duration(struct mac_context *mac,
+					  struct pe_session *pe_session)
+{
+	int8_t max_dur;
+	uint16_t max_meas_dur, sign;
+
+	/*
+	 * The logic here is to check the measurement duration passed in the
+	 * beacon request. Following are the cases handled.
+	 * Case 1: If measurement duration received in the beacon request is
+	 * greater than the max measurement duration advertised in the RRM
+	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 1,
+	 * REFUSE the beacon request.
+	 * Case 2: If measurement duration received in the beacon request is
+	 * greater than the max measurement duration advertised in the RRM
+	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 0,
+	 * perform measurement for the duration advertised in the
+	 * RRM capabilities
+	 * maxMeasurementDuration = 2^(nonOperatingChanMax - 4) * BeaconInterval
+	 */
+	max_dur = mac->rrm.rrmPEContext.rrmEnabledCaps.nonOperatingChanMax - 4;
+	sign = (max_dur < 0) ? 1 : 0;
+	max_dur = (1L << ABS(max_dur));
+	if (!sign)
+		max_meas_dur =
+			max_dur * pe_session->beaconParams.beaconInterval;
+	else
+		max_meas_dur =
+			pe_session->beaconParams.beaconInterval / max_dur;
+
+	return max_meas_dur;
+}
+
 /**
  * rrm_process_beacon_report_req
  *
@@ -635,8 +1188,6 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 	tpSirBeaconReportReqInd psbrr;
 	uint8_t num_rpt, idx_rpt;
 	uint16_t measDuration, maxMeasduration;
-	int8_t maxDuration;
-	uint8_t sign;
 	tDot11fIEAPChannelReport *ie_ap_chan_rpt;
 	uint8_t tmp_idx, buf_left, buf_cons;
 	uint16_t ch_ctr = 0;
@@ -650,9 +1201,8 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		return eRRM_INCAPABLE;
 	}
 
-	if (pBeaconReq->measurement_request.Beacon.BeaconReporting.present &&
-	    (pBeaconReq->measurement_request.Beacon.BeaconReporting.
-	     reportingCondition != 0)) {
+	if (pBeaconReq->measurement_request.Beacon.rrm_reporting.present &&
+	    (pBeaconReq->measurement_request.Beacon.rrm_reporting.reporting_condition != 0)) {
 		/* Repeated measurement is not supported. This means number of repetitions should be zero.(Already checked) */
 		/* All test case in VoWifi(as of version 0.36)  use zero for number of repetitions. */
 		/* Beacon reporting should not be included in request if number of repetitons is zero. */
@@ -662,33 +1212,14 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		return eRRM_INCAPABLE;
 	}
 
-	/* The logic here is to check the measurement duration passed in the beacon request. Following are the cases handled.
-	   Case 1: If measurement duration received in the beacon request is greater than the max measurement duration advertised
-	   in the RRM capabilities(Assoc Req), and Duration Mandatory bit is set to 1, REFUSE the beacon request
-	   Case 2: If measurement duration received in the beacon request is greater than the max measurement duration advertised
-	   in the RRM capabilities(Assoc Req), and Duration Mandatory bit is set to 0, perform measurement for
-	   the duration advertised in the RRM capabilities
-
-	   maxMeasurementDuration = 2^(nonOperatingChanMax - 4) * BeaconInterval
-	 */
-	maxDuration =
-		mac->rrm.rrmPEContext.rrmEnabledCaps.nonOperatingChanMax - 4;
-	sign = (maxDuration < 0) ? 1 : 0;
-	maxDuration = (1L << ABS(maxDuration));
-	if (!sign)
-		maxMeasduration =
-			maxDuration * pe_session->beaconParams.beaconInterval;
-	else
-		maxMeasduration =
-			pe_session->beaconParams.beaconInterval / maxDuration;
-
+	maxMeasduration = rrm_get_max_meas_duration(mac, pe_session);
 	if( pBeaconReq->measurement_request.Beacon.meas_mode ==
 	   eSIR_PASSIVE_SCAN)
 		maxMeasduration += 10;
 
 	measDuration = pBeaconReq->measurement_request.Beacon.meas_duration;
 
-	pe_nofl_info("RX: [802.11 BCN_RPT] seq:%d SSID:" QDF_SSID_FMT " BSSID:" QDF_MAC_ADDR_FMT " Token:%d op_class:%d ch:%d meas_mode:%d meas_duration:%d max_dur: %d sign: %d max_meas_dur: %d",
+	pe_nofl_info("RX: [802.11 BCN_RPT] seq:%d SSID:" QDF_SSID_FMT " BSSID:" QDF_MAC_ADDR_FMT " Token:%d op_class:%d ch:%d meas_mode:%d meas_duration:%d max_meas_dur: %d",
 		     mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
 		     QDF_SSID_REF(
 			pBeaconReq->measurement_request.Beacon.SSID.num_ssid,
@@ -699,7 +1230,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		     pBeaconReq->measurement_request.Beacon.regClass,
 		     pBeaconReq->measurement_request.Beacon.channel,
 		     pBeaconReq->measurement_request.Beacon.meas_mode,
-		     measDuration, maxDuration, sign, maxMeasduration);
+		     measDuration, maxMeasduration);
 
 	req_mode = (pBeaconReq->parallel << 0) | (pBeaconReq->enable << 1) |
 		   (pBeaconReq->request << 2) | (pBeaconReq->report << 3) |
@@ -1371,6 +1902,282 @@ QDF_STATUS rrm_process_beacon_req(struct mac_context *mac_ctx, tSirMacAddr peer,
 	return QDF_STATUS_SUCCESS;
 }
 
+
+/**
+ * rrm_process_channel_load_req() - process channel load request from AP
+ * @mac: global mac context
+ * @pe_session: per-vdev PE context
+ * @curr_req: current measurement req in progress
+ * @peer: Macaddress of the peer requesting the radio measurement
+ * @chan_load_req: channel load request received from AP
+ *
+ * return tRrmRetStatus
+ */
+static tRrmRetStatus
+rrm_process_channel_load_req(struct mac_context *mac,
+			     struct pe_session *pe_session,
+			     tpRRMReq curr_req, tSirMacAddr peer,
+			     tDot11fIEMeasurementRequest *chan_load_req)
+{
+	struct scheduler_msg msg = {0};
+	struct ch_load_ind *load_ind;
+	uint8_t op_class, channel, reporting_condition;
+	uint16_t randomization_intv, meas_duration, max_meas_duration;
+	bool present;
+
+	present = chan_load_req->measurement_request.channel_load.rrm_reporting.present;
+	reporting_condition = chan_load_req->measurement_request.channel_load.rrm_reporting.reporting_condition;
+	if (present && reporting_condition != 0) {
+		pe_err("Dropping req: Reporting condition is not zero");
+		return eRRM_INCAPABLE;
+	}
+
+	op_class = chan_load_req->measurement_request.channel_load.op_class;
+	channel = chan_load_req->measurement_request.channel_load.channel;
+	meas_duration =
+		chan_load_req->measurement_request.channel_load.meas_duration;
+	randomization_intv =
+	     chan_load_req->measurement_request.channel_load.randomization_intv;
+	max_meas_duration = rrm_get_max_meas_duration(mac, pe_session);
+	if (max_meas_duration < meas_duration) {
+		if (chan_load_req->durationMandatory) {
+			pe_nofl_err("RX:[802.11 CH_LOAD] Dropping the req: duration mandatory & max duration > meas duration");
+			return eRRM_REFUSED;
+		} else {
+			meas_duration = max_meas_duration;
+		}
+	}
+	pe_debug("RX:[802.11 CH_LOAD] seq:%d Token:%d op_c:%d ch:%d meas_dur:%d, rand intv: %d, max_dur:%d",
+		 mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
+		 chan_load_req->measurement_token, op_class,
+		 channel, meas_duration, randomization_intv,
+		 max_meas_duration);
+	if (!meas_duration || meas_duration > RRM_SCAN_MAX_DWELL_TIME)
+		return eRRM_REFUSED;
+
+	/* Prepare the request to send to SME. */
+	load_ind = qdf_mem_malloc(sizeof(struct ch_load_ind));
+	if (!load_ind)
+		return eRRM_FAILURE;
+
+	qdf_mem_copy(load_ind->peer_addr.bytes, peer,
+		     sizeof(struct qdf_mac_addr));
+	load_ind->message_type = eWNI_SME_CHAN_LOAD_REQ_IND;
+	load_ind->length = sizeof(struct ch_load_ind);
+	load_ind->dialog_token = chan_load_req->measurement_token;
+	load_ind->msg_source = eRRM_MSG_SOURCE_11K;
+	load_ind->randomization_intv = SYS_TU_TO_MS(randomization_intv);
+	load_ind->measurement_idx = curr_req->measurement_idx;
+	load_ind->channel = channel;
+	load_ind->op_class = op_class;
+	load_ind->meas_duration = meas_duration;
+	curr_req->token = chan_load_req->measurement_token;
+	/* Send request to SME. */
+	msg.type = eWNI_SME_CHAN_LOAD_REQ_IND;
+	msg.bodyptr = load_ind;
+	MTRACE(mac_trace(mac, TRACE_CODE_TX_SME_MSG,
+			 pe_session->vdev_id, msg.type));
+	lim_sys_process_mmh_msg_api(mac, &msg);
+	return eRRM_SUCCESS;
+}
+
+/**
+ * rrm_process_chan_load_request_failure() - process channel load request
+ * in case of failure
+ * @mac: global mac context
+ * @pe_session: per-vdev PE context
+ * @peer: peer mac address
+ * @status:failure status of channel load request
+ * @index: request index
+ *
+ * return none
+ */
+static void
+rrm_process_chan_load_request_failure(struct mac_context *mac,
+				      struct pe_session *pe_session,
+				      tSirMacAddr peer,
+				      tRrmRetStatus status, uint8_t index)
+{
+	tpSirMacRadioMeasureReport report = NULL;
+	tpRRMReq curr_req = mac->rrm.rrmPEContext.pCurrentReq[index];
+
+	if (!curr_req) {
+		pe_debug("Current request is NULL");
+		goto cleanup;
+	}
+	report = qdf_mem_malloc(sizeof(tSirMacRadioMeasureReport));
+	if (!report)
+		goto cleanup;
+	report->token = curr_req->token;
+	report->type = SIR_MAC_RRM_CHANNEL_LOAD_TYPE;
+	pe_debug("vdev:%d measurement index:%d status %d token %d",
+		 pe_session->vdev_id, index, status, report->token);
+	switch (status) {
+	case eRRM_REFUSED:
+	case eRRM_FAILURE:
+		report->refused = 1;
+		break;
+	case eRRM_INCAPABLE:
+		report->incapable = 1;
+		break;
+	default:
+		goto free;
+	}
+
+	lim_send_radio_measure_report_action_frame(mac, curr_req->dialog_token,
+						   1, true, report, peer,
+						   pe_session);
+free:
+	qdf_mem_free(report);
+cleanup:
+	rrm_cleanup(mac, index);
+}
+
+void
+rrm_process_chan_load_report_xmit(struct mac_context *mac_ctx,
+				  struct chan_load_xmit_ind *chan_load_ind)
+{
+	tSirMacRadioMeasureReport *report = NULL;
+	struct chan_load_report *channel_load_report;
+	tpRRMReq curr_req;
+	struct pe_session *session_entry;
+	uint8_t session_id, idx;
+	struct qdf_mac_addr sessionBssId;
+
+	if (!chan_load_ind) {
+		pe_err("Received chan_load_xmit_ind is NULL in PE");
+		return;
+	}
+
+	idx = chan_load_ind->measurement_idx;
+
+	if (idx >= QDF_ARRAY_SIZE(mac_ctx->rrm.rrmPEContext.pCurrentReq)) {
+		pe_err("Received measurement_idx is out of range: %u - %zu",
+		       idx,
+		       QDF_ARRAY_SIZE(mac_ctx->rrm.rrmPEContext.pCurrentReq));
+		return;
+	}
+
+	curr_req = mac_ctx->rrm.rrmPEContext.pCurrentReq[idx];
+	if (!curr_req) {
+		pe_err("no request pending in PE");
+		goto end;
+	}
+
+	pe_debug("Received chan load report xmit indication on idx:%d", idx);
+
+	sessionBssId = mac_ctx->rrm.rrmSmeContext[idx].sessionBssId;
+
+	session_entry = pe_find_session_by_bssid(mac_ctx, sessionBssId.bytes,
+						 &session_id);
+	if (!session_entry) {
+		pe_err("NULL session for bssId "QDF_MAC_ADDR_FMT"",
+		       QDF_MAC_ADDR_REF(sessionBssId.bytes));
+		goto end;
+	}
+
+	if (!chan_load_ind->is_report_success) {
+		rrm_process_chan_load_request_failure(mac_ctx, session_entry,
+						      sessionBssId.bytes,
+						      eRRM_REFUSED, idx);
+		return;
+	}
+
+	report = qdf_mem_malloc(sizeof(*report));
+	if (!report)
+		goto end;
+
+	/* Prepare the channel load report and send it to the peer.*/
+	report->token = chan_load_ind->dialog_token;
+	report->refused = 0;
+	report->incapable = 0;
+	report->type = SIR_MAC_RRM_CHANNEL_LOAD_TYPE;
+
+	channel_load_report = &report[0].report.channel_load_report;
+	channel_load_report->op_class = chan_load_ind->op_class;
+	channel_load_report->channel = chan_load_ind->channel;
+	channel_load_report->rrm_scan_tsf = chan_load_ind->rrm_scan_tsf;
+	channel_load_report->meas_duration = chan_load_ind->duration;
+	channel_load_report->chan_load = chan_load_ind->chan_load;
+
+	pe_err("send chan load report for bssId:"QDF_MAC_ADDR_FMT" reg_class:%d, channel:%d, measStartTime:%llu, measDuration:%d, chan_load:%d",
+	       QDF_MAC_ADDR_REF(sessionBssId.bytes),
+	       channel_load_report->op_class,
+	       channel_load_report->channel,
+	       channel_load_report->rrm_scan_tsf,
+	       channel_load_report->meas_duration,
+	       channel_load_report->chan_load);
+
+	lim_send_radio_measure_report_action_frame(mac_ctx,
+						   curr_req->dialog_token, 1,
+						   true, &report[0],
+						   sessionBssId.bytes,
+						   session_entry);
+
+end:
+	pe_debug("Measurement done idx:%d", idx);
+	rrm_cleanup(mac_ctx, idx);
+	qdf_mem_free(report);
+
+	return;
+}
+
+/**
+ * rrm_process_chan_load_req() - process channel load request
+ * @mac_ctx: Global pointer to MAC context
+ * @session_entry: session entry
+ * @report: Pointer to radio measurement report
+ * @rrm_req: Array of Measurement request IEs
+ * @peer: mac address of the peer requesting the radio measurement
+ * @num_report: No.of reports
+ * @index: Index for Measurement request
+ *
+ * Update structure sRRMReq and struct chan_load_req_ind and pass it to
+ * rrm_process_channel_load_req().
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+rrm_process_chan_load_req(struct mac_context *mac_ctx,
+			  struct pe_session *session_entry,
+			  tpSirMacRadioMeasureReport *report,
+			  tDot11fRadioMeasurementRequest *rrm_req,
+			  tSirMacAddr peer, uint8_t *num_report, int index)
+{
+	tRrmRetStatus rrm_status = eRRM_SUCCESS;
+	tpRRMReq curr_req;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (index  >= MAX_MEASUREMENT_REQUEST) {
+		status = rrm_reject_req(report, rrm_req, num_report, index,
+			       rrm_req->MeasurementRequest[0].measurement_type);
+		return status;
+	}
+
+	curr_req = qdf_mem_malloc(sizeof(*curr_req));
+	if (!curr_req) {
+		mac_ctx->rrm.rrmPEContext.pCurrentReq[index] = NULL;
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	curr_req->dialog_token = rrm_req->DialogToken.token;
+	curr_req->token =
+		rrm_req->MeasurementRequest[index].measurement_token;
+	curr_req->measurement_idx = index;
+	mac_ctx->rrm.rrmPEContext.pCurrentReq[index] = curr_req;
+	mac_ctx->rrm.rrmPEContext.num_active_request++;
+	pe_debug("Processing channel load req index: %d num_active_req:%d",
+		 index, mac_ctx->rrm.rrmPEContext.num_active_request);
+	rrm_status = rrm_process_channel_load_req(mac_ctx, session_entry,
+				curr_req, peer,
+				&rrm_req->MeasurementRequest[index]);
+	if (eRRM_SUCCESS != rrm_status)
+		rrm_process_chan_load_request_failure(mac_ctx, session_entry,
+						      peer, rrm_status, index);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * update_rrm_report() - Set incapable bit
  * @mac_ctx: Global pointer to MAC context
@@ -1532,6 +2339,16 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 
 	for (i = 0; i < rrm_req->num_MeasurementRequest; i++) {
 		switch (rrm_req->MeasurementRequest[i].measurement_type) {
+		case SIR_MAC_RRM_CHANNEL_LOAD_TYPE:
+			/* Process channel load request */
+			status = rrm_process_chan_load_req(mac_ctx,
+							   session_entry,
+							   &report,
+							   rrm_req, peer,
+							   &num_report, i);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
+			break;
 		case SIR_MAC_RRM_BEACON_TYPE:
 			/* Process beacon request. */
 			status = rrm_process_beacon_req(mac_ctx, peer,
@@ -1540,6 +2357,12 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 							i);
 			if (QDF_IS_STATUS_ERROR(status))
 				return status;
+			break;
+		case SIR_MAC_RRM_STA_STATISTICS_TYPE:
+		     status = rrm_process_sta_stats_req(mac_ctx, peer,
+							session_entry, &report,
+							rrm_req, &num_report,
+							i);
 			break;
 		case SIR_MAC_RRM_LCI_TYPE:
 		case SIR_MAC_RRM_LOCATION_CIVIC_TYPE:
@@ -1650,19 +2473,30 @@ void rrm_cleanup(struct mac_context *mac, uint8_t idx)
 {
 	tpRRMReq cur_rrm_req = NULL;
 
-	mac->rrm.rrmPEContext.num_active_request--;
-	pe_debug("Beacon report cleanup idx:%d, num_active_request:%d",
-		 idx, mac->rrm.rrmPEContext.num_active_request);
+	if (mac->rrm.rrmPEContext.num_active_request)
+		mac->rrm.rrmPEContext.num_active_request--;
+
 	cur_rrm_req = mac->rrm.rrmPEContext.pCurrentReq[idx];
 	if (!cur_rrm_req)
 		return;
+	if (cur_rrm_req->request.Beacon.reqIes.num) {
+		qdf_mem_free(cur_rrm_req->request.Beacon.reqIes.pElementIds);
+		cur_rrm_req->request.Beacon.reqIes.pElementIds = NULL;
+		cur_rrm_req->request.Beacon.reqIes.num = 0;
+	}
 
-	qdf_mem_free(cur_rrm_req->request.Beacon.reqIes.pElementIds);
-	cur_rrm_req->request.Beacon.reqIes.pElementIds = NULL;
-	cur_rrm_req->request.Beacon.reqIes.num = 0;
-
+	if (cur_rrm_req->type == SIR_MAC_RRM_STA_STATISTICS_TYPE) {
+		pe_debug("deactivate rrm sta stats timer");
+		lim_deactivate_and_change_timer(mac,
+						eLIM_RRM_STA_STATS_RSP_TIMER);
+		qdf_mem_zero(&mac->rrm.rrmPEContext.rrm_sta_stats,
+			     sizeof(mac->rrm.rrmPEContext.rrm_sta_stats));
+	}
 	qdf_mem_free(cur_rrm_req);
 	mac->rrm.rrmPEContext.pCurrentReq[idx] = NULL;
+
+	pe_debug("cleanup rrm req idx:%d, num_active_request:%d",
+		 idx, mac->rrm.rrmPEContext.num_active_request);
 }
 
 /**

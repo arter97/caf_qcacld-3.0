@@ -538,7 +538,6 @@ _fixed_srcs = [
     "core/hdd/src/wlan_hdd_wowl.c",
     "core/mac/src/dph/dph_hash_table.c",
     "core/mac/src/pe/lim/lim_admit_control.c",
-    #"core/mac/src/pe/lim/lim_aid_mgmt.c",
     "core/mac/src/pe/lim/lim_api.c",
     "core/mac/src/pe/lim/lim_assoc_utils.c",
     "core/mac/src/pe/lim/lim_ft.c",
@@ -1496,13 +1495,13 @@ _conditional_srcs = {
         ],
     },
     #"LEGACY_CONFIG_WLAN_FASTPATH": {
-        #True: [
-        #    "core/dp/txrx/ol_tx_ll_fastpath.c",
-        #],
-	#TODO: Will need to create a separate flag to handle false case
-        #False: [
-        #    "core/dp/txrx/ol_tx_ll_legacy.c",
-        #],
+    #True: [
+    #    "core/dp/txrx/ol_tx_ll_fastpath.c",
+    #],
+    #TODO: Will need to create a separate flag to handle false case
+    #False: [
+    #    "core/dp/txrx/ol_tx_ll_legacy.c",
+    #],
     #},
     "CONFIG_WLAN_FEATURE_11AX": {
         True: [
@@ -1534,12 +1533,14 @@ _conditional_srcs = {
             "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_sta.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_t2lm.c",
             "components/umac/mlme/mlo_mgr/src/wlan_epcs_api.c",
+            "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_link_switch.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_epcs.c",
             "components/umac/mlme/mlo_mgr/dispatcher/src/wlan_mlo_epcs_ucfg_api.c",
             "cmn/wmi/src/wmi_unified_11be_api.c",
             "cmn/wmi/src/wmi_unified_11be_tlv.c",
             "components/umac/mlme/mlo_mgr/src/wlan_mlo_mgr_roam.c",
             "components/umac/mlme/mlo_mgr/src/wlan_t2lm_api.c",
+            "components/umac/mlme/mlo_mgr/src/wlan_mlo_link_force.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_ACTION_OUI": {
@@ -1745,7 +1746,7 @@ _conditional_srcs = {
             "os_if/twt/src/osif_twt_ext_util.c",
             # TODO: rest being removed by David's TWT change
             #            "components/mlme/core/src/wlan_mlme_twt_api.c",
-	    # TODO: to be removed by David's TWT change
+            # TODO: to be removed by David's TWT change
             "components/mlme/dispatcher/src/wlan_mlme_twt_ucfg_api.c",
             "core/wma/src/wma_twt.c",
         ],
@@ -1866,6 +1867,16 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_dfsnol.c",
         ],
     },
+    "CONFIG_WLAN_SYSFS_WDS_MODE": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_wds_mode.c",
+        ],
+    },
+    "CONFIG_WLAN_SYSFS_ROAM_TRIGGER_BITMAP": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_roam_trigger_bitmap.c",
+        ],
+    },
     "CONFIG_WLAN_SYSFS_DP_STATS": {
         True: [
             "core/hdd/src/wlan_hdd_sysfs_txrx_stats_console.c",
@@ -1961,6 +1972,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_thermal_cfg.c",
         ],
     },
+    "CONFIG_WLAN_SYSFS_BITRATES": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_bitrates.c",
+        ],
+    },
     "CONFIG_WLAN_TRACEPOINTS": {
         True: [
             "cmn/qdf/linux/src/qdf_tracepoint.c",
@@ -2048,11 +2064,11 @@ _conditional_srcs = {
     },
     "CONFIG_WLAN_FEATURE_LL_LT_SAP": {
         True: [
-           "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_ucfg_api.c",
-           "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_sap_main.c",
+            "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_ucfg_api.c",
+            "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_lt_sap_main.c",
+            "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_sap_main.c",
         ],
     },
-
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
@@ -2079,29 +2095,89 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         copts.append("-include")
         copts.append(i)
 
+    feature_grep_map = [
+        {
+            "pattern": "walt_get_cpus_taken",
+            "file": "kernel/sched/walt/walt.c",
+            "flag": "WALT_GET_CPU_TAKEN_SUPPORT",
+        },
+        {
+            "pattern": "nl80211_validate_key_link_id",
+            "file": "net/wireless/nl80211.c",
+            "flag": "CFG80211_MLO_KEY_OPERATION_SUPPORT",
+        },
+        {
+            "pattern": "struct link_station_parameters",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_LINK_STA_PARAMS_PRESENT",
+        },
+        {
+            "pattern": "NL80211_EXT_FEATURE_PUNCT",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "NL80211_EXT_FEATURE_PUNCT_SUPPORT",
+        },
+        {
+            "pattern": "unsigned int link_id, u16 punct_bitmap",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_RU_PUNCT_NOTIFY",
+        },
+        {
+            "pattern": "NL80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA",
+        },
+    ]
+
+    cmd = 'touch "$@"\n'
+    for feature_grep in feature_grep_map:
+        cmd += """
+          if grep -qF "{pattern}" $(location //msm-kernel:{file}); then
+            echo "#define {flag} (1)" >> "$@"
+          fi
+        """.format(
+            pattern = feature_grep["pattern"],
+            file = feature_grep["file"],
+            flag = feature_grep["flag"],
+        )
+
+    grepSrcFiles = []
+    for e in feature_grep_map:
+        grepSrcFiles.append("//msm-kernel:{}".format(e["file"]))
+
+    depsetSrc = depset(grepSrcFiles)
+    native.genrule(
+        name = "{}_grep_defines".format(tvc),
+        outs = ["configs/grep_defines_{}.h".format(tvc)],
+        srcs = depsetSrc.to_list(),
+        cmd = cmd,
+    )
+
+    copts.append("-include")
+    copts.append("$(location :{}_grep_defines)".format(tvc))
+
     native.genrule(
         name = "configs/{}_defconfig_generate_consolidate".format(tvc),
         outs = ["configs/{}_defconfig.generated_consolidate".format(tvc)],
-	srcs = [
-		"configs/{}_gki_{}_defconfig".format(target,chipset),
-		"configs/{}_consolidate_{}_defconfig".format(target,chipset),
-	],
-	cmd = "cat $(SRCS) > $@",
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+            "configs/{}_consolidate_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
     )
     native.genrule(
         name = "configs/{}_defconfig_generate_gki".format(tvc),
         outs = ["configs/{}_defconfig.generated_gki".format(tvc)],
-	srcs = [
-		"configs/{}_gki_{}_defconfig".format(target,chipset),
-	],
-	cmd = "cat $(SRCS) > $@",
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
     )
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
     out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
     kconfig = "Kconfig"
-    defconfig = ":configs/{}_defconfig_generate_{}".format(tvc,variant)
+    defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
     print("name=", name)
     print("hw=", hw)
@@ -2115,7 +2191,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     ddk_module(
         name = name,
-        srcs = srcs,
+        srcs = srcs + [":{}_grep_defines".format(tvc)],
         includes = ipaths + ["."],
         kconfig = kconfig,
         defconfig = defconfig,
@@ -2130,8 +2206,8 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
             "//msm-kernel:all_headers",
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
-	    "//vendor/qcom/opensource/dataipa:include_headers",
-	    "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
+            "//vendor/qcom/opensource/dataipa:include_headers",
+            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ],
     )
 

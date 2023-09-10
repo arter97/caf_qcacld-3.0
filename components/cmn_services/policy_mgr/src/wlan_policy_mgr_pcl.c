@@ -1083,6 +1083,7 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t sta_gc_6ghz_freq = 0;
 	uint32_t ap_pwr_type_6g = 0;
 	bool indoor_ch_support = false;
+	bool keep_6ghz_sta_cli_conn;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1130,10 +1131,12 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("STA power type : %d", ap_pwr_type_6g);
 
 	ucfg_mlme_get_indoor_channel_support(psoc, &indoor_ch_support);
-
+	keep_6ghz_sta_cli_conn = wlan_reg_get_keep_6ghz_sta_cli_connection(
+								pm_ctx->pdev);
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl_list_org[i])) {
-			if (!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]))
+			if (!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]) ||
+			    keep_6ghz_sta_cli_conn)
 				continue;
 			if (ap_pwr_type_6g == REG_VERY_LOW_POWER_AP)
 				goto add_freq;
@@ -1760,6 +1763,8 @@ enum policy_mgr_one_connection_mode
 			index = PM_NAN_DISC_24_1x1;
 		else
 			index = PM_NAN_DISC_24_2x2;
+	} else if (PM_LL_LT_SAP_MODE == pm_conc_connection_list[0].mode) {
+		index = PM_LL_LT_SAP_5_2x2;
 	}
 
 	policy_mgr_debug("mode:%d freq:%d chain:%d index:%d",
@@ -3476,7 +3481,7 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 	ch_weight_len = *ch_cnt;
 
 	/* check the channel avoidance list for beaconing entities */
-	if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE)
+	if (policy_mgr_is_beaconing_mode(mode))
 		policy_mgr_update_with_safe_channel_list(
 			psoc, ch_freq_list, ch_cnt, ch_weight_list,
 			ch_weight_len);
@@ -3927,10 +3932,7 @@ QDF_STATUS policy_mgr_get_valid_chan_weights(struct wlan_objmgr_psoc *psoc,
 		 * vdev is SAP/P2PGO/P2PGC.
 		 */
 		if ((mode == PM_P2P_GO_MODE || mode == PM_P2P_CLIENT_MODE) &&
-		    (policy_mgr_mode_specific_connection_count(
-						psoc, PM_SAP_MODE, NULL) ||
-		     policy_mgr_mode_specific_connection_count(
-						psoc, PM_P2P_GO_MODE, NULL) ||
+		    ((policy_mgr_get_beaconing_mode_count(psoc, NULL)) ||
 		     policy_mgr_mode_specific_connection_count(
 					psoc, PM_P2P_CLIENT_MODE, NULL)))
 			strict_follow_pcl = true;
@@ -4305,8 +4307,7 @@ bool policy_mgr_is_sta_chan_valid_for_connect_and_roam(
 	skip_6g_and_indoor_freq =
 		wlan_scan_cfg_skip_6g_and_indoor_freq(psoc);
 	sap_count =
-		policy_mgr_mode_specific_connection_count(psoc, PM_SAP_MODE,
-							  NULL);
+		policy_mgr_get_sap_mode_count(psoc, NULL);
 	/*
 	 * Do not allow STA to connect/roam on 6Ghz or indoor channel for
 	 * non-dbs hardware if SAP is present and skip_6g_and_indoor_freq_scan
@@ -4393,7 +4394,7 @@ policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
 }
 
 bool
-policy_mgr_is_vdev_ht_ll_sap(struct wlan_objmgr_psoc *psoc,
+policy_mgr_is_vdev_ll_ht_sap(struct wlan_objmgr_psoc *psoc,
 			     uint32_t vdev_id)
 {
 	return _policy_mgr_is_vdev_ll_sap(psoc, vdev_id, LL_AP_TYPE_HT);

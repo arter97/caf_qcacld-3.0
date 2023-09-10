@@ -681,7 +681,6 @@ static void sme_state_info_dump(char **buf_ptr, uint16_t *size)
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
 	if (!mac_handle) {
-		QDF_ASSERT(0);
 		return;
 	}
 
@@ -2696,6 +2695,7 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		break;
 	case eWNI_SME_NEIGHBOR_REPORT_IND:
 	case eWNI_SME_BEACON_REPORT_REQ_IND:
+	case eWNI_SME_CHAN_LOAD_REQ_IND:
 		if (pMsg->bodyptr) {
 			status = sme_rrm_msg_processor(mac, pMsg->type,
 						       pMsg->bodyptr);
@@ -11068,7 +11068,7 @@ int sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id,
 	sme_debug("EHT OMI: BW %d rx nss %d tx nss %d", omi_data->eht_ch_bw_ext,
 		  omi_data->eht_rx_nss_ext, omi_data->eht_tx_nss_ext);
 
-	qdf_mem_copy(&param_val, omi_data, sizeof(omi_data));
+	qdf_mem_copy(&param_val, omi_data, sizeof(param_val));
 	wlan_mlme_get_bssid_vdev_id(mac_ctx->pdev, session_id,
 				    &connected_bssid);
 	sme_debug("param val %08X, bssid:"QDF_MAC_ADDR_FMT, param_val,
@@ -14717,6 +14717,20 @@ void sme_set_bss_max_idle_period(mac_handle_t mac_handle, uint16_t cfg_val)
 	mac_ctx->mlme_cfg->sta.bss_max_idle_period = cfg_val;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void sme_set_eht_mcs_info(struct mac_context *mac_ctx)
+{
+	mac_ctx->eht_cap_2g.bw_le_80_rx_max_nss_for_mcs_0_to_9 = 1;
+	mac_ctx->eht_cap_2g.bw_le_80_tx_max_nss_for_mcs_0_to_9 = 1;
+}
+#else
+#ifdef WLAN_FEATURE_11AX
+static void sme_set_eht_mcs_info(struct mac_context *mac_ctx)
+{
+}
+#endif
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		       enum eSirMacHTChannelWidth chwidth)
@@ -14779,6 +14793,7 @@ void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		mac_ctx->he_cap_5g.chan_width_1 = 1;
 		fallthrough;
 	case eHT_CHANNEL_WIDTH_40MHZ:
+		sme_set_eht_mcs_info(mac_ctx);
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 1;
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
 		mac_ctx->he_cap_2g.chan_width_0 = 1;
@@ -14980,6 +14995,7 @@ void sme_set_mlo_max_links(mac_handle_t mac_handle, uint8_t vdev_id,
 		return;
 	}
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, val);
+	wlan_mlme_set_user_set_link_num(mac_ctx->psoc, val);
 }
 
 void sme_set_mlo_max_simultaneous_links(mac_handle_t mac_handle,

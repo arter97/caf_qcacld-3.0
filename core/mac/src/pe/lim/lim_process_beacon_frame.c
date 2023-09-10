@@ -120,6 +120,11 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		return;
 	}
 
+	if (bcn_ptr->mlo_ie.mlo_ie.medium_sync_delay_info_present) {
+		wlan_vdev_mlme_cap_clear(vdev, WLAN_VDEV_C_EMLSR_CAP);
+		pe_debug("EMLSR not supported with D2.0 AP");
+	}
+
 	for (i = 0; i < bcn_ptr->mlo_ie.mlo_ie.num_sta_profile; i++) {
 		csa_ie = NULL;
 		xcsa_ie = NULL;

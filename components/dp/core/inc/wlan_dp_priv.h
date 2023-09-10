@@ -415,6 +415,7 @@ struct fisa_pkt_hist {
  * @rx_flow_tuple_info: RX tuple information
  * @napi_id: NAPI ID (REO ID) on which the flow is being received
  * @vdev: VDEV handle corresponding to the FLOW
+ * @dp_intf: DP interface handle corresponding to the flow
  * @bytes_aggregated: Number of bytes currently aggregated
  * @flush_count: Number of Flow flushes done
  * @aggr_count: Aggregation count
@@ -432,6 +433,7 @@ struct fisa_pkt_hist {
  * @flow_init_ts: FLOW init timestamp
  * @last_accessed_ts: Timestamp when the flow was last accessed
  * @pkt_hist: FISA aggreagtion packets history
+ * @same_mld_vdev_mismatch: Packets flushed after vdev_mismatch on same MLD
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -456,6 +458,7 @@ struct dp_fisa_rx_sw_ft {
 	struct cdp_rx_flow_tuple_info rx_flow_tuple_info;
 	uint8_t napi_id;
 	struct dp_vdev *vdev;
+	struct wlan_dp_intf *dp_intf;
 	uint64_t bytes_aggregated;
 	uint32_t flush_count;
 	uint32_t aggr_count;
@@ -478,6 +481,7 @@ struct dp_fisa_rx_sw_ft {
 #ifdef WLAN_SUPPORT_RX_FISA_HIST
 	struct fisa_pkt_hist pkt_hist;
 #endif
+	uint64_t same_mld_vdev_mismatch;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)
@@ -574,8 +578,6 @@ struct dp_rx_fst {
  * @device_mode: Device Mode
  * @intf_id: Interface ID
  * @node: list node for membership in the interface list
- * @vdev: object manager vdev context
- * @vdev_lock: vdev spin lock
  * @dev: netdev reference
  * @txrx_ops: Interface tx-rx ops
  * @dp_stats: Device TX/RX statistics
@@ -605,14 +607,21 @@ struct dp_rx_fst {
  * @sap_tx_block_mask: SAP TX block mask
  * @gro_disallowed: GRO disallowed flag
  * @gro_flushed: GRO flushed flag
+ * @fisa_disallowed: Flag to indicate fisa aggregation not to be done for a
+ *		     particular rx_context
+ * @fisa_force_flushed: Flag to indicate FISA flow has been flushed for a
+ *			particular rx_context
  * @runtime_disable_rx_thread: Runtime Rx thread flag
  * @rx_stack: function pointer Rx packet handover
  * @tx_fn: function pointer to send Tx packet
- * @conn_info: STA connection information
  * @bss_state: AP BSS state
  * @qdf_sta_eap_frm_done_event: EAP frame event management
  * @traffic_end_ind: store traffic end indication info
  * @direct_link_config: direct link configuration parameters
+ * @num_links: Number of links for this DP interface
+ * @def_link: Pointer to default link (usually used for TX operation)
+ * @dp_link_list_lock: Lock to protect dp_link_list operatiosn
+ * @dp_link_list: List of dp_links for this DP interface
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -623,12 +632,8 @@ struct wlan_dp_intf {
 
 	enum QDF_OPMODE device_mode;
 
-	uint8_t intf_id;
-
 	qdf_list_node_t node;
 
-	struct wlan_objmgr_vdev *vdev;
-	qdf_spinlock_t vdev_lock;
 	qdf_netdev_t dev;
 	struct ol_txrx_ops txrx_ops;
 	struct dp_stats dp_stats;
@@ -665,8 +670,15 @@ struct wlan_dp_intf {
 	qdf_atomic_t gro_disallowed;
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
 
+#ifdef WLAN_SUPPORT_RX_FISA
+	/*
+	 * Params used for controlling the fisa aggregation dynamically
+	 */
+	uint8_t fisa_disallowed[MAX_REO_DEST_RINGS];
+	uint8_t fisa_force_flushed[MAX_REO_DEST_RINGS];
+#endif
+
 	bool runtime_disable_rx_thread;
-	struct wlan_dp_conn_info conn_info;
 
 	enum bss_intf_state bss_state;
 	qdf_event_t qdf_sta_eap_frm_done_event;
@@ -674,6 +686,30 @@ struct wlan_dp_intf {
 #ifdef FEATURE_DIRECT_LINK
 	struct direct_link_info direct_link_config;
 #endif
+	uint8_t num_links;
+	struct wlan_dp_link *def_link;
+	qdf_spinlock_t dp_link_list_lock;
+	qdf_list_t dp_link_list;
+};
+
+/**
+ * struct wlan_dp_link - DP link (corresponds to objmgr vdev)
+ * @node: list node for membership in the DP links list
+ * @link_id: ID for this DP link (Same as vdev_id)
+ * @mac_addr: mac address of this link
+ * @dp_intf: Parent DP interface for this DP link
+ * @vdev: object manager vdev context
+ * @vdev_lock: vdev spin lock
+ * @conn_info: STA connection information
+ */
+struct wlan_dp_link {
+	qdf_list_node_t node;
+	uint8_t link_id;
+	struct qdf_mac_addr mac_addr;
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_objmgr_vdev *vdev;
+	qdf_spinlock_t vdev_lock;
+	struct wlan_dp_conn_info conn_info;
 };
 
 /**
@@ -764,6 +800,7 @@ struct dp_direct_link_context {
  * @fst_in_cmem: Flag indicating if FST is in CMEM or not
  * @fisa_enable: Flag to indicate if FISA is enabled or not
  * @fisa_lru_del_enable: Flag to indicate if LRU flow delete is enabled
+ * @fisa_dynamic_aggr_size_support: Indicate dynamic aggr size programming support
  * @skip_fisa_param: FISA skip params structure
  * @skip_fisa_param.skip_fisa: Flag to skip FISA aggr inside @skip_fisa_param
  * @skip_fisa_param.fisa_force_flush: Force flush inside @skip_fisa_param
@@ -852,6 +889,7 @@ struct wlan_dp_psoc_context {
 	bool fst_in_cmem;
 	uint8_t fisa_enable;
 	uint8_t fisa_lru_del_enable;
+	bool fisa_dynamic_aggr_size_support;
 	/*
 	 * Params used for controlling the fisa aggregation dynamically
 	 */

@@ -546,6 +546,8 @@ osif_send_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 		case HOST_ADD_TWT_STATUS_ROAM_IN_PROGRESS:
 		case HOST_ADD_TWT_STATUS_CHAN_SW_IN_PROGRESS:
 		case HOST_ADD_TWT_STATUS_SCAN_IN_PROGRESS:
+		case HOST_ADD_TWT_STATUS_LINK_SWITCH_IN_PROGRESS:
+		case HOST_ADD_TWT_STATUS_UNSUPPORTED_MODE_MLMR:
 			ret = -EBUSY;
 			break;
 		case HOST_ADD_TWT_STATUS_TWT_NOT_ENABLED:
@@ -1297,9 +1299,17 @@ osif_twt_concurrency_update_on_mcc(struct wlan_objmgr_pdev *pdev,
 	QDF_STATUS status;
 	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 	uint32_t reason;
+	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	psoc = wlan_pdev_get_psoc(pdev);
 
 	if (vdev->vdev_mlme.vdev_opmode == QDF_SAP_MODE &&
 	    vdev->vdev_mlme.mlme_state == WLAN_VDEV_S_UP) {
+		if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+			return;
+
 		osif_debug("Concurrency exist on SAP vdev");
 		reason = HOST_TWT_DISABLE_REASON_CONCURRENCY_MCC;
 		status = osif_twt_send_responder_disable_cmd(twt_arg->psoc,
@@ -1369,9 +1379,8 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 	sta_count = policy_mgr_mode_specific_connection_count(psoc,
 							      PM_STA_MODE,
 							      NULL);
-	sap_count = policy_mgr_mode_specific_connection_count(psoc,
-							      PM_SAP_MODE,
-							      NULL);
+	sap_count = policy_mgr_get_sap_mode_count(psoc, NULL);
+
 	twt_arg.psoc = psoc;
 
 	osif_debug("Total connection %d, sta_count %d, sap_count %d",

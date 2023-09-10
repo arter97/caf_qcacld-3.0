@@ -372,6 +372,28 @@ QDF_STATUS hdd_get_twt_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
  * Return: QDF_STATUS
  */
 QDF_STATUS hdd_get_twt_responder(struct wlan_objmgr_psoc *psoc, bool *val);
+
+/**
+ * wlan_hdd_resume_pmo_twt() - resume twt worker
+ * @hdd_ctx: hdd context
+ *
+ * Return: None
+ */
+void wlan_hdd_resume_pmo_twt(struct hdd_context *hdd_ctx);
+/**
+ * wlan_hdd_suspend_pmo_twt() - suspend twt worker
+ * @hdd_ctx: hdd context
+ *
+ * Return: None
+ */
+void wlan_hdd_suspend_pmo_twt(struct hdd_context *hdd_ctx);
+/**
+ * wlan_hdd_is_twt_pmo_allowed() - check twt disabled
+ * @hdd_ctx: hdd context
+ *
+ * Return: true if twt pmo is allowed otherwise false
+ */
+bool wlan_hdd_is_twt_pmo_allowed(struct hdd_context *hdd_ctx);
 #else
 static inline void hdd_update_tgt_twt_cap(struct hdd_context *hdd_ctx,
 					  struct wma_tgt_cfg *cfg)
@@ -487,6 +509,19 @@ QDF_STATUS hdd_get_twt_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	*val = false;
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void wlan_hdd_resume_pmo_twt(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline void wlan_hdd_suspend_pmo_twt(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline bool wlan_hdd_is_twt_pmo_allowed(struct hdd_context *hdd_ctx)
+{
+	return true;
 }
 
 #define FEATURE_VENDOR_SUBCMD_WIFI_CONFIG_TWT

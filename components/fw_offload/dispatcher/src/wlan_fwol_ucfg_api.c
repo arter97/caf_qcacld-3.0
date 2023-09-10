@@ -323,7 +323,7 @@ QDF_STATUS ucfg_fwol_get_ani_enabled(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS ucfg_fwol_get_pcie_config(struct wlan_objmgr_psoc *psoc,
-				     bool *pcie_config)
+				     uint8_t *pcie_config)
 {
 	struct wlan_fwol_psoc_obj *fwol_obj;
 

@@ -1254,23 +1254,21 @@ void hdd_clear_roam_profile_ie(struct hdd_adapter *adapter)
 }
 
 #if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
-static inline
-void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter)
+static inline void hdd_set_unpause_queue(void *soc, uint8_t vdev_id)
 {
-	cdp_fc_vdev_unpause(soc, adapter->deflink->vdev_id,
-			    OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED,
-			    0);
+	cdp_fc_vdev_unpause(soc, vdev_id,
+			    OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED, 0);
 }
 #else
-static inline
-void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter)
-{ }
+static inline void hdd_set_unpause_queue(void *soc, uint8_t vdev_id)
+{
+}
 #endif
 
 #ifdef FEATURE_WDS
 /**
  * hdd_config_wds_repeater_mode() - configures vdev for wds repeater mode
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @peer_addr: peer mac address
  *
  * Configure dp vdev to detect and drop multicast echo packets and enable
@@ -1278,35 +1276,37 @@ void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter)
  *
  * Return: None
  */
-static void
-hdd_config_wds_repeater_mode(struct hdd_adapter *adapter, uint8_t *peer_addr)
+static void hdd_config_wds_repeater_mode(struct wlan_hdd_link_info *link_info,
+					 uint8_t *peer_addr)
 {
 	cdp_config_param_type vdev_param;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	vdev_param.cdp_vdev_param_mec = true;
-	if (cdp_txrx_set_vdev_param(soc, adapter->deflink->vdev_id,
+	if (cdp_txrx_set_vdev_param(soc, link_info->vdev_id,
 				    CDP_ENABLE_MEC, vdev_param))
 		hdd_debug("Failed to set MEC param on DP vdev");
 
 	hdd_nofl_info("Turn on 4 address for peer: " QDF_MAC_ADDR_FMT,
 		      QDF_MAC_ADDR_REF(peer_addr));
 	if (sme_set_peer_param(peer_addr, WMI_HOST_PEER_USE_4ADDR, true,
-			       adapter->deflink->vdev_id))
+			       link_info->vdev_id))
 		hdd_err("Failed to enable WDS on vdev");
 }
 #else
 static inline void
-hdd_config_wds_repeater_mode(struct hdd_adapter *adapter, uint8_t *peer_addr)
+hdd_config_wds_repeater_mode(struct wlan_hdd_link_info *link_info,
+			     uint8_t *peer_addr)
 {
 }
 #endif
 
-QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
+QDF_STATUS hdd_change_peer_state(struct wlan_hdd_link_info *link_info,
 				 uint8_t *peer_mac,
 				 enum ol_txrx_peer_state sta_state)
 {
 	QDF_STATUS err;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
@@ -1316,23 +1316,22 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 		return QDF_STATUS_E_FAULT;
 	}
 
-	if (hdd_is_roam_sync_in_progress(hdd_ctx, adapter->deflink->vdev_id)) {
+	if (hdd_is_roam_sync_in_progress(hdd_ctx, link_info->vdev_id)) {
 		if (adapter->device_mode == QDF_STA_MODE &&
 		    (wlan_mlme_get_wds_mode(hdd_ctx->psoc) ==
 		    WLAN_WDS_MODE_REPEATER))
-			hdd_config_wds_repeater_mode(adapter, peer_mac);
+			hdd_config_wds_repeater_mode(link_info, peer_mac);
 
-		hdd_son_deliver_peer_authorize_event(adapter, peer_mac);
+		hdd_son_deliver_peer_authorize_event(link_info, peer_mac);
 		return QDF_STATUS_SUCCESS;
 	}
 
 	if (sta_state == OL_TXRX_PEER_STATE_AUTH) {
 		/* Reset scan reject params on successful set key */
 		hdd_debug("Reset scan reject params");
-		hdd_init_scan_reject_params(adapter->hdd_ctx);
+		hdd_init_scan_reject_params(hdd_ctx);
 
-		err = sme_set_peer_authorized(peer_mac,
-					      adapter->deflink->vdev_id);
+		err = sme_set_peer_authorized(peer_mac, link_info->vdev_id);
 		if (err != QDF_STATUS_SUCCESS) {
 			hdd_err("Failed to set the peer state to authorized");
 			return QDF_STATUS_E_FAULT;
@@ -1340,15 +1339,15 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 
 		if (adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-			hdd_set_unpause_queue(soc, adapter);
+			hdd_set_unpause_queue(soc, link_info->vdev_id);
 		}
 
 		if (adapter->device_mode == QDF_STA_MODE &&
 		    (wlan_mlme_get_wds_mode(hdd_ctx->psoc) ==
 		    WLAN_WDS_MODE_REPEATER))
-			hdd_config_wds_repeater_mode(adapter, peer_mac);
+			hdd_config_wds_repeater_mode(link_info, peer_mac);
 
-		hdd_son_deliver_peer_authorize_event(adapter, peer_mac);
+		hdd_son_deliver_peer_authorize_event(link_info, peer_mac);
 	}
 	return QDF_STATUS_SUCCESS;
 }
