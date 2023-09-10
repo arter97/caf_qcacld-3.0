@@ -20,6 +20,7 @@
 #include <qdf_types.h>
 struct dp_soc;
 
+#define	DP_UMAC_RESET_NOTIFY_DONE	20
 /**
  * enum umac_reset_action - Actions supported by the UMAC reset
  * @UMAC_RESET_ACTION_NONE: No action

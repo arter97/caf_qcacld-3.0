@@ -2937,8 +2937,7 @@ static uint32_t dp_service_srngs(void *dp_ctx, uint32_t dp_budget, int cpu)
 budget_done:
 	qdf_atomic_clear_bit(cpu, &soc->service_rings_running);
 
-	if (soc->notify_fw_callback)
-		soc->notify_fw_callback(soc);
+	dp_umac_reset_trigger_pre_reset_notify_cb(soc);
 
 	return dp_budget - budget;
 }
@@ -14199,12 +14198,17 @@ void dp_check_n_notify_umac_prereset_done(struct dp_soc *soc)
 	if (soc->service_rings_running)
 		return;
 
+	/* Unregister the callback */
+	dp_unregister_notify_umac_pre_reset_fw_callback(soc);
+
+	/* Check if notify was already sent by any other thread */
+	if (qdf_atomic_test_and_set_bit(DP_UMAC_RESET_NOTIFY_DONE,
+					&soc->service_rings_running))
+		return;
+
 	/* Notify the firmware that Umac pre reset is complete */
 	dp_umac_reset_notify_action_completion(soc,
 					       UMAC_RESET_ACTION_DO_PRE_RESET);
-
-	/* Unregister the callback */
-	dp_unregister_notify_umac_pre_reset_fw_callback(soc);
 }
 
 /**
@@ -14354,7 +14358,7 @@ static QDF_STATUS dp_umac_reset_service_handle_n_notify_done(struct dp_soc *soc)
 
 non_ppeds:
 	dp_register_notify_umac_pre_reset_fw_callback(soc);
-	dp_check_n_notify_umac_prereset_done(soc);
+	dp_umac_reset_trigger_pre_reset_notify_cb(soc);
 	soc->umac_reset_ctx.nbuf_list = NULL;
 	return QDF_STATUS_SUCCESS;
 }
@@ -14392,7 +14396,7 @@ static inline void dp_umac_reset_ppeds_start(struct dp_soc *soc)
 static QDF_STATUS dp_umac_reset_service_handle_n_notify_done(struct dp_soc *soc)
 {
 	dp_register_notify_umac_pre_reset_fw_callback(soc);
-	dp_check_n_notify_umac_prereset_done(soc);
+	dp_umac_reset_trigger_pre_reset_notify_cb(soc);
 	soc->umac_reset_ctx.nbuf_list = NULL;
 	return QDF_STATUS_SUCCESS;
 }
@@ -14467,6 +14471,8 @@ static QDF_STATUS dp_umac_reset_handle_post_reset_complete(struct dp_soc *soc)
 	qdf_nbuf_t nbuf_list = soc->umac_reset_ctx.nbuf_list;
 
 	soc->umac_reset_ctx.nbuf_list = NULL;
+
+	soc->service_rings_running = 0;
 
 	dp_resume_reo_send_cmd(soc);
 

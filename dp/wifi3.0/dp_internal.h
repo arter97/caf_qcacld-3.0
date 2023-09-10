@@ -3084,6 +3084,15 @@ void dp_reo_desc_freelist_destroy(struct dp_soc *soc);
 void dp_reset_rx_reo_tid_queue(struct dp_soc *soc, void *hw_qdesc_vaddr,
 			       uint32_t size);
 
+
+static inline void dp_umac_reset_trigger_pre_reset_notify_cb(struct dp_soc *soc)
+{
+	notify_pre_reset_fw_callback callback = soc->notify_fw_callback;
+
+	if (callback)
+		callback(soc);
+}
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 /**
  * dp_umac_reset_complete_umac_recovery() - Complete Umac reset session
@@ -3168,7 +3177,10 @@ QDF_STATUS dp_mlo_umac_reset_stats_print(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-
+#else
+static inline void dp_umac_reset_trigger_pre_reset_notify_cb(struct dp_soc *soc)
+{
+}
 #endif
 
 #if defined(DP_UMAC_HW_RESET_SUPPORT) && defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
