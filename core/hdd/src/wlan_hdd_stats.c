@@ -1416,6 +1416,8 @@ wlan_hdd_update_iface_stats_info(struct wlan_hdd_link_info *link_info,
 	stats->avg_rx_frms_leaked = hdd_stats->avg_rx_frms_leaked;
 	stats->rx_leak_window = hdd_stats->rx_leak_window;
 	stats->nf_cal_val = hdd_stats->nf_cal_val;
+	stats->num_peers = hdd_stats->num_peers;
+	stats->num_ac = hdd_stats->num_ac;
 
 	if_stat->rts_succ_cnt = link_info->ll_iface_stats.rts_succ_cnt;
 	if_stat->rts_fail_cnt = link_info->ll_iface_stats.rts_fail_cnt;
@@ -1890,7 +1892,7 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	u32 num_links, per_link_peers;
 	uint8_t i = 0;
-	int8_t rssi = WLAN_INVALID_PER_CHAIN_RSSI;
+	int8_t rssi = WLAN_INVALID_RSSI_VALUE;
 	struct wifi_interface_stats cumulative_if_stat = {0};
 	struct wlan_hdd_mlo_iface_stats_info info = {0};
 	struct wifi_interface_stats *stats;
@@ -1930,6 +1932,12 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 		if ((link_info->rssi != 0) && (rssi <= link_info->rssi)) {
 			rssi = link_info->rssi;
 			update_stats = true;
+			if (!hdd_get_interface_info(link_info,
+						    &cumulative_if_stat.info)) {
+				hdd_err("failed to get iface info for link %u",
+					info.link_id);
+				goto err;
+			}
 		} else {
 			update_stats = false;
 		}
