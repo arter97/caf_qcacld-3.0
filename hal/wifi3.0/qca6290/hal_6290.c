@@ -1100,9 +1100,19 @@ static void hal_hw_txrx_ops_attach_6290(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_get_tlv = hal_rx_get_tlv_6290;
 	hal_soc->ops->hal_rx_proc_phyrx_other_receive_info_tlv =
 		hal_rx_proc_phyrx_other_receive_info_tlv_6290;
+
+	hal_soc->ops->hal_rx_dump_msdu_end_tlv = hal_rx_dump_msdu_end_tlv_6290;
+	hal_soc->ops->hal_rx_dump_rx_attention_tlv =
+					hal_rx_dump_rx_attention_tlv_generic_li;
 	hal_soc->ops->hal_rx_dump_msdu_start_tlv =
 					hal_rx_dump_msdu_start_tlv_6290;
-	hal_soc->ops->hal_rx_dump_msdu_end_tlv = hal_rx_dump_msdu_end_tlv_6290;
+	hal_soc->ops->hal_rx_dump_mpdu_start_tlv =
+					hal_rx_dump_mpdu_start_tlv_generic_li;
+	hal_soc->ops->hal_rx_dump_mpdu_end_tlv =
+					hal_rx_dump_mpdu_end_tlv_generic_li;
+	hal_soc->ops->hal_rx_dump_pkt_hdr_tlv =
+					hal_rx_dump_pkt_hdr_tlv_generic_li;
+
 	hal_soc->ops->hal_get_link_desc_size = hal_get_link_desc_size_6290;
 	hal_soc->ops->hal_rx_mpdu_start_tid_get =
 					hal_rx_mpdu_start_tid_get_6290;
@@ -1120,8 +1130,6 @@ static void hal_hw_txrx_ops_attach_6290(struct hal_soc *hal_soc)
 					hal_rx_status_get_tlv_info_generic_li;
 	hal_soc->ops->hal_rx_wbm_err_info_get =
 					hal_rx_wbm_err_info_get_generic_li;
-	hal_soc->ops->hal_rx_dump_mpdu_start_tlv =
-					hal_rx_dump_mpdu_start_tlv_generic_li;
 
 	hal_soc->ops->hal_tx_set_pcp_tid_map =
 					hal_tx_set_pcp_tid_map_generic_li;
@@ -1232,6 +1240,14 @@ static void hal_hw_txrx_ops_attach_6290(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_get_first_wow_wakeup_packet =
 		hal_get_first_wow_wakeup_packet_6290;
 #endif
+	hal_soc->ops->hal_rx_tlv_get_pn_num = hal_rx_tlv_get_pn_num_li;
+	hal_soc->ops->hal_rx_tlv_mic_err_get = hal_rx_tlv_mic_err_get_li;
+	hal_soc->ops->hal_rx_tlv_decrypt_err_get =
+			hal_rx_tlv_decrypt_err_get_li;
+	hal_soc->ops->hal_rx_tlv_get_pkt_capture_flags =
+					hal_rx_tlv_get_pkt_capture_flags_li;
+	hal_soc->ops->hal_rx_mpdu_info_ampdu_flag_get =
+					hal_rx_mpdu_info_ampdu_flag_get_li;
 	hal_soc->ops->hal_compute_reo_remap_ix0 = NULL;
 };
 

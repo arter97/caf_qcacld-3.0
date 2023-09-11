@@ -148,21 +148,14 @@ static void hal_rx_dump_pkt_tlvs_li(hal_soc_handle_t hal_soc_hdl,
 				uint8_t *buf, uint8_t dbg_level)
 {
 	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
-	struct rx_attention *rx_attn = &pkt_tlvs->attn_tlv.rx_attn;
-	struct rx_mpdu_start *mpdu_start =
-				&pkt_tlvs->mpdu_start_tlv.rx_mpdu_start;
-	struct rx_msdu_start *msdu_start =
-				&pkt_tlvs->msdu_start_tlv.rx_msdu_start;
-	struct rx_mpdu_end *mpdu_end = &pkt_tlvs->mpdu_end_tlv.rx_mpdu_end;
-	struct rx_msdu_end *msdu_end = &pkt_tlvs->msdu_end_tlv.rx_msdu_end;
 	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
-	hal_rx_dump_rx_attention_tlv(rx_attn, dbg_level);
-	hal_rx_dump_mpdu_start_tlv(mpdu_start, dbg_level, hal_soc);
-	hal_rx_dump_msdu_start_tlv(hal_soc, msdu_start, dbg_level);
-	hal_rx_dump_mpdu_end_tlv(mpdu_end, dbg_level);
-	hal_rx_dump_msdu_end_tlv(hal_soc, msdu_end, dbg_level);
-	hal_rx_dump_pkt_hdr_tlv(pkt_tlvs, dbg_level);
+	hal_rx_dump_msdu_end_tlv(hal_soc, pkt_tlvs, dbg_level);
+	hal_rx_dump_rx_attention_tlv(hal_soc, pkt_tlvs, dbg_level);
+	hal_rx_dump_msdu_start_tlv(hal_soc, pkt_tlvs, dbg_level);
+	hal_rx_dump_mpdu_start_tlv(hal_soc, pkt_tlvs, dbg_level);
+	hal_rx_dump_mpdu_end_tlv(hal_soc, pkt_tlvs, dbg_level);
+	hal_rx_dump_pkt_hdr_tlv(hal_soc, pkt_tlvs, dbg_level);
 }
 
 /**
@@ -264,28 +257,6 @@ static int hal_rx_get_l3_l4_offsets_li(uint8_t *buf, uint32_t *l3_hdr_offset,
 	*l4_hdr_offset = HAL_RX_TLV_GET_TCP_OFFSET(buf);
 
 	return 0;
-}
-
-/**
- * hal_rx_tlv_get_pn_num_li() - Get packet number from RX TLV
- * @buf: rx tlv address
- * @pn_num: buffer to store packet number
- *
- * Return: None
- */
-static inline void hal_rx_tlv_get_pn_num_li(uint8_t *buf, uint64_t *pn_num)
-{
-	struct rx_pkt_tlvs *rx_pkt_tlv =
-			(struct rx_pkt_tlvs *)buf;
-	struct rx_mpdu_info *rx_mpdu_info_details =
-	 &rx_pkt_tlv->mpdu_start_tlv.rx_mpdu_start.rx_mpdu_info_details;
-
-	pn_num[0] = rx_mpdu_info_details->pn_31_0;
-	pn_num[0] |=
-		((uint64_t)rx_mpdu_info_details->pn_63_32 << 32);
-	pn_num[1] = rx_mpdu_info_details->pn_95_64;
-	pn_num[1] |=
-		((uint64_t)rx_mpdu_info_details->pn_127_96 << 32);
 }
 
 #ifdef NO_RX_PKT_HDR_TLV
@@ -651,26 +622,6 @@ hal_rx_tlv_csum_err_get_li(uint8_t *rx_tlv_hdr, uint32_t *ip_csum_err,
 	*tcp_udp_csum_err = hal_rx_attn_tcp_udp_cksum_fail_get(rx_tlv_hdr);
 }
 
-static
-void hal_rx_tlv_get_pkt_capture_flags_li(uint8_t *rx_tlv_pkt_hdr,
-					    struct hal_rx_pkt_capture_flags *flags)
-{
-	struct rx_pkt_tlvs *rx_tlv_hdr = (struct rx_pkt_tlvs *)rx_tlv_pkt_hdr;
-	struct rx_attention *rx_attn = &rx_tlv_hdr->attn_tlv.rx_attn;
-	struct rx_mpdu_start *mpdu_start =
-				&rx_tlv_hdr->mpdu_start_tlv.rx_mpdu_start;
-	struct rx_mpdu_end *mpdu_end = &rx_tlv_hdr->mpdu_end_tlv.rx_mpdu_end;
-	struct rx_msdu_start *msdu_start =
-				&rx_tlv_hdr->msdu_start_tlv.rx_msdu_start;
-
-	flags->encrypt_type = mpdu_start->rx_mpdu_info_details.encrypt_type;
-	flags->fcs_err = mpdu_end->fcs_err;
-	flags->fragment_flag = rx_attn->fragment_flag;
-	flags->chan_freq = HAL_RX_MSDU_START_FREQ_GET(msdu_start);
-	flags->rssi_comb = HAL_RX_MSDU_START_RSSI_GET(msdu_start);
-	flags->tsft = msdu_start->ppdu_start_timestamp;
-}
-
 static uint8_t hal_rx_err_status_get_li(hal_ring_desc_t rx_desc)
 {
 	return HAL_RX_ERROR_STATUS_GET(rx_desc);
@@ -679,21 +630,6 @@ static uint8_t hal_rx_err_status_get_li(hal_ring_desc_t rx_desc)
 static uint8_t hal_rx_reo_buf_type_get_li(hal_ring_desc_t rx_desc)
 {
 	return HAL_RX_REO_BUF_TYPE_GET(rx_desc);
-}
-
-static inline bool
-hal_rx_mpdu_info_ampdu_flag_get_li(uint8_t *buf)
-{
-	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
-	struct rx_mpdu_start *mpdu_start =
-				 &pkt_tlvs->mpdu_start_tlv.rx_mpdu_start;
-
-	struct rx_mpdu_info *mpdu_info = &mpdu_start->rx_mpdu_info_details;
-	bool ampdu_flag;
-
-	ampdu_flag = HAL_RX_MPDU_INFO_AMPDU_FLAG_GET(mpdu_info);
-
-	return ampdu_flag;
 }
 
 static
@@ -875,46 +811,6 @@ static inline uint32_t hal_rx_tlv_get_pkt_type_li(uint8_t *buf)
 	pkt_type = HAL_RX_MSDU_START_PKT_TYPE_GET(msdu_start);
 
 	return pkt_type;
-}
-
-/**
- * hal_rx_tlv_mic_err_get_li(): API to get the MIC ERR
- * from rx_mpdu_end TLV
- *
- * @buf: pointer to the start of RX PKT TLV headers
- * Return: uint32_t(mic_err)
- */
-static inline uint32_t
-hal_rx_tlv_mic_err_get_li(uint8_t *buf)
-{
-	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
-	struct rx_mpdu_end *mpdu_end =
-		&pkt_tlvs->mpdu_end_tlv.rx_mpdu_end;
-	uint32_t mic_err;
-
-	mic_err = HAL_RX_MPDU_END_MIC_ERR_GET(mpdu_end);
-
-	return mic_err;
-}
-
-/**
- * hal_rx_tlv_decrypt_err_get_li(): API to get the Decrypt ERR
- * from rx_mpdu_end TLV
- *
- * @buf: pointer to the start of RX PKT TLV headers
- * Return: uint32_t(decrypt_err)
- */
-static inline uint32_t
-hal_rx_tlv_decrypt_err_get_li(uint8_t *buf)
-{
-	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
-	struct rx_mpdu_end *mpdu_end =
-		&pkt_tlvs->mpdu_end_tlv.rx_mpdu_end;
-	uint32_t decrypt_err;
-
-	decrypt_err = HAL_RX_MPDU_END_DECRYPT_ERR_GET(mpdu_end);
-
-	return decrypt_err;
 }
 
 /*
@@ -1211,15 +1107,11 @@ void hal_hw_txrx_default_ops_attach_li(struct hal_soc *hal_soc)
 					hal_rx_priv_info_set_in_tlv_li;
 	hal_soc->ops->hal_rx_priv_info_get_from_tlv =
 					hal_rx_priv_info_get_from_tlv_li;
-	hal_soc->ops->hal_rx_mpdu_info_ampdu_flag_get =
-					hal_rx_mpdu_info_ampdu_flag_get_li;
 	hal_soc->ops->hal_rx_tlv_mpdu_len_err_get =
 					hal_rx_tlv_mpdu_len_err_get_li;
 	hal_soc->ops->hal_rx_tlv_mpdu_fcs_err_get =
 					hal_rx_tlv_mpdu_fcs_err_get_li;
 	hal_soc->ops->hal_reo_send_cmd = hal_reo_send_cmd_li;
-	hal_soc->ops->hal_rx_tlv_get_pkt_capture_flags =
-					hal_rx_tlv_get_pkt_capture_flags_li;
 	hal_soc->ops->hal_rx_desc_get_80211_hdr = hal_rx_desc_get_80211_hdr_li;
 	hal_soc->ops->hal_rx_hw_desc_mpdu_user_id =
 					hal_rx_hw_desc_mpdu_user_id_li;
@@ -1231,10 +1123,6 @@ void hal_hw_txrx_default_ops_attach_li(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_tlv_sgi_get = hal_rx_tlv_sgi_get_li;
 	hal_soc->ops->hal_rx_tlv_rate_mcs_get = hal_rx_tlv_rate_mcs_get_li;
 	hal_soc->ops->hal_rx_tlv_get_pkt_type = hal_rx_tlv_get_pkt_type_li;
-	hal_soc->ops->hal_rx_tlv_get_pn_num = hal_rx_tlv_get_pn_num_li;
-	hal_soc->ops->hal_rx_tlv_mic_err_get = hal_rx_tlv_mic_err_get_li;
-	hal_soc->ops->hal_rx_tlv_decrypt_err_get =
-			hal_rx_tlv_decrypt_err_get_li;
 	hal_soc->ops->hal_rx_tlv_first_mpdu_get = hal_rx_tlv_first_mpdu_get_li;
 	hal_soc->ops->hal_rx_tlv_get_is_decrypted =
 			hal_rx_tlv_get_is_decrypted_li;

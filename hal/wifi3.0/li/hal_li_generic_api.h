@@ -1822,18 +1822,319 @@ static inline uint8_t hal_get_wbm_internal_error_generic_li(void *hal_desc)
 }
 
 /**
- * hal_rx_dump_mpdu_start_tlv_generic_li() - dump RX mpdu_start TLV in
- *			                     structured human readable
- *			                     format.
- * @mpdustart: pointer the rx_attention TLV in pkt.
+ * hal_rx_dump_rx_attention_tlv_generic_li() - dump RX attention TLV in
+ *					       structured humman readable
+ *					       format.
+ * @pkttlvs: pointer the pkt tlv struct.
  * @dbg_level: log level.
  *
  * Return: void
  */
-static inline void hal_rx_dump_mpdu_start_tlv_generic_li(void *mpdustart,
-						      uint8_t dbg_level)
+static inline
+void hal_rx_dump_rx_attention_tlv_generic_li(void *pkttlvs,
+					     uint8_t dbg_level)
 {
-	struct rx_mpdu_start *mpdu_start = (struct rx_mpdu_start *)mpdustart;
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)pkttlvs;
+	struct rx_attention *rx_attn = &pkt_tlvs->attn_tlv.rx_attn;
+
+	hal_verbose_debug("rx_attention tlv (1/2) - "
+			  "rxpcu_mpdu_filter_in_category: %x "
+			  "sw_frame_group_id: %x "
+			  "reserved_0: %x "
+			  "phy_ppdu_id: %x "
+			  "first_mpdu : %x "
+			  "reserved_1a: %x "
+			  "mcast_bcast: %x "
+			  "ast_index_not_found: %x "
+			  "ast_index_timeout: %x "
+			  "power_mgmt: %x "
+			  "non_qos: %x "
+			  "null_data: %x "
+			  "mgmt_type: %x "
+			  "ctrl_type: %x "
+			  "more_data: %x "
+			  "eosp: %x "
+			  "a_msdu_error: %x "
+			  "fragment_flag: %x "
+			  "order: %x "
+			  "cce_match: %x "
+			  "overflow_err: %x "
+			  "msdu_length_err: %x "
+			  "tcp_udp_chksum_fail: %x "
+			  "ip_chksum_fail: %x "
+			  "sa_idx_invalid: %x "
+			  "da_idx_invalid: %x "
+			  "reserved_1b: %x "
+			  "rx_in_tx_decrypt_byp: %x ",
+			  rx_attn->rxpcu_mpdu_filter_in_category,
+			  rx_attn->sw_frame_group_id,
+			  rx_attn->reserved_0,
+			  rx_attn->phy_ppdu_id,
+			  rx_attn->first_mpdu,
+			  rx_attn->reserved_1a,
+			  rx_attn->mcast_bcast,
+			  rx_attn->ast_index_not_found,
+			  rx_attn->ast_index_timeout,
+			  rx_attn->power_mgmt,
+			  rx_attn->non_qos,
+			  rx_attn->null_data,
+			  rx_attn->mgmt_type,
+			  rx_attn->ctrl_type,
+			  rx_attn->more_data,
+			  rx_attn->eosp,
+			  rx_attn->a_msdu_error,
+			  rx_attn->fragment_flag,
+			  rx_attn->order,
+			  rx_attn->cce_match,
+			  rx_attn->overflow_err,
+			  rx_attn->msdu_length_err,
+			  rx_attn->tcp_udp_chksum_fail,
+			  rx_attn->ip_chksum_fail,
+			  rx_attn->sa_idx_invalid,
+			  rx_attn->da_idx_invalid,
+			  rx_attn->reserved_1b,
+			  rx_attn->rx_in_tx_decrypt_byp);
+
+	hal_verbose_debug("rx_attention tlv (2/2) - "
+			  "encrypt_required: %x "
+			  "directed: %x "
+			  "buffer_fragment: %x "
+			  "mpdu_length_err: %x "
+			  "tkip_mic_err: %x "
+			  "decrypt_err: %x "
+			  "unencrypted_frame_err: %x "
+			  "fcs_err: %x "
+			  "flow_idx_timeout: %x "
+			  "flow_idx_invalid: %x "
+			  "wifi_parser_error: %x "
+			  "amsdu_parser_error: %x "
+			  "sa_idx_timeout: %x "
+			  "da_idx_timeout: %x "
+			  "msdu_limit_error: %x "
+			  "da_is_valid: %x "
+			  "da_is_mcbc: %x "
+			  "sa_is_valid: %x "
+			  "decrypt_status_code: %x "
+			  "rx_bitmap_not_updated: %x "
+			  "reserved_2: %x "
+			  "msdu_done: %x ",
+			  rx_attn->encrypt_required,
+			  rx_attn->directed,
+			  rx_attn->buffer_fragment,
+			  rx_attn->mpdu_length_err,
+			  rx_attn->tkip_mic_err,
+			  rx_attn->decrypt_err,
+			  rx_attn->unencrypted_frame_err,
+			  rx_attn->fcs_err,
+			  rx_attn->flow_idx_timeout,
+			  rx_attn->flow_idx_invalid,
+			  rx_attn->wifi_parser_error,
+			  rx_attn->amsdu_parser_error,
+			  rx_attn->sa_idx_timeout,
+			  rx_attn->da_idx_timeout,
+			  rx_attn->msdu_limit_error,
+			  rx_attn->da_is_valid,
+			  rx_attn->da_is_mcbc,
+			  rx_attn->sa_is_valid,
+			  rx_attn->decrypt_status_code,
+			  rx_attn->rx_bitmap_not_updated,
+			  rx_attn->reserved_2,
+			  rx_attn->msdu_done);
+}
+
+/**
+ * hal_rx_dump_mpdu_end_tlv_generic_li() - dump RX mpdu_end TLV in structured
+ *					   human readable format.
+ * @pkttlvs: pointer the pkt tlv struct.
+ * @dbg_level: log level.
+ *
+ * Return: void
+ */
+static inline
+void hal_rx_dump_mpdu_end_tlv_generic_li(void *pkttlvs,
+					 uint8_t dbg_level)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)pkttlvs;
+	struct rx_mpdu_end *mpdu_end = &pkt_tlvs->mpdu_end_tlv.rx_mpdu_end;
+
+	hal_verbose_debug("rx_mpdu_end tlv - "
+			  "rxpcu_mpdu_filter_in_category: %x "
+			  "sw_frame_group_id: %x "
+			  "phy_ppdu_id: %x "
+			  "unsup_ktype_short_frame: %x "
+			  "rx_in_tx_decrypt_byp: %x "
+			  "overflow_err: %x "
+			  "mpdu_length_err: %x "
+			  "tkip_mic_err: %x "
+			  "decrypt_err: %x "
+			  "unencrypted_frame_err: %x "
+			  "pn_fields_contain_valid_info: %x "
+			  "fcs_err: %x "
+			  "msdu_length_err: %x "
+			  "rxdma0_destination_ring: %x "
+			  "rxdma1_destination_ring: %x "
+			  "decrypt_status_code: %x "
+			  "rx_bitmap_not_updated: %x ",
+			  mpdu_end->rxpcu_mpdu_filter_in_category,
+			  mpdu_end->sw_frame_group_id,
+			  mpdu_end->phy_ppdu_id,
+			  mpdu_end->unsup_ktype_short_frame,
+			  mpdu_end->rx_in_tx_decrypt_byp,
+			  mpdu_end->overflow_err,
+			  mpdu_end->mpdu_length_err,
+			  mpdu_end->tkip_mic_err,
+			  mpdu_end->decrypt_err,
+			  mpdu_end->unencrypted_frame_err,
+			  mpdu_end->pn_fields_contain_valid_info,
+			  mpdu_end->fcs_err,
+			  mpdu_end->msdu_length_err,
+			  mpdu_end->rxdma0_destination_ring,
+			  mpdu_end->rxdma1_destination_ring,
+			  mpdu_end->decrypt_status_code,
+			  mpdu_end->rx_bitmap_not_updated);
+}
+
+#ifdef NO_RX_PKT_HDR_TLV
+static inline
+void hal_rx_dump_pkt_hdr_tlv_generic_li(void *pkttlvs,
+					uint8_t dbg_level)
+{
+}
+#else
+/**
+ * hal_rx_dump_pkt_hdr_tlv_generic_li() - dump RX pkt header TLV in hex format
+ * @pkttlvs: pointer the pkt tlv struct.
+ * @dbg_level: log level.
+ *
+ * Return: void
+ */
+static inline
+void hal_rx_dump_pkt_hdr_tlv_generic_li(void *pkttlvs,
+					uint8_t dbg_level)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)pkttlvs;
+	struct rx_pkt_hdr_tlv *pkt_hdr_tlv = &pkt_tlvs->pkt_hdr_tlv;
+
+	hal_verbose_debug("\n---------------\nrx_pkt_hdr_tlv"
+			  "\n---------------\nphy_ppdu_id %d ",
+			  pkt_hdr_tlv->phy_ppdu_id);
+	hal_verbose_hex_dump(pkt_hdr_tlv->rx_pkt_hdr, 128);
+}
+#endif
+
+/**
+ * hal_rx_tlv_decrypt_err_get_li() - API to get the Decrypt ERR
+ * from rx_mpdu_end TLV
+ *
+ * @buf: pointer to the start of RX PKT TLV headers
+ * Return: uint32_t(decrypt_err)
+ */
+static inline uint32_t
+hal_rx_tlv_decrypt_err_get_li(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+	struct rx_mpdu_end *mpdu_end =
+		&pkt_tlvs->mpdu_end_tlv.rx_mpdu_end;
+	uint32_t decrypt_err;
+
+	decrypt_err = HAL_RX_MPDU_END_DECRYPT_ERR_GET(mpdu_end);
+
+	return decrypt_err;
+}
+
+/**
+ * hal_rx_tlv_mic_err_get_li() - API to get the MIC ERR
+ * from rx_mpdu_end TLV
+ *
+ * @buf: pointer to the start of RX PKT TLV headers
+ * Return: uint32_t(mic_err)
+ */
+static inline uint32_t
+hal_rx_tlv_mic_err_get_li(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+	struct rx_mpdu_end *mpdu_end =
+		&pkt_tlvs->mpdu_end_tlv.rx_mpdu_end;
+	uint32_t mic_err;
+
+	mic_err = HAL_RX_MPDU_END_MIC_ERR_GET(mpdu_end);
+
+	return mic_err;
+}
+
+static
+void hal_rx_tlv_get_pkt_capture_flags_li(uint8_t *rx_tlv_pkt_hdr,
+					 struct hal_rx_pkt_capture_flags *flags)
+{
+	struct rx_pkt_tlvs *rx_tlv_hdr = (struct rx_pkt_tlvs *)rx_tlv_pkt_hdr;
+	struct rx_attention *rx_attn = &rx_tlv_hdr->attn_tlv.rx_attn;
+	struct rx_mpdu_start *mpdu_start =
+				&rx_tlv_hdr->mpdu_start_tlv.rx_mpdu_start;
+	struct rx_mpdu_end *mpdu_end = &rx_tlv_hdr->mpdu_end_tlv.rx_mpdu_end;
+	struct rx_msdu_start *msdu_start =
+				&rx_tlv_hdr->msdu_start_tlv.rx_msdu_start;
+
+	flags->encrypt_type = mpdu_start->rx_mpdu_info_details.encrypt_type;
+	flags->fcs_err = mpdu_end->fcs_err;
+	flags->fragment_flag = rx_attn->fragment_flag;
+	flags->chan_freq = HAL_RX_MSDU_START_FREQ_GET(msdu_start);
+	flags->rssi_comb = HAL_RX_MSDU_START_RSSI_GET(msdu_start);
+	flags->tsft = msdu_start->ppdu_start_timestamp;
+}
+
+static inline bool
+hal_rx_mpdu_info_ampdu_flag_get_li(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+	struct rx_mpdu_start *mpdu_start =
+				 &pkt_tlvs->mpdu_start_tlv.rx_mpdu_start;
+
+	struct rx_mpdu_info *mpdu_info = &mpdu_start->rx_mpdu_info_details;
+	bool ampdu_flag;
+
+	ampdu_flag = HAL_RX_MPDU_INFO_AMPDU_FLAG_GET(mpdu_info);
+
+	return ampdu_flag;
+}
+
+/**
+ * hal_rx_tlv_get_pn_num_li() - Get packet number from RX TLV
+ * @buf: rx tlv address
+ * @pn_num: buffer to store packet number
+ *
+ * Return: None
+ */
+static inline void hal_rx_tlv_get_pn_num_li(uint8_t *buf, uint64_t *pn_num)
+{
+	struct rx_pkt_tlvs *rx_pkt_tlv =
+			(struct rx_pkt_tlvs *)buf;
+	struct rx_mpdu_info *rx_mpdu_info_details =
+	 &rx_pkt_tlv->mpdu_start_tlv.rx_mpdu_start.rx_mpdu_info_details;
+
+	pn_num[0] = rx_mpdu_info_details->pn_31_0;
+	pn_num[0] |=
+		((uint64_t)rx_mpdu_info_details->pn_63_32 << 32);
+	pn_num[1] = rx_mpdu_info_details->pn_95_64;
+	pn_num[1] |=
+		((uint64_t)rx_mpdu_info_details->pn_127_96 << 32);
+}
+
+/**
+ * hal_rx_dump_mpdu_start_tlv_generic_li() - dump RX mpdu_start TLV in
+ *			                     structured human readable
+ *			                     format.
+ * @pkttlvs: pointer to the pkttlvs.
+ * @dbg_level: log level.
+ *
+ * Return: void
+ */
+static inline
+void hal_rx_dump_mpdu_start_tlv_generic_li(void *pkttlvs,
+					   uint8_t dbg_level)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)pkttlvs;
+	struct rx_mpdu_start *mpdu_start =
+					&pkt_tlvs->mpdu_start_tlv.rx_mpdu_start;
 	struct rx_mpdu_info *mpdu_info =
 		(struct rx_mpdu_info *)&mpdu_start->rx_mpdu_info_details;
 
