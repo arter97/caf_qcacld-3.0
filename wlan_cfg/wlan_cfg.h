@@ -177,6 +177,7 @@ struct wlan_srng_cfg {
  * @int_timer_threshold_mon_dest: Timer threshold counter for monitor dest
  * @tx_ring_size:
  * @time_control_bp:
+ * @qref_control_size: list size for memory history arrays
  * @tx_comp_ring_size:
  * @tx_comp_ring_size_nss:
  * @int_rx_mon_ring_mask: Bitmap of Rx monitor ring interrupts mapped to each
@@ -378,6 +379,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	int int_timer_threshold_mon_dest;
 	int tx_ring_size;
 	int time_control_bp;
+	int qref_control_size;
 	int tx_comp_ring_size;
 	int tx_comp_ring_size_nss;
 	uint8_t int_tx_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
@@ -1561,6 +1563,14 @@ int wlan_cfg_tx_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
  * Return: interval time
  */
 int wlan_cfg_time_control_bp(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_qref_control_size - Get debug array size
+ * @cfg: soc configuration context
+ *
+ * Return: array size
+ */
+int wlan_cfg_qref_control_size(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /**
  * wlan_cfg_tx_comp_ring_size - Get Tx completion ring size (WBM Ring)

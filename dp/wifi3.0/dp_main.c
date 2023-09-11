@@ -193,6 +193,7 @@ QDF_COMPILE_TIME_ASSERT(wlan_cfg_num_int_ctxs,
 			WLAN_CFG_INT_NUM_CONTEXTS_MAX >=
 			WLAN_CFG_INT_NUM_CONTEXTS);
 
+static void dp_soc_unset_qref_debug_list(struct dp_soc *soc);
 static QDF_STATUS dp_sysfs_deinitialize_stats(struct dp_soc *soc_hdl);
 static QDF_STATUS dp_sysfs_initialize_stats(struct dp_soc *soc_hdl);
 
@@ -6554,6 +6555,7 @@ static void dp_soc_detach(struct cdp_soc_t *txrx_soc)
 
 	dp_runtime_deinit();
 
+	dp_soc_unset_qref_debug_list(soc);
 	dp_sysfs_deinitialize_stats(soc);
 	dp_soc_swlm_detach(soc);
 	dp_soc_tx_desc_sw_pools_free(soc);
@@ -16093,6 +16095,32 @@ dp_get_link_desc_id_start(uint16_t arch_id)
 	}
 }
 
+static void dp_soc_set_qref_debug_list(struct dp_soc *soc)
+{
+	uint32_t max_list_size = soc->wlan_cfg_ctx->qref_control_size;
+
+	if (max_list_size == 0)
+		return;
+
+	soc->list_shared_qaddr_del =
+			(struct test_qaddr_del *)
+				qdf_mem_malloc(sizeof(struct test_qaddr_del) *
+					       max_list_size);
+	soc->reo_write_list =
+			(struct test_qaddr_del *)
+				qdf_mem_malloc(sizeof(struct test_qaddr_del) *
+					       max_list_size);
+	soc->list_qdesc_addr_free =
+			(struct test_mem_free *)
+				qdf_mem_malloc(sizeof(struct test_mem_free) *
+					       max_list_size);
+	soc->list_qdesc_addr_alloc =
+			(struct test_mem_free *)
+				qdf_mem_malloc(sizeof(struct test_mem_free) *
+					       max_list_size);
+}
+
+
 /**
  * dp_soc_attach() - Attach txrx SOC
  * @ctrl_psoc: Opaque SOC handle from control plane
@@ -16218,6 +16246,7 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 	dp_soc_swlm_attach(soc);
 	dp_soc_set_interrupt_mode(soc);
 	dp_soc_set_def_pdev(soc);
+	dp_soc_set_qref_debug_list(soc);
 
 	dp_info("Mem stats: DMA = %u HEAP = %u SKB = %u",
 		qdf_dma_mem_stats_read(),
@@ -16623,6 +16652,19 @@ static void dp_clear_cfr_dbg_stats(struct cdp_soc_t *soc_hdl,
 	qdf_mem_zero(&pdev->stats.rcc, sizeof(pdev->stats.rcc));
 }
 #endif
+
+static void dp_soc_unset_qref_debug_list(struct dp_soc *soc)
+{
+	uint32_t max_list_size = soc->wlan_cfg_ctx->qref_control_size;
+
+	if (max_list_size == 0)
+		return;
+
+	qdf_mem_free(soc->list_shared_qaddr_del);
+	qdf_mem_free(soc->reo_write_list);
+	qdf_mem_free(soc->list_qdesc_addr_free);
+	qdf_mem_free(soc->list_qdesc_addr_alloc);
+}
 
 /**
  * dp_bucket_index() - Return index from array
