@@ -55,7 +55,8 @@
 #define MAX_CTRL_STAT_VDEV_ENTRIES 1
 #define MAX_CTRL_STAT_MAC_ADDR_ENTRIES 1
 #define MAX_RMM_STA_STATS_REQUESTED 2
-#define MAX_MEAS_DURATION_FOR_STA_STATS 10
+#define MIN_MEAS_DURATION_FOR_STA_STATS 10
+
 /* Max passive scan dwell for wide band rrm scan, in milliseconds */
 #define RRM_SCAN_MAX_DWELL_TIME 110
 
@@ -894,6 +895,48 @@ get_stats_fail:
 }
 #endif
 
+/* -------------------------------------------------------------------- */
+/**
+ * rrm_get_max_meas_duration() - calculate max measurement duration for a
+ * rrm req
+ * @mac: global mac context
+ * @pe_session: per vdev pe context
+ *
+ * Return: max measurement duration
+ */
+static uint16_t rrm_get_max_meas_duration(struct mac_context *mac,
+					  struct pe_session *pe_session)
+{
+	int8_t max_dur;
+	uint16_t max_meas_dur, sign;
+
+	/*
+	 * The logic here is to check the measurement duration passed in the
+	 * beacon request. Following are the cases handled.
+	 * Case 1: If measurement duration received in the beacon request is
+	 * greater than the max measurement duration advertised in the RRM
+	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 1,
+	 * REFUSE the beacon request.
+	 * Case 2: If measurement duration received in the beacon request is
+	 * greater than the max measurement duration advertised in the RRM
+	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 0,
+	 * perform measurement for the duration advertised in the
+	 * RRM capabilities
+	 * maxMeasurementDuration = 2^(nonOperatingChanMax - 4) * BeaconInterval
+	 */
+	max_dur = mac->rrm.rrmPEContext.rrmEnabledCaps.nonOperatingChanMax - 4;
+	sign = (max_dur < 0) ? 1 : 0;
+	max_dur = (1L << ABS(max_dur));
+	if (!sign)
+		max_meas_dur =
+			max_dur * pe_session->beaconParams.beaconInterval;
+	else
+		max_meas_dur =
+			pe_session->beaconParams.beaconInterval / max_dur;
+
+	return max_meas_dur;
+}
+
 /**
  * rrm_process_sta_stats_report_req: Process RRM sta stats request
  * @mac: mac context
@@ -910,16 +953,31 @@ rrm_process_sta_stats_report_req(struct mac_context *mac,
 				 struct pe_session *pe_session)
 {
 	QDF_STATUS status;
-	uint8_t meas_duration = 1;
+	uint16_t meas_duration = MIN_MEAS_DURATION_FOR_STA_STATS;
+	uint8_t max_meas_duration;
 	struct rrm_sta_stats *rrm_sta_statistics;
 
-	if (sta_stats_req->measurement_request.sta_stats.meas_duration >
-	    MAX_MEAS_DURATION_FOR_STA_STATS) {
-		pe_err("Dropping req measurement duration > threshold %d",
-		       sta_stats_req->measurement_request.sta_stats.meas_duration);
-		return eRRM_INCAPABLE;
-	}
+	max_meas_duration = rrm_get_max_meas_duration(mac, pe_session);
 
+	/*
+	 * Keep timer value atleast of 10 ms even if measurement duration
+	 * provided in meas request is < 10 ms because FW takes some time to
+	 * calculate and respond stats.
+	 * Start timer of 10 ms even if meas duration is 0.
+	 * To get stats from FW.
+	 */
+	if (sta_stats_req->measurement_request.sta_stats.meas_duration >
+	    MIN_MEAS_DURATION_FOR_STA_STATS)
+		meas_duration =
+		sta_stats_req->measurement_request.sta_stats.meas_duration;
+
+	if (meas_duration > max_meas_duration) {
+		if (sta_stats_req->durationMandatory) {
+			pe_nofl_err("Dropping the req: duration mandatory & max duration > meas duration");
+			return eRRM_REFUSED;
+		}
+		meas_duration = max_meas_duration;
+	}
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)
 	    sta_stats_req->measurement_request.sta_stats.peer_mac_addr)) {
 		pe_err("Dropping req: broadcast address not supported");
@@ -927,9 +985,6 @@ rrm_process_sta_stats_report_req(struct mac_context *mac,
 	}
 
 	rrm_sta_statistics = &mac->rrm.rrmPEContext.rrm_sta_stats;
-	if (sta_stats_req->measurement_request.sta_stats.meas_duration)
-		meas_duration =
-		sta_stats_req->measurement_request.sta_stats.meas_duration;
 
 	rrm_sta_statistics->rrm_report.token = pCurrentReq->token;
 	rrm_sta_statistics->rrm_report.type = pCurrentReq->type;
@@ -951,12 +1006,8 @@ rrm_process_sta_stats_report_req(struct mac_context *mac,
 			return eRRM_REFUSED;
 		mac->lim.lim_timers.rrm_sta_stats_resp_timer.sessionId =
 							pe_session->peSessionId;
-		/*
-		 * Start timer of 1 sec even if meas duration is 0.
-		 * To get stats from FW.
-		 */
 		tx_timer_change(&mac->lim.lim_timers.rrm_sta_stats_resp_timer,
-				SYS_MS_TO_TICKS(meas_duration * 1000), 0);
+				SYS_MS_TO_TICKS(meas_duration), 0);
 		/* Activate sta stats resp timer */
 		if (tx_timer_activate(
 		    &mac->lim.lim_timers.rrm_sta_stats_resp_timer) !=
@@ -1125,48 +1176,6 @@ failure:
 	return QDF_STATUS_E_FAILURE;
 }
 
-/* -------------------------------------------------------------------- */
-/**
- * rrm_get_max_meas_duration() - calculate max measurement duration for a
- * rrm req
- * @mac: global mac context
- * @pe_session: per vdev pe context
- *
- * Return: max measurement duration
- */
-static uint16_t rrm_get_max_meas_duration(struct mac_context *mac,
-					  struct pe_session *pe_session)
-{
-	int8_t max_dur;
-	uint16_t max_meas_dur, sign;
-
-	/*
-	 * The logic here is to check the measurement duration passed in the
-	 * beacon request. Following are the cases handled.
-	 * Case 1: If measurement duration received in the beacon request is
-	 * greater than the max measurement duration advertised in the RRM
-	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 1,
-	 * REFUSE the beacon request.
-	 * Case 2: If measurement duration received in the beacon request is
-	 * greater than the max measurement duration advertised in the RRM
-	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 0,
-	 * perform measurement for the duration advertised in the
-	 * RRM capabilities
-	 * maxMeasurementDuration = 2^(nonOperatingChanMax - 4) * BeaconInterval
-	 */
-	max_dur = mac->rrm.rrmPEContext.rrmEnabledCaps.nonOperatingChanMax - 4;
-	sign = (max_dur < 0) ? 1 : 0;
-	max_dur = (1L << ABS(max_dur));
-	if (!sign)
-		max_meas_dur =
-			max_dur * pe_session->beaconParams.beaconInterval;
-	else
-		max_meas_dur =
-			pe_session->beaconParams.beaconInterval / max_dur;
-
-	return max_meas_dur;
-}
-
 /**
  * rrm_process_beacon_report_req
  *
@@ -1259,8 +1268,8 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		if (pBeaconReq->durationMandatory) {
 			pe_nofl_err("RX: [802.11 BCN_RPT] Dropping the req: duration mandatory & maxduration > measduration");
 			return eRRM_REFUSED;
-		} else
-			measDuration = maxMeasduration;
+		}
+		measDuration = maxMeasduration;
 	}
 
 	pe_debug("measurement duration %d", measDuration);
@@ -2071,9 +2080,8 @@ rrm_process_channel_load_req(struct mac_context *mac,
 		if (chan_load_req->durationMandatory) {
 			pe_nofl_err("RX:[802.11 CH_LOAD] Dropping the req: duration mandatory & max duration > meas duration");
 			return eRRM_REFUSED;
-		} else {
-			meas_duration = max_meas_duration;
 		}
+		meas_duration = max_meas_duration;
 	}
 	pe_debug("RX:[802.11 CH_LOAD] vdev :%d, seq:%d Token:%d op_c:%d ch:%d meas_dur:%d, rand intv: %d, max_dur:%d",
 		 pe_session->vdev_id,
