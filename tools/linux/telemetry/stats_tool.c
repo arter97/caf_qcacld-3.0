@@ -3423,6 +3423,8 @@ void print_debug_radio_data_monitor(struct debug_pdev_data_monitor *monitor)
 					  monitor->nondata_rx_ru_size[i]);
 		}
 		STATS_UNVLBL(stdout, "ul_ofdma_nodata_rx_ru_size", str_buf);
+
+		free(str_buf);
 	}
 }
 
