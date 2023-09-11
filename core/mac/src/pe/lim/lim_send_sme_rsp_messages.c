@@ -2247,6 +2247,11 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 		goto err;
 	}
 
+	if (!wlan_cm_is_vdev_connected(session_entry->vdev)) {
+		pe_info_rl("Ignore CSA, vdev is in not in conncted state");
+		goto err;
+	}
+
 	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
 		link_id = wlan_vdev_get_link_id(session_entry->vdev);
 		update_csa_link_info(session_entry->vdev, link_id, csa_params);
