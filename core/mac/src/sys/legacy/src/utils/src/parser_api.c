@@ -3884,7 +3884,7 @@ sir_convert_assoc_resp_frame2_t2lm_struct(struct mac_context *mac,
 		ie[TAG_LEN_POS] = ar->t2lm_ie[i].num_data + 1;
 		ie[IDEXT_POS] = WLAN_EXTN_ELEMID_T2LM;
 		qdf_mem_copy(&ie[3], &ar->t2lm_ie[i].data[0],
-			     ar->t2lm_ie[i].num_data + 3);
+			     ar->t2lm_ie[i].num_data);
 		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   &ie[0], ar->t2lm_ie[i].num_data + 3);
 		status = wlan_mlo_parse_t2lm_info(&ie[0], &t2lm);
@@ -5207,7 +5207,7 @@ sir_convert_beacon_frame2_t2lm_struct(tDot11fBeacon *bcn_frm,
 		ie[TAG_LEN_POS] = bcn_frm->t2lm_ie[i].num_data + 1;
 		ie[IDEXT_POS] = WLAN_EXTN_ELEMID_T2LM;
 		qdf_mem_copy(&ie[3], &bcn_frm->t2lm_ie[i].data[0],
-			     bcn_frm->t2lm_ie[i].num_data + 3);
+			     bcn_frm->t2lm_ie[i].num_data);
 		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   &ie[0], bcn_frm->t2lm_ie[i].num_data + 3);
 		status = wlan_mlo_parse_t2lm_info(&ie[0], &t2lm);
@@ -5258,9 +5258,12 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 					nframe - WLAN_BEACON_IES_OFFSET,
 					&ml_ie, &ml_ie_total_len);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
-			util_get_bvmlie_persta_partner_info(ml_ie,
-							    ml_ie_total_len,
-							    &partner_info);
+			status = util_get_bvmlie_persta_partner_info(
+								ml_ie,
+								ml_ie_total_len,
+								&partner_info);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
 			bcn_struct->mlo_ie.mlo_ie.num_sta_profile =
 						partner_info.num_partner_links;
 			util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
