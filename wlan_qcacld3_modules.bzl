@@ -3,6 +3,9 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
+    "niobe": [
+	"kiwi-v2",
+    ],
     "pineapple": [
 	"kiwi-v2",
     ],
