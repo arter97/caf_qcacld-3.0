@@ -636,6 +636,16 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 		if ((op_mode == QDF_STA_MODE ||
 		     op_mode == QDF_P2P_CLIENT_MODE) &&
 		    cm_is_vdevid_connected(mac_ctx->pdev, i)) {
+			if (op_mode == QDF_STA_MODE &&
+			    policy_mgr_is_ml_vdev_id(mac_ctx->psoc,
+						     session->vdev_id) &&
+			    policy_mgr_vdev_is_force_inactive(
+							mac_ctx->psoc,
+							session->vdev_id)) {
+				sme_debug("skip inactive ml sta vdev %d",
+					  session->vdev_id);
+				continue;
+			}
 			wlan_get_op_chan_freq_info_vdev_id(mac_ctx->pdev,
 					   session->vdev_id,
 					   &intf_ch_freq, &intf_cfreq,
