@@ -628,8 +628,7 @@ static void dp_ppeds_enable_txcomp_irq(struct dp_soc_be *be_soc)
 	dp_ppeds_enable_irq(&be_soc->soc,
 			    &be_soc->ppeds_wbm_release_ring);
 
-	if (soc->notify_fw_callback)
-		soc->notify_fw_callback(soc);
+	dp_umac_reset_trigger_pre_reset_notify_cb(soc);
 }
 
 static void dp_ppeds_tx_desc_reset(void *ctxt, void *elem, void *elem_list)
@@ -1385,8 +1384,9 @@ void dp_ppeds_notify_napi_done(ppe_ds_wlan_handle_t *ppeds_handle)
 
 	qdf_atomic_clear_bit(DP_PPEDS_NAPI_DONE_BIT,
 			     &soc->service_rings_running);
-	if (soc && soc->notify_fw_callback)
-		soc->notify_fw_callback(soc);
+
+	if (soc)
+		dp_umac_reset_trigger_pre_reset_notify_cb(soc);
 }
 #endif
 
