@@ -31,7 +31,9 @@
 #ifndef DP_BE_WAR_DISABLED
 #include "li/hal_li_rx.h"
 #endif
+#ifdef CONFIG_LITHIUM
 #include <dp_rx_mon_1.0.h>
+#endif
 
 #ifdef QCA_SUPPORT_FULL_MON
 

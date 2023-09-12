@@ -150,20 +150,22 @@ monitor-objs := \
 	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/dp_mon_filter.o \
 	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/dp_mon.o \
 	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/dp_rx_mon.o \
-	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_full_mon.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_mon_ol.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_rx_mon_feature.o \
-	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_tx_capture.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/os_if/linux/dp/src/dp_mon_osif.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/os_if/linux/dp/src/dp_mon_cfg80211.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/os_if/linux/dp/src/dp_mon_utils.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/linux/dp_mon_module.o
 
+ifeq ($(strip ${CONFIG_LITHIUM}),1)
 monitor-objs += \
 	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_rx_mon_status_1.0.o \
 	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_rx_mon_dest_1.0.o \
 	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_mon_1.0.o \
-	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_mon_filter_1.0.o
+	$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_mon_filter_1.0.o \
+	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_full_mon.o \
+	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_tx_capture.o
+endif
 
 ifeq ($(strip ${CONFIG_BERYLLIUM}),1)
 TX_OR_RX =
@@ -194,19 +196,23 @@ clean-files := modules.order
 
 ################ QCA_GCC7_0_SUPPORT - START ##################
 ifeq ($(QCA_GCC7_0_SUPPORT), 1)
+ifeq ($(strip ${CONFIG_LITHIUM}),1)
 CFLAGS_$(obj)/$(DEPTH)/component_dev/dp/wifi3.0/monitor/src/dp_full_mon.o := $(MONITOR_1_0_INC)
 CFLAGS_$(obj)/$(DEPTH)/component_dev/dp/wifi3.0/monitor/src/dp_tx_capture.o := $(MONITOR_1_0_INC)
 CFLAGS_$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_rx_mon_status_1.0.o := $(PERF_PWR_OFFLOAD_HW_LI_INC) $(PERF_PWR_OFFLOAD_HAL_LI_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_1_0_INC)
 CFLAGS_$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_rx_mon_dest_1.0.o := $(PERF_PWR_OFFLOAD_HW_LI_INC) $(PERF_PWR_OFFLOAD_HAL_LI_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_1_0_INC)
 CFLAGS_$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_mon_1.0.o := $(PERF_PWR_OFFLOAD_HW_LI_INC) $(PERF_PWR_OFFLOAD_HAL_LI_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_1_0_INC)
 CFLAGS_$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_mon_filter_1.0.o := $(PERF_PWR_OFFLOAD_HW_LI_INC) $(PERF_PWR_OFFLOAD_HAL_LI_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_1_0_INC)
+endif
 
+ifeq ($(strip ${CONFIG_LITHIUM}),1)
 CFLAGS_REMOVE_$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_rx_mon_status_1.0.o := $(PERF_PWR_OFFLOAD_HAL_BE_INC) $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_rx_mon_dest_1.0.o := $(PERF_PWR_OFFLOAD_HAL_BE_INC) $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_mon_1.0.o := $(PERF_PWR_OFFLOAD_HAL_BE_INC) $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/1.0/dp_mon_filter_1.0.o := $(PERF_PWR_OFFLOAD_HAL_BE_INC) $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_$(obj)/$(DEPTH)/component_dev/dp/wifi3.0/monitor/src/dp_full_mon.o := $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_$(obj)/$(DEPTH)/component_dev/dp/wifi3.0/monitor/src/dp_tx_capture.o := $(MONITOR_2_0_INC)
+endif
 
 ifeq ($(strip ${CONFIG_BERYLLIUM}),1)
 CFLAGS_$(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/2.0/dp_rx_mon_status_2.0.o := $(PERF_PWR_OFFLOAD_HW_BE_INC) $(PERF_PWR_OFFLOAD_HAL_BE_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_2_0_INC) $(DP_BE_INC)
@@ -227,19 +233,23 @@ CFLAGS_REMOVE_$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_l
 endif
 ##### Else part of QCA_GCC7_0_SUPPORT (below used for build) ###########
 else
+ifeq ($(strip ${CONFIG_LITHIUM}),1)
 CFLAGS_dp_full_mon.o := $(MONITOR_1_0_INC)
 CFLAGS_dp_tx_capture.o := $(MONITOR_1_0_INC)
 CFLAGS_dp_rx_mon_status_1.0.o := $(PERF_PWR_OFFLOAD_HW_LI_INC) $(PERF_PWR_OFFLOAD_HAL_LI_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_1_0_INC)
 CFLAGS_dp_rx_mon_dest_1.0.o := $(PERF_PWR_OFFLOAD_HW_LI_INC) $(PERF_PWR_OFFLOAD_HAL_LI_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_1_0_INC)
 CFLAGS_dp_mon_1.0.o := $(PERF_PWR_OFFLOAD_HW_LI_INC) $(PERF_PWR_OFFLOAD_HAL_LI_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_1_0_INC)
 CFLAGS_dp_mon_filter_1.0.o := $(PERF_PWR_OFFLOAD_HW_LI_INC) $(PERF_PWR_OFFLOAD_HAL_LI_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_1_0_INC)
+endif
 
+ifeq ($(strip ${CONFIG_LITHIUM}),1)
 CFLAGS_REMOVE_dp_rx_mon_status_1.0.o := $(PERF_PWR_OFFLOAD_HAL_BE_INC) $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_dp_rx_mon_dest_1.0.o := $(PERF_PWR_OFFLOAD_HAL_BE_INC) $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_dp_mon_1.0.o := $(PERF_PWR_OFFLOAD_HAL_BE_INC) $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_dp_mon_filter_1.0.o := $(PERF_PWR_OFFLOAD_HAL_BE_INC) $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_dp_full_mon.o := $(MONITOR_2_0_INC)
 CFLAGS_REMOVE_dp_tx_capture.o := $(MONITOR_2_0_INC)
+endif
 
 ifeq ($(strip ${CONFIG_BERYLLIUM}),1)
 CFLAGS_dp_rx_mon_status_2.0.o := $(PERF_PWR_OFFLOAD_HW_BE_INC) $(PERF_PWR_OFFLOAD_HAL_BE_INC) -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/fwcommon $(MONITOR_2_0_INC) $(DP_BE_INC)
