@@ -1815,6 +1815,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	uint32_t *hal_tx_desc_cached;
 	void *hal_tx_desc;
 	uint8_t xmit_type = qdf_nbuf_get_vdev_xmit_type(nbuf);
+	uint8_t tid = HTT_TX_EXT_TID_INVALID;
 
 	if (qdf_unlikely(vdev_id >= MAX_VDEV_CNT))
 		return nbuf;
@@ -1833,6 +1834,14 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	pdev = vdev->pdev;
 	if (dp_tx_limit_check(vdev, nbuf))
 		return nbuf;
+
+	if (qdf_unlikely(vdev->skip_sw_tid_classification
+				& DP_TXRX_HLOS_TID_OVERRIDE_ENABLED)) {
+		tid = qdf_nbuf_get_priority(nbuf);
+
+		if (tid == DP_TX_INVALID_QOS_TAG)
+			tid = HTT_TX_EXT_TID_INVALID;
+	}
 
 	tx_desc = dp_tx_desc_alloc(soc, desc_pool_id);
 
@@ -1889,6 +1898,11 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 
 	hal_tx_desc_cached[5] = vdev->lmac_id << TCL_DATA_CMD_PMAC_ID_LSB;
 	hal_tx_desc_cached[5] |= vdev->vdev_id << TCL_DATA_CMD_VDEV_ID_LSB;
+
+	if (tid != HTT_TX_EXT_TID_INVALID) {
+		hal_tx_desc_cached[5] |= tid << TCL_DATA_CMD_HLOS_TID_LSB;
+		hal_tx_desc_cached[5] |= tid << TCL_DATA_CMD_HLOS_TID_OVERWRITE_LSB;
+	}
 
 	if (vdev->opmode == wlan_op_mode_sta)
 		hal_tx_desc_cached[6] = vdev->bss_ast_idx |
