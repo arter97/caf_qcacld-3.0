@@ -1679,6 +1679,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	bool pairwise;
 	uint8_t vdev_id;
 	uint8_t link_id;
+	bool key_present = false;
 	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
 				 WLAN_CRYPTO_MAXIGTKKEYIDX +
 				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
@@ -1710,6 +1711,12 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 			  vdev_id, link_id, i, pairwise);
 		mlme_cm_osif_send_keys(vdev, i, pairwise,
 				       crypto_key->cipher_type);
+		key_present = true;
+	}
+
+	if (!key_present && mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlme_err("No key found for link_id %d", link_id);
+		QDF_BUG(0);
 	}
 	mlo_defer_set_keys(vdev, link_id, false);
 }
