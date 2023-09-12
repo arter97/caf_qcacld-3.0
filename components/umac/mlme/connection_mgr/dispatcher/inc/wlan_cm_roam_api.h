@@ -1351,6 +1351,18 @@ wlan_cm_update_offload_ssid_from_candidate(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 			     struct roam_scan_candidate_frame *frame);
+
+/**
+ * wlan_cm_add_all_link_probe_rsp_to_scan_db() - Parse and generate
+ * probe responses for each of the per-sta profile
+ *
+ * @psoc: psoc objmgr ptr
+ * @candidate: roam scan candidate info
+ */
+QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate);
+
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1603,6 +1615,13 @@ wlan_cm_update_offload_ssid_from_candidate(struct wlan_objmgr_pdev *pdev,
 static inline QDF_STATUS
 wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 			     struct roam_scan_candidate_frame *frame)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -4997,7 +4997,14 @@ wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 
 	extracted_ie = (uint8_t *)wlan_get_ie_ptr_from_eid(WLAN_ELEMID_SSID,
 							   ie_ptr, ie_len);
-	if (extracted_ie && extracted_ie[0] == WLAN_ELEMID_SSID) {
+	/*
+	 * Roam offload ssid/bssid needs to be set only for SAE roam offload
+	 * candidate frames for supporting cross-ssid roaming.
+	 * This update is not needed for probe/beacons received from the
+	 * roam sync frame event.
+	 */
+	if (frame->roam_offload_candidate_frm &&
+	    extracted_ie && extracted_ie[0] == WLAN_ELEMID_SSID) {
 		wh = (struct wlan_frame_hdr *)frame->frame;
 		WLAN_ADDR_COPY(&bssid.bytes[0], wh->i_addr2);
 
@@ -5208,6 +5215,14 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 {
 	return mlo_add_all_link_probe_rsp_to_scan_db(psoc, candidate);
 }
+
+QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate)
+{
+	return mlo_add_all_link_probe_rsp_to_scan_db(psoc, candidate);
+}
+
 #elif defined(WLAN_FEATURE_ROAM_OFFLOAD) /* end WLAN_FEATURE_11BE_MLO */
 QDF_STATUS
 cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -5215,4 +5230,12 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 {
 	return wlan_cm_add_frame_to_scan_db(psoc, candidate);
 }
+
+QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate)
+{
+	return wlan_cm_add_frame_to_scan_db(psoc, candidate);
+}
+
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */

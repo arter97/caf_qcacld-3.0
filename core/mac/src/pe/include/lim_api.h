@@ -684,18 +684,6 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 			     uint8_t *probe_rsp,
 			     uint32_t probe_rsp_len);
 
-/**
- * lim_gen_link_probe_rsp_roam() - Generate link prb rsp from assoc link prb rsp
- * @mac_ctx: Pointer to mac context
- * @session_entry: pe session
- * @roam_sync_ind_ptr: Roam synch parameters
- *
- * Return qdf status
- */
-QDF_STATUS
-lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
-			    struct pe_session *session_entry,
-			    struct roam_offload_synch_ind *roam_sync_ind);
 #else
 static inline QDF_STATUS
 lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
@@ -719,14 +707,6 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 
 static inline QDF_STATUS
 lim_check_for_ml_probe_req(struct pe_session *session)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-lim_gen_link_probe_rsp_roam(struct mac_context *mac_ctx,
-			    struct pe_session *session_entry,
-			    struct roam_offload_synch_ind *roam_sync_ind)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
