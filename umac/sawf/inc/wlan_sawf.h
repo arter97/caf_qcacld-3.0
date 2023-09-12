@@ -71,16 +71,16 @@
 #define WLAN_MAX_SVC_CLASS_NAME 64
 #define DISABLED_MODE_MAX_LEN 128
 
-#ifdef WLAN_SUPPORT_SCS
-#define SAWF_SCS_TID_MAX 8
 /*
  * Service class defined for Pre-11BE SCS (Only TID based service class
  * without other QoS attributes)
  */
 #define SAWF_SCS_SVC_CLASS_MIN (SAWF_SVC_CLASS_MAX + 1)
 #define SAWF_SCS_SVC_CLASS_MAX (SAWF_SVC_CLASS_MAX + SAWF_SCS_TID_MAX)
-#endif
 
+#ifdef WLAN_SUPPORT_SCS
+#define SAWF_SCS_TID_MAX 8
+#endif
 /**
  * enum sawf_rule_type - Enum for SAWF rule type
  * @SAWF_RULE_TYPE_DEFAULT: Admin configured global SAWF rule
