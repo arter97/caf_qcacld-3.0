@@ -111,6 +111,16 @@ void dp_tx_desc_pool_cleanup(struct dp_soc *soc, qdf_nbuf_t *nbuf_list)
 						   tx_desc_pool->elem_count,
 						   true, &dp_tx_desc_clean_up,
 						   nbuf_list);
+
+		tx_desc_pool = dp_get_spcl_tx_desc_pool(soc, i);
+
+		if (tx_desc_pool)
+			qdf_tx_desc_pool_free_bufs(soc,
+						   &tx_desc_pool->desc_pages,
+						   tx_desc_pool->elem_size,
+						   tx_desc_pool->elem_count,
+						   true, &dp_tx_desc_clean_up,
+						   nbuf_list);
 	}
 }
 #endif

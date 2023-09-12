@@ -683,7 +683,8 @@ void dp_tx_comp_get_prefetched_params_from_hal_desc(
 			(tx_desc_id & DP_TX_DESC_ID_PAGE_MASK) >>
 			DP_TX_DESC_ID_PAGE_OS,
 			(tx_desc_id & DP_TX_DESC_ID_OFFSET_MASK) >>
-			DP_TX_DESC_ID_OFFSET_OS);
+			DP_TX_DESC_ID_OFFSET_OS,
+			!!(tx_desc_id & DP_TX_DESC_ID_SPCL_MASK));
 	qdf_prefetch((uint8_t *)*r_tx_desc);
 }
 #endif

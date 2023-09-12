@@ -49,7 +49,8 @@ void dp_tx_comp_get_params_from_hal_desc_li(struct dp_soc *soc,
 				     (tx_desc_id & DP_TX_DESC_ID_PAGE_MASK) >>
 							DP_TX_DESC_ID_PAGE_OS,
 				     (tx_desc_id & DP_TX_DESC_ID_OFFSET_MASK) >>
-						DP_TX_DESC_ID_OFFSET_OS);
+						DP_TX_DESC_ID_OFFSET_OS,
+				     !!(tx_desc_id & DP_TX_DESC_ID_SPCL_MASK));
 	/* Pool id is not matching. Error */
 	if ((*r_tx_desc)->pool_id != pool_id) {
 		dp_tx_comp_alert("Tx Comp pool id %d not matched %d",
@@ -594,7 +595,8 @@ QDF_STATUS dp_tx_desc_pool_init_li(struct dp_soc *soc,
 	while (tx_desc) {
 		page_id = count / num_desc_per_page;
 		offset = count % num_desc_per_page;
-		id = ((pool_id_32 << DP_TX_DESC_ID_POOL_OS) |
+		id = ((!!spcl_tx_desc) <<  DP_TX_DESC_ID_SPCL_OS |
+			(pool_id_32 << DP_TX_DESC_ID_POOL_OS) |
 			(page_id << DP_TX_DESC_ID_PAGE_OS) | offset);
 
 		tx_desc->id = id;

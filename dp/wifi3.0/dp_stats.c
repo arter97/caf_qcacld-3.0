@@ -7836,6 +7836,10 @@ dp_print_soc_tx_stats(struct dp_soc *soc)
 		tx_desc_pool = dp_get_tx_desc_pool(soc, desc_pool_id);
 		soc->stats.tx.desc_in_use +=
 			tx_desc_pool->num_allocated;
+
+		tx_desc_pool = dp_get_spcl_tx_desc_pool(soc, desc_pool_id);
+		soc->stats.tx.desc_in_use +=
+			tx_desc_pool->num_allocated;
 	}
 
 	DP_PRINT_STATS("Tx Descriptors In Use = %u",
