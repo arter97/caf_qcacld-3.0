@@ -27,35 +27,75 @@
 
 /* Indicates MAX bearer switch requesters at a time */
 #define MAX_BEARER_SWITCH_REQUESTERS 5
+#define BS_REQ_ID_INVALID 0xFFFFFFFF
+typedef uint32_t wlan_bs_req_id;
 
 /**
- * enum bearer_switch_requester_source: Bearer switch requester source
- * @XPAN_BLE_SWITCH_REQUESTER_CONNECT: Bearer switch requester is connect
- * @XPAN_BLE_SWITCH_REQUESTER_CSA: Bearer switch requester is CSA
- * @XPAN_BLE_SWITCH_REQUESTER_FW: Bearer switch requester is FW
- * @XPAN_BLE_SWITCH_REQUESTER_MAX: Indicates MAX bearer switch requester
+ * enum bearer_switch_req_type: Bearer switch request type
+ * @WLAN_BS_REQ_TO_WLAN: Bearer switch request to wlan
+ * @WLAN_BS_REQ_TO_NON_WLAN: Bearer switch request to non-wlan
  */
-enum bearer_switch_requester_source {
-	XPAN_BLE_SWITCH_REQUESTER_CONNECT,
-	XPAN_BLE_SWITCH_REQUESTER_CSA,
-	XPAN_BLE_SWITCH_REQUESTER_FW,
-	XPAN_BLE_SWITCH_REQUESTER_MAX,
+enum bearer_switch_req_type {
+	WLAN_BS_REQ_TO_WLAN = 0,
+	WLAN_BS_REQ_TO_NON_WLAN = 1,
+};
+
+/**
+ * enum bearer_switch_req_source: Bearer switch requester source
+ * @BEARER_SWITCH_REQ_CONNECT: Bearer switch requester is connect
+ * @BEARER_SWITCH_REQ_CSA: Bearer switch requester is CSA
+ * @BEARER_SWITCH_REQ_FW: Bearer switch requester is FW
+ * @BEARER_SWITCH_REQ_MAX: Indicates MAX bearer switch requester
+ */
+enum bearer_switch_req_source {
+	BEARER_SWITCH_REQ_CONNECT,
+	BEARER_SWITCH_REQ_CSA,
+	BEARER_SWITCH_REQ_FW,
+	BEARER_SWITCH_REQ_MAX,
 };
 
  /**
-  * typedef requester_callback() - Callback function, which will be invoked with
-  * the bearer switch request status.
-  * @psoc: Psoc pointer
-  * @request_id: Request ID
-  * @status: Status of the bearer switch request
-  * @request_params: Request params for the bearer switch request
-  *
-  * Return: None
-  */
+ * typedef bearer_switch_requester_cb() - Callback function, which will
+ * be invoked with the bearer switch request status.
+ * @psoc: Psoc pointer
+ * @request_id: Request ID
+ * @status: Status of the bearer switch request
+ * @req_value: Request value for the bearer switch request
+ * @request_params: Request params for the bearer switch request
+ *
+ * Return: None
+ */
+typedef void (*bearer_switch_requester_cb)(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id,
+					   wlan_bs_req_id request_id,
+					   QDF_STATUS status,
+					   uint32_t req_value,
+					   void *request_params);
 
-typedef void (*requester_callback)(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id, uint32_t request_id,
-				    QDF_STATUS status,
-				    void *request_params);
+/**
+ * struct wlan_bearer_switch_request - Data structure to store the bearer switch
+ * request
+ * @vdev_id: Vdev id of the requester
+ * @request_id: Unique value to identify the request
+ * @req_type: Type of the request,  bearer switch to wlan or bearer switch
+ * to non-wlan
+ * @source: Bearer switch request source
+ * @requester_cb: Callback which needs to be invoked to indicate the status of
+ * the request to the requester, this callback will be passed by the requester
+ * when requester will send the request.
+ * @arg_value: argument value passed by requester, this will be returned back
+ * in the callback
+ * @arg: Argument passed by requester, this will be returned back in the
+ * callback
+ */
+struct wlan_bearer_switch_request {
+	uint8_t vdev_id;
+	wlan_bs_req_id request_id;
+	enum bearer_switch_req_type req_type;
+	enum bearer_switch_req_source source;
+	bearer_switch_requester_cb requester_cb;
+	uint32_t arg_value;
+	void *arg;
+};
 
 #endif /* _WLAN_LL_LT_SAP_BEARER_SWITCH_PUBLIC_STRUCTS_H_ */

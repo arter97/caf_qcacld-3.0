@@ -18,7 +18,16 @@
 #include <../../core/src/wlan_ll_lt_sap_bearer_switch.h>
 #include <../../core/src/wlan_ll_lt_sap_main.h>
 
-uint32_t wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
+wlan_bs_req_id
+wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_psoc *psoc)
 {
-	return ll_lt_sap_bearer_switch_get_id(vdev);
+	return ll_lt_sap_bearer_switch_get_id(psoc);
 }
+
+QDF_STATUS
+wlan_ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
+				struct wlan_bearer_switch_request *bs_request)
+{
+	return ll_lt_sap_switch_bearer_to_ble(psoc, bs_request);
+}
+
