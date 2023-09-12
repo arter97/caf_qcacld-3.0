@@ -75,8 +75,9 @@ struct qca_sawf_connection_sync_param {
 uint16_t qca_sawf_get_msduq(struct net_device *netdev,
 			    uint8_t *peer_mac, uint32_t service_id);
 uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
-			       uint32_t service_id, uint32_t dscp,
-			       uint32_t rule_id, uint8_t sawf_rule_type);
+			       uint32_t service_id, uint32_t dscp_pcp,
+			       uint32_t rule_id, uint8_t sawf_rule_type,
+			       bool pcp);
 uint32_t qca_sawf_get_mark_metadata(
 		struct qca_sawf_metadata_param *params);
 uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
@@ -91,12 +92,15 @@ uint16_t qca_sawf_get_msdu_queue(struct net_device *netdev,
  * @fw_service_id: Service class ID in forward direction
  * @rv_service_id: Service class ID in reverse direction
  * @add_or_sub: Add or Sub param
+ * @fw_mark_metadata: Forward direction metadata
+ * @rv_mark_metadata: Reverse direction metadata
  *
  * Return: void
  */
 void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
 			uint8_t fw_service_id, uint8_t rv_service_id,
-			uint8_t add_or_sub);
+			uint8_t add_or_sub, uint32_t fw_mark_metadata,
+			uint32_t rv_mark_metadata);
 
 /*
  * qca_sawf_connection_sync() - Update connection status
