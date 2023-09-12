@@ -871,8 +871,7 @@ static int parse_mlo_glb_h_shmem_arena(
 
 QDF_STATUS mlo_glb_h_shmem_arena_ctx_init(void *arena_vaddr,
 					  size_t arena_len,
-					  uint8_t grp_id,
-					  uint8_t recovery)
+					  uint8_t grp_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 
@@ -886,8 +885,7 @@ QDF_STATUS mlo_glb_h_shmem_arena_ctx_init(void *arena_vaddr,
 	}
 
 	/* We need to initialize only for the first invocation */
-	if ((recovery != MLO_RECOVERY_MODE_1) &&
-	    qdf_atomic_read(&shmem_arena_ctx->init_count))
+	if (qdf_atomic_read(&shmem_arena_ctx->init_count))
 		goto success;
 
 	if (parse_mlo_glb_h_shmem_arena(arena_vaddr, arena_len,
@@ -906,7 +904,7 @@ success:
 
 qdf_export_symbol(mlo_glb_h_shmem_arena_ctx_init);
 
-QDF_STATUS mlo_glb_h_shmem_arena_ctx_deinit(uint8_t grp_id, uint8_t recovery)
+QDF_STATUS mlo_glb_h_shmem_arena_ctx_deinit(uint8_t grp_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 
@@ -925,8 +923,7 @@ QDF_STATUS mlo_glb_h_shmem_arena_ctx_deinit(uint8_t grp_id, uint8_t recovery)
 	}
 
        /* We need to de-initialize only for the last invocation */
-	if (qdf_atomic_dec_and_test(&shmem_arena_ctx->init_count) &&
-	    recovery != MLO_RECOVERY_MODE_1)
+	if (!qdf_atomic_dec_and_test(&shmem_arena_ctx->init_count))
 		goto success;
 
 	free_mlo_glb_rx_reo_per_link_info(

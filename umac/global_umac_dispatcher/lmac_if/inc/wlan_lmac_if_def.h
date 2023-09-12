@@ -263,10 +263,8 @@ struct wlan_lmac_if_global_shmem_local_ops {
 
 	QDF_STATUS (*init_shmem_arena_ctx)(void *arena_vaddr,
 					   size_t arena_len,
-					   uint8_t grp_id,
-					   uint8_t recovery);
-	QDF_STATUS (*deinit_shmem_arena_ctx)(uint8_t grp_id,
-					     uint8_t recovery);
+					   uint8_t grp_id);
+	QDF_STATUS (*deinit_shmem_arena_ctx)(uint8_t grp_id);
 	void *(*get_crash_reason_address)(uint8_t grp_id,
 					  uint8_t chip_id);
 	void *(*get_recovery_mode_address)(uint8_t grp_id,
