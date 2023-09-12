@@ -2552,6 +2552,7 @@ util_scan_gen_scan_entry(struct wlan_objmgr_pdev *pdev,
 	if (!scan_node) {
 		qdf_mem_free(scan_entry->raw_frame.ptr);
 		qdf_mem_free(scan_entry);
+		scm_err("failed to allocate memory for scan_node");
 		return QDF_STATUS_E_FAILURE;
 	}
 
