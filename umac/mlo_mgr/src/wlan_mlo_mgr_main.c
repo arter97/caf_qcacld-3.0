@@ -32,6 +32,146 @@
 #include <wlan_mlo_t2lm.h>
 #include "cdp_txrx_cmn.h"
 
+#ifdef WLAN_WSI_STATS_SUPPORT
+/*
+ * wlan_mlo_wsi_get_num_psocs() - Get the number of attached PSOCs
+ * @psoc: Pointer to psoc
+ * @arg: Pointer to variable to store count
+ * @index: Index for iteration function
+ */
+static void wlan_mlo_wsi_get_num_psocs(struct wlan_objmgr_psoc *psoc,
+				       void *arg, uint8_t index)
+{
+	/* If arg is NULL then skip increment */
+	if (!arg)
+		return;
+
+	(*(uint32_t *)arg)++;
+}
+
+static void mlo_wsi_link_info_deinit(struct mlo_mgr_context *mlo_mgr)
+{
+	if (!mlo_mgr)
+		return;
+
+	if (mlo_mgr->wsi_info) {
+		qdf_mem_free(mlo_mgr->wsi_info);
+		mlo_mgr->wsi_info = NULL;
+	}
+}
+
+#ifdef WLAN_MLO_MULTI_CHIP
+void mlo_wsi_link_info_update_soc(struct wlan_objmgr_psoc *psoc,
+				  uint8_t grp_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_wsi_psoc_grp *mlo_grp_info;
+	uint8_t i, j;
+
+	if (!mlo_ctx) {
+		mlo_err("Invalid mlo_mgr_ctx");
+		return;
+	}
+
+	mlo_grp_info = &mlo_ctx->wsi_info->mlo_psoc_grp[grp_id];
+	if (!mlo_grp_info) {
+		mlo_err("mlo_grp_info is invalid for ix %d", i);
+		return;
+	}
+
+	mlo_ctx->wsi_info->num_psoc++;
+
+	/* Set the PSOC order for the MLO group */
+	for (j = 0; j < WLAN_OBJMGR_MAX_DEVICES; j++) {
+		if (mlo_grp_info->psoc_order[j] == MLO_WSI_PSOC_ID_MAX) {
+			mlo_grp_info->psoc_order[j] = wlan_psoc_get_id(psoc);
+			mlo_grp_info->num_psoc++;
+			break;
+		}
+	}
+}
+#endif
+
+static void
+mlo_wsi_link_info_setup_mlo_grps(struct mlo_mgr_context *mlo_mgr)
+{
+	struct mlo_wsi_psoc_grp *mlo_grp_info;
+	uint8_t i, j;
+
+	if (!mlo_mgr) {
+		mlo_err("Invalid mlo_mgr");
+		return;
+	}
+
+	if (!mlo_mgr->wsi_info) {
+		mlo_err("Invalid wsi_info");
+		return;
+	}
+
+	wlan_objmgr_iterate_psoc_list(wlan_mlo_wsi_get_num_psocs,
+				      &mlo_mgr->wsi_info->num_psoc,
+				      WLAN_MLO_MGR_ID);
+	if (!mlo_mgr->wsi_info->num_psoc)
+		mlo_info("Could not find active PSOCs");
+
+	for (i = 0; i < MLO_WSI_MAX_MLO_GRPS; i++) {
+		mlo_grp_info =
+			&mlo_mgr->wsi_info->mlo_psoc_grp[i];
+		if (!mlo_grp_info) {
+			mlo_err("mlo_grp_info is invalid for ix %d", i);
+			continue;
+		}
+
+		/* Set the PSOC order for the MLO group */
+		for (j = 0; j < WLAN_OBJMGR_MAX_DEVICES; j++) {
+			/*
+			 * NOTE: Inclusion of more MLO groups will require
+			 * changes to this block where rvalue will need
+			 * to be checked against the group they need to
+			 * be assigned to.
+			 */
+			if (j < mlo_mgr->wsi_info->num_psoc) {
+				mlo_grp_info->psoc_order[j] = j;
+				mlo_grp_info->num_psoc++;
+			} else {
+				mlo_grp_info->psoc_order[j] =
+							MLO_WSI_PSOC_ID_MAX;
+			}
+			mlo_err("PSOC order %d, index %d",
+				mlo_grp_info->psoc_order[j], j);
+		}
+	}
+}
+
+static void mlo_wsi_link_info_init(struct mlo_mgr_context *mlo_mgr)
+{
+	uint8_t i;
+
+	if (!mlo_mgr)
+		return;
+
+	/* Initialize the mlo_wsi_link_info structure */
+	mlo_mgr->wsi_info = qdf_mem_malloc(
+					sizeof(struct mlo_wsi_info));
+	if (!mlo_mgr->wsi_info) {
+		mlo_err("Could not allocate memory for wsi_link_info");
+		return;
+	}
+
+	/* Initialize the MLO group context in the WSI stats */
+	for (i = 0; i < MLO_WSI_MAX_MLO_GRPS; i++)
+		mlo_wsi_link_info_setup_mlo_grps(mlo_mgr);
+}
+#else
+static void mlo_wsi_link_info_init(struct mlo_mgr_context *mlo_mgr)
+{
+}
+
+static void mlo_wsi_link_info_deinit(struct mlo_mgr_context *mlo_mgr)
+{
+}
+#endif
+
 static void mlo_global_ctx_deinit(void)
 {
 	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
@@ -41,6 +181,9 @@ static void mlo_global_ctx_deinit(void)
 
 	if (qdf_list_empty(&mlo_mgr_ctx->ml_dev_list))
 		mlo_debug("ML dev list is not empty");
+
+	/* Deallocation of the WSI link information */
+	mlo_wsi_link_info_deinit(mlo_mgr_ctx);
 
 	mlo_setup_deinit();
 	mlo_msgq_free();
@@ -80,6 +223,9 @@ static void mlo_global_ctx_init(void)
 	mlo_mgr_ctx->mlo_is_force_primary_umac = 0;
 	mlo_mgr_ctx->force_non_assoc_prim_umac = 0;
 	mlo_msgq_init();
+
+	/* Allocation of the WSI link information */
+	mlo_wsi_link_info_init(mlo_mgr_ctx);
 }
 
 /**

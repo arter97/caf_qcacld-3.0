@@ -974,6 +974,7 @@ void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer)
 	uint8_t i;
 
 	ml_peer = peer->mlo_peer_ctx;
+	wlan_mlo_peer_wsi_link_delete(ml_peer);
 	ml_peer->primary_umac_psoc_id = wlan_peer_get_psoc_id(peer);
 
 	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
@@ -988,6 +989,7 @@ void wlan_objmgr_mlo_update_primary_info(struct wlan_objmgr_peer *peer)
 		if (peer_ent_iter->link_peer == peer)
 			peer_ent_iter->is_primary = true;
 	}
+	wlan_mlo_peer_wsi_link_add(ml_peer);
 }
 
 qdf_export_symbol(wlan_objmgr_mlo_update_primary_info);

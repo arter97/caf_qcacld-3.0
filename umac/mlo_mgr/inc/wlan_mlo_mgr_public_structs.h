@@ -194,6 +194,45 @@ struct mlo_state_params {
 #endif
 
 /*
+ * struct mlo_wsi_link_stats - MLO ingress/egress counters of PSOC
+ * @ingress_cnt:  Ingress counter
+ * @egress_cnt:  Egress counter
+ * @send_wmi_cmd: To indicate whether WMI command to be sent or not
+ */
+struct mlo_wsi_link_stats {
+	uint32_t ingress_cnt;
+	uint32_t egress_cnt;
+	bool  send_wmi_cmd;
+};
+
+/*
+ * struct mlo_wsi_psoc_grp - MLO WSI PSOC group
+ * @psoc_order:  PSOC list in WSI loop order
+ * @num_psoc: num psoc in the group
+ */
+struct mlo_wsi_psoc_grp {
+	uint32_t psoc_order[WLAN_OBJMGR_MAX_DEVICES];
+	uint32_t num_psoc;
+};
+
+#define MLO_WSI_MAX_MLO_GRPS 2
+#define MLO_WSI_PSOC_ID_MAX 0xFF
+
+/*
+ * struct mlo_wsi_info - MLO ingress/egress link context per-PSOC
+ * @mlo_psoc_grp: PSOC IDs for different MLO groups
+ * @num_psoc: Total num psoc
+ * @link_stats: Ingress and Egress counts for PSOCs
+ * @block_wmi_cmd: Blocks WMI command
+ */
+struct mlo_wsi_info {
+	struct mlo_wsi_psoc_grp mlo_psoc_grp[MLO_WSI_MAX_MLO_GRPS];
+	uint32_t num_psoc;
+	struct mlo_wsi_link_stats link_stats[WLAN_OBJMGR_MAX_DEVICES];
+	uint8_t block_wmi_cmd;
+};
+
+/**
  * struct mlo_mgr_context - MLO manager context
  * @ml_dev_list_lock: ML DEV list lock
  * @aid_lock: AID global lock
@@ -209,6 +248,7 @@ struct mlo_state_params {
  * @mlo_is_force_primary_umac: Force Primary UMAC enable
  * @mlo_forced_primary_umac_id: Force Primary UMAC ID
  * @force_non_assoc_prim_umac: Force non-assoc link to be primary umac
+ * @wsi_info: WSI stats info
  *
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
@@ -236,6 +276,7 @@ struct mlo_mgr_context {
 	bool mlo_is_force_primary_umac;
 	uint8_t mlo_forced_primary_umac_id;
 	bool force_non_assoc_prim_umac;
+	struct mlo_wsi_info *wsi_info;
 };
 
 /*

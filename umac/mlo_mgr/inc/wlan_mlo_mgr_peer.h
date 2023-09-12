@@ -835,4 +835,50 @@ uint8_t
 wlan_mld_get_best_primary_umac_w_rssi(struct wlan_mlo_peer_context *ml_peer,
 				      struct wlan_objmgr_vdev *link_vdevs[],
 				      bool allow_all_links);
+
+/**
+ * wlan_mlo_wsi_link_info_send_cmd() - Send WSI stats to FW
+ *
+ * API to send WMI commands for all radios of all PSOCs
+ *
+ * Return: SUCCESS, on sending WMI commands
+ */
+QDF_STATUS wlan_mlo_wsi_link_info_send_cmd(void);
+
+/**
+ * wlan_mlo_wsi_stats_allow_cmd() - Allow WSI stats to FW
+ *
+ * API to allows WSI stats WMI commands for all radios of all PSOCs
+ *
+ * Return: void
+ */
+void wlan_mlo_wsi_stats_allow_cmd(void);
+
+/**
+ * wlan_mlo_wsi_stats_block_cmd() - Block WSI stats to FW
+ *
+ * API to block WST stats WMI commands for all radios of all PSOCs
+ *
+ * Return: void
+ */
+void wlan_mlo_wsi_stats_block_cmd(void);
+/**
+ * wlan_mlo_peer_wsi_link_add() - Add peer to WSI info list
+ * @ml_peer: ML peer context
+ *
+ * API to add peer to WSI link stats
+ *
+ * Return: SUCCESS, if peer details added to WSI link stats
+ */
+QDF_STATUS wlan_mlo_peer_wsi_link_add(struct wlan_mlo_peer_context *ml_peer);
+
+/**
+ * wlan_mlo_peer_wsi_link_delete() - Delete peer to WSI info list
+ * @ml_peer: ML peer context
+ *
+ * API to Delete peer from WSI link stats
+ *
+ * Return: SUCCESS, if peer details deleted from WSI link stats
+ */
+QDF_STATUS wlan_mlo_peer_wsi_link_delete(struct wlan_mlo_peer_context *ml_peer);
 #endif

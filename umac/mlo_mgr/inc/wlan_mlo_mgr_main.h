@@ -1000,6 +1000,28 @@ QDF_STATUS wlan_mlo_mgr_mld_vdev_attach(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_mlo_mgr_mld_vdev_detach(struct wlan_objmgr_vdev *vdev);
+
+#ifdef WLAN_MLO_MULTI_CHIP
+#ifdef WLAN_WSI_STATS_SUPPORT
+/**
+ * mlo_wsi_link_info_update_soc() - Update PSOC group in WSI stats
+ * @psoc: PSOC object
+ * @grp_id: Group ID
+ *
+ * API to update PSOC group id in WSI statas.
+ *
+ * Return: void
+ */
+void mlo_wsi_link_info_update_soc(struct wlan_objmgr_psoc *psoc,
+				  uint8_t grp_id);
+#else
+static void mlo_wsi_link_info_update_soc(struct wlan_objmgr_psoc *psoc,
+					 uint8_t grp_id)
+{
+}
+#endif
+#endif
+
 #else
 static inline QDF_STATUS wlan_mlo_mgr_init(void)
 {
