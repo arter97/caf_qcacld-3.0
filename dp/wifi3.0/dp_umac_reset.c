@@ -1000,10 +1000,10 @@ QDF_STATUS dp_umac_reset_stats_print(struct dp_soc *soc)
 	umac_reset_ctx = &soc->umac_reset_ctx;
 
 	DP_UMAC_RESET_PRINT_STATS("UMAC reset stats for soc:%pK\n"
-		  "\t\ttrigger time                  :%u us\n"
-		  "\t\tPre_reset time                :%u us\n"
-		  "\t\tPost_reset time               :%u us\n"
-		  "\t\tPost_reset_complete time      :%u us\n"
+		  "\t\ttrigger time                  :%llu us\n"
+		  "\t\tPre_reset time                :%llu us\n"
+		  "\t\tPost_reset time               :%llu us\n"
+		  "\t\tPost_reset_complete time      :%llu us\n"
 		  "\t\tCurrent state                 :%s\n"
 		  "\t\tPending action                :%s",
 		  soc,
