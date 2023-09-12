@@ -4162,6 +4162,26 @@ wlan_mlme_is_data_stall_recovery_fw_supported(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS mlme_cfg_get_eht_caps(struct wlan_objmgr_psoc *psoc,
 				 tDot11fIEeht_cap *eht_cap);
 
+/**
+ * wlan_mlme_set_bt_profile_con() - Set bluetooth connection profile
+ * @psoc: pointer to psoc object
+ * @bt_profile_con: Bluetooth connection profile bit
+ *
+ * Return: None
+ */
+void
+wlan_mlme_set_bt_profile_con(struct wlan_objmgr_psoc *psoc,
+			     bool bt_profile_con);
+
+/**
+ * wlan_mlme_get_bt_profile_con() - Get Bluetooth connection profile
+ * @psoc: pointer to psoc object
+ *
+ * Return: Bluetooth connection profile
+ */
+bool
+wlan_mlme_get_bt_profile_con(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * wlan_mlme_get_sta_mlo_conn_max_num() - get max number of links that sta mlo

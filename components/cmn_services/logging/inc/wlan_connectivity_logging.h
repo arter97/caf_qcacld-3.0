@@ -1277,6 +1277,14 @@ void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id);
 
+/**
+ * wlan_connectivity_connecting_event() - API to log connecting event
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
 
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
@@ -1346,6 +1354,15 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_algo, uint8_t auth_type,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag);
+
+/**
+ * wlan_connectivity_connecting_event() - API to log connecting event
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_populate_vsie() - Populate VSIE field for logging
@@ -1446,6 +1463,11 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      qdf_freq_t freq,
 				      bool is_rx, uint8_t subtype)
 {}
+
+static inline void
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
+{
+}
 #endif
 
 #if defined(CONNECTIVITY_DIAG_EVENT) && defined(WLAN_FEATURE_11BE_MLO)

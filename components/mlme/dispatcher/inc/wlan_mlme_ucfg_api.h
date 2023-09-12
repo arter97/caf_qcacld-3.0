@@ -95,6 +95,15 @@ void ucfg_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id, uint8_t value);
 
 /**
+ * ucfg_mlme_set_bt_profile_con() - set Bluetooth connection profile
+ * @psoc: Pointer to psoc object
+ * @bt_profile_con: Bluetooth connection profile indicator
+ *
+ * Return: None
+ */
+void ucfg_mlme_set_bt_profile_con(struct wlan_objmgr_psoc *psoc,
+				  bool bt_profile_con);
+/**
  * ucfg_mlme_get_ml_link_control_mode() - get ml_link_control_mode
  * @psoc: pointer to psoc object
  * @vdev_id: vdev id

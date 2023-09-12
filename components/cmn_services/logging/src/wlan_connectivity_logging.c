@@ -24,6 +24,7 @@
 #include "wlan_cm_api.h"
 #include "wlan_mlme_main.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlme_api.h"
 
 #ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 static struct wlan_connectivity_log_buf_data global_cl;
@@ -542,6 +543,9 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 		goto out;
 
+	if (!wlan_cm_is_first_candidate_connect_attempt(vdev))
+		goto out;
+
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
 	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
@@ -563,7 +567,7 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	}
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_STA_INFO);
-
+	wlan_connectivity_connecting_event(vdev);
 out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
@@ -676,6 +680,58 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
+}
+
+void
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	struct wlan_cm_connect_req req;
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_connect);
+
+	status = wlan_cm_get_active_connect_req_param(vdev, &req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		logging_err("vdev: %d failed to get active cmd request",
+			    wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	wlan_diag_event.version = DIAG_CONN_VERSION;
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
+	wlan_diag_event.subtype = WLAN_CONN_DIAG_CONNECTING_EVENT;
+
+	wlan_diag_event.ssid_len = req.ssid.length;
+
+	if (req.ssid.length > WLAN_SSID_MAX_LEN)
+		wlan_diag_event.ssid_len = WLAN_SSID_MAX_LEN;
+
+	qdf_mem_copy(wlan_diag_event.ssid, req.ssid.ssid,
+		     wlan_diag_event.ssid_len);
+
+	if (!qdf_is_macaddr_zero(&req.bssid))
+		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid, req.bssid.bytes,
+			     QDF_MAC_ADDR_SIZE);
+	else if (!qdf_is_macaddr_zero(&req.bssid_hint))
+		qdf_mem_copy(wlan_diag_event.bssid_hint, req.bssid_hint.bytes,
+			     QDF_MAC_ADDR_SIZE);
+
+	if (req.chan_freq)
+		wlan_diag_event.freq = req.chan_freq;
+	else if (req.chan_freq_hint)
+		wlan_diag_event.freq_hint = req.chan_freq_hint;
+
+	wlan_diag_event.pairwise_cipher	= req.crypto.user_cipher_pairwise;
+	wlan_diag_event.grp_cipher = req.crypto.user_grp_cipher;
+	wlan_diag_event.akm = req.crypto.user_akm_suite;
+	wlan_diag_event.auth_algo = req.crypto.user_auth_type;
+
+	wlan_diag_event.bt_coex =
+		wlan_mlme_get_bt_profile_con(wlan_vdev_get_psoc(vdev));
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_CONN);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO

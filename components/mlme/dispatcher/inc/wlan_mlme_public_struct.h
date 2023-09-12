@@ -1463,6 +1463,7 @@ struct wlan_mlme_aux_dev_caps {
  * connection, bypass strict power levels
  * @sr_enable_modes: modes for which SR(Spatial Reuse) is enabled
  * @wlan_mlme_aux0_dev_caps: capability for aux0
+ * @bt_profile_con: Bluetooth connection profile
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1530,6 +1531,7 @@ struct wlan_mlme_generic {
 #endif
 	struct wlan_mlme_aux_dev_caps
 		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX];
+	bool bt_profile_con;
 };
 
 /**

@@ -1413,6 +1413,31 @@ QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
 	return  status;
 }
 
+void
+wlan_mlme_set_bt_profile_con(struct wlan_objmgr_psoc *psoc,
+			     bool bt_profile_con)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	mlme_obj->cfg.gen.bt_profile_con = bt_profile_con;
+}
+
+bool
+wlan_mlme_get_bt_profile_con(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.gen.bt_profile_con;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc)
 {
