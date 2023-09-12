@@ -2442,6 +2442,7 @@ wlan_mlo_peer_wsi_link_update(struct wlan_mlo_peer_context *ml_peer, bool add)
 	uint32_t prim_psoc_ix_grp, sec_psoc_ix_grp;
 	uint32_t i, j;
 	struct mlo_wsi_psoc_grp *mlo_psoc_grp;
+	struct wlan_objmgr_psoc *psoc;
 
 	/* Check if ml_peer is valid */
 	if (!ml_peer) {
@@ -2480,6 +2481,13 @@ wlan_mlo_peer_wsi_link_update(struct wlan_mlo_peer_context *ml_peer, bool add)
 		if (!peer_entry->link_peer) {
 			mlo_err("link peer is null");
 			continue;
+		}
+
+		psoc = wlan_peer_get_psoc(peer_entry->link_peer);
+		if (!mlo_get_wsi_stats_info_support(psoc)) {
+			mlo_info("WSI stats support is not enabled on psoc %d",
+				 wlan_psoc_get_id(psoc));
+			return QDF_STATUS_E_INVAL;
 		}
 
 		/*
