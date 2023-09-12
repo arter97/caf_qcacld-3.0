@@ -985,7 +985,8 @@ static void mlo_send_teardown_req(struct wlan_objmgr_psoc *psoc,
 	setup_info = &mlo_ctx->setup_info[grp_id];
 	tot_links = setup_info->tot_links;
 
-	if (reason == WMI_HOST_MLO_TEARDOWN_REASON_MODE1_SSR) {
+	if (reason == WMI_HOST_MLO_TEARDOWN_REASON_MODE1_SSR ||
+	    reason == WMI_HOST_MLO_TEARDOWN_REASON_STANDBY) {
 		for (link_idx = 0; link_idx < tot_links; link_idx++) {
 			umac_reset = 0;
 			temp_pdev = setup_info->pdev_list[link_idx];

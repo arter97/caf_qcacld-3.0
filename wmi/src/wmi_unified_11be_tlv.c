@@ -1522,6 +1522,9 @@ QDF_STATUS mlo_teardown_cmd_send_tlv(struct wmi_unified *wmi_handle,
 	case WMI_HOST_MLO_TEARDOWN_REASON_MODE1_SSR:
 		cmd->reason_code = WMI_MLO_TEARDOWN_SSR_REASON;
 		break;
+	case WMI_HOST_MLO_TEARDOWN_REASON_STANDBY:
+		cmd->reason_code = WMI_MLO_TEARDOWN_REASON_STANDBY_DOWN;
+		break;
 	case WMI_HOST_MLO_TEARDOWN_REASON_DOWN:
 	default:
 		cmd->reason_code = WMI_MLO_TEARDOWN_SSR_REASON + 1;
