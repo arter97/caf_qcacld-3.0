@@ -24838,6 +24838,55 @@ static int wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+static int
+hdd_check_he_bitmask_for_single_rate(enum nl80211_band band,
+				     const struct cfg80211_bitrate_mask *mask)
+{
+	int he_rates = 0, i;
+
+	for (i = 0; i < QDF_ARRAY_SIZE(mask->control[band].he_mcs); i++)
+		he_rates += qdf_get_hweight16(mask->control[band].he_mcs[i]);
+
+	return he_rates;
+}
+
+static void
+hdd_get_he_bitrate_params_for_band(enum nl80211_band band,
+				   const struct cfg80211_bitrate_mask *mask,
+				   uint8_t *nss, uint8_t *rate_index,
+				   int *bit_rate)
+{
+	int i;
+
+	for (i = 0; i < QDF_ARRAY_SIZE(mask->control[band].he_mcs); i++) {
+		if (qdf_get_hweight16(mask->control[band].he_mcs[i]) == 1) {
+			*nss = i;
+			*rate_index = (ffs(mask->control[band].he_mcs[i]) - 1);
+			*bit_rate = hdd_assemble_rate_code(WMI_RATE_PREAMBLE_HE,
+							   *nss, *rate_index);
+			break;
+		}
+	}
+}
+#else
+static inline int
+hdd_check_he_bitmask_for_single_rate(enum nl80211_band band,
+				     const struct cfg80211_bitrate_mask *mask)
+{
+	return 0;
+}
+
+static inline void
+hdd_get_he_bitrate_params_for_band(enum nl80211_band band,
+				   const struct cfg80211_bitrate_mask *mask,
+				   uint8_t *nss, uint8_t *rate_index,
+				   int *bit_rate)
+
+{
+}
+#endif
+
 static bool hdd_check_bitmask_for_single_rate(enum nl80211_band band,
 				const struct cfg80211_bitrate_mask *mask)
 {
@@ -24850,6 +24899,8 @@ static bool hdd_check_bitmask_for_single_rate(enum nl80211_band band,
 
 	for (i = 0; i < QDF_ARRAY_SIZE(mask->control[band].vht_mcs); i++)
 		num_rates += qdf_get_hweight16(mask->control[band].vht_mcs[i]);
+
+	num_rates += hdd_check_he_bitmask_for_single_rate(band, mask);
 
 	return num_rates ? true : false;
 }
@@ -24928,9 +24979,12 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 				bit_rate = hdd_assemble_rate_code(
 						WMI_RATE_PREAMBLE_VHT,
 						nss, rate_index);
-				break;
+				goto configure_fw;
 			}
 		}
+
+		hdd_get_he_bitrate_params_for_band(band, mask, &nss,
+						   &rate_index, &bit_rate);
 
 configure_fw:
 		if (bit_rate != -1) {
