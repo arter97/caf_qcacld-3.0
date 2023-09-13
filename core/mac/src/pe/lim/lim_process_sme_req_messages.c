@@ -1105,7 +1105,8 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			goto free;
 		}
 #ifdef QCA_HT_2040_COEX
-		if (mac_ctx->roam.configParam.obssEnabled)
+		if (mac_ctx->roam.configParam.obssEnabled &&
+		    !policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id))
 			session->htSupportedChannelWidthSet =
 				session->htCapability;
 		else

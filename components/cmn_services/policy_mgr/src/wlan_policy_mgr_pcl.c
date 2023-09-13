@@ -1582,7 +1582,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 
 	for (i = 0; i < *len; i++) {
 		/* Remove passive/dfs/6G invalid channel for LL_LT_SAP */
-		if (wlan_reg_is_passive_for_freq(
+		if (wlan_reg_is_24ghz_ch_freq(pcl_channels[i]) ||
+		    wlan_reg_is_passive_for_freq(
 					pm_ctx->pdev,
 					pcl_channels[i]) ||
 		    wlan_reg_is_dfs_for_freq(

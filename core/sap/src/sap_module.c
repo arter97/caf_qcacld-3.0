@@ -1400,8 +1400,10 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	} else {
 		wlan_mlme_get_channel_bonding_5ghz(mac->psoc,
 						   &channel_bonding_mode);
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
-		    (!channel_bonding_mode))
+		if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc,
+						 sap_context->vdev_id) ||
+		    (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
+		     !channel_bonding_mode))
 			ch_width = CH_WIDTH_20MHZ;
 		else
 			ch_width = wlansap_get_max_bw_by_phymode(sap_context);
@@ -4044,11 +4046,11 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 								sap_ctx, NULL);
 		} else {
 			sap_debug("No need switch SAP/Go channel");
-			return 0;
+			return sap_ctx->chan_freq;
 		}
 	} else {
 		sap_debug("No need switch SAP/Go channel");
-		return 0;
+		return sap_ctx->chan_freq;
 	}
 	cc_mode = sap_ctx->cc_switch_mode;
 	phy_mode = sap_ctx->phyMode;

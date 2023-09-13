@@ -3931,9 +3931,15 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		ch_params.ch_width = CH_WIDTH_MAX;
 
 	intf_ch_freq = wlansap_get_chan_band_restrict(sap_context, &csa_reason);
-	if (intf_ch_freq)
+	if (intf_ch_freq && intf_ch_freq != sap_context->chan_freq) {
 		goto sap_restart;
-
+	} else if (!intf_ch_freq &&
+		  policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
+		schedule_work(&ap_adapter->sap_stop_bss_work);
+		wlansap_context_put(sap_context);
+		hdd_debug("stop ll_lt_sap, no channel found for csa");
+		return QDF_STATUS_E_FAILURE;
+	}
 	/*
 	 * If STA+SAP sessions are on DFS channel and STA+SAP SCC is
 	 * enabled on DFS channel then move the SAP out of DFS channel
