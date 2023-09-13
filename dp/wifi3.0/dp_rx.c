@@ -238,7 +238,7 @@ dp_pdev_frag_alloc_and_map(struct dp_soc *dp_soc,
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 
 	(nbuf_frag_info_t->virt_addr).vaddr =
-			qdf_frag_alloc(NULL, rx_desc_pool->buf_size);
+			qdf_frag_alloc(&rx_desc_pool->pf_cache, rx_desc_pool->buf_size);
 
 	if (!((nbuf_frag_info_t->virt_addr).vaddr)) {
 		dp_err("Frag alloc failed");
@@ -3137,6 +3137,8 @@ void dp_rx_enable_mon_dest_frag(struct rx_desc_pool *rx_desc_pool,
 	rx_desc_pool->rx_mon_dest_frag_enable = is_mon_dest_desc;
 	if (is_mon_dest_desc)
 		dp_alert("Feature DP_RX_MON_MEM_FRAG for mon_dest is enabled");
+	else
+		qdf_frag_cache_drain(&rx_desc_pool->pf_cache);
 }
 #else
 void dp_rx_enable_mon_dest_frag(struct rx_desc_pool *rx_desc_pool,

@@ -264,6 +264,7 @@ void dp_rx_desc_pool_deinit(struct dp_soc *soc,
 
 	/* Deinitialize rx mon desr frag flag */
 	rx_desc_pool->rx_mon_dest_frag_enable = false;
+	qdf_frag_cache_drain(&rx_desc_pool->pf_cache);
 
 	soc->arch_ops.dp_rx_desc_pool_deinit(soc, rx_desc_pool, pool_id);
 
@@ -460,6 +461,7 @@ void dp_rx_desc_pool_deinit(struct dp_soc *soc,
 
 		/* Deinitialize rx mon dest frag flag */
 		rx_desc_pool->rx_mon_dest_frag_enable = false;
+		qdf_frag_cache_drain(&rx_desc_pool->pf_cache);
 
 		soc->arch_ops.dp_rx_desc_pool_deinit(soc, rx_desc_pool,
 						     pool_id);
