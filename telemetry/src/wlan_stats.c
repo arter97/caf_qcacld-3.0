@@ -2939,8 +2939,7 @@ static QDF_STATUS get_advance_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 
 		mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
 		for (i = 0; i < num_links; i++) {
-			status = wlan_cfg80211_get_vdev_cp_stats(vdev_list[i],
-								 temp_cp_stats);
+			status = get_vdev_cp_stats(vdev_list[i], temp_cp_stats);
 			mlo_release_vdev_ref(vdev_list[i]);
 			if (status != QDF_STATUS_SUCCESS) {
 				ret = status;
@@ -2952,7 +2951,7 @@ static QDF_STATUS get_advance_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 	} else
 #endif
 	{
-		ret = wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
+		ret = get_vdev_cp_stats(vdev, cp_stats);
 	}
 
 	if (QDF_STATUS_SUCCESS != ret) {
@@ -4875,8 +4874,7 @@ static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		}
 		mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
 		for (i = 0; i < num_links; i++) {
-			status = wlan_cfg80211_get_vdev_cp_stats(vdev_list[i],
-								 temp_cp_stats);
+			status = get_vdev_cp_stats(vdev_list[i], temp_cp_stats);
 			mlo_release_vdev_ref(vdev_list[i]);
 			if (status != QDF_STATUS_SUCCESS) {
 				ret = status;
@@ -4888,7 +4886,7 @@ static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 	} else
 #endif
 	{
-		ret = wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
+		ret = get_vdev_cp_stats(vdev, cp_stats);
 	}
 
 	if (QDF_STATUS_SUCCESS != ret) {
