@@ -5063,3 +5063,33 @@ wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind_cmd(struct wlan_objmgr_vdev *vdev,
+					uint8_t csa_status)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct  wlan_mlme_tx_ops *tx_ops;
+	mlme_psoc_ext_t *mlme_priv;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlme_err("vdev_id %d psoc object is NULL",
+			 wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv = wlan_psoc_mlme_get_ext_hdl(psoc);
+	if (!mlme_priv)
+		return QDF_STATUS_E_FAILURE;
+
+	tx_ops = &mlme_priv->mlme_tx_ops;
+
+	if (!tx_ops || !tx_ops->send_csa_event_status_ind) {
+		mlme_err("CSA no op defined");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return tx_ops->send_csa_event_status_ind(vdev, csa_status);
+}
+
