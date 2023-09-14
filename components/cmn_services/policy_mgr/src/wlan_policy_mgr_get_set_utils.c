@@ -1045,7 +1045,6 @@ policy_mgr_update_5Ghz_freq_info(struct policy_mgr_freq_range *mac_range,
 				    QDF_MIN(mac_cap->reg_cap_ext.high_5ghz_chan,
 					    max_5g_freq) :
 				    max_5g_freq;
-
 }
 
 static void
@@ -1370,9 +1369,19 @@ policy_mgr_update_mac_freq_info(struct wlan_objmgr_psoc *psoc,
 
 		break;
 	case WMI_HW_MODE_EMLSR:
-	case WMI_HW_MODE_AUX_EMLSR_SINGLE:
-	case WMI_HW_MODE_AUX_EMLSR_SPLIT:
 		policy_mgr_update_freq_info(pm_ctx, mac_cap, MODE_EMLSR,
+					    phy_id);
+		break;
+	case WMI_HW_MODE_AUX_EMLSR_SINGLE:
+		if (phy_id) {
+			policy_mgr_debug("MAC Phy 1 is not supported");
+			break;
+		}
+		policy_mgr_update_freq_info(pm_ctx, mac_cap, MODE_EMLSR_SINGLE,
+					    phy_id);
+		break;
+	case WMI_HW_MODE_AUX_EMLSR_SPLIT:
+		policy_mgr_update_freq_info(pm_ctx, mac_cap, MODE_EMLSR_SPLIT,
 					    phy_id);
 		break;
 	default:
@@ -1410,6 +1419,8 @@ static const char *policy_mgr_hw_mode_to_str(enum policy_mgr_mode hw_mode)
 	CASE_RETURN_STRING(MODE_SBS_UPPER_SHARE);
 	CASE_RETURN_STRING(MODE_SBS_LOWER_SHARE);
 	CASE_RETURN_STRING(MODE_EMLSR);
+	CASE_RETURN_STRING(MODE_EMLSR_SINGLE);
+	CASE_RETURN_STRING(MODE_EMLSR_SPLIT);
 	default:
 		return "Unknown";
 	}
@@ -1560,6 +1571,12 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 		if (WMI_BECAP_PHY_GET_HW_MODE_CFG(hw_config_type) ==
 		    WMI_HW_MODE_EMLSR)
 			hw_config_type = WMI_HW_MODE_EMLSR;
+		else if (WMI_BECAP_PHY_GET_HW_MODE_CFG(hw_config_type) ==
+			 WMI_HW_MODE_AUX_EMLSR_SINGLE)
+			hw_config_type = WMI_HW_MODE_AUX_EMLSR_SINGLE;
+		else if (WMI_BECAP_PHY_GET_HW_MODE_CFG(hw_config_type) ==
+			 WMI_HW_MODE_AUX_EMLSR_SPLIT)
+			hw_config_type = WMI_HW_MODE_AUX_EMLSR_SPLIT;
 
 		policy_mgr_update_mac_freq_info(psoc, pm_ctx,
 						hw_config_type,
@@ -1584,7 +1601,8 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 			    (hw_config_type == WMI_HW_MODE_SBS) ||
 			    (hw_config_type == WMI_HW_MODE_DBS_OR_SBS)))
 				sbs_mode = HW_MODE_SBS;
-		} else if (hw_config_type == WMI_HW_MODE_EMLSR) {
+		} else if (hw_config_type == WMI_HW_MODE_EMLSR ||
+			hw_config_type == WMI_HW_MODE_AUX_EMLSR_SPLIT) {
 			/* eMLSR mode */
 			tmp = &info->mac_phy_cap[j++];
 			cap = &info->mac_phy_caps_ext2[i];
@@ -1593,6 +1611,12 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_update_mac_freq_info(psoc, pm_ctx,
 							hw_config_type,
 							tmp->phy_id, tmp);
+			emlsr_mode = HW_MODE_EMLSR;
+		} else if (hw_config_type == WMI_HW_MODE_AUX_EMLSR_SINGLE) {
+			/* eMLSR mode */
+			cap = &info->mac_phy_caps_ext2[i];
+			wlan_mlme_set_eml_params(psoc, cap);
+			policy_mgr_get_hw_mode_params(tmp, &mac1_ss_bw_info);
 			emlsr_mode = HW_MODE_EMLSR;
 		}
 
