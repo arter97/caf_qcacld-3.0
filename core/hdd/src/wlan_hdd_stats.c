@@ -7758,15 +7758,13 @@ wlan_hdd_update_mlo_sinfo(struct wlan_hdd_link_info *link_info,
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	if (!link_info->is_mlo_vdev_active) {
+	if (!link_info->is_mlo_vdev_active)
 		hdd_nofl_debug("vdev_id[%d] is inactive", link_info->vdev_id);
-		return;
-	}
 
 	/* Update the rate info for link with best RSSI */
 	if (sinfo->signal > hdd_sinfo->signal) {
-		hdd_nofl_debug("Updating rates for link_id %d",
-			       sta_ctx->conn_info.ieee_link_id);
+		hdd_debug_rl("Updating rates for link_id %d",
+			     sta_ctx->conn_info.ieee_link_id);
 		wlan_hdd_update_mlo_rate_info(hdd_sinfo, sinfo);
 	}
 
