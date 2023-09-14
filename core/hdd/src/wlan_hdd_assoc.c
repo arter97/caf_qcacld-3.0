@@ -590,7 +590,8 @@ void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx)
 	struct wlan_hdd_link_info *link_info;
 
 	link_info = hdd_get_sta_connection_in_progress(hdd_ctx);
-	if (link_info)
+	if (link_info &&
+	    !wlan_vdev_mlme_is_mlo_link_switch_in_progress(link_info->vdev))
 		wlan_hdd_cm_issue_disconnect(link_info,
 					     REASON_UNSPEC_FAILURE, false);
 }
@@ -602,7 +603,8 @@ void hdd_abort_ongoing_sta_sae_connection(struct hdd_context *hdd_ctx)
 	int32_t key_mgmt;
 
 	link_info = hdd_get_sta_connection_in_progress(hdd_ctx);
-	if (!link_info)
+	if (!link_info ||
+	    wlan_vdev_mlme_is_mlo_link_switch_in_progress(link_info->vdev))
 		return;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info->adapter->deflink,
