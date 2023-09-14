@@ -8660,6 +8660,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_STR_TX] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_LINK_POWER_SAVE] = {
+			.type = NLA_NESTED},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ] = {
 			.type = NLA_U8},
 };
@@ -14469,6 +14471,27 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 
 		if (ret_val)
 			hdd_err("Failed to send STR TX indication");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_LINK_POWER_SAVE;
+	if (tb[cmd_id]) {
+		struct nlattr *curr_attr;
+		int len;
+		uint8_t link_id, timeout = 0, num_links = 0;
+		bool allow_ps = true;
+
+		nla_for_each_nested(curr_attr, tb[cmd_id], len) {
+			if (nla_len(curr_attr) != sizeof(uint8_t)) {
+				hdd_err("len is not correct for idx %d",
+					num_links);
+				goto send_err;
+			}
+			link_id = nla_get_u8(curr_attr);
+			hdd_debug("link id[%d]: %d", num_links, link_id);
+			wlan_hdd_set_mlo_ps(adapter, allow_ps, timeout,
+					    link_id);
+			num_links++;
+		}
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ;
