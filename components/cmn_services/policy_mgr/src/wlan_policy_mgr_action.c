@@ -2978,8 +2978,8 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 		policymgr_nofl_debug("sap not capable on 6GHZ con ch_freq %d",
 				     ch_freq);
 		find_alternate = true;
-	} else if (wlan_reg_is_etsi13_srd_chan_for_freq(pm_ctx->pdev,
-							ch_freq) &&
+	} else if (wlan_reg_is_etsi_srd_chan_for_freq(pm_ctx->pdev,
+						      ch_freq) &&
 		   !policy_mgr_get_srd_enable_for_vdev(psoc, sap_vdev_id)) {
 		find_alternate = true;
 		policymgr_nofl_debug("sap not capable on SRD con ch_freq %d",

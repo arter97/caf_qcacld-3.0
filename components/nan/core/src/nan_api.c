@@ -453,7 +453,7 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 	}
 
 	/* Check for SRD channels */
-	if (wlan_reg_is_etsi13_srd_chan_for_freq(pdev, freq))
+	if (wlan_reg_is_etsi_srd_chan_for_freq(pdev, freq))
 		wlan_mlme_get_srd_master_mode_for_vdev(wlan_pdev_get_psoc(pdev),
 						       QDF_NAN_DISC_MODE,
 						       &nan_allowed);

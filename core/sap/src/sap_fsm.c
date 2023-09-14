@@ -4505,7 +4505,8 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 						       &srd_chan_enabled);
 
 		if (!srd_chan_enabled &&
-		    wlan_reg_is_etsi13_srd_chan_for_freq(mac_ctx->pdev,
+		    wlan_reg_is_etsi_srd_chan_for_freq(
+					mac_ctx->pdev,
 					WLAN_REG_CH_TO_FREQ(loop_count))) {
 			sap_debug("vdev opmode %d not allowed on SRD freq %d",
 				  vdev_opmode, WLAN_REG_CH_TO_FREQ(loop_count));

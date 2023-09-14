@@ -969,7 +969,7 @@ policy_mgr_modify_pcl_based_on_srd(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 	for (i = 0; i < *pcl_len_org; i++) {
-		if (wlan_reg_is_etsi13_srd_chan_for_freq(
+		if (wlan_reg_is_etsi_srd_chan_for_freq(
 		    pm_ctx->pdev, pcl_list_org[i]))
 			continue;
 		pcl_list[pcl_len] = pcl_list_org[i];
