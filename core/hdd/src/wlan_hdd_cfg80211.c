@@ -13312,6 +13312,31 @@ static int hdd_test_config_6ghz_security_test_mode(struct hdd_context *hdd_ctx,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void wlan_hdd_set_listen_interval(struct hdd_context *hdd_ctx,
+					 struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	enum wlan_eht_mode eht_mode;
+	uint16_t max_simult_link_num;
+
+	ucfg_mlme_get_eht_mode(psoc, &eht_mode);
+	max_simult_link_num = wlan_mlme_get_sta_mlo_simultaneous_links(psoc);
+
+	if (eht_mode == WLAN_EHT_MODE_MLSR && max_simult_link_num == 0)
+		sme_set_listen_interval(hdd_ctx->mac_handle,
+					adapter->deflink->vdev_id);
+
+	hdd_debug("EHT mode: %d, max simultaneous link num: %d",
+		  eht_mode, max_simult_link_num);
+}
+#else
+static inline void wlan_hdd_set_listen_interval(struct hdd_context *hdd_ctx,
+					        struct hdd_adapter *adapter)
+{
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_set_wifi_test_config() - Wifi test configuration
  * vendor command
@@ -14490,6 +14515,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 					    link_id);
 			num_links++;
 		}
+
+		wlan_hdd_set_listen_interval(hdd_ctx, adapter);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ;

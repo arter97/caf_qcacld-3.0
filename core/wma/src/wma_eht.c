@@ -1102,3 +1102,16 @@ wma_set_eht_txbf_vdev_params(struct mac_context *mac, uint32_t *mode)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+void wma_vdev_set_listen_interval(uint8_t vdev_id, uint8_t val)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	QDF_STATUS status;
+
+	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
+				    wmi_vdev_param_listen_interval, val);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("failed to set Listen interval for vdev: %d", vdev_id);
+}
+#endif

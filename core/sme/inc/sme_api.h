@@ -958,6 +958,15 @@ QDF_STATUS sme_hide_ssid(mac_handle_t mac_handle, uint8_t sessionId,
 		uint8_t ssidHidden);
 
 /**
+ * sme_set_listen_interval() - Set the listen interval
+ * @mac_handle: The handle returned by mac_open
+ * @vdev_id: vdev identifier
+ *
+ * Return: None
+ */
+void sme_set_listen_interval(mac_handle_t mac_handle, uint8_t vdev_id);
+
+/**
  * sme_update_roam_scan_n_probes() - Update no.of roam scan probes
  * @mac_handle: The handle returned by mac_open
  * @vdev_id: vdev identifier

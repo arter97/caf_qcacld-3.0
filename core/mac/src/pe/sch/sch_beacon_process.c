@@ -1039,6 +1039,8 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
+	session->dtimPeriod = bcn.tim.dtimPeriod;
+
 	sch_send_beacon_report(mac_ctx, &bcn, session);
 	__sch_beacon_process_for_session(mac_ctx, &bcn, rx_pkt_info, session);
 }

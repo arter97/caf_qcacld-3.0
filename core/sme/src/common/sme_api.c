@@ -85,6 +85,7 @@
 #include "wlan_cp_stats_mc_ucfg_api.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include <wlan_mlo_link_force.h>
+#include "wma_eht.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -6010,6 +6011,23 @@ QDF_STATUS sme_set_max_tx_power(mac_handle_t mac_handle,
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void sme_set_listen_interval(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct pe_session *session = NULL;
+	uint8_t val = 0;
+
+	session = pe_find_session_by_vdev_id(mac, vdev_id);
+	if (!session) {
+		sme_err("Session lookup fails for vdev %d", vdev_id);
+		return;
+	}
+
+	val = session->dtimPeriod;
+	pe_debug("Listen interval: %d vdev id: %d", val, vdev_id);
+	wma_vdev_set_listen_interval(vdev_id, val);
 }
 
 /*

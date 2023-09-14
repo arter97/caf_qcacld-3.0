@@ -366,4 +366,12 @@ QDF_STATUS wma_set_eht_txbf_vdev_params(struct mac_context *mac, uint32_t *mode)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+void wma_vdev_set_listen_interval(uint8_t vdev_id, uint8_t val);
+#else
+static inline
+void wma_vdev_set_listen_interval(uint8_t vdev_id, uint8_t val)
+{}
+#endif
 #endif
