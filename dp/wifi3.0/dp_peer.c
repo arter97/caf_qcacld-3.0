@@ -1359,6 +1359,33 @@ struct dp_ast_entry *dp_peer_ast_hash_find_soc(struct dp_soc *soc,
 	return NULL;
 }
 
+struct dp_ast_entry *dp_peer_ast_hash_find_soc_by_type(
+					struct dp_soc *soc,
+					uint8_t *ast_mac_addr,
+					enum cdp_txrx_ast_entry_type type)
+{
+	union dp_align_mac_addr local_mac_addr_aligned, *mac_addr;
+	unsigned index;
+	struct dp_ast_entry *ase;
+
+	if (!soc->ast_hash.bins)
+		return NULL;
+
+	qdf_mem_copy(&local_mac_addr_aligned.raw[0],
+			ast_mac_addr, QDF_MAC_ADDR_SIZE);
+	mac_addr = &local_mac_addr_aligned;
+
+	index = dp_peer_ast_hash_index(soc, mac_addr);
+	TAILQ_FOREACH(ase, &soc->ast_hash.bins[index], hash_list_elem) {
+		if (dp_peer_find_mac_addr_cmp(mac_addr, &ase->mac_addr) == 0 &&
+		    ase->type == type) {
+			return ase;
+		}
+	}
+
+	return NULL;
+}
+
 /**
  * dp_peer_map_ipa_evt() - Send peer map event to IPA
  * @soc: SoC handle
@@ -2230,6 +2257,14 @@ int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
 
 struct dp_ast_entry *dp_peer_ast_hash_find_soc(struct dp_soc *soc,
 					       uint8_t *ast_mac_addr)
+{
+	return NULL;
+}
+
+struct dp_ast_entry *dp_peer_ast_hash_find_soc_by_type(
+					struct dp_soc *soc,
+					uint8_t *ast_mac_addr,
+					enum cdp_txrx_ast_entry_type type)
 {
 	return NULL;
 }

@@ -3736,7 +3736,10 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 
 	/* delete ast entry for current primary peer */
 	qdf_spin_lock_bh(&current_pr_soc->ast_lock);
-	ast_entry = dp_peer_ast_hash_find_soc(current_pr_soc, mld_peer->mac_addr.raw);
+	ast_entry = dp_peer_ast_hash_find_soc_by_type(
+				current_pr_soc,
+				mld_peer->mac_addr.raw,
+				CDP_TXRX_AST_TYPE_MLD);
 	if (!ast_entry) {
 		dp_htt_err("Invalid ast entry");
 		qdf_spin_unlock_bh(&current_pr_soc->ast_lock);
