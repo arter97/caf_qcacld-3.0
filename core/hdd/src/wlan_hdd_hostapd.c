@@ -1366,6 +1366,10 @@ static int calcuate_max_phy_rate(int mode, int nss, int ch_width,
 	if (mode == SIR_SME_PHY_MODE_HT) {
 		/* check for HT Mode */
 		maxidx = ht_mcs_idx;
+		if (maxidx > 7) {
+			hdd_err("ht_mcs_idx %d is incorrect", ht_mcs_idx);
+			return maxrate;
+		}
 		if (nss == 1) {
 			supported_mcs_rate = supported_mcs_rate_nss1;
 		} else if (nss == 2) {
@@ -2832,7 +2836,7 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		memset(&dot11_rsn_ie, 0, sizeof(tDot11fIERSN));
 		ret = sme_unpack_rsn_ie(mac_handle, rsn_ie, rsn_ie_len,
 					&dot11_rsn_ie, false);
-		if (DOT11F_FAILED(ret)) {
+		if (!DOT11F_SUCCEEDED(ret)) {
 			hdd_err("unpack failed, 0x%x", ret);
 			return -EINVAL;
 		}
@@ -2873,7 +2877,7 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		ret = dot11f_unpack_ie_wpa(MAC_CONTEXT(mac_handle),
 					   rsn_ie, rsn_ie_len,
 					   &dot11_wpa_ie, false);
-		if (DOT11F_FAILED(ret)) {
+		if (!DOT11F_SUCCEEDED(ret)) {
 			hdd_err("unpack failed, 0x%x", ret);
 			return -EINVAL;
 		}
@@ -5439,7 +5443,10 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 					     config->RSNWPAReqIE[1] + 2,
 					     config->RSNWPAReqIE);
 
-		if (QDF_STATUS_SUCCESS == status) {
+		if (status != QDF_STATUS_SUCCESS) {
+			ret = -EINVAL;
+			goto error;
+		} else {
 			/* Now copy over all the security attributes you have
 			 * parsed out. Use the cipher type in the RSN IE
 			 */
@@ -5490,7 +5497,10 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 					 config->RSNWPAReqIE[1] + 2,
 					 config->RSNWPAReqIE);
 
-			if (QDF_STATUS_SUCCESS == status) {
+			if (status != QDF_STATUS_SUCCESS) {
+				ret = -EINVAL;
+				goto error;
+			} else {
 				/* Now copy over all the security attributes
 				 * you have parsed out. Use the cipher type
 				 * in the RSN IE
