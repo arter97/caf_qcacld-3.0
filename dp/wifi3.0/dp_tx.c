@@ -6007,10 +6007,6 @@ more_data:
 		}
 		tx_desc->buffer_src = buffer_src;
 
-		if (tx_desc->flags & DP_TX_DESC_FLAG_FASTPATH_SIMPLE ||
-		    tx_desc->flags & DP_TX_DESC_FLAG_PPEDS)
-			goto add_to_pool2;
-
 		/*
 		 * If the release source is FW, process the HTT status
 		 */
@@ -6029,6 +6025,10 @@ more_data:
 							htt_tx_status,
 							ring_id);
 		} else {
+			if (tx_desc->flags & DP_TX_DESC_FLAG_FASTPATH_SIMPLE ||
+			    tx_desc->flags & DP_TX_DESC_FLAG_PPEDS)
+				goto add_to_pool2;
+
 			tx_desc->tx_status =
 				hal_tx_comp_get_tx_status(tx_comp_hal_desc);
 			tx_desc->buffer_src = buffer_src;
