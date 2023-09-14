@@ -3503,6 +3503,12 @@ static inline int wlan_hdd_nl_init(struct hdd_context *hdd_ctx)
 	int proto;
 
 	proto = wlan_hdd_get_host_log_nl_proto(hdd_ctx);
+	hdd_ctx->radio_index = pld_get_pci_slot(hdd_ctx->parent_dev);
+	if (hdd_ctx->radio_index < 0) {
+		hdd_debug("Invalid radio index %d, force to 0",
+			  hdd_ctx->radio_index);
+		hdd_ctx->radio_index = 0;
+	}
 	return nl_srv_init(hdd_ctx->wiphy, proto);
 }
 #endif
