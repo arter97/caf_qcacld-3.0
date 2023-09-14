@@ -3892,6 +3892,9 @@ lim_clear_ml_partner_info(struct pe_session *session_entry)
 	}
 	pe_debug_rl("Clear Partner Link/s information");
 	for (idx = 0; idx < partner_info->num_partner_links; idx++) {
+		mlo_mgr_clear_ap_link_info(session_entry->vdev,
+			partner_info->partner_link_info[idx].link_addr.bytes);
+
 		partner_info->partner_link_info[idx].link_id = 0;
 		qdf_zero_macaddr(
 			&partner_info->partner_link_info[idx].link_addr);
@@ -4028,6 +4031,7 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	struct wlan_objmgr_pdev *pdev;
 	struct scan_cache_entry *cache_entry;
 	struct wlan_channel channel;
+	bool is_security_allowed;
 
 	pdev = mac_ctx->pdev;
 	if (!pdev) {
@@ -4039,6 +4043,22 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 							   freq);
 	if (!cache_entry)
 		return QDF_STATUS_E_FAILURE;
+
+	/**
+	 * Reject all the partner link if any partner link  doesn’t pass the
+	 * security check and proceed connection with single link.
+	 */
+	is_security_allowed =
+		wlan_cm_is_eht_allowed_for_current_security(
+					wlan_pdev_get_psoc(mac_ctx->pdev),
+					cache_entry);
+
+	if (!is_security_allowed) {
+		mlme_debug("current security is not valid for partner link link_addr:" QDF_MAC_ADDR_FMT,
+			   QDF_MAC_ADDR_REF(link_addr->bytes));
+		util_scan_free_cache_entry(cache_entry);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	channel.ch_freq = cache_entry->channel.chan_freq;
 	channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);
@@ -4235,11 +4255,7 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 							 link_info->chan_freq);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				pe_err("failed to update mlo_mgr %d", status);
-				status =
-				   lim_check_scan_db_for_join_req_partner_info(
-					session_entry, mac_ctx);
-				if (QDF_IS_STATUS_ERROR(status))
-					lim_clear_ml_partner_info(session_entry);
+				lim_clear_ml_partner_info(session_entry);
 
 				goto end;
 			}
