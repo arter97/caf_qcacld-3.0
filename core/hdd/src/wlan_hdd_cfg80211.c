@@ -11125,7 +11125,7 @@ skip_mlo:
 		return -EINVAL;
 	}
 set_chan_width:
-	return hdd_set_mac_chan_width(link_info, chwidth, link_id, false);
+	return hdd_set_mac_chan_width(link_info, chwidth, link_id, true);
 }
 
 /**
@@ -12513,7 +12513,6 @@ static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
-
 
 	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
 	if (!bss_chan) {
