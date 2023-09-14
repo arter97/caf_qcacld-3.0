@@ -8381,7 +8381,7 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_BEACON_REPORT_FAIL] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONF_TX_RATE] = {.type = NLA_U16},
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_MODULATED_DTIM] = {.type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_DYNAMIC_DTIM] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_IGNORE_ASSOC_DISALLOWED] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_DISABLE_FILS] = {.type = NLA_U8 },
@@ -9698,8 +9698,8 @@ hdd_config_fine_time_measurement(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
-static int hdd_config_modulated_dtim(struct wlan_hdd_link_info *link_info,
-				     const struct nlattr *attr)
+static int hdd_config_dynamic_dtim(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t modulated_dtim;
@@ -11941,8 +11941,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_scan_default_ies},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_FINE_TIME_MEASUREMENT,
 	 hdd_config_fine_time_measurement},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_MODULATED_DTIM,
-	 hdd_config_modulated_dtim},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_DYNAMIC_DTIM,
+	 hdd_config_dynamic_dtim},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL,
 	 hdd_config_listen_interval},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_LRO,
