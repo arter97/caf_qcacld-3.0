@@ -3608,14 +3608,7 @@ int hdd_set_11ax_rate(struct hdd_adapter *adapter, int set_value,
 
 int hdd_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 {
-	int set_value;
-
-	if (sme_is_feature_supported_by_fw(DOT11AX))
-		set_value = WMI_ASSEMBLE_RATECODE_V1(rate, nss, preamble);
-	else
-		set_value = (preamble << 6) | (nss << 4) | rate;
-
-	return set_value;
+	return ucfg_mlme_assemble_rate_code(preamble, nss, rate);
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -6377,7 +6370,8 @@ free_net_dev:
 	return NULL;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+	(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static int
 hdd_register_netdevice(struct hdd_adapter *adapter, struct net_device *dev,
 		       struct hdd_adapter_create_param *params)
@@ -7279,7 +7273,8 @@ static void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+	(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static void
 hdd_unregister_netdevice(struct hdd_adapter *adapter, struct net_device *dev)
 {
@@ -12780,6 +12775,8 @@ static int __hdd_psoc_idle_shutdown(struct hdd_context *hdd_ctx)
 
 	hdd_enter();
 
+	hdd_reg_wait_for_country_change(hdd_ctx);
+
 	errno = osif_psoc_sync_trans_start(hdd_ctx->parent_dev, &psoc_sync);
 	if (errno) {
 		hdd_info("psoc busy, abort idle shutdown; errno:%d", errno);
@@ -13094,6 +13091,25 @@ static void hdd_sar_cfg_update(struct hdd_config *config,
 				cfg_get(psoc, CFG_ENABLE_SAR_SAFETY_FEATURE);
 	config->config_sar_safety_sleep_index =
 			cfg_get(psoc, CFG_CONFIG_SAR_SAFETY_SLEEP_MODE_INDEX);
+}
+
+void hdd_set_sar_init_index(struct hdd_context *hdd_ctx)
+{
+	uint32_t index, enable = 0;
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx NULL");
+		return;
+	}
+	if (hdd_ctx->sar_version == SAR_VERSION_1) {
+		hdd_nofl_debug("FW SAR version: %d", hdd_ctx->sar_version);
+		return;
+	}
+
+	enable = hdd_ctx->config->enable_sar_safety;
+	index = hdd_ctx->config->sar_safety_index;
+	if (enable & SAR_SAFETY_ENABLED_INIT)
+		hdd_configure_sar_index(hdd_ctx, index);
 }
 #else
 static void hdd_sar_cfg_update(struct hdd_config *config,
