@@ -111,7 +111,9 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
+	wlan_hdd_lpc_handle_concurrency(hdd_ctx, false);
+	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc) &&
+	    !hdd_lpc_is_work_scheduled(hdd_ctx))
 		return -EINVAL;
 
 	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
@@ -679,7 +681,10 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	if (ret)
 		return ERR_PTR(ret);
 
-	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
+	wlan_hdd_lpc_handle_concurrency(hdd_ctx, true);
+
+	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc) &&
+	    !hdd_lpc_is_work_scheduled(hdd_ctx))
 		return ERR_PTR(-EINVAL);
 
 	if (wlan_hdd_is_mon_concurrency())

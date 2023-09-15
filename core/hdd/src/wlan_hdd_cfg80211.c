@@ -22285,7 +22285,10 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 	if (wlan_hdd_is_mon_concurrency())
 		return -EINVAL;
 
-	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
+	wlan_hdd_lpc_handle_concurrency(hdd_ctx, false);
+
+	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc) &&
+	    !hdd_lpc_is_work_scheduled(hdd_ctx))
 		return -EINVAL;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,

@@ -1804,6 +1804,18 @@ static inline bool hdd_get_wlan_driver_status(void)
 #endif
 
 /**
+ * struct hdd_lpc_info - Local packet capture information
+ * @lpc_wk: local packet capture work
+ * @lpc_wk_scheduled: flag to indicate if lpc work is scheduled or not
+ * @mon_adapter: monitor adapter
+ */
+struct hdd_lpc_info {
+	qdf_work_t lpc_wk;
+	bool lpc_wk_scheduled;
+	struct hdd_adapter *mon_adapter;
+};
+
+/**
  * enum wlan_state_ctrl_str_id - state control param string id
  * @WLAN_OFF_STR: Turn OFF WiFi
  * @WLAN_ON_STR: Turn ON WiFi
@@ -2015,6 +2027,7 @@ enum wlan_state_ctrl_str_id {
  * @is_mlo_per_link_stats_supported: Per link mlo stats is supported or not
  * @num_mlo_peers: Total number of MLO peers
  * @more_peer_data: more mlo peer data in peer stats
+ * @lpc_info: Local packet capture info
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2295,6 +2308,9 @@ struct hdd_context {
 	bool is_mlo_per_link_stats_supported;
 	uint8_t num_mlo_peers;
 	uint32_t more_peer_data;
+#endif
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+	struct hdd_lpc_info lpc_info;
 #endif
 };
 
@@ -5448,6 +5464,44 @@ void hdd_set_sar_init_index(struct hdd_context *hdd_ctx);
 #else
 static inline void hdd_set_sar_init_index(struct hdd_context *hdd_ctx)
 {}
+#endif
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * wlan_hdd_lpc_handle_concurrency() - Handle local packet capture
+ * concurrency scenario
+ * @hdd_ctx: hdd_ctx
+ * @is_virtual_iface: is virtual interface
+ *
+ * This function takes care of handling concurrency scenario
+ * If STA+Mon present and SAP is coming up, terminate Mon and let SAP come up
+ * If STA+Mon present and P2P is coming up, terminate Mon and let P2P come up
+ * If STA+Mon present and NAN is coming up, terminate Mon and let NAN come up
+ *
+ * Return: none
+ */
+void wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
+				     bool is_virtual_iface);
+
+/**
+ * hdd_lpc_is_work_scheduled() - function to return if lpc wq scheduled
+ * @hdd_ctx: hdd_ctx
+ *
+ * Return: true if scheduled; false otherwise
+ */
+bool hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx);
+
+#else
+static inline void
+wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
+				bool is_virtual_iface)
+{}
+
+static inline bool
+hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
 #endif
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

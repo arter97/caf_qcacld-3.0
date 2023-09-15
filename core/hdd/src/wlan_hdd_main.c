@@ -541,16 +541,17 @@ void hdd_start_complete(int ret)
 /**
  * wlan_hdd_lpc_del_monitor_interface() - Delete monitor interface
  * @hdd_ctx: hdd_ctx
+ * @is_virtual_iface: Is virtual interface
  *
  * This function takes care of deleting monitor interface
  *
  * Return: none
  */
 static void
-wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx)
+wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx,
+				   bool is_virtual_iface)
 {
 	struct hdd_adapter *adapter;
-	struct osif_vdev_sync *vdev_sync;
 	void *soc;
 	bool running;
 
@@ -575,21 +576,90 @@ wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx)
 	}
 
 	hdd_debug("lpc: Delete monitor interface");
-	vdev_sync = osif_vdev_sync_unregister(adapter->dev);
-	if (vdev_sync)
-		osif_vdev_sync_wait_for_ops(vdev_sync);
 
 	wlan_hdd_release_intf_addr(hdd_ctx, adapter->mac_addr.bytes);
+	qdf_zero_macaddr(&adapter->mac_addr);
 	hdd_stop_adapter(hdd_ctx, adapter);
 	hdd_deinit_adapter(hdd_ctx, adapter, true);
-	hdd_close_adapter(hdd_ctx, adapter, true);
+	adapter->is_virtual_iface = is_virtual_iface;
+	hdd_ctx->lpc_info.mon_adapter = adapter;
 
-	if (vdev_sync)
-		osif_vdev_sync_destroy(vdev_sync);
+	hdd_ctx->lpc_info.lpc_wk_scheduled = true;
+	qdf_sched_work(0, &hdd_ctx->lpc_info.lpc_wk);
 }
+
+void wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
+				     bool is_virtual_iface)
+{
+	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
+		wlan_hdd_lpc_del_monitor_interface(hdd_ctx, is_virtual_iface);
+}
+
+bool hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
+{
+	return hdd_ctx->lpc_info.lpc_wk_scheduled;
+}
+
+static void hdd_lpc_work_handler(void *arg)
+{
+	struct hdd_context *hdd_ctx = (struct hdd_context *)arg;
+	struct hdd_adapter *adapter;
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	if (!hdd_ctx)
+		return;
+
+	adapter = hdd_ctx->lpc_info.mon_adapter;
+	if (!adapter) {
+		hdd_err("There is no monitor adapter");
+		return;
+	}
+
+	errno = osif_vdev_sync_trans_start_wait(adapter->dev, &vdev_sync);
+	if (errno)
+		return;
+
+	osif_vdev_sync_unregister(adapter->dev);
+	osif_vdev_sync_wait_for_ops(vdev_sync);
+
+	hdd_close_adapter(hdd_ctx, adapter, true);
+	hdd_ctx->lpc_info.lpc_wk_scheduled = false;
+
+	osif_vdev_sync_trans_stop(vdev_sync);
+	osif_vdev_sync_destroy(vdev_sync);
+}
+
+static inline
+void hdd_lp_create_work(struct hdd_context *hdd_ctx)
+{
+	hdd_ctx->lpc_info.lpc_wk_scheduled = false;
+	qdf_create_work(0, &hdd_ctx->lpc_info.lpc_wk, hdd_lpc_work_handler,
+			hdd_ctx);
+}
+
+static inline
+void hdd_lpc_delete_work(struct hdd_context *hdd_ctx)
+{
+	qdf_flush_work(&hdd_ctx->lpc_info.lpc_wk);
+	hdd_ctx->lpc_info.lpc_wk_scheduled = false;
+	qdf_destroy_work(NULL, &hdd_ctx->lpc_info.lpc_wk);
+}
+
 #else
 static inline
-void wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx)
+void hdd_lp_create_work(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline
+void hdd_lpc_delete_work(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline
+void wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx,
+					bool is_virtual_iface)
 {
 }
 #endif
@@ -8789,7 +8859,6 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 	struct qdf_mac_addr adapter_mac;
 	struct wlan_hdd_link_info *link_info;
 
-
 	qdf_copy_macaddr(&adapter_mac, &adapter->mac_addr);
 	if (adapter->device_mode == QDF_STA_MODE) {
 		hdd_adapter_for_each_link_info(adapter, link_info)
@@ -10943,6 +11012,8 @@ static inline void hdd_pm_notifier_deinit(struct hdd_context *hdd_ctx)
  */
 static int hdd_context_deinit(struct hdd_context *hdd_ctx)
 {
+	hdd_lpc_delete_work(hdd_ctx);
+
 	qdf_wake_lock_destroy(&hdd_ctx->monitor_mode_wakelock);
 
 	wlan_hdd_cfg80211_deinit(hdd_ctx->wiphy);
@@ -13611,6 +13682,7 @@ static int hdd_context_init(struct hdd_context *hdd_ctx)
 
 	qdf_wake_lock_create(&hdd_ctx->monitor_mode_wakelock,
 			     "monitor_mode_wakelock");
+	hdd_lp_create_work(hdd_ctx);
 
 	return 0;
 
@@ -14560,7 +14632,7 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 
 	if ((adapter->device_mode == QDF_P2P_DEVICE_MODE) ||
 	    (adapter->device_mode == QDF_NAN_DISC_MODE))
-		wlan_hdd_lpc_del_monitor_interface(adapter->hdd_ctx);
+		wlan_hdd_lpc_del_monitor_interface(adapter->hdd_ctx, false);
 
 	status = hdd_adapter_fill_link_address(adapter);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -14635,8 +14707,6 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 			link_info->vdev_id);
 		return qdf_status_to_os_return(QDF_STATUS_SUCCESS);
 	}
-
-	wlan_hdd_lpc_del_monitor_interface(hdd_ctx);
 
 	status = hdd_adapter_fill_link_address(adapter);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -18329,7 +18399,7 @@ static void __hdd_inform_wifi_off(void)
 	ucfg_dlm_wifi_off(hdd_ctx->pdev);
 
 	if (rtnl_trylock()) {
-		wlan_hdd_lpc_del_monitor_interface(hdd_ctx);
+		wlan_hdd_lpc_del_monitor_interface(hdd_ctx, false);
 		rtnl_unlock();
 	}
 }
