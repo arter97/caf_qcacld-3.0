@@ -1081,6 +1081,8 @@ dp_print_pdev_rx_mon_stats(struct dp_pdev *pdev)
 		       rx_mon_stats->mpdu_ppdu_id_mismatch_drop);
 	DP_PRINT_STATS("mpdu_decap_type_invalid = %u",
 		       rx_mon_stats->mpdu_decap_type_invalid);
+	DP_PRINT_STATS("pending_desc_count = %u",
+		       rx_mon_stats->pending_desc_count);
 	stat_ring_ppdu_ids =
 		(uint32_t *)qdf_mem_malloc(sizeof(uint32_t) * MAX_PPDU_ID_HIST);
 	dest_ring_ppdu_ids =
