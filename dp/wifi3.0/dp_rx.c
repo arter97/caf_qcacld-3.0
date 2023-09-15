@@ -756,8 +756,10 @@ QDF_STATUS __dp_pdev_rx_buffers_no_map_attach(struct dp_soc *soc,
 					       rx_desc_pool->buf_size);
 		rxdma_ring_entry = (struct dp_buffer_addr_info *)
 			hal_srng_src_get_next(soc->hal_soc, rxdma_srng);
-		if (!rxdma_ring_entry)
+		if (!rxdma_ring_entry) {
+			qdf_nbuf_free(nbuf);
 			break;
+		}
 
 		desc_list->rx_desc.nbuf = nbuf;
 		dp_rx_set_reuse_nbuf(&desc_list->rx_desc, nbuf);
