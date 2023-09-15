@@ -1884,6 +1884,8 @@ config FEATURE_WLAN_CH_AVOID_EXT
 
 config WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE
 	bool "enable CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE"
+	default n
+
 config 4_BYTES_TLV_TAG
 	bool "enable 4_BYTES_TLV_TAG"
 	default n
