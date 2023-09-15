@@ -205,6 +205,11 @@ static inline
 void hal_srng_hw_disable_generic(struct hal_soc *hal, struct hal_srng *srng)
 {
 	uint32_t reg_val = 0;
+	struct hal_hw_srng_config *ring_config =
+		HAL_SRNG_CONFIG(hal, srng->ring_type);
+
+	if (ring_config->lmac_ring)
+		return;
 
 	if (srng->ring_dir == HAL_SRNG_DST_RING) {
 		reg_val = SRNG_DST_REG_READ(srng, MISC) & ~(SRNG_ENABLE_BIT);

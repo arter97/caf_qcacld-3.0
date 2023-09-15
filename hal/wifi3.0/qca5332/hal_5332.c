@@ -1336,6 +1336,7 @@ static void hal_hw_txrx_ops_attach_qca5332(struct hal_soc *hal_soc)
 	/* init and setup */
 	hal_soc->ops->hal_srng_dst_hw_init = hal_srng_dst_hw_init_generic;
 	hal_soc->ops->hal_srng_src_hw_init = hal_srng_src_hw_init_generic;
+	hal_soc->ops->hal_srng_hw_disable = hal_srng_hw_disable_generic;
 	hal_soc->ops->hal_get_hw_hptp = hal_get_hw_hptp_generic;
 	hal_soc->ops->hal_get_window_address = hal_get_window_address_5332;
 	hal_soc->ops->hal_cmem_write = hal_cmem_write_5332;
