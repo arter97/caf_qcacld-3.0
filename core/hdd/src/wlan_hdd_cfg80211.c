@@ -11028,12 +11028,13 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
 
 		if (!chn_bd || !mlo_link_id)
-			return 0;
+			return -EINVAL;
 
 		nl80211_chwidth = nla_get_u8(chn_bd);
-		if (nl80211_chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
-		    nl80211_chwidth > eHT_MAX_CHANNEL_WIDTH) {
-			hdd_err("Invalid channel width:%u", nl80211_chwidth);
+		chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
+		if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
+		    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
+			hdd_err("Invalid channel width:%u", chwidth);
 			return -EINVAL;
 		}
 
@@ -11051,19 +11052,17 @@ skip_mlo:
 	chn_bd = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
 
 	if (!chn_bd)
-		return 0;
+		return -EINVAL;
 
 	nl80211_chwidth = nla_get_u8(chn_bd);
-
-set_chan_width:
 	chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
 
 	if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
-	    chwidth > eHT_MAX_CHANNEL_WIDTH) {
+	    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
 		hdd_err("Invalid channel width %u", chwidth);
 		return -EINVAL;
 	}
-
+set_chan_width:
 	return hdd_set_mac_chan_width(link_info->adapter,
 				      chwidth, link_id);
 }
