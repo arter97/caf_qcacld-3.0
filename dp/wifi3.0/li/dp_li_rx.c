@@ -1357,6 +1357,7 @@ dp_rx_null_q_desc_handle_li(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			      hal_rx_msdu_end_sa_is_valid_get(soc->hal_soc,
 							      rx_tlv_hdr));
 
+	tid = hal_rx_tid_get(soc->hal_soc, rx_tlv_hdr);
 	hal_rx_msdu_metadata_get(soc->hal_soc, rx_tlv_hdr, &msdu_metadata);
 	msdu_len = hal_rx_msdu_start_msdu_len_get(soc->hal_soc, rx_tlv_hdr);
 	pkt_len = msdu_len + msdu_metadata.l3_hdr_pad + soc->rx_pkt_tlv_size;
@@ -1509,7 +1510,6 @@ dp_rx_null_q_desc_handle_li(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		struct dp_peer *peer;
 		struct dp_rx_tid *rx_tid;
 
-		tid = hal_rx_tid_get(soc->hal_soc, rx_tlv_hdr);
 		peer = dp_peer_get_ref_by_id(soc, txrx_peer->peer_id,
 					     DP_MOD_ID_RX_ERR);
 		if (peer) {
@@ -1611,6 +1611,18 @@ dp_rx_null_q_desc_handle_li(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		}
 
 		qdf_nbuf_set_exc_frame(nbuf, 1);
+
+		if (qdf_unlikely(vdev->multipass_en)) {
+			if (dp_rx_multipass_process(txrx_peer, nbuf,
+						    tid) == false) {
+				DP_PEER_PER_PKT_STATS_INC
+					(txrx_peer,
+					 rx.multipass_rx_pkt_drop,
+					 1, link_id);
+				goto drop_nbuf;
+			}
+		}
+
 		dp_rx_deliver_to_osif_stack(soc, vdev, txrx_peer, nbuf, NULL,
 					    is_eapol);
 	}
