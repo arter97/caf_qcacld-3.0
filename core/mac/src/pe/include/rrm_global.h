@@ -53,6 +53,49 @@ struct sir_channel_info {
 };
 
 /**
+ * struct rrm_reporting - Contains info for rrm_ reporting IE present in
+ * channel load request received from AP
+ * @reporting_condition: reporting condition
+ * @threshold: threshold value to report channel load request
+ */
+struct rrm_reporting {
+	uint8_t reporting_condition;
+	uint8_t threshold;
+};
+
+/**
+ * struct bw_ind_element - Contains info for Bandwidth Indication IE
+ * present in channel load request received from AP
+ * @s_bw_ind_element: to check Bandwidth Indication optional IE present
+ * @channel_width: channel width
+ * @ccfi0: center channel frequency index segment 0
+ * @ccfi1: center channel frequency index segment 1
+ * @center_chan_freq: center freq segment  for 320 MHz request
+ */
+struct bw_ind_element {
+	bool is_bw_ind_element;
+	uint8_t channel_width;
+	uint8_t ccfi0;
+	uint8_t ccfi1;
+	qdf_freq_t center_freq;
+};
+
+/**
+ * struct wide_bw_chan_switch - Contains info for Wide Bandwidth Channel
+ * Switch IE present in channel load request received from AP
+ * @is_wide_bw_chan_switch: to check Bandwidth Indication optional IE present
+ * @channel_width: channel width
+ * @center_chan_freq0: center freq segment 0 for till 160 MHz request
+ * @center_chan_freq1: center freq segment 1 for till 160 MHz request
+ */
+struct wide_bw_chan_switch {
+	uint8_t is_wide_bw_chan_switch;
+	uint8_t channel_width;
+	uint8_t center_chan_freq0;
+	uint8_t center_chan_freq1;
+};
+
+/**
  * struct ch_load_ind - Contains info for channel load request received from AP
  * @message_type: message type eWNI_SME_CHAN_LOAD_REQ_IND
  * @length: size of struct chan_load_req_ind
@@ -64,6 +107,8 @@ struct sir_channel_info {
  * @channel: channel number
  * @randomization_intv: Random interval in ms
  * @meas_duration: measurement duration in ms
+ * @bw_ind: Info for bandwidth indication IE
+ * @wide_bw: Info for wide bandwidth channel switch IE
  */
 struct ch_load_ind {
 	uint16_t message_type;
@@ -76,11 +121,13 @@ struct ch_load_ind {
 	uint8_t channel;
 	uint16_t randomization_intv;
 	uint16_t meas_duration;
+	struct bw_ind_element bw_ind;
+	struct wide_bw_chan_switch wide_bw;
 };
 
 /**
  * struct chan_load_xmit_ind - Contains info for channel load xmit indication
- * @message_type: message type eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND
+ * @messageType: message type eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND
  * @length: size of struct chan_load_req_ind
  * @measurement_idx: measurement index for channel load request
  * @peer_addr: MAC address of the BSS

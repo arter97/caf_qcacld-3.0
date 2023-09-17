@@ -388,39 +388,63 @@ wlan_scan_get_scan_phy_mode(struct wlan_objmgr_vdev *vdev, qdf_freq_t op_freq,
 	return scan_phymode;
 }
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * mlme_get_scan_phy_mode_for_chan_load() - get scan phymode from ch width
+ * @scan_ch_width: channel width
+ *
+ * Return: enum scan_phy_mode
+ */
+static enum scan_phy_mode
+mlme_get_scan_phy_mode_for_chan_load(enum phy_ch_width scan_ch_width)
+{
+	enum scan_phy_mode scan_phymode = SCAN_PHY_MODE_UNKNOWN;
+
+	switch (scan_ch_width) {
+	case CH_WIDTH_20MHZ:
+		scan_phymode = SCAN_PHY_MODE_11BE_EHT20;
+		break;
+	case CH_WIDTH_40MHZ:
+		scan_phymode = SCAN_PHY_MODE_11BE_EHT40;
+		break;
+	case CH_WIDTH_80MHZ:
+		scan_phymode = SCAN_PHY_MODE_11BE_EHT80;
+		break;
+	case CH_WIDTH_160MHZ:
+		scan_phymode = SCAN_PHY_MODE_11BE_EHT160;
+		break;
+	default:
+		mlme_debug("Invalid scan_ch_width:%d", scan_ch_width);
+		break;
+	}
+
+	return scan_phymode;
+}
+#else
+static inline enum scan_phy_mode
+mlme_get_scan_phy_mode_for_chan_load(enum phy_ch_width scan_ch_width)
+{
+	return SCAN_PHY_MODE_UNKNOWN;
+}
+#endif
+
 QDF_STATUS
 mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 				   struct scan_start_request *req,
 				   enum phy_ch_width scan_ch_width,
-				   qdf_freq_t scan_freq)
+				   qdf_freq_t scan_freq,
+				   qdf_freq_t cen320_freq)
 {
 	const struct bonded_channel_freq *range;
 	uint8_t num_chan;
 	qdf_freq_t op_freq, center_20_freq, start_freq, end_freq;
-	qdf_freq_t cen320_freq = 0;
 	enum scan_phy_mode phymode = SCAN_PHY_MODE_UNKNOWN;
-	uint8_t vdev_id;
-	struct wlan_channel *des_chan;
-	struct mlme_legacy_priv *mlme_priv;
+	uint8_t vdev_id = vdev->vdev_objmgr.vdev_id;
 
-	vdev_id = vdev->vdev_objmgr.vdev_id;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv)
-		return QDF_STATUS_E_FAILURE;
-
-	if (scan_freq != INVALID_CHANNEL) {
+	if (scan_freq != INVALID_CHANNEL)
 		op_freq = scan_freq;
-	} else {
-		des_chan = wlan_vdev_mlme_get_des_chan(vdev);
-		if (!des_chan) {
-			mlme_debug("null des chan");
-			return QDF_STATUS_E_FAILURE;
-		}
-		op_freq = des_chan->ch_freq;
-		/* Set center_freq1 to center frequency of complete 320MHz */
-		cen320_freq = mlme_priv->connect_info.assoc_chan_info.cen320_freq;
-	}
+	else
+		op_freq = wlan_get_operation_chan_freq(vdev);
 
 	mlme_debug("vdev %d :op_freq:%d, cen320_freq:%d, scan_ch_width: %d",
 		   vdev_id, op_freq, cen320_freq, scan_ch_width);
@@ -463,7 +487,11 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 		num_chan += 1;
 		req->scan_req.chan_list.num_chan = num_chan;
 	} else {
-		phymode = wlan_scan_get_scan_phy_mode(vdev, op_freq, vdev_id);
+		if (scan_freq != INVALID_CHANNEL)
+			phymode = mlme_get_scan_phy_mode_for_chan_load(scan_ch_width);
+		else
+			phymode = wlan_scan_get_scan_phy_mode(vdev, op_freq, vdev_id);
+
 		if (phymode == SCAN_PHY_MODE_UNKNOWN) {
 			mlme_debug("vdev %d : invalid scan phymode for freq %d",
 				   vdev_id, op_freq);
@@ -623,6 +651,16 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 	struct mlme_legacy_priv *mlme_priv;
 	enum phy_ch_width associated_ch_width;
 	QDF_STATUS status;
+	struct wlan_channel *des_chan;
+	qdf_freq_t cen320_freq = 0;
+
+	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
+	if (!des_chan) {
+		mlme_debug("null des chan");
+		return QDF_STATUS_E_FAILURE;
+	}
+	/* Set center_freq1 to center frequency of complete 320MHz */
+	cen320_freq = des_chan->ch_cfreq2;
 
 	req->scan_req.chan_list.num_chan = 0;
 
@@ -648,7 +686,8 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 
 	status = mlme_update_freq_in_scan_start_req(vdev, req,
 						    associated_ch_width,
-						    INVALID_CHANNEL);
+						    INVALID_CHANNEL,
+						    cen320_freq);
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_FAILURE;
 

@@ -1218,6 +1218,7 @@ QDF_STATUS wlan_mlme_get_bssid_vdev_id(struct wlan_objmgr_pdev *pdev,
  * @req: pointer to scan request
  * @scan_ch_width: Channel width for which to trigger a wide band scan
  * @scan_freq: frequency for which to trigger a wide band RRM scan
+ * @cen320_freq: 320 MHz center freq
  *
  * Return: QDF_STATUS
  */
@@ -1225,7 +1226,8 @@ QDF_STATUS
 mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 				   struct scan_start_request *req,
 				   enum phy_ch_width scan_ch_width,
-				   qdf_freq_t scan_freq);
+				   qdf_freq_t scan_freq,
+				   qdf_freq_t cen320_freq);
 
 /**
  * wlan_get_operation_chan_freq() - get operating chan freq of
