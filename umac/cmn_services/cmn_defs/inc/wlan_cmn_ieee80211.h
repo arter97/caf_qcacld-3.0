@@ -2685,15 +2685,9 @@ struct wlan_ml_prv_linfo_perstaprof {
 
 /* End of definitions related to Probe Request variant Multi-Link element. */
 
-#ifdef WLAN_SUPPORT_11BE_D3_0
 /* Definitions related to Reconfiguration variant Multi-Link element (per
  * IEEE802.11be D3.0)
  */
-#else
-/* Definitions related to Reconfiguration variant Multi-Link element (per
- * IEEE802.11be D2.0)
- */
-#endif /* WLAN_SUPPORT_11BE_D3_0 */
 
 /* Definitions for bits in the Presence Bitmap subfield in Reconfiguration
  * variant Multi-Link element Control field. Any unused bits are reserved.
@@ -2705,7 +2699,6 @@ struct wlan_ml_prv_linfo_perstaprof {
  * field.
  */
 
-#ifdef WLAN_SUPPORT_11BE_D3_0
 /* Size in octets of Common Info Length subfield of Common Info field in
  * Reconfiguration variant Multi-Link element.
  */
@@ -2717,7 +2710,6 @@ struct wlan_ml_prv_linfo_perstaprof {
 #define WLAN_ML_RV_CINFO_LENGTH_MAX \
 	(WLAN_ML_RV_CINFO_LENGTH_SIZE + \
 	 QDF_MAC_ADDR_SIZE)
-#endif /* WLAN_SUPPORT_11BE_D3_0 */
 
 /* End of definitions related to Reconfiguration variant Multi-Link element
  * Common Info field.
@@ -2759,21 +2751,12 @@ struct wlan_ml_rv_linfo_perstaprof {
 /* Complete Profile */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_IDX           4
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_BITS          1
-/* STA MAC Address Present
- * Note that as of 802.11be D2.0, this subfield is named 'MAC Address Present'.
- * However for simplicity we retain the latest name even for 802.11be D2.0
- * support since this support is now temporary and will soon be deprecated.
- */
+/* STA MAC Address Present */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_STAMACADDRP_IDX         5
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_STAMACADDRP_BITS        1
-/* AP Removal Timer Present
- * Note that as of 802.11be D2.0, this subfield is named 'Delete Timer Present'.
- * However for simplicity we retain the latest name even for 802.11be D2.0
- * support since this support is now temporary and will soon be deprecated.
- */
+/* AP Removal Timer Present */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_APREMOVALTIMERP_IDX     6
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_APREMOVALTIMERP_BITS    1
-#ifdef WLAN_SUPPORT_11BE_D3_0
 /* Operation Update Type */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPUPDATETYPE_IDX        7
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_OPUPDATETYPE_BITS       4
@@ -2794,27 +2777,20 @@ enum wlan_ml_operation_update_type {
 	WLAN_ML_OPERATION_UPDATE_TYPE_OPPARAMUPDATE = 0,
 	WLAN_ML_OPERATION_UPDATE_TYPE_RESERVEDSTART,
 };
-#endif /* WLAN_SUPPORT_11BE_D3_0 */
 
 /* Definitions for subfields in STA Info field of Per-STA Profile subelement
  * in Reconfiguration variant Multi-Link element Link Info field.
  */
 
-#ifdef WLAN_SUPPORT_11BE_D3_0
 /* STA Info Length */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE             1
-#endif /* WLAN_SUPPORT_11BE_D3_0 */
 
 /* Size in octets of the AP Removal Timer subfield in STA info field of Per-STA
  * Profile subelement in Reconfiguration variant Multi-Link element Link Info
  * field.
- * Note that as of 802.11be D2.0, this subfield is named 'Delete Timer Present'.
- * However for simplicity we retain the latest name even for 802.11be D2.0
- * support since this support is now temporary and will soon be deprecated.
  */
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_APREMOVALTIMER_SIZE     2
 
-#ifdef WLAN_SUPPORT_11BE_D3_0
 /**
  * struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams - Operation Parameters in
  * STA info in Per-STA Profile subelement in Reconfiguration variant Multi-Link
@@ -2843,22 +2819,15 @@ struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams {
  * Reconfiguration variant Multi-Link element Link Info field. Please refer to
  * the IEEE802.11be standard.
  */
-#endif /* WLAN_SUPPORT_11BE_D3_0 */
 
 /* Max length of STA Info field in Per-STA Profile subelement in Reconfiguration
  * variant Multi-Link element Link Info field.
  */
-#ifdef WLAN_SUPPORT_11BE_D3_0
 #define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_MAX \
 	(WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE + \
 	 QDF_MAC_ADDR_SIZE + \
 	 WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_APREMOVALTIMER_SIZE + \
 	 sizeof(struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams))
-#else
-#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_MAX \
-	(QDF_MAC_ADDR_SIZE + \
-	 WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_APREMOVALTIMER_SIZE)
-#endif /* WLAN_SUPPORT_11BE_D3_0 */
 
 /* End of definitions related to Reconfiguration variant Multi-Link element Link
  * Info field.
