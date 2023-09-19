@@ -69,6 +69,9 @@
 /* Invalid vdev_stats_id */
 #define CDP_INVALID_VDEV_STATS_ID 0xFF
 
+/* METADATA used for wakeup triggers, specifically for Standby modes */
+#define CDP_STANDBY_METADATA 5588
+
 /* Options for Dump Statistics */
 #define CDP_HDD_STATS               0
 #define CDP_TXRX_PATH_STATS         1

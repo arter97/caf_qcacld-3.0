@@ -1637,6 +1637,10 @@ struct ol_if_ops {
 	int (*dp_rx_get_pending)(ol_txrx_soc_handle soc);
 	void (*dp_rx_sched_refill_thread)(ol_txrx_soc_handle soc);
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+	void (*send_wakeup_trigger)(struct cdp_ctrl_objmgr_psoc *soc,
+				    uint8_t vdev_id);
+#endif
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	void (*rx_wds_ext_peer_learn)(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 				      uint16_t peer_id, uint8_t vdev_id,
