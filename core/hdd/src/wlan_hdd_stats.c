@@ -9356,6 +9356,7 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 	int8_t rssi;
 	struct hdd_station_ctx *sta_ctx;
 	struct wlan_hdd_link_info *link_info;
+	struct qdf_mac_addr *mac_addr;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
@@ -9364,7 +9365,7 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 		vdev_id = ev->vdev_summary_stats[i].vdev_id;
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
 		if (!link_info) {
-			hdd_debug("invalid vdev");
+			hdd_debug("invalid vdev %d", vdev_id);
 			continue;
 		}
 
@@ -9376,11 +9377,16 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 			return;
 		}
 		link_info->rssi_on_disconnect = rssi;
+		sta_ctx->cache_conn_info.signal = rssi;
+
+		mac_addr = hdd_adapter_get_link_mac_addr(link_info);
+		if (!mac_addr)
+			return;
+
 		hdd_debug("rssi %d for " QDF_MAC_ADDR_FMT,
 			  link_info->rssi_on_disconnect,
-			  QDF_MAC_ADDR_REF(link_info->adapter->mac_addr.bytes));
+			  QDF_MAC_ADDR_REF(&mac_addr->bytes[0]));
 
-		sta_ctx->cache_conn_info.signal = rssi;
 	}
 }
 
