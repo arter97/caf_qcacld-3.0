@@ -6150,7 +6150,8 @@ policy_mgr_mlo_sta_set_link_by_linkid(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	return policy_mgr_mlo_sta_set_nlink(psoc, vdev, reason, mode,
+	return policy_mgr_mlo_sta_set_nlink(psoc, wlan_vdev_get_id(vdev),
+					    reason, mode,
 					    link_num, link_bitmap,
 					    link_bitmap2, link_control_flags);
 }
@@ -6289,7 +6290,7 @@ policy_mgr_mlo_sta_set_link(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
-			     struct wlan_objmgr_vdev *vdev,
+			     uint8_t vdev_id,
 			     enum mlo_link_force_reason reason,
 			     enum mlo_link_force_mode mode,
 			     uint8_t link_num,
@@ -6300,6 +6301,7 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 	struct mlo_link_set_active_req *req;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct wlan_objmgr_vdev *vdev;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -6311,10 +6313,15 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 	if (!req)
 		return QDF_STATUS_E_NOMEM;
 
-	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_POLICY_MGR_ID);
-	if (QDF_IS_STATUS_ERROR(status)) {
+	vdev =
+	wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+					     vdev_id,
+					     WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("invalid vdev for id %d",
+			       vdev_id);
 		qdf_mem_free(req);
-		return QDF_STATUS_E_FAILURE;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	policy_mgr_set_link_in_progress(pm_ctx, true);
@@ -6847,6 +6854,63 @@ end:
 	return emlsr_connection;
 }
 
+static void policy_mgr_restore_no_force(struct wlan_objmgr_psoc *psoc,
+					uint8_t num_mlo,
+					uint8_t mlo_vdev_lst[],
+					bool conc_con_coming_up)
+{
+	struct ml_link_force_state force_cmd = {0};
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (num_mlo < 1) {
+		policy_mgr_err("invalid num_mlo %d",
+			       num_mlo);
+		return;
+	}
+
+	vdev =
+	wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+					     mlo_vdev_lst[0],
+					     WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("invalid vdev for id %d",
+			       mlo_vdev_lst[0]);
+		return;
+	}
+
+	ml_nlink_get_curr_force_state(psoc, vdev, &force_cmd);
+	if (!conc_con_coming_up || force_cmd.force_active_bitmap) {
+		if (ml_is_nlink_service_supported(psoc))
+			status = policy_mgr_mlo_sta_set_nlink(
+					psoc, mlo_vdev_lst[0],
+					MLO_LINK_FORCE_REASON_DISCONNECT,
+					MLO_LINK_FORCE_MODE_NO_FORCE,
+					0, 0, 0, 0);
+		else
+			status = policy_mgr_mlo_sta_set_link(
+					psoc,
+					MLO_LINK_FORCE_REASON_DISCONNECT,
+					MLO_LINK_FORCE_MODE_NO_FORCE,
+					num_mlo, mlo_vdev_lst);
+		/* If concurrency vdev is coming up and force active bitmap
+		 * is present, we need to wait for the respone of no force
+		 * command.
+		 */
+		if (force_cmd.force_active_bitmap && conc_con_coming_up) {
+			if (status == QDF_STATUS_E_PENDING)
+				policy_mgr_wait_for_set_link_update(psoc);
+			else
+				policy_mgr_err("status %d", status);
+
+			ml_nlink_get_curr_force_state(psoc, vdev, &force_cmd);
+			ml_nlink_dump_force_state(&force_cmd, "");
+		}
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+}
+
 void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 					     bool conc_con_coming_up,
 					     bool emlsr_sta_coming_up)
@@ -6888,6 +6952,18 @@ void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 	    (emlsr_sta_coming_up &&
 	     policy_mgr_get_connection_count(psoc) > 2)) {
 		/*
+		 * If any force active link bitmap is present, we have to
+		 * clear the force active bitmap from target. Otherwise that
+		 * will be conflict with the force inactive num bitmap, then
+		 * target can't handle force inactive num 1 command to exit
+		 * EMLSR.
+		 */
+		if (conc_con_coming_up)
+			policy_mgr_restore_no_force(psoc, num_mlo,
+						    mlo_vdev_lst,
+						    conc_con_coming_up);
+
+		/*
 		 * Force disable one of the links (FW will decide which link) if
 		 * 1) EMLSR STA is present and SAP/STA/NAN connection comes up.
 		 * 2) There is a legacy connection (SAP/P2P/NAN) and a STA comes
@@ -6909,10 +6985,9 @@ void policy_mgr_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 		 *    EMLSR capable. One of the links was disabled after EMLSR
 		 *    association.
 		 */
-		policy_mgr_mlo_sta_set_link(psoc,
-					    MLO_LINK_FORCE_REASON_DISCONNECT,
-					    MLO_LINK_FORCE_MODE_NO_FORCE,
-					    num_mlo, mlo_vdev_lst);
+		policy_mgr_restore_no_force(psoc, num_mlo,
+					    mlo_vdev_lst,
+					    conc_con_coming_up);
 }
 
 bool
@@ -8327,7 +8402,8 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		link_ctrl_flags = link_ctrl_f_overwrite_active_bitmap;
 	}
 
-	policy_mgr_mlo_sta_set_nlink(psoc, vdev, reason, mode, 0,
+	policy_mgr_mlo_sta_set_nlink(psoc, wlan_vdev_get_id(vdev),
+				     reason, mode, 0,
 				     active_link_bitmap, inactive_link_bitmap,
 				     link_ctrl_flags);
 done:
