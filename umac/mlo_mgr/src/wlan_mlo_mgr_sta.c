@@ -1068,7 +1068,7 @@ void mlo_handle_sta_link_connect_failure(struct wlan_objmgr_vdev *vdev,
 			msg.callback = ml_activate_disconnect_req_sched_cb;
 			msg.flush_callback =
 				ml_activate_disconnect_req_flush_cb;
-			mlo_post_disconnect_msg(&msg);
+			ret = mlo_post_disconnect_msg(&msg);
 			if (QDF_IS_STATUS_ERROR(ret)) {
 				wlan_objmgr_vdev_release_ref(
 						assoc_vdev,
