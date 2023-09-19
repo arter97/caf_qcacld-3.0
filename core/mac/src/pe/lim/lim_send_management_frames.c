@@ -6850,19 +6850,32 @@ lim_mgmt_t2lm_rsp_tx_complete(void *context, qdf_nbuf_t buf,
 	enum qdf_dp_tx_rx_status qdf_tx_complete;
 	uint32_t extract_status;
 	uint8_t *frame_ptr;
+	uint8_t ff_offset;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	if (qdf_nbuf_len(buf) < sizeof(struct wlan_frame_hdr) + 2)
-		return QDF_STATUS_E_FAILURE;
+	if (!params) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
 
-	if (!params)
-		return QDF_STATUS_E_FAILURE;
+	frame_ptr = qdf_nbuf_data(buf);
+	mac_hdr = (struct wlan_frame_hdr *)frame_ptr;
+
+	ff_offset = sizeof(*mac_hdr);
+	if (wlan_crypto_is_data_protected(frame_ptr))
+		ff_offset += IEEE80211_CCMP_MICLEN;
+
+	if (qdf_nbuf_len(buf) < (ff_offset + sizeof(rsp))) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
 
 	mgmt_params = params;
 	pe_session = pe_find_session_by_vdev_id(mac_ctx, mgmt_params->vdev_id);
-	if (!pe_session || pe_session->opmode != QDF_STA_MODE)
-		return QDF_STATUS_SUCCESS;
-
-	mac_hdr = (struct wlan_frame_hdr *)qdf_nbuf_data(buf);
+	if (!pe_session || pe_session->opmode != QDF_STA_MODE) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
 
 	if (tx_status == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
 		qdf_tx_complete = QDF_TX_RX_STATUS_OK;
@@ -6871,15 +6884,15 @@ lim_mgmt_t2lm_rsp_tx_complete(void *context, qdf_nbuf_t buf,
 	else
 		qdf_tx_complete = QDF_TX_RX_STATUS_NO_ACK;
 
-	frame_ptr = qdf_nbuf_data(buf);
 	extract_status =
 		dot11f_unpack_t2lm_neg_rsp(mac_ctx,
-					   frame_ptr + sizeof(*mac_hdr),
-					   qdf_nbuf_len(buf), &rsp, false);
+					   frame_ptr + ff_offset,
+					   sizeof(rsp), &rsp, false);
 	if (DOT11F_FAILED(extract_status)) {
 		pe_err("Failed to unpack T2LM negotiation response (0x%08x)",
 		       extract_status);
-		return QDF_STATUS_E_FAILURE;
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
 	}
 
 	wlan_connectivity_t2lm_req_resp_event(pe_session->vdev,
@@ -6889,9 +6902,10 @@ lim_mgmt_t2lm_rsp_tx_complete(void *context, qdf_nbuf_t buf,
 					      mgmt_params->chanfreq,
 					      false,
 					      WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT);
+out:
 	qdf_nbuf_free(buf);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 QDF_STATUS
