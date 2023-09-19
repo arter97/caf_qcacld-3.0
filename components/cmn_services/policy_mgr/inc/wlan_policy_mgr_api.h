@@ -1164,7 +1164,7 @@ polic_mgr_send_pcl_to_fw(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_mlo_sta_set_nlink() - Set link mode for MLO STA
  * by link id bitmap
  * @psoc: psoc object
- * @vdev: vdev object
+ * @vdev_id: vdev id
  * @reason: reason to set
  * @mode: mode to set
  * @link_num: number of link, valid for mode:
@@ -1183,7 +1183,7 @@ polic_mgr_send_pcl_to_fw(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
-			     struct wlan_objmgr_vdev *vdev,
+			     uint8_t vdev_id,
 			     enum mlo_link_force_reason reason,
 			     enum mlo_link_force_mode mode,
 			     uint8_t link_num,

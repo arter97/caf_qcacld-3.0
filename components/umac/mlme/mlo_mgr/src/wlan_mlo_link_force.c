@@ -1683,7 +1683,8 @@ ml_nlink_update_no_force_for_all(struct wlan_objmgr_psoc *psoc,
 		}
 
 		status = policy_mgr_mlo_sta_set_nlink(
-						psoc, vdev, reason,
+						psoc, wlan_vdev_get_id(vdev),
+						reason,
 						MLO_LINK_FORCE_MODE_NO_FORCE,
 						0, 0, 0, 0);
 	}
@@ -1717,7 +1718,7 @@ ml_nlink_update_force_inactive(struct wlan_objmgr_psoc *psoc,
 			goto end;
 		}
 		status = policy_mgr_mlo_sta_set_nlink(
-				psoc, vdev, reason,
+				psoc, wlan_vdev_get_id(vdev), reason,
 				MLO_LINK_FORCE_MODE_INACTIVE,
 				0,
 				new->force_inactive_bitmap,
@@ -1744,7 +1745,7 @@ ml_nlink_update_force_inactive_num(struct wlan_objmgr_psoc *psoc,
 	    new->force_inactive_num_bitmap !=
 			curr->force_inactive_num_bitmap) {
 		status = policy_mgr_mlo_sta_set_nlink(
-					psoc, vdev, reason,
+					psoc, wlan_vdev_get_id(vdev), reason,
 					MLO_LINK_FORCE_MODE_INACTIVE_NUM,
 					new->force_inactive_num,
 					new->force_inactive_num_bitmap,
