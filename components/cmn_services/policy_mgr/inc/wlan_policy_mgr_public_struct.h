@@ -65,8 +65,8 @@
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/* Max MLO VDEVS - 1 as all vdevs cannot be disabled */
-#define MAX_NUMBER_OF_DISABLE_LINK WLAN_UMAC_MLO_MAX_VDEVS - 1
+/* Max MLO VDEVS for disabled link table */
+#define MAX_NUMBER_OF_DISABLE_LINK WLAN_UMAC_MLO_MAX_VDEVS
 #endif
 
 /* BIT 0 for low latency and BIT 1 for HIGH TPUT */
