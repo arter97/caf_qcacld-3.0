@@ -21571,7 +21571,8 @@ int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width)
 
 		return hdd_update_channel_width(link_info->adapter, ch_width,
 						chwidth_info[i].bonding_mode,
-						link_id);
+						link_id,
+						false);
 	}
 
 	hdd_err("Invalid ch_width %d", ch_width);

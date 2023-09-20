@@ -1936,6 +1936,9 @@ QDF_STATUS csr_change_default_config_param(struct mac_context *mac,
 		mac->roam.configParam.channelBondingMode5GHz =
 			csr_convert_cb_ini_value_to_phy_cb_state(pParam->
 							channelBondingMode5GHz);
+		sme_debug("cb mode 2g %d 5g %d",
+			  mac->roam.configParam.channelBondingMode24GHz,
+			  mac->roam.configParam.channelBondingMode5GHz);
 		mac->roam.configParam.phyMode = pParam->phyMode;
 		mac->roam.configParam.HeartbeatThresh50 =
 			pParam->HeartbeatThresh50;

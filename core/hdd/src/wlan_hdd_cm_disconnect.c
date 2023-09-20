@@ -534,7 +534,7 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	cm_update_associated_ch_info(vdev, false);
 
 	max_bw = get_max_bw();
-	ret = hdd_set_mac_chan_width(adapter, max_bw, link_id);
+	ret = hdd_set_mac_chan_width(adapter, max_bw, link_id, true);
 	if (ret) {
 		hdd_err("vdev %d : fail to set max ch width", vdev_id);
 		return;
