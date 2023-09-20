@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -296,11 +296,12 @@ QDF_STATUS ol_txrx_ipa_cleanup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			       uint32_t tx_pipe_handle,
 			       uint32_t rx_pipe_handle,
 			       qdf_ipa_wdi_hdl_t hdl);
-QDF_STATUS ol_txrx_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
-		qdf_ipa_client_type_t prod_client,
-		qdf_ipa_client_type_t cons_client,
-		uint8_t session_id, bool is_ipv6_enabled,
-		qdf_ipa_wdi_hdl_t hdl);
+QDF_STATUS ol_txrx_ipa_setup_iface(struct cdp_soc_t *soc_hdl, char *ifname,
+				   uint8_t *mac_addr,
+				   qdf_ipa_client_type_t prod_client,
+				   qdf_ipa_client_type_t cons_client,
+				   uint8_t session_id, bool is_ipv6_enabled,
+				   qdf_ipa_wdi_hdl_t hdl);
 QDF_STATUS ol_txrx_ipa_cleanup_iface(char *ifname, bool is_ipv6_enabled,
 				     qdf_ipa_wdi_hdl_t hdl);
 
