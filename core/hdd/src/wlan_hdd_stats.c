@@ -8221,22 +8221,14 @@ struct net_device_stats *hdd_get_stats(struct net_device *dev)
 	return (struct net_device_stats *)ucfg_dp_get_dev_stats(dev);
 }
 
-
 /*
- * time = cycle_count * cycle
- * cycle = 1 / clock_freq
- * Since the unit of clock_freq reported from
- * FW is MHZ, and we want to calculate time in
- * ms level, the result is
- * time = cycle / (clock_freq * 1000)
+ * FW sends value of cycle_count, rx_clear_count and tx_frame_count in usec.
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 				    struct scan_chan_info *chan_info,
 				    struct ieee80211_channel *channels)
 {
-	uint64_t clock_freq = chan_info->clock_freq * 1000;
-
 	if (channels->center_freq != (uint16_t)chan_info->freq)
 		return false;
 
@@ -8250,14 +8242,9 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 	if (opfreq == chan_info->freq)
 		survey->filled |= SURVEY_INFO_IN_USE;
 
-	if (clock_freq == 0)
-		return true;
-
-	survey->time = qdf_do_div(chan_info->cycle_count, clock_freq);
-
-	survey->time_busy = qdf_do_div(chan_info->rx_clear_count, clock_freq);
-
-	survey->time_tx = qdf_do_div(chan_info->tx_frame_count, clock_freq);
+	survey->time = chan_info->cycle_count;
+	survey->time_busy = chan_info->rx_clear_count;
+	survey->time_tx = chan_info->tx_frame_count;
 
 	survey->filled |= SURVEY_INFO_TIME |
 			  SURVEY_INFO_TIME_BUSY |
@@ -8269,8 +8256,6 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 				    struct scan_chan_info *chan_info,
 				    struct ieee80211_channel *channels)
 {
-	uint64_t clock_freq = chan_info->clock_freq * 1000;
-
 	if (channels->center_freq != (uint16_t)chan_info->freq)
 		return false;
 
@@ -8284,16 +8269,9 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 	if (opfreq == chan_info->freq)
 		survey->filled |= SURVEY_INFO_IN_USE;
 
-	if (clock_freq == 0)
-		return true;
-
-	survey->channel_time = qdf_do_div(chan_info->cycle_count, clock_freq);
-
-	survey->channel_time_busy = qdf_do_div(chan_info->rx_clear_count,
-							 clock_freq);
-
-	survey->channel_time_tx = qdf_do_div(chan_info->tx_frame_count,
-							 clock_freq);
+	survey->channel_time = chan_info->cycle_count;
+	survey->channel_time_busy = chan_info->rx_clear_count;
+	survey->channel_time_tx = chan_info->tx_frame_count;
 
 	survey->filled |= SURVEY_INFO_CHANNEL_TIME |
 			  SURVEY_INFO_CHANNEL_TIME_BUSY |

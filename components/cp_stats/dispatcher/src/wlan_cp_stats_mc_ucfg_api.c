@@ -1060,8 +1060,7 @@ void wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
 	struct channel_status *channel_status_list;
 	uint8_t total_channel;
 	uint8_t i;
-	uint32_t rx_clear_count = 0, cycle_count = 0, mac_clk_mhz = 0;
-	uint64_t clock_freq, time, time_busy;
+	uint32_t rx_clear_count = 0, cycle_count = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_CP_STATS_ID);
@@ -1088,7 +1087,6 @@ void wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
 		if (channel_status_list[i].channel_id == channel) {
 			rx_clear_count = channel_status_list[i].rx_clear_count;
 			cycle_count = channel_status_list[i].cycle_count;
-			mac_clk_mhz = channel_status_list[i].mac_clk_mhz;
 			break;
 		}
 	}
@@ -1098,25 +1096,16 @@ void wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
 		goto release_ref;
 	}
 
-	clock_freq = mac_clk_mhz * 1000;
-	if (clock_freq == 0) {
-		cp_stats_debug("clock_freq is zero");
+	if (cycle_count == 0) {
+		cp_stats_debug("cycle_count is zero");
 		goto release_ref;
 	}
 
-	time = qdf_do_div(cycle_count, clock_freq);
-	if (time == 0) {
-		cp_stats_debug("time is zero");
-		goto release_ref;
-	}
+	*chan_load = ((rx_clear_count * 255) / cycle_count);
 
-	time_busy = qdf_do_div(rx_clear_count, clock_freq);
-
-	*chan_load = ((time_busy * 255) / time);
-
-	cp_stats_debug("t_chan:%d, chan:%d, rcc:%u, cc:%u, cf:%u, time:%u, time_busy:%u, chan_load:%d",
+	cp_stats_debug("t_chan:%d, chan:%d, rcc:%u, cc:%u, chan_load:%d",
 		       total_channel, channel, rx_clear_count, cycle_count,
-		       clock_freq, time, time_busy, *chan_load);
+		       *chan_load);
 
 release_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
