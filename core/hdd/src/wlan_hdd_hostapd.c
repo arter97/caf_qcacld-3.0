@@ -373,6 +373,7 @@ static void hdd_hostapd_channel_allow_suspend(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_hostapd_state *hostapd_state =
 		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+	struct sap_context *sap_ctx;
 
 	hdd_debug("bss_state: %d, chan_freq: %d, dfs_ref_cnt: %d",
 		  hostapd_state->bss_state, chan_freq,
@@ -382,8 +383,15 @@ static void hdd_hostapd_channel_allow_suspend(struct hdd_adapter *adapter,
 	if (hostapd_state->bss_state == BSS_STOP)
 		return;
 
-	if (!wlan_reg_chan_has_dfs_attribute_for_freq(hdd_ctx->pdev,
-						      chan_freq))
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	if (!sap_ctx) {
+		hdd_err("sap ctx null");
+		return;
+	}
+
+	if (!sap_chan_bond_dfs_sub_chan(sap_ctx,
+					chan_freq,
+					PHY_CHANNEL_BONDING_STATE_MAX))
 		return;
 
 	/* Release wakelock when no more DFS channels are used */
@@ -411,6 +419,7 @@ static void hdd_hostapd_channel_prevent_suspend(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_hostapd_state *hostapd_state =
 		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+	struct sap_context *sap_ctx;
 
 	hdd_debug("bss_state: %d, chan_freq: %d, dfs_ref_cnt: %d",
 		  hostapd_state->bss_state, chan_freq,
@@ -420,8 +429,15 @@ static void hdd_hostapd_channel_prevent_suspend(struct hdd_adapter *adapter,
 		(atomic_read(&hdd_ctx->sap_dfs_ref_cnt) >= 1))
 		return;
 
-	if (!wlan_reg_chan_has_dfs_attribute_for_freq(hdd_ctx->pdev,
-						      chan_freq))
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	if (!sap_ctx) {
+		hdd_err("sap ctx null");
+		return;
+	}
+
+	if (!sap_chan_bond_dfs_sub_chan(sap_ctx,
+					chan_freq,
+					PHY_CHANNEL_BONDING_STATE_MAX))
 		return;
 
 	/* Acquire wakelock if we have at least one DFS channel in use */
