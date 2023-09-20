@@ -974,6 +974,10 @@ hdd_get_tdls_connected_peer_count(struct wlan_hdd_link_info *link_info)
 	uint16_t peer_count;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_TDLS_ID);
+	if (!vdev) {
+		hdd_err("Invalid vdev");
+		return -EINVAL;
+	}
 
 	peer_count = ucfg_get_tdls_conn_peer_count(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_TDLS_ID);
