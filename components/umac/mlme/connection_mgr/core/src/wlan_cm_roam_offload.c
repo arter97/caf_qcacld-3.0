@@ -4152,6 +4152,20 @@ cm_roam_switch_to_init(struct wlan_objmgr_pdev *pdev,
 		}
 
 		/*
+		 * If dual sta roaming is not supported, do not enable
+		 * the RSO on the second STA interface, even if the
+		 * primary interface config is present via dual sta policy
+		 */
+		temp_vdev_id = policy_mgr_get_roam_enabled_sta_session_id(
+								psoc, vdev_id);
+		if (!dual_sta_roam_active &&
+		    temp_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
+			mlme_debug("Do not enable RSO on %d, RSO is enabled on %d",
+				   vdev_id, temp_vdev_id);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		/*
 		 * set_primary_vdev usecase is to use that
 		 * interface(e.g. wlan0) over the other
 		 * interface(i.e. wlan1) for data transfer. Non-primary
@@ -4171,8 +4185,6 @@ cm_roam_switch_to_init(struct wlan_objmgr_pdev *pdev,
 		 * Disable roaming on the enabled sta if supplicant wants to
 		 * enable roaming on this vdev id
 		 */
-		temp_vdev_id = policy_mgr_get_roam_enabled_sta_session_id(
-								psoc, vdev_id);
 		if (temp_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
 			/*
 			 * Roam init state can be requested as part of
