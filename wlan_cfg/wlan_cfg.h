@@ -1241,6 +1241,16 @@ int wlan_cfg_get_num_global_spcl_tx_desc(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_c
 int wlan_cfg_get_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
 
 /**
+ * wlan_cfg_set_num_tx_spl_desc() - Set the number of special Tx Descriptors
+ * per pool
+ *
+ * @cfg: Configuration Handle
+ * @num_desc: Number of descriptor
+ */
+void wlan_cfg_set_num_tx_spl_desc(struct wlan_cfg_dp_soc_ctxt *cfg,
+				  int num_desc);
+
+/**
  * wlan_cfg_get_num_tx_spl_desc() - Number of Tx Descriptors for special
  *				    frames per pool
  * @wlan_cfg_ctx: Configuration Handle
