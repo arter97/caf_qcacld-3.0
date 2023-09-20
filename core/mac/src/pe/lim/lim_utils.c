@@ -4620,7 +4620,7 @@ static void lim_diag_fill_mgmt_event_report(struct mac_context *mac_ctx,
 	mgmt_event->mgmt_subtype = mac_hdr->fc.subType;
 	qdf_mem_copy(mgmt_event->self_mac_addr, session->self_mac_addr,
 		     QDF_MAC_ADDR_SIZE);
-	qdf_mem_copy(mgmt_event->bssid, session->bssId,
+	qdf_mem_copy(mgmt_event->bssid, mac_hdr->bssId,
 		     QDF_MAC_ADDR_SIZE);
 	length = session->ssId.length;
 	if (length > WLAN_SSID_MAX_LEN)
