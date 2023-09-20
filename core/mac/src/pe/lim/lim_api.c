@@ -2568,6 +2568,7 @@ lim_fill_roamed_peer_twt_caps(struct mac_context *mac_ctx,
 	uint32_t status;
 	tDot11fReAssocResponse *reassoc_rsp;
 	struct pe_session *pe_session;
+	struct qdf_mac_addr mac_addr;
 
 	pe_session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!pe_session) {
@@ -2597,11 +2598,17 @@ lim_fill_roamed_peer_twt_caps(struct mac_context *mac_ctx,
 			 status, len);
 	}
 
-	if (lim_is_session_he_capable(pe_session))
+	if (lim_is_session_he_capable(pe_session)) {
+		if (is_multi_link_roam(roam_synch))
+			mlo_get_sta_link_mac_addr(vdev_id, roam_synch,
+						  &mac_addr);
+		else
+			qdf_copy_macaddr(&mac_addr, &roam_synch->bssid);
 		lim_set_twt_peer_capabilities(mac_ctx,
-					      &roam_synch->bssid,
+					      &mac_addr,
 					      &reassoc_rsp->he_cap,
 					      &reassoc_rsp->he_op);
+	}
 	qdf_mem_free(reassoc_rsp);
 }
 #endif

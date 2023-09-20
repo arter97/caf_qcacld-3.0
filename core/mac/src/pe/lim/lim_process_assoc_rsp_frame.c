@@ -1384,7 +1384,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				&assoc_rsp->obss_scanparams);
 
 	if (lim_is_session_he_capable(session_entry)) {
-		lim_set_twt_peer_capabilities(
+		if (!wlan_cm_is_vdev_roaming(session_entry->vdev))
+			lim_set_twt_peer_capabilities(
 				mac_ctx,
 				(struct qdf_mac_addr *)current_bssid,
 				&assoc_rsp->he_cap,
