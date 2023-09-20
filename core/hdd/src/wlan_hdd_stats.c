@@ -6546,7 +6546,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 			  "[RX: Reporting MCS rate %d, flags 0x%x pkt cnt %d, nss %d, bw %d]",
 			  sinfo->txrate.mcs, sinfo->txrate.flags,
 			  sinfo->tx_packets, sinfo->txrate.nss,
-			  sinfo->rxrate.bw, sinfo->rxrate.mcs,
+			  sinfo->txrate.bw, sinfo->rxrate.mcs,
 			  sinfo->rxrate.flags, sinfo->rx_packets,
 			  sinfo->rxrate.nss, sinfo->rxrate.bw);
 	}
@@ -6615,6 +6615,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 
 	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
+
 	if (!mac) {
 		hdd_err("Received NULL mac address");
 		return -EINVAL;
@@ -6623,6 +6624,8 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 		hdd_err("MAC is all zero");
 		return -EINVAL;
 	}
+
+	hdd_debug("Stats request on MAC: "QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac));
 
 	if (adapter->device_mode == QDF_SAP_MODE ||
 	    adapter->device_mode == QDF_P2P_GO_MODE) {

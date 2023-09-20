@@ -3608,14 +3608,7 @@ int hdd_set_11ax_rate(struct hdd_adapter *adapter, int set_value,
 
 int hdd_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 {
-	int set_value;
-
-	if (sme_is_feature_supported_by_fw(DOT11AX))
-		set_value = WMI_ASSEMBLE_RATECODE_V1(rate, nss, preamble);
-	else
-		set_value = (preamble << 6) | (nss << 4) | rate;
-
-	return set_value;
+	return ucfg_mlme_assemble_rate_code(preamble, nss, rate);
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -6377,7 +6370,8 @@ free_net_dev:
 	return NULL;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+	(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static int
 hdd_register_netdevice(struct hdd_adapter *adapter, struct net_device *dev,
 		       struct hdd_adapter_create_param *params)
@@ -7279,7 +7273,8 @@ static void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+	(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static void
 hdd_unregister_netdevice(struct hdd_adapter *adapter, struct net_device *dev)
 {
@@ -12779,6 +12774,8 @@ static int __hdd_psoc_idle_shutdown(struct hdd_context *hdd_ctx)
 	int errno;
 
 	hdd_enter();
+
+	hdd_reg_wait_for_country_change(hdd_ctx);
 
 	errno = osif_psoc_sync_trans_start(hdd_ctx->parent_dev, &psoc_sync);
 	if (errno) {

@@ -5180,10 +5180,8 @@ sir_convert_beacon_frame2_t2lm_struct(tDot11fBeacon *bcn_frm,
 		     sizeof(struct wlan_t2lm_info));
 	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
 
-	if (!bcn_frm->num_t2lm_ie) {
-		pe_debug("T2LM IEs not present");
+	if (!bcn_frm->num_t2lm_ie)
 		return status;
-	}
 
 	pe_debug("Number of T2LM IEs in beacon %d", bcn_frm->num_t2lm_ie);
 	for (i = 0; i < bcn_frm->num_t2lm_ie; i++) {
@@ -5244,9 +5242,12 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 					nframe - WLAN_BEACON_IES_OFFSET,
 					&ml_ie, &ml_ie_total_len);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
-			util_get_bvmlie_persta_partner_info(ml_ie,
-							    ml_ie_total_len,
-							    &partner_info);
+			status = util_get_bvmlie_persta_partner_info(
+								ml_ie,
+								ml_ie_total_len,
+								&partner_info);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
 			bcn_struct->mlo_ie.mlo_ie.num_sta_profile =
 						partner_info.num_partner_links;
 			util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
@@ -9688,6 +9689,9 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
 
 	assoc_req = session->parsedAssocReq[sta->assocId];
+	if (!assoc_req)
+		goto no_partner;
+
 	for (link = 0; link < assoc_req->mlo_info.num_partner_links; link++) {
 		lle_mode = 0;
 		sta_pro = &mlo_ie->sta_profile[num_sta_pro];
@@ -10217,6 +10221,8 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 		lim_mlo_release_vdev_ref(link_session->vdev);
 		num_sta_pro++;
 	}
+
+no_partner:
 	mlo_ie->num_sta_profile = num_sta_pro;
 	mlo_ie->mld_capab_and_op_info.max_simultaneous_link_num = num_sta_pro;
 	return QDF_STATUS_SUCCESS;

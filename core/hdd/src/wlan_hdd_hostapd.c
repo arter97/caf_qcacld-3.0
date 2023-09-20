@@ -7171,8 +7171,7 @@ static uint16_t hdd_get_data_rate_from_rate_mask(struct wiphy *wiphy,
 		sband_bitrates = sband->bitrates;
 		sband_n_bitrates = sband->n_bitrates;
 		for (i = 0; i < sband_n_bitrates; i++) {
-			if (bit_rate_mask->control[band].legacy ==
-			    sband_bitrates[i].hw_value)
+			if (bit_rate_mask->control[band].legacy == (1 << i))
 				return sband_bitrates[i].bitrate;
 		}
 	}
