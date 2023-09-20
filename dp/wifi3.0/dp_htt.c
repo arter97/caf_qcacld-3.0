@@ -3184,6 +3184,21 @@ static void dp_queue_ring_stats(struct dp_pdev *pdev)
 		       &pdev->bkp_stats.work);
 }
 
+#ifdef WIFI_MONITOR_SUPPORT
+static void
+dp_check_backpressure_in_monitor(uint8_t ring_id, struct dp_pdev *pdev)
+{
+	if (ring_id >= HTT_SW_RING_IDX_MONITOR_STATUS_RING &&
+	    ring_id <= HTT_SW_LMAC_RING_IDX_MAX)
+		pdev->monitor_pdev->is_bkpressure = true;
+}
+#else
+static void
+dp_check_backpressure_in_monitor(uint8_t ring_id, struct dp_pdev *pdev)
+{
+}
+#endif
+
 /**
  * dp_htt_bkp_event_alert() - htt backpressure event alert
  * @msg_word:	htt packet context
@@ -3242,6 +3257,7 @@ static void dp_htt_bkp_event_alert(u_int32_t *msg_word, struct htt_soc *soc)
 	case HTT_SW_RING_TYPE_LMAC:
 		if (!time_allow_print(radio_tt->lmac_path, ring_id, th_time))
 			return;
+		dp_check_backpressure_in_monitor(ring_id, pdev);
 		dp_htt_alert_print(msg_type, pdev, ring_id, hp_idx, tp_idx,
 				   bkp_time, radio_tt->lmac_path,
 				   "HTT_SW_RING_TYPE_LMAC");

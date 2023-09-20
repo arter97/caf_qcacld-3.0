@@ -74,13 +74,15 @@
  * @DP_MON_STATUS_LAG: status ppdu id is lagging
  * @DP_MON_STATUS_LEAD: status ppdu id is leading
  * @DP_MON_STATUS_REPLENISH: status ring entry is NULL
+ * @DP_MON_STATUS_MAX: max num of different status
  */
 enum dp_mon_reap_status {
 	DP_MON_STATUS_NO_DMA,
 	DP_MON_STATUS_MATCH,
 	DP_MON_STATUS_LAG,
 	DP_MON_STATUS_LEAD,
-	DP_MON_STATUS_REPLENISH
+	DP_MON_STATUS_REPLENISH,
+	DP_MON_STATUS_MAX
 };
 
 /**
@@ -148,6 +150,17 @@ void dp_full_mon_attach(struct dp_pdev *pdev);
  *
  */
 void dp_full_mon_detach(struct dp_pdev *pdev);
+
+/**
+ * dp_full_mon_partial_detach() - Full monitor mode detach with no locks
+ * This API deinitilises full monitor mode resources but mon_desc not free
+ *
+ * @pdev: dp pdev object
+ *
+ * Return: void
+ *
+ */
+void dp_full_mon_partial_detach(struct dp_pdev *pdev);
 
 /**
  * dp_rx_mon_process()- API to process monitor destination ring for

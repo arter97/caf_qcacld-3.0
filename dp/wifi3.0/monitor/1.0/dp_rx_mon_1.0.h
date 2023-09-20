@@ -107,7 +107,6 @@ dp_rx_pdev_mon_buf_desc_pool_init(struct dp_pdev *pdev, uint32_t mac_id)
 }
 #endif
 
-#if !defined(DISABLE_MON_CONFIG) && defined(MON_ENABLE_DROP_FOR_MAC)
 /**
  * dp_mon_dest_srng_drop_for_mac() - Drop the mon dest ring packets for
  *  a given mac
@@ -118,7 +117,6 @@ dp_rx_pdev_mon_buf_desc_pool_init(struct dp_pdev *pdev, uint32_t mac_id)
  */
 uint32_t
 dp_mon_dest_srng_drop_for_mac(struct dp_pdev *pdev, uint32_t mac_id);
-#endif
 
 /**
  * dp_rxdma_err_process() - RxDMA error processing functionality
