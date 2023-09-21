@@ -424,7 +424,7 @@ wlan_populate_band_bitmap(struct mlo_link_switch_context *link_ctx)
 	return band_bitmap;
 }
 
-static QDF_STATUS
+QDF_STATUS
 wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_diag_packet_info *data,
 				   enum wlan_main_tag tag)
@@ -674,14 +674,6 @@ out:
 static QDF_STATUS
 wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 			struct wlan_diag_sta_info *wlan_diag_event)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static QDF_STATUS
-wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
-				   struct wlan_diag_packet_info *data,
-				   enum wlan_main_tag tag)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -3018,6 +3018,11 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	uint8_t vdev_id = stats_info->vdev_id;
 	uint8_t band;
 
+	status = wmi_unified_extract_roam_scan_stats(
+			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
+	if (QDF_IS_STATUS_ERROR(status))
+		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
+
 	band = stats_info->scan[0].band;
 
 	status = wmi_unified_extract_roam_11kv_stats(
@@ -3031,11 +3036,6 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Extract roamtrigger stats failed vdev %d",
 			  vdev_id);
-
-	status = wmi_unified_extract_roam_scan_stats(
-			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
-	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
 
 	status = wmi_unified_extract_roam_btm_response(
 			wmi_handle, evt_buf, &stats_info->btm_rsp[0], 0);

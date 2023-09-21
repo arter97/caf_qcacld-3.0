@@ -1260,6 +1260,21 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
  */
 void wlan_connectivity_t2lm_status_event(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_populate_mlo_mgmt_event_param() - API to populate MLO management frame
+ * parameter
+ * @vdev: vdev pointer
+ * @data: Buffer to be filled with MLO parameter
+ * @tag: WLAN event tag. Refer enum wlan_main_tag
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_diag_packet_info *data,
+				   enum wlan_main_tag tag);
+
 #else
 static inline void
 wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
@@ -1284,6 +1299,14 @@ static inline void
 wlan_connectivity_t2lm_status_event(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev)
 {
+}
+
+static inline QDF_STATUS
+wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_diag_packet_info *data,
+				   enum wlan_main_tag tag)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -1505,6 +1528,14 @@ static inline enum wlan_diag_wifi_band
 wlan_convert_freq_to_diag_band(uint16_t ch_freq)
 {
 	return WLAN_INVALID_BAND;
+}
+
+static inline QDF_STATUS
+wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_diag_packet_info *data,
+				   enum wlan_main_tag tag)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline void
