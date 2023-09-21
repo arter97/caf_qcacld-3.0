@@ -4645,6 +4645,12 @@ int wlan_cfg_get_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return cfg->num_tx_desc;
 }
 
+void wlan_cfg_set_num_tx_spl_desc(struct wlan_cfg_dp_soc_ctxt *cfg,
+				  int num_desc)
+{
+	cfg->num_tx_spl_desc = num_desc;
+}
+
 int wlan_cfg_get_num_tx_spl_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->num_tx_spl_desc;
