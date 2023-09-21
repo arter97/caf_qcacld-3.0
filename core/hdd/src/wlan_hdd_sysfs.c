@@ -96,6 +96,8 @@
 #include <wlan_hdd_sysfs_roam_trigger_bitmap.h>
 #include <wlan_hdd_sysfs_bitrates.h>
 #include <wlan_hdd_sysfs_rf_test_mode.h>
+#include "wlan_module_ids.h"
+#include <wlan_coex_ucfg_api.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -797,6 +799,180 @@ hdd_sysfs_destroy_bcn_reception_interface(struct hdd_adapter *adapter)
 
 #endif /* WLAN_FEATURE_BEACON_RECEPTION_STATS */
 
+#define MAX_USER_COMMAND_SIZE_LOGGING_CONFIG 256
+#define MAX_SYS_LOGGING_CONFIG_COEX_NUM 7
+/**
+ * __hdd_sysfs_logging_config_store() - This API will store the values in local
+ * buffer.
+ * @hdd_ctx: hdd context
+ * @buf: input buffer
+ * @count: size fo buffer
+ *
+ * Return: local buffer count for success case, otherwise error
+ */
+static ssize_t __hdd_sysfs_logging_config_store(struct hdd_context *hdd_ctx,
+						const char *buf, size_t count)
+{
+	char buf_local[MAX_USER_COMMAND_SIZE_LOGGING_CONFIG + 1];
+	char *sptr, *token;
+	uint32_t apps_args[WMI_UNIT_TEST_MAX_NUM_ARGS];
+	int module_id, args_num, ret, i;
+	QDF_STATUS status;
+
+	ret = hdd_sysfs_validate_and_copy_buf(buf_local, sizeof(buf_local),
+					      buf, count);
+	if (ret) {
+		hdd_err_rl("invalid input");
+		return ret;
+	}
+
+	hdd_nofl_info("logging_config: count %zu buf_local:(%s)", count,
+		      buf_local);
+
+	sptr = buf_local;
+	/* Get module_id */
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou32(token, 0, &module_id))
+		return -EINVAL;
+
+	if (module_id < WLAN_MODULE_ID_MIN ||
+	    module_id >= WLAN_MODULE_ID_MAX) {
+		hdd_err_rl("Invalid MODULE ID %d", module_id);
+		return -EINVAL;
+	}
+
+	/* Get args_num */
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou32(token, 0, &args_num))
+		return -EINVAL;
+
+	if (args_num > WMI_UNIT_TEST_MAX_NUM_ARGS) {
+		hdd_err_rl("Too many args %d", args_num);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < args_num; i++) {
+		token = strsep(&sptr, " ");
+		if (!token) {
+			hdd_err_rl("not enough args(%d), expected args_num:%d",
+				   i, args_num);
+			return -EINVAL;
+		}
+		if (kstrtou32(token, 0, &apps_args[i]))
+			return -EINVAL;
+	}
+
+	switch (module_id) {
+	case WLAN_MODULE_COEX:
+		if (args_num > MAX_SYS_LOGGING_CONFIG_COEX_NUM) {
+			hdd_err_rl("arg num %d exceeds max limit %d", args_num,
+				   MAX_SYS_LOGGING_CONFIG_COEX_NUM);
+			return -EINVAL;
+		}
+
+		status = ucfg_coex_send_logging_config(hdd_ctx->psoc,
+						       &apps_args[0]);
+		if (status != QDF_STATUS_SUCCESS) {
+			hdd_err_rl("ucfg_coex_send_logging_config returned %d",
+				   status);
+			return -EINVAL;
+		}
+		break;
+
+	default:
+		hdd_debug_rl("module id not recognized");
+		break;
+	}
+
+	return count;
+}
+
+/**
+ * hdd_sysfs_logging_config_store() - This API will store the values in local
+ * buffer.
+ * @kobj: sysfs wifi kobject
+ * @attr: pointer to kobj_attribute structure
+ * @buf: input buffer
+ * @count: size fo buffer
+ *
+ * Return: local buffer count for success case, otherwise error
+ */
+static ssize_t hdd_sysfs_logging_config_store(struct kobject *kobj,
+					      struct kobj_attribute *attr,
+					      char const *buf, size_t count)
+{
+	struct osif_psoc_sync *psoc_sync;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	ssize_t errno_size;
+	int ret;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+					     &psoc_sync);
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_logging_config_store(hdd_ctx, buf, count);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno_size;
+}
+
+static struct kobj_attribute logging_config_attribute =
+	__ATTR(logging_config, 0220, NULL, hdd_sysfs_logging_config_store);
+
+/**
+ * hdd_sysfs_create_logging_config_interface() - API to create logging config
+ * sysfs file
+ * @driver_kobject: sysfs driver kobject
+ *
+ * Return: None
+ */
+static void
+hdd_sysfs_create_logging_config_interface(struct kobject *driver_kobject)
+{
+	int error;
+
+	if (!driver_kobject) {
+		hdd_err("could not get wifi kobject!");
+		return;
+	}
+
+	error = sysfs_create_file(driver_kobject,
+				  &logging_config_attribute.attr);
+	if (error)
+		hdd_err("could not create logging config sysfs file");
+}
+
+/**
+ * hdd_sysfs_destroy_logging_config_interface() - API to destroy logging config
+ * sysfs file
+ * @driver_kobject: sysfs driver kobject
+ *
+ * Return: None
+ */
+static void
+hdd_sysfs_destroy_logging_config_interface(struct kobject *driver_kobject)
+{
+	if (!driver_kobject) {
+		hdd_err("could not get wifi kobject!");
+		return;
+	}
+
+	sysfs_remove_file(driver_kobject, &logging_config_attribute.attr);
+}
+
 static void
 hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
@@ -968,12 +1144,14 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_wds_mode_create(driver_kobject);
 		hdd_sysfs_roam_trigger_bitmap_create(driver_kobject);
 		hdd_sysfs_rf_test_mode_create(driver_kobject);
+		hdd_sysfs_create_logging_config_interface(driver_kobject);
 	}
 }
 
 void hdd_destroy_sysfs_files(void)
 {
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_destroy_logging_config_interface(driver_kobject);
 		hdd_sysfs_rf_test_mode_destroy(driver_kobject);
 		hdd_sysfs_roam_trigger_bitmap_destroy(driver_kobject);
 		hdd_sysfs_wds_mode_destroy(driver_kobject);
