@@ -5897,7 +5897,7 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 		}
 
 		cm_req->roam_req.req.forced_roaming = true;
-		if (source == CM_ROAMING_HOST)
+		if (source == CM_ROAMING_HOST || source == CM_ROAMING_USER)
 			rso_cfg->is_forced_roaming = true;
 		source = CM_ROAMING_NUD_FAILURE;
 		goto send_evt;
@@ -5936,7 +5936,8 @@ send_evt:
 	 */
 	if (source == CM_ROAMING_HOST ||
 	    source == CM_ROAMING_NUD_FAILURE ||
-	    source == CM_ROAMING_LINK_REMOVAL)
+	    source == CM_ROAMING_LINK_REMOVAL ||
+	    source == CM_ROAMING_USER)
 		rso_cfg->roam_invoke_source = source;
 
 	cm_req->roam_req.req.vdev_id = vdev_id;
