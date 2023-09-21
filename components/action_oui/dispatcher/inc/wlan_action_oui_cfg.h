@@ -423,48 +423,6 @@
 
 /*
  * <ini>
- * gActionOUIForceMaxNss - Used to specify action OUIs for Max NSS connection
- * @Default:
- * Note: User should strictly add new action OUIs at the end of this
- * default value.
- *
- * Default OUIs: (All values in Hex)
- * OUI 1 :001018
- *   OUI data Len : 06
- *   OUI Data : 0201009c0000
- *   OUI data Mask: FC
- *   Info Mask : 01 - only OUI present in Info mask
- * OUI 2 :001018
- *   OUI data Len : 06
- *   OUI Data : 0201001c0000
- *   OUI data Mask: FC
- *   Info Mask : 01 - only OUI present in Info mask
- * OUI 3 :001018
- *   OUI data Len : 06
- *   OUI Data : 0200009c0000
- *   OUI data Mask: FC
- *   Info Mask : 01 - only OUI present in Info mask
- *
- * This ini is used to specify the AP OUIs with which max capability is
- * sent in association request even though AP advertises 1x1 capability.
- *
- * Related: None
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_FORCE_MAX_NSS CFG_INI_STRING( \
-			"gActionOUIForceMaxNss", \
-			0, \
-			ACTION_OUI_MAX_STR_LEN, \
-			"001018 06 0201009c0000 FC 01 001018 06 0201001c0000 FC 01 001018 06 0200009c0000 FC 01", \
-			"Used to specify action OUIs for forcing max NSS connection")
-
-/*
- * <ini>
  * gActionOUIDisableAggressiveEDCA - Used to specify action OUIs to control
  * EDCA configuration when join the candidate AP
  *
@@ -841,7 +799,6 @@
 	CFG(CFG_ACTION_OUI_ITO_ALTERNATE) \
 	CFG(CFG_ACTION_OUI_ITO_EXTENSION) \
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_TX) \
-	CFG(CFG_ACTION_OUI_FORCE_MAX_NSS) \
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_EDCA) \
 	CFG(CFG_ACTION_OUI_EXTEND_WOW_ITO) \
 	CFG(CFG_ACTION_OUI_SWITCH_TO_11N_MODE) \

@@ -1810,7 +1810,7 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 {
 	struct action_oui_search_attr vendor_ap_search_attr;
 	uint16_t ie_len;
-	bool force_max_nss, follow_ap_edca;
+	bool follow_ap_edca;
 	struct bss_description *bss_desc =
 					&session->lim_join_req->bssDescription;
 	bool is_vendor_ap_present;
@@ -1846,19 +1846,9 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	vendor_ap_search_attr.enable_5g =
 				wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq);
 
-	force_max_nss = wlan_action_oui_search(mac_ctx->psoc,
-					       &vendor_ap_search_attr,
-					       ACTION_OUI_FORCE_MAX_NSS);
-
 	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
-		force_max_nss = false;
 		session->nss = 1;
 		session->vdev_nss = 1;
-	}
-
-	if (!force_max_nss && session->nss > ap_nss) {
-		session->nss = ap_nss;
-		session->vdev_nss = ap_nss;
 	}
 
 	/*
