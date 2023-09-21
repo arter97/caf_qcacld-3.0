@@ -1183,6 +1183,13 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 				continue;
 			}
 
+			/*
+			 * Reject the partner link that doesn’t pass the
+			 * security check and validate the next available
+			 * partner link. If none of the partner link passes
+			 * the security check, proceed connection with
+			 * single link.
+			 */
 			is_security_allowed =
 				wlan_cm_is_eht_allowed_for_current_security(
 							part_scan_entry);
@@ -1618,6 +1625,9 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	if (!vdev || !vdev->mlo_dev_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
+	if (!wlan_cm_is_vdev_connected(vdev))
+		return QDF_STATUS_E_AGAIN;
+
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
 	    !mlo_check_if_all_links_up(vdev))
 		return QDF_STATUS_E_FAILURE;
@@ -1628,7 +1638,7 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	status = wlan_process_bcn_prbrsp_t2lm_ie(vdev, t2lm_ctx, t2lm_ctx->tsf);
+	status = wlan_update_t2lm_mapping(vdev, t2lm_ctx, t2lm_ctx->tsf);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("T2LM IE beacon process failed");
 	}

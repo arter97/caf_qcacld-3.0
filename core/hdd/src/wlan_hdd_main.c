@@ -3822,14 +3822,7 @@ int hdd_set_11ax_rate(struct hdd_adapter *adapter, int set_value,
 
 int hdd_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 {
-	int set_value;
-
-	if (sme_is_feature_supported_by_fw(DOT11AX))
-		set_value = WMI_ASSEMBLE_RATECODE_V1(rate, nss, preamble);
-	else
-		set_value = (preamble << 6) | (nss << 4) | rate;
-
-	return set_value;
+	return ucfg_mlme_assemble_rate_code(preamble, nss, rate);
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -7524,7 +7517,9 @@ QDF_STATUS hdd_init_station_mode(struct wlan_hdd_link_info *link_info)
 			goto error_wmm_init;
 	}
 
+	hdd_tsf_auto_report_init(adapter);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+
 	return QDF_STATUS_SUCCESS;
 
 error_wmm_init:
@@ -9689,7 +9684,6 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 						     WLAN_DATA_FLOW_CONTROL);
 
 			hdd_reset_scan_operation(link_info);
-
 			if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
 				hdd_wmm_adapter_close(adapter);
 				clear_bit(WMM_INIT_DONE, &adapter->event_flags);
@@ -10829,7 +10823,7 @@ out:
 static QDF_STATUS
 hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 {
-#define SHUTDOWN_IN_SUSPEND_RETRY 10
+#define SHUTDOWN_IN_SUSPEND_RETRY 30
 
 	int count = 0;
 	enum pmo_suspend_mode mode;
@@ -10842,7 +10836,7 @@ hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
 	hdd_debug("suspend mode is %d", mode);
 
-	if (mode == PMO_SUSPEND_NONE || PMO_SUSPEND_LEGENCY) {
+	if (mode == PMO_SUSPEND_NONE || mode == PMO_SUSPEND_LEGENCY) {
 		hdd_debug("needn't shutdown in suspend");
 		return 0;
 	}
@@ -10855,7 +10849,7 @@ hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 			return 0;
 	}
 
-	/*try to wait interfacee down for PMO_SUSPEND_SHUTDOWN mode*/
+	/*try to wait interface down for PMO_SUSPEND_SHUTDOWN mode*/
 	while (hdd_is_any_interface_open(hdd_ctx) &&
 	       count < SHUTDOWN_IN_SUSPEND_RETRY) {
 		count++;
@@ -21388,6 +21382,20 @@ uint8_t hdd_chwidth_to_nl80211_chwidth(enum eSirMacHTChannelWidth chwidth)
 	for (i = 0; i < ARRAY_SIZE(chwidth_info); i++) {
 		if (chwidth_info[i].sir_chwidth_valid &&
 		    chwidth_info[i].sir_chwidth == chwidth)
+			return i;
+	}
+
+	hdd_err("Unsupported channel width %d", chwidth);
+	return 0xFF;
+}
+
+uint8_t hdd_phy_chwidth_to_nl80211_chwidth(enum phy_ch_width chwidth)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chwidth_info); i++) {
+		if (chwidth_info[i].sir_chwidth_valid &&
+		    chwidth_info[i].phy_chwidth == chwidth)
 			return i;
 	}
 

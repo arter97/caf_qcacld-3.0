@@ -581,6 +581,8 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	__hdd_cm_disconnect_handler_post_user_update(link_info, vdev);
 	wlan_twt_concurrency_update(hdd_ctx);
 	hdd_cm_reset_udp_qos_upgrade_config(adapter);
+	ucfg_mlme_set_ml_link_control_mode(hdd_ctx->psoc,
+					   vdev->vdev_objmgr.vdev_id, 0);
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -210,6 +210,7 @@
 #include "wlan_mlo_epcs_ucfg_api.h"
 #include <wlan_ll_sap_ucfg_api.h>
 #include <wlan_mlo_mgr_link_switch.h>
+#include <wlan_hdd_ll_lt_sap.h>
 /*
  * A value of 100 (milliseconds) can be sent to FW.
  * FW would enable Tx beamforming based on this.
@@ -2129,6 +2130,12 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	},
 #endif
 	FEATURE_AFC_VENDOR_EVENTS
+
+	[QCA_NL80211_VENDOR_SUBCMD_AUDIO_TRANSPORT_SWITCH_INDEX] = {
+		.vendor_id = QCA_NL80211_VENDOR_ID,
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_AUDIO_TRANSPORT_SWITCH,
+	},
+
 };
 
 /**
@@ -9147,15 +9154,8 @@ static int hdd_config_mpdu_aggregation(struct wlan_hdd_link_info *link_info,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_MPDU_AGGREGATION];
 	struct nlattr *rx_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MPDU_AGGREGATION];
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
-	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	uint8_t tx_size, rx_size;
 	QDF_STATUS status;
-
-	if (!mac_handle) {
-		hdd_err("NULL Mac handle");
-		return -EINVAL;
-	}
 
 	/* nothing to do if neither attribute is present */
 	if (!tx_attr && !rx_attr)
@@ -9178,20 +9178,6 @@ static int hdd_config_mpdu_aggregation(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	if (tx_size > 1)
-		sme_set_amsdu(mac_handle, true);
-	else
-		sme_set_amsdu(mac_handle, false);
-
-	hdd_debug("tx size: %d", tx_size);
-	status = wma_cli_set_command(link_info->vdev_id,
-				     GEN_VDEV_PARAM_AMSDU,
-				     tx_size, GEN_CMD);
-	if (status) {
-		hdd_err("Failed to set AMSDU param to FW, status %d", status);
-		return qdf_status_to_os_return(status);
-	}
-
 	status = wma_set_tx_rx_aggr_size(link_info->vdev_id,
 					 tx_size, rx_size,
 					 WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
@@ -9207,7 +9193,14 @@ static int hdd_config_msdu_aggregation(struct wlan_hdd_link_info *link_info,
 	struct nlattr *rx_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MSDU_AGGREGATION];
 	uint8_t tx_size, rx_size;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	QDF_STATUS status;
+
+	if (!mac_handle) {
+		hdd_err("NULL Mac handle");
+		return -EINVAL;
+	}
 
 	/* nothing to do if neither attribute is present */
 	if (!tx_attr && !rx_attr)
@@ -9230,10 +9223,19 @@ static int hdd_config_msdu_aggregation(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	status = wma_set_tx_rx_aggr_size(link_info->vdev_id,
-					 tx_size,
-					 rx_size,
-					 WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
+	if (tx_size > 1)
+		sme_set_amsdu(mac_handle, true);
+	else
+		sme_set_amsdu(mac_handle, false);
+
+	hdd_debug("tx size: %d", tx_size);
+	status = wma_cli_set_command(link_info->vdev_id,
+				     GEN_VDEV_PARAM_AMSDU,
+				     tx_size, GEN_CMD);
+	if (status) {
+		hdd_err("Failed to set AMSDU param to FW, status %d", status);
+		return qdf_status_to_os_return(status);
+	}
 
 	return qdf_status_to_os_return(status);
 }
@@ -9350,6 +9352,7 @@ static int hdd_config_vdev_chains(struct wlan_hdd_link_info *link_info,
 	tx_chains = nla_get_u8(tx_attr);
 	rx_chains = nla_get_u8(rx_attr);
 
+	hdd_debug("tx_chains %d rx_chains %d", tx_chains, rx_chains);
 	if (hdd_ctx->dynamic_nss_chains_support)
 		return hdd_set_dynamic_antenna_mode(link_info,
 						    rx_chains, tx_chains);
@@ -10907,6 +10910,7 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	struct nlattr *curr_attr;
 	struct nlattr *chn_bd = NULL;
 	struct nlattr *mlo_link_id;
+	enum eSirMacHTChannelWidth chwidth;
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS])
 		goto skip_mlo;
@@ -10952,15 +10956,17 @@ skip_mlo:
 
 	nl80211_chwidth = nla_get_u8(chn_bd);
 
-	if (nl80211_chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
-	    nl80211_chwidth > eHT_MAX_CHANNEL_WIDTH) {
-		hdd_err("Invalid channel width");
+set_chan_width:
+	chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
+
+	if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
+	    chwidth > eHT_MAX_CHANNEL_WIDTH) {
+		hdd_err("Invalid channel width %u", chwidth);
 		return -EINVAL;
 	}
 
-set_chan_width:
 	return hdd_set_mac_chan_width(link_info->adapter,
-				      nl80211_chwidth, link_id);
+				      chwidth, link_id);
 }
 
 /**
@@ -12216,23 +12222,29 @@ static int hdd_get_rx_amsdu(struct wlan_hdd_link_info *link_info,
 static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
 				 struct sk_buff *skb, const struct nlattr *attr)
 {
-	enum eSirMacHTChannelWidth chwidth;
 	uint8_t nl80211_chwidth;
+	struct wlan_channel *bss_chan;
+	struct wlan_objmgr_vdev *vdev;
 
-	chwidth = wma_cli_get_command(link_info->vdev_id,
-				      wmi_vdev_param_chwidth, VDEV_CMD);
-	if (chwidth < 0) {
-		hdd_err("Failed to get chwidth");
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+
+	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
+	if (!bss_chan) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		hdd_err("get bss_chan failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(bss_chan->ch_width);
+	if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH, nl80211_chwidth)) {
+		hdd_err("nla_put chn width failure");
 		return -EINVAL;
 	}
 
-	nl80211_chwidth = hdd_chwidth_to_nl80211_chwidth(chwidth);
-	if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH,
-		       nl80211_chwidth)) {
-		hdd_err("nla_put failure");
-		return -EINVAL;
-	}
-
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return 0;
 }
 
@@ -12255,6 +12267,7 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	uint32_t link_id = 0;
 	struct wlan_objmgr_vdev *vdev, *link_vdev;
 	struct wlan_channel *bss_chan;
+	uint8_t nl80211_chwidth;
 
 	chwidth = wma_cli_get_command(link_info->vdev_id,
 				      wmi_vdev_param_chwidth, VDEV_CMD);
@@ -12267,14 +12280,7 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	if (!vdev)
 		return -EINVAL;
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
-
-		if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH,
-			       (uint8_t)bss_chan->ch_width)) {
-			hdd_err("nla_put chn width failure");
-		}
-	} else {
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		mlo_bd_info = nla_nest_start(skb, CONFIG_MLO_LINKS);
 		for (link_id = 0; link_id < WLAN_MAX_LINK_ID; link_id++) {
 			link_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
@@ -12302,8 +12308,9 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 				return -EINVAL;
 			}
 
+			nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(bss_chan->ch_width);
 			if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH,
-				       (uint8_t)bss_chan->ch_width)) {
+				       nl80211_chwidth)) {
 				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 				mlo_release_vdev_ref(link_vdev);
 				hdd_err("nla_put failure");
@@ -13237,10 +13244,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		op_mode = wlan_get_opmode_from_vdev_id(
 						hdd_ctx->pdev,
 						link_info->vdev_id);
-		if (op_mode == QDF_STA_MODE)
-			sme_set_ba_opmode(mac_handle,
-					  link_info->vdev_id,
-					  set_val);
+
+		sme_set_per_link_ba_mode(mac_handle, set_val);
 
 		if (!cfg_val) {
 			ret_val = wma_cli_set_command(
@@ -13322,14 +13327,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			/* Configure ADDBA req buffer size to 64 */
 			set_val = HDD_BA_MODE_64;
 
-		sme_set_ba_opmode(mac_handle, link_info->vdev_id,
-				  set_val);
+		sme_set_per_link_ba_mode(mac_handle, set_val);
 
-		ret_val = wma_cli_set_command(link_info->vdev_id,
-					      wmi_vdev_param_set_ba_mode,
-					      set_val, VDEV_CMD);
-		if (ret_val)
-			hdd_err("Failed to set BA operating mode %d", set_val);
 		ret_val = wma_cli_set_command(link_info->vdev_id,
 					      GEN_VDEV_PARAM_AMPDU,
 					      buff_size, GEN_CMD);
@@ -20452,6 +20451,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_COAP_OFFLOAD_COMMANDS
 	FEATURE_ML_LINK_STATE_COMMANDS
 	FEATURE_AFC_VENDOR_COMMANDS
+	FEATURE_LL_LT_SAP_VENDOR_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
@@ -23485,7 +23485,8 @@ static int wlan_add_key_standby_link(struct hdd_adapter *adapter,
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	mlo_link_info = mlo_mgr_get_ap_link_by_link_id(vdev, link_id);
+	mlo_link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx,
+						       link_id);
 	if (!mlo_link_info)
 		return QDF_STATUS_E_FAILURE;
 
@@ -27954,7 +27955,7 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	uint8_t vdev_id;
 	enum phy_ch_width ch_width;
 	enum wlan_phymode peer_phymode;
-	struct hdd_station_ctx *sta_ctx;
+	struct hdd_station_ctx *sta_ctx = NULL;
 	struct ch_params ch_params = {0};
 
 	hdd_enter_dev(wdev->netdev);

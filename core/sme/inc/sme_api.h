@@ -1822,6 +1822,24 @@ QDF_STATUS sme_nss_update_request(uint32_t vdev_id,
 				  uint32_t original_vdev_id,
 				  uint32_t request_id);
 
+/**
+ * sme_sap_update_ch_width() - Update SAP ch_width
+ * @psoc: Psoc object
+ * @vdev_id: the session id
+ * @ch_width: channel width to be updated
+ * @reason: Reason for ch_width update
+ * @conc_vdev_id: Concurrent connection vdev_id that is causing ch_width update
+ * @request_id: request id
+ *
+ * Return: QDF_STATUS_SUCCESS on successful posting
+ */
+QDF_STATUS
+sme_sap_update_ch_width(struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id,
+			enum phy_ch_width ch_width,
+			enum policy_mgr_conn_update_reason reason,
+			uint8_t conc_vdev_id, uint32_t request_id);
+
 QDF_STATUS sme_set_peer_authorized(uint8_t *peer_addr,
 				   uint32_t vdev_id);
 QDF_STATUS sme_soc_set_dual_mac_config(struct policy_mgr_dual_mac_config msg);
@@ -3040,17 +3058,6 @@ int sme_set_auto_rate_ldpc(mac_handle_t mac_handle, uint8_t session_id,
 int sme_set_auto_rate_he_ltf(mac_handle_t mac_handle, uint8_t session_id,
 			     uint8_t cfg_val);
 
-/**
- * sme_set_ba_opmode() - sets the BA op mode
- * @mac_handle: Opaque handle to the global MAC context
- * @session_id: SME session id
- * @cfg_val: BA mode
- *
- * Return: None
- */
-void sme_set_ba_opmode(mac_handle_t mac_handle, uint8_t session_id,
-		       bool cfg_val);
-
 #ifdef WLAN_FEATURE_11BE
 /**
  * sme_update_tgt_eht_cap() - sets the EHT caps to pmac
@@ -3795,6 +3802,15 @@ int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
 int sme_send_vdev_pause_for_bcn_period(mac_handle_t mac_handle,
 				       uint8_t session_id,
 				       uint8_t cfg_val);
+
+/**
+ * sme_set_per_link_ba_mode() - sets BA mode for each STA MLD link
+ * @mac_handle: Opaque handle to the global MAC context
+ * @val: BA mode
+ *
+ * Return: None
+ */
+void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val);
 #else
 static inline void sme_set_eht_testbed_def(mac_handle_t mac_handle,
 					   uint8_t vdev_id)
@@ -3846,6 +3862,10 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    struct qdf_mac_addr active_link_addr[2])
 {
 }
+
+static inline
+void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val)
+{}
 #endif
 
 /**

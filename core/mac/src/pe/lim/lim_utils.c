@@ -3811,26 +3811,39 @@ static void lim_ht_switch_chnl_req(struct pe_session *session)
 	}
 }
 
+uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
+				 struct pe_session *session,
+				 qdf_freq_t chan_freq)
+{
+	uint8_t cb_mode = mac->roam.configParam.channelBondingMode5GHz;
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
+		if (session->force_24ghz_in_ht20) {
+			cb_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
+			pe_debug_rl("vdev %d force 20 Mhz in 2.4 GHz",
+				    session->vdev_id);
+		} else {
+			cb_mode = mac->roam.configParam.channelBondingMode24GHz;
+		}
+	}
+
+	return cb_mode;
+}
+
 void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 						   tDot11fIEHTInfo *pHTInfo,
 						   struct pe_session *pe_session)
 {
 	qdf_freq_t chan_freq;
-	uint32_t self_cb_mode = mac->roam.configParam.channelBondingMode5GHz;
+	uint8_t cb_mode;
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq))
-		self_cb_mode = mac->roam.configParam.channelBondingMode24GHz;
+	cb_mode = lim_get_cb_mode_for_freq(mac, pe_session,
+					   pe_session->curr_op_freq);
 
 	/* If self capability is set to '20Mhz only', then do not change the CB mode. */
-	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) {
-		pe_debug("self_cb_mode 0 for freq %d",
-			 pe_session->curr_op_freq);
-		return;
-	}
-
-	if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) &&
-	    pe_session->force_24ghz_in_ht20) {
-		pe_debug("force_24ghz_in_ht20 is set and channel is 2.4 Ghz");
+	if (cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) {
+		pe_debug_rl("self_cb_mode 0 for freq %d",
+			    pe_session->curr_op_freq);
 		return;
 	}
 
@@ -9338,7 +9351,8 @@ void lim_extract_ml_info(struct pe_session *session,
 
 	ml_link->vdev_id = wlan_vdev_get_id(session->vdev);
 	ml_link->link_id = wlan_vdev_get_link_id(session->vdev);
-	link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev,
+
+	link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev->mlo_dev_ctx,
 						   ml_link->link_id);
 	if (!link_info)
 		return;
@@ -9355,8 +9369,9 @@ void lim_extract_ml_info(struct pe_session *session,
 
 	for (i = 0; i < ml_partner_info->num_partner_links; i++) {
 		link_id = ml_partner_info->partner_link_info[i].link_id;
-		link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev,
-							   link_id);
+		link_info = mlo_mgr_get_ap_link_by_link_id(
+					session->vdev->mlo_dev_ctx,
+					link_id);
 		if (!link_info)
 			continue;
 
@@ -9813,25 +9828,8 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 		!vdev_id) {
 		pe_debug("Broadcast action frame");
 		vdev_id = SME_SESSION_ID_BROADCAST;
-		goto fill_frame;
 	}
 
-	if (frame_type != SIR_MAC_MGMT_ACTION)
-		goto fill_frame;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
-						    WLAN_LEGACY_MAC_ID);
-
-	if (!vdev) {
-		pe_debug("Action frame received with invalid vdev id:%d",
-			 vdev_id);
-		goto fill_frame;
-	}
-
-	wlan_mlo_update_action_frame_to_user(vdev, frame, frame_len);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-
-fill_frame:
 	sme_mgmt_frame->frame_len = frame_len;
 	sme_mgmt_frame->sessionId = vdev_id;
 	sme_mgmt_frame->frameType = frame_type;
@@ -9842,6 +9840,23 @@ fill_frame:
 	qdf_mem_zero(sme_mgmt_frame->frameBuf, frame_len);
 	qdf_mem_copy(sme_mgmt_frame->frameBuf, frame, frame_len);
 
+	if (vdev_id != SME_SESSION_ID_BROADCAST &&
+	    frame_type == SIR_MAC_MGMT_ACTION) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+							    vdev_id,
+							    WLAN_LEGACY_MAC_ID);
+		if (!vdev) {
+			pe_debug("Invalid VDEV %d", vdev_id);
+			goto send_frame;
+		}
+
+		wlan_mlo_update_action_frame_to_user(vdev,
+						     sme_mgmt_frame->frameBuf,
+						     sme_mgmt_frame->frame_len);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
+
+send_frame:
 	if (mac_ctx->mgmt_frame_ind_cb)
 		mac_ctx->mgmt_frame_ind_cb(sme_mgmt_frame);
 	else
@@ -9963,8 +9978,26 @@ void lim_process_ap_ecsa_timeout(void *data)
 
 	mac_ctx = session->mac_ctx;
 
-	if (!session->dfsIncludeChanSwIe) {
-		pe_debug("session->dfsIncludeChanSwIe not set");
+	if (!session->dfsIncludeChanSwIe &&
+	    !session->bw_update_include_ch_sw_ie) {
+		pe_debug("session->dfsIncludeChanSwIe/chWidthUpdateIncludeChanSwIe not set");
+		return;
+	}
+
+	if (session->bw_update_include_ch_sw_ie) {
+		/* Stop the timer if already running */
+		qdf_mc_timer_stop(&session->ap_ecsa_timer);
+
+		lim_nss_or_ch_width_update_rsp(mac_ctx,
+					       session->vdev_id,
+					       QDF_STATUS_SUCCESS,
+					       REASON_CH_WIDTH_UPDATE);
+		session->gLimChannelSwitch.switchCount = 0;
+		session->bw_update_include_ch_sw_ie = false;
+
+		/* Clear CSA IE count and update beacon */
+		lim_send_dfs_chan_sw_ie_update(mac_ctx, session);
+
 		return;
 	}
 
@@ -11054,6 +11087,14 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 							&ch_params,
 							REG_CURRENT_PWR_MODE);
 		lim_update_ap_he_op(session, &ch_params);
+
+		wlan_mlme_set_ap_oper_ch_width(session->vdev,
+					       session->ch_width);
+		if (session->ch_width == CH_WIDTH_320MHZ &&
+		    policy_mgr_is_conn_lead_to_dbs_sbs(mac->psoc,
+						       session->curr_op_freq))
+			wlan_mlme_set_ap_oper_ch_width(session->vdev,
+						       CH_WIDTH_160MHZ);
 	}
 	mlme_obj->mgmt.generic.maxregpower = session->maxTxPower;
 	mlme_obj->proto.generic.beacon_interval =
@@ -11184,10 +11225,8 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 	enum phy_ch_width oper_mode;
 	enum phy_ch_width fw_vht_ch_wd;
 
-	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
-		cb_mode = mac_ctx->roam.configParam.channelBondingMode24GHz;
-	else
-		cb_mode = mac_ctx->roam.configParam.channelBondingMode5GHz;
+	cb_mode = lim_get_cb_mode_for_freq(mac_ctx, session,
+					   session->curr_op_freq);
 	/*
 	 * Do not update the channel bonding mode if channel bonding
 	 * mode is disabled in INI.

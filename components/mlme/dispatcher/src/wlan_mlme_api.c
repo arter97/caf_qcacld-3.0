@@ -37,6 +37,7 @@
 #include "target_if.h"
 #include "wlan_vdev_mgr_tgt_if_tx_api.h"
 #include "wmi_unified_vdev_api.h"
+#include "wlan_mlme_api.h"
 #include "../../core/src/wlan_cp_stats_defs.h"
 
 /* quota in milliseconds */
@@ -1280,6 +1281,22 @@ QDF_STATUS mlme_update_tgt_mlo_caps_in_cfg(struct wlan_objmgr_psoc *psoc)
 	return status;
 }
 
+uint8_t wlan_mlme_convert_phy_ch_width_to_eht_op_bw(enum phy_ch_width ch_width)
+{
+	switch (ch_width) {
+	case CH_WIDTH_320MHZ:
+		return WLAN_EHT_CHWIDTH_320;
+	case CH_WIDTH_160MHZ:
+		return WLAN_EHT_CHWIDTH_160;
+	case CH_WIDTH_80MHZ:
+		return WLAN_EHT_CHWIDTH_80;
+	case CH_WIDTH_40MHZ:
+		return WLAN_EHT_CHWIDTH_40;
+	default:
+		return WLAN_EHT_CHWIDTH_20;
+	}
+}
+
 enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						uint8_t channel_width)
 {
@@ -1403,7 +1420,7 @@ uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc)
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
-		return false;
+		return 0;
 
 	return mlme_obj->cfg.sta.mlo_max_simultaneous_links;
 }
@@ -1430,7 +1447,7 @@ uint8_t wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc)
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
-		return false;
+		return 0;
 
 	return mlme_obj->cfg.sta.mlo_support_link_num;
 }
@@ -1470,6 +1487,72 @@ QDF_STATUS wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_objmgr_vdev *vdev;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev)
+		return;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		mlme_legacy_debug("not mlo vdev");
+		goto release_ref;
+	}
+
+	if (!vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->sta_ctx) {
+		mlme_legacy_debug("mlo dev/sta ctx is null");
+		goto release_ref;
+	}
+
+	vdev->mlo_dev_ctx->sta_ctx->ml_link_control_mode = value;
+	mlme_legacy_debug("set ml_link_control_mode %d", value);
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+	return;
+}
+
+uint8_t wlan_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t value = 0;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return 0;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev)
+		return 0;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		mlme_legacy_debug("not mlo vdev");
+		goto release_ref;
+	}
+
+	if (!vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->sta_ctx) {
+		mlme_legacy_debug("mlo dev/sta ctx is null");
+		goto release_ref;
+	}
+
+	value = vdev->mlo_dev_ctx->sta_ctx->ml_link_control_mode;
+	mlme_legacy_debug("get ml_link_control_mode %d", value);
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+	return value;
+}
+
 void wlan_mlme_restore_user_set_link_num(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -1504,7 +1587,7 @@ uint8_t wlan_mlme_get_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc)
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
-		return false;
+		return 0;
 
 	return mlme_obj->cfg.sta.mlo_support_link_band;
 }
@@ -5442,6 +5525,88 @@ wlan_mlme_get_self_bss_roam(struct wlan_objmgr_psoc *psoc,
 #endif
 
 QDF_STATUS
+wlan_mlme_get_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
+				      struct peer_oper_mode_event *data)
+{
+	struct wlan_objmgr_peer *peer;
+	struct peer_mlme_priv_obj *peer_priv;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!data) {
+		mlme_err("Data params is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, data->peer_mac_address.bytes,
+					   WLAN_MLME_NB_ID);
+	if (!peer) {
+		mlme_err("peer not found for mac: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(data->peer_mac_address.bytes));
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_MLME);
+	if (!peer_priv) {
+		mlme_err("peer priv not found for mac: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(peer->macaddr));
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto done;
+	}
+
+	if (peer_priv->peer_ind_bw == CH_WIDTH_INVALID) {
+		status = QDF_STATUS_E_INVAL;
+		goto done;
+	}
+
+	data->new_bw = peer_priv->peer_ind_bw;
+
+done:
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
+
+	return status;
+}
+
+QDF_STATUS
+wlan_mlme_set_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
+				      struct peer_oper_mode_event *data)
+{
+	struct wlan_objmgr_peer *peer;
+	struct peer_mlme_priv_obj *peer_priv;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!data) {
+		mlme_err("Data params is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, data->peer_mac_address.bytes,
+					   WLAN_MLME_NB_ID);
+	if (!peer) {
+		mlme_err("peer not found for mac: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(data->peer_mac_address.bytes));
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_MLME);
+	if (!peer_priv) {
+		mlme_err("peer priv not found for mac: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(peer->macaddr));
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto done;
+	}
+
+	peer_priv->peer_ind_bw =
+			target_if_wmi_chan_width_to_phy_ch_width(data->new_bw);
+
+done:
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
+
+	return status;
+}
+
+QDF_STATUS
 wlan_mlme_set_ft_over_ds(struct wlan_objmgr_psoc *psoc,
 			 uint8_t ft_over_ds_enable)
 {
@@ -6195,17 +6360,6 @@ bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc)
 		return true;
 
 	return false;
-}
-
-bool wlan_mlme_is_local_tpe_pref(struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj)
-		return false;
-
-	return mlme_obj->cfg.power.use_local_tpe;
 }
 
 bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc)
@@ -7048,7 +7202,8 @@ wlan_mlme_update_vdev_chwidth_with_notify(struct wlan_objmgr_psoc *psoc,
 
 static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 					    uint8_t vdev_id,
-					    enum phy_ch_width ch_width)
+					    enum phy_ch_width ch_width,
+					    qdf_freq_t sec_2g_freq)
 {
 	struct wlan_channel *des_chan;
 	struct wlan_channel *bss_chan;
@@ -7075,7 +7230,7 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	curr_op_freq = des_chan->ch_freq;
 
 	wlan_reg_set_channel_params_for_pwrmode(pdev, curr_op_freq,
-						0, &ch_params,
+						sec_2g_freq, &ch_params,
 						REG_CURRENT_PWR_MODE);
 
 	des_chan->ch_width = ch_width;
@@ -7297,6 +7452,7 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	enum phy_ch_width associated_ch_width;
 	struct wlan_channel *des_chan;
 	struct mlme_legacy_priv *mlme_priv;
+	qdf_freq_t sec_2g_freq = 0;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
@@ -7305,12 +7461,6 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
 		return QDF_STATUS_E_INVAL;
-
-	if (wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq)) {
-		mlme_debug("vdev %d: CW:%d update not supported for freq:%d",
-			   vdev_id, ch_width, des_chan->ch_freq);
-		return QDF_STATUS_E_NOSUPPORT;
-	}
 
 	associated_ch_width =
 		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
@@ -7321,8 +7471,22 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq)) {
+		if (ch_width == CH_WIDTH_40MHZ &&
+		    mlme_priv->connect_info.assoc_chan_info.sec_2g_freq) {
+			sec_2g_freq =
+			mlme_priv->connect_info.assoc_chan_info.sec_2g_freq;
+		} else if (ch_width != CH_WIDTH_20MHZ) {
+			mlme_debug("vdev %d: CW:%d update not supported for freq:%d sec_2g_freq %d",
+				   vdev_id, ch_width, des_chan->ch_freq,
+				   mlme_priv->connect_info.assoc_chan_info.sec_2g_freq);
+			return QDF_STATUS_E_NOSUPPORT;
+		}
+	}
+
 	/* update ch width to internal host structure */
-	status = wlan_mlme_update_ch_width(vdev, vdev_id, ch_width);
+	status = wlan_mlme_update_ch_width(vdev, vdev_id, ch_width,
+					   sec_2g_freq);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("vdev %d: Failed to update CW:%d to host, status:%d",
 			 vdev_id, ch_width, status);
@@ -7626,4 +7790,56 @@ wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 err:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 	return status;
+}
+
+uint32_t
+wlan_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
+{
+	uint32_t set_value;
+
+	if (wma_get_fw_wlan_feat_caps(DOT11AX))
+		set_value = ASSEMBLE_RATECODE_V1(preamble, nss, rate);
+	else
+		set_value = (preamble << 6) | (nss << 4) | rate;
+
+	return set_value;
+}
+
+QDF_STATUS
+wlan_mlme_set_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev,
+			       enum phy_ch_width ch_width)
+
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev %d legacy private object is NULL",
+				wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->mlme_ap.oper_ch_width = ch_width;
+	mlme_debug("SAP oper ch_width: %d, vdev %d",
+		   mlme_priv->mlme_ap.oper_ch_width, wlan_vdev_get_id(vdev));
+
+	return QDF_STATUS_SUCCESS;
+}
+
+enum phy_ch_width
+wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev %d legacy private object is NULL",
+				wlan_vdev_get_id(vdev));
+		return CH_WIDTH_INVALID;
+	}
+
+	mlme_debug("SAP oper ch_width: %d, vdev %d",
+		   mlme_priv->mlme_ap.oper_ch_width, wlan_vdev_get_id(vdev));
+
+	return mlme_priv->mlme_ap.oper_ch_width;
 }

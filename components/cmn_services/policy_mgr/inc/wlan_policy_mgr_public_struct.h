@@ -1163,6 +1163,8 @@ enum policy_mgr_three_connection_mode {
  * @PM_DBS2_DOWNGRADE: downgrade 5G beaconing entity to 1x1 and switch to DBS2.
  * @PM_UPGRADE_5G: upgrade 5g beaconing entity to 2x2.
  * @PM_UPGRADE_2G: upgrade 2g beaconing entity to 2x2.
+ * @PM_DOWNGRADE_BW: Downgrade SAP bandwidth.
+ * @PM_UPGRADE_BW: Upgrade SAP bandwidth.
  * @PM_MAX_CONC_NEXT_ACTION: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -1185,6 +1187,8 @@ enum policy_mgr_conc_next_action {
 	PM_DBS2_DOWNGRADE,
 	PM_UPGRADE_5G,
 	PM_UPGRADE_2G,
+	PM_DOWNGRADE_BW,
+	PM_UPGRADE_BW,
 
 	PM_MAX_CONC_NEXT_ACTION
 };
@@ -1224,8 +1228,9 @@ enum policy_mgr_band {
  *        to the other DBS mode. This reason code indicates such condition.
  * @POLICY_MGR_UPDATE_REASON_NAN_DISCOVERY: NAN Discovery related
  * @POLICY_MGR_UPDATE_REASON_NDP_UPDATE: NAN Datapath related update
- * @POLICY_MGR_UPDATE_REASON_LFR2_ROAM: Roaming
+ * @POLICY_MGR_UPDATE_REASON_LFR2_ROAM: LFR2 Roaming
  * @POLICY_MGR_UPDATE_REASON_STA_CONNECT: STA/CLI connection to peer
+ * @POLICY_MGR_UPDATE_REASON_LFR3_ROAM: LFR3 Roaming
  */
 enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN,
@@ -1242,6 +1247,7 @@ enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_NDP_UPDATE,
 	POLICY_MGR_UPDATE_REASON_LFR2_ROAM,
 	POLICY_MGR_UPDATE_REASON_STA_CONNECT,
+	POLICY_MGR_UPDATE_REASON_LFR3_ROAM,
 };
 
 /**
@@ -1560,6 +1566,8 @@ struct policy_mgr_freq_range {
  * @MODE_SBS_UPPER_SHARE:   Higher 5Ghz shared with 2.4Ghz
  * @MODE_SBS_LOWER_SHARE:   LOWER 5Ghz shared with 2.4Ghz
  * @MODE_EMLSR:             eMLSR mode
+ * @MODE_EMLSR_SINGLE:	    eMLSR split mode
+ * @MODE_EMLSR_SPLIT:	    eMLSR split mode
  * @MODE_HW_MAX: MAX
  */
 enum policy_mgr_mode {
@@ -1569,6 +1577,8 @@ enum policy_mgr_mode {
 	MODE_SBS_UPPER_SHARE,
 	MODE_SBS_LOWER_SHARE,
 	MODE_EMLSR,
+	MODE_EMLSR_SINGLE,
+	MODE_EMLSR_SPLIT,
 	MODE_HW_MAX,
 };
 

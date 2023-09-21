@@ -91,6 +91,7 @@ static void lim_add_mgmt_seq_num(struct mac_context *mac, tpSirMacMgmtHdr pMacHd
 	pMacHdr->seqControl.seqNumLo = (mac->mgmtSeqNum & LOW_SEQ_NUM_MASK);
 	pMacHdr->seqControl.seqNumHi =
 		((mac->mgmtSeqNum & HIGH_SEQ_NUM_MASK) >> HIGH_SEQ_NUM_OFFSET);
+	pMacHdr->seqControl.fragNum = 0;
 }
 
 /**
@@ -141,9 +142,9 @@ void lim_populate_mac_header(struct mac_context *mac_ctx, uint8_t *buf,
 
 	/* Prepare sequence number */
 	lim_add_mgmt_seq_num(mac_ctx, mac_hdr);
-	pe_debug("seqNumLo=%d, seqNumHi=%d, mgmtSeqNum=%d",
-		mac_hdr->seqControl.seqNumLo,
-		mac_hdr->seqControl.seqNumHi, mac_ctx->mgmtSeqNum);
+	pe_debug("seqNumLo=%d, seqNumHi=%d, mgmtSeqNum=%d, fragNum=%d",
+		 mac_hdr->seqControl.seqNumLo, mac_hdr->seqControl.seqNumHi,
+		 mac_ctx->mgmtSeqNum, mac_hdr->seqControl.fragNum);
 }
 
 /**
@@ -3411,7 +3412,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 	enum rateid min_rid = RATEID_DEFAULT;
 	uint16_t ch_freq_tx_frame = 0;
 	int8_t peer_rssi = 0;
-	uint8_t *mlo_ie_buf;
+	uint8_t *mlo_ie_buf = NULL;
 	uint32_t mlo_ie_len = 0;
 
 	if (!session) {
@@ -5094,6 +5095,10 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 			 frm.WiderBWChanSwitchAnn.newCenterChanFreq0,
 			 frm.WiderBWChanSwitchAnn.newCenterChanFreq1);
 	}
+
+	if (lim_is_session_eht_capable(session_entry))
+		populate_dot11f_bw_ind_element(mac_ctx, session_entry,
+					       &frm.bw_ind_element);
 
 	status = dot11f_get_packed_ext_channel_switch_action_frame_size(mac_ctx,
 							    &frm, &n_payload);

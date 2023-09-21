@@ -2678,13 +2678,13 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		return;
 	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(mac_ctx->psoc,
 						WLAN_SOC_CEXT_CSA_TX_OFFLOAD);
-	if (session->dfsIncludeChanSwIe && !csa_tx_offload &&
-	    ((session->gLimChannelSwitch.switchCount ==
-	      mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
-	     (session->gLimChannelSwitch.switchCount == 1) ||
-	     is_sap_go_moved_before_sta))
+	if ((session->dfsIncludeChanSwIe && !csa_tx_offload &&
+	     ((session->gLimChannelSwitch.switchCount ==
+	       mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
+	      (session->gLimChannelSwitch.switchCount == 1) ||
+	      is_sap_go_moved_before_sta)) ||
+	     session->bw_update_include_ch_sw_ie)
 		lim_process_ap_ecsa_timeout(session);
-
 
 	if (session->gLimOperatingMode.present)
 		/* Done with nss update */
@@ -2693,4 +2693,36 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 	lim_handle_bss_color_change_ie(mac_ctx, session);
 
 	return;
+}
+
+void lim_nss_or_ch_width_update_rsp(struct mac_context *mac_ctx,
+				    uint8_t vdev_id, QDF_STATUS status,
+				    enum sir_bcn_update_reason reason)
+{
+	struct scheduler_msg msg = {0};
+	struct sir_bcn_update_rsp *rsp;
+	QDF_STATUS qdf_status = QDF_STATUS_E_INVAL;
+
+	rsp = qdf_mem_malloc(sizeof(*rsp));
+	if (!rsp)
+		return;
+
+	rsp->vdev_id = vdev_id;
+	rsp->status = status;
+	rsp->reason = reason;
+
+	if (rsp->reason == REASON_NSS_UPDATE)
+		msg.type = eWNI_SME_NSS_UPDATE_RSP;
+	else if (rsp->reason == REASON_CH_WIDTH_UPDATE)
+		msg.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
+	else
+		goto done;
+
+	msg.bodyptr = rsp;
+	msg.bodyval = 0;
+	qdf_status = scheduler_post_message(QDF_MODULE_ID_PE, QDF_MODULE_ID_SME,
+					    QDF_MODULE_ID_SME, &msg);
+done:
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		qdf_mem_free(rsp);
 }

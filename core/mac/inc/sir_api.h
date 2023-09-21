@@ -3808,6 +3808,20 @@ struct sir_nss_update_request {
 };
 
 /**
+ * struct sir_sap_ch_width_update
+ * @msgType: ch_width update msg type
+ * @msgLen: length of the msg
+ * @ch_width: channel width
+ * @vdev_id: vdev id
+ */
+struct sir_sap_ch_width_update {
+	uint16_t msgType;
+	uint16_t msgLen;
+	enum phy_ch_width ch_width;
+	uint32_t vdev_id;
+};
+
+/**
  * enum sir_bcn_update_reason: bcn update reason
  * @REASON_DEFAULT: reason default
  * @REASON_NSS_UPDATE: If NSS is updated
@@ -3827,6 +3841,7 @@ enum sir_bcn_update_reason {
 	REASON_CHANNEL_SWITCH = 5,
 	REASON_MLO_IE_UPDATE = 6,
 	REASON_RNR_UPDATE = 7,
+	REASON_CH_WIDTH_UPDATE = 8,
 };
 
 /**

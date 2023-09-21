@@ -109,6 +109,7 @@
 
 #define MAX_WAIT_FOR_BCN_TX_COMPLETE 4000
 #define MAX_WAKELOCK_FOR_CSA         5000
+#define MAX_WAIT_FOR_CH_WIDTH_UPDATE_COMPLETE 200
 
 #ifdef WLAN_FEATURE_11BE
 #define MAX_NUM_PWR_LEVELS 16
@@ -461,6 +462,18 @@ void lim_decide_sta_protection(struct mac_context *mac,
 void lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 		tpSchBeaconStruct pBeaconStruct,
 		struct pe_session *pe_session);
+
+/**
+ * lim_get_cb_mode_for_freq() - Get cb mode depending on the freq
+ * @mac: pointer to Global MAC structure
+ * @pe_session: pe session
+ * @chan_freq: Freq to get cb mode for
+ *
+ * Return: cb mode allowed for the freq
+ */
+uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
+				 struct pe_session *session,
+				 qdf_freq_t chan_freq);
 
 /**
  * lim_update_sta_run_time_ht_switch_chnl_params() - Process change in HT

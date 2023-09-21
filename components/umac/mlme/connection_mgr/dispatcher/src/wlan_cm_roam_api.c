@@ -3239,7 +3239,7 @@ cm_roam_stats_print_scan_info(struct wlan_objmgr_psoc *psoc,
  * @trigger: roam trigger information
  * @res:     Roam result structure pointer
  * @scan_data: scan data
- * @vdev_id: Vdev id
+ * @vdev_id: vdev id
  *
  * Print roam result and failure reason if roaming failed.
  *
@@ -3403,15 +3403,18 @@ cm_get_frame_subtype_str(enum mgmt_subtype frame_subtype)
 #define WLAN_SAE_AUTH_ALGO 3
 static void
 cm_roam_print_frame_info(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev,
 			 struct roam_frame_stats *frame_data,
-			 struct wmi_roam_scan_data *scan_data, uint8_t vdev_id)
+			 struct wmi_roam_scan_data *scan_data)
 {
 	struct roam_frame_info *frame_info;
 	char time[TIME_STRING_LEN];
-	uint8_t i;
+	uint8_t i, vdev_id;
 
 	if (!frame_data->num_frame)
 		return;
+
+	vdev_id = wlan_vdev_get_id(vdev);
 
 	for (i = 0; i < frame_data->num_frame; i++) {
 		frame_info = &frame_data->frame_info[i];
@@ -3438,7 +3441,7 @@ cm_roam_print_frame_info(struct wlan_objmgr_psoc *psoc,
 				       frame_info->status_code,
 				       frame_info->seq_num);
 
-		cm_roam_mgmt_frame_event(frame_info, scan_data, vdev_id);
+		cm_roam_mgmt_frame_event(vdev, frame_info, scan_data);
 	}
 }
 
@@ -3524,10 +3527,19 @@ cm_roam_handle_btm_stats(struct wlan_objmgr_psoc *psoc,
 			 uint8_t *rem_tlv_len)
 {
 	bool log_btm_frames_only = false;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (stats_info->data_11kv[i].present)
 		cm_roam_stats_print_11kv_info(psoc, &stats_info->data_11kv[i],
 					      stats_info->vdev_id);
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    stats_info->vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev: %d vdev not found", stats_info->vdev_id);
+		return;
+	}
 
 	/*
 	 * If roam trigger is BTM and roam scan type is no scan then
@@ -3562,17 +3574,21 @@ cm_roam_handle_btm_stats(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (stats_info->result[i].present)
-		cm_roam_stats_print_roam_result(psoc, &stats_info->trigger[i],
+		cm_roam_stats_print_roam_result(psoc,
+						&stats_info->trigger[i],
 						&stats_info->result[i],
 						&stats_info->scan[i],
 						stats_info->vdev_id);
 
 	if (stats_info->frame_stats[i].num_frame)
-		cm_roam_print_frame_info(psoc, &stats_info->frame_stats[i],
-					 &stats_info->scan[i],
-					 stats_info->vdev_id);
+		cm_roam_print_frame_info(psoc, vdev,
+					 &stats_info->frame_stats[i],
+					 &stats_info->scan[i]);
 
 log_btm_frames_only:
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
 	/*
 	 * Print BTM resp TLV info (wmi_roam_btm_response_info) only
 	 * when trigger reason is BTM or WTC_BTM. As for other roam
@@ -4076,6 +4092,57 @@ wlan_cm_clear_current_roam_stats_info(struct mlme_legacy_priv *mlme_priv)
 }
 
 /**
+ * wlan_cm_update_roam_bssid() - API to get roam stats AP BSSID
+ * @mlme_priv: Pointer to Pointer to vdev mlme legacy priv struct
+ * @scan: Scan data from target_if wmi event
+ *
+ * get AP BSSID from roam stats info which keep in scan data.
+ *
+ * Return: void
+ */
+static void
+wlan_cm_update_roam_bssid(struct mlme_legacy_priv *mlme_priv,
+			  struct wmi_roam_scan_data *scan)
+{
+	struct enhance_roam_info *info;
+	int16_t i;
+	uint16_t index, scan_ap_idx;
+	struct wmi_roam_candidate_info *ap = NULL;
+
+	if (scan->num_ap == 0)
+		return;
+
+	scan_ap_idx = scan->num_ap - 1;
+	ap = &scan->ap[scan_ap_idx];
+
+	index = mlme_priv->roam_write_index;
+	info = &mlme_priv->roam_info[index];
+
+	/* For roam failed, we may get candidate ap list, and only
+	 * fetch the last candidate AP bssid.
+	 */
+
+	for (i = scan_ap_idx; i >= 0; i--) {
+		if (ap->type == WLAN_ROAM_SCAN_CURRENT_AP)
+			qdf_mem_copy(info->scan.original_bssid.bytes,
+				     ap->bssid.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		else if (ap->type == WLAN_ROAM_SCAN_CANDIDATE_AP &&
+			 qdf_is_macaddr_zero(&info->scan.candidate_bssid))
+			qdf_mem_copy(info->scan.candidate_bssid.bytes,
+				     ap->bssid.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		else if (ap->type == WLAN_ROAM_SCAN_ROAMED_AP)
+			qdf_mem_copy(info->scan.roamed_bssid.bytes,
+				     ap->bssid.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		else
+			mlme_debug("unknown type:%u of AP", ap->type);
+		ap--;
+	}
+}
+
+/**
  * wlan_cm_update_roam_stats_info() - API to update roam stats info
  * @psoc:    Pointer to psoc
  * @stats_info:  Roam stats event
@@ -4131,6 +4198,9 @@ wlan_cm_update_roam_stats_info(struct wlan_objmgr_psoc *psoc,
 		if (stats_info->frame_stats[index].num_frame)
 			wlan_cm_update_roam_frame_info(mlme_priv,
 						       &stats_info->frame_stats[index]);
+		if (stats_info->scan[index].present)
+			wlan_cm_update_roam_bssid(mlme_priv,
+						  &stats_info->scan[index]);
 
 		mlme_priv->roam_write_index += 1;
 		if (mlme_priv->roam_write_index == mlme_priv->roam_cache_num)
@@ -4234,9 +4304,17 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 	uint8_t i, rem_tlv = 0;
 	bool is_wtc = false;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!stats_info)
 		return QDF_STATUS_E_FAILURE;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, stats_info->vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
 
 	for (i = 0; i < stats_info->num_tlv; i++) {
 		if (stats_info->trigger[i].present) {
@@ -4274,9 +4352,9 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 
 		if (stats_info->frame_stats[i].num_frame)
 			cm_roam_print_frame_info(psoc,
+						 vdev,
 						 &stats_info->frame_stats[i],
-						 &stats_info->scan[i],
-						 stats_info->vdev_id);
+						 &stats_info->scan[i]);
 
 		wlan_cm_update_roam_stats_info(psoc, stats_info, i);
 
@@ -4314,6 +4392,8 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 					ROAM_RT_STATS_TYPE_ROAM_SCAN_INFO,
 					stats_info, 0, i, 0);
 	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	if (!stats_info->num_tlv) {
 		/*
@@ -4376,6 +4456,7 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
+out:
 	wlan_clear_sae_auth_logs_cache(psoc, stats_info->vdev_id);
 	qdf_mem_free(stats_info->roam_msg_info);
 	qdf_mem_free(stats_info);

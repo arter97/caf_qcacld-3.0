@@ -661,7 +661,8 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		WLAN_REG_IS_6GHZ_CHAN_FREQ
 			(session->gLimChannelSwitch.sw_target_freq);
 	if (session->limSystemRole == eLIM_AP_ROLE &&
-	    session->dfsIncludeChanSwIe == true) {
+	    (session->dfsIncludeChanSwIe == true ||
+	     session->bw_update_include_ch_sw_ie == true)) {
 		if (!CHAN_HOP_ALL_BANDS_ENABLE ||
 		    session->lim_non_ecsa_cap_num == 0 || is_6ghz_chsw) {
 			tDot11fIEext_chan_switch_ann *ext_csa =
@@ -674,6 +675,13 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 				 ext_csa->new_reg_class,
 				 ext_csa->new_channel,
 				 ext_csa->switch_count);
+
+			if (lim_is_session_eht_capable(session)) {
+				bcn_2->ChannelSwitchWrapper.present = 1;
+				populate_dot11f_bw_ind_element(mac_ctx,
+						session,
+				&bcn_2->ChannelSwitchWrapper.bw_ind_element);
+			}
 		}
 
 		if (session->lim_non_ecsa_cap_num &&

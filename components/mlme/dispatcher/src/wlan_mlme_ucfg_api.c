@@ -128,6 +128,19 @@ QDF_STATUS ucfg_mlme_pdev_close(struct wlan_objmgr_pdev *pdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+void ucfg_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value)
+{
+	wlan_mlme_set_ml_link_control_mode(psoc, vdev_id, value);
+}
+
+uint8_t ucfg_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	return wlan_mlme_get_ml_link_control_mode(psoc, vdev_id);
+}
+
+
 /**
  * ucfg_mlme_convert_power_cfg_chan_to_freq() - converts channel numbers to
  * frequencies and copies the triplets to power_freq_data array

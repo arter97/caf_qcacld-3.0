@@ -257,7 +257,7 @@ __wlan_hdd_enter_sap_low_pwr_mode(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	hdd_debug("Cookie id received : %u", cookie_id);
+	hdd_debug("Cookie id received : %llu", cookie_id);
 
 	len = NLMSG_HDRLEN;
 	/*QCA_WLAN_VENDOR_ATTR_DOZED_AP_COOKIE*/
@@ -361,7 +361,7 @@ QDF_STATUS wlan_hdd_send_green_ap_ll_ps_event(
 		goto nla_put_failure;
 	}
 
-	hdd_debug("next_tsf : %llu, cookie: %llu beacon multiplier: %u",
+	hdd_debug("next_tsf : %llu, cookie: %u beacon multiplier: %u",
 		  ll_ps_param->next_tsf, ll_ps_param->dialog_token,
 		  ll_ps_param->bcn_mult);
 

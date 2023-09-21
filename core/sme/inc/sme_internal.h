@@ -62,6 +62,7 @@ typedef enum eSmeCommandType {
 	e_sme_command_nss_update,
 	e_sme_command_set_dual_mac_config,
 	e_sme_command_set_antenna_mode,
+	e_sme_command_sap_ch_width_update,
 } eSmeCommandType;
 
 typedef enum eSmeState {

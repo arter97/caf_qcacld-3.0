@@ -81,6 +81,30 @@ void ucfg_mlme_psoc_close(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS ucfg_mlme_pdev_open(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * ucfg_mlme_set_ml_link_control_mode() - set ml_link_control_mode
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ * @value: value to set
+ *
+ * API get call when host receives vendor command
+ * QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE to configure link control mode.
+ *
+ * Return: none
+ */
+void ucfg_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value);
+
+/**
+ * ucfg_mlme_get_ml_link_control_mode() - get ml_link_control_mode
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ *
+ * Return: value of ml_link_control_mode in success
+ */
+uint8_t ucfg_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
+
+/**
  * ucfg_mlme_pdev_close() - MLME component pdev close
  * @pdev: pointer to pdev object
  *
@@ -5288,5 +5312,22 @@ QDF_STATUS ucfg_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc,
 				      uint8_t ulmu_disable)
 {
 	return wlan_mlme_set_ul_mu_config(psoc, vdev_id, ulmu_disable);
+}
+
+/**
+ * ucfg_mlme_assemble_rate_code - assemble rate code to be sent to FW
+ * @preamble: rate preamble
+ * @nss: number of spatial streams
+ * @rate: rate index
+ *
+ * Rate code assembling is different for targets which are 11ax capable.
+ * Check for the target support and assemble the rate code accordingly.
+ *
+ * Return: assembled rate code
+ */
+static inline uint32_t
+ucfg_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
+{
+	return wlan_mlme_assemble_rate_code(preamble, nss, rate);
 }
 #endif /* _WLAN_MLME_UCFG_API_H_ */

@@ -530,6 +530,7 @@ struct wlan_diag_bcn_rpt {
 } qdf_packed;
 
 #define DIAG_ROAM_CAND_VERSION 1
+#define DIAG_ROAM_CAND_VERSION_V2 2
 
 /**
  * struct wlan_diag_roam_candidate_info  - Roam candidate information for
@@ -1184,6 +1185,43 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag);
 
+/**
+ * wlan_populate_vsie() - Populate VSIE field for logging
+ * @vdev: vdev pointer
+ * @data: Diag packet info data
+ * @is_tx: flag to indicate whether packet transmitted or received
+ *
+ * Return: None
+ */
+void
+wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
+		   struct wlan_diag_packet_info *data, bool is_tx);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_connectivity_mlo_setup_event() - Fill and send MLO setup data
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_convert_freq_to_diag_band() - API to convert frequency to band value
+ * mentioned in enum wlan_diag_wifi_band
+ * @ch_freq: Frequency(in MHz)
+ *
+ * Return: Band specified in enum wlan_diag_wifi_band
+ */
+enum wlan_diag_wifi_band
+wlan_convert_freq_to_diag_band(uint16_t ch_freq);
+
+#else
+static inline
+void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
 static inline void wlan_connectivity_logging_stop(void)
 {}
 
@@ -1266,6 +1304,18 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     enum wlan_main_tag tag);
 
 /**
+ * wlan_populate_vsie() - Populate VSIE field for logging
+ * @vdev: vdev pointer
+ * @data: Diag packet info data
+ * @is_tx: Flag to indicate whether the packet is transmitted or received
+ *
+ * Return: None
+ */
+void
+wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
+		   struct wlan_diag_packet_info *data, bool is_tx);
+
+/**
  * wlan_connectivity_sta_info_event() - APi to send STA info event
  * @psoc: Pointer to global psoc object
  * @vdev_id: Vdev id
@@ -1304,6 +1354,13 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag)
 {}
+
+static inline void
+wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
+		   struct wlan_diag_packet_info *data, bool is_tx)
+{
+}
+
 static inline void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id)

@@ -1068,8 +1068,16 @@ QDF_STATUS hdd_chan_change_notify(struct wlan_hdd_link_info *link_info,
 		dev = assoc_adapter->dev;
 	}
 
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		mutex_lock(&dev->ieee80211_ptr->mtx);
+
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id,
 				       puncture_bitmap);
+
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		mutex_unlock(&dev->ieee80211_ptr->mtx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4369,6 +4377,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 	/* rcpi info initialization */
 	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
 
+	hdd_tsf_auto_report_init(adapter);
 	hdd_exit();
 
 	return status;
@@ -7316,8 +7325,7 @@ static uint16_t hdd_get_data_rate_from_rate_mask(struct wiphy *wiphy,
 		sband_bitrates = sband->bitrates;
 		sband_n_bitrates = sband->n_bitrates;
 		for (i = 0; i < sband_n_bitrates; i++) {
-			if (bit_rate_mask->control[band].legacy ==
-			    sband_bitrates[i].hw_value)
+			if (bit_rate_mask->control[band].legacy == (1 << i))
 				return sband_bitrates[i].bitrate;
 		}
 	}

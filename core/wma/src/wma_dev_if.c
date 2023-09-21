@@ -1353,16 +1353,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 							    iface->mac_id, rsp);
 	}
 
-	if (iface->type == WMI_VDEV_TYPE_STA &&
-	    rsp->resp_type == WMI_VDEV_START_RESP_EVENT) {
-		wma_debug("BA mode: %d", mac_ctx->ba_mode);
-		if (wma_cli_set_command(rsp->vdev_id,
-					wmi_vdev_param_set_ba_mode,
-					mac_ctx->ba_mode, VDEV_CMD))
-			wma_err("Set BA opmode failed for vdev: %d",
-				rsp->vdev_id);
-	}
-
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	if (rsp->status == QDF_STATUS_SUCCESS
 		&& mac_ctx->sap.sap_channel_avoidance)
@@ -3223,6 +3213,33 @@ enum mlme_bcn_tx_rate_code wma_get_bcn_rate_code(uint16_t rate)
 	}
 }
 
+#ifdef WLAN_BCN_RATECODE_ENABLE
+/**
+ * wma_update_beacon_tx_rate_code() - Update bcn_tx_rate_code
+ * @mlme_obj: pointer to mlme object
+ *
+ * Return: none
+ */
+static void  wma_update_beacon_tx_rate_code(struct vdev_mlme_obj *mlme_obj)
+{
+	uint8_t preamble, nss, rix;
+	uint32_t rate_code;
+
+	rate_code = mlme_obj->mgmt.rate_info.bcn_tx_rate;
+
+	rix = rate_code & RATECODE_V1_RIX_MASK;
+	nss = (rate_code >> RATECODE_V1_NSS_OFFSET) & RATECODE_V1_NSS_MASK;
+	preamble = rate_code >> RATECODE_V1_PREAMBLE_OFFSET;
+
+	mlme_obj->mgmt.rate_info.bcn_tx_rate_code =
+		wlan_mlme_assemble_rate_code(preamble, nss, rix);
+}
+#else
+static void wma_update_beacon_tx_rate_code(struct vdev_mlme_obj *mlme_obj)
+{
+}
+#endif
+
 QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -3313,6 +3330,7 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 		 */
 		mlme_obj->mgmt.rate_info.bcn_tx_rate =
 		wma_get_bcn_rate_code(mlme_obj->mgmt.rate_info.bcn_tx_rate);
+		wma_update_beacon_tx_rate_code(mlme_obj);
 	}
 
 	if (!restart) {

@@ -333,12 +333,14 @@ QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
  * dp_link_switch_notification() - DP notifier for MLO link switch
  * @vdev: Objmgr vdev handle
  * @lswitch_req: Link switch request params
+ * @notify_reason: Reason of notification
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 dp_link_switch_notification(struct wlan_objmgr_vdev *vdev,
-			    struct wlan_mlo_link_switch_req *lswitch_req);
+			    struct wlan_mlo_link_switch_req *lswitch_req,
+			    enum wlan_mlo_link_switch_notify_reason notify_reason);
 #endif
 
 /**

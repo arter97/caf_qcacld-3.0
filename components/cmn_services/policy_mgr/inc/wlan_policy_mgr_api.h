@@ -2129,6 +2129,8 @@ typedef void (*policy_mgr_nss_update_cback)(struct wlan_objmgr_psoc *psoc,
  * @sme_rso_stop_cb: Disable roaming offload callback
  * @sme_change_sap_csa_count: Change CSA count for SAP/GO, only one
  *			      time, needs to set again if used once.
+ * @sme_sap_update_ch_width: Update sap ch_width to fw to handle SAP 320MHz
+ *                           concurrencies
  */
 struct policy_mgr_sme_cbacks {
 	void (*sme_get_nss_for_vdev)(enum QDF_OPMODE,
@@ -2150,6 +2152,11 @@ struct policy_mgr_sme_cbacks {
 		mac_handle_t mac_handle, uint8_t vdev_id,
 		uint8_t reason, enum wlan_cm_rso_control_requestor requestor);
 	QDF_STATUS (*sme_change_sap_csa_count)(uint8_t count);
+	QDF_STATUS (*sme_sap_update_ch_width)(struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id,
+			enum phy_ch_width ch_width,
+			enum policy_mgr_conn_update_reason reason,
+			uint8_t conc_vdev_id, uint32_t request_id);
 };
 
 /**
@@ -5088,8 +5095,22 @@ policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id);
 
 /**
+ * policy_mgr_activate_mlo_links_nlink() - Force active ML links based on user
+ * requested link mac address with link bitmap
+ * @psoc: objmgr psoc
+ * @session_id: session id
+ * @num_links: number of links to be forced active
+ * @active_link_addr: link mac address of links to be forced active
+ *
+ * Return: void
+ */
+void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
+					 uint8_t session_id, uint8_t num_links,
+					 struct qdf_mac_addr *active_link_addr);
+
+/**
  * policy_mgr_activate_mlo_links() - Force active ML links based on user
- * requested link mac address
+ * requested link mac address with vdev bitmap
  * @psoc: objmgr psoc
  * @session_id: session id
  * @num_links: number of links to be forced active
@@ -5529,5 +5550,74 @@ uint32_t policy_mgr_get_beaconing_mode_info(struct wlan_objmgr_psoc *psoc,
  */
 bool policy_mgr_is_freq_on_mac_id(struct policy_mgr_freq_range *freq_range,
 				  qdf_freq_t freq, uint8_t mac_id);
+
+/**
+ * policy_mgr_is_conn_lead_to_dbs_sbs() - New freq leads to DBS/SBS
+ * @psoc: PSOC object information
+ * @freq: New connection frequency
+ *
+ * This API loops through existing connections from policy_mgr connection table
+ *
+ * Return: True if new frequency causes DBS/SBS with existing connections
+ */
+bool
+policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
+				   uint32_t freq);
+
+/**
+ * policy_mgr_sap_ch_width_update() - Update SAP ch_width
+ * @psoc: PSOC object information
+ * @next_action: next action to happen in order to update bandwidth
+ * @reason: reason for ch_width update
+ * @conc_vdev_id: Concurrent connection vdev_id that is causing ch_width update
+ * @request_id: request id for connection manager
+ *
+ * Update ch_width as per next_action
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
+			       enum policy_mgr_conc_next_action next_action,
+			       enum policy_mgr_conn_update_reason reason,
+			       uint8_t conc_vdev_id, uint32_t request_id);
+
+/*
+ * policy_mgr_get_vdev_same_freq_new_conn() - Get vdev_id of the first
+ *					      connection that has same
+ *					      channel frequency as new_freq
+ * @psoc: psoc object pointer
+ * @new_freq: channel frequency for the new connection
+ * @vdev_id: Output parameter to return vdev id of the first existing connection
+ *	     that has same channel frequency as @new_freq
+ *
+ * This function is to return the first connection that has same
+ * channel frequency as @new_freq.
+ *
+ * Return: true if connection that has same channel frequency as
+ *	   @new_freq exists. Otherwise false.
+ */
+bool policy_mgr_get_vdev_same_freq_new_conn(struct wlan_objmgr_psoc *psoc,
+					    uint32_t new_freq,
+					    uint8_t *vdev_id);
+
+/*
+ * policy_mgr_get_vdev_diff_freq_new_conn() - Get vdev id of the first
+ *					      connection that has different
+ *					      channel freq from new_freq
+ * @psoc: psoc object pointer
+ * @new_freq: channel frequency for the new connection
+ * @vdev_id: Output parameter to return vdev id of the first existing connection
+ *	     that has different channel frequency from @new_freq
+ *
+ * This function is to return the first connection that has different
+ * channel frequency from @new_freq.
+ *
+ * Return: true if connection that has different channel frequency from
+ *	   @new_freq exists. Otherwise false.
+ */
+bool policy_mgr_get_vdev_diff_freq_new_conn(struct wlan_objmgr_psoc *psoc,
+					    uint32_t new_freq,
+					    uint8_t *vdev_id);
 
 #endif /* __WLAN_POLICY_MGR_API_H */

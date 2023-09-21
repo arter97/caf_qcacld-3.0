@@ -295,6 +295,7 @@ bool wlan_twt_is_command_in_progress(struct wlan_objmgr_psoc *psoc,
  * @vdev: vdev pointer
  * @peer_mac: mac address of peer
  * @dialog_id: dialog_id of TWT session
+ * @is_ps_disabled: Whether power save is disabled or not
  * @twt_next_action: Set next action to do before work scheduled
  *
  * Return: None
@@ -303,6 +304,7 @@ void wlan_twt_set_work_params(
 			struct wlan_objmgr_vdev *vdev,
 			struct qdf_mac_addr *peer_mac,
 			uint8_t dialog_id,
+			bool is_ps_disabled,
 			uint32_t twt_next_action);
 
 /**
