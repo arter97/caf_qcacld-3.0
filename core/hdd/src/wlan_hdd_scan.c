@@ -673,6 +673,9 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to get unicast probe req ra cfg");
 
+	params.mld_id = ucfg_mlme_get_eht_mld_id(hdd_ctx->psoc);
+	hdd_debug("MLD ID: %d", params.mld_id);
+
 	status = wlan_cfg80211_scan(vdev, request, &params);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
 error:

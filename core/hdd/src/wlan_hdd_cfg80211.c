@@ -14498,7 +14498,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	if (tb[cmd_id]) {
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("MLD ID in ML probe request: %d", cfg_val);
-		ret_val = wlan_mlme_set_eht_mld_id(hdd_ctx->psoc, cfg_val);
+		ret_val = ucfg_mlme_set_eht_mld_id(hdd_ctx->psoc, cfg_val);
 		if (ret_val)
 			hdd_err("Failed to set MLD ID");
 	}

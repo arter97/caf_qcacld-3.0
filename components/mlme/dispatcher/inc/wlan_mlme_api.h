@@ -2941,18 +2941,6 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
-static inline uint8_t
-wlan_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
-{
-	return 0;
-}
-
-static inline QDF_STATUS
-wlan_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc, uint8_t value)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
 static inline void
 wlan_mlme_get_mlo_prefer_percentage(
 				struct wlan_objmgr_psoc *psoc,
