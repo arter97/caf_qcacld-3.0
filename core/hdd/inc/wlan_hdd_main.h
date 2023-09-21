@@ -888,6 +888,7 @@ struct hdd_fw_txrx_stats {
  * @client_count: client count per dot11_mode
  * @country_ie_updated: country ie is updated or not by hdd hostapd
  * @during_auth_offload: auth mgmt frame is offloading to hostapd
+ * @reg_punc_bitmap: puncturing bitmap
  */
 struct hdd_ap_ctx {
 	struct hdd_hostapd_state hostapd_state;
@@ -910,6 +911,9 @@ struct hdd_ap_ctx {
 	uint16_t client_count[QCA_WLAN_802_11_MODE_INVALID];
 	bool country_ie_updated;
 	bool during_auth_offload;
+#ifdef WLAN_FEATURE_11BE
+	uint16_t reg_punc_bitmap;
+#endif
 };
 
 /**
@@ -1108,6 +1112,7 @@ enum udp_qos_upgrade {
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
+ * @chan_change_notify_work: Channel change notify work
  */
 struct wlan_hdd_link_info {
 	struct hdd_adapter *adapter;
@@ -1148,6 +1153,7 @@ struct wlan_hdd_link_info {
 #endif /* WLAN_FEATURE_MSCS */
 
 	unsigned long link_flags;
+	qdf_work_t chan_change_notify_work;
 };
 
 /**
@@ -3834,21 +3840,16 @@ int hdd_update_config(struct hdd_context *hdd_ctx);
 int hdd_update_components_config(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_chan_change_notify() - Function to notify hostapd about channel change
- * @link_info:          Link info pointer in HDD adapter
- * @dev:		Net device structure
- * @chan_change:	New channel change parameters
- * @legacy_phymode:	is the phymode legacy
+ * hdd_chan_change_notify_work_handler() - Function to notify hostapd about
+ * channel change
+ * @work: work pointer
  *
  * This function is used to notify hostapd about the channel change
  *
- * Return: Success on intimating userspace
+ * Return: None
  *
  */
-QDF_STATUS hdd_chan_change_notify(struct wlan_hdd_link_info *link_info,
-				  struct net_device *dev,
-				  struct hdd_chan_change_params chan_change,
-				  bool legacy_phymode);
+void hdd_chan_change_notify_work_handler(void *work);
 
 int wlan_hdd_set_channel(struct wiphy *wiphy,
 		struct net_device *dev,

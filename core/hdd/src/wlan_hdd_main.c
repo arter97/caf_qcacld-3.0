@@ -8555,6 +8555,9 @@ static void hdd_adapter_init_link_info(struct hdd_adapter *adapter)
 
 		idx_pos = hdd_adapter_get_index_of_link_info(link_info);
 		adapter->curr_link_info_map[idx_pos] = idx_pos;
+		qdf_create_work(0, &link_info->chan_change_notify_work,
+				hdd_chan_change_notify_work_handler,
+				link_info);
 	}
 }
 
@@ -8866,6 +8869,10 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 		hdd_adapter_for_each_link_info(adapter, link_info)
 			hdd_cleanup_conn_info(link_info);
 	}
+
+	hdd_adapter_for_each_link_info(adapter, link_info)
+		qdf_flush_work(&link_info->chan_change_notify_work);
+
 	qdf_list_destroy(&adapter->blocked_scan_request_q);
 	qdf_mutex_destroy(&adapter->blocked_scan_request_q_lock);
 	policy_mgr_clear_concurrency_mode(hdd_ctx->psoc, adapter->device_mode);

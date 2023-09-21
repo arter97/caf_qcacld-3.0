@@ -2352,12 +2352,7 @@ hdd_roam_channel_switch_handler(struct wlan_hdd_link_info *link_info,
 			notify = false;
 	}
 	if (notify) {
-		status = hdd_chan_change_notify(link_info,
-						adapter->dev, chan_change,
-						roam_info->mode ==
-						SIR_SME_PHY_MODE_LEGACY);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_err("channel change notification failed");
+		qdf_sched_work(0, &link_info->chan_change_notify_work);
 	} else {
 		hdd_err("BSS "QDF_MAC_ADDR_FMT" no connected with vdev %d (%d)",
 			QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes),
