@@ -6411,14 +6411,13 @@ void __dp_tx_desc_flush(struct dp_pdev *pdev, struct dp_vdev *vdev,
 		return;
 	}
 
-	num_desc = spcl_pool ? wlan_cfg_get_num_tx_spl_desc(soc->wlan_cfg_ctx) :
-			wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
-
 	num_pool = wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
 
 	for (i = 0; i < num_pool; i++) {
 		tx_desc_pool = spcl_pool ? dp_get_spcl_tx_desc_pool(soc, i) :
 						dp_get_tx_desc_pool(soc, i);
+
+		num_desc = tx_desc_pool->elem_count;
 		if (!tx_desc_pool->desc_pages.cacheable_pages)
 			continue;
 
