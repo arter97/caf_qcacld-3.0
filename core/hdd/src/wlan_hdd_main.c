@@ -3643,9 +3643,11 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 			goto err_start_adapter;
 
 		fallthrough;
+	case QDF_MONITOR_MODE:
+		hdd_set_idle_ps_config(adapter->hdd_ctx, false);
+		fallthrough;
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_OCB_MODE:
-	case QDF_MONITOR_MODE:
 	case QDF_NAN_DISC_MODE:
 		ret = hdd_start_station_adapter(adapter);
 		if (ret)
