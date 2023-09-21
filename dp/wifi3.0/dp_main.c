@@ -8349,8 +8349,9 @@ dp_peer_create_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			goto fail; /* failure */
 
 		dp_mld_peer_init_link_peers_info(peer);
-	} else if (dp_monitor_peer_attach(soc, peer) !=
-				QDF_STATUS_SUCCESS)
+	}
+
+	if (dp_monitor_peer_attach(soc, peer) != QDF_STATUS_SUCCESS)
 		dp_warn("peer monitor ctx alloc failed");
 
 	TAILQ_INIT(&peer->ast_entry_list);
@@ -9327,8 +9328,7 @@ void dp_peer_unref_delete(struct dp_peer *peer, enum dp_mod_id mod_id)
 		/* cleanup the peer data */
 		dp_peer_cleanup(vdev, peer);
 
-		if (!IS_MLO_DP_MLD_PEER(peer))
-			dp_monitor_peer_detach(soc, peer);
+		dp_monitor_peer_detach(soc, peer);
 
 		qdf_spinlock_destroy(&peer->peer_state_lock);
 
