@@ -199,6 +199,10 @@ wlan_rptr_core_register_ext_cb(struct rptr_ext_cbacks *ext_cbacks)
 		g_priv->ext_cbacks.nss_prep_mac_db_store_stavap =
 				ext_cbacks->nss_prep_mac_db_store_stavap;
 #endif
+#ifdef CONFIG_AFC_SUPPORT
+		g_priv->ext_cbacks.vdev_is_6g_txable_chan_available =
+				ext_cbacks->vdev_is_6g_txable_chan_available;
+#endif
 		return QDF_STATUS_SUCCESS;
 	}
 
