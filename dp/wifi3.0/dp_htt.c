@@ -920,6 +920,7 @@ int htt_h2t_full_mon_cfg(struct htt_soc *htt_soc,
 	qdf_nbuf_t htt_msg;
 	uint32_t *msg_word;
 	uint8_t *htt_logger_bufp;
+	QDF_STATUS status;
 
 	htt_msg = qdf_nbuf_alloc(soc->osdev,
 				 HTT_MSG_BUF_SIZE(
@@ -992,9 +993,16 @@ int htt_h2t_full_mon_cfg(struct htt_soc *htt_soc,
 
 	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, htt_msg);
 	qdf_debug("config: %d", config);
-	DP_HTT_SEND_HTC_PKT(soc, pkt, HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE,
-			    htt_logger_bufp);
-	return QDF_STATUS_SUCCESS;
+	status = DP_HTT_SEND_HTC_PKT(soc, pkt,
+				     HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE,
+				     htt_logger_bufp);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		qdf_nbuf_free(htt_msg);
+		htt_htc_pkt_free(soc, pkt);
+	}
+
+	return status;
 fail1:
 	qdf_nbuf_free(htt_msg);
 	return QDF_STATUS_E_FAILURE;

@@ -2135,12 +2135,13 @@ struct dp_peer *dp_get_primary_link_peer_by_id(struct dp_soc *soc,
 		for (i = 0; i < link_peers_info.num_links; i++) {
 			link_peer = link_peers_info.link_peers[i];
 			if (link_peer->primary_link) {
-				primary_peer = link_peer;
 				/*
 				 * Take additional reference over
 				 * primary link peer.
 				 */
-				dp_peer_get_ref(NULL, primary_peer, mod_id);
+				if (QDF_STATUS_SUCCESS ==
+				    dp_peer_get_ref(NULL, link_peer, mod_id))
+					primary_peer = link_peer;
 				break;
 			}
 		}
