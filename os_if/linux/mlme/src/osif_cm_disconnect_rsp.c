@@ -141,6 +141,58 @@ osif_cm_indicate_disconnect(struct wlan_objmgr_vdev *vdev,
 	}
 }
 #else /* WLAN_FEATURE_11BE_MLO_ADV_FEATURE */
+
+/**
+ * osif_cm_get_anchor_vdev() - API to get the anchor vdev
+ * @vdev: Pointer to vdev
+ *
+ * Return: If the assoc vdev is available, return it. Otherwise, if the MLD is
+ * disconnected, return the current vdev. If neither is available, return NULL.
+ */
+static struct wlan_objmgr_vdev *osif_cm_get_anchor_vdev(
+		struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_vdev *assoc_vdev = NULL;
+
+	assoc_vdev = ucfg_mlo_get_assoc_link_vdev(vdev);
+	if (assoc_vdev)
+		return assoc_vdev;
+	else if (ucfg_mlo_is_mld_disconnected(vdev))
+		return vdev;
+	else
+		return NULL;
+}
+
+#if (LINUX_VERSION_CODE == KERNEL_VERSION(5, 4, 0))
+/**
+ * osif_cm_indicate_disconnect_for_non_assoc_link() - Wrapper API to clear
+ * current bss param of non-assoc link
+ * @netdev: Pointer to netdev of non-assoc link vdev
+ * @vdev: Pointer to non-assoc link vdev
+ *
+ * Return: None
+ */
+static void osif_cm_indicate_disconnect_for_non_assoc_link(
+		struct net_device *netdev,
+		struct wlan_objmgr_vdev *vdev)
+{
+	int ret;
+
+	ret = cfg80211_clear_current_bss(netdev);
+	if (ret)
+		osif_err("cfg80211_clear_current_bss failed for psoc:%d pdev:%d vdev:%d",
+			 wlan_vdev_get_psoc_id(vdev),
+			 wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev)),
+			 wlan_vdev_get_id(vdev));
+}
+#else
+static void osif_cm_indicate_disconnect_for_non_assoc_link(
+		struct net_device *netdev,
+		struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
+
 void
 osif_cm_indicate_disconnect(struct wlan_objmgr_vdev *vdev,
 			    struct net_device *dev,
@@ -150,7 +202,7 @@ osif_cm_indicate_disconnect(struct wlan_objmgr_vdev *vdev,
 {
 	struct net_device *netdev = dev;
 	struct vdev_osif_priv *osif_priv = NULL;
-	struct wlan_objmgr_vdev *assoc_vdev = NULL;
+	struct wlan_objmgr_vdev *anchor_vdev;
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) || (link_id != -1)) {
 		osif_cm_indicate_disconnect_result(
@@ -159,7 +211,12 @@ osif_cm_indicate_disconnect(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	if (ucfg_mlo_is_mld_disconnected(vdev)) {
+	anchor_vdev = osif_cm_get_anchor_vdev(vdev);
+
+	if (vdev != anchor_vdev)
+		osif_cm_indicate_disconnect_for_non_assoc_link(netdev, vdev);
+
+	if (anchor_vdev && ucfg_mlo_is_mld_disconnected(vdev)) {
 		/**
 		 * Kernel maintains some extra state on the assoc netdev.
 		 * If the assoc vdev exists, send disconnected event on the
@@ -168,11 +225,8 @@ osif_cm_indicate_disconnect(struct wlan_objmgr_vdev *vdev,
 		 * already cleaned up the extra state while processing the
 		 * disconnected event sent as part of the link removal.
 		 */
-		assoc_vdev = ucfg_mlo_get_assoc_link_vdev(vdev);
-		if (assoc_vdev) {
-			osif_priv = wlan_vdev_get_ospriv(assoc_vdev);
-			netdev = osif_priv->wdev->netdev;
-		}
+		osif_priv = wlan_vdev_get_ospriv(anchor_vdev);
+		netdev = osif_priv->wdev->netdev;
 
 		osif_cm_indicate_disconnect_result(
 				netdev, reason,
