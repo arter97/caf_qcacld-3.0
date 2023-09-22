@@ -2012,6 +2012,26 @@ wlan_rptr_disconnect_sec_stavap_cb(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * wlan_rptr_check_rpt_max_phy - Check repeater max phy feature is enabled.
+ * param: pdev: pdev object manager
+ *
+ * ret: true/false
+ */
+bool wlan_rptr_check_rpt_max_phy(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_global_priv *g_priv = NULL;
+	struct rptr_ext_cbacks *ext_cb = NULL;
+	bool is_rpt_max_phy;
+
+	g_priv = wlan_rptr_get_global_ctx();
+	ext_cb = &g_priv->ext_cbacks;
+
+	is_rpt_max_phy = ext_cb->check_rpt_max_phy(pdev);
+
+	return is_rpt_max_phy;
+}
+
+/**
  * wlan_rptr_pdev_extd_ioctl - NB api for extd ioctl call
  * param: pdev: pdev object manager
  * param: feature specific param
