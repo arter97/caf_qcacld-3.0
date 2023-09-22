@@ -97,6 +97,8 @@
 
 #define INVALID_PREAMBLE 0xFF
 
+#define MAX_RSSI_MCS_INDEX 14
+
 /* 11B, 11G Rate table include Basic rate and Extended rate
  * The IDX field is the rate index
  * The HI field is the rate when RSSI is strong or being ignored
@@ -184,7 +186,7 @@ static const struct index_vht_data_rate_type supported_vht_mcs_rate_nss2[] = {
 };
 
 /*array index points to MCS and array value points respective rssi*/
-static int rssi_mcs_tbl[][14] = {
+static int rssi_mcs_tbl[][MAX_RSSI_MCS_INDEX] = {
 /*  MCS 0   1    2   3    4    5    6    7    8    9    10   11   12   13*/
 	/* 20 */
 	{-82, -79, -77, -74, -70, -66, -65, -64, -59, -57, -52, -48, -46, -42},
@@ -5923,7 +5925,7 @@ static void hdd_get_max_rate_vht(struct hdd_station_info *stainfo,
 		}
 
 		if (!report_max) {
-			for (i = 0; i <= mcsidx; i++) {
+			for (i = 0; i <= mcsidx && i < MAX_RSSI_MCS_INDEX; i++) {
 				if (rssi <= rssi_mcs_tbl[mode][i]) {
 					mcsidx = i;
 					break;
