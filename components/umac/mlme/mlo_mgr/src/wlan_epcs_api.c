@@ -670,7 +670,7 @@ QDF_STATUS wlan_epcs_set_config(struct wlan_objmgr_vdev *vdev, uint8_t flag)
 	else
 		wlan_mlme_set_epcs_capability(wlan_vdev_get_psoc(vdev), false);
 
-	return lim_send_eht_caps_ie(mac_ctx, NULL, QDF_STA_MODE,
+	return lim_send_eht_caps_ie(mac_ctx, QDF_STA_MODE,
 				    wlan_vdev_get_id(vdev));
 }
 

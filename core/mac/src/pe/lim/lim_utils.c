@@ -3834,6 +3834,20 @@ uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
 	return cb_mode;
 }
 
+static
+uint8_t lim_get_sta_cb_mode_for_24ghz(struct mac_context *mac,
+				      uint8_t vdev_id)
+{
+	struct pe_session *session;
+	uint8_t cb_mode = mac->roam.configParam.channelBondingMode24GHz;
+
+	session = pe_find_session_by_vdev_id(mac, vdev_id);
+	if (!session || !session->force_24ghz_in_ht20)
+		return cb_mode;
+
+	return WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
+}
+
 void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 						   tDot11fIEHTInfo *pHTInfo,
 						   struct pe_session *pe_session)
@@ -5099,13 +5113,13 @@ lim_set_protected_bit(struct mac_context *mac,
 	}
 } /*** end lim_set_protected_bit() ***/
 
-void lim_set_ht_caps(struct mac_context *p_mac, struct pe_session *p_session_entry,
-		uint8_t *p_ie_start, uint32_t num_bytes)
+void lim_set_ht_caps(struct mac_context *p_mac, uint8_t *p_ie_start,
+		     uint32_t num_bytes)
 {
 	const uint8_t *p_ie = NULL;
 	tDot11fIEHTCaps dot11_ht_cap = {0,};
 
-	populate_dot11f_ht_caps(p_mac, p_session_entry, &dot11_ht_cap);
+	populate_dot11f_ht_caps(p_mac, NULL, &dot11_ht_cap);
 	p_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_HTCAPS,
 					p_ie_start, num_bytes);
 	pe_debug("p_ie: %pK dot11_ht_cap.supportedMCSSet[0]: 0x%x",
@@ -5174,13 +5188,13 @@ void lim_set_ht_caps(struct mac_context *p_mac, struct pe_session *p_session_ent
 	}
 }
 
-void lim_set_vht_caps(struct mac_context *p_mac, struct pe_session *p_session_entry,
+void lim_set_vht_caps(struct mac_context *p_mac,
 		      uint8_t *p_ie_start, uint32_t num_bytes)
 {
 	const uint8_t       *p_ie = NULL;
 	tDot11fIEVHTCaps     dot11_vht_cap;
 
-	populate_dot11f_vht_caps(p_mac, p_session_entry, &dot11_vht_cap);
+	populate_dot11f_vht_caps(p_mac, NULL, &dot11_vht_cap);
 	p_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_VHTCAPS, p_ie_start,
 					num_bytes);
 	if (p_ie) {
@@ -5851,7 +5865,6 @@ static bool is_dot11mode_support_eht_cap(enum csr_cfgdot11mode dot11mode)
 /**
  * lim_send_ht_caps_ie() - gets HT capability and send to firmware via wma
  * @mac_ctx: global mac context
- * @session: pe session. This can be NULL. In that case self cap will be sent
  * @device_mode: VDEV op mode
  * @vdev_id: vdev for which IE is targeted
  *
@@ -5860,7 +5873,6 @@ static bool is_dot11mode_support_eht_cap(enum csr_cfgdot11mode dot11mode)
  * Return: QDF_STATUS
  */
 static QDF_STATUS lim_send_ht_caps_ie(struct mac_context *mac_ctx,
-				      struct pe_session *session,
 				      enum QDF_OPMODE device_mode,
 				      uint8_t vdev_id)
 {
@@ -5871,13 +5883,13 @@ static QDF_STATUS lim_send_ht_caps_ie(struct mac_context *mac_ctx,
 
 	ht_caps[0] = DOT11F_EID_HTCAPS;
 	ht_caps[1] = DOT11F_IE_HTCAPS_MIN_LEN;
-	lim_set_ht_caps(mac_ctx, session, ht_caps,
+	lim_set_ht_caps(mac_ctx, ht_caps,
 			DOT11F_IE_HTCAPS_MIN_LEN + 2);
 	/* Get LDPC and over write for 2G */
 	p_ht_cap->advCodingCap = lim_get_rx_ldpc(mac_ctx,
 						 CHAN_ENUM_2437);
 	/* Get self cap for HT40 support in 2G */
-	if (mac_ctx->roam.configParam.channelBondingMode24GHz) {
+	if (lim_get_sta_cb_mode_for_24ghz(mac_ctx, vdev_id)) {
 		p_ht_cap->supportedChannelWidthSet = 1;
 		p_ht_cap->shortGI40MHz = 1;
 	} else {
@@ -5928,7 +5940,6 @@ static QDF_STATUS lim_send_ht_caps_ie(struct mac_context *mac_ctx,
 /**
  * lim_send_vht_caps_ie() - gets VHT capability and send to firmware via wma
  * @mac_ctx: global mac context
- * @session: pe session. This can be NULL. In that case self cap will be sent
  * @device_mode: VDEV op mode
  * @vdev_id: vdev for which IE is targeted
  *
@@ -5937,7 +5948,6 @@ static QDF_STATUS lim_send_ht_caps_ie(struct mac_context *mac_ctx,
  * Return: QDF_STATUS
  */
 static QDF_STATUS lim_send_vht_caps_ie(struct mac_context *mac_ctx,
-				       struct pe_session *session,
 				       enum QDF_OPMODE device_mode,
 				       uint8_t vdev_id)
 {
@@ -5949,8 +5959,7 @@ static QDF_STATUS lim_send_vht_caps_ie(struct mac_context *mac_ctx,
 
 	vht_caps[0] = DOT11F_EID_VHTCAPS;
 	vht_caps[1] = DOT11F_IE_VHTCAPS_MAX_LEN;
-	lim_set_vht_caps(mac_ctx, session, vht_caps,
-			DOT11F_IE_VHTCAPS_MIN_LEN + 2);
+	lim_set_vht_caps(mac_ctx, vht_caps, DOT11F_IE_VHTCAPS_MIN_LEN + 2);
 	/*
 	 * Get LDPC and over write for 5G - using channel 64 because it
 	 * is available in all reg domains.
@@ -6000,8 +6009,7 @@ static QDF_STATUS lim_send_vht_caps_ie(struct mac_context *mac_ctx,
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
-				 struct pe_session *session, uint8_t vdev_id,
+QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx, uint8_t vdev_id,
 				 enum csr_cfgdot11mode dot11_mode,
 				 enum QDF_OPMODE device_mode)
 {
@@ -6015,27 +6023,21 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 	 * to send IE to wma.
 	 */
 	if (is_dot11mode_support_ht_cap(dot11_mode))
-		status_ht = lim_send_ht_caps_ie(mac_ctx, session,
-						device_mode, vdev_id);
+		status_ht = lim_send_ht_caps_ie(mac_ctx, device_mode, vdev_id);
 
 	if (is_dot11mode_support_vht_cap(dot11_mode))
-		status_vht = lim_send_vht_caps_ie(mac_ctx, session,
-						  device_mode, vdev_id);
+		status_vht = lim_send_vht_caps_ie(mac_ctx, device_mode, vdev_id);
 
 	if (is_dot11mode_support_he_cap(dot11_mode)) {
-		status_he = lim_send_he_caps_ie(mac_ctx, session,
-						device_mode, vdev_id);
+		status_he = lim_send_he_caps_ie(mac_ctx, device_mode, vdev_id);
 
 		if (QDF_IS_STATUS_SUCCESS(status_he))
 			status_he = lim_send_he_6g_band_caps_ie(mac_ctx,
-								session,
 								vdev_id);
 	}
 
-	if (is_dot11mode_support_eht_cap(dot11_mode)) {
-		status_he = lim_send_eht_caps_ie(mac_ctx, session,
-						 device_mode, vdev_id);
-	}
+	if (is_dot11mode_support_eht_cap(dot11_mode))
+		status_he = lim_send_eht_caps_ie(mac_ctx, device_mode, vdev_id);
 
 	if (QDF_IS_STATUS_SUCCESS(status_ht) &&
 	    QDF_IS_STATUS_SUCCESS(status_vht) &&
@@ -7768,8 +7770,8 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 		 mac->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band);
 }
 
-void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
-		     uint8_t *ie_start, uint32_t num_bytes, uint8_t band)
+void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
+		     uint32_t num_bytes, uint8_t band)
 {
 	const uint8_t *ie = NULL;
 	tDot11fIEhe_cap dot11_cap;
@@ -7780,7 +7782,7 @@ void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
 		is_band_2g = true;
 
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_cap,
-					session);
+					NULL);
 	lim_log_he_cap(mac, &dot11_cap);
 	ie = wlan_get_ext_ie_ptr_from_ext_id(HE_CAP_OUI_TYPE,
 			HE_CAP_OUI_SIZE, ie_start, num_bytes);
@@ -7916,19 +7918,17 @@ void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
 }
 
 static void lim_intersect_he_ch_width_2g(struct mac_context *mac,
-					 struct he_capability_info *he_cap)
+					 struct he_capability_info *he_cap,
+					 uint8_t vdev_id)
 {
 	struct wlan_objmgr_psoc *psoc;
 	uint32_t cbm_24ghz;
-	QDF_STATUS ret;
 
 	psoc = mac->psoc;
 	if (!psoc)
 		return;
 
-	ret = ucfg_mlme_get_channel_bonding_24ghz(psoc, &cbm_24ghz);
-	if (QDF_IS_STATUS_ERROR(ret))
-		return;
+	cbm_24ghz = lim_get_sta_cb_mode_for_24ghz(mac, vdev_id);
 
 	pe_debug("channel bonding mode 2.4GHz %d", cbm_24ghz);
 
@@ -7967,7 +7967,6 @@ static uint8_t lim_set_he_caps_ppet(struct mac_context *mac, uint8_t *ie,
 }
 
 QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
-			       struct pe_session *session,
 			       enum QDF_OPMODE device_mode,
 			       uint8_t vdev_id)
 {
@@ -7988,7 +7987,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	he_caps[0] = DOT11F_EID_HE_CAP;
 	he_caps[1] = SIR_MAC_HE_CAP_MIN_LEN;
 	qdf_mem_copy(&he_caps[2], HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE);
-	lim_set_he_caps(mac_ctx, session, he_caps, he_cap_total_len,
+	lim_set_he_caps(mac_ctx, he_caps, he_cap_total_len,
 			CDS_BAND_5GHZ);
 	he_cap = (struct he_capability_info *) (&he_caps[2 + HE_CAP_OUI_SIZE]);
 
@@ -8054,7 +8053,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	he_caps[0] = DOT11F_EID_HE_CAP;
 	he_caps[1] = SIR_MAC_HE_CAP_MIN_LEN;
 	qdf_mem_copy(&he_caps[2], HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE);
-	lim_set_he_caps(mac_ctx, session, he_caps, he_cap_total_len,
+	lim_set_he_caps(mac_ctx, he_caps, he_cap_total_len,
 			CDS_BAND_2GHZ);
 	he_cap = (struct he_capability_info *)(&he_caps[2 + HE_CAP_OUI_SIZE]);
 
@@ -8071,7 +8070,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 		pe_debug("he_cap_2g: bfee_sts_gt_80 %d num_sounding_gt_80 %d",
 			 he_cap->bfee_sts_gt_80, he_cap->num_sounding_gt_80);
 	}
-	lim_intersect_he_ch_width_2g(mac_ctx, he_cap);
+	lim_intersect_he_ch_width_2g(mac_ctx, he_cap, vdev_id);
 
 	if (he_cap->ppet_present)
 		num_ppe_th = lim_set_he_caps_ppet(mac_ctx, he_caps,
@@ -8975,7 +8974,7 @@ void lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
 			   eht_ops, sizeof(tDot11fIEeht_op));
 }
 
-void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
+void lim_set_eht_caps(struct mac_context *mac,
 		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band,
 		      uint8_t vdev_id)
 {
@@ -8993,13 +8992,13 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
 
-	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, session);
+	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
-					session);
+					NULL);
 	lim_log_eht_cap(mac, &dot11_cap);
 
 	if (is_band_2g) {
-		ucfg_mlme_get_channel_bonding_24ghz(mac->psoc, &cbm_24ghz);
+		cbm_24ghz = lim_get_sta_cb_mode_for_24ghz(mac, vdev_id);
 		if (!cbm_24ghz) {
 			/* B0: 40Mhz channel width in the 2.4GHz band */
 			dot11_he_cap.chan_width_0 = 0;
@@ -9221,7 +9220,6 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 }
 
 QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
-				struct pe_session *session,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id)
 {
@@ -9248,7 +9246,7 @@ QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 
 	qdf_mem_copy(&eht_caps_2g[2], EHT_CAP_OUI_TYPE, EHT_CAP_OUI_SIZE);
 
-	lim_set_eht_caps(mac_ctx, session, eht_caps_2g, eht_cap_total_len,
+	lim_set_eht_caps(mac_ctx,  eht_caps_2g, eht_cap_total_len,
 			 CDS_BAND_2GHZ, vdev_id);
 	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_EHT_CAP,
 				CDS_BAND_2GHZ, &eht_caps_2g[2],
@@ -9259,7 +9257,7 @@ QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 
 	qdf_mem_copy(&eht_caps_5g[2], EHT_CAP_OUI_TYPE, EHT_CAP_OUI_SIZE);
 
-	lim_set_eht_caps(mac_ctx, session, eht_caps_5g, eht_cap_total_len,
+	lim_set_eht_caps(mac_ctx, eht_caps_5g, eht_cap_total_len,
 			 CDS_BAND_5GHZ, vdev_id);
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_EHT_CAP,
 				CDS_BAND_5GHZ, &eht_caps_5g[2],
@@ -9534,7 +9532,6 @@ void lim_extract_msd_caps(struct mac_context *mac_ctx,
 
 #if defined(CONFIG_BAND_6GHZ) && defined(WLAN_FEATURE_11AX)
 QDF_STATUS lim_send_he_6g_band_caps_ie(struct mac_context *mac_ctx,
-				       struct pe_session *session,
 				       uint8_t vdev_id)
 {
 	uint8_t he_6g_band_caps_ie[DOT11F_IE_HE_6GHZ_BAND_CAP_MIN_LEN + 3];
@@ -9544,7 +9541,7 @@ QDF_STATUS lim_send_he_6g_band_caps_ie(struct mac_context *mac_ctx,
 	uint32_t result;
 
 	qdf_mem_zero(&he_6g_band_cap, sizeof(he_6g_band_cap));
-	populate_dot11f_he_6ghz_cap(mac_ctx, session, &he_6g_band_cap);
+	populate_dot11f_he_6ghz_cap(mac_ctx, NULL, &he_6g_band_cap);
 	if (!he_6g_band_cap.present) {
 		pe_debug("no HE 6g band cap for vdev %d", vdev_id);
 		return QDF_STATUS_SUCCESS;
