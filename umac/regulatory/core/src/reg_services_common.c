@@ -7530,14 +7530,14 @@ reg_get_partial_afc_req_info(struct wlan_objmgr_pdev *pdev,
 
 	/* frange list is already filled just copy it */
 	frange_lst_len = reg_get_frange_list_len(num_freq_ranges);
-	p_frange_lst_afc = (struct wlan_afc_frange_list *)&p_fixed_params[1];
+	p_frange_lst_afc = (struct wlan_afc_frange_list *)(p_fixed_params + 1);
 	qdf_mem_copy(p_frange_lst_afc, p_frange_lst_local, frange_lst_len);
 
 	p_num_opclasses = (struct wlan_afc_num_opclasses *)
 	    ((char *)(p_frange_lst_afc) + frange_lst_len);
 	p_num_opclasses->num_opclasses = num_opclasses;
 
-	p_obj_opclass_arr = (struct wlan_afc_opclass_obj *)&p_num_opclasses[1];
+	p_obj_opclass_arr = (struct wlan_afc_opclass_obj *)(p_num_opclasses + 1);
 	p_obj_opclass_arr = reg_fill_afc_opclasses_arr(pdev,
 						       num_opclasses,
 						       opclass_lst,
