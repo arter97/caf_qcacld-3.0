@@ -67,7 +67,7 @@ static inline bool __dsc_assert(const bool cond, const char *cond_str,
 #define dsc_assert_success(status) dsc_assert(QDF_IS_STATUS_SUCCESS(status))
 
 #ifdef WLAN_DSC_DEBUG
-#define DSC_OP_TIMEOUT_MS		(1 * 60 * 1000) /* 1 minute */
+#define DSC_OP_TIMEOUT_MS		(2 * 60 * 1000) /* 2 minute */
 #define DSC_TRANS_TIMEOUT_MS		(1 * 60 * 1000) /* 1 minute */
 #define DSC_TRANS_WAIT_TIMEOUT_MS	(2 * 60 * 1000) /* 2 minutes */
 
