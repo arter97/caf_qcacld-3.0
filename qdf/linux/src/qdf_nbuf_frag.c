@@ -829,6 +829,9 @@ void __qdf_frag_cache_drain(qdf_frag_cache_t *pf_cache)
 {
 	struct page *page;
 
+	if (!pf_cache->va)
+		return;
+
 	page  = virt_to_page(pf_cache->va);
 	__page_frag_cache_drain(page, pf_cache->pagecnt_bias);
 	memset(pf_cache, 0, sizeof(*pf_cache));

@@ -592,6 +592,7 @@ enum dp_desc_type {
  * @buf_size: Buffer size
  * @buf_alignment: Buffer alignment
  * @rx_mon_dest_frag_enable: Enable frag processing for mon dest buffer
+ * @pf_cache: page frag cache
  * @desc_type: type of desc this pool serves
  */
 struct rx_desc_pool {
@@ -609,6 +610,7 @@ struct rx_desc_pool {
 	uint8_t buf_alignment;
 	bool rx_mon_dest_frag_enable;
 	enum dp_desc_type desc_type;
+	qdf_frag_cache_t pf_cache;
 };
 
 /**
