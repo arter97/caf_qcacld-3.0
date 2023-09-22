@@ -8197,7 +8197,7 @@ static void lim_set_pdev_ht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 		}
 		*ie_params->ie_ptr = WLAN_ELEMID_HTCAP_ANA;
 		*(ie_params->ie_ptr + 1) = ie_params->ie_len - 2;
-		lim_set_ht_caps(mac_ctx, NULL, ie_params->ie_ptr,
+		lim_set_ht_caps(mac_ctx, ie_params->ie_ptr,
 				ie_params->ie_len);
 
 		if (NSS_1x1_MODE == i) {
@@ -8267,8 +8267,7 @@ static void lim_set_pdev_vht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 		}
 		*ie_params->ie_ptr = WLAN_ELEMID_VHTCAP;
 		*(ie_params->ie_ptr + 1) = ie_params->ie_len - 2;
-		lim_set_vht_caps(mac_ctx, NULL, ie_params->ie_ptr,
-				ie_params->ie_len);
+		lim_set_vht_caps(mac_ctx, ie_params->ie_ptr, ie_params->ie_len);
 
 		if (NSS_1x1_MODE == i) {
 			p_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_VHTCAPS,
@@ -8328,8 +8327,8 @@ static void lim_process_set_vdev_ies_per_band(struct mac_context *mac_ctx,
 
 	pe_debug("rcvd set vdev ie per band req vdev_id = %d",
 		p_msg->vdev_id);
-	/* intentionally using NULL here so that self capability are sent */
-	if (lim_send_ies_per_band(mac_ctx, NULL, p_msg->vdev_id,
+
+	if (lim_send_ies_per_band(mac_ctx, p_msg->vdev_id,
 				  p_msg->dot11_mode, p_msg->device_mode) !=
 	    QDF_STATUS_SUCCESS)
 		pe_err("Unable to send HT/VHT Cap to FW");
