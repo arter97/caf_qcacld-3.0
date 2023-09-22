@@ -2335,6 +2335,7 @@ QDF_STATUS (*extract_vdev_peer_delete_all_response_event)(
 
 bool (*is_management_record)(uint32_t cmd_id);
 bool (*is_diag_event)(uint32_t event_id);
+bool (*is_force_fw_hang_cmd)(uint32_t event_id);
 uint8_t *(*wmi_id_to_name)(uint32_t cmd_id);
 QDF_STATUS (*send_dfs_phyerr_offload_en_cmd)(wmi_unified_t wmi_handle,
 		uint32_t pdev_id);
