@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5678,6 +5678,7 @@ QDF_STATUS
 cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 			struct wlan_cm_connect_resp *rsp)
 {
+	mac_handle_t mac_handle;
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	int32_t count;
@@ -5693,7 +5694,9 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 	 * CSR is cleaned up fully. No new params should be added to CSR, use
 	 * vdev/pdev/psoc instead
 	 */
-	mac_ctx = cds_get_context(QDF_MODULE_ID_SME);
+	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
+
+	mac_ctx = MAC_CONTEXT(mac_handle);
 	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
 
@@ -5800,6 +5803,12 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 				vdev_id);
 	}
 
+	/*
+	 * Update the IEs after connection to reconfigure
+	 * any capability that changed during connection.
+	 */
+	sme_set_vdev_ies_per_band(mac_handle, vdev_id,
+				  wlan_vdev_mlme_get_opmode(vdev));
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -5857,6 +5866,7 @@ QDF_STATUS
 cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 			  struct wlan_cm_discon_rsp *rsp)
 {
+	mac_handle_t mac_handle;
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 
@@ -5865,7 +5875,9 @@ cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 	 * CSR is cleaned up fully. No new params should be added to CSR, use
 	 * vdev/pdev/psoc instead
 	 */
-	mac_ctx = cds_get_context(QDF_MODULE_ID_SME);
+	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
+
+	mac_ctx = MAC_CONTEXT(mac_handle);
 	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
 
@@ -5874,6 +5886,13 @@ cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 		sme_qos_update_hand_off(vdev_id, false);
 	csr_set_default_dot11_mode(mac_ctx);
 
+	/*
+	 * Update the IEs after disconnection to remove
+	 * any connection specific capability change and
+	 * to reset back to self cap
+	 */
+	sme_set_vdev_ies_per_band(mac_handle, vdev_id,
+				  wlan_vdev_mlme_get_opmode(vdev));
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -8075,4 +8094,30 @@ void csr_process_sap_response(struct mac_context *mac_ctx,
 
 	wlan_vdev_mlme_ser_remove_request(vdev, cmd_id, cmd_type);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
+
+void csr_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id,
+			       enum QDF_OPMODE device_mode)
+{
+	struct sir_set_vdev_ies_per_band *p_msg;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	enum csr_cfgdot11mode curr_dot11_mode =
+			mac_ctx->roam.configParam.uCfgDot11Mode;
+
+	p_msg = qdf_mem_malloc(sizeof(*p_msg));
+	if (!p_msg)
+		return;
+
+	p_msg->vdev_id = vdev_id;
+	p_msg->device_mode = device_mode;
+	p_msg->dot11_mode = csr_get_vdev_dot11_mode(mac_ctx, vdev_id,
+						    curr_dot11_mode);
+	p_msg->msg_type = eWNI_SME_SET_VDEV_IES_PER_BAND;
+	p_msg->len = sizeof(*p_msg);
+	sme_debug("SET_VDEV_IES_PER_BAND: vdev_id %d dot11mode %d dev_mode %d",
+		  vdev_id, p_msg->dot11_mode, device_mode);
+	status = umac_send_mb_message_to_mac(p_msg);
+	if (QDF_STATUS_SUCCESS != status)
+		sme_err("Send eWNI_SME_SET_VDEV_IES_PER_BAND fail");
 }
