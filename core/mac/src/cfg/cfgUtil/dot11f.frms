@@ -1688,6 +1688,31 @@ IE reporting_reason (EID_REPORTING_REASON)
    }
 }
 
+const SUB_EID_BANDWIDTH_INDICATION     = 164;
+IE bw_indication (SUB_EID_BANDWIDTH_INDICATION)
+{
+   {
+       reserved: 1;
+       disabled_sub_chan_bitmap_present: 1;
+       reserved_1: 6;
+   }
+   {
+       channel_width: 3;
+       reserved_2: 5;
+   }
+   ccfs0, 1;
+   ccfs1, 1;
+   disabled_sub_chan_bitmap[2][0..1] COUNTIS disabled_sub_chan_bitmap_present;
+}
+
+const SUB_EID_WIDE_BW_CHANNEL_SWITCH     = 163;
+IE wide_bw_chan_switch (SUB_EID_WIDE_BW_CHANNEL_SWITCH)
+{
+   new_chan_width,           1;
+   new_center_chan_freq0,    1;
+   new_center_chan_freq1,    1;
+}
+
 IE MeasurementReport (EID_MEAS_REPORT)    // 7.3.2.22
 {
     token, 1;
@@ -1744,6 +1769,8 @@ IE MeasurementReport (EID_MEAS_REPORT)    // 7.3.2.22
             meas_start_time,   8;
             meas_duration,     2;
             chan_load,         1;
+            OPTIE wide_bw_chan_switch;
+            OPTIE bw_indication;
         }
        Beacon (type IS 5)
        {
@@ -3129,6 +3156,8 @@ IE MeasurementRequest (EID_MEAS_REQUEST)  // 7.3.2.21
            randomization_intv,      2;
            meas_duration,           2;
            OPTIE rrm_reporting;
+           OPTIE wide_bw_chan_switch;
+           OPTIE bw_indication;
        }
        Beacon (measurement_type IS 5)
        {
