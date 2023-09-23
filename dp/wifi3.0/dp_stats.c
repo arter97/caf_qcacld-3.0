@@ -2100,21 +2100,21 @@ static void dp_print_tx_pdev_mu_mimo_sch_stats_tlv(uint32_t *tag_buf)
 	DP_PRINT_STATS("mu_mimo_ppdu_posted = %u\n",
 		       dp_stats_buf->mu_mimo_ppdu_posted);
 
-	DP_PRINT_STATS("11ac MU_MIMO SCH STATS:");
+	DP_PRINT_STATS("\n11ac MU_MIMO SCH STATS:\n");
 
 	for (i = 0; i < HTT_TX_PDEV_STATS_NUM_AC_MUMIMO_USER_STATS; i++) {
 		DP_PRINT_STATS("ac_mu_mimo_sch_nusers_%u = %u", i,
 			       dp_stats_buf->ac_mu_mimo_sch_nusers[i]);
 	}
 
-	DP_PRINT_STATS("\n11ax MU_MIMO SCH STATS:");
+	DP_PRINT_STATS("\n11ax MU_MIMO SCH STATS:\n");
 
 	for (i = 0; i < HTT_TX_PDEV_STATS_NUM_AX_MUMIMO_USER_STATS; i++) {
 		DP_PRINT_STATS("ax_mu_mimo_sch_nusers_%u = %u", i,
 			       dp_stats_buf->ax_mu_mimo_sch_nusers[i]);
 	}
 
-	DP_PRINT_STATS("\n11ax OFDMA SCH STATS:");
+	DP_PRINT_STATS("\n11ax OFDMA SCH STATS:\n");
 
 	for (i = 0; i < HTT_TX_PDEV_STATS_NUM_AX_MUMIMO_USER_STATS; i++) {
 		DP_PRINT_STATS("ax_ofdma_sch_nusers_%u = %u", i,
@@ -2138,7 +2138,7 @@ static void dp_print_tx_pdev_mu_mimo_mpdu_stats_tlv(uint32_t *tag_buf)
 			HTT_STATS_TX_SCHED_MODE_MU_MIMO_AC) {
 		if (!dp_stats_buf->user_index)
 			DP_PRINT_STATS(
-				       "HTT_TX_PDEV_MU_MIMO_AC_MPDU_STATS:\n");
+				       "\nHTT_TX_PDEV_MU_MIMO_AC_MPDU_STATS:\n");
 
 		if (dp_stats_buf->user_index <
 			HTT_TX_PDEV_STATS_NUM_AC_MUMIMO_USER_STATS) {
@@ -2176,7 +2176,7 @@ static void dp_print_tx_pdev_mu_mimo_mpdu_stats_tlv(uint32_t *tag_buf)
 	if (dp_stats_buf->tx_sched_mode == HTT_STATS_TX_SCHED_MODE_MU_MIMO_AX) {
 		if (!dp_stats_buf->user_index)
 			DP_PRINT_STATS(
-				       "HTT_TX_PDEV_MU_MIMO_AX_MPDU_STATS:\n");
+				       "\nHTT_TX_PDEV_MU_MIMO_AX_MPDU_STATS:\n");
 
 		if (dp_stats_buf->user_index <
 				HTT_TX_PDEV_STATS_NUM_AX_MUMIMO_USER_STATS) {
@@ -2215,7 +2215,7 @@ static void dp_print_tx_pdev_mu_mimo_mpdu_stats_tlv(uint32_t *tag_buf)
 			HTT_STATS_TX_SCHED_MODE_MU_OFDMA_AX) {
 		if (!dp_stats_buf->user_index)
 			DP_PRINT_STATS(
-				       "HTT_TX_PDEV_AX_MU_OFDMA_MPDU_STATS:\n");
+				       "\nHTT_TX_PDEV_AX_MU_OFDMA_MPDU_STATS:\n");
 
 		if (dp_stats_buf->user_index <
 				HTT_TX_PDEV_STATS_NUM_OFDMA_USER_STATS) {
