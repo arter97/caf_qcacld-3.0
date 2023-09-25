@@ -2196,12 +2196,15 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 
 			if (lim_send_t2lm_action_rsp_frame(
 					mac_ctx, mac_hdr->sa, session, token,
-					status_code) != QDF_STATUS_SUCCESS)
+					status_code) != QDF_STATUS_SUCCESS) {
 				pe_err("T2LM action response frame not sent");
-			else
+			} else {
 				wlan_send_peer_level_tid_to_link_mapping(
 								session->vdev,
 								peer);
+				wlan_connectivity_t2lm_status_event(
+								session->vdev);
+			}
 			break;
 		case EHT_T2LM_RESPONSE:
 			wlan_t2lm_deliver_event(

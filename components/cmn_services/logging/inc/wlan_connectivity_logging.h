@@ -1253,13 +1253,11 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      bool is_rx, uint8_t subtype);
 /**
  * wlan_connectivity_t2lm_status_event() - Fill and send T2LM data
- * @psoc: Pointer to global psoc object
  * @vdev: vdev pointer
  *
  * Return: None
  */
-void wlan_connectivity_t2lm_status_event(struct wlan_objmgr_psoc *psoc,
-					 struct wlan_objmgr_vdev *vdev);
+void wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_populate_mlo_mgmt_event_param() - API to populate MLO management frame
@@ -1296,8 +1294,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 {}
 
 static inline void
-wlan_connectivity_t2lm_status_event(struct wlan_objmgr_psoc *psoc,
-				    struct wlan_objmgr_vdev *vdev)
+wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 {
 }
 
@@ -1561,6 +1558,11 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      qdf_freq_t freq,
 				      bool is_rx, uint8_t subtype)
 {}
+
+static inline void
+wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
+{
+}
 
 static inline void
 wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
