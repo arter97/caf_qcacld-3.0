@@ -2182,6 +2182,7 @@ rrm_process_channel_load_req(struct mac_context *mac,
 	load_ind->randomization_intv = SYS_TU_TO_MS(randomization_intv);
 	load_ind->measurement_idx = curr_req->measurement_idx;
 	load_ind->channel = channel;
+	load_ind->req_freq = chan_freq;
 	load_ind->op_class = op_class;
 	load_ind->meas_duration = meas_duration;
 	curr_req->token = chan_load_req->measurement_token;
@@ -2332,7 +2333,10 @@ rrm_process_chan_load_report_xmit(struct mac_context *mac_ctx,
 	channel_load_report->rrm_scan_tsf = chan_load_ind->rrm_scan_tsf;
 	channel_load_report->meas_duration = chan_load_ind->duration;
 	channel_load_report->chan_load = chan_load_ind->chan_load;
-
+	qdf_mem_copy(&channel_load_report->bw_ind, &chan_load_ind->bw_ind,
+		     sizeof(channel_load_report->bw_ind));
+	qdf_mem_copy(&channel_load_report->wide_bw, &chan_load_ind->wide_bw,
+		     sizeof(channel_load_report->wide_bw));
 	pe_err("send chan load report for bssId:"QDF_MAC_ADDR_FMT" reg_class:%d, channel:%d, measStartTime:%llu, measDuration:%d, chan_load:%d",
 	       QDF_MAC_ADDR_REF(sessionBssId.bytes),
 	       channel_load_report->op_class,

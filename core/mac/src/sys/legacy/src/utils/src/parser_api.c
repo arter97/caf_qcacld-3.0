@@ -7092,6 +7092,20 @@ populate_dot11f_chan_load_report(struct mac_context *mac,
 	dot11f->report.channel_load_report.chan_load =
 				channel_load_report->chan_load;
 
+	if (channel_load_report->wide_bw.is_wide_bw_chan_switch) {
+		dot11f->report.channel_load_report.wide_bw_chan_switch.present = 1;
+		dot11f->report.channel_load_report.wide_bw_chan_switch.new_chan_width = channel_load_report->wide_bw.channel_width;
+		dot11f->report.channel_load_report.wide_bw_chan_switch.new_center_chan_freq0 = channel_load_report->wide_bw.center_chan_freq0;
+		dot11f->report.channel_load_report.wide_bw_chan_switch.new_center_chan_freq1 = channel_load_report->wide_bw.center_chan_freq1;
+	}
+
+	if (channel_load_report->bw_ind.is_bw_ind_element) {
+		dot11f->report.channel_load_report.bw_indication.present = 1;
+		dot11f->report.channel_load_report.bw_indication.channel_width = channel_load_report->bw_ind.channel_width;
+		dot11f->report.channel_load_report.bw_indication.ccfs0 = channel_load_report->bw_ind.center_freq_seg0;
+		dot11f->report.channel_load_report.bw_indication.ccfs1 = channel_load_report->bw_ind.center_freq_seg1;
+	}
+
 	pe_debug("regClass %d chan %d meas_time %d meas_dur %d, chan_load %d",
 		 dot11f->report.channel_load_report.op_class,
 		 dot11f->report.channel_load_report.channel,

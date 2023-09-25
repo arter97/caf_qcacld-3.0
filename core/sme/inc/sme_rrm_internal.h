@@ -74,12 +74,16 @@ enum rrm_measurement_type {
 /**
  * enum channel_load_req_info: channel load request info
  * @channel: channel for which the host receives the channel load req from AP
+ * @req_chan_width: channel width for which the host receives the channel load
+ * req from AP
  * @rrm_scan_tsf: to store jiffies for RRM scan to process chan load req
  * @bw_ind: Contains info for Bandwidth Indication IE
  * @wide_bw: Contains info for Wide Bandwidth Channel IE
  */
 struct channel_load_req_info {
 	uint8_t channel;
+	qdf_freq_t req_freq;
+	enum phy_ch_width req_chan_width;
 	qdf_time_t rrm_scan_tsf;
 	struct bw_ind_element bw_ind;
 	struct wide_bw_chan_switch wide_bw;

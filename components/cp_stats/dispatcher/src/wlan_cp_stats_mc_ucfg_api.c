@@ -1049,23 +1049,23 @@ void ucfg_mc_cp_stats_register_lost_link_info_cb(
 }
 
 #ifdef QCA_SUPPORT_CP_STATS
-void wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
-				      uint8_t vdev_id, uint8_t channel,
-				      uint8_t *chan_load)
+uint8_t wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, qdf_freq_t req_freq)
 {
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_vdev *vdev;
 	struct pdev_cp_stats *pdev_cp_stats_priv;
 	struct per_channel_stats *channel_stats;
 	struct channel_status *channel_status_list;
-	uint8_t total_channel;
+	uint8_t total_channel, chan_load = 0;
 	uint8_t i;
 	uint32_t rx_clear_count = 0, cycle_count = 0;
+	bool found = false;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_CP_STATS_ID);
 	if (!vdev)
-		return;
+		return 0;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
@@ -1083,16 +1083,17 @@ void wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
 	channel_status_list = channel_stats->channel_status_list;
 	total_channel = channel_stats->total_channel;
 
-	for (i = 0; i < total_channel && i < NUM_CHANNELS; i++) {
-		if (channel_status_list[i].channel_id == channel) {
+	for (i = 0; i < total_channel; i++) {
+		if (channel_status_list[i].channel_freq == req_freq) {
 			rx_clear_count = channel_status_list[i].rx_clear_count;
 			cycle_count = channel_status_list[i].cycle_count;
+			found = true;
 			break;
 		}
 	}
 
-	if (i == total_channel) {
-		cp_stats_debug("no channel found for chan:%d", channel);
+	if (!found) {
+		cp_stats_debug("no channel found for freq:%d", req_freq);
 		goto release_ref;
 	}
 
@@ -1101,14 +1102,15 @@ void wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
 		goto release_ref;
 	}
 
-	*chan_load = ((rx_clear_count * 255) / cycle_count);
+	chan_load = ((rx_clear_count * 255) / cycle_count);
 
-	cp_stats_debug("t_chan:%d, chan:%d, rcc:%u, cc:%u, chan_load:%d",
-		       total_channel, channel, rx_clear_count, cycle_count,
-		       *chan_load);
+	cp_stats_debug("t_chan:%d, freq:%d, rcc:%u, cc:%u, chan_load:%d",
+		       total_channel, req_freq, rx_clear_count, cycle_count,
+		       chan_load);
 
 release_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+	return chan_load;
 }
 #endif
 

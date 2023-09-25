@@ -66,11 +66,11 @@ struct rrm_reporting {
 /**
  * struct bw_ind_element - Contains info for Bandwidth Indication IE
  * present in channel load request received from AP
- * @s_bw_ind_element: to check Bandwidth Indication optional IE present
+ * @is_bw_ind_element: to check Bandwidth Indication optional IE present
  * @channel_width: channel width
  * @ccfi0: center channel frequency index segment 0
  * @ccfi1: center channel frequency index segment 1
- * @center_chan_freq: center freq segment  for 320 MHz request
+ * @center_freq: center freq segment  for 320 MHz request
  */
 struct bw_ind_element {
 	bool is_bw_ind_element;
@@ -105,6 +105,7 @@ struct wide_bw_chan_switch {
  * @msg_source: message source of type enum tRrmMsgReqSource
  * @op_class: regulatory class
  * @channel: channel number
+ * @req_freq: freq as per channel load req
  * @randomization_intv: Random interval in ms
  * @meas_duration: measurement duration in ms
  * @bw_ind: Info for bandwidth indication IE
@@ -119,6 +120,7 @@ struct ch_load_ind {
 	tRrmMsgReqSource msg_source;
 	uint8_t op_class;
 	uint8_t channel;
+	qdf_freq_t req_freq;
 	uint16_t randomization_intv;
 	uint16_t meas_duration;
 	struct bw_ind_element bw_ind;
@@ -138,6 +140,8 @@ struct ch_load_ind {
  * @chan_load: channel utilization measurement
  * @rrm_scan_tsf: time at which driver triggers rrm scan for channel load
  * @is_report_success: need to send failure report or not
+ * @bw_ind: Info for bandwidth indication IE
+ * @wide_bw: Info for wide bandwidth channel switch IE
  */
 struct chan_load_xmit_ind {
 	uint16_t messageType;
@@ -151,6 +155,8 @@ struct chan_load_xmit_ind {
 	uint8_t chan_load;
 	qdf_time_t rrm_scan_tsf;
 	bool is_report_success;
+	struct bw_ind_element bw_ind;
+	struct wide_bw_chan_switch wide_bw;
 };
 
 typedef struct sSirBeaconReportReqInd {
