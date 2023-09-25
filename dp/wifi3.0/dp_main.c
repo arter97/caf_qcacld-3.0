@@ -11613,6 +11613,9 @@ dp_set_psoc_param(struct cdp_soc_t *cdp_soc,
 		wlan_cfg_set_ast_indication_disable
 			(wlan_cfg_ctx, val.cdp_ast_indication_disable);
 		break;
+	case CDP_CONFIG_DP_DEBUG_LOG:
+		soc->dp_debug_log_en = val.cdp_psoc_param_dp_debug_log;
+		break;
 	default:
 		break;
 	}
@@ -11655,6 +11658,9 @@ static QDF_STATUS dp_get_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_CFG_PEER_JITTER_STATS:
 		val->cdp_psoc_param_jitter_stats =
 			wlan_cfg_is_peer_jitter_stats_enabled(soc->wlan_cfg_ctx);
+		break;
+	case CDP_CONFIG_DP_DEBUG_LOG:
+		val->cdp_psoc_param_dp_debug_log = soc->dp_debug_log_en;
 		break;
 	default:
 		dp_warn("Invalid param");

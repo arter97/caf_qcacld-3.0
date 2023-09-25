@@ -1536,6 +1536,7 @@ typedef union cdp_config_param_t {
 	int cdp_psoc_param_preferred_hw_mode;
 	bool cdp_psoc_param_pext_stats;
 	bool cdp_psoc_param_jitter_stats;
+	bool cdp_psoc_param_dp_debug_log;
 
 	bool cdp_skip_bar_update;
 	bool cdp_ipa_enabled;
@@ -1706,6 +1707,7 @@ enum cdp_vdev_param_type {
  * @CDP_UMAC_RESET_STATS: UMAC reset stats
  * @CDP_CFG_AST_INDICATION_DISABLE: AST indication disable
  * @CDP_CFG_PEER_JITTER_STATS: Peer Jitter Stats
+ * @CDP_CONFIG_DP_DEBUG_LOG: set/get dp debug logging
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1720,6 +1722,7 @@ enum cdp_psoc_param_type {
 	CDP_UMAC_RESET_STATS,
 	CDP_CFG_AST_INDICATION_DISABLE,
 	CDP_CFG_PEER_JITTER_STATS,
+	CDP_CONFIG_DP_DEBUG_LOG,
 };
 
 #define TXRX_FW_STATS_TXSTATS                     1

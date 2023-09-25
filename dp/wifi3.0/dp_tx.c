@@ -419,10 +419,11 @@ dp_tx_desc_release(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
 							     soc->hal_soc);
 	else
 		comp_status = HAL_TX_COMP_RELEASE_REASON_FW;
-
-	dp_tx_debug("Tx Completion Release desc %d status %d outstanding %d",
-		    tx_desc->id, comp_status,
-		    qdf_atomic_read(&pdev->num_tx_outstanding));
+	if (soc->dp_debug_log_en) {
+		dp_tx_debug("Tx Completion Release desc %d status %d outstanding %d",
+			    tx_desc->id, comp_status,
+			    qdf_atomic_read(&pdev->num_tx_outstanding));
+	}
 
 	if (tx_desc->flags & DP_TX_DESC_FLAG_SPECIAL)
 		dp_tx_spcl_desc_free(soc, tx_desc, desc_pool_id);
@@ -5370,37 +5371,38 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 				 qdf_nbuf_data_addr(nbuf),
 				 sizeof(qdf_nbuf_data(nbuf)),
 				 tx_desc->id, ts->status, dp_status));
-
-	dp_tx_comp_debug("-------------------- \n"
-			 "Tx Completion Stats: \n"
-			 "-------------------- \n"
-			 "ack_frame_rssi = %d \n"
-			 "first_msdu = %d \n"
-			 "last_msdu = %d \n"
-			 "msdu_part_of_amsdu = %d \n"
-			 "rate_stats valid = %d \n"
-			 "bw = %d \n"
-			 "pkt_type = %d \n"
-			 "stbc = %d \n"
-			 "ldpc = %d \n"
-			 "sgi = %d \n"
-			 "mcs = %d \n"
-			 "ofdma = %d \n"
-			 "tones_in_ru = %d \n"
-			 "tsf = %d \n"
-			 "ppdu_id = %d \n"
-			 "transmit_cnt = %d \n"
-			 "tid = %d \n"
-			 "peer_id = %d\n"
-			 "tx_status = %d\n"
-			 "tx_release_source = %d\n",
-			 ts->ack_frame_rssi, ts->first_msdu,
-			 ts->last_msdu, ts->msdu_part_of_amsdu,
-			 ts->valid, ts->bw, ts->pkt_type, ts->stbc,
-			 ts->ldpc, ts->sgi, ts->mcs, ts->ofdma,
-			 ts->tones_in_ru, ts->tsf, ts->ppdu_id,
-			 ts->transmit_cnt, ts->tid, ts->peer_id,
-			 ts->status, ts->release_src);
+	if (soc->dp_debug_log_en) {
+		dp_tx_comp_debug("--------------------\n"
+				 "Tx Completion Stats:\n"
+				 "--------------------\n"
+				 "ack_frame_rssi = %d\n"
+				 "first_msdu = %d\n"
+				 "last_msdu = %d\n"
+				 "msdu_part_of_amsdu = %d\n"
+				 "rate_stats valid = %d\n"
+				 "bw = %d\n"
+				 "pkt_type = %d\n"
+				 "stbc = %d\n"
+				 "ldpc = %d\n"
+				 "sgi = %d\n"
+				 "mcs = %d\n"
+				 "ofdma = %d\n"
+				 "tones_in_ru = %d\n"
+				 "tsf = %d\n"
+				 "ppdu_id = %d\n"
+				 "transmit_cnt = %d\n"
+				 "tid = %d\n"
+				 "peer_id = %d\n"
+				 "tx_status = %d\n"
+				 "tx_release_source = %d\n",
+				 ts->ack_frame_rssi, ts->first_msdu,
+				 ts->last_msdu, ts->msdu_part_of_amsdu,
+				 ts->valid, ts->bw, ts->pkt_type, ts->stbc,
+				 ts->ldpc, ts->sgi, ts->mcs, ts->ofdma,
+				 ts->tones_in_ru, ts->tsf, ts->ppdu_id,
+				 ts->transmit_cnt, ts->tid, ts->peer_id,
+				 ts->status, ts->release_src);
+	}
 
 	/* Update SoC level stats */
 	DP_STATS_INCC(soc, tx.dropped_fw_removed, 1,
