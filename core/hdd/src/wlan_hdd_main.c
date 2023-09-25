@@ -248,6 +248,7 @@
 #include "os_if_dp_local_pkt_capture.h"
 #include <wlan_mlo_mgr_link_switch.h>
 #include "cdp_txrx_mon.h"
+#include "os_if_ll_sap.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -18983,6 +18984,26 @@ static void hdd_vdev_mgr_unregister_cb(void)
 }
 
 /**
+ * hdd_ll_sap_register_cb() - Register ll_sap osif callbacks
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS hdd_ll_sap_register_cb(void)
+{
+	return osif_ll_sap_register_cb();
+}
+
+/**
+ * hdd_ll_sap_unregister_cb() - Un-register ll_sap osif callbacks
+ *
+ * Return: void
+ */
+static void hdd_ll_sap_unregister_cb(void)
+{
+	osif_ll_sap_unregister_cb();
+}
+
+/**
  * hdd_component_cb_init() - Initialize component callbacks
  *
  * This function initializes hdd callbacks to different
@@ -19011,8 +19032,14 @@ static QDF_STATUS hdd_component_cb_init(void)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto hdd_vdev_mgr_unregister_cb;
 
+	status = hdd_ll_sap_register_cb();
+	if (QDF_IS_STATUS_ERROR(status))
+		goto pre_cac_unregister_cb;
+
 	return QDF_STATUS_SUCCESS;
 
+pre_cac_unregister_cb:
+	hdd_pre_cac_unregister_cb();
 hdd_vdev_mgr_unregister_cb:
 	hdd_vdev_mgr_unregister_cb();
 cm_unregister_cb:
@@ -19030,6 +19057,7 @@ cm_unregister_cb:
  */
 static void hdd_component_cb_deinit(void)
 {
+	hdd_ll_sap_unregister_cb();
 	hdd_pre_cac_unregister_cb();
 	hdd_vdev_mgr_unregister_cb();
 	hdd_cm_unregister_cb();

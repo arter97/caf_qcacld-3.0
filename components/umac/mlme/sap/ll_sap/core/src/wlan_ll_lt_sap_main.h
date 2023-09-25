@@ -76,4 +76,13 @@ QDF_STATUS
 ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
 			       struct wlan_bearer_switch_request *bs_request);
 
+/**
+ * ll_lt_sap_request_for_audio_transport_switch() - Handls audio transport
+ * switch request from userspace
+ * @req_type: requested transport switch type
+ *
+ * Return: True/False
+ */
+QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
+					enum bearer_switch_req_type req_type);
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

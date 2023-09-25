@@ -150,6 +150,24 @@ QDF_STATUS ll_lt_sap_switch_bearer_to_ble(
 				struct wlan_objmgr_psoc *psoc,
 				struct wlan_bearer_switch_request *bs_request)
 {
-	return bs_sm_deliver_event(psoc, WLAN_BS_SM_EV_SWITCH_TO_WLAN,
+	return bs_sm_deliver_event(psoc, WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN,
 				   sizeof(*bs_request), bs_request);
+}
+
+QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
+					enum bearer_switch_req_type req_type)
+{
+	/*
+	 * return status as QDF_STATUS_SUCCESS or failure based on the current
+	 * pending requests of the transport switch
+	 */
+	if (req_type == WLAN_BS_REQ_TO_NON_WLAN) {
+		ll_sap_debug("request SWITCH_TYPE_NON_WLAN accepted");
+		return QDF_STATUS_SUCCESS;
+	} else if (req_type == WLAN_BS_REQ_TO_WLAN) {
+		ll_sap_debug("request SWITCH_TYPE_WLAN accepted");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return QDF_STATUS_E_RESOURCES;
 }

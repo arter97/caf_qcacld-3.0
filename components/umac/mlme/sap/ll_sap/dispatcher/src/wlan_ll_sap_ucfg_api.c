@@ -39,9 +39,18 @@ bool ucfg_is_ll_lt_sap_supported(void)
 }
 
 QDF_STATUS ucfg_ll_lt_sap_request_for_audio_transport_switch(
-						uint8_t transport_switch_type)
+					enum bearer_switch_req_type req_type)
 {
-	return ll_lt_sap_request_for_audio_transport_switch(
-							transport_switch_type);
+	return ll_lt_sap_request_for_audio_transport_switch(req_type);
+}
+
+void ucfg_ll_sap_register_cb(struct ll_sap_ops *ll_sap_global_ops)
+{
+	ll_sap_register_os_if_cb(ll_sap_global_ops);
+}
+
+void ucfg_ll_sap_unregister_cb(void)
+{
+	ll_sap_unregister_os_if_cb();
 }
 

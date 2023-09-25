@@ -289,6 +289,7 @@ _fixed_ipaths = [
     "os_if/dp/inc",
     "os_if/fw_offload/inc",
     "os_if/interop_issues_ap/inc",
+    "os_if/mlme/sap/ll_sap/inc",
     "os_if/nan/inc",
     "os_if/p2p/inc",
     "os_if/pkt_capture/inc",
@@ -2097,6 +2098,7 @@ _conditional_srcs = {
             "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_lt_sap_main.c",
             "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_sap_main.c",
             "components/cmn_services/policy_mgr/src/wlan_policy_mgr_ll_sap.c",
+            "os_if/mlme/sap/ll_sap/src/os_if_ll_sap.c",
         ],
     },
 }

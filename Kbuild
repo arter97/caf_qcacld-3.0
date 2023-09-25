@@ -1636,8 +1636,10 @@ MLME_OBJS += $(WFA_TGT_IF_DIR)/src/target_if_wfa_testcmd.o \
 
 ####### LL_SAP #######
 LL_SAP_DIR := components/umac/mlme/sap/ll_sap
+LL_SAP_OS_IF_DIR := os_if/mlme/sap/ll_sap
 
 LL_SAP_INC := -I$(WLAN_ROOT)/$(LL_SAP_DIR)/dispatcher/inc \
+		-I$(WLAN_ROOT)/$(LL_SAP_OS_IF_DIR)/inc
 
 MLME_INC += $(LL_SAP_INC)
 
@@ -1646,7 +1648,8 @@ MLME_OBJS += $(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_ucfg_api.o \
 		$(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_api.o \
 		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o \
 		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_main.o \
-		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_bearer_switch.o
+		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_bearer_switch.o \
+		$(LL_SAP_OS_IF_DIR)/src/os_if_ll_sap.o
 endif
 
 $(call add-wlan-objs,mlme,$(MLME_OBJS))

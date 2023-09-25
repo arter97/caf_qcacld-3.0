@@ -32,12 +32,12 @@ typedef uint32_t wlan_bs_req_id;
 
 /**
  * enum bearer_switch_req_type: Bearer switch request type
- * @WLAN_BS_REQ_TO_WLAN: Bearer switch request to wlan
  * @WLAN_BS_REQ_TO_NON_WLAN: Bearer switch request to non-wlan
+ * @WLAN_BS_REQ_TO_WLAN: Bearer switch request to wlan
  */
 enum bearer_switch_req_type {
-	WLAN_BS_REQ_TO_WLAN = 0,
-	WLAN_BS_REQ_TO_NON_WLAN = 1,
+	WLAN_BS_REQ_TO_NON_WLAN = 0,
+	WLAN_BS_REQ_TO_WLAN = 1,
 };
 
 /**
@@ -58,6 +58,7 @@ enum bearer_switch_req_source {
  * typedef bearer_switch_requester_cb() - Callback function, which will
  * be invoked with the bearer switch request status.
  * @psoc: Psoc pointer
+ * @vdev_id: Vdev id of the requester
  * @request_id: Request ID
  * @status: Status of the bearer switch request
  * @req_value: Request value for the bearer switch request
@@ -96,6 +97,17 @@ struct wlan_bearer_switch_request {
 	bearer_switch_requester_cb requester_cb;
 	uint32_t arg_value;
 	void *arg;
+};
+
+/**
+ * struct ll_sap_ops - ll_sap osif callbacks
+ * @ll_sap_send_audio_transport_switch_req_cb: Send audio transport request to
+ * userspace
+ */
+struct ll_sap_ops {
+		void (*ll_sap_send_audio_transport_switch_req_cb)(
+					struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_req_type req_type);
 };
 
 #endif /* _WLAN_LL_LT_SAP_BEARER_SWITCH_PUBLIC_STRUCTS_H_ */
