@@ -67,4 +67,13 @@ struct pdev_mlme_obj {
 	qdf_atomic_t multivdev_restart_wait_cnt;
 };
 
+#ifdef MOBILE_DFS_SUPPORT
+static inline
+bool wlan_rptr_check_rpt_max_phy(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
+#else
+bool wlan_rptr_check_rpt_max_phy(struct wlan_objmgr_pdev *pdev);
+#endif /* MOBILE_DFS_SUPPORT */
 #endif
