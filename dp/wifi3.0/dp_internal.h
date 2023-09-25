@@ -1979,6 +1979,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 					_srcobj->tx.dropped.fw_rem_notx; \
 		_tgtobj->tx.dropped.fw_rem_tx += \
 					_srcobj->tx.dropped.fw_rem_tx; \
+		_tgtobj->tx.dropped.fw_rem_tx_bytes += \
+					_srcobj->tx.dropped.fw_rem_tx_bytes; \
 		_tgtobj->tx.dropped.age_out += _srcobj->tx.dropped.age_out; \
 		_tgtobj->tx.dropped.fw_reason1 += \
 					_srcobj->tx.dropped.fw_reason1; \

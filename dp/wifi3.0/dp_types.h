@@ -4398,6 +4398,7 @@ struct dp_peer_per_pkt_tx_stats {
 		struct cdp_pkt_info fw_rem;
 		uint32_t fw_rem_notx;
 		uint32_t fw_rem_tx;
+		uint64_t fw_rem_tx_bytes;
 		uint32_t age_out;
 		uint32_t fw_reason1;
 		uint32_t fw_reason2;
