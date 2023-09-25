@@ -66,6 +66,7 @@ struct wmi_mlo_teardown_params {
 	uint32_t pdev_id;
 	enum wmi_mlo_teardown_reason reason;
 	bool umac_reset;
+	bool standby_active;
 };
 
 /** enum wmi_mlo_setup_status - Status code in WMI MLO setup completion event
