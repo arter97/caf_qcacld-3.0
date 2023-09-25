@@ -26,6 +26,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlme_api.h"
 #include "cdp_txrx_ctrl.h"
+#include "wlan_mlo_mgr_peer.h"
 
 #ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 static struct wlan_connectivity_log_buf_data global_cl;
@@ -887,6 +888,46 @@ wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+
+#define BAND_TO_BITMAP(band) (band - 1)
+
+static uint8_t
+wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
+				  uint16_t link_bitmap)
+{
+	uint8_t i, band_bitmap = 0, band;
+	struct wlan_mlo_dev_context *mldev = NULL;
+	struct wlan_mlo_peer_context *mlpeer = NULL;
+	struct mlo_link_info *link_info = NULL;
+	uint32_t freq;
+
+	mlpeer = wlan_mlo_get_mlpeer_by_peer_mladdr(peer_mld, &mldev);
+	if (!mlpeer) {
+		logging_err("ml peer not found");
+		goto out;
+	}
+
+	for (i = 0; i < MAX_MLO_LINK_ID; i++) {
+		if (IS_LINK_SET(link_bitmap, i)) {
+			link_info = mlo_mgr_get_ap_link_by_link_id(mldev, i);
+			if (!link_info) {
+				logging_err("link: %d info does not exist", i);
+				continue;
+			}
+
+			freq = link_info->link_chan_info->ch_freq;
+			band = wlan_convert_freq_to_diag_band(freq);
+			if (band == WLAN_INVALID_BAND)
+				continue;
+
+			band_bitmap |= BIT(BAND_TO_BITMAP(band));
+		}
+	}
+
+out:
+	return band_bitmap;
+}
+
 void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 					     struct mlo_link_switch_params *src)
 {
@@ -894,15 +935,18 @@ void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_diag_mlo_link_status);
 
 	qdf_mem_zero(&wlan_diag_event,
-
 		     sizeof(struct wlan_diag_mlo_link_status));
 
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
 	wlan_diag_event.version = DIAG_MLO_LINK_STATUS_VERSION;
 
-	wlan_diag_event.active_link = src->active_link_bitmap;
-	wlan_diag_event.prev_active_link = src->prev_link_bitmap;
+	wlan_diag_event.active_link =
+		wlan_convert_link_id_to_diag_band(&src->mld_addr,
+						  src->active_link_bitmap);
+	wlan_diag_event.prev_active_link =
+		wlan_convert_link_id_to_diag_band(&src->mld_addr,
+						  src->prev_link_bitmap);
 	wlan_diag_event.reason = src->reason_code;
 	wlan_diag_event.diag_cmn.fw_timestamp = src->fw_timestamp;
 
