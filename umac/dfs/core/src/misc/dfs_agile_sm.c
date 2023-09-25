@@ -503,6 +503,8 @@ static void dfs_agile_state_running_entry(void *ctx)
 
 	dfs_agile_set_curr_state(dfs_soc, DFS_AGILE_S_RUNNING);
 
+	qdf_mem_zero(&dfs->adfs_completion_status, sizeof(struct adfs_completion_params));
+
 	/* RCAC */
 	if (dfs_is_agile_rcac_enabled(dfs)) {
 		dfs_soc->ocac_status = OCAC_RESET;
@@ -1024,6 +1026,7 @@ dfs_rcac_timeout(qdf_hrtimer_data_t *arg)
 	dfs = dfs_soc_obj->dfs_priv[dfs_soc_obj->cur_agile_dfs_index].dfs;
 
 	dfs_soc_obj->ocac_status = OCAC_SUCCESS;
+	dfs_fill_adfs_completion_params(dfs, OCAC_SUCCESS);
 	dfs_agile_sm_deliver_evt(dfs_soc_obj,
 				DFS_AGILE_SM_EV_AGILE_DONE,
 				0,

@@ -644,6 +644,24 @@ void dfs_find_pdev_for_agile_precac(struct wlan_objmgr_pdev *pdev,
 	   (dfs_soc_obj->cur_agile_dfs_index + 1) % dfs_soc_obj->num_dfs_privs;
 }
 
+void dfs_fill_adfs_completion_params(struct wlan_dfs *dfs,
+				     enum ocac_status_type ocac_status)
+{
+	struct adfs_completion_params *adfs_completion_status;
+	qdf_freq_t ch_freq = dfs->dfs_agile_precac_freq_mhz;
+
+	adfs_completion_status = &dfs->adfs_completion_status;
+
+	adfs_completion_status->ocac_status = ocac_status;
+	adfs_completion_status->center_freq1 =
+		(ch_freq == RESTRICTED_80P80_CHAN_CENTER_FREQ) ?
+		(RESTRICTED_80P80_LEFT_80_CENTER_FREQ) : ch_freq;
+	adfs_completion_status->center_freq2 =
+		(ch_freq == RESTRICTED_80P80_CHAN_CENTER_FREQ) ?
+		(RESTRICTED_80P80_RIGHT_80_CENTER_FREQ) : 0;
+	adfs_completion_status->chan_width = dfs->dfs_precac_chwidth;
+}
+
 void dfs_fill_adfs_chan_params(struct wlan_dfs *dfs,
 			       struct dfs_agile_cac_params *adfs_param)
 {
