@@ -5590,11 +5590,9 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 			return false;
 		}
 
-		if (!policy_mgr_is_dbs_enable(psoc) ||
-		    !pm_ctx->cfg.sta_sap_scc_on_dfs_chnl  ||
-		    !pm_ctx->cfg.sta_sap_scc_on_lte_coex_chnl) {
+		if (!policy_mgr_is_dbs_enable(psoc)) {
 			policy_mgr_err(
-				"Couldn't start 4th port for bad cfg of dual mac, dfs scc, lte coex scc");
+				"Couldn't start 4th port for bad cfg of dual mac");
 			return false;
 		}
 		for (i = 0; i < pcl.pcl_len; i++)
