@@ -1958,6 +1958,10 @@ config BCN_RATECODE_ENABLE
 	bool "enable CONFIG_BCN_RATECODE_ENABLE"
 	default n
 
+config WLAN_DP_TXPOOL_SHARE
+	bool "enable CONFIG_WLAN_DP_TXPOOL_SHARE"
+	default n
+
 config WLAN_SYSFS_RF_TEST_MODE
 	bool "enable CONFIG_WLAN_SYSFS_RF_TEST_MODE"
 	default n

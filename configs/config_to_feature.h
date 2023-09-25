@@ -3027,4 +3027,10 @@
 #endif
 #endif
 
+#ifdef CONFIG_WLAN_FEATURE_MULTI_LINK_SAP
+#ifdef CONFIG_WLAN_DP_TXPOOL_SHARE
+#define WLAN_DP_TXPOOL_SHARE (1)
+#endif
+#endif
+
 #endif /* CONFIG_TO_FEATURE_H */
