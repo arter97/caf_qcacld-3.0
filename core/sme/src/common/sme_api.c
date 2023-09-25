@@ -2656,8 +2656,7 @@ static void sme_process_chan_info_event(struct mac_context *mac,
 		return;
 	}
 
-	if (mac->sap.acs_with_more_param || sap_is_acs_scan_optimize_enable())
-		wlan_cp_stats_update_chan_info(mac->psoc, chan_stats, vdev_id);
+	wlan_cp_stats_update_chan_info(mac->psoc, chan_stats, vdev_id);
 
 	sme_indicate_chan_info_event(mac, chan_stats, vdev_id);
 }

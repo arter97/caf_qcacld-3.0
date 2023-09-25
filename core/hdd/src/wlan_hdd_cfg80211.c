@@ -211,6 +211,8 @@
 #include <wlan_ll_sap_ucfg_api.h>
 #include <wlan_mlo_mgr_link_switch.h>
 #include <wlan_hdd_ll_lt_sap.h>
+#include "wlan_cp_stats_mc_defs.h"
+
 /*
  * A value of 100 (milliseconds) can be sent to FW.
  * FW would enable Tx beamforming based on this.

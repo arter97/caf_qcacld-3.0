@@ -4370,24 +4370,6 @@ struct wow_pulse_mode {
  */
 QDF_STATUS umac_send_mb_message_to_mac(void *msg);
 
-/* Max supported bandwidth is 320Mhz, so max 16 subbands fo 20Mhz */
-#define MAX_WIDE_BAND_SCAN_CHAN 16
-
-/**
- * struct wide_band_scan_chan_info - wide band scan channel info
- * @vdev_id: vdev id
- * @num_chan: number of channels (for each subbands fo 20Mhz)
- * @is_wide_band_scan: wide band scan or not
- * @cca_busy_subband_info: CCA busy for each possible 20Mhz subbands
- * of the wideband scan channel
- */
-struct wide_band_scan_chan_info {
-	uint32_t vdev_id;
-	uint8_t num_chan;
-	bool is_wide_band_scan;
-	uint32_t cca_busy_subband_info[MAX_WIDE_BAND_SCAN_CHAN];
-};
-
 /**
  * struct scan_chan_info - channel info
  * @freq: radio frequence
