@@ -726,7 +726,6 @@ static QDF_STATUS policy_mgr_modify_pcl_based_on_enabled_channels(
 			pm_ctx->pdev, pcl_list_org[i],
 			REG_CURRENT_PWR_MODE)) ||
 		    (allow_go_scc_on_dfs_chn &&
-		     policy_mgr_is_sta_sap_scc(psoc, pcl_list_org[i]) &&
 		     wlan_reg_is_dfs_for_freq(pm_ctx->pdev, pcl_list_org[i]))) {
 			pcl_list_org[pcl_len] = pcl_list_org[i];
 			weight_list_org[pcl_len++] = weight_list_org[i];
