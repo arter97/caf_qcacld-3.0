@@ -48,6 +48,11 @@ static ssize_t hdd_sysfs_rf_test_mode_show(struct kobject *kobj,
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	ssize_t errno_size;
 
+	if (!hdd_ctx) {
+		hdd_err_rl("invalid input");
+		return -EINVAL;
+	}
+
 	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
 					     &psoc_sync);
 	if (errno_size)
@@ -112,6 +117,11 @@ hdd_sysfs_rf_test_mode_store(struct kobject *kobj,
 	struct osif_psoc_sync *psoc_sync;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	ssize_t errno_size;
+
+	if (!hdd_ctx) {
+		hdd_err_rl("invalid input");
+		return -EINVAL;
+	}
 
 	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
 					     &psoc_sync);
