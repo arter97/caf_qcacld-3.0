@@ -241,6 +241,7 @@ struct sawf_fw_mpdu_stats {
  * @ingress_rate: ingress-rate
  * @tid: tid used for transmit
  * @msduq: msdu-queue used for transmit
+ * @reinject_pkt: reinject packet
  */
 struct sawf_tx_stats {
 	struct cdp_pkt_info tx_success;
@@ -265,6 +266,7 @@ struct sawf_tx_stats {
 	uint32_t failed_retry_count;
 	uint8_t tid;
 	uint8_t msduq;
+	uint16_t reinject_pkt;
 };
 #endif /* CONFIG_SAWF */
 #endif /* _CDP_TXRX_EXTD_STRUCT_H_ */
