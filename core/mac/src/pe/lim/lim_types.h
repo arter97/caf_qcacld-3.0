@@ -1625,6 +1625,15 @@ void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 void lim_process_sae_auth_timeout(struct mac_context *mac_ctx);
 
 /**
+ * lim_process_rrm_sta_stats_rsp_timeout() - This function is called to process
+ * sta stats response timeout
+ * @mac_ctx: Pointer to Global MAC structure
+ *
+ * @Return: None
+ */
+void lim_process_rrm_sta_stats_rsp_timeout(struct mac_context *mac_ctx);
+
+/**
  * lim_send_frame() - API to send frame
  * @mac_ctx Pointer to Global MAC structure
  * @vdev_id: vdev id

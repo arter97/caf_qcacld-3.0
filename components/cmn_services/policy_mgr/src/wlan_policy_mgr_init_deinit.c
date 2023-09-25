@@ -797,6 +797,8 @@ QDF_STATUS policy_mgr_register_sme_cb(struct wlan_objmgr_psoc *psoc,
 		sme_cbacks->sme_rso_stop_cb;
 	pm_ctx->sme_cbacks.sme_change_sap_csa_count =
 		sme_cbacks->sme_change_sap_csa_count;
+	pm_ctx->sme_cbacks.sme_sap_update_ch_width =
+		sme_cbacks->sme_sap_update_ch_width;
 
 	return QDF_STATUS_SUCCESS;
 }

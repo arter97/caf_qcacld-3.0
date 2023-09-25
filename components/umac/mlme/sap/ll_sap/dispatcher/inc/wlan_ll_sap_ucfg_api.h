@@ -46,6 +46,16 @@ QDF_STATUS ucfg_ll_sap_deinit(void);
  */
 bool ucfg_is_ll_lt_sap_supported(void);
 
+/**
+ * ucfg_ll_lt_sap_request_for_audio_transport_switch() - Request to switch the
+ * audio transport medium
+ * @transport_switch_type: Requested transport switch type
+ *
+ * Return: Accepted/Rejected
+ */
+QDF_STATUS ucfg_ll_lt_sap_request_for_audio_transport_switch(
+						uint8_t transport_switch_type);
+
 #else
 static inline QDF_STATUS ucfg_ll_sap_init(void)
 {
@@ -60,6 +70,12 @@ static inline QDF_STATUS ucfg_ll_sap_deinit(void)
 static inline bool ucfg_is_ll_lt_sap_supported(void)
 {
 	return false;
+}
+
+static inline QDF_STATUS
+ucfg_ll_lt_sap_request_for_audio_transport_switch(uint8_t transport_switch_type)
+{
+	return QDF_STATUS_E_INVAL;
 }
 
 #endif /* WLAN_FEATURE_LL_LT_SAP */

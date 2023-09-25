@@ -205,7 +205,7 @@ static QDF_STATUS tdls_vdev_init(struct tdls_vdev_priv_obj *vdev_obj)
 				WLAN_TDLS_PEER_SUB_LIST_SIZE);
 	}
 	qdf_mc_timer_init(&vdev_obj->peer_update_timer, QDF_TIMER_TYPE_SW,
-			  tdls_ct_handler, soc_obj->soc);
+			  tdls_ct_handler, vdev_obj->vdev);
 	qdf_mc_timer_init(&vdev_obj->peer_discovery_timer, QDF_TIMER_TYPE_SW,
 			  tdls_discovery_timeout_peer_cb, vdev_obj->vdev);
 

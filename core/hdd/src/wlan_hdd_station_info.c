@@ -141,6 +141,8 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_REQ_IES
 #define REMOTE_CH_WIDTH_V2\
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_CH_WIDTH_V2
+#define EHT_OPERATION \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_EHT_OPERATION
 
 /*
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
@@ -767,6 +769,39 @@ static uint32_t hdd_get_he_op_len(struct hdd_station_ctx *hdd_sta_ctx)
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+static int32_t hdd_add_eht_oper_info(struct sk_buff *skb,
+				     struct hdd_station_ctx *hdd_sta_ctx)
+{
+	int32_t ret = 0;
+	struct hdd_connection_info *conn_info;
+
+	conn_info = &hdd_sta_ctx->cache_conn_info;
+	if (!conn_info->eht_oper_len)
+		return -EINVAL;
+
+	if (nla_put(skb, EHT_OPERATION, conn_info->eht_oper_len,
+		    &conn_info->eht_operation)) {
+		ret = -EINVAL;
+	} else {
+		hdd_nofl_debug("STA EHT operation:");
+		qdf_trace_hex_dump(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   (uint8_t *)&conn_info->eht_operation,
+				   conn_info->eht_oper_len);
+	}
+
+	return ret;
+}
+#else
+static inline int32_t hdd_add_eht_oper_info(
+					struct sk_buff *skb,
+					struct hdd_station_ctx *hdd_sta_ctx)
+{
+	return 0;
+}
+#endif
+
 static uint32_t hdd_get_prev_connected_bss_ies_len(
 					struct hdd_station_ctx *hdd_sta_ctx)
 {
@@ -917,6 +952,10 @@ hdd_populate_station_info_skb(struct sk_buff *skb,
 
 	if (hdd_add_he_oper_info(skb, hdd_sta_ctx)) {
 		hdd_err("he operation info put fail");
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (hdd_add_eht_oper_info(skb, hdd_sta_ctx)) {
+		hdd_err("eht operation info put fail");
 		return QDF_STATUS_E_FAILURE;
 	}
 

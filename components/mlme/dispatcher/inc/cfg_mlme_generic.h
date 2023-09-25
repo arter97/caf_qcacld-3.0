@@ -1195,7 +1195,7 @@ enum wlan_epcs_frame {
  *
  * Supported Feature: STA
  */
-#define CFG_T2LM_NEGOTIATION_SUPPORT CFG_UINT( \
+#define CFG_T2LM_NEGOTIATION_SUPPORT CFG_INI_UINT( \
 					"t2lm_negotiation_supported", \
 					T2LM_NEGOTIATION_DISABLED, \
 					T2LM_NEGOTIATION_DISJOINT_MAPPING, \

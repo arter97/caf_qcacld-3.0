@@ -229,6 +229,19 @@ int dp_post_dhcp_ind(struct wlan_dp_link *dp_link, uint8_t *mac_addr,
 	}
 
 	dp_intf = dp_link->dp_intf;
+	/*
+	 * If DP RX thread is enabled, RX DHCP packets are enqueue into
+	 * DP RX thread queue, defer DHCP inspection until host has
+	 * resumed entirely, no issue to send DHCP indication MSG.
+	 * If DP RX thread is disabled, DHCP inspection happens earlier,
+	 * skip sending DHCP indication MSG if host has not resumed.
+	 */
+	if (qdf_unlikely(!dp_intf->dp_ctx->enable_dp_rx_threads &&
+			 dp_intf->dp_ctx->is_suspend)) {
+		dp_err_rl("Device is system suspended, skip DHCP Ind");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	sb_ops = &dp_intf->dp_ctx->sb_ops;
 	msg.dhcp_start = dhcp_start;
 	msg.device_mode = dp_intf->device_mode;
@@ -322,7 +335,9 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 						sta_info->sta_mac.bytes,
 						true);
 			sta_info->dhcp_phase = DHCP_PHASE_DISCOVER;
-			sta_info->dhcp_nego_status = DHCP_NEGO_IN_PROGRESS;
+			if (QDF_IS_STATUS_SUCCESS(errno))
+				sta_info->dhcp_nego_status =
+						DHCP_NEGO_IN_PROGRESS;
 			break;
 		case QDF_PROTO_DHCP_OFFER:
 			sta_info->dhcp_phase = DHCP_PHASE_OFFER;
@@ -335,7 +350,9 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 						dp_link,
 						sta_info->sta_mac.bytes,
 						true);
-			sta_info->dhcp_nego_status = DHCP_NEGO_IN_PROGRESS;
+			if (QDF_IS_STATUS_SUCCESS(errno))
+				sta_info->dhcp_nego_status =
+						DHCP_NEGO_IN_PROGRESS;
 			fallthrough;
 		case QDF_PROTO_DHCP_DECLINE:
 			if (dir == QDF_RX)

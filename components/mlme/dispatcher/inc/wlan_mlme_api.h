@@ -28,6 +28,28 @@
 #include <wlan_cmn.h>
 #include "sme_api.h"
 
+#define ASSEMBLE_RATECODE_V1(_pream, _nss, _rate) \
+		(((1) << 28) | ((_pream) << 8) | ((_nss) << 5) | (_rate))
+
+/* This macro is used to extract the rate from the rate_code as first four bits
+ * in rate_code represents the rate, next 3 bits represents the nss and
+ * next 2 bits represents preamble.
+ */
+#define RATECODE_V1_RIX_MASK    0xf
+
+/* This macro is used to extract preamble from the rate_code as first 4 bits
+ * in rate_code represents the rate, next 3 bits represents the nss and
+ * next 2 bits represents preamble.
+ */
+#define RATECODE_V1_PREAMBLE_OFFSET (4 + 3)
+
+/* This macro is used to extract NSS from the rate_code as first 4 bits
+ * in rate_code represents the rate, next 3 bits represents the NSS and
+ * next 2 bits represents preamble.
+ */
+#define RATECODE_V1_NSS_OFFSET  0x4
+#define RATECODE_V1_NSS_MASK    0x7
+
 #ifdef FEATURE_SET
 /**
  * wlan_mlme_get_feature_info() - Get mlme features
@@ -419,6 +441,15 @@ wlan_mlme_set_ap_policy(struct wlan_objmgr_vdev *vdev,
  */
 enum host_concurrent_ap_policy
 wlan_mlme_get_ap_policy(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_ll_lt_sap_send_oce_flags_fw() - Send the oce flags to FW for
+ * ll_lt_sap
+ * @vdev: pointer to vdev object
+ *
+ * Return: void
+ */
+void wlan_mlme_ll_lt_sap_send_oce_flags_fw(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_mlme_get_prevent_link_down() - Get the prevent link down config
@@ -1210,6 +1241,15 @@ QDF_STATUS mlme_update_tgt_mlo_caps_in_cfg(struct wlan_objmgr_psoc *psoc);
  */
 enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						uint8_t channel_width);
+
+/**
+ * wlan_mlme_convert_phy_ch_width_to_eht_op_bw() - convert channel width to eht
+ *                                                 operation IE format
+ * @ch_width: phy_ch_width
+ *
+ * Return: channel width in eht operation IE
+ */
+uint8_t wlan_mlme_convert_phy_ch_width_to_eht_op_bw(enum phy_ch_width ch_width);
 
 /**
  * wlan_mlme_get_epcs_capability() - Get mlme epcs capability flag
@@ -2856,6 +2896,31 @@ wlan_mlme_get_mlo_prefer_percentage(
 #endif
 
 /**
+ * wlan_mlme_set_btm_abridge_flag() - Set BTM abridge flag
+ * @psoc: psoc context
+ * @value: abridge flag
+ *
+ * Return: qdf status
+ *
+ * BTM abridge flag indicates whether to select candidates
+ * for BTM roam based on score.
+ */
+QDF_STATUS
+wlan_mlme_set_btm_abridge_flag(struct wlan_objmgr_psoc *psoc, bool value);
+
+/**
+ * wlan_mlme_get_btm_abridge_flag() - Get BTM abridge flag
+ * @psoc: psoc context
+ *
+ * Return: abridge flag
+ *
+ * BTM abridge flag indicates whether to select candidates
+ * for BTM roam based on score.
+ */
+bool
+wlan_mlme_get_btm_abridge_flag(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mlme_get_sta_miracast_mcc_rest_time() - Get STA/MIRACAST MCC rest time
  * @psoc: pointer to psoc object
  * @value: value which needs to filled by API
@@ -3485,6 +3550,28 @@ wlan_mlme_get_roaming_offload(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * wlan_mlme_set_peer_indicated_ch_width() - Set peer indicated channel width
+ * @psoc: pointer to psoc object
+ * @data: Pointer to peer operating mode change event status
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
+				      struct peer_oper_mode_event *data);
+
+/**
+ * wlan_mlme_get_peer_indicated_ch_width() - Get peer indicated channel width
+ * @psoc: pointer to psoc object
+ * @data: Pointer to peer operating mode change event status
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
+				      struct peer_oper_mode_event *data);
+
+/**
  * wlan_mlme_set_ft_over_ds() - Update ft_over_ds
  * @psoc: pointer to psoc object
  * @ft_over_ds_enable: value of ft_over_ds
@@ -4014,16 +4101,6 @@ mlme_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
 #endif /* WLAN_SUPPORT_TWT */
 
 /**
- * wlan_mlme_is_local_tpe_pref() - Get preference to use local TPE or
- * regulatory TPE values
- * @psoc: pointer to psoc object
- *
- * Return: True if there is local preference, false if there is regulatory
- * preference
- */
-bool wlan_mlme_is_local_tpe_pref(struct wlan_objmgr_psoc *psoc);
-
-/**
  * wlan_mlme_skip_tpe() - Get preference to not consider TPE in 2G/5G case
  *
  * @psoc: pointer to psoc object
@@ -4083,6 +4160,30 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
 					   uint8_t value);
+
+/**
+ * wlan_mlme_set_ml_link_control_mode() - set ml_link_control_mode
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ * @value: value to set
+ *
+ * API get call when host receives vendor command
+ * QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE to configure link control mode.
+ *
+ * Return: none
+ */
+void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value);
+
+/**
+ * wlan_mlme_get_ml_link_control_mode() - get ml_link_control_mode
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ *
+ * Return: value of ml_link_control_mode in success
+ */
+uint8_t wlan_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
 
 /**
  * wlan_mlme_restore_user_set_link_num() - restore link num when SSR happens
@@ -4147,6 +4248,19 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
  */
 bool wlan_mlme_get_sta_same_link_mld_addr(struct wlan_objmgr_psoc *psoc);
 #else
+static inline
+void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value)
+{
+}
+
+static inline
+uint8_t wlan_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	return 0;
+}
+
 static inline QDF_STATUS
 wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
 				uint8_t value)
@@ -4589,4 +4703,41 @@ QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   uint8_t ulmu_disable);
+
+/**
+ * wlan_mlme_assemble_rate_code() - assemble rate code to be sent to FW
+ *
+ * @preamble: rate preamble
+ * @nss: number of spatial streams
+ * @rate: rate index
+ *
+ * Rate code assembling is different for targets which are 11ax capable.
+ * Check for the target support and assemble the rate code accordingly.
+ *
+ * Return: assembled rate code
+ */
+uint32_t
+wlan_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate);
+
+/**
+ * wlan_mlme_set_ap_oper_ch_width() - set SAP current operating ch_width
+ *
+ * @vdev: SAP VDEV object
+ * @ch_width: ch_width to be cached
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev,
+			       enum phy_ch_width ch_width);
+
+/**
+ * wlan_mlme_get_ap_oper_ch_width() - get SAP current operating ch_width
+ *
+ * @vdev: SAP VDEV object
+ *
+ * Return: Current SAP operating ch_width
+ */
+enum phy_ch_width
+wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev);
 #endif /* _WLAN_MLME_API_H_ */

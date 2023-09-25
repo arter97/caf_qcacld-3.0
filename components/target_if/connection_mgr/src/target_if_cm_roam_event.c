@@ -817,8 +817,9 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 				keys[i].vdev_id = wlan_vdev_get_id(vdev_list);
 				qdf_copy_macaddr((struct qdf_mac_addr *)keys[i].mac_addr.raw,
 						 (struct qdf_mac_addr *)vdev_list->vdev_mlme.linkaddr);
-				link_info = mlo_mgr_get_ap_link_by_link_id(vdev_list,
-									   keys[i].link_id);
+				link_info = mlo_mgr_get_ap_link_by_link_id(
+							vdev_list->mlo_dev_ctx,
+							keys[i].link_id);
 				if (!link_info) {
 					target_if_err("Link info not found for link_id:%d",
 						      keys[i].link_id);

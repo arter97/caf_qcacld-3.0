@@ -60,7 +60,8 @@ static ssize_t __hdd_sysfs_direct_link_ut_cmd_store(struct net_device *net_dev,
 		return -EINVAL;
 	if (kstrtou32(token, 0, (uint32_t *)&cmd_info.cmd))
 		return -EINVAL;
-	if (cmd_info.cmd > WFDS_GET_STATS)
+
+	if (cmd_info.cmd >= WFDS_CMD_MAX)
 		return -EINVAL;
 
 	if (cmd_info.cmd == WFDS_STOP_TRAFFIC || cmd_info.cmd == WFDS_GET_STATS)

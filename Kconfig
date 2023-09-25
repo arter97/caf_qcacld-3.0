@@ -107,6 +107,10 @@ config CNSS_KIWI_V2
 	bool "Enable CNSS_KIWI_V2"
 	default n
 
+config CNSS_PEACH
+	bool "Enable CNSS_PEACH"
+	default n
+
 config CNSS_UTILS_MODULE
 	bool "Enable CNSS_UTILS_MODULE"
 	default n
@@ -1602,6 +1606,11 @@ config WLAN_SYSFS_WLAN_DBG
 	depends on WLAN_SYSFS
 	default n
 
+config WLAN_SYSFS_BITRATES
+	bool "enable WLAN_SYSFS_BITRATES"
+	depends on WLAN_SYSFS
+	default n
+
 config WLAN_THERMAL_CFG
 	bool "Enable WLAN_THERMAL_CFG"
 	default n
@@ -1614,8 +1623,13 @@ config WLAN_TRACEPOINTS
 	bool "Enable WLAN_TRACEPOINTS"
 	default n
 
+config WLAN_TSF_AUTO_REPORT
+	bool "Enable WLAN_TSF_AUTO_REPORT"
+	default n
+
 config WLAN_TSF_UPLINK_DELAY
 	bool "Enable WLAN_TSF_UPLINK_DELAY"
+	depends on WLAN_TSF_AUTO_REPORT
 	default n
 
 config WLAN_TWT_CONVERGED
@@ -1742,10 +1756,6 @@ config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"
 	default \"wlan\"
 
-config QCA_WIFI_FTM_IOCTL
-	bool "Enable CONFIG_QCA_WIFI_FTM_IOCTL"
-	default n
-
 config LL_DP_SUPPORT_NON_LITH
 	bool "ENABLE CONFIG_LL_DP_SUPPORT_NON_LITH"
 	default n
@@ -1863,6 +1873,30 @@ config FEATURE_WLAN_CH_AVOID_EXT
 
 config WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE
 	bool "enable CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE"
+config 4_BYTES_TLV_TAG
+	bool "enable 4_BYTES_TLV_TAG"
 	default n
 
+config QCA_WIFI_EMULATION
+	bool "enable CONFIG_QCA_WIFI_EMULATION"
+	default n
+
+config QDF_TIMER_MULTIPLIER_FRAC
+	int "set QDF_TIMER_MULTIPLIER_FRAC"
+
+config QDF_TIMER_MULTIPLIER_FRAC_ENABLE
+	bool "enable QDF_TIMER_MULTIPLIER_FRAC_ENABLE"
+	default n
+
+config QCA_WIFI_PEACH
+	bool "enable QCA_WIFI_PEACH"
+	default n
+
+config BCN_RATECODE_ENABLE
+	bool "enable CONFIG_BCN_RATECODE_ENABLE"
+	default n
+
+config WLAN_SYSFS_RF_TEST_MODE
+	bool "enable CONFIG_WLAN_SYSFS_RF_TEST_MODE"
+	default n
 endif # QCA_CLD_WLAN

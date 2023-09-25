@@ -94,6 +94,8 @@
 #include <wlan_hdd_sysfs_dfsnol.h>
 #include <wlan_hdd_sysfs_wds_mode.h>
 #include <wlan_hdd_sysfs_roam_trigger_bitmap.h>
+#include <wlan_hdd_sysfs_bitrates.h>
+#include <wlan_hdd_sysfs_rf_test_mode.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -824,11 +826,13 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_bmiss_create(adapter);
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
+	hdd_sysfs_sta_bitrates_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_sta_bitrates_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
 	hdd_sysfs_bmiss_destroy(adapter);
@@ -887,11 +891,13 @@ hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_dp_traffic_end_indication_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
 	hdd_sysfs_dfsnol_create(adapter);
+	hdd_sysfs_sap_bitrates_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_sap_bitrates_destroy(adapter);
 	hdd_sysfs_dfsnol_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_traffic_end_indication_destroy(adapter);
@@ -961,12 +967,14 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_log_buffer_create(driver_kobject);
 		hdd_sysfs_wds_mode_create(driver_kobject);
 		hdd_sysfs_roam_trigger_bitmap_create(driver_kobject);
+		hdd_sysfs_rf_test_mode_create(driver_kobject);
 	}
 }
 
 void hdd_destroy_sysfs_files(void)
 {
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_rf_test_mode_destroy(driver_kobject);
 		hdd_sysfs_roam_trigger_bitmap_destroy(driver_kobject);
 		hdd_sysfs_wds_mode_destroy(driver_kobject);
 		hdd_sysfs_log_buffer_destroy(driver_kobject);

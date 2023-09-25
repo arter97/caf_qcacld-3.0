@@ -1122,7 +1122,14 @@ __lim_process_radio_measure_request(struct mac_context *mac, uint8_t *pRxPacketI
 	}
 	/* Call rrm function to handle the request. */
 
-	rrm_process_radio_measurement_request(mac, pHdr->sa, frm,
+	pe_debug("vdev: %d Received rrm req from sa addr:"QDF_MAC_ADDR_FMT" bssId:"QDF_MAC_ADDR_FMT" session addr:"QDF_MAC_ADDR_FMT" session self addr:"QDF_MAC_ADDR_FMT"",
+		 pe_session->vdev_id,
+		 QDF_MAC_ADDR_REF(pHdr->sa),
+		 QDF_MAC_ADDR_REF(pHdr->bssId),
+		 QDF_MAC_ADDR_REF(pe_session->bssId),
+		 QDF_MAC_ADDR_REF(pe_session->self_mac_addr));
+
+	rrm_process_radio_measurement_request(mac, pe_session->bssId, frm,
 					      pe_session);
 err:
 	qdf_mem_free(frm);

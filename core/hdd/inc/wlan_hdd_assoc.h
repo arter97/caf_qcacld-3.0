@@ -70,7 +70,7 @@ enum peer_status {
  * @ht_op_present: ht operation present or not
  * @vht_op_present: vht operation present or not
  * @he_present: he operation present or not
- * @reserved: reserved spare bits
+ * @eht_op_present: eht operation present or not
  */
 struct hdd_conn_flag {
 	uint8_t ht_present:1;
@@ -80,7 +80,7 @@ struct hdd_conn_flag {
 	uint8_t ht_op_present:1;
 	uint8_t vht_op_present:1;
 	uint8_t he_present:1;
-	uint8_t reserved:1;
+	uint8_t eht_op_present:1;
 };
 
 /*defines for tx_BF_cap_info */
@@ -158,6 +158,8 @@ struct hdd_conn_flag {
  * to which currently sta is connected.
  * @prev_ap_bcn_ie: ap beacon IE information to which sta is currently connected
  * @ieee_link_id: AP Link Id valid for MLO connection
+ * @eht_operation: EHT operation info
+ * @eht_oper_len: length of @eht_operation
  */
 struct hdd_connection_info {
 	eConnectionState conn_state;
@@ -200,6 +202,10 @@ struct hdd_connection_info {
 	struct element_info prev_ap_bcn_ie;
 #ifdef WLAN_FEATURE_11BE_MLO
 	int32_t ieee_link_id;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	struct ieee80211_eht_operation eht_operation;
+	uint32_t eht_oper_len;
 #endif
 };
 
@@ -533,6 +539,30 @@ void hdd_copy_ht_operation(struct hdd_station_ctx *hdd_sta_ctx,
  */
 void hdd_copy_vht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 			    tDot11fIEVHTOperation *vht_ops);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+/**
+ * hdd_copy_eht_operation()- copy EHT operations element to
+ * hdd station context.
+ * @hdd_sta_ctx: pointer to hdd station context
+ * @eht_ops: pointer to eht operation
+ *
+ * Return: None
+ */
+void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
+			    tDot11fIEeht_op *eht_ops);
+
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
+			    tDot11fIEeht_op *eht_ops);
+#else
+static inline void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
+					  tDot11fIEeht_op *eht_ops)
+{
+}
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
      defined(WLAN_FEATURE_11AX)

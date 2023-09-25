@@ -1697,7 +1697,7 @@ QDF_STATUS sap_set_session_param(mac_handle_t mac_handle,
 
 	mac_ctx->sap.sapCtxList[sapctx->sessionId].sap_context = sapctx;
 	mac_ctx->sap.sapCtxList[sapctx->sessionId].sapPersona =
-			wlan_get_opmode_vdev_id(mac_ctx->pdev, session_id);
+			wlan_get_opmode_from_vdev_id(mac_ctx->pdev, session_id);
 	sap_debug("Initializing sap_ctx = %pK with session = %d",
 		   sapctx, session_id);
 
@@ -2978,6 +2978,7 @@ QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 	uint8_t intf;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
+	bool is_acs;
 
 	/*
 	 * eSAP_DFS_CHANNEL_CAC_END:
@@ -3050,6 +3051,15 @@ QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 					 intf);
 				return qdf_status;
 			}
+
+			/*
+			 * CAC wait prevent SAP restart, check if need
+			 * restart SAP after CAC end
+			 */
+			is_acs = sap_context->acs_cfg &&
+				 sap_context->acs_cfg->acs_mode;
+			policy_mgr_check_concurrent_intf_and_restart_sap(mac->psoc,
+									 is_acs);
 		}
 	}
 

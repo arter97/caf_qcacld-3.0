@@ -509,7 +509,6 @@ static void lim_state_info_dump(char **buf_ptr, uint16_t *size)
 
 	mac = cds_get_context(QDF_MODULE_ID_PE);
 	if (!mac) {
-		QDF_ASSERT(0);
 		return;
 	}
 
@@ -3964,18 +3963,11 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	cache_entry = qdf_mem_malloc(sizeof(struct scan_cache_entry));
-
-	if (!cache_entry)
-		return QDF_STATUS_E_FAILURE;
-
 	partner_link = qdf_mem_malloc(sizeof(struct partner_link_info) *
 			(MLD_MAX_LINKS - 1));
 
-	if (!partner_link) {
-		status = QDF_STATUS_E_FAILURE;
-		goto free_cache_entry;
-	}
+	if (!partner_link)
+		return QDF_STATUS_E_FAILURE;
 
 	qdf_mem_copy(&qdf_bssid,
 		     &(lim_join_req->bssDescription.bssId),
@@ -3983,12 +3975,11 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 
 	join_req_freq = lim_join_req->bssDescription.chan_freq;
 
-	status = wlan_scan_get_scan_entry_by_mac_freq(pdev,
-						      &qdf_bssid,
-						      join_req_freq,
-						      cache_entry);
+	cache_entry = wlan_scan_get_scan_entry_by_mac_freq(pdev,
+							   &qdf_bssid,
+							   join_req_freq);
 
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
+	if (!cache_entry) {
 		pe_err("failed to get partner link info by mac addr");
 		status = QDF_STATUS_E_FAILURE;
 		goto free_mem;
@@ -3996,6 +3987,8 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 
 	qdf_mem_copy(partner_link, cache_entry->ml_info.link_info,
 		     sizeof(struct partner_link_info) * (MLD_MAX_LINKS - 1));
+
+	util_scan_free_cache_entry(cache_entry);
 
 	partner_info = &lim_join_req->partner_info;
 
@@ -4010,8 +4003,6 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 
 free_mem:
 	qdf_mem_free(partner_link);
-free_cache_entry:
-	qdf_mem_free(cache_entry);
 	return status;
 }
 
@@ -4022,7 +4013,6 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 {
 	struct wlan_objmgr_pdev *pdev;
 	struct scan_cache_entry *cache_entry;
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct wlan_channel channel;
 
 	pdev = mac_ctx->pdev;
@@ -4031,17 +4021,10 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	cache_entry = qdf_mem_malloc(sizeof(struct scan_cache_entry));
+	cache_entry = wlan_scan_get_scan_entry_by_mac_freq(pdev, link_addr,
+							   freq);
 	if (!cache_entry)
 		return QDF_STATUS_E_FAILURE;
-
-	status = wlan_scan_get_scan_entry_by_mac_freq(pdev, link_addr, freq,
-						      cache_entry);
-
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		status = QDF_STATUS_E_FAILURE;
-		goto free_cache_entry;
-	}
 
 	channel.ch_freq = cache_entry->channel.chan_freq;
 	channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);
@@ -4049,12 +4032,12 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	channel.ch_cfreq1 = cache_entry->channel.cfreq0;
 	channel.ch_cfreq2 = cache_entry->channel.cfreq1;
 
+	util_scan_free_cache_entry(cache_entry);
+
 	mlo_mgr_update_ap_channel_info(vdev, link_id, (uint8_t *)link_addr,
 				       channel);
 
-free_cache_entry:
-	qdf_mem_free(cache_entry);
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 #else
 static inline void

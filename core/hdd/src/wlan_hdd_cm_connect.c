@@ -1000,10 +1000,18 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_clear_roam_profile_ie(adapter);
 	ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
 	hdd_wmm_dscp_initial_state(adapter);
-	hdd_debug("Disabling queues");
-	wlan_hdd_netif_queue_control(adapter,
-				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
-				     WLAN_CONTROL_PATH);
+
+	/*
+	 * If connect failure is due to link switch, do not disable the
+	 * netdev queues as it will lead to data stall/NUD failure.
+	 */
+	if (!(rsp->cm_id & CM_ID_LSWITCH_BIT)) {
+		hdd_debug("Disabling queues");
+		wlan_hdd_netif_queue_control(adapter,
+					     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
+					     WLAN_CONTROL_PATH);
+	}
+
 	ucfg_dp_periodic_sta_stats_start(vdev);
 	wlan_twt_concurrency_update(hdd_ctx);
 }
@@ -1117,7 +1125,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 	} else {
 		hdd_sta_ctx->conn_info.conn_flag.ht_present = false;
 	}
-	if (hdd_is_roam_sync_in_progress(hdd_ctx, link_info->vdev_id))
+	if (rsp->is_reassoc)
 		hdd_sta_ctx->conn_info.roam_count++;
 
 	if (assoc_resp->HTInfo.present) {
@@ -1143,6 +1151,11 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 	else
 		hdd_sta_ctx->conn_info.conn_flag.eht_present = false;
 
+	if (assoc_resp->eht_op.present)
+		hdd_sta_ctx->conn_info.conn_flag.eht_op_present = true;
+	else
+		hdd_sta_ctx->conn_info.conn_flag.eht_op_present = false;
+
 	/*
 	 * Cache connection info only in case of station
 	 */
@@ -1150,6 +1163,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 		/* Cleanup already existing he info */
 		hdd_cleanup_conn_info(link_info);
 
+		hdd_copy_eht_operation(hdd_sta_ctx, &assoc_resp->eht_op);
 		/* Cache last connection info */
 		qdf_mem_copy(&hdd_sta_ctx->cache_conn_info,
 			     &hdd_sta_ctx->conn_info,
@@ -1525,6 +1539,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	struct hdd_adapter *assoc_link_adapter;
 	bool is_immediate_power_save;
 	struct wlan_hdd_link_info *link_info;
+	QDF_STATUS status;
+	bool alt_pipe;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
@@ -1687,14 +1703,21 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			adapter->device_mode);
 	}
 
-	if (ucfg_ipa_is_enabled() && !is_auth_required)
+	if (ucfg_ipa_is_enabled() && !is_auth_required) {
+		status = hdd_ipa_get_tx_pipe(hdd_ctx, link_info, &alt_pipe);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_debug("Failed to get alternate pipe for vdev %d",
+				  link_info->vdev_id);
+			alt_pipe = false;
+		}
+
 		ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
 				  link_info->vdev_id,
 				  WLAN_IPA_STA_CONNECT,
 				  rsp->bssid.bytes,
-				  WLAN_REG_IS_24GHZ_CH_FREQ(
-					sta_ctx->conn_info.chan_freq));
+				  alt_pipe);
+	}
 
 	if (adapter->device_mode == QDF_STA_MODE)
 		cdp_reset_rx_hw_ext_stats(soc);

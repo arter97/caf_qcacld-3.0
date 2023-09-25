@@ -48,6 +48,7 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_mlo_link_force.h"
+#include <wlan_psoc_mlme_api.h>
 
 QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			       void *event, uint32_t event_data_len)
@@ -438,16 +439,21 @@ cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 	if (!is_multi_link_roam(roam_synch_data))
 		return;
 
+	mlo_mgr_reset_ap_link_info(vdev);
 	for (i = 0; i < roam_synch_data->num_setup_links; i++) {
 		ml_link = &roam_synch_data->ml_link[i];
+
+		qdf_mem_zero(&channel, sizeof(channel));
 
 		channel.ch_freq = ml_link->channel.mhz;
 		channel.ch_cfreq1 = ml_link->channel.band_center_freq1;
 		channel.ch_cfreq1 = ml_link->channel.band_center_freq2;
 
-		mlo_mgr_roam_update_ap_link_info(vdev, ml_link->link_id,
-						 ml_link->link_addr.bytes,
-						 channel);
+		/*
+		 * Update Link switch context for each vdev with roamed AP link
+		 * address and self link address for each vdev
+		 */
+		mlo_mgr_roam_update_ap_link_info(vdev, ml_link, &channel);
 	}
 }
 
@@ -994,6 +1000,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	wlan_cm_id cm_id;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_cm_connect_resp *connect_rsp;
+	bool eht_capab = false;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
@@ -1110,7 +1117,20 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp);
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
-	status = QDF_STATUS_SUCCESS;
+
+	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
+	if (eht_capab) {
+		status = policy_mgr_current_connections_update(
+				psoc, vdev_id,
+				connect_rsp->freq,
+				POLICY_MGR_UPDATE_REASON_LFR3_ROAM,
+				POLICY_MGR_DEF_REQ_ID);
+		if (status == QDF_STATUS_E_NOSUPPORT)
+			status = QDF_STATUS_SUCCESS;
+		else if (status == QDF_STATUS_E_FAILURE)
+			mlme_err("Failed to take next action LFR3_ROAM");
+	}
+
 error:
 	if (rsp)
 		wlan_cm_free_connect_rsp(rsp);

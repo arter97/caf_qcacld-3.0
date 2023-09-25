@@ -2913,6 +2913,7 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 	bool is_hs_20_ap, is_pmf_enabled, is_open_connection = false;
 	uint8_t vdev_id;
 	uint32_t mbo_oce_enabled_ap;
+	bool abridge_flag;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -2967,6 +2968,14 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id, MBO_OCE_ENABLED_AP, &temp);
 	mbo_oce_enabled_ap = temp.uint_value;
+
+	abridge_flag = wlan_mlme_get_btm_abridge_flag(psoc);
+	if (!abridge_flag)
+		MLME_CLEAR_BIT(*btm_offload_config,
+			       BTM_OFFLOAD_CONFIG_BIT_7);
+	mlme_debug("Abridge flag: %d, btm offload: %u", abridge_flag,
+		   *btm_offload_config);
+
 	/*
 	 * If peer does not support PMF in case of OCE/MBO
 	 * Connection, Disable BTM offload to firmware.
@@ -3475,6 +3484,8 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto rel_vdev_ref;
 
 	stop_req->btm_config.vdev_id = vdev_id;
+	MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
+		     BTM_OFFLOAD_CONFIG_BIT_0);
 	stop_req->disconnect_params.vdev_id = vdev_id;
 	stop_req->idle_params.vdev_id = vdev_id;
 	stop_req->roam_triggers.vdev_id = vdev_id;
@@ -4713,10 +4724,8 @@ cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
 }
 
 QDF_STATUS
-cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev,
-			       uint8_t *vdev_id,
-			       uint8_t reason,
-			       bool *is_rso_skip)
+cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
+			       uint8_t reason, bool *is_rso_skip)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *vdev;
@@ -4728,10 +4737,23 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev,
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 
+	/*
+	 * When link switch is in progress, the MLO link flag would be reset and
+	 * set back on assoc vdev, so avoid any state transition during link
+	 * switch.
+	 */
 	if (wlan_vdev_mlme_get_is_mlo_vdev(psoc, *vdev_id) &&
+	    mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlme_debug("MLO ROAM: Link switch in prog! skip RSO cmd on vdev %d",
+			   *vdev_id);
+		*is_rso_skip = true;
+		goto end;
+	}
+
+	if (wlan_vdev_mlme_get_is_mlo_vdev(psoc, *vdev_id) &&
+	    cm_is_vdev_disconnecting(vdev) &&
 	    (reason == REASON_DISCONNECTED ||
-	     reason == REASON_DRIVER_DISABLED) &&
-	    cm_is_vdev_disconnecting(vdev)) {
+	     reason == REASON_DRIVER_DISABLED)) {
 		/*
 		 * Processing disconnect on assoc vdev but roaming is still
 		 * enabled. It's either due to single ML usecase or failed to
@@ -4749,36 +4771,34 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 
-	if (wlan_vdev_mlme_get_is_mlo_link(wlan_pdev_get_psoc(pdev),
-					   *vdev_id)) {
-		if (reason == REASON_ROAM_HANDOFF_DONE ||
-		    reason == REASON_ROAM_ABORT) {
-			status = cm_mlo_roam_switch_for_link(pdev, *vdev_id,
-							     reason);
-			mlme_debug("MLO ROAM: update rso state on link vdev %d",
-				   *vdev_id);
-			*is_rso_skip = true;
-		} else if ((reason == REASON_DISCONNECTED ||
-			    reason == REASON_DRIVER_DISABLED) &&
-			   (cm_is_vdev_disconnecting(vdev))) {
-			assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+	if (!wlan_vdev_mlme_get_is_mlo_link(wlan_pdev_get_psoc(pdev),
+					    *vdev_id))
+		goto end;
 
-			if (!assoc_vdev) {
-				mlme_err("Assoc vdev is NULL");
-				status = QDF_STATUS_E_FAILURE;
-				goto end;
-			}
-			/* Update the vdev id to send RSO stop on assoc vdev */
-			*vdev_id = wlan_vdev_get_id(assoc_vdev);
-			*is_rso_skip = false;
-			mlme_debug("MLO ROAM: process RSO stop on assoc vdev %d",
-				   *vdev_id);
-			goto end;
-		} else {
-			mlme_debug("MLO ROAM: skip RSO cmd on link vdev %d",
-				   *vdev_id);
+	if (reason == REASON_ROAM_HANDOFF_DONE || reason == REASON_ROAM_ABORT) {
+		status = cm_mlo_roam_switch_for_link(pdev, *vdev_id, reason);
+		mlme_debug("MLO ROAM: update rso state on link vdev %d",
+			   *vdev_id);
 			*is_rso_skip = true;
+	} else if ((reason == REASON_DISCONNECTED ||
+		    reason == REASON_DRIVER_DISABLED) &&
+		   cm_is_vdev_disconnecting(vdev)) {
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+
+		if (!assoc_vdev) {
+			mlme_err("Assoc vdev is NULL");
+			status = QDF_STATUS_E_FAILURE;
+			goto end;
 		}
+		/* Update the vdev id to send RSO stop on assoc vdev */
+		*vdev_id = wlan_vdev_get_id(assoc_vdev);
+		*is_rso_skip = false;
+		mlme_debug("MLO ROAM: process RSO stop on assoc vdev %d",
+			   *vdev_id);
+		goto end;
+	} else {
+		mlme_debug("MLO ROAM: skip RSO cmd on link vdev %d", *vdev_id);
+		*is_rso_skip = true;
 	}
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
@@ -6192,7 +6212,7 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 	wlan_diag_event.trigger_sub_reason =
 		cm_get_diag_roam_sub_reason(data->trigger_sub_reason);
 
-	wlan_diag_event.version = DIAG_ROAM_SCAN_START_VERSION;
+	wlan_diag_event.version = DIAG_ROAM_SCAN_START_VERSION_V2;
 
 	/*
 	 * Get the current AP rssi & CU load from the
@@ -6225,6 +6245,7 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 	}
 
 	wlan_diag_event.is_full_scan = is_full_scan;
+	wlan_diag_event.band = scan_data->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_ROAM_SCAN_START);
@@ -6253,7 +6274,7 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 		wlan_diag_event.subtype =
 					WLAN_CONN_DIAG_ROAM_SCORE_CAND_AP_EVENT;
 
-	wlan_diag_event.version = DIAG_ROAM_CAND_VERSION;
+	wlan_diag_event.version = DIAG_ROAM_CAND_VERSION_V2;
 	wlan_diag_event.rssi = (-1) * ap->rssi;
 	wlan_diag_event.cu_load = ap->cu_load;
 	wlan_diag_event.total_score = ap->total_score;
@@ -6267,6 +6288,7 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 
 	wlan_diag_event.idx = cand_ap_idx;
 	wlan_diag_event.freq = ap->freq;
+	wlan_diag_event.is_mlo = ap->is_mlo;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_ROAM_CAND_INFO);
@@ -6646,9 +6668,10 @@ cm_roam_btm_query_event(struct wmi_neighbor_report_data *btm_data,
 			  (uint64_t)btm_data->timestamp, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_QUERY_EVENT;
-	wlan_diag_event.version = DIAG_BTM_VERSION;
+	wlan_diag_event.version = DIAG_BTM_VERSION_2;
 	wlan_diag_event.token = btm_data->btm_query_token;
 	wlan_diag_event.reason = btm_data->btm_query_reason;
+	wlan_diag_event.band = btm_data->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BTM);
 
@@ -6667,8 +6690,9 @@ cm_roam_neigh_rpt_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 			  (uint64_t)neigh_rpt->timestamp, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_NBR_RPT_REQ_EVENT;
-	wlan_diag_event.version = DIAG_NBR_RPT_VERSION;
+	wlan_diag_event.version = DIAG_NBR_RPT_VERSION_2;
 	wlan_diag_event.token = neigh_rpt->req_token;
+	wlan_diag_event.band = neigh_rpt->band;
 
 	wlan_vdev_mlme_get_ssid(vdev, wlan_diag_event.ssid,
 				(uint8_t *)&wlan_diag_event.ssid_len);
@@ -6690,7 +6714,7 @@ cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 			  (uint64_t)neigh_rpt->timestamp, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_NBR_RPT_RESP_EVENT;
-	wlan_diag_event.version = DIAG_NBR_RPT_VERSION;
+	wlan_diag_event.version = DIAG_NBR_RPT_VERSION_2;
 	wlan_diag_event.token = neigh_rpt->resp_token;
 	wlan_diag_event.num_freq = neigh_rpt->num_freq;
 
@@ -6698,6 +6722,7 @@ cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 		wlan_diag_event.freq[i] = neigh_rpt->freq[i];
 
 	wlan_diag_event.num_rpt = neigh_rpt->num_rpt;
+	wlan_diag_event.band = neigh_rpt->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_NBR_RPT);
 }
@@ -6764,11 +6789,12 @@ cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
 			  (uint64_t)trigger_info->timestamp,
 			  &btm_data->target_bssid);
 
-	wlan_diag_event.version = DIAG_BTM_VERSION;
+	wlan_diag_event.version = DIAG_BTM_VERSION_2;
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_RESP_EVENT;
 	wlan_diag_event.token = btm_data->btm_resp_dialog_token;
 	wlan_diag_event.status = btm_data->btm_status;
 	wlan_diag_event.delay = btm_data->btm_delay;
+	wlan_diag_event.band = btm_data->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BTM);
 
@@ -6824,7 +6850,7 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 			  NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_REQ_EVENT;
-	wlan_diag_event.version = DIAG_BTM_VERSION;
+	wlan_diag_event.version = DIAG_BTM_VERSION_2;
 	wlan_diag_event.token = btm_data->token;
 	wlan_diag_event.mode = btm_data->btm_request_mode;
 	/*
@@ -6836,6 +6862,7 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 	wlan_diag_event.validity_timer =
 					btm_data->validity_interval / 1000;
 	wlan_diag_event.cand_lst_cnt = btm_data->candidate_list_count;
+	wlan_diag_event.band = btm_data->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BTM);
 
@@ -6849,8 +6876,9 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 }
 
 QDF_STATUS
-cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
-			 struct wmi_roam_scan_data *scan_data, uint8_t vdev_id)
+cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
+			 struct roam_frame_info *frame_data,
+			 struct wmi_roam_scan_data *scan_data)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t i;
@@ -6860,11 +6888,11 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
-	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
+	populate_diag_cmn(&wlan_diag_event.diag_cmn, wlan_vdev_get_id(vdev),
 			  (uint64_t)frame_data->timestamp,
 			  &frame_data->bssid);
 
-	wlan_diag_event.version = DIAG_MGMT_VERSION;
+	wlan_diag_event.version = DIAG_MGMT_VERSION_V2;
 	wlan_diag_event.sn = frame_data->seq_num;
 	wlan_diag_event.auth_algo = frame_data->auth_algo;
 	wlan_diag_event.rssi = frame_data->rssi;
@@ -6910,7 +6938,14 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
 		wlan_diag_event.reason = frame_data->status_code;
 
+	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_DEAUTH_RX_EVENT ||
+	    wlan_diag_event.subtype == WLAN_CONN_DIAG_DISASSOC_RX_EVENT)
+		wlan_populate_vsie(vdev, &wlan_diag_event, false);
+
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
+	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_REASSOC_RESP_EVENT ||
+	    wlan_diag_event.subtype == WLAN_CONN_DIAG_ASSOC_RESP_EVENT)
+		wlan_connectivity_mlo_setup_event(vdev);
 
 	return status;
 }

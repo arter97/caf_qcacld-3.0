@@ -53,7 +53,7 @@
 	(FISA_MAX_SINGLE_CUMULATIVE_IP_LEN * FISA_FLOW_MAX_AGGR_COUNT)
 
 /* minimal pure UDP data length required for FISA */
-#define FISA_MIN_UDP_DATA_LEN 16
+#define FISA_MIN_UDP_DATA_LEN 64
 /* minimal length without L2/L3 header required for FISA */
 #define FISA_MIN_L4_AND_DATA_LEN \
 	(FISA_UDP_HDR_LEN + FISA_MIN_UDP_DATA_LEN)
@@ -72,6 +72,7 @@ struct dp_fisa_rx_fst_update_elem {
 	qdf_list_node_t node;
 	struct cdp_rx_flow_tuple_info flow_tuple_info;
 	struct dp_vdev *vdev;
+	uint8_t vdev_id;
 	uint32_t flow_idx;
 	uint32_t reo_dest_indication;
 	bool is_tcp_flow;

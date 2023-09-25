@@ -1068,8 +1068,16 @@ QDF_STATUS hdd_chan_change_notify(struct wlan_hdd_link_info *link_info,
 		dev = assoc_adapter->dev;
 	}
 
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		mutex_lock(&dev->ieee80211_ptr->mtx);
+
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id,
 				       puncture_bitmap);
+
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		mutex_unlock(&dev->ieee80211_ptr->mtx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2033,12 +2041,7 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 		return;
 	}
 
-	sap_cnt = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-							    PM_SAP_MODE,
-							    NULL);
-	sap_cnt += policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-							     PM_P2P_GO_MODE,
-							     NULL);
+	sap_cnt = policy_mgr_get_beaconing_mode_count(hdd_ctx->psoc, NULL);
 	if (sap_cnt > 1)
 		policy_mgr_check_concurrent_intf_and_restart_sap(
 				hdd_ctx->psoc,
@@ -2085,6 +2088,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	struct qdf_mac_addr sta_addr = {0};
 	qdf_freq_t dfs_freq;
 	struct wlan_hdd_link_info *link_info;
+	bool alt_pipe;
 
 	dev = context;
 	if (!dev) {
@@ -2249,6 +2253,14 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		}
 
 		if (ucfg_ipa_is_enabled()) {
+			status = hdd_ipa_get_tx_pipe(hdd_ctx, link_info,
+						     &alt_pipe);
+			if (!QDF_IS_STATUS_SUCCESS(status)) {
+				hdd_debug("Failed to get alt pipe for vdev %d",
+					  link_info->vdev_id);
+				alt_pipe = false;
+			}
+
 			status = ucfg_ipa_wlan_evt(
 					hdd_ctx->pdev,
 					adapter->dev,
@@ -2256,8 +2268,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 					link_info->vdev_id,
 					WLAN_IPA_AP_CONNECT,
 					adapter->dev->dev_addr,
-					WLAN_REG_IS_24GHZ_CH_FREQ(
-						ap_ctx->operating_chan_freq));
+					alt_pipe);
 			if (status)
 				hdd_err("WLAN_AP_CONNECT event failed");
 		}
@@ -4058,7 +4069,7 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc,
 							ap_adapter->device_mode,
 							vdev_id);
-	if ((con_mode != PM_SAP_MODE && con_mode != PM_P2P_GO_MODE) ||
+	if (!policy_mgr_is_beaconing_mode(con_mode) ||
 	    !policy_mgr_is_6ghz_conc_mode_supported(psoc, con_mode)) {
 		hdd_err("unexpected device mode %d", ap_adapter->device_mode);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
@@ -4374,6 +4385,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 	/* rcpi info initialization */
 	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
 
+	hdd_tsf_auto_report_init(adapter);
 	hdd_exit();
 
 	return status;
@@ -6226,6 +6238,17 @@ wlan_hdd_set_multipass(struct wlan_objmgr_vdev *vdev)
 }
 #endif
 
+static void wlan_hdd_update_ll_lt_sap_configs(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      struct sap_config *config)
+{
+	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+		return;
+
+	config->SapHw_mode = eCSR_DOT11_MODE_11n;
+	config->ch_width_orig = CH_WIDTH_20MHZ;
+}
+
 /**
  * wlan_hdd_cfg80211_start_bss() - start bss
  * @link_info: Link info pointer in HDD adapter
@@ -6760,6 +6783,9 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		    config->SapHw_mode == eCSR_DOT11_MODE_11ac_ONLY)
 			config->SapHw_mode = eCSR_DOT11_MODE_11n;
 	}
+
+	wlan_hdd_update_ll_lt_sap_configs(hdd_ctx->psoc,
+					  link_info->vdev_id, config);
 
 	config->sap_orig_hw_mode = config->SapHw_mode;
 	reg_phy_mode = csr_convert_to_reg_phy_mode(config->SapHw_mode,
@@ -7307,8 +7333,7 @@ static uint16_t hdd_get_data_rate_from_rate_mask(struct wiphy *wiphy,
 		sband_bitrates = sband->bitrates;
 		sband_n_bitrates = sband->n_bitrates;
 		for (i = 0; i < sband_n_bitrates; i++) {
-			if (bit_rate_mask->control[band].legacy ==
-			    sband_bitrates[i].hw_value)
+			if (bit_rate_mask->control[band].legacy == (1 << i))
 				return sband_bitrates[i].bitrate;
 		}
 	}
@@ -7864,9 +7889,9 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	sta_cnt = policy_mgr_get_mode_specific_conn_info(hdd_ctx->psoc, NULL,
 							 vdev_id_list,
 							 PM_STA_MODE);
-	sap_cnt = policy_mgr_get_mode_specific_conn_info(hdd_ctx->psoc, NULL,
-							 &vdev_id_list[sta_cnt],
-							 PM_SAP_MODE);
+	sap_cnt = policy_mgr_get_sap_mode_info(hdd_ctx->psoc, NULL,
+					       &vdev_id_list[sta_cnt]);
+
 	/* Disable NAN Disc before starting P2P GO or STA+SAP or SAP+SAP */
 	if (adapter->device_mode == QDF_P2P_GO_MODE || sta_cnt ||
 	    (sap_cnt > (MAX_SAP_NUM_CONCURRENCY_WITH_NAN - 1))) {

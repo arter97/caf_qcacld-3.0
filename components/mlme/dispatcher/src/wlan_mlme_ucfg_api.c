@@ -128,6 +128,19 @@ QDF_STATUS ucfg_mlme_pdev_close(struct wlan_objmgr_pdev *pdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+void ucfg_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t value)
+{
+	wlan_mlme_set_ml_link_control_mode(psoc, vdev_id, value);
+}
+
+uint8_t ucfg_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	return wlan_mlme_get_ml_link_control_mode(psoc, vdev_id);
+}
+
+
 /**
  * ucfg_mlme_convert_power_cfg_chan_to_freq() - converts channel numbers to
  * frequencies and copies the triplets to power_freq_data array
@@ -396,12 +409,15 @@ QDF_STATUS ucfg_mlme_update_bss_rate_flags(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id,
-					   enum phy_ch_width ch_width)
+					   enum phy_ch_width ch_width,
+					   uint8_t link_id)
 {
 	struct wlan_objmgr_vdev *vdev;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	enum QDF_OPMODE op_mode;
-	bool is_mlo_vdev;
+	struct wlan_objmgr_vdev *link_vdev;
+	bool is_mlo_link = false;
+	uint8_t link_vdev_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_OBJMGR_ID);
@@ -411,16 +427,32 @@ ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	}
 
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
-	if (op_mode != QDF_STA_MODE || is_mlo_vdev) {
-		mlme_legacy_debug("vdev %d: op mode %d, is_mlo_vdev:%d, CW update not supported",
-				  vdev_id, op_mode, is_mlo_vdev);
+	if (op_mode != QDF_STA_MODE) {
+		mlme_legacy_debug("vdev %d: op mode %d, CW update not supported",
+				  vdev_id, op_mode);
 		status = QDF_STATUS_E_NOSUPPORT;
 		goto release;
 	}
 
-	status = wlan_mlme_send_ch_width_update_with_notify(psoc, vdev,
-							    vdev_id, ch_width);
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && link_id != 0xFF) {
+		link_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
+		if (!link_vdev) {
+			mlme_legacy_debug("vdev is null for the link id:%u",
+					  link_id);
+			goto release;
+		}
+		is_mlo_link = true;
+		link_vdev_id = wlan_vdev_get_id(link_vdev);
+	} else {
+		link_vdev = vdev;
+		link_vdev_id = vdev_id;
+		mlme_legacy_debug("vdev mlme is not mlo vdev");
+	}
+	status = wlan_mlme_send_ch_width_update_with_notify(psoc, link_vdev,
+							    link_vdev_id,
+							    ch_width);
+	if (is_mlo_link)
+		mlo_release_vdev_ref(link_vdev);
 
 release:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);

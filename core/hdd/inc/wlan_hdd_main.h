@@ -587,6 +587,7 @@ struct hdd_peer_stats {
 	uint32_t fcs_count;
 };
 
+#define HDD_MAX_PER_PEER_RATES 16
 #if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * struct wlan_hdd_station_stats_info - Station stats info
@@ -630,6 +631,30 @@ struct wlan_hdd_mlo_iface_stats_info {
 	uint8_t link_id;
 	uint32_t freq;
 	uint32_t radio_id;
+};
+
+/**
+ * struct wlan_hdd_peer_info - hdd per peer info
+ * @type: peer type (AP, TDLS, GO etc.)
+ * @peer_mac: peer mac address
+ * @capabilities: peer WIFI_CAPABILITY_XXX
+ * @power_saving: peer power saving mode
+ * @num_rate: number of rates
+ * @rate_stats: per rate statistics, num entries = HDD_MAX_PER_PEER_RATES
+ * @stats_cached: whether peer stats cached into link_info struct
+ * @link_id: IEEE link id for the link
+ */
+struct wlan_hdd_peer_info {
+	enum wmi_peer_type type;
+	struct qdf_mac_addr peer_mac;
+	uint32_t capabilities;
+	union {
+		uint32_t power_saving;
+		uint32_t num_rate;
+	};
+	struct wifi_rate_stat rate_stats[HDD_MAX_PER_PEER_RATES];
+	bool stats_cached;
+	uint32_t link_id;
 };
 #endif
 
@@ -1078,6 +1103,8 @@ enum udp_qos_upgrade {
  * @hdd_stats: HDD statistics
  * @big_data_stats: Big data stats
  * @ll_iface_stats: Link Layer interface stats
+ * @hdd_sinfo: hdd vdev station stats that will be sent to userspace
+ * @mlo_peer_info: mlo peer stats info
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
@@ -1111,6 +1138,8 @@ struct wlan_hdd_link_info {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 	struct wifi_interface_stats ll_iface_stats;
+	struct wlan_hdd_station_stats_info hdd_sinfo;
+	struct wlan_hdd_peer_info mlo_peer_info;
 #endif
 
 #ifdef WLAN_FEATURE_MSCS
@@ -5217,6 +5246,14 @@ hdd_nl80211_chwidth_to_chwidth(uint8_t nl80211_chwidth);
 uint8_t hdd_chwidth_to_nl80211_chwidth(enum eSirMacHTChannelWidth chwidth);
 
 /**
+ * hdd_phy_chwidth_to_nl80211_chwidth() - Get nl chan width from phy chan width
+ * @chwidth: enum phy_ch_width
+ *
+ * Return: enum nl80211_chan_width or 0xFF for unsupported phy chan width
+ */
+uint8_t hdd_phy_chwidth_to_nl80211_chwidth(enum phy_ch_width chwidth);
+
+/**
  * wlan_hdd_get_channel_bw() - get channel bandwidth
  * @width: input channel width in nl80211_chan_width value
  *
@@ -5396,5 +5433,17 @@ static inline void wlan_hdd_link_speed_update(struct wlan_objmgr_psoc *psoc,
  * Return: none
  */
 void hdd_update_multicast_list(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * hdd_set_sar_init_index() - Set SAR safety index at init.
+ * @hdd_ctx: HDD context
+ *
+ */
+#ifdef SAR_SAFETY_FEATURE
+void hdd_set_sar_init_index(struct hdd_context *hdd_ctx);
+#else
+static inline void hdd_set_sar_init_index(struct hdd_context *hdd_ctx)
+{}
+#endif
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

@@ -529,7 +529,7 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 		pm_ctx->cdp_cbacks.cdp_update_mac_id(psoc, vdev_id, mac);
 
 	/* IPA only cares about STA or SAP mode */
-	if (mode == PM_STA_MODE || mode == PM_SAP_MODE) {
+	if (mode == PM_STA_MODE || policy_mgr_is_sap_mode(mode)) {
 		mcc_mode = policy_mgr_current_concurrency_is_mcc(psoc);
 
 		if (pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb)
@@ -1166,6 +1166,9 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
 	case PM_NDI_MODE:
 		count = strlcat(cc_mode, "NDI", length);
 		break;
+	case PM_LL_LT_SAP_MODE:
+		count = strlcat(cc_mode, "LT_SAP", length);
+		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
 		break;
@@ -1236,6 +1239,12 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 		count = policy_mgr_dump_current_concurrency_one_connection(
 				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NAN Disc", length);
+		break;
+	case PM_LL_LT_SAP_MODE:
+		count = policy_mgr_dump_current_concurrency_one_connection(
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+LT_SAP",
+					length);
 		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
@@ -1308,6 +1317,13 @@ static uint32_t policy_mgr_dump_current_concurrency_three_connection(
 				psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+NDI",
 					length);
+		break;
+	case PM_LL_LT_SAP_MODE:
+		count = policy_mgr_dump_current_concurrency_two_connection(
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+LT_SAP",
+					length);
+
 		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
@@ -1519,6 +1535,13 @@ static uint32_t policy_mgr_dump_current_concurrency_4_connection(
 		count += strlcat(cc_mode, "+NDI",
 					length);
 		break;
+	case PM_LL_LT_SAP_MODE:
+		count = policy_mgr_dump_current_concurrency_three_connection(
+				psoc, cc_mode, length);
+		count += strlcat(cc_mode, "+LT_SAP",
+					length);
+		break;
+
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
 		break;
@@ -2034,7 +2057,8 @@ void pm_dbs_opportunistic_timer_handler(void *data)
 	enum policy_mgr_conc_next_action action = PM_NOP;
 	uint32_t session_id;
 	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)data;
-	enum policy_mgr_conn_update_reason reason;
+	enum policy_mgr_conn_update_reason reason =
+				POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC;
 	struct policy_mgr_psoc_priv_obj *pm_ctx = policy_mgr_get_context(psoc);
 
 	if (!psoc) {
@@ -2080,58 +2104,6 @@ uint32_t policy_mgr_get_connection_for_vdev_id(struct wlan_objmgr_psoc *psoc,
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	return conn_index;
-}
-
-/**
- * policy_mgr_get_mode() - Get mode from type and subtype
- * @type: type
- * @subtype: subtype
- *
- * Get the concurrency mode from the type and subtype
- * of the interface
- *
- * Return: policy_mgr_con_mode
- */
-enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
-		uint8_t subtype)
-{
-	enum policy_mgr_con_mode mode = PM_MAX_NUM_OF_MODE;
-
-	if (type == WMI_VDEV_TYPE_AP) {
-		switch (subtype) {
-		case 0:
-			mode = PM_SAP_MODE;
-			break;
-		case WMI_UNIFIED_VDEV_SUBTYPE_P2P_GO:
-			mode = PM_P2P_GO_MODE;
-			break;
-		default:
-			policy_mgr_err("Unknown subtype %d for type %d",
-				subtype, type);
-			break;
-		}
-	} else if (type == WMI_VDEV_TYPE_STA) {
-		switch (subtype) {
-		case 0:
-			mode = PM_STA_MODE;
-			break;
-		case WMI_UNIFIED_VDEV_SUBTYPE_P2P_CLIENT:
-			mode = PM_P2P_CLIENT_MODE;
-			break;
-		default:
-			policy_mgr_err("Unknown subtype %d for type %d",
-				subtype, type);
-			break;
-		}
-	} else if (type == WMI_VDEV_TYPE_NAN) {
-		mode = PM_NAN_DISC_MODE;
-	} else if (type == WMI_VDEV_TYPE_NDI) {
-		mode = PM_NDI_MODE;
-	} else {
-		policy_mgr_err("Unknown type %d", type);
-	}
-
-	return mode;
 }
 
 /**
@@ -3706,6 +3678,49 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 					  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
+	case PM_SBS_CH_MCC_CH:
+		get_sub_channels(psoc,
+				 sbs_freqs, &sbs_num,
+				 scc_freqs, &scc_num,
+				 rest_freqs, &rest_num,
+				 channel_list_5, chan_index_5,
+				 channel_list_6, chan_index_6);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
+				  sbs_freqs, sbs_num,
+				  skip_6ghz_channel);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+				  rest_freqs, rest_num,
+				  false);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SBS_5G_MCC_24G:
+		get_sub_channels(psoc,
+				 sbs_freqs, &sbs_num,
+				 scc_freqs, &scc_num,
+				 rest_freqs, &rest_num,
+				 channel_list_5, chan_index_5,
+				 channel_list_6, chan_index_6);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
+				  sbs_freqs, sbs_num,
+				  skip_6ghz_channel);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+				  rest_freqs, rest_num,
+				  skip_6ghz_channel);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
+				  channel_list_24, chan_index_24,
+				  false);
+		status = QDF_STATUS_SUCCESS;
+		break;
 	default:
 		policy_mgr_err("unknown pcl value %d", pcl);
 		break;
@@ -4009,7 +4024,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	else if (policy_mgr_is_mlo_in_mode_sbs(psoc, PM_STA_MODE, NULL, NULL))
 		sbs_ml_sta_present = true;
 
-	op_mode = wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id);
+	op_mode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
 	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
 
 	qdf_mem_zero(&pcl, sizeof(pcl));
@@ -4351,6 +4366,46 @@ static void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
 	return;
 }
 
+QDF_STATUS
+policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
+			       enum policy_mgr_conc_next_action next_action,
+			       enum policy_mgr_conn_update_reason reason,
+			       uint8_t conc_vdev_id, uint32_t request_id)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t freq;
+	uint8_t sap_vdev_id;
+	enum phy_ch_width target_bw;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return status;
+	}
+
+	policy_mgr_debug("action: %d reason: %d", next_action, reason);
+
+	policy_mgr_get_mode_specific_conn_info(psoc, &freq,
+					       &sap_vdev_id,
+					       PM_SAP_MODE);
+	if (next_action == PM_DOWNGRADE_BW)
+		target_bw = CH_WIDTH_160MHZ;
+	else
+		target_bw = CH_WIDTH_320MHZ;
+
+	status = pm_ctx->sme_cbacks.sme_sap_update_ch_width(psoc,
+							    sap_vdev_id,
+							    target_bw, reason,
+							    conc_vdev_id,
+							    request_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		policy_mgr_err("vdev %d failed to set BW to %d",
+			       sap_vdev_id, target_bw);
+
+	return status;
+}
+
 QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 		uint8_t  new_nss, uint8_t next_action,
 		enum policy_mgr_band band,
@@ -4409,8 +4464,8 @@ QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	count = policy_mgr_mode_specific_connection_count(psoc,
-			PM_SAP_MODE, list);
+	count = policy_mgr_get_sap_mode_count(psoc, list);
+
 	for (index = 0; index < count; index++) {
 		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 		vdev_id = pm_conc_connection_list[list[index]].vdev_id;

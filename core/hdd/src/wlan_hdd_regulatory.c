@@ -1068,6 +1068,11 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 		return;
 	}
 
+	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
+		hdd_err_rl("Driver module is closed, dropping request");
+		return;
+	}
+
 	hdd_debug("country: %c%c, initiator %d, dfs_region: %d",
 		  request->alpha2[0],
 		  request->alpha2[1],

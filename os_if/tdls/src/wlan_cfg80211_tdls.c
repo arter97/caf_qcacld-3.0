@@ -176,6 +176,12 @@ int wlan_cfg80211_tdls_add_peer_mlo(struct hdd_adapter *adapter,
 	if (!vdev)
 		return -EINVAL;
 
+	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
+		osif_debug("sta is not connected or disconnecting");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
+		return -EINVAL;
+	}
+
 	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
 	if (is_mlo_vdev) {
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);

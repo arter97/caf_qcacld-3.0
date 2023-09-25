@@ -989,6 +989,7 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 	QDF_STATUS nSirStatus;
 	uint8_t disable_high_ht_mcs_2x2 = 0;
 	struct ch_params ch_params = {0};
+	uint8_t cb_mode;
 
 	tSirMacTxBFCapabilityInfo *pTxBFCapabilityInfo;
 	tSirMacASCapabilityInfo *pASCapabilityInfo;
@@ -1017,10 +1018,11 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 		pDot11f->shortGI20MHz = ht_cap_info->short_gi_20_mhz;
 		pDot11f->shortGI40MHz = ht_cap_info->short_gi_40_mhz;
 	} else {
+		cb_mode = lim_get_cb_mode_for_freq(mac, pe_session,
+						   pe_session->curr_op_freq);
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq) &&
 		    LIM_IS_STA_ROLE(pe_session) &&
-		    WNI_CFG_CHANNEL_BONDING_MODE_DISABLE !=
-		    mac->roam.configParam.channelBondingMode24GHz) {
+		    cb_mode != WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) {
 			pDot11f->supportedChannelWidthSet = 1;
 			ch_params.ch_width = CH_WIDTH_40MHZ;
 			wlan_reg_set_channel_params_for_pwrmode(
@@ -1158,14 +1160,7 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 	uint32_t self_cb_mode;
 	struct ch_params ch_params = {0};
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) {
-		self_cb_mode =
-			mac->roam.configParam.channelBondingMode24GHz;
-	} else {
-		self_cb_mode =
-			mac->roam.configParam.channelBondingMode5GHz;
-	}
-
+	self_cb_mode = lim_get_cb_mode_for_freq(mac, pe_session, ch_freq);
 	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
 		return PHY_SINGLE_CHANNEL_CENTERED;
 
@@ -5289,9 +5284,12 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 					nframe - WLAN_BEACON_IES_OFFSET,
 					&ml_ie, &ml_ie_total_len);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
-			util_get_bvmlie_persta_partner_info(ml_ie,
-							    ml_ie_total_len,
-							    &partner_info);
+			status = util_get_bvmlie_persta_partner_info(
+								ml_ie,
+								ml_ie_total_len,
+								&partner_info);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
 			bcn_struct->mlo_ie.mlo_ie.num_sta_profile =
 						partner_info.num_partner_links;
 			util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
@@ -7057,6 +7055,186 @@ QDF_STATUS populate_dot11f_wfatpc(struct mac_context *mac,
 	pDot11f->txPower = txPower;
 	pDot11f->linkMargin = linkMargin;
 	pDot11f->present = 1;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void
+populate_dot11f_chan_load_report(struct mac_context *mac,
+				 tDot11fIEMeasurementReport *dot11f,
+				 struct chan_load_report *channel_load_report)
+{
+	dot11f->report.channel_load_report.op_class =
+					channel_load_report->op_class;
+	dot11f->report.channel_load_report.channel =
+					channel_load_report->channel;
+	qdf_mem_copy(dot11f->report.channel_load_report.meas_start_time,
+		&channel_load_report->rrm_scan_tsf,
+		sizeof(dot11f->report.channel_load_report.meas_start_time));
+	dot11f->report.channel_load_report.meas_duration =
+				channel_load_report->meas_duration;
+	dot11f->report.channel_load_report.chan_load =
+				channel_load_report->chan_load;
+
+	pe_debug("regClass %d chan %d meas_time %d meas_dur %d, chan_load %d",
+		 dot11f->report.channel_load_report.op_class,
+		 dot11f->report.channel_load_report.channel,
+		 channel_load_report->rrm_scan_tsf,
+		 dot11f->report.channel_load_report.meas_duration,
+		 dot11f->report.channel_load_report.chan_load);
+}
+
+static void
+populate_dot11f_rrm_counter_stats(tDot11fIEMeasurementReport *pdot11f,
+				  struct counter_stats *counter_stats,
+				  bool *reporting_reason_present)
+{
+	tDot11fIEreporting_reason *reporting_reason;
+
+	reporting_reason = &pdot11f->report.sta_stats.reporting_reason;
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.transmitted_fragment_count =
+		counter_stats->transmitted_fragment_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.group_transmitted_frame_count =
+		counter_stats->group_transmitted_frame_count;
+
+	if (counter_stats->failed_count) {
+		reporting_reason->failed_count = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.failed_count =
+			counter_stats->failed_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.received_fragment_count =
+		counter_stats->received_fragment_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.group_received_frame_count =
+		counter_stats->group_received_frame_count;
+
+	if (counter_stats->fcs_error_count) {
+		reporting_reason->fcs_error = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.fcs_error_count =
+			counter_stats->fcs_error_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_counter_stats.transmitted_frame_count =
+			counter_stats->transmitted_frame_count;
+}
+
+static void
+populate_dot11f_rrm_mac_stats(tDot11fIEMeasurementReport *pdot11f,
+			      struct mac_stats *mac_stats,
+			      bool *reporting_reason_present)
+{
+	tDot11fIEreporting_reason *reporting_reason;
+
+	reporting_reason = &pdot11f->report.sta_stats.reporting_reason;
+	if (mac_stats->retry_count) {
+		reporting_reason->retry = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.retry_count =
+			mac_stats->retry_count;
+
+	if (mac_stats->multiple_retry_count) {
+		reporting_reason->multiple_retry = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.multiple_retry_count =
+			mac_stats->multiple_retry_count;
+
+	if (mac_stats->frame_duplicate_count) {
+		reporting_reason->frame_duplicate = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.frame_duplicate_count =
+			mac_stats->frame_duplicate_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.rts_success_count =
+			mac_stats->rts_success_count;
+
+	if (mac_stats->rts_failure_count) {
+		reporting_reason->rts_failure = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.rts_failure_count =
+			mac_stats->rts_failure_count;
+
+	if (mac_stats->ack_failure_count) {
+		reporting_reason->ack_failure = 1;
+		*reporting_reason_present = true;
+	}
+	pdot11f->report.sta_stats.statsgroupdata.dot11_mac_stats.ack_failure_count =
+			mac_stats->ack_failure_count;
+}
+
+static void
+populate_dot11f_rrm_access_delay_stats(
+				tDot11fIEMeasurementReport *pdot11f,
+				struct access_delay_stats *access_delay_stats)
+{
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.ap_average_access_delay =
+		access_delay_stats->ap_average_access_delay;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_besteffort =
+		access_delay_stats->average_access_delay_besteffort;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_background =
+		access_delay_stats->average_access_delay_background;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_video =
+		access_delay_stats->average_access_delay_video;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.average_access_delay_voice =
+		access_delay_stats->average_access_delay_voice;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.station_count =
+		access_delay_stats->station_count;
+
+	pdot11f->report.sta_stats.statsgroupdata.dot11_bss_average_access_delay.channel_utilization =
+		access_delay_stats->channel_utilization;
+}
+
+QDF_STATUS
+populate_dot11f_rrm_sta_stats_report(
+		struct mac_context *mac, tDot11fIEMeasurementReport *pdot11f,
+		struct statistics_report *statistics_report)
+{
+	struct counter_stats counter_stats;
+	struct mac_stats mac_stats;
+	struct access_delay_stats access_delay_stats;
+	bool reporting_reason_present = false;
+
+	counter_stats = statistics_report->group_stats.counter_stats;
+	mac_stats = statistics_report->group_stats.mac_stats;
+	access_delay_stats = statistics_report->group_stats.access_delay_stats;
+
+	pdot11f->report.sta_stats.meas_duration =
+					statistics_report->meas_duration;
+	pdot11f->report.sta_stats.group_id = statistics_report->group_id;
+	pdot11f->report.sta_stats.reporting_reason.present = 0;
+
+	switch (statistics_report->group_id) {
+	case STA_STAT_GROUP_ID_COUNTER_STATS:
+		populate_dot11f_rrm_counter_stats(pdot11f, &counter_stats,
+						  &reporting_reason_present);
+		break;
+	case STA_STAT_GROUP_ID_MAC_STATS:
+		populate_dot11f_rrm_mac_stats(pdot11f, &mac_stats,
+					      &reporting_reason_present);
+		break;
+	case STA_STAT_GROUP_ID_DELAY_STATS:
+		populate_dot11f_rrm_access_delay_stats(pdot11f,
+						       &access_delay_stats);
+		break;
+	default:
+		pe_err("group id not supported %d",
+		       statistics_report->group_id);
+		return QDF_STATUS_SUCCESS;
+	}
+	if (reporting_reason_present)
+		pdot11f->report.sta_stats.reporting_reason.present = 1;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -9505,29 +9683,33 @@ QDF_STATUS populate_dot11f_eht_operation(struct mac_context *mac_ctx,
 					 struct pe_session *session,
 					 tDot11fIEeht_op *eht_op)
 {
+	enum phy_ch_width oper_ch_width;
+
 	qdf_mem_copy(eht_op, &session->eht_op, sizeof(*eht_op));
 
 	eht_op->present = 1;
 
 	eht_op->eht_op_information_present = 1;
-	if (session->ch_width == CH_WIDTH_320MHZ) {
+
+	oper_ch_width = wlan_mlme_get_ap_oper_ch_width(session->vdev);
+	if (oper_ch_width == CH_WIDTH_320MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_320;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = session->ch_center_freq_seg1;
-	} else if (session->ch_width == CH_WIDTH_160MHZ ||
-		   session->ch_width == CH_WIDTH_80P80MHZ) {
+	} else if (oper_ch_width == CH_WIDTH_160MHZ ||
+		   oper_ch_width == CH_WIDTH_80P80MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_160;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = session->ch_center_freq_seg1;
-	} else if (session->ch_width == CH_WIDTH_80MHZ) {
+	} else if (oper_ch_width == CH_WIDTH_80MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_80;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = 0;
-	} else if (session->ch_width == CH_WIDTH_40MHZ) {
+	} else if (oper_ch_width == CH_WIDTH_40MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_40;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = 0;
-	} else if (session->ch_width == CH_WIDTH_20MHZ) {
+	} else if (oper_ch_width == CH_WIDTH_20MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_20;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = 0;
@@ -9537,6 +9719,31 @@ QDF_STATUS populate_dot11f_eht_operation(struct mac_context *mac_ctx,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+
+QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
+					  struct pe_session *session,
+					  tDot11fIEbw_ind_element *bw_ind)
+{
+	tLimChannelSwitchInfo *ch_switch;
+
+	ch_switch = &session->gLimChannelSwitch;
+	bw_ind->present = true;
+	bw_ind->channel_width =	wlan_mlme_convert_phy_ch_width_to_eht_op_bw(
+							ch_switch->ch_width);
+	if (ch_switch->puncture_bitmap) {
+		bw_ind->disabled_sub_chan_bitmap_present = 1;
+		bw_ind->disabled_sub_chan_bitmap[0][0] =
+				QDF_GET_BITS(ch_switch->puncture_bitmap, 0, 8);
+		bw_ind->disabled_sub_chan_bitmap[0][1] =
+				QDF_GET_BITS(ch_switch->puncture_bitmap, 8, 8);
+	}
+	bw_ind->ccfs0 = ch_switch->ch_center_freq_seg0;
+	bw_ind->ccfs1 = ch_switch->ch_center_freq_seg1;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif /* WLAN_FEATURE_11BE */
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -11884,8 +12091,9 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		p_sta_prof = sta_prof->data;
 		len_remaining = sizeof(sta_prof->data);
 		ml_link_info =
-			mlo_mgr_get_ap_link_by_link_id(pe_session->vdev,
-						       link_info->link_id);
+			mlo_mgr_get_ap_link_by_link_id(
+					pe_session->vdev->mlo_dev_ctx,
+					link_info->link_id);
 		if (!ml_link_info)
 			continue;
 

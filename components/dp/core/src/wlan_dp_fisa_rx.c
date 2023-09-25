@@ -913,6 +913,7 @@ void dp_fisa_rx_fst_update_work(void *arg)
 	struct dp_rx_fst *fisa_hdl = arg;
 	qdf_list_node_t *node;
 	hal_soc_handle_t hal_soc_hdl = fisa_hdl->dp_ctx->hal_soc;
+	struct dp_vdev *vdev;
 
 	if (qdf_atomic_read(&fisa_hdl->pm_suspended)) {
 		dp_err_rl("WQ triggered during suspend stage, deferred update");
@@ -930,7 +931,21 @@ void dp_fisa_rx_fst_update_work(void *arg)
 	while (qdf_list_peek_front(&fisa_hdl->fst_update_list, &node) ==
 	       QDF_STATUS_SUCCESS) {
 		elem = (struct dp_fisa_rx_fst_update_elem *)node;
-		dp_fisa_rx_fst_update(fisa_hdl, elem);
+		vdev = dp_vdev_get_ref_by_id(fisa_hdl->soc_hdl,
+					     elem->vdev_id,
+					     DP_MOD_ID_RX);
+		/*
+		 * Update fst only if current dp_vdev fetched by vdev_id is
+		 * still valid and match with the original dp_vdev when fst
+		 * node is queued.
+		 */
+		if (vdev) {
+			if (vdev == elem->vdev)
+				dp_fisa_rx_fst_update(fisa_hdl, elem);
+
+			dp_vdev_unref_delete(fisa_hdl->soc_hdl, vdev,
+					     DP_MOD_ID_RX);
+		}
 		qdf_list_remove_front(&fisa_hdl->fst_update_list, &node);
 		qdf_mem_free(elem);
 	}
@@ -1043,6 +1058,7 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	elem->reo_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
 	elem->reo_dest_indication = reo_dest_indication;
 	elem->vdev = vdev;
+	elem->vdev_id = vdev->vdev_id;
 
 	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
 	qdf_list_insert_back(&fisa_hdl->fst_update_list, &elem->node);
@@ -1470,6 +1486,10 @@ get_new_vdev_ref:
 				fisa_flow_head_skb_vdev->mld_mac_addr.raw,
 				QDF_MAC_ADDR_SIZE) != 0)) {
 			qdf_nbuf_free(fisa_flow->head_skb);
+			dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+					     fisa_flow_head_skb_vdev,
+					     DP_MOD_ID_RX);
+			fisa_flow_head_skb_vdev = NULL;
 			goto out;
 		} else {
 			fisa_flow->same_mld_vdev_mismatch++;
@@ -1511,9 +1531,10 @@ dp_fisa_rx_get_flow_flush_vdev_ref(ol_txrx_soc_handle cdp_soc,
 	return fisa_flow_head_skb_vdev;
 
 out:
-	dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
-			     fisa_flow_head_skb_vdev,
-			     DP_MOD_ID_RX);
+	if (fisa_flow_head_skb_vdev)
+		dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+				     fisa_flow_head_skb_vdev,
+				     DP_MOD_ID_RX);
 	return NULL;
 }
 #endif
