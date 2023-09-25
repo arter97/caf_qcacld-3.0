@@ -254,6 +254,7 @@ struct wlan_objmgr_pdev_objmgr {
  * @peer_free_list:    list to hold freed peer
  * @peer_obj_free_work:delayed work to be queued into workqueue
  * @active_work_cnt:   active work counts
+ * @standby_active: Pdev in standby mode while power down
 */
 struct wlan_objmgr_pdev {
 	struct wlan_chan_list *current_chan_list;
@@ -265,6 +266,7 @@ struct wlan_objmgr_pdev {
 	WLAN_OBJ_STATE obj_state;
 	target_pdev_info_t *tgt_if_handle;
 	qdf_spinlock_t pdev_lock;
+	bool standby_active;
 #ifdef FEATURE_DELAYED_PEER_OBJ_DESTROY
 	qdf_spinlock_t peer_free_lock;
 	qdf_list_t peer_free_list;

@@ -1532,6 +1532,7 @@ QDF_STATUS mlo_teardown_cmd_send_tlv(struct wmi_unified *wmi_handle,
 	}
 
 	cmd->trigger_umac_reset = param->umac_reset;
+	cmd->erp_standby_mode = param->standby_active;
 
 	wmi_mtrace(WMI_MLO_TEARDOWN_CMDID, NO_SESSION, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,

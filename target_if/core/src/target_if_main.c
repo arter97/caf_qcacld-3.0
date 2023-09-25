@@ -1233,7 +1233,7 @@ QDF_STATUS target_if_mlo_ready(struct wlan_objmgr_pdev **pdev,
 QDF_STATUS
 target_if_mlo_teardown_req(struct wlan_objmgr_pdev *pdev,
 			   enum wmi_mlo_teardown_reason reason,
-			   bool reset)
+			   bool reset, bool standby_active)
 {
 	wmi_unified_t wmi_handle;
 	struct wmi_mlo_teardown_params params = {0};
@@ -1245,6 +1245,7 @@ target_if_mlo_teardown_req(struct wlan_objmgr_pdev *pdev,
 	params.pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 	params.reason = reason;
 	params.umac_reset = reset;
+	params.standby_active = standby_active;
 
 	return wmi_mlo_teardown_cmd_send(wmi_handle, &params);
 }

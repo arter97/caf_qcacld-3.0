@@ -588,7 +588,8 @@ struct wlan_lmac_if_mlme_tx_ops {
 	QDF_STATUS (*target_if_mlo_ready)(struct wlan_objmgr_pdev **pdev,
 					  uint8_t num_pdevs);
 	QDF_STATUS (*target_if_mlo_teardown_req)(struct wlan_objmgr_pdev *pdev,
-						 uint32_t grp_id, bool reset);
+						 uint32_t grp_id, bool reset,
+						 bool standby_active);
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 QDF_STATUS (*vdev_send_set_mac_addr)(struct qdf_mac_addr mac_addr,
