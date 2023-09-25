@@ -7839,6 +7839,18 @@ void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
 		he_cap->ndp_feedback_supp = dot11_cap.ndp_feedback_supp;
 		he_cap->amsdu_in_ampdu = dot11_cap.amsdu_in_ampdu;
 
+		if (!mac->roam.configParam.channelBondingMode5GHz) {
+			/*
+			 * clearing bits for setting 20MHz support
+			 */
+			dot11_cap.chan_width_1 =
+				HE_CH_WIDTH_CLR_BIT(dot11_cap.chan_width_1, 0);
+			dot11_cap.chan_width_2 =
+				HE_CH_WIDTH_CLR_BIT(dot11_cap.chan_width_2, 0);
+			dot11_cap.chan_width_3 =
+				HE_CH_WIDTH_CLR_BIT(dot11_cap.chan_width_3, 0);
+			he_cap->he_ppdu_20_in_160_80p80Mhz = 0;
+		}
 		he_cap->chan_width = HE_CH_WIDTH_COMBINE(dot11_cap.chan_width_0,
 				dot11_cap.chan_width_1, dot11_cap.chan_width_2,
 				dot11_cap.chan_width_3, dot11_cap.chan_width_4,
