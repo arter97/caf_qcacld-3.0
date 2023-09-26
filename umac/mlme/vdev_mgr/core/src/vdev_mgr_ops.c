@@ -26,6 +26,7 @@
 #include "vdev_mgr_ops.h"
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_vdev_mlme_api.h>
+#include <wlan_pdev_mlme.h>
 #include <wlan_mlme_dbg.h>
 #include <wlan_vdev_mgr_tgt_if_tx_api.h>
 #include <target_if.h>
@@ -426,11 +427,25 @@ vdev_mgr_start_param_update_cac_ms(struct wlan_objmgr_vdev *vdev,
 	param->cac_duration_ms =
 			wlan_util_vdev_mgr_get_cac_timeout_for_vdev(vdev);
 }
+
+static inline
+bool vdev_mgr_is_sta_max_phy_enabled(enum QDF_OPMODE op_mode,
+				     struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
 #else
 static void
 vdev_mgr_start_param_update_cac_ms(struct wlan_objmgr_vdev *vdev,
 				   struct vdev_start_params *param)
 {
+}
+
+static inline
+bool vdev_mgr_is_sta_max_phy_enabled(enum QDF_OPMODE op_mode,
+				     struct wlan_objmgr_pdev *pdev)
+{
+	return (op_mode == QDF_STA_MODE && wlan_rptr_check_rpt_max_phy(pdev));
 }
 #endif
 
@@ -470,7 +485,8 @@ static QDF_STATUS vdev_mgr_start_param_update(
 	param->vdev_id = wlan_vdev_get_id(vdev);
 
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	if (vdev_mgr_is_opmode_sap_or_p2p_go(op_mode) &&
+	if (!vdev_mgr_is_sta_max_phy_enabled(op_mode, pdev) &&
+	    vdev_mgr_is_opmode_sap_or_p2p_go(op_mode) &&
 	    vdev_mgr_is_49G_5G_chan_freq(des_chan->ch_freq)) {
 		vdev_mgr_set_cur_chan_punc_bitmap(des_chan, &puncture_bitmap);
 		tgt_dfs_set_current_channel_for_freq(pdev, des_chan->ch_freq,
