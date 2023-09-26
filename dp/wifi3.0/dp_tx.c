@@ -4795,52 +4795,54 @@ dp_tx_update_peer_stats(struct dp_tx_desc_s *tx_desc,
 
 	if (ts->status == HAL_TX_TQM_RR_REM_CMD_AGED) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.age_out, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_REM) {
 		DP_PEER_PER_PKT_STATS_INC_PKT(txrx_peer, tx.dropped.fw_rem, 1,
-					      length, link_id);
+					      length, 0);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_NOTX) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_rem_notx, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_TX) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_rem_tx, 1,
 					  link_id);
+		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_rem_tx_bytes,
+					  length, link_id);
 	} else if (ts->status == HAL_TX_TQM_RR_FW_REASON1) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_reason1, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_FW_REASON2) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_reason2, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_FW_REASON3) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.fw_reason3, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_DISABLE_QUEUE) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 					  tx.dropped.fw_rem_queue_disable, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_REM_CMD_TILL_NONMATCHING) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 					  tx.dropped.fw_rem_no_match, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_DROP_THRESHOLD) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 					  tx.dropped.drop_threshold, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_LINK_DESC_UNAVAILABLE) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 					  tx.dropped.drop_link_desc_na, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_DROP_OR_INVALID_MSDU) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 					  tx.dropped.invalid_drop, 1,
-					  link_id);
+					  0);
 	} else if (ts->status == HAL_TX_TQM_RR_MULTICAST_DROP) {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer,
 					  tx.dropped.mcast_vdev_drop, 1,
-					  link_id);
+					  0);
 	} else {
 		DP_PEER_PER_PKT_STATS_INC(txrx_peer, tx.dropped.invalid_rr, 1,
-					  link_id);
+					  0);
 	}
 }
 

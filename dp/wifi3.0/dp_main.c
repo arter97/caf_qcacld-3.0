@@ -10266,30 +10266,6 @@ void dp_get_peer_calibr_stats(struct dp_peer *peer,
 	peer_stats->rx.rx_data_rate = tgt_peer->stats.rx.rx_data_rate;
 }
 
-/**
- * dp_get_peer_basic_stats()- Get peer basic stats
- * @peer: Datapath peer
- * @peer_stats: buffer for peer stats
- *
- * Return: none
- */
-static inline
-void dp_get_peer_basic_stats(struct dp_peer *peer,
-			     struct cdp_peer_stats *peer_stats)
-{
-	struct dp_txrx_peer *txrx_peer;
-
-	txrx_peer = dp_get_txrx_peer(peer);
-	if (!txrx_peer)
-		return;
-
-	peer_stats->tx.comp_pkt.num += txrx_peer->comp_pkt.num;
-	peer_stats->tx.comp_pkt.bytes += txrx_peer->comp_pkt.bytes;
-	peer_stats->tx.tx_failed += txrx_peer->tx_failed;
-	peer_stats->rx.to_stack.num += txrx_peer->to_stack.num;
-	peer_stats->rx.to_stack.bytes += txrx_peer->to_stack.bytes;
-}
-
 #ifdef QCA_ENHANCED_STATS_SUPPORT
 /**
  * dp_get_peer_per_pkt_stats()- Get peer per pkt stats
@@ -10375,8 +10351,69 @@ void dp_get_peer_extd_stats(struct dp_peer *peer,
 
 	dp_monitor_peer_get_stats(soc, peer, peer_stats, UPDATE_PEER_STATS);
 }
-#endif /* WLAN_FEATURE_11BE_MLO */
-#else /* QCA_ENHANCED_STATS_SUPPORT */
+#endif
+
+/**
+ * dp_get_peer_basic_stats()- Get peer basic stats
+ * @peer: Datapath peer
+ * @peer_stats: buffer for peer stats
+ *
+ * Return: none
+ */
+static inline
+void dp_get_peer_basic_stats(struct dp_peer *peer,
+			     struct cdp_peer_stats *peer_stats)
+{
+	struct dp_txrx_peer *txrx_peer;
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer)
+		return;
+
+	if (!IS_MLO_DP_LINK_PEER(peer)) {
+		peer_stats->tx.tx_failed += txrx_peer->tx_failed;
+		peer_stats->tx.comp_pkt.num += txrx_peer->comp_pkt.num;
+		peer_stats->tx.comp_pkt.bytes += txrx_peer->comp_pkt.bytes;
+		peer_stats->rx.to_stack.num += txrx_peer->to_stack.num;
+		peer_stats->rx.to_stack.bytes += txrx_peer->to_stack.bytes;
+	}
+	else {
+		peer_stats->tx.tx_failed += peer_stats->tx.dropped.fw_rem_tx;
+		peer_stats->tx.comp_pkt.num += peer_stats->tx.tx_success.num +
+					      peer_stats->tx.tx_failed;
+		peer_stats->tx.comp_pkt.bytes += peer_stats->tx.tx_success.bytes +
+						peer_stats->tx.dropped.fw_rem_tx_bytes;
+		peer_stats->rx.to_stack.num += peer_stats->rx.rx_success.num;
+		peer_stats->rx.to_stack.bytes += peer_stats->rx.rx_success.bytes;
+	}
+}
+
+#else
+
+/**
+ * dp_get_peer_basic_stats()- Get peer basic stats
+ * @peer: Datapath peer
+ * @peer_stats: buffer for peer stats
+ *
+ * Return: none
+ */
+static inline
+void dp_get_peer_basic_stats(struct dp_peer *peer,
+			     struct cdp_peer_stats *peer_stats)
+{
+	struct dp_txrx_peer *txrx_peer;
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer)
+		return;
+
+	peer_stats->tx.comp_pkt.num += txrx_peer->comp_pkt.num;
+	peer_stats->tx.comp_pkt.bytes += txrx_peer->comp_pkt.bytes;
+	peer_stats->tx.tx_failed += txrx_peer->tx_failed;
+	peer_stats->rx.to_stack.num += txrx_peer->to_stack.num;
+	peer_stats->rx.to_stack.bytes += txrx_peer->to_stack.bytes;
+}
+
 static inline
 void dp_get_peer_per_pkt_stats(struct dp_peer *peer,
 			       struct cdp_peer_stats *peer_stats)
@@ -10431,13 +10468,13 @@ void dp_get_peer_stats(struct dp_peer *peer, struct cdp_peer_stats *peer_stats)
 {
 	dp_get_peer_calibr_stats(peer, peer_stats);
 
-	dp_get_peer_basic_stats(peer, peer_stats);
-
 	dp_get_peer_per_pkt_stats(peer, peer_stats);
 
 	dp_get_peer_extd_stats(peer, peer_stats);
 
 	dp_get_peer_tx_per(peer_stats);
+
+	dp_get_peer_basic_stats(peer, peer_stats);
 }
 
 /**
