@@ -10554,7 +10554,6 @@ QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
 			 * If operating channel in different band
 			 * (not DBS capable), return false.
 			 */
-			/* TODO: To be enhanced for SBS */
 			if (policy_mgr_is_dnsc_set(vdev)) {
 				if (op_ch_freq_list[i] == ch_freq) {
 					*ok = true;
@@ -10562,12 +10561,13 @@ QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
 							vdev,
 							WLAN_POLICY_MGR_ID);
 					break;
-				} else if (WLAN_REG_IS_SAME_BAND_FREQS(
-					op_ch_freq_list[i], ch_freq)) {
+				} else if (policy_mgr_2_freq_always_on_same_mac(
+					   psoc,
+					   op_ch_freq_list[i], ch_freq)) {
 					*ok = false;
 					wlan_objmgr_vdev_release_ref(
-							vdev,
-							WLAN_POLICY_MGR_ID);
+					vdev,
+					WLAN_POLICY_MGR_ID);
 					break;
 				} else if (policy_mgr_is_hw_dbs_capable(psoc)) {
 					*ok = true;
@@ -11333,47 +11333,6 @@ bool policy_mgr_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc,
 	return is_6g_allowed;
 }
 #endif
-
-bool policy_mgr_is_valid_for_channel_switch(struct wlan_objmgr_psoc *psoc,
-					    uint32_t ch_freq)
-{
-	uint32_t sta_sap_scc_on_dfs_chan, sta_sap_scc_allowed_on_indoor_chan;
-	uint32_t sap_count;
-	enum channel_state state;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return false;
-	}
-
-	sta_sap_scc_on_dfs_chan =
-			policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
-	sta_sap_scc_allowed_on_indoor_chan =
-			policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc);
-
-	sap_count = policy_mgr_mode_specific_connection_count(psoc,
-							      PM_SAP_MODE,
-							      NULL);
-	state = wlan_reg_get_channel_state_for_pwrmode(pm_ctx->pdev, ch_freq,
-						       REG_CURRENT_PWR_MODE);
-
-	policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, sap_count %u, ch freq %u, state %u",
-			 sta_sap_scc_on_dfs_chan, sap_count, ch_freq, state);
-
-	if ((state == CHANNEL_STATE_ENABLE) || (sap_count == 0) ||
-	    (wlan_reg_is_dfs_for_freq(pm_ctx->pdev, ch_freq) &&
-	     sta_sap_scc_on_dfs_chan) ||
-	    (sta_sap_scc_allowed_on_indoor_chan &&
-	     wlan_reg_is_freq_indoor(pm_ctx->pdev, ch_freq))) {
-		policy_mgr_debug("Valid channel for channel switch");
-		return true;
-	}
-
-	policy_mgr_debug("Invalid channel for channel switch");
-	return false;
-}
 
 bool policy_mgr_is_sta_sap_scc(struct wlan_objmgr_psoc *psoc,
 			       uint32_t sap_freq)

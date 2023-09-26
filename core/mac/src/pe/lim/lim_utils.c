@@ -4249,7 +4249,6 @@ lim_get_b_dfrom_rx_packet(struct mac_context *mac, void *body, uint32_t **pRxPac
 bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
 					     uint32_t channel_freq)
 {
-	uint8_t index;
 	bool ok = false;
 
 	if (policy_mgr_is_chan_ok_for_dnbs(mac->psoc, channel_freq,
@@ -4263,15 +4262,9 @@ bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
 		return false;
 	}
 
-	for (index = 0; index < mac->mlme_cfg->reg.valid_channel_list_num; index++) {
-		if (mac->mlme_cfg->reg.valid_channel_freq_list[index] !=
-		    channel_freq)
-			continue;
-
-		ok = policy_mgr_is_valid_for_channel_switch(
-				mac->psoc, channel_freq);
-		return ok;
-	}
+	if (wlan_reg_is_freq_enabled(mac->pdev, channel_freq,
+				     REG_CURRENT_PWR_MODE))
+		return true;
 
 	/* channel does not belong to list of valid channels */
 	return false;

@@ -4435,19 +4435,6 @@ bool policy_mgr_sta_sap_scc_on_lte_coex_chan(
 	struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_is_valid_for_channel_switch() - check for valid channel for
- * channel switch.
- * @psoc: pointer to psoc
- * @ch_freq: channel frequency to be validated.
- * This function validates whether the given channel is valid for channel
- * switch.
- *
- * Return: true or false
- */
-bool policy_mgr_is_valid_for_channel_switch(struct wlan_objmgr_psoc *psoc,
-					    uint32_t ch_freq);
-
-/**
  * policy_mgr_get_user_config_sap_freq() - Get the user configured channel
  *
  * @psoc: pointer to psoc
