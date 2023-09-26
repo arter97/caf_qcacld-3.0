@@ -1887,10 +1887,6 @@ bool policy_mgr_are_2_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	if (!policy_mgr_is_hw_dbs_capable(psoc))
 		return true;
 
-	policy_mgr_rl_debug("freq_1 %d freq_2 %d old_hw_mode_index=%d, new_hw_mode_index=%d",
-			    freq_1, freq_2, pm_ctx->old_hw_mode_index,
-			    pm_ctx->new_hw_mode_index);
-
 	/* HW is DBS/SBS capable */
 	status = policy_mgr_get_current_hw_mode(psoc, &hw_mode);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -1901,14 +1897,16 @@ bool policy_mgr_are_2_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	if (hw_mode.dbs_cap || hw_mode.sbs_cap)
 		cur_range_sbs = policy_mgr_is_cur_freq_range_sbs(psoc);
 
-	policy_mgr_rl_debug("dbs_cap %d sbs_cap %d, cur range is sbs %d",
-			    hw_mode.dbs_cap, hw_mode.sbs_cap, cur_range_sbs);
 	freq_range = pm_ctx->hw_mode.cur_mac_freq_range;
 	/* current HW is DBS OR SBS check current DBS/SBS freq range */
-	if (hw_mode.dbs_cap || hw_mode.sbs_cap)
+	if (hw_mode.dbs_cap || hw_mode.sbs_cap) {
+		policy_mgr_rl_debug("freq1 %d freq2 %d dbs_cap %d sbs_cap %d, cur range is sbs %d",
+				    freq_1, freq_2, hw_mode.dbs_cap,
+				    hw_mode.sbs_cap, cur_range_sbs);
 		return policy_mgr_2_freq_same_mac_in_freq_range(pm_ctx,
 								freq_range,
 								freq_1, freq_2);
+	}
 
 	/*
 	 * If current HW mode is not DBS/SBS, check if in all supported mode
@@ -2035,9 +2033,6 @@ policy_mgr_are_3_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	if (!policy_mgr_is_hw_dbs_capable(psoc))
 		return true;
 
-	policy_mgr_rl_debug("freq_1 %d freq_2 %d freq_3 %d", freq_1, freq_2,
-			    freq_3);
-
 	/* HW is DBS/SBS capable, get current HW mode */
 	status = policy_mgr_get_current_hw_mode(psoc, &hw_mode);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -2047,15 +2042,17 @@ policy_mgr_are_3_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	if (hw_mode.dbs_cap || hw_mode.sbs_cap)
 		cur_range_sbs = policy_mgr_is_cur_freq_range_sbs(psoc);
 
-	policy_mgr_rl_debug("dbs_cap %d sbs_cap %d, cur range is sbs %d",
-			    hw_mode.dbs_cap, hw_mode.sbs_cap, cur_range_sbs);
 	freq_range = pm_ctx->hw_mode.cur_mac_freq_range;
 
 	/* current HW is DBS OR SBS check current DBS/SBS freq range */
-	if (hw_mode.dbs_cap || hw_mode.sbs_cap)
+	if (hw_mode.dbs_cap || hw_mode.sbs_cap) {
+		policy_mgr_rl_debug("freq1 %d freq2 %d freq3 %d dbs_cap %d sbs_cap %d, cur range is sbs %d",
+				     freq_1, freq_2, freq_3, hw_mode.dbs_cap,
+				     hw_mode.sbs_cap, cur_range_sbs);
 		return policy_mgr_3_freq_same_mac_in_freq_range(pm_ctx,
 							freq_range,
 							freq_1, freq_2, freq_3);
+	}
 	/*
 	 * If current HW mode is not DBS/SBS, check if in all supported mode
 	 * it they will be on same mac
@@ -2780,9 +2777,6 @@ bool policy_mgr_is_pcl_weightage_required(struct wlan_objmgr_psoc *psoc)
 	if (dual_sta_policy->concurrent_sta_policy  ==
 		QCA_WLAN_CONCURRENT_STA_POLICY_PREFER_PRIMARY &&
 		dual_sta_policy->primary_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
-		policy_mgr_debug("dual_sta_policy : %d, primary_vdev_id:%d",
-			dual_sta_policy->concurrent_sta_policy,
-			dual_sta_policy->primary_vdev_id);
 		return false;
 	}
 
