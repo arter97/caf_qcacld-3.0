@@ -1051,7 +1051,7 @@ static inline void lim_cache_emlsr_params(struct pe_session *session_entry,
 #endif
 
 /**
- * lim_send_join_fail() - Send join failure
+ * lim_send_join_fail_on_vdev() - Send join failure for link vdev
  * @mac_ctx: Pointer to Global MAC structure
  * @session_entry: Session entry
  * @result_code: result code to send in join result
@@ -1060,10 +1060,13 @@ static inline void lim_cache_emlsr_params(struct pe_session *session_entry,
  * resp doesn't match with current bssid
  */
 static
-void lim_send_join_fail(struct mac_context *mac_ctx,
-			struct pe_session *session_entry,
-			enum eSirResultCodes result_code)
+void lim_send_join_fail_on_vdev(struct mac_context *mac_ctx,
+				struct pe_session *session_entry,
+				enum eSirResultCodes result_code)
 {
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev))
+		return;
+
 	session_entry->limSmeState = eLIM_SME_JOIN_FAILURE_STATE;
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_SME_STATE,
 			 session_entry->peSessionId,
@@ -1187,11 +1190,10 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				QDF_MAC_ADDR_REF(hdr->sa));
 			/*
 			 * Send Assoc failure to avoid connection in
-			 * progress state.
+			 * progress state for link vdev.
 			 */
-
-			lim_send_join_fail(mac_ctx, session_entry,
-					   eSIR_SME_ASSOC_REFUSED);
+			lim_send_join_fail_on_vdev(mac_ctx, session_entry,
+						   eSIR_SME_ASSOC_REFUSED);
 			qdf_mem_free(beacon);
 			return;
 		}
@@ -1208,10 +1210,10 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				QDF_MAC_ADDR_REF(hdr->sa));
 			/*
 			 * Send Reassoc failure to avoid connection in
-			 * progress state.
+			 * progress state for link vdev.
 			 */
-			lim_send_join_fail(mac_ctx, session_entry,
-					   eSIR_SME_REASSOC_REFUSED);
+			lim_send_join_fail_on_vdev(mac_ctx, session_entry,
+						   eSIR_SME_REASSOC_REFUSED);
 			qdf_mem_free(beacon);
 			return;
 		}
