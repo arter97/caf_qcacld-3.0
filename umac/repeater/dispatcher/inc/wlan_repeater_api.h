@@ -101,6 +101,7 @@ struct dbdc_flags {
  * @vdev_pwrsave_force_sleep:       set powersave force sleep
  * @send_wds_cmd:                   send wds command
  * @get_stavap:                     get stavap pointer
+ * @check_rpt_max_phy:              Check repeater max phy enabled
  * @peer_disassoc:                  disconnect peer
  * @pdev_update_beacon:             update beacon
  * @target_lithium:                 check target type
@@ -132,6 +133,7 @@ struct rptr_ext_cbacks {
 					 bool enable);
 	int (*send_wds_cmd)(struct wlan_objmgr_vdev *vdev, uint8_t value);
 	struct wlan_objmgr_vdev *(*get_stavap)(struct wlan_objmgr_pdev *pdev);
+	bool (*check_rpt_max_phy)(struct wlan_objmgr_pdev *pdev);
 	void (*peer_disassoc)(struct wlan_objmgr_peer *peer);
 	void (*pdev_update_beacon)(struct wlan_objmgr_pdev *pdev);
 	bool (*target_lithium)(struct wlan_objmgr_pdev *pdev);
