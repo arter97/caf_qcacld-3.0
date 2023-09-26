@@ -1152,6 +1152,15 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 		}
 		*akm_type = lim_translate_rsn_oui_to_akm_type(
 						  dot11f_ie_wpa.auth_suites[0]);
+	} else {
+		if (session->gStartBssRSNIe.present ||
+		    session->gStartBssWPAIe.present) {
+			pe_warn("STA does not support RSN and WPA!");
+			lim_send_assoc_rsp_mgmt_frame(
+				mac_ctx, STATUS_NOT_SUPPORTED_AUTH_ALG, 1,
+				sa, sub_type, 0, session, false);
+			return false;
+		}
 	}
 
 	return true;
