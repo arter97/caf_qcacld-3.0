@@ -812,6 +812,14 @@ void tdls_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 			void *arg);
 
 /**
+ * tdls_set_link_unforce() - set link unforce
+ * @vdev: vdev object
+ *
+ * Return: void
+ */
+void tdls_set_link_unforce(struct wlan_objmgr_vdev *vdev);
+
+/**
  * tdls_scan_callback() - callback for TDLS scan operation
  * @tdls_soc: tdls soc pvt object
  *

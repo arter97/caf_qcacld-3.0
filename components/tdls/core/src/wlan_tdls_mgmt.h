@@ -100,6 +100,14 @@ struct wlan_objmgr_vdev *
 tdls_mlo_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * tdls_set_remain_links_unforce() - unforce links
+ * @vdev: vdev object
+ *
+ * Return: void
+ */
+void tdls_set_remain_links_unforce(struct wlan_objmgr_vdev *vdev);
+
+/**
  * tdls_mgmt_rx_ops() - register or unregister rx callback
  * @psoc: psoc object
  * @isregister: register if true, unregister if false
@@ -150,5 +158,13 @@ tdls_process_mlo_choice_tdls_vdev(struct wlan_objmgr_vdev *vdev);
  * Return: void
  */
 void tdls_set_no_force_vdev(struct wlan_objmgr_vdev *vdev, bool flag);
+
+/**
+ * tdls_set_link_mode() - force active or unfore link for MLO case
+ * @req: the pointer of tdls_action_frame_request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req);
 #endif
 
