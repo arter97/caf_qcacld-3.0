@@ -260,4 +260,40 @@ bool __ll_lt_sap_is_bs_ctx_valid(struct bearer_switch_info *bs_ctx,
 bool __ll_lt_sap_is_bs_req_valid(struct wlan_bearer_switch_request *bs_req,
 				 const char *func);
 
+/**
+ * ll_lt_sap_switch_bearer_to_ble() - Switch audio transport to BLE
+ * @psoc: Pointer to psoc
+ * @bs_request: Pointer to bearer switch request
+ * Return: QDF_STATUS_SUCCESS on successful bearer switch else failure
+ */
+QDF_STATUS
+ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_bearer_switch_request *bs_request);
+
+/**
+ * ll_lt_sap_request_for_audio_transport_switch() - Handls audio transport
+ * switch request from userspace
+ * @vdev: Vdev on which the request is received
+ * @req_type: requested transport switch type
+ *
+ * Return: True/False
+ */
+QDF_STATUS
+ll_lt_sap_request_for_audio_transport_switch(struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_req_type req_type);
+
+/**
+ * ll_lt_sap_deliver_audio_transport_switch_resp() - Deliver audio
+ * transport switch response
+ * @vdev: Vdev on which the request is received
+ * @req_type: Transport switch type for which the response is received
+ * @status: Status of the response
+ *
+ * Return: None
+ */
+void ll_lt_sap_deliver_audio_transport_switch_resp(
+					struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_req_type req_type,
+					enum bearer_switch_status status);
+
 #endif /* _WLAN_LL_LT_SAP_BEARER_SWITCH_H_ */

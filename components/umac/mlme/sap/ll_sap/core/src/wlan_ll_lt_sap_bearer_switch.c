@@ -404,6 +404,26 @@ ll_lt_sap_find_first_valid_bs_non_wlan_req(struct bearer_switch_info *bs_ctx)
 	return NULL;
 }
 
+/*
+ * ll_lt_sap_send_bs_req_to_userspace() - Send bearer switch request to user
+ * space
+ * @vdev: ll_lt sap vdev
+ *
+ * API to send bearer switch request to userspace
+ *
+ * Return: None
+ */
+static void
+ll_lt_sap_send_bs_req_to_userspace(struct wlan_objmgr_vdev *vdev,
+				   enum bearer_switch_req_type req_type)
+{
+	struct ll_sap_ops *osif_cbk;
+
+	osif_cbk = ll_sap_get_osif_cbk();
+	if (osif_cbk && osif_cbk->ll_sap_send_audio_transport_switch_req_cb)
+		osif_cbk->ll_sap_send_audio_transport_switch_req_cb(vdev,
+								    req_type);
+}
 /**
  * ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state() - API to handle bearer switch
  * to wlan in non-wlan state.
@@ -439,9 +459,7 @@ static void ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state(
 
 	ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
 
-	/*
-	 * Todo, Send bearer switch request to userspace
-	 */
+	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
 
 	status = qdf_mc_timer_start(&bs_ctx->bs_request_timer,
 				    BEARER_SWITCH_TIMEOUT);
@@ -484,9 +502,8 @@ ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_state(
 	if (QDF_IS_STATUS_SUCCESS(bs_ctx->last_status))
 		return ll_lt_sap_invoke_req_callback(bs_ctx, bs_req,
 						     QDF_STATUS_E_ALREADY);
-	/*
-	 * Todo, Send bearer switch request to userspace
-	 */
+
+	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
 
 	status = qdf_mc_timer_start(&bs_ctx->bs_request_timer,
 				    BEARER_SWITCH_TIMEOUT);
@@ -750,7 +767,6 @@ static void ll_lt_sap_handle_bs_to_wlan_in_wlan_state(
 				struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
-
 	ll_lt_sap_invoke_req_callback(bs_ctx, bs_req, QDF_STATUS_E_ALREADY);
 }
 
@@ -847,12 +863,6 @@ ll_lt_sap_handle_bs_to_non_wlan_in_wlan_req_state(
 					  bs_req->source);
 
 	ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
-
-	/*
-	 * Todo, upon receiving response for wlan request, deliver event
-	 * WLAN_BS_SM_EV_SWITCH_TO_WLAN_COMPLETED from the vendor command
-	 * path
-	 */
 }
 
 /**
@@ -1472,4 +1482,199 @@ rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
 
 	return status;
+}
+
+QDF_STATUS ll_lt_sap_switch_bearer_to_ble(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_bearer_switch_request *bs_request)
+{
+	return bs_sm_deliver_event(psoc, WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN,
+				   sizeof(*bs_request), bs_request);
+}
+
+QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
+					struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_req_type req_type)
+{
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+	struct bearer_switch_info *bearer_switch_ctx;
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+
+	if (!ll_sap_obj) {
+		ll_sap_err("BS_SM vdev %d ll_sap obj null",
+			   wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+	bearer_switch_ctx = ll_sap_obj->bearer_switch_ctx;
+	if (!bearer_switch_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	/*
+	 * Request to switch to non-wlan can always be acceptes so,
+	 * always return success
+	 */
+	if (req_type == WLAN_BS_REQ_TO_NON_WLAN) {
+		ll_sap_debug("BS_SM vdev %d WLAN_BS_REQ_TO_NON_WLAN accepted",
+			     wlan_vdev_get_id(vdev));
+		return QDF_STATUS_SUCCESS;
+	} else if (req_type == WLAN_BS_REQ_TO_WLAN) {
+		/*
+		 * Total_ref_count zero indicates that no module wants to stay
+		 * in non-wlan mode so this request can be accepted
+		 */
+		if (!qdf_atomic_read(&bearer_switch_ctx->total_ref_count)) {
+			ll_sap_debug("BS_SM vdev %d WLAN_BS_REQ_TO_WLAN accepted",
+				     wlan_vdev_get_id(vdev));
+			return QDF_STATUS_SUCCESS;
+		}
+		ll_sap_debug("BS_SM vdev %d WLAN_BS_REQ_TO_WLAN rejected",
+			     wlan_vdev_get_id(vdev));
+
+		return QDF_STATUS_E_FAILURE;
+		}
+	} else {
+		ll_sap_err("BS_SM vdev %d Invalid audio transport type %d",
+			   req_type);
+	}
+
+	return QDF_STATUS_E_INVAL;
+}
+
+/**
+ * ll_lt_sap_deliver_wlan_audio_transport_switch_resp() - Deliver wlan
+ * audio transport switch response to BS_SM
+ * @vdev: ll_lt sap vdev
+ * @status: Status of the request
+ *
+ * Return: None
+ */
+static void ll_lt_sap_deliver_wlan_audio_transport_switch_resp(
+					struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_status status)
+{
+	struct wlan_bearer_switch_request *bs_request;
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+	struct bearer_switch_info *bs_ctx;
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+
+	if (!ll_sap_obj) {
+		ll_sap_err("BS_SM vdev %d ll_sap obj null",
+			   wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	bs_ctx = ll_sap_obj->bearer_switch_ctx;
+	if (!bs_ctx)
+		return;
+
+	bs_request = ll_lt_sap_find_first_valid_bs_wlan_req(bs_ctx);
+
+	/*
+	 * If bs_request is cached in the BS_SM, it means this is a response
+	 * to the host driver's request of bearer switch so deliver the event
+	 * to the BS_SM
+	 */
+	if (bs_request) {
+		if (status == WLAN_BS_STATUS_COMPLETED)
+			bs_sm_deliver_event(
+					wlan_vdev_get_psoc(vdev),
+					WLAN_BS_SM_EV_SWITCH_TO_WLAN_COMPLETED,
+					sizeof(*bs_request), bs_request);
+		else if (status == WLAN_BS_STATUS_REJECTED)
+			bs_sm_deliver_event(
+					wlan_vdev_get_psoc(vdev),
+					WLAN_BS_SM_EV_SWITCH_TO_WLAN_FAILURE,
+					sizeof(*bs_request), bs_request);
+		else
+			ll_sap_err("BS_SM vdev %d Invalid BS status %d",
+				   wlan_vdev_get_id(vdev), status);
+		return;
+	}
+
+	/*
+	 * If there is no cached request in BS_SM, it means that some other
+	 * module has performed the bearer switch and it is not a response of
+	 * the wlan bearer switch request, so just update the current state of
+	 * the state machine
+	 */
+	bs_sm_state_update(bs_ctx, BEARER_WLAN);
+}
+
+/**
+ * ll_lt_sap_deliver_non_wlan_audio_transport_switch_resp() - Deliver non wlan
+ * audio transport switch response to BS_SM
+ * @vdev: ll_lt sap vdev
+ * @status: Status of the request
+ *
+ * Return: None
+ */
+static void ll_lt_sap_deliver_non_wlan_audio_transport_switch_resp(
+					struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_status status)
+{
+	struct wlan_bearer_switch_request *bs_request;
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+	struct bearer_switch_info *bs_ctx;
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+
+	if (!ll_sap_obj) {
+		ll_sap_err("BS_SM vdev %d ll_sap obj null",
+			   wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	bs_ctx = ll_sap_obj->bearer_switch_ctx;
+	if (!bs_ctx)
+		return;
+
+	bs_request = ll_lt_sap_find_first_valid_bs_non_wlan_req(bs_ctx);
+
+	/*
+	 * If bs_request is cached in the BS_SM, it means this is a response
+	 * to the host driver's request of bearer switch so deliver the event
+	 * to the BS_SM
+	 */
+	if (bs_request) {
+		if (status == WLAN_BS_STATUS_COMPLETED)
+			bs_sm_deliver_event(
+				wlan_vdev_get_psoc(vdev),
+				WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN_COMPLETED,
+				sizeof(*bs_request), bs_request);
+		else if (status == WLAN_BS_STATUS_REJECTED)
+			bs_sm_deliver_event(
+				wlan_vdev_get_psoc(vdev),
+				WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN_FAILURE,
+				sizeof(*bs_request), bs_request);
+		else
+			ll_sap_err("BS_SM vdev %d Invalid BS status %d",
+				   wlan_vdev_get_id(vdev), status);
+		return;
+	}
+
+	/*
+	 * If there is no cached request in BS_SM, it means that some other
+	 * module has performed the bearer switch and it is not a response of
+	 * the wlan bearer switch request, so just update the current state of
+	 * the state machine
+	 */
+	bs_sm_state_update(bs_ctx, BEARER_NON_WLAN);
+}
+
+void ll_lt_sap_deliver_audio_transport_switch_resp(
+			struct wlan_objmgr_vdev *vdev,
+			enum bearer_switch_req_type req_type,
+			enum bearer_switch_status status)
+{
+	if (req_type == WLAN_BS_REQ_TO_NON_WLAN)
+		ll_lt_sap_deliver_non_wlan_audio_transport_switch_resp(
+								vdev,
+								status);
+
+	if (req_type == WLAN_BS_REQ_TO_WLAN)
+		ll_lt_sap_deliver_wlan_audio_transport_switch_resp(
+								vdev,
+								status);
 }

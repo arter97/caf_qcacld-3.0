@@ -34,10 +34,24 @@ typedef uint32_t wlan_bs_req_id;
  * enum bearer_switch_req_type: Bearer switch request type
  * @WLAN_BS_REQ_TO_NON_WLAN: Bearer switch request to non-wlan
  * @WLAN_BS_REQ_TO_WLAN: Bearer switch request to wlan
+ * @WLAN_BS_REQ_INVALID: Invalid bearer switch request
  */
 enum bearer_switch_req_type {
 	WLAN_BS_REQ_TO_NON_WLAN = 0,
 	WLAN_BS_REQ_TO_WLAN = 1,
+	WLAN_BS_REQ_INVALID,
+};
+
+/**
+ * enum bearer_switch_status: Bearer switch status
+ * @WLAN_BS_STATUS_REJECTED: Bearer switch request rejected
+ * @WLAN_BS_STATUS_COMPLETED: Bearer switch request completed
+ * @WLAN_BS_STATUS_INVALID: Invalid bearer switch request
+ */
+enum bearer_switch_status {
+	WLAN_BS_STATUS_REJECTED = 0,
+	WLAN_BS_STATUS_COMPLETED = 1,
+	WLAN_BS_STATUS_INVALID,
 };
 
 /**
@@ -58,7 +72,7 @@ enum bearer_switch_req_source {
  * typedef bearer_switch_requester_cb() - Callback function, which will
  * be invoked with the bearer switch request status.
  * @psoc: Psoc pointer
- * @vdev_id: Vdev id of the requester
+ * @vdev_id: vdev id of the requester
  * @request_id: Request ID
  * @status: Status of the bearer switch request
  * @req_value: Request value for the bearer switch request

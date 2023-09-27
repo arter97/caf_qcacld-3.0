@@ -233,3 +233,8 @@ void ll_sap_unregister_os_if_cb(void)
 {
 	global_ll_sap_ops = NULL;
 }
+
+struct ll_sap_ops *ll_sap_get_osif_cbk(void)
+{
+	return global_ll_sap_ops;
+}

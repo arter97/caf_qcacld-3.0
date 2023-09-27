@@ -25,6 +25,8 @@
 #include "wlan_cfg80211.h"
 #include "wlan_osif_priv.h"
 
+#define WLAN_AUDIO_TRANSPORT_SWITCH_TYPE_INVALID 0xFFFF
+
 /**
  * osif_convert_audio_transport_switch_req_type_to_qca_type() - Convert
  * audio transport switch request type to qca audio transport switch req type
@@ -41,6 +43,9 @@ osif_convert_audio_transport_switch_req_type_to_qca_type
 		return QCA_WLAN_AUDIO_TRANSPORT_SWITCH_TYPE_NON_WLAN;
 	case WLAN_BS_REQ_TO_WLAN:
 		return QCA_WLAN_AUDIO_TRANSPORT_SWITCH_TYPE_WLAN;
+	default:
+		osif_err("Invalid audio transport switch type");
+		return WLAN_AUDIO_TRANSPORT_SWITCH_TYPE_INVALID;
 	}
 }
 
@@ -60,6 +65,30 @@ osif_convert_audio_transport_switch_req_type_from_qca_type
 		return WLAN_BS_REQ_TO_NON_WLAN;
 	case QCA_WLAN_AUDIO_TRANSPORT_SWITCH_TYPE_WLAN:
 		return WLAN_BS_REQ_TO_WLAN;
+	default:
+		osif_err("Invalid %d req type", req_type);
+		return WLAN_BS_REQ_INVALID;
+	}
+}
+
+/**
+ * osif_convert_audio_transport_switch_status_type_from_qca_type() - Convert
+ * audio transport switch status from qca audio transport switch status type
+ * @status:    audio transport switch status.
+ *
+ * Return:   enum bearer_switch_status
+ */
+static enum bearer_switch_status
+osif_convert_audio_transport_switch_status_type_from_qca_type
+			(enum qca_wlan_audio_transport_switch_status status)
+{
+	switch (status) {
+	case  QCA_WLAN_AUDIO_TRANSPORT_SWITCH_STATUS_REJECTED:
+		return WLAN_BS_STATUS_REJECTED;
+	case QCA_WLAN_AUDIO_TRANSPORT_SWITCH_STATUS_COMPLETED:
+		return WLAN_BS_STATUS_COMPLETED;
+	default:
+		return WLAN_BS_REQ_INVALID;
 	}
 }
 
@@ -126,11 +155,46 @@ static void wlan_osif_send_audio_transport_switch_req_event(
 }
 
 QDF_STATUS osif_ll_lt_sap_request_for_audio_transport_switch(
+			struct wlan_objmgr_vdev *vdev,
 			enum qca_wlan_audio_transport_switch_type req_type)
 {
 	return ucfg_ll_lt_sap_request_for_audio_transport_switch(
+		vdev,
 		osif_convert_audio_transport_switch_req_type_from_qca_type(
 								req_type));
+}
+
+QDF_STATUS osif_ll_lt_sap_deliver_audio_transport_switch_resp(
+			struct wlan_objmgr_vdev *vdev,
+			enum qca_wlan_audio_transport_switch_type req_type,
+			enum qca_wlan_audio_transport_switch_status status)
+{
+	static enum bearer_switch_status bs_status;
+	enum bearer_switch_req_type bs_req_type;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	if (status == QCA_WLAN_AUDIO_TRANSPORT_SWITCH_STATUS_COMPLETED) {
+		osif_nofl_debug("vdev %d Transport switch request %d completed",
+				vdev_id, req_type);
+	} else if (status == QCA_WLAN_AUDIO_TRANSPORT_SWITCH_STATUS_REJECTED) {
+		osif_nofl_debug("vdev %d Transport switch request %d rejected",
+				vdev_id, req_type);
+	} else {
+		osif_err("vdev %d Invalid transport switch status %d", vdev_id,
+			 status);
+		return QDF_STATUS_E_INVAL;
+	}
+	bs_status =
+		osif_convert_audio_transport_switch_status_type_from_qca_type(
+									status);
+	bs_req_type =
+		osif_convert_audio_transport_switch_req_type_from_qca_type(
+								req_type);
+
+	ucfg_ll_lt_sap_deliver_audio_transport_switch_resp(vdev, bs_req_type,
+							   bs_status);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 static struct ll_sap_ops ll_sap_global_ops = {

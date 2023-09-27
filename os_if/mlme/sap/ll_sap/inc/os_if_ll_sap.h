@@ -23,6 +23,7 @@
 
 #include "qdf_types.h"
 #include "qca_vendor.h"
+#include "wlan_objmgr_vdev_obj.h"
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
 
@@ -40,8 +41,31 @@ QDF_STATUS osif_ll_sap_register_cb(void);
  */
 void osif_ll_sap_unregister_cb(void);
 
+/**
+ * osif_ll_lt_sap_request_for_audio_transport_switch() - Userspace request for
+ * the audio transport switch
+ * @vdev: Vdev on which the request is received
+ * @req_type: Type of the request
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS osif_ll_lt_sap_request_for_audio_transport_switch(
+			struct wlan_objmgr_vdev *vdev,
 			enum qca_wlan_audio_transport_switch_type req_type);
+
+/**
+ * osif_ll_lt_sap_deliver_audio_transport_switch_resp() - Deliver userspace
+ * response for the audio transport switch request to BS_SM
+ * @vdev: Vdev on which the response is received
+ * @req_type: Type of the request
+ * @status: status of the response
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS osif_ll_lt_sap_deliver_audio_transport_switch_resp(
+			struct wlan_objmgr_vdev *vdev,
+			enum qca_wlan_audio_transport_switch_type req_type,
+			enum qca_wlan_audio_transport_switch_status status);
 
 #else
 static inline QDF_STATUS osif_ll_sap_register_cb(void)
@@ -53,9 +77,20 @@ static inline void osif_ll_sap_unregister_cb(void) {}
 
 static inline QDF_STATUS
 osif_ll_lt_sap_request_for_audio_transport_switch(
+			struct wlan_objmgr_vdev *vdev,
 			enum qca_wlan_audio_transport_switch_type req_type)
 {
 	return QDF_STATUS_E_INVAL;
 }
+
+static inline QDF_STATUS
+osif_ll_lt_sap_deliver_audio_transport_switch_resp(
+			struct wlan_objmgr_vdev *vdev,
+			enum qca_wlan_audio_transport_switch_type req_type,
+			enum qca_wlan_audio_transport_switch_status status)
+{
+	return QDF_STATUS_E_INVAL;
+}
+
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* __OS_IF_LL_SAP_H__*/

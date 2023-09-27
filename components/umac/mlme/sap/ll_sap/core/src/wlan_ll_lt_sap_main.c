@@ -146,8 +146,7 @@ QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS ll_lt_sap_switch_bearer_to_ble(
-				struct wlan_objmgr_psoc *psoc,
+QDF_STATUS ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
 				struct wlan_bearer_switch_request *bs_request)
 {
 	return bs_sm_deliver_event(psoc, WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN,

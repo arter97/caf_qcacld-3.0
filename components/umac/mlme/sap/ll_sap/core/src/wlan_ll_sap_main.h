@@ -94,4 +94,12 @@ void ll_sap_register_os_if_cb(struct ll_sap_ops *ll_sap_global_ops);
  * Return: None
  */
 void ll_sap_unregister_os_if_cb(void);
+
+/**
+ * ll_sap_get_osif_cbk() - API to get ll_sap osif callbacks
+ *
+ * Return: global ll_sap osif callback
+ */
+struct ll_sap_ops *ll_sap_get_osif_cbk(void);
+
 #endif /* _WLAN_LL_SAP_MAIN_H_ */
