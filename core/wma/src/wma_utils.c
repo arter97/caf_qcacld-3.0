@@ -3862,12 +3862,6 @@ void wma_update_intf_hw_mode_params(uint32_t vdev_id, uint32_t mac_id,
 	else
 		wma->interfaces[vdev_id].tx_streams =
 			hw_mode.mac1_tx_ss;
-
-	wma_debug("vdev %d, update tx ss:%d mac %d hw_mode_id %d",
-		 vdev_id,
-		 wma->interfaces[vdev_id].tx_streams,
-		 mac_id,
-		 cfgd_hw_mode_index);
 }
 
 /**

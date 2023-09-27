@@ -4309,10 +4309,6 @@ void wma_process_pdev_hw_mode_trans_ind(void *handle,
 	hw_mode_trans_ind->new_hw_mode_index = fixed_param->new_hw_mode_index;
 	hw_mode_trans_ind->num_vdev_mac_entries =
 					fixed_param->num_vdev_mac_entries;
-	wma_debug("old_hw_mode_index:%d new_hw_mode_index:%d entries=%d",
-		fixed_param->old_hw_mode_index,
-		fixed_param->new_hw_mode_index,
-		fixed_param->num_vdev_mac_entries);
 
 	if (!vdev_mac_entry) {
 		wma_debug("null vdev_mac_entry");
@@ -4337,9 +4333,6 @@ void wma_process_pdev_hw_mode_trans_ind(void *handle,
 		}
 
 		mac_id = WMA_PDEV_TO_MAC_MAP(vdev_mac_entry[i].pdev_id);
-
-		wma_debug("vdev_id:%d mac_id:%d", vdev_id, mac_id);
-
 		hw_mode_trans_ind->vdev_mac_map[i].vdev_id = vdev_id;
 		hw_mode_trans_ind->vdev_mac_map[i].mac_id = mac_id;
 		wma_update_intf_hw_mode_params(vdev_id, mac_id,
@@ -4352,9 +4345,6 @@ update_hw_mode:
 		fixed_param->new_hw_mode_index);
 	policy_mgr_update_old_hw_mode_index(wma->psoc,
 		fixed_param->old_hw_mode_index);
-
-	wma_debug("Updated: old_hw_mode_index:%d new_hw_mode_index:%d",
-		 wma->old_hw_mode_index, wma->new_hw_mode_index);
 }
 
 static void

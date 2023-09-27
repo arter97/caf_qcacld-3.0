@@ -626,10 +626,8 @@ void policy_mgr_update_with_safe_channel_list(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if (pm_ctx->unsafe_channel_count == 0) {
-		policy_mgr_debug("There are no unsafe channels");
+	if (!pm_ctx->unsafe_channel_count)
 		return;
-	}
 
 	qdf_mem_copy(current_channel_list, pcl_channels,
 		     current_channel_count * sizeof(*current_channel_list));
@@ -890,10 +888,8 @@ static QDF_STATUS policy_mgr_modify_sap_pcl_based_on_dfs(
 		return status;
 	}
 
-	if (!skip_dfs_channel) {
-		policy_mgr_debug("No more operation on DFS channel");
+	if (!skip_dfs_channel)
 		return QDF_STATUS_SUCCESS;
-	}
 
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (!wlan_reg_is_dfs_in_secondary_list_for_freq(
@@ -1726,6 +1722,8 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_conc_priority_mode conc_system_pref = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	enum QDF_OPMODE qdf_mode;
+	uint32_t orig_pcl_len;
+
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("context is NULL");
@@ -1822,7 +1820,11 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
-	policy_mgr_debug("PCL before modification");
+	if (!*len) {
+		policymgr_nofl_debug("Total PCL Chan %d", *len);
+		return QDF_STATUS_SUCCESS;
+	}
+	orig_pcl_len = *len;
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 	policy_mgr_mode_specific_modification_on_pcl(
 		psoc, pcl_channels, pcl_weight, len, weight_len, mode);
@@ -1835,8 +1837,10 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
-	policy_mgr_debug("PCL after modification");
-	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
+	if (orig_pcl_len != *len) {
+		policy_mgr_debug("PCL after modification");
+		policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -3567,6 +3567,8 @@ bool policy_mgr_current_concurrency_is_mcc(struct wlan_objmgr_psoc *psoc)
 	}
 
 	num_connections = policy_mgr_get_connection_count(psoc);
+	if (!num_connections)
+		return is_mcc;
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	switch (num_connections) {
@@ -10289,7 +10291,7 @@ void policy_mgr_dump_connection_status_info(struct wlan_objmgr_psoc *psoc)
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	policy_mgr_dump_freq_range(pm_ctx);
+	policy_mgr_dump_curr_freq_range(pm_ctx);
 	policy_mgr_validate_conn_info(psoc);
 }
 

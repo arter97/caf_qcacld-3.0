@@ -3073,6 +3073,23 @@ QDF_STATUS policy_mgr_check_conn_with_mode_and_vdev_id(
 		uint32_t vdev_id);
 
 /**
+ * policy_mgr_dump_freq_range_n_vdev_map() - Dump freq range of mac and vdev to
+ * mac mapping
+ * @num_vdev_mac_entries: Number of vdev-mac id mapping that follows
+ * @vdev_mac_map: vdev-mac id map. This memory will be freed by the caller.
+ * So, make local copy if needed.
+ * @num_mac_freq: Number of pdev freq mapping that follows
+ * @mac_freq_range: mac_freq_range mapping
+ *
+ * Return: None
+ */
+void
+policy_mgr_dump_freq_range_n_vdev_map(uint32_t num_vdev_mac_entries,
+			struct policy_mgr_vdev_mac_map *vdev_mac_map,
+			uint32_t num_mac_freq,
+			struct policy_mgr_pdev_mac_freq_map *mac_freq_range);
+
+/**
  * policy_mgr_hw_mode_transition_cb() - Callback for HW mode
  * transition from FW
  * @old_hw_mode_index: Old HW mode index
