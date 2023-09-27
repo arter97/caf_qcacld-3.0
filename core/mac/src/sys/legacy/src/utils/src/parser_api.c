@@ -9835,7 +9835,6 @@ populate_dot11f_probe_req_mlo_ie(struct mac_context *mac,
 		pe_debug("Do not populate sta profile in MLO IE");
 		goto no_sta_prof;
 	}
-	pe_debug("Populate sta profile in MLO IE");
 
 	partner_info = session->lim_join_req->partner_info;
 	for (link = 0; link < partner_info.num_partner_links; link++) {
@@ -12478,8 +12477,6 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	pe_debug("Populate MLO common IEs");
-
 	mlo_ie->type = 0;
 	mlo_ie->common_info_length = WLAN_ML_BV_CINFO_LENGTH_SIZE;
 	mld_addr =
@@ -12586,11 +12583,6 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 		len_remaining -= WLAN_ML_BV_CINFO_EMLCAP_SIZE;
 	}
 
-	pe_debug("EMLSR support: %d, padding delay: %d, transition delay: %d",
-		 mlo_ie->eml_capabilities_info.emlsr_support,
-		 mlo_ie->eml_capabilities_info.emlsr_padding_delay,
-		 mlo_ie->eml_capabilities_info.emlsr_transition_delay);
-
 	if (mlo_ie->mld_capab_and_op_present) {
 		QDF_SET_BITS(*(uint16_t *)p_ml_ie,
 			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_IDX,
@@ -12605,7 +12597,11 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 	}
 
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
-	pe_debug("MLO common IEs total len: %d", mlo_ie->num_data);
+	pe_debug("VDEV %d ML-IE common info len %d eMLSR support %d pad_delay %d, trans_delay %d",
+		 wlan_vdev_get_id(vdev), mlo_ie->num_data,
+		 mlo_ie->eml_capabilities_info.emlsr_support,
+		 mlo_ie->eml_capabilities_info.emlsr_padding_delay,
+		 mlo_ie->eml_capabilities_info.emlsr_transition_delay);
 
 	return QDF_STATUS_SUCCESS;
 }

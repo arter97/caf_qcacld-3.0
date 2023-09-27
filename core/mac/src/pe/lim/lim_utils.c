@@ -7398,8 +7398,7 @@ void lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
 		tx_mcs_map = HE_SET_MCS_4_NSS(tx_mcs_map, mcs_map, 2);
 		rx_mcs_map = HE_SET_MCS_4_NSS(rx_mcs_map, mcs_map, 2);
 	}
-	pe_debug("new HE Nss MCS MAP: Rx 0x%0X, Tx: 0x%0X",
-		 rx_mcs_map, tx_mcs_map);
+
 	mlme_priv->he_config.tx_he_mcs_map_lt_80 = tx_mcs_map;
 	mlme_priv->he_config.rx_he_mcs_map_lt_80 = rx_mcs_map;
 	*((uint16_t *)mlme_priv->he_config.tx_he_mcs_map_160) = tx_mcs_map;
@@ -7408,11 +7407,6 @@ void lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
 		     sizeof(u_int16_t));
 	qdf_mem_copy(mlme_priv->he_config.rx_he_mcs_map_160, &rx_mcs_map,
 		     sizeof(u_int16_t));
-
-	pe_debug("new HE80 mcs map tx: 0x%x, rx: 0x%x", tx_mcs_map, rx_mcs_map);
-	pe_debug("new HE160 mcs map tx: 0x%x, rx: 0x%x",
-		 *(uint16_t *)mlme_priv->he_config.tx_he_mcs_map_160,
-		 *(uint16_t *)mlme_priv->he_config.rx_he_mcs_map_160);
 }
 
 static void
@@ -7731,10 +7725,6 @@ void lim_update_session_he_capable(struct mac_context *mac, struct pe_session *s
 		session->he_config.rx_pream_puncturing =
 					mac->he_cap_5g.rx_pream_puncturing;
 	}
-
-	pe_debug("he_capable: %d ul mu %d, rx_pream_puncturing %d",
-		 session->he_capable, session->he_config.ul_mu,
-		 mac->he_cap_5g.rx_pream_puncturing);
 }
 
 void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
@@ -8697,13 +8687,10 @@ lim_revise_req_eht_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 {
 	struct mac_context *mac = session->mac_ctx;
 
-	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
 		mlme_priv->eht_config = mac->eht_cap_2g;
-		pe_debug("revise 2G eht cap");
-	} else {
+	else
 		mlme_priv->eht_config = mac->eht_cap_5g;
-		pe_debug("revise 5G eht cap");
-	}
 }
 
 /**
@@ -8833,8 +8820,6 @@ void lim_update_session_eht_capable(struct mac_context *mac,
 				    struct pe_session *session)
 {
 	session->eht_capable = true;
-	pe_debug("eht_capable: %d", session->eht_capable);
-	pe_debug("Draft 3.0 support enabled");
 }
 
 void lim_add_bss_eht_cfg(struct bss_params *add_bss, struct pe_session *session)
