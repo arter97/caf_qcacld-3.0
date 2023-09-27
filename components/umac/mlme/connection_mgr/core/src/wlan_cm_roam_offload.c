@@ -6144,7 +6144,7 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	}
 
 	populate_diag_cmn(&wlan_diag_event->diag_cmn, vdev_id,
-			  (uint64_t)scan->ap->timestamp, &ap->bssid);
+			  (uint64_t)scan->scan_complete_timestamp, &ap->bssid);
 
 	wlan_diag_event->version = DIAG_SCAN_DONE_VERSION;
 
