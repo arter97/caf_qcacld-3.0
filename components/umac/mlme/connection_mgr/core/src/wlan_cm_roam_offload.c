@@ -3986,7 +3986,6 @@ cm_roam_switch_to_rso_stop(struct wlan_objmgr_pdev *pdev,
 	 * nothing to do here
 	 */
 	default:
-
 		return QDF_STATUS_SUCCESS;
 	}
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_RSO_STOPPED);
@@ -4308,7 +4307,9 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 	control_bitmap = mlme_get_operations_bitmap(psoc, vdev_id);
 
 	cur_state = mlme_get_roam_state(psoc, vdev_id);
-	mlme_debug("CM_RSO: vdev%d: cur_state : %d", vdev_id, cur_state);
+	mlme_debug("CM_RSO: vdev%d: cur_state : %d reason:%d control_bmap:0x%x sup_disabled_roam:%d",
+		   vdev_id, cur_state, reason, control_bitmap,
+		   sup_disabled_roaming);
 
 	switch (cur_state) {
 	case WLAN_ROAM_INIT:
@@ -4382,7 +4383,7 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 
 	status = cm_roam_send_rso_cmd(psoc, vdev_id, rso_command, reason);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_debug("ROAM: RSO start failed");
+		mlme_err("ROAM: vdev:%d RSO start failed", vdev_id);
 		return status;
 	}
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_RSO_ENABLED);
@@ -4696,8 +4697,7 @@ cm_record_state_change(struct wlan_objmgr_pdev *pdev,
  */
 static QDF_STATUS
 cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
-			    uint8_t vdev_id,
-			    uint8_t reason)
+			    uint8_t vdev_id, uint8_t reason)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	enum roam_offload_state cur_state = mlme_get_roam_state(psoc, vdev_id);
@@ -4738,6 +4738,7 @@ cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
 
 QDF_STATUS
 cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
+			       enum roam_offload_state requested_state,
 			       uint8_t reason, bool *is_rso_skip)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -4757,8 +4758,8 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 	 */
 	if (wlan_vdev_mlme_get_is_mlo_vdev(psoc, *vdev_id) &&
 	    mlo_mgr_is_link_switch_in_progress(vdev)) {
-		mlme_debug("MLO ROAM: Link switch in prog! skip RSO cmd on vdev %d",
-			   *vdev_id);
+		mlme_debug("MLO ROAM: Link switch in prog! skip RSO cmd:%d on vdev %d",
+			   requested_state, *vdev_id);
 		*is_rso_skip = true;
 		goto end;
 	}
@@ -4774,12 +4775,12 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 		 */
 		if (!wlan_vdev_mlme_get_is_mlo_link(psoc, *vdev_id) &&
 		    wlan_is_roaming_enabled(pdev, *vdev_id)) {
-			mlme_debug("MLO ROAM: Process RSO stop on assoc vdev : %d",
-				   *vdev_id);
+			mlme_debug("MLO ROAM: Process RSO cmd:%d on assoc vdev : %d",
+				   requested_state, *vdev_id);
 			*is_rso_skip = false;
 		} else {
-			mlme_debug("MLO ROAM: skip RSO cmd on assoc vdev %d",
-				   *vdev_id);
+			mlme_debug("MLO ROAM: skip RSO cmd:%d on assoc vdev %d",
+				   requested_state, *vdev_id);
 			*is_rso_skip = true;
 		}
 	}
@@ -4846,14 +4847,13 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		is_up = QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev));
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
-	cur_state = mlme_get_roam_state(psoc, vdev_id);
-
 	if (requested_state != WLAN_ROAM_DEINIT && !is_up) {
-		mlme_debug("ROAM: roam state change requested in non-connected state");
+		mlme_debug("ROAM: roam state(%d) change requested in non-connected state",
+			   requested_state);
 		goto end;
 	}
 
-	status = cm_handle_mlo_rso_state_change(pdev, &vdev_id,
+	status = cm_handle_mlo_rso_state_change(pdev, &vdev_id, requested_state,
 						reason, &is_rso_skip);
 	if (is_rso_skip)
 		return status;
@@ -4861,7 +4861,7 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_MLME_CM_ID);
 	if (!vdev) {
-		mlme_err("Invalid vdev");
+		mlme_err("Invalid vdev:%d", vdev_id);
 		goto end;
 	}
 
@@ -4901,6 +4901,7 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 release_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 end:
+	cur_state = mlme_get_roam_state(psoc, vdev_id);
 	cm_record_state_change(pdev, vdev_id, cur_state, requested_state,
 			       reason, is_up, status);
 

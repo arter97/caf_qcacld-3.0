@@ -1188,6 +1188,12 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			 */
 			pe_warn("received AssocRsp from unexpected peer "QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(hdr->sa));
+
+			if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry)) {
+				session_entry->is_unexpected_peer_error = true;
+				qdf_mem_free(beacon);
+				return;
+			}
 			/*
 			 * Send Assoc failure to avoid connection in
 			 * progress state for link vdev.
@@ -1208,6 +1214,13 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			 */
 			pe_warn("received ReassocRsp from unexpected peer "QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(hdr->sa));
+
+			if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry)) {
+				session_entry->is_unexpected_peer_error = true;
+				qdf_mem_free(beacon);
+				return;
+			}
+
 			/*
 			 * Send Reassoc failure to avoid connection in
 			 * progress state for link vdev.

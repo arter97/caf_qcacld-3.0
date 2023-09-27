@@ -555,16 +555,14 @@ void cm_update_owe_info(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 QDF_STATUS
-cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev,
-			       uint8_t *vdev_id,
-			       uint8_t reason,
-			       bool *is_rso_skip);
+cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
+			       enum roam_offload_state requested_state,
+			       uint8_t reason, bool *is_rso_skip);
 #else
 static inline QDF_STATUS
-cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev,
-			       uint8_t *vdev_id,
-			       uint8_t reason,
-			       bool *is_rso_skip)
+cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
+			       enum roam_offload_state requested_state,
+			       uint8_t reason, bool *is_rso_skip)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

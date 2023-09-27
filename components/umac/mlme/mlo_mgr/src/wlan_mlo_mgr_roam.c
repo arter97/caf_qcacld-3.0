@@ -1593,3 +1593,40 @@ mlo_is_enable_roaming_on_connected_sta_allowed(struct wlan_objmgr_vdev *vdev)
 	/* Roamed to MLO AP, do nothing if link vdev is disconnected */
 	return false;
 }
+
+bool
+mlo_check_is_given_vdevs_on_same_mld(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id_1, uint8_t vdev_id_2)
+{
+	struct wlan_objmgr_vdev *vdev1;
+	struct wlan_mlo_dev_context *ml_dev_ctx1;
+	struct wlan_objmgr_vdev **vdev_list;
+	bool is_same_mld = false;
+	uint8_t i;
+
+	vdev1 = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id_1,
+						     WLAN_MLME_CM_ID);
+	if (!vdev1)
+		return false;
+
+	ml_dev_ctx1 = vdev1->mlo_dev_ctx;
+	if (!ml_dev_ctx1)
+		goto end;
+
+	vdev_list = ml_dev_ctx1->wlan_vdev_list;
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!vdev_list[i])
+			continue;
+
+		if (wlan_vdev_get_id(vdev_list[i]) == vdev_id_2) {
+			is_same_mld = true;
+			goto end;
+		}
+	}
+
+end:
+	if (vdev1)
+		wlan_objmgr_vdev_release_ref(vdev1, WLAN_MLME_CM_ID);
+
+	return is_same_mld;
+}

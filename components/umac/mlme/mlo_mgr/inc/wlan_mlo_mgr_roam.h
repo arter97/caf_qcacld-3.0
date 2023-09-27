@@ -453,14 +453,27 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 
 /**
  * mlo_is_enable_roaming_on_connected_sta_allowed() - whether connected STA is
- *                                                    allowed to enable roaming
- *                                                    if link vdev disconnects
+ * allowed to enable roaming if link vdev disconnects
  * @vdev: vdev object
  *
- * Return true if connected STA is allowed to enable roaming, false otherwise.
+ * Return: true if connected STA is allowed to enable roaming, false otherwise.
  */
 bool
 mlo_is_enable_roaming_on_connected_sta_allowed(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlo_check_is_given_vdevs_on_same_mld() - check if the 2 given vdev's are on
+ * same MLD
+ * @psoc: PSOC object
+ * @vdev_id_1: Current connected station vdev id on which roaming is to be
+ * enabled
+ * @vdev_id_2: vdev id on which disconnection is happening
+ *
+ * Return: true if both vdev ids are on same MLD, false otherwise.
+ */
+bool
+mlo_check_is_given_vdevs_on_same_mld(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id_1, uint8_t vdev_id_2);
 #else /* WLAN_FEATURE_11BE_MLO */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 static inline
@@ -657,5 +670,13 @@ mlo_is_enable_roaming_on_connected_sta_allowed(struct wlan_objmgr_vdev *vdev)
 {
 	return true;
 }
+
+static inline bool
+mlo_check_is_given_vdevs_on_same_mld(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id_1, uint8_t vdev_id_2)
+{
+	return false;
+}
+
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif

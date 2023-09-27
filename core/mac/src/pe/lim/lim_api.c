@@ -3049,13 +3049,20 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 						ft_session_ptr,
 						reassoc_resp,
 						roam_sync_ind_ptr->reassoc_resp_length);
+		if (ft_session_ptr->is_unexpected_peer_error)
+			status = QDF_STATUS_E_FAILURE;
+
 		if (QDF_IS_STATUS_ERROR(status))
 			goto roam_sync_fail;
-	}
-	else
+	} else {
 		lim_process_assoc_rsp_frame(mac_ctx, reassoc_resp,
 					    roam_sync_ind_ptr->reassoc_resp_length - SIR_MAC_HDR_LEN_3A,
 					    LIM_REASSOC, ft_session_ptr);
+		if (ft_session_ptr->is_unexpected_peer_error) {
+			status = QDF_STATUS_E_FAILURE;
+			goto roam_sync_fail;
+		}
+	}
 
 	lim_check_ft_initial_im_association(roam_sync_ind_ptr, ft_session_ptr);
 
