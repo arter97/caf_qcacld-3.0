@@ -7254,7 +7254,7 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 	int status;
 	struct sk_buff *reply_skb;
 	uint32_t skb_len = 0, count = 0;
-	struct pld_soc_info info;
+	struct pld_soc_info *info;
 	bool stt_flag = false;
 
 	hdd_enter_dev(wdev->netdev);
@@ -7286,7 +7286,14 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 
 	if (tb_vendor[QCA_WLAN_VENDOR_ATTR_WIFI_INFO_FIRMWARE_VERSION]) {
 		hdd_debug("Rcvd req for FW version");
-		if (!pld_get_soc_info(hdd_ctx->parent_dev, &info))
+
+		info = qdf_mem_malloc(sizeof(*info));
+		if (!info) {
+			hdd_err("No enough memory for info");
+			return -ENOMEM;
+		}
+
+		if (!pld_get_soc_info(hdd_ctx->parent_dev, info))
 			stt_flag = true;
 
 		snprintf(firmware_version, sizeof(firmware_version),
@@ -7298,9 +7305,11 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 			hdd_ctx->fw_version_info.crmid,
 			hdd_ctx->fw_version_info.sub_id,
 			hdd_ctx->target_hw_name,
-			(stt_flag ? info.fw_build_id : " "));
+			(stt_flag ? info->fw_build_id : " "));
 		skb_len += strlen(firmware_version) + 1;
 		count++;
+
+		qdf_mem_free(info);
 	}
 
 	if (tb_vendor[QCA_WLAN_VENDOR_ATTR_WIFI_INFO_RADIO_INDEX]) {
