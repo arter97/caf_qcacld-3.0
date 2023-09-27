@@ -4088,7 +4088,7 @@ static QDF_STATUS lim_deauth_tx_complete_cnf_handler(void *context,
 	struct scheduler_msg msg = {0};
 	tLimMlmDeauthReq *deauth_req;
 	struct pe_session *session = NULL;
-	tSirMacMgmtHdr *mac_hdr;
+	tSirMacMgmtHdr *mac_hdr = NULL;
 	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 	struct wmi_mgmt_params *mgmt_params =
 			(struct wmi_mgmt_params *)params;
