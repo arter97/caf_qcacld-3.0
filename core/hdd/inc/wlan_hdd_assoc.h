@@ -203,7 +203,8 @@ struct hdd_connection_info {
 #ifdef WLAN_FEATURE_11BE_MLO
 	int32_t ieee_link_id;
 #endif
-#ifdef WLAN_FEATURE_11BE
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
+	defined(WLAN_FEATURE_11BE)
 	struct ieee80211_eht_operation eht_operation;
 	uint32_t eht_oper_len;
 #endif
