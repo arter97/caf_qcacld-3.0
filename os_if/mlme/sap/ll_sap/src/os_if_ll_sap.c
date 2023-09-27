@@ -88,7 +88,7 @@ osif_convert_audio_transport_switch_status_type_from_qca_type
 	case QCA_WLAN_AUDIO_TRANSPORT_SWITCH_STATUS_COMPLETED:
 		return WLAN_BS_STATUS_COMPLETED;
 	default:
-		return WLAN_BS_REQ_INVALID;
+		return WLAN_BS_STATUS_INVALID;
 	}
 }
 

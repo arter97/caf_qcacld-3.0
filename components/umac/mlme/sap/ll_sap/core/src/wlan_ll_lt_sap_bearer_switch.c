@@ -202,7 +202,7 @@ ll_lt_sap_invoke_req_callback_f(struct bearer_switch_info *bs_ctx,
 				QDF_STATUS status, const char *func)
 {
 	if (!bs_req->requester_cb) {
-		ll_sap_err("%s BS_SM vdev %d NULL cbk req_vdev %d src %d req %d arg val %d",
+		ll_sap_err("%s BS_SM vdev %d NULL cbk, req_vdev %d src %d req %d arg val %d",
 			   func, wlan_vdev_get_id(bs_ctx->vdev), bs_req->vdev_id,
 			   bs_req->source, bs_req->request_id,
 			   bs_req->arg_value);
@@ -443,8 +443,8 @@ ll_lt_sap_send_bs_req_to_userspace(struct wlan_objmgr_vdev *vdev,
  *
  * Return: None
  */
-static void ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state(
-				struct bearer_switch_info *bs_ctx,
+static void
+ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
 	QDF_STATUS status;
@@ -550,7 +550,7 @@ ll_lt_sap_handle_bs_to_wlan_in_non_wlan_requested_state(
 		return;
 
 	if (!bs_req->requester_cb) {
-		ll_sap_err("BS_SM vdev %d NULL cbk req_vdev %d src %d req %d arg val %d",
+		ll_sap_err("BS_SM vdev %d NULL cbk, req_vdev %d src %d req %d arg val %d",
 			   wlan_vdev_get_id(bs_ctx->vdev),
 			   bs_req->vdev_id, bs_req->source,
 			   bs_req->request_id, bs_req->arg_value);
@@ -609,8 +609,8 @@ ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_requested_state(
  *
  * Return: None
  */
-static void ll_lt_sap_handle_bs_to_non_wlan_timeout(
-				struct bearer_switch_info *bs_ctx,
+static void
+ll_lt_sap_handle_bs_to_non_wlan_timeout(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
 	struct wlan_bearer_switch_request *first_bs_req;
@@ -659,8 +659,8 @@ static void ll_lt_sap_handle_bs_to_non_wlan_timeout(
  *
  * Return: None
  */
-static void ll_lt_sap_handle_bs_to_non_wlan_completed(
-				struct bearer_switch_info *bs_ctx,
+static void
+ll_lt_sap_handle_bs_to_non_wlan_completed(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
 	struct wlan_bearer_switch_request *first_bs_req;
@@ -717,8 +717,8 @@ static void ll_lt_sap_handle_bs_to_non_wlan_completed(
  *
  * Return: None
  */
-static void ll_lt_sap_handle_bs_to_non_wlan_failure(
-				struct bearer_switch_info *bs_ctx,
+static void
+ll_lt_sap_handle_bs_to_non_wlan_failure(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
 	struct wlan_bearer_switch_request *first_bs_req;
@@ -763,8 +763,8 @@ static void ll_lt_sap_handle_bs_to_non_wlan_failure(
  *
  * Return: None
  */
-static void ll_lt_sap_handle_bs_to_wlan_in_wlan_state(
-				struct bearer_switch_info *bs_ctx,
+static void
+ll_lt_sap_handle_bs_to_wlan_in_wlan_state(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
 	ll_lt_sap_invoke_req_callback(bs_ctx, bs_req, QDF_STATUS_E_ALREADY);
@@ -781,8 +781,8 @@ static void ll_lt_sap_handle_bs_to_wlan_in_wlan_state(
  *
  * Return: None
  */
-static void ll_lt_sap_handle_bs_to_non_wlan_in_wlan_state(
-				struct bearer_switch_info *bs_ctx,
+static void
+ll_lt_sap_handle_bs_to_non_wlan_in_wlan_state(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
 	QDF_STATUS status;
@@ -915,8 +915,8 @@ ll_lt_sap_switch_to_non_wlan_from_wlan(struct bearer_switch_info *bs_ctx)
  *
  * Return: None
  */
-static void ll_lt_sap_handle_bs_to_wlan_timeout(
-				struct bearer_switch_info *bs_ctx,
+static void
+ll_lt_sap_handle_bs_to_wlan_timeout(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
 	bs_sm_transition_to(bs_ctx, BEARER_WLAN);
@@ -940,8 +940,8 @@ static void ll_lt_sap_handle_bs_to_wlan_timeout(
  *
  * Return: None
  */
-static void ll_lt_sap_handle_bs_to_wlan_completed(
-				struct bearer_switch_info *bs_ctx,
+static void
+ll_lt_sap_handle_bs_to_wlan_completed(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
 	ll_lt_sap_stop_bs_timer(bs_ctx);
@@ -969,8 +969,8 @@ static void ll_lt_sap_handle_bs_to_wlan_completed(
  *
  * Return: None
  */
-static void ll_lt_sap_handle_bs_to_wlan_failure(
-				struct bearer_switch_info *bs_ctx,
+static void
+ll_lt_sap_handle_bs_to_wlan_failure(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
 	ll_lt_sap_stop_bs_timer(bs_ctx);
@@ -1484,16 +1484,24 @@ rel_ref:
 	return status;
 }
 
-QDF_STATUS ll_lt_sap_switch_bearer_to_ble(
-				struct wlan_objmgr_psoc *psoc,
-				struct wlan_bearer_switch_request *bs_request)
+QDF_STATUS
+ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_bearer_switch_request *bs_request)
 {
 	return bs_sm_deliver_event(psoc, WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN,
 				   sizeof(*bs_request), bs_request);
 }
 
-QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
-					struct wlan_objmgr_vdev *vdev,
+QDF_STATUS
+ll_lt_sap_switch_bearer_to_wlan(struct wlan_objmgr_psoc *psoc,
+				struct wlan_bearer_switch_request *bs_request)
+{
+	return bs_sm_deliver_event(psoc, WLAN_BS_SM_EV_SWITCH_TO_WLAN,
+				   sizeof(*bs_request), bs_request);
+}
+
+QDF_STATUS
+ll_lt_sap_request_for_audio_transport_switch(struct wlan_objmgr_vdev *vdev,
 					enum bearer_switch_req_type req_type)
 {
 	struct ll_sap_vdev_priv_obj *ll_sap_obj;
@@ -1532,11 +1540,8 @@ QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
 			     wlan_vdev_get_id(vdev));
 
 		return QDF_STATUS_E_FAILURE;
-		}
-	} else {
-		ll_sap_err("BS_SM vdev %d Invalid audio transport type %d",
-			   req_type);
 	}
+	ll_sap_err("BS_SM vdev %d Invalid audio transport type %d", req_type);
 
 	return QDF_STATUS_E_INVAL;
 }
@@ -1663,10 +1668,10 @@ static void ll_lt_sap_deliver_non_wlan_audio_transport_switch_resp(
 	bs_sm_state_update(bs_ctx, BEARER_NON_WLAN);
 }
 
-void ll_lt_sap_deliver_audio_transport_switch_resp(
-			struct wlan_objmgr_vdev *vdev,
-			enum bearer_switch_req_type req_type,
-			enum bearer_switch_status status)
+void
+ll_lt_sap_deliver_audio_transport_switch_resp(struct wlan_objmgr_vdev *vdev,
+				enum bearer_switch_req_type req_type,
+				enum bearer_switch_status status)
 {
 	if (req_type == WLAN_BS_REQ_TO_NON_WLAN)
 		ll_lt_sap_deliver_non_wlan_audio_transport_switch_resp(
