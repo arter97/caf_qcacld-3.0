@@ -80,6 +80,8 @@ QDF_STATUS cm_update_advance_roam_scan_filter(
 		return QDF_STATUS_E_FAILURE;
 
 	rso_usr_cfg = wlan_cm_get_rso_user_config(vdev);
+	if (!rso_usr_cfg)
+		return QDF_STATUS_E_INVAL;
 
 	mlme_debug("No of Allowed SSID List:%d",
 		   rso_usr_cfg->num_ssid_allowed_list);
