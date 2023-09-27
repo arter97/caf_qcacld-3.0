@@ -134,6 +134,47 @@ tdls_process_mlo_cal_tdls_link_score(struct wlan_objmgr_vdev *vdev)
 	return status;
 }
 
+/**
+ * tdls_check_wait_more() - wait until the timer timeout if necessary
+ * @vdev: vdev object
+ *
+ * Return: true if need to wait else false
+ */
+static bool tdls_check_wait_more(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *mlo_vdev;
+	struct tdls_vdev_priv_obj *tdls_vdev;
+	/* expect response number */
+	int expect_num;
+	/* received response number */
+	int receive_num;
+	int i;
+
+	expect_num = 0;
+	receive_num = 0;
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!mlo_vdev)
+			continue;
+
+		expect_num++;
+
+		tdls_vdev =
+		     wlan_objmgr_vdev_get_comp_private_obj(mlo_vdev,
+							   WLAN_UMAC_COMP_TDLS);
+		if (tdls_vdev->rx_mgmt)
+			receive_num++;
+	}
+
+	/* +1 means the one received last has not been recorded */
+	if (expect_num > receive_num + 1)
+		return true;
+	else
+		return false;
+}
+
 struct wlan_objmgr_vdev *
 tdls_process_mlo_choice_tdls_vdev(struct wlan_objmgr_vdev *vdev)
 {
@@ -260,6 +301,7 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 	struct wlan_objmgr_vdev *mlo_vdev;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	bool peer_mlo;
+	bool waitmore = false;
 	uint8_t i;
 
 	vdev = tdls_vdev->vdev;
@@ -303,9 +345,17 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 			goto exit;
 		}
 
-		tdls_vdev->discovery_sent_cnt = 0;
-		qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
-		qdf_atomic_dec(&tdls_soc->timer_cnt);
+		if (qdf_atomic_read(&tdls_soc->timer_cnt) == 1)
+			waitmore = tdls_check_wait_more(vdev);
+
+		if (waitmore) {
+			/* do not stop the timer */
+			tdls_debug("wait more tdls response");
+		} else {
+			tdls_vdev->discovery_sent_cnt = 0;
+			qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
+			qdf_atomic_dec(&tdls_soc->timer_cnt);
+		}
 
 		tdls_vdev->rx_mgmt = qdf_mem_malloc_atomic(sizeof(*rx_mgmt) +
 							   rx_mgmt->frame_len);

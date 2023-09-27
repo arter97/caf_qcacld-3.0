@@ -132,6 +132,8 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 				tdls_notice("[TDLS] TDLS Discovery Response,"
 					    "QDF_MAC_ADDR_FMT RSSI[%d]<---OTA",
 					    rx_mgmt->rx_rssi);
+				tdls_debug("discovery resp on vdev %d",
+					   wlan_vdev_get_id(tdls_vdev->vdev));
 				tdls_recv_discovery_resp(tdls_vdev, mac);
 				tdls_set_rssi(tdls_vdev->vdev, mac,
 					      rx_mgmt->rx_rssi);
