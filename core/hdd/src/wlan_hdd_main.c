@@ -14658,9 +14658,14 @@ static void hdd_restore_info_for_ssr(struct hdd_adapter *adapter)
 void hdd_adapter_reset_station_ctx(struct hdd_adapter *adapter)
 {
 	struct wlan_hdd_link_info *link_info;
+	struct hdd_station_ctx *sta_ctx;
 
-	hdd_adapter_for_each_link_info(adapter, link_info)
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		qdf_mem_zero(&sta_ctx->conn_info.bssid, QDF_MAC_ADDR_SIZE);
+
 		hdd_cm_clear_ieee_link_id(link_info);
+	}
 }
 
 int hdd_start_station_adapter(struct hdd_adapter *adapter)
