@@ -308,6 +308,22 @@ bool mlme_is_max_twt_sessions_reached(struct wlan_objmgr_psoc *psoc,
  */
 bool mlme_is_24ghz_twt_enabled(struct wlan_objmgr_psoc *psoc);
 
+#ifdef WLAN_TWT_CONV_SUPPORTED
+/**
+ * mlme_is_twt_disable_info_frame() - Get if TWT info frame enabled/disabled
+ * @psoc: Pointer to psoc object
+ *
+ * Return: True if TWT info frame is disabled.
+ */
+bool mlme_is_twt_disable_info_frame(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+mlme_is_twt_disable_info_frame(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+#endif
 #else
 static inline
 void mlme_set_twt_peer_capabilities(struct wlan_objmgr_psoc *psoc,
@@ -334,5 +350,12 @@ mlme_is_24ghz_twt_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
+
+static inline bool
+mlme_is_twt_disable_info_frame(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
 #endif /* WLAN_SUPPORT_TWT */
 #endif /* _WLAN_MLME_TWT_API_H_ */

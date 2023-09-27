@@ -2165,6 +2165,28 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
+/**
+ * mlme_init_disable_twt_info() - initialize disable twt info
+ * @psoc: Pointer to PSOC
+ * @twt_cfg: Pointer to twt_cfg
+ *
+ * Return: None
+ */
+static void mlme_init_disable_twt_info(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_mlme_cfg_twt *twt_cfg)
+{
+	twt_cfg->disable_twt_info_frame = cfg_get(psoc,
+						  CFG_DISABLE_TWT_INFO_FRAME);
+}
+#elif defined(WLAN_SUPPORT_TWT)
+static void mlme_init_disable_twt_info(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_mlme_cfg_twt *twt_cfg)
+{
+}
+
+#endif
+
 #ifdef WLAN_SUPPORT_TWT
 static void mlme_init_twt_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_cfg_twt *twt_cfg)
@@ -2176,6 +2198,7 @@ static void mlme_init_twt_cfg(struct wlan_objmgr_psoc *psoc,
 	twt_cfg->enable_twt_24ghz = cfg_get(psoc, CFG_ENABLE_TWT_24GHZ);
 	twt_cfg->is_bcast_requestor_enabled = CFG_TWT_GET_BCAST_REQ(bcast_conf);
 	twt_cfg->is_bcast_responder_enabled = CFG_TWT_GET_BCAST_RES(bcast_conf);
+	mlme_init_disable_twt_info(psoc, twt_cfg);
 }
 #else
 static void mlme_init_twt_cfg(struct wlan_objmgr_psoc *psoc,
