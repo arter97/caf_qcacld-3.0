@@ -3998,7 +3998,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	bool sap_force_11n_for_11ac = 0;
 	bool go_force_11n_for_11ac = 0;
 	bool is_ll_lt_sap = false;
-	bool sap_force_11n;
+	bool sap_force_11n = false;
 	bool go_11ac_override = 0;
 	bool sap_11ac_override = 0;
 	uint8_t vht_ch_width;
