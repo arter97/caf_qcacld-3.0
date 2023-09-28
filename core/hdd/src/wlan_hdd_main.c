@@ -7430,8 +7430,23 @@ hdd_vdev_configure_rtscts_enable(struct hdd_context *hdd_ctx,
 }
 
 static void
+hdd_vdev_configure_usr_ps_params(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_objmgr_vdev *vdev,
+				 struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	if (cds_get_conparam() == QDF_GLOBAL_FTM_MODE || !adapter)
+		return;
+
+	ucfg_mlme_set_user_ps(psoc, wlan_vdev_get_id(vdev),
+			      adapter->allow_power_save);
+}
+
+static void
 hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
-				 struct wlan_objmgr_vdev *vdev)
+				 struct wlan_objmgr_vdev *vdev,
+				 struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
 	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
@@ -7440,9 +7455,11 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 	case QDF_STA_MODE:
 		hdd_vdev_configure_rtt_mac_randomization(psoc, vdev);
 		hdd_vdev_configure_max_tdls_params(psoc, vdev);
+		hdd_vdev_configure_usr_ps_params(psoc, vdev, link_info);
 		break;
 	case QDF_P2P_CLIENT_MODE:
 		hdd_vdev_configure_max_tdls_params(psoc, vdev);
+		hdd_vdev_configure_usr_ps_params(psoc, vdev, link_info);
 		break;
 	case QDF_NAN_DISC_MODE:
 		hdd_vdev_configure_nan_params(psoc, vdev);
@@ -7587,7 +7604,7 @@ int hdd_vdev_create(struct wlan_hdd_link_info *link_info)
 		goto hdd_vdev_destroy_procedure;
 	}
 
-	hdd_vdev_configure_opmode_params(hdd_ctx, vdev);
+	hdd_vdev_configure_opmode_params(hdd_ctx, vdev, link_info);
 
 	hdd_nofl_debug("vdev %d created successfully", link_info->vdev_id);
 
