@@ -417,25 +417,30 @@ static void hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter)
 		temp_link_info->vdev_id = link_info->vdev_id;
 		qdf_spin_unlock_bh(&temp_link_info->vdev_lock);
 
+		/* Update VDEV-OSIF priv pointer to new link info. */
+		if (temp_link_info->vdev) {
+			osif_priv = wlan_vdev_get_ospriv(temp_link_info->vdev);
+			if (osif_priv)
+				osif_priv->legacy_osif_priv = temp_link_info;
+		}
+
 		/* Fill current link info's actual VDEV info */
 		qdf_spin_lock_bh(&link_info->vdev_lock);
 		link_info->vdev = vdev;
 		link_info->vdev_id = vdev_id;
 		qdf_spin_unlock_bh(&link_info->vdev_lock);
 
+		/* Update VDEV-OSIF priv pointer to new link info. */
+		if (link_info->vdev) {
+			osif_priv = wlan_vdev_get_ospriv(link_info->vdev);
+			if (osif_priv)
+				osif_priv->legacy_osif_priv = link_info;
+		}
+
 		/* Swap link flags */
 		link_flags = temp_link_info->link_flags;
 		temp_link_info->link_flags = link_info->link_flags;
 		link_info->link_flags = link_flags;
-
-		/* Update VDEV-OSIF priv pointer to new link info. */
-		if (!vdev)
-			continue;
-
-		osif_priv = wlan_vdev_get_ospriv(vdev);
-		if (!osif_priv)
-			continue;
-		osif_priv->legacy_osif_priv = link_info;
 
 		/* Update the mapping, current link info's mapping will be
 		 * set to be proper.
