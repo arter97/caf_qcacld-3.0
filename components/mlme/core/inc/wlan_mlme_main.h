@@ -718,12 +718,6 @@ struct roam_scan_chn {
  *  For non-MLO scenario, it indicates the original connected AP BSSID.
  *  For MLO scenario, it indicates the original BSSID of the link
  *  for which the reassociation occurred during the roam.
- * @candidate_bssid: roam candidate AP BSSID when roam failed.
- *  If the firmware updates more than one candidate AP BSSID
- *  to the driver, the driver only fills the last candidate AP BSSID.
- *  For non-MLO scenario, it indicates the last candidate AP BSSID.
- *  For MLO scenario, it indicates the AP BSSID which may be the primary
- *  link BSSID or a nonprimary link BSSID.
  * @roamed_bssid: roamed AP BSSID when roam succeeds.
  *  For non-MLO case, it indicates new AP BSSID which has been
  *  successfully roamed.
@@ -735,7 +729,6 @@ struct eroam_scan_info {
 	struct roam_scan_chn roam_chn[MAX_ROAM_SCAN_CHAN];
 	uint32_t total_scan_time;
 	struct qdf_mac_addr original_bssid;
-	struct qdf_mac_addr candidate_bssid;
 	struct qdf_mac_addr roamed_bssid;
 };
 
@@ -746,15 +739,15 @@ struct eroam_scan_info {
  * @timestamp: timestamp of the auth/assoc/eapol-M1/M2/M3/M4 frame,
  *  if status is successful, indicate received or send success,
  *  if status is failed, timestamp indicate roaming fail at that time
+ * @bssid: Source address for auth/assoc/eapol frame.
  */
 struct eroam_frame_info {
 	enum eroam_frame_subtype frame_type;
 	enum eroam_frame_status status;
 	uint64_t timestamp;
-};
+	struct qdf_mac_addr bssid;
 
-/* Key frame num during roaming: PREAUTH/PREASSOC/EAPOL M1-M4 */
-#define ROAM_FRAME_NUM 6
+};
 
 /**
  * struct enhance_roam_info - enhance roam information
@@ -765,7 +758,7 @@ struct eroam_frame_info {
 struct enhance_roam_info {
 	struct eroam_trigger_info trigger;
 	struct eroam_scan_info scan;
-	struct eroam_frame_info timestamp[ROAM_FRAME_NUM];
+	struct eroam_frame_info timestamp[WLAN_ROAM_MAX_FRAME_INFO];
 };
 
 /**

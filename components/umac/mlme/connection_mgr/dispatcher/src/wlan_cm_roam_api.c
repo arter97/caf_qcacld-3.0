@@ -4000,18 +4000,24 @@ wlan_cm_update_roam_scan_info(struct wlan_objmgr_vdev *vdev,
 
 /**
  * wlan_cm_roam_frame_subtype() - Convert roam host enum
+ * @frame: Roam frame info
  * @frame_type: roam frame type
  *
  * Return: Roam frame type defined in host driver
  */
 static enum eroam_frame_subtype
-wlan_cm_roam_frame_subtype(uint8_t frame_type)
+wlan_cm_roam_frame_subtype(struct roam_frame_info *frame, uint8_t frame_type)
 {
 	switch (frame_type) {
 	case MGMT_SUBTYPE_AUTH:
-		return WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH;
+		if (frame->is_rsp)
+			return WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_RESP;
+		else
+			return WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ;
+	case MGMT_SUBTYPE_REASSOC_REQ:
+		return WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_REQ;
 	case MGMT_SUBTYPE_REASSOC_RESP:
-		return WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC;
+		return WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_RESP;
 	case ROAM_FRAME_SUBTYPE_M1:
 		return WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1;
 	case ROAM_FRAME_SUBTYPE_M2:
@@ -4025,33 +4031,23 @@ wlan_cm_roam_frame_subtype(uint8_t frame_type)
 	case ROAM_FRAME_SUBTYPE_GTK_M2:
 		return WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M2;
 	default:
-		return WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH;
+		return WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ;
 	}
 }
 
-static uint8_t
-wlan_cm_get_index_from_frame_type(struct roam_frame_info *frame)
+static bool
+wlan_cm_get_valid_frame_type(struct roam_frame_info *frame)
 {
-	uint8_t index;
-
-	if (frame->subtype == MGMT_SUBTYPE_AUTH && frame->is_rsp) {
-		index = WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH - 1;
-	} else if (frame->subtype == MGMT_SUBTYPE_REASSOC_RESP) {
-		index = WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC - 1;
-	} else if (frame->subtype == ROAM_FRAME_SUBTYPE_M1) {
-		index = WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1 - 1;
-	} else if (frame->subtype == ROAM_FRAME_SUBTYPE_M2) {
-		index = WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M2 - 1;
-	} else if (frame->subtype == ROAM_FRAME_SUBTYPE_M3) {
-		index = WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M3 - 1;
-	} else if (frame->subtype == ROAM_FRAME_SUBTYPE_M4) {
-		index = WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M4 - 1;
-	} else {
-		mlme_err("Invalid subtype: %d", frame->subtype);
-		index =  ROAM_FRAME_NUM;
-	}
-
-	return index;
+	if (frame->subtype == MGMT_SUBTYPE_AUTH ||
+	    frame->subtype == MGMT_SUBTYPE_REASSOC_REQ ||
+	    frame->subtype == MGMT_SUBTYPE_REASSOC_RESP ||
+	    frame->subtype == ROAM_FRAME_SUBTYPE_M1 ||
+	    frame->subtype == ROAM_FRAME_SUBTYPE_M2 ||
+	    frame->subtype == ROAM_FRAME_SUBTYPE_M3 ||
+	    frame->subtype == ROAM_FRAME_SUBTYPE_M4)
+		return true;
+	else
+		return false;
 }
 
 /**
@@ -4070,35 +4066,40 @@ wlan_cm_update_roam_frame_info(struct mlme_legacy_priv *mlme_priv,
 			       struct roam_frame_stats *frame_data)
 {
 	struct enhance_roam_info *info;
-	uint32_t i, j, index;
+	uint32_t index, i, j = 0;
 	uint8_t subtype;
 
 	index = mlme_priv->roam_write_index;
 	info = &mlme_priv->roam_info[index];
 
 	for (i = 0; i < frame_data->num_frame; i++) {
-		j = wlan_cm_get_index_from_frame_type(&frame_data->frame_info[i]);
-
-		if (j == ROAM_FRAME_NUM)
+		if (!wlan_cm_get_valid_frame_type(&frame_data->frame_info[i]))
 			continue;
-
+		j++;
+		if (j >= WLAN_ROAM_MAX_FRAME_INFO)
+			break;
 		/*
-		 * fill frame info into roam buffer from zero
-		 * only need preauth/reassoc/EAPOL-M1/M2/M3/M4
-		 * types of frame cache in driver.
+		 * fill frame preauth req/rsp, reassoc req/rsp
+		 * and EAPOL-M1/M2/M3/M4 into roam buffer
 		 */
 		subtype = frame_data->frame_info[i].subtype;
 		info->timestamp[j].frame_type =
-			wlan_cm_roam_frame_subtype(subtype);
+			wlan_cm_roam_frame_subtype(&frame_data->frame_info[i],
+						   subtype);
 		info->timestamp[j].timestamp =
 			frame_data->frame_info[i].timestamp;
 		info->timestamp[j].status =
 			frame_data->frame_info[i].status_code;
 
-		mlme_debug("frame:subtype %x time %llu status:%u, index:%u",
-			   info->timestamp[j].frame_type,
+		qdf_mem_copy(info->timestamp[j].bssid.bytes,
+			     frame_data->frame_info[i].bssid.bytes,
+			     QDF_MAC_ADDR_SIZE);
+
+		mlme_debug("frame:idx:%u subtype:%x time:%llu status:%u AP BSSID" QDF_MAC_ADDR_FMT,
+			   j, info->timestamp[j].frame_type,
 			   info->timestamp[j].timestamp,
-			   info->timestamp[j].status, j);
+			   info->timestamp[j].status,
+			   QDF_MAC_ADDR_REF(info->timestamp[j].bssid.bytes));
 	}
 }
 
@@ -4154,11 +4155,6 @@ wlan_cm_update_roam_bssid(struct mlme_legacy_priv *mlme_priv,
 	for (i = scan_ap_idx; i >= 0; i--) {
 		if (ap->type == WLAN_ROAM_SCAN_CURRENT_AP)
 			qdf_mem_copy(info->scan.original_bssid.bytes,
-				     ap->bssid.bytes,
-				     QDF_MAC_ADDR_SIZE);
-		else if (ap->type == WLAN_ROAM_SCAN_CANDIDATE_AP &&
-			 qdf_is_macaddr_zero(&info->scan.candidate_bssid))
-			qdf_mem_copy(info->scan.candidate_bssid.bytes,
 				     ap->bssid.bytes,
 				     QDF_MAC_ADDR_SIZE);
 		else if (ap->type == WLAN_ROAM_SCAN_ROAMED_AP)
