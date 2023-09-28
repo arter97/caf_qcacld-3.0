@@ -2011,6 +2011,9 @@ void dfs_unmark_rcac_done(struct wlan_dfs *dfs)
 							      precac_entry)) {
 				dfs_unmark_tree_node_as_cac_done_for_freq
 					(precac_entry, channels[i]);
+				utils_dfs_deliver_event(dfs->dfs_pdev_obj, channels[i],
+							WLAN_EV_CAC_RESET);
+
 				break;
 			}
 		}
