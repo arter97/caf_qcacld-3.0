@@ -236,6 +236,16 @@ mbss_start_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 mbss_stop_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
 			      void *arg);
+
+/* mbss_start_bridge_vdevs() - start all the bridge vdevs
+ *
+ * @pdev: pdev object
+ * @arg: argument to vdev start function
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mbss_start_bridge_vdevs(struct wlan_objmgr_pdev *pdev,
+			      void *arg);
 #endif
 #endif
 
