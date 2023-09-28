@@ -6781,6 +6781,21 @@ hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+static void
+hdd_vdev_configure_usr_ps_params(struct hdd_context *hdd_ctx,
+				 struct wlan_objmgr_vdev *vdev,
+				 struct hdd_adapter *adapter)
+{
+	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (cds_get_conparam() == QDF_GLOBAL_FTM_MODE || !adapter)
+		return;
+	if (opmode != QDF_STA_MODE && opmode != QDF_P2P_CLIENT_MODE)
+		return;
+	ucfg_mlme_set_user_ps(hdd_ctx->psoc, wlan_vdev_get_id(vdev),
+			      adapter->allow_power_save);
+}
+
 int hdd_vdev_create(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -6892,6 +6907,8 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 	/* Configure vdev params */
 	ucfg_fwol_configure_vdev_params(hdd_ctx->psoc, hdd_ctx->pdev,
 					adapter->device_mode, adapter->vdev_id);
+
+	hdd_vdev_configure_usr_ps_params(hdd_ctx, vdev, adapter);
 
 	hdd_nofl_debug("vdev %d created successfully", adapter->vdev_id);
 
