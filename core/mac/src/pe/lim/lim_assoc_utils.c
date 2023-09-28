@@ -2162,6 +2162,25 @@ static bool lim_is_add_sta_params_he_capable(tpAddStaParams add_sta_params)
 #endif
 
 #ifdef FEATURE_WLAN_TDLS
+#ifdef WLAN_FEATURE_11BE
+static void lim_add_tdls_sta_eht_config(tpAddStaParams add_sta_params,
+					tpDphHashNode sta_ds)
+{
+	if (add_sta_params->eht_capable) {
+		pe_debug("Adding tdls eht capabilities");
+		qdf_mem_copy(&add_sta_params->eht_config, &sta_ds->eht_config,
+			     sizeof(add_sta_params->eht_config));
+		qdf_mem_copy(&add_sta_params->eht_op, &sta_ds->eht_op,
+			     sizeof(add_sta_params->eht_op));
+	}
+}
+#else
+static void lim_add_tdls_sta_eht_config(tpAddStaParams add_sta_params,
+					tpDphHashNode sta_ds)
+{
+}
+
+#endif
 #ifdef WLAN_FEATURE_11AX
 static void lim_add_tdls_sta_he_config(tpAddStaParams add_sta_params,
 				       tpDphHashNode sta_ds)
@@ -2530,6 +2549,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 		if (lim_is_he_6ghz_band(session_entry))
 			lim_add_tdls_sta_6ghz_he_cap(mac_ctx, add_sta_params,
 						     sta_ds);
+		lim_add_tdls_sta_eht_config(add_sta_params, sta_ds);
 	}
 #endif
 

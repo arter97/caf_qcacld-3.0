@@ -3275,6 +3275,23 @@ lim_tdls_populate_dot11f_vht_caps(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void
+lim_tdls_populate_eht_mcs(struct mac_context *mac_ctx, tpDphHashNode stads,
+			  struct pe_session *session_entry)
+{
+	lim_populate_eht_mcs_set(mac_ctx, &stads->supportedRates,
+				 &stads->eht_config, session_entry,
+				 session_entry->nss);
+}
+#else
+static void
+lim_tdls_populate_eht_mcs(struct mac_context *mac_ctx, tpDphHashNode stads,
+			  struct pe_session *session_entry)
+{
+}
+#endif
+
 /**
  * lim_tdls_populate_matching_rate_set() - populate matching rate set
  *
@@ -3393,6 +3410,8 @@ lim_tdls_populate_matching_rate_set(struct mac_context *mac_ctx,
 	lim_populate_vht_mcs_set(mac_ctx, &stads->supportedRates, vht_caps,
 				 session_entry, nss, NULL);
 
+	lim_tdls_populate_eht_mcs(mac_ctx, stads, session_entry);
+
 	lim_tdls_populate_he_matching_rate_set(mac_ctx, stads, nss,
 					       session_entry);
 	/**
@@ -3432,6 +3451,8 @@ lim_tdls_populate_dot11f_eht_caps(struct pe_session *pe_session,
 		pe_debug("copy eht config from pe_session");
 		qdf_mem_copy(&sta->eht_config, &pe_session->eht_config,
 			     sizeof(sta->eht_config));
+		qdf_mem_copy(&sta->eht_op, &pe_session->eht_op,
+			     sizeof(sta->eht_op));
 	}
 }
 #else
