@@ -1196,6 +1196,7 @@ struct hdd_context;
  * @vdev: object manager vdev context
  * @vdev_lock: lock to protect vdev context access
  * @vdev_id: Unique identifier assigned to the vdev
+ * @allow_power_save: STA/CLI powersave enable/disable from userspace
  * @event_flags: a bitmap of hdd_adapter_flags
  * @mic_work: mic work information
  * @gpio_tsf_sync_work: work to sync send TSF CAP WMI command
@@ -1258,6 +1259,7 @@ struct hdd_adapter {
 	 */
 	uint8_t ops;
 	uint32_t ctw;
+	bool allow_power_save;
 
 	/** Current MAC Address for the adapter  */
 	struct qdf_mac_addr mac_addr;

@@ -5807,6 +5807,23 @@ static void hdd_check_wait_for_hw_mode_completion(struct hdd_context *hdd_ctx)
 	}
 }
 
+static void
+hdd_vdev_configure_usr_ps_params(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_objmgr_vdev *vdev,
+				 struct hdd_adapter *adapter)
+{
+	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (cds_get_conparam() == QDF_GLOBAL_FTM_MODE || !adapter)
+		return;
+
+	if (opmode != QDF_STA_MODE && opmode != QDF_P2P_CLIENT_MODE)
+		return;
+
+	ucfg_mlme_set_user_ps(psoc, wlan_vdev_get_id(vdev),
+			      adapter->allow_power_save);
+}
+
 int hdd_vdev_destroy(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -6042,6 +6059,8 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 		VDEV_CMD);
 	}
 	hdd_store_nss_chains_cfg_in_vdev(adapter);
+
+	hdd_vdev_configure_usr_ps_params(hdd_ctx->psoc, vdev, adapter);
 
 	/* Configure vdev params */
 	ucfg_fwol_configure_vdev_params(hdd_ctx->psoc, hdd_ctx->pdev,

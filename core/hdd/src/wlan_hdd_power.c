@@ -2644,8 +2644,8 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 	hdd_enter();
 
 	if (timeout < 0) {
-		hdd_debug("User space timeout: %d; Enter full power or power save",
-			  timeout);
+		hdd_debug("User space timeout: %d; Enter full power or power save: %d",
+			  timeout, allow_power_save);
 		timeout = 0;
 	}
 
@@ -2683,6 +2683,10 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 		hdd_debug("vdev mod %d disconnected ignore dhcp protection",
 			  adapter->device_mode);
 	}
+
+	/* Cache the powersave state for success case */
+	if (!status)
+		adapter->allow_power_save = allow_power_save;
 
 	hdd_exit();
 	return status;
