@@ -2643,3 +2643,129 @@ QDF_STATUS wlan_mlo_peer_wsi_link_delete(struct wlan_mlo_peer_context *ml_peer)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+void wlan_mlo_ap_vdev_add_assoc_entry(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mld_addr)
+{
+	struct wlan_mlo_dev_context *mld_ctx = vdev->mlo_dev_ctx;
+	struct wlan_mlo_sta_assoc_pending_list *assoc_list;
+	struct wlan_mlo_sta_entry *sta_entry = NULL;
+
+	if (!mld_ctx || !wlan_vdev_mlme_is_mlo_ap(vdev))
+		return;
+
+	assoc_list = &mld_ctx->ap_ctx->assoc_list;
+
+	sta_entry = wlan_mlo_ap_vdev_find_assoc_entry(vdev, mld_addr);
+	if (sta_entry) {
+		mlo_err("Duplicate entry " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(mld_addr->bytes));
+		return;
+	}
+
+	sta_entry = qdf_mem_malloc(sizeof(*sta_entry));
+	if (!sta_entry)
+		return;
+
+	qdf_copy_macaddr((struct qdf_mac_addr *)&sta_entry->peer_mld_addr,
+			 (struct qdf_mac_addr *)&mld_addr[0]);
+
+	qdf_spin_lock_bh(&assoc_list->list_lock);
+	qdf_list_insert_back(&assoc_list->peer_list, &sta_entry->mac_node);
+	qdf_spin_unlock_bh(&assoc_list->list_lock);
+}
+
+void wlan_mlo_ap_vdev_del_assoc_entry(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mld_addr)
+{
+	struct wlan_mlo_dev_context *mld_ctx = vdev->mlo_dev_ctx;
+	struct wlan_mlo_sta_assoc_pending_list *assoc_list;
+	struct wlan_mlo_sta_entry *sta_entry = NULL;
+
+	if (!mld_ctx || !wlan_vdev_mlme_is_mlo_ap(vdev))
+		return;
+
+	assoc_list = &mld_ctx->ap_ctx->assoc_list;
+	sta_entry = wlan_mlo_ap_vdev_find_assoc_entry(vdev, mld_addr);
+	if (!sta_entry)
+		return;
+
+	qdf_spin_lock_bh(&assoc_list->list_lock);
+	qdf_list_remove_node(&assoc_list->peer_list, &sta_entry->mac_node);
+	qdf_spin_unlock_bh(&assoc_list->list_lock);
+
+	qdf_mem_free(sta_entry);
+}
+
+static inline struct wlan_mlo_sta_entry *
+wlan_mlo_assoc_list_peek_head(qdf_list_t *assoc_list)
+{
+	struct wlan_mlo_sta_entry *sta_entry = NULL;
+	qdf_list_node_t *list_node = NULL;
+
+	/* This API is invoked with lock acquired, do not add log prints */
+	if (qdf_list_peek_front(assoc_list, &list_node) != QDF_STATUS_SUCCESS)
+		return NULL;
+
+	sta_entry = qdf_container_of(list_node,
+				     struct wlan_mlo_sta_entry, mac_node);
+	return sta_entry;
+}
+
+static inline struct wlan_mlo_sta_entry *
+wlan_mlo_sta_get_next_sta_entry(qdf_list_t *assoc_list,
+				struct wlan_mlo_sta_entry *sta_entry)
+{
+	struct wlan_mlo_sta_entry *next_sta_entry = NULL;
+	qdf_list_node_t *node = &sta_entry->mac_node;
+	qdf_list_node_t *next_node = NULL;
+
+	/* This API is invoked with lock acquired, do not add log prints */
+	if (!node)
+		return NULL;
+
+	if (qdf_list_peek_next(assoc_list, node, &next_node) !=
+				QDF_STATUS_SUCCESS)
+		return NULL;
+
+	next_sta_entry = qdf_container_of(next_node,
+					  struct wlan_mlo_sta_entry, mac_node);
+	return next_sta_entry;
+}
+
+struct wlan_mlo_sta_entry *
+wlan_mlo_ap_vdev_find_assoc_entry(struct wlan_objmgr_vdev *vdev,
+				  struct qdf_mac_addr *mld_addr)
+{
+	struct wlan_mlo_dev_context *mld_ctx = vdev->mlo_dev_ctx;
+	struct wlan_mlo_sta_assoc_pending_list *assoc_list;
+	struct wlan_mlo_sta_entry *sta_entry = NULL;
+	struct wlan_mlo_sta_entry *next_sta_entry = NULL;
+
+	if (!mld_ctx || !wlan_vdev_mlme_is_mlo_ap(vdev))
+		return NULL;
+
+	assoc_list = &mld_ctx->ap_ctx->assoc_list;
+	if (qdf_list_empty(&assoc_list->peer_list)) {
+		mlo_info("list is empty");
+		return NULL;
+	}
+	qdf_spin_lock_bh(&assoc_list->list_lock);
+
+	sta_entry = wlan_mlo_assoc_list_peek_head(&assoc_list->peer_list);
+	while (sta_entry) {
+		if (qdf_is_macaddr_equal(&sta_entry->peer_mld_addr, mld_addr)) {
+			qdf_spin_unlock_bh(&assoc_list->list_lock);
+			return sta_entry;
+		}
+
+		next_sta_entry =
+		wlan_mlo_sta_get_next_sta_entry(&assoc_list->peer_list,
+						sta_entry);
+		sta_entry = next_sta_entry;
+	}
+	qdf_spin_unlock_bh(&assoc_list->list_lock);
+
+	return NULL;
+}
+
