@@ -401,6 +401,25 @@ wlan_mbss_stop_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
 }
 
 qdf_export_symbol(wlan_mbss_stop_standalone_ap_vdevs);
+
+QDF_STATUS
+wlan_mbss_start_bridge_vdevs(struct wlan_objmgr_pdev *pdev,
+				   void *arg)
+{
+	return mbss_start_bridge_vdevs(pdev, arg);
+}
+
+qdf_export_symbol(wlan_mbss_start_bridge_vdevs);
+#else
+
+QDF_STATUS
+wlan_mbss_start_bridge_vdevs(struct wlan_objmgr_pdev *pdev,
+				   void *arg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(wlan_mbss_start_bridge_vdevs);
 #endif
 
 #ifdef WLAN_MBSS_DEBUG
