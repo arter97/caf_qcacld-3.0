@@ -11055,7 +11055,7 @@ skip_mlo:
 	chn_bd = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
 
 	if (!chn_bd)
-		return -EINVAL;
+		return 0;
 
 	nl80211_chwidth = nla_get_u8(chn_bd);
 	chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
