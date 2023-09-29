@@ -38,7 +38,9 @@
 #include "dp_rx_mon.h"
 #include "dp_tx_capture.h"
 
+#ifdef CONFIG_LITHIUM
 #include <dp_rx_mon_1.0.h>
+#endif
 
 #define NUM_BITS_DWORD 32
 

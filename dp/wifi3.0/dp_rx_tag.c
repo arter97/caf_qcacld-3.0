@@ -24,7 +24,7 @@
 #include "dp_peer.h"
 #include "dp_internal.h"
 #include "dp_rx_tag.h"
-#ifndef DP_BE_WAR_DISABLED
+#if defined(CONFIG_LITHIUM) && !defined(DP_BE_WAR_DISABLED)
 #include "li/hal_li_rx.h" /* Currently build dp_rx_tag for Lithium only */
 #endif
 #ifdef WIFI_MONITOR_SUPPORT
