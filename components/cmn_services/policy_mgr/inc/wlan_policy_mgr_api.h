@@ -1887,7 +1887,7 @@ policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
  * @vdev_id: vdev id
  *
  * Based on vdev id ap profile set via vendor command is get and compared with
- * ht_ll_type AP type and is return true if profile set is throghput sensitive.
+ * ll_ht_type AP type and is return true if profile set is throghput sensitive.
  *
  * Return: true if it's present otherwise false
  */
@@ -5364,7 +5364,7 @@ QDF_STATUS policy_mgr_get_sbs_cfg(struct wlan_objmgr_psoc *psoc, bool *sbs);
 qdf_freq_t policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_get_lt_ll_sap_freq()- Function to get LT LL sap freq if it's
+ * policy_mgr_get_ll_lt_sap_freq()- Function to get LT LL sap freq if it's
  * present
  * @psoc: PSOC object
  *
@@ -5375,21 +5375,21 @@ qdf_freq_t policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
  * Return: freq if it's LT LL SAP otherwise 0
  *
  */
-qdf_freq_t policy_mgr_get_lt_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
+qdf_freq_t policy_mgr_get_ll_lt_sap_freq(struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_get_ht_ll_sap_freq()- Function to get HT LL sap freq if it's
+ * policy_mgr_get_ll_ht_sap_freq()- Function to get LL HT sap freq if it's
  * present
  * @psoc: PSOC object
  *
  * Based on vdev id ap profile set via vendor command is get and compared with
- * ht_ll_type AP type and return freq for that SAP if profile set is throghput
+ * ll_ht_type AP type and return freq for that SAP if profile set is throghput
  * sensitive.
  *
  * Return: freq if it's HT LL SAP otherwise 0
  *
  */
-qdf_freq_t policy_mgr_get_ht_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
+qdf_freq_t policy_mgr_get_ll_ht_sap_freq(struct wlan_objmgr_psoc *psoc);
 
 #ifndef WLAN_FEATURE_LL_LT_SAP
 /**
