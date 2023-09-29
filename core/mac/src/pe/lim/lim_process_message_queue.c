@@ -508,7 +508,7 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 	if (mac_ctx->lim.gLimSmeState == eLIM_SME_OFFLINE_STATE) {
 		/* Defer processing this message */
 		if (lim_defer_msg(mac_ctx, lim_msg) != TX_SUCCESS) {
-			pe_err_rl("Unable to Defer Msg");
+			pe_err_rl("Unable to Defer Msg in offline state");
 			lim_log_session_states(mac_ctx);
 			lim_handle_defer_msg_error(mac_ctx, lim_msg);
 		}
@@ -572,7 +572,7 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 				 lim_msg_str(lim_msg->type));
 			/* Defer processing this message */
 			if (lim_defer_msg(mac_ctx, lim_msg) != TX_SUCCESS) {
-				pe_err("Unable to Defer Msg");
+				pe_err_rl("Unable to Defer Msg");
 				lim_log_session_states(mac_ctx);
 				lim_handle_defer_msg_error(mac_ctx, lim_msg);
 			}
