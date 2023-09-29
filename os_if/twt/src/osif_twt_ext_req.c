@@ -46,6 +46,7 @@
 #define TWT_SETUP_WAKE_INTVL_EXP_MAX            31
 #define TWT_MAX_NEXT_TWT_SIZE                   3
 #define TWT_DEL_DIALOG_REQ_MAX_RETRY            10
+#define TWT_TEARDOWN_IN_PS_DISABLE_WAIT_TIME    500
 
 static const struct nla_policy
 qca_wlan_vendor_twt_add_dialog_policy[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX + 1] = {
@@ -2420,6 +2421,7 @@ static void osif_twt_teardown_req_retry(struct wlan_objmgr_vdev *vdev,
 	int ret;
 
 	while (retries < TWT_DEL_DIALOG_REQ_MAX_RETRY) {
+		qdf_sleep(TWT_TEARDOWN_IN_PS_DISABLE_WAIT_TIME);
 		osif_debug("Implicitly TWT teardown req retry count:%d", retries);
 		ret = osif_send_sta_twt_teardown_req(vdev, psoc, &params);
 		if (ret != -EBUSY)
