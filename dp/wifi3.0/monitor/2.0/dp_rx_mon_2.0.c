@@ -283,7 +283,7 @@ dp_rx_mon_pf_tag_to_buf_headroom_2_0(void *nbuf,
 	}
 
 	user_id = ppdu_info->user_id;
-	if (qdf_unlikely(user_id > HAL_MAX_UL_MU_USERS)) {
+	if (qdf_unlikely(user_id >= HAL_MAX_UL_MU_USERS)) {
 		dp_mon_debug("Invalid user_id user_id: %d pdev: %pK", user_id, pdev);
 		return;
 	}
