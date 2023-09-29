@@ -2429,6 +2429,37 @@ static uint32_t wlan_mlo_psoc_get_ix_in_grp(struct mlo_mgr_context *mlo_mgr,
 	return 0xFF;
 }
 
+static uint32_t
+wlan_mlo_get_wsi_next_psoc(struct mlo_wsi_psoc_grp *mlo_psoc_grp,
+			   uint32_t prim_psoc_id, uint32_t n)
+{
+	uint32_t i, j;
+	uint32_t psoc_index = MLO_WSI_PSOC_ID_MAX;
+
+	if (!n)
+		return psoc_index;
+
+	for (i = 0; i < mlo_psoc_grp->num_psoc; i++) {
+		if (mlo_psoc_grp->psoc_order[i] == prim_psoc_id) {
+			psoc_index = i;
+			break;
+		}
+	}
+
+	if (psoc_index == MLO_WSI_PSOC_ID_MAX)
+		return psoc_index;
+
+	for (i = 1; i <= WLAN_OBJMGR_MAX_DEVICES; i++) {
+		j = (psoc_index + i) % WLAN_OBJMGR_MAX_DEVICES;
+		if (mlo_psoc_grp->psoc_order[j] != MLO_WSI_PSOC_ID_MAX)
+			n--;
+		if (!n)
+			return mlo_psoc_grp->psoc_order[j];
+	}
+
+	return MLO_WSI_PSOC_ID_MAX;
+}
+
 static QDF_STATUS
 wlan_mlo_peer_wsi_link_update(struct wlan_mlo_peer_context *ml_peer, bool add)
 {
@@ -2440,7 +2471,7 @@ wlan_mlo_peer_wsi_link_update(struct wlan_mlo_peer_context *ml_peer, bool add)
 	uint32_t hops, hop_id;
 	uint32_t prim_grp_idx, sec_grp_idx;
 	uint32_t prim_psoc_ix_grp, sec_psoc_ix_grp;
-	uint32_t i, j;
+	uint32_t i, j, n;
 	struct mlo_wsi_psoc_grp *mlo_psoc_grp;
 	struct wlan_objmgr_psoc *psoc;
 
@@ -2514,19 +2545,31 @@ wlan_mlo_peer_wsi_link_update(struct wlan_mlo_peer_context *ml_peer, bool add)
 	/*
 	 * Logic for finding ingress and egress stats:
 	 * For a given MLO group, there is a PSOC order
+	 *
+	 * If there is secondary link, Increment the egress count for
+	 * the primary PSOC
 	 * (1) Iterate through each secondary link
 	 *      (1.1) Set the WMI command to true for that PSOC
-	 *      (1.2) Increment the ingress count for that PSOC
-	 *      (1.3) Calculate the number of hops from the secondary link
+	 *      (1.2) Calculate the number of hops from the secondary link
 	 *            to that primary link within the group.
-	 *      (1.4) Iterate through a decrement sequence from the hop_count
-	 *            (1.4.1) Increment the egress count for that PSOC index
+	 *      (1.3) Iterate through a decrement sequence from the hop_count
+	 *            (1.3.1) Increment the ingress count for that PSOC index
 	 */
 	prim_psoc_ix_grp = wlan_mlo_psoc_get_ix_in_grp(mlo_mgr, prim_grp_idx,
 						       prim_psoc_id);
 
 	wsi_info->link_stats[prim_psoc_id].send_wmi_cmd = true;
 	mlo_psoc_grp = &wsi_info->mlo_psoc_grp[prim_grp_idx];
+
+	if (j) {
+		wsi_info->link_stats[prim_psoc_id].send_wmi_cmd = true;
+		if (add)
+			wsi_info->link_stats[prim_psoc_id].egress_cnt++;
+		else
+			wsi_info->link_stats[prim_psoc_id].egress_cnt--;
+	}
+
+	n = 1;
 	for (i = 0; i < j; i++) {
 		sec_psoc_ix_grp = wlan_mlo_psoc_get_ix_in_grp(mlo_mgr,
 							      prim_grp_idx,
@@ -2535,20 +2578,19 @@ wlan_mlo_peer_wsi_link_update(struct wlan_mlo_peer_context *ml_peer, bool add)
 			       (prim_psoc_ix_grp - sec_psoc_ix_grp),
 				(sec_psoc_ix_grp - prim_psoc_ix_grp));
 
-		wsi_info->link_stats[sec_psoc_id[i]].send_wmi_cmd = true;
-		if (add)
-			wsi_info->link_stats[sec_psoc_id[i]].ingress_cnt++;
-		else
-			wsi_info->link_stats[sec_psoc_id[i]].ingress_cnt--;
 
-		while (hops > 1) {
-			hops--;
-			hop_id = mlo_psoc_grp->psoc_order[hops];
+		if (hops > n) {
+			hop_id = wlan_mlo_get_wsi_next_psoc(mlo_psoc_grp,
+							    prim_psoc_id, n);
+			n++;
+			if (hop_id == MLO_WSI_PSOC_ID_MAX)
+				continue;
+
 			wsi_info->link_stats[hop_id].send_wmi_cmd = true;
 			if (add)
-				wsi_info->link_stats[hop_id].egress_cnt++;
+				wsi_info->link_stats[hop_id].ingress_cnt++;
 			else
-				wsi_info->link_stats[hop_id].egress_cnt--;
+				wsi_info->link_stats[hop_id].ingress_cnt--;
 		}
 	}
 
