@@ -623,7 +623,7 @@ dp_tx_mlo_mcast_multipass_send(struct dp_vdev_be *be_vdev,
 	} else {
 		/* return when vlan map is not initialized */
 		if (!ptnr_vdev->iv_vlan_map)
-			return;
+			goto nbuf_free;
 		group_key = ptnr_vdev->iv_vlan_map[ptr->vlan_id];
 
 		/*
@@ -631,7 +631,7 @@ dp_tx_mlo_mcast_multipass_send(struct dp_vdev_be *be_vdev,
 		 */
 
 		if (!group_key)
-			return;
+			goto nbuf_free;
 
 		dp_tx_remove_vlan_tag(ptnr_vdev, nbuf_clone);
 		dp_tx_add_groupkey_metadata(ptnr_vdev, &msdu_info, group_key);
@@ -644,6 +644,8 @@ dp_tx_mlo_mcast_multipass_send(struct dp_vdev_be *be_vdev,
 					&msdu_info,
 					DP_MLO_MCAST_REINJECT_PEER_ID,
 					NULL);
+
+nbuf_free:
 	if (qdf_unlikely(nbuf_clone)) {
 		dp_info("pkt send failed");
 		qdf_nbuf_free(nbuf_clone);
