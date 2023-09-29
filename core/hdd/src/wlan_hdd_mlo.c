@@ -292,8 +292,8 @@ QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 	adapter = link_info->adapter;
 
 	if (link_info->vdev_id != adapter->deflink->vdev_id) {
-		hdd_err("Default VDEV %d not equal", adapter->deflink->vdev_id);
-		QDF_ASSERT(0);
+		hdd_err("Deflink VDEV %d not equals current VDEV %d",
+			adapter->deflink->vdev_id, link_info->vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
