@@ -251,6 +251,7 @@ struct mlo_wsi_info {
  * @mlo_forced_primary_umac_id: Force Primary UMAC ID
  * @force_non_assoc_prim_umac: Force non-assoc link to be primary umac
  * @wsi_info: WSI stats info
+ * @disable_eml: Disable Enhanced Multi Link features(eMLSR and eMLMR).
  *
  * NB: not using kernel-doc format since the kernel-doc script doesn't
  *     handle the qdf_bitmap() macro
@@ -279,6 +280,7 @@ struct mlo_mgr_context {
 	uint8_t mlo_forced_primary_umac_id;
 	bool force_non_assoc_prim_umac;
 	struct mlo_wsi_info *wsi_info;
+	bool disable_eml;
 };
 
 /*

@@ -459,6 +459,62 @@ bool wlan_mlo_is_mld_ctx_exist(struct qdf_mac_addr *mldaddr)
 	return false;
 }
 
+#ifdef WLAN_MLO_MULTI_CHIP
+QDF_STATUS mlo_mgr_is_mld_has_active_link(bool *is_active)
+{
+	qdf_list_t *ml_list;
+	uint32_t idx, count;
+	struct wlan_mlo_dev_context *mld_cur, *mld_next;
+	struct wlan_objmgr_vdev *vdev;
+	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	QDF_STATUS status;
+
+	if (!g_mlo_ctx || !is_active)
+		return QDF_STATUS_E_FAILURE;
+
+	ml_link_lock_acquire(g_mlo_ctx);
+	ml_list = &g_mlo_ctx->ml_dev_list;
+	if (!qdf_list_size(ml_list)) {
+		ml_link_lock_release(g_mlo_ctx);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*is_active = false;
+	mld_cur = wlan_mlo_list_peek_head(ml_list);
+	while (mld_cur) {
+		mlo_dev_lock_acquire(mld_cur);
+		count = QDF_ARRAY_SIZE(mld_cur->wlan_vdev_list);
+		for (idx = 0; idx < count; idx++) {
+			vdev = mld_cur->wlan_vdev_list[idx];
+			if (!vdev)
+				continue;
+
+			status = wlan_vdev_mlme_is_init_state(vdev);
+			if (QDF_STATUS_SUCCESS == status)
+				continue;
+
+			qdf_err("VDEV [vdev_id %u, pdev_id %u, psoc_id %u, state %u] is still active",
+				wlan_vdev_get_id(vdev),
+				wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev)),
+				wlan_vdev_get_psoc_id(vdev),
+				wlan_vdev_mlme_get_state(vdev));
+			*is_active = true;
+			mlo_dev_lock_release(mld_cur);
+			ml_link_lock_release(g_mlo_ctx);
+			return QDF_STATUS_SUCCESS;
+		}
+		mld_next = wlan_mlo_get_next_mld_ctx(ml_list, mld_cur);
+		mlo_dev_lock_release(mld_cur);
+		mld_cur = mld_next;
+	}
+	ml_link_lock_release(g_mlo_ctx);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(mlo_mgr_is_mld_has_active_link);
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 bool mlo_mgr_ml_peer_exist_on_diff_ml_ctx(uint8_t *peer_addr,
 					  uint8_t *peer_vdev_id)
