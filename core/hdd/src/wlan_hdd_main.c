@@ -3654,14 +3654,16 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	hdd_enter_dev(adapter->dev);
 
 	switch (device_mode) {
+	case QDF_MONITOR_MODE:
+		ret = hdd_start_station_adapter(adapter);
+		if (ret)
+			goto err_start_adapter;
+		hdd_set_idle_ps_config(adapter->hdd_ctx, false);
+		break;
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
 		if (hdd_max_sta_interface_up_count_reached(adapter))
 			goto err_start_adapter;
-
-		fallthrough;
-	case QDF_MONITOR_MODE:
-		hdd_set_idle_ps_config(adapter->hdd_ctx, false);
 		fallthrough;
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_OCB_MODE:
