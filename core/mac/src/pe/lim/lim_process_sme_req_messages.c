@@ -3228,10 +3228,14 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	/*
 	 * Join timeout: if we find a BeaconInterval in the BssDescription,
 	 * then set the Join Timeout to be 10 x the BeaconInterval.
+	 *
+	 * 10 * BeaconInterval should be greater than the minimum join
+	 * timeout and lesser than the configured timeout.
 	 */
 	timeout = mac_ctx->mlme_cfg->timeouts.join_failure_timeout_ori;
 	if (bss_desc->beaconInterval)
-		timeout = QDF_MAX(10 * bss_desc->beaconInterval, timeout);
+		timeout = QDF_MAX(10 * bss_desc->beaconInterval,
+				  cfg_min(CFG_JOIN_FAILURE_TIMEOUT));
 
 	mac_ctx->mlme_cfg->timeouts.join_failure_timeout =
 		QDF_MIN(timeout,
