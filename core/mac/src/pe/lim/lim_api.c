@@ -2669,9 +2669,9 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 {
 	struct element_info link_reassoc_rsp;
 	struct qdf_mac_addr sta_link_addr;
+	struct mlo_partner_info *ml_partner_info;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint8_t idx = 0;
-	uint8_t link_id;
+	uint8_t idx = 0, num_partner_links, link_id, link_vdev_id;
 
 	link_reassoc_rsp.ptr = qdf_mem_malloc(reassoc_rsp_len);
 	if (!link_reassoc_rsp.ptr)
@@ -2682,30 +2682,32 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 
 	link_reassoc_rsp.len = reassoc_rsp_len;
 
-	for (idx = 0;
-	     idx < session_entry->ml_partner_info.num_partner_links;
-	     idx++) {
-		link_id =
-		 session_entry->ml_partner_info.partner_link_info[idx].link_id;
-		status =
-		 util_gen_link_assoc_rsp(reassoc_rsp + WLAN_MAC_HDR_LEN_3A,
-					 reassoc_rsp_len - WLAN_MAC_HDR_LEN_3A,
-					 true,
-					 link_id,
-					 sta_link_addr,
-					 link_reassoc_rsp.ptr,
-					 reassoc_rsp_len,
-					 (qdf_size_t *)&link_reassoc_rsp.len);
+	ml_partner_info = &session_entry->ml_partner_info;
+	num_partner_links = ml_partner_info->num_partner_links;
+	for (idx = 0; idx < num_partner_links; idx++) {
+		link_vdev_id = ml_partner_info->partner_link_info[idx].vdev_id;
+		if (link_vdev_id == WLAN_INVALID_VDEV_ID)
+			continue;
 
+		if (link_vdev_id != session_entry->vdev_id)
+			continue;
+
+		link_id = ml_partner_info->partner_link_info[idx].link_id;
+		status = util_gen_link_assoc_rsp(
+					reassoc_rsp + WLAN_MAC_HDR_LEN_3A,
+					reassoc_rsp_len - WLAN_MAC_HDR_LEN_3A,
+					true, link_id, sta_link_addr,
+					link_reassoc_rsp.ptr, reassoc_rsp_len,
+					(qdf_size_t *)&link_reassoc_rsp.len);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("MLO ROAM: Link reassoc generation failed %d",
-			       status);
+			pe_err("MLO ROAM: link_id:%d vdev:%d Reassoc generation failed %d",
+			       link_id, link_vdev_id, status);
 			goto end;
 		}
 
 		lim_process_assoc_rsp_frame(mac_ctx, link_reassoc_rsp.ptr,
-				    link_reassoc_rsp.len - SIR_MAC_HDR_LEN_3A,
-				    LIM_REASSOC, session_entry);
+					    link_reassoc_rsp.len - WLAN_MAC_HDR_LEN_3A,
+					    LIM_REASSOC, session_entry);
 	}
 end:
 	qdf_mem_free(link_reassoc_rsp.ptr);
