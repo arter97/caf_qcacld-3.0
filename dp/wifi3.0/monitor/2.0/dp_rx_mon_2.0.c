@@ -1342,8 +1342,6 @@ dp_rx_mon_flush_status_buf_queue(struct dp_pdev *pdev)
 		qdf_frag_free(buf);
 		DP_STATS_INC(mon_soc, frag_free, 1);
 	}
-	mon_pdev_be->prev_rxmon_pkt_desc = NULL;
-	mon_pdev_be->prev_rxmon_pkt_cookie = 0;
 
 	if (work_done) {
 		mon_pdev->rx_mon_stats.mon_rx_bufs_replenished_dest +=
@@ -1367,9 +1365,6 @@ dp_rx_mon_handle_flush_n_trucated_ppdu(struct dp_soc *soc,
 				       struct dp_pdev *pdev,
 				       struct dp_mon_desc *mon_desc)
 {
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
-	struct dp_mon_pdev_be *mon_pdev_be =
-			dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
 	union dp_mon_desc_list_elem_t *desc_list = NULL;
 	union dp_mon_desc_list_elem_t *tail = NULL;
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
@@ -1392,9 +1387,6 @@ dp_rx_mon_handle_flush_n_trucated_ppdu(struct dp_soc *soc,
 		qdf_frag_free(buf);
 		DP_STATS_INC(mon_soc, frag_free, 1);
 	}
-
-	mon_pdev_be->prev_rxmon_desc = NULL;
-	mon_pdev_be->prev_rxmon_cookie = 0;
 
 	if (desc_list)
 		dp_mon_add_desc_list_to_free_list(soc, &desc_list, &tail,
@@ -1934,10 +1926,6 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 		mon_pdev->rx_mon_stats.status_buf_count++;
 		dp_mon_record_index_update(mon_pdev_be);
 	}
-	mon_pdev_be->prev_rxmon_desc = NULL;
-	mon_pdev_be->prev_rxmon_cookie = 0;
-	mon_pdev_be->prev_rxmon_pkt_desc = NULL;
-	mon_pdev_be->prev_rxmon_pkt_cookie = 0;
 
 	dp_mon_rx_stats_update_rssi_dbm_params(mon_pdev, ppdu_info);
 	if (work_done) {
