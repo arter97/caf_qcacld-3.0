@@ -156,6 +156,7 @@ void dp_tx_process_htt_completion_li(struct dp_soc *soc,
 	case HTT_TX_FW2WBM_TX_STATUS_TTL:
 	{
 		uint8_t tid;
+		uint8_t transmit_cnt_valid = 0;
 
 		if (HTT_TX_WBM_COMPLETION_V2_VALID_GET(htt_desc[2])) {
 			ts.peer_id =
@@ -175,6 +176,13 @@ void dp_tx_process_htt_completion_li(struct dp_soc *soc,
 		ts.ack_frame_rssi =
 			HTT_TX_WBM_COMPLETION_V2_ACK_FRAME_RSSI_GET(
 					htt_desc[1]);
+		transmit_cnt_valid =
+			HTT_TX_WBM_COMPLETION_V2_TRANSMIT_CNT_VALID_GET(
+					htt_desc[2]);
+		if (transmit_cnt_valid)
+			ts.transmit_cnt =
+				HTT_TX_WBM_COMPLETION_V2_TRANSMIT_COUNT_GET(
+						htt_desc[0]);
 
 		ts.tsf = htt_desc[3];
 		ts.first_msdu = 1;

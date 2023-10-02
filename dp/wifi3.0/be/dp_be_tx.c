@@ -77,6 +77,8 @@ struct dp_mlo_mpass_buf {
 	HTT_TX_WBM_COMPLETION_V2_SCH_CMD_ID_GET(_var)
 #define DP_TX_WBM_COMPLETION_V3_ACK_FRAME_RSSI_GET(_var) \
 	HTT_TX_WBM_COMPLETION_V2_ACK_FRAME_RSSI_GET(_var)
+#define DP_TX_WBM_COMPLETION_V3_TRANSMIT_CNT_VALID_GET(_var) \
+	HTT_TX_WBM_COMPLETION_V2_TRANSMIT_CNT_VALID_GET(_var)
 
 extern uint8_t sec_type_map[MAX_CDP_SEC_TYPE];
 
@@ -310,6 +312,7 @@ void dp_tx_process_htt_completion_be(struct dp_soc *soc,
 	case HTT_TX_FW2WBM_TX_STATUS_TTL:
 	{
 		uint8_t tid;
+		uint8_t transmit_cnt_valid = 0;
 
 		if (DP_TX_WBM_COMPLETION_V3_VALID_GET(htt_desc[3])) {
 			ts.peer_id =
@@ -329,6 +332,14 @@ void dp_tx_process_htt_completion_be(struct dp_soc *soc,
 		ts.ack_frame_rssi =
 			DP_TX_WBM_COMPLETION_V3_ACK_FRAME_RSSI_GET(
 					htt_desc[2]);
+
+		transmit_cnt_valid =
+			DP_TX_WBM_COMPLETION_V3_TRANSMIT_CNT_VALID_GET(
+					htt_desc[3]);
+		if (transmit_cnt_valid)
+			ts.transmit_cnt =
+				HTT_TX_WBM_COMPLETION_V3_TRANSMIT_COUNT_GET(
+						htt_desc[1]);
 
 		ts.tsf = htt_desc[4];
 		ts.first_msdu = 1;
