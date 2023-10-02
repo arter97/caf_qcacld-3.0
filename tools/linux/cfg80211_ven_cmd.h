@@ -800,7 +800,8 @@ enum {
 	IEEE80211_PARAM_SWITCH_RTT_ROLE            = 743, /* Switch between RTT intiator/responder modes for a single vap
 							     without the vap restart */
 	IEEE80211_PARAM_PURE_11AX_ENABLE           = 744,
-	IEEE80211_PARAM_IOCTL_DBG_ENABLE           = 745,
+	IEEE80211_PARAM_HE_ULOFDMA_DCM             = 745, /* set 11ax - HE ULOFDMA DCM */
+	IEEE80211_PARAM_IOCTL_DBG_ENABLE           = 746,
 };
 
 enum {
@@ -2347,6 +2348,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"vap_resource_profile ",     IEEE80211_PARAM_VAP_PROFILE_CONFIG, SET_PARAM, 2},
 	{"pure_11ax",             IEEE80211_PARAM_PURE_11AX_ENABLE, SET_PARAM, 1},
 	{"ioctl_dbg",   IEEE80211_PARAM_IOCTL_DBG_ENABLE, SET_PARAM, 1},
+	{"he_ulofdma_dcm",        IEEE80211_PARAM_HE_ULOFDMA_DCM, SET_PARAM, 1},
+	{"g_he_ulofdma_dcm",    IEEE80211_PARAM_HE_ULOFDMA_DCM, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
