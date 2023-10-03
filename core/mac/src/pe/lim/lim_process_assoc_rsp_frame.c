@@ -1361,12 +1361,6 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		lim_add_bssid_to_reject_list(mac_ctx->pdev, &ap_info);
 	}
 
-	/* Stop Association failure timer */
-	if (subtype == LIM_ASSOC)
-		lim_deactivate_and_change_timer(mac_ctx, eLIM_ASSOC_FAIL_TIMER);
-	else
-		lim_stop_reassoc_retry_timer(mac_ctx);
-
 	status = lim_handle_pmfcomeback_timer(session_entry, assoc_rsp);
 	/* return if retry again timer is started and ignore this assoc resp */
 	if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -1375,6 +1369,12 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		qdf_mem_free(assoc_rsp);
 		return;
 	}
+
+	/* Stop Association failure timer */
+	if (subtype == LIM_ASSOC)
+		lim_deactivate_and_change_timer(mac_ctx, eLIM_ASSOC_FAIL_TIMER);
+	else
+		lim_stop_reassoc_retry_timer(mac_ctx);
 
 	if (assoc_rsp->status_code != STATUS_SUCCESS) {
 		/*
