@@ -139,8 +139,16 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	struct mlme_legacy_priv *mlme_priv;
 	struct wlan_channel *des_chan;
 	struct assoc_channel_info *assoc_chan_info;
+	struct wlan_objmgr_pdev *pdev;
 	enum phy_ch_width ch_width;
 	QDF_STATUS status;
+	uint8_t band_mask;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		mlme_err("invalid pdev");
+		return;
+	}
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
@@ -177,6 +185,19 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 		if (des_chan->ch_cfreq1 == des_chan->ch_freq - BW_10_MHZ)
 			assoc_chan_info->sec_2g_freq =
 					des_chan->ch_freq - BW_20_MHZ;
+	} else if (des_chan->ch_width == CH_WIDTH_320MHZ) {
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(des_chan->ch_freq))
+			band_mask = BIT(REG_BAND_6G);
+		else
+			band_mask = BIT(REG_BAND_5G);
+		assoc_chan_info->cen320_freq =
+			wlan_reg_chan_band_to_freq(pdev,
+						   des_chan->ch_freq_seg2,
+						   band_mask);
+
+		mlme_debug("ch_freq_seg2: %d, cen320_freq: %d",
+			   des_chan->ch_freq_seg2,
+			   assoc_chan_info->cen320_freq);
 	}
 
 	mlme_debug("ch width :%d, ch_freq:%d, ch_cfreq1:%d, sec_2g_freq:%d",

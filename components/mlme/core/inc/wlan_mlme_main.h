@@ -400,10 +400,12 @@ struct ft_context {
  * struct assoc_channel_info - store channel info at the time of association
  * @assoc_ch_width: channel width at the time of initial connection
  * @sec_2g_freq: secondary 2 GHz freq
+ * @cen320_freq: 320 MHz center freq
  */
 struct assoc_channel_info {
 	enum phy_ch_width assoc_ch_width;
 	qdf_freq_t sec_2g_freq;
+	qdf_freq_t cen320_freq;
 };
 
 /**
