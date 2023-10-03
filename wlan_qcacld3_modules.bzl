@@ -6,6 +6,10 @@ _target_chipset_map = {
     "pineapple": [
 	"kiwi-v2",
     ],
+    "sun": [
+        "peach",
+        "kiwi-v2",
+    ],
 }
 
 _chipset_hw_map = {
@@ -1883,6 +1887,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_roam_trigger_bitmap.c",
         ],
     },
+    "CONFIG_WLAN_SYSFS_RF_TEST_MODE": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_rf_test_mode.c",
+        ],
+    },
     "CONFIG_WLAN_SYSFS_DP_STATS": {
         True: [
             "core/hdd/src/wlan_hdd_sysfs_txrx_stats_console.c",
@@ -2103,11 +2112,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     feature_grep_map = [
         {
-            "pattern": "walt_get_cpus_taken",
-            "file": "kernel/sched/walt/walt.c",
-            "flag": "WALT_GET_CPU_TAKEN_SUPPORT",
-        },
-        {
             "pattern": "nl80211_validate_key_link_id",
             "file": "net/wireless/nl80211.c",
             "flag": "CFG80211_MLO_KEY_OPERATION_SUPPORT",
@@ -2158,6 +2162,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = cmd,
     )
 
+    copts.append("-Wno-format")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 

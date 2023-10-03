@@ -1899,6 +1899,18 @@ static bool lim_is_puncture_same(tLimChannelSwitchInfo *lim_ch_switch,
 	return lim_ch_switch->puncture_bitmap == session->puncture_bitmap;
 }
 
+static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
+				 uint8_t link_id,
+				 struct csa_offload_params *csa_params)
+{
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	mlo_mgr_update_csa_link_info(vdev->mlo_dev_ctx,
+				     csa_params, link_id);
+	pe_debug("vdev_id: %d link id %d mlo csa sta param updated ",
+		 vdev_id, link_id);
+}
+
 #else
 static void lim_set_csa_chan_param_11be(struct pe_session *session,
 					struct csa_offload_params *csa_param,
@@ -1920,6 +1932,13 @@ static bool lim_is_puncture_same(tLimChannelSwitchInfo *lim_ch_switch,
 {
 	return true;
 }
+
+static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
+				 uint8_t link_id,
+				 struct csa_offload_params *csa_params)
+{
+}
+
 #endif
 
 void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
@@ -1935,6 +1954,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
 	tLimWiderBWChannelSwitchInfo *chnl_switch_info = NULL;
 	tLimChannelSwitchInfo *lim_ch_switch = NULL;
+	uint8_t link_id;
 
 	if (!csa_params) {
 		pe_err("limMsgQ body ptr is NULL");
@@ -2225,6 +2245,16 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
 		pe_debug("Ignore CSA, no change in ch, bw and puncture");
 		goto err;
+	}
+
+	if (!wlan_cm_is_vdev_connected(session_entry->vdev)) {
+		pe_info_rl("Ignore CSA, vdev is in not in conncted state");
+		goto err;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
+		link_id = wlan_vdev_get_link_id(session_entry->vdev);
+		update_csa_link_info(session_entry->vdev, link_id, csa_params);
 	}
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_params->csa_chan_freq) &&

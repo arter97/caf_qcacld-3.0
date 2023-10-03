@@ -2821,6 +2821,26 @@ QDF_STATUS
 wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 					 uint8_t value);
 
+/**
+ * wlan_mlme_get_eht_mld_id() - Get the MLD ID of the requested BSS
+ * @psoc: psoc context
+ *
+ * Return: MLD ID of the requested BSS
+ */
+uint8_t
+wlan_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_eht_mld_id() - Set MLD ID of the requested BSS information
+ * within the ML probe request.
+ * @psoc: psoc context
+ * @value: MLD ID
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+wlan_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc, uint8_t value);
+
 /*
  * wlan_mlme_get_mlo_prefer_percentage() - get MLO preference percentage
  * @psoc: pointer to psoc object
@@ -2888,12 +2908,49 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
+static inline uint8_t
+wlan_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc, uint8_t value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline void
 wlan_mlme_get_mlo_prefer_percentage(
 				struct wlan_objmgr_psoc *psoc,
 				int8_t *mlo_prefer_percentage)
 {}
 #endif
+
+/**
+ * wlan_mlme_set_btm_abridge_flag() - Set BTM abridge flag
+ * @psoc: psoc context
+ * @value: abridge flag
+ *
+ * Return: qdf status
+ *
+ * BTM abridge flag indicates whether to select candidates
+ * for BTM roam based on score.
+ */
+QDF_STATUS
+wlan_mlme_set_btm_abridge_flag(struct wlan_objmgr_psoc *psoc, bool value);
+
+/**
+ * wlan_mlme_get_btm_abridge_flag() - Get BTM abridge flag
+ * @psoc: psoc context
+ *
+ * Return: abridge flag
+ *
+ * BTM abridge flag indicates whether to select candidates
+ * for BTM roam based on score.
+ */
+bool
+wlan_mlme_get_btm_abridge_flag(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_mlme_get_sta_miracast_mcc_rest_time() - Get STA/MIRACAST MCC rest time

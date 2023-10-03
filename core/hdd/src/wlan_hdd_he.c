@@ -663,7 +663,7 @@ static bool hdd_check_mode_support_for_sr(struct hdd_adapter *adapter,
 					  uint8_t sr_ctrl)
 {
 	if ((adapter->device_mode == QDF_STA_MODE) &&
-	    (!hdd_cm_is_vdev_connected(adapter->deflink) || !sr_ctrl ||
+	    (!hdd_cm_is_vdev_connected(adapter->deflink) ||
 	    ((sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
 	    !(sr_ctrl & SRG_INFO_PRESENT)))) {
 		hdd_err("mode %d doesn't supports SR", adapter->device_mode);
@@ -707,7 +707,6 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 	struct sk_buff *skb;
 	struct cdp_pdev_obss_pd_stats_tlv stats;
 	uint8_t sr_device_modes;
-	bool is_pd_threshold_present = false;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -727,7 +726,6 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		hdd_err("Null VDEV");
 		return -EINVAL;
 	}
-	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
 	/**
 	 * Reject command if SR concurrency is not allowed and
 	 * only STA mode is set in ini to enable SR.
@@ -776,6 +774,15 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 
 	ucfg_spatial_reuse_get_sr_config(vdev, &sr_ctrl, &non_srg_max_pd_offset,
 					 &is_sr_enable);
+
+	if (!hdd_check_mode_support_for_sr(adapter, sr_ctrl) &&
+	    (sr_oper != QCA_WLAN_SR_OPERATION_GET_PARAMS)) {
+		hdd_err("SR operation not allowed, sr_ctrl = %x, mode = %d",
+			sr_ctrl, adapter->device_mode);
+		ret = -EINVAL;
+		goto exit;
+	}
+
 	if (sr_oper != QCA_WLAN_SR_OPERATION_SR_ENABLE && !is_sr_enable) {
 		hdd_err("SR operation not allowed");
 		ret = -EINVAL;
@@ -818,9 +825,7 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 			srg_pd_threshold =
 			nla_get_s32(
 			tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_SRG_PD_THRESHOLD]);
-			is_pd_threshold_present = true;
-			wlan_vdev_mlme_set_pd_threshold_present(
-						vdev, is_pd_threshold_present);
+			wlan_vdev_mlme_set_pd_threshold_present(vdev, true);
 		}
 
 		if (is_sr_enable &&
@@ -829,37 +834,25 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 			nla_get_s32(
 			tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_NON_SRG_PD_THRESHOLD]
 			);
-			is_pd_threshold_present = true;
-			wlan_vdev_mlme_set_pd_threshold_present(
-						vdev, is_pd_threshold_present);
+			wlan_vdev_mlme_set_pd_threshold_present(vdev, true);
 		}
-		if (is_pd_threshold_present) {
-			if (!hdd_check_mode_support_for_sr(adapter, sr_ctrl)) {
-				ret = -EINVAL;
-				goto exit;
-			}
-		}
+
 		hdd_debug("setting sr enable %d with pd threshold srg: %d non srg: %d",
 			  is_sr_enable, srg_pd_threshold, non_srg_pd_threshold);
 		/* Set the variables */
 		ucfg_spatial_reuse_set_sr_enable(vdev, is_sr_enable);
-		if (hdd_check_mode_support_for_sr(adapter, sr_ctrl)) {
-			status = ucfg_spatial_reuse_setup_req(
-				vdev, hdd_ctx->pdev, is_sr_enable,
-				srg_pd_threshold, non_srg_pd_threshold);
-			if (status != QDF_STATUS_SUCCESS) {
-				hdd_err("failed to enable Spatial Reuse feature");
-				ret = -EINVAL;
-				goto exit;
-			}
+		status = ucfg_spatial_reuse_setup_req(vdev, hdd_ctx->pdev,
+						      is_sr_enable,
+						      srg_pd_threshold,
+						      non_srg_pd_threshold);
+		if (status != QDF_STATUS_SUCCESS) {
+			hdd_err("failed to enable Spatial Reuse feature");
+			ret = -EINVAL;
+			goto exit;
 		}
 
 		break;
 	case QCA_WLAN_SR_OPERATION_GET_STATS:
-		if (!hdd_check_mode_support_for_sr(adapter, sr_ctrl)) {
-			ret = -EINVAL;
-			goto exit;
-		}
 		status = policy_mgr_get_mac_id_by_session_id(
 						hdd_ctx->psoc,
 						adapter->deflink->vdev_id,
@@ -892,10 +885,6 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		ret = wlan_cfg80211_vendor_cmd_reply(skb);
 		break;
 	case QCA_WLAN_SR_OPERATION_CLEAR_STATS:
-		if (!hdd_check_mode_support_for_sr(adapter, sr_ctrl)) {
-			ret = -EINVAL;
-			goto exit;
-		}
 		status = policy_mgr_get_mac_id_by_session_id(
 						hdd_ctx->psoc,
 						adapter->deflink->vdev_id,
@@ -912,10 +901,6 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		}
 		break;
 	case QCA_WLAN_SR_OPERATION_PSR_AND_NON_SRG_OBSS_PD_PROHIBIT:
-		if (!hdd_check_mode_support_for_sr(adapter, sr_ctrl)) {
-			ret = -EINVAL;
-			goto exit;
-		}
 		if (tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_HESIGA_VAL15_ENABLE])
 			sr_he_siga_val15_allowed = nla_get_u8(
 			tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_HESIGA_VAL15_ENABLE]
@@ -933,10 +918,6 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		}
 		break;
 	case QCA_WLAN_SR_OPERATION_PSR_AND_NON_SRG_OBSS_PD_ALLOW:
-		if (!hdd_check_mode_support_for_sr(adapter, sr_ctrl)) {
-			ret = -EINVAL;
-			goto exit;
-		}
 		if (!QDF_IS_STATUS_SUCCESS(ucfg_spatial_reuse_send_sr_prohibit(
 					   vdev, false))) {
 			hdd_debug("Prohibit command can not be sent");
@@ -945,10 +926,6 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		}
 		break;
 	case QCA_WLAN_SR_OPERATION_GET_PARAMS:
-		if (!hdd_check_mode_support_for_sr(adapter, sr_ctrl)) {
-			ret = -EINVAL;
-			goto exit;
-		}
 		wlan_vdev_mlme_get_srg_pd_offset(vdev, &srg_max_pd_offset,
 						 &srg_min_pd_offset);
 		non_srg_max_pd_offset =

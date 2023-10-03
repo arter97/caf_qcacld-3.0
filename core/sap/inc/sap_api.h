@@ -460,11 +460,11 @@ struct sap_acs_cfg {
 	/* ACS Algo Input */
 	uint8_t    acs_mode;
 	eCsrPhyMode hw_mode;
-	uint32_t    start_ch_freq;
-	uint32_t    end_ch_freq;
-	uint32_t   *freq_list;
+	qdf_freq_t    start_ch_freq;
+	qdf_freq_t    end_ch_freq;
+	qdf_freq_t   *freq_list;
 	uint8_t    ch_list_count;
-	uint32_t   *master_freq_list;
+	qdf_freq_t   *master_freq_list;
 	uint8_t    master_ch_list_count;
 	bool master_ch_list_updated;
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -1936,6 +1936,27 @@ void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
  */
 int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 				 qdf_freq_t *freq_list, uint16_t count);
+
+/**
+ * wlansap_sort_channel_list() - Sort channel list
+ * @vdev_id: Vdev Id
+ * @list: List of channels which needs to sort
+ * @ch_info: Fill sorted channels list in ch_info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
+				     struct sap_sel_ch_info *ch_info);
+
+/**
+ * wlansap_get_user_config_acs_ch_list() - Get user config ACS channel list
+ * @vdev_id: Vdev Id
+ * @filter: Filter to apply to get scan result
+ *
+ * Return: None
+ */
+void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
+					 struct scan_filter *filter);
 #ifdef __cplusplus
 }
 #endif

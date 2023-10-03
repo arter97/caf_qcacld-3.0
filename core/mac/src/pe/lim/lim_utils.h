@@ -528,11 +528,11 @@ void lim_process_channel_switch(struct mac_context *mac, uint8_t vdev_id);
  *
  * This function changes the current operating channel frequency.
  *
- * return NONE
+ * return qdf_status
  */
-void lim_switch_primary_channel(struct mac_context *mac,
-				uint32_t new_channel_freq,
-				struct pe_session *pe_session);
+QDF_STATUS lim_switch_primary_channel(struct mac_context *mac,
+				      uint32_t new_channel_freq,
+				      struct pe_session *pe_session);
 
 /**
  * lim_switch_primary_secondary_channel() - switch primary and secondary
@@ -546,10 +546,10 @@ void lim_switch_primary_channel(struct mac_context *mac,
  *  then we must set this new channel in session context and
  *  assign notify LIM of such change.
  *
- * @return NONE
+ * @return qdf_status
  */
-void lim_switch_primary_secondary_channel(struct mac_context *mac,
-					  struct pe_session *pe_session);
+QDF_STATUS lim_switch_primary_secondary_channel(struct mac_context *mac,
+						struct pe_session *pe_session);
 
 void lim_update_sta_run_time_ht_capability(struct mac_context *mac,
 		tDot11fIEHTCaps *pHTCaps);

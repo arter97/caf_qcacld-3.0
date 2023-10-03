@@ -527,7 +527,8 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 	 * Instead of making another infra, send the RSN-CAPS in MSB of
 	 * beacon Caps.
 	 */
-	rsn_caps = rso_cfg->orig_sec_info.rsn_caps;
+	/* RSN caps with global user MFP which can be used for cross-AKM roam */
+	rsn_caps = rso_cfg->rso_rsn_caps;
 
 	/* Fill LFR3 specific self capabilities for roam scan mode TLV */
 	self_caps.ess = 1;
@@ -2913,6 +2914,7 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 	bool is_hs_20_ap, is_pmf_enabled, is_open_connection = false;
 	uint8_t vdev_id;
 	uint32_t mbo_oce_enabled_ap;
+	bool abridge_flag;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -2967,6 +2969,14 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id, MBO_OCE_ENABLED_AP, &temp);
 	mbo_oce_enabled_ap = temp.uint_value;
+
+	abridge_flag = wlan_mlme_get_btm_abridge_flag(psoc);
+	if (!abridge_flag)
+		MLME_CLEAR_BIT(*btm_offload_config,
+			       BTM_OFFLOAD_CONFIG_BIT_7);
+	mlme_debug("Abridge flag: %d, btm offload: %u", abridge_flag,
+		   *btm_offload_config);
+
 	/*
 	 * If peer does not support PMF in case of OCE/MBO
 	 * Connection, Disable BTM offload to firmware.
@@ -6681,8 +6691,9 @@ cm_roam_neigh_rpt_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 			  (uint64_t)neigh_rpt->timestamp, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_NBR_RPT_REQ_EVENT;
-	wlan_diag_event.version = DIAG_NBR_RPT_VERSION;
+	wlan_diag_event.version = DIAG_NBR_RPT_VERSION_2;
 	wlan_diag_event.token = neigh_rpt->req_token;
+	wlan_diag_event.band = neigh_rpt->band;
 
 	wlan_vdev_mlme_get_ssid(vdev, wlan_diag_event.ssid,
 				(uint8_t *)&wlan_diag_event.ssid_len);
@@ -6704,7 +6715,7 @@ cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 			  (uint64_t)neigh_rpt->timestamp, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_NBR_RPT_RESP_EVENT;
-	wlan_diag_event.version = DIAG_NBR_RPT_VERSION;
+	wlan_diag_event.version = DIAG_NBR_RPT_VERSION_2;
 	wlan_diag_event.token = neigh_rpt->resp_token;
 	wlan_diag_event.num_freq = neigh_rpt->num_freq;
 
@@ -6712,6 +6723,7 @@ cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 		wlan_diag_event.freq[i] = neigh_rpt->freq[i];
 
 	wlan_diag_event.num_rpt = neigh_rpt->num_rpt;
+	wlan_diag_event.band = neigh_rpt->band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_NBR_RPT);
 }

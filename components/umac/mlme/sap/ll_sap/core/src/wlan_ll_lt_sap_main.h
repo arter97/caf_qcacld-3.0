@@ -21,7 +21,8 @@
 #ifndef _WLAN_LL_LT_SAP_MAIN_H_
 #define _WLAN_LL_LT_SAP_MAIN_H_
 
-#include <i_qdf_types.h>
+#include "wlan_ll_sap_main.h"
+#include "wlan_mlme_public_struct.h"
 
 /**
  * ll_lt_sap_is_supported() - Check if ll_lt_sap is supported or not
@@ -30,4 +31,17 @@
  */
 bool ll_lt_sap_is_supported(void);
 
+/**
+ * ll_lt_sap_get_sorted_user_config_acs_ch_list() - API to get sorted user
+ * configured channel list
+ * @psoc: Pointer to psoc object
+ * @vdev_id: Vdev Id
+ * @ch_info: Pointer to ch_info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ll_lt_sap_get_sorted_user_config_acs_ch_list(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					struct sap_sel_ch_info *ch_info);
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

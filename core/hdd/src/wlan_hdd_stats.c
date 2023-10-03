@@ -509,7 +509,7 @@ hdd_get_link_info_by_bssid(struct hdd_context *hdd_ctx, const uint8_t *bssid)
 	return NULL;
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 #define WLAN_INVALID_RSSI_VALUE -128
 /**
  * wlan_hdd_is_per_link_stats_supported - Check if FW supports per link stats
@@ -1416,6 +1416,8 @@ wlan_hdd_update_iface_stats_info(struct wlan_hdd_link_info *link_info,
 	stats->avg_rx_frms_leaked = hdd_stats->avg_rx_frms_leaked;
 	stats->rx_leak_window = hdd_stats->rx_leak_window;
 	stats->nf_cal_val = hdd_stats->nf_cal_val;
+	stats->num_peers = hdd_stats->num_peers;
+	stats->num_ac = hdd_stats->num_ac;
 
 	if_stat->rts_succ_cnt = link_info->ll_iface_stats.rts_succ_cnt;
 	if_stat->rts_fail_cnt = link_info->ll_iface_stats.rts_fail_cnt;
@@ -1643,15 +1645,15 @@ wlan_hdd_send_mlo_ll_peer_stats_to_user(struct hdd_adapter *adapter)
 	}
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
+		wlan_hdd_get_connected_link_info(link_info, &info);
+		if (info.link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
 		peers = nla_nest_start(skb, i);
 		if (!peers) {
 			hdd_err("nla_nest_start failed");
 			goto exit;
 		}
-
-		wlan_hdd_get_connected_link_info(link_info, &info);
-		if (info.link_id == WLAN_INVALID_LINK_ID)
-			continue;
 
 		if (!wlan_hdd_put_mlo_peer_info(link_info, skb)) {
 			hdd_err("put_wifi_peer_info fail");
@@ -1890,7 +1892,7 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	u32 num_links, per_link_peers;
 	uint8_t i = 0;
-	int8_t rssi = WLAN_INVALID_PER_CHAIN_RSSI;
+	int8_t rssi = WLAN_INVALID_RSSI_VALUE;
 	struct wifi_interface_stats cumulative_if_stat = {0};
 	struct wlan_hdd_mlo_iface_stats_info info = {0};
 	struct wifi_interface_stats *stats;
@@ -1930,6 +1932,12 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 		if ((link_info->rssi != 0) && (rssi <= link_info->rssi)) {
 			rssi = link_info->rssi;
 			update_stats = true;
+			if (!hdd_get_interface_info(link_info,
+						    &cumulative_if_stat.info)) {
+				hdd_err("failed to get iface info for link %u",
+					info.link_id);
+				goto err;
+			}
 		} else {
 			update_stats = false;
 		}
@@ -1966,15 +1974,15 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 	}
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
+		wlan_hdd_get_connected_link_info(link_info, &info);
+		if (info.link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
 		ml_iface_links = nla_nest_start(skb, i);
 		if (!ml_iface_links) {
 			hdd_err("per link mlo iface stats failed");
 			goto err;
 		}
-
-		wlan_hdd_get_connected_link_info(link_info, &info);
-		if (info.link_id == WLAN_INVALID_LINK_ID)
-			continue;
 
 		stats = &link_info->ll_iface_stats;
 		per_link_peers = stats->link_stats.num_peers;
@@ -7296,24 +7304,14 @@ wlan_hdd_refill_os_rateflags(struct rate_info *os_rate, uint8_t preamble)
  * @sinfo: kernel station_info struct to populate
  * @link_info: pointer to link_info struct in adapter,
  *             where hdd_stats is located in this struct
- * @mac_handle: opaque handle to MAC context
- * @rate_flags: indicating phy mode and bandwidth
- * @fw_mcs_index: MCS from parsing rate_flags and fw_raw_rate
- * @fw_rate: raw_rate from fw
- * @nss_max: max nss
  *
- * When rates info reported is provided by driver, this function
- * will take effect to replace the bandwidth calculated from fw.
+ * This function is to replace RX rates which was previously filled by fw.
  *
  * Return: None
  */
 static void
 wlan_hdd_refill_actual_rate(struct station_info *sinfo,
-			    struct wlan_hdd_link_info *link_info,
-			    mac_handle_t mac_handle,
-			    enum tx_rate_info rate_flags,
-			    uint8_t fw_mcs_index,
-			    uint16_t fw_rate, uint8_t nss_max)
+			    struct wlan_hdd_link_info *link_info)
 {
 	uint8_t preamble = link_info->hdd_stats.class_a_stat.rx_preamble;
 
@@ -7326,16 +7324,10 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 	} else if (qdf_unlikely(preamble == INVALID_PREAMBLE)) {
 		/*
 		 * If preamble is invalid, it means that DP has not received
-		 * a data frame since assoc or roaming so there is no rates
-		 * info. In this case, we report max rate with FW rates info.
+		 * a data frame since assoc or roaming so there is no rates.
+		 * In this case, using FW rates which was set previously.
 		 */
-		hdd_report_max_rate(link_info, mac_handle,
-				    &sinfo->rxrate,
-				    sinfo->signal,
-				    rate_flags,
-				    fw_mcs_index,
-				    fw_rate,
-				    nss_max);
+		hdd_debug("Driver failed to get rate, reporting FW rate");
 		return;
 	}
 
@@ -7363,11 +7355,7 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 #else
 static inline void
 wlan_hdd_refill_actual_rate(struct station_info *sinfo,
-			    struct wlan_hdd_link_info *link_info,
-			    mac_handle_t mac_handle,
-			    enum tx_rate_info rate_flags,
-			    uint8_t fw_mcs_index,
-			    uint16_t fw_rate, uint8_t nss_max)
+			    struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
@@ -7583,8 +7571,6 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 					       rx_nss, rx_dcm, rx_gi);
 		}
 	} else {
-		uint8_t rx_nss_max = wlan_vdev_mlme_get_nss(vdev);
-
 		/* Fill TX stats */
 		hdd_report_actual_rate(tx_rate_flags, my_tx_rate,
 				       &sinfo->txrate, tx_mcs_index,
@@ -7596,9 +7582,7 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 				       rx_nss, rx_dcm, rx_gi);
 
 		/* Using driver RX rate to replace the FW RX rate */
-		wlan_hdd_refill_actual_rate(sinfo, link_info, mac_handle,
-					    rx_rate_flags, rx_mcs_index,
-					    my_rx_rate, rx_nss_max);
+		wlan_hdd_refill_actual_rate(sinfo, link_info);
 	}
 
 	wlan_hdd_fill_summary_stats(&hdd_stats->summary_stat,
@@ -7774,15 +7758,13 @@ wlan_hdd_update_mlo_sinfo(struct wlan_hdd_link_info *link_info,
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	if (!link_info->is_mlo_vdev_active) {
+	if (!link_info->is_mlo_vdev_active)
 		hdd_nofl_debug("vdev_id[%d] is inactive", link_info->vdev_id);
-		return;
-	}
 
 	/* Update the rate info for link with best RSSI */
 	if (sinfo->signal > hdd_sinfo->signal) {
-		hdd_nofl_debug("Updating rates for link_id %d",
-			       sta_ctx->conn_info.ieee_link_id);
+		hdd_debug_rl("Updating rates for link_id %d",
+			     sta_ctx->conn_info.ieee_link_id);
 		wlan_hdd_update_mlo_rate_info(hdd_sinfo, sinfo);
 	}
 
@@ -9114,8 +9096,10 @@ void wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info)
 		return;
 
 	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
-	if (!peer_stats)
+	if (!peer_stats) {
+		hdd_err("Failed to malloc peer_stats");
 		return;
+	}
 
 	/*
 	 * If failed to get RX rates info, assign an invalid value to the
@@ -9126,7 +9110,7 @@ void wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info)
 	status = wlan_hdd_get_per_peer_stats(link_info, peer_stats);
 	if (qdf_unlikely(QDF_IS_STATUS_ERROR(status)) ||
 	    qdf_unlikely(peer_stats->rx.last_rx_rate == 0)) {
-		hdd_debug("No rates, reporting max rate, rx mcs=%d, status=%d",
+		hdd_debug("Driver failed to get rx rates, rx mcs=%d, status=%d",
 			  hdd_stats->class_a_stat.rx_mcs_index, status);
 		hdd_stats->class_a_stat.rx_preamble = INVALID_PREAMBLE;
 		if (hdd_stats->class_a_stat.rx_mcs_index == INVALID_MCS_IDX) {

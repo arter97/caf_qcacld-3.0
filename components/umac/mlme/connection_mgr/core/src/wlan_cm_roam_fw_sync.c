@@ -954,6 +954,9 @@ cm_update_scan_db_on_roam_success(struct wlan_objmgr_vdev *vdev,
 
 	cm_update_scan_mlme_on_roam(vdev, &resp->bssid,
 				    SCAN_ENTRY_CON_STATE_ASSOC);
+
+	cm_standby_link_update_mlme_by_bssid(vdev, SCAN_ENTRY_CON_STATE_ASSOC,
+					     resp->ssid);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO

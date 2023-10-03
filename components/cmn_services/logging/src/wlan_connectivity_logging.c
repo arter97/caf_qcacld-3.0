@@ -647,4 +647,29 @@ out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
+					     struct mlo_link_switch_params *src)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
+				 struct wlan_diag_mlo_link_status);
+
+	qdf_mem_zero(&wlan_diag_event,
+
+		     sizeof(struct wlan_diag_mlo_link_status));
+
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.version = DIAG_MLO_LINK_STATUS_VERSION;
+
+	wlan_diag_event.active_link = src->active_link_bitmap;
+	wlan_diag_event.prev_active_link = src->prev_link_bitmap;
+	wlan_diag_event.reason = src->reason_code;
+	wlan_diag_event.diag_cmn.fw_timestamp = src->fw_timestamp;
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
+				    EVENT_WLAN_MLO_LINK_STATUS);
+}
+#endif
 #endif

@@ -1458,6 +1458,7 @@ struct wlan_mlme_aux_dev_caps {
  * @eht_mode: EHT mode of operation
  * @t2lm_negotiation_support: T2LM negotiation supported enum value
  * @enable_emlsr_mode: 11BE eMLSR mode support
+ * @mld_id: MLD ID of requested BSS within ML probe request frame
  * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
  * connection, bypass strict power levels
  * @sr_enable_modes: modes for which SR(Spatial Reuse) is enabled
@@ -1518,6 +1519,7 @@ struct wlan_mlme_generic {
 	enum wlan_eht_mode eht_mode;
 	bool enable_emlsr_mode;
 	enum t2lm_negotiation_support t2lm_negotiation_support;
+	uint8_t mld_id;
 #endif
 #ifdef WLAN_FEATURE_MCC_QUOTA
 	struct wlan_user_mcc_quota user_mcc_quota;
@@ -2568,6 +2570,7 @@ struct wlan_mlme_wifi_pos_cfg {
 };
 
 #define MLME_SET_BIT(value, bit_offset) ((value) |= (1 << (bit_offset)))
+#define MLME_CLEAR_BIT(value, bit_offset) ((value) &= ~(1 << (bit_offset)))
 
 /* Mask to check if BTM offload is enabled/disabled*/
 #define BTM_OFFLOAD_ENABLED_MASK    0x01

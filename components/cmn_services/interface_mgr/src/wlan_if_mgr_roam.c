@@ -66,7 +66,7 @@ if_mgr_is_assoc_link_of_vdev(struct wlan_objmgr_pdev *pdev,
 			     struct wlan_objmgr_vdev *vdev,
 			     uint8_t cur_vdev_id)
 {
-	return true;
+	return false;
 }
 #endif
 

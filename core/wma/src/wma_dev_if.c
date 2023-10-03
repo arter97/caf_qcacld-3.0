@@ -3368,15 +3368,19 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("failed to set aggregation sizes(status = %d)", status);
 
-	status = wlan_mlme_get_max_amsdu_num(wma->psoc, &amsdu_val);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("failed to get amsdu aggr.size(status = %d)", status);
-	} else {
-		status = wma_set_tx_rx_aggr_size(vdev_id, amsdu_val, amsdu_val,
-					WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
-		if (QDF_IS_STATUS_ERROR(status))
-			wma_err("failed to set amsdu aggr.size(status = %d)",
+	if (mac_ctx->is_usr_cfg_amsdu_enabled) {
+		status = wlan_mlme_get_max_amsdu_num(wma->psoc, &amsdu_val);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("failed to get amsdu aggr.size(status = %d)",
 				status);
+		} else {
+			status = wma_set_tx_rx_aggr_size(
+					vdev_id, amsdu_val, amsdu_val,
+					WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
+			if (QDF_IS_STATUS_ERROR(status))
+				wma_err("failed to set amsdu aggr.size(status = %d)",
+					status);
+		}
 	}
 
 	if (mlme_obj->mgmt.generic.type == WMI_VDEV_TYPE_STA) {

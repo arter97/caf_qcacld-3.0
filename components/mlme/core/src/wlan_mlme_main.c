@@ -1261,7 +1261,8 @@ static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
 static void mlme_init_tl2m_negotiation_support(struct wlan_objmgr_psoc *psoc,
 						 struct wlan_mlme_generic *gen)
 {
-	gen->t2lm_negotiation_support = cfg_default(CFG_T2LM_NEGOTIATION_SUPPORT);
+	gen->t2lm_negotiation_support = cfg_get(psoc,
+						CFG_T2LM_NEGOTIATION_SUPPORT);
 }
 #else
 static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
@@ -3437,6 +3438,7 @@ static void mlme_init_btm_cfg(struct wlan_objmgr_psoc *psoc,
 	btm->abridge_flag = cfg_get(psoc, CFG_ENABLE_BTM_ABRIDGE);
 	if (btm->abridge_flag)
 		MLME_SET_BIT(btm->btm_offload_config, BTM_OFFLOAD_CONFIG_BIT_7);
+	wlan_mlme_set_btm_abridge_flag(psoc, btm->abridge_flag);
 
 	btm->btm_solicited_timeout = cfg_get(psoc, CFG_BTM_SOLICITED_TIMEOUT);
 	btm->btm_max_attempt_cnt = cfg_get(psoc, CFG_BTM_MAX_ATTEMPT_CNT);

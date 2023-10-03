@@ -2088,6 +2088,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	struct qdf_mac_addr sta_addr = {0};
 	qdf_freq_t dfs_freq;
 	struct wlan_hdd_link_info *link_info;
+	bool alt_pipe;
 
 	dev = context;
 	if (!dev) {
@@ -2252,6 +2253,14 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		}
 
 		if (ucfg_ipa_is_enabled()) {
+			status = hdd_ipa_get_tx_pipe(hdd_ctx, link_info,
+						     &alt_pipe);
+			if (!QDF_IS_STATUS_SUCCESS(status)) {
+				hdd_debug("Failed to get alt pipe for vdev %d",
+					  link_info->vdev_id);
+				alt_pipe = false;
+			}
+
 			status = ucfg_ipa_wlan_evt(
 					hdd_ctx->pdev,
 					adapter->dev,
@@ -2259,8 +2268,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 					link_info->vdev_id,
 					WLAN_IPA_AP_CONNECT,
 					adapter->dev->dev_addr,
-					WLAN_REG_IS_24GHZ_CH_FREQ(
-						ap_ctx->operating_chan_freq));
+					alt_pipe);
 			if (status)
 				hdd_err("WLAN_AP_CONNECT event failed");
 		}
@@ -7665,6 +7673,15 @@ static void hdd_update_he_obss_pd(struct wlan_hdd_link_info *link_info,
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct ieee80211_he_obss_pd *obss_pd;
+	uint8_t sr_device_modes;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	ucfg_mlme_get_sr_enable_modes(hdd_ctx->psoc, &sr_device_modes);
+	if (!(sr_device_modes & (1 << link_info->adapter->device_mode))) {
+		hdd_debug("SR operation not allowed for mode %d",
+			  link_info->adapter->device_mode);
+		return;
+	}
 
 	if (!params || !params->he_obss_pd.enable)
 		return;

@@ -89,12 +89,24 @@ QDF_STATUS mlme_register_mlme_ext_ops(void)
 #ifdef WLAN_FEATURE_11BE_MLO
 QDF_STATUS mlme_register_mlo_ext_ops(void)
 {
+	QDF_STATUS status;
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
-	if (mlo_ctx)
-		mlo_reg_mlme_ext_cb(mlo_ctx, &mlo_ext_ops);
+	if (!mlo_ctx)
+		return QDF_STATUS_E_FAILURE;
 
-	return QDF_STATUS_SUCCESS;
+	mlo_reg_mlme_ext_cb(mlo_ctx, &mlo_ext_ops);
+
+	status = mlo_mgr_register_link_switch_notifier(WLAN_UMAC_COMP_MLME,
+						       wlan_cm_link_switch_notif_cb);
+	if (status == QDF_STATUS_E_NOSUPPORT) {
+		status = QDF_STATUS_SUCCESS;
+		mlme_debug("Link switch not supported");
+	} else if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to register link switch notifier for mlme!");
+	}
+
+	return status;
 }
 
 QDF_STATUS mlme_unregister_mlo_ext_ops(void)
@@ -256,8 +268,7 @@ int mlme_sr_is_enable(struct wlan_objmgr_vdev *vdev)
 	uint8_t sr_ctrl;
 
 	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
-	return ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
-		 (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
+	return (!sr_ctrl || !(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) ||
 		(sr_ctrl & SRG_INFO_PRESENT));
 }
 
@@ -279,6 +290,7 @@ mlme_sr_handle_conc(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_lmac_if_tx_ops *tx_ops;
+	struct wlan_lmac_if_spatial_reuse_tx_ops *sr_tx_ops;
 	uint8_t conc_vdev_id = wlan_vdev_get_id(conc_vdev);
 
 	pdev = wlan_vdev_get_pdev(vdev);
@@ -289,7 +301,12 @@ mlme_sr_handle_conc(struct wlan_objmgr_vdev *vdev,
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
+	if (!tx_ops) {
+		mlme_err("tx_ops is NULL");
+		return;
+	}
 
+	sr_tx_ops = &tx_ops->spatial_reuse_tx_ops;
 	if (en_sr_curr_vdev) {
 		wlan_vdev_mlme_set_sr_disable_due_conc(vdev, true);
 		wlan_vdev_mlme_set_sr_disable_due_conc(conc_vdev, true);
@@ -297,24 +314,27 @@ mlme_sr_handle_conc(struct wlan_objmgr_vdev *vdev,
 		if (!wlan_vdev_mlme_get_he_spr_enabled(conc_vdev))
 			return;
 
-		if (tx_ops && tx_ops->spatial_reuse_tx_ops.target_if_sr_update)
-			tx_ops->spatial_reuse_tx_ops.target_if_sr_update
-						     (pdev, conc_vdev_id, val);
+		if (mlme_sr_is_enable(conc_vdev)) {
+			if (sr_tx_ops->target_if_sr_update)
+				sr_tx_ops->target_if_sr_update
+						(pdev, conc_vdev_id, val);
 
-		wlan_spatial_reuse_osif_event(conc_vdev, SR_OPERATION_SUSPEND,
-					      SR_REASON_CODE_CONCURRENCY);
+			wlan_spatial_reuse_osif_event(conc_vdev,
+						      SR_OPERATION_SUSPEND,
+						   SR_REASON_CODE_CONCURRENCY);
+		}
 	} else if (wlan_vdev_mlme_is_sr_disable_due_conc(conc_vdev)) {
 		wlan_vdev_mlme_set_sr_disable_due_conc(conc_vdev, false);
 
 		if (!wlan_vdev_mlme_get_he_spr_enabled(conc_vdev))
 			return;
 
-		if (mlme_sr_is_enable(vdev)) {
+		if (mlme_sr_is_enable(conc_vdev)) {
 			wlan_mlme_update_sr_data(conc_vdev, &val, 0, 0, true);
 
-			if (tx_ops && tx_ops->spatial_reuse_tx_ops.target_if_sr_update)
-				tx_ops->spatial_reuse_tx_ops.target_if_sr_update
-						      (pdev, conc_vdev_id, val);
+			if (sr_tx_ops->target_if_sr_update)
+				sr_tx_ops->target_if_sr_update
+						(pdev, conc_vdev_id, val);
 
 			wlan_spatial_reuse_osif_event(conc_vdev,
 						      SR_OPERATION_RESUME,
@@ -388,6 +408,7 @@ void mlme_sr_update(struct wlan_objmgr_vdev *vdev, bool enable)
 			wlan_mlme_update_sr_data(vdev, &val, 0, 0, true);
 		} else {
 			/* VDEV down, disable SR */
+			wlan_vdev_mlme_set_he_spr_enabled(vdev, false);
 			wlan_vdev_mlme_set_sr_ctrl(vdev, 0);
 			wlan_vdev_mlme_set_non_srg_pd_offset(vdev, 0);
 		}
@@ -845,6 +866,8 @@ QDF_STATUS mlme_set_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev,
 	}
 
 	mlme_priv->chan_switch_in_progress = val;
+	mlme_legacy_info("Set chan_switch_in_progress: %d vdev %d",
+			 val, wlan_vdev_get_id(vdev));
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2249,6 +2272,22 @@ static QDF_STATUS ap_mlme_vdev_csa_complete(struct vdev_mlme_obj *vdev_mlme)
 		mlme_legacy_debug("CSAIE_TX_COMPLETE_IND already sent");
 
 	return QDF_STATUS_SUCCESS;
+}
+
+#ifdef WLAN_FEATURE_LL_LT_SAP
+QDF_STATUS
+wlan_ll_sap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
+			      struct sap_sel_ch_info *ch_info)
+{
+	return wlansap_sort_channel_list(vdev_id, list, ch_info);
+}
+#endif
+
+void
+wlan_sap_get_user_config_acs_ch_list(uint8_t vdev_id,
+				     struct scan_filter *filter)
+{
+	wlansap_get_user_config_acs_ch_list(vdev_id, filter);
 }
 
 static struct vdev_mlme_ops sta_mlme_ops = {

@@ -78,6 +78,9 @@
 #include "hif.h"
 #include "wlan_cmn_ieee80211.h"
 #include "wlan_mlo_mgr_cmn.h"
+#include "wlan_mlo_mgr_peer.h"
+#include "wlan_mlo_mgr_sta.h"
+
 /**
  * WMA_SET_VDEV_IE_SOURCE_HOST - Flag to identify the source of VDEV SET IE
  * command. The value is 0x0 for the VDEV SET IE WMI commands from mobile
@@ -752,10 +755,11 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 					phymode = WLAN_PHYMODE_11AXG_HE40;
 				break;
 			default:
-				phymode = wma_eht_chan_phy_mode(freq,
-								dot11_mode,
-								bw_val,
-								chan_width);
+				phymode = wma_eht_chan_phy_mode(
+							freq,
+							dot11_mode,
+							bw_val,
+							chan_width);
 				break;
 			}
 		}
@@ -811,10 +815,11 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 					phymode = WLAN_PHYMODE_11AXA_HE80_80;
 				break;
 			default:
-				phymode = wma_eht_chan_phy_mode(freq,
-								dot11_mode,
-								bw_val,
-								chan_width);
+				phymode = wma_eht_chan_phy_mode(
+							freq,
+							dot11_mode,
+							bw_val,
+							chan_width);
 				break;
 			}
 		}
@@ -1313,6 +1318,203 @@ QDF_STATUS wma_parse_bw_indication_ie(uint8_t *ie,
 }
 #endif
 
+static bool fill_csa_offload_params(
+			wmi_csa_event_fixed_param *csa_event,
+			struct csa_offload_params *csa_offload_event,
+			struct wlan_objmgr_pdev *pdev)
+{
+	struct ieee80211_channelswitch_ie *csa_ie;
+	struct ieee80211_extendedchannelswitch_ie *xcsa_ie;
+	uint8_t is_csa_ie_present = false;
+
+	if (csa_event->ies_present_flag & WMI_CSA_IE_PRESENT) {
+		csa_ie = (struct ieee80211_channelswitch_ie *)
+					(&csa_event->csa_ie[0]);
+		csa_offload_event->channel = csa_ie->newchannel;
+		csa_offload_event->csa_chan_freq =
+		wlan_reg_legacy_chan_to_freq(pdev,
+					     csa_ie->newchannel);
+		csa_offload_event->switch_mode = csa_ie->switchmode;
+		csa_offload_event->ies_present_flag |= MLME_CSA_IE_PRESENT;
+		is_csa_ie_present = true;
+	} else if (csa_event->ies_present_flag & WMI_XCSA_IE_PRESENT) {
+		xcsa_ie = (struct ieee80211_extendedchannelswitch_ie *)
+						(&csa_event->xcsa_ie[0]);
+		csa_offload_event->channel = xcsa_ie->newchannel;
+		csa_offload_event->switch_mode = xcsa_ie->switchmode;
+		csa_offload_event->new_op_class = xcsa_ie->newClass;
+		if (wlan_reg_is_6ghz_op_class(pdev, xcsa_ie->newClass)) {
+			csa_offload_event->csa_chan_freq =
+				wlan_reg_chan_band_to_freq
+					(pdev, xcsa_ie->newchannel,
+					 BIT(REG_BAND_6G));
+		} else {
+			csa_offload_event->csa_chan_freq =
+				wlan_reg_legacy_chan_to_freq
+					(pdev, xcsa_ie->newchannel);
+		}
+		csa_offload_event->ies_present_flag |= MLME_XCSA_IE_PRESENT;
+		is_csa_ie_present = true;
+	}
+	return is_csa_ie_present;
+}
+
+#ifdef WLAN_FEATURE_11BE
+static bool handle_csa_standby_link(wmi_csa_event_fixed_param *csa_event,
+				    struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_pdev *pdev)
+{
+	struct mlo_link_info *link_info;
+	struct wlan_mlo_dev_context *mldev;
+	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
+	struct csa_offload_params csa_param = {0};
+	struct mlo_link_bss_params params = {0};
+	uint8_t is_csa_standby = false;
+	uint8_t link_id;
+	struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!psoc) {
+		wma_err("null psoc");
+		return is_csa_standby;
+	}
+
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->mld_mac_address,
+				   &mld_addr[0]);
+	wlan_mlo_get_mlpeer_by_peer_mladdr(
+			(struct qdf_mac_addr *)&mld_addr[0],
+			&mldev);
+	if (!mldev) {
+		wma_err("NULL ml dev ctx");
+		return is_csa_standby;
+	}
+
+	link_id =  csa_event->link_id;
+	link_info = mlo_mgr_get_ap_link_by_link_id(mldev,
+						   link_id);
+	if (!link_info) {
+		wma_err("NULL link info ");
+		return is_csa_standby;
+	}
+
+	if (link_info->vdev_id != WLAN_INVALID_VDEV_ID) {
+		wma_debug("vdev id %d link id %d ", link_info->vdev_id,
+			  link_id);
+		return is_csa_standby;
+	}
+
+	mlo_tx_ops = &psoc->soc_cb.tx_ops->mlo_ops;
+	if (!mlo_tx_ops) {
+		wma_err("tx_ops is null!");
+		return is_csa_standby;
+	}
+
+	if (!fill_csa_offload_params(csa_event, &csa_param, pdev)) {
+		wma_err("CSA Event error: No CSA IE present");
+		return is_csa_standby;
+	}
+
+	mlo_mgr_update_csa_link_info(mldev, &csa_param, link_id);
+
+	params.link_id = link_info->link_id;
+	params.chan = qdf_mem_malloc(sizeof(struct wlan_channel));
+	if (!params.chan) {
+		wma_err("no mem acquired");
+		return is_csa_standby;
+	}
+
+	qdf_copy_macaddr((struct qdf_mac_addr *)&params.ap_mld_mac[0],
+			 &link_info->ap_link_addr);
+
+	params.chan->ch_freq = link_info->link_chan_info->ch_freq;
+	params.chan->ch_cfreq1 = link_info->link_chan_info->ch_cfreq1;
+	params.chan->ch_cfreq2 = link_info->link_chan_info->ch_cfreq2;
+	params.chan->ch_phymode = link_info->link_chan_info->ch_phymode;
+
+	mlo_debug("link id %d chan freq %d cfreq1 %d cfreq2 %d host phymode %d ap mld mac " QDF_MAC_ADDR_FMT,
+		  link_info->link_id, link_info->link_chan_info->ch_freq,
+		  link_info->link_chan_info->ch_cfreq1,
+		  link_info->link_chan_info->ch_cfreq2,
+		  link_info->link_chan_info->ch_phymode,
+		  QDF_MAC_ADDR_REF(&params.ap_mld_mac[0]));
+
+	if (!mlo_tx_ops->send_link_set_bss_params_cmd) {
+		wma_err("handler is not registered");
+		qdf_mem_free(params.chan);
+		return is_csa_standby;
+	}
+
+	status = mlo_tx_ops->send_link_set_bss_params_cmd(psoc, &params);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed to send link set bss request command to FW");
+		qdf_mem_free(params.chan);
+		return is_csa_standby;
+	}
+
+	is_csa_standby = true;
+	qdf_mem_free(params.chan);
+
+	return is_csa_standby;
+}
+
+static int fill_peer_mac_addr(wmi_csa_event_fixed_param *csa_event,
+			      uint8_t *bssid)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t link_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t link_id;
+	struct mlo_link_info *link_info;
+	struct wlan_mlo_dev_context *mldev;
+
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->mld_mac_address,
+				   &mld_addr[0]);
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->link_mac_address,
+				   &link_addr[0]);
+	wlan_mlo_get_mlpeer_by_peer_mladdr(
+				(struct qdf_mac_addr *)&mld_addr[0],
+				&mldev);
+	if (!mldev) {
+		wma_err("NULL ml dev ctx");
+		return -EINVAL;
+	}
+
+	link_id =  csa_event->link_id;
+	link_info = mlo_mgr_get_ap_link_by_link_id(mldev,
+						   link_id);
+	if (!link_info) {
+		wma_err("NULL link info ");
+		return -EINVAL;
+	}
+
+	qdf_copy_macaddr((struct qdf_mac_addr *)&bssid[0],
+			 &link_info->ap_link_addr);
+	wma_debug("csa event link id %d vdev id %d peer mld addr" QDF_MAC_ADDR_FMT "peer link addr" QDF_MAC_ADDR_FMT "host link info ap_link_addr" QDF_MAC_ADDR_FMT,
+		  link_id, link_info->vdev_id,
+		  QDF_MAC_ADDR_REF(&mld_addr[0]),
+		  QDF_MAC_ADDR_REF(&link_addr[0]),
+		  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes));
+
+	return status;
+}
+
+#else
+static int fill_peer_mac_addr(wmi_csa_event_fixed_param *csa_event,
+			      uint8_t *bssid)
+{
+	return 0;
+}
+
+static bool handle_csa_standby_link(wmi_csa_event_fixed_param *csa_event,
+				    struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
+
+#endif
+
 /**
  * wma_csa_offload_handler() - CSA event handler
  * @handle: wma handle
@@ -1331,9 +1533,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
 	uint8_t vdev_id = 0;
 	uint8_t cur_chan = 0;
-	struct ieee80211_channelswitch_ie *csa_ie;
 	struct csa_offload_params *csa_offload_event;
-	struct ieee80211_extendedchannelswitch_ie *xcsa_ie;
 	struct ieee80211_ie_wide_bw_switch *wb_ie;
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_vdev *vdev;
@@ -1349,7 +1549,20 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		return -EINVAL;
 	}
 	csa_event = param_buf->fixed_param;
-	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->i_addr2, &bssid[0]);
+
+	if (csa_event->link_id_present &&
+	    csa_event->mld_mac_address_present) {
+		status = fill_peer_mac_addr(csa_event, &bssid[0]);
+		if (status)
+			return -EINVAL;
+
+		/* check standby link and return */
+		if (handle_csa_standby_link(csa_event, wma->psoc, wma->pdev))
+			return 0;
+		} else {
+			WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->i_addr2,
+						   &bssid[0]);
+		}
 
 	peer = wlan_objmgr_get_peer_by_mac(wma->psoc,
 					   bssid, WLAN_LEGACY_WMA_ID);
@@ -1383,33 +1596,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	qdf_copy_macaddr(&csa_offload_event->bssid,
 			 (struct qdf_mac_addr *)bssid);
 
-	if (csa_event->ies_present_flag & WMI_CSA_IE_PRESENT) {
-		csa_ie = (struct ieee80211_channelswitch_ie *)
-						(&csa_event->csa_ie[0]);
-		csa_offload_event->channel = csa_ie->newchannel;
-		csa_offload_event->csa_chan_freq =
-			wlan_reg_legacy_chan_to_freq(wma->pdev,
-						     csa_ie->newchannel);
-		csa_offload_event->switch_mode = csa_ie->switchmode;
-		csa_offload_event->ies_present_flag |= MLME_CSA_IE_PRESENT;
-	} else if (csa_event->ies_present_flag & WMI_XCSA_IE_PRESENT) {
-		xcsa_ie = (struct ieee80211_extendedchannelswitch_ie *)
-						(&csa_event->xcsa_ie[0]);
-		csa_offload_event->channel = xcsa_ie->newchannel;
-		csa_offload_event->switch_mode = xcsa_ie->switchmode;
-		csa_offload_event->new_op_class = xcsa_ie->newClass;
-		if (wlan_reg_is_6ghz_op_class(wma->pdev, xcsa_ie->newClass)) {
-			csa_offload_event->csa_chan_freq =
-				wlan_reg_chan_band_to_freq
-					(wma->pdev, xcsa_ie->newchannel,
-					 BIT(REG_BAND_6G));
-		} else {
-			csa_offload_event->csa_chan_freq =
-				wlan_reg_legacy_chan_to_freq
-					(wma->pdev, xcsa_ie->newchannel);
-		}
-		csa_offload_event->ies_present_flag |= MLME_XCSA_IE_PRESENT;
-	} else {
+	if (!fill_csa_offload_params(csa_event, csa_offload_event, wma->pdev)) {
 		wma_err("CSA Event error: No CSA IE present");
 		qdf_mem_free(csa_offload_event);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
@@ -2324,7 +2511,7 @@ static void wma_log_pkt_icmpv6(uint8_t *data, uint32_t length)
 	pkt_len = *(uint16_t *)(data + IPV6_PKT_LEN_OFFSET);
 	seq_num = *(uint16_t *)(data + ICMPV6_SEQ_NUM_OFFSET);
 	wma_debug("Pkt_len: %u, Seq_num: %u",
-		 qdf_cpu_to_be16(pkt_len), qdf_cpu_to_be16(seq_num));
+		  qdf_cpu_to_be16(pkt_len), qdf_cpu_to_be16(seq_num));
 }
 
 static void wma_log_pkt_ipv4(uint8_t *data, uint32_t length)
@@ -2344,10 +2531,10 @@ static void wma_log_pkt_ipv4(uint8_t *data, uint32_t length)
 		      ip_addr[2], ip_addr[3]);
 	src_port = *(uint16_t *)(data + IPV4_SRC_PORT_OFFSET);
 	dst_port = *(uint16_t *)(data + IPV4_DST_PORT_OFFSET);
-	wma_info("Pkt_len: %u, src_port: %u, dst_port: %u",
-		qdf_cpu_to_be16(pkt_len),
-		qdf_cpu_to_be16(src_port),
-		qdf_cpu_to_be16(dst_port));
+	wma_debug("Pkt_len: %u, src_port: %u, dst_port: %u",
+		  qdf_cpu_to_be16(pkt_len),
+		  qdf_cpu_to_be16(src_port),
+		  qdf_cpu_to_be16(dst_port));
 }
 
 static void wma_log_pkt_ipv6(uint8_t *data, uint32_t length)
@@ -2768,7 +2955,7 @@ static int wma_wake_event_packet(
 	case WOW_REASON_DELAYED_WAKEUP_HOST_CFG_TIMER_ELAPSED:
 	case WOW_REASON_DELAYED_WAKEUP_DATA_STORE_LIST_FULL:
 		wma_info("Wake event packet:");
-		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_INFO,
+		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 				   packet, packet_len);
 
 		vdev = &wma->interfaces[wake_info->vdev_id];

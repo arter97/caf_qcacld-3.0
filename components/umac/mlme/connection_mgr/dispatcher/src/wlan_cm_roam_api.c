@@ -4997,7 +4997,14 @@ wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 
 	extracted_ie = (uint8_t *)wlan_get_ie_ptr_from_eid(WLAN_ELEMID_SSID,
 							   ie_ptr, ie_len);
-	if (extracted_ie && extracted_ie[0] == WLAN_ELEMID_SSID) {
+	/*
+	 * Roam offload ssid/bssid needs to be set only for SAE roam offload
+	 * candidate frames for supporting cross-ssid roaming.
+	 * This update is not needed for probe/beacons received from the
+	 * roam sync frame event.
+	 */
+	if (frame->roam_offload_candidate_frm &&
+	    extracted_ie && extracted_ie[0] == WLAN_ELEMID_SSID) {
 		wh = (struct wlan_frame_hdr *)frame->frame;
 		WLAN_ADDR_COPY(&bssid.bytes[0], wh->i_addr2);
 
@@ -5208,6 +5215,14 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 {
 	return mlo_add_all_link_probe_rsp_to_scan_db(psoc, candidate);
 }
+
+QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate)
+{
+	return mlo_add_all_link_probe_rsp_to_scan_db(psoc, candidate);
+}
+
 #elif defined(WLAN_FEATURE_ROAM_OFFLOAD) /* end WLAN_FEATURE_11BE_MLO */
 QDF_STATUS
 cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -5215,4 +5230,42 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 {
 	return wlan_cm_add_frame_to_scan_db(psoc, candidate);
 }
+
+QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate)
+{
+	return wlan_cm_add_frame_to_scan_db(psoc, candidate);
+}
+
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_link_switch_req *req,
+					enum wlan_mlo_link_switch_notify_reason notify_reason)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (notify_reason != MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_PRE_SER)
+		return status;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return status;
+
+	/* Only send RSO stop for assoc vdev */
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return status;
+
+	status = cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+				      wlan_vdev_get_id(vdev),
+				      WLAN_ROAM_RSO_STOPPED,
+				      REASON_DISCONNECTED, NULL, false);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_err("vdev:%d switch to RSO Stop failed",
+			 wlan_vdev_get_id(vdev));
+
+	return status;
+}
+#endif
+

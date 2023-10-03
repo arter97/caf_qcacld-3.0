@@ -507,29 +507,24 @@ static void lim_detect_change_in_srp(struct mac_context *mac_ctx,
 				     tpSchBeaconStruct bcn)
 {
 	tDot11fIEspatial_reuse sr_ie;
+	int32_t ret = 0;
 
 	sr_ie = sta->parsed_ies.srp_ie;
-	if (!sr_ie.present) {
-		return;
-	} else if (!bcn->srp_ie.present) {
-		pe_err_rl("SRP IE is missing in beacon, disable SR");
-	} else if (!qdf_mem_cmp(&sr_ie, &bcn->srp_ie,
-				sizeof(tDot11fIEspatial_reuse))) {
-		/* No change in beacon SRP IE */
-		return;
+	if (sr_ie.present || bcn->srp_ie.present) {
+		ret = qdf_mem_cmp(&sr_ie, &bcn->srp_ie,
+				  sizeof(tDot11fIEspatial_reuse));
+
+		if (ret) {
+			/*
+			 * If SRP IE has changes, update the new params.
+			 */
+			sta->parsed_ies.srp_ie = bcn->srp_ie;
+			lim_update_vdev_sr_elements(session, sta);
+
+			lim_handle_sr_cap(session->vdev,
+					  SR_REASON_CODE_BCN_IE_CHANGE);
+		}
 	}
-
-	/*
-	 * If SRP IE has changes, update the new params.
-	 * Else if the SRP IE is missing, disable SR
-	 */
-	sta->parsed_ies.srp_ie = bcn->srp_ie;
-	if (bcn->srp_ie.present)
-		lim_update_vdev_sr_elements(session, sta);
-	else
-		wlan_vdev_mlme_set_sr_ctrl(session->vdev, SR_DISABLE);
-
-	lim_handle_sr_cap(session->vdev, SR_REASON_CODE_BCN_IE_CHANGE);
 }
 #else
 static void lim_detect_change_in_srp(struct mac_context *mac_ctx,
