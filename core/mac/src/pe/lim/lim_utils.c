@@ -3852,7 +3852,7 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 	}
 
 	if (!wlan_cm_is_vdev_connected(pe_session->vdev)) {
-		pe_err("vdev not connected, ignore HT IE BW update");
+		pe_debug_rl("vdev not connected, ignore HT IE BW update");
 		return;
 	}
 
