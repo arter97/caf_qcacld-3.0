@@ -18822,6 +18822,18 @@ const struct file_operations wlan_hdd_state_fops = {
 	.release = wlan_hdd_state_ctrl_param_release,
 };
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
+static void wlan_hdd_class_create(struct class *class_input, const char *name)
+{
+	class_input = class_create(THIS_MODULE, name);
+}
+#else
+static void wlan_hdd_class_create(struct class *class_input, const char *name)
+{
+	class_input = class_create(name);
+}
+#endif
+
 static int  wlan_hdd_state_ctrl_param_create(void)
 {
 	unsigned int wlan_hdd_state_major = 0;
@@ -18839,8 +18851,7 @@ static int  wlan_hdd_state_ctrl_param_create(void)
 		goto dev_alloc_err;
 	}
 	wlan_hdd_state_major = MAJOR(device);
-
-	class = class_create(THIS_MODULE, WLAN_CTRL_NAME);
+	wlan_hdd_class_create(class, WLAN_CTRL_NAME);
 	if (IS_ERR(class)) {
 		pr_err("wlan_hdd_state class_create error");
 		goto class_err;
