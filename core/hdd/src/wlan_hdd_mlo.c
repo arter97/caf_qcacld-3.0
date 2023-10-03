@@ -764,6 +764,23 @@ hdd_ml_generate_link_state_resp_nlmsg(struct sk_buff *skb,
 	return 0;
 }
 
+static char *link_state_status_id_to_str(uint32_t status)
+{
+	switch (status) {
+	case WLAN_LINK_INFO_EVENT_SUCCESS:
+		return "LINK_INFO_EVENT_SUCCESS";
+	case WLAN_LINK_INFO_EVENT_REJECT_FAILURE:
+		return "LINK_INFO_EVENT_REJECT_FAILURE";
+	case WLAN_LINK_INFO_EVENT_REJECT_VDEV_NOT_UP:
+		return "LINK_INFO_EVENT_REJECT_VDEV_NOT_UP";
+	case WLAN_LINK_INFO_EVENT_REJECT_ROAMING_IN_PROGRESS:
+		return "LINK_INFO_EVENT_REJECT_ROAMING_IN_PROGRESS";
+	case WLAN_LINK_INFO_EVENT_REJECT_NON_MLO_CONNECTION:
+		return "LINK_INFO_EVENT_REJECT_NON_MLO_CONNECTION";
+	}
+	return "Undefined link state status ID";
+}
+
 static QDF_STATUS wlan_hdd_link_state_request(struct wiphy *wiphy,
 					      struct wlan_objmgr_psoc *psoc,
 					      struct wlan_objmgr_vdev *vdev)
@@ -821,6 +838,12 @@ static QDF_STATUS wlan_hdd_link_state_request(struct wiphy *wiphy,
 		  link_state_event->vdev_id, link_state_event->status,
 		  link_state_event->num_mlo_vdev_link_info,
 		  QDF_MAC_ADDR_REF(link_state_event->mldaddr.bytes));
+
+	if (QDF_IS_STATUS_ERROR(link_state_event->status)) {
+		hdd_debug("ml_link_state_status failed %s",
+			  link_state_status_id_to_str(link_state_event->status));
+		return QDF_STATUS_E_INVAL;
+	}
 
 	for (num_info = 0; num_info < link_state_event->num_mlo_vdev_link_info;
 	     num_info++) {
