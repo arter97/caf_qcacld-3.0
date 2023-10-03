@@ -495,6 +495,27 @@ static inline enum eSirMacHTChannelWidth get_max_bw(void)
 	else
 		return eHT_CHANNEL_WIDTH_40MHZ;
 }
+
+static
+void wlan_hdd_re_enable_320mhz_6g_conection(struct hdd_context *hdd_ctx,
+					    enum phy_ch_width assoc_ch_width)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(hdd_ctx->psoc);
+	if (!mlme_obj)
+		return;
+	/*
+	 * Initial connection was in 320 MHz and if via SET_MAX_BANDWIDTH
+	 * command, current channel BW (des_chan->ch_width) gets modified
+	 * to less than 320MHz, driver disables 6 GHz connection by disabling
+	 * support_320mhz_6ghz EHT capability. So, in order to allow
+	 * re-connection (after disconnection) in 320 MHz, also re-enable
+	 * support_320mhz_6ghz EHT capability before disconnect complete.
+	 */
+	if (assoc_ch_width == CH_WIDTH_320MHZ)
+		mlme_obj->cfg.eht_caps.dot11_eht_cap.support_320mhz_6ghz = 1;
+}
 #else
 static inline enum eSirMacHTChannelWidth get_max_bw(void)
 {
@@ -508,6 +529,12 @@ static inline enum eSirMacHTChannelWidth get_max_bw(void)
 		return eHT_CHANNEL_WIDTH_80MHZ;
 	else
 		return eHT_CHANNEL_WIDTH_40MHZ;
+}
+
+static
+void wlan_hdd_re_enable_320mhz_6g_conection(struct hdd_context *hdd_ctx,
+					    enum phy_ch_width assoc_ch_width)
+{
 }
 #endif
 
@@ -537,6 +564,9 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 		return;
 
 	cm_update_associated_ch_info(vdev, false);
+
+	if (des_chan->ch_width != assoc_ch_width)
+		wlan_hdd_re_enable_320mhz_6g_conection(hdd_ctx, assoc_ch_width);
 
 	max_bw = get_max_bw();
 	ret = hdd_set_mac_chan_width(adapter, max_bw, link_id, true);
