@@ -215,7 +215,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	uint8_t *mac_addr = NULL;
 	uint32_t pre_cac_chan_freq = 0;
 	int ret;
-	struct hdd_adapter *ap_adapter, *pre_cac_adapter;
+	struct hdd_adapter *ap_adapter, *pre_cac_adapter = NULL;
 	struct hdd_ap_ctx *hdd_ap_ctx, *pre_cac_ap_ctx;
 	QDF_STATUS status;
 	struct wiphy *wiphy;
@@ -226,6 +226,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	enum phy_ch_width cac_ch_width;
 	struct hdd_adapter_create_param params = {0};
 	struct wlan_hdd_link_info *pre_cac_link_info, *link_info;
+	bool is_rtnl_locked = false;
 
 	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc)) {
 		hdd_debug("Pre CAC is not supported on non-dbs platforms");
@@ -302,11 +303,16 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * feature announcement to not use this temporary interface for
 	 * any activity from user space.
 	 */
+
 	params.is_add_virtual_iface = 1;
-	pre_cac_adapter = hdd_open_adapter(hdd_ctx, QDF_SAP_MODE,
-					   SAP_PRE_CAC_IFNAME, mac_addr,
-					   NET_NAME_UNKNOWN, true,
-					   &params);
+	params.is_pre_cac_adapter = 1;
+	if (rtnl_trylock()) {
+		pre_cac_adapter = hdd_open_adapter(hdd_ctx, QDF_SAP_MODE,
+						   SAP_PRE_CAC_IFNAME,
+						   mac_addr, NET_NAME_UNKNOWN,
+						   true, &params);
+		rtnl_unlock();
+	}
 
 	if (!pre_cac_adapter) {
 		hdd_err("error opening the pre cac adapter");
@@ -427,7 +433,13 @@ stop_close_pre_cac_adapter:
 	qdf_mem_free(pre_cac_ap_ctx->beacon);
 	pre_cac_ap_ctx->beacon = NULL;
 close_pre_cac_adapter:
+	if (rtnl_trylock())
+		is_rtnl_locked = true;
+
 	hdd_close_adapter(hdd_ctx, pre_cac_adapter, true);
+
+	if (is_rtnl_locked)
+		rtnl_unlock();
 release_intf_addr_and_return_failure:
 	/*
 	 * Release the interface address as the adapter

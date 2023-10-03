@@ -8810,7 +8810,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		INIT_WORK(&adapter->ipv6_notifier_work,
 			  hdd_ipv6_notifier_work_queue);
 #endif
-		wlan_hdd_set_ml_cap_for_sap_intf(params, session_type);
+		if (!params->is_pre_cac_adapter)
+			wlan_hdd_set_ml_cap_for_sap_intf(params, session_type);
 		break;
 	case QDF_FTM_MODE:
 		adapter = hdd_alloc_station_adapter(hdd_ctx, mac_addr,
