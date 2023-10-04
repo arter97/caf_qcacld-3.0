@@ -1388,10 +1388,11 @@ enum wlan_mlme_hw_mode_config_type {
 };
 
 /**
- * wlan_mlme_aux_caps_bit - Bit mapping for aux capability
- * WLAN_MLME_AUX_MODE_SCAN_BIT: if set, aux scan is supported
- * WLAN_MLME_AUX_MODE_LISTEN_BIT: if set, aux listen is supported
- * WLAN_MLME_AUX_MODE_EMLSR_BIT: if set, aux emlsr is supported
+ * enum wlan_mlme_aux_caps_bit - Bit mapping for aux capability
+ *
+ * @WLAN_MLME_AUX_MODE_SCAN_BIT: if set, aux scan is supported
+ * @WLAN_MLME_AUX_MODE_LISTEN_BIT: if set, aux listen is supported
+ * @WLAN_MLME_AUX_MODE_EMLSR_BIT: if set, aux emlsr is supported
  */
 enum wlan_mlme_aux_caps_bit {
 	WLAN_MLME_AUX_MODE_SCAN_BIT = 0,
