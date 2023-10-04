@@ -490,7 +490,7 @@ int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value);
 
 /**
  * hdd_update_channel_width() - Update adapter channel width settings
- * @adapter: adapter being modified
+ * @link_info: Link info in HDD adapter
  * @chwidth: new channel width of enum eSirMacHTChannelWidth
  * @bonding_mode: channel bonding mode of the new channel width
  * @link_id: mlo link id
@@ -498,7 +498,7 @@ int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value);
  *
  * Return: 0 on success, negative errno on failure
  */
-int hdd_update_channel_width(struct hdd_adapter *adapter,
+int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 			     enum eSirMacHTChannelWidth chwidth,
 			     uint32_t bonding_mode, uint8_t link_id,
 			     bool is_restore);

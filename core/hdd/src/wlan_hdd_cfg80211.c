@@ -10988,16 +10988,15 @@ static uint32_t hdd_mac_chwidth_to_bonding_mode(
 	return bonding_mode;
 }
 
-int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
+int hdd_set_mac_chan_width(struct wlan_hdd_link_info *link_info,
 			   enum eSirMacHTChannelWidth chwidth,
-			   uint8_t link_id,
-			   bool is_restore)
+			   uint8_t link_id, bool is_restore)
 {
 	uint32_t bonding_mode;
 
 	bonding_mode = hdd_mac_chwidth_to_bonding_mode(chwidth);
 
-	return hdd_update_channel_width(adapter, chwidth,
+	return hdd_update_channel_width(link_info, chwidth,
 					bonding_mode, link_id, is_restore);
 }
 
@@ -11072,8 +11071,7 @@ skip_mlo:
 		return -EINVAL;
 	}
 set_chan_width:
-	return hdd_set_mac_chan_width(link_info->adapter,
-				      chwidth, link_id, false);
+	return hdd_set_mac_chan_width(link_info, chwidth, link_id, false);
 }
 
 /**
@@ -13353,7 +13351,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	uint8_t link_id = 0xFF;
 	struct keep_alive_req keep_alive_req = {0};
 	struct set_wfatest_params wfa_param = {0};
-	struct wlan_hdd_link_info *link_info = adapter->link_info;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 	struct hdd_station_ctx *hdd_sta_ctx =
 			WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	uint8_t op_mode;
@@ -14067,7 +14065,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		sme_set_ru_242_tone_tx_cfg(hdd_ctx->mac_handle, cfg_val);
 		if (cfg_val)
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_20MHZ,
+					link_info, eHT_CHANNEL_WIDTH_20MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
 					link_id, false);
 	}
@@ -14078,7 +14076,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_debug("EU SU PPDU type Tx enable: %d", cfg_val);
 		if (cfg_val) {
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_20MHZ,
+					link_info, eHT_CHANNEL_WIDTH_20MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
 					link_id, false);
 			hdd_set_tx_stbc(link_info, 0);
@@ -14099,7 +14097,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 					status);
 		} else {
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_160MHZ,
+					link_info, eHT_CHANNEL_WIDTH_160MHZ,
 					link_id,
 					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE,
 					false);

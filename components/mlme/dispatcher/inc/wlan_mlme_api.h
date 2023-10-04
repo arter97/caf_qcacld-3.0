@@ -4174,6 +4174,16 @@ bool
 wlan_mlme_is_data_stall_recovery_fw_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * mlme_cfg_get_orig_eht_caps() - Get the original EHT capability info
+ * @psoc: pointer to psoc object
+ * @eht_cap: Caps that needs to be filled.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS mlme_cfg_get_orig_eht_caps(struct wlan_objmgr_psoc *psoc,
+				      tDot11fIEeht_cap *eht_cap);
+
+/**
  * mlme_cfg_get_eht_caps() - Get the EHT capability info
  * @psoc: pointer to psoc object
  * @eht_cap: Caps that needs to be filled.

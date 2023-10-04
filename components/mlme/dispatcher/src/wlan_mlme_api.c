@@ -6514,6 +6514,20 @@ bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc)
 }
 
 #ifdef WLAN_FEATURE_11BE
+QDF_STATUS mlme_cfg_get_orig_eht_caps(struct wlan_objmgr_psoc *psoc,
+				      tDot11fIEeht_cap *eht_cap)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*eht_cap = mlme_obj->cfg.eht_caps.eht_cap_orig;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS mlme_cfg_get_eht_caps(struct wlan_objmgr_psoc *psoc,
 				 tDot11fIEeht_cap *eht_cap)
 {
