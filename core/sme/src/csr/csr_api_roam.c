@@ -7719,14 +7719,13 @@ void csr_process_sap_ch_width_update(struct mac_context *mac, tSmeCmd *command)
 
 	sme_err("Posting to PE failed");
 fail:
-	param = qdf_mem_malloc(sizeof(*param));
-	if (!param)
-		return;
-
 	sme_err("Sending ch_width update fail response to SME");
-	param->status = QDF_STATUS_E_FAILURE;
-	param->vdev_id = command->u.bw_update_cmd.vdev_id;
-	param->reason = REASON_CH_WIDTH_UPDATE;
+	param = qdf_mem_malloc(sizeof(*param));
+	if (param) {
+		param->status = QDF_STATUS_E_FAILURE;
+		param->vdev_id = command->u.bw_update_cmd.vdev_id;
+		param->reason = REASON_CH_WIDTH_UPDATE;
+	}
 	msg_return.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
 	msg_return.bodyptr = param;
 	msg_return.bodyval = 0;

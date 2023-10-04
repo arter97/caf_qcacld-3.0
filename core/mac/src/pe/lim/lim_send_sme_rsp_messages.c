@@ -2773,16 +2773,15 @@ void lim_nss_or_ch_width_update_rsp(struct mac_context *mac_ctx,
 	QDF_STATUS qdf_status = QDF_STATUS_E_INVAL;
 
 	rsp = qdf_mem_malloc(sizeof(*rsp));
-	if (!rsp)
-		return;
+	if (rsp) {
+		rsp->vdev_id = vdev_id;
+		rsp->status = status;
+		rsp->reason = reason;
+	}
 
-	rsp->vdev_id = vdev_id;
-	rsp->status = status;
-	rsp->reason = reason;
-
-	if (rsp->reason == REASON_NSS_UPDATE)
+	if (reason == REASON_NSS_UPDATE)
 		msg.type = eWNI_SME_NSS_UPDATE_RSP;
-	else if (rsp->reason == REASON_CH_WIDTH_UPDATE)
+	else if (reason == REASON_CH_WIDTH_UPDATE)
 		msg.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
 	else
 		goto done;

@@ -8819,14 +8819,13 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	return;
 
 fail:
-	param = qdf_mem_malloc(sizeof(*param));
-	if (!param)
-		return;
-
 	pe_err("vdev %d: send bandwidth update fail", vdev_id);
-	param->status = QDF_STATUS_E_FAILURE;
-	param->vdev_id = INVALID_VDEV_ID;
-	param->reason = REASON_CH_WIDTH_UPDATE;
+	param = qdf_mem_malloc(sizeof(*param));
+	if (param) {
+		param->status = QDF_STATUS_E_FAILURE;
+		param->vdev_id = INVALID_VDEV_ID;
+		param->reason = REASON_CH_WIDTH_UPDATE;
+	}
 	msg_return.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
 	msg_return.bodyptr = param;
 	msg_return.bodyval = 0;
