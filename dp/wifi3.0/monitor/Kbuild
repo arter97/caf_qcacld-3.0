@@ -195,7 +195,7 @@ endif
 clean-files := modules.order
 
 ################ QCA_GCC7_0_SUPPORT - START ##################
-ifeq ($(QCA_GCC7_0_SUPPORT), 1)
+ifeq (1, $(filter 1, $(QCA_GCC7_0_SUPPORT) $(QCA_GCC12_0_SUPPORT)))
 ifeq ($(strip ${CONFIG_LITHIUM}),1)
 CFLAGS_$(obj)/$(DEPTH)/component_dev/dp/wifi3.0/monitor/src/dp_full_mon.o := $(MONITOR_1_0_INC)
 CFLAGS_$(obj)/$(DEPTH)/component_dev/dp/wifi3.0/monitor/src/dp_tx_capture.o := $(MONITOR_1_0_INC)
