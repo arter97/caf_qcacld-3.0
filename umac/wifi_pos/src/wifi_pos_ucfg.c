@@ -206,8 +206,11 @@ void ucfg_wifi_pos_set_oem_6g_supported(struct wlan_objmgr_psoc *psoc,
 bool ucfg_wifi_pos_is_nl_rsp(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t val = 0;
-	struct wifi_pos_psoc_priv_obj *wifi_pos_psoc =
-			wifi_pos_get_psoc_priv_obj(psoc);
+	struct wifi_pos_psoc_priv_obj *wifi_pos_psoc = NULL;
+	struct wlan_objmgr_psoc *tmp_psoc = wifi_pos_get_psoc();
+
+	if (tmp_psoc)
+		wifi_pos_psoc = wifi_pos_get_psoc_priv_obj(tmp_psoc);
 
 	if (!wifi_pos_psoc) {
 		wifi_pos_alert("unable to get wifi_pos psoc obj");

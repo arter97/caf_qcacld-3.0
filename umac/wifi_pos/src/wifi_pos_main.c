@@ -314,10 +314,13 @@ static QDF_STATUS wifi_pos_process_set_cap_req(struct wlan_objmgr_psoc *psoc,
 					struct wifi_pos_req_msg *req)
 {
 	int error_code;
-	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-				wifi_pos_get_psoc_priv_obj(psoc);
+	struct wifi_pos_psoc_priv_obj *wifi_pos_obj = NULL;
+	struct wlan_objmgr_psoc *tmp_psoc = wifi_pos_get_psoc();
 	struct wifi_pos_user_defined_caps *caps =
 				(struct wifi_pos_user_defined_caps *)req->buf;
+
+	if (tmp_psoc)
+		wifi_pos_obj = wifi_pos_get_psoc_priv_obj(tmp_psoc);
 
 	if (!wifi_pos_obj) {
 		wifi_pos_err("wifi_pos priv obj is null");
@@ -342,8 +345,11 @@ static QDF_STATUS wifi_pos_process_get_cap_req(struct wlan_objmgr_psoc *psoc,
 					struct wifi_pos_req_msg *req)
 {
 	struct wifi_pos_oem_get_cap_rsp cap_rsp = { { {0} } };
-	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-					wifi_pos_get_psoc_priv_obj(psoc);
+	struct wifi_pos_psoc_priv_obj *wifi_pos_obj = NULL;
+	struct wlan_objmgr_psoc *tmp_psoc = wifi_pos_get_psoc();
+
+	if (tmp_psoc)
+		wifi_pos_obj = wifi_pos_get_psoc_priv_obj(tmp_psoc);
 
 	if (!wifi_pos_obj) {
 		wifi_pos_err("wifi_pos priv obj is null");
@@ -370,8 +376,11 @@ QDF_STATUS wifi_pos_send_report_resp(struct wlan_objmgr_psoc *psoc,
 				     int err_code)
 {
 	struct wifi_pos_err_msg_report err_report = {0};
-	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-					wifi_pos_get_psoc_priv_obj(psoc);
+	struct wifi_pos_psoc_priv_obj *wifi_pos_obj = NULL;
+	struct wlan_objmgr_psoc *tmp_psoc = wifi_pos_get_psoc();
+
+	if (tmp_psoc)
+		wifi_pos_obj = wifi_pos_get_psoc_priv_obj(tmp_psoc);
 
 	if (!wifi_pos_obj) {
 		wifi_pos_err("wifi_pos priv obj is null");
@@ -631,11 +640,14 @@ static QDF_STATUS wifi_pos_process_ch_info_req(struct wlan_objmgr_psoc *psoc,
 	uint32_t num_valid_channels = 0;
 	struct wifi_pos_ch_info_rsp *ch_info;
 	struct wifi_pos_channel_list *ch_list = NULL;
-	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-					wifi_pos_get_psoc_priv_obj(psoc);
+	struct wifi_pos_psoc_priv_obj *wifi_pos_obj = NULL;
 	QDF_STATUS ret_val;
 	struct wifi_pos_channel_power *ch;
 	bool dup_freq = false;
+	struct wlan_objmgr_psoc *tmp_psoc = wifi_pos_get_psoc();
+
+	if (tmp_psoc)
+		wifi_pos_obj = wifi_pos_get_psoc_priv_obj(tmp_psoc);
 
 	if (!wifi_pos_obj) {
 		wifi_pos_err("wifi_pos priv obj is null");
@@ -843,8 +855,11 @@ static QDF_STATUS wifi_pos_process_app_reg_req(struct wlan_objmgr_psoc *psoc,
 	uint32_t vdev_count;
 	char *sign_str = NULL;
 	struct app_reg_rsp_vdev_info *vdevs_info = NULL;
-	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-			wifi_pos_get_psoc_priv_obj(psoc);
+	struct wifi_pos_psoc_priv_obj *wifi_pos_obj = NULL;
+	struct wlan_objmgr_psoc *tmp_psoc = wifi_pos_get_psoc();
+
+	if (tmp_psoc)
+		wifi_pos_obj = wifi_pos_get_psoc_priv_obj(tmp_psoc);
 
 	if (!wifi_pos_obj) {
 		wifi_pos_err("wifi_pos priv obj is null");
@@ -1282,11 +1297,15 @@ QDF_STATUS wifi_pos_populate_caps(struct wlan_objmgr_psoc *psoc,
 {
 	uint16_t i, count = 0;
 	uint32_t freq;
-	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-					wifi_pos_get_psoc_priv_obj(psoc);
+	struct wifi_pos_psoc_priv_obj *wifi_pos_obj = NULL;
 	struct wifi_pos_channel_list *ch_list = NULL;
+	struct wlan_objmgr_psoc *tmp_psoc = wifi_pos_get_psoc();
 
 	wifi_pos_debug("Enter");
+
+	if (tmp_psoc)
+		wifi_pos_obj = wifi_pos_get_psoc_priv_obj(tmp_psoc);
+
 	if (!wifi_pos_obj) {
 		wifi_pos_err("wifi_pos_obj is null");
 		return QDF_STATUS_E_NULL_VALUE;
