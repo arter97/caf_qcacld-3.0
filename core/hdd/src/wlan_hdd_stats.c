@@ -1484,7 +1484,11 @@ wlan_hdd_copy_mlo_peer_stats(struct hdd_adapter *adapter,
 		qdf_mem_copy(&link_info->mlo_peer_info.peer_mac,
 			     &sta_ctx->conn_info.bssid, QDF_MAC_ADDR_SIZE);
 		link_info->mlo_peer_info.type = peer_info->type;
-		hdd_debug("For peer " QDF_MAC_ADDR_FMT "filling default values",
+		link_info->mlo_peer_info.num_rate = HDD_MAX_PER_PEER_RATES;
+		for (j = 0; j < HDD_MAX_PER_PEER_RATES; j++)
+			qdf_mem_zero(&link_info->mlo_peer_info.rate_stats[j],
+				     sizeof(struct wifi_rate_stat));
+		hdd_debug("Default values for standby link " QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes));
 	}
 
