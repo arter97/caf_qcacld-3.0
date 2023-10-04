@@ -1499,6 +1499,9 @@ enum _ol_ath_param_t {
 #endif
 	OL_ATH_PARAM_STANDBY_ACTIVE_MODE = 540,
 	OL_ATH_PARAM_SET_AWGN_EVENT = 541,
+#ifdef WLAN_FEATURE_11BE_MLO
+	OL_ATH_PARAM_DISABLE_EML = 542,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3944,6 +3947,13 @@ struct vendor_commands radio_vendor_cmds[] = {
 #endif
 	{"set_awgn_event",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_AWGN_EVENT, SET_PARAM, 1},
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"disable_eml",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_EML, SET_PARAM, 1},
+	{"g_disable_eml",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_EML, GET_PARAM, 0},
+
+#endif
 };
 #endif
 
