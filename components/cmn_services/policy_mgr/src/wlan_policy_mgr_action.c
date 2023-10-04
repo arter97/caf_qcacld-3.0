@@ -2157,6 +2157,11 @@ policy_mgr_nan_sap_pre_enable_conc_check(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_debug("NAN+SAP unsafe ch SCC disabled");
 			return false;
 		}
+		if (pm_ctx->hdd_cbacks.hdd_is_cac_in_progress &&
+		    pm_ctx->hdd_cbacks.hdd_is_cac_in_progress()) {
+			policy_mgr_debug("DFS CAC in progress, reject NAN enable");
+			return false;
+		}
 	} else if (policy_mgr_is_sap_mode(mode)) {
 		nan_2g_freq =
 			policy_mgr_mode_specific_get_channel(pm_ctx->psoc,
