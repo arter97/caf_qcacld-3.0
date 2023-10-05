@@ -22,9 +22,15 @@
 #define __WLAN_HDD_DRIVER_OPS_H__
 
 #include "hif.h"
+#include <qdf_types.h>
 
 struct hdd_context;
 
+#define wlan_hdd_trigger_cds_recovery(reason) \
+	__wlan_hdd_trigger_cds_recovery(reason, __func__, __LINE__)
+
+void __wlan_hdd_trigger_cds_recovery(enum qdf_hang_reason reason,
+				     const char *func, const uint32_t line);
 /**
  * DOC: wlan_hdd_driver_ops.h
  *
