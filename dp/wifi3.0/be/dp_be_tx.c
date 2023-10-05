@@ -1852,7 +1852,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 				& DP_TXRX_HLOS_TID_OVERRIDE_ENABLED)) {
 		tid = qdf_nbuf_get_priority(nbuf);
 
-		if (tid == DP_TX_INVALID_QOS_TAG)
+		if (tid >= DP_TX_INVALID_QOS_TAG)
 			tid = HTT_TX_EXT_TID_INVALID;
 	}
 
@@ -1913,7 +1913,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 
 	if (tid != HTT_TX_EXT_TID_INVALID) {
 		hal_tx_desc_cached[5] |= tid << TCL_DATA_CMD_HLOS_TID_LSB;
-		hal_tx_desc_cached[5] |= tid << TCL_DATA_CMD_HLOS_TID_OVERWRITE_LSB;
+		hal_tx_desc_cached[5] |= 1 << TCL_DATA_CMD_HLOS_TID_OVERWRITE_LSB;
 	}
 
 	if (vdev->opmode == wlan_op_mode_sta)
