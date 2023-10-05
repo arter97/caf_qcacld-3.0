@@ -9,6 +9,7 @@ _target_chipset_map = {
     "pineapple": [
 	"peach",
 	"kiwi-v2",
+	"qca6750",
     ],
     "sun": [
         "peach",
@@ -19,6 +20,7 @@ _target_chipset_map = {
 _chipset_hw_map = {
     "kiwi-v2": "BERYLLIUM",
     "peach": "BERYLLIUM",
+    "qca6750": "MOSELLE",
 }
 
 _chipset_header_map = {
@@ -30,12 +32,19 @@ _chipset_header_map = {
         "api/hw/kiwi/v2",
         "cmn/hal/wifi3.0/kiwi",
     ],
+    "qca6750" : [
+        "api/hw/qca6750/v1",
+        "cmn/hal/wifi3.0/qca6750",
+    ],
 }
 
 _hw_header_map = {
     "BERYLLIUM": [
         "cmn/hal/wifi3.0/be",
     ],
+    "MOSELLE" : [
+        "cmn/hal/wifi3.0/li",
+	],
 }
 
 _fixed_includes = [
@@ -66,6 +75,7 @@ _fixed_ipaths = [
     "cmn/hif/src/ce",
     "cmn/hif/src/dispatcher",
     "cmn/hif/src/pcie",
+    "cmn/hif/src/ipcie",
     "cmn/htc",
     "cmn/init_deinit/dispatcher/inc",
     "cmn/ipa/core/inc",
@@ -683,6 +693,12 @@ _conditional_srcs = {
             "cmn/hif/src/kiwidef.c",
         ],
     },
+    "CONFIG_QCA6750_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qca6750/hal_6750.c",
+            "cmn/hif/src/qca6750def.c",
+        ],
+    },
     "CONFIG_CNSS_PEACH": {
         True: [
             "cmn/hal/wifi3.0/kiwi/hal_kiwi.c",
@@ -963,6 +979,7 @@ _conditional_srcs = {
     "CONFIG_HIF_IPCI": {
         True: [
             "cmn/hif/src/dispatcher/multibus_ipci.c",
+            "cmn/hif/src/ipcie/if_ipci.c",
         ],
     },
     "CONFIG_HIF_PCI": {
@@ -2217,6 +2234,29 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
+    if chipset == "qca6750":
+        deps = [
+            "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
+            "//msm-kernel:all_headers",
+            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+            "//vendor/qcom/opensource/dataipa:include_headers",
+            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
+        ]
+    else:
+        deps = [
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
+            "//msm-kernel:all_headers",
+            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+            "//vendor/qcom/opensource/dataipa:include_headers",
+            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
+        ]
+
     print("name=", name)
     print("hw=", hw)
     print("ipaths=", ipaths)
@@ -2226,6 +2266,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     print("copts=", copts)
     print("kconfig=", kconfig)
     print("defconfig=", defconfig)
+    print("deps = ", deps)
 
     ddk_module(
         name = name,
@@ -2237,16 +2278,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         copts = copts,
         out = out,
         kernel_build = "//msm-kernel:{}".format(tv),
-        deps = [
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
-            "//msm-kernel:all_headers",
-            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
-            "//vendor/qcom/opensource/dataipa:include_headers",
-            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
-        ],
+        deps = deps,
     )
 
 def define_dist(target, variant, chipsets):
