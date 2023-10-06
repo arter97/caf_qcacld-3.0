@@ -958,7 +958,7 @@ int mgmt_rx_reo_get_num_links(uint8_t grp_id)
 {
 	struct wlan_host_mlo_glb_h_shmem_arena_ctx *shmem_arena_ctx;
 
-	if (grp_id > WLAN_MAX_MLO_GROUPS)
+	if (grp_id >= WLAN_MAX_MLO_GROUPS)
 		return -EINVAL;
 
 	shmem_arena_ctx = get_shmem_arena_ctx(grp_id);
