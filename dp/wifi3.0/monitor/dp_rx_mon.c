@@ -1339,7 +1339,7 @@ static inline bool
 dp_rx_is_valid_undecoded_frame(uint64_t err_mask, uint8_t err_code)
 {
 	if (err_code < CDP_PHYRX_ERR_MAX &&
-	    (err_mask & (1L << err_code)))
+	    (err_mask & (1ULL << err_code)))
 		return true;
 
 	return false;
