@@ -284,6 +284,11 @@
 #define WLAN_CIPHER_SUITE_GCMP_256 0x000FAC09
 #endif
 
+/* Default number of Simultaneous Transmit */
+#define DEFAULT_MAX_STR_LINK_COUNT 1
+/* Maximum number of Simultaneous Transmit */
+#define MAX_STR_LINK_COUNT 2
+
 static const u32 hdd_gcmp_cipher_suits[] = {
 	WLAN_CIPHER_SUITE_GCMP,
 	WLAN_CIPHER_SUITE_GCMP_256,
@@ -5093,6 +5098,8 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 	QDF_STATUS status;
 	int ret_val;
+	uint8_t max_assoc_cnt = 0;
+	uint8_t max_str_link_count = 0;
 
 	uint8_t feature_flags[(NUM_QCA_WLAN_VENDOR_FEATURES + 7) / 8] = {0};
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
@@ -5235,7 +5242,28 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 			MAX_CONCURRENT_CHAN_ON_5G))
 		goto nla_put_failure;
 
-	hdd_debug("feature flags:");
+	max_assoc_cnt = wlan_mlme_get_sta_mlo_conn_max_num(hdd_ctx->psoc);
+	if (max_assoc_cnt) {
+		if (nla_put_u8(
+			skb,
+			QCA_WLAN_VENDOR_ATTR_MLO_CAPABILITY_MAX_ASSOCIATION_COUNT,
+			max_assoc_cnt))
+			goto nla_put_failure;
+
+		max_str_link_count = DEFAULT_MAX_STR_LINK_COUNT;
+
+		if (policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) ||
+		    policy_mgr_is_hw_sbs_capable(hdd_ctx->psoc))
+			max_str_link_count = MAX_STR_LINK_COUNT;
+
+		if (nla_put_u8(skb,
+			       QCA_WLAN_VENDOR_ATTR_MLO_CAPABILITY_MAX_STR_LINK_COUNT,
+			       max_str_link_count))
+			goto nla_put_failure;
+	}
+
+	hdd_debug("max_assoc_cnt %d max_str_link_count %d",
+		  max_assoc_cnt, max_str_link_count);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 			   feature_flags, sizeof(feature_flags));
 
