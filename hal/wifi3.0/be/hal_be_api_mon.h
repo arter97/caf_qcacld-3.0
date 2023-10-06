@@ -370,7 +370,7 @@ struct rx_mpdu_start_mon_data {
 		 decrypt_needed                    :  1,
 		 new_peer_entry                    :  1,
 		 key_id_octet                      :  8;
-	uint32_t reserved_13                       : 1;
+	uint32_t reserved_13                       : 1,
 		 amsdu_present                     : 1,
 		 directed                          : 1,
 		 encrypt_required                  : 1,
@@ -388,7 +388,7 @@ struct rx_mpdu_start_mon_data {
 		 ast_index_not_found               : 1,
 		 mcast_bcast                       : 1,
 		 first_mpdu                        : 1,
-		 mpdu_length                       : 14,
+		 mpdu_length                       : 14;
 	uint32_t mpdu_duration_field               : 16,
 		 mpdu_frame_control_field          : 16;
 	uint32_t mac_addr_ad1_31_0                 : 32;
