@@ -2956,6 +2956,33 @@ void mlme_reinit_control_config_lfr_params(struct wlan_objmgr_psoc *psoc,
 	lfr->wes_mode_enabled = cfg_get(psoc, CFG_LFR_ENABLE_WES_MODE);
 }
 
+#ifdef CONNECTION_ROAMING_CFG
+/**
+ * mlme_init_bmiss_timeout() - Init bmiss timeout
+ * @psoc: Pointer to psoc
+ * @lfr: Pointer to lfr config
+ *
+ * Return: None
+ */
+static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_mlme_lfr_cfg *lfr)
+{
+	lfr->beaconloss_timeout_onwakeup =
+		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP) / 2;
+	lfr->beaconloss_timeout_onsleep =
+		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP) / 2;
+}
+#else
+static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_mlme_lfr_cfg *lfr)
+{
+	lfr->beaconloss_timeout_onwakeup =
+		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP);
+	lfr->beaconloss_timeout_onsleep =
+		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP);
+}
+#endif
+
 static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_lfr_cfg *lfr)
 {
@@ -3147,10 +3174,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_adaptive_11r_cfg(psoc, lfr);
 	mlme_init_subnet_detection(psoc, lfr);
 	lfr->rso_user_config.cat_rssi_offset = DEFAULT_RSSI_DB_GAP;
-	lfr->beaconloss_timeout_onwakeup =
-		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP);
-	lfr->beaconloss_timeout_onsleep =
-		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP);
+	mlme_init_bmiss_timeout(psoc, lfr);
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,
