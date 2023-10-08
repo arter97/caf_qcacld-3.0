@@ -352,17 +352,16 @@ void wlan_rptr_core_reset_global_flags(void)
 #if REPEATER_SAME_SSID
 	wlan_rptr_same_ssid_feature_t   *ss_info;
 	int i;
+	u32 value;
 #endif
 
 	g_priv = wlan_rptr_get_global_ctx();
 	if (g_priv) {
 		RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
-		g_priv->global_feature_caps = 0;
 		g_priv->disconnect_timeout = 10;
 		g_priv->reconfiguration_timeout = 60;
 #if REPEATER_SAME_SSID
 		ss_info = &g_priv->ss_info;
-		ss_info->same_ssid_disable = 0;
 		ss_info->num_rptr_clients = 0;
 		ss_info->ap_preference = ap_preference_type_init;
 		ss_info->extender_info = 0;
@@ -375,6 +374,16 @@ void wlan_rptr_core_reset_global_flags(void)
 		}
 #endif
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
+
+#if REPEATER_SAME_SSID
+		wlan_rptr_core_global_same_ssid_disable_get(&value);
+		if (!value) {
+			RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
+			ss_info->same_ssid_disable = 0;
+			g_priv->global_feature_caps = 0;
+			RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
+		}
+#endif
 	}
 }
 
@@ -948,7 +957,21 @@ void wlan_rptr_core_global_reconfig_timeout_get(u32 *value)
 }
 
 #if REPEATER_SAME_SSID
-void wlan_rptr_core_global_same_ssid_disable(u32 value)
+void wlan_rptr_core_global_same_ssid_disable_get(u32 *value)
+{
+	struct wlan_rptr_global_priv *g_priv = NULL;
+	wlan_rptr_same_ssid_feature_t   *ss_info = NULL;
+
+	g_priv = wlan_rptr_get_global_ctx();
+	if (g_priv) {
+		RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
+		ss_info = &g_priv->ss_info;
+		*value = ss_info->same_ssid_disable;
+		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
+	}
+}
+
+void wlan_rptr_core_global_same_ssid_disable_set(u32 value)
 {
 	struct wlan_rptr_global_priv *g_priv = NULL;
 	wlan_rptr_same_ssid_feature_t   *ss_info = NULL;

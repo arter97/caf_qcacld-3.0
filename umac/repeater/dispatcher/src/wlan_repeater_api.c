@@ -893,7 +893,7 @@ wlan_rptr_pdev_ucfg_config_set(struct wlan_objmgr_pdev *pdev,
 		break;
 	case OL_ATH_PARAM_SAME_SSID_DISABLE:
 #if REPEATER_SAME_SSID
-		wlan_rptr_core_global_same_ssid_disable(value);
+		wlan_rptr_core_global_same_ssid_disable_set(value);
 #endif
 		break;
 	case OL_ATH_PARAM_DISCONNECTION_TIMEOUT:
@@ -928,6 +928,11 @@ wlan_rptr_pdev_ucfg_config_get(struct wlan_objmgr_pdev *pdev, int param)
 		break;
 	case OL_ATH_PARAM_RECONFIGURATION_TIMEOUT:
 		wlan_rptr_core_global_reconfig_timeout_get(&value);
+		break;
+	case OL_ATH_PARAM_SAME_SSID_DISABLE:
+#if REPEATER_SAME_SSID
+		wlan_rptr_core_global_same_ssid_disable_get(&value);
+#endif
 		break;
 	default:
 		value = 0;

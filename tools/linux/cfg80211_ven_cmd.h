@@ -3466,10 +3466,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RF_PATH_SWITCH, SET_PARAM, 1},
 	{"get_rf_path_mode",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RF_PATH_SWITCH, GET_PARAM, 0},
-#if DBDC_REPEATER_SUPPORT
 	{"samessid_disable",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SAME_SSID_DISABLE, SET_PARAM, 1},
-#endif
+	{"g_samessid_disable",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SAME_SSID_DISABLE, GET_PARAM, 0},
 	{"get_mbss_en",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MBSS_EN, GET_PARAM, 0},
 	{"chan_coex_disable",
