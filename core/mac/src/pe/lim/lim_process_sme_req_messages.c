@@ -5566,7 +5566,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	 * PSD is power spectral density, incoming TPE could contain
 	 * non PSD info, or PSD info, or both, so need to keep track of them
 	 */
-	bool use_local_tpe, non_psd_set = false, psd_set = false;
+	bool non_psd_set = false, psd_set = false;
 	bool both_tpe_present = false;
 	bool local_eirp_set = false, local_psd_set = false;
 	bool reg_eirp_set = false, reg_psd_set = false;
@@ -5605,11 +5605,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 
 	if (!reg_tpe_count && !local_tpe_count)
 		return;
-	else if (!reg_tpe_count)
-		use_local_tpe = true;
-	else if (!local_tpe_count)
-		use_local_tpe = false;
-	else
+	else if (reg_tpe_count && local_tpe_count)
 		both_tpe_present = true;
 
 	for (i = 0; i < num_tpe_ies; i++) {
