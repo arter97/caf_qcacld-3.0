@@ -1046,12 +1046,8 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 		  chandef.chan->center_freq, chandef.width,
 		  chandef.center_freq1, chandef.center_freq2);
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 15, 78)
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id,
 				       puncture_bitmap);
-#else
-	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id);
-#endif
 
 	return QDF_STATUS_SUCCESS;
 }
