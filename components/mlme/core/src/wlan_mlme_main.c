@@ -4448,8 +4448,9 @@ void wlan_vdev_set_dot11mode(struct wlan_mlme_cfg *mac_mlme_cfg,
 	}
 
 	vdev_dot11_mode = QDF_GET_BITS(mac_dot11_mode, dot11_mode_indx, 4);
-	if (vdev_dot11_mode == MLME_VDEV_DOT11_MODE_AUTO ||
-	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11BE) {
+	if ((device_mode != QDF_NAN_DISC_MODE && device_mode != QDF_NDI_MODE) &&
+	    (vdev_dot11_mode == MLME_VDEV_DOT11_MODE_AUTO ||
+	     vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11BE)) {
 		mld_addr = wlan_vdev_mlme_get_mldaddr(vdev_mlme->vdev);
 		if (qdf_is_macaddr_zero((struct qdf_mac_addr *)mld_addr)) {
 			vdev_dot11_mode = MLME_VDEV_DOT11_MODE_11AX;
