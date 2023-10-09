@@ -2018,6 +2018,10 @@ config CNSS_QCA6750
 	bool "Enable CNSS_QCA6750"
 	default n
 
+config WLAN_FEATURE_EMLSR
+	bool "Enable EMLSR feature"
+	default n
+
 menu "Optional Configs"
 
 if CNSS_KIWI_V2

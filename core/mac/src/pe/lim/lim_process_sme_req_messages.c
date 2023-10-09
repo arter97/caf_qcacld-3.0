@@ -4475,6 +4475,7 @@ static void lim_copy_ml_partner_info_to_session(struct pe_session *session,
 void lim_set_emlsr_caps(struct mac_context *mac_ctx, struct pe_session *session)
 {
 	bool emlsr_cap, emlsr_allowed, emlsr_band_check, emlsr_enabled = false;
+	bool emlsr_aux_support = false;
 
 	/* Check if HW supports eMLSR mode */
 	emlsr_cap = policy_mgr_is_hw_emlsr_capable(mac_ctx->psoc);
@@ -4488,8 +4489,11 @@ void lim_set_emlsr_caps(struct mac_context *mac_ctx, struct pe_session *session)
 	emlsr_band_check = lim_is_emlsr_band_supported(session);
 
 	emlsr_allowed = emlsr_cap && emlsr_enabled && emlsr_band_check;
+	emlsr_aux_support = emlsr_enabled && WLAN_EMLSR_ENABLE &&
+			     wlan_mlme_is_aux_emlsr_support(mac_ctx->psoc,
+							    WLAN_MLME_HW_MODE_MAX);
 
-	if (emlsr_allowed) {
+	if (emlsr_allowed || emlsr_aux_support) {
 		wlan_vdev_obj_lock(session->vdev);
 		wlan_vdev_mlme_cap_set(session->vdev, WLAN_VDEV_C_EMLSR_CAP);
 		wlan_vdev_obj_unlock(session->vdev);
@@ -4498,6 +4502,9 @@ void lim_set_emlsr_caps(struct mac_context *mac_ctx, struct pe_session *session)
 		wlan_vdev_mlme_cap_clear(session->vdev, WLAN_VDEV_C_EMLSR_CAP);
 		wlan_vdev_obj_unlock(session->vdev);
 	}
+
+	pe_debug("eMLSR vdev cap: %d", emlsr_allowed);
+	pe_debug("eMLSR aux support: %d", emlsr_aux_support);
 }
 #else
 static void lim_fill_ml_info(struct cm_vdev_join_req *req,

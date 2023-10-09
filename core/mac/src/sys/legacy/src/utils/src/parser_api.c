@@ -13036,6 +13036,7 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 	struct wlan_mlo_eml_cap eml_cap = {0};
 	uint16_t presence_bitmap = 0;
 	bool emlsr_cap,  emlsr_enabled = false;
+	bool aux_emlsr_support = false;
 
 	if (!mac_ctx || !mlo_ie)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -13079,8 +13080,13 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 	/* Check if vendor command chooses eMLSR mode */
 	wlan_mlme_get_emlsr_mode_enabled(mac_ctx->psoc, &emlsr_enabled);
 
+	/* check if aux elmsr capable */
+	aux_emlsr_support = wlan_mlme_is_aux_emlsr_support(mac_ctx->psoc,
+							   WLAN_MLME_HW_MODE_MAX);
+
 	/* Check if STA supports EMLSR and vendor command prefers EMLSR mode */
-	if (emlsr_cap && emlsr_enabled) {
+	if ((emlsr_cap && emlsr_enabled) ||
+	    aux_emlsr_support) {
 		wlan_mlme_get_eml_params(psoc, &eml_cap);
 		mlo_ie->eml_capab_present = 1;
 		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EMLCAP_P;

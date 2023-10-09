@@ -4696,6 +4696,13 @@ CONFIG_WLAN_MAX_ML_BSS_LINKS ?= 1
 endif
 ccflags-y += -DWLAN_MAX_ML_BSS_LINKS=$(CONFIG_WLAN_MAX_ML_BSS_LINKS)
 
+ifdef CONFIG_WLAN_FEATURE_EMLSR
+CONFIG_WLAN_EMLSR_ENABLE ?= 1
+else
+CONFIG_WLAN_EMLSR_ENABLE ?= 0
+endif
+ccflags-y += -DWLAN_EMLSR_ENABLE=$(CONFIG_WLAN_EMLSR_ENABLE)
+
 #Maximum pending commands for a vdev is calculated in vdev create handler
 #by WLAN_SER_MAX_PENDING_CMDS/WLAN_SER_MAX_VDEVS. For SAP case, we will need
 #to accommodate 32 Pending commands to handle multiple STA sending
