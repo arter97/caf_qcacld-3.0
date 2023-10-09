@@ -124,3 +124,48 @@ send_wmi_link_recommendation_cmd_tlv(
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_11BE
+QDF_STATUS
+send_mu_on_off_cmd_tlv(wmi_unified_t wmi_handle,
+		       struct wmi_host_mu_on_off_params *params)
+{
+	wmi_vdev_sched_mode_probe_req_fixed_param *cmd;
+	wmi_buf_t buf;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+	uint32_t buf_len = 0;
+
+	buf_len = sizeof(wmi_vdev_sched_mode_probe_req_fixed_param);
+
+	buf = wmi_buf_alloc(wmi_handle, buf_len);
+	if (!buf) {
+		wmi_err("wmi buf alloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd = (wmi_vdev_sched_mode_probe_req_fixed_param *)wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_vdev_sched_mode_probe_req_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(wmi_vdev_sched_mode_probe_req_fixed_param));
+
+	cmd->vdev_id = params->vdev_id;
+	cmd->on_duration_ms = params->mu_on_duration;
+	cmd->off_duration_ms = params->mu_off_duration;
+	cmd->sched_mode_to_probe = 1;
+
+	wmi_info("vdev id: %d, mu_on: %d, mu_off: %d", params->vdev_id,
+		 params->mu_on_duration, params->mu_off_duration);
+
+	ret = wmi_unified_cmd_send(wmi_handle, buf, buf_len,
+				   WMI_VDEV_SCHED_MODE_PROBE_REQ_CMDID);
+	if (ret) {
+		wmi_err("Failed to send MU Toggle command to FW", ret);
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return ret;
+}
+#endif /* WLAN_FEATURE_11BE */
