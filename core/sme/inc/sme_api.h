@@ -241,8 +241,7 @@ enum {
   Function declarations and documentation
   ------------------------------------------------------------------------*/
 QDF_STATUS sme_open(mac_handle_t mac_handle);
-QDF_STATUS sme_init_chan_list(mac_handle_t mac_handle, uint8_t *alpha2,
-		enum country_src cc_src);
+QDF_STATUS sme_init_chan_list(mac_handle_t mac_handle, enum country_src cc_src);
 QDF_STATUS sme_close(mac_handle_t mac_handle);
 QDF_STATUS sme_start(mac_handle_t mac_handle);
 
@@ -1333,6 +1332,13 @@ QDF_STATUS sme_update_add_ie(mac_handle_t mac_handle,
 		tSirUpdateIE *pUpdateIE, eUpdateIEsType updateType);
 QDF_STATUS sme_update_connect_debug(mac_handle_t mac_handle,
 				    uint32_t set_value);
+
+/**
+ * sme_bss_type_to_string() - converts bss type to string.
+ * @bss_type: bss type enum
+ *
+ * Return: printable string for bss type
+ */
 const char *sme_bss_type_to_string(const uint8_t bss_type);
 QDF_STATUS sme_ap_disable_intra_bss_fwd(mac_handle_t mac_handle,
 					uint8_t sessionId,
@@ -1815,6 +1821,24 @@ QDF_STATUS sme_nss_update_request(uint32_t vdev_id,
 				  enum policy_mgr_conn_update_reason reason,
 				  uint32_t original_vdev_id,
 				  uint32_t request_id);
+
+/**
+ * sme_sap_update_ch_width() - Update SAP ch_width
+ * @psoc: Psoc object
+ * @vdev_id: the session id
+ * @ch_width: channel width to be updated
+ * @reason: Reason for ch_width update
+ * @conc_vdev_id: Concurrent connection vdev_id that is causing ch_width update
+ * @request_id: request id
+ *
+ * Return: QDF_STATUS_SUCCESS on successful posting
+ */
+QDF_STATUS
+sme_sap_update_ch_width(struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id,
+			enum phy_ch_width ch_width,
+			enum policy_mgr_conn_update_reason reason,
+			uint8_t conc_vdev_id, uint32_t request_id);
 
 QDF_STATUS sme_set_peer_authorized(uint8_t *peer_addr,
 				   uint32_t vdev_id);
@@ -3034,17 +3058,6 @@ int sme_set_auto_rate_ldpc(mac_handle_t mac_handle, uint8_t session_id,
 int sme_set_auto_rate_he_ltf(mac_handle_t mac_handle, uint8_t session_id,
 			     uint8_t cfg_val);
 
-/**
- * sme_set_ba_opmode() - sets the BA op mode
- * @mac_handle: Opaque handle to the global MAC context
- * @session_id: SME session id
- * @cfg_val: BA mode
- *
- * Return: None
- */
-void sme_set_ba_opmode(mac_handle_t mac_handle, uint8_t session_id,
-		       bool cfg_val);
-
 #ifdef WLAN_FEATURE_11BE
 /**
  * sme_update_tgt_eht_cap() - sets the EHT caps to pmac
@@ -3789,6 +3802,15 @@ int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
 int sme_send_vdev_pause_for_bcn_period(mac_handle_t mac_handle,
 				       uint8_t session_id,
 				       uint8_t cfg_val);
+
+/**
+ * sme_set_per_link_ba_mode() - sets BA mode for each STA MLD link
+ * @mac_handle: Opaque handle to the global MAC context
+ * @val: BA mode
+ *
+ * Return: None
+ */
+void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val);
 #else
 static inline void sme_set_eht_testbed_def(mac_handle_t mac_handle,
 					   uint8_t vdev_id)
@@ -3840,6 +3862,10 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    struct qdf_mac_addr active_link_addr[2])
 {
 }
+
+static inline
+void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val)
+{}
 #endif
 
 /**
@@ -4480,14 +4506,15 @@ QDF_STATUS sme_get_full_roam_scan_period(mac_handle_t mac_handle,
 /**
  * sme_check_for_duplicate_session() - check for duplicate session
  * @mac_handle: Opaque handle to the MAC context
- * @peer_addr: Peer device mac address
+ * @mac_list: List of mac address of peers.
  *
  * Check for duplicate mac address is available on other vdev.
+ * The list pointed by @mac_list has to be NULL terminated.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_check_for_duplicate_session(mac_handle_t mac_handle,
-					   uint8_t *peer_addr);
+					   uint8_t **mac_list);
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 /*
  * sme_get_ani_level() -

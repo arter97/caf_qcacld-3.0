@@ -120,10 +120,21 @@ struct peer_disconnect_stats_param {
 };
 
 /**
+ * struct wlan_mlme_rx_ops  - structure of tx function pointers for
+ * roaming related commands
+ * @peer_oper_mode_eventid : Rx ops function pointer for operating mode event
+ */
+struct wlan_mlme_rx_ops {
+	QDF_STATUS (*peer_oper_mode_eventid)(struct wlan_objmgr_psoc *psoc,
+					     struct peer_oper_mode_event *data);
+};
+
+/**
  * struct wlan_mlme_psoc_ext_obj -MLME ext psoc priv object
  * @cfg:     cfg items
  * @rso_tx_ops: Roam Tx ops to send roam offload commands to firmware
  * @rso_rx_ops: Roam Rx ops to receive roam offload events from firmware
+ * @mlme_rx_ops: mlme Rx ops to receive events from firmware
  * @wfa_testcmd: WFA config tx ops to send to FW
  * @disconnect_stats_param: Peer disconnect stats related params for SAP case
  * @scan_requester_id: mlme scan requester id
@@ -132,6 +143,7 @@ struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
 	struct wlan_cm_roam_tx_ops rso_tx_ops;
 	struct wlan_cm_roam_rx_ops rso_rx_ops;
+	struct wlan_mlme_rx_ops mlme_rx_ops;
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
 	struct peer_disconnect_stats_param disconnect_stats_param;
 	wlan_scan_requester scan_requester_id;
@@ -175,6 +187,7 @@ struct sae_auth_retry {
  * @peer_set_key_runtime_wakelock: runtime pm wakelock for set key
  * @is_key_wakelock_set: flag to check if key wakelock is pending to release
  * @assoc_rsp: assoc rsp IE received during connection
+ * @peer_ind_bw: peer indication channel bandwidth
  */
 struct peer_mlme_priv_obj {
 	uint8_t last_pn_valid;
@@ -194,6 +207,7 @@ struct peer_mlme_priv_obj {
 	qdf_runtime_lock_t peer_set_key_runtime_wakelock;
 	bool is_key_wakelock_set;
 	struct element_info assoc_rsp;
+	enum phy_ch_width peer_ind_bw;
 };
 
 /**
@@ -370,12 +384,12 @@ struct ft_context {
 };
 
 /**
- * struct connect_chan_info - store channel info at the time of association
- * @ch_width_orig: channel width at the time of initial connection
+ * struct assoc_channel_info - store channel info at the time of association
+ * @assoc_ch_width: channel width at the time of initial connection
  * @sec_2g_freq: secondary 2 GHz freq
  */
-struct connect_chan_info {
-	enum phy_ch_width ch_width_orig;
+struct assoc_channel_info {
+	enum phy_ch_width assoc_ch_width;
 	qdf_freq_t sec_2g_freq;
 };
 
@@ -398,7 +412,7 @@ struct connect_chan_info {
  * @ese_tspec_info: ese tspec info
  * @ext_cap_ie: Ext CAP IE
  * @assoc_btm_cap: BSS transition management cap used in (re)assoc req
- * @chan_info_orig: store channel info at the time of association
+ * @assoc_chan_info: store channel info at the time of association
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -424,7 +438,7 @@ struct mlme_connect_info {
 #endif
 	uint8_t ext_cap_ie[DOT11F_IE_EXTCAP_MAX_LEN + 2];
 	bool assoc_btm_cap;
-	struct connect_chan_info chan_info_orig;
+	struct assoc_channel_info assoc_chan_info;
 };
 
 /** struct wait_for_key_timer - wait for key timer object
@@ -443,6 +457,7 @@ struct wait_for_key_timer {
  * @update_required_scc_sta_power: Change the 6 GHz power type of the
  * concurrent STA
  * @ap_policy: Concurrent ap policy config
+ * @oper_ch_width: SAP current operating ch_width
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
@@ -450,6 +465,7 @@ struct mlme_ap_config {
 	bool update_required_scc_sta_power;
 #endif
 	enum host_concurrent_ap_policy ap_policy;
+	enum phy_ch_width oper_ch_width;
 };
 
 /**
@@ -682,11 +698,30 @@ struct roam_scan_chn {
  * @num_channels: total number of channels scanned during roam scan
  * @roam_chn: each roam scan channel information
  * @total_scan_time: total scan time of all roam channel
+ * @original_bssid: connected AP before roam happens, regardless of
+ *  the roam resulting in success or failure.
+ *  For non-MLO scenario, it indicates the original connected AP BSSID.
+ *  For MLO scenario, it indicates the original BSSID of the link
+ *  for which the reassociation occurred during the roam.
+ * @candidate_bssid: roam candidate AP BSSID when roam failed.
+ *  If the firmware updates more than one candidate AP BSSID
+ *  to the driver, the driver only fills the last candidate AP BSSID.
+ *  For non-MLO scenario, it indicates the last candidate AP BSSID.
+ *  For MLO scenario, it indicates the AP BSSID which may be the primary
+ *  link BSSID or a nonprimary link BSSID.
+ * @roamed_bssid: roamed AP BSSID when roam succeeds.
+ *  For non-MLO case, it indicates new AP BSSID which has been
+ *  successfully roamed.
+ *  For MLO case, it indicates the new AP BSSID of the link on
+ *  which the reassociation occurred during the roam.
  */
 struct eroam_scan_info {
 	uint8_t num_channels;
 	struct roam_scan_chn roam_chn[MAX_ROAM_SCAN_CHAN];
 	uint32_t total_scan_time;
+	struct qdf_mac_addr original_bssid;
+	struct qdf_mac_addr candidate_bssid;
+	struct qdf_mac_addr roamed_bssid;
 };
 
 /**
@@ -759,12 +794,13 @@ struct enhance_roam_info {
  * @connect_info: mlme connect information
  * @wait_key_timer: wait key timer
  * @eht_config: Eht capability configuration
- * @is_mlo_sta_link_removed: link on vdev has been removed by AP
  * @last_delba_sent_time: Last delba sent time to handle back to back delba
  *			  requests from some IOT APs
  * @ba_2k_jump_iot_ap: This is set to true if connected to the ba 2k jump IOT AP
  * @is_usr_ps_enabled: Is Power save enabled
  * @notify_co_located_ap_upt_rnr: Notify co located AP to update RNR or not
+ * @is_user_std_set: true if user set the @wifi_std
+ * @wifi_std: wifi standard version
  * @max_mcs_index: Max supported mcs index of vdev
  * @vdev_traffic_type: to set if vdev is LOW_LATENCY or HIGH_TPUT
  * @country_ie_for_all_band: take all band channel info in country ie
@@ -773,6 +809,7 @@ struct enhance_roam_info {
  * @bss_color_change_wakelock: wakelock to complete bss color change
  *				operation on bss color collision detection
  * @bss_color_change_runtime_lock: runtime lock to complete bss color change
+ * @disconnect_runtime_lock: runtime lock to complete disconnection
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -826,13 +863,12 @@ struct mlme_legacy_priv {
 #ifdef WLAN_FEATURE_11BE
 	tDot11fIEeht_cap eht_config;
 #endif
-#if defined(WLAN_FEATURE_11BE_MLO)
-	bool is_mlo_sta_link_removed;
-#endif
 	qdf_time_t last_delba_sent_time;
 	bool ba_2k_jump_iot_ap;
 	bool is_usr_ps_enabled;
 	bool notify_co_located_ap_upt_rnr;
+	bool is_user_std_set;
+	WMI_HOST_WIFI_STANDARD wifi_std;
 #ifdef WLAN_FEATURE_SON
 	uint8_t max_mcs_index;
 #endif
@@ -844,6 +880,7 @@ struct mlme_legacy_priv {
 #endif
 	qdf_wake_lock_t bss_color_change_wakelock;
 	qdf_runtime_lock_t bss_color_change_runtime_lock;
+	qdf_runtime_lock_t disconnect_runtime_lock;
 };
 
 /**
@@ -1160,6 +1197,22 @@ QDF_STATUS wlan_mlme_get_bssid_vdev_id(struct wlan_objmgr_pdev *pdev,
 				       struct qdf_mac_addr *bss_peer_mac);
 
 /**
+ * mlme_update_freq_in_scan_start_req() - Fill frequencies in wide
+ * band scan req for mlo connection
+ * @vdev: vdev common object
+ * @req: pointer to scan request
+ * @scan_ch_width: Channel width for which to trigger a wide band scan
+ * @scan_freq: frequency for which to trigger a wide band RRM scan
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
+				   struct scan_start_request *req,
+				   enum phy_ch_width scan_ch_width,
+				   qdf_freq_t scan_freq);
+
+/**
  * wlan_get_operation_chan_freq() - get operating chan freq of
  * given vdev
  * @vdev: vdev
@@ -1178,16 +1231,6 @@ qdf_freq_t wlan_get_operation_chan_freq(struct wlan_objmgr_vdev *vdev);
  */
 qdf_freq_t wlan_get_operation_chan_freq_vdev_id(struct wlan_objmgr_pdev *pdev,
 						uint8_t vdev_id);
-
-/**
- * wlan_get_opmode_vdev_id() - get operating mode of given vdev id
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- *
- * Return: opmode
- */
-enum QDF_OPMODE wlan_get_opmode_vdev_id(struct wlan_objmgr_pdev *pdev,
-					uint8_t vdev_id);
 
 /**
  * wlan_vdev_set_dot11mode - Set the dot11mode of the vdev
@@ -1673,6 +1716,63 @@ wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * wlan_mlme_get_sta_num_tx_chains() - API to get station num tx chains
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @tx_chains : tx_chains out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_num_tx_chains(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t *tx_chains);
+
+/**
+ * wlan_mlme_get_sta_tx_nss() - API to get station tx NSS
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @tx_nss : tx_nss out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev,
+			 uint8_t *tx_nss);
+
+/**
+ * wlan_mlme_get_sta_num_rx_chains() - API to get station num rx chains
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @rx_chains : rx_chains out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_num_rx_chains(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t *rx_chains);
+
+/**
+ * wlan_mlme_get_sta_rx_nss() - API to get station rx NSS
+ *
+ * @psoc: psoc context
+ * @vdev: pointer to vdev
+ * @rx_nss : rx_nss out parameter
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_objmgr_vdev *vdev,
+			 uint8_t *rx_nss);
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wlan_mlme_defer_pmk_set_in_roaming() - Set the set_key pending status
@@ -1735,4 +1835,88 @@ bool wlan_vdev_is_sae_auth_type(struct wlan_objmgr_vdev *vdev);
  */
 uint16_t wlan_get_rand_from_lst_for_freq(uint16_t *freq_lst,
 					 uint8_t num_chan);
+#if defined WLAN_FEATURE_SR
+/**
+ * mlme_sr_update() - MLME sr update callback
+ * @vdev: vdev object
+ * @enable: true or false
+ *
+ * This function is called to update the SR threshold
+ */
+void mlme_sr_update(struct wlan_objmgr_vdev *vdev, bool enable);
+
+/**
+ * mlme_sr_is_enable: Check whether SR is enabled or not
+ * @vdev: object manager vdev
+ *
+ * Return: True/False
+ */
+int mlme_sr_is_enable(struct wlan_objmgr_vdev *vdev);
+#else
+static inline void mlme_sr_update(struct wlan_objmgr_vdev *vdev, bool enable)
+{
+}
+
+static inline int mlme_sr_is_enable(struct wlan_objmgr_vdev *vdev)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_SR */
+
+/**
+ * mlme_peer_oper_mode_change_event_handler() - Handle peer oper mode event
+ * @scn: handle
+ * @event: Event data received from firmware
+ * @len: Event data length received from firmware
+ */
+int mlme_peer_oper_mode_change_event_handler(ol_scn_t scn, uint8_t *event,
+					     uint32_t len);
+
+/**
+ * wmi_extract_peer_oper_mode_event() - Extract the peer operating
+ * mode change event and update the new bandwidth
+ * @wmi_handle: wmi handle
+ * @event: Event data received from firmware
+ * @len: Event data length received from firmware
+ * @data: Extract the event and fill in data
+ */
+QDF_STATUS
+wmi_extract_peer_oper_mode_event(wmi_unified_t wmi_handle,
+				 uint8_t *event,
+				 uint32_t len,
+				 struct peer_oper_mode_event *data);
+
+/**
+ * wlan_mlme_register_rx_ops - Target IF mlme API to register mlme
+ * related rx op.
+ * @rx_ops: Pointer to rx ops fp struct
+ *
+ * Return: none
+ */
+void wlan_mlme_register_rx_ops(struct wlan_mlme_rx_ops *rx_ops);
+
+/**
+ * mlme_get_rx_ops - Get mlme rx ops from psoc
+ * @psoc: psoc
+ *
+ * Return: Pointer to rx ops fp struct
+ */
+struct wlan_mlme_rx_ops *
+mlme_get_rx_ops(struct wlan_objmgr_psoc *psoc);
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * wlan_mlme_register_common_events - Wrapper to register common events
+ * @psoc: psoc
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_register_common_events(struct wlan_objmgr_psoc *psoc);
+#else
+static inline QDF_STATUS
+wlan_mlme_register_common_events(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif

@@ -286,6 +286,7 @@ typedef enum {
 #define WIFI_TDLS_SUPPORT			BIT(0)
 #define WIFI_TDLS_EXTERNAL_CONTROL_SUPPORT	BIT(1)
 #define WIFI_TDLS_OFFCHANNEL_SUPPORT		BIT(2)
+#define WIFI_TDLS_WIDER_BW_SUPPORT		BIT(3)
 
 #define CFG_NON_AGG_RETRY_MAX                  (64)
 #define CFG_AGG_RETRY_MAX                      (64)
@@ -530,7 +531,7 @@ void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
 
 /**
  * wlan_hdd_cfg80211_acs_ch_select_evt: Callback function for ACS evt
- * @adapter: Pointer to SAP adapter struct
+ * @link_info: Link info pointer in HDD adapter
  * @store_acs_freq: Store current ACS frequecy flag
  *
  * This is a callback function on ACS procedure is completed.
@@ -538,7 +539,7 @@ void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
  *
  * Return: None
  */
-void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter,
+void wlan_hdd_cfg80211_acs_ch_select_evt(struct wlan_hdd_link_info *link_info,
 					 bool store_acs_freq);
 
 #ifdef WLAN_CFR_ENABLE
@@ -585,7 +586,13 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 }
 #endif
 
-int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter);
+/**
+ * wlan_hdd_cfg80211_update_apies() - update ap mode ies
+ * @link_info: Link info pointer in hostapd adapter
+ *
+ * Return: 0 for success non-zero for failure
+ */
+int wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info);
 
 int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter);
 
@@ -682,14 +689,15 @@ enum hdd_ba_mode {
 void hdd_set_rate_bw(struct rate_info *info, enum hdd_rate_info_bw hdd_bw);
 
 /*
- * hdd_get_sap_operating_band_by_adapter: Get current adapter operating channel
+ * hdd_get_sap_operating_band_by_link_info: Get operating channel of link info
  * for sap.
- * @adapter: Pointer to adapter
+ * @link_info: Pointer to link_info in adapter
  *
  * Return : Corresponding band for SAP operating channel
  */
 
-uint8_t hdd_get_sap_operating_band_by_adapter(struct hdd_adapter *adapter);
+uint8_t
+hdd_get_sap_operating_band_by_link_info(struct wlan_hdd_link_info *link_info);
 
 /*
  * hdd_get_sap_operating_band:  Get current operating channel
@@ -789,7 +797,7 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
 
 /**
  * hdd_set_dynamic_antenna_mode() - set dynamic antenna mode
- * @adapter: Pointer to network adapter
+ * @link_info: Link info pointer in HDD adapter
  * @num_rx_chains: number of chains to be used for receiving data
  * @num_tx_chains: number of chains to be used for transmitting data
  *
@@ -797,9 +805,8 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
  *
  * Return: 0 for success
  */
-int hdd_set_dynamic_antenna_mode(struct hdd_adapter *adapter,
-				 uint8_t num_rx_chains,
-				 uint8_t num_tx_chains);
+int hdd_set_dynamic_antenna_mode(struct wlan_hdd_link_info *link_info,
+				 uint8_t num_rx_chains, uint8_t num_tx_chains);
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**
@@ -921,6 +928,16 @@ enum qca_wlan_802_11_mode
 hdd_convert_cfgdot11mode_to_80211mode(enum csr_cfgdot11mode mode);
 
 /**
+ * hdd_convert_phymode_to_80211mode() - Function to convert eCsrPhyMode
+ *					to 80211 mode
+ * @mode: eCsrPhyMode
+ *
+ * Return: 80211 mode
+ */
+enum qca_wlan_802_11_mode
+hdd_convert_phymode_to_80211mode(eCsrPhyMode mode);
+
+/**
  * hdd_send_update_owe_info_event - Send update OWE info event
  * @adapter: Pointer to adapter
  * @sta_addr: MAC address of peer STA
@@ -960,19 +977,21 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
  * hdd_set_mac_chan_width() - set channel width
  * @adapter: Handle to hdd_adapter
  * @chwidth: given channel width
+ * @link_id: mlo link id
  *
  * Return: 0 on success, negative errno on failure
  */
 int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
-			   enum eSirMacHTChannelWidth chwidth);
+			   enum eSirMacHTChannelWidth chwidth,
+			   uint8_t link_id);
 
 /**
  * hdd_is_legacy_connection() - Is adapter connection is legacy
- * @adapter: Handle to hdd_adapter
+ * @link_info: Pointer to link_info in hdd_adapter
  *
  * Return: true if connection mode is legacy, false otherwise.
  */
-bool hdd_is_legacy_connection(struct hdd_adapter *adapter);
+bool hdd_is_legacy_connection(struct wlan_hdd_link_info *link_info);
 
 struct hdd_hostapd_state;
 
@@ -1115,6 +1134,15 @@ QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/** hdd_set_vdev_phy_mode() - Set vdev phy mode
+ * @adapter: adapter pointer
+ * @vendor_phy_mode: vendor phy mode
+ *
+ * Return: 0 for success
+ */
+int hdd_set_vdev_phy_mode(struct hdd_adapter *adapter,
+			  enum qca_wlan_vendor_phy_mode vendor_phy_mode);
 
 #if defined(WLAN_FEATURE_11BE_MLO) && \
 	defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)

@@ -399,7 +399,6 @@ QDF_STATUS lim_get_bpcc_from_mlo_ie(tSchBeaconStruct *bcn,
  * Return: bool
  */
 bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev, uint8_t new_bpcc);
-
 #else
 static inline void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev)
 {

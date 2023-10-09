@@ -35,7 +35,7 @@
 #endif
 
 #include "ol_txrx_api.h"
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+#ifdef WLAN_FEATURE_TSF_AUTO_REPORT
 #include <cdp_txrx_ctrl.h>
 #endif
 
@@ -314,6 +314,17 @@ bool hdd_tsf_is_tsf64_tx_set(struct hdd_context *hdd)
 	if (hdd && QDF_IS_STATUS_SUCCESS(
 	    ucfg_fwol_get_tsf_ptp_options(hdd->psoc, &tsf_ptp_options)))
 		return tsf_ptp_options & CFG_SET_TSF_PTP_OPT_TSF64_TX;
+	else
+		return false;
+}
+
+bool hdd_tsf_is_time_sync_enabled_cfg(struct hdd_context *hdd_ctx)
+{
+	uint32_t tsf_ptp_options;
+
+	if (hdd_ctx && QDF_IS_STATUS_SUCCESS(
+	    ucfg_fwol_get_tsf_ptp_options(hdd_ctx->psoc, &tsf_ptp_options)))
+		return tsf_ptp_options & CFG_SET_TSF_PTP_SYNC_PERIOD;
 	else
 		return false;
 }
@@ -1782,6 +1793,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	struct hdd_context *hdd_ctx;
 	uint64_t tsf_sync_qtime, host_time, reg_qtime, qtime, target_time;
 	ssize_t size;
+	uint8_t *mac;
 
 	struct net_device *net_dev = container_of(dev, struct net_device, dev);
 
@@ -1815,18 +1827,22 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		mac = hdd_sta_ctx->conn_info.bssid.bytes;
 		size = scnprintf(buf, PAGE_SIZE,
-				 "%s%llu %llu %pM %llu %llu %llu\n",
+				 "%s%llu %llu " QDF_MAC_ADDR_FMT
+				 " %llu %llu %llu\n",
 				 buf, adapter->tsf.last_target_time,
 				 tsf_sync_qtime,
-				 hdd_sta_ctx->conn_info.bssid.bytes,
+				 QDF_MAC_ADDR_REF(mac),
 				 qtime, host_time, target_time);
 	} else {
+		mac = adapter->mac_addr.bytes;
 		size = scnprintf(buf, PAGE_SIZE,
-				 "%s%llu %llu %pM %llu %llu %llu\n",
+				 "%s%llu %llu " QDF_MAC_ADDR_FMT
+				 " %llu %llu %llu\n",
 				 buf, adapter->tsf.last_target_time,
 				 tsf_sync_qtime,
-				 adapter->mac_addr.bytes,
+				 QDF_MAC_ADDR_REF(mac),
 				 qtime, host_time, target_time);
 	}
 
@@ -1946,6 +1962,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	struct hdd_context *hdd_ctx;
 	ssize_t size;
 	uint64_t host_time, target_time;
+	uint8_t *mac;
 
 	struct net_device *net_dev = container_of(dev, struct net_device, dev);
 
@@ -1975,13 +1992,17 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	} else {
 		if (adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-			size = scnprintf(buf, PAGE_SIZE, "%s%llu %llu %pM\n",
+			mac = hdd_sta_ctx->conn_info.bssid.bytes;
+			size = scnprintf(buf, PAGE_SIZE,
+					 "%s%llu %llu " QDF_MAC_ADDR_FMT "\n",
 					 buf, target_time, host_time,
-					 hdd_sta_ctx->conn_info.bssid.bytes);
+					 QDF_MAC_ADDR_REF(mac));
 		} else {
-			size = scnprintf(buf, PAGE_SIZE, "%s%llu %llu %pM\n",
+			mac = adapter->mac_addr.bytes;
+			size = scnprintf(buf, PAGE_SIZE,
+					 "%s%llu %llu " QDF_MAC_ADDR_FMT "\n",
 					 buf, target_time, host_time,
-					 adapter->mac_addr.bytes);
+					 QDF_MAC_ADDR_REF(mac));
 		}
 	}
 
@@ -2259,6 +2280,9 @@ static int hdd_handle_tsf_dynamic_start(struct hdd_adapter *adapter,
 
 	tsf->dynamic_tsf_sync_interval = dynamic_tsf_sync_interval;
 	tsf->enable_dynamic_tsf_sync = true;
+	if (hdd_tsf_is_time_sync_enabled_cfg(hdd_ctx))
+		pld_set_tsf_sync_period(hdd_ctx->parent_dev,
+					dynamic_tsf_sync_interval);
 
 	return hdd_start_tsf_sync(adapter);
 }
@@ -2287,6 +2311,9 @@ static int hdd_handle_tsf_dynamic_stop(struct hdd_adapter *adapter)
 
 	adapter->tsf.enable_dynamic_tsf_sync = false;
 	adapter->tsf.dynamic_tsf_sync_interval = 0;
+	if (hdd_tsf_is_time_sync_enabled_cfg(hdd_ctx))
+		pld_reset_tsf_sync_period(hdd_ctx->parent_dev);
+
 	return hdd_stop_tsf_sync(adapter);
 }
 
@@ -2973,18 +3000,23 @@ static void wlan_hdd_phc_deinit(struct hdd_context *hdd_ctx)
 }
 #endif /* WLAN_FEATURE_TSF_PTP */
 
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
-static int hdd_set_tsf_auto_report(struct hdd_adapter *adapter, bool ena)
+#ifdef WLAN_FEATURE_TSF_AUTO_REPORT
+void hdd_tsf_auto_report_init(struct hdd_adapter *adapter)
 {
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	int ret;
+	adapter->tsf.auto_rpt_src = 0;
+}
 
-	if (QDF_IS_STATUS_ERROR(cdp_set_tsf_ul_delay_report(
-						soc,
-						adapter->deflink->vdev_id,
-						ena))) {
-		hdd_err_rl("Set tsf report uplink delay failed");
-		return -EPERM;
+int
+hdd_set_tsf_auto_report(struct hdd_adapter *adapter, bool ena,
+			enum hdd_tsf_auto_rpt_source source)
+{
+	int ret = 0;
+	bool enabled;
+
+	enabled = !!adapter->tsf.auto_rpt_src;
+	if (enabled == ena) {
+		hdd_info_rl("current %d and no action is required", enabled);
+		goto set_src;
 	}
 
 	ret = wma_cli_set_command((int)adapter->deflink->vdev_id,
@@ -2992,67 +3024,58 @@ static int hdd_set_tsf_auto_report(struct hdd_adapter *adapter, bool ena)
 				  (int)GEN_PARAM_TSF_AUTO_REPORT_DISABLE,
 				  ena, GEN_CMD);
 	if (ret) {
-		hdd_err_rl("tsf auto report %d failed", ena);
-		return -EINPROGRESS;
+		hdd_err_rl("tsf auto report %d failed: %d", ena, ret);
+		ret = -EINPROGRESS;
+		goto out;
 	}
 
-	qdf_atomic_set(&adapter->tsf.tsf_auto_report, ena);
+set_src:
+	if (ena)
+		qdf_atomic_set_bit(source, &adapter->tsf.auto_rpt_src);
+	else
+		qdf_atomic_clear_bit(source, &adapter->tsf.auto_rpt_src);
 
-	return 0;
+out:
+	return ret;
 }
 
 /**
- * hdd_handle_tsf_auto_report(): Handle TSF auto report enable or disable
- * @adapter: pointer of struct hdd_adapter
- * @tsf_cmd: TSF command from user space
+ * hdd_tsf_auto_report_enabled() - get current state of tsf auto report
+ * for an adapter
+ * @adapter: pointer to Adapter context
  *
- * Return: 0 for success, -EINVAL to continue to handle other TSF commands and
- *	   else errors
+ * Return: true for enabled, false for disabled
  */
-static int hdd_handle_tsf_auto_report(struct hdd_adapter *adapter,
-				      uint32_t tsf_cmd)
+static inline bool hdd_tsf_auto_report_enabled(struct hdd_adapter *adapter)
 {
-	bool ena;
-
-	if (tsf_cmd != QCA_TSF_AUTO_REPORT_ENABLE &&
-	    tsf_cmd != QCA_TSF_AUTO_REPORT_DISABLE) {
-		hdd_debug_rl("tsf_cmd %d not for uplink delay", tsf_cmd);
-		return -EINVAL;
-	}
-
-	/* uplink delay feature is required for STA and P2P-GC mode */
-	if (adapter->device_mode != QDF_STA_MODE &&
-	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
-		hdd_debug_rl("tsf_cmd %d not allowed for device mode %d",
-			     tsf_cmd, adapter->device_mode);
-		return -EPERM;
-	}
-
-	ena = (tsf_cmd == QCA_TSF_AUTO_REPORT_ENABLE) ? true : false;
-
-	return hdd_set_tsf_auto_report(adapter, ena);
+	return !!adapter->tsf.auto_rpt_src;
 }
 
+/**
+ * hdd_set_delta_tsf() - calculate and save the time difference between
+ * TQM clock and TSF clock
+ * @adapter: pointer to Adapter context
+ * @ptsf: pointer to tsf information
+ *
+ * Return: QDF_STATUS
+ */
 static QDF_STATUS hdd_set_delta_tsf(struct hdd_adapter *adapter,
 				    struct stsf *ptsf)
 {
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint32_t delta_tsf;
 
-	/* If TSF report is for uplink delay, mac_id_valid will be set to
-	 * 1 by target. If not, the report is not for uplink delay feature
-	 * and return failure here so that legacy BSS TSF logic can be
-	 * continued.
+	/* A tsf report event with mac_id_valid equals to 1 represents
+	 * for tsf auto report, that's what we need to handle in this
+	 * function; otherwise, return failure here so that legacy BSS
+	 * TSF logic can be continued.
 	 */
 	if (!ptsf->mac_id_valid) {
-		hdd_debug_rl("TSF report not for uplink delay");
+		hdd_debug_rl("Not TSF auto report");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	/* For uplink delay feature, TSF auto report needs to be enabled
-	 * first. Otherwise TSF event will not be posted by target.
-	 */
-	if (!qdf_atomic_read(&adapter->tsf.tsf_auto_report)) {
+	if (!hdd_tsf_auto_report_enabled(adapter)) {
 		hdd_debug_rl("adapter %u tsf_auto_report disabled",
 			     adapter->deflink->vdev_id);
 		goto exit_with_success;
@@ -3062,13 +3085,52 @@ static QDF_STATUS hdd_set_delta_tsf(struct hdd_adapter *adapter,
 	hdd_debug("vdev %u tsf_low %u qtimer_low %u delta_tsf %u",
 		  ptsf->vdev_id, ptsf->tsf_low, ptsf->soc_timer_low, delta_tsf);
 
-	/* Pass delta_tsf to DP layer to report uplink delay
+	/* Pass delta_tsf to DP layer to calculate hw delay
 	 * on a per vdev basis
 	 */
 	cdp_set_delta_tsf(soc, adapter->deflink->vdev_id, delta_tsf);
 
 exit_with_success:
 	return QDF_STATUS_SUCCESS;
+}
+#else /* !WLAN_FEATURE_TSF_AUTO_REPORT */
+static inline QDF_STATUS hdd_set_delta_tsf(struct hdd_adapter *adapter,
+					   struct stsf *ptsf)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool hdd_tsf_auto_report_enabled(struct hdd_adapter *adapter)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_TSF_AUTO_REPORT */
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+/**
+ * hdd_set_tsf_ul_delay_report() - enable or disable tsf uplink delay report
+ * for an adapter
+ * @adapter: pointer to Adapter context
+ * @ena: requesting state (true or false)
+ *
+ * Return: 0 for success or non-zero negative failure code
+ */
+static int
+hdd_set_tsf_ul_delay_report(struct hdd_adapter *adapter, bool ena)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	QDF_STATUS status;
+
+	status = cdp_set_tsf_ul_delay_report(soc,
+					     adapter->deflink->vdev_id,
+					     ena);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("Set tsf report uplink delay failed");
+		return -EPERM;
+	}
+
+	return 0;
 }
 
 uint32_t hdd_get_uplink_delay_len(struct hdd_adapter *adapter)
@@ -3090,7 +3152,7 @@ QDF_STATUS hdd_add_uplink_delay(struct hdd_adapter *adapter,
 	    adapter->device_mode != QDF_P2P_CLIENT_MODE)
 		return QDF_STATUS_SUCCESS;
 
-	if (qdf_atomic_read(&adapter->tsf.tsf_auto_report)) {
+	if (hdd_tsf_auto_report_enabled(adapter)) {
 		status = cdp_get_uplink_delay(soc, adapter->deflink->vdev_id,
 					      &ul_delay);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -3105,18 +3167,11 @@ QDF_STATUS hdd_add_uplink_delay(struct hdd_adapter *adapter,
 
 	return QDF_STATUS_SUCCESS;
 }
-
-#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY */
-static inline int hdd_handle_tsf_auto_report(struct hdd_adapter *adapter,
-					     uint32_t tsf_cmd)
+#else
+static inline int
+hdd_set_tsf_ul_delay_report(struct hdd_adapter *adapter, bool ena)
 {
-	return -EINVAL;
-}
-
-static inline QDF_STATUS hdd_set_delta_tsf(struct hdd_adapter *adapter,
-					   struct stsf *ptsf)
-{
-	return QDF_STATUS_E_FAILURE;
+	return -ENOTSUPP;
 }
 #endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
 
@@ -3160,7 +3215,7 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 	}
 
 	adapter = link_info->adapter;
-	/* Intercept tsf report and check if it is for uplink delay.
+	/* Intercept tsf report and check if it is for auto report.
 	 * If yes, return in advance and skip the legacy BSS TSF
 	 * report. Otherwise continue on to the legacy BSS TSF
 	 * report logic.
@@ -3241,6 +3296,9 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 	uint32_t tsf_cmd;
 	enum qca_nl80211_vendor_subcmds_index index =
 		QCA_NL80211_VENDOR_SUBCMD_TSF_INDEX;
+	bool enable_auto_rpt;
+	enum hdd_tsf_auto_rpt_source source =
+		HDD_TSF_AUTO_RPT_SOURCE_UPLINK_DELAY;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -3265,13 +3323,22 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 	}
 	tsf_cmd = nla_get_u32(tb_vendor[QCA_WLAN_VENDOR_ATTR_TSF_CMD]);
 
-	/* Intercept tsf_cmd for TSF auto report enable or disable subcmds.
-	 * If status is -EINVAL, it means tsf_cmd is not for auto report and
-	 * need to continue to handle other tsf cmds.
+	/* Intercept tsf_cmd for TSF auto report enable or disable subcmds,
+	 * and treat as trigger for uplink delay report.
 	 */
-	status = hdd_handle_tsf_auto_report(adapter, tsf_cmd);
-	if (status != -EINVAL)
+	if (tsf_cmd == QCA_TSF_AUTO_REPORT_DISABLE ||
+	    tsf_cmd == QCA_TSF_AUTO_REPORT_ENABLE) {
+		enable_auto_rpt = (tsf_cmd == QCA_TSF_AUTO_REPORT_ENABLE);
+		status = hdd_set_tsf_auto_report(adapter,
+						 enable_auto_rpt,
+						 source);
+		if (status)
+			goto end;
+
+		hdd_set_tsf_ul_delay_report(adapter, enable_auto_rpt);
 		goto end;
+	}
+
 	ret = qdf_event_reset(&tsf_sync_get_completion_evt);
 	if (QDF_IS_STATUS_ERROR(ret))
 		hdd_warn("failed to reset tsf_sync_get_completion_evt");
@@ -3384,29 +3451,33 @@ void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx)
 	if (!hdd_ctx)
 		return;
 
-	if (qdf_atomic_inc_return(&hdd_ctx->tsf.tsf_ready_flag) > 1)
+	if (qdf_atomic_inc_return(&hdd_ctx->tsf.tsf_ready_flag) > 1) {
+		hdd_err("TSF ready flag already set");
 		return;
+	}
 
 	qdf_atomic_init(&hdd_ctx->tsf.cap_tsf_flag);
+
+	status = qdf_event_create(&tsf_sync_get_completion_evt);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to create tsf_sync_get_completion_evt");
+		goto fail;
+	}
 
 	status = hdd_tsf_set_gpio(hdd_ctx);
 
 	if (QDF_STATUS_SUCCESS != status) {
-		hdd_debug("set tsf GPIO failed, status: %d", status);
+		hdd_err("set tsf GPIO failed, status: %d", status);
 		goto fail;
 	}
 
-	if (wlan_hdd_tsf_plus_init(hdd_ctx) != HDD_TSF_OP_SUCC)
+	if (wlan_hdd_tsf_plus_init(hdd_ctx) != HDD_TSF_OP_SUCC) {
+		hdd_err("TSF plus init  failed");
 		goto fail;
+	}
 
 	if (hdd_tsf_is_ptp_enabled(hdd_ctx))
 		wlan_hdd_phc_init(hdd_ctx);
-
-	status = qdf_event_create(&tsf_sync_get_completion_evt);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_debug("failed to create tsf_sync_get_completion_evt");
-		goto fail;
-	}
 
 	return;
 
@@ -3421,12 +3492,14 @@ void wlan_hdd_tsf_deinit(struct hdd_context *hdd_ctx)
 	if (!hdd_ctx)
 		return;
 
-	if (!qdf_atomic_read(&hdd_ctx->tsf.tsf_ready_flag))
-		return;
-
 	status = qdf_event_destroy(&tsf_sync_get_completion_evt);
 	if (QDF_IS_STATUS_ERROR(status))
-		hdd_debug("failed to destroy tsf_sync_get_completion_evt");
+		hdd_err("failed to destroy tsf_sync_get_completion_evt");
+
+	if (!qdf_atomic_read(&hdd_ctx->tsf.tsf_ready_flag)) {
+		hdd_err("ready flag not set");
+		return;
+	}
 
 	if (hdd_tsf_is_ptp_enabled(hdd_ctx))
 		wlan_hdd_phc_deinit(hdd_ctx);

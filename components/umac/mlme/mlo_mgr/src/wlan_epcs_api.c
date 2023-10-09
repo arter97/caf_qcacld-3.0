@@ -338,7 +338,11 @@ static QDF_STATUS epcs_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 	edca_info = &epcs_req.pa_info;
 	for (i = 0; i < edca_info->num_links; i++) {
 		link = &edca_info->link_info[i];
-		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id);
+		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id,
+						    WLAN_MLO_MGR_ID);
+		if (!link_vdev)
+			continue;
+
 		if (link->edca_ie_present)
 			epcs_update_edca_param(link_vdev, &link->edca);
 		else if (link->ven_wme_ie_present)
@@ -349,6 +353,8 @@ static QDF_STATUS epcs_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 
 		if (link->muedca_ie_present)
 			epcs_update_mu_edca_param(link_vdev, &link->muedca);
+
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
 	}
 
 	args.category = ACTION_CATEGORY_PROTECTED_EHT;
@@ -384,11 +390,11 @@ static QDF_STATUS epcs_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 
 	if (!vdev || !peer)
-		return QDF_STATUS_E_INVAL;
+		return QDF_STATUS_E_NULL_VALUE;
 
 	ml_peer = peer->mlo_peer_ctx;
 	if (!ml_peer)
-		return QDF_STATUS_E_FAILURE;
+		return QDF_STATUS_E_NULL_VALUE;
 
 	epcs_info = &ml_peer->epcs_info;
 	if (epcs_info->state == EPCS_ENABLE) {
@@ -416,7 +422,11 @@ static QDF_STATUS epcs_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 	edca_info = &epcs_rsp.pa_info;
 	for (i = 0; i < edca_info->num_links; i++) {
 		link = &edca_info->link_info[i];
-		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id);
+		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id,
+						    WLAN_MLO_MGR_ID);
+		if (!link_vdev)
+			continue;
+
 		if (link->edca_ie_present)
 			epcs_update_edca_param(link_vdev, &link->edca);
 		else if (link->ven_wme_ie_present)
@@ -427,6 +437,8 @@ static QDF_STATUS epcs_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 
 		if (link->muedca_ie_present)
 			epcs_update_mu_edca_param(link_vdev, &link->muedca);
+
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
 	}
 
 	epcs_info->state = EPCS_ENABLE;
@@ -631,5 +643,46 @@ static QDF_STATUS epcs_deliver_cmd(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_epcs_deliver_cmd(struct wlan_objmgr_vdev *vdev,
 				 enum wlan_epcs_evt event)
 {
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!wlan_mlme_get_epcs_capability(wlan_vdev_get_psoc(vdev))) {
+		mlme_info("EPCS has been disabled");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	return epcs_deliver_cmd(vdev, event);
+}
+
+QDF_STATUS wlan_epcs_set_config(struct wlan_objmgr_vdev *vdev, uint8_t flag)
+{
+	struct mac_context *mac_ctx;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	if (flag)
+		wlan_mlme_set_epcs_capability(wlan_vdev_get_psoc(vdev), true);
+	else
+		wlan_mlme_set_epcs_capability(wlan_vdev_get_psoc(vdev), false);
+
+	return lim_send_eht_caps_ie(mac_ctx, NULL, QDF_STA_MODE,
+				    wlan_vdev_get_id(vdev));
+}
+
+bool wlan_epcs_get_config(struct wlan_objmgr_vdev *vdev)
+{
+	bool epcs_flag;
+
+	if (!vdev)
+		return false;
+
+	epcs_flag = wlan_mlme_get_epcs_capability(wlan_vdev_get_psoc(vdev));
+	mlme_debug("EPCS %s", epcs_flag ? "Enabled" : "Disabled");
+
+	return epcs_flag;
 }

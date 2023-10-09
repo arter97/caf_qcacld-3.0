@@ -44,6 +44,8 @@
 #include "cdp_txrx_bus.h"
 #include "wlan_pmo_ucfg_api.h"
 #include "hif.h"
+#include "target_type.h"
+
 /**
  * pmo_core_get_vdev_dtim_period() - Get vdev dtim period
  * @vdev: objmgr vdev handle
@@ -196,11 +198,18 @@ static void pmo_configure_vdev_suspend_params(
 					pmo_sta_ps_param_inactivity_time,
 					psoc_cfg->wow_data_inactivity_timeout);
 	if (QDF_IS_STATUS_ERROR(ret)) {
-		pmo_debug("Failed to Set wow inactivity timeout vdevId %d",
-			  vdev_id);
+		pmo_err("Failed to Set wow inactivity timeout vdevId %d",
+			vdev_id);
+	}
+	ret = pmo_tgt_send_vdev_sta_ps_param(vdev,
+					     pmo_sta_ps_param_spec_wake_interval,
+					     psoc_cfg->wow_spec_wake_interval);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		pmo_err("Failed to Set wow spec wake interval vdevId %d",
+			vdev_id);
 	}
 
-	non_wow_inactivity_time = PS_DATA_INACTIVITY_TIMEOUT;
+	non_wow_inactivity_time = PMO_PS_DATA_INACTIVITY_TIMEOUT;
 	wow_inactivity_time = psoc_cfg->wow_data_inactivity_timeout;
 	/*
 	 * To keep ito repeat count same in wow mode as in non wow mode,
@@ -237,10 +246,17 @@ static void pmo_configure_vdev_resume_params(
 		return;
 	ret = pmo_tgt_send_vdev_sta_ps_param(vdev,
 					 pmo_sta_ps_param_inactivity_time,
-					 PS_DATA_INACTIVITY_TIMEOUT);
+					 vdev_ctx->ps_params.ps_ito);
 	if (QDF_IS_STATUS_ERROR(ret)) {
-		pmo_debug("Failed to Set inactivity timeout vdevId %d",
-			  vdev_id);
+		pmo_err("Failed to Set inactivity timeout vdevId %d",
+			vdev_id);
+	}
+	ret = pmo_tgt_send_vdev_sta_ps_param(vdev,
+					     pmo_sta_ps_param_spec_wake_interval,
+					     vdev_ctx->ps_params.spec_wake);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		pmo_err("Failed to Set wow spec wake interval vdevId %d",
+			vdev_id);
 	}
 }
 
@@ -478,15 +494,25 @@ static QDF_STATUS pmo_core_psoc_configure_suspend(struct wlan_objmgr_psoc *psoc,
 						  bool is_runtime_pm)
 {
 	struct pmo_psoc_priv_obj *psoc_ctx;
+	struct hif_target_info *tgt_info;
+	struct hif_opaque_softc *hif_ctx;
 
 	psoc_ctx = pmo_psoc_get_priv(psoc);
 
 	if (is_runtime_pm)
 		pmo_core_enable_runtime_pm_offloads(psoc);
 
+	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
+	if (!hif_ctx) {
+		pmo_err("Invalid hif ctx");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	tgt_info = hif_get_target_info_handle(hif_ctx);
+
 	if ((is_runtime_pm) ||
 	    (psoc_ctx->psoc_cfg.suspend_mode == PMO_SUSPEND_WOW &&
-	    pmo_core_is_wow_applicable(psoc))) {
+	    ((tgt_info->target_type == TARGET_TYPE_QCA6490) ||
+	    pmo_core_is_wow_applicable(psoc)))) {
 		pmo_debug("WOW Suspend");
 		pmo_core_apply_lphb(psoc);
 		/*

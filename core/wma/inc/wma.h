@@ -836,7 +836,6 @@ struct wma_wlm_stats_data {
  * @vht_supp_mcs: VHT supported MCS
  * @is_fw_assert: is fw asserted
  * @ack_work_ctx: Context for deferred processing of TX ACK
- * @powersave_mode: power save mode
  * @pGetRssiReq: get RSSI request
  * @get_one_peer_info: When a "get peer info" request is active, is
  *   the request for a single peer?
@@ -961,7 +960,6 @@ typedef struct {
 	uint32_t vht_supp_mcs;
 	uint8_t is_fw_assert;
 	struct wma_tx_ack_work_ctx *ack_work_ctx;
-	uint8_t powersave_mode;
 	void *pGetRssiReq;
 	bool get_one_peer_info;
 	struct qdf_mac_addr peer_macaddr;
@@ -1704,15 +1702,6 @@ struct wma_ini_config *wma_get_ini_handle(tp_wma_handle wma_handle);
  */
 enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 				    uint8_t dot11_mode);
-
-/**
- * wma_host_to_fw_phymode() - convert host to fw phymode
- * @host_phymode: phymode to convert
- *
- * Return: one of the values defined in enum WMI_HOST_WLAN_PHY_MODE;
- *         or WMI_HOST_MODE_UNKNOWN if the conversion fails
- */
-WMI_HOST_WLAN_PHY_MODE wma_host_to_fw_phymode(enum wlan_phymode host_phymode);
 
 /**
  * wma_fw_to_host_phymode() - convert fw to host phymode

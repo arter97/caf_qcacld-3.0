@@ -225,16 +225,14 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	mac_handle_t mac_handle;
 	enum phy_ch_width cac_ch_width;
 	struct hdd_adapter_create_param params = {0};
+	struct wlan_hdd_link_info *pre_cac_link_info, *link_info;
 
 	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc)) {
 		hdd_debug("Pre CAC is not supported on non-dbs platforms");
 		return -EINVAL;
 	}
 
-	pre_cac_adapter = hdd_get_adapter_by_iface_name(hdd_ctx,
-							SAP_PRE_CAC_IFNAME);
-	if (!pre_cac_adapter &&
-	    (policy_mgr_get_connection_count(hdd_ctx->psoc) > 1)) {
+	if (policy_mgr_get_connection_count(hdd_ctx->psoc) > 1) {
 		hdd_err("pre cac not allowed in concurrency");
 		return -EINVAL;
 	}
@@ -245,7 +243,8 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
+	link_info = ap_adapter->deflink;
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
 	if (qdf_atomic_read(&hdd_ap_ctx->ch_switch_in_progress)) {
 		hdd_err("pre cac not allowed during CSA");
@@ -262,7 +261,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	}
 
 	if (!WLAN_REG_IS_24GHZ_CH_FREQ(hdd_ap_ctx->operating_chan_freq)) {
-		hdd_err("pre CAC alllowed only when SAP is in 2.4GHz:%d",
+		hdd_err("pre CAC allowed only when SAP is in 2.4GHz:%d",
 			hdd_ap_ctx->operating_chan_freq);
 		return -EINVAL;
 	}
@@ -278,45 +277,44 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 
 	hdd_debug("starting pre cac SAP  adapter");
 
-	if (!pre_cac_adapter) {
-		mac_addr = wlan_hdd_get_intf_addr(hdd_ctx, QDF_SAP_MODE);
-		if (!mac_addr) {
-			hdd_err("can't add virtual intf: Not getting valid mac addr");
-			return -EINVAL;
-		}
-
-		/**
-		 * Starting a SAP adapter:
-		 * Instead of opening an adapter, we could just do a SME open
-		 * session for AP type. But, start BSS would still need an
-		 * adapter. So, this option is not taken.
-		 *
-		 * hdd open adapter is going to register this precac interface
-		 * with user space. This interface though exposed to user space
-		 * will be in DOWN state. Consideration was done to avoid this
-		 * registration to the user space. But, as part of SAP
-		 * operations multiple events are sent to user space. Some of
-		 * these events received from unregistered interface was
-		 * causing crashes. So, retaining the registration.
-		 *
-		 * So, this interface would remain registered and will remain
-		 * in DOWN state for the CAC duration. We will add notes in the
-		 * feature announcement to not use this temporary interface for
-		 * any activity from user space.
-		 */
-		params.is_add_virtual_iface = 1;
-		pre_cac_adapter = hdd_open_adapter(hdd_ctx, QDF_SAP_MODE,
-						   SAP_PRE_CAC_IFNAME, mac_addr,
-						   NET_NAME_UNKNOWN, true,
-						   &params);
-
-		if (!pre_cac_adapter) {
-			hdd_err("error opening the pre cac adapter");
-			goto release_intf_addr_and_return_failure;
-		}
+	mac_addr = wlan_hdd_get_intf_addr(hdd_ctx, QDF_SAP_MODE);
+	if (!mac_addr) {
+		hdd_err("can't add virtual intf: Not getting valid mac addr");
+		return -EINVAL;
 	}
 
-	pre_cac_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(pre_cac_adapter->deflink);
+	/**
+	 * Starting a SAP adapter:
+	 * Instead of opening an adapter, we could just do a SME open
+	 * session for AP type. But, start BSS would still need an
+	 * adapter. So, this option is not taken.
+	 *
+	 * hdd open adapter is going to register this precac interface
+	 * with user space. This interface though exposed to user space
+	 * will be in DOWN state. Consideration was done to avoid this
+	 * registration to the user space. But, as part of SAP
+	 * operations multiple events are sent to user space. Some of
+	 * these events received from unregistered interface was
+	 * causing crashes. So, retaining the registration.
+	 *
+	 * So, this interface would remain registered and will remain
+	 * in DOWN state for the CAC duration. We will add notes in the
+	 * feature announcement to not use this temporary interface for
+	 * any activity from user space.
+	 */
+	params.is_add_virtual_iface = 1;
+	pre_cac_adapter = hdd_open_adapter(hdd_ctx, QDF_SAP_MODE,
+					   SAP_PRE_CAC_IFNAME, mac_addr,
+					   NET_NAME_UNKNOWN, true,
+					   &params);
+
+	if (!pre_cac_adapter) {
+		hdd_err("error opening the pre cac adapter");
+		goto release_intf_addr_and_return_failure;
+	}
+
+	pre_cac_link_info = pre_cac_adapter->deflink;
+	pre_cac_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(pre_cac_link_info);
 	sap_clear_global_dfs_param(mac_handle, pre_cac_ap_ctx->sap_context);
 
 	/*
@@ -324,7 +322,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * up comes for this interface from user space and hence starting
 	 * the adapter internally.
 	 */
-	if (hdd_start_adapter(pre_cac_adapter)) {
+	if (hdd_start_adapter(pre_cac_adapter, false)) {
 		hdd_err("error starting the pre cac adapter");
 		goto close_pre_cac_adapter;
 	}
@@ -380,7 +378,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 */
 	status = policy_mgr_update_and_wait_for_connection_update(
 					    hdd_ctx->psoc,
-					    ap_adapter->deflink->vdev_id,
+					    link_info->vdev_id,
 					    pre_cac_chan_freq,
 					    POLICY_MGR_UPDATE_REASON_PRE_CAC);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -394,8 +392,8 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		goto stop_close_pre_cac_adapter;
 	}
 
-	status = wlan_hdd_cfg80211_start_bss(pre_cac_adapter, NULL,
-					     PRE_CAC_SSID,
+	status = wlan_hdd_cfg80211_start_bss(pre_cac_link_info,
+					     NULL, PRE_CAC_SSID,
 					     qdf_str_len(PRE_CAC_SSID),
 					     NL80211_HIDDEN_SSID_NOT_IN_USE,
 					     false);
@@ -409,26 +407,27 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * anywhere, since after the pre cac success/failure, the pre cac
 	 * adapter itself would be removed.
 	 */
-	ret = ucfg_pre_cac_set_status(pre_cac_adapter->deflink->vdev, true);
+	ret = ucfg_pre_cac_set_status(pre_cac_link_info->vdev, true);
 	if (ret != 0) {
 		hdd_err("failed to set pre cac status");
 		goto stop_close_pre_cac_adapter;
 	}
 
-	ucfg_pre_cac_set_freq_before_pre_cac(ap_adapter->deflink->vdev,
+	ucfg_pre_cac_set_freq_before_pre_cac(link_info->vdev,
 					     hdd_ap_ctx->operating_chan_freq);
-	ucfg_pre_cac_set_freq(ap_adapter->deflink->vdev, pre_cac_chan_freq);
-	ucfg_pre_cac_adapter_set(pre_cac_adapter->deflink->vdev, true);
+	ucfg_pre_cac_set_freq(link_info->vdev, pre_cac_chan_freq);
+	ucfg_pre_cac_adapter_set(pre_cac_link_info->vdev, true);
 	*out_adapter = pre_cac_adapter;
 
 	return 0;
 
 stop_close_pre_cac_adapter:
+	pre_cac_adapter->is_virtual_iface = true;
 	hdd_stop_adapter(hdd_ctx, pre_cac_adapter);
 	qdf_mem_free(pre_cac_ap_ctx->beacon);
 	pre_cac_ap_ctx->beacon = NULL;
 close_pre_cac_adapter:
-	hdd_close_adapter(hdd_ctx, pre_cac_adapter, false);
+	hdd_close_adapter(hdd_ctx, pre_cac_adapter, true);
 release_intf_addr_and_return_failure:
 	/*
 	 * Release the interface address as the adapter

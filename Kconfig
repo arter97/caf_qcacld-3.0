@@ -74,6 +74,10 @@ config BUILD_TIMESTAMP
 	bool "Embed timestamp in wlan version"
 	default n
 
+config BUS_AUTO_SUSPEND
+	bool "enable CONFIG_BUS_AUTO_SUSPEND"
+	default n
+
 config CE_DISABLE_SRNG_TIMER_IRQ
 	bool "Enable CE_DISABLE_SRNG_TIMER_IRQ"
 	default n
@@ -103,9 +107,17 @@ config CNSS_KIWI_V2
 	bool "Enable CNSS_KIWI_V2"
 	default n
 
+config CNSS_PEACH
+	bool "Enable CNSS_PEACH"
+	default n
+
 config CNSS_UTILS_MODULE
 	bool "Enable CNSS_UTILS_MODULE"
 	default n
+
+config CNSS_UTILS
+        bool "Enable CNSS_UTILS"
+        default n
 
 config CONNECTIVITY_PKTLOG
 	bool "Enable CONNECTIVITY_PKTLOG"
@@ -212,6 +224,12 @@ config DP_RX_BUFFER_POOL_ALLOC_THRES
 
 config DP_RX_BUFFER_POOL_SIZE
 	int "Enable DP_RX_BUFFER_POOL_SIZE"
+
+config DP_RX_REFILL_BUFF_POOL_SIZE
+	int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+
+config DP_RX_REFILL_THRD_THRESHOLD
+	int "Enable DP_RX_REFILL_THRD_THRESHOLD"
 
 config DP_RX_DROP_RAW_FRM
 	bool "Enable DP_RX_DROP_RAW_FRM"
@@ -490,6 +508,10 @@ config FEATURE_WLAN_SCAN_PNO
 	bool "Enable FEATURE_WLAN_SCAN_PNO"
 	default n
 
+config WALT_GET_CPU_TAKEN_SUPPORT
+	bool "enable WALT_GET_CPU_TAKEN_SUPPORT"
+	default n
+
 config FEATURE_WLAN_WAPI
 	bool "Enable FEATURE_WLAN_WAPI"
 	default n
@@ -628,6 +650,10 @@ config MARK_ICMP_REQ_TO_FW
 
 config MAX_ALLOC_PAGE_SIZE
 	bool "Enable MAX_ALLOC_PAGE_SIZE"
+	default n
+
+config ENABLE_MAX_LOGS_PER_SEC
+	bool "Enable ENABLE_MAX_LOGS_PER_SEC"
 	default n
 
 config MAX_LOGS_PER_SEC
@@ -840,6 +866,10 @@ config ROME_IF
 	string "Enable ROME_IF"
 	default pci
 
+config RPS
+	bool "enable CONFIG_QCA_CONFIG_RPS"
+	default n
+
 config RX_DEFRAG_DO_NOT_REINJECT
 	bool "Enable RX_DEFRAG_DO_NOT_REINJECT"
 	default n
@@ -888,6 +918,10 @@ config SCALE_INCLUDES
 	bool "Enable SCALE_INCLUDES"
 	default n
 
+config ENABLE_SCHED_HISTORY_SIZE
+	bool "Enable ENABLE_SCHED_HISTORY_SIZE"
+	default n
+
 config SCHED_HISTORY_SIZE
 	int "Enable SCHED_HISTORY_SIZE"
 
@@ -901,6 +935,10 @@ config SHADOW_V3
 
 config SMMU_S1_UNMAP
 	bool "Enable SMMU_S1_UNMAP"
+	default n
+
+config SMP
+	bool "enable CONFIG_SMP"
 	default n
 
 config SOFTAP_CHANNEL_RANGE
@@ -973,6 +1011,10 @@ config WAPI_BIG_ENDIAN
 
 config WCNSS_MEM_PRE_ALLOC_MODULE
 	bool "Enable WCNSS_MEM_PRE_ALLOC_MODULE"
+	default n
+
+config WCNSS_MEM_PRE_ALLOC
+	bool "Enable WCNSS_MEM_PRE_ALLOC"
 	default n
 
 config WDI_EVENT_ENABLE
@@ -1114,6 +1156,10 @@ config WLAN_FEATURE_11BE
 
 config WLAN_FEATURE_11BE_MLO
 	bool "Enable WLAN_FEATURE_11BE_MLO"
+	default n
+
+config WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+	bool "Enable WLAN_HDD_MULTI_VDEV_SINGLE_NDEV"
 	default n
 
 config WLAN_FEATURE_11W
@@ -1566,6 +1612,11 @@ config WLAN_SYSFS_WLAN_DBG
 	depends on WLAN_SYSFS
 	default n
 
+config WLAN_SYSFS_BITRATES
+	bool "enable WLAN_SYSFS_BITRATES"
+	depends on WLAN_SYSFS
+	default n
+
 config WLAN_THERMAL_CFG
 	bool "Enable WLAN_THERMAL_CFG"
 	default n
@@ -1578,8 +1629,13 @@ config WLAN_TRACEPOINTS
 	bool "Enable WLAN_TRACEPOINTS"
 	default n
 
+config WLAN_TSF_AUTO_REPORT
+	bool "Enable WLAN_TSF_AUTO_REPORT"
+	default n
+
 config WLAN_TSF_UPLINK_DELAY
 	bool "Enable WLAN_TSF_UPLINK_DELAY"
+	depends on WLAN_TSF_AUTO_REPORT
 	default n
 
 config WLAN_TWT_CONVERGED
@@ -1623,7 +1679,7 @@ config WLAN_WBUFF
 
 config WLAN_WEXT_SUPPORT_ENABLE
 	bool "Enable WLAN_WEXT_SUPPORT_ENABLE"
-	depends on WIRELESS_EXT
+	depends on CFG80211_WEXT
 	default n
 
 config WLAN_WOW_ITO
@@ -1674,4 +1730,179 @@ config PADDR_CHECK_ON_3RD_PARTY_PLATFORM
 	bool "Enable data path memory addr check on third-party platforms"
 	default n
 
+config CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+	bool "Enable CONFIG_CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT"
+	default n
+
+config CFG80211_RU_PUNCT_NOTIFY
+	bool "Enable CFG80211_RU_PUNCT_NOTIFY"
+	default n
+
+config CFG80211_EXTERNAL_AUTH_MLO_SUPPORT
+	bool "Enable CFG80211_EXTERNAL_AUTH_MLO_SUPPORT"
+	default n
+
+config CFG80211_MLO_KEY_OPERATION_SUPPORT
+	bool "Enable CFG80211_MLO_KEY_OPERATION_SUPPORT"
+	default n
+
+config CFG80211_WEXT
+	bool "Enable CFG80211_WEXT"
+	default n
+
+config FEATURE_PKTLOG
+	bool "Enable CONFIG_FEATURE_PKTLOG"
+	default n
+
+config FEATURE_PKTLOG_EN_NON_LEGACY
+	bool "Enable FEATURE_PKTLOG_EN_NON_LEGACY"
+	default n
+
+config WLAN_CTRL_NAME
+	string "Enable CONFIG_WLAN_CTRL_NAME"
+	default \"wlan\"
+
+config LL_DP_SUPPORT_NON_LITH
+	bool "ENABLE CONFIG_LL_DP_SUPPORT_NON_LITH"
+	default n
+
+config QCA_SUPPORT_TX_THROTTLE_NON_LITH
+	bool "Enable CONFIG_QCA_SUPPORT_TX_THROTTLE_NON_LITH"
+	default n
+
+config PANIC_ON_BUG
+	bool "Enable PANIC_ON_BUG"
+	default n
+
+config CFG80211_LINK_STA_PARAMS_PRESENT
+	bool "Enable CONFIG_CFG80211_LINK_STA_PARAMS_PRESENT"
+	default n
+
+config ARCH_MSM
+	bool "Enable CONFIG_ARCH_MSM"
+	default n
+
+config WLAN_HOST_ARCH_ARM
+	bool "Enable if host arch is arm"
+	default n
+
+config WLAN_WARN_ON_ASSERT
+	bool "Enable WLAN_WARN_ON_ASSERT"
+	default n
+
+config WIFI_MONITOR_SUPPORT_2_0
+	bool "Enable WIFI MONITOR SUPPORT 2_0"
+	default n
+
+config WLAN_TX_MON_2_0_Y_WLAN_DP_LOCAL_PKT_CAPTURE
+	bool "Enable WLAN_TX_MON_2_0_Y_DP_LOCAL_PKT_CAPTURE"
+	default n
+
+config WIFI_MONITOR_SUPPORT_Y_WLAN_TX_MON_2_0
+	bool "Enable WIFI_MONITOR_SUPPORT_Y_WLAN_TX_MON_2_0"
+	default n
+
+config WLAN_DP_LOCAL_PKT_CAPTURE
+	bool "Enable CONFIG_WLAN_DP_LOCAL_PKT_CAPTURE"
+	default n
+
+config DP_TX_PACKET_INSPECT_FOR_ILP
+	bool "enable DP_TX_PACKET_INSPECT_FOR_ILP"
+	default n
+
+config NUM_SOC_PERF_CLUSTER
+	int "enable NUM_SOC_PERF_CLUSTER"
+
+config WLAN_OPEN_SOURCE
+	bool "enable WLAN_OPEN_SOURCE"
+	default n
+
+config CFG80211_EXT_FEATURE_SECURE_NAN
+	bool "enable CFG80211_EXT_FEATURE_SECURE_NAN"
+	default n
+
+config CNSS_OUT_OF_TREE
+        bool "enable CNSS_OUT_OF_TREE"
+        default n
+
+config CFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT
+	bool "enable CFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT"
+	default n
+
+config DP_MULTIPASS_SUPPORT
+	bool "enable CONFIG_DP_MULTIPASS_SUPPORT"
+	default n
+
+config WLAN_FEATURE_LL_LT_SAP
+	bool "enable CONFIG_WLAN_FEATURE_LL_LT_SAP"
+	default n
+
+config WLAN_DP_VDEV_NO_SELF_PEER
+	bool "enable CONFIG_WLAN_DP_VDEV_NO_SELF_PEER"
+	default n
+
+config WLAN_FEATURE_AFFINITY_MGR
+	bool "enable CONFIG_WLAN_FEATURE_AFFINITY_MGR"
+	default n
+
+config NL80211_EXT_FEATURE_PUNCT_SUPPORT
+	bool "enable CONFIG_NL80211_EXT_FEATURE_PUNCT_SUPPORT"
+	default n
+
+config NL80211_TESTMODE
+	bool "enable CONFIG_NL80211_TESTMODE"
+	default n
+
+config DYNAMIC_DEBUG
+	bool "enable CONFIG_DYNAMIC_DEBUG"
+	default n
+
+config DP_MLO_LINK_STATS_SUPPORT
+	bool "enable CONFIG_DP_MLO_LINK_STATS_SUPPORT"
+	default n
+
+config MULTI_IF_NAME
+	string "set MULTI_IF_NAME"
+	default \"wlan\"
+
+config CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA
+	bool "enable CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA"
+	default n
+
+config WLAN_DP_FEATURE_DEFERRED_REO_QDESC_DESTROY
+	bool "enable WLAN_DP_FEATURE_DEFERRED_REO_QDESC_DESTROY"
+	default n
+
+config FEATURE_WLAN_CH_AVOID_EXT
+	bool "enable FEATURE_WLAN_CH_AVOID_EXT"
+	default n
+
+config WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE
+	bool "enable CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE"
+config 4_BYTES_TLV_TAG
+	bool "enable 4_BYTES_TLV_TAG"
+	default n
+
+config QCA_WIFI_EMULATION
+	bool "enable CONFIG_QCA_WIFI_EMULATION"
+	default n
+
+config QDF_TIMER_MULTIPLIER_FRAC
+	int "set QDF_TIMER_MULTIPLIER_FRAC"
+
+config QDF_TIMER_MULTIPLIER_FRAC_ENABLE
+	bool "enable QDF_TIMER_MULTIPLIER_FRAC_ENABLE"
+	default n
+
+config QCA_WIFI_PEACH
+	bool "enable QCA_WIFI_PEACH"
+	default n
+
+config BCN_RATECODE_ENABLE
+	bool "enable CONFIG_BCN_RATECODE_ENABLE"
+	default n
+
+config WLAN_SYSFS_RF_TEST_MODE
+	bool "enable CONFIG_WLAN_SYSFS_RF_TEST_MODE"
+	default n
 endif # QCA_CLD_WLAN

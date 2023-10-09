@@ -46,7 +46,7 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 
 /**
  * wlan_hdd_cm_issue_disconnect() - initiate disconnect from osif
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @reason: Disconnect reason code
  * @sync: true if wait for disconnect to complete is required. for the
  *        supplicant initiated disconnect or during vdev delete/change interface
@@ -56,9 +56,9 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
-					enum wlan_reason_code reason,
-					bool sync);
+QDF_STATUS
+wlan_hdd_cm_issue_disconnect(struct wlan_hdd_link_info *link_info,
+			     enum wlan_reason_code reason, bool sync);
 
 /**
  * wlan_hdd_cm_disconnect() - cfg80211 disconnect api
@@ -234,54 +234,55 @@ void reset_mscs_params(struct wlan_hdd_link_info *link_info)
 
 /**
  * hdd_handle_disassociation_event() - Handle disassociation event
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @peer_macaddr: Pointer to peer mac address
  *
  * Return: None
  */
-void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
+void hdd_handle_disassociation_event(struct wlan_hdd_link_info *link_info,
 				     struct qdf_mac_addr *peer_macaddr);
 
 /**
  * __hdd_cm_disconnect_handler_pre_user_update() - Handle disconnect indication
  * before updating to user space
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: None
  */
-void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter);
+void
+__hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info);
 
 /**
  * __hdd_cm_disconnect_handler_post_user_update() - Handle disconnect indication
  * after updating to user space
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @vdev: vdev ptr
  *
  * Return: None
  */
 void
-__hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
+__hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_info,
 					     struct wlan_objmgr_vdev *vdev);
 
 /**
  * hdd_cm_set_peer_authenticate() - set peer as authenticated
- * @adapter: pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  * @bssid: bssid of the connection
  * @is_auth_required: is upper layer authenticatoin required
  *
  * Return: QDF_STATUS enumeration
  */
-void hdd_cm_set_peer_authenticate(struct hdd_adapter *adapter,
+void hdd_cm_set_peer_authenticate(struct wlan_hdd_link_info *link_info,
 				  struct qdf_mac_addr *bssid,
 				  bool is_auth_required);
 
 /**
  * hdd_cm_update_rssi_snr_by_bssid() - update rsi and snr into adapter
- * @adapter: Pointer to adapter
+ * @link_info: Link info pointer in HDD adapter
  *
  * Return: None
  */
-void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter);
+void hdd_cm_update_rssi_snr_by_bssid(struct wlan_hdd_link_info *link_info);
 
 /**
  *  hdd_cm_handle_assoc_event() - Send disassociation indication to oem
@@ -318,12 +319,12 @@ void hdd_cm_clear_pmf_stats(struct hdd_adapter *adapter);
 
 /**
  * hdd_cm_save_connect_status() - Save connect status
- * @adapter: pointer to the adapter structure
+ * @link_info: Link info pointer in HDD adapter
  * @reason_code: IEE80211 wlan status code
  *
  * Returns: None
  */
-void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
+void hdd_cm_save_connect_status(struct wlan_hdd_link_info *link_info,
 				uint32_t reason_code);
 
 /**
@@ -378,4 +379,65 @@ QDF_STATUS
 hdd_cm_get_scan_ie_params(struct wlan_objmgr_vdev *vdev,
 			  struct element_info *scan_ie,
 			  enum dot11_mode_filter *dot11mode_filter);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * hdd_cm_save_connected_links_info() - Update connection info to station
+ * context.
+ * @self_mac: Self MAC address.
+ * @bssid: BSSID of link.
+ * @link_id: IEEE link id.
+ *
+ * It searches for link info pointer matching with @self_mac and updates
+ * the BSSID and link ID fields in station context's connection info.
+ * This will help to retrieve the link information using IEEE link ID or
+ * BSSID thereafter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_cm_save_connected_links_info(struct qdf_mac_addr *self_mac,
+					    struct qdf_mac_addr *bssid,
+					    int32_t link_id);
+
+/**
+ * hdd_cm_set_ieee_link_id() - Set IEEE link ID in station context conn info.
+ * @link_info: Link info pointer in HDD adapter
+ * @link_id: IEEE link ID
+ *
+ * Sets IEEE link ID in connection info of @link_info's station context.
+ *
+ * Return: void
+ */
+void
+hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id);
+
+/**
+ * hdd_cm_clear_ieee_link_id() - Clear IEEE link ID in station context
+ * conn info.
+ * @link_info: Link info pointer in HDD adapter
+ *
+ * Clear IEEE link ID in connection info of @link_info's station context.
+ *
+ * Return: void
+ */
+void hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info);
+#else
+static inline void
+hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id)
+{
+}
+
+static inline void
+hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info)
+{
+}
+
+static inline
+QDF_STATUS hdd_cm_save_connected_links_info(struct qdf_mac_addr *self_mac,
+					    struct qdf_mac_addr *bssid,
+					    int32_t link_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* __WLAN_HDD_CM_API_H */

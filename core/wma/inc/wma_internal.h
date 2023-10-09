@@ -49,12 +49,6 @@
 
 #define WMA_WMM_EXPO_TO_VAL(val)        ((1 << (val)) - 1)
 
-#define MAX_HT_MCS_IDX 8
-#define MAX_VHT_MCS_IDX 10
-#ifdef WLAN_FEATURE_11AX
-#define MAX_HE_MCS_IDX 12
-#define MAX_HE_MCS12_13_IDX 14
-#endif
 #define INVALID_MCS_IDX 255
 
 #define IS_MCS_HAS_DCM_RATE(val)  \
@@ -1251,7 +1245,7 @@ QDF_STATUS wma_capture_tsf(tp_wma_handle wma_handle, uint32_t vdev_id);
 QDF_STATUS wma_reset_tsf_gpio(tp_wma_handle wma_handle, uint32_t vdev_id);
 QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin);
 
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+#ifdef WLAN_FEATURE_TSF_AUTO_REPORT
 /**
  * wma_set_tsf_auto_report() - Set TSF auto report in firmware
  * @wma_handle: wma handle
@@ -1263,14 +1257,14 @@ QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin);
  */
 QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle, uint32_t vdev_id,
 				   uint32_t param_id, bool ena);
-#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY */
+#else /* !WLAN_FEATURE_TSF_AUTO_REPORT */
 static inline QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle,
 						 uint32_t vdev_id,
 						 uint32_t param_id, bool ena)
 {
-	return QDF_STATUS_E_FAILURE;
+	return QDF_STATUS_E_NOSUPPORT;
 }
-#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+#endif /* WLAN_FEATURE_TSF_AUTO_REPORT */
 
 #else
 static inline QDF_STATUS wma_capture_tsf(tp_wma_handle wma_handle,
@@ -1294,24 +1288,6 @@ static inline int wma_vdev_tsf_handler(void *handle, uint8_t *data,
 static inline QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
 {
 	return QDF_STATUS_E_INVAL;
-}
-#endif
-
-#ifdef WLAN_FEATURE_SR
-/**
- * wma_sr_update() - enable/disable spatial reuse
- * @wma: wma handle
- * @vdev_id: vdev id
- * @enable: indicates spatial reuse enable/disable
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
-QDF_STATUS wma_sr_update(tp_wma_handle wma, uint8_t vdev_id, bool enable);
-#else
-static inline QDF_STATUS wma_sr_update(tp_wma_handle wma, uint8_t vdev_id,
-				       bool enable)
-{
-	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -1710,9 +1686,9 @@ int wma_roam_scan_stats_event_handler(void *handle, uint8_t *event,
  *
  * This function sends del bss resp to upper layer
  *
- * Return: none
+ * Return: Success or Failure status
  */
-void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *req);
+QDF_STATUS wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *req);
 
 /**
  * wma_cold_boot_cal_event_handler() - Cold boot cal event handler

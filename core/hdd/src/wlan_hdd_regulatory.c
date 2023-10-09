@@ -867,6 +867,11 @@ int hdd_reg_set_country(struct hdd_context *hdd_ctx, char *country_code)
 		return -EINVAL;
 	}
 
+	if (!ucfg_reg_is_user_country_set_allowed(hdd_ctx->psoc)) {
+		hdd_err("user_country is not allowed");
+		return -EINVAL;
+	}
+
 	qdf_mem_copy(cc, country_code, REG_ALPHA2_LEN);
 	cc[REG_ALPHA2_LEN] = '\0';
 
@@ -890,6 +895,8 @@ int hdd_reg_set_country(struct hdd_context *hdd_ctx, char *country_code)
 		hdd_ctx->is_regulatory_update_in_progress = false;
 		qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
 	}
+
+	hdd_reg_wait_for_country_change(hdd_ctx);
 
 	return qdf_status_to_os_return(status);
 }
@@ -1053,6 +1060,16 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 	if (cds_is_driver_unloading() || cds_is_driver_recovering() ||
 	    cds_is_driver_in_bad_state()) {
 		hdd_err("unloading or ssr in progress, ignore");
+		return;
+	}
+
+	if (hdd_ctx->is_wiphy_suspended) {
+		hdd_err_rl("system/cfg80211 is already suspend");
+		return;
+	}
+
+	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
+		hdd_err_rl("Driver module is closed, dropping request");
 		return;
 	}
 
@@ -1572,17 +1589,15 @@ static void hdd_regulatory_chanlist_dump(struct regulatory_channel *chan_list)
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
 /**
  * hdd_country_change_bw_check() - Check if bandwidth changed
- * @hdd_ctx: Global HDD context
- * @adapter: HDD vdev context
+ * @link_info: Link info pointer in HDD adapter
  * @oper_freq: current frequency of adapter
  *
  * Return: true if bandwidth changed otherwise false.
  */
-static bool
-hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
-			    struct hdd_adapter *adapter,
-			    qdf_freq_t oper_freq)
+static bool hdd_country_change_bw_check(struct wlan_hdd_link_info *link_info,
+					qdf_freq_t oper_freq)
 {
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	bool width_changed = false;
 	enum phy_ch_width width;
 	uint16_t org_bw = 0;
@@ -1593,10 +1608,9 @@ hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
 	if (!cur_chan_list)
 		return false;
 
-	ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
-				       cur_chan_list);
+	ucfg_reg_get_current_chan_list(hdd_ctx->pdev, cur_chan_list);
 
-	width = hdd_get_link_info_width(adapter->deflink);
+	width = hdd_get_link_info_width(link_info);
 	org_bw = wlan_reg_get_bw_value(width);
 
 	for (i = 0; i < NUM_CHANNELS; i++) {
@@ -1615,8 +1629,7 @@ hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
 }
 #else
 static inline bool
-hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
-			    struct hdd_adapter *adapter,
+hdd_country_change_bw_check(struct wlan_hdd_link_info *link_info,
 			    qdf_freq_t oper_freq)
 {
 	return false;
@@ -1642,62 +1655,66 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	qdf_freq_t oper_freq;
 	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_STA;
+	struct wlan_hdd_link_info *link_info;
 
 	pdev = hdd_ctx->pdev;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		width_changed = false;
-		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
-		if (oper_freq)
-			freq_changed = wlan_reg_is_disable_for_pwrmode(
-							pdev,
-							oper_freq,
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			width_changed = false;
+			oper_freq = hdd_get_link_info_home_channel(link_info);
+			if (oper_freq)
+				freq_changed = wlan_reg_is_disable_for_pwrmode(
+							pdev, oper_freq,
 							REG_CURRENT_PWR_MODE);
-		else
-			freq_changed = false;
+			else
+				freq_changed = false;
 
-		switch (adapter->device_mode) {
-		case QDF_P2P_CLIENT_MODE:
-			/*
-			 * P2P client is the same as STA
-			 * continue to next statement
-			 */
-		case QDF_STA_MODE:
-			sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-			new_phy_mode = wlan_reg_get_max_phymode(pdev,
+			switch (adapter->device_mode) {
+			case QDF_P2P_CLIENT_MODE:
+				/*
+				 * P2P client is the same as STA
+				 * continue to next statement
+				 */
+			case QDF_STA_MODE:
+				sta_ctx =
+					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+				new_phy_mode = wlan_reg_get_max_phymode(pdev,
 								REG_PHYMODE_MAX,
 								oper_freq);
-			csr_phy_mode =
-				csr_convert_from_reg_phy_mode(new_phy_mode);
-			phy_changed = (sta_ctx->reg_phymode != csr_phy_mode);
+				csr_phy_mode =
+					csr_convert_from_reg_phy_mode(new_phy_mode);
+				phy_changed =
+					(sta_ctx->reg_phymode != csr_phy_mode);
 
-			width_changed = hdd_country_change_bw_check(hdd_ctx,
-								    adapter,
+				width_changed =
+					hdd_country_change_bw_check(link_info,
 								    oper_freq);
 
-			if (hdd_is_vdev_in_conn_state(adapter->deflink)) {
+				if (!hdd_is_vdev_in_conn_state(link_info))
+					continue;
+
 				if (phy_changed || freq_changed ||
 				    width_changed) {
 					hdd_debug("changed: phy %d, freq %d, width %d",
 						  phy_changed, freq_changed,
 						  width_changed);
 					wlan_hdd_cm_issue_disconnect(
-							adapter,
+							link_info,
 							REASON_UNSPEC_FAILURE,
 							false);
 					sta_ctx->reg_phymode = csr_phy_mode;
 				} else {
 					hdd_debug("Remain on current channel but update tx power");
 					wlan_reg_update_tx_power_on_ctry_change(
-						    pdev,
-						    adapter->deflink->vdev_id);
+							    pdev,
+							    link_info->vdev_id);
 				}
+				break;
+			default:
+				break;
 			}
-			break;
-		default:
-			break;
 		}
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -1706,8 +1723,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 
 /**
  * hdd_restart_sap_with_new_phymode() - restart the SAP with the new phymode
- * @hdd_ctx: Global HDD context
- * @adapter: HDD vdev context
+ * @link_info: Link info pointer in HDD adapter.
  * @sap_config: sap configuration pointer
  * @csr_phy_mode: phymode to restart SAP with
  *
@@ -1716,19 +1732,21 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
  *
  * Return: none
  */
-static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
-					     struct hdd_adapter *adapter,
-					     struct sap_config *sap_config,
-					     eCsrPhyMode csr_phy_mode)
+static void
+hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
+				 struct sap_config *sap_config,
+				 eCsrPhyMode csr_phy_mode)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct hdd_hostapd_state *hostapd_state = NULL;
 	struct sap_context *sap_ctx = NULL;
 	QDF_STATUS status;
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 		sap_config->SapHw_mode = csr_phy_mode;
 		hdd_err("Can't restart AP because it is not started");
@@ -1792,50 +1810,53 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 	qdf_freq_t oper_freq;
 	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_SAP;
+	struct wlan_hdd_link_info *link_info;
 
 	pdev = hdd_ctx->pdev;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		oper_freq = hdd_get_link_info_home_channel(adapter->deflink);
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			oper_freq = hdd_get_link_info_home_channel(link_info);
 
-		switch (adapter->device_mode) {
-		case QDF_P2P_GO_MODE:
-			policy_mgr_check_sap_restart(hdd_ctx->psoc,
-						     adapter->deflink->vdev_id);
-			break;
-		case QDF_SAP_MODE:
-			if (!test_bit(SOFTAP_INIT_DONE,
-				      &adapter->deflink->link_flags)) {
-				hdd_info("AP is not started yet");
+			switch (adapter->device_mode) {
+			case QDF_P2P_GO_MODE:
+				policy_mgr_check_sap_restart(hdd_ctx->psoc,
+							     link_info->vdev_id);
 				break;
-			}
-			sap_config = &adapter->deflink->session.ap.sap_config;
-			reg_phy_mode = csr_convert_to_reg_phy_mode(
-						sap_config->sap_orig_hw_mode,
-						oper_freq);
-			new_phy_mode = wlan_reg_get_max_phymode(pdev,
+			case QDF_SAP_MODE:
+				if (!test_bit(SOFTAP_INIT_DONE,
+					      &link_info->link_flags)) {
+					hdd_info("AP is not started yet");
+					break;
+				}
+				sap_config = &link_info->session.ap.sap_config;
+				reg_phy_mode = csr_convert_to_reg_phy_mode(
+						    sap_config->sap_orig_hw_mode,
+						    oper_freq);
+				new_phy_mode = wlan_reg_get_max_phymode(pdev,
 								reg_phy_mode,
 								oper_freq);
-			csr_phy_mode =
-				csr_convert_from_reg_phy_mode(new_phy_mode);
-			phy_changed = (csr_phy_mode != sap_config->SapHw_mode);
+				csr_phy_mode =
+					csr_convert_from_reg_phy_mode(new_phy_mode);
+				phy_changed =
+					(csr_phy_mode != sap_config->SapHw_mode);
 
-			if (phy_changed)
-				hdd_restart_sap_with_new_phymode(hdd_ctx,
-								 adapter,
-								 sap_config,
-								 csr_phy_mode);
-			else
-				policy_mgr_check_sap_restart(
-						hdd_ctx->psoc,
-						adapter->deflink->vdev_id);
+				if (phy_changed)
+					hdd_restart_sap_with_new_phymode(link_info,
+									 sap_config,
+									 csr_phy_mode);
+				else
+					policy_mgr_check_sap_restart(
+							hdd_ctx->psoc,
+							link_info->vdev_id);
 				hdd_debug("Update tx power due to ctry change");
 				wlan_reg_update_tx_power_on_ctry_change(
-					    pdev, adapter->deflink->vdev_id);
-			break;
-		default:
-			break;
+						    pdev, link_info->vdev_id);
+				break;
+			default:
+				break;
+			}
 		}
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -1852,7 +1873,7 @@ static void __hdd_country_change_work_handle(struct hdd_context *hdd_ctx)
 	sme_generic_change_country_code(hdd_ctx->mac_handle,
 					hdd_ctx->reg.alpha2);
 
-	qdf_event_set(&hdd_ctx->regulatory_update_event);
+	qdf_event_set_all(&hdd_ctx->regulatory_update_event);
 	qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
 	hdd_ctx->is_regulatory_update_in_progress = false;
 	qdf_mutex_release(&hdd_ctx->regulatory_status_lock);

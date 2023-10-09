@@ -54,11 +54,6 @@ struct mac_context;
 #include "wlan_mlo_mgr_public_structs.h"
 #endif
 
-/* The ini gDataInactivityTimeout is deprecated. So, definng a new macro
- * PS_DATA_INACTIVITY_TIMEOUT with the ini's default value.
- */
-#define PS_DATA_INACTIVITY_TIMEOUT (200)
-
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
 #define WLAN_DOT11_BASIC_RATE_MASK (0x80)
 #define BITS_ON(_Field, _Bitmask)  ((_Field) |=  (_Bitmask))
@@ -1081,6 +1076,7 @@ struct assoc_ind {
 	tDot11fIEHTCaps HTCaps;
 	tDot11fIEVHTCaps VHTCaps;
 	bool he_caps_present;
+	bool eht_caps_present;
 	tSirMacCapabilityInfo capability_info;
 	bool is_sae_authenticated;
 	const uint8_t *owe_ie;
@@ -3812,6 +3808,20 @@ struct sir_nss_update_request {
 };
 
 /**
+ * struct sir_sap_ch_width_update
+ * @msgType: ch_width update msg type
+ * @msgLen: length of the msg
+ * @ch_width: channel width
+ * @vdev_id: vdev id
+ */
+struct sir_sap_ch_width_update {
+	uint16_t msgType;
+	uint16_t msgLen;
+	enum phy_ch_width ch_width;
+	uint32_t vdev_id;
+};
+
+/**
  * enum sir_bcn_update_reason: bcn update reason
  * @REASON_DEFAULT: reason default
  * @REASON_NSS_UPDATE: If NSS is updated
@@ -3831,6 +3841,7 @@ enum sir_bcn_update_reason {
 	REASON_CHANNEL_SWITCH = 5,
 	REASON_MLO_IE_UPDATE = 6,
 	REASON_RNR_UPDATE = 7,
+	REASON_CH_WIDTH_UPDATE = 8,
 };
 
 /**

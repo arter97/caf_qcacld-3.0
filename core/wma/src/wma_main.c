@@ -294,7 +294,8 @@ static void wma_update_num_peers_tids(t_wma_handle *wma_handle,
 static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,
 					     target_resource_config *tgt_cfg)
 {
-	tgt_cfg->peer_map_unmap_v2 = cfg_get(psoc, CFG_WDS_MODE) ? true : false;
+	tgt_cfg->peer_map_unmap_v2 =
+			wlan_mlme_get_wds_mode(psoc) ? true : false;
 }
 #else
 static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,
@@ -335,14 +336,15 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
  * Version 1 - Base feature version
  * Version 2 - WMI_HOST_VENDOR1_REQ1_VERSION_3_30 updated.
  * Version 3 - min sleep period for TWT and Scheduled PM in FW updated
- * Version 4 -  WMI_HOST_VENDOR1_REQ1_VERSION_3_40 updated.
+ * Version 4 - WMI_HOST_VENDOR1_REQ1_VERSION_3_40 updated.
  * Version 5 - INI based 11BE support updated
+ * Version 6 - sta dump info updated
  *
  * Return: None
  */
 static void wma_update_set_feature_version(struct target_feature_set *fs)
 {
-	fs->feature_set_version = 5;
+	fs->feature_set_version = 6;
 }
 
 /**
@@ -501,6 +503,7 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->peer_bigdata_getbssinfo_support = true;
 	feature_set->peer_bigdata_assocreject_info_support = true;
 	feature_set->peer_getstainfo_support = true;
+	feature_set->sta_dump_support = true;
 	wma_update_set_feature_version(feature_set);
 }
 
@@ -652,6 +655,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 		ucfg_pmo_get_go_mode_bus_suspend(wma_handle->psoc);
 	tgt_cfg->num_max_active_vdevs =
 		policy_mgr_get_max_conc_cxns(wma_handle->psoc);
+	tgt_cfg->num_max_mlo_link_per_ml_bss =
+		wlan_mlme_get_sta_mlo_conn_max_num(wma_handle->psoc);
 	cfg_nan_get_max_ndi(wma_handle->psoc,
 			    &tgt_cfg->max_ndi);
 
@@ -3270,7 +3275,7 @@ void wma_get_fw_phy_mode_for_freq_cb(uint32_t freq, uint32_t chan_width,
 		dot11_mode = MLME_DOT11_MODE_11A;
 
 	host_phy_mode = wma_chan_phy_mode(freq, chan_width, dot11_mode);
-	*phy_mode = wma_host_to_fw_phymode(host_phy_mode);
+	*phy_mode = wmi_host_to_fw_phymode(host_phy_mode);
 }
 
 void wma_get_phy_mode_cb(qdf_freq_t freq, uint32_t chan_width,
@@ -3372,10 +3377,27 @@ wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
 	wlan_res_cfg->num_tdls_vdevs = WLAN_UMAC_MLO_MAX_VDEVS;
 	wma_debug("update tdls num vdevs %d", wlan_res_cfg->num_tdls_vdevs);
 }
+
+static void
+wma_get_service_cap_per_link_mlo_stats(struct wmi_unified *wmi_handle,
+				       struct wma_tgt_services *cfg)
+{
+	cfg->is_mlo_per_link_stats_supported =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_per_link_stats_support);
+	wma_debug("mlo_per_link stats is %s supported by FW",
+		  cfg->is_mlo_per_link_stats_supported ? "" : "NOT");
+}
 #else
 static void
 wma_update_num_tdls_vdevs_if_11be_mlo(struct wlan_objmgr_psoc *psoc,
 				      target_resource_config *wlan_res_cfg)
+{
+}
+
+static void
+wma_get_service_cap_per_link_mlo_stats(struct wmi_unified *wmi_handle,
+				       struct wma_tgt_services *cfg)
 {
 }
 #endif
@@ -3557,6 +3579,8 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 							cds_cfg->max_station);
 
 	wlan_mlme_set_assoc_sta_limit(psoc, cds_cfg->max_station);
+
+	wlan_mlme_register_common_events(psoc);
 
 	/* initialize default target config */
 	wlan_res_cfg = target_psoc_get_wlan_res_cfg(tgt_psoc_info);
@@ -3773,15 +3797,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 		goto err_dbglog_init;
 	}
 
-	/*
-	 * Update Powersave mode
-	 * 1 - Legacy Powersave + Deepsleep Disabled
-	 * 2 - QPower + Deepsleep Disabled
-	 * 3 - Legacy Powersave + Deepsleep Enabled
-	 * 4 - QPower + Deepsleep Enabled
-	 */
-	wma_handle->powersave_mode =
-			ucfg_pmo_power_save_offload_enabled(wma_handle->psoc);
 	wma_handle->staMaxLIModDtim = cds_cfg->sta_maxlimod_dtim;
 	wma_handle->sta_max_li_mod_dtim_ms = cds_cfg->sta_maxlimod_dtim_ms;
 	wma_handle->staModDtim = ucfg_pmo_get_sta_mod_dtim(wma_handle->psoc);
@@ -5098,10 +5113,25 @@ wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_tdls_mlo_support);
 }
+
+static inline void
+wma_get_n_link_mlo_support(struct wmi_unified *wmi_handle,
+			   struct wma_tgt_services *cfg)
+{
+	cfg->en_n_link_mlo_support =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_n_link_mlo_support);
+}
 #else
 static inline void
 wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
 			 struct wma_tgt_services *cfg)
+{
+}
+
+static inline void
+wma_get_n_link_mlo_support(struct wmi_unified *wmi_handle,
+			   struct wma_tgt_services *cfg)
 {
 }
 #endif /* WLAN_FEATURE_11BE */
@@ -5150,6 +5180,11 @@ wma_get_tdls_mlo_support(struct wmi_unified *wmi_handle,
 			 struct wma_tgt_services *cfg)
 {
 }
+
+static inline void
+wma_get_n_link_mlo_support(struct wmi_unified *wmi_handle,
+			   struct wma_tgt_services *cfg)
+{}
 
 static inline void
 wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
@@ -5363,6 +5398,8 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	wma_get_tdls_6g_support(wmi_handle, cfg);
 	wma_get_tdls_wideband_support(wmi_handle, cfg);
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);
+	wma_get_service_cap_per_link_mlo_stats(wmi_handle, cfg);
+	wma_get_n_link_mlo_support(wmi_handle, cfg);
 }
 
 /**
@@ -5917,6 +5954,45 @@ static void wma_update_restricted_80p80_bw_support(tp_wma_handle wh,
 		tgt_cfg->restricted_80p80_bw_supp = false;
 }
 
+/**
+ * wma_update_aux_dev_caps() - update aux device capability
+ * @tgt_hdl: target psoc information
+ * @tgt_cfg: target configuration to be updated
+ *
+ * Update aux device capability to wma_tgt_cfg.
+ *
+ * Return: None
+ */
+static void wma_update_aux_dev_caps(struct target_psoc_info *tgt_hdl,
+				    struct wma_tgt_cfg *tgt_cfg)
+{
+	uint8_t cap_idx;
+	uint32_t num_aux_dev_caps;
+	struct wlan_psoc_host_aux_dev_caps *aux_dev_caps;
+	enum wmi_host_hw_mode_config_type hw_mode_id;
+
+	num_aux_dev_caps  = tgt_hdl->info.service_ext2_param.num_aux_dev_caps;
+	aux_dev_caps = tgt_hdl->info.aux_dev_caps;
+
+	for (cap_idx = 0; cap_idx < num_aux_dev_caps; cap_idx++) {
+		/*current only support AUX0*/
+		if (aux_dev_caps[cap_idx].aux_index != 0)
+			continue;
+
+		hw_mode_id = aux_dev_caps[cap_idx].hw_mode_id;
+		if (hw_mode_id >= WMI_HOST_HW_MODE_MAX) {
+			wma_err("invalid hw mode id %d.", hw_mode_id);
+			continue;
+		}
+		tgt_cfg->wma_aux0_dev_caps[hw_mode_id].supported_modes_bitmap =
+			aux_dev_caps[cap_idx].supported_modes_bitmap;
+		tgt_cfg->wma_aux0_dev_caps[hw_mode_id].listen_pdev_id_map =
+			aux_dev_caps[cap_idx].listen_pdev_id_map;
+		tgt_cfg->wma_aux0_dev_caps[hw_mode_id].emlsr_pdev_id_map =
+			aux_dev_caps[cap_idx].emlsr_pdev_id_map;
+	}
+}
+
 #ifdef WLAN_SUPPORT_GREEN_AP
 static void wma_green_ap_register_handlers(tp_wma_handle wma_handle)
 {
@@ -6076,6 +6152,53 @@ static void wma_update_mlme_related_tgt_caps(struct wlan_objmgr_psoc *psoc,
 	wlan_mlme_update_cfg_with_tgt_caps(psoc, &mlme_tgt_cfg);
 }
 
+/**
+ * wma_update_mlme_aux_dev_caps() - update aux device capability to mlme
+ * @psoc: psoc handle
+ * @tgt_hdl: target psoc information
+ *
+ * Update aux device capability to mlme.
+ *
+ * Return: None
+ */
+static void wma_update_mlme_aux_dev_caps(struct wlan_objmgr_psoc *psoc,
+					 struct target_psoc_info *tgt_hdl)
+{
+	uint8_t cap_idx;
+	uint32_t num_aux_dev_caps;
+	struct wlan_psoc_host_aux_dev_caps *aux_dev_caps;
+	enum wmi_host_hw_mode_config_type hw_mode_id;
+	struct wlan_mlme_aux_dev_caps
+		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX];
+
+	if (WMI_HOST_HW_MODE_MAX != WLAN_MLME_HW_MODE_MAX)
+		wma_err("struct define mismatch, pls fix it.");
+
+	num_aux_dev_caps =
+		tgt_hdl->info.service_ext2_param.num_aux_dev_caps;
+	aux_dev_caps = tgt_hdl->info.aux_dev_caps;
+
+	for (cap_idx = 0; cap_idx < num_aux_dev_caps; cap_idx++) {
+		/*current only support AUX0*/
+		if (aux_dev_caps[cap_idx].aux_index != 0)
+			continue;
+
+		hw_mode_id = aux_dev_caps[cap_idx].hw_mode_id;
+		if (hw_mode_id >= WMI_HOST_HW_MODE_MAX) {
+			wma_err("invalid hw mode id %d.", hw_mode_id);
+			continue;
+		}
+		wlan_mlme_aux0_dev_caps[hw_mode_id].supported_modes_bitmap =
+				aux_dev_caps[cap_idx].supported_modes_bitmap;
+		wlan_mlme_aux0_dev_caps[hw_mode_id].listen_pdev_id_map =
+				aux_dev_caps[cap_idx].listen_pdev_id_map;
+		wlan_mlme_aux0_dev_caps[hw_mode_id].emlsr_pdev_id_map =
+				aux_dev_caps[cap_idx].emlsr_pdev_id_map;
+	}
+
+	wlan_mlme_update_aux_dev_caps(psoc, wlan_mlme_aux0_dev_caps);
+}
+
 static bool
 wma_is_dbs_mandatory(struct wlan_objmgr_psoc *psoc,
 		     struct target_psoc_info *tgt_hdl)
@@ -6155,6 +6278,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 		return -EINVAL;
 
 	wma_update_mlme_related_tgt_caps(wma_handle->psoc, wmi_handle);
+	wma_update_mlme_aux_dev_caps(wma_handle->psoc, tgt_hdl);
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_peer_create_conf))
 		wlan_psoc_nif_fw_ext_cap_set(wma_handle->psoc,
@@ -6223,6 +6347,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	wma_update_bcast_twt_support(wma_handle, &tgt_cfg);
 	wma_update_twt_tgt_cap(wma_handle, &tgt_cfg);
 	wma_update_restricted_80p80_bw_support(wma_handle, &tgt_cfg);
+	wma_update_aux_dev_caps(tgt_hdl, &tgt_cfg);
 	/* Take the max of chains supported by FW, which will limit nss */
 	for (i = 0; i < tgt_hdl->info.total_mac_phy_cnt; i++)
 		wma_fill_chain_cfg(tgt_hdl, i);
@@ -6602,6 +6727,12 @@ int wma_rx_service_ready_event(void *handle, uint8_t *cmd_param_info,
 		wmi_service_enabled(wmi_handle, wmi_service_lpass);
 #endif /* WLAN_FEATURE_LPSS */
 
+	if (wmi_service_enabled(wmi_handle, wmi_service_fse_cmem_alloc_support))
+		wlan_dp_set_fst_in_cmem(true);
+
+	if (wmi_service_enabled(wmi_handle,
+			wmi_service_fisa_dynamic_msdu_aggr_size_support))
+		wlan_dp_set_fisa_dynamic_aggr_size_support(true);
 	/*
 	 * This Service bit is added to check for ARP/NS Offload
 	 * support for LL/HL targets

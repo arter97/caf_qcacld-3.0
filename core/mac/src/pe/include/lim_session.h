@@ -50,9 +50,6 @@ struct comeback_timer_info {
 /*--------------------------------------------------------------------------
    Preprocessor definitions and constants
    ------------------------------------------------------------------------*/
-/* Maximum Number of WEP KEYS */
-#define MAX_WEP_KEYS 4
-
 #define SCH_PROTECTION_RESET_TIME 4000
 
 /*--------------------------------------------------------------------------
@@ -197,6 +194,18 @@ struct mld_capab_and_op {
 };
 
 /**
+ * struct ext_mld_capab_and_op - EXT MLD capability and operations info
+ * @op_parameter_update_support: operation parameter update support
+ * @rec_max_simultaneous_links: recommended max simultaneous links
+ * @reserved: reserved
+ */
+struct ext_mld_capab_and_op {
+	uint16_t op_parameter_update_support:1;
+	uint16_t rec_max_simultaneous_links:3;
+	uint16_t reserved:11;
+};
+
+/**
  * struct wlan_mlo_ie - wlan ML IE info
  * @type: the variant of the ML IE
  * @reserved: reserved
@@ -217,6 +226,7 @@ struct mld_capab_and_op {
  * @eml_capabilities_info: structure of eml_capabilities
  * @mld_capab_and_op_info: structure of mld_capabilities and operations
  * @mld_id_info: MLD ID
+ * @ext_mld_capab_and_op_info: structure of ext_mld_capab_and operations
  * @num_sta_profile: the number of sta profile
  * @sta_profile: structure of wlan_mlo_sta_profile
  * @num_data: the length of data
@@ -242,6 +252,7 @@ struct wlan_mlo_ie {
 	struct eml_capabilities eml_capabilities_info;
 	struct mld_capab_and_op mld_capab_and_op_info;
 	uint8_t mld_id_info;
+	struct ext_mld_capab_and_op ext_mld_capab_and_op_info;
 	uint16_t num_sta_profile;
 	struct wlan_mlo_sta_profile sta_profile[WLAN_MLO_MAX_VDEVS];
 	uint16_t num_data;
@@ -508,8 +519,9 @@ struct wlan_mlo_ie_info {
  * @vhtCapability:
  * @gLimOperatingMode:
  * @vhtCapabilityPresentInBeacon:
- * @ch_center_freq_seg0: center freq number as advertized OTA
- * @ch_width:
+ * @ch_center_freq_seg0: center freq number as advertised OTA
+ * @ch_width:    Session max channel width
+ * @ap_ch_width: AP advertised channel width
  * @puncture_bitmap:
  * @ch_center_freq_seg1:
  * @enableVhtpAid:
@@ -560,6 +572,8 @@ struct wlan_mlo_ie_info {
  * @chainMask:
  * @dfsIncludeChanSwIe: Flag to indicate Chan Sw announcement is required
  * @dfsIncludeChanWrapperIe: Flag to indicate Chan Wrapper Element is required
+ * @bw_update_include_ch_sw_ie: Flag to indicate chan switch Element is required
+ *                              due to bandwidth update
  * @cc_switch_mode:
  * @isCiscoVendorAP:
  * @add_ie_params:
@@ -773,8 +787,6 @@ struct pe_session {
 
 	uint8_t privacy;
 	tAniAuthType authType;
-	tSirKeyMaterial WEPKeyMaterial[MAX_WEP_KEYS];
-
 	tDot11fIEWMMParams wmm_params;
 	tDot11fIERSN gStartBssRSNIe;
 	tDot11fIEWPA gStartBssWPAIe;
@@ -822,6 +834,7 @@ struct pe_session {
 	uint8_t vhtCapabilityPresentInBeacon;
 	uint8_t ch_center_freq_seg0;
 	enum phy_ch_width ch_width;
+	enum phy_ch_width ap_ch_width;
 #ifdef WLAN_FEATURE_11BE
 	uint16_t puncture_bitmap;
 #endif
@@ -870,6 +883,7 @@ struct pe_session {
 	uint8_t dfsIncludeChanSwIe;
 
 	uint8_t dfsIncludeChanWrapperIe;
+	uint8_t bw_update_include_ch_sw_ie;
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;

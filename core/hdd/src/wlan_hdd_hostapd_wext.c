@@ -368,6 +368,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	int ret = 0;
 	struct hdd_context *hdd_ctx;
 	bool bval = false;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
 
@@ -395,7 +396,7 @@ static __iw_softap_setparam(struct net_device *dev,
 
 	case QCSAP_PARAM_CLR_ACL:
 		if (QDF_STATUS_SUCCESS != wlansap_clear_acl(
-		    WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink))) {
+		    WLAN_HDD_GET_SAP_CTX_PTR(link_info))) {
 			ret = -EIO;
 		}
 		break;
@@ -407,7 +408,7 @@ static __iw_softap_setparam(struct net_device *dev,
 			ret = -EINVAL;
 		} else {
 			wlansap_set_acl_mode(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
+				WLAN_HDD_GET_SAP_CTX_PTR(link_info),
 				set_value);
 		}
 		break;
@@ -416,7 +417,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		if ((QDF_SAP_MODE == adapter->device_mode) ||
 		   (QDF_P2P_GO_MODE == adapter->device_mode)) {
 			wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    CSA_REASON_USER_INITIATED);
 			hdd_debug("SET Channel Change to new channel= %d",
 			       set_value);
@@ -481,14 +482,15 @@ static __iw_softap_setparam(struct net_device *dev,
 		 * Disable Roaming on all adapters before start of
 		 * start of Hidden ssid connection
 		 */
-		wlan_hdd_disable_roaming(adapter, RSO_START_BSS);
+		wlan_hdd_set_roaming_state(link_info, RSO_START_BSS, false);
 
 		status = sme_update_session_param(mac_handle,
-				adapter->deflink->vdev_id,
+				link_info->vdev_id,
 				SIR_PARAM_SSID_HIDDEN, set_value);
 		if (QDF_STATUS_SUCCESS != status) {
 			hdd_err("QCSAP_PARAM_HIDE_SSID failed");
-			wlan_hdd_enable_roaming(adapter, RSO_START_BSS);
+			wlan_hdd_set_roaming_state(link_info, RSO_START_BSS,
+						   true);
 			return -EIO;
 		}
 		break;
@@ -523,7 +525,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_PARAM_SET_TXRX_FW_STATS:
 	{
 		hdd_debug("QCSAP_PARAM_SET_TXRX_FW_STATS val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMA_VDEV_TXRX_FWSTATS_ENABLE_CMDID,
 					  set_value, VDEV_CMD);
 		break;
@@ -533,7 +535,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_DBGLOG_LOG_LEVEL:
 	{
 		hdd_debug("QCSAP_DBGLOG_LOG_LEVEL val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMI_DBGLOG_LOG_LEVEL,
 					  set_value, DBG_CMD);
 		break;
@@ -542,7 +544,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_DBGLOG_VAP_ENABLE:
 	{
 		hdd_debug("QCSAP_DBGLOG_VAP_ENABLE val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMI_DBGLOG_VAP_ENABLE,
 					  set_value, DBG_CMD);
 		break;
@@ -551,7 +553,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_DBGLOG_VAP_DISABLE:
 	{
 		hdd_debug("QCSAP_DBGLOG_VAP_DISABLE val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMI_DBGLOG_VAP_DISABLE,
 					  set_value, DBG_CMD);
 		break;
@@ -560,7 +562,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_DBGLOG_MODULE_ENABLE:
 	{
 		hdd_debug("QCSAP_DBGLOG_MODULE_ENABLE val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMI_DBGLOG_MODULE_ENABLE,
 					  set_value, DBG_CMD);
 		break;
@@ -569,7 +571,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_DBGLOG_MODULE_DISABLE:
 	{
 		hdd_debug("QCSAP_DBGLOG_MODULE_DISABLE val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMI_DBGLOG_MODULE_DISABLE,
 					  set_value, DBG_CMD);
 		break;
@@ -578,7 +580,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_DBGLOG_MOD_LOG_LEVEL:
 	{
 		hdd_debug("QCSAP_DBGLOG_MOD_LOG_LEVEL val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMI_DBGLOG_MOD_LOG_LEVEL,
 					  set_value, DBG_CMD);
 		break;
@@ -587,7 +589,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_DBGLOG_TYPE:
 	{
 		hdd_debug("QCSAP_DBGLOG_TYPE val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMI_DBGLOG_TYPE,
 					  set_value, DBG_CMD);
 		break;
@@ -595,7 +597,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_DBGLOG_REPORT_ENABLE:
 	{
 		hdd_debug("QCSAP_DBGLOG_REPORT_ENABLE val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMI_DBGLOG_REPORT_ENABLE,
 					  set_value, DBG_CMD);
 		break;
@@ -618,7 +620,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCASAP_TXRX_FWSTATS_RESET:
 	{
 		hdd_debug("WE_TXRX_FWSTATS_RESET val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMA_VDEV_TXRX_FWSTATS_RESET_CMDID,
 					  set_value, VDEV_CMD);
 		break;
@@ -626,7 +628,7 @@ static __iw_softap_setparam(struct net_device *dev,
 
 	case QCSAP_PARAM_RTSCTS:
 	{
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_enable_rtscts,
 					  set_value, VDEV_CMD);
 		if (ret) {
@@ -639,7 +641,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	{
 		uint8_t preamble = 0, nss = 0, rix = 0;
 		struct sap_config *config =
-			&adapter->deflink->session.ap.sap_config;
+			&link_info->session.ap.sap_config;
 
 		hdd_debug("SET_HT_RATE val %d", set_value);
 
@@ -692,7 +694,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		}
 		hdd_debug("SET_HT_RATE val %d rix %d preamble %x nss %d",
 		       set_value, rix, preamble, nss);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_fixed_rate,
 					  set_value, VDEV_CMD);
 		break;
@@ -702,7 +704,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	{
 		uint8_t preamble = 0, nss = 0, rix = 0;
 		struct sap_config *config =
-			&adapter->deflink->session.ap.sap_config;
+			&link_info->session.ap.sap_config;
 
 		if (config->SapHw_mode < eCSR_DOT11_MODE_11ac ||
 		    config->SapHw_mode == eCSR_DOT11_MODE_11ax_ONLY ||
@@ -723,7 +725,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		hdd_debug("SET_VHT_RATE val %d rix %d preamble %x nss %d",
 		       set_value, rix, preamble, nss);
 
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_fixed_rate,
 					  set_value, VDEV_CMD);
 		break;
@@ -732,7 +734,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCASAP_SHORT_GI:
 	{
 		hdd_debug("QCASAP_SET_SHORT_GI val %d", set_value);
-		ret = hdd_we_set_short_gi(adapter, set_value);
+		ret = hdd_we_set_short_gi(link_info, set_value);
 		if (ret)
 			hdd_err("Failed to set ShortGI value ret: %d", ret);
 		break;
@@ -741,7 +743,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_SET_AMPDU:
 	{
 		hdd_debug("QCSAP_SET_AMPDU %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  GEN_VDEV_PARAM_AMPDU,
 					  set_value, GEN_CMD);
 		break;
@@ -750,7 +752,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_SET_AMSDU:
 	{
 		hdd_debug("QCSAP_SET_AMSDU %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  GEN_VDEV_PARAM_AMSDU,
 					  set_value, GEN_CMD);
 		break;
@@ -758,7 +760,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_GTX_HT_MCS:
 	{
 		hdd_debug("wmi_vdev_param_gtx_ht_mcs %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_gtx_ht_mcs,
 					  set_value, GTX_CMD);
 		break;
@@ -767,7 +769,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_GTX_VHT_MCS:
 	{
 		hdd_debug("wmi_vdev_param_gtx_vht_mcs %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_gtx_vht_mcs,
 						set_value, GTX_CMD);
 		break;
@@ -776,7 +778,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_GTX_USRCFG:
 	{
 		hdd_debug("wmi_vdev_param_gtx_usr_cfg %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_gtx_usr_cfg,
 					  set_value, GTX_CMD);
 		break;
@@ -785,7 +787,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_GTX_THRE:
 	{
 		hdd_debug("wmi_vdev_param_gtx_thre %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_gtx_thre,
 					  set_value, GTX_CMD);
 		break;
@@ -794,7 +796,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_GTX_MARGIN:
 	{
 		hdd_debug("wmi_vdev_param_gtx_margin %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_gtx_margin,
 					  set_value, GTX_CMD);
 		break;
@@ -803,7 +805,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_GTX_STEP:
 	{
 		hdd_debug("wmi_vdev_param_gtx_step %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_gtx_step,
 					  set_value, GTX_CMD);
 		break;
@@ -812,7 +814,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_GTX_MINTPC:
 	{
 		hdd_debug("wmi_vdev_param_gtx_mintpc %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_gtx_mintpc,
 					  set_value, GTX_CMD);
 		break;
@@ -821,7 +823,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCSAP_GTX_BWMASK:
 	{
 		hdd_debug("wmi_vdev_param_gtx_bw_mask%d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_gtx_bw_mask,
 					  set_value, GTX_CMD);
 		break;
@@ -863,7 +865,7 @@ static __iw_softap_setparam(struct net_device *dev,
 			return -EINVAL;
 
 		status = sme_set_he_bss_color(mac_handle,
-					      adapter->deflink->vdev_id,
+					      link_info->vdev_id,
 					      set_value);
 		if (QDF_STATUS_SUCCESS != status) {
 			hdd_err("SET_HE_BSS_COLOR failed");
@@ -872,7 +874,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	case QCASAP_SET_DFS_NOL:
 		wlansap_set_dfs_nol(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
+			WLAN_HDD_GET_SAP_CTX_PTR(link_info),
 			(eSapDfsNolType) set_value);
 		break;
 
@@ -890,7 +892,7 @@ static __iw_softap_setparam(struct net_device *dev,
 			return -EINVAL;
 		}
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 		qdf_mem_zero(&radar, sizeof(radar));
 		if (wlansap_is_channel_in_nol_list(ap_ctx->sap_context,
 						   ap_ctx->operating_chan_freq,
@@ -909,28 +911,28 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCASAP_TX_CHAINMASK_CMD:
 	{
 		hdd_debug("QCASAP_TX_CHAINMASK_CMD val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_pdev_param_tx_chain_mask,
 					  set_value, PDEV_CMD);
-		ret = hdd_set_antenna_mode(adapter, hdd_ctx, set_value);
+		ret = hdd_set_antenna_mode(link_info, set_value);
 		break;
 	}
 
 	case QCASAP_RX_CHAINMASK_CMD:
 	{
 		hdd_debug("QCASAP_RX_CHAINMASK_CMD val %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_pdev_param_rx_chain_mask,
 					  set_value, PDEV_CMD);
-		ret = hdd_set_antenna_mode(adapter, hdd_ctx, set_value);
+		ret = hdd_set_antenna_mode(link_info, set_value);
 		break;
 	}
 
 	case QCASAP_NSS_CMD:
 	{
 		hdd_debug("QCASAP_NSS_CMD val %d", set_value);
-		hdd_update_nss(adapter, set_value, set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		hdd_update_nss(link_info, set_value, set_value);
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_nss,
 					  set_value, VDEV_CMD);
 		break;
@@ -962,7 +964,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	}
 
 	case QCASAP_SET_PHYMODE:
-		ret = hdd_we_update_phymode(adapter, set_value);
+		ret = hdd_we_update_phymode(link_info, set_value);
 		break;
 
 	case QCASAP_DUMP_STATS:
@@ -979,8 +981,8 @@ static __iw_softap_setparam(struct net_device *dev,
 		switch (set_value) {
 		case CDP_HDD_STATS:
 			ucfg_dp_clear_net_dev_stats(adapter->dev);
-			memset(&adapter->deflink->hdd_stats, 0,
-			       sizeof(adapter->deflink->hdd_stats));
+			memset(&link_info->hdd_stats, 0,
+			       sizeof(link_info->hdd_stats));
 			break;
 		case CDP_TXRX_HIST_STATS:
 			ucfg_wlan_dp_clear_tx_rx_histogram(hdd_ctx->psoc);
@@ -1000,54 +1002,54 @@ static __iw_softap_setparam(struct net_device *dev,
 	}
 	case QCSAP_START_FW_PROFILING:
 		hdd_debug("QCSAP_START_FW_PROFILING %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  WMI_WLAN_PROFILE_TRIGGER_CMDID,
 					  set_value, DBG_CMD);
 		break;
 	case QCASAP_PARAM_LDPC:
-		ret = hdd_set_ldpc(adapter, set_value);
+		ret = hdd_set_ldpc(link_info, set_value);
 		break;
 	case QCASAP_PARAM_TX_STBC:
-		ret = hdd_set_tx_stbc(adapter, set_value);
+		ret = hdd_set_tx_stbc(link_info, set_value);
 		break;
 	case QCASAP_PARAM_RX_STBC:
-		ret = hdd_set_rx_stbc(adapter, set_value);
+		ret = hdd_set_rx_stbc(link_info, set_value);
 		break;
 	case QCASAP_SET_11AX_RATE:
 		ret = hdd_set_11ax_rate(adapter, set_value,
-					&adapter->deflink->session.ap.sap_config);
+					&link_info->session.ap.sap_config);
 		break;
 	case QCASAP_PARAM_DCM:
 		hdd_debug("Set wmi_vdev_param_he_dcm_enable: %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_he_dcm_enable,
 					  set_value, VDEV_CMD);
 		break;
 	case QCASAP_PARAM_RANGE_EXT:
 		hdd_debug("Set wmi_vdev_param_he_range_ext: %d", set_value);
-		ret = wma_cli_set_command(adapter->deflink->vdev_id,
+		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_vdev_param_he_range_ext,
 					  set_value, VDEV_CMD);
 		break;
 	case QCSAP_SET_DEFAULT_AMPDU:
 		hdd_debug("QCSAP_SET_DEFAULT_AMPDU val %d", set_value);
 		ret = wma_cli_set_command(
-				(int)adapter->deflink->vdev_id,
+				(int)link_info->vdev_id,
 				(int)wmi_pdev_param_max_mpdus_in_ampdu,
 				set_value, PDEV_CMD);
 		break;
 	case QCSAP_ENABLE_RTS_BURSTING:
 		hdd_debug("QCSAP_ENABLE_RTS_BURSTING val %d", set_value);
 		ret = wma_cli_set_command(
-				(int)adapter->deflink->vdev_id,
+				(int)link_info->vdev_id,
 				(int)wmi_pdev_param_enable_rts_sifs_bursting,
 				set_value, PDEV_CMD);
 		break;
 	case QCSAP_SET_BTCOEX_MODE:
-		ret =  wlan_hdd_set_btcoex_mode(adapter, set_value);
+		ret =  wlan_hdd_set_btcoex_mode(link_info, set_value);
 		break;
 	case QCSAP_SET_BTCOEX_LOW_RSSI_THRESHOLD:
-		ret =  wlan_hdd_set_btcoex_rssi_threshold(adapter, set_value);
+		ret =  wlan_hdd_set_btcoex_rssi_threshold(link_info, set_value);
 		break;
 	default:
 		hdd_err("Invalid setparam command %d value %d",
@@ -1921,8 +1923,8 @@ static int __iw_get_char_setnone(struct net_device *dev,
 
 	switch (sub_cmd) {
 	case QCSAP_GET_STATS:
-		hdd_wlan_get_stats(adapter, &(wrqu->data.length),
-					extra, WE_MAX_STR_LEN);
+		hdd_wlan_get_stats(adapter->deflink, &wrqu->data.length,
+				   extra, WE_MAX_STR_LEN);
 		break;
 	case QCSAP_LIST_FW_PROFILE:
 		hdd_wlan_list_fw_profile(&(wrqu->data.length),
@@ -2296,9 +2298,9 @@ static int hdd_softap_get_sta_info(struct hdd_adapter *adapter,
 		}
 
 		written += scnprintf(buf + written, size - written,
-				     QDF_FULL_MAC_FMT
+				     QDF_MAC_ADDR_FMT
 				     " ecsa=%d\n",
-				     QDF_FULL_MAC_REF(sta->sta_mac.bytes),
+				     QDF_MAC_ADDR_REF(sta->sta_mac.bytes),
 				     sta->ecsa_capable);
 		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta, true,
 				     STA_INFO_SOFTAP_GET_STA_INFO);
@@ -2570,8 +2572,8 @@ int __iw_get_softap_linkspeed(struct net_device *dev,
 		hdd_err("Invalid peer macaddress");
 		return -EINVAL;
 	}
-	rc = wlan_hdd_get_linkspeed_for_peermac(adapter, &mac_address,
-						&link_speed);
+	rc = wlan_hdd_get_linkspeed_for_peermac(adapter->deflink,
+						&mac_address, &link_speed);
 	if (rc) {
 		hdd_err("Unable to retrieve SME linkspeed");
 		return rc;
@@ -2681,8 +2683,8 @@ __iw_get_peer_rssi(struct net_device *dev, struct iw_request_info *info,
 		wrqu->data.length +=
 			scnprintf(extra + wrqu->data.length,
 				  IW_PRIV_SIZE_MASK - wrqu->data.length,
-				  "["QDF_FULL_MAC_FMT"] [%d]\n",
-				  QDF_FULL_MAC_REF(rssi_info->peer_stats[i].peer_macaddr),
+				  "["QDF_MAC_ADDR_FMT"] [%d]\n",
+				  QDF_MAC_ADDR_REF(rssi_info->peer_stats[i].peer_macaddr),
 				  rssi_info->peer_stats[i].peer_rssi);
 
 	wrqu->data.length++;

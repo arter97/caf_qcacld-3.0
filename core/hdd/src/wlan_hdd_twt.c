@@ -41,6 +41,7 @@
 #include <target_if.h>
 #include "wlan_hdd_object_manager.h"
 #include "osif_twt_ext_req.h"
+#include "wlan_mlo_mgr_sta.h"
 #include "wlan_twt_ucfg_ext_api.h"
 #include "wlan_twt_ucfg_ext_cfg.h"
 #include "osif_twt_internal.h"
@@ -81,7 +82,8 @@ QDF_STATUS hdd_send_twt_responder_enable_cmd(struct hdd_context *hdd_ctx)
 
 void wlan_twt_concurrency_update(struct hdd_context *hdd_ctx)
 {
-	qdf_sched_work(0, &hdd_ctx->twt_en_dis_work);
+	if (wlan_hdd_is_twt_pmo_allowed(hdd_ctx))
+		qdf_sched_work(0, &hdd_ctx->twt_en_dis_work);
 }
 
 void hdd_twt_update_work_handler(void *data)
@@ -138,7 +140,7 @@ void wlan_hdd_twt_deinit(struct hdd_context *hdd_ctx)
 }
 
 void
-hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
+hdd_send_twt_del_all_sessions_to_userspace(struct wlan_hdd_link_info *link_info)
 {
 }
 
@@ -2387,16 +2389,17 @@ hdd_twt_del_dialog_comp_cb(struct wlan_objmgr_psoc *psoc,
 }
 
 void
-hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
+hdd_send_twt_del_all_sessions_to_userspace(struct wlan_hdd_link_info *link_info)
 {
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct wlan_objmgr_psoc *psoc = adapter->hdd_ctx->psoc;
 	struct hdd_station_ctx *hdd_sta_ctx = NULL;
 	struct wmi_twt_del_dialog_complete_event_param params;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	if (!hdd_cm_is_vdev_associated(link_info)) {
 		hdd_debug("Not associated, vdev %d mode %d",
-			   adapter->deflink->vdev_id, adapter->device_mode);
+			   link_info->vdev_id, adapter->device_mode);
 		return;
 	}
 
@@ -2404,13 +2407,13 @@ hdd_send_twt_del_all_sessions_to_userspace(struct hdd_adapter *adapter)
 					 &hdd_sta_ctx->conn_info.bssid,
 					 TWT_ALL_SESSIONS_DIALOG_ID)) {
 		hdd_debug("No active TWT sessions, vdev_id: %d dialog_id: %d",
-			  adapter->deflink->vdev_id,
+			  link_info->vdev_id,
 			  TWT_ALL_SESSIONS_DIALOG_ID);
 		return;
 	}
 
 	qdf_mem_zero(&params, sizeof(params));
-	params.vdev_id = adapter->deflink->vdev_id;
+	params.vdev_id = link_info->vdev_id;
 	params.dialog_id = TWT_ALL_SESSIONS_DIALOG_ID;
 	params.status = WMI_HOST_DEL_TWT_STATUS_UNKNOWN_ERROR;
 	qdf_mem_copy(params.peer_macaddr, hdd_sta_ctx->conn_info.bssid.bytes,
@@ -3557,14 +3560,20 @@ hdd_twt_pack_get_capabilities_resp(struct hdd_adapter *adapter)
 
 	/*
 	 * Userspace will query the TWT get capabilities before
-	 * issuing a get capabilities request. If the STA is
-	 * connected, then check the "enable_twt_24ghz" ini
-	 * value to advertise the TWT requestor capability.
+	 * issuing a get capabilities request. For legacy connection,
+	 * if the STA is connected, then check the "enable_twt_24ghz"
+	 * ini value to advertise the TWT requestor capability.
+	 * For MLO connection, TWT requestor capabilities are advertised
+	 * irrespective of connected band.
 	 */
-	connected_band = hdd_conn_get_connected_band(adapter);
-	if (connected_band == BAND_2G &&
-	    !ucfg_mlme_is_24ghz_twt_enabled(hdd_ctx->psoc))
-		is_twt_24ghz_allowed = false;
+	if (!mlo_is_mld_sta(adapter->deflink->vdev)) {
+		connected_band = hdd_conn_get_connected_band(adapter->deflink);
+		if (connected_band == BAND_2G &&
+		    !ucfg_mlme_is_24ghz_twt_enabled(hdd_ctx->psoc))
+			is_twt_24ghz_allowed = false;
+	} else {
+		is_twt_24ghz_allowed = true;
+	}
 
 	/* fill the self_capability bitmap  */
 	ucfg_mlme_get_twt_requestor(hdd_ctx->psoc, &twt_req);
@@ -4767,9 +4776,7 @@ void __hdd_twt_update_work_handler(struct hdd_context *hdd_ctx)
 	sta_count = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
 							      PM_STA_MODE,
 							      NULL);
-	sap_count = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-							      PM_SAP_MODE,
-							      NULL);
+	sap_count = policy_mgr_get_sap_mode_count(hdd_ctx->psoc, NULL);
 	twt_arg.hdd_ctx = hdd_ctx;
 
 	hdd_debug("Total connection %d, sta_count %d, sap_count %d",
@@ -5047,5 +5054,25 @@ int wlan_hdd_cfg80211_wifi_twt_config(struct wiphy *wiphy,
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
+}
+
+void wlan_hdd_resume_pmo_twt(struct hdd_context *hdd_ctx)
+{
+	wlan_twt_concurrency_update(hdd_ctx);
+}
+
+void wlan_hdd_suspend_pmo_twt(struct hdd_context *hdd_ctx)
+{
+	qdf_flush_work(&hdd_ctx->twt_en_dis_work);
+}
+
+bool wlan_hdd_is_twt_pmo_allowed(struct hdd_context *hdd_ctx)
+{
+	bool twt_pmo_allowed = false;
+
+	twt_pmo_allowed = ucfg_twt_get_pmo_allowed(hdd_ctx->psoc);
+	hdd_debug("twt_disabled_allowed %d ", twt_pmo_allowed);
+
+	return twt_pmo_allowed;
 }
 

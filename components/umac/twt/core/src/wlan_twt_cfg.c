@@ -438,3 +438,16 @@ wlan_twt_get_restricted_support(struct wlan_objmgr_psoc *psoc, bool *val)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+bool
+wlan_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+
+	if (twt_psoc_obj->twt_pmo_disabled)
+		return false;
+	else
+		return true;
+}

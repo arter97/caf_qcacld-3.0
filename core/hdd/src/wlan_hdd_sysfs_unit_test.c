@@ -45,8 +45,13 @@ static ssize_t __hdd_sysfs_unit_test_target_store(
 	uint8_t vdev_id = 0;
 	QDF_STATUS status;
 
-	if (hdd_validate_adapter(adapter))
+	if (!adapter) {
+		hdd_err("Adapter is null");
 		return -EINVAL;
+	} else if (adapter->device_mode != QDF_FTM_MODE &&
+		   hdd_validate_adapter(adapter)) {
+		return -EINVAL;
+	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);

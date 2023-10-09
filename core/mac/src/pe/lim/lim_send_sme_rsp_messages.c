@@ -169,6 +169,37 @@ lim_get_he_rate_info_flag(tpDphHashNode sta_ds)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * lim_get_eht_rate_info_flag() - Get eht tx rate info flag
+ * @sta_ds: Pointer to station ds structure
+ *
+ * This function is called to get the eht tx rate info.
+ *
+ * Return: Returns eht tx rate flag
+ */
+static enum tx_rate_info
+lim_get_eht_rate_info_flag(tpDphHashNode sta_ds)
+{
+	if (sta_ds->eht_config.support_320mhz_6ghz)
+		return  TX_RATE_EHT320;
+	else if (sta_ds->ch_width == CH_WIDTH_160MHZ)
+		return  TX_RATE_EHT160;
+	else if (sta_ds->ch_width == CH_WIDTH_80MHZ)
+		return TX_RATE_EHT80;
+	else if (sta_ds->ch_width == CH_WIDTH_40MHZ)
+		return TX_RATE_EHT40;
+	else
+		return TX_RATE_EHT20;
+}
+#else
+static enum tx_rate_info
+lim_get_eht_rate_info_flag(tpDphHashNode sta_ds)
+{
+	return TX_RATE_LEGACY;
+}
+#endif
+
 /**
  * lim_get_max_rate_flags() - Get rate flags
  * @mac_ctx: Pointer to global MAC structure
@@ -189,12 +220,15 @@ uint32_t lim_get_max_rate_flags(struct mac_context *mac_ctx, tpDphHashNode sta_d
 		return rate_flags;
 	}
 
-	if (!sta_ds->mlmStaContext.htCapability &&
+	if (!lim_is_sta_eht_capable(sta_ds) &&
+	    !sta_ds->mlmStaContext.htCapability &&
 	    !sta_ds->mlmStaContext.vhtCapability &&
 	    !lim_is_sta_he_capable(sta_ds)) {
 		rate_flags |= TX_RATE_LEGACY;
 	} else {
-		if (lim_is_sta_he_capable(sta_ds)) {
+		if (lim_is_sta_eht_capable(sta_ds)) {
+			rate_flags |= lim_get_eht_rate_info_flag(sta_ds);
+		} else if (lim_is_sta_he_capable(sta_ds)) {
 			rate_flags |= lim_get_he_rate_info_flag(sta_ds);
 		} else if (sta_ds->mlmStaContext.vhtCapability) {
 			if (WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ ==
@@ -1733,12 +1767,14 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 				       struct pe_session *session_entry,
 				       qdf_freq_t ch_freq1,
-				       uint32_t ch_freq2,
-				       enum phy_ch_width new_ch_width)
+				       struct csa_offload_params *csa_params)
 {
 	bool is_allowed = true;
 	u32 cnx_count = 0;
 	enum QDF_OPMODE mode;
+	qdf_freq_t csa_freq = csa_params->csa_chan_freq, sec_ch_2g_freq = 0;
+	enum phy_ch_width new_ch_width = csa_params->new_ch_width;
+	enum channel_state chan_state;
 
 	if (!session_entry->vdev ||
 	    wlan_cm_is_vdev_disconnecting(session_entry->vdev) ||
@@ -1748,16 +1784,42 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 		return false;
 	}
 
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_freq) &&
+	    wlan_reg_get_bw_value(new_ch_width) > 20) {
+		if (csa_params->sec_chan_offset == PHY_DOUBLE_CHANNEL_LOW_PRIMARY)
+			sec_ch_2g_freq = csa_freq + HT40_SEC_OFFSET;
+		else if (csa_params->sec_chan_offset == PHY_DOUBLE_CHANNEL_HIGH_PRIMARY)
+			sec_ch_2g_freq = csa_freq - HT40_SEC_OFFSET;
+	}
+
+	chan_state = wlan_reg_get_bonded_channel_state_for_pwrmode(
+						mac_ctx->pdev,
+						csa_freq, new_ch_width,
+						sec_ch_2g_freq,
+						REG_CURRENT_PWR_MODE);
+	if (chan_state == CHANNEL_STATE_INVALID ||
+	    chan_state == CHANNEL_STATE_DISABLE) {
+		pe_err("Invalid csa_freq:%d for provided ch_width:%d. Disconnect",
+		       csa_freq, new_ch_width);
+		lim_tear_down_link_with_ap(mac_ctx,
+					   session_entry->peSessionId,
+					   REASON_CHANNEL_SWITCH_FAILED,
+					   eLIM_HOST_DISASSOC);
+		return false;
+	}
+
 	mode = wlan_vdev_mlme_get_opmode(session_entry->vdev);
 	cnx_count = policy_mgr_get_connection_count(mac_ctx->psoc);
 	if ((cnx_count > 1) && !policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) &&
 	    !policy_mgr_is_interband_mcc_supported(mac_ctx->psoc)) {
-		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, ch_freq2);
+		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, csa_freq);
 	} else if (cnx_count > 2) {
 		is_allowed =
 		policy_mgr_allow_concurrency_csa(
-			mac_ctx->psoc, ch_freq2,
-			policy_mgr_convert_device_mode_to_qdf_type(mode),
+			mac_ctx->psoc, csa_freq,
+			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
+							     mode,
+							     session_entry->vdev_id),
 			session_entry->vdev_id,
 			policy_mgr_get_bw(new_ch_width), false,
 			CSA_REASON_UNKNOWN);
@@ -1837,6 +1899,18 @@ static bool lim_is_puncture_same(tLimChannelSwitchInfo *lim_ch_switch,
 	return lim_ch_switch->puncture_bitmap == session->puncture_bitmap;
 }
 
+static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
+				 uint8_t link_id,
+				 struct csa_offload_params *csa_params)
+{
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	mlo_mgr_update_csa_link_info(vdev->mlo_dev_ctx,
+				     csa_params, link_id);
+	pe_debug("vdev_id: %d link id %d mlo csa sta param updated ",
+		 vdev_id, link_id);
+}
+
 #else
 static void lim_set_csa_chan_param_11be(struct pe_session *session,
 					struct csa_offload_params *csa_param,
@@ -1858,6 +1932,13 @@ static bool lim_is_puncture_same(tLimChannelSwitchInfo *lim_ch_switch,
 {
 	return true;
 }
+
+static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
+				 uint8_t link_id,
+				 struct csa_offload_params *csa_params)
+{
+}
+
 #endif
 
 void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
@@ -1873,6 +1954,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
 	tLimWiderBWChannelSwitchInfo *chnl_switch_info = NULL;
 	tLimChannelSwitchInfo *lim_ch_switch = NULL;
+	uint8_t link_id;
 
 	if (!csa_params) {
 		pe_err("limMsgQ body ptr is NULL");
@@ -1902,8 +1984,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (!lim_is_csa_channel_allowed(mac_ctx, session_entry,
 					session_entry->curr_op_freq,
-					csa_params->csa_chan_freq,
-					csa_params->new_ch_width)) {
+					csa_params)) {
 		pe_debug("Channel switch is not allowed");
 		goto err;
 	}
@@ -2164,6 +2245,16 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
 		pe_debug("Ignore CSA, no change in ch, bw and puncture");
 		goto err;
+	}
+
+	if (!wlan_cm_is_vdev_connected(session_entry->vdev)) {
+		pe_info_rl("Ignore CSA, vdev is in not in conncted state");
+		goto err;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
+		link_id = wlan_vdev_get_link_id(session_entry->vdev);
+		update_csa_link_info(session_entry->vdev, link_id, csa_params);
 	}
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_params->csa_chan_freq) &&
@@ -2617,13 +2708,13 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		return;
 	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(mac_ctx->psoc,
 						WLAN_SOC_CEXT_CSA_TX_OFFLOAD);
-	if (session->dfsIncludeChanSwIe && !csa_tx_offload &&
-	    ((session->gLimChannelSwitch.switchCount ==
-	      mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
-	     (session->gLimChannelSwitch.switchCount == 1) ||
-	     is_sap_go_moved_before_sta))
+	if ((session->dfsIncludeChanSwIe && !csa_tx_offload &&
+	     ((session->gLimChannelSwitch.switchCount ==
+	       mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
+	      (session->gLimChannelSwitch.switchCount == 1) ||
+	      is_sap_go_moved_before_sta)) ||
+	     session->bw_update_include_ch_sw_ie)
 		lim_process_ap_ecsa_timeout(session);
-
 
 	if (session->gLimOperatingMode.present)
 		/* Done with nss update */
@@ -2632,4 +2723,36 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 	lim_handle_bss_color_change_ie(mac_ctx, session);
 
 	return;
+}
+
+void lim_nss_or_ch_width_update_rsp(struct mac_context *mac_ctx,
+				    uint8_t vdev_id, QDF_STATUS status,
+				    enum sir_bcn_update_reason reason)
+{
+	struct scheduler_msg msg = {0};
+	struct sir_bcn_update_rsp *rsp;
+	QDF_STATUS qdf_status = QDF_STATUS_E_INVAL;
+
+	rsp = qdf_mem_malloc(sizeof(*rsp));
+	if (!rsp)
+		return;
+
+	rsp->vdev_id = vdev_id;
+	rsp->status = status;
+	rsp->reason = reason;
+
+	if (rsp->reason == REASON_NSS_UPDATE)
+		msg.type = eWNI_SME_NSS_UPDATE_RSP;
+	else if (rsp->reason == REASON_CH_WIDTH_UPDATE)
+		msg.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
+	else
+		goto done;
+
+	msg.bodyptr = rsp;
+	msg.bodyval = 0;
+	qdf_status = scheduler_post_message(QDF_MODULE_ID_PE, QDF_MODULE_ID_SME,
+					    QDF_MODULE_ID_SME, &msg);
+done:
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		qdf_mem_free(rsp);
 }

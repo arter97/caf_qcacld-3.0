@@ -249,7 +249,7 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 	uint32_t status;
 	tpDphHashNode sta_ptr;
 	uint16_t aid;
-	uint8_t ch_bw = 0;
+	enum phy_ch_width ch_bw = 0;
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
@@ -1122,7 +1122,14 @@ __lim_process_radio_measure_request(struct mac_context *mac, uint8_t *pRxPacketI
 	}
 	/* Call rrm function to handle the request. */
 
-	rrm_process_radio_measurement_request(mac, pHdr->sa, frm,
+	pe_debug("vdev: %d Received rrm req from sa addr:"QDF_MAC_ADDR_FMT" bssId:"QDF_MAC_ADDR_FMT" session addr:"QDF_MAC_ADDR_FMT" session self addr:"QDF_MAC_ADDR_FMT"",
+		 pe_session->vdev_id,
+		 QDF_MAC_ADDR_REF(pHdr->sa),
+		 QDF_MAC_ADDR_REF(pHdr->bssId),
+		 QDF_MAC_ADDR_REF(pe_session->bssId),
+		 QDF_MAC_ADDR_REF(pe_session->self_mac_addr));
+
+	rrm_process_radio_measurement_request(mac, pe_session->bssId, frm,
 					      pe_session);
 err:
 	qdf_mem_free(frm);
@@ -2168,7 +2175,8 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			if (wlan_t2lm_deliver_event(
 				session->vdev, peer,
 				WLAN_T2LM_EV_ACTION_FRAME_RX_REQ,
-				(void *)body_ptr, &token) == QDF_STATUS_SUCCESS)
+				(void *)body_ptr, frame_len,
+				&token) == QDF_STATUS_SUCCESS)
 				status_code = WLAN_T2LM_RESP_TYPE_SUCCESS;
 			else
 				status_code =
@@ -2187,13 +2195,13 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			wlan_t2lm_deliver_event(
 					session->vdev, peer,
 					WLAN_T2LM_EV_ACTION_FRAME_RX_RESP,
-					(void *)body_ptr, &token);
+					(void *)body_ptr, frame_len, &token);
 			break;
 		case EHT_T2LM_TEARDOWN:
 			wlan_t2lm_deliver_event(
 					session->vdev, peer,
 					WLAN_T2LM_EV_ACTION_FRAME_RX_TEARDOWN,
-					(void *)body_ptr, NULL);
+					(void *)body_ptr, frame_len, NULL);
 			break;
 		case EHT_EPCS_REQUEST:
 			wlan_epcs_deliver_event(

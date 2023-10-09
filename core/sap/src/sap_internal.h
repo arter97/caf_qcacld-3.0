@@ -121,6 +121,7 @@ struct sap_avoid_channels_info {
 };
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
+#define MAX_VLAN 4
 struct sap_context {
 
 	/* Include the current channel frequency of AP */
@@ -130,9 +131,10 @@ struct sap_context {
 #ifdef DCS_INTERFERENCE_DETECTION
 	qdf_freq_t dcs_ch_freq;
 #endif
-
-	/* Include the SME(CSR) sessionId here */
-	uint8_t sessionId;
+	union {
+		uint8_t sessionId;
+		uint8_t vdev_id;
+	};
 	uint8_t sap_radar_found_status;
 
 	/* vdev object corresponding to sessionId */
@@ -254,6 +256,9 @@ struct sap_context {
  */
 	bool clean_channel_array[NUM_CHANNELS];
 #endif
+#ifdef QCA_MULTIPASS_SUPPORT
+	uint16_t vlan_map[2 * MAX_VLAN];
+#endif
 };
 
 /*----------------------------------------------------------------------------
@@ -310,6 +315,23 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 						   uint8_t sessionid,
 						   uint32_t scanid,
 						   eCsrScanStatus scan_status);
+
+/**
+ * sap_sort_channel_list() - Sort channel list based on channel weight
+ * @mac_ctx: Pointer to mac_context
+ * @vdev_id: Vdev ID
+ * @ch_list: Pointer to qdf_list_t
+ * @ch_info: Pointer to sap_sel_ch_info structure
+ * @domain: Regulatory Domain
+ * @operating_band: Operating band
+ *
+ * Return: None
+ *
+ */
+void
+sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
+		      qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
+		      v_REGDOMAIN_t *domain, uint32_t *operating_band);
 
 /**
  * sap_select_channel() - select SAP channel

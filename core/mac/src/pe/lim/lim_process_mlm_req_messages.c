@@ -43,12 +43,15 @@
 #include "wlan_mlme_public_struct.h"
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wlan_pmo_ucfg_api.h"
+#include "wlan_cp_stats_utils_api.h"
 #include "wlan_objmgr_vdev_obj.h"
 #include <wlan_cm_api.h>
 #include <lim_mlo.h>
 #include "wlan_mlo_mgr_peer.h"
 #include <son_api.h>
 #include "wifi_pos_pasn_api.h"
+#include "rrm_api.h"
+#include "../../core/src/wlan_cp_stats_obj_mgr_handler.h"
 
 static void lim_process_mlm_auth_req(struct mac_context *, uint32_t *);
 static void lim_process_mlm_assoc_req(struct mac_context *, uint32_t *);
@@ -94,6 +97,75 @@ static void lim_fill_status_code(uint8_t frame_type,
 			*proto_status_code = STATUS_UNSPECIFIED_FAILURE;
 		}
 	}
+}
+
+void lim_process_rrm_sta_stats_rsp_timeout(struct mac_context *mac)
+{
+	struct pe_session *session;
+	tSirMacRadioMeasureReport rrm_report;
+	QDF_STATUS status;
+	uint8_t index;
+	tpRRMReq pcurrent_req = NULL;
+	tRrmRetStatus rrm_status;
+
+	session = pe_find_session_by_session_id(mac,
+		mac->lim.lim_timers.rrm_sta_stats_resp_timer.sessionId);
+	if (!session) {
+		pe_err("Session does not exist for given session id %d",
+		       mac->lim.lim_timers.rrm_sta_stats_resp_timer.sessionId);
+		rrm_cleanup(mac, mac->rrm.rrmPEContext.rrm_sta_stats.index);
+		return;
+	}
+
+	pe_warn("STA STATS RSP timeout vdev_id %d", session->vdev_id);
+	index = mac->rrm.rrmPEContext.rrm_sta_stats.index;
+	pcurrent_req = mac->rrm.rrmPEContext.pCurrentReq[index];
+	if (!pcurrent_req) {
+		pe_err("Current request is NULL for index %d", index);
+		qdf_mem_zero(&mac->rrm.rrmPEContext.rrm_sta_stats,
+			     sizeof(mac->rrm.rrmPEContext.rrm_sta_stats));
+		return;
+	}
+
+	if (!mac->rrm.rrmPEContext.rrm_sta_stats.rrm_sta_stats_res_count) {
+		pe_err("response not received for previous req");
+		rrm_status = eRRM_INCAPABLE;
+		goto err;
+	}
+
+	rrm_report = mac->rrm.rrmPEContext.rrm_sta_stats.rrm_report;
+	switch (rrm_report.report.statistics_report.group_id) {
+	/*
+	 * For Counter stats and Mac stats some stats will be received
+	 * via FW and some via DP. So, same handling is required for both
+	 * cases.
+	 */
+	case STA_STAT_GROUP_ID_COUNTER_STATS:
+	case STA_STAT_GROUP_ID_MAC_STATS:
+		status = wlan_cp_stats_infra_cp_deregister_resp_cb(mac->psoc);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_err("failed to deregister callback %d", status);
+
+		status =
+			rrm_send_sta_stats_req(
+				mac, session,
+				mac->rrm.rrmPEContext.rrm_sta_stats.peer);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("fail to send stats req");
+			rrm_status = eRRM_FAILURE;
+			goto err;
+		}
+		break;
+	case STA_STAT_GROUP_ID_DELAY_STATS:
+		/* TOdo: fetch from scan ie */
+		break;
+	}
+	return;
+err:
+	rrm_process_rrm_sta_stats_request_failure(
+		mac, session, mac->rrm.rrmPEContext.rrm_sta_stats.peer,
+		rrm_status, mac->rrm.rrmPEContext.rrm_sta_stats.index);
+	rrm_cleanup(mac, mac->rrm.rrmPEContext.rrm_sta_stats.index);
 }
 
 void lim_process_sae_auth_timeout(struct mac_context *mac_ctx)
@@ -188,14 +260,14 @@ void lim_process_mlm_req_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_DISASSOC_ACK_TIMEOUT:
 		lim_process_disassoc_ack_timeout(mac_ctx);
 		break;
-	case SIR_LIM_DEAUTH_ACK_TIMEOUT:
-		lim_process_deauth_ack_timeout(mac_ctx);
-		break;
 	case SIR_LIM_AUTH_RETRY_TIMEOUT:
 		lim_process_auth_retry_timer(mac_ctx);
 		break;
 	case SIR_LIM_AUTH_SAE_TIMEOUT:
 		lim_process_sae_auth_timeout(mac_ctx);
+		break;
+	case SIR_LIM_RRM_STA_STATS_RSP_TIMEOUT:
+		lim_process_rrm_sta_stats_rsp_timeout(mac_ctx);
 		break;
 	case LIM_MLM_TSPEC_REQ:
 	default:
@@ -1257,7 +1329,8 @@ void lim_clean_up_disassoc_deauth_req(struct mac_context *mac_ctx,
 			     (uint8_t *) &mlm_deauth_req->peer_macaddr.bytes,
 			     QDF_MAC_ADDR_SIZE))) {
 		if (clean_rx_path) {
-			lim_process_deauth_ack_timeout(mac_ctx);
+			lim_process_deauth_ack_timeout(mac_ctx,
+						       mlm_deauth_req->sessionId);
 		} else {
 			if (tx_timer_running(
 				&mac_ctx->lim.lim_timers.gLimDeauthAckTimer)) {
@@ -1569,16 +1642,19 @@ end:
  * lim_process_deauth_ack_timeout() - wrapper function around
  * lim_send_deauth_cnf
  *
- * @mac_ctx:        mac_ctx
+ * @pMacGlobal:     mac_ctx
+ * @vdev_id:        vdev id
  *
  * wrapper function around lim_send_deauth_cnf
  *
  * Return: void
  */
-void lim_process_deauth_ack_timeout(struct mac_context *mac_ctx)
+void lim_process_deauth_ack_timeout(void *pMacGlobal, uint32_t vdev_id)
 {
-	pe_debug("Deauth Ack timeout");
-	lim_send_deauth_cnf(mac_ctx);
+	struct mac_context *mac_ctx = (struct mac_context *)pMacGlobal;
+
+	pe_debug("Deauth Ack timeout for vdev id %d", vdev_id);
+	lim_send_deauth_cnf(mac_ctx, vdev_id);
 }
 
 /*

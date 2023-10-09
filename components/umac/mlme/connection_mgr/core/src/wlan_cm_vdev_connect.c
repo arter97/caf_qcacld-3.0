@@ -42,6 +42,9 @@
 #include "wlan_psoc_mlme_api.h"
 #include "wlan_t2lm_api.h"
 #include "wlan_mlo_t2lm.h"
+#include "wlan_mlo_link_force.h"
+#include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_dp_api.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
@@ -741,6 +744,7 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	enum phy_ch_width ch_width = CH_WIDTH_20MHZ;
 	WLAN_HOST_DIAG_EVENT_DEF(conn_stats,
 				 struct host_event_wlan_connection_stats);
 
@@ -771,8 +775,8 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 
-	conn_stats.chnl_bw =
-		cm_get_diag_ch_width(des_chan->ch_width);
+	wlan_mlme_get_sta_ch_width(vdev, &ch_width);
+	conn_stats.chnl_bw = cm_get_diag_ch_width(ch_width);
 	conn_stats.dot11mode =
 		cm_diag_dot11_mode_from_phy_mode(des_chan->ch_phymode);
 
@@ -1034,6 +1038,8 @@ void cm_get_sta_cxn_info(struct wlan_objmgr_vdev *vdev,
 #endif
 #endif
 
+#define MGMT_FRAME_FULL_PROTECTION (RSN_CAP_MFP_REQUIRED | RSN_CAP_MFP_CAPABLE)
+
 QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 				struct wlan_cm_connect_req *req)
 {
@@ -1051,11 +1057,15 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 		mlme_err("vdev_id: %d psoc not found", req->vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
-	if (policy_mgr_is_sta_mon_concurrency(psoc))
+
+	if (!wlan_dp_is_local_pkt_capture_enabled(psoc) &&
+	    policy_mgr_is_sta_mon_concurrency(psoc))
 		return QDF_STATUS_E_NOSUPPORT;
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
 	if (rso_cfg) {
+		uint8_t rso_user_mfp;
+
 		rso_cfg->orig_sec_info.rsn_caps = req->crypto.rsn_caps;
 		rso_cfg->orig_sec_info.authmodeset = req->crypto.auth_type;
 		rso_cfg->orig_sec_info.ucastcipherset =
@@ -1069,6 +1079,19 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 		 * wlan_cm_send_connect_rsp
 		 */
 		rso_cfg->tried_candidate_freq_list.num_chan = 0;
+
+		/*
+		 * This user configure MFP capability is global and is for
+		 * multiple profiles which can be used by firmware for cross-AKM
+		 * roaming. When user configures MFP required then we should
+		 * set both MFPC and MFPR in RSN caps.
+		 */
+		rso_user_mfp = req->crypto.user_mfp;
+		if (rso_user_mfp == RSN_CAP_MFP_REQUIRED)
+			rso_user_mfp = MGMT_FRAME_FULL_PROTECTION;
+		rso_cfg->rso_rsn_caps = (req->crypto.rsn_caps) &
+					(~MGMT_FRAME_FULL_PROTECTION);
+		rso_cfg->rso_rsn_caps = (rso_cfg->rso_rsn_caps) | rso_user_mfp;
 	}
 
 	if (wlan_get_vendor_ie_ptr_from_oui(HS20_OUI_TYPE,
@@ -1080,6 +1103,10 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 					   wlan_vdev_get_id(vdev),
 					   HS_20_AP, &src_cfg);
 	}
+	if (req->source != CM_MLO_LINK_SWITCH_CONNECT)
+		ml_nlink_conn_change_notify(
+			psoc, wlan_vdev_get_id(vdev),
+			ml_nlink_connect_start_evt, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1115,12 +1142,16 @@ QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg)
 
 #ifdef WLAN_FEATURE_11BE_MLO
 QDF_STATUS
-cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
+cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
+		       struct scan_cache_entry *scan_entry,
 		       struct mlo_partner_info *partner_info)
 {
 	uint8_t i, j = 0;
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
+	struct scan_cache_entry *part_scan_entry = NULL;
+	bool is_security_allowed;
+	struct qdf_mac_addr *link_mac;
 
 	/* If ML IE is not present then return failure*/
 	if (!scan_entry->ie_list.multi_link_bv)
@@ -1130,9 +1161,9 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 	if (!scan_entry->ml_info.num_links)
 		return QDF_STATUS_SUCCESS;
 
-	psoc = wlan_objmgr_get_psoc_by_id(0, WLAN_MLME_CM_ID);
+	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
-		mlme_debug("psoc is NULL");
+		mlme_err("psoc is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1157,6 +1188,34 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 			break;
 
 		if (scan_entry->ml_info.link_info[i].is_valid_link) {
+			link_mac = &scan_entry->ml_info.link_info[i].link_addr;
+			part_scan_entry = wlan_scan_get_scan_entry_by_mac_freq(
+					pdev,
+					link_mac,
+					scan_entry->ml_info.link_info[i].freq);
+			if (!part_scan_entry) {
+				scm_debug("scan entry not found for link addr: "
+					  QDF_MAC_ADDR_FMT,
+					  QDF_MAC_ADDR_REF(link_mac->bytes));
+				continue;
+			}
+
+			/*
+			 * Reject the partner link that doesn’t pass the
+			 * security check and validate the next available
+			 * partner link. If none of the partner link passes
+			 * the security check, proceed connection with
+			 * single link.
+			 */
+			is_security_allowed =
+				wlan_cm_is_eht_allowed_for_current_security(
+							part_scan_entry);
+			util_scan_free_cache_entry(part_scan_entry);
+			if (!is_security_allowed) {
+				mlme_debug("current security is not valid for partner link");
+				continue;
+			}
+
 			partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
 			partner_info->partner_link_info[j].link_id =
@@ -1173,9 +1232,38 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 	partner_info->num_partner_links = j;
 	mlme_debug("sta and ap integrate link num: %d", j);
 
-	wlan_objmgr_psoc_release_ref(psoc, WLAN_MLME_CM_ID);
-
 	return QDF_STATUS_SUCCESS;
+}
+
+static void cm_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
+				   struct cm_vdev_join_req *join_req)
+{
+	struct qdf_mac_addr link_addr;
+	uint8_t link_id, i;
+	struct wlan_channel channel = {0};
+	struct mlo_partner_info *partner_info;
+
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return;
+
+	link_id = join_req->entry->ml_info.self_link_id;
+	qdf_mem_copy(link_addr.bytes, join_req->entry->bssid.bytes,
+		     QDF_MAC_ADDR_SIZE);
+
+	/* Reset Previous info if any and update the AP self link info */
+	mlo_mgr_reset_ap_link_info(vdev);
+	mlo_mgr_update_ap_link_info(vdev, link_id, link_addr.bytes, channel);
+
+	partner_info = &join_req->partner_info;
+	for (i = 0; i < partner_info->num_partner_links; i++) {
+		link_id = partner_info->partner_link_info[i].link_id;
+		qdf_mem_copy(link_addr.bytes,
+			     partner_info->partner_link_info[i].link_addr.bytes,
+			     QDF_MAC_ADDR_SIZE);
+		/* Updating AP partner link info */
+		mlo_mgr_update_ap_link_info(vdev, link_id, link_addr.bytes,
+					    channel);
+	}
 }
 
 static void
@@ -1195,6 +1283,8 @@ cm_copy_join_req_info_from_cm_connect_req(struct wlan_objmgr_vdev *vdev,
 	mlme_debug("Num of partner links %d assoc_link_id:%d",
 		   join_req->partner_info.num_partner_links,
 		   join_req->assoc_link_id);
+
+	cm_update_mlo_mgr_info(vdev, join_req);
 }
 #else
 static inline void
@@ -1526,9 +1616,9 @@ static void cm_process_connect_complete(struct wlan_objmgr_psoc *psoc,
 	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP_104) ||
 	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP))) {
 		cm_csr_set_ss_none(vdev_id);
-		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 			mlo_enable_rso(pdev, vdev, rsp);
-		else if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		else
 			cm_roam_start_init_on_connect(pdev, vdev_id);
 	} else {
 		if (rsp->is_wps_connection)
@@ -1552,6 +1642,9 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	if (!vdev || !vdev->mlo_dev_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
+	if (!wlan_cm_is_vdev_connected(vdev))
+		return QDF_STATUS_E_AGAIN;
+
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
 	    !mlo_check_if_all_links_up(vdev))
 		return QDF_STATUS_E_FAILURE;
@@ -1562,7 +1655,7 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	status = wlan_process_bcn_prbrsp_t2lm_ie(vdev, t2lm_ctx, t2lm_ctx->tsf);
+	status = wlan_update_t2lm_mapping(vdev, t2lm_ctx, t2lm_ctx->tsf);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("T2LM IE beacon process failed");
 	}
@@ -1579,12 +1672,12 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 static void
 cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_objmgr_peer *peer;
 	struct wlan_crypto_key *crypto_key;
 	enum QDF_OPMODE op_mode;
 	uint16_t i;
 	bool pairwise;
 	uint8_t vdev_id;
+	uint8_t link_id;
 	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
 				 WLAN_CRYPTO_MAXIGTKKEYIDX +
 				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
@@ -1598,15 +1691,11 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		return;
 
-	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLME_CM_ID);
-	if (!peer) {
-		mlo_err("Peer is null return");
-		return;
-	}
+	link_id = wlan_vdev_get_link_id(vdev);
 
-	if (!mlo_get_keys_saved(vdev, wlan_peer_get_macaddr(peer))) {
-		mlo_debug("keys are not saved for vdev_id %d", vdev_id);
-		wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
+	if (!mlo_is_set_key_defered(vdev, link_id) &&
+	    !mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlme_debug("keys are not deferred for link_id %d", link_id);
 		return;
 	}
 
@@ -1616,15 +1705,12 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 			continue;
 
 		pairwise = crypto_key->key_type ? WLAN_CRYPTO_KEY_TYPE_UNICAST : WLAN_CRYPTO_KEY_TYPE_GROUP;
-		mlo_debug("MLO:send keys for vdev_id %d, key_idx %d, pairwise %d",
-			  vdev_id, i, pairwise);
+		mlo_debug("MLO:send keys for vdev_id %d link_id %d , key_idx %d, pairwise %d",
+			  vdev_id, link_id, i, pairwise);
 		mlme_cm_osif_send_keys(vdev, i, pairwise,
 				       crypto_key->cipher_type);
 	}
-	mlo_set_keys_saved(vdev,
-			   (struct qdf_mac_addr *)wlan_peer_get_macaddr(peer),
-			   false);
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
+	mlo_defer_set_keys(vdev, link_id, false);
 }
 
 QDF_STATUS
@@ -1663,12 +1749,20 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			rsp->freq);
 
 	if (QDF_IS_STATUS_SUCCESS(rsp->connect_status)) {
-		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev))
+		if (rsp->cm_id & CM_ID_LSWITCH_BIT)
+			ml_nlink_conn_change_notify(
+				psoc, vdev_id,
+				ml_nlink_link_switch_pre_completion_evt, NULL);
+
+		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
+								false))
 			policy_mgr_move_vdev_from_connection_to_disabled_tbl(
 								psoc, vdev_id);
 		else
 			policy_mgr_incr_active_session(psoc, op_mode, vdev_id);
-
+		ml_nlink_conn_change_notify(
+			psoc, vdev_id,
+			ml_nlink_connect_completion_evt, NULL);
 		cm_process_connect_complete(psoc, pdev, vdev, rsp);
 		cm_install_link_vdev_keys(vdev);
 		wlan_tdls_notify_sta_connect(vdev_id,

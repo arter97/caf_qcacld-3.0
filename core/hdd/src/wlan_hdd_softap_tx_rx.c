@@ -521,14 +521,14 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
-				   bool auth_required,
-				   bool privacy_required,
+QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
+				   bool auth_required, bool privacy_required,
 				   struct qdf_mac_addr *sta_mac,
 				   tSap_StationAssocReassocCompleteEvent *event)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct ol_txrx_desc_type txrx_desc = {0};
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct ol_txrx_ops txrx_ops;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -545,7 +545,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		dot11mode = hdd_convert_dot11mode_from_phymode(event->chan_info.info);
 	}
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
 	/*
 	 * If the address is a broadcast address, then provide the self mac addr
@@ -572,7 +572,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 
 	txrx_desc.is_qos_enabled = wmm_enabled;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
@@ -619,7 +619,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		/* Connections that do not need Upper layer auth,
 		 * transition TL directly to 'Authenticated' state.
 		 */
-		qdf_status = hdd_change_peer_state(adapter,
+		qdf_status = hdd_change_peer_state(link_info,
 						   txrx_desc.peer_addr.bytes,
 						   OL_TXRX_PEER_STATE_AUTH);
 
@@ -634,7 +634,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 			  ".  Changing TL state to CONNECTED at Join time",
 			 QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
 
-		qdf_status = hdd_change_peer_state(adapter,
+		qdf_status = hdd_change_peer_state(link_info,
 						   txrx_desc.peer_addr.bytes,
 						   OL_TXRX_PEER_STATE_CONN);
 
@@ -659,29 +659,23 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 	return qdf_status;
 }
 
-/**
- * hdd_softap_register_bc_sta() - Register the SoftAP broadcast STA
- * @adapter: pointer to adapter context
- * @privacy_required: should 802.11 privacy bit be set?
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
- */
-QDF_STATUS hdd_softap_register_bc_sta(struct hdd_adapter *adapter,
-				      bool privacy_required)
+QDF_STATUS
+hdd_softap_register_bc_sta(struct wlan_hdd_link_info *link_info,
+			   bool privacy_required)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct qdf_mac_addr broadcast_macaddr = QDF_MAC_ADDR_BCAST_INIT;
 	struct hdd_ap_ctx *ap_ctx;
 	uint8_t sta_id;
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	sta_id = ap_ctx->broadcast_sta_id;
 
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	sta_id = ap_ctx->broadcast_sta_id;
 	if (sta_id >= WLAN_MAX_STA_COUNT) {
 		hdd_err("Error: Invalid sta_id: %u", sta_id);
 		return qdf_status;
 	}
 
-	qdf_status = hdd_softap_register_sta(adapter, false,
+	qdf_status = hdd_softap_register_sta(link_info, false,
 					     privacy_required,
 					     &broadcast_macaddr, NULL);
 
@@ -780,7 +774,7 @@ static QDF_STATUS hdd_softap_change_per_sta_state(struct hdd_adapter *adapter,
 		qdf_mem_copy(&mac_addr, sta_mac, QDF_MAC_ADDR_SIZE);
 
 	qdf_status =
-		hdd_change_peer_state(adapter, mac_addr.bytes, state);
+		hdd_change_peer_state(adapter->deflink, mac_addr.bytes, state);
 	hdd_debug("Station " QDF_MAC_ADDR_FMT " changed to state %d",
 		  QDF_MAC_ADDR_REF(mac_addr.bytes), state);
 

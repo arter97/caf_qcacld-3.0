@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -324,6 +324,10 @@ static u32 hdd_to_nl_sar_version(enum sar_version hdd_sar_version)
 		return QCA_WLAN_VENDOR_SAR_VERSION_2;
 	case (SAR_VERSION_3):
 		return QCA_WLAN_VENDOR_SAR_VERSION_3;
+	case (SAR_VERSION_4):
+	case (SAR_VERSION_5):
+	case (SAR_VERSION_6):
+		return QCA_WLAN_VENDOR_SAR_VERSION_1;
 	default:
 		hdd_err("Unexpected SAR version received :%u, sending default to userspace",
 			hdd_sar_version);
@@ -350,7 +354,8 @@ static int hdd_sar_fill_capability_response(struct sk_buff *skb,
 	attr = QCA_WLAN_VENDOR_ATTR_SAR_CAPABILITY_VERSION;
 	value = hdd_to_nl_sar_version(hdd_ctx->sar_version);
 
-	hdd_debug("Sending SAR Version = %u to userspace", value);
+	hdd_debug("Sending SAR Version = %u to userspace, fw_sar_version: %d",
+		  value, hdd_ctx->sar_version);
 
 	errno = nla_put_u32(skb, attr, value);
 
@@ -1093,7 +1098,7 @@ config_sar_failed:
 
 void hdd_configure_sar_sleep_index(struct hdd_context *hdd_ctx)
 {
-	if (!hdd_ctx->config->enable_sar_safety)
+	if (!(hdd_ctx->config->enable_sar_safety & SAR_SAFETY_ENABLED_TIMER))
 		return;
 
 	if (hdd_ctx->config->config_sar_safety_sleep_index) {
@@ -1110,7 +1115,7 @@ void hdd_configure_sar_sleep_index(struct hdd_context *hdd_ctx)
 
 void hdd_configure_sar_resume_index(struct hdd_context *hdd_ctx)
 {
-	if (!hdd_ctx->config->enable_sar_safety)
+	if (!(hdd_ctx->config->enable_sar_safety & SAR_SAFETY_ENABLED_TIMER))
 		return;
 
 	hdd_nofl_debug("Configure SAR safety index %d on wlan resume",
@@ -1199,7 +1204,7 @@ static void hdd_sar_safety_timer_cb(void *user_data)
 
 void wlan_hdd_sar_unsolicited_timer_start(struct hdd_context *hdd_ctx)
 {
-	if (!hdd_ctx->config->enable_sar_safety)
+	if (!(hdd_ctx->config->enable_sar_safety & SAR_SAFETY_ENABLED_TIMER))
 		return;
 
 	if (qdf_atomic_read(
@@ -1216,7 +1221,7 @@ void wlan_hdd_sar_timers_reset(struct hdd_context *hdd_ctx)
 {
 	QDF_STATUS status;
 
-	if (!hdd_ctx->config->enable_sar_safety)
+	if (!(hdd_ctx->config->enable_sar_safety & SAR_SAFETY_ENABLED_TIMER))
 		return;
 
 	if (hdd_ctx->sar_version == SAR_VERSION_1)
@@ -1245,7 +1250,7 @@ void wlan_hdd_sar_timers_init(struct hdd_context *hdd_ctx)
 {
 	QDF_STATUS status;
 
-	if (!hdd_ctx->config->enable_sar_safety)
+	if (!(hdd_ctx->config->enable_sar_safety & SAR_SAFETY_ENABLED_TIMER))
 		return;
 
 	hdd_enter();
@@ -1271,7 +1276,7 @@ hdd_exit:
 
 void wlan_hdd_sar_timers_deinit(struct hdd_context *hdd_ctx)
 {
-	if (!hdd_ctx->config->enable_sar_safety)
+	if (!(hdd_ctx->config->enable_sar_safety & SAR_SAFETY_ENABLED_TIMER))
 		return;
 
 	hdd_enter();

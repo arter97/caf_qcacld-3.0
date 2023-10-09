@@ -1337,6 +1337,71 @@ struct wlan_user_mcc_quota {
 	uint8_t vdev_id;
 };
 
+/**
+ * enum wlan_mlme_hw_mode_config_type - HW mode config type replicated from
+ *                                     wmi_hw_mode_config_type in FW header.
+ *                                     similar as wmi_host_hw_mode_config_type.
+ * @WLAN_MLME_HW_MODE_SINGLE: Only one PHY is active.
+ * @WLAN_MLME_HW_MODE_DBS: Both PHYs are active in different bands,
+ *                        one in 2G and another in 5G.
+ * @WLAN_MLME_HW_MODE_SBS_PASSIVE: Both PHYs are in passive mode (only rx) in
+ *                        same band; no tx allowed.
+ * @WLAN_MLME_HW_MODE_SBS: Both PHYs are active in the same band.
+ *                        Support for both PHYs within one band is planned
+ *                        for 5G only(as indicated in WMI_MAC_PHY_CAPABILITIES),
+ *                        but could be extended to other bands in the future.
+ *                        The separation of the band between the two PHYs needs
+ *                        to be communicated separately.
+ * @WLAN_MLME_HW_MODE_DBS_SBS: 3 PHYs, with 2 on the same band doing SBS
+ *                           as in WMI_HW_MODE_SBS, and 3rd on the other band
+ * @WLAN_MLME_HW_MODE_DBS_OR_SBS: Two PHY with one PHY capabale of both 2G and
+ *                        5G. It can support SBS (5G + 5G) OR DBS (5G + 2G).
+ * @WLAN_MLME_HW_MODE_DBS_2G_5G: Both PHYs are active in different bands.
+ *                               PhyA 2G and PhyB 5G
+ * @WLAN_MLME_HW_MODE_2G_PHYB: Only one phy is active. 2G mode on PhyB.
+ * @WLAN_MLME_HW_MODE_EMLSR: Both PHYs are active in listen mode in 1x1
+ *                          and Tx/Rx trigger on any PHY will switch
+ *                          from 1x1 to 2x2 on that Phy
+ * @WLAN_MLME_HW_MODE_AUX_EMLSR_SINGLE:  PHYA0 and AUX are active in listen mode
+ *                                      in 1x1 and Tx/Rx trigger on any.
+ *                                      PHY will switch from 1x1 to 2x2
+ *                                      on that Phy.
+ * @WLAN_MLME_HW_MODE_AUX_EMLSR_SPLIT: PHYA1 and AUX are active in listen mode
+ *                                    in 1x1 and Tx/Rx trigger on any.
+ *                                    PHY will switch from 1x1 to 2x2
+ *                                    on that Phy.
+ * @WLAN_MLME_HW_MODE_MAX: Max hw_mode_id.
+ */
+enum wlan_mlme_hw_mode_config_type {
+	WLAN_MLME_HW_MODE_SINGLE       = 0,
+	WLAN_MLME_HW_MODE_DBS          = 1,
+	WLAN_MLME_HW_MODE_SBS_PASSIVE  = 2,
+	WLAN_MLME_HW_MODE_SBS          = 3,
+	WLAN_MLME_HW_MODE_DBS_SBS      = 4,
+	WLAN_MLME_HW_MODE_DBS_OR_SBS   = 5,
+	WLAN_MLME_HW_MODE_DBS_2G_5G    = 6,
+	WLAN_MLME_HW_MODE_2G_PHYB      = 7,
+	WLAN_MLME_HW_MODE_EMLSR        = 8,
+	WLAN_MLME_HW_MODE_AUX_EMLSR_SINGLE = 9,
+	WLAN_MLME_HW_MODE_AUX_EMLSR_SPLIT  = 10,
+	WLAN_MLME_HW_MODE_MAX,
+};
+
+/* struct wlan_mlme_aux_dev_caps - wlan mlme aux dev capability
+ *
+ * @supported_modes_bitmap: indicate which mode this AUX supports for the
+ *                          HW mode defined in hw_mode_id
+ * @listen_pdev_id_map: indicate which AUX MAC can listen/scan for the HW mode
+ *                      described in hw_mode_id
+ * @emlsr_pdev_id_map: indicate which AUX MAC can perform eMLSR for the HW mode
+ *                     described in hw_mode_id.
+ */
+struct wlan_mlme_aux_dev_caps {
+	uint32_t supported_modes_bitmap;
+	uint32_t listen_pdev_id_map;
+	uint32_t emlsr_pdev_id_map;
+};
+
 /* struct wlan_mlme_generic - Generic CFG config items
  *
  * @band_capability: HW Band Capability - Both or 2.4G only or 5G only
@@ -1393,9 +1458,11 @@ struct wlan_user_mcc_quota {
  * @eht_mode: EHT mode of operation
  * @t2lm_negotiation_support: T2LM negotiation supported enum value
  * @enable_emlsr_mode: 11BE eMLSR mode support
+ * @mld_id: MLD ID of requested BSS within ML probe request frame
  * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
  * connection, bypass strict power levels
  * @sr_enable_modes: modes for which SR(Spatial Reuse) is enabled
+ * @wlan_mlme_aux0_dev_caps: capability for aux0
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1452,6 +1519,7 @@ struct wlan_mlme_generic {
 	enum wlan_eht_mode eht_mode;
 	bool enable_emlsr_mode;
 	enum t2lm_negotiation_support t2lm_negotiation_support;
+	uint8_t mld_id;
 #endif
 #ifdef WLAN_FEATURE_MCC_QUOTA
 	struct wlan_user_mcc_quota user_mcc_quota;
@@ -1460,6 +1528,8 @@ struct wlan_mlme_generic {
 #if defined(WLAN_FEATURE_SR)
 	uint32_t sr_enable_modes;
 #endif
+	struct wlan_mlme_aux_dev_caps
+		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX];
 };
 
 /**
@@ -1723,10 +1793,13 @@ enum station_prefer_bw {
  * @usr_scan_probe_unicast_ra:      User config unicast probe req in scan
  * @event_payload:                  Diagnostic event payload
  * @max_li_modulated_dtim_time_ms:  Max modulated DTIM time in ms.
+ * @mlo_same_link_mld_address:      Use one of the links same as mld address
+ * @user_set_link_num:              save link num set by vendor command
  * @mlo_support_link_num:           max number of links that sta mlo supports
  * @mlo_support_link_band:          band bitmap that sta mlo supports
  * @mlo_max_simultaneous_links:     number of simultaneous links
  * @mlo_prefer_percentage:          percentage to boost/reduce mlo scoring
+ * @epcs_capability:                epcs capability enable or disable flag
  * @usr_disable_eht:                user disable the eht for STA
  */
 struct wlan_mlme_sta_cfg {
@@ -1756,12 +1829,15 @@ struct wlan_mlme_sta_cfg {
 #endif
 	uint16_t max_li_modulated_dtim_time_ms;
 #ifdef WLAN_FEATURE_11BE_MLO
+	bool mlo_same_link_mld_address;
+	uint8_t user_set_link_num;
 	uint8_t mlo_support_link_num;
 	uint8_t mlo_support_link_band;
 	uint8_t mlo_max_simultaneous_links;
 	int8_t mlo_prefer_percentage;
 #endif
 #ifdef WLAN_FEATURE_11BE
+	bool epcs_capability;
 	bool usr_disable_eht;
 #endif
 };
@@ -2387,7 +2463,6 @@ struct mlme_power_usage {
  * @tx_power_5g: limit tx power in 5 ghz
  * @current_tx_power_level: current tx power level
  * @local_power_constraint: local power constraint
- * @use_local_tpe: preference to use local or regulatory TPE
  * @skip_tpe: option to not consider TPE values in 2.4G/5G bands
  */
 struct wlan_mlme_power {
@@ -2400,7 +2475,6 @@ struct wlan_mlme_power {
 	uint8_t tx_power_5g;
 	uint8_t current_tx_power_level;
 	uint8_t local_power_constraint;
-	bool use_local_tpe;
 	bool skip_tpe;
 };
 
@@ -2496,10 +2570,12 @@ struct wlan_mlme_wifi_pos_cfg {
 };
 
 #define MLME_SET_BIT(value, bit_offset) ((value) |= (1 << (bit_offset)))
+#define MLME_CLEAR_BIT(value, bit_offset) ((value) &= ~(1 << (bit_offset)))
 
 /* Mask to check if BTM offload is enabled/disabled*/
 #define BTM_OFFLOAD_ENABLED_MASK    0x01
 
+#define BTM_OFFLOAD_CONFIG_BIT_0    0
 #define BTM_OFFLOAD_CONFIG_BIT_8    8
 #define BTM_OFFLOAD_CONFIG_BIT_7    7
 
@@ -2735,6 +2811,8 @@ struct wlan_mlme_iot {
  * @connection_roaming_ini_flag: To indicate whether connection_roaming related
  * ini file is present or not.
  * @eml_cap: EML capability subfield present in ML IE common info
+ * @dynamic_nss_chains_support : intersection of host and fw capability of
+ *				 dynamic NSS chain support
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
@@ -2785,6 +2863,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_iot iot;
 	bool connection_roaming_ini_flag;
 	struct wlan_mlme_eml_cap eml_cap;
+	bool dynamic_nss_chains_support;
 };
 
 /**
@@ -2922,5 +3001,67 @@ enum ll_ap_type {
 	LL_AP_TYPE_HT = 0,
 	LL_AP_TYPE_LT = 1,
 	LL_AP_TYPE_ANY = 2,
+};
+
+/**
+ * struct sap_ch_info - Structure holding all the information required to make
+ * a decision for the best operating channel based on dfs formula.
+ * @chan_freq: Channel frequency found in scanresult
+ * @bss_count: Bss found in scanresult for this channel
+ * @rssi_agr: Max value of rssi among all BSS(es) from scan result
+ * for this channel.
+ * @weight: Weightage of this channel
+ * @weight_copy: copy of the original weight
+ * @valid: Is this a valid center frequency for regulatory domain
+ * @weight_calc_done: Weight calculation done for this channel
+ */
+struct sap_ch_info {
+	uint32_t chan_freq;
+	uint16_t bss_count;
+	int32_t rssi_agr;
+	uint32_t weight;
+	uint32_t weight_copy;
+	bool valid;
+	bool weight_calc_done;
+};
+
+/**
+ * struct sap_sel_ch_info - Wrapper of sap_ch_info structure.
+ * @ch_info: Ptr to the channel information.
+ * @num_ch: Total num of channels.
+ */
+struct sap_sel_ch_info {
+	struct sap_ch_info *ch_info;
+	uint8_t num_ch;
+};
+
+/**
+ * enum mlme_peer_oper_mode_ind - Peer mode indication type
+ * @mlme_peer_ind_smps: spatial multiplexing power save
+ * @mlme_peer_ind_omn: Operating mode notification
+ * @mlme_peer_ind_omi: Operating mode indication
+ */
+enum mlme_peer_oper_mode_ind {
+	mlme_peer_ind_smps,
+	mlme_peer_ind_omn,
+	mlme_peer_ind_omi,
+};
+
+/**
+ * struct peer_oper_mode_event - structure for peer oper mode indication data
+ * @peer_mac_address: mac address of peer
+ * @ind_type: indication type of type @enum mlme_peer_oper_mode_ind
+ * @new_rxnss: New Rx NSS
+ * @new_bw: New bandwidth
+ * @new_txnss: New Tx NSS, valid only for mlme_peer_ind_omi
+ * @new_disablemu: Disabled MU mode, valid only for mlme_peer_ind_omi
+ */
+struct peer_oper_mode_event {
+	struct qdf_mac_addr peer_mac_address;
+	uint32_t ind_type;
+	uint32_t new_rxnss;
+	uint32_t new_bw;
+	uint32_t new_txnss;
+	uint32_t new_disablemu;
 };
 #endif

@@ -20,6 +20,7 @@
 
 #include "wlan_dp_main.h"
 #include "wlan_dp_api.h"
+#include <wlan_dp_fisa_rx.h>
 
 void wlan_dp_update_peer_map_unmap_version(uint8_t *version)
 {
@@ -35,3 +36,27 @@ QDF_STATUS wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
 	return __wlan_dp_runtime_resume(soc, pdev_id);
 }
+
+void wlan_dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id)
+{
+	dp_print_fisa_rx_stats(stats_id);
+}
+
+void wlan_dp_set_fst_in_cmem(bool fst_in_cmem)
+{
+	dp_set_fst_in_cmem(fst_in_cmem);
+}
+
+void wlan_dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support)
+{
+	dp_set_fisa_dynamic_aggr_size_support(dynamic_aggr_size_support);
+}
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+bool wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+}
+#endif

@@ -1070,7 +1070,7 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 	uint8_t type, sub_type;
 	bool match = false;
 	tpSirMacActionFrameHdr action_hdr;
-	uint8_t actionID, category;
+	uint8_t actionID, category, vdev_id = WLAN_INVALID_VDEV_ID;
 	QDF_STATUS qdf_status;
 
 	hdr = WMA_GET_RX_MAC_HEADER(buff_desc);
@@ -1149,11 +1149,20 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 				}
 			}
 		}
+
+		/*
+		 * Some frames like GAS_INITIAL_REQ are registered with
+		 * SME_SESSION_ID_ANY, and received without session.
+		 */
+		vdev_id = mgmt_frame->sessionId;
+		if (session_entry)
+			vdev_id = session_entry->vdev_id;
+
 		/* Indicate this to SME */
 		lim_send_sme_mgmt_frame_ind(mac_ctx, hdr->fc.subType,
 			(uint8_t *) hdr,
 			WMA_GET_RX_PAYLOAD_LEN(buff_desc) +
-			sizeof(tSirMacMgmtHdr), mgmt_frame->sessionId,
+			sizeof(tSirMacMgmtHdr), vdev_id,
 			WMA_GET_RX_FREQ(buff_desc),
 			WMA_GET_RX_RSSI_NORMALIZED(buff_desc),
 			RXMGMT_FLAG_NONE);
@@ -1752,6 +1761,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_CHNG_MCC_BEACON_INTERVAL:
 	case eWNI_SME_NEIGHBOR_REPORT_REQ_IND:
 	case eWNI_SME_BEACON_REPORT_RESP_XMIT_IND:
+	case eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND:
 #if defined FEATURE_WLAN_ESE
 	case eWNI_SME_ESE_ADJACENT_AP_REPORT:
 #endif
@@ -1849,9 +1859,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_REASSOC_FAIL_TIMEOUT:
 	case SIR_LIM_FT_PREAUTH_RSP_TIMEOUT:
 	case SIR_LIM_DISASSOC_ACK_TIMEOUT:
-	case SIR_LIM_DEAUTH_ACK_TIMEOUT:
 	case SIR_LIM_AUTH_RETRY_TIMEOUT:
 	case SIR_LIM_AUTH_SAE_TIMEOUT:
+	case SIR_LIM_RRM_STA_STATS_RSP_TIMEOUT:
 		/* These timeout messages are handled by MLM sub module */
 		lim_process_mlm_req_messages(mac_ctx, msg);
 		break;
@@ -2107,6 +2117,11 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case WIFI_POS_PASN_PEER_DELETE_ALL:
 		lim_process_pasn_delete_all_peers(mac_ctx, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
+		msg->bodyptr = NULL;
+		break;
+	case eWNI_SME_SAP_CH_WIDTH_UPDATE_REQ:
+		lim_process_sme_req_messages(mac_ctx, msg);
+		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
 	default:

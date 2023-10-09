@@ -109,6 +109,7 @@
 
 #define MAX_WAIT_FOR_BCN_TX_COMPLETE 4000
 #define MAX_WAKELOCK_FOR_CSA         5000
+#define MAX_WAIT_FOR_CH_WIDTH_UPDATE_COMPLETE 200
 
 #ifdef WLAN_FEATURE_11BE
 #define MAX_NUM_PWR_LEVELS 16
@@ -284,6 +285,17 @@ QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
  */
 void lim_strip_mlo_ie(struct mac_context *mac_ctx,
 		      uint8_t *add_ie, uint16_t *add_ielen);
+
+/**
+ * lim_set_emlsr_caps() - This API will set EMLSR caps in vdev obj if ELMSR is
+ * supported.
+ * @mac: mac context
+ * @pe_session: session entry
+ *
+ * Return: Void
+ */
+void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+			struct pe_session *session);
 #else
 static inline uint16_t lim_assign_mlo_conn_idx(struct mac_context *mac,
 					       struct pe_session *pe_session,
@@ -323,6 +335,11 @@ QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
 				uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+				      struct pe_session *session)
+{
 }
 #endif
 
@@ -447,6 +464,18 @@ void lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 		struct pe_session *pe_session);
 
 /**
+ * lim_get_cb_mode_for_freq() - Get cb mode depending on the freq
+ * @mac: pointer to Global MAC structure
+ * @pe_session: pe session
+ * @chan_freq: Freq to get cb mode for
+ *
+ * Return: cb mode allowed for the freq
+ */
+uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
+				 struct pe_session *session,
+				 qdf_freq_t chan_freq);
+
+/**
  * lim_update_sta_run_time_ht_switch_chnl_params() - Process change in HT
  * bandwidth
  * @mac: pointer to Global MAC structure
@@ -499,11 +528,11 @@ void lim_process_channel_switch(struct mac_context *mac, uint8_t vdev_id);
  *
  * This function changes the current operating channel frequency.
  *
- * return NONE
+ * return qdf_status
  */
-void lim_switch_primary_channel(struct mac_context *mac,
-				uint32_t new_channel_freq,
-				struct pe_session *pe_session);
+QDF_STATUS lim_switch_primary_channel(struct mac_context *mac,
+				      uint32_t new_channel_freq,
+				      struct pe_session *pe_session);
 
 /**
  * lim_switch_primary_secondary_channel() - switch primary and secondary
@@ -517,10 +546,10 @@ void lim_switch_primary_channel(struct mac_context *mac,
  *  then we must set this new channel in session context and
  *  assign notify LIM of such change.
  *
- * @return NONE
+ * @return qdf_status
  */
-void lim_switch_primary_secondary_channel(struct mac_context *mac,
-					  struct pe_session *pe_session);
+QDF_STATUS lim_switch_primary_secondary_channel(struct mac_context *mac,
+						struct pe_session *pe_session);
 
 void lim_update_sta_run_time_ht_capability(struct mac_context *mac,
 		tDot11fIEHTCaps *pHTCaps);
@@ -1067,6 +1096,18 @@ void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
 
 void lim_strip_eht_ies_from_add_ies(struct mac_context *mac_ctx,
 				    struct pe_session *session);
+
+/**
+ * lim_strip_wapi_ies_from_add_ies() - This function strip WAPI IE from add_ie
+ * @mac_ctx: pointer to mac context
+ * @pe_session: pointer to PE session
+ *
+ * This API is to strip WAPI IE from add_ie
+ *
+ * Return: none
+ */
+void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
+				     struct pe_session *session);
 
 /**
  * lim_del_pmf_sa_query_timer() - This function deletes SA query timer
@@ -2026,11 +2067,13 @@ void lim_log_eht_cap(struct mac_context *mac, tDot11fIEeht_cap *eht_cap);
  * @ie_start: pointer to start of IE buffer
  * @num_bytes: length of IE buffer
  * @band: 2g or 5g band
+ * @vdev_id: vdev id
  *
  * Return: None
  */
 void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band);
+		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band,
+		      uint8_t vdev_id);
 
 /**
  * lim_send_eht_caps_ie() - gets EHT capability and send to firmware via wma
@@ -2098,6 +2141,17 @@ void lim_update_stads_eht_bw_320mhz(struct pe_session *session,
  * Return: bool
  */
 bool lim_is_session_chwidth_320mhz(struct pe_session *session);
+
+/**
+ * lim_update_eht_caps_mcs() - update eht caps
+ *
+ * @mac: Pointer to Global mac structure
+ * @session: Session pointer of the interface
+ *
+ * Return: None
+ */
+void
+lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session);
 #else
 static inline
 void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
@@ -2246,7 +2300,8 @@ lim_log_eht_cap(struct mac_context *mac, tDot11fIEeht_cap *eht_cap)
 
 static inline void
 lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		 uint8_t *ie_start, uint32_t num_bytes, uint8_t band)
+		 uint8_t *ie_start, uint32_t num_bytes, uint8_t band,
+		 uint8_t vdev_id)
 {
 }
 
@@ -2282,6 +2337,11 @@ lim_is_session_chwidth_320mhz(struct pe_session *session)
 {
 	return false;
 }
+
+static inline void
+lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
+{
+}
 #endif /* WLAN_FEATURE_11BE */
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -2296,6 +2356,18 @@ lim_is_session_chwidth_320mhz(struct pe_session *session)
 void lim_extract_per_link_id(struct pe_session *session,
 			     struct bss_params *add_bss,
 			     tpSirAssocRsp assoc_rsp);
+
+/**
+ * lim_extract_ml_info() - Extract ML info and send with FW
+ * @session: pointer to PE session
+ * @add_bss: pointer to ADD BSS params
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_extract_ml_info(struct pe_session *session,
+			 struct bss_params *add_bss,
+			 tpSirAssocRsp assoc_rsp);
 
 /**
  * lim_intersect_ap_emlsr_caps() - Intersect AP and self STA EML capabilities
@@ -2330,6 +2402,13 @@ static inline void
 lim_extract_per_link_id(struct pe_session *session,
 			struct bss_params *add_bss,
 			tpSirAssocRsp assoc_rsp)
+{
+}
+
+static inline void
+lim_extract_ml_info(struct pe_session *session,
+		    struct bss_params *add_bss,
+		    tpSirAssocRsp assoc_rsp)
 {
 }
 
@@ -3115,8 +3194,8 @@ void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 bool lim_update_channel_width(struct mac_context *mac_ctx,
 			      tpDphHashNode sta_ptr,
 			      struct pe_session *session,
-			      uint8_t ch_width,
-			      uint8_t *new_ch_width);
+			      enum phy_ch_width ch_width,
+			      enum phy_ch_width *new_ch_width);
 
 /**
  * lim_get_vht_ch_width() - Function to get the VHT
@@ -3239,16 +3318,30 @@ void
 lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id);
 
 /*
- * lim_is_chan_connected_for_mode() - Check if frequency is connected
- *                                    for given opmode.
+ * lim_get_connected_chan_for_mode() - Get connected channel for given opmode
+ *                                     in given frequency range.
+ *
  * @psoc: Pointer to psoc object
  * @opmode: Vdev opmode
  * @freq: Frequency
  *
- * Return: Return true if frequency is connected for given opmode.
+ * Return: Return connected channel in given frequcy range for given opmode.
  */
-bool
-lim_is_chan_connected_for_mode(struct wlan_objmgr_psoc *psoc,
-			       enum QDF_OPMODE opmode,
-			       qdf_freq_t freq);
+struct wlan_channel *
+lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
+				enum QDF_OPMODE opmode,
+				qdf_freq_t start_freq,
+				qdf_freq_t end_freq);
+
+/**
+ * lim_convert_vht_chwidth_to_phy_chwidth() - Convert VHT operation
+ * ch width into phy ch width
+ *
+ * @ch_width: VHT op channel width
+ * @is_40: is 40 MHz
+ *
+ * Return: phy chwidth
+ */
+enum phy_ch_width
+lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40);
 #endif /* __LIM_UTILS_H */

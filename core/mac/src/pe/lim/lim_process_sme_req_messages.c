@@ -72,6 +72,7 @@
 #include <spatial_reuse_api.h>
 #include "wlan_psoc_mlme_api.h"
 #include "wma_he.h"
+#include "wlan_mlo_mgr_sta.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_peer.h>
 #endif
@@ -645,6 +646,31 @@ void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
 }
 #endif
 
+#ifdef FEATURE_WLAN_WAPI
+
+void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
+				     struct pe_session *session)
+{
+	struct add_ie_params *add_ie = &session->add_ie_params;
+	uint8_t wapiie_buff[DOT11F_IE_WAPIOPAQUE_MAX_LEN + 2];
+	QDF_STATUS status;
+
+	qdf_mem_zero(wapiie_buff, sizeof(wapiie_buff));
+
+	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
+			      &add_ie->probeRespBCNDataLen,
+			      DOT11F_EID_WAPIOPAQUE, ONE_BYTE,
+			      NULL, 0,
+			      wapiie_buff, DOT11F_IE_WAPIOPAQUE_MAX_LEN);
+	if (status != QDF_STATUS_SUCCESS)
+		pe_debug("Failed to strip WAPI IE status: %d", status);
+}
+#else
+void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
+				     struct pe_session *session)
+{
+}
+#endif
 /**
  * lim_set_ldpc_exception() - to set allow any LDPC exception permitted
  * @mac_ctx: Pointer to mac context
@@ -859,7 +885,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 	qdf_mem_copy(sme_start_bss_req, msg_buf, size);
 	vdev_id = sme_start_bss_req->vdev_id;
 
-	opmode = wlan_get_opmode_vdev_id(mac_ctx->pdev, vdev_id);
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
 	if (opmode == QDF_NDI_MODE)
 		bss_type = eSIR_NDI_MODE;
 	else
@@ -1698,14 +1724,83 @@ lim_update_he_caps_htc(struct pe_session *session,  bool val)
 #endif
 
 #ifdef WLAN_FEATURE_11BE
-static void
+void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 {
-}
-#else
-static void
-lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
-{
+	uint8_t tx_nss = 0;
+	uint8_t rx_nss = 0;
+	struct wlan_objmgr_vdev *vdev = session->vdev;
+	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_mlme_cfg *mlme_cfg = mac->mlme_cfg;
+	tDot11fIEeht_cap *dot11_eht_cap;
+	tDot11fIEeht_cap *eht_config;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return;
+
+	eht_config = &mlme_priv->eht_config;
+	dot11_eht_cap = &mlme_cfg->eht_caps.dot11_eht_cap;
+
+	if (session->nss == 1) {
+		tx_nss = 1;
+		rx_nss = 1;
+	} else {
+		tx_nss = dot11_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7;
+		rx_nss = dot11_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7;
+	}
+
+	if (!tx_nss || tx_nss > 2 || !rx_nss || rx_nss > 2) {
+		pe_err("invalid Nss values tx_nss: %u rx_nss: %u",
+		       tx_nss, rx_nss);
+		return;
+	}
+
+	pe_debug("tx_nss: %u rx_nss: %u", tx_nss, rx_nss);
+
+	eht_config->bw_20_rx_max_nss_for_mcs_0_to_7 = rx_nss;
+	eht_config->bw_20_tx_max_nss_for_mcs_0_to_7 = tx_nss;
+	eht_config->bw_20_rx_max_nss_for_mcs_8_and_9 = rx_nss;
+	eht_config->bw_20_tx_max_nss_for_mcs_8_and_9 = tx_nss;
+	if (dot11_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_20_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_20_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_20_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_20_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+	eht_config->bw_le_80_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+	eht_config->bw_le_80_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+	if (dot11_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_le_80_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_le_80_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_le_80_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_le_80_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+	eht_config->bw_160_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+	eht_config->bw_160_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+	if (dot11_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_160_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_160_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_160_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_160_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+	eht_config->bw_320_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+	eht_config->bw_320_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+
+	if (dot11_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11) {
+		eht_config->bw_320_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		eht_config->bw_320_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+	}
+	if (dot11_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13) {
+		eht_config->bw_320_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		eht_config->bw_320_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
 }
 #endif
 
@@ -1897,6 +1992,54 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 }
 
 static enum mlme_dot11_mode
+lim_get_user_dot11_mode(struct wlan_objmgr_vdev *vdev)
+{
+	WMI_HOST_WIFI_STANDARD wifi_std;
+
+	wifi_std = mlme_get_vdev_wifi_std(vdev);
+
+	switch (wifi_std) {
+	case WMI_HOST_WIFI_STANDARD_4:
+		return MLME_DOT11_MODE_11N;
+	case WMI_HOST_WIFI_STANDARD_5:
+		return MLME_DOT11_MODE_11AC;
+	case WMI_HOST_WIFI_STANDARD_6:
+	case WMI_HOST_WIFI_STANDARD_6E:
+		return MLME_DOT11_MODE_11AX;
+	case WMI_HOST_WIFI_STANDARD_7:
+	default:
+		return MLME_DOT11_MODE_11BE;
+	}
+}
+
+static enum mlme_dot11_mode
+lim_intersect_user_dot11_mode(struct mac_context *mac_ctx,
+			      enum QDF_OPMODE opmode, uint8_t vdev_id,
+			      enum mlme_dot11_mode self_mode)
+{
+	struct wlan_objmgr_vdev *vdev;
+	enum mlme_dot11_mode user_mode;
+
+	switch (opmode) {
+	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
+		break;
+	default:
+		return self_mode;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac_ctx->pdev, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev)
+		return self_mode;
+
+	user_mode = lim_get_user_dot11_mode(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+
+	return user_mode > self_mode ? self_mode : user_mode;
+}
+
+static enum mlme_dot11_mode
 lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode,
 			uint8_t vdev_id)
 {
@@ -1958,9 +2101,29 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 			      struct bss_description *bss_desc,
 			      tDot11fBeaconIEs *ie_struct)
 {
+	struct scan_cache_entry *scan_entry;
+	bool is_eht_allowed;
+
 	if (!ie_struct->eht_cap.present)
 		return false;
 
+	scan_entry = wlan_scan_get_entry_by_bssid(mac_ctx->pdev,
+						  (struct qdf_mac_addr *)
+						  bss_desc->bssId);
+
+	/*
+	 * If AP advertises multiple AKMs(WPA2 PSK + WPA3), allow connection
+	 * in 11BE mode as our connection is going to be WPA3
+	 */
+	if (scan_entry) {
+		is_eht_allowed =
+			wlan_cm_is_eht_allowed_for_current_security(scan_entry);
+		util_scan_free_cache_entry(scan_entry);
+		if (!is_eht_allowed) {
+			pe_debug("Downgrade to 11ax mode due to AP security validation failure");
+			return false;
+		}
+	}
 	return mlme_get_bss_11be_allowed(
 			mac_ctx->psoc,
 			(struct qdf_mac_addr *)&bss_desc->bssId,
@@ -2600,6 +2763,13 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 
 	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, session->opmode,
 						  session->vdev_id);
+
+	/* if user set dot11 mode by cmd, need to do intersect first */
+	self_dot11_mode =
+		   lim_intersect_user_dot11_mode(mac_ctx, session->opmode,
+						 session->vdev_id,
+						 self_dot11_mode);
+
 	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
 
 	pe_debug("vdev id %d opmode %d self dot11mode %d bss_dot11 mode %d",
@@ -2680,24 +2850,6 @@ static inline void lim_fill_rssi(struct pe_session *session,
 {
 }
 #endif
-
-static QDF_STATUS lim_check_and_validate_6g_ap(struct mac_context *mac_ctx,
-					       struct bss_description *bss,
-					       tDot11fBeaconIEs *ie)
-{
-	tDot11fIEhe_op *he_op = &ie->he_op;
-
-	if (!wlan_reg_is_6ghz_chan_freq(bss->chan_freq))
-		return QDF_STATUS_SUCCESS;
-
-	if (!he_op->oper_info_6g_present) {
-		pe_err(QDF_MAC_ADDR_FMT" Invalid 6GHZ AP BSS description IE",
-			QDF_MAC_ADDR_REF(bss->bssId));
-		return QDF_STATUS_E_INVAL;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
 
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
@@ -2966,6 +3118,57 @@ static void lim_update_qos(struct mac_context *mac_ctx,
 		 session->limWmeEnabled);
 }
 
+static void lim_reset_self_ocv_caps(struct pe_session *session)
+{
+	uint16_t self_rsn_cap;
+
+	self_rsn_cap = wlan_crypto_get_param(session->vdev,
+					     WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (self_rsn_cap == -1)
+		return;
+
+	pe_debug("self RSN cap: %d", self_rsn_cap);
+	self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED;
+
+	/* Update the new rsn caps */
+	wlan_crypto_set_vdev_param(session->vdev, WLAN_CRYPTO_PARAM_RSN_CAP,
+				   self_rsn_cap);
+
+}
+
+/**
+ * lim_disable_bformee_for_iot_ap() - disable bformee for iot ap
+ *@mac_ctx: mac context
+ *@session: pe session
+ *@bss_desc: bss descriptor
+ *
+ * When connect IoT AP with BW 160MHz and NSS 2, disable Beamformee
+ *
+ * Return: None
+ */
+static void
+lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
+			       struct pe_session *session,
+			       struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr;
+	uint16_t ie_len;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+
+	if (wlan_action_oui_search(mac_ctx->psoc,
+				   &vendor_ap_search_attr,
+				   ACTION_OUI_DISABLE_BFORMEE) &&
+	    session->nss == 2 && CH_WIDTH_160MHZ == session->ch_width) {
+		session->vht_config.su_beam_formee = 0;
+		session->vht_config.mu_beam_formee = 0;
+		pe_debug("IoT ap with BW 160 MHz NSS 2, disable Beamformee");
+	}
+}
+
 QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		    struct bss_description *bss_desc)
@@ -3060,12 +3263,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	else
 		mac_ctx->mlme_cfg->feature_flags.enable_short_slot_time_11g =
 			mac_ctx->mlme_cfg->ht_caps.short_slot_time_enabled;
-
-	status = lim_check_and_validate_6g_ap(mac_ctx, bss_desc, ie_struct);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		status = QDF_STATUS_E_FAILURE;
-		goto send;
-	}
 
 	/*
 	 * Join timeout: if we find a BeaconInterval in the BssDescription,
@@ -3201,6 +3398,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		session->ch_center_freq_seg0 = 0;
 		session->ch_width = CH_WIDTH_20MHZ;
 	}
+	session->ap_ch_width = session->ch_width;
 
 	if (IS_DOT11_MODE_HE(session->dot11mode)) {
 		lim_update_session_he_capable(mac_ctx, session);
@@ -3209,6 +3407,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode)) {
 		lim_update_session_eht_capable(mac_ctx, session);
+		lim_reset_self_ocv_caps(session);
 		lim_copy_join_req_eht_cap(session);
 	}
 
@@ -3237,6 +3436,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		&session->limCurrentBssQosCaps,
 		&session->gLimCurrentBssUapsd,
 		&local_power_constraint, session, &is_pwr_constraint);
+
+	lim_disable_bformee_for_iot_ap(mac_ctx, session, bss_desc);
 
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs =
 						!is_pwr_constraint;
@@ -4228,8 +4429,7 @@ static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 	pe_join_req->assoc_link_id = req->assoc_link_id;
 }
 
-static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
-			       struct pe_session *session)
+void lim_set_emlsr_caps(struct mac_context *mac_ctx, struct pe_session *session)
 {
 	bool emlsr_cap, emlsr_allowed, emlsr_band_check, emlsr_enabled = false;
 
@@ -4261,11 +4461,6 @@ static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
 #else
 static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 			     struct join_req *pe_join_req)
-{
-}
-
-static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
-			       struct pe_session *session)
 {
 }
 #endif
@@ -4590,6 +4785,8 @@ static void lim_prepare_and_send_disassoc(struct mac_context *mac_ctx,
 		disassoc_req.doNotSendOverTheAir = 1;
 		disassoc_req.reasonCode =
 					REASON_AUTHORIZED_ACCESS_LIMIT_REACHED;
+	} else if (req->req.reason_code == CM_MLO_LINK_SWITCH_DISCONNECT) {
+		disassoc_req.doNotSendOverTheAir = 1;
 	}
 
 	msg.bodyptr = &disassoc_req;
@@ -4737,7 +4934,8 @@ lim_cm_handle_disconnect_req(struct wlan_cm_vdev_discon_req *req)
 	}
 
 	if (req->req.source == CM_PEER_DISCONNECT ||
-	    req->req.source == CM_SB_DISCONNECT)
+	    req->req.source == CM_SB_DISCONNECT ||
+	    req->req.source == CM_MLO_LINK_SWITCH_DISCONNECT)
 		lim_process_sb_disconnect_req(mac_ctx, pe_session, req);
 	else
 		lim_process_nb_disconnect_req(mac_ctx, pe_session, req);
@@ -5240,6 +5438,11 @@ lim_fill_preauth_req_dot11_mode(struct mac_context *mac_ctx,
 
 	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, QDF_STA_MODE,
 						  vdev_id);
+	/* if user set dot11 mode by cmd, need to do intersect first */
+	self_dot11_mode =
+		   lim_intersect_user_dot11_mode(mac_ctx, QDF_STA_MODE,
+						 vdev_id, self_dot11_mode);
+
 	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,
@@ -5392,12 +5595,18 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	qdf_freq_t curr_op_freq, curr_freq;
 	enum reg_6g_client_type client_mobility_type;
 	struct ch_params ch_params = {0};
-	tDot11fIEtransmit_power_env single_tpe;
+	tDot11fIEtransmit_power_env single_tpe, local_tpe, reg_tpe;
 	/*
 	 * PSD is power spectral density, incoming TPE could contain
 	 * non PSD info, or PSD info, or both, so need to keep track of them
 	 */
 	bool use_local_tpe, non_psd_set = false, psd_set = false;
+	bool both_tpe_present = false;
+	bool local_eirp_set = false, local_psd_set = false;
+	bool reg_eirp_set = false, reg_psd_set = false;
+	uint8_t local_eirp_idx = 0, local_psd_idx = 0;
+	uint8_t reg_eirp_idx = 0, reg_psd_idx = 0;
+	uint8_t min_count = 0;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!vdev_mlme)
@@ -5435,34 +5644,35 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	else if (!local_tpe_count)
 		use_local_tpe = false;
 	else
-		use_local_tpe = wlan_mlme_is_local_tpe_pref(mac->psoc);
+		both_tpe_present = true;
 
 	for (i = 0; i < num_tpe_ies; i++) {
 		single_tpe = tpe_ies[i];
 		if (single_tpe.present &&
 		    (single_tpe.max_tx_pwr_category == client_mobility_type)) {
-			if (use_local_tpe) {
-				if (single_tpe.max_tx_pwr_interpret ==
-				    LOCAL_EIRP) {
-					non_psd_index = i;
-					non_psd_set = true;
-				}
-				if (single_tpe.max_tx_pwr_interpret ==
-				    LOCAL_EIRP_PSD) {
-					psd_index = i;
-					psd_set = true;
-				}
-			} else {
-				if (single_tpe.max_tx_pwr_interpret ==
-				    REGULATORY_CLIENT_EIRP) {
-					non_psd_index = i;
-					non_psd_set = true;
-				}
-				if (single_tpe.max_tx_pwr_interpret ==
-				    REGULATORY_CLIENT_EIRP_PSD) {
-					psd_index = i;
-					psd_set = true;
-				}
+			if (single_tpe.max_tx_pwr_interpret == LOCAL_EIRP) {
+				non_psd_index = i;
+				non_psd_set = true;
+				local_eirp_idx = non_psd_index;
+				local_eirp_set = non_psd_set;
+			} else if (single_tpe.max_tx_pwr_interpret ==
+				   LOCAL_EIRP_PSD) {
+				psd_index = i;
+				psd_set = true;
+				local_psd_idx = psd_index;
+				local_psd_set = psd_set;
+			} else if (single_tpe.max_tx_pwr_interpret ==
+				   REGULATORY_CLIENT_EIRP) {
+				non_psd_index = i;
+				non_psd_set = true;
+				reg_eirp_idx = non_psd_index;
+				reg_eirp_set = non_psd_set;
+			} else if (single_tpe.max_tx_pwr_interpret ==
+				   REGULATORY_CLIENT_EIRP_PSD) {
+				psd_index = i;
+				psd_set = true;
+				reg_psd_idx = psd_index;
+				reg_psd_set = psd_set;
 			}
 		}
 	}
@@ -5563,6 +5773,35 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		vdev_mlme->reg_tpc_obj.eirp_power =
 			single_tpe.tx_power[single_tpe.max_tx_pwr_count];
 		vdev_mlme->reg_tpc_obj.is_psd_power = false;
+	}
+
+	if (both_tpe_present) {
+		pe_debug("Local: eirp: %d psd: %d, Regulatory: eirp: %d psd %d",
+			 local_eirp_set, local_psd_set, reg_eirp_set,
+			 reg_psd_set);
+		if (local_eirp_set && reg_eirp_set) {
+			local_tpe = tpe_ies[local_eirp_idx];
+			reg_tpe = tpe_ies[reg_eirp_idx];
+		} else if (local_psd_set && reg_psd_set) {
+			local_tpe = tpe_ies[local_psd_idx];
+			reg_tpe = tpe_ies[reg_psd_idx];
+		} else {
+			return;
+		}
+
+		min_count = QDF_MIN(local_tpe.max_tx_pwr_count,
+				    reg_tpe.max_tx_pwr_count);
+		for (i = 0; i < min_count + 1; i++) {
+			if (vdev_mlme->reg_tpc_obj.tpe[i] !=
+			    QDF_MIN(local_tpe.tx_power[i], reg_tpe.tx_power[i]))
+				*has_tpe_updated = true;
+			vdev_mlme->reg_tpc_obj.tpe[i] =
+						QDF_MIN(local_tpe.tx_power[i],
+							reg_tpe.tx_power[i]);
+			pe_debug("TPE: Local: %d, Reg: %d, power updated: %d",
+				 local_tpe.tx_power[i], reg_tpe.tx_power[i],
+				 *has_tpe_updated);
+		}
 	}
 }
 
@@ -6636,7 +6875,7 @@ void lim_delete_all_peers(struct pe_session *session)
 		if (!sta_ds)
 			continue;
 		lim_mlo_notify_peer_disconn(session, sta_ds);
-		status = lim_del_sta(mac_ctx, sta_ds, true, session);
+		status = lim_del_sta(mac_ctx, sta_ds, false, session);
 		if (QDF_STATUS_SUCCESS == status) {
 			lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr,
 						  sta_ds->assocId, session);
@@ -7856,6 +8095,9 @@ static void __lim_process_report_message(struct mac_context *mac,
 	case eWNI_SME_BEACON_REPORT_RESP_XMIT_IND:
 		rrm_process_beacon_report_xmit(mac, pMsg->bodyptr);
 		break;
+	case eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND:
+		rrm_process_chan_load_report_xmit(mac, pMsg->bodyptr);
+		break;
 	default:
 		pe_err("Invalid msg type: %d", pMsg->type);
 	}
@@ -8455,6 +8697,211 @@ static void lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 	__lim_process_sme_deauth_req(mac_ctx, (uint32_t *)msg->bodyptr);
 }
 
+void lim_send_bcn_rsp(struct mac_context *mac_ctx, tpSendbeaconParams rsp)
+{
+	if (!rsp) {
+		pe_err("rsp is NULL");
+		return;
+	}
+
+	/* Success case response is sent from beacon_tx completion/timeout */
+	if (rsp->reason == REASON_CH_WIDTH_UPDATE &&
+	    QDF_IS_STATUS_SUCCESS(rsp->status))
+		return;
+
+	pe_debug("Send beacon resp status %d for reason %d",
+		 rsp->status, rsp->reason);
+
+	lim_nss_or_ch_width_update_rsp(mac_ctx, rsp->vdev_id,
+				       rsp->status, rsp->reason);
+}
+
+static void
+lim_update_bcn_with_new_ch_width(struct mac_context *mac_ctx,
+				 struct pe_session *session,
+				 enum phy_ch_width ch_width)
+{
+	QDF_STATUS status;
+
+	session->gLimOperatingMode.present = 1;
+	session->gLimOperatingMode.chanWidth = ch_width;
+
+	pe_debug("ch width %d",
+		 session->gLimOperatingMode.chanWidth);
+
+	session->bw_update_include_ch_sw_ie = true;
+	status = qdf_mc_timer_start(&session->ap_ecsa_timer,
+				    MAX_WAIT_FOR_CH_WIDTH_UPDATE_COMPLETE);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("cannot start ap_ecsa_timer");
+
+	/* Send nss update request from here */
+	status = sch_set_fixed_beacon_fields(mac_ctx, session);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Unable to set op mode IE in beacon");
+		goto end;
+	}
+
+	status = lim_send_beacon_ind(mac_ctx, session,
+				     REASON_CH_WIDTH_UPDATE);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		return;
+
+	pe_err("Unable to send beacon");
+end:
+	/*
+	 * send resp only in case of failure,
+	 * success case response will be from wma.
+	 */
+	lim_nss_or_ch_width_update_rsp(mac_ctx, session->vdev_id, status,
+				       REASON_CH_WIDTH_UPDATE);
+}
+
+static enum phy_ch_width
+lim_calculate_peer_ch_width(struct pe_session *session,
+			    uint8_t *mac_addr,
+			    enum phy_ch_width new_ch_width)
+{
+	enum phy_ch_width peer_org_bw, updated_bw;
+	struct peer_oper_mode_event data = {0};
+	QDF_STATUS status;
+
+	peer_org_bw = wlan_mlme_get_peer_ch_width(
+				wlan_vdev_get_psoc(session->vdev), mac_addr);
+
+	updated_bw = new_ch_width;
+
+	qdf_mem_copy(&data.peer_mac_address.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
+	status = wlan_mlme_get_peer_indicated_ch_width(
+				wlan_vdev_get_psoc(session->vdev), &data);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		updated_bw = data.new_bw;
+
+	pe_debug("Peer: " QDF_MAC_ADDR_FMT " original bw: %d, updated bw: %d, new bw: %d",
+		 QDF_MAC_ADDR_REF(mac_addr), peer_org_bw, updated_bw,
+		 new_ch_width);
+
+	return qdf_min(peer_org_bw, qdf_min(updated_bw, new_ch_width));
+}
+
+static void
+lim_update_new_ch_width_to_fw(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      enum phy_ch_width ch_bandwidth)
+{
+	uint8_t i;
+	tpDphHashNode psta;
+	tUpdateVHTOpMode params;
+
+	wlan_mlme_set_ap_oper_ch_width(session->vdev, ch_bandwidth);
+
+	for (i = 0; i <= mac_ctx->lim.max_sta_of_pe_session; i++) {
+		psta = session->dph.dphHashTable.pDphNodeArray + i;
+		if (!psta || !psta->added)
+			continue;
+
+		params.opMode = lim_calculate_peer_ch_width(session,
+					psta->staAddr, ch_bandwidth);
+		params.smesessionId = session->smeSessionId;
+		qdf_mem_copy(params.peer_mac, psta->staAddr,
+			     sizeof(tSirMacAddr));
+
+		lim_send_mode_update(mac_ctx, &params, session);
+	}
+}
+
+/**
+ * lim_process_sap_ch_width_update() - process sme nss update req
+ *
+ * @mac_ctx: Pointer to Global MAC structure
+ * @msg_buf: pointer to the SME message buffer
+ *
+ * This function processes SME request messages from HDD or upper layer
+ * application.
+ *
+ * Return: None
+ */
+static void
+lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
+				uint32_t *msg_buf)
+{
+	struct sir_sap_ch_width_update *req;
+	struct pe_session *session = NULL;
+	uint8_t vdev_id;
+	struct sir_bcn_update_rsp *param;
+	struct scheduler_msg msg_return = {0};
+	uint8_t primary_channel;
+	struct ch_params ch_params = {0};
+
+	if (!msg_buf) {
+		pe_err("Buffer is Pointing to NULL");
+		return;
+	}
+
+	req = (struct sir_sap_ch_width_update *)msg_buf;
+	vdev_id = req->vdev_id;
+	session = pe_find_session_by_vdev_id(mac_ctx, req->vdev_id);
+	if (!session) {
+		pe_err("vdev %d session not found", req->vdev_id);
+		goto fail;
+	}
+
+	if (session->opmode != QDF_SAP_MODE) {
+		pe_err("Invalid opmode %d", session->opmode);
+		goto fail;
+	}
+
+	ch_params.ch_width = req->ch_width;
+	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+						session->curr_op_freq,
+						0,
+						&ch_params,
+						REG_CURRENT_PWR_MODE);
+
+	session->gLimChannelSwitch.switchCount = 1;
+	session->gLimChannelSwitch.sw_target_freq = session->curr_op_freq;
+	primary_channel = wlan_reg_freq_to_chan(mac_ctx->pdev,
+						session->curr_op_freq);
+	session->gLimChannelSwitch.primaryChannel = primary_channel;
+	session->gLimChannelSwitch.ch_width = req->ch_width;
+	session->gLimChannelSwitch.ch_center_freq_seg0 =
+						ch_params.center_freq_seg0;
+	session->gLimChannelSwitch.ch_center_freq_seg1 =
+						ch_params.center_freq_seg1;
+
+	wlan_mlme_set_ap_oper_ch_width(session->vdev, req->ch_width);
+
+	/* Send ECSA to the peers */
+	send_extended_chan_switch_action_frame(mac_ctx,
+				       session->curr_op_freq,
+				       req->ch_width, session);
+
+	/* Send beacon template to firmware */
+	lim_update_bcn_with_new_ch_width(mac_ctx, session, req->ch_width);
+	/* Send updated bw info of each peer to firmware */
+	lim_update_new_ch_width_to_fw(mac_ctx, session, req->ch_width);
+
+	/*
+	 * Release the SER command only after this, otherwise it may cause
+	 * out of sync issues if any other WMI commands go to fw
+	 */
+	return;
+
+fail:
+	param = qdf_mem_malloc(sizeof(*param));
+	if (!param)
+		return;
+
+	pe_err("vdev %d: send bandwidth update fail", vdev_id);
+	param->status = QDF_STATUS_E_FAILURE;
+	param->vdev_id = INVALID_VDEV_ID;
+	param->reason = REASON_CH_WIDTH_UPDATE;
+	msg_return.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
+	msg_return.bodyptr = param;
+	msg_return.bodyval = 0;
+	sys_process_mmh_msg(mac_ctx, &msg_return);
+}
+
 /**
  * lim_process_sme_req_messages()
  *
@@ -8569,6 +9016,7 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 
 	case eWNI_SME_NEIGHBOR_REPORT_REQ_IND:
 	case eWNI_SME_BEACON_REPORT_RESP_XMIT_IND:
+	case eWNI_SME_CHAN_LOAD_REPORT_RESP_XMIT_IND:
 		__lim_process_report_message(mac, pMsg);
 		break;
 	case eWNI_SME_FT_AGGR_QOS_REQ:
@@ -8662,6 +9110,9 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 	case eWNI_SME_VDEV_PAUSE_IND:
 		lim_process_sme_send_vdev_pause(mac,
 					(struct sme_vdev_pause *)msg_buf);
+		break;
+	case eWNI_SME_SAP_CH_WIDTH_UPDATE_REQ:
+		lim_process_sap_ch_width_update(mac, msg_buf);
 		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);
@@ -9278,36 +9729,42 @@ void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	uint8_t op_class = 0;
 	uint8_t switch_mode = 0, i;
 	tpDphHashNode psta;
-	uint8_t switch_count;
 	uint8_t new_channel = 0;
+	enum phy_ch_width ch_width;
+	tLimChannelSwitchInfo *ch_switch = &session_entry->gLimChannelSwitch;
 
 	op_class =
 		lim_op_class_from_bandwidth(mac_ctx, new_channel_freq,
 					    ch_bandwidth,
-					    session_entry->gLimChannelSwitch.sec_ch_offset);
+					    ch_switch->sec_ch_offset);
 	new_channel = wlan_reg_freq_to_chan(mac_ctx->pdev, new_channel_freq);
 	if (LIM_IS_AP_ROLE(session_entry) &&
 		(mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch == false))
-		switch_mode = session_entry->gLimChannelSwitch.switchMode;
-
-	switch_count = session_entry->gLimChannelSwitch.switchCount;
+		switch_mode = ch_switch->switchMode;
 
 	if (LIM_IS_AP_ROLE(session_entry)) {
 		for (i = 0; i <= mac_ctx->lim.max_sta_of_pe_session; i++) {
 			psta =
 			  session_entry->dph.dphHashTable.pDphNodeArray + i;
-			if (psta && psta->added)
-				lim_send_extended_chan_switch_action_frame(
-					mac_ctx,
-					psta->staAddr,
+			if (!psta || !psta->added)
+				continue;
+			ch_width = lim_calculate_peer_ch_width(session_entry,
+							       psta->staAddr,
+							       ch_bandwidth);
+			op_class = lim_op_class_from_bandwidth(mac_ctx,
+						new_channel_freq, ch_width,
+						ch_switch->sec_ch_offset);
+			lim_send_extended_chan_switch_action_frame(
+					mac_ctx, psta->staAddr,
 					switch_mode, op_class, new_channel,
-					switch_count, session_entry);
+					ch_switch->switchCount, session_entry);
 		}
 	} else if (LIM_IS_STA_ROLE(session_entry)) {
 		lim_send_extended_chan_switch_action_frame(mac_ctx,
 					session_entry->bssId,
 					switch_mode, op_class, new_channel,
-					switch_count, session_entry);
+					ch_switch->switchCount,
+					session_entry);
 	}
 
 }
@@ -9586,52 +10043,6 @@ static void lim_process_ext_change_channel(struct mac_context *mac_ctx,
 }
 
 /**
- * lim_nss_update_rsp() - send NSS update response to SME
- * @mac_ctx Pointer to Global MAC structure
- * @vdev_id: vdev id
- * @status: nss update status
- *
- * Return: None
- */
-static void lim_nss_update_rsp(struct mac_context *mac_ctx,
-			       uint8_t vdev_id, QDF_STATUS status)
-{
-	struct scheduler_msg msg = {0};
-	struct sir_bcn_update_rsp *nss_rsp;
-	QDF_STATUS qdf_status;
-
-	nss_rsp = qdf_mem_malloc(sizeof(*nss_rsp));
-	if (!nss_rsp)
-		return;
-
-	nss_rsp->vdev_id = vdev_id;
-	nss_rsp->status = status;
-	nss_rsp->reason = REASON_NSS_UPDATE;
-
-	msg.type = eWNI_SME_NSS_UPDATE_RSP;
-	msg.bodyptr = nss_rsp;
-	msg.bodyval = 0;
-	qdf_status = scheduler_post_message(QDF_MODULE_ID_PE, QDF_MODULE_ID_SME,
-					    QDF_MODULE_ID_SME, &msg);
-	if (QDF_IS_STATUS_ERROR(qdf_status))
-		qdf_mem_free(nss_rsp);
-}
-
-void lim_send_bcn_rsp(struct mac_context *mac_ctx, tpSendbeaconParams rsp)
-{
-	if (!rsp) {
-		pe_err("rsp is NULL");
-		return;
-	}
-
-	pe_debug("Send beacon resp status %d for reason %d",
-		 rsp->status, rsp->reason);
-
-	if (rsp->reason == REASON_NSS_UPDATE)
-		lim_nss_update_rsp(mac_ctx, rsp->vdev_id, rsp->status);
-}
-
-/**
  * lim_process_nss_update_request() - process sme nss update req
  *
  * @mac_ctx: Pointer to Global MAC structure
@@ -9706,7 +10117,8 @@ end:
 	 * send resp only in case of failure,
 	 * success case response will be from wma.
 	 */
-	lim_nss_update_rsp(mac_ctx, vdev_id, status);
+	lim_nss_or_ch_width_update_rsp(mac_ctx, vdev_id, status,
+				       REASON_NSS_UPDATE);
 }
 
 /**

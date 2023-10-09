@@ -185,14 +185,14 @@ int hdd_set_tdls_offchannel(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_get_tdls_connected_peer_count() - Gets connected TDLS peer count.
- * @adapter: Pointer to adapter
+ * @link_info: Pointer to link_info in hdd adapter
  *
  * This function return number of connected peer.
  *
  * Return: void
  */
 uint16_t
-hdd_get_tdls_connected_peer_count(struct hdd_adapter *adapter);
+hdd_get_tdls_connected_peer_count(struct wlan_hdd_link_info *link_info);
 
 /**
  * hdd_check_and_set_tdls_conn_params() - Sets and Overwrite netdev params if
@@ -254,8 +254,16 @@ int hdd_set_tdls_offchannelmode(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter,
 				int offchanmode);
 int hdd_set_tdls_scan_type(struct hdd_context *hdd_ctx, int val);
-int wlan_hdd_tdls_antenna_switch(struct hdd_context *hdd_ctx,
-				 struct hdd_adapter *adapter,
+
+/**
+ * wlan_hdd_tdls_antenna_switch() - Dynamic TDLS antenna  switch 1x1 <-> 2x2
+ * antenna mode in standalone station
+ * @link_info: Pointer to link_info in hdd adapter
+ * @mode: enum antenna_mode
+ *
+ * Return: 0 if success else non zero
+ */
+int wlan_hdd_tdls_antenna_switch(struct wlan_hdd_link_info *link_info,
 				 uint32_t mode);
 
 /**
@@ -297,9 +305,9 @@ void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx);
 
 #define FEATURE_TDLS_VENDOR_COMMANDS
 
-static inline int wlan_hdd_tdls_antenna_switch(struct hdd_context *hdd_ctx,
-					       struct hdd_adapter *adapter,
-					       uint32_t mode)
+static inline int
+wlan_hdd_tdls_antenna_switch(struct wlan_hdd_link_info *link_info,
+			     uint32_t mode)
 {
 	return 0;
 }
@@ -328,7 +336,7 @@ static inline void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
 }
 
 static inline uint16_t
-hdd_get_tdls_connected_peer_count(struct hdd_adapter *adapter)
+hdd_get_tdls_connected_peer_count(struct wlan_hdd_link_info *link_info)
 {
 	return 0;
 }

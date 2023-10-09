@@ -169,6 +169,13 @@ const struct nla_policy vendor_attr_policy[
 						.type = NLA_U8,
 						.len = NDP_SERVICE_ID_LEN
 	},
+	[QCA_WLAN_VENDOR_ATTR_NDP_CSIA_CAPABILITIES] = {
+						.type = NLA_U8,
+						.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_NDP_GTK_REQUIRED] = {
+						.type = NLA_FLAG,
+	},
 };
 
 /**
@@ -624,16 +631,20 @@ reregister:
  * @pmk: out parameter to populate pmk
  * @passphrase: out parameter to populate passphrase
  * @service_name: out parameter to populate service_name
+ * @ndp_add_param: parameters to populate csid and gtk
  *
  * Return:  0 on success or error code on failure
  */
 static int os_if_nan_parse_security_params(struct nlattr **tb,
 			uint32_t *ncs_sk_type, struct nan_datapath_pmk *pmk,
 			struct ndp_passphrase *passphrase,
-			struct ndp_service_name *service_name)
+			struct ndp_service_name *service_name,
+			struct ndp_additional_params *ndp_add_param)
 {
+	struct nlattr *attr;
+
 	if (!ncs_sk_type || !pmk || !passphrase || !service_name) {
-		osif_err("out buffers for one ore more parameters is null");
+		osif_err("out buffers for one or more parameters is null");
 		return -EINVAL;
 	}
 
@@ -677,6 +688,13 @@ static int os_if_nan_parse_security_params(struct nlattr **tb,
 				   service_name->service_name,
 				   service_name->service_name_len);
 	}
+
+	attr = tb[QCA_WLAN_VENDOR_ATTR_NDP_CSIA_CAPABILITIES];
+	if (attr)
+		ndp_add_param->csid_cap = nla_get_u8(attr);
+
+	ndp_add_param->gtk =
+			nla_get_flag(tb[QCA_WLAN_VENDOR_ATTR_NDP_GTK_REQUIRED]);
 
 	return 0;
 }
@@ -807,7 +825,8 @@ static int __os_if_nan_process_ndp_initiator_req(struct wlan_objmgr_psoc *psoc,
 
 	if (os_if_nan_parse_security_params(tb, &req.ncs_sk_type, &req.pmk,
 					    &req.passphrase,
-					    &req.service_name)) {
+					    &req.service_name,
+					    &req.ndp_add_params)) {
 		osif_err("inconsistent security params in request.");
 		ret = -EINVAL;
 		goto initiator_req_failed;
@@ -997,7 +1016,8 @@ static int __os_if_nan_process_ndp_responder_req(struct wlan_objmgr_psoc *psoc,
 		   req.is_protocol_present);
 
 	if (os_if_nan_parse_security_params(tb, &req.ncs_sk_type, &req.pmk,
-			&req.passphrase, &req.service_name)) {
+					    &req.passphrase, &req.service_name,
+					    &req.ndp_add_params)) {
 		osif_err("inconsistent security params in request.");
 		ret = -EINVAL;
 		goto responder_req_failed;
@@ -1254,7 +1274,7 @@ static void os_if_ndp_initiator_rsp_handler(struct wlan_objmgr_vdev *vdev,
 		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!rsp) {
-		osif_err("Invalid NDP Initator response");
+		osif_err("Invalid NDP Initiator response");
 		return;
 	}
 
@@ -1410,6 +1430,14 @@ static inline uint32_t osif_ndp_get_ndp_req_ind_len(
 	if (event->is_service_id_present)
 		data_len += nla_total_size(vendor_attr_policy[
 				QCA_WLAN_VENDOR_ATTR_NDP_SERVICE_ID].len);
+
+	if (event->ndp_add_params.csid_cap)
+		data_len += nla_total_size(vendor_attr_policy[
+			QCA_WLAN_VENDOR_ATTR_NDP_CSIA_CAPABILITIES].len);
+	if (event->ndp_add_params.gtk)
+		data_len += nla_total_size(vendor_attr_policy[
+				QCA_WLAN_VENDOR_ATTR_NDP_GTK_REQUIRED].len);
+
 	return data_len;
 }
 
@@ -1558,6 +1586,19 @@ static void os_if_ndp_indication_handler(struct wlan_objmgr_vdev *vdev,
 			goto ndp_indication_nla_failed;
 	}
 
+	if (event->ndp_add_params.csid_cap) {
+		if (nla_put_u8(vendor_event,
+			       QCA_WLAN_VENDOR_ATTR_NDP_CSIA_CAPABILITIES,
+			       event->ndp_add_params.csid_cap))
+			goto ndp_indication_nla_failed;
+	}
+
+	if (event->ndp_add_params.gtk) {
+		if (nla_put_flag(vendor_event,
+				 QCA_WLAN_VENDOR_ATTR_NDP_GTK_REQUIRED))
+			goto ndp_indication_nla_failed;
+	}
+
 	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	return;
 ndp_indication_nla_failed:
@@ -1684,7 +1725,7 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
 
 	if (!ndp_confirm) {
-		osif_err("Invalid NDP Initator response");
+		osif_err("Invalid NDP Initiator response");
 		return;
 	}
 

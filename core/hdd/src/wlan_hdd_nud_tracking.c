@@ -64,20 +64,21 @@ hdd_handle_nud_fail_sta(struct hdd_context *hdd_ctx,
 }
 
 static void
-hdd_handle_nud_fail_non_sta(struct hdd_adapter *adapter)
+hdd_handle_nud_fail_non_sta(struct wlan_hdd_link_info *link_info)
 {
-	wlan_hdd_cm_issue_disconnect(adapter,
+	wlan_hdd_cm_issue_disconnect(link_info,
 				     REASON_GATEWAY_REACHABILITY_FAILURE,
 				     false);
 }
 
 /**
  * __hdd_nud_failure_work() - work for nud event
- * @adapter: Pointer to hdd_adapter
+ * @adapter: HDD adapter
  *
  * Return: None
  */
-static void __hdd_nud_failure_work(struct hdd_adapter *adapter)
+static void
+__hdd_nud_failure_work(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
 	int status;
@@ -119,31 +120,22 @@ static void __hdd_nud_failure_work(struct hdd_adapter *adapter)
 		hdd_handle_nud_fail_sta(hdd_ctx, adapter);
 		return;
 	}
-	hdd_handle_nud_fail_non_sta(adapter);
+	hdd_handle_nud_fail_non_sta(adapter->deflink);
 
 	hdd_exit();
 }
 
-void hdd_nud_failure_work(hdd_cb_handle context, uint8_t vdev_id)
+void hdd_nud_failure_work(hdd_cb_handle context, qdf_netdev_t netdev)
 {
-	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
-	struct wlan_hdd_link_info *link_info;
 	struct osif_vdev_sync *vdev_sync;
 
-	hdd_ctx = hdd_cb_handle_to_context(context);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
+	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
+	if (!adapter) {
+		hdd_err("adapter is null");
 		return;
 	}
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("Invalid vdev");
-		return;
-	}
-
-	adapter = link_info->adapter;
 	if (osif_vdev_sync_op_start(adapter->dev, &vdev_sync))
 		return;
 

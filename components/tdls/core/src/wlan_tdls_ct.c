@@ -105,6 +105,14 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 
 	vdev = (struct wlan_objmgr_vdev *)user_data;
 	tdls_soc = wlan_vdev_get_tdls_soc_obj(vdev);
+	if (!tdls_soc)
+		return;
+
+	/* timer_cnt is reset when link switch happens */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    qdf_atomic_read(&tdls_soc->timer_cnt) == 0)
+		return;
+
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 	    qdf_atomic_dec_and_test(&tdls_soc->timer_cnt)) {
 		tdls_process_mlo_cal_tdls_link_score(vdev);
@@ -144,6 +152,9 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 	}
 
 	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
+	if (!tdls_vdev)
+		return;
+
 	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
 		head = &tdls_vdev->peer_list[i];
 		status = qdf_list_peek_front(head, &p_node);
@@ -538,6 +549,16 @@ int tdls_recv_discovery_resp(struct tdls_vdev_priv_obj *tdls_vdev,
 		   QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
 		   curr_peer->link_status);
 
+	/* Since peer link status bases on vdev and stream goes through
+	 * vdev0 (assoc link) at start, rx/tx pkt count on vdev0, but
+	 * it choices vdev1 as tdls link, the peer status does not change on
+	 * vdev1 though it has been changed for vdev0 per the rx/tx pkt count.
+	 */
+	if (wlan_vdev_mlme_is_mlo_vdev(tdls_vdev->vdev) &&
+	    curr_peer->link_status == TDLS_LINK_IDLE)
+		tdls_set_peer_link_status(curr_peer, TDLS_LINK_DISCOVERING,
+					  TDLS_LINK_SUCCESS);
+
 	tdls_cfg = &tdls_vdev->threshold_config;
 	if (TDLS_LINK_DISCOVERING == curr_peer->link_status) {
 		/* Since we are here, it means Throughput threshold is
@@ -854,11 +875,11 @@ static void tdls_ct_process_cap_supported(struct tdls_peer *curr_peer,
 					struct tdls_soc_priv_obj *tdls_soc_obj)
 {
 	if (curr_peer->rx_pkt || curr_peer->tx_pkt)
-		tdls_debug(QDF_MAC_ADDR_FMT "link_status %d tdls_support %d tx %d rx %d rssi %d",
+		tdls_debug(QDF_MAC_ADDR_FMT "link_status %d tdls_support %d tx %d rx %d rssi %d vdev %d",
 			   QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
 			   curr_peer->link_status, curr_peer->tdls_support,
 			   curr_peer->tx_pkt, curr_peer->rx_pkt,
-			   curr_peer->rssi);
+			   curr_peer->rssi, wlan_vdev_get_id(tdls_vdev->vdev));
 
 	switch (curr_peer->link_status) {
 	case TDLS_LINK_IDLE:
@@ -899,10 +920,11 @@ static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 			return;
 
 	if (curr_peer->rx_pkt || curr_peer->tx_pkt)
-		tdls_debug(QDF_MAC_ADDR_FMT "link_status %d tdls_support %d tx %d rx %d",
+		tdls_debug(QDF_MAC_ADDR_FMT "link_status %d tdls_support %d tx %d rx %d vdev %d",
 			   QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
 			   curr_peer->link_status, curr_peer->tdls_support,
-			   curr_peer->tx_pkt, curr_peer->rx_pkt);
+			   curr_peer->tx_pkt, curr_peer->rx_pkt,
+			   wlan_vdev_get_id(tdls_vdev->vdev));
 
 	if (!TDLS_IS_LINK_CONNECTED(curr_peer) &&
 	    ((curr_peer->tx_pkt + curr_peer->rx_pkt) >=
@@ -1014,7 +1036,7 @@ void tdls_ct_handler(void *user_data)
 	if (!user_data)
 		return;
 
-	vdev = tdls_get_vdev(user_data, WLAN_TDLS_NB_ID);
+	vdev = (struct wlan_objmgr_vdev *)user_data;
 	if (!vdev)
 		return;
 
@@ -1029,9 +1051,6 @@ void tdls_ct_handler(void *user_data)
 	} else {
 		tdls_ct_process_handler(vdev);
 	}
-
-	wlan_objmgr_vdev_release_ref(vdev,
-				     WLAN_TDLS_NB_ID);
 }
 
 int tdls_set_tdls_offchannel(struct tdls_soc_priv_obj *tdls_soc,

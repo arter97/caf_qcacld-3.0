@@ -1257,12 +1257,12 @@ int wlan_hdd_vendor_abort_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 	return errno;
 }
 
-int wlan_hdd_scan_abort(struct hdd_adapter *adapter)
+int wlan_hdd_scan_abort(struct wlan_hdd_link_info *link_info)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
-			adapter->deflink->vdev_id, INVALID_SCAN_ID, true);
+			link_info->vdev_id, INVALID_SCAN_ID, true);
 
 	return 0;
 }

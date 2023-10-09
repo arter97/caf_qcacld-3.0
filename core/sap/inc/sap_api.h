@@ -63,6 +63,14 @@ extern "C" {
 #define       SAP_MAX_NUM_SESSION          5
 #define       SAP_MAX_OBSS_STA_CNT         1    /* max # of OBSS STA */
 #define       SAP_ACS_WEIGHT_MAX           (26664)
+/* ACS will mark non ACS channels(filtered by PCL) or channels not in
+ * ACS scan list to SAP_ACS_WEIGHT_MAX.
+ * But the filtered channel still need a reasonable weight to
+ * calculate the combined weight for ACS bw 40/80/160/320.
+ * Assign SAP_ACS_WEIGHT_ADJUSTABLE to such channels and update it
+ * with reasonable weight after all channels weight are computed.
+ */
+#define       SAP_ACS_WEIGHT_ADJUSTABLE    (SAP_ACS_WEIGHT_MAX - 1)
 
 #define SAP_DEFAULT_24GHZ_CHANNEL     (6)
 #define SAP_DEFAULT_5GHZ_CHANNEL      (40)
@@ -285,6 +293,7 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
 	uint8_t supported_band;
 	tDot11fIEHTCaps ht_caps;
 	tDot11fIEVHTCaps vht_caps;
+	bool eht_caps_present;
 	tSirMacCapabilityInfo capability_info;
 	bool he_caps_present;
 	struct qdf_mac_addr sta_mld;
@@ -451,12 +460,13 @@ struct sap_acs_cfg {
 	/* ACS Algo Input */
 	uint8_t    acs_mode;
 	eCsrPhyMode hw_mode;
-	uint32_t    start_ch_freq;
-	uint32_t    end_ch_freq;
-	uint32_t   *freq_list;
+	qdf_freq_t    start_ch_freq;
+	qdf_freq_t    end_ch_freq;
+	qdf_freq_t   *freq_list;
 	uint8_t    ch_list_count;
-	uint32_t   *master_freq_list;
+	qdf_freq_t   *master_freq_list;
 	uint8_t    master_ch_list_count;
+	bool master_ch_list_updated;
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 	uint8_t    skip_scan_status;
 	uint32_t    skip_scan_range1_stch;
@@ -1916,6 +1926,37 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
 					 qdf_freq_t last_acs_freq);
 
+/**
+ * wlansap_update_sap_chan_list() - set channel list of sap
+ * @sap_config: sap config
+ * @freq_list: freq list sent by userspace
+ * @count: valid freq count
+ *
+ * Return: 0 on success, else error number
+ */
+int wlansap_update_sap_chan_list(struct sap_config *sap_config,
+				 qdf_freq_t *freq_list, uint16_t count);
+
+/**
+ * wlansap_sort_channel_list() - Sort channel list
+ * @vdev_id: Vdev Id
+ * @list: List of channels which needs to sort
+ * @ch_info: Fill sorted channels list in ch_info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
+				     struct sap_sel_ch_info *ch_info);
+
+/**
+ * wlansap_get_user_config_acs_ch_list() - Get user config ACS channel list
+ * @vdev_id: Vdev Id
+ * @filter: Filter to apply to get scan result
+ *
+ * Return: None
+ */
+void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
+					 struct scan_filter *filter);
 #ifdef __cplusplus
 }
 #endif

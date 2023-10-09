@@ -39,6 +39,11 @@
 #include "wlan_mlme_api.h"
 #include "wlan_mlme_ucfg_api.h"
 #include "target_if.h"
+#include "wlan_cm_api.h"
+#include "wlan_mlo_link_force.h"
+#include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_psoc_mlme_api.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -218,6 +223,64 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * policy_mgr_get_sap_ch_width_update_action() - get SAP ch_width update action
+ * @psoc: Pointer to psoc
+ * @ch_freq: channel frequency of new connection
+ * @next_action: next action to happen in order to update bandwidth
+ *
+ * Check if current operating SAP needs a downgrade to 160MHz or an upgrade
+ * to 320MHz based on the new connection.
+ *
+ * return : None
+ */
+static void
+policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
+				uint32_t ch_freq,
+				enum policy_mgr_conc_next_action *next_action)
+{
+	struct wlan_objmgr_vdev *vdev;
+	enum phy_ch_width cur_bw;
+	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
+	bool eht_capab = false;
+
+	if (QDF_IS_STATUS_ERROR(wlan_psoc_mlme_get_11be_capab(psoc,
+							      &eht_capab)) ||
+	    !eht_capab ||
+	    policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
+						   &vdev_id_list[0],
+						   PM_SAP_MODE) != 1)
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id_list[0],
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev %d is NULL", vdev_id_list[0]);
+		return;
+	}
+
+	cur_bw = wlan_mlme_get_ap_oper_ch_width(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	if (cur_bw < CH_WIDTH_160MHZ)
+		return;
+
+	if (!ch_freq) {
+		if (policy_mgr_get_connection_count(psoc) == 1 ||
+		    (!policy_mgr_is_current_hwmode_dbs(psoc) &&
+		     !policy_mgr_is_current_hwmode_sbs(psoc)))
+			*next_action = PM_UPGRADE_BW;
+		return;
+	}
+
+	if (cur_bw == CH_WIDTH_320MHZ &&
+	    policy_mgr_is_conn_lead_to_dbs_sbs(psoc, ch_freq))
+		*next_action = PM_DOWNGRADE_BW;
+	else
+		*next_action = PM_UPGRADE_BW;
+}
+
 enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 		struct wlan_objmgr_psoc *psoc,
 		enum policy_mgr_conn_update_reason *reason)
@@ -232,6 +295,7 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
 		policy_mgr_debug("HW mode selection offload is enabled");
+		policy_mgr_get_sap_ch_width_update_action(psoc, 0, &upgrade);
 		return upgrade;
 	}
 
@@ -383,8 +447,13 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 
 	cur_freq = pm_conc_connection_list[conn_index].freq;
 
-	mode = policy_mgr_get_mode(conn_table_entry.type,
-					conn_table_entry.sub_type);
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(
+					psoc,
+					wlan_get_opmode_from_vdev_id(
+								pm_ctx->pdev,
+								vdev_id),
+					vdev_id);
+
 	ch_freq = conn_table_entry.mhz;
 	status = policy_mgr_get_nss_for_vdev(psoc, mode, &nss_2g, &nss_5g);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -411,8 +480,6 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 
 	/* do we need to change the HW mode */
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
-	policy_mgr_handle_ml_sta_links_on_vdev_up_csa(psoc,
-				policy_mgr_get_qdf_mode_from_pm(mode), vdev_id);
 
 	if (policy_mgr_is_conc_sap_present_on_sta_freq(psoc, mode, cur_freq) &&
 	    policy_mgr_update_indoor_concurrency(psoc, vdev_id, 0,
@@ -424,6 +491,8 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	else if (wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev))
 		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
 
+	ml_nlink_conn_change_notify(
+		psoc, vdev_id, ml_nlink_connection_updated_evt, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -691,8 +760,10 @@ policy_mgr_get_preferred_dbs_action_table(
 			new_conn_op_mode = pm_ctx->hdd_cbacks.
 					hdd_get_device_mode(vdev_id);
 
-		new_conn_mode = policy_mgr_convert_device_mode_to_qdf_type(
-			new_conn_op_mode);
+		new_conn_mode =
+			policy_mgr_qdf_opmode_to_pm_con_mode(psoc,
+							     new_conn_op_mode,
+							     vdev_id);
 		if (new_conn_mode == PM_MAX_NUM_OF_MODE)
 			policy_mgr_debug("new vdev %d op_mode %d freq %d reason %d: not prioritized",
 					 vdev_id, new_conn_op_mode,
@@ -834,6 +905,27 @@ policy_mgr_get_third_conn_action_table(
 	}
 }
 
+bool
+policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
+				   uint32_t freq)
+{
+	struct connection_info info[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint32_t connection_count, i;
+
+	if (policy_mgr_is_current_hwmode_dbs(psoc) ||
+	    policy_mgr_is_current_hwmode_sbs(psoc))
+		return true;
+
+	connection_count = policy_mgr_get_connection_info(psoc, info);
+
+	for (i = 0; i < connection_count; i++)
+		if (!policy_mgr_2_freq_always_on_same_mac(psoc, freq,
+							  info[i].ch_freq))
+			return true;
+
+	return false;
+}
+
 static QDF_STATUS
 policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 			   uint32_t session_id,
@@ -858,6 +950,8 @@ policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
 		policy_mgr_debug("HW mode selection offload is enabled");
 		*next_action = PM_NOP;
+		policy_mgr_get_sap_ch_width_update_action(psoc, ch_freq,
+							  next_action);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -973,6 +1067,20 @@ policy_mgr_is_hw_mode_change_required(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
+static bool
+policy_mgr_is_ch_width_downgrade_required(struct wlan_objmgr_psoc *psoc,
+					  struct scan_cache_entry *entry,
+					  qdf_list_t *scan_list)
+
+{
+	if (policy_mgr_is_conn_lead_to_dbs_sbs(psoc,
+					       entry->channel.chan_freq) ||
+	    wlan_cm_bss_mlo_type(psoc, entry, scan_list))
+		return true;
+
+	return false;
+}
+
 static uint32_t
 policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 				    qdf_list_t *scan_list, uint8_t vdev_id)
@@ -982,10 +1090,18 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
 	uint32_t ch_freq = 0;
 	struct scan_cache_entry *entry;
+	bool eht_capab =  false, check_sap_bw_downgrade = false;
 
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
 		policy_mgr_debug("HW mode selection offload is enabled");
-		goto end;
+		wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
+		if (eht_capab &&
+		    policy_mgr_mode_specific_connection_count(psoc,
+							      PM_SAP_MODE,
+							      NULL) == 1)
+			check_sap_bw_downgrade = true;
+		else
+			goto end;
 	}
 
 	if (!scan_list || !qdf_list_size(scan_list)) {
@@ -997,6 +1113,9 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_debug("Driver isn't DBS capable");
 		goto end;
 	}
+
+	if (check_sap_bw_downgrade)
+		goto ch_width_update;
 
 	if (!policy_mgr_is_dbs_allowed_for_concurrency(psoc, QDF_STA_MODE)) {
 		policy_mgr_debug("DBS not allowed for concurrency combo");
@@ -1011,6 +1130,7 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
+ch_width_update:
 	qdf_list_peek_front(scan_list, &cur_node);
 
 	while (cur_node) {
@@ -1022,8 +1142,10 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 		ch_freq = entry->channel.chan_freq;
 
 		if (policy_mgr_is_hw_mode_change_required(psoc, ch_freq,
-							  vdev_id)) {
-			policy_mgr_debug("Scan list has BSS of freq %d hw mode required",
+							  vdev_id) ||
+		    policy_mgr_is_ch_width_downgrade_required(psoc, entry,
+							      scan_list)) {
+			policy_mgr_debug("Scan list has BSS of freq %d hw mode/ch_width update required",
 					 ch_freq);
 			break;
 		}
@@ -1437,6 +1559,17 @@ QDF_STATUS policy_mgr_next_actions(
 					PM_NOP, POLICY_MGR_BAND_24, reason,
 					session_id, request_id);
 		break;
+	case PM_DOWNGRADE_BW:
+		policy_mgr_sap_ch_width_update(psoc, action, reason,
+					       session_id, request_id);
+		break;
+	case PM_UPGRADE_BW:
+		if (reason == POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC)
+			policy_mgr_sap_ch_width_update(psoc, action, reason,
+						       session_id, request_id);
+		else
+			policy_mgr_restart_opportunistic_timer(psoc, false);
+		break;
 	default:
 		policy_mgr_err("unexpected action value %d", action);
 		status = QDF_STATUS_E_FAILURE;
@@ -1495,8 +1628,8 @@ policy_mgr_con_mode_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 		return mode;
 	}
 
-	op_mode = wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id);
-	return policy_mgr_convert_device_mode_to_qdf_type(op_mode);
+	op_mode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
+	return policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -1531,8 +1664,7 @@ static bool policy_mgr_is_sap_go_existed(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t ap_present, go_present;
 
-	ap_present = policy_mgr_mode_specific_connection_count(
-				psoc, PM_SAP_MODE, NULL);
+	ap_present = policy_mgr_get_sap_mode_count(psoc, NULL);
 	if (ap_present)
 		return true;
 
@@ -1576,6 +1708,22 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 
 	return is_safe;
 }
+
+bool policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	unsigned long restriction_mask;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return false;
+	}
+
+	restriction_mask =
+		(unsigned long)policy_mgr_get_freq_restriction_mask(pm_ctx);
+	return qdf_test_bit(QDF_SAP_MODE, &restriction_mask);
+}
 #else
 bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 				uint32_t ch_freq)
@@ -1608,6 +1756,8 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 				    uint32_t sap_freq)
 {
+	uint32_t nan_2g_freq, nan_5g_freq;
+
 	if (policy_mgr_is_safe_channel(psoc, sap_freq))
 		return true;
 
@@ -1618,6 +1768,19 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	if (policy_mgr_sta_sap_scc_on_lte_coex_chan(psoc) &&
 	    policy_mgr_is_sta_sap_scc(psoc, sap_freq)) {
 		policy_mgr_debug("unsafe freq %d for sap is allowed", sap_freq);
+		return true;
+	}
+
+	nan_2g_freq =
+		policy_mgr_mode_specific_get_channel(psoc, PM_NAN_DISC_MODE);
+	nan_5g_freq = wlan_nan_get_disc_5g_ch_freq(psoc);
+
+	if ((WLAN_REG_IS_SAME_BAND_FREQS(nan_2g_freq, sap_freq) ||
+	     WLAN_REG_IS_SAME_BAND_FREQS(nan_5g_freq, sap_freq)) &&
+	    policy_mgr_is_force_scc(psoc) &&
+	    policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(psoc)) {
+		policy_mgr_debug("NAN+SAP SCC on unsafe freq %d is allowed",
+				  sap_freq);
 		return true;
 	}
 
@@ -1711,8 +1874,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		}
 
 		if ((is_acs_mode ||
-		     !target_psoc_get_sap_coex_fixed_chan_cap(
-					wlan_psoc_get_tgt_if_handle(psoc))) &&
+		     policy_mgr_restrict_sap_on_unsafe_chan(psoc)) &&
 		    sta_sap_scc_on_lte_coex_chan &&
 		    !policy_mgr_is_safe_channel(psoc, op_ch_freq_list[i]) &&
 		    pm_ctx->last_disconn_sta_freq == op_ch_freq_list[i]) {
@@ -1929,7 +2091,7 @@ policy_mgr_nan_sap_pre_enable_conc_check(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	if (!(mode == PM_SAP_MODE || mode == PM_NAN_DISC_MODE)) {
+	if (!policy_mgr_is_sap_mode(mode) || mode == PM_NAN_DISC_MODE) {
 		policy_mgr_debug("Not NAN or SAP mode");
 		return true;
 	}
@@ -1953,6 +2115,13 @@ policy_mgr_nan_sap_pre_enable_conc_check(struct wlan_objmgr_psoc *psoc,
 		sap_freq = policy_mgr_mode_specific_get_channel(pm_ctx->psoc,
 								PM_SAP_MODE);
 		policy_mgr_debug("FREQ SAP: %d NAN: %d", sap_freq, ch_freq);
+		if (!sap_freq) {
+			sap_freq = policy_mgr_mode_specific_get_channel(
+							pm_ctx->psoc,
+							PM_LL_LT_SAP_MODE);
+			policy_mgr_debug("FREQ LL_LT_SAP: %d NAN: %d",
+					 sap_freq, ch_freq);
+		}
 		if (ucfg_is_nan_dbs_supported(pm_ctx->psoc) &&
 		    !WLAN_REG_IS_SAME_BAND_FREQS(sap_freq, ch_freq))
 			return true;
@@ -1971,7 +2140,7 @@ policy_mgr_nan_sap_pre_enable_conc_check(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_debug("NAN+SAP unsafe ch SCC disabled");
 			return false;
 		}
-	} else if (mode == PM_SAP_MODE) {
+	} else if (policy_mgr_is_sap_mode(mode)) {
 		nan_2g_freq =
 			policy_mgr_mode_specific_get_channel(pm_ctx->psoc,
 							     PM_NAN_DISC_MODE);
@@ -2029,7 +2198,7 @@ policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		if (pm_conc_connection_list[i].mode == PM_SAP_MODE &&
+		if (policy_mgr_is_sap_mode(pm_conc_connection_list[i].mode) &&
 		    pm_conc_connection_list[i].in_use) {
 			sap_info = &pm_conc_connection_list[i];
 			break;
@@ -2100,6 +2269,10 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 	struct policy_mgr_conc_connection_info *sap_info = NULL;
 	uint32_t sap_freq = 0, i;
 	QDF_STATUS status;
+	uint32_t user_config_freq;
+	uint8_t band_mask = 0;
+	uint8_t chn_idx, num_chan;
+	struct regulatory_channel *channel_list;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2118,13 +2291,48 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 	if (sap_freq == 0 || policy_mgr_is_safe_channel(psoc, sap_freq))
 		return;
 
+	user_config_freq = policy_mgr_get_user_config_sap_freq(
+						psoc, sap_info->vdev_id);
+
 	sap_freq = policy_mgr_get_nondfs_preferred_channel(psoc, PM_SAP_MODE,
 							   false,
 							   sap_info->vdev_id);
 	policy_mgr_debug("User/ACS orig Freq: %d New SAP Freq: %d",
-			 policy_mgr_get_user_config_sap_freq(
-						psoc, sap_info->vdev_id),
-			 sap_freq);
+			 user_config_freq, sap_freq);
+
+	if (wlan_reg_is_enable_in_secondary_list_for_freq(pm_ctx->pdev,
+							  user_config_freq) &&
+	    policy_mgr_is_safe_channel(psoc, user_config_freq)) {
+		policy_mgr_debug("Give preference to user config freq");
+		sap_freq = user_config_freq;
+	} else {
+		channel_list = qdf_mem_malloc(
+					sizeof(struct regulatory_channel) *
+					       NUM_CHANNELS);
+		if (!channel_list)
+			return;
+
+		band_mask |= BIT(wlan_reg_freq_to_band(user_config_freq));
+		num_chan = wlan_reg_get_band_channel_list_for_pwrmode(
+						pm_ctx->pdev,
+						band_mask,
+						channel_list,
+						REG_CURRENT_PWR_MODE);
+		for (chn_idx = 0; chn_idx < num_chan; chn_idx++) {
+			if (wlan_reg_is_enable_in_secondary_list_for_freq(
+					pm_ctx->pdev,
+					channel_list[chn_idx].center_freq) &&
+			    policy_mgr_is_safe_channel(
+					psoc,
+					channel_list[chn_idx].center_freq)) {
+				policy_mgr_debug("Prefer user config band freq %d",
+						 channel_list[chn_idx].center_freq);
+				sap_freq = channel_list[chn_idx].center_freq;
+			}
+		}
+		qdf_mem_free(channel_list);
+	}
+
 	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
 	    pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress()) {
 		policy_mgr_debug("wait as channel switch is already in progress");
@@ -2169,6 +2377,16 @@ void policy_mgr_check_sap_restart(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	/*
+	 * Restart should be handled by sap_fsm_validate_and_change_channel(),
+	 * after SAP starts.
+	 */
+	if (pm_ctx->hdd_cbacks.hdd_is_cac_in_progress &&
+	    pm_ctx->hdd_cbacks.hdd_is_cac_in_progress()) {
+		policy_mgr_debug("DFS CAC in progress, do not restart SAP");
+		return;
+	}
+
 	if (!pm_ctx->hdd_cbacks.wlan_hdd_get_channel_for_sap_restart) {
 		policy_mgr_err("SAP restart get channel callback in NULL");
 		goto end;
@@ -2208,6 +2426,7 @@ policy_mgr_handle_sap_plus_go_force_scc(struct wlan_objmgr_psoc *psoc)
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct sta_ap_intf_check_work_ctx *work_info;
 	struct ch_params ch_params = {0};
+	enum QDF_OPMODE opmode;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2225,8 +2444,9 @@ policy_mgr_handle_sap_plus_go_force_scc(struct wlan_objmgr_psoc *psoc)
 
 	vdev_id = work_info->sap_plus_go_force_scc.initiator_vdev_id;
 	chan_freq = wlan_get_operation_chan_freq_vdev_id(pm_ctx->pdev, vdev_id);
-	vdev_con_mode = policy_mgr_convert_device_mode_to_qdf_type(
-			wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id));
+	opmode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
+	vdev_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, opmode,
+							     vdev_id);
 
 	existing_vdev_id =
 		policy_mgr_fetch_existing_con_info(
@@ -2320,6 +2540,7 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 	uint8_t vdev_id;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct sta_ap_intf_check_work_ctx *work_info;
+	enum QDF_OPMODE opmode;
 
 	if (reason_code != CSA_REASON_GO_BSS_STARTED &&
 	    reason_code != CSA_REASON_USER_INITIATED)
@@ -2335,6 +2556,7 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 	vdev_id = wlan_vdev_get_id(vdev);
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	work_info = pm_ctx->sta_ap_intf_check_work_info;
 	if (!work_info) {
 		policy_mgr_err("invalid work info");
@@ -2342,8 +2564,8 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 	}
 
 	chan_freq = wlan_get_operation_chan_freq(vdev);
-	vdev_con_mode = policy_mgr_convert_device_mode_to_qdf_type(
-			wlan_vdev_mlme_get_opmode(vdev));
+	vdev_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, opmode,
+							     vdev_id);
 
 	existing_vdev_id =
 		policy_mgr_fetch_existing_con_info(psoc,
@@ -2373,6 +2595,71 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_debug("change interface request already queued");
 
 	return QDF_STATUS_E_PENDING;
+}
+
+/**
+ * policy_mgr_is_any_conn_in_transition() - Check if any STA/CLI
+ * connection is disconnecting or roaming state
+ * @psoc: PSOC object information
+ *
+ * This function will check connection table and find any STA/CLI
+ * in transition state such as disconnecting, link switch or roaming.
+ *
+ * Return: true if there is one STA/CLI in transition state.
+ */
+static bool
+policy_mgr_is_any_conn_in_transition(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t i;
+	struct policy_mgr_conc_connection_info *conn_info;
+	struct wlan_objmgr_vdev *vdev;
+	bool non_connected = false;
+	bool in_link_switch = false;
+	uint8_t vdev_id;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid pm context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		conn_info = &pm_conc_connection_list[i];
+		if (!(conn_info->in_use &&
+		      (conn_info->mode == PM_STA_MODE ||
+		       conn_info->mode == PM_P2P_CLIENT_MODE)))
+			continue;
+		vdev_id = conn_info->vdev_id;
+		vdev = wlan_objmgr_get_vdev_by_id_from_pdev(
+				pm_ctx->pdev, vdev_id, WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("vdev %d: not found", vdev_id);
+			continue;
+		}
+
+		non_connected = !wlan_cm_is_vdev_connected(vdev);
+
+		if (mlo_is_mld_sta(vdev) &&
+		    mlo_mgr_is_link_switch_in_progress(vdev))
+			in_link_switch = true;
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		if (non_connected) {
+			policy_mgr_debug("vdev %d: is in transition state",
+					 vdev_id);
+			break;
+		}
+		if (in_link_switch) {
+			policy_mgr_debug("vdev %d: sta mld is in link switch state",
+					 vdev_id);
+			break;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return non_connected || in_link_switch;
 }
 
 static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
@@ -2430,9 +2717,10 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 	if (!policy_mgr_is_sap_go_existed(pm_ctx->psoc))
 		goto end;
 
-	cc_count = policy_mgr_get_mode_specific_conn_info(
-				pm_ctx->psoc, &op_ch_freq_list[cc_count],
-				&vdev_id[cc_count], PM_SAP_MODE);
+	cc_count = policy_mgr_get_sap_mode_info(pm_ctx->psoc,
+						&op_ch_freq_list[cc_count],
+						&vdev_id[cc_count]);
+
 	policy_mgr_debug("Number of concurrent SAP: %d", cc_count);
 	if (cc_count < MAX_NUMBER_OF_CONC_CONNECTIONS)
 		cc_count = cc_count +
@@ -2445,6 +2733,17 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 		policy_mgr_err("Could not retrieve SAP/GO operating channel&vdevid");
 		goto end;
 	}
+
+	/* When any STA/CLI is transition state, such as roaming or
+	 * disconnecting, skip force scc for this time.
+	 */
+	if (policy_mgr_is_any_conn_in_transition(pm_ctx->psoc)) {
+		policy_mgr_debug("defer sap conc check to a later time due to another sta/cli dicon/roam pending");
+		qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
+				       SAP_CONC_CHECK_DEFER_TIMEOUT_MS);
+		goto end;
+	}
+
 	if (policy_mgr_is_ap_start_in_progress(pm_ctx->psoc)) {
 		policy_mgr_debug("defer sap conc check to a later time due to another sap/go start pending");
 		qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
@@ -2536,8 +2835,9 @@ static bool policy_mgr_valid_sta_channel_check(struct wlan_objmgr_psoc *psoc,
 	    wlan_reg_is_passive_or_disable_for_pwrmode(
 	    pm_ctx->pdev, sta_ch_freq, REG_CURRENT_PWR_MODE) ||
 	    (wlan_reg_is_freq_indoor(pm_ctx->pdev, sta_ch_freq) &&
-	    !sta_sap_scc_on_indoor_channel) ||
-	    !policy_mgr_is_safe_channel(psoc, sta_ch_freq)) {
+	     !sta_sap_scc_on_indoor_channel) ||
+	    (!policy_mgr_sta_sap_scc_on_lte_coex_chan(psoc) &&
+	     !policy_mgr_is_safe_channel(psoc, sta_ch_freq))) {
 		if (policy_mgr_is_hw_dbs_capable(psoc))
 			return true;
 		else
@@ -2586,6 +2886,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	bool is_6ghz_cap;
 	bool is_sta_sap_scc;
 	enum policy_mgr_con_mode con_mode;
+	uint32_t nan_2g_freq, nan_5g_freq;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2621,6 +2922,10 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	con_mode = policy_mgr_con_mode_by_vdev_id(psoc, sap_vdev_id);
 
 	is_sta_sap_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq);
+
+	nan_2g_freq =
+		policy_mgr_mode_specific_get_channel(psoc, PM_NAN_DISC_MODE);
+	nan_5g_freq = wlan_nan_get_disc_5g_ch_freq(psoc);
 
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
@@ -2658,7 +2963,10 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 				     ch_freq);
 	} else if (!policy_mgr_is_safe_channel(psoc, ch_freq) &&
 		   !(policy_mgr_sta_sap_scc_on_lte_coex_chan(psoc) &&
-		     is_sta_sap_scc)) {
+		     is_sta_sap_scc) &&
+		   !(policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(psoc) &&
+		    (WLAN_REG_IS_SAME_BAND_FREQS(nan_2g_freq, ch_freq) ||
+		     WLAN_REG_IS_SAME_BAND_FREQS(nan_5g_freq, ch_freq)))) {
 		find_alternate = true;
 		policymgr_nofl_debug("sap not capable unsafe con ch_freq %d",
 				     ch_freq);
@@ -3535,11 +3843,21 @@ QDF_STATUS policy_mgr_check_and_set_hw_mode_for_channel_switch(
 	uint8_t num_cxn_del = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	enum policy_mgr_conc_next_action next_action = PM_NOP;
+	bool eht_capab =  false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid context");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
+	if (eht_capab &&
+	    policy_mgr_mode_specific_connection_count(psoc,
+						      PM_SAP_MODE,
+						      NULL) == 1) {
+		policy_mgr_stop_opportunistic_timer(psoc);
+		goto ch_width_update;
 	}
 
 	if (!policy_mgr_is_hw_dbs_capable(psoc) ||
@@ -3558,6 +3876,7 @@ QDF_STATUS policy_mgr_check_and_set_hw_mode_for_channel_switch(
 	if (wlan_reg_freq_to_band(ch_freq) != REG_BAND_2G)
 		return QDF_STATUS_E_NOSUPPORT;
 
+ch_width_update:
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	/*
 	 * Store the connection's parameter and temporarily delete it

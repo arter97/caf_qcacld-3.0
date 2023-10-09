@@ -317,7 +317,7 @@ wlan_cm_get_rso_user_config_fl(struct wlan_objmgr_vdev *vdev,
 	wlan_cm_get_rso_config_fl(vdev, __func__, __LINE__)
 
 /**
- * wlan_cm_get_rso_config - get per vdev RSO userspace config
+ * wlan_cm_get_rso_user_config - get per vdev RSO userspace config
  * @vdev: vdev pointer
  *
  * Return: rso user space config pointer
@@ -741,13 +741,15 @@ static inline QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
  * wlan_cm_get_associated_ch_info() - get associated channel info
  * @psoc: psoc pointer
  * @vdev_id: vdev id
- * @chan_info: channel info to get
+ * @scanned_ch_width: channel width as per scan response
+ * @assoc_chan_info: channel info to get
  *
  * Return: none
  */
 void wlan_cm_get_associated_ch_info(struct wlan_objmgr_psoc *psoc,
 				    uint8_t vdev_id,
-				    struct connect_chan_info *chan_info);
+				    enum phy_ch_width scanned_ch_width,
+				    struct assoc_channel_info *assoc_chan_info);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -1349,6 +1351,18 @@ wlan_cm_update_offload_ssid_from_candidate(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 			     struct roam_scan_candidate_frame *frame);
+
+/**
+ * wlan_cm_add_all_link_probe_rsp_to_scan_db() - Parse and generate
+ * probe responses for each of the per-sta profile
+ *
+ * @psoc: psoc objmgr ptr
+ * @candidate: roam scan candidate info
+ */
+QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate);
+
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1604,7 +1618,37 @@ wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * cm_roam_sync_key_event_handler() - Handle roam sync key event and
+ * store the keys in crypto module
+ * @psoc:  Pointer to psoc object
+ * @keys:  Pointer to the keys
+ * @num_keys: Number of links for which keys entries are available
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_crypto_key_entry *keys,
+					  uint8_t num_keys);
+#else
+static inline
+QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_crypto_key_entry *keys,
+					  uint8_t num_keys)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 
 #ifdef WLAN_FEATURE_FIPS
 /**
@@ -2082,6 +2126,18 @@ wlan_cm_roaming_get_peer_link_addr(struct wlan_objmgr_vdev *vdev);
  */
 bool
 wlan_cm_roam_is_mlo_ap(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_cm_link_switch_notif_cb() - MLME CM link switch notifier callback
+ * @vdev: object manager vdev
+ * @req: Link switch request
+ * @notify_reason: Notify reason
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_link_switch_req *req,
+					enum wlan_mlo_link_switch_notify_reason notify_reason);
 #else
 static inline void
 wlan_cm_store_mlo_roam_peer_address(struct wlan_objmgr_pdev *pdev,
@@ -2105,6 +2161,14 @@ static inline bool
 wlan_cm_roam_is_mlo_ap(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
+}
+
+static inline
+QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_link_switch_req *req,
+					enum wlan_mlo_link_switch_notify_reason notify_reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_11BE_MLO && WLAN_FEATURE_ROAM_OFFLOAD */
 

@@ -763,9 +763,9 @@ static int dp_rx_refill_thread_loop(void *arg)
 			QDF_DEBUG_PANIC("wait_event_interruptible returned -ERESTARTSYS");
 			break;
 		}
-		dp_rx_refill_thread_sub_loop(rx_thread, &shutdown);
 		qdf_atomic_clear_bit(RX_REFILL_POST_EVENT,
 				     &rx_thread->event_flag);
+		dp_rx_refill_thread_sub_loop(rx_thread, &shutdown);
 	}
 
 	/* If we get here the scheduler thread must exit */
@@ -1521,6 +1521,7 @@ QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 		if (qdf_status != QDF_STATUS_SUCCESS) {
 			dp_err("Failed to initialize RX refill thread status:%d",
 			       qdf_status);
+			qdf_mem_free(dp_ext_hdl);
 			return qdf_status;
 		}
 		cdp_register_rx_refill_thread_sched_handler(soc,

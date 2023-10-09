@@ -49,8 +49,10 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <cds_ieee80211_common.h>
 #endif
+#include "wlan_t2lm_api.h"
 
 #ifdef WLAN_FEATURE_11BE_MLO
+
 void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
 				  struct pe_session *session,
 				  tpSirProbeRespBeacon bcn_ptr)
@@ -67,20 +69,17 @@ void lim_process_bcn_prb_rsp_t2lm(struct mac_context *mac_ctx,
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return;
 
+	if (!wlan_cm_is_vdev_connected(vdev))
+		return;
+
 	if (!mlo_check_if_all_links_up(vdev))
 		return;
 
-	if (bcn_ptr->t2lm_ctx.upcoming_t2lm.t2lm.direction ==
-	    WLAN_T2LM_INVALID_DIRECTION &&
-	    bcn_ptr->t2lm_ctx.established_t2lm.t2lm.direction ==
-	    WLAN_T2LM_INVALID_DIRECTION)
-		return;
-
 	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
+
 	qdf_mem_copy((uint8_t *)&t2lm_ctx->tsf, (uint8_t *)bcn_ptr->timeStamp,
 		     sizeof(uint64_t));
-	wlan_process_bcn_prbrsp_t2lm_ie(vdev, &bcn_ptr->t2lm_ctx,
-					t2lm_ctx->tsf);
+	wlan_update_t2lm_mapping(vdev, &bcn_ptr->t2lm_ctx, t2lm_ctx->tsf);
 }
 
 void lim_process_beacon_mlo(struct mac_context *mac_ctx,
@@ -100,6 +99,9 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_mlo_dev_context *mlo_ctx;
+	uint8_t is_sta_csa_synced;
+	struct mlo_link_info *link_info;
+	uint8_t sta_info_len = 0;
 
 	if (!session || !bcn_ptr || !mac_ctx) {
 		pe_err("invalid input parameters");
@@ -120,39 +122,58 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		return;
 	}
 
+	if (bcn_ptr->mlo_ie.mlo_ie.medium_sync_delay_info_present) {
+		wlan_vdev_mlme_cap_clear(vdev, WLAN_VDEV_C_EMLSR_CAP);
+		pe_debug("EMLSR not supported with D2.0 AP");
+	}
+
 	for (i = 0; i < bcn_ptr->mlo_ie.mlo_ie.num_sta_profile; i++) {
 		csa_ie = NULL;
 		xcsa_ie = NULL;
 		qdf_mem_zero(&csa_param, sizeof(csa_param));
 		per_sta_pro = bcn_ptr->mlo_ie.mlo_ie.sta_profile[i].data;
-		per_sta_pro_len =
-			bcn_ptr->mlo_ie.mlo_ie.sta_profile[i].num_data;
-		stacontrol = *(uint16_t *)per_sta_pro;
-		/* IE ID + LEN + STA control */
-		sta_pro = per_sta_pro + MIN_IE_LEN + 2;
-		sta_pro_len = per_sta_pro_len - MIN_IE_LEN - 2;
+		/* Append one byte to get the element length  */
+		per_sta_pro_len = bcn_ptr->mlo_ie.mlo_ie.sta_profile[i].num_data;
+		stacontrol = *(uint16_t *)(per_sta_pro + sizeof(struct subelem_header));
+		sta_info_len = *(uint8_t *)(per_sta_pro +
+				sizeof(struct subelem_header) + WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE);
+		/* IE ID + LEN + STA control STA info len*/
+		sta_pro = per_sta_pro + sizeof(struct subelem_header) +
+			WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE + sta_info_len;
+		sta_pro_len = per_sta_pro_len - sizeof(struct subelem_header) -
+				WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE - sta_info_len;
 		link_id = QDF_GET_BITS(
 			    stacontrol,
 			    WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
 			    WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS);
 
-		if (!mlo_is_sta_csa_synced(mlo_ctx, link_id)) {
-			csa_ie = (struct ieee80211_channelswitch_ie *)
-					wlan_get_ie_ptr_from_eid(
-						DOT11F_EID_CHANSWITCHANN,
-						sta_pro, sta_pro_len);
-			xcsa_ie = (struct ieee80211_extendedchannelswitch_ie *)
-					wlan_get_ie_ptr_from_eid(
-						DOT11F_EID_EXT_CHAN_SWITCH_ANN,
-						sta_pro, sta_pro_len);
+		csa_ie = (struct ieee80211_channelswitch_ie *)
+				wlan_get_ie_ptr_from_eid(
+					DOT11F_EID_CHANSWITCHANN,
+					sta_pro, sta_pro_len);
+		xcsa_ie = (struct ieee80211_extendedchannelswitch_ie *)
+				wlan_get_ie_ptr_from_eid(
+					DOT11F_EID_EXT_CHAN_SWITCH_ANN,
+					sta_pro, sta_pro_len);
+		is_sta_csa_synced = mlo_is_sta_csa_synced(mlo_ctx, link_id);
+		link_info = mlo_mgr_get_ap_link_by_link_id(mlo_ctx, link_id);
+		if (!link_info) {
+			mlo_err("link info null");
+			return;
 		}
+
 		if (csa_ie) {
 			csa_param.channel = csa_ie->newchannel;
 			csa_param.csa_chan_freq = wlan_reg_legacy_chan_to_freq(
 						pdev, csa_ie->newchannel);
 			csa_param.switch_mode = csa_ie->switchmode;
 			csa_param.ies_present_flag |= MLME_CSA_IE_PRESENT;
-			mlo_sta_csa_save_params(mlo_ctx, link_id, &csa_param);
+			mlo_sta_handle_csa_standby_link(mlo_ctx, link_id,
+							&csa_param, vdev);
+
+			if (!is_sta_csa_synced)
+				mlo_sta_csa_save_params(mlo_ctx, link_id,
+							&csa_param);
 		} else if (xcsa_ie) {
 			csa_param.channel = xcsa_ie->newchannel;
 			csa_param.switch_mode = xcsa_ie->switchmode;
@@ -167,7 +188,11 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 					wlan_reg_legacy_chan_to_freq(
 						pdev, xcsa_ie->newchannel);
 			csa_param.ies_present_flag |= MLME_XCSA_IE_PRESENT;
-			mlo_sta_csa_save_params(mlo_ctx, link_id, &csa_param);
+			mlo_sta_handle_csa_standby_link(mlo_ctx, link_id,
+							&csa_param, vdev);
+			if (!is_sta_csa_synced)
+				mlo_sta_csa_save_params(mlo_ctx, link_id,
+							&csa_param);
 		}
 	}
 }
@@ -282,16 +307,8 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 	chan_id = wlan_reg_freq_to_chan(wlan_vdev_get_pdev(vdev),
 					bcn_ptr->chan_freq);
 
-	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
-		if (session->force_24ghz_in_ht20)
-			cb_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
-		else
-			cb_mode =
-			   mac_ctx->roam.configParam.channelBondingMode24GHz;
-	} else {
-		cb_mode = mac_ctx->roam.configParam.channelBondingMode5GHz;
-	}
-
+	cb_mode = lim_get_cb_mode_for_freq(mac_ctx, session,
+					   session->curr_op_freq);
 	if (cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) {
 		/*
 		 * if channel bonding is disabled from INI do not

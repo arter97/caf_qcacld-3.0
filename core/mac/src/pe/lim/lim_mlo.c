@@ -191,7 +191,7 @@ QDF_STATUS lim_partner_link_info_change(struct wlan_objmgr_vdev *vdev)
 
 void lim_mlo_release_vdev_ref(struct wlan_objmgr_vdev *vdev)
 {
-	mlo_release_vdev_ref(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 }
 
 struct pe_session *pe_find_partner_session_by_link_id(
@@ -212,7 +212,8 @@ struct pe_session *pe_find_partner_session_by_link_id(
 		return NULL;
 	}
 
-	vdev = mlo_get_vdev_by_link_id(session->vdev, link_id);
+	vdev = mlo_get_vdev_by_link_id(session->vdev, link_id,
+				       WLAN_LEGACY_MAC_ID);
 
 	if (!vdev) {
 		pe_err("vdev is null");
@@ -223,7 +224,7 @@ struct pe_session *pe_find_partner_session_by_link_id(
 			mac, vdev->vdev_objmgr.vdev_id);
 
 	if (!partner_session)
-		lim_mlo_release_vdev_ref(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 	return partner_session;
 }
@@ -456,8 +457,8 @@ void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev)
 
 	status = wlan_vdev_get_bss_peer_mac(vdev, &bssid);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("vdev id %d : failed to get bssid",
-		       wlan_vdev_get_id(vdev));
+		pe_debug("vdev id %d : failed to get bssid",
+			 wlan_vdev_get_id(vdev));
 		return;
 	}
 
@@ -1391,7 +1392,13 @@ bool lim_is_emlsr_band_supported(struct pe_session *session)
 	uint32_t freq;
 	struct mlo_partner_info *partner_info;
 
-	partner_info = &session->lim_join_req->partner_info;
+	if (!session->lim_join_req) {
+		/* Initial connection */
+		partner_info = &session->ml_partner_info;
+	} else {
+		/* Roaming */
+		partner_info = &session->lim_join_req->partner_info;
+	}
 
 	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
 		pe_debug("Pri link freq: %d, EMLSR mode not allowed",

@@ -139,6 +139,36 @@ enum t2lm_negotiation_support {
 	T2LM_NEGOTIATION_MAX = T2LM_NEGOTIATION_LAST - 1,
 };
 
+/**
+ * enum wlan_epcs_capability - EPCS capability
+ * @WLAN_EPCS_CAP_DISABLED: EPCS capability disable
+ * @WLAN_EPCS_CAP_ENABLE: EPCS capability enable
+ * @WLAN_EPCS_CAP_LAST: last value in enum
+ * @WLAN_EPCS_CAP_MAX: max value supported
+ */
+enum wlan_epcs_capability {
+	WLAN_EPCS_CAP_DISABLED  =  0,
+	WLAN_EPCS_CAP_ENABLE  =  1,
+	/* keep this last */
+	WLAN_EPCS_CAP_LAST,
+	WLAN_EPCS_CAP_MAX = WLAN_EPCS_CAP_LAST - 1,
+};
+
+/**
+ * enum wlan_epcs_frame - EPCS frame type
+ * @WLAN_EPCS_FRAME_TEARDOWN: EPCS teardown frame
+ * @WLAN_EPCS_FRAME_REQUEST: EPCS request frame
+ * @WLAN_EPCS_FRAME_LAST: last value in enum
+ * @WLAN_EPCS_FRAME_MAX: max value supported
+ */
+enum wlan_epcs_frame {
+	WLAN_EPCS_FRAME_TEARDOWN  =  0,
+	WLAN_EPCS_FRAME_REQUEST  =  1,
+	/* keep this last */
+	WLAN_EPCS_FRAME_LAST,
+	WLAN_EPCS_FRAME_MAX = WLAN_EPCS_FRAME_LAST - 1,
+};
+
 /*
  * pmfSaQueryMaxRetries - Control PMF SA query retries for SAP
  * @Min: 0
@@ -1165,7 +1195,7 @@ enum t2lm_negotiation_support {
  *
  * Supported Feature: STA
  */
-#define CFG_T2LM_NEGOTIATION_SUPPORT CFG_UINT( \
+#define CFG_T2LM_NEGOTIATION_SUPPORT CFG_INI_UINT( \
 					"t2lm_negotiation_supported", \
 					T2LM_NEGOTIATION_DISABLED, \
 					T2LM_NEGOTIATION_DISJOINT_MAPPING, \

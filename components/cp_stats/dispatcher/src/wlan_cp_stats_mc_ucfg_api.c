@@ -810,6 +810,21 @@ QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev;
 	struct pdev_mc_cp_stats *pdev_mc_stats;
 	struct pdev_cp_stats *pdev_cp_stats_priv;
+	struct vdev_mc_cp_stats *vdev_mc_stats;
+	struct vdev_cp_stats *vdev_cp_stat;
+	uint32_t vdev_power = 0;
+
+	vdev_cp_stat = wlan_cp_stats_get_vdev_stats_obj(vdev);
+	if (vdev_cp_stat) {
+		wlan_cp_stats_vdev_obj_lock(vdev_cp_stat);
+		vdev_mc_stats = vdev_cp_stat->vdev_stats;
+		vdev_power = vdev_mc_stats->vdev_extd_stats.vdev_tx_power;
+		wlan_cp_stats_vdev_obj_unlock(vdev_cp_stat);
+		if (vdev_power) {
+			*dbm = vdev_power;
+			return QDF_STATUS_SUCCESS;
+		}
+	}
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
@@ -1032,6 +1047,81 @@ void ucfg_mc_cp_stats_register_lost_link_info_cb(
 
 	psoc_cp_stats_priv->legacy_stats_cb = lost_link_cp_stats_info_cb;
 }
+
+#ifdef QCA_SUPPORT_CP_STATS
+void wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id, uint8_t channel,
+				      uint8_t *chan_load)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev;
+	struct pdev_cp_stats *pdev_cp_stats_priv;
+	struct per_channel_stats *channel_stats;
+	struct channel_status *channel_status_list;
+	uint8_t total_channel;
+	uint8_t i;
+	uint32_t rx_clear_count = 0, cycle_count = 0, mac_clk_mhz = 0;
+	uint64_t clock_freq, time, time_busy;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_CP_STATS_ID);
+	if (!vdev)
+		return;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cp_stats_err("pdev object is null");
+		goto release_ref;
+	}
+
+	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
+	if (!pdev_cp_stats_priv) {
+		cp_stats_err("pdev cp stats object is null");
+		goto release_ref;
+	}
+
+	channel_stats = &pdev_cp_stats_priv->pdev_stats->chan_stats;
+	channel_status_list = channel_stats->channel_status_list;
+	total_channel = channel_stats->total_channel;
+
+	for (i = 0; i < total_channel && i < NUM_CHANNELS; i++) {
+		if (channel_status_list[i].channel_id == channel) {
+			rx_clear_count = channel_status_list[i].rx_clear_count;
+			cycle_count = channel_status_list[i].cycle_count;
+			mac_clk_mhz = channel_status_list[i].mac_clk_mhz;
+			break;
+		}
+	}
+
+	if (i == total_channel) {
+		cp_stats_debug("no channel found for chan:%d", channel);
+		goto release_ref;
+	}
+
+	clock_freq = mac_clk_mhz * 1000;
+	if (clock_freq == 0) {
+		cp_stats_debug("clock_freq is zero");
+		goto release_ref;
+	}
+
+	time = qdf_do_div(cycle_count, clock_freq);
+	if (time == 0) {
+		cp_stats_debug("time is zero");
+		goto release_ref;
+	}
+
+	time_busy = qdf_do_div(rx_clear_count, clock_freq);
+
+	*chan_load = ((time_busy * 255) / time);
+
+	cp_stats_debug("t_chan:%d, chan:%d, rcc:%u, cc:%u, cf:%u, time:%u, time_busy:%u, chan_load:%d",
+		       total_channel, channel, rx_clear_count, cycle_count,
+		       clock_freq, time, time_busy, *chan_load);
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+}
+#endif
 
 #ifdef WLAN_POWER_MANAGEMENT_OFFLOAD
 static QDF_STATUS

@@ -39,8 +39,8 @@ static struct ll_stats_buf ll_stats;
 
 static DEFINE_MUTEX(llstats_mutex);
 
-void hdd_debugfs_process_iface_stats(struct hdd_adapter *adapter,
-		void *data, uint32_t num_peers)
+void hdd_debugfs_process_iface_stats(struct wlan_hdd_link_info *link_info,
+				     void *data, uint32_t num_peers)
 {
 	struct wifi_interface_stats *iface_stat;
 	struct wifi_interface_info *iface_info;
@@ -68,7 +68,7 @@ void hdd_debugfs_process_iface_stats(struct hdd_adapter *adapter,
 	len = scnprintf(buffer, DEBUGFS_LLSTATS_BUF_SIZE - ll_stats.len,
 			"\n\n===LL_STATS_IFACE: num_peers: %d===", num_peers);
 
-	if (false == hdd_get_interface_info(adapter, &iface_stat->info)) {
+	if (!hdd_get_interface_info(link_info, &iface_stat->info)) {
 		mutex_unlock(&llstats_mutex);
 		hdd_err("hdd_get_interface_info get fail");
 		return;
@@ -78,12 +78,16 @@ void hdd_debugfs_process_iface_stats(struct hdd_adapter *adapter,
 	buffer += len;
 	ll_stats.len += len;
 	len = scnprintf(buffer, DEBUGFS_LLSTATS_BUF_SIZE - ll_stats.len,
-			"\nmode: %u, MAC_ADDR: %pM, state: %u, roaming: %u, capabilities: %u, SSID: %s, BSSID_MAC: %pM, ap_country_str: %s, country_str: %s",
-			iface_info->mode, &iface_info->macAddr.bytes[0],
+			"\nmode: %u, MAC_ADDR: " QDF_MAC_ADDR_FMT ", state: %u,"
+			" roaming: %u, capabilities: %u, SSID: %s,"
+			" BSSID_MAC: " QDF_MAC_ADDR_FMT
+			", ap_country_str: %s, country_str: %s",
+			iface_info->mode,
+			QDF_MAC_ADDR_REF(&iface_info->macAddr.bytes[0]),
 			iface_info->state, iface_info->roaming,
 			iface_info->capabilities, iface_info->ssid,
-			&iface_info->bssid.bytes[0], iface_info->apCountryStr,
-			iface_info->countryStr);
+			QDF_MAC_ADDR_REF(&iface_info->bssid.bytes[0]),
+			iface_info->apCountryStr, iface_info->countryStr);
 
 	link_stats = &iface_stat->link_stats;
 	average_tsf_offset =  link_stats->avg_bcn_spread_offset_high;
@@ -201,9 +205,10 @@ void hdd_debugfs_process_peer_stats(struct hdd_adapter *adapter, void *data)
 		ll_stats.len += len;
 		len = scnprintf(buffer,
 				DEBUGFS_LLSTATS_BUF_SIZE - ll_stats.len,
-				"\nType: %d, peer_mac: %pM, capabilities: %u\nnum_rates: %d",
+				"\nType: %d, peer_mac: " QDF_MAC_ADDR_FMT
+				", capabilities: %u\nnum_rates: %d",
 				wmi_to_sir_peer_type(peer_info->type),
-				&peer_info->peer_macaddr.bytes[0],
+				QDF_MAC_ADDR_REF(&peer_info->peer_macaddr.bytes[0]),
 				peer_info->capabilities, peer_info->num_rate);
 
 		num_rate = peer_info->num_rate;
@@ -476,7 +481,8 @@ static int __wlan_hdd_open_ll_stats_debugfs(struct net_device *net_dev)
 	if (errno)
 		return errno;
 
-	errno = wlan_hdd_ll_stats_get(adapter, DEBUGFS_LLSTATS_REQID,
+	errno = wlan_hdd_ll_stats_get(adapter->deflink,
+				      DEBUGFS_LLSTATS_REQID,
 				      DEBUGFS_LLSTATS_REQMASK);
 	if (errno)
 		goto free_buf;

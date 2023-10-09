@@ -27,6 +27,7 @@
 #include "ol_defines.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlme_api.h"
+#include "wlan_crypto_global_api.h"
 
 #define WMI_MAC_TO_PDEV_MAP(x) ((x) + (1))
 #define WMI_PDEV_TO_MAC_MAP(x) ((x) - (1))
@@ -1878,6 +1879,9 @@ extract_roam_btm_response_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	dst->timestamp = src_data->timestamp;
 	dst->btm_resp_dialog_token = src_data->btm_resp_dialog_token;
 	dst->btm_delay = src_data->btm_resp_bss_termination_delay;
+	dst->band = WMI_ROAM_BTM_RESP_MLO_BAND_INFO_GET(src_data->info);
+	if (dst->band != WMI_MLO_BAND_NO_MLO)
+		dst->is_mlo = true;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2226,41 +2230,56 @@ wmi_fill_data_synch_event(struct roam_offload_synch_ind *roam_sync_ind,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+#define STANDBY_VDEV_ID (0xFFFFFFFF)
 static QDF_STATUS
 wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 		       WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
 		       struct roam_offload_synch_ind *roam_sync_ind)
 {
-	uint8_t i;
+	uint8_t i, mlo_max_allowed_links;
 	wmi_roam_ml_setup_links_param *setup_links;
 	wmi_roam_ml_key_material_param *ml_key_param;
 	struct ml_setup_link_param *link;
 	struct ml_key_material_param *key;
 
+	mlo_max_allowed_links =
+		wlan_mlme_get_sta_mlo_conn_max_num(wmi_handle->soc->wmi_psoc);
 	if (param_buf->num_setup_links_param) {
-		if (param_buf->num_setup_links_param >
-		    WLAN_UMAC_MLO_MAX_VDEVS) {
-			wmi_err("Number of umac mlo vdev entries %d exceeded max vdev supported %d",
+		if (param_buf->num_setup_links_param > mlo_max_allowed_links ||
+		    param_buf->num_setup_links_param > WLAN_MAX_ML_BSS_LINKS) {
+			wmi_err("Number of links %d exceeded max vdev supported %d",
 				param_buf->num_setup_links_param,
-				WLAN_UMAC_MLO_MAX_VDEVS);
+				mlo_max_allowed_links);
 			return QDF_STATUS_E_INVAL;
 		}
+
 		roam_sync_ind->num_setup_links =
-			param_buf->num_setup_links_param;
+				param_buf->num_setup_links_param;
 		setup_links = param_buf->setup_links_param;
 
 		for (i = 0; i < roam_sync_ind->num_setup_links; i++) {
 			link = &roam_sync_ind->ml_link[i];
 			link->link_id = setup_links->link_id;
-			link->vdev_id = setup_links->vdev_id;
+
+			/*
+			 * setup_links->vdev_id == UINT32_MAX for standby link
+			 */
+			link->vdev_id = WLAN_INVALID_VDEV_ID;
+			if (setup_links->vdev_id != STANDBY_VDEV_ID)
+				link->vdev_id = setup_links->vdev_id;
+
 			link->channel = setup_links->channel;
 			link->flags = setup_links->flags;
 
 			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->link_addr,
 						   link->link_addr.bytes);
-			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT,
+			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->self_link_addr,
+						   link->self_link_addr.bytes);
+			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT "self_addr:" QDF_MAC_ADDR_FMT,
 				  link->link_id, link->vdev_id,
-				  link->flags, link->link_addr.bytes);
+				  link->flags,
+				  QDF_MAC_ADDR_REF(link->link_addr.bytes),
+				  QDF_MAC_ADDR_REF(link->self_link_addr.bytes));
 			wmi_debug("channel: %u mhz center_freq1: %u center_freq2: %u",
 				  link->channel.mhz,
 				  link->channel.band_center_freq1,
@@ -2268,25 +2287,30 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 			setup_links++;
 		}
 	}
-	if (param_buf->num_ml_key_material) {
-		roam_sync_ind->num_ml_key_material =
-			param_buf->num_ml_key_material;
-		ml_key_param = param_buf->ml_key_material;
 
-		for (i = 0; i < roam_sync_ind->num_ml_key_material; i++) {
-			key = &roam_sync_ind->ml_key[i];
-			key->link_id = ml_key_param->link_id;
-			key->key_idx = ml_key_param->key_ix;
-			key->key_cipher = ml_key_param->key_cipher;
-			qdf_mem_copy(key->pn, ml_key_param->pn,
-				     WMI_MAX_PN_LEN);
-			qdf_mem_copy(key->key_buff, ml_key_param->key_buff,
-				     WMI_MAX_KEY_LEN);
-			wmi_debug("link_id: %u key_idx: %u key_cipher: %u",
-				  key->link_id, key->key_idx, key->key_cipher);
-			ml_key_param++;
-		}
+	if (!param_buf->num_ml_key_material)
+		return QDF_STATUS_SUCCESS;
+
+	if (param_buf->num_ml_key_material > WLAN_MAX_ML_BSS_LINKS)
+		param_buf->num_ml_key_material = WLAN_MAX_ML_BSS_LINKS;
+
+	roam_sync_ind->num_ml_key_material = param_buf->num_ml_key_material;
+	ml_key_param = param_buf->ml_key_material;
+
+	for (i = 0; i < roam_sync_ind->num_ml_key_material; i++) {
+		key = &roam_sync_ind->ml_key[i];
+		key->link_id = ml_key_param->link_id;
+		key->key_idx = ml_key_param->key_ix;
+		key->key_cipher = ml_key_param->key_cipher;
+		qdf_mem_copy(key->pn, ml_key_param->pn,
+			     WMI_MAX_PN_LEN);
+		qdf_mem_copy(key->key_buff, ml_key_param->key_buff,
+			     WMI_MAX_KEY_LEN);
+		wmi_debug("link_id: %u key_idx: %u key_cipher: %u",
+			  key->link_id, key->key_idx, key->key_cipher);
+		ml_key_param++;
 	}
+
 	return QDF_STATUS_SUCCESS;
 }
 #else
@@ -2989,9 +3013,13 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 {
 	QDF_STATUS status;
 	uint8_t vdev_id = stats_info->vdev_id;
+	uint8_t band;
+
+	band = stats_info->scan[0].band;
 
 	status = wmi_unified_extract_roam_11kv_stats(
-			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0);
+			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0,
+			band);
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Roam 11kv stats extract failed vdev %d", vdev_id);
 
@@ -3034,7 +3062,7 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	struct roam_msg_info *roam_msg_info = NULL;
 	uint8_t vdev_id, i, num_btm = 0, num_frames = 0;
 	uint8_t num_tlv = 0, num_chan = 0, num_ap = 0, num_rpt = 0;
-	uint8_t num_trigger_reason = 0;
+	uint8_t num_trigger_reason = 0, band;
 	uint32_t rem_len;
 	QDF_STATUS status;
 
@@ -3223,12 +3251,14 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 			}
 		}
 
+		band = stats_info->scan[i].band;
+
 		/* BTM req/resp or Neighbor report/response info */
 		status = wmi_unified_extract_roam_11kv_stats(
 				      wmi_handle,
 				      evt_buf,
 				      &stats_info->data_11kv[i],
-				      i, num_rpt);
+				      i, num_rpt, band);
 		if (QDF_IS_STATUS_ERROR(status))
 			wmi_debug_rl("Roam 11kv stats extract fail vdev %d iter %d",
 				     vdev_id, i);
@@ -3461,12 +3491,55 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	data->vdev_id = frame_params->vdev_id;
 	data->frame_length = frame_params->frame_length;
 	data->frame = (uint8_t *)param_buf->frame;
+	data->roam_offload_candidate_frm = true;
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
 			   data->frame, data->frame_length);
 
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+static QDF_STATUS
+extract_peer_oper_mode_event_tlv(wmi_unified_t wmi_handle, uint8_t *event,
+				 uint32_t len,
+				 struct peer_oper_mode_event *data)
+{
+	WMI_PEER_OPER_MODE_CHANGE_EVENTID_param_tlvs *param_buf = NULL;
+	wmi_peer_oper_mode_change_event_fixed_param *params = NULL;
+
+	if (!event || !len) {
+		wmi_debug("Empty operating mode change event");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	param_buf = (WMI_PEER_OPER_MODE_CHANGE_EVENTID_param_tlvs *)event;
+	if (!param_buf) {
+		wmi_err("Received null buf from target");
+		return -EINVAL;
+	}
+
+	params =
+		(wmi_peer_oper_mode_change_event_fixed_param *)param_buf->fixed_param;
+
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&params->peer_mac_address,
+				   data->peer_mac_address.bytes);
+	data->ind_type = params->ind_type;
+	data->new_rxnss = params->new_rxnss;
+	data->new_bw = params->new_bw;
+	data->new_txnss = params->new_txnss;
+	data->new_disablemu = params->new_disablemu;
+
+	wmi_debug("peer_mac_addr: " QDF_MAC_ADDR_FMT " ind_type: %d new_rxnss: %d new_bw: %d new_txnss: %d new_disablemu: %d",
+		  QDF_MAC_ADDR_REF(data->peer_mac_address.bytes),
+		  data->ind_type,
+		  data->new_rxnss,
+		  data->new_bw,
+		  data->new_txnss,
+		  data->new_disablemu);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 /**
  * convert_roam_vendor_control_param() - Function to convert
@@ -3676,6 +3749,409 @@ wmi_roam_offload_attach_vendor_handoff_tlv(struct wmi_ops *ops)
 }
 #endif
 
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_11BE_MLO)
+static inline
+enum wlan_crypto_cipher_type wlan_wmi_cipher_to_crypto(uint8_t cipher)
+{
+	switch (cipher) {
+	case WMI_CIPHER_NONE:
+		return WLAN_CRYPTO_CIPHER_NONE;
+	case WMI_CIPHER_WEP:
+		return WLAN_CRYPTO_CIPHER_WEP;
+	case WMI_CIPHER_WAPI:
+		return WLAN_CRYPTO_CIPHER_WAPI_SMS4;
+	case WMI_CIPHER_AES_CCM:
+		return WLAN_CRYPTO_CIPHER_AES_CCM;
+	case WMI_CIPHER_AES_CMAC:
+		return WLAN_CRYPTO_CIPHER_AES_CMAC;
+	case WMI_CIPHER_AES_GMAC:
+		return WLAN_CRYPTO_CIPHER_AES_GMAC;
+	case WMI_CIPHER_AES_GCM:
+		return WLAN_CRYPTO_CIPHER_AES_GCM;
+	default:
+		return 0;
+	}
+}
+#define MLO_PAIRWISE_LINKID 0xF
+/**
+ * wmi_fill_keys_from_tlv  - Fill the destination key buffer from the WMI TLV
+ * @ml_keys: ML Keys TLV pointer
+ * @dst_key: Destination keys
+ * @dst_key_len: Destination keys length
+ * @count: TLV count
+ * @max_num_tlv: Total number of TLVs
+ *
+ * Return: None
+ */
+static void
+wmi_fill_keys_from_tlv(wmi_roam_ml_key_material_param **ml_keys,
+		       uint8_t *dst_key, uint8_t *dst_key_len, uint8_t *count,
+		       uint8_t max_num_tlv)
+{
+	uint8_t rem_key_len, bytes_filled, key_len, total_key_len;
+	uint8_t max_key_len = WLAN_CRYPTO_KEYBUF_SIZE + WLAN_CRYPTO_MICBUF_SIZE;
+
+	*dst_key_len = (*ml_keys)->key_len;
+	if (*dst_key_len > max_key_len)
+		*dst_key_len = max_key_len;
+
+	total_key_len = *dst_key_len;
+	rem_key_len = *dst_key_len;
+
+	while (rem_key_len) {
+		if (!(*ml_keys)) {
+			wmi_err_rl("ml_keys is NULL. rem_key_len:%d",
+				   rem_key_len);
+			return;
+		}
+
+		if (*count >= max_num_tlv) {
+			wmi_debug("Read all TLVs count:%d", *count);
+			return;
+		}
+
+		if (rem_key_len < WMI_MAX_KEY_LEN)
+			key_len = rem_key_len;
+		else
+			key_len = WMI_MAX_KEY_LEN;
+
+		bytes_filled = total_key_len - rem_key_len;
+		qdf_mem_copy(dst_key + bytes_filled, (*ml_keys)->key_buff,
+			     key_len);
+		(*ml_keys)++;
+		(*count)++;
+
+		rem_key_len -= key_len;
+	}
+}
+
+#define WMI_NUM_KEYS_ALLOCATED (WLAN_MAX_ML_BSS_LINKS * 4)
+static QDF_STATUS
+extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
+				 uint8_t *event, uint32_t data_len,
+				 struct wlan_crypto_key_entry **entries,
+				 uint8_t *num_entries,
+				 struct qdf_mac_addr *mld_addr)
+{
+	WMI_ROAM_SYNCH_KEY_EVENTID_param_tlvs *param_buf = NULL;
+	wmi_roam_ml_key_material_param *ml_keys = NULL;
+	struct wlan_crypto_key_entry *key_entry;
+	struct wlan_crypto_keys *all_keys;
+	struct wlan_crypto_key *dst_key, *pairwise;
+	struct wlan_crypto_key *key_alloc_buf[WMI_NUM_KEYS_ALLOCATED];
+	bool flush_keybuf;
+	uint8_t total_num_tlv,  j = 0, k = 0;
+	uint8_t count = 0, total_links = 0, dst_key_count = 0;
+	uint8_t igtk_idx = 0, bigtk_idx = 0;
+	bool slot_found;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	param_buf = (WMI_ROAM_SYNCH_KEY_EVENTID_param_tlvs *)event;
+	if (!param_buf) {
+		wmi_err_rl("received null buf from target");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	total_num_tlv = param_buf->num_ml_key_material;
+	ml_keys = (wmi_roam_ml_key_material_param *)param_buf->ml_key_material;
+	if (!ml_keys) {
+		wmi_err_rl("received ml keys param is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*entries = qdf_mem_malloc(WLAN_MAX_ML_BSS_LINKS * sizeof(*key_entry));
+	if (!*entries)
+		return QDF_STATUS_E_NOMEM;
+
+	/*
+	 * Allocate memory for each PTK, GTK, IGTK, BIGTK keys.
+	 * So total WLAN_MAX_ML_BSS_LINKS * 4 keys are needed
+	 */
+	for (k = 0; k < WMI_NUM_KEYS_ALLOCATED; k++) {
+		key_alloc_buf[k] = qdf_mem_malloc(sizeof(*dst_key));
+		if (!key_alloc_buf[k]) {
+			flush_keybuf = true;
+			status = QDF_STATUS_E_NOMEM;
+			goto free_entries;
+		}
+	}
+
+	/*
+	 * key_entry is the master structure that is given directly to the
+	 * crypto module and stored for each link.
+	 * key_entry -> keys ->key filled from dst_key has the PTK & GTK indexed
+	 * with corresponding key index
+	 *
+	 * key_entry -> keys -> iGTK holds the iGTK key
+	 * key_entry -> keys -> BIGTK holds the BIGTK key
+	 */
+	key_entry = *entries;
+
+	/*
+	 * Initialize all the Key Entry structures with invalid Link
+	 * ID to identify empty links allocated and will be freed
+	 * at the end.
+	 */
+	for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++)
+		key_entry[j].link_id = MLO_INVALID_LINK_IDX;
+
+	/*
+	 * TLV Format to parse:
+	 * 1. wmi_roam_ml_key_material_param -> For PTK with Link ID = 0xF
+	 * Copy this PTK to all the key entry of all the links.
+	 *
+	 * 2. wmi_roam_ml_key_material_param -> GTK for a valid Link.
+	 * Get available entry, and fill the GTK to that entry
+	 *
+	 * 3. wmi_roam_ml_key_material_param -> IGTK for a valid link
+	 *
+	 * 4. wmi_roam_ml_key_material_param -> BIGTK for a valid link
+	 *
+	 * 5. wmi_roam_ml_key_material_param -> For LTF Keyseed with Link ID =
+	 * 0xF and flags has LTF_USAGE set.
+	 *
+	 * If any of the key length is > WMI_MAX_KEY_LEN, then multiple
+	 * wmi_roam_ml_key_material_param TLVs follow to get the entire key
+	 */
+	while (ml_keys && count < total_num_tlv &&
+	       dst_key_count < WMI_NUM_KEYS_ALLOCATED) {
+		/*
+		 * Track individual keys with key_alloc_buf[dst_key_count] array
+		 * pointer to avoid mem leaks if parsing/validating any of the
+		 * keys fail.
+		 * Freeing the allocated keys it done at the end of this
+		 * function
+		 */
+		dst_key = key_alloc_buf[dst_key_count];
+		wmi_debug("link_id:%d key_ix:%d key_cipher:%d key_len:%d key_flags:%d",
+			  ml_keys->link_id, ml_keys->key_ix,
+			  ml_keys->key_cipher,
+			  ml_keys->key_len, ml_keys->key_flags);
+
+		if (!is_valid_keyix(ml_keys->key_ix)) {
+			wmi_err_rl("invalid key index:%d", ml_keys->key_ix);
+			status = QDF_STATUS_E_INVAL;
+			flush_keybuf = true;
+			goto free_entries;
+		}
+
+		/* Copy pairwise keys to all the entries */
+		if (ml_keys->link_id == MLO_PAIRWISE_LINKID) {
+			WMI_MAC_ADDR_TO_CHAR_ARRAY(&ml_keys->mac_addr,
+						   mld_addr->bytes);
+			if (!ml_keys->key_len) {
+				wmi_err_rl("Received key_len as 0 for tlv:%d",
+					   count);
+				status = QDF_STATUS_E_INVAL;
+				flush_keybuf = true;
+				goto free_entries;
+			}
+
+			if (ml_keys->key_flags & LTF_USAGE) {
+				struct wlan_crypto_ltf_keyseed_data key_seed;
+				uint8_t key_seed_len;
+
+				if (ml_keys->key_len >
+				    WLAN_MAX_SECURE_LTF_KEYSEED_LEN)
+					ml_keys->key_len =
+						WLAN_MAX_SECURE_LTF_KEYSEED_LEN;
+
+				/*
+				 * Filling the keys from multiple TLVs is
+				 * handled by below API and ml_keys ptr gets
+				 * incremented accordingly inside
+				 */
+				wmi_fill_keys_from_tlv(&ml_keys,
+						       key_seed.key_seed,
+						       &key_seed_len, &count,
+						       total_num_tlv);
+				key_seed.key_seed_len = key_seed_len;
+				wmi_debug("ML_KEY: Got LTF keyseed key for MLD: "
+					  QDF_MAC_ADDR_FMT   " key_seed_len:%d",
+					  QDF_MAC_ADDR_REF(mld_addr->bytes),
+					  key_seed.key_seed_len);
+
+				for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++)
+					key_entry[j].keys.ltf_key_seed =
+								key_seed;
+
+				continue;
+			}
+
+			dst_key->valid = true;
+			dst_key->keylen = ml_keys->key_len;
+			dst_key->flags = ml_keys->key_flags;
+			dst_key->keyix = ml_keys->key_ix;
+			dst_key->key_type =
+					WLAN_CRYPTO_KEY_TYPE_UNICAST;
+			dst_key->cipher_type =
+				wlan_wmi_cipher_to_crypto(ml_keys->key_cipher);
+			dst_key->keylen = ml_keys->key_len;
+
+			wmi_fill_keys_from_tlv(&ml_keys, dst_key->keyval,
+					       &dst_key->keylen, &count,
+					       total_num_tlv);
+			wmi_err_rl("ML_KEY: Got Pairwise key for MLD: "
+				   QDF_MAC_ADDR_FMT " rem_len:%d",
+				   QDF_MAC_ADDR_REF(mld_addr->bytes),
+				   dst_key->keylen);
+
+			pairwise = dst_key;
+			/*
+			 * Pairwise keys will be sent only once. Copy that for
+			 * all the link entries
+			 */
+			for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
+				dst_key = key_alloc_buf[dst_key_count];
+				*dst_key = *pairwise;
+				key_entry[j].keys.key[dst_key->keyix] = dst_key;
+				dst_key_count++;
+			}
+
+			continue;
+		}
+
+		slot_found = false;
+		for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
+			if (ml_keys->link_id == MLO_INVALID_LINK_IDX)
+				break;
+
+			if (key_entry[j].link_id == MLO_INVALID_LINK_IDX ||
+			    key_entry[j].link_id == ml_keys->link_id) {
+				slot_found = true;
+				break;
+			}
+		}
+
+		if (!slot_found) {
+			wmi_err_rl("Not able to find a entry for link:%d j=%d",
+				   ml_keys->link_id, j);
+			break;
+		}
+
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&ml_keys->mac_addr,
+					   dst_key->macaddr);
+		key_entry[j].link_id = ml_keys->link_id;
+		qdf_copy_macaddr((struct qdf_mac_addr *)key_entry[j].mac_addr.raw,
+				 (struct qdf_mac_addr *)dst_key->macaddr);
+		all_keys = &key_entry[j].keys;
+
+		dst_key->valid = true;
+		dst_key->keyix = ml_keys->key_ix;
+		dst_key->cipher_type =
+				wlan_wmi_cipher_to_crypto(ml_keys->key_cipher);
+
+		qdf_mem_copy(dst_key->keyrsc, ml_keys->pn, WMI_MAX_PN_LEN);
+
+		/*
+		 * For LTF keyseed or FILS SHA 384, FILS SHA 512 cases, the key
+		 * size will go beyond WMI_MAX_KEY_LEN(32). So extract first 32
+		 * bytes from 1st TLV and extract the rest of the bytes from
+		 * the following TLVs
+		 */
+		dst_key->keylen = ml_keys->key_len;
+		wmi_fill_keys_from_tlv(&ml_keys, dst_key->keyval,
+				       &dst_key->keylen, &count, total_num_tlv);
+
+		if (is_igtk(dst_key->keyix)) {
+			dst_key->key_type = WLAN_CRYPTO_KEY_TYPE_GROUP;
+
+			igtk_idx = dst_key->keyix - WLAN_CRYPTO_MAXKEYIDX;
+			bigtk_idx = igtk_idx - WLAN_CRYPTO_MAXIGTKKEYIDX;
+
+			wmi_debug("ML_KEY: Slot:%d link_id:%d addr: " QDF_MAC_ADDR_FMT "Key is IGTK key_ix:%d igtk_idx:%d bigtk:%d",
+				  j, key_entry[j].link_id,
+				  QDF_MAC_ADDR_REF(dst_key->macaddr),
+				  dst_key->keyix, igtk_idx, bigtk_idx);
+			all_keys->igtk_key[igtk_idx] = dst_key;
+			all_keys->def_igtk_tx_keyid = igtk_idx;
+
+			bigtk_idx = 0;
+			igtk_idx = 0;
+		} else if (is_bigtk(dst_key->keyix)) {
+			dst_key->key_type = WLAN_CRYPTO_KEY_TYPE_GROUP;
+
+			igtk_idx = dst_key->keyix - WLAN_CRYPTO_MAXKEYIDX;
+			bigtk_idx = igtk_idx - WLAN_CRYPTO_MAXIGTKKEYIDX;
+
+			wmi_debug("ML_KEY: Slot:%d link_id:%d addr: " QDF_MAC_ADDR_FMT "Key is BIGTK key_ix:%d igtk_idx:%d bigtk:%d",
+				  j, key_entry[j].link_id,
+				  QDF_MAC_ADDR_REF(dst_key->macaddr),
+				  dst_key->keyix, igtk_idx, bigtk_idx);
+			all_keys->bigtk_key[bigtk_idx] = dst_key;
+			all_keys->def_bigtk_tx_keyid = bigtk_idx;
+
+			bigtk_idx = 0;
+			igtk_idx = 0;
+		} else if (is_gtk(dst_key->keyix)) {
+			wmi_debug("ML_KEY: Slot:%d link_id:%d addr: " QDF_MAC_ADDR_FMT " Key is GTK key_ix:%d",
+				  j, key_entry[j].link_id,
+				  QDF_MAC_ADDR_REF(dst_key->macaddr),
+				  dst_key->keyix);
+			dst_key->key_type = WLAN_CRYPTO_KEY_TYPE_GROUP;
+			all_keys->key[dst_key->keyix] = dst_key;
+		} else {
+			wmi_debug("Key is Pairwise. Shouldn't reach here");
+			/* Pairwise key */
+			dst_key->key_type = WLAN_CRYPTO_KEY_TYPE_UNICAST;
+			all_keys->key[dst_key->keyix] = dst_key;
+		}
+
+		dst_key_count++;
+	}
+
+	for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
+		if (key_entry[j].link_id != MLO_INVALID_LINK_IDX)
+			total_links++;
+	}
+
+	*num_entries = total_links;
+	/* Free the invalid dst_keys allocated */
+	if (!*num_entries)
+		goto free_entries;
+
+	/*
+	 * This is to free the unfilled key_alloc_buf that
+	 * was allocated initially
+	 */
+	flush_keybuf = false;
+
+	wmi_err_rl("ML_KEYS: total_entries filled:%d total_num_tlv:%d dst_key_count:%d",
+		   *num_entries, total_num_tlv, dst_key_count);
+	goto free_keys;
+
+free_entries:
+	qdf_mem_zero(*entries,
+		     WLAN_MAX_ML_BSS_LINKS * sizeof(**entries));
+	qdf_mem_free(*entries);
+
+free_keys:
+	for (k = 0; k < WMI_NUM_KEYS_ALLOCATED; k++) {
+		if (!key_alloc_buf[k])
+			continue;
+
+		if (!flush_keybuf && key_alloc_buf[k]->valid)
+			continue;
+
+		wmi_debug("Free key allocated at idx:%d", k);
+		qdf_mem_zero(key_alloc_buf[k], sizeof(key_alloc_buf[k]));
+		qdf_mem_free(key_alloc_buf[k]);
+	}
+
+	return status;
+}
+
+static void
+wmi_roam_offload_attach_mlo_tlv(struct wmi_ops *ops)
+{
+	ops->extract_roam_synch_key_event = extract_roam_synch_key_event_tlv;
+}
+#else
+static inline void
+wmi_roam_offload_attach_mlo_tlv(struct wmi_ops *ops)
+{}
+#endif
+
 void wmi_roam_offload_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -3701,7 +4177,9 @@ void wmi_roam_offload_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_vdev_set_pcl_cmd = send_vdev_set_pcl_cmd_tlv;
 	ops->send_set_roam_trigger_cmd = send_set_roam_trigger_cmd_tlv;
 	ops->extract_roam_candidate_frame = extract_roam_candidate_frame_tlv;
+	ops->extract_peer_oper_mode_event = extract_peer_oper_mode_event_tlv;
 	wmi_roam_offload_attach_vendor_handoff_tlv(ops);
+	wmi_roam_offload_attach_mlo_tlv(ops);
 }
 #else
 static inline QDF_STATUS

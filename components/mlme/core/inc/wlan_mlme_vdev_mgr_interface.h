@@ -441,6 +441,14 @@ void mlme_set_notify_co_located_ap_update_rnr(struct wlan_objmgr_vdev *vdev,
 bool wlan_is_vdev_traffic_ll_ht(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlme_get_vdev_wifi_std() - get the wifi std version for the vdev
+ * @vdev: vdev pointer
+ *
+ * Return: WMI_HOST_WIFI_STANDARD
+ */
+WMI_HOST_WIFI_STANDARD mlme_get_vdev_wifi_std(struct wlan_objmgr_vdev *vdev);
+
+/**
  * mlme_get_assoc_type() - get associate type
  * @vdev: vdev pointer
  *
@@ -565,4 +573,30 @@ wlan_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_LL_LT_SAP
+/**
+ * wlan_ll_sap_sort_channel_list() - Sort channel list
+ * @vdev_id: Vdev Id
+ * @list: Pointer to list
+ * @ch_info: Pointer to ch_info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_ll_sap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
+			      struct sap_sel_ch_info *ch_info);
+#endif
+
+/**
+ * wlan_sap_get_user_config_acs_ch_list: Get user configured channel list
+ * @vdev_id: Vdev Id
+ * @filter: Filter to apply to get scan result
+ *
+ * Return: None
+ *
+ */
+void
+wlan_sap_get_user_config_acs_ch_list(uint8_t vdev_id,
+				     struct scan_filter *filter);
 #endif

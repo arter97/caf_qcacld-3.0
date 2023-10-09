@@ -117,6 +117,28 @@ enum sap_csa_reason_code {
 	CSA_REASON_SAP_FIX_CH_CONC_WITH_GO
 };
 
+/*
+ * enum link_control_flags: This enum is used for setting
+ * mlo_control_flags by api policy_mgr_mlo_sta_set_nlink.
+ * @link_ctrl_f_overwrite_active_bitmap: indicate overwrite all earlier
+ * force_active bitmaps. Used with MLO_LINK_FORCE_MODE_ACTIVE or
+ * MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE
+ * @link_ctrl_f_overwrite_inactive_bitmap: indicate overwrite all earlier
+ * force_inactive bitmaps. Used with MLO_LINK_FORCE_MODE_INACTIVE or
+ * MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE.
+ * @link_ctrl_f_dynamic_force_link_num: indicate fw to use force link number
+ * instead of force link bitmaps. Used with MLO_LINK_FORCE_MODE_ACTIVE_NUM.
+ * MLO_LINK_FORCE_MODE_INACTIVE_NUM, MLO_LINK_FORCE_MODE_NO_FORCE.
+ * @link_ctrl_f_post_re_evaluate: run link state check again after command
+ * response handled.
+ */
+enum link_control_flags {
+	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
+	link_ctrl_f_overwrite_inactive_bitmap = 1 << 1,
+	link_ctrl_f_dynamic_force_link_num =    1 << 2,
+	link_ctrl_f_post_re_evaluate =          1 << 3,
+};
+
 /**
  * enum hw_mode_ss_config - Possible spatial stream configuration
  * @HW_MODE_SS_0x0: Unused Tx and Rx of MAC
@@ -236,6 +258,9 @@ enum policy_mgr_pcl_group_id {
  * 5G low band i.e 5G freq < sbs cutoff freq
  * @POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH: 5G High SCC frequency followed by
  * 5G High band i.e 5G freq > sbs cutoff freq
+ * @POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW: 5 GHz High SCC
+ * frequency followed by 5G High band i.e 5G freq > sbs cutoff freq, add 5 GHz
+ * Low SCC frequency
  *
  * Order in which the PCL is requested
  */
@@ -247,6 +272,7 @@ enum policy_mgr_pcl_channel_order {
 	POLICY_MGR_PCL_ORDER_5G,
 	POLICY_MGR_PCL_ORDER_SCC_5G_LOW_5G_LOW,
 	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH,
+	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW,
 };
 
 /**
@@ -407,6 +433,10 @@ enum policy_mgr_mac_use {
  * 5 GHz high frequencies, add 2.4 GHZ if its shared with 5GHz high
  * @PM_SBS_CH_MCC_CH: SBS channels followed by MCC channels
  * @PM_SBS_5G_MCC_24G: SBS channels, 5G MCC channels and 2.4GHz channels
+ * @PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G: 5GHZ high SCC
+ * channel followed by 5 GHz high frequencies and 5 GHz low SCC channel,
+ * add 2.4 GHZ if its shared with 5GHz high
+ *
  * @PM_MAX_PCL_TYPE: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -450,6 +480,7 @@ enum policy_mgr_pcl_type {
 	PM_SBS_CH_2G,
 	PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
 	PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G,
+	PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G,
 
 	PM_SBS_CH_MCC_CH,
 	PM_SBS_5G_MCC_24G,
@@ -1132,6 +1163,8 @@ enum policy_mgr_three_connection_mode {
  * @PM_DBS2_DOWNGRADE: downgrade 5G beaconing entity to 1x1 and switch to DBS2.
  * @PM_UPGRADE_5G: upgrade 5g beaconing entity to 2x2.
  * @PM_UPGRADE_2G: upgrade 2g beaconing entity to 2x2.
+ * @PM_DOWNGRADE_BW: Downgrade SAP bandwidth.
+ * @PM_UPGRADE_BW: Upgrade SAP bandwidth.
  * @PM_MAX_CONC_NEXT_ACTION: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -1154,6 +1187,8 @@ enum policy_mgr_conc_next_action {
 	PM_DBS2_DOWNGRADE,
 	PM_UPGRADE_5G,
 	PM_UPGRADE_2G,
+	PM_DOWNGRADE_BW,
+	PM_UPGRADE_BW,
 
 	PM_MAX_CONC_NEXT_ACTION
 };
@@ -1193,8 +1228,9 @@ enum policy_mgr_band {
  *        to the other DBS mode. This reason code indicates such condition.
  * @POLICY_MGR_UPDATE_REASON_NAN_DISCOVERY: NAN Discovery related
  * @POLICY_MGR_UPDATE_REASON_NDP_UPDATE: NAN Datapath related update
- * @POLICY_MGR_UPDATE_REASON_LFR2_ROAM: Roaming
+ * @POLICY_MGR_UPDATE_REASON_LFR2_ROAM: LFR2 Roaming
  * @POLICY_MGR_UPDATE_REASON_STA_CONNECT: STA/CLI connection to peer
+ * @POLICY_MGR_UPDATE_REASON_LFR3_ROAM: LFR3 Roaming
  */
 enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN,
@@ -1211,6 +1247,7 @@ enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_NDP_UPDATE,
 	POLICY_MGR_UPDATE_REASON_LFR2_ROAM,
 	POLICY_MGR_UPDATE_REASON_STA_CONNECT,
+	POLICY_MGR_UPDATE_REASON_LFR3_ROAM,
 };
 
 /**
@@ -1529,6 +1566,8 @@ struct policy_mgr_freq_range {
  * @MODE_SBS_UPPER_SHARE:   Higher 5Ghz shared with 2.4Ghz
  * @MODE_SBS_LOWER_SHARE:   LOWER 5Ghz shared with 2.4Ghz
  * @MODE_EMLSR:             eMLSR mode
+ * @MODE_EMLSR_SINGLE:	    eMLSR split mode
+ * @MODE_EMLSR_SPLIT:	    eMLSR split mode
  * @MODE_HW_MAX: MAX
  */
 enum policy_mgr_mode {
@@ -1538,6 +1577,8 @@ enum policy_mgr_mode {
 	MODE_SBS_UPPER_SHARE,
 	MODE_SBS_LOWER_SHARE,
 	MODE_EMLSR,
+	MODE_EMLSR_SINGLE,
+	MODE_EMLSR_SPLIT,
 	MODE_HW_MAX,
 };
 
@@ -1700,6 +1741,23 @@ struct sta_ap_intf_check_work_ctx {
 	struct go_plus_go_force_scc go_plus_go_force_scc;
 	struct sap_plus_go_force_scc sap_plus_go_force_scc;
 	uint8_t nan_force_scc_in_progress;
+};
+
+/**
+ * union conc_ext_flag - extended flags for concurrency check
+ *
+ * @mlo: the new connection is MLO
+ * @mlo_link_assoc_connected: the new connection is secondary MLO link and
+ *  the corresponding assoc link is connected
+ * @value: uint32 value for extended flags
+ */
+union conc_ext_flag {
+	struct {
+		uint32_t mlo: 1;
+		uint32_t mlo_link_assoc_connected: 1;
+	};
+
+	uint32_t value;
 };
 
 /**

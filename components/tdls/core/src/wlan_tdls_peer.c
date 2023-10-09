@@ -505,7 +505,8 @@ static void tdls_determine_channel_opclass(struct tdls_soc_priv_obj *soc_obj,
 	uint32_t vdev_id;
 	enum QDF_OPMODE opmode;
 	struct wlan_objmgr_pdev *pdev = NULL;
-
+	struct wlan_objmgr_psoc *psoc = NULL;
+	enum policy_mgr_con_mode mode;
 	/*
 	 * If tdls offchannel is not enabled then we provide base channel
 	 * and in that case pass opclass as 0 since opclass is mainly needed
@@ -517,10 +518,13 @@ static void tdls_determine_channel_opclass(struct tdls_soc_priv_obj *soc_obj,
 		vdev_id = wlan_vdev_get_id(vdev_obj->vdev);
 		opmode = wlan_vdev_mlme_get_opmode(vdev_obj->vdev);
 		pdev = wlan_vdev_get_pdev(vdev_obj->vdev);
+		psoc = wlan_pdev_get_psoc(pdev);
 
+		mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, opmode,
+							    vdev_id);
 		*channel = wlan_reg_freq_to_chan(pdev, policy_mgr_get_channel(
 						 soc_obj->soc,
-						 policy_mgr_convert_device_mode_to_qdf_type(opmode),
+						 mode,
 						 &vdev_id));
 		*opclass = 0;
 	} else {
@@ -710,7 +714,7 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 							REG_CURRENT_PWR_MODE);
 
 		if (CHANNEL_STATE_INVALID != ch_state &&
-		    CHANNEL_STATE_DFS != ch_state &&
+		    !wlan_reg_is_dfs_for_freq(pdev, ch_freq) &&
 		    !wlan_reg_is_dsrc_freq(ch_freq)) {
 			peer_param->peer_cap.peer_chan[num].ch_freq = ch_freq;
 			if (!wlan_reg_is_6ghz_chan_freq(ch_freq)) {

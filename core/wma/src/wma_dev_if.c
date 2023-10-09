@@ -87,6 +87,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_mlme_main.h"
 #include "wlan_mlme_ucfg_api.h"
+#include "wlan_mlme_twt_api.h"
 #include <wlan_dfs_utils_api.h>
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wlan_utility.h"
@@ -113,6 +114,7 @@
 #include "target_if_vdev_mgr_tx_ops.h"
 #include "wlan_fwol_ucfg_api.h"
 #include "wlan_vdev_mgr_utils_api.h"
+#include "target_if.h"
 
 /*
  * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
@@ -1001,6 +1003,7 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	uint16_t puncture_bitmap = 0;
 	uint16_t new_puncture_bitmap = 0;
 	uint32_t bw_puncture = 0;
+	enum phy_ch_width new_bw;
 
 	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_SELF)
 		return;
@@ -1036,7 +1039,7 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	}
 	wlan_peer_set_phymode(peer, new_phymode);
 
-	fw_phymode = wma_host_to_fw_phymode(new_phymode);
+	fw_phymode = wmi_host_to_fw_phymode(new_phymode);
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_PHYMODE,
@@ -1045,14 +1048,17 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	max_ch_width_supported =
 		wmi_get_ch_width_from_phy_mode(wma->wmi_handle,
 					       fw_phymode);
+	new_bw =
+	target_if_wmi_chan_width_to_phy_ch_width(max_ch_width_supported);
+
 	if (is_eht) {
 		wlan_reg_extract_puncture_by_bw(vdev_chan->ch_width,
 						puncture_bitmap,
 						vdev_chan->ch_freq,
 						vdev_chan->ch_freq_seg2,
-						max_ch_width_supported,
+						new_bw,
 						&new_puncture_bitmap);
-		QDF_SET_BITS(bw_puncture, 0, 8, max_ch_width_supported);
+		QDF_SET_BITS(bw_puncture, 0, 8, new_bw);
 		QDF_SET_BITS(bw_puncture, 8, 16, new_puncture_bitmap);
 		wlan_util_vdev_peer_set_param_send(vdev, peer_mac_addr,
 						   WLAN_MLME_PEER_BW_PUNCTURE,
@@ -1061,7 +1067,7 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 		wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_CHWIDTH,
 				   max_ch_width_supported, vdev_id);
 	}
-	wma_debug("FW phymode %d old phymode %d new phymode %d bw %d punct: %d macaddr " QDF_MAC_ADDR_FMT,
+	wma_debug("FW phymode %d old phymode %d new phymode %d bw %d punct: 0x%x macaddr " QDF_MAC_ADDR_FMT,
 		  fw_phymode, old_peer_phymode, new_phymode,
 		  max_ch_width_supported, new_puncture_bitmap,
 		  QDF_MAC_ADDR_REF(peer_mac_addr));
@@ -1345,16 +1351,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 		wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
 		wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
 							    iface->mac_id, rsp);
-	}
-
-	if (iface->type == WMI_VDEV_TYPE_STA &&
-	    rsp->resp_type == WMI_VDEV_START_RESP_EVENT) {
-		wma_debug("BA mode: %d", mac_ctx->ba_mode);
-		if (wma_cli_set_command(rsp->vdev_id,
-					wmi_vdev_param_set_ba_mode,
-					mac_ctx->ba_mode, VDEV_CMD))
-			wma_err("Set BA opmode failed for vdev: %d",
-				rsp->vdev_id);
 	}
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
@@ -2502,7 +2498,8 @@ void wma_send_del_bss_response(tp_wma_handle wma, struct del_bss_resp *resp)
 	}
 }
 
-void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
+QDF_STATUS
+wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 {
 	uint8_t vdev_id;
 	struct wma_txrx_node *iface = &wma->interfaces[resp->vdev_id];
@@ -2510,8 +2507,8 @@ void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 	QDF_STATUS status;
 
 	if (!resp) {
-		wma_err("req is NULL");
-		return;
+		wma_err("resp is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	vdev_id = resp->vdev_id;
@@ -2519,19 +2516,21 @@ void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err("Failed to get vdev stop type");
 		qdf_mem_free(resp);
-		return;
+		return status;
 	}
 
 	if (vdev_stop_type != WMA_DELETE_BSS_HO_FAIL_REQ) {
-		if (wma_send_vdev_down_to_fw(wma, vdev_id) !=
-		    QDF_STATUS_SUCCESS)
+		status = wma_send_vdev_down_to_fw(wma, vdev_id);
+		if (QDF_IS_STATUS_ERROR(status))
 			wma_err("Failed to send vdev down cmd: vdev %d", vdev_id);
 		else
 			wma_check_and_find_mcc_ap(wma, vdev_id);
 	}
+
 	wlan_vdev_mlme_sm_deliver_evt(iface->vdev,
 				      WLAN_VDEV_SM_EV_DOWN_COMPLETE,
 				      sizeof(*resp), resp);
+	return status;
 }
 
 /**
@@ -3214,6 +3213,33 @@ enum mlme_bcn_tx_rate_code wma_get_bcn_rate_code(uint16_t rate)
 	}
 }
 
+#ifdef WLAN_BCN_RATECODE_ENABLE
+/**
+ * wma_update_beacon_tx_rate_code() - Update bcn_tx_rate_code
+ * @mlme_obj: pointer to mlme object
+ *
+ * Return: none
+ */
+static void  wma_update_beacon_tx_rate_code(struct vdev_mlme_obj *mlme_obj)
+{
+	uint8_t preamble, nss, rix;
+	uint32_t rate_code;
+
+	rate_code = mlme_obj->mgmt.rate_info.bcn_tx_rate;
+
+	rix = rate_code & RATECODE_V1_RIX_MASK;
+	nss = (rate_code >> RATECODE_V1_NSS_OFFSET) & RATECODE_V1_NSS_MASK;
+	preamble = rate_code >> RATECODE_V1_PREAMBLE_OFFSET;
+
+	mlme_obj->mgmt.rate_info.bcn_tx_rate_code =
+		wlan_mlme_assemble_rate_code(preamble, nss, rix);
+}
+#else
+static void wma_update_beacon_tx_rate_code(struct vdev_mlme_obj *mlme_obj)
+{
+}
+#endif
+
 QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -3304,6 +3330,7 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 		 */
 		mlme_obj->mgmt.rate_info.bcn_tx_rate =
 		wma_get_bcn_rate_code(mlme_obj->mgmt.rate_info.bcn_tx_rate);
+		wma_update_beacon_tx_rate_code(mlme_obj);
 	}
 
 	if (!restart) {
@@ -3341,15 +3368,19 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("failed to set aggregation sizes(status = %d)", status);
 
-	status = wlan_mlme_get_max_amsdu_num(wma->psoc, &amsdu_val);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("failed to get amsdu aggr.size(status = %d)", status);
-	} else {
-		status = wma_set_tx_rx_aggr_size(vdev_id, amsdu_val, amsdu_val,
-					WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
-		if (QDF_IS_STATUS_ERROR(status))
-			wma_err("failed to set amsdu aggr.size(status = %d)",
+	if (mac_ctx->is_usr_cfg_amsdu_enabled) {
+		status = wlan_mlme_get_max_amsdu_num(wma->psoc, &amsdu_val);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("failed to get amsdu aggr.size(status = %d)",
 				status);
+		} else {
+			status = wma_set_tx_rx_aggr_size(
+					vdev_id, amsdu_val, amsdu_val,
+					WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
+			if (QDF_IS_STATUS_ERROR(status))
+				wma_err("failed to set amsdu aggr.size(status = %d)",
+					status);
+		}
 	}
 
 	if (mlme_obj->mgmt.generic.type == WMI_VDEV_TYPE_STA) {
@@ -5262,16 +5293,17 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 	} else {
 		wma_debug("listen interval offload is not set");
 	}
-	iface->aid = params->assocId;
 	params->nss = iface->nss;
 out:
+	iface->aid = params->assocId;
+
 	/* Do not send add stat resp when peer assoc cnf is enabled */
 	if (peer_assoc_cnf)
 		return;
 
 	params->status = status;
 	wma_debug("vdev_id %d aid %d sta mac " QDF_MAC_ADDR_FMT " status %d",
-		  params->smesessionId, params->assocId,
+		  params->smesessionId, iface->aid,
 		  QDF_MAC_ADDR_REF(params->bssId), params->status);
 
 	/* Don't send a response during roam sync operation */
@@ -5602,7 +5634,7 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 		wma_add_sta_req_ap_mode(wma, add_sta);
 		break;
 	case BSS_OPERATIONAL_MODE_NDI:
-		wma_add_sta_ndi_mode(wma, add_sta);
+		status = wma_add_sta_ndi_mode(wma, add_sta);
 		break;
 	}
 
@@ -6368,7 +6400,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
 	return QDF_STATUS_SUCCESS;
 }
 
-#define MAX_VDEV_CREATE_PARAMS 20
+#define MAX_VDEV_CREATE_PARAMS 21
 /* params being sent:
  * 1.wmi_vdev_param_wmm_txop_enable
  * 2.wmi_vdev_param_disconnect_th
@@ -6390,6 +6422,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
  * 18.wmi_vdev_param_bmiss_first_bcnt
  * 19.wmi_vdev_param_bmiss_final_bcnt
  * 20.wmi_vdev_param_set_sap_ps_with_twt
+ * 21.wmi_vdev_param_disable_2g_twt
  */
 
 QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
@@ -6405,6 +6438,7 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 	uint32_t hemu_mode;
 	struct dev_set_param setparam[MAX_VDEV_CREATE_PARAMS];
 	uint8_t index = 0;
+	bool is_24ghz_twt_enabled;
 	enum QDF_OPMODE opmode;
 
 	if (!mac)
@@ -6654,6 +6688,16 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 			wma_debug("failed to set wmi_vdev_param_set_sap_ps_with_twt");
 			goto error;
 		}
+	}
+
+	is_24ghz_twt_enabled = mlme_is_24ghz_twt_enabled(mac->psoc);
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_disable_2g_twt,
+					   !is_24ghz_twt_enabled,
+					   index++, MAX_VDEV_CREATE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_debug("failed to set wmi_vdev_param_disable_2g_twt");
+		goto error;
 	}
 
 	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,

@@ -445,10 +445,12 @@ struct pmf_bcn_protect_stats {
  * struct vdev_summary_extd_stats - vdev summary extended stats
  * @vdev_id: vdev_id of the event
  * @is_mlo_vdev_active: is the mlo vdev currently active
+ * @vdev_tx_power: vdev tx power
  */
 struct vdev_summary_extd_stats {
 	uint8_t vdev_id;
 	bool is_mlo_vdev_active;
+	uint32_t vdev_tx_power;
 };
 
 /**

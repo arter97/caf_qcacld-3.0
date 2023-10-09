@@ -265,7 +265,7 @@ struct wlan_fwol_cfg {
 	struct wlan_fwol_ie_allowlist ie_allowlist_cfg;
 	struct wlan_fwol_neighbor_report_cfg neighbor_report_cfg;
 	bool ani_enabled;
-	bool pcie_config;
+	uint8_t pcie_config;
 	bool enable_rts_sifsbursting;
 	uint8_t enable_sifs_burst;
 	uint8_t max_mpdus_inampdu;

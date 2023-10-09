@@ -34,4 +34,14 @@
  */
 QDF_STATUS ucfg_epcs_deliver_cmd(struct wlan_objmgr_vdev *vdev,
 				 enum wlan_epcs_evt event);
+
+/**
+ * ucfg_epcs_set_config() - Set EPCS enable/disable config
+ * @vdev: vdev pointer
+ * @flag: EPCS flag
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_epcs_set_config(struct wlan_objmgr_vdev *vdev, uint8_t flag);
+
 #endif /* _WLAN_MLO_EPCS_UCFG_API_H_ */

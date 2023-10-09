@@ -246,10 +246,10 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 			       enum pmo_offload_trigger trigger);
 
 /**
- * hdd_set_grat_arp_keepalive() - Enable grat APR keepalive
+ * hdd_set_grat_arp_keepalive() - Enable gratuitous ARP keepalive
  * @adapter: the HDD adapter to configure
  *
- * This configures gratuitous APR keepalive based on the adapter's current
+ * This configures gratuitous ARP keepalive based on the adapter's current
  * connection information, specifically IPv4 address and BSSID
  *
  * return: zero for success, non-zero for failure
@@ -499,13 +499,26 @@ int wlan_hdd_ipv6_changed(struct notifier_block *nb,
  * hdd_set_power_config() - set power config to firmware
  * @hddctx: HDD context
  * @adapter: HDD adapter
- * @power: new power config value
+ * @opm_mode: pointer to vendor opm_mode
  *
  * Return: 0 on success; Errno on failure
  */
 int hdd_set_power_config(struct hdd_context *hddctx,
-			 struct hdd_adapter *adapter, uint8_t power);
+			 struct hdd_adapter *adapter,
+			 enum qca_wlan_vendor_opm_mode *opm_mode);
 
+/**
+ * hdd_set_power_config_params() - set power config parameters
+ * @hddctx: HDD context
+ * @adapter: HDD adapter
+ * @ps_ito: power save inactivitiy duration in ms
+ * @spec_wake: power save speculative wake duration in ms
+ *
+ * Return: 0 on success; Errno on failure
+ */
+int hdd_set_power_config_params(struct hdd_context *hddctx,
+				struct hdd_adapter *adapter,
+				uint16_t ps_ito, uint16_t spec_wake);
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
  * hdd_wlan_suspend_resume_event()- send suspend/resume state
@@ -524,13 +537,13 @@ void hdd_wlan_suspend_resume_event(uint8_t state) {}
 
 /**
  * wlan_hdd_set_powersave() - Set powersave mode
- * @adapter: adapter upon which the request was received
+ * @link_info: Link inof pointer in HDD adapter
  * @allow_power_save: is wlan allowed to go into power save mode
  * @timeout: timeout period in ms
  *
  * Return: 0 on success, non-zero on any error
  */
-int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
+int wlan_hdd_set_powersave(struct wlan_hdd_link_info *link_info,
 			   bool allow_power_save, uint32_t timeout);
 
 /**

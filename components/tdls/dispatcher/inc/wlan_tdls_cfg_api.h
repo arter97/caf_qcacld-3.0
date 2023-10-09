@@ -274,6 +274,14 @@ cfg_tdls_set_scan_enable(struct wlan_objmgr_psoc *psoc,
  * This function gets tdls max peer count
  */
 uint16_t cfg_tdls_get_max_peer_count(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * cfg_tdls_get_connected_peer_count() - get tdls connected peer count
+ * @psoc: pointer to psoc object
+ *
+ * This function gets tdls connected peer count
+ */
+uint16_t cfg_tdls_get_connected_peer_count(struct wlan_objmgr_psoc *psoc);
 #else
 static inline QDF_STATUS
 cfg_tdls_get_support_enable(struct wlan_objmgr_psoc *psoc,
@@ -450,5 +458,12 @@ cfg_tdls_get_max_peer_count(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
 }
+
+static inline uint16_t
+cfg_tdls_get_connected_peer_count(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
 #endif /* FEATURE_WLAN_TDLS */
 #endif /* _WLAN_TDLS_CFG_API_H_ */

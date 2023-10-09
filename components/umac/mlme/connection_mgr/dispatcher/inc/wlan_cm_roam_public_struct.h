@@ -92,6 +92,7 @@
 #define REASON_ROAM_HANDOFF_DONE                    52
 #define REASON_ROAM_ABORT                           53
 #define REASON_ROAM_SET_PRIMARY                     54
+#define REASON_ROAM_LINK_SWITCH_ASSOC_VDEV_CHANGE   55
 
 #define FILS_MAX_KEYNAME_NAI_LENGTH WLAN_CM_FILS_MAX_KEYNAME_NAI_LENGTH
 #define WLAN_FILS_MAX_REALM_LEN WLAN_CM_FILS_MAX_REALM_LEN
@@ -571,6 +572,8 @@ struct sae_roam_auth_map {
  * @roam_invoke_bssid: mac address used for roam invoke
  * @is_forced_roaming: bool value indicating if its forced roaming
  * @tried_candidate_freq_list: freq list on which connection tried
+ * @rso_rsn_caps: rsn caps with global user MFP which can be used for
+ *                cross-AKM roaming
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -624,6 +627,7 @@ struct rso_config {
 	struct qdf_mac_addr roam_invoke_bssid;
 	bool is_forced_roaming;
 	struct wlan_chan_list tried_candidate_freq_list;
+	uint16_t rso_rsn_caps;
 };
 
 /**
@@ -1282,7 +1286,7 @@ struct wlan_roam_scan_filter_params {
  * @btm_max_attempt_cnt: Maximum attempt for sending BTM query to ESS
  * @btm_sticky_time: Stick time after roaming to new AP by BTM
  * @disassoc_timer_threshold: threshold value till which the firmware can
- * wait before triggering the roam scan after receiving the disassoc iminent
+ * wait before triggering the roam scan after receiving the disassoc imminent
  * @btm_query_bitmask: bitmask to btm query with candidate list
  * @btm_candidate_min_score: Minimum score of the AP to consider it as a
  * candidate if the roam trigger is BTM kickout.
@@ -1943,9 +1947,7 @@ enum roam_rt_stats_params {
  * @support_link_num: Configure max number of link mlo connection supports.
  *  Invalid value or 0 will use max supported value by fw.
  * @support_link_band: Configure the band bitmap of mlo connection supports
- *  Bit 0: 2G band support if 1
- *  Bit 1: 5G band support if 1
- *  Bit 2: 6G band support if 1
+ * The bits of the bitmap are defined by the enum reg_wifi_band
  */
 struct wlan_roam_mlo_config {
 	uint8_t vdev_id;
@@ -2126,6 +2128,8 @@ enum roam_offload_state {
  *  @timestamp:     This timestamp indicates the time when btm rsp is sent
  *  @btm_resp_dialog_token: Dialog token
  *  @btm_delay: BTM bss termination delay
+ *  @is_mlo: Flag to check if the current connection is a MLO connection
+ *  @band: Band of the link that is involved in frame exchange
  */
 struct roam_btm_response_data {
 	bool present;
@@ -2135,6 +2139,8 @@ struct roam_btm_response_data {
 	uint32_t timestamp;
 	uint16_t btm_resp_dialog_token;
 	uint8_t btm_delay;
+	bool is_mlo;
+	uint8_t band;
 };
 
 /**
@@ -2776,7 +2782,8 @@ struct cm_hw_mode_trans_ind {
  * @link_id: link id of the link
  * @channel: wmi channel
  * @flags: link flags
- * @link_addr: link mac addr
+ * @link_addr: link mac address
+ * @self_link_addr: VDEV link mac address
  */
 struct ml_setup_link_param {
 	uint32_t vdev_id;
@@ -2784,6 +2791,7 @@ struct ml_setup_link_param {
 	wmi_channel channel;
 	uint32_t flags;
 	struct qdf_mac_addr link_addr;
+	struct qdf_mac_addr self_link_addr;
 };
 
 /**
@@ -2854,9 +2862,9 @@ struct roam_offload_synch_ind {
 	uint8_t is_link_beacon;
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t num_setup_links;
-	struct ml_setup_link_param ml_link[WLAN_UMAC_MLO_MAX_VDEVS];
+	struct ml_setup_link_param ml_link[WLAN_MAX_ML_BSS_LINKS];
 	uint8_t num_ml_key_material;
-	struct ml_key_material_param ml_key[WLAN_UMAC_MLO_MAX_VDEVS];
+	struct ml_key_material_param ml_key[WLAN_MAX_ML_BSS_LINKS];
 #endif
 };
 
@@ -2866,12 +2874,14 @@ struct roam_offload_synch_ind {
  * @frame_length : Length of the beacon/probe rsp frame
  * @frame : Pointer to the frame
  * @rssi: RSSI of the received frame, 0 if not available
+ * @roam_offload_candidate_frm: Is a roam offload candidate frame
  */
 struct roam_scan_candidate_frame {
 	uint8_t vdev_id;
 	uint32_t frame_length;
 	uint8_t *frame;
 	int32_t rssi;
+	bool roam_offload_candidate_frm;
 };
 
 /**
@@ -2879,6 +2889,7 @@ struct roam_scan_candidate_frame {
  * roaming related commands
  * @roam_sync_event: RX ops function pointer for roam sync event
  * @roam_sync_frame_event: Rx ops function pointer for roam sync frame event
+ * @roam_sync_key_event: Rx ops function pointer for roam sych key event
  * @roam_event_rx: Rx ops function pointer for roam info event
  * @btm_denylist_event: Rx ops function pointer for btm denylist event
  * @vdev_disconnect_event: Rx ops function pointer for vdev disconnect event
@@ -2896,6 +2907,9 @@ struct wlan_cm_roam_rx_ops {
 				      struct roam_offload_synch_ind *sync_ind);
 	QDF_STATUS (*roam_sync_frame_event)(struct wlan_objmgr_psoc *psoc,
 					    struct roam_synch_frame_ind *frm);
+	QDF_STATUS (*roam_sync_key_event)(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_crypto_key_entry *keys,
+					  uint8_t num_keys);
 	QDF_STATUS (*roam_event_rx)(struct roam_offload_roam_event *roam_event);
 	QDF_STATUS (*btm_denylist_event)(struct wlan_objmgr_psoc *psoc,
 					 struct roam_denylist_event *list);

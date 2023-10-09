@@ -125,7 +125,6 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct pdev_mc_cp_stats *pdev_mc_stats;
 	struct pdev_cp_stats *pdev_cp_stats_priv;
-	bool pending = false;
 
 	if (!ev->pdev_stats)
 		return;
@@ -180,17 +179,6 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 			ev->pdev_stats[pdev_id].max_pwr;
 
 	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
-	if (is_station_stats)
-		goto end;
-
-	if (mac_id == ev->mac_seq_num) {
-		ucfg_mc_cp_stats_reset_pending_req(psoc,
-						   TYPE_CONNECTION_TX_POWER,
-						   &last_req,
-						   &pending);
-		if (last_req.u.get_tx_power_cb && pending)
-			last_req.u.get_tx_power_cb(max_pwr, last_req.cookie);
-	}
 
 end:
 	if (vdev)
@@ -684,8 +672,8 @@ tgt_mc_infra_cp_stats_extract_twt_stats(struct wlan_objmgr_psoc *psoc,
 					struct infra_cp_stats_event *ev)
 {
 	QDF_STATUS status;
-	get_infra_cp_stats_cb resp_cb;
-	void *context;
+	get_infra_cp_stats_cb resp_cb = NULL;
+	void *context = NULL;
 
 	status = wlan_cp_stats_infra_cp_get_context(psoc, &resp_cb, &context);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -772,35 +760,26 @@ tgt_mc_cp_stats_extract_congestion_stats(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
-update_ml_vdev_id_from_stats_event(struct wlan_objmgr_psoc *psoc,
-				   struct stats_event *ev,
-				   struct request_info *req,
+update_ml_vdev_id_from_stats_event(struct request_info *req,
 				   uint8_t *vdev_id)
 {
-	uint8_t i, j, t_vdev_id;
-
-	if (!wlan_vdev_mlme_get_is_mlo_vdev(psoc, req->vdev_id)) {
+	if (!req->ml_vdev_info.ml_vdev_count) {
 		*vdev_id = req->vdev_id;
 		return;
 	}
 
-	for (i = 0; i < ev->num_summary_stats; i++) {
-		t_vdev_id = ev->vdev_summary_stats[i].vdev_id;
-		for (j = 0; j < req->ml_vdev_info.ml_vdev_count; j++) {
-			if (t_vdev_id == req->ml_vdev_info.ml_vdev_id[j]) {
-				*vdev_id = req->ml_vdev_info.ml_vdev_id[j];
-				break;
-			}
-		}
+	if (*vdev_id == WLAN_UMAC_VDEV_ID_MAX ||
+	    *vdev_id >= WLAN_MAX_VDEVS) {
+		cp_stats_err("Invalid vdev[%u] sent by firmware", *vdev_id);
+		*vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 	}
 }
 #else
-static void
-update_ml_vdev_id_from_stats_event(struct wlan_objmgr_psoc *psoc,
-				   struct stats_event *ev,
-				   struct request_info *req,
+static inline void
+update_ml_vdev_id_from_stats_event(struct request_info *req,
 				   uint8_t *vdev_id)
 {
+	*vdev_id = req->vdev_id;
 }
 #endif
 
@@ -904,9 +883,9 @@ static void tgt_mc_cp_stats_extract_vdev_summary_stats(
 		return;
 	}
 
-	vdev_id = last_req.vdev_id;
-	update_ml_vdev_id_from_stats_event(psoc, ev, &last_req, &vdev_id);
 	for (i = 0; i < ev->num_summary_stats; i++) {
+		vdev_id = ev->vdev_summary_stats[i].vdev_id;
+		update_ml_vdev_id_from_stats_event(&last_req, &vdev_id);
 		if (ev->vdev_summary_stats[i].vdev_id == vdev_id)
 			break;
 	}
@@ -985,12 +964,11 @@ static void tgt_mc_cp_stats_extract_vdev_chain_rssi_stats(
 	}
 
 	for (i = 0; i < ev->num_chain_rssi_stats; i++) {
-		vdev_id = last_req.vdev_id;
-		if (vdev_id != ev->vdev_chain_rssi[i].vdev_id)
+		vdev_id = ev->vdev_chain_rssi[i].vdev_id;
+		update_ml_vdev_id_from_stats_event(&last_req, &vdev_id);
+		if (ev->vdev_chain_rssi[i].vdev_id != vdev_id)
 			continue;
 
-		update_ml_vdev_id_from_stats_event(psoc, ev,
-						   &last_req, &vdev_id);
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 							    WLAN_CP_STATS_ID);
 		if (!vdev) {
@@ -1216,6 +1194,86 @@ end:
 	return QDF_STATUS_E_NULL_VALUE;
 }
 
+static QDF_STATUS
+tgt_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev, int *dbm)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct pdev_mc_cp_stats *pdev_mc_stats;
+	struct pdev_cp_stats *pdev_cp_stats_priv;
+	struct vdev_mc_cp_stats *vdev_mc_stats;
+	struct vdev_cp_stats *vdev_cp_stat;
+	uint32_t vdev_power = 0;
+
+	vdev_cp_stat = wlan_cp_stats_get_vdev_stats_obj(vdev);
+	if (vdev_cp_stat) {
+		wlan_cp_stats_vdev_obj_lock(vdev_cp_stat);
+		vdev_mc_stats = vdev_cp_stat->vdev_stats;
+		vdev_power = vdev_mc_stats->vdev_extd_stats.vdev_tx_power;
+		wlan_cp_stats_vdev_obj_unlock(vdev_cp_stat);
+		if (vdev_power) {
+			*dbm = vdev_power;
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
+	if (!pdev_cp_stats_priv) {
+		cp_stats_err("pdev cp stats object is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
+	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
+	*dbm = pdev_mc_stats->max_pwr;
+	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+tgt_mc_cp_stats_extract_vdev_and_extd_stats(struct wlan_objmgr_psoc *psoc,
+					    struct stats_event *ev)
+{
+	QDF_STATUS status;
+	struct request_info last_req = {0};
+	bool pending = false;
+	int32_t max_pwr = 0;
+	struct wlan_objmgr_vdev *vdev = NULL;
+
+	status = ucfg_mc_cp_stats_get_pending_req(psoc,
+						  TYPE_CONNECTION_TX_POWER,
+						  &last_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("ucfg_mc_cp_stats_get_pending_req failed");
+		return;
+	}
+
+	if (ev->pdev_stats)
+		tgt_mc_cp_stats_extract_tx_power(psoc, ev, false);
+	else if (ev->vdev_extd_stats)
+		tgt_mc_cp_stats_extract_vdev_extd_stats(psoc, ev);
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req.vdev_id,
+						    WLAN_CP_STATS_ID);
+	if (!vdev) {
+		cp_stats_err("vdev is null");
+		return;
+	}
+	tgt_mc_cp_stats_get_tx_power(vdev, &max_pwr);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+
+	if (tgt_mc_cp_stats_is_last_event(ev, TYPE_CONNECTION_TX_POWER)) {
+		ucfg_mc_cp_stats_reset_pending_req(psoc,
+						   TYPE_CONNECTION_TX_POWER,
+						   &last_req,
+						   &pending);
+		if (last_req.u.get_tx_power_cb && pending)
+			last_req.u.get_tx_power_cb(max_pwr, last_req.cookie);
+	}
+}
+
 static void
 tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 				       struct request_info *last_req)
@@ -1374,7 +1432,7 @@ QDF_STATUS tgt_mc_cp_stats_process_stats_event(struct wlan_objmgr_psoc *psoc,
 					       struct stats_event *ev)
 {
 	if (ucfg_mc_cp_stats_is_req_pending(psoc, TYPE_CONNECTION_TX_POWER))
-		tgt_mc_cp_stats_extract_tx_power(psoc, ev, false);
+		tgt_mc_cp_stats_extract_vdev_and_extd_stats(psoc, ev);
 
 	if (ucfg_mc_cp_stats_is_req_pending(psoc, TYPE_PEER_STATS))
 		tgt_mc_cp_stats_extract_peer_stats(psoc, ev, false);
