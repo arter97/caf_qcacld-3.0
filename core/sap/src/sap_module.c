@@ -1416,6 +1416,10 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 		ch_width = QDF_MIN(ch_width, concurrent_bw);
 		if (tgt_ch_params)
 			ch_width = QDF_MIN(ch_width, tgt_ch_params->ch_width);
+
+		if (ch_width == CH_WIDTH_320MHZ)
+			ch_width = wlan_mlme_get_ap_oper_ch_width(
+							sap_context->vdev);
 	}
 	ch_params.ch_width = ch_width;
 	if (sap_phymode_is_eht(sap_context->phyMode))

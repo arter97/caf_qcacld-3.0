@@ -265,7 +265,8 @@ policy_mgr_get_sap_bw(struct wlan_objmgr_psoc *psoc, enum phy_ch_width *bw)
 
 	if (policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
 						   &vdev_id_list[0],
-						   PM_SAP_MODE) != 1)
+						   PM_SAP_MODE) != 1 ||
+	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(freq_list[0]))
 		return QDF_STATUS_E_NOSUPPORT;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id_list[0],
@@ -954,6 +955,9 @@ policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
 {
 	struct connection_info info[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint32_t connection_count, i;
+
+	if (wlan_reg_is_24ghz_ch_freq(freq))
+		return true;
 
 	connection_count = policy_mgr_get_connection_info(psoc, info);
 

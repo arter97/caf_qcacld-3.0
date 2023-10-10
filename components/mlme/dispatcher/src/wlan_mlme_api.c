@@ -7992,9 +7992,6 @@ wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev)
 		return CH_WIDTH_INVALID;
 	}
 
-	mlme_debug("SAP oper ch_width: %d, vdev %d",
-		   mlme_priv->mlme_ap.oper_ch_width, wlan_vdev_get_id(vdev));
-
 	return mlme_priv->mlme_ap.oper_ch_width;
 }
 

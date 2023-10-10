@@ -8756,8 +8756,6 @@ lim_update_new_ch_width_to_fw(struct mac_context *mac_ctx,
 	tpDphHashNode psta;
 	tUpdateVHTOpMode params;
 
-	wlan_mlme_set_ap_oper_ch_width(session->vdev, ch_bandwidth);
-
 	for (i = 0; i <= mac_ctx->lim.max_sta_of_pe_session; i++) {
 		psta = session->dph.dphHashTable.pDphNodeArray + i;
 		if (!psta || !psta->added)
