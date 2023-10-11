@@ -42,6 +42,9 @@
 #ifdef WLAN_SUPPORT_SERVICE_CLASS
 #include "wlan_dp_svc.h"
 #endif
+#ifdef WLAN_SUPPORT_LAPB
+#include "wlan_dp_lapb_flow.h"
+#endif
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -2517,3 +2520,10 @@ QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 {
 	return dp_txrx_set_cpu_mask(soc, new_mask);
 }
+
+#ifdef WLAN_SUPPORT_LAPB
+QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
+{
+	return wlan_dp_lapb_handle_app_ind(nbuf);
+}
+#endif
