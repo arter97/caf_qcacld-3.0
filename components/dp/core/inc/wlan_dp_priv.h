@@ -625,6 +625,7 @@ struct dp_rx_fst {
  * @dp_link_list_lock: Lock to protect dp_link_list operatiosn
  * @dp_link_list: List of dp_links for this DP interface
  * @fpm_ctx: Flow policy manager context
+ * @fim_ctx: Flow identification manager context
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -695,6 +696,7 @@ struct wlan_dp_intf {
 	qdf_list_t dp_link_list;
 #ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 	struct fpm_table *fpm_ctx;
+	struct fim_vdev_ctx *fim_ctx;
 #endif
 };
 

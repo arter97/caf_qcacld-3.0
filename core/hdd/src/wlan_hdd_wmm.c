@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2054,8 +2054,13 @@ void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 	hdd_wmm_classify_critical_pkt(skb, user_pri, is_critical);
 
 	if (false == *is_critical) {
-		hdd_wmm_get_user_priority_from_ip_tos(adapter, skb, user_pri);
-		hdd_check_and_upgrade_udp_qos(adapter, skb, user_pri);
+		ucfg_dp_fim_update_metadata((qdf_nbuf_t)skb,
+					    adapter->deflink->vdev);
+		if (!ucfg_dp_fpm_check_tid_override_tagged((qdf_nbuf_t)skb)) {
+			hdd_wmm_get_user_priority_from_ip_tos(adapter, skb,
+							      user_pri);
+			hdd_check_and_upgrade_udp_qos(adapter, skb, user_pri);
+		}
 	}
 }
 

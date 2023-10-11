@@ -28,6 +28,7 @@
 #include "wlan_dp_objmgr.h"
 #ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 #include "wlan_fpm_table.h"
+#include "wlan_dp_fim.h"
 #endif
 
 #define NUM_RX_QUEUES 5
@@ -1032,6 +1033,7 @@ bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 static inline void dp_flow_priortization_init(struct wlan_dp_intf *dp_intf)
 {
 	dp_fpm_init(dp_intf);
+	dp_fim_init(dp_intf);
 }
 
 /**
@@ -1042,6 +1044,7 @@ static inline void dp_flow_priortization_init(struct wlan_dp_intf *dp_intf)
  */
 static inline void dp_flow_priortization_deinit(struct wlan_dp_intf *dp_intf)
 {
+	dp_fim_deinit(dp_intf);
 	dp_fpm_deinit(dp_intf);
 }
 #else
