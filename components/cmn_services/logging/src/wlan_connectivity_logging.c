@@ -498,6 +498,7 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	uint i = 0;
 	struct mlo_link_switch_context *link_ctx = NULL;
 	struct wlan_channel *chan_info;
+	uint8_t num_links = 0;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
 				 struct wlan_diag_mlo_setup);
@@ -525,24 +526,37 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	}
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		wlan_diag_event.mlo_cmn_info[i].link_id =
+		if (link_ctx->links_info[i].link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		chan_info = link_ctx->links_info[i].link_chan_info;
+		if (!chan_info) {
+			logging_debug("link %d: chan_info not found",
+				      link_ctx->links_info[i].link_id);
+			continue;
+		}
+
+		wlan_diag_event.mlo_cmn_info[num_links].link_id =
 				link_ctx->links_info[i].link_id;
-		wlan_diag_event.mlo_cmn_info[i].vdev_id =
+		wlan_diag_event.mlo_cmn_info[num_links].vdev_id =
 				link_ctx->links_info[i].vdev_id;
 
-		qdf_mem_copy(wlan_diag_event.mlo_cmn_info[i].link_addr,
+		qdf_mem_copy(wlan_diag_event.mlo_cmn_info[num_links].link_addr,
 			     link_ctx->links_info[i].ap_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 
-		chan_info = link_ctx->links_info[i].link_chan_info;
-
-		wlan_diag_event.mlo_cmn_info[i].band =
+		wlan_diag_event.mlo_cmn_info[num_links].band =
 			wlan_convert_freq_to_diag_band(chan_info->ch_freq);
 
-		if (wlan_diag_event.mlo_cmn_info[i].band == WLAN_INVALID_BAND)
+		if (wlan_diag_event.mlo_cmn_info[num_links].band ==
+							 WLAN_INVALID_BAND)
 			wlan_diag_event.mlo_cmn_info[i].status =
 							REJECTED_LINK_STATUS;
+
+		num_links++;
 	}
+
+	wlan_diag_event.num_links = num_links;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_SETUP);
 }

@@ -346,6 +346,7 @@ struct wlan_diag_mlo_cmn_info {
  * struct wlan_diag_mlo_setup - MLO setup structure
  * @diag_cmn: Common diag info
  * @version: structure version
+ * @num_links: Number of links associated for MLO setup
  * @reserved: Reserved field
  * @status: status code of the link. Non-zero value when link is rejected
  * @mlo_cmn_info: MLO common info
@@ -353,7 +354,8 @@ struct wlan_diag_mlo_cmn_info {
 struct wlan_diag_mlo_setup {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint32_t version:8;
-	uint32_t reserved:24;
+	uint32_t num_links:8;
+	uint32_t reserved:16;
 	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
 } qdf_packed;
 
@@ -379,13 +381,15 @@ struct wlan_diag_mlo_reconfig {
  * struct wlan_diag_mlo_t2lm_status - MLO T2LM status diag event structure
  * @diag_cmn: Common diag info
  * @version: structure version
+ * @num_links: Number of links associated for T2LM status
  * @reserved: Reserved field
  * @mlo_cmn_info: MLO common info
  */
 struct wlan_diag_mlo_t2lm_status {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint32_t version:8;
-	uint32_t reserved:24;
+	uint32_t num_links:8;
+	uint32_t reserved:16;
 	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
 } qdf_packed;
 
