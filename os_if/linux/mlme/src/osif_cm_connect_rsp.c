@@ -865,7 +865,8 @@ static void osif_indcate_connect_results(struct wlan_objmgr_vdev *vdev,
 }
 #else /* WLAN_FEATURE_11BE_MLO_ADV_FEATURE */
 
-#if (LINUX_VERSION_CODE == KERNEL_VERSION(5, 4, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 213)) && \
+	(LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0))
 /**
  * osif_update_current_bss() - Wrapper API to call cfg80211_update_current_bss
  * @dev: network device
