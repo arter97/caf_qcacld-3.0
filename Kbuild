@@ -2657,6 +2657,7 @@ endif
 
 ifeq ($(CONFIG_WLAN_SUPPORT_FLOW_PRIORTIZATION), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_UCFG_DIR)/wlan_dp_flow_ucfg_api.o
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_fim.o
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_fpm.o
 endif
 

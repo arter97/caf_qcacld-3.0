@@ -16,7 +16,108 @@
 
 #include "wlan_dp_priv.h"
 #include "wlan_dp_ucfg_api.h"
-#include "wlan_fpm_table.h"
+#include "wlan_dp_fim.h"
+
+QDF_STATUS ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
+				       struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (qdf_unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf)) {
+		dp_err_rl("DP interface not found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return dp_fim_update_metadata(dp_intf, nbuf);
+}
+
+void ucfg_dp_fim_display_hash_table(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (qdf_unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf)) {
+		dp_err_rl("DP interface not found");
+		return;
+	}
+
+	dp_fim_display_hash_table(dp_intf);
+}
+
+void ucfg_dp_fim_display_stats(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (qdf_unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf)) {
+		dp_err_rl("DP interface not found");
+		return;
+	}
+
+	dp_fim_display_stats(dp_intf);
+}
+
+void ucfg_dp_fim_clear_stats(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (qdf_unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf)) {
+		dp_err_rl("DP interface not found");
+		return;
+	}
+
+	dp_fim_clear_stats(dp_intf);
+}
+
+void ucfg_dp_fim_clear_hash_table(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (qdf_unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf)) {
+		dp_err_rl("DP interface not found");
+		return;
+	}
+
+	dp_fim_clear_hash_table(dp_intf);
+}
 
 bool ucfg_dp_fpm_check_tid_override_tagged(qdf_nbuf_t nbuf)
 {
