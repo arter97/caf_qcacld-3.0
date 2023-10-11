@@ -1608,6 +1608,48 @@ ucfg_dp_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
 
 #ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 /*
+ * ucfg_dp_fim_update_metadata() - Update skb with metadata
+ * @nbuf: skb
+ * @vdev:vdev
+ *
+ * Return: QDF_STATUS_SUCCESS if skb marked with valid metadata
+ */
+QDF_STATUS ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
+				       struct wlan_objmgr_vdev *vdev);
+
+/*
+ * ucfg_dp_fim_display_hash_table() - Display FIM node from hash table
+ * @vdev: vdev
+ *
+ * Return: None
+ */
+void ucfg_dp_fim_display_hash_table(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * ucfg_dp_fim_clear_hash_table() - Clear FIM nodes from hash table
+ * @vdev: vdev
+ *
+ * Return: None
+ */
+void ucfg_dp_fim_clear_hash_table(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * ucfg_dp_fim_display_stats() - Display FIM stats
+ * @vdev: vdev
+ *
+ * Return: None
+ */
+void ucfg_dp_fim_display_stats(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * ucfg_dp_fim_clear_stats() - Clear FIM stats
+ * @vdev: vdev
+ *
+ * Return: None
+ */
+void ucfg_dp_fim_clear_stats(struct wlan_objmgr_vdev *vdev);
+
+/*
  * ucfg_dp_fpm_check_tid_override_tagged() - Check skb marked with tid override
  * @nbuf: skb
  *
@@ -1670,6 +1712,33 @@ QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint32_t cookie);
 uint8_t ucfg_fpm_policy_get(struct fpm_table *fpm, struct dp_policy *policy,
 			    uint8_t max_count);
 #else
+static inline
+QDF_STATUS ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
+				       struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+void ucfg_dp_fim_display_hash_table(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void ucfg_dp_fim_clear_hash_table(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void ucfg_dp_fim_display_stats(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void ucfg_dp_fim_clear_stats(struct wlan_objmgr_vdev *vdev)
+{
+}
+
 static inline
 bool ucfg_dp_fpm_check_tid_override_tagged(qdf_nbuf_t nbuf)
 {

@@ -377,6 +377,7 @@ struct direct_link_info {
  * @traffic_end_ind: store traffic end indication info
  * @direct_link_config: direct link configuration parameters
  * @fpm_ctx: Flow policy manager context
+ * @fim_ctx: Flow identification manager context
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -441,6 +442,7 @@ struct wlan_dp_intf {
 #endif
 #ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 	struct fpm_table *fpm_ctx;
+	struct fim_vdev_ctx *fim_ctx;
 #endif
 };
 
