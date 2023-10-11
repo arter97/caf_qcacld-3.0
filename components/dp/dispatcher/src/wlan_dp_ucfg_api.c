@@ -43,6 +43,9 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_public_api.h"
 #endif
+#ifdef WLAN_SUPPORT_LAPB
+#include "wlan_dp_lapb_flow.h"
+#endif
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -2811,3 +2814,10 @@ QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 {
 	return cdp_host_get_vdev_stats(soc, vdev_id, buf, true);
 }
+
+#ifdef WLAN_SUPPORT_LAPB
+QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
+{
+	return wlan_dp_lapb_handle_app_ind(nbuf);
+}
+#endif
