@@ -6560,11 +6560,20 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 	struct hdd_adapter *adapter, *next = NULL;
 	QDF_STATUS status;
 	struct hdd_ap_ctx *ap_ctx;
+	uint32_t ch_list[NUM_CHANNELS];
+	uint32_t ch_count = 0;
+	bool is_valid_chan_present = true;
 
 	if (!hdd_ctx)
 		return;
 
 	hdd_check_and_disconnect_sta_on_invalid_channel(hdd_ctx, reason);
+
+	status = policy_mgr_get_valid_chans(hdd_ctx->psoc, ch_list, &ch_count);
+	if (QDF_IS_STATUS_ERROR(status) || !ch_count) {
+		hdd_debug("No valid channels present, stop the SAPs");
+		is_valid_chan_present = false;
+	}
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapter);
 	while (adapter && (status == QDF_STATUS_SUCCESS)) {
@@ -6574,7 +6583,10 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 		}
 
 		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-		if (check_disable_channels(hdd_ctx, ap_ctx->operating_chan_freq))
+		if (!is_valid_chan_present)
+			wlan_hdd_stop_sap(adapter);
+		else if (check_disable_channels(hdd_ctx,
+						ap_ctx->operating_chan_freq))
 			policy_mgr_check_sap_restart(hdd_ctx->psoc,
 						     adapter->deflink->vdev_id);
 next_adapter:
