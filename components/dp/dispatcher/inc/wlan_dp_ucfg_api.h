@@ -1905,4 +1905,22 @@ uint8_t ucfg_fpm_policy_get(struct fpm_table *fpm, struct dp_policy *policy,
 	return 0;
 }
 #endif
+
+#ifdef WLAN_SUPPORT_LAPB
+/*
+ * ucfg_dp_lapb_handle_app_ind() - Handle LAPB application traffic end
+ *				   indication
+ * @nbuf: skb
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf);
+#else
+static inline
+QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 #endif /* _WLAN_DP_UCFG_API_H_ */
