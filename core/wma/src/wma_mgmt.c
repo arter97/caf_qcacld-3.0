@@ -2302,6 +2302,16 @@ static QDF_STATUS wma_store_bcn_tmpl(tp_wma_handle wma, uint8_t vdev_id,
 	else
 		bcn->p2p_ie_offset = bcn_info->p2pIeOffset;
 
+	if (bcn_info->csa_count_offset > 3)
+		bcn->csa_count_offset = bcn_info->csa_count_offset - 4;
+	else
+		bcn->csa_count_offset = bcn_info->csa_count_offset;
+
+	if (bcn_info->ecsa_count_offset > 3)
+		bcn->ecsa_count_offset = bcn_info->ecsa_count_offset - 4;
+	else
+		bcn->ecsa_count_offset = bcn_info->ecsa_count_offset;
+
 	bcn_payload = qdf_nbuf_data(bcn->buf);
 	if (bcn->tim_ie_offset) {
 		tim_ie = (struct beacon_tim_ie *)
@@ -2379,8 +2389,12 @@ int wma_tbttoffset_update_event_handler(void *handle, uint8_t *event,
 		bcn_info.p2pIeOffset = bcn->p2p_ie_offset;
 		bcn_info.beaconLength = bcn->len;
 		bcn_info.timIeOffset = bcn->tim_ie_offset;
+		bcn_info.csa_count_offset = bcn->csa_count_offset;
+		bcn_info.ecsa_count_offset = bcn->ecsa_count_offset;
 		qdf_spin_unlock_bh(&bcn->lock);
 
+		wma_err_rl("Update beacon template for vdev %d due to TBTT offset update",
+			   if_id);
 		/* Update beacon template in firmware */
 		wma_unified_bcn_tmpl_send(wma, if_id, &bcn_info, 0);
 	}
