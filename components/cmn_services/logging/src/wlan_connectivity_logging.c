@@ -559,9 +559,12 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	wlan_diag_event.num_links = num_links;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_SETUP);
+
+	wlan_connectivity_t2lm_status_event(vdev);
 }
 
 #define IS_LINK_SET(link_bitmap, link_id) ((link_bitmap) & (BIT(link_id)))
+#define DEFAULT_TID_MAP 0xFF
 
 static void
 wlan_populate_tid_link_id_bitmap(struct wlan_t2lm_info *t2lm,
@@ -580,6 +583,12 @@ wlan_populate_tid_link_id_bitmap(struct wlan_t2lm_info *t2lm,
 	buf->mlo_cmn_info[bss_link].vdev_id = link_info->vdev_id;
 
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
+		if (t2lm[dir].default_link_mapping) {
+			buf->mlo_cmn_info[bss_link].tid_ul = DEFAULT_TID_MAP;
+			buf->mlo_cmn_info[bss_link].tid_dl = DEFAULT_TID_MAP;
+			continue;
+		}
+
 		for (i = 0; i < T2LM_MAX_NUM_TIDS; i++) {
 			switch (t2lm[dir].direction) {
 			case WLAN_T2LM_DL_DIRECTION:
@@ -618,7 +627,7 @@ wlan_populate_tid_link_id_bitmap(struct wlan_t2lm_info *t2lm,
 void
 wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 {
-	uint8_t i = 0, dir;
+	uint8_t i = 0, dir, num_links = 0;
 	QDF_STATUS status;
 	struct mlo_link_info *link_info;
 	struct wlan_t2lm_info t2lm[WLAN_T2LM_MAX_DIRECTION] = {0};
@@ -657,13 +666,16 @@ wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS && i < MAX_BANDS; i++) {
 		if (qdf_is_macaddr_zero(&link_info->ap_link_addr) &&
-		    link_info->vdev_id == WLAN_INVALID_VDEV_ID)
+		    link_info->link_id == WLAN_INVALID_LINK_ID)
 			continue;
 
 		wlan_populate_tid_link_id_bitmap(t2lm, link_info,
-						 &wlan_diag_event, i);
+						 &wlan_diag_event, num_links);
 		link_info++;
+		num_links++;
 	}
+
+	wlan_diag_event.num_links = num_links;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_MLO_T2LM_STATUS);
