@@ -13040,6 +13040,9 @@ static int hdd_populate_dns_stats_info(struct hdd_adapter *adapter,
 {
 	uint8_t *dns_query;
 
+	if (adapter->track_dns_domain_len < 1 || adapter->track_dns_domain_len > 256)
+		return -EINVAL;
+
 	dns_query = qdf_mem_malloc(adapter->track_dns_domain_len + 1);
 	if (!dns_query)
 		return -EINVAL;
