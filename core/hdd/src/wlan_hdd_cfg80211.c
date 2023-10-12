@@ -14177,9 +14177,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		} else {
 			hdd_update_channel_width(
 					link_info, eHT_CHANNEL_WIDTH_160MHZ,
-					link_id,
 					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE,
-					false);
+					link_id, false);
 			hdd_set_tx_stbc(link_info, 1);
 			hdd_set_11ax_rate(adapter, 0xFFFF, NULL);
 			status = wma_cli_set_command(
