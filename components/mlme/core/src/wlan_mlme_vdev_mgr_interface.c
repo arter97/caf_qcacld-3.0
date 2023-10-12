@@ -2120,6 +2120,20 @@ vdevmgr_vdev_reconfig_notify(struct vdev_mlme_obj *vdev_mlme,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+vdevmgr_vdev_reconfig_notify_standby(struct vdev_mlme_obj *vdev_mlme,
+				     struct ml_rv_info *reconfig_info)
+{
+	struct wlan_objmgr_vdev *vdev = vdev_mlme->vdev;
+
+	if (!vdev) {
+		mlme_err("invalid vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return policy_mgr_handle_link_removal_on_standby(vdev, reconfig_info);
+}
+
 static void
 vdevmgr_vdev_reconfig_timer_complete(struct vdev_mlme_obj *vdev_mlme)
 {
@@ -2339,6 +2353,9 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 			vdevmgr_vdev_reconfig_notify,
 	.mlme_vdev_reconfig_timer_complete =
 			vdevmgr_vdev_reconfig_timer_complete,
+	.mlme_vdev_reconfig_notify_standby =
+			vdevmgr_vdev_reconfig_notify_standby,
+
 #endif
 };
 

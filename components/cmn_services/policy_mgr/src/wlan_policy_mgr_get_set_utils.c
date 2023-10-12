@@ -4383,6 +4383,20 @@ policy_mgr_trigger_roam_on_link_removal(struct wlan_objmgr_vdev *vdev)
 		policy_mgr_err("roam invoke failed");
 }
 
+/*
+ * policy_mgr_update_dynamic_inactive_bitmap() - Update dynamic inactive links
+ * @psoc: psoc object
+ * @vdev: vdev object
+ * @req: req of set link command
+ * @resp: resp of set link command
+ *
+ * If MLO_LINK_FORCE_MODE_INACTIVE_NUM force mode with control flag -
+ * "dynamic_force_link_num" enabled was sent to firmware,
+ * host will need to select same num of links to be dyamic inactive
+ * links. And move corresponding vdevs to disabled policy mgr connection table.
+ *
+ * Return: void
+ */
 static void
 policy_mgr_update_dynamic_inactive_bitmap(
 			struct wlan_objmgr_psoc *psoc,
@@ -4390,63 +4404,121 @@ policy_mgr_update_dynamic_inactive_bitmap(
 			struct mlo_link_set_active_req *req,
 			struct mlo_link_set_active_resp *resp)
 {
-	uint32_t candidate_inactive_links;
+	uint32_t candidate_inactive_links, inactive_links;
+	uint32_t standby_links;
 	uint32_t dyn_inactive_links = 0;
 	uint8_t dyn_num = 0, num = 0, i;
 	uint8_t link_ids[MAX_MLO_LINK_ID * 2];
+	struct ml_link_force_state curr_state = {0};
+	uint8_t force_inactive_num = 0;
+	uint32_t force_inactive_num_bitmap = 0;
+	uint32_t force_inactive_bitmap;
 
-	if (req->param.force_mode != MLO_LINK_FORCE_MODE_INACTIVE_NUM ||
-	    !req->param.control_flags.dynamic_force_link_num)
+	ml_nlink_get_curr_force_state(psoc, vdev, &curr_state);
+
+	switch (req->param.force_mode) {
+	case MLO_LINK_FORCE_MODE_ACTIVE:
+	case MLO_LINK_FORCE_MODE_INACTIVE:
+	case MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE:
+	case MLO_LINK_FORCE_MODE_ACTIVE_NUM:
+	case MLO_LINK_FORCE_MODE_NO_FORCE:
+		if (!curr_state.curr_dynamic_inactive_bitmap)
+			return;
+
+		force_inactive_num = curr_state.force_inactive_num;
+		force_inactive_num_bitmap =
+			curr_state.force_inactive_num_bitmap;
+		force_inactive_bitmap = curr_state.force_inactive_bitmap;
+		break;
+	case MLO_LINK_FORCE_MODE_INACTIVE_NUM:
+		if (!req->param.control_flags.dynamic_force_link_num) {
+			if (!curr_state.curr_dynamic_inactive_bitmap)
+				return;
+			dyn_inactive_links = 0;
+			dyn_num = 0;
+			goto update;
+		}
+
+		force_inactive_num = curr_state.force_inactive_num;
+		force_inactive_num_bitmap =
+			curr_state.force_inactive_num_bitmap;
+		force_inactive_bitmap = curr_state.force_inactive_bitmap;
+		break;
+	default:
 		return;
+	}
 
 	/* force inactive num "clear" case, return 0 - no
 	 * dynamic inactive links.
 	 */
-	if (!req->param.force_cmd.link_num) {
+	if (!force_inactive_num) {
 		dyn_inactive_links = 0;
 		dyn_num = 0;
 		goto update;
 	}
-	/* 1. If force inactive overlap with force num bitmap,
-	 * select the inactive link from overlapped links firstly.
-	 * 2. If selected inactive link num <
-	 * req->param.force_cmd.link_num, then select the inactive
-	 * links from current inactive links reported from FW.
-	 */
-	candidate_inactive_links =
-		req->param.force_cmd.ieee_link_id_bitmap &
-		resp->inactive_linkid_bitmap;
 
+	/* 1. If standby link is force inactive,
+	 * select the standby link as dynamic inactive link firstly.
+	 */
+	standby_links = ml_nlink_get_standby_link_bitmap(psoc, vdev);
+	candidate_inactive_links =
+		force_inactive_num_bitmap &
+		force_inactive_bitmap &
+		standby_links;
+	inactive_links = candidate_inactive_links;
 	num = ml_nlink_convert_link_bitmap_to_ids(candidate_inactive_links,
 						  QDF_ARRAY_SIZE(link_ids),
 						  link_ids);
-	if (num < req->param.force_cmd.link_num &&
+
+	/* 2. If non standby link is force inactive,
+	 *  select the non standby link as second option.
+	 */
+	if (num < force_inactive_num &&
 	    num < QDF_ARRAY_SIZE(link_ids)) {
 		candidate_inactive_links =
-			req->param.force_cmd.ieee_link_id_bitmap &
-			resp->curr_inactive_linkid_bitmap &
-			~candidate_inactive_links;
+			force_inactive_num_bitmap &
+			force_inactive_bitmap &
+			~inactive_links;
 		num += ml_nlink_convert_link_bitmap_to_ids(
 				candidate_inactive_links,
 				QDF_ARRAY_SIZE(link_ids) - num,
 				&link_ids[num]);
+		inactive_links |= candidate_inactive_links;
 	}
+
+	/* 3. If there are links inactive from fw event's
+	 * curr_inactive_linkid_bitmap, select the current inactive
+	 * links as third option. note: those link may not be force
+	 * inactive.
+	 */
+	if (num < force_inactive_num &&
+	    num < QDF_ARRAY_SIZE(link_ids)) {
+		candidate_inactive_links =
+			force_inactive_num_bitmap &
+			resp->curr_inactive_linkid_bitmap &
+			~inactive_links;
+		num += ml_nlink_convert_link_bitmap_to_ids(
+				candidate_inactive_links,
+				QDF_ARRAY_SIZE(link_ids) - num,
+				&link_ids[num]);
+		inactive_links |= candidate_inactive_links;
+	}
+
 	for (i = 0; i < num; i++) {
-		if (dyn_num >= req->param.force_cmd.link_num)
+		if (dyn_num >= force_inactive_num)
 			break;
 		dyn_inactive_links |= 1 << link_ids[i];
 		dyn_num++;
 	}
 
 update:
-	policy_mgr_debug("inactive link num %d bitmap 0x%x force inactive 0x%x dyn links 0x%x num %d",
-			 req->param.force_cmd.link_num,
-			 req->param.force_cmd.ieee_link_id_bitmap,
+	policy_mgr_debug("inactive link num %d bitmap 0x%x force inactive 0x%x curr 0x%x dyn links 0x%x num %d",
+			 force_inactive_num,
+			 force_inactive_num_bitmap,
 			 resp->inactive_linkid_bitmap,
+			 resp->curr_inactive_linkid_bitmap,
 			 dyn_inactive_links, dyn_num);
-	if (dyn_num < req->param.force_cmd.link_num)
-		policy_mgr_debug("unexpected selected dynamic inactive link num %d",
-				 dyn_num);
+
 	ml_nlink_set_dynamic_inactive_links(psoc, vdev, dyn_inactive_links);
 }
 
@@ -4512,6 +4584,9 @@ policy_mgr_handle_force_active_resp(struct wlan_objmgr_psoc *psoc,
 			req->param.control_flags.overwrite_force_active_bitmap ?
 			LINK_OVERWRITE : LINK_ADD);
 
+		policy_mgr_update_dynamic_inactive_bitmap(psoc, vdev, req,
+							  resp);
+
 		/* update vdev active inactive status */
 		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
 							    resp);
@@ -4545,6 +4620,9 @@ policy_mgr_handle_force_inactive_resp(struct wlan_objmgr_psoc *psoc,
 			req->param.control_flags.overwrite_force_inactive_bitmap ?
 			LINK_OVERWRITE : LINK_ADD);
 
+		policy_mgr_update_dynamic_inactive_bitmap(psoc, vdev, req,
+							  resp);
+
 		/* update vdev active inactive status */
 		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
 							    resp);
@@ -4577,6 +4655,9 @@ policy_mgr_handle_force_active_num_resp(struct wlan_objmgr_psoc *psoc,
 		ml_nlink_set_curr_force_active_num_state(
 			psoc, vdev, req->param.force_cmd.link_num,
 			req->param.force_cmd.ieee_link_id_bitmap);
+
+		policy_mgr_update_dynamic_inactive_bitmap(psoc, vdev, req,
+							  resp);
 
 		/* update vdev active inactive status */
 		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
@@ -4688,6 +4769,9 @@ policy_mgr_handle_force_active_inactive_resp(
 			req->param.control_flags.overwrite_force_inactive_bitmap ?
 			LINK_OVERWRITE : LINK_ADD);
 
+		policy_mgr_update_dynamic_inactive_bitmap(psoc, vdev, req,
+							  resp);
+
 		/* update vdev active inactive status */
 		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
 							    resp);
@@ -4742,6 +4826,8 @@ policy_mgr_handle_no_force_resp(struct wlan_objmgr_psoc *psoc,
 			ml_nlink_clr_force_state(psoc, vdev);
 		}
 
+		policy_mgr_update_dynamic_inactive_bitmap(psoc, vdev, req,
+							  resp);
 		/* update vdev active inactive status */
 		policy_mgr_handle_vdev_active_inactive_resp(psoc, vdev, req,
 							    resp);
@@ -6034,16 +6120,14 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 	}
 
-	if (ml_sta_is_not_connected)
+	if (ml_sta_is_not_connected) {
 		status = QDF_STATUS_E_FAILURE;
-	else if (reason == MLO_LINK_FORCE_REASON_LINK_REMOVAL) {
-		if (!ml_sta_is_link_removal)
-			status = QDF_STATUS_E_FAILURE;
-	} else {
+	} else if (reason != MLO_LINK_FORCE_REASON_LINK_REMOVAL) {
 		if (ml_sta_is_link_removal)
 			status = QDF_STATUS_E_FAILURE;
 	}
-	policy_mgr_debug("set link reason %d status %d", reason, status);
+	policy_mgr_debug("set link reason %d status %d rm %d", reason, status,
+			 ml_sta_is_link_removal);
 
 	return status;
 }
@@ -8141,6 +8225,77 @@ policy_mgr_pick_link_vdev_from_inactive_list(
 	/* Restore the connection info */
 	policy_mgr_restore_deleted_conn_info(psoc, info, num_del);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+}
+
+QDF_STATUS
+policy_mgr_handle_link_removal_on_standby(struct wlan_objmgr_vdev *vdev,
+					  struct ml_rv_info *reconfig_info)
+{
+	struct mlo_link_info *link_info;
+	uint8_t i, link_id;
+	uint32_t removal_link_bitmap = 0;
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!vdev || !vdev->mlo_dev_ctx) {
+		policy_mgr_err("invalid vdev or mlo_dev_ctx");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		policy_mgr_err("psoc is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < reconfig_info->num_links; i++) {
+		if (!(reconfig_info->link_info[i].is_ap_removal_timer_p &&
+		      reconfig_info->link_info[i].ap_removal_timer))
+			continue;
+
+		link_id = reconfig_info->link_info[i].link_id;
+		link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx,
+							   link_id);
+		if (!link_info) {
+			policy_mgr_err("link info null, id %d", link_id);
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+		policy_mgr_debug("AP removal tbtt %d vdev %d link %d flag 0x%x STA MAC " QDF_MAC_ADDR_FMT " BSSID " QDF_MAC_ADDR_FMT,
+				 reconfig_info->link_info[i].ap_removal_timer,
+				 link_info->vdev_id, link_id,
+				 (uint32_t)link_info->link_status_flags,
+				 QDF_MAC_ADDR_REF(link_info->link_addr.bytes),
+				 QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes));
+
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
+			continue;
+
+		if (link_info->vdev_id != WLAN_INVALID_VDEV_ID)
+			continue;
+
+		if (qdf_atomic_test_and_set_bit(LS_F_AP_REMOVAL_BIT,
+						&link_info->link_status_flags))
+			continue;
+
+		removal_link_bitmap |= 1 << link_id;
+	}
+	if (!removal_link_bitmap)
+		return QDF_STATUS_SUCCESS;
+
+	status = policy_mgr_mlo_sta_set_nlink(
+			psoc, wlan_vdev_get_id(vdev),
+			MLO_LINK_FORCE_REASON_LINK_REMOVAL,
+			MLO_LINK_FORCE_MODE_INACTIVE,
+			0,
+			removal_link_bitmap,
+			0,
+			0);
+	if (status == QDF_STATUS_E_PENDING)
+		status = QDF_STATUS_SUCCESS;
+	else
+		policy_mgr_err("status %d", status);
+
+	return status;
 }
 
 void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev)

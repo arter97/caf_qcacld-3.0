@@ -524,7 +524,7 @@ ml_nlink_get_standby_link_info(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
-static uint32_t
+uint32_t
 ml_nlink_get_standby_link_bitmap(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_objmgr_vdev *vdev)
 {

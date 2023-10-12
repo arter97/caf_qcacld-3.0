@@ -335,6 +335,17 @@ ml_nlink_clr_force_state(struct wlan_objmgr_psoc *psoc,
  * Return: true if supported
  */
 bool ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ml_nlink_get_standby_link_bitmap() - Get standby link info
+ * @psoc: psoc
+ * @vdev: vdev object
+ *
+ * Return: standby link bitmap
+ */
+uint32_t
+ml_nlink_get_standby_link_bitmap(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_objmgr_vdev *vdev);
 #else
 static inline QDF_STATUS
 ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
