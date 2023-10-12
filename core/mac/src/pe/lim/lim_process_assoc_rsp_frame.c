@@ -1684,6 +1684,13 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	lim_update_iot_aggr_sz(mac_ctx, ie, ie_len, session_entry);
 
 	lim_extract_ap_capabilities(mac_ctx, ie, ie_len, beacon);
+
+	if (session_entry->opmode == QDF_STA_MODE) {
+		lim_enable_cts_to_self_for_exempted_iot_ap(
+			mac_ctx, session_entry,
+			ie, ie_len);
+	}
+
 	lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp,
 				   session_entry, beacon);
 

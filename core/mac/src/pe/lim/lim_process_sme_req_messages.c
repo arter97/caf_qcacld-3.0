@@ -3098,6 +3098,28 @@ static void lim_reset_self_ocv_caps(struct pe_session *session)
 
 }
 
+bool lim_enable_cts_to_self_for_exempted_iot_ap(
+				       struct mac_context *mac_ctx,
+				       struct pe_session *session,
+				       uint8_t *ie_ptr,
+				       uint16_t ie_len)
+{
+	struct action_oui_search_attr vendor_ap_search_attr;
+
+	vendor_ap_search_attr.ie_data = ie_ptr;
+	vendor_ap_search_attr.ie_length = ie_len;
+
+	if (wlan_action_oui_search(mac_ctx->psoc, &vendor_ap_search_attr,
+				   ACTION_OUI_ENABLE_CTS2SELF)) {
+		pe_debug("vdev %d: enable cts to self", session->vdev_id);
+		wma_cli_set_command(session->vdev_id,
+				    wmi_vdev_param_enable_rtscts,
+				    FW_CTS2SELF_PROFILE, VDEV_CMD);
+		return true;
+	}
+	return false;
+}
+
 /**
  * lim_disable_bformee_for_iot_ap() - disable bformee for iot ap
  *@mac_ctx: mac context
