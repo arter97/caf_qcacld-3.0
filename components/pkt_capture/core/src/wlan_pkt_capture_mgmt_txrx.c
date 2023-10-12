@@ -741,7 +741,6 @@ pkt_capture_mgmt_rx_data_cb(struct wlan_objmgr_psoc *psoc,
 
 	/* Convert rate from Mbps to 500 Kbps */
 	txrx_status.rate = txrx_status.rate * 2;
-	txrx_status.add_rtap_ext = true;
 
 	wh = (struct ieee80211_frame *)qdf_nbuf_data(nbuf);
 	wh->i_fc[1] &= ~IEEE80211_FC1_WEP;

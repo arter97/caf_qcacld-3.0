@@ -957,9 +957,6 @@ pkt_capture_rx_data_cb(
 		/* need to update this to fill rx_status*/
 		htt_rx_mon_get_rx_status(pdev, rx_desc, &rx_status);
 		rx_status.chan_noise_floor = NORMALIZED_TO_NOISE_FLOOR;
-		rx_status.tx_status = status;
-		rx_status.tx_retry_cnt = tx_retry_cnt;
-		rx_status.add_rtap_ext = true;
 
 		/* clear IEEE80211_RADIOTAP_F_FCS flag*/
 		rx_status.rtap_flags &= ~(BIT(4));
@@ -1066,9 +1063,6 @@ pkt_capture_rx_data_cb(
 		/* need to update this to fill rx_status*/
 		pkt_capture_rx_mon_get_rx_status(vdev, psoc,
 						 rx_tlv_hdr, &rx_status);
-		rx_status.tx_status = status;
-		rx_status.tx_retry_cnt = tx_retry_cnt;
-		rx_status.add_rtap_ext = true;
 
 		/* clear IEEE80211_RADIOTAP_F_FCS flag*/
 		rx_status.rtap_flags &= ~(BIT(4));
