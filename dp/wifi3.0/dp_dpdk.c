@@ -351,4 +351,52 @@ int dp_cfgmgr_get_peer_info(struct cdp_soc_t *soc_hdl, uint8_t soc_id,
 	dp_soc_iterate_peer(soc, dp_cfgmgr_peer_info, &peer_info, DP_MOD_ID_CDP);
 	return 0;
 }
+
+int dp_cfgmgr_get_vdev_create_evt_info(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+				       struct dpdk_wlan_vdev_create_info *ev_buf)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+						     DP_MOD_ID_CDP);
+
+	if (!vdev) {
+		dp_cdp_err("%pK: Invalid vdev id %d", soc, vdev_id);
+		return 0;
+	}
+
+	ev_buf->vdev_id = vdev->vdev_id;
+	ev_buf->pdev_id = vdev->pdev->pdev_id;
+	ev_buf->lmac_id = vdev->lmac_id;
+	ev_buf->bank_id = vdev->bank_id;
+	ev_buf->opmode = vdev->opmode;
+	qdf_mem_copy(ev_buf->mac_addr, vdev->mac_addr.raw,
+		     QDF_MAC_ADDR_SIZE);
+	ev_buf->mesh_vdev = vdev->mesh_vdev;
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+	return 0;
+}
+
+int dp_cfgmgr_get_peer_create_evt_info(struct cdp_soc_t *soc_hdl, uint16_t peer_id,
+				       struct dpdk_wlan_peer_create_info *ev_buf)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct dp_peer *peer;
+
+	peer = dp_peer_get_ref_by_id((struct dp_soc *)soc,
+				     (uint16_t)peer_id,
+				     DP_MOD_ID_CDP);
+
+	if (!peer)
+		return 0;
+
+	ev_buf->peer_id = peer->peer_id;
+	ev_buf->vdev_id = peer->vdev->vdev_id;
+	qdf_mem_copy(ev_buf->mac_addr, peer->mac_addr.raw,
+		     QDF_MAC_ADDR_SIZE);
+	ev_buf->ast_idx = peer->ast_idx;
+	ev_buf->ast_hash = peer->ast_hash;
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+	return 0;
+}
 #endif

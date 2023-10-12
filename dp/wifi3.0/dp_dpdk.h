@@ -75,5 +75,27 @@ int dp_cfgmgr_get_vdev_info(struct cdp_soc_t *soc_hdl, uint8_t soc_id,
  */
 int dp_cfgmgr_get_peer_info(struct cdp_soc_t *soc_hdl, uint8_t soc_id,
 			    struct dpdk_wlan_peer_info *ev_buf);
+
+/*
+ * dp_cfgmgr_get_vdev_create_evt_info - get vdev create info of a soc for dpdk
+ * @soc: soc handle
+ * @vdev_id: vdev id
+ * @ev_buf: pointer to fill vdev info
+ *
+ * Return: 0 if info filled successful, error otherwise
+ */
+int dp_cfgmgr_get_vdev_create_evt_info(struct cdp_soc_t *soc, uint8_t vdev_id,
+				       struct dpdk_wlan_vdev_create_info *ev_buf);
+
+/*
+ * dp_cfgmgr_get_peer_create_evt_info - get peer create info of a soc for dpdk
+ * @soc: soc handle
+ * @peer_id: peer id
+ * @ev_buf: pointer to fill peer info
+ *
+ * Return: 0 if info filled successful, error otherwise
+ */
+int dp_cfgmgr_get_peer_create_evt_info(struct cdp_soc_t *soc, uint16_t peer_id,
+				       struct dpdk_wlan_peer_create_info *ev_buf);
 #endif /* WLAN_SUPPORT_DPDK */
 #endif /* _DP_DPDK_H_ */
