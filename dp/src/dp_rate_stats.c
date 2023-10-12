@@ -1020,13 +1020,13 @@ static inline void
 __wlan_peer_update_tx_rate_stats(struct wlan_tx_rate_stats *__tx_stats,
 				 struct cdp_tx_completion_ppdu_user *ppdu_user)
 {
-	uint8_t num_ppdus;
-	uint8_t mpdu_attempts;
-	uint8_t mpdu_success;
+	uint32_t num_ppdus;
+	uint32_t mpdu_attempts;
+	uint32_t mpdu_success;
 
-	num_ppdus = ppdu_user->long_retries + 1;
-	mpdu_attempts = num_ppdus * ppdu_user->mpdu_tried_ucast;
-	mpdu_success = ppdu_user->mpdu_tried_ucast - ppdu_user->mpdu_failed;
+	num_ppdus = (uint32_t)ppdu_user->long_retries + 1;
+	mpdu_attempts = num_ppdus * (uint32_t)ppdu_user->mpdu_tried_ucast;
+	mpdu_success = (uint32_t)ppdu_user->mpdu_tried_ucast - (uint32_t)ppdu_user->mpdu_failed;
 	if (ppdu_user->rix == -1) {
 		__tx_stats->ratecode = ppdu_user->rix;
 	} else {
