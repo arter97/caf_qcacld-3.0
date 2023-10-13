@@ -92,6 +92,10 @@
 #include <target_if_spatial_reuse.h>
 #include "wlan_nan_api_i.h"
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#include <wmi_unified_11be_api.h>
+#endif
+
 /* Max debug string size for WMM in bytes */
 #define WMA_WMM_DEBUG_STRING_SIZE    512
 
@@ -4026,6 +4030,52 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 	return 0;
 }
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * wma_mgmt_mlo_rx_process() - process management rx mlo tlv.
+ * @handle: wma handle
+ * @data: rx data
+ * @data_len: data length
+ *
+ * Return: 0 for success or error code
+ */
+static int
+wma_mlo_link_info_sync_rx_process(void *handle, uint8_t *data,
+				  uint32_t data_len)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	struct mgmt_mlo_link_info_sync_params *mgmt_mlo_rx_params;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (wma_validate_handle(wma_handle))
+		return -EINVAL;
+
+	mgmt_mlo_rx_params = qdf_mem_malloc(sizeof(*mgmt_mlo_rx_params));
+	if (!mgmt_mlo_rx_params)
+		return -ENOMEM;
+
+	psoc = (struct wlan_objmgr_psoc *)wma_handle->psoc;
+	if (!psoc) {
+		wma_err("psoc ctx is NULL");
+		qdf_mem_free(mgmt_mlo_rx_params);
+		return -EINVAL;
+	}
+
+	if (wmi_extract_mgmt_rx_ml_cu_params(wma_handle->wmi_handle,
+					     data,
+					     &mgmt_mlo_rx_params->cu_params)) {
+		wma_debug("Failed to extract CU Params");
+		qdf_mem_free(mgmt_mlo_rx_params);
+		return -EINVAL;
+	}
+
+	lim_update_cuflag_bpcc_each_link(&mgmt_mlo_rx_params->cu_params);
+
+	qdf_mem_free(mgmt_mlo_rx_params);
+	return 0;
+}
+#endif
+
 /**
  * wma_de_register_mgmt_frm_client() - deregister management frame
  *
@@ -4052,6 +4102,14 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void)
 		wma_err("Failed to Unregister rx mgmt handler with wmi");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+	if (wmi_unified_unregister_event_handler(wma_handle->wmi_handle,
+						 wmi_mlo_link_info_sync_event_id) != 0) {
+		wma_err("Failed to Unregister rx mgmt mlo handler");
+		return QDF_STATUS_E_FAILURE;
+	}
+#endif
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -4117,7 +4175,16 @@ QDF_STATUS wma_register_mgmt_frm_client(void)
 		wma_err("Failed to register rx mgmt handler with wmi");
 		return QDF_STATUS_E_FAILURE;
 	}
-
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+	/* this event will be delivered before mgmt rx event */
+	if (wmi_unified_register_event_handler(wma_handle->wmi_handle,
+					       wmi_mlo_link_info_sync_event_id,
+					       wma_mlo_link_info_sync_rx_process,
+					       WMA_RX_WORK_CTX) != 0) {
+		wma_err("Failed to register rx mgmt mlo handler with wmi");
+		return QDF_STATUS_E_FAILURE;
+	}
+#endif
 	return QDF_STATUS_SUCCESS;
 }
 
