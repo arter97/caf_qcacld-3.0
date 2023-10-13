@@ -1026,6 +1026,11 @@ exit:
 #ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
 bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 {
+	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL)) {
+		tdls_debug("eMLSR STA present. Don't allow TDLS");
+		return false;
+	}
+
 	if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
 					   WLAN_TDLS_CONCURRENCIES_SUPPORT)) {
 		tdls_debug("fw cap is not advertised");

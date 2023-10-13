@@ -37,6 +37,7 @@
  * @ml_nlink_ap_started_evt: SAP/GO bss started
  * @ml_nlink_ap_stopped_evt: SAP/GO bss stopped
  * @ml_nlink_connection_updated_evt: connection home channel changed
+ * @ml_nlink_tdls_request_evt: tdls request link enable/disable
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
@@ -50,12 +51,14 @@ enum ml_nlink_change_event_type {
 	ml_nlink_ap_started_evt,
 	ml_nlink_ap_stopped_evt,
 	ml_nlink_connection_updated_evt,
+	ml_nlink_tdls_request_evt,
 };
 
 /**
  * struct ml_nlink_change_event - connection change event data struct
  * @evt: event parameters
  * @link_switch: link switch start parameters
+ * @tdls: tdls parameters
  */
 struct ml_nlink_change_event {
 	union {
@@ -65,6 +68,13 @@ struct ml_nlink_change_event {
 			uint32_t new_primary_freq;
 			enum wlan_mlo_link_switch_reason reason;
 		} link_switch;
+		struct {
+			uint32_t link_bitmap;
+			uint8_t vdev_count;
+			uint8_t mlo_vdev_lst[WLAN_UMAC_MLO_MAX_VDEVS];
+			enum mlo_link_force_mode mode;
+			enum mlo_link_force_reason reason;
+		} tdls;
 	} evt;
 };
 
@@ -108,6 +118,7 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_ap_started_evt);
 	CASE_RETURN_STRING(ml_nlink_ap_stopped_evt);
 	CASE_RETURN_STRING(ml_nlink_connection_updated_evt);
+	CASE_RETURN_STRING(ml_nlink_tdls_request_evt);
 	default:
 		return "Unknown";
 	}

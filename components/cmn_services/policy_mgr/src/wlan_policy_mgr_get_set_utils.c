@@ -6356,8 +6356,7 @@ policy_mgr_mlo_sta_set_link_ext(struct wlan_objmgr_psoc *psoc,
 		req->param.link_num[0].num_of_link = num_mlo_vdev - 1;
 	}
 
-	if (ml_is_nlink_service_supported(psoc) &&
-	    reason != MLO_LINK_FORCE_REASON_TDLS) {
+	if (ml_is_nlink_service_supported(psoc)) {
 		status =
 		policy_mgr_mlo_sta_set_link_by_linkid(psoc, vdev, reason,
 						      mode,
