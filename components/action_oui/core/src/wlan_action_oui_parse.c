@@ -172,8 +172,8 @@ validate_and_convert_data_length(uint8_t *token,
 	}
 
 	if ((uint32_t)len > ACTION_OUI_MAX_DATA_LENGTH) {
-		action_oui_err("action OUI data len is more than %u",
-			ACTION_OUI_MAX_DATA_LENGTH);
+		action_oui_err("action OUI data len %d is more than %u",
+			       len, ACTION_OUI_MAX_DATA_LENGTH);
 		return false;
 	}
 
