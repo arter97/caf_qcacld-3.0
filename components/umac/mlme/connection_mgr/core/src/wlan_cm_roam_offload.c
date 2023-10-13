@@ -6216,7 +6216,6 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	uint32_t *chan_freq = NULL;
 	uint8_t count = 0, status, num_chan;
 	uint32_t band_capability = 0, band_mask = 0;
-	bool is_full_scan;
 	struct wlan_diag_roam_scan_done *wlan_diag_event = NULL;
 
 	wlan_diag_event = qdf_mem_malloc(sizeof(*wlan_diag_event));
@@ -6245,9 +6244,7 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	if (scan->num_ap)
 		wlan_diag_event->cand_ap_count = scan->num_ap - 1;
 
-	is_full_scan = scan->type && scan->present;
-
-	if (is_full_scan) {
+	if (scan->type == ROAM_STATS_SCAN_TYPE_FULL && scan->present) {
 		status = mlme_get_fw_scan_channels(psoc, chan_freq, &num_chan);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto out;
