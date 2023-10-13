@@ -597,6 +597,7 @@ struct wlan_diag_roam_scan_done {
  * @diag_cmn: Common diag info
  * @version: Structure Version
  * @is_roam_successful: True if roamed successfully or false if roaming failed
+ * @is_mlo: Indicates whether the current connection is a MLO connection
  * @reserved: Reserved
  * @roam_fail_reason: Roam failure reason code defined in enum
  * wlan_roam_failure_reason_code
@@ -605,7 +606,8 @@ struct wlan_diag_roam_result {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint8_t version;
 	uint8_t is_roam_successful:1;
-	uint8_t reserved:7;
+	uint8_t is_mlo:1;
+	uint8_t reserved:6;
 	uint16_t roam_fail_reason;
 } qdf_packed;
 

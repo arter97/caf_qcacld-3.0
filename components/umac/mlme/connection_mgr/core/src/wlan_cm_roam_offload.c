@@ -50,7 +50,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
-
+#include "wlan_mlo_mgr_sta.h"
 
 #ifdef WLAN_FEATURE_SAE
 #define CM_IS_FW_FT_SAE_SUPPORTED(fw_akm_bitmap) \
@@ -6397,6 +6397,58 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 #define WLAN_ROAM_SCAN_TYPE_PARTIAL_SCAN 0
 #define WLAN_ROAM_SCAN_TYPE_FULL_SCAN 1
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+cm_populate_roam_success_mlo_param(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_diag_roam_result *event,
+				   uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_vdev *assoc_vdev = NULL;
+	struct qdf_mac_addr bss_peer;
+	QDF_STATUS status;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev: %d not found", vdev_id);
+		return;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		goto out;
+
+	event->is_mlo = true;
+
+	assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+	if (!assoc_vdev) {
+		mlme_err("assoc vdev not found");
+		goto out;
+	}
+
+	status = wlan_vdev_get_bss_peer_mac(assoc_vdev,
+					    &bss_peer);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("vdev: %d bss peer not found",
+			 wlan_vdev_get_id(assoc_vdev));
+		goto out;
+	}
+
+	qdf_mem_copy(event->diag_cmn.bssid,
+		     bss_peer.bytes, QDF_MAC_ADDR_SIZE);
+
+out:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+}
+#else
+static void
+cm_populate_roam_success_mlo_param(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_diag_roam_result *event,
+				   uint8_t vdev_id)
+{
+}
+#endif
+
 void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_trigger_info *trigger,
 			       struct wmi_roam_result *res,
@@ -6468,6 +6520,10 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			     QDF_MAC_ADDR_SIZE);
 	}
 
+	if (!wlan_diag_event.is_roam_successful)
+		cm_populate_roam_success_mlo_param(psoc, &wlan_diag_event,
+						   vdev_id);
+
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_ROAM_RESULT);
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
@@ -6485,6 +6541,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 				       trigger->trigger_reason,
 				       wlan_diag_event.is_roam_successful,
 				       is_full_scan, res->fail_reason);
+
 }
 
 #endif
