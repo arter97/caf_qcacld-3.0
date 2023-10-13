@@ -928,7 +928,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		}
 	}
 
-	if (session->vhtCapability || session->gLimOperatingMode.present) {
+	if (session->vhtCapability && session->gLimOperatingMode.present) {
 		populate_dot11f_operating_mode(mac_ctx, &bcn_2->OperatingMode,
 					       session);
 		lim_strip_ie(mac_ctx, addn_ie, &addn_ielen,
