@@ -1745,31 +1745,33 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 #endif
 	lim_update_stads_ext_cap(mac_ctx, session_entry, assoc_rsp, sta_ds);
 	/* Update the BSS Entry, this entry was added during preassoc. */
-	if (QDF_STATUS_SUCCESS == lim_sta_send_add_bss(mac_ctx, assoc_rsp,
-			beacon,
-			&session_entry->lim_join_req->bssDescription, true,
-			 session_entry)) {
+	if (QDF_STATUS_SUCCESS ==
+	    lim_sta_send_add_bss(mac_ctx, assoc_rsp, beacon,
+				 &session_entry->lim_join_req->bssDescription,
+				 true, session_entry)) {
 		clean_up_ft_sha384(assoc_rsp, sha384_akm);
 		if (session_entry->limAssocResponseData != assoc_rsp)
 			qdf_mem_free(assoc_rsp);
+
 		qdf_mem_free(beacon);
+
 		return;
-	} else {
-		pe_err("could not update the bss entry");
-		assoc_cnf.resultCode = eSIR_SME_RESOURCES_UNAVAILABLE;
-		assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
 	}
 
+	pe_err("vdev:%d could not update the bss entry",
+	       session_entry->vdev_id);
+	assoc_cnf.resultCode = eSIR_SME_RESOURCES_UNAVAILABLE;
+	assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
+
 assocReject:
-	if ((subtype == LIM_ASSOC)
-		|| ((subtype == LIM_REASSOC)
-		&& (session_entry->limMlmState ==
-		    eLIM_MLM_WT_FT_REASSOC_RSP_STATE))) {
+	if (subtype == LIM_ASSOC ||
+	    (subtype == LIM_REASSOC &&
+	     session_entry->limMlmState == eLIM_MLM_WT_FT_REASSOC_RSP_STATE)) {
 		pe_err("Assoc Rejected by the peer mlmestate: %d sessionid: %d Reason: %d MACADDR:"
-			QDF_MAC_ADDR_FMT,
-			session_entry->limMlmState,
-			session_entry->peSessionId,
-			assoc_cnf.resultCode, QDF_MAC_ADDR_REF(hdr->sa));
+			QDF_MAC_ADDR_FMT, session_entry->limMlmState,
+			session_entry->peSessionId, assoc_cnf.resultCode,
+			QDF_MAC_ADDR_REF(hdr->sa));
+
 		session_entry->limMlmState = eLIM_MLM_IDLE_STATE;
 		MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
 			session_entry->peSessionId,
@@ -1778,6 +1780,7 @@ assocReject:
 			qdf_mem_free(session_entry->pLimMlmJoinReq);
 			session_entry->pLimMlmJoinReq = NULL;
 		}
+
 		if (subtype == LIM_ASSOC) {
 			lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
 				(uint32_t *) &assoc_cnf);
@@ -1797,5 +1800,6 @@ assocReject:
 	qdf_mem_free(assoc_rsp->sha384_ft_subelem.gtk);
 	qdf_mem_free(assoc_rsp->sha384_ft_subelem.igtk);
 	qdf_mem_free(assoc_rsp);
+
 	return;
 }

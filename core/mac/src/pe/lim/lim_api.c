@@ -3589,6 +3589,10 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 	}
 
 	pe_join_req = pe_session->lim_join_req;
+
+	mlo_roam_copy_partner_info(&pe_join_req->partner_info,
+				   sync_ind, vdev_id, false);
+
 	bss_desc = &pe_session->lim_join_req->bssDescription;
 
 	status = lim_roam_fill_bss_descr(mac_ctx, sync_ind, bss_desc,

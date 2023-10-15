@@ -3752,28 +3752,32 @@ sir_convert_assoc_resp_frame2_eht_struct(tDot11fAssocResponse *ar,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static QDF_STATUS
-sir_convert_assoc_resp_to_partner_mlo_struct(struct pe_session *session_entry,
-					     struct mlo_partner_info *partner_info,
-					     struct mlo_partner_info *ml_partner_info)
+sir_copy_assoc_rsp_partner_info_to_session(struct pe_session *session_entry,
+					   struct mlo_partner_info *partner_info)
 {
 	uint16_t i, partner_idx = 0, j, link_id;
 	struct mlo_link_info *link_info;
+	struct mlo_partner_info *ml_partner_info =
+			&session_entry->ml_partner_info;
 
 	link_info = mlo_mgr_get_ap_link(session_entry->vdev);
 	if (!link_info)
 		return QDF_STATUS_E_FAILURE;
 
+	/* Clear the Partner info already filled from the join request */
+	qdf_mem_zero(ml_partner_info, sizeof(*ml_partner_info));
 	for (i = 1; i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		link_id = link_info[i].link_id;
 		for (j = 0; j < partner_info->num_partner_links; j++) {
-			if (partner_info->partner_link_info[j].link_id == link_id) {
-				ml_partner_info->partner_link_info[partner_idx++] =
-							partner_info->partner_link_info[j];
-				break;
-			}
+			if (partner_info->partner_link_info[j].link_id !=
+			    link_id)
+				continue;
+
+			ml_partner_info->partner_link_info[partner_idx++] =
+					partner_info->partner_link_info[j];
+			break;
 		}
 	}
-
 	ml_partner_info->num_partner_links = partner_idx;
 
 	return QDF_STATUS_SUCCESS;
@@ -3799,80 +3803,85 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mlo_partner_info partner_info;
 
-	if (ar->mlo_ie.present) {
-		status = util_find_mlie(frame + WLAN_ASSOC_RSP_IES_OFFSET,
-					frame_len - WLAN_ASSOC_RSP_IES_OFFSET,
-					&ml_ie, &ml_ie_total_len);
-		if (QDF_IS_STATUS_SUCCESS(status)) {
-			ml_ie_info = &p_assoc_rsp->mlo_ie.mlo_ie;
-			util_get_bvmlie_persta_partner_info(ml_ie,
-					       ml_ie_total_len,
-					       &partner_info);
-			sir_convert_assoc_resp_to_partner_mlo_struct(session_entry,
-								     &partner_info,
-								     &session_entry->ml_partner_info);
-			if (!wlan_cm_is_roam_sync_in_progress(mac->psoc, session_entry->vdev_id)) {
-				session_entry->ml_partner_info.num_partner_links =
-				QDF_MIN(
-				session_entry->ml_partner_info.num_partner_links,
-				session_entry->lim_join_req->partner_info.num_partner_links);
-			}
-			util_get_bvmlie_mldmacaddr(ml_ie, ml_ie_total_len,
-						   &mld_mac_addr);
-			qdf_mem_copy(ml_ie_info->mld_mac_addr,
-				     mld_mac_addr.bytes, QDF_MAC_ADDR_SIZE);
+	if (ar->mlo_ie.present)
+		return status;
 
-			util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
-					       &ml_ie_info->common_info_length);
+	status = util_find_mlie(frame + WLAN_ASSOC_RSP_IES_OFFSET,
+				frame_len - WLAN_ASSOC_RSP_IES_OFFSET,
+				&ml_ie, &ml_ie_total_len);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
-			util_get_bvmlie_primary_linkid(ml_ie, ml_ie_total_len,
-						       &link_id_found,
-						       &link_id);
-			util_get_bvmlie_msd_cap(ml_ie, ml_ie_total_len,
-						&msd_cap_found, &msd_cap);
-			if (msd_cap_found) {
-				ml_ie_info->medium_sync_delay_info_present =
-								msd_cap_found;
-				ml_ie_info->medium_sync_delay_info.medium_sync_duration =
-				  QDF_GET_BITS(
-				     msd_cap,
-				     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_DURATION_IDX,
-				     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_DURATION_BITS);
-				ml_ie_info->medium_sync_delay_info.medium_sync_ofdm_ed_thresh =
-				  QDF_GET_BITS(
-				     msd_cap,
-				     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_OFDMEDTHRESH_IDX,
-				     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_OFDMEDTHRESH_BITS);
-				ml_ie_info->medium_sync_delay_info.medium_sync_max_txop_num =
-				  QDF_GET_BITS(
-				     msd_cap,
-				     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_MAXTXOPS_IDX,
-				     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_MAXTXOPS_BITS);
-			}
-			util_get_bvmlie_eml_cap(ml_ie, ml_ie_total_len,
-						&eml_cap_found, &eml_cap);
-			if (eml_cap_found) {
-				ml_ie_info->eml_capab_present = eml_cap_found;
-				ml_ie_info->eml_capabilities_info.emlsr_support =
-				  QDF_GET_BITS(eml_cap,
+	ml_ie_info = &p_assoc_rsp->mlo_ie.mlo_ie;
+	util_get_bvmlie_persta_partner_info(ml_ie, ml_ie_total_len,
+					    &partner_info);
+
+	sir_copy_assoc_rsp_partner_info_to_session(session_entry,
+						   &partner_info);
+
+	if (!wlan_cm_is_roam_sync_in_progress(mac->psoc,
+					      session_entry->vdev_id)) {
+		session_entry->ml_partner_info.num_partner_links =
+		QDF_MIN(
+		session_entry->ml_partner_info.num_partner_links,
+		session_entry->lim_join_req->partner_info.num_partner_links);
+	}
+	util_get_bvmlie_mldmacaddr(ml_ie, ml_ie_total_len,
+				   &mld_mac_addr);
+	qdf_mem_copy(ml_ie_info->mld_mac_addr,
+		     mld_mac_addr.bytes, QDF_MAC_ADDR_SIZE);
+
+	util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
+				      &ml_ie_info->common_info_length);
+
+	util_get_bvmlie_primary_linkid(ml_ie, ml_ie_total_len,
+				       &link_id_found, &link_id);
+	util_get_bvmlie_msd_cap(ml_ie, ml_ie_total_len,
+				&msd_cap_found, &msd_cap);
+	if (msd_cap_found) {
+		ml_ie_info->medium_sync_delay_info_present =
+						msd_cap_found;
+		ml_ie_info->medium_sync_delay_info.medium_sync_duration =
+		  QDF_GET_BITS(
+		     msd_cap,
+		     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_DURATION_IDX,
+		     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_DURATION_BITS);
+		ml_ie_info->medium_sync_delay_info.medium_sync_ofdm_ed_thresh =
+		  QDF_GET_BITS(
+		     msd_cap,
+		     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_OFDMEDTHRESH_IDX,
+		     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_OFDMEDTHRESH_BITS);
+		ml_ie_info->medium_sync_delay_info.medium_sync_max_txop_num =
+		  QDF_GET_BITS(
+		     msd_cap,
+		     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_MAXTXOPS_IDX,
+		     WLAN_ML_BV_CINFO_MEDMSYNCDELAYINFO_MAXTXOPS_BITS);
+	}
+	util_get_bvmlie_eml_cap(ml_ie, ml_ie_total_len,
+				&eml_cap_found, &eml_cap);
+	if (eml_cap_found) {
+		ml_ie_info->eml_capab_present = eml_cap_found;
+		ml_ie_info->eml_capabilities_info.emlsr_support =
+			QDF_GET_BITS(eml_cap,
 				     WLAN_ML_BV_CINFO_EMLCAP_EMLSRSUPPORT_IDX,
 				     WLAN_ML_BV_CINFO_EMLCAP_EMLSRSUPPORT_BITS);
-				ml_ie_info->eml_capabilities_info.transition_timeout =
-				  QDF_GET_BITS(eml_cap,
+
+		ml_ie_info->eml_capabilities_info.transition_timeout =
+			QDF_GET_BITS(eml_cap,
 				     WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_IDX,
 				     WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_BITS);
-			}
-
-			ml_ie_info->num_sta_profile =
-			      session_entry->ml_partner_info.num_partner_links;
-			ml_ie_info->link_id_info_present = link_id_found;
-			ml_ie_info->link_id = link_id;
-			pe_debug("Partner link count: %d, Link id: %d, MLD mac addr: " QDF_MAC_ADDR_FMT,
-				 ml_ie_info->num_sta_profile,
-				 ml_ie_info->link_id,
-				 QDF_MAC_ADDR_REF(ml_ie_info->mld_mac_addr));
-		}
 	}
+
+	ml_ie_info->num_sta_profile =
+			session_entry->ml_partner_info.num_partner_links;
+	ml_ie_info->link_id_info_present = link_id_found;
+	ml_ie_info->link_id = link_id;
+
+	pe_debug("vdev:%d Partner link count: %d, Link id: %d, MLD mac addr: " QDF_MAC_ADDR_FMT,
+		 session_entry->vdev_id,
+		 ml_ie_info->num_sta_profile, ml_ie_info->link_id,
+		 QDF_MAC_ADDR_REF(ml_ie_info->mld_mac_addr));
+
 	return status;
 }
 

@@ -9381,7 +9381,7 @@ void lim_extract_ml_info(struct pe_session *session,
 	ml_link->link_id = wlan_vdev_get_link_id(session->vdev);
 
 	ml_link->rec_max_simultaneous_links =
-	session->vdev->mlo_dev_ctx->mlo_max_recom_simult_links;
+		session->vdev->mlo_dev_ctx->mlo_max_recom_simult_links;
 
 	link_info = mlo_mgr_get_ap_link_by_link_id(session->vdev->mlo_dev_ctx,
 						   ml_link->link_id);
@@ -9408,6 +9408,7 @@ void lim_extract_ml_info(struct pe_session *session,
 
 		ml_link->partner_info[partner_idx].vdev_id = link_info->vdev_id;
 		ml_link->partner_info[partner_idx].link_id = link_info->link_id;
+
 		qdf_mem_copy(&ml_link->partner_info[partner_idx].channel_info,
 			     link_info->link_chan_info,
 			     sizeof(ml_link->partner_info[partner_idx].channel_info));
@@ -9420,7 +9421,8 @@ void lim_extract_ml_info(struct pe_session *session,
 	}
 
 	ml_link->num_links = partner_idx;
-	pe_debug("Num of partner links: %d", ml_link->num_links);
+	pe_debug("vdev:%d Num of partner links: %d", session->vdev_id,
+		 ml_link->num_links);
 }
 
 void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,
