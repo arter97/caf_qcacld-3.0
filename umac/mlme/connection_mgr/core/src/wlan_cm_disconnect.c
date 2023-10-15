@@ -348,7 +348,7 @@ cm_update_scan_mlme_on_disconnect(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_pdev *pdev;
 	struct bss_info bss_info;
-	struct mlme_info mlme;
+	struct mlme_info mlme = {0};
 	struct wlan_channel *chan;
 	QDF_STATUS status;
 
