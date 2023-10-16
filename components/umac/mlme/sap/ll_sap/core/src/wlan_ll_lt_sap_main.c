@@ -162,31 +162,40 @@ QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev)
 static
 void ll_lt_sap_update_mac_freq(struct wlan_ll_lt_sap_mac_freq *freq_list,
 			       qdf_freq_t sbs_cut_off_freq,
-			       qdf_freq_t given_freq)
+			       qdf_freq_t given_freq, uint32_t given_weight)
 {
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(given_freq) &&
 	    ((sbs_cut_off_freq && given_freq < sbs_cut_off_freq) ||
 	    !sbs_cut_off_freq) && !freq_list->freq_5GHz_low) {
 		freq_list->freq_5GHz_low = given_freq;
+		freq_list->weight_5GHz_low = given_weight;
+
 		/*
 		 * Update same freq in 5GHz high freq if sbs_cut_off_freq
 		 * is not present
 		 */
-		if (!sbs_cut_off_freq)
+		if (!sbs_cut_off_freq) {
 			freq_list->freq_5GHz_high = given_freq;
+			freq_list->weight_5GHz_high = given_weight;
+		}
 	} else if (WLAN_REG_IS_5GHZ_CH_FREQ(given_freq) &&
 		   ((sbs_cut_off_freq && given_freq > sbs_cut_off_freq) ||
 		   !sbs_cut_off_freq) && !freq_list->freq_5GHz_high) {
 			freq_list->freq_5GHz_high = given_freq;
+			freq_list->weight_5GHz_high = given_weight;
+
 		/*
 		 * Update same freq for 5GHz low freq if sbs_cut_off_freq
 		 * is not present
 		 */
-		if (!sbs_cut_off_freq)
+		if (!sbs_cut_off_freq) {
 			freq_list->freq_5GHz_low = given_freq;
+			freq_list->weight_5GHz_low = given_weight;
+		}
 	} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(given_freq) &&
 		   !freq_list->freq_6GHz) {
 		freq_list->freq_6GHz = given_freq;
+		freq_list->weight_6GHz = given_weight;
 	}
 }
 
@@ -204,6 +213,7 @@ void ll_lt_sap_update_freq_list(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t freq, sbs_cut_off_freq;
 	qdf_freq_t same_mac_freq, standalone_mac_freq;
 	uint8_t i = 0, count;
+	uint32_t weight;
 	enum policy_mgr_con_mode con_mode = PM_MAX_NUM_OF_MODE;
 
 	sbs_cut_off_freq = policy_mgr_get_sbs_cut_off_freq(psoc);
@@ -213,6 +223,7 @@ void ll_lt_sap_update_freq_list(struct wlan_objmgr_psoc *psoc,
 			continue;
 
 		freq = ch_param->ch_info[i].chan_freq;
+		weight = ch_param->ch_info[i].weight;
 
 		/*
 		 * Do not select same channel where LL_LT_SAP was
@@ -230,8 +241,10 @@ void ll_lt_sap_update_freq_list(struct wlan_objmgr_psoc *psoc,
 		 * This will be used if there is no valid freq present
 		 * within threshold value or no concurrency present
 		 */
-		if (!freq_list->best_freq)
+		if (!freq_list->best_freq) {
 			freq_list->best_freq = freq;
+			freq_list->weight_best_freq = weight;
+		}
 
 		if (!connection_count)
 			break;
@@ -243,7 +256,7 @@ void ll_lt_sap_update_freq_list(struct wlan_objmgr_psoc *psoc,
 		 * to get the best channel compartively and avoid multiple
 		 * times of channel switch.
 		 */
-		if (ch_param->ch_info[i].weight > CHANNEL_WEIGHT_THRESHOLD_VALUE)
+		if (weight > CHANNEL_WEIGHT_THRESHOLD_VALUE)
 			continue;
 
 		same_mac_freq = 0;
@@ -319,11 +332,13 @@ void ll_lt_sap_update_freq_list(struct wlan_objmgr_psoc *psoc,
 		if (same_mac_freq)
 			ll_lt_sap_update_mac_freq(&freq_list->shared_mac,
 						  sbs_cut_off_freq,
-						  same_mac_freq);
+						  same_mac_freq,
+						  weight);
 		else if (standalone_mac_freq)
 			ll_lt_sap_update_mac_freq(&freq_list->standalone_mac,
 						  sbs_cut_off_freq,
-						  standalone_mac_freq);
+						  standalone_mac_freq,
+						  weight);
 
 		if (freq_list->shared_mac.freq_5GHz_low &&
 		    freq_list->shared_mac.freq_5GHz_high &&
@@ -334,14 +349,21 @@ void ll_lt_sap_update_freq_list(struct wlan_objmgr_psoc *psoc,
 			break;
 	}
 
-	ll_sap_debug("vdev %d, best %d Shared: low %d high %d 6Ghz %d, Standalone: low %d high %d 6Ghz %d, prev %d, existing connection cnt %d",
+	ll_sap_debug("vdev %d, best %d[%d] Shared: low %d[%d] high %d[%d] 6Ghz %d[%d], Standalone: low %d[%d] high %d[%d] 6Ghz %d[%d], prev %d, existing connection cnt %d",
 		     vdev_id, freq_list->best_freq,
+		     freq_list->weight_best_freq,
 		     freq_list->shared_mac.freq_5GHz_low,
+		     freq_list->shared_mac.weight_5GHz_low,
 		     freq_list->shared_mac.freq_5GHz_high,
+		     freq_list->shared_mac.weight_5GHz_high,
 		     freq_list->shared_mac.freq_6GHz,
+		     freq_list->shared_mac.weight_6GHz,
 		     freq_list->standalone_mac.freq_5GHz_low,
+		     freq_list->standalone_mac.weight_5GHz_low,
 		     freq_list->standalone_mac.freq_5GHz_high,
+		     freq_list->standalone_mac.weight_5GHz_high,
 		     freq_list->standalone_mac.freq_6GHz,
+		     freq_list->standalone_mac.weight_6GHz,
 		     freq_list->prev_freq, connection_count);
 }
 

@@ -73,11 +73,17 @@ enum bearer_switch_req_source {
  * @freq_5GHz_low: Low 5GHz frequency
  * @freq_5GHz_high: High 5GHz frequency
  * @freq_6GHz: 6GHz frequency
+ * @weight_5GHz_low: Weight of 5GHz low frequency
+ * @weight_5GHz_high: Weight of 5GHz high frequency
+ * @weight_6GHz: Weight of 6GHz frequency
  */
 struct wlan_ll_lt_sap_mac_freq {
 	qdf_freq_t freq_5GHz_low;
 	qdf_freq_t freq_5GHz_high;
 	qdf_freq_t freq_6GHz;
+	uint32_t weight_5GHz_low;
+	uint32_t weight_5GHz_high;
+	uint32_t weight_6GHz;
 };
 
 /**
@@ -91,12 +97,14 @@ struct wlan_ll_lt_sap_mac_freq {
  * @prev_freq: Previous/current freq on which LL_LT_SAP is present.
  * This will be use to avoid SCC channel selection while updating this
  * list. This freq should be filled by user.
+ * @weight_best_freq: Weight of best frequency
  */
 struct wlan_ll_lt_sap_freq_list {
 	struct wlan_ll_lt_sap_mac_freq standalone_mac;
 	struct wlan_ll_lt_sap_mac_freq shared_mac;
 	qdf_freq_t best_freq;
 	qdf_freq_t prev_freq;
+	uint32_t weight_best_freq;
 };
 
 /**
