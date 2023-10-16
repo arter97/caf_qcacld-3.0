@@ -30,7 +30,6 @@
 #include <wlan_objmgr_pdev_obj.h>
 #include <wlan_dfs_ioctl.h>
 #include <wlan_dfs_public_struct.h>
-#include <wlan_objmgr_vdev_obj.h>
 
 /**
  * struct dfs_to_mlme - These are MLME function pointer used by DFS component.
@@ -79,7 +78,6 @@
  * @mlme_proc_spoof_success:           Called when FW send spoof success event.
  * @mlme_set_tx_flag:                  Called when Radar is detected to
  *                                     indicate stop data traffic.
- * @mlme_send_dfs_cfg_event:           Send dfs events to user space.
  */
 struct dfs_to_mlme {
 	QDF_STATUS (*pdev_component_obj_attach)(struct wlan_objmgr_pdev *pdev,
@@ -217,11 +215,6 @@ struct dfs_to_mlme {
 #endif
 	QDF_STATUS (*mlme_set_tx_flag)(struct wlan_objmgr_pdev *pdev,
 				       bool is_tx_allowed);
-#ifndef MOBILE_DFS_SUPPORT
-	void (*mlme_send_dfs_cfg_event)(struct wlan_objmgr_pdev *pdev,
-					struct wlan_channel *wlan_chan,
-					QDF_RADAR_EVENT event);
-#endif
 };
 
 extern struct dfs_to_mlme global_dfs_to_mlme;
