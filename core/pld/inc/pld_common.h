@@ -25,6 +25,12 @@
 #include <linux/pm.h>
 #include <osapi_linux.h>
 
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss2.h"
+#else
+#include <net/cnss2.h>
+#endif
+
 #ifdef CNSS_UTILS
 #ifdef CONFIG_CNSS_OUT_OF_TREE
 #include "cnss_utils.h"
@@ -410,6 +416,54 @@ struct pld_dev_mem_info {
 	u64 size;
 };
 
+/**
+ * enum pld_wlan_hw_nss_info - WLAN HW nss info
+ * @PLD_WLAN_HW_CAP_NSS_UNSPECIFIED: nss info not specified
+ * @PLD_WLAN_HW_CAP_NSS_1x1: supported nss link 1x1
+ * @PLD_WLAN_HW_CAP_NSS_2x2: supported nss link 2x2
+ */
+enum pld_wlan_hw_nss_info {
+	PLD_WLAN_HW_CAP_NSS_UNSPECIFIED,
+	PLD_WLAN_HW_CAP_NSS_1x1,
+	PLD_WLAN_HW_CAP_NSS_2x2
+};
+
+/**
+ * enum pld_wlan_hw_channel_bw_info - WLAN HW channel bw info
+ * @PLD_WLAN_HW_CHANNEL_BW_UNSPECIFIED: bw info not specified
+ * @PLD_WLAN_HW_CHANNEL_BW_80MHZ: supported bw 80MHZ
+ * @PLD_WLAN_HW_CHANNEL_BW_160MHZ: supported bw 160MHZ
+ */
+enum pld_wlan_hw_channel_bw_info  {
+	PLD_WLAN_HW_CHANNEL_BW_UNSPECIFIED,
+	PLD_WLAN_HW_CHANNEL_BW_80MHZ,
+	PLD_WLAN_HW_CHANNEL_BW_160MHZ
+};
+
+/**
+ * enum pld_wlan_hw_qam_info - WLAN HW qam info
+ * @PLD_WLAN_HW_QAM_UNSPECIFIED: QAM info not specified
+ * @PLD_WLAN_HW_QAM_1K: 1K QAM supported
+ * @PLD_WLAN_HW_QAM_4K: 4K QAM supported
+ */
+enum pld_wlan_hw_qam_info  {
+	PLD_WLAN_HW_QAM_UNSPECIFIED,
+	PLD_WLAN_HW_QAM_1K,
+	PLD_WLAN_HW_QAM_4K
+};
+
+/**
+ * struct pld_wlan_hw_cap_info - WLAN HW cap info
+ * @nss: nss info
+ * @bw: bw info
+ * @qam: qam info
+ */
+struct pld_wlan_hw_cap_info {
+	enum pld_wlan_hw_nss_info nss;
+	enum pld_wlan_hw_channel_bw_info bw;
+	enum pld_wlan_hw_qam_info qam;
+};
+
 #define PLD_MAX_TIMESTAMP_LEN 32
 #define PLD_WLFW_MAX_BUILD_ID_LEN 128
 #define PLD_MAX_DEV_MEM_NUM 4
@@ -426,6 +480,7 @@ struct pld_dev_mem_info {
  * @fw_build_timestamp: FW build timestamp
  * @device_version: WLAN device version info
  * @dev_mem_info: WLAN device memory info
+ * @hw_cap_info: WLAN HW capabilities info
  *
  * pld_soc_info is used to store WLAN SOC information.
  */
@@ -441,6 +496,7 @@ struct pld_soc_info {
 	struct pld_device_version device_version;
 	struct pld_dev_mem_info dev_mem_info[PLD_MAX_DEV_MEM_NUM];
 	char fw_build_id[PLD_WLFW_MAX_BUILD_ID_LEN + 1];
+	struct pld_wlan_hw_cap_info hw_cap_info;
 };
 
 /**
@@ -551,6 +607,13 @@ struct pld_driver_ops {
 			     enum pld_bus_type bus_type,
 			     int state);
 	void (*uevent)(struct device *dev, struct pld_uevent_data *uevent);
+#ifdef WLAN_FEATURE_SSR_DRIVER_DUMP
+	int (*collect_driver_dump)(struct device *dev,
+				   enum pld_bus_type bus_type,
+				   struct cnss_ssr_driver_dump_entry
+				   *input_array,
+				   size_t *num_entries_loaded);
+#endif
 	int (*runtime_suspend)(struct device *dev,
 			       enum pld_bus_type bus_type);
 	int (*runtime_resume)(struct device *dev,
@@ -1154,6 +1217,23 @@ const char *pld_bus_width_type_to_str(enum pld_bus_width_type level);
  */
 int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 			  int mon_id);
+
+/**
+ * pld_set_tsf_sync_period() - Set TSF sync period
+ * @dev: device
+ * @val: TSF sync time value
+ *
+ * Return: void
+ */
+void pld_set_tsf_sync_period(struct device *dev, u32 val);
+
+/**
+ * pld_reset_tsf_sync_period() - Reset TSF sync period
+ * @dev: device
+ *
+ * Return: void
+ */
+void pld_reset_tsf_sync_period(struct device *dev);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 /**

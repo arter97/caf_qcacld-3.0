@@ -2352,6 +2352,7 @@ end:
 
 QDF_STATUS ucfg_dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 {
+	wlan_dp_select_profile_cfg((struct wlan_objmgr_psoc *)ctrl_psoc);
 	return dp_prealloc_init(ctrl_psoc);
 }
 
@@ -2372,6 +2373,21 @@ void *ucfg_dp_prealloc_get_consistent_mem_unaligned(qdf_size_t size,
 void ucfg_dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned)
 {
 	dp_prealloc_put_consistent_mem_unaligned(va_unaligned);
+}
+
+void ucfg_dp_prealloc_get_multi_pages(uint32_t desc_type, qdf_size_t elem_size,
+				      uint16_t elem_num,
+				      struct qdf_mem_multi_page_t *pages,
+				      bool cacheable)
+{
+	dp_prealloc_get_multi_pages(desc_type, elem_size, elem_num, pages,
+				    cacheable);
+}
+
+void ucfg_dp_prealloc_put_multi_pages(uint32_t desc_type,
+				      struct qdf_mem_multi_page_t *pages)
+{
+	dp_prealloc_put_multi_pages(desc_type, pages);
 }
 #endif
 

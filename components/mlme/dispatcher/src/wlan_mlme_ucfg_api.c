@@ -367,10 +367,10 @@ ucfg_mlme_set_vdev_traffic_type(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
-void ucfg_mlme_connected_chan_stats_request(struct wlan_objmgr_psoc *psoc,
-					    uint8_t vdev_id)
+QDF_STATUS ucfg_mlme_connected_chan_stats_request(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id)
 {
-	mlme_connected_chan_stats_request(psoc, vdev_id);
+	return mlme_connected_chan_stats_request(psoc, vdev_id);
 }
 
 bool
@@ -1702,7 +1702,7 @@ ucfg_mlme_set_obss_detection_offload_enabled(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 ucfg_mlme_set_bss_color_collision_det_sta(struct wlan_objmgr_psoc *psoc,
-					  uint8_t value)
+					  bool value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -1711,6 +1711,36 @@ ucfg_mlme_set_bss_color_collision_det_sta(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 
 	mlme_obj->cfg.obss_ht40.bss_color_collision_det_sta = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_mlme_set_bss_color_collision_det_support(struct wlan_objmgr_psoc *psoc,
+					      bool val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.obss_ht40.bss_color_collision_det_tgt_support = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_mlme_get_bss_color_collision_det_support(struct wlan_objmgr_psoc *psoc,
+					      bool *val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	*val = mlme_obj->cfg.obss_ht40.bss_color_collision_det_tgt_support;
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -50,9 +50,9 @@ ifeq ($(findstring yes, $(found)), yes)
 cppflags-y += -DCFG80211_LINK_STA_PARAMS_PRESENT
 endif
 
-found = $(shell if grep -qF "nl80211_put_ru_punct_supp_bw" $(srctree)/net/wireless/nl80211.c; then echo "yes" ;else echo "no" ;fi;)
+found = $(shell if grep -qF "NL80211_EXT_FEATURE_PUNCT" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
-cppflags-y += -DCFG80211_RU_PUNCT_SUPPORT
+ccflags-y += -DNL80211_EXT_FEATURE_PUNCT_SUPPORT
 endif
 
 found = $(shell if grep -qF "unsigned int link_id, u16 punct_bitmap" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
@@ -986,6 +986,10 @@ QDF_OBJS := \
 	$(QDF_OBJ_DIR)/qdf_str.o \
 	$(QDF_OBJ_DIR)/qdf_talloc.o \
 	$(QDF_OBJ_DIR)/qdf_types.o \
+
+ifeq ($(CONFIG_CNSS2_SSR_DRIVER_DUMP), y)
+QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_ssr_driver_dump.o
+endif
 
 ifeq ($(CONFIG_WLAN_DEBUGFS), y)
 QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_debugfs.o
@@ -3299,6 +3303,23 @@ cppflags-$(CONFIG_WLAN_FEATURE_MEDIUM_ASSESS) += -DWLAN_FEATURE_MEDIUM_ASSESS
 cppflags-$(CONFIG_FEATURE_RADAR_HISTORY) += -DFEATURE_RADAR_HISTORY
 cppflags-$(CONFIG_DIRECT_BUF_RX_ENABLE) += -DDIRECT_BUF_RX_ENABLE
 cppflags-$(CONFIG_WMI_DBR_SUPPORT) += -DWMI_DBR_SUPPORT
+
+found = $(shell if grep -qF "NL80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes"; else echo "no"; fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA
+endif
+
+found = $(shell if grep -qF "NL80211_EXT_FEATURE_SECURE_NAN" $(srctree)/include/uapi/linux/nl80211.h; then echo "yes"; else echo "no"; fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_EXT_FEATURE_SECURE_NAN
+endif
+
+
+found = $(shell if grep -qF "bool mlo_params_valid;" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT
+endif
+
 ifneq ($(CONFIG_CNSS_QCA6750), y)
 cppflags-$(CONFIG_DIRECT_BUF_RX_ENABLE) += -DDBR_MULTI_SRNG_ENABLE
 endif
@@ -3309,6 +3330,10 @@ ifeq ($(CONFIG_DP_USE_REDUCED_PEER_ID_FIELD_WIDTH), y)
 cppflags-y += -DDP_USE_REDUCED_PEER_ID_FIELD_WIDTH
 endif
 endif
+ccflags-$(CONFIG_DP_MULTIPASS_SUPPORT) += -DQCA_MULTIPASS_SUPPORT
+ccflags-$(CONFIG_DP_MULTIPASS_SUPPORT) += -DWLAN_REPEATER_NOT_SUPPORTED
+ccflags-$(CONFIG_DP_MULTIPASS_SUPPORT) += -DQCA_SUPPORT_PEER_ISOLATION
+ccflags-$(CONFIG_WLAN_DP_PROFILE_SUPPORT) += -DWLAN_DP_PROFILE_SUPPORT
 
 ifdef CONFIG_WLAN_TWT_SAP_STA_COUNT
 WLAN_TWT_SAP_STA_COUNT ?= 32
@@ -4077,6 +4102,7 @@ cppflags-$(CONFIG_DP_TX_COMP_RING_DESC_SANITY_CHECK) += -DDP_TX_COMP_RING_DESC_S
 cppflags-$(CONFIG_RX_HASH_DEBUG) += -DRX_HASH_DEBUG
 cppflags-$(CONFIG_DP_PKT_STATS_PER_LMAC) += -DDP_PKT_STATS_PER_LMAC
 cppflags-$(CONFIG_NO_RX_PKT_HDR_TLV) += -DNO_RX_PKT_HDR_TLV
+cppflags-$(CONFIG_DP_TX_PACKET_INSPECT_FOR_ILP) += -DDP_TX_PACKET_INSPECT_FOR_ILP
 
 ifeq ($(CONFIG_QCA6290_11AX), y)
 cppflags-y += -DQCA_WIFI_QCA6290_11AX -DQCA_WIFI_QCA6290_11AX_MU_UL
@@ -4330,6 +4356,7 @@ cppflags-$(CONFIG_WLAN_TRACEPOINTS) += -DWLAN_TRACEPOINTS
 
 cppflags-$(CONFIG_QCACLD_FEATURE_SON) += -DFEATURE_PERPKT_INFO
 cppflags-$(CONFIG_QCACLD_FEATURE_SON) += -DQCA_ENHANCED_STATS_SUPPORT
+ccflags-$(CONFIG_WLAN_FEATURE_CE_RX_BUFFER_REUSE) += -DWLAN_FEATURE_CE_RX_BUFFER_REUSE
 
 ifeq ($(CONFIG_QMI_COMPONENT_ENABLE), y)
 cppflags-y += -DQMI_COMPONENT_ENABLE
@@ -4704,6 +4731,9 @@ endif
 
 # Flag to enable Constrained Application Protocol feature
 cppflags-$(CONFIG_WLAN_FEATURE_COAP) += -DWLAN_FEATURE_COAP
+
+# SSR driver dump config
+cppflags-$(CONFIG_CNSS2_SSR_DRIVER_DUMP) += -DWLAN_FEATURE_SSR_DRIVER_DUMP
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 

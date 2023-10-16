@@ -184,9 +184,22 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 			      CFG_ACTION_OUI_DISABLE_DYNAMIC_QOS_NULL_TX_RATE),
 		      ACTION_OUI_MAX_STR_LEN);
 	qdf_str_lcopy(psoc_priv->action_oui_str
+			[ACTION_OUI_ENABLE_CTS2SELF_WITH_QOS_NULL],
+		      cfg_get(psoc,
+			      CFG_ACTION_OUI_ENABLE_CTS2SELF_WITH_QOS_NULL),
+		      ACTION_OUI_MAX_STR_LEN);
+	qdf_str_lcopy(psoc_priv->action_oui_str
+			[ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN],
+		      cfg_get(psoc,
+			      CFG_ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN),
+		      ACTION_OUI_MAX_STR_LEN);
+	qdf_str_lcopy(psoc_priv->action_oui_str
 			[ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ],
 		      cfg_get(psoc, CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ),
 		      ACTION_OUI_MAX_STR_LEN);
+	qdf_str_lcopy(psoc_priv->action_oui_str[ACTION_OUI_DISABLE_BFORMEE],
+		      cfg_get(psoc, CFG_ACTION_OUI_DISABLE_BFORMEE),
+			      ACTION_OUI_MAX_STR_LEN);
 }
 
 static void action_oui_parse_config(struct wlan_objmgr_psoc *psoc)

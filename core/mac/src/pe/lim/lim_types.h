@@ -454,12 +454,12 @@ void lim_process_beacon_eht(struct mac_context *mac_ctx,
 /**
  * lim_process_beacon_eht_op() - process beacon 11be eht op IE
  * @session: pe session
- * @eht_op: pointer to eht op IE
+ * @bcn_ptr: pointer to bcn ptr
  *
  * Return none
  */
 void lim_process_beacon_eht_op(struct pe_session *session,
-			       tDot11fIEeht_op *eht_op);
+			       struct sSirProbeRespBeacon *bcn_ptr);
 #else
 static inline
 void lim_process_beacon_eht(struct mac_context *mac_ctx,
@@ -470,7 +470,7 @@ void lim_process_beacon_eht(struct mac_context *mac_ctx,
 
 static inline
 void lim_process_beacon_eht_op(struct pe_session *session,
-			       tDot11fIEeht_op *eht_op)
+			       struct sSirProbeRespBeacon *bcn_ptr)
 {
 }
 #endif
@@ -1443,6 +1443,7 @@ typedef enum sHalBitVal         /* For Bit operations */
  * @amsdu_support: amsdu in ampdu support
  * @is_wep: protected bit in fc
  * @calc_buff_size: Calculated buf size from peer and self capabilities
+ * @bssid: peer BSSID
  *
  * This function is called when ADDBA request is successful. ADDBA response is
  * setup by calling addba_response_setup API and frame is then sent out OTA.
@@ -1454,7 +1455,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 					 struct pe_session *session,
 					 uint8_t addba_extn_present,
 					 uint8_t amsdu_support, uint8_t is_wep,
-					 uint16_t calc_buff_size);
+					 uint16_t calc_buff_size,
+					 tSirMacAddr bssid);
 
 /**
  * lim_send_delba_action_frame() - Send delba to peer
@@ -1472,6 +1474,23 @@ QDF_STATUS lim_send_delba_action_frame(struct mac_context *mac_ctx,
 				       uint8_t reason_code);
 
 #ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_send_t2lm_action_req_frame() - Send T2LM negotiation request to peer
+ * @vdev: vdev pointer
+ * @peer_mac: Peer mac addr
+ * @args: Pointer to action frame args
+ * @ongoing_t2lm_neg: T2LM negotiation request
+ * @token: Dialog token
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+QDF_STATUS
+lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
+			       uint8_t *peer_mac,
+			       struct wlan_action_frame_args *args,
+			       struct wlan_t2lm_onging_negotiation_info *t2lm_neg,
+			       uint8_t token);
+
 /**
  * lim_send_t2lm_action_rsp_frame() - Send T2LM negotiation response to peer
  * @mac_ctx: mac context
@@ -1494,6 +1513,16 @@ lim_send_t2lm_action_rsp_frame(struct mac_context *mac_ctx,
 			       tSirMacAddr peer_mac,
 			       struct pe_session *session, uint8_t token,
 			       enum wlan_t2lm_resp_frm_type status_code)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
+			       uint8_t *peer_mac,
+			       struct wlan_action_frame_args *args,
+			       struct wlan_t2lm_onging_negotiation_info *t2lm_neg,
+			       uint8_t token)
 {
 	return QDF_STATUS_SUCCESS;
 }

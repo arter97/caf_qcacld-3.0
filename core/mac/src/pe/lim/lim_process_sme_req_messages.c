@@ -71,6 +71,7 @@
 #include "wlan_twt_cfg_ext_api.h"
 #include <spatial_reuse_api.h>
 #include "wlan_psoc_mlme_api.h"
+#include "wlan_mlo_mgr_sta.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_peer.h>
 #endif
@@ -2831,7 +2832,7 @@ lim_fill_ese_params(struct mac_context *mac_ctx, struct pe_session *session,
 }
 #endif
 
-static void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq)
+void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq)
 {
 	/*
 	 * Some IOT APs don't send supported rates in
@@ -2983,6 +2984,56 @@ static void lim_update_qos(struct mac_context *mac_ctx,
 		 session->limWmeEnabled);
 }
 
+static void lim_reset_self_ocv_caps(struct pe_session *session)
+{
+	uint16_t self_rsn_cap;
+
+	self_rsn_cap = wlan_crypto_get_param(session->vdev,
+					     WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (self_rsn_cap == -1)
+		return;
+
+	pe_debug("self RSN cap: %d", self_rsn_cap);
+	self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED;
+
+	/* Update the new rsn caps */
+	wlan_crypto_set_vdev_param(session->vdev, WLAN_CRYPTO_PARAM_RSN_CAP,
+				   self_rsn_cap);
+}
+
+/**
+ * lim_disable_bformee_for_iot_ap() - disable bformee for iot ap
+ *@mac_ctx: mac context
+ *@session: pe session
+ *@bss_desc: bss descriptor
+ *
+ * When connect IoT AP with BW 160MHz and NSS 2, disable Beamformee
+ *
+ * Return: None
+ */
+static void
+lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
+			       struct pe_session *session,
+			       struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr;
+	uint16_t ie_len;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+
+	if (wlan_action_oui_search(mac_ctx->psoc,
+				   &vendor_ap_search_attr,
+				   ACTION_OUI_DISABLE_BFORMEE) &&
+	    session->nss == 2 && CH_WIDTH_160MHZ == session->ch_width) {
+		session->vht_config.su_beam_formee = 0;
+		session->vht_config.mu_beam_formee = 0;
+		pe_debug("IoT ap with BW 160 MHz NSS 2, disable Beamformee");
+	}
+}
+
 QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		    struct bss_description *bss_desc)
@@ -3006,9 +3057,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	struct ps_params *ps_param =
 				&ps_global_info->ps_params[session->vdev_id];
 	uint32_t timeout;
-	uint8_t programmed_country[REG_ALPHA2_LEN + 1];
 	enum reg_6g_ap_type power_type_6g;
-	bool ctry_code_match;
 	struct cm_roam_values_copy temp;
 	uint32_t neighbor_lookup_threshold;
 	uint32_t hi_rssi_scan_rssi_delta;
@@ -3230,6 +3279,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode)) {
 		lim_update_session_eht_capable(mac_ctx, session);
+		lim_reset_self_ocv_caps(session);
 		lim_copy_join_req_eht_cap(session);
 	}
 
@@ -3266,22 +3316,21 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		&session->gLimCurrentBssUapsd,
 		&local_power_constraint, session, &is_pwr_constraint);
 
+	lim_disable_bformee_for_iot_ap(mac_ctx, session, bss_desc);
+
 	if (wlan_reg_is_6ghz_chan_freq(bss_desc->chan_freq)) {
 		if (!ie_struct->Country.present)
 			pe_debug("Channel is 6G but country IE not present");
-		wlan_reg_read_current_country(mac_ctx->psoc,
-					      programmed_country);
-		status = wlan_reg_get_6g_power_type_for_ctry(
+		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev,
-				ie_struct->Country.country,
-				programmed_country, &power_type_6g,
-				&ctry_code_match, session->ap_power_type);
+				&power_type_6g,
+				session->ap_defined_power_type_6g,
+				bss_desc->chan_freq);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			status = QDF_STATUS_E_NOSUPPORT;
 			goto send;
 		}
-		session->ap_power_type_6g = power_type_6g;
-		session->same_ctry_code = ctry_code_match;
+		session->best_6g_power_type = power_type_6g;
 
 		lim_iterate_triplets(ie_struct->Country);
 
@@ -3731,12 +3780,21 @@ static inline void lim_update_pmksa_to_profile(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+/*
+ * lim_is_non_default_rsnxe_cap_set() - Check if non-default userspace RSNXE
+ * CAP is set
+ *
+ * @mac_ctx: pointer to mac contetx
+ * @req: join request
+ *
+ * Return: Non default cap set
+ */
 static inline bool
-lim_is_rsnxe_cap_set(struct mac_context *mac_ctx,
-		     struct cm_vdev_join_req *req)
+lim_is_non_default_rsnxe_cap_set(struct mac_context *mac_ctx,
+				 struct cm_vdev_join_req *req)
 {
 	const uint8_t *rsnxe, *rsnxe_cap;
-	uint8_t cap_len, cap_index;
+	uint8_t cap_len = 0, cap_index;
 	uint32_t cap_mask;
 
 	rsnxe = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE,
@@ -3746,9 +3804,10 @@ lim_is_rsnxe_cap_set(struct mac_context *mac_ctx,
 		return false;
 
 	rsnxe_cap = wlan_crypto_parse_rsnxe_ie(rsnxe, &cap_len);
-	if (!rsnxe_cap) {
-		mlme_debug("RSNXE caps not present");
-		return false;
+	if (!rsnxe_cap || (rsnxe[SIR_MAC_IE_LEN_OFFSET] > (cap_len + 1))) {
+		mlme_err("RSNXE caps not present/unknown caps present. Cap len %d",
+			 cap_len);
+		return true;
 	}
 
 	/*
@@ -3782,57 +3841,107 @@ lim_is_rsnxe_cap_set(struct mac_context *mac_ctx,
 }
 
 /*
- * lim_rebuild_rsnxe() - Rebuild the RSNXE for STA
+ * lim_rebuild_rsnxe_cap() - Rebuild the RSNXE CAP for STA
  *
  * @rsnx_ie: RSNX IE
+ * @length: length of extended RSN cap field
  *
- * This API is used to construct new RSNX IE for a WPA3
- * connection where the AP doesn't advertise the RSNX IE,
- * mask all bits other than WPA3 caps(SAE_H2E and SAE_PK)
+ * This API is used to truncate/rebuild the RSNXE based on the length
+ * provided. This length marks the length of the extended RSN cap field.
  *
  * Return: Newly constructed RSNX IE
  */
-static inline uint8_t *lim_rebuild_rsnxe(uint8_t *rsnx_ie)
+static inline uint8_t *lim_rebuild_rsnxe_cap(uint8_t *rsnx_ie, uint8_t length)
 {
 	const uint8_t *rsnxe_cap;
-	uint16_t cap_mask, capab;
 	uint8_t cap_len;
 	uint8_t *new_rsnxe = NULL;
 
+	if (length < SIR_MAC_RSNX_CAP_MIN_LEN ||
+	    length > SIR_MAC_RSNX_CAP_MAX_LEN) {
+		pe_err("Invalid length %d", length);
+		return NULL;
+	}
+
 	rsnxe_cap = wlan_crypto_parse_rsnxe_ie(rsnx_ie, &cap_len);
-	if (!rsnxe_cap || !cap_len)
+	if (!rsnxe_cap)
 		return NULL;
 
-	cap_mask = WLAN_CRYPTO_RSNX_CAP_SAE_H2E | WLAN_CRYPTO_RSNX_CAP_SAE_PK;
-	capab = (rsnxe_cap[RSNXE_CAP_POS_0] & cap_mask);
+	new_rsnxe = qdf_mem_malloc(length + SIR_MAC_IE_TYPE_LEN_SIZE);
+	if (!new_rsnxe)
+		return NULL;
 
-	if (capab) {
-		cap_len = 1;
-		capab |= cap_len - 1;
+	new_rsnxe[SIR_MAC_IE_TYPE_OFFSET] = WLAN_ELEMID_RSNXE;
+	new_rsnxe[SIR_MAC_IE_LEN_OFFSET] = length;
+	qdf_mem_copy(&new_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE], rsnxe_cap, length);
 
-		new_rsnxe = qdf_mem_malloc(RSNXE_CAP_FOR_SAE_LEN);
-		if (!new_rsnxe)
-			return NULL;
-		new_rsnxe[0] = WLAN_ELEMID_RSNXE;
-		new_rsnxe[1] = cap_len;
-		new_rsnxe[2] = capab & 0x00ff;
-		return new_rsnxe;
-	}
-	return NULL;
+	/* Now update the new field length in octet 0 for the new length*/
+	new_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE] =
+		(new_rsnxe[SIR_MAC_IE_TYPE_LEN_SIZE] & 0xF0) | (length - 1);
+
+	pe_debug("New RSNXE length %d", length);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   new_rsnxe, length + SIR_MAC_IE_TYPE_LEN_SIZE);
+	return new_rsnxe;
 }
 
-static inline void
+/*
+ * lim_append_rsnxe_to_assoc_ie() - Append the new RSNXE to the
+ * assoc ie buffer
+ *
+ * @req: join request
+ * @new_rsnxe: new rsnxe to be appended
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+lim_append_rsnxe_to_assoc_ie(struct cm_vdev_join_req *req,
+			     uint8_t *new_rsnxe)
+{
+	uint8_t *assoc_ie = NULL;
+	uint8_t assoc_ie_len;
+
+	assoc_ie = qdf_mem_malloc(req->assoc_ie.len +
+				  new_rsnxe[SIR_MAC_IE_LEN_OFFSET] +
+				  SIR_MAC_IE_TYPE_LEN_SIZE);
+	if (!assoc_ie)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mem_copy(assoc_ie, req->assoc_ie.ptr, req->assoc_ie.len);
+	assoc_ie_len = req->assoc_ie.len;
+	qdf_mem_copy(&assoc_ie[assoc_ie_len], new_rsnxe,
+		     new_rsnxe[SIR_MAC_IE_LEN_OFFSET] +
+		     SIR_MAC_IE_TYPE_LEN_SIZE);
+	assoc_ie_len += new_rsnxe[SIR_MAC_IE_LEN_OFFSET] +
+			SIR_MAC_IE_TYPE_LEN_SIZE;
+
+	/* Replace the assoc ie with new assoc_ie */
+	qdf_mem_free(req->assoc_ie.ptr);
+	req->assoc_ie.ptr = &assoc_ie[0];
+	req->assoc_ie.len = assoc_ie_len;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
 lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 		  struct pe_session *session,
 		  struct cm_vdev_join_req *req)
 {
 	int32_t akm;
-	uint8_t *rsnxe = NULL, *new_rsnxe = NULL, *assoc_ie = NULL;
-	uint8_t assoc_ie_len;
+	uint8_t ap_rsnxe_len = 0, len = 0;
+	uint8_t *rsnxe = NULL, *new_rsnxe = NULL;
+	uint8_t *ap_rsnxe = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	akm = wlan_crypto_get_param(session->vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
-	if (akm == -1)
-		return;
+	if (akm == -1 ||
+	    !(WLAN_CRYPTO_IS_WPA_WPA2(akm) || WLAN_CRYPTO_IS_WPA3(akm)))
+		return status;
+
+	if (!wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE, req->assoc_ie.ptr,
+				      req->assoc_ie.len))
+		return status;
+
 	/*
 	 * Userspace may send RSNXE also in connect request irrespective
 	 * of the connecting AP capabilities. This allows the driver to chose
@@ -3843,60 +3952,96 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 	 * may misbahave due to the new IE. It's observed that few
 	 * legacy APs which don't support the RSNXE reject the
 	 * connection at EAPOL stage.
-	 * So, modify the IE when below conditions are met to avoid
-	 * the interop issues due to RSNXE,
-	 * 1. If AP doesn't support/advertise the RSNXE
-	 * 2. If no other bits are set than SAE_H2E, SAE_PK, SECURE_LTF,
-	 * SECURE_RTT, PROT_RANGE_NEGOTIOATION in RSNXE capabilities
-	 * field.
 	 *
-	 * For WPA2 and older security - Remove the RSNXE completely.
-	 * For WPA3 security - Mask all caps others than SAE_H2E and SAE_PK.
+	 * Modify the RSNXE only when known capability bits are set.
+	 * i.e., don't strip when bits other than SAE_H2E, SAE_PK, SECURE_LTF,
+	 * SECURE_RTT, PROT_RANGE_NEGOTIOATION are set by userspace.
+	 *
 	 */
-
-	if (util_scan_entry_rsnxe(req->entry) ||
-	    lim_is_rsnxe_cap_set(mac_ctx, req)) {
-		return;
+	if (lim_is_non_default_rsnxe_cap_set(mac_ctx, req)) {
+		pe_debug("Do not strip RSNXE, unknown caps are set");
+		return status;
 	}
 
-	rsnxe = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
+	ap_rsnxe = util_scan_entry_rsnxe(req->entry);
+	if (!ap_rsnxe)
+		ap_rsnxe_len = 0;
+	else
+		ap_rsnxe_len = ap_rsnxe[SIR_MAC_IE_LEN_OFFSET];
+
+	/*
+	 * Do not modify userspace RSNXE if either:
+	 * a) AP supports RSNXE cap with more than 1 bytes
+	 * b) AP has zero length RSNXE.
+	 */
+
+	if (ap_rsnxe_len > 1 || (ap_rsnxe && ap_rsnxe_len == 0))
+		return QDF_STATUS_SUCCESS;
+
+	rsnxe = qdf_mem_malloc(WLAN_MAX_IE_LEN + SIR_MAC_IE_TYPE_LEN_SIZE);
 	if (!rsnxe)
-		return;
+		return QDF_STATUS_E_FAILURE;
 
 	lim_strip_ie(mac_ctx, req->assoc_ie.ptr,
 		     (uint16_t *)&req->assoc_ie.len, WLAN_ELEMID_RSNXE,
 		     ONE_BYTE, NULL, 0, rsnxe, WLAN_MAX_IE_LEN);
 
-	if (WLAN_CRYPTO_IS_WPA_WPA2(akm)) {
-		mlme_debug("Strip RSNXE as it is not supported by AP");
+	if (!rsnxe[0])
 		goto end;
-	} else if (WLAN_CRYPTO_IS_WPA3(akm)) {
-		new_rsnxe = lim_rebuild_rsnxe(rsnxe);
-		if (!new_rsnxe)
-			goto end;
 
-		assoc_ie = qdf_mem_malloc(req->assoc_ie.len + new_rsnxe[1] + 2);
-		if (!assoc_ie) {
-			qdf_mem_free(new_rsnxe);
+	switch (ap_rsnxe_len) {
+	case 0:
+		/*
+		 * AP doesn't broadcast RSNXE/invalid RSNXE:
+		 * For WPA2 - Strip the RSNXE
+		 * For WPA3 - Retain only SAE caps: H2E and PK in the 1st octet
+		 */
+		if (WLAN_CRYPTO_IS_WPA_WPA2(akm)) {
+			mlme_debug("Strip RSNXE as it is not supported by AP");
 			goto end;
 		}
-
-		/* Append the new RSNXE to the assoc ie */
-		qdf_mem_copy(assoc_ie, req->assoc_ie.ptr, req->assoc_ie.len);
-		assoc_ie_len = req->assoc_ie.len;
-		qdf_mem_copy(&assoc_ie[assoc_ie_len], new_rsnxe,
-			     new_rsnxe[1] + 2);
-		assoc_ie_len += new_rsnxe[1] + 2;
-		qdf_mem_free(new_rsnxe);
-
-		/* Replace the assoc ie with new assoc_ie */
-		qdf_mem_free(req->assoc_ie.ptr);
-		req->assoc_ie.ptr = &assoc_ie[0];
-		req->assoc_ie.len = assoc_ie_len;
-		mlme_debug("Update the RSNXE for WPA3 connection");
+		if (WLAN_CRYPTO_IS_WPA3(akm)) {
+			len = 1;
+			goto rebuild_rsnxe;
+		}
+		break;
+	case 1:
+		/*
+		 * In some IOT cases, APs do not recognize more than 1 octet of
+		 * RSNXE. This leads to connectivity failures.
+		 * Therefore, restrict the self RSNXE to 1 octet if AP supports
+		 * only 1 octet
+		 */
+		len = 1;
+		goto rebuild_rsnxe;
+	default:
+		break;
 	}
+
+	pe_err("Error in handling RSNXE. Length AP: %d SELF: %d",
+	       ap_rsnxe_len, rsnxe[SIR_MAC_IE_LEN_OFFSET]);
+	status = QDF_STATUS_E_FAILURE;
+	goto end;
+
+rebuild_rsnxe:
+	/* Build the new RSNXE */
+	new_rsnxe = lim_rebuild_rsnxe_cap(rsnxe, len);
+	if (!new_rsnxe) {
+		status = QDF_STATUS_E_FAILURE;
+		goto end;
+	} else if (!new_rsnxe[1]) {
+		qdf_mem_free(new_rsnxe);
+		status = QDF_STATUS_E_FAILURE;
+		goto end;
+	}
+
+	/* Append the new RSNXE to the assoc ie */
+	status = lim_append_rsnxe_to_assoc_ie(req, new_rsnxe);
+	qdf_mem_free(new_rsnxe);
+
 end:
 	qdf_mem_free(rsnxe);
+	return status;
 }
 
 void
@@ -4066,14 +4211,15 @@ lim_fill_wapi_ie(struct mac_context *mac_ctx, struct pe_session *session,
 }
 #endif
 
-static void lim_fill_crypto_params(struct mac_context *mac_ctx,
-				   struct pe_session *session,
-				   struct cm_vdev_join_req *req)
+static QDF_STATUS lim_fill_crypto_params(struct mac_context *mac_ctx,
+					 struct pe_session *session,
+					 struct cm_vdev_join_req *req)
 {
 	int32_t ucast_cipher;
 	int32_t auth_mode;
 	int32_t akm;
 	tSirMacCapabilityInfo *ap_cap_info;
+	QDF_STATUS status;
 
 	ucast_cipher = wlan_crypto_get_param(session->vdev,
 					     WLAN_CRYPTO_PARAM_UCAST_CIPHER);
@@ -4100,9 +4246,12 @@ static void lim_fill_crypto_params(struct mac_context *mac_ctx,
 	else if (lim_is_wapi_profile(session))
 		lim_fill_wapi_ie(mac_ctx, session, req);
 
-	lim_strip_rsnx_ie(mac_ctx, session, req);
+	status = lim_strip_rsnx_ie(mac_ctx, session, req);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
 	lim_update_fils_config(mac_ctx, session, req);
+	return QDF_STATUS_SUCCESS;
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -4251,7 +4400,13 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 				   req->assoc_ie.ptr, req->assoc_ie.len);
 
 	assoc_ie_len = req->assoc_ie.len;
-	lim_fill_crypto_params(mac_ctx, session, req);
+	status = lim_fill_crypto_params(mac_ctx, session, req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Error in handling RSNXE");
+		qdf_mem_free(session->lim_join_req);
+		session->lim_join_req = NULL;
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	/* Reset the SPMK global cache for non-SAE connection */
 	if (session->connected_akm != ANI_AKM_TYPE_SAE) {
@@ -5332,16 +5487,14 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		}
 	}
 
-	if (!reg_tpe_count && !local_tpe_count) {
-		pe_debug("No TPEs found in beacon IE");
+	if (!reg_tpe_count && !local_tpe_count)
 		return;
-	} else if (!reg_tpe_count) {
+	else if (!reg_tpe_count)
 		use_local_tpe = true;
-	} else if (!local_tpe_count) {
+	else if (!local_tpe_count)
 		use_local_tpe = false;
-	} else {
+	else
 		use_local_tpe = wlan_mlme_is_local_tpe_pref(mac->psoc);
-	}
 
 	for (i = 0; i < num_tpe_ies; i++) {
 		single_tpe = tpe_ies[i];
@@ -5540,6 +5693,9 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 		case CH_WIDTH_160MHZ:
 			num_pwr_levels = 8;
 			break;
+		case CH_WIDTH_320MHZ:
+			num_pwr_levels = 16;
+			break;
 		default:
 			pe_err("Invalid channel width");
 			return 0;
@@ -5557,6 +5713,9 @@ uint32_t lim_get_num_pwr_levels(bool is_psd,
 			break;
 		case CH_WIDTH_160MHZ:
 			num_pwr_levels = 4;
+			break;
+		case CH_WIDTH_320MHZ:
+			num_pwr_levels = 5;
 			break;
 		default:
 			pe_err("Invalid channel width");
@@ -5591,9 +5750,7 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
 
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool is_pwr_constraint_absolute,
-		       uint8_t ap_pwr_type,
-		       bool ctry_code_match)
+		       bool is_pwr_constraint_absolute)
 {
 	bool is_psd_power = false;
 	bool is_tpe_present = false, is_6ghz_freq = false;
@@ -5641,9 +5798,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 		skip_tpe = wlan_mlme_skip_tpe(mac->psoc);
 	} else {
 		is_6ghz_freq = true;
-		/* Power mode calculation for 6G*/
-		ap_power_type_6g = session->ap_power_type;
+		/* Power mode calculation for 6 GHz STA*/
 		if (LIM_IS_STA_ROLE(session)) {
+			ap_power_type_6g = session->best_6g_power_type;
 			wlan_mlme_get_safe_mode_enable(mac->psoc,
 						       &safe_mode_enable);
 			wlan_mlme_is_rf_test_mode_enabled(mac->psoc,
@@ -5652,18 +5809,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 			 * set LPI power if safe mode is enabled OR RF test
 			 * mode is enabled.
 			 */
-			if (rf_test_mode || safe_mode_enable) {
+			if (rf_test_mode || safe_mode_enable)
 				ap_power_type_6g = REG_INDOOR_AP;
-			} else {
-				if (!session->lim_join_req) {
-					if (!ctry_code_match)
-						ap_power_type_6g = ap_pwr_type;
-				} else {
-					if (!session->same_ctry_code)
-						ap_power_type_6g =
-						session->ap_power_type_6g;
-				}
-			}
 		}
 	}
 
@@ -7422,6 +7569,36 @@ lim_process_sme_cfg_action_frm_in_tb_ppdu(struct mac_context *mac_ctx,
 	lim_send_action_frm_tb_ppdu_cfg(mac_ctx, msg->vdev_id, msg->cfg);
 }
 
+static void
+lim_process_sme_send_vdev_pause(struct mac_context *mac_ctx,
+				struct sme_vdev_pause *msg)
+{
+	struct pe_session *session;
+	uint16_t vdev_pause_dur_ms;
+
+	if (!msg) {
+		pe_err("Buffer is NULL");
+		return;
+	}
+
+	session = pe_find_session_by_vdev_id(mac_ctx, msg->session_id);
+	if (!session) {
+		pe_warn("Session does not exist for given BSSID");
+		return;
+	}
+
+	if (!(wlan_vdev_mlme_get_opmode(session->vdev) == QDF_STA_MODE) &&
+	    wlan_vdev_mlme_is_mlo_vdev(session->vdev)) {
+		pe_err("vdev is not ML STA");
+		return;
+	}
+
+	vdev_pause_dur_ms = session->beaconParams.beaconInterval *
+						msg->vdev_pause_duration;
+	wlan_mlo_send_vdev_pause(mac_ctx->psoc, session->vdev,
+				 msg->session_id, vdev_pause_dur_ms);
+}
+
 static void lim_process_sme_update_config(struct mac_context *mac_ctx,
 					  struct update_config *msg)
 {
@@ -7686,7 +7863,7 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 				eHT_CHANNEL_WIDTH_20MHZ : eHT_CHANNEL_WIDTH_40MHZ;
 			qdf_mem_copy(pHtOpMode->peer_mac, &sta->staAddr,
 				     sizeof(tSirMacAddr));
-			pHtOpMode->smesessionId = sessionId;
+			pHtOpMode->smesessionId = pe_session->smeSessionId;
 
 			msg.type = WMA_UPDATE_OP_MODE;
 			msg.reserved = 0;
@@ -8539,6 +8716,10 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 	case WNI_SME_CFG_ACTION_FRM_HE_TB_PPDU:
 		lim_process_sme_cfg_action_frm_in_tb_ppdu(mac,
 				(struct  sir_cfg_action_frm_tb_ppdu *)msg_buf);
+		break;
+	case eWNI_SME_VDEV_PAUSE_IND:
+		lim_process_sme_send_vdev_pause(mac,
+					(struct sme_vdev_pause *)msg_buf);
 		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);

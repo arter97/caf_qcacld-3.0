@@ -2758,6 +2758,7 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 	bool is_hs_20_ap, is_pmf_enabled, is_open_connection = false;
 	uint8_t vdev_id;
 	uint32_t mbo_oce_enabled_ap;
+	bool abridge_flag;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -2812,6 +2813,14 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id, MBO_OCE_ENABLED_AP, &temp);
 	mbo_oce_enabled_ap = temp.uint_value;
+
+	abridge_flag = wlan_mlme_get_btm_abridge_flag(psoc);
+	if (!abridge_flag)
+		MLME_CLEAR_BIT(*btm_offload_config,
+			       BTM_OFFLOAD_CONFIG_BIT_7);
+	mlme_debug("Abridge flag: %d, btm offload: %u", abridge_flag,
+		   *btm_offload_config);
+
 	/*
 	 * If peer does not support PMF in case of OCE/MBO
 	 * Connection, Disable BTM offload to firmware.
@@ -5137,7 +5146,7 @@ void cm_update_pmk_cache_ft(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	 * the newly added entry to avoid multiple PMK cache entries for the
 	 * same MDID.
 	 */
-	wlan_vdev_get_bss_peer_mac(vdev, &pmksa.bssid);
+	wlan_vdev_get_bss_peer_mac_for_pmksa(vdev, &pmksa.bssid);
 	wlan_vdev_mlme_get_ssid(vdev, pmksa.ssid, &pmksa.ssid_len);
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id, MOBILITY_DOMAIN, &src_cfg);
 
@@ -5250,7 +5259,7 @@ cm_store_sae_single_pmk_to_global_cache(struct wlan_objmgr_psoc *psoc,
 	/*
 	 * Mark the AP as single PMK capable in Crypto Table
 	 */
-	wlan_vdev_get_bss_peer_mac(vdev, &bssid);
+	wlan_vdev_get_bss_peer_mac_for_pmksa(vdev, &bssid);
 	wlan_crypto_set_sae_single_pmk_bss_cap(vdev, &bssid, true);
 
 	pmk_info = qdf_mem_malloc(sizeof(*pmk_info));
@@ -5297,7 +5306,7 @@ void cm_check_and_set_sae_single_pmk_cap(struct wlan_objmgr_psoc *psoc,
 		mlme_err("get vdev failed");
 		return;
 	}
-	status = wlan_vdev_get_bss_peer_mac(vdev, &bssid);
+	status = wlan_vdev_get_bss_peer_mac_for_pmksa(vdev, &bssid);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Failed to find connected bssid");
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
@@ -6601,9 +6610,8 @@ cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 					roam_invoke_req);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err(CM_PREFIX_FMT "No Candidate found",
+		mlme_err(CM_PREFIX_FMT "No Candidate found, send roam invoke req, fw will perform scan",
 			 CM_PREFIX_REF(vdev_id, cm_id));
-		goto roam_err;
 	}
 
 	if (wlan_cm_get_ese_assoc(pdev, vdev_id)) {
@@ -7009,6 +7017,11 @@ cm_roam_beacon_loss_disconnect_event(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return status;
+	}
+
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
@@ -7322,7 +7335,7 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 	start_timer = cm_roam_offload_enabled(wlan_vdev_get_psoc(vdev));
 
 	cm_roam_state_change(wlan_vdev_get_pdev(vdev), wlan_vdev_get_id(vdev),
-			     WLAN_ROAM_RSO_STOPPED, REASON_DRIVER_DISABLED,
+			     WLAN_ROAM_RSO_STOPPED, REASON_DISCONNECTED,
 			     &send_resp, start_timer);
 	/*
 	 * RSO stop resp is not supported or RSO STOP timer/req failed,

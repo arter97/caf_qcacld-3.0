@@ -31,6 +31,7 @@
 #include <include/wlan_mlme_cmn.h>
 #include <wlan_cm_api.h>
 #include <utils_mlo.h>
+#include <wlan_mlo_mgr_peer.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool
@@ -257,12 +258,14 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (!sync_ind->num_setup_links) {
 		mlo_debug("MLO_ROAM: Roamed to Legacy");
 		is_non_mlo_ap = true;
+		mlo_set_single_link_ml_roaming(psoc, vdev_id, false);
 	} else if (sync_ind->num_setup_links == 1 ||
 		sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED) {
 		mlo_debug("MLO_ROAM: Roamed to single link MLO");
 		mlo_set_single_link_ml_roaming(psoc, vdev_id, true);
 	} else {
 		mlo_debug("MLO_ROAM: Roamed to MLO");
+		mlo_set_single_link_ml_roaming(psoc, vdev_id, false);
 	}
 
 	mlo_roam_update_vdev_macaddr(psoc, vdev_id, is_non_mlo_ap);
@@ -528,17 +531,17 @@ QDF_STATUS mlo_enable_rso(struct wlan_objmgr_pdev *pdev,
 
 	num_partner_links = rsp->ml_parnter_info.num_partner_links;
 
-	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
-	    !num_partner_links ||
-	    num_partner_links == 1) {
-		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
-		if (!assoc_vdev) {
-			mlo_err("Assoc vdev is null");
-			return QDF_STATUS_E_NULL_VALUE;
-		}
-		cm_roam_start_init_on_connect(pdev,
-					      wlan_vdev_get_id(assoc_vdev));
+	if (num_partner_links &&
+	    (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	     !mlo_check_if_all_links_up(vdev)))
+		return QDF_STATUS_SUCCESS;
+
+	assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+	if (!assoc_vdev) {
+		mlo_err("Assoc vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
 	}
+	cm_roam_start_init_on_connect(pdev, wlan_vdev_get_id(assoc_vdev));
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -602,8 +605,12 @@ mlo_roam_update_connected_links(struct wlan_objmgr_vdev *vdev,
 				struct wlan_cm_connect_resp *connect_rsp)
 {
 	mlo_clear_connected_links_bmap(vdev);
-	mlo_update_connected_links_bmap(vdev->mlo_dev_ctx,
-					connect_rsp->ml_parnter_info);
+	if (mlo_get_single_link_ml_roaming(wlan_vdev_get_psoc(vdev),
+					   wlan_vdev_get_id(vdev)))
+		mlo_update_connected_links(vdev, 1);
+	else
+		mlo_update_connected_links_bmap(vdev->mlo_dev_ctx,
+						connect_rsp->ml_parnter_info);
 }
 
 QDF_STATUS
@@ -756,6 +763,12 @@ mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 		return false;
 	}
 
+	if (QDF_IS_STATUS_ERROR(wlan_vdev_is_up(vdev))) {
+		mlo_debug("Vdev id %d is not in up state",
+			  wlan_vdev_get_id(vdev));
+			return false;
+	}
+
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	sta_ctx = mlo_dev_ctx->sta_ctx;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
@@ -764,7 +777,7 @@ mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 
 		if (qdf_test_bit(i, sta_ctx->wlan_connected_links) &&
 		    !QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(mlo_dev_ctx->wlan_vdev_list[i]))) {
-			mlo_debug("Vdev id %d is not in connected state",
+			mlo_debug("Vdev id %d is not in up state",
 				  wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]));
 			return false;
 		}
@@ -783,14 +796,30 @@ mlo_roam_set_link_id(struct wlan_objmgr_vdev *vdev,
 		     struct roam_offload_synch_ind *sync_ind)
 {
 	uint8_t i;
+	uint8_t j;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
 
-	for (i = 0; i < sync_ind->num_setup_links; i++) {
-		if (sync_ind->ml_link[i].vdev_id == wlan_vdev_get_id(vdev)) {
-			wlan_vdev_set_link_id(vdev,
-					      sync_ind->ml_link[i].link_id);
-			mlme_debug("Set link for vdev id %d link id %d",
-				   wlan_vdev_get_id(vdev),
-				   sync_ind->ml_link[i].link_id);
+	if (!vdev || !sync_ind || !vdev->mlo_dev_ctx) {
+		mlo_debug("Invalid input");
+		return;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!vdev)
+			continue;
+
+		wlan_vdev_set_link_id(vdev, WLAN_LINK_ID_INVALID);
+		for (j = 0; j < sync_ind->num_setup_links; j++) {
+			if (sync_ind->ml_link[j].vdev_id ==
+			    wlan_vdev_get_id(vdev)) {
+				wlan_vdev_set_link_id(
+					vdev, sync_ind->ml_link[j].link_id);
+				mlme_debug("Set link for vdev id %d link id %d",
+					   wlan_vdev_get_id(vdev),
+					   sync_ind->ml_link[j].link_id);
+			}
 		}
 	}
 }
@@ -1486,4 +1515,25 @@ done:
 	qdf_mem_free(gen_probe_rsp.ptr);
 
 	return status;
+}
+
+bool
+mlo_is_enable_roaming_on_connected_sta_allowed(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlo_partner_info *partner_info;
+
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return true;
+
+	if (!vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->sta_ctx ||
+	    !vdev->mlo_dev_ctx->sta_ctx->copied_reassoc_rsp)
+		return true;
+
+	partner_info =
+	       &vdev->mlo_dev_ctx->sta_ctx->copied_reassoc_rsp->ml_parnter_info;
+	if (partner_info->num_partner_links <= 1)
+		return true;
+
+	/* Roamed to MLO AP, do nothing if link vdev is disconnected */
+	return false;
 }

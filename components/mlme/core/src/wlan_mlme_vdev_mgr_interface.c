@@ -669,6 +669,8 @@ QDF_STATUS mlme_set_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev,
 	}
 
 	mlme_priv->chan_switch_in_progress = val;
+	mlme_legacy_info("Set chan_switch_in_progress: %d vdev %d",
+			 val, wlan_vdev_get_id(vdev));
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1392,6 +1394,7 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 		return QDF_STATUS_E_NOMEM;
 
 	mlme_init_rate_config(vdev_mlme);
+	mlme_init_connect_chan_info_config(vdev_mlme);
 	vdev_mlme->ext_vdev_ptr->connect_info.fils_con_info = NULL;
 	mlme_init_wait_for_key_timer(vdev_mlme->vdev,
 				     &vdev_mlme->ext_vdev_ptr->wait_key_timer);
@@ -1818,11 +1821,23 @@ vdevmgr_vdev_peer_delete_all_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 static QDF_STATUS vdevmgr_reconfig_req_cb(struct scheduler_msg *msg)
 {
 	struct wlan_objmgr_vdev *vdev = msg->bodyptr;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t vdev_id;
 
 	if (!vdev) {
 		mlme_err("vdev null");
 		return QDF_STATUS_E_INVAL;
 	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlme_err("Failed to get psoc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	if (!wlan_get_vdev_link_removed_flag_by_vdev_id(psoc, vdev_id))
+		mlme_cm_osif_link_reconfig_notify(vdev);
 
 	policy_mgr_handle_link_removal_on_vdev(vdev);
 	mlo_sta_stop_reconfig_timer_by_vdev(vdev);

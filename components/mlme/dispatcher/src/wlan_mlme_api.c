@@ -36,6 +36,7 @@
 #include "wlan_action_oui_main.h"
 #include "target_if.h"
 #include "wlan_vdev_mgr_tgt_if_tx_api.h"
+#include "wmi_unified_vdev_api.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -246,6 +247,36 @@ QDF_STATUS wlan_mlme_get_band_capability(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef QCA_MULTIPASS_SUPPORT
+QDF_STATUS
+wlan_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
+			   uint8_t *mac_addr)
+{
+	QDF_STATUS status;
+	wmi_unified_t wmi_handle;
+	struct peer_vlan_config_param param;
+
+	wmi_handle = get_wmi_unified_hdl_from_pdev(wlan_vdev_get_pdev(vdev));
+	if (!wmi_handle) {
+		mlme_err("unable to get wmi_handle");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_set(&param, sizeof(param), 0);
+
+	param.rx_cmd = 1;
+	/* Enabling Rx_insert_inner_vlan_tag */
+	param.rx_insert_c_tag = 1;
+	param.vdev_id = wlan_vdev_get_id(vdev);
+
+	status = wmi_send_peer_vlan_config(wmi_handle, mac_addr, param);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 QDF_STATUS wlan_mlme_set_band_capability(struct wlan_objmgr_psoc *psoc,
 					 uint32_t band_capability)
@@ -1184,6 +1215,35 @@ void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.sta.usr_disable_eht = disable;
 }
 
+enum phy_ch_width wlan_mlme_get_max_bw(void)
+{
+	uint32_t max_bw = wma_get_eht_ch_width();
+
+	if (max_bw == WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ)
+		return CH_WIDTH_320MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		return CH_WIDTH_160MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+		return CH_WIDTH_80P80MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+		return CH_WIDTH_80MHZ;
+	else
+		return CH_WIDTH_40MHZ;
+}
+#else
+enum phy_ch_width wlan_mlme_get_max_bw(void)
+{
+	uint32_t max_bw = wma_get_vht_ch_width();
+
+	if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		return CH_WIDTH_160MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+		return CH_WIDTH_80P80MHZ;
+	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+		return CH_WIDTH_80MHZ;
+	else
+		return CH_WIDTH_40MHZ;
+}
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -3327,8 +3387,9 @@ wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
-wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
-					      bool *value)
+wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
+						struct wlan_objmgr_psoc *psoc,
+						bool *value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -3336,22 +3397,7 @@ wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
 
-	*value = mlme_obj->cfg.gen.relaxed_6ghz_conn_policy;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-wlan_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
-				       bool value)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj)
-		return QDF_STATUS_E_FAILURE;
-
-	mlme_obj->cfg.gen.relaxed_6ghz_conn_policy = value;
+	*value = mlme_obj->cfg.gen.disable_vlp_sta_conn_to_sp_ap;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3503,6 +3549,33 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+QDF_STATUS
+wlan_mlme_set_btm_abridge_flag(struct wlan_objmgr_psoc *psoc,
+			       bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.btm.abridge_flag = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool
+wlan_mlme_get_btm_abridge_flag(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.btm.abridge_flag;
+}
 
 QDF_STATUS
 wlan_mlme_cfg_set_vht_chan_width(struct wlan_objmgr_psoc *psoc, uint8_t value)
@@ -5948,6 +6021,19 @@ bool mlme_get_user_ps(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	return usr_ps_enable;
 }
 
+bool wlan_mlme_is_multipass_sap(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *info;
+
+	info = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!info) {
+		mlme_legacy_err("target_psoc_info is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return wma_is_multipass_sap(info);
+}
+
 QDF_STATUS wlan_mlme_get_phy_max_freq_range(struct wlan_objmgr_psoc *psoc,
 					    uint32_t *low_2ghz_chan,
 					    uint32_t *high_2ghz_chan,
@@ -6697,6 +6783,11 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	enum phy_ch_width associated_ch_width;
 	struct wlan_channel *des_chan;
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return QDF_STATUS_E_INVAL;
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
@@ -6708,8 +6799,10 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
-	associated_ch_width = wlan_cm_get_associated_ch_width(psoc, vdev_id);
-	if (ch_width > associated_ch_width) {
+	associated_ch_width =
+		mlme_priv->connect_info.chan_info_orig.ch_width_orig;
+	if (associated_ch_width == CH_WIDTH_INVALID ||
+	    ch_width > associated_ch_width) {
 		mlme_debug("vdev %d: Invalid new chwidth:%d, assoc ch_width:%d",
 			   vdev_id, ch_width, associated_ch_width);
 		return QDF_STATUS_E_INVAL;
@@ -6733,17 +6826,63 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
-enum phy_ch_width wlan_mlme_convert_vht_op_bw_to_phy_ch_width(
-						uint8_t channel_width)
+enum phy_ch_width
+wlan_mlme_convert_vht_op_bw_to_phy_ch_width(uint8_t channel_width,
+					    uint8_t chan_id,
+					    uint8_t ccfs0,
+					    uint8_t ccfs1)
 {
-	enum phy_ch_width phy_bw = CH_WIDTH_40MHZ;
+	/** channel_width in vht op from 802.11-2020
+	 * Set to 0 for 20 MHz or 40 MHz BSS bandwidth.
+	 * Set to 1 for 80 MHz, 160 MHz or 80+80 MHz BSS
+	 * bandwidth.
+	 * Set to 2 for 160 MHz BSS bandwidth (deprecated).
+	 * Set to 3 for noncontiguous 80+80 MHz BSS
+	 * bandwidth (deprecated).
+	 * Values in the range 4 to 255 are reserved
+	 *
+	 * 80+80 not supported by MCC platform, so downgrade to 80
+	 */
+	enum phy_ch_width phy_bw = CH_WIDTH_20MHZ;
 
-	if (channel_width == WLAN_VHTOP_CHWIDTH_80)
-		phy_bw = CH_WIDTH_80MHZ;
-	else if (channel_width == WLAN_VHTOP_CHWIDTH_160)
+	if (channel_width == WLAN_VHTOP_CHWIDTH_2040) {
+		phy_bw = CH_WIDTH_20MHZ;
+		if (abs(ccfs0 - chan_id) == 2)
+			phy_bw = CH_WIDTH_40MHZ;
+	} else if (channel_width == WLAN_VHTOP_CHWIDTH_80) {
+		if (ccfs1 && (abs(ccfs1 - ccfs0) == 8))
+			phy_bw = CH_WIDTH_160MHZ;
+		else
+			phy_bw = CH_WIDTH_80MHZ;
+	} else if (channel_width == WLAN_VHTOP_CHWIDTH_160) {
 		phy_bw = CH_WIDTH_160MHZ;
-	else if (channel_width == WLAN_VHTOP_CHWIDTH_80_80)
-		phy_bw = CH_WIDTH_80P80MHZ;
+	} else if (channel_width == WLAN_VHTOP_CHWIDTH_80_80) {
+		phy_bw = WLAN_VHTOP_CHWIDTH_80;
+	}
+
+	return phy_bw;
+}
+
+enum phy_ch_width
+wlan_mlme_convert_he_6ghz_op_bw_to_phy_ch_width(uint8_t channel_width,
+						uint8_t chan_id,
+						uint8_t ccfs0,
+						uint8_t ccfs1)
+{
+	enum phy_ch_width phy_bw = CH_WIDTH_20MHZ;
+
+	if (channel_width == WLAN_HE_6GHZ_CHWIDTH_20) {
+		phy_bw = CH_WIDTH_20MHZ;
+	} else if (channel_width == WLAN_HE_6GHZ_CHWIDTH_40) {
+		phy_bw = CH_WIDTH_40MHZ;
+	} else if (channel_width == WLAN_HE_6GHZ_CHWIDTH_80) {
+		phy_bw = CH_WIDTH_80MHZ;
+	} else if (channel_width == WLAN_HE_6GHZ_CHWIDTH_160_80_80) {
+		phy_bw = CH_WIDTH_160MHZ;
+		/* 80+80 not supported */
+		if (ccfs1 && abs(ccfs0 - ccfs1) > 8)
+			phy_bw = CH_WIDTH_80MHZ;
+	}
 
 	return phy_bw;
 }

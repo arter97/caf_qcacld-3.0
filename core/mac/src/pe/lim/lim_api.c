@@ -903,6 +903,9 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 					mac->psoc,
 					lim_update_tx_pwr_on_ctry_change_cb);
 
+	wlan_reg_register_is_chan_connected_callback(mac->psoc,
+					lim_is_chan_connected_for_mode);
+
 	if (mac->mlme_cfg->edca_params.enable_edca_params)
 		lim_register_policy_mgr_callback(mac->psoc);
 
@@ -949,6 +952,9 @@ QDF_STATUS pe_close(struct mac_context *mac)
 	wlan_reg_unregister_ctry_change_callback(
 					mac->psoc,
 					lim_update_tx_pwr_on_ctry_change_cb);
+
+	wlan_reg_unregister_is_chan_connected_callback(mac->psoc,
+					lim_is_chan_connected_for_mode);
 
 	if (mac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq) {
 		qdf_mem_free(mac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq);
@@ -1540,33 +1546,11 @@ lim_enc_type_matched(struct mac_context *mac_ctx,
 	return false;
 }
 
-/**
- * lim_detect_change_in_ap_capabilities()
- *
- ***FUNCTION:
- * This function is called while SCH is processing
- * received Beacon from AP on STA to detect any
- * change in AP's capabilities. If there any change
- * is detected, Roaming is informed of such change
- * so that it can trigger reassociation.
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- *
- ***NOTE:
- * Notification is enabled for STA product only since
- * it is not a requirement on BP side.
- *
- * @param  mac      Pointer to Global MAC structure
- * @param  pBeacon   Pointer to parsed Beacon structure
- * @return None
- */
-
 void
 lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 				     tpSirProbeRespBeacon pBeacon,
-				     struct pe_session *pe_session)
+				     struct pe_session *pe_session,
+				     bool is_bcn)
 {
 	uint8_t len;
 	uint32_t new_chan_freq;
@@ -1592,16 +1576,17 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 		(new_chan_freq != 0)) ||
 	      (false == security_caps_matched)
 	     ))) {
-		if (false == pe_session->fWaitForProbeRsp) {
+		if (!pe_session->fWaitForProbeRsp || is_bcn) {
 			/* If Beacon capabilities is not matching with the current capability,
 			 * then send unicast probe request to AP and take decision after
 			 * receiving probe response */
-			if (true == pe_session->fIgnoreCapsChange) {
-				pe_debug("Ignoring the Capability change as it is false alarm");
+			if (pe_session->fIgnoreCapsChange) {
+				pe_debug_rl("Ignore the Capability change as probe rsp Capability matched");
 				return;
 			}
 			pe_session->fWaitForProbeRsp = true;
-			pe_warn("AP capabilities are not matching, sending directed probe request");
+			pe_info(QDF_MAC_ADDR_FMT ": capabilities are not matching, sending directed probe request",
+				QDF_MAC_ADDR_REF(pe_session->bssId));
 			status =
 				lim_send_probe_req_mgmt_frame(
 					mac, &pe_session->ssId,
@@ -1625,8 +1610,9 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 		      pBeacon->ssId.length + 1;
 
 		if (new_chan_freq != pe_session->curr_op_freq) {
-			pe_err("Channel freq Change from %d --> %d Ignoring beacon!",
-			       pe_session->curr_op_freq, new_chan_freq);
+			pe_info(QDF_MAC_ADDR_FMT ": Channel freq Change from %d --> %d Ignoring beacon!",
+				QDF_MAC_ADDR_REF(pe_session->bssId),
+				pe_session->curr_op_freq, new_chan_freq);
 			return;
 		}
 
@@ -1642,29 +1628,29 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 		 */
 		else if ((SIR_MAC_GET_PRIVACY(ap_cap) == 0) &&
 			 (pBeacon->rsnPresent || pBeacon->wpaPresent)) {
-			pe_err("BSS Caps (Privacy) bit 0 in beacon, but WPA or RSN IE present, Ignore Beacon!");
+			pe_info_rl(QDF_MAC_ADDR_FMT ": BSS Caps (Privacy) bit 0 in beacon, but WPA or RSN IE present, Ignore Beacon!",
+				   QDF_MAC_ADDR_REF(pe_session->bssId));
 			return;
 		}
 
 		pe_session->fIgnoreCapsChange = false;
 		pe_session->fWaitForProbeRsp = false;
 		pe_session->limSentCapsChangeNtf = true;
-		pe_err("Disconnect as cap mismatch!");
+		pe_info(QDF_MAC_ADDR_FMT ": initiate Disconnect due to cap mismatch!",
+			QDF_MAC_ADDR_REF(pe_session->bssId));
 		lim_send_deauth_mgmt_frame(mac, REASON_UNSPEC_FAILURE,
 					   pe_session->bssId, pe_session,
 					   false);
 		lim_tear_down_link_with_ap(mac, pe_session->peSessionId,
 					   REASON_UNSPEC_FAILURE,
 					   eLIM_HOST_DISASSOC);
-	} else if (true == pe_session->fWaitForProbeRsp) {
+	} else if (pe_session->fWaitForProbeRsp) {
 		/* Only for probe response frames and matching capabilities the control
 		 * will come here. If beacon is with broadcast ssid then fWaitForProbeRsp
 		 * will be false, the control will not come here*/
 
-		pe_debug("capabilities in probe response are"
-				       "matching with the current setting,"
-				       "Ignoring subsequent capability"
-				       "mismatch");
+		pe_debug(QDF_MAC_ADDR_FMT ": capabilities in probe rsp are matching, so ignoring capability mismatch",
+			 QDF_MAC_ADDR_REF(pe_session->bssId));
 		pe_session->fIgnoreCapsChange = true;
 		pe_session->fWaitForProbeRsp = false;
 	}
@@ -2231,6 +2217,7 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	bool is_mlo_link = false;
 	uint8_t vdev_id = session->vdev_id;
 	struct element_info frame;
+	struct cm_roam_values_copy mdie_cfg = {0};
 
 	bcn_proberesp_ptr = (uint8_t *)roam_synch_ind +
 		roam_synch_ind->beacon_probe_resp_offset;
@@ -2359,11 +2346,9 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		bss_desc_ptr->chan_freq = roam_synch_ind->chan_freq;
 	}
 
-	bss_desc_ptr->nwType = lim_get_nw_type(
-			mac,
-			bss_desc_ptr->chan_freq,
-			SIR_MAC_MGMT_FRAME,
-			parsed_frm_ptr);
+	bss_desc_ptr->nwType = lim_get_nw_type(mac, bss_desc_ptr->chan_freq,
+					       SIR_MAC_MGMT_FRAME,
+					       parsed_frm_ptr);
 
 	bss_desc_ptr->sinr = 0;
 	bss_desc_ptr->beaconInterval = parsed_frm_ptr->beaconInterval;
@@ -2387,10 +2372,18 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		qdf_mem_copy((uint8_t *)bss_desc_ptr->mdie,
 				(uint8_t *)parsed_frm_ptr->mdie,
 				SIR_MDIE_SIZE);
+
+		mdie_cfg.bool_value = true;
+		mdie_cfg.uint_value =
+			(bss_desc_ptr->mdie[1] << 8) | (bss_desc_ptr->mdie[0]);
+
+		wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					   MOBILITY_DOMAIN, &mdie_cfg);
 	}
-	pe_debug("chan: %d rssi: %d ie_len %d",
+	pe_debug("chan: %d rssi: %d ie_len %d mdie_present:%d mdie = %02x %02x %02x",
 		 bss_desc_ptr->chan_freq,
-		 bss_desc_ptr->rssi, ie_len);
+		 bss_desc_ptr->rssi, ie_len, bss_desc_ptr->mdiePresent,
+		 bss_desc_ptr->mdie[0], bss_desc_ptr->mdie[1], bss_desc_ptr->mdie[2]);
 
 	if (ie_len) {
 		qdf_mem_copy(&bss_desc_ptr->ieFields,
@@ -2903,7 +2896,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	struct pe_session *ft_session_ptr;
 	uint8_t session_id;
 	uint8_t *reassoc_resp;
-	tpDphHashNode curr_sta_ds;
+	tpDphHashNode curr_sta_ds = NULL, sta_ds = NULL;
 	uint16_t aid;
 	struct bss_params *add_bss_params;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -3034,28 +3027,17 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		(struct bss_params *) ft_session_ptr->ftPEContext.pAddBssReq;
 	add_bss_params = ft_session_ptr->ftPEContext.pAddBssReq;
 	lim_delete_tdls_peers(mac_ctx, session_ptr);
-	curr_sta_ds = dph_lookup_hash_entry(mac_ctx, session_ptr->bssId, &aid,
-					    &session_ptr->dph.dphHashTable);
-	if (!curr_sta_ds && !is_multi_link_roam(roam_sync_ind_ptr)) {
+	sta_ds = dph_lookup_hash_entry(mac_ctx, session_ptr->bssId, &aid,
+				       &session_ptr->dph.dphHashTable);
+	if (!sta_ds && !is_multi_link_roam(roam_sync_ind_ptr)) {
 		pe_err("LFR3:failed to lookup hash entry");
 		ft_session_ptr->bRoamSynchInProgress = false;
-		return status;
-	}
-
-	session_ptr->limSmeState = eLIM_SME_IDLE_STATE;
-	if (curr_sta_ds) {
-		lim_mlo_notify_peer_disconn(session_ptr, curr_sta_ds);
-		lim_mlo_roam_delete_link_peer(session_ptr, curr_sta_ds);
-		lim_cleanup_rx_path(mac_ctx, curr_sta_ds, session_ptr, false);
-		lim_delete_dph_hash_entry(mac_ctx, curr_sta_ds->staAddr, aid,
-					  session_ptr);
+		goto roam_sync_fail;
 	}
 
 	/* update OBSS scan param */
 	pe_roam_fill_obss_scan_param(session_ptr, ft_session_ptr);
 
-	pe_delete_session(mac_ctx, session_ptr);
-	session_ptr = NULL;
 	curr_sta_ds = dph_add_hash_entry(mac_ctx,
 					 bssid.bytes,
 					 DPH_STA_HASH_INDEX_PEER,
@@ -3064,7 +3046,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		pe_err("LFR3:failed to add hash entry for "QDF_MAC_ADDR_FMT,
 		       QDF_MAC_ADDR_REF(add_bss_params->staContext.staMac));
 		ft_session_ptr->bRoamSynchInProgress = false;
-		return status;
+		goto roam_sync_fail;
 	}
 
 	if (roam_sync_ind_ptr->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
@@ -3082,7 +3064,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 						reassoc_resp,
 						roam_sync_ind_ptr->reassoc_resp_length);
 		if (QDF_IS_STATUS_ERROR(status))
-			return status;
+			goto roam_sync_fail;
 	}
 	else
 		lim_process_assoc_rsp_frame(mac_ctx, reassoc_resp,
@@ -3112,7 +3094,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 				qdf_mem_malloc(ric_tspec_len);
 		if (!roam_sync_ind_ptr->ric_tspec_data) {
 			ft_session_ptr->bRoamSynchInProgress = false;
-			return QDF_STATUS_E_NOMEM;
+			status = QDF_STATUS_E_NOMEM;
+			goto roam_sync_fail;
 		}
 
 		if (ft_session_ptr->ricData) {
@@ -3144,7 +3127,42 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	ft_session_ptr->limSmeState = eLIM_SME_LINK_EST_STATE;
 	ft_session_ptr->limPrevSmeState = ft_session_ptr->limSmeState;
 	ft_session_ptr->bRoamSynchInProgress = false;
+
+	/* Cleanup the old session */
+	session_ptr->limSmeState = eLIM_SME_IDLE_STATE;
+
+	/*
+	 * Delete the ml_peer only if DUT is roamed to a non-11BE candidate.
+	 * ml_peer is already cleaned up in wma_delete_all_peers() at the
+	 * beginning of roam_sync handling for 11BE candidates.
+	 */
+	if (sta_ds) {
+		if (!wlan_vdev_mlme_is_mlo_vdev(session_ptr->vdev)) {
+			lim_mlo_notify_peer_disconn(session_ptr, sta_ds);
+			lim_mlo_roam_delete_link_peer(session_ptr, sta_ds);
+		}
+		lim_cleanup_rx_path(mac_ctx, sta_ds, session_ptr, false);
+		lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr, aid,
+					  session_ptr);
+	}
+	pe_delete_session(mac_ctx, session_ptr);
 	return QDF_STATUS_SUCCESS;
+
+roam_sync_fail:
+	pe_err("Roam sync failure status %d session vdev %d", status,
+	       session_ptr->vdev_id);
+	/*
+	 * Cleanup the new session upon roam sync failure.
+	 * Retain the old session for graceful HO failure handling.
+	 */
+	if (curr_sta_ds) {
+		lim_cleanup_rx_path(mac_ctx, curr_sta_ds, ft_session_ptr,
+				    false);
+		lim_delete_dph_hash_entry(mac_ctx, curr_sta_ds->staAddr,
+					  curr_sta_ds->assocId, ft_session_ptr);
+	}
+	pe_delete_session(mac_ctx, ft_session_ptr);
+	return status;
 }
 #endif
 

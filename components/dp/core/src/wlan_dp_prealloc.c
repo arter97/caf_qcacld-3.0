@@ -17,6 +17,7 @@
  */
 
 #include <wlan_objmgr_pdev_obj.h>
+#include <wlan_dp_main.h>
 #include <wlan_dp_prealloc.h>
 #include <dp_types.h>
 #include <dp_internal.h>
@@ -88,7 +89,7 @@ struct dp_consistent_prealloc {
  * @pages: multi page information storage
  */
 struct dp_multi_page_prealloc {
-	enum dp_desc_type desc_type;
+	enum qdf_dp_desc_type desc_type;
 	qdf_size_t element_size;
 	uint16_t element_num;
 	bool in_use;
@@ -335,70 +336,83 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 #define NON_CACHEABLE 0
 #define CACHEABLE 1
 
+#define DIRECT_LINK_CE_RX_BUF_SIZE  256
+#define DIRECT_LINK_DEFAULT_BUF_SZ  2048
+#define TX_DIRECT_LINK_BUF_NUM      380
+#define TX_DIRECT_LINK_CE_BUF_NUM   8
+#define RX_DIRECT_LINK_CE_BUF_NUM   30
+
 static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	/* 4 TX DESC pools */
-	{DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
 
 	/* 4 Tx EXT DESC NON Cacheable pools */
-	{DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
+	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
+	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
+	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
+	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
 
 	/* 4 Tx EXT DESC Link Cacheable pools */
-	{DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0, 0,
-	 CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0, 0,
-	 CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0, 0,
-	 CACHEABLE, { 0 } },
-	{DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0, 0,
-	 CACHEABLE, { 0 } },
+	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
+	 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
+	 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
+	 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
+	 0, CACHEABLE, { 0 } },
 
 	/* 4 TX TSO DESC pools */
-	{DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
-	{DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
 
 	/* 4 TX TSO NUM SEG DESC pools */
-	{DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
+	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
-	{DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
+	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
-	{DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
+	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
-	{DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
+	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
 
 	/* DP RX DESCs BUF pools */
-	{DP_RX_DESC_BUF_TYPE, sizeof(union dp_rx_desc_list_elem_t),
-	 WLAN_CFG_RX_SW_DESC_WEIGHT_SIZE * WLAN_CFG_RXDMA_REFILL_RING_SIZE, 0,
-	 CACHEABLE, { 0 } },
+	{QDF_DP_RX_DESC_BUF_TYPE, sizeof(union dp_rx_desc_list_elem_t),
+	 0, 0, CACHEABLE, { 0 } },
 
 #ifdef DISABLE_MON_CONFIG
 	/* no op */
 #else
 	/* 2 DP RX DESCs Status pools */
-	{DP_RX_DESC_STATUS_TYPE, sizeof(union dp_rx_desc_list_elem_t),
+	{QDF_DP_RX_DESC_STATUS_TYPE, sizeof(union dp_rx_desc_list_elem_t),
 	 WLAN_CFG_RXDMA_MONITOR_STATUS_RING_SIZE + 1, 0, CACHEABLE, { 0 } },
-	{DP_RX_DESC_STATUS_TYPE, sizeof(union dp_rx_desc_list_elem_t),
+	{QDF_DP_RX_DESC_STATUS_TYPE, sizeof(union dp_rx_desc_list_elem_t),
 	 WLAN_CFG_RXDMA_MONITOR_STATUS_RING_SIZE + 1, 0, CACHEABLE, { 0 } },
 #endif
 	/* DP HW Link DESCs pools */
-	{DP_HW_LINK_DESC_TYPE, HW_LINK_DESC_SIZE, NUM_HW_LINK_DESCS, 0,
-	NON_CACHEABLE, { 0 } },
+	{QDF_DP_HW_LINK_DESC_TYPE, HW_LINK_DESC_SIZE, NUM_HW_LINK_DESCS, 0,
+	 NON_CACHEABLE, { 0 } },
 #ifdef CONFIG_BERYLLIUM
-	{DP_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	{QDF_DP_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
 	 ((DP_TX_RX_DESC_MAX_NUM * sizeof(uint64_t)) / qdf_page_size),
 	 0, NON_CACHEABLE, { 0 } },
+#endif
+#ifdef FEATURE_DIRECT_LINK
+	{QDF_DP_TX_DIRECT_LINK_CE_BUF_TYPE, DIRECT_LINK_DEFAULT_BUF_SZ,
+	 TX_DIRECT_LINK_CE_BUF_NUM, 0, NON_CACHEABLE, { 0 } },
+	{QDF_DP_TX_DIRECT_LINK_BUF_TYPE, DIRECT_LINK_DEFAULT_BUF_SZ,
+	 TX_DIRECT_LINK_BUF_NUM, 0, NON_CACHEABLE, { 0 } },
+	{QDF_DP_RX_DIRECT_LINK_CE_BUF_TYPE, DIRECT_LINK_CE_RX_BUF_SIZE,
+	 RX_DIRECT_LINK_CE_BUF_NUM, 0, NON_CACHEABLE, { 0 } },
 #endif
 };
 
@@ -601,23 +615,77 @@ dp_update_mem_size_by_ring_type(struct wlan_dp_prealloc_cfg *cfg,
  */
 static void
 dp_update_num_elements_by_desc_type(struct wlan_dp_prealloc_cfg *cfg,
-				    enum dp_desc_type desc_type,
+				    enum qdf_dp_desc_type desc_type,
 				    uint16_t *num_elements)
 {
 	switch (desc_type) {
-	case DP_TX_DESC_TYPE:
+	case QDF_DP_TX_DESC_TYPE:
 		*num_elements = cfg->num_tx_desc;
 		return;
-	case DP_TX_EXT_DESC_TYPE:
-	case DP_TX_EXT_DESC_LINK_TYPE:
-	case DP_TX_TSO_DESC_TYPE:
-	case DP_TX_TSO_NUM_SEG_TYPE:
+	case QDF_DP_TX_EXT_DESC_TYPE:
+	case QDF_DP_TX_EXT_DESC_LINK_TYPE:
+	case QDF_DP_TX_TSO_DESC_TYPE:
+	case QDF_DP_TX_TSO_NUM_SEG_TYPE:
 		*num_elements = cfg->num_tx_ext_desc;
+		return;
+	case QDF_DP_RX_DESC_BUF_TYPE:
+		*num_elements = cfg->num_rx_sw_desc * WLAN_CFG_RX_SW_DESC_WEIGHT_SIZE;
 		return;
 	default:
 		return;
 	}
 }
+
+#ifdef WLAN_DP_PROFILE_SUPPORT
+static void
+wlan_dp_sync_prealloc_with_profile_cfg(struct wlan_dp_prealloc_cfg *cfg)
+{
+	struct wlan_dp_memory_profile_info *profile_info;
+	struct wlan_dp_memory_profile_ctx *profile_ctx;
+	int i;
+
+	profile_info = wlan_dp_get_profile_info();
+	if (!profile_info->is_selected)
+		return;
+
+	for (i = 0; i < profile_info->size; i++) {
+		profile_ctx = &profile_info->ctx[i];
+
+		switch (profile_ctx->param_type) {
+		case DP_TX_DESC_NUM_CFG:
+			cfg->num_tx_desc = profile_ctx->size;
+			break;
+		case DP_TX_EXT_DESC_NUM_CFG:
+			cfg->num_tx_ext_desc = profile_ctx->size;
+			break;
+		case DP_TX_RING_SIZE_CFG:
+			cfg->num_tx_ring_entries = profile_ctx->size;
+			break;
+		case DP_TX_COMPL_RING_SIZE_CFG:
+			cfg->num_tx_comp_ring_entries = profile_ctx->size;
+			break;
+		case DP_RX_SW_DESC_NUM_CFG:
+			cfg->num_rx_sw_desc = profile_ctx->size;
+			break;
+		case DP_REO_DST_RING_SIZE_CFG:
+			cfg->num_reo_dst_ring_entries = profile_ctx->size;
+			break;
+		case DP_RXDMA_BUF_RING_SIZE_CFG:
+			cfg->num_rxdma_buf_ring_entries = profile_ctx->size;
+			break;
+		case DP_RXDMA_REFILL_RING_SIZE_CFG:
+			cfg->num_rxdma_refill_ring_entries = profile_ctx->size;
+			break;
+		default:
+			break;
+		}
+	}
+}
+#else
+
+static inline void
+wlan_dp_sync_prealloc_with_profile_cfg(struct wlan_dp_prealloc_cfg *cfg) {}
+#endif
 
 QDF_STATUS dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 {
@@ -635,6 +703,7 @@ QDF_STATUS dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	}
 
 	wlan_cfg_get_prealloc_cfg(ctrl_psoc, &cfg);
+	wlan_dp_sync_prealloc_with_profile_cfg(&cfg);
 
 	/*Context pre-alloc*/
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_context_allocs); i++) {

@@ -267,6 +267,21 @@ QDF_STATUS ucfg_mlme_get_band_capability(struct wlan_objmgr_psoc *psoc,
 	return wlan_mlme_get_band_capability(psoc, band_capability);
 }
 
+/**
+ * ucfg_mlme_peer_config_vlan() - Send VLAN id to FW for
+ * RX packet
+ * @vdev: vdev pointer
+ * @macaddr: Peer mac address
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_mlme_peer_config_vlan(struct wlan_objmgr_vdev *vdev,
+			   uint8_t *macaddr)
+{
+	return wlan_mlme_peer_config_vlan(vdev, macaddr);
+}
+
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**
  * ucfg_mlme_get_wlm_multi_client_ll_caps() - Get multi client latency level
@@ -2904,8 +2919,8 @@ ucfg_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 }
 
 /**
- * ucfg_mlme_is_relaxed_6ghz_conn_policy_enabled() - Get 6ghz relaxed
- *                                                   connection policy flag
+ * ucfg_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled() - Get disable vlp sta
+ *                                                        conn to sp ap flag
  * @psoc: pointer to psoc object
  * @value: pointer to hold the value of flag
  *
@@ -2914,10 +2929,11 @@ ucfg_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
  * Return: QDF Status
  */
 static inline QDF_STATUS
-ucfg_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
-					      bool *value)
+ucfg_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
+						struct wlan_objmgr_psoc *psoc,
+						bool *value)
 {
-	return wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(psoc, value);
+	return wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(psoc, value);
 }
 
 /**
@@ -2935,23 +2951,6 @@ ucfg_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool *value)
 {
 	return wlan_mlme_is_standard_6ghz_conn_policy_enabled(psoc, value);
-}
-
-/**
- * ucfg_mlme_set_relaxed_6ghz_conn_policy() - Set 6ghz relaxed
- *                                            connection policy flag
- * @psoc: pointer to psoc object
- * @value: Value that needs to be set
- *
- * Inline UCFG API to be used by HDD/OSIF callers
- *
- * Return: QDF Status
- */
-static inline QDF_STATUS
-ucfg_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
-				       bool value)
-{
-	return wlan_mlme_set_relaxed_6ghz_conn_policy(psoc, value);
 }
 
 /**
@@ -2982,6 +2981,21 @@ static inline QDF_STATUS
 ucfg_mlme_get_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode *value)
 {
 	return wlan_mlme_get_eht_mode(psoc, value);
+}
+
+/**
+ * ucfg_mlme_is_multipass_sap() - check whether FW supports
+ * multipass sap capabilites
+ * @psoc: pointer to psoc object
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: True if FW support mulitpass sap
+ */
+static inline bool
+ucfg_mlme_is_multipass_sap(struct wlan_objmgr_psoc *psoc)
+{
+	return  wlan_mlme_is_multipass_sap(psoc);
 }
 
 /**
@@ -4406,7 +4420,31 @@ ucfg_mlme_set_obss_color_collision_offload_enabled(
  */
 QDF_STATUS
 ucfg_mlme_set_bss_color_collision_det_sta(struct wlan_objmgr_psoc *psoc,
-					  uint8_t value);
+					  bool value);
+
+/**
+ * ucfg_mlme_set_bss_color_collision_det_support() - Set bss color collision
+ * detection offload support from FW for STA mode
+ * @psoc:  pointer to psoc object
+ * @value: enable or disable
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_set_bss_color_collision_det_support(struct wlan_objmgr_psoc *psoc,
+					      bool value);
+
+/**
+ * ucfg_mlme_get_bss_color_collision_det_support() - Get bss color collision
+ * detection offload FW support for STA mode
+ * @psoc:  pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_bss_color_collision_det_support(struct wlan_objmgr_psoc *psoc,
+					      bool *value);
 
 /**
  * ucfg_mlme_set_restricted_80p80_bw_supp() - Set the restricted 80p80 support
@@ -4642,10 +4680,10 @@ ucfg_mlme_is_chwidth_with_notify_supported(struct wlan_objmgr_psoc *psoc);
  * @psoc: pointer to psoc object
  * @vdev_id: Vdev id
  *
- * Return: none
+ * Return: QDF_STATUS
  */
-void ucfg_mlme_connected_chan_stats_request(struct wlan_objmgr_psoc *psoc,
-					    uint8_t vdev_id);
+QDF_STATUS ucfg_mlme_connected_chan_stats_request(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id);
 
 /**
  * ucfg_mlme_set_vdev_traffic_high_throughput()  - Set/clear vdev high

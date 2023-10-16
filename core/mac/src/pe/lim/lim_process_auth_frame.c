@@ -48,6 +48,7 @@
 #include "lim_types.h"
 #include <wlan_mlo_mgr_main.h>
 #include "wlan_nan_api_i.h"
+#include <utils_mlo.h>
 /**
  * is_auth_valid
  *
@@ -310,6 +311,42 @@ static void lim_process_auth_open_system_algo(struct mac_context *mac_ctx,
 	lim_send_auth_mgmt_frame(mac_ctx, auth_frame, mac_hdr->sa,
 					LIM_NO_WEP_IN_FC,
 					pe_session);
+}
+
+static QDF_STATUS
+lim_validate_mac_address_in_auth_frame(struct mac_context *mac_ctx,
+				       tpSirMacMgmtHdr mac_hdr,
+				       struct qdf_mac_addr *mld_addr)
+{
+	struct wlan_objmgr_vdev *vdev;
+
+	/* SA is same as any of the device vdev, return failure */
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac_ctx->pdev,
+							 mac_hdr->sa,
+							 WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return QDF_STATUS_E_ALREADY;
+	}
+
+	if (mlo_mgr_ml_peer_exist_on_diff_ml_ctx(mac_hdr->sa, NULL))
+		return QDF_STATUS_E_ALREADY;
+
+	if (qdf_is_macaddr_zero(mld_addr))
+		return QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac_ctx->pdev,
+							 mld_addr->bytes,
+							 WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return QDF_STATUS_E_ALREADY;
+	}
+
+	if (mlo_mgr_ml_peer_exist_on_diff_ml_ctx(mld_addr->bytes, NULL))
+		return QDF_STATUS_E_ALREADY;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 #ifdef WLAN_FEATURE_SAE
@@ -690,6 +727,14 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 			 */
 			lim_get_sta_mld_address(pe_session->vdev, body_ptr,
 						frame_len, &peer_mld);
+			status = lim_validate_mac_address_in_auth_frame(mac_ctx,
+									mac_hdr,
+									&peer_mld);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				pe_debug("Drop SAE auth, duplicate entity found");
+				return;
+			}
+
 			lim_external_auth_add_pre_auth_node(mac_ctx, mac_hdr,
 						eLIM_MLM_WT_SAE_AUTH_STATE,
 						&peer_mld);
@@ -880,41 +925,6 @@ lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS
-lim_validate_mac_address_in_auth_frame(struct mac_context *mac_ctx,
-				       tpSirMacMgmtHdr mac_hdr,
-				       tSirMacAuthFrameBody *rx_auth_frm_body)
-{
-	struct wlan_objmgr_vdev *vdev;
-
-	/* SA is same as any of the device vdev, return failure */
-	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac_ctx->pdev,
-							 mac_hdr->sa,
-							 WLAN_LEGACY_MAC_ID);
-	if (vdev) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-		return QDF_STATUS_E_ALREADY;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(
-					mac_ctx->pdev,
-					rx_auth_frm_body->peer_mld.bytes,
-					WLAN_LEGACY_MAC_ID);
-	if (vdev) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-		return QDF_STATUS_E_ALREADY;
-	}
-
-	if (mlo_mgr_ml_peer_exist_on_diff_ml_ctx(mac_hdr->sa, NULL))
-		return QDF_STATUS_E_ALREADY;
-
-	if (mlo_mgr_ml_peer_exist_on_diff_ml_ctx(
-				rx_auth_frm_body->peer_mld.bytes, NULL))
-		return QDF_STATUS_E_ALREADY;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		tpSirMacMgmtHdr mac_hdr,
 		tSirMacAuthFrameBody *rx_auth_frm_body,
@@ -1073,9 +1083,11 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 	if (lim_is_auth_algo_supported(mac_ctx,
 			(tAniAuthType) rx_auth_frm_body->authAlgoNumber,
 			pe_session)) {
-		status = lim_validate_mac_address_in_auth_frame(
-						mac_ctx, mac_hdr,
-						rx_auth_frm_body);
+		struct qdf_mac_addr *mld_addr = &rx_auth_frm_body->peer_mld;
+
+		status = lim_validate_mac_address_in_auth_frame(mac_ctx,
+								mac_hdr,
+								mld_addr);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("Duplicate MAC address found, reject auth");
 			auth_frame->authAlgoNumber =

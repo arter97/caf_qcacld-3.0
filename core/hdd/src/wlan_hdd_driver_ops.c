@@ -49,6 +49,7 @@
 #include <qdf_hang_event_notifier.h>
 #include "wlan_hdd_thermal.h"
 #include "wlan_dp_ucfg_api.h"
+#include "qdf_ssr_driver_dump.h"
 
 #ifdef MODULE
 #ifdef WLAN_WEAR_CHIPSET
@@ -135,6 +136,39 @@ void hdd_put_consistent_mem_unaligned(void *vaddr)
 	ucfg_dp_prealloc_put_consistent_mem_unaligned(vaddr);
 }
 
+/**
+ * hdd_dp_prealloc_get_multi_pages() - gets pre-alloc DP multi-pages memory
+ * @desc_type: descriptor type
+ * @elem_size: single element size
+ * @elem_num: total number of elements should be allocated
+ * @pages: multi page information storage
+ * @cacheable: coherent memory or cacheable memory
+ *
+ * Return: None
+ */
+static
+void hdd_dp_prealloc_get_multi_pages(uint32_t desc_type, qdf_size_t elem_size,
+				     uint16_t elem_num,
+				     struct qdf_mem_multi_page_t *pages,
+				     bool cacheable)
+{
+	ucfg_dp_prealloc_get_multi_pages(desc_type, elem_size, elem_num, pages,
+					 cacheable);
+}
+
+/**
+ * hdd_dp_prealloc_put_multi_pages() - puts back pre-alloc DP multi-pages memory
+ * @desc_type: descriptor type
+ * @pages: multi page information storage
+ *
+ * Return: None
+ */
+static
+void hdd_dp_prealloc_put_multi_pages(uint32_t desc_type,
+				     struct qdf_mem_multi_page_t *pages)
+{
+	ucfg_dp_prealloc_put_multi_pages(desc_type, pages);
+}
 #else
 static
 void *hdd_get_consistent_mem_unaligned(size_t size,
@@ -150,6 +184,20 @@ static
 void hdd_put_consistent_mem_unaligned(void *vaddr)
 {
 	hdd_err_rl("prealloc not support!");
+}
+
+static inline
+void hdd_dp_prealloc_get_multi_pages(uint32_t desc_type, qdf_size_t elem_size,
+				     uint16_t elem_num,
+				     struct qdf_mem_multi_page_t *pages,
+				     bool cacheable)
+{
+}
+
+static inline
+void hdd_dp_prealloc_put_multi_pages(uint32_t desc_type,
+				     struct qdf_mem_multi_page_t *pages)
+{
 }
 #endif
 
@@ -264,6 +312,10 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 		hdd_get_consistent_mem_unaligned;
 	cbk->prealloc_put_consistent_mem_unaligned =
 		hdd_put_consistent_mem_unaligned;
+	cbk->prealloc_get_multi_pages =
+		hdd_dp_prealloc_get_multi_pages;
+	cbk->prealloc_put_multi_pages =
+		hdd_dp_prealloc_put_multi_pages;
 }
 
 #ifdef HIF_DETECTION_LATENCY_ENABLE
@@ -2182,6 +2234,21 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 
 }
 
+#ifdef WLAN_FEATURE_SSR_DRIVER_DUMP
+static int
+wlan_hdd_pld_collect_driver_dump(struct device *dev,
+				 enum pld_bus_type bus_type,
+				 struct cnss_ssr_driver_dump_entry *input_array,
+				 size_t *num_entries_loaded)
+{
+	QDF_STATUS status;
+
+	status =  qdf_ssr_driver_dump_retrieve_regions(input_array,
+						       num_entries_loaded);
+	return qdf_status_to_os_return(status);
+}
+#endif
+
 #ifdef FEATURE_RUNTIME_PM
 /**
  * wlan_hdd_pld_runtime_suspend() - runtime suspend function registered to PLD
@@ -2248,6 +2315,9 @@ struct pld_driver_ops wlan_drv_ops = {
 	.reset_resume = wlan_hdd_pld_reset_resume,
 	.modem_status = wlan_hdd_pld_notify_handler,
 	.uevent = wlan_hdd_pld_uevent,
+#ifdef WLAN_FEATURE_SSR_DRIVER_DUMP
+	.collect_driver_dump = wlan_hdd_pld_collect_driver_dump,
+#endif
 #ifdef FEATURE_RUNTIME_PM
 	.runtime_suspend = wlan_hdd_pld_runtime_suspend,
 	.runtime_resume = wlan_hdd_pld_runtime_resume,
