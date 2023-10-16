@@ -1153,9 +1153,6 @@ sme_rrm_fill_freq_list_for_channel_load(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	sme_debug("opclass: %d, channel: %d freq:%d, country code %c%c 0x%x",
-		  sme_rrm_ctx->regClass, channel, scan_freq,
-		  country_code[0], country_code[1], country_code[2]);
 	if (wlan_reg_is_6ghz_op_class(mac_ctx->pdev, sme_rrm_ctx->regClass))
 		chan_space = wlan_reg_get_op_class_width
 			(mac_ctx->pdev, sme_rrm_ctx->regClass, true);
@@ -1163,6 +1160,12 @@ sme_rrm_fill_freq_list_for_channel_load(struct mac_context *mac_ctx,
 		chan_space = wlan_reg_dmn_get_chanwidth_from_opclass_auto(
 							country_code, channel,
 							sme_rrm_ctx->regClass);
+
+	sme_debug("opclass: %d, channel: %d freq:%d, country code %c%c 0x%x, chan_space:%d",
+		  sme_rrm_ctx->regClass, channel, scan_freq,
+		  country_code[0], country_code[1], country_code[2],
+		  chan_space);
+
 	switch (chan_space) {
 	case 320:
 		fallthrough;

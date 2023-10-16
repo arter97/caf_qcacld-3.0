@@ -49,12 +49,13 @@
 #include "../../core/src/wlan_cp_stats_obj_mgr_handler.h"
 #include "../../core/src/wlan_cp_stats_defs.h"
 #include "cdp_txrx_host_stats.h"
+#include "utils_mlo.h"
+#include "wlan_mlo_mgr_sta.h"
 
 #define MAX_CTRL_STAT_VDEV_ENTRIES 1
 #define MAX_CTRL_STAT_MAC_ADDR_ENTRIES 1
 #define MAX_RMM_STA_STATS_REQUESTED 2
 #define MAX_MEAS_DURATION_FOR_STA_STATS 10
-
 /* Max passive scan dwell for wide band rrm scan, in milliseconds */
 #define RRM_SCAN_MAX_DWELL_TIME 110
 
@@ -581,24 +582,28 @@ void rrm_get_country_code_from_connected_profile(struct mac_context *mac,
  * @chan: channel number
  * @req_mode: Request mode
  * @duration: The duration over which the Beacon report was measured
- * @vdev_id: vdev Id
+ * @pe_session: pe session pointer
  */
 static void
 wlan_diag_log_beacon_rpt_req_event(uint8_t token, uint8_t mode,
 				   uint8_t op_class, uint8_t chan,
 				   uint8_t req_mode, uint32_t duration,
-				   uint8_t vdev_id)
+				   struct pe_session *pe_session)
 {
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_bcn_rpt);
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
-	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
+	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(pe_session->vdev);
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us =  qdf_ktime_to_us(qdf_ktime_get());
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BCN_RPT_REQ_EVENT;
-	wlan_diag_event.version = DIAG_BCN_RPT_VERSION;
+	wlan_diag_event.version = DIAG_BCN_RPT_VERSION_2;
+
+	if (mlo_is_mld_sta(pe_session->vdev))
+		wlan_diag_event.band =
+			wlan_convert_freq_to_diag_band(pe_session->curr_op_freq);
 
 	wlan_diag_event.meas_token = token;
 	wlan_diag_event.mode = mode;
@@ -614,7 +619,7 @@ static void
 wlan_diag_log_beacon_rpt_req_event(uint8_t token, uint8_t mode,
 				   uint8_t op_class, uint8_t chan,
 				   uint8_t req_mode, uint32_t duration,
-				   uint8_t vdev_id)
+				   struct pe_session *pe_session)
 {
 }
 #endif
@@ -1195,6 +1200,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 	char *tmp_buf = NULL;
 	uint8_t country[WNI_CFG_COUNTRY_CODE_LEN];
 	uint8_t req_mode;
+	uint8_t i;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -1240,7 +1246,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 					   pBeaconReq->measurement_request.Beacon.meas_mode,
 					   pBeaconReq->measurement_request.Beacon.regClass,
 					   pBeaconReq->measurement_request.Beacon.channel,
-					   req_mode, measDuration, wlan_vdev_get_id(pe_session->vdev));
+					   req_mode, measDuration, pe_session);
 
 	if (measDuration == 0 &&
 	    pBeaconReq->measurement_request.Beacon.meas_mode !=
@@ -1297,6 +1303,36 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 			     pBeaconReq->measurement_request.Beacon.
 			     RequestedInfo.requested_eids,
 			     pCurrentReq->request.Beacon.reqIes.num);
+		for (i = 0; i < pCurrentReq->request.Beacon.reqIes.num; i++)
+			pe_debug("RX: [802.11 BCN_RPT]:Requested EID is %d",
+				pBeaconReq->measurement_request.Beacon.RequestedInfo.requested_eids[i]);
+	}
+
+	if (pBeaconReq->measurement_request.Beacon.ExtRequestedInfo.present) {
+		if (!pBeaconReq->measurement_request.Beacon.ExtRequestedInfo.num_req_element_id_ext) {
+			pe_err("RX: [802.11 BCN_RPT]: Requested num of Extn EID is 0");
+			return eRRM_FAILURE;
+		}
+		if (pBeaconReq->measurement_request.Beacon.ExtRequestedInfo.req_element_id !=
+			WLAN_ELEMID_EXTN_ELEM) {
+			pe_err("RX: [802.11 BCN_RPT]: Extn Element ID is not 0xFF");
+			return eRRM_FAILURE;
+		}
+
+		pCurrentReq->request.Beacon.reqIes.ext_info.eid =
+			pBeaconReq->measurement_request.Beacon.ExtRequestedInfo.req_element_id;
+		pCurrentReq->request.Beacon.reqIes.ext_info.num_eid_ext =
+			pBeaconReq->measurement_request.Beacon.ExtRequestedInfo.num_req_element_id_ext;
+		qdf_mem_copy(pCurrentReq->request.Beacon.reqIes.ext_info.eid_ext,
+			     pBeaconReq->measurement_request.Beacon.ExtRequestedInfo.req_element_id_ext,
+			     pCurrentReq->request.Beacon.reqIes.ext_info.num_eid_ext);
+		pe_debug("RX: [802.11 BCN_RPT]: EID is %d",
+			 pCurrentReq->request.Beacon.reqIes.ext_info.eid);
+		pe_debug("RX: [802.11 BCN_RPT]:Num of Extn EID is %d",
+			 pCurrentReq->request.Beacon.reqIes.ext_info.num_eid_ext);
+	for (i = 0; i < pCurrentReq->request.Beacon.reqIes.ext_info.num_eid_ext; i++)
+		pe_debug("RX: [802.11 BCN_RPT]:Requested Extn EID is %d",
+			 pBeaconReq->measurement_request.Beacon.ExtRequestedInfo.req_element_id_ext[i]);
 	}
 
 	/* Prepare the request to send to SME. */
@@ -1421,6 +1457,70 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 	return eRRM_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static uint8_t *
+rrm_check_ml_ie(uint8_t *ies, uint16_t len, uint8_t *mlie_copy_len)
+{
+	uint8_t *ml_ie = NULL;
+	qdf_size_t ml_ie_total_len = 0;
+	uint8_t *mlie_copy = NULL;
+	uint8_t ml_common_info_length = 0;
+	uint8_t ml_bv_ie_len = 0;
+
+	util_find_mlie(ies, len, &ml_ie, &ml_ie_total_len);
+	if (!ml_ie) {
+		mlo_debug("[802.11 BCN_RPT]: Not ML AP total_len:%d", len);
+		return NULL;
+	}
+
+	mlo_debug("[802.11 BCN_RPT]: ML IE is present ml_ie_total_len:%d", ml_ie_total_len);
+
+	util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
+				      &ml_common_info_length);
+
+	ml_bv_ie_len = sizeof(struct wlan_ie_multilink) + ml_common_info_length;
+	if (ml_bv_ie_len) {
+		mlie_copy = qdf_mem_malloc(ml_bv_ie_len);
+		if (!mlie_copy) {
+			mlo_err("malloc failed");
+			goto end;
+		}
+		qdf_mem_copy(mlie_copy, ml_ie, ml_bv_ie_len);
+		mlie_copy[TAG_LEN_POS] = ml_bv_ie_len - sizeof(struct ie_header);
+		*mlie_copy_len = ml_bv_ie_len;
+	}
+
+end:
+	return mlie_copy;
+}
+
+static bool
+rrm_copy_ml_ie(uint8_t eid, uint8_t extn_eid,
+	       uint8_t *ml_ie, uint16_t ml_len, uint8_t *pIes)
+{
+	if ((eid == WLAN_ELEMID_EXTN_ELEM || !eid) &&
+		extn_eid == WLAN_EXTN_ELEMID_MULTI_LINK) {
+		if (ml_ie && ml_len && pIes) {
+			qdf_mem_copy(pIes, ml_ie, ml_len);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+#else
+static inline uint8_t *
+rrm_check_ml_ie(uint8_t *ies, uint16_t len, uint8_t *mlie_copy_len) {
+	return NULL;
+}
+
+static inline bool
+rrm_copy_ml_ie(uint8_t eid, uint8_t extn_eid, uint8_t *ml_ie,
+	       uint16_t ml_len, uint8_t *pIes) {
+	return false;
+}
+#endif
 /**
  * rrm_fill_beacon_ies() - Fills fixed fields and Ies in bss description to an
  * array of uint8_t.
@@ -1438,19 +1538,25 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 static uint16_t
 rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 		    uint8_t *pNumIes, uint8_t pIesMaxSize, uint8_t *eids,
-		    uint8_t numEids, uint16_t start_offset,
+		    uint8_t numEids, uint8_t eid, uint8_t *extn_eids,
+		    uint8_t extn_eids_count, uint16_t start_offset,
 		    struct bss_description *bss_desc)
 {
-	uint8_t *pBcnIes, count = 0, i;
+	uint8_t *pBcnIes, i;
 	uint16_t BcnNumIes, total_ies_len, len;
 	uint16_t rem_len = 0;
+	uint8_t num_eids = 0;
+	uint8_t ml_len = 0;
+	uint8_t *ml_copy = NULL;
 
 	if ((!pIes) || (!pNumIes) || (!bss_desc)) {
 		pe_err("Invalid parameters");
 		return 0;
 	}
 	/* Make sure that if eid is null, numEids is set to zero. */
-	numEids = (!eids) ? 0 : numEids;
+	num_eids = (!eids) ? 0 : numEids;
+	num_eids += (!extn_eids) ? 0 : extn_eids_count;
+	pe_err("extn_eids_count %d", extn_eids_count);
 
 	total_ies_len = GET_IE_LEN_IN_BSS(bss_desc->length);
 	BcnNumIes = total_ies_len;
@@ -1461,6 +1567,7 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 	}
 
 	pBcnIes = (uint8_t *)&bss_desc->ieFields[0];
+	ml_copy = rrm_check_ml_ie(pBcnIes, total_ies_len, &ml_len);
 	pBcnIes += start_offset;
 	BcnNumIes = BcnNumIes - start_offset;
 
@@ -1491,6 +1598,8 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 		len += 2;       /* element id + length. */
 		pe_debug("EID = %d, len = %d total = %d",
 			*pBcnIes, *(pBcnIes + 1), len);
+		if (*pBcnIes == WLAN_ELEMID_EXTN_ELEM && *(pBcnIes + 2) > 0)
+			pe_debug("Extended EID = %d", *(pBcnIes + 2));
 
 		if (BcnNumIes < len || len <= 2) {
 			pe_err("RRM: Invalid IE len:%d exp_len:%d",
@@ -1500,31 +1609,37 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 
 		i = 0;
 		do {
-			if ((!eids) || (*pBcnIes == eids[i])) {
+			if (((!eids) || (*pBcnIes == eids[i])) ||
+				((*pBcnIes == eid) && *(pBcnIes + 2) == extn_eids[i])) {
 				if (((*pNumIes) + len) < pIesMaxSize) {
-					qdf_mem_copy(pIes, pBcnIes, len);
-					pIes += len;
-					*pNumIes += len;
-					count++;
+						qdf_mem_copy(pIes, pBcnIes, len);
+						pIes += len;
+						*pNumIes += len;
 				} else {
+					if (rrm_copy_ml_ie(*pBcnIes, *(pBcnIes + 2), ml_copy, ml_len, pIes)) {
+						pIes += ml_len;
+						*pNumIes += ml_len;
+						start_offset = start_offset + len - ml_len;
+					} else {
 					/*
 					 * If max size of fragment is reached,
 					 * calculate the remaining length and
 					 * break. For first fragment, account
 					 * for the fixed fields also.
 					 */
-					rem_len = total_ies_len - *pNumIes -
-						  start_offset;
+						rem_len = total_ies_len - *pNumIes -
+							  start_offset;
 					if (start_offset == 0)
 						rem_len = rem_len +
 						BEACON_FRAME_IES_OFFSET;
 					pe_debug("rem_len %d ies added %d",
 						 rem_len, *pNumIes);
+					}
 				}
 				break;
 			}
 			i++;
-		} while (i < numEids);
+		} while (i < num_eids);
 
 		if (rem_len)
 			break;
@@ -1532,6 +1647,10 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 		pBcnIes += len;
 		BcnNumIes -= len;
 	}
+
+	if (ml_copy)
+		qdf_mem_free(ml_copy);
+
 	pe_debug("Total length of Ies added = %d rem_len %d",
 		 *pNumIes, rem_len);
 
@@ -1688,6 +1807,9 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 					    curr_req->request.Beacon.reqIes.
 					    pElementIds,
 					    curr_req->request.Beacon.reqIes.num,
+					    curr_req->request.Beacon.reqIes.ext_info.eid,
+					    &curr_req->request.Beacon.reqIes.ext_info.eid_ext[0],
+					    curr_req->request.Beacon.reqIes.ext_info.num_eid_ext,
 					    offset, bss_desc);
 				break;
 			case BEACON_REPORTING_DETAIL_ALL_FF_IE:
@@ -1700,6 +1822,9 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 					    (uint8_t *) &beacon_report->Ies[0],
 					    (uint8_t *) &beacon_report->numIes,
 					    BEACON_REPORT_MAX_IES,
+					    NULL,
+					    0,
+					    0,
 					    NULL,
 					    0,
 					    offset, bss_desc);
@@ -1924,6 +2049,9 @@ rrm_process_channel_load_req(struct mac_context *mac,
 	uint8_t op_class, channel, reporting_condition;
 	uint16_t randomization_intv, meas_duration, max_meas_duration;
 	bool present;
+	uint8_t country[WNI_CFG_COUNTRY_CODE_LEN];
+	qdf_freq_t chan_freq;
+	bool is_freq_enabled;
 
 	present = chan_load_req->measurement_request.channel_load.rrm_reporting.present;
 	reporting_condition = chan_load_req->measurement_request.channel_load.rrm_reporting.reporting_condition;
@@ -1947,13 +2075,41 @@ rrm_process_channel_load_req(struct mac_context *mac,
 			meas_duration = max_meas_duration;
 		}
 	}
-	pe_debug("RX:[802.11 CH_LOAD] seq:%d Token:%d op_c:%d ch:%d meas_dur:%d, rand intv: %d, max_dur:%d",
+	pe_debug("RX:[802.11 CH_LOAD] vdev :%d, seq:%d Token:%d op_c:%d ch:%d meas_dur:%d, rand intv: %d, max_dur:%d",
+		 pe_session->vdev_id,
 		 mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
 		 chan_load_req->measurement_token, op_class,
 		 channel, meas_duration, randomization_intv,
 		 max_meas_duration);
 	if (!meas_duration || meas_duration > RRM_SCAN_MAX_DWELL_TIME)
 		return eRRM_REFUSED;
+
+	if (!wlan_reg_is_6ghz_supported(mac->psoc) &&
+	    (wlan_reg_is_6ghz_op_class(mac->pdev, op_class))) {
+		pe_debug("RX: [802.11 CH_LOAD] Ch belongs to 6 ghz spectrum, abort");
+		return eRRM_INCAPABLE;
+	}
+
+	rrm_get_country_code_from_connected_profile(mac, pe_session->vdev_id,
+						    country);
+	chan_freq = wlan_reg_country_chan_opclass_to_freq(mac->pdev,
+							  country, channel,
+							  op_class, false);
+	if (!chan_freq) {
+		pe_debug("Invalid ch freq for country code %c%c 0x%x",
+			 country[0], country[1], country[2]);
+		return eRRM_INCAPABLE;
+	}
+
+	pe_debug("freq:%d, country code %c%c 0x%x", chan_freq, country[0],
+		 country[1], country[2]);
+
+	is_freq_enabled = wlan_reg_is_freq_enabled(mac->pdev, chan_freq,
+						   REG_CURRENT_PWR_MODE);
+	if (!is_freq_enabled) {
+		pe_debug("No channels populated with requested operation class and current country, Hence abort the rrm operation");
+		return eRRM_INCAPABLE;
+	}
 
 	/* Prepare the request to send to SME. */
 	load_ind = qdf_mem_malloc(sizeof(struct ch_load_ind));
@@ -2462,6 +2618,8 @@ QDF_STATUS rrm_initialize(struct mac_context *mac)
 	pRRMCaps->APChanReport = 1;
 	pRRMCaps->fine_time_meas_rpt = 1;
 	pRRMCaps->lci_capability = 1;
+	pRRMCaps->ChannelLoad = 1;
+	pRRMCaps->statistics = 1;
 
 	pRRMCaps->operatingChanMax = 3;
 	pRRMCaps->nonOperatingChanMax = 3;

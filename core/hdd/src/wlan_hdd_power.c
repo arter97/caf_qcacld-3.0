@@ -2225,12 +2225,10 @@ int wlan_hdd_set_powersave(struct wlan_hdd_link_info *link_info,
 				hdd_ctx->mac_handle, link_info->vdev_id,
 				allow_power_save, timeout,
 				sta_ctx->ap_supports_immediate_power_save);
-	if (!allow_power_save) {
-		if (adapter->device_mode == QDF_STA_MODE)
-			hdd_twt_del_dialog_in_ps_disable(hdd_ctx,
-						&sta_ctx->conn_info.bssid,
-						link_info->vdev_id);
-	}
+	if (!allow_power_save && adapter->device_mode == QDF_STA_MODE)
+		hdd_twt_del_dialog_in_ps_disable(hdd_ctx,
+						 &sta_ctx->conn_info.bssid,
+						 link_info->vdev_id);
 
 	return qdf_status_to_os_return(status);
 }

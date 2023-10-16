@@ -38,3 +38,10 @@ bool ucfg_is_ll_lt_sap_supported(void)
 	return ll_lt_sap_is_supported();
 }
 
+QDF_STATUS ucfg_ll_lt_sap_request_for_audio_transport_switch(
+						uint8_t transport_switch_type)
+{
+	return ll_lt_sap_request_for_audio_transport_switch(
+							transport_switch_type);
+}
+

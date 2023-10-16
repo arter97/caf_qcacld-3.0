@@ -513,6 +513,7 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	struct mlme_legacy_priv *mlme_priv;
 	enum eSirMacHTChannelWidth max_bw;
 	struct wlan_channel *des_chan;
+	uint8_t link_id = 0xFF;
 	int ret;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	enum phy_ch_width assoc_ch_width;
@@ -533,7 +534,7 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	cm_update_associated_ch_info(vdev, false);
 
 	max_bw = get_max_bw();
-	ret = hdd_set_mac_chan_width(adapter, max_bw);
+	ret = hdd_set_mac_chan_width(adapter, max_bw, link_id);
 	if (ret) {
 		hdd_err("vdev %d : fail to set max ch width", vdev_id);
 		return;
@@ -580,6 +581,8 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	__hdd_cm_disconnect_handler_post_user_update(link_info, vdev);
 	wlan_twt_concurrency_update(hdd_ctx);
 	hdd_cm_reset_udp_qos_upgrade_config(adapter);
+	ucfg_mlme_set_ml_link_control_mode(hdd_ctx->psoc,
+					   vdev->vdev_objmgr.vdev_id, 0);
 
 	return QDF_STATUS_SUCCESS;
 }

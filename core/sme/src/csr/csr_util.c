@@ -356,7 +356,7 @@ static bool csr_is_conn_state_ap(struct mac_context *mac, uint32_t sessionId)
 {
 	enum QDF_OPMODE opmode;
 
-	opmode = wlan_get_opmode_vdev_id(mac->pdev, sessionId);
+	opmode = wlan_get_opmode_from_vdev_id(mac->pdev, sessionId);
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE)
 		return true;
 

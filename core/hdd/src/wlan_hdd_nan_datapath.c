@@ -68,6 +68,27 @@ void hdd_nan_datapath_target_config(struct hdd_context *hdd_ctx,
 		  tgt_cfg->nan_datapath_enabled);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+/**
+ * hdd_close_ndi_adapter() - close the adapter
+ * @hdd_ctx: pointer to HDD context
+ * @adapter: adapter context
+ * @value: true or false
+ *
+ * Returns: void
+ */
+static void hdd_close_ndi_adapter(struct hdd_context *hdd_ctx,
+				  struct hdd_adapter *adapter, bool value)
+{
+}
+#else
+static void hdd_close_ndi_adapter(struct hdd_context *hdd_ctx,
+				  struct hdd_adapter *adapter, bool value)
+{
+	hdd_close_adapter(hdd_ctx, adapter, value);
+}
+#endif
+
 /**
  * hdd_close_ndi() - close NAN Data interface
  * @adapter: adapter context
@@ -101,7 +122,7 @@ static int hdd_close_ndi(struct hdd_adapter *adapter)
 
 	adapter->is_virtual_iface = true;
 	/* We are good to close the adapter */
-	hdd_close_adapter(hdd_ctx, adapter, true);
+	hdd_close_ndi_adapter(hdd_ctx, adapter, true);
 
 	hdd_exit();
 	return 0;
@@ -651,6 +672,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 
 	hdd_set_netdev_flags(adapter);
 
+	hdd_tsf_auto_report_init(adapter);
 	update_ndi_state(adapter, NAN_DATA_NDI_CREATING_STATE);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	return ret_val;

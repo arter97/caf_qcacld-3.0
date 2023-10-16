@@ -4,15 +4,24 @@ load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
     "pineapple": [
+	"kiwi-v2",
+    ],
+    "sun": [
+        "peach",
         "kiwi-v2",
     ],
 }
 
 _chipset_hw_map = {
     "kiwi-v2": "BERYLLIUM",
+    "peach": "BERYLLIUM",
 }
 
 _chipset_header_map = {
+    "peach": [
+        "api/hw/peach/v1",
+        "cmn/hal/wifi3.0/kiwi",
+    ],
     "kiwi-v2": [
         "api/hw/kiwi/v2",
         "cmn/hal/wifi3.0/kiwi",
@@ -523,6 +532,7 @@ _fixed_srcs = [
     "core/hdd/src/wlan_hdd_hostapd.c",
     "core/hdd/src/wlan_hdd_ioctl.c",
     "core/hdd/src/wlan_hdd_main.c",
+    "core/hdd/src/wlan_hdd_ll_lt_sap.c",
     "core/hdd/src/wlan_hdd_object_manager.c",
     "core/hdd/src/wlan_hdd_oemdata.c",
     "core/hdd/src/wlan_hdd_p2p.c",
@@ -1877,6 +1887,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_roam_trigger_bitmap.c",
         ],
     },
+    "CONFIG_WLAN_SYSFS_RF_TEST_MODE": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_rf_test_mode.c",
+        ],
+    },
     "CONFIG_WLAN_SYSFS_DP_STATS": {
         True: [
             "core/hdd/src/wlan_hdd_sysfs_txrx_stats_console.c",
@@ -2097,11 +2112,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     feature_grep_map = [
         {
-            "pattern": "walt_get_cpus_taken",
-            "file": "kernel/sched/walt/walt.c",
-            "flag": "WALT_GET_CPU_TAKEN_SUPPORT",
-        },
-        {
             "pattern": "nl80211_validate_key_link_id",
             "file": "net/wireless/nl80211.c",
             "flag": "CFG80211_MLO_KEY_OPERATION_SUPPORT",
@@ -2152,6 +2162,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = cmd,
     )
 
+    copts.append("-Wno-format")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 
@@ -2211,9 +2222,26 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         ],
     )
 
+def define_dist(target, variant, chipsets):
+    tv = "{}_{}".format(target, variant)
+    dataList = []
+    for c in chipsets:
+        tvc = "{}_{}_{}".format(target, variant, c)
+        name = "{}_qca_cld_{}".format(tv, c)
+        dataList.append(":{}".format(name))
+        copy_to_dist_dir(
+            name = "{}_modules_dist".format(tvc),
+            data =  [":{}".format(name)],
+            dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+            flat = True,
+            wipe_dist_dir = False,
+            allow_duplicate_filenames = False,
+            mode_overrides = {"**/*": "644"},
+            log = "info",
+        )
     copy_to_dist_dir(
-        name = "{}_modules_dist".format(tvc),
-        data = [":{}".format(name)],
+        name = "{}_all_modules_dist".format(tv),
+        data = dataList,
         dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         flat = True,
         wipe_dist_dir = False,
@@ -2228,3 +2256,4 @@ def define_modules():
         if chipsets:
             for c in chipsets:
                 _define_module_for_target_variant_chipset(t, v, c)
+            define_dist(t, v, chipsets)

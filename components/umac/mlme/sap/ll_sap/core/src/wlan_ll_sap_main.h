@@ -48,4 +48,14 @@ QDF_STATUS ll_sap_init(void);
  */
 QDF_STATUS ll_sap_deinit(void);
 
+/**
+ * ll_lt_sap_request_for_audio_transport_switch() - Check if audio transport
+ * switch request can be supported or not
+ * @transport_switch_type: requested transport switch type
+ *
+ * Return: True/False
+ */
+QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
+						uint8_t transport_switch_type);
+
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

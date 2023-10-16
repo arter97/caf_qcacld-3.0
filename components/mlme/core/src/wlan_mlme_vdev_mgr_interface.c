@@ -1561,6 +1561,8 @@ static void mlme_ext_handler_destroy(struct vdev_mlme_obj *vdev_mlme)
 		&vdev_mlme->ext_vdev_ptr->bss_color_change_runtime_lock);
 	qdf_wake_lock_destroy(
 		&vdev_mlme->ext_vdev_ptr->bss_color_change_wakelock);
+	qdf_runtime_lock_deinit(
+		&vdev_mlme->ext_vdev_ptr->disconnect_runtime_lock);
 	mlme_free_self_disconnect_ies(vdev_mlme->vdev);
 	mlme_free_peer_disconnect_ies(vdev_mlme->vdev);
 	mlme_free_sae_auth_retry(vdev_mlme->vdev);
@@ -1600,6 +1602,8 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 			"bss_color_change_wakelock");
 	qdf_runtime_lock_init(
 		&vdev_mlme->ext_vdev_ptr->bss_color_change_runtime_lock);
+	qdf_runtime_lock_init(
+		&vdev_mlme->ext_vdev_ptr->disconnect_runtime_lock);
 
 	sme_get_vdev_type_nss(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
 			      &vdev_mlme->proto.generic.nss_2g,
@@ -1931,6 +1935,7 @@ QDF_STATUS psoc_mlme_ext_hdl_create(struct psoc_mlme_obj *psoc_mlme)
 			&psoc_mlme->ext_psoc_ptr->wfa_testcmd.tx_ops);
 	target_if_cm_roam_register_rx_ops(
 			&psoc_mlme->ext_psoc_ptr->rso_rx_ops);
+	wlan_mlme_register_rx_ops(&psoc_mlme->ext_psoc_ptr->mlme_rx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }

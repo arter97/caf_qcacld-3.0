@@ -36,6 +36,7 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_t2lm_api.h"
 #include "wlan_mlo_link_force.h"
+#include <wlan_mlo_mgr_public_api.h>
 
 static void cm_abort_connect_request_timers(struct wlan_objmgr_vdev *vdev)
 {
@@ -326,9 +327,15 @@ QDF_STATUS cm_send_sb_disconnect_req(struct scheduler_msg *msg)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	status = mlo_disconnect(vdev, ind->disconnect_param.source,
-				ind->disconnect_param.reason_code,
-				&ind->disconnect_param.bssid);
+	status = wlan_mlo_mgr_link_switch_defer_disconnect_req(vdev,
+							       ind->disconnect_param.source,
+							       ind->disconnect_param.reason_code);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		status = mlo_disconnect(vdev, ind->disconnect_param.source,
+					ind->disconnect_param.reason_code,
+					&ind->disconnect_param.bssid);
+	}
+
 	qdf_mem_free(ind);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 

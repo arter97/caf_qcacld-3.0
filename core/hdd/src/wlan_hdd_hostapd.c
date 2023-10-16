@@ -1068,8 +1068,16 @@ QDF_STATUS hdd_chan_change_notify(struct wlan_hdd_link_info *link_info,
 		dev = assoc_adapter->dev;
 	}
 
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		mutex_lock(&dev->ieee80211_ptr->mtx);
+
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id,
 				       puncture_bitmap);
+
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		mutex_unlock(&dev->ieee80211_ptr->mtx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2080,6 +2088,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	struct qdf_mac_addr sta_addr = {0};
 	qdf_freq_t dfs_freq;
 	struct wlan_hdd_link_info *link_info;
+	bool alt_pipe;
 
 	dev = context;
 	if (!dev) {
@@ -2244,6 +2253,14 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		}
 
 		if (ucfg_ipa_is_enabled()) {
+			status = hdd_ipa_get_tx_pipe(hdd_ctx, link_info,
+						     &alt_pipe);
+			if (!QDF_IS_STATUS_SUCCESS(status)) {
+				hdd_debug("Failed to get alt pipe for vdev %d",
+					  link_info->vdev_id);
+				alt_pipe = false;
+			}
+
 			status = ucfg_ipa_wlan_evt(
 					hdd_ctx->pdev,
 					adapter->dev,
@@ -2251,8 +2268,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 					link_info->vdev_id,
 					WLAN_IPA_AP_CONNECT,
 					adapter->dev->dev_addr,
-					WLAN_REG_IS_24GHZ_CH_FREQ(
-						ap_ctx->operating_chan_freq));
+					alt_pipe);
 			if (status)
 				hdd_err("WLAN_AP_CONNECT event failed");
 		}
@@ -4369,6 +4385,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 	/* rcpi info initialization */
 	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
 
+	hdd_tsf_auto_report_init(adapter);
 	hdd_exit();
 
 	return status;
@@ -7316,8 +7333,7 @@ static uint16_t hdd_get_data_rate_from_rate_mask(struct wiphy *wiphy,
 		sband_bitrates = sband->bitrates;
 		sband_n_bitrates = sband->n_bitrates;
 		for (i = 0; i < sband_n_bitrates; i++) {
-			if (bit_rate_mask->control[band].legacy ==
-			    sband_bitrates[i].hw_value)
+			if (bit_rate_mask->control[band].legacy == (1 << i))
 				return sband_bitrates[i].bitrate;
 		}
 	}

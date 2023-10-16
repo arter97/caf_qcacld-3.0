@@ -2813,6 +2813,7 @@ void sap_undo_acs(struct sap_context *sap_ctx, struct sap_config *sap_cfg)
 	acs_cfg->ch_list_count = 0;
 	acs_cfg->master_ch_list_count = 0;
 	acs_cfg->acs_mode = false;
+	acs_cfg->master_ch_list_updated = false;
 	sap_ctx->num_of_channel = 0;
 	wlansap_dcs_set_vdev_wlan_interference_mitigation(sap_ctx, false);
 }
@@ -3766,6 +3767,8 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 {
 	uint32_t *acs_cfg_freq_list;
 	uint32_t *master_freq_list;
+	uint32_t i;
+	bool old_acs_2g_only = true, acs_2g_only_new = true;
 
 	acs_cfg_freq_list = qdf_mem_malloc(count * sizeof(uint32_t));
 	if (!acs_cfg_freq_list)
@@ -3782,6 +3785,13 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 		return -ENOMEM;
 
 	if (sap_config->acs_cfg.master_ch_list_count) {
+		for (i = 0; i < sap_config->acs_cfg.master_ch_list_count; i++)
+			if (sap_config->acs_cfg.master_freq_list &&
+			    !WLAN_REG_IS_24GHZ_CH_FREQ(
+				sap_config->acs_cfg.master_freq_list[i])) {
+				old_acs_2g_only = false;
+				break;
+			}
 		qdf_mem_free(sap_config->acs_cfg.master_freq_list);
 		sap_config->acs_cfg.master_freq_list = NULL;
 		sap_config->acs_cfg.master_ch_list_count = 0;
@@ -3794,6 +3804,24 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 		     sizeof(freq_list[0]) * count);
 	sap_config->acs_cfg.master_ch_list_count = count;
 	sap_config->acs_cfg.ch_list_count = count;
+	for (i = 0; i < sap_config->acs_cfg.master_ch_list_count; i++)
+		if (sap_config->acs_cfg.master_freq_list &&
+		    !WLAN_REG_IS_24GHZ_CH_FREQ(
+				sap_config->acs_cfg.master_freq_list[i])) {
+			acs_2g_only_new = false;
+			break;
+		}
+	/* If SAP initially started on world mode, the SAP ACS master channel
+	 * list will only contain 2.4 GHz channels. When country code changed
+	 * from world mode to non world mode, the master_ch_list will
+	 * be updated by this API from userspace and the list will include
+	 * 2.4 GHz + 5/6 GHz normally. If this transition happens, we set
+	 * master_ch_list_updated flag. And later only if the flag is set,
+	 * wlansap_get_chan_band_restrict will be invoked to select new SAP
+	 * channel frequency based on PCL.
+	 */
+	sap_config->acs_cfg.master_ch_list_updated =
+			old_acs_2g_only && !acs_2g_only_new;
 	sap_dump_acs_channel(&sap_config->acs_cfg);
 
 	return 0;
@@ -3804,6 +3832,11 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
  * @psoc: psoc object
  * @sap_ctx: sap context
  * @freq: pointer to valid freq
+ *
+ * If sap master channel list is updated from 2G only to 2G+5G/6G,
+ * this API will find new SAP channel frequency likely 5G/6G to have
+ * better performance for SAP. This happens when SAP started in
+ * world mode, later country code change to non world mode.
  *
  * Return: None
  */
@@ -3818,6 +3851,14 @@ void wlansap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 	uint32_t *pcl_freqs;
 	QDF_STATUS status;
 	uint32_t pcl_len = 0;
+
+	if (!sap_ctx->acs_cfg || !sap_ctx->acs_cfg->master_ch_list_count)
+		return;
+
+	if (!sap_ctx->acs_cfg->master_ch_list_updated)
+		return;
+
+	sap_ctx->acs_cfg->master_ch_list_updated = false;
 
 	pcl_freqs =  qdf_mem_malloc(NUM_CHANNELS * sizeof(uint32_t));
 	if (!pcl_freqs)
@@ -3957,10 +3998,9 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 			}
 		} else {
 			wlansap_get_valid_freq(mac->psoc, sap_ctx, &freq);
-			if (!freq) {
-				sap_debug("no valid freq found");
+			if (!freq)
 				return 0;
-			}
+
 			restart_freq = freq;
 			sap_debug("restart SAP on freq %d",
 				  restart_freq);
@@ -4020,7 +4060,12 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 						       cc_mode, vdev_id);
 	if (intf_ch_freq)
 		restart_freq = intf_ch_freq;
-	sap_debug("vdev: %d, CSA target freq: %d", vdev_id, restart_freq);
+	if (restart_freq == sap_ctx->chan_freq)
+		restart_freq = 0;
+
+	if (restart_freq)
+		sap_debug("vdev: %d, CSA target freq: %d", vdev_id,
+			  restart_freq);
 
 	return restart_freq;
 }

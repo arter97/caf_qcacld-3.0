@@ -84,6 +84,7 @@
 #include "wlan_wifi_pos_interface.h"
 #include "wlan_cp_stats_mc_ucfg_api.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
+#include <wlan_mlo_link_force.h>
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -541,6 +542,9 @@ QDF_STATUS sme_ser_handle_active_cmd(struct wlan_serialization_command *cmd)
 		break;
 	case e_sme_command_set_antenna_mode:
 		csr_process_set_antenna_mode(mac_ctx, sme_cmd);
+		break;
+	case e_sme_command_sap_ch_width_update:
+		csr_process_sap_ch_width_update(mac_ctx, sme_cmd);
 		break;
 	default:
 		/* something is wrong */
@@ -1222,6 +1226,7 @@ QDF_STATUS sme_start(mac_handle_t mac_handle)
 		sme_cbacks.sme_rso_start_cb = sme_start_roaming;
 		sme_cbacks.sme_rso_stop_cb = sme_stop_roaming;
 		sme_cbacks.sme_change_sap_csa_count = sme_change_sap_csa_count;
+		sme_cbacks.sme_sap_update_ch_width = sme_sap_update_ch_width;
 		status = policy_mgr_register_sme_cb(mac->psoc, &sme_cbacks);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			sme_err("Failed to register sme cb with Policy Manager: %d",
@@ -2657,6 +2662,80 @@ static void sme_process_chan_info_event(struct mac_context *mac,
 	sme_indicate_chan_info_event(mac, chan_stats, vdev_id);
 }
 
+/**
+ * sme_process_sap_ch_width_update_rsp() - Process ch_width update response
+ * @mac: Global MAC pointer
+ * @msg: ch_width update response
+ *
+ * Processes the ch_width update response and invokes the HDD
+ * callback to process further
+ */
+static QDF_STATUS
+sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
+{
+	tListElem *entry = NULL;
+	tSmeCmd *command = NULL;
+	bool found;
+	struct sir_bcn_update_rsp *param;
+	enum policy_mgr_conn_update_reason reason;
+	uint32_t request_id;
+	uint8_t vdev_id;
+
+	param = (struct sir_bcn_update_rsp *)msg;
+	if (!param)
+		sme_err("ch_width update resp param is NULL");
+		/* Not returning. Need to check if active command list
+		 * needs to be freed
+		 */
+
+	if (param && param->reason != REASON_CH_WIDTH_UPDATE) {
+		sme_err("reason not ch_width update");
+		return QDF_STATUS_E_INVAL;
+	}
+	entry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+	if (!entry) {
+		sme_err("No cmd found in active list");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	command = GET_BASE_ADDR(entry, tSmeCmd, Link);
+	if (!command) {
+		sme_err("Base address is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (e_sme_command_sap_ch_width_update != command->command) {
+		sme_err("Command mismatch!");
+		return QDF_STATUS_E_FAILURE;
+	}
+	reason = command->u.bw_update_cmd.reason;
+	request_id = command->u.bw_update_cmd.request_id;
+	vdev_id = command->u.bw_update_cmd.conc_vdev_id;
+	sme_debug("vdev %d reason %d status %d cm_id 0x%x",
+		  vdev_id, reason, param->status, request_id);
+
+	if (reason == POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA) {
+		sme_debug("Continue channel switch for STA on vdev %d",
+			  vdev_id);
+		csr_sta_continue_csa(mac, vdev_id);
+	} else if (reason == POLICY_MGR_UPDATE_REASON_STA_CONNECT) {
+		sme_debug("Continue connect/reassoc on vdev %d reason %d status %d cm_id 0x%x",
+			  vdev_id, reason, param->status, request_id);
+		wlan_cm_handle_hw_mode_change_resp(mac->pdev, vdev_id,
+						   request_id, param->status);
+	}
+
+	policy_mgr_set_connection_update(mac->psoc);
+
+	found = csr_nonscan_active_ll_remove_entry(mac, entry, LL_ACCESS_LOCK);
+	if (found) {
+		/* Now put this command back on the available command list */
+		csr_release_command(mac, command);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -2981,6 +3060,11 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		break;
 	case eWNI_SME_CHAN_INFO_EVENT:
 		sme_process_chan_info_event(mac, pMsg->bodyptr, pMsg->bodyval);
+		qdf_mem_free(pMsg->bodyptr);
+		break;
+	case eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP:
+		status = sme_process_sap_ch_width_update_rsp(mac,
+							     pMsg->bodyptr);
 		qdf_mem_free(pMsg->bodyptr);
 		break;
 	default:
@@ -7330,6 +7414,11 @@ QDF_STATUS sme_set_wlm_latency_level(mac_handle_t mac_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (session_id == WLAN_INVALID_LINK_ID) {
+		sme_err("Invalid vdev_id[%u]", session_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	params.wlm_latency_level = latency_level;
 	params.wlm_latency_flags =
 		mac_ctx->mlme_cfg->wlm_config.latency_flags[latency_level];
@@ -10487,15 +10576,6 @@ int sme_update_tx_bfee_nsts(mac_handle_t mac_handle, uint8_t session_id,
 	return sme_update_he_tx_bfee_nsts(mac_handle, session_id, nsts_set_val);
 }
 
-void sme_set_ba_opmode(mac_handle_t mac_handle, uint8_t session_id,
-		       bool ba_opmode)
-{
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-
-	mac_ctx->ba_mode = ba_opmode;
-	sme_debug("BA mode %d", mac_ctx->ba_mode);
-}
-
 #ifdef WLAN_FEATURE_11BE
 void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 			    struct wma_tgt_cfg *cfg,
@@ -11698,6 +11778,48 @@ QDF_STATUS sme_nss_update_request(uint32_t vdev_id,
 		csr_queue_sme_command(mac, cmd, false);
 		sme_release_global_lock(&mac->sme);
 	}
+	return status;
+}
+
+QDF_STATUS
+sme_sap_update_ch_width(struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id,
+			enum phy_ch_width ch_width,
+			enum policy_mgr_conn_update_reason reason,
+			uint8_t conc_vdev_id, uint32_t request_id)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct mac_context *mac = sme_get_mac_context();
+	tSmeCmd *cmd = NULL;
+
+	if (!mac) {
+		sme_err("mac is null");
+		return status;
+	}
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	cmd = csr_get_command_buffer(mac);
+	if (!cmd) {
+		sme_err("Get command buffer failed");
+		sme_release_global_lock(&mac->sme);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	cmd->command = e_sme_command_sap_ch_width_update;
+	/* Sessionized modules may require this info */
+	cmd->vdev_id = vdev_id;
+	cmd->u.bw_update_cmd.ch_width = ch_width;
+	cmd->u.bw_update_cmd.vdev_id = vdev_id;
+	cmd->u.bw_update_cmd.reason = reason;
+	cmd->u.bw_update_cmd.request_id = request_id;
+	cmd->u.bw_update_cmd.conc_vdev_id = conc_vdev_id;
+
+	sme_debug("Queuing e_sme_command_sap_ch_width_update to CSR:vdev %d ch_width: %d reason: %d",
+		  vdev_id, ch_width, reason);
+	csr_queue_sme_command(mac, cmd, false);
+	sme_release_global_lock(&mac->sme);
+
 	return status;
 }
 
@@ -14978,6 +15100,7 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 
 	if (mac_ctx->usr_cfg_disable_rsp_tx)
 		sme_set_cfg_disable_tx(mac_handle, vdev_id, 0);
+	mac_ctx->is_usr_cfg_amsdu_enabled = true;
 }
 #endif
 
@@ -15128,12 +15251,56 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	ucfg_mlme_set_bss_color_collision_det_sta(mac_ctx->psoc, false);
 }
 
+void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	enum QDF_OPMODE op_mode;
+	uint8_t vdev_id;
+	int ret_val = 0;
+
+	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
+		op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
+		if (op_mode == QDF_STA_MODE) {
+			ret_val = wma_cli_set_command(
+						vdev_id,
+						wmi_vdev_param_set_ba_mode,
+						val, VDEV_CMD);
+
+		if (QDF_IS_STATUS_ERROR(ret_val))
+			sme_err("BA mode set failed for vdev: %d, ret %d",
+				vdev_id, ret_val);
+		else
+			sme_debug("vdev: %d ba mode: %d param id %d",
+				  vdev_id, val, wmi_vdev_param_set_ba_mode);
+		}
+	}
+}
+
+static inline
+void sme_set_mcs_15_tx_rx_disable(uint8_t vdev_id)
+{
+	uint32_t tx_disable[2] = {67, 0};
+	uint32_t rx_disable[3] = {125, 0, 1};
+	QDF_STATUS status;
+
+	sme_debug("Send MCS 15 rx/tx disable to FW");
+
+	status = sme_send_unit_test_cmd(vdev_id, 10, 2, tx_disable);
+	if (status)
+		sme_err("Failed to send MCS 15 tx disable");
+
+	status = sme_send_unit_test_cmd(vdev_id, 67, 3, rx_disable);
+	if (status)
+		sme_err("Failed to send MCS 15 rx disable");
+}
+
 void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
 	bool val;
 	QDF_STATUS status;
+	uint8_t ba_mode_auto = 0;
 
 	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 
@@ -15161,6 +15328,9 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 							       &val);
 	if (QDF_IS_STATUS_SUCCESS(status))
 		ucfg_mlme_set_bss_color_collision_det_sta(mac_ctx->psoc, val);
+	sme_set_per_link_ba_mode(mac_handle, ba_mode_auto);
+	sme_set_mcs_15_tx_rx_disable(vdev_id);
+	wlan_mlme_set_btm_abridge_flag(mac_ctx->psoc, false);
 }
 
 void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t vdev_id,
@@ -15323,8 +15493,14 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 		return;
 	}
 
-	policy_mgr_activate_mlo_links(mac_ctx->psoc, session_id, num_links,
-				      active_link_addr);
+	if (ml_is_nlink_service_supported(mac_ctx->psoc)) {
+		policy_mgr_activate_mlo_links_nlink(mac_ctx->psoc, session_id,
+						    num_links,
+						    active_link_addr);
+	} else {
+		policy_mgr_activate_mlo_links(mac_ctx->psoc, session_id,
+					      num_links, active_link_addr);
+	}
 }
 
 int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,

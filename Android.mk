@@ -16,6 +16,10 @@ endef
 LOCAL_MODULE_DDK_BUILD := false
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := false
 
+ifeq ($(TARGET_BOARD_PLATFORM), sun)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+endif
 ifeq ($(TARGET_BOARD_PLATFORM), pineapple)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
@@ -79,8 +83,15 @@ ifeq ($(LOCAL_MULTI_KO), true)
 LOCAL_ANDROID_ROOT := $(shell pwd)
 LOCAL_WLAN_BLD_DIR := $(LOCAL_ANDROID_ROOT)/$(WLAN_BLD_DIR)
 $(shell `find $(LOCAL_WLAN_BLD_DIR)/qcacld-3.0/ -maxdepth 1 -name '.*' ! -name '.git' -delete`)
+
 ifeq ($(LOCAL_MODULE_DDK_BUILD), true)
+ifeq ($(CHIPSET),)
+$(foreach chip, $(TARGET_WLAN_CHIP),\
+	$(eval CHIPSET := $(chip))\
+	$(eval include $(LOCAL_PATH)/Android.mk))
+else
 # DLKM_DIR was moved for JELLY_BEAN (PLATFORM_SDK 16)
+BAZEL_CHIPSET_NAME := $(subst _,-,$(CHIPSET))
 ifeq ($(call is-platform-sdk-version-at-least,16),true)
         DLKM_DIR := $(TOP)/$(BOARD_COMMON_DIR)/dlkm
 else
@@ -89,9 +100,10 @@ endif # platform-sdk-version
 
 include $(CLEAR_VARS)
 LOCAL_MOD_NAME := wlan
-LOCAL_MODULE              := qca_cld3_kiwi_v2.ko
-LOCAL_MODULE_KBUILD_NAME  := qca_cld3_kiwi_v2.ko
+LOCAL_MODULE              := qca_cld3_$(CHIPSET).ko
+LOCAL_MODULE_KBUILD_NAME  := qca_cld3_$(CHIPSET).ko
 LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_DDK_SUBTARGET_REGEX := "all.*"
 ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
     ifeq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),true)
         LOCAL_MODULE_PATH := $(KERNEL_MODULES_OUT)
@@ -103,7 +115,7 @@ else
 endif
 
 
-LOCAL_DEV_NAME := kiwi_v2
+LOCAL_DEV_NAME := $(CHIPSET)
 LOCAL_CHIP_NAME := $(LOCAL_DEV_NAME)
 TARGET_MAC_BIN_PATH := /mnt/vendor/persist/$(LOCAL_CHIP_NAME)
 TARGET_FW_DIR := firmware/wlan/qca_cld/$(LOCAL_CHIP_NAME)
@@ -158,7 +170,7 @@ ifeq ($(TARGET_USES_KERNEL_PLATFORM),true)
 else
     include $(DLKM_DIR)/AndroidKernelModule.mk
 endif
-
+endif
 else
 $(foreach chip, $(TARGET_WLAN_CHIP), \
 	$(shell ln -sf . $(LOCAL_WLAN_BLD_DIR)/qcacld-3.0/.$(chip)))

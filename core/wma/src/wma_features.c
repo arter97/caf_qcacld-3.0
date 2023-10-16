@@ -91,6 +91,8 @@
  */
 #define ADDBA_TXAGGR_SIZE_HELIUM 64
 #define ADDBA_TXAGGR_SIZE_LITHIUM 256
+#define ADDBA_TXAGGR_SIZE_512 512
+#define ADDBA_TXAGGR_SIZE_BERYLLIUM 1024
 
 static bool is_wakeup_event_console_logs_enabled = false;
 
@@ -318,7 +320,7 @@ end:
 
 #ifdef WLAN_FEATURE_TSF
 
-#if defined(WLAN_FEATURE_TSF_UPLINK_DELAY) || defined(QCA_GET_TSF_VIA_REG)
+#if defined(WLAN_FEATURE_TSF_AUTO_REPORT) || defined(QCA_GET_TSF_VIA_REG)
 static inline void
 wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
 			       uint32_t mac_id_valid, uint32_t tsf_id,
@@ -333,14 +335,14 @@ wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
 		       ptsf->mac_id, ptsf->mac_id_valid, ptsf->tsf_id,
 		       ptsf->tsf_id_valid);
 }
-#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY || !QCA_GET_TSF_VIA_REG*/
+#else /* !(WLAN_FEATURE_TSF_AUTO_REPORT || QCA_GET_TSF_VIA_REG) */
 static inline void
 wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
 			       uint32_t mac_id_valid, uint32_t tsf_id,
 			       uint32_t tsf_id_valid)
 {
 }
-#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY || QCA_GET_TSF_VIA_REG*/
+#endif /* WLAN_FEATURE_TSF_AUTO_REPORT || QCA_GET_TSF_VIA_REG */
 
 /**
  * wma_vdev_tsf_handler() - handle tsf event indicated by FW
@@ -515,7 +517,7 @@ QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+#ifdef WLAN_FEATURE_TSF_AUTO_REPORT
 QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle, uint32_t vdev_id,
 				   uint32_t param_id, bool ena)
 {
@@ -560,7 +562,7 @@ QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle, uint32_t vdev_id,
 
 	return status;
 }
-#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+#endif /* WLAN_FEATURE_TSF_AUTO_REPORT */
 #endif
 
 /**
@@ -2322,7 +2324,7 @@ static void wma_log_pkt_icmpv6(uint8_t *data, uint32_t length)
 	pkt_len = *(uint16_t *)(data + IPV6_PKT_LEN_OFFSET);
 	seq_num = *(uint16_t *)(data + ICMPV6_SEQ_NUM_OFFSET);
 	wma_debug("Pkt_len: %u, Seq_num: %u",
-		 qdf_cpu_to_be16(pkt_len), qdf_cpu_to_be16(seq_num));
+		  qdf_cpu_to_be16(pkt_len), qdf_cpu_to_be16(seq_num));
 }
 
 static void wma_log_pkt_ipv4(uint8_t *data, uint32_t length)
@@ -2342,10 +2344,10 @@ static void wma_log_pkt_ipv4(uint8_t *data, uint32_t length)
 		      ip_addr[2], ip_addr[3]);
 	src_port = *(uint16_t *)(data + IPV4_SRC_PORT_OFFSET);
 	dst_port = *(uint16_t *)(data + IPV4_DST_PORT_OFFSET);
-	wma_info("Pkt_len: %u, src_port: %u, dst_port: %u",
-		qdf_cpu_to_be16(pkt_len),
-		qdf_cpu_to_be16(src_port),
-		qdf_cpu_to_be16(dst_port));
+	wma_debug("Pkt_len: %u, src_port: %u, dst_port: %u",
+		  qdf_cpu_to_be16(pkt_len),
+		  qdf_cpu_to_be16(src_port),
+		  qdf_cpu_to_be16(dst_port));
 }
 
 static void wma_log_pkt_ipv6(uint8_t *data, uint32_t length)
@@ -2766,7 +2768,7 @@ static int wma_wake_event_packet(
 	case WOW_REASON_DELAYED_WAKEUP_HOST_CFG_TIMER_ELAPSED:
 	case WOW_REASON_DELAYED_WAKEUP_DATA_STORE_LIST_FULL:
 		wma_info("Wake event packet:");
-		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_INFO,
+		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 				   packet, packet_len);
 
 		vdev = &wma->interfaces[wake_info->vdev_id];
@@ -4491,8 +4493,10 @@ QDF_STATUS wma_set_tx_rx_aggr_size(uint8_t vdev_id,
 		cmd->enable_bitmap |= (0x1 << 6);
 	}
 
-	if ((tx_size != ADDBA_TXAGGR_SIZE_LITHIUM) &&
-	    (tx_size > ADDBA_TXAGGR_SIZE_HELIUM)) {
+	if ((tx_size > ADDBA_TXAGGR_SIZE_HELIUM) &&
+	    (tx_size != ADDBA_TXAGGR_SIZE_LITHIUM) &&
+	    (tx_size != ADDBA_TXAGGR_SIZE_512) &&
+	    (tx_size != ADDBA_TXAGGR_SIZE_BERYLLIUM)) {
 		wma_err("Invalid AMPDU Size");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -5265,18 +5269,19 @@ wma_update_sacn_channel_info_buf(wmi_unified_t wmi_handle,
 }
 
 static void
-wma_get_scan_rx_clear_count_average(wmi_cca_busy_subband_info *cca_info,
-				    uint32_t num_tlvs, uint32_t *rx_clear_count)
+wma_get_scan_max_rx_clear_count(wmi_cca_busy_subband_info *cca_info,
+				uint32_t num_tlvs, uint32_t *rx_clear_count)
 {
-	uint32_t i, total_rx_clear_count = 0;
+	uint32_t i, max_rx_clear_count = 0;
 
 	for (i = 0; i < num_tlvs && i < MAX_WIDE_BAND_SCAN_CHAN; i++) {
-		total_rx_clear_count += cca_info->rx_clear_count;
+		if (max_rx_clear_count < cca_info->rx_clear_count)
+			max_rx_clear_count = cca_info->rx_clear_count;
 		cca_info++;
 	}
 
-	*rx_clear_count = total_rx_clear_count / num_tlvs;
-	wma_debug("average rx_clear_count : %d", *rx_clear_count);
+	*rx_clear_count = max_rx_clear_count;
+	wma_debug("max rx_clear_count : %d", *rx_clear_count);
 }
 
 int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
@@ -5349,7 +5354,7 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	channel_status->noise_floor = event->noise_floor;
 
 	if (is_cca_busy_info && num_tlvs)
-		wma_get_scan_rx_clear_count_average(cca_info, num_tlvs,
+		wma_get_scan_max_rx_clear_count(cca_info, num_tlvs,
 					&channel_status->rx_clear_count);
 	else
 		channel_status->rx_clear_count = event->rx_clear_count;

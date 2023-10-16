@@ -550,6 +550,7 @@ static void
 wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter;
+	struct osif_vdev_sync *vdev_sync;
 	void *soc;
 	bool running;
 
@@ -574,9 +575,17 @@ wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx)
 	}
 
 	hdd_debug("lpc: Delete monitor interface");
+	vdev_sync = osif_vdev_sync_unregister(adapter->dev);
+	if (vdev_sync)
+		osif_vdev_sync_wait_for_ops(vdev_sync);
+
 	wlan_hdd_release_intf_addr(hdd_ctx, adapter->mac_addr.bytes);
 	hdd_stop_adapter(hdd_ctx, adapter);
+	hdd_deinit_adapter(hdd_ctx, adapter, true);
 	hdd_close_adapter(hdd_ctx, adapter, true);
+
+	if (vdev_sync)
+		osif_vdev_sync_destroy(vdev_sync);
 }
 #else
 static inline
@@ -3822,14 +3831,7 @@ int hdd_set_11ax_rate(struct hdd_adapter *adapter, int set_value,
 
 int hdd_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 {
-	int set_value;
-
-	if (sme_is_feature_supported_by_fw(DOT11AX))
-		set_value = WMI_ASSEMBLE_RATECODE_V1(rate, nss, preamble);
-	else
-		set_value = (preamble << 6) | (nss << 4) | rate;
-
-	return set_value;
+	return ucfg_mlme_assemble_rate_code(preamble, nss, rate);
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -6815,7 +6817,8 @@ free_net_dev:
 	return NULL;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+	(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static int
 hdd_register_netdevice(struct hdd_adapter *adapter, struct net_device *dev,
 		       struct hdd_adapter_create_param *params)
@@ -7312,6 +7315,31 @@ hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
 #endif
 
 static void
+hdd_vdev_configure_rtscts_enable(struct hdd_context *hdd_ctx,
+				 struct wlan_objmgr_vdev *vdev)
+{
+	int ret;
+	QDF_STATUS status;
+	uint16_t rts_profile = 0;
+
+	if (cds_get_conparam() == QDF_GLOBAL_FTM_MODE)
+		return;
+
+	status = ucfg_fwol_get_rts_profile(hdd_ctx->psoc, &rts_profile);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("FAILED TO GET RTSCTS Profile status:%d", status);
+		return;
+	}
+
+	ret = sme_cli_set_command(wlan_vdev_get_id(vdev),
+				  wmi_vdev_param_enable_rtscts,
+				  rts_profile,
+				  VDEV_CMD);
+	if (ret)
+		hdd_err("FAILED TO SET RTSCTS Profile ret:%d", ret);
+}
+
+static void
 hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 				 struct wlan_objmgr_vdev *vdev)
 {
@@ -7336,6 +7364,7 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 	ucfg_fwol_configure_vdev_params(psoc, vdev);
 	hdd_set_vdev_mlo_external_sae_auth_conversion(vdev, opmode);
 	hdd_store_nss_chains_cfg_in_vdev(hdd_ctx, vdev);
+	hdd_vdev_configure_rtscts_enable(hdd_ctx, vdev);
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
@@ -7523,7 +7552,9 @@ QDF_STATUS hdd_init_station_mode(struct wlan_hdd_link_info *link_info)
 			goto error_wmm_init;
 	}
 
+	hdd_tsf_auto_report_init(adapter);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+
 	return QDF_STATUS_SUCCESS;
 
 error_wmm_init:
@@ -7786,7 +7817,8 @@ static void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+	(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static void
 hdd_unregister_netdevice(struct hdd_adapter *adapter, struct net_device *dev)
 {
@@ -8104,7 +8136,7 @@ err:
 int hdd_set_fw_params(struct hdd_adapter *adapter)
 {
 	int ret;
-	uint16_t upper_brssi_thresh, lower_brssi_thresh, rts_profile;
+	uint16_t upper_brssi_thresh, lower_brssi_thresh;
 	bool enable_dtim_1chrx;
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx;
@@ -8282,19 +8314,6 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 					    adapter->deflink->vdev_id);
 	if (ret) {
 		hdd_err("wmi_pdev_param_hyst_en set failed %d", ret);
-		goto error;
-	}
-
-	status = ucfg_fwol_get_rts_profile(hdd_ctx->psoc, &rts_profile);
-	if (QDF_IS_STATUS_ERROR(status))
-		return -EINVAL;
-
-	ret = sme_cli_set_command(adapter->deflink->vdev_id,
-				  wmi_vdev_param_enable_rtscts,
-				  rts_profile,
-				  VDEV_CMD);
-	if (ret) {
-		hdd_err("FAILED TO SET RTSCTS Profile ret:%d", ret);
 		goto error;
 	}
 
@@ -9687,7 +9706,6 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 						     WLAN_DATA_FLOW_CONTROL);
 
 			hdd_reset_scan_operation(link_info);
-
 			if (test_bit(WMM_INIT_DONE, &adapter->event_flags)) {
 				hdd_wmm_adapter_close(adapter);
 				clear_bit(WMM_INIT_DONE, &adapter->event_flags);
@@ -18306,6 +18324,11 @@ static void __hdd_inform_wifi_off(void)
 		return;
 
 	ucfg_dlm_wifi_off(hdd_ctx->pdev);
+
+	if (rtnl_trylock()) {
+		wlan_hdd_lpc_del_monitor_interface(hdd_ctx);
+		rtnl_unlock();
+	}
 }
 
 static void hdd_inform_wifi_off(void)
@@ -20244,6 +20267,27 @@ static void hdd_populate_runtime_cfg(struct hdd_context *hdd_ctx,
 }
 #endif
 
+#ifdef FEATURE_ENABLE_CE_DP_IRQ_AFFINE
+/**
+ * hdd_populate_ce_dp_irq_affine_cfg() - populate ce irq affine configuration
+ * @hdd_ctx: hdd context
+ * @cfg: pointer to the configuration memory being populated
+ *
+ * Return: void
+ */
+static void hdd_populate_ce_dp_irq_affine_cfg(struct hdd_context *hdd_ctx,
+					      struct hif_config_info *cfg)
+{
+	cfg->enable_ce_dp_irq_affine = cfg_get(hdd_ctx->psoc,
+					       CFG_ENABLE_CE_DP_IRQ_AFFINE);
+}
+#else
+static void hdd_populate_ce_dp_irq_affine_cfg(struct hdd_context *hdd_ctx,
+					      struct hif_config_info *cfg)
+{
+}
+#endif
+
 /**
  * hdd_update_hif_config - API to update HIF configuration parameters
  * @hdd_ctx: HDD Context
@@ -20274,6 +20318,7 @@ static void hdd_update_hif_config(struct hdd_context *hdd_ctx)
 	hdd_populate_runtime_cfg(hdd_ctx, &cfg);
 	cfg.rx_softirq_max_yield_duration_ns =
 		ucfg_dp_get_rx_softirq_yield_duration(hdd_ctx->psoc);
+	hdd_populate_ce_dp_irq_affine_cfg(hdd_ctx, &cfg);
 
 	hif_init_ini_config(scn, &cfg);
 	hif_set_enable_rpm(scn);
@@ -21371,6 +21416,20 @@ uint8_t hdd_chwidth_to_nl80211_chwidth(enum eSirMacHTChannelWidth chwidth)
 	return 0xFF;
 }
 
+uint8_t hdd_phy_chwidth_to_nl80211_chwidth(enum phy_ch_width chwidth)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chwidth_info); i++) {
+		if (chwidth_info[i].sir_chwidth_valid &&
+		    chwidth_info[i].phy_chwidth == chwidth)
+			return i;
+	}
+
+	hdd_err("Unsupported channel width %d", chwidth);
+	return 0xFF;
+}
+
 enum hw_mode_bandwidth wlan_hdd_get_channel_bw(enum nl80211_chan_width width)
 {
 	if (width >= ARRAY_SIZE(chwidth_info)) {
@@ -21396,6 +21455,7 @@ uint8_t *hdd_ch_width_str(enum phy_ch_width ch_width)
 int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width)
 {
 	int i;
+	uint8_t link_id = 0xFF;
 
 	/* updating channel bonding only on 5Ghz */
 	hdd_debug("wmi_vdev_param_chwidth val %d", ch_width);
@@ -21406,7 +21466,8 @@ int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width)
 			continue;
 
 		return hdd_update_channel_width(link_info->adapter, ch_width,
-						chwidth_info[i].bonding_mode);
+						chwidth_info[i].bonding_mode,
+						link_id);
 	}
 
 	hdd_err("Invalid ch_width %d", ch_width);

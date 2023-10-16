@@ -1879,6 +1879,9 @@ extract_roam_btm_response_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	dst->timestamp = src_data->timestamp;
 	dst->btm_resp_dialog_token = src_data->btm_resp_dialog_token;
 	dst->btm_delay = src_data->btm_resp_bss_termination_delay;
+	dst->band = WMI_ROAM_BTM_RESP_MLO_BAND_INFO_GET(src_data->info);
+	if (dst->band != WMI_MLO_BAND_NO_MLO)
+		dst->is_mlo = true;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2270,10 +2273,13 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 
 			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->link_addr,
 						   link->link_addr.bytes);
-			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT,
+			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->self_link_addr,
+						   link->self_link_addr.bytes);
+			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT "self_addr:" QDF_MAC_ADDR_FMT,
 				  link->link_id, link->vdev_id,
 				  link->flags,
-				  QDF_MAC_ADDR_REF(link->link_addr.bytes));
+				  QDF_MAC_ADDR_REF(link->link_addr.bytes),
+				  QDF_MAC_ADDR_REF(link->self_link_addr.bytes));
 			wmi_debug("channel: %u mhz center_freq1: %u center_freq2: %u",
 				  link->channel.mhz,
 				  link->channel.band_center_freq1,
@@ -3007,9 +3013,13 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 {
 	QDF_STATUS status;
 	uint8_t vdev_id = stats_info->vdev_id;
+	uint8_t band;
+
+	band = stats_info->scan[0].band;
 
 	status = wmi_unified_extract_roam_11kv_stats(
-			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0);
+			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0,
+			band);
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Roam 11kv stats extract failed vdev %d", vdev_id);
 
@@ -3052,7 +3062,7 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	struct roam_msg_info *roam_msg_info = NULL;
 	uint8_t vdev_id, i, num_btm = 0, num_frames = 0;
 	uint8_t num_tlv = 0, num_chan = 0, num_ap = 0, num_rpt = 0;
-	uint8_t num_trigger_reason = 0;
+	uint8_t num_trigger_reason = 0, band;
 	uint32_t rem_len;
 	QDF_STATUS status;
 
@@ -3241,12 +3251,14 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 			}
 		}
 
+		band = stats_info->scan[i].band;
+
 		/* BTM req/resp or Neighbor report/response info */
 		status = wmi_unified_extract_roam_11kv_stats(
 				      wmi_handle,
 				      evt_buf,
 				      &stats_info->data_11kv[i],
-				      i, num_rpt);
+				      i, num_rpt, band);
 		if (QDF_IS_STATUS_ERROR(status))
 			wmi_debug_rl("Roam 11kv stats extract fail vdev %d iter %d",
 				     vdev_id, i);
@@ -3485,6 +3497,48 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+static QDF_STATUS
+extract_peer_oper_mode_event_tlv(wmi_unified_t wmi_handle, uint8_t *event,
+				 uint32_t len,
+				 struct peer_oper_mode_event *data)
+{
+	WMI_PEER_OPER_MODE_CHANGE_EVENTID_param_tlvs *param_buf = NULL;
+	wmi_peer_oper_mode_change_event_fixed_param *params = NULL;
+
+	if (!event || !len) {
+		wmi_debug("Empty operating mode change event");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	param_buf = (WMI_PEER_OPER_MODE_CHANGE_EVENTID_param_tlvs *)event;
+	if (!param_buf) {
+		wmi_err("Received null buf from target");
+		return -EINVAL;
+	}
+
+	params =
+		(wmi_peer_oper_mode_change_event_fixed_param *)param_buf->fixed_param;
+
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&params->peer_mac_address,
+				   data->peer_mac_address.bytes);
+	data->ind_type = params->ind_type;
+	data->new_rxnss = params->new_rxnss;
+	data->new_bw = params->new_bw;
+	data->new_txnss = params->new_txnss;
+	data->new_disablemu = params->new_disablemu;
+
+	wmi_debug("peer_mac_addr: " QDF_MAC_ADDR_FMT " ind_type: %d new_rxnss: %d new_bw: %d new_txnss: %d new_disablemu: %d",
+		  QDF_MAC_ADDR_REF(data->peer_mac_address.bytes),
+		  data->ind_type,
+		  data->new_rxnss,
+		  data->new_bw,
+		  data->new_txnss,
+		  data->new_disablemu);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 /**
  * convert_roam_vendor_control_param() - Function to convert
@@ -4122,6 +4176,7 @@ void wmi_roam_offload_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_vdev_set_pcl_cmd = send_vdev_set_pcl_cmd_tlv;
 	ops->send_set_roam_trigger_cmd = send_set_roam_trigger_cmd_tlv;
 	ops->extract_roam_candidate_frame = extract_roam_candidate_frame_tlv;
+	ops->extract_peer_oper_mode_event = extract_peer_oper_mode_event_tlv;
 	wmi_roam_offload_attach_vendor_handoff_tlv(ops);
 	wmi_roam_offload_attach_mlo_tlv(ops);
 }

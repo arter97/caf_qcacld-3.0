@@ -226,6 +226,18 @@ static const int beacon_filter_extn_table[] = {
 #define HE_OPERATION_BSS_COL_DISABLED_POS 31
 #endif
 
+/* EHT operation BIT positins */
+#if defined(WLAN_FEATURE_11BE)
+#define EHT_OPER_BASIC_RX_NSS_MCS_0_TO_7_POS 0
+#define EHT_OPER_BASIC_TX_NSS_MCS_0_TO_7_POS 4
+#define EHT_OPER_BASIC_RX_NSS_MCS_8_AND_9_POS 8
+#define EHT_OPER_BASIC_TX_NSS_MCS_8_AND_9_POS 12
+#define EHT_OPER_BASIC_RX_NSS_MCS_10_AND_11_POS 16
+#define EHT_OPER_BASIC_TX_NSS_MCS_10_AND_11_POS 20
+#define EHT_OPER_BASIC_RX_NSS_MCS_12_AND_13_POS 24
+#define EHT_OPER_BASIC_TX_NSS_MCS_12_AND_13_POS 28
+#endif
+
 #if defined(WLAN_FEATURE_SAE) && \
 		(defined(CFG80211_EXTERNAL_AUTH_SUPPORT) || \
 		LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0))
@@ -1112,6 +1124,99 @@ void hdd_copy_vht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 	hdd_vht_ops->basic_mcs_set = vht_ops->basicMCSSet;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
+			    tDot11fIEeht_op *eht_ops)
+{
+	struct ieee80211_eht_operation *hdd_eht_ops =
+		&hdd_sta_ctx->conn_info.eht_operation;
+	uint32_t mcs_param = 0, filled = 0, len = 0;
+
+	qdf_mem_zero(hdd_eht_ops, sizeof(struct ieee80211_eht_operation));
+
+	if (!eht_ops->eht_op_information_present)
+		return;
+
+	/* Min length if op_info_present */
+	len += 3;
+
+	hdd_eht_ops->params |= IEEE80211_EHT_OPER_INFO_PRESENT;
+
+	if (eht_ops->eht_default_pe_duration)
+		hdd_eht_ops->params |=
+			IEEE80211_EHT_OPER_EHT_DEF_PE_DURATION;
+	if (eht_ops->group_addr_bu_indication_limit)
+		hdd_eht_ops->params |=
+			IEEE80211_EHT_OPER_GROUP_ADDRESSED_BU_IND_LIMIT;
+	if (eht_ops->group_addr_bu_indication_exponent)
+		hdd_eht_ops->params |=
+			IEEE80211_EHT_OPER_GROUP_ADDRESSED_BU_IND_EXP_MASK;
+
+	mcs_param |= eht_ops->basic_rx_max_nss_for_mcs_0_to_7 <<
+				EHT_OPER_BASIC_RX_NSS_MCS_0_TO_7_POS;
+	mcs_param |= eht_ops->basic_tx_max_nss_for_mcs_0_to_7 <<
+				EHT_OPER_BASIC_TX_NSS_MCS_0_TO_7_POS;
+	mcs_param |= eht_ops->basic_rx_max_nss_for_mcs_8_and_9 <<
+				EHT_OPER_BASIC_RX_NSS_MCS_8_AND_9_POS;
+	mcs_param |= eht_ops->basic_tx_max_nss_for_mcs_8_and_9 <<
+				EHT_OPER_BASIC_TX_NSS_MCS_8_AND_9_POS;
+	mcs_param |= eht_ops->basic_rx_max_nss_for_mcs_10_and_11 <<
+				EHT_OPER_BASIC_RX_NSS_MCS_10_AND_11_POS;
+	mcs_param |= eht_ops->basic_tx_max_nss_for_mcs_10_and_11 <<
+				EHT_OPER_BASIC_TX_NSS_MCS_10_AND_11_POS;
+	mcs_param |= eht_ops->basic_rx_max_nss_for_mcs_12_and_13 <<
+				EHT_OPER_BASIC_RX_NSS_MCS_12_AND_13_POS;
+	mcs_param |= eht_ops->basic_tx_max_nss_for_mcs_12_and_13 <<
+				EHT_OPER_BASIC_TX_NSS_MCS_12_AND_13_POS;
+
+	hdd_eht_ops->basic_mcs_nss = mcs_param;
+	hdd_eht_ops->optional[filled++] = eht_ops->channel_width;
+	hdd_eht_ops->optional[filled++] = eht_ops->ccfs0;
+	hdd_eht_ops->optional[filled++] = eht_ops->ccfs1;
+
+	if (eht_ops->disabled_sub_chan_bitmap_present) {
+		hdd_eht_ops->params |=
+			IEEE80211_EHT_OPER_DISABLED_SUBCHANNEL_BITMAP_PRESENT;
+		len += 2;
+		hdd_eht_ops->optional[filled++] =
+				eht_ops->disabled_sub_chan_bitmap[0][0];
+		hdd_eht_ops->optional[filled++] =
+				eht_ops->disabled_sub_chan_bitmap[0][1];
+	}
+	hdd_sta_ctx->conn_info.eht_oper_len =
+				sizeof(struct ieee80211_eht_operation) + len;
+}
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
+			    tDot11fIEeht_op *eht_ops)
+{
+	struct ieee80211_eht_operation *hdd_eht_ops =
+		&hdd_sta_ctx->conn_info.eht_operation;
+	uint32_t filled = 0, len = 0;
+
+	qdf_mem_zero(hdd_eht_ops, sizeof(struct ieee80211_eht_operation));
+
+	if (!eht_ops->eht_op_information_present)
+		return;
+
+	hdd_eht_ops->chan_width = eht_ops->channel_width;
+	hdd_eht_ops->ccfs = eht_ops->ccfs0;
+	hdd_eht_ops->present_bm = eht_ops->disabled_sub_chan_bitmap_present;
+
+	if (eht_ops->disabled_sub_chan_bitmap_present) {
+		hdd_eht_ops->disable_subchannel_bitmap[filled++] =
+				eht_ops->disabled_sub_chan_bitmap[0][0];
+		hdd_eht_ops->disable_subchannel_bitmap[filled++] =
+				eht_ops->disabled_sub_chan_bitmap[0][1];
+		len += 2;
+	}
+	hdd_sta_ctx->conn_info.eht_oper_len =
+				sizeof(struct ieee80211_eht_operation) + len;
+}
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
      defined(WLAN_FEATURE_11AX)
 void hdd_copy_he_operation(struct hdd_station_ctx *hdd_sta_ctx,
@@ -1473,6 +1578,9 @@ hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
 	uint8_t *mac_addr;
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx;
+	QDF_STATUS status;
+	bool alt_pipe;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
@@ -1482,13 +1590,22 @@ hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
 	    adapter->device_mode == QDF_STA_MODE &&
 	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_NONE &&
 	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_OPEN_SYSTEM &&
-	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_SHARED_KEY)
+	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_SHARED_KEY) {
+
+		hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+		status = hdd_ipa_get_tx_pipe(hdd_ctx, link_info, &alt_pipe);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_debug("Failed to get alternate pipe for vdev %d",
+				  link_info->vdev_id);
+			alt_pipe = false;
+		}
+
 		ucfg_ipa_wlan_evt(adapter->hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
 				  link_info->vdev_id,
 				  WLAN_IPA_STA_CONNECT, mac_addr,
-				  WLAN_REG_IS_24GHZ_CH_FREQ(
-					sta_ctx->conn_info.chan_freq));
+				  alt_pipe);
+	}
 
 	hdd_cm_set_peer_authenticate(link_info,
 				     &sta_ctx->conn_info.bssid, false);

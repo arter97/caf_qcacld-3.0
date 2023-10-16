@@ -466,6 +466,7 @@ struct sap_acs_cfg {
 	uint8_t    ch_list_count;
 	uint32_t   *master_freq_list;
 	uint8_t    master_ch_list_count;
+	bool master_ch_list_updated;
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 	uint8_t    skip_scan_status;
 	uint32_t    skip_scan_range1_stch;

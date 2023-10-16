@@ -1164,6 +1164,117 @@ add_freq:
 }
 
 /**
+ * policy_mgr_channel_mcc_with_non_sap() - Helper function to check if channel
+ * is MCC with exist non-movable connections.
+ * @psoc: pointer to SOC
+ * @chan_freq: channel frequency to check
+ *
+ * Return: true if is MCC with exist non-movable connections, otherwise false.
+ */
+static bool policy_mgr_channel_mcc_with_non_sap(struct wlan_objmgr_psoc *psoc,
+						qdf_freq_t chan_freq)
+{
+	uint32_t i, connection_of_2ghz = 0;
+	qdf_freq_t conc_freq;
+	bool is_mcc = false, check_only_dbs = false;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (pm_conc_connection_list[i].in_use &&
+		    WLAN_REG_IS_24GHZ_CH_FREQ(pm_conc_connection_list[i].freq))
+			connection_of_2ghz++;
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	if (connection_of_2ghz >= 2)
+		check_only_dbs = true;
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (pm_conc_connection_list[i].in_use &&
+		    (pm_conc_connection_list[i].mode == PM_STA_MODE ||
+		     pm_conc_connection_list[i].mode == PM_P2P_CLIENT_MODE ||
+		     pm_conc_connection_list[i].mode == PM_P2P_GO_MODE)) {
+			conc_freq = pm_conc_connection_list[i].freq;
+			if (conc_freq != chan_freq &&
+			    ((check_only_dbs &&
+			      policy_mgr_2_freq_same_mac_in_dbs(pm_ctx,
+								chan_freq,
+								conc_freq)) ||
+			     policy_mgr_2_freq_always_on_same_mac(psoc,
+								  chan_freq,
+								  conc_freq))) {
+				is_mcc = true;
+				break;
+			}
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return is_mcc;
+}
+
+/**
+ * policy_mgr_modify_sap_pcl_filter_mcc() - API to filter out MCC channel with
+ * existing non-SAP connection frequency from SAP PCL list.
+ * @psoc: pointer to SOC
+ * @pcl_list_org: channel list to filter out
+ * @weight_list_org: weight of channel list
+ * @pcl_len_org: length of channel list
+ * @mode: Policy manager connection mode
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+policy_mgr_modify_sap_pcl_filter_mcc(struct wlan_objmgr_psoc *psoc,
+				     uint32_t *pcl_list_org,
+				     uint8_t *weight_list_org,
+				     uint32_t *pcl_len_org,
+				     enum policy_mgr_con_mode mode)
+{
+	uint32_t i, pcl_len = 0;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	if (mode == PM_LL_LT_SAP_MODE)
+		return QDF_STATUS_SUCCESS;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (*pcl_len_org > NUM_CHANNELS) {
+		policy_mgr_err("Invalid PCL List Length %d", *pcl_len_org);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!policy_mgr_is_force_scc(psoc)) {
+		policy_mgr_debug("force SCC is not prefer, skip!");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	for (i = 0; i < *pcl_len_org; i++) {
+		if (policy_mgr_channel_mcc_with_non_sap(psoc, pcl_list_org[i]))
+			continue;
+
+		pcl_list_org[pcl_len] = pcl_list_org[i];
+		weight_list_org[pcl_len++] = weight_list_org[i];
+	}
+
+	*pcl_len_org = pcl_len;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * policy_mgr_modify_sap_go_4th_conc_disallow() - filter out channel that
  * is not allowed for 4th sap/go connection
  * @psoc: pointer to soc
@@ -1217,7 +1328,8 @@ end:
 static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len, uint32_t weight_len)
+			uint32_t *len, uint32_t weight_len,
+			enum policy_mgr_con_mode mode)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -1227,6 +1339,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	bool indoor_modified_pcl = false;
 	bool passive_modified_pcl = false;
 	bool band_6ghz_modified_pcl = false;
+	bool fourth_conc_modified_pcl = false;
 	bool modified_final_pcl = false;
 	bool srd_chan_enabled;
 
@@ -1309,16 +1422,27 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to modify pcl for 4th sap channels");
 		return status;
 	}
+	fourth_conc_modified_pcl = true;
+
+	status = policy_mgr_modify_sap_pcl_filter_mcc(psoc,
+						      pcl_channels,
+						      pcl_weight, len,
+						      mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to modify pcl for filter mcc");
+		return status;
+	}
 
 	modified_final_pcl = true;
-	policy_mgr_debug("%d %d %d %d %d %d %d",
+	policy_mgr_debug("%d %d %d %d %d %d %d %d",
 			 mandatory_modified_pcl,
 			 nol_modified_pcl,
 			 dfs_modified_pcl,
 			 indoor_modified_pcl,
 			 passive_modified_pcl,
-			 modified_final_pcl,
-			 band_6ghz_modified_pcl);
+			 band_6ghz_modified_pcl,
+			 fourth_conc_modified_pcl,
+			 modified_final_pcl);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1394,6 +1518,45 @@ static inline bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 	return false;
 }
 #endif
+
+static bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return false;
+
+	return (policy_mgr_is_hw_sbs_capable(psoc) &&
+		policy_mgr_can_2ghz_share_low_high_5ghz_sbs(pm_ctx));
+}
+
+/**
+ * policy_mgr_is_sbs_mac0_freq() - Check if the given frequency is
+ * sbs frequency on mac0.
+ * @psoc: psoc pointer
+ * @freq: Frequency which needs to be checked.
+ *
+ * Return: true/false.
+ */
+static bool policy_mgr_is_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
+					qdf_freq_t freq)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_freq_range *freq_range;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return false;
+
+	freq_range = pm_ctx->hw_mode.freq_range_caps[MODE_SBS];
+
+	if (policy_mgr_is_freq_on_mac_id(freq_range, freq, 0))
+		return true;
+
+	return false;
+}
+
 static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
@@ -1403,6 +1566,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	uint32_t pcl_list[NUM_CHANNELS], orig_len = *len;
 	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t i, pcl_len = 0;
+	bool is_dynamic_sbs_enabled;
+	bool sbs_mac0_modified_pcl;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1410,8 +1575,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	is_dynamic_sbs_enabled = policy_mgr_is_dynamic_sbs_enabled(psoc);
 	policy_mgr_pcl_modification_for_sap(
-		psoc, pcl_channels, pcl_weight, len, weight_len);
+		psoc, pcl_channels, pcl_weight, len, weight_len,
+		PM_LL_LT_SAP_MODE);
 
 	for (i = 0; i < *len; i++) {
 		/* Remove passive/dfs/6G invalid channel for LL_LT_SAP */
@@ -1423,6 +1590,13 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 					pcl_channels[i]) ||
 		    !policy_mgr_is_6G_chan_valid_for_ll_sap(pcl_channels[i]))
 			continue;
+
+		/* Remove mac0 frequencies for static SBS case */
+		if (!is_dynamic_sbs_enabled &&
+		    policy_mgr_is_sbs_mac0_freq(psoc, pcl_channels[i])) {
+			sbs_mac0_modified_pcl = true;
+			continue;
+		}
 
 		pcl_list[pcl_len] = pcl_channels[i];
 		weight_list[pcl_len++] = pcl_weight[i];
@@ -1437,7 +1611,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
 	*len = pcl_len;
 
-	policy_mgr_debug("PCL after ll sap modification");
+	policy_mgr_debug("sbs_mac0_modified_pcl %d, PCL after ll sap modification",
+			 sbs_mac0_modified_pcl);
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 
 	return QDF_STATUS_SUCCESS;
@@ -1464,7 +1639,7 @@ static QDF_STATUS policy_mgr_mode_specific_modification_on_pcl(
 	switch (mode) {
 	case PM_SAP_MODE:
 		status = policy_mgr_pcl_modification_for_sap(
-			psoc, pcl_channels, pcl_weight, len, weight_len);
+			psoc, pcl_channels, pcl_weight, len, weight_len, mode);
 		break;
 	case PM_P2P_GO_MODE:
 		status = policy_mgr_pcl_modification_for_p2p_go(

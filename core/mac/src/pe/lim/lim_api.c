@@ -4013,7 +4013,6 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 {
 	struct wlan_objmgr_pdev *pdev;
 	struct scan_cache_entry *cache_entry;
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct wlan_channel channel;
 
 	pdev = mac_ctx->pdev;
@@ -4038,7 +4037,7 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	mlo_mgr_update_ap_channel_info(vdev, link_id, (uint8_t *)link_addr,
 				       channel);
 
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 #else
 static inline void

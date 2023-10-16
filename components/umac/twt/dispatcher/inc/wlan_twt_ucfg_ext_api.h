@@ -283,6 +283,7 @@ bool ucfg_twt_is_command_in_progress(struct wlan_objmgr_psoc *psoc,
  * @vdev: Vdev pointer
  * @peer_mac: peer mac address
  * @dialog_id: dialog_id
+ * @is_ps_disabled: Whether Power saave is disabled or not
  * @twt_next_action: Set TWT next action to do before work schedule
  *
  * Return: None
@@ -291,6 +292,7 @@ void ucfg_twt_set_work_params(
 		struct wlan_objmgr_vdev *vdev,
 		struct qdf_mac_addr *peer_mac,
 		uint8_t dialog_id,
+		bool is_ps_disabled,
 		uint32_t twt_next_action);
 
 /**
@@ -415,6 +417,7 @@ ucfg_twt_set_work_params(
 		struct wlan_objmgr_vdev *vdev,
 		struct qdf_mac_addr *peer_mac,
 		uint8_t dialog_id,
+		bool is_ps_disabled,
 		uint32_t twt_next_action)
 {
 }

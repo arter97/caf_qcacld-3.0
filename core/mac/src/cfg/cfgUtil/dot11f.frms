@@ -1333,6 +1333,13 @@ IE RequestedInfo (EID_REQUEST)            // 7.3.2.12
     requested_eids[0..255];
 }
 
+const EID_BCN_REQ_EXTENDED_INFO = 11;
+IE ExtRequestedInfo (EID_BCN_REQ_EXTENDED_INFO)
+{
+    req_element_id,     1;
+    req_element_id_ext[0..255];
+}
+
 IE Country (EID_COUNTRY)                  // 7.3.2.9
 {
     country[3];
@@ -2554,10 +2561,27 @@ IE transmit_power_env (EID_TRANSMIT_POWER_ENVELOPE)
     tx_power[1..8];
 }
 
+IE bw_ind_element (EID_EXTN_ID_ELEMENT) OUI (0x87)
+{
+   {
+       reserved: 1;
+       disabled_sub_chan_bitmap_present: 1;
+       reserved_1: 6;
+   }
+   {
+       channel_width: 3;
+       reserved_2: 5;
+   }
+   ccfs0, 1;
+   ccfs1, 1;
+   disabled_sub_chan_bitmap[2][0..1] COUNTIS disabled_sub_chan_bitmap_present;
+}
+
 IE ChannelSwitchWrapper (EID_CHANNEL_SWITCH_WRAPPER)
 {
     OPTIE IE  WiderBWChanSwitchAnn;
     OPTIE IE  transmit_power_env;
+    OPTIE IE  bw_ind_element;
 }
 
 IE reduced_neighbor_report (EID_RNR_IE)
@@ -3118,6 +3142,7 @@ IE MeasurementRequest (EID_MEAS_REQUEST)  // 7.3.2.21
           OPTIE rrm_reporting;
           OPTIE BcnReportingDetail;
           OPTIE RequestedInfo;
+          OPTIE ExtRequestedInfo;
           OPTIE APChannelReport[0..2];
           OPTIE last_beacon_report_indication;
           //OPTIONAL vendor_specific[1..239];
@@ -4942,6 +4967,7 @@ FRAME ext_channel_switch_action_frame
     FF     ext_chan_switch_ann_action;
     OPTIE  WiderBWChanSwitchAnn;
     OPTIE  qcn_ie;
+    OPTIE  bw_ind_element;
 }
 
 FRAME p2p_oper_chan_change_confirm

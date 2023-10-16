@@ -928,6 +928,16 @@ enum qca_wlan_802_11_mode
 hdd_convert_cfgdot11mode_to_80211mode(enum csr_cfgdot11mode mode);
 
 /**
+ * hdd_convert_phymode_to_80211mode() - Function to convert eCsrPhyMode
+ *					to 80211 mode
+ * @mode: eCsrPhyMode
+ *
+ * Return: 80211 mode
+ */
+enum qca_wlan_802_11_mode
+hdd_convert_phymode_to_80211mode(eCsrPhyMode mode);
+
+/**
  * hdd_send_update_owe_info_event - Send update OWE info event
  * @adapter: Pointer to adapter
  * @sta_addr: MAC address of peer STA
@@ -967,11 +977,13 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
  * hdd_set_mac_chan_width() - set channel width
  * @adapter: Handle to hdd_adapter
  * @chwidth: given channel width
+ * @link_id: mlo link id
  *
  * Return: 0 on success, negative errno on failure
  */
 int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
-			   enum eSirMacHTChannelWidth chwidth);
+			   enum eSirMacHTChannelWidth chwidth,
+			   uint8_t link_id);
 
 /**
  * hdd_is_legacy_connection() - Is adapter connection is legacy
