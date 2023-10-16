@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -701,6 +701,11 @@ struct wlan_dp_intf {
  * @vdev: object manager vdev context
  * @vdev_lock: vdev spin lock
  * @conn_info: STA connection information
+ * @destroyed: flag to indicate dp_link destroyed (logical delete)
+ * @cdp_vdev_registered: flag to indicate if corresponding CDP vdev
+ *			 is registered
+ * @cdp_vdev_deleted: flag to indicate if corresponding CDP vdev is deleted
+ * @inactive_list_elem: list node for membership in dp link inactive list
  */
 struct wlan_dp_link {
 	qdf_list_node_t node;
@@ -710,6 +715,10 @@ struct wlan_dp_link {
 	struct wlan_objmgr_vdev *vdev;
 	qdf_spinlock_t vdev_lock;
 	struct wlan_dp_conn_info conn_info;
+	uint8_t destroyed : 1,
+		cdp_vdev_registered : 1,
+		cdp_vdev_deleted : 1;
+	TAILQ_ENTRY(wlan_dp_link) inactive_list_elem;
 };
 
 /**
@@ -807,6 +816,8 @@ struct dp_direct_link_context {
  * @skip_fisa_param.skip_fisa: Flag to skip FISA aggr inside @skip_fisa_param
  * @skip_fisa_param.fisa_force_flush: Force flush inside @skip_fisa_param
  * @fst_cmem_size: CMEM size for FISA flow table
+ * @inactive_dp_link_list: inactive DP links list
+ * @dp_link_del_lock: DP link delete operation lock
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -907,6 +918,8 @@ struct wlan_dp_psoc_context {
 	uint64_t fst_cmem_size;
 
 #endif
+	TAILQ_HEAD(, wlan_dp_link) inactive_dp_link_list;
+	qdf_spinlock_t dp_link_del_lock;
 };
 
 #ifdef WLAN_DP_PROFILE_SUPPORT

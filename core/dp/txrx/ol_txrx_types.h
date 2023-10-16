@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1217,6 +1217,9 @@ struct ol_txrx_vdev_t {
 
 	/* completion function used by this vdev*/
 	ol_txrx_completion_fp tx_comp;
+
+	/* delete notifier to DP component */
+	ol_txrx_vdev_delete_cb vdev_del_notify;
 
 	struct {
 		/*
