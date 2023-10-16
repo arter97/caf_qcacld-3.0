@@ -3342,7 +3342,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		break;
 	case LIM_SWITCH_CHANNEL_SAP_DFS:
 		if (QDF_IS_STATUS_SUCCESS(status))
-			lim_set_tpc_power(mac, pe_session);
+			lim_set_tpc_power(mac, pe_session, NULL);
 
 		/* Note: This event code specific to SAP mode
 		 * When SAP session issues channel change as performing

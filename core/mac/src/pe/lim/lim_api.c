@@ -2986,8 +2986,15 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	ft_session_ptr->csaOffloadEnable = session_ptr->csaOffloadEnable;
 
 	/* Next routine will update nss and vdev_nss with AP's capabilities */
-	lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr,
-			    session_ptr, roam_sync_ind_ptr->phy_mode);
+	status = lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr,
+				     session_ptr, roam_sync_ind_ptr->phy_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to fill ft session for vdev id %d",
+		       ft_session_ptr->vdev_id);
+		qdf_mem_free(bss_desc);
+		goto roam_sync_fail;
+	}
+
 	roam_sync_ind_ptr->ssid.length =
 		qdf_min((qdf_size_t)ft_session_ptr->ssId.length,
 			sizeof(roam_sync_ind_ptr->ssid.ssid));
@@ -3001,6 +3008,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	/* Next routine may update nss based on dot11Mode */
 
 	lim_ft_prepare_add_bss_req(mac_ctx, ft_session_ptr, bss_desc);
+	lim_set_tpc_power(mac_ctx, ft_session_ptr, bss_desc);
 
 	if (session_ptr->is11Rconnection)
 		lim_fill_fils_ft(session_ptr, ft_session_ptr);
@@ -3155,6 +3163,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr, aid,
 					  session_ptr);
 	}
+
 	pe_delete_session(mac_ctx, session_ptr);
 	return QDF_STATUS_SUCCESS;
 

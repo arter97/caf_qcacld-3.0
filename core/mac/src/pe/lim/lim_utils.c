@@ -11344,7 +11344,8 @@ uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
 }
 
 bool
-lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session)
+lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
+		  struct bss_description *bss_desc)
 {
 	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 	struct vdev_mlme_obj *mlme_obj;
@@ -11363,10 +11364,9 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session)
 
 	if ((session->opmode == QDF_STA_MODE ||
 	     session->opmode == QDF_P2P_CLIENT_MODE) &&
-	    session->lim_join_req)
+	     bss_desc)
 		lim_process_tpe_ie_from_beacon(mac_ctx, session,
-				       &session->lim_join_req->bssDescription,
-				       &tpe_change);
+					       bss_desc, &tpe_change);
 
 	if (session->opmode == QDF_SAP_MODE ||
 	    session->opmode == QDF_P2P_GO_MODE)
@@ -11445,6 +11445,7 @@ lim_update_tx_power(struct mac_context *mac_ctx, struct pe_session *sap_session,
 	struct vdev_mlme_obj *sta_mlme_obj, *sap_mlme_obj;
 	struct reg_tpc_power_info *reg_info;
 	uint8_t tx_power, i;
+	struct bss_description *bss_desc = NULL;
 
 	sta_mlme_obj = wlan_vdev_mlme_get_cmpt_obj(sta_session->vdev);
 	sap_mlme_obj = wlan_vdev_mlme_get_cmpt_obj(sap_session->vdev);
@@ -11456,7 +11457,11 @@ lim_update_tx_power(struct mac_context *mac_ctx, struct pe_session *sap_session,
 		/* SAP interface is removed, restore the STA power */
 		wlan_set_tpc_update_required_for_sta(sap_session->vdev, false);
 		sta_session->sta_follows_sap_power = false;
-		lim_set_tpc_power(mac_ctx, sta_session);
+
+		if (sta_session->lim_join_req)
+			bss_desc = &sta_session->lim_join_req->bssDescription;
+
+		lim_set_tpc_power(mac_ctx, sta_session, bss_desc);
 	} else {
 		/*
 		 * SAP and STA are in different AP power types. Therefore,
@@ -11569,7 +11574,7 @@ lim_check_conc_power_for_csa(struct mac_context *mac_ctx,
 	    (wlan_vdev_mlme_get_state(sap_session->vdev) == WLAN_VDEV_S_UP)) {
 		if (lim_is_power_change_required_for_sta(mac_ctx, sta_session,
 							 sap_session)) {
-			lim_set_tpc_power(mac_ctx, sap_session);
+			lim_set_tpc_power(mac_ctx, sap_session, NULL);
 			if (lim_update_tx_power(mac_ctx, sap_session,
 						sta_session, false) ==
 							QDF_STATUS_SUCCESS)
@@ -11604,6 +11609,7 @@ lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 {
 	struct mac_context *mac_ctx;
 	struct pe_session *session;
+	struct bss_description *bss_desc = NULL;
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	if (!mac_ctx) {
@@ -11617,7 +11623,10 @@ lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 		return;
 	}
 
-	lim_set_tpc_power(mac_ctx, session);
+	if (session->lim_join_req)
+		bss_desc = &session->lim_join_req->bssDescription;
+
+	lim_set_tpc_power(mac_ctx, session, bss_desc);
 }
 
 struct wlan_channel *
