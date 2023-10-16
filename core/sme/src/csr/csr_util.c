@@ -605,6 +605,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	QDF_STATUS status;
 	enum QDF_OPMODE op_mode;
 	enum phy_ch_width ch_width;
+	enum channel_state state;
 
 	if (mac_ctx->roam.configParam.cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
@@ -672,6 +673,20 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 					&intf_cfreq, op_mode,
 					cc_switch_mode);
 		}
+
+		if (intf_ch_freq) {
+			state = wlan_reg_get_channel_state_for_pwrmode(
+					mac_ctx->pdev, intf_ch_freq,
+					REG_CURRENT_PWR_MODE);
+			if (state == CHANNEL_STATE_DISABLE ||
+			    state == CHANNEL_STATE_INVALID) {
+				sme_debug("skip vdev %d for intf_ch:%d",
+					  i, intf_ch_freq);
+				intf_ch_freq = 0;
+				continue;
+			}
+		}
+
 		if (intf_ch_freq &&
 		    ((intf_ch_freq <= wlan_reg_ch_to_freq(CHAN_ENUM_2484) &&
 		     sap_ch_freq <= wlan_reg_ch_to_freq(CHAN_ENUM_2484)) ||
