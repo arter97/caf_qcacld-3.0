@@ -372,13 +372,12 @@ void wlan_mlme_ll_lt_sap_send_oce_flags_fw(struct wlan_objmgr_vdev *vdev)
 
 	updated_fw_value = mlme_obj->cfg.oce.feature_bitmap;
 	vdev_id = wlan_vdev_get_id(vdev);
-	wma_debug("Disable FILS discovery for vdev %d",
-		  vdev_id);
+	wma_debug("Vdev %d Disable FILS discovery", vdev_id);
 	updated_fw_value &= ~(WMI_VDEV_OCE_FILS_DISCOVERY_FRAME_FEATURE_BITMAP);
 	if (wma_cli_set_command(vdev_id,
 				wmi_vdev_param_enable_disable_oce_features,
 				updated_fw_value, VDEV_CMD))
-		mlme_legacy_err("Failed to send OCE update to FW");
+		mlme_legacy_err("Vdev %d failed to send OCE update", vdev_id);
 }
 
 QDF_STATUS wlan_mlme_set_ap_policy(struct wlan_objmgr_vdev *vdev,
