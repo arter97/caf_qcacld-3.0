@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -550,6 +550,19 @@ QDF_STATUS csr_roam_modify_add_ies(struct mac_context *mac,
 QDF_STATUS
 csr_roam_update_add_ies(struct mac_context *mac,
 		tSirUpdateIE *pUpdateIE, eUpdateIEsType updateType);
+
+/*
+ * csr_roam_update_rnr_ies -
+ * This function sends msg to update the RNR IE buffers in PE
+ *
+ * @mac: mac global structure
+ * @updateie: buffer containing rnr IE from hostapd
+ *
+ * Return: QDF_STATUS -  Success or failure
+ */
+QDF_STATUS
+csr_roam_update_rnr_ies(struct mac_context *mac,
+			struct ssirupdaternrie *updateie);
 
 bool csr_nonscan_active_ll_remove_entry(
 			struct mac_context *mac_ctx,

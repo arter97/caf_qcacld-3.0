@@ -592,6 +592,9 @@ struct sap_config {
 	bool mlo_sap;
 	uint8_t link_id;
 	uint8_t num_link;
+	uint8_t rnrie[WLAN_MAX_IE_LEN + MIN_IE_LEN];
+	/* The byte count in the RNRIE */
+	uint16_t rnrielen;
 #endif
 	qdf_freq_t last_acs_freq;
 	qdf_time_t last_acs_complete_time;

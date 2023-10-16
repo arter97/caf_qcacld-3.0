@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -171,5 +171,14 @@ typedef struct sBcnReportFields {
 	uint16_t BcnInterval;
 	uint16_t CapabilityInfo;
 } qdf_packed tBcnReportFields, *tpBcnReportFields;
+
+/* struct ssirrnrie - RNR IE
+ * @length: rnrie data buffer actual length
+ * @rnriedata: ponit to rnrie data buffer
+ */
+struct ssirrnrie {
+	uint16_t length;
+	uint8_t rnriedata[WLAN_MAX_IE_LEN + MIN_IE_LEN];
+};
 
 #endif /* __ANI_SYSTEM_DEFS_H */

@@ -129,6 +129,21 @@ static void lim_process_ext_change_channel(struct mac_context *mac_ctx,
 
 static void lim_mlo_sap_validate_and_update_ra(struct pe_session *session,
 					       struct qdf_mac_addr *peer_addr);
+
+/**
+ * lim_process_update_rnr_ies() - process sme rnrie update request
+ *
+ * @mac_ctx: Pointer to Global MAC structure
+ * @msg_buf: pointer to the SME message buffer
+ *
+ * This function processes SME request messages from HDD or upper layer
+ * application.
+ *
+ * Return: None
+ */
+static void lim_process_update_rnr_ies(struct mac_context *mac_ctx,
+				       uint32_t *msg_buf);
+
 /**
  * enum get_next_lower_bw - Get next higher bandwidth for a given BW.
  * This enum is used in conjunction with
@@ -1154,6 +1169,12 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			/* Initialize WPS PBC session link list */
 			session->pAPWPSPBCSession = NULL;
 		}
+
+		/* keep the RNR IE in PE Session Entry */
+		lim_set_rnr_ie_from_start_bss_req(mac_ctx,
+						  &sme_start_bss_req->rnrie,
+						  session);
+
 		/* Prepare and Issue LIM_MLM_START_REQ to MLM */
 		mlm_start_req = qdf_mem_malloc(sizeof(tLimMlmStartReq));
 		if (!mlm_start_req) {
@@ -9362,6 +9383,9 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 	case eWNI_SME_SAP_CH_WIDTH_UPDATE_REQ:
 		lim_process_sap_ch_width_update(mac, msg_buf);
 		break;
+	case WNI_SME_UPDATE_RNR_IES:
+		lim_process_update_rnr_ies(mac, msg_buf);
+		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);
 		pMsg->bodyptr = NULL;
@@ -10056,6 +10080,62 @@ end:
 	qdf_mem_free(update_ie->pAdditionIEBuffer);
 	update_ie->pAdditionIEBuffer = NULL;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static void lim_process_update_rnr_ies(struct mac_context *mac_ctx,
+				       uint32_t *msg_buf)
+{
+	struct ssirupdaternriesind *update_add_ies = (struct ssirupdaternriesind *)msg_buf;
+	struct pe_session *session_entry;
+	struct ssirupdaternrie *update_ie;
+	uint32_t ret;
+
+	if (!msg_buf) {
+		pe_err("msg_buf is NULL");
+		return;
+	}
+	update_ie = &update_add_ies->updateie;
+	/* skip update_ie null check since it is static */
+
+	/* if len is 0, upper layer requested freeing of buffer */
+	if (update_ie->iebufferlength == 0)
+		goto end;
+
+	/* incoming message has smeSession, use BSSID to find PE session */
+	session_entry = pe_find_session_by_vdev_id(mac_ctx, update_ie->vdev_id);
+
+	if (!session_entry) {
+		pe_debug("Session not found for given vdev id %d",
+			 update_ie->vdev_id);
+		goto end;
+	}
+
+	if (update_ie->piebuffer[ID_POS] !=
+	    WLAN_ELEMID_REDUCED_NEIGHBOR_REPORT) {
+		pe_debug("EID: %d is not rnr", update_ie->piebuffer[ID_POS]);
+		goto end;
+	}
+	/* Check validity of RNR IE */
+	if (update_ie->piebuffer[TAG_LEN_POS] < SIR_MAC_RSN_IE_MIN_LENGTH) {
+		pe_debug("invalid RNR IE len: %d ",
+			 update_ie->piebuffer[TAG_LEN_POS]);
+		goto end;
+	}
+
+	ret = lim_populate_rnr_entry(mac_ctx, session_entry,
+				     &update_ie->piebuffer[ID_POS]);
+end:
+	qdf_mem_free(update_ie->piebuffer);
+	update_ie->piebuffer = NULL;
+}
+
+#else
+static void
+lim_process_update_rnr_ies(struct mac_context *mac_ctx,
+			   uint32_t *msg_buf)
+{
+}
+#endif
 
 void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 					    uint16_t new_channel_freq,

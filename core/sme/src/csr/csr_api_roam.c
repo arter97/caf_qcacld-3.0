@@ -7155,6 +7155,46 @@ csr_roam_update_add_ies(struct mac_context *mac,
 	return status;
 }
 
+QDF_STATUS
+csr_roam_update_rnr_ies(struct mac_context *mac,
+			struct ssirupdaternrie *updateie)
+{
+	struct ssirupdaternriesind *updateaddies = NULL;
+	uint8_t *localbuffer = NULL;
+	QDF_STATUS status;
+
+	if (updateie->iebufferlength) {
+		/* Following buffer will be freed by consumer (PE) */
+		localbuffer = qdf_mem_malloc(updateie->iebufferlength);
+		if (!localbuffer)
+			return QDF_STATUS_E_NOMEM;
+
+		qdf_mem_copy(localbuffer, updateie->piebuffer,
+			     updateie->iebufferlength);
+	}
+
+	updateaddies = qdf_mem_malloc(sizeof(*updateaddies));
+	if (!updateaddies) {
+		qdf_mem_free(localbuffer);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	updateaddies->msgtype = WNI_SME_UPDATE_RNR_IES;
+	updateaddies->msglen = sizeof(struct ssirupdaternriesind);
+
+	updateaddies->updateie.vdev_id = updateie->vdev_id;
+	updateaddies->updateie.iebufferlength = updateie->iebufferlength;
+	updateaddies->updateie.piebuffer = localbuffer;
+
+	status = umac_send_mb_message_to_mac(updateaddies);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("Failed to send eWNI_SME_UPDATE_ADDTIONAL_IES msg status %d",
+			status);
+		qdf_mem_free(localbuffer);
+	}
+	return status;
+}
+
 /**
  * csr_send_ext_change_freq()- function to post send ECSA
  * action frame to lim.

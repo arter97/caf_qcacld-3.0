@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2012,2014-2015,2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -53,6 +53,40 @@ bool lim_is_sme_start_bss_req_valid(struct mac_context *mac_ctx,
 uint8_t lim_set_rs_nie_wp_aiefrom_sme_start_bss_req_message(struct mac_context *,
 							    tpSirRSNie, struct pe_session *);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_populate_rnr_entry() - To populate the rnrie
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session_entry: Pointer to the PE session
+ * @ie: ie data
+ *
+ * This function is used to parse and populate RNR IE properly.
+ *
+ * Return: DOT11F_PARSE_SUCCESS if parse correctly, and other value
+ *         otherwise
+ */
+uint32_t lim_populate_rnr_entry(struct mac_context *mac_ctx,
+				struct pe_session *session_entry,
+				uint8_t *ie);
+#endif
+
+/**
+ * lim_set_rnr_ie_from_start_bss_req() - update rnrie buffer while start bss
+ *
+ * @mac_ctx : Pointer to Global MAC structure
+ * @rnr_ie  : Pointer to received RNR IE
+ * @session : Pointer to pe session
+ *
+ * This function is called to verify if the RNR IE received in various
+ * SME_REQ messages is valid or not. RNR IE validity checks are performed in
+ * this function
+ *
+ * Return: true when RNR IE is valid, false otherwise
+ */
+bool
+lim_set_rnr_ie_from_start_bss_req(struct mac_context *mac_ctx,
+				  struct ssirrnrie *rnr_ie,
+				  struct pe_session *session);
 /**
  * lim_is_sme_disassoc_req_valid() - Validate disassoc req message
  * @mac: Pointer to Global MAC structure

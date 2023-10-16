@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -371,6 +371,8 @@ struct wlan_mlo_ie_info {
 
 #endif
 
+#define MAX_NUM_RNR_ENTRY 2
+
 /**
  * struct pe_session - per-vdev PE context
  * @available: true if the entry is available, false if it is in use
@@ -674,6 +676,7 @@ struct wlan_mlo_ie_info {
  * @ml_partner_info:
  * @mlo_ie_total_len:
  * @mlo_ie:
+ * @start_bss_rnr_ie: RNRIE
  * @user_edca_set:
  * @is_oui_auth_assoc_6mbps_2ghz_enable: send auth/assoc req with 6 Mbps rate
  * @is_unexpected_peer_error: true if unexpected peer error
@@ -1002,6 +1005,7 @@ struct pe_session {
 	struct mlo_partner_info ml_partner_info;
 	uint16_t mlo_ie_total_len;
 	struct wlan_mlo_ie mlo_ie;
+	tDot11fIEreduced_neighbor_report start_bss_rnr_ie[MAX_NUM_RNR_ENTRY];
 #endif
 #endif /* WLAN_FEATURE_11BE */
 	uint8_t user_edca_set;

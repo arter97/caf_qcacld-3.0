@@ -1385,6 +1385,20 @@ QDF_STATUS sme_modify_add_ie(mac_handle_t mac_handle,
 		tSirModifyIE *pModifyIE, eUpdateIEsType updateType);
 QDF_STATUS sme_update_add_ie(mac_handle_t mac_handle,
 		tSirUpdateIE *pUpdateIE, eUpdateIEsType updateType);
+
+/*
+ * sme_update_rnr_ie() - This function sends msg to updates
+ * the RNR IE buffers in PE
+ *
+ * @mac_handle - global structure
+ * @updateie - pointer to rnrie related information structure
+ *
+ * Return: QDF_STATUS_SUCCESS if update rnrie successfully else return
+ * appropriate error status.
+ */
+QDF_STATUS sme_update_rnr_ie(mac_handle_t mac_handle,
+			     struct ssirupdaternrie *updateie);
+
 QDF_STATUS sme_update_connect_debug(mac_handle_t mac_handle,
 				    uint32_t set_value);
 

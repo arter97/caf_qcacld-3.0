@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -274,6 +274,99 @@ lim_set_rs_nie_wp_aiefrom_sme_start_bss_req_message(struct mac_context *mac_ctx,
 	}
 	return true;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+uint32_t lim_populate_rnr_entry(struct mac_context *mac_ctx,
+				struct pe_session *session_entry,
+				uint8_t *ie)
+{
+	uint32_t rnr_ie_len;
+	uint16_t tbtt_count, tbtt_length, i = 0, fieldtype;
+	uint8_t *data;
+	uint32_t ret = DOT11F_UNKNOWN_IES;
+	struct neighbor_ap_info_field *neighbor_ap_info;
+
+	qdf_mem_zero(&session_entry->start_bss_rnr_ie[0],
+		     (sizeof(tDot11fIEreduced_neighbor_report) *
+		      MAX_NUM_RNR_ENTRY));
+
+	rnr_ie_len = ie[TAG_LEN_POS];
+	data = ie + MIN_IE_LEN;
+
+	while ((data < (ie + rnr_ie_len + MIN_IE_LEN)) &&
+	       i < MAX_NUM_RNR_ENTRY) {
+		neighbor_ap_info = (struct neighbor_ap_info_field *)data;
+
+		tbtt_count = neighbor_ap_info->tbtt_header.tbtt_info_count;
+		tbtt_length = neighbor_ap_info->tbtt_header.tbtt_info_length;
+		fieldtype = neighbor_ap_info->tbtt_header.tbbt_info_fieldtype;
+
+		pe_debug("chan %d, opclass %d tbtt_cnt %d, tbtt_len %d, fieldtype %d",
+			 neighbor_ap_info->channel_number,
+			 neighbor_ap_info->operting_class,
+			 tbtt_count, tbtt_length, fieldtype);
+
+		if (tbtt_count) {
+			pe_debug("Not support MBSSID case or rnr content wrong");
+			ret = DOT11F_UNKNOWN_IES;
+			return ret;
+		}
+
+		ret = dot11f_unpack_ie_reduced_neighbor_report(mac_ctx,
+							       data,
+							       (sizeof(struct neighbor_ap_info_field) +
+								tbtt_length),
+							       &session_entry->start_bss_rnr_ie[i],
+							       false);
+		if (!DOT11F_SUCCEEDED(ret)) {
+			pe_err("unpack failed, ret: %d", ret);
+			return ret;
+		}
+		data += sizeof(struct neighbor_ap_info_field) + tbtt_length;
+		i++;
+	}
+	return ret;
+}
+
+bool
+lim_set_rnr_ie_from_start_bss_req(struct mac_context *mac_ctx,
+				  struct ssirrnrie *rnr_ie,
+				  struct pe_session *session)
+{
+	uint32_t ret;
+
+	if (!rnr_ie->length)
+		return true;
+
+	if (rnr_ie->rnriedata[ID_POS] !=
+	    WLAN_ELEMID_REDUCED_NEIGHBOR_REPORT) {
+		pe_debug("EID: %d is not rnr", rnr_ie->rnriedata[ID_POS]);
+		return false;
+	}
+	/* Check validity of RNR IE */
+	if (rnr_ie->rnriedata[TAG_LEN_POS] < SIR_MAC_RSN_IE_MIN_LENGTH) {
+		pe_debug("invalid RNR IE len: %d",
+			 rnr_ie->rnriedata[TAG_LEN_POS]);
+		return false;
+	}
+
+	ret = lim_populate_rnr_entry(mac_ctx, session,
+				     &rnr_ie->rnriedata[ID_POS]);
+	if (!DOT11F_SUCCEEDED(ret))
+		return false;
+
+	return true;
+}
+
+#else
+bool
+lim_set_rnr_ie_from_start_bss_req(struct mac_context *mac_ctx,
+				  struct ssirrnrie *rnr_ie,
+				  struct pe_session *session)
+{
+	return false;
+}
+#endif
 
 bool lim_is_sme_start_bss_req_valid(struct mac_context *mac_ctx,
 				    struct start_bss_config *start_bss_req,

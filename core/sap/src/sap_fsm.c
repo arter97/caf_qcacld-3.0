@@ -5061,6 +5061,25 @@ bool sap_is_conc_sap_doing_scc_dfs(mac_handle_t mac_handle,
 	return false;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+sap_build_rnrie_config(struct start_bss_config *sap_bss_cfg,
+		       struct sap_config *config)
+{
+	/* RNRIE */
+	sap_bss_cfg->rnrie.length = config->rnrielen;
+	if (config->rnrielen)
+		qdf_mem_copy(sap_bss_cfg->rnrie.rnriedata,
+			     config->rnrie, config->rnrielen);
+}
+#else
+static void
+sap_build_rnrie_config(struct start_bss_config *sap_bss_cfg,
+		       struct sap_config *config)
+{
+}
+#endif
+
 /**
  * sap_build_start_bss_config() - Fill the start bss request for SAP
  * @sap_bss_cfg: start bss config
@@ -5148,6 +5167,7 @@ sap_build_start_bss_config(struct start_bss_config *sap_bss_cfg,
 		sap_bss_cfg->extendedRateSet.numRates =
 				config->extended_rates.numRates;
 	}
+	sap_build_rnrie_config(sap_bss_cfg, config);
 
 	return;
 }

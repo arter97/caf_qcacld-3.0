@@ -9147,6 +9147,23 @@ QDF_STATUS sme_update_add_ie(mac_handle_t mac_handle,
 	return status;
 }
 
+QDF_STATUS sme_update_rnr_ie(mac_handle_t mac_handle,
+			     struct ssirupdaternrie *updateie)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	status = sme_acquire_global_lock(&mac->sme);
+
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		status = csr_roam_update_rnr_ies(mac, updateie);
+		sme_release_global_lock(&mac->sme);
+		/* need update beacon if has new rnrie */
+		csr_update_beacon(mac);
+	}
+	return status;
+}
+
 /**
  * sme_update_dsc_pto_up_mapping()
  * @mac_handle: Opaque handle to the global MAC context

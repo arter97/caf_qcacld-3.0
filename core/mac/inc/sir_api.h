@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2316,6 +2316,29 @@ typedef struct sSirUpdateIEsInd {
 	tSirUpdateIE updateIE;
 	eUpdateIEsType updateType;
 } tSirUpdateIEsInd, *tpSirUpdateIEsInd;
+
+/* struct ssirupdaternrie - RNRIE related information
+ * @vdev_id: vdev id
+ * @ieBufferlength: ie buffer actual length
+ * @piebuffer: ie buffer pointer
+ */
+struct ssirupdaternrie {
+	uint16_t vdev_id;
+	uint16_t iebufferlength;
+	uint8_t *piebuffer;
+};
+
+/* struct ssirupdaternriesind - Message format to update RNRIE message
+ * sent to PE.
+ * @msgtype: message type
+ * @msglen: message length
+ * @updateie: rnrie related information data structure
+ */
+struct ssirupdaternriesind {
+	uint16_t msgtype;
+	uint16_t msglen;
+	struct ssirupdaternrie updateie;
+};
 
 /* Message format for requesting channel switch announcement to lower layers */
 typedef struct sSirDfsCsaIeRequest {
@@ -5005,6 +5028,7 @@ struct channel_change_req {
  * @beacon_tx_rate: Tx rate for beacon
  * @cac_duration_ms: cac duration in ms
  * @dfs_regdomain: dfs regdomain
+ * @rnrie: rnr ie
  */
 struct start_bss_config {
 	uint8_t vdev_id;
@@ -5034,6 +5058,7 @@ struct start_bss_config {
 	uint16_t beacon_tx_rate;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
+	struct ssirrnrie rnrie;
 };
 
 #endif /* __SIR_API_H */
