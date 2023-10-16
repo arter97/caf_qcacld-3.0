@@ -1172,15 +1172,9 @@ dfs_process_radar_ind_on_home_chan(struct wlan_dfs *dfs,
 			  dfs_radar_bitmap);
 
 exit:
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		struct wlan_channel wlan_chan = {0};
-
+	if (QDF_IS_STATUS_SUCCESS(status))
 		utils_dfs_deliver_event(dfs->dfs_pdev_obj, radarfound_freq,
 					WLAN_EV_RADAR_DETECTED);
-		dfs_conv_dfs_channel_to_wlan_channel(dfs_curchan, &wlan_chan);
-		dfs_mlme_send_cfg80211_event(dfs->dfs_pdev_obj, &wlan_chan,
-					     QDF_RADAR_CAC_ABORTED);
-	}
 
 	return status;
 }
