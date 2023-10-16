@@ -2994,17 +2994,16 @@ sap_max_weight_invalidate_2ghz_channels(struct sap_sel_ch_info *spect_info)
  * sap_compute_spect_max_power_weight() - Compute channel weight use max power
  *                                        factor
  * @spect_info: pointer to SAP channel select structure of spectrum info
- * @mac_handle: mac handle
+ * @mac: mac context
  * @sap_ctx: pointer to SAP context
  *
  * Return: None
  */
 static void
 sap_compute_spect_max_power_weight(struct sap_sel_ch_info *spect_info,
-				   mac_handle_t mac_handle,
+				   struct mac_context *mac,
 				   struct sap_context *sap_ctx)
 {
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	uint32_t i;
 	struct sap_ch_info *spect_ch = spect_info->ch_info;
 
@@ -3135,12 +3134,12 @@ qdf_freq_t sap_afc_dcs_sel_chan(struct sap_context *sap_ctx,
 	 * not included in current ACS range, ignore ACS range check
 	 * in this scenario so that SAP can move to new SP channel.
 	 */
-	sap_chan_sel_init(mac_handle, spect_info, sap_ctx,
+	sap_chan_sel_init(mac_ctx, spect_info, sap_ctx,
 			  is_sap_afc_dcs_skip_acs(sap_ctx));
 
 	sap_max_weight_invalidate_2ghz_channels(spect_info);
 
-	sap_compute_spect_max_power_weight(spect_info, mac_handle, sap_ctx);
+	sap_compute_spect_max_power_weight(spect_info, mac_ctx, sap_ctx);
 
 	sap_sort_chl_weight_all(mac_ctx, sap_ctx, spect_info,
 				eCSR_DOT11_MODE_11a, REGDOMAIN_FCC, pref_bw);
