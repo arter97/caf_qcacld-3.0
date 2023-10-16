@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -80,6 +80,7 @@ QDF_STATUS dp_allocate_ctx(void)
 
 	qdf_spinlock_create(&dp_ctx->intf_list_lock);
 	qdf_list_create(&dp_ctx->intf_list, 0);
+	TAILQ_INIT(&dp_ctx->inactive_dp_link_list);
 
 	dp_attach_ctx(dp_ctx);
 
@@ -1246,10 +1247,32 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	return status;
 }
 
+static void dp_link_handle_cdp_vdev_delete(struct wlan_dp_psoc_context *dp_ctx,
+					   struct wlan_dp_link *dp_link)
+{
+	qdf_spin_lock_bh(&dp_ctx->dp_link_del_lock);
+
+	if (!dp_link->cdp_vdev_registered || dp_link->cdp_vdev_deleted) {
+		/* CDP vdev is not created/registered or already deleted */
+		qdf_mem_free(dp_link);
+	} else {
+		/*
+		 * Add it to inactive dp_link list, and it will be freed when
+		 * the CDP vdev gets deleted
+		 */
+		TAILQ_INSERT_TAIL(&dp_ctx->inactive_dp_link_list, dp_link,
+				  inactive_list_elem);
+		dp_link->destroyed = 1;
+	}
+
+	qdf_spin_unlock_bh(&dp_ctx->dp_link_del_lock);
+}
+
 QDF_STATUS
 dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 {
+	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -1264,6 +1287,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	}
 
 	dp_intf = dp_link->dp_intf;
+	dp_ctx = dp_intf->dp_ctx;
 
 	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
 	qdf_list_remove_node(&dp_intf->dp_link_list, &dp_link->node);
@@ -1324,7 +1348,8 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		return status;
 	}
 
-	qdf_mem_free(dp_link);
+	dp_link_handle_cdp_vdev_delete(dp_ctx, dp_link);
+
 	return status;
 }
 
@@ -1977,6 +2002,53 @@ wlan_dp_fisa_resume(struct wlan_dp_psoc_context *dp_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+void wlan_dp_link_cdp_vdev_delete_notification(void *context)
+{
+	struct wlan_dp_link *dp_link = (struct wlan_dp_link *)context;
+	struct wlan_dp_link *tmp_dp_link;
+	struct wlan_dp_intf *dp_intf = NULL;
+	struct wlan_dp_psoc_context *dp_ctx = NULL;
+	uint8_t found = 0;
+
+	/* TODO - What will happen if cdp vdev was never created ? */
+
+	/* dp_link will not be freed before this point. */
+	if (!dp_link)
+		return;
+
+	dp_intf = dp_link->dp_intf;
+	dp_ctx = dp_intf->dp_ctx;
+
+	qdf_spin_lock_bh(&dp_ctx->dp_link_del_lock);
+
+	if (dp_link->destroyed) {
+		/*
+		 * dp_link has been destroyed as a part of vdev_obj_destroy
+		 * notification and will be present in inactive list
+		 */
+		TAILQ_FOREACH(tmp_dp_link, &dp_ctx->inactive_dp_link_list,
+			      inactive_list_elem) {
+			if (tmp_dp_link == dp_link) {
+				found = 1;
+				break;
+			}
+		}
+
+		if (found)
+			TAILQ_REMOVE(&dp_ctx->inactive_dp_link_list, dp_link,
+				     inactive_list_elem);
+		else
+			qdf_assert_always(0);
+
+		qdf_mem_free(dp_link);
+	} else {
+		/* dp_link not yet destroyed */
+		dp_link->cdp_vdev_deleted = 1;
+	}
+
+	qdf_spin_unlock_bh(&dp_ctx->dp_link_del_lock);
+}
 
 QDF_STATUS __wlan_dp_runtime_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
