@@ -140,7 +140,6 @@
 #include "nan_ucfg_api.h"
 #include "wlan_reg_ucfg_api.h"
 #include "wlan_hdd_afc.h"
-#include "wlan_afc_ucfg_api.h"
 #include "wlan_dfs_ucfg_api.h"
 #include "wlan_hdd_rx_monitor.h"
 #include "sme_power_save_api.h"
@@ -19601,18 +19600,12 @@ static QDF_STATUS hdd_component_init(void)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto qmi_deinit;
 
-	status = ucfg_afc_init();
+	status = hdd_mlo_mgr_register_osif_ops();
 	if (QDF_IS_STATUS_ERROR(status))
 		goto ll_sap_deinit;
 
-	status = hdd_mlo_mgr_register_osif_ops();
-	if (QDF_IS_STATUS_ERROR(status))
-		goto afc_deinit;
-
 	return QDF_STATUS_SUCCESS;
 
-afc_deinit:
-	ucfg_afc_deinit();
 ll_sap_deinit:
 	ucfg_ll_sap_deinit();
 qmi_deinit:
@@ -19668,7 +19661,6 @@ static void hdd_component_deinit(void)
 {
 	/* deinitialize non-converged components */
 	hdd_mlo_mgr_unregister_osif_ops();
-	ucfg_afc_deinit();
 	ucfg_ll_sap_deinit();
 	ucfg_qmi_deinit();
 	ucfg_dp_deinit();
