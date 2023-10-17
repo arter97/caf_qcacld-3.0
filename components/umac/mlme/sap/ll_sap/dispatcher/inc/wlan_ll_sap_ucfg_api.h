@@ -172,6 +172,19 @@ void ucfg_ll_lt_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 {
 }
 #endif
+
+/**
+ * ucfg_ll_sap_get_valid_freq_for_csa() - Wrapper api to get valid freq for
+ * LL_LT_SAP
+ * @psoc: Pointer to psoc
+ * @vdev_id: Vdev ID
+ * @curr_freq: current frequency
+ *
+ * Return: Frequency
+ */
+qdf_freq_t
+ucfg_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, qdf_freq_t curr_freq);
 #else
 static inline QDF_STATUS ucfg_ll_sap_init(void)
 {
@@ -246,6 +259,12 @@ static inline void ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete(
 {
 }
 
+static inline qdf_freq_t
+ucfg_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, qdf_freq_t curr_freq)
+{
+	return 0;
+}
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* _WLAN_LL_SAP_UCFG_API_H_ */
 

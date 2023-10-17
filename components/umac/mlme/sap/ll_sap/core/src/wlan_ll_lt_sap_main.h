@@ -51,11 +51,12 @@ QDF_STATUS ll_lt_sap_get_freq_list(struct wlan_objmgr_psoc *psoc,
  * ll_lt_sap_get_valid_freq() - API to get valid frequency for LL_LT_SAP
  * @psoc: Pointer to psoc object
  * @vdev_id: Vdev Id of ll_lt_sap
+ * @curr_freq: current frequency
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id);
+				    uint8_t vdev_id, qdf_freq_t curr_freq);
 
 /*
  * ll_lt_sap_init() - Initialize ll_lt_sap infrastructure

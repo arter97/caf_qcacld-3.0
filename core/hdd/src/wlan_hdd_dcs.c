@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,6 +30,7 @@
 #include <wlan_osif_priv.h>
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_dcs_ucfg_api.h>
+#include "wlan_ll_sap_ucfg_api.h"
 
 /* Time(in milliseconds) before which the AP doesn't expect a connection */
 #define HDD_DCS_AWGN_BSS_RETRY_DELAY (5 * 60 * 1000)
@@ -237,6 +238,70 @@ hdd_dcs_select_random_chan(struct wlan_objmgr_pdev *pdev,
 #endif
 
 /**
+ * hdd_dcs_trigger_csa_for_ll_lt_sap() - Trigger CSA for ll_sap
+ * once dcs threshold reaches
+ * @psoc: psoc object
+ * @hdd_ctx: hdd_ctx
+ * @vdev_id: vdev_id
+ *
+ * Return: None
+ */
+static void
+hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
+				  struct hdd_context *hdd_ctx,
+				  uint8_t vdev_id)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+	qdf_freq_t restart_freq, curr_freq;
+	QDF_STATUS status;
+
+	if (!ucfg_is_vdev_level_dcs_supported(psoc))
+		goto end;
+
+	curr_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
+
+	/**
+	 * For LL_LT_SAP, use LL_LT_SAP channel selection logic instead
+	 * of going with ACS flow to select new channel. Because ACS
+	 * will do scan and selects best channel. This will increase
+	 * dcs overall time for LL_LT_SAP.
+	 */
+	restart_freq = ucfg_ll_sap_get_valid_freq_for_csa(psoc, vdev_id,
+							  curr_freq);
+
+	hdd_debug("vdev_id %d freq %d selected for LL_LT_SAP DCS",
+		  vdev_id, restart_freq);
+	if (!restart_freq)
+		goto end;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+					psoc, vdev_id,
+					WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_debug("vdev %d is null", vdev_id);
+		return;
+	}
+	status = ucfg_dcs_switch_chan(vdev, restart_freq,
+				      CH_WIDTH_20MHZ);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto end;
+
+	return;
+
+end:
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx,
+					      vdev_id);
+	if (!link_info) {
+		hdd_err("ll_sap vdev_id %u does not exist with host",
+			vdev_id);
+		return;
+	}
+	wlan_hdd_cfg80211_start_acs(link_info);
+}
+
+/**
  * hdd_dcs_cb() - hdd dcs specific callback
  * @psoc: psoc
  * @param: pointer to dcs_param
@@ -265,6 +330,10 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, struct dcs_param *param,
 		return;
 	}
 
+	if (policy_mgr_is_vdev_ll_lt_sap(psoc, param->vdev_id))
+		return hdd_dcs_trigger_csa_for_ll_lt_sap(psoc, hdd_ctx,
+							 param->vdev_id);
+
 	if (policy_mgr_is_force_scc(psoc) &&
 	    policy_mgr_is_sta_gc_active_on_mac(psoc, param->mac_id)) {
 		ucfg_config_dcs_event_data(psoc, param->mac_id, true);
@@ -291,6 +360,7 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, struct dcs_param *param,
 
 		hdd_debug("DCS triggers ACS on vdev_id=%u, mac_id=%u",
 			  list[index], param->mac_id);
+
 		/*
 		 * Select Random channel for low latency sap as
 		 * ACS can't select channel of same MAC from which
