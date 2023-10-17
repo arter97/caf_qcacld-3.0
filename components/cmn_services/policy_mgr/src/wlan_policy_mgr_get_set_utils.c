@@ -12684,3 +12684,18 @@ policy_mgr_get_connection_max_channel_width(struct wlan_objmgr_psoc *psoc)
 	return bw;
 }
 
+bool policy_mgr_is_given_freq_5g_low(struct wlan_objmgr_psoc *psoc,
+				     qdf_freq_t given_freq)
+{
+	qdf_freq_t sbs_cut_off_freq;
+
+	sbs_cut_off_freq = policy_mgr_get_sbs_cut_off_freq(psoc);
+	if (!sbs_cut_off_freq)
+		return false;
+
+	if (given_freq < sbs_cut_off_freq &&
+	    WLAN_REG_IS_5GHZ_CH_FREQ(given_freq))
+		return true;
+
+	return false;
+}
