@@ -5283,12 +5283,13 @@ hdd_send_roam_scan_channel_freq_list_to_sme(struct hdd_context *hdd_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	nla_for_each_nested(curr_attr, tb2[PARAM_SCAN_FREQ_LIST], rem)
+	nla_for_each_nested(curr_attr, tb2[PARAM_SCAN_FREQ_LIST], rem) {
+		if (num_chan >= SIR_MAX_SUPPORTED_CHANNEL_LIST) {
+			hdd_err("number of channels (%d) supported exceeded max (%d)",
+				num_chan, SIR_MAX_SUPPORTED_CHANNEL_LIST);
+			return QDF_STATUS_E_INVAL;
+		}
 		num_chan++;
-	if (num_chan > SIR_MAX_SUPPORTED_CHANNEL_LIST) {
-		hdd_err("number of channels (%d) supported exceeded max (%d)",
-			num_chan, SIR_MAX_SUPPORTED_CHANNEL_LIST);
-		return QDF_STATUS_E_INVAL;
 	}
 	num_chan = 0;
 
@@ -7488,7 +7489,7 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 	int status;
 	struct sk_buff *reply_skb;
 	uint32_t skb_len = 0;
-	struct pld_soc_info info;
+	struct pld_soc_info *info;
 	bool stt_flag = false;
 
 	hdd_enter_dev(wdev->netdev);
@@ -7517,12 +7518,21 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 
 	if (tb_vendor[QCA_WLAN_VENDOR_ATTR_WIFI_INFO_FIRMWARE_VERSION]) {
 		hdd_debug("Rcvd req for FW version");
-		if (!pld_get_soc_info(hdd_ctx->parent_dev, &info))
+
+		info = qdf_mem_malloc(sizeof(*info));
+		if (!info) {
+			hdd_err("No enough memory for info");
+			return -ENOMEM;
+		}
+
+		if (!pld_get_soc_info(hdd_ctx->parent_dev, info))
 			stt_flag = true;
 
 		firmware_version = qdf_mem_malloc(SIR_VERSION_STRING_LEN);
-		if (!firmware_version)
+		if (!firmware_version) {
+			qdf_mem_free(info);
 			return -ENOMEM;
+		}
 
 		snprintf(firmware_version, SIR_VERSION_STRING_LEN,
 			 "FW:%d.%d.%d.%d.%d.%d HW:%s STT:%s",
@@ -7535,6 +7545,8 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 			 hdd_ctx->target_hw_name,
 			 (stt_flag ? info.fw_build_id : " "));
 		skb_len += nla_total_size(strlen(firmware_version) + 1);
+
+		qdf_mem_free(info);
 	}
 
 	if (tb_vendor[QCA_WLAN_VENDOR_ATTR_WIFI_INFO_RADIO_INDEX]) {
