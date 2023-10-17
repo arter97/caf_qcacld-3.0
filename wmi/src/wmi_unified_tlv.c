@@ -3444,6 +3444,9 @@ static inline void copy_peer_flags_tlv(
 			wmi_peer_assoc_complete_cmd_fixed_param * cmd,
 			struct peer_assoc_params *param)
 {
+#ifndef WMI_PEER_EXT_IS_HT_VHT_CAPS_CHANGD
+#define WMI_PEER_EXT_IS_HT_VHT_CAPS_CHANGD 0x80000000
+#endif
 	/*
 	 * The target only needs a subset of the flags maintained in the host.
 	 * Just populate those flags and send it down
@@ -3538,6 +3541,9 @@ static inline void copy_peer_flags_tlv(
 
 	if (param->twt_responder)
 		cmd->peer_flags |= WMI_PEER_TWT_RESP;
+
+	if (param->peer_htcap_vhtcap_updated)
+		cmd->peer_flags_ext |= WMI_PEER_EXT_IS_HT_VHT_CAPS_CHANGD;
 }
 
 static inline void copy_peer_mac_addr_tlv(
