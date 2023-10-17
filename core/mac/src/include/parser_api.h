@@ -1525,32 +1525,37 @@ QDF_STATUS populate_dot11f_tdls_mgmt_mlo_ie(struct mac_context *mac_ctx,
  * @mac_ctx: Global MAC context
  * @session: PE session
  * @dot11f: tDot11fIEreduced_neighbor_report to be filled
+ * @num_rnr: rnr entry size
  *
  * Return: void
  */
 void populate_dot11f_mlo_rnr(struct mac_context *mac_ctx,
 			     struct pe_session *pe_session,
-			     tDot11fIEreduced_neighbor_report *dot11f);
+			     tDot11fIEreduced_neighbor_report *dot11f,
+			     uint16_t *num_rnr);
 
 /**
  * populate_dot11f_rnr_tbtt_info_16() - populate rnr with tbtt_info length 16
  * @mac_ctx: pointer to mac_context
  * @pe_session: pe session
  * @rnr_session: session to populate in rnr ie
- * @dot11f: tDot11fIEreduced_neighbor_report to be filled
+ * @dot11f_out: tDot11fIEreduced_neighbor_report to be filled
+ * @dot11f_in: tDot11fIEreduced_neighbor_report input parameter
  *
  * Return: void
  */
 void populate_dot11f_rnr_tbtt_info_16(struct mac_context *mac_ctx,
 				      struct pe_session *pe_session,
 				      struct pe_session *rnr_session,
-				      tDot11fIEreduced_neighbor_report *dot11f);
+				      tDot11fIEreduced_neighbor_report *dot11f_out,
+				      tDot11fIEreduced_neighbor_report *dot11f_in);
 
 #else
 static inline void populate_dot11f_mlo_rnr(
 				struct mac_context *mac_ctx,
 				struct pe_session *pe_session,
-				tDot11fIEreduced_neighbor_report *dot11f)
+				tDot11fIEreduced_neighbor_report *dot11f,
+				uint16_t *num_rnr)
 {
 }
 
@@ -1558,7 +1563,8 @@ static inline void populate_dot11f_rnr_tbtt_info_16(
 			struct mac_context *mac_ctx,
 			struct pe_session *pe_session,
 			struct pe_session *rnr_session,
-			tDot11fIEreduced_neighbor_report *dot11f)
+			tDot11fIEreduced_neighbor_report *dot11f_out,
+			tDot11fIEreduced_neighbor_report *dot11f_in)
 {
 }
 #endif /* WLAN_FEATURE_11BE_MLO */

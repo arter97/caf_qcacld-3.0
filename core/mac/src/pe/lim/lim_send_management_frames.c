@@ -814,7 +814,8 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	if (wlan_vdev_mlme_is_mlo_ap(pe_session->vdev)) {
 		mlo_ie_len = lim_send_bcn_frame_mlo(mac_ctx, pe_session);
 		populate_dot11f_mlo_rnr(mac_ctx, pe_session,
-					&frm->reduced_neighbor_report);
+					&frm->reduced_neighbor_report[0],
+					&frm->num_reduced_neighbor_report);
 	}
 	if (lim_is_session_eht_capable(pe_session)) {
 		pe_debug("Populate EHT IEs");

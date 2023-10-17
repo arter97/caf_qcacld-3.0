@@ -11332,7 +11332,8 @@ typedef struct sDot11fBeacon2{
 	tDot11fIEQComVendorIE                   QComVendorIE;
 	tDot11fIEESEVersion                     ESEVersion;
 	tDot11fIEqcn_ie                         qcn_ie;
-	tDot11fIEreduced_neighbor_report        reduced_neighbor_report;
+	uint16_t                                num_reduced_neighbor_report;
+	tDot11fIEreduced_neighbor_report        reduced_neighbor_report[2];
 } tDot11fBeacon2;
 
 #define DOT11F_BEACON2 (8)
@@ -11859,7 +11860,8 @@ typedef struct sDot11fProbeResponse{
 	tDot11fIEQComVendorIE                   QComVendorIE;
 	tDot11fIEMBO_IE                         MBO_IE;
 	tDot11fIEqcn_ie                         qcn_ie;
-	tDot11fIEreduced_neighbor_report        reduced_neighbor_report;
+	uint16_t                                num_reduced_neighbor_report;
+	tDot11fIEreduced_neighbor_report        reduced_neighbor_report[2];
 } tDot11fProbeResponse;
 
 #define DOT11F_PROBERESPONSE (22)

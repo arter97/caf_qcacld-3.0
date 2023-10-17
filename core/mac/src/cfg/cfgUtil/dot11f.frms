@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2006-2007, 2014-2018, 2020-2021 The Linux Foundation.
  * All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4217,7 +4217,7 @@ FRAME Beacon2
     OPTIE  QComVendorIE;
     OPTIE  ESEVersion;
     OPTIE  qcn_ie;
-    OPTIE  reduced_neighbor_report;
+    OPTIE  reduced_neighbor_report[0..2];
 }
 
 // This frame is just Beacon with its Fixed Fields stripped out.  It's handy
@@ -4605,7 +4605,7 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  QComVendorIE;
     OPTIE  MBO_IE;
     OPTIE  qcn_ie;
-    OPTIE  reduced_neighbor_report;
+    OPTIE  reduced_neighbor_report[0..2];
 } // End frame ProbeResponse.
 
 FRAME Authentication                      // 7.2.3.10

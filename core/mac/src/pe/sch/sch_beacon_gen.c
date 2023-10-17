@@ -869,7 +869,8 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			mlo_ie_len = lim_send_bcn_frame_mlo(mac_ctx, session);
 			populate_dot11f_mlo_rnr(
 				mac_ctx, session,
-				&bcn_2->reduced_neighbor_report);
+				&bcn_2->reduced_neighbor_report[0],
+				&bcn_2->num_reduced_neighbor_report);
 		} else if (!wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
 			/*
 			 * TD: If current AP is MLO, RNR IE is already populated
@@ -877,7 +878,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			 *     MLO SAP + 6G legacy SAP
 			 */
 			populate_dot11f_6g_rnr(mac_ctx, session,
-					       &bcn_2->reduced_neighbor_report);
+					       &bcn_2->reduced_neighbor_report[0]);
 		}
 		/*
 		 * Can be efficiently updated whenever new IE added  in Probe
@@ -1180,6 +1181,7 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(struct mac_context *mac,
 {
 	uint8_t i;
 	uint16_t num_tpe = beacon2->num_transmit_power_env;
+	uint16_t num_rnr = beacon2->num_reduced_neighbor_report;
 
 	if (beacon2->Country.present) {
 		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap, WLAN_ELEMID_COUNTRY);
@@ -1421,13 +1423,17 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(struct mac_context *mac,
 			     sizeof(beacon2->mlo_ie));
 	}
 
-	if (beacon2->reduced_neighbor_report.present) {
+	for (i = 0; i < num_rnr; i++) {
+		if (!beacon2->reduced_neighbor_report[i].present)
+			continue;
+
 		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,
 					DOT11F_EID_REDUCED_NEIGHBOR_REPORT);
-		qdf_mem_copy((void *)&prb_rsp->reduced_neighbor_report,
-			     (void *)&beacon2->reduced_neighbor_report,
-			     sizeof(beacon2->reduced_neighbor_report));
+		qdf_mem_copy(&prb_rsp->reduced_neighbor_report[i],
+			     &beacon2->reduced_neighbor_report[i],
+			     sizeof(beacon2->reduced_neighbor_report[i]));
 	}
+	prb_rsp->num_reduced_neighbor_report = num_rnr;
 
 	if (beacon2->TPCReport.present) {
 		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,

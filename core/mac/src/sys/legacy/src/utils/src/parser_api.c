@@ -11744,13 +11744,16 @@ static inline void populate_2link_rnr_info(struct pe_session *session,
 
 void populate_dot11f_mlo_rnr(struct mac_context *mac_ctx,
 			     struct pe_session *session,
-			     tDot11fIEreduced_neighbor_report *dot11f)
+			     tDot11fIEreduced_neighbor_report *dot11f,
+			     uint16_t *num_rnr)
 {
 	int link;
 	uint16_t vdev_count;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
 	struct pe_session *link_session;
 	bool rnr_populated = false;
+	int i = 0;
+	uint16_t num = 0;
 
 	lim_get_mlo_vdev_list(session, &vdev_count, wlan_vdev_list);
 	for (link = 0; link < vdev_count; link++) {
@@ -11772,33 +11775,136 @@ void populate_dot11f_mlo_rnr(struct mac_context *mac_ctx,
 			lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
 			continue;
 		}
-		if (!rnr_populated) {
-			populate_dot11f_rnr_tbtt_info_16(mac_ctx, session,
-							 link_session, dot11f);
-			pe_debug("mlo vdev id %d populate vdev id %d link id %d op class %d chan num %d in RNR IE",
+
+		for (i = 0; i < MAX_NUM_RNR_ENTRY; i++) {
+			struct qdf_mac_addr mac_addr1;
+			struct qdf_mac_addr mac_addr2;
+
+			qdf_mem_copy(mac_addr1.bytes,
+				     session->start_bss_rnr_ie[i].tbtt_info.tbtt_info_16.bssid,
+				     QDF_MAC_ADDR_SIZE);
+			qdf_mem_copy(mac_addr2.bytes,
+				     link_session->self_mac_addr,
+				     QDF_MAC_ADDR_SIZE);
+			/* hostapd only support rnrie length=16 */
+			if (session->start_bss_rnr_ie[i].tbtt_info_len == 16 &&
+			    qdf_is_macaddr_equal(&mac_addr1, &mac_addr2)) {
+				rnr_populated = true;
+				break;
+			}
+		}
+		if (rnr_populated && num < MAX_NUM_RNR_ENTRY) {
+			populate_dot11f_rnr_tbtt_info_16(mac_ctx,
+							 session,
+							 link_session,
+							 (dot11f +
+							  num * sizeof(tDot11fIEreduced_neighbor_report)),
+							 &session->start_bss_rnr_ie[i]);
+			pe_debug("mlo vdev id %d populate vdev id %d "
+				 "link id %d op class %d chan num %d in RNR IE",
 				 wlan_vdev_get_id(session->vdev),
 				 wlan_vdev_get_id(wlan_vdev_list[link]),
 				 dot11f->tbtt_info.tbtt_info_16.link_id,
 				 dot11f->op_class, dot11f->channel_num);
-			rnr_populated = true;
+			num++;
+			rnr_populated = false;
 		}
 		lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
 	}
+	*num_rnr = num;
 
 	populate_2link_rnr_info(session, dot11f);
 
 }
 
-void populate_dot11f_rnr_tbtt_info_16(struct mac_context *mac_ctx,
-				      struct pe_session *pe_session,
-				      struct pe_session *rnr_session,
-				      tDot11fIEreduced_neighbor_report *dot11f)
+/**
+ * mlo_rnr_get_6g_20mhz_psd() - Calculate 20Mhz psd for 6GHz band channel
+ * @mac_ctx: pointer to mac_context
+ * @freq: frequency of the channel
+ *
+ * Return: 20MHz psd value
+ */
+static int8_t
+mlo_rnr_get_6g_20mhz_psd(struct mac_context *mac_ctx,
+			 qdf_freq_t freq)
+{
+	bool is_psd_pwr = false;
+	uint16_t max_reg_eirp_pwr = 0;
+	uint16_t max_reg_eirp_psd_pwr = 0;
+	int8_t psd_20mhz = 0;
+
+	wlan_reg_get_client_power_for_6ghz_ap(mac_ctx->pdev,
+					      REG_DEFAULT_CLIENT,
+					      freq,
+					      &is_psd_pwr, &max_reg_eirp_pwr,
+					      &max_reg_eirp_psd_pwr);
+	pe_debug("chan_freq %d, is_psd_pwr %d eirp_pwr %d, eirp_psd_pwr %d",
+		 freq, is_psd_pwr, max_reg_eirp_pwr, max_reg_eirp_psd_pwr);
+
+	if (is_psd_pwr)
+		psd_20mhz = (int8_t)max_reg_eirp_psd_pwr * 2;
+	else
+		psd_20mhz = REG_PSD_MAX_TXPOWER_FOR_DEFAULT_CLIENT * 2;
+
+	return psd_20mhz;
+}
+
+/**
+ * mlo_rnr_get_non6g_20mhz_psd() - Calculate 20Mhz psd for non-6GHz band channel
+ * @mac_ctx: pointer to mac_context
+ * @freq: frequency of the channel
+ * @phy_chan_width: bandwidth index
+ *
+ * Return: 20MHz psd value
+ */
+static int8_t
+mlo_rnr_get_non6g_20mhz_psd(struct mac_context *mac_ctx,
+			    qdf_freq_t freq,
+			    enum phy_ch_width phy_chan_width)
+{
+	int16_t eirp = 0;
+	int16_t psd_20mhz_value = 0;
+	int8_t psd_20mhz = 0;
+	uint16_t ch_bw = 0;
+
+	eirp = wlan_reg_get_channel_reg_power_for_freq(mac_ctx->pdev, freq);
+	ch_bw = wlan_reg_get_bw_value(phy_chan_width);
+	wlan_reg_eirp_2_psd(mac_ctx->pdev, ch_bw, eirp, &psd_20mhz_value);
+	psd_20mhz = (int8_t)psd_20mhz_value * 2;
+
+	return psd_20mhz;
+}
+
+/**
+ * mlo_rnr_get_20mhz_psd() - API to get 20MHz psd value of frequency
+ * @mac_ctx: pointer to mac_context
+ * @freq: frequency of the channel
+ * @phy_chan_width: bandwidth index
+ *
+ * Return: 20MHz psd value
+ */
+static int8_t mlo_rnr_get_20mhz_psd(struct mac_context *mac_ctx,
+				    qdf_freq_t freq,
+				    enum phy_ch_width ch_bw)
+{
+	if (wlan_reg_is_6ghz_chan_freq(freq))
+		return mlo_rnr_get_6g_20mhz_psd(mac_ctx, freq);
+	else
+		return mlo_rnr_get_non6g_20mhz_psd(mac_ctx, freq, ch_bw);
+}
+
+void
+populate_dot11f_rnr_tbtt_info_16(struct mac_context *mac_ctx,
+				 struct pe_session *pe_session,
+				 struct pe_session *rnr_session,
+				 tDot11fIEreduced_neighbor_report *dot11f_out,
+				 tDot11fIEreduced_neighbor_report *dot11f_in)
 {
 	uint8_t reg_class;
 	uint8_t ch_offset;
 
-	dot11f->present = 1;
-	dot11f->tbtt_type = 0;
+	dot11f_out->present = 1;
+	dot11f_out->tbtt_type = 0;
 	if (rnr_session->ch_width == CH_WIDTH_80MHZ) {
 		ch_offset = BW80;
 	} else {
@@ -11820,17 +11926,45 @@ void populate_dot11f_rnr_tbtt_info_16(struct mac_context *mac_ctx,
 						rnr_session->ch_width,
 						ch_offset);
 
-	dot11f->op_class = reg_class;
-	dot11f->channel_num = wlan_reg_freq_to_chan(mac_ctx->pdev,
-						    rnr_session->curr_op_freq);
-	dot11f->tbtt_info_count = 0;
-	dot11f->tbtt_info_len = 16;
-	qdf_mem_copy(dot11f->tbtt_info.tbtt_info_16.bssid,
+	dot11f_out->op_class = reg_class;
+	dot11f_out->channel_num = wlan_reg_freq_to_chan(mac_ctx->pdev,
+							rnr_session->curr_op_freq);
+	dot11f_out->filtered_neighbor_ap = dot11f_in->filtered_neighbor_ap;
+
+	/*
+	 * In the basic RNR case handled here, we will have one TBTT Information
+	 * field included in the TBTT Information Set field of the Neighbor AP
+	 * Information field. So the value we set is 1-1=0 from hostapd.
+	 */
+
+	dot11f_out->tbtt_info_count = dot11f_in->tbtt_info_count;
+	dot11f_out->tbtt_info_len = dot11f_in->tbtt_info_len;
+
+	/* tbtt_offset will be update by fw */
+	dot11f_out->tbtt_info.tbtt_info_16.tbtt_offset =
+		dot11f_in->tbtt_info.tbtt_info_16.tbtt_offset;
+
+	qdf_mem_copy(dot11f_out->tbtt_info.tbtt_info_16.bssid,
 		     rnr_session->self_mac_addr, sizeof(tSirMacAddr));
-	dot11f->tbtt_info.tbtt_info_16.mld_id = 0;
-	dot11f->tbtt_info.tbtt_info_16.link_id = wlan_vdev_get_link_id(
-							rnr_session->vdev);
-	dot11f->tbtt_info.tbtt_info_16.bss_param_change_cnt =
+
+	dot11f_out->tbtt_info.tbtt_info_16.short_ssid =
+		dot11f_in->tbtt_info.tbtt_info_16.short_ssid;
+
+	/* default bit 1 & bit6 set by hostapd (co_located_ap & same_ssid) */
+	dot11f_out->tbtt_info.tbtt_info_16.bss_params =
+		dot11f_in->tbtt_info.tbtt_info_16.bss_params;
+
+	dot11f_out->tbtt_info.tbtt_info_16.psd_20mhz =
+		mlo_rnr_get_20mhz_psd(mac_ctx,
+				      rnr_session->curr_op_freq,
+				      rnr_session->ch_width);
+
+	/* mld id not need for non-MBSSID case */
+	dot11f_out->tbtt_info.tbtt_info_16.mld_id = 0;
+	dot11f_out->tbtt_info.tbtt_info_16.link_id =
+		wlan_vdev_get_link_id(rnr_session->vdev);
+	/* fw will update it */
+	dot11f_out->tbtt_info.tbtt_info_16.bss_param_change_cnt =
 		rnr_session->mlo_link_info.link_ie.bss_param_change_cnt;
 }
 
