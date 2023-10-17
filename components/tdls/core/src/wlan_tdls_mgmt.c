@@ -167,17 +167,18 @@ static bool tdls_check_wait_more(struct wlan_objmgr_vdev *vdev)
 	struct wlan_objmgr_vdev *mlo_vdev;
 	struct tdls_vdev_priv_obj *tdls_vdev;
 	/* expect response number */
-	int expect_num;
+	int expect_num = 0;
 	/* received response number */
-	int receive_num;
+	int receive_num = 0;
 	int i;
 
-	expect_num = 0;
-	receive_num = 0;
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
 		if (!mlo_vdev)
+			continue;
+
+		if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 			continue;
 
 		expect_num++;
@@ -362,7 +363,7 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 		tdls_vdev = tdls_get_correct_vdev(tdls_vdev, rx_mgmt);
 		status = QDF_STATUS_TDLS_MLO_SYNC;
 		if (!tdls_vdev || tdls_vdev->rx_mgmt) {
-			tdls_err("rx dup tdls discovery resp on same vdev.");
+			tdls_err("rx dup tdls discovery resp on same vdev");
 			goto exit;
 		}
 
@@ -371,7 +372,8 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 
 		if (waitmore) {
 			/* do not stop the timer */
-			tdls_debug("wait more tdls response");
+			tdls_debug("vdev:%d wait further for tdls response",
+				   wlan_vdev_get_id(vdev));
 		} else {
 			tdls_vdev->discovery_sent_cnt = 0;
 			qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
@@ -540,7 +542,6 @@ static QDF_STATUS tdls_process_rx_mgmt(
 	}
 
 	vdev = tdls_vdev->vdev;
-	tdls_debug("received mgmt on vdev %d", wlan_vdev_get_id(vdev));
 	tdls_debug("soc:%pK, frame_len:%d, rx_freq:%d, vdev_id:%d, frm_type:%d, rx_rssi:%d, buf:%pK",
 		   tdls_soc_obj->soc, rx_mgmt->frame_len,
 		   rx_mgmt->rx_freq, rx_mgmt->vdev_id, rx_mgmt->frm_type,
@@ -592,13 +593,20 @@ static QDF_STATUS tdls_process_rx_mgmt(
 
 		/* this is mld mac address for mlo case*/
 		mac = &rx_mgmt->buf[TDLS_80211_PEER_ADDR_OFFSET];
-		tdls_notice("[TDLS] TDLS Discovery Response,"
+		tdls_notice("[TDLS] vdev:%d TDLS Discovery Response,"
 			    QDF_MAC_ADDR_FMT " RSSI[%d] <--- OTA",
+			    wlan_vdev_get_id(vdev),
 			    QDF_MAC_ADDR_REF(mac), rx_mgmt->rx_rssi);
 
-		tdls_debug("discovery resp on vdev %d", wlan_vdev_get_id(vdev));
+		if (tdls_soc_obj && tdls_soc_obj->tdls_rx_cb)
+			tdls_soc_obj->tdls_rx_cb(tdls_soc_obj->tdls_rx_cb_data,
+						 rx_mgmt);
+		else
+			tdls_debug("rx mgmt, but no valid up layer callback");
+
 		tdls_recv_discovery_resp(tdls_vdev, mac);
 		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
+		goto end;
 	}
 
 	if (rx_mgmt->buf[TDLS_PUBLIC_ACTION_FRAME_OFFSET] ==
@@ -621,6 +629,7 @@ static QDF_STATUS tdls_process_rx_mgmt(
 	else
 		tdls_debug("rx mgmt, but no valid up layer callback");
 
+end:
 	if (tdls_vdev_select && tdls_vdev->rx_mgmt) {
 		qdf_mem_free(tdls_vdev->rx_mgmt);
 		tdls_vdev->rx_mgmt = NULL;
@@ -637,7 +646,7 @@ QDF_STATUS tdls_process_rx_frame(struct scheduler_msg *msg)
 	struct tdls_vdev_priv_obj *tdls_vdev;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
-	if (!(msg->bodyptr)) {
+	if (!msg->bodyptr) {
 		tdls_err("invalid message body");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -648,7 +657,8 @@ QDF_STATUS tdls_process_rx_frame(struct scheduler_msg *msg)
 				tdls_rx->rx_mgmt->vdev_id, WLAN_TDLS_NB_ID);
 
 	if (vdev) {
-		tdls_debug("tdls rx mgmt frame received");
+		tdls_debug("vdev:%d tdls rx mgmt frame received",
+			   wlan_vdev_get_id(vdev));
 		tdls_vdev = wlan_objmgr_vdev_get_comp_private_obj(vdev,
 							WLAN_UMAC_COMP_TDLS);
 		if (tdls_vdev)

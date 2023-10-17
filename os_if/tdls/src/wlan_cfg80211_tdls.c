@@ -844,13 +844,11 @@ int wlan_cfg80211_tdls_oper(struct wlan_objmgr_vdev *vdev,
 	bool is_mlo_vdev;
 
 	status = wlan_cfg80211_tdls_validate_mac_addr(peer);
-
 	if (status)
 		return status;
 
 	if (NL80211_TDLS_DISCOVERY_REQ == oper) {
-		osif_warn(
-			"We don't support in-driver setup/teardown/discovery");
+		osif_warn("We don't support in-driver setup/teardown/discovery");
 		return -ENOTSUPP;
 	}
 
