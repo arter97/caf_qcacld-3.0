@@ -256,8 +256,7 @@ int mlme_sr_is_enable(struct wlan_objmgr_vdev *vdev)
 	uint8_t sr_ctrl;
 
 	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
-	return ((!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
-		 (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
+	return (!sr_ctrl || !(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) ||
 		(sr_ctrl & SRG_INFO_PRESENT));
 }
 
@@ -279,6 +278,7 @@ mlme_sr_handle_conc(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_lmac_if_tx_ops *tx_ops;
+	struct wlan_lmac_if_spatial_reuse_tx_ops *sr_tx_ops;
 	uint8_t conc_vdev_id = wlan_vdev_get_id(conc_vdev);
 
 	pdev = wlan_vdev_get_pdev(vdev);
@@ -289,7 +289,12 @@ mlme_sr_handle_conc(struct wlan_objmgr_vdev *vdev,
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
+	if (!tx_ops) {
+		mlme_err("tx_ops is NULL");
+		return;
+	}
 
+	sr_tx_ops = &tx_ops->spatial_reuse_tx_ops;
 	if (en_sr_curr_vdev) {
 		wlan_vdev_mlme_set_sr_disable_due_conc(vdev, true);
 		wlan_vdev_mlme_set_sr_disable_due_conc(conc_vdev, true);
@@ -297,25 +302,27 @@ mlme_sr_handle_conc(struct wlan_objmgr_vdev *vdev,
 		if (!wlan_vdev_mlme_get_he_spr_enabled(conc_vdev))
 			return;
 
-		if (tx_ops && tx_ops->spatial_reuse_tx_ops.target_if_sr_update)
-			tx_ops->spatial_reuse_tx_ops.target_if_sr_update
-						     (pdev, conc_vdev_id, val);
+		if (mlme_sr_is_enable(conc_vdev)) {
+			if (sr_tx_ops->target_if_sr_update)
+				sr_tx_ops->target_if_sr_update
+						(pdev, conc_vdev_id, val);
 
-		wlan_spatial_reuse_osif_event(conc_vdev, SR_OPERATION_SUSPEND,
-					      SR_REASON_CODE_CONCURRENCY);
+			wlan_spatial_reuse_osif_event(conc_vdev,
+						      SR_OPERATION_SUSPEND,
+						   SR_REASON_CODE_CONCURRENCY);
+		}
 	} else if (wlan_vdev_mlme_is_sr_disable_due_conc(conc_vdev)) {
 		wlan_vdev_mlme_set_sr_disable_due_conc(conc_vdev, false);
 
 		if (!wlan_vdev_mlme_get_he_spr_enabled(conc_vdev))
 			return;
 
-		if (mlme_sr_is_enable(vdev)) {
+		if (mlme_sr_is_enable(conc_vdev)) {
 			wlan_mlme_update_sr_data(conc_vdev, &val, 0, 0, true);
 
-			if (tx_ops &&
-			    tx_ops->spatial_reuse_tx_ops.target_if_sr_update)
-				tx_ops->spatial_reuse_tx_ops.target_if_sr_update
-						      (pdev, conc_vdev_id, val);
+			if (sr_tx_ops->target_if_sr_update)
+				sr_tx_ops->target_if_sr_update
+						(pdev, conc_vdev_id, val);
 
 			wlan_spatial_reuse_osif_event(conc_vdev,
 						      SR_OPERATION_RESUME,
@@ -389,6 +396,7 @@ void mlme_sr_update(struct wlan_objmgr_vdev *vdev, bool enable)
 			wlan_mlme_update_sr_data(vdev, &val, 0, 0, true);
 		} else {
 			/* VDEV down, disable SR */
+			wlan_vdev_mlme_set_he_spr_enabled(vdev, false);
 			wlan_vdev_mlme_set_sr_ctrl(vdev, 0);
 			wlan_vdev_mlme_set_non_srg_pd_offset(vdev, 0);
 		}
@@ -842,6 +850,8 @@ QDF_STATUS mlme_set_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev,
 	}
 
 	mlme_priv->chan_switch_in_progress = val;
+	mlme_legacy_info("Set chan_switch_in_progress: %d vdev %d",
+			 val, wlan_vdev_get_id(vdev));
 
 	return QDF_STATUS_SUCCESS;
 }

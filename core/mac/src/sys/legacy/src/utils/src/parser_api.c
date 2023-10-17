@@ -987,6 +987,7 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 	QDF_STATUS nSirStatus;
 	uint8_t disable_high_ht_mcs_2x2 = 0;
 	struct ch_params ch_params = {0};
+	uint8_t cb_mode;
 
 	tSirMacTxBFCapabilityInfo *pTxBFCapabilityInfo;
 	tSirMacASCapabilityInfo *pASCapabilityInfo;
@@ -1015,10 +1016,11 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 		pDot11f->shortGI20MHz = ht_cap_info->short_gi_20_mhz;
 		pDot11f->shortGI40MHz = ht_cap_info->short_gi_40_mhz;
 	} else {
+		cb_mode = lim_get_cb_mode_for_freq(mac, pe_session,
+						   pe_session->curr_op_freq);
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq) &&
 		    LIM_IS_STA_ROLE(pe_session) &&
-		    WNI_CFG_CHANNEL_BONDING_MODE_DISABLE !=
-		    mac->roam.configParam.channelBondingMode24GHz) {
+		    cb_mode != WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) {
 			pDot11f->supportedChannelWidthSet = 1;
 			ch_params.ch_width = CH_WIDTH_40MHZ;
 			wlan_reg_set_channel_params_for_pwrmode(
@@ -1156,14 +1158,7 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 	uint32_t self_cb_mode;
 	struct ch_params ch_params = {0};
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) {
-		self_cb_mode =
-			mac->roam.configParam.channelBondingMode24GHz;
-	} else {
-		self_cb_mode =
-			mac->roam.configParam.channelBondingMode5GHz;
-	}
-
+	self_cb_mode = lim_get_cb_mode_for_freq(mac, pe_session, ch_freq);
 	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
 		return PHY_SINGLE_CHANNEL_CENTERED;
 
@@ -7478,24 +7473,28 @@ populate_dot11f_sr_info(struct mac_context *mac_ctx,
 	uint8_t non_srg_pd_offset;
 	uint8_t sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(session->vdev);
 	bool sr_enabled = wlan_vdev_mlme_get_he_spr_enabled(session->vdev);
-	bool sr_disabled_due_conc =
-		wlan_vdev_mlme_is_sr_disable_due_conc(session->vdev);
 
-	if (!sr_enabled || !sr_ctrl || sr_disabled_due_conc ||
-	    (sr_ctrl & WLAN_HE_NON_SRG_PD_SR_DISALLOWED) ||
-	    !(sr_ctrl & WLAN_HE_NON_SRG_OFFSET_PRESENT))
+	if (!sr_enabled)
 		return QDF_STATUS_SUCCESS;
 
-	non_srg_pd_offset = wlan_vdev_mlme_get_non_srg_pd_offset(session->vdev);
 	sr_info->present = 1;
 	sr_info->psr_disallow = 1;
-	sr_info->non_srg_pd_sr_disallow = 0;
 	sr_info->srg_info_present = 0;
-	sr_info->non_srg_offset_present = 1;
-	sr_info->srg_info_present = 0;
+	sr_info->non_srg_offset_present = 0;
+	sr_info->non_srg_pd_sr_disallow = !!(sr_ctrl &
+					   WLAN_HE_NON_SRG_PD_SR_DISALLOWED);
+
+	if ((!sr_info->non_srg_pd_sr_disallow) &&
+	    (sr_ctrl & WLAN_HE_NON_SRG_OFFSET_PRESENT)) {
+		non_srg_pd_offset =
+			wlan_vdev_mlme_get_non_srg_pd_offset(session->vdev);
+		sr_info->non_srg_offset_present = 1;
+		sr_info->non_srg_offset.info.non_srg_pd_max_offset =
+							non_srg_pd_offset;
+	}
+
 	if (sr_ctrl & WLAN_HE_SIGA_SR_VAL15_ALLOWED)
 		sr_info->sr_value15_allow = 1;
-	sr_info->non_srg_offset.info.non_srg_pd_max_offset = non_srg_pd_offset;
 
 	return QDF_STATUS_SUCCESS;
 }
