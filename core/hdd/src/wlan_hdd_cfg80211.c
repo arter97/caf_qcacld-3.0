@@ -7543,7 +7543,7 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 			 hdd_ctx->fw_version_info.crmid,
 			 hdd_ctx->fw_version_info.sub_id,
 			 hdd_ctx->target_hw_name,
-			 (stt_flag ? info.fw_build_id : " "));
+			 (stt_flag ? info->fw_build_id : " "));
 		skb_len += nla_total_size(strlen(firmware_version) + 1);
 
 		qdf_mem_free(info);
