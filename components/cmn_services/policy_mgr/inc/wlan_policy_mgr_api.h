@@ -4935,6 +4935,21 @@ policy_mgr_get_ml_sta_info_psoc(struct wlan_objmgr_psoc *psoc,
 void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * policy_mgr_handle_link_removal_on_standby() - Handle AP link removal for
+ * MLO STA standby links
+ * @vdev: objmgr vdev
+ * @reconfig_info: link reconfig info
+ *
+ * Handle link removal for ML STA standby links:
+ * Send force link command to target with link removal reason code
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_handle_link_removal_on_standby(struct wlan_objmgr_vdev *vdev,
+					  struct ml_rv_info *reconfig_info);
+
+/**
  * policy_mgr_is_mlo_sap_concurrency_allowed() - Check for mlo sap allowed
  *                                               concurrency combination
  * @psoc: PSOC object information
