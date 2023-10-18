@@ -1002,6 +1002,20 @@ QDF_STATUS wlan_mlo_mgr_mld_vdev_attach(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_mlo_mgr_mld_vdev_detach(struct wlan_objmgr_vdev *vdev);
 
 #ifdef WLAN_MLO_MULTI_CHIP
+/**
+ * mlo_mgr_is_mld_has_active_link() - Check if any MLD has active link
+ *
+ * @is_active: Buffer indicating links are active or not
+ *
+ * The API iterates through all the ML dev ctx in the global MLO
+ * manager to check if there is atleast one active link present in
+ * any of the MLDs
+ *
+ * Return: QDF_STATUS_SUCCESS if link information is retrieved
+ *         successfully else QDF_STATUS_E*.
+ */
+QDF_STATUS mlo_mgr_is_mld_has_active_link(bool *is_active);
+
 #ifdef WLAN_WSI_STATS_SUPPORT
 /**
  * mlo_wsi_link_info_update_soc() - Update PSOC group in WSI stats
@@ -1020,6 +1034,12 @@ static void mlo_wsi_link_info_update_soc(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+#else
+static inline
+QDF_STATUS mlo_mgr_is_mld_has_active_link(bool *is_active)
+{
+	return QDF_STATUS_E_FAILURE;
+}
 #endif
 
 #else
