@@ -5577,6 +5577,9 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 		csr_qos_send_assoc_ind(mac_ctx, vdev_id, &assoc_info);
 	}
 
+	if (rsp->connect_rsp.is_reassoc)
+		mlme_set_mbssid_info(vdev, &cur_node->entry->mbssid_info);
+
 	if (bcn_ies->Country.present)
 		qdf_mem_copy(country_code, bcn_ies->Country.country,
 			     REG_ALPHA2_LEN + 1);
