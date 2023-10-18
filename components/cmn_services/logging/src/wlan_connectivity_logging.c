@@ -693,7 +693,10 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return;
 	}
 
-	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
+	    (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	     (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
+	      wlan_vdev_mlme_is_mlo_link_vdev(vdev))))
 		goto out;
 
 	if (!wlan_cm_is_first_candidate_connect_attempt(vdev))
@@ -702,7 +705,7 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
 	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
-	wlan_diag_event.is_mlo = mlo_is_mld_sta(vdev);
+	wlan_diag_event.is_mlo = wlan_vdev_mlme_is_mlo_vdev(vdev);
 
 	if (wlan_diag_event.is_mlo) {
 		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
@@ -775,8 +778,9 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	if (opmode != QDF_STA_MODE)
 		goto out;
 
-	if (mlo_is_mld_sta(vdev) &&
-	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	     wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)))
 		goto out;
 
 	is_initial_connection = wlan_cm_is_vdev_connecting(vdev);

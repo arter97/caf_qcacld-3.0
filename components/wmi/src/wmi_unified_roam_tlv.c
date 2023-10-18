@@ -3016,18 +3016,14 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 {
 	QDF_STATUS status;
 	uint8_t vdev_id = stats_info->vdev_id;
-	uint8_t band;
 
 	status = wmi_unified_extract_roam_scan_stats(
 			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
 
-	band = stats_info->scan[0].band;
-
 	status = wmi_unified_extract_roam_11kv_stats(
-			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0,
-			band);
+			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Roam 11kv stats extract failed vdev %d", vdev_id);
 
@@ -3065,7 +3061,7 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	struct roam_msg_info *roam_msg_info = NULL;
 	uint8_t vdev_id, i, num_btm = 0, num_frames = 0;
 	uint8_t num_tlv = 0, num_chan = 0, num_ap = 0, num_rpt = 0;
-	uint8_t num_trigger_reason = 0, band;
+	uint8_t num_trigger_reason = 0;
 	uint32_t rem_len;
 	QDF_STATUS status;
 
@@ -3254,14 +3250,12 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 			}
 		}
 
-		band = stats_info->scan[i].band;
-
 		/* BTM req/resp or Neighbor report/response info */
 		status = wmi_unified_extract_roam_11kv_stats(
 				      wmi_handle,
 				      evt_buf,
 				      &stats_info->data_11kv[i],
-				      i, num_rpt, band);
+				      i, num_rpt);
 		if (QDF_IS_STATUS_ERROR(status))
 			wmi_debug_rl("Roam 11kv stats extract fail vdev %d iter %d",
 				     vdev_id, i);
