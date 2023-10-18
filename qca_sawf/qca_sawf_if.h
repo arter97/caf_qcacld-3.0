@@ -17,6 +17,13 @@
 #ifndef _DP_SAWF_H__
 #define _DP_SAWF_H_
 
+#define QCA_SAWF_SVID_VALID 0x1
+#define QCA_SAWF_DSCP_VALID 0x2
+#define QCA_SAWF_PCP_VALID  0x4
+#define QCA_SAWF_SVC_ID_INVALID 0xFF
+#define FLOW_START 1
+#define FLOW_STOP  2
+
 /* qca_sawf_metadata_param
  *
  * @netdev : Netdevice
@@ -25,6 +32,8 @@
  * @dscp : Differentiated Services Code Point
  * @rule_id : Rule id
  * @sawf_rule_type: Rule type
+ * @pcp: pcp value
+ * @valid_flag: flag to indicate if pcp is valid or not
  *
  */
 struct qca_sawf_metadata_param {
@@ -34,6 +43,8 @@ struct qca_sawf_metadata_param {
 	uint32_t dscp;
 	uint32_t rule_id;
 	uint8_t sawf_rule_type;
+	uint32_t pcp;
+	uint32_t valid_flag;
 };
 
 /*
@@ -46,6 +57,8 @@ struct qca_sawf_metadata_param {
  * @fw_service_id: Service ID matching in forward direction
  * @rv_service_id: Service ID matching in reverse direction
  * @start_or_stop: Connection stat or stop indication 1:start, 2:stop
+ * @fw_mark_metadata: forward metadata
+ * @rv_mark_metadata: reverse metadata
  */
 struct qca_sawf_connection_sync_param {
 	struct net_device *dst_dev;
@@ -55,6 +68,8 @@ struct qca_sawf_connection_sync_param {
 	uint8_t fw_service_id;
 	uint8_t rv_service_id;
 	uint8_t start_or_stop;
+	uint32_t fw_mark_metadata;
+	uint32_t rv_mark_metadata;
 };
 
 uint16_t qca_sawf_get_msduq(struct net_device *netdev,
