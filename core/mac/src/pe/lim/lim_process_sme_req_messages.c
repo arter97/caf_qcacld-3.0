@@ -10040,6 +10040,7 @@ skip_vht:
 
 	/* Send ECSA/CSA Action frame after updating the beacon */
 	if (CHAN_HOP_ALL_BANDS_ENABLE &&
+	    session_entry->lim_non_ecsa_cap_num &&
 	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(target_ch_freq))
 		lim_send_chan_switch_action_frame
 			(mac_ctx,
