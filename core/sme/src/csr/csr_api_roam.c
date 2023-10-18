@@ -5425,6 +5425,18 @@ csr_update_beacon_in_connect_rsp(struct scan_cache_entry *entry,
 		     connect_ies->bcn_probe_rsp.len);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static bool csr_is_link_switch_in_progress(struct wlan_objmgr_vdev *vdev)
+{
+	return mlo_mgr_is_link_switch_in_progress(vdev);
+}
+#else
+static bool csr_is_link_switch_in_progress(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif
+
 static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 				       struct csr_roam_session *session,
 				       struct wlan_objmgr_vdev *vdev,
@@ -5513,6 +5525,10 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 		assoc_info.uapsd_mask = rsp->uapsd_mask;
 		csr_qos_send_assoc_ind(mac_ctx, vdev_id, &assoc_info);
 	}
+
+	if (rsp->connect_rsp.is_reassoc ||
+	    csr_is_link_switch_in_progress(vdev))
+		mlme_set_mbssid_info(vdev, &cur_node->entry->mbssid_info);
 
 	if (bcn_ies->Country.present)
 		qdf_mem_copy(country_code, bcn_ies->Country.country,

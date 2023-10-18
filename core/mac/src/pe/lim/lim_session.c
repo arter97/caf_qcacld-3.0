@@ -824,6 +824,13 @@ static void lim_clear_pmfcomeback_timer(struct pe_session *session)
 	session->pmf_retry_timer_info.retried = false;
 }
 
+static void lim_clear_mbssid_info(struct wlan_objmgr_vdev *vdev)
+{
+	struct scan_mbssid_info mbssid_info = {0};
+
+	mlme_set_mbssid_info(vdev, &mbssid_info);
+}
+
 /**
  * pe_delete_session() - deletes the PE session given the session ID.
  * @mac_ctx: pointer to global adapter context
@@ -853,6 +860,7 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 	lim_reset_bcn_probe_filter(mac_ctx, session);
 	lim_sae_auth_cleanup_retry(mac_ctx, session->vdev_id);
 	lim_cleanup_power_change(mac_ctx, session);
+	lim_clear_mbssid_info(session->vdev);
 
 	/* Restore default failure timeout */
 	if (session->defaultAuthFailureTimeout) {
