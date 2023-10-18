@@ -18,13 +18,16 @@
 #include "qca_fse_if.h"
 #include "cdp_txrx_fse.h"
 #include "qdf_trace.h"
+#ifdef CONFIG_SAWF
+#include "wlan_sawf.h"
+#endif
+
+#define QCA_FSE_TID_INVALID 0xff
 
 #ifdef WLAN_SUPPORT_RX_FLOW_TAG
 static inline
-struct wlan_objmgr_psoc *qca_fse_get_psoc_from_dev(struct net_device *dev)
+struct wlan_objmgr_vdev *qca_fse_get_vdev_from_dev(struct net_device *dev)
 {
-	struct wlan_objmgr_psoc *psoc = NULL;
-	struct wlan_objmgr_pdev *pdev = NULL;
 	struct wlan_objmgr_vdev *vdev = NULL;
 	osif_dev *osdev;
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -36,8 +39,8 @@ struct wlan_objmgr_psoc *qca_fse_get_psoc_from_dev(struct net_device *dev)
 
 	osdev = ath_netdev_priv(dev);
 	if (!osdev) {
-		qdf_err("%p: No osdev found for dev", dev);
-		return false;
+		qdf_err("No osdev found for dev %s", dev->name);
+		return NULL;
 	}
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -48,9 +51,10 @@ struct wlan_objmgr_psoc *qca_fse_get_psoc_from_dev(struct net_device *dev)
 
 		os_linkdev = mldev->link_dev[primary_chip_id][primary_pdev_id];
 		if (!os_linkdev) {
-			qdf_err("%p: No osdev found for ML dev", dev);
-			return false;
+			qdf_err("No osdev found for ML dev", dev->name);
+			return NULL;
 		}
+
 		osdev = os_linkdev;
 	}
 #endif
@@ -62,34 +66,90 @@ struct wlan_objmgr_psoc *qca_fse_get_psoc_from_dev(struct net_device *dev)
 		osifp = ath_netdev_priv(dev);
 		parent_osdev = osif_wds_ext_get_parent_osif(osifp);
 		if (!parent_osdev) {
-			qdf_err("%p: No osdev found for dev", dev);
-			return false;
+			qdf_err("No osdev found for dev %s", dev->name);
+			return NULL;
 		}
 
 		osdev = parent_osdev;
 	}
 #endif
 	vdev = osdev->ctrl_vdev;
+
+	return vdev;
+}
+
+static inline
+struct wlan_objmgr_psoc *qca_fse_get_psoc_from_dev(struct net_device *dev)
+{
+	struct wlan_objmgr_psoc *psoc = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wlan_objmgr_vdev *vdev = NULL;
+
+	vdev = qca_fse_get_vdev_from_dev(dev);
 	if (!vdev) {
-		qdf_err("%p: No vdev found for osdev", osdev);
-		return false;
+		qdf_err("No vdev found for dev %s", dev->name);
+		return NULL;
 	}
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
-		qdf_err("%p: No pdev found for vdev", vdev);
-		return false;
+		qdf_err("No pdev found for dev %s", dev->name);
+		return NULL;
 	}
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	return psoc;
 }
 
+#ifdef CONFIG_SAWF
+QDF_STATUS qca_fse_get_sawf_params(struct net_device *dev,
+				   uint8_t *mac_addr,
+				   uint32_t svc_id,
+				   uint8_t **p_peer_mac_addr,
+				   uint8_t *p_tid)
+{
+	uint8_t *peer_mac_addr = mac_addr;
+	uint8_t tid;
+	QDF_STATUS status;
+	osif_dev *osdev;
+
+	osdev = ath_netdev_priv(dev);
+
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
+		osif_peer_dev *osifp;
+
+		osifp = ath_netdev_priv(dev);
+
+		peer_mac_addr = osifp->peer_mac_addr;
+	}
+
+	status = wlan_sawf_get_uplink_params(svc_id, &tid,
+					     NULL, NULL, NULL, NULL);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		return status;
+	}
+
+	if (p_peer_mac_addr)
+		*p_peer_mac_addr = peer_mac_addr;
+
+	if (p_tid)
+		*p_tid = tid;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 {
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	ol_txrx_soc_handle soc_txrx_handle;
+	uint8_t pdev_id;
+	uint8_t tid;
+	uint8_t *peer_mac_addr;
 
 	if (!fse_info->src_dev || !fse_info->dest_dev) {
 		qdf_debug("Unable to find dev for FSE rule push");
@@ -112,15 +172,39 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 	 * reversed for adding a rule.
 	 */
 	if (fse_info->src_dev->ieee80211_ptr) {
-		psoc = qca_fse_get_psoc_from_dev(fse_info->src_dev);
+		vdev = qca_fse_get_vdev_from_dev(fse_info->src_dev);
+		if (!vdev)
+			return false;
+		pdev = wlan_vdev_get_pdev(vdev);
+		if (!pdev)
+			return false;
+		psoc = wlan_pdev_get_psoc(pdev);
 		if (!psoc)
 			return false;
 
+		pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 		soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+		tid = QCA_FSE_TID_INVALID;
+		peer_mac_addr = fse_info->src_mac;
+
+#ifdef CONFIG_SAWF
+		qca_fse_get_sawf_params(fse_info->src_dev,
+					fse_info->src_mac,
+					fse_info->fw_svc_id,
+					&peer_mac_addr, &tid);
+#endif
+
+		qdf_debug("src dev %s src_mac %pM, fw_svc_id %u -> tid %u peer_mac %pM pdev_id %u",
+			  fse_info->src_dev->name, fse_info->src_mac,
+			  fse_info->fw_svc_id, tid, peer_mac_addr, pdev_id);
+
 		ret = cdp_fse_flow_add(soc_txrx_handle,
 				       fse_info->src_ip, fse_info->src_port,
 				       fse_info->dest_ip, fse_info->dest_port,
-				       fse_info->protocol, fse_info->version);
+				       fse_info->protocol, fse_info->version,
+				       fse_info->fw_svc_id, tid,
+				       peer_mac_addr, pdev_id);
 	}
 
 	if (ret != QDF_STATUS_SUCCESS) {
@@ -129,7 +213,17 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 	}
 
 	if (fse_info->dest_dev->ieee80211_ptr) {
-		psoc = qca_fse_get_psoc_from_dev(fse_info->dest_dev);
+		vdev = qca_fse_get_vdev_from_dev(fse_info->dest_dev);
+		if (!vdev)
+			return false;
+		pdev = wlan_vdev_get_pdev(vdev);
+		if (!pdev)
+			return false;
+
+		pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+
+		psoc = wlan_pdev_get_psoc(pdev);
+
 		if (!psoc) {
 			if (fse_info->src_dev->ieee80211_ptr) {
 				cdp_fse_flow_delete(soc_txrx_handle,
@@ -138,17 +232,32 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 						    fse_info->dest_ip,
 						    fse_info->dest_port,
 						    fse_info->protocol,
-						    fse_info->version);
+						    fse_info->version, pdev_id);
 			}
 
 			return false;
 		}
 
 		soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+		tid = QCA_FSE_TID_INVALID;
+		peer_mac_addr = fse_info->dest_mac;
+#ifdef CONFIG_SAWF
+		qca_fse_get_sawf_params(fse_info->dest_dev,
+					fse_info->dest_mac,
+					fse_info->rv_svc_id,
+					&peer_mac_addr, &tid);
+#endif
+		qdf_debug("dest dev %s dest_mac %pM, rv_svc_id %u -> tid %u peer_mac %pM pdev_id %u",
+			  fse_info->dest_dev->name, fse_info->dest_mac,
+			  fse_info->rv_svc_id, tid, peer_mac_addr, pdev_id);
+
 		ret = cdp_fse_flow_add(soc_txrx_handle,
 				       fse_info->dest_ip, fse_info->dest_port,
 				       fse_info->src_ip, fse_info->src_port,
-				       fse_info->protocol, fse_info->version);
+				       fse_info->protocol, fse_info->version,
+				       fse_info->rv_svc_id, tid,
+				       peer_mac_addr, pdev_id);
 	}
 
 	if (ret != QDF_STATUS_SUCCESS) {
@@ -162,7 +271,8 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 			cdp_fse_flow_delete(soc_txrx_handle,
 					    fse_info->src_ip, fse_info->src_port,
 					    fse_info->dest_ip, fse_info->dest_port,
-					    fse_info->protocol, fse_info->version);
+					    fse_info->protocol, fse_info->version,
+					    pdev_id);
 		}
 
 		qdf_debug("%p: Failed to add a rule in FSE", fse_info->dest_dev);
@@ -175,9 +285,12 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 bool qca_fse_delete_rule(struct qca_fse_flow_info *fse_info)
 {
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev;
 	ol_txrx_soc_handle soc_txrx_handle;
 	QDF_STATUS fw_ret = QDF_STATUS_SUCCESS;
 	QDF_STATUS rv_ret = QDF_STATUS_SUCCESS;
+	uint8_t pdev_id;
 
 	if (!fse_info->src_dev || !fse_info->dest_dev) {
 		qdf_debug("Unable to find dev for FSE rule delete");
@@ -200,27 +313,55 @@ bool qca_fse_delete_rule(struct qca_fse_flow_info *fse_info)
 	 * reversed to delete a rule.
 	 */
 	if (fse_info->src_dev->ieee80211_ptr) {
-		psoc = qca_fse_get_psoc_from_dev(fse_info->src_dev);
+		vdev = qca_fse_get_vdev_from_dev(fse_info->src_dev);
+		if (!vdev)
+			return false;
+		pdev = wlan_vdev_get_pdev(vdev);
+		if (!pdev)
+			return false;
+
+		pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+
+		psoc = wlan_pdev_get_psoc(pdev);
+
 		if (!psoc)
 			return false;
+
+		qdf_debug("src dev %s pdev_id %u",
+			  fse_info->src_dev->name, pdev_id);
 
 		soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 		fw_ret = cdp_fse_flow_delete(soc_txrx_handle,
 					     fse_info->src_ip, fse_info->src_port,
 					     fse_info->dest_ip, fse_info->dest_port,
-					     fse_info->protocol, fse_info->version);
+					     fse_info->protocol, fse_info->version,
+					     pdev_id);
+
 	}
 
 	if (fse_info->dest_dev->ieee80211_ptr) {
-		psoc = qca_fse_get_psoc_from_dev(fse_info->dest_dev);
+		vdev = qca_fse_get_vdev_from_dev(fse_info->dest_dev);
+		if (!vdev)
+			return false;
+		pdev = wlan_vdev_get_pdev(vdev);
+		if (!pdev)
+			return false;
+
+		pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+
+		psoc = wlan_pdev_get_psoc(pdev);
 		if (!psoc)
 			return false;
+
+		qdf_debug("dst dev %s pdev_id %u",
+			  fse_info->dest_dev->name, pdev_id);
 
 		soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 		rv_ret = cdp_fse_flow_delete(soc_txrx_handle,
 					      fse_info->dest_ip, fse_info->dest_port,
 					      fse_info->src_ip, fse_info->src_port,
-					      fse_info->protocol, fse_info->version);
+					      fse_info->protocol, fse_info->version,
+					      pdev_id);
 	}
 
 	if (fw_ret == QDF_STATUS_SUCCESS && rv_ret == QDF_STATUS_SUCCESS)
