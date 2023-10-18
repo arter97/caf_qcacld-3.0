@@ -238,7 +238,8 @@ void wlan_rptr_core_reset_pdev_flags(struct wlan_objmgr_pdev *pdev);
 void wlan_rptr_core_reset_global_flags(void);
 struct wlan_rptr_global_priv *wlan_rptr_get_global_ctx(void);
 #if REPEATER_SAME_SSID
-void wlan_rptr_core_global_same_ssid_disable(u_int32_t value);
+void wlan_rptr_core_global_same_ssid_disable_set(u_int32_t value);
+void wlan_rptr_core_global_same_ssid_disable_get(uint32_t *value);
 void wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 					  struct scan_event *event);
 #endif
