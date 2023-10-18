@@ -12576,10 +12576,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		op_mode = wlan_get_opmode_from_vdev_id(
 						hdd_ctx->pdev,
 						link_info->vdev_id);
-		if (op_mode == QDF_STA_MODE)
-			sme_set_ba_opmode(mac_handle,
-					  link_info->vdev_id,
-					  set_val);
+
+		sme_set_per_link_ba_mode(mac_handle, set_val);
 
 		if (!cfg_val) {
 			ret_val = wma_cli_set_command(
@@ -12661,14 +12659,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			/* Configure ADDBA req buffer size to 64 */
 			set_val = HDD_BA_MODE_64;
 
-		sme_set_ba_opmode(mac_handle, link_info->vdev_id,
-				  set_val);
+		sme_set_per_link_ba_mode(mac_handle, set_val);
 
-		ret_val = wma_cli_set_command(link_info->vdev_id,
-					      wmi_vdev_param_set_ba_mode,
-					      set_val, VDEV_CMD);
-		if (ret_val)
-			hdd_err("Failed to set BA operating mode %d", set_val);
 		ret_val = wma_cli_set_command(link_info->vdev_id,
 					      GEN_VDEV_PARAM_AMPDU,
 					      buff_size, GEN_CMD);
