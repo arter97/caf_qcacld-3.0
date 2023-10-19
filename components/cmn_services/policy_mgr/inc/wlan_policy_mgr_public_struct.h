@@ -431,11 +431,22 @@ enum policy_mgr_mac_use {
  * 5 GHz low frequencies, add 2.4 GHz if its shared with 5 GHz low
  * @PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G: 5GHZ high SCC channel followed by
  * 5 GHz high frequencies, add 2.4 GHZ if its shared with 5GHz high
- * @PM_SBS_CH_MCC_CH: SBS channels followed by MCC channels
- * @PM_SBS_5G_MCC_24G: SBS channels, 5G MCC channels and 2.4GHz channels
  * @PM_SCC_ON_5G_HIGH_5G_HIGH_SCC_ON_5G_LOW_PLUS_SHARED_2G: 5GHZ high SCC
  * channel followed by 5 GHz high frequencies and 5 GHz low SCC channel,
  * add 2.4 GHZ if its shared with 5GHz high
+ * @PM_SBS_CH_MCC_CH: SBS channels followed by MCC channels
+ * @PM_SBS_5G_MCC_24G: SBS channels, 5G MCC channels and 2.4GHz channels
+ * @PM_SCC_ON_24G: SCC channels on 2.4 Ghz
+ * @PM_SCC_ON_5G_LOW: SCC channels on 5G low frequencies
+ * @PM_SCC_ON_5G_HIGH: SCC channels on 5G high frequencies
+ * @PM_SBS_CH_MCC_CH_SCC_ON_24_24G: SBS channels followed by MCC channels
+ * followed by SCC channels on 2.4 GHz followed by 2.4 GHz channels
+ * @PM_5G_24G: 5 GHz channels, followed by 2.4 GHz channels
+ * @PM_MCC_CH_SCC_ON_24G: MCC chanenls followed by SCC channels on 2.4 Ghz
+ * @PM_SCC_ON_5G_LOW_MCC_ON_5G_HIGH: SCC channels on 5G low frequencies
+ * followed by MCC channels on 5G high frequencies
+ * @PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW: SCC channels on 5G high frequencies
+ * followed by MCC channels on 5G low frequencies
  *
  * @PM_MAX_PCL_TYPE: Max place holder
  *
@@ -484,6 +495,14 @@ enum policy_mgr_pcl_type {
 
 	PM_SBS_CH_MCC_CH,
 	PM_SBS_5G_MCC_24G,
+	PM_SCC_ON_24G,
+	PM_SCC_ON_5G_LOW,
+	PM_SCC_ON_5G_HIGH,
+	PM_SBS_CH_MCC_CH_SCC_ON_24_24G,
+	PM_5G_24G,
+	PM_MCC_CH_SCC_ON_24G,
+	PM_SCC_ON_5G_LOW_MCC_ON_5G_HIGH,
+	PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW,
 
 	PM_MAX_PCL_TYPE
 };
@@ -812,6 +831,58 @@ enum policy_mgr_one_connection_mode {
  * @PM_NAN_DISC_NDI_MCC_24_2x2: NAN & NDI connection on MCC using 2x2 on 2.4 GHz
  * @PM_NAN_DISC_NDI_DBS_1x1: NAN & NDI connection on DBS using 1x1
  * @PM_NAN_DISC_NDI_DBS_2x2: NAN & NDI connection on DBS using 2x2
+ * @PM_STA_24_LL_LT_SAP_DBS_1x1: STA & LL_LT_SAP connection in DBS using 1x1
+ * @PM_STA_24_LL_LT_SAP_DBS_2x2: STA & LL_LT_SAP connection in DBS using 2x2
+ * @PM_STA_5_LL_LT_SAP_MCC_1x1: STA & LL_LT_SAP connection in MCC on 5 GHz
+ * using 1x1
+ * @PM_STA_5_LL_LT_SAP_MCC_2x2: STA & LL_LT_SAP connection in MCC on 5 GHz
+ * using 2x2
+ * @PM_STA_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1: STA on 5G low & LL_LT_SAP on 5G high
+ * connection in SBS using 1x1
+ * @PM_STA_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2: STA on 5G low & LL_LT_SAP on 5G high
+ * connection in SBS using 2x2
+ * @PM_STA_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1: STA on 5G high & LL_LT_SAP on 5G low
+ * connection in SBS using 1x1
+ * @PM_STA_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2: STA on 5G high & LL_LT_SAP on 5G low
+ * connection in SBS using 1x1
+ * @PM_SAP_24_LL_LT_SAP_DBS_1x1: SAP & LL_LT_SAP connection in DBS using 1x1
+ * @PM_SAP_24_LL_LT_SAP_DBS_2x2: SAP & LL_LT_SAP connection in DBS using 2x2
+ * @PM_SAP_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1: SAP on 5G low & LL_LT_SAP on 5G high
+ * connection in SBS using 1x1
+ * @PM_SAP_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2: SAP on 5G low & LL_LT_SAP on 5G high
+ * connection in SBS using 2x2
+ * @PM_SAP_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1: SAP on 5G high & LL_LT_SAP on 5G low
+ * connection in SBS using 1x1
+ * @PM_SAP_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2: SAP on 5G high & LL_LT_SAP on 5G low
+ * connection in SBS using 1x1
+ * @PM_P2P_GO_24_LL_LT_SAP_DBS_1x1: P2P GO & LL_LT_SAP connection in DBS
+ * using 1x1
+ * @PM_P2P_GO_24_LL_LT_SAP_DBS_2x2: P2P GO & LL_LT_SAP connection in DBS
+ * using 2x2
+ * @PM_P2P_GO_5_LL_LT_SAP_MCC_1x1: GO & LL_LT_SAP connection in MCC using 1x1
+ * @PM_P2P_GO_5_LL_LT_SAP_MCC_2x2: GO & LL_LT_SAP connection in MCC using 2x2
+ * @PM_P2P_GO_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1: GO on 5G low & LL_LT_SAP on 5G
+ * high connection in SBS using 1x1
+ * @PM_P2P_GO_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2: GO on 5G low & LL_LT_SAP on 5G
+ * high connection in SBS using 2x2
+ * @PM_P2P_GO_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1: GO on 5G high & LL_LT_SAP on 5G
+ * low connection in SBS using 1x1
+ * @PM_P2P_GO_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2: GO on 5G high & LL_LT_SAP on 5G
+ * low connection in SBS using 2x2
+ * @PM_P2P_CLI_24_LL_LT_SAP_DBS_1x1: CLI & LL_LT_SAP connection in DBS using 1x1
+ * @PM_P2P_CLI_24_LL_LT_SAP_DBS_2x2: CLI & LL_LT_SAP connection in DBS using 2x2
+ * @PM_P2P_CLI_5_LL_LT_SAP_MCC_1x1: CLI & LL_LT_SAP connection in MCC on 5 GHz
+ * using 1x1
+ * @PM_P2P_CLI_5_LL_LT_SAP_MCC_2x2: CLI & LL_LT_SAP connection in MCC on 5 GHz
+ * using 2x2
+ * @PM_P2P_CLI_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1: CLI on 5G low & LL_LT_SAP on 5G
+ * high connection in SBS using 1x1
+ * @PM_P2P_CLI_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2: CLI on 5G low & LL_LT_SAP on 5G
+ * high connection in SBS using 2x2
+ * @PM_P2P_CLI_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1: CLI on 5G high & LL_LT_SAP on 5G
+ * low connection in SBS using 1x1
+ * @PM_P2P_CLI_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2: CLI on 5G high & LL_LT_SAP on 5G
+ * low connection in SBS using 2x2
  * @PM_MAX_TWO_CONNECTION_MODE: Max enumeration
  *
  * These are generic IDs that identify the various roles in the
@@ -976,6 +1047,45 @@ enum policy_mgr_two_connection_mode {
 	PM_NAN_DISC_NDI_MCC_24_2x2,
 	PM_NAN_DISC_NDI_DBS_1x1,
 	PM_NAN_DISC_NDI_DBS_2x2,
+	PM_STA_24_LL_LT_SAP_DBS_1x1,
+	PM_STA_24_LL_LT_SAP_DBS_2x2 = PM_STA_24_LL_LT_SAP_DBS_1x1,
+	PM_STA_5_LL_LT_SAP_MCC_1x1,
+	PM_STA_5_LL_LT_SAP_MCC_2x2 = PM_STA_5_LL_LT_SAP_MCC_1x1,
+	PM_STA_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1,
+	PM_STA_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2 =
+					PM_STA_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1,
+	PM_STA_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1,
+	PM_STA_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2 =
+					PM_STA_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1,
+	PM_SAP_24_LL_LT_SAP_DBS_1x1,
+	PM_SAP_24_LL_LT_SAP_DBS_2x2 = PM_SAP_24_LL_LT_SAP_DBS_1x1,
+	PM_SAP_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1,
+	PM_SAP_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2 =
+					PM_SAP_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1,
+	PM_SAP_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1,
+	PM_SAP_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2 =
+					PM_SAP_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1,
+	PM_P2P_GO_24_LL_LT_SAP_DBS_1x1,
+	PM_P2P_GO_24_LL_LT_SAP_DBS_2x2 = PM_P2P_GO_24_LL_LT_SAP_DBS_1x1,
+	PM_P2P_GO_5_LL_LT_SAP_MCC_1x1,
+	PM_P2P_GO_5_LL_LT_SAP_MCC_2x2 = PM_P2P_GO_5_LL_LT_SAP_MCC_1x1,
+	PM_P2P_GO_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1,
+	PM_P2P_GO_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2 =
+				PM_P2P_GO_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1,
+	PM_P2P_GO_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1,
+	PM_P2P_GO_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2 =
+				PM_P2P_GO_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1,
+	PM_P2P_CLI_24_LL_LT_SAP_DBS_1x1,
+	PM_P2P_CLI_24_LL_LT_SAP_DBS_2x2 = PM_P2P_CLI_24_LL_LT_SAP_DBS_1x1,
+	PM_P2P_CLI_5_LL_LT_SAP_MCC_1x1,
+	PM_P2P_CLI_5_LL_LT_SAP_MCC_2x2 = PM_P2P_CLI_5_LL_LT_SAP_MCC_1x1,
+	PM_P2P_CLI_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1,
+	PM_P2P_CLI_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2 =
+				PM_P2P_CLI_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1,
+	PM_P2P_CLI_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1,
+	PM_P2P_CLI_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2 =
+				PM_P2P_CLI_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1,
+
 	PM_MAX_TWO_CONNECTION_MODE
 };
 
