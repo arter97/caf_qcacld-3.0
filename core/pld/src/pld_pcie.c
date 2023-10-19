@@ -34,6 +34,7 @@
 #include "pld_internal.h"
 #include "pld_pcie.h"
 #include "osif_psoc_sync.h"
+#include "cds_api.h"
 
 #ifdef CONFIG_PCI
 
@@ -96,17 +97,13 @@ static void pld_pcie_remove(struct pci_dev *pdev)
 {
 	struct pld_context *pld_context;
 	int errno;
-	struct osif_psoc_sync *psoc_sync;
+	struct osif_psoc_sync *psoc_sync = NULL;
 
-	errno = osif_psoc_sync_trans_start_wait(&pdev->dev, &psoc_sync);
-
-#ifdef ENFORCE_PLD_REMOVE
-	if (errno && errno != -EINVAL)
-		return;
-#else
-	if (errno)
-		return;
-#endif
+	if (!cds_is_pcie_link_resume_fail()) {
+		errno = osif_psoc_sync_trans_start_wait(&pdev->dev, &psoc_sync);
+		if (errno)
+			return;
+	}
 
 	osif_psoc_sync_unregister(&pdev->dev);
 
@@ -341,7 +338,7 @@ pld_pcie_collect_driver_dump(struct pci_dev *pdev,
 }
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
 /**
  * pld_bus_event_type_convert() - Convert enum cnss_bus_event_type
  *		to enum pld_bus_event
@@ -360,6 +357,9 @@ enum pld_bus_event pld_bus_event_type_convert(enum cnss_bus_event_type etype)
 	switch (etype) {
 	case BUS_EVENT_PCI_LINK_DOWN:
 		pld_etype = PLD_BUS_EVENT_PCIE_LINK_DOWN;
+		break;
+	case BUS_EVENT_PCI_LINK_RESUME_FAIL:
+		pld_etype = PLD_BUS_EVENT_PCIE_LINK_RESUME_FAIL;
 		break;
 	default:
 		break;
@@ -751,7 +751,7 @@ struct cnss_wlan_driver pld_pcie_ops = {
 #ifdef WLAN_FEATURE_SSR_DRIVER_DUMP
 	.collect_driver_dump = pld_pcie_collect_driver_dump,
 #endif
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
 	.update_event = pld_pcie_update_event,
 #endif
 #ifdef CONFIG_PM
