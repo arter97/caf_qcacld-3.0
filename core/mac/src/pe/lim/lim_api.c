@@ -3767,6 +3767,51 @@ lim_mlo_roam_delete_link_peer(struct pe_session *pe_session,
 }
 #endif
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+void
+lim_update_cuflag_bpcc_each_link(struct mlo_mgmt_ml_info *cu_params)
+{
+	int i = 0;
+	struct mac_context *mac;
+
+	mac = cds_get_context(QDF_MODULE_ID_PE);
+
+	for (i = 0; i < mac->lim.maxBssId; i++) {
+		struct pe_session *session_entry = &mac->lim.gpSession[i];
+		uint8_t index  = session_entry->vdev_id;
+		int hw_link_id = 0;
+		uint16_t cu_flag = 0;
+		int bpcc_index = 0;
+
+		if (session_entry->valid &&
+		    LIM_IS_AP_ROLE(session_entry)) {
+			hw_link_id = policy_mgr_mode_get_macid_by_vdev_id(mac->psoc,
+									  index);
+
+			if (hw_link_id >= CU_MAX_MLO_LINKS) {
+				pe_err("mac id %d out of range for vdev id %d",
+				       bpcc_index, index);
+				break;
+			}
+
+			cu_flag = cu_params->cu_vdev_map[hw_link_id];
+			if (qdf_test_bit(index, (unsigned long *)&cu_flag))
+				session_entry->mlo_link_info.bss_param_change = true;
+
+			bpcc_index = hw_link_id * MAX_AP_MLDS_PER_LINK + index;
+			if (bpcc_index >=
+			    MAX_AP_MLDS_PER_LINK * CU_MAX_MLO_LINKS) {
+				pe_err("bpcc index out of range %d",
+				       bpcc_index);
+				break;
+			}
+			session_entry->mlo_link_info.link_ie.bss_param_change_cnt =
+				cu_params->vdev_bpcc[bpcc_index];
+		}
+	}
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool
 lim_match_link_info(uint8_t req_link_id,
