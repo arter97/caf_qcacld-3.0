@@ -8981,6 +8981,7 @@ QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
+	uint8_t num_enabled_ml_sta = 0, conn_count;
 	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -9017,11 +9018,13 @@ QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 		goto release_vdev_ref;
 	}
 
+	conn_count = policy_mgr_get_connection_count(psoc);
 	policy_mgr_get_ml_sta_info(pm_ctx, &num_ml_sta, &num_disabled_ml_sta,
 				   ml_sta_vdev_lst, ml_freq_lst, &num_non_ml,
 				   NULL, NULL);
-	policy_mgr_debug("vdev %d: num_ml_sta %d disabled %d num_non_ml: %d",
-			 vdev_id, num_ml_sta, num_disabled_ml_sta, num_non_ml);
+	policy_mgr_debug("vdev %d: num_ml_sta %d disabled %d num_non_ml: %d conn cout %d",
+			 vdev_id, num_ml_sta, num_disabled_ml_sta, num_non_ml,
+			 conn_count);
 
 	/*
 	 * No ML STA is present or more no.of links are active than supported
@@ -9044,7 +9047,38 @@ QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 	 * In this case send set link command with num link 2 and mode
 	 * MLO_LINK_FORCE_MODE_ACTIVE_NUM, so that FW should restrict to only
 	 * in MLMR mode (2 link should be active).
+	 * If current enabled links are < 2, and there are concurrent
+	 * connection present, force active 2 links, which may be
+	 * conflict with concurrent rules, reject it.
+	 * If the two enabled links are MCC, don't not force active 2 links.
 	 */
+	num_enabled_ml_sta = num_ml_sta;
+	if (num_ml_sta >= num_disabled_ml_sta)
+		num_enabled_ml_sta = num_ml_sta - num_disabled_ml_sta;
+
+	if (force_active_cnt >= 2) {
+		if (num_ml_sta < 2) {
+			policy_mgr_debug("num_ml_sta %d < 2, can't force active cnt %d",
+					 num_ml_sta,
+					 force_active_cnt);
+			goto release_vdev_ref;
+		}
+		if (num_enabled_ml_sta < 2 &&
+		    conn_count > num_enabled_ml_sta) {
+			policy_mgr_debug("enabled link num %d < 2, concurrent conn present %d",
+					 num_enabled_ml_sta,
+					 conn_count);
+			goto release_vdev_ref;
+		}
+		if (policy_mgr_is_ml_sta_links_in_mcc(
+					psoc, ml_freq_lst,
+					ml_sta_vdev_lst,
+					NULL, num_ml_sta,
+					NULL)) {
+			policy_mgr_debug("enabled links are mcc, concurrency disallow");
+			goto release_vdev_ref;
+		}
+	}
 	if (force_active_cnt == 2 && num_disabled_ml_sta == 0)
 		goto set_link;
 
