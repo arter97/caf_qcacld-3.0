@@ -1041,9 +1041,6 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	fw_phymode = wma_host_to_fw_phymode(new_phymode);
 	vdev_id = wlan_vdev_get_id(vdev);
 
-	wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_PHYMODE,
-			   fw_phymode, vdev_id);
-
 	max_ch_width_supported =
 		wmi_get_ch_width_from_phy_mode(wma->wmi_handle,
 					       fw_phymode);
@@ -1062,7 +1059,11 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 		wlan_util_vdev_peer_set_param_send(vdev, peer_mac_addr,
 						   WLAN_MLME_PEER_BW_PUNCTURE,
 						   bw_puncture);
+		wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_PHYMODE,
+			fw_phymode, vdev_id);
 	} else {
+		wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_PHYMODE,
+			   fw_phymode, vdev_id);
 		wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_CHWIDTH,
 				   max_ch_width_supported, vdev_id);
 	}
