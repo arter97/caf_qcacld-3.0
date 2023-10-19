@@ -21828,6 +21828,65 @@ static void wlan_hdd_set_mfp_optional(struct wiphy *wiphy)
 }
 #endif
 
+/**
+ * wlan_hdd_iface_debug_string() - This API converts IFACE type to string
+ * @iface_type: interface type
+ *
+ * Return: name string
+ */
+static char *wlan_hdd_iface_debug_string(uint32_t iface_type)
+{
+	if (iface_type == BIT(NL80211_IFTYPE_STATION))
+		return "STA";
+	else if (iface_type == BIT(NL80211_IFTYPE_AP))
+		return "SAP";
+	else if (iface_type == (BIT(NL80211_IFTYPE_P2P_CLIENT) |
+		 BIT(NL80211_IFTYPE_P2P_GO)))
+		return "(P2P_CLI or P2P_GO)";
+	else if (iface_type == BIT(NL80211_IFTYPE_P2P_CLIENT))
+		return "P2P_CLIENT";
+	else if (iface_type == BIT(NL80211_IFTYPE_P2P_GO))
+		return "P2P_GO";
+	else if (iface_type == BIT(NL80211_IFTYPE_NAN))
+		return "NAN";
+	else if (iface_type == BIT(NL80211_IFTYPE_MONITOR))
+		return "MONITOR";
+
+	return "invalid iface";
+}
+
+#define IFACE_DUMP_SIZE 100
+/**
+ * wlan_hdd_dump_iface_combinations() - This API prints the IFACE combinations
+ * @num: number of combinations
+ * @combination: pointer to iface combination structure
+ *
+ * Return: void
+ */
+static void wlan_hdd_dump_iface_combinations(uint32_t num,
+			const struct ieee80211_iface_combination *combination)
+{
+	int i, j;
+	char buf[IFACE_DUMP_SIZE] = {0};
+	uint8_t len = 0;
+
+	hdd_debug("max combinations %d", num);
+
+	for (i = 0; i < num; i++) {
+		for (j = 0; j < combination[i].max_interfaces; j++) {
+			if (combination[i].limits[j].types)
+				len += qdf_scnprintf(buf + len,
+						     IFACE_DUMP_SIZE - len,
+						     " + %s",
+					wlan_hdd_iface_debug_string(
+					combination[i].limits[j].types));
+		}
+
+		hdd_nofl_debug("iface combination[%d]: %s", i, buf);
+		len = 0;
+	}
+}
+
 /*
  * In this function, wiphy structure is updated after QDF
  * initialization. In wlan_hdd_cfg80211_init, only the
@@ -21923,6 +21982,9 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 		}
 
 		wiphy->n_iface_combinations = iface_num;
+
+		wlan_hdd_dump_iface_combinations(wiphy->n_iface_combinations,
+						 wiphy->iface_combinations);
 	}
 
 	mac_spoofing_enabled = ucfg_scan_is_mac_spoofing_enabled(hdd_ctx->psoc);
