@@ -3683,6 +3683,7 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 	struct dp_ast_entry *ast_entry;
 	uint16_t hw_peer_id;
 	uint16_t ast_hash;
+	int i = 0;
 
 	if (!dp_mlo) {
 		dp_htt_err("Invalid dp_mlo ctxt");
@@ -3768,6 +3769,21 @@ QDF_STATUS dp_htt_reo_migration(struct dp_soc *soc, uint16_t peer_id,
 	peer_info->chip_id = chip_id;
 	peer_info->hw_peer_id = hw_peer_id;
 	peer_info->ast_hash = ast_hash;
+
+
+	for (i = 0; i < DP_MAX_TIDS; i++) {
+		rx_tid = &mld_peer->rx_tid[i];
+		if (!rx_tid)
+			continue;
+
+		qdf_mem_zero(&params, sizeof(params));
+		params.std.need_status = 1;
+		params.std.addr_lo = rx_tid->hw_qdesc_paddr & 0xffffffff;
+		params.std.addr_hi = (uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
+
+		status = dp_reo_send_cmd(current_pr_soc, CMD_FLUSH_QUEUE, &params,
+					 NULL,NULL);
+	}
 
 	qdf_mem_zero(&params, sizeof(params));
 
