@@ -884,6 +884,9 @@ enum {
 	IEEE80211_PARAM_ASSOC_REJECT = 818,
 #endif
 	IEEE80211_PARAM_VDEV_UP = 819, /* Flag to indicate if vdev is in UP State*/
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* MLO Max Simultaneous Active links */
+#endif
 };
 
 enum {
@@ -2645,6 +2648,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, GET_PARAM, 0},
 #endif
 	{"g_is_vdev_up", IEEE80211_PARAM_VDEV_UP, GET_PARAM, 0},
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
+		SET_PARAM, 1},
+	{"g_max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
+		GET_PARAM, 0},
+#endif
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
