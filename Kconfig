@@ -1126,6 +1126,11 @@ config WLAN_DISABLE_EXPORT_SYMBOL
 	bool "Enable WLAN_DISABLE_EXPORT_SYMBOL"
 	default n
 
+config WLAN_MULTI_CHIP_SUPPORT
+	bool "Enable WLAN_MULTI_CHIP_SUPPORT"
+	select WLAN_DISABLE_EXPORT_SYMBOL
+	default n
+
 config WLAN_DL_MODES
 	bool "Enable WLAN_DL_MODES"
 	default n
