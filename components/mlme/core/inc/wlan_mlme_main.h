@@ -825,6 +825,7 @@ struct enhance_roam_info {
  *				operation on bss color collision detection
  * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  * @disconnect_runtime_lock: runtime lock to complete disconnection
+ * @best_6g_power_type: best 6g power type
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -896,6 +897,7 @@ struct mlme_legacy_priv {
 	qdf_wake_lock_t bss_color_change_wakelock;
 	qdf_runtime_lock_t bss_color_change_runtime_lock;
 	qdf_runtime_lock_t disconnect_runtime_lock;
+	enum reg_6g_ap_type best_6g_power_type;
 };
 
 /**
@@ -1115,6 +1117,24 @@ void mlme_set_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev, bool flag);
  * Return: value of follow_ap_edca
  */
 bool mlme_get_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_best_6g_power_type() - Set best 6g power type
+ * @vdev: vdev pointer
+ * @best_6g_power_type: best 6g power type
+ *
+ * Return: None
+ */
+void mlme_set_best_6g_power_type(struct wlan_objmgr_vdev *vdev,
+				 enum reg_6g_ap_type best_6g_power_type);
+
+/**
+ * mlme_get_best_6g_power_type() - Get best 6g power type
+ * @vdev: vdev pointer
+ *
+ * Return: value of best 6g power type
+ */
+enum reg_6g_ap_type mlme_get_best_6g_power_type(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlme_set_reconn_after_assoc_timeout_flag() - Set reconn after assoc timeout

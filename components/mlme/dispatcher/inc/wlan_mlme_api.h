@@ -1318,6 +1318,33 @@ bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc);
  */
 void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable);
+
+/**
+ * wlan_mlme_update_bw_no_punct() - update connected VDEV
+ * channel bandwidth without puncture bitmap for FCC requirement
+ * @psoc: pointer to SOC object
+ * @vdev_id: vdev id
+ *
+ * Return: none
+ */
+QDF_STATUS
+wlan_mlme_update_bw_no_punct(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id);
+
+/**
+ * wlan_mlme_get_bw_no_punct() - Get connected VDEV
+ * channel bandwidth without puncture bitmap for FCC requirement
+ * @psoc: pointer to SOC object
+ * @vdev: pointer to vdev
+ * @bss_chan: bss chan with puncture
+ * @new_ch_width: pointer to new channel bandwidth without puncture
+ * Return: none
+ */
+QDF_STATUS
+wlan_mlme_get_bw_no_punct(struct wlan_objmgr_psoc *psoc,
+			  struct wlan_objmgr_vdev *vdev,
+			  struct wlan_channel *bss_chan,
+			  enum phy_ch_width *new_ch_width);
 #else
 static inline
 bool wlan_mlme_get_epcs_capability(struct wlan_objmgr_psoc *psoc)
@@ -1340,6 +1367,22 @@ static inline
 void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable)
 {
+}
+
+static inline QDF_STATUS
+wlan_mlme_update_bw_no_punct(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id)
+{
+	return QDF_STATUS_E_INVAL;
+}
+
+static inline QDF_STATUS
+wlan_mlme_get_bw_no_punct(struct wlan_objmgr_psoc *psoc,
+			  struct wlan_objmgr_vdev *vdev,
+			  struct wlan_channel *bss_chan,
+			  enum phy_ch_width *new_ch_width)
+{
+	return QDF_STATUS_E_INVAL;
 }
 #endif
 

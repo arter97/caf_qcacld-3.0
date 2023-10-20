@@ -2139,6 +2139,26 @@ bool lim_is_session_chwidth_320mhz(struct pe_session *session);
  */
 void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session);
+
+/**
+ * lim_update_des_chan_puncture() - set puncture_bitmap of des_chan
+ * @des_chan: pointer to wlan_channel
+ * @ch_params: pointer to ch_params
+ *
+ * Return: void
+ */
+void lim_update_des_chan_puncture(struct wlan_channel *des_chan,
+				  struct ch_params *ch_params);
+
+/**
+ * lim_overwrite_sta_puncture() - overwrite STA puncture with AP puncture
+ * @session: session
+ * @@ch_param: pointer to ch_params
+ *
+ * Return: void
+ */
+void lim_overwrite_sta_puncture(struct pe_session *session,
+				struct ch_params *ch_param);
 #else
 static inline
 void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
@@ -2326,6 +2346,18 @@ lim_is_session_chwidth_320mhz(struct pe_session *session)
 
 static inline void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
+{
+}
+
+static inline void
+lim_update_des_chan_puncture(struct wlan_channel *des_chan,
+			     struct ch_params *ch_params)
+{
+}
+
+static inline void
+lim_overwrite_sta_puncture(struct pe_session *session,
+			   struct ch_params *ch_param)
 {
 }
 #endif /* WLAN_FEATURE_11BE */

@@ -10987,28 +10987,14 @@ static void lim_update_ap_puncture(struct pe_session *session,
 	}
 }
 
-/**
- * lim_update_des_chan_puncture() - set puncture_bitmap of des_chan
- * @des_chan: pointer to wlan_channel
- * @ch_params: pointer to ch_params
- *
- * Return: void
- */
-static void lim_update_des_chan_puncture(struct wlan_channel *des_chan,
-					 struct ch_params *ch_params)
+void lim_update_des_chan_puncture(struct wlan_channel *des_chan,
+				  struct ch_params *ch_params)
 {
 	des_chan->puncture_bitmap = ch_params->reg_punc_bitmap;
 }
 
-/**
- * lim_overwrite_sta_puncture() - overwrite STA puncture with AP puncture
- * @session: session
- * @@ch_param: pointer to ch_params
- *
- * Return: void
- */
-static void lim_overwrite_sta_puncture(struct pe_session *session,
-				       struct ch_params *ch_param)
+void lim_overwrite_sta_puncture(struct pe_session *session,
+				struct ch_params *ch_param)
 {
 	uint16_t new_punc = 0;
 
@@ -11026,16 +11012,6 @@ static void lim_overwrite_sta_puncture(struct pe_session *session,
 #else
 static void lim_update_ap_puncture(struct pe_session *session,
 				   struct ch_params *ch_params)
-{
-}
-
-static void lim_update_des_chan_puncture(struct wlan_channel *des_chan,
-					 struct ch_params *ch_params)
-{
-}
-
-static void lim_overwrite_sta_puncture(struct pe_session *session,
-				       struct ch_params *ch_params)
 {
 }
 #endif

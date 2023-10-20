@@ -39,6 +39,7 @@
 #include "wmi_unified_vdev_api.h"
 #include "wlan_mlme_api.h"
 #include "../../core/src/wlan_cp_stats_defs.h"
+#include "wlan_reg_services_api.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -8003,3 +8004,93 @@ wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
 {
 	return wlan_mlme_send_csa_event_status_ind_cmd(vdev, csa_status);
 }
+
+#ifdef WLAN_FEATURE_11BE
+QDF_STATUS
+wlan_mlme_get_bw_no_punct(struct wlan_objmgr_psoc *psoc,
+			  struct wlan_objmgr_vdev *vdev,
+			  struct wlan_channel *bss_chan,
+			  enum phy_ch_width *new_ch_width)
+{
+	uint16_t new_punct_bitmap = 0;
+	enum phy_ch_width ch_width;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	uint8_t country[REG_ALPHA2_LEN + 1];
+
+	wlan_reg_read_current_country(psoc, country);
+
+	if (!wlan_reg_is_6ghz_chan_freq(bss_chan->ch_freq) ||
+	    !bss_chan->puncture_bitmap ||
+	    qdf_mem_cmp(country, "US", REG_ALPHA2_LEN) ||
+	    mlme_get_best_6g_power_type(vdev) != REG_INDOOR_AP ||
+	    !IS_WLAN_PHYMODE_EHT(bss_chan->ch_phymode))
+		goto err;
+
+	ch_width = bss_chan->ch_width;
+
+	while (ch_width != CH_WIDTH_INVALID) {
+		status = wlan_reg_extract_puncture_by_bw(bss_chan->ch_width,
+							 bss_chan->puncture_bitmap,
+							 bss_chan->ch_freq,
+							 bss_chan->ch_cfreq2,
+							 ch_width,
+							 &new_punct_bitmap);
+		if (QDF_IS_STATUS_SUCCESS(status) && new_punct_bitmap)
+			ch_width = wlan_get_next_lower_bandwidth(ch_width);
+		else
+			break;
+	}
+
+	if (ch_width == bss_chan->ch_width)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_debug("freq %d ccfs2 %d punct 0x%x BW old %d, new %d",
+		   bss_chan->ch_freq, bss_chan->ch_cfreq2, bss_chan->puncture_bitmap,
+		   bss_chan->ch_width, ch_width);
+
+	*new_ch_width = ch_width;
+	bss_chan->puncture_bitmap = 0;
+err:
+	return status;
+}
+
+QDF_STATUS
+wlan_mlme_update_bw_no_punct(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	enum phy_ch_width new_ch_width;
+	struct wlan_objmgr_pdev *pdev;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0,
+					  WLAN_MLME_NB_ID);
+	if (!pdev) {
+		sme_err("pdev is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (!vdev) {
+		mlme_err("VDEV not found for vdev id : %d", vdev_id);
+		goto rel_pdev;
+	}
+
+	status = wlan_mlme_get_bw_no_punct(psoc, vdev,
+					   wlan_vdev_mlme_get_des_chan(vdev),
+					   &new_ch_width);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto rel_vdev;
+
+	status = wlan_mlme_send_ch_width_update_with_notify(psoc,
+							    vdev,
+							    vdev_id,
+							    new_ch_width);
+rel_vdev:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+rel_pdev:
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
+
+	return status;
+}
+#endif

@@ -424,6 +424,7 @@ ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *link_vdev;
 	bool is_mlo_link = false;
 	uint8_t link_vdev_id;
+	enum phy_ch_width new_ch_width;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_OBJMGR_ID);
@@ -450,11 +451,19 @@ ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 		}
 		is_mlo_link = true;
 		link_vdev_id = wlan_vdev_get_id(link_vdev);
+
+		status = wlan_mlme_get_bw_no_punct(psoc,
+						   link_vdev,
+						   wlan_vdev_mlme_get_des_chan(link_vdev),
+						   &new_ch_width);
+		if (QDF_IS_STATUS_SUCCESS(status) && ch_width > new_ch_width)
+			ch_width = new_ch_width;
 	} else {
 		link_vdev = vdev;
 		link_vdev_id = vdev_id;
 		mlme_legacy_debug("vdev mlme is not mlo vdev");
 	}
+
 	status = wlan_mlme_send_ch_width_update_with_notify(psoc, link_vdev,
 							    link_vdev_id,
 							    ch_width);

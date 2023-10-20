@@ -51,6 +51,7 @@
 #include "wlan_lmac_if_def.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlme_main.h"
 
 static void
 ap_beacon_process_5_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
@@ -685,6 +686,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 			return;
 
 		session->best_6g_power_type = pwr_type_6g;
+		mlme_set_best_6g_power_type(session->vdev, pwr_type_6g);
 	}
 
 	/*
