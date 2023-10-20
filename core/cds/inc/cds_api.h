@@ -62,6 +62,8 @@
  * CDS_DRIVER_STATE_BAD: Driver in bad state.
  * CDS_DRIVER_STATE_MODULE_STOPPING: Module stop in progress.
  * CDS_DRIVER_STATE_ASSERTING_TARGET: Driver assert target in progress.
+ * @CDS_DRIVER_STATE_SYS_REBOOTING: System reboot in progress.
+ * @CDS_DRIVER_STATE_PCIE_LINK_RESUME_FAIL: system in PCIe resume failed state.
  */
 enum cds_driver_state {
 	CDS_DRIVER_STATE_UNINITIALIZED          = 0,
@@ -73,6 +75,8 @@ enum cds_driver_state {
 	CDS_DRIVER_STATE_FW_READY               = BIT(5),
 	CDS_DRIVER_STATE_MODULE_STOPPING        = BIT(6),
 	CDS_DRIVER_STATE_ASSERTING_TARGET       = BIT(7),
+	CDS_DRIVER_STATE_SYS_REBOOTING          = BIT(8),
+	CDS_DRIVER_STATE_PCIE_LINK_RESUME_FAIL  = BIT(9),
 };
 
 /**
@@ -161,6 +165,19 @@ static inline bool cds_is_target_ready(void)
 	enum cds_driver_state state = cds_get_driver_state();
 
 	return __CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_FW_READY);
+}
+
+/**
+ * cds_is_pcie_link_resume_fail() - Is PCIe link in resume fail state
+ *
+ * Return: true if PCIe link is in resume fail state and false otherwise.
+ */
+static inline bool cds_is_pcie_link_resume_fail(void)
+{
+	enum cds_driver_state state = cds_get_driver_state();
+
+	return __CDS_IS_DRIVER_STATE(state,
+				     CDS_DRIVER_STATE_PCIE_LINK_RESUME_FAIL);
 }
 
 /**
