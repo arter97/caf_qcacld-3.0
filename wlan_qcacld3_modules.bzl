@@ -3,7 +3,11 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
+    "niobe": [
+	"kiwi-v2",
+    ],
     "pineapple": [
+	"peach",
 	"kiwi-v2",
     ],
     "sun": [
@@ -179,6 +183,7 @@ _fixed_ipaths = [
     "components/coex/core/inc",
     "components/coex/dispatcher/inc",
     "components/cp_stats/dispatcher/inc",
+    "components/target_if/mlme/inc",
     "components/denylist_mgr/core/inc",
     "components/denylist_mgr/dispatcher/inc",
     "components/disa/core/inc",
@@ -699,6 +704,13 @@ _conditional_srcs = {
             "components/wmi/src/wmi_unified_mc_cp_stats_tlv.c",
             "os_if/cp_stats/src/wlan_cfg80211_mc_cp_stats.c",
         ],
+    },
+    "CONFIG_QCA_TARGET_IF_MLME": {
+	True: [
+	    "components/target_if/mlme/src/target_if_mlme.c",
+	    "components/wmi/src/wmi_unified_mlme_api.c",
+	    "components/wmi/src/wmi_unified_mlme_tlv.c",
+	],
     },
     "CONFIG_DCS": {
         True: [
@@ -2079,9 +2091,12 @@ _conditional_srcs = {
     },
     "CONFIG_WLAN_FEATURE_LL_LT_SAP": {
         True: [
+            "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_api.c",
             "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_ucfg_api.c",
+            "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_lt_sap_bearer_switch.c",
             "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_lt_sap_main.c",
             "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_sap_main.c",
+            "components/cmn_services/policy_mgr/src/wlan_policy_mgr_ll_sap.c",
         ],
     },
 }

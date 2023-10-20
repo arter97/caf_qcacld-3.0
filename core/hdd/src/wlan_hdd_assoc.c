@@ -590,7 +590,8 @@ void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx)
 	struct wlan_hdd_link_info *link_info;
 
 	link_info = hdd_get_sta_connection_in_progress(hdd_ctx);
-	if (link_info)
+	if (link_info &&
+	    !wlan_vdev_mlme_is_mlo_link_switch_in_progress(link_info->vdev))
 		wlan_hdd_cm_issue_disconnect(link_info,
 					     REASON_UNSPEC_FAILURE, false);
 }
@@ -602,7 +603,8 @@ void hdd_abort_ongoing_sta_sae_connection(struct hdd_context *hdd_ctx)
 	int32_t key_mgmt;
 
 	link_info = hdd_get_sta_connection_in_progress(hdd_ctx);
-	if (!link_info)
+	if (!link_info ||
+	    wlan_vdev_mlme_is_mlo_link_switch_in_progress(link_info->vdev))
 		return;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info->adapter->deflink,
@@ -2350,12 +2352,7 @@ hdd_roam_channel_switch_handler(struct wlan_hdd_link_info *link_info,
 			notify = false;
 	}
 	if (notify) {
-		status = hdd_chan_change_notify(link_info,
-						adapter->dev, chan_change,
-						roam_info->mode ==
-						SIR_SME_PHY_MODE_LEGACY);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_err("channel change notification failed");
+		qdf_sched_work(0, &link_info->chan_change_notify_work);
 	} else {
 		hdd_err("BSS "QDF_MAC_ADDR_FMT" no connected with vdev %d (%d)",
 			QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes),

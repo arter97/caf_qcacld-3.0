@@ -491,6 +491,7 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool mcc_mode;
+	enum hw_mode_bandwidth max_bw;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -534,6 +535,13 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 
 		if (pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb)
 			pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb(mcc_mode);
+
+		if (pm_ctx->dp_cbacks.hdd_ipa_set_perf_level_bw) {
+			max_bw = policy_mgr_get_connection_max_channel_width(
+					psoc);
+			policy_mgr_debug("max channel width %d", max_bw);
+			pm_ctx->dp_cbacks.hdd_ipa_set_perf_level_bw(max_bw);
+		}
 	}
 
 	if (pm_ctx->conc_cbacks.connection_info_update)
@@ -869,10 +877,6 @@ policy_mgr_fill_curr_freq_by_pdev_freq(int32_t num_mac_freq,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		policy_mgr_debug("mac_id %d start freq %d end_freq %d",
-				 mac_id, freq[i].start_freq,
-				 freq[i].end_freq);
-
 		if (policy_mgr_is_freq_range_2ghz(freq[i].start_freq,
 						  freq[i].end_freq)) {
 			policy_mgr_fill_curr_mac_2ghz_freq(mac_id,
@@ -986,7 +990,6 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 {
 	QDF_STATUS ret;
 	struct policy_mgr_hw_mode_params hw_mode;
-	uint32_t i;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	pm_ctx = policy_mgr_get_context(context);
@@ -1015,29 +1018,22 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 		goto set_done_event;
 	}
 
-	policy_mgr_debug("cfgd_hw_mode_index=%d", cfgd_hw_mode_index);
-
-	for (i = 0; i < num_vdev_mac_entries; i++)
-		policy_mgr_debug("vdev_id:%d mac_id:%d",
-				vdev_mac_map[i].vdev_id,
-				vdev_mac_map[i].mac_id);
-
 	ret = policy_mgr_get_hw_mode_from_idx(context, cfgd_hw_mode_index,
-			&hw_mode);
-	if (ret != QDF_STATUS_SUCCESS) {
-		policy_mgr_err("Get HW mode failed: %d", ret);
+					      &hw_mode);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		policy_mgr_err("Get HW mode for index %d reason: %d",
+			       cfgd_hw_mode_index, ret);
 		goto set_done_event;
 	}
-
-	policy_mgr_debug("MAC0: TxSS:%d, RxSS:%d, Bw:%d, band_cap %d",
+	policy_mgr_debug("HW mode idx %d, DBS %d Agile %d SBS %d, MAC0:: SS:Tx %d Rx %d, BW %d band %d. MAC1:: SS:Tx %d Rx %d, BW %d",
+			 cfgd_hw_mode_index, hw_mode.dbs_cap,
+			 hw_mode.agile_dfs_cap, hw_mode.sbs_cap,
 			 hw_mode.mac0_tx_ss, hw_mode.mac0_rx_ss,
-			 hw_mode.mac0_bw, hw_mode.mac0_band_cap);
-	policy_mgr_debug("MAC1: TxSS:%d, RxSS:%d, Bw:%d",
+			 hw_mode.mac0_bw, hw_mode.mac0_band_cap,
 			 hw_mode.mac1_tx_ss, hw_mode.mac1_rx_ss,
 			 hw_mode.mac1_bw);
-	policy_mgr_debug("DBS:%d, Agile DFS:%d, SBS:%d",
-			 hw_mode.dbs_cap, hw_mode.agile_dfs_cap,
-			 hw_mode.sbs_cap);
+	policy_mgr_dump_freq_range_n_vdev_map(num_vdev_mac_entries,
+					      vdev_mac_map, 0, NULL);
 
 	/* update pm_conc_connection_list */
 	policy_mgr_update_hw_mode_conn_info(context,
@@ -4249,6 +4245,8 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 			return;
 		policy_mgr_debug("no mandatory channels (%d, %d)", sap_ch_freq,
 				 *intf_ch_freq);
+	} else if (sta_count && policy_mgr_is_hw_dbs_capable(psoc)) {
+		policy_mgr_sap_on_non_psc_channel(psoc, intf_ch_freq, vdev_id);
 	}
 
 	/* Get allow 6Gz before interface entry is temporary deleted */

@@ -2078,6 +2078,9 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		dst_buf->assoc_id =
 			WMI_GET_ASSOC_ID(src_data->frame_info_ext);
 
+		dst_buf->band =
+			WMI_GET_MLO_BITMAP_BAND_INFO(src_data->frame_info_ext);
+
 		dst_buf++;
 		src_data++;
 	}
@@ -2275,7 +2278,7 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 						   link->link_addr.bytes);
 			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->self_link_addr,
 						   link->self_link_addr.bytes);
-			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT "self_addr:" QDF_MAC_ADDR_FMT,
+			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr: " QDF_MAC_ADDR_FMT " self_addr:" QDF_MAC_ADDR_FMT,
 				  link->link_id, link->vdev_id,
 				  link->flags,
 				  QDF_MAC_ADDR_REF(link->link_addr.bytes),
@@ -3015,6 +3018,11 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	uint8_t vdev_id = stats_info->vdev_id;
 	uint8_t band;
 
+	status = wmi_unified_extract_roam_scan_stats(
+			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
+	if (QDF_IS_STATUS_ERROR(status))
+		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
+
 	band = stats_info->scan[0].band;
 
 	status = wmi_unified_extract_roam_11kv_stats(
@@ -3028,11 +3036,6 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Extract roamtrigger stats failed vdev %d",
 			  vdev_id);
-
-	status = wmi_unified_extract_roam_scan_stats(
-			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
-	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
 
 	status = wmi_unified_extract_roam_btm_response(
 			wmi_handle, evt_buf, &stats_info->btm_rsp[0], 0);

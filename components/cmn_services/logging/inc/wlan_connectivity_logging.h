@@ -1198,7 +1198,30 @@ void
 wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 		   struct wlan_diag_packet_info *data, bool is_tx);
 
+/**
+ * wlan_cdp_set_peer_freq() - API to set frequency to dp peer
+ * @psoc: psoc pointer
+ * @peer_mac: Bssid of peer
+ * @freq: frequency(in MHz)
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void
+wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
+		       uint32_t freq, uint8_t vdev_id);
+
 #ifdef WLAN_FEATURE_11BE_MLO
+
+/**
+ * wlan_connectivity_mlo_reconfig_event() -API to log MLO reconfig event
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void
+wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev);
+
 /**
  * wlan_connectivity_mlo_setup_event() - Fill and send MLO setup data
  * @vdev: vdev pointer
@@ -1206,10 +1229,81 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_connectivity_t2lm_req_resp_event - API to send t2lm Req/resp
+ * event logs to userspace
+ * @vdev: vdev pointer
+ * @token: dialog Token
+ * @t2lm_status: T2LM response status code. Refer enum wlan_t2lm_resp_frm_type
+ * @tx_status: TX status
+ * @freq: Frame received/transmitted frequency
+ * @is_rx: Flag to inidcate packet being received
+ * @subtype: Determine whether the evnt sent is for t2lm request
+ * or t2lm response
+ *
+ * Return: None
+ */
+void
+wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
+				      uint8_t token,
+				      enum wlan_t2lm_resp_frm_type t2lm_status,
+				      enum qdf_dp_tx_rx_status tx_status,
+				      qdf_freq_t freq,
+				      bool is_rx, uint8_t subtype);
+/**
+ * wlan_connectivity_t2lm_status_event() - Fill and send T2LM data
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_populate_mlo_mgmt_event_param() - API to populate MLO management frame
+ * parameter
+ * @vdev: vdev pointer
+ * @data: Buffer to be filled with MLO parameter
+ * @tag: WLAN event tag. Refer enum wlan_main_tag
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_diag_packet_info *data,
+				   enum wlan_main_tag tag);
+
 #else
+static inline void
+wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
+{
+}
+
 static inline void
 wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 {
+}
+
+static inline void
+wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
+				      uint8_t token,
+				      enum wlan_t2lm_resp_frm_type status,
+				      enum qdf_dp_tx_rx_status tx_status,
+				      qdf_freq_t freq,
+				      bool is_rx, uint8_t subtype)
+{}
+
+static inline void
+wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline QDF_STATUS
+wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_diag_packet_info *data,
+				   enum wlan_main_tag tag)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -1246,6 +1340,14 @@ void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id);
 
+/**
+ * wlan_connectivity_connecting_event() - API to log connecting event
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
 
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
@@ -1317,6 +1419,15 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     enum wlan_main_tag tag);
 
 /**
+ * wlan_connectivity_connecting_event() - API to log connecting event
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_populate_vsie() - Populate VSIE field for logging
  * @vdev: vdev pointer
  * @data: Diag packet info data
@@ -1358,6 +1469,20 @@ wlan_convert_freq_to_diag_band(uint16_t ch_freq);
 void
 wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 		   struct wlan_diag_packet_info *data, bool is_tx);
+
+/**
+ * wlan_cdp_set_peer_freq() - API to set frequency to dp peer
+ * @psoc: psoc pointer
+ * @peer_mac: Bssid of peer
+ * @freq: frequency(in MHz)
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void
+wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
+		       uint32_t freq, uint8_t vdev_id);
+
 #else
 static inline
 void wlan_connectivity_logging_start(struct wlan_objmgr_psoc *psoc,
@@ -1402,10 +1527,47 @@ wlan_convert_freq_to_diag_band(uint16_t ch_freq)
 	return WLAN_INVALID_BAND;
 }
 
+static inline QDF_STATUS
+wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_diag_packet_info *data,
+				   enum wlan_main_tag tag)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
+		       uint32_t freq, uint8_t vdev_id)
+{}
+
+static inline void
+wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
+{
+}
+
 static inline void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id)
 {}
+
+static inline void
+wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
+				      uint8_t token,
+				      enum wlan_t2lm_resp_frm_type status,
+				      enum qdf_dp_tx_rx_status tx_status,
+				      qdf_freq_t freq,
+				      bool is_rx, uint8_t subtype)
+{}
+
+static inline void
+wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline void
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
+{
+}
 #endif
 
 #if defined(CONNECTIVITY_DIAG_EVENT) && defined(WLAN_FEATURE_11BE_MLO)

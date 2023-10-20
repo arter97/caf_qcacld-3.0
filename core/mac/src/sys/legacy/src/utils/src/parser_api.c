@@ -1039,6 +1039,9 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 			pDot11f->supportedChannelWidthSet =
 				pe_session->htSupportedChannelWidthSet;
 		}
+		pe_debug("cb mode %d scws %d session cw %d",
+			 cb_mode, pDot11f->supportedChannelWidthSet,
+			 pe_session->ch_width);
 
 		pDot11f->advCodingCap = pe_session->ht_config.adv_coding_cap;
 		pDot11f->txSTBC = pe_session->ht_config.tx_stbc;
@@ -3305,7 +3308,7 @@ sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pFrame,
 }
 #endif
 
-QDF_STATUS
+enum wlan_status_code
 sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 				    uint8_t *pFrame,
 				    uint32_t nFrame, tpSirAssocReq pAssocReq)
@@ -3315,7 +3318,7 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 
 	ar = qdf_mem_malloc(sizeof(tDot11fAssocRequest));
 	if (!ar)
-		return QDF_STATUS_E_NOMEM;
+		return STATUS_UNSPECIFIED_FAILURE;
 
 	/* delegate to the framesc-generated code, */
 	status = dot11f_unpack_assoc_request(mac, pFrame, nFrame, ar, false);
@@ -3325,7 +3328,7 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
 				   pFrame, nFrame);
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_UNSPECIFIED_FAILURE;
 	} else if (DOT11F_WARNED(status)) {
 		pe_debug("There were warnings while unpacking an Association Request (0x%08x, %d bytes):",
 			status, nFrame);
@@ -3447,13 +3450,13 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 	if (!pAssocReq->ssidPresent) {
 		pe_debug("Received Assoc without SSID IE");
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_UNSPECIFIED_FAILURE;
 	}
 
 	if (!pAssocReq->suppRatesPresent && !pAssocReq->extendedRatesPresent) {
 		pe_debug("Received Assoc without supp rate IE");
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_ASSOC_DENIED_RATES;
 	}
 	if (ar->VHTCaps.present) {
 		qdf_mem_copy(&pAssocReq->VHTCaps, &ar->VHTCaps,
@@ -3523,7 +3526,7 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 		 ar->eht_cap.present);
 
 	qdf_mem_free(ar);
-	return QDF_STATUS_SUCCESS;
+	return STATUS_SUCCESS;
 
 } /* End sir_convert_assoc_req_frame2_struct. */
 
@@ -4340,7 +4343,7 @@ sir_convert_reassoc_req_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-QDF_STATUS
+enum wlan_status_code
 sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 				      uint8_t *pFrame,
 				      uint32_t nFrame, tpSirAssocReq pAssocReq)
@@ -4350,7 +4353,7 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 
 	ar = qdf_mem_malloc(sizeof(*ar));
 	if (!ar)
-		return QDF_STATUS_E_NOMEM;
+		return STATUS_UNSPECIFIED_FAILURE;
 
 	/* delegate to the framesc-generated code, */
 	status = dot11f_unpack_re_assoc_request(mac, pFrame, nFrame,
@@ -4361,7 +4364,7 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
 				   pFrame, nFrame);
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_UNSPECIFIED_FAILURE;
 	} else if (DOT11F_WARNED(status)) {
 		pe_debug("There were warnings while unpacking a Re-association Request (0x%08x, %d bytes):",
 			status, nFrame);
@@ -4459,13 +4462,13 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 	if (!pAssocReq->ssidPresent) {
 		pe_debug("Received Assoc without SSID IE");
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_UNSPECIFIED_FAILURE;
 	}
 
 	if (!pAssocReq->suppRatesPresent && !pAssocReq->extendedRatesPresent) {
 		pe_debug("Received Assoc without supp rate IE");
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_ASSOC_DENIED_RATES;
 	}
 	/* Why no call to 'updateAssocReqFromPropCapability' here, like */
 	/* there is in 'sir_convert_assoc_req_frame2_struct'? */
@@ -4534,7 +4537,7 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 						  ar, pAssocReq);
 	qdf_mem_free(ar);
 
-	return QDF_STATUS_SUCCESS;
+	return STATUS_SUCCESS;
 
 } /* End sir_convert_reassoc_req_frame2_struct. */
 
@@ -5278,6 +5281,8 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t bpcc;
 	bool bpcc_found;
+	bool ext_mld_cap_found = false;
+	uint16_t ext_mld_cap = 0;
 
 	if (bcn_frm->mlo_ie.present) {
 		status = util_find_mlie(pframe + WLAN_BEACON_IES_OFFSET,
@@ -5301,6 +5306,17 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 						  ml_ie_total_len,
 						  &bcn_struct->mlo_ie.mlo_ie);
 
+			util_get_bvmlie_ext_mld_cap_op_info(ml_ie,
+							    ml_ie_total_len,
+							    &ext_mld_cap_found,
+							    &ext_mld_cap);
+			if (ext_mld_cap_found) {
+				bcn_struct->mlo_ie.mlo_ie.ext_mld_capab_and_op_info.rec_max_simultaneous_links =
+				QDF_GET_BITS(
+				ext_mld_cap,
+				WLAN_ML_BV_CINFO_EXTMLDCAPINFO_RECOM_MAX_SIMULT_LINKS_IDX,
+				WLAN_ML_BV_CINFO_EXTMLDCAPINFO_RECOM_MAX_SIMULT_LINKS_BITS);
+			}
 			util_get_bvmlie_bssparamchangecnt(ml_ie,
 							  ml_ie_total_len,
 							  &bpcc_found, &bpcc);
@@ -9496,6 +9512,19 @@ populate_dot11f_rtwt_eht_cap(struct mac_context *mac,
 	eht_cap->restricted_twt = false;
 }
 #endif
+static void
+populate_dot11f_revise_eht_caps(struct pe_session *session,
+				tDot11fIEeht_cap *eht_cap)
+{
+	if (session->ch_width != CH_WIDTH_320MHZ)
+		eht_cap->support_320mhz_6ghz = 0;
+
+	if (wlan_epcs_get_config(session->vdev))
+		eht_cap->epcs_pri_access = 1;
+	else
+		eht_cap->epcs_pri_access = 0;
+}
+
 QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 				    struct pe_session *session,
 				    tDot11fIEeht_cap *eht_cap)
@@ -9511,13 +9540,7 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 
 	/** TODO: String items needs attention. **/
 	qdf_mem_copy(eht_cap, &session->eht_config, sizeof(*eht_cap));
-	if (session->ch_width != CH_WIDTH_320MHZ)
-		eht_cap->support_320mhz_6ghz = 0;
-
-	if (wlan_epcs_get_config(session->vdev))
-		eht_cap->epcs_pri_access = 1;
-	else
-		eht_cap->epcs_pri_access = 0;
+	populate_dot11f_revise_eht_caps(session, eht_cap);
 
 	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
 	return QDF_STATUS_SUCCESS;
@@ -9525,8 +9548,8 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 
 QDF_STATUS
 populate_dot11f_eht_caps_by_band(struct mac_context *mac_ctx,
-				 bool is_2g,
-				 tDot11fIEeht_cap *eht_cap)
+				 bool is_2g, tDot11fIEeht_cap *eht_cap,
+				 struct pe_session *session)
 {
 	pe_debug("is_2g %d", is_2g);
 	if (is_2g)
@@ -9537,6 +9560,8 @@ populate_dot11f_eht_caps_by_band(struct mac_context *mac_ctx,
 		qdf_mem_copy(eht_cap,
 			     &mac_ctx->eht_cap_5g,
 			     sizeof(tDot11fIEeht_cap));
+	if (session)
+		populate_dot11f_revise_eht_caps(session, eht_cap);
 
 	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
 	return QDF_STATUS_SUCCESS;
@@ -9810,7 +9835,6 @@ populate_dot11f_probe_req_mlo_ie(struct mac_context *mac,
 		pe_debug("Do not populate sta profile in MLO IE");
 		goto no_sta_prof;
 	}
-	pe_debug("Populate sta profile in MLO IE");
 
 	partner_info = session->lim_join_req->partner_info;
 	for (link = 0; link < partner_info.num_partner_links; link++) {
@@ -12364,7 +12388,8 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 			non_inher_ext_ie_lists[non_inher_ext_len++] =
 						WLAN_EXTN_ELEMID_HE_6G_CAP;
 		}
-		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps);
+		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps,
+						 pe_session);
 		if ((eht_caps.present && frm->eht_cap.present &&
 		     qdf_mem_cmp(&eht_caps, &frm->eht_cap, sizeof(eht_caps))) ||
 		     (eht_caps.present && !frm->eht_cap.present) ||
@@ -12451,8 +12476,6 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 		pe_err("Invalid psoc");
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	pe_debug("Populate MLO common IEs");
 
 	mlo_ie->type = 0;
 	mlo_ie->common_info_length = WLAN_ML_BV_CINFO_LENGTH_SIZE;
@@ -12560,11 +12583,6 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 		len_remaining -= WLAN_ML_BV_CINFO_EMLCAP_SIZE;
 	}
 
-	pe_debug("EMLSR support: %d, padding delay: %d, transition delay: %d",
-		 mlo_ie->eml_capabilities_info.emlsr_support,
-		 mlo_ie->eml_capabilities_info.emlsr_padding_delay,
-		 mlo_ie->eml_capabilities_info.emlsr_transition_delay);
-
 	if (mlo_ie->mld_capab_and_op_present) {
 		QDF_SET_BITS(*(uint16_t *)p_ml_ie,
 			     WLAN_ML_BV_CINFO_MLDCAPANDOP_MAXSIMULLINKS_IDX,
@@ -12579,7 +12597,11 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 	}
 
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
-	pe_debug("MLO common IEs total len: %d", mlo_ie->num_data);
+	pe_debug("VDEV %d ML-IE common info len %d eMLSR support %d pad_delay %d, trans_delay %d",
+		 wlan_vdev_get_id(vdev), mlo_ie->num_data,
+		 mlo_ie->eml_capabilities_info.emlsr_support,
+		 mlo_ie->eml_capabilities_info.emlsr_padding_delay,
+		 mlo_ie->eml_capabilities_info.emlsr_transition_delay);
 
 	return QDF_STATUS_SUCCESS;
 }

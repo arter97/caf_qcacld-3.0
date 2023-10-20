@@ -225,13 +225,20 @@ bbm_get_bus_bw_level_vote(struct wlan_dp_intf *dp_intf,
 			break;
 
 		/*
+		 * If the tput levels are between mid to high range, then
+		 * apply next SNOC voting level BUS_BW_LEVEL_5 which maps
+		 * to PLD_BUS_WIDTH_LOW_LATENCY.
+		 *
 		 * NDI dot11mode is currently hardcoded to 11AC in driver and
 		 * since the bus bw levels in table do not differ between 11AC
 		 * and 11AX, using max supported mode instead. Dot11mode of the
 		 * peers are not saved in driver and legacy modes are not
 		 * supported in NAN.
 		 */
-		return (*lkp_table)[QCA_WLAN_802_11_MODE_11AX][tput_level];
+		if (tput_level <= TPUT_LEVEL_HIGH)
+			return BUS_BW_LEVEL_5;
+		else
+			return (*lkp_table)[QCA_WLAN_802_11_MODE_11AX][tput_level];
 	default:
 		break;
 	}

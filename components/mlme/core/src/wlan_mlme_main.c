@@ -579,7 +579,8 @@ mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS  &&
+	     link_ctx->links_info[i].link_id != WLAN_INVALID_LINK_ID; i++) {
 		status = mlme_update_freq_from_link_ctx(
 						&link_ctx->links_info[i], req);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -618,10 +619,6 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 	enum phy_ch_width associated_ch_width;
 	QDF_STATUS status;
 
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv)
-		return QDF_STATUS_E_FAILURE;
-
 	req->scan_req.chan_list.num_chan = 0;
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
@@ -631,6 +628,10 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 			return QDF_STATUS_E_FAILURE;
 		goto update_param;
 	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return QDF_STATUS_E_FAILURE;
 
 	associated_ch_width =
 		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
@@ -2164,6 +2165,28 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
+/**
+ * mlme_init_disable_twt_info() - initialize disable twt info
+ * @psoc: Pointer to PSOC
+ * @twt_cfg: Pointer to twt_cfg
+ *
+ * Return: None
+ */
+static void mlme_init_disable_twt_info(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_mlme_cfg_twt *twt_cfg)
+{
+	twt_cfg->disable_twt_info_frame = cfg_get(psoc,
+						  CFG_DISABLE_TWT_INFO_FRAME);
+}
+#elif defined(WLAN_SUPPORT_TWT)
+static void mlme_init_disable_twt_info(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_mlme_cfg_twt *twt_cfg)
+{
+}
+
+#endif
+
 #ifdef WLAN_SUPPORT_TWT
 static void mlme_init_twt_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_cfg_twt *twt_cfg)
@@ -2175,6 +2198,7 @@ static void mlme_init_twt_cfg(struct wlan_objmgr_psoc *psoc,
 	twt_cfg->enable_twt_24ghz = cfg_get(psoc, CFG_ENABLE_TWT_24GHZ);
 	twt_cfg->is_bcast_requestor_enabled = CFG_TWT_GET_BCAST_REQ(bcast_conf);
 	twt_cfg->is_bcast_responder_enabled = CFG_TWT_GET_BCAST_RES(bcast_conf);
+	mlme_init_disable_twt_info(psoc, twt_cfg);
 }
 #else
 static void mlme_init_twt_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2647,7 +2671,7 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 	sta->sta_keep_alive_period =
 		cfg_get(psoc, CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
 	sta->bss_max_idle_period =
-		(uint32_t)cfg_default(CFG_STA_BSS_MAX_IDLE_PERIOD);
+		cfg_get(psoc, CFG_STA_BSS_MAX_IDLE_PERIOD);
 	sta->tgt_gtx_usr_cfg =
 		cfg_get(psoc, CFG_TGT_GTX_USR_CFG);
 	sta->pmkid_modes =
@@ -5506,3 +5530,33 @@ QDF_STATUS wlan_mlme_register_common_events(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind_cmd(struct wlan_objmgr_vdev *vdev,
+					uint8_t csa_status)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct  wlan_mlme_tx_ops *tx_ops;
+	mlme_psoc_ext_t *mlme_priv;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlme_err("vdev_id %d psoc object is NULL",
+			 wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv = wlan_psoc_mlme_get_ext_hdl(psoc);
+	if (!mlme_priv)
+		return QDF_STATUS_E_FAILURE;
+
+	tx_ops = &mlme_priv->mlme_tx_ops;
+
+	if (!tx_ops || !tx_ops->send_csa_event_status_ind) {
+		mlme_err("CSA no op defined");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return tx_ops->send_csa_event_status_ind(vdev, csa_status);
+}
+

@@ -50,8 +50,7 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t sta_vdev_id = WLAN_INVALID_VDEV_ID;
-	uint32_t count;
-	uint32_t idx;
+	uint32_t count, idx;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 
 	sta_vdev_id = policy_mgr_get_roam_enabled_sta_session_id(psoc, vdev_id);
@@ -62,7 +61,6 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 						       op_ch_freq_list,
 						       vdev_id_list,
 						       PM_STA_MODE);
-
 	if (!count)
 		return QDF_STATUS_E_FAILURE;
 
@@ -81,6 +79,13 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 
 	if (sta_vdev_id == WLAN_INVALID_VDEV_ID)
 		return QDF_STATUS_E_FAILURE;
+
+	if (mlo_check_is_given_vdevs_on_same_mld(psoc, sta_vdev_id, vdev_id)) {
+		mlme_debug("RSO_CFG: vdev:%d , vdev:%d are on same MLD skip RSO enable",
+			   sta_vdev_id, vdev_id);
+
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	mlme_debug("ROAM: Enabling roaming on vdev[%d]", sta_vdev_id);
 
@@ -1709,6 +1714,9 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		mlme_err("vdev object is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	mlme_debug("vdev: %d source: %d freq: %d bssid: " QDF_MAC_ADDR_FMT,
+		   vdev_id, source, chan_freq, QDF_MAC_ADDR_REF(bssid->bytes));
 
 	status = cm_start_roam_invoke(psoc, vdev, bssid, chan_freq, source);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);

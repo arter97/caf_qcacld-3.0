@@ -665,9 +665,6 @@ rrm_update_mac_cp_stats(struct infra_cp_stats_event *ev,
 	 * by FW and previous stats.
 	 */
 	case STA_STAT_GROUP_ID_COUNTER_STATS:
-		counter_stats->group_transmitted_frame_count =
-			ev_counter_stats.group_transmitted_frame_count -
-			counter_stats->group_transmitted_frame_count;
 		counter_stats->failed_count =
 			ev_counter_stats.failed_count -
 			counter_stats->failed_count;
@@ -695,8 +692,7 @@ rrm_update_mac_cp_stats(struct infra_cp_stats_event *ev,
 	default:
 		pe_debug("group id not supported");
 	}
-	pe_nofl_debug("counter stats: group frame count ( tx %d rx %d ) failed_count %d fcs_error %d tx frame count %d mac stats: rts success count %d rts fail count %d ack fail count %d",
-		      counter_stats->group_transmitted_frame_count,
+	pe_nofl_debug("counter stats: group rx frame count %d failed_count %d fcs_error %d tx frame count %d mac stats: rts success count %d rts fail count %d ack fail count %d",
 		      counter_stats->group_received_frame_count,
 		      counter_stats->failed_count,
 		      counter_stats->fcs_error_count,
@@ -800,9 +796,10 @@ rrm_update_vdev_stats(tpSirMacRadioMeasureReport rrm_report, uint8_t vdev_id)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	pe_nofl_debug("counter stats count: fragment (tx: %d rx: %d) mac stats count: retry : %d multiple retry: %d frame duplicate %d",
+	pe_nofl_debug("counter stats count: fragment (tx: %d rx: %d) group tx: %d mac stats count: retry : %d multiple retry: %d frame duplicate %d",
 		      stats->tx.fragment_count, stats->rx.fragment_count,
-		      stats->tx.retry_count, stats->tx.multiple_retry_count,
+		      stats->tx.mcast.num, stats->tx.retry_count,
+		      stats->tx.multiple_retry_count,
 		      stats->rx.duplicate_count);
 
 	switch (rrm_report->report.statistics_report.group_id) {
@@ -813,6 +810,9 @@ rrm_update_vdev_stats(tpSirMacRadioMeasureReport rrm_report, uint8_t vdev_id)
 		counter_stats->received_fragment_count =
 			stats->rx.fragment_count -
 				counter_stats->received_fragment_count;
+		counter_stats->group_transmitted_frame_count =
+			stats->tx.mcast.num -
+			counter_stats->group_transmitted_frame_count;
 		break;
 	case STA_STAT_GROUP_ID_MAC_STATS:
 		mac_stats->retry_count =

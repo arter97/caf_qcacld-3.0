@@ -6400,7 +6400,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
 	return QDF_STATUS_SUCCESS;
 }
 
-#define MAX_VDEV_CREATE_PARAMS 21
+#define MAX_VDEV_CREATE_PARAMS 22
 /* params being sent:
  * 1.wmi_vdev_param_wmm_txop_enable
  * 2.wmi_vdev_param_disconnect_th
@@ -6423,6 +6423,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
  * 19.wmi_vdev_param_bmiss_final_bcnt
  * 20.wmi_vdev_param_set_sap_ps_with_twt
  * 21.wmi_vdev_param_disable_2g_twt
+ * 22.wmi_vdev_param_disable_twt_info_frame
  */
 
 QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
@@ -6439,6 +6440,7 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 	struct dev_set_param setparam[MAX_VDEV_CREATE_PARAMS];
 	uint8_t index = 0;
 	bool is_24ghz_twt_enabled;
+	bool disable_twt_info_frame;
 	enum QDF_OPMODE opmode;
 
 	if (!mac)
@@ -6697,6 +6699,17 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 					   index++, MAX_VDEV_CREATE_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_debug("failed to set wmi_vdev_param_disable_2g_twt");
+		goto error;
+	}
+
+	disable_twt_info_frame = mlme_is_twt_disable_info_frame(mac->psoc);
+	status = mlme_check_index_setparam(
+					setparam,
+					wmi_vdev_param_disable_twt_info_frame,
+					disable_twt_info_frame,
+					index++, MAX_VDEV_CREATE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_debug("failed to set wmi_vdev_param_disable_twt_info_frame");
 		goto error;
 	}
 

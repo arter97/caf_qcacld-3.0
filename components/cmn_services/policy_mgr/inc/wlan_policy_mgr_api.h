@@ -2253,6 +2253,7 @@ struct policy_mgr_cdp_cbacks {
  * @hdd_ipa_set_mcc_mode_cb: Callback to set mcc mode for ipa module
  * @hdd_v2_flow_pool_map: Callback to create vdev flow pool
  * @hdd_v2_flow_pool_unmap: Callback to delete vdev flow pool
+ * @hdd_ipa_set_perf_level_bw: Callback to set ipa perf level based on BW
  */
 struct policy_mgr_dp_cbacks {
 	void (*hdd_disable_rx_ol_in_concurrency)(bool);
@@ -2260,6 +2261,7 @@ struct policy_mgr_dp_cbacks {
 	void (*hdd_ipa_set_mcc_mode_cb)(bool);
 	void (*hdd_v2_flow_pool_map)(int);
 	void (*hdd_v2_flow_pool_unmap)(int);
+	void (*hdd_ipa_set_perf_level_bw)(enum hw_mode_bandwidth bw);
 };
 
 /**
@@ -3069,6 +3071,23 @@ uint32_t policy_mgr_mode_specific_connection_count(
 QDF_STATUS policy_mgr_check_conn_with_mode_and_vdev_id(
 		struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode,
 		uint32_t vdev_id);
+
+/**
+ * policy_mgr_dump_freq_range_n_vdev_map() - Dump freq range of mac and vdev to
+ * mac mapping
+ * @num_vdev_mac_entries: Number of vdev-mac id mapping that follows
+ * @vdev_mac_map: vdev-mac id map. This memory will be freed by the caller.
+ * So, make local copy if needed.
+ * @num_mac_freq: Number of pdev freq mapping that follows
+ * @mac_freq_range: mac_freq_range mapping
+ *
+ * Return: None
+ */
+void
+policy_mgr_dump_freq_range_n_vdev_map(uint32_t num_vdev_mac_entries,
+			struct policy_mgr_vdev_mac_map *vdev_mac_map,
+			uint32_t num_mac_freq,
+			struct policy_mgr_pdev_mac_freq_map *mac_freq_range);
 
 /**
  * policy_mgr_hw_mode_transition_cb() - Callback for HW mode
@@ -4433,19 +4452,6 @@ bool policy_mgr_sta_sap_scc_on_lte_coex_chan(
 	struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_is_valid_for_channel_switch() - check for valid channel for
- * channel switch.
- * @psoc: pointer to psoc
- * @ch_freq: channel frequency to be validated.
- * This function validates whether the given channel is valid for channel
- * switch.
- *
- * Return: true or false
- */
-bool policy_mgr_is_valid_for_channel_switch(struct wlan_objmgr_psoc *psoc,
-					    uint32_t ch_freq);
-
-/**
  * policy_mgr_get_user_config_sap_freq() - Get the user configured channel
  *
  * @psoc: pointer to psoc
@@ -5626,4 +5632,21 @@ bool policy_mgr_get_vdev_diff_freq_new_conn(struct wlan_objmgr_psoc *psoc,
 					    uint32_t new_freq,
 					    uint8_t *vdev_id);
 
+/**
+ * policy_mgr_sap_on_non_psc_channel() - Check if STA operates in PSC or Non-PSC
+ *					 channel to restart SAP on Non-PSC
+ *					 channel
+ * @psoc: PSOC object information
+ * @intf_ch_freq: input/out interference channel frequency to sap
+ * @sap_vdev_id: SAP vdev id
+ *
+ * This function is to check if STA operates in PSC or Non-PSC channel
+ * to restart SAP on Non-PSC channel.
+ *
+ * Return: None
+ */
+void
+policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
+				  qdf_freq_t *intf_ch_freq,
+				  uint8_t sap_vdev_id);
 #endif /* __WLAN_POLICY_MGR_API_H */

@@ -134,6 +134,12 @@ void ucfg_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
 	wlan_mlme_set_ml_link_control_mode(psoc, vdev_id, value);
 }
 
+void ucfg_mlme_set_bt_profile_con(struct wlan_objmgr_psoc *psoc,
+				  bool bt_profile_con)
+{
+	wlan_mlme_set_bt_profile_con(psoc, bt_profile_con);
+}
+
 uint8_t ucfg_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id)
 {

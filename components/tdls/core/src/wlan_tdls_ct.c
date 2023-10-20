@@ -97,6 +97,7 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 	struct wlan_objmgr_vdev *tdls_link_vdev;
 	struct tdls_rx_mgmt_frame *rx_mgmt;
 	uint8_t *mac;
+	bool unforce = true;
 
 	if (!user_data) {
 		tdls_err("discovery time out data is null");
@@ -132,6 +133,8 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 				tdls_notice("[TDLS] TDLS Discovery Response,"
 					    "QDF_MAC_ADDR_FMT RSSI[%d]<---OTA",
 					    rx_mgmt->rx_rssi);
+				tdls_debug("discovery resp on vdev %d",
+					   wlan_vdev_get_id(tdls_vdev->vdev));
 				tdls_recv_discovery_resp(tdls_vdev, mac);
 				tdls_set_rssi(tdls_vdev->vdev, mac,
 					      rx_mgmt->rx_rssi);
@@ -161,6 +164,15 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 		while (QDF_IS_STATUS_SUCCESS(status)) {
 			peer = qdf_container_of(p_node, struct tdls_peer,
 						node);
+
+			tdls_debug("Peer: " QDF_MAC_ADDR_FMT "link status %d, vdev id %d",
+				   QDF_MAC_ADDR_REF(peer->peer_mac.bytes),
+				   peer->link_status, wlan_vdev_get_id(vdev));
+
+			if (peer->link_status != TDLS_LINK_DISCOVERING &&
+			    peer->link_status != TDLS_LINK_IDLE)
+				unforce = false;
+
 			if (TDLS_LINK_DISCOVERING != peer->link_status) {
 				status = qdf_list_peek_next(head, p_node,
 							    &p_node);
@@ -172,6 +184,12 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 						  TDLS_LINK_IDLE,
 						  TDLS_LINK_NOT_SUPPORTED);
 		}
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && unforce) {
+		tdls_debug("try to set vdev %d to unforce",
+			   wlan_vdev_get_id(vdev));
+		tdls_set_link_unforce(vdev);
 	}
 
 	tdls_vdev->discovery_sent_cnt = 0;
@@ -1456,6 +1474,14 @@ void tdls_disable_offchan_and_teardown_links(
 	QDF_STATUS status;
 	uint8_t vdev_id;
 	bool tdls_in_progress = false;
+	bool is_mlo_vdev;
+
+	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
+	if (is_mlo_vdev) {
+		tdls_debug("try to set vdev %d to unforce",
+			   wlan_vdev_get_id(vdev));
+		tdls_set_link_unforce(vdev);
+	}
 
 	status = tdls_get_vdev_objects(vdev, &tdls_vdev, &tdls_soc);
 	if (QDF_STATUS_SUCCESS != status) {

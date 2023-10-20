@@ -2214,13 +2214,21 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 	uint8_t *info;
 	uint32_t stats_len = 0;
 	int ret;
-
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	struct wma_ini_config *cfg = wma_get_ini_handle(wma_handle);
+	bool exclude_selftx_from_cca_busy;
 
 	if (!mac) {
 		wma_debug("NULL mac ptr. Exiting");
 		return -EINVAL;
 	}
+
+	if (!cfg) {
+		wma_err("NULL WMA ini handle");
+		return 0;
+	}
+
+	exclude_selftx_from_cca_busy = cfg->exclude_selftx_from_cca_busy;
 
 	if (!mac->sme.link_layer_stats_cb) {
 		wma_debug("HDD callback is null");
@@ -2385,6 +2393,10 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 		}
 
 		for (count = 0; count < radio_stats->num_channels; count++) {
+			if (exclude_selftx_from_cca_busy)
+				channel_stats->cca_busy_time -=
+						channel_stats->tx_time;
+
 			ret = qdf_scnprintf(info + stats_len,
 					WMI_MAX_RADIO_STATS_LOGS - stats_len,
 					" %d[%d][%d][%d]",
@@ -3850,12 +3862,6 @@ void wma_update_intf_hw_mode_params(uint32_t vdev_id, uint32_t mac_id,
 	else
 		wma->interfaces[vdev_id].tx_streams =
 			hw_mode.mac1_tx_ss;
-
-	wma_debug("vdev %d, update tx ss:%d mac %d hw_mode_id %d",
-		 vdev_id,
-		 wma->interfaces[vdev_id].tx_streams,
-		 mac_id,
-		 cfgd_hw_mode_index);
 }
 
 /**

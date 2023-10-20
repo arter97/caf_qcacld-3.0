@@ -3986,7 +3986,6 @@ cm_roam_switch_to_rso_stop(struct wlan_objmgr_pdev *pdev,
 	 * nothing to do here
 	 */
 	default:
-
 		return QDF_STATUS_SUCCESS;
 	}
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_RSO_STOPPED);
@@ -4152,6 +4151,20 @@ cm_roam_switch_to_init(struct wlan_objmgr_pdev *pdev,
 		}
 
 		/*
+		 * If dual sta roaming is not supported, do not enable
+		 * the RSO on the second STA interface, even if the
+		 * primary interface config is present via dual sta policy
+		 */
+		temp_vdev_id = policy_mgr_get_roam_enabled_sta_session_id(
+								psoc, vdev_id);
+		if (!dual_sta_roam_active &&
+		    temp_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
+			mlme_debug("Do not enable RSO on %d, RSO is enabled on %d",
+				   vdev_id, temp_vdev_id);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		/*
 		 * set_primary_vdev usecase is to use that
 		 * interface(e.g. wlan0) over the other
 		 * interface(i.e. wlan1) for data transfer. Non-primary
@@ -4171,8 +4184,6 @@ cm_roam_switch_to_init(struct wlan_objmgr_pdev *pdev,
 		 * Disable roaming on the enabled sta if supplicant wants to
 		 * enable roaming on this vdev id
 		 */
-		temp_vdev_id = policy_mgr_get_roam_enabled_sta_session_id(
-								psoc, vdev_id);
 		if (temp_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
 			/*
 			 * Roam init state can be requested as part of
@@ -4296,7 +4307,9 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 	control_bitmap = mlme_get_operations_bitmap(psoc, vdev_id);
 
 	cur_state = mlme_get_roam_state(psoc, vdev_id);
-	mlme_debug("CM_RSO: vdev%d: cur_state : %d", vdev_id, cur_state);
+	mlme_debug("CM_RSO: vdev%d: cur_state : %d reason:%d control_bmap:0x%x sup_disabled_roam:%d",
+		   vdev_id, cur_state, reason, control_bitmap,
+		   sup_disabled_roaming);
 
 	switch (cur_state) {
 	case WLAN_ROAM_INIT:
@@ -4370,7 +4383,7 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 
 	status = cm_roam_send_rso_cmd(psoc, vdev_id, rso_command, reason);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_debug("ROAM: RSO start failed");
+		mlme_err("ROAM: vdev:%d RSO start failed", vdev_id);
 		return status;
 	}
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_RSO_ENABLED);
@@ -4684,8 +4697,7 @@ cm_record_state_change(struct wlan_objmgr_pdev *pdev,
  */
 static QDF_STATUS
 cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
-			    uint8_t vdev_id,
-			    uint8_t reason)
+			    uint8_t vdev_id, uint8_t reason)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	enum roam_offload_state cur_state = mlme_get_roam_state(psoc, vdev_id);
@@ -4726,6 +4738,7 @@ cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
 
 QDF_STATUS
 cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
+			       enum roam_offload_state requested_state,
 			       uint8_t reason, bool *is_rso_skip)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -4745,8 +4758,8 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 	 */
 	if (wlan_vdev_mlme_get_is_mlo_vdev(psoc, *vdev_id) &&
 	    mlo_mgr_is_link_switch_in_progress(vdev)) {
-		mlme_debug("MLO ROAM: Link switch in prog! skip RSO cmd on vdev %d",
-			   *vdev_id);
+		mlme_debug("MLO ROAM: Link switch in prog! skip RSO cmd:%d on vdev %d",
+			   requested_state, *vdev_id);
 		*is_rso_skip = true;
 		goto end;
 	}
@@ -4762,12 +4775,12 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 		 */
 		if (!wlan_vdev_mlme_get_is_mlo_link(psoc, *vdev_id) &&
 		    wlan_is_roaming_enabled(pdev, *vdev_id)) {
-			mlme_debug("MLO ROAM: Process RSO stop on assoc vdev : %d",
-				   *vdev_id);
+			mlme_debug("MLO ROAM: Process RSO cmd:%d on assoc vdev : %d",
+				   requested_state, *vdev_id);
 			*is_rso_skip = false;
 		} else {
-			mlme_debug("MLO ROAM: skip RSO cmd on assoc vdev %d",
-				   *vdev_id);
+			mlme_debug("MLO ROAM: skip RSO cmd:%d on assoc vdev %d",
+				   requested_state, *vdev_id);
 			*is_rso_skip = true;
 		}
 	}
@@ -4834,14 +4847,13 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		is_up = QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev));
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
-	cur_state = mlme_get_roam_state(psoc, vdev_id);
-
 	if (requested_state != WLAN_ROAM_DEINIT && !is_up) {
-		mlme_debug("ROAM: roam state change requested in non-connected state");
+		mlme_debug("ROAM: roam state(%d) change requested in non-connected state",
+			   requested_state);
 		goto end;
 	}
 
-	status = cm_handle_mlo_rso_state_change(pdev, &vdev_id,
+	status = cm_handle_mlo_rso_state_change(pdev, &vdev_id, requested_state,
 						reason, &is_rso_skip);
 	if (is_rso_skip)
 		return status;
@@ -4849,7 +4861,7 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_MLME_CM_ID);
 	if (!vdev) {
-		mlme_err("Invalid vdev");
+		mlme_err("Invalid vdev:%d", vdev_id);
 		goto end;
 	}
 
@@ -4889,6 +4901,7 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 release_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 end:
+	cur_state = mlme_get_roam_state(psoc, vdev_id);
 	cm_record_state_change(pdev, vdev_id, cur_state, requested_state,
 			       reason, is_up, status);
 
@@ -5885,7 +5898,7 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 		}
 
 		cm_req->roam_req.req.forced_roaming = true;
-		if (source == CM_ROAMING_HOST)
+		if (source == CM_ROAMING_HOST || source == CM_ROAMING_USER)
 			rso_cfg->is_forced_roaming = true;
 		source = CM_ROAMING_NUD_FAILURE;
 		goto send_evt;
@@ -5924,7 +5937,8 @@ send_evt:
 	 */
 	if (source == CM_ROAMING_HOST ||
 	    source == CM_ROAMING_NUD_FAILURE ||
-	    source == CM_ROAMING_LINK_REMOVAL)
+	    source == CM_ROAMING_LINK_REMOVAL ||
+	    source == CM_ROAMING_USER)
 		rso_cfg->roam_invoke_source = source;
 
 	cm_req->roam_req.req.vdev_id = vdev_id;
@@ -6131,7 +6145,7 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	}
 
 	populate_diag_cmn(&wlan_diag_event->diag_cmn, vdev_id,
-			  (uint64_t)scan->ap->timestamp, &ap->bssid);
+			  (uint64_t)scan->scan_complete_timestamp, &ap->bssid);
 
 	wlan_diag_event->version = DIAG_SCAN_DONE_VERSION;
 
@@ -6924,6 +6938,8 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
+	wlan_diag_event.supported_links = frame_data->band;
+
 	if (frame_data->type == ROAM_FRAME_INFO_FRAME_TYPE_EXT) {
 		wlan_diag_event.subtype =
 			(uint8_t)cm_roam_get_eapol_tag(frame_data->subtype);
@@ -6933,6 +6949,16 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 		(uint8_t)cm_roam_get_tag(frame_data->subtype,
 					 !frame_data->is_rsp);
 		diag_event = EVENT_WLAN_MGMT;
+
+		status =
+			wlan_populate_mlo_mgmt_event_param(vdev,
+							   &wlan_diag_event,
+							   wlan_diag_event.subtype);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_err("vdev: %d Unable to populate MLO parameter",
+				 wlan_vdev_get_id(vdev));
+			return status;
+		}
 	}
 
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&

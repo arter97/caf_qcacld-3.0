@@ -95,6 +95,15 @@ void ucfg_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id, uint8_t value);
 
 /**
+ * ucfg_mlme_set_bt_profile_con() - set Bluetooth connection profile
+ * @psoc: Pointer to psoc object
+ * @bt_profile_con: Bluetooth connection profile indicator
+ *
+ * Return: None
+ */
+void ucfg_mlme_set_bt_profile_con(struct wlan_objmgr_psoc *psoc,
+				  bool bt_profile_con);
+/**
  * ucfg_mlme_get_ml_link_control_mode() - get ml_link_control_mode
  * @psoc: pointer to psoc object
  * @vdev_id: vdev id
@@ -3178,6 +3187,24 @@ static inline QDF_STATUS
 ucfg_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 {
 	return wlan_mlme_get_emlsr_mode_enabled(psoc, value);
+}
+
+/**
+ * ucfg_mlme_set_t2lm_negotiation_supported() - Enables/disables t2lm
+ * negotiation support value
+ * @psoc: psoc context
+ * @value: data to be set
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers to set the
+ * t2lm negotiation supported value
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
+					 bool value)
+{
+	return wlan_mlme_set_t2lm_negotiation_supported(psoc, value);
 }
 
 /**

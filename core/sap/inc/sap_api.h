@@ -388,6 +388,16 @@ struct sap_ch_change_ind {
 	uint32_t new_chan_freq;
 };
 
+/**
+ * struct sap_ch_change_rsp - channel change response
+ * @sap_ch_selected: channel parameters of new channel
+ * @ch_change_rsp_status: channel change response status
+ */
+struct sap_ch_change_rsp {
+	struct sap_ch_selected_s sap_ch_selected;
+	eSapStatus ch_change_rsp_status;
+};
+
 /*
  * This struct will be filled in and passed to sap_event_cb that is
  * provided during wlansap_start_bss call The event id corresponding to
@@ -422,8 +432,8 @@ struct sap_event {
 		tSap_MaxAssocExceededEvent sapMaxAssocExceeded;
 		struct sap_ch_selected_s sap_ch_selected;
 		struct sap_ch_change_ind sap_chan_cng_ind;
+		struct sap_ch_change_rsp sap_chan_cng_rsp;
 		struct sap_acs_scan_complete_event sap_acs_scan_comp;
-		QDF_STATUS ch_change_rsp_status;
 	} sapevt;
 };
 

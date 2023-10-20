@@ -80,6 +80,7 @@ static char *tdls_get_cmd_type_str(enum tdls_command_type cmd_type)
 	CASE_RETURN_STRING(TDLS_CMD_SET_SECOFFCHANOFFSET);
 	CASE_RETURN_STRING(TDLS_DELETE_ALL_PEERS_INDICATION);
 	CASE_RETURN_STRING(TDLS_CMD_START_BSS);
+	CASE_RETURN_STRING(TDLS_CMD_SET_LINK_UNFORCE);
 	default:
 		return "Invalid TDLS command";
 	}
@@ -582,6 +583,17 @@ QDF_STATUS tdls_handle_start_bss(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
+static void tdls_handle_link_unforce(struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_action_frame_request req = {0};
+
+	req.vdev = vdev;
+	req.tdls_mgmt.frame_type = TDLS_MAX_ACTION_CODE;
+
+	tdls_debug("set vdev %d unforce", wlan_vdev_get_id(vdev));
+	tdls_set_link_mode(&req);
+}
+
 QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -667,6 +679,9 @@ QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 		break;
 	case TDLS_CMD_START_BSS:
 		tdls_handle_start_bss(msg->bodyptr);
+		break;
+	case TDLS_CMD_SET_LINK_UNFORCE:
+		tdls_handle_link_unforce(msg->bodyptr);
 		break;
 	default:
 		break;
@@ -2037,6 +2052,21 @@ void tdls_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 
 	tdls_soc = (struct tdls_soc_priv_obj *) arg;
 	tdls_post_scan_done_msg(tdls_soc);
+}
+
+void tdls_set_link_unforce(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+
+	msg.callback = tdls_process_cmd;
+	msg.type = TDLS_CMD_SET_LINK_UNFORCE;
+	msg.bodyptr = vdev;
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		tdls_err("failed to set tdls link mode");
 }
 
 /**

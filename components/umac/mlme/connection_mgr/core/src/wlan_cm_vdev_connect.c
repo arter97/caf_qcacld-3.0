@@ -1149,9 +1149,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	uint8_t i, j = 0;
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
-	struct scan_cache_entry *part_scan_entry = NULL;
-	bool is_security_allowed;
-	struct qdf_mac_addr *link_mac;
 
 	/* If ML IE is not present then return failure*/
 	if (!scan_entry->ie_list.multi_link_bv)
@@ -1188,34 +1185,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 			break;
 
 		if (scan_entry->ml_info.link_info[i].is_valid_link) {
-			link_mac = &scan_entry->ml_info.link_info[i].link_addr;
-			part_scan_entry = wlan_scan_get_scan_entry_by_mac_freq(
-					pdev,
-					link_mac,
-					scan_entry->ml_info.link_info[i].freq);
-			if (!part_scan_entry) {
-				scm_debug("scan entry not found for link addr: "
-					  QDF_MAC_ADDR_FMT,
-					  QDF_MAC_ADDR_REF(link_mac->bytes));
-				continue;
-			}
-
-			/*
-			 * Reject the partner link that doesn’t pass the
-			 * security check and validate the next available
-			 * partner link. If none of the partner link passes
-			 * the security check, proceed connection with
-			 * single link.
-			 */
-			is_security_allowed =
-				wlan_cm_is_eht_allowed_for_current_security(
-							part_scan_entry);
-			util_scan_free_cache_entry(part_scan_entry);
-			if (!is_security_allowed) {
-				mlme_debug("current security is not valid for partner link");
-				continue;
-			}
-
 			partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
 			partner_info->partner_link_info[j].link_id =
@@ -1230,7 +1199,7 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	}
 
 	partner_info->num_partner_links = j;
-	mlme_debug("sta and ap integrate link num: %d", j);
+	mlme_debug("sta and ap intersect num of partner link: %d", j);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1659,6 +1628,7 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("T2LM IE beacon process failed");
 	}
+	wlan_connectivity_t2lm_status_event(vdev);
 
 	return status;
 }

@@ -80,6 +80,8 @@
 #include "wlan_mlo_mgr_cmn.h"
 #include "wlan_mlo_mgr_peer.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_cp_stats_mc_defs.h"
+
 
 /**
  * WMA_SET_VDEV_IE_SOURCE_HOST - Flag to identify the source of VDEV SET IE
@@ -5431,7 +5433,7 @@ wma_vdev_bcn_latency_event_handler(void *handle,
 #endif
 
 static void
-wma_update_sacn_channel_info_buf(wmi_unified_t wmi_handle,
+wma_update_scan_channel_info_buf(wmi_unified_t wmi_handle,
 				 wmi_chan_info_event_fixed_param *event,
 				 struct scan_chan_info *buf,
 				 wmi_cca_busy_subband_info *cca_info,
@@ -5456,19 +5458,27 @@ wma_update_sacn_channel_info_buf(wmi_unified_t wmi_handle,
 }
 
 static void
-wma_get_scan_max_rx_clear_count(wmi_cca_busy_subband_info *cca_info,
-				uint32_t num_tlvs, uint32_t *rx_clear_count)
+wma_update_scan_channel_subband_info(wmi_chan_info_event_fixed_param *event,
+				     struct channel_status *channel_status,
+				     wmi_cca_busy_subband_info *cca_info,
+				     uint32_t num_tlvs)
 {
-	uint32_t i, max_rx_clear_count = 0;
+	uint32_t i;
 
-	for (i = 0; i < num_tlvs && i < MAX_WIDE_BAND_SCAN_CHAN; i++) {
-		if (max_rx_clear_count < cca_info->rx_clear_count)
-			max_rx_clear_count = cca_info->rx_clear_count;
-		cca_info++;
+	if (cca_info && num_tlvs > 0) {
+		channel_status->subband_info.num_chan = 0;
+		for (i = 0; i < num_tlvs && i < MAX_WIDE_BAND_SCAN_CHAN; i++) {
+			channel_status->subband_info.cca_busy_subband_info[i] =
+						cca_info->rx_clear_count;
+			wma_debug("cca_info->rx_clear_count[%d]: %d", i,
+				  cca_info->rx_clear_count);
+			channel_status->subband_info.num_chan++;
+			cca_info++;
+		}
+
+		channel_status->subband_info.is_wide_band_scan = true;
+		channel_status->subband_info.vdev_id = event->vdev_id;
 	}
-
-	*rx_clear_count = max_rx_clear_count;
-	wma_debug("max rx_clear_count : %d", *rx_clear_count);
 }
 
 int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
@@ -5527,7 +5537,7 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 		buf.rx_clear_count = event->rx_clear_count;
 		/* wide band scan case */
 		if (is_cca_busy_info && num_tlvs)
-			wma_update_sacn_channel_info_buf(wma->wmi_handle,
+			wma_update_scan_channel_info_buf(wma->wmi_handle,
 							 event, &buf,
 							 cca_info, num_tlvs);
 		mac->chan_info_cb(&buf);
@@ -5541,8 +5551,8 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	channel_status->noise_floor = event->noise_floor;
 
 	if (is_cca_busy_info && num_tlvs)
-		wma_get_scan_max_rx_clear_count(cca_info, num_tlvs,
-					&channel_status->rx_clear_count);
+		wma_update_scan_channel_subband_info(event, channel_status,
+						     cca_info, num_tlvs);
 	else
 		channel_status->rx_clear_count = event->rx_clear_count;
 

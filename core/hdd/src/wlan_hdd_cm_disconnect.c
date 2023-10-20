@@ -167,7 +167,8 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 
 void
 __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_info,
-					     struct wlan_objmgr_vdev *vdev)
+					     struct wlan_objmgr_vdev *vdev,
+					     enum wlan_cm_source source)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -212,11 +213,15 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		}
 	}
 
-	if (!is_link_switch) {
+	if (!is_link_switch && source != CM_MLO_ROAM_INTERNAL_DISCONNECT) {
 		/* Clear saved connection information in HDD */
 		hdd_conn_remove_connect_info(sta_ctx);
-		/* Reset the IEEE link ID to invalid when disconnect is not
-		 * due to link switch.
+
+		/*
+		 * Reset the IEEE link ID to invalid when disconnect is not
+		 * due to link switch. This API resets link id for all the
+		 * valid link_info for the given adapter. So avoid this reset
+		 * for Link Switch disconnect/internal disconnect
 		 */
 		hdd_adapter_reset_station_ctx(adapter);
 	}
@@ -534,7 +539,7 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	cm_update_associated_ch_info(vdev, false);
 
 	max_bw = get_max_bw();
-	ret = hdd_set_mac_chan_width(adapter, max_bw, link_id);
+	ret = hdd_set_mac_chan_width(adapter, max_bw, link_id, true);
 	if (ret) {
 		hdd_err("vdev %d : fail to set max ch width", vdev_id);
 		return;
@@ -578,7 +583,8 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	 */
 	hdd_cm_restore_ch_width(vdev, adapter);
 	hdd_cm_set_default_wlm_mode(adapter);
-	__hdd_cm_disconnect_handler_post_user_update(link_info, vdev);
+	__hdd_cm_disconnect_handler_post_user_update(link_info, vdev,
+						     rsp->req.req.source);
 	wlan_twt_concurrency_update(hdd_ctx);
 	hdd_cm_reset_udp_qos_upgrade_config(adapter);
 	ucfg_mlme_set_ml_link_control_mode(hdd_ctx->psoc,

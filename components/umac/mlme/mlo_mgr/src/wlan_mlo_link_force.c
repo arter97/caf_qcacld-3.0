@@ -209,10 +209,8 @@ ml_nlink_clr_force_state(struct wlan_objmgr_psoc *psoc,
 	struct ml_link_force_state *force_state;
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
-	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
-		mlo_err("mlo_ctx or sta_ctx null");
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx)
 		return;
-	}
 
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	force_state = &mlo_dev_ctx->sta_ctx->link_force_ctx.force_state;
@@ -406,10 +404,9 @@ ml_nlink_get_affect_ml_sta(struct wlan_objmgr_psoc *psoc)
 					&num_disabled_ml_sta,
 					ml_sta_vdev_lst, ml_freq_lst, NULL,
 					NULL, NULL);
-	if (!num_ml_sta || num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS) {
-		mlo_debug("ml sta num is %d", num_ml_sta);
+	if (!num_ml_sta || num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS)
 		return NULL;
-	}
+
 	if (num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS) {
 		mlo_debug("unexpected num_ml_sta %d", num_ml_sta);
 		return NULL;
@@ -1851,8 +1848,6 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	mlo_debug("enter evaluate force state change");
-
 	/*
 	 * eMLSR is allowed in MCC mode also. So, don't disable any links
 	 * if current connection happens in eMLSR mode.
@@ -1926,15 +1921,16 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 						  &force_state,
 						  reason);
 end:
-	if (vdev)
+	if (vdev) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 
-	if (status == QDF_STATUS_SUCCESS)
-		mlo_debug("exit no force state change");
-	else if (status == QDF_STATUS_E_PENDING)
-		mlo_debug("exit pending force state change");
-	else
-		mlo_err("exit err %d state change", status);
+		if (status == QDF_STATUS_SUCCESS)
+			mlo_debug("exit no force state change");
+		else if (status == QDF_STATUS_E_PENDING)
+			mlo_debug("exit pending force state change");
+		else
+			mlo_err("exit err %d state change", status);
+	}
 
 	return status;
 }

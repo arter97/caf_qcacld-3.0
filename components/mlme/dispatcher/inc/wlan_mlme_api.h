@@ -1063,6 +1063,39 @@ bool wlan_mlme_cfg_get_aux_supported_modes(
 		enum wlan_mlme_hw_mode_config_type hw_mode_id,
 		uint32_t *supported_modes_bitmap);
 
+/**
+ * wlan_mlme_is_aux_scan_support() - check whether aux scan is supported.
+ * @psoc: pointer to psoc object
+ * @hw_mode_id: hw mode id
+ *
+ * Return: true if supporting, else false
+ */
+bool
+wlan_mlme_is_aux_scan_support(struct wlan_objmgr_psoc *psoc,
+			      enum wlan_mlme_hw_mode_config_type hw_mode_id);
+
+/**
+ * wlan_mlme_is_aux_listen_support() - check whether aux listen is supported.
+ * @psoc: pointer to psoc object
+ * @hw_mode_id: hw mode id
+ *
+ * Return: true if supporting, else false
+ */
+bool
+wlan_mlme_is_aux_listen_support(struct wlan_objmgr_psoc *psoc,
+				enum wlan_mlme_hw_mode_config_type hw_mode_id);
+
+/**
+ * wlan_mlme_is_aux_emlsr_support() - check whether aux emlsr is supported.
+ * @psoc: pointer to psoc object
+ * @hw_mode_id: hw mode id
+ *
+ * Return: true if supporting, else false
+ */
+bool
+wlan_mlme_is_aux_emlsr_support(struct wlan_objmgr_psoc *psoc,
+			       enum wlan_mlme_hw_mode_config_type hw_mode_id);
+
 #ifdef WLAN_FEATURE_11AX
 /**
  * wlan_mlme_cfg_get_he_ul_mumimo() - Get the HE Ul Mumio
@@ -4162,6 +4195,26 @@ wlan_mlme_is_data_stall_recovery_fw_supported(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS mlme_cfg_get_eht_caps(struct wlan_objmgr_psoc *psoc,
 				 tDot11fIEeht_cap *eht_cap);
 
+/**
+ * wlan_mlme_set_bt_profile_con() - Set bluetooth connection profile
+ * @psoc: pointer to psoc object
+ * @bt_profile_con: Bluetooth connection profile bit
+ *
+ * Return: None
+ */
+void
+wlan_mlme_set_bt_profile_con(struct wlan_objmgr_psoc *psoc,
+			     bool bt_profile_con);
+
+/**
+ * wlan_mlme_get_bt_profile_con() - Get Bluetooth connection profile
+ * @psoc: pointer to psoc object
+ *
+ * Return: Bluetooth connection profile
+ */
+bool
+wlan_mlme_get_bt_profile_con(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * wlan_mlme_get_sta_mlo_conn_max_num() - get max number of links that sta mlo
@@ -4772,4 +4825,15 @@ wlan_mlme_set_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev,
  */
 enum phy_ch_width
 wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_send_csa_event_status_ind() - send csa event status ind
+ * @vdev: vdev obj
+ * @csa_status: csa status
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
+				    uint8_t csa_status);
 #endif /* _WLAN_MLME_API_H_ */
