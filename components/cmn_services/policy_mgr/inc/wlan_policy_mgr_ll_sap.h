@@ -46,6 +46,28 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
 
 #define policy_mgr_is_ll_lt_sap_restart_required(psoc) \
 	__policy_mgr_is_ll_lt_sap_restart_required(psoc, __func__)
+
+/**
+ * policy_mgr_ll_lt_sap_restart_concurrent_sap() - Check and restart
+ * concurrent SAP on ll_lt_sap enable
+ * @psoc: PSOC object
+ * @is_ll_lt_sap_enabled: Indicates if ll_lt_sap is getting enabled or
+ * getting disabled
+ *
+ * This API checks and restarts concurrent SAP when ll_lt_sap comes up or
+ * goes down.
+ * Concurrent SAP and ll_lt_sap should always be on different MAC.
+ * restart the concurrent SAP in below scenario:
+ * If ll_lt_sap is coming up and HW is not sbs capable and concurrent SAP is
+ * operating on 5 GHz, then move concurrent SAP to 2.4 Ghz MAC to allow
+ * ll_lt_sap on 5 GHz
+ * If ll_lt_sap is going down and if concurrent SAP is on 2.4 GHz then try to
+ * restart ll_lt_sap on its original user configured frequency
+ *
+ * Return: None
+ */
+void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
+						 bool is_ll_lt_sap_enabled);
 #else
 
 static inline bool
@@ -58,5 +80,11 @@ static inline
 uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
 {
 	return WLAN_INVALID_VDEV_ID;
+}
+
+static inline void
+policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
+					    bool is_ll_lt_sap_enabled)
+{
 }
 #endif

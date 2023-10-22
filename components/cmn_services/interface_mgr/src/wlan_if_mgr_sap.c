@@ -32,6 +32,7 @@
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_tdls_tgt_api.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
@@ -112,7 +113,12 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 		policy_mgr_check_sap_go_force_scc(psoc, vdev,
 						  CSA_REASON_GO_BSS_STARTED);
 	ifmgr_debug("check for SAP restart");
-	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
+
+	if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(psoc, true);
+	else
+		policy_mgr_check_concurrent_intf_and_restart_sap(
+				psoc,
 				wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev));
 	/*
 	 * Enable TDLS again on concurrent STA
@@ -165,6 +171,9 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE &&
 	    mcc_scc_switch == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)
 		policy_mgr_check_concurrent_intf_and_restart_sap(psoc, false);
+
+	if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(psoc, false);
 
 	return QDF_STATUS_SUCCESS;
 }
