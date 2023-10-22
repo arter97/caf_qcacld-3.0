@@ -3053,6 +3053,14 @@ static int drv_cmd_set_roam_mode(struct wlan_hdd_link_info *link_info,
 
 	hdd_debug("Received Command to Set Roam Mode = %d",
 		  roam_mode);
+
+	if (sme_roaming_in_progress(hdd_ctx->mac_handle,
+				    link_info->vdev_id)) {
+		hdd_err_rl("Roaming in progress for vdev %d",
+			   link_info->vdev_id);
+		return -EAGAIN;
+	}
+
 	/*
 	 * Note that
 	 *     SETROAMMODE 0 is to enable LFR while
@@ -4369,6 +4377,13 @@ static int drv_cmd_set_fast_roam(struct wlan_hdd_link_info *link_info,
 
 	hdd_debug("Received Command to change lfr mode = %d",
 		  lfr_mode);
+
+	if (sme_roaming_in_progress(hdd_ctx->mac_handle,
+				    link_info->vdev_id)) {
+		hdd_err_rl("Roaming in progress for vdev %d",
+			   link_info->vdev_id);
+		return -EAGAIN;
+	}
 
 	ucfg_mlme_set_lfr_enabled(hdd_ctx->psoc, (bool)lfr_mode);
 	sme_update_is_fast_roam_ini_feature_enabled(hdd_ctx->mac_handle,
