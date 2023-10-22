@@ -429,6 +429,8 @@ qdf_freq_t ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_ll_lt_sap_freq_list freq_list;
 
+	qdf_mem_zero(&freq_list, sizeof(freq_list));
+
 	ll_lt_sap_get_freq_list(psoc, &freq_list, vdev_id);
 
 	if (freq_list.standalone_mac.freq_5GHz_low)
