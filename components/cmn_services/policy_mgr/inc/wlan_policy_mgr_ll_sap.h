@@ -49,13 +49,13 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_ll_lt_sap_restart_concurrent_sap() - Check and restart
- * concurrent SAP on ll_lt_sap enable
+ * concurrent SAP or ll_lt_sap
  * @psoc: PSOC object
  * @is_ll_lt_sap_enabled: Indicates if ll_lt_sap is getting enabled or
  * getting disabled
  *
- * This API checks and restarts concurrent SAP when ll_lt_sap comes up or
- * goes down.
+ * This API checks and restarts concurrent SAP or ll_lt_sap when ll_lt_sap comes
+ * up or goes down.
  * Concurrent SAP and ll_lt_sap should always be on different MAC.
  * restart the concurrent SAP in below scenario:
  * If ll_lt_sap is coming up and HW is not sbs capable and concurrent SAP is
@@ -63,6 +63,8 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
  * ll_lt_sap on 5 GHz
  * If ll_lt_sap is going down and if concurrent SAP is on 2.4 GHz then try to
  * restart ll_lt_sap on its original user configured frequency
+ * If ll_lt_sap interface has come up and in parallel if some other interface
+ * comes up on the ll_lt_sap frequency, then ll_lt_sap needs to be restarted.
  *
  * Return: None
  */

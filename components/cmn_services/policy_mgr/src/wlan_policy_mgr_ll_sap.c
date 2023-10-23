@@ -23,6 +23,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_policy_mgr_i.h"
 #include "wlan_cmn.h"
+#include "wlan_ll_sap_api.h"
 
 uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
 {
@@ -168,6 +169,7 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t restart_freq;
 	struct ch_params ch_params = {0};
 	uint8_t i;
+	enum sap_csa_reason_code csa_reason;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -175,17 +177,14 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	/*
-	 * For SBS case, no need to restart concurrent SAP as LL_LT_SAP and
-	 * concurrent SAP can be on different MACs
-	 */
-	if (policy_mgr_is_hw_sbs_capable(psoc))
-		return;
+	qdf_mem_zero(&sap_info, sizeof(sap_info));
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		if ((PM_SAP_MODE == pm_conc_connection_list[i].mode) &&
-		    pm_conc_connection_list[i].in_use) {
+		if (!pm_conc_connection_list[i].in_use)
+			continue;
+		if (PM_SAP_MODE == pm_conc_connection_list[i].mode ||
+		    PM_LL_LT_SAP_MODE == pm_conc_connection_list[i].mode) {
 			qdf_mem_copy(&sap_info, &pm_conc_connection_list[i],
 				     sizeof(sap_info));
 			break;
@@ -193,25 +192,48 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	/* No concurrent SAP present, return */
+	/* No concurrent SAP or ll_lt_sap present, return */
 	if (!sap_info.in_use)
 		return;
 
-	/*
-	 * If concurrent SAP is 2.4 GHz and ll_lt_sap is getting enabled then
-	 * there is no need to restart the concurrent SAP
-	 */
-	if (is_ll_lt_sap_enabled && wlan_reg_is_24ghz_ch_freq(sap_info.freq))
-		return;
+	if (sap_info.mode == PM_SAP_MODE) {
+		/*
+		 * For SBS case, no need to restart concurrent SAP as LL_LT_SAP
+		 * and concurrent SAP can be on different MACs
+		 */
+		if (policy_mgr_is_hw_sbs_capable(psoc))
+			return;
 
-	/*
-	 * If concurrent SAP is 5 GHz/6 GHz and ll_lt_sap is getting disabled
-	 * then there is no need to restart the concurrent SAP
-	 */
-	else if (!is_ll_lt_sap_enabled &&
-		 (wlan_reg_is_5ghz_ch_freq(sap_info.freq) ||
-		  wlan_reg_is_6ghz_chan_freq(sap_info.freq)))
-		return;
+		/*
+		 * If concurrent SAP is 2.4 GHz and ll_lt_sap is getting enabled
+		 * then there is no need to restart the concurrent SAP
+		 */
+		if (is_ll_lt_sap_enabled &&
+		    wlan_reg_is_24ghz_ch_freq(sap_info.freq))
+			return;
+
+		/*
+		 * If concurrent SAP is 5 GHz/6 GHz and ll_lt_sap is getting
+		 * disabled then there is no need to restart the concurrent SAP
+		 */
+		else if (!is_ll_lt_sap_enabled &&
+			 (wlan_reg_is_5ghz_ch_freq(sap_info.freq) ||
+			 wlan_reg_is_6ghz_chan_freq(sap_info.freq)))
+			return;
+
+		restart_freq =
+		policy_mgr_ll_lt_sap_get_restart_freq_for_concurent_sap(
+							pm_ctx,
+							sap_info.vdev_id,
+							sap_info.freq,
+							is_ll_lt_sap_enabled);
+		csa_reason = CSA_REASON_CONCURRENT_LL_LT_SAP_EVENT;
+	} else {
+		restart_freq = wlan_get_ll_lt_sap_restart_freq(pm_ctx->pdev,
+							       sap_info.freq,
+							       sap_info.vdev_id,
+							       &csa_reason);
+	}
 
 	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
 	    pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress()) {
@@ -219,19 +241,11 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	restart_freq =
-		policy_mgr_ll_lt_sap_get_restart_freq_for_concurent_sap(
-							pm_ctx,
-							sap_info.vdev_id,
-							sap_info.freq,
-							is_ll_lt_sap_enabled);
-
 	if (!restart_freq) {
 		policy_mgr_err("Restart freq not found for vdev %d",
 			       sap_info.vdev_id);
 		return;
 	}
-
 	if (restart_freq == sap_info.freq) {
 		policy_mgr_debug("vdev %d restart freq %d same as current freq",
 				 sap_info.vdev_id, restart_freq);
@@ -245,10 +259,9 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 			 sap_info.vdev_id, restart_freq, ch_params.ch_width);
 
 	if (pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason)
-		pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason(
-					psoc,
-					sap_info.vdev_id,
-					CSA_REASON_CONCURRENT_LL_LT_SAP_EVENT);
+		pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason(psoc,
+							       sap_info.vdev_id,
+							       csa_reason);
 
 	policy_mgr_change_sap_channel_with_csa(psoc, sap_info.vdev_id,
 					       restart_freq,
