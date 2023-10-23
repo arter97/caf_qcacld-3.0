@@ -3714,6 +3714,21 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter);
  */
 void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit);
 
+/**
+ * wlan_hdd_set_sap_beacon_protection() - this function will set beacon
+ * protection for SAP.
+ * @hdd_ctx: pointer to HDD context
+ * @link_info: Link info pointer
+ * @beacon: pointer to beacon data structure
+ *
+ * This function will enable beacon protection and cache the value in vdev
+ * priv object.
+ *
+ * Return: None
+ */
+void wlan_hdd_set_sap_beacon_protection(struct hdd_context *hdd_ctx,
+					struct wlan_hdd_link_info *link_info,
+					struct hdd_beacon_data *beacon);
 #ifdef QCA_CONFIG_SMP
 int wlan_hdd_get_cpu(void);
 #else

@@ -18416,6 +18416,65 @@ wlan_hdd_mlo_sap_reinit(struct wlan_hdd_link_info *link_info)
 }
 #endif
 
+void wlan_hdd_set_sap_beacon_protection(struct hdd_context *hdd_ctx,
+					struct wlan_hdd_link_info *link_info,
+					struct hdd_beacon_data *beacon)
+{
+	const uint8_t *ie = NULL;
+	struct s_ext_cap *p_ext_cap;
+	struct wlan_objmgr_vdev *vdev;
+	bool target_bigtk_support = false;
+	uint8_t vdev_id;
+	uint8_t ie_len;
+
+	if (!beacon) {
+		hdd_err("beacon is null");
+		return;
+	}
+
+	ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_EXTCAP, beacon->tail,
+				      beacon->tail_len);
+	if (!ie) {
+		hdd_err("IE is null");
+		return;
+	}
+
+	if (ie[1] > DOT11F_IE_EXTCAP_MAX_LEN ||
+	    ie[1] < DOT11F_IE_EXTCAP_MIN_LEN) {
+		hdd_err("Invalid IEs eid: %d elem_len: %d", ie[0], ie[1]);
+		return;
+	}
+
+	p_ext_cap = qdf_mem_malloc(sizeof(*p_ext_cap));
+	if (!p_ext_cap)
+		return;
+
+	ie_len = (ie[1] > sizeof(*p_ext_cap)) ? sizeof(*p_ext_cap) : ie[1];
+
+	qdf_mem_copy(p_ext_cap, &ie[2], ie_len);
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		goto end;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	hdd_debug("vdev %d beacon protection %d", vdev_id,
+		  p_ext_cap->beacon_protection_enable);
+
+	ucfg_mlme_get_bigtk_support(hdd_ctx->psoc, &target_bigtk_support);
+
+	if (target_bigtk_support && p_ext_cap->beacon_protection_enable)
+		mlme_set_bigtk_support(vdev, true);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+
+end:
+	qdf_mem_free(p_ext_cap);
+}
+
 void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 {
 	struct hdd_ap_ctx *ap_ctx;
@@ -18459,6 +18518,8 @@ void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 				       ap_adapter->dev);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		goto end;
+
+	wlan_hdd_set_sap_beacon_protection(hdd_ctx, link_info, ap_ctx->beacon);
 
 	hdd_debug("Waiting for SAP to start");
 	qdf_status = qdf_wait_single_event(&hostapd_state->qdf_event,
