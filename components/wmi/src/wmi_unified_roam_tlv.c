@@ -4132,7 +4132,7 @@ free_keys:
 			continue;
 
 		wmi_debug("Free key allocated at idx:%d", k);
-		qdf_mem_zero(key_alloc_buf[k], sizeof(key_alloc_buf[k]));
+		qdf_mem_zero(key_alloc_buf[k], sizeof(*key_alloc_buf[k]));
 		qdf_mem_free(key_alloc_buf[k]);
 	}
 
