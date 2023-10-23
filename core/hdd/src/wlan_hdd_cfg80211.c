@@ -28695,7 +28695,7 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 			nss = 0;
 			if (band == NL80211_BAND_5GHZ)
 				rate_index += 4;
-			if (rate_index >= 0 && rate_index < 4)
+			if (rate_index < 4)
 				bit_rate = hdd_assemble_rate_code(
 					WMI_RATE_PREAMBLE_CCK, nss,
 					hdd_legacy_rates[rate_index].hw_value);
