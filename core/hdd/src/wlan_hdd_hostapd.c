@@ -6406,7 +6406,6 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	bool bval = false;
 	bool enable_dfs_scan = true;
 	bool deliver_start_evt = true;
-	struct s_ext_cap p_ext_cap = {0};
 	enum reg_phymode reg_phy_mode, updated_phy_mode;
 	struct sap_context *sap_ctx;
 	struct wlan_objmgr_vdev *vdev;
@@ -6541,29 +6540,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 
 	ucfg_policy_mgr_get_mcc_scc_switch(hdd_ctx->psoc, &mcc_to_scc_switch);
 
-	ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_EXTCAP, beacon->tail,
-				      beacon->tail_len);
-	if (ie && (ie[0] != DOT11F_EID_EXTCAP ||
-		   ie[1] > DOT11F_IE_EXTCAP_MAX_LEN)) {
-		hdd_err("Invalid IEs eid: %d elem_len: %d", ie[0], ie[1]);
-		ret = -EINVAL;
-		goto error;
-	}
-
-	if (ie) {
-		bool target_bigtk_support = false;
-
-		memcpy(&p_ext_cap, &ie[2], (ie[1] > sizeof(p_ext_cap)) ?
-		       sizeof(p_ext_cap) : ie[1]);
-
-		hdd_debug("beacon protection %d",
-			  p_ext_cap.beacon_protection_enable);
-
-		ucfg_mlme_get_bigtk_support(hdd_ctx->psoc,
-					    &target_bigtk_support);
-		if (target_bigtk_support && p_ext_cap.beacon_protection_enable)
-			mlme_set_bigtk_support(vdev, true);
-	}
+	wlan_hdd_set_sap_beacon_protection(hdd_ctx, link_info, beacon);
 
 	/* Overwrite second AP's channel with first only when:
 	 * 1. If operating mode is single mac
