@@ -2514,8 +2514,142 @@ add_sbs_chlist_to_pcl(struct wlan_objmgr_psoc *psoc,
 			}
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 		}
-	} else {
-		policy_mgr_debug("invalid order");
+	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_LOW) {
+		/* Add 5 GHz low SCC channel*/
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		cl = pm_conc_connection_list;
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+			    cl[conn_index].freq < sbs_cut_off_freq) {
+				pcl_freqs[*index] = cl[conn_index].freq;
+				pcl_weights[*index] =
+						WEIGHT_OF_GROUP1_PCL_CHANNELS;
+				(*index)++;
+				*low_5_band_scc_present = true;
+				break;
+			}
+
+			conn_index++;
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_HIGH) {
+		/* Add 5 GHz high SCC channel*/
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		cl = pm_conc_connection_list;
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+			    cl[conn_index].freq > sbs_cut_off_freq) {
+				pcl_freqs[*index] = cl[conn_index].freq;
+				pcl_weights[*index] =
+					WEIGHT_OF_GROUP1_PCL_CHANNELS;
+				(*index)++;
+				*high_5_band_scc_present = true;
+				break;
+			}
+			conn_index++;
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_LOW_MCC_5G_HIGH) {
+		/* Add 5 GHz low SCC channel*/
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		cl = pm_conc_connection_list;
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+			    cl[conn_index].freq < sbs_cut_off_freq) {
+				pcl_freqs[*index] = cl[conn_index].freq;
+				pcl_weights[*index] =
+						WEIGHT_OF_GROUP1_PCL_CHANNELS;
+				(*index)++;
+				*low_5_band_scc_present = true;
+				break;
+			}
+
+			conn_index++;
+		}
+
+		/* Add 5 GHz high MCC channels*/
+		for (i = 0; i < chlist_len_5 && *index < pcl_sz; i++) {
+			/* Skip 5 GHz low frequencies */
+			if (chlist_5[i] < sbs_cut_off_freq)
+				continue;
+
+			conn_index = 0;
+			/* Skip SCC channels */
+			while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+				if (cl[conn_index].freq == chlist_5[i])
+					break;
+				conn_index++;
+			}
+
+			if (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index))
+				continue;
+			pcl_freqs[*index] = chlist_5[i];
+			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
+			(*index)++;
+		}
+		for (i = 0; i < chlist_len_6 && *index < pcl_sz &&
+		     !skip_6gh_channel; i++) {
+			if (chlist_6[i] < sbs_cut_off_freq)
+				return;
+
+			conn_index = 0;
+			/* Skip SCC channels */
+			while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+				if (cl[conn_index].freq == chlist_6[i])
+					break;
+				conn_index++;
+			}
+
+			if (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index))
+				continue;
+
+			pcl_freqs[*index] = chlist_6[i];
+			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
+			(*index)++;
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_MCC_5G_LOW) {
+		/* Add 5 GHz high SCC channel*/
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		cl = pm_conc_connection_list;
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+			    cl[conn_index].freq > sbs_cut_off_freq) {
+				pcl_freqs[*index] = cl[conn_index].freq;
+				pcl_weights[*index] =
+						WEIGHT_OF_GROUP1_PCL_CHANNELS;
+				(*index)++;
+				*high_5_band_scc_present = true;
+				break;
+			}
+
+			conn_index++;
+		}
+
+		/* Add 5 GHz low MCC channels */
+		for (i = 0; i < chlist_len_5 && *index < pcl_sz; i++) {
+			/* Skip 5 GHz high frequencies */
+			if (chlist_5[i] > sbs_cut_off_freq)
+				continue;
+
+			conn_index = 0;
+			/* Skip SCC channels */
+			while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+				if (cl[conn_index].freq == chlist_5[i])
+					break;
+				conn_index++;
+			}
+
+			if (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index))
+				continue;
+			pcl_freqs[*index] = chlist_5[i];
+			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
+			(*index)++;
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	}   else {
+		policy_mgr_debug("invalid order %d", order);
 		return;
 	}
 
@@ -3715,6 +3849,122 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
 				  false);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SCC_ON_24G:
+		policy_mgr_get_connection_channels(psoc, mode,
+						   POLICY_MGR_PCL_ORDER_2G,
+						   true,
+						   POLICY_MGR_PCL_GROUP_ID1_ID2,
+						   pcl_channels, pcl_weights,
+						   pcl_sz, len);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SCC_ON_5G_LOW:
+		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
+				      pcl_weights, pcl_sz,
+				      len,
+				      skip_6ghz_channel,
+				      channel_list_5, chan_index_5,
+				      channel_list_6, chan_index_6,
+				      POLICY_MGR_PCL_ORDER_SCC_5G_LOW,
+				      &high_5_band_scc_present,
+				      &low_5_band_scc_present);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SCC_ON_5G_HIGH:
+		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
+				      pcl_weights, pcl_sz,
+				      len,
+				      skip_6ghz_channel,
+				      channel_list_5, chan_index_5,
+				      channel_list_6, chan_index_6,
+				      POLICY_MGR_PCL_ORDER_SCC_5G_HIGH,
+				      &high_5_band_scc_present,
+				      &low_5_band_scc_present);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SBS_CH_MCC_CH_SCC_ON_24_24G:
+		get_sub_channels(psoc,
+				 sbs_freqs, &sbs_num,
+				 scc_freqs, &scc_num,
+				 rest_freqs, &rest_num,
+				 channel_list_5, chan_index_5,
+				 channel_list_6, chan_index_6);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
+				  sbs_freqs, sbs_num,
+				  skip_6ghz_channel);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+				  rest_freqs, rest_num,
+				  skip_6ghz_channel);
+		policy_mgr_get_connection_channels(psoc, mode,
+						   POLICY_MGR_PCL_ORDER_2G,
+						   true,
+						   POLICY_MGR_PCL_GROUP_ID1_ID2,
+						   pcl_channels, pcl_weights,
+						   pcl_sz, len);
+		policy_mgr_add_24g_to_pcl(pcl_channels, pcl_weights, pcl_sz,
+					  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
+					  channel_list_24, chan_index_24);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_5G_24G:
+		policy_mgr_add_5g_to_pcl(psoc, pcl_channels, pcl_weights,
+					 pcl_sz, len,
+					 POLICY_MGR_PCL_GROUP_ID1_ID2,
+					 channel_list_5, chan_index_5,
+					 channel_list_6, chan_index_6);
+		policy_mgr_add_24g_to_pcl(pcl_channels, pcl_weights, pcl_sz,
+					  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
+					  channel_list_24, chan_index_24);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_MCC_CH_SCC_ON_24G:
+		get_sub_channels(psoc,
+				 sbs_freqs, &sbs_num,
+				 scc_freqs, &scc_num,
+				 rest_freqs, &rest_num,
+				 channel_list_5, chan_index_5,
+				 channel_list_6, chan_index_6);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+				  rest_freqs, rest_num,
+				  skip_6ghz_channel);
+		policy_mgr_get_connection_channels(psoc, mode,
+						   POLICY_MGR_PCL_ORDER_2G,
+						   true,
+						   POLICY_MGR_PCL_GROUP_ID1_ID2,
+						   pcl_channels, pcl_weights,
+						   pcl_sz, len);
+		status = QDF_STATUS_SUCCESS;
+		break;
+
+	case PM_SCC_ON_5G_LOW_MCC_ON_5G_HIGH:
+		add_sbs_chlist_to_pcl(
+				psoc,  pcl_channels, pcl_weights, pcl_sz, len,
+				skip_6ghz_channel, channel_list_5, chan_index_5,
+				channel_list_6, chan_index_6,
+				POLICY_MGR_PCL_ORDER_SCC_5G_LOW_MCC_5G_HIGH,
+				&high_5_band_scc_present,
+				&low_5_band_scc_present);
+		status = QDF_STATUS_SUCCESS;
+		break;
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW:
+		add_sbs_chlist_to_pcl(
+				psoc,  pcl_channels, pcl_weights, pcl_sz, len,
+				skip_6ghz_channel, channel_list_5, chan_index_5,
+				channel_list_6, chan_index_6,
+				POLICY_MGR_PCL_ORDER_SCC_5G_LOW_MCC_5G_HIGH,
+				&high_5_band_scc_present,
+				&low_5_band_scc_present);
+
 		status = QDF_STATUS_SUCCESS;
 		break;
 	default:

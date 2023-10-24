@@ -261,6 +261,12 @@ enum policy_mgr_pcl_group_id {
  * @POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW: 5 GHz High SCC
  * frequency followed by 5G High band i.e 5G freq > sbs cutoff freq, add 5 GHz
  * Low SCC frequency
+ * @POLICY_MGR_PCL_ORDER_SCC_5G_LOW: SCC channel on 5G low
+ * @POLICY_MGR_PCL_ORDER_SCC_5G_HIGH: SCC channel on 5G high
+ * @POLICY_MGR_PCL_ORDER_SCC_5G_LOW_MCC_5G_HIGH: SCC channels on 5G low
+ * followed by MCC channels on 5G high
+ * @POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_MCC_5G_LOW: SCC channels on 5G high
+ * followed by MCC channels on 5G low
  *
  * Order in which the PCL is requested
  */
@@ -273,6 +279,10 @@ enum policy_mgr_pcl_channel_order {
 	POLICY_MGR_PCL_ORDER_SCC_5G_LOW_5G_LOW,
 	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH,
 	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_5G_HIGH_SCC_5G_LOW,
+	POLICY_MGR_PCL_ORDER_SCC_5G_LOW,
+	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH,
+	POLICY_MGR_PCL_ORDER_SCC_5G_LOW_MCC_5G_HIGH,
+	POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_MCC_5G_LOW,
 };
 
 /**

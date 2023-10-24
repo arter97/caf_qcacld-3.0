@@ -1533,7 +1533,7 @@ static bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
 
 /**
  * policy_mgr_is_sbs_mac0_freq() - Check if the given frequency is
- * sbs frequency on mac0.
+ * sbs frequency on mac0 for static sbs case.
  * @psoc: psoc pointer
  * @freq: Frequency which needs to be checked.
  *
@@ -1544,6 +1544,9 @@ static bool policy_mgr_is_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct policy_mgr_freq_range *freq_range;
+
+	if (policy_mgr_is_dynamic_sbs_enabled(psoc))
+		return false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx)
@@ -1566,7 +1569,6 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	uint32_t pcl_list[NUM_CHANNELS], orig_len = *len;
 	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t i, pcl_len = 0;
-	bool is_dynamic_sbs_enabled;
 	bool sbs_mac0_modified_pcl;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -1575,7 +1577,6 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	is_dynamic_sbs_enabled = policy_mgr_is_dynamic_sbs_enabled(psoc);
 	policy_mgr_pcl_modification_for_sap(
 		psoc, pcl_channels, pcl_weight, len, weight_len,
 		PM_LL_LT_SAP_MODE);
@@ -1593,8 +1594,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			continue;
 
 		/* Remove mac0 frequencies for static SBS case */
-		if (!is_dynamic_sbs_enabled &&
-		    policy_mgr_is_sbs_mac0_freq(psoc, pcl_channels[i])) {
+		if (policy_mgr_is_sbs_mac0_freq(psoc, pcl_channels[i])) {
 			sbs_mac0_modified_pcl = true;
 			continue;
 		}
@@ -2638,6 +2638,206 @@ policy_mgr_get_third_connection_pcl_table_index_sap_nan(
 	return index;
 }
 
+static enum policy_mgr_two_connection_mode
+policy_mgr_get_third_connection_pcl_table_index_sta_ll_lt_sap(
+						struct wlan_objmgr_psoc *psoc)
+{
+	enum policy_mgr_two_connection_mode index;
+	enum policy_mgr_two_connection_mode sbs_5g_1x1;
+	enum policy_mgr_two_connection_mode sbs_5g_2x2;
+	qdf_freq_t sta_freq, sbs_cut_off_freq;
+
+	/*
+	 * LL_LT_SAP can not be in SCC so there will not be any scc index.
+	 * With LL_LT_SAP, MCC is possible only on 5 GHz
+	 */
+	if (policy_mgr_are_2_freq_on_same_mac(
+					psoc,
+					pm_conc_connection_list[0].freq,
+					pm_conc_connection_list[1].freq)) {
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
+			   pm_conc_connection_list[0].freq)) &&
+			   !(WLAN_REG_IS_24GHZ_CH_FREQ(
+			   pm_conc_connection_list[1].freq))) {
+			if (POLICY_MGR_ONE_ONE ==
+					pm_conc_connection_list[0].chain_mask)
+				index = PM_STA_5_LL_LT_SAP_MCC_1x1;
+			else
+				index = PM_STA_5_LL_LT_SAP_MCC_2x2;
+
+			return index;
+		}
+	}
+
+	if (pm_conc_connection_list[0].mode == PM_STA_MODE)
+		sta_freq = pm_conc_connection_list[0].freq;
+	else
+		sta_freq = pm_conc_connection_list[1].freq;
+
+	sbs_cut_off_freq =  policy_mgr_get_sbs_cut_off_freq(psoc);
+
+	if (sta_freq < sbs_cut_off_freq) {
+		sbs_5g_1x1 = PM_STA_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1;
+		sbs_5g_2x2 = PM_STA_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2;
+	} else {
+		sbs_5g_1x1 = PM_STA_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1;
+		sbs_5g_2x2 = PM_STA_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2;
+	}
+
+	index =
+	policy_mgr_check_and_get_third_connection_pcl_table_index_for_dbs(
+						psoc, sbs_5g_1x1, sbs_5g_2x2,
+						PM_STA_24_LL_LT_SAP_DBS_1x1,
+						PM_STA_24_LL_LT_SAP_DBS_2x2);
+	return index;
+}
+
+static enum policy_mgr_two_connection_mode
+policy_mgr_get_third_connection_pcl_table_index_sap_ll_lt_sap(
+						struct wlan_objmgr_psoc *psoc)
+{
+	enum policy_mgr_two_connection_mode index;
+	enum policy_mgr_two_connection_mode sbs_5g_1x1;
+	enum policy_mgr_two_connection_mode sbs_5g_2x2;
+	qdf_freq_t sap_freq, sbs_cut_off_freq;
+
+	if (pm_conc_connection_list[0].mode == PM_SAP_MODE)
+		sap_freq = pm_conc_connection_list[0].freq;
+	else
+		sap_freq = pm_conc_connection_list[1].freq;
+
+	sbs_cut_off_freq =  policy_mgr_get_sbs_cut_off_freq(psoc);
+
+	if (sap_freq < sbs_cut_off_freq) {
+		sbs_5g_1x1 = PM_SAP_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1;
+		sbs_5g_2x2 = PM_SAP_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2;
+	} else {
+		sbs_5g_1x1 = PM_SAP_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1;
+		sbs_5g_2x2 = PM_SAP_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2;
+	}
+
+	/*
+	 * LL_LT_SAP can not be in SCC so there will not be any scc index.
+	 * For LL_LT_SAP + SAP, MCC is not possible, so there will be only
+	 * sbs or dbs index
+	 */
+
+	index =
+	policy_mgr_check_and_get_third_connection_pcl_table_index_for_dbs(
+						psoc, sbs_5g_1x1, sbs_5g_2x2,
+						PM_SAP_24_LL_LT_SAP_DBS_1x1,
+						PM_SAP_24_LL_LT_SAP_DBS_2x2);
+	return index;
+}
+
+static enum policy_mgr_two_connection_mode
+policy_mgr_get_third_connection_pcl_table_index_go_ll_lt_sap(
+						struct wlan_objmgr_psoc *psoc)
+{
+	enum policy_mgr_two_connection_mode index;
+	enum policy_mgr_two_connection_mode sbs_5g_1x1;
+	enum policy_mgr_two_connection_mode sbs_5g_2x2;
+	qdf_freq_t go_freq, sbs_cut_off_freq;
+
+	/*
+	 * LL_LT_SAP can not be in SCC so there will not be any scc index.
+	 * With LL_LT_SAP, MCC is possible only on 5 GHz
+	 */
+	if (policy_mgr_are_2_freq_on_same_mac(
+					psoc,
+					pm_conc_connection_list[0].freq,
+					pm_conc_connection_list[1].freq)) {
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
+			   pm_conc_connection_list[0].freq)) &&
+			   !(WLAN_REG_IS_24GHZ_CH_FREQ(
+			   pm_conc_connection_list[1].freq))) {
+			if (POLICY_MGR_ONE_ONE ==
+					pm_conc_connection_list[0].chain_mask)
+				index = PM_P2P_GO_5_LL_LT_SAP_MCC_1x1;
+			else
+				index = PM_P2P_GO_5_LL_LT_SAP_MCC_2x2;
+
+			return index;
+		}
+	}
+
+	if (pm_conc_connection_list[0].mode == PM_P2P_GO_MODE)
+		go_freq = pm_conc_connection_list[0].freq;
+	else
+		go_freq = pm_conc_connection_list[1].freq;
+
+	sbs_cut_off_freq =  policy_mgr_get_sbs_cut_off_freq(psoc);
+
+	if (go_freq < sbs_cut_off_freq) {
+		sbs_5g_1x1 = PM_P2P_GO_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1;
+		sbs_5g_2x2 = PM_P2P_GO_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2;
+	} else {
+		sbs_5g_1x1 = PM_P2P_GO_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1;
+		sbs_5g_2x2 = PM_P2P_GO_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2;
+	}
+
+	index =
+	policy_mgr_check_and_get_third_connection_pcl_table_index_for_dbs(
+						psoc, sbs_5g_1x1, sbs_5g_2x2,
+						PM_P2P_GO_24_LL_LT_SAP_DBS_1x1,
+						PM_P2P_GO_24_LL_LT_SAP_DBS_2x2);
+	return index;
+}
+
+static enum policy_mgr_two_connection_mode
+policy_mgr_get_third_connection_pcl_table_index_cli_ll_lt_sap(
+						struct wlan_objmgr_psoc *psoc)
+{
+	enum policy_mgr_two_connection_mode index;
+	enum policy_mgr_two_connection_mode sbs_5g_1x1;
+	enum policy_mgr_two_connection_mode sbs_5g_2x2;
+	qdf_freq_t cli_freq, sbs_cut_off_freq;
+
+	/*
+	 * LL_LT_SAP can not be in SCC so there will not be any scc index.
+	 * With LL_LT_SAP, MCC is possible only on 5 GHz
+	 */
+	if (policy_mgr_are_2_freq_on_same_mac(
+					psoc,
+					pm_conc_connection_list[0].freq,
+					pm_conc_connection_list[1].freq)) {
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
+			   pm_conc_connection_list[0].freq)) &&
+			   !(WLAN_REG_IS_24GHZ_CH_FREQ(
+			   pm_conc_connection_list[1].freq))) {
+			if (POLICY_MGR_ONE_ONE ==
+					pm_conc_connection_list[0].chain_mask)
+				index = PM_P2P_CLI_5_LL_LT_SAP_MCC_1x1;
+			else
+				index = PM_P2P_CLI_5_LL_LT_SAP_MCC_2x2;
+
+			return index;
+		}
+	}
+
+	if (pm_conc_connection_list[0].mode == PM_P2P_GO_MODE)
+		cli_freq = pm_conc_connection_list[0].freq;
+	else
+		cli_freq = pm_conc_connection_list[1].freq;
+
+	sbs_cut_off_freq =  policy_mgr_get_sbs_cut_off_freq(psoc);
+
+	if (cli_freq < sbs_cut_off_freq) {
+		sbs_5g_1x1 = PM_P2P_GO_5_LOW_LL_LT_SAP_5_HIGH_SBS_1x1;
+		sbs_5g_2x2 = PM_P2P_GO_5_LOW_LL_LT_SAP_5_HIGH_SBS_2x2;
+	} else {
+		sbs_5g_1x1 = PM_P2P_GO_5_HIGH_LL_LT_SAP_5_LOW_SBS_1x1;
+		sbs_5g_2x2 = PM_P2P_GO_5_HIGH_LL_LT_SAP_5_LOW_SBS_2x2;
+	}
+
+	index =
+	policy_mgr_check_and_get_third_connection_pcl_table_index_for_dbs(
+					psoc, sbs_5g_1x1, sbs_5g_2x2,
+					PM_P2P_CLI_24_LL_LT_SAP_DBS_1x1,
+					PM_P2P_CLI_24_LL_LT_SAP_DBS_2x2);
+	return index;
+}
+
 enum policy_mgr_two_connection_mode
 policy_mgr_get_third_connection_pcl_table_index(
 					struct wlan_objmgr_psoc *psoc)
@@ -2725,6 +2925,30 @@ policy_mgr_get_third_connection_pcl_table_index(
 		 (pm_conc_connection_list[1].mode == PM_P2P_CLIENT_MODE))
 		index =
 		policy_mgr_get_third_connection_pcl_table_index_cli_cli(psoc);
+
+	else if (((PM_STA_MODE == pm_conc_connection_list[0].mode) &&
+		  (PM_LL_LT_SAP_MODE == pm_conc_connection_list[1].mode)) ||
+		((PM_LL_LT_SAP_MODE == pm_conc_connection_list[0].mode) &&
+		 (PM_STA_MODE == pm_conc_connection_list[1].mode)))
+		index = policy_mgr_get_third_connection_pcl_table_index_sta_ll_lt_sap(psoc);
+
+	else if (((PM_SAP_MODE == pm_conc_connection_list[0].mode) &&
+		  (PM_LL_LT_SAP_MODE == pm_conc_connection_list[1].mode)) ||
+		((PM_LL_LT_SAP_MODE == pm_conc_connection_list[0].mode) &&
+		 (PM_SAP_MODE == pm_conc_connection_list[1].mode)))
+		index = policy_mgr_get_third_connection_pcl_table_index_sap_ll_lt_sap(psoc);
+
+	else if (((PM_P2P_GO_MODE == pm_conc_connection_list[0].mode) &&
+		  (PM_LL_LT_SAP_MODE == pm_conc_connection_list[1].mode)) ||
+		((PM_LL_LT_SAP_MODE == pm_conc_connection_list[0].mode) &&
+		 (PM_P2P_GO_MODE == pm_conc_connection_list[1].mode)))
+		index = policy_mgr_get_third_connection_pcl_table_index_go_ll_lt_sap(psoc);
+
+	else if (((PM_P2P_CLIENT_MODE == pm_conc_connection_list[0].mode) &&
+		  (PM_LL_LT_SAP_MODE == pm_conc_connection_list[1].mode)) ||
+		((PM_LL_LT_SAP_MODE == pm_conc_connection_list[0].mode) &&
+		 (PM_P2P_CLIENT_MODE == pm_conc_connection_list[1].mode)))
+		index = policy_mgr_get_third_connection_pcl_table_index_cli_ll_lt_sap(psoc);
 
 	policy_mgr_debug("mode0:%d mode1:%d freq0:%d freq1:%d chain:%d index:%d",
 			 pm_conc_connection_list[0].mode,
