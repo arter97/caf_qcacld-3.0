@@ -25,6 +25,64 @@
 #include "wlan_cmn.h"
 #include "wlan_ll_sap_api.h"
 
+void policy_mgr_ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_pdev *pdev,
+					 uint8_t vdev_id,
+					 qdf_freq_t sap_ch_freq,
+					 uint8_t cc_switch_mode,
+					 qdf_freq_t *new_sap_freq,
+					 bool *is_ll_lt_sap_present)
+{
+	enum sap_csa_reason_code csa_reason;
+	enum policy_mgr_con_mode conn_mode;
+	qdf_freq_t ll_lt_sap_freq = 0;
+	*is_ll_lt_sap_present = false;
+
+	/* If Vdev is ll_lt_sap, check if the frequency on which it is
+	 * coming up is correct, else, get new frequency
+	 */
+	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
+		*new_sap_freq = wlan_get_ll_lt_sap_restart_freq(pdev,
+								sap_ch_freq,
+								vdev_id,
+								&csa_reason);
+		*is_ll_lt_sap_present = true;
+	}
+
+	ll_lt_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
+	if (!ll_lt_sap_freq)
+		return;
+
+	conn_mode = policy_mgr_get_mode_by_vdev_id(psoc, vdev_id);
+
+	if (conn_mode == PM_SAP_MODE) {
+		/* If ll_lt_sap and concurrent SAP are on same MAC,
+		 * update the frequency of concurrent SAP, else return.
+		 */
+		if (!policy_mgr_are_2_freq_on_same_mac(psoc, sap_ch_freq,
+						       ll_lt_sap_freq))
+			return;
+		goto policy_mgr_check_scc;
+	} else if (conn_mode == PM_P2P_GO_MODE) {
+		/* If ll_lt_sap and P2P_GO are in SCC,
+		 * update the frequency of concurrent GO else, return.
+		 */
+		if (ll_lt_sap_freq != sap_ch_freq)
+			return;
+		goto policy_mgr_check_scc;
+	} else {
+		policy_mgr_debug("Invalid con mode %d vdev %d", conn_mode,
+				 vdev_id);
+		return;
+	}
+
+policy_mgr_check_scc:
+	policy_mgr_check_scc_channel(psoc, new_sap_freq, sap_ch_freq, vdev_id,
+				     cc_switch_mode);
+	policy_mgr_debug("vdev_id %d old_freq %d new_freq %d", vdev_id,
+			 sap_ch_freq, new_sap_freq);
+}
+
 uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
 {
 	uint8_t ll_lt_sap_cnt;

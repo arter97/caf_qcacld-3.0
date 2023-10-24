@@ -210,5 +210,14 @@ qdf_freq_t wlan_ll_lt_sap_override_freq(struct wlan_objmgr_psoc *psoc,
 {
 	return chan_freq;
 }
+
+static inline
+qdf_freq_t wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
+					   qdf_freq_t chan_freq,
+					   uint8_t vdev_id,
+					   enum sap_csa_reason_code *csa_reason)
+{
+	return 0;
+}
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* _WLAN_LL_LT_SAP_API_H_ */

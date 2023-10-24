@@ -38,6 +38,7 @@
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include <wlan_mlo_mgr_public_structs.h>
 #include "wlan_objmgr_vdev_obj.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 #define CASE_RETURN_STR(n) {\
 	case (n): return (# n);\
@@ -623,12 +624,42 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	enum phy_ch_width ch_width;
 	enum channel_state state;
 
+#ifdef WLAN_FEATURE_LL_LT_SAP
+	qdf_freq_t new_sap_freq = 0;
+	bool is_ll_lt_sap_present = false;
+#endif
+
 	if (mac_ctx->roam.configParam.cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
 		return 0;
 
-	if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id))
-		return 0;
+	/*
+	 * This is temporary code and will be removed once this feature flag
+	 * is enabled
+	 */
+#ifndef WLAN_FEATURE_LL_LT_SAP
+		if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id))
+			return 0;
+#else
+	policy_mgr_ll_lt_sap_get_valid_freq(
+				mac_ctx->psoc, mac_ctx->pdev,
+				vdev_id, sap_ch_freq,
+				mac_ctx->roam.configParam.cc_switch_mode,
+				&new_sap_freq,
+				&is_ll_lt_sap_present);
+	/*
+	 * If ll_lt_sap is present, then it has already updated the frequency
+	 * according to current concurrency, so, return from here
+	 */
+	if (is_ll_lt_sap_present) {
+		if (new_sap_freq == sap_ch_freq)
+			return 0;
+
+		sme_debug("LL_LT_SAP concurrency updated freq %d for vdev %d",
+			  new_sap_freq, vdev_id);
+		return new_sap_freq;
+	}
+#endif
 
 	if (sap_ch_freq != 0) {
 		sap_cfreq = sap_ch_freq;
