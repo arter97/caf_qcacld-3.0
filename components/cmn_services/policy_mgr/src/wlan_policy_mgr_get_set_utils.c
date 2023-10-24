@@ -7115,6 +7115,27 @@ policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
+static bool
+policy_mgr_is_ml_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
+	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t num_enabled_ml_sta, conn_count;
+
+	conn_count = policy_mgr_get_connection_count(psoc);
+	policy_mgr_get_ml_sta_info_psoc(psoc, &num_ml_sta,
+					&num_disabled_ml_sta,
+					ml_sta_vdev_lst, ml_freq_lst,
+					&num_non_ml,
+					NULL, NULL);
+	num_enabled_ml_sta = num_ml_sta;
+	if (num_ml_sta >= num_disabled_ml_sta)
+		num_enabled_ml_sta = num_ml_sta - num_disabled_ml_sta;
+
+	return conn_count > num_enabled_ml_sta;
+}
+
 static uint8_t
 policy_mgr_get_affected_links_for_sta_sta(struct wlan_objmgr_psoc *psoc,
 					  uint8_t num_ml, qdf_freq_t *freq_list,
@@ -8508,6 +8529,8 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 	uint8_t iter, link, active_link_cnt = 0, inactive_link_cnt = 0;
 	uint32_t active_link_bitmap = 0;
 	uint32_t inactive_link_bitmap = 0;
+	struct ml_link_force_state curr = {0};
+	bool update_inactive_link = false;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, session_id,
 						    WLAN_POLICY_MGR_ID);
@@ -8567,6 +8590,29 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 	} else if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
 		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
 		goto done;
+	} else {
+		if (policy_mgr_is_ml_sta_concurrency_present(psoc)) {
+			policy_mgr_debug("Concurrency exists, don't enter EMLSR mode");
+				goto done;
+		}
+		ml_nlink_get_curr_force_state(psoc, vdev, &curr);
+		if (curr.force_inactive_num || curr.force_active_num) {
+			policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
+					 curr.force_active_num,
+					 curr.force_inactive_num);
+			goto done;
+		}
+		/* If current force inactive bitmap exists, we have to remove
+		 * the new active bitmap from the existing inactive bitmap,
+		 * e.g. a link id can't be present in active bitmap and
+		 * inactive bitmap at same time, so update inactive bitmap
+		 * as well.
+		 */
+		if (curr.force_inactive_bitmap && !inactive_link_cnt) {
+			inactive_link_bitmap = curr.force_inactive_bitmap &
+						~active_link_bitmap;
+			update_inactive_link = true;
+		}
 	}
 
 	/*
@@ -8575,7 +8621,7 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 	 * else if there is only active vdev count, send single WMI for
 	 * all active vdevs with force mode MLO_LINK_FORCE_MODE_ACTIVE.
 	 */
-	if (inactive_link_cnt) {
+	if (inactive_link_cnt || update_inactive_link) {
 		reason = MLO_LINK_FORCE_REASON_CONNECT;
 		mode = MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE;
 		link_ctrl_flags = link_ctrl_f_overwrite_active_bitmap |
