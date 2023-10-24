@@ -529,6 +529,13 @@ static void dp_mark_icmp_req_to_fw(struct wlan_dp_psoc_context *dp_ctx,
 	if (time_interval_ms == WLAN_CFG_ICMP_REQ_TO_FW_MARK_ALL)
 		QDF_NBUF_CB_TX_PACKET_TO_FW(nbuf) = 1;
 
+	/* For fragment IPV4 ICMP frames
+	 * only mark last segment once to FW
+	 */
+	if (qdf_nbuf_is_ipv4_pkt(nbuf) &&
+	    qdf_nbuf_is_ipv4_fragment(nbuf))
+		return;
+
 	curr_time = qdf_get_log_timestamp();
 	time_delta = curr_time - prev_marked_icmp_time;
 	if (time_delta >= (time_interval_ms *
