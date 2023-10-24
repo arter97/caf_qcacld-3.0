@@ -7354,9 +7354,25 @@ wlan_mlme_update_vdev_chwidth_with_notify(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static
+void wlan_mlme_set_puncture(struct wlan_channel *des_chan,
+			    uint16_t puncture_bitmap)
+{
+	des_chan->puncture_bitmap = puncture_bitmap;
+}
+#else
+static
+void wlan_mlme_set_puncture(struct wlan_channel *des_chan,
+			    uint16_t puncture_bitmap)
+{
+}
+#endif
+
 static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 					    uint8_t vdev_id,
 					    enum phy_ch_width ch_width,
+					    uint16_t puncture_bitmap,
 					    qdf_freq_t sec_2g_freq)
 {
 	struct wlan_channel *des_chan;
@@ -7392,6 +7408,7 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	des_chan->ch_freq_seg2 = ch_params.center_freq_seg1;
 	des_chan->ch_cfreq1 = ch_params.mhz_freq_seg0;
 	des_chan->ch_cfreq2 = ch_params.mhz_freq_seg1;
+	wlan_mlme_set_puncture(des_chan, puncture_bitmap);
 
 	status = wlan_update_peer_phy_mode(des_chan, vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -7639,7 +7656,7 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/* update ch width to internal host structure */
-	status = wlan_mlme_update_ch_width(vdev, vdev_id, ch_width,
+	status = wlan_mlme_update_ch_width(vdev, vdev_id, ch_width, 0,
 					   sec_2g_freq);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("vdev %d: Failed to update CW:%d to host, status:%d",
