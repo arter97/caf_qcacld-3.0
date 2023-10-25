@@ -554,8 +554,15 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 	 * to the data path. Else provide the mac address of the connected peer.
 	 */
 	if (qdf_is_macaddr_broadcast(sta_mac)) {
-		qdf_mem_copy(&txrx_desc.peer_addr, &adapter->mac_addr,
-			     QDF_MAC_ADDR_SIZE);
+		if (adapter->device_mode == QDF_SAP_MODE &&
+		    wlan_vdev_mlme_is_mlo_vdev(adapter->deflink->vdev))
+			qdf_mem_copy(&txrx_desc.peer_addr,
+				     &link_info->link_addr,
+				     QDF_MAC_ADDR_SIZE);
+		else
+			qdf_mem_copy(&txrx_desc.peer_addr,
+				     &adapter->mac_addr,
+				     QDF_MAC_ADDR_SIZE);
 		is_macaddr_broadcast = true;
 	} else {
 		qdf_mem_copy(&txrx_desc.peer_addr, sta_mac,
