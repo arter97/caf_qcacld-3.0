@@ -42,10 +42,11 @@ QDF_STATUS ucfg_ll_sap_deinit(void);
 
 /**
  * ucfg_is_ll_lt_sap_supported() - Check if ll_lt_sap is supported or not
+ *@psoc: Psoc pointer
  *
  * Return: True/False
  */
-bool ucfg_is_ll_lt_sap_supported(void);
+bool ucfg_is_ll_lt_sap_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_ll_lt_sap_request_for_audio_transport_switch() - Request to switch the
@@ -99,7 +100,7 @@ static inline QDF_STATUS ucfg_ll_sap_deinit(void)
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline bool ucfg_is_ll_lt_sap_supported(void)
+static inline bool ucfg_is_ll_lt_sap_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

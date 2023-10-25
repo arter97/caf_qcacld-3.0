@@ -5061,12 +5061,17 @@ static inline void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
 }
 #endif
 
-static inline void wlan_hdd_set_ll_lt_sap_feature(uint8_t *feature_flags)
+static inline void wlan_hdd_set_ll_lt_sap_feature(struct wlan_objmgr_psoc *psoc,
+						  uint8_t *feature_flags)
 {
 	/* To Do: Once FW feature capability changes for ll_lt_sap feature are
 	 * merged, then this feature will be set based on that feature set
 	 * capability
 	 */
+	if (!ucfg_is_ll_lt_sap_supported(psoc)) {
+		hdd_debug("ll_lt_sap feature is disabled in FW");
+		return;
+	}
 	wlan_hdd_cfg80211_set_feature(feature_flags,
 				      QCA_WLAN_VENDOR_FEATURE_ENHANCED_AUDIO_EXPERIENCE_OVER_WLAN);
 }
@@ -5193,7 +5198,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 				feature_flags,
 				QCA_WLAN_VENDOR_FEATURE_AP_ALLOWED_FREQ_LIST);
 	wlan_wifi_pos_cfg80211_set_features(hdd_ctx->psoc, feature_flags);
-	wlan_hdd_set_ll_lt_sap_feature(feature_flags);
+	wlan_hdd_set_ll_lt_sap_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
