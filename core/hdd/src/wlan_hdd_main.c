@@ -7602,6 +7602,24 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
 	defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_vdev_params_mlo_sap_sync_disable - disable mlo sap sync when vdev
+ * up, multi link sap will design as each link to be independent.
+ * @params: vdev params
+ *
+ * Return void
+ */
+static inline void
+hdd_vdev_params_mlo_sap_sync_disable(struct wlan_vdev_create_params *params) {
+	params->mlo_sap_sync_disable = true;
+}
+#else
+static inline void
+hdd_vdev_params_mlo_sap_sync_disable(struct wlan_vdev_create_params *params)
+{}
+#endif
+
 static int
 hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 				struct wlan_vdev_create_params *vdev_params)
@@ -7610,6 +7628,7 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 
 	vdev_params->opmode = adapter->device_mode;
 	vdev_params->size_vdev_priv = sizeof(struct vdev_osif_priv);
+	hdd_vdev_params_mlo_sap_sync_disable(vdev_params);
 
 	if (hdd_adapter_is_ml_adapter(adapter)) {
 		qdf_ether_addr_copy(vdev_params->mldaddr,
