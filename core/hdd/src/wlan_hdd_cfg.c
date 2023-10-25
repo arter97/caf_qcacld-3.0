@@ -2446,8 +2446,15 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 	struct sme_config_params *sme_config;
 	int ret;
 	enum phy_ch_width ch_width = CH_WIDTH_INVALID;
+	struct wlan_objmgr_vdev *link_vdev;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *link_info_t;
+	bool is_mlo_link = false;
+	uint8_t link_vdev_id;
+	enum QDF_OPMODE op_mode;
 	QDF_STATUS status;
 	uint8_t vdev_id = link_info->vdev_id;
+	enum phy_ch_width new_ch_width;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	if (!hdd_ctx) {
@@ -2455,18 +2462,65 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
+	vdev = link_info->vdev;
+	if (!vdev) {
+		mlme_legacy_err("vdev %d: vdev not found", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && link_id != 0xFF) {
+		link_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
+						    WLAN_MLME_OBJMGR_ID);
+		if (!link_vdev) {
+			mlme_legacy_debug("vdev is null for the link id:%u",
+					  link_id);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+			return QDF_STATUS_E_FAILURE;
+		}
+		is_mlo_link = true;
+		link_vdev_id = wlan_vdev_get_id(link_vdev);
+		status = wlan_mlme_get_bw_no_punct(hdd_ctx->psoc,
+						   link_vdev,
+						   wlan_vdev_mlme_get_des_chan(link_vdev),
+						   &new_ch_width);
+		if (QDF_IS_STATUS_SUCCESS(status) && ch_width > new_ch_width)
+			ch_width = new_ch_width;
+	} else {
+		link_vdev = vdev;
+		link_vdev_id = vdev_id;
+		mlme_legacy_debug("vdev mlme is not mlo vdev");
+	}
+
+	link_info_t = hdd_get_link_info_by_vdev(hdd_ctx, link_vdev_id);
+	if (!link_info_t) {
+		mlme_legacy_debug("vdev mlme is not mlo vdev");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (ucfg_mlme_is_chwidth_with_notify_supported(hdd_ctx->psoc) &&
-	    hdd_cm_is_vdev_connected(link_info)) {
+	    hdd_cm_is_vdev_connected(link_info_t)) {
+		op_mode = wlan_vdev_mlme_get_opmode(vdev);
+		if (op_mode != QDF_STA_MODE) {
+			mlme_legacy_debug("vdev %d: op mode %d, CW update not supported",
+				          link_vdev_id, op_mode);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+			return QDF_STATUS_E_NOSUPPORT;
+		}
+
 		ch_width = hdd_convert_chwidth_to_phy_chwidth(chwidth);
 		hdd_debug("vdev %d : process update ch width request to %d",
-			  vdev_id, ch_width);
+			  link_vdev_id, ch_width);
+
 		status = ucfg_mlme_send_ch_width_update_with_notify(hdd_ctx->psoc,
-								    vdev_id,
+								    link_vdev,
 								    ch_width,
-								    link_id);
+								    link_vdev_id);
+		if (is_mlo_link)
+			wlan_objmgr_vdev_release_ref(link_vdev,
+						     WLAN_MLME_OBJMGR_ID);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EIO;
-		status = hdd_update_bss_rate_flags(link_info, hdd_ctx->psoc,
+		status = hdd_update_bss_rate_flags(link_info_t, hdd_ctx->psoc,
 						   ch_width);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EIO;
@@ -2476,7 +2530,7 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 	if (!sme_config)
 		return -ENOMEM;
 
-	ret = wma_cli_set_command(vdev_id, wmi_vdev_param_chwidth,
+	ret = wma_cli_set_command(link_vdev_id, wmi_vdev_param_chwidth,
 				  chwidth, VDEV_CMD);
 	if (ret)
 		goto free_config;
@@ -2492,8 +2546,8 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 		sme_config->csr_config.channelBondingMode24GHz = bonding_mode;
 	}
 	sme_update_config(hdd_ctx->mac_handle, sme_config);
-	sme_set_he_bw_cap(hdd_ctx->mac_handle, vdev_id, chwidth);
-	sme_set_eht_bw_cap(hdd_ctx->mac_handle, vdev_id, chwidth);
+	sme_set_he_bw_cap(hdd_ctx->mac_handle, link_vdev_id, chwidth);
+	sme_set_eht_bw_cap(hdd_ctx->mac_handle, link_vdev_id, chwidth);
 free_config:
 	qdf_mem_free(sme_config);
 	return ret;
