@@ -2081,13 +2081,10 @@ bool dfs_is_rcac_domain(struct wlan_dfs *dfs)
 
 bool dfs_is_agile_rcac_enabled(struct wlan_dfs *dfs)
 {
-	enum dfs_reg dfsdomain;
 	bool rcac_enabled = false;
+	bool is_rcac_applicable_on_cur_dfs_domain = dfs_is_rcac_domain(dfs);
 
-	dfsdomain = utils_get_dfsdomain(dfs->dfs_pdev_obj);
-	if ((dfsdomain == DFS_FCC_REGION ||
-	     dfsdomain == DFS_MKK_REGION ||
-	     dfsdomain == DFS_MKKN_REGION) &&
+	if (is_rcac_applicable_on_cur_dfs_domain &&
 	    dfs->dfs_agile_rcac_ucfg && dfs->dfs_fw_adfs_support_non_160)
 	    rcac_enabled = true;
 

@@ -975,6 +975,12 @@ QDF_STATUS dfs_agile_sm_destroy(struct dfs_soc_priv_obj *dfs_soc_obj)
 #ifdef QCA_SUPPORT_ADFS_RCAC
 QDF_STATUS dfs_set_rcac_enable(struct wlan_dfs *dfs, bool rcac_en)
 {
+	if (!dfs_is_rcac_domain(dfs)) {
+		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			 "Rolling CAC: not supported in current DFS domain");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (rcac_en == dfs->dfs_agile_rcac_ucfg) {
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 			 "Rolling CAC: %d is already configured", rcac_en);
