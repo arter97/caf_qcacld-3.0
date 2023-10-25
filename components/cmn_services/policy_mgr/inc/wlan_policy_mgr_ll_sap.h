@@ -53,4 +53,10 @@ policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
+
+static inline
+uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
+{
+	return WLAN_INVALID_VDEV_ID;
+}
 #endif

@@ -51,6 +51,7 @@
 #include "cdp_txrx_host_stats.h"
 #include "utils_mlo.h"
 #include "wlan_mlo_mgr_sta.h"
+#include <wlan_policy_mgr_ll_sap.h>
 
 #define MAX_CTRL_STAT_VDEV_ENTRIES 1
 #define MAX_CTRL_STAT_MAC_ADDR_ENTRIES 1
@@ -1216,6 +1217,11 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		return eRRM_INCAPABLE;
 	}
 
+	if (wlan_policy_mgr_get_ll_lt_sap_vdev_id(mac->psoc) != WLAN_INVALID_VDEV_ID) {
+		pe_debug("RX: [802.11 BCN_RPT] reject req as ll_lt_sap is present");
+		return eRRM_REFUSED;
+	}
+
 	if (pBeaconReq->measurement_request.Beacon.rrm_reporting.present &&
 	    (pBeaconReq->measurement_request.Beacon.rrm_reporting.reporting_condition != 0)) {
 		/* Repeated measurement is not supported. This means number of repetitions should be zero.(Already checked) */
@@ -2064,6 +2070,11 @@ rrm_process_channel_load_req(struct mac_context *mac,
 	uint8_t country[WNI_CFG_COUNTRY_CODE_LEN];
 	qdf_freq_t chan_freq;
 	bool is_freq_enabled, is_bw_ind;
+
+	if (wlan_policy_mgr_get_ll_lt_sap_vdev_id(mac->psoc) != WLAN_INVALID_VDEV_ID) {
+		pe_debug("RX:[802.11 CH_LOAD] reject req as ll_lt_sap is present");
+		return eRRM_REFUSED;
+	}
 
 	is_rrm_reporting = chan_load_req->measurement_request.channel_load.rrm_reporting.present;
 	is_wide_bw_chan_switch = chan_load_req->measurement_request.channel_load.wide_bw_chan_switch.present;
