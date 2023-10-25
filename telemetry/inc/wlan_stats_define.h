@@ -924,7 +924,6 @@ struct advance_psoc_data_rx {
 #define STATS_IF_MAX_PPDU_ID_HIST            128
 #define STATS_IF_MAX_MU_GROUP_ID             64
 #define STATS_IF_MU_GROUP_SHOW               16
-#define STATS_IF_MU_GROUP_LENGTH             (6 * STATS_IF_MU_GROUP_SHOW)
 #ifdef WLAN_FEATURE_11BE
 #define STATS_IF_MAX_RU_LOCATIONS            16
 #define STATS_IF_OFDMA_NUM_RU_SIZE           16
