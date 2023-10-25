@@ -2169,6 +2169,10 @@ static uint8_t util_get_link_info_offset(uint8_t *ml_ie, bool *is_ml_ie_valid)
 	if (presencebm & WLAN_ML_BV_CTRL_PBM_MLDID_P)
 		parsed_ie_len += WLAN_ML_BV_CINFO_MLDID_SIZE;
 
+	/* Check if Extended MLD Cap and Op is present */
+	if (presencebm & WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P)
+		parsed_ie_len += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
+
 	/* Offset calculation starts from the beginning of the ML IE (including
 	 * EID) hence, adding the size of IE header to ML IE length.
 	 */
