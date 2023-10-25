@@ -2668,6 +2668,9 @@ struct dp_soc {
 	/* rx pkt tlv size in current operation mode */
 	uint16_t curr_rx_pkt_tlv_size;
 
+	/* enable/disable dp debug logs */
+	bool dp_debug_log_en;
+
 	struct dp_arch_ops arch_ops;
 
 	/* Device ID coming from Bus sub-system */
