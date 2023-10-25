@@ -9,6 +9,22 @@ config QCA_CLD_WLAN
 
 if QCA_CLD_WLAN != n
 
+config WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+	bool "Enable WLAN_FEATURE_NO_STA_SAP_CONCURRENCY"
+	default n
+
+config WLAN_FEATURE_NO_STA_NAN_CONCURRENCY
+	bool "Enable WLAN_FEATURE_NO_STA_NAN_CONCURRENCY"
+	default n
+
+config WLAN_FEATURE_NO_SAP_NAN_CONCURRENCY
+	bool "Enable WLAN_FEATURE_NO_SAP_NAN_CONCURRENCY"
+	default n
+
+config WLAN_FEATURE_NO_P2P_CONCURRENCY
+	bool "Enable WLAN_FEATURE_NO_P2P_CONCURRENCY"
+	default n
+
 config 160MHZ_SUPPORT
 	bool "Enable 160MHZ_SUPPORT"
 	default n
@@ -131,6 +147,10 @@ config CP_STATS
 	bool "Enable CP_STATS"
 	default n
 
+config QCA_TARGET_IF_MLME
+	bool "Enable TARGET_IF MLME"
+	default n
+
 config DCS
 	bool "Enable DCS"
 	default n
@@ -224,6 +244,12 @@ config DP_RX_BUFFER_POOL_ALLOC_THRES
 
 config DP_RX_BUFFER_POOL_SIZE
 	int "Enable DP_RX_BUFFER_POOL_SIZE"
+
+config DP_RX_REFILL_BUFF_POOL_SIZE
+	int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+
+config DP_RX_REFILL_THRD_THRESHOLD
+	int "Enable DP_RX_REFILL_THRD_THRESHOLD"
 
 config DP_RX_DROP_RAW_FRM
 	bool "Enable DP_RX_DROP_RAW_FRM"
@@ -1632,6 +1658,11 @@ config WLAN_TSF_UPLINK_DELAY
 	depends on WLAN_TSF_AUTO_REPORT
 	default n
 
+config WLAN_TX_LATENCY_STATS
+	bool "Enable WLAN_TX_LATENCY_STATS"
+	depends on WLAN_TSF_AUTO_REPORT
+	default n
+
 config WLAN_TWT_CONVERGED
 	bool "Enable WLAN_TWT_CONVERGED"
 	default n
@@ -1873,6 +1904,8 @@ config FEATURE_WLAN_CH_AVOID_EXT
 
 config WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE
 	bool "enable CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE"
+	default n
+
 config 4_BYTES_TLV_TAG
 	bool "enable 4_BYTES_TLV_TAG"
 	default n

@@ -21,6 +21,7 @@
  */
 #include "../../core/src/wlan_ll_sap_main.h"
 #include "../../core/src/wlan_ll_lt_sap_main.h"
+#include "../../core/src/wlan_ll_lt_sap_bearer_switch.h"
 #include <wlan_ll_sap_ucfg_api.h>
 
 QDF_STATUS ucfg_ll_sap_init(void)
@@ -39,9 +40,27 @@ bool ucfg_is_ll_lt_sap_supported(void)
 }
 
 QDF_STATUS ucfg_ll_lt_sap_request_for_audio_transport_switch(
-						uint8_t transport_switch_type)
+					struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_req_type req_type)
 {
-	return ll_lt_sap_request_for_audio_transport_switch(
-							transport_switch_type);
+	return ll_lt_sap_request_for_audio_transport_switch(vdev, req_type);
 }
 
+void ucfg_ll_lt_sap_deliver_audio_transport_switch_resp(
+					struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_req_type req_type,
+					enum bearer_switch_status status)
+{
+	ll_lt_sap_deliver_audio_transport_switch_resp(vdev, req_type,
+						      status);
+}
+
+void ucfg_ll_sap_register_cb(struct ll_sap_ops *ll_sap_global_ops)
+{
+	ll_sap_register_os_if_cb(ll_sap_global_ops);
+}
+
+void ucfg_ll_sap_unregister_cb(void)
+{
+	ll_sap_unregister_os_if_cb();
+}

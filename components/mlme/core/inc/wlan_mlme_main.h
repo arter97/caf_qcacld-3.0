@@ -130,11 +130,23 @@ struct wlan_mlme_rx_ops {
 };
 
 /**
+ * struct wlan_mlme_tx_ops - structure of mlme tx function pointers
+ * @send_csa_event_status_ind: Tx ops function to send csa event indication
+ *
+ */
+struct wlan_mlme_tx_ops {
+	QDF_STATUS
+		(*send_csa_event_status_ind)(struct wlan_objmgr_vdev *vdev,
+					     uint8_t csa_status);
+};
+
+/**
  * struct wlan_mlme_psoc_ext_obj -MLME ext psoc priv object
  * @cfg:     cfg items
  * @rso_tx_ops: Roam Tx ops to send roam offload commands to firmware
  * @rso_rx_ops: Roam Rx ops to receive roam offload events from firmware
  * @mlme_rx_ops: mlme Rx ops to receive events from firmware
+ * @mlme_tx_ops: mlme tx ops
  * @wfa_testcmd: WFA config tx ops to send to FW
  * @disconnect_stats_param: Peer disconnect stats related params for SAP case
  * @scan_requester_id: mlme scan requester id
@@ -144,6 +156,7 @@ struct wlan_mlme_psoc_ext_obj {
 	struct wlan_cm_roam_tx_ops rso_tx_ops;
 	struct wlan_cm_roam_rx_ops rso_rx_ops;
 	struct wlan_mlme_rx_ops mlme_rx_ops;
+	struct wlan_mlme_tx_ops mlme_tx_ops;
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
 	struct peer_disconnect_stats_param disconnect_stats_param;
 	wlan_scan_requester scan_requester_id;
@@ -387,10 +400,12 @@ struct ft_context {
  * struct assoc_channel_info - store channel info at the time of association
  * @assoc_ch_width: channel width at the time of initial connection
  * @sec_2g_freq: secondary 2 GHz freq
+ * @cen320_freq: 320 MHz center freq
  */
 struct assoc_channel_info {
 	enum phy_ch_width assoc_ch_width;
 	qdf_freq_t sec_2g_freq;
+	qdf_freq_t cen320_freq;
 };
 
 /**
@@ -1919,4 +1934,16 @@ wlan_mlme_register_common_events(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * wlan_mlme_send_csa_event_status_ind_cmd() - send csa event status indication
+ * @vdev: vdev obj
+ * @csa_status: csa status
+ *
+ *  Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind_cmd(struct wlan_objmgr_vdev *vdev,
+					uint8_t csa_status);
+
 #endif

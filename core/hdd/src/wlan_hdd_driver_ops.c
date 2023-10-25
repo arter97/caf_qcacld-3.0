@@ -1278,6 +1278,12 @@ hdd_to_pmo_wow_enable_params(struct wow_enable_params *in_params,
 	return 0;
 }
 
+void __wlan_hdd_trigger_cds_recovery(enum qdf_hang_reason reason,
+				     const char *func, const uint32_t line)
+{
+	__cds_trigger_recovery(reason, func, line);
+}
+
 /**
  * __wlan_hdd_bus_suspend() - handles platform suspend
  * @wow_params: collection of wow enable override parameters
@@ -1406,26 +1412,40 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 
 resume_txrx:
 	status = ucfg_pmo_core_txrx_resume(hdd_ctx->psoc);
-	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_hdd_trigger_cds_recovery(QDF_RESUME_TIMEOUT);
+		return qdf_status_to_os_return(status);
+	}
 
 resume_hif:
 	status = hif_bus_resume(hif_ctx);
-	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_hdd_trigger_cds_recovery(QDF_RESUME_TIMEOUT);
+		return qdf_status_to_os_return(status);
+	}
 
 resume_pmo:
 	status = ucfg_pmo_psoc_bus_resume_req(hdd_ctx->psoc,
 					      type);
-	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_hdd_trigger_cds_recovery(QDF_RESUME_TIMEOUT);
+		return qdf_status_to_os_return(status);
+	}
 
 late_hif_resume:
 	status = hif_bus_late_resume(hif_ctx);
-	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_hdd_trigger_cds_recovery(QDF_RESUME_TIMEOUT);
+		return qdf_status_to_os_return(status);
+	}
 
 resume_dp:
 	status = ucfg_dp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
-	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_hdd_trigger_cds_recovery(QDF_RESUME_TIMEOUT);
+		return qdf_status_to_os_return(status);
+	}
 	hif_system_pm_set_state_on(hif_ctx);
-
 	return err;
 }
 

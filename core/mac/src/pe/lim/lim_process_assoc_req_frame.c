@@ -254,24 +254,25 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 					  uint8_t sub_type, uint8_t *frm_body,
 					  uint32_t frame_len)
 {
-	QDF_STATUS status;
+	QDF_STATUS qdf_status;
+	enum wlan_status_code wlan_status;
 
 	if (sub_type == LIM_ASSOC)
-		status = sir_convert_assoc_req_frame2_struct(mac_ctx, frm_body,
+		wlan_status = sir_convert_assoc_req_frame2_struct(mac_ctx, frm_body,
 							     frame_len,
 							     assoc_req);
 	else
-		status = sir_convert_reassoc_req_frame2_struct(mac_ctx,
+		wlan_status = sir_convert_reassoc_req_frame2_struct(mac_ctx,
 						frm_body, frame_len, assoc_req);
 
-	if (status == QDF_STATUS_SUCCESS) {
-		status = lim_strip_and_decode_eht_cap(
+	if (wlan_status == STATUS_SUCCESS) {
+		qdf_status = lim_strip_and_decode_eht_cap(
 					frm_body + WLAN_ASSOC_REQ_IES_OFFSET,
 					frame_len - WLAN_ASSOC_REQ_IES_OFFSET,
 					&assoc_req->eht_cap,
 					assoc_req->he_cap,
 					session->curr_op_freq);
-		if (status != QDF_STATUS_SUCCESS) {
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
 			pe_err("Failed to extract eht cap");
 			return false;
 		}
@@ -281,7 +282,7 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 
 	pe_warn("Assoc Req rejected: frame parsing error. source addr:"
 			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(sa));
-	lim_send_assoc_rsp_mgmt_frame(mac_ctx, STATUS_UNSPECIFIED_FAILURE,
+	lim_send_assoc_rsp_mgmt_frame(mac_ctx, wlan_status,
 				      1, sa, sub_type, 0, session, false);
 	return false;
 }
@@ -1149,6 +1150,15 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 		}
 		*akm_type = lim_translate_rsn_oui_to_akm_type(
 						  dot11f_ie_wpa.auth_suites[0]);
+	} else {
+		if (session->gStartBssRSNIe.present ||
+		    session->gStartBssWPAIe.present) {
+			pe_warn("STA does not support RSN and WPA!");
+			lim_send_assoc_rsp_mgmt_frame(
+				mac_ctx, STATUS_NOT_SUPPORTED_AUTH_ALG, 1,
+				sa, sub_type, 0, session, false);
+			return false;
+		}
 	}
 
 	return true;

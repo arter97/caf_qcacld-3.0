@@ -317,6 +317,23 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 						   eCsrScanStatus scan_status);
 
 /**
+ * sap_sort_channel_list() - Sort channel list based on channel weight
+ * @mac_ctx: Pointer to mac_context
+ * @vdev_id: Vdev ID
+ * @ch_list: Pointer to qdf_list_t
+ * @ch_info: Pointer to sap_sel_ch_info structure
+ * @domain: Regulatory Domain
+ * @operating_band: Operating band
+ *
+ * Return: None
+ *
+ */
+void
+sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
+		      qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
+		      v_REGDOMAIN_t *domain, uint32_t *operating_band);
+
+/**
  * sap_select_channel() - select SAP channel
  * @mac_handle: Opaque handle to the global MAC context
  * @sap_ctx: Sap context

@@ -1432,10 +1432,12 @@ void lim_handle_sme_join_result(struct mac_context *mac_ctx,
 
 	mlme_set_connection_fail(session->vdev, true);
 	if (wlan_vdev_mlme_get_substate(session->vdev) ==
-	    WLAN_VDEV_SS_START_START_PROGRESS)
+	    WLAN_VDEV_SS_START_START_PROGRESS) {
+		mlme_set_vdev_start_failed(session->vdev, true);
 		status = wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					       WLAN_VDEV_SM_EV_START_REQ_FAIL,
 					       sizeof(param), &param);
+	}
 	else
 		status = wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					       WLAN_VDEV_SM_EV_CONNECTION_FAIL,

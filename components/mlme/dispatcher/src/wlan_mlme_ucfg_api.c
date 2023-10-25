@@ -134,6 +134,12 @@ void ucfg_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
 	wlan_mlme_set_ml_link_control_mode(psoc, vdev_id, value);
 }
 
+void ucfg_mlme_set_bt_profile_con(struct wlan_objmgr_psoc *psoc,
+				  bool bt_profile_con)
+{
+	wlan_mlme_set_bt_profile_con(psoc, bt_profile_con);
+}
+
 uint8_t ucfg_mlme_get_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id)
 {
@@ -435,7 +441,8 @@ ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && link_id != 0xFF) {
-		link_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
+		link_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
+						    WLAN_MLME_OBJMGR_ID);
 		if (!link_vdev) {
 			mlme_legacy_debug("vdev is null for the link id:%u",
 					  link_id);
@@ -452,7 +459,7 @@ ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 							    link_vdev_id,
 							    ch_width);
 	if (is_mlo_link)
-		mlo_release_vdev_ref(link_vdev);
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLME_OBJMGR_ID);
 
 release:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);

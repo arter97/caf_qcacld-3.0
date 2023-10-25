@@ -388,6 +388,16 @@ struct sap_ch_change_ind {
 	uint32_t new_chan_freq;
 };
 
+/**
+ * struct sap_ch_change_rsp - channel change response
+ * @sap_ch_selected: channel parameters of new channel
+ * @ch_change_rsp_status: channel change response status
+ */
+struct sap_ch_change_rsp {
+	struct sap_ch_selected_s sap_ch_selected;
+	eSapStatus ch_change_rsp_status;
+};
+
 /*
  * This struct will be filled in and passed to sap_event_cb that is
  * provided during wlansap_start_bss call The event id corresponding to
@@ -422,8 +432,8 @@ struct sap_event {
 		tSap_MaxAssocExceededEvent sapMaxAssocExceeded;
 		struct sap_ch_selected_s sap_ch_selected;
 		struct sap_ch_change_ind sap_chan_cng_ind;
+		struct sap_ch_change_rsp sap_chan_cng_rsp;
 		struct sap_acs_scan_complete_event sap_acs_scan_comp;
-		QDF_STATUS ch_change_rsp_status;
 	} sapevt;
 };
 
@@ -460,11 +470,11 @@ struct sap_acs_cfg {
 	/* ACS Algo Input */
 	uint8_t    acs_mode;
 	eCsrPhyMode hw_mode;
-	uint32_t    start_ch_freq;
-	uint32_t    end_ch_freq;
-	uint32_t   *freq_list;
+	qdf_freq_t    start_ch_freq;
+	qdf_freq_t    end_ch_freq;
+	qdf_freq_t   *freq_list;
 	uint8_t    ch_list_count;
-	uint32_t   *master_freq_list;
+	qdf_freq_t   *master_freq_list;
 	uint8_t    master_ch_list_count;
 	bool master_ch_list_updated;
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -651,6 +661,7 @@ typedef struct sSapDfsInfo {
 	uint8_t sap_ch_switch_beacon_cnt;
 	uint8_t sap_ch_switch_mode;
 	uint16_t reduced_beacon_interval;
+	uint8_t vdev_id;
 } tSapDfsInfo;
 
 /* MAX number of CAC channels to be recorded */
@@ -1936,6 +1947,27 @@ void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
  */
 int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 				 qdf_freq_t *freq_list, uint16_t count);
+
+/**
+ * wlansap_sort_channel_list() - Sort channel list
+ * @vdev_id: Vdev Id
+ * @list: List of channels which needs to sort
+ * @ch_info: Fill sorted channels list in ch_info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
+				     struct sap_sel_ch_info *ch_info);
+
+/**
+ * wlansap_get_user_config_acs_ch_list() - Get user config ACS channel list
+ * @vdev_id: Vdev Id
+ * @filter: Filter to apply to get scan result
+ *
+ * Return: None
+ */
+void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
+					 struct scan_filter *filter);
 #ifdef __cplusplus
 }
 #endif

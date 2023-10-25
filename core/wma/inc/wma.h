@@ -765,11 +765,13 @@ struct mac_ss_bw_info {
 /**
  * struct wma_ini_config - Structure to hold wma ini configuration
  * @max_no_of_peers: Max Number of supported
+ * @exclude_selftx_from_cca_busy: Exclude self tx time from cca busy time flag.
  *
  * Placeholder for WMA ini parameters.
  */
 struct wma_ini_config {
 	uint8_t max_no_of_peers;
+	bool exclude_selftx_from_cca_busy;
 };
 
 /**
@@ -1476,8 +1478,29 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle,
 uint32_t wma_get_vht_ch_width(void);
 
 #ifdef WLAN_FEATURE_11BE
+/**
+ * wma_get_orig_eht_ch_width() - Get original EHT channel width supported
+ *
+ * API to get original EHT channel width
+ *
+ * Return: void
+ */
+uint32_t wma_get_orig_eht_ch_width(void);
+
+/**
+ * wma_get_orig_eht_ch_width() - Get current EHT channel width supported
+ *
+ * API to get current EHT channel width
+ *
+ * Return: void
+ */
 uint32_t wma_get_eht_ch_width(void);
 #else
+static inline uint32_t wma_get_orig_eht_ch_width(void)
+{
+	return 0;
+}
+
 static inline uint32_t wma_get_eht_ch_width(void)
 {
 	return 0;

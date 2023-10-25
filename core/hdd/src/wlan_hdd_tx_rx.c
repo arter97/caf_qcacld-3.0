@@ -59,6 +59,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "os_if_dp.h"
 #include "wlan_ipa_ucfg_api.h"
+#include "wlan_hdd_stats.h"
 
 #ifdef TX_MULTIQ_PER_AC
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
@@ -518,6 +519,7 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		return;
 
 	osif_dp_mark_pkt_type(skb);
+	hdd_tx_latency_record_ingress_ts(adapter, skb);
 
 	/* Get TL AC corresponding to Qdisc queue index/AC. */
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];

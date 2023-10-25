@@ -1936,6 +1936,9 @@ QDF_STATUS csr_change_default_config_param(struct mac_context *mac,
 		mac->roam.configParam.channelBondingMode5GHz =
 			csr_convert_cb_ini_value_to_phy_cb_state(pParam->
 							channelBondingMode5GHz);
+		sme_debug("cb mode 2g %d 5g %d",
+			  mac->roam.configParam.channelBondingMode24GHz,
+			  mac->roam.configParam.channelBondingMode5GHz);
 		mac->roam.configParam.phyMode = pParam->phyMode;
 		mac->roam.configParam.HeartbeatThresh50 =
 			pParam->HeartbeatThresh50;
@@ -5525,6 +5528,11 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 	qdf_copy_macaddr(&filter->bssid_list[0], &rsp->connect_rsp.bssid);
 	filter->ignore_auth_enc_type = true;
 
+	status = wlan_vdev_mlme_get_ssid(vdev, filter->ssid_list[0].ssid,
+					 &filter->ssid_list[0].length);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		filter->num_of_ssid = 1;
+
 	list = wlan_scan_get_result(mac_ctx->pdev, filter);
 	qdf_mem_free(filter);
 	if (!list || (list && !qdf_list_size(list)))
@@ -5544,6 +5552,10 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 		goto purge_list;
 
 	wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc, cur_node->entry);
+	pe_debug("Dump scan entry frm:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   cur_node->entry->raw_frame.ptr,
+			   cur_node->entry->raw_frame.len);
 
 	src_cfg.uint_value = bss_desc->mbo_oce_enabled_ap;
 	wlan_cm_roam_cfg_set_value(mac_ctx->psoc, vdev_id, MBO_OCE_ENABLED_AP,
@@ -5559,17 +5571,6 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 
 	csr_update_beacon_in_connect_rsp(cur_node->entry,
 					 &rsp->connect_rsp.connect_ies);
-
-	if (bss_desc->mdiePresent) {
-		src_cfg.bool_value = true;
-		src_cfg.uint_value =
-			(bss_desc->mdie[1] << 8) | (bss_desc->mdie[0]);
-	} else {
-		src_cfg.bool_value = false;
-		src_cfg.uint_value = 0;
-	}
-	wlan_cm_roam_cfg_set_value(mac_ctx->psoc, vdev_id,
-				   MOBILITY_DOMAIN, &src_cfg);
 
 	assoc_info.bss_desc = bss_desc;
 	if (rsp->connect_rsp.is_reassoc) {
@@ -5689,6 +5690,7 @@ QDF_STATUS
 cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 			struct wlan_cm_connect_resp *rsp)
 {
+	mac_handle_t mac_handle;
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	int32_t count;
@@ -5704,7 +5706,9 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 	 * CSR is cleaned up fully. No new params should be added to CSR, use
 	 * vdev/pdev/psoc instead
 	 */
-	mac_ctx = cds_get_context(QDF_MODULE_ID_SME);
+	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
+
+	mac_ctx = MAC_CONTEXT(mac_handle);
 	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
 
@@ -5811,6 +5815,12 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 				vdev_id);
 	}
 
+	/*
+	 * Update the IEs after connection to reconfigure
+	 * any capability that changed during connection.
+	 */
+	sme_set_vdev_ies_per_band(mac_handle, vdev_id,
+				  wlan_vdev_mlme_get_opmode(vdev));
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -5870,6 +5880,7 @@ QDF_STATUS
 cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 			  struct wlan_cm_discon_rsp *rsp)
 {
+	mac_handle_t mac_handle;
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 
@@ -5878,7 +5889,9 @@ cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 	 * CSR is cleaned up fully. No new params should be added to CSR, use
 	 * vdev/pdev/psoc instead
 	 */
-	mac_ctx = cds_get_context(QDF_MODULE_ID_SME);
+	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
+
+	mac_ctx = MAC_CONTEXT(mac_handle);
 	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
 
@@ -5887,6 +5900,13 @@ cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 		sme_qos_update_hand_off(vdev_id, false);
 	csr_set_default_dot11_mode(mac_ctx);
 
+	/*
+	 * Update the IEs after disconnection to remove
+	 * any connection specific capability change and
+	 * to reset back to self cap
+	 */
+	sme_set_vdev_ies_per_band(mac_handle, vdev_id,
+				  wlan_vdev_mlme_get_opmode(vdev));
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -7718,14 +7738,13 @@ void csr_process_sap_ch_width_update(struct mac_context *mac, tSmeCmd *command)
 
 	sme_err("Posting to PE failed");
 fail:
-	param = qdf_mem_malloc(sizeof(*param));
-	if (!param)
-		return;
-
 	sme_err("Sending ch_width update fail response to SME");
-	param->status = QDF_STATUS_E_FAILURE;
-	param->vdev_id = command->u.bw_update_cmd.vdev_id;
-	param->reason = REASON_CH_WIDTH_UPDATE;
+	param = qdf_mem_malloc(sizeof(*param));
+	if (param) {
+		param->status = QDF_STATUS_E_FAILURE;
+		param->vdev_id = command->u.bw_update_cmd.vdev_id;
+		param->reason = REASON_CH_WIDTH_UPDATE;
+	}
 	msg_return.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
 	msg_return.bodyptr = param;
 	msg_return.bodyval = 0;
@@ -8161,4 +8180,30 @@ void csr_process_sap_response(struct mac_context *mac_ctx,
 
 	wlan_vdev_mlme_ser_remove_request(vdev, cmd_id, cmd_type);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
+
+void csr_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id,
+			       enum QDF_OPMODE device_mode)
+{
+	struct sir_set_vdev_ies_per_band *p_msg;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	enum csr_cfgdot11mode curr_dot11_mode =
+			mac_ctx->roam.configParam.uCfgDot11Mode;
+
+	p_msg = qdf_mem_malloc(sizeof(*p_msg));
+	if (!p_msg)
+		return;
+
+	p_msg->vdev_id = vdev_id;
+	p_msg->device_mode = device_mode;
+	p_msg->dot11_mode = csr_get_vdev_dot11_mode(mac_ctx, vdev_id,
+						    curr_dot11_mode);
+	p_msg->msg_type = eWNI_SME_SET_VDEV_IES_PER_BAND;
+	p_msg->len = sizeof(*p_msg);
+	sme_debug("SET_VDEV_IES_PER_BAND: vdev_id %d dot11mode %d dev_mode %d",
+		  vdev_id, p_msg->dot11_mode, device_mode);
+	status = umac_send_mb_message_to_mac(p_msg);
+	if (QDF_STATUS_SUCCESS != status)
+		sme_err("Send eWNI_SME_SET_VDEV_IES_PER_BAND fail");
 }

@@ -1400,8 +1400,10 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	} else {
 		wlan_mlme_get_channel_bonding_5ghz(mac->psoc,
 						   &channel_bonding_mode);
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
-		    (!channel_bonding_mode))
+		if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc,
+						 sap_context->vdev_id) ||
+		    (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
+		     !channel_bonding_mode))
 			ch_width = CH_WIDTH_20MHZ;
 		else
 			ch_width = wlansap_get_max_bw_by_phymode(sap_context);
@@ -3010,15 +3012,24 @@ void wlansap_cleanup_cac_timer(struct sap_context *sap_ctx)
 		return;
 	}
 
+	if (mac->sap.SapDfsInfo.vdev_id != sap_ctx->vdev_id) {
+		sap_err("sapdfs, force cleanup vdev mismatch sap vdev id %d mac_ctx vdev id %d",
+			sap_ctx->vdev_id, mac->sap.SapDfsInfo.vdev_id);
+		return;
+	}
+
 	if (mac->sap.SapDfsInfo.is_dfs_cac_timer_running) {
 		mac->sap.SapDfsInfo.is_dfs_cac_timer_running = 0;
+		mac->sap.SapDfsInfo.vdev_id = WLAN_INVALID_VDEV_ID;
+
 		if (!sap_ctx->dfs_cac_offload) {
 			qdf_mc_timer_stop(
 				&mac->sap.SapDfsInfo.sap_dfs_cac_timer);
 			qdf_mc_timer_destroy(
 				&mac->sap.SapDfsInfo.sap_dfs_cac_timer);
+			sap_debug("sapdfs, force cleanup running dfs cac timer vdev id %d",
+				  sap_ctx->vdev_id);
 		}
-		sap_err("sapdfs, force cleanup running dfs cac timer");
 	}
 }
 
@@ -4006,9 +4017,9 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 				  restart_freq);
 			*csa_reason = CSA_REASON_BAND_RESTRICTED;
 		}
-	} else if (wlan_reg_is_disable_for_pwrmode(mac->pdev,
-						   sap_ctx->chan_freq,
-						   REG_CURRENT_PWR_MODE) &&
+	} else if (wlan_reg_is_disable_in_secondary_list_for_freq(
+							mac->pdev,
+							sap_ctx->chan_freq) &&
 		   !utils_dfs_is_freq_in_nol(mac->pdev, sap_ctx->chan_freq)) {
 		sap_debug("channel is disabled");
 		*csa_reason = CSA_REASON_CHAN_DISABLED;
@@ -4044,11 +4055,11 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 								sap_ctx, NULL);
 		} else {
 			sap_debug("No need switch SAP/Go channel");
-			return 0;
+			return sap_ctx->chan_freq;
 		}
 	} else {
 		sap_debug("No need switch SAP/Go channel");
-		return 0;
+		return sap_ctx->chan_freq;
 	}
 	cc_mode = sap_ctx->cc_switch_mode;
 	phy_mode = sap_ctx->phyMode;
@@ -4343,4 +4354,55 @@ void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
 	wlansap_set_acs_ch_freq(sap_ctx, last_acs_freq);
 	sap_ctx->acs_cfg->pri_ch_freq = last_acs_freq;
 	sap_ctx->acs_cfg->ht_sec_ch_freq = 0;
+}
+
+QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
+				     struct sap_sel_ch_info *ch_info)
+{
+	struct mac_context *mac_ctx;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sap_sort_channel_list(mac_ctx, vdev_id, list,
+			      ch_info, NULL, NULL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
+					 struct scan_filter *filter)
+{
+	struct mac_context *mac_ctx;
+	struct sap_context *sap_ctx;
+	uint8_t ch_count = 0;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return;
+	}
+
+	if (vdev_id >= WLAN_UMAC_VDEV_ID_MAX)
+		return;
+
+	sap_ctx = mac_ctx->sap.sapCtxList[vdev_id].sap_context;
+
+	if (!sap_ctx) {
+		sap_err("vdev %d sap_ctx is NULL", vdev_id);
+		return;
+	}
+
+	ch_count = sap_ctx->acs_cfg->master_ch_list_count;
+
+	if (!ch_count || ch_count > NUM_CHANNELS)
+		return;
+
+	filter->num_of_channels = ch_count;
+	qdf_mem_copy(filter->chan_freq_list, sap_ctx->acs_cfg->master_freq_list,
+		     filter->num_of_channels *
+		     sizeof(filter->chan_freq_list[0]));
 }

@@ -626,10 +626,8 @@ void policy_mgr_update_with_safe_channel_list(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if (pm_ctx->unsafe_channel_count == 0) {
-		policy_mgr_debug("There are no unsafe channels");
+	if (!pm_ctx->unsafe_channel_count)
 		return;
-	}
 
 	qdf_mem_copy(current_channel_list, pcl_channels,
 		     current_channel_count * sizeof(*current_channel_list));
@@ -726,7 +724,6 @@ static QDF_STATUS policy_mgr_modify_pcl_based_on_enabled_channels(
 			pm_ctx->pdev, pcl_list_org[i],
 			REG_CURRENT_PWR_MODE)) ||
 		    (allow_go_scc_on_dfs_chn &&
-		     policy_mgr_is_sta_sap_scc(psoc, pcl_list_org[i]) &&
 		     wlan_reg_is_dfs_for_freq(pm_ctx->pdev, pcl_list_org[i]))) {
 			pcl_list_org[pcl_len] = pcl_list_org[i];
 			weight_list_org[pcl_len++] = weight_list_org[i];
@@ -891,10 +888,8 @@ static QDF_STATUS policy_mgr_modify_sap_pcl_based_on_dfs(
 		return status;
 	}
 
-	if (!skip_dfs_channel) {
-		policy_mgr_debug("No more operation on DFS channel");
+	if (!skip_dfs_channel)
 		return QDF_STATUS_SUCCESS;
-	}
 
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (!wlan_reg_is_dfs_in_secondary_list_for_freq(
@@ -970,7 +965,7 @@ policy_mgr_modify_pcl_based_on_srd(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 	for (i = 0; i < *pcl_len_org; i++) {
-		if (wlan_reg_is_etsi13_srd_chan_for_freq(
+		if (wlan_reg_is_etsi_srd_chan_for_freq(
 		    pm_ctx->pdev, pcl_list_org[i]))
 			continue;
 		pcl_list[pcl_len] = pcl_list_org[i];
@@ -1582,7 +1577,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 
 	for (i = 0; i < *len; i++) {
 		/* Remove passive/dfs/6G invalid channel for LL_LT_SAP */
-		if (wlan_reg_is_passive_for_freq(
+		if (wlan_reg_is_24ghz_ch_freq(pcl_channels[i]) ||
+		    wlan_reg_is_passive_for_freq(
 					pm_ctx->pdev,
 					pcl_channels[i]) ||
 		    wlan_reg_is_dfs_for_freq(
@@ -1726,6 +1722,8 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_conc_priority_mode conc_system_pref = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	enum QDF_OPMODE qdf_mode;
+	uint32_t orig_pcl_len;
+
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("context is NULL");
@@ -1822,7 +1820,11 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
-	policy_mgr_debug("PCL before modification");
+	if (!*len) {
+		policymgr_nofl_debug("Total PCL Chan %d", *len);
+		return QDF_STATUS_SUCCESS;
+	}
+	orig_pcl_len = *len;
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 	policy_mgr_mode_specific_modification_on_pcl(
 		psoc, pcl_channels, pcl_weight, len, weight_len, mode);
@@ -1835,8 +1837,10 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
-	policy_mgr_debug("PCL after modification");
-	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
+	if (orig_pcl_len != *len) {
+		policy_mgr_debug("PCL after modification");
+		policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3897,6 +3901,64 @@ update_pcl:
 	*pcl_len_org = pcl_len;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void
+policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
+				  qdf_freq_t *intf_ch_freq, uint8_t vdev_id)
+{
+	struct policy_mgr_pcl_list pcl;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+	uint32_t i;
+	uint32_t ap_pwr_type_6g = 0;
+
+	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(*intf_ch_freq))
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+
+	if (!vdev) {
+		policy_mgr_err("vdev %d is not present", vdev_id);
+		return;
+	}
+
+	ap_pwr_type_6g = wlan_mlme_get_6g_ap_power_type(vdev);
+	qdf_mem_zero(&pcl, sizeof(pcl));
+
+	/* PCL list is filtered with Non-PSC channels during
+	 * policy_mgr_pcl_modification_for_sap, Reuse same list to check
+	 * if STA is in PSC channel for STA + SAP concurrency during SAP restart
+	 */
+	status = policy_mgr_get_pcl_for_existing_conn(
+			psoc, PM_SAP_MODE, pcl.pcl_list, &pcl.pcl_len,
+			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list),
+			false, vdev_id);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Unable to get PCL for SAP");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return;
+	}
+
+	for (i = 0; i < pcl.pcl_len; i++) {
+		if ((WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl.pcl_list[i])) &&
+		    pcl.pcl_list[i] == *intf_ch_freq &&
+		    ap_pwr_type_6g == REG_VERY_LOW_POWER_AP) {
+			policy_mgr_debug("STA is in PSC channel %d in VLP mode, Hence SAP + STA allowed in PSC",
+					 *intf_ch_freq);
+			*intf_ch_freq = 0;
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			return;
+		}
+	}
+
+	/* if STA is in Non-PSC Channel + VLP or in non-VLP mode then move
+	 * SAP to 2 GHz from PCL list channels
+	 */
+	*intf_ch_freq = pcl.pcl_list[0];
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 }
 
 QDF_STATUS

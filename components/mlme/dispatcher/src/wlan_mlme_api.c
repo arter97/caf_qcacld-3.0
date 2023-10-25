@@ -737,6 +737,67 @@ bool wlan_mlme_cfg_get_aux_supported_modes(
 	return true;
 }
 
+/**
+ * wlan_mlme_is_aux_cap_support() - checking the corresponding capability
+ * @psoc: wlan_objmgr_psoc pointer
+ * @bit: the corresponding bit
+ * @hw_mode_id: hw mode id
+ *
+ * Return: true if corresponding capability supporting
+ */
+static bool
+wlan_mlme_is_aux_cap_support(struct wlan_objmgr_psoc *psoc,
+			     enum wlan_mlme_aux_caps_bit bit,
+			     enum wlan_mlme_hw_mode_config_type hw_mode_id)
+{
+	uint32_t supported_modes_bitmap = 0;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_mlme_aux_dev_caps *wlan_mlme_aux0_dev_caps;
+	int idx;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_err("MLME obj is NULL");
+		return false;
+	}
+
+	wlan_mlme_aux0_dev_caps = mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps;
+	if (hw_mode_id >= WLAN_MLME_HW_MODE_MAX) {
+		for (idx = 0; idx < WLAN_MLME_HW_MODE_MAX; idx++)
+			supported_modes_bitmap |=
+			    wlan_mlme_aux0_dev_caps[idx].supported_modes_bitmap;
+	} else {
+		supported_modes_bitmap =
+		     wlan_mlme_aux0_dev_caps[hw_mode_id].supported_modes_bitmap;
+	}
+
+	return (supported_modes_bitmap & (0x1 << bit)) ? true : false;
+}
+
+bool
+wlan_mlme_is_aux_scan_support(struct wlan_objmgr_psoc *psoc,
+			      enum wlan_mlme_hw_mode_config_type hw_mode_id)
+{
+	return wlan_mlme_is_aux_cap_support(psoc, WLAN_MLME_AUX_MODE_SCAN_BIT,
+					    hw_mode_id);
+}
+
+bool
+wlan_mlme_is_aux_listen_support(struct wlan_objmgr_psoc *psoc,
+				enum wlan_mlme_hw_mode_config_type hw_mode_id)
+{
+	return wlan_mlme_is_aux_cap_support(psoc, WLAN_MLME_AUX_MODE_LISTEN_BIT,
+					    hw_mode_id);
+}
+
+bool
+wlan_mlme_is_aux_emlsr_support(struct wlan_objmgr_psoc *psoc,
+			       enum wlan_mlme_hw_mode_config_type hw_mode_id)
+{
+	return wlan_mlme_is_aux_cap_support(psoc, WLAN_MLME_AUX_MODE_EMLSR_BIT,
+					    hw_mode_id);
+}
+
 #ifdef WLAN_FEATURE_11AX
 QDF_STATUS wlan_mlme_cfg_get_he_ul_mumimo(struct wlan_objmgr_psoc *psoc,
 					  uint32_t *value)
@@ -1411,6 +1472,31 @@ QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
 	}
 
 	return  status;
+}
+
+void
+wlan_mlme_set_bt_profile_con(struct wlan_objmgr_psoc *psoc,
+			     bool bt_profile_con)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	mlme_obj->cfg.gen.bt_profile_con = bt_profile_con;
+}
+
+bool
+wlan_mlme_get_bt_profile_con(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.gen.bt_profile_con;
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -3902,6 +3988,33 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 	}
 
 	mlme_obj->cfg.gen.t2lm_negotiation_support = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint8_t
+wlan_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return 0;
+
+	return mlme_obj->cfg.gen.mld_id;
+}
+
+QDF_STATUS
+wlan_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc,
+			 uint8_t value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.gen.mld_id = value;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -6401,6 +6514,20 @@ bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc)
 }
 
 #ifdef WLAN_FEATURE_11BE
+QDF_STATUS mlme_cfg_get_orig_eht_caps(struct wlan_objmgr_psoc *psoc,
+				      tDot11fIEeht_cap *eht_cap)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*eht_cap = mlme_obj->cfg.eht_caps.eht_cap_orig;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS mlme_cfg_get_eht_caps(struct wlan_objmgr_psoc *psoc,
 				 tDot11fIEeht_cap *eht_cap)
 {
@@ -7869,4 +7996,11 @@ wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev)
 		   mlme_priv->mlme_ap.oper_ch_width, wlan_vdev_get_id(vdev));
 
 	return mlme_priv->mlme_ap.oper_ch_width;
+}
+
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
+				    uint8_t csa_status)
+{
+	return wlan_mlme_send_csa_event_status_ind_cmd(vdev, csa_status);
 }

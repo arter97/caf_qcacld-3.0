@@ -492,7 +492,7 @@ policy_mgr_init_ml_link_update(struct policy_mgr_psoc_priv_obj *pm_ctx)
 {
 	QDF_STATUS qdf_status;
 
-	pm_ctx->set_link_in_progress = false;
+	qdf_atomic_init(&pm_ctx->link_in_progress);
 	qdf_status = qdf_event_create(&pm_ctx->set_link_update_done_evt);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		policy_mgr_err("init event failed for for set_link_update_done_evt");
@@ -507,7 +507,7 @@ policy_mgr_deinit_ml_link_update(struct policy_mgr_psoc_priv_obj *pm_ctx)
 {
 	QDF_STATUS qdf_status;
 
-	pm_ctx->set_link_in_progress = false;
+	qdf_atomic_set(&pm_ctx->link_in_progress, 0);
 	qdf_status = qdf_event_destroy(&pm_ctx->set_link_update_done_evt);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		policy_mgr_err("deinit event failed for set_link_update_done_evt");
@@ -929,6 +929,8 @@ QDF_STATUS policy_mgr_register_dp_cb(struct wlan_objmgr_psoc *psoc,
 		dp_cbacks->hdd_v2_flow_pool_map;
 	pm_ctx->dp_cbacks.hdd_v2_flow_pool_unmap =
 		dp_cbacks->hdd_v2_flow_pool_unmap;
+	pm_ctx->dp_cbacks.hdd_ipa_set_perf_level_bw =
+		dp_cbacks->hdd_ipa_set_perf_level_bw;
 
 	return QDF_STATUS_SUCCESS;
 }

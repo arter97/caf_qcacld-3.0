@@ -24,6 +24,7 @@
 #include "wlan_ll_sap_ucfg_api.h"
 #include "osif_sync.h"
 #include "wlan_hdd_cfg80211.h"
+#include "os_if_ll_sap.h"
 
 const struct nla_policy
 	wlan_hdd_ll_lt_sap_transport_switch_policy
@@ -53,9 +54,10 @@ __wlan_hdd_cfg80211_ll_lt_sap_transport_switch(struct wiphy *wiphy,
 	struct net_device *dev = wdev->netdev;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_objmgr_vdev *vdev;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_AUDIO_TRANSPORT_SWITCH_MAX + 1];
-	uint8_t transport_switch_type;
-	uint8_t transport_switch_status;
+	enum qca_wlan_audio_transport_switch_type transport_switch_type;
+	enum qca_wlan_audio_transport_switch_status transport_switch_status;
 	QDF_STATUS status;
 
 	hdd_enter_dev(dev);
@@ -65,97 +67,70 @@ __wlan_hdd_cfg80211_ll_lt_sap_transport_switch(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if (0 != wlan_hdd_validate_context(hdd_ctx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return -EINVAL;
 
-	if (!adapter)
+	if (hdd_validate_adapter(adapter))
 		return -EINVAL;
+
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+		return -EINVAL;
+
+	if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+					  adapter->deflink->vdev_id)) {
+		hdd_err("Command not allowed on vdev %d",
+			adapter->deflink->vdev_id);
+		return -EINVAL;
+	}
 
 	if (wlan_cfg80211_nla_parse(
 			tb, QCA_WLAN_VENDOR_ATTR_AUDIO_TRANSPORT_SWITCH_MAX,
 			data, data_len,
 			wlan_hdd_ll_lt_sap_transport_switch_policy)) {
-		hdd_err("Invalid attribute");
+		hdd_err("vdev %d Invalid attribute", adapter->deflink->vdev_id);
 		return -EINVAL;
 	}
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_AUDIO_TRANSPORT_SWITCH_TYPE]) {
-		hdd_err("attr transport switch type failed");
+		hdd_err("Vdev %d attr transport switch type failed",
+			adapter->deflink->vdev_id);
 		return -EINVAL;
 	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc,
+						    adapter->deflink->vdev_id,
+						    WLAN_LL_SAP_ID);
+	if (!vdev) {
+		hdd_err("vdev %d not found", adapter->deflink->vdev_id);
+		return -EINVAL;
+	}
+
 	transport_switch_type = nla_get_u8(
 			tb[QCA_WLAN_VENDOR_ATTR_AUDIO_TRANSPORT_SWITCH_TYPE]);
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_AUDIO_TRANSPORT_SWITCH_STATUS]) {
-		status = ucfg_ll_lt_sap_request_for_audio_transport_switch(
-							transport_switch_type);
-		hdd_debug("Transport switch request type %d status %d",
-			  transport_switch_type, status);
+		status = osif_ll_lt_sap_request_for_audio_transport_switch(
+						vdev,
+						transport_switch_type);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
+		hdd_debug("Transport switch request type %d status %d vdev %d",
+			  transport_switch_type, status,
+			  adapter->deflink->vdev_id);
 		return qdf_status_to_os_return(status);
 	}
 
 	transport_switch_status = nla_get_u8(
 			tb[QCA_WLAN_VENDOR_ATTR_AUDIO_TRANSPORT_SWITCH_STATUS]);
 
-	if (transport_switch_status ==
-		QCA_WLAN_AUDIO_TRANSPORT_SWITCH_STATUS_COMPLETED) {
-		hdd_debug("Transport switch request completed");
-		return 0;
-	} else if (transport_switch_status ==
-		QCA_WLAN_AUDIO_TRANSPORT_SWITCH_STATUS_REJECTED) {
-		hdd_debug("Transport switch request rejected");
-		return 0;
-	}
+	/* Deliver the switch response */
+	status = osif_ll_lt_sap_deliver_audio_transport_switch_resp(
+						vdev,
+						transport_switch_type,
+						transport_switch_status);
 
-	hdd_err("Invalid transport switch status");
-	return -EINVAL;
-}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
 
-int wlan_hdd_send_audio_transport_switch_req_event(struct hdd_adapter *adapter,
-						   uint8_t audio_switch_mode)
-{
-	struct sk_buff *vendor_event;
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	uint32_t len;
-
-	hdd_enter();
-
-	if (wlan_hdd_validate_context(hdd_ctx)) {
-		hdd_err("Invalid context");
-		return -EINVAL;
-	}
-	if (hdd_validate_adapter(adapter)) {
-		hdd_err("Invalid adapter");
-		return -EINVAL;
-	}
-
-	len = nla_total_size(sizeof(uint8_t)) + NLMSG_HDRLEN;
-
-	vendor_event = wlan_cfg80211_vendor_event_alloc(
-			hdd_ctx->wiphy,
-			&adapter->wdev,
-			len,
-			QCA_NL80211_VENDOR_SUBCMD_AUDIO_TRANSPORT_SWITCH_INDEX,
-			GFP_KERNEL);
-
-	if (!vendor_event) {
-		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
-		return -ENOMEM;
-	}
-
-	if (nla_put_u8(vendor_event,
-		       QCA_WLAN_VENDOR_ATTR_AUDIO_TRANSPORT_SWITCH_TYPE,
-		       audio_switch_mode)) {
-		hdd_err("VENDOR_ATTR_AUDIO_TRANSPORT_SWITCH_TYPE put fail");
-		wlan_cfg80211_vendor_free_skb(vendor_event);
-		return -EINVAL;
-	}
-
-	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
-
-	hdd_debug("transport switch request sent on %s interface",
-		   netdev_name(adapter->dev));
-	return 0;
+	return qdf_status_to_os_return(status);
 }
 
 int wlan_hdd_cfg80211_ll_lt_sap_transport_switch(struct wiphy *wiphy,

@@ -292,8 +292,8 @@ QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 	adapter = link_info->adapter;
 
 	if (link_info->vdev_id != adapter->deflink->vdev_id) {
-		hdd_err("Default VDEV %d not equal", adapter->deflink->vdev_id);
-		QDF_ASSERT(0);
+		hdd_err("Deflink VDEV %d not equals current VDEV %d",
+			adapter->deflink->vdev_id, link_info->vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -417,25 +417,30 @@ static void hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter)
 		temp_link_info->vdev_id = link_info->vdev_id;
 		qdf_spin_unlock_bh(&temp_link_info->vdev_lock);
 
+		/* Update VDEV-OSIF priv pointer to new link info. */
+		if (temp_link_info->vdev) {
+			osif_priv = wlan_vdev_get_ospriv(temp_link_info->vdev);
+			if (osif_priv)
+				osif_priv->legacy_osif_priv = temp_link_info;
+		}
+
 		/* Fill current link info's actual VDEV info */
 		qdf_spin_lock_bh(&link_info->vdev_lock);
 		link_info->vdev = vdev;
 		link_info->vdev_id = vdev_id;
 		qdf_spin_unlock_bh(&link_info->vdev_lock);
 
+		/* Update VDEV-OSIF priv pointer to new link info. */
+		if (link_info->vdev) {
+			osif_priv = wlan_vdev_get_ospriv(link_info->vdev);
+			if (osif_priv)
+				osif_priv->legacy_osif_priv = link_info;
+		}
+
 		/* Swap link flags */
 		link_flags = temp_link_info->link_flags;
 		temp_link_info->link_flags = link_info->link_flags;
 		link_info->link_flags = link_flags;
-
-		/* Update VDEV-OSIF priv pointer to new link info. */
-		if (!vdev)
-			continue;
-
-		osif_priv = wlan_vdev_get_ospriv(vdev);
-		if (!osif_priv)
-			continue;
-		osif_priv->legacy_osif_priv = link_info;
 
 		/* Update the mapping, current link info's mapping will be
 		 * set to be proper.
@@ -759,6 +764,23 @@ hdd_ml_generate_link_state_resp_nlmsg(struct sk_buff *skb,
 	return 0;
 }
 
+static char *link_state_status_id_to_str(uint32_t status)
+{
+	switch (status) {
+	case WLAN_LINK_INFO_EVENT_SUCCESS:
+		return "LINK_INFO_EVENT_SUCCESS";
+	case WLAN_LINK_INFO_EVENT_REJECT_FAILURE:
+		return "LINK_INFO_EVENT_REJECT_FAILURE";
+	case WLAN_LINK_INFO_EVENT_REJECT_VDEV_NOT_UP:
+		return "LINK_INFO_EVENT_REJECT_VDEV_NOT_UP";
+	case WLAN_LINK_INFO_EVENT_REJECT_ROAMING_IN_PROGRESS:
+		return "LINK_INFO_EVENT_REJECT_ROAMING_IN_PROGRESS";
+	case WLAN_LINK_INFO_EVENT_REJECT_NON_MLO_CONNECTION:
+		return "LINK_INFO_EVENT_REJECT_NON_MLO_CONNECTION";
+	}
+	return "Undefined link state status ID";
+}
+
 static QDF_STATUS wlan_hdd_link_state_request(struct wiphy *wiphy,
 					      struct wlan_objmgr_psoc *psoc,
 					      struct wlan_objmgr_vdev *vdev)
@@ -816,6 +838,12 @@ static QDF_STATUS wlan_hdd_link_state_request(struct wiphy *wiphy,
 		  link_state_event->vdev_id, link_state_event->status,
 		  link_state_event->num_mlo_vdev_link_info,
 		  QDF_MAC_ADDR_REF(link_state_event->mldaddr.bytes));
+
+	if (QDF_IS_STATUS_ERROR(link_state_event->status)) {
+		hdd_debug("ml_link_state_status failed %s",
+			  link_state_status_id_to_str(link_state_event->status));
+		return QDF_STATUS_E_INVAL;
+	}
 
 	for (num_info = 0; num_info < link_state_event->num_mlo_vdev_link_info;
 	     num_info++) {
@@ -896,6 +924,12 @@ int wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
 	case QCA_WLAN_VENDOR_LINK_STATE_OP_GET:
 		return wlan_hdd_link_state_request(wiphy, hdd_ctx->psoc, vdev);
 	case QCA_WLAN_VENDOR_LINK_STATE_OP_SET:
+		if (policy_mgr_is_set_link_in_progress(hdd_ctx->psoc)) {
+			hdd_debug("vdev %d: change link already in progress",
+				  vdev_id);
+			return -EBUSY;
+		}
+
 		break;
 	default:
 		hdd_debug("vdev %d: Invalid op type:%d", vdev_id, ml_link_op);

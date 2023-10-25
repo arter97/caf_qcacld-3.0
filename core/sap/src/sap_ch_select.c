@@ -2772,23 +2772,22 @@ sap_acs_next_lower_bandwidth(enum phy_ch_width ch_width)
 	return wlan_reg_get_next_lower_bandwidth(ch_width);
 }
 
-static void sap_sort_channel_list(struct mac_context *mac_ctx,
-				  uint8_t vdev_id,
-				  qdf_list_t *ch_list,
-				  struct sap_sel_ch_info *ch_info,
-				  v_REGDOMAIN_t *domain,
-				  uint32_t *operating_band)
+void sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
+			   qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
+			   v_REGDOMAIN_t *domain, uint32_t *operating_band)
 {
 	uint8_t country[CDS_COUNTRY_CODE_LEN + 1];
 	struct sap_context *sap_ctx;
 	enum phy_ch_width cur_bw;
+	v_REGDOMAIN_t reg_domain;
+	uint32_t op_band;
 
 	sap_ctx = mac_ctx->sap.sapCtxList[vdev_id].sap_context;
 	cur_bw = sap_ctx->acs_cfg->ch_width;
 
 	/* Initialize the structure pointed by spect_info */
 	if (!sap_chan_sel_init(mac_ctx, ch_info, sap_ctx, false)) {
-		sap_err("Ch Select initialization failed");
+		sap_err("vdev %d ch select initialization failed", vdev_id);
 		return;
 	}
 
@@ -2801,14 +2800,20 @@ static void sap_sort_channel_list(struct mac_context *mac_ctx,
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
 	wlan_reg_read_current_country(mac_ctx->psoc, country);
-	wlan_reg_get_domain_from_country_code(domain, country, SOURCE_DRIVER);
+	wlan_reg_get_domain_from_country_code(&reg_domain, country,
+					      SOURCE_DRIVER);
 
-	SET_ACS_BAND(*operating_band, sap_ctx);
+	SET_ACS_BAND(op_band, sap_ctx);
 
 	/* Sort the ch lst as per the computed weights, lesser weight first. */
-	sap_sort_chl_weight_all(mac_ctx, sap_ctx, ch_info, *operating_band,
-				*domain, &cur_bw);
+	sap_sort_chl_weight_all(mac_ctx, sap_ctx, ch_info, op_band,
+				reg_domain, &cur_bw);
 	sap_ctx->acs_cfg->ch_width = cur_bw;
+
+	if (domain)
+		*domain = reg_domain;
+	if (operating_band)
+		*operating_band = op_band;
 }
 
 uint32_t sap_select_channel(mac_handle_t mac_handle,
