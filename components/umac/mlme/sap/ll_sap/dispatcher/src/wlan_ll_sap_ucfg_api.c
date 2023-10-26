@@ -64,3 +64,13 @@ void ucfg_ll_sap_unregister_cb(void)
 {
 	ll_sap_unregister_os_if_cb();
 }
+
+QDF_STATUS ucfg_ll_sap_psoc_enable(struct wlan_objmgr_psoc *psoc)
+{
+	return ll_sap_psoc_enable(psoc);
+}
+
+QDF_STATUS ucfg_ll_sap_psoc_disable(struct wlan_objmgr_psoc *psoc)
+{
+	return ll_sap_psoc_disable(psoc);
+}

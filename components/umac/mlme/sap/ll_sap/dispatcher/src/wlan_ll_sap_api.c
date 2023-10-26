@@ -222,3 +222,44 @@ get_new_ll_lt_sap_freq:
 		     vdev_id, chan_freq, restart_freq, *csa_reason);
 	return restart_freq;
 }
+
+static void fw_bearer_switch_requester_cb(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
+					  wlan_bs_req_id request_id,
+					  QDF_STATUS status,
+					  uint32_t req_value,
+					  void *request_params)
+{
+	/*
+	 * Drop this response as all the responses to the FW is always
+	 * forwarded
+	 */
+}
+
+QDF_STATUS
+wlan_ll_sap_fw_bearer_switch_req(struct wlan_objmgr_psoc *psoc,
+				 enum bearer_switch_req_type req_type)
+{
+	struct wlan_bearer_switch_request bs_request = {0};
+	QDF_STATUS status;
+	uint8_t ll_lt_sap_vdev_id;
+
+	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
+
+	bs_request.vdev_id = ll_lt_sap_vdev_id;
+	bs_request.request_id = ll_lt_sap_bearer_switch_get_id(psoc);
+	bs_request.req_type = req_type;
+	bs_request.source = BEARER_SWITCH_REQ_FW;
+	bs_request.requester_cb = fw_bearer_switch_requester_cb;
+
+	if (req_type == WLAN_BS_REQ_TO_WLAN)
+		status = ll_lt_sap_switch_bearer_to_wlan(psoc, &bs_request);
+
+	else
+		status = ll_lt_sap_switch_bearer_to_ble(psoc, &bs_request);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return QDF_STATUS_E_ALREADY;
+
+	return QDF_STATUS_SUCCESS;
+}

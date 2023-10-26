@@ -89,6 +89,22 @@ void ucfg_ll_sap_register_cb(struct ll_sap_ops *ll_sap_global_ops);
  */
 void ucfg_ll_sap_unregister_cb(void);
 
+/**
+ * ucfg_ll_sap_psoc_enable() - Enable ll_lt_sap psoc
+ * @psoc: objmgr psoc pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_ll_sap_psoc_enable(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_ll_sap_psoc_disable() - Disable ll_lt_sap psoc
+ * @psoc: objmgr psoc pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_ll_sap_psoc_disable(struct wlan_objmgr_psoc *psoc);
+
 #else
 static inline QDF_STATUS ucfg_ll_sap_init(void)
 {
@@ -127,6 +143,16 @@ static inline void ucfg_ll_sap_register_cb(struct ll_sap_ops *ll_sap_global_ops)
 
 static inline void ucfg_ll_sap_unregister_cb(void)
 {
+}
+
+static inline QDF_STATUS ucfg_ll_sap_psoc_enable(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS ucfg_ll_sap_psoc_disable(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 #endif /* WLAN_FEATURE_LL_LT_SAP */

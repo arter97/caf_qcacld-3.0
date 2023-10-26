@@ -19391,10 +19391,12 @@ void hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	ucfg_tdls_psoc_enable(psoc);
 	ucfg_fwol_psoc_enable(psoc);
 	ucfg_action_oui_psoc_enable(psoc);
+	ucfg_ll_sap_psoc_enable(psoc);
 }
 
 void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
+	ucfg_ll_sap_psoc_disable(psoc);
 	ucfg_action_oui_psoc_disable(psoc);
 	ucfg_fwol_psoc_disable(psoc);
 	ucfg_tdls_psoc_disable(psoc);
