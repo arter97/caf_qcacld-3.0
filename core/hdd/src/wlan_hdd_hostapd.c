@@ -5258,7 +5258,14 @@ wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info)
 
 	wlan_hdd_add_sap_obss_scan_ie(link_info, genie, &total_ielen);
 
-	qdf_copy_macaddr(&update_ie.bssid, &adapter->mac_addr);
+	if (adapter->device_mode == QDF_SAP_MODE &&
+	    wlan_vdev_mlme_is_mlo_vdev(adapter->deflink->vdev))
+		qdf_mem_copy(&update_ie.bssid, &link_info->link_addr,
+			     QDF_MAC_ADDR_SIZE);
+	else
+		qdf_mem_copy(&update_ie.bssid, &adapter->mac_addr,
+			     QDF_MAC_ADDR_SIZE);
+
 	update_ie.vdev_id = link_info->vdev_id;
 
 	/* Added for Probe Response IE */
