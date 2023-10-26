@@ -85,6 +85,7 @@ void wlan_twt_get_feature_info(struct wlan_objmgr_psoc *psoc,
 		wlan_twt_cfg_get_requestor(
 					psoc,
 					&twt_feature_set->enable_twt_requester);
+		twt_feature_set->enable_twt_flexible = true;
 	}
 }
 #endif
