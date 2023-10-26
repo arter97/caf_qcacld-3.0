@@ -60,8 +60,6 @@
 /* WLAN MAC Address length */
 #define USER_MAC_ADDR_LEN     (ETH_ALEN * 3)
 
-#define STATS_IF_NSS_LENGTH   (6 * STATS_IF_SS_COUNT)
-
 #define MAX_STRING_LEN        500
 
 #define STATS_IF_MCS_VALID           1
@@ -2579,7 +2577,7 @@ static void stats_if_print_ru_loc(struct debug_data_tx_stats *tx)
 
 void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 {
-	char mu_group_id[STATS_IF_MU_GROUP_LENGTH] = {'\0'};
+	char *mu_group_id;
 	uint8_t i, mcs, ptype;
 	uint32_t j, index;
 
@@ -2640,18 +2638,26 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 		    tx->transmit_type[STATS_IF_MU_MIMO].mpdu_tried,
 		    tx->transmit_type[STATS_IF_MU_OFDMA].mpdu_tried,
 		    tx->transmit_type[STATS_IF_MU_MIMO_OFDMA].mpdu_tried);
+	mu_group_id = malloc(MAX_STRING_LEN);
+	if (!mu_group_id) {
+		STATS_PRINT("Failed to allocate byffer of %d bytes!\n",
+			    MAX_STRING_LEN);
+		return;
+	}
 	for (i = 0; i < STATS_IF_MAX_MU_GROUP_ID;) {
 		index = 0;
+		memset(mu_group_id, 0, MAX_STRING_LEN);
 		for (j = 0; j < STATS_IF_MU_GROUP_SHOW &&
 		     i < STATS_IF_MAX_MU_GROUP_ID; j++) {
 			index += snprintf(&mu_group_id[index],
-					  STATS_IF_MU_GROUP_LENGTH - index,
+					  MAX_STRING_LEN - index,
 					  " %d", tx->mu_group_id[i]);
 			i++;
 		}
 		STATS_PRINT("\tUser position list for GID %02u->%u: [%s]\n",
 			    i - STATS_IF_MU_GROUP_SHOW, i - 1, mu_group_id);
 	}
+	free(mu_group_id);
 	STATS_PRINT("\tTx MCS stats:\n");
 	for (ptype = 0; ptype < STATS_IF_DOT11_MAX; ptype++) {
 		for (mcs = 0; mcs < STATS_IF_MAX_MCS; mcs++) {
@@ -2678,7 +2684,7 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 {
 	uint32_t *pnss;
-	char nss[STATS_IF_NSS_LENGTH];
+	char *nss;
 	uint8_t i, mcs, ptype;
 	uint32_t index;
 
@@ -2712,13 +2718,20 @@ void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 				    rx->rx_mu[ptype].ppdu.mcs_count[mcs]);
 		}
 	}
+	nss = malloc(MAX_STRING_LEN);
+	if (!nss) {
+		STATS_PRINT("Failed to allocate buffer of %d zize!\n",
+			    MAX_STRING_LEN);
+		return;
+	}
 	for (ptype = 0; ptype < STATS_IF_TXRX_TYPE_MU_MAX; ptype++) {
 		STATS_PRINT("\tReception mode %s\n", mu_reception_mode[ptype]);
 		pnss = &rx->rx_mu[ptype].ppdu_nss[0];
 		index = 0;
+		memset(nss, 0, MAX_STRING_LEN);
 		for (i = 0; i < STATS_IF_SS_COUNT; i++) {
 			index += snprintf(&nss[index],
-					  STATS_IF_NSS_LENGTH - index,
+					  MAX_STRING_LEN - index,
 					  " %u", *(pnss + i));
 		}
 		STATS_PRINT("\t\t\tNSS(1-8) = %s\n", nss);
@@ -2726,6 +2739,7 @@ void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 			    rx->rx_mu[ptype].mpdu_cnt_fcs_ok,
 			    rx->rx_mu[ptype].mpdu_cnt_fcs_err);
 	}
+	free(nss);
 	STATS_PRINT("\tRx MCS stats:\n");
 	for (ptype = 0; ptype < STATS_IF_DOT11_MAX; ptype++) {
 		for (mcs = 0; mcs < STATS_IF_MAX_MCS; mcs++) {
@@ -3409,7 +3423,7 @@ void print_debug_radio_data_monitor(struct debug_pdev_data_monitor *monitor)
 		memset(str_buf, 0, MAX_STRING_LEN);
 		for (i = 0; i < STATS_IF_OFDMA_NUM_RU_SIZE; i++) {
 			index += snprintf(&str_buf[index],
-					  STATS_IF_OFDMA_NUM_RU_SIZE - index,
+					  MAX_STRING_LEN - index,
 					  " %u:%u,", i,
 					  monitor->data_rx_ru_size[i]);
 		}
@@ -3418,7 +3432,7 @@ void print_debug_radio_data_monitor(struct debug_pdev_data_monitor *monitor)
 		memset(str_buf, 0, MAX_STRING_LEN);
 		for (i = 0; i < STATS_IF_OFDMA_NUM_RU_SIZE; i++) {
 			index += snprintf(&str_buf[index],
-					  STATS_IF_OFDMA_NUM_RU_SIZE - index,
+					  MAX_STRING_LEN - index,
 					  " %u:%u,", i,
 					  monitor->nondata_rx_ru_size[i]);
 		}
