@@ -7108,16 +7108,14 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 
 	} else {
 		wlan_diag_event.subtype =
-		(uint8_t)cm_roam_get_tag(frame_data->subtype,
-					 !frame_data->is_rsp);
+			(uint8_t)cm_roam_get_tag(frame_data->subtype,
+						 !frame_data->is_rsp);
 		diag_event = EVENT_WLAN_MGMT;
 
 		wlan_diag_event.supported_links = frame_data->band;
-
-		status =
-			wlan_populate_mlo_mgmt_event_param(vdev,
-							   &wlan_diag_event,
-							   wlan_diag_event.subtype);
+		status = wlan_populate_roam_mld_log_param(vdev,
+							  &wlan_diag_event,
+							  wlan_diag_event.subtype);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlme_err("vdev: %d Unable to populate MLO parameter",
 				 wlan_vdev_get_id(vdev));

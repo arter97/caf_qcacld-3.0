@@ -3438,7 +3438,7 @@ cm_roam_print_frame_info(struct wlan_objmgr_psoc *psoc,
 {
 	struct roam_frame_info *frame_info;
 	char time[TIME_STRING_LEN];
-	uint8_t i, vdev_id;
+	uint8_t i, vdev_id, cached_vdev_id;
 
 	if (!frame_data->num_frame)
 		return;
@@ -3446,27 +3446,35 @@ cm_roam_print_frame_info(struct wlan_objmgr_psoc *psoc,
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	for (i = 0; i < frame_data->num_frame; i++) {
+		cached_vdev_id = vdev_id;
 		frame_info = &frame_data->frame_info[i];
+		/*
+		 * For SAE auth frame, since host sends the authentication
+		 * frames, its cached in the TX/RX path and the cached
+		 * frames are printed from here.
+		 */
 		if (frame_info->auth_algo == WLAN_SAE_AUTH_ALGO &&
-		    wlan_is_log_record_present_for_bssid(psoc,
-							 &frame_info->bssid,
-							 vdev_id)) {
+		    wlan_is_sae_auth_log_present_for_bssid(psoc,
+							   &frame_info->bssid,
+							   &cached_vdev_id)) {
 			wlan_print_cached_sae_auth_logs(psoc,
 							&frame_info->bssid,
-							vdev_id);
+							cached_vdev_id);
 			continue;
 		}
 
 		qdf_mem_zero(time, TIME_STRING_LEN);
 		mlme_get_converted_timestamp(frame_info->timestamp, time);
 
+		/* Log the auth & reassoc frames here to driver log */
 		if (frame_info->type != ROAM_FRAME_INFO_FRAME_TYPE_EXT)
-			mlme_nofl_info("%s [%s%s] VDEV[%d] status:%d seq_num:%d",
+			mlme_nofl_info("%s [%s%s] VDEV[%d] bssid: " QDF_MAC_ADDR_FMT " status:%d seq_num:%d",
 				       time,
 				       cm_get_frame_subtype_str(frame_info->subtype),
 				       frame_info->subtype ==  MGMT_SUBTYPE_AUTH ?
 				       (frame_info->is_rsp ? " RX" : " TX") : "",
 				       vdev_id,
+				       QDF_MAC_ADDR_REF(frame_info->bssid.bytes),
 				       frame_info->status_code,
 				       frame_info->seq_num);
 

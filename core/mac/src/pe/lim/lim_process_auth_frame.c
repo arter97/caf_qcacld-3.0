@@ -687,7 +687,8 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 
-	pe_nofl_rl_info("SAE Auth RX type %d subtype %d from "QDF_MAC_ADDR_FMT,
+	pe_nofl_rl_info("vdev:%d SAE Auth RX type %d subtype %d from " QDF_MAC_ADDR_FMT,
+			pe_session->vdev_id,
 			mac_hdr->fc.type, mac_hdr->fc.subType,
 			QDF_MAC_ADDR_REF(mac_hdr->sa));
 
@@ -765,15 +766,11 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 	}
 
 	if (LIM_IS_STA_ROLE(pe_session)) {
-		status = lim_update_link_to_mld_address(mac_ctx,
-							pe_session->vdev,
-							mac_hdr);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_debug("SAE address conversion failure with status:%d",
-				 status);
-			return;
-		}
-
+		/*
+		 * Cache the connectivity event with link address.
+		 * So call the Connectivity logging API before address
+		 * translation while forwarding the frame to userspace.
+		 */
 		auth_algo = *(uint16_t *)body_ptr;
 		if (frame_len >= (SAE_AUTH_STATUS_CODE_OFFSET + 2)) {
 			sae_auth_seq =
@@ -783,12 +780,22 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 				*(uint16_t *)(body_ptr +
 					      SAE_AUTH_STATUS_CODE_OFFSET);
 		}
+
 		wlan_connectivity_mgmt_event(
 			mac_ctx->psoc,
 			(struct wlan_frame_hdr *)mac_hdr, pe_session->vdev_id,
 			sae_status_code, 0,
 			WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info), auth_algo,
 			sae_auth_seq, sae_auth_seq, 0, WLAN_AUTH_RESP);
+
+		status = lim_update_link_to_mld_address(mac_ctx,
+							pe_session->vdev,
+							mac_hdr);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("vdev:%d STA SAE address conversion failed status:%d",
+				 pe_session->vdev_id, status);
+			return;
+		}
 	}
 
 	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
@@ -2146,6 +2153,7 @@ static
 bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 {
 	tpSirMacMgmtHdr dot11_hdr;
+	tSirMacMgmtHdr original_hdr;
 	uint16_t auth_alg, frm_len;
 	uint16_t sae_auth_seq = 0, sae_status_code = 0;
 	uint8_t *frm_body, pdev_id, vdev_id;
@@ -2153,6 +2161,7 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	dot11_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt);
+	original_hdr = *dot11_hdr;
 	frm_body = WMA_GET_RX_MPDU_DATA(rx_pkt);
 	frm_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt);
 
@@ -2201,13 +2210,13 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 	}
 
 	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("dropping the auth frame for vdev id: %d and BSSID " QDF_MAC_ADDR_FMT ", SAE address conversion failure",
+		pe_err("vdev:%d dropping auth frame BSSID: " QDF_MAC_ADDR_FMT ", SAE address conversion failure",
 		       vdev_id, QDF_MAC_ADDR_REF(dot11_hdr->bssId));
 		return false;
 	}
 
 	wlan_connectivity_mgmt_event(mac->psoc,
-				     (struct wlan_frame_hdr *)dot11_hdr,
+				     (struct wlan_frame_hdr *)&original_hdr,
 				     vdev_id, sae_status_code,
 				     0, WMA_GET_RX_RSSI_NORMALIZED(rx_pkt),
 				     auth_alg, sae_auth_seq,

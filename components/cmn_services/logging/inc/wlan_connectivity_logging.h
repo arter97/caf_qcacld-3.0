@@ -1128,6 +1128,22 @@ bool wlan_is_log_record_present_for_bssid(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id);
 
 /**
+ * wlan_is_sae_auth_log_present_for_bssid() - Is cached SAE auth log record
+ * present for the given bssid. This API checks on all the link vdev if the
+ * given vdev_id is an MLO vdev and updates the vdev_id to caller in which
+ * the auth frame was cached.
+ * @psoc: Global psoc pointer
+ * @bssid: BSSID
+ * @vdev_id: vdev id
+ *
+ * Return: True if an entry is found
+ */
+bool
+wlan_is_sae_auth_log_present_for_bssid(struct wlan_objmgr_psoc *psoc,
+				       struct qdf_mac_addr *bssid,
+				       uint8_t *vdev_id);
+
+/**
  * wlan_clear_sae_auth_logs_cache() - Clear the cached auth related logs
  * @psoc: Pointer to global psoc object
  * @vdev_id: vdev id
@@ -1149,6 +1165,14 @@ static inline
 bool wlan_is_log_record_present_for_bssid(struct wlan_objmgr_psoc *psoc,
 					  struct qdf_mac_addr *bssid,
 					  uint8_t vdev_id)
+{
+	return false;
+}
+
+static inline bool
+wlan_is_sae_auth_log_present_for_bssid(struct wlan_objmgr_psoc *psoc,
+				       struct qdf_mac_addr *bssid,
+				       uint8_t *vdev_id)
 {
 	return false;
 }
@@ -1279,6 +1303,18 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_diag_packet_info *data,
 				   enum wlan_main_tag tag);
 
+/**
+ * wlan_populate_roam_mld_log_param() - Populate roam MLO log parameters
+ * @vdev: Pointer to vdev object
+ * @data: Diag event packet info
+ * @tag: Main Tag
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_populate_roam_mld_log_param(struct wlan_objmgr_vdev *vdev,
+				 struct wlan_diag_packet_info *data,
+				 enum wlan_main_tag tag);
 #else
 static inline void
 wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
@@ -1308,6 +1344,14 @@ static inline QDF_STATUS
 wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_diag_packet_info *data,
 				   enum wlan_main_tag tag)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_populate_roam_mld_log_param(struct wlan_objmgr_vdev *vdev,
+				 struct wlan_diag_packet_info *data,
+				 enum wlan_main_tag tag)
 {
 	return QDF_STATUS_SUCCESS;
 }
