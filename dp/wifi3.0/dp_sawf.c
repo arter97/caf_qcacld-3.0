@@ -750,6 +750,7 @@ struct dp_peer *dp_sawf_get_peer(struct net_device *netdev, uint8_t *dest_mac,
 	struct dp_peer *peer = NULL;
 	wlan_if_t vap;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_peer *bss_peer;
 	struct dp_peer *primary_link_peer = NULL;
 	uint8_t vdev_id;
 
@@ -783,7 +784,16 @@ struct dp_peer *dp_sawf_get_peer(struct net_device *netdev, uint8_t *dest_mac,
 
 	vdev_id = wlan_vdev_get_id(vdev);
 
-	peer = dp_find_peer_by_destmac(*soc, dest_mac, vdev_id);
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
+		bss_peer = wlan_vdev_get_bsspeer(vdev);
+		if (!bss_peer) {
+			dp_sawf_err("NULL peer");
+			return NULL;
+		}
+		peer = dp_find_peer_by_destmac(*soc, bss_peer->macaddr, vdev_id);
+	} else {
+		peer = dp_find_peer_by_destmac(*soc, dest_mac, vdev_id);
+	}
 
 	if (!peer) {
 		dp_sawf_err("NULL peer");
