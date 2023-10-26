@@ -274,7 +274,10 @@ dfs_fill_emulate_bang_radar_test(struct wlan_dfs *dfs,
 			      FREQ_OFFSET_MASK) |
 		ADD_TO_32BYTE(bangradar_params->detector_id,
 			      DET_ID_SHIFT,
-			      DET_ID_MASK);
+			      DET_ID_MASK) |
+		ADD_TO_32BYTE(bangradar_params->is_fh_radar,
+			      IS_FH_SHIFT,
+			      IS_FH_MASK);
 
 	if (dfs->dfs_is_bangradar_320_supported) {
 		freq_offset_signbit = (
@@ -356,6 +359,7 @@ int dfs_bang_radar(struct wlan_dfs *dfs, void *indata, uint32_t insize)
 	dfs->dfs_seg_id = bangradar_params->seg_id;
 	dfs->dfs_is_chirp = bangradar_params->is_chirp;
 	dfs->dfs_freq_offset = bangradar_params->freq_offset;
+	dfs->dfs_is_fh_pulse = bangradar_params->is_fh_radar;
 
 	if (dfs->dfs_is_offload_enabled) {
 		error = dfs_fill_emulate_bang_radar_test(
