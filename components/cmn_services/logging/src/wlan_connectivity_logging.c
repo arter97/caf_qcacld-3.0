@@ -431,7 +431,7 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   enum wlan_main_tag tag)
 {
 	struct mlo_link_switch_context *link_ctx;
-	struct qdf_mac_addr peer_mac;
+	struct qdf_mac_addr peer_mac, peer_mld_mac;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!mlo_is_mld_sta(vdev))
@@ -447,16 +447,18 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 		return status;
 	}
 
-	qdf_mem_copy(data->diag_cmn.bssid,
-		     peer_mac.bytes,
-		     QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(data->diag_cmn.bssid, peer_mac.bytes, QDF_MAC_ADDR_SIZE);
 
-	qdf_mem_copy(data->mld_addr,
-		     wlan_vdev_mlme_get_mldaddr(vdev),
-		     QDF_MAC_ADDR_SIZE);
+	status = wlan_vdev_get_bss_peer_mld_mac(vdev, &peer_mld_mac);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		logging_err("vdev: %d failed to get mld mac address of peer",
+			    wlan_vdev_get_id(vdev));
+		return status;
+	}
 
-	if (tag == WLAN_ASSOC_REQ ||
-	    tag == WLAN_REASSOC_REQ) {
+	qdf_mem_copy(data->mld_addr, peer_mld_mac.bytes, QDF_MAC_ADDR_SIZE);
+
+	if (tag == WLAN_ASSOC_REQ || tag == WLAN_REASSOC_REQ) {
 		link_ctx = vdev->mlo_dev_ctx->link_ctx;
 		if (!link_ctx) {
 			logging_debug("vdev: %d link_ctx not found",
@@ -464,8 +466,7 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		data->supported_links =
-			wlan_populate_band_bitmap(link_ctx);
+		data->supported_links = wlan_populate_band_bitmap(link_ctx);
 	}
 
 	return status;
@@ -559,8 +560,6 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	wlan_diag_event.num_links = num_links;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_SETUP);
-
-	wlan_connectivity_t2lm_status_event(vdev);
 }
 
 #define IS_LINK_SET(link_bitmap, link_id) ((link_bitmap) & (BIT(link_id)))
