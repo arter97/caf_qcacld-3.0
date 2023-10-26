@@ -24106,7 +24106,7 @@ wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev,
 	mlo_peer_lock_acquire(ml_peer);
 	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
 		peer_entry = &ml_peer->peer_list[i];
-		if (!peer_entry)
+		if (!peer_entry->link_peer)
 			continue;
 		/* Checking for VDEV match which will
 		 * be used for multiple VDEV case.
