@@ -109,6 +109,18 @@ ucfg_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_coex_send_btc_chain_mode(struct wlan_objmgr_vdev *vdev,
 			      enum coex_btc_chain_mode mode);
+
+/**
+ * ucfg_coex_send_multi_config() - API to send coex multiple config to target
+ * @vdev: pointer to vdev object
+ * @param: pointer to coex multiple config parameters
+ *
+ * Return: status of operation
+ */
+QDF_STATUS
+ucfg_coex_send_multi_config(struct wlan_objmgr_vdev *vdev,
+			    struct coex_multi_config *param);
+
 /**
  * ucfg_coex_send_logging_config() - API to send BT coex logging config to
  * target if
@@ -144,6 +156,13 @@ ucfg_coex_send_btc_chain_mode(struct wlan_objmgr_vdev *vdev,
 			      enum coex_btc_chain_mode mode)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_coex_send_multi_config(struct wlan_objmgr_vdev *vdev,
+			    struct coex_multi_config *param)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static inline QDF_STATUS

@@ -8117,6 +8117,166 @@ void hdd_adapter_update_mlo_mgr_mac_addr(struct hdd_adapter *adapter)
 	mlo_mgr_update_link_info_mac_addr(adapter->deflink->vdev, &link_mac);
 }
 
+#ifdef FEATURE_COEX
+/**
+ * hdd_send_coex_config_params() - Send coex config params to FW
+ * @hdd_ctx: HDD context
+ * @adapter: Primary adapter context
+ *
+ * This function is used to send all coex config related params to FW
+ *
+ * Return: 0 on success and -EINVAL on failure
+ */
+static int hdd_send_coex_config_params(struct hdd_context *hdd_ctx,
+				       struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct coex_config_params coex_cfg_params = {0};
+	struct coex_multi_config *coex_multi_cfg = NULL;
+	struct wlan_fwol_coex_config config = {0};
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	enum coex_btc_chain_mode btc_chain_mode;
+	QDF_STATUS status;
+	uint32_t i = 0;
+
+	if (!adapter) {
+		hdd_err("adapter is invalid");
+		goto err;
+	}
+
+	if (!psoc) {
+		hdd_err("HDD psoc is invalid");
+		goto err;
+	}
+
+	status = ucfg_fwol_get_coex_config_params(psoc, &config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Unable to get coex config params");
+		goto err;
+	}
+
+	coex_multi_cfg = qdf_mem_malloc(sizeof(*coex_multi_cfg));
+	if (!coex_multi_cfg)
+		goto err;
+
+	coex_multi_cfg->vdev_id = adapter->deflink->vdev_id;
+
+	coex_multi_cfg->cfg_items[i].config_type = WMI_COEX_CONFIG_TX_POWER;
+	coex_multi_cfg->cfg_items[i].config_arg1 = config.max_tx_power_for_btc;
+
+	wma_nofl_debug("TXP[W][send_coex_cfg]: %d",
+		       config.max_tx_power_for_btc);
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+					WMI_COEX_CONFIG_HANDOVER_RSSI;
+	coex_multi_cfg->cfg_items[i].config_arg1 =
+					config.wlan_low_rssi_threshold;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type = WMI_COEX_CONFIG_BTC_MODE;
+
+	/* Modify BTC_MODE according to BTC_CHAIN_MODE */
+	status = ucfg_coex_psoc_get_btc_chain_mode(psoc, &btc_chain_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get btc chain mode");
+		btc_chain_mode = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
+	}
+
+	if (btc_chain_mode <= WLAN_COEX_BTC_CHAIN_MODE_HYBRID)
+		coex_multi_cfg->cfg_items[i].config_arg1 = btc_chain_mode;
+	else
+		coex_multi_cfg->cfg_items[i].config_arg1 = config.btc_mode;
+
+	hdd_debug("Configured BTC mode is %d, BTC chain mode is 0x%x, set BTC mode to %d",
+		  config.btc_mode, btc_chain_mode,
+		  coex_multi_cfg->cfg_items[i].config_arg1);
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_ANTENNA_ISOLATION;
+	coex_multi_cfg->cfg_items[i].config_arg1 = config.antenna_isolation;
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_BT_LOW_RSSI_THRESHOLD;
+	coex_multi_cfg->cfg_items[i].config_arg1 = config.bt_low_rssi_threshold;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_BT_INTERFERENCE_LEVEL;
+	coex_multi_cfg->cfg_items[i].config_arg1 =
+				config.bt_interference_low_ll;
+	coex_multi_cfg->cfg_items[i].config_arg2 =
+				config.bt_interference_low_ul;
+	coex_multi_cfg->cfg_items[i].config_arg3 =
+				config.bt_interference_medium_ll;
+	coex_multi_cfg->cfg_items[i].config_arg4 =
+				config.bt_interference_medium_ul;
+	coex_multi_cfg->cfg_items[i].config_arg5 =
+				config.bt_interference_high_ll;
+	coex_multi_cfg->cfg_items[i].config_arg6 =
+				config.bt_interference_high_ul;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	if (wlan_hdd_mpta_helper_enable(&coex_cfg_params, &config))
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_BT_SCO_ALLOW_WLAN_2G_SCAN;
+	coex_multi_cfg->cfg_items[i].config_arg1 =
+				config.bt_sco_allow_wlan_2g_scan;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_LE_SCAN_POLICY;
+	coex_multi_cfg->cfg_items[i].config_arg1 = config.ble_scan_coex_policy;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+#ifdef FEATURE_COEX_TPUT_SHAPING_CONFIG
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_ENABLE_TPUT_SHAPING;
+	coex_multi_cfg->cfg_items[i].config_arg1 =
+				config.coex_tput_shaping_enable;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+#endif
+
+	coex_multi_cfg->num_configs = i;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_COEX_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		goto err;
+	}
+
+	ucfg_coex_send_multi_config(vdev, coex_multi_cfg);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_COEX_ID);
+	qdf_mem_free(coex_multi_cfg);
+
+	return 0;
+err:
+	qdf_mem_free(coex_multi_cfg);
+	return -EINVAL;
+}
+#else
 /**
  * hdd_send_coex_config_params() - Send coex config params to FW
  * @hdd_ctx: HDD context
@@ -8267,6 +8427,7 @@ static int hdd_send_coex_config_params(struct hdd_context *hdd_ctx,
 err:
 	return -EINVAL;
 }
+#endif
 
 /**
  * hdd_send_coex_traffic_shaping_mode() - Send coex traffic shaping mode

@@ -23,6 +23,7 @@
 #include <wlan_coex_ucfg_api.h>
 #include "wmi_unified.h"
 #include "wlan_coex_public_structs.h"
+#include "wlan_coex_tgt_api.h"
 
 QDF_STATUS
 ucfg_coex_register_cfg_updated_handler(struct wlan_objmgr_psoc *psoc,
@@ -75,6 +76,13 @@ ucfg_coex_send_btc_chain_mode(struct wlan_objmgr_vdev *vdev,
 	coex_debug("send btc chain mode %d for vdev %d", mode, param.vdev_id);
 
 	return wlan_coex_config_send(vdev, &param);
+}
+
+QDF_STATUS
+ucfg_coex_send_multi_config(struct wlan_objmgr_vdev *vdev,
+			    struct coex_multi_config *param)
+{
+	return wlan_coex_multi_config_send(vdev, param);
 }
 
 #ifdef WLAN_FEATURE_DBAM_CONFIG
