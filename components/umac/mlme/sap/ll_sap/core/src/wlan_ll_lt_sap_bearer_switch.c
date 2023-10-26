@@ -491,6 +491,25 @@ invoke_requester_cb:
 }
 
 /**
+ * ll_lt_sap_handle_bs_to_wlan_completed_wlan_in_non_wlan_state() - API to
+ * handle bearer switch to wlan completed event in non-wlan state.
+ * @bs_ctx: Bearer switch context
+ *
+ * This event is possible only if current bearer is non-wlan and user space
+ * switches the bearer to wlan first time after bringing up the LL_LT_SAP.
+ * Since host driver did not request for the bearer switch so there will not
+ * be any valid bearer switch request.
+ *
+ * Return: None
+ */
+static void
+ll_lt_sap_handle_bs_to_wlan_completed_wlan_in_non_wlan_state(
+				struct bearer_switch_info *bs_ctx)
+{
+	bs_sm_transition_to(bs_ctx, BEARER_WLAN);
+}
+
+/**
  * ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_state() - API to handle bearer
  * switch to non-wlan in non-wlan state.
  * @bs_ctx: Bearer switch context
@@ -608,7 +627,7 @@ ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_requested_state(
  * @bs_req: Bearer switch request
  *
  * Move the bearer state to BEARER_NON_WLAN, even if this request is timedout as
- * requester of this request needs to invoke the earer switch to wlan again
+ * requester of this request needs to invoke the bearer switch to wlan again
  * to reset the ref counts and in that path the state will be moved to
  * BEARER_WLAN and the request to switch the bearer to userspace will still be
  * sent irrespective of last_status and userspace should return success as
@@ -1049,7 +1068,8 @@ static bool bs_state_non_wlan_event(void *ctx, uint16_t event,
 	struct bearer_switch_info *bs_ctx = ctx;
 	struct wlan_bearer_switch_request *bs_req = data;
 
-	if (!ll_lt_sap_is_bs_req_valid(bs_req))
+	if (event != WLAN_BS_SM_EV_SWITCH_TO_WLAN_COMPLETED &&
+	    !ll_lt_sap_is_bs_req_valid(bs_req))
 		return false;
 	if (!ll_lt_sap_is_bs_ctx_valid(bs_ctx))
 		return false;
@@ -1061,6 +1081,14 @@ static bool bs_state_non_wlan_event(void *ctx, uint16_t event,
 	case WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN:
 		ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_state(bs_ctx,
 								  bs_req);
+		break;
+	/*
+	 * This event is possible when userspace first time sends the request
+	 * to switch the bearer.
+	 */
+	case WLAN_BS_SM_EV_SWITCH_TO_WLAN_COMPLETED:
+		ll_lt_sap_handle_bs_to_wlan_completed_wlan_in_non_wlan_state(
+									bs_ctx);
 		break;
 	default:
 		event_handled = false;
@@ -1602,33 +1630,21 @@ static void ll_lt_sap_deliver_wlan_audio_transport_switch_resp(
 	 * If bs_request is cached in the BS_SM, it means this is a response
 	 * to the host driver's request of bearer switch so deliver the event
 	 * to the BS_SM
-	 */
-	if (bs_request) {
-		if (status == WLAN_BS_STATUS_COMPLETED)
-			bs_sm_deliver_event(
-					wlan_vdev_get_psoc(vdev),
-					WLAN_BS_SM_EV_SWITCH_TO_WLAN_COMPLETED,
-					sizeof(*bs_request), bs_request);
-		else if (status == WLAN_BS_STATUS_REJECTED)
-			bs_sm_deliver_event(
-					wlan_vdev_get_psoc(vdev),
-					WLAN_BS_SM_EV_SWITCH_TO_WLAN_FAILURE,
-					sizeof(*bs_request), bs_request);
-		else
-			ll_sap_err(BS_PREFIX_FMT "Invalid BS status %d",
-				   BS_PREFIX_REF(wlan_vdev_get_id(vdev),
-						 bs_request->request_id),
-				   status);
-		return;
-	}
-
-	/*
 	 * If there is no cached request in BS_SM, it means that some other
 	 * module (other than wlan) has performed the bearer switch and it is
-	 * not a response of the wlan module's bearer switch request, so just
-	 * update the current state of the state machine
+	 * not a response of the wlan module's bearer switch request.
 	 */
-	bs_sm_state_update(bs_ctx, BEARER_WLAN);
+	if (status == WLAN_BS_STATUS_COMPLETED)
+		bs_sm_deliver_event(wlan_vdev_get_psoc(vdev),
+				    WLAN_BS_SM_EV_SWITCH_TO_WLAN_COMPLETED,
+				    sizeof(*bs_request), bs_request);
+	else if (status == WLAN_BS_STATUS_REJECTED)
+		bs_sm_deliver_event(wlan_vdev_get_psoc(vdev),
+				    WLAN_BS_SM_EV_SWITCH_TO_WLAN_FAILURE,
+				    sizeof(*bs_request), bs_request);
+	else
+		ll_sap_err("BS_SM vdev %d Invalid BS status %d",
+			   wlan_vdev_get_id(vdev), status);
 }
 
 /**
@@ -1706,8 +1722,11 @@ ll_lt_sap_deliver_audio_transport_switch_resp(
 								vdev,
 								status);
 
-	if (req_type == WLAN_BS_REQ_TO_WLAN)
+	else if (req_type == WLAN_BS_REQ_TO_WLAN)
 		ll_lt_sap_deliver_wlan_audio_transport_switch_resp(
 								vdev,
 								status);
+	else
+		ll_sap_err("Vdev %d Invalid req_type %d ",
+			   wlan_vdev_get_id(vdev), req_type);
 }
