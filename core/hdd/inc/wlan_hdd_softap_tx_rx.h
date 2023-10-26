@@ -162,13 +162,13 @@ QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter);
 
 /**
  * hdd_softap_change_sta_state() - Change the state of a SoftAP station
- * @adapter: pointer to adapter context
+ * @link_info: Link info pointer in HDD adapter
  * @sta_mac: MAC address of the station
  * @state: new state of the station
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
-QDF_STATUS hdd_softap_change_sta_state(struct hdd_adapter *adapter,
+QDF_STATUS hdd_softap_change_sta_state(struct wlan_hdd_link_info *link_info,
 				       struct qdf_mac_addr *sta_mac,
 				       enum ol_txrx_peer_state state);
 

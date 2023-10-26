@@ -2563,7 +2563,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			  "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
 
 		if (QDF_IS_STATUS_SUCCESS(key_complete->status)) {
-			hdd_softap_change_sta_state(adapter,
+			hdd_softap_change_sta_state(link_info,
 						    &key_complete->peerMacAddr,
 						    OL_TXRX_PEER_STATE_AUTH);
 		status = wlan_hdd_send_sta_authorized_event(

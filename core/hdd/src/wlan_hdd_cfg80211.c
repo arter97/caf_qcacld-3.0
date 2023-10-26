@@ -23146,7 +23146,7 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 			}
 
 			status =
-				hdd_softap_change_sta_state(adapter,
+				hdd_softap_change_sta_state(adapter->deflink,
 							    &sta_macaddr,
 							    OL_TXRX_PEER_STATE_AUTH);
 
