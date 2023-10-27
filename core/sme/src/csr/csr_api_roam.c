@@ -7649,13 +7649,28 @@ void csr_process_sap_ch_width_update(struct mac_context *mac, tSmeCmd *command)
 	QDF_STATUS status;
 	struct scheduler_msg msg_return = {0};
 	struct sir_bcn_update_rsp *param;
-	struct csr_roam_session *session;
+	enum policy_mgr_conn_update_reason reason =
+				command->u.bw_update_cmd.reason;
 
 	if (!CSR_IS_SESSION_VALID(mac, command->vdev_id)) {
 		sme_err("Invalid session id %d", command->vdev_id);
 		goto fail;
 	}
-	session = CSR_GET_SESSION(mac, command->vdev_id);
+
+	if ((reason == POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC) &&
+	    (mac->sme.get_connection_info_cb(NULL, NULL))) {
+		policy_mgr_restart_opportunistic_timer(mac->psoc, false);
+		sme_info("Vdev %d : Avoid set BW as conn in progress",
+			 command->vdev_id);
+		goto fail;
+	}
+
+	if ((reason == POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC) &&
+	    (!policy_mgr_need_opportunistic_upgrade(mac->psoc, &reason))) {
+		sme_info("Vdev %d: BW update not needed anymore",
+			 command->vdev_id);
+		goto fail;
+	}
 
 	len = sizeof(*msg);
 	msg = qdf_mem_malloc(len);
@@ -7679,7 +7694,6 @@ void csr_process_sap_ch_width_update(struct mac_context *mac, tSmeCmd *command)
 
 	sme_err("Posting to PE failed");
 fail:
-	sme_err("Sending ch_width update fail response to SME");
 	param = qdf_mem_malloc(sizeof(*param));
 	if (param) {
 		param->status = QDF_STATUS_E_FAILURE;

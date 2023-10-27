@@ -305,6 +305,11 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
 	bool eht_capab = false;
 
+	/*
+	 * Stop any running opportunistic timer as it will be started after
+	 * decision if required.
+	 */
+	policy_mgr_stop_opportunistic_timer(psoc);
 	if (QDF_IS_STATUS_ERROR(wlan_psoc_mlme_get_11be_capab(psoc,
 							      &eht_capab)) ||
 	    !eht_capab ||
@@ -961,6 +966,9 @@ policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
 
 	connection_count = policy_mgr_get_connection_info(psoc, info);
 
+	if (connection_count == 1)
+		return false;
+
 	for (i = 0; i < connection_count; i++)
 		if (!policy_mgr_2_freq_always_on_same_mac(psoc, freq,
 							  info[i].ch_freq))
@@ -1136,6 +1144,11 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 	enum phy_ch_width cur_bw = CH_WIDTH_INVALID;
 
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		/*
+		 * Stop any running opportunistic timer as it will be started
+		 * after decision if required.
+		 */
+		policy_mgr_stop_opportunistic_timer(psoc);
 		wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
 		if (eht_capab &&
 		    QDF_IS_STATUS_SUCCESS(policy_mgr_get_sap_bw(psoc,

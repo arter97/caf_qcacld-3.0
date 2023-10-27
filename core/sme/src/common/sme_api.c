@@ -11900,8 +11900,7 @@ sme_sap_update_ch_width(struct wlan_objmgr_psoc *psoc,
 	cmd->u.bw_update_cmd.request_id = request_id;
 	cmd->u.bw_update_cmd.conc_vdev_id = conc_vdev_id;
 
-	sme_debug("Queuing e_sme_command_sap_ch_width_update to CSR:vdev %d ch_width: %d reason: %d",
-		  vdev_id, ch_width, reason);
+	sme_debug("vdev %d ch_width: %d reason: %d", vdev_id, ch_width, reason);
 	csr_queue_sme_command(mac, cmd, false);
 	sme_release_global_lock(&mac->sme);
 
