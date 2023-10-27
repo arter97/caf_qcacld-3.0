@@ -2755,6 +2755,8 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_sta_mlo_cfg(psoc, sta);
 	wlan_mlme_set_epcs_capability(psoc, false);
 	wlan_mlme_set_usr_disable_sta_eht(psoc, false);
+	wlan_mlme_set_eht_disable_punct_in_us_lpi(psoc,
+						  cfg_default(CFG_EHT_DISABLE_PUNCT_IN_US_LPI));
 }
 
 static void mlme_init_stats_cfg(struct wlan_objmgr_psoc *psoc,
