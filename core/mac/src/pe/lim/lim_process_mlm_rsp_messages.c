@@ -2997,6 +2997,64 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 }
 #endif /* (WLAN_FEATURE_ROAM_OFFLOAD) && (WLAN_FEATURE_11BE_MLO) */
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
+{
+	struct mlo_partner_info *partner_info;
+	struct mlo_link_info *partner_link_info;
+	struct wlan_channel channel;
+	struct mlo_link_switch_context *link_ctx;
+	uint8_t i = 0;
+
+	if (!session->vdev) {
+		pe_err("vdev:%d is NULL", session->vdev_id);
+		return;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(session->vdev))
+		return;
+
+	if (!session->lim_join_req) {
+		pe_err("vdev:%d lim_join_req is NULL", session->vdev_id);
+		return;
+	}
+
+	link_ctx = session->vdev->mlo_dev_ctx->link_ctx;
+	if (!link_ctx) {
+		pe_err("vdev:%d MLO Link_ctx not found",
+		       session->vdev_id);
+		return;
+	}
+
+	/* Populating Assoc Link Band info */
+	channel.ch_freq = (uint16_t)session->curr_op_freq;
+
+	mlo_mgr_reset_ap_link_info(session->vdev);
+	mlo_mgr_update_ap_link_info(session->vdev,
+				    wlan_vdev_get_link_id(session->vdev),
+				    session->bssId, channel);
+
+	/* Populating Partner link band Info */
+	partner_info = &session->lim_join_req->partner_info;
+	for (i = 0; i < partner_info->num_partner_links; i++) {
+		partner_link_info = &partner_info->partner_link_info[i];
+
+		qdf_mem_zero(&channel, sizeof(channel));
+		channel.ch_freq = partner_link_info->chan_freq;
+
+		mlo_mgr_update_ap_link_info(session->vdev,
+					    partner_link_info->link_id,
+					    partner_link_info->ap_link_addr.bytes,
+					    channel);
+	}
+}
+#else
+static void
+lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
+{}
+#endif
+
 /**
  * lim_process_switch_channel_join_req() -Initiates probe request
  *
@@ -3098,6 +3156,9 @@ static void lim_process_switch_channel_join_req(
 		join_cnf.sessionId = session_entry->peSessionId;
 		join_cnf.resultCode = eSIR_SME_SUCCESS;
 		join_cnf.protStatusCode = STATUS_SUCCESS;
+
+		lim_update_mlo_mgr_ap_link_info_mbssid_connect(session_entry);
+
 		lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
 				     (uint32_t *)&join_cnf);
 		return;
