@@ -967,6 +967,11 @@ QDF_STATUS sme_update_config(mac_handle_t mac_handle,
 		sme_err("SME config params empty");
 		return status;
 	}
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("SME lock error %d", status);
+		return status;
+	}
 
 	status = csr_change_default_config_param(mac, &pSmeConfigParams->
 						csr_config);
@@ -980,7 +985,9 @@ QDF_STATUS sme_update_config(mac_handle_t mac_handle,
 	if (csr_is_all_session_disconnected(mac))
 		csr_set_global_cfgs(mac);
 
-	return status;
+	sme_release_global_lock(&mac->sme);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS sme_update_roam_params(mac_handle_t mac_handle,
