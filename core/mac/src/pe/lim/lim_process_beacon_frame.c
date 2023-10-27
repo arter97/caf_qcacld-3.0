@@ -356,6 +356,9 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 			ori_punc = QDF_GET_BITS(eht_op->disabled_sub_chan_bitmap[0][0], 0, 8);
 			ori_punc |= QDF_GET_BITS(eht_op->disabled_sub_chan_bitmap[0][1], 0, 8) << 8;
 
+			if (!wlan_mlme_get_eht_disable_punct_in_us_lpi(mac_ctx->psoc))
+				goto update_bw;
+
 			bss_chan.ch_freq = bcn_ptr->chan_freq;
 			bss_chan.puncture_bitmap = ori_punc;
 			bss_chan.ch_width = ori_bw;
@@ -397,6 +400,7 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 		return;
 	}
 
+update_bw:
 	status = lim_get_update_eht_bw_puncture_allow(session, ori_bw,
 						      &new_bw,
 						      &update_allow);
