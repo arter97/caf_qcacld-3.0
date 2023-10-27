@@ -1959,7 +1959,7 @@ release_ref:
 
 #ifdef WLAN_MLD_AP_STA_CONNECT_SUPPORT
 static void
-hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
+hdd_hostapd_sap_fill_peer_ml_info(struct wlan_hdd_link_info *link_info,
 				  struct station_info *sta_info,
 				  uint8_t *peer_mac)
 {
@@ -1967,8 +1967,9 @@ hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_peer *sta_peer;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("Failed to get link id, VDEV NULL");
 		return;
@@ -2003,7 +2004,7 @@ hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
 }
 #elif defined(CFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT)
 static void
-hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
+hdd_hostapd_sap_fill_peer_ml_info(struct wlan_hdd_link_info *link_info,
 				  struct station_info *sta_info,
 				  uint8_t *peer_mac)
 {
@@ -2011,8 +2012,9 @@ hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_peer *sta_peer;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+	vdev = hdd_objmgr_get_vdev_by_user(link_info,
 					   WLAN_HDD_ID_OBJ_MGR);
 	if (!vdev) {
 		hdd_err("Failed to get link id, VDEV NULL");
@@ -2049,7 +2051,7 @@ hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
 }
 #else
 static void
-hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
+hdd_hostapd_sap_fill_peer_ml_info(struct wlan_hdd_link_info *link_info,
 				  struct station_info *sta_info,
 				  uint8_t *peer_mac)
 {
@@ -2859,7 +2861,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			 * For Legacy clients MLD address will be
 			 * NULL MAC address.
 			 */
-			hdd_hostapd_sap_fill_peer_ml_info(adapter, sta_info,
+			hdd_hostapd_sap_fill_peer_ml_info(link_info, sta_info,
 							  event->staMac.bytes);
 
 			if (notify_new_sta)
