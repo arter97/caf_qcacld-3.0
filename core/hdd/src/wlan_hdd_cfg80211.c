@@ -7288,7 +7288,6 @@ wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 	return errno;
 }
 
-#define RATEMASK_PARAMS_TYPE_MAX 4
 #define RATEMASK_PARAMS_BITMAP_MAX 16
 #define RATEMASK_PARAMS_MAX QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_MAX
 const struct nla_policy wlan_hdd_set_ratemask_param_policy[
@@ -7298,6 +7297,25 @@ const struct nla_policy wlan_hdd_set_ratemask_param_policy[
 	[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_BITMAP] = {.type = NLA_BINARY,
 					.len = RATEMASK_PARAMS_BITMAP_MAX},
 };
+
+static enum ratemask_param_type
+hdd_convert_to_drv_ratemask_type(enum qca_wlan_ratemask_params_type type)
+{
+	switch (type) {
+	case QCA_WLAN_RATEMASK_PARAMS_TYPE_CCK_OFDM:
+		return RATEMASK_PARAMS_TYPE_CCK_OFDM;
+	case QCA_WLAN_RATEMASK_PARAMS_TYPE_HT:
+		return RATEMASK_PARAMS_TYPE_HT;
+	case QCA_WLAN_RATEMASK_PARAMS_TYPE_VHT:
+		return RATEMASK_PARAMS_TYPE_VHT;
+	case QCA_WLAN_RATEMASK_PARAMS_TYPE_HE:
+		return RATEMASK_PARAMS_TYPE_HE;
+	case QCA_WLAN_RATEMASK_PARAMS_TYPE_EHT:
+		return RATEMASK_PARAMS_TYPE_EHT;
+	default:
+		return RATEMASK_PARAMS_TYPE_MAX;
+	}
+}
 
 /**
  * hdd_set_ratemask_params() - parse ratemask params
@@ -7334,8 +7352,7 @@ static int hdd_set_ratemask_params(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	memset(rate_params, 0, (RATEMASK_PARAMS_TYPE_MAX *
-				sizeof(struct config_ratemask_params)));
+	qdf_mem_set(&rate_params, sizeof(rate_params), 0);
 
 	nla_for_each_nested(curr_attr,
 			    tb[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_LIST],
@@ -7364,7 +7381,9 @@ static int hdd_set_ratemask_params(struct hdd_context *hdd_ctx,
 		}
 
 		ratemask_type =
-		 nla_get_u8(tb2[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_TYPE]);
+		     nla_get_u8(tb2[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_TYPE]);
+
+		ratemask_type = hdd_convert_to_drv_ratemask_type(ratemask_type);
 		if (ratemask_type >= RATEMASK_PARAMS_TYPE_MAX) {
 			hdd_err("invalid ratemask type");
 			return -EINVAL;
