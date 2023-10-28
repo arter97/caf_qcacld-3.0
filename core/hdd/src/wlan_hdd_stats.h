@@ -43,7 +43,7 @@
 #define WLAN_WAIT_TIME_LL_STATS 800
 #endif
 
-#define WLAN_HDD_TGT_NOISE_FLOOR_DBM     (-96)
+#define WLAN_HDD_TGT_NOISE_FLOOR_DBM     (-128)
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 extern const struct nla_policy qca_wlan_vendor_ll_ext_policy[
