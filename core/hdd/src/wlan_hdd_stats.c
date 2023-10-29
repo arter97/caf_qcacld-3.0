@@ -5681,6 +5681,63 @@ wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
 #define linkspeed_dbg(format, args...)
 #endif /* LINKSPEED_DEBUG_ENABLED */
 
+static void
+wlan_hdd_fill_per_link_summary_stats(tCsrSummaryStatsInfo *stats,
+				     struct station_info *info,
+				     struct wlan_hdd_link_info *link_info)
+{
+	uint8_t i;
+	uint32_t orig_cnt;
+	uint32_t orig_fail_cnt;
+	QDF_STATUS status;
+	uint8_t *peer_mac;
+	ol_txrx_soc_handle soc;
+	struct cdp_peer_stats *peer_stats;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	if (!wlan_hdd_is_per_link_stats_supported(hdd_ctx))
+		return;
+
+	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
+	if (!peer_stats)
+		return;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	peer_mac = link_info->session.station.conn_info.bssid.bytes;
+	status = ucfg_dp_get_per_link_peer_stats(soc, link_info->vdev_id,
+						 peer_mac, peer_stats,
+						 CDP_WILD_PEER_TYPE,
+						 WLAN_MAX_MLD);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Unable to get per link peer stats for the peer: "
+			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(peer_mac));
+		goto exit;
+	}
+
+	info->tx_retries = 0;
+	info->tx_failed = 0;
+
+	for (i = 0; i < WIFI_MAX_AC; ++i) {
+		info->tx_retries += stats->multiple_retry_cnt[i];
+		info->tx_failed += stats->fail_cnt[i];
+	}
+
+	orig_cnt = info->tx_retries;
+	orig_fail_cnt = info->tx_failed;
+	info->tx_retries = peer_stats->tx.retries_mpdu;
+	info->tx_failed += peer_stats->tx.mpdu_success_with_retries;
+	hdd_debug("for peer: " QDF_MAC_ADDR_FMT "tx retries adjust from %d to %d",
+		  QDF_MAC_ADDR_REF(peer_mac), orig_cnt, info->tx_retries);
+	hdd_debug("for peer: " QDF_MAC_ADDR_FMT "tx failed adjust from %d to %d",
+		  QDF_MAC_ADDR_REF(peer_mac), orig_fail_cnt, info->tx_failed);
+exit:
+	qdf_mem_free(peer_stats);
+}
+
 /**
  * wlan_hdd_fill_summary_stats() - populate station_info summary stats
  * @stats: summary stats to use as a source
@@ -7602,6 +7659,9 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 
 	wlan_hdd_fill_summary_stats(&hdd_stats->summary_stat,
 				    sinfo, link_info->vdev_id);
+
+	wlan_hdd_fill_per_link_summary_stats(&hdd_stats->summary_stat,
+					     sinfo, link_info);
 
 	ucfg_dp_get_net_dev_stats(vdev, &stats);
 	sinfo->tx_bytes = stats.tx_bytes;
