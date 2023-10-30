@@ -7096,12 +7096,36 @@ static int hdd_vdev_destroy_event_wait(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 	uint8_t vdev_id;
 	struct wlan_hdd_link_info *link_info;
+	struct qdf_mac_addr *mld_addr;
+	struct wlan_objmgr_psoc *psoc = NULL;
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
 	if (!link_info) {
 		hdd_err("Invalid vdev");
 		return -EINVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		obj_mgr_err("Failed to get psoc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Detach DP vdev from DP MLO Device Context */
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+
+	if (!qdf_is_macaddr_zero(mld_addr)) {
+		/* only for MLO vdev's */
+
+		if (cdp_mlo_dev_ctxt_detach(wlan_psoc_get_dp_handle(psoc),
+					    wlan_vdev_get_id(vdev),
+					    (uint8_t *)mld_addr)
+					    != QDF_STATUS_SUCCESS) {
+			obj_mgr_err("Failed to detach DP vdev from DP MLO Dev ctxt");
+			QDF_BUG(0);
+			return QDF_STATUS_E_FAILURE;
+		}
 	}
 
 	/* close sme session (destroy vdev in firmware via legacy API) */
