@@ -8215,8 +8215,17 @@ int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 	if (errno)
 		return errno;
 
+	errno = wlan_hdd_qmi_get_sync_resume();
+	if (errno) {
+		hdd_err("qmi sync resume failed: %d", errno);
+		goto end;
+	}
+
 	errno = __wlan_hdd_cfg80211_dump_station(wiphy, dev, idx, mac, sinfo);
 
+	wlan_hdd_qmi_put_suspend();
+
+end:
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
