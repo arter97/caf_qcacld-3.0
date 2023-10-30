@@ -23,6 +23,7 @@
 #include "wlan_reg_services_api.h"
 #include "wlan_dfs_utils_api.h"
 
+#ifdef WLAN_FEATURE_BEARER_SWITCH
 wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_psoc *psoc)
 {
@@ -155,6 +156,7 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_complete(
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 
 QDF_STATUS wlan_ll_lt_sap_get_freq_list(
 				struct wlan_objmgr_psoc *psoc,
