@@ -1506,6 +1506,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_DISABLE_EML = 542,
 #endif
 	OL_ATH_PARAM_DP_DEBUG_LOG = 543,
+	OL_ATH_PARAM_UL_OFDMA_RTD = 544,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3968,6 +3969,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DP_DEBUG_LOG, SET_PARAM, 1},
 	{"g_dp_debug_log",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DP_DEBUG_LOG, GET_PARAM, 0},
+	{"cmn_ulofdma_rtd",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UL_OFDMA_RTD, SET_PARAM, 1},
 };
 #endif
 
