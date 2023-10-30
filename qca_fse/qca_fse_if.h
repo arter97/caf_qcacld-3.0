@@ -26,6 +26,10 @@
  * @protocl: Protocol
  * @src_dev: Source Netdev
  * @dest_dev: Dest Netdev
+ * @src_mac: Source MAC
+ * @dest_mac: Destination MAC
+ * @fw_svc_id: Service Class ID in forward direction
+ * @rv_svc_id: Service Class ID in reverse direction
  */
 struct qca_fse_flow_info {
 	uint32_t src_ip[4];
@@ -36,6 +40,10 @@ struct qca_fse_flow_info {
 	uint8_t version;
 	struct net_device *src_dev;
 	struct net_device *dest_dev;
+	uint8_t *src_mac;
+	uint8_t *dest_mac;
+	uint32_t fw_svc_id;
+	uint32_t rv_svc_id;
 };
 
 /*
