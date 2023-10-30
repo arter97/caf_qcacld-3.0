@@ -2792,11 +2792,15 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	session->dot11mode = intersected_mode;
 	pe_debug("vdev id %d opmode %d self dot11mode %d bss_dot11 mode %d intersected %d",
 		 session->vdev_id, session->opmode, self_dot11_mode,
 		 bss_dot11_mode, intersected_mode);
 
+	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev) &&
+	    !IS_DOT11_MODE_EHT(intersected_mode))
+		return QDF_STATUS_E_INVAL;
+
+	session->dot11mode = intersected_mode;
 	lim_verify_dot11_mode_with_crypto(session);
 
 	return status;
