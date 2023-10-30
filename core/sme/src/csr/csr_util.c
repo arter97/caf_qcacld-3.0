@@ -921,12 +921,12 @@ uint32_t csr_translate_to_wni_cfg_dot11_mode(struct mac_context *mac,
 			ret = MLME_DOT11_MODE_11N;
 		break;
 #endif
+	case eCSR_CFG_DOT11_MODE_ABG:
+		ret = MLME_DOT11_MODE_ABG;
+		break;
 	default:
 		sme_warn("doesn't expect %d as csrDo11Mode", csrDot11Mode);
-		if (BAND_2G == mac->mlme_cfg->gen.band)
-			ret = MLME_DOT11_MODE_11G;
-		else
-			ret = MLME_DOT11_MODE_11A;
+		ret = MLME_DOT11_MODE_ALL;
 		break;
 	}
 
