@@ -1,2 +1,3 @@
 CONFIG_CNSS_QCA6490 := y
 include $(WLAN_ROOT)/configs/default_defconfig
+CONFIG_HIF_CPU_PERF_AFFINE_MASK := n
