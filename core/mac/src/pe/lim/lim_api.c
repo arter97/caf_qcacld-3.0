@@ -908,6 +908,7 @@ QDF_STATUS pe_close(struct mac_context *mac)
 		return QDF_STATUS_SUCCESS;
 
 	qdf_hang_event_unregister_notifier(&pe_hang_event_notifier);
+	lim_cleanup_mlm(mac);
 	lim_cleanup(mac);
 	lim_unregister_scan_mbssid_callback(mac);
 	lim_unregister_sap_bcn_callback(mac);
@@ -974,7 +975,6 @@ QDF_STATUS pe_start(struct mac_context *mac)
 
 void pe_stop(struct mac_context *mac)
 {
-	lim_cleanup_mlm(mac);
 	pe_debug(" PE STOP: Set LIM state to eLIM_MLM_OFFLINE_STATE");
 	SET_LIM_MLM_STATE(mac, eLIM_MLM_OFFLINE_STATE);
 	return;
