@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -79,11 +79,11 @@ uint32_t qca_mlo_get_mark_metadata(struct qca_mlo_metadata_param *mlo_param)
 	}
 
 	if (vap->cp.icp_flags & IEEE80211_PPE_VP_DS_ACCEL)
-		mlo_param->out_ppe_ds_node_id = MLO_METADATA_INVALID_DS_NODE_ID;
+		mlo_param->out_ppe_ds_node_id = osdev->mlo_link_id;
 	else
 		mlo_param->out_ppe_ds_node_id = MLO_METADATA_INVALID_DS_NODE_ID;
 
-	/* TODO set the link id and node id */
+	qca_mlo_metadata_set_primary_link_id(&mlo_key, osdev->mlo_link_id);
 	qca_mlo_metadata_set_tag(&mlo_key);
 	return mlo_key;
 }
