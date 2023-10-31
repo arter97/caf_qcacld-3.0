@@ -31,6 +31,8 @@
 #include <ppe_drv_sc.h>
 #endif
 
+#define RING_MAP_MAX 0xF
+
 #if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
 /**
  * dp_rx_ppe_fse_register() - function to register fse add and delete
@@ -332,6 +334,78 @@ QDF_STATUS dp_rx_flow_send_htt_operation_cmd(struct dp_pdev *pdev,
 }
 
 /**
+ * dp_rx_get_ring_map() - API to fetch ring id mask
+ * @cfg: dp soc configuration object
+ *
+ * Return: configured ring map
+ */
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+static inline uint8_t
+dp_rx_get_ring_map(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return wlan_cfg_mlo_rx_ring_map_get(cfg);
+}
+#else
+static inline uint8_t
+dp_rx_get_ring_map(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	/* Always default to 3 ring configuration*/
+	return 0x7;
+}
+#endif
+
+/**
+ * dp_rx_get_next_ring_id() - traverse through ring id mask
+ * @last_ring_id: ring id used for last flow
+ * @cfg: dp soc configuration object
+ *
+ * Return: ring id with which flow should be attached
+ */
+static uint8_t
+dp_rx_get_next_ring_id(uint8_t last_ring_id, struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	uint8_t ring_id_mask = dp_rx_get_ring_map(cfg);
+	if (ring_id_mask == 0 || ring_id_mask > RING_MAP_MAX) {
+		ring_id_mask = RING_MAP_MAX;
+	}
+
+	if (ring_id_mask >> last_ring_id)
+		ring_id_mask >>= last_ring_id;
+	else
+		last_ring_id = 0;
+
+	last_ring_id += qdf_ffs(ring_id_mask);
+
+	return last_ring_id;
+}
+
+/**
+ * dp_rx_set_rr_reo_indication() - API to update reo_destination_indication
+ * @hal_rx_flow: hal level flow info
+ * @ring_id: last indicated ring id
+ * @cfg: dp soc configuration object
+ *
+ * Return: true on valid indication
+ */
+static inline bool
+dp_rx_set_rr_reo_indication(struct hal_rx_flow *flow, uint8_t *ring_id,
+			    struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	/**
+	 * If Round Robin flow to core distribution is enabled,
+	 * select reo_destination_indication in a round robin
+	 * fashion for all the incoming flows.
+	 */
+	if (!wlan_cfg_is_rx_rr_enabled(cfg)) {
+		return false;
+	}
+
+	flow->reo_destination_indication = *ring_id;
+	*ring_id = dp_rx_get_next_ring_id(*ring_id, cfg);
+	return true;
+}
+
+/**
  * dp_rx_flow_add_entry() - Add a flow entry to flow search table
  * @pdev: DP pdev instance
  * @rx_flow_info: DP flow paramaters
@@ -391,19 +465,7 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 		flow.reo_destination_indication = pdev->reo_dest;
 	}
 
-	/**
-	 * If Round Robin flow to core distribution is enabled,
-	 * select reo_destination_indication in a round robin
-	 * fashion for all the incoming flows.
-	 */
-	if (wlan_cfg_is_rx_rr_enabled(soc->wlan_cfg_ctx)) {
-		flow.reo_destination_indication = fst->ring_id;
-		fst->ring_id += 1;
-		fst->ring_id = fst->ring_id % 4;
-
-		if (!fst->ring_id)
-			fst->ring_id = 1;
-	}
+	dp_rx_set_rr_reo_indication(&flow, &(fst->ring_id), cfg);
 
 	flow.reo_destination_handler = HAL_RX_FSE_REO_DEST_FT;
 	flow.fse_metadata = rx_flow_info->fse_metadata;
@@ -661,6 +723,7 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 {
 	struct dp_rx_fst *fst;
 	uint8_t *hash_key;
+	struct hal_rx_flow flow;
 	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
 	bool is_rx_flow_search_table_per_pdev =
 		wlan_cfg_is_rx_flow_search_table_per_pdev(cfg);
@@ -709,7 +772,9 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	qdf_mem_set(fst, 0, sizeof(struct dp_rx_fst));
 
-	fst->ring_id = 1;
+	if (!dp_rx_set_rr_reo_indication(&flow, &(fst->ring_id), cfg)) {
+		fst->ring_id = 1;
+	}
 
 	fst->max_skid_length = wlan_cfg_rx_fst_get_max_search(cfg);
 	fst->max_entries = wlan_cfg_get_rx_flow_search_table_size(cfg);
