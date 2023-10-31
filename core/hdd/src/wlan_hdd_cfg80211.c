@@ -212,6 +212,7 @@
 #include <wlan_mlo_mgr_link_switch.h>
 #include <wlan_hdd_ll_lt_sap.h>
 #include "wlan_cp_stats_mc_defs.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -28213,6 +28214,7 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	enum hdd_chain_mode chains;
 	struct dev_set_param setparam[MAX_PDEV_TXRX_PARAMS] = {};
 	uint8_t index = 0;
+	uint8_t ll_lt_sap_vdev_id;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
@@ -28230,6 +28232,14 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 			   tx_mask, rx_mask, hdd_ctx->num_rf_chains);
 
 		return -EINVAL;
+	}
+
+	ll_lt_sap_vdev_id =
+			wlan_policy_mgr_get_ll_lt_sap_vdev_id(hdd_ctx->psoc);
+	if (ll_lt_sap_vdev_id != WLAN_INVALID_VDEV_ID) {
+		hdd_info_rl("LL_LT_SAP vdev %d present, chainmask config not allowed",
+			    ll_lt_sap_vdev_id);
+		return -ENOTSUPP;
 	}
 
 	if (sme_validate_txrx_chain_mask(wmi_pdev_param_tx_chain_mask, tx_mask))

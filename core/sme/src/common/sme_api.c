@@ -86,6 +86,7 @@
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include <wlan_mlo_link_force.h>
 #include "wma_eht.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -4744,8 +4745,18 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 		       wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 							    vdev_id,
 							    WLAN_LEGACY_SME_ID);
+	uint8_t ll_lt_sap_vdev_id;
+
 	if (!vdev) {
 		sme_err("Got NULL vdev obj, returning");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ll_lt_sap_vdev_id =
+			wlan_policy_mgr_get_ll_lt_sap_vdev_id(mac_ctx->psoc);
+	if (ll_lt_sap_vdev_id != WLAN_INVALID_VDEV_ID) {
+		sme_info_rl("LL_LT_SAP vdev %d present, chainmask config not allowed",
+			    ll_lt_sap_vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
