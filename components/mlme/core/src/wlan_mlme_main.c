@@ -651,16 +651,7 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 	struct mlme_legacy_priv *mlme_priv;
 	enum phy_ch_width associated_ch_width;
 	QDF_STATUS status;
-	struct wlan_channel *des_chan;
-	qdf_freq_t cen320_freq = 0;
-
-	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
-	if (!des_chan) {
-		mlme_debug("null des chan");
-		return QDF_STATUS_E_FAILURE;
-	}
-	/* Set center_freq1 to center frequency of complete 320MHz */
-	cen320_freq = des_chan->ch_cfreq2;
+	qdf_freq_t assoc_cen320_freq = 0;
 
 	req->scan_req.chan_list.num_chan = 0;
 
@@ -684,10 +675,13 @@ mlme_fill_freq_in_wide_scan_start_request(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	/* Set center frequency of complete 320MHz */
+	assoc_cen320_freq = mlme_priv->connect_info.assoc_chan_info.cen320_freq;
+
 	status = mlme_update_freq_in_scan_start_req(vdev, req,
 						    associated_ch_width,
 						    INVALID_CHANNEL,
-						    cen320_freq);
+						    assoc_cen320_freq);
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_FAILURE;
 
