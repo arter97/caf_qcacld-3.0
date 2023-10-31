@@ -4381,6 +4381,23 @@ void sap_dump_acs_channel(struct sap_acs_cfg *acs_cfg)
 }
 
 #ifdef SOFTAP_CHANNEL_RANGE
+
+/*
+ * Consider 3 char for ACS, 5 char for Range, 4 char for Freq,
+ * 9 char Normalize, 6 char for factor, 2 char for number of
+ * channels to print, 1 char for colon, 2 char for parenthesis,
+ * 5 char for space and 1 char to end string which
+ * makes total of 38 chars.
+ */
+#define SAP_FREQ_IN_RANGE_LIST_LEN 38
+
+/*
+ * Consider 3 char for ACS, 4 char for Freq, 9 char Normalize,
+ * 6 char for factor, 2 char for number of channels to print,
+ * 1 char for colon, 2 char for parenthesis, 4 char for space
+ * and 1 char to end string which makes total of 32 chars.
+ */
+#define SAP_FREQ_IN_WEIGHT_LIST_LEN 32
 /**
  * sap_get_freq_list() - get the list of channel frequency
  * @sap_ctx: sap context
@@ -4409,9 +4426,11 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 	struct acs_weight *weight_list;
 	struct acs_weight_range *range_list;
 	bool freq_present_in_list = false;
-	uint8_t i;
+	uint8_t i, range_num_chan, weight_num_chan;
 	bool srd_chan_enabled;
 	enum QDF_OPMODE vdev_opmode;
+	uint8_t *info, *buffer;
+	uint32_t len = 0, buff_len = 0;
 
 	mac_ctx = sap_get_mac_context();
 	if (!mac_ctx) {
@@ -4457,6 +4476,23 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 	if (!list) {
 		*num_ch = 0;
 		*freq_list = NULL;
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	info = qdf_mem_malloc(SAP_MAX_CHANNEL_INFO_LOG);
+	if (!info) {
+		*num_ch = 0;
+		*freq_list = NULL;
+		qdf_mem_free(list);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	buffer = qdf_mem_malloc(SAP_MAX_CHANNEL_INFO_LOG);
+	if (!buffer) {
+		*num_ch = 0;
+		*freq_list = NULL;
+		qdf_mem_free(list);
+		qdf_mem_free(info);
 		return QDF_STATUS_E_NOMEM;
 	}
 
@@ -4553,8 +4589,17 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 			    chan_freq <= range_list[i].end_freq) {
 				normalize_factor =
 					range_list[i].normalize_weight;
-				sap_debug("Range list, freq %d normalize weight factor %d",
-					  chan_freq, normalize_factor);
+
+				len += qdf_scnprintf(info + len, SAP_MAX_CHANNEL_INFO_LOG - len,
+						     "%d[%d] ", chan_freq,
+						     normalize_factor);
+				range_num_chan++;
+				if (len >= SAP_MAX_CHANNEL_INFO_LOG - SAP_FREQ_IN_RANGE_LIST_LEN) {
+					sap_nofl_debug("ACS Range Freq Normalize factor(%d): %s",
+						       range_num_chan, info);
+					len = 0;
+					range_num_chan = 0;
+				}
 				freq_present_in_list = true;
 			}
 		}
@@ -4565,16 +4610,25 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 			if (chan_freq == weight_list[i].chan_freq) {
 				normalize_factor =
 					weight_list[i].normalize_weight;
-				sap_debug("freq %d normalize weight factor %d",
-					  chan_freq, normalize_factor);
 				freq_present_in_list = true;
+
+				len += qdf_scnprintf(
+						buffer + buff_len,
+						SAP_MAX_CHANNEL_INFO_LOG - buff_len,
+						"%d[%d] ", chan_freq,
+						normalize_factor);
+				weight_num_chan++;
+				if (len >= SAP_MAX_CHANNEL_INFO_LOG - SAP_FREQ_IN_WEIGHT_LIST_LEN) {
+					sap_nofl_debug("ACS Freq Normalize factor(%d): %s",
+						       weight_num_chan, buffer);
+					buff_len = 0;
+					weight_num_chan = 0;
+				}
 			}
 		}
 
 		/* This would mean that the user does not want this freq */
 		if (freq_present_in_list && !normalize_factor) {
-			sap_debug("chan_freq %d ecluded normalize weight 0",
-				  chan_freq);
 			freq_present_in_list = false;
 			continue;
 		}
@@ -4611,6 +4665,18 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 		ch_count++;
 #endif
 	}
+
+	if (len)
+		sap_nofl_debug("ACS Range Freq Normalize factor(%d): %s",
+			       range_num_chan, info);
+
+	if (buff_len)
+		sap_nofl_debug("ACS Freq Normalize factor(%d): %s",
+			       weight_num_chan, buffer);
+
+	qdf_mem_free(buffer);
+	qdf_mem_free(info);
+
 	if (!ch_count) {
 		sap_info("No active channels present for the current region");
 		/*

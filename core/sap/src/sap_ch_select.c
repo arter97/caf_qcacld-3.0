@@ -400,6 +400,14 @@ uint32_t sap_select_preferred_channel_from_channel_list(uint32_t best_ch_freq,
 	return SAP_CHANNEL_NOT_SELECTED;
 }
 
+/*
+ * Consider 3 char for ACS, 7 char for Invalid, 4 char for freq,
+ * 2 char for number of freq to print, 2 char for parenthesis,
+ * 1 char for colon, 3 char for space and 1 char to end string
+ * which makes total of 23 chars.
+ */
+#define SAP_INVALID_CHAN_LOG_LEN 23
+
 /**
  * sap_chan_sel_init() - Initialize channel select
  * @mac: Opaque handle to the global MAC context
@@ -423,6 +431,9 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 	bool include_dfs_ch = true;
 	uint8_t sta_sap_scc_on_dfs_chnl_config_value;
 	bool ch_support_puncture;
+	uint32_t len = 0;
+	uint8_t num_freq = 0;
+	uint8_t *info;
 
 	ch_info_params->num_ch =
 		mac->scan.base_channels.numChannels;
@@ -448,6 +459,10 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 	    ACS_DFS_MODE_DISABLE == sap_ctx->dfs_mode)
 		include_dfs_ch = false;
 
+	info = qdf_mem_malloc(SAP_MAX_CHANNEL_INFO_LOG);
+	if (!info)
+		return false;
+
 	/* Fill the channel number in the spectrum in the operating freq band */
 	for (num_chan = 0;
 	     num_chan < ch_info_params->num_ch;
@@ -459,17 +474,32 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 		/* Initialise max ACS weight for all channels */
 		ch_info->weight = SAP_ACS_WEIGHT_MAX;
 
+		if (len >= SAP_MAX_CHANNEL_INFO_LOG - SAP_INVALID_CHAN_LOG_LEN) {
+			sap_nofl_debug("ACS Invalid freq(%d): %s",
+				       num_freq, info);
+			num_freq = 0;
+			len = 0;
+		}
+
 		/* check if the channel is in NOL denylist */
 		if (sap_dfs_is_channel_in_nol_list(
 					sap_ctx, *ch_list,
 					PHY_SINGLE_CHANNEL_CENTERED)) {
 			if (sap_acs_is_puncture_applicable(sap_ctx->acs_cfg)) {
-				sap_debug_rl("freq %d is in NOL list, can be punctured",
-					     *ch_list);
 				ch_support_puncture = true;
+				len += qdf_scnprintf(
+						info + len,
+						SAP_MAX_CHANNEL_INFO_LOG - len,
+						"%d[%d] ", *ch_list,
+						CHAN_IN_NOL_CAN_BE_PUNCTURED);
+				num_freq++;
 			} else {
-				sap_debug_rl("freq %d is in NOL list",
-					     *ch_list);
+				len += qdf_scnprintf(
+						info + len,
+						SAP_MAX_CHANNEL_INFO_LOG - len,
+						"%d[%d] ", *ch_list,
+						CHAN_IN_NOL);
+				num_freq++;
 				continue;
 			}
 		}
@@ -481,40 +511,69 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 						ch_info->chan_freq))) {
 			if (wlan_reg_is_dfs_for_freq(mac->pdev,
 						     ch_info->chan_freq)) {
-				sap_debug("DFS Ch %d not considered for ACS. include_dfs_ch %u, sta_sap_scc_on_dfs_chnl_config_value %d",
-					  *ch_list, include_dfs_ch,
-					  sta_sap_scc_on_dfs_chnl_config_value);
+				len += qdf_scnprintf(
+						info + len,
+						SAP_MAX_CHANNEL_INFO_LOG - len,
+						"%d[%d] ",
+						ch_info->chan_freq,
+						CHAN_DFS_NOT_CONSIDERED);
+				num_freq++;
 				continue;
 			}
 		}
 
 		if (!policy_mgr_is_sap_freq_allowed(mac->psoc, *ch_list)) {
 			if (sap_acs_is_puncture_applicable(sap_ctx->acs_cfg)) {
-				sap_info("freq %d is not allowed, can be punctured",
-					 *ch_list);
 				ch_support_puncture = true;
+				len += qdf_scnprintf(
+						info + len,
+						SAP_MAX_CHANNEL_INFO_LOG - len,
+						"%d[%d] ", *ch_list,
+						CHAN_IN_LTE_COEX_NOT_ALLOWED_AND_CAN_BE_PUNCTURED);
+				num_freq++;
 			} else {
-				sap_info("Skip freq %d", *ch_list);
+				len += qdf_scnprintf(
+						info + len,
+						SAP_MAX_CHANNEL_INFO_LOG - len,
+						"%d[%d] ", *ch_list,
+						CHAN_IN_LTE_COEX_NOT_ALLOWED);
+				num_freq++;
 				continue;
 			}
 		}
 
 		/* OFDM rates are not supported on frequency 2484 */
 		if (*ch_list == 2484 &&
-		    eCSR_DOT11_MODE_11b != sap_ctx->phyMode)
+		    eCSR_DOT11_MODE_11b != sap_ctx->phyMode) {
+			len += qdf_scnprintf(info + len,
+					     SAP_MAX_CHANNEL_INFO_LOG - len,
+					     "%d[%d] ", *ch_list,
+					     CHAN_IN_OFDM_RATES_NOT_SUPPORTED);
+			num_freq++;
 			continue;
+		}
 
 		/* Skip DSRC channels */
-		if (wlan_reg_is_dsrc_freq(ch_info->chan_freq))
+		if (wlan_reg_is_dsrc_freq(ch_info->chan_freq)) {
+			len += qdf_scnprintf(info + len,
+					     SAP_MAX_CHANNEL_INFO_LOG - len,
+					     "%d[%d] ",
+					     ch_info->chan_freq,
+					     CHAN_DSRC_NOT_ALLOWED);
+			num_freq++;
 			continue;
+		}
 
 		/* Skip indoor channels for non-scc indoor scenario*/
 		if (!policy_mgr_is_sap_go_interface_allowed_on_indoor(
 							mac->pdev,
 							sap_ctx->sessionId,
 							*ch_list)) {
-			sap_debug("Do not allow SAP on indoor frequency %u",
-				  *ch_list);
+			len += qdf_scnprintf(info + len,
+					     SAP_MAX_CHANNEL_INFO_LOG - len,
+					     "%d[%d] ", *ch_list,
+					     CHAN_INDOOR_NOT_ALLOWED);
+			num_freq++;
 			continue;
 		}
 
@@ -529,15 +588,28 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 			if (wlansap_is_channel_present_in_acs_list(
 					ch_info->chan_freq,
 					sap_ctx->acs_cfg->master_freq_list,
-					sap_ctx->acs_cfg->master_ch_list_count))
+					sap_ctx->acs_cfg->master_ch_list_count)) {
 				ch_info->weight = SAP_ACS_WEIGHT_ADJUSTABLE;
-			continue;
+			} else {
+				len += qdf_scnprintf(
+						info + len,
+						SAP_MAX_CHANNEL_INFO_LOG - len,
+						"%d[%d] ", *ch_list,
+						CHAN_NOT_IN_ACS_CONFIG);
+				num_freq++;
+				continue;
+			}
 		}
 
 		ch_info->valid = true;
 		if (!ch_support_puncture)
 			ch_info->weight = 0;
 	}
+
+	if (len)
+		sap_nofl_debug("ACS Invalid freq(%d): %s", num_freq, info);
+
+	qdf_mem_free(info);
 
 	return true;
 }
@@ -1526,6 +1598,16 @@ static void sap_update_5ghz_low_freq_weight(
 	}
 }
 
+/*
+ * Consider 4 char for Freq, 3 char for ACS, 6 char for weight, 4 char
+ * for info, 2 char for freq_count to print, 4 char for freq, 6 char
+ * for weight, 15 char for rssi_bss_weight, 18 char for chan_status_weight,
+ * 12 char for power_weight, 4 char for rssi, 3 char for bss, 2 char
+ * for comma, 2 char for colon, 10 char for parenthesis, 5 char for
+ * space and 1 char to end string which makes total of 102 chars.
+ */
+#define SAP_PER_CHANNEL_INFO_LOG_LEN 101
+
 /**
  * sap_compute_spect_weight() - Compute spectrum weight
  * @ch_info_params: Pointer to the tSpectInfoParams structure
@@ -1548,7 +1630,7 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 	tSirMacHTChannelWidth ch_width = 0;
 	uint16_t secondaryChannelOffset;
 	uint32_t center_freq0, center_freq1, chan_freq;
-	uint8_t i;
+	uint8_t i, freq_count;
 	bool found;
 	struct sap_ch_info *ch_start = ch_info_params->ch_info;
 	struct sap_ch_info *ch_end = ch_info_params->ch_info +
@@ -1556,9 +1638,8 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 	qdf_list_node_t *cur_lst = NULL, *next_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
 	uint32_t rssi_bss_weight = 0, chan_status_weight = 0, power_weight = 0;
-	uint32_t max_valid_weight_6ghz = 0;
-
-	sap_debug("Computing spectral weight");
+	uint32_t max_valid_weight_6ghz = 0, len = 0;
+	uint8_t *info;
 
 	if (scan_list)
 		qdf_list_peek_front(scan_list, &cur_lst);
@@ -1614,6 +1695,10 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 
 	/* Calculate the weights for all channels in the spectrum ch_info */
 	ch_info = ch_info_params->ch_info;
+
+	info = qdf_mem_malloc(SAP_MAX_CHANNEL_INFO_LOG);
+	if (!info)
+		return;
 
 	for (chn_num = 0; chn_num < (ch_info_params->num_ch);
 	     chn_num++) {
@@ -1696,14 +1781,31 @@ debug_info:
 		    max_valid_weight_6ghz < ch_info->weight)
 			max_valid_weight_6ghz = ch_info->weight;
 
-		sap_debug("freq %d valid %d weight %d(%d,%d,%d) rssi %d bss %d",
-			  ch_info->chan_freq, ch_info->valid,
-			  ch_info->weight, rssi_bss_weight,
-			  chan_status_weight, power_weight,
-			  ch_info->rssi_agr, ch_info->bss_count);
-
+		if (ch_info->valid) {
+			len += qdf_scnprintf(info + len,
+					     SAP_MAX_CHANNEL_INFO_LOG - len,
+					     "%d[%d(%d,%d,%d)][%d][%d] ",
+					     ch_info->chan_freq,
+					     ch_info->weight,
+					     rssi_bss_weight,
+					     chan_status_weight,
+					     power_weight, ch_info->rssi_agr,
+					     ch_info->bss_count);
+			freq_count++;
+			if (len >= (SAP_MAX_CHANNEL_INFO_LOG - SAP_PER_CHANNEL_INFO_LOG_LEN)) {
+				sap_nofl_debug("Freq ACS weight info(%d): freq[weight(rssi_bss_weight,chan_status_weight,power_weight)][rssi][bss]: %s", freq_count, info);
+				len = 0;
+				freq_count = 0;
+			}
+		}
 		ch_info++;
 	}
+
+	if (len)
+		sap_nofl_debug("Freq ACS weight info(%d): freq[weight(rssi_bss_weight,chan_status_weight,power_weight)][rssi][bss]: %s", freq_count, info);
+
+	qdf_mem_free(info);
+
 	sap_update_6ghz_max_weight(ch_info_params,
 				   max_valid_weight_6ghz);
 

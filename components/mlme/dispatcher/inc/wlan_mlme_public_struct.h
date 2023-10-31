@@ -3090,4 +3090,29 @@ struct peer_oper_mode_event {
 	uint32_t new_txnss;
 	uint32_t new_disablemu;
 };
+
+/**
+ * enum sap_invalid_chan_reason_code - SAP invalid channel reason code
+ * @CHAN_IN_NOL: Channel in NOL list
+ * @CHAN_IN_NOL_CAN_BE_PUNCTURED: Channel in NOL list can be punctured
+ * @CHAN_DFS_NOT_CONSIDERED: DFS channel not considered
+ * @CHAN_IN_LTE_COEX_NOT_ALLOWED: Channel in LTE coex not allowed
+ * @CHAN_IN_LTE_COEX_NOT_ALLOWED_AND_CAN_BE_PUNCTURED: Channel in LTE
+ * coex not allowed and can be punctured
+ * @CHAN_IN_OFDM_RATES_NOT_SUPPORTED: Channel in OFDM rates not supported
+ * @CHAN_DSRC_NOT_ALLOWED: DSRC channel not allowed
+ * @CHAN_INDOOR_NOT_ALLOWED: Indoor channel not allowed
+ * @CHAN_NOT_IN_ACS_CONFIG: Channel not present in ACS config
+ */
+enum sap_invalid_chan_reason_code {
+	CHAN_IN_NOL,
+	CHAN_IN_NOL_CAN_BE_PUNCTURED,
+	CHAN_DFS_NOT_CONSIDERED,
+	CHAN_IN_LTE_COEX_NOT_ALLOWED,
+	CHAN_IN_LTE_COEX_NOT_ALLOWED_AND_CAN_BE_PUNCTURED,
+	CHAN_IN_OFDM_RATES_NOT_SUPPORTED,
+	CHAN_DSRC_NOT_ALLOWED,
+	CHAN_INDOOR_NOT_ALLOWED,
+	CHAN_NOT_IN_ACS_CONFIG,
+};
 #endif
