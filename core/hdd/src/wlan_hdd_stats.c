@@ -6858,7 +6858,7 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 	survey->noise = chan_info->noise_floor;
 	survey->filled = 0;
 
-	if (chan_info->noise_floor)
+	if (!is_noise_floor_invalid(chan_info->noise_floor))
 		survey->filled |= SURVEY_INFO_NOISE_DBM;
 
 	if (opfreq == chan_info->freq)
@@ -6892,7 +6892,7 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 	survey->noise = chan_info->noise_floor;
 	survey->filled = 0;
 
-	if (chan_info->noise_floor)
+	if (!is_noise_floor_invalid(chan_info->noise_floor))
 		survey->filled |= SURVEY_INFO_NOISE_DBM;
 
 	if (opfreq == chan_info->freq)
