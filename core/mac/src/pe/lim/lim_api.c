@@ -355,23 +355,12 @@ QDF_STATUS lim_start(struct mac_context *mac)
 }
 
 /**
- * lim_initialize()
+ * lim_initialize() - This function is called from LIM thread entry function.
+ * @mac: Pointer to global MAC structure
  *
- ***FUNCTION:
- * This function is called from LIM thread entry function.
  * LIM related global data structures are initialized in this function.
  *
- ***LOGIC:
- * NA
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param  mac - Pointer to global MAC structure
- * @return None
+ * Return: QDF_STATUS
  */
 
 QDF_STATUS lim_initialize(struct mac_context *mac)
@@ -410,23 +399,11 @@ QDF_STATUS lim_initialize(struct mac_context *mac)
 } /*** end lim_initialize() ***/
 
 /**
- * lim_cleanup()
- *
- ***FUNCTION:
- * This function is called upon reset or persona change
+ * lim_cleanup() - This function is called upon reset or persona change
  * to cleanup LIM state
+ * @mac: Pointer to Global MAC structure
  *
- ***LOGIC:
- * NA
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param  mac - Pointer to Global MAC structure
- * @return None
+ * Return: None
  */
 
 void lim_cleanup(struct mac_context *mac)
@@ -495,7 +472,7 @@ void lim_cleanup(struct mac_context *mac)
 #ifdef WLAN_FEATURE_MEMDUMP_ENABLE
 /**
  * lim_state_info_dump() - print state information of lim layer
- * @buf: buffer pointer
+ * @buf_ptr: buffer pointer
  * @size: size of buffer to be filled
  *
  * This function is used to print state information of lim layer
@@ -1130,7 +1107,7 @@ static inline bool pe_is_ext_scan_bcn_probe_rsp(tpSirMacMgmtHdr hdr,
 #endif
 
 /**
- * pe_filter_drop_bcn_probe_frame - Apply filter on the received frame
+ * pe_filter_bcn_probe_frame - Apply filter on the received frame
  *
  * @mac_ctx: pointer to the global mac context
  * @hdr: pointer to the 802.11 header of the frame
@@ -1142,8 +1119,8 @@ static inline bool pe_is_ext_scan_bcn_probe_rsp(tpSirMacMgmtHdr hdr,
  * Return: true if frame is allowed, false if frame is to be dropped.
  */
 static bool pe_filter_bcn_probe_frame(struct mac_context *mac_ctx,
-					tpSirMacMgmtHdr hdr,
-					uint8_t *rx_pkt_info)
+				      tpSirMacMgmtHdr hdr,
+				      uint8_t *rx_pkt_info)
 {
 	uint8_t session_id;
 	struct mgmt_beacon_probe_filter *filter;
@@ -1205,7 +1182,7 @@ static QDF_STATUS pe_handle_probe_req_frames(struct mac_context *mac_ctx,
  * @psoc: psoc context
  * @peer: peer
  * @buf: buffer
- * @mgmt_rx_params; rx event params
+ * @mgmt_rx_params: rx event params
  * @frm_type: frame type
  *
  * This function handles the mgmt rx frame from mgmt txrx component and forms
@@ -1355,12 +1332,6 @@ void pe_deregister_mgmt_rx_frm_callback(struct mac_context *mac_ctx)
 	wma_de_register_mgmt_frm_client();
 }
 
-
-/**
- * pe_register_callbacks_with_wma() - register SME and PE callback functions to
- * WMA.
- * (function documentation in lim_api.h)
- */
 void pe_register_callbacks_with_wma(struct mac_context *mac,
 				    struct sme_ready_req *ready_req)
 {
@@ -1434,9 +1405,9 @@ lim_update_overlap_sta_param(struct mac_context *mac, tSirMacAddr bssId,
 /**
  * lim_enc_type_matched() - matches security type of incoming beracon with
  * current
- * @mac_ctx      Pointer to Global MAC structure
- * @bcn          Pointer to parsed Beacon structure
- * @session      PE session entry
+ * @mac_ctx:      Pointer to Global MAC structure
+ * @bcn:          Pointer to parsed Beacon structure
+ * @session:      PE session entry
  *
  * This function matches security type of incoming beracon with current
  *
@@ -1622,19 +1593,15 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 
 /* --------------------------------------------------------------------- */
 /**
- * lim_update_short_slot
+ * lim_update_short_slot() - Enable/Disable short slot
  *
- * FUNCTION:
- * Enable/Disable short slot
+ * @mac: mac global ctx
+ * @pBeacon: Beacon/Probe Response structure
+ * @pBeaconParams: pointer to the struct, which contains the beacon
+ * parameters which are changed.
+ * @pe_session: PE session entry
  *
- * LOGIC:
- *
- * ASSUMPTIONS:
- *
- * NOTE:
- *
- * @param enable        Flag to enable/disable short slot
- * @return None
+ * Return: QDF_STATUS
  */
 
 QDF_STATUS lim_update_short_slot(struct mac_context *mac,
@@ -4140,6 +4107,176 @@ QDF_STATUS lim_check_for_ml_probe_req(struct pe_session *session)
 	return QDF_STATUS_E_FAILURE;
 }
 
+static uint8_t *lim_find_ie(uint8_t eid, uint8_t *ies, int32_t len)
+{
+	if (!ies)
+		return NULL;
+
+	while (len >= 2 && len >= ies[1] + 2) {
+		if (ies[0] == eid)
+			return ies;
+		len -= ies[1] + 2;
+		ies += ies[1] + 2;
+	}
+
+	return NULL;
+}
+
+static uint8_t lim_get_op_class(struct mac_context *mac_ctx,
+				struct pe_session *session)
+{
+	uint8_t ch_offset;
+
+	if (session->ch_width == CH_WIDTH_80MHZ) {
+		ch_offset = BW80;
+	} else {
+		switch (session->htSecondaryChannelOffset) {
+		case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+			ch_offset = BW40_HIGH_PRIMARY;
+			break;
+		case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+			ch_offset = BW40_LOW_PRIMARY;
+			break;
+		default:
+			ch_offset = BW20;
+			break;
+		}
+	}
+
+	return lim_op_class_from_bandwidth(mac_ctx, session->curr_op_freq,
+					   session->ch_width, ch_offset);
+}
+
+static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
+					    struct pe_session *session_entry,
+					    struct mlo_link_info *link_info,
+					    uint8_t *rnr)
+{
+	struct neighbor_ap_info_field *neighbor_ap_info;
+	uint8_t tbtt_type, tbtt_len, tbtt_count;
+	int32_t i, len;
+	uint8_t bssid_pos;
+	uint8_t mld_pos;
+	struct qdf_mac_addr *rnr_bssid = NULL;
+	struct qdf_mac_addr assoc_link_addr;
+	uint8_t *data, *rnr_end;
+	bool is_found = false;
+	struct rnr_mld_info *mld_param;
+	uint8_t *op_class, *chan_num;
+	qdf_freq_t chan_freq = 0;
+	struct wlan_objmgr_pdev *pdev;
+
+	qdf_mem_copy(&assoc_link_addr, session_entry->self_mac_addr,
+		     QDF_MAC_ADDR_SIZE);
+
+	rnr_end = rnr + rnr[TAG_LEN_POS] + MIN_IE_LEN;
+	data = rnr + PAYLOAD_START_POS;
+	while (data < rnr_end) {
+		neighbor_ap_info = (struct neighbor_ap_info_field *)data;
+		tbtt_count = neighbor_ap_info->tbtt_header.tbtt_info_count;
+		tbtt_len = neighbor_ap_info->tbtt_header.tbtt_info_length;
+		tbtt_type = neighbor_ap_info->tbtt_header.tbbt_info_fieldtype;
+		len = tbtt_len * (tbtt_count + 1) +
+			sizeof(struct neighbor_ap_info_field);
+		if (data + len > rnr_end) {
+			pe_debug("error about rnr length");
+			return;
+		}
+
+		if (tbtt_len >= TBTT_NEIGHBOR_AP_BSSID)
+			bssid_pos = TBTT_NEIGHBOR_AP_OFFSET_ONLY;
+		else
+			bssid_pos = 0;
+
+		if (tbtt_len >=
+			TBTT_NEIGHBOR_AP_BSSID_S_SSID_BSS_PARAM_20MHZ_PSD_MLD_PARAM)
+			mld_pos = TBTT_NEIGHBOR_AP_BSSID_S_SSID_BSS_PARAM_20MHZ_PSD;
+		else
+			mld_pos = 0;
+
+		rnr_bssid = (struct qdf_mac_addr *)(data +
+					sizeof(struct neighbor_ap_info_field) +
+					bssid_pos);
+		if (!rnr_bssid)
+			continue;
+
+		if (!qdf_mem_cmp(rnr_bssid->bytes, link_info->link_addr.bytes,
+				 QDF_MAC_ADDR_SIZE))
+			is_found = true;
+
+		pdev = wlan_vdev_get_pdev(session_entry->vdev);
+		chan_freq = session_entry->curr_op_freq;
+
+		data += sizeof(struct tbtt_information_header);
+		op_class = data;
+
+		if (is_found)
+			*op_class = lim_get_op_class(mac_ctx, session_entry);
+
+		data += sizeof(uint8_t);
+		chan_num = data;
+
+		if (is_found)
+			*chan_num = wlan_reg_freq_to_chan(pdev, chan_freq);
+
+		data += sizeof(uint8_t);
+		for (i = 0; i < tbtt_count + 1; i++) {
+			if (bssid_pos != 0 && is_found &&
+			    (data + bssid_pos +
+			     QDF_MAC_ADDR_SIZE <= rnr_end))
+				qdf_mem_copy(data + bssid_pos,
+					     assoc_link_addr.bytes,
+					     QDF_MAC_ADDR_SIZE);
+
+			if (mld_pos != 0 && is_found &&
+			    (data + mld_pos +
+			     sizeof(struct rnr_mld_info) <= rnr_end)) {
+				mld_param =
+					(struct rnr_mld_info *)(data + mld_pos);
+				mld_param->link_id = wlan_vdev_get_link_id(
+							session_entry->vdev);
+			}
+
+			data += tbtt_len;
+		}
+
+		if (is_found)
+			return;
+	}
+}
+
+static void
+lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
+			     struct pe_session *session_entry,
+			     struct mlo_link_info *link_info,
+			     struct element_info link_probe_rsp)
+{
+	uint8_t *new_rnr_ie = NULL;
+
+	new_rnr_ie = lim_find_ie(WLAN_ELEMID_REDUCED_NEIGHBOR_REPORT,
+				 link_probe_rsp.ptr +
+				 sizeof(struct wlan_frame_hdr) +
+				 WLAN_PROBE_RESP_IES_OFFSET,
+				 link_probe_rsp.len -
+				 sizeof(struct wlan_frame_hdr) -
+				 WLAN_PROBE_RESP_IES_OFFSET);
+	if (!new_rnr_ie) {
+		pe_debug("RNR IE not present in gen link frame");
+		return;
+	}
+
+	pe_debug("Generated RNR IE received:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, new_rnr_ie,
+			   new_rnr_ie[1] + MIN_IE_LEN);
+
+	lim_derive_link_specific_rnr_ie(mac_ctx, session_entry, link_info,
+					new_rnr_ie);
+
+	pe_debug("Updated RNR IE: ");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, new_rnr_ie,
+			   new_rnr_ie[1] + MIN_IE_LEN);
+}
+
 QDF_STATUS
 lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 				struct pe_session *session_entry,
@@ -4243,10 +4380,14 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 				goto end;
 			}
 
+			link_info = &partner_info->partner_link_info[idx];
+
+			lim_gen_link_specific_rnr_ie(mac_ctx, session_entry,
+						     link_info, link_probe_rsp);
+
 			pe_debug("MLO:link probe rsp size:%u orig probe rsp:%u",
 				 link_probe_rsp.len, probe_rsp_len);
 
-			link_info = &partner_info->partner_link_info[idx];
 			wlan_get_chan_by_bssid_from_rnr(session_entry->vdev,
 							session_entry->cm_id,
 							&link_info->link_addr,
