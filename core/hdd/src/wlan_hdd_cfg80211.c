@@ -9908,8 +9908,13 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL];
 	int ret;
 
-	if (!power_attr && !opm_attr)
+	hdd_enter_dev(adapter->dev);
+
+	if (!power_attr && !opm_attr) {
+		hdd_err_rl("power attr and opm attr is null");
 		return 0;
+	}
+
 
 	if (power_attr && opm_attr) {
 		hdd_err_rl("Invalid OPM set attribute");
@@ -9922,11 +9927,14 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 	}
 
 	opm_mode = power_attr ? nla_get_u8(power_attr) : nla_get_u8(opm_attr);
-	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED)
+	hdd_debug("opm_mode %d", opm_mode);
+
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) {
 		if (!ps_ito_attr || !spec_wake_attr) {
 			hdd_err_rl("Invalid User defined OPM attributes");
 			return -EINVAL;
 		}
+	}
 
 	ret = hdd_set_power_config(hdd_ctx, adapter, &opm_mode);
 	if (ret)
@@ -9936,19 +9944,34 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) {
 		ps_params.ps_ito = nla_get_u16(ps_ito_attr);
 		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
+
+		if (!ps_params.ps_ito)
+			return -EINVAL;
+
+		hdd_debug("ps_ito %d spec_wake %d opm_mode %d",
+			  ps_params.ps_ito, ps_params.spec_wake,
+			  ps_params.opm_mode);
+
 		ret = hdd_set_power_config_params(hdd_ctx, adapter,
 						  ps_params.ps_ito,
 						  ps_params.spec_wake);
+
 		if (ret)
 			return ret;
 	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_POWER_ID);
-	if (vdev) {
-		ucfg_pmo_set_ps_params(vdev, &ps_params);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		return 0;
 	}
 
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED)
+		ucfg_pmo_set_ps_params(vdev, &ps_params);
+	else
+		ucfg_pmo_core_vdev_set_ps_opm_mode(vdev, ps_params.opm_mode);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	return 0;
 }
 
