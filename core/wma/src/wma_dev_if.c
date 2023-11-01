@@ -1280,6 +1280,7 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 	struct wlan_mlme_psoc_ext_obj *mlme_psoc_obj;
 	const struct wlan_mlme_ratemask *ratemask_cfg;
 	struct config_ratemask_params rparams = {0};
+	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma)
@@ -1351,6 +1352,11 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 		qdf_mem_copy(iface->vdev->vdev_mlme.bss_chan,
 			     iface->vdev->vdev_mlme.des_chan,
 			     sizeof(struct wlan_channel));
+
+		if (wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev))
+			cdp_update_mac_id(dp_soc, rsp->vdev_id,
+					  wma->interfaces[rsp->vdev_id].mac_id);
+
 	}
 
 	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id)) {
