@@ -2146,28 +2146,6 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 	lim_switch_channel_vdev_started(pe_session);
 }
 
-QDF_STATUS lim_switch_primary_channel(struct mac_context *mac,
-				      uint32_t new_channel_freq,
-				      struct pe_session *pe_session)
-{
-	pe_debug("freq: %d --> freq: %d", pe_session->curr_op_freq,
-		 new_channel_freq);
-
-	pe_session->curr_req_chan_freq = new_channel_freq;
-	pe_session->curr_op_freq = pe_session->curr_req_chan_freq;
-	pe_session->ch_center_freq_seg0 = 0;
-	pe_session->ch_center_freq_seg1 = 0;
-	pe_session->ch_width = CH_WIDTH_20MHZ;
-	pe_session->limRFBand = lim_get_rf_band(pe_session->curr_req_chan_freq);
-
-	pe_session->channelChangeReasonCode = LIM_SWITCH_CHANNEL_OPERATION;
-
-	mac->lim.gpchangeChannelCallback = lim_switch_channel_cback;
-	mac->lim.gpchangeChannelData = NULL;
-
-	return lim_send_switch_chnl_params(mac, pe_session);
-}
-
 #ifdef WLAN_FEATURE_11BE
 /**
  * lim_set_puncture_from_chan_switch_to_session() - set puncture from channel
@@ -2188,6 +2166,29 @@ lim_set_puncture_from_chan_switch_to_session(struct pe_session *pe_session)
 {
 }
 #endif
+
+QDF_STATUS lim_switch_primary_channel(struct mac_context *mac,
+				      uint32_t new_channel_freq,
+				      struct pe_session *pe_session)
+{
+	pe_debug("freq: %d --> freq: %d", pe_session->curr_op_freq,
+		 new_channel_freq);
+
+	pe_session->curr_req_chan_freq = new_channel_freq;
+	pe_session->curr_op_freq = pe_session->curr_req_chan_freq;
+	pe_session->ch_center_freq_seg0 = 0;
+	pe_session->ch_center_freq_seg1 = 0;
+	pe_session->ch_width = CH_WIDTH_20MHZ;
+	lim_set_puncture_from_chan_switch_to_session(pe_session);
+	pe_session->limRFBand = lim_get_rf_band(pe_session->curr_req_chan_freq);
+
+	pe_session->channelChangeReasonCode = LIM_SWITCH_CHANNEL_OPERATION;
+
+	mac->lim.gpchangeChannelCallback = lim_switch_channel_cback;
+	mac->lim.gpchangeChannelData = NULL;
+
+	return lim_send_switch_chnl_params(mac, pe_session);
+}
 
 QDF_STATUS lim_switch_primary_secondary_channel(struct mac_context *mac,
 						struct pe_session *pe_session)
