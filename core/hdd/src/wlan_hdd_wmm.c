@@ -2599,7 +2599,6 @@ QDF_STATUS hdd_wmm_connect(struct hdd_adapter *adapter,
 	adapter->hdd_wmm_status.qos_connection = qos_connection;
 
 	for (ac = 0; ac < WLAN_MAX_AC; ac++) {
-		hdd_debug("ac %d off", ac);
 		/* admission is not required so access is allowed */
 		adapter->hdd_wmm_status.ac_status[ac].is_access_required = false;
 		adapter->hdd_wmm_status.ac_status[ac].is_access_allowed = true;

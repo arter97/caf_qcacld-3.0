@@ -9075,16 +9075,12 @@ QDF_STATUS sme_update_dsc_pto_up_mapping(mac_handle_t mac_handle,
 
 	pSession = pe_find_session_by_vdev_id(mac, sessionId);
 
-	if (!pSession) {
-		sme_err("Session lookup fails for vdev %d", sessionId);
+	if (!pSession)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	pqosmapset = &pSession->QosMapSet;
-	if (!pqosmapset->present) {
-		sme_debug("QOS Mapping IE not present");
+	if (!pqosmapset->present)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	for (i = 0; i < SME_QOS_WMM_UP_MAX; i++) {
 		for (j = pqosmapset->dscp_range[i][0];
