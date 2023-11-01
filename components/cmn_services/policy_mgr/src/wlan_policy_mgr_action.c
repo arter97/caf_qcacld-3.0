@@ -285,6 +285,7 @@ policy_mgr_get_sap_bw(struct wlan_objmgr_psoc *psoc, enum phy_ch_width *bw)
 /**
  * policy_mgr_get_sap_ch_width_update_action() - get SAP ch_width update action
  * @psoc: Pointer to psoc
+ * @vdev_id: Vdev id of the caller
  * @ch_freq: channel frequency of new connection
  * @next_action: next action to happen in order to update bandwidth
  * @reason: Bandwidth upgrade/downgrade reason
@@ -296,12 +297,12 @@ policy_mgr_get_sap_bw(struct wlan_objmgr_psoc *psoc, enum phy_ch_width *bw)
  */
 static void
 policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
-				uint32_t ch_freq,
+				uint8_t vdev_id, qdf_freq_t ch_freq,
 				enum policy_mgr_conc_next_action *next_action,
 				enum policy_mgr_conn_update_reason *reason)
 {
 	enum phy_ch_width cur_bw;
-	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
 	bool eht_capab = false;
 
@@ -319,12 +320,13 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 
 	policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
 					       &vdev_id_list[0], PM_SAP_MODE);
-	if (cur_bw == CH_WIDTH_320MHZ &&
-	    ch_freq && policy_mgr_is_conn_lead_to_dbs_sbs(psoc, ch_freq))
+	if (cur_bw == CH_WIDTH_320MHZ && ch_freq &&
+	    policy_mgr_is_conn_lead_to_dbs_sbs(psoc, vdev_id, ch_freq))
 		*next_action = PM_DOWNGRADE_BW;
 	else if (cur_bw == CH_WIDTH_160MHZ &&
 		 !ch_freq &&
-		 !policy_mgr_is_conn_lead_to_dbs_sbs(psoc, freq_list[0]) &&
+		 !policy_mgr_is_conn_lead_to_dbs_sbs(psoc,
+					vdev_id_list[0], freq_list[0]) &&
 		 (reason &&
 		  (*reason == POLICY_MGR_UPDATE_REASON_TIMER_START ||
 		   *reason == POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC)))
@@ -344,7 +346,9 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
-		policy_mgr_get_sap_ch_width_update_action(psoc, 0, &upgrade,
+		policy_mgr_get_sap_ch_width_update_action(psoc,
+							  WLAN_INVALID_VDEV_ID,
+							  0, &upgrade,
 							  reason);
 		return upgrade;
 	}
@@ -956,24 +960,20 @@ policy_mgr_get_third_conn_action_table(
 
 bool
 policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
-				   uint32_t freq)
+				   uint8_t vdev_id, qdf_freq_t freq)
 {
 	struct connection_info info[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint32_t connection_count, i;
 
-	if (wlan_reg_is_24ghz_ch_freq(freq))
-		return true;
-
 	connection_count = policy_mgr_get_connection_info(psoc, info);
-
-	if (connection_count == 1)
-		return false;
-
-	for (i = 0; i < connection_count; i++)
+	for (i = 0; i < connection_count; i++) {
+		/* Ignore the vdev id for which freq is passed */
+		if (vdev_id == info[i].vdev_id)
+			continue;
 		if (!policy_mgr_2_freq_always_on_same_mac(psoc, freq,
 							  info[i].ch_freq))
 			return true;
-
+	}
 	return false;
 }
 
@@ -1000,7 +1000,8 @@ policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
 		*next_action = PM_NOP;
-		policy_mgr_get_sap_ch_width_update_action(psoc, ch_freq,
+		policy_mgr_get_sap_ch_width_update_action(psoc, session_id,
+							  ch_freq,
 							  next_action, &reason);
 		return QDF_STATUS_SUCCESS;
 	}
@@ -1119,11 +1120,12 @@ policy_mgr_is_hw_mode_change_required(struct wlan_objmgr_psoc *psoc,
 
 static bool
 policy_mgr_is_ch_width_downgrade_required(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
 					  struct scan_cache_entry *entry,
 					  qdf_list_t *scan_list)
 
 {
-	if (policy_mgr_is_conn_lead_to_dbs_sbs(psoc,
+	if (policy_mgr_is_conn_lead_to_dbs_sbs(psoc, vdev_id,
 					       entry->channel.chan_freq) ||
 	    wlan_cm_bss_mlo_type(psoc, entry, scan_list))
 		return true;
@@ -1198,7 +1200,8 @@ ch_width_update:
 
 		if (policy_mgr_is_hw_mode_change_required(psoc, ch_freq,
 							  vdev_id) ||
-		    policy_mgr_is_ch_width_downgrade_required(psoc, entry,
+		    policy_mgr_is_ch_width_downgrade_required(psoc, vdev_id,
+							      entry,
 							      scan_list)) {
 			policy_mgr_debug("Scan list has BSS of freq %d hw mode/SAP ch_width:%d update required",
 					 ch_freq, cur_bw);

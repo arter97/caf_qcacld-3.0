@@ -5609,6 +5609,7 @@ bool policy_mgr_is_freq_on_mac_id(struct policy_mgr_freq_range *freq_range,
 /**
  * policy_mgr_is_conn_lead_to_dbs_sbs() - New freq leads to DBS/SBS
  * @psoc: PSOC object information
+ * @vdev_id: vdev id of the caller
  * @freq: New connection frequency
  *
  * This API loops through existing connections from policy_mgr connection table
@@ -5617,7 +5618,7 @@ bool policy_mgr_is_freq_on_mac_id(struct policy_mgr_freq_range *freq_range,
  */
 bool
 policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
-				   uint32_t freq);
+				   uint8_t vdev_id, qdf_freq_t freq);
 
 /**
  * policy_mgr_sap_ch_width_update() - Update SAP ch_width

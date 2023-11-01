@@ -11105,6 +11105,7 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 					       session->ch_width);
 		if (session->ch_width == CH_WIDTH_320MHZ &&
 		    policy_mgr_is_conn_lead_to_dbs_sbs(mac->psoc,
+						       session->vdev_id,
 						       session->curr_op_freq))
 			wlan_mlme_set_ap_oper_ch_width(session->vdev,
 						       CH_WIDTH_160MHZ);
