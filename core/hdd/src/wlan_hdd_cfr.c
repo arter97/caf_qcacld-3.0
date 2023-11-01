@@ -31,6 +31,7 @@
 #include "wlan_cfr_ucfg_api.h"
 #include "wlan_hdd_object_manager.h"
 #include "wlan_cmn.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 const struct nla_policy cfr_config_policy[
 		QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1] = {
@@ -716,6 +717,7 @@ static int __wlan_hdd_cfg80211_peer_cfr_capture_cfg(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter;
+	uint8_t ll_lt_sap_vdev_id;
 
 	hdd_enter();
 
@@ -731,6 +733,14 @@ static int __wlan_hdd_cfg80211_peer_cfr_capture_cfg(struct wiphy *wiphy,
 	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
 		return -EINVAL;
+
+	ll_lt_sap_vdev_id =
+			wlan_policy_mgr_get_ll_lt_sap_vdev_id(hdd_ctx->psoc);
+	if (ll_lt_sap_vdev_id != WLAN_INVALID_VDEV_ID) {
+		hdd_info_rl("LL_LT_SAP vdev %d present, cfr cmd not allowed",
+			     ll_lt_sap_vdev_id);
+		return -EINVAL;
+	}
 
 	wlan_cfg80211_peer_cfr_capture_cfg(wiphy, adapter,
 					   data, data_len);
