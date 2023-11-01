@@ -2085,8 +2085,6 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 	struct ieee80211_frame *wh;
 	struct wmi_probe_resp_params params;
 
-	wma_debug("Send probe response template for vdev %d", vdev_id);
-
 	/*
 	 * Make the TSF offset negative so probe response in the same
 	 * staggered batch have the same TSF.
@@ -2175,7 +2173,8 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wma_nofl_debug("Send beacon template for vdev %d", vdev_id);
+	wma_nofl_debug("vdev %d: bcn update reason %d", vdev_id,
+		       bcn_info->reason);
 
 	if (bcn_info->p2pIeOffset) {
 		p2p_ie = bcn_info->beacon + bcn_info->p2pIeOffset;
@@ -2454,7 +2453,6 @@ void wma_send_probe_rsp_tmpl(tp_wma_handle wma,
 
 	if (wmi_service_enabled(wma->wmi_handle,
 				   wmi_service_beacon_offload)) {
-		wma_nofl_debug("Beacon Offload Enabled Sending Unified command");
 		if (wmi_unified_probe_rsp_tmpl_send(wma, vdev_id,
 						    probe_rsp_info) < 0) {
 			wma_err("wmi_unified_probe_rsp_tmpl_send Failed");
@@ -2509,7 +2507,6 @@ void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 	uint8_t *p2p_ie;
 	struct sAniBeaconStruct *beacon;
 
-	wma_nofl_debug("Beacon update reason %d", bcn_info->reason);
 	beacon = (struct sAniBeaconStruct *) (bcn_info->beacon);
 	if (wma_find_vdev_id_by_addr(wma, beacon->macHdr.sa, &vdev_id)) {
 		wma_err("failed to get vdev id");

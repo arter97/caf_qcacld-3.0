@@ -195,7 +195,6 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 	uint32_t sw_target_freq;
 	uint8_t primary_channel;
 	enum phy_ch_width ch_width;
-	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
 	ch_width = session_entry->gLimChannelSwitch.ch_width;
 	ch_offset = session_entry->gLimChannelSwitch.sec_ch_offset;
@@ -211,15 +210,6 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 	dot_11_ptr->switch_count =
 		session_entry->gLimChannelSwitch.switchCount;
 	dot_11_ptr->present = 1;
-
-	wlan_reg_read_current_country(mac_ptr->psoc, reg_cc);
-	pe_debug("country:%s chan:%d freq %d width:%d reg:%d off:%d",
-		 reg_cc,
-		 session_entry->gLimChannelSwitch.primaryChannel,
-		 sw_target_freq,
-		 session_entry->gLimChannelSwitch.ch_width,
-		 dot_11_ptr->new_reg_class,
-		 session_entry->gLimChannelSwitch.sec_ch_offset);
 }
 
 #define TIME_UNIT 1024 //time unit (TU): A measurement of time equal to 1024 us
@@ -1039,9 +1029,6 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 			pDot11f->supportedChannelWidthSet =
 				pe_session->htSupportedChannelWidthSet;
 		}
-		pe_debug("cb mode %d scws %d session cw %d",
-			 cb_mode, pDot11f->supportedChannelWidthSet,
-			 pe_session->ch_width);
 
 		pDot11f->advCodingCap = pe_session->ht_config.adv_coding_cap;
 		pDot11f->txSTBC = pe_session->ht_config.tx_stbc;
@@ -7732,7 +7719,6 @@ populate_dot11f_he_operation(struct mac_context *mac_ctx,
 		wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_pwr_type);
 		he_op->oper_info_6g.info.reg_info = ap_pwr_type;
 	}
-	lim_log_he_op(mac_ctx, he_op, session);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -13107,11 +13093,8 @@ void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 				     vdev_id_list, 1,
 				     WLAN_LEGACY_MAC_ID);
 
-	if (vdev_id_list[0] == INVALID_VDEV_ID) {
-		pe_debug("vdev id %d no 6G vdev, no need to populate RNR IE",
-			 wlan_vdev_get_id(session->vdev));
+	if (vdev_id_list[0] == INVALID_VDEV_ID)
 		return;
-	}
 
 	co_session = pe_find_session_by_vdev_id(mac_ctx,
 						vdev_id_list[0]);

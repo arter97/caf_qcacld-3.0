@@ -7656,34 +7656,25 @@ void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap)
 void lim_log_he_op(struct mac_context *mac, tDot11fIEhe_op *he_ops,
 		   struct pe_session *session)
 {
-	pe_debug("bss_color 0x%x, default_pe_dur 0x%x, twt_req  0x%x, txop_rts_thres  0x%x, vht_op 0x%x",
+	pe_debug("bss_color 0x%x pe_dur 0x%x twt req  0x%x txop_rts_thres  0x%x vht_op 0x%x part color 0x%x Co-located 0x%x color dis 0x%x basic mcs nss 0x%x",
 		 he_ops->bss_color, he_ops->default_pe,
 		 he_ops->twt_required, he_ops->txop_rts_threshold,
-		 he_ops->vht_oper_present);
-	pe_debug("\tpart_bss_color 0x%x, Co-located BSS 0x%x, BSS color dis 0x%x basic mcs nss: 0x%x",
-		 he_ops->partial_bss_col, he_ops->co_located_bss,
-		 he_ops->bss_col_disabled,
+		 he_ops->vht_oper_present, he_ops->partial_bss_col,\
+		 he_ops->co_located_bss, he_ops->bss_col_disabled,
 		 *((uint16_t *)he_ops->basic_mcs_nss));
 
-	if (!session->he_6ghz_band) {
-		if (!he_ops->vht_oper_present)
-			pe_debug("VHT Info not present in HE Operation");
-		else
-			pe_debug("VHT Info: ch_bw %d cntr_freq0 %d cntr_freq1 %d",
-				 he_ops->vht_oper.info.chan_width,
-				 he_ops->vht_oper.info.center_freq_seg0,
-				 he_ops->vht_oper.info.center_freq_seg1);
-	} else {
-		if (!he_ops->oper_info_6g_present)
-			pe_debug("6G op_info not present in HE Operation");
-		else
-			pe_debug("6G_op_info:ch_bw %d cntr_freq0 %d cntr_freq1 %d dup_bcon %d, min_rate %d",
-				 he_ops->oper_info_6g.info.ch_width,
-				 he_ops->oper_info_6g.info.center_freq_seg0,
-				 he_ops->oper_info_6g.info.center_freq_seg1,
-				 he_ops->oper_info_6g.info.dup_bcon,
-				 he_ops->oper_info_6g.info.min_rate);
-	}
+	if (!session->he_6ghz_band && he_ops->vht_oper_present)
+		pe_debug("VHT Info: ch_bw %d cntr_freq0 %d cntr_freq1 %d",
+			 he_ops->vht_oper.info.chan_width,
+			 he_ops->vht_oper.info.center_freq_seg0,
+			 he_ops->vht_oper.info.center_freq_seg1);
+	else if (he_ops->oper_info_6g_present)
+		pe_debug("6G_op_info:ch_bw %d cntr_freq0 %d cntr_freq1 %d dup_bcon %d, min_rate %d",
+			 he_ops->oper_info_6g.info.ch_width,
+			 he_ops->oper_info_6g.info.center_freq_seg0,
+			 he_ops->oper_info_6g.info.center_freq_seg1,
+			 he_ops->oper_info_6g.info.dup_bcon,
+			 he_ops->oper_info_6g.info.min_rate);
 }
 
 void lim_log_he_6g_cap(struct mac_context *mac,
