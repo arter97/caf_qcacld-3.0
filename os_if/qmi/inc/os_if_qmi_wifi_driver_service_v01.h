@@ -86,6 +86,20 @@ struct wifi_drv_qmi_srng_information_v01 {
 };
 
 /**
+ * enum wifi_drv_qmi_adsp_crash_type_v01 - ADSP crash type
+ * @WIFI_DRV_QMI_ADSP_CRASH_TYPE_MIN_VAL_V01: ADSP crash type enum min value
+ * @WFDS_ADSP_CRASH_TYPE_NMI_V01: ADSP NMI crash
+ * @WFDS_ADSP_CRASH_TYPE_NON_NMI_V01: ADSP non-NMI crash
+ * @WIFI_DRV_QMI_ADSP_CRASH_TYPE_MAX_VAL_V01: ADSP crash type enum max value
+ */
+enum wifi_drv_qmi_adsp_crash_type_v01 {
+	WIFI_DRV_QMI_ADSP_CRASH_TYPE_MIN_VAL_V01 = INT_MIN,
+	WFDS_ADSP_CRASH_TYPE_NMI_V01 = 0,
+	WFDS_ADSP_CRASH_TYPE_NON_NMI_V01 = 1,
+	WIFI_DRV_QMI_ADSP_CRASH_TYPE_MAX_VAL_V01 = INT_MAX,
+};
+
+/**
  * enum wifi_drv_qmi_pipe_dir_v01 - pipe direction
  * @WIFI_DRV_QMI_PIPE_DIR_MIN_VAL_V01: pipe direction enum min value
  * @WFDS_PIPEDIR_NONE_V01: none pipe direction
@@ -127,6 +141,24 @@ struct wifi_drv_qmi_ce_information_v01 {
  * @pcie_bar_pa: PCIe BAR physical address
  * @pci_slot: PCIe slot
  * @lpass_ep_id: LPASS data message service endpoint id
+ * @apss_shared_wrmem_paddr_valid: whether corresponding QMI field is valid or
+ *  not
+ * @apss_shared_wrmem_paddr: APSS shared write memory physical address
+ * @apss_shared_wrmem_size_valid: whether corresponding QMI field is valid or
+ *  not
+ * @apss_shared_wrmem_size: APSS shared write memory size
+ * @fw_shared_rdmem_paddr_valid: whether corresponding QMI field is valid or
+ *  not
+ * @fw_shared_rdmem_paddr: FW shared read memory physical address
+ * @fw_shared_rdmem_size_valid: whether corresponding QMI field is valid or
+ *  not
+ * @fw_shared_rdmem_size: FW shared read memory size
+ * @fw_shared_wrmem_paddr_valid: whether corresponding QMI field is valid or
+ *  not
+ * @fw_shared_wrmem_paddr: FW shared write memory physical address
+ * @fw_shared_wrmem_size_valid: whether corresponding QMI field is valid or
+ *  not
+ * @fw_shared_wrmem_size: FW shared write memory size
  */
 struct wfds_config_req_msg_v01 {
 	u32 ce_info_len;
@@ -141,9 +173,21 @@ struct wfds_config_req_msg_v01 {
 	u64 pcie_bar_pa;
 	u32 pci_slot;
 	u32 lpass_ep_id;
+	u8 apss_shared_wrmem_paddr_valid;
+	u64 apss_shared_wrmem_paddr;
+	u8 apss_shared_wrmem_size_valid;
+	u32 apss_shared_wrmem_size;
+	u8 fw_shared_rdmem_paddr_valid;
+	u64 fw_shared_rdmem_paddr;
+	u8 fw_shared_rdmem_size_valid;
+	u32 fw_shared_rdmem_size;
+	u8 fw_shared_wrmem_paddr_valid;
+	u64 fw_shared_wrmem_paddr;
+	u8 fw_shared_wrmem_size_valid;
+	u32 fw_shared_wrmem_size;
 };
 
-#define WFDS_CONFIG_REQ_MSG_V01_MAX_MSG_LEN 253
+#define WFDS_CONFIG_REQ_MSG_V01_MAX_MSG_LEN 307
 extern struct qmi_elem_info wfds_config_req_msg_v01_ei[];
 
 /**
