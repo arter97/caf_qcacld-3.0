@@ -4014,6 +4014,9 @@ ccflags-$(CONFIG_CHECKSUM_OFFLOAD) += -DCHECKSUM_OFFLOAD
 
 #Enable IPA Offload support
 ccflags-$(CONFIG_IPA_OFFLOAD) += -DIPA_OFFLOAD
+ifeq ($(CONFIG_IPA_OFFLOAD), y)
+ccflags-$(CONFIG_IPA_WDS_EASYMESH) += -DIPA_WDS_EASYMESH_FEATURE
+endif
 
 #Enable IPA optional Wifi datapath
 ifeq ($(CONFIG_IPA_OPT_WIFI_DP), y)
