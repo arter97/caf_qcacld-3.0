@@ -88,6 +88,7 @@
 #include <wlan_twt_api.h>
 #include "wlan_tdls_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_cm_api.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -3221,8 +3222,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 	uint8_t *pBody;
 	tSirMacCapabilityInfo capabilityInfo;
 	tpSirMacMgmtHdr pHdr = NULL;
-	struct pe_session *pe_session = NULL;
-	uint8_t sessionId;
+	struct wlan_objmgr_vdev *vdev;
 
 	/*
 	 *
@@ -3264,10 +3264,12 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		struct tLimPreAuthNode *auth_node;
 
 		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-		pe_session = pe_find_session_by_bssid(mac, pHdr->bssId,
-							 &sessionId);
-		if (!pe_session)
+		vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+								 pHdr->da,
+								 WLAN_LEGACY_MAC_ID);
+		if (!vdev)
 			return eMGMT_DROP_NO_DROP;
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 		curr_seq_num = ((pHdr->seqControl.seqNumHi << 4) |
 				(pHdr->seqControl.seqNumLo));
@@ -3286,18 +3288,21 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		qdf_time_t *timestamp;
 
 		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-		pe_session = pe_find_session_by_bssid(mac, pHdr->bssId,
-				&sessionId);
-		if (!pe_session)
+		vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+								 pHdr->da,
+								 WLAN_LEGACY_MAC_ID);
+		if (!vdev)
 			return eMGMT_DROP_SPURIOUS_FRAME;
 
 		peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
 						   pHdr->sa,
 						   WLAN_LEGACY_MAC_ID);
 		if (!peer) {
-			if (subType == SIR_MAC_MGMT_ASSOC_REQ)
+			if (subType == SIR_MAC_MGMT_ASSOC_REQ) {
+				wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 				return eMGMT_DROP_NO_DROP;
-
+			}
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 			return eMGMT_DROP_SPURIOUS_FRAME;
 		}
 
@@ -3305,11 +3310,22 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 							WLAN_UMAC_COMP_MLME);
 		if (!peer_priv) {
 			wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
-			if (subType == SIR_MAC_MGMT_ASSOC_REQ)
+			if (subType == SIR_MAC_MGMT_ASSOC_REQ) {
+				wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 				return eMGMT_DROP_NO_DROP;
-
+			}
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 			return eMGMT_DROP_SPURIOUS_FRAME;
 		}
+
+		if (QDF_STA_MODE == wlan_vdev_mlme_get_opmode(vdev) &&
+		    wlan_cm_is_vdev_roam_started(vdev) &&
+		    (subType == SIR_MAC_MGMT_DISASSOC ||
+		     subType == SIR_MAC_MGMT_DEAUTH)) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+			return eMGMT_DROP_DEAUTH_DURING_ROAM_STARTED;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 		if (subType == SIR_MAC_MGMT_ASSOC_REQ)
 			timestamp =
