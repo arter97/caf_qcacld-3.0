@@ -497,6 +497,19 @@ int wlan_hdd_get_linkspeed_for_peermac(struct wlan_hdd_link_info *link_info,
 int wlan_hdd_get_link_speed(struct wlan_hdd_link_info *link_info,
 			    uint32_t *link_speed);
 
+/**
+ * wlan_hdd_get_sap_go_peer_linkspeed() - Get SAP/GO peer link speed
+ * @link_info:   Link info pointer in HDD adapter
+ * @link_speed:  Pointer to link speed
+ * @command:     Driver command string
+ * @command_len: Driver command string length
+ *
+ * Return: 0 if linkspeed data is available, negative errno otherwise
+ */
+int wlan_hdd_get_sap_go_peer_linkspeed(struct wlan_hdd_link_info *link_info,
+				       uint32_t *link_speed,
+				       uint8_t *command,
+				       uint8_t command_len);
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 /**
  * wlan_hdd_get_peer_rx_rate_stats() - STA gets rx rate stats
