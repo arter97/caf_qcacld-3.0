@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5541,6 +5541,56 @@ static int drv_cmd_get_rssi(struct wlan_hdd_link_info *link_info,
 	return ret;
 }
 
+/**
+ * drv_cmd_get_sap_go_linkspeed() - Driver command to get SAP/P2P Go peer link
+ *                                  speed
+ * @link_info: Link info pointer in HDD adapter
+ * @hdd_ctx: HDD context pointer
+ * @command: Driver command string
+ * @command_len: Driver command string length
+ * @priv_data: Pointer to HDD private data
+ *
+ * Return: 0 if linkspeed data is available, negative errno otherwise
+ */
+static int drv_cmd_get_sap_go_linkspeed(struct wlan_hdd_link_info *link_info,
+					struct hdd_context *hdd_ctx,
+					uint8_t *command,
+					uint8_t command_len,
+					struct hdd_priv_data *priv_data)
+{
+	int ret;
+	uint32_t link_speed = 0;
+	char extra[64];
+	uint8_t len = 0;
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	if (adapter->device_mode == QDF_P2P_GO_MODE ||
+	    adapter->device_mode == QDF_SAP_MODE) {
+		ret = wlan_hdd_get_sap_go_peer_linkspeed(link_info,
+							 &link_speed,
+							 command,
+							 command_len);
+	} else {
+		hdd_err("Link Speed is not allowed in Device mode %s(%d)",
+			qdf_opmode_str(adapter->device_mode),
+			adapter->device_mode);
+		ret = -ENOTSUPP;
+	}
+
+	if (0 != ret)
+		return ret;
+
+	len = scnprintf(extra, sizeof(extra), "%s %d\n",
+			"SOFT-AP LINKSPEED", link_speed);
+	len = QDF_MIN(priv_data->total_len, len + 1);
+	if (copy_to_user(priv_data->buf, &extra, len)) {
+		hdd_err("Failed to copy data to user buffer");
+		ret = -EFAULT;
+	}
+
+	return ret;
+}
+
 static int drv_cmd_get_linkspeed(struct wlan_hdd_link_info *link_info,
 				 struct hdd_context *hdd_ctx,
 				 uint8_t *command,
@@ -7291,6 +7341,7 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"RXFILTER-STOP",             drv_cmd_dummy, false},
 	{"BTCOEXSCAN-START",          drv_cmd_dummy, false},
 	{"BTCOEXSCAN-STOP",           drv_cmd_dummy, false},
+	{"GET_SOFTAP_LINK_SPEED",     drv_cmd_get_sap_go_linkspeed, true},
 };
 
 /**
