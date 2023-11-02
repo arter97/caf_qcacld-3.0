@@ -5160,9 +5160,6 @@ void policy_mgr_add_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("mand list overflow (%u)", ch_freq);
 		return;
 	}
-
-	policy_mgr_debug("Ch freq: %u", ch_freq);
-
 	pm_ctx->sap_mandatory_channels[pm_ctx->sap_mandatory_channels_len++]
 		= ch_freq;
 }
@@ -5225,9 +5222,6 @@ void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc)
 				&tx_power, &eirp_psd_power);
 			if (status != QDF_STATUS_SUCCESS || !tx_power)
 				continue;
-
-			policy_mgr_debug("Add chan %u to mandatory list",
-					 ch_freq_list[i]);
 			pm_ctx->sap_mandatory_channels[
 				pm_ctx->sap_mandatory_channels_len++] =
 				ch_freq_list[i];
@@ -5240,6 +5234,28 @@ void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc)
 {
 }
 #endif
+
+#define MANDATORY_CHAN_CHAR_LEN 6
+void policy_mgr_dump_sap_mandatory(struct policy_mgr_psoc_priv_obj *pm_ctx)
+{
+	char *chan_buff;
+	uint32_t len = pm_ctx->sap_mandatory_channels_len;
+	uint32_t idx, num = 0, buff_len;
+
+	if (!len)
+		return;
+	buff_len = (QDF_MIN(len, NUM_CHANNELS) * MANDATORY_CHAN_CHAR_LEN) + 1;
+	chan_buff = qdf_mem_malloc(buff_len);
+	if (!chan_buff)
+		return;
+
+	for (idx = 0; (idx < len) && (idx < NUM_CHANNELS); idx++)
+		num += qdf_scnprintf(chan_buff + num, buff_len - num, " %d",
+				     pm_ctx->sap_mandatory_channels[idx]);
+
+	policymgr_nofl_debug("Mandatory SAP fav freq(%d):%s", len, chan_buff);
+	qdf_mem_free(chan_buff);
+}
 
 /**
  * policy_mgr_init_sap_mandatory_chan_by_band() - Init SAP mandatory channel
@@ -5266,6 +5282,7 @@ policy_mgr_init_sap_mandatory_chan_by_band(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("Invalid Context");
 		return;
 	}
+	policy_mgr_debug("band mask 0x%x", band_bitmap);
 
 	status = policy_mgr_get_valid_chans(psoc, ch_freq_list, &len);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -5275,8 +5292,6 @@ policy_mgr_init_sap_mandatory_chan_by_band(struct wlan_objmgr_psoc *psoc,
 	pm_ctx->sap_mandatory_channels_len = 0;
 	for (i = 0; (i < len) && (i < NUM_CHANNELS); i++) {
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq_list[i])) {
-			policy_mgr_debug("Add chan %u to mandatory list",
-					ch_freq_list[i]);
 			pm_ctx->sap_mandatory_channels[
 				pm_ctx->sap_mandatory_channels_len++] =
 				ch_freq_list[i];
@@ -5288,14 +5303,14 @@ policy_mgr_init_sap_mandatory_chan_by_band(struct wlan_objmgr_psoc *psoc,
 				psoc, sap_mand_5g_freq_list[i]);
 	if (band_bitmap & BIT(REG_BAND_6G))
 		policy_mgr_add_sap_mandatory_6ghz_chan(psoc);
+
+	policy_mgr_dump_sap_mandatory(pm_ctx);
 }
 
 void  policy_mgr_init_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
 					 uint32_t org_ch_freq)
 {
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(org_ch_freq)) {
-		policy_mgr_debug("channel %u, sap mandatory chan list enabled",
-				 org_ch_freq);
 		policy_mgr_init_sap_mandatory_chan_by_band(
 			psoc, BIT(REG_BAND_2G) | BIT(REG_BAND_5G));
 		policy_mgr_add_sap_mandatory_chan(

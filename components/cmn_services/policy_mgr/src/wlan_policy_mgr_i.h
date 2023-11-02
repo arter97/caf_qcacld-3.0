@@ -1187,6 +1187,14 @@ policy_mgr_set_freq_restriction_mask(struct policy_mgr_psoc_priv_obj *pm_ctx,
 #endif
 
 /**
+ * policy_mgr_dump_sap_mandatory() - Dump mandatory freq list
+ * @pm_ctx: pm_ctx
+ *
+ * Return: None
+ */
+void policy_mgr_dump_sap_mandatory(struct policy_mgr_psoc_priv_obj *pm_ctx);
+
+/**
  * policy_mgr_get_connection_max_channel_width() - Get max channel width
  * among vdevs in use
  * @psoc: PSOC object pointer

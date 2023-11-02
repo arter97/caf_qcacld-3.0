@@ -4073,10 +4073,7 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 		return QDF_STATUS_E_FAILURE;
 	}
 
-
-	for (i = 0; i < pm_ctx->sap_mandatory_channels_len; i++)
-		policy_mgr_debug("fav chan:%d",
-				 pm_ctx->sap_mandatory_channels[i]);
+	policy_mgr_dump_sap_mandatory(pm_ctx);
 
 	if (scc_on_indoor)
 		indoor_sta_freq = policy_mgr_is_sta_on_indoor_channel(psoc);
