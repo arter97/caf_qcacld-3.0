@@ -1774,6 +1774,30 @@ reg_is_non_6g_freq_txable(struct wlan_objmgr_pdev *pdev,
 }
 
 /**
+* reg_is_dev_outdoor() - Check if AFC Deployment type is Outdoor.
+* @pdev: Pointer to pdev
+*
+* Return: True if the deployment type is Outdoor, else false.
+*/
+#ifdef CONFIG_AFC_SUPPORT
+static inline bool
+reg_is_dev_outdoor(struct wlan_objmgr_pdev *pdev)
+{
+	enum reg_afc_dev_deploy_type reg_afc_deploy_type = AFC_DEPLOYMENT_UNKNOWN;
+
+	reg_get_afc_dev_deploy_type(pdev, &reg_afc_deploy_type);
+
+	return reg_afc_deploy_type == AFC_DEPLOYMENT_OUTDOOR;
+}
+#else
+static inline bool
+reg_is_dev_outdoor(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
+#endif /* CONFIG_AFC_SUPPORT*/
+
+/**
  * reg_is_6g_freq_txable() - Check if the given 6 GHz frequency is tx-able.
  * @pdev: Pointer to pdev
  * @freq: Frequency in MHz
@@ -1791,7 +1815,6 @@ reg_is_6g_freq_txable(struct wlan_objmgr_pdev *pdev,
 		      enum supported_6g_pwr_types in_6ghz_pwr_mode)
 {
 	bool is_freq_enabled;
-	enum reg_afc_dev_deploy_type reg_afc_deploy_type;
 	enum channel_enum chan_idx;
 
 	is_freq_enabled = reg_is_freq_enabled(pdev, freq, in_6ghz_pwr_mode);
@@ -1799,13 +1822,12 @@ reg_is_6g_freq_txable(struct wlan_objmgr_pdev *pdev,
 	if (!is_freq_enabled)
 		return false;
 
-	reg_get_afc_dev_deploy_type(pdev, &reg_afc_deploy_type);
 
 	/* Outdoor deployment requires additional checks if power mode is SP.
 	 * If the deployment is indoor, return if the frequency is enabled or
 	 * or not.
 	 */
-	if (reg_afc_deploy_type != AFC_DEPLOYMENT_OUTDOOR)
+	if (!reg_is_dev_outdoor(pdev))
 		return is_freq_enabled;
 
 	if (in_6ghz_pwr_mode == REG_BEST_PWR_MODE) {
