@@ -930,10 +930,9 @@ void htt_interface_logging_init(struct htt_logger **phtt_logger_handle,
 	log_buf_init(event_log_buf);
 	log_buf_init(wbm_event_log_buf);
 
-	/**
-	 * Disable all command except:
-	 * HTT_H2T_MSG_TYPE_SRING_SETUP, HTT_H2T_MSG_TYPE_RX_RING_CFG
-	 * HTT_H2T_MSG_TYPE_RX_RING_SELECTION_CFG, HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE
+	/*
+	 * Disable logging all commands and enable for specific
+	 * commands
 	 */
 	disable_all_command(htt_logger_handle);
 	enable_command(htt_logger_handle, HTT_H2T_MSG_TYPE_RX_RING_CFG);
@@ -942,11 +941,12 @@ void htt_interface_logging_init(struct htt_logger **phtt_logger_handle,
 		       HTT_H2T_MSG_TYPE_RX_RING_SELECTION_CFG);
 	enable_command(htt_logger_handle,
 		       HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE);
+	enable_command(htt_logger_handle,
+		       HTT_H2T_MSG_TYPE_PRIMARY_LINK_PEER_MIGRATE_RESP);
 
-	/* Disable all event except:
-	 * HTT_T2H_MSG_TYPE_PEER_MAP, HTT_T2H_MSG_TYPE_PEER_UNMAP
-	 * HTT_T2H_MSG_TYPE_RX_ADDBA HTT_T2H_MSG_TYPE_RX_DELBA
-	 * HTT_T2H_MSG_TYPE_PEER_MAP_V2 HTT_T2H_MSG_TYPE_PEER_UNMAP_V2
+	/*
+	 *  Disable logging for all events and enable for specific
+	 *  events
 	 */
 	disable_all_event(htt_logger_handle);
 	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_MAP);
@@ -958,6 +958,8 @@ void htt_interface_logging_init(struct htt_logger **phtt_logger_handle,
 	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_MAP_V3);
 	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_MLO_RX_PEER_MAP);
 	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_MLO_RX_PEER_UNMAP);
+	enable_event(htt_logger_handle,
+		     HTT_T2H_MSG_TYPE_PRIMARY_LINK_PEER_MIGRATE_IND);
 
 	/* Disable success status*/
 	disable_wbm_success_status(htt_logger_handle);
