@@ -37,6 +37,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_cmn.h"
 #endif
+#include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_cm_ucfg_api.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_scan_api.h"
@@ -4192,6 +4193,16 @@ QDF_STATUS policy_mgr_get_valid_chan_weights(struct wlan_objmgr_psoc *psoc,
 		     policy_mgr_mode_specific_connection_count(
 					psoc, PM_P2P_CLIENT_MODE, NULL)))
 			strict_follow_pcl = true;
+
+		/*
+		 * This is a temporary check and will be removed once ll_lt_sap
+		 * CSA support is added.
+		 */
+		if (wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc) !=
+							WLAN_INVALID_VDEV_ID) {
+			policy_mgr_debug("LL_LT_SAP present, strict follow PCL");
+			strict_follow_pcl = true;
+		}
 
 		/*
 		 * There is a small window between releasing the above lock

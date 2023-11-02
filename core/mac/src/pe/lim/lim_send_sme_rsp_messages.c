@@ -1784,6 +1784,18 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 		return false;
 	}
 
+	/*
+	 * This is a temporary check and will be removed once ll_lt_sap CSA
+	 * support is added.
+	 */
+	if (policy_mgr_get_ll_lt_sap_freq(mac_ctx->psoc) == csa_freq) {
+		pe_err("CSA not allowed on LL_LT_SAP freq %d", csa_freq);
+		lim_tear_down_link_with_ap(mac_ctx, session_entry->peSessionId,
+					   REASON_CHANNEL_SWITCH_FAILED,
+					   eLIM_HOST_DISASSOC);
+		return false;
+	}
+
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_freq) &&
 	    wlan_reg_get_bw_value(new_ch_width) > 20) {
 		if (csa_params->new_ch_freq_seg1 == csa_params->channel + 2)
