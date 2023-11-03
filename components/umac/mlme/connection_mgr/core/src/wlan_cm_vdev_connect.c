@@ -1732,6 +1732,8 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
 	enum QDF_OPMODE op_mode;
+	bool eht_capab = false;
+	QDF_STATUS status;
 
 	if (!vdev || !rsp) {
 		mlme_err("vdev or rsp is NULL");
@@ -1783,6 +1785,17 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 		wlan_p2p_status_connect(vdev);
 		cm_update_tid_mapping(vdev);
 		cm_update_associated_ch_info(vdev, true);
+
+		wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
+		if (eht_capab) {
+			status = policy_mgr_current_connections_update(
+					psoc, vdev_id,
+					rsp->freq,
+					POLICY_MGR_UPDATE_REASON_STA_CONNECT,
+					POLICY_MGR_DEF_REQ_ID);
+			if (status == QDF_STATUS_E_FAILURE)
+				mlme_debug("Failed to take next action after connect");
+		}
 	}
 
 	mlo_roam_connect_complete(vdev);
