@@ -203,6 +203,25 @@ wlan_twt_cfg_get_bcast_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
+wlan_twt_cfg_get_rtwt_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	struct twt_psoc_priv_obj *twt_psoc;
+	psoc_twt_ext_cfg_params_t *twt_cfg;
+
+	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							 WLAN_UMAC_COMP_TWT);
+	if (!twt_psoc) {
+		twt_err("null twt psoc priv obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	twt_cfg = &twt_psoc->cfg_params;
+	*val = twt_cfg->r_twt_enable;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_twt_cfg_set_requestor_flag(struct wlan_objmgr_psoc *psoc, bool val)
 {
 	return QDF_STATUS_SUCCESS;
