@@ -371,6 +371,10 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 		       uint16_t deauth_disassoc_frame_len,
 		       uint16_t reason_code);
 
+QDF_STATUS
+pe_set_ie_for_roam_invoke(struct mac_context *mac_ctx, uint8_t vdev_id,
+			  uint16_t dot11_mode, enum QDF_OPMODE opmode);
+
 #else
 static inline QDF_STATUS
 pe_roam_synch_callback(struct mac_context *mac_ctx,
@@ -387,6 +391,13 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 		       uint8_t *deauth_disassoc_frame,
 		       uint16_t deauth_disassoc_frame_len,
 		       uint16_t reason_code)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+pe_set_ie_for_roam_invoke(struct mac_context *mac_ctx, uint8_t vdev_id,
+			  uint16_t dot11_mode, enum QDF_OPMODE opmode)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
