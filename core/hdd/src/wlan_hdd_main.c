@@ -248,6 +248,7 @@
 #include "os_if_dp_local_pkt_capture.h"
 #include <wlan_mlo_mgr_link_switch.h>
 #include "cdp_txrx_mon.h"
+#include "os_if_ll_sap.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -18821,6 +18822,18 @@ const struct file_operations wlan_hdd_state_fops = {
 	.release = wlan_hdd_state_ctrl_param_release,
 };
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
+static struct class *wlan_hdd_class_create(const char *name)
+{
+	return class_create(THIS_MODULE, name);
+}
+#else
+static struct class *wlan_hdd_class_create(const char *name)
+{
+	return class_create(name);
+}
+#endif
+
 static int  wlan_hdd_state_ctrl_param_create(void)
 {
 	unsigned int wlan_hdd_state_major = 0;
@@ -18838,8 +18851,7 @@ static int  wlan_hdd_state_ctrl_param_create(void)
 		goto dev_alloc_err;
 	}
 	wlan_hdd_state_major = MAJOR(device);
-
-	class = class_create(THIS_MODULE, WLAN_CTRL_NAME);
+	class = wlan_hdd_class_create(WLAN_CTRL_NAME);
 	if (IS_ERR(class)) {
 		pr_err("wlan_hdd_state class_create error");
 		goto class_err;
@@ -18983,6 +18995,26 @@ static void hdd_vdev_mgr_unregister_cb(void)
 }
 
 /**
+ * hdd_ll_sap_register_cb() - Register ll_sap osif callbacks
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS hdd_ll_sap_register_cb(void)
+{
+	return osif_ll_sap_register_cb();
+}
+
+/**
+ * hdd_ll_sap_unregister_cb() - Un-register ll_sap osif callbacks
+ *
+ * Return: void
+ */
+static void hdd_ll_sap_unregister_cb(void)
+{
+	osif_ll_sap_unregister_cb();
+}
+
+/**
  * hdd_component_cb_init() - Initialize component callbacks
  *
  * This function initializes hdd callbacks to different
@@ -19011,8 +19043,14 @@ static QDF_STATUS hdd_component_cb_init(void)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto hdd_vdev_mgr_unregister_cb;
 
+	status = hdd_ll_sap_register_cb();
+	if (QDF_IS_STATUS_ERROR(status))
+		goto pre_cac_unregister_cb;
+
 	return QDF_STATUS_SUCCESS;
 
+pre_cac_unregister_cb:
+	hdd_pre_cac_unregister_cb();
 hdd_vdev_mgr_unregister_cb:
 	hdd_vdev_mgr_unregister_cb();
 cm_unregister_cb:
@@ -19030,6 +19068,7 @@ cm_unregister_cb:
  */
 static void hdd_component_cb_deinit(void)
 {
+	hdd_ll_sap_unregister_cb();
 	hdd_pre_cac_unregister_cb();
 	hdd_vdev_mgr_unregister_cb();
 	hdd_cm_unregister_cb();
@@ -21619,10 +21658,9 @@ int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width)
 		    chwidth_info[i].sir_chwidth != ch_width)
 			continue;
 
-		return hdd_update_channel_width(link_info->adapter, ch_width,
+		return hdd_update_channel_width(link_info, ch_width,
 						chwidth_info[i].bonding_mode,
-						link_id,
-						false);
+						link_id, false);
 	}
 
 	hdd_err("Invalid ch_width %d", ch_width);

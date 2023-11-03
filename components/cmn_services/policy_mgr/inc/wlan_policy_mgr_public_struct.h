@@ -1213,6 +1213,8 @@ enum policy_mgr_band {
 
 /**
  * enum policy_mgr_conn_update_reason: Reason for conc connection update
+ * @POLICY_MGR_UPDATE_REASON_TIMER_START: This is to decide whether to start the
+ *                                        timer or not
  * @POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN: Set probable operating channel
  * @POLICY_MGR_UPDATE_REASON_START_AP: Start AP
  * @POLICY_MGR_UPDATE_REASON_NORMAL_STA: Connection to Normal STA
@@ -1231,8 +1233,11 @@ enum policy_mgr_band {
  * @POLICY_MGR_UPDATE_REASON_LFR2_ROAM: LFR2 Roaming
  * @POLICY_MGR_UPDATE_REASON_STA_CONNECT: STA/CLI connection to peer
  * @POLICY_MGR_UPDATE_REASON_LFR3_ROAM: LFR3 Roaming
+ * @POLICY_MGR_UPDATE_REASON_MAX: Reason code to indicate that it's not a
+ * valid operation, should always be maintained at the end of enum.
  */
 enum policy_mgr_conn_update_reason {
+	POLICY_MGR_UPDATE_REASON_TIMER_START,
 	POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN,
 	POLICY_MGR_UPDATE_REASON_START_AP,
 	POLICY_MGR_UPDATE_REASON_NORMAL_STA,
@@ -1248,6 +1253,7 @@ enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_LFR2_ROAM,
 	POLICY_MGR_UPDATE_REASON_STA_CONNECT,
 	POLICY_MGR_UPDATE_REASON_LFR3_ROAM,
+	POLICY_MGR_UPDATE_REASON_MAX,
 };
 
 /**
@@ -1566,8 +1572,8 @@ struct policy_mgr_freq_range {
  * @MODE_SBS_UPPER_SHARE:   Higher 5Ghz shared with 2.4Ghz
  * @MODE_SBS_LOWER_SHARE:   LOWER 5Ghz shared with 2.4Ghz
  * @MODE_EMLSR:             eMLSR mode
- * @MODE_EMLSR_SINGLE:	    eMLSR split mode
- * @MODE_EMLSR_SPLIT:	    eMLSR split mode
+ * @MODE_EMLSR_SINGLE:      eMLSR single mode
+ * @MODE_EMLSR_SPLIT:       eMLSR split mode
  * @MODE_HW_MAX: MAX
  */
 enum policy_mgr_mode {

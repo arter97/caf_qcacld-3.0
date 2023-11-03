@@ -1636,8 +1636,10 @@ MLME_OBJS += $(WFA_TGT_IF_DIR)/src/target_if_wfa_testcmd.o \
 
 ####### LL_SAP #######
 LL_SAP_DIR := components/umac/mlme/sap/ll_sap
+LL_SAP_OS_IF_DIR := os_if/mlme/sap/ll_sap
 
 LL_SAP_INC := -I$(WLAN_ROOT)/$(LL_SAP_DIR)/dispatcher/inc \
+		-I$(WLAN_ROOT)/$(LL_SAP_OS_IF_DIR)/inc
 
 MLME_INC += $(LL_SAP_INC)
 
@@ -1646,7 +1648,8 @@ MLME_OBJS += $(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_ucfg_api.o \
 		$(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_api.o \
 		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o \
 		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_main.o \
-		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_bearer_switch.o
+		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_bearer_switch.o \
+		$(LL_SAP_OS_IF_DIR)/src/os_if_ll_sap.o
 endif
 
 $(call add-wlan-objs,mlme,$(MLME_OBJS))
@@ -4204,6 +4207,7 @@ ccflags-$(CONFIG_DP_RX_UDP_OVER_PEER_ROAM) += -DDP_RX_UDP_OVER_PEER_ROAM
 cppflags-$(CONFIG_WLAN_BOOST_CPU_FREQ_IN_ROAM) += -DWLAN_BOOST_CPU_FREQ_IN_ROAM
 
 ccflags-$(CONFIG_QCA_WIFI_EMULATION) += -DQCA_WIFI_EMULATION
+ccflags-$(CONFIG_SAP_MULTI_LINK_EMULATION) += -DSAP_MULTI_LINK_EMULATION
 ccflags-$(CONFIG_SHADOW_V2) += -DCONFIG_SHADOW_V2
 ccflags-$(CONFIG_SHADOW_V3) += -DCONFIG_SHADOW_V3
 ccflags-$(CONFIG_QCA6290_HEADERS_DEF) += -DQCA6290_HEADERS_DEF

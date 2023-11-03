@@ -2058,13 +2058,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	chnl_switch_info =
 		&session_entry->gLimWiderBWChannelSwitch;
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_params->csa_chan_freq)) {
-		channel_bonding_mode =
-			mac_ctx->roam.configParam.channelBondingMode24GHz;
-	} else {
-		channel_bonding_mode =
-			mac_ctx->roam.configParam.channelBondingMode5GHz;
-	}
+	channel_bonding_mode = lim_get_cb_mode_for_freq(mac_ctx, session_entry,
+						   csa_params->csa_chan_freq);
 
 	pe_debug("Session %d vdev %d: vht: %d ht: %d he %d cbmode %d",
 		 session_entry->peSessionId, session_entry->vdev_id,
@@ -2773,16 +2768,15 @@ void lim_nss_or_ch_width_update_rsp(struct mac_context *mac_ctx,
 	QDF_STATUS qdf_status = QDF_STATUS_E_INVAL;
 
 	rsp = qdf_mem_malloc(sizeof(*rsp));
-	if (!rsp)
-		return;
+	if (rsp) {
+		rsp->vdev_id = vdev_id;
+		rsp->status = status;
+		rsp->reason = reason;
+	}
 
-	rsp->vdev_id = vdev_id;
-	rsp->status = status;
-	rsp->reason = reason;
-
-	if (rsp->reason == REASON_NSS_UPDATE)
+	if (reason == REASON_NSS_UPDATE)
 		msg.type = eWNI_SME_NSS_UPDATE_RSP;
-	else if (rsp->reason == REASON_CH_WIDTH_UPDATE)
+	else if (reason == REASON_CH_WIDTH_UPDATE)
 		msg.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
 	else
 		goto done;

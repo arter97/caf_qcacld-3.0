@@ -85,6 +85,7 @@
 #include "wlan_cp_stats_mc_ucfg_api.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include <wlan_mlo_link_force.h>
+#include "wma_eht.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -2679,6 +2680,7 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 	enum policy_mgr_conn_update_reason reason;
 	uint32_t request_id;
 	uint8_t vdev_id;
+	QDF_STATUS status = QDF_STATUS_E_NOMEM;
 
 	param = (struct sir_bcn_update_rsp *)msg;
 	if (!param)
@@ -2710,8 +2712,10 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 	reason = command->u.bw_update_cmd.reason;
 	request_id = command->u.bw_update_cmd.request_id;
 	vdev_id = command->u.bw_update_cmd.conc_vdev_id;
+	if (param)
+		status = param->status;
 	sme_debug("vdev %d reason %d status %d cm_id 0x%x",
-		  vdev_id, reason, param->status, request_id);
+		  vdev_id, reason, status, request_id);
 
 	if (reason == POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA) {
 		sme_debug("Continue channel switch for STA on vdev %d",
@@ -2719,9 +2723,9 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 		csr_sta_continue_csa(mac, vdev_id);
 	} else if (reason == POLICY_MGR_UPDATE_REASON_STA_CONNECT) {
 		sme_debug("Continue connect/reassoc on vdev %d reason %d status %d cm_id 0x%x",
-			  vdev_id, reason, param->status, request_id);
+			  vdev_id, reason, status, request_id);
 		wlan_cm_handle_hw_mode_change_resp(mac->pdev, vdev_id,
-						   request_id, param->status);
+						   request_id, status);
 	}
 
 	policy_mgr_set_connection_update(mac->psoc);
@@ -6007,6 +6011,23 @@ QDF_STATUS sme_set_max_tx_power(mac_handle_t mac_handle,
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void sme_set_listen_interval(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct pe_session *session = NULL;
+	uint8_t val = 0;
+
+	session = pe_find_session_by_vdev_id(mac, vdev_id);
+	if (!session) {
+		sme_err("Session lookup fails for vdev %d", vdev_id);
+		return;
+	}
+
+	val = session->dtimPeriod;
+	pe_debug("Listen interval: %d vdev id: %d", val, vdev_id);
+	wma_vdev_set_listen_interval(vdev_id, val);
 }
 
 /*
@@ -12673,28 +12694,15 @@ void sme_set_cal_failure_event_cb(
 void sme_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id,
 			       enum QDF_OPMODE device_mode)
 {
-	struct sir_set_vdev_ies_per_band *p_msg;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	enum csr_cfgdot11mode curr_dot11_mode =
-				mac_ctx->roam.configParam.uCfgDot11Mode;
 
-	p_msg = qdf_mem_malloc(sizeof(*p_msg));
-	if (!p_msg)
-		return;
-
-
-	p_msg->vdev_id = vdev_id;
-	p_msg->device_mode = device_mode;
-	p_msg->dot11_mode = csr_get_vdev_dot11_mode(mac_ctx, vdev_id,
-						    curr_dot11_mode);
-	p_msg->msg_type = eWNI_SME_SET_VDEV_IES_PER_BAND;
-	p_msg->len = sizeof(*p_msg);
-	sme_debug("SET_VDEV_IES_PER_BAND: vdev_id %d dot11mode %d dev_mode %d",
-		  vdev_id, p_msg->dot11_mode, device_mode);
-	status = umac_send_mb_message_to_mac(p_msg);
-	if (QDF_STATUS_SUCCESS != status)
-		sme_err("Send eWNI_SME_SET_VDEV_IES_PER_BAND fail");
+	status = sme_acquire_global_lock(&mac_ctx->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		csr_set_vdev_ies_per_band(mac_handle, vdev_id,
+					  device_mode);
+		sme_release_global_lock(&mac_ctx->sme);
+	}
 }
 
 /**
@@ -15165,6 +15173,10 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	if (mac_ctx->usr_cfg_disable_rsp_tx)
 		sme_set_cfg_disable_tx(mac_handle, vdev_id, 0);
 	mac_ctx->is_usr_cfg_amsdu_enabled = true;
+	status = wlan_scan_cfg_set_scan_mode_6g(mac_ctx->psoc,
+						SCAN_MODE_6G_ALL_CHANNEL);
+	if (QDF_IS_STATUS_ERROR(status))
+		sme_err("Failed to set scan mode for 6 GHz, %d", status);
 }
 #endif
 

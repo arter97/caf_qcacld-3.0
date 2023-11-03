@@ -219,6 +219,7 @@ static uint8_t wma_get_number_of_peers_supported(tp_wma_handle wma)
 /**
  * wma_get_number_of_tids_supported - API to query for number of tids supported
  * @no_of_peers_supported: Number of peer supported
+ * @no_vdevs: Number of vdevs
  *
  * Return: Max number of tids supported
  */
@@ -576,6 +577,7 @@ static bool wma_is_feature_set_supported(tp_wma_handle wma_handle)
  * wma_set_default_tgt_config() - set default tgt config
  * @wma_handle: wma handle
  * @tgt_cfg: Resource config given to target
+ * @cds_cfg: cds configuration
  *
  * Return: none
  */
@@ -2199,7 +2201,7 @@ struct wma_version_info g_wmi_version_info;
 #ifdef WLAN_FEATURE_MEMDUMP_ENABLE
 /**
  * wma_state_info_dump() - prints state information of wma layer
- * @buf: buffer pointer
+ * @buf_ptr: buffer pointer
  * @size: size of buffer to be filled
  *
  * This function is used to dump state information of wma layer
@@ -2603,11 +2605,11 @@ static int wma_flush_complete_evt_handler(void *handle,
 /**
  * wma_extract_single_phyerr_spectral() - extract single phy error from event
  * @handle: wma handle
- * @param evt_buf: pointer to event buffer
- * @param datalen: data length of event buffer
- * @param buf_offset: Pointer to hold value of current event buffer offset
+ * @evt_buf: pointer to event buffer
+ * @datalen: data length of event buffer
+ * @buf_offset: Pointer to hold value of current event buffer offset
  * post extraction
- * @param phyerr: Pointer to hold phyerr
+ * @phyerr: Pointer to hold phyerr
  *
  * Return: QDF_STATUS
  */
@@ -3426,10 +3428,10 @@ wma_set_exclude_selftx_from_cca_busy_time(bool exclude_selftx_from_cca_busy,
 
 /**
  * wma_open() - Allocate wma context and initialize it.
- * @cds_context:  cds context
- * @wma_tgt_cfg_cb: tgt config callback fun
- * @radar_ind_cb: dfs radar indication callback
+ * @psoc: psoc object
+ * @tgt_cfg_cb: tgt config callback fun
  * @cds_cfg:  mac parameters
+ * @target_type: target type
  *
  * Return: 0 on success, errno on failure
  */
@@ -4283,8 +4285,8 @@ fail:
  *
  * @handle: WMA handle
  * @fixed_param: Event fixed parameters
- * @vdev_mac_entry - vdev mac entry
- * @hw_mode_trans_ind - Buffer to store parsed information
+ * @vdev_mac_entry: vdev mac entry
+ * @hw_mode_trans_ind: Buffer to store parsed information
  *
  * Parses fixed_param, vdev_mac_entry and fills in the information into
  * hw_mode_trans_ind and wma
@@ -5593,9 +5595,9 @@ static QDF_STATUS wma_update_supported_bands(
 /**
  * wma_derive_ext_ht_cap() - Derive HT caps based on given value
  * @ht_cap: given pointer to HT caps which needs to be updated
+ * @value: new HT cap info provided in form of bitmask
  * @tx_chain: given tx chainmask value
  * @rx_chain: given rx chainmask value
- * @value: new HT cap info provided in form of bitmask
  *
  * This function takes the value provided in form of bitmask and decodes
  * it. After decoding, what ever value it gets, it takes the union(max) or
@@ -5647,7 +5649,7 @@ static void wma_derive_ext_ht_cap(
 
 /**
  * wma_update_target_ext_ht_cap() - Update HT caps with given extended cap
- * @tgt_hdl - target psoc information
+ * @tgt_hdl: target psoc information
  * @ht_cap: HT cap structure to be filled
  *
  * This function loop through each hardware mode and for each hardware mode
@@ -5821,7 +5823,7 @@ static void wma_derive_ext_vht_cap(
 
 /**
  * wma_update_target_ext_vht_cap() - Update VHT caps with given extended cap
- * @tgt_hdl - target psoc information
+ * @tgt_hdl: target psoc information
  * @vht_cap: VHT cap structure to be filled
  *
  * This function loop through each hardware mode and for each hardware mode
@@ -6639,6 +6641,7 @@ static QDF_STATUS wma_register_gtk_offload_event(tp_wma_handle wma_handle)
  *                                wmi rx service ready event.
  * @handle: wma handle
  * @cmd_param_info: command params info
+ * @length: param length
  *
  * Return: none
  */
@@ -7185,7 +7188,7 @@ static void wma_print_mac_phy_capabilities(struct wlan_psoc_host_mac_phy_caps
 
 /**
  * wma_print_populate_soc_caps() - Prints all the caps populated per hw mode
- * @tgt_info: target related info
+ * @tgt_hdl: target related info
  *
  * This function prints all the caps populater per hw mode and per PHY
  *
@@ -7226,7 +7229,7 @@ static void wma_print_populate_soc_caps(struct target_psoc_info *tgt_hdl)
 /**
  * wma_update_hw_mode_list() - updates hw_mode_list
  * @wma_handle: pointer to wma global structure
- * @tgt_hdl - target psoc information
+ * @tgt_hdl: target psoc information
  *
  * This function updates hw_mode_list with tx_streams, rx_streams,
  * bandwidth, dbs and agile dfs for each hw_mode.
@@ -7371,6 +7374,7 @@ static inline void wma_init_dbr_params(t_wma_handle *wma_handle)
 /**
  * wma_set_coex_res_cfg() - Set target COEX resource configuration.
  * @wma_handle: pointer to wma global structure
+ * @wmi_handle: pointer to wmi handle
  * @wlan_res_cfg: Pointer to target resource configuration
  *
  * Return: none
@@ -8058,7 +8062,7 @@ void wma_send_flush_logs_to_fw(tp_wma_handle wma_handle)
 
 /**
  * wma_update_tx_fail_cnt_th() - Set threshold for TX pkt fail
- * @wma_handle: WMA handle
+ * @wma: WMA handle
  * @tx_fail_cnt_th: sme_tx_fail_cnt_threshold parameter
  *
  * This function is used to set Tx pkt fail count threshold,
@@ -8100,7 +8104,7 @@ static QDF_STATUS wma_update_tx_fail_cnt_th(tp_wma_handle wma,
 
 /**
  * wma_update_short_retry_limit() - Set retry limit for short frames
- * @wma_handle: WMA handle
+ * @wma: WMA handle
  * @short_retry_limit_th: retry limir count for Short frames.
  *
  * This function is used to configure the transmission retry limit at which
@@ -8141,7 +8145,7 @@ static QDF_STATUS wma_update_short_retry_limit(tp_wma_handle wma,
 
 /**
  * wma_update_long_retry_limit() - Set retry limit for long frames
- * @wma_handle: WMA handle
+ * @wma: WMA handle
  * @long_retry_limit_th: retry limir count for long frames
  *
  * This function is used to configure the transmission retry limit at which
@@ -8282,7 +8286,7 @@ WMITLV_TAG_STRUC_wmi_wow_hostwakeup_gpio_pin_pattern_config_cmd_fixed_param
  * wma_send_wow_pulse_cmd() - send wmi cmd of wow pulse cmd
  * information to fw.
  * @wma_handle: wma handler
- * @udp_response: wow_pulse_mode pointer
+ * @wow_pulse_cmd: wow_pulse_mode pointer
  *
  * Return: Return QDF_STATUS
  */
@@ -8436,7 +8440,7 @@ static QDF_STATUS wma_process_beacon_debug_stats_req(tp_wma_handle wma_handle,
 
 /**
  * wma_set_arp_req_stats() - process set arp stats request command to fw
- * @wma_handle: WMA handle
+ * @handle: WMA handle
  * @req_buf: set srp stats request buffer
  *
  * Return: None
@@ -8739,7 +8743,7 @@ static QDF_STATUS wma_roam_scan_send_hlp(tp_wma_handle wma_handle,
 #endif
 
 /**
- * wma_process_set_limit_off_chan() - set limit off channel parameters
+ * wma_process_limit_off_chan() - set limit off channel parameters
  * @wma_handle: pointer to wma handle
  * @param: pointer to sir_limit_off_chan
  *

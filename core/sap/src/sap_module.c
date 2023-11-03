@@ -3012,15 +3012,24 @@ void wlansap_cleanup_cac_timer(struct sap_context *sap_ctx)
 		return;
 	}
 
+	if (mac->sap.SapDfsInfo.vdev_id != sap_ctx->vdev_id) {
+		sap_err("sapdfs, force cleanup vdev mismatch sap vdev id %d mac_ctx vdev id %d",
+			sap_ctx->vdev_id, mac->sap.SapDfsInfo.vdev_id);
+		return;
+	}
+
 	if (mac->sap.SapDfsInfo.is_dfs_cac_timer_running) {
 		mac->sap.SapDfsInfo.is_dfs_cac_timer_running = 0;
+		mac->sap.SapDfsInfo.vdev_id = WLAN_INVALID_VDEV_ID;
+
 		if (!sap_ctx->dfs_cac_offload) {
 			qdf_mc_timer_stop(
 				&mac->sap.SapDfsInfo.sap_dfs_cac_timer);
 			qdf_mc_timer_destroy(
 				&mac->sap.SapDfsInfo.sap_dfs_cac_timer);
+			sap_debug("sapdfs, force cleanup running dfs cac timer vdev id %d",
+				  sap_ctx->vdev_id);
 		}
-		sap_err("sapdfs, force cleanup running dfs cac timer");
 	}
 }
 

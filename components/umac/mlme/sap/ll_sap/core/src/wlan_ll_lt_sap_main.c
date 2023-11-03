@@ -76,6 +76,8 @@ QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev)
 {
 	struct ll_sap_vdev_priv_obj *ll_sap_obj;
 	QDF_STATUS status;
+	uint8_t i, j;
+	struct bearer_switch_info *bs_ctx;
 
 	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
 
@@ -85,16 +87,24 @@ QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	ll_sap_obj->bearer_switch_ctx =
-			qdf_mem_malloc(sizeof(struct bearer_switch_info));
-	if (!ll_sap_obj->bearer_switch_ctx)
+	bs_ctx = ll_sap_obj->bearer_switch_ctx;
+
+	bs_ctx = qdf_mem_malloc(sizeof(struct bearer_switch_info));
+	if (!bs_ctx)
 		return QDF_STATUS_E_NOMEM;
 
-	qdf_atomic_init(&ll_sap_obj->bearer_switch_ctx->request_id);
+	qdf_atomic_init(&bs_ctx->request_id);
 
-	ll_sap_obj->bearer_switch_ctx->vdev = vdev;
+	for (i = 0; i < WLAN_UMAC_PSOC_MAX_VDEVS; i++)
+		for (j = 0; j < BEARER_SWITCH_REQ_MAX; j++)
+			qdf_atomic_init(&bs_ctx->ref_count[i][j]);
 
-	status = bs_sm_create(ll_sap_obj->bearer_switch_ctx);
+	qdf_atomic_init(&bs_ctx->fw_ref_count);
+	qdf_atomic_init(&bs_ctx->total_ref_count);
+
+	bs_ctx->vdev = vdev;
+
+	status = bs_sm_create(bs_ctx);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		goto bs_sm_failed;
@@ -105,6 +115,7 @@ QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev)
 
 bs_sm_failed:
 	qdf_mem_free(ll_sap_obj->bearer_switch_ctx);
+	ll_sap_obj->bearer_switch_ctx = NULL;
 	return status;
 }
 
@@ -133,4 +144,29 @@ QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev)
 	ll_sap_debug("vdev %d", wlan_vdev_get_id(vdev));
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
+				struct wlan_bearer_switch_request *bs_request)
+{
+	return bs_sm_deliver_event(psoc, WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN,
+				   sizeof(*bs_request), bs_request);
+}
+
+QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
+					enum bearer_switch_req_type req_type)
+{
+	/*
+	 * return status as QDF_STATUS_SUCCESS or failure based on the current
+	 * pending requests of the transport switch
+	 */
+	if (req_type == WLAN_BS_REQ_TO_NON_WLAN) {
+		ll_sap_debug("request SWITCH_TYPE_NON_WLAN accepted");
+		return QDF_STATUS_SUCCESS;
+	} else if (req_type == WLAN_BS_REQ_TO_WLAN) {
+		ll_sap_debug("request SWITCH_TYPE_WLAN accepted");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return QDF_STATUS_E_RESOURCES;
 }

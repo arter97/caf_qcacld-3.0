@@ -3228,10 +3228,14 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	/*
 	 * Join timeout: if we find a BeaconInterval in the BssDescription,
 	 * then set the Join Timeout to be 10 x the BeaconInterval.
+	 *
+	 * 10 * BeaconInterval should be greater than the minimum join
+	 * timeout and lesser than the configured timeout.
 	 */
 	timeout = mac_ctx->mlme_cfg->timeouts.join_failure_timeout_ori;
 	if (bss_desc->beaconInterval)
-		timeout = QDF_MAX(10 * bss_desc->beaconInterval, timeout);
+		timeout = QDF_MAX(10 * bss_desc->beaconInterval,
+				  cfg_min(CFG_JOIN_FAILURE_TIMEOUT));
 
 	mac_ctx->mlme_cfg->timeouts.join_failure_timeout =
 		QDF_MIN(timeout,
@@ -8286,7 +8290,7 @@ static void lim_set_pdev_ht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 		}
 		*ie_params->ie_ptr = WLAN_ELEMID_HTCAP_ANA;
 		*(ie_params->ie_ptr + 1) = ie_params->ie_len - 2;
-		lim_set_ht_caps(mac_ctx, NULL, ie_params->ie_ptr,
+		lim_set_ht_caps(mac_ctx, ie_params->ie_ptr,
 				ie_params->ie_len);
 
 		if (NSS_1x1_MODE == i) {
@@ -8356,8 +8360,7 @@ static void lim_set_pdev_vht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 		}
 		*ie_params->ie_ptr = WLAN_ELEMID_VHTCAP;
 		*(ie_params->ie_ptr + 1) = ie_params->ie_len - 2;
-		lim_set_vht_caps(mac_ctx, NULL, ie_params->ie_ptr,
-				ie_params->ie_len);
+		lim_set_vht_caps(mac_ctx, ie_params->ie_ptr, ie_params->ie_len);
 
 		if (NSS_1x1_MODE == i) {
 			p_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_VHTCAPS,
@@ -8417,8 +8420,8 @@ static void lim_process_set_vdev_ies_per_band(struct mac_context *mac_ctx,
 
 	pe_debug("rcvd set vdev ie per band req vdev_id = %d",
 		p_msg->vdev_id);
-	/* intentionally using NULL here so that self capability are sent */
-	if (lim_send_ies_per_band(mac_ctx, NULL, p_msg->vdev_id,
+
+	if (lim_send_ies_per_band(mac_ctx, p_msg->vdev_id,
 				  p_msg->dot11_mode, p_msg->device_mode) !=
 	    QDF_STATUS_SUCCESS)
 		pe_err("Unable to send HT/VHT Cap to FW");
@@ -8815,14 +8818,13 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	return;
 
 fail:
-	param = qdf_mem_malloc(sizeof(*param));
-	if (!param)
-		return;
-
 	pe_err("vdev %d: send bandwidth update fail", vdev_id);
-	param->status = QDF_STATUS_E_FAILURE;
-	param->vdev_id = INVALID_VDEV_ID;
-	param->reason = REASON_CH_WIDTH_UPDATE;
+	param = qdf_mem_malloc(sizeof(*param));
+	if (param) {
+		param->status = QDF_STATUS_E_FAILURE;
+		param->vdev_id = INVALID_VDEV_ID;
+		param->reason = REASON_CH_WIDTH_UPDATE;
+	}
 	msg_return.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
 	msg_return.bodyptr = param;
 	msg_return.bodyval = 0;

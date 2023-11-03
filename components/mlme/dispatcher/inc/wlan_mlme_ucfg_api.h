@@ -3905,6 +3905,51 @@ void ucfg_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * ucfg_mlme_get_eht_mld_id() - Get the MLD ID of the requested BSS
+ * @psoc: pointer to psoc object
+ *
+ * This API gives the MLD ID of the requested BSS
+ *
+ * Return: MLD ID of the requested BSS
+ */
+static inline uint8_t
+ucfg_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_eht_mld_id(psoc);
+}
+
+/**
+ * ucfg_mlme_set_eht_mld_id() - Set MLD ID of the requested BSS information
+ * @psoc: pointer to psoc object
+ * @value: set MLD ID
+ *
+ * This API sets the MLD ID of the requested BSS information within the ML
+ * probe request.
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc,
+			 uint8_t value)
+{
+	return wlan_mlme_set_eht_mld_id(psoc, value);
+}
+#else
+static inline uint8_t
+ucfg_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline QDF_STATUS
+ucfg_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc, uint8_t value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 /**
  * ucfg_mlme_get_80211e_is_enabled() - Enable 802.11e feature
  * @psoc: pointer to psoc object

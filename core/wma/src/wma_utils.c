@@ -5169,12 +5169,32 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 }
 #endif
 
-/**
- * wma_get_eht_ch_width - return eht channel width
- *
- * Return: return eht channel width
- */
 #ifdef WLAN_FEATURE_11BE
+uint32_t wma_get_orig_eht_ch_width(void)
+{
+	tDot11fIEeht_cap eht_cap;
+	tp_wma_handle wma;
+	QDF_STATUS status;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (qdf_unlikely(!wma)) {
+		wma_err_rl("wma handle is NULL");
+		goto vht_ch_width;
+	}
+
+	status = mlme_cfg_get_orig_eht_caps(wma->psoc, &eht_cap);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err_rl("Failed to get eht caps");
+		goto vht_ch_width;
+	}
+
+	if (eht_cap.support_320mhz_6ghz)
+		return WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ;
+
+vht_ch_width:
+	return wma_get_vht_ch_width();
+}
+
 uint32_t wma_get_eht_ch_width(void)
 {
 	tDot11fIEeht_cap eht_cap;

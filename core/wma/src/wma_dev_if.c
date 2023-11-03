@@ -481,7 +481,7 @@ wma_release_vdev_ref(struct wma_txrx_node *iface)
 
 /**
  * wma_handle_monitor_mode_vdev_detach() - Stop and down monitor mode vdev
- * @wma_handle: wma handle
+ * @wma: wma handle
  * @vdev_id: used to get wma interface txrx node
  *
  * Monitor mode is unconneted mode, so do explicit vdev stop and down
@@ -539,9 +539,8 @@ rel_ref:
 
 /**
  * wma_self_peer_remove() - Self peer remove handler
- * @wma: wma handle
- * @del_vdev_req_param: vdev id
- * @generate_vdev_rsp: request type
+ * @wma_handle: wma handle
+ * @del_vdev_req: vdev id
  *
  * Return: success if peer delete command sent to firmware, else failure.
  */
@@ -768,8 +767,8 @@ send_fail_rsp:
 /**
  * wma_send_start_resp() - send vdev start response to upper layer
  * @wma: wma handle
- * @add_bss: add bss params
- * @resp_event: response params
+ * @add_bss_rsp: add bss params
+ * @rsp: response params
  *
  * Return: none
  */
@@ -814,7 +813,7 @@ static void wma_send_start_resp(tp_wma_handle wma,
  * wma_vdev_start_rsp() - send vdev start response to upper layer
  * @wma: wma handle
  * @vdev: vdev
- * @resp_event: response params
+ * @rsp: response params
  *
  * Return: none
  */
@@ -1517,7 +1516,7 @@ QDF_STATUS wma_set_peer_param(void *wma_ctx, uint8_t *peer_addr,
 
 /**
  * wma_peer_unmap_conf_send - send peer unmap conf cmnd to fw
- * @wma_ctx: wma handle
+ * @wma: wma handle
  * @msg: peer unmap conf params
  *
  * Return: QDF_STATUS
@@ -1762,7 +1761,7 @@ peer_detach:
 }
 
 /**
- * wma_get_peer_type() - Determine the type of peer(eg. STA/AP) and return it
+ * wma_get_obj_mgr_peer_type() - Determine the type of peer(eg. STA/AP)
  * @wma: wma handle
  * @vdev_id: vdev id
  * @peer_addr: peer mac address
@@ -2289,6 +2288,7 @@ end:
  * @wma: pointer to WMA handle
  * @vdev_id: vdev id on which delete BSS request was received
  * @vdev_stop_resp: pointer to Delete BSS response
+ * @type: request type
  *
  * This function is called on receiving vdev stop response from FW or
  * vdev stop response timeout. In case of NDI, use vdev's self MAC
@@ -6064,7 +6064,7 @@ out:
 }
 
 /**
- * wma_find_ibss_vdev() - This function finds vdev_id based on input type
+ * wma_find_vdev_by_type() - This function finds vdev_id based on input type
  * @wma: wma handle
  * @type: vdev type
  *

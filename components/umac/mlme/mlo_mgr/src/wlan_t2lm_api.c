@@ -146,6 +146,19 @@ QDF_STATUS t2lm_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 	bool valid_map = false;
 	QDF_STATUS status;
 	struct wlan_mlo_peer_context *ml_peer;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!vdev)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	if (!wlan_mlme_get_t2lm_negotiation_supported(psoc)) {
+		mlme_rl_debug("T2LM negotiation not supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
 
 	ml_peer = peer->mlo_peer_ctx;
 	if (!ml_peer)
@@ -449,11 +462,20 @@ wlan_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
 	uint16_t tid_map_link_id;
 	uint16_t established_tid_mapped_link_id = 0;
 	uint16_t upcoming_tid_mapped_link_id = 0;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!scan_entry || !cm_ctx || !cm_ctx->vdev)
 		return QDF_STATUS_E_NULL_VALUE;
 
 	vdev = cm_ctx->vdev;
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	if (!wlan_mlme_get_t2lm_negotiation_supported(psoc)) {
+		mlme_rl_debug("T2LM negotiation not supported");
+		return QDF_STATUS_SUCCESS;
+	}
 
 	/*
 	 * Skip T2LM validation for following cases:

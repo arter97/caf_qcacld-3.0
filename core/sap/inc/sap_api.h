@@ -661,6 +661,7 @@ typedef struct sSapDfsInfo {
 	uint8_t sap_ch_switch_beacon_cnt;
 	uint8_t sap_ch_switch_mode;
 	uint16_t reduced_beacon_interval;
+	uint8_t vdev_id;
 } tSapDfsInfo;
 
 /* MAX number of CAC channels to be recorded */

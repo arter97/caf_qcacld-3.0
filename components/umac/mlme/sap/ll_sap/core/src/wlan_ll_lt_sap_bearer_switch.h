@@ -26,20 +26,7 @@
 #include <qdf_atomic.h>
 #include "wlan_cmn.h"
 #include "wlan_ll_sap_main.h"
-
-/**
- * enum bearer_switch_status: Bearer switch request status
- * @XPAN_BLE_SWITCH_INIT: Init status
- * @XPAN_BLE_SWITCH_SUCCESS: Bearer switch success
- * @XPAN_BLE_SWITCH_REJECTED: Bearer switch is rejected
- * @XPAN_BLE_SWITCH_TIMEOUT: Bearer switch request timed out
- */
-enum bearer_switch_status {
-	XPAN_BLE_SWITCH_INIT,
-	XPAN_BLE_SWITCH_SUCCESS,
-	XPAN_BLE_SWITCH_REJECTED,
-	XPAN_BLE_SWITCH_TIMEOUT,
-};
+#include "wlan_sm_engine.h"
 
 /**
  * enum wlan_bearer_switch_sm_state - Bearer switch states
@@ -99,48 +86,37 @@ struct bs_state_sm {
 };
 
 /**
- * struct bearer_switch_request - Data structure to store the bearer switch
- * request
- * @requester_cb: Callback which needs to be invoked to indicate the status of
- * the request to the requester, this callback will be passed by the requester
- * when requester will send the request.
- * @arg: Argument passed by requester, this will be returned back in the
- * callback
- * @request_id: Unique value to identify the request
- */
-
-struct bearer_switch_request {
-	requester_callback requester_cb;
-	void *arg;
-	uint32_t request_id;
-};
-
-/**
  * struct bearer_switch_info - Data structure to store the bearer switch
  * requests and related information
  * @vdev: Pointer to the ll lt sap vdev
  * @request_id: Last allocated request id
  * @sm: state machine context
  * @ref_count: Reference count corresponding to each vdev and requester
- * @last_status: last status of the bearer switch request
+ * @fw_ref_count: Reference counts for the firmware requests
+ * @total_ref_count: Total reference counts
+ * @last_status:status of the last bearer switch request
  * @requests: Array of bearer_switch_requests to cache the request information
+ * @bs_request_timer: Bearer switch request timer
  */
 struct bearer_switch_info {
 	struct wlan_objmgr_vdev *vdev;
 	qdf_atomic_t request_id;
 	struct bs_state_sm sm;
-	uint8_t ref_count[WLAN_UMAC_PSOC_MAX_VDEVS][XPAN_BLE_SWITCH_REQUESTER_MAX];
-	enum bearer_switch_status last_status;
-	struct bearer_switch_request requests[MAX_BEARER_SWITCH_REQUESTERS];
+	qdf_atomic_t ref_count[WLAN_UMAC_PSOC_MAX_VDEVS][BEARER_SWITCH_REQ_MAX];
+	qdf_atomic_t fw_ref_count;
+	qdf_atomic_t total_ref_count;
+	QDF_STATUS last_status;
+	struct wlan_bearer_switch_request requests[MAX_BEARER_SWITCH_REQUESTERS];
+	qdf_mc_timer_t bs_request_timer;
 };
 
 /**
  * ll_lt_sap_bearer_switch_get_id() - Get the request id for bearer switch
  * request
- * @vdev: Pointer to vdev
+ * @psoc: Pointer to psoc
  * Return: Bearer switch request id
  */
-uint32_t ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev);
+wlan_bs_req_id ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_psoc *psoc);
 
 /**
  * bs_sm_create() - Invoke SM creation for bearer switch
@@ -211,4 +187,123 @@ static inline void bs_lock_release(struct bearer_switch_info *bs_ctx)
 {
 	qdf_mutex_release(&bs_ctx->sm.bs_sm_lock);
 }
+
+/**
+ * bs_sm_transition_to() - invokes state transition
+ * @bs_ctx:  Bearer switch ctx
+ * @state: new cm state
+ *
+ * API to invoke SM API to move to new state
+ *
+ * Return: void
+ */
+static inline void bs_sm_transition_to(struct bearer_switch_info *bs_ctx,
+				       enum wlan_bearer_switch_sm_state state)
+{
+	wlan_sm_transition_to(bs_ctx->sm.sm_hdl, state);
+}
+
+/**
+ * bs_sm_deliver_event() - Delivers event to Bearer switch SM
+ * @psoc: Pointer to psoc
+ * @event: BS event
+ * @data_len: data size
+ * @data: event data
+ *
+ * API to dispatch event to Bearer switch state machine. To be used while
+ * posting events from API called from public API.
+ *
+ * Return: SUCCESS: on handling event
+ *         FAILURE: If event not handled
+ */
+QDF_STATUS bs_sm_deliver_event(struct wlan_objmgr_psoc *psoc,
+			       enum wlan_bearer_switch_sm_evt event,
+			       uint16_t data_len, void *data);
+
+/**
+ * bs_req_timer_init() - Initialize Bearer switch request timer
+ * @bs_ctx: Bearer switch context
+ *
+ * Return: None
+ */
+void bs_req_timer_init(struct bearer_switch_info *bs_ctx);
+
+/**
+ * bs_req_timer_deinit() - De-initialize Bearer switch request timer
+ * @bs_ctx: Bearer switch context
+ *
+ * Return: None
+ */
+void bs_req_timer_deinit(struct bearer_switch_info *bs_ctx);
+
+/**
+ * ll_lt_sap_is_bs_ctx_valid() - Check if bearer switch context is valid or not
+ * @bs_ctx: Bearer switch context
+ *
+ * Return: True if bearer switch context is valid else return false
+ */
+#define ll_lt_sap_is_bs_ctx_valid(bs_ctx) \
+	__ll_lt_sap_is_bs_ctx_valid(bs_ctx, __func__)
+
+bool __ll_lt_sap_is_bs_ctx_valid(struct bearer_switch_info *bs_ctx,
+				 const char *func);
+
+/**
+ * ll_lt_sap_is_bs_req_valid() - Check if bearer switch request is valid or not
+ * @bs_req: Bearer switch request
+ *
+ * Return: True if bearer switch request is valid else return false
+ */
+#define ll_lt_sap_is_bs_req_valid(bs_req) \
+	__ll_lt_sap_is_bs_req_valid(bs_req, __func__)
+
+bool __ll_lt_sap_is_bs_req_valid(struct wlan_bearer_switch_request *bs_req,
+				 const char *func);
+
+/**
+ * ll_lt_sap_switch_bearer_to_ble() - Switch audio transport to BLE
+ * @psoc: Pointer to psoc
+ * @bs_request: Pointer to bearer switch request
+ * Return: QDF_STATUS_SUCCESS on successful bearer switch else failure
+ */
+QDF_STATUS
+ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_bearer_switch_request *bs_request);
+
+/**
+ * ll_lt_sap_switch_bearer_to_wlan() - Switch audio transport to BLE
+ * @psoc: Pointer to psoc
+ * @bs_request: Pointer to bearer switch request
+ * Return: QDF_STATUS_SUCCESS on successful bearer switch else failure
+ */
+QDF_STATUS
+ll_lt_sap_switch_bearer_to_wlan(struct wlan_objmgr_psoc *psoc,
+				struct wlan_bearer_switch_request *bs_request);
+
+/**
+ * ll_lt_sap_request_for_audio_transport_switch() - Handls audio transport
+ * switch request from userspace
+ * @vdev: Vdev on which the request is received
+ * @req_type: requested transport switch type
+ *
+ * Return: True/False
+ */
+QDF_STATUS
+ll_lt_sap_request_for_audio_transport_switch(struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_req_type req_type);
+
+/**
+ * ll_lt_sap_deliver_audio_transport_switch_resp() - Deliver audio
+ * transport switch response
+ * @vdev: Vdev on which the request is received
+ * @req_type: Transport switch type for which the response is received
+ * @status: Status of the response
+ *
+ * Return: None
+ */
+void
+ll_lt_sap_deliver_audio_transport_switch_resp(struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_req_type req_type,
+					enum bearer_switch_status status);
+
 #endif /* _WLAN_LL_LT_SAP_BEARER_SWITCH_H_ */

@@ -2872,13 +2872,18 @@ static int wlan_hdd_set_ps(struct wlan_hdd_link_info *link_info,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 #ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
-static int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
-			       bool allow_power_save, int timeout)
+int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
+			bool allow_power_save, int timeout,
+			int link_id)
 {
 	struct wlan_hdd_link_info *link_info;
 	int status = -EINVAL;
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (link_id >= 0 &&
+		    wlan_vdev_get_link_id(link_info->vdev) != link_id)
+			continue;
+
 		status = wlan_hdd_set_ps(link_info,
 					 link_info->link_addr.bytes,
 					 allow_power_save, timeout);
@@ -2889,8 +2894,9 @@ static int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
 	return status;
 }
 #else
-static int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
-			       bool allow_power_save, int timeout)
+int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
+			bool allow_power_save, int timeout,
+			int link_id)
 {
 	struct hdd_adapter *link_adapter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
@@ -2901,6 +2907,12 @@ static int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
 		link_adapter = mlo_adapter_info->link_adapter[i];
 		if (!link_adapter)
 			continue;
+
+		if (link_id >= 0 &&
+		    wlan_vdev_get_link_id(link_adapter->deflink->vdev) !=
+		    link_id)
+			continue;
+
 		status = wlan_hdd_set_ps(link_adapter->deflink,
 					 link_adapter->mac_addr.bytes,
 					 allow_power_save, timeout);
@@ -2908,15 +2920,12 @@ static int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
 			break;
 	}
 
+	if (i == WLAN_MAX_MLD && link_id >= 0)
+		hdd_err("No link adapter found for link id: %d", link_id);
+
 	return status;
 }
 #endif
-#else
-static int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
-			       bool allow_power_save, int timeout)
-{
-	return 0;
-}
 #endif
 
 /**
@@ -2978,7 +2987,7 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 
 	if (hdd_adapter_is_ml_adapter(adapter)) {
 		status = wlan_hdd_set_mlo_ps(adapter, allow_power_save,
-					     timeout);
+					     timeout, -1);
 		goto exit;
 	}
 

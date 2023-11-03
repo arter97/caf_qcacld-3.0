@@ -834,6 +834,7 @@ QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 	qdf_nbuf_t nbuf_next;
 	unsigned int cpu_index;
 	struct dp_tx_rx_stats *stats;
+	enum dp_nbuf_push_type type;
 
 	/* Sanity check on inputs */
 	if ((!context) || (!rxbuf)) {
@@ -879,8 +880,10 @@ QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 			 * This is the last packet on the chain
 			 * Scheduling rx sirq
 			 */
+			type = qdf_in_atomic() ? DP_NBUF_PUSH_NAPI :
+						 DP_NBUF_PUSH_BH_DISABLE;
 			status = dp_intf->dp_ctx->dp_ops.dp_nbuf_push_pkt(nbuf,
-							DP_NBUF_PUSH_NAPI);
+							type);
 		}
 
 		if (QDF_IS_STATUS_SUCCESS(status))

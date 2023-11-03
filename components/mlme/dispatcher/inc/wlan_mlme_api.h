@@ -2941,18 +2941,6 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
-static inline uint8_t
-wlan_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
-{
-	return 0;
-}
-
-static inline QDF_STATUS
-wlan_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc, uint8_t value)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
 static inline void
 wlan_mlme_get_mlo_prefer_percentage(
 				struct wlan_objmgr_psoc *psoc,
@@ -4184,6 +4172,16 @@ bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc);
  */
 bool
 wlan_mlme_is_data_stall_recovery_fw_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * mlme_cfg_get_orig_eht_caps() - Get the original EHT capability info
+ * @psoc: pointer to psoc object
+ * @eht_cap: Caps that needs to be filled.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS mlme_cfg_get_orig_eht_caps(struct wlan_objmgr_psoc *psoc,
+				      tDot11fIEeht_cap *eht_cap);
 
 /**
  * mlme_cfg_get_eht_caps() - Get the EHT capability info

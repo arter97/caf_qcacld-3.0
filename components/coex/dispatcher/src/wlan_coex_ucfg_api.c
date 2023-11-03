@@ -128,12 +128,17 @@ ucfg_coex_send_logging_config(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 
 	if (apps_args[0] != COEX_CONFIG_ENABLE_CONT_INFO) {
-		coex_err("invalid cmd %d", apps_args);
+		coex_err("invalid cmd %d", apps_args[0]);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_STA_MODE,
 							WLAN_COEX_ID);
+
+	if (!vdev) {
+		coex_err("vdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	param.vdev_id = wlan_vdev_get_id(vdev);
 	param.config_type = WMI_COEX_CONFIG_ENABLE_CONT_INFO;

@@ -30,8 +30,6 @@
  * caller has to invoke the wlan_objmgr_vdev_release_ref() to decrement
  * ref count
  *
- * Return: vdev pointer
- *         NULL on FAILURE
+ * Return: vdev id
  */
-struct wlan_objmgr_vdev *
-wlan_policy_mgr_get_ll_lt_sap_vdev(struct wlan_objmgr_psoc *psoc);
+uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev(struct wlan_objmgr_psoc *psoc);

@@ -401,8 +401,13 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 	enum scan_phy_mode phymode = SCAN_PHY_MODE_UNKNOWN;
 	uint8_t vdev_id;
 	struct wlan_channel *des_chan;
+	struct mlme_legacy_priv *mlme_priv;
 
 	vdev_id = vdev->vdev_objmgr.vdev_id;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return QDF_STATUS_E_FAILURE;
 
 	if (scan_freq != INVALID_CHANNEL) {
 		op_freq = scan_freq;
@@ -414,7 +419,7 @@ mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 		}
 		op_freq = des_chan->ch_freq;
 		/* Set center_freq1 to center frequency of complete 320MHz */
-		cen320_freq = des_chan->ch_cfreq2;
+		cen320_freq = mlme_priv->connect_info.assoc_chan_info.cen320_freq;
 	}
 
 	mlme_debug("vdev %d :op_freq:%d, cen320_freq:%d, scan_ch_width: %d",
@@ -827,6 +832,7 @@ QDF_STATUS mlme_init_connect_chan_info_config(struct vdev_mlme_obj *vdev_mlme)
 	mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
 							CH_WIDTH_INVALID;
 	mlme_priv->connect_info.assoc_chan_info.sec_2g_freq = 0;
+	mlme_priv->connect_info.assoc_chan_info.cen320_freq = 0;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2950,6 +2956,33 @@ void mlme_reinit_control_config_lfr_params(struct wlan_objmgr_psoc *psoc,
 	lfr->wes_mode_enabled = cfg_get(psoc, CFG_LFR_ENABLE_WES_MODE);
 }
 
+#ifdef CONNECTION_ROAMING_CFG
+/**
+ * mlme_init_bmiss_timeout() - Init bmiss timeout
+ * @psoc: Pointer to psoc
+ * @lfr: Pointer to lfr config
+ *
+ * Return: None
+ */
+static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_mlme_lfr_cfg *lfr)
+{
+	lfr->beaconloss_timeout_onwakeup =
+		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP) / 2;
+	lfr->beaconloss_timeout_onsleep =
+		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP) / 2;
+}
+#else
+static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_mlme_lfr_cfg *lfr)
+{
+	lfr->beaconloss_timeout_onwakeup =
+		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP);
+	lfr->beaconloss_timeout_onsleep =
+		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP);
+}
+#endif
+
 static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_lfr_cfg *lfr)
 {
@@ -3141,10 +3174,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_adaptive_11r_cfg(psoc, lfr);
 	mlme_init_subnet_detection(psoc, lfr);
 	lfr->rso_user_config.cat_rssi_offset = DEFAULT_RSSI_DB_GAP;
-	lfr->beaconloss_timeout_onwakeup =
-		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP);
-	lfr->beaconloss_timeout_onsleep =
-		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP);
+	mlme_init_bmiss_timeout(psoc, lfr);
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,
@@ -4418,8 +4448,9 @@ void wlan_vdev_set_dot11mode(struct wlan_mlme_cfg *mac_mlme_cfg,
 	}
 
 	vdev_dot11_mode = QDF_GET_BITS(mac_dot11_mode, dot11_mode_indx, 4);
-	if (vdev_dot11_mode == MLME_VDEV_DOT11_MODE_AUTO ||
-	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11BE) {
+	if ((device_mode != QDF_NAN_DISC_MODE && device_mode != QDF_NDI_MODE) &&
+	    (vdev_dot11_mode == MLME_VDEV_DOT11_MODE_AUTO ||
+	     vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11BE)) {
 		mld_addr = wlan_vdev_mlme_get_mldaddr(vdev_mlme->vdev);
 		if (qdf_is_macaddr_zero((struct qdf_mac_addr *)mld_addr)) {
 			vdev_dot11_mode = MLME_VDEV_DOT11_MODE_11AX;

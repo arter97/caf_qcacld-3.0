@@ -26,6 +26,7 @@
 #include <i_qdf_types.h>
 #include <qdf_types.h>
 #include "wlan_ll_sap_main.h"
+#include "wlan_ll_sap_public_structs.h"
 
 /**
  * ll_lt_sap_is_supported() - Check if ll_lt_sap is supported or not
@@ -64,4 +65,24 @@ QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev);
  * else error code
  */
 QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ll_lt_sap_switch_bearer_to_ble() - Switch audio transport to BLE
+ * @psoc: Pointer to psoc
+ * @bs_request: Pointer to bearer switch request
+ * Return: QDF_STATUS_SUCCESS on successful bearer switch else failure
+ */
+QDF_STATUS
+ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_bearer_switch_request *bs_request);
+
+/**
+ * ll_lt_sap_request_for_audio_transport_switch() - Handls audio transport
+ * switch request from userspace
+ * @req_type: requested transport switch type
+ *
+ * Return: True/False
+ */
+QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
+					enum bearer_switch_req_type req_type);
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

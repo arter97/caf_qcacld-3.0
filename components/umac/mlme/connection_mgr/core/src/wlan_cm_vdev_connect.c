@@ -1139,8 +1139,29 @@ QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg)
 
 	return QDF_STATUS_SUCCESS;
 }
-
 #ifdef WLAN_FEATURE_11BE_MLO
+#if defined (SAP_MULTI_LINK_EMULATION)
+static void
+set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
+			       struct mlo_partner_info *partner_info)
+{
+	partner_info->partner_link_info[0].link_addr =
+		scan_entry->ml_info.link_info[0].link_addr;
+	partner_info->partner_link_info[0].link_id =
+		scan_entry->ml_info.link_info[0].link_id;
+	partner_info->partner_link_info[0].chan_freq =
+		scan_entry->ml_info.link_info[0].freq;
+	partner_info->num_partner_links = 1;
+
+}
+#else
+static void
+set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
+			       struct mlo_partner_info *partner_info)
+{
+}
+#endif
+
 QDF_STATUS
 cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 		       struct scan_cache_entry *scan_entry,
@@ -1200,6 +1221,8 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 
 	partner_info->num_partner_links = j;
 	mlme_debug("sta and ap intersect num of partner link: %d", j);
+
+	set_partner_info_for_2link_sap(scan_entry, partner_info);
 
 	return QDF_STATUS_SUCCESS;
 }

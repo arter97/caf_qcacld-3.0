@@ -940,6 +940,7 @@ lim_process_assoc_rsp_t2lm(struct pe_session *session,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_t2lm_context *t2lm_ctx;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!session || !assoc_rsp) {
 		pe_err("invalid input parameters");
@@ -949,6 +950,15 @@ lim_process_assoc_rsp_t2lm(struct pe_session *session,
 	vdev = session->vdev;
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	if (!wlan_mlme_get_t2lm_negotiation_supported(psoc)) {
+		pe_err_rl("T2LM negotiation not supported");
+		return;
+	}
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
 	if (!mlo_dev_ctx) {

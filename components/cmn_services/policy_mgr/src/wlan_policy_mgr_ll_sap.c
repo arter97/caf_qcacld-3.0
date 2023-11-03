@@ -24,27 +24,18 @@
 #include "wlan_policy_mgr_i.h"
 #include "wlan_cmn.h"
 
-struct wlan_objmgr_vdev *
-wlan_policy_mgr_get_ll_lt_sap_vdev(struct wlan_objmgr_psoc *psoc)
+uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev(struct wlan_objmgr_psoc *psoc)
 {
 	uint8_t ll_lt_sap_cnt;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	struct wlan_objmgr_vdev *vdev;
 
-	ll_lt_sap_cnt = policy_mgr_get_mode_specific_conn_info(
-							psoc, NULL,
+	ll_lt_sap_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							vdev_id_list,
 							PM_LL_LT_SAP_MODE);
 
 	/* Currently only 1 ll_lt_sap is supported */
-	if (ll_lt_sap_cnt != 1) {
-		policy_mgr_err("invalid number of ll_lt_sap %d", ll_lt_sap_cnt);
-		return NULL;
-	}
+	if (!ll_lt_sap_cnt)
+		return WLAN_INVALID_VDEV_ID;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id_list[0],
-						    WLAN_LL_SAP_ID);
-	if (!vdev)
-		policy_mgr_err("vdev is NULL");
-	return vdev;
+	return vdev_id_list[0];
 }

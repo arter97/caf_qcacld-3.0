@@ -1727,6 +1727,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 	enum wlan_t2lm_resp_frm_type status_code;
 	uint8_t token = 0;
 	struct wlan_objmgr_peer *peer = NULL;
+	QDF_STATUS status;
 
 	if (frame_len < sizeof(*action_hdr)) {
 		pe_debug("frame_len %d less than Action Frame Hdr size",
@@ -2184,17 +2185,20 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		}
 		switch (action_hdr->actionID) {
 		case EHT_T2LM_REQUEST:
-			if (wlan_t2lm_deliver_event(
+			status = wlan_t2lm_deliver_event(
 				session->vdev, peer,
 				WLAN_T2LM_EV_ACTION_FRAME_RX_REQ,
 				(void *)body_ptr, frame_len,
-				&token) == QDF_STATUS_SUCCESS)
+				&token);
+			if (QDF_IS_STATUS_SUCCESS(status))
 				status_code = WLAN_T2LM_RESP_TYPE_SUCCESS;
 			else
 				status_code =
 				WLAN_T2LM_RESP_TYPE_DENIED_TID_TO_LINK_MAPPING;
 
-			if (lim_send_t2lm_action_rsp_frame(
+			if (status == QDF_STATUS_E_NOSUPPORT)
+				pe_err("STA does not support T2LM drop frame");
+			else if (lim_send_t2lm_action_rsp_frame(
 					mac_ctx, mac_hdr->sa, session, token,
 					status_code) != QDF_STATUS_SUCCESS) {
 				pe_err("T2LM action response frame not sent");

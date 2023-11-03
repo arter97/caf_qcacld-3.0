@@ -6890,6 +6890,22 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 	return status;
 }
 
+static enum wlan_diag_wifi_band
+wlan_convert_bitmap_to_band(uint8_t bitmap)
+{
+	uint8_t i;
+	enum wlan_diag_wifi_band band = WLAN_INVALID_BAND;
+
+	for (i = WLAN_24GHZ_BAND; i <= WLAN_6GHZ_BAND; i++) {
+		if (qdf_test_bit(i, (unsigned long *)&bitmap)) {
+			band = i;
+			break;
+		}
+	}
+
+	return band;
+}
+
 QDF_STATUS
 cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 			 struct roam_frame_info *frame_data,
@@ -6938,17 +6954,20 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
-	wlan_diag_event.supported_links = frame_data->band;
-
 	if (frame_data->type == ROAM_FRAME_INFO_FRAME_TYPE_EXT) {
 		wlan_diag_event.subtype =
 			(uint8_t)cm_roam_get_eapol_tag(frame_data->subtype);
 		diag_event = EVENT_WLAN_CONN_DP;
+		wlan_diag_event.supported_links =
+			wlan_convert_bitmap_to_band(frame_data->band);
+
 	} else {
 		wlan_diag_event.subtype =
 		(uint8_t)cm_roam_get_tag(frame_data->subtype,
 					 !frame_data->is_rsp);
 		diag_event = EVENT_WLAN_MGMT;
+
+		wlan_diag_event.supported_links = frame_data->band;
 
 		status =
 			wlan_populate_mlo_mgmt_event_param(vdev,

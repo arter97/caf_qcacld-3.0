@@ -284,6 +284,11 @@
 #define WLAN_CIPHER_SUITE_GCMP_256 0x000FAC09
 #endif
 
+/* Default number of Simultaneous Transmit */
+#define DEFAULT_MAX_STR_LINK_COUNT 1
+/* Maximum number of Simultaneous Transmit */
+#define MAX_STR_LINK_COUNT 2
+
 static const u32 hdd_gcmp_cipher_suits[] = {
 	WLAN_CIPHER_SUITE_GCMP,
 	WLAN_CIPHER_SUITE_GCMP_256,
@@ -5093,6 +5098,8 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 	QDF_STATUS status;
 	int ret_val;
+	uint8_t max_assoc_cnt = 0;
+	uint8_t max_str_link_count = 0;
 
 	uint8_t feature_flags[(NUM_QCA_WLAN_VENDOR_FEATURES + 7) / 8] = {0};
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
@@ -5235,7 +5242,28 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 			MAX_CONCURRENT_CHAN_ON_5G))
 		goto nla_put_failure;
 
-	hdd_debug("feature flags:");
+	max_assoc_cnt = wlan_mlme_get_sta_mlo_conn_max_num(hdd_ctx->psoc);
+	if (max_assoc_cnt) {
+		if (nla_put_u8(
+			skb,
+			QCA_WLAN_VENDOR_ATTR_MLO_CAPABILITY_MAX_ASSOCIATION_COUNT,
+			max_assoc_cnt))
+			goto nla_put_failure;
+
+		max_str_link_count = DEFAULT_MAX_STR_LINK_COUNT;
+
+		if (policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) ||
+		    policy_mgr_is_hw_sbs_capable(hdd_ctx->psoc))
+			max_str_link_count = MAX_STR_LINK_COUNT;
+
+		if (nla_put_u8(skb,
+			       QCA_WLAN_VENDOR_ATTR_MLO_CAPABILITY_MAX_STR_LINK_COUNT,
+			       max_str_link_count))
+			goto nla_put_failure;
+	}
+
+	hdd_debug("max_assoc_cnt %d max_str_link_count %d",
+		  max_assoc_cnt, max_str_link_count);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 			   feature_flags, sizeof(feature_flags));
 
@@ -8660,6 +8688,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_STR_TX] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_LINK_POWER_SAVE] = {
+			.type = NLA_NESTED},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ] = {
 			.type = NLA_U8},
 };
@@ -10986,16 +11016,15 @@ static uint32_t hdd_mac_chwidth_to_bonding_mode(
 	return bonding_mode;
 }
 
-int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
+int hdd_set_mac_chan_width(struct wlan_hdd_link_info *link_info,
 			   enum eSirMacHTChannelWidth chwidth,
-			   uint8_t link_id,
-			   bool is_restore)
+			   uint8_t link_id, bool is_restore)
 {
 	uint32_t bonding_mode;
 
 	bonding_mode = hdd_mac_chwidth_to_bonding_mode(chwidth);
 
-	return hdd_update_channel_width(adapter, chwidth,
+	return hdd_update_channel_width(link_info, chwidth,
 					bonding_mode, link_id, is_restore);
 }
 
@@ -11070,8 +11099,7 @@ skip_mlo:
 		return -EINVAL;
 	}
 set_chan_width:
-	return hdd_set_mac_chan_width(link_info->adapter,
-				      chwidth, link_id, false);
+	return hdd_set_mac_chan_width(link_info, chwidth, link_id, false);
 }
 
 /**
@@ -13312,6 +13340,31 @@ static int hdd_test_config_6ghz_security_test_mode(struct hdd_context *hdd_ctx,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void wlan_hdd_set_listen_interval(struct hdd_context *hdd_ctx,
+					 struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	enum wlan_eht_mode eht_mode;
+	uint16_t max_simult_link_num;
+
+	ucfg_mlme_get_eht_mode(psoc, &eht_mode);
+	max_simult_link_num = wlan_mlme_get_sta_mlo_simultaneous_links(psoc);
+
+	if (eht_mode == WLAN_EHT_MODE_MLSR && max_simult_link_num == 0)
+		sme_set_listen_interval(hdd_ctx->mac_handle,
+					adapter->deflink->vdev_id);
+
+	hdd_debug("EHT mode: %d, max simultaneous link num: %d",
+		  eht_mode, max_simult_link_num);
+}
+#else
+static inline void wlan_hdd_set_listen_interval(struct hdd_context *hdd_ctx,
+					        struct hdd_adapter *adapter)
+{
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_set_wifi_test_config() - Wifi test configuration
  * vendor command
@@ -13351,7 +13404,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	uint8_t link_id = 0xFF;
 	struct keep_alive_req keep_alive_req = {0};
 	struct set_wfatest_params wfa_param = {0};
-	struct wlan_hdd_link_info *link_info = adapter->link_info;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 	struct hdd_station_ctx *hdd_sta_ctx =
 			WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	uint8_t op_mode;
@@ -14065,7 +14118,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		sme_set_ru_242_tone_tx_cfg(hdd_ctx->mac_handle, cfg_val);
 		if (cfg_val)
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_20MHZ,
+					link_info, eHT_CHANNEL_WIDTH_20MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
 					link_id, false);
 	}
@@ -14076,7 +14129,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_debug("EU SU PPDU type Tx enable: %d", cfg_val);
 		if (cfg_val) {
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_20MHZ,
+					link_info, eHT_CHANNEL_WIDTH_20MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
 					link_id, false);
 			hdd_set_tx_stbc(link_info, 0);
@@ -14097,7 +14150,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 					status);
 		} else {
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_160MHZ,
+					link_info, eHT_CHANNEL_WIDTH_160MHZ,
 					link_id,
 					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE,
 					false);
@@ -14471,11 +14524,34 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			hdd_err("Failed to send STR TX indication");
 	}
 
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_LINK_POWER_SAVE;
+	if (tb[cmd_id]) {
+		struct nlattr *curr_attr;
+		int len;
+		uint8_t link_id, timeout = 0, num_links = 0;
+		bool allow_ps = true;
+
+		nla_for_each_nested(curr_attr, tb[cmd_id], len) {
+			if (nla_len(curr_attr) != sizeof(uint8_t)) {
+				hdd_err("len is not correct for idx %d",
+					num_links);
+				goto send_err;
+			}
+			link_id = nla_get_u8(curr_attr);
+			hdd_debug("link id[%d]: %d", num_links, link_id);
+			wlan_hdd_set_mlo_ps(adapter, allow_ps, timeout,
+					    link_id);
+			num_links++;
+		}
+
+		wlan_hdd_set_listen_interval(hdd_ctx, adapter);
+	}
+
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ;
 	if (tb[cmd_id]) {
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("MLD ID in ML probe request: %d", cfg_val);
-		ret_val = wlan_mlme_set_eht_mld_id(hdd_ctx->psoc, cfg_val);
+		ret_val = ucfg_mlme_set_eht_mld_id(hdd_ctx->psoc, cfg_val);
 		if (ret_val)
 			hdd_err("Failed to set MLD ID");
 	}
