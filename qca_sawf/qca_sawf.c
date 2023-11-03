@@ -456,11 +456,13 @@ void qca_sawf_config_ul(struct net_device *dst_dev, struct net_device *src_dev,
 	if (wlan_service_id_valid(rv_service_id))
 		qca_sawf_peer_dl_flow_count(src_dev, src_mac, rv_service_id,
 								add_or_sub);
-	if (fw_mark_metadata != DP_SAWF_META_DATA_INVALID)
+	if (fw_mark_metadata != DP_SAWF_META_DATA_INVALID &&
+	    add_or_sub == FLOW_STOP)
 		qca_sawf_3_link_peer_dl_flow_count(dst_dev, dst_mac,
 						   fw_mark_metadata);
 
-	if (rv_mark_metadata != DP_SAWF_META_DATA_INVALID)
+	if (rv_mark_metadata != DP_SAWF_META_DATA_INVALID &&
+	    add_or_sub == FLOW_STOP)
 		qca_sawf_3_link_peer_dl_flow_count(src_dev, src_mac,
 						   rv_mark_metadata);
 }
