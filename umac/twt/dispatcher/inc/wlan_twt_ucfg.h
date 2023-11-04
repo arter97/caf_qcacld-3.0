@@ -57,6 +57,16 @@ QDF_STATUS ucfg_twt_disable_cmd(struct wlan_objmgr_pdev *pdev);
 QDF_STATUS ucfg_twt_cfg_get_bcast(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
+ * ucfg_twt_cfg_get_rtwt_requestor() - Get restricted TWT requestor
+ * @psoc: Pointer to global psoc object
+ * @val: pointer to output variable
+
+ * Return: QDF_STATUS_SUCCESS
+ */
+QDF_STATUS
+ucfg_twt_cfg_get_rtwt_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
+
+/**
  * ucfg_twt_get_requestor) - ucfg API to get requestor value
  * @psoc: pointer to psoc
  * @val: pointer reference to retrieved value
