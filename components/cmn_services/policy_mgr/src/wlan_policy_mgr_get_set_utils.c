@@ -5677,8 +5677,15 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 {
 	uint32_t i;
 	struct policy_mgr_psoc_priv_obj *pm_ctx = NULL;
-	uint8_t sap_cnt, go_cnt;
+	uint8_t sap_cnt, go_cnt, ll_lt_sap_vdev_id;
 
+	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
+
+	if (ll_lt_sap_vdev_id != WLAN_INVALID_VDEV_ID) {
+		policy_mgr_debug("LL_LT_SAP vdev %d present avoid 4th port concurrency",
+				 ll_lt_sap_vdev_id);
+		return false;
+	}
 	/* new STA may just have ssid, no channel until bssid assigned */
 	if (ch_freq == 0 && mode == PM_STA_MODE)
 		return true;
