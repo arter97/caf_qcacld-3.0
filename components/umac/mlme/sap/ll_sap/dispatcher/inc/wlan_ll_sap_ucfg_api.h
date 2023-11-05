@@ -49,6 +49,21 @@ QDF_STATUS ucfg_ll_sap_deinit(void);
 bool ucfg_is_ll_lt_sap_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_ll_lt_sap_high_ap_availability() - Request for high ap availability
+ * @vdev: LL_LT_SAP vdev
+ * @operation: Type of the operation which needs to be performed
+ * @duration: Duration for high AP availability
+ * @cookie: Cookie of the request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_ll_lt_sap_high_ap_availability(
+			struct wlan_objmgr_vdev *vdev,
+			enum high_ap_availability_operation operation,
+			uint32_t duration, uint16_t cookie);
+
+/**
  * ucfg_ll_lt_sap_request_for_audio_transport_switch() - Request to switch the
  * audio transport medium
  * @vdev: Vdev on which the request is received
@@ -119,6 +134,15 @@ static inline QDF_STATUS ucfg_ll_sap_deinit(void)
 static inline bool ucfg_is_ll_lt_sap_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+
+static inline QDF_STATUS
+ucfg_ll_lt_sap_high_ap_availability(
+				struct wlan_objmgr_vdev *vdev,
+				enum high_ap_availability_operation operation,
+				uint32_t duration, uint16_t cookie)
+{
+	return QDF_STATUS_E_INVAL;
 }
 
 static inline QDF_STATUS

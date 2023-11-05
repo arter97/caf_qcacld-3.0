@@ -26,7 +26,7 @@
 #include "wlan_osif_priv.h"
 
 #define WLAN_AUDIO_TRANSPORT_SWITCH_TYPE_INVALID 0xFFFF
-
+#define WLAN_HiGH_AP_AVAILABILITY_OPERATION_INVALID 0xFFFF
 /**
  * osif_convert_audio_transport_switch_req_type_to_qca_type() - Convert
  * audio transport switch request type to qca audio transport switch req type
@@ -93,6 +93,62 @@ osif_convert_audio_transport_switch_status_type_from_qca_type
 }
 
 /**
+ * osif_convert_high_ap_availability_oper_from_qca() - Convert high ap
+ * availability operation type from qca type
+ * @operation:    High ap availability operation type.
+ *
+ * Return:   enum high_ap_availability_operation
+ */
+static enum high_ap_availability_operation
+osif_convert_high_ap_availability_oper_from_qca(
+		enum qca_high_ap_availability_operation operation)
+{
+	switch (operation) {
+	case QCA_HIGH_AP_AVAILABILITY_OPERATION_REQUEST:
+		return HIGH_AP_AVAILABILITY_OPERATION_REQUEST;
+	case QCA_HIGH_AP_AVAILABILITY_OPERATION_CANCEL:
+		return HIGH_AP_AVAILABILITY_OPERATION_CANCEL;
+	case QCA_HIGH_AP_AVAILABILITY_OPERATION_STARTED:
+		return HIGH_AP_AVAILABILITY_OPERATION_STARTED;
+	case QCA_HIGH_AP_AVAILABILITY_OPERATION_COMPLETED:
+		return HIGH_AP_AVAILABILITY_OPERATION_COMPLETED;
+	case QCA_HIGH_AP_AVAILABILITY_OPERATION_CANCELLED:
+		return HIGH_AP_AVAILABILITY_OPERATION_CANCELLED;
+	default:
+		osif_err("Invalid operation value %d", operation);
+		return HiGH_AP_AVAILABILITY_OPERATION_INVALID;
+	}
+}
+
+/**
+ * osif_convert_high_ap_availability_oper_to_qca() - Convert high ap
+ * availability operation type to qca type
+ * @operation:    High ap availability operation type.
+ *
+ * Return:   enum qca_wlan_vendor_attr_high_ap_availability
+ */
+static enum qca_high_ap_availability_operation
+osif_convert_high_ap_availability_oper_to_qca(
+				enum high_ap_availability_operation operation)
+{
+	switch (operation) {
+	case HIGH_AP_AVAILABILITY_OPERATION_REQUEST:
+		return QCA_HIGH_AP_AVAILABILITY_OPERATION_REQUEST;
+	case HIGH_AP_AVAILABILITY_OPERATION_CANCEL:
+		return QCA_HIGH_AP_AVAILABILITY_OPERATION_CANCEL;
+	case HIGH_AP_AVAILABILITY_OPERATION_STARTED:
+		return QCA_HIGH_AP_AVAILABILITY_OPERATION_STARTED;
+	case HIGH_AP_AVAILABILITY_OPERATION_COMPLETED:
+		return QCA_HIGH_AP_AVAILABILITY_OPERATION_COMPLETED;
+	case HIGH_AP_AVAILABILITY_OPERATION_CANCELLED:
+		return QCA_HIGH_AP_AVAILABILITY_OPERATION_CANCELLED;
+	default:
+		osif_err("Invalid operation value %d", operation);
+		return WLAN_HiGH_AP_AVAILABILITY_OPERATION_INVALID;
+	}
+}
+
+/**
  * wlan_osif_send_audio_transport_switch_req() - Send audio transport
  * switch request
  * @vdev: pointer to vdev structure.
@@ -154,6 +210,86 @@ wlan_osif_send_audio_transport_switch_req(struct wlan_objmgr_vdev *vdev,
 			vdev_id, switch_type);
 }
 
+/**
+ * wlan_osif_send_high_ap_availability_resp() - Send high AP availability
+ * response
+ * @vdev: pointer to vdev structure.
+ * @operation: High AP availability operation
+ * @cookie: Cookie needs to be sent in the response
+ *
+ * Return: None.
+ */
+static void wlan_osif_send_high_ap_availability_resp(
+				struct wlan_objmgr_vdev *vdev,
+				enum high_ap_availability_operation operation,
+				uint16_t cookie)
+{
+	struct sk_buff *vendor_event;
+	struct wireless_dev *wdev;
+	struct vdev_osif_priv *osif_priv;
+	uint32_t len;
+	enum qca_high_ap_availability_operation qca_oper;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv) {
+		osif_err("Vdev %d osif_priv is null", vdev_id);
+		return;
+	}
+
+	wdev = osif_priv->wdev;
+	if (!wdev) {
+		osif_err("vdev %d wireless dev is null", vdev_id);
+		return;
+	}
+
+	qca_oper = osif_convert_high_ap_availability_oper_to_qca(operation);
+
+	if (operation == HIGH_AP_AVAILABILITY_OPERATION_REQUEST) {
+		len = nla_total_size(sizeof(cookie)) + NLMSG_HDRLEN;
+	} else {
+		len = nla_total_size(sizeof(cookie) + sizeof(uint8_t)) +
+				     NLMSG_HDRLEN;
+	}
+
+	vendor_event = wlan_cfg80211_vendor_event_alloc(
+			wdev->wiphy, wdev, len,
+			QCA_NL80211_VENDOR_SUBCMD_HIGH_AP_AVAILABILITY_INDEX,
+			GFP_KERNEL);
+
+	if (!vendor_event) {
+		osif_err("vdev %d wlan_cfg80211_vendor_event_alloc failed",
+			 vdev_id);
+		return;
+	}
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_HIGH_AP_AVAILABILITY_COOKIE,
+		       cookie)) {
+		osif_err("Vdev %d VENDOR_ATTR_HIGH_AP_AVAILABILITY_COOKIE put fail",
+			 vdev_id);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		return;
+	}
+
+	if (operation != HIGH_AP_AVAILABILITY_OPERATION_REQUEST) {
+		if (nla_put_u8(
+			vendor_event,
+			QCA_WLAN_VENDOR_ATTR_HIGH_AP_AVAILABILITY_OPERATION,
+			qca_oper)) {
+			osif_err("Vdev %d VENDOR_ATTR_HIGH_AP_AVAILABILITY_OPERATION put fail",
+				 vdev_id);
+			wlan_cfg80211_vendor_free_skb(vendor_event);
+			return;
+		}
+	}
+
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+
+	osif_nofl_debug("Vdev %d high AP availability operation resp with cookie %d and operation %d sent",
+			vdev_id, cookie, qca_oper);
+}
+
 QDF_STATUS osif_ll_lt_sap_request_for_audio_transport_switch(
 			struct wlan_objmgr_vdev *vdev,
 			enum qca_wlan_audio_transport_switch_type req_type)
@@ -200,6 +336,8 @@ QDF_STATUS osif_ll_lt_sap_deliver_audio_transport_switch_resp(
 static struct ll_sap_ops ll_sap_global_ops = {
 	.ll_sap_send_audio_transport_switch_req_cb =
 		wlan_osif_send_audio_transport_switch_req,
+	.ll_sap_send_high_ap_availability_resp_cb =
+		wlan_osif_send_high_ap_availability_resp,
 };
 
 QDF_STATUS osif_ll_sap_register_cb(void)
@@ -211,4 +349,19 @@ QDF_STATUS osif_ll_sap_register_cb(void)
 void osif_ll_sap_unregister_cb(void)
 {
 	ucfg_ll_sap_unregister_cb();
+}
+
+QDF_STATUS
+osif_ll_lt_sap_high_ap_availability(
+		struct wlan_objmgr_vdev *vdev,
+		enum qca_high_ap_availability_operation operation,
+		uint32_t duration, uint16_t cookie)
+
+{
+	enum high_ap_availability_operation oper;
+
+	oper = osif_convert_high_ap_availability_oper_from_qca(operation);
+
+	return ucfg_ll_lt_sap_high_ap_availability(vdev, oper, duration,
+						   cookie);
 }

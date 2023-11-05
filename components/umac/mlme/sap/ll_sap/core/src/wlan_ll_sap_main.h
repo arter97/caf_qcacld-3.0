@@ -36,6 +36,8 @@
 #define ll_sap_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_LL_SAP, params)
 
+#define MAX_HIGH_AP_AVAILABILITY_REQUESTS 2
+
 /**
  * struct ll_sap_psoc_priv_obj - ll_sap private psoc obj
  * @tx_ops: Tx ops registered with Target IF interface
@@ -49,9 +51,11 @@ struct ll_sap_psoc_priv_obj {
 /**
  * struct ll_sap_vdev_priv_obj - ll sap private vdev obj
  * @bearer_switch_ctx: Bearer switch context
+ * @high_ap_availability_cookie: High AP availability cookie
  */
 struct ll_sap_vdev_priv_obj {
 	struct bearer_switch_info *bearer_switch_ctx;
+	uint16_t high_ap_availability_cookie[MAX_HIGH_AP_AVAILABILITY_REQUESTS];
 };
 
 /**

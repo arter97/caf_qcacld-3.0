@@ -28,6 +28,8 @@
 /* Indicates MAX bearer switch requesters at a time */
 #define MAX_BEARER_SWITCH_REQUESTERS 5
 #define BS_REQ_ID_INVALID 0xFFFFFFFF
+#define LL_SAP_INVALID_COOKIE 0xFFFF
+
 typedef uint32_t wlan_bs_req_id;
 
 /**
@@ -68,6 +70,28 @@ enum bearer_switch_req_source {
 	BEARER_SWITCH_REQ_CSA,
 	BEARER_SWITCH_REQ_FW,
 	BEARER_SWITCH_REQ_MAX,
+};
+
+/**
+ * enum high_ap_availability_operation: High AP Availability operation type
+ * @HIGH_AP_AVAILABILITY_OPERATION_REQUEST: High AP availability operation req
+ * @HIGH_AP_AVAILABILITY_OPERATION_CANCEL: High AP availability operation cancel
+ * @HIGH_AP_AVAILABILITY_OPERATION_STARTED: High AP availability operation
+ * started
+ * @HIGH_AP_AVAILABILITY_OPERATION_COMPLETED: High AP availability operation
+ * completed
+ * @HIGH_AP_AVAILABILITY_OPERATION_CANCELLED: High AP availability operation
+ * cancelled
+ * @HiGH_AP_AVAILABILITY_OPERATION_INVALID: Invalid high AP availability
+ * operation
+ */
+enum high_ap_availability_operation {
+	HIGH_AP_AVAILABILITY_OPERATION_REQUEST = 0,
+	HIGH_AP_AVAILABILITY_OPERATION_CANCEL = 1,
+	HIGH_AP_AVAILABILITY_OPERATION_STARTED = 2,
+	HIGH_AP_AVAILABILITY_OPERATION_COMPLETED = 3,
+	HIGH_AP_AVAILABILITY_OPERATION_CANCELLED = 4,
+	HiGH_AP_AVAILABILITY_OPERATION_INVALID,
 };
 
 /**
@@ -183,10 +207,16 @@ struct wlan_ll_sap_rx_ops {
  * struct ll_sap_ops - ll_sap osif callbacks
  * @ll_sap_send_audio_transport_switch_req_cb: Send audio transport request to
  * userspace
+ * @ll_sap_send_high_ap_availability_resp_cb: Send high ap availability response
+ * to userspace
  */
 struct ll_sap_ops {
 		void (*ll_sap_send_audio_transport_switch_req_cb)(
 					struct wlan_objmgr_vdev *vdev,
 					enum bearer_switch_req_type req_type);
+		void (*ll_sap_send_high_ap_availability_resp_cb)(
+				struct wlan_objmgr_vdev *vdev,
+				enum high_ap_availability_operation operation,
+				uint16_t cookie);
 };
 #endif /* _WLAN_LL_SAP_PUBLIC_STRUCTS_H_ */

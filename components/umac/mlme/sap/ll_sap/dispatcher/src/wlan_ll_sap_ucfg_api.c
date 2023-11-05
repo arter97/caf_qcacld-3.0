@@ -39,6 +39,16 @@ bool ucfg_is_ll_lt_sap_supported(struct wlan_objmgr_psoc *psoc)
 	return ll_lt_sap_is_supported(psoc);
 }
 
+QDF_STATUS
+ucfg_ll_lt_sap_high_ap_availability(
+				struct wlan_objmgr_vdev *vdev,
+				enum high_ap_availability_operation operation,
+				uint32_t duration, uint16_t cookie)
+{
+	return ll_lt_sap_high_ap_availability(vdev, operation, duration,
+					      cookie);
+}
+
 QDF_STATUS ucfg_ll_lt_sap_request_for_audio_transport_switch(
 					struct wlan_objmgr_vdev *vdev,
 					enum bearer_switch_req_type req_type)

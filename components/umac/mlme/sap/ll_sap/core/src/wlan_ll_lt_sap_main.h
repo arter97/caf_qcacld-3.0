@@ -74,4 +74,19 @@ QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev);
  * else error code
  */
 QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ll_lt_sap_high_ap_availability() - Request for high ap availability
+ * @vdev: LL_LT_SAP vdev
+ * @operation: Type of the operation which needs to be performed
+ * @duration: Duration for high AP availability
+ * @cookie: Cookie of the request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
+			       enum high_ap_availability_operation operation,
+			       uint32_t duration, uint16_t cookie);
+
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

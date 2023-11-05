@@ -106,6 +106,10 @@ QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	for (i = 0; i < MAX_HIGH_AP_AVAILABILITY_REQUESTS; i++)
+		ll_sap_obj->high_ap_availability_cookie[i] =
+							LL_SAP_INVALID_COOKIE;
+
 	bs_ctx = qdf_mem_malloc(sizeof(struct bearer_switch_info));
 	if (!bs_ctx)
 		return QDF_STATUS_E_NOMEM;
@@ -453,4 +457,59 @@ qdf_freq_t ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 		return freq_list.shared_mac.freq_5GHz_high;
 
 	return freq_list.best_freq;
+}
+
+QDF_STATUS
+ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
+			       enum high_ap_availability_operation operation,
+			       uint32_t duration, uint16_t cookie)
+{
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+	uint8_t i;
+	uint16_t new_cookie;
+	struct ll_sap_ops *osif_cbk;
+
+	if (operation == HiGH_AP_AVAILABILITY_OPERATION_INVALID) {
+		ll_sap_err("Invalid operation value received");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+
+	if (!ll_sap_obj) {
+		ll_sap_err("vdev %d ll_sap obj null",
+			   wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Send this request to FW */
+
+	/*
+	 * If operation is HIGH_AP_AVAILABILITY_OPERATION_REQUEST, means this
+	 * is the first request, assign the cookie for this request and send
+	 * this cookie to userspace
+	 */
+	if (operation == HIGH_AP_AVAILABILITY_OPERATION_REQUEST) {
+		for (i = 0; i < MAX_HIGH_AP_AVAILABILITY_REQUESTS; i++) {
+			if (ll_sap_obj->high_ap_availability_cookie[i] ==
+							LL_SAP_INVALID_COOKIE)
+				break;
+		}
+		if (i == MAX_HIGH_AP_AVAILABILITY_REQUESTS) {
+			ll_sap_debug("Invalid high AP availability request");
+			return QDF_STATUS_E_INVAL;
+		}
+		qdf_get_random_bytes(&new_cookie, sizeof(new_cookie));
+		ll_sap_debug("LL_LT_SAP vdev %d high ap availability cookie %d",
+			     wlan_vdev_get_id(vdev), new_cookie);
+		ll_sap_obj->high_ap_availability_cookie[i] = new_cookie;
+
+		/* Send event to userspace with cookie */
+		osif_cbk = ll_sap_get_osif_cbk();
+		if (osif_cbk &&
+		    osif_cbk->ll_sap_send_high_ap_availability_resp_cb)
+			osif_cbk->ll_sap_send_high_ap_availability_resp_cb(
+						vdev, operation, new_cookie);
+	}
+	return QDF_STATUS_SUCCESS;
 }

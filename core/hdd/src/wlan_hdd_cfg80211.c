@@ -2180,6 +2180,11 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	},
 
 	FEATURE_TX_LATENCY_STATS_EVENTS
+
+	[QCA_NL80211_VENDOR_SUBCMD_HIGH_AP_AVAILABILITY_INDEX] = {
+		.vendor_id = QCA_NL80211_VENDOR_ID,
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_HIGH_AP_AVAILABILITY,
+	},
 };
 
 /**

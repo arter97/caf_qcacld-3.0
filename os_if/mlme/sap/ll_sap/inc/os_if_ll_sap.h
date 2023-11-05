@@ -67,6 +67,21 @@ QDF_STATUS osif_ll_lt_sap_deliver_audio_transport_switch_resp(
 			enum qca_wlan_audio_transport_switch_type req_type,
 			enum qca_wlan_audio_transport_switch_status status);
 
+/**
+ * osif_ll_lt_sap_high_ap_availability() - Request for high ap availability
+ * @vdev: LL_LT_SAP vdev
+ * @operation: Type of the operation which needs to be performed
+ * @duration: Duration for high AP availability
+ * @cookie: Cookie of the request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+osif_ll_lt_sap_high_ap_availability(
+		struct wlan_objmgr_vdev *vdev,
+		enum qca_high_ap_availability_operation operation,
+		uint32_t duration,
+		uint16_t cookie);
 #else
 static inline QDF_STATUS osif_ll_sap_register_cb(void)
 {
@@ -92,5 +107,14 @@ osif_ll_lt_sap_deliver_audio_transport_switch_resp(
 	return QDF_STATUS_E_INVAL;
 }
 
+static inline QDF_STATUS
+osif_ll_lt_sap_high_ap_availability(
+		struct wlan_objmgr_vdev *vdev,
+		enum qca_high_ap_availability_operation operation,
+		uint32_t duration,
+		uint16_t cookie)
+{
+	return QDF_STATUS_E_INVAL;
+}
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* __OS_IF_LL_SAP_H__*/
