@@ -2826,4 +2826,21 @@ void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 		break;
 	}
 }
+
+int pld_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				size_t *size)
+{
+	int ret;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_get_fw_lpass_shared_mem(dev, iova, size);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
 #endif

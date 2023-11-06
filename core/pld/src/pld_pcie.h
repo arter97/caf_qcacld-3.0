@@ -504,6 +504,13 @@ void pld_pcie_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 {
 }
 
+static inline
+int pld_pcie_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				     size_t *size)
+{
+	return -EINVAL;
+}
+
 static inline int pld_pcie_set_wfc_mode(struct device *dev,
 					enum pld_wfc_mode wfc_mode)
 {
@@ -950,6 +957,13 @@ void pld_pcie_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 {
 	cnss_audio_smmu_unmap(dev, iova, size);
 }
+
+static inline
+int pld_pcie_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				     size_t *size)
+{
+	return cnss_get_fw_lpass_shared_mem(dev, iova, size);
+}
 #else
 static inline bool pld_pcie_is_direct_link_supported(struct device *dev)
 {
@@ -966,6 +980,13 @@ int pld_pcie_audio_smmu_map(struct device *dev, phys_addr_t paddr,
 static inline
 void pld_pcie_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 {
+}
+
+static inline
+int pld_pcie_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				     size_t *size)
+{
+	return -EINVAL;
 }
 #endif
 #endif

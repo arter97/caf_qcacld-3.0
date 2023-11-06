@@ -2101,6 +2101,17 @@ int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
  * Return: None
  */
 void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size);
+
+/**
+ * pld_get_fw_lpass_shared_mem()- Get information of the FW-LPASS shared memory
+ * @dev: pointer to device structure
+ * @iova: DMA address
+ * @size: memory region size
+ *
+ * Return: 0 on success else failure code
+ */
+int pld_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				size_t *size);
 #else
 static inline
 int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
@@ -2112,6 +2123,13 @@ int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
 static inline
 void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 {
+}
+
+static inline
+int pld_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				size_t *size)
+{
+	return -EINVAL;
 }
 #endif
 #endif
