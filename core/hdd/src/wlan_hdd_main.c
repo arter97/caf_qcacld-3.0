@@ -5760,6 +5760,8 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 			hdd_info_rl("VDEV is not in disconnected state, set mac address isn't supported");
 			return false;
 		}
+		fallthrough;
+	case QDF_P2P_DEVICE_MODE:
 		return true;
 	case QDF_SAP_MODE:
 		if (test_bit(SOFTAP_BSS_STARTED,
@@ -5784,14 +5786,15 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	int ret;
 	void *cookie;
 	bool update_mld_addr;
-	uint32_t *fw_resp_status;
+	uint32_t fw_resp_status;
 	QDF_STATUS status;
 	struct osif_request *request;
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+	struct mac_addr_set_priv *priv;
 	static const struct osif_request_params params = {
-		.priv_size = sizeof(*fw_resp_status),
+		.priv_size = sizeof(*priv),
 		.timeout_ms = WLAN_SET_MAC_ADDR_TIMEOUT
 	};
 
@@ -5799,13 +5802,14 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	if (!vdev)
 		return -EINVAL;
 
-	status = ucfg_vdev_mgr_cdp_vdev_detach(vdev);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to detach CDP vdev. Status:%d", status);
-		ret = qdf_status_to_os_return(status);
-		goto vdev_ref;
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_P2P_DEVICE_MODE) {
+		status = ucfg_vdev_mgr_cdp_vdev_detach(vdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to detach CDP vdev. Status:%d", status);
+			ret = qdf_status_to_os_return(status);
+			goto vdev_ref;
+		}
 	}
-
 	request = osif_request_alloc(&params);
 	if (!request) {
 		ret = -ENOMEM;
@@ -5822,6 +5826,22 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	cookie = osif_request_cookie(request);
 	hdd_update_set_mac_addr_req_ctx(adapter, cookie);
 
+	priv = (struct mac_addr_set_priv *)osif_request_priv(request);
+
+	/* For p2p device mode, need send delete self peer cmd to F/W,
+	 * To avoid p2p new DP vdev is created before old DP vdev deleted,
+	 * don't create new DP vdev until both self peer delete rsp and set
+	 * mac addr rsp received, so initialize pending_rsp_cnt as 2.
+	 *
+	 * For other mode like STA/SAP, don't need send delete self peer cmd
+	 * to F/W, only need wait set mad addr rsp, so initialize
+	 * pending_rsp_cnt as 1.
+	 */
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_DEVICE_MODE)
+		qdf_atomic_set(&priv->pending_rsp_cnt, 2);
+	else
+		qdf_atomic_set(&priv->pending_rsp_cnt, 1);
+
 	status = sme_send_set_mac_addr(mac_addr, mld_addr, vdev);
 	ret = qdf_status_to_os_return(status);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -5834,10 +5854,10 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 		if (ret) {
 			hdd_err("Set MAC address response timed out");
 		} else {
-			fw_resp_status = (uint32_t *)osif_request_priv(request);
-			if (*fw_resp_status) {
+			fw_resp_status = priv->fw_resp_status;
+			if (fw_resp_status) {
 				hdd_err("Set MAC address failed in FW. Status: %d",
-					*fw_resp_status);
+					fw_resp_status);
 				ret = -EAGAIN;
 			}
 		}
@@ -5858,7 +5878,6 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 		ret = qdf_status_to_os_return(status);
 
 status_ret:
-	status = ucfg_vdev_mgr_cdp_vdev_attach(vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to attach CDP vdev. status:%d", status);
 		ret = qdf_status_to_os_return(status);
@@ -5894,8 +5913,9 @@ static void hdd_set_mac_addr_event_cb(uint8_t vdev_id, uint8_t status)
 	struct hdd_context *hdd_ctx;
 	struct wlan_hdd_link_info *link_info;
 	struct osif_request *req;
-	uint32_t *fw_response_status;
+	struct mac_addr_set_priv *priv;
 
+	osif_debug("enter");
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
 		hdd_err("Invalid HDD context");
@@ -5914,10 +5934,13 @@ static void hdd_set_mac_addr_event_cb(uint8_t vdev_id, uint8_t status)
 		return;
 	}
 
-	fw_response_status = (uint32_t *)osif_request_priv(req);
-	*fw_response_status = status;
+	priv = (struct mac_addr_set_priv *)osif_request_priv(req);
 
-	osif_request_complete(req);
+	if (qdf_atomic_dec_and_test(&priv->pending_rsp_cnt)) {
+		priv->fw_resp_status = status;
+		osif_request_complete(req);
+	}
+
 	osif_request_put(req);
 }
 #else

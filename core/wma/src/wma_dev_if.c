@@ -472,7 +472,11 @@ wma_release_vdev_ref(struct wma_txrx_node *iface)
 	struct wlan_objmgr_vdev *vdev;
 
 	vdev = iface->vdev;
-
+	wma_debug("vdev state: %d", vdev->obj_state);
+	if (vdev->obj_state != WLAN_OBJ_STATE_LOGICALLY_DELETED) {
+		wma_debug("no vdev delete");
+		return;
+	}
 	iface->vdev_active = false;
 	iface->vdev = NULL;
 	if (vdev)
@@ -555,13 +559,6 @@ static QDF_STATUS wma_self_peer_remove(tp_wma_handle wma_handle,
 	wma_debug("P2P Device: removing self peer "QDF_MAC_ADDR_FMT,
 		  QDF_MAC_ADDR_REF(del_vdev_req->self_mac_addr));
 
-	qdf_status = wma_remove_peer(wma_handle, del_vdev_req->self_mac_addr,
-				     vdev_id, false);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		wma_err("wma_remove_peer is failed");
-		goto error;
-	}
-
 	if (wmi_service_enabled(wma_handle->wmi_handle,
 				wmi_service_sync_delete_cmds)) {
 		sta_self_wmi_rsp =
@@ -586,6 +583,17 @@ static QDF_STATUS wma_self_peer_remove(tp_wma_handle wma_handle,
 			qdf_status = QDF_STATUS_E_FAILURE;
 			goto error;
 		}
+	}
+
+	 qdf_status = wma_remove_peer(wma_handle, del_vdev_req->self_mac_addr,
+				      vdev_id, false);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		wma_err("wma_remove_peer is failed");
+		wma_remove_req(wma_handle, vdev_id,
+			       WMA_DEL_P2P_SELF_STA_RSP_START);
+		qdf_mem_free(sta_self_wmi_rsp);
+
+		goto error;
 	}
 
 error:

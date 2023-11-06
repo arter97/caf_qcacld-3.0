@@ -87,6 +87,8 @@
 #include <wlan_mlo_link_force.h>
 #include "wma_eht.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_vdev_mgr_ucfg_api.h"
+#include "wlan_vdev_mlme_main.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -4977,7 +4979,14 @@ QDF_STATUS sme_vdev_self_peer_delete_resp(struct del_vdev_params *del_vdev_req)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+	if (vdev->obj_state == WLAN_OBJ_STATE_LOGICALLY_DELETED) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		wma_debug("vdev delete");
+	} else {
+		wlan_vdev_mlme_notify_set_mac_addr_response(vdev,
+							    del_vdev_req->status);
+		wma_debug("mac update");
+	}
 
 	status = del_vdev_req->status;
 	qdf_mem_free(del_vdev_req);
@@ -16812,6 +16821,7 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 	wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
 	wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
 
+	ucfg_vdev_mgr_cdp_vdev_attach(vdev);
 p2p_self_peer_create:
 	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {
 		vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
