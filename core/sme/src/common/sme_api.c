@@ -14411,13 +14411,24 @@ uint32_t sme_unpack_rsn_ie(mac_handle_t mac_handle, uint8_t *buf,
 }
 
 QDF_STATUS sme_unpack_assoc_rsp(mac_handle_t mac_handle,
-				uint8_t *frame, uint32_t frame_len,
+				struct wlan_cm_connect_resp *rsp,
 				struct sDot11fAssocResponse *assoc_resp)
 {
+	QDF_STATUS status;
+	uint8_t ies_offset = WLAN_ASSOC_RSP_IES_OFFSET;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
-	return dot11f_parse_assoc_response(mac_ctx, frame, frame_len,
-					   assoc_resp, false);
+	status = dot11f_parse_assoc_response(mac_ctx,
+					     rsp->connect_ies.assoc_rsp.ptr,
+					     rsp->connect_ies.assoc_rsp.len,
+					     assoc_resp, false);
+
+	lim_strip_and_decode_eht_cap(rsp->connect_ies.assoc_rsp.ptr + ies_offset,
+				     rsp->connect_ies.assoc_rsp.len - ies_offset,
+				     &assoc_resp->eht_cap,
+				     assoc_resp->he_cap,
+				     rsp->freq);
+	return status;
 }
 
 void sme_get_hs20vendor_ie(mac_handle_t mac_handle, uint8_t *frame,
