@@ -3803,7 +3803,7 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mlo_partner_info partner_info;
 
-	if (ar->mlo_ie.present)
+	if (!ar->mlo_ie.present)
 		return status;
 
 	status = util_find_mlie(frame + WLAN_ASSOC_RSP_IES_OFFSET,
