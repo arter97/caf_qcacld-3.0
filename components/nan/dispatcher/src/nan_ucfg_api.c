@@ -65,6 +65,8 @@ static void nan_cfg_init(struct wlan_objmgr_psoc *psoc,
 	nan_obj->cfg_param.nan_feature_config =
 					cfg_get(psoc, CFG_NAN_FEATURE_CONFIG);
 	nan_obj->cfg_param.disable_6g_nan = cfg_get(psoc, CFG_DISABLE_6G_NAN);
+	nan_obj->cfg_param.enable_nan_eht_cap =
+					cfg_get(psoc, CFG_NAN_ENABLE_EHT_CAP);
 }
 
 /**

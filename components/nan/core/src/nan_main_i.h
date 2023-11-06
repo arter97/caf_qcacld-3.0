@@ -103,6 +103,7 @@ enum nan_disc_state {
  *                      configuration in firmware. It's sent to firmware through
  *                      wmi_vdev_param_enable_disable_nan_config_features
  * @disable_6g_nan: Disable NAN in 6GHz frequency band
+ * @enable_nan_eht_cap: Enable(1)/Disable(0) NAN EHT capability
  */
 struct nan_cfg_params {
 	bool enable;
@@ -116,6 +117,7 @@ struct nan_cfg_params {
 	uint32_t max_ndi;
 	uint32_t nan_feature_config;
 	bool disable_6g_nan;
+	bool enable_nan_eht_cap;
 };
 
 /**
