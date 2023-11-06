@@ -22,6 +22,87 @@
 #include "wlan_ll_sap_api.h"
 
 /**
+ * target_if_send_oob_connect_request() - Send OOB connect request to FW
+ * @psoc: pointer to psoc
+ * @req: OOB connect request
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS target_if_send_oob_connect_request(
+					struct wlan_objmgr_psoc *psoc,
+					struct ll_sap_oob_connect_request req)
+{
+	struct wmi_unified *wmi_handle;
+	struct wmi_oob_connect_request request;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	request.vdev_id = req.vdev_id;
+	request.vdev_available_duration = req.vdev_available_duration;
+	request.connect_req_type = req.connect_req_type;
+
+	return wmi_unified_oob_connect_request_send(wmi_handle, request);
+}
+
+static int target_if_oob_connect_response_event_handler(ol_scn_t scn,
+							uint8_t *event,
+							uint32_t len)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
+	struct wmi_unified *wmi_handle;
+	struct wlan_ll_sap_rx_ops *rx_ops;
+	QDF_STATUS qdf_status;
+	struct wmi_oob_connect_response_event response;
+	struct ll_sap_oob_connect_response_event ll_sap_response;
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		target_if_err("psoc is null");
+		return -EINVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return -EINVAL;
+	}
+
+	psoc_ll_sap_obj = wlan_objmgr_psoc_get_comp_private_obj(
+							psoc,
+							WLAN_UMAC_COMP_LL_SAP);
+
+	if (!psoc_ll_sap_obj) {
+		target_if_err("psoc_ll_sap_obj is null");
+		return -EINVAL;
+	}
+
+	rx_ops = &psoc_ll_sap_obj->rx_ops;
+	if (!rx_ops || !rx_ops->oob_connect_response) {
+		target_if_err("Invalid ll_sap rx ops");
+		return -EINVAL;
+	}
+
+	qdf_status = wmi_extract_oob_connect_response_event(wmi_handle, event,
+							    len, &response);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		target_if_err("parsing of event failed, %d", qdf_status);
+		return -EINVAL;
+	}
+
+	ll_sap_response.vdev_id = response.vdev_id;
+	ll_sap_response.connect_resp_type = response.connect_resp_type;
+
+	rx_ops->oob_connect_response(psoc, ll_sap_response);
+
+	return 0;
+}
+
+/**
  * target_if_send_audio_transport_switch_resp() - Send audio transport switch
  * response to fw
  * @psoc: pointer to psoc
@@ -103,6 +184,7 @@ target_if_ll_sap_register_tx_ops(struct wlan_ll_sap_tx_ops *tx_ops)
 {
 	tx_ops->send_audio_transport_switch_resp =
 		target_if_send_audio_transport_switch_resp;
+	tx_ops->send_oob_connect_request = target_if_send_oob_connect_request;
 }
 
 void
@@ -110,6 +192,8 @@ target_if_ll_sap_register_rx_ops(struct wlan_ll_sap_rx_ops *rx_ops)
 {
 	rx_ops->audio_transport_switch_req =
 		wlan_ll_sap_fw_bearer_switch_req;
+	rx_ops->oob_connect_response =
+		wlan_ll_sap_oob_connect_response;
 }
 
 QDF_STATUS
@@ -128,6 +212,19 @@ target_if_ll_sap_register_events(struct wlan_objmgr_psoc *psoc)
 			wmi_audio_transport_switch_type_event_id,
 			target_if_send_audio_transport_switch_req_event_handler,
 			WMI_RX_SERIALIZER_CTX);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		target_if_err("audio_transport_switch_req_event_handler registration failed");
+		return ret;
+	}
+
+	ret = wmi_unified_register_event_handler(
+			handle,
+			wmi_vdev_oob_connection_response_event_id,
+			target_if_oob_connect_response_event_handler,
+			WMI_RX_SERIALIZER_CTX);
+	if (QDF_IS_STATUS_ERROR(ret))
+		target_if_err("oob_connect_response_event_handler registration failed");
+
 	return ret;
 }
 
@@ -145,5 +242,10 @@ target_if_ll_sap_deregister_events(struct wlan_objmgr_psoc *psoc)
 	ret = wmi_unified_unregister_event_handler(
 			handle,
 			wmi_audio_transport_switch_type_event_id);
+
+	ret = wmi_unified_unregister_event_handler(
+			handle,
+			wmi_vdev_oob_connection_response_event_id);
+
 	return ret;
 }

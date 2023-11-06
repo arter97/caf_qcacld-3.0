@@ -18,6 +18,10 @@
  * DOC: contains ll_lt_sap declarations specific to the bearer
  * switch functionalities
  */
+
+#ifndef TARGET_IF_LL_SAP_H
+#define TARGET_IF_LL_SAP_H
+
 #include "wlan_ll_sap_public_structs.h"
 
 /**
@@ -53,3 +57,4 @@ QDF_STATUS target_if_ll_sap_register_events(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 target_if_ll_sap_deregister_events(struct wlan_objmgr_psoc *psoc);
 
+#endif /* TARGET_IF_LL_SAP_H */

@@ -263,3 +263,52 @@ wlan_ll_sap_fw_bearer_switch_req(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS wlan_ll_sap_oob_connect_response(
+			struct wlan_objmgr_psoc *psoc,
+			struct ll_sap_oob_connect_response_event rsp)
+{
+	struct ll_sap_ops *osif_cbk;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t i;
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, rsp.vdev_id,
+						    WLAN_LL_SAP_ID);
+
+	if (!vdev) {
+		ll_sap_err("Invalid vdev %d for oob connect response",
+			   rsp.vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+
+	if (!ll_sap_obj) {
+		ll_sap_err("vdev %d ll_sap obj null",
+			   wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	osif_cbk = ll_sap_get_osif_cbk();
+	if (!osif_cbk || !osif_cbk->ll_sap_send_high_ap_availability_resp_cb) {
+		ll_sap_err("invalid high ap availability ops");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < MAX_HIGH_AP_AVAILABILITY_REQUESTS; i++) {
+		/* Send response for all the valid cookies */
+		if (ll_sap_obj->high_ap_availability_cookie[i] ==
+							LL_SAP_INVALID_COOKIE)
+			continue;
+
+		osif_cbk->ll_sap_send_high_ap_availability_resp_cb(
+				vdev,
+				rsp.connect_resp_type,
+				ll_sap_obj->high_ap_availability_cookie[i]);
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
+
+	return QDF_STATUS_SUCCESS;
+}

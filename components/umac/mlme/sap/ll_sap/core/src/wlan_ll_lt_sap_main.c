@@ -468,6 +468,10 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 	uint8_t i;
 	uint16_t new_cookie;
 	struct ll_sap_ops *osif_cbk;
+	struct wlan_objmgr_psoc *psoc;
+	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
+	struct ll_sap_oob_connect_request req;
+	struct wlan_ll_sap_tx_ops *tx_ops;
 
 	if (operation == HiGH_AP_AVAILABILITY_OPERATION_INVALID) {
 		ll_sap_err("Invalid operation value received");
@@ -482,7 +486,27 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	psoc = wlan_vdev_get_psoc(vdev);
+	psoc_ll_sap_obj = wlan_objmgr_psoc_get_comp_private_obj(
+							psoc,
+							WLAN_UMAC_COMP_LL_SAP);
+	if (!psoc_ll_sap_obj) {
+		ll_sap_err("psoc_ll_sap_obj is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	/* Send this request to FW */
+	req.connect_req_type = operation;
+	req.vdev_available_duration = duration;
+	req.vdev_id = wlan_vdev_get_id(vdev);
+
+	tx_ops = &psoc_ll_sap_obj->tx_ops;
+	if (!tx_ops->send_oob_connect_request) {
+		ll_sap_err("send_oob_connect_request op is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	tx_ops->send_oob_connect_request(psoc, req);
 
 	/*
 	 * If operation is HIGH_AP_AVAILABILITY_OPERATION_REQUEST, means this

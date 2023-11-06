@@ -172,6 +172,18 @@ wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 wlan_ll_sap_fw_bearer_switch_req(struct wlan_objmgr_psoc *psoc,
 				 enum bearer_switch_req_type req_type);
+
+/**
+ * wlan_ll_sap_oob_connect_response() - FW response to OOB connect request
+ * @psoc: Pointer to psoc object
+ * @rsp: FW response to the OOB connect request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_ll_sap_oob_connect_response(
+			struct wlan_objmgr_psoc *psoc,
+			struct ll_sap_oob_connect_response_event rsp);
+
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)

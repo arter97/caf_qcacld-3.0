@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifndef WMI_UNIFIED_LL_SAP_TLV_H
+#define WMI_UNIFIED_LL_SAP_TLV_H
+
 #include "qdf_status.h"
 #include "wlan_ll_sap_public_structs.h"
 #include "wmi_unified_param.h"
@@ -48,4 +51,30 @@ extract_audio_transport_switch_req_event_tlv(
 				uint8_t *event, uint32_t len,
 				enum bearer_switch_req_type *req_type);
 
+/**
+ * oob_connect_request_tlv() - Send OOB connect request to FW
+ * response to fw
+ * @wmi_hdl: WMI handle
+ * @request: OOB connect request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS oob_connect_request_tlv(wmi_unified_t wmi_hdl,
+				   struct wmi_oob_connect_request request);
+
+/**
+ * extract_oob_connect_response_event_tlv() - Extract aOOB connect response
+ * @wmi_handle: WMI handle
+ * @event: WMI event from fw
+ * @len: Length of the event
+ * @response: OOB connect response
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS extract_oob_connect_response_event_tlv(
+			wmi_unified_t wmi_handle,
+			uint8_t *event, uint32_t len,
+			struct wmi_oob_connect_response_event *response);
+
 #endif
+#endif  /* WMI_UNIFIED_LL_SAP_TLV_H */

@@ -14,11 +14,64 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifndef WMI_UNIFIED_LL_SAP_API_H
+#define WMI_UNIFIED_LL_SAP_API_H
+
 #include "qdf_status.h"
 #include "wlan_ll_sap_public_structs.h"
 #include "wmi_unified_param.h"
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
+
+/**
+ * struct wmi_oob_connect_request - ll_sap OOB connect request
+ * @vdev_id: Vdev id on which OOB connect request is received
+ * @connect_req_type: Connect request type
+ * @vdev_available_duration: Vdev available duratin, for which vdev, identified
+ * with vdev id will remain on its current channel
+ */
+struct wmi_oob_connect_request {
+	uint8_t vdev_id;
+	enum high_ap_availability_operation connect_req_type;
+	uint32_t vdev_available_duration;
+};
+
+/**
+ * struct wmi_oob_connect_response_event - ll_sap OOB connect request
+ * @vdev_id: Vdev id on which OOB connect response is received
+ * @connect_resp_type: Connect response type
+ */
+struct wmi_oob_connect_response_event {
+	uint8_t vdev_id;
+	enum high_ap_availability_operation connect_resp_type;
+};
+
+/**
+ * wmi_unified_oob_connect_request_send() - Send OOB connect request to FW
+ * response to fw
+ * @wmi_hdl: WMI handle
+ * @request: OOB connect request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wmi_unified_oob_connect_request_send(
+					wmi_unified_t wmi_hdl,
+					struct wmi_oob_connect_request request);
+
+/**
+ * wmi_extract_oob_connect_response_event() - Extract aOOB connect response
+ * @wmi_handle: WMI handle
+ * @event: WMI event from fw
+ * @len: Length of the event
+ * @response: OOB connect response
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wmi_extract_oob_connect_response_event(
+				wmi_unified_t wmi_handle,
+				uint8_t *event, uint32_t len,
+				struct wmi_oob_connect_response_event *response);
+
 /**
  * wmi_unified_audio_transport_switch_resp_send() - Send audio transport switch
  * response to fw
@@ -49,3 +102,5 @@ wmi_extract_audio_transport_switch_req_event(
 				uint8_t *event, uint32_t len,
 				enum bearer_switch_req_type *req_type);
 #endif
+
+#endif /* WMI_UNIFIED_LL_SAP_API_H*/

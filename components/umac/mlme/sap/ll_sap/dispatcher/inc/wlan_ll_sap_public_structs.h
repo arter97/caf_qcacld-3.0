@@ -179,16 +179,43 @@ struct wlan_bearer_switch_request {
 };
 
 /**
+ * struct ll_sap_oob_connect_request - ll_sap OOB connect request
+ * @vdev_id: Vdev id on which OOB connect request is received
+ * @connect_req_type: Connect request type
+ * @vdev_available_duration: Vdev available duratin, for which vdev, identified
+ * with vdev id will remain on its current channel
+ */
+struct ll_sap_oob_connect_request {
+	uint8_t vdev_id;
+	enum high_ap_availability_operation connect_req_type;
+	uint32_t vdev_available_duration;
+};
+
+/**
+ * struct ll_sap_oob_connect_response_event - ll_sap OOB connect response
+ * @vdev_id: Vdev id on which OOB connect response is received
+ * @connect_resp_type: Connect response type
+ */
+struct ll_sap_oob_connect_response_event {
+	uint8_t vdev_id;
+	enum high_ap_availability_operation connect_resp_type;
+};
+
+/**
  * struct wlan_ll_sap_tx_ops - defines southbound tx callbacks for
  * LL_SAP (low latency sap) component
  * @send_audio_transport_switch_resp: function pointer to indicate audio
  * transport switch response to FW
+ * @send_oob_connect_request: OOB connect request to FW
  */
 struct wlan_ll_sap_tx_ops {
 	QDF_STATUS (*send_audio_transport_switch_resp)(
 					struct wlan_objmgr_psoc *psoc,
 					enum bearer_switch_req_type req_type,
 					enum bearer_switch_status status);
+	QDF_STATUS (*send_oob_connect_request)(
+					struct wlan_objmgr_psoc *psoc,
+					struct ll_sap_oob_connect_request req);
 };
 
 /**
@@ -196,11 +223,15 @@ struct wlan_ll_sap_tx_ops {
  * LL_SAP (low latency SAP) component
  * @audio_transport_switch_req: function pointer to indicate audio
  * transport switch request from FW
+ * @oob_connect_response: Response of the out of bound connect request
  */
 struct wlan_ll_sap_rx_ops {
 	QDF_STATUS (*audio_transport_switch_req)(
 					struct wlan_objmgr_psoc *psoc,
 					enum bearer_switch_req_type req_type);
+	QDF_STATUS (*oob_connect_response)(
+				struct wlan_objmgr_psoc *psoc,
+				struct ll_sap_oob_connect_response_event rsp);
 };
 
 /**

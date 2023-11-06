@@ -66,6 +66,9 @@ static void wmi_mlme_attach_ll_lt_sap_tlv(struct wmi_ops *ops)
 	ops->send_audio_transport_switch_resp = audio_transport_switch_resp_tlv;
 	ops->extract_audio_transport_switch_req_event =
 				extract_audio_transport_switch_req_event_tlv;
+	ops->send_oob_connect_request = oob_connect_request_tlv;
+	ops->extract_oob_connect_response_event =
+				extract_oob_connect_response_event_tlv;
 }
 #else
 static inline void wmi_mlme_attach_ll_lt_sap_tlv(struct wmi_ops *ops)
