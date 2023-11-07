@@ -6823,6 +6823,23 @@ wlan_mlme_get_tx_retry_multiplier(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
+wlan_mlme_get_update_chan_width_allowed(struct wlan_objmgr_psoc *psoc,
+					bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = cfg_default(CFG_ALLOW_UPDATE_CHANNEL_WIDTH);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.feature_flags.update_cw_allowed;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_get_channel_bonding_5ghz(struct wlan_objmgr_psoc *psoc,
 				   uint32_t *value)
 {

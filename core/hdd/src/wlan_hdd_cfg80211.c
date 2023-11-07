@@ -11100,6 +11100,20 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	struct nlattr *chn_bd = NULL;
 	struct nlattr *mlo_link_id;
 	enum eSirMacHTChannelWidth chwidth;
+	struct wlan_objmgr_psoc *psoc;
+	bool update_cw_allowed;
+
+	psoc = wlan_vdev_get_psoc(link_info->vdev);
+	if (!psoc) {
+		hdd_debug("psoc is null");
+		return -EINVAL;
+	}
+
+	ucfg_mlme_get_update_chan_width_allowed(psoc, &update_cw_allowed);
+	if (!update_cw_allowed) {
+		hdd_debug("update_channel_width is disabled via INI");
+		return -EINVAL;
+	}
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS])
 		goto skip_mlo;
