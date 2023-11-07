@@ -354,7 +354,8 @@ QDF_STATUS wlan_cp_stats_vdev_cs_deinit(struct vdev_cp_stats *vdev_cs)
 
 QDF_STATUS wlan_cp_stats_pdev_cs_init(struct pdev_cp_stats *pdev_cs)
 {
-	pdev_cs->pdev_stats = qdf_mem_malloc(sizeof(struct pdev_mc_cp_stats));
+	pdev_cs->pdev_stats = qdf_mem_malloc(
+				MAX_MAC * sizeof(struct pdev_mc_cp_stats));
 	if (!pdev_cs->pdev_stats)
 		return QDF_STATUS_E_NOMEM;
 
@@ -812,7 +813,9 @@ QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	struct pdev_cp_stats *pdev_cp_stats_priv;
 	struct vdev_mc_cp_stats *vdev_mc_stats;
 	struct vdev_cp_stats *vdev_cp_stat;
+	struct wlan_objmgr_psoc *psoc;
 	uint32_t vdev_power = 0;
+	uint32_t mac_id;
 
 	vdev_cp_stat = wlan_cp_stats_get_vdev_stats_obj(vdev);
 	if (vdev_cp_stat) {
@@ -827,6 +830,24 @@ QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	}
 
 	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cp_stats_err("pdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc = pdev->pdev_objmgr.wlan_psoc;
+	if (!psoc) {
+		cp_stats_err("psoc is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc,
+						vdev->vdev_objmgr.vdev_id);
+	if (mac_id >= MAX_MAC) {
+		cp_stats_err("invalid mac_id %d", mac_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
 	if (!pdev_cp_stats_priv) {
 		cp_stats_err("pdev cp stats object is null");
@@ -834,7 +855,7 @@ QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	}
 
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
-	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
+	pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[mac_id];
 	*dbm = pdev_mc_stats->max_pwr;
 	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
 
@@ -1057,10 +1078,12 @@ uint8_t wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
 	struct pdev_cp_stats *pdev_cp_stats_priv;
 	struct per_channel_stats *channel_stats;
 	struct channel_status *channel_status_list;
+	struct pdev_mc_cp_stats *pdev_mc_stats;
 	uint8_t total_channel, chan_load = 0;
 	uint8_t i;
 	uint32_t rx_clear_count = 0, cycle_count = 0;
 	bool found = false;
+	uint32_t mac_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_CP_STATS_ID);
@@ -1073,13 +1096,20 @@ uint8_t wlan_cp_stats_get_rx_clear_count(struct wlan_objmgr_psoc *psoc,
 		goto release_ref;
 	}
 
+	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
+	if (mac_id >= MAX_MAC) {
+		cp_stats_err("invalid mac_id %d", mac_id);
+		goto release_ref;
+	}
+
 	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
 	if (!pdev_cp_stats_priv) {
 		cp_stats_err("pdev cp stats object is null");
 		goto release_ref;
 	}
 
-	channel_stats = &pdev_cp_stats_priv->pdev_stats->chan_stats;
+	pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[mac_id];
+	channel_stats = &pdev_mc_stats->chan_stats;
 	channel_status_list = channel_stats->channel_status_list;
 	total_channel = channel_stats->total_channel;
 
@@ -1340,9 +1370,11 @@ void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
 	struct pdev_cp_stats *pdev_cp_stats_priv;
 	struct per_channel_stats *channel_stats;
 	struct channel_status *channel_status_list;
+	struct pdev_mc_cp_stats *pdev_mc_stats;
 	uint8_t total_channel;
 	uint8_t i;
 	bool found = false;
+	uint32_t mac_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_CP_STATS_ID);
@@ -1356,6 +1388,12 @@ void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
+	if (mac_id >= MAX_MAC) {
+		cp_stats_err("invalid mac_id %d", mac_id);
+		return;
+	}
+
 	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
 	if (!pdev_cp_stats_priv) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
@@ -1363,7 +1401,8 @@ void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	channel_stats = &pdev_cp_stats_priv->pdev_stats->chan_stats;
+	pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[mac_id];
+	channel_stats = &pdev_mc_stats->chan_stats;
 	channel_status_list = channel_stats->channel_status_list;
 	total_channel = channel_stats->total_channel;
 
@@ -1422,7 +1461,8 @@ ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 	struct pdev_cp_stats *pdev_cp_stats_priv;
 	struct per_channel_stats *channel_stats;
 	struct channel_status *entry;
-	uint8_t i;
+	struct pdev_mc_cp_stats *pdev_mc_stats;
+	uint8_t i, mac_id;
 
 	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
 	if (!pdev_cp_stats_priv) {
@@ -1430,13 +1470,17 @@ ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 		return NULL;
 	}
 
-	channel_stats = &pdev_cp_stats_priv->pdev_stats->chan_stats;
+	for (mac_id = 0; mac_id < MAX_MAC; mac_id++) {
+		pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[mac_id];
+		channel_stats = &pdev_mc_stats->chan_stats;
 
-	for (i = 0; i < channel_stats->total_channel; i++) {
-		entry = &channel_stats->channel_status_list[i];
-		if (entry->channel_freq == chan_freq)
-			return entry;
+		for (i = 0; i < channel_stats->total_channel; i++) {
+			entry = &channel_stats->channel_status_list[i];
+			if (entry->channel_freq == chan_freq)
+				return entry;
+		}
 	}
+
 	cp_stats_err("Channel %d status info not exist", chan_freq);
 
 	return NULL;
@@ -1446,6 +1490,8 @@ void ucfg_mc_cp_stats_clear_channel_status(struct wlan_objmgr_pdev *pdev)
 {
 	struct pdev_cp_stats *pdev_cp_stats_priv;
 	struct per_channel_stats *channel_stats;
+	struct pdev_mc_cp_stats *pdev_mc_stats;
+	uint8_t mac_id;
 
 	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
 	if (!pdev_cp_stats_priv) {
@@ -1453,8 +1499,11 @@ void ucfg_mc_cp_stats_clear_channel_status(struct wlan_objmgr_pdev *pdev)
 		return;
 	}
 
-	channel_stats = &pdev_cp_stats_priv->pdev_stats->chan_stats;
-	channel_stats->total_channel = 0;
+	for (mac_id = 0; mac_id < MAX_MAC; mac_id++) {
+		pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[mac_id];
+		channel_stats = &pdev_mc_stats->chan_stats;
+		channel_stats->total_channel = 0;
+	}
 }
 
 #endif
