@@ -1550,6 +1550,37 @@ tdls_process_sta_connect(struct tdls_sta_notify_params *notify)
 	return QDF_STATUS_SUCCESS;
 }
 
+static void
+tdls_update_discovery_tries(struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+	struct tdls_vdev_priv_obj *vdev_obj;
+	struct tdls_user_config *tdls_config;
+	struct tdls_config_params *vdev_config;
+	QDF_STATUS status;
+
+	status = tdls_get_vdev_objects(vdev, &vdev_obj, &soc_obj);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("can't get vdev_obj & soc_obj");
+		return;
+	}
+
+	vdev_config = &vdev_obj->threshold_config;
+	tdls_config = &soc_obj->tdls_configs;
+
+	vdev_config->discovery_tries_n =
+			tdls_config->tdls_max_discovery_attempt;
+
+	/*
+	 * For MLO peer discovery will happen on 2 links and the best link
+	 * will be chosen based on score for TDLS. So factor that into the
+	 * number of discovery attempts to increase the discoverability
+	 * window for the peer.
+	 */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		vdev_config->discovery_tries_n *= 2;
+}
+
 QDF_STATUS tdls_notify_sta_connect(struct tdls_sta_notify_params *notify)
 {
 	QDF_STATUS status;
@@ -1566,6 +1597,8 @@ QDF_STATUS tdls_notify_sta_connect(struct tdls_sta_notify_params *notify)
 	}
 
 	status = tdls_process_sta_connect(notify);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		tdls_update_discovery_tries(notify->vdev);
 
 	wlan_objmgr_vdev_release_ref(notify->vdev, WLAN_TDLS_NB_ID);
 	qdf_mem_free(notify);
