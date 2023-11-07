@@ -2393,7 +2393,9 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 		}
 
 		for (count = 0; count < radio_stats->num_channels; count++) {
-			if (exclude_selftx_from_cca_busy)
+			if (exclude_selftx_from_cca_busy &&
+			    channel_stats->cca_busy_time >=
+			    channel_stats->tx_time)
 				channel_stats->cca_busy_time -=
 						channel_stats->tx_time;
 
@@ -2421,7 +2423,7 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 
 			if (stats_len >= (WMI_MAX_RADIO_STATS_LOGS -
 					WMI_MAX_RADIO_SINGLE_STATS_LEN)) {
-				wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][rx time][tx time] :%s",
+				wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][tx time][rx time] :%s",
 					       info);
 				stats_len = 0;
 			}
@@ -2437,7 +2439,7 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 		}
 
 		if (stats_len)
-			wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][rx time][tx time] :%s",
+			wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][tx time][rx time] :%s",
 				       info);
 
 		qdf_mem_free(info);
