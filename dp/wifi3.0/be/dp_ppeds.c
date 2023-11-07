@@ -417,6 +417,33 @@ static void dp_ppeds_setup_vp_entry_be(struct dp_soc_be *be_soc,
 }
 
 /**
+ * dp_tx_ppeds_vp_profile_update() - Update ppe vp profile with new bank data
+ * @be_soc: BE Soc handle
+ * @be_vdev: pointer to be_vdev structure
+ *
+ * The function updates the vp profile with new bank information
+ *
+ * Return: void
+ */
+void dp_tx_ppeds_vp_profile_update(struct dp_soc_be *be_soc,
+				   struct dp_vdev_be *be_vdev)
+{
+	struct dp_ppe_vp_profile *ppe_vp_profile;
+	int i;
+
+	/* Iterate through ppe vp profile and update for VAPs with same vdev_id */
+	for (i = 0; i < be_soc->num_ppe_vp_profiles; i++) {
+		if (!be_soc->ppe_vp_profile[i].is_configured)
+			continue;
+
+		if (be_soc->ppe_vp_profile[i].vdev_id == be_vdev->vdev.vdev_id) {
+			ppe_vp_profile = &be_soc->ppe_vp_profile[i];
+			dp_ppeds_setup_vp_entry_be(be_soc, be_vdev, ppe_vp_profile);
+		}
+	}
+}
+
+/**
  * dp_ppeds_alloc_vp_tbl_entry_be() - PPE VP entry alloc
  * @be_soc: BE SoC
  * @be_vdev: BE VAP
@@ -1618,6 +1645,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	vp_profile->to_fw = 0;
 	vp_profile->use_ppe_int_pri = 0;
 	vp_profile->drop_prec_enable = 0;
+	vp_profile->vdev_id = vdev_id;
 
 	/*
 	 * For the sta mode fill up the index reg number.
