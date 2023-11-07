@@ -1666,11 +1666,11 @@ static void
 cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_crypto_key *crypto_key;
+	struct wlan_crypto_params *crypto_params;
 	enum QDF_OPMODE op_mode;
 	uint16_t i;
 	bool pairwise;
-	uint8_t vdev_id;
-	uint8_t link_id;
+	uint8_t vdev_id, link_id;
 	bool key_present = false;
 	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
 				 WLAN_CRYPTO_MAXIGTKKEYIDX +
@@ -1683,6 +1683,16 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 	if (op_mode != QDF_STA_MODE ||
 	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return;
+
+	crypto_params = wlan_crypto_vdev_get_crypto_params(vdev);
+	if (!crypto_params) {
+		mlme_err("crypto params is null");
+		return;
+	}
+
+	if (!crypto_params->ucastcipherset ||
+	    QDF_HAS_PARAM(crypto_params->ucastcipherset, WLAN_CRYPTO_CIPHER_NONE))
 		return;
 
 	link_id = wlan_vdev_get_link_id(vdev);
