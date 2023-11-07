@@ -2745,6 +2745,9 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 			hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 			return -EIO;
 		}
+
+		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
+		return 0;
 	}
 	hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 
