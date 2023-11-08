@@ -2142,6 +2142,9 @@ static void __dp_bus_bw_compute_timer_stop(struct wlan_objmgr_psoc *psoc)
 	if (QDF_GLOBAL_FTM_MODE == cds_get_conparam())
 		return;
 
+	if (!dp_ctx || !soc)
+		return;
+
 	ctx = dp_ctx->dp_ops.callback_ctx;
 	is_any_adapter_conn = dp_ctx->dp_ops.dp_any_adapter_connected(ctx);
 
