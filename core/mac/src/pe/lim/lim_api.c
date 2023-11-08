@@ -3295,31 +3295,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		if (!vdev)
 			return eMGMT_DROP_SPURIOUS_FRAME;
 
-		peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
-						   pHdr->sa,
-						   WLAN_LEGACY_MAC_ID);
-		if (!peer) {
-			if (subType == SIR_MAC_MGMT_ASSOC_REQ) {
-				wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-				return eMGMT_DROP_NO_DROP;
-			}
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-			return eMGMT_DROP_SPURIOUS_FRAME;
-		}
-
-		peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
-							WLAN_UMAC_COMP_MLME);
-		if (!peer_priv) {
-			wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
-			if (subType == SIR_MAC_MGMT_ASSOC_REQ) {
-				wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-				return eMGMT_DROP_NO_DROP;
-			}
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-			return eMGMT_DROP_SPURIOUS_FRAME;
-		}
-
-		if (QDF_STA_MODE == wlan_vdev_mlme_get_opmode(vdev) &&
+		if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
 		    wlan_cm_is_vdev_roam_started(vdev) &&
 		    (subType == SIR_MAC_MGMT_DISASSOC ||
 		     subType == SIR_MAC_MGMT_DEAUTH)) {
@@ -3327,6 +3303,24 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 			return eMGMT_DROP_DEAUTH_DURING_ROAM_STARTED;
 		}
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+		peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
+						   pHdr->sa,
+						   WLAN_LEGACY_MAC_ID);
+		if (!peer) {
+			if (subType == SIR_MAC_MGMT_ASSOC_REQ)
+				return eMGMT_DROP_NO_DROP;
+			return eMGMT_DROP_SPURIOUS_FRAME;
+		}
+
+		peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							WLAN_UMAC_COMP_MLME);
+		if (!peer_priv) {
+			wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+			if (subType == SIR_MAC_MGMT_ASSOC_REQ)
+				return eMGMT_DROP_NO_DROP;
+			return eMGMT_DROP_SPURIOUS_FRAME;
+		}
 
 		if (subType == SIR_MAC_MGMT_ASSOC_REQ)
 			timestamp =
