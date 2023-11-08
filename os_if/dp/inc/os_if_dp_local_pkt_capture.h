@@ -80,6 +80,15 @@ QDF_STATUS os_if_dp_local_pkt_capture_stop(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS os_if_dp_get_lpc_state(struct wlan_objmgr_vdev *vdev,
 				  const void *data, int data_len);
 
+/**
+ * os_if_lpc_mon_intf_creation_allowed() - Check if local packet capture
+ * monitor interface creation is allowed or not
+ * @psoc: psoc object handle
+ *
+ * Return: true, If monitor interface creation is allowed
+ *         false, Otherwise
+ */
+bool os_if_lpc_mon_intf_creation_allowed(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 QDF_STATUS os_if_dp_set_lpc_configure(struct wlan_objmgr_vdev *vdev,
@@ -99,6 +108,12 @@ QDF_STATUS os_if_dp_get_lpc_state(struct wlan_objmgr_vdev *vdev,
 				  const void *data, int data_len)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+bool os_if_lpc_mon_intf_creation_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
 }
 
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
