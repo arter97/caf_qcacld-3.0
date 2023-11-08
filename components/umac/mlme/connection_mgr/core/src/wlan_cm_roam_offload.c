@@ -6049,20 +6049,29 @@ send_evt:
 #if (defined(CONNECTIVITY_DIAG_EVENT) || \
 	defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)) && \
 	defined(WLAN_FEATURE_ROAM_OFFLOAD)
-static
-bool wlan_is_valid_frequency(uint32_t freq, uint32_t band_capability,
-			     uint32_t band_mask)
+static bool wlan_is_valid_frequency(uint32_t freq, uint32_t band_capability,
+				    uint32_t band_mask)
 {
-	if ((band_capability == BIT(REG_BAND_5G) ||
-	     band_mask == BIT(REG_BAND_5G) ||
-	     band_capability == BIT(REG_BAND_6G) ||
-	     band_mask == BIT(REG_BAND_6G)) &&
-	     WLAN_REG_IS_24GHZ_CH_FREQ(freq))
+	bool is_2g_band, is_5g_band, is_6g_band;
+
+	if (band_capability == REG_BAND_MASK_ALL &&
+	    band_mask == REG_BAND_MASK_ALL)
+		return true;
+
+	is_2g_band = (band_capability & BIT(REG_BAND_2G)) &&
+		     (band_mask & BIT(REG_BAND_2G));
+	is_5g_band = (band_capability & BIT(REG_BAND_5G)) &&
+		     (band_mask & BIT(REG_BAND_5G));
+	is_6g_band = (band_capability & BIT(REG_BAND_6G)) &&
+		     (band_mask & BIT(REG_BAND_6G));
+
+	if (!is_6g_band && WLAN_REG_IS_6GHZ_CHAN_FREQ(freq))
 		return false;
 
-	if ((band_capability == BIT(REG_BAND_2G) ||
-	     band_mask == BIT(REG_BAND_2G)) &&
-	     !WLAN_REG_IS_24GHZ_CH_FREQ(freq))
+	if (!is_5g_band && WLAN_REG_IS_5GHZ_CH_FREQ(freq))
+		return false;
+
+	if (!is_2g_band && WLAN_REG_IS_24GHZ_CH_FREQ(freq))
 		return false;
 
 	return true;
@@ -6218,7 +6227,7 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	struct wmi_roam_candidate_info *ap = scan->ap;
 	uint32_t *chan_freq = NULL;
 	uint8_t count = 0, status, num_chan;
-	uint32_t band_capability = 0, band_mask = 0;
+	uint32_t band_capability = 0, band_mask = 0, scan_band_mask = 0;
 	struct wlan_diag_roam_scan_done *wlan_diag_event = NULL;
 
 	wlan_diag_event = qdf_mem_malloc(sizeof(*wlan_diag_event));
@@ -6247,7 +6256,10 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	if (scan->num_ap)
 		wlan_diag_event->cand_ap_count = scan->num_ap - 1;
 
-	if (scan->type == ROAM_STATS_SCAN_TYPE_FULL && scan->present) {
+	if (scan->present &&
+	    (scan->type == ROAM_STATS_SCAN_TYPE_FULL ||
+	     scan->type == ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ ||
+	     scan->type == ROAM_STATS_SCAN_TYPE_HIGHER_BAND_6GHZ)) {
 		status = mlme_get_fw_scan_channels(psoc, chan_freq, &num_chan);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto out;
@@ -6260,11 +6272,20 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 		if (QDF_IS_STATUS_ERROR(status))
 			goto out;
 
-		band_mask =
-			policy_mgr_get_connected_roaming_vdev_band_mask(psoc,
-									vdev_id);
-
 		num_chan = QDF_MIN(WLAN_MAX_LOGGING_FREQ, NUM_CHANNELS);
+
+		band_mask = policy_mgr_get_connected_roaming_vdev_band_mask(
+							psoc, vdev_id);
+
+		mlme_debug("mask:%d, capability:%d, scan_type:%d, num_chan:%d",
+			   band_mask, band_capability, scan->type, num_chan);
+		if (scan->type == ROAM_STATS_SCAN_TYPE_HIGHER_BAND_6GHZ)
+			scan_band_mask = BIT(REG_BAND_6G);
+		else if (scan->type ==
+			 ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ)
+			scan_band_mask = BIT(REG_BAND_5G) | BIT(REG_BAND_6G);
+
+		band_mask &= scan_band_mask;
 
 		for (i = 0; i < num_chan; i++) {
 			if (!wlan_is_valid_frequency(chan_freq[i],
