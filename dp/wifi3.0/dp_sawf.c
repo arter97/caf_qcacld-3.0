@@ -852,20 +852,14 @@ static bool dp_is_mlo_3_link_peer(struct dp_peer *peer)
 
 static bool dp_is_mlo_3_link_war_needed(struct dp_peer *peer)
 {
-	struct dp_soc *soc = peer->vdev->pdev->soc;
-	struct dp_soc *link_soc = NULL;
-	struct dp_mld_link_peers link_peers_info = {0};
+	struct dp_soc *primary_link_soc = NULL;
 	uint32_t target_type;
-	uint8_t i = 0;
-	struct dp_peer *mld_peer = NULL;
-	struct dp_peer *link_peer = NULL;
 	bool war_needed = true;
 
 	if (!IS_MLO_DP_LINK_PEER(peer))
 		return false;
 
-	mld_peer = peer->mld_peer;
-	if (!mld_peer) {
+	if (!peer->mld_peer) {
 		dp_sawf_err("mld peer is null for MLO capable peer");
 		return false;
 	}
@@ -873,18 +867,11 @@ static bool dp_is_mlo_3_link_war_needed(struct dp_peer *peer)
 	if (!dp_is_mlo_3_link_peer(peer))
 		return false;
 
-	dp_get_link_peers_ref_from_mld_peer(soc, peer, &link_peers_info,
-					    DP_MOD_ID_SAWF);
-	for (i = 0; i < link_peers_info.num_links; i++) {
-		link_peer = link_peers_info.link_peers[i];
-		link_soc = link_peer->vdev->pdev->soc;
-		target_type = hal_get_target_type(link_soc->hal_soc);
-		if (target_type == TARGET_TYPE_QCN6432) {
-			war_needed = false;
-			break;
-		}
-	}
-	dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_SAWF);
+	primary_link_soc = peer->mld_peer->vdev->pdev->soc;
+	target_type = hal_get_target_type(primary_link_soc->hal_soc);
+	if (target_type != TARGET_TYPE_QCN9224)
+		war_needed = false;
+
 	return war_needed;
 }
 
