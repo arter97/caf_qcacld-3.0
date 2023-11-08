@@ -428,7 +428,7 @@ update_bw:
 		csa_param->new_ch_freq_seg2 = ccfs1;
 		qdf_copy_macaddr(&csa_param->bssid,
 				 (struct qdf_mac_addr *)session->bssId);
-		lim_handle_sta_csa_param(session->mac_ctx, csa_param);
+		lim_handle_sta_csa_param(session->mac_ctx, csa_param, false);
 	}
 }
 

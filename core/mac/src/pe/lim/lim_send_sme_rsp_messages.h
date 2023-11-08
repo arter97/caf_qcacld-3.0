@@ -272,11 +272,13 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac, uint16_t msgType,
  * lim_handle_sta_csa_param() - Handle CSA offload param
  * @mac_ctx: pointer to global adapter context
  * @csa_params: csa parameters.
+ * @send_status: Flag to send CSA status to fw in case of failure
  *
  * Return: None
  */
 void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
-			      struct csa_offload_params *csa_params);
+			      struct csa_offload_params *csa_params,
+			      bool send_status);
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
