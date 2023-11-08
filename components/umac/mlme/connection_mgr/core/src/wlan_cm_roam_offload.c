@@ -7057,7 +7057,8 @@ wlan_convert_bitmap_to_band(uint8_t bitmap)
 QDF_STATUS
 cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 			 struct roam_frame_info *frame_data,
-			 struct wmi_roam_scan_data *scan_data)
+			 struct wmi_roam_scan_data *scan_data,
+			 struct wmi_roam_result *result)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t i;
@@ -7137,8 +7138,17 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
 	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_REASSOC_RESP_EVENT ||
-	    wlan_diag_event.subtype == WLAN_CONN_DIAG_ASSOC_RESP_EVENT)
+	    wlan_diag_event.subtype == WLAN_CONN_DIAG_ASSOC_RESP_EVENT) {
 		wlan_connectivity_mlo_setup_event(vdev);
+
+		/*
+		 * Send STA info event when roaming is successful
+		 */
+		if (result->present && !result->status)
+			wlan_connectivity_sta_info_event(wlan_vdev_get_psoc(vdev),
+							 wlan_vdev_get_id(vdev),
+							 true);
+	}
 
 	return status;
 }

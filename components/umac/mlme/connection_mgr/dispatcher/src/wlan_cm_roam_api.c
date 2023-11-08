@@ -3434,7 +3434,8 @@ static void
 cm_roam_print_frame_info(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev,
 			 struct roam_frame_stats *frame_data,
-			 struct wmi_roam_scan_data *scan_data)
+			 struct wmi_roam_scan_data *scan_data,
+			 struct wmi_roam_result *result)
 {
 	struct roam_frame_info *frame_info;
 	char time[TIME_STRING_LEN];
@@ -3478,7 +3479,7 @@ cm_roam_print_frame_info(struct wlan_objmgr_psoc *psoc,
 				       frame_info->status_code,
 				       frame_info->seq_num);
 
-		cm_roam_mgmt_frame_event(vdev, frame_info, scan_data);
+		cm_roam_mgmt_frame_event(vdev, frame_info, scan_data, result);
 	}
 }
 
@@ -3620,7 +3621,8 @@ cm_roam_handle_btm_stats(struct wlan_objmgr_psoc *psoc,
 	if (stats_info->frame_stats[i].num_frame)
 		cm_roam_print_frame_info(psoc, vdev,
 					 &stats_info->frame_stats[i],
-					 &stats_info->scan[i]);
+					 &stats_info->scan[i],
+					 &stats_info->result[i]);
 
 log_btm_frames_only:
 
@@ -4387,7 +4389,8 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 			cm_roam_print_frame_info(psoc,
 						 vdev,
 						 &stats_info->frame_stats[i],
-						 &stats_info->scan[i]);
+						 &stats_info->scan[i],
+						 &stats_info->result[i]);
 
 		wlan_cm_update_roam_stats_info(psoc, stats_info, i);
 

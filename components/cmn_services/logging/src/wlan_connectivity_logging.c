@@ -847,7 +847,8 @@ wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
 }
 
 void
-wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+				 bool is_roam)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev = NULL;
@@ -867,7 +868,7 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	      wlan_vdev_mlme_is_mlo_link_vdev(vdev))))
 		goto out;
 
-	if (!wlan_cm_is_first_candidate_connect_attempt(vdev))
+	if (!is_roam && !wlan_cm_is_first_candidate_connect_attempt(vdev))
 		goto out;
 
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();

@@ -307,7 +307,8 @@ void lim_process_mlm_join_cnf(struct mac_context *mac_ctx,
 		return;
 	}
 
-	wlan_connectivity_sta_info_event(mac_ctx->psoc, session_entry->vdev_id);
+	wlan_connectivity_sta_info_event(mac_ctx->psoc, session_entry->vdev_id,
+					 false);
 
 	if (session_entry->limSmeState != eLIM_SME_WT_JOIN_STATE) {
 		pe_err("received unexpected MLM_JOIN_CNF in state %X",

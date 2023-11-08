@@ -591,13 +591,15 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
  * @vdev: vdev pointer
  * @frame_data: frame_data
  * @scan_data: Roam scan data
+ * @result: Roam result
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 			 struct roam_frame_info *frame_data,
-			 struct wmi_roam_scan_data *scan_data);
+			 struct wmi_roam_scan_data *scan_data,
+			 struct wmi_roam_result *result);
 
 /**
  * cm_roam_btm_req_event  - Send BTM request related logging event
@@ -675,7 +677,8 @@ cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 static inline QDF_STATUS
 cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 			 struct roam_frame_info *frame_data,
-			 struct wmi_roam_scan_data *scan_data)
+			 struct wmi_roam_scan_data *scan_data,
+			 struct wmi_roam_result *result)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
