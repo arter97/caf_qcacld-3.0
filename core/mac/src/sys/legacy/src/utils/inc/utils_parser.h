@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,6 +35,8 @@
 #include "sir_api.h"
 #include "dot11f.h"
 #include "utils_api.h"
+
+#define EID_TRANSMIT_POWER_ENVELOPE 195
 
 void convert_ssid(struct mac_context *, tSirMacSSid *, tDot11fIESSID *);
 void convert_supp_rates(struct mac_context *, tSirMacRateSet *, tDot11fIESuppRates *);

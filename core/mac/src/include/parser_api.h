@@ -1648,7 +1648,22 @@ QDF_STATUS lim_strip_and_decode_eht_op(uint8_t *ie, uint16_t ie_len,
 				       tDot11fIEVHTOperation dot11f_vht_op,
 				       tDot11fIEhe_op dot11f_he_op,
 				       tDot11fIEHTInfo dot11f_ht_info);
-
+/**
+ * lim_strip_and_decode_tpe_ie(): API to decode TPE IE
+ * @ie: pointer to IE
+ * @ie_len: length of IE
+ * @transmit_power_env: pointer to dot11f TPE IE structure
+ * @num_transmit_power_env: number of TPE IE
+ *
+ * This API is used to strip and decode TPE IE which is of variable length
+ * depending on the bandwidth.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+lim_strip_and_decode_tpe_ie(uint8_t *ie, uint16_t ie_len,
+			    tDot11fIEtransmit_power_env *transmit_power_env,
+			    uint16_t *num_transmit_power_env);
 #else
 static inline QDF_STATUS
 populate_dot11f_eht_caps(struct mac_context *mac_ctx,
@@ -1712,6 +1727,14 @@ QDF_STATUS lim_strip_and_decode_eht_op(uint8_t *ie, uint16_t ie_len,
 				       tDot11fIEVHTOperation dot11f_vht_op,
 				       tDot11fIEhe_op dot11f_he_op,
 				       tDot11fIEHTInfo dot11f_ht_info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+lim_strip_and_decode_tpe_ie(uint8_t *ie, uint16_t ie_len,
+			    tDot11fIEtransmit_power_env *transmit_power_env,
+			    uint16_t *num_transmit_power_env)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -6048,6 +6048,14 @@ void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
 		return;
 	}
 
+	status = lim_strip_and_decode_tpe_ie(buf, buf_len,
+					     bcn_ie->transmit_power_env,
+					     &bcn_ie->num_transmit_power_env);
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("Failed to extract TPE IE");
+		return;
+	}
+
 	lim_parse_tpe_ie(mac, session, bcn_ie->transmit_power_env,
 			 bcn_ie->num_transmit_power_env, &bcn_ie->he_op,
 			 has_tpe_updated);

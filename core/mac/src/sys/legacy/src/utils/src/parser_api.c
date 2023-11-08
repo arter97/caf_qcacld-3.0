@@ -4604,6 +4604,16 @@ sir_beacon_ie_ese_bcn_report(struct mac_context *mac,
 		return status;
 	}
 
+	status = lim_strip_and_decode_tpe_ie(pPayload + WLAN_BEACON_IES_OFFSET,
+					     nPayload - WLAN_BEACON_IES_OFFSET,
+					     pBies->transmit_power_env,
+					     &pBies->num_transmit_power_env);
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("Failed to extract tpe IE");
+		qdf_mem_free(pBies);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	/* & "transliterate" from a 'tDot11fBeaconIEs' to a 'eseBcnReportMandatoryIe'... */
 	if (!pBies->SSID.present) {
 		pe_debug("Mandatory IE SSID not present!");
@@ -4894,6 +4904,16 @@ sir_parse_beacon_ie(struct mac_context *mac,
 					      freq);
 	if (status != QDF_STATUS_SUCCESS) {
 		pe_err("Failed to extract eht cap");
+		qdf_mem_free(pBies);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = lim_strip_and_decode_tpe_ie(pPayload,
+					     nPayload,
+					     pBies->transmit_power_env,
+					     &pBies->num_transmit_power_env);
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("Failed to extract tpe IE");
 		qdf_mem_free(pBies);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -5396,6 +5416,16 @@ sir_convert_beacon_frame2_struct(struct mac_context *mac,
 					      freq);
 	if (status != QDF_STATUS_SUCCESS) {
 		pe_err("Failed to extract eht cap");
+		qdf_mem_free(pBeacon);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = lim_strip_and_decode_tpe_ie(pPayload + WLAN_BEACON_IES_OFFSET,
+					     nPayload - WLAN_BEACON_IES_OFFSET,
+					     pBeacon->transmit_power_env,
+					     &pBeacon->num_transmit_power_env);
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("Failed to extract tpe IE");
 		qdf_mem_free(pBeacon);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -9787,6 +9817,143 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+static
+QDF_STATUS lim_ieee80211_unpack_tpe(const uint8_t *tpe_ie,
+				    tDot11fIEtransmit_power_env *dot11f_tpe)
+{
+	uint8_t *buf = (uint8_t *)tpe_ie;
+	uint8_t eid, ie_len, tmp, ext_psd_count = 0;
+
+	if (!tpe_ie) {
+		pe_err("Invalid TPE IE");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* 1st Octet - Element ID */
+	eid = *buf;
+	buf += 1;
+
+	/* 2nd Octet - IE length */
+	ie_len = *buf;
+	buf += 1;
+
+	if (eid != EID_TRANSMIT_POWER_ENVELOPE || !ie_len) {
+		pe_err("Invalid TPE IE or IE len is 0");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(dot11f_tpe, (sizeof(tDot11fIEtransmit_power_env)));
+
+	/* Transmit Power Information */
+	tmp = *buf;
+	buf += 1;
+	ie_len -= 1;
+
+	dot11f_tpe->present = 1;
+
+	dot11f_tpe->max_tx_pwr_count = tmp >> 0 & 0x7;
+	dot11f_tpe->max_tx_pwr_interpret = tmp >> 3 & 0x7;
+	dot11f_tpe->max_tx_pwr_category = tmp >> 6 & 0x3;
+
+	/* Get number of tx power included in IE based on interpret value */
+	if (dot11f_tpe->max_tx_pwr_interpret == 0 ||
+	    dot11f_tpe->max_tx_pwr_interpret == 2) {
+		dot11f_tpe->num_tx_power = dot11f_tpe->max_tx_pwr_count + 1;
+	} else {
+		if (!dot11f_tpe->max_tx_pwr_count) {
+			dot11f_tpe->num_tx_power = dot11f_tpe->max_tx_pwr_count;
+			qdf_mem_copy(dot11f_tpe->tx_power, buf, 1);
+			return QDF_STATUS_SUCCESS;
+		}
+		else
+			dot11f_tpe->num_tx_power =
+					1 << (dot11f_tpe->max_tx_pwr_count - 1);
+	}
+
+	qdf_mem_copy(dot11f_tpe->tx_power, buf, dot11f_tpe->num_tx_power);
+
+	buf += dot11f_tpe->num_tx_power;
+	ie_len -= dot11f_tpe->num_tx_power;
+
+	if (!ie_len)
+		return QDF_STATUS_SUCCESS;
+
+	/* Extended Transmit Power Element for 320Mhz */
+	switch (dot11f_tpe->max_tx_pwr_interpret) {
+	case 0:
+		dot11f_tpe->ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320 = *buf;
+		dot11f_tpe->num_tx_power++;
+		buf += 1;
+		ie_len -= 1;
+		break;
+	case 1:
+		tmp = *buf;
+		buf += 1;
+		ie_len -= 1;
+		dot11f_tpe->ext_max_tx_power.ext_max_tx_power_local_psd.ext_count = tmp >> 0 & 0xf;
+		if (unlikely(ie_len < (tmp >> 0 & 0xf))) {
+			return QDF_STATUS_E_BADMSG;
+		}
+		ext_psd_count = dot11f_tpe->ext_max_tx_power.ext_max_tx_power_local_psd.ext_count;
+		qdf_mem_copy(dot11f_tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power,
+			     buf, ext_psd_count);
+
+		buf += ext_psd_count;
+		ie_len -= ext_psd_count;
+		break;
+	case 2:
+		dot11f_tpe->ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320 = *buf;
+		dot11f_tpe->num_tx_power++;
+		buf += 1;
+		ie_len -= 1;
+		break;
+	case 3:
+		tmp = *buf;
+		buf += 1;
+		ie_len -= 1;
+		dot11f_tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count = tmp >> 0 & 0xf;
+		if (unlikely(ie_len < (tmp >> 0 & 0xf))) {
+			return QDF_STATUS_E_BADMSG;
+		}
+		ext_psd_count = dot11f_tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count;
+		qdf_mem_copy(dot11f_tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power,
+			     buf, ext_psd_count);
+
+		buf += ext_psd_count;
+		ie_len -= ext_psd_count;
+		break;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+lim_strip_and_decode_tpe_ie(uint8_t *ie, uint16_t ie_len,
+			    tDot11fIEtransmit_power_env *transmit_power_env,
+			    uint16_t *num_transmit_power_env)
+{
+	const uint8_t *tpe_ie, *pos, *end;
+	QDF_STATUS status;
+	int i = 0;
+
+	pos = ie;
+	end = ie + ie_len;
+
+	while ((tpe_ie = wlan_get_ie_ptr_from_eid(EID_TRANSMIT_POWER_ENVELOPE,
+						  pos, end - pos)) &&
+		i < 8) {
+		status = lim_ieee80211_unpack_tpe(tpe_ie,
+						  &transmit_power_env[i]);
+		if (status != QDF_STATUS_SUCCESS) {
+			pe_err("Failed to extract TPE IE");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		pos = tpe_ie + 2 + tpe_ie[1];
+		i++;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_FEATURE_11BE */
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -11455,6 +11622,15 @@ QDF_STATUS wlan_parse_bss_description_ies(struct mac_context *mac_ctx,
 					      bss_desc->chan_freq);
 	if (status != QDF_STATUS_SUCCESS) {
 		pe_err("Failed to extract eht cap");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = lim_strip_and_decode_tpe_ie(
+				(uint8_t *)bss_desc->ieFields, ie_len,
+				ie_struct->transmit_power_env,
+				&ie_struct->num_transmit_power_env);
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("Failed to extract TPE IE");
 		return QDF_STATUS_E_FAILURE;
 	}
 
