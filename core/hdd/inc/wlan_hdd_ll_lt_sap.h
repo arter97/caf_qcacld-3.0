@@ -57,16 +57,4 @@ int wlan_hdd_cfg80211_ll_lt_sap_transport_switch(struct wiphy *wiphy,
 						 const void *data,
 						 int data_len);
 
-/**
- * wlan_hdd_send_audio_transport_switch_req_event() - Audio transport switch
- * event
- * @adapter:              pointer to adapter structure.
- * @audio_switch_mode:    audio switch mode.
- *
- * Return:   Return the Success or Failure code.
- */
-int wlan_hdd_send_audio_transport_switch_req_event(struct hdd_adapter *adapter,
-						   uint8_t audio_switch_mode);
-
-
 #endif /* __WLAN_HDD_LL_LT_SAP_H */

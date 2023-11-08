@@ -423,48 +423,6 @@
 
 /*
  * <ini>
- * gActionOUIForceMaxNss - Used to specify action OUIs for Max NSS connection
- * @Default:
- * Note: User should strictly add new action OUIs at the end of this
- * default value.
- *
- * Default OUIs: (All values in Hex)
- * OUI 1 :001018
- *   OUI data Len : 06
- *   OUI Data : 0201009c0000
- *   OUI data Mask: FC
- *   Info Mask : 01 - only OUI present in Info mask
- * OUI 2 :001018
- *   OUI data Len : 06
- *   OUI Data : 0201001c0000
- *   OUI data Mask: FC
- *   Info Mask : 01 - only OUI present in Info mask
- * OUI 3 :001018
- *   OUI data Len : 06
- *   OUI Data : 0200009c0000
- *   OUI data Mask: FC
- *   Info Mask : 01 - only OUI present in Info mask
- *
- * This ini is used to specify the AP OUIs with which max capability is
- * sent in association request even though AP advertises 1x1 capability.
- *
- * Related: None
- *
- * Supported Feature: Action OUIs
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTION_OUI_FORCE_MAX_NSS CFG_INI_STRING( \
-			"gActionOUIForceMaxNss", \
-			0, \
-			ACTION_OUI_MAX_STR_LEN, \
-			"001018 06 0201009c0000 FC 01 001018 06 0201001c0000 FC 01 001018 06 0200009c0000 FC 01", \
-			"Used to specify action OUIs for forcing max NSS connection")
-
-/*
- * <ini>
  * gActionOUIDisableAggressiveEDCA - Used to specify action OUIs to control
  * EDCA configuration when join the candidate AP
  *
@@ -805,6 +763,58 @@
 
 /*
  * <ini>
+ * g_action_oui_enable_cts_2_self - Used to enable CTS2SELF for specified APs
+ *
+ * Default OUIs: (All values in Hex)
+ * OUI 1: 000C43
+ * OUI data Len: 04
+ * OUI Data : 07000000
+ * OUI data Mask: F0 - 11110000
+ * Info Mask : 21 - 0010 0001 Check for OUI and Band
+ * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
+ *
+ * OUI 2 : 000C43
+ * OUI data Len : 04
+ * OUI Data : 03000000
+ * OUI data Mask: F0 - 11110000
+ * Info Mask : 21 - 0010 0001 Check for OUI and Band
+ * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
+ *
+ * OUI 3 : 8CFDF0
+ * OUI data Len : 05
+ * OUI Data : 0101020100
+ * OUI data Mask: F8 - 11111000
+ * Info Mask : 21 - 0010 0001 Check for OUI and Band
+ * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
+ *
+ * OUI 4 : 8CFDF0
+ * OUI data Len : 05
+ * OUI Data : 0109020300
+ * OUI data Mask: F8 - 11111000
+ * Info Mask : 21 - 0010 0001 Check for OUI and Band
+ * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
+ *
+ * g_action_oui_enable_cts_2_self=000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0 8CFDF0 05 0101020100 F8 21 C0 8CFDF0 05 0109020300 F8 21 C0
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_ENABLE_CTS2SELF CFG_INI_STRING( \
+	"g_action_oui_enable_cts_2_self", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0 8CFDF0 05 0101020100 F8 21 C0 8CFDF0 05 0109020300 F8 21 C0", \
+	"Used to enable CTS2SELF frame for specified APs")
+
+/*
+ * <ini>
  * gActionOUISendSMPSFrameWithOMN - Used to send SMPS frame along with OMN
  * for specified APs
  *
@@ -841,7 +851,6 @@
 	CFG(CFG_ACTION_OUI_ITO_ALTERNATE) \
 	CFG(CFG_ACTION_OUI_ITO_EXTENSION) \
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_TX) \
-	CFG(CFG_ACTION_OUI_FORCE_MAX_NSS) \
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_EDCA) \
 	CFG(CFG_ACTION_OUI_EXTEND_WOW_ITO) \
 	CFG(CFG_ACTION_OUI_SWITCH_TO_11N_MODE) \
@@ -850,6 +859,7 @@
 	CFG(CFG_ACTION_OUI_TAKE_ALL_BAND_INFO) \
 	CFG(CFG_ACTION_OUI_11BE_ALLOW_LIST) \
 	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_QOS_NULL_TX_RATE) \
+	CFG(CFG_ACTION_OUI_ENABLE_CTS2SELF) \
 	CFG(CFG_ACTION_OUI_ENABLE_CTS2SELF_WITH_QOS_NULL) \
 	CFG(CFG_ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN) \
 	CFG(CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ) \

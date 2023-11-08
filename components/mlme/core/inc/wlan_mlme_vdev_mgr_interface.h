@@ -573,4 +573,49 @@ wlan_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_LL_LT_SAP
+/**
+ * wlan_ll_sap_sort_channel_list() - Sort channel list
+ * @vdev_id: Vdev Id
+ * @list: Pointer to list
+ * @ch_info: Pointer to ch_info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_ll_sap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
+			      struct sap_sel_ch_info *ch_info);
+
+/**
+ * wlan_ll_sap_free_chan_info() - API to free allocated memory
+ * @ch_param: pointer to sap_sel_ch_info structure
+ *
+ * Return: None
+ */
+void wlan_ll_sap_free_chan_info(struct sap_sel_ch_info *ch_param);
+
+/**
+ * wlan_ll_sap_freq_present_in_pcl() - API to check whether given
+ * frequency is present in PCL or not
+ * @pcl: pcl list
+ * @freq: Frequency to check in PCL list
+ *
+ * Return: True/False
+ */
+bool wlan_ll_sap_freq_present_in_pcl(struct policy_mgr_pcl_list *pcl,
+				     qdf_freq_t freq);
+#endif
+
+/**
+ * wlan_sap_get_user_config_acs_ch_list: Get user configured channel list
+ * @vdev_id: Vdev Id
+ * @filter: Filter to apply to get scan result
+ *
+ * Return: None
+ *
+ */
+void
+wlan_sap_get_user_config_acs_ch_list(uint8_t vdev_id,
+				     struct scan_filter *filter);
 #endif

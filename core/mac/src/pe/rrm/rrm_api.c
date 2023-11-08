@@ -55,7 +55,8 @@
 #define MAX_CTRL_STAT_VDEV_ENTRIES 1
 #define MAX_CTRL_STAT_MAC_ADDR_ENTRIES 1
 #define MAX_RMM_STA_STATS_REQUESTED 2
-#define MAX_MEAS_DURATION_FOR_STA_STATS 10
+#define MIN_MEAS_DURATION_FOR_STA_STATS 10
+
 /* Max passive scan dwell for wide band rrm scan, in milliseconds */
 #define RRM_SCAN_MAX_DWELL_TIME 110
 
@@ -664,9 +665,6 @@ rrm_update_mac_cp_stats(struct infra_cp_stats_event *ev,
 	 * by FW and previous stats.
 	 */
 	case STA_STAT_GROUP_ID_COUNTER_STATS:
-		counter_stats->group_transmitted_frame_count =
-			ev_counter_stats.group_transmitted_frame_count -
-			counter_stats->group_transmitted_frame_count;
 		counter_stats->failed_count =
 			ev_counter_stats.failed_count -
 			counter_stats->failed_count;
@@ -694,8 +692,7 @@ rrm_update_mac_cp_stats(struct infra_cp_stats_event *ev,
 	default:
 		pe_debug("group id not supported");
 	}
-	pe_nofl_debug("counter stats: group frame count ( tx %d rx %d ) failed_count %d fcs_error %d tx frame count %d mac stats: rts success count %d rts fail count %d ack fail count %d",
-		      counter_stats->group_transmitted_frame_count,
+	pe_nofl_debug("counter stats: group rx frame count %d failed_count %d fcs_error %d tx frame count %d mac stats: rts success count %d rts fail count %d ack fail count %d",
 		      counter_stats->group_received_frame_count,
 		      counter_stats->failed_count,
 		      counter_stats->fcs_error_count,
@@ -799,9 +796,10 @@ rrm_update_vdev_stats(tpSirMacRadioMeasureReport rrm_report, uint8_t vdev_id)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	pe_nofl_debug("counter stats count: fragment (tx: %d rx: %d) mac stats count: retry : %d multiple retry: %d frame duplicate %d",
+	pe_nofl_debug("counter stats count: fragment (tx: %d rx: %d) group tx: %d mac stats count: retry : %d multiple retry: %d frame duplicate %d",
 		      stats->tx.fragment_count, stats->rx.fragment_count,
-		      stats->tx.retry_count, stats->tx.multiple_retry_count,
+		      stats->tx.mcast.num, stats->tx.retry_count,
+		      stats->tx.multiple_retry_count,
 		      stats->rx.duplicate_count);
 
 	switch (rrm_report->report.statistics_report.group_id) {
@@ -812,6 +810,9 @@ rrm_update_vdev_stats(tpSirMacRadioMeasureReport rrm_report, uint8_t vdev_id)
 		counter_stats->received_fragment_count =
 			stats->rx.fragment_count -
 				counter_stats->received_fragment_count;
+		counter_stats->group_transmitted_frame_count =
+			stats->tx.mcast.num -
+			counter_stats->group_transmitted_frame_count;
 		break;
 	case STA_STAT_GROUP_ID_MAC_STATS:
 		mac_stats->retry_count =
@@ -894,6 +895,48 @@ get_stats_fail:
 }
 #endif
 
+/* -------------------------------------------------------------------- */
+/**
+ * rrm_get_max_meas_duration() - calculate max measurement duration for a
+ * rrm req
+ * @mac: global mac context
+ * @pe_session: per vdev pe context
+ *
+ * Return: max measurement duration
+ */
+static uint16_t rrm_get_max_meas_duration(struct mac_context *mac,
+					  struct pe_session *pe_session)
+{
+	int8_t max_dur;
+	uint16_t max_meas_dur, sign;
+
+	/*
+	 * The logic here is to check the measurement duration passed in the
+	 * beacon request. Following are the cases handled.
+	 * Case 1: If measurement duration received in the beacon request is
+	 * greater than the max measurement duration advertised in the RRM
+	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 1,
+	 * REFUSE the beacon request.
+	 * Case 2: If measurement duration received in the beacon request is
+	 * greater than the max measurement duration advertised in the RRM
+	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 0,
+	 * perform measurement for the duration advertised in the
+	 * RRM capabilities
+	 * maxMeasurementDuration = 2^(nonOperatingChanMax - 4) * BeaconInterval
+	 */
+	max_dur = mac->rrm.rrmPEContext.rrmEnabledCaps.nonOperatingChanMax - 4;
+	sign = (max_dur < 0) ? 1 : 0;
+	max_dur = (1L << ABS(max_dur));
+	if (!sign)
+		max_meas_dur =
+			max_dur * pe_session->beaconParams.beaconInterval;
+	else
+		max_meas_dur =
+			pe_session->beaconParams.beaconInterval / max_dur;
+
+	return max_meas_dur;
+}
+
 /**
  * rrm_process_sta_stats_report_req: Process RRM sta stats request
  * @mac: mac context
@@ -910,16 +953,31 @@ rrm_process_sta_stats_report_req(struct mac_context *mac,
 				 struct pe_session *pe_session)
 {
 	QDF_STATUS status;
-	uint8_t meas_duration = 1;
+	uint16_t meas_duration = MIN_MEAS_DURATION_FOR_STA_STATS;
+	uint8_t max_meas_duration;
 	struct rrm_sta_stats *rrm_sta_statistics;
 
-	if (sta_stats_req->measurement_request.sta_stats.meas_duration >
-	    MAX_MEAS_DURATION_FOR_STA_STATS) {
-		pe_err("Dropping req measurement duration > threshold %d",
-		       sta_stats_req->measurement_request.sta_stats.meas_duration);
-		return eRRM_INCAPABLE;
-	}
+	max_meas_duration = rrm_get_max_meas_duration(mac, pe_session);
 
+	/*
+	 * Keep timer value atleast of 10 ms even if measurement duration
+	 * provided in meas request is < 10 ms because FW takes some time to
+	 * calculate and respond stats.
+	 * Start timer of 10 ms even if meas duration is 0.
+	 * To get stats from FW.
+	 */
+	if (sta_stats_req->measurement_request.sta_stats.meas_duration >
+	    MIN_MEAS_DURATION_FOR_STA_STATS)
+		meas_duration =
+		sta_stats_req->measurement_request.sta_stats.meas_duration;
+
+	if (meas_duration > max_meas_duration) {
+		if (sta_stats_req->durationMandatory) {
+			pe_nofl_err("Dropping the req: duration mandatory & max duration > meas duration");
+			return eRRM_REFUSED;
+		}
+		meas_duration = max_meas_duration;
+	}
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)
 	    sta_stats_req->measurement_request.sta_stats.peer_mac_addr)) {
 		pe_err("Dropping req: broadcast address not supported");
@@ -927,9 +985,6 @@ rrm_process_sta_stats_report_req(struct mac_context *mac,
 	}
 
 	rrm_sta_statistics = &mac->rrm.rrmPEContext.rrm_sta_stats;
-	if (sta_stats_req->measurement_request.sta_stats.meas_duration)
-		meas_duration =
-		sta_stats_req->measurement_request.sta_stats.meas_duration;
 
 	rrm_sta_statistics->rrm_report.token = pCurrentReq->token;
 	rrm_sta_statistics->rrm_report.type = pCurrentReq->type;
@@ -951,12 +1006,8 @@ rrm_process_sta_stats_report_req(struct mac_context *mac,
 			return eRRM_REFUSED;
 		mac->lim.lim_timers.rrm_sta_stats_resp_timer.sessionId =
 							pe_session->peSessionId;
-		/*
-		 * Start timer of 1 sec even if meas duration is 0.
-		 * To get stats from FW.
-		 */
 		tx_timer_change(&mac->lim.lim_timers.rrm_sta_stats_resp_timer,
-				SYS_MS_TO_TICKS(meas_duration * 1000), 0);
+				SYS_MS_TO_TICKS(meas_duration), 0);
 		/* Activate sta stats resp timer */
 		if (tx_timer_activate(
 		    &mac->lim.lim_timers.rrm_sta_stats_resp_timer) !=
@@ -1125,48 +1176,6 @@ failure:
 	return QDF_STATUS_E_FAILURE;
 }
 
-/* -------------------------------------------------------------------- */
-/**
- * rrm_get_max_meas_duration() - calculate max measurement duration for a
- * rrm req
- * @mac: global mac context
- * @pe_session: per vdev pe context
- *
- * Return: max measurement duration
- */
-static uint16_t rrm_get_max_meas_duration(struct mac_context *mac,
-					  struct pe_session *pe_session)
-{
-	int8_t max_dur;
-	uint16_t max_meas_dur, sign;
-
-	/*
-	 * The logic here is to check the measurement duration passed in the
-	 * beacon request. Following are the cases handled.
-	 * Case 1: If measurement duration received in the beacon request is
-	 * greater than the max measurement duration advertised in the RRM
-	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 1,
-	 * REFUSE the beacon request.
-	 * Case 2: If measurement duration received in the beacon request is
-	 * greater than the max measurement duration advertised in the RRM
-	 * capabilities(Assoc Req), and Duration Mandatory bit is set to 0,
-	 * perform measurement for the duration advertised in the
-	 * RRM capabilities
-	 * maxMeasurementDuration = 2^(nonOperatingChanMax - 4) * BeaconInterval
-	 */
-	max_dur = mac->rrm.rrmPEContext.rrmEnabledCaps.nonOperatingChanMax - 4;
-	sign = (max_dur < 0) ? 1 : 0;
-	max_dur = (1L << ABS(max_dur));
-	if (!sign)
-		max_meas_dur =
-			max_dur * pe_session->beaconParams.beaconInterval;
-	else
-		max_meas_dur =
-			pe_session->beaconParams.beaconInterval / max_dur;
-
-	return max_meas_dur;
-}
-
 /**
  * rrm_process_beacon_report_req
  *
@@ -1259,8 +1268,8 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		if (pBeaconReq->durationMandatory) {
 			pe_nofl_err("RX: [802.11 BCN_RPT] Dropping the req: duration mandatory & maxduration > measduration");
 			return eRRM_REFUSED;
-		} else
-			measDuration = maxMeasduration;
+		}
+		measDuration = maxMeasduration;
 	}
 
 	pe_debug("measurement duration %d", measDuration);
@@ -2046,18 +2055,64 @@ rrm_process_channel_load_req(struct mac_context *mac,
 {
 	struct scheduler_msg msg = {0};
 	struct ch_load_ind *load_ind;
-	uint8_t op_class, channel, reporting_condition;
+	struct bw_ind_element bw_ind;
+	struct wide_bw_chan_switch wide_bw;
+	struct rrm_reporting rrm_report;
+	uint8_t op_class, channel;
 	uint16_t randomization_intv, meas_duration, max_meas_duration;
-	bool present;
+	bool is_rrm_reporting, is_wide_bw_chan_switch;
 	uint8_t country[WNI_CFG_COUNTRY_CODE_LEN];
 	qdf_freq_t chan_freq;
-	bool is_freq_enabled;
+	bool is_freq_enabled, is_bw_ind;
 
-	present = chan_load_req->measurement_request.channel_load.rrm_reporting.present;
-	reporting_condition = chan_load_req->measurement_request.channel_load.rrm_reporting.reporting_condition;
-	if (present && reporting_condition != 0) {
-		pe_err("Dropping req: Reporting condition is not zero");
-		return eRRM_INCAPABLE;
+	is_rrm_reporting = chan_load_req->measurement_request.channel_load.rrm_reporting.present;
+	is_wide_bw_chan_switch = chan_load_req->measurement_request.channel_load.wide_bw_chan_switch.present;
+	is_bw_ind = chan_load_req->measurement_request.channel_load.bw_indication.present;
+
+	pe_debug("RX:[802.11 CH_LOAD] vdev: %d, is_rrm_reporting: %d, is_wide_bw_chan_switch: %d, is_bw_ind: %d",
+		 pe_session->vdev_id, is_rrm_reporting, is_wide_bw_chan_switch,
+		 is_bw_ind);
+
+	if (is_rrm_reporting) {
+		rrm_report.threshold = chan_load_req->measurement_request.channel_load.rrm_reporting.threshold;
+		rrm_report.reporting_condition = chan_load_req->measurement_request.channel_load.rrm_reporting.reporting_condition;
+		pe_debug("RX:[802.11 CH_LOAD] threshold:%d reporting_c:%d",
+			 rrm_report.threshold, rrm_report.reporting_condition);
+		if (rrm_report.reporting_condition != 0) {
+			pe_debug("RX:[802.11 CH_LOAD]: Dropping req");
+			return eRRM_INCAPABLE;
+		}
+	}
+
+	if (is_bw_ind) {
+		bw_ind.is_bw_ind_element = true;
+		bw_ind.channel_width = chan_load_req->measurement_request.channel_load.bw_indication.channel_width;
+		bw_ind.ccfi0 = chan_load_req->measurement_request.channel_load.bw_indication.ccfs0;
+		bw_ind.ccfi1 = chan_load_req->measurement_request.channel_load.bw_indication.ccfs1;
+		bw_ind.center_freq = wlan_reg_compute_6g_center_freq_from_cfi(bw_ind.ccfi0);
+		pe_debug("RX:[802.11 CH_LOAD] chan_width:%d ccfs0:%d, ccfs1:%d, center_freq:%d",
+			 bw_ind.channel_width, bw_ind.ccfi0,
+			 bw_ind.ccfi1, bw_ind.center_freq);
+
+		if (bw_ind.channel_width == 0 || !bw_ind.ccfi0 ||
+		    bw_ind.channel_width < CH_WIDTH_320MHZ || !bw_ind.center_freq) {
+			pe_debug("Dropping req: invalid is_bw_ind_element IE");
+			return eRRM_REFUSED;
+		}
+	} else if (is_wide_bw_chan_switch) {
+		wide_bw.channel_width = chan_load_req->measurement_request.channel_load.wide_bw_chan_switch.new_chan_width;
+		wide_bw.center_chan_freq0 = chan_load_req->measurement_request.channel_load.wide_bw_chan_switch.new_center_chan_freq0;
+		wide_bw.center_chan_freq1 = chan_load_req->measurement_request.channel_load.wide_bw_chan_switch.new_center_chan_freq1;
+		pe_debug("RX:[802.11 CH_LOAD] cw:%d ccf0:%d, ccf1:%d",
+			 wide_bw.channel_width, wide_bw.center_chan_freq0,
+			 wide_bw.center_chan_freq1);
+		if (wide_bw.channel_width < CH_WIDTH_20MHZ ||
+		    bw_ind.channel_width >= CH_WIDTH_320MHZ) {
+			pe_debug("Dropping req: invalid wide_bw IE");
+			return eRRM_REFUSED;
+		}
+	} else {
+		pe_debug("IE(s) are NULL in channel load request");
 	}
 
 	op_class = chan_load_req->measurement_request.channel_load.op_class;
@@ -2067,20 +2122,22 @@ rrm_process_channel_load_req(struct mac_context *mac,
 	randomization_intv =
 	     chan_load_req->measurement_request.channel_load.randomization_intv;
 	max_meas_duration = rrm_get_max_meas_duration(mac, pe_session);
+
 	if (max_meas_duration < meas_duration) {
 		if (chan_load_req->durationMandatory) {
 			pe_nofl_err("RX:[802.11 CH_LOAD] Dropping the req: duration mandatory & max duration > meas duration");
 			return eRRM_REFUSED;
-		} else {
-			meas_duration = max_meas_duration;
 		}
+		meas_duration = max_meas_duration;
 	}
+
 	pe_debug("RX:[802.11 CH_LOAD] vdev :%d, seq:%d Token:%d op_c:%d ch:%d meas_dur:%d, rand intv: %d, max_dur:%d",
 		 pe_session->vdev_id,
 		 mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
 		 chan_load_req->measurement_token, op_class,
 		 channel, meas_duration, randomization_intv,
 		 max_meas_duration);
+
 	if (!meas_duration || meas_duration > RRM_SCAN_MAX_DWELL_TIME)
 		return eRRM_REFUSED;
 
@@ -2125,9 +2182,30 @@ rrm_process_channel_load_req(struct mac_context *mac,
 	load_ind->randomization_intv = SYS_TU_TO_MS(randomization_intv);
 	load_ind->measurement_idx = curr_req->measurement_idx;
 	load_ind->channel = channel;
+	load_ind->req_freq = chan_freq;
 	load_ind->op_class = op_class;
 	load_ind->meas_duration = meas_duration;
 	curr_req->token = chan_load_req->measurement_token;
+
+	if (is_wide_bw_chan_switch) {
+		load_ind->wide_bw.is_wide_bw_chan_switch = true;
+		load_ind->wide_bw.channel_width = wide_bw.channel_width;
+		load_ind->wide_bw.center_chan_freq0 = wide_bw.center_chan_freq0;
+		load_ind->wide_bw.center_chan_freq1 = wide_bw.center_chan_freq1;
+	} else {
+		load_ind->wide_bw.channel_width = CH_WIDTH_INVALID;
+	}
+
+	if (bw_ind.is_bw_ind_element) {
+		load_ind->bw_ind.is_bw_ind_element = true;
+		load_ind->bw_ind.channel_width = bw_ind.channel_width;
+		load_ind->bw_ind.ccfi0 = bw_ind.ccfi0;
+		load_ind->bw_ind.ccfi1 = bw_ind.ccfi1;
+		load_ind->bw_ind.center_freq = bw_ind.center_freq;
+	} else {
+		load_ind->bw_ind.is_bw_ind_element = false;
+	}
+
 	/* Send request to SME. */
 	msg.type = eWNI_SME_CHAN_LOAD_REQ_IND;
 	msg.bodyptr = load_ind;
@@ -2255,7 +2333,10 @@ rrm_process_chan_load_report_xmit(struct mac_context *mac_ctx,
 	channel_load_report->rrm_scan_tsf = chan_load_ind->rrm_scan_tsf;
 	channel_load_report->meas_duration = chan_load_ind->duration;
 	channel_load_report->chan_load = chan_load_ind->chan_load;
-
+	qdf_mem_copy(&channel_load_report->bw_ind, &chan_load_ind->bw_ind,
+		     sizeof(channel_load_report->bw_ind));
+	qdf_mem_copy(&channel_load_report->wide_bw, &chan_load_ind->wide_bw,
+		     sizeof(channel_load_report->wide_bw));
 	pe_err("send chan load report for bssId:"QDF_MAC_ADDR_FMT" reg_class:%d, channel:%d, measStartTime:%llu, measDuration:%d, chan_load:%d",
 	       QDF_MAC_ADDR_REF(sessionBssId.bytes),
 	       channel_load_report->op_class,

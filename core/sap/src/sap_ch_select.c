@@ -215,7 +215,7 @@ sap_check_n_add_channel(struct sap_context *sap_ctx,
  * sap_check_n_add_overlapped_chnls() - checks & add overlapped channels
  *                                      to primary channel in 2.4Ghz band.
  * @sap_ctx:           sap context.
- * @primary_chnl:      primary channel to be avoided.
+ * @primary_channel:      primary channel to be avoided.
  *
  * sap_ctx contains sap_avoid_ch_info struct containing the list of channels on
  * which MDM device's AP with MCC was detected. This function will add channels
@@ -276,7 +276,7 @@ sap_check_n_add_overlapped_chnls(struct sap_context *sap_ctx,
  * context's avoid_channels_info struct
  * @mac_ctx:            pointer to mac_context structure
  * @sap_ctx:            sap context.
- * @scan_result:        scan results for ACS scan.
+ * @scan_list:        scan results for ACS scan.
  * @spect_info:         spectrum weights array to update
  *
  * Detection of Q2Q IE indicates presence of another MDM device with its AP
@@ -402,7 +402,7 @@ uint32_t sap_select_preferred_channel_from_channel_list(uint32_t best_ch_freq,
 
 /**
  * sap_chan_sel_init() - Initialize channel select
- * @mac_handle: Opaque handle to the global MAC context
+ * @mac: Opaque handle to the global MAC context
  * @ch_info_params: Pointer to tSapChSelSpectInfo structure
  * @sap_ctx: Pointer to SAP Context
  * @ignore_acs_range: Whether ignore channel which is out of acs range
@@ -544,7 +544,7 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 
 /**
  * sapweight_rssi_count() - calculates the channel weight due to rssi
-    and data count(here number of BSS observed)
+ *                          and data count(here number of BSS observed)
  * @sap_ctx     : Softap context
  * @rssi        : Max signal strength received from a BSS for the channel
  * @count       : Number of BSS observed in the channel
@@ -604,7 +604,7 @@ uint32_t sapweight_rssi_count(struct sap_context *sap_ctx, int8_t rssi,
 /**
  * sap_get_channel_status() - get channel info via channel number
  * @p_mac: Pointer to Global MAC structure
- * @channel_id: channel id
+ * @chan_freq: channel frequency
  *
  * Return: chan status info
  */
@@ -640,7 +640,7 @@ static void sap_clear_channel_status(struct mac_context *p_mac)
 /**
  * sap_weight_channel_noise_floor() - compute noise floor weight
  * @sap_ctx:  sap context
- * @chn_stat: Pointer to chan status info
+ * @channel_stat: Pointer to chan status info
  *
  * Return: channel noise floor weight
  */
@@ -685,7 +685,7 @@ static uint32_t sap_weight_channel_noise_floor(struct sap_context *sap_ctx,
 /**
  * sap_weight_channel_free() - compute channel free weight
  * @sap_ctx:  sap context
- * @chn_stat: Pointer to chan status info
+ * @channel_stat: Pointer to chan status info
  *
  * Return: channel free weight
  */
@@ -743,7 +743,7 @@ static uint32_t sap_weight_channel_free(struct sap_context *sap_ctx,
 /**
  * sap_weight_channel_txpwr_range() - compute channel tx power range weight
  * @sap_ctx:  sap context
- * @chn_stat: Pointer to chan status info
+ * @channel_stat: Pointer to chan status info
  *
  * Return: tx power range weight
  */
@@ -791,7 +791,7 @@ static uint32_t sap_weight_channel_txpwr_range(struct sap_context *sap_ctx,
  * sap_weight_channel_txpwr_tput() - compute channel tx power
  * throughput weight
  * @sap_ctx:  sap context
- * @chn_stat: Pointer to chan status info
+ * @channel_stat: Pointer to chan status info
  *
  * Return: tx power throughput weight
  */
@@ -837,7 +837,7 @@ static uint32_t sap_weight_channel_txpwr_tput(struct sap_context *sap_ctx,
 /**
  * sap_weight_channel_status() - compute chan status weight
  * @sap_ctx:  sap context
- * @chn_stat: Pointer to chan status info
+ * @channel_stat: Pointer to chan status info
  *
  * Return: chan status weight
  */
@@ -977,8 +977,9 @@ static void sap_update_rssi_bsscount_vht_5G(
  * @spect_ch:        Channel Information
  * @chan_width:      Channel width parsed from beacon IE
  * @sec_chan_offset: Secondary Channel Offset
- * @center_freq:     Central frequency for the given channel.
- * @channel_id:      channel_id
+ * @ch_freq0:     frequency_0 for the given channel.
+ * @ch_freq1:     frequency_1 for the given channel.
+ * @op_chan_freq: Operating channel frequency.
  * @ch_start: the start of spect ch array
  * @ch_end: the end of spect ch array
  *
@@ -1063,9 +1064,10 @@ static void sap_interference_rssi_count_5G(struct sap_ch_info *spect_ch,
  * sap_interference_rssi_count() - sap_interference_rssi_count
  *                                 considers the Adjacent channel rssi
  *                                 and data count(here number of BSS observed)
- * @spect_ch    Channel Information
+ * @spect_ch: Channel Information
  * @ch_start: the start of spect ch array
  * @ch_end: the end of spect ch array
+ * @mac: Opaque handle to the global MAC context
  *
  * sap_interference_rssi_count considers the Adjacent channel rssi
  * and data count(here number of BSS observed)
@@ -1226,13 +1228,11 @@ static void sap_interference_rssi_count(struct sap_ch_info *spect_ch,
 /**
  * ch_in_pcl() - Is channel in the Preferred Channel List (PCL)
  * @sap_ctx: SAP context which contains the current PCL
- * @channel: Input channel number to be checked
+ * @ch_freq: Input channel number to be checked
  *
  * Check if a channel is in the preferred channel list
  *
- * Return:
- *   true:    channel is in PCL,
- *   false:   channel is not in PCL
+ * Return: True if channel is in PCL, else False
  */
 static bool ch_in_pcl(struct sap_context *sap_ctx, uint32_t ch_freq)
 {
@@ -1476,7 +1476,7 @@ static void sap_update_6ghz_max_weight(struct sap_sel_ch_info *ch_info_params,
  * sap_compute_spect_weight() - Compute spectrum weight
  * @ch_info_params: Pointer to the tSpectInfoParams structure
  * @mac: Pointer to mac_context struucture
- * @pResult: Pointer to tScanResultHandle
+ * @scan_list: Pointer to channel list
  * @sap_ctx: Context of the SAP
  *
  * Main function for computing the weight of each channel in the
@@ -1655,27 +1655,7 @@ debug_info:
 	sap_clear_channel_status(mac);
 }
 
-/*==========================================================================
-   FUNCTION    sap_chan_sel_exit
-
-   DESCRIPTION
-    Exit function for free out the allocated memory, to be called
-    at the end of the dfsSelectChannel function
-
-   DEPENDENCIES
-    NA.
-
-   PARAMETERS
-
-    IN
-    ch_info_params       : Pointer to the tSapChSelSpectInfo structure
-
-   RETURN VALUE
-    void     : NULL
-
-   SIDE EFFECTS
-   ============================================================================*/
-static void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params)
+void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params)
 {
 	/* Free all the allocated memory */
 	qdf_mem_free(ch_info_params->ch_info);
@@ -1903,7 +1883,7 @@ sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 }
 
 /**
- * sap_sort_chl_weight_vht160() - to sort the channels with the least weight
+ * sap_sort_chl_weight_160_mhz() - to sort the channels with the least weight
  * @mac_ctx: pointer to max context
  * @sap_ctx: Pointer to the struct sap_context *structure
  * @ch_info_params: Pointer to the tSapChSelSpectInfo structure
@@ -2322,7 +2302,7 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 #endif /* WLAN_FEATURE_11BE */
 
 /**
- * sap_allocate_max_weight_ht40_24_g() - allocate max weight for 40Mhz
+ * sap_allocate_max_weight_40_mhz_24_g() - allocate max weight for 40Mhz
  *                                       to all 2.4Ghz channels
  * @spect_info_params: Pointer to the tSapChSelSpectInfo structure
  *
@@ -2346,7 +2326,7 @@ sap_allocate_max_weight_40_mhz_24_g(struct sap_sel_ch_info *spect_info_params)
 }
 
 /**
- * sap_allocate_max_weight_ht40_5_g() - allocate max weight for 40Mhz
+ * sap_allocate_max_weight_40_mhz() - allocate max weight for 40Mhz
  *                                      to all 5Ghz channels
  * @spect_info_params: Pointer to the tSapChSelSpectInfo structure
  *
@@ -2772,23 +2752,22 @@ sap_acs_next_lower_bandwidth(enum phy_ch_width ch_width)
 	return wlan_reg_get_next_lower_bandwidth(ch_width);
 }
 
-static void sap_sort_channel_list(struct mac_context *mac_ctx,
-				  uint8_t vdev_id,
-				  qdf_list_t *ch_list,
-				  struct sap_sel_ch_info *ch_info,
-				  v_REGDOMAIN_t *domain,
-				  uint32_t *operating_band)
+void sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
+			   qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
+			   v_REGDOMAIN_t *domain, uint32_t *operating_band)
 {
 	uint8_t country[CDS_COUNTRY_CODE_LEN + 1];
 	struct sap_context *sap_ctx;
 	enum phy_ch_width cur_bw;
+	v_REGDOMAIN_t reg_domain;
+	uint32_t op_band;
 
 	sap_ctx = mac_ctx->sap.sapCtxList[vdev_id].sap_context;
 	cur_bw = sap_ctx->acs_cfg->ch_width;
 
 	/* Initialize the structure pointed by spect_info */
 	if (!sap_chan_sel_init(mac_ctx, ch_info, sap_ctx, false)) {
-		sap_err("Ch Select initialization failed");
+		sap_err("vdev %d ch select initialization failed", vdev_id);
 		return;
 	}
 
@@ -2801,14 +2780,20 @@ static void sap_sort_channel_list(struct mac_context *mac_ctx,
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
 	wlan_reg_read_current_country(mac_ctx->psoc, country);
-	wlan_reg_get_domain_from_country_code(domain, country, SOURCE_DRIVER);
+	wlan_reg_get_domain_from_country_code(&reg_domain, country,
+					      SOURCE_DRIVER);
 
-	SET_ACS_BAND(*operating_band, sap_ctx);
+	SET_ACS_BAND(op_band, sap_ctx);
 
 	/* Sort the ch lst as per the computed weights, lesser weight first. */
-	sap_sort_chl_weight_all(mac_ctx, sap_ctx, ch_info, *operating_band,
-				*domain, &cur_bw);
+	sap_sort_chl_weight_all(mac_ctx, sap_ctx, ch_info, op_band,
+				reg_domain, &cur_bw);
 	sap_ctx->acs_cfg->ch_width = cur_bw;
+
+	if (domain)
+		*domain = reg_domain;
+	if (operating_band)
+		*operating_band = op_band;
 }
 
 uint32_t sap_select_channel(mac_handle_t mac_handle,
@@ -3009,17 +2994,16 @@ sap_max_weight_invalidate_2ghz_channels(struct sap_sel_ch_info *spect_info)
  * sap_compute_spect_max_power_weight() - Compute channel weight use max power
  *                                        factor
  * @spect_info: pointer to SAP channel select structure of spectrum info
- * @mac_handle: mac handle
+ * @mac: mac context
  * @sap_ctx: pointer to SAP context
  *
  * Return: None
  */
 static void
 sap_compute_spect_max_power_weight(struct sap_sel_ch_info *spect_info,
-				   mac_handle_t mac_handle,
+				   struct mac_context *mac,
 				   struct sap_context *sap_ctx)
 {
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	uint32_t i;
 	struct sap_ch_info *spect_ch = spect_info->ch_info;
 
@@ -3150,12 +3134,12 @@ qdf_freq_t sap_afc_dcs_sel_chan(struct sap_context *sap_ctx,
 	 * not included in current ACS range, ignore ACS range check
 	 * in this scenario so that SAP can move to new SP channel.
 	 */
-	sap_chan_sel_init(mac_handle, spect_info, sap_ctx,
+	sap_chan_sel_init(mac_ctx, spect_info, sap_ctx,
 			  is_sap_afc_dcs_skip_acs(sap_ctx));
 
 	sap_max_weight_invalidate_2ghz_channels(spect_info);
 
-	sap_compute_spect_max_power_weight(spect_info, mac_handle, sap_ctx);
+	sap_compute_spect_max_power_weight(spect_info, mac_ctx, sap_ctx);
 
 	sap_sort_chl_weight_all(mac_ctx, sap_ctx, spect_info,
 				eCSR_DOT11_MODE_11a, REGDOMAIN_FCC, pref_bw);

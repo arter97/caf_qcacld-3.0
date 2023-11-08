@@ -589,7 +589,7 @@ static int hdd_parse_reassoc_v1(struct hdd_adapter *adapter, const char *command
 	status = ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
 					  adapter->deflink->vdev_id,
 					  &target_bssid, freq,
-					  CM_ROAMING_HOST);
+					  CM_ROAMING_USER);
 	return qdf_status_to_os_return(status);
 }
 
@@ -645,7 +645,7 @@ static int hdd_parse_reassoc_v2(struct hdd_adapter *adapter,
 		status = ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
 						  adapter->deflink->vdev_id,
 						  &target_bssid, freq,
-						  CM_ROAMING_HOST);
+						  CM_ROAMING_USER);
 		ret = qdf_status_to_os_return(status);
 	}
 
@@ -4414,6 +4414,30 @@ exit:
 	return ret;
 }
 
+/**
+ * drv_cmd_fast_reassoc() - Handler for FASTREASSOC driver command
+ * @link_info: Carries link specific info, which contains adapter
+ * @hdd_ctx: pointer to hdd context
+ * @command: Buffer that carries actual command data, which can be parsed by
+ *           hdd_parse_reassoc_command_v1_data()
+ * @command_len: Command length
+ * @priv_data: to carry any priv data, FASTREASSOC doesn't have any priv
+ *             data for now.
+ *
+ * This function parses the reasoc command data passed in the format
+ * FASTREASSOC<space><bssid><space><channel/frequency>
+ *
+ * If MAC from user space is broadcast MAC as:
+ * "wpa_cli DRIVER FASTREASSOC ff:ff:ff:ff:ff:ff 0",
+ * user space invoked roaming candidate selection will base on firmware score
+ * algorithm, current connection will be kept if current AP has highest
+ * score. It is requirement from customer which can avoid ping-pong roaming.
+ *
+ * If firmware fails to roam to new AP due to any reason, host to disconnect
+ * from current AP as it's unable to roam.
+ *
+ * Return: 0 for success non-zero for failure
+ */
 static int drv_cmd_fast_reassoc(struct wlan_hdd_link_info *link_info,
 				struct hdd_context *hdd_ctx,
 				uint8_t *command,
@@ -6396,6 +6420,11 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
+	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		hdd_err("SAP not started");
+		return -EINVAL;
+	}
+
 	status = hdd_parse_set_channel_switch_command(value,
 							&chan_number, &chan_bw);
 	if (status) {
@@ -6531,11 +6560,20 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 	struct hdd_adapter *adapter, *next = NULL;
 	QDF_STATUS status;
 	struct hdd_ap_ctx *ap_ctx;
+	uint32_t ch_list[NUM_CHANNELS];
+	uint32_t ch_count = 0;
+	bool is_valid_chan_present = true;
 
 	if (!hdd_ctx)
 		return;
 
 	hdd_check_and_disconnect_sta_on_invalid_channel(hdd_ctx, reason);
+
+	status = policy_mgr_get_valid_chans(hdd_ctx->psoc, ch_list, &ch_count);
+	if (QDF_IS_STATUS_ERROR(status) || !ch_count) {
+		hdd_debug("No valid channels present, stop the SAPs");
+		is_valid_chan_present = false;
+	}
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapter);
 	while (adapter && (status == QDF_STATUS_SUCCESS)) {
@@ -6545,7 +6583,10 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 		}
 
 		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-		if (check_disable_channels(hdd_ctx, ap_ctx->operating_chan_freq))
+		if (!is_valid_chan_present)
+			wlan_hdd_stop_sap(adapter);
+		else if (check_disable_channels(hdd_ctx,
+						ap_ctx->operating_chan_freq))
 			policy_mgr_check_sap_restart(hdd_ctx->psoc,
 						     adapter->deflink->vdev_id);
 next_adapter:
@@ -6555,19 +6596,51 @@ next_adapter:
 }
 
 /**
+ * hdd_check_chan_and_fill_freq() - to validate chan and convert into freq
+ * @pdev: The physical dev to cache the channels for
+ * @in_chan: input as channel number or freq
+ * @freq: frequency for input in_chan (output parameter)
+ *
+ * This function checks input "in_chan" is channel number, if yes then fills
+ * appropriate frequency into "freq" out param. If the "in_param" is greater
+ * than MAX_5GHZ_CHANNEL then gets the valid frequencies for legacy channels
+ * else get the valid channel for 6Ghz frequency.
+ *
+ * Return: true if "in_chan" is valid channel/frequency; false otherwise
+ */
+static bool hdd_check_chan_and_fill_freq(struct wlan_objmgr_pdev *pdev,
+					 uint32_t *in_chan, qdf_freq_t *freq)
+{
+	if (IS_CHANNEL_VALID(*in_chan)) {
+		*freq = wlan_reg_legacy_chan_to_freq(pdev, *in_chan);
+	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(*in_chan) ||
+		   WLAN_REG_IS_5GHZ_CH_FREQ(*in_chan) ||
+		   WLAN_REG_IS_6GHZ_CHAN_FREQ(*in_chan)) {
+		*freq = *in_chan;
+		*in_chan = wlan_reg_freq_to_chan(pdev, *in_chan);
+	} else {
+		return false;
+	}
+
+	return true;
+}
+
+/**
  * hdd_parse_disable_chan_cmd() - Parse the channel list received
  * in command.
  * @adapter: pointer to hdd adapter
  * @ptr: Pointer to the command string
  *
- * This function parses the channel list received in the command.
+ * This function parses the channel list/frequency received in the command.
  * command should be a string having format
  * SET_DISABLE_CHANNEL_LIST <num of channels>
- * <channels separated by spaces>.
- * If the command comes multiple times than this function will compare
- * the channels received in the command with the channels cached in the
- * first command, if the channel list matches with the cached channels,
- * it returns success otherwise returns failure.
+ * <channels separated by spaces>/<frequency separated by spaces>.
+ * If this command has frequency as input, this function first converts into
+ * equivalent channel.
+ * If the command comes multiple times then the channels received in the
+ * command or channels converted from frequency will be compared with the
+ * channels cached in the first command, if the channel list matches with
+ * the cached channels, it returns success otherwise returns failure.
  *
  * Return: 0 on success, Error code on failure
  */
@@ -6579,6 +6652,7 @@ static int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
 	int j, i, temp_int, ret = 0, num_channels;
 	qdf_freq_t *chan_freq_list = NULL;
 	bool is_command_repeated = false;
+	qdf_freq_t freq = 0;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD Context is NULL");
@@ -6678,15 +6752,16 @@ static int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
 			goto parse_failed;
 		}
 
-		if (!IS_CHANNEL_VALID(temp_int)) {
+		if (!hdd_check_chan_and_fill_freq(hdd_ctx->pdev, &temp_int,
+						  &freq)) {
 			hdd_err("Invalid channel number received");
 			ret = -EINVAL;
 			goto parse_failed;
 		}
 
-		hdd_debug("channel[%d] = %d", j, temp_int);
-		chan_freq_list[j] = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
-								 temp_int);
+		hdd_debug("channel[%d] = %d Frequency[%d] = %d", j, temp_int,
+			  j, freq);
+		chan_freq_list[j] = freq;
 	}
 
 	/*extra arguments check*/

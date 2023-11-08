@@ -1276,6 +1276,29 @@ wlan_cm_roam_set_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc,
  */
 uint8_t wlan_cm_roam_get_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_cm_set_roam_scan_high_rssi_offset() - Set the delta change in high RSSI
+ * at which roam scan is triggered in 2.4/5 GHz.
+ * @psoc: PSOC pointer
+ * @roam_high_rssi_delta: Set the High RSSI delta for roam scan trigger
+ * * 1-16 - Set an offset value in this range
+ * * 0    - Disable
+ *
+ * Return: none
+ */
+void
+wlan_cm_set_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc,
+				       uint8_t roam_high_rssi_delta);
+
+/**
+ * wlan_cm_get_roam_scan_high_rssi_offset() - Get the delta change in high RSSI
+ * at which roam scan is triggered in 2.4/5 GHz.
+ * @psoc: PSOC pointer
+ *
+ * Return: High RSSI delta for roam scan trigger
+ */
+uint8_t wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_FEATURE_ROAM_INFO_STATS
 /**
  * mlme_cm_alloc_roam_stats_info() - alloc roam stats info buffer
@@ -1351,6 +1374,18 @@ wlan_cm_update_offload_ssid_from_candidate(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 			     struct roam_scan_candidate_frame *frame);
+
+/**
+ * wlan_cm_add_all_link_probe_rsp_to_scan_db() - Parse and generate
+ * probe responses for each of the per-sta profile
+ *
+ * @psoc: psoc objmgr ptr
+ * @candidate: roam scan candidate info
+ */
+QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate);
+
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1605,6 +1640,19 @@ wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 			     struct roam_scan_candidate_frame *frame)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline uint8_t
+wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
@@ -2107,6 +2155,18 @@ wlan_cm_roaming_get_peer_link_addr(struct wlan_objmgr_vdev *vdev);
  */
 bool
 wlan_cm_roam_is_mlo_ap(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_cm_link_switch_notif_cb() - MLME CM link switch notifier callback
+ * @vdev: object manager vdev
+ * @req: Link switch request
+ * @notify_reason: Notify reason
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_link_switch_req *req,
+					enum wlan_mlo_link_switch_notify_reason notify_reason);
 #else
 static inline void
 wlan_cm_store_mlo_roam_peer_address(struct wlan_objmgr_pdev *pdev,
@@ -2130,6 +2190,14 @@ static inline bool
 wlan_cm_roam_is_mlo_ap(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
+}
+
+static inline
+QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_link_switch_req *req,
+					enum wlan_mlo_link_switch_notify_reason notify_reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_11BE_MLO && WLAN_FEATURE_ROAM_OFFLOAD */
 

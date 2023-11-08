@@ -211,6 +211,8 @@
 #include <wlan_ll_sap_ucfg_api.h>
 #include <wlan_mlo_mgr_link_switch.h>
 #include <wlan_hdd_ll_lt_sap.h>
+#include "wlan_cp_stats_mc_defs.h"
+
 /*
  * A value of 100 (milliseconds) can be sent to FW.
  * FW would enable Tx beamforming based on this.
@@ -281,6 +283,11 @@
 #ifndef WLAN_CIPHER_SUITE_GCMP_256
 #define WLAN_CIPHER_SUITE_GCMP_256 0x000FAC09
 #endif
+
+/* Default number of Simultaneous Transmit */
+#define DEFAULT_MAX_STR_LINK_COUNT 1
+/* Maximum number of Simultaneous Transmit */
+#define MAX_STR_LINK_COUNT 2
 
 static const u32 hdd_gcmp_cipher_suits[] = {
 	WLAN_CIPHER_SUITE_GCMP,
@@ -805,6 +812,25 @@ wlan_hdd_p2p_p2p_iface_limit[] = {
 	   .types = BIT(NL80211_IFTYPE_P2P_GO) | BIT(NL80211_IFTYPE_P2P_CLIENT)
 	},
 };
+#elif defined(WLAN_FEATURE_STA_SAP_P2P_CONCURRENCY)
+/* STA + AP + P2P combination */
+static const struct ieee80211_iface_limit
+wlan_hdd_sta_ap_p2p_iface_limit[] = {
+	{
+	   .max = 1,
+	   .types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+	   .max = 1,
+	   .types = BIT(NL80211_IFTYPE_P2P_GO) | BIT(NL80211_IFTYPE_P2P_CLIENT)
+	},
+#ifndef WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+	{
+	   .max = 1,
+	   .types = BIT(NL80211_IFTYPE_AP)
+	},
+#endif /* WLAN_FEATURE_NO_STA_SAP_CONCURRENCY */
+};
 #endif
 
 #ifndef WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
@@ -951,7 +977,23 @@ static struct ieee80211_iface_combination
 		.n_limits = ARRAY_SIZE(wlan_hdd_p2p_p2p_iface_limit),
 		.beacon_int_infra_match = true,
 	},
-#endif
+#elif defined(WLAN_FEATURE_STA_SAP_P2P_CONCURRENCY)
+	/* STA + P2P + SAP */
+	{
+		.limits = wlan_hdd_sta_ap_p2p_iface_limit,
+		/* we can allow 3 channels for three different persona
+		 * but due to firmware limitation, allow max 2 concrnt channels.
+		 */
+		.num_different_channels = 2,
+#ifndef WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+		.max_interfaces = 3,
+#else
+		.max_interfaces = 2,
+#endif /* WLAN_FEATURE_NO_STA_SAP_CONCURRENCY */
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_ap_p2p_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+#endif /* WLAN_FEATURE_NO_P2P_CONCURRENCY */
 	/* STA + P2P */
 	{
 		.limits = wlan_hdd_sta_p2p_iface_limit,
@@ -2136,6 +2178,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_AUDIO_TRANSPORT_SWITCH,
 	},
 
+	FEATURE_TX_LATENCY_STATS_EVENTS
 };
 
 /**
@@ -3962,7 +4005,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	bool sap_force_11n_for_11ac = 0;
 	bool go_force_11n_for_11ac = 0;
 	bool is_ll_lt_sap = false;
-	bool sap_force_11n;
+	bool sap_force_11n = false;
 	bool go_11ac_override = 0;
 	bool sap_11ac_override = 0;
 	uint8_t vht_ch_width;
@@ -5055,6 +5098,8 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 	QDF_STATUS status;
 	int ret_val;
+	uint8_t max_assoc_cnt = 0;
+	uint8_t max_str_link_count = 0;
 
 	uint8_t feature_flags[(NUM_QCA_WLAN_VENDOR_FEATURES + 7) / 8] = {0};
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
@@ -5197,7 +5242,28 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 			MAX_CONCURRENT_CHAN_ON_5G))
 		goto nla_put_failure;
 
-	hdd_debug("feature flags:");
+	max_assoc_cnt = wlan_mlme_get_sta_mlo_conn_max_num(hdd_ctx->psoc);
+	if (max_assoc_cnt) {
+		if (nla_put_u8(
+			skb,
+			QCA_WLAN_VENDOR_ATTR_MLO_CAPABILITY_MAX_ASSOCIATION_COUNT,
+			max_assoc_cnt))
+			goto nla_put_failure;
+
+		max_str_link_count = DEFAULT_MAX_STR_LINK_COUNT;
+
+		if (policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) ||
+		    policy_mgr_is_hw_sbs_capable(hdd_ctx->psoc))
+			max_str_link_count = MAX_STR_LINK_COUNT;
+
+		if (nla_put_u8(skb,
+			       QCA_WLAN_VENDOR_ATTR_MLO_CAPABILITY_MAX_STR_LINK_COUNT,
+			       max_str_link_count))
+			goto nla_put_failure;
+	}
+
+	hdd_debug("max_assoc_cnt %d max_str_link_count %d",
+		  max_assoc_cnt, max_str_link_count);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 			   feature_flags, sizeof(feature_flags));
 
@@ -5708,6 +5774,7 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U8},
 	[QCA_ATTR_ROAM_CONTROL_FULL_SCAN_6GHZ_ONLY_ON_PRIOR_DISCOVERY] = {
 			.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_CONNECTED_HIGH_RSSI_OFFSET] = {.type = NLA_U8},
 };
 
 /**
@@ -6483,6 +6550,31 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 							     vdev_id, value);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("Fail to decide inclusion of 6 GHz channels");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CONNECTED_HIGH_RSSI_OFFSET];
+	if (attr) {
+		value = nla_get_u8(attr);
+		if (!cfg_in_range(CFG_LFR_ROAM_SCAN_HI_RSSI_DELTA, value)) {
+			hdd_err("High RSSI offset value %d is out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("%s roam scan high RSSI with offset: %d for vdev %d",
+			  value ? "Enable" : "Disable", value, vdev_id);
+
+		if (!value &&
+		    !wlan_cm_get_roam_scan_high_rssi_offset(hdd_ctx->psoc)) {
+			hdd_debug("Roam scan high RSSI is already disabled");
+			return -EINVAL;
+		}
+
+		status = ucfg_cm_set_roam_scan_high_rssi_offset(hdd_ctx->psoc,
+								vdev_id, value);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Fail to set roam scan high RSSI offset for vdev %d",
+				vdev_id);
 	}
 
 	return qdf_status_to_os_return(status);
@@ -8345,7 +8437,7 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_BEACON_REPORT_FAIL] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONF_TX_RATE] = {.type = NLA_U16},
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_MODULATED_DTIM] = {.type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_DYNAMIC_DTIM] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_IGNORE_ASSOC_DISALLOWED] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_DISABLE_FILS] = {.type = NLA_U8 },
@@ -8458,6 +8550,11 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_NESTED},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS] = {
 		.type = NLA_NESTED },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_PEER_AMPDU_CNT] = {.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TTLM_NEGOTIATION_SUPPORT] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE] = {
+		.type = NLA_U8},
 };
 
 #define WLAN_MAX_LINK_ID 15
@@ -8616,6 +8713,10 @@ wlan_hdd_wifi_test_config_policy[
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_FORCE_MLO_POWER_SAVE_BCN_PERIOD] = {
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_STR_TX] = {
+			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_LINK_POWER_SAVE] = {
+			.type = NLA_NESTED},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ] = {
 			.type = NLA_U8},
 };
 
@@ -8823,12 +8924,10 @@ wlan_hdd_cfg80211_wifi_set_rx_blocksize(struct wlan_hdd_link_info *link_info,
 #define WINDOW_SIZE_VAL_MIN 1
 #define WINDOW_SIZE_VAL_MAX 64
 
-	if (tb[RX_BLOCKSIZE_PEER_MAC] ||
-	    tb[RX_BLOCKSIZE_WINLIMIT]) {
+	if (tb[RX_BLOCKSIZE_WINLIMIT]) {
 
 		/* if one is specified, both must be specified */
-		if (!tb[RX_BLOCKSIZE_PEER_MAC] ||
-		    !tb[RX_BLOCKSIZE_WINLIMIT]) {
+		if (!tb[RX_BLOCKSIZE_PEER_MAC]) {
 			hdd_err("Both Peer MAC and windows limit required");
 			return -EINVAL;
 		}
@@ -8970,6 +9069,68 @@ static int hdd_config_phy_mode(struct wlan_hdd_link_info *link_info,
 	hdd_err_rl("ifindex %d, expected ifindex %d", ifindex,
 		   link_info->adapter->dev->ifindex);
 	return -EINVAL;
+}
+
+/**
+ * hdd_config_peer_ampdu() - Configure peer A-MPDU count
+ * @link_info: Link info pointer in HDD adapter
+ * @tb: nla attr sent from userspace
+ *
+ * Return: 0 on success; error number otherwise
+ */
+static int hdd_config_peer_ampdu(struct wlan_hdd_link_info *link_info,
+				 struct nlattr *tb[])
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct nlattr *ampdu_cnt_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_PEER_AMPDU_CNT];
+	struct nlattr *ampdu_mac_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_PEER_MAC];
+	struct qdf_mac_addr peer_macaddr;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+	bool is_sap;
+	uint16_t cfg_val;
+
+	if (!ampdu_cnt_attr)
+		return 0;
+
+	if (adapter->device_mode == QDF_SAP_MODE ||
+	    adapter->device_mode == QDF_P2P_GO_MODE)
+		is_sap = true;
+	else if (adapter->device_mode == QDF_STA_MODE ||
+		 adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		is_sap = false;
+	else {
+		hdd_debug("mode not support");
+		return -EINVAL;
+	}
+
+	if (is_sap) {
+		if (!ampdu_mac_attr) {
+			hdd_debug("sap must provide peer mac attr");
+			return -EINVAL;
+		}
+		nla_memcpy(&peer_macaddr, ampdu_mac_attr, QDF_MAC_ADDR_SIZE);
+	} else {
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+		if (!vdev) {
+			hdd_debug("vdev is null");
+			return -EINVAL;
+		}
+		status = wlan_vdev_get_bss_peer_mac(vdev, &peer_macaddr);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_debug("fail to get bss peer mac");
+			return -EINVAL;
+		}
+	}
+	cfg_val = nla_get_u16(ampdu_cnt_attr);
+	return sme_set_peer_ampdu(hdd_ctx->mac_handle,
+				  link_info->vdev_id,
+				  &peer_macaddr,
+				  cfg_val);
 }
 
 /**
@@ -9599,8 +9760,8 @@ hdd_config_fine_time_measurement(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
-static int hdd_config_modulated_dtim(struct wlan_hdd_link_info *link_info,
-				     const struct nlattr *attr)
+static int hdd_config_dynamic_dtim(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t modulated_dtim;
@@ -10881,16 +11042,16 @@ static uint32_t hdd_mac_chwidth_to_bonding_mode(
 	return bonding_mode;
 }
 
-int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
+int hdd_set_mac_chan_width(struct wlan_hdd_link_info *link_info,
 			   enum eSirMacHTChannelWidth chwidth,
-			   uint8_t link_id)
+			   uint8_t link_id, bool is_restore)
 {
 	uint32_t bonding_mode;
 
 	bonding_mode = hdd_mac_chwidth_to_bonding_mode(chwidth);
 
-	return hdd_update_channel_width(adapter, chwidth,
-					bonding_mode, link_id);
+	return hdd_update_channel_width(link_info, chwidth,
+					bonding_mode, link_id, is_restore);
 }
 
 /**
@@ -10929,12 +11090,13 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
 
 		if (!chn_bd || !mlo_link_id)
-			return 0;
+			return -EINVAL;
 
 		nl80211_chwidth = nla_get_u8(chn_bd);
-		if (nl80211_chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
-		    nl80211_chwidth > eHT_MAX_CHANNEL_WIDTH) {
-			hdd_err("Invalid channel width:%u", nl80211_chwidth);
+		chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
+		if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
+		    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
+			hdd_err("Invalid channel width:%u", chwidth);
 			return -EINVAL;
 		}
 
@@ -10955,18 +11117,15 @@ skip_mlo:
 		return 0;
 
 	nl80211_chwidth = nla_get_u8(chn_bd);
-
-set_chan_width:
 	chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
 
 	if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
-	    chwidth > eHT_MAX_CHANNEL_WIDTH) {
+	    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
 		hdd_err("Invalid channel width %u", chwidth);
 		return -EINVAL;
 	}
-
-	return hdd_set_mac_chan_width(link_info->adapter,
-				      chwidth, link_id);
+set_chan_width:
+	return hdd_set_mac_chan_width(link_info, chwidth, link_id, false);
 }
 
 /**
@@ -11386,6 +11545,42 @@ static int hdd_set_ul_mu_config(struct wlan_hdd_link_info *link_info,
 	return errno;
 }
 
+/**
+ * hdd_set_coex_traffic_shaping_mode() - Configure coex traffic
+ * shaping mode
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+
+static int
+hdd_set_coex_traffic_shaping_mode(struct wlan_hdd_link_info *link_info,
+				  const struct nlattr *attr)
+{
+	uint8_t mode;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	int errno, ret;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno) {
+		hdd_err("Invalid HDD ctx, errno : %d", errno);
+		return errno;
+	}
+
+	mode = nla_get_u8(attr);
+	if (mode > QCA_COEX_TRAFFIC_SHAPING_MODE_ENABLE) {
+		hdd_err("Invalid traffic shaping mode : %d", mode);
+		return -EINVAL;
+	}
+
+	hdd_debug("Coex Traffic shaping mode : %d", mode);
+
+	ret = hdd_send_coex_traffic_shaping_mode(link_info->vdev_id, mode);
+
+	return ret;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static int hdd_test_config_emlsr_mode(struct hdd_context *hdd_ctx,
 				      bool cfg_val)
@@ -11529,6 +11724,27 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 
 #ifdef WLAN_FEATURE_11BE
 /**
+ * hdd_set_eht_emlsr_capability() - Set EMLSR capability for EHT STA
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int
+hdd_set_eht_emlsr_capability(struct wlan_hdd_link_info *link_info,
+			     const struct nlattr *attr)
+{
+	uint8_t cfg_val;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	cfg_val = nla_get_u8(attr);
+	hdd_debug("EMLSR capable: %d", cfg_val);
+	hdd_test_config_emlsr_mode(hdd_ctx, cfg_val);
+
+	return 0;
+}
+
+/**
  * hdd_set_eht_max_simultaneous_links() - Set EHT maximum number of
  * simultaneous links
  * @link_info: Link info pointer in HDD adapter
@@ -11631,6 +11847,13 @@ static int hdd_set_eht_mlo_mode(struct wlan_hdd_link_info *link_info,
 }
 #else
 static inline int
+hdd_set_eht_emlsr_capability(struct wlan_hdd_link_info *link_info,
+			     const struct nlattr *attr)
+{
+	return 0;
+}
+
+static inline int
 hdd_set_eht_max_simultaneous_links(struct wlan_hdd_link_info *link_info,
 				   const struct nlattr *attr)
 {
@@ -11708,6 +11931,31 @@ hdd_get_cfg_emlsr_mode(enum qca_wlan_eht_mlo_mode qca_wlan_emlsr_mode)
 	}
 }
 
+/**
+ * hdd_get_cfg_t2lm_neg_support_type() - Convert qca wlan TID-to-link mapping
+ * enum to cfg wlan
+ *
+ * @qca_wlan_t2lm_support: qca wlan TID-to-link mapping
+ *
+ * Return: TID-to-link mapping support on success, 0 on failure
+ */
+static enum wlan_t2lm_negotiation_support
+hdd_get_cfg_t2lm_neg_support_type(enum qca_wlan_ttlm_negotiation_support
+				  qca_wlan_t2lm_support)
+{
+	switch (qca_wlan_t2lm_support) {
+	case QCA_WLAN_TTLM_DISABLE:
+		return WLAN_T2LM_DISABLE;
+	case QCA_WLAN_TTLM_SAME_LINK_SET:
+		return WLAN_T2LM_SAME_LINK_SET;
+	case QCA_WLAN_TTLM_SAME_DIFF_LINK_SET:
+		return WLAN_T2LM_SAME_DIFF_LINK_SET;
+	default:
+		hdd_debug("Invalid T2LM negotiation support");
+		return WLAN_T2LM_DISABLE;
+	}
+}
+
 static int hdd_set_emlsr_mode(struct wlan_hdd_link_info *link_info,
 			      const struct nlattr *attr)
 {
@@ -11729,6 +11977,29 @@ static int hdd_set_emlsr_mode(struct wlan_hdd_link_info *link_info,
 
 	return 0;
 }
+
+static int hdd_set_t2lm_negotiation_support(struct wlan_hdd_link_info *link_info,
+					    const struct nlattr *attr)
+{
+	struct hdd_context *hdd_ctx = NULL;
+	uint8_t cfg_val;
+	enum wlan_t2lm_negotiation_support t2lm_support;
+
+	if (!attr)
+		return -EINVAL;
+
+	cfg_val = nla_get_u8(attr);
+
+	t2lm_support = hdd_get_cfg_t2lm_neg_support_type(cfg_val);
+	hdd_debug("T2LM negotiation support: %d", t2lm_support);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	wlan_mlme_set_t2lm_negotiation_supported(hdd_ctx->psoc,
+						 t2lm_support);
+
+	return 0;
+}
 #else
 static inline int
 hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
@@ -11740,6 +12011,13 @@ hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 static inline
 int hdd_set_emlsr_mode(struct wlan_hdd_link_info *link_info,
 		       const struct nlattr *attr)
+{
+	return 0;
+}
+
+static inline
+int hdd_set_t2lm_negotiation_support(struct wlan_hdd_link_info *link_info,
+				     const struct nlattr *attr)
 {
 	return 0;
 }
@@ -11842,8 +12120,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_scan_default_ies},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_FINE_TIME_MEASUREMENT,
 	 hdd_config_fine_time_measurement},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_MODULATED_DTIM,
-	 hdd_config_modulated_dtim},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_DYNAMIC_DTIM,
+	 hdd_config_dynamic_dtim},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL,
 	 hdd_config_listen_interval},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_LRO,
@@ -11935,6 +12213,8 @@ static const struct independent_setters independent_setters[] = {
 
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE,
 	 hdd_set_wfc_state},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_EML_CAPABILITY,
+	 hdd_set_eht_emlsr_capability},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_MLO_MAX_SIMULTANEOUS_LINKS,
 	 hdd_set_eht_max_simultaneous_links},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EPCS_CAPABILITY,
@@ -11953,6 +12233,10 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_ul_mu_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_AP_ALLOWED_FREQ_LIST,
 	 hdd_set_master_channel_list},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_TTLM_NEGOTIATION_SUPPORT,
+	 hdd_set_t2lm_negotiation_support},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE,
+	 hdd_set_coex_traffic_shaping_mode},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -12268,6 +12552,7 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_vdev *vdev, *link_vdev;
 	struct wlan_channel *bss_chan;
 	uint8_t nl80211_chwidth;
+	int8_t ret = 0;
 
 	chwidth = wma_cli_get_command(link_info->vdev_id,
 				      wmi_vdev_param_chwidth, VDEV_CMD);
@@ -12283,47 +12568,50 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		mlo_bd_info = nla_nest_start(skb, CONFIG_MLO_LINKS);
 		for (link_id = 0; link_id < WLAN_MAX_LINK_ID; link_id++) {
-			link_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
+			link_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
+							    WLAN_OSIF_ID);
 			if (!link_vdev)
 				continue;
 
 			mlo_bd = nla_nest_start(skb, i);
 			if (!mlo_bd) {
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-				mlo_release_vdev_ref(link_vdev);
 				hdd_err("nla_nest_start fail");
-				return -EINVAL;
+				ret = -EINVAL;
+				goto end;
 			}
 			bss_chan = wlan_vdev_mlme_get_bss_chan(link_vdev);
 			if (!bss_chan) {
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-				mlo_release_vdev_ref(link_vdev);
 				hdd_err("fail to get bss_chan info");
-				return QDF_STATUS_E_FAILURE;
+				ret = -EINVAL;
+				goto end;
 			}
 			if (nla_put_u8(skb, CONFIG_MLO_LINK_ID, link_id)) {
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-				mlo_release_vdev_ref(link_vdev);
 				hdd_err("nla_put failure");
-				return -EINVAL;
+				ret = -EINVAL;
+				goto end;
 			}
 
 			nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(bss_chan->ch_width);
 			if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH,
 				       nl80211_chwidth)) {
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-				mlo_release_vdev_ref(link_vdev);
 				hdd_err("nla_put failure");
-				return -EINVAL;
+				ret = -EINVAL;
+				goto end;
 			}
 			nla_nest_end(skb, mlo_bd);
 			i++;
-			mlo_release_vdev_ref(link_vdev);
+			hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 		}
 		nla_nest_end(skb, mlo_bd_info);
 	}
+
+end:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-	return 0;
+
+	if (ret)
+		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
+
+	return ret;
 }
 
 /**
@@ -12843,6 +13131,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_phy_mode,
 	hdd_config_power,
 	hdd_set_channel_width,
+	hdd_config_peer_ampdu,
 };
 
 /**
@@ -13107,6 +13396,31 @@ static int hdd_test_config_6ghz_security_test_mode(struct hdd_context *hdd_ctx,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void wlan_hdd_set_listen_interval(struct hdd_context *hdd_ctx,
+					 struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	enum wlan_eht_mode eht_mode;
+	uint16_t max_simult_link_num;
+
+	ucfg_mlme_get_eht_mode(psoc, &eht_mode);
+	max_simult_link_num = wlan_mlme_get_sta_mlo_simultaneous_links(psoc);
+
+	if (eht_mode == WLAN_EHT_MODE_MLSR && max_simult_link_num == 0)
+		sme_set_listen_interval(hdd_ctx->mac_handle,
+					adapter->deflink->vdev_id);
+
+	hdd_debug("EHT mode: %d, max simultaneous link num: %d",
+		  eht_mode, max_simult_link_num);
+}
+#else
+static inline void wlan_hdd_set_listen_interval(struct hdd_context *hdd_ctx,
+					        struct hdd_adapter *adapter)
+{
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_set_wifi_test_config() - Wifi test configuration
  * vendor command
@@ -13146,7 +13460,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	uint8_t link_id = 0xFF;
 	struct keep_alive_req keep_alive_req = {0};
 	struct set_wfatest_params wfa_param = {0};
-	struct wlan_hdd_link_info *link_info = adapter->link_info;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 	struct hdd_station_ctx *hdd_sta_ctx =
 			WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	uint8_t op_mode;
@@ -13860,9 +14174,9 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		sme_set_ru_242_tone_tx_cfg(hdd_ctx->mac_handle, cfg_val);
 		if (cfg_val)
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_20MHZ,
+					link_info, eHT_CHANNEL_WIDTH_20MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
-					link_id);
+					link_id, false);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_ER_SU_PPDU_TYPE;
@@ -13871,9 +14185,9 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_debug("EU SU PPDU type Tx enable: %d", cfg_val);
 		if (cfg_val) {
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_20MHZ,
+					link_info, eHT_CHANNEL_WIDTH_20MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
-					link_id);
+					link_id, false);
 			hdd_set_tx_stbc(link_info, 0);
 			hdd_set_11ax_rate(adapter, 0x400, NULL);
 			status = wma_cli_set_command(
@@ -13892,9 +14206,9 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 					status);
 		} else {
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_160MHZ,
-					link_id,
-					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE);
+					link_info, eHT_CHANNEL_WIDTH_160MHZ,
+					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE,
+					link_id, false);
 			hdd_set_tx_stbc(link_info, 1);
 			hdd_set_11ax_rate(adapter, 0xFFFF, NULL);
 			status = wma_cli_set_command(
@@ -14245,7 +14559,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 							mac_handle,
 							vdev_id, cfg_val);
 				if (ret_val)
-					sme_err("Failed to send vdev pause");
+					hdd_err("Failed to send vdev pause");
 			}
 		}
 	}
@@ -14262,7 +14576,39 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 						 0x48, 2, arg);
 
 		if (ret_val)
-			sme_err("Failed to send STR TX indication");
+			hdd_err("Failed to send STR TX indication");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_MLO_LINK_POWER_SAVE;
+	if (tb[cmd_id]) {
+		struct nlattr *curr_attr;
+		int len;
+		uint8_t link_id, timeout = 0, num_links = 0;
+		bool allow_ps = true;
+
+		nla_for_each_nested(curr_attr, tb[cmd_id], len) {
+			if (nla_len(curr_attr) != sizeof(uint8_t)) {
+				hdd_err("len is not correct for idx %d",
+					num_links);
+				goto send_err;
+			}
+			link_id = nla_get_u8(curr_attr);
+			hdd_debug("link id[%d]: %d", num_links, link_id);
+			wlan_hdd_set_mlo_ps(adapter, allow_ps, timeout,
+					    link_id);
+			num_links++;
+		}
+
+		wlan_hdd_set_listen_interval(hdd_ctx, adapter);
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("MLD ID in ML probe request: %d", cfg_val);
+		ret_val = ucfg_mlme_set_eht_mld_id(hdd_ctx->psoc, cfg_val);
+		if (ret_val)
+			hdd_err("Failed to set MLD ID");
 	}
 
 	if (update_sme_cfg)
@@ -18373,6 +18719,7 @@ void hdd_bt_activity_cb(hdd_handle_t hdd_handle, uint32_t bt_activity)
 		return;
 
 	ucfg_scan_set_bt_activity(hdd_ctx->psoc, hdd_ctx->bt_a2dp_active);
+	ucfg_mlme_set_bt_profile_con(hdd_ctx->psoc, hdd_ctx->bt_profile_con);
 	hdd_debug("a2dp_active: %d vo_active: %d connected:%d",
 		  hdd_ctx->bt_a2dp_active,
 		  hdd_ctx->bt_vo_active, hdd_ctx->bt_profile_con);
@@ -20463,6 +20810,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_ML_LINK_STATE_COMMANDS
 	FEATURE_AFC_VENDOR_COMMANDS
 	FEATURE_LL_LT_SAP_VENDOR_COMMANDS
+	FEATURE_TX_LATENCY_STATS_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
@@ -21469,6 +21817,17 @@ static void wlan_hdd_set_vlan_offload(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
+static void wlan_hdd_set_mfp_optional(struct wiphy *wiphy)
+{
+	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_MFP_OPTIONAL);
+}
+#else
+static void wlan_hdd_set_mfp_optional(struct wiphy *wiphy)
+{
+}
+#endif
+
 /*
  * In this function, wiphy structure is updated after QDF
  * initialization. In wlan_hdd_cfg80211_init, only the
@@ -21576,6 +21935,7 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 	wlan_hdd_set_32bytes_kck_support(wiphy);
 	wlan_hdd_set_nan_secure_mode(wiphy);
 	wlan_hdd_set_vlan_offload(hdd_ctx);
+	wlan_hdd_set_mfp_optional(wiphy);
 }
 
 /**
@@ -22159,7 +22519,10 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 	if (wlan_hdd_is_mon_concurrency())
 		return -EINVAL;
 
-	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
+	wlan_hdd_lpc_handle_concurrency(hdd_ctx, false);
+
+	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc) &&
+	    !hdd_lpc_is_work_scheduled(hdd_ctx))
 		return -EINVAL;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
@@ -22750,7 +23113,7 @@ struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return vdev;
 
-	link_vdev = mlo_get_vdev_by_link_id(vdev, link_id);
+	link_vdev = mlo_get_vdev_by_link_id(vdev, link_id, id);
 	hdd_objmgr_put_vdev_by_user(vdev, id);
 
 	return link_vdev;
@@ -22764,7 +23127,7 @@ void wlan_key_put_link_vdev(struct wlan_objmgr_vdev *link_vdev,
 		return;
 	}
 
-	mlo_release_vdev_ref(link_vdev);
+	wlan_objmgr_vdev_release_ref(link_vdev, id);
 }
 #else
 struct wlan_objmgr_vdev *wlan_key_get_link_vdev(struct hdd_adapter *adapter,
@@ -23080,18 +23443,23 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 			    struct wlan_objmgr_vdev *vdev,
 			    struct qdf_mac_addr *mac_address)
 {
+	uint8_t link_id;
+
 	if (!adapter)
 		return false;
 
-	if (!vdev)
+	if (!vdev || !vdev->mlo_dev_ctx)
 		return false;
+
+	link_id = wlan_vdev_get_link_id(vdev);
 
 	if ((adapter->device_mode == QDF_STA_MODE) &&
 	    ((!wlan_cm_is_vdev_connected(vdev)) ||
 	    (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
 	     mlo_roam_is_auth_status_connected(adapter->hdd_ctx->psoc,
 					       wlan_vdev_get_id(vdev))))) {
-		hdd_debug("MLO:Defer set keys for vdev %d", wlan_vdev_get_id(vdev));
+		hdd_debug("MLO:Defer set keys for link_id %d", link_id);
+		mlo_defer_set_keys(vdev, link_id, true);
 		return true;
 	}
 
@@ -23156,14 +23524,14 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 		} else if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
 			   adapter->device_mode == QDF_STA_MODE) {
 			status = wlan_objmgr_vdev_try_get_ref(vdev,
-							      WLAN_MLO_MGR_ID);
+							      WLAN_OSIF_ID);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				hdd_err("Failed to get vdev ref");
 				return qdf_status_to_os_return(status);
 			}
 			status = wlan_hdd_mlo_copy_partner_addr_from_mlie(
 							vdev, &mac_address);
-			mlo_release_vdev_ref(vdev);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				hdd_err("Failed to get peer address from ML IEs");
 				return qdf_status_to_os_return(status);
@@ -23509,6 +23877,8 @@ static int wlan_add_key_standby_link(struct hdd_adapter *adapter,
 			params,
 			&mlo_link_info->link_addr,
 			link_id);
+	hdd_debug("ml defer set key link id %d", link_id);
+	mlo_defer_set_keys(vdev, link_id, true);
 	return errno;
 }
 

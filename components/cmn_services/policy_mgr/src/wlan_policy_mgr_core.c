@@ -491,6 +491,7 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool mcc_mode;
+	enum hw_mode_bandwidth max_bw;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -534,6 +535,13 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 
 		if (pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb)
 			pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb(mcc_mode);
+
+		if (pm_ctx->dp_cbacks.hdd_ipa_set_perf_level_bw) {
+			max_bw = policy_mgr_get_connection_max_channel_width(
+					psoc);
+			policy_mgr_debug("max channel width %d", max_bw);
+			pm_ctx->dp_cbacks.hdd_ipa_set_perf_level_bw(max_bw);
+		}
 	}
 
 	if (pm_ctx->conc_cbacks.connection_info_update)
@@ -869,10 +877,6 @@ policy_mgr_fill_curr_freq_by_pdev_freq(int32_t num_mac_freq,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		policy_mgr_debug("mac_id %d start freq %d end_freq %d",
-				 mac_id, freq[i].start_freq,
-				 freq[i].end_freq);
-
 		if (policy_mgr_is_freq_range_2ghz(freq[i].start_freq,
 						  freq[i].end_freq)) {
 			policy_mgr_fill_curr_mac_2ghz_freq(mac_id,
@@ -986,7 +990,6 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 {
 	QDF_STATUS ret;
 	struct policy_mgr_hw_mode_params hw_mode;
-	uint32_t i;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	pm_ctx = policy_mgr_get_context(context);
@@ -1015,29 +1018,22 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 		goto set_done_event;
 	}
 
-	policy_mgr_debug("cfgd_hw_mode_index=%d", cfgd_hw_mode_index);
-
-	for (i = 0; i < num_vdev_mac_entries; i++)
-		policy_mgr_debug("vdev_id:%d mac_id:%d",
-				vdev_mac_map[i].vdev_id,
-				vdev_mac_map[i].mac_id);
-
 	ret = policy_mgr_get_hw_mode_from_idx(context, cfgd_hw_mode_index,
-			&hw_mode);
-	if (ret != QDF_STATUS_SUCCESS) {
-		policy_mgr_err("Get HW mode failed: %d", ret);
+					      &hw_mode);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		policy_mgr_err("Get HW mode for index %d reason: %d",
+			       cfgd_hw_mode_index, ret);
 		goto set_done_event;
 	}
-
-	policy_mgr_debug("MAC0: TxSS:%d, RxSS:%d, Bw:%d, band_cap %d",
+	policy_mgr_debug("HW mode idx %d, DBS %d Agile %d SBS %d, MAC0:: SS:Tx %d Rx %d, BW %d band %d. MAC1:: SS:Tx %d Rx %d, BW %d",
+			 cfgd_hw_mode_index, hw_mode.dbs_cap,
+			 hw_mode.agile_dfs_cap, hw_mode.sbs_cap,
 			 hw_mode.mac0_tx_ss, hw_mode.mac0_rx_ss,
-			 hw_mode.mac0_bw, hw_mode.mac0_band_cap);
-	policy_mgr_debug("MAC1: TxSS:%d, RxSS:%d, Bw:%d",
+			 hw_mode.mac0_bw, hw_mode.mac0_band_cap,
 			 hw_mode.mac1_tx_ss, hw_mode.mac1_rx_ss,
 			 hw_mode.mac1_bw);
-	policy_mgr_debug("DBS:%d, Agile DFS:%d, SBS:%d",
-			 hw_mode.dbs_cap, hw_mode.agile_dfs_cap,
-			 hw_mode.sbs_cap);
+	policy_mgr_dump_freq_range_n_vdev_map(num_vdev_mac_entries,
+					      vdev_mac_map, 0, NULL);
 
 	/* update pm_conc_connection_list */
 	policy_mgr_update_hw_mode_conn_info(context,
@@ -4128,7 +4124,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_handle_sta_sap_fav_channel() - Get preferred force SCC
- * channel frequency using favorite mandatory channel list
+ * channel frequency using favorite mandatory channel list for STA+SAP
+ * concurrency
  * @psoc: Pointer to Psoc
  * @pm_ctx: pm ctx
  * @vdev_id: vdev id
@@ -4205,6 +4202,101 @@ policy_mgr_handle_sta_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
+QDF_STATUS
+policy_mgr_handle_go_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, qdf_freq_t sap_ch_freq,
+				     qdf_freq_t *intf_ch_freq)
+{
+	QDF_STATUS status;
+	uint8_t go_count;
+	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct policy_mgr_pcl_list pcl;
+	uint32_t i;
+
+	go_count = policy_mgr_get_mode_specific_conn_info(psoc,
+							  op_ch_freq_list,
+							  vdev_id_list,
+							  PM_P2P_GO_MODE);
+	if (!go_count)
+		return QDF_STATUS_E_FAILURE;
+
+	/* According to requirement, SAP should move to 2.4 GHz if P2P GO is
+	 * on 5G/6G.
+	 */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[0]) ||
+	    WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq))
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mem_zero(&pcl, sizeof(pcl));
+	status = policy_mgr_get_pcl_for_existing_conn(
+			psoc, PM_SAP_MODE, pcl.pcl_list, &pcl.pcl_len,
+			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list),
+			false, vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Unable to get PCL for SAP");
+		return status;
+	}
+
+	for (i = 0; i < pcl.pcl_len; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(pcl.pcl_list[i])) {
+			*intf_ch_freq = pcl.pcl_list[i];
+			policy_mgr_debug("sap move to %d because GO on %d",
+					 *intf_ch_freq, op_ch_freq_list[0]);
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * policy_mgr_handle_sap_fav_channel() - Get preferred force SCC
+ * channel frequency using favorite mandatory channel list
+ * @psoc: Pointer to Psoc
+ * @pm_ctx: pm ctx
+ * @vdev_id: vdev id
+ * @intf_ch_freq: prefer force scc frequency
+ * @sap_ch_freq: sap/go channel starting channel frequency
+ * @acs_band: acs band
+ *
+ * Return: QDF_STATUS_SUCCESS if a valid favorite mandatory force scc channel
+ * is found.
+ */
+static QDF_STATUS
+policy_mgr_handle_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
+				  struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  uint8_t vdev_id, qdf_freq_t sap_ch_freq,
+				  qdf_freq_t *intf_ch_freq,
+				  uint32_t acs_band)
+{
+	QDF_STATUS status;
+	uint8_t sta_count, go_count;
+
+	go_count = policy_mgr_mode_specific_connection_count(psoc,
+							     PM_P2P_GO_MODE,
+							     NULL);
+	if (go_count) {
+		status = policy_mgr_handle_go_sap_fav_channel(
+					psoc, vdev_id,
+					sap_ch_freq, intf_ch_freq);
+		if (QDF_IS_STATUS_SUCCESS(status) &&
+		    *intf_ch_freq && *intf_ch_freq != sap_ch_freq)
+			return QDF_STATUS_SUCCESS;
+	}
+
+	sta_count = policy_mgr_mode_specific_connection_count(psoc,
+							      PM_STA_MODE,
+							      NULL);
+	if (sta_count && sta_count < 2)
+		return policy_mgr_handle_sta_sap_fav_channel(
+					psoc, pm_ctx, vdev_id,
+					sap_ch_freq, intf_ch_freq,
+					acs_band);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t *intf_ch_freq,
 				  qdf_freq_t sap_ch_freq,
@@ -4240,15 +4332,17 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_debug("acs_band: %d", acs_band);
 	}
 
-	/* Handle STA + SAP mandaory freq cases */
-	if (sta_count && sta_count < 2 &&
-	    cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
-		status = policy_mgr_handle_sta_sap_fav_channel(psoc, pm_ctx,
-				vdev_id, sap_ch_freq, intf_ch_freq, acs_band);
+	/* Handle STA/P2P + SAP mandaory freq cases */
+	if (cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
+		status = policy_mgr_handle_sap_fav_channel(
+				psoc, pm_ctx, vdev_id, sap_ch_freq,
+				intf_ch_freq, acs_band);
 		if (QDF_IS_STATUS_SUCCESS(status))
 			return;
 		policy_mgr_debug("no mandatory channels (%d, %d)", sap_ch_freq,
 				 *intf_ch_freq);
+	} else if (sta_count && policy_mgr_is_hw_dbs_capable(psoc)) {
+		policy_mgr_sap_on_non_psc_channel(psoc, intf_ch_freq, vdev_id);
 	}
 
 	/* Get allow 6Gz before interface entry is temporary deleted */

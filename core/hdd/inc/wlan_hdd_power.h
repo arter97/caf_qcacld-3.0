@@ -683,4 +683,17 @@ void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
 {}
 #endif /* FEATURE_ICMP_OFFLOAD */
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
+			bool allow_power_save, int timeout,
+			int link_id);
+#else
+static inline
+int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
+			bool allow_power_save, int timeout,
+			int link_id)
+{
+        return 0;
+}
+#endif
 #endif /* __WLAN_HDD_POWER_H */

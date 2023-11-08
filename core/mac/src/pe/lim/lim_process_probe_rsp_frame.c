@@ -326,8 +326,6 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 
 	if (session_entry->limMlmState ==
 			eLIM_MLM_WT_JOIN_BEACON_STATE) {
-		uint8_t vdev_id = wlan_vdev_get_id(session_entry->vdev);
-
 		/*
 		 * Either Beacon/probe response is required.
 		 * Hence store it in same buffer.
@@ -357,7 +355,6 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 		lim_check_and_announce_join_success(mac_ctx, probe_rsp,
 						header,
 						session_entry);
-		wlan_connectivity_sta_info_event(mac_ctx->psoc, vdev_id);
 
 	} else if (session_entry->limMlmState ==
 		   eLIM_MLM_LINK_ESTABLISHED_STATE) {

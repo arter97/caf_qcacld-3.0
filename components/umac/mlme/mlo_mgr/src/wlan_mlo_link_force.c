@@ -209,10 +209,8 @@ ml_nlink_clr_force_state(struct wlan_objmgr_psoc *psoc,
 	struct ml_link_force_state *force_state;
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
-	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
-		mlo_err("mlo_ctx or sta_ctx null");
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx)
 		return;
-	}
 
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	force_state = &mlo_dev_ctx->sta_ctx->link_force_ctx.force_state;
@@ -406,10 +404,9 @@ ml_nlink_get_affect_ml_sta(struct wlan_objmgr_psoc *psoc)
 					&num_disabled_ml_sta,
 					ml_sta_vdev_lst, ml_freq_lst, NULL,
 					NULL, NULL);
-	if (!num_ml_sta || num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS) {
-		mlo_debug("ml sta num is %d", num_ml_sta);
+	if (!num_ml_sta || num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS)
 		return NULL;
-	}
+
 	if (num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS) {
 		mlo_debug("unexpected num_ml_sta %d", num_ml_sta);
 		return NULL;
@@ -527,7 +524,7 @@ ml_nlink_get_standby_link_info(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
-static uint32_t
+uint32_t
 ml_nlink_get_standby_link_bitmap(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_objmgr_vdev *vdev)
 {
@@ -1683,7 +1680,8 @@ ml_nlink_update_no_force_for_all(struct wlan_objmgr_psoc *psoc,
 		}
 
 		status = policy_mgr_mlo_sta_set_nlink(
-						psoc, vdev, reason,
+						psoc, wlan_vdev_get_id(vdev),
+						reason,
 						MLO_LINK_FORCE_MODE_NO_FORCE,
 						0, 0, 0, 0);
 	}
@@ -1717,7 +1715,7 @@ ml_nlink_update_force_inactive(struct wlan_objmgr_psoc *psoc,
 			goto end;
 		}
 		status = policy_mgr_mlo_sta_set_nlink(
-				psoc, vdev, reason,
+				psoc, wlan_vdev_get_id(vdev), reason,
 				MLO_LINK_FORCE_MODE_INACTIVE,
 				0,
 				new->force_inactive_bitmap,
@@ -1744,7 +1742,7 @@ ml_nlink_update_force_inactive_num(struct wlan_objmgr_psoc *psoc,
 	    new->force_inactive_num_bitmap !=
 			curr->force_inactive_num_bitmap) {
 		status = policy_mgr_mlo_sta_set_nlink(
-					psoc, vdev, reason,
+					psoc, wlan_vdev_get_id(vdev), reason,
 					MLO_LINK_FORCE_MODE_INACTIVE_NUM,
 					new->force_inactive_num,
 					new->force_inactive_num_bitmap,
@@ -1850,8 +1848,6 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	mlo_debug("enter evaluate force state change");
-
 	/*
 	 * eMLSR is allowed in MCC mode also. So, don't disable any links
 	 * if current connection happens in eMLSR mode.
@@ -1925,15 +1921,16 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 						  &force_state,
 						  reason);
 end:
-	if (vdev)
+	if (vdev) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 
-	if (status == QDF_STATUS_SUCCESS)
-		mlo_debug("exit no force state change");
-	else if (status == QDF_STATUS_E_PENDING)
-		mlo_debug("exit pending force state change");
-	else
-		mlo_err("exit err %d state change", status);
+		if (status == QDF_STATUS_SUCCESS)
+			mlo_debug("exit no force state change");
+		else if (status == QDF_STATUS_E_PENDING)
+			mlo_debug("exit pending force state change");
+		else
+			mlo_err("exit err %d state change", status);
+	}
 
 	return status;
 }
@@ -1975,6 +1972,80 @@ ml_nlink_state_change_handler(struct wlan_objmgr_psoc *psoc,
 	else
 		policy_mgr_handle_ml_sta_links_on_vdev_down(psoc, mode,
 							    vdev_id);
+
+	return status;
+}
+
+static QDF_STATUS
+ml_nlink_tdls_event_handler(struct wlan_objmgr_psoc *psoc,
+			    struct wlan_objmgr_vdev *vdev,
+			    enum ml_nlink_change_event_type evt,
+			    struct ml_nlink_change_event *data)
+{
+	struct ml_link_force_state curr_force_state = {0};
+	QDF_STATUS status;
+
+	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
+
+	switch (data->evt.tdls.mode) {
+	case MLO_LINK_FORCE_MODE_ACTIVE:
+		if ((data->evt.tdls.link_bitmap &
+		    curr_force_state.force_active_bitmap) ==
+		    data->evt.tdls.link_bitmap) {
+			mlo_debug("link_bitmap 0x%x already active, 0x%x",
+				  data->evt.tdls.link_bitmap,
+				  curr_force_state.force_active_bitmap);
+			return QDF_STATUS_SUCCESS;
+		}
+		if (data->evt.tdls.link_bitmap &
+		    (curr_force_state.force_inactive_bitmap |
+		     curr_force_state.curr_dynamic_inactive_bitmap)) {
+			mlo_debug("link_bitmap 0x%x can't be active due to concurrency, 0x%x 0x%x",
+				  data->evt.tdls.link_bitmap,
+				  curr_force_state.force_inactive_bitmap,
+				  curr_force_state.
+				  curr_dynamic_inactive_bitmap);
+			return QDF_STATUS_E_INVAL;
+		}
+		break;
+	case MLO_LINK_FORCE_MODE_NO_FORCE:
+		if (data->evt.tdls.link_bitmap &
+		    curr_force_state.force_inactive_bitmap) {
+			mlo_debug("link_bitmap 0x%x can't be no_force due to concurrency, 0x%x",
+				  data->evt.tdls.link_bitmap,
+				  curr_force_state.force_inactive_bitmap);
+			return QDF_STATUS_E_INVAL;
+		}
+		if (!(data->evt.tdls.link_bitmap &
+			curr_force_state.force_active_bitmap)) {
+			mlo_debug("link_bitmap 0x%x already no force, 0x%x",
+				  data->evt.tdls.link_bitmap,
+				  curr_force_state.force_active_bitmap);
+			return QDF_STATUS_SUCCESS;
+		}
+		break;
+	default:
+		mlo_err("unhandled for tdls force mode %d",
+			data->evt.tdls.mode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (ml_is_nlink_service_supported(psoc))
+		status = policy_mgr_mlo_sta_set_nlink(
+				psoc, wlan_vdev_get_id(vdev),
+				data->evt.tdls.reason,
+				data->evt.tdls.mode,
+				0,
+				data->evt.tdls.link_bitmap,
+				0,
+				0);
+	else
+		status =
+		policy_mgr_mlo_sta_set_link(psoc,
+					    data->evt.tdls.reason,
+					    data->evt.tdls.mode,
+					    data->evt.tdls.vdev_count,
+					    data->evt.tdls.mlo_vdev_lst);
 
 	return status;
 }
@@ -2147,6 +2218,10 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		status = ml_nlink_state_change_handler(
 			psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
 			evt, data);
+		break;
+	case ml_nlink_tdls_request_evt:
+		status = ml_nlink_tdls_event_handler(
+			psoc, vdev, evt, data);
 		break;
 	default:
 		break;

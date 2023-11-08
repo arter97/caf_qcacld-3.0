@@ -66,6 +66,17 @@ QDF_STATUS hdd_ipa_get_tx_pipe(struct hdd_context *hdd_ctx,
 			       struct wlan_hdd_link_info *link,
 			       bool *tx_pipe);
 
+/*
+ * hdd_ipa_set_perf_level_bw() - Set ipa perf level based on BW
+ * @bw: enum hw_mode_bandwidth
+ *
+ * This routine is called to set IPA perf level based on max BW configured
+ * among in-use STA and SAP vdevs.
+ *
+ * Return: None
+ */
+void hdd_ipa_set_perf_level_bw(enum hw_mode_bandwidth bw);
+
 #else
 static inline
 void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t skb, qdf_netdev_t dev)
@@ -83,5 +94,10 @@ hdd_ipa_get_tx_pipe(struct hdd_context *hdd_ctx,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline void hdd_ipa_set_perf_level_bw(enum hw_mode_bandwidth bw)
+{
+}
+
 #endif
 #endif /* HDD_IPA_H__ */

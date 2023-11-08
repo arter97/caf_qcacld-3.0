@@ -135,6 +135,7 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
+	uint8_t mcc_scc_switch;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -159,6 +160,11 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 		ifmgr_debug("p2p go disconnected enable roam");
 		if_mgr_enable_roaming(pdev, vdev, RSO_START_BSS);
 	}
+
+	policy_mgr_get_mcc_scc_switch(psoc, &mcc_scc_switch);
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE &&
+	    mcc_scc_switch == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)
+		policy_mgr_check_concurrent_intf_and_restart_sap(psoc, false);
 
 	return QDF_STATUS_SUCCESS;
 }

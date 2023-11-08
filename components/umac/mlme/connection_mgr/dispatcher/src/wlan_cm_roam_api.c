@@ -50,8 +50,7 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t sta_vdev_id = WLAN_INVALID_VDEV_ID;
-	uint32_t count;
-	uint32_t idx;
+	uint32_t count, idx;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 
 	sta_vdev_id = policy_mgr_get_roam_enabled_sta_session_id(psoc, vdev_id);
@@ -62,7 +61,6 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 						       op_ch_freq_list,
 						       vdev_id_list,
 						       PM_STA_MODE);
-
 	if (!count)
 		return QDF_STATUS_E_FAILURE;
 
@@ -81,6 +79,13 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 
 	if (sta_vdev_id == WLAN_INVALID_VDEV_ID)
 		return QDF_STATUS_E_FAILURE;
+
+	if (mlo_check_is_given_vdevs_on_same_mld(psoc, sta_vdev_id, vdev_id)) {
+		mlme_debug("RSO_CFG: vdev:%d , vdev:%d are on same MLD skip RSO enable",
+			   sta_vdev_id, vdev_id);
+
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	mlme_debug("ROAM: Enabling roaming on vdev[%d]", sta_vdev_id);
 
@@ -134,8 +139,16 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	struct mlme_legacy_priv *mlme_priv;
 	struct wlan_channel *des_chan;
 	struct assoc_channel_info *assoc_chan_info;
+	struct wlan_objmgr_pdev *pdev;
 	enum phy_ch_width ch_width;
 	QDF_STATUS status;
+	uint8_t band_mask;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		mlme_err("invalid pdev");
+		return;
+	}
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
@@ -172,6 +185,19 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 		if (des_chan->ch_cfreq1 == des_chan->ch_freq - BW_10_MHZ)
 			assoc_chan_info->sec_2g_freq =
 					des_chan->ch_freq - BW_20_MHZ;
+	} else if (des_chan->ch_width == CH_WIDTH_320MHZ) {
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(des_chan->ch_freq))
+			band_mask = BIT(REG_BAND_6G);
+		else
+			band_mask = BIT(REG_BAND_5G);
+		assoc_chan_info->cen320_freq =
+			wlan_reg_chan_band_to_freq(pdev,
+						   des_chan->ch_freq_seg2,
+						   band_mask);
+
+		mlme_debug("ch_freq_seg2: %d, cen320_freq: %d",
+			   des_chan->ch_freq_seg2,
+			   assoc_chan_info->cen320_freq);
 	}
 
 	mlme_debug("ch width :%d, ch_freq:%d, ch_cfreq1:%d, sec_2g_freq:%d",
@@ -1709,6 +1735,9 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		mlme_err("vdev object is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	mlme_debug("vdev: %d source: %d freq: %d bssid: " QDF_MAC_ADDR_FMT,
+		   vdev_id, source, chan_freq, QDF_MAC_ADDR_REF(bssid->bytes));
 
 	status = cm_start_roam_invoke(psoc, vdev, bssid, chan_freq, source);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
@@ -4672,6 +4701,31 @@ uint8_t wlan_cm_roam_get_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.lfr.roam_full_scan_6ghz_on_disc;
 }
 
+void
+wlan_cm_set_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc,
+				       uint8_t roam_high_rssi_delta)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	mlme_obj->cfg.lfr.roam_high_rssi_delta = roam_high_rssi_delta;
+}
+
+uint8_t
+wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return 0;
+
+	return mlme_obj->cfg.lfr.roam_high_rssi_delta;
+}
+
 #else
 QDF_STATUS
 cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -4997,7 +5051,14 @@ wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 
 	extracted_ie = (uint8_t *)wlan_get_ie_ptr_from_eid(WLAN_ELEMID_SSID,
 							   ie_ptr, ie_len);
-	if (extracted_ie && extracted_ie[0] == WLAN_ELEMID_SSID) {
+	/*
+	 * Roam offload ssid/bssid needs to be set only for SAE roam offload
+	 * candidate frames for supporting cross-ssid roaming.
+	 * This update is not needed for probe/beacons received from the
+	 * roam sync frame event.
+	 */
+	if (frame->roam_offload_candidate_frm &&
+	    extracted_ie && extracted_ie[0] == WLAN_ELEMID_SSID) {
 		wh = (struct wlan_frame_hdr *)frame->frame;
 		WLAN_ADDR_COPY(&bssid.bytes[0], wh->i_addr2);
 
@@ -5208,6 +5269,14 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 {
 	return mlo_add_all_link_probe_rsp_to_scan_db(psoc, candidate);
 }
+
+QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate)
+{
+	return mlo_add_all_link_probe_rsp_to_scan_db(psoc, candidate);
+}
+
 #elif defined(WLAN_FEATURE_ROAM_OFFLOAD) /* end WLAN_FEATURE_11BE_MLO */
 QDF_STATUS
 cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -5215,4 +5284,42 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 {
 	return wlan_cm_add_frame_to_scan_db(psoc, candidate);
 }
+
+QDF_STATUS
+wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
+				struct roam_scan_candidate_frame *candidate)
+{
+	return wlan_cm_add_frame_to_scan_db(psoc, candidate);
+}
+
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_link_switch_req *req,
+					enum wlan_mlo_link_switch_notify_reason notify_reason)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (notify_reason != MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_PRE_SER)
+		return status;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return status;
+
+	/* Only send RSO stop for assoc vdev */
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return status;
+
+	status = cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+				      wlan_vdev_get_id(vdev),
+				      WLAN_ROAM_RSO_STOPPED,
+				      REASON_DISCONNECTED, NULL, false);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_err("vdev:%d switch to RSO Stop failed",
+			 wlan_vdev_get_id(vdev));
+
+	return status;
+}
+#endif
+

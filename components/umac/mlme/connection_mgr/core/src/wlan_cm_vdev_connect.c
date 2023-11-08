@@ -1038,6 +1038,8 @@ void cm_get_sta_cxn_info(struct wlan_objmgr_vdev *vdev,
 #endif
 #endif
 
+#define MGMT_FRAME_FULL_PROTECTION (RSN_CAP_MFP_REQUIRED | RSN_CAP_MFP_CAPABLE)
+
 QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 				struct wlan_cm_connect_req *req)
 {
@@ -1062,6 +1064,8 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
 	if (rso_cfg) {
+		uint8_t rso_user_mfp;
+
 		rso_cfg->orig_sec_info.rsn_caps = req->crypto.rsn_caps;
 		rso_cfg->orig_sec_info.authmodeset = req->crypto.auth_type;
 		rso_cfg->orig_sec_info.ucastcipherset =
@@ -1075,6 +1079,19 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 		 * wlan_cm_send_connect_rsp
 		 */
 		rso_cfg->tried_candidate_freq_list.num_chan = 0;
+
+		/*
+		 * This user configure MFP capability is global and is for
+		 * multiple profiles which can be used by firmware for cross-AKM
+		 * roaming. When user configures MFP required then we should
+		 * set both MFPC and MFPR in RSN caps.
+		 */
+		rso_user_mfp = req->crypto.user_mfp;
+		if (rso_user_mfp == RSN_CAP_MFP_REQUIRED)
+			rso_user_mfp = MGMT_FRAME_FULL_PROTECTION;
+		rso_cfg->rso_rsn_caps = (req->crypto.rsn_caps) &
+					(~MGMT_FRAME_FULL_PROTECTION);
+		rso_cfg->rso_rsn_caps = (rso_cfg->rso_rsn_caps) | rso_user_mfp;
 	}
 
 	if (wlan_get_vendor_ie_ptr_from_oui(HS20_OUI_TYPE,
@@ -1122,8 +1139,29 @@ QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg)
 
 	return QDF_STATUS_SUCCESS;
 }
-
 #ifdef WLAN_FEATURE_11BE_MLO
+#if defined (SAP_MULTI_LINK_EMULATION)
+static void
+set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
+			       struct mlo_partner_info *partner_info)
+{
+	partner_info->partner_link_info[0].link_addr =
+		scan_entry->ml_info.link_info[0].link_addr;
+	partner_info->partner_link_info[0].link_id =
+		scan_entry->ml_info.link_info[0].link_id;
+	partner_info->partner_link_info[0].chan_freq =
+		scan_entry->ml_info.link_info[0].freq;
+	partner_info->num_partner_links = 1;
+
+}
+#else
+static void
+set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
+			       struct mlo_partner_info *partner_info)
+{
+}
+#endif
+
 QDF_STATUS
 cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 		       struct scan_cache_entry *scan_entry,
@@ -1132,9 +1170,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	uint8_t i, j = 0;
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
-	struct scan_cache_entry *part_scan_entry = NULL;
-	bool is_security_allowed;
-	struct qdf_mac_addr *link_mac;
 
 	/* If ML IE is not present then return failure*/
 	if (!scan_entry->ie_list.multi_link_bv)
@@ -1171,34 +1206,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 			break;
 
 		if (scan_entry->ml_info.link_info[i].is_valid_link) {
-			link_mac = &scan_entry->ml_info.link_info[i].link_addr;
-			part_scan_entry = wlan_scan_get_scan_entry_by_mac_freq(
-					pdev,
-					link_mac,
-					scan_entry->ml_info.link_info[i].freq);
-			if (!part_scan_entry) {
-				scm_debug("scan entry not found for link addr: "
-					  QDF_MAC_ADDR_FMT,
-					  QDF_MAC_ADDR_REF(link_mac->bytes));
-				continue;
-			}
-
-			/*
-			 * Reject the partner link that doesn’t pass the
-			 * security check and validate the next available
-			 * partner link. If none of the partner link passes
-			 * the security check, proceed connection with
-			 * single link.
-			 */
-			is_security_allowed =
-				wlan_cm_is_eht_allowed_for_current_security(
-							part_scan_entry);
-			util_scan_free_cache_entry(part_scan_entry);
-			if (!is_security_allowed) {
-				mlme_debug("current security is not valid for partner link");
-				continue;
-			}
-
 			partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
 			partner_info->partner_link_info[j].link_id =
@@ -1213,7 +1220,9 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	}
 
 	partner_info->num_partner_links = j;
-	mlme_debug("sta and ap integrate link num: %d", j);
+	mlme_debug("sta and ap intersect num of partner link: %d", j);
+
+	set_partner_info_for_2link_sap(scan_entry, partner_info);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1642,6 +1651,7 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("T2LM IE beacon process failed");
 	}
+	wlan_connectivity_t2lm_status_event(vdev);
 
 	return status;
 }
@@ -1655,12 +1665,13 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 static void
 cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_objmgr_peer *peer;
 	struct wlan_crypto_key *crypto_key;
 	enum QDF_OPMODE op_mode;
 	uint16_t i;
 	bool pairwise;
 	uint8_t vdev_id;
+	uint8_t link_id;
+	bool key_present = false;
 	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
 				 WLAN_CRYPTO_MAXIGTKKEYIDX +
 				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
@@ -1674,9 +1685,11 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		return;
 
-	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLME_CM_ID);
-	if (!peer) {
-		mlo_err("Peer is null return");
+	link_id = wlan_vdev_get_link_id(vdev);
+
+	if (!mlo_is_set_key_defered(vdev, link_id) &&
+	    !mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlme_debug("keys are not deferred for link_id %d", link_id);
 		return;
 	}
 
@@ -1686,13 +1699,18 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 			continue;
 
 		pairwise = crypto_key->key_type ? WLAN_CRYPTO_KEY_TYPE_UNICAST : WLAN_CRYPTO_KEY_TYPE_GROUP;
-		mlo_debug("MLO:send keys for vdev_id %d, key_idx %d, pairwise %d",
-			  vdev_id, i, pairwise);
+		mlo_debug("MLO:send keys for vdev_id %d link_id %d , key_idx %d, pairwise %d",
+			  vdev_id, link_id, i, pairwise);
 		mlme_cm_osif_send_keys(vdev, i, pairwise,
 				       crypto_key->cipher_type);
+		key_present = true;
 	}
 
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
+	if (!key_present && mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlme_err("No key found for link_id %d", link_id);
+		QDF_BUG(0);
+	}
+	mlo_defer_set_keys(vdev, link_id, false);
 }
 
 QDF_STATUS
