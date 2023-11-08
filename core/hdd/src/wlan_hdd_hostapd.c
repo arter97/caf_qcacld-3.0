@@ -7736,16 +7736,6 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 {}
 #endif
 
-static inline uint32_t
-wlan_util_get_centre_freq(struct wlan_hdd_link_info *link_info)
-{
-	struct wlan_channel *chan;
-
-	chan = wlan_vdev_get_active_channel(link_info->vdev);
-
-	return chan->ch_freq;
-}
-
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 static inline struct cfg80211_chan_def
 wlan_util_get_chan_def(struct wireless_dev *wdev, unsigned int link_id)
@@ -7814,6 +7804,8 @@ static void hdd_update_param_chandef(struct wlan_hdd_link_info *link_info,
 	struct wlan_channel *chan;
 
 	chan = wlan_vdev_get_active_channel(link_info->vdev);
+	if (!chan)
+		return;
 
 	hdd_create_chandef(link_info->adapter, chan, chandef);
 }
@@ -8166,7 +8158,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
-		if (wlan_util_get_centre_freq(link_info) !=
+		if (wlan_get_operation_chan_freq(link_info->vdev) !=
 				params->chandef.chan->center_freq)
 			hdd_update_param_chandef(link_info, &params->chandef);
 
