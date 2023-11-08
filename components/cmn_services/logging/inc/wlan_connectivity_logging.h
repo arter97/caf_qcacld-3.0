@@ -367,6 +367,7 @@ struct wlan_diag_sta_info {
  * @vdev_id: vdev id associated with the link
  * @tid_ul: TID-to-link mapping information on the uplink
  * @tid_dl: TID-to-link mapping information on the downlink
+ * @status: MLO setup status. 0 - Success, 1 - failure
  * @link_addr: Link address of the link.
  */
 struct wlan_diag_mlo_cmn_info {
@@ -377,7 +378,7 @@ struct wlan_diag_mlo_cmn_info {
 	uint8_t tid_dl;
 	uint8_t status;
 	uint8_t link_addr[QDF_MAC_ADDR_SIZE];
-};
+} qdf_packed;
 
 #define DIAG_MLO_SETUP_VERSION 1
 #define DIAG_MLO_SETUP_VERSION_V2 2

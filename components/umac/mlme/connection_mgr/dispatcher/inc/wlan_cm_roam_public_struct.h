@@ -384,7 +384,8 @@ enum roam_fail_params {
  * @ROAM_FAIL_REASON_AUTH_RECV: Authentication response received with
  * error status code
  * @ROAM_FAIL_REASON_REASSOC_SEND: Reassoc request TX failed
- * @ROAM_FAIL_REASON_REASSOC_RECV: Reassoc response frame not received
+ * @ROAM_FAIL_REASON_REASSOC_RECV: Reassoc response frame received with failure
+ * status
  * @ROAM_FAIL_REASON_NO_REASSOC_RESP: No reassociation response received
  * @ROAM_FAIL_REASON_EAPOL_TIMEOUT: EAPoL timedout
  * @ROAM_FAIL_REASON_MLME: MLME internal error
@@ -430,8 +431,8 @@ enum wlan_roam_failure_reason_code {
 	/* Failure reasons after roam scan is complete */
 	ROAM_FAIL_REASON_HOST,
 	ROAM_FAIL_REASON_AUTH_SEND,
-	ROAM_FAIL_REASON_NO_AUTH_RESP,
 	ROAM_FAIL_REASON_AUTH_RECV,
+	ROAM_FAIL_REASON_NO_AUTH_RESP,
 	ROAM_FAIL_REASON_REASSOC_SEND,
 	ROAM_FAIL_REASON_REASSOC_RECV,
 	ROAM_FAIL_REASON_NO_REASSOC_RESP,
