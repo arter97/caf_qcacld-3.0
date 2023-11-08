@@ -1998,7 +1998,8 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 }
 
 void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
-			      struct csa_offload_params *csa_params)
+			      struct csa_offload_params *csa_params,
+			      bool send_status)
 {
 	struct pe_session *session_entry;
 	struct mlme_legacy_priv *mlme_priv;
@@ -2024,19 +2025,19 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	if (!session_entry) {
 		pe_err("Session does not exists for "QDF_MAC_ADDR_FMT,
 		       QDF_MAC_ADDR_REF(csa_params->bssid.bytes));
-		goto err;
+		goto free;
 	}
 	sta_ds = dph_lookup_hash_entry(mac_ctx, session_entry->bssId, &aid,
 		&session_entry->dph.dphHashTable);
 
 	if (!sta_ds) {
 		pe_err("sta_ds does not exist");
-		goto err;
+		goto send_event;
 	}
 
 	if (!LIM_IS_STA_ROLE(session_entry)) {
 		pe_debug("Invalid role to handle CSA");
-		goto err;
+		goto send_event;
 	}
 
 	lim_ch_switch = &session_entry->gLimChannelSwitch;
@@ -2055,7 +2056,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (!lim_sta_follow_csa(session_entry, csa_params,
 				lim_ch_switch, ch_params))
-		goto err;
+		goto send_event;
 	else
 		qdf_mem_zero(&ch_params, sizeof(struct ch_params));
 
@@ -2063,13 +2064,13 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 					session_entry->curr_op_freq,
 					csa_params)) {
 		pe_debug("Channel switch is not allowed");
-		goto err;
+		goto send_event;
 	}
 
 	if (!lim_mlo_is_csa_allow(session_entry->vdev,
 				  csa_params->csa_chan_freq)) {
 		pe_debug("Channel switch for MLO vdev is not allowed");
-		goto err;
+		goto send_event;
 	}
 	/*
 	 * on receiving channel switch announcement from AP, delete all
@@ -2319,7 +2320,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (!lim_sta_follow_csa(session_entry, csa_params,
 				lim_ch_switch, ch_params))
-		goto err;
+		goto send_event;
 
 	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
 		link_id = wlan_vdev_get_link_id(session_entry->vdev);
@@ -2349,7 +2350,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (mlo_is_any_link_disconnecting(session_entry->vdev)) {
 		pe_info_rl("Ignore CSA, vdev is in not in conncted state");
-		goto err;
+		goto send_event;
 	}
 
 	lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
@@ -2361,8 +2362,10 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 			WLAN_PE_DIAG_SWITCH_CHL_IND_EVENT, session_entry,
 			QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
 #endif
-
-err:
+send_event:
+	if (send_status)
+		wlan_mlme_send_csa_event_status_ind(session_entry->vdev, 0);
+free:
 	qdf_mem_free(csa_params);
 }
 
@@ -2394,7 +2397,7 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 		qdf_mem_free(csa_params);
 		return;
 	}
-	lim_handle_sta_csa_param(mac_ctx, csa_params);
+	lim_handle_sta_csa_param(mac_ctx, csa_params, true);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -2418,7 +2421,7 @@ void lim_handle_mlo_sta_csa_param(struct wlan_objmgr_vdev *vdev,
 
 	qdf_mem_copy(tmp_csa_params, csa_params, sizeof(*tmp_csa_params));
 
-	lim_handle_sta_csa_param(mac, tmp_csa_params);
+	lim_handle_sta_csa_param(mac, tmp_csa_params, false);
 }
 #endif
 
