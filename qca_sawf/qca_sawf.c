@@ -389,6 +389,10 @@ void qca_sawf_peer_config_ul(struct net_device *netdev, uint8_t *mac_addr,
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc)
 		return;
+
+	if (cfg_get(psoc, CFG_OL_SAWF_UL_FSE_ENABLE))
+		return;
+
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 
 	osdev = ath_netdev_priv(netdev);
