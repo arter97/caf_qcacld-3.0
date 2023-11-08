@@ -7438,9 +7438,12 @@ hdd_vdev_configure_max_tdls_params(struct wlan_objmgr_psoc *psoc,
 	uint16_t max_peer_count;
 	bool target_bigtk_support = false;
 
-	/* Max peer can be tdls peers + self peer + bss peer */
+	/*
+	 * Max peer can be tdls peers + self peer + bss peer +
+	 * temp bss peer for roaming create/delete peer at same time
+	 */
 	max_peer_count = cfg_tdls_get_max_peer_count(psoc);
-	max_peer_count += 2;
+	max_peer_count += 3;
 	wlan_vdev_set_max_peer_count(vdev, max_peer_count);
 
 	ucfg_mlme_get_bigtk_support(psoc, &target_bigtk_support);
