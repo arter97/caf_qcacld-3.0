@@ -1325,6 +1325,7 @@ cm_copy_join_params(struct wlan_objmgr_vdev *vdev,
 	join_req->force_rsne_override = req->force_rsne_override;
 	join_req->is_wps_connection = req->is_wps_connection;
 	join_req->is_osen_connection = req->is_osen_connection;
+	join_req->is_ssid_hidden = req->bss->entry->is_hidden_ssid;
 
 	return QDF_STATUS_SUCCESS;
 }

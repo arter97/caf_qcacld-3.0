@@ -678,6 +678,7 @@ struct wlan_mlo_ie_info {
  * @is_oui_auth_assoc_6mbps_2ghz_enable: send auth/assoc req with 6 Mbps rate
  * @is_unexpected_peer_error: true if unexpected peer error
  * on 2.4 GHz
+ * @join_probe_cnt: join probe request count
  */
 struct pe_session {
 	uint8_t available;
@@ -1006,6 +1007,7 @@ struct pe_session {
 	uint8_t user_edca_set;
 	bool is_oui_auth_assoc_6mbps_2ghz_enable;
 	bool is_unexpected_peer_error;
+	uint8_t join_probe_cnt;
 };
 
 /*-------------------------------------------------------------------------

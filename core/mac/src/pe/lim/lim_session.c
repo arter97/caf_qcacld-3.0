@@ -670,6 +670,7 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 	session_ptr->prev_auth_seq_num = 0xFFFF;
 
 	session_ptr->user_edca_set = 0;
+	session_ptr->join_probe_cnt = 0;
 
 	return &mac->lim.gpSession[i];
 

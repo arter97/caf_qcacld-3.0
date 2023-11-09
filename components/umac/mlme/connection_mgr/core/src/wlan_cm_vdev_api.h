@@ -46,7 +46,8 @@
  * as a testbed device with special functionality and not recommended
  * for production.
  * @is_wps_connection: is wps connection
- * @is_osen_connection: is osen connectgion
+ * @is_osen_connection: is osen connection
+ * @is_ssid_hidden: AP SSID is hidden
  * @assoc_ie: assoc ie to be used in assoc req
  * @scan_ie: Default scan ie to be used in the uncast probe req
  * @entry: scan entry for the candidate
@@ -59,7 +60,8 @@ struct cm_vdev_join_req {
 	wlan_cm_id cm_id;
 	uint8_t force_rsne_override:1,
 		is_wps_connection:1,
-		is_osen_connection:1;
+		is_osen_connection:1,
+		is_ssid_hidden:1;
 	struct element_info assoc_ie;
 	struct element_info scan_ie;
 	struct scan_cache_entry *entry;

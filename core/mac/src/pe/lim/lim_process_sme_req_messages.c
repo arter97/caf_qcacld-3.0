@@ -4557,6 +4557,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	session->ssId.length = req->entry->ssid.length;
 	qdf_mem_copy(session->ssId.ssId, req->entry->ssid.ssid,
 		     session->ssId.length);
+	session->ssidHidden = req->is_ssid_hidden;
 
 	status = lim_fill_pe_session(mac_ctx, session, bss_desc);
 	if (QDF_IS_STATUS_ERROR(status)) {
