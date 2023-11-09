@@ -46,6 +46,7 @@
 #endif
 #include <wlan_lmac_if_def.h>
 #include "target_if_mlme.h"
+#include "wlan_mlo_mgr_sta.h"
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -867,6 +868,8 @@ QDF_STATUS mlme_set_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev,
 	}
 
 	mlme_priv->chan_switch_in_progress = val;
+	mlo_set_chan_switch_in_progress(vdev, val);
+
 	mlme_legacy_info("Set chan_switch_in_progress: %d vdev %d",
 			 val, wlan_vdev_get_id(vdev));
 
