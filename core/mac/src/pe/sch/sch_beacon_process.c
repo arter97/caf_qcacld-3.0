@@ -52,6 +52,7 @@
 #include "wlan_reg_services_api.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlme_main.h"
+#include <wlan_mlo_mgr_link_switch.h>
 
 static void
 ap_beacon_process_5_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
@@ -1028,8 +1029,19 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (!session)
 		return;
 
+	/*
+	 * Drop the beacon/probe response from current connected AP in
+	 * below cases to avoid responding to the changes in beacon(e.g. doing
+	 * VDEV_RESTART to update to the latest capabilities),
+	 * 1. vdev is not in connected state: vdev might be transitioning
+	 * 2. Link switch is in progress: Current link or one of the partner
+	 *                                links are getting replaced.
+	 *
+	 * New beacons/probe rsps can be considered once post these operations.
+	 */
 	if (LIM_IS_STA_ROLE(session) &&
-	    !wlan_cm_is_vdev_connected(session->vdev)) {
+	    (!wlan_cm_is_vdev_connected(session->vdev) ||
+	     mlo_mgr_is_link_switch_in_progress(session->vdev))) {
 		pe_debug_rl("vdev %d, drop beacon", session->vdev_id);
 		return;
 	}
