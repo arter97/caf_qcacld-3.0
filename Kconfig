@@ -2062,6 +2062,18 @@ config CNSS_QCA6750
 	bool "Enable CNSS_QCA6750"
 	default n
 
+config QMI_COMPONENT_ENABLE
+	bool "enable QMI_COMPONENT_ENABLE"
+	default n
+
+config QMI_WFDS
+	bool "enable QMI_WFDS"
+	default n
+
+config FEATURE_DIRECT_LINK
+	bool "enable FEATURE_DIRECT_LINK"
+	default n
+
 config WLAN_FEATURE_EMLSR
 	bool "Enable EMLSR feature"
 	default n
