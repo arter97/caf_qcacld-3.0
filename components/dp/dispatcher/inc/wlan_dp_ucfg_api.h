@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1633,4 +1633,51 @@ ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 				  struct cdp_vdev_stats *buf);
 
+#ifdef WLAN_SUPPORT_SERVICE_CLASS
+/*
+ * ucfg_dp_svc_add() - Add service class
+ * @data: pointer to svc data
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_svc_add(struct dp_svc_data *data);
+
+/*
+ * ucfg_dp_svc_remove() - Remove service class
+ * @svc_id: service class id
+ *
+ * Return: Zero in case of successful deletion
+ */
+QDF_STATUS ucfg_dp_svc_remove(uint8_t svc_id);
+
+/*
+ * ucfg_dp_svc_get() - Get service class
+ * @svc_id: service class id
+ * @svc_table: pointer to service claass table
+ * @table_size: size of svc table
+ *
+ * Return: number of service class in a svc table
+ */
+uint8_t ucfg_dp_svc_get(uint8_t svc_id,	struct dp_svc_data *svc_table,
+			uint16_t table_size);
+#else
+static inline QDF_STATUS
+ucfg_dp_svc_add(struct dp_svc_data *data)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+ucfg_dp_svc_remove(uint8_t svc_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline uint8_t
+ucfg_dp_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
+		uint16_t table_size)
+{
+	return 0;
+}
+#endif
 #endif /* _WLAN_DP_UCFG_API_H_ */

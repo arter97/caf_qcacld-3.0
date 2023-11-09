@@ -45,6 +45,7 @@
 #include "dp_internal.h"
 #endif
 #include <cdp_txrx_ctrl.h>
+#include "wlan_dp_svc.h"
 
 #ifdef WLAN_DP_PROFILE_SUPPORT
 /* Memory profile table based on supported caps */
@@ -2178,6 +2179,7 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 
 	dp_ctx->cdp_soc = dp_soc;
 	wlan_dp_rx_fisa_cmem_attach(dp_ctx);
+	wlan_dp_svc_init(dp_ctx);
 
 	return dp_soc;
 
@@ -2192,6 +2194,7 @@ void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
 {
 	cdp_soc_deinit(soc);
 	cdp_soc_detach(soc);
+	wlan_dp_svc_deinit(dp_get_context());
 }
 
 QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
