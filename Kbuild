@@ -2655,6 +2655,12 @@ ifeq ($(CONFIG_FEATURE_DIRECT_LINK), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_wfds.o
 endif
 
+ifeq ($(CONFIG_WLAN_SUPPORT_SERVICE_CLASS), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_svc.o
+WLAN_DP_COMP_OBJS += $(DP_COMP_UCFG_DIR)/wlan_dp_svc_ucfg_api.o
+endif
+###########################################################
+
 $(call add-wlan-objs,dp_comp,$(WLAN_DP_COMP_OBJS))
 
 #######################################################
@@ -4857,6 +4863,7 @@ ccflags-$(CONFIG_DUMP_REO_QUEUE_INFO_IN_DDR) += -DDUMP_REO_QUEUE_INFO_IN_DDR
 ccflags-$(CONFIG_DP_RX_REFILL_CPU_PERF_AFFINE_MASK) += -DDP_RX_REFILL_CPU_PERF_AFFINE_MASK
 ccflags-$(CONFIG_WLAN_FEATURE_AFFINITY_MGR) += -DWLAN_FEATURE_AFFINITY_MGR
 ccflags-$(CONFIG_FEATURE_ENABLE_CE_DP_IRQ_AFFINE) += -DFEATURE_ENABLE_CE_DP_IRQ_AFFINE
+ccflags-$(CONFIG_WLAN_SUPPORT_SERVICE_CLASS) += -DWLAN_SUPPORT_SERVICE_CLASS
 found = $(shell if grep -qF "walt_get_cpus_taken" $(srctree)/kernel/sched/walt/walt.c; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DWALT_GET_CPU_TAKEN_SUPPORT
