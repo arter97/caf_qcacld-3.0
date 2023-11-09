@@ -2565,6 +2565,7 @@ void wlan_add_supported_5Ghz_channels(struct wlan_objmgr_psoc *psoc,
 	uint32_t size = 0;
 	uint32_t *freq_list;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	*num_chnl = 0;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -2572,7 +2573,6 @@ void wlan_add_supported_5Ghz_channels(struct wlan_objmgr_psoc *psoc,
 
 	if (!chan_list) {
 		mlme_err("chan_list buffer NULL");
-		*num_chnl = 0;
 		return;
 	}
 	size = mlme_obj->cfg.reg.valid_channel_list_num;

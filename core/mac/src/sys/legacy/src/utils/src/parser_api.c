@@ -2015,6 +2015,10 @@ populate_dot11f_supp_channels(struct mac_context *mac,
 					 supportedChannels.channelList,
 					 &supportedChannels.numChnl,
 					 false);
+
+	if (supportedChannels.numChnl == 0)
+		return;
+
 	p = supportedChannels.channelList;
 	pDot11f->num_bands = supportedChannels.numChnl;
 
