@@ -521,6 +521,7 @@ struct dp_direct_link_context {
  * @arp_connectivity_map: ARP connectiviy map
  * @rx_wake_lock: rx wake lock
  * @ol_enable: Enable/Disable offload
+ * @svc_ctx: service class context
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -597,6 +598,9 @@ struct wlan_dp_psoc_context {
 #ifdef FEATURE_DIRECT_LINK
 	qdf_mutex_t dp_direct_link_lock;
 	struct dp_direct_link_context *dp_direct_link_ctx;
+#endif
+#ifdef WLAN_SUPPORT_SERVICE_CLASS
+	struct dp_svc_ctx *svc_ctx;
 #endif
 };
 

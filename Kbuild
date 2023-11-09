@@ -2604,6 +2604,12 @@ ifeq ($(CONFIG_FEATURE_DIRECT_LINK), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_wfds.o
 endif
 
+ifeq ($(CONFIG_WLAN_SUPPORT_SERVICE_CLASS), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_svc.o
+WLAN_DP_COMP_OBJS += $(DP_COMP_UCFG_DIR)/wlan_dp_svc_ucfg_api.o
+endif
+###########################################################
+
 $(call add-wlan-objs,dp_comp,$(WLAN_DP_COMP_OBJS))
 
 #######################################################
@@ -4657,6 +4663,7 @@ cppflags-$(CONFIG_DEVICE_FORCE_WAKE_ENABLE) += -DDEVICE_FORCE_WAKE_ENABLE
 cppflags-$(CONFIG_WINDOW_REG_PLD_LOCK_ENABLE) += -DWINDOW_REG_PLD_LOCK_ENABLE
 cppflags-$(CONFIG_DUMP_REO_QUEUE_INFO_IN_DDR) += -DDUMP_REO_QUEUE_INFO_IN_DDR
 cppflags-$(CONFIG_DP_RX_REFILL_CPU_PERF_AFFINE_MASK) += -DDP_RX_REFILL_CPU_PERF_AFFINE_MASK
+cppflags-$(CONFIG_WLAN_SUPPORT_SERVICE_CLASS) += -DWLAN_SUPPORT_SERVICE_CLASS
 
 ifdef CONFIG_MAX_CLIENTS_ALLOWED
 ccflags-y += -DWLAN_MAX_CLIENTS_ALLOWED=$(CONFIG_MAX_CLIENTS_ALLOWED)

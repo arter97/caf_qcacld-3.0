@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -770,4 +770,32 @@ struct dp_traffic_end_indication {
 	uint8_t def_dscp;
 	uint8_t spl_dscp;
 };
+
+#define DP_SVC_INVALID_ID 0xFF
+#define DP_MAX_SVC 32
+#define DP_SVC_ARRAY_SIZE DP_MAX_SVC
+
+#define DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE   BIT(0)
+#define DP_SVC_FLAGS_APP_IND_DEF_DSCP           BIT(1)
+#define DP_SVC_FLAGS_APP_IND_SPL_DSCP           BIT(2)
+#define DP_SVC_FLAGS_SVC_ID			BIT(3)
+
+/* struct dp_svc_data - service class node
+ * @node: list node
+ * @svc_id: service class id
+ * @policy_ref_count: number of policies associated
+ * @buffer_latency_tolerance: buffer latency tolarence in ms
+ * @app_ind_default_dscp: default dscp
+ * @app_ind_special_dscp: special dscp to override with default dscp
+ */
+struct dp_svc_data {
+	qdf_list_node_t node;
+	uint8_t svc_id;
+	uint8_t policy_ref_count;
+	uint32_t buffer_latency_tolerance;
+	uint8_t app_ind_default_dscp;
+	uint8_t app_ind_special_dscp;
+	uint32_t flags;
+};
+
 #endif /* end  of _WLAN_DP_PUBLIC_STRUCT_H_ */

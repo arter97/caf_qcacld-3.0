@@ -42,6 +42,7 @@
 #ifdef FEATURE_DIRECT_LINK
 #include "dp_internal.h"
 #endif
+#include "wlan_dp_svc.h"
 
 #ifdef WLAN_DP_PROFILE_SUPPORT
 /* Memory profile table based on supported caps */
