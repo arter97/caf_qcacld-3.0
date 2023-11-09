@@ -3047,7 +3047,7 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
 
 		mlo_mgr_update_ap_link_info(session->vdev,
 					    partner_link_info->link_id,
-					    partner_link_info->ap_link_addr.bytes,
+					    partner_link_info->link_addr.bytes,
 					    channel);
 	}
 }
