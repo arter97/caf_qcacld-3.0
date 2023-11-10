@@ -21,7 +21,7 @@
 #include "wlan_policy_mgr_ll_sap.h"
 
 #define BEARER_SWITCH_TIMEOUT 5000
-#define BS_PREFIX_FMT "BS_SM vdev %d req_id 0x%x: "
+#define BS_PREFIX_FMT "BS_SM_%d req_id 0x%x: "
 #define BS_PREFIX_REF(vdev_id, req_id) (vdev_id), (req_id)
 
 
@@ -291,7 +291,7 @@ ll_lt_sap_bs_increament_ref_count(struct bearer_switch_info *bs_ctx,
 		ref_count = qdf_atomic_inc_return(
 			&bs_ctx->ref_count[bs_req->vdev_id][bs_req->source]);
 
-	ll_sap_nofl_debug(BS_PREFIX_FMT "req_vdev %d src %d ref_count %d Total ref count %d",
+	ll_sap_nofl_debug(BS_PREFIX_FMT "vdev %d src %d count %d Total req count %d",
 			  BS_PREFIX_REF(wlan_vdev_get_id(bs_ctx->vdev),
 					bs_req->request_id),
 			  bs_req->vdev_id, bs_req->source, ref_count,
@@ -331,7 +331,7 @@ ll_lt_sap_bs_decreament_ref_count(struct bearer_switch_info *bs_ctx,
 		ref_count = qdf_atomic_dec_return(&bs_ctx->fw_ref_count);
 	} else if (!qdf_atomic_read(
 			&bs_ctx->ref_count[bs_req->vdev_id][bs_req->source])) {
-		ll_sap_debug(BS_PREFIX_FMT "req_vdev %d src %d ref_count is zero",
+		ll_sap_debug(BS_PREFIX_FMT "vdev %d src %d count is zero",
 			     BS_PREFIX_REF(wlan_vdev_get_id(bs_ctx->vdev),
 					   bs_req->request_id),
 			     bs_req->vdev_id, bs_req->source);
@@ -341,7 +341,7 @@ ll_lt_sap_bs_decreament_ref_count(struct bearer_switch_info *bs_ctx,
 			&bs_ctx->ref_count[bs_req->vdev_id][bs_req->source]);
 	}
 	total_ref_count = qdf_atomic_dec_return(&bs_ctx->total_ref_count);
-	ll_sap_nofl_debug(BS_PREFIX_FMT "req_vdev %d src %d ref_count %d Total ref count %d",
+	ll_sap_nofl_debug(BS_PREFIX_FMT "vdev %d src %d count %d Total req count %d",
 			  BS_PREFIX_REF(wlan_vdev_get_id(bs_ctx->vdev),
 					bs_req->request_id),
 			  bs_req->vdev_id, bs_req->source,
@@ -417,6 +417,13 @@ ll_lt_sap_invoke_bs_requester_cbks(struct bearer_switch_info *bs_ctx,
 
 	for (i = 0; i < MAX_BEARER_SWITCH_REQUESTERS; i++) {
 		if (!bs_ctx->requests[i].requester_cb)
+			continue;
+
+		/*
+		 * Callbacks of WLAN_BS_REQ_TO_WLAN already invoked without
+		 * waiting for any response so no need to invoke from here
+		 */
+		if (bs_ctx->requests[i].req_type == WLAN_BS_REQ_TO_WLAN)
 			continue;
 
 		bs_ctx->requests[i].requester_cb(psoc,
@@ -505,8 +512,9 @@ ll_lt_sap_send_bs_req_to_userspace(struct wlan_objmgr_vdev *vdev,
  * no further action is required, just invoke the callback of the requester
  * with status as success.
  * If total_ref_count is zero, means none of the module wants to be in the
- * non-wlan bearer, cache the request and send the wlan bearer switch request
- * to userspace.
+ * non-wlan bearer, send the wlan bearer switch request to userspace.and
+ * cache the request so that if timeout or failure happens, state machine can
+ * be moved from BEARER_WLAN_REQUESTED to BEARER_WLAN
  * If the last_status is not QDF_STATUS_SUCCESS, means the last request to
  * switch the bearer to non-wlan was failed/timedout and the state is moved to
  * non-wlan, irrespective of the last status follow the same flow and send the
@@ -525,12 +533,27 @@ ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state(
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
+	/*
+	 * If host driver did not requested for non wlan bearer then don't send
+	 * a request to switch back to wlan
+	 */
+	if (!bs_ctx->sm.is_non_wlan_requested) {
+		ll_sap_debug("Non wlan is not requested, don't switch to wlan");
+		goto invoke_requester_cb;
+	}
+
 	if (qdf_atomic_read(&bs_ctx->total_ref_count))
 		goto invoke_requester_cb;
 
 	ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
 
 	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
+
+	/*
+	 * Switch back to wlan is sent here, hence set the non wlan requested
+	 * as false
+	 */
+	bs_ctx->sm.is_non_wlan_requested = false;
 
 	status = qdf_mc_timer_start(&bs_ctx->bs_request_timer,
 				    BEARER_SWITCH_TIMEOUT);
@@ -594,6 +617,8 @@ ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_state(
 
 	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
 
+	bs_ctx->sm.is_non_wlan_requested = true;
+
 	status = qdf_mc_timer_start(&bs_ctx->bs_request_timer,
 				    BEARER_SWITCH_TIMEOUT);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -618,7 +643,7 @@ ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_state(
  * 2) If total_ref_count is zero, it means no other module wants to be
  * in non-wlan state, cache this wlan bearer switch request and invoke the
  * callback of the caller with status as success, once the response of
- * ongoign request of the non-wlan switch is received then check the
+ * ongoing request of the non-wlan switch is received then check the
  * total_ref_count and if it is 0, then send the request to switch to
  * wlan in ll_lt_sap_handle_bs_to_non_wlan_completed,
  * ll_lt_sap_handle_bs_to_non_wlan_failure or in
@@ -723,7 +748,6 @@ ll_lt_sap_handle_bs_to_non_wlan_timeout(
 		ll_sap_err("BS_SM vdev %d Invalid total ref count %d",
 			   wlan_vdev_get_id(bs_ctx->vdev),
 			   qdf_atomic_read(&bs_ctx->total_ref_count));
-		QDF_BUG(0);
 	}
 
 	bs_sm_deliver_event(wlan_vdev_get_psoc(bs_ctx->vdev),
@@ -776,7 +800,6 @@ ll_lt_sap_handle_bs_to_non_wlan_completed(
 		ll_sap_err("BS_SM vdev %d Invalid total ref count %d",
 			   wlan_vdev_get_id(bs_ctx->vdev),
 			   qdf_atomic_read(&bs_ctx->total_ref_count));
-		QDF_BUG(0);
 	}
 
 	bs_sm_deliver_event(wlan_vdev_get_psoc(bs_ctx->vdev),
@@ -835,7 +858,6 @@ ll_lt_sap_handle_bs_to_non_wlan_failure(
 		ll_sap_err("BS_SM vdev %d Invalid total ref count %d",
 			   wlan_vdev_get_id(bs_ctx->vdev),
 			   qdf_atomic_read(&bs_ctx->total_ref_count));
-		QDF_BUG(0);
 	}
 
 	bs_sm_deliver_event(wlan_vdev_get_psoc(bs_ctx->vdev),
@@ -893,9 +915,9 @@ ll_lt_sap_handle_bs_to_non_wlan_in_wlan_state(
 
 	ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
 
-	/*
-	 * Todo, Send bearer switch request to userspace
-	 */
+	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
+
+	bs_ctx->sm.is_non_wlan_requested = true;
 
 	bs_sm_transition_to(bs_ctx, BEARER_NON_WLAN_REQUESTED);
 
@@ -978,12 +1000,38 @@ ll_lt_sap_switch_to_non_wlan_from_wlan(struct bearer_switch_info *bs_ctx)
 		ll_sap_err("BS_SM vdev %d Invalid total ref count %d",
 			   wlan_vdev_get_id(bs_ctx->vdev),
 			   qdf_atomic_read(&bs_ctx->total_ref_count));
-		QDF_BUG(0);
 	}
 
 	bs_sm_deliver_event(wlan_vdev_get_psoc(bs_ctx->vdev),
 			    WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN,
 			    sizeof(*bs_req), bs_req);
+}
+
+/**
+ * ll_lt_sap_flush_bs_wlan_req() - API to flush bearer switch
+ * requests to wlan bearer from cached requests
+ * @bs_ctx: Bearer switch info
+ *
+ * This function clears the wlan bearer requests from the cached list, there is
+ * no need to invoke the callbacks of wlan switch requests as these were already
+ * invoked as soon as the requests are received.
+ *
+ * Return: None
+ */
+static void
+ll_lt_sap_flush_bs_wlan_req(struct bearer_switch_info *bs_ctx)
+{
+	uint8_t i;
+
+	for (i = 0; i < MAX_BEARER_SWITCH_REQUESTERS; i++) {
+		if (bs_ctx->requests[i].requester_cb &&
+		    bs_ctx->requests[i].req_type != WLAN_BS_REQ_TO_WLAN)
+			continue;
+
+		bs_ctx->requests[i].requester_cb = NULL;
+		bs_ctx->requests[i].arg = NULL;
+		bs_ctx->requests[i].arg_value = 0;
+	}
 }
 
 /**
@@ -1015,6 +1063,9 @@ ll_lt_sap_handle_bs_to_wlan_timeout(
 
 	bs_ctx->last_status = QDF_STATUS_E_TIMEOUT;
 
+	/* Remove this request from the cache list if it was cached */
+	ll_lt_sap_flush_bs_wlan_req(bs_ctx);
+
 	ll_lt_sap_switch_to_non_wlan_from_wlan(bs_ctx);
 }
 
@@ -1042,6 +1093,9 @@ ll_lt_sap_handle_bs_to_wlan_completed(
 	bs_sm_transition_to(bs_ctx, BEARER_WLAN);
 
 	bs_ctx->last_status = QDF_STATUS_SUCCESS;
+
+	/* Remove this request from the cache list if it was cached */
+	ll_lt_sap_flush_bs_wlan_req(bs_ctx);
 
 	ll_lt_sap_switch_to_non_wlan_from_wlan(bs_ctx);
 }
@@ -1072,6 +1126,9 @@ ll_lt_sap_handle_bs_to_wlan_failure(
 	bs_sm_transition_to(bs_ctx, BEARER_WLAN);
 
 	bs_ctx->last_status = QDF_STATUS_E_FAILURE;
+
+	/* Remove this request from the cache list if it was cached */
+	ll_lt_sap_flush_bs_wlan_req(bs_ctx);
 
 	ll_lt_sap_switch_to_non_wlan_from_wlan(bs_ctx);
 }

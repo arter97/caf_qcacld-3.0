@@ -78,11 +78,13 @@ enum wlan_bearer_switch_sm_evt {
  * @bs_sm_lock: sm lock
  * @sm_hdl: sm handlers
  * @bs_state: bearer switch state
+ * @is_non_wlan_requested: Is non-wlan bearer switch is requested or not
  */
 struct bs_state_sm {
 	qdf_mutex_t bs_sm_lock;
 	struct wlan_sm *sm_hdl;
 	enum wlan_bearer_switch_sm_state bs_state;
+	bool is_non_wlan_requested;
 };
 
 /**
