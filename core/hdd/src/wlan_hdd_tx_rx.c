@@ -2246,7 +2246,7 @@ QDF_STATUS hdd_rx_deliver_to_stack(struct hdd_adapter *adapter,
 
 	adapter->hdd_stats.tx_rx_stats.rx_non_aggregated++;
 	hdd_ctx->no_rx_offload_pkt_cnt++;
-	netif_status = netif_rx_ni(skb);
+	netif_status = netif_rx(skb);
 
 	if (netif_status == NET_RX_SUCCESS)
 		status = QDF_STATUS_SUCCESS;
@@ -2592,7 +2592,6 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 	bool wake_lock = false;
 	uint8_t pkt_type = 0;
 	bool track_arp = false;
-	struct wlan_objmgr_vdev *vdev;
 	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
 	bool is_eapol, send_over_nl;
 	bool is_dhcp;
@@ -2705,15 +2704,6 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 
 		dest_mac_addr = (struct qdf_mac_addr *)(skb->data);
 		mac_addr = (struct qdf_mac_addr *)(skb->data+QDF_MAC_ADDR_SIZE);
-
-		vdev = hdd_objmgr_get_vdev_by_user(adapter,
-						   WLAN_OSIF_TDLS_ID);
-		if (vdev) {
-			ucfg_tdls_update_rx_pkt_cnt(vdev, mac_addr,
-						    dest_mac_addr);
-			hdd_objmgr_put_vdev_by_user(vdev,
-						    WLAN_OSIF_TDLS_ID);
-		}
 
 		if (hdd_rx_pkt_tracepoints_enabled())
 			qdf_trace_dp_packet(skb, QDF_RX, NULL, 0);

@@ -63,6 +63,10 @@ ifeq ($(CONFIG_ARCH_MDM9640), y)
 CONFIG_MOBILE_ROUTER := y
 endif
 
+ifeq ($(CONFIG_ARCH_MDM9607), y)
+CONFIG_MOBILE_ROUTER := y
+endif
+
 ifeq ($(CONFIG_ARCH_SDX20), y)
 CONFIG_MOBILE_ROUTER := y
 endif
@@ -346,12 +350,18 @@ BUILD_DIAG_VERSION := y
 ifeq ($(CONFIG_SLUB_DEBUG), y)
 	PANIC_ON_BUG := y
 	WLAN_WARN_ON_ASSERT := y
+	CONFIG_DP_TRACE := y
 else ifeq ($(CONFIG_PERF_DEBUG), y)
 	PANIC_ON_BUG := y
 	WLAN_WARN_ON_ASSERT := y
 else
 	PANIC_ON_BUG := n
 	WLAN_WARN_ON_ASSERT := n
+ifeq ($(CONFIG_ARCH_MDM9607), y)
+	BUILD_DIAG_VERSION := n
+	BUILD_DEBUG_VERSION := n
+	CONFIG_DP_TRACE := n
+endif
 endif
 
 # Compile all log levels by default
@@ -701,8 +711,6 @@ ifneq ($(TARGET_BUILD_VARIANT),user)
 CONFIG_DESC_DUP_DETECT_DEBUG := y
 CONFIG_DEBUG_RX_RING_BUFFER := y
 endif
-
-CONFIG_DP_TRACE := y
 
 ifeq ($(CONFIG_CNSS), y)
 ifeq ($(CONFIG_CNSS_SDIO), y)

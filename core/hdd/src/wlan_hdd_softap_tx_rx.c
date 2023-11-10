@@ -1175,22 +1175,23 @@ QDF_STATUS hdd_softap_rx_packet_cbk(void *adapter_context, qdf_nbuf_t rx_buf)
 		adapter->stats.rx_bytes += skb->len;
 
 		/* Send DHCP Indication to FW */
-		src_mac = (struct qdf_mac_addr *)(skb->data +
-						  QDF_NBUF_SRC_MAC_OFFSET);
-		sta_info = hdd_get_sta_info_by_mac(
-					&adapter->sta_info_list,
-					(uint8_t *)src_mac,
-					STA_INFO_SOFTAP_RX_PACKET_CBK);
+		if (qdf_nbuf_is_ipv4_dhcp_pkt(skb) || qdf_nbuf_is_ipv6_dhcp_pkt(skb)) {
+			src_mac = (struct qdf_mac_addr *)(skb->data +
+							  QDF_NBUF_SRC_MAC_OFFSET);
+			sta_info = hdd_get_sta_info_by_mac(
+						&adapter->sta_info_list,
+						(uint8_t *)src_mac,
+						STA_INFO_SOFTAP_RX_PACKET_CBK);
 
-		if (sta_info) {
-			sta_info->rx_packets++;
-			sta_info->rx_bytes += skb->len;
-			hdd_softap_inspect_dhcp_packet(adapter, skb, QDF_RX);
-			hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info,
-					     true,
-					     STA_INFO_SOFTAP_RX_PACKET_CBK);
+			if (sta_info) {
+				sta_info->rx_packets++;
+				sta_info->rx_bytes += skb->len;
+				hdd_softap_inspect_dhcp_packet(adapter, skb, QDF_RX);
+				hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info,
+						     true,
+						     STA_INFO_SOFTAP_RX_PACKET_CBK);
+			}
 		}
-
 		if (qdf_nbuf_is_ipv4_eapol_pkt(skb))
 			is_eapol = true;
 
