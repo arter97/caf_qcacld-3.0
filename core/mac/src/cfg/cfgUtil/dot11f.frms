@@ -1836,13 +1836,13 @@ IE MeasurementReport (EID_MEAS_REPORT)    // 7.3.2.22
                 }
                 dot11_bss_average_access_delay (group_id IS 10)
                 {
-                        ap_average_access_delay, 2;
-                        average_access_delay_besteffort, 2;
-                        average_access_delay_background, 2;
-                        average_access_delay_video, 2;
-                        average_access_delay_voice, 2;
+                        ap_average_access_delay, 1;
+                        average_access_delay_besteffort, 1;
+                        average_access_delay_background, 1;
+                        average_access_delay_video, 1;
+                        average_access_delay_voice, 1;
                         station_count, 2;
-                        channel_utilization, 2;
+                        channel_utilization, 1;
                 }
             };
             OPTIE reporting_reason;
