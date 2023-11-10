@@ -2961,4 +2961,8 @@
 #define DP_RX_MSDU_DONE_FAIL_HISTORY (1)
 #endif
 
+#ifdef CONFIG_DP_RX_PEEK_MSDU_DONE_WAR
+#define DP_RX_PEEK_MSDU_DONE_WAR (1)
+#endif
+
 #endif /* CONFIG_TO_FEATURE_H */
