@@ -669,15 +669,7 @@ static void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 	*ml_link_bitmap = link_bitmap;
 }
 
-/**
- * convert_link_bitmap_to_link_ids() - Convert link bitmap to link ids
- * @link_bitmap: PSOC object information
- * @link_id_sz: link_ids array size
- * @link_ids: link id array
- *
- * Return: num of link id in link_ids array converted from link bitmap
- */
-static uint32_t
+uint32_t
 convert_link_bitmap_to_link_ids(uint32_t link_bitmap,
 				uint8_t link_id_sz,
 				uint8_t *link_ids)

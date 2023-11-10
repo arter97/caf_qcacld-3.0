@@ -8522,6 +8522,45 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 	return restart_required;
 }
 
+/**
+ * policy_mgr_is_new_force_allowed() - Check if the new force command is allowed
+ * @psoc: PSOC object information
+ * @active_link_bitmap: Active link bitmap
+ * @force_inactive_num_bitmap: Force inactive number bitmap
+ * @force_inactive_num: Number of links to be forced inactive
+ *
+ * If ML STA associates in 3-link (2.4 GHz + 5 GHz + 6 GHz), Host sends force
+ * inactive num command between 5 GHz and 6 GHz links to firmware as it's a DBS
+ * RD. This force has to be in effect at all times but any new force active num
+ * command request from the userspace (except for 5 GHz + 6 GHz links) should be
+ * honored. This API checks if the new force command can be allowed.
+ *
+ * Return: True if the new force command is allowed, else False
+ */
+static bool
+policy_mgr_is_new_force_allowed(struct wlan_objmgr_psoc *psoc,
+				uint32_t active_link_bitmap,
+				uint16_t force_inactive_num_bitmap,
+				uint8_t force_inactive_num)
+{
+	uint32_t link_bitmap = 0;
+	uint8_t link_num = 0;
+
+	link_bitmap = ~active_link_bitmap & force_inactive_num_bitmap;
+	if (force_inactive_num_bitmap) {
+		if (!link_bitmap) {
+			policy_mgr_err("New force bitmap not allowed");
+			return false;
+		}
+		link_num = convert_link_bitmap_to_link_ids(link_bitmap,
+							   0, NULL);
+		if (link_num < force_inactive_num)
+			return false;
+	}
+
+	return true;
+}
+
 void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 					 uint8_t session_id, uint8_t num_links,
 					 struct qdf_mac_addr active_link_addr[2])
@@ -8604,10 +8643,17 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		}
 		ml_nlink_get_curr_force_state(psoc, vdev, &curr);
 		if (curr.force_inactive_num || curr.force_active_num) {
-			policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
-					 curr.force_active_num,
-					 curr.force_inactive_num);
-			goto done;
+			if (curr.force_inactive_num) {
+				if (!policy_mgr_is_new_force_allowed(
+						psoc, active_link_bitmap,
+						curr.force_inactive_num_bitmap,
+						curr.force_inactive_num)) {
+					policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
+							 curr.force_active_num,
+							 curr.force_inactive_num);
+				goto done;
+				}
+			}
 		}
 		/* If current force inactive bitmap exists, we have to remove
 		 * the new active bitmap from the existing inactive bitmap,
