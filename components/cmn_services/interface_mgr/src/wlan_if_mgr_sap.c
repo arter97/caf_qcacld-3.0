@@ -167,6 +167,9 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 		if_mgr_enable_roaming(pdev, vdev, RSO_START_BSS);
 	}
 
+	ifmgr_debug("SAP/P2P-GO is stopped, re-enable roaming if it's stopped due to SAP/P2P-GO CSA");
+	if_mgr_enable_roaming(pdev, vdev, RSO_SAP_CHANNEL_CHANGE);
+
 	policy_mgr_get_mcc_scc_switch(psoc, &mcc_scc_switch);
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE &&
 	    mcc_scc_switch == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)
