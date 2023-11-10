@@ -2049,5 +2049,9 @@ config DP_RX_MSDU_DONE_FAIL_HISTORY
 	bool "Enable DP_RX_MSDU_DONE_FAIL_HISTORY"
 	default n
 
+config DP_RX_PEEK_MSDU_DONE_WAR
+	bool "Enable DP_RX_PEEK_MSDU_DONE_WAR"
+	default n
+
 endmenu
 endif # QCA_CLD_WLAN
