@@ -15636,8 +15636,10 @@ hdd_convert_nl80211_to_reg_band_mask(enum nl80211_band band)
 		reg_band |= 1 << REG_BAND_2G;
 	if (band & 1 << NL80211_BAND_5GHZ)
 		reg_band |= 1 << REG_BAND_5G;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 	if (band & 1 << NL80211_BAND_6GHZ)
 		reg_band |= 1 << REG_BAND_6G;
+#endif
 	if (band & 1 << NL80211_BAND_60GHZ)
 		hdd_err("band: %d not supported", NL80211_BAND_60GHZ);
 

@@ -1474,7 +1474,11 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 		dp_fisa_debug("gso_size %d, udp_len %d\n", shinfo->gso_size,
 			      qdf_ntohs(head_skb_udp_hdr->len));
 		shinfo->gso_segs = fisa_flow->cur_aggr;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
 		shinfo->gso_type = SKB_GSO_UDP_L4;
+#else
+		shinfo->gso_type = SKB_GSO_UDP;
+#endif
 		head_skb->ip_summed = CHECKSUM_PARTIAL;
 	}
 
@@ -1556,8 +1560,11 @@ dp_rx_fisa_flush_tcp_flow(struct dp_vdev *vdev,
 	/* Update the head_skb before flush */
 	head_skb->hash = fisa_flow->flow_hash;
 	head_skb->sw_hash = 1;
-	shinfo->gso_type = SKB_GSO_UDP_L4;
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
+		shinfo->gso_type = SKB_GSO_UDP_L4;
+#else
+		shinfo->gso_type = SKB_GSO_UDP;
+#endif
 	head_skb_iph = (struct iphdr *)(qdf_nbuf_data(head_skb) +
 					fisa_flow->head_skb_ip_hdr_offset);
 
