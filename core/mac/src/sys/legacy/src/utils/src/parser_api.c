@@ -4264,7 +4264,7 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 						 session_entry, ar, pAssocRsp);
 	sir_convert_assoc_resp_frame2_t2lm_struct(mac, frame, frame_len,
 						  session_entry, ar, pAssocRsp);
-	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d",
+	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d mlo %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
 		 ar->vendor_vht_ie.VHTCaps.present,
 		 ar->vendor_vht_ie.VHTOperation.present, ar->he_cap.present,
@@ -4273,7 +4273,8 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 		 ar->bss_max_idle_period.present,
 		 pAssocRsp->bss_max_idle_period.max_idle_period,
 		 ar->mu_edca_param_set.present, ar->WMMParams.present,
-		 ar->QosMapSet.present);
+		 ar->QosMapSet.present,
+		 ar->mlo_ie.present);
 
 	if (ar->WMMParams.present)
 		__print_wmm_params(mac, &ar->WMMParams);
