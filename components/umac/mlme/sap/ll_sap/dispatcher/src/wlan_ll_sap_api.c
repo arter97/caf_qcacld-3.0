@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,7 +23,6 @@
 #include "wlan_reg_services_api.h"
 #include "wlan_dfs_utils_api.h"
 
-#ifdef WLAN_FEATURE_BEARER_SWITCH
 wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_psoc *psoc)
 {
@@ -141,7 +140,13 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_complete(
 						uint8_t vdev_id)
 {
 	struct wlan_bearer_switch_request bs_request = {0};
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_ALREADY;
+	uint8_t ll_lt_sap_vdev_id;
+
+	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
+	/* LL_LT SAP is not present, bearer switch is not required */
+	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID)
+		return status;
 
 	bs_request.vdev_id = vdev_id;
 	bs_request.request_id = ll_lt_sap_bearer_switch_get_id(psoc);
@@ -156,7 +161,6 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_complete(
 
 	return QDF_STATUS_SUCCESS;
 }
-#endif
 
 QDF_STATUS wlan_ll_lt_sap_get_freq_list(
 				struct wlan_objmgr_psoc *psoc,

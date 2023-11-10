@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,7 +30,6 @@
 #include "wlan_policy_mgr_public_struct.h"
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
-#ifdef WLAN_FEATURE_BEARER_SWITCH
 /**
  * wlan_ll_lt_sap_bearer_switch_get_id() - Get the request id for bearer switch
  * request
@@ -66,39 +65,6 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_start(
 						qdf_list_t *scan_list,
 						uint8_t vdev_id,
 						wlan_cm_id cm_id);
-#else
-static inline wlan_bs_req_id
-wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
-{
-	return 0;
-}
-
-static inline QDF_STATUS
-wlan_ll_lt_sap_switch_bearer_to_ble(
-				struct wlan_objmgr_psoc *psoc,
-				struct wlan_bearer_switch_request *bs_request)
-{
-	return QDF_STATUS_E_FAILURE;
-}
-
-static inline QDF_STATUS
-wlan_ll_sap_switch_bearer_on_sta_connect_start(struct wlan_objmgr_psoc *psoc,
-					       qdf_list_t *scan_list,
-					       uint8_t vdev_id,
-					       wlan_cm_id cm_id)
-
-{
-	return QDF_STATUS_E_ALREADY;
-}
-
-static inline QDF_STATUS
-wlan_ll_sap_switch_bearer_on_sta_connect_complete(struct wlan_objmgr_psoc *psoc,
-						  uint8_t vdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 /**
  * wlan_ll_sap_switch_bearer_on_sta_connect_complete() - Switch bearer during
  * station connection complete
