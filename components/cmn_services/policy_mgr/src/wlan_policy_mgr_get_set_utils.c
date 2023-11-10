@@ -6941,6 +6941,13 @@ bool policy_mgr_is_mlo_in_mode_emlsr(struct wlan_objmgr_psoc *psoc,
 	uint8_t i, mlo_idx = 0;
 	struct wlan_objmgr_vdev *temp_vdev;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
 
 	mode_num = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							  vdev_id_list,
@@ -6967,6 +6974,27 @@ bool policy_mgr_is_mlo_in_mode_emlsr(struct wlan_objmgr_psoc *psoc,
 
 		wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_POLICY_MGR_ID);
 	}
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_DISABLE_LINK; i++) {
+		if (!pm_disabled_ml_links[i].in_use)
+			continue;
+		if (pm_disabled_ml_links[i].mode != PM_STA_MODE)
+			continue;
+		temp_vdev =
+		wlan_objmgr_get_vdev_by_id_from_psoc(
+					psoc, pm_disabled_ml_links[i].vdev_id,
+					WLAN_POLICY_MGR_ID);
+		if (!temp_vdev) {
+			policy_mgr_err("invalid inactive vdev for id %d",
+				       pm_disabled_ml_links[i].vdev_id);
+			continue;
+		}
+		/* Check if existing vdev is eMLSR STA */
+		if (wlan_vdev_mlme_cap_get(temp_vdev, WLAN_VDEV_C_EMLSR_CAP))
+			emlsr_connection = true;
+		wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_POLICY_MGR_ID);
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 end:
 	if (num_mlo)
 		*num_mlo = mlo_idx;
