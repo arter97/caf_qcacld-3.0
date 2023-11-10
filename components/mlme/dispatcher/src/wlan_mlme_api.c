@@ -1715,6 +1715,16 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool wlan_mlme_is_5gl_5gh_mlsr_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return 0;
+	return mlme_obj->cfg.sta.mlo_5gl_5gh_mlsr;
+}
+
 void
 wlan_mlme_get_mlo_prefer_percentage(struct wlan_objmgr_psoc *psoc,
 				    int8_t *mlo_prefer_percentage)

@@ -4298,6 +4298,14 @@ wlan_mlme_get_bt_profile_con(struct wlan_objmgr_psoc *psoc);
 uint8_t wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_mlme_is_5gl_5gh_mlsr_supported() - check 5GH_5GL MLSR supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if 5GH_5GL MLSR supported otherwise false
+ */
+bool wlan_mlme_is_5gl_5gh_mlsr_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mlme_set_sta_mlo_conn_max_num() - set max number of links that sta mlo
  *                                        connection can support
  * @psoc: pointer to psoc object
@@ -4444,6 +4452,12 @@ wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 
 static inline uint8_t
 wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline bool
+wlan_mlme_is_5gl_5gh_mlsr_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
 }
