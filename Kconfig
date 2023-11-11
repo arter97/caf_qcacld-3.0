@@ -2045,5 +2045,9 @@ config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
 
 endif
 
+config DP_RX_MSDU_DONE_FAIL_HISTORY
+	bool "Enable DP_RX_MSDU_DONE_FAIL_HISTORY"
+	default n
+
 endmenu
 endif # QCA_CLD_WLAN
