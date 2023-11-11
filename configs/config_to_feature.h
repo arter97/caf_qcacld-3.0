@@ -2957,4 +2957,8 @@
 #endif
 #endif
 
+#ifdef CONFIG_DP_RX_MSDU_DONE_FAIL_HISTORY
+#define DP_RX_MSDU_DONE_FAIL_HISTORY (1)
+#endif
+
 #endif /* CONFIG_TO_FEATURE_H */
