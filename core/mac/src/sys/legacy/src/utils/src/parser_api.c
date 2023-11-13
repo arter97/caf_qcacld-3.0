@@ -7115,7 +7115,7 @@ populate_dot11f_chan_load_report(struct mac_context *mac,
 		dot11f->report.channel_load_report.bw_indication.ccfs1 = channel_load_report->bw_ind.center_freq_seg1;
 	}
 
-	pe_debug("regClass %d chan %d meas_time %d meas_dur %d, chan_load %d",
+	pe_debug("regClass %d chan %d meas_time %lu meas_dur %d, chan_load %d",
 		 dot11f->report.channel_load_report.op_class,
 		 dot11f->report.channel_load_report.channel,
 		 channel_load_report->rrm_scan_tsf,
