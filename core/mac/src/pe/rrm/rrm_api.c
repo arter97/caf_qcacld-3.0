@@ -2337,7 +2337,7 @@ rrm_process_chan_load_report_xmit(struct mac_context *mac_ctx,
 		     sizeof(channel_load_report->bw_ind));
 	qdf_mem_copy(&channel_load_report->wide_bw, &chan_load_ind->wide_bw,
 		     sizeof(channel_load_report->wide_bw));
-	pe_err("send chan load report for bssId:"QDF_MAC_ADDR_FMT" reg_class:%d, channel:%d, measStartTime:%llu, measDuration:%d, chan_load:%d",
+	pe_err("send chan load report for bssId:"QDF_MAC_ADDR_FMT" reg_class:%d, channel:%d, measStartTime:%lu, measDuration:%d, chan_load:%d",
 	       QDF_MAC_ADDR_REF(sessionBssId.bytes),
 	       channel_load_report->op_class,
 	       channel_load_report->channel,
