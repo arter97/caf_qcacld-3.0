@@ -3423,7 +3423,6 @@ cppflags-y += -DCONFIG_AR6320_SUPPORT \
             -DCONFIG_DISABLE_CDC_MAX_PERF_WAR=0 \
             -DCONFIG_ATH_PROCFS_DIAG_SUPPORT \
             -DHIF_MBOX_SLEEP_WAR \
-            -DDEBUG_HL_LOGGING \
             -DQCA_BAD_PEER_TX_FLOW_CL \
             -DCONFIG_SDIO \
             -DFEATURE_WLAN_FORCE_SAP_SCC

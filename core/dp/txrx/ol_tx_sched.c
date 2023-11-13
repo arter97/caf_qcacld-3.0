@@ -138,7 +138,10 @@ typedef TAILQ_HEAD(ol_tx_frms_queue_list_s, ol_tx_frms_queue_t)
 #define ol_tx_sched_txq_deactivate      ol_tx_sched_txq_deactivate_wrr_adv
 #define ol_tx_sched_category_tx_queues  ol_tx_sched_category_tx_queues_wrr_adv
 #define ol_tx_sched_txq_discard         ol_tx_sched_txq_discard_wrr_adv
+
+#if defined(DEBUG_HL_LOGGING)
 #define ol_tx_sched_category_info       ol_tx_sched_category_info_wrr_adv
+#endif
 #define ol_tx_sched_discard_select_category \
 		ol_tx_sched_discard_select_category_wrr_adv
 
@@ -974,6 +977,7 @@ ol_tx_sched_txq_discard_wrr_adv(
 		category->state.active = 0;
 }
 
+#if defined(DEBUG_HL_LOGGING)
 static void
 ol_tx_sched_category_info_wrr_adv(
 	struct ol_txrx_pdev_t *pdev,
@@ -988,7 +992,7 @@ ol_tx_sched_category_info_wrr_adv(
 	*frms = category->state.frms;
 	*bytes = category->state.bytes;
 }
-
+#endif
 /**
  * ol_tx_sched_wrr_param_update() - update the WRR TX sched params
  * @pdev: Pointer to PDEV structure.
