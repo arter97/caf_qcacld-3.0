@@ -862,7 +862,7 @@ static void tgt_mc_cp_stats_extract_vdev_summary_stats(
 					struct wlan_objmgr_psoc *psoc,
 					struct stats_event *ev)
 {
-	uint8_t i, vdev_id;
+	uint8_t i, vdev_id = 0;
 	QDF_STATUS status;
 	struct wlan_objmgr_peer *peer = NULL;
 	struct request_info last_req = {0};
