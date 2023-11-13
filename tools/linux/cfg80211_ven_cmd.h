@@ -887,6 +887,7 @@ enum {
 #ifdef WLAN_FEATURE_11BE_MLO
 	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* MLO Max Simultaneous Active links */
 #endif
+	IEEE80211_PARAM_NOACK_MAP = 821, /* Get NoAck map for vdev */
 };
 
 enum {
@@ -2656,6 +2657,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
 		GET_PARAM, 0},
 #endif
+	{"get_noack_map", IEEE80211_PARAM_NOACK_MAP, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
