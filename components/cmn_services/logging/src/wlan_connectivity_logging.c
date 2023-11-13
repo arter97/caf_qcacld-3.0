@@ -1091,7 +1091,7 @@ wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
 	mlpeer = wlan_mlo_get_mlpeer_by_peer_mladdr(peer_mld, &mldev);
 	if (!mlpeer) {
 		logging_err("ml peer not found");
-		goto out;
+		return 0;
 	}
 
 	for (i = 0; i < MAX_MLO_LINK_ID; i++) {
@@ -1099,7 +1099,7 @@ wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
 			link_info = mlo_mgr_get_ap_link_by_link_id(mldev, i);
 			if (!link_info) {
 				logging_err("link: %d info does not exist", i);
-				continue;
+				return 0;
 			}
 
 			freq = link_info->link_chan_info->ch_freq;
@@ -1111,7 +1111,6 @@ wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
 		}
 	}
 
-out:
 	return band_bitmap;
 }
 
@@ -1131,9 +1130,14 @@ void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 	wlan_diag_event.active_link =
 		wlan_convert_link_id_to_diag_band(&src->mld_addr,
 						  src->active_link_bitmap);
+	if (!wlan_diag_event.active_link)
+		return;
 	wlan_diag_event.prev_active_link =
 		wlan_convert_link_id_to_diag_band(&src->mld_addr,
 						  src->prev_link_bitmap);
+	if (!wlan_diag_event.prev_active_link)
+		return;
+
 	wlan_diag_event.reason = src->reason_code;
 	/*
 	 * FW timestamp received from FW in milliseconds and to be sent to
