@@ -2055,9 +2055,9 @@ rrm_process_channel_load_req(struct mac_context *mac,
 {
 	struct scheduler_msg msg = {0};
 	struct ch_load_ind *load_ind;
-	struct bw_ind_element bw_ind;
-	struct wide_bw_chan_switch wide_bw;
-	struct rrm_reporting rrm_report;
+	struct bw_ind_element bw_ind = {0};
+	struct wide_bw_chan_switch wide_bw = {0};
+	struct rrm_reporting rrm_report = {0};
 	uint8_t op_class, channel;
 	uint16_t randomization_intv, meas_duration, max_meas_duration;
 	bool is_rrm_reporting, is_wide_bw_chan_switch;
