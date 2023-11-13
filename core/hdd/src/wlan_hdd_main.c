@@ -4233,7 +4233,11 @@ static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
 	hdd_check_for_objmgr_leaks(hdd_ctx);
 }
 
-#define hdd_debug_domain_set(domain) 0
+static int hdd_debug_domain_set2(void)
+{
+        return 0;
+}
+#define hdd_debug_domain_set(domain) hdd_debug_domain_set2()
 #define hdd_debug_domain_get() DEFAULT_DEBUG_DOMAIN_INIT
 #endif /* CONFIG_LEAK_DETECTION */
 
