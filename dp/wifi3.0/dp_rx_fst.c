@@ -495,8 +495,13 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 			if (chip_id >= soc->arch_ops.dp_soc_get_num_soc(soc))
 				return QDF_STATUS_SUCCESS;
 
-			partner_soc =
-			soc->arch_ops.dp_get_soc_by_chip_id(soc, chip_id);
+			if (soc->arch_ops.dp_get_soc_by_chip_id)
+				partner_soc =
+				soc->arch_ops.dp_get_soc_by_chip_id(soc,
+								   chip_id);
+			else
+				partner_soc = soc;
+
 
 			if (!partner_soc)
 			    continue;
@@ -586,8 +591,12 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 			if (chip_id >= soc->arch_ops.dp_soc_get_num_soc(soc))
 				return QDF_STATUS_SUCCESS;
 
-			partner_soc =
-			soc->arch_ops.dp_get_soc_by_chip_id(soc, chip_id);
+			if (soc->arch_ops.dp_get_soc_by_chip_id)
+				partner_soc =
+				soc->arch_ops.dp_get_soc_by_chip_id(soc,
+								    chip_id);
+			else
+				partner_soc = soc;
 
 			if (!partner_soc)
 			    continue;
