@@ -796,7 +796,7 @@ rrm_update_vdev_stats(tpSirMacRadioMeasureReport rrm_report, uint8_t vdev_id)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	pe_nofl_debug("counter stats count: fragment (tx: %d rx: %d) group tx: %d mac stats count: retry : %d multiple retry: %d frame duplicate %d",
+	pe_nofl_debug("counter stats count: fragment (tx: %d rx: %d) group tx: %llu mac stats count: retry : %d multiple retry: %d frame duplicate %d",
 		      stats->tx.fragment_count, stats->rx.fragment_count,
 		      stats->tx.mcast.num, stats->tx.retry_count,
 		      stats->tx.multiple_retry_count,
