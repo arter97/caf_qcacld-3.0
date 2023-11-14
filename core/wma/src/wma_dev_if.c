@@ -1697,11 +1697,19 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 	bool peer_unmap_conf_support_enabled;
 	uint8_t peer_vdev_id;
 	struct peer_delete_cmd_params del_param = {0};
+	struct wma_txrx_node *iface;
 
-	if (!wma->interfaces[vdev_id].peer_count) {
+	if (vdev_id >= WLAN_MAX_VDEVS) {
+		wma_err("Invalid vdev_id %d", vdev_id);
+		QDF_BUG(0);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	iface = &wma->interfaces[vdev_id];
+	if (!iface->peer_count) {
 		wma_err("Can't remove peer with peer_addr "QDF_MAC_ADDR_FMT" vdevid %d peer_count %d",
 			QDF_MAC_ADDR_REF(peer_addr), vdev_id,
-			wma->interfaces[vdev_id].peer_count);
+			iface->peer_count);
 		QDF_ASSERT(0);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -1714,14 +1722,14 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 	if (!wma_objmgr_peer_exist(wma, peer_addr, &peer_vdev_id)) {
 		wma_err("peer doesn't exist peer_addr "QDF_MAC_ADDR_FMT" vdevid %d peer_count %d",
 			 QDF_MAC_ADDR_REF(peer_addr), vdev_id,
-			 wma->interfaces[vdev_id].peer_count);
+			 iface->peer_count);
 		return QDF_STATUS_E_INVAL;
 	}
 
 	if (peer_vdev_id != vdev_id) {
 		wma_err("peer "QDF_MAC_ADDR_FMT" is on vdev id %d but delete req on vdevid %d peer_count %d",
 			 QDF_MAC_ADDR_REF(peer_addr), peer_vdev_id, vdev_id,
-			 wma->interfaces[vdev_id].peer_count);
+			 iface->peer_count);
 		return QDF_STATUS_E_INVAL;
 	}
 	peer_unmap_conf_support_enabled =
@@ -1747,6 +1755,8 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 			    0, 0);
 
 	del_param.vdev_id = vdev_id;
+	del_param.is_mlo_link_switch =
+		wlan_vdev_mlme_is_mlo_link_switch_in_progress(iface->vdev);
 	qdf_status = wmi_unified_peer_delete_send(wma->wmi_handle, peer_addr,
 						  &del_param);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
@@ -1759,8 +1769,7 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 
 peer_detach:
 	wma_debug("vdevid %d is detaching with peer_addr "QDF_MAC_ADDR_FMT" peer_count %d",
-		vdev_id, QDF_MAC_ADDR_REF(peer_addr),
-		wma->interfaces[vdev_id].peer_count);
+		vdev_id, QDF_MAC_ADDR_REF(peer_addr), iface->peer_count);
 	/* Copy peer mac to find and delete objmgr peer */
 	qdf_mem_copy(peer_mac, peer_addr, QDF_MAC_ADDR_SIZE);
 	if (no_fw_peer_delete &&
@@ -1788,9 +1797,9 @@ peer_detach:
 	}
 
 	wlan_release_peer_key_wakelock(wma->pdev, peer_mac);
-	wma_remove_objmgr_peer(wma, wma->interfaces[vdev_id].vdev, peer_mac);
+	wma_remove_objmgr_peer(wma, iface->vdev, peer_mac);
 
-	wma->interfaces[vdev_id].peer_count--;
+	iface->peer_count--;
 #undef PEER_ALL_TID_BITMASK
 
 	return qdf_status;
