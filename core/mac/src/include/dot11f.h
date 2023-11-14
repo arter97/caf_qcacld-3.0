@@ -4947,6 +4947,24 @@ typedef struct sDot11fIEtransmit_power_env {
 	uint8_t  max_tx_pwr_category:2;
 	uint8_t             num_tx_power;
 	uint8_t             tx_power[8];
+	union {
+		struct {
+			uint8_t max_tx_power_for_320;
+		} ext_max_tx_power_local_eirp; /* max_tx_pwr_interpret = 0 */
+		struct {
+			uint8_t  ext_count:4;
+			uint8_t   reserved:4;
+			uint8_t max_tx_psd_power[8];
+		} ext_max_tx_power_local_psd; /* max_tx_pwr_interpret = 1 */
+		struct {
+			uint8_t max_tx_power_for_320;
+		} ext_max_tx_power_reg_eirp; /* max_tx_pwr_interpret = 2 */
+		struct {
+			uint8_t  ext_count:4;
+			uint8_t   reserved:4;
+			uint8_t max_tx_psd_power[8];
+		} ext_max_tx_power_reg_psd; /* max_tx_pwr_interpret = 3 */
+	} ext_max_tx_power;
 } tDot11fIEtransmit_power_env;
 
 #define DOT11F_EID_TRANSMIT_POWER_ENV (195)
@@ -4954,7 +4972,7 @@ typedef struct sDot11fIEtransmit_power_env {
 /* N.B. These #defines do *not* include the EID & length */
 #define DOT11F_IE_TRANSMIT_POWER_ENV_MIN_LEN (2)
 
-#define DOT11F_IE_TRANSMIT_POWER_ENV_MAX_LEN (9)
+#define DOT11F_IE_TRANSMIT_POWER_ENV_MAX_LEN (18)
 
 #ifdef __cplusplus
 extern "C" {
@@ -5198,7 +5216,7 @@ typedef struct sDot11fIEChannelSwitchWrapper {
 /* N.B. These #defines do *not* include the EID & length */
 #define DOT11F_IE_CHANNELSWITCHWRAPPER_MIN_LEN (0)
 
-#define DOT11F_IE_CHANNELSWITCHWRAPPER_MAX_LEN (24)
+#define DOT11F_IE_CHANNELSWITCHWRAPPER_MAX_LEN (33)
 
 #ifdef __cplusplus
 extern "C" {
