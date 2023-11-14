@@ -888,6 +888,7 @@ struct hdd_fw_txrx_stats {
  * @client_count: client count per dot11_mode
  * @country_ie_updated: country ie is updated or not by hdd hostapd
  * @during_auth_offload: auth mgmt frame is offloading to hostapd
+ * @reg_punc_bitmap: puncturing bitmap
  */
 struct hdd_ap_ctx {
 	struct hdd_hostapd_state hostapd_state;
@@ -910,6 +911,9 @@ struct hdd_ap_ctx {
 	uint16_t client_count[QCA_WLAN_802_11_MODE_INVALID];
 	bool country_ie_updated;
 	bool during_auth_offload;
+#ifdef WLAN_FEATURE_11BE
+	uint16_t reg_punc_bitmap;
+#endif
 };
 
 /**
@@ -1108,6 +1112,7 @@ enum udp_qos_upgrade {
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
+ * @chan_change_notify_work: Channel change notify work
  */
 struct wlan_hdd_link_info {
 	struct hdd_adapter *adapter;
@@ -1148,6 +1153,7 @@ struct wlan_hdd_link_info {
 #endif /* WLAN_FEATURE_MSCS */
 
 	unsigned long link_flags;
+	qdf_work_t chan_change_notify_work;
 };
 
 /**
@@ -1179,6 +1185,7 @@ struct wlan_hdd_tx_power {
  * @ctw: stores CT Window value once we receive Opps command from
  *       wpa_supplicant then using CT Window value we need to Enable
  *       Opportunistic Power Save
+ * @allow_power_save: STA/CLI powersave enable/disable from userspace
  * @mac_addr: Current MAC Address for the adapter
  * @mld_addr: MLD address for adapter
  * @event_flags: a bitmap of hdd_adapter_flags
@@ -1284,6 +1291,7 @@ struct wlan_hdd_tx_power {
  * @deflink: Default link pointing to the 0th index of the linkinfo array
  * @link_info: Data structure to hold link specific information
  * @tx_power: Structure to hold connection tx Power info
+ * @tx_latency_cfg: configuration for per-link transmit latency statistics
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1306,6 +1314,7 @@ struct hdd_adapter {
 
 	uint8_t ops;
 	uint32_t ctw;
+	bool allow_power_save;
 
 	struct qdf_mac_addr mac_addr;
 #ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
@@ -1474,6 +1483,9 @@ struct hdd_adapter {
 	struct wlan_hdd_link_info *deflink;
 	struct wlan_hdd_link_info link_info[WLAN_MAX_ML_BSS_LINKS];
 	struct wlan_hdd_tx_power tx_power;
+#ifdef WLAN_FEATURE_TX_LATENCY_STATS
+	struct cdp_tx_latency_config tx_latency_cfg;
+#endif
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -1800,6 +1812,18 @@ static inline bool hdd_get_wlan_driver_status(void)
 #endif
 
 /**
+ * struct hdd_lpc_info - Local packet capture information
+ * @lpc_wk: local packet capture work
+ * @lpc_wk_scheduled: flag to indicate if lpc work is scheduled or not
+ * @mon_adapter: monitor adapter
+ */
+struct hdd_lpc_info {
+	qdf_work_t lpc_wk;
+	bool lpc_wk_scheduled;
+	struct hdd_adapter *mon_adapter;
+};
+
+/**
  * enum wlan_state_ctrl_str_id - state control param string id
  * @WLAN_OFF_STR: Turn OFF WiFi
  * @WLAN_ON_STR: Turn ON WiFi
@@ -2011,6 +2035,7 @@ enum wlan_state_ctrl_str_id {
  * @is_mlo_per_link_stats_supported: Per link mlo stats is supported or not
  * @num_mlo_peers: Total number of MLO peers
  * @more_peer_data: more mlo peer data in peer stats
+ * @lpc_info: Local packet capture info
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2291,6 +2316,9 @@ struct hdd_context {
 	bool is_mlo_per_link_stats_supported;
 	uint8_t num_mlo_peers;
 	uint32_t more_peer_data;
+#endif
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+	struct hdd_lpc_info lpc_info;
 #endif
 };
 
@@ -3814,21 +3842,16 @@ int hdd_update_config(struct hdd_context *hdd_ctx);
 int hdd_update_components_config(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_chan_change_notify() - Function to notify hostapd about channel change
- * @link_info:          Link info pointer in HDD adapter
- * @dev:		Net device structure
- * @chan_change:	New channel change parameters
- * @legacy_phymode:	is the phymode legacy
+ * hdd_chan_change_notify_work_handler() - Function to notify hostapd about
+ * channel change
+ * @work: work pointer
  *
  * This function is used to notify hostapd about the channel change
  *
- * Return: Success on intimating userspace
+ * Return: None
  *
  */
-QDF_STATUS hdd_chan_change_notify(struct wlan_hdd_link_info *link_info,
-				  struct net_device *dev,
-				  struct hdd_chan_change_params chan_change,
-				  bool legacy_phymode);
+void hdd_chan_change_notify_work_handler(void *work);
 
 int wlan_hdd_set_channel(struct wiphy *wiphy,
 		struct net_device *dev,
@@ -5444,6 +5467,55 @@ void hdd_set_sar_init_index(struct hdd_context *hdd_ctx);
 #else
 static inline void hdd_set_sar_init_index(struct hdd_context *hdd_ctx)
 {}
+#endif
+/**
+ * hdd_send_coex_traffic_shaping_mode() - Send coex traffic shaping mode
+ * to FW
+ * @vdev_id: vdev ID
+ * @mode: traffic shaping mode
+ *
+ * This function is used to send coex traffic shaping mode to FW
+ *
+ * Return: 0 on success and -EINVAL on failure
+ */
+int hdd_send_coex_traffic_shaping_mode(uint8_t vdev_id, uint8_t mode);
+
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * wlan_hdd_lpc_handle_concurrency() - Handle local packet capture
+ * concurrency scenario
+ * @hdd_ctx: hdd_ctx
+ * @is_virtual_iface: is virtual interface
+ *
+ * This function takes care of handling concurrency scenario
+ * If STA+Mon present and SAP is coming up, terminate Mon and let SAP come up
+ * If STA+Mon present and P2P is coming up, terminate Mon and let P2P come up
+ * If STA+Mon present and NAN is coming up, terminate Mon and let NAN come up
+ *
+ * Return: none
+ */
+void wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
+				     bool is_virtual_iface);
+
+/**
+ * hdd_lpc_is_work_scheduled() - function to return if lpc wq scheduled
+ * @hdd_ctx: hdd_ctx
+ *
+ * Return: true if scheduled; false otherwise
+ */
+bool hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx);
+
+#else
+static inline void
+wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
+				bool is_virtual_iface)
+{}
+
+static inline bool
+hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
 #endif
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

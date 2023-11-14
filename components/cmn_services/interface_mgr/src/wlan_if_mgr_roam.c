@@ -66,7 +66,7 @@ if_mgr_is_assoc_link_of_vdev(struct wlan_objmgr_pdev *pdev,
 			     struct wlan_objmgr_vdev *vdev,
 			     uint8_t cur_vdev_id)
 {
-	return true;
+	return false;
 }
 #endif
 
@@ -168,7 +168,10 @@ if_mgr_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 				       struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_psoc *psoc;
-	uint8_t vdev_id;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+		return QDF_STATUS_E_FAILURE;
 
 	/*
 	 * When link switch is in progress, don't send RSO Enable before vdev
@@ -183,10 +186,7 @@ if_mgr_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_E_FAILURE;
 
 	if (policy_mgr_is_sta_active_connection_exists(psoc) &&
-	    wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
 	    mlo_is_enable_roaming_on_connected_sta_allowed(vdev)) {
-		vdev_id = wlan_vdev_get_id(vdev);
-		ifmgr_debug("Enable roaming on connected sta for vdev_id %d", vdev_id);
 		wlan_cm_enable_roaming_on_connected_sta(pdev, vdev_id);
 		policy_mgr_set_pcl_for_connected_vdev(psoc, vdev_id, true);
 	}

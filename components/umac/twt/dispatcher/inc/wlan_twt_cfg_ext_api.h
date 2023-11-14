@@ -182,5 +182,12 @@ wlan_twt_get_bcast_responder_cfg(struct wlan_objmgr_psoc *psoc, bool *val)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef FEATURE_SET
+static inline void
+wlan_twt_get_feature_info(struct wlan_objmgr_psoc *psoc,
+			  struct wlan_twt_features *twt_feature_set)
+{
+}
+#endif
 #endif
 #endif

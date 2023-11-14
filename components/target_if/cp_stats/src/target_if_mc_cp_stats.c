@@ -874,7 +874,7 @@ target_if_cp_stats_extract_vdev_extd_stats(struct wmi_unified *wmi_hdl,
 	if (!ev->num_vdev_extd_stats)
 		return QDF_STATUS_SUCCESS;
 
-	if (ev->num_vdev_extd_stats > WLAN_MAX_MLD) {
+	if (ev->num_vdev_extd_stats > WLAN_MAX_VDEVS) {
 		cp_stats_err("num_vdev_extd_stats is invalid: %u",
 			     ev->num_vdev_extd_stats);
 		return QDF_STATUS_E_INVAL;

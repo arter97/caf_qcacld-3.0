@@ -1661,6 +1661,48 @@ QDF_STATUS tdls_process_add_peer_rsp(struct tdls_add_sta_rsp *rsp)
 	return QDF_STATUS_E_INVAL;
 }
 
+static void tdls_process_unforce_link_mode(struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_vdev_priv_obj *tdls_vdev;
+	struct tdls_peer *peer;
+	qdf_list_t *head;
+	qdf_list_node_t *p_node;
+	QDF_STATUS status;
+	bool unforce = true;
+	int i;
+
+	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
+	if (!tdls_vdev)
+		return;
+
+	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
+		head = &tdls_vdev->peer_list[i];
+		status = qdf_list_peek_front(head, &p_node);
+		while (QDF_IS_STATUS_SUCCESS(status)) {
+			peer = qdf_container_of(p_node, struct tdls_peer, node);
+
+			tdls_debug("Peer: " QDF_MAC_ADDR_FMT "link status %d, vdev id %d",
+				   QDF_MAC_ADDR_REF(peer->peer_mac.bytes),
+				   peer->link_status, wlan_vdev_get_id(vdev));
+
+			if (peer->link_status == TDLS_LINK_CONNECTED ||
+			    peer->link_status == TDLS_LINK_CONNECTING) {
+				unforce = false;
+				goto unforce_exit;
+			}
+
+			status = qdf_list_peek_next(head, p_node, &p_node);
+		}
+	}
+
+unforce_exit:
+	if (unforce) {
+		tdls_debug("try to set vdev %d to unforce",
+			   wlan_vdev_get_id(vdev));
+		tdls_set_link_unforce(vdev);
+	}
+}
+
 QDF_STATUS tdls_process_del_peer_rsp(struct tdls_del_sta_rsp *rsp)
 {
 	uint8_t sta_idx, id;
@@ -1733,6 +1775,8 @@ QDF_STATUS tdls_process_del_peer_rsp(struct tdls_del_sta_rsp *rsp)
 						  TDLS_LINK_UNSPECIFIED :
 						  TDLS_LINK_DROPPED_BY_REMOTE);
 	}
+
+	tdls_process_unforce_link_mode(vdev);
 
 cmddone:
 	tdls_release_serialization_command(vdev, WLAN_SER_CMD_TDLS_DEL_PEER);
@@ -2014,8 +2058,6 @@ QDF_STATUS tdls_process_setup_peer(struct tdls_oper_request *req)
 	uint32_t pref_width;
 	struct wlan_objmgr_pdev *pdev;
 
-	tdls_debug("Configure external TDLS peer " QDF_MAC_ADDR_FMT,
-		   QDF_MAC_ADDR_REF(req->peer_addr));
 
 	/* reference cnt is acquired in ucfg_tdls_oper */
 	vdev = req->vdev;
@@ -2026,11 +2068,15 @@ QDF_STATUS tdls_process_setup_peer(struct tdls_oper_request *req)
 	}
 
 	if (!tdls_check_is_tdls_allowed(vdev)) {
-		tdls_err("TDLS not allowed, Reject setup peer");
+		tdls_err("TDLS not allowed on vdev:%d, Reject setup peer",
+			 wlan_vdev_get_id(vdev));
 		status = QDF_STATUS_E_INVAL;
 		goto error;
 	}
 
+	tdls_debug("vdev:%d Configure external TDLS peer " QDF_MAC_ADDR_FMT,
+		   wlan_vdev_get_id(vdev),
+		   QDF_MAC_ADDR_REF(req->peer_addr));
 	qdf_mem_zero(&peer_req, sizeof(peer_req));
 	peer_req.vdev = vdev;
 	qdf_mem_copy(peer_req.peer_addr, req->peer_addr, QDF_MAC_ADDR_SIZE);

@@ -2412,63 +2412,61 @@ hdd_convert_chwidth_to_phy_chwidth(enum eSirMacHTChannelWidth chwidth)
 
 /**
  * hdd_update_bss_rate_flags() - update bss rate flag as per new channel width
- * @adapter: adapter being modified
+ * @link_info: Link info in HDD adapter
  * @psoc: psoc common object
  * @cw: channel width for which bss rate flag being updated
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS hdd_update_bss_rate_flags(struct hdd_adapter *adapter,
-					    struct wlan_objmgr_psoc *psoc,
-					    enum phy_ch_width cw)
+static QDF_STATUS
+hdd_update_bss_rate_flags(struct wlan_hdd_link_info *link_info,
+			  struct wlan_objmgr_psoc *psoc, enum phy_ch_width cw)
 {
 	struct hdd_station_ctx *hdd_sta_ctx;
 	uint8_t eht_present, he_present, vht_present, ht_present;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	if (!hdd_sta_ctx) {
-		hdd_err("hdd_sta_ctx is null");
-		return QDF_STATUS_E_INVAL;
-	}
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	eht_present = hdd_sta_ctx->conn_info.conn_flag.eht_present;
 	he_present = hdd_sta_ctx->conn_info.conn_flag.he_present;
 	vht_present = hdd_sta_ctx->conn_info.conn_flag.vht_present;
 	ht_present = hdd_sta_ctx->conn_info.conn_flag.ht_present;
 
-	return ucfg_mlme_update_bss_rate_flags(psoc, adapter->deflink->vdev_id,
+	return ucfg_mlme_update_bss_rate_flags(psoc, link_info->vdev_id,
 					       cw, eht_present, he_present,
 					       vht_present, ht_present);
 }
 
-int hdd_update_channel_width(struct hdd_adapter *adapter,
+int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 			     enum eSirMacHTChannelWidth chwidth,
-			     uint32_t bonding_mode, uint8_t link_id)
+			     uint32_t bonding_mode, uint8_t link_id,
+			     bool is_restore)
 {
 	struct hdd_context *hdd_ctx;
 	struct sme_config_params *sme_config;
 	int ret;
 	enum phy_ch_width ch_width = CH_WIDTH_INVALID;
 	QDF_STATUS status;
+	uint8_t vdev_id = link_info->vdev_id;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx failure");
 		return -EINVAL;
 	}
 
 	if (ucfg_mlme_is_chwidth_with_notify_supported(hdd_ctx->psoc) &&
-	    hdd_cm_is_vdev_connected(adapter->deflink)) {
+	    hdd_cm_is_vdev_connected(link_info)) {
 		ch_width = hdd_convert_chwidth_to_phy_chwidth(chwidth);
 		hdd_debug("vdev %d : process update ch width request to %d",
-			  adapter->deflink->vdev_id, ch_width);
-		status =
-		    ucfg_mlme_send_ch_width_update_with_notify(hdd_ctx->psoc,
-					adapter->deflink->vdev_id, ch_width,
-					link_id);
+			  vdev_id, ch_width);
+		status = ucfg_mlme_send_ch_width_update_with_notify(hdd_ctx->psoc,
+								    vdev_id,
+								    ch_width,
+								    link_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EIO;
-		status = hdd_update_bss_rate_flags(adapter, hdd_ctx->psoc,
+		status = hdd_update_bss_rate_flags(link_info, hdd_ctx->psoc,
 						   ch_width);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EIO;
@@ -2478,19 +2476,24 @@ int hdd_update_channel_width(struct hdd_adapter *adapter,
 	if (!sme_config)
 		return -ENOMEM;
 
-	ret = wma_cli_set_command(adapter->deflink->vdev_id,
-				  wmi_vdev_param_chwidth, chwidth, VDEV_CMD);
+	ret = wma_cli_set_command(vdev_id, wmi_vdev_param_chwidth,
+				  chwidth, VDEV_CMD);
 	if (ret)
 		goto free_config;
 
 	sme_get_config_param(hdd_ctx->mac_handle, sme_config);
-	sme_config->csr_config.channelBondingMode5GHz = bonding_mode;
-	sme_config->csr_config.channelBondingMode24GHz = bonding_mode;
+	if (is_restore) {
+		sme_config->csr_config.channelBondingMode5GHz =
+			cfg_get(hdd_ctx->psoc, CFG_CHANNEL_BONDING_MODE_5GHZ);
+		sme_config->csr_config.channelBondingMode24GHz =
+			cfg_get(hdd_ctx->psoc, CFG_CHANNEL_BONDING_MODE_24GHZ);
+	} else {
+		sme_config->csr_config.channelBondingMode5GHz = bonding_mode;
+		sme_config->csr_config.channelBondingMode24GHz = bonding_mode;
+	}
 	sme_update_config(hdd_ctx->mac_handle, sme_config);
-	sme_set_he_bw_cap(hdd_ctx->mac_handle,
-			  adapter->deflink->vdev_id, chwidth);
-	sme_set_eht_bw_cap(hdd_ctx->mac_handle,
-			   adapter->deflink->vdev_id, chwidth);
+	sme_set_he_bw_cap(hdd_ctx->mac_handle, vdev_id, chwidth);
+	sme_set_eht_bw_cap(hdd_ctx->mac_handle, vdev_id, chwidth);
 free_config:
 	qdf_mem_free(sme_config);
 	return ret;

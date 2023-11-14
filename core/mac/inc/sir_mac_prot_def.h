@@ -1348,12 +1348,44 @@ typedef struct sSirMacBeaconReport {
 } tSirMacBeaconReport, *tpSirMacBeaconReport;
 
 /**
+ * struct sir_mac_bw_ind_element - Contains info for Bandwidth Indication IE
+ * present in channel load request received from AP
+ * @is_wide_bw_chan_switch: to check Bandwidth Indication optional IE present
+ * @channel_width: channel width
+ * @center_chan_freq0: center freq segment 0 for 320 MHz request
+ * @center_chan_freq1: center freq segment 1 for 320 MHz request
+ */
+struct sir_mac_bw_ind_element {
+	bool is_bw_ind_element;
+	uint8_t channel_width;
+	uint8_t center_freq_seg0;
+	uint8_t center_freq_seg1;
+};
+
+/**
+ * struct sir_mac_wide_bw_chan_switch - Contains info for Wide Bandwidth Channel
+ * Switch IE present in channel load request received from AP
+ * @is_wide_bw_chan_switch: to check Bandwidth Indication optional IE present
+ * @channel_width: channel width
+ * @center_chan_freq0: center freq segment 0 for till 160 MHz request
+ * @center_chan_freq1: center freq segment 1 for till 160 MHz request
+ */
+struct sir_mac_wide_bw_chan_switch {
+	uint8_t is_wide_bw_chan_switch;
+	uint8_t channel_width;
+	uint8_t center_chan_freq0;
+	uint8_t center_chan_freq1;
+};
+
+/**
  * struct chan_load_report - channel load Report Structure
  * @op_class: Regulatory Class
  * @channel: Channel for which the current report is being sent
  * @rrm_scan_tsf: RRM scan start time for this report
  * @meas_duration: Scan duration for the current channel
  * @chan_load: channel utilization measurement
+ * @bw_ind: Contains info for Bandwidth Indication IE
+ * @wide_bw: Contains info for Wide Bandwidth Channel IE
  */
 struct chan_load_report {
 	uint8_t op_class;
@@ -1361,6 +1393,8 @@ struct chan_load_report {
 	qdf_time_t rrm_scan_tsf;
 	uint8_t meas_duration;
 	uint8_t chan_load;
+	struct sir_mac_bw_ind_element bw_ind;
+	struct sir_mac_wide_bw_chan_switch wide_bw;
 };
 
 /**

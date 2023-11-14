@@ -24,6 +24,9 @@
 #include "wlan_cm_api.h"
 #include "wlan_mlme_main.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlme_api.h"
+#include "cdp_txrx_ctrl.h"
+#include "wlan_mlo_mgr_peer.h"
 
 #ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 static struct wlan_connectivity_log_buf_data global_cl;
@@ -302,6 +305,73 @@ wlan_cache_connectivity_log(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 #ifdef CONNECTIVITY_DIAG_EVENT
 
 #ifdef WLAN_FEATURE_11BE_MLO
+void
+wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
+				      uint8_t token,
+				      enum wlan_t2lm_resp_frm_type t2lm_status,
+				      enum qdf_dp_tx_rx_status tx_status,
+				      qdf_freq_t freq,
+				      bool is_rx, uint8_t subtype)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
+				 struct wlan_diag_mlo_t2lm_req_resp);
+
+	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+
+	wlan_diag_event.version = DIAG_MLO_T2LM_REQ_RESP_VERSION;
+
+	wlan_diag_event.token = token;
+	wlan_diag_event.subtype = subtype;
+
+	wlan_diag_event.status = t2lm_status;
+	wlan_diag_event.tx_status = wlan_get_diag_tx_status(tx_status);
+	wlan_diag_event.is_rx = is_rx;
+
+	wlan_diag_event.band = wlan_convert_freq_to_diag_band(freq);
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
+				    EVENT_WLAN_MLO_T2LM_REQ_RESP);
+}
+
+void
+wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlo_link_info *link_info = NULL;
+	struct wlan_channel *chan_info = NULL;
+	uint8_t link_id;
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
+				 struct wlan_diag_mlo_reconfig);
+
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.version = DIAG_MLO_RECONFIG_VERSION;
+
+	link_id = wlan_vdev_get_link_id(vdev);
+	wlan_diag_event.mlo_cmn_info.link_id = link_id;
+
+	if (!vdev->mlo_dev_ctx)
+		return;
+
+	link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx, link_id);
+	if (!link_info) {
+		mlme_err("linl: %d Link info not found", link_id);
+		return;
+	}
+	chan_info = link_info->link_chan_info;
+	if (!chan_info) {
+		mlme_err("link: %d Chan info not found", link_id);
+		return;
+	}
+
+	wlan_diag_event.mlo_cmn_info.band =
+			wlan_convert_freq_to_diag_band(chan_info->ch_freq);
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_RECONFIG);
+}
+
 static QDF_STATUS
 wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 			struct wlan_diag_sta_info *wlan_diag_event)
@@ -355,7 +425,7 @@ wlan_populate_band_bitmap(struct mlo_link_switch_context *link_ctx)
 	return band_bitmap;
 }
 
-static QDF_STATUS
+QDF_STATUS
 wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_diag_packet_info *data,
 				   enum wlan_main_tag tag)
@@ -428,6 +498,7 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	uint i = 0;
 	struct mlo_link_switch_context *link_ctx = NULL;
 	struct wlan_channel *chan_info;
+	uint8_t num_links = 0;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
 				 struct wlan_diag_mlo_setup);
@@ -455,26 +526,159 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	}
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		wlan_diag_event.mlo_cmn_info[i].link_id =
+		if (link_ctx->links_info[i].link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		chan_info = link_ctx->links_info[i].link_chan_info;
+		if (!chan_info) {
+			logging_debug("link %d: chan_info not found",
+				      link_ctx->links_info[i].link_id);
+			continue;
+		}
+
+		wlan_diag_event.mlo_cmn_info[num_links].link_id =
 				link_ctx->links_info[i].link_id;
-		wlan_diag_event.mlo_cmn_info[i].vdev_id =
+		wlan_diag_event.mlo_cmn_info[num_links].vdev_id =
 				link_ctx->links_info[i].vdev_id;
 
-		qdf_mem_copy(wlan_diag_event.mlo_cmn_info[i].link_addr,
+		qdf_mem_copy(wlan_diag_event.mlo_cmn_info[num_links].link_addr,
 			     link_ctx->links_info[i].ap_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 
-		chan_info = link_ctx->links_info[i].link_chan_info;
-
-		wlan_diag_event.mlo_cmn_info[i].band =
+		wlan_diag_event.mlo_cmn_info[num_links].band =
 			wlan_convert_freq_to_diag_band(chan_info->ch_freq);
 
-		if (wlan_diag_event.mlo_cmn_info[i].band == WLAN_INVALID_BAND)
+		if (wlan_diag_event.mlo_cmn_info[num_links].band ==
+							 WLAN_INVALID_BAND)
 			wlan_diag_event.mlo_cmn_info[i].status =
 							REJECTED_LINK_STATUS;
+
+		num_links++;
 	}
 
+	wlan_diag_event.num_links = num_links;
+
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_SETUP);
+
+	wlan_connectivity_t2lm_status_event(vdev);
+}
+
+#define IS_LINK_SET(link_bitmap, link_id) ((link_bitmap) & (BIT(link_id)))
+#define DEFAULT_TID_MAP 0xFF
+
+static void
+wlan_populate_tid_link_id_bitmap(struct wlan_t2lm_info *t2lm,
+				 struct mlo_link_info *link_info,
+				 struct wlan_diag_mlo_t2lm_status *buf,
+				 uint8_t bss_link)
+{
+	uint8_t link_id;
+	uint8_t dir, i;
+	uint16_t freq;
+
+	link_id = link_info->link_id;
+	freq = link_info->link_chan_info->ch_freq;
+	buf->mlo_cmn_info[bss_link].band =
+		wlan_convert_freq_to_diag_band(freq);
+	buf->mlo_cmn_info[bss_link].vdev_id = link_info->vdev_id;
+
+	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
+		if (t2lm[dir].default_link_mapping) {
+			buf->mlo_cmn_info[bss_link].tid_ul = DEFAULT_TID_MAP;
+			buf->mlo_cmn_info[bss_link].tid_dl = DEFAULT_TID_MAP;
+			continue;
+		}
+
+		for (i = 0; i < T2LM_MAX_NUM_TIDS; i++) {
+			switch (t2lm[dir].direction) {
+			case WLAN_T2LM_DL_DIRECTION:
+				if (
+				IS_LINK_SET(
+				t2lm[dir].ieee_link_map_tid[i], link_id))
+					buf->mlo_cmn_info[bss_link].tid_dl |=
+									BIT(i);
+				break;
+			case WLAN_T2LM_UL_DIRECTION:
+				if (
+				IS_LINK_SET(
+				t2lm[dir].ieee_link_map_tid[i], link_id))
+					buf->mlo_cmn_info[bss_link].tid_ul |=
+									BIT(i);
+				break;
+			case WLAN_T2LM_BIDI_DIRECTION:
+				if (
+				IS_LINK_SET(
+				t2lm[dir].ieee_link_map_tid[i], link_id)) {
+					buf->mlo_cmn_info[bss_link].tid_dl |=
+									BIT(i);
+					buf->mlo_cmn_info[bss_link].tid_ul |=
+									BIT(i);
+				}
+				break;
+			default:
+				logging_debug("Invalid direction %d",
+					      t2lm[dir].direction);
+				break;
+			}
+		}
+	}
+}
+
+void
+wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t i = 0, dir, num_links = 0;
+	QDF_STATUS status;
+	struct mlo_link_info *link_info;
+	struct wlan_t2lm_info t2lm[WLAN_T2LM_MAX_DIRECTION] = {0};
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
+				 struct wlan_diag_mlo_t2lm_status);
+
+	if (!mlo_is_mld_sta(vdev))
+		return;
+
+	if (!vdev->mlo_dev_ctx) {
+		logging_err("MLO dev ctx not found");
+		return;
+	}
+	link_info = mlo_mgr_get_ap_link(vdev);
+	if (!link_info) {
+		logging_err("link_info invalid");
+		return;
+	}
+
+	if (mlo_mgr_is_link_switch_in_progress(vdev))
+		return;
+
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.version = DIAG_MLO_T2LM_STATUS_VERSION;
+
+	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++)
+		t2lm[dir].direction = WLAN_T2LM_INVALID_DIRECTION;
+
+	status = wlan_get_t2lm_mapping_status(vdev, t2lm);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		logging_err("Unable to get t2lm_mapping");
+		return;
+	}
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS && i < MAX_BANDS; i++) {
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr) &&
+		    link_info->link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		wlan_populate_tid_link_id_bitmap(t2lm, link_info,
+						 &wlan_diag_event, num_links);
+		link_info++;
+		num_links++;
+	}
+
+	wlan_diag_event.num_links = num_links;
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
+				    EVENT_WLAN_MLO_T2LM_STATUS);
 }
 
 #else
@@ -484,15 +688,21 @@ wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 {
 	return QDF_STATUS_SUCCESS;
 }
-
-static QDF_STATUS
-wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
-				   struct wlan_diag_packet_info *data,
-				   enum wlan_main_tag tag)
-{
-	return QDF_STATUS_SUCCESS;
-}
 #endif
+
+void
+wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
+		       uint32_t freq, uint8_t vdev_id)
+{
+	ol_txrx_soc_handle soc_txrx_handle;
+	cdp_config_param_type val = {0};
+
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+	val.cdp_peer_param_freq = freq;
+	cdp_txrx_set_peer_param(soc_txrx_handle, vdev_id, peer_mac,
+				CDP_CONFIG_PEER_FREQ, val);
+}
 
 void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
@@ -509,13 +719,19 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return;
 	}
 
-	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
+	    (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	     (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
+	      wlan_vdev_mlme_is_mlo_link_vdev(vdev))))
+		goto out;
+
+	if (!wlan_cm_is_first_candidate_connect_attempt(vdev))
 		goto out;
 
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
 	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
-	wlan_diag_event.is_mlo = mlo_is_mld_sta(vdev);
+	wlan_diag_event.is_mlo = wlan_vdev_mlme_is_mlo_vdev(vdev);
 
 	if (wlan_diag_event.is_mlo) {
 		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
@@ -533,7 +749,7 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	}
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_STA_INFO);
-
+	wlan_connectivity_connecting_event(vdev);
 out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
@@ -588,8 +804,9 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	if (opmode != QDF_STA_MODE)
 		goto out;
 
-	if (mlo_is_mld_sta(vdev) &&
-	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	     wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)))
 		goto out;
 
 	is_initial_connection = wlan_cm_is_vdev_connecting(vdev);
@@ -647,4 +864,124 @@ out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 }
+
+void
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	struct wlan_cm_connect_req req;
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_connect);
+
+	status = wlan_cm_get_active_connect_req_param(vdev, &req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		logging_err("vdev: %d failed to get active cmd request",
+			    wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	wlan_diag_event.version = DIAG_CONN_VERSION;
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
+	wlan_diag_event.subtype = WLAN_CONN_DIAG_CONNECTING_EVENT;
+
+	wlan_diag_event.ssid_len = req.ssid.length;
+
+	if (req.ssid.length > WLAN_SSID_MAX_LEN)
+		wlan_diag_event.ssid_len = WLAN_SSID_MAX_LEN;
+
+	qdf_mem_copy(wlan_diag_event.ssid, req.ssid.ssid,
+		     wlan_diag_event.ssid_len);
+
+	if (!qdf_is_macaddr_zero(&req.bssid))
+		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid, req.bssid.bytes,
+			     QDF_MAC_ADDR_SIZE);
+	else if (!qdf_is_macaddr_zero(&req.bssid_hint))
+		qdf_mem_copy(wlan_diag_event.bssid_hint, req.bssid_hint.bytes,
+			     QDF_MAC_ADDR_SIZE);
+
+	if (req.chan_freq)
+		wlan_diag_event.freq = req.chan_freq;
+	else if (req.chan_freq_hint)
+		wlan_diag_event.freq_hint = req.chan_freq_hint;
+
+	wlan_diag_event.pairwise_cipher	= req.crypto.user_cipher_pairwise;
+	wlan_diag_event.grp_cipher = req.crypto.user_grp_cipher;
+	wlan_diag_event.akm = req.crypto.user_akm_suite;
+	wlan_diag_event.auth_algo = req.crypto.user_auth_type;
+
+	wlan_diag_event.bt_coex =
+		wlan_mlme_get_bt_profile_con(wlan_vdev_get_psoc(vdev));
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_CONN);
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+
+#define BAND_TO_BITMAP(band) (band - 1)
+
+static uint8_t
+wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
+				  uint16_t link_bitmap)
+{
+	uint8_t i, band_bitmap = 0, band;
+	struct wlan_mlo_dev_context *mldev = NULL;
+	struct wlan_mlo_peer_context *mlpeer = NULL;
+	struct mlo_link_info *link_info = NULL;
+	uint32_t freq;
+
+	mlpeer = wlan_mlo_get_mlpeer_by_peer_mladdr(peer_mld, &mldev);
+	if (!mlpeer) {
+		logging_err("ml peer not found");
+		goto out;
+	}
+
+	for (i = 0; i < MAX_MLO_LINK_ID; i++) {
+		if (IS_LINK_SET(link_bitmap, i)) {
+			link_info = mlo_mgr_get_ap_link_by_link_id(mldev, i);
+			if (!link_info) {
+				logging_err("link: %d info does not exist", i);
+				continue;
+			}
+
+			freq = link_info->link_chan_info->ch_freq;
+			band = wlan_convert_freq_to_diag_band(freq);
+			if (band == WLAN_INVALID_BAND)
+				continue;
+
+			band_bitmap |= BIT(BAND_TO_BITMAP(band));
+		}
+	}
+
+out:
+	return band_bitmap;
+}
+
+void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
+					     struct mlo_link_switch_params *src)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
+				 struct wlan_diag_mlo_link_status);
+
+	qdf_mem_zero(&wlan_diag_event,
+		     sizeof(struct wlan_diag_mlo_link_status));
+
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.version = DIAG_MLO_LINK_STATUS_VERSION;
+
+	wlan_diag_event.active_link =
+		wlan_convert_link_id_to_diag_band(&src->mld_addr,
+						  src->active_link_bitmap);
+	wlan_diag_event.prev_active_link =
+		wlan_convert_link_id_to_diag_band(&src->mld_addr,
+						  src->prev_link_bitmap);
+	wlan_diag_event.reason = src->reason_code;
+	wlan_diag_event.diag_cmn.fw_timestamp = src->fw_timestamp;
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
+				    EVENT_WLAN_MLO_LINK_STATUS);
+}
+#endif
 #endif

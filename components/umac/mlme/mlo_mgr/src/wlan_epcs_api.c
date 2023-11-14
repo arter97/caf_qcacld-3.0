@@ -338,7 +338,8 @@ static QDF_STATUS epcs_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 	edca_info = &epcs_req.pa_info;
 	for (i = 0; i < edca_info->num_links; i++) {
 		link = &edca_info->link_info[i];
-		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id);
+		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id,
+						    WLAN_MLO_MGR_ID);
 		if (!link_vdev)
 			continue;
 
@@ -353,7 +354,7 @@ static QDF_STATUS epcs_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 		if (link->muedca_ie_present)
 			epcs_update_mu_edca_param(link_vdev, &link->muedca);
 
-		mlo_release_vdev_ref(link_vdev);
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
 	}
 
 	args.category = ACTION_CATEGORY_PROTECTED_EHT;
@@ -389,11 +390,11 @@ static QDF_STATUS epcs_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 
 	if (!vdev || !peer)
-		return QDF_STATUS_E_INVAL;
+		return QDF_STATUS_E_NULL_VALUE;
 
 	ml_peer = peer->mlo_peer_ctx;
 	if (!ml_peer)
-		return QDF_STATUS_E_FAILURE;
+		return QDF_STATUS_E_NULL_VALUE;
 
 	epcs_info = &ml_peer->epcs_info;
 	if (epcs_info->state == EPCS_ENABLE) {
@@ -421,7 +422,8 @@ static QDF_STATUS epcs_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 	edca_info = &epcs_rsp.pa_info;
 	for (i = 0; i < edca_info->num_links; i++) {
 		link = &edca_info->link_info[i];
-		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id);
+		link_vdev = mlo_get_vdev_by_link_id(vdev, link->link_id,
+						    WLAN_MLO_MGR_ID);
 		if (!link_vdev)
 			continue;
 
@@ -436,7 +438,7 @@ static QDF_STATUS epcs_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 		if (link->muedca_ie_present)
 			epcs_update_mu_edca_param(link_vdev, &link->muedca);
 
-		mlo_release_vdev_ref(link_vdev);
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
 	}
 
 	epcs_info->state = EPCS_ENABLE;
@@ -668,7 +670,7 @@ QDF_STATUS wlan_epcs_set_config(struct wlan_objmgr_vdev *vdev, uint8_t flag)
 	else
 		wlan_mlme_set_epcs_capability(wlan_vdev_get_psoc(vdev), false);
 
-	return lim_send_eht_caps_ie(mac_ctx, NULL, QDF_STA_MODE,
+	return lim_send_eht_caps_ie(mac_ctx, QDF_STA_MODE,
 				    wlan_vdev_get_id(vdev));
 }
 

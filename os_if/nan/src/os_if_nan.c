@@ -2676,6 +2676,9 @@ static void os_if_nan_discovery_event_handler(struct nan_event_params *nan_evt)
 	struct pdev_osif_priv *os_priv;
 	enum qca_nl80211_vendor_subcmds_index index =
 		QCA_NL80211_VENDOR_SUBCMD_NAN_INDEX;
+	struct wireless_dev *wdev;
+	struct vdev_osif_priv *osif_priv;
+	struct wlan_objmgr_vdev *vdev = NULL;
 
 	/*
 	 * Since Partial Offload chipsets have only one pdev per psoc, the first
@@ -2689,8 +2692,31 @@ static void os_if_nan_discovery_event_handler(struct nan_event_params *nan_evt)
 	os_if_nan_handle_sr_nan_concurrency(nan_evt);
 
 	os_priv = wlan_pdev_get_ospriv(pdev);
+	if (!os_priv) {
+		osif_err(" pdev osif priv is null");
+		goto fail;
+	}
 
-	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, NULL,
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, nan_evt->vdev_id,
+						    WLAN_NAN_ID);
+	if (!vdev) {
+		osif_err("vdev is null");
+		goto fail;
+	}
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv) {
+		osif_err("osif_priv is null");
+		goto fail;
+	}
+
+	wdev = osif_priv->wdev;
+	if (!wdev) {
+		osif_err("wireless dev is null");
+		goto fail;
+	}
+
+	vendor_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy, wdev,
 							nan_evt->buf_len +
 							NLMSG_HDRLEN,
 							index, GFP_KERNEL);
@@ -2708,6 +2734,9 @@ static void os_if_nan_discovery_event_handler(struct nan_event_params *nan_evt)
 
 	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 fail:
+	if (vdev)
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
 }
 

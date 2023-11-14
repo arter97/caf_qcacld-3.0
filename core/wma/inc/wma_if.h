@@ -159,6 +159,7 @@ struct peer_ml_info {
 	struct qdf_mac_addr self_mac_addr;
 	uint8_t num_links;
 	struct ml_partner_link_info partner_info[MLD_MAX_LINKS - 1];
+	uint8_t rec_max_simultaneous_links;
 };
 #endif
 
