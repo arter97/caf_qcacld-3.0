@@ -1391,7 +1391,7 @@ struct chan_load_report {
 	uint8_t op_class;
 	uint8_t channel;
 	qdf_time_t rrm_scan_tsf;
-	uint8_t meas_duration;
+	uint16_t meas_duration;
 	uint8_t chan_load;
 	struct sir_mac_bw_ind_element bw_ind;
 	struct sir_mac_wide_bw_chan_switch wide_bw;
@@ -1488,7 +1488,7 @@ union stats_group_data {
  * @group stats: stats data
  */
 struct statistics_report {
-	uint8_t meas_duration;
+	uint16_t meas_duration;
 	uint8_t group_id;
 	union stats_group_data group_stats;
 };

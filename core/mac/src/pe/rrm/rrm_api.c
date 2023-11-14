@@ -955,7 +955,7 @@ rrm_process_sta_stats_report_req(struct mac_context *mac,
 {
 	QDF_STATUS status;
 	uint16_t meas_duration = MIN_MEAS_DURATION_FOR_STA_STATS;
-	uint8_t max_meas_duration;
+	uint16_t max_meas_duration;
 	struct rrm_sta_stats *rrm_sta_statistics;
 
 	max_meas_duration = rrm_get_max_meas_duration(mac, pe_session);
@@ -994,8 +994,11 @@ rrm_process_sta_stats_report_req(struct mac_context *mac,
 	rrm_sta_statistics->rrm_report.report.statistics_report.group_id =
 	sta_stats_req->measurement_request.sta_stats.group_identity;
 	rrm_sta_statistics->rrm_report.report.statistics_report.meas_duration
-		= sta_stats_req->measurement_request.sta_stats.meas_duration;
+		= meas_duration;
 
+	pe_debug("sta stats req vdev :%d, meas_dur:%d, max_dur:%d group id %d",
+		 pe_session->vdev_id, meas_duration, max_meas_duration,
+		 sta_stats_req->measurement_request.sta_stats.group_identity);
 	switch  (sta_stats_req->measurement_request.sta_stats.group_identity) {
 	case STA_STAT_GROUP_ID_COUNTER_STATS:
 	case STA_STAT_GROUP_ID_MAC_STATS:
