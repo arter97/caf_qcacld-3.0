@@ -1508,6 +1508,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_DP_DEBUG_LOG = 543,
 	OL_ATH_PARAM_UL_OFDMA_RTD = 544,
 	OL_ATH_PARAM_ENABLE_DELAYED_LMR_FEEDBACK = 545,
+	OL_ATH_PARAM_RTT_SKIP_VDEV_RESTART = 546,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3739,6 +3740,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"afc_send_cmd",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_AFC_SEND_CMD, SET_PARAM, 1},
 #endif
+	{"rtt_skip_vdev_restart",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RTT_SKIP_VDEV_RESTART, SET_PARAM, 1},
 	{"enable_rtt",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RTT_ENABLE, SET_PARAM, 1},
 	{"switch_rtt_role",
