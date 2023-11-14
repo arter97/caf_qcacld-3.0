@@ -51,7 +51,12 @@ int wlan_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+#ifndef ENABLE_CFG80211_BACKPORTS_MLO
 	ic = cfg_ctx->ic;
+#else
+	ic = cfg_ctx->ic_list[0];
+#endif
+
 	if (!ic) {
 		dp_mon_err("Invalid interface");
 		return -EINVAL;
@@ -139,7 +144,11 @@ wlan_cfg80211_set_phyrx_error_mask(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+#ifndef ENABLE_CFG80211_BACKPORTS_MLO
 	ic = cfg_ctx->ic;
+#else
+	ic = cfg_ctx->ic_list[0];
+#endif
 	if (!ic) {
 		dp_mon_err("Invalid interface");
 		return -EINVAL;
@@ -194,7 +203,12 @@ wlan_cfg80211_get_phyrx_error_mask(struct wiphy *wiphy,
 	uint32_t mask = 0, mask_cont = 0;
 
 	cfg_ctx = (struct cfg80211_context *)wiphy_priv(wiphy);
+
+#ifndef ENABLE_CFG80211_BACKPORTS_MLO
 	ic = cfg_ctx->ic;
+#else
+	ic = cfg_ctx->ic_list[0];
+#endif
 
 	cmd = extract_command(ic, wdev, &cmd_type);
 
@@ -272,7 +286,12 @@ int wlan_cfg80211_lite_monitor_config(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+#ifndef ENABLE_CFG80211_BACKPORTS_MLO
 	ic = cfg_ctx->ic;
+#else
+	ic = cfg_ctx->ic_list[0];
+#endif
+
 	if (!ic) {
 		dp_mon_err("Invalid interface");
 		return -EINVAL;
