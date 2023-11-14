@@ -2339,6 +2339,11 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (vdev_id >= wma_handle->max_bssid) {
+		wma_err("tx packet with invalid vdev_id :%d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	iface = &wma_handle->interfaces[vdev_id];
 
 	if (!soc) {
@@ -2370,7 +2375,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if ((iface && (iface->rmfEnabled || tx_flag & HAL_USE_PMF)) &&
+	if (((iface->rmfEnabled || tx_flag & HAL_USE_PMF)) &&
 	    (frmType == TXRX_FRM_802_11_MGMT) &&
 	    (pFc->subType == SIR_MAC_MGMT_DISASSOC ||
 	     pFc->subType == SIR_MAC_MGMT_DEAUTH ||
@@ -2717,7 +2722,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	mgmt_param.use_6mbps = use_6mbps;
 	mgmt_param.tx_type = tx_frm_index;
 	mgmt_param.peer_rssi = peer_rssi;
-	if (iface && wlan_vdev_mlme_get_opmode(iface->vdev) == QDF_STA_MODE &&
+	if (wlan_vdev_mlme_get_opmode(iface->vdev) == QDF_STA_MODE &&
 	    wlan_vdev_mlme_is_mlo_vdev(iface->vdev) &&
 	    (wlan_vdev_mlme_is_active(iface->vdev) == QDF_STATUS_SUCCESS) &&
 	    frmType == TXRX_FRM_802_11_MGMT &&
