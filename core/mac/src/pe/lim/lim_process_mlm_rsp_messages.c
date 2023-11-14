@@ -3005,7 +3005,7 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
 {
 	struct mlo_partner_info *partner_info;
 	struct mlo_link_info *partner_link_info;
-	struct wlan_channel channel;
+	struct wlan_channel channel = {0};
 	struct mlo_link_switch_context *link_ctx;
 	uint8_t i = 0;
 
