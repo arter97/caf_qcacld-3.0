@@ -1175,6 +1175,30 @@ static void wma_dcs_clear_vdev_starting(struct mac_context *mac_ctx,
 }
 
 /**
+ * wma_send_dcs_cmd_for_vdev() - Send DCS command
+ * @psoc: pointer to psoc object
+ * @mac_id: mac_id
+ * @vdev_id: vdev_id
+ *
+ * Return: None
+ */
+#ifdef WLAN_FEATURE_VDEV_DCS
+static void wma_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+			     uint32_t mac_id, uint8_t vdev_id)
+{
+	/* Send DCS command only for low latency sap*/
+	if (policy_mgr_is_vdev_ll_sap(psoc, vdev_id))
+		ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
+}
+#else
+static void wma_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+			     uint32_t mac_id, uint8_t vdev_id)
+{
+	ucfg_wlan_dcs_cmd(psoc, mac_id, true);
+}
+#endif
+
+/**
  * wma_dcs_wlan_interference_mitigation_enable() - enable wlan
  * interference mitigation
  * @mac_ctx: mac context
@@ -1219,7 +1243,8 @@ static void wma_dcs_wlan_interference_mitigation_enable(
 	if (rsp->resp_type == WMI_HOST_VDEV_START_RESP_EVENT) {
 		ucfg_config_dcs_enable(mac_ctx->psoc, mac_id,
 				       WLAN_HOST_DCS_WLANIM);
-		ucfg_wlan_dcs_cmd(mac_ctx->psoc, mac_id, true);
+
+		wma_send_dcs_cmd(mac_ctx->psoc, mac_id, rsp->vdev_id);
 	}
 }
 #else

@@ -239,16 +239,15 @@ hdd_dcs_select_random_chan(struct wlan_objmgr_pdev *pdev,
 /**
  * hdd_dcs_cb() - hdd dcs specific callback
  * @psoc: psoc
- * @mac_id: mac_id
- * @interference_type: wlan or continuous wave interference type
+ * @param: pointer to dcs_param
  * @arg: List of arguments
  *
  * This callback is registered with dcs component to start acs operation
  *
  * Return: None
  */
-static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, uint8_t mac_id,
-		       uint8_t interference_type, void *arg)
+static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, struct dcs_param *param,
+		       void *arg)
 {
 	struct hdd_context *hdd_ctx = (struct hdd_context *)arg;
 	struct wlan_hdd_link_info *link_info;
@@ -261,22 +260,23 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, uint8_t mac_id,
 	/*
 	 * so far CAP_DCS_CWIM interference mitigation is not supported
 	 */
-	if (interference_type == WLAN_HOST_DCS_CWIM) {
+	if (param->interference_type == WLAN_HOST_DCS_CWIM) {
 		hdd_debug("CW interference mitigation is not supported");
 		return;
 	}
 
 	if (policy_mgr_is_force_scc(psoc) &&
-	    policy_mgr_is_sta_gc_active_on_mac(psoc, mac_id)) {
-		ucfg_config_dcs_event_data(psoc, mac_id, true);
+	    policy_mgr_is_sta_gc_active_on_mac(psoc, param->mac_id)) {
+		ucfg_config_dcs_event_data(psoc, param->mac_id, true);
 
 		hdd_debug("force scc %d, mac id %d sta gc count %d",
-			  policy_mgr_is_force_scc(psoc), mac_id,
-			  policy_mgr_is_sta_gc_active_on_mac(psoc, mac_id));
+			  policy_mgr_is_force_scc(psoc), param->mac_id,
+			  policy_mgr_is_sta_gc_active_on_mac(psoc,
+							     param->mac_id));
 		return;
 	}
 
-	count = policy_mgr_get_sap_go_count_on_mac(psoc, list, mac_id);
+	count = policy_mgr_get_sap_go_count_on_mac(psoc, list, param->mac_id);
 	for (index = 0; index < count; index++) {
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx, list[index]);
 		if (!link_info) {
@@ -290,7 +290,7 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, uint8_t mac_id,
 			continue;
 
 		hdd_debug("DCS triggers ACS on vdev_id=%u, mac_id=%u",
-			  list[index], mac_id);
+			  list[index], param->mac_id);
 		/*
 		 * Select Random channel for low latency sap as
 		 * ACS can't select channel of same MAC from which
