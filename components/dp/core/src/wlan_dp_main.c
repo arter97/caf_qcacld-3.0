@@ -1229,6 +1229,7 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		qdf_atomic_init(&dp_intf->num_active_task);
 		dp_nud_ignore_tracking(dp_intf, false);
 		dp_mic_enable_work(dp_intf);
+		dp_flow_priortization_init(dp_intf);
 
 		if (dp_intf->device_mode == QDF_SAP_MODE ||
 		    dp_intf->device_mode == QDF_P2P_GO_MODE) {
@@ -1300,6 +1301,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		 * Interface level operations are stopped when last
 		 * link is deleted
 		 */
+		dp_flow_priortization_deinit(dp_intf);
 		dp_nud_ignore_tracking(dp_intf, true);
 		dp_nud_reset_tracking(dp_intf);
 		dp_nud_flush_work(dp_intf);
