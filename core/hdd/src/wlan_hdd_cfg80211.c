@@ -204,6 +204,7 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_hdd_mlo.h"
 #include "os_if_dp_svc.h"
+#include "wlan_osif_fpm.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -19625,6 +19626,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_COAP_OFFLOAD_COMMANDS
 	FEATURE_ML_LINK_STATE_COMMANDS
 	FEATURE_SERVICE_CLASS_COMMANDS
+	FEATURE_FLOW_POLICY_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
