@@ -241,6 +241,7 @@ enum tdls_feature_mode {
  * @TDLS_CMD_SET_SECOFFCHANOFFSET: tdls secondary offchannel offset
  * @TDLS_DELETE_ALL_PEERS_INDICATION: tdls delete all peers indication
  * @TDLS_CMD_START_BSS: SAP start indication to tdls module
+ * @TDLS_CMD_SET_LINK_UNFORCE: tdls to unforce link for MLO case
  */
 enum tdls_command_type {
 	TDLS_CMD_TX_ACTION = 1,
@@ -267,7 +268,8 @@ enum tdls_command_type {
 	TDLS_CMD_SET_OFFCHANMODE,
 	TDLS_CMD_SET_SECOFFCHANOFFSET,
 	TDLS_DELETE_ALL_PEERS_INDICATION,
-	TDLS_CMD_START_BSS
+	TDLS_CMD_START_BSS,
+	TDLS_CMD_SET_LINK_UNFORCE
 };
 
 /**

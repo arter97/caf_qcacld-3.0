@@ -97,6 +97,10 @@
 
 #define INVALID_PREAMBLE 0xFF
 
+#define MAX_RSSI_MCS_INDEX 14
+
+#define MAX_HT_MCS_INDEX 7
+
 /* 11B, 11G Rate table include Basic rate and Extended rate
  * The IDX field is the rate index
  * The HI field is the rate when RSSI is strong or being ignored
@@ -184,7 +188,7 @@ static const struct index_vht_data_rate_type supported_vht_mcs_rate_nss2[] = {
 };
 
 /*array index points to MCS and array value points respective rssi*/
-static int rssi_mcs_tbl[][14] = {
+static int rssi_mcs_tbl[][MAX_RSSI_MCS_INDEX] = {
 /*  MCS 0   1    2   3    4    5    6    7    8    9    10   11   12   13*/
 	/* 20 */
 	{-82, -79, -77, -74, -70, -66, -65, -64, -59, -57, -52, -48, -46, -42},
@@ -1482,7 +1486,11 @@ wlan_hdd_copy_mlo_peer_stats(struct hdd_adapter *adapter,
 		qdf_mem_copy(&link_info->mlo_peer_info.peer_mac,
 			     &sta_ctx->conn_info.bssid, QDF_MAC_ADDR_SIZE);
 		link_info->mlo_peer_info.type = peer_info->type;
-		hdd_debug("For peer " QDF_MAC_ADDR_FMT "filling default values",
+		link_info->mlo_peer_info.num_rate = HDD_MAX_PER_PEER_RATES;
+		for (j = 0; j < HDD_MAX_PER_PEER_RATES; j++)
+			qdf_mem_zero(&link_info->mlo_peer_info.rate_stats[j],
+				     sizeof(struct wifi_rate_stat));
+		hdd_debug("Default values for standby link " QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes));
 	}
 
@@ -5131,6 +5139,8 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+		return -EINVAL;
 	/**
 	 * HTT_DBG_EXT_STATS_PDEV_RX
 	 */
@@ -5833,16 +5843,19 @@ static void hdd_get_max_rate_ht(struct hdd_station_info *stainfo,
 	}
 
 	if (!report_max) {
-		for (i = 0; i < mcsidx; i++) {
+		for (i = 0; i < MAX_HT_MCS_INDEX && i < mcsidx; i++) {
 			if (rssi <= rssi_mcs_tbl[mode][i]) {
 				mcsidx = i;
 				break;
 			}
 		}
-		if (mcsidx < stats->tx_rate.mcs)
+		if (mcsidx < stats->tx_rate.mcs &&
+		    stats->tx_rate.mcs <= MAX_HT_MCS_INDEX)
 			mcsidx = stats->tx_rate.mcs;
 	}
 
+	if (mcsidx > MAX_HT_MCS_INDEX)
+		mcsidx = MAX_HT_MCS_INDEX;
 	tmprate = supported_mcs_rate[mcsidx].supported_rate[flag];
 
 	hdd_debug("tmprate %d mcsidx %d", tmprate, mcsidx);
@@ -5923,7 +5936,7 @@ static void hdd_get_max_rate_vht(struct hdd_station_info *stainfo,
 		}
 
 		if (!report_max) {
-			for (i = 0; i <= mcsidx; i++) {
+			for (i = 0; i <= mcsidx && i < MAX_RSSI_MCS_INDEX; i++) {
 				if (rssi <= rssi_mcs_tbl[mode][i]) {
 					mcsidx = i;
 					break;
@@ -7317,6 +7330,8 @@ wlan_hdd_refill_actual_rate(struct station_info *sinfo,
 
 	sinfo->rxrate.nss = link_info->hdd_stats.class_a_stat.rx_nss;
 	if (preamble == DOT11_A || preamble == DOT11_B) {
+		/* Clear rxrate which may have been set previously */
+		qdf_mem_zero(&sinfo->rxrate, sizeof(sinfo->rxrate));
 		sinfo->rxrate.legacy =
 			link_info->hdd_stats.class_a_stat.rx_rate;
 		hdd_debug("Reporting legacy rate %d", sinfo->rxrate.legacy);
@@ -8221,22 +8236,14 @@ struct net_device_stats *hdd_get_stats(struct net_device *dev)
 	return (struct net_device_stats *)ucfg_dp_get_dev_stats(dev);
 }
 
-
 /*
- * time = cycle_count * cycle
- * cycle = 1 / clock_freq
- * Since the unit of clock_freq reported from
- * FW is MHZ, and we want to calculate time in
- * ms level, the result is
- * time = cycle / (clock_freq * 1000)
+ * FW sends value of cycle_count, rx_clear_count and tx_frame_count in usec.
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 				    struct scan_chan_info *chan_info,
 				    struct ieee80211_channel *channels)
 {
-	uint64_t clock_freq = chan_info->clock_freq * 1000;
-
 	if (channels->center_freq != (uint16_t)chan_info->freq)
 		return false;
 
@@ -8250,14 +8257,9 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 	if (opfreq == chan_info->freq)
 		survey->filled |= SURVEY_INFO_IN_USE;
 
-	if (clock_freq == 0)
-		return true;
-
-	survey->time = qdf_do_div(chan_info->cycle_count, clock_freq);
-
-	survey->time_busy = qdf_do_div(chan_info->rx_clear_count, clock_freq);
-
-	survey->time_tx = qdf_do_div(chan_info->tx_frame_count, clock_freq);
+	survey->time = chan_info->cycle_count;
+	survey->time_busy = chan_info->rx_clear_count;
+	survey->time_tx = chan_info->tx_frame_count;
 
 	survey->filled |= SURVEY_INFO_TIME |
 			  SURVEY_INFO_TIME_BUSY |
@@ -8269,8 +8271,6 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 				    struct scan_chan_info *chan_info,
 				    struct ieee80211_channel *channels)
 {
-	uint64_t clock_freq = chan_info->clock_freq * 1000;
-
 	if (channels->center_freq != (uint16_t)chan_info->freq)
 		return false;
 
@@ -8284,16 +8284,9 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 	if (opfreq == chan_info->freq)
 		survey->filled |= SURVEY_INFO_IN_USE;
 
-	if (clock_freq == 0)
-		return true;
-
-	survey->channel_time = qdf_do_div(chan_info->cycle_count, clock_freq);
-
-	survey->channel_time_busy = qdf_do_div(chan_info->rx_clear_count,
-							 clock_freq);
-
-	survey->channel_time_tx = qdf_do_div(chan_info->tx_frame_count,
-							 clock_freq);
+	survey->channel_time = chan_info->cycle_count;
+	survey->channel_time_busy = chan_info->rx_clear_count;
+	survey->channel_time_tx = chan_info->tx_frame_count;
 
 	survey->filled |= SURVEY_INFO_CHANNEL_TIME |
 			  SURVEY_INFO_CHANNEL_TIME_BUSY |
@@ -9356,6 +9349,7 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 	int8_t rssi;
 	struct hdd_station_ctx *sta_ctx;
 	struct wlan_hdd_link_info *link_info;
+	struct qdf_mac_addr *mac_addr;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
@@ -9364,7 +9358,7 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 		vdev_id = ev->vdev_summary_stats[i].vdev_id;
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
 		if (!link_info) {
-			hdd_debug("invalid vdev");
+			hdd_debug("invalid vdev %d", vdev_id);
 			continue;
 		}
 
@@ -9376,11 +9370,16 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 			return;
 		}
 		link_info->rssi_on_disconnect = rssi;
+		sta_ctx->cache_conn_info.signal = rssi;
+
+		mac_addr = hdd_adapter_get_link_mac_addr(link_info);
+		if (!mac_addr)
+			return;
+
 		hdd_debug("rssi %d for " QDF_MAC_ADDR_FMT,
 			  link_info->rssi_on_disconnect,
-			  QDF_MAC_ADDR_REF(link_info->adapter->mac_addr.bytes));
+			  QDF_MAC_ADDR_REF(&mac_addr->bytes[0]));
 
-		sta_ctx->cache_conn_info.signal = rssi;
 	}
 }
 
@@ -10535,5 +10534,877 @@ int wlan_hdd_cfg80211_get_roam_stats(struct wiphy *wiphy,
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
+}
+#endif
+
+#ifdef WLAN_FEATURE_TX_LATENCY_STATS
+#define TX_LATENCY_BUCKET_DISTRIBUTION_LEN \
+	(sizeof(uint32_t) * CDP_TX_LATENCY_TYPE_MAX)
+
+#define TX_LATENCY_ATTR(_name) QCA_WLAN_VENDOR_ATTR_TX_LATENCY_ ## _name
+
+static const struct nla_policy
+tx_latency_bucket_policy[TX_LATENCY_ATTR(BUCKET_MAX) + 1] = {
+	[TX_LATENCY_ATTR(BUCKET_TYPE)] = {.type = NLA_U8},
+	[TX_LATENCY_ATTR(BUCKET_GRANULARITY)] = {.type = NLA_U32},
+	[TX_LATENCY_ATTR(BUCKET_AVERAGE)] = {.type = NLA_U32},
+	[TX_LATENCY_ATTR(BUCKET_DISTRIBUTION)] = {
+		.type = NLA_BINARY, .len = TX_LATENCY_BUCKET_DISTRIBUTION_LEN},
+};
+
+static const struct nla_policy
+tx_latency_link_policy[TX_LATENCY_ATTR(LINK_MAX) + 1] = {
+	[TX_LATENCY_ATTR(LINK_MAC_REMOTE)] = {
+		.type = NLA_BINARY, .len = QDF_MAC_ADDR_SIZE},
+	[TX_LATENCY_ATTR(LINK_STAT_BUCKETS)] =
+		VENDOR_NLA_POLICY_NESTED_ARRAY(tx_latency_bucket_policy),
+};
+
+const struct nla_policy
+tx_latency_policy[TX_LATENCY_ATTR(MAX) + 1] = {
+	[TX_LATENCY_ATTR(ACTION)] = {.type = NLA_U32},
+	[TX_LATENCY_ATTR(PERIODIC_REPORT)] = {.type = NLA_FLAG},
+	[TX_LATENCY_ATTR(PERIOD)] = {.type = NLA_U32 },
+	[TX_LATENCY_ATTR(BUCKETS)] =
+		VENDOR_NLA_POLICY_NESTED_ARRAY(tx_latency_bucket_policy),
+	[TX_LATENCY_ATTR(LINKS)] =
+		VENDOR_NLA_POLICY_NESTED_ARRAY(tx_latency_link_policy),
+};
+
+/**
+ * struct tx_latency_link_node - Link info of remote peer
+ * @node: list node for membership in the link list
+ * @vdev_id: Unique value to identify VDEV
+ * @mac_remote: link MAC address of the remote peer
+ */
+struct tx_latency_link_node {
+	qdf_list_node_t node;
+	uint8_t vdev_id;
+	struct qdf_mac_addr mac_remote;
+};
+
+/**
+ * hdd_tx_latency_set_for_link() - set tx latency stats config for a link
+ * @link_info: link specific information
+ * @config: pointer to tx latency stats config
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+hdd_tx_latency_set_for_link(struct wlan_hdd_link_info *link_info,
+			    struct cdp_tx_latency_config *config)
+{
+	QDF_STATUS status;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	if (!soc)
+		return QDF_STATUS_E_INVAL;
+
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+		return QDF_STATUS_SUCCESS;
+
+	status = cdp_host_tx_latency_stats_config(soc,
+						  link_info->vdev_id,
+						  config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("failed to %s for vdev id %d, status %d",
+			   config->enable ? "enable" : "disable",
+			   link_info->vdev_id, status);
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_tx_latency_restore_config() - restore tx latency stats config for a link
+ * @link_info: link specific information
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_tx_latency_restore_config(struct wlan_hdd_link_info *link_info)
+{
+	QDF_STATUS status;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct cdp_tx_latency_config *config;
+
+	if (!soc)
+		return QDF_STATUS_E_INVAL;
+
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+		return QDF_STATUS_SUCCESS;
+
+	config = &link_info->adapter->tx_latency_cfg;
+	status = cdp_host_tx_latency_stats_config(soc,
+						  link_info->vdev_id,
+						  config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("failed to %s for vdev id %d, status %d",
+			   config->enable ? "enable" : "disable",
+			   link_info->vdev_id, status);
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_tx_latency_set() - restore tx latency stats config for a link
+ * @adapter: pointer to hdd vdev/net_device context
+ * @config: pointer to tx latency stats config
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+hdd_tx_latency_set(struct hdd_adapter *adapter,
+		   struct cdp_tx_latency_config *config)
+{
+	int ret;
+	struct wlan_hdd_link_info *link_info;
+	QDF_STATUS status = QDF_STATUS_E_NOENT;
+
+	ret = hdd_set_tsf_auto_report(adapter, config->enable,
+				      HDD_TSF_AUTO_RPT_SOURCE_TX_LATENCY);
+	if (ret) {
+		hdd_err_rl("failed to %s tsf auto report, ret %d",
+			   config->enable ? "enable" : "disable", ret);
+		return ret;
+	}
+
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		status = hdd_tx_latency_set_for_link(link_info, config);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
+	}
+
+	/* restore TSF auto report config on failure */
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_set_tsf_auto_report(adapter, !config->enable,
+					HDD_TSF_AUTO_RPT_SOURCE_TX_LATENCY);
+	else
+		qdf_mem_copy(&adapter->tx_latency_cfg, config,
+			     sizeof(*config));
+	hdd_debug("enable %d status %d", config->enable, status);
+	return qdf_status_to_os_return(status);
+}
+
+/**
+ * hdd_tx_latency_fill_link_stats() - fill tx latency statistics info skb
+ * @skb: skb to be filled
+ * @latency: per link tx latency statistics
+ * @idx: index of the nested attribute
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+hdd_tx_latency_fill_link_stats(struct sk_buff *skb,
+			       struct cdp_tx_latency *latency, int idx)
+{
+	struct nlattr *link, *link_stat_buckets, *link_stat_bucket;
+	uint32_t type;
+	int ret = 0;
+
+	link = nla_nest_start(skb, idx);
+	if (!link) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	if (nla_put(skb, TX_LATENCY_ATTR(LINK_MAC_REMOTE),
+		    QDF_MAC_ADDR_SIZE, latency->mac_remote.bytes)) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	hdd_debug_rl("idx %d link mac " QDF_MAC_ADDR_FMT,
+		     idx, QDF_MAC_ADDR_REF(latency->mac_remote.bytes));
+	link_stat_buckets =
+		nla_nest_start(skb, TX_LATENCY_ATTR(LINK_STAT_BUCKETS));
+	for (type = 0; type < CDP_TX_LATENCY_TYPE_MAX; type++) {
+		link_stat_bucket = nla_nest_start(skb, type);
+		if (!link_stat_bucket) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		if (nla_put_u8(skb, TX_LATENCY_ATTR(BUCKET_TYPE), type)) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		if (nla_put_u32(skb, TX_LATENCY_ATTR(BUCKET_GRANULARITY),
+				latency->stats[type].granularity)) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		if (nla_put_u32(skb, TX_LATENCY_ATTR(BUCKET_AVERAGE),
+				latency->stats[type].average)) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		if (nla_put(skb, TX_LATENCY_ATTR(BUCKET_DISTRIBUTION),
+			    TX_LATENCY_BUCKET_DISTRIBUTION_LEN,
+			    latency->stats[type].distribution)) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		nla_nest_end(skb, link_stat_bucket);
+		hdd_debug_rl("	type %u granularity %u average %u",
+			     type, latency->stats[type].granularity,
+			     latency->stats[type].average);
+	}
+
+	nla_nest_end(skb, link_stat_buckets);
+	nla_nest_end(skb, link);
+
+err:
+	if (ret)
+		hdd_err("failed for link " QDF_MAC_ADDR_FMT " ret: %d",
+			QDF_MAC_ADDR_REF(latency->mac_remote.bytes), ret);
+	return ret;
+}
+
+/**
+ * hdd_tx_latency_get_skb_len() - get required skb length for vendor command
+ * response/async event
+ * @num: required number of entries
+ *
+ * Return: the required skb length
+ */
+static uint32_t hdd_tx_latency_get_skb_len(uint32_t num)
+{
+	int32_t peer_stat_sz = 0, per_bucket_len = 0, len;
+
+	if (!num)
+		return 0;
+
+	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_BUCKET_TYPE */
+	per_bucket_len += nla_total_size(sizeof(uint8_t));
+	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_BUCKET_GRANULARITY */
+	per_bucket_len += nla_total_size(sizeof(uint32_t));
+	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_BUCKET_DISTRIBUTION */
+	per_bucket_len += nla_total_size(TX_LATENCY_BUCKET_DISTRIBUTION_LEN);
+	/* Nested attr */
+	per_bucket_len = nla_total_size(per_bucket_len);
+
+	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_LINK_MAC_REMOTE */
+	peer_stat_sz += nla_total_size(QDF_MAC_ADDR_SIZE);
+	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_LINK_STAT_BUCKETS */
+	peer_stat_sz +=
+		nla_total_size(per_bucket_len * CDP_TX_LATENCY_TYPE_MAX);
+	/* Nested attr */
+	peer_stat_sz = nla_total_size(peer_stat_sz);
+
+	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_LINKS */
+	len = nla_total_size(peer_stat_sz * num);
+	len += NLMSG_HDRLEN;
+	return len;
+}
+
+/**
+ * hdd_tx_latency_link_list_free() - free all the nodes in the list
+ * @list: list of the nodes for link info
+ *
+ * Return: None
+ */
+static void hdd_tx_latency_link_list_free(qdf_list_t *list)
+{
+	struct tx_latency_link_node *entry, *next;
+
+	qdf_list_for_each_del(list, entry, next, node) {
+		qdf_list_remove_node(list, &entry->node);
+		qdf_mem_free(entry);
+	}
+}
+
+/**
+ * hdd_tx_latency_link_list_add() - add a new node to the list for tx latency
+ * links
+ * @list: list of the nodes for link info
+ * @vdev_id: Unique value to identify VDEV
+ * @mac: link mac address of the remote peer
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+hdd_tx_latency_link_list_add(qdf_list_t *list, uint8_t vdev_id, uint8_t *mac)
+{
+	struct tx_latency_link_node *link;
+
+	link = (struct tx_latency_link_node *)qdf_mem_malloc(sizeof(*link));
+	if (!link)
+		return -ENOMEM;
+
+	qdf_mem_copy(link->mac_remote.bytes, mac, QDF_MAC_ADDR_SIZE);
+	link->vdev_id = vdev_id;
+	qdf_list_insert_back(list, &link->node);
+	return 0;
+}
+
+/**
+ * hdd_tx_latency_get_links_from_attr() - parse information of the links from
+ * attribute QCA_WLAN_VENDOR_ATTR_TX_LATENCY_LINKS
+ * @adapter: pointer to hdd vdev/net_device context
+ * @links_attr: pointer to attribute QCA_WLAN_VENDOR_ATTR_TX_LATENCY_LINKS
+ * @list: list of the nodes for link info
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+hdd_tx_latency_get_links_from_attr(struct hdd_adapter *adapter,
+				   struct nlattr *links_attr,
+				   qdf_list_t *list)
+{
+	struct nlattr *attr, *link_mac_remote_attr;
+	struct nlattr *tb[TX_LATENCY_ATTR(LINK_MAX) + 1];
+	int ret = 0, rem;
+	uint8_t vdev_id, *mac;
+
+	if (!links_attr || !list)
+		return -EINVAL;
+
+	/* links for MLO STA are attached to different vdevs */
+	vdev_id = (adapter->device_mode == QDF_STA_MODE ?
+		   CDP_VDEV_ALL : adapter->deflink->vdev_id);
+
+	nla_for_each_nested(attr, links_attr, rem) {
+		ret = wlan_cfg80211_nla_parse(tb, TX_LATENCY_ATTR(LINK_MAX),
+					      nla_data(attr), nla_len(attr),
+					      tx_latency_link_policy);
+		if (ret) {
+			hdd_err("Attribute parse failed, ret %d", ret);
+			ret = -EINVAL;
+			goto out;
+		}
+
+		link_mac_remote_attr = tb[TX_LATENCY_ATTR(LINK_MAC_REMOTE)];
+		if (!link_mac_remote_attr) {
+			hdd_err("Missing link mac remote attribute");
+			ret = -EINVAL;
+			goto out;
+		}
+
+		if (nla_len(link_mac_remote_attr) < QDF_MAC_ADDR_SIZE) {
+			hdd_err("Attribute link mac remote is invalid");
+			ret = -EINVAL;
+			goto out;
+		}
+
+		mac = (uint8_t *)nla_data(link_mac_remote_attr);
+		ret = hdd_tx_latency_link_list_add(list, vdev_id, mac);
+		if (ret)
+			goto out;
+	}
+
+out:
+	if (ret)
+		hdd_tx_latency_link_list_free(list);
+
+	return ret;
+}
+
+/**
+ * hdd_tx_latency_get_links_for_sap() - get all the active links for SAP mode
+ * @adapter: pointer to hdd vdev/net_device context
+ * @list: list of the nodes for link info
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+hdd_tx_latency_get_links_for_sap(struct hdd_adapter *adapter, qdf_list_t *list)
+{
+	struct hdd_station_info *sta, *tmp = NULL;
+	int ret = 0;
+
+	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta, tmp,
+				  STA_INFO_SOFTAP_GET_STA_INFO) {
+		if (QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes)) {
+			hdd_put_sta_info_ref(&adapter->sta_info_list,
+					     &sta, true,
+					     STA_INFO_SOFTAP_GET_STA_INFO);
+			continue;
+		}
+
+		ret = hdd_tx_latency_link_list_add(list,
+						   adapter->deflink->vdev_id,
+						   sta->sta_mac.bytes);
+		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta, true,
+				     STA_INFO_SOFTAP_GET_STA_INFO);
+		if (ret)
+			goto out;
+	}
+
+out:
+	if (ret)
+		hdd_tx_latency_link_list_free(list);
+
+	return ret;
+}
+
+/**
+ * hdd_tx_latency_get_links_for_sta() - get all the active links for station
+ * mode
+ * @adapter: pointer to hdd vdev/net_device context
+ * @list: list of the nodes for link info
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+hdd_tx_latency_get_links_for_sta(struct hdd_adapter *adapter, qdf_list_t *list)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_station_ctx *ctx;
+	int ret = 0;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+			continue;
+
+		ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		if (!hdd_cm_is_vdev_associated(link_info))
+			continue;
+
+		ret = hdd_tx_latency_link_list_add(list, link_info->vdev_id,
+						   ctx->conn_info.bssid.bytes);
+		if (ret)
+			goto out;
+	}
+
+out:
+	if (ret)
+		hdd_tx_latency_link_list_free(list);
+
+	return ret;
+}
+
+/**
+ * hdd_tx_latency_get_links() - get all the active links
+ * @adapter: pointer to hdd vdev/net_device context
+ * @links_attr: pointer to attribute QCA_WLAN_VENDOR_ATTR_TX_LATENCY_LINKS
+ * @list: list of the nodes for link info
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+hdd_tx_latency_get_links(struct hdd_adapter *adapter,
+			 struct nlattr *links_attr, qdf_list_t *list)
+{
+	if (!list)
+		return -EINVAL;
+
+	if (links_attr)
+		return hdd_tx_latency_get_links_from_attr(adapter,
+							  links_attr, list);
+
+	if (adapter->device_mode == QDF_SAP_MODE ||
+	    adapter->device_mode == QDF_P2P_GO_MODE)
+		return hdd_tx_latency_get_links_for_sap(adapter, list);
+	else if (adapter->device_mode == QDF_STA_MODE ||
+		 adapter->device_mode == QDF_P2P_CLIENT_MODE)
+		return hdd_tx_latency_get_links_for_sta(adapter, list);
+	else
+		return -ENOTSUPP;
+}
+
+/**
+ * hdd_tx_latency_populate_links() - get per link tx latency stats and fill
+ * into skb
+ * @soc: pointer to soc context
+ * @skb: skb for vendor command response/async event
+ * @list: list of the nodes for link info
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static inline int
+hdd_tx_latency_populate_links(void *soc, struct sk_buff *skb, qdf_list_t *list)
+{
+	struct nlattr *links;
+	struct tx_latency_link_node *entry, *next;
+	struct cdp_tx_latency latency = {0};
+	int ret, idx = 0;
+	uint8_t *mac;
+	QDF_STATUS status;
+
+	links = nla_nest_start(skb, TX_LATENCY_ATTR(LINKS));
+	if (!links)
+		return -ENOMEM;
+
+	qdf_list_for_each_del(list, entry, next, node) {
+		qdf_list_remove_node(list, &entry->node);
+		mac = entry->mac_remote.bytes;
+		status = cdp_host_tx_latency_stats_fetch(soc, entry->vdev_id,
+							 mac, &latency);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			qdf_mem_free(entry);
+			return qdf_status_to_os_return(status);
+		}
+
+		ret = hdd_tx_latency_fill_link_stats(skb, &latency, idx);
+		qdf_mem_free(entry);
+		if (ret)
+			return ret;
+
+		idx++;
+	}
+
+	nla_nest_end(skb, links);
+	return 0;
+}
+
+/**
+ * hdd_tx_latency_get() - get per link tx latency stats
+ * @wiphy: pointer to wiphy
+ * @adapter: pointer to hdd vdev/net_device context
+ * @links_attr: pointer to attribute QCA_WLAN_VENDOR_ATTR_TX_LATENCY_LINKS
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+hdd_tx_latency_get(struct wiphy *wiphy,
+		   struct hdd_adapter *adapter, struct nlattr *links_attr)
+{
+	int ret;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct sk_buff *reply_skb = NULL;
+	uint32_t skb_len, links_num = 0;
+	qdf_list_t links_list;
+
+	if (!soc)
+		return -EINVAL;
+
+	qdf_list_create(&links_list, 0);
+	ret = hdd_tx_latency_get_links(adapter, links_attr, &links_list);
+	if (ret)
+		goto out;
+
+	links_num = qdf_list_size(&links_list);
+	if (!links_num) {
+		hdd_err_rl("no valid peers");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	skb_len = hdd_tx_latency_get_skb_len(links_num);
+	reply_skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, skb_len);
+	if (!reply_skb) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = hdd_tx_latency_populate_links(soc, reply_skb, &links_list);
+	if (ret)
+		goto free_skb;
+
+	ret = wlan_cfg80211_vendor_cmd_reply(reply_skb);
+	/* skb has been consumed regardless of the return value */
+	goto out;
+
+free_skb:
+	wlan_cfg80211_vendor_free_skb(reply_skb);
+	hdd_tx_latency_link_list_free(&links_list);
+out:
+	qdf_list_destroy(&links_list);
+	hdd_debug_rl("get stats with ret %d", ret);
+	return ret;
+}
+
+/**
+ * hdd_tx_latency_enable() - enable per link tx latency stats
+ * @adapter: pointer to hdd vdev/net_device context
+ * @period: statistical period for transmit latency
+ * @periodic_report: whether driver needs to report transmit latency
+ * statistics at the end of each period
+ * @buckets_attr: pointer to attribute QCA_WLAN_VENDOR_ATTR_TX_LATENCY_BUCKETS
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+hdd_tx_latency_enable(struct hdd_adapter *adapter, uint32_t period,
+		      bool periodic_report, struct nlattr *buckets_attr)
+{
+	struct nlattr *tb[TX_LATENCY_ATTR(BUCKET_MAX) + 1];
+	struct nlattr *attr, *bucket_type_attr, *bucket_granularity_attr;
+	int rem, ret;
+	uint8_t bucket_type;
+	struct cdp_tx_latency_config config = {0};
+
+	nla_for_each_nested(attr, buckets_attr, rem) {
+		ret = wlan_cfg80211_nla_parse(tb, TX_LATENCY_ATTR(BUCKET_MAX),
+					      nla_data(attr), nla_len(attr),
+					      tx_latency_bucket_policy);
+		if (ret) {
+			hdd_err_rl("Attribute parse failed, ret %d", ret);
+			return -EINVAL;
+		}
+
+		bucket_type_attr = tb[TX_LATENCY_ATTR(BUCKET_TYPE)];
+		if (!bucket_type_attr) {
+			hdd_err_rl("Missing bucket type attribute");
+			return -EINVAL;
+		}
+
+		bucket_granularity_attr =
+			tb[TX_LATENCY_ATTR(BUCKET_GRANULARITY)];
+		if (!bucket_granularity_attr) {
+			hdd_err_rl("Missing bucket granularity attribute");
+			return -EINVAL;
+		}
+
+		bucket_type = nla_get_u8(bucket_type_attr);
+		if (bucket_type >= CDP_TX_LATENCY_TYPE_MAX) {
+			hdd_err_rl("Invalid bucket type %u", bucket_type);
+			return -EINVAL;
+		}
+
+		config.granularity[bucket_type] =
+			nla_get_u32(bucket_granularity_attr);
+		if (!config.granularity[bucket_type]) {
+			hdd_err_rl("Invalid granularity for type %d",
+				   bucket_type);
+			return -EINVAL;
+		}
+	}
+
+	for (rem = 0; rem < CDP_TX_LATENCY_TYPE_MAX; rem++) {
+		if (config.granularity[rem])
+			continue;
+
+		hdd_err_rl("Invalid granularity for type %d", rem);
+		return -EINVAL;
+	}
+
+	config.enable = true;
+	config.report = periodic_report;
+	config.period = period;
+	return hdd_tx_latency_set(adapter, &config);
+}
+
+/**
+ * hdd_tx_latency_disable() - disable per link tx latency stats
+ * @adapter: pointer to hdd vdev/net_device context
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int hdd_tx_latency_disable(struct hdd_adapter *adapter)
+{
+	struct cdp_tx_latency_config config = {0};
+
+	return hdd_tx_latency_set(adapter, &config);
+}
+
+/**
+ * __wlan_hdd_cfg80211_tx_latency - configure/retrieve per-link transmit
+ * latency statistics
+ * @wiphy: wiphy handle
+ * @wdev: wdev handle
+ * @data: user layer input
+ * @data_len: length of user layer input
+ *
+ * this function is called in ssr protected environment.
+ *
+ * return: 0 success, none zero for failure
+ */
+static int
+__wlan_hdd_cfg80211_tx_latency(struct wiphy *wiphy, struct wireless_dev *wdev,
+			       const void *data, int data_len)
+{
+	int ret;
+	uint32_t action, period;
+	struct nlattr *period_attr, *buckets_attr, *links_attr;
+
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct nlattr *tb[TX_LATENCY_ATTR(MAX) + 1];
+	bool periodic_report;
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_warn("command not allowed in ftm mode");
+		return -EPERM;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return -EINVAL;
+
+	if (wlan_cfg80211_nla_parse(tb, TX_LATENCY_ATTR(MAX),
+				    data, data_len,
+				    tx_latency_policy)) {
+		hdd_err_rl("invalid attribute");
+		return -EINVAL;
+	}
+
+	if (!tb[TX_LATENCY_ATTR(ACTION)]) {
+		hdd_err_rl("no attr action");
+		return -EINVAL;
+	}
+
+	action = nla_get_u32(tb[TX_LATENCY_ATTR(ACTION)]);
+	switch (action) {
+	case QCA_WLAN_VENDOR_TX_LATENCY_ACTION_DISABLE:
+		if (!adapter->tx_latency_cfg.enable) {
+			ret = 0;
+			break;
+		}
+
+		ret = hdd_tx_latency_disable(adapter);
+		break;
+	case QCA_WLAN_VENDOR_TX_LATENCY_ACTION_ENABLE:
+		period_attr = tb[TX_LATENCY_ATTR(PERIOD)];
+		if (!period_attr) {
+			hdd_err_rl("no attr period");
+			return -EINVAL;
+		}
+
+		buckets_attr = tb[TX_LATENCY_ATTR(BUCKETS)];
+		if (!buckets_attr) {
+			hdd_err_rl("no attr buckets");
+			return -EINVAL;
+		}
+
+		period = nla_get_u32(period_attr);
+		if (!period) {
+			hdd_err_rl("invalid period");
+			return -EINVAL;
+		}
+
+		periodic_report =
+			nla_get_flag(tb[TX_LATENCY_ATTR(PERIODIC_REPORT)]);
+		ret = hdd_tx_latency_enable(adapter, period,
+					    periodic_report, buckets_attr);
+		break;
+	case QCA_WLAN_VENDOR_TX_LATENCY_ACTION_GET:
+		if (!adapter->tx_latency_cfg.enable) {
+			hdd_err_rl("please enable the feature first");
+			ret = -EINVAL;
+			break;
+		}
+
+		links_attr = tb[TX_LATENCY_ATTR(LINKS)];
+		ret = hdd_tx_latency_get(wiphy, adapter, links_attr);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_tx_latency - configure/retrieve per-link transmit latency
+ * statistics
+ * @wiphy: wiphy handle
+ * @wdev: wdev handle
+ * @data: user layer input
+ * @data_len: length of user layer input
+ *
+ * return: 0 success, einval failure
+ */
+int wlan_hdd_cfg80211_tx_latency(struct wiphy *wiphy,
+				 struct wireless_dev *wdev,
+				 const void *data, int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_tx_latency(wiphy, wdev, data, data_len);
+	osif_vdev_sync_op_stop(vdev_sync);
+	return errno;
+}
+
+/**
+ * hdd_tx_latency_stats_cb() - callback function for transmit latency stats
+ * @vdev_id: Unique value to identify VDEV
+ * @stats_list: list of the nodes for per-link transmit latency statistics
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_tx_latency_stats_cb(uint8_t vdev_id, qdf_list_t *stats_list)
+{
+	uint32_t len, stats_cnt;
+	struct sk_buff *vendor_event;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+	struct cdp_tx_latency *entry, *next;
+	struct nlattr *links;
+	int ret, idx = 0, flags = cds_get_gfp_flags();
+	int event_idx = QCA_NL80211_VENDOR_SUBCMD_TX_LATENCY_INDEX;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	if (!stats_list || qdf_list_empty(stats_list)) {
+		hdd_err("invalid stats list");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("adapter NULL for vdev id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	stats_cnt = qdf_list_size(stats_list);
+	len = hdd_tx_latency_get_skb_len(stats_cnt);
+	hdd_debug_rl("vdev id %d stats cnt %d", vdev_id, stats_cnt);
+	vendor_event =
+		wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
+						 &link_info->adapter->wdev,
+						 len, event_idx, flags);
+	if (!vendor_event) {
+		hdd_err("event alloc failed vdev id %d, len %d",
+			vdev_id, len);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	links = nla_nest_start(vendor_event, TX_LATENCY_ATTR(LINKS));
+	if (!links) {
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		hdd_err("failed to put peers");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_list_for_each_del(stats_list, entry, next, node) {
+		qdf_list_remove_node(stats_list, &entry->node);
+		ret = hdd_tx_latency_fill_link_stats(vendor_event, entry, idx);
+		qdf_mem_free(entry);
+		if (ret) {
+			hdd_err("failed to populate stats for idx %d", idx);
+			wlan_cfg80211_vendor_free_skb(vendor_event);
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		idx++;
+	}
+
+	nla_nest_end(vendor_event, links);
+	wlan_cfg80211_vendor_event(vendor_event, flags);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_tx_latency_register_cb() - register callback function for transmit
+ * latency stats
+ * @soc: pointer to soc context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_tx_latency_register_cb(void *soc)
+{
+	hdd_debug("Register tx latency callback");
+	return cdp_host_tx_latency_stats_register_cb(soc,
+						     hdd_tx_latency_stats_cb);
 }
 #endif

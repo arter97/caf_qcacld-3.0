@@ -1400,8 +1400,10 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	} else {
 		wlan_mlme_get_channel_bonding_5ghz(mac->psoc,
 						   &channel_bonding_mode);
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
-		    (!channel_bonding_mode))
+		if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc,
+						 sap_context->vdev_id) ||
+		    (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
+		     !channel_bonding_mode))
 			ch_width = CH_WIDTH_20MHZ;
 		else
 			ch_width = wlansap_get_max_bw_by_phymode(sap_context);
@@ -3010,15 +3012,24 @@ void wlansap_cleanup_cac_timer(struct sap_context *sap_ctx)
 		return;
 	}
 
+	if (mac->sap.SapDfsInfo.vdev_id != sap_ctx->vdev_id) {
+		sap_err("sapdfs, force cleanup vdev mismatch sap vdev id %d mac_ctx vdev id %d",
+			sap_ctx->vdev_id, mac->sap.SapDfsInfo.vdev_id);
+		return;
+	}
+
 	if (mac->sap.SapDfsInfo.is_dfs_cac_timer_running) {
 		mac->sap.SapDfsInfo.is_dfs_cac_timer_running = 0;
+		mac->sap.SapDfsInfo.vdev_id = WLAN_INVALID_VDEV_ID;
+
 		if (!sap_ctx->dfs_cac_offload) {
 			qdf_mc_timer_stop(
 				&mac->sap.SapDfsInfo.sap_dfs_cac_timer);
 			qdf_mc_timer_destroy(
 				&mac->sap.SapDfsInfo.sap_dfs_cac_timer);
+			sap_debug("sapdfs, force cleanup running dfs cac timer vdev id %d",
+				  sap_ctx->vdev_id);
 		}
-		sap_err("sapdfs, force cleanup running dfs cac timer");
 	}
 }
 
@@ -3444,6 +3455,7 @@ next_lower_bw:
  * wlansap_get_safe_channel() - Get safe channel from current regulatory
  * @sap_ctx: Pointer to SAP context
  * @ch_width: selected channel bandwdith
+ * @pref_band: Preferred channel band for sap
  *
  * This function is used to get safe channel from current regulatory valid
  * channels to restart SAP if failed to get safe channel from PCL.
@@ -3453,7 +3465,8 @@ next_lower_bw:
  */
 static uint32_t
 wlansap_get_safe_channel(struct sap_context *sap_ctx,
-			 enum phy_ch_width *ch_width)
+			 enum phy_ch_width *ch_width,
+			 enum reg_wifi_band pref_band)
 {
 	struct mac_context *mac;
 	uint32_t pcl_freqs[NUM_CHANNELS];
@@ -3462,6 +3475,9 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 	uint32_t pcl_len = 0, i;
 	uint32_t selected_freq;
 	enum policy_mgr_con_mode mode;
+	uint32_t first_valid_dfs_5g_freq = 0;
+	uint32_t first_valid_non_dfs_5g_freq = 0;
+	uint32_t first_valid_6g_freq = 0;
 
 	if (!sap_ctx) {
 		sap_err("NULL parameter");
@@ -3513,16 +3529,45 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 			return selected_freq;
 
 		for (i = 0; i < pcl_len; i++) {
-			if (WLAN_REG_IS_SAME_BAND_FREQS(sap_ctx->chan_freq,
+			if (!first_valid_non_dfs_5g_freq &&
+			    wlan_reg_is_5ghz_ch_freq(pcl_freqs[i])) {
+				if (!wlan_reg_is_dfs_in_secondary_list_for_freq(
+							mac->pdev,
 							pcl_freqs[i])) {
-				sap_debug("select %d from valid channel list",
-					  pcl_freqs[i]);
-				return pcl_freqs[i];
+					first_valid_non_dfs_5g_freq = pcl_freqs[i];
+					if (pref_band == REG_BAND_5G)
+						break;
+				} else if (!first_valid_dfs_5g_freq) {
+					first_valid_dfs_5g_freq = pcl_freqs[i];
+				}
+			}
+			if (!first_valid_6g_freq &&
+			    wlan_reg_is_6ghz_chan_freq(pcl_freqs[i])) {
+				first_valid_6g_freq = pcl_freqs[i];
+				if (pref_band == REG_BAND_6G)
+					break;
 			}
 		}
-		sap_debug("select first %d from valid channel list",
-			  pcl_freqs[0]);
-		return pcl_freqs[0];
+
+		selected_freq = pcl_freqs[0];
+
+		if (pref_band == REG_BAND_6G) {
+			if (first_valid_6g_freq)
+				selected_freq = first_valid_6g_freq;
+			else if (first_valid_non_dfs_5g_freq)
+				selected_freq = first_valid_non_dfs_5g_freq;
+			else if (first_valid_dfs_5g_freq)
+				selected_freq = first_valid_dfs_5g_freq;
+		} else if (pref_band == REG_BAND_5G) {
+			if (first_valid_non_dfs_5g_freq)
+				selected_freq = first_valid_non_dfs_5g_freq;
+			else if (first_valid_dfs_5g_freq)
+				selected_freq = first_valid_dfs_5g_freq;
+		}
+
+		sap_debug("select %d from valid channel list, pref band = %d",
+			  selected_freq, pref_band);
+		return selected_freq;
 	}
 
 	return INVALID_CHANNEL_ID;
@@ -3553,6 +3598,7 @@ wlansap_select_chan_with_best_bandwidth(struct sap_context *sap_ctx,
  * wlansap_get_safe_channel() - Get safe channel from current regulatory
  * @sap_ctx: Pointer to SAP context
  * @ch_width: selected channel width
+ * @pref_band: Preferred channel band for sap
  *
  * This function is used to get safe channel from current regulatory valid
  * channels to restart SAP if failed to get safe channel from PCL.
@@ -3562,7 +3608,8 @@ wlansap_select_chan_with_best_bandwidth(struct sap_context *sap_ctx,
  */
 static uint8_t
 wlansap_get_safe_channel(struct sap_context *sap_ctx,
-			 enum phy_ch_width *ch_width)
+			 enum phy_ch_width *ch_width,
+			 enum reg_wifi_band pref_band)
 {
 	return 0;
 }
@@ -3595,7 +3642,7 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 
 	if (policy_mgr_get_connection_count(mac->psoc) == 1) {
 		sap_debug("only SAP present return best channel from ACS list");
-		return wlansap_get_safe_channel(sap_ctx, ch_width);
+		return wlansap_get_safe_channel(sap_ctx, ch_width, REG_BAND_6G);
 	}
 
 	mode = policy_mgr_qdf_opmode_to_pm_con_mode(mac->psoc, QDF_SAP_MODE,
@@ -3644,7 +3691,7 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 	 * channel is unsafe channel, the pcl may be empty, instead of return,
 	 * try to choose a safe channel from acs range.
 	 */
-	return wlansap_get_safe_channel(sap_ctx, ch_width);
+	return wlansap_get_safe_channel(sap_ctx, ch_width, REG_BAND_6G);
 }
 
 static uint32_t wlansap_get_2g_first_safe_chan_freq(struct sap_context *sap_ctx)
@@ -4044,11 +4091,11 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 								sap_ctx, NULL);
 		} else {
 			sap_debug("No need switch SAP/Go channel");
-			return 0;
+			return sap_ctx->chan_freq;
 		}
 	} else {
 		sap_debug("No need switch SAP/Go channel");
-		return 0;
+		return sap_ctx->chan_freq;
 	}
 	cc_mode = sap_ctx->cc_switch_mode;
 	phy_mode = sap_ctx->phyMode;
@@ -4360,6 +4407,11 @@ QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
 			      ch_info, NULL, NULL);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void wlansap_free_chan_info(struct sap_sel_ch_info *ch_param)
+{
+	sap_chan_sel_exit(ch_param);
 }
 
 void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,

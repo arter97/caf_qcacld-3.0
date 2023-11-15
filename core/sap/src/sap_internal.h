@@ -317,6 +317,14 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 						   eCsrScanStatus scan_status);
 
 /**
+ * sap_chan_sel_exit() - Exit function for free out the allocated memory,
+ * @ch_info_params: Pointer to sap_sel_ch_info structure
+ *
+ * Return: None
+ */
+void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params);
+
+/**
  * sap_sort_channel_list() - Sort channel list based on channel weight
  * @mac_ctx: Pointer to mac_context
  * @vdev_id: Vdev ID

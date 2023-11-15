@@ -57,6 +57,7 @@
 #include <os_if_dp.h>
 #include <cfg_ucfg_api.h>
 #include <wlan_twt_ucfg_ext_api.h>
+#include "wlan_hdd_stats.h"
 
 /* Preprocessor definitions and constants */
 #undef QCA_HDD_SAP_DUMP_SK_BUFF
@@ -210,6 +211,7 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	QDF_STATUS status;
 
 	osif_dp_mark_pkt_type(skb);
+	hdd_tx_latency_record_ingress_ts(adapter, skb);
 
 	/* Get TL AC corresponding to Qdisc queue index/AC. */
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];

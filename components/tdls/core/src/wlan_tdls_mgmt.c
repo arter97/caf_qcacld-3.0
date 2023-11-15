@@ -33,6 +33,7 @@
 #include "wlan_policy_mgr_api.h"
 #include <wlan_reg_services_api.h>
 #include <wlan_mlo_mgr_sta.h>
+#include "wlan_mlo_link_force.h"
 
 static
 const char *const tdls_action_frames_type[] = { "TDLS Setup Request",
@@ -87,6 +88,26 @@ tdls_mlo_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev)
 	return wlan_mlo_get_tdls_link_vdev(vdev);
 }
 
+void
+tdls_set_remain_links_unforce(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *mlo_vdev;
+	int i;
+
+	/* TDLS link is selected, unforce link for other vdevs */
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!mlo_vdev || mlo_vdev == vdev)
+			continue;
+
+		tdls_debug("try to set vdev %d to unforce",
+			   wlan_vdev_get_id(mlo_vdev));
+		tdls_set_link_unforce(mlo_vdev);
+	}
+}
+
 QDF_STATUS
 tdls_process_mlo_cal_tdls_link_score(struct wlan_objmgr_vdev *vdev)
 {
@@ -132,6 +153,47 @@ tdls_process_mlo_cal_tdls_link_score(struct wlan_objmgr_vdev *vdev)
 	}
 
 	return status;
+}
+
+/**
+ * tdls_check_wait_more() - wait until the timer timeout if necessary
+ * @vdev: vdev object
+ *
+ * Return: true if need to wait else false
+ */
+static bool tdls_check_wait_more(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *mlo_vdev;
+	struct tdls_vdev_priv_obj *tdls_vdev;
+	/* expect response number */
+	int expect_num;
+	/* received response number */
+	int receive_num;
+	int i;
+
+	expect_num = 0;
+	receive_num = 0;
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!mlo_vdev)
+			continue;
+
+		expect_num++;
+
+		tdls_vdev =
+		     wlan_objmgr_vdev_get_comp_private_obj(mlo_vdev,
+							   WLAN_UMAC_COMP_TDLS);
+		if (tdls_vdev->rx_mgmt)
+			receive_num++;
+	}
+
+	/* +1 means the one received last has not been recorded */
+	if (expect_num > receive_num + 1)
+		return true;
+	else
+		return false;
 }
 
 struct wlan_objmgr_vdev *
@@ -260,6 +322,7 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 	struct wlan_objmgr_vdev *mlo_vdev;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	bool peer_mlo;
+	bool waitmore = false;
 	uint8_t i;
 
 	vdev = tdls_vdev->vdev;
@@ -303,9 +366,17 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 			goto exit;
 		}
 
-		tdls_vdev->discovery_sent_cnt = 0;
-		qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
-		qdf_atomic_dec(&tdls_soc->timer_cnt);
+		if (qdf_atomic_read(&tdls_soc->timer_cnt) == 1)
+			waitmore = tdls_check_wait_more(vdev);
+
+		if (waitmore) {
+			/* do not stop the timer */
+			tdls_debug("wait more tdls response");
+		} else {
+			tdls_vdev->discovery_sent_cnt = 0;
+			qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
+			qdf_atomic_dec(&tdls_soc->timer_cnt);
+		}
 
 		tdls_vdev->rx_mgmt = qdf_mem_malloc_atomic(sizeof(*rx_mgmt) +
 							   rx_mgmt->frame_len);
@@ -333,12 +404,13 @@ exit:
 
 void tdls_set_no_force_vdev(struct wlan_objmgr_vdev *vdev, bool flag)
 {
-	uint8_t i, count = 0;
+	uint8_t i;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *mlo_vdev;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	uint8_t mlo_vdev_lst[WLAN_UMAC_MLO_MAX_VDEVS];
 	bool is_mlo_vdev;
+	struct ml_nlink_change_event data;
+	QDF_STATUS status;
 
 	if (!vdev)
 		return;
@@ -351,28 +423,43 @@ void tdls_set_no_force_vdev(struct wlan_objmgr_vdev *vdev, bool flag)
 	if (!psoc)
 		return;
 
+	qdf_mem_zero(&data, sizeof(data));
+
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!mlo_vdev)
+			continue;
 
 		/* flag: true means no force all vdevs,
 		 * false means except the current one
 		 */
 		if (!flag && (mlo_vdev == vdev))
 			continue;
-		mlo_vdev_lst[count] = wlan_vdev_get_id(mlo_vdev);
-		count++;
+		data.evt.tdls.link_bitmap |=
+				1 << wlan_vdev_get_link_id(mlo_vdev);
+		data.evt.tdls.mlo_vdev_lst[data.evt.tdls.vdev_count] =
+				wlan_vdev_get_id(mlo_vdev);
+		data.evt.tdls.vdev_count++;
 	}
 
-	policy_mgr_mlo_sta_set_link(psoc, MLO_LINK_FORCE_REASON_TDLS,
-				    MLO_LINK_FORCE_MODE_NO_FORCE,
-				    count, mlo_vdev_lst);
+	data.evt.tdls.mode = MLO_LINK_FORCE_MODE_NO_FORCE;
+	data.evt.tdls.reason = MLO_LINK_FORCE_REASON_TDLS;
+	status = ml_nlink_conn_change_notify(psoc,
+					     wlan_vdev_get_id(vdev),
+					     ml_nlink_tdls_request_evt,
+					     &data);
 }
 #else
 struct wlan_objmgr_vdev *
 tdls_mlo_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev)
 {
 	return NULL;
+}
+
+void
+tdls_set_remain_links_unforce(struct wlan_objmgr_vdev *vdev)
+{
 }
 
 QDF_STATUS
@@ -802,21 +889,16 @@ tdls_send_mgmt_serialize_callback(struct wlan_serialization_command *cmd,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
+QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 {
-	uint8_t mlo_vdev_lst[WLAN_UMAC_MLO_MAX_VDEVS] = {-1};
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *mlo_tdls_vdev;
-	uint8_t vdev_count = 0;
 	bool is_mlo_vdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct ml_nlink_change_event data;
 
 	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(req->vdev);
 	if (!is_mlo_vdev)
-		return status;
-
-	mlo_tdls_vdev = wlan_mlo_get_tdls_link_vdev(req->vdev);
-	if (mlo_tdls_vdev)
 		return status;
 
 	psoc = wlan_vdev_get_psoc(req->vdev);
@@ -827,21 +909,46 @@ static QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 
 	if (req->tdls_mgmt.frame_type == TDLS_DISCOVERY_RESPONSE ||
 	    req->tdls_mgmt.frame_type == TDLS_DISCOVERY_REQUEST) {
-		mlo_vdev_lst[0] = wlan_vdev_get_id(req->vdev);
-		vdev_count = 1;
+		mlo_tdls_vdev = wlan_mlo_get_tdls_link_vdev(req->vdev);
+		if (mlo_tdls_vdev)
+			return status;
 
-		status = policy_mgr_mlo_sta_set_link(psoc,
-						     MLO_LINK_FORCE_REASON_TDLS,
-						     MLO_LINK_FORCE_MODE_ACTIVE,
-						     vdev_count, mlo_vdev_lst);
-		if (status == QDF_STATUS_SUCCESS)
+		qdf_mem_zero(&data, sizeof(data));
+		data.evt.tdls.link_bitmap =
+				1 << wlan_vdev_get_link_id(req->vdev);
+		data.evt.tdls.mlo_vdev_lst[0] = wlan_vdev_get_id(req->vdev);
+		data.evt.tdls.vdev_count = 1;
+		data.evt.tdls.mode = MLO_LINK_FORCE_MODE_ACTIVE;
+		data.evt.tdls.reason = MLO_LINK_FORCE_REASON_TDLS;
+		status =
+		ml_nlink_conn_change_notify(psoc,
+					    wlan_vdev_get_id(req->vdev),
+					    ml_nlink_tdls_request_evt,
+					    &data);
+		if (status == QDF_STATUS_SUCCESS ||
+		    status == QDF_STATUS_E_PENDING)
 			req->link_active = true;
+	} else if (req->tdls_mgmt.frame_type == TDLS_MAX_ACTION_CODE) {
+		qdf_mem_zero(&data, sizeof(data));
+		data.evt.tdls.link_bitmap =
+				1 << wlan_vdev_get_link_id(req->vdev);
+		data.evt.tdls.mlo_vdev_lst[0] = wlan_vdev_get_id(req->vdev);
+		data.evt.tdls.vdev_count = 1;
+		data.evt.tdls.mode = MLO_LINK_FORCE_MODE_NO_FORCE;
+		data.evt.tdls.reason = MLO_LINK_FORCE_REASON_TDLS;
+		status =
+		ml_nlink_conn_change_notify(psoc,
+					    wlan_vdev_get_id(req->vdev),
+					    ml_nlink_tdls_request_evt,
+					    &data);
 	}
+	if (status == QDF_STATUS_E_PENDING)
+		status = QDF_STATUS_SUCCESS;
 
 	return status;
 }
 #else
-static QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
+QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 {
 	return QDF_STATUS_SUCCESS;
 }

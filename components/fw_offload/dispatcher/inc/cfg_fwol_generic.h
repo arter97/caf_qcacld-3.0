@@ -935,7 +935,7 @@
  * <ini>
  * pcie_config - Ini to control pcie gen and lane params
  * @Min: 0
- * @Max: 3
+ * @Max: 4
  * @Default: 0
  *
  * This ini is used to control to pcie gen and lane params
@@ -943,6 +943,8 @@
  * 1 - Force PCIe Gen and lane to max supported value
  * 2 - Configure PCIE Gen and Lane based on MCS and BW
  * 3 - Configure PCIE Gen and Lane based on TXRX tput using traffic monitor
+ * 4 - Allow PCIE Gen Speed and Lane width to be configured by host via
+ *     OEM data commands.
  *
  * Related: g_enable_pci_gen
  *
@@ -955,7 +957,7 @@
 #define CFG_PCIE_CONFIG CFG_INI_UINT( \
 				"pcie_config", \
 				0, \
-				3, \
+				4, \
 				0, \
 				CFG_VALUE_OR_DEFAULT, \
 				"to control pcie gen and lane")

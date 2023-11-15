@@ -421,6 +421,17 @@ void dp_get_transmit_mac_addr(struct wlan_dp_link *dp_link,
 	bool is_mc_bc_addr = false;
 	enum nan_datapath_state state;
 
+	/* Check for VDEV validity before accessing it. Since VDEV references
+	 * are not taken in the per packet path, there is a change for VDEV
+	 * getting deleted in a parallel context. Because DP VDEV object is
+	 * protected by dp_intf::num_active_task, the chance of VDEV object
+	 * getting deleted while executing dp_start_xmit() is sparse. So, a
+	 * simple VDEV NULL check should be sufficient to handle the case of
+	 * VDEV getting destroyed first followed by dp_start_xmit().
+	 */
+	if (!dp_link->vdev)
+		return;
+
 	switch (dp_intf->device_mode) {
 	case QDF_NDI_MODE:
 		state = wlan_nan_get_ndi_state(dp_link->vdev);
@@ -834,6 +845,7 @@ QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 	qdf_nbuf_t nbuf_next;
 	unsigned int cpu_index;
 	struct dp_tx_rx_stats *stats;
+	enum dp_nbuf_push_type type;
 
 	/* Sanity check on inputs */
 	if ((!context) || (!rxbuf)) {
@@ -879,8 +891,10 @@ QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 			 * This is the last packet on the chain
 			 * Scheduling rx sirq
 			 */
+			type = qdf_in_atomic() ? DP_NBUF_PUSH_NAPI :
+						 DP_NBUF_PUSH_BH_DISABLE;
 			status = dp_intf->dp_ctx->dp_ops.dp_nbuf_push_pkt(nbuf,
-							DP_NBUF_PUSH_NAPI);
+							type);
 		}
 
 		if (QDF_IS_STATUS_SUCCESS(status))

@@ -1139,8 +1139,29 @@ QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg)
 
 	return QDF_STATUS_SUCCESS;
 }
-
 #ifdef WLAN_FEATURE_11BE_MLO
+#if defined (SAP_MULTI_LINK_EMULATION)
+static void
+set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
+			       struct mlo_partner_info *partner_info)
+{
+	partner_info->partner_link_info[0].link_addr =
+		scan_entry->ml_info.link_info[0].link_addr;
+	partner_info->partner_link_info[0].link_id =
+		scan_entry->ml_info.link_info[0].link_id;
+	partner_info->partner_link_info[0].chan_freq =
+		scan_entry->ml_info.link_info[0].freq;
+	partner_info->num_partner_links = 1;
+
+}
+#else
+static void
+set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
+			       struct mlo_partner_info *partner_info)
+{
+}
+#endif
+
 QDF_STATUS
 cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 		       struct scan_cache_entry *scan_entry,
@@ -1149,9 +1170,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	uint8_t i, j = 0;
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
-	struct scan_cache_entry *part_scan_entry = NULL;
-	bool is_security_allowed;
-	struct qdf_mac_addr *link_mac;
 
 	/* If ML IE is not present then return failure*/
 	if (!scan_entry->ie_list.multi_link_bv)
@@ -1188,34 +1206,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 			break;
 
 		if (scan_entry->ml_info.link_info[i].is_valid_link) {
-			link_mac = &scan_entry->ml_info.link_info[i].link_addr;
-			part_scan_entry = wlan_scan_get_scan_entry_by_mac_freq(
-					pdev,
-					link_mac,
-					scan_entry->ml_info.link_info[i].freq);
-			if (!part_scan_entry) {
-				scm_debug("scan entry not found for link addr: "
-					  QDF_MAC_ADDR_FMT,
-					  QDF_MAC_ADDR_REF(link_mac->bytes));
-				continue;
-			}
-
-			/*
-			 * Reject the partner link that doesn’t pass the
-			 * security check and validate the next available
-			 * partner link. If none of the partner link passes
-			 * the security check, proceed connection with
-			 * single link.
-			 */
-			is_security_allowed =
-				wlan_cm_is_eht_allowed_for_current_security(
-							part_scan_entry);
-			util_scan_free_cache_entry(part_scan_entry);
-			if (!is_security_allowed) {
-				mlme_debug("current security is not valid for partner link");
-				continue;
-			}
-
 			partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
 			partner_info->partner_link_info[j].link_id =
@@ -1230,7 +1220,9 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	}
 
 	partner_info->num_partner_links = j;
-	mlme_debug("sta and ap integrate link num: %d", j);
+	mlme_debug("sta and ap intersect num of partner link: %d", j);
+
+	set_partner_info_for_2link_sap(scan_entry, partner_info);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1659,6 +1651,7 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("T2LM IE beacon process failed");
 	}
+	wlan_connectivity_t2lm_status_event(vdev);
 
 	return status;
 }
@@ -1678,6 +1671,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	bool pairwise;
 	uint8_t vdev_id;
 	uint8_t link_id;
+	bool key_present = false;
 	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
 				 WLAN_CRYPTO_MAXIGTKKEYIDX +
 				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
@@ -1709,6 +1703,12 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 			  vdev_id, link_id, i, pairwise);
 		mlme_cm_osif_send_keys(vdev, i, pairwise,
 				       crypto_key->cipher_type);
+		key_present = true;
+	}
+
+	if (!key_present && mlo_mgr_is_link_switch_in_progress(vdev)) {
+		mlme_err("No key found for link_id %d", link_id);
+		QDF_BUG(0);
 	}
 	mlo_defer_set_keys(vdev, link_id, false);
 }

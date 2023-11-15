@@ -630,4 +630,15 @@ csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
 QDF_STATUS csr_invoke_neighbor_report_request(uint8_t session_id,
 				struct sRrmNeighborReq *neighbor_report_req,
 				bool send_resp_to_host);
+
+/**
+ * csr_set_vdev_ies_per_band() - sends the per band IEs to vdev
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: vdev_id for which IE is targeted
+ * @device_mode: vdev mode
+ *
+ * Return: None
+ */
+void csr_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id,
+			       enum QDF_OPMODE device_mode);
 #endif

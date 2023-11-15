@@ -1276,6 +1276,29 @@ wlan_cm_roam_set_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc,
  */
 uint8_t wlan_cm_roam_get_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_cm_set_roam_scan_high_rssi_offset() - Set the delta change in high RSSI
+ * at which roam scan is triggered in 2.4/5 GHz.
+ * @psoc: PSOC pointer
+ * @roam_high_rssi_delta: Set the High RSSI delta for roam scan trigger
+ * * 1-16 - Set an offset value in this range
+ * * 0    - Disable
+ *
+ * Return: none
+ */
+void
+wlan_cm_set_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc,
+				       uint8_t roam_high_rssi_delta);
+
+/**
+ * wlan_cm_get_roam_scan_high_rssi_offset() - Get the delta change in high RSSI
+ * at which roam scan is triggered in 2.4/5 GHz.
+ * @psoc: PSOC pointer
+ *
+ * Return: High RSSI delta for roam scan trigger
+ */
+uint8_t wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_FEATURE_ROAM_INFO_STATS
 /**
  * mlme_cm_alloc_roam_stats_info() - alloc roam stats info buffer
@@ -1624,6 +1647,12 @@ wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 				struct roam_scan_candidate_frame *candidate)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline uint8_t
+wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 

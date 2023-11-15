@@ -22,6 +22,8 @@
 #define _WLAN_LL_SAP_MAIN_H_
 
 #include "wlan_objmgr_psoc_obj.h"
+#include "wlan_objmgr_vdev_obj.h"
+#include "wlan_ll_sap_public_structs.h"
 
 #define ll_sap_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_LL_SAP, params)
 #define ll_sap_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_LL_SAP, params)
@@ -33,6 +35,36 @@
 	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_LL_SAP, params)
 #define ll_sap_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_LL_SAP, params)
+
+/**
+ * struct ll_sap_vdev_priv_obj - ll sap private vdev obj
+ * @bearer_switch_ctx: Bearer switch context
+ */
+struct ll_sap_vdev_priv_obj {
+	struct bearer_switch_info *bearer_switch_ctx;
+};
+
+/**
+ * ll_sap_get_vdev_priv_obj: get ll_sap priv object from vdev object
+ * @vdev: pointer to vdev object
+ *
+ * Return: pointer to ll_sap vdev private object
+ */
+static inline
+struct ll_sap_vdev_priv_obj *ll_sap_get_vdev_priv_obj(
+						struct wlan_objmgr_vdev *vdev)
+{
+	struct ll_sap_vdev_priv_obj *obj;
+
+	if (!vdev) {
+		ll_sap_err("vdev is null");
+		return NULL;
+	}
+	obj = wlan_objmgr_vdev_get_comp_private_obj(vdev,
+						    WLAN_UMAC_COMP_LL_SAP);
+
+	return obj;
+}
 
 /**
  * ll_sap_init() - initializes ll_sap component
@@ -49,13 +81,25 @@ QDF_STATUS ll_sap_init(void);
 QDF_STATUS ll_sap_deinit(void);
 
 /**
- * ll_lt_sap_request_for_audio_transport_switch() - Check if audio transport
- * switch request can be supported or not
- * @transport_switch_type: requested transport switch type
+ * ll_sap_register_os_if_cb() - Register ll_sap osif callbacks
+ * @ll_sap_global_ops: Ops which needs to be registered
  *
- * Return: True/False
+ * Return: None
  */
-QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
-						uint8_t transport_switch_type);
+void ll_sap_register_os_if_cb(struct ll_sap_ops *ll_sap_global_ops);
+
+/**
+ * ll_sap_unregister_os_if_cb() - Un-register ll_sap osif callbacks
+ *
+ * Return: None
+ */
+void ll_sap_unregister_os_if_cb(void);
+
+/**
+ * ll_sap_get_osif_cbk() - API to get ll_sap osif callbacks
+ *
+ * Return: global ll_sap osif callback
+ */
+struct ll_sap_ops *ll_sap_get_osif_cbk(void);
 
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

@@ -167,7 +167,8 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 
 void
 __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_info,
-					     struct wlan_objmgr_vdev *vdev)
+					     struct wlan_objmgr_vdev *vdev,
+					     enum wlan_cm_source source)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -212,11 +213,15 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		}
 	}
 
-	if (!is_link_switch) {
+	if (!is_link_switch && source != CM_MLO_ROAM_INTERNAL_DISCONNECT) {
 		/* Clear saved connection information in HDD */
 		hdd_conn_remove_connect_info(sta_ctx);
-		/* Reset the IEEE link ID to invalid when disconnect is not
-		 * due to link switch.
+
+		/*
+		 * Reset the IEEE link ID to invalid when disconnect is not
+		 * due to link switch. This API resets link id for all the
+		 * valid link_info for the given adapter. So avoid this reset
+		 * for Link Switch disconnect/internal disconnect
 		 */
 		hdd_adapter_reset_station_ctx(adapter);
 	}
@@ -477,7 +482,7 @@ static void hdd_cm_reset_udp_qos_upgrade_config(struct hdd_adapter *adapter)
 #ifdef WLAN_FEATURE_11BE
 static inline enum eSirMacHTChannelWidth get_max_bw(void)
 {
-	uint32_t max_bw = wma_get_eht_ch_width();
+	uint32_t max_bw = wma_get_orig_eht_ch_width();
 
 	if (max_bw == WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ)
 		return eHT_CHANNEL_WIDTH_320MHZ;
@@ -489,6 +494,27 @@ static inline enum eSirMacHTChannelWidth get_max_bw(void)
 		return eHT_CHANNEL_WIDTH_80MHZ;
 	else
 		return eHT_CHANNEL_WIDTH_40MHZ;
+}
+
+static
+void wlan_hdd_re_enable_320mhz_6g_conection(struct hdd_context *hdd_ctx,
+					    enum phy_ch_width assoc_ch_width)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(hdd_ctx->psoc);
+	if (!mlme_obj)
+		return;
+	/*
+	 * Initial connection was in 320 MHz and if via SET_MAX_BANDWIDTH
+	 * command, current channel BW (des_chan->ch_width) gets modified
+	 * to less than 320MHz, driver disables 6 GHz connection by disabling
+	 * support_320mhz_6ghz EHT capability. So, in order to allow
+	 * re-connection (after disconnection) in 320 MHz, also re-enable
+	 * support_320mhz_6ghz EHT capability before disconnect complete.
+	 */
+	if (assoc_ch_width == CH_WIDTH_320MHZ)
+		mlme_obj->cfg.eht_caps.dot11_eht_cap.support_320mhz_6ghz = 1;
 }
 #else
 static inline enum eSirMacHTChannelWidth get_max_bw(void)
@@ -504,12 +530,18 @@ static inline enum eSirMacHTChannelWidth get_max_bw(void)
 	else
 		return eHT_CHANNEL_WIDTH_40MHZ;
 }
+
+static
+void wlan_hdd_re_enable_320mhz_6g_conection(struct hdd_context *hdd_ctx,
+					    enum phy_ch_width assoc_ch_width)
+{
+}
 #endif
 
 static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
-				    struct hdd_adapter *adapter)
+				    struct wlan_hdd_link_info *link_info)
 {
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct mlme_legacy_priv *mlme_priv;
 	enum eSirMacHTChannelWidth max_bw;
 	struct wlan_channel *des_chan;
@@ -533,8 +565,11 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 
 	cm_update_associated_ch_info(vdev, false);
 
+	if (des_chan->ch_width != assoc_ch_width)
+		wlan_hdd_re_enable_320mhz_6g_conection(hdd_ctx, assoc_ch_width);
+
 	max_bw = get_max_bw();
-	ret = hdd_set_mac_chan_width(adapter, max_bw, link_id);
+	ret = hdd_set_mac_chan_width(link_info, max_bw, link_id, true);
 	if (ret) {
 		hdd_err("vdev %d : fail to set max ch width", vdev_id);
 		return;
@@ -576,9 +611,10 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	 * bandwidth on disconnection so that post disconnection DUT can
 	 * connect in max BW.
 	 */
-	hdd_cm_restore_ch_width(vdev, adapter);
+	hdd_cm_restore_ch_width(vdev, link_info);
 	hdd_cm_set_default_wlm_mode(adapter);
-	__hdd_cm_disconnect_handler_post_user_update(link_info, vdev);
+	__hdd_cm_disconnect_handler_post_user_update(link_info, vdev,
+						     rsp->req.req.source);
 	wlan_twt_concurrency_update(hdd_ctx);
 	hdd_cm_reset_udp_qos_upgrade_config(adapter);
 	ucfg_mlme_set_ml_link_control_mode(hdd_ctx->psoc,
