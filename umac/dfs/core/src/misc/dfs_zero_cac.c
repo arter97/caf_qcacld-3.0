@@ -1549,7 +1549,7 @@ qdf_freq_t dfs_configure_deschan_for_precac(struct wlan_dfs *dfs)
  *
  * Return: True if weather channel, else false.
  */
-static bool dfs_is_pcac_on_weather_channel_for_freq(struct wlan_dfs *dfs,
+bool dfs_is_pcac_on_weather_channel_for_freq(struct wlan_dfs *dfs,
 						    enum phy_ch_width chwidth,
 						    uint16_t precac_freq)
 {
@@ -2070,9 +2070,10 @@ bool dfs_is_rcac_domain(struct wlan_dfs *dfs)
 {
 	enum dfs_reg dfsdomain = utils_get_dfsdomain(dfs->dfs_pdev_obj);
 
-	if (dfsdomain == DFS_FCC_REGION ||
-	    dfsdomain == DFS_MKK_REGION ||
-	    dfsdomain == DFS_MKKN_REGION)
+	if (dfsdomain == DFS_FCC_REGION  ||
+	    dfsdomain == DFS_MKK_REGION  ||
+	    dfsdomain == DFS_MKKN_REGION ||
+	    dfsdomain == DFS_ETSI_REGION)
 		return true;
 
 	return false;
