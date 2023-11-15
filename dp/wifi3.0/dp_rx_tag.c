@@ -756,7 +756,9 @@ wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc_hdl,
 				    uint32_t *src_ip, uint32_t src_port,
 				    uint32_t *dest_ip, uint32_t dest_port,
-				    uint8_t protocol, uint8_t version)
+				    uint8_t protocol, uint8_t version,
+				    uint32_t svc_id, uint8_t tid,
+				    uint8_t *dest_mac, uint8_t pdev_id)
 {
 	struct cdp_rx_flow_info flow_info = { 0 };
 	struct wlan_cfg_dp_soc_ctxt *cfg;
@@ -781,7 +783,14 @@ QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc_hdl,
 	 * Set FSE metadata to indicate that the SFE flow rule
 	 * is matched in FSE.
 	 */
-	flow_info.fse_metadata = DP_RX_FSE_FLOW_MATCH_SFE;
+	if (DP_RX_FLOW_INVALID_SVC_ID != svc_id) {
+		flow_info.fse_metadata =
+			DP_RX_FSE_FLOW_UPDATE_TID(DP_RX_FSE_FLOW_MATCH_SFE,
+						  tid);
+		flow_info.fse_metadata =
+			DP_RX_FSE_FLOW_UPDATE_EVT_REQ(flow_info.fse_metadata,
+						      1);
+	}
 
 	if (version == 4) {
 		flow_info.is_addr_ipv4 = 1;
@@ -800,7 +809,10 @@ QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc_hdl,
 	}
 
 	flow_info.op_code = CDP_FLOW_FST_ENTRY_ADD;
-	status = dp_rx_flow_add_entry(soc->pdev_list[0], &flow_info);
+	flow_info.svc_id = svc_id;
+	flow_info.tid = tid;
+	flow_info.dest_mac = dest_mac;
+	status = dp_rx_flow_add_entry(soc->pdev_list[pdev_id], &flow_info);
 
 	if (status == QDF_STATUS_SUCCESS) {
 		if (version == 4)
@@ -816,7 +828,8 @@ qdf_export_symbol(dp_rx_sfe_add_flow_entry);
 QDF_STATUS dp_rx_sfe_delete_flow_entry(struct cdp_soc_t *soc_hdl,
 				       uint32_t *src_ip, uint32_t src_port,
 				       uint32_t *dest_ip, uint32_t dest_port,
-				       uint8_t protocol, uint8_t version)
+				       uint8_t protocol, uint8_t version,
+				       uint8_t pdev_id)
 {
 	struct cdp_rx_flow_info flow_info = { 0 };
 	struct wlan_cfg_dp_soc_ctxt *cfg;
@@ -854,7 +867,7 @@ QDF_STATUS dp_rx_sfe_delete_flow_entry(struct cdp_soc_t *soc_hdl,
 	}
 
 	flow_info.op_code = CDP_FLOW_FST_ENTRY_DEL;
-	status = dp_rx_flow_delete_entry(soc->pdev_list[0], &flow_info);
+	status = dp_rx_flow_delete_entry(soc->pdev_list[pdev_id], &flow_info);
 
 	if (status == QDF_STATUS_SUCCESS) {
 		if (version == 4)
@@ -910,7 +923,9 @@ dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	flow_info.flow_tuple_info.src_port = ppe_flow_info->tuple.src_port;
 	flow_info.flow_tuple_info.dest_port = ppe_flow_info->tuple.dest_port;
 	flow_info.flow_tuple_info.l4_protocol = ppe_flow_info->tuple.protocol;
-	flow_info.fse_metadata = ppe_flow_info->vp_num;
+	flow_info.fse_metadata =
+		DP_RX_FSE_FLOW_UPDATE_VP_NUM(flow_info.fse_metadata,
+					     ppe_flow_info->vp_num);
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4) {
 		flow_info.is_addr_ipv4 = 1;
@@ -1011,7 +1026,9 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	flow_info.flow_tuple_info.src_port = ppe_flow_info->tuple.src_port;
 	flow_info.flow_tuple_info.dest_port = ppe_flow_info->tuple.dest_port;
 	flow_info.flow_tuple_info.l4_protocol = ppe_flow_info->tuple.protocol;
-	flow_info.fse_metadata = ppe_flow_info->vp_num;
+	flow_info.fse_metadata =
+		DP_RX_FSE_FLOW_UPDATE_VP_NUM(flow_info.fse_metadata,
+					     ppe_flow_info->vp_num);
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4) {
 		flow_info.is_addr_ipv4 = 1;
