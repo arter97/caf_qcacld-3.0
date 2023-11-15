@@ -819,11 +819,11 @@ struct dp_svc_data {
 	uint32_t flags;
 };
 
-#define DP_FLOW_PRIO_MAX 4
+#define DP_FLOW_PRIO_MAX 8
 #define DP_MAX_POLICY 32
 #define DP_INVALID_ID 0xFF
 #define DP_FLOW_HASH_MASK 0xFF
-#define DP_FLOW_PRIO_DEF 0
+#define DP_FLOW_PRIO_DEF 3
 #define MAX_TID 8
 
 /*
@@ -875,7 +875,6 @@ struct flow_info {
  * @rcu: Protect dp_policy with rcu
  * @prio: Priority of defined flow
  * @policy_id: Unique policy ID
- * @cookie: Unique cookie value used as key
  * @flow: Flow tuble
  * @flags: Flags indication policy mapping
  * @target_tid: Target TID for TID override
@@ -886,8 +885,7 @@ struct dp_policy {
 	struct qdf_ht_entry node;
 	qdf_rcu_head_t rcu;
 	uint8_t prio;
-	uint32_t policy_id;
-	uint32_t cookie;
+	uint64_t policy_id;
 	struct flow_info flow;
 	uint32_t flags;
 	uint8_t target_tid;

@@ -214,6 +214,7 @@
 #include "wlan_cp_stats_mc_defs.h"
 #include "wlan_policy_mgr_ll_sap.h"
 #include "os_if_dp_svc.h"
+#include "wlan_osif_fpm.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -21142,6 +21143,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_COAP_OFFLOAD_COMMANDS
 	FEATURE_ML_LINK_STATE_COMMANDS
 	FEATURE_SERVICE_CLASS_COMMANDS
+	FEATURE_FLOW_POLICY_COMMANDS
 	FEATURE_AFC_VENDOR_COMMANDS
 	FEATURE_LL_LT_SAP_VENDOR_COMMANDS
 	FEATURE_TX_LATENCY_STATS_COMMANDS

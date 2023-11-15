@@ -32,7 +32,7 @@
  */
 struct policy_notifier_data {
 	struct flow_info flow;
-	uint32_t policy_id;
+	uint64_t policy_id;
 	uint8_t prio;
 };
 
@@ -150,7 +150,7 @@ QDF_STATUS fpm_policy_update(struct fpm_table *fpm, struct dp_policy *policy);
  *
  * Return: 0 if successful
  */
-QDF_STATUS fpm_policy_rem(struct fpm_table *fpm, uint32_t cookie);
+QDF_STATUS fpm_policy_rem(struct fpm_table *fpm, uint64_t cookie);
 
 /*
  * fpm_policy_get() - FPM policy list get

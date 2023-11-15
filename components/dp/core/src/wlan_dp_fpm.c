@@ -96,7 +96,7 @@ static void fpm_free_cb(qdf_rcu_head_t *rp)
 }
 
 static inline QDF_STATUS
-fpm_hash_table_delete_node(struct fpm_table *fpm, uint32_t cookie)
+fpm_hash_table_delete_node(struct fpm_table *fpm, uint64_t policy_id)
 {
 	uint16_t hash_idx;
 	struct dp_policy *policy = NULL;
@@ -108,7 +108,7 @@ fpm_hash_table_delete_node(struct fpm_table *fpm, uint32_t cookie)
 	for (hash_idx = 0; hash_idx < DP_FLOW_PRIO_MAX; hash_idx++) {
 		lhead = &fpm->policy_tab[hash_idx];
 		qdf_hl_for_each_entry_safe(policy, tmp, lhead, node) {
-			if (cookie == policy->cookie) {
+			if (policy_id == policy->policy_id) {
 				ret = fpm_policy_node_delete(fpm, policy);
 				qdf_call_rcu(&policy->rcu, fpm_free_cb);
 			}
@@ -208,8 +208,8 @@ static QDF_STATUS fpm_policy_update_map(struct dp_policy *policy,
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS fpm_policy_update_with_cookie(struct fpm_table *fpm,
-						struct dp_policy *new_policy)
+static QDF_STATUS fpm_policy_update_with_policyid(struct fpm_table *fpm,
+						  struct dp_policy *new_policy)
 {
 	struct dp_policy *policy = NULL;
 	struct qdf_ht *lhead;
@@ -221,7 +221,7 @@ static QDF_STATUS fpm_policy_update_with_cookie(struct fpm_table *fpm,
 		lhead = &fpm->policy_tab[hash_idx];
 
 		qdf_hl_for_each_entry_rcu(policy, lhead, node) {
-			if (policy->cookie == new_policy->cookie) {
+			if (policy->policy_id == new_policy->policy_id) {
 				status = fpm_policy_update_map(policy,
 							       new_policy);
 				goto out;
@@ -249,10 +249,10 @@ QDF_STATUS fpm_policy_update(struct fpm_table *fpm, struct dp_policy *policy)
 	}
 
 	qdf_spin_lock_bh(&fpm->lock);
-	ret = fpm_policy_update_with_cookie(fpm, policy);
+	ret = fpm_policy_update_with_policyid(fpm, policy);
 	switch (ret) {
 	case QDF_STATUS_E_NOENT:
-		dp_err("no policy found with cookie:%x", policy->cookie);
+		dp_err("no policy found with policy_id:%lx", policy->policy_id);
 		break;
 	case QDF_STATUS_E_INVAL:
 		dp_err("new svc_id:%u is not valid", policy->svc_id);
@@ -344,7 +344,7 @@ QDF_STATUS fpm_policy_add(struct fpm_table *fpm, struct dp_policy *policy)
 {
 	struct dp_policy *new_policy;
 	struct policy_notifier_data data = {0};
-	uint8_t policy_id = DP_INVALID_ID;
+	uint64_t policy_id = DP_INVALID_ID;
 	uint8_t i;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 
@@ -358,7 +358,7 @@ QDF_STATUS fpm_policy_add(struct fpm_table *fpm, struct dp_policy *policy)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	dp_info("new_policy:[flags:0x%x][prio:%u][policy_id:%u]"
+	dp_info("new_policy:[flags:0x%x][prio:%u][policy_id:0x%lx]"
 		"[src_ip:%x][dst_ip:%x][src_port:%u][dst_port:%u][proto:%u]"
 		"[tid:%u][svc:%u]",
 		policy->flags, policy->prio, policy->policy_id,
@@ -409,7 +409,6 @@ QDF_STATUS fpm_policy_add(struct fpm_table *fpm, struct dp_policy *policy)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	qdf_get_random_bytes(&policy->cookie, sizeof(policy->cookie));
 	qdf_mem_copy(new_policy, policy, sizeof(struct dp_policy));
 	fpm_hash_table_insert_node(fpm, policy->prio, new_policy);
 	fpm->policy_count++;
@@ -424,14 +423,14 @@ exit:
 	return ret;
 }
 
-QDF_STATUS fpm_policy_rem(struct fpm_table *fpm, uint32_t cookie)
+QDF_STATUS fpm_policy_rem(struct fpm_table *fpm, uint64_t policy_id)
 {
 	if (!fpm) {
 		dp_err("fpm_ctx is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	return fpm_hash_table_delete_node(fpm, cookie);
+	return fpm_hash_table_delete_node(fpm, policy_id);
 }
 
 uint8_t fpm_policy_get(struct fpm_table *fpm, struct dp_policy *policies,
@@ -555,9 +554,8 @@ void dp_fpm_display_policy(struct wlan_dp_intf *dp_intf)
 	for (hash_idx = 0; hash_idx < DP_FLOW_PRIO_MAX; hash_idx++) {
 		lhead = &fpm->policy_tab[hash_idx];
 		qdf_hl_for_each_entry_rcu(policy, lhead, node) {
-			dp_info("policy_id:%u cookie:0x%x prio:%u",
-				policy->policy_id, policy->cookie,
-				policy->prio);
+			dp_info("policy_id:0x%llx prio:%u",
+				policy->policy_id, policy->prio);
 			dp_info("pflags:0x%x flow_flags:0x%x svc_id:%u tid:%u",
 				policy->flags, policy->flow.flags,
 				policy->svc_id, policy->target_tid);
