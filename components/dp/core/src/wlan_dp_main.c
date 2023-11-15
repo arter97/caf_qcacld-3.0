@@ -974,6 +974,7 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 	dp_nud_ignore_tracking(dp_intf, false);
 	dp_mic_enable_work(dp_intf);
+	dp_flow_priortization_init(dp_intf);
 
 	return status;
 }
@@ -993,6 +994,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	dp_flow_priortization_deinit(dp_intf);
 	dp_nud_ignore_tracking(dp_intf, true);
 	dp_nud_reset_tracking(dp_intf);
 	dp_nud_flush_work(dp_intf);

@@ -1605,4 +1605,112 @@ ucfg_dp_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
 	return 0;
 }
 #endif
+
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
+/*
+ * ucfg_dp_fpm_check_tid_override_tagged() - Check skb marked with tid override
+ * @nbuf: skb
+ *
+ * Return: True if skb marked with tid override
+ */
+bool ucfg_dp_fpm_check_tid_override_tagged(qdf_nbuf_t nbuf);
+
+/*
+ * ucfg_dp_fpm_display_policy() - Display FPM policies
+ * @vdev: vdev
+ *
+ * Return: None
+ */
+void ucfg_dp_fpm_display_policy(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * ucfg_fpm_policy_get_ctx_by_vdev() - Fet FPM context from vdev
+ * @vdev: vdev
+ *
+ * Return: Return fpm context
+ */
+struct fpm_table *
+ucfg_fpm_policy_get_ctx_by_vdev(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * ucfg_fpm_policy_add() - Add FPM policy
+ * @fpm: FPM context
+ * @policy: Flow policy
+ *
+ * Return: 0 if FPM policy added successfully
+ */
+QDF_STATUS ucfg_fpm_policy_add(struct fpm_table *fpm, struct dp_policy *policy);
+
+/*
+ * ucfg_fpm_policy_update() - Update FPM policy
+ * @fpm: FPM context
+ * @policy: Flow policy
+ *
+ * Return: 0 if FPM policy updated successfully
+ */
+QDF_STATUS ucfg_fpm_policy_update(struct fpm_table *fpm,
+				  struct dp_policy *policy);
+
+/*
+ * ucfg_fpm_policy_rem() - Remove FPM policy
+ * @fpm: FPM context
+ * @cookie: Cookie to get associated policy
+ *
+ * Return: 0 if FPM policy removed successfully
+ */
+QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint32_t cookie);
+
+/*
+ * ucfg_fpm_policy_get() - Get FPM policy array
+ * @fpm: FPM context
+ * @policy: Flow policy array to be filled
+ *
+ * Return: Policy count
+ */
+uint8_t ucfg_fpm_policy_get(struct fpm_table *fpm, struct dp_policy *policy,
+			    uint8_t max_count);
+#else
+static inline
+bool ucfg_dp_fpm_check_tid_override_tagged(qdf_nbuf_t nbuf)
+{
+	return false;
+}
+
+static inline
+void ucfg_dp_fpm_display_policy(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+struct fpm_table *ucfg_fpm_policy_get_ctx_by_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return NULL;
+}
+
+static inline
+QDF_STATUS ucfg_fpm_policy_add(struct fpm_table *fpm, struct dp_policy *policy)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS ucfg_fpm_policy_update(struct fpm_table *fpm,
+				  struct dp_policy *policy)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint32_t cookie)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+uint8_t ucfg_fpm_policy_get(struct fpm_table *fpm, struct dp_policy *policy,
+			    uint8_t max_count)
+{
+	return 0;
+}
+#endif
 #endif /* _WLAN_DP_UCFGi_API_H_ */
