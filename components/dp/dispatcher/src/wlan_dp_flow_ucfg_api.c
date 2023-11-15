@@ -157,9 +157,9 @@ ucfg_fpm_policy_add(struct fpm_table *fpm, struct dp_policy *policy)
 	return fpm_policy_add(fpm, policy);
 }
 
-QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint32_t cookie)
+QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint64_t policy_id)
 {
-	return fpm_policy_rem(fpm, cookie);
+	return fpm_policy_rem(fpm, policy_id);
 }
 
 uint8_t
