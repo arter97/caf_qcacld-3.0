@@ -622,6 +622,7 @@ struct dp_rx_fst {
  * @def_link: Pointer to default link (usually used for TX operation)
  * @dp_link_list_lock: Lock to protect dp_link_list operatiosn
  * @dp_link_list: List of dp_links for this DP interface
+ * @fpm_ctx: Flow policy manager context
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -690,6 +691,9 @@ struct wlan_dp_intf {
 	struct wlan_dp_link *def_link;
 	qdf_spinlock_t dp_link_list_lock;
 	qdf_list_t dp_link_list;
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
+	struct fpm_table *fpm_ctx;
+#endif
 };
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,10 @@
 #include "wlan_dp_main.h"
 #include "wlan_dp_api.h"
 #include <wlan_dp_fisa_rx.h>
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
+#include "wlan_fpm_table.h"
+#endif
+
 
 void wlan_dp_update_peer_map_unmap_version(uint8_t *version)
 {
@@ -58,5 +62,12 @@ bool wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+}
+#endif
+
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
+bool wlan_dp_fpm_is_tid_override(qdf_nbuf_t nbuf, uint8_t *tid)
+{
+	return fpm_is_tid_override(nbuf, tid);
 }
 #endif
