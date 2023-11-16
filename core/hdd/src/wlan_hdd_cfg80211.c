@@ -9072,7 +9072,9 @@ int hdd_set_vdev_phy_mode(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
-	eCsrPhyMode phymode;
+	eCsrPhyMode csr_req_phymode, csr_max_phymode;
+	enum reg_phymode reg_req_phymode, reg_max_phymode;
+	enum qca_wlan_vendor_phy_mode max_vendor_phy_mode;
 	WMI_HOST_WIFI_STANDARD std;
 	enum hdd_dot11_mode dot11_mode;
 	uint8_t supported_band;
@@ -9082,24 +9084,41 @@ int hdd_set_vdev_phy_mode(struct hdd_adapter *adapter,
 		hdd_err("Station is connected, command is not supported");
 		return -EINVAL;
 	}
+	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &csr_req_phymode);
+	if (ret < 0)
+		return ret;
 
-	adapter->user_phy_mode = vendor_phy_mode;
+	reg_req_phymode = csr_convert_to_reg_phy_mode(csr_req_phymode, 0);
+	reg_max_phymode = wlan_reg_get_max_phymode(hdd_ctx->pdev,
+						   reg_req_phymode, 0);
+	if (reg_req_phymode != reg_max_phymode) {
+		hdd_debug("reg_max_phymode %d, req_req_phymode %d",
+			  reg_max_phymode, reg_req_phymode);
+		csr_max_phymode =
+			csr_convert_from_reg_phy_mode(reg_max_phymode);
+		ret = hdd_phymode_to_vendor_mode(csr_max_phymode,
+						 &max_vendor_phy_mode);
+		if (ret)
+			return ret;
+	} else {
+		csr_max_phymode = csr_req_phymode;
+		max_vendor_phy_mode = vendor_phy_mode;
+	}
 
-	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &phymode);
+	adapter->user_phy_mode = max_vendor_phy_mode;
+
+	ret = hdd_phymode_to_dot11_mode(csr_max_phymode, &dot11_mode);
 	if (ret)
 		return ret;
 
-	ret = hdd_phymode_to_dot11_mode(phymode, &dot11_mode);
-	if (ret)
-		return ret;
-
-	ret = hdd_vendor_mode_to_band(vendor_phy_mode, &supported_band,
+	ret = hdd_vendor_mode_to_band(max_vendor_phy_mode, &supported_band,
 				      wlan_reg_is_6ghz_supported(psoc));
 	if (ret)
 		return ret;
 
 	std = hdd_get_wifi_standard(hdd_ctx, dot11_mode, supported_band);
-	hdd_debug("wifi_standard %d, vendor_phy_mode %d", std, vendor_phy_mode);
+	hdd_debug("wifi_standard %d, vendor_phy_mode %d",
+		  std, max_vendor_phy_mode);
 
 	ret = sme_cli_set_command(link_info->vdev_id,
 				  wmi_vdev_param_wifi_standard_version,
@@ -9119,7 +9138,9 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
-	eCsrPhyMode phymode;
+	eCsrPhyMode csr_req_phymode, csr_max_phymode;
+	enum reg_phymode reg_req_phymode, reg_max_phymode;
+	enum qca_wlan_vendor_phy_mode max_vendor_phy_mode = vendor_phy_mode;
 	uint8_t supported_band;
 	uint32_t bonding_mode;
 	int ret = 0;
@@ -9131,20 +9152,39 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &phymode);
+	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &csr_req_phymode);
 	if (ret < 0)
 		return ret;
 
-	ret = hdd_vendor_mode_to_band(vendor_phy_mode, &supported_band,
+	reg_req_phymode = csr_convert_to_reg_phy_mode(csr_req_phymode, 0);
+	reg_max_phymode = wlan_reg_get_max_phymode(hdd_ctx->pdev,
+						   reg_req_phymode, 0);
+
+	if (reg_req_phymode != reg_max_phymode) {
+		hdd_debug("reg_max_phymode %d, req_req_phymode %d",
+			  reg_max_phymode, reg_req_phymode);
+		csr_max_phymode =
+			csr_convert_from_reg_phy_mode(reg_max_phymode);
+		ret = hdd_phymode_to_vendor_mode(csr_max_phymode,
+						 &max_vendor_phy_mode);
+		if (ret)
+			return ret;
+	} else {
+		csr_max_phymode = csr_req_phymode;
+		max_vendor_phy_mode = vendor_phy_mode;
+	}
+
+	ret = hdd_vendor_mode_to_band(max_vendor_phy_mode, &supported_band,
 				      wlan_reg_is_6ghz_supported(psoc));
 	if (ret < 0)
 		return ret;
 
-	ret = hdd_vendor_mode_to_bonding_mode(vendor_phy_mode, &bonding_mode);
+	ret = hdd_vendor_mode_to_bonding_mode(max_vendor_phy_mode,
+					      &bonding_mode);
 	if (ret < 0)
 		return ret;
 
-	ret = hdd_update_phymode(adapter, phymode, supported_band,
+	ret = hdd_update_phymode(adapter, csr_max_phymode, supported_band,
 				 bonding_mode);
 	if (ret)
 		return ret;
@@ -9152,9 +9192,10 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, curr_adapter, next_adapter,
 					   dbgid) {
 		if (curr_adapter->device_mode == QDF_STA_MODE &&
-		    !hdd_cm_is_vdev_connected(curr_adapter->deflink))
-			hdd_set_vdev_phy_mode(curr_adapter, vendor_phy_mode);
-
+		    !hdd_cm_is_vdev_connected(curr_adapter->deflink)) {
+			hdd_set_vdev_phy_mode(curr_adapter,
+					      max_vendor_phy_mode);
+		}
 		hdd_adapter_dev_put_debug(curr_adapter, dbgid);
 	}
 
