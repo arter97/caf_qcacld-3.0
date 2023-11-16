@@ -719,10 +719,18 @@ void  dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs, bool *is_chan_found)
 		dfs_soc_obj->cur_agile_dfs_index = cur_agile_dfs_idx;
 		temp_dfs = dfs_soc_obj->dfs_priv[cur_agile_dfs_idx].dfs;
 		pdev = temp_dfs->dfs_pdev_obj;
+		if (!pdev) {
+			dfs_debug(dfs, WLAN_DEBUG_DFS_AGILE, "pdev at index: %u is NULL\n", cur_agile_dfs_idx);
+			*is_chan_found = false;
+			return;
+		}
 		if (!dfs_soc_obj->dfs_priv[cur_agile_dfs_idx].agile_precac_active) {
 			continue;
 		}
-
+		if (!dfs_mlme_is_pdev_valid(pdev)) {
+			dfs_debug(dfs, WLAN_DEBUG_DFS_AGILE, "pdev: %p is not valid in current hwmode\n", pdev);
+			continue;
+		}
 		vhtop_ch_freq_seg1 =
 			temp_dfs->dfs_curchan->dfs_ch_mhz_freq_seg1;
 		vhtop_ch_freq_seg2 =
