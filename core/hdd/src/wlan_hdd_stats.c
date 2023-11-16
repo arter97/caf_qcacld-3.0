@@ -3564,6 +3564,12 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 	if (0 != ret)
 		return -EINVAL;
 
+	if (adapter->device_mode == QDF_P2P_DEVICE_MODE) {
+		hdd_nofl_debug("device mode: %d not supported",
+			       adapter->device_mode);
+		return -EINVAL;
+	}
+
 	if (!adapter->is_link_layer_stats_set) {
 		hdd_nofl_debug("is_link_layer_stats_set: %d",
 			       adapter->is_link_layer_stats_set);
