@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -8645,6 +8645,8 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		session_entry->lim11hEnable = 0;
 
 	session_entry->dot11mode = ch_change_req->dot11mode;
+	session_entry->htCapability = IS_DOT11_MODE_HT(session_entry->dot11mode);
+	session_entry->vhtCapability = IS_DOT11_MODE_VHT(session_entry->dot11mode);
 	session_entry->nwType = ch_change_req->nw_type;
 	qdf_mem_copy(&session_entry->rateSet,
 		     &ch_change_req->opr_rates,
