@@ -341,6 +341,8 @@ static const uint32_t vdev_param_non_tlv[] = {
 		WMI_UNAVAILABLE_PARAM,
 	[wmi_vdev_param_rtt_11az_ntb_min_time_bw_meas] =
 		WMI_UNAVAILABLE_PARAM,
+	[wmi_vdev_param_mlo_max_recom_active_links] =
+		WMI_UNAVAILABLE_PARAM,
 };
 #endif
 
