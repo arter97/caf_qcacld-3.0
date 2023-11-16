@@ -1654,6 +1654,16 @@ wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 void wlan_clear_mlo_sta_link_removed_flag(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * wlan_get_mlo_link_agnostic_flag() - Update mlo link agnostic flag
+ *
+ * @vdev: pointer to vdev
+ * @dest_addr: destination address
+ *
+ * Return: true/false
+ */
+bool wlan_get_mlo_link_agnostic_flag(struct wlan_objmgr_vdev *vdev,
+				     uint8_t *dest_addr);
+/**
  * wlan_set_vdev_link_removed_flag_by_vdev_id() - Set link removal flag
  * on vdev
  * @psoc: psoc object
@@ -1690,6 +1700,13 @@ bool wlan_drop_mgmt_frame_on_link_removal(struct wlan_objmgr_vdev *vdev);
 static inline void
 wlan_clear_mlo_sta_link_removed_flag(struct wlan_objmgr_vdev *vdev)
 {
+}
+
+static inline
+bool wlan_get_mlo_link_agnostic_flag(struct wlan_objmgr_vdev *vdev,
+				     uint8_t *dest_addr)
+{
+	return false;
 }
 
 static inline QDF_STATUS
