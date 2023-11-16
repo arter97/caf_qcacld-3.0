@@ -9107,6 +9107,8 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
 	uint8_t supported_band;
 	uint32_t bonding_mode;
 	int ret = 0;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER_BY_VDEV;
+	struct hdd_adapter *curr_adapter, *next_adapter;
 
 	if (!psoc) {
 		hdd_err("psoc is NULL");
@@ -9126,8 +9128,21 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
 	if (ret < 0)
 		return ret;
 
-	return hdd_update_phymode(adapter, phymode, supported_band,
-				  bonding_mode);
+	ret = hdd_update_phymode(adapter, phymode, supported_band,
+				 bonding_mode);
+	if (ret)
+		return ret;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, curr_adapter, next_adapter,
+					   dbgid) {
+		if (curr_adapter->device_mode == QDF_STA_MODE &&
+		    !hdd_cm_is_vdev_connected(curr_adapter->deflink))
+			hdd_set_vdev_phy_mode(curr_adapter, vendor_phy_mode);
+
+		hdd_adapter_dev_put_debug(curr_adapter, dbgid);
+	}
+
+	return 0;
 }
 
 /**
