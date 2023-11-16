@@ -2333,6 +2333,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	uint8_t *mld_addr = NULL;
 	bool is_5g = false;
 	uint8_t pdev_id;
+	bool mlo_link_agnostic;
 
 	if (wma_validate_handle(wma_handle)) {
 		cds_packet_free((void *)tx_frame);
@@ -2713,6 +2714,11 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	if (wlan_reg_is_5ghz_ch_freq(wma_handle->interfaces[vdev_id].ch_freq))
 		is_5g = true;
 
+	wh = (struct ieee80211_frame *)(qdf_nbuf_data(tx_frame));
+
+	mlo_link_agnostic =
+		wlan_get_mlo_link_agnostic_flag(iface->vdev, wh->i_addr1);
+
 	mgmt_param.tx_frame = tx_frame;
 	mgmt_param.frm_len = frmLen;
 	mgmt_param.vdev_id = vdev_id;
@@ -2729,7 +2735,8 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	    pFc->subType != SIR_MAC_MGMT_PROBE_REQ &&
 	    pFc->subType != SIR_MAC_MGMT_AUTH &&
 	    action != (ACTION_CATEGORY_PUBLIC << 8 | TDLS_DISCOVERY_RESPONSE) &&
-	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE))
+	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE) &&
+	    mlo_link_agnostic)
 		mgmt_param.mlo_link_agnostic = true;
 
 	if (tx_flag & HAL_USE_INCORRECT_KEY_PMF)
@@ -2760,7 +2767,6 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	}
 
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma_handle->pdev);
-	wh = (struct ieee80211_frame *)(qdf_nbuf_data(tx_frame));
 	mac_addr = wh->i_addr1;
 	peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr, WLAN_MGMT_NB_ID);
 	if (!peer) {
