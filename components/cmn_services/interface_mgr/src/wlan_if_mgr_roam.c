@@ -814,7 +814,8 @@ static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
 
 	if (!mlme_get_bss_11be_allowed(psoc, &candidate_info->peer_addr,
 				       attr.ie_data, attr.ie_length) ||
-	    wlan_vdev_mlme_get_user_dis_eht_flag(vdev)) {
+	    wlan_vdev_mlme_get_user_dis_eht_flag(vdev) ||
+	    !wlan_reg_phybitmap_support_11be(wlan_vdev_get_pdev(vdev))) {
 		scan_entry->ie_list.multi_link_bv = NULL;
 		scan_entry->ie_list.ehtcap = NULL;
 		scan_entry->ie_list.ehtop = NULL;
