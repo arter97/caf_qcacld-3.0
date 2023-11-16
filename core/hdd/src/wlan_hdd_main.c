@@ -1941,9 +1941,11 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	if ((config->dot11Mode == eHDD_DOT11_MODE_11ac ||
 	     config->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY) && !cfg->en_11ac)
 		config->dot11Mode = eHDD_DOT11_MODE_AUTO;
+
 	/* 11BE mode support */
-	if (!hdd_dot11Mode_support_11be(config->dot11Mode) &&
-	    cfg->en_11be) {
+	if (cfg->en_11be &&
+	    (!hdd_dot11Mode_support_11be(config->dot11Mode) ||
+	     !wlan_reg_phybitmap_support_11be(hdd_ctx->pdev))) {
 		hdd_debug("dot11Mode %d override target en_11be to false",
 			  config->dot11Mode);
 		cfg->en_11be = false;
