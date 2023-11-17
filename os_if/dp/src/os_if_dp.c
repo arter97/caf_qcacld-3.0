@@ -33,6 +33,10 @@
 #include "wlan_osif_request_manager.h"
 #include <ol_defines.h>
 
+#ifdef FEATURE_DIRECT_LINK
+#include <linux/remoteproc/qcom_rproc.h>
+#endif
+
 /*
  * define short names for the global vendor params
  * used by wlan_hdd_cfg80211_setarp_stats_cmd()
@@ -1217,6 +1221,143 @@ int osif_dp_set_nud_stats(struct wiphy *wiphy,
 	return err;
 }
 
+#ifdef FEATURE_DIRECT_LINK
+/*
+ * osif_dp_lpass_ssr_cb() - DP LPASS SSR notifier callback
+ * @nb: pointer to notifier block
+ * @event: remote proc event
+ * @data: pointer to ssr notify data
+ *
+ * Return: notifier block return codes
+ */
+static int osif_dp_lpass_ssr_cb(struct notifier_block *nb, unsigned long event,
+				void *data)
+{
+	struct osif_dp_lpass_ssr_nb_params *dp_lpass_ssr_nb_param;
+	struct qcom_ssr_notify_data *notify_data = data;
+	qdf_device_t qdf_dev;
+	struct osif_psoc_sync *psoc_sync;
+	int err;
+
+	dp_lpass_ssr_nb_param =
+			qdf_container_of(nb,
+					 struct osif_dp_lpass_ssr_nb_params,
+					 dp_lpass_ssr_nb);
+
+	qdf_dev = wlan_psoc_get_qdf_dev(dp_lpass_ssr_nb_param->psoc);
+	err = osif_psoc_sync_op_start(qdf_dev->dev, &psoc_sync);
+	if (err)
+		return NOTIFY_DONE;
+
+	switch (event) {
+	case QCOM_SSR_BEFORE_SHUTDOWN:
+		if (!notify_data->crashed)
+			return NOTIFY_DONE;
+
+		dp_info("LPASS before shutdown event received");
+
+		ucfg_dp_direct_link_handle_lpass_ssr_notif(dp_lpass_ssr_nb_param->psoc);
+		break;
+	case QCOM_SSR_AFTER_SHUTDOWN:
+	case QCOM_SSR_BEFORE_POWERUP:
+	case QCOM_SSR_AFTER_POWERUP:
+	default:
+		break;
+	}
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return NOTIFY_OK;
+}
+
+static struct osif_dp_lpass_ssr_nb_params dp_lpass_ssr_nb_params = {
+	.dp_lpass_ssr_nb.notifier_call = osif_dp_lpass_ssr_cb
+};
+
+/*
+ * osif_dp_register_lpass_ssr_notifier() - Register LPASS SSR notifier
+ * @psoc: psoc handle
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+osif_dp_register_lpass_ssr_notifier(struct wlan_objmgr_psoc *psoc)
+{
+	void *ssr_notif_handle;
+
+	dp_lpass_ssr_nb_params.psoc = psoc;
+
+	/*
+	 * qcom_register_ssr_notifier internally uses
+	 * srcu_notifier_chain_register so blocking calls are allowed in the
+	 * notifier call.
+	 */
+	ssr_notif_handle =
+	    qcom_register_ssr_notifier("lpass",
+				       &dp_lpass_ssr_nb_params.dp_lpass_ssr_nb);
+	if (IS_ERR_OR_NULL(ssr_notif_handle)) {
+		dp_err("LPASS SSR notifier registration failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return ucfg_dp_set_lpass_ssr_notif_hdl(psoc, ssr_notif_handle);
+}
+
+/*
+ * osif_dp_unregister_lpass_ssr_notifier() - Unregister LPASS SSR notifier
+ * @psoc: psoc handle
+ *
+ * Return: None
+ */
+static void
+osif_dp_unregister_lpass_ssr_notifier(struct wlan_objmgr_psoc *psoc)
+{
+	void *ssr_notif_handle = ucfg_dp_get_lpass_ssr_notif_hdl(psoc);
+	int ret;
+
+	ret =
+	  qcom_unregister_ssr_notifier(ssr_notif_handle,
+				       &dp_lpass_ssr_nb_params.dp_lpass_ssr_nb);
+	if (ret)
+		dp_err("LPASS SSR notifier unregister failed %d", ret);
+
+	dp_lpass_ssr_nb_params.psoc = NULL;
+	ucfg_dp_set_lpass_ssr_notif_hdl(psoc, NULL);
+}
+
+/*
+ * osif_dp_register_direct_link_callbacks() - Register direct link related
+ *  osif callbacks
+ * @cb_obj: callback object
+ *
+ * Return: None
+ */
+static inline void
+osif_dp_register_direct_link_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
+{
+	cb_obj->dp_register_lpass_ssr_notifier =
+				osif_dp_register_lpass_ssr_notifier;
+	cb_obj->dp_unregister_lpass_ssr_notifier =
+				osif_dp_unregister_lpass_ssr_notifier;
+}
+#else
+static inline QDF_STATUS
+osif_dp_register_lpass_ssr_notifier(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+osif_dp_unregister_lpass_ssr_notifier(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+osif_dp_register_direct_link_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
+{
+}
+#endif
+
 /*
  * os_if_dp_register_event_handler() - Register osif event handler
  * @psoc: psoc handle
@@ -1241,6 +1382,7 @@ void os_if_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	cb_obj->os_if_dp_nud_stats_info = os_if_dp_nud_stats_info;
 	cb_obj->osif_dp_process_mic_error = osif_dp_process_mic_error;
 	os_if_dp_register_txrx_callbacks(cb_obj);
+	osif_dp_register_direct_link_callbacks(cb_obj);
 
 	ucfg_dp_register_hdd_callbacks(psoc, cb_obj);
 	os_if_dp_register_event_handler(psoc);
