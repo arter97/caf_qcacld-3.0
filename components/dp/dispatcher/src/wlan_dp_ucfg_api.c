@@ -2150,6 +2150,31 @@ ucfg_dp_req_set_arp_stats(struct wlan_objmgr_psoc *psoc,
 	return sb_ops->dp_set_arp_req_stats(psoc, params);
 }
 
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * ucfg_dp_register_direct_link_hdd_cbs() - Register direct link hdd callbacks
+ * @dp_ctx: DP private context
+ * @cb_obj: Callback object
+ *
+ * Returns: None
+ */
+static void
+ucfg_dp_register_direct_link_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
+				     struct wlan_dp_psoc_callbacks *cb_obj)
+{
+	dp_ctx->dp_ops.dp_register_lpass_ssr_notifier =
+		cb_obj->dp_register_lpass_ssr_notifier;
+	dp_ctx->dp_ops.dp_unregister_lpass_ssr_notifier =
+		cb_obj->dp_unregister_lpass_ssr_notifier;
+}
+#else
+static inline void
+ucfg_dp_register_direct_link_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
+				     struct wlan_dp_psoc_callbacks *cb_obj)
+{
+}
+#endif
+
 void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_dp_psoc_callbacks *cb_obj)
 {
@@ -2225,7 +2250,8 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	dp_ctx->dp_ops.osif_dp_process_mic_error =
 		cb_obj->osif_dp_process_mic_error;
 	dp_ctx->dp_ops.link_monitoring_cb = cb_obj->link_monitoring_cb;
-	}
+	ucfg_dp_register_direct_link_hdd_cbs(dp_ctx, cb_obj);
+}
 
 void ucfg_dp_register_event_handler(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_dp_psoc_nb_ops *cb_obj)
@@ -2712,6 +2738,46 @@ QDF_STATUS ucfg_dp_config_direct_link(qdf_netdev_t dev,
 
 	return dp_config_direct_link(dp_intf, config_direct_link,
 				     enable_low_latency);
+}
+
+QDF_STATUS
+ucfg_dp_set_lpass_ssr_notif_hdl(struct wlan_objmgr_psoc *psoc, void *handle)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx || !dp_ctx->dp_direct_link_ctx) {
+		dp_err("Invalid DP or DP direct link context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dp_ctx->dp_direct_link_ctx->lpass_ssr_notif_hdl = handle;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void *ucfg_dp_get_lpass_ssr_notif_hdl(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx || !dp_ctx->dp_direct_link_ctx) {
+		dp_err("Invalid DP or DP direct link context");
+		return NULL;
+	}
+
+	return dp_ctx->dp_direct_link_ctx->lpass_ssr_notif_hdl;
+}
+
+QDF_STATUS
+ucfg_dp_direct_link_handle_lpass_ssr_notif(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx || !dp_ctx->dp_direct_link_ctx) {
+		dp_err("Invalid DP or DP direct link context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return dp_direct_link_handle_lpass_ssr_notif(dp_ctx);
 }
 #endif
 

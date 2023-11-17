@@ -886,6 +886,16 @@ void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx, bool is_ssr);
 QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 				 bool config_direct_link,
 				 bool enable_low_latency);
+
+/**
+ * dp_direct_link_handle_lpass_ssr_notif: Handle LPASS SSR notification in the
+ *  context of direct link
+ * @dp_ctx: DP private context
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+dp_direct_link_handle_lpass_ssr_notif(struct wlan_dp_psoc_context *dp_ctx);
 #else
 static inline
 QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)
@@ -902,6 +912,12 @@ static inline
 QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 				 bool config_direct_link,
 				 bool enable_low_latency)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+dp_direct_link_handle_lpass_ssr_notif(struct wlan_dp_psoc_context *dp_ctx)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -37,9 +37,9 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 {
 	struct dp_direct_link_context *direct_link_ctx =
 					dl_wfds->direct_link_ctx;
+	struct wlan_dp_psoc_context *dp_ctx = direct_link_ctx->dp_ctx;
 	struct wlan_qmi_wfds_config_req_msg *info;
-	struct dp_soc *dp_soc =
-		wlan_psoc_get_dp_handle(dl_wfds->direct_link_ctx->dp_ctx->psoc);
+	struct dp_soc *dp_soc = wlan_psoc_get_dp_handle(dp_ctx->psoc);
 	struct hif_opaque_softc *hif_ctx;
 	qdf_device_t qdf_dev;
 	void *hal_soc;
@@ -51,7 +51,7 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	hal_ring_handle_t refill_ring;
 	uint8_t i;
 
-	qdf_dev = dl_wfds->direct_link_ctx->dp_ctx->qdf_dev;
+	qdf_dev = dp_ctx->qdf_dev;
 
 	if (!dp_soc || !dp_soc->hif_handle || !qdf_dev)
 		return QDF_STATUS_E_FAILURE;
@@ -158,8 +158,7 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	qdf_assert(info.pci_slot >= 0);
 	info->lpass_ep_id = direct_link_ctx->lpass_ep_id;
 
-	status = wlan_qmi_wfds_send_config_msg(direct_link_ctx->dp_ctx->psoc,
-					       info);
+	status = wlan_qmi_wfds_send_config_msg(dp_ctx->psoc, info);
 	qdf_mem_free(info);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -557,6 +556,8 @@ QDF_STATUS dp_wfds_new_server(void)
 {
 	struct dp_direct_link_wfds_context *dl_wfds = gp_dl_wfds_ctx;
 	void *htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
+	struct wlan_dp_psoc_context *dp_ctx;
+	QDF_STATUS status;
 
 	if (!dl_wfds || !htc_handle)
 		return QDF_STATUS_E_INVAL;
@@ -567,13 +568,41 @@ QDF_STATUS dp_wfds_new_server(void)
 	dp_debug("Connected to WFDS QMI service, state: 0x%x",
 		 qdf_atomic_read(&dl_wfds->wfds_state));
 
-	return dp_wfds_event_post(dl_wfds, DP_WFDS_NEW_SERVER, NULL);
+	dp_ctx = dl_wfds->direct_link_ctx->dp_ctx;
+	if (dp_ctx->dp_ops.dp_register_lpass_ssr_notifier) {
+		status =
+		    dp_ctx->dp_ops.dp_register_lpass_ssr_notifier(dp_ctx->psoc);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_err("DP LPASS SSR notifier registration failed %d",
+			       status);
+			goto lpass_ssr_notifier_failed;
+		}
+	}
+
+	status = dp_wfds_event_post(dl_wfds, DP_WFDS_NEW_SERVER, NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("DP WFDS event post failed %d", status);
+		goto wfds_event_post_failed;
+	}
+
+	return status;
+
+wfds_event_post_failed:
+	if (dp_ctx->dp_ops.dp_unregister_lpass_ssr_notifier)
+		dp_ctx->dp_ops.dp_unregister_lpass_ssr_notifier(dp_ctx->psoc);
+
+lpass_ssr_notifier_failed:
+	htc_vote_link_down(htc_handle, HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
+	qdf_atomic_set(&dl_wfds->wfds_state, DP_WFDS_SVC_DISCONNECTED);
+
+	return status;
 }
 
 void dp_wfds_del_server(void)
 {
 	struct dp_direct_link_wfds_context *dl_wfds = gp_dl_wfds_ctx;
-	qdf_device_t qdf_ctx = dl_wfds->direct_link_ctx->dp_ctx->qdf_dev;
+	struct wlan_dp_psoc_context *dp_ctx = dl_wfds->direct_link_ctx->dp_ctx;
+	qdf_device_t qdf_ctx = dp_ctx->qdf_dev;
 	void *htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
 	void *hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	enum dp_wfds_state dl_wfds_state;
@@ -654,6 +683,9 @@ void dp_wfds_del_server(void)
 			dl_wfds->iommu_cfg.direct_link_refill_ring_base_paddr,
 			dl_wfds->iommu_cfg.direct_link_refill_ring_map_size);
 	}
+
+	if (dp_ctx->dp_ops.dp_unregister_lpass_ssr_notifier)
+		dp_ctx->dp_ops.dp_unregister_lpass_ssr_notifier(dp_ctx->psoc);
 
 	htc_vote_link_down(htc_handle, HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
 }

@@ -729,12 +729,14 @@ enum RX_OFFLOAD {
  * @lpass_ep_id: LPASS data msg service endpoint id
  * @direct_link_refill_ring_hdl: Direct Link refill ring handle
  * @dl_wfds: pointer to direct link WFDS context
+ * @lpass_ssr_notif_hdl: LPASS SSR notifier handle
  */
 struct dp_direct_link_context {
 	struct wlan_dp_psoc_context *dp_ctx;
 	HTC_ENDPOINT_ID lpass_ep_id;
 	struct dp_srng *direct_link_refill_ring_hdl;
 	struct dp_direct_link_wfds_context *dl_wfds;
+	void *lpass_ssr_notif_hdl;
 };
 #endif
 

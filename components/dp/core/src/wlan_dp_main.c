@@ -2451,6 +2451,12 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 
 	return status;
 }
+
+QDF_STATUS
+dp_direct_link_handle_lpass_ssr_notif(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 #ifdef WLAN_DP_PROFILE_SUPPORT

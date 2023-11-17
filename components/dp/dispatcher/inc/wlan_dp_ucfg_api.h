@@ -1439,6 +1439,36 @@ void ucfg_dp_wfds_del_server(void);
 QDF_STATUS ucfg_dp_config_direct_link(qdf_netdev_t dev,
 				      bool config_direct_link,
 				      bool enable_low_latency);
+
+/**
+ * ucfg_dp_set_lpass_ssr_notif_hdl() - Set lpass ssr notifier handle in DP
+ *  direct link context
+ * @psoc: psoc handle
+ * @handle: lpass ssr notifier handle to be set
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+ucfg_dp_set_lpass_ssr_notif_hdl(struct wlan_objmgr_psoc *psoc, void *handle);
+
+/**
+ * ucfg_dp_get_lpass_ssr_notif_hdl() - Get lpass ssr notifier handle
+ *  direct link context
+ * @psoc: psoc handle
+ *
+ * Return: pointer to handle
+ */
+void *ucfg_dp_get_lpass_ssr_notif_hdl(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_direct_link_handle_lpass_ssr_notif() - Handle LPASS SSR notification
+ *  in the context of direct link
+ * @psoc: psoc handle
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+ucfg_dp_direct_link_handle_lpass_ssr_notif(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
@@ -1476,6 +1506,24 @@ static inline
 QDF_STATUS ucfg_dp_config_direct_link(qdf_netdev_t dev,
 				      bool config_direct_link,
 				      bool enable_low_latency)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_dp_set_lpass_ssr_notif_hdl(struct wlan_objmgr_psoc *psoc, void *handle)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void *ucfg_dp_get_lpass_ssr_notif_hdl(struct wlan_objmgr_psoc *psoc)
+{
+	return NULL;
+}
+
+static inline QDF_STATUS
+ucfg_dp_direct_link_handle_lpass_ssr_notif(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
 }
