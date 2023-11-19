@@ -3085,6 +3085,8 @@ cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
 		wlan_mlme_get_sta_mlo_conn_max_num(psoc);
 	roam_mlo_params->support_link_band =
 		wlan_mlme_get_sta_mlo_conn_band_bmp(psoc);
+	roam_mlo_params->mlo_5gl_5gh_mlsr =
+		wlan_mlme_is_5gl_5gh_mlsr_supported(psoc);
 
 	/*
 	 * Update the supported link band based on roam_band_bitmap
