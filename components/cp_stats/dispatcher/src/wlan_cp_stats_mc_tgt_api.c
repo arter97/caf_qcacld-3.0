@@ -1578,3 +1578,20 @@ QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+
+QDF_STATUS tgt_set_pdev_stats_update_period(struct wlan_objmgr_psoc *psoc,
+					    uint8_t pdev_id, uint32_t val)
+{
+	struct wlan_lmac_if_cp_stats_tx_ops *tx_ops;
+	QDF_STATUS status;
+
+	tx_ops = target_if_cp_stats_get_tx_ops(psoc);
+	if (!tx_ops || !tx_ops->set_pdev_stats_update_period) {
+		cp_stats_err("could not get tx_ops");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	status = tx_ops->set_pdev_stats_update_period(psoc, pdev_id, val);
+
+	return status;
+}
+
