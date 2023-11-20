@@ -100,6 +100,18 @@ QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 				    struct request_info *req);
 
 /**
+ * tgt_set_pdev_stats_update_period(): API to set pdev stats update
+ * period to FW
+ * @psoc: pointer to psoc object
+ * @pdev_id: pdev id
+ * @val: pdev stats update period, 0: disabled periodical stats report.
+ *
+ * Return: status of operation
+ */
+QDF_STATUS tgt_set_pdev_stats_update_period(struct wlan_objmgr_psoc *psoc,
+					    uint8_t pdev_id, uint32_t val);
+
+/**
  * tgt_mc_cp_stats_inc_wake_lock_stats() : API to increment wake lock stats
  * given the wake reason code
  * @psoc: pointer to psoc object
