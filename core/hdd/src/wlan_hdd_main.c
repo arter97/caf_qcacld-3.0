@@ -9277,6 +9277,7 @@ static void hdd_stop_and_cleanup_ndi(struct wlan_hdd_link_info *link_info)
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 
+	hdd_destroy_adapter_sysfs_files(adapter);
 	/* For NDI do not use roam_profile */
 	INIT_COMPLETION(adapter->disconnect_comp_var);
 	hdd_peer_cleanup(link_info);

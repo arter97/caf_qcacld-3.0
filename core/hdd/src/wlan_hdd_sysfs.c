@@ -1187,6 +1187,20 @@ void hdd_sysfs_create_ftm_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_unit_test_target_create(adapter);
 }
 
+static void
+hdd_sysfs_create_ndi_adapter_root_obj(struct hdd_adapter *adapter)
+{
+	hdd_sysfs_unit_test_target_create(adapter);
+	hdd_sysfs_11be_rate_create(adapter);
+}
+
+static void
+hdd_sysfs_destroy_ndi_adapter_root_obj(struct hdd_adapter *adapter)
+{
+	hdd_sysfs_11be_rate_destroy(adapter);
+	hdd_sysfs_unit_test_target_destroy(adapter);
+}
+
 void hdd_create_adapter_sysfs_files(struct hdd_adapter *adapter)
 {
 	int device_mode = adapter->device_mode;
@@ -1211,6 +1225,9 @@ void hdd_create_adapter_sysfs_files(struct hdd_adapter *adapter)
 		break;
 	case QDF_FTM_MODE:
 		hdd_sysfs_create_ftm_adapter_root_obj(adapter);
+		break;
+	case QDF_NDI_MODE:
+		hdd_sysfs_create_ndi_adapter_root_obj(adapter);
 		break;
 	default:
 		break;
@@ -1246,6 +1263,9 @@ void hdd_destroy_adapter_sysfs_files(struct hdd_adapter *adapter)
 		break;
 	case QDF_FTM_MODE:
 		hdd_sysfs_destroy_ftm_adapter_root_obj(adapter);
+		break;
+	case QDF_NDI_MODE:
+		hdd_sysfs_destroy_ndi_adapter_root_obj(adapter);
 		break;
 	default:
 		break;
