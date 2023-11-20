@@ -2583,7 +2583,10 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 	sta->mlo_same_link_mld_address =
 		cfg_default(CFG_MLO_SAME_LINK_MLD_ADDR);
 	sta->mlo_5gl_5gh_mlsr =
-		cfg_default(CFG_MLO_MLO_5GL_5GH_MLSR);
+		cfg_get(psoc, CFG_MLO_MLO_5GL_5GH_MLSR);
+
+	mlme_debug("mlo_support_link_num: %d, mlo_support_link_band: 0x%x",
+		   sta->mlo_support_link_num, sta->mlo_support_link_band);
 }
 
 static bool
