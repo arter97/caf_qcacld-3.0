@@ -6290,17 +6290,19 @@ returnAfterError:
  * event
  * @token: Dialog token
  * @num_rpt: Number of Report element
- * @pe_session: pe session pointer
+ * @band: Tx packet band info
+ * @vdev_id: vdev id
  */
 static void
 lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
-				 struct pe_session *pe_session)
+				 enum wlan_diag_wifi_band band,
+				 uint8_t vdev_id)
 {
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_bcn_rpt);
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
-	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(pe_session->vdev);
+	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us =  qdf_ktime_to_us(qdf_ktime_get());
 
@@ -6309,19 +6311,90 @@ lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 	wlan_diag_event.meas_token = token;
 	wlan_diag_event.num_rpt = num_rpt;
 
-	if (mlo_is_mld_sta(pe_session->vdev))
-		wlan_diag_event.band =
-			wlan_convert_freq_to_diag_band(pe_session->curr_op_freq);
+	wlan_diag_event.band = band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BCN_RPT);
 }
 #else
 static void
 lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
-				 struct pe_session *pe_session)
+				 enum wlan_diag_wifi_band band,
+				 uint8_t vdev_id)
 {
 }
 #endif
+
+static QDF_STATUS
+lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
+					  uint32_t tx_status, void *params)
+{
+	struct mac_context *mac_ctx = (struct mac_context *)context;
+	struct wlan_frame_hdr *mac_hdr;
+	struct wmi_mgmt_params *mgmt_params;
+	tDot11fRadioMeasurementReport *frm = NULL;
+	uint32_t extract_status;
+	uint8_t *frame_ptr;
+	uint8_t ff_offset;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	enum wlan_diag_wifi_band band;
+
+	if (!buf) {
+		pe_err("Invalid nbuf buffer");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	frm = qdf_mem_malloc(sizeof(*frm));
+	if (!frm) {
+		pe_err("Radio measurement buffer allocation failed");
+		qdf_nbuf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!params) {
+		pe_err("Invalid param");
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	frame_ptr = qdf_nbuf_data(buf);
+	mac_hdr = (struct wlan_frame_hdr *)frame_ptr;
+	ff_offset = sizeof(*mac_hdr);
+	if (wlan_crypto_is_data_protected(frame_ptr))
+		ff_offset += IEEE80211_CCMP_MICLEN;
+
+	if (qdf_nbuf_len(buf) < (ff_offset + sizeof(*frm))) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	mgmt_params = params;
+
+	extract_status =
+		dot11f_unpack_radio_measurement_report(mac_ctx,
+						       frame_ptr + ff_offset,
+						       sizeof(*frm), frm,
+						       false);
+
+	if (DOT11F_FAILED(extract_status)) {
+		pe_err("Failed to unpack Beacon Report response (0x%08x)",
+		       extract_status);
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	band = mgmt_params->band;
+
+	if (frm->MeasurementReport[0].type == SIR_MAC_RRM_BEACON_TYPE)
+		lim_beacon_report_response_event(frm->DialogToken.token,
+						 frm->num_MeasurementReport,
+						 band,
+						 mgmt_params->vdev_id);
+out:
+	qdf_nbuf_free(buf);
+	qdf_mem_free(frm);
+
+	return status;
+}
 
 QDF_STATUS
 lim_send_radio_measure_report_action_frame(struct mac_context *mac,
@@ -6477,12 +6550,6 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 			nStatus);
 	}
 
-	if (frm->MeasurementReport[0].type == SIR_MAC_RRM_BEACON_TYPE) {
-		lim_beacon_report_response_event(frm->MeasurementReport[0].token,
-						 num_report,
-						 pe_session);
-	}
-
 	pe_nofl_rl_info("TX: type:%d seq_no:%d dialog_token:%d no. of APs:%d is_last_rpt:%d num_report:%d peer:"QDF_MAC_ADDR_FMT,
 			frm->MeasurementReport[0].type,
 			(pMacHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET |
@@ -6497,10 +6564,12 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, pMacHdr->fc.subType));
-	qdf_status = wma_tx_frame(mac, pPacket, (uint16_t)nBytes,
+	qdf_status = wma_tx_frameWithTxComplete(mac, pPacket, (uint16_t)nBytes,
 				  TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
-				  7, lim_tx_complete, pFrame, txFlag,
-				  smeSessionId, 0, RATEID_DEFAULT, 0);
+				  7, lim_tx_complete, pFrame,
+				  lim_mgmt_radio_measure_report_tx_complete,
+				  txFlag, smeSessionId, 0, 0,
+				  RATEID_DEFAULT, 0, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 pe_session->peSessionId, qdf_status));
 	if (QDF_STATUS_SUCCESS != qdf_status) {

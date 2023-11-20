@@ -420,6 +420,25 @@ wlan_cache_connectivity_log(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 #define WLAN_SAE_AUTH_ALGO_NUMBER 3
 #ifdef CONNECTIVITY_DIAG_EVENT
 
+enum wlan_diag_wifi_band
+wlan_convert_freq_to_diag_band(qdf_freq_t ch_freq)
+{
+	enum reg_wifi_band band;
+
+	band = wlan_reg_freq_to_band(ch_freq);
+
+	switch (band) {
+	case REG_BAND_2G:
+		return WLAN_24GHZ_BAND;
+	case REG_BAND_5G:
+		return WLAN_5GHZ_BAND;
+	case REG_BAND_6G:
+		return WLAN_6GHZ_BAND;
+	default:
+		return WLAN_INVALID_BAND;
+	}
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 void
 wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
@@ -890,25 +909,6 @@ wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status)
 	return WLAN_DIAG_TX_RX_STATUS_INVALID;
 }
 
-enum wlan_diag_wifi_band
-wlan_convert_freq_to_diag_band(uint16_t ch_freq)
-{
-	enum reg_wifi_band band;
-
-	band = wlan_reg_freq_to_band((qdf_freq_t)ch_freq);
-
-	switch (band) {
-	case REG_BAND_2G:
-		return WLAN_24GHZ_BAND;
-	case REG_BAND_5G:
-		return WLAN_5GHZ_BAND;
-	case REG_BAND_6G:
-		return WLAN_6GHZ_BAND;
-	default:
-		return WLAN_INVALID_BAND;
-	}
-}
-
 void
 wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
 		       uint32_t freq, uint8_t vdev_id)
@@ -1198,7 +1198,7 @@ wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
 			}
 
 			freq = link_info->link_chan_info->ch_freq;
-			band = wlan_convert_freq_to_diag_band(freq);
+			band = wlan_convert_freq_to_diag_band((qdf_freq_t)freq);
 			if (band == WLAN_INVALID_BAND)
 				continue;
 

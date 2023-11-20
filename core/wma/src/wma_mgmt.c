@@ -3150,12 +3150,15 @@ static inline void wma_mgmt_pktdump_rx_handler(
  * @desc_id: descriptor id
  * @status: status
  * @vdev_id: vdev id
+ * @peer_rssi: Peer RSSI
+ * @band: TX packet band info
  *
  * Return: 0 for success or error code
  */
 static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 					  uint32_t desc_id, uint32_t status,
-					  uint32_t vdev_id,  int32_t peer_rssi)
+					  uint32_t vdev_id,  int32_t peer_rssi,
+					  enum wmi_mlo_band_info band)
 {
 	struct wlan_objmgr_pdev *pdev;
 	qdf_nbuf_t buf = NULL;
@@ -3186,6 +3189,9 @@ static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 		mgmt_params.vdev_id = vdev_id;
 
 	mgmt_params.peer_rssi = peer_rssi;
+	vdev_id = mgmt_txrx_get_vdev_id(pdev, desc_id);
+	mgmt_params.vdev_id = vdev_id;
+	mgmt_params.band = band;
 
 	wma_mgmt_pktdump_tx_handler(wma_handle, buf, mgmt_params.vdev_id,
 				    status);
@@ -3220,6 +3226,20 @@ static void wma_extract_mgmt_offload_event_params(
 	params->tx_retry_cnt = hdr->tx_retry_cnt;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static enum wmi_mlo_band_info
+wma_mgmt_get_band(wmi_mgmt_tx_compl_event_fixed_param *cmpl_params)
+{
+	return WMI_ROAM_BTM_RESP_MLO_BAND_INFO_GET(cmpl_params->info);
+}
+#else
+static enum wmi_mlo_band_info
+wma_mgmt_get_band(wmi_mgmt_tx_compl_event_fixed_param *cmpl_params)
+{
+	return WMI_MLO_BAND_NO_MLO;
+}
+#endif
+
 /**
  * wma_mgmt_tx_completion_handler() - wma mgmt Tx completion event handler
  * @handle: wma handle
@@ -3236,6 +3256,7 @@ int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 	WMI_MGMT_TX_COMPLETION_EVENTID_param_tlvs *param_buf;
 	wmi_mgmt_tx_compl_event_fixed_param *cmpl_params;
 	uint32_t vdev_id = INVALID_VDEV_ID;
+	enum wmi_mlo_band_info band = WMI_MLO_BAND_NO_MLO;
 
 	param_buf = (WMI_MGMT_TX_COMPLETION_EVENTID_param_tlvs *)
 		cmpl_event_params;
@@ -3244,6 +3265,7 @@ int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 		return -EINVAL;
 	}
 	cmpl_params = param_buf->fixed_param;
+	band = wma_mgmt_get_band(cmpl_params);
 
 	if ((ucfg_pkt_capture_get_pktcap_mode(wma_handle->psoc) &
 	    PKT_CAPTURE_MODE_MGMT_ONLY) && param_buf->mgmt_hdr) {
@@ -3262,7 +3284,7 @@ int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 
 	wma_process_mgmt_tx_completion(wma_handle, cmpl_params->desc_id,
 				       cmpl_params->status, vdev_id,
-				       cmpl_params->ack_rssi);
+				       cmpl_params->ack_rssi, band);
 
 	return 0;
 }
@@ -3337,7 +3359,8 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle, uint8_t *buf,
 
 		wma_process_mgmt_tx_completion(wma_handle,
 					       desc_ids[i], status[i],
-					       INVALID_VDEV_ID, 0);
+					       INVALID_VDEV_ID, 0,
+					       WMI_MLO_BAND_NO_MLO);
 	}
 	return 0;
 }

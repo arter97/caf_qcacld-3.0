@@ -1611,7 +1611,7 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
  * Return: Band specified in enum wlan_diag_wifi_band
  */
 enum wlan_diag_wifi_band
-wlan_convert_freq_to_diag_band(uint16_t ch_freq);
+wlan_convert_freq_to_diag_band(qdf_freq_t ch_freq);
 
 /**
  * wlan_get_qdf_to_diag_txrx_status() - API to convert qdf_dp_tx_rx_status
@@ -1759,7 +1759,7 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
  * Return: Band specified in enum wlan_diag_wifi_band
  */
 enum wlan_diag_wifi_band
-wlan_convert_freq_to_diag_band(uint16_t ch_freq);
+wlan_convert_freq_to_diag_band(qdf_freq_t ch_freq);
 
 /**
  * wlan_get_qdf_to_diag_txrx_status() - API to convert qdf_dp_tx_rx_status
@@ -1838,7 +1838,7 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 }
 
 static inline enum wlan_diag_wifi_band
-wlan_convert_freq_to_diag_band(uint16_t ch_freq)
+wlan_convert_freq_to_diag_band(qdf_freq_t ch_freq)
 {
 	return WLAN_INVALID_BAND;
 }
