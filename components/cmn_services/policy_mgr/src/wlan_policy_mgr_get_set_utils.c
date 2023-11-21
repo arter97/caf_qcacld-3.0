@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6471,6 +6471,8 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 	req->param.force_cmd.ieee_link_id_bitmap = link_bitmap;
 	req->param.force_cmd.ieee_link_id_bitmap2 = link_bitmap2;
 	req->param.force_cmd.link_num = link_num;
+	policy_mgr_update_disallowed_mode_bitmap(psoc, vdev, req);
+
 	if (link_control_flags & link_ctrl_f_overwrite_active_bitmap)
 		req->param.control_flags.overwrite_force_active_bitmap = true;
 	if (link_control_flags & link_ctrl_f_overwrite_inactive_bitmap)
@@ -12860,3 +12862,66 @@ policy_mgr_get_connection_max_channel_width(struct wlan_objmgr_psoc *psoc)
 	return bw;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+bool
+policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev,
+					 struct mlo_link_set_active_req *req)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	uint8_t i, j, k;
+	uint8_t link_id;
+	uint8_t num_disallow_mode_comb;
+
+	if (!vdev)
+		return false;
+
+	if (!req)
+		return false;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		return false;
+
+	if (!wlan_mlme_is_aux_emlsr_support(psoc))
+		return false;
+
+	policy_mgr_init_disallow_mode_bmap(req);
+	if (policy_mgr_get_connection_count_with_mlo(psoc) == 1) {
+		num_disallow_mode_comb = 1;
+		req->param.num_disallow_mode_comb = num_disallow_mode_comb;
+		for (j = 0; j < num_disallow_mode_comb; j++) {
+			for (i = 0, k = 0;
+				(i < WLAN_UMAC_MLO_MAX_VDEVS || k < WLAN_UMAC_MLO_MAX_VDEVS);
+			     i++, k++) {
+				if (!mlo_dev_ctx->wlan_vdev_list[i])
+					continue;
+
+				link_id = wlan_vdev_get_link_id(mlo_dev_ctx->wlan_vdev_list[i]);
+				req->param.disallow_mode_link_bmap[j].disallowed_mode = MLO_DISALLOWED_MODE_NO_RESTRICTION;
+				req->param.disallow_mode_link_bmap[j].ieee_link_id[k] = link_id;
+				policy_mgr_debug("ieee_link_id_comb 0%x, disallowed mode %d, link_id %d",
+						 req->param.disallow_mode_link_bmap[j].ieee_link_id_comb,
+						 req->param.disallow_mode_link_bmap[j].disallowed_mode,
+						 link_id);
+			}
+		}
+	}
+	return true;
+}
+
+bool
+policy_mgr_init_disallow_mode_bmap(struct mlo_link_set_active_req *req)
+{
+	uint8_t i;
+
+	if (!req)
+		return false;
+
+	/* set link id to invalid */
+	for (i = 0; i < MAX_DISALLOW_BMAP_COMB ; i++)
+		req->param.disallow_mode_link_bmap[i].ieee_link_id_comb = MLO_INVALID_LINK_BMAP;
+
+	return true;
+}
+#endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1318,7 +1318,52 @@ policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc);
  * Return: true is it's allow otherwise false
  */
 bool policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_update_disallowed_mode_bitmap() - Update the disallowed
+ * mode bitmap concurrency if present.
+ * @psoc: PSOC object information
+ * @vdev: Vdev object pointer
+ * @req: Pointer to mlo link set active
+ *
+ * This API is to update the disallowed mode bitmap. It conveys which mode
+ * the HW can operate for links. This helps FW to understand the
+ * restrictions applied (if any) per link.
+ *
+ * Return: true or false
+ */
+bool
+policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev,
+					 struct mlo_link_set_active_req *req);
+
+/**
+ * policy_mgr_init_disallow_mode_bmap() - Initialize the disallowed
+ * mode bitmap.
+ * @req: Pointer to mlo link set active
+ *
+ * This API is to initialize the disallowed mode bitmap.
+ * Specifically to set the link id's to invalid value
+ *
+ * Return: true or false
+ */
+bool
+policy_mgr_init_disallow_mode_bmap(struct mlo_link_set_active_req *req);
 #else
+static inline bool
+policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev,
+					 struct mlo_link_set_active_req *req)
+{
+	return false;
+}
+
+static inline bool
+policy_mgr_init_disallow_mode_bmap(struct mlo_link_set_active_req *req)
+{
+	return false;
+}
+
 static inline bool
 policy_mgr_is_ml_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
