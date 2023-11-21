@@ -598,7 +598,8 @@ wlan_t2lm_clear_all_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	}
 
 	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
-	peer = wlan_vdev_get_bsspeer(vdev);
+	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
+						WLAN_MLO_MGR_ID);
 	if (!peer) {
 		t2lm_err("peer is null");
 		return;
@@ -626,6 +627,7 @@ wlan_t2lm_clear_all_tid_mapping(struct wlan_objmgr_vdev *vdev)
 	wlan_t2lm_clear_peer_negotiation(peer);
 	wlan_t2lm_clear_ongoing_negotiation(peer);
 	wlan_mlo_t2lm_timer_stop(vdev);
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
 }
 
 static bool
