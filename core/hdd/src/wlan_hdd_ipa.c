@@ -382,7 +382,7 @@ QDF_STATUS hdd_ipa_get_tx_pipe(struct hdd_context *hdd_ctx,
 			       struct wlan_hdd_link_info *link,
 			       bool *tx_pipe)
 {
-	struct hdd_ipa_connection_info conn;
+	struct hdd_ipa_connection_info conn = {0};
 	uint32_t count;
 
 	if (qdf_unlikely(!hdd_ctx || !link || !tx_pipe)) {
@@ -390,14 +390,14 @@ QDF_STATUS hdd_ipa_get_tx_pipe(struct hdd_context *hdd_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	hdd_ipa_fill_connection_info(link, &conn);
+
 	/* If SBS not capable, use legacy DBS selection */
 	if (!ucfg_policy_mgr_is_hw_sbs_capable(hdd_ctx->psoc)) {
 		hdd_debug("firmware is not sbs capable");
 		*tx_pipe = WLAN_REG_IS_24GHZ_CH_FREQ(conn.ch_freq);
 		return QDF_STATUS_SUCCESS;
 	}
-
-	hdd_ipa_fill_connection_info(link, &conn);
 
 	/* Always select the primary pipe for connection that is EHT160 or
 	 * EHT320 due to higher tput requiements.
