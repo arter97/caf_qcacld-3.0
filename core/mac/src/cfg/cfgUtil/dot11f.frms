@@ -2586,6 +2586,32 @@ IE transmit_power_env (EID_TRANSMIT_POWER_ENVELOPE)
         max_tx_pwr_category:          2;
     }
     tx_power[1..8];
+    OPTIONAL UNION ext_max_tx_power (DISCRIMINATOR max_tx_pwr_interpret)
+    {
+       ext_max_tx_power_local_eirp (max_tx_pwr_interpret IS 0) {
+               max_tx_power_for_320, 1;
+       }
+       ext_max_tx_power_local_psd (max_tx_pwr_interpret IS 1) {
+               //ext_transmit_psd_info, 1;
+               {
+                       ext_count: 4;
+                       reserved: 4;
+               }
+               max_tx_psd_power[8];
+       }
+       ext_max_tx_power_reg_eirp (max_tx_pwr_interpret IS 2) {
+               max_tx_power_for_320, 1;
+       }
+       ext_max_tx_power_reg_psd (max_tx_pwr_interpret IS 3) {
+               //ext_transmit_psd_info, 1;
+               {
+                       ext_count: 4;
+                       reserved: 4;
+               }
+               max_tx_psd_power[8];
+       }
+
+    };
 }
 
 IE bw_ind_element (EID_EXTN_ID_ELEMENT) OUI (0x87)
