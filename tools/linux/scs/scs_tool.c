@@ -561,7 +561,7 @@ done:
 static int32_t
 scs_tool_nl_prepare_response(struct nl_msg *nlmsg, uint32_t rule_id)
 {
-	if (nla_put_u32(nlmsg, QCA_WLAN_VENDOR_ATTR_SCS_CONFIG_RESP_RULE_ID,
+	if (nla_put_u32(nlmsg, QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_RULE_ID,
 	    rule_id))
 		return -EIO;
 
@@ -597,7 +597,7 @@ static void scs_tool_nl_sal_cb(void *cbd, uint8_t *data, size_t len,
 	/* Send NL msg if rule population failed and request type is ADD */
 	if (rul_ret && (req_type == SCS_RULE_CONFIG_REQUEST_TYPE_ADD)) {
 		nlmsg = wifi_cfg80211_prepare_command(&g_nl_ctxt.cfg80211_ctxt,
-						      QCA_NL80211_VENDOR_SUBCMD_SCS_RULE_CONFIG_RESP,
+						      QCA_NL80211_VENDOR_SUBCMD_SCS_RULE_CONFIG,
 						      ifname);
 		if (nlmsg) {
 			nl_ven_data = (struct nlattr *)start_vendor_data(nlmsg);
