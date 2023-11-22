@@ -2198,6 +2198,9 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 		QDF_GET_BITS(mcs_12_13,
 			     HE_MCS12_13_5G_INDEX * HE_MCS12_13_BITS,
 			     HE_MCS12_13_BITS);
+
+	mlme_cfg->he_caps.disable_sap_mcs_12_13 = cfg_get(psoc,
+						CFG_DISABLE_MCS_12_13_SAP);
 }
 #else
 static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
