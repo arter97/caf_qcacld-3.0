@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,7 @@
 #include "wlan_pmo_tgt_api.h"
 #include "wlan_pmo_common_public_struct.h"
 #include "wlan_pmo_obj_mgmt_public_struct.h"
+#include "wlan_objmgr_psoc_obj.h"
 
 /**
  * DOC: wlan_pmo_wowl
@@ -700,6 +701,39 @@ enum pmo_wow_state pmo_core_get_wow_state(struct pmo_psoc_priv_obj *pmo_ctx)
 {
 	return pmo_ctx->wow.wow_state;
 }
+
+/**
+ * pmo_set_wow_suspend_type() - Set wow suspend type
+ * @psoc: psoc context
+ * @type: what wow suspend type to set
+ *
+ * Return: none
+ */
+void pmo_set_wow_suspend_type(struct wlan_objmgr_psoc *psoc,
+			      enum qdf_suspend_type type);
+
+/**
+ * pmo_get_wow_suspend_type() - Get wow suspend type
+ * @psoc: psoc context
+ *
+ * Return: what is the current suspend type
+ */
+enum qdf_suspend_type pmo_get_wow_suspend_type(struct wlan_objmgr_psoc *psoc);
+
+#else /* WLAN_POWER_MANAGEMENT_OFFLOAD */
+
+static inline
+void pmo_set_wow_suspend_type(struct wlan_objmgr_psoc *psoc,
+			      enum qdf_suspend_type type)
+{
+}
+
+static inline
+enum qdf_suspend_type pmo_get_wow_suspend_type(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_WOW_UNSUPPORTED_TYPE;
+}
+
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 #endif /* end  of _WLAN_PMO_WOW_H_ */

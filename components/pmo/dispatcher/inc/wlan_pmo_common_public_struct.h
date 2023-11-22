@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -394,6 +394,7 @@ struct pmo_icmp_offload {
  * system suspend wow else false
  * @is_bus_suspend_enabled_in_sap_mode: Can bus suspend in SoftAP mode
  * @is_bus_suspend_enabled_in_go_mode: Can bus suspend in P2P GO mode
+ * @wow_suspend_type: What wow suspend type is currently happening
  * @enable_gpio_wakeup: enable gpio wakeup
  * @gpio_wakeup_pin: gpio wakeup pin
  * @gpio_wakeup_mode: gpio wakeup mode
@@ -477,6 +478,7 @@ struct pmo_psoc_cfg {
 	bool is_mod_dtim_on_sys_suspend_enabled;
 	bool is_bus_suspend_enabled_in_sap_mode;
 	bool is_bus_suspend_enabled_in_go_mode;
+	enum qdf_suspend_type wow_suspend_type;
 #ifdef WLAN_ENABLE_GPIO_WAKEUP
 	bool enable_gpio_wakeup;
 	uint32_t gpio_wakeup_pin;

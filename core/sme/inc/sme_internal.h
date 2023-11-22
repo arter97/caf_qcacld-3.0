@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -505,6 +505,10 @@ struct sme_context {
 	/* async oem event callback */
 	void (*oem_data_async_event_handler_cb)
 			(const struct oem_data *oem_event_data);
+	void (*oem_data_smem_event_handler_cb)
+			(const struct oem_data *oem_event_data,
+			 int smem_id);
+	int smem_id;
 #endif
 
 	void (*ssr_on_pagefault_cb)(void);

@@ -4217,6 +4217,44 @@ void sme_async_oem_event_deinit(mac_handle_t mac_handle)
 
 	SME_EXIT();
 }
+
+void sme_smem_oem_event_init(mac_handle_t mac_handle,
+			     void (*oem_data_smem_event_handler_cb)
+			     (const struct oem_data *oem_event_data,
+			     int smem_id))
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.oem_data_smem_event_handler_cb =
+			oem_data_smem_event_handler_cb;
+		mac->sme.smem_id = pld_oem_event_smem_start("wlan_driver");
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
+}
+
+void sme_smem_oem_event_deinit(mac_handle_t mac_handle)
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	SME_ENTER();
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.oem_data_smem_event_handler_cb = NULL;
+		pld_oem_event_smem_stop(mac->sme.smem_id);
+		sme_release_global_lock(&mac->sme);
+	}
+
+	SME_EXIT();
+}
 #endif
 
 #define STA_NSS_CHAINS_SHIFT               0

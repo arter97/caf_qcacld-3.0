@@ -17911,6 +17911,9 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 	sme_async_oem_event_init(mac_handle,
 				 hdd_oem_event_async_cb);
 
+	sme_smem_oem_event_init(mac_handle,
+				hdd_oem_event_smem_cb);
+
 	sme_register_ssr_on_pagefault_cb(mac_handle, hdd_ssr_on_pagefault_cb);
 
 	hdd_exit();
@@ -17941,6 +17944,8 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	mac_handle = hdd_ctx->mac_handle;
 
 	sme_deregister_ssr_on_pagefault_cb(mac_handle);
+
+	sme_smem_oem_event_deinit(mac_handle);
 
 	sme_async_oem_event_deinit(mac_handle);
 

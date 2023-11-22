@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2132,4 +2132,55 @@ int pld_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
 	return -EINVAL;
 }
 #endif
+
+#ifdef FEATURE_OEM_DATA
+
+/**
+ * pld_oem_event_smem_start()- Start communication channel to smem DLKM
+ * @name: name of client
+ *
+ * Return: negative on error or ID on success
+ */
+int pld_oem_event_smem_start(char *name);
+
+/**
+ * pld_oem_event_smem_stop()- Stop communication channel to smem DLKM
+ * @id: smem ID
+ *
+ * Return: 0 on success else failure code
+ */
+int pld_oem_event_smem_stop(int id);
+
+/**
+ * pld_oem_event_smem_write()- Write to smem DLKM
+ * @id: smem ID
+ * @flags: flags for message
+ * @data: payload to send
+ *
+ * Return: 0 on success else failure code
+ */
+int pld_oem_event_smem_write(int id, int flags, const __u8 *data);
+
+#else
+
+static inline
+int pld_oem_event_smem_start(char *name)
+{
+	return 0;
+}
+
+static inline
+int pld_oem_event_smem_stop(int id)
+{
+	return 0;
+}
+
+static inline
+int pld_oem_event_smem_write(int id, int flags, const __u8 *data)
+{
+	return 0;
+}
+
+#endif
+
 #endif

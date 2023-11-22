@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -481,6 +481,21 @@ uint8_t pmo_get_num_wow_filters(struct wlan_objmgr_psoc *psoc)
 		return PMO_WOW_FILTERS_MAX;
 
 	return PMO_WOW_FILTERS_PKT_OR_APF;
+}
+
+void pmo_set_wow_suspend_type(struct wlan_objmgr_psoc *psoc,
+			      enum qdf_suspend_type type)
+{
+	struct pmo_psoc_priv_obj *psoc_priv = pmo_psoc_get_priv(psoc);
+
+	psoc_priv->psoc_cfg.wow_suspend_type = type;
+}
+
+enum qdf_suspend_type pmo_get_wow_suspend_type(struct wlan_objmgr_psoc *psoc)
+{
+	struct pmo_psoc_priv_obj *psoc_priv = pmo_psoc_get_priv(psoc);
+
+	return psoc_priv->psoc_cfg.wow_suspend_type;
 }
 
 #ifdef WLAN_FEATURE_NAN

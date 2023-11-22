@@ -836,6 +836,9 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		pmo_info("Unit test WoW, force DRV mode");
 		param.flags |= WMI_WOW_FLAG_ENABLE_DRV_PCIE_L1SS_SLEEP;
 	}
+
+	pmo_set_wow_suspend_type(psoc, type);
+
 	if (type == QDF_SYSTEM_SUSPEND) {
 		pmo_info("system suspend wow");
 		param.flags |= WMI_WOW_FLAG_SYSTEM_SUSPEND_WOW;
@@ -902,6 +905,8 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	}
 	pmo_debug("WOW enabled successfully in fw: credits:%d pending_cmds: %d",
 		host_credits, wmi_pending_cmds);
+
+	pmo_set_wow_suspend_type(psoc, QDF_WOW_UNSUPPORTED_TYPE);
 
 	hif_latency_detect_timer_stop(pmo_core_psoc_get_hif_handle(psoc));
 

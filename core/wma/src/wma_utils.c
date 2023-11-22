@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -72,6 +72,8 @@
 #include "wma_eht.h"
 #include <target_if_spatial_reuse.h>
 #include "wlan_dp_ucfg_api.h"
+#include "cfg_hif.h"
+#include "wlan_pmo_wow.h"
 
 /* MCS Based rate table */
 /* HT MCS parameters with Nss = 1 */
@@ -5098,6 +5100,14 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 		(struct mac_context *)cds_get_context(QDF_MODULE_ID_PE);
 	wmi_oem_data_event_fixed_param *event;
 	struct oem_data oem_event_data;
+	tp_wma_handle wma;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma) {
+		wma_err("NULL wma handle");
+		return -EINVAL;
+	}
 
 	if (!pmac) {
 		wma_err("NULL mac handle");
@@ -5148,6 +5158,22 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 		if (pmac->sme.oem_data_async_event_handler_cb)
 			pmac->sme.oem_data_async_event_handler_cb(
 					&oem_event_data);
+	} else if (event->event_cause == WMI_OEM_DATA_EVT_CAUSE_QMS) {
+		if (!cfg_get(wma->psoc, CFG_ENABLE_SMEM_QMS)) {
+			QDF_DEBUG_PANIC("Received unsupported SMEM QMS event");
+			return QDF_STATUS_E_FAULT;
+		}
+		if (pmo_get_wow_suspend_type(wma->psoc) ==
+		    QDF_SYSTEM_SUSPEND) {
+			if (pmac->sme.oem_data_smem_event_handler_cb)
+				pmac->sme.oem_data_smem_event_handler_cb(
+					&oem_event_data,
+					pmac->sme.smem_id);
+		} else {
+			if (pmac->sme.oem_data_async_event_handler_cb)
+				pmac->sme.oem_data_async_event_handler_cb(
+						&oem_event_data);
+		}
 	} else {
 		return QDF_STATUS_E_FAILURE;
 	}

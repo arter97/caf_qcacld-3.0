@@ -1344,6 +1344,30 @@ enum host_log_level {
 	false, \
 	"This ini is used to exclude self tx time from CCA busy time")
 
+/*
+ * <ini>
+ * gEnableSmemQms - enable shared memory qms
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable shared memory qms
+ *
+ * 0: shared memory qms is disabled
+ * 1: shared memory qms is enabled
+ * Related: None
+ *
+ * Supported Feature: Power Save
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_SMEM_QMS CFG_INI_BOOL( \
+		"gEnableSmemQms", \
+		0, \
+		"This ini is used to enable shared memory qms")
+
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
@@ -1383,5 +1407,6 @@ enum host_log_level {
 	CFG_GET_WIFI_FEATURES_ALL \
 	CFG_CPU_CXPC_THRESHOLD_ALL \
 	CFG(CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME) \
-	CFG_LINK_STATE_CACHE_EXPIRY_ALL
+	CFG_LINK_STATE_CACHE_EXPIRY_ALL \
+	CFG(CFG_ENABLE_SMEM_QMS)
 #endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -683,6 +683,10 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	wma_set_peer_map_unmap_v2_config(wma_handle->psoc, tgt_cfg);
 
 	tgt_cfg->notify_frame_support = DP_MARK_NOTIFY_FRAME_SUPPORT;
+
+	if (cfg_get(wma_handle->psoc, CFG_ENABLE_SMEM_QMS))
+		tgt_cfg->is_qms_smem_supported = true;
+
 }
 
 /**
