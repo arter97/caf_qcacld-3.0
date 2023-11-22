@@ -16775,7 +16775,8 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr mac_addr,
 				    struct qdf_mac_addr mld_addr,
 				    bool update_sta_self_peer,
-				    bool update_mld_addr, int req_status)
+				    bool update_mld_addr, int req_status,
+				    bool skip_attach)
 {
 	enum QDF_OPMODE vdev_opmode;
 	uint8_t *old_macaddr, *new_macaddr;
@@ -16834,8 +16835,8 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 	}
 	wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
 	wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
-
-	ucfg_vdev_mgr_cdp_vdev_attach(vdev);
+	if (!skip_attach)
+		ucfg_vdev_mgr_cdp_vdev_attach(vdev);
 p2p_self_peer_create:
 	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {
 		vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);

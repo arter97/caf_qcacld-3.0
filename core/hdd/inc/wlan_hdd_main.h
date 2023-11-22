@@ -5392,6 +5392,7 @@ hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id);
  * @mac_addr: MAC address to set
  * @mld_addr: MLD address to set
  * @update_self_peer: Set to true to update self peer's address
+ * @skip_reattach: flag indicate if need do dp vdev detach & reattach
  *
  * This API is used to update the current VDEV MAC address.
  *
@@ -5400,7 +5401,8 @@ hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id);
 int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 				struct qdf_mac_addr mac_addr,
 				struct qdf_mac_addr mld_addr,
-				bool update_self_peer);
+				bool update_self_peer,
+				bool skip_reattach);
 
 /**
  * hdd_is_dynamic_set_mac_addr_allowed() - API to check dynamic MAC address
@@ -5430,7 +5432,7 @@ static inline int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	return hdd_dynamic_mac_address_set(adapter->deflink, mac_addr,
-					   mld_addr, true);
+					   mld_addr, true, false);
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 #else
@@ -5444,7 +5446,8 @@ static inline int
 hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 			    struct qdf_mac_addr mac_addr,
 			    struct qdf_mac_addr mld_addr,
-			    bool update_self_peer)
+			    bool update_self_peer,
+			    bool skip_reattach)
 {
 	return 0;
 }

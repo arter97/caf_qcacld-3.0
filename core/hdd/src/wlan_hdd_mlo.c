@@ -472,7 +472,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 		ret = hdd_dynamic_mac_address_set(adapter->deflink, mac_addr,
-						  mld_addr, true);
+						  mld_addr, true, false);
 		return ret;
 	}
 
@@ -505,7 +505,8 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		update_self_peer =
 			(link_info == adapter->deflink) ? true : false;
 		ret = hdd_dynamic_mac_address_set(link_info, link_addrs[idx],
-						  mac_addr, update_self_peer);
+						  mac_addr, update_self_peer,
+						  false);
 		if (ret)
 			return ret;
 
@@ -537,7 +538,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 		ret = hdd_dynamic_mac_address_set(adapter->deflink, mac_addr,
-						  mld_addr, true);
+						  mld_addr, true, false);
 		return ret;
 	}
 
@@ -569,7 +570,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 
 		ret = hdd_dynamic_mac_address_set(link_adapter->deflink,
 						  link_addrs[i], mac_addr,
-						  update_self_peer);
+						  update_self_peer, false);
 		if (ret)
 			return ret;
 

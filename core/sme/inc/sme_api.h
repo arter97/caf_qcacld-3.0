@@ -4726,6 +4726,7 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
  * @update_sta_self_peer: Flag to check self peer MAC address or not.
  * @update_mld_addr: Flag to check if MLD address update needed or not.
  * @req_status: Status of the set MAC address request to the FW
+ * @skip_attach: flag to indicate if skip dp vdev attach or not
  *
  * API to update MLME structures with new MAC address. This will be invoked
  * after receiving success status form the FW for the set MAC address request
@@ -4737,7 +4738,8 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr mac_addr,
 				    struct qdf_mac_addr mld_addr,
 				    bool update_sta_self_peer,
-				    bool update_mld_addr, int req_status);
+				    bool update_mld_addr, int req_status,
+				    bool skip_attach);
 #endif
 
 /**

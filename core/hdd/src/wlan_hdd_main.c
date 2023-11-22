@@ -5807,7 +5807,8 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 				struct qdf_mac_addr mac_addr,
 				struct qdf_mac_addr mld_addr,
-				bool update_self_peer)
+				bool update_self_peer,
+				bool skip_reattach)
 {
 	int ret;
 	void *cookie;
@@ -5828,7 +5829,8 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	if (!vdev)
 		return -EINVAL;
 
-	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_P2P_DEVICE_MODE) {
+	if (!skip_reattach &&
+	    wlan_vdev_mlme_get_opmode(vdev) != QDF_P2P_DEVICE_MODE) {
 		status = ucfg_vdev_mgr_cdp_vdev_detach(vdev);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Failed to detach CDP vdev. Status:%d", status);
@@ -5898,7 +5900,7 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 
 	status = sme_update_vdev_mac_addr(vdev, mac_addr, mld_addr,
 					  update_self_peer, update_mld_addr,
-					  ret);
+					  ret, skip_reattach);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		ret = qdf_status_to_os_return(status);
@@ -5909,7 +5911,10 @@ status_ret:
 		ret = qdf_status_to_os_return(status);
 		goto allow_suspend;
 	} else if (!ret) {
-		status = ucfg_dp_update_link_mac_addr(vdev, &mac_addr, false);
+		/* need to update mac address for dp vdev in the mlo sap case */
+		status = ucfg_dp_update_link_mac_addr(vdev, &mac_addr,
+						      skip_reattach);
+
 		if (QDF_IS_STATUS_ERROR(status)) {
 			ret = qdf_status_to_os_return(status);
 			hdd_err("DP link MAC update failed");
