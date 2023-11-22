@@ -2514,8 +2514,142 @@ add_sbs_chlist_to_pcl(struct wlan_objmgr_psoc *psoc,
 			}
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 		}
-	} else {
-		policy_mgr_debug("invalid order");
+	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_LOW) {
+		/* Add 5 GHz low SCC channel*/
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		cl = pm_conc_connection_list;
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+			    cl[conn_index].freq < sbs_cut_off_freq) {
+				pcl_freqs[*index] = cl[conn_index].freq;
+				pcl_weights[*index] =
+						WEIGHT_OF_GROUP1_PCL_CHANNELS;
+				(*index)++;
+				*low_5_band_scc_present = true;
+				break;
+			}
+
+			conn_index++;
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_HIGH) {
+		/* Add 5 GHz high SCC channel*/
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		cl = pm_conc_connection_list;
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+			    cl[conn_index].freq > sbs_cut_off_freq) {
+				pcl_freqs[*index] = cl[conn_index].freq;
+				pcl_weights[*index] =
+					WEIGHT_OF_GROUP1_PCL_CHANNELS;
+				(*index)++;
+				*high_5_band_scc_present = true;
+				break;
+			}
+			conn_index++;
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_LOW_MCC_5G_HIGH) {
+		/* Add 5 GHz low SCC channel*/
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		cl = pm_conc_connection_list;
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+			    cl[conn_index].freq < sbs_cut_off_freq) {
+				pcl_freqs[*index] = cl[conn_index].freq;
+				pcl_weights[*index] =
+						WEIGHT_OF_GROUP1_PCL_CHANNELS;
+				(*index)++;
+				*low_5_band_scc_present = true;
+				break;
+			}
+
+			conn_index++;
+		}
+
+		/* Add 5 GHz high MCC channels*/
+		for (i = 0; i < chlist_len_5 && *index < pcl_sz; i++) {
+			/* Skip 5 GHz low frequencies */
+			if (chlist_5[i] < sbs_cut_off_freq)
+				continue;
+
+			conn_index = 0;
+			/* Skip SCC channels */
+			while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+				if (cl[conn_index].freq == chlist_5[i])
+					break;
+				conn_index++;
+			}
+
+			if (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index))
+				continue;
+			pcl_freqs[*index] = chlist_5[i];
+			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
+			(*index)++;
+		}
+		for (i = 0; i < chlist_len_6 && *index < pcl_sz &&
+		     !skip_6gh_channel; i++) {
+			if (chlist_6[i] < sbs_cut_off_freq)
+				return;
+
+			conn_index = 0;
+			/* Skip SCC channels */
+			while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+				if (cl[conn_index].freq == chlist_6[i])
+					break;
+				conn_index++;
+			}
+
+			if (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index))
+				continue;
+
+			pcl_freqs[*index] = chlist_6[i];
+			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
+			(*index)++;
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	} else if (order == POLICY_MGR_PCL_ORDER_SCC_5G_HIGH_MCC_5G_LOW) {
+		/* Add 5 GHz high SCC channel*/
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		cl = pm_conc_connection_list;
+		while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(cl[conn_index].freq) &&
+			    cl[conn_index].freq > sbs_cut_off_freq) {
+				pcl_freqs[*index] = cl[conn_index].freq;
+				pcl_weights[*index] =
+						WEIGHT_OF_GROUP1_PCL_CHANNELS;
+				(*index)++;
+				*high_5_band_scc_present = true;
+				break;
+			}
+
+			conn_index++;
+		}
+
+		/* Add 5 GHz low MCC channels */
+		for (i = 0; i < chlist_len_5 && *index < pcl_sz; i++) {
+			/* Skip 5 GHz high frequencies */
+			if (chlist_5[i] > sbs_cut_off_freq)
+				continue;
+
+			conn_index = 0;
+			/* Skip SCC channels */
+			while (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
+				if (cl[conn_index].freq == chlist_5[i])
+					break;
+				conn_index++;
+			}
+
+			if (PM_CONC_CONNECTION_LIST_VALID_INDEX(conn_index))
+				continue;
+			pcl_freqs[*index] = chlist_5[i];
+			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
+			(*index)++;
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	}   else {
+		policy_mgr_debug("invalid order %d", order);
 		return;
 	}
 
@@ -3717,6 +3851,122 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
+	case PM_SCC_ON_24G:
+		policy_mgr_get_connection_channels(psoc, mode,
+						   POLICY_MGR_PCL_ORDER_2G,
+						   true,
+						   POLICY_MGR_PCL_GROUP_ID1_ID2,
+						   pcl_channels, pcl_weights,
+						   pcl_sz, len);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SCC_ON_5G_LOW:
+		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
+				      pcl_weights, pcl_sz,
+				      len,
+				      skip_6ghz_channel,
+				      channel_list_5, chan_index_5,
+				      channel_list_6, chan_index_6,
+				      POLICY_MGR_PCL_ORDER_SCC_5G_LOW,
+				      &high_5_band_scc_present,
+				      &low_5_band_scc_present);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SCC_ON_5G_HIGH:
+		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
+				      pcl_weights, pcl_sz,
+				      len,
+				      skip_6ghz_channel,
+				      channel_list_5, chan_index_5,
+				      channel_list_6, chan_index_6,
+				      POLICY_MGR_PCL_ORDER_SCC_5G_HIGH,
+				      &high_5_band_scc_present,
+				      &low_5_band_scc_present);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SBS_CH_MCC_CH_SCC_ON_24_24G:
+		get_sub_channels(psoc,
+				 sbs_freqs, &sbs_num,
+				 scc_freqs, &scc_num,
+				 rest_freqs, &rest_num,
+				 channel_list_5, chan_index_5,
+				 channel_list_6, chan_index_6);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
+				  sbs_freqs, sbs_num,
+				  skip_6ghz_channel);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+				  rest_freqs, rest_num,
+				  skip_6ghz_channel);
+		policy_mgr_get_connection_channels(psoc, mode,
+						   POLICY_MGR_PCL_ORDER_2G,
+						   true,
+						   POLICY_MGR_PCL_GROUP_ID1_ID2,
+						   pcl_channels, pcl_weights,
+						   pcl_sz, len);
+		policy_mgr_add_24g_to_pcl(pcl_channels, pcl_weights, pcl_sz,
+					  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
+					  channel_list_24, chan_index_24);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_5G_24G:
+		policy_mgr_add_5g_to_pcl(psoc, pcl_channels, pcl_weights,
+					 pcl_sz, len,
+					 POLICY_MGR_PCL_GROUP_ID1_ID2,
+					 channel_list_5, chan_index_5,
+					 channel_list_6, chan_index_6);
+		policy_mgr_add_24g_to_pcl(pcl_channels, pcl_weights, pcl_sz,
+					  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
+					  channel_list_24, chan_index_24);
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_MCC_CH_SCC_ON_24G:
+		get_sub_channels(psoc,
+				 sbs_freqs, &sbs_num,
+				 scc_freqs, &scc_num,
+				 rest_freqs, &rest_num,
+				 channel_list_5, chan_index_5,
+				 channel_list_6, chan_index_6);
+		add_chlist_to_pcl(pm_ctx->pdev,
+				  pcl_channels, pcl_weights, pcl_sz,
+				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+				  rest_freqs, rest_num,
+				  skip_6ghz_channel);
+		policy_mgr_get_connection_channels(psoc, mode,
+						   POLICY_MGR_PCL_ORDER_2G,
+						   true,
+						   POLICY_MGR_PCL_GROUP_ID1_ID2,
+						   pcl_channels, pcl_weights,
+						   pcl_sz, len);
+		status = QDF_STATUS_SUCCESS;
+		break;
+
+	case PM_SCC_ON_5G_LOW_MCC_ON_5G_HIGH:
+		add_sbs_chlist_to_pcl(
+				psoc,  pcl_channels, pcl_weights, pcl_sz, len,
+				skip_6ghz_channel, channel_list_5, chan_index_5,
+				channel_list_6, chan_index_6,
+				POLICY_MGR_PCL_ORDER_SCC_5G_LOW_MCC_5G_HIGH,
+				&high_5_band_scc_present,
+				&low_5_band_scc_present);
+		status = QDF_STATUS_SUCCESS;
+		break;
+		status = QDF_STATUS_SUCCESS;
+		break;
+	case PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW:
+		add_sbs_chlist_to_pcl(
+				psoc,  pcl_channels, pcl_weights, pcl_sz, len,
+				skip_6ghz_channel, channel_list_5, chan_index_5,
+				channel_list_6, chan_index_6,
+				POLICY_MGR_PCL_ORDER_SCC_5G_LOW_MCC_5G_HIGH,
+				&high_5_band_scc_present,
+				&low_5_band_scc_present);
+
+		status = QDF_STATUS_SUCCESS;
+		break;
 	default:
 		policy_mgr_err("unknown pcl value %d", pcl);
 		break;
@@ -4124,7 +4374,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_handle_sta_sap_fav_channel() - Get preferred force SCC
- * channel frequency using favorite mandatory channel list
+ * channel frequency using favorite mandatory channel list for STA+SAP
+ * concurrency
  * @psoc: Pointer to Psoc
  * @pm_ctx: pm ctx
  * @vdev_id: vdev id
@@ -4201,6 +4452,101 @@ policy_mgr_handle_sta_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
+QDF_STATUS
+policy_mgr_handle_go_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, qdf_freq_t sap_ch_freq,
+				     qdf_freq_t *intf_ch_freq)
+{
+	QDF_STATUS status;
+	uint8_t go_count;
+	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct policy_mgr_pcl_list pcl;
+	uint32_t i;
+
+	go_count = policy_mgr_get_mode_specific_conn_info(psoc,
+							  op_ch_freq_list,
+							  vdev_id_list,
+							  PM_P2P_GO_MODE);
+	if (!go_count)
+		return QDF_STATUS_E_FAILURE;
+
+	/* According to requirement, SAP should move to 2.4 GHz if P2P GO is
+	 * on 5G/6G.
+	 */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[0]) ||
+	    WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq))
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mem_zero(&pcl, sizeof(pcl));
+	status = policy_mgr_get_pcl_for_existing_conn(
+			psoc, PM_SAP_MODE, pcl.pcl_list, &pcl.pcl_len,
+			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list),
+			false, vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Unable to get PCL for SAP");
+		return status;
+	}
+
+	for (i = 0; i < pcl.pcl_len; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(pcl.pcl_list[i])) {
+			*intf_ch_freq = pcl.pcl_list[i];
+			policy_mgr_debug("sap move to %d because GO on %d",
+					 *intf_ch_freq, op_ch_freq_list[0]);
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * policy_mgr_handle_sap_fav_channel() - Get preferred force SCC
+ * channel frequency using favorite mandatory channel list
+ * @psoc: Pointer to Psoc
+ * @pm_ctx: pm ctx
+ * @vdev_id: vdev id
+ * @intf_ch_freq: prefer force scc frequency
+ * @sap_ch_freq: sap/go channel starting channel frequency
+ * @acs_band: acs band
+ *
+ * Return: QDF_STATUS_SUCCESS if a valid favorite mandatory force scc channel
+ * is found.
+ */
+static QDF_STATUS
+policy_mgr_handle_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
+				  struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  uint8_t vdev_id, qdf_freq_t sap_ch_freq,
+				  qdf_freq_t *intf_ch_freq,
+				  uint32_t acs_band)
+{
+	QDF_STATUS status;
+	uint8_t sta_count, go_count;
+
+	go_count = policy_mgr_mode_specific_connection_count(psoc,
+							     PM_P2P_GO_MODE,
+							     NULL);
+	if (go_count) {
+		status = policy_mgr_handle_go_sap_fav_channel(
+					psoc, vdev_id,
+					sap_ch_freq, intf_ch_freq);
+		if (QDF_IS_STATUS_SUCCESS(status) &&
+		    *intf_ch_freq && *intf_ch_freq != sap_ch_freq)
+			return QDF_STATUS_SUCCESS;
+	}
+
+	sta_count = policy_mgr_mode_specific_connection_count(psoc,
+							      PM_STA_MODE,
+							      NULL);
+	if (sta_count && sta_count < 2)
+		return policy_mgr_handle_sta_sap_fav_channel(
+					psoc, pm_ctx, vdev_id,
+					sap_ch_freq, intf_ch_freq,
+					acs_band);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t *intf_ch_freq,
 				  qdf_freq_t sap_ch_freq,
@@ -4236,11 +4582,11 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_debug("acs_band: %d", acs_band);
 	}
 
-	/* Handle STA + SAP mandaory freq cases */
-	if (sta_count && sta_count < 2 &&
-	    cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
-		status = policy_mgr_handle_sta_sap_fav_channel(psoc, pm_ctx,
-				vdev_id, sap_ch_freq, intf_ch_freq, acs_band);
+	/* Handle STA/P2P + SAP mandaory freq cases */
+	if (cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
+		status = policy_mgr_handle_sap_fav_channel(
+				psoc, pm_ctx, vdev_id, sap_ch_freq,
+				intf_ch_freq, acs_band);
 		if (QDF_IS_STATUS_SUCCESS(status))
 			return;
 		policy_mgr_debug("no mandatory channels (%d, %d)", sap_ch_freq,

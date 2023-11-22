@@ -730,6 +730,26 @@ static void pkt_capture_rx_get_phy_info(void *context, void *psoc,
 			IEEE80211_RADIOTAP_HE_DATA1_BW_RU_ALLOC_KNOWN;
 		rx_status->he_data2 |= IEEE80211_RADIOTAP_HE_DATA2_GI_KNOWN;
 		rx_status->he_data3 |= mcs << 0x8;
+
+		/* Map uCode SGI values to Radiotap header
+		 * as per Radiotap header expectation.
+		 *
+		 * uCode has:
+		 *	enum 0     0_8_us_sgi
+		 *	enum 1     0_4_us_sgi
+		 *	enum 2     1_6_us_sgi
+		 *	enum 3     3_2_us_sgi
+		 *
+		 * Radiotap header expectation:
+		 *	enum 0     0_8_us_sgi
+		 *	enum 1     1_6_us_sgi
+		 *	enum 2     3_2_us_sgi
+		 */
+		if (sgi == HE_GI_1_6)
+			sgi = HE_GI_RADIOTAP_1_6;
+		else if (sgi == HE_GI_3_2)
+			sgi = HE_GI_RADIOTAP_3_2;
+
 		rx_status->he_data5 |= (bw | (sgi << 0x4));
 		rx_status->he_data6 |= nss;
 	default:
@@ -937,9 +957,6 @@ pkt_capture_rx_data_cb(
 		/* need to update this to fill rx_status*/
 		htt_rx_mon_get_rx_status(pdev, rx_desc, &rx_status);
 		rx_status.chan_noise_floor = NORMALIZED_TO_NOISE_FLOOR;
-		rx_status.tx_status = status;
-		rx_status.tx_retry_cnt = tx_retry_cnt;
-		rx_status.add_rtap_ext = true;
 
 		/* clear IEEE80211_RADIOTAP_F_FCS flag*/
 		rx_status.rtap_flags &= ~(BIT(4));
@@ -1046,9 +1063,6 @@ pkt_capture_rx_data_cb(
 		/* need to update this to fill rx_status*/
 		pkt_capture_rx_mon_get_rx_status(vdev, psoc,
 						 rx_tlv_hdr, &rx_status);
-		rx_status.tx_status = status;
-		rx_status.tx_retry_cnt = tx_retry_cnt;
-		rx_status.add_rtap_ext = true;
 
 		/* clear IEEE80211_RADIOTAP_F_FCS flag*/
 		rx_status.rtap_flags &= ~(BIT(4));

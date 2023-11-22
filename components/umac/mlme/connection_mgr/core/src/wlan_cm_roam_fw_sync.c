@@ -447,7 +447,7 @@ cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 
 		channel.ch_freq = ml_link->channel.mhz;
 		channel.ch_cfreq1 = ml_link->channel.band_center_freq1;
-		channel.ch_cfreq1 = ml_link->channel.band_center_freq2;
+		channel.ch_cfreq2 = ml_link->channel.band_center_freq2;
 
 		/*
 		 * Update Link switch context for each vdev with roamed AP link
@@ -1115,8 +1115,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
 
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
-	    roam_synch_data->auth_status == ROAM_AUTH_STATUS_CONNECTED)
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp);
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);

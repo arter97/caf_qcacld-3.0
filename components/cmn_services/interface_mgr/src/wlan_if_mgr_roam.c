@@ -870,6 +870,15 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 	}
 
 	/*
+	 * This is a temporary check and will be removed once ll_lt_sap CSA
+	 * support is added.
+	 */
+	if (policy_mgr_get_ll_lt_sap_freq(psoc) == chan_freq) {
+		ifmgr_debug("STA connection not allowed on LL_LT_SAP freq %d",
+			    chan_freq);
+		return QDF_STATUS_E_INVAL;
+	}
+	/*
 	 * Ignore the BSS if any other vdev is already connected to it.
 	 */
 	qdf_copy_macaddr(&bssid_arg.peer_addr,

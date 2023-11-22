@@ -470,21 +470,12 @@ populate_channel_switch_ann(struct mac_context *mac_ctx,
 {
 	populate_dot11f_chan_switch_ann(mac_ctx, &bcn->ChanSwitchAnn,
 					pe_session);
-	pe_debug("csa: mode:%d chan:%d count:%d",
-		 bcn->ChanSwitchAnn.switchMode,
-		 bcn->ChanSwitchAnn.newChannel,
-		 bcn->ChanSwitchAnn.switchCount);
-
 	if (!pe_session->dfsIncludeChanWrapperIe)
 		return;
 
 	populate_dot11f_chan_switch_wrapper(mac_ctx,
 					    &bcn->ChannelSwitchWrapper,
 					    pe_session);
-	pe_debug("wrapper: width:%d f0:%d f1:%d",
-		 bcn->ChannelSwitchWrapper.WiderBWChanSwitchAnn.newChanWidth,
-		 bcn->ChannelSwitchWrapper.WiderBWChanSwitchAnn.newCenterChanFreq0,
-		 bcn->ChannelSwitchWrapper.WiderBWChanSwitchAnn.newCenterChanFreq1);
 }
 
 /**
@@ -579,6 +570,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	uint16_t ie_buf_size;
 	uint16_t mlo_ie_len = 0;
 	uint16_t tim_size;
+	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
 	tim_size = sch_get_tim_size(HAL_NUM_STA);
 
@@ -686,12 +678,6 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			populate_dot_11_f_ext_chann_switch_ann(mac_ctx,
 							       ext_csa,
 							       session);
-			pe_debug("ecsa: mode:%d reg:%d chan:%d count:%d",
-				 ext_csa->switch_mode,
-				 ext_csa->new_reg_class,
-				 ext_csa->new_channel,
-				 ext_csa->switch_count);
-
 			if (lim_is_session_eht_capable(session)) {
 				bcn_2->ChannelSwitchWrapper.present = 1;
 				populate_dot11f_bw_ind_element(mac_ctx,
@@ -699,11 +685,10 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 				&bcn_2->ChannelSwitchWrapper.bw_ind_element);
 			}
 		}
-
 		if (session->lim_non_ecsa_cap_num &&
-		    WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq) &&
 		    !is_6ghz_chsw)
 			populate_channel_switch_ann(mac_ctx, bcn_2, session);
+
 	}
 
 	populate_dot11_supp_operating_classes(mac_ctx,
@@ -777,7 +762,6 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	}
 
 	if (lim_is_session_he_capable(session)) {
-		pe_debug("Populate HE IEs");
 		populate_dot11f_he_caps(mac_ctx, session,
 					&bcn_2->he_cap);
 		populate_dot11f_he_operation(mac_ctx, session,
@@ -791,7 +775,6 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	}
 
 	if (lim_is_session_eht_capable(session)) {
-		pe_debug("Populate EHT IEs");
 		populate_dot11f_eht_caps(mac_ctx, session, &bcn_2->eht_cap);
 		populate_dot11f_eht_operation(mac_ctx, session, &bcn_2->eht_op);
 	}
@@ -928,7 +911,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		}
 	}
 
-	if (session->vhtCapability || session->gLimOperatingMode.present) {
+	if (session->vhtCapability && session->gLimOperatingMode.present) {
 		populate_dot11f_operating_mode(mac_ctx, &bcn_2->OperatingMode,
 					       session);
 		lim_strip_ie(mac_ctx, addn_ie, &addn_ielen,
@@ -1080,10 +1063,24 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	else
 		mac_ctx->sch.p2p_ie_offset = 0;
 
-	pe_debug("vdev %d: beacon begin offset %d fixed size %d csa_count_offset %d ecsa_count_offset %d max_bcn_size_left %d addn_ielen %d beacon end offset %d",
+	pe_debug("vdev %d: beacon begin offset %d fixed size %d csa_count_offset %d ecsa_count_offset %d max_bcn_size_left %d addn_ielen %d beacon end offset %d HT %d VHT %d HE %d EHT %d",
 		 session->vdev_id, offset, session->schBeaconOffsetBegin,
 		 mac_ctx->sch.csa_count_offset, mac_ctx->sch.ecsa_count_offset,
-		 bcn_size_left, addn_ielen, session->schBeaconOffsetEnd);
+		 bcn_size_left, addn_ielen, session->schBeaconOffsetEnd,
+		 bcn_2->HTCaps.present, bcn_2->VHTCaps.present,
+		 bcn_2->he_cap.present, bcn_2->eht_cap.present);
+	if (mac_ctx->sch.ecsa_count_offset || mac_ctx->sch.csa_count_offset) {
+		wlan_reg_read_current_country(mac_ctx->psoc, reg_cc);
+		pe_debug("ECSA/CSA : country:%s chan:%d freq %d width:%d reg:%d off:%d count %d mode %d",
+			 reg_cc, session->gLimChannelSwitch.primaryChannel,
+			 session->gLimChannelSwitch.sw_target_freq,
+			 session->gLimChannelSwitch.ch_width,
+			 bcn_2->ext_chan_switch_ann.present ?
+			 bcn_2->ext_chan_switch_ann.new_reg_class : 0,
+			 session->gLimChannelSwitch.sec_ch_offset,
+			 session->gLimChannelSwitch.switchCount,
+			 session->gLimChannelSwitch.switchMode);
+	}
 	mac_ctx->sch.beacon_changed = 1;
 	status = QDF_STATUS_SUCCESS;
 

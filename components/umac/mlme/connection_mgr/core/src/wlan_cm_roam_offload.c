@@ -50,7 +50,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
-
+#include "wlan_mlo_mgr_sta.h"
 
 #ifdef WLAN_FEATURE_SAE
 #define CM_IS_FW_FT_SAE_SUPPORTED(fw_akm_bitmap) \
@@ -1166,6 +1166,7 @@ cm_roam_scan_offload_rssi_thresh(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct wlan_mlme_lfr_cfg *lfr_cfg;
 	struct rso_config_params *rso_config;
+	struct wlan_objmgr_vdev *vdev;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -1200,6 +1201,40 @@ cm_roam_scan_offload_rssi_thresh(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	else
 		params->hi_rssi_scan_rssi_delta =
 			rso_cfg->cfg_param.hi_rssi_scan_rssi_delta;
+	/*
+	 * When the STA operating band is 2.4/5 GHz and if the high RSSI delta
+	 * is configured through vendor command then the priority should be
+	 * given to it and the high RSSI delta value will be overridden with it.
+	 */
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("Cannot set high RSSI offset as vdev object is NULL for vdev %d",
+			 vdev_id);
+	} else {
+		qdf_freq_t op_freq;
+
+		op_freq = wlan_get_operation_chan_freq(vdev);
+		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(op_freq)) {
+			uint8_t roam_high_rssi_delta;
+
+			roam_high_rssi_delta =
+				wlan_cm_get_roam_scan_high_rssi_offset(psoc);
+			if (roam_high_rssi_delta)
+				params->hi_rssi_scan_rssi_delta =
+							roam_high_rssi_delta;
+			/*
+			 * Firmware will use this flag to enable 5 to 6 GHz
+			 * high RSSI roam
+			 */
+			if (roam_high_rssi_delta &&
+			    WLAN_REG_IS_5GHZ_CH_FREQ(op_freq))
+				params->flags |=
+					ROAM_SCAN_RSSI_THRESHOLD_FLAG_ROAM_HI_RSSI_EN_ON_5G;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+	}
+
 	params->hi_rssi_scan_rssi_ub =
 		rso_cfg->cfg_param.hi_rssi_scan_rssi_ub;
 	params->raise_rssi_thresh_5g = lfr_cfg->rssi_boost_threshold_5g;
@@ -3484,9 +3519,12 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (!pdev)
 		goto rel_vdev_ref;
 
+	mlme_debug("vdev:%d process rso stop for reason: %d", vdev_id, reason);
+
 	stop_req->btm_config.vdev_id = vdev_id;
-	MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
-		     BTM_OFFLOAD_CONFIG_BIT_0);
+	if (reason == REASON_SUPPLICANT_DISABLED_ROAMING)
+		MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
+			     BTM_OFFLOAD_CONFIG_BIT_0);
 	stop_req->disconnect_params.vdev_id = vdev_id;
 	stop_req->idle_params.vdev_id = vdev_id;
 	stop_req->roam_triggers.vdev_id = vdev_id;
@@ -3720,6 +3758,59 @@ cm_akm_roam_allowed(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS cm_set_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc,
+					     uint8_t vdev_id,
+					     uint8_t param_value)
+{
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_roam_offload_scan_rssi_params *roam_rssi_params;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	qdf_freq_t op_freq;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	op_freq = wlan_get_operation_chan_freq(vdev);
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(op_freq)) {
+		mlme_err("vdev:%d High RSSI offset can't be set in 6 GHz band",
+			 vdev_id);
+		goto rel_vdev_ref;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg)
+		goto rel_vdev_ref;
+
+	roam_rssi_params = qdf_mem_malloc(sizeof(*roam_rssi_params));
+	if (!roam_rssi_params)
+		goto rel_vdev_ref;
+
+	wlan_cm_set_roam_scan_high_rssi_offset(psoc, param_value);
+	qdf_mem_zero(roam_rssi_params, sizeof(*roam_rssi_params));
+	cm_roam_scan_offload_rssi_thresh(psoc, vdev_id,
+					 roam_rssi_params, rso_cfg);
+	mlme_debug("vdev:%d Configured high RSSI delta=%d, 5 GHZ roam flag=%d",
+		   vdev_id, roam_rssi_params->hi_rssi_scan_rssi_delta,
+		   (roam_rssi_params->flags &
+		    ROAM_SCAN_RSSI_THRESHOLD_FLAG_ROAM_HI_RSSI_EN_ON_5G));
+
+	status = wlan_cm_tgt_send_roam_scan_offload_rssi_params(
+							vdev, roam_rssi_params);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_err("fail to set roam scan high RSSI offset");
+
+	qdf_mem_free(roam_rssi_params);
+rel_vdev_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
+	return status;
 }
 #endif
 
@@ -6128,7 +6219,6 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	uint32_t *chan_freq = NULL;
 	uint8_t count = 0, status, num_chan;
 	uint32_t band_capability = 0, band_mask = 0;
-	bool is_full_scan;
 	struct wlan_diag_roam_scan_done *wlan_diag_event = NULL;
 
 	wlan_diag_event = qdf_mem_malloc(sizeof(*wlan_diag_event));
@@ -6157,9 +6247,7 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	if (scan->num_ap)
 		wlan_diag_event->cand_ap_count = scan->num_ap - 1;
 
-	is_full_scan = scan->type && scan->present;
-
-	if (is_full_scan) {
+	if (scan->type == ROAM_STATS_SCAN_TYPE_FULL && scan->present) {
 		status = mlme_get_fw_scan_channels(psoc, chan_freq, &num_chan);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto out;
@@ -6312,6 +6400,58 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 #define WLAN_ROAM_SCAN_TYPE_PARTIAL_SCAN 0
 #define WLAN_ROAM_SCAN_TYPE_FULL_SCAN 1
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+cm_populate_roam_success_mlo_param(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_diag_roam_result *event,
+				   uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_vdev *assoc_vdev = NULL;
+	struct qdf_mac_addr bss_peer;
+	QDF_STATUS status;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev: %d not found", vdev_id);
+		return;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		goto out;
+
+	event->is_mlo = true;
+
+	assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+	if (!assoc_vdev) {
+		mlme_err("assoc vdev not found");
+		goto out;
+	}
+
+	status = wlan_vdev_get_bss_peer_mac(assoc_vdev,
+					    &bss_peer);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("vdev: %d bss peer not found",
+			 wlan_vdev_get_id(assoc_vdev));
+		goto out;
+	}
+
+	qdf_mem_copy(event->diag_cmn.bssid,
+		     bss_peer.bytes, QDF_MAC_ADDR_SIZE);
+
+out:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+}
+#else
+static void
+cm_populate_roam_success_mlo_param(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_diag_roam_result *event,
+				   uint8_t vdev_id)
+{
+}
+#endif
+
 void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_trigger_info *trigger,
 			       struct wmi_roam_result *res,
@@ -6383,6 +6523,10 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			     QDF_MAC_ADDR_SIZE);
 	}
 
+	if (!wlan_diag_event.is_roam_successful)
+		cm_populate_roam_success_mlo_param(psoc, &wlan_diag_event,
+						   vdev_id);
+
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_ROAM_RESULT);
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
@@ -6400,6 +6544,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 				       trigger->trigger_reason,
 				       wlan_diag_event.is_roam_successful,
 				       is_full_scan, res->fail_reason);
+
 }
 
 #endif
@@ -6897,7 +7042,8 @@ wlan_convert_bitmap_to_band(uint8_t bitmap)
 	enum wlan_diag_wifi_band band = WLAN_INVALID_BAND;
 
 	for (i = WLAN_24GHZ_BAND; i <= WLAN_6GHZ_BAND; i++) {
-		if (qdf_test_bit(i, (unsigned long *)&bitmap)) {
+		/* 2.4 GHz band will be populated at 0th bit in the bitmap*/
+		if (qdf_test_bit((i - 1), (unsigned long *)&bitmap)) {
 			band = i;
 			break;
 		}
@@ -6963,21 +7109,20 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 
 	} else {
 		wlan_diag_event.subtype =
-		(uint8_t)cm_roam_get_tag(frame_data->subtype,
-					 !frame_data->is_rsp);
+			(uint8_t)cm_roam_get_tag(frame_data->subtype,
+						 !frame_data->is_rsp);
 		diag_event = EVENT_WLAN_MGMT;
 
-		wlan_diag_event.supported_links = frame_data->band;
-
-		status =
-			wlan_populate_mlo_mgmt_event_param(vdev,
-							   &wlan_diag_event,
-							   wlan_diag_event.subtype);
+		status = wlan_populate_roam_mld_log_param(vdev,
+							  &wlan_diag_event,
+							  wlan_diag_event.subtype);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlme_err("vdev: %d Unable to populate MLO parameter",
 				 wlan_vdev_get_id(vdev));
 			return status;
 		}
+
+		wlan_diag_event.supported_links = frame_data->band;
 	}
 
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&

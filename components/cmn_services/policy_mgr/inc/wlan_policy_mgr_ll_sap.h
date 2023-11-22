@@ -20,16 +20,43 @@
 
 #include "wlan_objmgr_psoc_obj.h"
 
+#ifdef WLAN_FEATURE_LL_LT_SAP
 /**
- * wlan_policy_mgr_get_ll_lt_sap_vdev() - Get ll_lt_sap vdev
+ * wlan_policy_mgr_get_ll_lt_sap_vdev_id() - Get ll_lt_sap vdev id
  * @psoc: PSOC object
  *
- * API to find ll_lt_sap vdev pointer
- *
- * This API increments the ref count of the vdev object internally, the
- * caller has to invoke the wlan_objmgr_vdev_release_ref() to decrement
- * ref count
+ * API to find ll_lt_sap vdev id
  *
  * Return: vdev id
  */
-uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev(struct wlan_objmgr_psoc *psoc);
+uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * __policy_mgr_is_ll_lt_sap_restart_required() - Check in ll_lt_sap restart is
+ * required
+ * @psoc: PSOC object
+ * @func: Function pointer of the caller function.
+ *
+ * This API checks if ll_lt_sap restart is required or not
+ *
+ * Return: true/false
+ */
+bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
+						const char *func);
+
+#define policy_mgr_is_ll_lt_sap_restart_required(psoc) \
+	__policy_mgr_is_ll_lt_sap_restart_required(psoc, __func__)
+#else
+
+static inline bool
+policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
+{
+	return WLAN_INVALID_VDEV_ID;
+}
+#endif

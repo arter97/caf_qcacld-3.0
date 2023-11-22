@@ -86,6 +86,7 @@
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include <wlan_mlo_link_force.h>
 #include "wma_eht.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -4744,8 +4745,18 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 		       wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 							    vdev_id,
 							    WLAN_LEGACY_SME_ID);
+	uint8_t ll_lt_sap_vdev_id;
+
 	if (!vdev) {
 		sme_err("Got NULL vdev obj, returning");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ll_lt_sap_vdev_id =
+			wlan_policy_mgr_get_ll_lt_sap_vdev_id(mac_ctx->psoc);
+	if (ll_lt_sap_vdev_id != WLAN_INVALID_VDEV_ID) {
+		sme_info_rl("LL_LT_SAP vdev %d present, chainmask config not allowed",
+			    ll_lt_sap_vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -7773,6 +7784,11 @@ int sme_set_peer_ampdu(mac_handle_t mac_handle, uint8_t vdev_id,
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 						    vdev_id,
 						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("vdev null");
+		return -EINVAL;
+	}
+
 	status = wlan_vdev_is_up(vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sme_debug("vdev id %d not up", vdev_id);
@@ -9075,16 +9091,12 @@ QDF_STATUS sme_update_dsc_pto_up_mapping(mac_handle_t mac_handle,
 
 	pSession = pe_find_session_by_vdev_id(mac, sessionId);
 
-	if (!pSession) {
-		sme_err("Session lookup fails for vdev %d", sessionId);
+	if (!pSession)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	pqosmapset = &pSession->QosMapSet;
-	if (!pqosmapset->present) {
-		sme_debug("QOS Mapping IE not present");
+	if (!pqosmapset->present)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	for (i = 0; i < SME_QOS_WMM_UP_MAX; i++) {
 		for (j = pqosmapset->dscp_range[i][0];
@@ -11900,8 +11912,7 @@ sme_sap_update_ch_width(struct wlan_objmgr_psoc *psoc,
 	cmd->u.bw_update_cmd.request_id = request_id;
 	cmd->u.bw_update_cmd.conc_vdev_id = conc_vdev_id;
 
-	sme_debug("Queuing e_sme_command_sap_ch_width_update to CSR:vdev %d ch_width: %d reason: %d",
-		  vdev_id, ch_width, reason);
+	sme_debug("vdev %d ch_width: %d reason: %d", vdev_id, ch_width, reason);
 	csr_queue_sme_command(mac, cmd, false);
 	sme_release_global_lock(&mac->sme);
 

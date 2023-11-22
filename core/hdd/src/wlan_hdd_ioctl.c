@@ -3053,6 +3053,14 @@ static int drv_cmd_set_roam_mode(struct wlan_hdd_link_info *link_info,
 
 	hdd_debug("Received Command to Set Roam Mode = %d",
 		  roam_mode);
+
+	if (sme_roaming_in_progress(hdd_ctx->mac_handle,
+				    link_info->vdev_id)) {
+		hdd_err_rl("Roaming in progress for vdev %d",
+			   link_info->vdev_id);
+		return -EAGAIN;
+	}
+
 	/*
 	 * Note that
 	 *     SETROAMMODE 0 is to enable LFR while
@@ -4369,6 +4377,13 @@ static int drv_cmd_set_fast_roam(struct wlan_hdd_link_info *link_info,
 
 	hdd_debug("Received Command to change lfr mode = %d",
 		  lfr_mode);
+
+	if (sme_roaming_in_progress(hdd_ctx->mac_handle,
+				    link_info->vdev_id)) {
+		hdd_err_rl("Roaming in progress for vdev %d",
+			   link_info->vdev_id);
+		return -EAGAIN;
+	}
 
 	ucfg_mlme_set_lfr_enabled(hdd_ctx->psoc, (bool)lfr_mode);
 	sme_update_is_fast_roam_ini_feature_enabled(hdd_ctx->mac_handle,
@@ -6560,11 +6575,20 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 	struct hdd_adapter *adapter, *next = NULL;
 	QDF_STATUS status;
 	struct hdd_ap_ctx *ap_ctx;
+	uint32_t ch_list[NUM_CHANNELS];
+	uint32_t ch_count = 0;
+	bool is_valid_chan_present = true;
 
 	if (!hdd_ctx)
 		return;
 
 	hdd_check_and_disconnect_sta_on_invalid_channel(hdd_ctx, reason);
+
+	status = policy_mgr_get_valid_chans(hdd_ctx->psoc, ch_list, &ch_count);
+	if (QDF_IS_STATUS_ERROR(status) || !ch_count) {
+		hdd_debug("No valid channels present, stop the SAPs");
+		is_valid_chan_present = false;
+	}
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapter);
 	while (adapter && (status == QDF_STATUS_SUCCESS)) {
@@ -6574,7 +6598,10 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
 		}
 
 		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-		if (check_disable_channels(hdd_ctx, ap_ctx->operating_chan_freq))
+		if (!is_valid_chan_present)
+			wlan_hdd_stop_sap(adapter);
+		else if (check_disable_channels(hdd_ctx,
+						ap_ctx->operating_chan_freq))
 			policy_mgr_check_sap_restart(hdd_ctx->psoc,
 						     adapter->deflink->vdev_id);
 next_adapter:

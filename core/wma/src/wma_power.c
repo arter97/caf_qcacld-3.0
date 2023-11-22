@@ -729,7 +729,7 @@ void wma_enable_sta_ps_mode(tpEnablePsParams ps_req)
 					vdev_id, uapsd_val);
 		}
 
-		if (ps_params.opm_mode && iface->uapsd_cached_val) {
+		if (!!ps_params.opm_mode && !!iface->uapsd_cached_val) {
 			ps_params.opm_mode = WMI_STA_PS_OPM_CONSERVATIVE;
 			wma_debug("Qpower is disabled");
 		}
@@ -911,7 +911,7 @@ void wma_enable_uapsd_mode(tp_wma_handle wma, tpEnableUapsdParams ps_req)
 		return;
 	}
 
-	if (ps_params.opm_mode && uapsd_val) {
+	if (!!ps_params.opm_mode && !!uapsd_val) {
 		ps_params.opm_mode = 0;
 		wma_debug("Disable power %d", vdev_id);
 	}

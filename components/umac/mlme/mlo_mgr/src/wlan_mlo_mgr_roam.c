@@ -987,57 +987,67 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 	if (!sta_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	if (sta_ctx) {
-		wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
-
-		sta_ctx->copied_reassoc_rsp = qdf_mem_malloc(
-				sizeof(struct wlan_cm_connect_resp));
-		if (!sta_ctx->copied_reassoc_rsp)
-			return QDF_STATUS_E_NOMEM;
-
-		qdf_mem_copy(sta_ctx->copied_reassoc_rsp, reassoc_rsp,
-			     sizeof(struct wlan_cm_connect_resp));
-
-		sta_ctx->copied_reassoc_rsp->roaming_info = qdf_mem_malloc(
-				sizeof(struct wlan_roam_sync_info));
-
-		if (!sta_ctx->copied_reassoc_rsp->roaming_info) {
-			qdf_mem_free(sta_ctx->copied_reassoc_rsp);
-			return QDF_STATUS_E_NOMEM;
-		}
-
-		qdf_mem_copy(sta_ctx->copied_reassoc_rsp->roaming_info,
-			     reassoc_rsp->roaming_info,
-			     sizeof(struct wlan_roam_sync_info));
-
-		connect_ies = &sta_ctx->copied_reassoc_rsp->connect_ies;
-
-		connect_ies->assoc_rsp.len =
-			reassoc_rsp->connect_ies.assoc_rsp.len;
-
-		connect_ies->assoc_rsp.ptr = qdf_mem_malloc(
-				connect_ies->assoc_rsp.len);
-
-		if (!connect_ies->assoc_rsp.ptr) {
-			qdf_mem_free(sta_ctx->copied_reassoc_rsp->roaming_info);
-			qdf_mem_free(sta_ctx->copied_reassoc_rsp);
-			return QDF_STATUS_E_NOMEM;
-		}
-
-		qdf_mem_copy(connect_ies->assoc_rsp.ptr,
-			     reassoc_rsp->connect_ies.assoc_rsp.ptr,
-			     reassoc_rsp->connect_ies.assoc_rsp.len);
-
-		connect_ies->assoc_req.len = 0;
-		connect_ies->assoc_req.ptr = NULL;
-		connect_ies->bcn_probe_rsp.len = 0;
-		connect_ies->bcn_probe_rsp.ptr = NULL;
-		connect_ies->link_bcn_probe_rsp.len = 0;
-		connect_ies->link_bcn_probe_rsp.ptr = NULL;
-		connect_ies->fils_ie = NULL;
-
-		mlo_debug("Copied reassoc response");
+	wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
+	/* Free assoc rsp, so that reassoc rsp can be used during
+	 * reassociation.
+	 */
+	if (sta_ctx->assoc_rsp.ptr) {
+		qdf_mem_free(sta_ctx->assoc_rsp.ptr);
+		sta_ctx->assoc_rsp.ptr = NULL;
+		sta_ctx->assoc_rsp.len = 0;
 	}
+	sta_ctx->copied_reassoc_rsp = qdf_mem_malloc(
+			sizeof(struct wlan_cm_connect_resp));
+	if (!sta_ctx->copied_reassoc_rsp)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(sta_ctx->copied_reassoc_rsp, reassoc_rsp,
+		     sizeof(struct wlan_cm_connect_resp));
+
+	sta_ctx->copied_reassoc_rsp->roaming_info = qdf_mem_malloc(
+			sizeof(struct wlan_roam_sync_info));
+
+	if (!sta_ctx->copied_reassoc_rsp->roaming_info) {
+		qdf_mem_free(sta_ctx->copied_reassoc_rsp);
+		sta_ctx->copied_reassoc_rsp = NULL;
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(sta_ctx->copied_reassoc_rsp->roaming_info,
+		     reassoc_rsp->roaming_info,
+		     sizeof(struct wlan_roam_sync_info));
+
+	connect_ies = &sta_ctx->copied_reassoc_rsp->connect_ies;
+
+	connect_ies->assoc_rsp.len =
+		reassoc_rsp->connect_ies.assoc_rsp.len;
+
+	connect_ies->assoc_rsp.ptr = qdf_mem_malloc(
+			connect_ies->assoc_rsp.len);
+
+	if (!connect_ies->assoc_rsp.ptr) {
+		qdf_mem_free(sta_ctx->copied_reassoc_rsp->roaming_info);
+		sta_ctx->copied_reassoc_rsp->roaming_info = NULL;
+		qdf_mem_free(sta_ctx->copied_reassoc_rsp);
+		sta_ctx->copied_reassoc_rsp = NULL;
+		connect_ies->assoc_rsp.len = 0;
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(connect_ies->assoc_rsp.ptr,
+		     reassoc_rsp->connect_ies.assoc_rsp.ptr,
+		     reassoc_rsp->connect_ies.assoc_rsp.len);
+
+	connect_ies->assoc_req.len = 0;
+	connect_ies->assoc_req.ptr = NULL;
+	connect_ies->bcn_probe_rsp.len = 0;
+	connect_ies->bcn_probe_rsp.ptr = NULL;
+	connect_ies->link_bcn_probe_rsp.len = 0;
+	connect_ies->link_bcn_probe_rsp.ptr = NULL;
+	connect_ies->fils_ie = NULL;
+
+	mlo_debug("Copied reassoc response for vdev: %d len: %d",
+		  wlan_vdev_get_id(vdev), connect_ies->assoc_rsp.len);
 
 	return QDF_STATUS_SUCCESS;
 }

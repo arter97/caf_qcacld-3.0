@@ -284,6 +284,46 @@ enum wlan_bcn_rpt_measurement_mode {
 };
 
 /**
+ * enum wlan_diag_connect_fail_reason - WLAN diag connect fail reason code
+ * @WLAN_DIAG_UNSPECIFIC_REASON: Unspecific reason
+ * @WLAN_DIAG_NO_CANDIDATE_FOUND: No candidate found
+ * @WLAN_DIAG_ABORT_DUE_TO_NEW_REQ_RECVD: Aborted as new command is
+ * received.
+ * @WLAN_DIAG_BSS_SELECT_IND_FAILED: Failed BSS select indication
+ * @WLAN_DIAG_PEER_CREATE_FAILED: peer create failed
+ * @WLAN_DIAG_JOIN_FAILED: Failed in joining state
+ * @WLAN_DIAG_JOIN_TIMEOUT: Did not receive beacon or probe response after
+ * unicast probe request
+ * @WLAN_DIAG_AUTH_FAILED: Auth rejected by AP
+ * @WLAN_DIAG_AUTH_TIMEOUT: No Auth resp from AP
+ * @WLAN_DIAG_ASSOC_FAILED: Assoc rejected by AP
+ * @WLAN_DIAG_ASSOC_TIMEOUT: No Assoc resp from AP
+ * @WLAN_DIAG_HW_MODE_FAILURE: failed to change HW mode
+ * @WLAN_DIAG_SER_FAILURE: Failed to serialize command
+ * @WLAN_DIAG_SER_TIMEOUT: Serialization cmd timeout
+ * @WLAN_DIAG_GENERIC_FAILURE: Generic failure apart from above
+ * @WLAN_DIAG_VALID_CANDIDATE_CHECK_FAIL: Valid Candidate Check fail
+ */
+enum wlan_diag_connect_fail_reason {
+	WLAN_DIAG_UNSPECIFIC_REASON = 0,
+	WLAN_DIAG_NO_CANDIDATE_FOUND = 1,
+	WLAN_DIAG_ABORT_DUE_TO_NEW_REQ_RECVD,
+	WLAN_DIAG_BSS_SELECT_IND_FAILED,
+	WLAN_DIAG_PEER_CREATE_FAILED,
+	WLAN_DIAG_JOIN_FAILED,
+	WLAN_DIAG_JOIN_TIMEOUT,
+	WLAN_DIAG_AUTH_FAILED,
+	WLAN_DIAG_AUTH_TIMEOUT,
+	WLAN_DIAG_ASSOC_FAILED,
+	WLAN_DIAG_ASSOC_TIMEOUT,
+	WLAN_DIAG_HW_MODE_FAILURE,
+	WLAN_DIAG_SER_FAILURE,
+	WLAN_DIAG_SER_TIMEOUT,
+	WLAN_DIAG_GENERIC_FAILURE,
+	WLAN_DIAG_VALID_CANDIDATE_CHECK_FAIL,
+};
+
+/**
  * struct wlan_connectivity_log_diag_cmn - Structure for diag event
  * @bssid: bssid
  * @vdev_id: Vdev id
@@ -340,21 +380,24 @@ struct wlan_diag_mlo_cmn_info {
 };
 
 #define DIAG_MLO_SETUP_VERSION 1
+#define DIAG_MLO_SETUP_VERSION_V2 2
 
-#define MAX_BANDS 3
+#define MAX_NUM_LINKS_PER_EVENT 3
 /**
  * struct wlan_diag_mlo_setup - MLO setup structure
  * @diag_cmn: Common diag info
  * @version: structure version
+ * @num_links: Number of links associated for MLO setup
  * @reserved: Reserved field
  * @status: status code of the link. Non-zero value when link is rejected
  * @mlo_cmn_info: MLO common info
  */
 struct wlan_diag_mlo_setup {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
-	uint32_t version:8;
-	uint32_t reserved:24;
-	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
+	uint8_t version;
+	uint8_t num_links;
+	uint16_t reserved;
+	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_NUM_LINKS_PER_EVENT];
 } qdf_packed;
 
 #define DIAG_MLO_RECONFIG_VERSION 1
@@ -374,19 +417,22 @@ struct wlan_diag_mlo_reconfig {
 } qdf_packed;
 
 #define DIAG_MLO_T2LM_STATUS_VERSION 1
+#define DIAG_MLO_T2LM_STATUS_VERSION_V2 2
 
 /**
  * struct wlan_diag_mlo_t2lm_status - MLO T2LM status diag event structure
  * @diag_cmn: Common diag info
  * @version: structure version
+ * @num_links: Number of links associated for T2LM status
  * @reserved: Reserved field
  * @mlo_cmn_info: MLO common info
  */
 struct wlan_diag_mlo_t2lm_status {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
-	uint32_t version:8;
-	uint32_t reserved:24;
-	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
+	uint8_t version;
+	uint8_t num_links;
+	uint16_t reserved;
+	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_NUM_LINKS_PER_EVENT];
 } qdf_packed;
 
 #define DIAG_MLO_T2LM_REQ_RESP_VERSION 1
@@ -593,6 +639,7 @@ struct wlan_diag_roam_scan_done {
  * @diag_cmn: Common diag info
  * @version: Structure Version
  * @is_roam_successful: True if roamed successfully or false if roaming failed
+ * @is_mlo: Indicates whether the current connection is a MLO connection
  * @reserved: Reserved
  * @roam_fail_reason: Roam failure reason code defined in enum
  * wlan_roam_failure_reason_code
@@ -601,7 +648,8 @@ struct wlan_diag_roam_result {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint8_t version;
 	uint8_t is_roam_successful:1;
-	uint8_t reserved:7;
+	uint8_t is_mlo:1;
+	uint8_t reserved:6;
 	uint16_t roam_fail_reason;
 } qdf_packed;
 
@@ -1122,6 +1170,22 @@ bool wlan_is_log_record_present_for_bssid(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id);
 
 /**
+ * wlan_is_sae_auth_log_present_for_bssid() - Is cached SAE auth log record
+ * present for the given bssid. This API checks on all the link vdev if the
+ * given vdev_id is an MLO vdev and updates the vdev_id to caller in which
+ * the auth frame was cached.
+ * @psoc: Global psoc pointer
+ * @bssid: BSSID
+ * @vdev_id: vdev id
+ *
+ * Return: True if an entry is found
+ */
+bool
+wlan_is_sae_auth_log_present_for_bssid(struct wlan_objmgr_psoc *psoc,
+				       struct qdf_mac_addr *bssid,
+				       uint8_t *vdev_id);
+
+/**
  * wlan_clear_sae_auth_logs_cache() - Clear the cached auth related logs
  * @psoc: Pointer to global psoc object
  * @vdev_id: vdev id
@@ -1143,6 +1207,14 @@ static inline
 bool wlan_is_log_record_present_for_bssid(struct wlan_objmgr_psoc *psoc,
 					  struct qdf_mac_addr *bssid,
 					  uint8_t vdev_id)
+{
+	return false;
+}
+
+static inline bool
+wlan_is_sae_auth_log_present_for_bssid(struct wlan_objmgr_psoc *psoc,
+				       struct qdf_mac_addr *bssid,
+				       uint8_t *vdev_id)
 {
 	return false;
 }
@@ -1273,6 +1345,18 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_diag_packet_info *data,
 				   enum wlan_main_tag tag);
 
+/**
+ * wlan_populate_roam_mld_log_param() - Populate roam MLO log parameters
+ * @vdev: Pointer to vdev object
+ * @data: Diag event packet info
+ * @tag: Main Tag
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_populate_roam_mld_log_param(struct wlan_objmgr_vdev *vdev,
+				 struct wlan_diag_packet_info *data,
+				 enum wlan_main_tag tag);
 #else
 static inline void
 wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
@@ -1302,6 +1386,14 @@ static inline QDF_STATUS
 wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_diag_packet_info *data,
 				   enum wlan_main_tag tag)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_populate_roam_mld_log_param(struct wlan_objmgr_vdev *vdev,
+				 struct wlan_diag_packet_info *data,
+				 enum wlan_main_tag tag)
 {
 	return QDF_STATUS_SUCCESS;
 }

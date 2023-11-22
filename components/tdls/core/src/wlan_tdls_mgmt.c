@@ -33,6 +33,7 @@
 #include "wlan_policy_mgr_api.h"
 #include <wlan_reg_services_api.h>
 #include <wlan_mlo_mgr_sta.h>
+#include "wlan_mlo_link_force.h"
 
 static
 const char *const tdls_action_frames_type[] = { "TDLS Setup Request",
@@ -403,12 +404,13 @@ exit:
 
 void tdls_set_no_force_vdev(struct wlan_objmgr_vdev *vdev, bool flag)
 {
-	uint8_t i, count = 0;
+	uint8_t i;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *mlo_vdev;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	uint8_t mlo_vdev_lst[WLAN_UMAC_MLO_MAX_VDEVS];
 	bool is_mlo_vdev;
+	struct ml_nlink_change_event data;
+	QDF_STATUS status;
 
 	if (!vdev)
 		return;
@@ -421,22 +423,32 @@ void tdls_set_no_force_vdev(struct wlan_objmgr_vdev *vdev, bool flag)
 	if (!psoc)
 		return;
 
+	qdf_mem_zero(&data, sizeof(data));
+
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
 		mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!mlo_vdev)
+			continue;
 
 		/* flag: true means no force all vdevs,
 		 * false means except the current one
 		 */
 		if (!flag && (mlo_vdev == vdev))
 			continue;
-		mlo_vdev_lst[count] = wlan_vdev_get_id(mlo_vdev);
-		count++;
+		data.evt.tdls.link_bitmap |=
+				1 << wlan_vdev_get_link_id(mlo_vdev);
+		data.evt.tdls.mlo_vdev_lst[data.evt.tdls.vdev_count] =
+				wlan_vdev_get_id(mlo_vdev);
+		data.evt.tdls.vdev_count++;
 	}
 
-	policy_mgr_mlo_sta_set_link(psoc, MLO_LINK_FORCE_REASON_TDLS,
-				    MLO_LINK_FORCE_MODE_NO_FORCE,
-				    count, mlo_vdev_lst);
+	data.evt.tdls.mode = MLO_LINK_FORCE_MODE_NO_FORCE;
+	data.evt.tdls.reason = MLO_LINK_FORCE_REASON_TDLS;
+	status = ml_nlink_conn_change_notify(psoc,
+					     wlan_vdev_get_id(vdev),
+					     ml_nlink_tdls_request_evt,
+					     &data);
 }
 #else
 struct wlan_objmgr_vdev *
@@ -879,12 +891,11 @@ tdls_send_mgmt_serialize_callback(struct wlan_serialization_command *cmd,
 #ifdef WLAN_FEATURE_11BE_MLO
 QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 {
-	uint8_t mlo_vdev_lst[WLAN_UMAC_MLO_MAX_VDEVS] = {-1};
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *mlo_tdls_vdev;
-	uint8_t vdev_count = 0;
 	bool is_mlo_vdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct ml_nlink_change_event data;
 
 	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(req->vdev);
 	if (!is_mlo_vdev)
@@ -902,24 +913,37 @@ QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 		if (mlo_tdls_vdev)
 			return status;
 
-		mlo_vdev_lst[0] = wlan_vdev_get_id(req->vdev);
-		vdev_count = 1;
-
-		status = policy_mgr_mlo_sta_set_link(psoc,
-						     MLO_LINK_FORCE_REASON_TDLS,
-						     MLO_LINK_FORCE_MODE_ACTIVE,
-						     vdev_count, mlo_vdev_lst);
-		if (status == QDF_STATUS_SUCCESS)
+		qdf_mem_zero(&data, sizeof(data));
+		data.evt.tdls.link_bitmap =
+				1 << wlan_vdev_get_link_id(req->vdev);
+		data.evt.tdls.mlo_vdev_lst[0] = wlan_vdev_get_id(req->vdev);
+		data.evt.tdls.vdev_count = 1;
+		data.evt.tdls.mode = MLO_LINK_FORCE_MODE_ACTIVE;
+		data.evt.tdls.reason = MLO_LINK_FORCE_REASON_TDLS;
+		status =
+		ml_nlink_conn_change_notify(psoc,
+					    wlan_vdev_get_id(req->vdev),
+					    ml_nlink_tdls_request_evt,
+					    &data);
+		if (status == QDF_STATUS_SUCCESS ||
+		    status == QDF_STATUS_E_PENDING)
 			req->link_active = true;
 	} else if (req->tdls_mgmt.frame_type == TDLS_MAX_ACTION_CODE) {
-		mlo_vdev_lst[0] = wlan_vdev_get_id(req->vdev);
-		vdev_count = 1;
+		qdf_mem_zero(&data, sizeof(data));
+		data.evt.tdls.link_bitmap =
+				1 << wlan_vdev_get_link_id(req->vdev);
+		data.evt.tdls.mlo_vdev_lst[0] = wlan_vdev_get_id(req->vdev);
+		data.evt.tdls.vdev_count = 1;
+		data.evt.tdls.mode = MLO_LINK_FORCE_MODE_NO_FORCE;
+		data.evt.tdls.reason = MLO_LINK_FORCE_REASON_TDLS;
 		status =
-		    policy_mgr_mlo_sta_set_link(psoc,
-						MLO_LINK_FORCE_REASON_TDLS,
-						MLO_LINK_FORCE_MODE_NO_FORCE,
-						vdev_count, mlo_vdev_lst);
+		ml_nlink_conn_change_notify(psoc,
+					    wlan_vdev_get_id(req->vdev),
+					    ml_nlink_tdls_request_evt,
+					    &data);
 	}
+	if (status == QDF_STATUS_E_PENDING)
+		status = QDF_STATUS_SUCCESS;
 
 	return status;
 }

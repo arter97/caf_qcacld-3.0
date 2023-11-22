@@ -1129,6 +1129,9 @@ __lim_process_radio_measure_request(struct mac_context *mac, uint8_t *pRxPacketI
 		 QDF_MAC_ADDR_REF(pe_session->bssId),
 		 QDF_MAC_ADDR_REF(pe_session->self_mac_addr));
 
+	pe_debug("RX RRM - type %hu, sub type %hu, seq num[%d]",
+		 pHdr->fc.type, pHdr->fc.subType, curr_seq_num);
+
 	rrm_process_radio_measurement_request(mac, pe_session->bssId, frm,
 					      pe_session);
 err:

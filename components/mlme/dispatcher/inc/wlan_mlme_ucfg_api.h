@@ -4904,17 +4904,17 @@ QDF_STATUS ucfg_mlme_update_bss_rate_flags(struct wlan_objmgr_psoc *psoc,
  * ucfg_mlme_send_ch_width_update_with_notify() - Send chwidth with notify
  * capability of FW
  * @psoc: pointer to psoc object
- * @vdev_id: Vdev id
+ * @link_vdev: Link VDEV object
  * @ch_width: channel width to update
- * @link_id: mlo link id
+ * @link_vdev_id: vdev id for each link
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
-					   uint8_t vdev_id,
+					   struct wlan_objmgr_vdev *link_vdev,
 					   enum phy_ch_width ch_width,
-					   uint8_t link_id);
+					   uint8_t link_vdev_id);
 
 /**
  * ucfg_mlme_is_chwidth_with_notify_supported() - Get chwidth with notify

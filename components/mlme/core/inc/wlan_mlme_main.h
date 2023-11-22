@@ -718,12 +718,6 @@ struct roam_scan_chn {
  *  For non-MLO scenario, it indicates the original connected AP BSSID.
  *  For MLO scenario, it indicates the original BSSID of the link
  *  for which the reassociation occurred during the roam.
- * @candidate_bssid: roam candidate AP BSSID when roam failed.
- *  If the firmware updates more than one candidate AP BSSID
- *  to the driver, the driver only fills the last candidate AP BSSID.
- *  For non-MLO scenario, it indicates the last candidate AP BSSID.
- *  For MLO scenario, it indicates the AP BSSID which may be the primary
- *  link BSSID or a nonprimary link BSSID.
  * @roamed_bssid: roamed AP BSSID when roam succeeds.
  *  For non-MLO case, it indicates new AP BSSID which has been
  *  successfully roamed.
@@ -735,7 +729,6 @@ struct eroam_scan_info {
 	struct roam_scan_chn roam_chn[MAX_ROAM_SCAN_CHAN];
 	uint32_t total_scan_time;
 	struct qdf_mac_addr original_bssid;
-	struct qdf_mac_addr candidate_bssid;
 	struct qdf_mac_addr roamed_bssid;
 };
 
@@ -746,15 +739,15 @@ struct eroam_scan_info {
  * @timestamp: timestamp of the auth/assoc/eapol-M1/M2/M3/M4 frame,
  *  if status is successful, indicate received or send success,
  *  if status is failed, timestamp indicate roaming fail at that time
+ * @bssid: Source address for auth/assoc/eapol frame.
  */
 struct eroam_frame_info {
 	enum eroam_frame_subtype frame_type;
 	enum eroam_frame_status status;
 	uint64_t timestamp;
-};
+	struct qdf_mac_addr bssid;
 
-/* Key frame num during roaming: PREAUTH/PREASSOC/EAPOL M1-M4 */
-#define ROAM_FRAME_NUM 6
+};
 
 /**
  * struct enhance_roam_info - enhance roam information
@@ -765,7 +758,7 @@ struct eroam_frame_info {
 struct enhance_roam_info {
 	struct eroam_trigger_info trigger;
 	struct eroam_scan_info scan;
-	struct eroam_frame_info timestamp[ROAM_FRAME_NUM];
+	struct eroam_frame_info timestamp[WLAN_ROAM_MAX_FRAME_INFO];
 };
 
 /**
@@ -825,6 +818,7 @@ struct enhance_roam_info {
  *				operation on bss color collision detection
  * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  * @disconnect_runtime_lock: runtime lock to complete disconnection
+ * @best_6g_power_type: best 6g power type
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -896,6 +890,7 @@ struct mlme_legacy_priv {
 	qdf_wake_lock_t bss_color_change_wakelock;
 	qdf_runtime_lock_t bss_color_change_runtime_lock;
 	qdf_runtime_lock_t disconnect_runtime_lock;
+	enum reg_6g_ap_type best_6g_power_type;
 };
 
 /**
@@ -1117,6 +1112,24 @@ void mlme_set_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev, bool flag);
 bool mlme_get_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlme_set_best_6g_power_type() - Set best 6g power type
+ * @vdev: vdev pointer
+ * @best_6g_power_type: best 6g power type
+ *
+ * Return: None
+ */
+void mlme_set_best_6g_power_type(struct wlan_objmgr_vdev *vdev,
+				 enum reg_6g_ap_type best_6g_power_type);
+
+/**
+ * mlme_get_best_6g_power_type() - Get best 6g power type
+ * @vdev: vdev pointer
+ *
+ * Return: value of best 6g power type
+ */
+enum reg_6g_ap_type mlme_get_best_6g_power_type(struct wlan_objmgr_vdev *vdev);
+
+/**
  * mlme_set_reconn_after_assoc_timeout_flag() - Set reconn after assoc timeout
  * flag
  * @psoc: soc object
@@ -1218,6 +1231,7 @@ QDF_STATUS wlan_mlme_get_bssid_vdev_id(struct wlan_objmgr_pdev *pdev,
  * @req: pointer to scan request
  * @scan_ch_width: Channel width for which to trigger a wide band scan
  * @scan_freq: frequency for which to trigger a wide band RRM scan
+ * @cen320_freq: 320 MHz center freq
  *
  * Return: QDF_STATUS
  */
@@ -1225,7 +1239,8 @@ QDF_STATUS
 mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 				   struct scan_start_request *req,
 				   enum phy_ch_width scan_ch_width,
-				   qdf_freq_t scan_freq);
+				   qdf_freq_t scan_freq,
+				   qdf_freq_t cen320_freq);
 
 /**
  * wlan_get_operation_chan_freq() - get operating chan freq of

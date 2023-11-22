@@ -99,6 +99,8 @@
 
 #define MAX_RSSI_MCS_INDEX 14
 
+#define MAX_HT_MCS_INDEX 7
+
 /* 11B, 11G Rate table include Basic rate and Extended rate
  * The IDX field is the rate index
  * The HI field is the rate when RSSI is strong or being ignored
@@ -5137,6 +5139,8 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+		return -EINVAL;
 	/**
 	 * HTT_DBG_EXT_STATS_PDEV_RX
 	 */
@@ -5677,6 +5681,63 @@ wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
 #define linkspeed_dbg(format, args...)
 #endif /* LINKSPEED_DEBUG_ENABLED */
 
+static void
+wlan_hdd_fill_per_link_summary_stats(tCsrSummaryStatsInfo *stats,
+				     struct station_info *info,
+				     struct wlan_hdd_link_info *link_info)
+{
+	uint8_t i;
+	uint32_t orig_cnt;
+	uint32_t orig_fail_cnt;
+	QDF_STATUS status;
+	uint8_t *peer_mac;
+	ol_txrx_soc_handle soc;
+	struct cdp_peer_stats *peer_stats;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	if (!wlan_hdd_is_per_link_stats_supported(hdd_ctx))
+		return;
+
+	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
+	if (!peer_stats)
+		return;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	peer_mac = link_info->session.station.conn_info.bssid.bytes;
+	status = ucfg_dp_get_per_link_peer_stats(soc, link_info->vdev_id,
+						 peer_mac, peer_stats,
+						 CDP_WILD_PEER_TYPE,
+						 WLAN_MAX_MLD);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Unable to get per link peer stats for the peer: "
+			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(peer_mac));
+		goto exit;
+	}
+
+	info->tx_retries = 0;
+	info->tx_failed = 0;
+
+	for (i = 0; i < WIFI_MAX_AC; ++i) {
+		info->tx_retries += stats->multiple_retry_cnt[i];
+		info->tx_failed += stats->fail_cnt[i];
+	}
+
+	orig_cnt = info->tx_retries;
+	orig_fail_cnt = info->tx_failed;
+	info->tx_retries = peer_stats->tx.retries_mpdu;
+	info->tx_failed += peer_stats->tx.mpdu_success_with_retries;
+	hdd_debug("for peer: " QDF_MAC_ADDR_FMT "tx retries adjust from %d to %d",
+		  QDF_MAC_ADDR_REF(peer_mac), orig_cnt, info->tx_retries);
+	hdd_debug("for peer: " QDF_MAC_ADDR_FMT "tx failed adjust from %d to %d",
+		  QDF_MAC_ADDR_REF(peer_mac), orig_fail_cnt, info->tx_failed);
+exit:
+	qdf_mem_free(peer_stats);
+}
+
 /**
  * wlan_hdd_fill_summary_stats() - populate station_info summary stats
  * @stats: summary stats to use as a source
@@ -5839,16 +5900,19 @@ static void hdd_get_max_rate_ht(struct hdd_station_info *stainfo,
 	}
 
 	if (!report_max) {
-		for (i = 0; i < mcsidx; i++) {
+		for (i = 0; i < MAX_HT_MCS_INDEX && i < mcsidx; i++) {
 			if (rssi <= rssi_mcs_tbl[mode][i]) {
 				mcsidx = i;
 				break;
 			}
 		}
-		if (mcsidx < stats->tx_rate.mcs)
+		if (mcsidx < stats->tx_rate.mcs &&
+		    stats->tx_rate.mcs <= MAX_HT_MCS_INDEX)
 			mcsidx = stats->tx_rate.mcs;
 	}
 
+	if (mcsidx > MAX_HT_MCS_INDEX)
+		mcsidx = MAX_HT_MCS_INDEX;
 	tmprate = supported_mcs_rate[mcsidx].supported_rate[flag];
 
 	hdd_debug("tmprate %d mcsidx %d", tmprate, mcsidx);
@@ -7596,6 +7660,9 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	wlan_hdd_fill_summary_stats(&hdd_stats->summary_stat,
 				    sinfo, link_info->vdev_id);
 
+	wlan_hdd_fill_per_link_summary_stats(&hdd_stats->summary_stat,
+					     sinfo, link_info);
+
 	ucfg_dp_get_net_dev_stats(vdev, &stats);
 	sinfo->tx_bytes = stats.tx_bytes;
 	sinfo->rx_bytes = stats.rx_bytes;
@@ -8208,8 +8275,17 @@ int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 	if (errno)
 		return errno;
 
+	errno = wlan_hdd_qmi_get_sync_resume();
+	if (errno) {
+		hdd_err("qmi sync resume failed: %d", errno);
+		goto end;
+	}
+
 	errno = __wlan_hdd_cfg80211_dump_station(wiphy, dev, idx, mac, sinfo);
 
+	wlan_hdd_qmi_put_suspend();
+
+end:
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
@@ -9637,10 +9713,14 @@ static enum qca_wlan_roam_stats_frame_subtype
 hdd_convert_roam_frame_type(enum eroam_frame_subtype type)
 {
 	switch (type) {
-	case WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH:
-		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH;
-	case WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC:
-		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_RESP:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_RESP;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_REQ:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_REQ;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_RESP:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_RESP;
 	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1:
 		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1;
 	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M2:
@@ -9658,7 +9738,7 @@ hdd_convert_roam_frame_type(enum eroam_frame_subtype type)
 		break;
 	}
 
-	return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH;
+	return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ;
 };
 
 static enum qca_wlan_roam_stats_frame_status
@@ -9914,7 +9994,7 @@ static uint32_t hdd_get_roam_stats_individual_record_len(struct enhance_roam_inf
 
 	/* ROAM_STATS_FRAME_INFO */
 	len += nla_total_size(0);
-	for (i = 0; i < ROAM_FRAME_NUM; i++) {
+	for (i = 0; i < WLAN_ROAM_MAX_FRAME_INFO; i++) {
 		/* nest attribute */
 		len += nla_total_size(0);
 		/* ROAM_STATS_FRAME_SUBTYPE */
@@ -10293,7 +10373,7 @@ static int hdd_nla_put_roam_stats_info(struct sk_buff *skb,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < ROAM_FRAME_NUM; i++) {
+	for (i = 0; i < WLAN_ROAM_MAX_FRAME_INFO; i++) {
 		roam_frame = nla_nest_start(skb, i);
 		if (!roam_frame) {
 			hdd_err("nla_nest_start fail");
@@ -10321,6 +10401,15 @@ static int hdd_nla_put_roam_stats_info(struct sk_buff *skb,
 			hdd_err("frame[%u].timestamp put fail %d", i, ret);
 			return -EINVAL;
 		}
+		ret = nla_put(skb,
+			      QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FRAME_BSSID,
+			      QDF_MAC_ADDR_SIZE,
+			      info->timestamp[i].bssid.bytes);
+		if (ret) {
+			hdd_err("roam candidate AP bssid put fail");
+			return -EINVAL;
+		}
+
 		nla_nest_end(skb, roam_frame);
 	}
 	nla_nest_end(skb, roam_frame_info);
@@ -10330,14 +10419,7 @@ static int hdd_nla_put_roam_stats_info(struct sk_buff *skb,
 		hdd_err("roam original AP bssid put fail");
 		return -EINVAL;
 	}
-	if (info->trigger.roam_status) {
-		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ROAM_STATS_CANDIDATE_BSSID,
-			    QDF_MAC_ADDR_SIZE,
-			    info->scan.candidate_bssid.bytes)) {
-			hdd_err("roam candidate AP bssid put fail");
-			return -EINVAL;
-		}
-	} else {
+	if (!info->trigger.roam_status) {
 		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ROAM_STATS_ROAMED_BSSID,
 			    QDF_MAC_ADDR_SIZE, info->scan.roamed_bssid.bytes)) {
 			hdd_err("roam roamed AP bssid put fail");

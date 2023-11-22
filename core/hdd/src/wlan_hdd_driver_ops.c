@@ -203,18 +203,6 @@ void hdd_dp_prealloc_put_multi_pages(uint32_t desc_type,
 #endif
 
 /**
- * hdd_set_recovery_in_progress() - API to set recovery in progress
- * @data: Context
- * @val: Value to set
- *
- * Return: None
- */
-static void hdd_set_recovery_in_progress(void *data, uint8_t val)
-{
-	cds_set_recovery_in_progress(val);
-}
-
-/**
  * hdd_is_driver_unloading() - API to query if driver is unloading
  * @data: Private Data
  *
@@ -287,6 +275,106 @@ static void hdd_send_driver_ready_to_user(void)
 	}
 
 	wlan_cfg80211_vendor_event(nl_event, flags);
+}
+
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+/**
+ * hdd_wlan_ssr_shutdown_event()- send ssr shutdown state
+ *
+ * This Function sends ssr shutdown state diag event
+ *
+ * Return: void.
+ */
+static void hdd_wlan_ssr_shutdown_event(void)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(ssr_shutdown,
+				 struct host_event_wlan_ssr_shutdown);
+	qdf_mem_zero(&ssr_shutdown, sizeof(ssr_shutdown));
+	ssr_shutdown.status = SSR_SUB_SYSTEM_SHUTDOWN;
+	WLAN_HOST_DIAG_EVENT_REPORT(&ssr_shutdown,
+					EVENT_WLAN_SSR_SHUTDOWN_SUBSYSTEM);
+}
+#else
+static inline void hdd_wlan_ssr_shutdown_event(void) { }
+#endif
+
+/**
+ * hdd_psoc_shutdown_notify() - notify the various interested parties that the
+ *	soc is starting recovery shutdown
+ * @hdd_ctx: the HDD context corresponding to the soc undergoing shutdown
+ *
+ * Return: None
+ */
+static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
+{
+	hdd_enter();
+	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
+
+	if (ucfg_ipa_is_enabled()) {
+		ucfg_ipa_uc_force_pipe_shutdown(hdd_ctx->pdev);
+
+		if (pld_is_fw_rejuvenate(hdd_ctx->parent_dev) ||
+		    pld_is_pdr(hdd_ctx->parent_dev))
+			ucfg_ipa_fw_rejuvenate_send_msg(hdd_ctx->pdev);
+	}
+
+	cds_shutdown_notifier_call();
+	cds_shutdown_notifier_purge();
+
+	hdd_wlan_ssr_shutdown_event();
+	hdd_exit();
+}
+
+/**
+ * hdd_soc_recovery_cleanup() - Perform SSR related cleanup activities.
+ *
+ * This function will perform cleanup activities related to when driver
+ * undergoes SSR. Activities include stopping idle timer and invoking shutdown
+ * notifier.
+ *
+ * Return: None
+ */
+static void hdd_soc_recovery_cleanup(void)
+{
+	struct hdd_context *hdd_ctx;
+
+	hdd_enter();
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return;
+
+	/* cancel/flush any pending/active idle shutdown work */
+	hdd_psoc_idle_timer_stop(hdd_ctx);
+	ucfg_dp_bus_bw_compute_timer_stop(hdd_ctx->psoc);
+
+	/* nothing to do if the soc is already unloaded */
+	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
+		hdd_info("Driver modules are already closed");
+		return;
+	}
+
+	if (cds_is_load_or_unload_in_progress()) {
+		hdd_info("Load/unload in progress, ignore SSR shutdown");
+		return;
+	}
+
+	hdd_psoc_shutdown_notify(hdd_ctx);
+	hdd_exit();
+}
+
+/**
+ * hdd_set_recovery_in_progress() - API to set recovery in progress
+ * @data: Context
+ * @val: Value to set
+ *
+ * Return: None
+ */
+static void hdd_set_recovery_in_progress(void *data, uint8_t val)
+{
+	cds_set_recovery_in_progress(val);
+	/* SSR can be triggred late cleanup existing queue for kernel handshake */
+	if (!qdf_in_interrupt())
+		hdd_soc_recovery_cleanup();
 }
 
 /**
@@ -977,27 +1065,6 @@ static void hdd_soc_remove(struct device *dev)
 	__hdd_soc_remove(dev);
 }
 
-#ifdef FEATURE_WLAN_DIAG_SUPPORT
-/**
- * hdd_wlan_ssr_shutdown_event()- send ssr shutdown state
- *
- * This Function send send ssr shutdown state diag event
- *
- * Return: void.
- */
-static void hdd_wlan_ssr_shutdown_event(void)
-{
-	WLAN_HOST_DIAG_EVENT_DEF(ssr_shutdown,
-					struct host_event_wlan_ssr_shutdown);
-	qdf_mem_zero(&ssr_shutdown, sizeof(ssr_shutdown));
-	ssr_shutdown.status = SSR_SUB_SYSTEM_SHUTDOWN;
-	WLAN_HOST_DIAG_EVENT_REPORT(&ssr_shutdown,
-					EVENT_WLAN_SSR_SHUTDOWN_SUBSYSTEM);
-}
-#else
-static inline void hdd_wlan_ssr_shutdown_event(void) { }
-#endif
-
 /**
  * hdd_send_hang_data() - Send hang data to userspace
  * @data: Hang data
@@ -1016,70 +1083,6 @@ static void hdd_send_hang_data(uint8_t *data, size_t data_len)
 	cds_get_recovery_reason(&reason);
 	cds_reset_recovery_reason();
 	wlan_hdd_send_hang_reason_event(hdd_ctx, reason, data, data_len);
-}
-
-/**
- * hdd_psoc_shutdown_notify() - notify the various interested parties that the
- *	soc is starting recovery shutdown
- * @hdd_ctx: the HDD context corresponding to the soc undergoing shutdown
- *
- * Return: None
- */
-static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
-{
-	hdd_enter();
-	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
-
-	if (ucfg_ipa_is_enabled()) {
-		ucfg_ipa_uc_force_pipe_shutdown(hdd_ctx->pdev);
-
-		if (pld_is_fw_rejuvenate(hdd_ctx->parent_dev) ||
-		    pld_is_pdr(hdd_ctx->parent_dev))
-			ucfg_ipa_fw_rejuvenate_send_msg(hdd_ctx->pdev);
-	}
-
-	cds_shutdown_notifier_call();
-	cds_shutdown_notifier_purge();
-
-	hdd_wlan_ssr_shutdown_event();
-	hdd_exit();
-}
-
-/**
- * hdd_soc_recovery_cleanup() - Perform SSR related cleanup activities.
- *
- * This function will perform cleanup activities related to when driver
- * undergoes SSR. Activities include stopping idle timer and invoking shutdown
- * notifier.
- *
- * Return: None
- */
-static void hdd_soc_recovery_cleanup(void)
-{
-	struct hdd_context *hdd_ctx;
-
-	hdd_enter();
-	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx)
-		return;
-
-	/* cancel/flush any pending/active idle shutdown work */
-	hdd_psoc_idle_timer_stop(hdd_ctx);
-	ucfg_dp_bus_bw_compute_timer_stop(hdd_ctx->psoc);
-
-	/* nothing to do if the soc is already unloaded */
-	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
-		hdd_info("Driver modules are already closed");
-		return;
-	}
-
-	if (cds_is_load_or_unload_in_progress()) {
-		hdd_info("Load/unload in progress, ignore SSR shutdown");
-		return;
-	}
-
-	hdd_psoc_shutdown_notify(hdd_ctx);
-	hdd_exit();
 }
 
 static void __hdd_soc_recovery_shutdown(void)

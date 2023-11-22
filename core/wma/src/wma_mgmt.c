@@ -2085,8 +2085,6 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 	struct ieee80211_frame *wh;
 	struct wmi_probe_resp_params params;
 
-	wma_debug("Send probe response template for vdev %d", vdev_id);
-
 	/*
 	 * Make the TSF offset negative so probe response in the same
 	 * staggered batch have the same TSF.
@@ -2175,7 +2173,8 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wma_nofl_debug("Send beacon template for vdev %d", vdev_id);
+	wma_nofl_debug("vdev %d: bcn update reason %d", vdev_id,
+		       bcn_info->reason);
 
 	if (bcn_info->p2pIeOffset) {
 		p2p_ie = bcn_info->beacon + bcn_info->p2pIeOffset;
@@ -2302,6 +2301,16 @@ static QDF_STATUS wma_store_bcn_tmpl(tp_wma_handle wma, uint8_t vdev_id,
 	else
 		bcn->p2p_ie_offset = bcn_info->p2pIeOffset;
 
+	if (bcn_info->csa_count_offset > 3)
+		bcn->csa_count_offset = bcn_info->csa_count_offset - 4;
+	else
+		bcn->csa_count_offset = bcn_info->csa_count_offset;
+
+	if (bcn_info->ecsa_count_offset > 3)
+		bcn->ecsa_count_offset = bcn_info->ecsa_count_offset - 4;
+	else
+		bcn->ecsa_count_offset = bcn_info->ecsa_count_offset;
+
 	bcn_payload = qdf_nbuf_data(bcn->buf);
 	if (bcn->tim_ie_offset) {
 		tim_ie = (struct beacon_tim_ie *)
@@ -2379,8 +2388,12 @@ int wma_tbttoffset_update_event_handler(void *handle, uint8_t *event,
 		bcn_info.p2pIeOffset = bcn->p2p_ie_offset;
 		bcn_info.beaconLength = bcn->len;
 		bcn_info.timIeOffset = bcn->tim_ie_offset;
+		bcn_info.csa_count_offset = bcn->csa_count_offset;
+		bcn_info.ecsa_count_offset = bcn->ecsa_count_offset;
 		qdf_spin_unlock_bh(&bcn->lock);
 
+		wma_err_rl("Update beacon template for vdev %d due to TBTT offset update",
+			   if_id);
 		/* Update beacon template in firmware */
 		wma_unified_bcn_tmpl_send(wma, if_id, &bcn_info, 0);
 	}
@@ -2440,7 +2453,6 @@ void wma_send_probe_rsp_tmpl(tp_wma_handle wma,
 
 	if (wmi_service_enabled(wma->wmi_handle,
 				   wmi_service_beacon_offload)) {
-		wma_nofl_debug("Beacon Offload Enabled Sending Unified command");
 		if (wmi_unified_probe_rsp_tmpl_send(wma, vdev_id,
 						    probe_rsp_info) < 0) {
 			wma_err("wmi_unified_probe_rsp_tmpl_send Failed");
@@ -2495,7 +2507,6 @@ void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 	uint8_t *p2p_ie;
 	struct sAniBeaconStruct *beacon;
 
-	wma_nofl_debug("Beacon update reason %d", bcn_info->reason);
 	beacon = (struct sAniBeaconStruct *) (bcn_info->beacon);
 	if (wma_find_vdev_id_by_addr(wma, beacon->macHdr.sa, &vdev_id)) {
 		wma_err("failed to get vdev id");

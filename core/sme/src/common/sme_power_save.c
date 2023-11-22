@@ -372,11 +372,8 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 	 * also if command is power save disable  there is not need to check
 	 * for connected state as firmware can handle this
 	 */
-	if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id)) {
-		sme_debug("vdev:%d STA not infra/connected state",
-			  session_id);
+	if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id))
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return QDF_STATUS_SUCCESS;
 }

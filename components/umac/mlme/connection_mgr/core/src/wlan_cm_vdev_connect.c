@@ -1171,6 +1171,9 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
 
+	/* Initialize number of partner links as zero */
+	partner_info->num_partner_links = 0;
+
 	/* If ML IE is not present then return failure*/
 	if (!scan_entry->ie_list.multi_link_bv)
 		return QDF_STATUS_E_FAILURE;

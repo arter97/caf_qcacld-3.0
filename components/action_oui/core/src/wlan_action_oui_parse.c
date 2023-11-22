@@ -966,6 +966,50 @@ action_oui_is_empty(struct action_oui_psoc_priv *psoc_priv,
 	return false;
 }
 
+static bool validate_vendor_oui_data(struct action_oui_extension *extension,
+				     struct action_oui_search_attr *attr)
+{
+	uint8_t elem_id, elem_len;
+	int32_t left;
+	uint8_t eid = WLAN_MAC_EID_VENDOR;
+	const uint8_t *ptr = NULL;
+	const uint8_t *oui = extension->oui;
+
+	if (!attr->ie_data || !attr->ie_length || !oui)
+		return false;
+
+	ptr = attr->ie_data;
+	left = attr->ie_length;
+
+	while (left >= 2) {
+		elem_id  = ptr[0];
+		elem_len = ptr[1];
+		left -= 2;
+
+		if (elem_len > left)
+			return false;
+
+		if (eid == elem_id) {
+			/*
+			 * if oui is provided and oui_size is more than left
+			 * bytes, then we cannot have match
+			 */
+			if (extension->oui_length > left)
+				return false;
+
+			if (qdf_mem_cmp(&ptr[2], extension->oui,
+					extension->oui_length) == 0 &&
+			    check_for_vendor_oui_data(extension, ptr))
+				return true;
+		}
+
+		left -= elem_len;
+		ptr += (elem_len + 2);
+	}
+
+	return false;
+}
+
 bool
 action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 		  struct action_oui_search_attr *attr,
@@ -1016,9 +1060,8 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 			goto next;
 
 		if (extension->data_length && !wildcard_oui &&
-		    !check_for_vendor_oui_data(extension, oui_ptr))
+		    !validate_vendor_oui_data(extension, attr))
 			goto next;
-
 
 		if ((extension->info_mask & ACTION_OUI_INFO_MAC_ADDRESS) &&
 		    !check_for_vendor_ap_mac(extension, attr))

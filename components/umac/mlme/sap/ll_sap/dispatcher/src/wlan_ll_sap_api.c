@@ -20,7 +20,10 @@
 #include "wlan_cm_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_policy_mgr_api.h"
+#include "wlan_reg_services_api.h"
+#include "wlan_dfs_utils_api.h"
 
+#ifdef WLAN_FEATURE_BEARER_SWITCH
 wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_psoc *psoc)
 {
@@ -61,13 +64,13 @@ wlan_ll_sap_switch_bearer_on_sta_connect_start(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t ll_lt_sap_freq;
 	bool is_bearer_switch_required = false;
 	QDF_STATUS status = QDF_STATUS_E_ALREADY;
-	uint8_t vdev_id;
+	uint8_t ll_lt_sap_vdev_id;
 
-	vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev(psoc);
+	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
 	/* LL_LT SAP is not present, bearer switch is not required */
-	if (vdev_id == WLAN_INVALID_VDEV_ID)
+	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID)
 		return status;
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, ll_lt_sap_vdev_id,
 						    WLAN_LL_SAP_ID);
 	if (!vdev)
 		return status;
@@ -75,7 +78,7 @@ wlan_ll_sap_switch_bearer_on_sta_connect_start(struct wlan_objmgr_psoc *psoc,
 	if (!scan_list || !qdf_list_size(scan_list))
 		goto rel_ref;
 
-	ll_lt_sap_freq = policy_mgr_get_lt_ll_sap_freq(psoc);
+	ll_lt_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
 	qdf_list_peek_front(scan_list, &cur_node);
 
 	while (cur_node) {
@@ -152,4 +155,70 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_complete(
 		return QDF_STATUS_E_ALREADY;
 
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+QDF_STATUS wlan_ll_lt_sap_get_freq_list(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_ll_lt_sap_freq_list *freq_list,
+				uint8_t vdev_id)
+{
+	return ll_lt_sap_get_freq_list(psoc, freq_list, vdev_id);
+}
+
+qdf_freq_t wlan_ll_lt_sap_override_freq(struct wlan_objmgr_psoc *psoc,
+					uint32_t vdev_id,
+					qdf_freq_t chan_freq)
+{
+	qdf_freq_t freq;
+
+	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+		return chan_freq;
+
+	/*
+	 * If already any concurrent interface is present on this frequency,
+	 * select a different frequency to start ll_lt_sap
+	 */
+	if (!policy_mgr_get_connection_count_with_ch_freq(chan_freq))
+		return chan_freq;
+
+	freq = ll_lt_sap_get_valid_freq(psoc, vdev_id);
+
+	ll_sap_debug("Vdev %d ll_lt_sap old freq %d new freq %d", vdev_id,
+		     chan_freq, freq);
+
+	return freq;
+}
+
+qdf_freq_t wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
+					   qdf_freq_t chan_freq,
+					   uint8_t vdev_id,
+					   enum sap_csa_reason_code *csa_reason)
+{
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+	qdf_freq_t restart_freq;
+
+	if (wlan_reg_is_disable_in_secondary_list_for_freq(pdev, chan_freq) &&
+	    !utils_dfs_is_freq_in_nol(pdev, chan_freq)) {
+		*csa_reason = CSA_REASON_CHAN_DISABLED;
+		goto get_new_ll_lt_sap_freq;
+	} else if (wlan_reg_is_passive_for_freq(pdev, chan_freq))  {
+		*csa_reason = CSA_REASON_CHAN_PASSIVE;
+		goto get_new_ll_lt_sap_freq;
+	} else if (!policy_mgr_is_sap_freq_allowed(psoc, chan_freq)) {
+		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
+		goto get_new_ll_lt_sap_freq;
+	} else if (policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
+		*csa_reason = CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
+		goto get_new_ll_lt_sap_freq;
+	}
+
+	return chan_freq;
+
+get_new_ll_lt_sap_freq:
+	restart_freq = ll_lt_sap_get_valid_freq(psoc, vdev_id);
+
+	ll_sap_debug("vdev %d old freq %d restart freq %d CSA reason %d ",
+		     vdev_id, chan_freq, restart_freq, *csa_reason);
+	return restart_freq;
 }
