@@ -2134,6 +2134,26 @@ _conditional_srcs = {
             "os_if/mlme/sap/ll_sap/src/os_if_ll_sap.c",
         ],
     },
+    "CONFIG_WLAN_SUPPORT_FLOW_PRIORTIZATION": {
+        True: [
+            "components/dp/core/src/wlan_dp_fpm.c",
+            "components/dp/dispatcher/src/wlan_dp_flow_ucfg_api.c",
+            "os_if/dp/src/wlan_osif_fpm.c",
+            "components/dp/core/src/wlan_dp_fim.c",
+        ],
+    },
+    "CONFIG_WLAN_SUPPORT_SERVICE_CLASS": {
+        True: [
+            "components/dp/core/src/wlan_dp_svc.c",
+            "components/dp/dispatcher/src/wlan_dp_svc_ucfg_api.c",
+            "os_if/dp/src/os_if_dp_svc.c",
+        ],
+    },
+    "CONFIG_WLAN_SUPPORT_LAPB": {
+        True: [
+            "components/dp/core/src/wlan_dp_lapb_flow.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):

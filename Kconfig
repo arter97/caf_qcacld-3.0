@@ -1800,6 +1800,18 @@ config FEATURE_PKTLOG_EN_NON_LEGACY
 	bool "Enable FEATURE_PKTLOG_EN_NON_LEGACY"
 	default n
 
+config WLAN_SUPPORT_SERVICE_CLASS
+	bool "enable CONFIG_WLAN_SUPPORT_SERVICE_CLASS"
+	default n
+
+config WLAN_SUPPORT_FLOW_PRIORTIZATION
+	bool "enable CONFIG_WLAN_SUPPORT_FLOW_PRIORTIZATION"
+	default n
+
+config WLAN_SUPPORT_LAPB
+	bool "enable CONFIG_WLAN_SUPPORT_LAPB"
+	default n
+
 config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"
 	default \"wlan\"
