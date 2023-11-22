@@ -7085,6 +7085,7 @@ void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
 {
 	tDot11fIEhe_cap *rcvd_he = &assoc_req->he_cap;
 	tDot11fIEhe_cap *peer_he = &sta_ds->he_config;
+	struct wlan_mlme_cfg *mlme_cfg = mac_ctx->mlme_cfg;
 
 	if (!sta_ds->mlmStaContext.he_capable)
 		return;
@@ -7094,6 +7095,15 @@ void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
 		return;
 
 	lim_intersect_he_caps(rcvd_he, peer_he, session);
+
+	if ((mlme_cfg->he_caps.disable_sap_mcs_12_13 &
+	     BIT(DISABLE_MCS_12_13_2G_40M)) &&
+	    LIM_IS_AP_ROLE(session) &&
+	    wlan_reg_is_24ghz_ch_freq(session->curr_op_freq) &&
+	    session->ch_width == CH_WIDTH_40MHZ) {
+		sta_ds->he_mcs_12_13_map = 0;
+		return;
+	}
 
 	/* If MCS 12/13 is supported from assoc QCN IE */
 	if (assoc_req->qcn_ie.present &&
