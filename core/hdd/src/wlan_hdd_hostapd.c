@@ -6410,11 +6410,101 @@ void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 	sap_config->num_link = 0;
 	mlo_ap_vdev_detach(link_info->vdev);
 }
+
+/**
+ * wlan_hdd_update_rnrie() - handle rnrie for start bss
+ * @beacon: Pointer to beacon buffer
+ * @config: sap config
+ * @link_info: link info
+ *
+ * Return: 0 if update rnrie success otherwise error code.
+ */
+static int wlan_hdd_update_rnrie(struct hdd_beacon_data *beacon,
+				 struct sap_config *config,
+				 struct wlan_hdd_link_info *link_info)
+{
+	int ret = 0;
+	const uint8_t *ie = NULL;
+	struct ssirupdaternrie update_ie;
+	mac_handle_t mac_handle;
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	config->rnrielen = 0;
+	qdf_mem_zero(&config->rnrie[0], sizeof(config->rnrie));
+	ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_REDUCED_NEIGHBOR_REPORT,
+				      beacon->tail,
+				      beacon->tail_len);
+
+	/* although no rnrie, should not block bss start */
+	if (!ie || !ie[1])
+		return ret;
+
+	config->rnrielen = ie[1] + 2;
+	hdd_debug("RNR IEs length %d, vdev id %d", config->rnrielen,
+		  link_info->vdev_id);
+
+	if (config->rnrielen > sizeof(config->rnrie)) {
+		hdd_debug("RNR IEs too large");
+		ret = -EINVAL;
+		goto fail;
+	}
+
+	qdf_mem_copy(&config->rnrie[0], ie, config->rnrielen);
+
+	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
+		return ret;
+
+	/* update rnrie if sap already running */
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	if (!mac_handle) {
+		hdd_debug("NULL MAC context and reset rnrie buf");
+		ret = -EINVAL;
+		goto fail;
+	}
+
+	update_ie.vdev_id = link_info->vdev_id;
+	update_ie.iebufferlength = config->rnrielen;
+
+	/* Added for rnrIE */
+	update_ie.piebuffer = qdf_mem_malloc(update_ie.iebufferlength);
+	if (!update_ie.piebuffer) {
+		ret = -EINVAL;
+		goto fail;
+	}
+	qdf_mem_copy(update_ie.piebuffer, &config->rnrie[0],
+		     update_ie.iebufferlength);
+
+	if (sme_update_rnr_ie(mac_handle,
+			      &update_ie) ==
+	    QDF_STATUS_E_FAILURE) {
+		hdd_err("Update rnrie failure");
+		qdf_mem_free(update_ie.piebuffer);
+		ret = -EINVAL;
+		goto fail;
+	}
+
+	qdf_mem_free(update_ie.piebuffer);
+
+	return ret;
+fail:
+	config->rnrielen = 0;
+	qdf_mem_zero(&config->rnrie[0], sizeof(config->rnrie));
+	return ret;
+}
+
 #else
 static inline QDF_STATUS
 wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline int
+wlan_hdd_update_rnrie(struct hdd_beacon_data *beacon,
+		      struct sap_config *config,
+		      struct wlan_hdd_link_info *link_info)
+{
+	return 0;
 }
 #endif
 
@@ -6967,6 +7057,10 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		wlan_hdd_check_h2e(&config->extended_rates,
 				   &config->require_h2e);
 	}
+
+	ret = wlan_hdd_update_rnrie(beacon, config, link_info);
+	if (ret != 0)
+		goto error;
 
 	if (!cds_is_sub_20_mhz_enabled())
 		wlan_hdd_set_sap_hwmode(link_info);
