@@ -347,7 +347,7 @@ bool pmo_core_is_wow_applicable(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-void pmo_set_sta_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)
+void pmo_set_sta_wow_bitmask(struct pmo_psoc_cfg *pmo_cfg, uint32_t *bitmask, uint32_t wow_bitmap_size)
 {
 
 	pmo_set_wow_event_bitmap(WOW_CSA_IE_EVENT,
@@ -356,12 +356,17 @@ void pmo_set_sta_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)
 	pmo_set_wow_event_bitmap(WOW_CLIENT_KICKOUT_EVENT,
 				 wow_bitmap_size,
 				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_PATTERN_MATCH_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
+
+	if (pmo_cfg->ptrn_match_enable_all_vdev)
+		pmo_set_wow_event_bitmap(WOW_PATTERN_MATCH_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_cfg->magic_ptrn_enable)
+		pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
 	pmo_set_wow_event_bitmap(WOW_DEAUTH_RECVD_EVENT,
 				 wow_bitmap_size,
 				 bitmask);

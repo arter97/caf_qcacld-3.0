@@ -94,7 +94,7 @@ void pmo_set_wow_event_bitmap(WOW_WAKE_EVENT_TYPE event,
  *
  * Return: none
  */
-void pmo_set_sta_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmask_size);
+void pmo_set_sta_wow_bitmask(struct pmo_psoc_cfg *pmo_cfg, uint32_t *bitmask, uint32_t wow_bitmask_size);
 
 /**
  * pmo_set_sap_wow_bitmask() - set predefined SAP wow wakeup events
