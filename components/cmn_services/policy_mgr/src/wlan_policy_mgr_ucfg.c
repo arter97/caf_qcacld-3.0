@@ -64,6 +64,16 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 	cfg = &pm_ctx->cfg;
 
 	cfg->mcc_to_scc_switch = cfg_get(psoc, CFG_MCC_TO_SCC_SWITCH);
+	if (cfg->mcc_to_scc_switch != QDF_MCC_TO_SCC_SWITCH_DISABLE &&
+	    cfg->mcc_to_scc_switch <
+			QDF_MCC_TO_SCC_SWITCH_FORCE_WITHOUT_DISCONNECTION) {
+		policy_mgr_info("User configured mcc_to_scc_switch: %d, overwrite it to: %d",
+			cfg->mcc_to_scc_switch,
+			QDF_MCC_TO_SCC_SWITCH_FORCE_WITHOUT_DISCONNECTION);
+		cfg->mcc_to_scc_switch =
+			QDF_MCC_TO_SCC_SWITCH_FORCE_WITHOUT_DISCONNECTION;
+	}
+
 	cfg->sys_pref = cfg_get(psoc, CFG_CONC_SYS_PREF);
 
 	if (wlan_is_mlo_sta_nan_ndi_allowed(psoc)) {
