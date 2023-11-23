@@ -2347,6 +2347,7 @@ static int32_t build_child_vap_list(struct interface_list *if_list,
 						    ifname, (char *)&buffer,
 						    buffer.length);
 
+		strlcpy(mld_intf, (char *)buffer.data, IFNAME_LEN);
 		if (mld_intf[0] && is_interface_active(mld_intf, STATS_OBJ_VAP)) {
 			temp_obj->is_mld_slave = true;
 			strlcpy(temp_obj->mld_ifname, mld_intf, IFNAME_LEN);
