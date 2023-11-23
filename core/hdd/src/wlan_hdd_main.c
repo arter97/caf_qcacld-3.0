@@ -2690,6 +2690,9 @@ static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
 
 	ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
 
+	if (wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 1))
+		hdd_err("IMPS feature enable failed");
+
 	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (!sta_adapter) {
 		hdd_debug("STA adapter does not exist");
@@ -2707,6 +2710,9 @@ static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 		return;
 
 	ucfg_fwol_set_ilp_config(hdd_ctx->psoc, hdd_ctx->pdev, 0);
+
+	if (wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 0))
+		hdd_err("IMPS feature disable failed");
 
 	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (!sta_adapter) {
