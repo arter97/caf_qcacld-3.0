@@ -2038,6 +2038,10 @@ config WLAN_FEATURE_EMLSR
 	bool "Enable EMLSR feature"
 	default n
 
+config WLAN_FEATURE_UPSTREAM_MLO_SAP
+	bool "Enable support upstream mlo sap"
+	default n
+
 menu "Optional Configs"
 
 if CNSS_KIWI_V2
