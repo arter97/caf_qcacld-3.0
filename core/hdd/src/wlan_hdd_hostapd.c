@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -8212,6 +8212,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		old = ap_ctx->beacon;
 		if (old)
 			return -EALREADY;
+
+		if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+						 link_info->vdev_id)) {
+			hdd_debug("Actual dtim_period %d",
+				  params->dtim_period);
+			params->dtim_period = 10;
+			hdd_debug("overwritten dtim_period %d",
+				  params->dtim_period);
+		}
 
 		status =
 			wlan_hdd_cfg80211_alloc_new_beacon(link_info, &new,
