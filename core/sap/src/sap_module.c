@@ -4437,7 +4437,7 @@ void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 		return;
 	}
 
-	if (vdev_id >= WLAN_UMAC_VDEV_ID_MAX)
+	if (vdev_id >= SAP_MAX_NUM_SESSION)
 		return;
 
 	sap_ctx = mac_ctx->sap.sapCtxList[vdev_id].sap_context;
