@@ -1704,6 +1704,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 		return;
 	}
 
+	wlan_crypto_aquire_lock();
 	for (i = 0; i < max_key_index; i++) {
 		crypto_key = wlan_crypto_get_key(vdev, i);
 		if (!crypto_key)
@@ -1716,6 +1717,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 				       crypto_key->cipher_type);
 		key_present = true;
 	}
+	wlan_crypto_release_lock();
 
 	if (!key_present && mlo_mgr_is_link_switch_in_progress(vdev)) {
 		mlme_err("No key found for link_id %d", link_id);
