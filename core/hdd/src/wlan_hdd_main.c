@@ -15088,7 +15088,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	 */
 	if (WLAN_HDD_GET_SAP_CTX_PTR(link_info)) {
 		is_ssr = true;
-	} else if (!hdd_sap_create_ctx(adapter)) {
+	} else if (!hdd_sap_create_ctx(link_info)) {
 		hdd_err("sap creation failed");
 		return qdf_status_to_os_return(QDF_STATUS_E_FAILURE);
 	}

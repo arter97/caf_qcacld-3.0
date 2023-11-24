@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -265,14 +265,14 @@ void hdd_deinit_ap_mode(struct wlan_hdd_link_info *link_info);
 void hdd_set_ap_ops(struct net_device *dev);
 /**
  * hdd_sap_create_ctx() - Wrapper API to create SAP context
- * @adapter: pointer to adapter
+ * @link_info: pointer to link info
  *
  * This wrapper API can be called to create the sap context. It will
  * eventually calls SAP API to create the sap context
  *
  * Return: true or false based on overall success or failure
  */
-bool hdd_sap_create_ctx(struct hdd_adapter *adapter);
+bool hdd_sap_create_ctx(struct wlan_hdd_link_info *link_info);
 /**
  * hdd_sap_destroy_ctx() - Wrapper API to destroy SAP context
  * @link_info: Pointer of link_info in adapter

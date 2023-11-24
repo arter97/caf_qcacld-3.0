@@ -4412,11 +4412,11 @@ void hdd_set_ap_ops(struct net_device *dev)
 }
 #endif
 
-bool hdd_sap_create_ctx(struct hdd_adapter *adapter)
+bool hdd_sap_create_ctx(struct wlan_hdd_link_info *link_info)
 {
 	hdd_debug("creating sap context");
-	adapter->deflink->session.ap.sap_context = sap_create_ctx();
-	if (adapter->deflink->session.ap.sap_context)
+	link_info->session.ap.sap_context = sap_create_ctx();
+	if (link_info->session.ap.sap_context)
 		return true;
 
 	return false;
