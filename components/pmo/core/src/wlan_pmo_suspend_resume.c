@@ -1032,10 +1032,13 @@ QDF_STATUS pmo_core_txrx_suspend(struct wlan_objmgr_psoc *psoc)
 		goto out;
 	}
 
+	cdp_display_txrx_hw_info(dp_soc);
+	/* drain RX rings only */
+	cdp_drain_txrx(dp_soc, 1);
+
 	if (ret == -EOPNOTSUPP)
 		goto out;
 
-	cdp_drain_txrx(dp_soc);
 	pmo_ctx->wow.txrx_suspended = true;
 out:
 	pmo_psoc_put_ref(psoc);
