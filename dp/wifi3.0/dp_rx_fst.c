@@ -683,8 +683,29 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 					  fse->hal_rx_fse);
 	qdf_assert_always(status == QDF_STATUS_SUCCESS);
 
+	if (fse->svc_id != DP_RX_FLOW_INVALID_SVC_ID) {
+		/* send WDI event */
+		struct fse_info_cookie cookie = {0};
+
+		/* send wdi event */
+		qdf_mem_copy(&cookie.tuple_info, &rx_flow_info->flow_tuple_info,
+			     sizeof(struct cdp_rx_flow_tuple_info));
+
+		cookie.svc_id = fse->svc_id;
+		cookie.tid = fse->tid;
+		cookie.dest_mac = &fse->dest_mac.raw[0];
+
+		dp_wdi_event_handler(WDI_EVENT_FSE_UPDATE, soc, &cookie,
+				     HTT_INVALID_PEER, dp_rx_fse_event_del,
+				     pdev->pdev_id);
+	}
+
 	/* Free the FSE in DP FST */
 	fse->is_valid = false;
+	fse->mismatch = false;
+	fse->svc_id = 0;
+	fse->tid = 0;
+	qdf_mem_zero(&fse->dest_mac.raw[0], QDF_MAC_ADDR_SIZE);
 
 	/* Decrement number of valid entries in table */
 	fst->num_entries--;
