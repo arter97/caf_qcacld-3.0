@@ -509,58 +509,58 @@ static const struct option long_opts[] = {
 
 #ifndef WLAN_CONFIG_TX_DELAY
 const char *stats_if_fw_to_hw_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
-	"0 to 10 ms", "11 to 20 ms",
-	"21 to 30 ms", "31 to 40 ms",
-	"41 to 50 ms", "51 to 60 ms",
-	"61 to 70 ms", "71 to 80 ms",
-	"81 to 90 ms", "91 to 100 ms",
-	"101 to 250 ms", "251 to 500 ms", "500+ ms"
+	"0   to 10  ms", "11  to 20  ms",
+	"21  to 30  ms", "31  to 40  ms",
+	"41  to 50  ms", "51  to 60  ms",
+	"61  to 70  ms", "71  to 80  ms",
+	"81  to 90  ms", "91  to 100 ms",
+	"101 to 250 ms", "251 to 500 ms", "500+       ms"
 };
 
 const char *stats_if_sw_enq_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
-	"0 to 1 ms", "1 to 2 ms",
-	"2 to 3 ms", "3 to 4 ms",
-	"4 to 5 ms", "5 to 6 ms",
-	"6 to 7 ms", "7 to 8 ms",
-	"8 to 9 ms", "9 to 10 ms",
-	"10 to 11 ms", "11 to 12 ms", "12+ ms"
+	"0  to 1  ms", "1  to 2  ms",
+	"2  to 3  ms", "3  to 4  ms",
+	"4  to 5  ms", "5  to 6  ms",
+	"6  to 7  ms", "7  to 8  ms",
+	"8  to 9  ms", "9  to 10 ms",
+	"10 to 11 ms", "11 to 12 ms", "12+      ms"
 };
 #else
 const char *stats_if_fw_to_hw_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
-	"0 to 250 us", "250 to 500 us",
-	"500 to 750 us", "750 to 1000 us",
+	"0    to 250  us", "250  to 500  us",
+	"500  to 750  us", "750  to 1000 us",
 	"1000 to 1500 us", "1500 to 2000 us",
 	"2000 to 2500 us", "2500 to 5000 us",
 	"5000 to 6000 us", "6000 to 7000 us",
-	"7000 to 8000 us", "8000 to 9000 us", "9000+ us"
+	"7000 to 8000 us", "8000 to 9000 us", "9000+        us"
 };
 
 const char *stats_if_sw_enq_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
-	"0 to 250 us", "250 to 500 us",
-	"500 to 750 us", "750 to 1000 us",
+	"0    to 250  us", "250  to 500  us",
+	"500  to 750  us", "750  to 1000 us",
 	"1000 to 1500 us", "1500 to 2000 us",
 	"2000 to 2500 us", "2500 to 5000 us",
 	"5000 to 6000 us", "6000 to 7000 us",
-	"7000 to 8000 us", "8000 to 9000 us", "9000+ us"
+	"7000 to 8000 us", "8000 to 9000 us", "9000+        us"
 };
 #endif
 
 const char *stats_if_intfrm_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
-	"0 to 5 ms", "6 to 10 ms",
+	"0  to 5  ms", "6  to 10 ms",
 	"11 to 15 ms", "16 to 20 ms",
 	"21 to 25 ms", "26 to 30 ms",
 	"31 to 35 ms", "36 to 40 ms",
 	"41 to 45 ms", "46 to 50 ms",
-	"51 to 55 ms", "56 to 60 ms", "60+ ms"
+	"51 to 55 ms", "56 to 60 ms", "60+      ms"
 };
 
 const char *stats_if_hw_tx_comp_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
-	"0 to 250 us", "250 to 500 us",
-	"500 to 750 us", "750 to 1000 us",
+	"0    to 250  us", "250  to 500  us",
+	"500  to 750  us", "750  to 1000 us",
 	"1000 to 1500 us", "1500 to 2000 us",
 	"2000 to 2500 us", "2500 to 5000 us",
 	"5000 to 6000 us", "6000 to 7000 us",
-	"7000 to 8000 us", "8000 to 9000 us", "9000+ us"
+	"7000 to 8000 us", "8000 to 9000 us", "9000+        us"
 };
 
 static void display_help(void)
@@ -1431,17 +1431,17 @@ static void print_advance_hist_stats(struct stats_if_hist_stats *hstats,
 		}
 		switch (hist_type) {
 		case STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY:
-			STATS_PRINT("%s: Packets = %ju ",
+			STATS_PRINT("\n\t\t%s: Packets = %ju ",
 				    stats_if_sw_enq_delay_bucket[index],
 				    count);
 			break;
 		case STATS_IF_HIST_TYPE_HW_COMP_DELAY:
-			STATS_PRINT("%s: Packets = %ju ",
+			STATS_PRINT("\n\t\t%s: Packets = %ju ",
 				    stats_if_fw_to_hw_delay_bucket[index],
 				    count);
 			break;
 		case STATS_IF_HIST_TYPE_REAP_STACK:
-			STATS_PRINT("%s: Packets = %ju ",
+			STATS_PRINT("\n\t\t%s: Packets = %ju ",
 				    stats_if_intfrm_delay_bucket[index],
 				    count);
 			break;
@@ -1455,9 +1455,9 @@ static void print_advance_hist_stats(struct stats_if_hist_stats *hstats,
 		}
 	}
 
-	STATS_PRINT("Min = %d us\n", hstats->min);
-	STATS_PRINT("Max = %d us\n", hstats->max);
-	STATS_PRINT("Avg = %d us\n", hstats->avg);
+	STATS_PRINT("\n\t\tMin = %d us\n", hstats->min);
+	STATS_PRINT("\t\tMax = %d us\n", hstats->max);
+	STATS_PRINT("\t\tAvg = %d us\n", hstats->avg);
 }
 
 static void print_advance_sta_data_delay(struct advance_peer_data_delay *delay)
@@ -1466,24 +1466,24 @@ static void print_advance_sta_data_delay(struct advance_peer_data_delay *delay)
 
 	STATS_PRINT("Tx Delay Stats:\n");
 	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
-		STATS_PRINT("----TID: %d----", tid);
-		STATS_PRINT(" Software Enqueue Delay: ");
+		STATS_PRINT("\tTID: %d", tid);
+		STATS_PRINT("\n\t\tSoftware Enqueue Delay: ");
 		print_advance_hist_stats(&delay->delay_stats[tid].tx_delay.tx_swq_delay,
 					 STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY);
-		STATS_PRINT("\t\tHardware Transmission Delay: ");
+		STATS_PRINT("\n\t\tHardware Transmission Delay: ");
 		print_advance_hist_stats(&delay->delay_stats[tid].tx_delay.hwtx_delay,
 					 STATS_IF_HIST_TYPE_HW_COMP_DELAY);
-		STATS_PRINT("\t\tNW Delay Average: %d",
+		STATS_PRINT("\n\t\tNW Delay Average: %d",
 				delay->delay_stats[tid].tx_delay.nwdelay_avg);
-		STATS_PRINT("\t\tSW Delay Average: %d",
+		STATS_PRINT("\n\t\tSW Delay Average: %d",
 				delay->delay_stats[tid].tx_delay.swdelay_avg);
-		STATS_PRINT("\t\tHW Delay Average: %d\n",
+		STATS_PRINT("\n\t\tHW Delay Average: %d\n",
 				delay->delay_stats[tid].tx_delay.hwdelay_avg);
 	}
 	STATS_PRINT("\nRx Delay Stats:\n");
 	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
-		STATS_PRINT("----TID: %d---- ", tid);
-		STATS_PRINT("Reap2stack Deliver Delay: ");
+		STATS_PRINT("\tTID: %d", tid);
+		STATS_PRINT("\n\t\tReap2stack Deliver Delay: ");
 		print_advance_hist_stats(&delay->delay_stats[tid].rx_delay
 					 .to_stack_delay,
 					 STATS_IF_HIST_TYPE_REAP_STACK);
