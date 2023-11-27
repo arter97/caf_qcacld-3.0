@@ -275,7 +275,7 @@ int hdd_sap_context_init(struct hdd_context *hdd_ctx)
 
 /**
  * hdd_hostapd_init_sap_session() - To init the sap session completely
- * @adapter: SAP/GO adapter
+ * @link_info: pointer of link info
  * @reinit: if called as part of reinit
  *
  * This API will do
@@ -284,9 +284,10 @@ int hdd_sap_context_init(struct hdd_context *hdd_ctx)
  * Return: 0 if success else non-zero value.
  */
 static struct sap_context *
-hdd_hostapd_init_sap_session(struct hdd_adapter *adapter, bool reinit)
+hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 {
 	struct sap_context *sap_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
 	QDF_STATUS status;
 
 	if (!adapter) {
@@ -294,7 +295,7 @@ hdd_hostapd_init_sap_session(struct hdd_adapter *adapter, bool reinit)
 		return NULL;
 	}
 
-	sap_ctx = adapter->deflink->session.ap.sap_context;
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
 	if (!sap_ctx) {
 		hdd_err("can't allocate the sap_ctx");
@@ -302,17 +303,17 @@ hdd_hostapd_init_sap_session(struct hdd_adapter *adapter, bool reinit)
 	}
 	status = sap_init_ctx(sap_ctx, adapter->device_mode,
 			       adapter->mac_addr.bytes,
-			       adapter->deflink->vdev_id, reinit);
+			       link_info->vdev_id, reinit);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wlansap_start failed!! status: %d", status);
-		adapter->deflink->session.ap.sap_context = NULL;
+		link_info->session.ap.sap_context = NULL;
 		goto error;
 	}
 	return sap_ctx;
 error:
 	wlansap_context_put(sap_ctx);
 	hdd_err("releasing the sap context for session-id:%d",
-		adapter->deflink->vdev_id);
+		link_info->vdev_id);
 
 	return NULL;
 }
@@ -4506,7 +4507,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 	hdd_debug("SSR in progress: %d", reinit);
 	qdf_atomic_init(&adapter->deflink->session.ap.acs_in_progress);
 
-	sap_ctx = hdd_hostapd_init_sap_session(adapter, reinit);
+	sap_ctx = hdd_hostapd_init_sap_session(adapter->deflink, reinit);
 	if (!sap_ctx) {
 		hdd_err("Invalid sap_ctx");
 		goto error_release_vdev;
