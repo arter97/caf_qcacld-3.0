@@ -43,6 +43,10 @@
 #include <qdf_nbuf.h>
 #include <qdf_net_stats.h>
 
+#ifdef FEATURE_WDS
+#include <cdp_txrx_ctrl.h>
+#endif
+
 /* Preprocessor definitions and constants */
 #undef QCA_DP_SAP_DUMP_SK_BUFF
 
