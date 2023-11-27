@@ -1496,16 +1496,16 @@ print_advance_sta_data_jitter(struct advance_peer_data_jitter *jitter)
 	uint8_t tid;
 
 	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
-		STATS_PRINT("----TID: %d---- ", tid);
-		STATS_PRINT("\tavg_jitter = %u ",
+		STATS_PRINT("\tTID: %d\n ", tid);
+		STATS_PRINT("\t\tavg_jitter = %u\n ",
 			    jitter->jitter_stats[tid].tx_avg_jitter);
-		STATS_PRINT("\tavg_delay  = %u ",
+		STATS_PRINT("\t\tavg_delay  = %u\n ",
 			    jitter->jitter_stats[tid].tx_avg_delay);
-		STATS_PRINT("\tavg_err  = %ju ",
+		STATS_PRINT("\t\tavg_err  = %ju\n ",
 			    jitter->jitter_stats[tid].tx_avg_err);
-		STATS_PRINT("\ttotal_success = %ju ",
+		STATS_PRINT("\t\ttotal_success = %ju\n ",
 			    jitter->jitter_stats[tid].tx_total_success);
-		STATS_PRINT("\tdrop  = %ju\n", jitter->jitter_stats[tid].tx_drop);
+		STATS_PRINT("\t\tdrop  = %ju\n", jitter->jitter_stats[tid].tx_drop);
 	}
 }
 
