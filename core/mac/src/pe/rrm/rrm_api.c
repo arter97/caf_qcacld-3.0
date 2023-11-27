@@ -1625,7 +1625,8 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 		i = 0;
 		do {
 			if (((!eids) || (*pBcnIes == eids[i])) ||
-				((*pBcnIes == eid) && *(pBcnIes + 2) == extn_eids[i])) {
+			    ((*pBcnIes == eid) &&
+			     (extn_eids && *(pBcnIes + 2) == extn_eids[i]))) {
 				if (((*pNumIes) + len) < pIesMaxSize) {
 						qdf_mem_copy(pIes, pBcnIes, len);
 						pIes += len;
