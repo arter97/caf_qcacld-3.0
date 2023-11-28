@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -392,7 +392,8 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		goto stop_close_pre_cac_adapter;
 	}
 
-	ret = wlan_hdd_set_channel(wiphy, dev, &chandef, channel_type);
+	ret = wlan_hdd_set_channel(link_info, wiphy, dev,
+				   &chandef, channel_type);
 	if (ret != 0) {
 		hdd_err("failed to set channel");
 		goto stop_close_pre_cac_adapter;

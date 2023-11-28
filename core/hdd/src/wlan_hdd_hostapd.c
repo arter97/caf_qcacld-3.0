@@ -4795,16 +4795,9 @@ static inline bool wlan_hdd_get_sap_obss(struct wlan_hdd_link_info *link_info)
 	return false;
 }
 #endif
-/**
- * wlan_hdd_set_channel() - set channel in sap mode
- * @wiphy: Pointer to wiphy structure
- * @dev: Pointer to net_device structure
- * @chandef: Pointer to channel definition structure
- * @channel_type: Channel type
- *
- * Return: 0 for success non-zero for failure
- */
-int wlan_hdd_set_channel(struct wiphy *wiphy, struct net_device *dev,
+
+int wlan_hdd_set_channel(struct wlan_hdd_link_info *link_info,
+			 struct wiphy *wiphy, struct net_device *dev,
 			 struct cfg80211_chan_def *chandef,
 			 enum nl80211_channel_type channel_type)
 {
@@ -4817,14 +4810,12 @@ int wlan_hdd_set_channel(struct wiphy *wiphy, struct net_device *dev,
 	struct sme_config_params *sme_config;
 	struct sap_config *sap_config;
 	struct hdd_ap_ctx *ap_ctx;
-	struct wlan_hdd_link_info *link_info;
 
 	if (!dev) {
 		hdd_err("Called with dev = NULL");
 		return -ENODEV;
 	}
 	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	link_info = adapter->deflink;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_SET_CHANNEL,
@@ -4875,7 +4866,7 @@ int wlan_hdd_set_channel(struct wiphy *wiphy, struct net_device *dev,
 		return -EINVAL;
 	}
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_config = &ap_ctx->sap_config;
 	sap_config->chan_freq = chandef->chan->center_freq;
 	sap_config->ch_params.center_freq_seg1 = channel_seg2;
@@ -8249,7 +8240,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			channel_type = NL80211_CHAN_HT40PLUS;
 
 
-		wlan_hdd_set_channel(wiphy, dev, chandef, channel_type);
+		wlan_hdd_set_channel(link_info, wiphy, dev,
+				     chandef, channel_type);
 
 		hdd_update_beacon_rate(link_info, wiphy, params);
 

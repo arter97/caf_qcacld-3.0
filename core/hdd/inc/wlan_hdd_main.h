@@ -3885,10 +3885,21 @@ int hdd_update_components_config(struct hdd_context *hdd_ctx);
  */
 void hdd_chan_change_notify_work_handler(void *work);
 
-int wlan_hdd_set_channel(struct wiphy *wiphy,
-		struct net_device *dev,
-		struct cfg80211_chan_def *chandef,
-		enum nl80211_channel_type channel_type);
+/**
+ * wlan_hdd_set_channel() - set channel in sap mode
+ * @link_info: pointer to link info
+ * @wiphy: Pointer to wiphy structure
+ * @dev: Pointer to net_device structure
+ * @chandef: Pointer to channel definition structure
+ * @channel_type: Channel type
+ *
+ * Return: 0 for success non-zero for failure
+ */
+int wlan_hdd_set_channel(struct wlan_hdd_link_info *link_info,
+			 struct wiphy *wiphy,
+			 struct net_device *dev,
+			 struct cfg80211_chan_def *chandef,
+			 enum nl80211_channel_type channel_type);
 
 /**
  * wlan_hdd_cfg80211_start_bss() - start bss
