@@ -324,7 +324,7 @@ bool tgt_dfs_is_stadfs_enabled(struct wlan_objmgr_pdev *pdev)
 
 	dfs = wlan_pdev_get_dfs_obj(pdev);
 	if (!dfs) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "dfs is NULL");
+		dfs_err(dfs, WLAN_DEBUG_DFS, "dfs is NULL");
 		return false;
 	}
 
