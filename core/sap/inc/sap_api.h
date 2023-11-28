@@ -59,7 +59,9 @@ extern "C" {
 #define       SAP_WPS_ENABLED_CONFIGURED   2
 
 #define       MAX_CHANNEL_LIST_LEN         256
+#ifndef QDF_MAX_NO_OF_SAP_MODE
 #define       QDF_MAX_NO_OF_SAP_MODE       2    /* max # of SAP */
+#endif
 #define       SAP_MAX_NUM_SESSION          5
 #define       SAP_MAX_OBSS_STA_CNT         1    /* max # of OBSS STA */
 #define       SAP_ACS_WEIGHT_MAX           (26664)
