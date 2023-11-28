@@ -4926,6 +4926,11 @@ ifeq ($(CONFIG_DP_HW_TX_DELAY_STATS_ENABLE), y)
 ccflags-y += -DHW_TX_DELAY_STATS_ENABLE
 endif
 
+# Config MAX SAP interface number
+ifdef CONFIG_QDF_MAX_NO_OF_SAP_MODE
+ccflags-y += -DQDF_MAX_NO_OF_SAP_MODE=$(CONFIG_QDF_MAX_NO_OF_SAP_MODE)
+endif
+
 #Flags to enable/disable Dynamic WLAN interface control feature
 ifeq ($(CONFIG_CNSS_HW_SECURE_DISABLE), y)
 ccflags-y += -DFEATURE_CNSS_HW_SECURE_DISABLE
