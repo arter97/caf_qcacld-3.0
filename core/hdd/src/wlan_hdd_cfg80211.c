@@ -12624,6 +12624,12 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	}
 
 	mlo_bd_info = nla_nest_start(skb, CONFIG_MLO_LINKS);
+	if (!mlo_bd_info) {
+		hdd_err("nla_nest_start error");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EINVAL;
+	}
+
 	hdd_adapter_for_each_link_info(link_info->adapter, link_info_t) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info_t);
 		if (sta_ctx->conn_info.ieee_link_id == WLAN_INVALID_LINK_ID)
