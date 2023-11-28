@@ -29781,7 +29781,214 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 }
 #endif
 
-#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+#if defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT) && \
+	defined(WLAN_FEATURE_MULTI_LINK_SAP)
+/**
+ * hdd_get_link_info_for_add_intf_link() - get link_info for add_intf_link
+ * @adapter: HDD adapter
+ *
+ * Return: pointer of wlan_hdd_link_info
+ */
+static struct wlan_hdd_link_info *
+hdd_get_link_info_for_add_intf_link(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		if (!test_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags))
+			return link_info;
+	}
+
+	return NULL;
+}
+
+/**
+ * hdd_deflink_update_mac_address() - update link mac for deflink
+ * @link_info: Pointer to hdd link info
+ * @link_addr_mac: link mac address
+ *
+ * Return: 0 for success, non zero for failure
+ */
+static inline int
+hdd_deflink_update_mac_address(struct wlan_hdd_link_info *link_info,
+			       struct qdf_mac_addr link_addr_mac)
+{
+	int ret;
+
+	if (!WLAN_HDD_IS_DEFLINK(link_info))
+		return 0;
+
+	ret = hdd_dynamic_mac_address_set(link_info, link_addr_mac,
+					  link_info->adapter->mac_addr,
+					  false, true);
+	return ret;
+}
+
+/**
+ * __wlan_hdd_cfg80211_add_intf_link() - to process add_inft_link
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @link_id: link id
+ *
+ * Return: 0 for success, non zero for failure
+ */
+static int
+__wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  unsigned int link_id)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct qdf_mac_addr link_addr_mac;
+	struct wlan_hdd_link_info *link_info;
+	QDF_STATUS status;
+	uint8_t link_idx;
+	int ret = -EINVAL;
+
+	link_info = hdd_get_link_info_for_add_intf_link(adapter);
+	if (!link_info) {
+		hdd_err(" invalid link info %u", link_id);
+		goto end;
+	}
+
+	if (link_id >= IEEE80211_MLD_MAX_NUM_LINKS) {
+		hdd_err(" invalid link_id %u", link_id);
+		goto end;
+	}
+
+	qdf_ether_addr_copy(link_addr_mac.bytes, wdev->links[link_id].addr);
+	link_info->link_addr = link_addr_mac;
+
+	hdd_debug("link id: %u link address:" QDF_MAC_ADDR_FMT,
+		  link_id, QDF_MAC_ADDR_REF(link_addr_mac.bytes));
+
+	/* For default link, update link address to vdev.
+	 * for 2nd link, create new vdev with link address.
+	 */
+	if (!WLAN_HDD_IS_DEFLINK(link_info)) {
+		link_idx =
+			hdd_adapter_get_index_of_link_info(link_info);
+		qdf_atomic_set_bit(link_idx, &adapter->active_links);
+
+		status = hdd_start_ap_link(link_info);
+		if (QDF_STATUS_SUCCESS != status) {
+			hdd_err("fail to start ap link %d", status);
+			goto clear_active_links;
+		}
+	} else {
+		ret = hdd_deflink_update_mac_address(link_info, link_addr_mac);
+		if (ret)
+			goto end;
+	}
+
+	if (QDF_STATUS_SUCCESS !=
+		hdd_multi_link_sap_vdev_attach(link_info, link_id)) {
+		hdd_err("failed to attach sap vdev");
+		goto stop_ap_link;
+	}
+
+	set_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags);
+	return 0;
+
+stop_ap_link:
+	if (!WLAN_HDD_IS_DEFLINK(link_info))
+		hdd_stop_ap_link(link_info);
+	else
+		return ret;
+
+clear_active_links:
+	qdf_atomic_clear_bit(link_idx, &adapter->active_links);
+
+end:
+	return ret;
+}
+
+/**
+ * __wlan_hdd_cfg80211_del_intf_link() - to process del_intf_link
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @link_id: link id
+ *
+ * Return: void
+ */
+static void
+__wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  unsigned int link_id)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_hdd_link_info *link_info;
+	uint8_t link_idx;
+
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link info");
+		return;
+	}
+
+	if (!WLAN_HDD_IS_DEFLINK(link_info)) {
+		hdd_stop_ap_link(link_info);
+
+		link_idx = hdd_adapter_get_index_of_link_info(link_info);
+		qdf_atomic_clear_bit(link_idx, &adapter->active_links);
+	}
+
+	clear_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags);
+}
+
+/**
+ * wlan_hdd_cfg80211_add_intf_link() - API for cfg80211 to process
+ * add_inft_link
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @link_id: link id
+ *
+ * Return: 0 for success, non zero for failure
+ */
+static int
+wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
+				unsigned int link_id)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_add_intf_link(wiphy, wdev, link_id);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+/**
+ * wlan_hdd_cfg80211_del_intf_link() - API for cfg80211 to process
+ * del_intf_link
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wireless device
+ * @link_id: link id
+ *
+ * Return: void
+ */
+static void
+wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
+				unsigned int link_id)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return;
+
+	__wlan_hdd_cfg80211_del_intf_link(wiphy, wdev, link_id);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+}
+#else
 static int
 wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 				unsigned int link_id)

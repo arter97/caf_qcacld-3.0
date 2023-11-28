@@ -4628,8 +4628,7 @@ hdd_indicate_peers_deleted(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 }
 
 QDF_STATUS hdd_init_ap_mode(struct wlan_hdd_link_info *link_info,
-			    bool reinit,
-			    bool rtnl_held)
+			    bool reinit)
 {
 	struct hdd_hostapd_state *phostapdBuf;
 	struct hdd_adapter *adapter = link_info->adapter;
@@ -6465,12 +6464,37 @@ static void wlan_hdd_set_sap_mcc_chnl_avoid(struct hdd_context *hdd_ctx)
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
 /**
  * wlan_hdd_mlo_update() - handle mlo scenario for start bss
  * @link_info: Pointer to hostapd adapter
  *
  * Return: QDF_STATUS
  */
+static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
+					  unsigned int link_id)
+{
+	struct sap_config *config;
+
+	if (!link_info || !link_info->vdev) {
+		hdd_err("invalid parameter");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (!mlo_ap_vdev_attach(link_info->vdev, link_id, 0)) {
+		hdd_err("MLO SAP attach fails");
+		return QDF_STATUS_E_INVAL;
+	}
+	config = &link_info->session.ap.sap_config;
+	config->mlo_sap = true;
+	config->link_id = link_id;
+	return QDF_STATUS_SUCCESS;
+}
+#else
 static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 {
 	bool is_ml_ap;
@@ -6509,6 +6533,7 @@ static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 
 void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 {

@@ -263,15 +263,13 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
  * hdd_init_ap_mode() - to init the AP adaptor
  * @link_info: pointer of link_info
  * @reinit: true if re-init, otherwise initial init
- * @rtnl_held: true if rtnl lock is taken, otherwise false
  *
  * This API can be called to open the SAP session as well as
  * to create and store the vdev object. It also initializes necessary
  * SAP adapter related params.
  */
 QDF_STATUS hdd_init_ap_mode(struct wlan_hdd_link_info *link_info,
-			    bool reinit,
-			    bool rtnl_held);
+			    bool reinit);
 
 /**
  * hdd_indicate_peers_deleted() - indicate peer delete for vdev
@@ -509,6 +507,26 @@ void
 wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 				 bool twt_responder, uint8_t vdev_id);
 #ifdef WLAN_FEATURE_11BE_MLO
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_multi_link_sap_vdev_attach() - attach vdev with link_id
+ * update multi link parameter to vdev and sap_config.
+ * @link_info: Pointer to wlan_hdd_link_info
+ * @link_id: link id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
+					  unsigned int link_id);
+#else
+static inline QDF_STATUS
+hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
+			       unsigned int link_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * wlan_hdd_mlo_reset() - reset mlo configuration if start bss fails
  * @link_info: Pointer to link_info in hostapd adapter

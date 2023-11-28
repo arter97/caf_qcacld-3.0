@@ -15194,6 +15194,33 @@ QDF_STATUS hdd_adapter_check_duplicate_session(struct hdd_adapter *adapter)
 }
 #endif
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_link_id(struct hdd_adapter *adapter, int link_id)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	if (!adapter) {
+		hdd_err("NULL adapter");
+		return NULL;
+	}
+
+	if (adapter->device_mode != QDF_SAP_MODE)
+		goto end;
+
+	hdd_debug("link_id %d, %ps", link_id, __builtin_return_address(0));
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (test_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags) &&
+		    wlan_vdev_get_link_id(link_info->vdev) == link_id)
+			return link_info;
+	}
+
+end:
+	return adapter->deflink;
+}
+#endif
+
 static void hdd_restore_info_for_ssr(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -15318,11 +15345,58 @@ fail:
 	return ret;
 }
 
+QDF_STATUS hdd_start_ap_link(struct wlan_hdd_link_info *link_info)
+{
+	bool is_ssr = false;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	int ret;
+
+	/*
+	 * In SSR case no need to create new sap context.
+	 * Otherwise create sap context first and then create
+	 * vdev as while creating the vdev, driver needs to
+	 * register SAP callback and that callback uses sap context
+	 */
+	if (WLAN_HDD_GET_SAP_CTX_PTR(link_info)) {
+		is_ssr = true;
+	} else if (!hdd_sap_create_ctx(link_info)) {
+		hdd_err("sap creation failed");
+		goto end;
+	}
+
+	ret = hdd_vdev_create(link_info);
+	if (ret) {
+		hdd_err("failed to create vdev, ret:%d", ret);
+		goto sap_destroy_ctx;
+	}
+
+	status = hdd_init_ap_mode(link_info, is_ssr);
+	if (QDF_STATUS_SUCCESS != status) {
+		hdd_err("Error Initializing the AP mode: %d", status);
+		goto sap_vdev_destroy;
+	}
+
+	return QDF_STATUS_SUCCESS;
+
+sap_vdev_destroy:
+	hdd_vdev_destroy(link_info);
+sap_destroy_ctx:
+	hdd_sap_destroy_ctx(link_info);
+end:
+	return status;
+}
+
+QDF_STATUS hdd_stop_ap_link(struct wlan_hdd_link_info *link_info)
+{
+	hdd_deinit_ap_mode(link_info);
+	hdd_vdev_destroy(link_info);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 {
 	QDF_STATUS status;
-	bool is_ssr = false;
-	int ret;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
@@ -15346,30 +15420,10 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 		return qdf_status_to_os_return(status);
 	}
 
-	/*
-	 * In SSR case no need to create new sap context.
-	 * Otherwise create sap context first and then create
-	 * vdev as while creating the vdev, driver needs to
-	 * register SAP callback and that callback uses sap context
-	 */
-	if (WLAN_HDD_GET_SAP_CTX_PTR(link_info)) {
-		is_ssr = true;
-	} else if (!hdd_sap_create_ctx(link_info)) {
-		hdd_err("sap creation failed");
-		return qdf_status_to_os_return(QDF_STATUS_E_FAILURE);
-	}
-
-	ret = hdd_vdev_create(link_info);
-	if (ret) {
-		hdd_err("failed to create vdev, status:%d", ret);
-		goto sap_destroy_ctx;
-	}
-
-	status = hdd_init_ap_mode(link_info, is_ssr, rtnl_held);
+	status = hdd_start_ap_link(link_info);
 	if (QDF_STATUS_SUCCESS != status) {
-		hdd_err("Error Initializing the AP mode: %d", status);
-		ret = qdf_status_to_os_return(status);
-		goto sap_vdev_destroy;
+		hdd_err("fail to start ap link %d", status);
+		return qdf_status_to_os_return(status);
 	}
 
 	hdd_sap_set_acs_with_more_param(hdd_ctx);
@@ -15410,12 +15464,6 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 
 	hdd_exit();
 	return 0;
-
-sap_vdev_destroy:
-	hdd_vdev_destroy(link_info);
-sap_destroy_ctx:
-	hdd_sap_destroy_ctx(link_info);
-	return ret;
 }
 
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)

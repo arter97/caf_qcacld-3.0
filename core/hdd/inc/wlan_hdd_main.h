@@ -276,12 +276,14 @@ enum hdd_adapter_flags {
  * @SOFTAP_BSS_STARTED: Software Access Point (SAP) is running
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
+ * @SOFTAP_ADD_INTF_LINK: add_intf_link is set for multi link SAP
  */
 enum hdd_link_flags {
 	SME_SESSION_OPENED,
 	SOFTAP_BSS_STARTED,
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
+	SOFTAP_ADD_INTF_LINK,
 };
 
 /**
@@ -1524,6 +1526,9 @@ struct hdd_adapter {
 		(&(WLAN_HDD_GET_AP_CTX_PTR((link_info))->hostapd_state))
 #define WLAN_HDD_GET_SAP_CTX_PTR(link_info) \
 		(WLAN_HDD_GET_AP_CTX_PTR((link_info))->sap_context)
+#define WLAN_HDD_IS_DEFLINK(link_info) \
+		((link_info) ? \
+		((link_info) == (link_info)->adapter->deflink) : false)
 
 #ifdef WLAN_FEATURE_NAN
 #define WLAN_HDD_IS_NDP_ENABLED(hdd_ctx) ((hdd_ctx)->nan_datapath_enabled)
@@ -4246,6 +4251,26 @@ void hdd_adapter_reset_station_ctx(struct hdd_adapter *adapter);
 int hdd_start_station_adapter(struct hdd_adapter *adapter);
 
 /**
+ * hdd_stop_ap_link()- Stop link of AP
+ * @link_info: pointer of hdd link info
+ *
+ * This function destroy vdev and deinit ap mode for each link.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_stop_ap_link(struct wlan_hdd_link_info *link_info);
+
+/**
+ * hdd_start_ap_link()- Start link of AP
+ * @link_info: pointer of hdd link info
+ *
+ * This function create vdev and init ap mode for each link.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_start_ap_link(struct wlan_hdd_link_info *link_info);
+
+/**
  * hdd_start_ap_adapter()- Start AP Adapter
  * @adapter: HDD adapter
  * @rtnl_held: True if rtnl lock is taken, otherwise false
@@ -5646,4 +5671,25 @@ int wlan_hdd_alloc_iface_combination_mem(struct hdd_context *hdd_ctx);
  */
 void wlan_hdd_free_iface_combination_mem(struct hdd_context *hdd_ctx);
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_get_link_info_by_link_id() - get wlan_hdd_link_info by link id
+ * @adapter: pointer to adapter
+ * @link_id: link id
+ * get link_info by link_id, for multi link sap, it has been configured
+ * with add_inft_link, so loop active link to match link_id, if it doesn't
+ * match, then return NULL.
+ * For other case, always return deflink.
+ *
+ * Return: wlan_hdd_link_info
+ */
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_link_id(struct hdd_adapter *adapter, int link_id);
+#else
+static inline struct wlan_hdd_link_info *
+hdd_get_link_info_by_link_id(struct hdd_adapter *adapter, int link_id)
+{
+	return adapter->deflink;
+}
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
