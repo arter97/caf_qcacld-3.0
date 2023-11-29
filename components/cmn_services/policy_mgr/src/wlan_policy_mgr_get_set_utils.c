@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -8722,7 +8722,7 @@ done:
 
 void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 				   uint8_t session_id, uint8_t num_links,
-				   struct qdf_mac_addr active_link_addr[2])
+				   struct qdf_mac_addr *active_link_addr)
 {
 	uint8_t idx, link, active_vdev_cnt = 0, inactive_vdev_cnt = 0;
 	uint16_t ml_vdev_cnt = 0;
