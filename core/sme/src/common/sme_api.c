@@ -15278,6 +15278,7 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	}
 	mlme_eht_cap = &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap;
 	sme_debug("set EHT caps testbed defaults");
+	mlme_eht_cap->scs_traffic_desc = 0;
 	mlme_eht_cap->epcs_pri_access = 0;
 	mlme_eht_cap->eht_om_ctl = 0;
 	mlme_eht_cap->triggered_txop_sharing_mode1 = 0;
