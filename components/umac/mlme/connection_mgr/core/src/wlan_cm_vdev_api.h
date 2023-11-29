@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -766,14 +766,12 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 /**
  * cm_get_ml_partner_info() - Fill ML partner info from scan entry
  * @pdev: PDEV object
- * @scan_entry: Scan entry
- * @partner_info: Partner info to be filled
+ * @conn_req: Connect request pointer
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
-		       struct scan_cache_entry *scan_entry,
-		       struct mlo_partner_info *partner_info);
+		       struct cm_connect_req *conn_req);
 #endif
 #endif /* __WLAN_CM_VDEV_API_H__ */
