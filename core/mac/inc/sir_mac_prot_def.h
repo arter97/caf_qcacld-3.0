@@ -1871,4 +1871,7 @@ struct he_6ghz_capability_info {
 #define SIR_MAC_TXSTBC                             1
 #define SIR_MAC_RXSTBC                             1
 
+#define SIR_MAC_IE_TYPE_OFFSET                     0
+#define SIR_MAC_IE_LEN_OFFSET                      1
+#define SIR_MAC_IE_TYPE_LEN_SIZE                   2
 #endif /* __MAC_PROT_DEFS_H */
