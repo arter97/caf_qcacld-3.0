@@ -2459,6 +2459,26 @@ struct hdd_chwidth_info {
 };
 
 /**
+ * enum hdd_nb_params_id - North bound parameter id
+ * @NB_NO_ID: non-use id
+ * @NB_START_AP: parameter from start ap
+ * @NB_MGMT_TX: parameter from mgmt tx
+ * @NB_CHANNEL_SWITCH: parameter from channel switch
+ * @NB_CHANGE_BSS: parameter from change bss
+ * @NB_CHANGE_BEACON: parameter from change beacon
+ * @NB_SET_TXQ: parameter from set txq
+ */
+enum hdd_nb_params_id {
+	NB_NO_ID,
+	NB_START_AP,
+	NB_MGMT_TX,
+	NB_CHANNEL_SWITCH,
+	NB_CHANGE_BSS,
+	NB_CHANGE_BEACON,
+	NB_SET_TXQ,
+};
+
+/**
  * struct mac_addr_set_priv: Set MAC addr private context
  * @fw_resp_status: F/W response status
  * @pending_rsp_cnt: Pending response count
@@ -5685,11 +5705,27 @@ void wlan_hdd_free_iface_combination_mem(struct hdd_context *hdd_ctx);
  */
 struct wlan_hdd_link_info *
 hdd_get_link_info_by_link_id(struct hdd_adapter *adapter, int link_id);
+
+/**
+ * hdd_nb_get_link_id_from_params() - to parse link id from northbound params
+ * @params: params from kernel
+ * @id: id to identify where is the parameter from.
+ *
+ * Return: link id
+ */
+int hdd_nb_get_link_id_from_params(void *params, enum hdd_nb_params_id id);
 #else
 static inline struct wlan_hdd_link_info *
 hdd_get_link_info_by_link_id(struct hdd_adapter *adapter, int link_id)
 {
 	return adapter->deflink;
+}
+
+static inline int
+hdd_nb_get_link_id_from_params(void *params, enum hdd_nb_params_id id)
+{
+	int link_id = -1;
+	return link_id;
 }
 #endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

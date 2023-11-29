@@ -15141,6 +15141,7 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 
 	return status;
 }
+
 #elif defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 QDF_STATUS hdd_adapter_check_duplicate_session(struct hdd_adapter *adapter)
 {
@@ -15210,6 +15211,45 @@ hdd_get_link_info_by_link_id(struct hdd_adapter *adapter, int link_id)
 end:
 	return adapter->deflink;
 }
+
+int hdd_nb_get_link_id_from_params(void *params, enum hdd_nb_params_id id)
+{
+	int link_id = -1;
+
+	switch (id) {
+	case NB_START_AP:
+		link_id = ((struct cfg80211_ap_settings *)params)->
+							beacon.link_id;
+		break;
+	case NB_MGMT_TX:
+		link_id = ((struct cfg80211_mgmt_tx_params *)params)->link_id;
+		break;
+	case NB_CHANNEL_SWITCH:
+		/* extract link_id from beacon_after instead of beacon_csa. as
+		 * beacon_csa is parsing from NL80211_ATTR_CSA_IES which is
+		 * nested so the link_id is always 0 from kernel if using
+		 * beacon_csa.
+		 */
+		link_id = ((struct cfg80211_csa_settings *)params)->
+							beacon_after.link_id;
+		break;
+	case NB_CHANGE_BSS:
+		link_id = ((struct bss_parameters *)params)->link_id;
+		break;
+	case NB_CHANGE_BEACON:
+		link_id = ((struct cfg80211_beacon_data *)params)->link_id;
+		break;
+	case NB_SET_TXQ:
+		link_id = ((struct ieee80211_txq_params *)params)->link_id;
+		break;
+	default:
+		hdd_err("wrong northbound id %d", id);
+		break;
+	}
+
+	return link_id;
+}
+
 #endif
 
 static void hdd_restore_info_for_ssr(struct hdd_adapter *adapter)

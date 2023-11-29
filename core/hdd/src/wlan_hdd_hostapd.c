@@ -8239,12 +8239,19 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS], i;
 	enum policy_mgr_con_mode intf_pm_mode;
 	struct wlan_objmgr_vdev *vdev;
-	uint16_t link_id = 0;
+	int link_id;
 	struct sap_config *sap_config;
 	struct hdd_ap_ctx *ap_ctx;
-	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
+
+	link_id = hdd_nb_get_link_id_from_params((void *)params, NB_START_AP);
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
 
 	clear_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
