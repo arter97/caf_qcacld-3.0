@@ -18718,8 +18718,7 @@ void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 
 	qdf_event_reset(&hostapd_state->qdf_event);
 	qdf_status = wlansap_start_bss(ap_ctx->sap_context,
-				       hdd_hostapd_sap_event_cb, sap_config,
-				       ap_adapter->dev);
+				       hdd_hostapd_sap_event_cb, sap_config);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		goto end;
 
@@ -21577,7 +21576,7 @@ void hdd_restart_sap(struct wlan_hdd_link_info *link_info)
 
 		qdf_event_reset(&hapd_state->qdf_event);
 		status = wlansap_start_bss(sap_ctx, hdd_hostapd_sap_event_cb,
-					   sap_config, ap_adapter->dev);
+					   sap_config);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("SAP Start Bss fail");
 			goto deinit_mlo;

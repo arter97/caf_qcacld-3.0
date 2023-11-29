@@ -2274,8 +2274,8 @@ void hdd_hostapd_chan_change_started(struct wlan_hdd_link_info *link_info,
 	qdf_sched_work(0, &link_info->ch_chng_info.chan_change_notify_work);
 }
 
-QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
-				    void *context)
+QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
+				    struct sap_event *sap_event)
 {
 	struct hdd_adapter *adapter;
 	struct hdd_ap_ctx *ap_ctx;
@@ -2307,7 +2307,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	struct hdd_station_info *stainfo, *cache_stainfo, *tmp = NULL;
 	mac_handle_t mac_handle;
 	struct sap_config *sap_config;
-	struct sap_context *sap_ctx = NULL;
 	uint8_t pdev_id;
 	bool notify_new_sta = true;
 	struct wlan_objmgr_vdev *vdev;
@@ -2316,21 +2315,25 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	struct wlan_hdd_link_info *link_info;
 	bool alt_pipe;
 
-	dev = context;
-	if (!dev) {
-		hdd_err("context is null");
+	link_info = (struct wlan_hdd_link_info *)sap_ctx->user_context;
+	if (!link_info) {
+		hdd_err("invalid link info");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	adapter = netdev_priv(dev);
-
+	adapter = link_info->adapter;
 	if ((!adapter) ||
 	    (WLAN_HDD_ADAPTER_MAGIC != adapter->magic)) {
 		hdd_err("invalid adapter or adapter has invalid magic");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	link_info = adapter->deflink;
+	dev = adapter->dev;
+	if (!dev) {
+		hdd_err("dev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
@@ -2338,7 +2341,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		hdd_err("sap_event is null");
 		return QDF_STATUS_E_FAILURE;
 	}
-
 	event_id = sap_event->sapHddEventCode;
 	memset(&wrqu, '\0', sizeof(wrqu));
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -4459,7 +4461,7 @@ void hdd_set_ap_ops(struct net_device *dev)
 bool hdd_sap_create_ctx(struct wlan_hdd_link_info *link_info)
 {
 	hdd_debug("creating sap context");
-	link_info->session.ap.sap_context = sap_create_ctx();
+	link_info->session.ap.sap_context = sap_create_ctx(link_info);
 	if (link_info->session.ap.sap_context)
 		return true;
 
@@ -7260,8 +7262,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		goto error;
 	}
 
-	status = wlansap_start_bss(sap_ctx, sap_event_callback, config,
-				   adapter->dev);
+	status = wlansap_start_bss(sap_ctx, sap_event_callback, config);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		mutex_unlock(&hdd_ctx->sap_lock);
 
@@ -8684,7 +8685,7 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter)
 				eSAP_MAC_INITATED_DISASSOC;
 		sap_event.sapevt.sapStationDisassocCompleteEvent.status_code =
 				QDF_STATUS_E_RESOURCES;
-		hdd_hostapd_sap_event_cb(&sap_event, sap_ctx->user_context);
+		hdd_hostapd_sap_event_cb(sap_ctx, &sap_event);
 	}
 
 	hdd_exit();

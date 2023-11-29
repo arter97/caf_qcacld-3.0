@@ -236,8 +236,17 @@ QDF_STATUS hdd_softap_sta_deauth(struct hdd_adapter *adapter,
 void hdd_softap_sta_disassoc(struct hdd_adapter *adapter,
 			     struct csr_del_sta_params *param);
 
-QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
-				    void *context);
+/**
+ * hdd_hostapd_sap_event_cb() - callback to process sap event
+ * @sap_ctx: SAP context
+ * @sap_event: SAP event buffer
+ *
+ * Function for HDD to process event notification from sap
+ * module
+ * return: QDF_STATUS
+ */
+QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
+				    struct sap_event *sap_event);
 /**
  * hdd_init_ap_mode() - to init the AP adaptor
  * @link_info: pointer of link_info

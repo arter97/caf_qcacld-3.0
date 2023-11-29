@@ -209,7 +209,7 @@ void wlansap_context_put(struct sap_context *ctx)
 	qdf_mutex_release(&sap_context_lock);
 }
 
-struct sap_context *sap_create_ctx(void)
+struct sap_context *sap_create_ctx(void *link_info)
 {
 	struct sap_context *sap_ctx;
 	QDF_STATUS status;
@@ -226,6 +226,8 @@ struct sap_context *sap_create_ctx(void)
 		qdf_mem_free(sap_ctx);
 		return NULL;
 	}
+
+	sap_ctx->user_context = link_info;
 	sap_debug("Exit");
 
 	return sap_ctx;
@@ -451,6 +453,9 @@ QDF_STATUS sap_destroy_ctx(struct sap_context *sap_ctx)
 		sap_err("Invalid SAP pointer");
 		return QDF_STATUS_E_FAULT;
 	}
+
+	sap_ctx->user_context = NULL;
+
 	/* Cleanup SAP control block */
 	/*
 	 * wlansap_context_put will release actual sap_ctx memory
@@ -535,8 +540,6 @@ uint16_t wlansap_check_cc_intf(struct sap_context *sap_ctx)
   * wlansap_set_scan_acs_channel_params() - Config scan and channel parameters.
   * config:                                Pointer to the SAP config
   * psap_ctx:                               Pointer to the SAP Context.
-  * pusr_context:                           Parameter that will be passed
-  *                                         back in all the SAP callback events.
   *
   * This api function is used to copy Scan and Channel parameters from sap
   * config to sap context.
@@ -546,8 +549,7 @@ uint16_t wlansap_check_cc_intf(struct sap_context *sap_ctx)
   */
 static QDF_STATUS
 wlansap_set_scan_acs_channel_params(struct sap_config *config,
-				    struct sap_context *psap_ctx,
-				    void *pusr_context)
+				    struct sap_context *psap_ctx)
 {
 	struct mac_context *mac;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -583,7 +585,6 @@ wlansap_set_scan_acs_channel_params(struct sap_config *config,
 		sap_err("get_auto_channel_weight failed");
 
 	psap_ctx->auto_channel_select_weight = auto_channel_select_weight;
-	psap_ctx->user_context = pusr_context;
 	psap_ctx->enableOverLapCh = config->enOverLapCh;
 	psap_ctx->acs_cfg = &config->acs_cfg;
 	psap_ctx->ch_width_orig = config->acs_cfg.ch_width;
@@ -783,7 +784,7 @@ void wlan_sap_set_sap_ctx_acs_cfg(struct sap_context *sap_ctx,
 
 QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 			     sap_event_cb sap_event_cb,
-			     struct sap_config *config, void *user_context)
+			     struct sap_config *config)
 {
 	struct sap_sm_event sap_event;        /* State machine event */
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
@@ -833,7 +834,6 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 
 	sap_ctx->auto_channel_select_weight = auto_channel_select_weight;
 
-	sap_ctx->user_context = user_context;
 	sap_ctx->enableOverLapCh = config->enOverLapCh;
 	sap_ctx->acs_cfg = &config->acs_cfg;
 	sap_ctx->sec_ch_freq = config->sec_ch_freq;
@@ -2825,8 +2825,7 @@ void sap_undo_acs(struct sap_context *sap_ctx, struct sap_config *sap_cfg)
 
 QDF_STATUS wlansap_acs_chselect(struct sap_context *sap_context,
 				sap_event_cb acs_event_callback,
-				struct sap_config *config,
-				void *pusr_context)
+				struct sap_config *config)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct mac_context *mac;
@@ -2851,8 +2850,7 @@ QDF_STATUS wlansap_acs_chselect(struct sap_context *sap_context,
 	 * Now, configure the scan and ACS channel params
 	 * to issue a scan request.
 	 */
-	wlansap_set_scan_acs_channel_params(config, sap_context,
-					    pusr_context);
+	wlansap_set_scan_acs_channel_params(config, sap_context);
 
 	/*
 	 * Copy the HDD callback function to report the

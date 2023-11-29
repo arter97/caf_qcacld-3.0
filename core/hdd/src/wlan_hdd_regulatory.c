@@ -1778,7 +1778,7 @@ hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
 	mutex_lock(&hdd_ctx->sap_lock);
 	qdf_event_reset(&hostapd_state->qdf_event);
 	status = wlansap_start_bss(sap_ctx, hdd_hostapd_sap_event_cb,
-				   sap_config, adapter->dev);
+				   sap_config);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		mutex_unlock(&hdd_ctx->sap_lock);
 		hdd_err("SAP Start Bss fail");

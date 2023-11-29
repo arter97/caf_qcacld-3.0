@@ -2884,7 +2884,7 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 		break;
 	}
 	qdf_status = (*sap_ctx->sap_event_cb)
-			(sap_ap_event, sap_ctx->user_context);
+			(sap_ctx, sap_ap_event);
 
 	qdf_mem_free(sap_ap_event);
 

@@ -2466,7 +2466,7 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 		adapter->mac_addr.bytes, sizeof(struct qdf_mac_addr));
 
 	qdf_status = wlansap_acs_chselect(sap_ctx, acs_event_callback,
-					  sap_config, adapter->dev);
+					  sap_config);
 
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("ACS channel select failed");

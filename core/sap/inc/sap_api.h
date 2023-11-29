@@ -779,6 +779,7 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 
 /**
  * sap_create_ctx() - API to create the sap context
+ * @link_info: pointer of hdd link info
  *
  * This API assigns the sap context from global sap context pool
  * stored in gp_sap_ctx[i] array.
@@ -786,7 +787,7 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
  * Return: Pointer to the SAP context, or NULL if a context could not
  * be allocated
  */
-struct sap_context *sap_create_ctx(void);
+struct sap_context *sap_create_ctx(void *link_info);
 
 /**
  * sap_destroy_ctx - API to destroy the sap context
@@ -846,8 +847,8 @@ bool sap_is_auto_channel_select(struct sap_context *sapcontext);
 
 QDF_STATUS wlansap_global_init(void);
 QDF_STATUS wlansap_global_deinit(void);
-typedef QDF_STATUS (*sap_event_cb)(struct sap_event *sap_event,
-				   void *user_context);
+typedef QDF_STATUS (*sap_event_cb)(struct sap_context *sap_ctx,
+				struct sap_event *sap_event);
 
 /**
  * wlansap_is_channel_in_nol_list() - This API checks if channel is
@@ -882,8 +883,6 @@ bool wlansap_is_channel_leaking_in_nol(struct sap_context *sap_ctx,
  *                        about SAP results
  * @config: Pointer to configuration structure passed down from
  *                    HDD(HostApd for Android)
- * @user_context: Parameter that will be passed back in all the SAP callback
- *               events.
  *
  * This api function provides SAP FSM event eWLAN_SAP_PHYSICAL_LINK_CREATE for
  * starting AP BSS
@@ -895,7 +894,7 @@ bool wlansap_is_channel_leaking_in_nol(struct sap_context *sap_ctx,
  */
 QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 			     sap_event_cb sap_event_cb,
-			     struct sap_config *config, void *user_context);
+			     struct sap_config *config);
 
 /**
  * wlansap_stop_bss() - stop BSS.
@@ -1424,8 +1423,6 @@ void wlansap_populate_del_sta_params(const uint8_t *mac,
  *                             to inform hdd about channel selection result
  * @config:                   Pointer to configuration structure
  *                             passed down from hdd
- * @pusr_context:              Parameter that will be passed back in all
- *                             the sap callback events.
  *
  * This function serves as an api for hdd to initiate acs scan pre
  * start bss.
@@ -1434,8 +1431,7 @@ void wlansap_populate_del_sta_params(const uint8_t *mac,
  */
 QDF_STATUS wlansap_acs_chselect(struct sap_context *sap_context,
 				sap_event_cb acs_event_callback,
-				struct sap_config *config,
-				void *pusr_context);
+				struct sap_config *config);
 
 /**
  * sap_undo_acs() - Undo acs i.e free the allocated ch lists
