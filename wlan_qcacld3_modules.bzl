@@ -26,7 +26,7 @@ _chipset_hw_map = {
 _chipset_header_map = {
     "peach": [
         "api/hw/peach/v1",
-        "cmn/hal/wifi3.0/kiwi",
+        "cmn/hal/wifi3.0/peach",
     ],
     "kiwi-v2": [
         "api/hw/kiwi/v2",
@@ -691,19 +691,23 @@ _conditional_srcs = {
     },
     "CONFIG_CNSS_KIWI_V2": {
         True: [
-            "cmn/hal/wifi3.0/kiwi/hal_kiwi.c",
             "cmn/hif/src/kiwidef.c",
+        ],
+    },
+    "CONFIG_INCLUDE_HAL_KIWI": {
+        True: [
+            "cmn/hal/wifi3.0/kiwi/hal_kiwi.c",
+        ],
+    },
+    "CONFIG_INCLUDE_HAL_PEACH": {
+        True: [
+            "cmn/hal/wifi3.0/peach/hal_peach.c",
         ],
     },
     "CONFIG_QCA6750_HEADERS_DEF": {
         True: [
             "cmn/hal/wifi3.0/qca6750/hal_6750.c",
             "cmn/hif/src/qca6750def.c",
-        ],
-    },
-    "CONFIG_CNSS_PEACH": {
-        True: [
-            "cmn/hal/wifi3.0/kiwi/hal_kiwi.c",
         ],
     },
     "CONFIG_CP_STATS": {

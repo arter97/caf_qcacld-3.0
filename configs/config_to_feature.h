@@ -1548,6 +1548,14 @@
 #define QCA_WIFI_PEACH (1)
 #endif
 
+#ifdef CONFIG_INCLUDE_HAL_KIWI
+#define INCLUDE_HAL_KIWI (1)
+#endif
+
+#ifdef CONFIG_INCLUDE_HAL_PEACH
+#define INCLUDE_HAL_PEACH (1)
+#endif
+
 #ifdef CONFIG_QCA_WIFI_QCA8074
 #define QCA_WIFI_QCA8074 (1)
 #endif
