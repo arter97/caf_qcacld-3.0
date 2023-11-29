@@ -1,6 +1,7 @@
 CONFIG_CNSS_KIWI := y
 CONFIG_CNSS_KIWI_V2 := y
 CONFIG_CNSS_MANGO := y
+CONFIG_INCLUDE_HAL_KIWI := y
 
 include $(WLAN_ROOT)/configs/default_defconfig
 

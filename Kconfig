@@ -120,6 +120,14 @@ config CNSS_PEACH
 	bool "Enable CNSS_PEACH"
 	default n
 
+config INCLUDE_HAL_KIWI
+	bool "Enable INCLUDE_HAL_KIWI"
+	default n
+
+config INCLUDE_HAL_PEACH
+	bool "Enable INCLUDE_HAL_PEACH"
+	default n
+
 config CNSS_UTILS_MODULE
 	bool "Enable CNSS_UTILS_MODULE"
 	default n
