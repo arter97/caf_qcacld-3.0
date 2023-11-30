@@ -290,6 +290,7 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 	struct sap_context *sap_ctx;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct qdf_mac_addr *link_mac;
 	QDF_STATUS status;
 
 	if (!adapter) {
@@ -304,6 +305,12 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 		return NULL;
 	}
 
+	link_mac = hdd_adapter_get_link_mac_addr(link_info);
+	if (!link_mac) {
+		hdd_err("invalid link_mac");
+		return NULL;
+	}
+
 	status = sap_acquire_vdev_ref(hdd_ctx->psoc, sap_ctx,
 				      link_info->vdev_id);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -313,7 +320,7 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 	}
 
 	status = sap_init_ctx(sap_ctx, adapter->device_mode,
-			       adapter->mac_addr.bytes,
+			       link_mac->bytes,
 			       link_info->vdev_id, reinit);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wlansap_start failed!! status: %d", status);
@@ -6758,6 +6765,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	uint32_t user_config_freq = 0;
 	struct hdd_ap_ctx *ap_ctx;
 	enum policy_mgr_con_mode pm_con_mode;
+	struct qdf_mac_addr *link_mac;
 
 	hdd_enter();
 
@@ -6771,6 +6779,13 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_HDD_ID_OBJ_MGR);
 	if (!vdev)
 		return -EINVAL;
+
+	link_mac = hdd_adapter_get_link_mac_addr(link_info);
+	if (!link_mac) {
+		hdd_err("Invalid link_mac");
+		ret = -EINVAL;
+		goto objmgr_vdev_put;
+	}
 
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	ucfg_mlme_get_sap_force_11n_for_11ac(hdd_ctx->psoc,
@@ -6788,7 +6803,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("start bss failed!!");
 			ret = -EINVAL;
-			goto deliver_start_err;
+			goto objmgr_vdev_put;
 		}
 	}
 
@@ -7115,7 +7130,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	wlan_hdd_set_multipass(vdev);
 
 	qdf_mem_copy(config->self_macaddr.bytes,
-		     adapter->mac_addr.bytes,
+		     link_mac->bytes,
 		     QDF_MAC_ADDR_SIZE);
 
 	/* default value */
@@ -7471,7 +7486,7 @@ free:
 		}
 	}
 	qdf_mem_free(sme_config);
-deliver_start_err:
+objmgr_vdev_put:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
 
 	return ret;
