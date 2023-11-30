@@ -7464,10 +7464,10 @@ static void wlan_hdd_update_rssi(struct wlan_hdd_link_info *link_info,
 	}
 
 	/* If RSSi is reported as positive then it is invalid */
-	if (link_info->rssi > 0) {
-		hdd_debug_rl("RSSI invalid %d", link_info->rssi);
-		link_info->rssi = 0;
-		link_info->hdd_stats.summary_stat.rssi = 0;
+	if (link_info->rssi >= 0) {
+		hdd_debug_rl("Invalid RSSI %d, reset to -1", link_info->rssi);
+		link_info->rssi = -1;
+		link_info->hdd_stats.summary_stat.rssi = -1;
 	}
 
 	sinfo->signal = link_info->rssi;
