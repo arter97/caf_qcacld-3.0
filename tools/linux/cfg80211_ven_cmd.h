@@ -888,6 +888,7 @@ enum {
 	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* MLO Max Simultaneous Active links */
 #endif
 	IEEE80211_PARAM_NOACK_MAP = 821, /* Get NoAck map for vdev */
+	IEEE80211_PARAM_SET_RTT_RESPONDER_ROLE = 822,
 };
 
 enum {
@@ -2027,6 +2028,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"meshdbg",             IEEE80211_PARAM_SET_MESHDBG, SET_PARAM, 1},
 	{"enable_rtt",          IEEE80211_PARAM_RTT_ENABLE, SET_PARAM, 1},
 	{"switch_rtt_role",     IEEE80211_PARAM_SWITCH_RTT_ROLE, SET_PARAM, 1},
+	{"set_rtt_responder_role", IEEE80211_PARAM_SET_RTT_RESPONDER_ROLE, SET_PARAM, 1},
 	{"enable_lci",          IEEE80211_PARAM_LCI_ENABLE, SET_PARAM, 1},
 	{"athnewind",           IEEE80211_PARAM_VAP_ENHIND, SET_PARAM, 1},
 	{"get_athnewind",       IEEE80211_PARAM_VAP_ENHIND, GET_PARAM, 0},
