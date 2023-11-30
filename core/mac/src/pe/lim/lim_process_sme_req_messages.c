@@ -455,6 +455,7 @@ lim_configure_ap_start_bss_session(struct mac_context *mac_ctx,
 {
 	bool sap_uapsd;
 	uint16_t ht_cap = cfg_default(CFG_AP_PROTECTION_MODE);
+	QDF_STATUS status;
 
 	session->limSystemRole = eLIM_AP_ROLE;
 	session->privacy = sme_start_bss_req->privacy;
@@ -464,7 +465,12 @@ lim_configure_ap_start_bss_session(struct mac_context *mac_ctx,
 	session->dtimPeriod = (uint8_t) sme_start_bss_req->dtimPeriod;
 
 	/* Enable/disable UAPSD */
-	wlan_mlme_is_sap_uapsd_enabled(mac_ctx->psoc, &sap_uapsd);
+	status = wlan_mlme_is_sap_uapsd_enabled(mac_ctx->psoc, &sap_uapsd);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("failed to get uapsd, %d", status);
+		return;
+	}
+
 	session->apUapsdEnable = sap_uapsd;
 
 	session->gLimProtectionControl =
