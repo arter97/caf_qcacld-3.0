@@ -1954,6 +1954,10 @@ config DP_TX_TRACKING
 	bool "Enable DP_TX_TRACKING"
 	default n
 
+config WLAN_DP_MLO_DEV_CTX
+	bool "Enable WLAN_DP_MLO_DEV_CTX"
+	default n
+
 config DP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE
 	bool "Enable DP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE"
 	default n
