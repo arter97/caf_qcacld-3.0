@@ -1370,6 +1370,9 @@ static bool bs_state_wlan_event(void *ctx, uint16_t event,
  */
 static void bs_state_wlan_req_entry(void *ctx)
 {
+	struct bearer_switch_info *bs_ctx = ctx;
+
+	bs_sm_state_update(bs_ctx, BEARER_WLAN_REQUESTED);
 }
 
 /**
@@ -1383,9 +1386,6 @@ static void bs_state_wlan_req_entry(void *ctx)
  */
 static void bs_state_wlan_req_exit(void *ctx)
 {
-	struct bearer_switch_info *bs_ctx = ctx;
-
-	bs_sm_state_update(bs_ctx, BEARER_WLAN_REQUESTED);
 }
 
 /**
