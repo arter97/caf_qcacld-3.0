@@ -55,6 +55,94 @@
 #endif
 
 #ifdef QCA_SUPPORT_AGILE_DFS
+/* dfs_agile_fill_rcac_timeouts_for_etsi() - Fill ADFS timeout params for ETSI
+ * RCAC.
+ *
+ * @dfs: Pointer to DFS object.
+ * @adfs_param: Pointer to ADFS params.
+ */
+static void
+dfs_agile_fill_rcac_timeouts(struct wlan_dfs *dfs,
+			     struct dfs_agile_cac_params *adfs_param)
+{
+	enum dfs_reg dfsdomain = utils_get_dfsdomain(dfs->dfs_pdev_obj);
+	uint32_t min_rcac_timeout;
+	uint16_t rcacfreq = adfs_param->precac_center_freq_1;
+	enum phy_ch_width chwidth = adfs_param->precac_chwidth;
+
+	if (dfsdomain == DFS_ETSI_REGION) {
+		/* In case of ETSI domain, RCAC should follow the OCAC timeout
+		 * rules:
+		 * 1) 6 minutes OCAC timeout for non-weather radar DFS channels
+		 * and,
+		 * 2) 60 minutes OCAC timeout for weather radar DFS channels.
+		 */
+		if (dfs_is_pcac_on_weather_channel_for_freq(dfs, chwidth,
+							    rcacfreq)) {
+			min_rcac_timeout = MIN_WEATHER_PRECAC_DURATION;
+		} else {
+			min_rcac_timeout = MIN_PRECAC_DURATION;
+		}
+	} else {
+		min_rcac_timeout = MIN_RCAC_DURATION;
+	}
+
+	adfs_param->min_precac_timeout = min_rcac_timeout;
+	adfs_param->max_precac_timeout = MAX_RCAC_DURATION;
+}
+
+#ifdef QCA_SUPPORT_ADFS_RCAC
+/* dfs_start_agile_rcac_timer() - Start host agile RCAC timer.
+ *
+ * @dfs: Pointer to struct wlan_dfs.
+ */
+static
+void dfs_start_agile_rcac_timer(struct wlan_dfs *dfs, uint32_t rcac_timeout)
+{
+	struct dfs_soc_priv_obj *dfs_soc_obj = dfs->dfs_soc_obj;
+
+	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		 "Host RCAC timeout = %d ms", rcac_timeout);
+
+	qdf_hrtimer_start(&dfs_soc_obj->dfs_rcac_timer,
+			  qdf_time_ms_to_ktime(rcac_timeout),
+			  QDF_HRTIMER_MODE_REL);
+}
+
+/* dfs_stop_agile_rcac_timer() - Cancel the RCAC timer.
+ *
+ * @dfs: Pointer to struct wlan_dfs.
+ */
+void dfs_stop_agile_rcac_timer(struct wlan_dfs *dfs)
+{
+	struct dfs_soc_priv_obj *dfs_soc_obj;
+
+	dfs_soc_obj = dfs->dfs_soc_obj;
+	qdf_hrtimer_cancel(&dfs_soc_obj->dfs_rcac_timer);
+}
+
+/**
+ * dfs_abort_agile_rcac() - Send abort Agile RCAC to F/W.
+ * @dfs: Pointer to struct wlan_dfs.
+ */
+static void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
+{
+
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
+
+	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
+	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
+
+	dfs_stop_agile_rcac_timer(dfs);
+	if (dfs_tx_ops && dfs_tx_ops->dfs_ocac_abort_cmd)
+		dfs_tx_ops->dfs_ocac_abort_cmd(dfs->dfs_pdev_obj);
+
+	qdf_mem_zero(&dfs->dfs_rcac_param, sizeof(struct dfs_rcac_params));
+	dfs->dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
+	dfs_agile_cleanup_rcac(dfs);
+}
+
 /* dfs_start_agile_engine() - Prepare ADFS params and program the agile
  *                            engine sending agile config cmd to FW.
  * @dfs: Pointer to struct wlan_dfs.
@@ -73,9 +161,10 @@ void dfs_start_agile_engine(struct wlan_dfs *dfs)
 	 * FW runs an infinite timer.
 	 */
 	dfs_fill_adfs_chan_params(dfs, &adfs_param);
-	adfs_param.min_precac_timeout = MIN_RCAC_DURATION;
-	adfs_param.max_precac_timeout = MAX_RCAC_DURATION;
 	adfs_param.ocac_mode = QUICK_RCAC_MODE;
+
+	dfs_agile_fill_rcac_timeouts(dfs, &adfs_param);
+	dfs_start_agile_rcac_timer(dfs, adfs_param.min_precac_timeout);
 
 	qdf_info("%s : %d RCAC channel request sent for pdev: %pK ch_freq: %d",
 		 __func__, __LINE__, dfs->dfs_pdev_obj,
@@ -102,6 +191,17 @@ void dfs_start_agile_engine(struct wlan_dfs *dfs)
 		dfs_err(NULL, WLAN_DEBUG_DFS_ALWAYS,
 			"dfs_tx_ops=%pK", dfs_tx_ops);
 }
+
+#else
+static inline void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
+{
+}
+
+static inline
+void dfs_start_agile_engine(struct wlan_dfs *dfs)
+{
+}
+#endif
 
 /**
  * --------------------- ROLLING CAC STATE MACHINE ----------------------
@@ -308,65 +408,6 @@ QDF_STATUS dfs_agile_sm_deliver_event(struct dfs_soc_priv_obj *dfs_soc_obj,
 				event_data);
 }
 
-#ifdef QCA_SUPPORT_ADFS_RCAC
-/* dfs_start_agile_rcac_timer() - Start host agile RCAC timer.
- *
- * @dfs: Pointer to struct wlan_dfs.
- */
-void dfs_start_agile_rcac_timer(struct wlan_dfs *dfs)
-{
-	struct dfs_soc_priv_obj *dfs_soc_obj = dfs->dfs_soc_obj;
-	uint32_t rcac_timeout = MIN_RCAC_DURATION;
-
-	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
-		 "Host RCAC timeout = %d ms", rcac_timeout);
-
-	qdf_hrtimer_start(&dfs_soc_obj->dfs_rcac_timer,
-			  qdf_time_ms_to_ktime(rcac_timeout),
-			  QDF_HRTIMER_MODE_REL);
-}
-
-
-/* dfs_stop_agile_rcac_timer() - Cancel the RCAC timer.
- *
- * @dfs: Pointer to struct wlan_dfs.
- */
-void dfs_stop_agile_rcac_timer(struct wlan_dfs *dfs)
-{
-	struct dfs_soc_priv_obj *dfs_soc_obj;
-
-	dfs_soc_obj = dfs->dfs_soc_obj;
-	qdf_hrtimer_cancel(&dfs_soc_obj->dfs_rcac_timer);
-}
-
-
-/**
- * dfs_abort_agile_rcac() - Send abort Agile RCAC to F/W.
- * @dfs: Pointer to struct wlan_dfs.
- */
-static void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
-{
-
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
-
-	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
-	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
-
-	dfs_stop_agile_rcac_timer(dfs);
-	if (dfs_tx_ops && dfs_tx_ops->dfs_ocac_abort_cmd)
-		dfs_tx_ops->dfs_ocac_abort_cmd(dfs->dfs_pdev_obj);
-
-	qdf_mem_zero(&dfs->dfs_rcac_param, sizeof(struct dfs_rcac_params));
-	dfs->dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
-	dfs_agile_cleanup_rcac(dfs);
-}
-#else
-static inline void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
-{
-}
-#endif
-
 /* dfs_abort_agile_precac() - Reset parameters of wlan_dfs and send abort
  * to F/W.
  * @dfs: Pointer to struct wlan_dfs.
@@ -524,7 +565,6 @@ static void dfs_agile_state_running_entry(void *ctx)
 	/* RCAC */
 	if (dfs_is_agile_rcac_enabled(dfs)) {
 		dfs_soc->ocac_status = OCAC_RESET;
-		dfs_start_agile_rcac_timer(dfs);
 		dfs_start_agile_engine(dfs);
 	}
 }
@@ -599,9 +639,9 @@ static bool dfs_agile_state_running_event(void *ctx,
 		status = true;
 		break;
 	case DFS_AGILE_SM_EV_AGILE_STOP:
-		if (dfs_is_rcac_domain(dfs))
+		if (dfs_is_agile_rcac_enabled(dfs))
 			dfs_abort_agile_rcac(dfs);
-		else if (dfs_is_precac_domain(dfs))
+		else if (dfs_is_agile_precac_enabled(dfs))
 			dfs_abort_agile_precac(dfs);
 
 		dfs_agile_sm_transition_to(dfs_soc, DFS_AGILE_S_INIT);
