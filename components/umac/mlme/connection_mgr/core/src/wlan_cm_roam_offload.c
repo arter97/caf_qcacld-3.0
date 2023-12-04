@@ -7041,6 +7041,16 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
+	/* The BTM req and BTM candidate event is logged twice
+	 * for both partial and full scan but the OTA frame is received
+	 * is received only once on the device. Restricting the
+	 * BTM req and BTM candidate event to be logged only for partial scan
+	 */
+	if (trigger_info->present &&
+	    trigger_info->scan_type == ROAM_STATS_SCAN_TYPE_FULL &&
+	    btm_data->disassoc_timer)
+		return status;
+
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
 			  (uint64_t)btm_data->timestamp,
 			  NULL);
