@@ -2963,6 +2963,42 @@ struct wlan_change_bi {
 
 #ifdef FEATURE_SET
 /**
+ * enum wlan_mlme_iface_combinations - Iface combinations
+ * @MLME_IFACE_STA_P2P_SUPPORT: STA + P2P concurrency bit
+ * @MLME_IFACE_STA_SAP_SUPPORT: STA + SAP concurrency bit
+ * @MLME_IFACE_STA_NAN_SUPPORT: STA + NAN concurrency bit
+ * @MLME_IFACE_STA_TDLS_SUPPORT: STA + TDLS concurrency bit
+ * @MLME_IFACE_STA_DUAL_P2P_SUPPORT: STA + P2P + P2P concurrency bit
+ * @MLME_IFACE_STA_SAP_P2P_SUPPORT: STA + SAP + P2P concurrency bit
+ * @MLME_IFACE_STA_SAP_NAN_SUPPORT: STA + SAP + NAN concurrency bit
+ * @MLME_IFACE_STA_P2P_NAN_SUPPORT: STA + P2P + NAN concurrency bit
+ * @MLME_IFACE_STA_P2P_TDLS_SUPPORT: STA + P2P + TDLS concurrency bit
+ * @MLME_IFACE_STA_SAP_TDLS_SUPPORT: STA + SAP + TDLS concurrency bit
+ * @MLME_IFACE_STA_NAN_TDLS_SUPPORT: STA + NAN + TDLS concurrency bit
+ * @MLME_IFACE_STA_SAP_P2P_TDLS_SUPPORT: STA + SAP + P2P + TDLS concurrency bit
+ * @MLME_IFACE_STA_SAP_NAN_TDLS_SUPPORT: STA + SAP + NAN + TDLS concurrency bit
+ * @MLME_IFACE_STA_P2P_P2P_TDLS_SUPPORT: STA + P2P + P2P + TDLS concurrency bit
+ * @MLME_IFACE_STA_P2P_NAN_TDLS_SUPPORT: STA + P2P + NAN + TDLS concurrency bit
+ */
+enum wlan_mlme_iface_combinations {
+	MLME_IFACE_STA_P2P_SUPPORT = 0x1,
+	MLME_IFACE_STA_SAP_SUPPORT = 0x2,
+	MLME_IFACE_STA_NAN_SUPPORT = 0x4,
+	MLME_IFACE_STA_TDLS_SUPPORT = 0x8,
+	MLME_IFACE_STA_DUAL_P2P_SUPPORT = 0x10,
+	MLME_IFACE_STA_SAP_P2P_SUPPORT = 0x20,
+	MLME_IFACE_STA_SAP_NAN_SUPPORT = 0x40,
+	MLME_IFACE_STA_P2P_NAN_SUPPORT = 0x80,
+	MLME_IFACE_STA_P2P_TDLS_SUPPORT = 0x100,
+	MLME_IFACE_STA_SAP_TDLS_SUPPORT = 0x200,
+	MLME_IFACE_STA_NAN_TDLS_SUPPORT = 0x400,
+	MLME_IFACE_STA_SAP_P2P_TDLS_SUPPORT = 0x800,
+	MLME_IFACE_STA_SAP_NAN_TDLS_SUPPORT = 0x1000,
+	MLME_IFACE_STA_P2P_P2P_TDLS_SUPPORT = 0x2000,
+	MLME_IFACE_STA_P2P_NAN_TDLS_SUPPORT = 0x4000,
+};
+
+/**
  * struct wlan_mlme_features - Mlme feature set structure
  * @enable_wifi_optimizer: indicates wifi optimizer is enabled or disabled
  * @sap_max_num_clients: maximum number of SoftAP clients
@@ -2981,8 +3017,8 @@ struct wlan_change_bi {
  * @roaming_ctrl_get_cu: Roaming ctrl get cu enabled or disabled
  * @vendor_req_1_version: Vendor requirement version 1
  * @vendor_req_2_version: Vendor requirement version 2
- * @sta_dual_p2p_support: STA + dual p2p support enabled or not
  * @enable2x2: Enable 2x2
+ * @iface_combinations: iface combination bitmask
  */
 struct wlan_mlme_features {
 	bool enable_wifi_optimizer;
@@ -3001,8 +3037,8 @@ struct wlan_mlme_features {
 	bool roaming_ctrl_get_cu;
 	WMI_HOST_VENDOR1_REQ1_VERSION vendor_req_1_version;
 	WMI_HOST_VENDOR1_REQ2_VERSION vendor_req_2_version;
-	bool sta_dual_p2p_support;
 	bool enable2x2;
+	uint32_t iface_combinations;
 };
 #endif
 
