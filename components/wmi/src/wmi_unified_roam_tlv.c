@@ -3943,7 +3943,8 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 			}
 
 			if (ml_keys->key_flags & LTF_USAGE) {
-				struct wlan_crypto_ltf_keyseed_data key_seed;
+				struct wlan_crypto_ltf_keyseed_data key_seed
+					= {0};
 				uint8_t key_seed_len;
 
 				if (ml_keys->key_len >
