@@ -1439,11 +1439,13 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_connectivity_connecting_event() - API to log connecting event
  * @vdev: vdev pointer
+ * @con_req: Connection request parameter
  *
  * Return: None
  */
 void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req);
 
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
@@ -1517,11 +1519,13 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_connectivity_connecting_event() - API to log connecting event
  * @vdev: vdev pointer
+ * @con_req: Connection request parameter
  *
  * Return: None
  */
 void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req);
 
 /**
  * wlan_populate_vsie() - Populate VSIE field for logging
@@ -1662,7 +1666,8 @@ wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 }
 
 static inline void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req)
 {
 }
 #endif

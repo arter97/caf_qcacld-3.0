@@ -892,7 +892,7 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_STA_INFO);
-	wlan_connectivity_connecting_event(vdev);
+	wlan_connectivity_connecting_event(vdev, NULL);
 out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
@@ -1023,18 +1023,27 @@ out:
 }
 
 void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req)
 {
 	QDF_STATUS status;
 	struct wlan_cm_connect_req req;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_connect);
 
-	status = wlan_cm_get_active_connect_req_param(vdev, &req);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		logging_err("vdev: %d failed to get active cmd request",
-			    wlan_vdev_get_id(vdev));
+	if (!wlan_cm_is_first_candidate_connect_attempt(vdev))
 		return;
+
+	/* for candidate not found case*/
+	if (con_req) {
+		req = *con_req;
+	} else {
+		status = wlan_cm_get_active_connect_req_param(vdev, &req);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			logging_err("vdev: %d failed to get active cmd request",
+				    wlan_vdev_get_id(vdev));
+			return;
+		}
 	}
 
 	wlan_diag_event.version = DIAG_CONN_VERSION;
