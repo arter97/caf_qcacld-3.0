@@ -136,6 +136,33 @@ os_if_qmi_wfds_send_config_msg(struct wlan_qmi_wfds_config_req_msg *src_info)
 	req->pci_slot = src_info->pci_slot;
 	req->lpass_ep_id = src_info->lpass_ep_id;
 
+	req->apss_shared_wrmem_paddr_valid =
+				src_info->apss_shared_wrmem_paddr_valid;
+	req->apss_shared_wrmem_paddr =
+				src_info->apss_shared_wrmem_paddr;
+	req->apss_shared_wrmem_size_valid =
+				src_info->apss_shared_wrmem_size_valid;
+	req->apss_shared_wrmem_size =
+				src_info->apss_shared_wrmem_size;
+
+	req->fw_shared_rdmem_paddr_valid =
+				src_info->fw_shared_rdmem_paddr_valid;
+	req->fw_shared_rdmem_paddr =
+				src_info->fw_shared_rdmem_paddr;
+	req->fw_shared_rdmem_size_valid =
+				src_info->fw_shared_rdmem_size_valid;
+	req->fw_shared_rdmem_size =
+				src_info->fw_shared_rdmem_size;
+
+	req->fw_shared_wrmem_paddr_valid =
+				src_info->fw_shared_wrmem_paddr_valid;
+	req->fw_shared_wrmem_paddr =
+				src_info->fw_shared_wrmem_paddr;
+	req->fw_shared_wrmem_size_valid =
+				src_info->fw_shared_wrmem_size_valid;
+	req->fw_shared_wrmem_size =
+				src_info->fw_shared_wrmem_size;
+
 	status = os_if_qmi_txn_init(&qmi_wfds, &txn, wfds_gen_resp_msg_v01_ei,
 				    resp);
 	if (QDF_IS_STATUS_ERROR(status)) {

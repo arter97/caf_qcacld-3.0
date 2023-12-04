@@ -49,6 +49,8 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	struct hif_ce_ring_info *srng_info;
 	struct hal_srng_params srng_params = {0};
 	hal_ring_handle_t refill_ring;
+	qdf_dma_addr_t fw_lpass_mem_iova = 0;
+	qdf_size_t fw_lpass_mem_size;
 	uint8_t i;
 
 	qdf_dev = dp_ctx->qdf_dev;
@@ -157,6 +159,52 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	info->pci_slot = pld_get_pci_slot(qdf_dev->dev);
 	qdf_assert(info.pci_slot >= 0);
 	info->lpass_ep_id = direct_link_ctx->lpass_ep_id;
+
+	pld_get_fw_lpass_shared_mem(qdf_dev->dev, &fw_lpass_mem_iova,
+				    &fw_lpass_mem_size);
+
+	if (fw_lpass_mem_iova) {
+		dl_wfds->fw_lpass_shared_mem_pa = fw_lpass_mem_iova;
+		dl_wfds->fw_lpass_shared_mem_size = fw_lpass_mem_size;
+		pld_audio_smmu_map(qdf_dev->dev,
+				   qdf_mem_paddr_from_dmaaddr(qdf_dev,
+							      fw_lpass_mem_iova),
+				   fw_lpass_mem_iova, fw_lpass_mem_size);
+
+		info->fw_shared_wrmem_paddr_valid = 1;
+		info->fw_shared_wrmem_paddr = fw_lpass_mem_iova;
+		info->fw_shared_wrmem_size_valid = 1;
+		info->fw_shared_wrmem_size = DP_WFDS_FW_LPASS_SHARED_MEM_SEG_SIZE;
+
+		info->fw_shared_rdmem_paddr_valid = 1;
+		info->fw_shared_rdmem_paddr = fw_lpass_mem_iova +
+			DP_WFDS_FW_LPASS_SHARED_MEM_RDMEM_OFFSET;
+		info->fw_shared_rdmem_size_valid = 1;
+		info->fw_shared_rdmem_size = DP_WFDS_FW_LPASS_SHARED_MEM_SEG_SIZE;
+	} else {
+		dp_err("Unable to get fw_lpass shared memory info");
+	}
+
+	dl_wfds->apss_lpass_shared_mem_size =
+				DP_WFDS_APSS_LPASS_SHARED_MEM_SIZE;
+	dl_wfds->apss_lpass_shared_mem_va =
+		qdf_mem_alloc_consistent(qdf_dev, qdf_dev->dev,
+					 dl_wfds->apss_lpass_shared_mem_size,
+					 &dl_wfds->apss_lpass_shared_mem_pa);
+	if (dl_wfds->apss_lpass_shared_mem_va) {
+		info->apss_shared_wrmem_paddr_valid = 1;
+		info->apss_shared_wrmem_paddr = dl_wfds->apss_lpass_shared_mem_pa;
+		info->apss_shared_wrmem_size_valid = 1;
+		info->apss_shared_wrmem_size = DP_WFDS_APSS_LPASS_SHARED_MEM_SIZE;
+
+		pld_audio_smmu_map(qdf_dev->dev,
+				   qdf_mem_paddr_from_dmaaddr(qdf_dev,
+							      info->apss_shared_wrmem_paddr),
+				   info->apss_shared_wrmem_paddr,
+				   info->apss_shared_wrmem_size);
+	} else {
+		dp_err("Unable to allocate apss_lpass shared memory");
+	}
 
 	status = wlan_qmi_wfds_send_config_msg(dp_ctx->psoc, info);
 	qdf_mem_free(info);
@@ -682,6 +730,22 @@ void dp_wfds_del_server(void)
 		pld_audio_smmu_unmap(qdf_ctx->dev,
 			dl_wfds->iommu_cfg.direct_link_refill_ring_base_paddr,
 			dl_wfds->iommu_cfg.direct_link_refill_ring_map_size);
+
+		if (dl_wfds->fw_lpass_shared_mem_pa)
+			pld_audio_smmu_unmap(qdf_ctx->dev,
+					     dl_wfds->fw_lpass_shared_mem_pa,
+					     dl_wfds->fw_lpass_shared_mem_size);
+
+		if (dl_wfds->apss_lpass_shared_mem_pa)
+			pld_audio_smmu_unmap(qdf_ctx->dev,
+					     dl_wfds->apss_lpass_shared_mem_pa,
+					     dl_wfds->apss_lpass_shared_mem_size);
+
+		if (dl_wfds->apss_lpass_shared_mem_va)
+			qdf_mem_free_consistent(qdf_ctx, qdf_ctx->dev,
+						dl_wfds->apss_lpass_shared_mem_size,
+						dl_wfds->apss_lpass_shared_mem_va,
+						dl_wfds->apss_lpass_shared_mem_pa, 0);
 	}
 
 	if (dp_ctx->dp_ops.dp_unregister_lpass_ssr_notifier)

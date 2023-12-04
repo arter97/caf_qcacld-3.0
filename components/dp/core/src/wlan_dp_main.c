@@ -2455,6 +2455,14 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 QDF_STATUS
 dp_direct_link_handle_lpass_ssr_notif(struct wlan_dp_psoc_context *dp_ctx)
 {
+	struct dp_direct_link_context *dp_direct_link_ctx =
+						dp_ctx->dp_direct_link_ctx;
+
+	if (!dp_wfds_is_nmi_adsp_crash(dp_direct_link_ctx->dl_wfds))
+		return QDF_STATUS_SUCCESS;
+
+	qdf_trigger_self_recovery(dp_ctx->psoc, QDF_DIRECT_LINK_ADSP_NMI_CRASH);
+
 	return QDF_STATUS_SUCCESS;
 }
 #endif

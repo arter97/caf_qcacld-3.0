@@ -62,6 +62,16 @@ struct wlan_qmi_wfds_srng_info {
 };
 
 /**
+ * enum wlan_qmi_adsp_crash_type - ADSP crash type
+ * @QMI_WFDS_ADSP_CRASH_TYPE_NMI: ADSP NMI crash
+ * @QMI_WFDS_ADSP_CRASH_TYPE_NON_NMI: ADSP non-NMI crash
+ */
+enum wlan_qmi_adsp_crash_type {
+	QMI_WFDS_ADSP_CRASH_TYPE_NMI = 0,
+	QMI_WFDS_ADSP_CRASH_TYPE_NON_NMI = 1,
+};
+
+/**
  * enum wlan_qmi_wfds_pipe_dir - pipe direction
  * @QMI_WFDS_PIPEDIR_NONE: none pipe direction
  * @QMI_WFDS_PIPEDIR_IN: target to host pipe direction
@@ -99,6 +109,24 @@ struct wlan_qmi_wfds_ce_info {
  * @pcie_bar_pa: PCIe BAR physical address
  * @pci_slot: PCIe slot
  * @lpass_ep_id: LPASS data message service endpoint id
+ * @apss_shared_wrmem_paddr_valid: whether corresponding QMI field is valid or
+ *  not
+ * @apss_shared_wrmem_paddr: APSS shared write memory physical address
+ * @apss_shared_wrmem_size_valid: whether corresponding QMI field is valid or
+ *  not
+ * @apss_shared_wrmem_size: APSS shared write memory size
+ * @fw_shared_rdmem_paddr_valid: whether corresponding QMI field is valid or
+ *  not
+ * @fw_shared_rdmem_paddr: FW shared read memory physical address
+ * @fw_shared_rdmem_size_valid: whether corresponding QMI field is valid or
+ *  not
+ * @fw_shared_rdmem_size: FW shared read memory size
+ * @fw_shared_wrmem_paddr_valid: whether corresponding QMI field is valid or
+ *  not
+ * @fw_shared_wrmem_paddr: FW shared write memory physical address
+ * @fw_shared_wrmem_size_valid: whether corresponding QMI field is valid or
+ *  not
+ * @fw_shared_wrmem_size: FW shared write memory size
  */
 struct wlan_qmi_wfds_config_req_msg {
 	uint32_t ce_info_len;
@@ -113,6 +141,18 @@ struct wlan_qmi_wfds_config_req_msg {
 	uint64_t pcie_bar_pa;
 	uint32_t pci_slot;
 	uint32_t lpass_ep_id;
+	uint8_t apss_shared_wrmem_paddr_valid;
+	uint64_t apss_shared_wrmem_paddr;
+	uint8_t apss_shared_wrmem_size_valid;
+	uint32_t apss_shared_wrmem_size;
+	uint8_t fw_shared_rdmem_paddr_valid;
+	uint64_t fw_shared_rdmem_paddr;
+	uint8_t fw_shared_rdmem_size_valid;
+	uint32_t fw_shared_rdmem_size;
+	uint8_t fw_shared_wrmem_paddr_valid;
+	uint64_t fw_shared_wrmem_paddr;
+	uint8_t fw_shared_wrmem_size_valid;
+	uint32_t fw_shared_wrmem_size;
 };
 
 /**
