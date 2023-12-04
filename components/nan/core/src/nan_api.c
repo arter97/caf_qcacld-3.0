@@ -422,6 +422,12 @@ wlan_is_nan_allowed_on_6ghz_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 						     REG_VERY_LOW_POWER_AP,
 						     chan_list);
 
+	if (QDF_IS_STATUS_ERROR(status))
+	{
+		nan_err("fail to get chan_list");
+		return false;
+	}
+
 	for (i = 0; i < NUM_6GHZ_CHANNELS; i++) {
 		if ((freq == chan_list[i].center_freq) &&
 		    (chan_list[i].state == CHANNEL_STATE_ENABLE))

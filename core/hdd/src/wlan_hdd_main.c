@@ -2132,6 +2132,23 @@ static void hdd_extract_fw_version_info(struct hdd_context *hdd_ctx)
 	(defined(CFG80211_SBAND_IFTYPE_DATA_BACKPORT) || \
 	 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)))
 
+static void
+hdd_update_wiphy_he_mcs(struct ieee80211_sband_iftype_data *iftype_data,
+			tDot11fIEhe_cap *he_cap_cfg)
+{
+	if (!iftype_data || !he_cap_cfg) {
+		hdd_err("Unable to update wiphy he_mcs");
+		return;
+	}
+
+	iftype_data->he_cap.he_mcs_nss_supp.tx_mcs_80 =
+		he_cap_cfg->tx_he_mcs_map_lt_80;
+	iftype_data->he_cap.he_mcs_nss_supp.tx_mcs_160 =
+		*((uint16_t *)he_cap_cfg->tx_he_mcs_map_160);
+	iftype_data->he_cap.he_mcs_nss_supp.tx_mcs_80p80 =
+		*((uint16_t *)he_cap_cfg->tx_he_mcs_map_80_80);
+}
+
 #if defined(CONFIG_BAND_6GHZ) && (defined(IEEE80211_HE_6GHZ_CAP_MIN_MPDU_START))
 static void hdd_update_wiphy_he_6ghz_capa(struct hdd_context *hdd_ctx)
 {
@@ -2209,6 +2226,8 @@ hdd_update_wiphy_he_caps_6ghz(struct hdd_context *hdd_ctx,
 
 	hdd_update_wiphy_he_6ghz_capa(hdd_ctx);
 
+	hdd_update_wiphy_he_mcs(hdd_ctx->iftype_data_6g, he_cap_cfg);
+
 	band_6g->iftype_data = hdd_ctx->iftype_data_6g;
 }
 #else
@@ -2248,6 +2267,7 @@ static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 			(BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP));
 		hdd_ctx->iftype_data_2g->he_cap.has_he = he_cap_cfg.present;
 		band_2g->n_iftype_data = 1;
+		hdd_update_wiphy_he_mcs(hdd_ctx->iftype_data_2g, &he_cap_cfg);
 		band_2g->iftype_data = hdd_ctx->iftype_data_2g;
 
 		ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc,
@@ -2267,7 +2287,9 @@ static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 			(BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP));
 		hdd_ctx->iftype_data_5g->he_cap.has_he = he_cap_cfg.present;
 		band_5g->n_iftype_data = 1;
+		hdd_update_wiphy_he_mcs(hdd_ctx->iftype_data_5g, &he_cap_cfg);
 		band_5g->iftype_data = hdd_ctx->iftype_data_5g;
+
 		if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
 			phy_info_5g[0] |=
 				IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G;
@@ -5828,9 +5850,13 @@ static void hdd_set_multi_client_ll_support(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	bool multi_client_ll_ini_support, multi_client_ll_caps;
+	QDF_STATUS status;
 
-	ucfg_mlme_cfg_get_multi_client_ll_ini_support(hdd_ctx->psoc,
+	status = ucfg_mlme_cfg_get_multi_client_ll_ini_support(hdd_ctx->psoc,
 						&multi_client_ll_ini_support);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
 	multi_client_ll_caps =
 		ucfg_mlme_get_wlm_multi_client_ll_caps(hdd_ctx->psoc);
 
@@ -9453,15 +9479,33 @@ out:
 static QDF_STATUS
 hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 {
-#define SHUTDOWN_IN_SUSPEND_RETRY 10
+#define SHUTDOWN_IN_SUSPEND_RETRY 30
 
 	int count = 0;
+	enum pmo_suspend_mode mode;
 
-	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) != PMO_SUSPEND_SHUTDOWN) {
-		hdd_debug("shutdown in suspend not supported");
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		hdd_debug("Driver Modules not Enabled ");
 		return 0;
 	}
 
+	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
+	hdd_debug("suspend mode is %d", mode);
+
+	if (mode == PMO_SUSPEND_NONE || mode == PMO_SUSPEND_LEGENCY) {
+		hdd_debug("needn't shutdown in suspend");
+		return 0;
+	}
+
+	if (!hdd_is_any_interface_open(hdd_ctx)) {
+		return pld_idle_shutdown(hdd_ctx->parent_dev,
+					 hdd_psoc_idle_shutdown);
+	} else {
+		if (mode == PMO_SUSPEND_WOW)
+			return 0;
+	}
+
+	/*try to wait interface down for PMO_SUSPEND_SHUTDOWN mode*/
 	while (hdd_is_any_interface_open(hdd_ctx) &&
 	       count < SHUTDOWN_IN_SUSPEND_RETRY) {
 		count++;
@@ -9472,8 +9516,6 @@ hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 		hdd_err("some adapters not stopped");
 		return -EBUSY;
 	}
-
-	hdd_debug("call pld idle shutdown directly");
 	return pld_idle_shutdown(hdd_ctx->parent_dev, hdd_psoc_idle_shutdown);
 }
 
@@ -12172,12 +12214,29 @@ list_destroy:
 	return ret;
 }
 
-void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
+#ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+static void hdd_idle_timer_in_active(uint32_t timeout_ms)
 {
-	uint32_t timeout_ms = hdd_ctx->config->iface_change_wait_time;
+	/* do nothing because idle shutdown will be called in system
+	 * suspend prepare
+	 */
+}
+#else
+/* ensure idle shutdown can be called/finished once timer started */
+static void hdd_idle_timer_in_active(uint32_t timeout_ms)
+{
 	uint32_t suspend_timeout_ms;
 	enum wake_lock_reason reason =
 		WIFI_POWER_EVENT_WAKELOCK_IFACE_CHANGE_TIMER;
+
+	suspend_timeout_ms = timeout_ms + HDD_PSOC_IDLE_SHUTDOWN_SUSPEND_DELAY;
+	hdd_prevent_suspend_timeout(suspend_timeout_ms, reason);
+}
+#endif
+
+void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
+{
+	uint32_t timeout_ms = hdd_ctx->config->iface_change_wait_time;
 
 	if (!timeout_ms) {
 		hdd_info("psoc idle timer is disabled");
@@ -12195,8 +12254,7 @@ void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
 	}
 
 	qdf_delayed_work_start(&hdd_ctx->psoc_idle_timeout_work, timeout_ms);
-	suspend_timeout_ms = timeout_ms + HDD_PSOC_IDLE_SHUTDOWN_SUSPEND_DELAY;
-	hdd_prevent_suspend_timeout(suspend_timeout_ms, reason);
+	hdd_idle_timer_in_active(timeout_ms);
 }
 
 void hdd_psoc_idle_timer_stop(struct hdd_context *hdd_ctx)
@@ -18059,7 +18117,8 @@ pld_deinit:
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
 	osif_driver_sync_unregister();
-	osif_driver_sync_wait_for_ops(driver_sync);
+	if (driver_sync)
+		osif_driver_sync_wait_for_ops(driver_sync);
 
 	hdd_driver_mode_change_unregister();
 	pld_deinit();
@@ -18077,8 +18136,10 @@ comp_cb_deinit:
 hdd_deinit:
 	hdd_deinit();
 trans_stop:
-	osif_driver_sync_trans_stop(driver_sync);
-	osif_driver_sync_destroy(driver_sync);
+	if (driver_sync) {
+		osif_driver_sync_trans_stop(driver_sync);
+		osif_driver_sync_destroy(driver_sync);
+	}
 sync_deinit:
 	osif_sync_deinit();
 	hdd_qdf_deinit();

@@ -7500,16 +7500,27 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 
 	stats = wlan_cfg80211_mc_cp_stats_get_station_stats(vdev, &ret);
 	if (ret || !stats) {
-		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+		hdd_err("Invalid stats");
+		goto out;
+	}
+
+	if (!stats->vdev_summary_stats || !stats->vdev_chain_rssi ||
+	    !stats->peer_adv_stats || !stats->pdev_stats) {
+		hdd_err("Invalid:%s%s%s%s",
+			stats->vdev_summary_stats ? "" : " vdev_summary_stats",
+			stats->vdev_chain_rssi ? "" : " vdev_chain_rssi",
+			stats->peer_adv_stats ? "" : " peer_adv_stats",
+			stats->pdev_stats ? "" : " pdev_stats");
+		ret = -EINVAL;
 		goto out;
 	}
 
 	/* update get stats cached time stamp */
 	hdd_update_station_stats_cached_timestamp(adapter);
 	copy_station_stats_to_adapter(adapter, stats);
-	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 
 out:
+	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	return ret;
 }

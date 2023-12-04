@@ -5069,7 +5069,7 @@ void lim_set_vht_caps(struct mac_context *p_mac, struct pe_session *p_session_en
 		      uint8_t *p_ie_start, uint32_t num_bytes)
 {
 	const uint8_t       *p_ie = NULL;
-	tDot11fIEVHTCaps     dot11_vht_cap;
+	tDot11fIEVHTCaps     dot11_vht_cap = {0};
 
 	populate_dot11f_vht_caps(p_mac, p_session_entry, &dot11_vht_cap);
 	p_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_VHTCAPS, p_ie_start,
@@ -10742,8 +10742,9 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session)
 	if (!mlme_obj)
 		return false;
 
-	if (session->opmode == QDF_STA_MODE ||
-	    session->opmode == QDF_P2P_CLIENT_MODE)
+	if ((session->opmode == QDF_STA_MODE ||
+	     session->opmode == QDF_P2P_CLIENT_MODE) &&
+	    session->lim_join_req)
 		lim_process_tpe_ie_from_beacon(mac_ctx, session,
 				       &session->lim_join_req->bssDescription,
 				       &tpe_change);

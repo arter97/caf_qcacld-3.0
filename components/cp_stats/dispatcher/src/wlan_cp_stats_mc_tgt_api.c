@@ -126,6 +126,7 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	struct pdev_mc_cp_stats *pdev_mc_stats;
 	struct pdev_cp_stats *pdev_cp_stats_priv;
 	bool pending = false;
+	bool hw_dbs_capable;
 
 	if (!ev->pdev_stats)
 		return;
@@ -167,6 +168,7 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
+	hw_dbs_capable = policy_mgr_is_hw_dbs_capable(psoc);
 	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, last_req.vdev_id);
 
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
@@ -175,7 +177,12 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	    pdev_mc_stats->max_pwr != ev->pdev_stats[pdev_id].max_pwr)
 		wlan_son_deliver_tx_power(vdev,
 					  ev->pdev_stats[pdev_id].max_pwr);
-	if (mac_id == ev->mac_seq_num)
+
+	/* 
+	 * hw_dbs_capable false mean single mac, max power from mac0
+	 * hw_dbs_capable true mean dual mac, max power per mac_id
+	 */
+	if (!hw_dbs_capable || mac_id == ev->mac_seq_num)
 		max_pwr = pdev_mc_stats->max_pwr =
 			ev->pdev_stats[pdev_id].max_pwr;
 
@@ -183,7 +190,13 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	if (is_station_stats)
 		goto end;
 
-	if (mac_id == ev->mac_seq_num) {
+	if ((!hw_dbs_capable &&
+	     tgt_mc_cp_stats_is_last_event(ev, TYPE_CONNECTION_TX_POWER)) ||
+	     (hw_dbs_capable && mac_id == ev->mac_seq_num)) {
+		/*
+		 * single mac, 2 events reported, only the last one is valid
+		 * dual mac, mac_seq_num indicate mac id of tx power event
+		 */
 		ucfg_mc_cp_stats_reset_pending_req(psoc,
 						   TYPE_CONNECTION_TX_POWER,
 						   &last_req,
