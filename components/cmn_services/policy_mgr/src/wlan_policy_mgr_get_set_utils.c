@@ -4487,9 +4487,24 @@ policy_mgr_update_dynamic_inactive_bitmap(
 		inactive_links |= candidate_inactive_links;
 	}
 
-	/* 3. If there are links inactive from fw event's
+	/* 3. If standby link is present (may not be force inactive),
+	 * select the standby link as dynamic inactive link.
+	 */
+	if (num < force_inactive_num &&
+	    num < QDF_ARRAY_SIZE(link_ids)) {
+		candidate_inactive_links =
+			force_inactive_num_bitmap &
+			standby_links;
+		num += ml_nlink_convert_link_bitmap_to_ids(
+				candidate_inactive_links,
+				QDF_ARRAY_SIZE(link_ids) - num,
+				&link_ids[num]);
+		inactive_links |= candidate_inactive_links;
+	}
+
+	/* 4. If there are links inactive from fw event's
 	 * curr_inactive_linkid_bitmap, select the current inactive
-	 * links as third option. note: those link may not be force
+	 * links as last option. note: those link may not be force
 	 * inactive.
 	 */
 	if (num < force_inactive_num &&
@@ -7150,27 +7165,6 @@ policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-static bool
-policy_mgr_is_ml_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
-{
-	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
-	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t num_enabled_ml_sta, conn_count;
-
-	conn_count = policy_mgr_get_connection_count(psoc);
-	policy_mgr_get_ml_sta_info_psoc(psoc, &num_ml_sta,
-					&num_disabled_ml_sta,
-					ml_sta_vdev_lst, ml_freq_lst,
-					&num_non_ml,
-					NULL, NULL);
-	num_enabled_ml_sta = num_ml_sta;
-	if (num_ml_sta >= num_disabled_ml_sta)
-		num_enabled_ml_sta = num_ml_sta - num_disabled_ml_sta;
-
-	return conn_count > num_enabled_ml_sta;
-}
-
 static uint8_t
 policy_mgr_get_affected_links_for_sta_sta(struct wlan_objmgr_psoc *psoc,
 					  uint8_t num_ml, qdf_freq_t *freq_list,
@@ -8665,10 +8659,6 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
 		goto done;
 	} else {
-		if (policy_mgr_is_ml_sta_concurrency_present(psoc)) {
-			policy_mgr_debug("Concurrency exists, don't enter EMLSR mode");
-				goto done;
-		}
 		ml_nlink_get_curr_force_state(psoc, vdev, &curr);
 		if (curr.force_inactive_num || curr.force_active_num) {
 			if (curr.force_inactive_num) {
@@ -8679,7 +8669,7 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 					policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
 							 curr.force_active_num,
 							 curr.force_inactive_num);
-				goto done;
+					goto done;
 				}
 			}
 		}
