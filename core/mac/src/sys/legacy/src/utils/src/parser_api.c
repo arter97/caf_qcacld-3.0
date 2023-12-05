@@ -2015,6 +2015,10 @@ populate_dot11f_supp_channels(struct mac_context *mac,
 					 supportedChannels.channelList,
 					 &supportedChannels.numChnl,
 					 false);
+
+	if (supportedChannels.numChnl == 0)
+		return;
+
 	p = supportedChannels.channelList;
 	pDot11f->num_bands = supportedChannels.numChnl;
 
@@ -3153,7 +3157,7 @@ sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pFrame,
 }
 #endif
 
-QDF_STATUS
+enum wlan_status_code
 sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 				    uint8_t *pFrame,
 				    uint32_t nFrame, tpSirAssocReq pAssocReq)
@@ -3163,7 +3167,7 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 
 	ar = qdf_mem_malloc(sizeof(tDot11fAssocRequest));
 	if (!ar)
-		return QDF_STATUS_E_NOMEM;
+		return STATUS_UNSPECIFIED_FAILURE;
 
 	/* delegate to the framesc-generated code, */
 	status = dot11f_unpack_assoc_request(mac, pFrame, nFrame, ar, false);
@@ -3173,7 +3177,7 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
 				   pFrame, nFrame);
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_UNSPECIFIED_FAILURE;
 	} else if (DOT11F_WARNED(status)) {
 		pe_debug("There were warnings while unpacking an Association Request (0x%08x, %d bytes):",
 			status, nFrame);
@@ -3295,13 +3299,13 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 	if (!pAssocReq->ssidPresent) {
 		pe_debug("Received Assoc without SSID IE");
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_UNSPECIFIED_FAILURE;
 	}
 
 	if (!pAssocReq->suppRatesPresent && !pAssocReq->extendedRatesPresent) {
 		pe_debug("Received Assoc without supp rate IE");
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_ASSOC_DENIED_RATES;
 	}
 	if (ar->VHTCaps.present) {
 		qdf_mem_copy(&pAssocReq->VHTCaps, &ar->VHTCaps,
@@ -3371,7 +3375,7 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 		 ar->eht_cap.present);
 
 	qdf_mem_free(ar);
-	return QDF_STATUS_SUCCESS;
+	return STATUS_SUCCESS;
 
 } /* End sir_convert_assoc_req_frame2_struct. */
 
@@ -4081,7 +4085,7 @@ sir_convert_reassoc_req_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-QDF_STATUS
+enum wlan_status_code
 sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 				      uint8_t *pFrame,
 				      uint32_t nFrame, tpSirAssocReq pAssocReq)
@@ -4091,7 +4095,7 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 
 	ar = qdf_mem_malloc(sizeof(*ar));
 	if (!ar)
-		return QDF_STATUS_E_NOMEM;
+		return STATUS_UNSPECIFIED_FAILURE;
 
 	/* delegate to the framesc-generated code, */
 	status = dot11f_unpack_re_assoc_request(mac, pFrame, nFrame,
@@ -4102,7 +4106,7 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
 				   pFrame, nFrame);
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_UNSPECIFIED_FAILURE;
 	} else if (DOT11F_WARNED(status)) {
 		pe_debug("There were warnings while unpacking a Re-association Request (0x%08x, %d bytes):",
 			status, nFrame);
@@ -4200,13 +4204,13 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 	if (!pAssocReq->ssidPresent) {
 		pe_debug("Received Assoc without SSID IE");
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_UNSPECIFIED_FAILURE;
 	}
 
 	if (!pAssocReq->suppRatesPresent && !pAssocReq->extendedRatesPresent) {
 		pe_debug("Received Assoc without supp rate IE");
 		qdf_mem_free(ar);
-		return QDF_STATUS_E_FAILURE;
+		return STATUS_ASSOC_DENIED_RATES;
 	}
 	/* Why no call to 'updateAssocReqFromPropCapability' here, like */
 	/* there is in 'sir_convert_assoc_req_frame2_struct'? */
@@ -4275,7 +4279,7 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 						  ar, pAssocReq);
 	qdf_mem_free(ar);
 
-	return QDF_STATUS_SUCCESS;
+	return STATUS_SUCCESS;
 
 } /* End sir_convert_reassoc_req_frame2_struct. */
 
@@ -4943,9 +4947,12 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 					nframe - WLAN_BEACON_IES_OFFSET,
 					&ml_ie, &ml_ie_total_len);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
-			util_get_bvmlie_persta_partner_info(ml_ie,
-							    ml_ie_total_len,
-							    &partner_info);
+			status = util_get_bvmlie_persta_partner_info(
+								ml_ie,
+								ml_ie_total_len,
+								&partner_info);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
 			bcn_struct->mlo_ie.mlo_ie.num_sta_profile =
 						partner_info.num_partner_links;
 			util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
