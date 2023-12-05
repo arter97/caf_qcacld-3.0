@@ -1380,9 +1380,10 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 			     iface->vdev->vdev_mlme.des_chan,
 			     sizeof(struct wlan_channel));
 
-		if (wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev))
+		if (wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev) ||
+		    wma->interfaces[rsp->vdev_id].type ==
+		    WMI_VDEV_TYPE_MONITOR)
 			cdp_update_mac_id(dp_soc, rsp->vdev_id, mac_id);
-
 	}
 
 	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id)) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -288,13 +288,13 @@ pkt_capture_update_tx_status(
 		return;
 	}
 
-	if (!cdp_txrx_get_pdev_param(soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+	if (!cdp_txrx_get_vdev_param(soc, wlan_vdev_get_id(vdev),
 				     CDP_MONITOR_CHANNEL, &val))
-		tx_status->chan_num = val.cdp_pdev_param_monitor_chan;
+		tx_status->chan_num = val.cdp_vdev_param_monitor_chan;
 
-	if (!cdp_txrx_get_pdev_param(soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+	if (!cdp_txrx_get_vdev_param(soc, wlan_vdev_get_id(vdev),
 				     CDP_MONITOR_FREQUENCY, &val))
-		tx_status->chan_freq = val.cdp_pdev_param_mon_freq;
+		tx_status->chan_freq = val.cdp_vdev_param_mon_freq;
 
 	vdev_priv = pkt_capture_vdev_get_priv(vdev);
 	if (qdf_unlikely(!vdev_priv))

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1229,11 +1229,11 @@ void pkt_capture_record_channel(struct wlan_objmgr_vdev *vdev)
 	 * Record packet capture channel here
 	 */
 	des_chan = vdev->vdev_mlme.des_chan;
-	val.cdp_pdev_param_monitor_chan = des_chan->ch_ieee;
-	cdp_txrx_set_pdev_param(soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+	val.cdp_vdev_param_monitor_chan = des_chan->ch_ieee;
+	cdp_txrx_set_vdev_param(soc, wlan_vdev_get_id(vdev),
 				CDP_MONITOR_CHANNEL, val);
-	val.cdp_pdev_param_mon_freq = des_chan->ch_freq;
-	cdp_txrx_set_pdev_param(soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+	val.cdp_vdev_param_mon_freq = des_chan->ch_freq;
+	cdp_txrx_set_vdev_param(soc, wlan_vdev_get_id(vdev),
 				CDP_MONITOR_FREQUENCY, val);
 }
 

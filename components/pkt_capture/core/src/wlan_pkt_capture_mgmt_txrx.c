@@ -184,15 +184,15 @@ pkt_capture_mgmtpkt_process(struct wlan_objmgr_psoc *psoc,
 		if (auth->authTransactionSeqNumber == SIR_MAC_AUTH_FRAME_2 ||
 		    auth->authTransactionSeqNumber == SIR_MAC_AUTH_FRAME_4) {
 			if (auth->authStatusCode == STATUS_SUCCESS) {
-				val.cdp_pdev_param_monitor_chan = chan;
-				cdp_txrx_set_pdev_param(
-					soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+				val.cdp_vdev_param_monitor_chan = chan;
+				cdp_txrx_set_vdev_param(
+					soc, wlan_vdev_get_id(vdev),
 					CDP_MONITOR_CHANNEL, val);
 
-				val.cdp_pdev_param_mon_freq =
+				val.cdp_vdev_param_mon_freq =
 							txrx_status->chan_freq;
-				cdp_txrx_set_pdev_param(
-					soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+				cdp_txrx_set_vdev_param(
+					soc, wlan_vdev_get_id(vdev),
 					CDP_MONITOR_FREQUENCY, val);
 			}
 		}
@@ -225,14 +225,14 @@ pkt_capture_mgmtpkt_process(struct wlan_objmgr_psoc *psoc,
 			chan_num = wlan_reg_freq_to_chan(pdev,
 							 vdev_priv->last_freq);
 
-			val.cdp_pdev_param_monitor_chan = chan_num;
-			cdp_txrx_set_pdev_param(
-				soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+			val.cdp_vdev_param_monitor_chan = chan_num;
+			cdp_txrx_set_vdev_param(
+				soc, wlan_vdev_get_id(vdev),
 				CDP_MONITOR_CHANNEL, val);
 
-			val.cdp_pdev_param_mon_freq = vdev_priv->last_freq;
-			cdp_txrx_set_pdev_param(
-				soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+			val.cdp_vdev_param_mon_freq = vdev_priv->last_freq;
+			cdp_txrx_set_vdev_param(
+				soc, wlan_vdev_get_id(vdev),
 				CDP_MONITOR_FREQUENCY, val);
 
 			vdev_priv->curr_freq = vdev_priv->last_freq;

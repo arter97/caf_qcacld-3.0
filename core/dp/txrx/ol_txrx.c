@@ -6095,7 +6095,7 @@ static QDF_STATUS ol_set_pdev_param(struct cdp_soc_t *soc_hdl,  uint8_t pdev_id,
 	switch (param) {
 	case CDP_MONITOR_CHANNEL:
 	{
-		ol_htt_mon_note_chan(pdev, val.cdp_pdev_param_monitor_chan);
+		ol_htt_mon_note_chan(pdev, val.cdp_vdev_param_monitor_chan);
 		break;
 	}
 	default:
