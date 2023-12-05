@@ -6287,7 +6287,8 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 			 ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ)
 			scan_band_mask = BIT(REG_BAND_5G) | BIT(REG_BAND_6G);
 
-		band_mask &= scan_band_mask;
+		if (scan_band_mask)
+			band_mask &= scan_band_mask;
 
 		for (i = 0; i < num_chan; i++) {
 			if (!wlan_is_valid_frequency(chan_freq[i],
