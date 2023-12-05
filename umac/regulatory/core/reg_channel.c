@@ -1625,7 +1625,8 @@ bool reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev)
 		reg_err_rl("reg pdev priv obj is NULL");
 		return false;
 	}
-	return pdev_priv_obj->reg_6g_superid == MKK1_6G_0B;
+	return (pdev_priv_obj->reg_6g_superid == MKK1_6G_0B ||
+		pdev_priv_obj->reg_6g_superid == MKK2_6G_16);
 }
 
 #ifdef CONFIG_BAND_6GHZ
