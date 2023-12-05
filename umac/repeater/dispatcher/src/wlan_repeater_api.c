@@ -38,6 +38,7 @@
 #include <wlan_pdev_mlme.h>
 #define IE_CONTENT_SIZE 1
 #include <ieee80211_api.h>
+#include "ieee80211_cfg80211.h"
 
 extern bool
 wlan_rptr_is_psta_vdev(struct wlan_objmgr_vdev *vdev);
@@ -1114,6 +1115,9 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	struct iterate_info iterate_msg;
 #endif
 	osif_dev *osdev;
+	struct ieee80211vap *vap = NULL;
+
+	vap = wlan_vdev_get_vap(vdev);
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ext_cb = &g_priv->ext_cbacks;
@@ -1132,7 +1136,13 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_LOGI("Number of STA VAPs connected:%d", g_priv->num_stavaps_up);
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
-	osdev = ath_netdev_priv(dev);
+	if (!vap) {
+		RPTR_LOGE("vap is NULL");
+		return;
+	}
+
+	osdev = (osif_dev *)vap->iv_ifp;
+
 	if (wiphy && dev)
 		qca_multi_link_add_station_vap(wiphy, dev, osif_get_mld_netdev(osdev), wlan_vdev_mlme_get_mldaddr(vdev));
 
