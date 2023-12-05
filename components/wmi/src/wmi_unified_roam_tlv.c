@@ -4126,10 +4126,12 @@ free_keys:
 		if (!key_alloc_buf[k])
 			continue;
 
+		wmi_err_rl("flush keybuf :%d, key is valid", flush_keybuf,
+			   key_alloc_buf[k]->valid);
 		if (!flush_keybuf && key_alloc_buf[k]->valid)
 			continue;
 
-		wmi_debug("Free key allocated at idx:%d", k);
+		wmi_err("Free key allocated at idx:%d", k);
 		qdf_mem_zero(key_alloc_buf[k], sizeof(*key_alloc_buf[k]));
 		qdf_mem_free(key_alloc_buf[k]);
 	}
