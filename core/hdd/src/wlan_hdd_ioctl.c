@@ -7342,6 +7342,8 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"BTCOEXSCAN-START",          drv_cmd_dummy, false},
 	{"BTCOEXSCAN-STOP",           drv_cmd_dummy, false},
 	{"GET_SOFTAP_LINK_SPEED",     drv_cmd_get_sap_go_linkspeed, true},
+	{"SET_MAX_BANDWIDTH",         drv_cmd_dummy, false},
+	{"GET_MAX_BANDWIDTH",         drv_cmd_dummy, false},
 };
 
 /**
