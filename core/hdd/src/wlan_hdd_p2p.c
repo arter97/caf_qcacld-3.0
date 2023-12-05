@@ -449,6 +449,9 @@ int wlan_hdd_cfg80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
 int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	struct sap_config *sap_config = &ap_ctx->sap_config;
 	struct p2p_ps_config noa = {0};
 	int count, duration, interval, start = 0;
 	char *param;
@@ -469,7 +472,7 @@ int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command)
 	}
 
 	if (ret == 3)
-		interval = 100;
+		interval = sap_config->beacon_int;
 
 	if (start < 0 || count < 0 || interval < 0 || duration < 0 ||
 	    start > MAX_MUS_VAL || interval > MAX_MUS_VAL ||
