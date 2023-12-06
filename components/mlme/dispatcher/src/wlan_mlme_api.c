@@ -1332,7 +1332,7 @@ QDF_STATUS mlme_update_tgt_mlo_caps_in_cfg(struct wlan_objmgr_psoc *psoc)
 {
 	struct target_psoc_info *tgt_hdl;
 	QDF_STATUS status;
-	uint16_t value;
+	uint16_t mlo_sta_value, mlo_sap_value;
 
 	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
 	if (!tgt_hdl) {
@@ -1340,9 +1340,15 @@ QDF_STATUS mlme_update_tgt_mlo_caps_in_cfg(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	value = target_if_res_cfg_get_num_max_mlo_link(tgt_hdl);
-	status = wlan_mlme_set_sta_mlo_conn_max_num(psoc, value);
-	mlme_debug("Max ML link supported: %d", value);
+	mlo_sta_value = target_if_res_cfg_get_num_max_mlo_link(tgt_hdl);
+	status = wlan_mlme_set_sta_mlo_conn_max_num(psoc, mlo_sta_value);
+
+	mlo_sap_value = QDF_MIN(target_psoc_get_mlo_sap_support_link(tgt_hdl),
+				wlan_mlme_get_mlo_sap_support_link(psoc));
+	status = wlan_mlme_set_mlo_sap_support_link(psoc, mlo_sap_value);
+
+	mlme_debug("Max ML link supported: %u(ML-STA)  %u(ML-SAP)",
+		   mlo_sta_value, mlo_sap_value);
 
 	return status;
 }
@@ -2669,6 +2675,39 @@ wlan_mlme_get_ts_acm_value_for_ac(struct wlan_objmgr_psoc *psoc, bool *value)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+uint8_t wlan_mlme_get_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return 0;
+
+	return mlme_obj->cfg.sap_cfg.mlo_sap_support_link_num;
+}
+
+QDF_STATUS wlan_mlme_set_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc,
+					      uint8_t value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!value)
+		mlme_obj->cfg.sap_cfg.mlo_sap_support_link_num =
+			cfg_default(CFG_MLO_SAP_SUPPORT_LINK_NUM);
+	else
+		mlme_obj->cfg.sap_cfg.mlo_sap_support_link_num = value;
+
+	mlme_legacy_debug("ML SAP: support_link_num %d", value);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 QDF_STATUS wlan_mlme_get_listen_interval(struct wlan_objmgr_psoc *psoc,
 					     int *value)

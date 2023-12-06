@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -793,6 +793,37 @@
 				false, \
 				"Enable/Disable SAP power save with twt")
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/*
+ * <ini>
+ * mlo_sap_support_link_num - Set support number of multi link sap
+ * @Min: 1
+ * @Max: 2
+ * @Default: 1
+ *
+ * This ini is used to configure supported link number of multi link sap
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_MLO_SAP_SUPPORT_LINK_NUM CFG_INI_UINT( \
+				"mlo_sap_support_link_num", \
+				1, \
+				2, \
+				1, \
+				CFG_VALUE_OR_DEFAULT, \
+				"supported mlo sap link number")
+
+#define CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG CFG(CFG_MLO_SAP_SUPPORT_LINK_NUM)
+#else
+#define CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG
+#endif
+
 #define CFG_SAP_ALL \
 	CFG_SAP_SAE \
 	CFG(CFG_AP_ENABLE_RANDOM_BSSID) \
@@ -829,6 +860,7 @@
 	CFG(CFG_6G_SAP_FILS_DISCOVERY_ENABLED) \
 	CFG(CFG_DISABLE_MCS13_SUPPORT) \
 	CFG(CFG_DISABLE_SAP_BCN_PROT) \
-	CFG(CFG_SAP_PS_WITH_TWT)
+	CFG(CFG_SAP_PS_WITH_TWT) \
+	CFG_MLO_SAP_SUPPORT_LINK_NUM_CFG
 
 #endif /* __CFG_MLME_SAP_H */

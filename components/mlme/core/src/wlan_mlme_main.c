@@ -2348,6 +2348,20 @@ uint16_t wlan_get_rand_from_lst_for_freq(uint16_t *freq_lst,
 	return freq_lst[i];
 }
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+static inline void mlme_init_sap_mlo_cfg(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_mlme_cfg_sap *sap_cfg)
+{
+	sap_cfg->mlo_sap_support_link_num =
+		cfg_get(psoc, CFG_MLO_SAP_SUPPORT_LINK_NUM);
+}
+#else
+static inline void mlme_init_sap_mlo_cfg(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_mlme_cfg_sap *sap_cfg)
+{
+}
+#endif
+
 static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_cfg_sap *sap_cfg)
 {
@@ -2406,6 +2420,7 @@ static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_DISABLE_SAP_BCN_PROT);
 	sap_cfg->sap_ps_with_twt_enable =
 		cfg_get(psoc, CFG_SAP_PS_WITH_TWT);
+	mlme_init_sap_mlo_cfg(psoc, sap_cfg);
 }
 
 static void mlme_init_obss_ht40_cfg(struct wlan_objmgr_psoc *psoc,

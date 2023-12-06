@@ -4505,6 +4505,40 @@ wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * wlan_mlme_get_mlo_sap_support_link() - get max supported link number of
+ * multi link sap
+ * @psoc: pointer to psoc object
+ *
+ * Return: value of link num
+ */
+uint8_t wlan_mlme_get_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_mlo_sap_support_link() - set supported link number of mlo sap
+ * @psoc: pointer to psoc object
+ * @value: value to set
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc,
+					      uint8_t value);
+#else
+static inline uint8_t
+wlan_mlme_get_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc,
+				   uint8_t value)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * wlan_mlme_set_ba_2k_jump_iot_ap() - Set a flag if ba 2k jump IOT AP is found
  * @vdev: vdev pointer
