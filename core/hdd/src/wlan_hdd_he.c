@@ -689,6 +689,7 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 	QDF_STATUS status;
 	uint32_t id;
 	bool is_sr_enable = false;
+	bool non_srg_sr_disallowed = false, srg_info_present = false;
 	int32_t srg_pd_threshold = 0;
 	int32_t non_srg_pd_threshold = 0;
 	uint8_t sr_he_siga_val15_allowed = true;
@@ -804,6 +805,9 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 	switch (sr_oper) {
 	case QCA_WLAN_SR_OPERATION_SR_ENABLE:
 	case QCA_WLAN_SR_OPERATION_SR_DISABLE:
+		non_srg_sr_disallowed = sr_ctrl & NON_SRG_PD_SR_DISALLOWED;
+		srg_info_present = sr_ctrl & SRG_INFO_PRESENT;
+
 		if (sr_oper == QCA_WLAN_SR_OPERATION_SR_ENABLE) {
 			is_sr_enable = true;
 		} else {
@@ -822,19 +826,38 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		 */
 		if (is_sr_enable &&
 		    tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_SRG_PD_THRESHOLD]) {
-			srg_pd_threshold =
-			nla_get_s32(
-			tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_SRG_PD_THRESHOLD]);
-			wlan_vdev_mlme_set_pd_threshold_present(vdev, true);
+			if (srg_info_present) {
+				srg_pd_threshold =
+				nla_get_s32(
+				tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_SRG_PD_THRESHOLD]);
+				wlan_vdev_mlme_set_pd_threshold_present(vdev,
+									true);
+			} else {
+				hdd_err("SRG OBSS PD threshold set is disallowed\n");
+				ret = -EINVAL;
+				goto exit;
+			}
 		}
 
 		if (is_sr_enable &&
 		    tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_NON_SRG_PD_THRESHOLD]) {
-			non_srg_pd_threshold =
-			nla_get_s32(
-			tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_NON_SRG_PD_THRESHOLD]
-			);
-			wlan_vdev_mlme_set_pd_threshold_present(vdev, true);
+			if (!non_srg_sr_disallowed) {
+				non_srg_pd_threshold =
+				nla_get_s32(
+				tb2[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_NON_SRG_PD_THRESHOLD]);
+				wlan_vdev_mlme_set_pd_threshold_present(vdev,
+									true);
+			} else {
+				hdd_err("non-SRG OBSS PD threshold set is disallowed\n");
+				ret = -EINVAL;
+				goto exit;
+			}
+		}
+
+		if (non_srg_sr_disallowed && !srg_info_present) {
+			hdd_err("Failed to enable SR\n");
+			ret = -EINVAL;
+			goto exit;
 		}
 
 		hdd_debug("setting sr enable %d with pd threshold srg: %d non srg: %d",
