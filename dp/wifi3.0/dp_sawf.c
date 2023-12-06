@@ -86,6 +86,7 @@
 
 #define SAWF_FLOW_START 1
 #define SAWF_FLOW_STOP  2
+#define DP_RETRY_COUNT 7
 
 uint16_t dp_sawf_msduq_peer_id_set(uint16_t peer_id, uint8_t msduq)
 {
@@ -1554,13 +1555,25 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 
 	DP_STATS_DEC(stats_ctx, tx_stats[host_q_idx].queue_depth, 1);
 
+	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].retry_count, 1,
+			  (ts->status == HAL_TX_TQM_RR_FRAME_ACKED
+			  && ts->transmit_cnt > 1));
+
+	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].multiple_retry_count, 1,
+			  (ts->status == HAL_TX_TQM_RR_FRAME_ACKED
+			  && ts->transmit_cnt > 2));
+
+	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].failed_retry_count, 1,
+			  (ts->status != HAL_TX_TQM_RR_FRAME_ACKED
+			  && ts->transmit_cnt > DP_RETRY_COUNT));
+
 	if (!(tx_stats->tx_success.num + tx_stats->tx_failed) %
 	      dp_sawf_get_sla_num_pkt()) {
 		telemetry_sawf_update_msdu_drop(sawf_ctx->telemetry_ctx,
 						host_tid, host_q_idx,
 						tx_stats->tx_success.num,
 						tx_stats->tx_failed,
-						tx_stats->dropped. age_out);
+						tx_stats->dropped.age_out);
 	}
 
 latency_stats_update:
@@ -1821,6 +1834,9 @@ static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
 	dp_sawf_print_stats("dropped: fw_reason3 = %u",
 		       tx_stats->dropped.fw_reason3);
 	dp_sawf_print_stats("tx_failed = %u", tx_stats->tx_failed);
+	dp_sawf_print_stats("retry_count = %u", tx_stats->retry_count);
+	dp_sawf_print_stats("multiple_retry_count = %u", tx_stats->multiple_retry_count);
+	dp_sawf_print_stats("failed_retry_count = %u", tx_stats->failed_retry_count);
 	dp_sawf_print_stats("queue_depth = %u", tx_stats->queue_depth);
 	dp_sawf_print_stats("throughput = %u", tx_stats->throughput);
 	dp_sawf_print_stats("ingress rate = %u", tx_stats->ingress_rate);
