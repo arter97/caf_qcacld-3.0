@@ -29862,6 +29862,11 @@ __wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy,
 	uint8_t link_idx;
 	int ret = -EINVAL;
 
+	if (!hdd_mlosap_check_support_link_num(adapter)) {
+		hdd_err("invalid link num");
+		return -EINVAL;
+	}
+
 	link_info = hdd_get_link_info_for_add_intf_link(adapter);
 	if (!link_info) {
 		hdd_err(" invalid link info %u", link_id);

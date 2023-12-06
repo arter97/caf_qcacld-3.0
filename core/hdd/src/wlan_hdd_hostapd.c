@@ -8878,3 +8878,55 @@ bool hdd_sap_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 	return in_progress;
 }
 #endif
+
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_mlosap_get_started_link_num() - get number of started mlo sap
+ *
+ * @adapter: HDD adapter to iterate each link_info.
+ *
+ * The function get added link number of mlo sap.
+ *
+ *return: number of added link
+ */
+static inline uint8_t
+hdd_mlosap_get_started_link_num(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+	uint8_t count = 0;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (test_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags))
+			count++;
+	}
+
+	return count;
+}
+
+bool hdd_mlosap_check_support_link_num(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx;
+	uint8_t mlo_sap_support_link_num, started_link_num;
+	int status;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	status = wlan_hdd_validate_context(hdd_ctx);
+
+	if (0 != status)
+		return false;
+
+	mlo_sap_support_link_num =
+		wlan_mlme_get_mlo_sap_support_link(hdd_ctx->psoc);
+	started_link_num = hdd_mlosap_get_started_link_num(adapter);
+	hdd_debug("mlo_sap_support_link_num %u, started_link_num %u",
+		  mlo_sap_support_link_num, started_link_num);
+
+	if (!mlo_sap_support_link_num)
+		return false;
+
+	if (started_link_num < mlo_sap_support_link_num)
+		return true;
+
+	return false;
+}
+#endif

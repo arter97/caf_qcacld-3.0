@@ -555,4 +555,14 @@ bool hdd_sap_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 #endif
+
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_mlosap_check_support_link_num() - mlo sap to check if link
+ *                               number exceed max support link number
+ * @adapter: pointer to adapter
+ * Return: true if not exceed max support num.
+ */
+bool hdd_mlosap_check_support_link_num(struct hdd_adapter *adapter);
+#endif
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */
