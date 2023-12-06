@@ -5536,12 +5536,14 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	frm.DialogToken.token = dialog_token;
 	frm.Status.status = status_code;
 
-	if ((LIM_IS_STA_ROLE(session) && qos_aggr->rx_aggregation_size == 1 &&
-	    !mac_ctx->usr_cfg_ba_buff_size) || mac_ctx->reject_addba_req) {
+	if (((LIM_IS_STA_ROLE(session) || LIM_IS_AP_ROLE(session)) &&
+	     qos_aggr->rx_aggregation_size == 1 &&
+	     !mac_ctx->usr_cfg_ba_buff_size) || mac_ctx->reject_addba_req) {
 		frm.Status.status = STATUS_REQUEST_DECLINED;
 		pe_err("refused addba req for rx_aggregation_size: %d mac_ctx->reject_addba_req: %d",
 		       qos_aggr->rx_aggregation_size, mac_ctx->reject_addba_req);
-	} else if (LIM_IS_STA_ROLE(session) && !mac_ctx->usr_cfg_ba_buff_size) {
+	} else if ((LIM_IS_STA_ROLE(session) || LIM_IS_AP_ROLE(session)) &&
+		   !mac_ctx->usr_cfg_ba_buff_size) {
 		frm.addba_param_set.buff_size =
 			QDF_MIN(qos_aggr->rx_aggregation_size, calc_buff_size);
 	} else {
