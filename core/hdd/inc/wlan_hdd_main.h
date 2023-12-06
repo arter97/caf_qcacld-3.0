@@ -1719,6 +1719,7 @@ enum wlan_state_ctrl_str_id {
  * @hdd_dual_sta_policy: Concurrent STA policy configuration
  * @is_wlan_disabled: if wlan is disabled by userspace
  * @pm_notifier: PM notifier of hdd modules
+ * @nl_reg_pid: hdd_init_netlink_services process id
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2048,6 +2049,10 @@ struct hdd_context {
 	uint8_t file_name[HDD_MAX_FILE_NAME_LEN];
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	enum coex_dbam_config_mode dbam_mode;
+#endif
+
+#ifdef CNSS_GENL
+	int nl_reg_pid;
 #endif
 };
 
