@@ -309,6 +309,7 @@ void lim_process_mlm_join_cnf(struct mac_context *mac_ctx,
 
 	wlan_connectivity_sta_info_event(mac_ctx->psoc, session_entry->vdev_id,
 					 false);
+	wlan_connectivity_connecting_event(session_entry->vdev, NULL);
 
 	session_entry->join_probe_cnt = 0;
 	if (session_entry->limSmeState != eLIM_SME_WT_JOIN_STATE) {
