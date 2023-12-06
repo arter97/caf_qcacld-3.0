@@ -21486,6 +21486,8 @@ static void wlan_hdd_update_eapol_over_nl80211_flags(struct wiphy *wiphy)
 			      NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211);
 	wiphy_ext_feature_set(wiphy,
 			      NL80211_EXT_FEATURE_CONTROL_PORT_NO_PREAUTH);
+	wiphy_ext_feature_set(wiphy,
+			      NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211_TX_STATUS);
 }
 #else
 static void wlan_hdd_update_eapol_over_nl80211_flags(struct wiphy *wiphy)
@@ -29541,11 +29543,98 @@ static int wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 	return errno;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_MULTI_LINK_SAP)
+/**
+ * wlan_hdd_mlo_update_sa() - update the source address of the skb
+ * @adapter: HDD adapter
+ * @ehdr: skb ethernet header
+ * @src: skb source address
+ * @dest: skb destination address
+ *
+ * Return: None
+ */
+static void
+wlan_hdd_mlo_update_sa(struct hdd_adapter *adapter,
+		       struct ethhdr *ehdr,
+		       const u8 *src,
+		       const u8 *dest)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *link_info;
+	uint8_t dest_addr[ETH_ALEN] = {0};
+	uint8_t *peer_mld_addr;
+	bool mlo_sta = false;
+	struct wlan_objmgr_peer *peer;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_ID);
+	if (!vdev)
+		return;
+
+	if (!(wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	      adapter->device_mode == QDF_SAP_MODE)) {
+		qdf_mem_copy(ehdr->h_source, src, ETH_ALEN);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return;
+	}
+
+	qdf_mem_copy(dest_addr, dest, ETH_ALEN);
+
+	/* link peer should be found in the peer list */
+	peer = wlan_objmgr_get_peer_by_mac(adapter->hdd_ctx->psoc,
+					   dest_addr, WLAN_OSIF_ID);
+	if (!peer) {
+		/* if dest_addr is mld address, should go here */
+		hdd_err("Peer not found with MAC " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(dest));
+		qdf_mem_copy(ehdr->h_source, src, ETH_ALEN);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return;
+	}
+
+	peer_mld_addr = wlan_peer_mlme_get_mldaddr(peer);
+	if (peer_mld_addr &&
+	    !qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_mld_addr))
+		mlo_sta = true;
+	else
+		mlo_sta = false;
+
+	if (!mlo_sta) {
+		uint8_t peer_vdevid = 0;
+
+		peer_vdevid  = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
+
+		hdd_adapter_for_each_active_link_info(adapter,
+						      link_info) {
+			if (link_info->vdev_id == peer_vdevid) {
+				qdf_mem_copy(ehdr->h_source,
+					     link_info->vdev->vdev_mlme.macaddr,
+					     ETH_ALEN);
+				break;
+			}
+		}
+	} else {
+		qdf_mem_copy(ehdr->h_source, src, ETH_ALEN);
+	}
+	wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+}
+#else
+static void wlan_hdd_mlo_update_sa(struct hdd_adapter *adapter,
+				   struct ethhdr *ehdr,
+				   const u8 *src,
+				   const u8 *dest)
+{
+	qdf_mem_copy(ehdr->h_source, src, ETH_ALEN);
+}
+#endif
+
 static int __wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					       struct net_device *dev,
 					       const u8 *buf, size_t len,
 					       const u8 *src, const u8 *dest,
-						__be16 proto, bool unencrypted)
+						__be16 proto, bool unencrypted,
+						int link_id)
 {
 	qdf_nbuf_t nbuf;
 	struct ethhdr *ehdr;
@@ -29565,7 +29654,7 @@ static int __wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 	if (!src || qdf_is_macaddr_zero((struct qdf_mac_addr *)src))
 		qdf_mem_copy(ehdr->h_source, adapter->mac_addr.bytes, ETH_ALEN);
 	else
-		qdf_mem_copy(ehdr->h_source, src, ETH_ALEN);
+		wlan_hdd_mlo_update_sa(adapter, ehdr, src, dest);
 
 	ehdr->h_proto = proto;
 
@@ -29587,7 +29676,8 @@ static int _wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					      struct net_device *dev,
 					      const u8 *buf, size_t len,
 					      const u8 *src, const u8 *dest,
-					      __be16 proto, bool unencrypted)
+					      __be16 proto, bool unencrypted,
+					      int link_id)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -29597,14 +29687,15 @@ static int _wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 		return errno;
 
 	errno = __wlan_hdd_cfg80211_tx_control_port(wiphy, dev, buf, len, src,
-						    dest, proto, unencrypted);
+						    dest, proto, unencrypted,
+						    link_id);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0) || \
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41) || \
 	defined(CFG80211_TX_CONTROL_PORT_LINK_SUPPORT))
 static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					     struct net_device *dev,
@@ -29613,28 +29704,54 @@ static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					     const u8 *dest, const __be16 proto,
 					     bool unencrypted, int link_id,
 					     u64 *cookie)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	return _wlan_hdd_cfg80211_tx_control_port(wiphy, dev, buf, len,
+						  adapter->mac_addr.bytes,
+						  dest, proto, unencrypted,
+						  link_id);
+}
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0))
 static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					     struct net_device *dev,
 					     const u8 *buf, size_t len,
 					     const u8 *dest, __be16 proto,
 					     bool unencrypted, u64 *cookie)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	return _wlan_hdd_cfg80211_tx_control_port(wiphy, dev, buf, len,
+						  adapter->mac_addr.bytes,
+						  dest, proto, unencrypted, -1);
+}
 #else
 static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					     struct net_device *dev,
 					     const u8 *buf, size_t len,
 					     const u8 *dest, __be16 proto,
 					     bool unencrypted)
-#endif
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
 	return _wlan_hdd_cfg80211_tx_control_port(wiphy, dev, buf, len,
 						  adapter->mac_addr.bytes,
-						  dest, proto, unencrypted);
+						  dest, proto, unencrypted, -1);
 }
+#endif
 
 #if defined(CFG80211_CTRL_FRAME_SRC_ADDR_TA_ADDR)
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
+bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
+				       u8 *ta_addr,
+				       struct sk_buff *skb,
+				       bool unencrypted)
+{
+	return cfg80211_rx_control_port(dev, skb, unencrypted, -1);
+}
+
+#else
 bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 				       u8 *ta_addr,
 				       struct sk_buff *skb,
@@ -29642,6 +29759,8 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 {
 	return cfg80211_rx_control_port(dev, ta_addr, skb, unencrypted);
 }
+#endif
+
 #else
 bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 				       u8 *ta_addr,
