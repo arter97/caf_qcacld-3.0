@@ -1323,6 +1323,12 @@ enum _ol_ath_param_t {
 	*/
 	OL_ATH_PARAM_SWITCH_RTT_ROLE = 504,
 	OL_ATH_PARAM_PRE_11AX_PACKET_REMOVAL = 505,
+	OL_ATH_PARAM_DUMP_ALL_NODES = 506,
+	OL_ATH_PARAM_EDGE_NODE_ADV = 507,
+	OL_ATH_PARAM_ENABLE_IOT_MESH_FEATURE = 508,
+
+	/* Set tsf qtimer sync report period */
+	OL_ATH_PARAM_SET_TSF_QTIMER_PERIOD = 999,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3384,6 +3390,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_RU_106_TONE_ER_SU_DCM, SET_PARAM, 1},
 	{"counter_period",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_WLAN_COUNTER_PERIOD, SET_PARAM, 1},
+	{"set_tsf_qtimer",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_TSF_QTIMER_PERIOD, SET_PARAM, 1},
 	{"cmn_ulofdma_rtd",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UL_OFDMA_RTD, SET_PARAM, 1},
 	{"preamble_power_removal",
@@ -3394,6 +3402,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SWITCH_RTT_ROLE, SET_PARAM, 1},
 	{"pre_11ax_packet_removal",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PRE_11AX_PACKET_REMOVAL, SET_PARAM, 1},
+	{"set_as_edge_node",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EDGE_NODE_ADV, SET_PARAM, 1},
+	{"dump_all_nodes",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DUMP_ALL_NODES, GET_PARAM, 0},
+	{"enable_drone_mesh",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_IOT_MESH_FEATURE, SET_PARAM, 1},
 };
 #endif
 #endif
