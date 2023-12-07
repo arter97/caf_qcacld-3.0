@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -160,7 +160,8 @@ int find_ie_location(struct mac_context *mac, tpSirRSNie pRsnIe, uint8_t EID)
 QDF_STATUS
 populate_dot11f_capabilities(struct mac_context *mac,
 			     tDot11fFfCapabilities *pDot11f,
-			     struct pe_session *pe_session)
+			     struct pe_session *pe_session,
+			     bool update_cu)
 {
 	uint16_t cfg;
 	QDF_STATUS nSirStatus;
@@ -171,7 +172,13 @@ populate_dot11f_capabilities(struct mac_context *mac,
 			   nSirStatus);
 		return nSirStatus;
 	}
+	if (update_cu) {
+	/* criticalUpdateFlag bit */
+		tpSirMacCapabilityInfo pcap_info;
 
+		pcap_info = (tpSirMacCapabilityInfo)&cfg;
+		lim_update_cu_flag(pcap_info, pe_session);
+	}
 	swap_bit_field16(cfg, (uint16_t *) pDot11f);
 
 	return QDF_STATUS_SUCCESS;

@@ -10709,6 +10709,24 @@ void lim_send_start_bss_confirm(struct mac_context *mac_ctx,
 	}
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_MLO_SAP)
+void lim_update_cu_flag(tSirMacCapabilityInfo *pcap_info,
+			struct pe_session *pe_session)
+{
+	/* update cu flag */
+	if (pe_session->mlo_link_info.bss_param_change)
+		pcap_info->criticalUpdateFlag = 1;
+	else
+		pcap_info->criticalUpdateFlag = 0;
+}
+
+#else
+void lim_update_cu_flag(tSirMacCapabilityInfo *pcap_info,
+			struct pe_session *pe_session)
+{
+}
+#endif
+
 QDF_STATUS lim_get_capability_info(struct mac_context *mac, uint16_t *pcap,
 				   struct pe_session *pe_session)
 {

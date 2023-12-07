@@ -716,7 +716,8 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		frm->BeaconInterval.interval = (uint16_t) cfg;
 	}
 
-	populate_dot11f_capabilities(mac_ctx, &frm->Capabilities, pe_session);
+	populate_dot11f_capabilities(mac_ctx, &frm->Capabilities,
+				     pe_session, false);
 	populate_dot11f_ssid(mac_ctx, (tSirMacSSid *) ssid, &frm->SSID);
 	populate_dot11f_supp_rates(mac_ctx, POPULATE_DOT11F_RATES_OPERATIONAL,
 		&frm->SuppRates, pe_session);
@@ -1720,7 +1721,16 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	 * Populate Do11capabilities after updating session with
 	 * Assos req details
 	 */
-	populate_dot11f_capabilities(mac_ctx, &frm.Capabilities, pe_session);
+	if (sta && lim_is_sta_eht_capable(sta) &&
+	    lim_is_mlo_conn(pe_session, sta) &&
+	    lim_is_session_eht_capable(pe_session) &&
+	    wlan_vdev_mlme_is_mlo_ap(pe_session->vdev) &&
+	    (status_code != STATUS_ASSOC_REJECTED_TEMPORARILY))
+		populate_dot11f_capabilities(mac_ctx, &frm.Capabilities,
+					     pe_session, true);
+	else
+		populate_dot11f_capabilities(mac_ctx, &frm.Capabilities,
+					     pe_session, false);
 
 	beacon_params.bss_idx = pe_session->vdev_id;
 
