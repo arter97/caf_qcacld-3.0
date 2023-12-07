@@ -299,6 +299,7 @@ struct psoc_peer_iter {
 	uint8_t svc_id;
 	uint8_t param;
 	uint8_t tid;
+	uint8_t queue_id;
 };
 
 /* wlan_sawf_init() - Initialize SAWF subsytem
@@ -417,6 +418,25 @@ QDF_STATUS
 wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
 			    uint32_t *service_interval, uint32_t *burst_size,
 			    uint32_t *min_tput, uint32_t *max_latency);
+
+/* wlan_sawf_get_downlink_params() - Get service class downlink parameters
+ *
+ * @svc_id: service class ID
+ * @tid: pointer to update TID
+ * @service_interval: Pointer to update Service Interval
+ * @burst_size: Pointer to update Burst Size
+ * @min_tput: Pointer to update minimum throughput
+ * @max_latency: Pointer to update max_latency
+ * @priority: Pointer to update priority
+ * @type: Pointer to update type
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_sawf_get_downlink_params(uint8_t svc_id, uint8_t *tid,
+			      uint32_t *service_interval, uint32_t *burst_size,
+			      uint32_t *min_tput, uint32_t *max_latency,
+			      uint32_t *priority, uint8_t *type);
 
 /* wlan_sawf_sla_process_sla_event() - Process SLA-related nl-event
  *
@@ -698,6 +718,7 @@ int wlan_sawf_get_drop_stats(void *soc, void *arg, uint64_t *pass,
  * @param: parameter for which notification is being sent
  * @set_clear: flag tro indicate breach detection or clear
  * @tid: tid no for the sawf flow
+ * @queue_id: msduq id on which breach is detected
  *
  * Return: void
  */
@@ -705,7 +726,8 @@ void wlan_sawf_notify_breach(uint8_t *mac_addr,
 			     uint8_t svc_id,
 			     uint8_t param,
 			     bool set_clear,
-			     uint8_t tid);
+			     uint8_t tid,
+			     uint8_t queue_id);
 #else
 static inline
 int wlan_sawf_get_tput_stats(void *soc, void *arg, uint64_t *in_bytes,
@@ -737,7 +759,8 @@ void wlan_sawf_notify_breach(uint8_t *mac_addr,
 			     uint8_t svc_id,
 			     uint8_t param,
 			     bool set_clear,
-			     uint8_t tid)
+			     uint8_t tid,
+			     uint8_t queue_id)
 {
 }
 #endif /* CONFIG_SAWF */

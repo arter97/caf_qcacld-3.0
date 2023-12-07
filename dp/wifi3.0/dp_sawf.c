@@ -172,6 +172,9 @@ dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 	for (index = 0; index < DP_SAWF_MAX_DYNAMIC_AST; index++)
 		sawf_ctx->dynamic_ast_idx[index] = DP_SAWF_INVALID_AST_IDX;
 
+	for (index = 0; index < DP_SAWF_Q_MAX; index++)
+		qdf_atomic_init(&sawf_ctx->msduq[index].ref_count);
+
 	peer->sawf = sawf_ctx;
 
 	return QDF_STATUS_SUCCESS;
@@ -193,9 +196,11 @@ static inline void dp_sawf_dec_peer_count(struct dp_soc *soc, struct dp_peer *pe
 			 */
 			if (!wlan_service_id_get_peer_count(svc_id) &&
 			    !wlan_service_id_get_ref_count(svc_id)) {
-				wlan_disable_service_class(svc_id);
 				if (soc->cdp_soc.ol_ops->disable_sawf_svc)
 					cdp_soc->ol_ops->disable_sawf_svc(svc_id);
+				telemetry_sawf_set_svclass_cfg(false, svc_id,
+							       0, 0, 0, 0, 0, 0, 0);
+				wlan_disable_service_class(svc_id);
 			}
 		}
 	}
@@ -703,10 +708,27 @@ dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 
 	if (match_found) {
 		if (start_or_stop == SAWF_FLOW_START) {
-			msduq->ref_count++;
+			/*
+			 * Increment MSDUQ refcount and send add notification
+			 * when refcount is 1
+			 */
+			if (qdf_atomic_inc_return(&msduq->ref_count) == 1) {
+				dp_sawf_peer_msduq_event_notify(dpsoc, peer, q_idx,
+								svc_id,
+								SAWF_PEER_MSDUQ_ADD_EVENT);
+			}
 		} else if (start_or_stop == SAWF_FLOW_STOP) {
-			if (msduq->ref_count)
-				msduq->ref_count--;
+			if (qdf_atomic_read(&msduq->ref_count)) {
+				/*
+				 * Decrement MSDUQ refcount and send delete
+				 * notification when refcount becomes 0
+				 */
+				if (qdf_atomic_dec_and_test(&msduq->ref_count)) {
+					    dp_sawf_peer_msduq_event_notify(dpsoc, peer,
+									    q_idx, svc_id,
+									    SAWF_PEER_MSDUQ_DELETE_EVENT);
+				}
+			}
 		}
 	}
 
@@ -1233,7 +1255,7 @@ dp_swaf_peer_sla_configuration(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 
 	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
 		msduq = &sawf_ctx->msduq[q_idx];
-		if (msduq->is_used && msduq->ref_count) {
+		if (msduq->is_used && qdf_atomic_read(&msduq->ref_count)) {
 			sla_mask |= wlan_service_id_get_enabled_param_mask
 				(msduq->svc_id);
 		}
@@ -1396,6 +1418,62 @@ dp_sawf_reinject_handler(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	return QDF_STATUS_E_FAILURE;
 }
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
+
+#ifdef SAWF_ADMISSION_CONTROL
+void dp_sawf_peer_msduq_event_notify(struct dp_soc *soc, struct dp_peer *peer,
+				     uint8_t queue_id, uint8_t svc_id,
+				     enum cdp_sawf_peer_msduq_event event_type)
+{
+	uint16_t peer_id, msduq_peer_id;
+	uint32_t mark_metadata;
+	uint8_t tid = 0, type = 0;
+	uint32_t service_interval = 0, burst_size = 0, min_throughput = 0,
+		delay_bound = 0, priority = 0;
+	struct cdp_sawf_peer_msduq_event_intf params = {0};
+
+	params.vdev_id = peer->vdev->vdev_id;
+	params.event_type = event_type;
+	params.queue_id = queue_id;
+
+	peer_id = peer->peer_id;
+	qdf_mem_copy(params.peer_mac, peer->mac_addr.raw, QDF_MAC_ADDR_SIZE);
+
+	/* No need of service class params in case of delete */
+	if (event_type == SAWF_PEER_MSDUQ_DELETE_EVENT)
+		goto dispatch_event;
+
+	if (wlan_sawf_get_downlink_params(svc_id, &tid, &service_interval,
+					  &burst_size, &min_throughput,
+					  &delay_bound, &priority, &type) != QDF_STATUS_SUCCESS)
+		return;
+
+	queue_id = queue_id + DP_SAWF_DEFAULT_Q_MAX;
+	msduq_peer_id = dp_sawf_msduq_peer_id_set(peer_id, queue_id);
+	DP_SAWF_METADATA_SET(mark_metadata, svc_id, msduq_peer_id);
+
+	params.svc_id = svc_id;
+	params.type = type;
+	params.priority = priority;
+	params.tid = tid;
+	params.ac = TID_TO_WME_AC(tid);
+	params.mark_metadata = mark_metadata;
+	params.service_interval = service_interval;
+	params.burst_size = burst_size;
+	params.min_throughput = min_throughput;
+	params.delay_bound = delay_bound;
+
+dispatch_event:
+	dp_wdi_event_handler(WDI_EVENT_PEER_MSDUQ_EVENT, soc, (void *)&params,
+			     HTT_INVALID_PEER, WDI_NO_VAL,
+			     peer->vdev->pdev->pdev_id);
+}
+#else
+void dp_sawf_peer_msduq_event_notify(struct dp_soc *soc, struct dp_peer *peer,
+				     uint8_t queue_id, uint8_t svc_id,
+				     enum cdp_sawf_peer_msduq_event event_type)
+{
+}
+#endif
 
 #ifdef CONFIG_SAWF_STATS
 struct sawf_telemetry_params sawf_telemetry_cfg;
