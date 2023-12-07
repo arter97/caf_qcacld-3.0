@@ -11215,7 +11215,9 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	uint32_t sta_sap_scc_on_dfs_chan;
-	uint32_t sta_cnt, gc_cnt;
+	uint32_t sta_cnt, gc_cnt, idx;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct wlan_objmgr_vdev *vdev;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
@@ -11223,10 +11225,12 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
-	sta_cnt = policy_mgr_mode_specific_connection_count(psoc,
-							    PM_STA_MODE, NULL);
-	gc_cnt = policy_mgr_mode_specific_connection_count(psoc,
-						PM_P2P_CLIENT_MODE, NULL);
+	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
+							 vdev_id_list,
+							 PM_STA_MODE);
+	gc_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
+							&vdev_id_list[sta_cnt],
+							PM_P2P_CLIENT_MODE);
 
 	policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, sta_cnt %u, gc_cnt %u",
 			 sta_sap_scc_on_dfs_chan, sta_cnt, gc_cnt);
@@ -11240,6 +11244,30 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	    !policy_mgr_get_dfs_master_dynamic_enabled(psoc, vdev_id)) {
 		policy_mgr_err("SAP not allowed on DFS channel if no dfs master capability!!");
 		return false;
+	}
+
+	/*
+	 * Check if any of the concurrent STA/ML-STA link/P2P client are in
+	 * disconnecting state and disallow current SAP CSA. Concurrencies
+	 * would be re-evaluated upon disconnect completion and SAP would be
+	 * moved to right channel.
+	 */
+	for (idx = 0; idx < sta_cnt + gc_cnt; idx++) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    vdev_id_list[idx],
+							    WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("Invalid vdev");
+			return false;
+		}
+		if (wlan_cm_is_vdev_disconnecting(vdev) ||
+		    mlo_is_any_link_disconnecting(vdev)) {
+			policy_mgr_err("SAP is not allowed to move to DFS channel at this time, vdev %d",
+				       vdev_id_list[idx]);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			return false;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 	}
 
 	return true;
