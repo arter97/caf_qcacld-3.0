@@ -58,8 +58,6 @@
 #define REG_MAX_EIRP_POWER 36
 #define REG_MIN_EIRP_POWER 14
 
-#define SAP_NORMALISE_ACS_WEIGHT 5
-
 /* In HT40/VHT80, Effect of primary Channel RSSi on Subband1 */
 #define SAP_SUBBAND1_RSSI_EFFECT_PRIMARY  (-20)
 /* In VHT80, Effect of primary Channel RSSI on Subband2 */

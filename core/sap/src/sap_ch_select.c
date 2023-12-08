@@ -1545,59 +1545,6 @@ static void sap_update_6ghz_max_weight(struct sap_sel_ch_info *ch_info_params,
 	}
 }
 
-/**
- * sap_update_5ghz_low_freq_weight() - Update weight of 5GHz low frequency
- * @psoc: Pointer to psoc
- * @ch_info_params: Pointer to sap_sel_ch_info structure
- *
- * This api helps to lower the 5GHz low frequency weight by
- * SAP_NORMALISE_ACS_WEIGHT so that it will get more preference to get
- * selected during ACS.
- *
- * Return: void
- */
-static void sap_update_5ghz_low_freq_weight(
-					struct wlan_objmgr_psoc *psoc,
-					struct sap_sel_ch_info *ch_info_params)
-{
-	uint8_t ch_num;
-	qdf_freq_t freq;
-	uint32_t weight;
-
-	if (!policy_mgr_is_hw_sbs_capable(psoc))
-		return;
-
-	for (ch_num = 0; ch_num < ch_info_params->num_ch; ch_num++) {
-		freq = ch_info_params->ch_info[ch_num].chan_freq;
-		weight = ch_info_params->ch_info[ch_num].weight;
-		if (policy_mgr_is_given_freq_5g_low(psoc, freq)) {
-			/*
-			 * Lower the weight by SAP_NORMALISE_ACS_WEIGHT i.e 5%
-			 * from channel weight itself. Later if required, modify
-			 * this value.
-			 * Here are the few observation captured which results
-			 * to go with SAP_NORMALISE_ACS_WEIGHT.
-			 *
-			 * +-----------+-------------+------------+---------------+--------------------------------------+
-			 * |   freq    |  bss_count  |    rssi    |     weight    |              observation             |
-			 * +---------------------------------------------------------------------------------------------+
-			 * |  5G low   |    >6       | -76 - -56  | 17419 - 17774 | Diff b/w 5G low & 5G high min weight |
-			 * |  5G high  |    <4       | -100 - -50 | 16842 - 17685 | is ~5% of 5G low min weight		 |
-			 * |	       |	     |		  |		  |					 |
-			 * |  5G low   |    >6       | -77 - -54  | 17419 - 17730 | Diff b/w 5G low & 5G high min weight |
-			 * |  5G high  |    <4	     | -100 - -50 | 16842 - 17552 | is ~5% of 5G low min weight		 |
-			 * |	       |	     |		  |		  |					 |
-			 * |  5G low   |    >5       | -77 - -57  | 17286 - 17552 | Diff b/w 5G low & 5G high min weight |
-			 * |  5G high  |    <4       | -100 - -50 | 16842 - 17596 | is ~5% of 5G low min weight		 |
-			 * +-----------+-------------+------------+---------------+--------------------------------------+
-			 */
-
-			weight = weight - ((weight * SAP_NORMALISE_ACS_WEIGHT ) / 100);
-			ch_info_params->ch_info[ch_num].weight = weight;
-		}
-	}
-}
-
 /*
  * Consider 4 char for Freq, 3 char for ACS, 6 char for weight, 4 char
  * for info, 2 char for freq_count to print, 4 char for freq, 6 char
@@ -1808,10 +1755,6 @@ debug_info:
 
 	sap_update_6ghz_max_weight(ch_info_params,
 				   max_valid_weight_6ghz);
-
-	if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc, sap_ctx->vdev_id))
-		sap_update_5ghz_low_freq_weight(mac->psoc, ch_info_params);
-
 	sap_clear_channel_status(mac);
 }
 

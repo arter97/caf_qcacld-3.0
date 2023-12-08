@@ -5712,15 +5712,4 @@ QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
 					struct connection_info *info,
 					uint8_t *connection_count);
 #endif
-
-/**
- * policy_mgr_is_given_freq_5g_low() - API to check whether given freq
- * is 5GHz low or not
- * @psoc: psoc object
- * @given_freq: given freq
- *
- * Return: True if it 5GHz low otherwise false
- */
-bool policy_mgr_is_given_freq_5g_low(struct wlan_objmgr_psoc *psoc,
-				     qdf_freq_t given_freq);
 #endif /* __WLAN_POLICY_MGR_API_H */
