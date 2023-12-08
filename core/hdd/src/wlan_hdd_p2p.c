@@ -220,7 +220,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			      struct ieee80211_channel *chan, bool offchan,
 			      unsigned int wait,
 			      const u8 *buf, size_t len, bool no_cck,
-			      bool dont_wait_for_ack, u64 *cookie)
+			      bool dont_wait_for_ack, u64 *cookie, int link_id)
 {
 	QDF_STATUS status;
 	struct net_device *dev = wdev->netdev;
@@ -235,13 +235,20 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	const uint8_t  *assoc_resp;
 	void *ft_info;
 	struct hdd_ap_ctx *ap_ctx;
+	struct wlan_hdd_link_info *link_info;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -250,7 +257,8 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	type = WLAN_HDD_GET_TYPE_FRM_FC(buf[0]);
 	sub_type = WLAN_HDD_GET_SUBTYPE_FRM_FC(buf[0]);
-	hdd_debug("type %d, sub_type %d", type, sub_type);
+	hdd_debug("vdev_id %d, type %d, sub_type %d",
+		  link_info->vdev_id, type, sub_type);
 
 	/* When frame to be transmitted is auth mgmt, then trigger
 	 * sme_send_mgmt_tx to send auth frame without need for policy manager.
@@ -275,17 +283,17 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			if ((auth_algo == eSIR_FT_AUTH) &&
 			    (adapter->device_mode == QDF_SAP_MODE ||
 			     adapter->device_mode == QDF_P2P_GO_MODE)) {
-				ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+				ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 				ap_ctx->during_auth_offload = false;
 			}
 		}
 
 		qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_SME,
 			   TRACE_CODE_HDD_SEND_MGMT_TX,
-			   adapter->deflink->vdev_id, 0);
+			   link_info->vdev_id, 0);
 
 		qdf_status = sme_send_mgmt_tx(hdd_ctx->mac_handle,
-					      adapter->deflink->vdev_id,
+					      link_info->vdev_id,
 					      buf, len);
 
 		if (QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -314,7 +322,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 		if (!ft_info || !ft_info_len)
 			return -EINVAL;
 		hdd_debug("get ft_info_len from Assoc rsp :%d", ft_info_len);
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 		qdf_status = wlansap_update_ft_info(ap_ctx->sap_context,
 						    ((struct ieee80211_mgmt *)buf)->da,
 						    ft_info, ft_info_len, 0);
@@ -327,7 +335,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	}
 
 off_chan_tx:
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_P2P_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_P2P_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -361,20 +369,27 @@ int wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
-
+	int link_id = -1;
 	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
 	if (errno)
 		return errno;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
+	(defined(WLAN_FEATURE_MULTI_LINK_SAP))
+	link_id = hdd_nb_get_link_id_from_params((void *)params, NB_MGMT_TX);
 	errno = __wlan_hdd_mgmt_tx(wiphy, wdev, params->chan, params->offchan,
 				   params->wait, params->buf, params->len,
 				   params->no_cck, params->dont_wait_for_ack,
-				   cookie);
+				   cookie, link_id);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+	errno = __wlan_hdd_mgmt_tx(wiphy, wdev, params->chan, params->offchan,
+				   params->wait, params->buf, params->len,
+				   params->no_cck, params->dont_wait_for_ack,
+				   cookie, link_id);
 #else
 	errno = __wlan_hdd_mgmt_tx(wiphy, wdev, chan, offchan,
 				   wait, buf, len, no_cck,
-				   dont_wait_for_ack, cookie);
+				   dont_wait_for_ack, cookie, link_id);
 #endif /* LINUX_VERSION_CODE */
 
 	osif_vdev_sync_op_stop(vdev_sync);
