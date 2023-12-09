@@ -10759,6 +10759,28 @@ int sme_update_eht_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
 
 	return 0;
 }
+
+int sme_update_eht_scs_traffic_desc_support(mac_handle_t mac_handle,
+					    uint8_t session_id,
+					    uint8_t cfg_val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.scs_traffic_desc = cfg_val;
+	mac_ctx->eht_cap_2g.scs_traffic_desc = cfg_val;
+	mac_ctx->eht_cap_5g.scs_traffic_desc = cfg_val;
+
+	csr_update_session_eht_cap(mac_ctx, session);
+
+	return 0;
+}
 #endif
 
 #ifdef WLAN_FEATURE_11AX

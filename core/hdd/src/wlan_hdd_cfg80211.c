@@ -8728,6 +8728,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_NESTED},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MLD_ID_ML_PROBE_REQ] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_SCS_TRAFFIC_SUPPORT] = {
+			.type = NLA_U8},
 };
 
 /**
@@ -14682,6 +14684,18 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		ret_val = ucfg_mlme_set_eht_mld_id(hdd_ctx->psoc, cfg_val);
 		if (ret_val)
 			hdd_err("Failed to set MLD ID");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_SCS_TRAFFIC_SUPPORT;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("SCS traffic description support: %d", cfg_val);
+		ret_val = sme_update_eht_scs_traffic_desc_support(
+							hdd_ctx->mac_handle,
+							link_info->vdev_id,
+							cfg_val);
+		if (ret_val)
+			hdd_err("Failed to set SCS traffic desc support");
 	}
 
 	if (update_sme_cfg)

@@ -3134,6 +3134,19 @@ void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t session_id,
  */
 int sme_update_eht_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
 				uint8_t cfg_val);
+
+/**
+ * sme_update_eht_scs_traffic_desc_support() - sets the EHT SCS traffic
+ * description support capability
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: SME session id
+ * @cfg_val: EHT SCS traffic description config
+ *
+ * Return: 0 on success else err code
+ */
+int sme_update_eht_scs_traffic_desc_support(mac_handle_t mac_handle,
+					    uint8_t session_id,
+					    uint8_t cfg_val);
 #else
 static inline void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 					  struct wma_tgt_cfg *cfg,
@@ -3156,6 +3169,14 @@ static inline void sme_update_eht_cap_mcs(mac_handle_t mac_handle,
 static inline
 int sme_update_eht_om_ctrl_supp(mac_handle_t mac_handle, uint8_t session_id,
 				uint8_t cfg_val)
+{
+	return 0;
+}
+
+static inline
+int sme_update_eht_scs_traffic_desc_support(mac_handle_t mac_handle,
+					    uint8_t session_id,
+					    uint8_t cfg_val)
 {
 	return 0;
 }
