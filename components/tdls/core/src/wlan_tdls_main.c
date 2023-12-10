@@ -600,12 +600,12 @@ QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!msg || !msg->bodyptr) {
-		tdls_err("msg: 0x%pK", msg);
+		tdls_err("msg %s is NULL", !msg ? "" : "body ptr");
 		QDF_ASSERT(0);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-	tdls_debug("TDLS process command: %s(%d)",
-		   tdls_get_cmd_type_str(msg->type), msg->type);
+
+	tdls_debug(" %s(%d)", tdls_get_cmd_type_str(msg->type), msg->type);
 
 	switch (msg->type) {
 	case TDLS_CMD_TX_ACTION:
@@ -736,9 +736,14 @@ QDF_STATUS tdls_process_evt(struct scheduler_msg *msg)
 }
 
 void tdls_timer_restart(struct wlan_objmgr_vdev *vdev,
-				 qdf_mc_timer_t *timer,
-				 uint32_t expiration_time)
+			qdf_mc_timer_t *timer, uint32_t expiration_time)
 {
+	if (!wlan_cm_is_vdev_connected(vdev)) {
+		tdls_debug("vdev:%d is not connected. Can't restart timer",
+			   wlan_vdev_get_id(vdev));
+		return;
+	}
+
 	if (QDF_TIMER_STATE_RUNNING !=
 	    qdf_mc_timer_get_current_state(timer))
 		qdf_mc_timer_start(timer, expiration_time);
@@ -753,7 +758,7 @@ void tdls_timer_restart(struct wlan_objmgr_vdev *vdev,
 static void tdls_monitor_timers_stop(struct tdls_vdev_priv_obj *tdls_vdev)
 {
 	if (!wlan_vdev_mlme_is_mlo_vdev(tdls_vdev->vdev))
-		qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
+		qdf_mc_timer_stop_sync(&tdls_vdev->peer_discovery_timer);
 }
 
 /**
@@ -781,7 +786,7 @@ static void tdls_peer_idle_timers_stop(struct tdls_vdev_priv_obj *tdls_vdev)
 			curr_peer = qdf_container_of(p_node, struct tdls_peer,
 						     node);
 			if (curr_peer->is_peer_idle_timer_initialised)
-				qdf_mc_timer_stop(&curr_peer->peer_idle_timer);
+				qdf_mc_timer_stop_sync(&curr_peer->peer_idle_timer);
 			status = qdf_list_peek_next(head, p_node, &p_node);
 		}
 	}
@@ -796,7 +801,8 @@ static void tdls_peer_idle_timers_stop(struct tdls_vdev_priv_obj *tdls_vdev)
  */
 static void tdls_ct_timers_stop(struct tdls_vdev_priv_obj *tdls_vdev)
 {
-	qdf_mc_timer_stop(&tdls_vdev->peer_update_timer);
+	qdf_mc_timer_stop_sync(&tdls_vdev->peer_update_timer);
+
 	tdls_peer_idle_timers_stop(tdls_vdev);
 }
 
@@ -808,6 +814,7 @@ static void tdls_ct_timers_stop(struct tdls_vdev_priv_obj *tdls_vdev)
  */
 void tdls_timers_stop(struct tdls_vdev_priv_obj *tdls_vdev)
 {
+	tdls_debug("Stop TDLS timers");
 	tdls_monitor_timers_stop(tdls_vdev);
 	tdls_ct_timers_stop(tdls_vdev);
 }
@@ -1634,7 +1641,9 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 	tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj, false,
 			       false, false, notify->session_id);
 
-	/* If concurrency is not marked, then we have to
+	tdls_timers_stop(tdls_vdev_obj);
+	/*
+	 * If concurrency is not marked, then we have to
 	 * check, whether TDLS could be enabled in the
 	 * system after this disassoc event.
 	 */
