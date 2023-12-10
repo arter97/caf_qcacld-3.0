@@ -99,12 +99,12 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 	uint8_t *mac;
 	bool unforce = true;
 
-	if (!user_data) {
-		tdls_err("discovery time out data is null");
+	vdev = user_data;
+	if (!vdev) {
+		tdls_err("discovery time out vdev is null");
 		return;
 	}
 
-	vdev = (struct wlan_objmgr_vdev *)user_data;
 	tdls_soc = wlan_vdev_get_tdls_soc_obj(vdev);
 	if (!tdls_soc)
 		return;
@@ -251,9 +251,11 @@ void tdls_implicit_disable(struct tdls_vdev_priv_obj *tdls_vdev)
  */
 void tdls_implicit_enable(struct tdls_vdev_priv_obj *tdls_vdev)
 {
-	tdls_debug("Enable Implicit TDLS");
 	if (!tdls_vdev)
 		return;
+
+	tdls_debug("vdev:%d Enable Implicit TDLS",
+		   wlan_vdev_get_id(tdls_vdev->vdev));
 
 	tdls_peer_reset_discovery_processed(tdls_vdev);
 	tdls_reset_tx_rx(tdls_vdev);
@@ -1060,6 +1062,7 @@ void tdls_ct_handler(void *user_data)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_vdev *link_vdev;
+	QDF_STATUS status;
 
 	if (!user_data)
 		return;
@@ -1070,8 +1073,9 @@ void tdls_ct_handler(void *user_data)
 
 	link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
 	if (link_vdev) {
-		if (wlan_objmgr_vdev_try_get_ref(link_vdev, WLAN_TDLS_NB_ID) ==
-		    QDF_STATUS_SUCCESS) {
+		status = wlan_objmgr_vdev_try_get_ref(link_vdev,
+						      WLAN_TDLS_NB_ID);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
 			tdls_ct_process_handler(link_vdev);
 			wlan_objmgr_vdev_release_ref(link_vdev,
 						     WLAN_TDLS_NB_ID);
