@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1694,6 +1694,10 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 		    roam_info->chan_info_freq) &&
 	    !wlan_reg_is_6ghz_psc_chan_freq(
 		    roam_info->chan_info_freq))
+		return;
+
+	/* Do not select first empty channel for LL_LT_SAP */
+	if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc, sap_ctx->vdev_id))
 		return;
 
 	filter = qdf_mem_malloc(sizeof(*filter));
