@@ -7600,6 +7600,11 @@ int sme_set_peer_ampdu(mac_handle_t mac_handle, uint8_t vdev_id,
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 						    vdev_id,
 						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("vdev null");
+		return -EINVAL;
+	}
+
 	status = wlan_vdev_is_up(vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sme_debug("vdev id %d not up", vdev_id);
@@ -11048,7 +11053,7 @@ int sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id,
 	sme_debug("EHT OMI: BW %d rx nss %d tx nss %d", omi_data->eht_ch_bw_ext,
 		  omi_data->eht_rx_nss_ext, omi_data->eht_tx_nss_ext);
 
-	qdf_mem_copy(&param_val, omi_data, sizeof(omi_data));
+	qdf_mem_copy(&param_val, omi_data, sizeof(param_val));
 	wlan_mlme_get_bssid_vdev_id(mac_ctx->pdev, session_id,
 				    &connected_bssid);
 	sme_debug("param val %08X, bssid:"QDF_MAC_ADDR_FMT, param_val,
