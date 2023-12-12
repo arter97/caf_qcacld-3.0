@@ -1750,6 +1750,36 @@ dfs_puncturing_get_curr_state(struct dfs_punc_obj *dfs_punc)
 }
 
 /**
+ * dfs_deliver_punc_cac_completion_events() - Deliver punctured CAC expiry event
+ * @dfs: Pointer to structure wlan_dfs.
+ * @dfs_punc: Pointer to dfs puncturing sm group.
+ *
+ * Return: None
+ */
+static void
+dfs_deliver_punc_cac_completion_events(struct wlan_dfs *dfs,
+				       struct dfs_punc_obj *dfs_punc)
+{
+	uint16_t punc_freq_list[N_MAX_PUNC_SM];
+	uint8_t n_punc_channels;
+	uint8_t i;
+	bool is_dfsreg_etsi = (utils_get_dfsdomain(dfs->dfs_pdev_obj) == DFS_ETSI_REGION);
+
+	n_punc_channels = dfs_generate_punc_list_from_sm(dfs_punc, punc_freq_list);
+	for (i = 0; i < n_punc_channels; i++) {
+		if (is_dfsreg_etsi) {
+			dfs_mark_precac_done_for_freq(dfs,
+						      punc_freq_list[i],
+						      0,
+						      CH_WIDTH_20MHZ);
+		}
+		utils_dfs_deliver_event(dfs->dfs_pdev_obj,
+					punc_freq_list[i],
+					WLAN_EV_CAC_COMPLETED);
+	}
+}
+
+/**
  * dfs_puncturing_sm_transition_to() - Wrapper API to transition the Puncturing SM state.
  * @dfs_punc: Pointer to struct dfs_punc_obj that indicates the active SM.
  * @state:    State to which the SM is transitioning to.
@@ -2068,6 +2098,7 @@ static bool dfs_puncturing_state_cac_wait_event(void *ctx,
 		    dfs->dfs_curchan->dfs_ch_punc_pattern ^ dfs_internal_pattern;
 		dfs_internal_pattern = dfs_unpuncture_radar_bitmap(dfs, dfs_punc);
 		new_punc_pattern = dfs_useronly_pattern | dfs_internal_pattern;
+		dfs_deliver_punc_cac_completion_events(dfs, dfs_punc);
 		dfs_puncturing_sm_transition_to(dfs_punc, DFS_S_UNPUNCTURED);
 		if (global_dfs_to_mlme.mlme_unpunc_chan_switch)
 			global_dfs_to_mlme.mlme_unpunc_chan_switch(dfs->dfs_pdev_obj,
