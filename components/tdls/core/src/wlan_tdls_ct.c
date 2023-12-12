@@ -213,6 +213,16 @@ static void tdls_reset_tx_rx(struct tdls_vdev_priv_obj *tdls_vdev)
 	qdf_list_node_t *p_node;
 	struct tdls_peer *peer;
 	QDF_STATUS status;
+	struct tdls_soc_priv_obj *tdls_soc;
+
+	tdls_soc = wlan_vdev_get_tdls_soc_obj(tdls_vdev->vdev);
+	if (!tdls_soc)
+		return;
+
+	/* reset stale connection tracker */
+	qdf_spin_lock_bh(&tdls_soc->tdls_ct_spinlock);
+	tdls_vdev->valid_mac_entries = 0;
+	qdf_spin_unlock_bh(&tdls_soc->tdls_ct_spinlock);
 
 	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
 		head = &tdls_vdev->peer_list[i];

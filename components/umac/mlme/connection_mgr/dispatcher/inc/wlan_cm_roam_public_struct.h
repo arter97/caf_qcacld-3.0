@@ -384,7 +384,8 @@ enum roam_fail_params {
  * @ROAM_FAIL_REASON_AUTH_RECV: Authentication response received with
  * error status code
  * @ROAM_FAIL_REASON_REASSOC_SEND: Reassoc request TX failed
- * @ROAM_FAIL_REASON_REASSOC_RECV: Reassoc response frame not received
+ * @ROAM_FAIL_REASON_REASSOC_RECV: Reassoc response frame received with failure
+ * status
  * @ROAM_FAIL_REASON_NO_REASSOC_RESP: No reassociation response received
  * @ROAM_FAIL_REASON_EAPOL_TIMEOUT: EAPoL timedout
  * @ROAM_FAIL_REASON_MLME: MLME internal error
@@ -430,8 +431,8 @@ enum wlan_roam_failure_reason_code {
 	/* Failure reasons after roam scan is complete */
 	ROAM_FAIL_REASON_HOST,
 	ROAM_FAIL_REASON_AUTH_SEND,
-	ROAM_FAIL_REASON_NO_AUTH_RESP,
 	ROAM_FAIL_REASON_AUTH_RECV,
+	ROAM_FAIL_REASON_NO_AUTH_RESP,
 	ROAM_FAIL_REASON_REASSOC_SEND,
 	ROAM_FAIL_REASON_REASSOC_RECV,
 	ROAM_FAIL_REASON_NO_REASSOC_RESP,
@@ -477,6 +478,23 @@ struct reassoc_timer_ctx {
 };
 #endif
 
+/**
+ * struct roam_synch_frame_ind  - Structure to hold the information on frames
+ * received during roam synch frame indication.
+ * @bcn_probe_rsp_len: Length of the beacon/probe response frame
+ * @bcn_probe_rsp: Beacon probe response frame pointer
+ * @is_beacon: Flag to indicate if received frame is beacon or probe response
+ * @link_bcn_probe_rsp_len: Length of the link beacon/probe response frame
+ * @link_bcn_probe_rsp: Link beacon probe response frame pointer
+ * @is_link_beacon: Flag to indicate if received frame is link beacon or probe
+ * response
+ * @reassoc_req_len: Reassoc request frame length
+ * @reassoc_req: Reassoc request frame pointer
+ * @reassoc_rsp_len: Reassoc response frame length
+ * @reassoc_rsp: Reassoc response frame pointer
+ * @vdev_id: Vdev id
+ * @rssi: RSSI of the frame
+ */
 struct roam_synch_frame_ind {
 	uint32_t bcn_probe_rsp_len;
 	uint8_t *bcn_probe_rsp;
@@ -489,6 +507,7 @@ struct roam_synch_frame_ind {
 	uint32_t reassoc_rsp_len;
 	uint8_t *reassoc_rsp;
 	uint8_t vdev_id;
+	int8_t rssi;
 };
 
 /**
@@ -2851,7 +2870,7 @@ struct roam_offload_synch_ind {
 	struct wlan_ssid ssid;
 	int8_t tx_mgmt_power;
 	uint32_t auth_status;
-	uint8_t rssi;
+	int8_t rssi;
 	uint8_t roam_reason;
 	uint32_t chan_freq;
 	uint8_t kck[MAX_KCK_LEN];

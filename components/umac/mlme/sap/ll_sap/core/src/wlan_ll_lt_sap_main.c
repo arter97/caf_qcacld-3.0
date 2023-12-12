@@ -22,13 +22,19 @@
 #include "wlan_ll_sap_main.h"
 #include "wlan_ll_lt_sap_bearer_switch.h"
 #include "wlan_scan_api.h"
+#include "target_if.h"
 
-bool ll_lt_sap_is_supported(void)
+bool ll_lt_sap_is_supported(struct wlan_objmgr_psoc *psoc)
 {
-	/* To do, check the FW capability to decide if this is supported
-	 * or not supported.
-	 */
-	return true;
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		ll_sap_err("Invalid WMI handle");
+		return false;
+	}
+
+	return wmi_service_enabled(wmi_handle, wmi_service_xpan_support);
 }
 
 /**

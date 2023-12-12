@@ -56,6 +56,7 @@
 #include "wlan_pre_cac_ucfg_api.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
+#include "os_if_dp_local_pkt_capture.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -686,6 +687,14 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	if (ret)
 		return ERR_PTR(ret);
 
+	status = hdd_nl_to_qdf_iface_type(type, &mode);
+	if (QDF_IS_STATUS_ERROR(status))
+		return ERR_PTR(qdf_status_to_os_return(status));
+
+	if (mode == QDF_MONITOR_MODE &&
+	    !os_if_lpc_mon_intf_creation_allowed(hdd_ctx->psoc))
+		return ERR_PTR(-EOPNOTSUPP);
+
 	wlan_hdd_lpc_handle_concurrency(hdd_ctx, true);
 
 	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc) &&
@@ -698,10 +707,6 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_ADD_VIRTUAL_INTF,
 		   NO_SESSION, type);
-
-	status = hdd_nl_to_qdf_iface_type(type, &mode);
-	if (QDF_IS_STATUS_ERROR(status))
-		return ERR_PTR(qdf_status_to_os_return(status));
 
 	switch (mode) {
 	case QDF_SAP_MODE:

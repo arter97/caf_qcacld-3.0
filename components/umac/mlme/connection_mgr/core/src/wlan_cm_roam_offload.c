@@ -6460,7 +6460,6 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t i;
 	struct qdf_mac_addr bssid = {0};
-	bool ap_found_in_roam_scan = false;
 	bool roam_abort = (res->fail_reason == ROAM_FAIL_REASON_SYNC ||
 			   res->fail_reason == ROAM_FAIL_REASON_DISCONNECT ||
 			   res->fail_reason == ROAM_FAIL_REASON_HOST ||
@@ -6479,30 +6478,33 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
 			  (uint64_t)res->timestamp, NULL);
 
-	for (i = 0; i < scan_data->num_ap && scan_data->present; i++) {
-		if (i >= MAX_ROAM_CANDIDATE_AP)
-			break;
-
-		if (scan_data->ap[i].type == WLAN_ROAM_SCAN_ROAMED_AP ||
-		    scan_data->ap[i].type == WLAN_ROAM_SCAN_CANDIDATE_AP) {
-			ap_found_in_roam_scan = true;
-			break;
-		}
-	}
-
 	wlan_diag_event.version = DIAG_ROAM_RESULT_VERSION;
 	wlan_diag_event.roam_fail_reason = res->fail_reason;
 	/*
-	 * Print ROAM if:
-	 * 1. Roaming is successful to AP
-	 * 2. Atleast one candidate AP found during scan
+	 * Print ROAM if,
+	 * 1. FW sends res->status == 0 on successful roaming to AP
+	 * 2. FW sends res->status == 1 if FW triggered roaming but failed due
+	 *    to the reason other than below reasons
 	 *
-	 * Print NO_ROAM only if:
-	 * 1. No candidate AP found(even though other APs are found in scan)
+	 * Print NO_ROAM for below reasons where either candidate AP is not
+	 * found or we roamed to current AP itself irrespective of the
+	 * res->status value:
+	 * ROAM_FAIL_REASON_NO_AP_FOUND
+	 * ROAM_FAIL_REASON_NO_CAND_AP_FOUND
+	 * ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT
+	 * ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT
+	 * ROAM_FAIL_REASON_CURR_AP_STILL_OK
 	 */
-	wlan_diag_event.is_roam_successful = (res->status == 0) ||
-		(ap_found_in_roam_scan &&
-		 res->fail_reason != ROAM_FAIL_REASON_NO_CAND_AP_FOUND);
+	wlan_diag_event.is_roam_successful = true;
+
+	if (res->fail_reason == ROAM_FAIL_REASON_NO_AP_FOUND ||
+	    res->fail_reason == ROAM_FAIL_REASON_NO_CAND_AP_FOUND ||
+	    res->fail_reason == ROAM_FAIL_REASON_CURR_AP_STILL_OK ||
+	    res->fail_reason ==
+		ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT ||
+	    res->fail_reason ==
+		ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT)
+		wlan_diag_event.is_roam_successful = false;
 
 	for (i = 0; i < scan_data->num_ap; i++) {
 		if (i >= MAX_ROAM_CANDIDATE_AP)
@@ -7055,7 +7057,8 @@ wlan_convert_bitmap_to_band(uint8_t bitmap)
 QDF_STATUS
 cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 			 struct roam_frame_info *frame_data,
-			 struct wmi_roam_scan_data *scan_data)
+			 struct wmi_roam_scan_data *scan_data,
+			 struct wmi_roam_result *result)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t i;
@@ -7135,8 +7138,17 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
 	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_REASSOC_RESP_EVENT ||
-	    wlan_diag_event.subtype == WLAN_CONN_DIAG_ASSOC_RESP_EVENT)
+	    wlan_diag_event.subtype == WLAN_CONN_DIAG_ASSOC_RESP_EVENT) {
 		wlan_connectivity_mlo_setup_event(vdev);
+
+		/*
+		 * Send STA info event when roaming is successful
+		 */
+		if (result->present && !result->status)
+			wlan_connectivity_sta_info_event(wlan_vdev_get_psoc(vdev),
+							 wlan_vdev_get_id(vdev),
+							 true);
+	}
 
 	return status;
 }

@@ -30,10 +30,10 @@
 
 /**
  * ll_lt_sap_is_supported() - Check if ll_lt_sap is supported or not
- *
+ * @psoc: Pointer to psoc object
  * Return: True/False
  */
-bool ll_lt_sap_is_supported(void);
+bool ll_lt_sap_is_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ll_lt_sap_get_freq_list() - API to get frequency list for LL_LT_SAP

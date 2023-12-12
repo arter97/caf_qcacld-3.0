@@ -2782,7 +2782,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_MGMT_NB_ID);
 	if (status != QDF_STATUS_SUCCESS) {
-		wma_err("mgmt tx failed");
+		wma_err_rl("mgmt tx failed");
 		qdf_nbuf_free((qdf_nbuf_t)tx_frame);
 		goto error;
 	}

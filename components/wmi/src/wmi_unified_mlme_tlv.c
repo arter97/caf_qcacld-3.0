@@ -22,6 +22,7 @@
 #include <wmi_unified_priv.h>
 #include "wmi.h"
 #include "wlan_mlme_api.h"
+#include "wmi_unified_ll_sap_tlv.h"
 
 static QDF_STATUS csa_event_status_ind_tlv(wmi_unified_t wmi_handle,
 					   struct csa_event_status_ind params)
@@ -53,6 +54,25 @@ static QDF_STATUS csa_event_status_ind_tlv(wmi_unified_t wmi_handle,
 	return status;
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP
+/**
+ * wmi_mlme_attach_ll_lt_sap_tlv() - attach ll_lt_sap tlv handlers
+ * @ops: wmi ops
+ *
+ * Return: void
+ */
+static void wmi_mlme_attach_ll_lt_sap_tlv(struct wmi_ops *ops)
+{
+	ops->send_audio_transport_switch_resp = audio_transport_switch_resp_tlv;
+	ops->extract_audio_transport_switch_req_event =
+				extract_audio_transport_switch_req_event_tlv;
+}
+#else
+static inline void wmi_mlme_attach_ll_lt_sap_tlv(struct wmi_ops *ops)
+{
+}
+#endif
+
 /**
  * wmi_mlme_attach_tlv() - attach MLME tlv handlers
  * @wmi_handle: wmi handle
@@ -64,5 +84,5 @@ void wmi_mlme_attach_tlv(wmi_unified_t wmi_handle)
 	struct wmi_ops *ops = wmi_handle->ops;
 
 	ops->send_csa_event_status_ind = csa_event_status_ind_tlv;
+	wmi_mlme_attach_ll_lt_sap_tlv(ops);
 }
-

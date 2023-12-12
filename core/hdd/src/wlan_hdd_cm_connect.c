@@ -1102,10 +1102,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 				      rsp->connect_ies.bcn_probe_rsp.len,
 				      &hdd_sta_ctx->conn_info.hs20vendor_ie);
 
-	status = sme_unpack_assoc_rsp(mac_handle,
-				      rsp->connect_ies.assoc_rsp.ptr,
-				      rsp->connect_ies.assoc_rsp.len,
-				      assoc_resp);
+	status = sme_unpack_assoc_rsp(mac_handle, rsp, assoc_resp);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("could not parse assoc response");
 		qdf_mem_free(assoc_resp);

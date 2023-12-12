@@ -47,10 +47,12 @@ enum bearer_switch_req_type {
  * @WLAN_BS_STATUS_REJECTED: Bearer switch request rejected
  * @WLAN_BS_STATUS_COMPLETED: Bearer switch request completed
  * @WLAN_BS_STATUS_INVALID: Invalid bearer switch request
+ * @WLAN_BS_STATUS_TIMEOUT: Bearer switch request timedout
  */
 enum bearer_switch_status {
 	WLAN_BS_STATUS_REJECTED = 0,
 	WLAN_BS_STATUS_COMPLETED = 1,
+	WLAN_BS_STATUS_TIMEOUT = 2,
 	WLAN_BS_STATUS_INVALID,
 };
 
@@ -150,6 +152,31 @@ struct wlan_bearer_switch_request {
 	bearer_switch_requester_cb requester_cb;
 	uint32_t arg_value;
 	void *arg;
+};
+
+/**
+ * struct wlan_ll_sap_tx_ops - defines southbound tx callbacks for
+ * LL_SAP (low latency sap) component
+ * @send_audio_transport_switch_resp: function pointer to indicate audio
+ * transport switch response to FW
+ */
+struct wlan_ll_sap_tx_ops {
+	QDF_STATUS (*send_audio_transport_switch_resp)(
+					struct wlan_objmgr_psoc *psoc,
+					enum bearer_switch_req_type req_type,
+					enum bearer_switch_status status);
+};
+
+/**
+ * struct wlan_ll_sap_rx_ops - defines southbound rx callbacks for
+ * LL_SAP (low latency SAP) component
+ * @audio_transport_switch_req: function pointer to indicate audio
+ * transport switch request from FW
+ */
+struct wlan_ll_sap_rx_ops {
+	QDF_STATUS (*audio_transport_switch_req)(
+					struct wlan_objmgr_psoc *psoc,
+					enum bearer_switch_req_type req_type);
 };
 
 /**

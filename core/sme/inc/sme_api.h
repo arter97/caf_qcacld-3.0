@@ -2911,14 +2911,13 @@ uint32_t sme_unpack_rsn_ie(mac_handle_t mac_handle, uint8_t *buf,
 /**
  * sme_unpack_assoc_rsp() - wrapper to unpack assoc response
  * @mac_handle: handle returned by mac_open
- * @frame: assoc response buffer pointer
- * @frame_len: assoc response buffer length
+ * @rsp: Pointer to connect rsp
  * @assoc_resp: output assoc response structure
  *
  * Return: parse status
  */
 QDF_STATUS sme_unpack_assoc_rsp(mac_handle_t mac_handle,
-				uint8_t *frame, uint32_t frame_len,
+				struct wlan_cm_connect_resp *rsp,
 				struct sDot11fAssocResponse *assoc_resp);
 
 /**

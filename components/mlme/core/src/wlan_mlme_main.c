@@ -1969,6 +1969,8 @@ static void mlme_init_feature_flag_in_cfg(
 			cfg_get(psoc, CFG_CHANNEL_BONDING_MODE_24GHZ);
 	feature_flags->channel_bonding_mode_5ghz =
 			cfg_get(psoc, CFG_CHANNEL_BONDING_MODE_5GHZ);
+	feature_flags->update_cw_allowed =
+			cfg_get(psoc, CFG_ALLOW_UPDATE_CHANNEL_WIDTH);
 }
 
 static void mlme_init_sap_protection_cfg(struct wlan_objmgr_psoc *psoc,
@@ -3369,8 +3371,8 @@ mlme_init_wifi_pos_11az_config(struct wlan_objmgr_psoc *psoc,
 {
 	bool rsta_sec_ltf_enabled =
 			cfg_get(psoc, CFG_RESPONDER_SECURE_LTF_SUPPORT);
-	bool rsta_11az_ranging_enabled = cfg_get(psoc,
-						 CFG_RESPONDER_11AZ_SUPPORT);
+	uint32_t rsta_11az_ranging_enabled =
+				cfg_get(psoc, CFG_RESPONDER_11AZ_SUPPORT);
 
 	wifi_pos_set_rsta_11az_ranging_cap(rsta_11az_ranging_enabled);
 	wifi_pos_set_rsta_sec_ltf_cap(rsta_sec_ltf_enabled);

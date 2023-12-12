@@ -367,6 +367,7 @@ struct wlan_diag_sta_info {
  * @vdev_id: vdev id associated with the link
  * @tid_ul: TID-to-link mapping information on the uplink
  * @tid_dl: TID-to-link mapping information on the downlink
+ * @status: MLO setup status. 0 - Success, 1 - failure
  * @link_addr: Link address of the link.
  */
 struct wlan_diag_mlo_cmn_info {
@@ -377,7 +378,7 @@ struct wlan_diag_mlo_cmn_info {
 	uint8_t tid_dl;
 	uint8_t status;
 	uint8_t link_addr[QDF_MAC_ADDR_SIZE];
-};
+} qdf_packed;
 
 #define DIAG_MLO_SETUP_VERSION 1
 #define DIAG_MLO_SETUP_VERSION_V2 2
@@ -1427,10 +1428,13 @@ static inline void wlan_connectivity_logging_stop(void)
  * wlan_connectivity_sta_info_event() - APi to send STA info event
  * @psoc: Pointer to global psoc object
  * @vdev_id: Vdev id
+ * @is_roam: Is sta info event for roaming stats
+ *
+ * Return: None
  */
 void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id);
+				 uint8_t vdev_id, bool is_roam);
 
 /**
  * wlan_connectivity_connecting_event() - API to log connecting event
@@ -1535,10 +1539,11 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
  * wlan_connectivity_sta_info_event() - APi to send STA info event
  * @psoc: Pointer to global psoc object
  * @vdev_id: Vdev id
+ * @is_roam: Is sta info event for roaming stats
  */
 void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id);
+				 uint8_t vdev_id, bool is_roam);
 
 /**
  * wlan_convert_freq_to_diag_band() - API to convert frequency to band value
@@ -1639,7 +1644,7 @@ wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
 
 static inline void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id)
+				 uint8_t vdev_id, bool is_roam)
 {}
 
 static inline void

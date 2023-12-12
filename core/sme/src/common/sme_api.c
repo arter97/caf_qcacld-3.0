@@ -87,6 +87,8 @@
 #include <wlan_mlo_link_force.h>
 #include "wma_eht.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_vdev_mgr_ucfg_api.h"
+#include "wlan_vdev_mlme_main.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -967,6 +969,11 @@ QDF_STATUS sme_update_config(mac_handle_t mac_handle,
 		sme_err("SME config params empty");
 		return status;
 	}
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("SME lock error %d", status);
+		return status;
+	}
 
 	status = csr_change_default_config_param(mac, &pSmeConfigParams->
 						csr_config);
@@ -980,7 +987,9 @@ QDF_STATUS sme_update_config(mac_handle_t mac_handle,
 	if (csr_is_all_session_disconnected(mac))
 		csr_set_global_cfgs(mac);
 
-	return status;
+	sme_release_global_lock(&mac->sme);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS sme_update_roam_params(mac_handle_t mac_handle,
@@ -4970,7 +4979,14 @@ QDF_STATUS sme_vdev_self_peer_delete_resp(struct del_vdev_params *del_vdev_req)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+	if (vdev->obj_state == WLAN_OBJ_STATE_LOGICALLY_DELETED) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		wma_debug("vdev delete");
+	} else {
+		wlan_vdev_mlme_notify_set_mac_addr_response(vdev,
+							    del_vdev_req->status);
+		wma_debug("mac update");
+	}
 
 	status = del_vdev_req->status;
 	qdf_mem_free(del_vdev_req);
@@ -14395,13 +14411,24 @@ uint32_t sme_unpack_rsn_ie(mac_handle_t mac_handle, uint8_t *buf,
 }
 
 QDF_STATUS sme_unpack_assoc_rsp(mac_handle_t mac_handle,
-				uint8_t *frame, uint32_t frame_len,
+				struct wlan_cm_connect_resp *rsp,
 				struct sDot11fAssocResponse *assoc_resp)
 {
+	QDF_STATUS status;
+	uint8_t ies_offset = WLAN_ASSOC_RSP_IES_OFFSET;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
-	return dot11f_parse_assoc_response(mac_ctx, frame, frame_len,
-					   assoc_resp, false);
+	status = dot11f_parse_assoc_response(mac_ctx,
+					     rsp->connect_ies.assoc_rsp.ptr,
+					     rsp->connect_ies.assoc_rsp.len,
+					     assoc_resp, false);
+
+	lim_strip_and_decode_eht_cap(rsp->connect_ies.assoc_rsp.ptr + ies_offset,
+				     rsp->connect_ies.assoc_rsp.len - ies_offset,
+				     &assoc_resp->eht_cap,
+				     assoc_resp->he_cap,
+				     rsp->freq);
+	return status;
 }
 
 void sme_get_hs20vendor_ie(mac_handle_t mac_handle, uint8_t *frame,
@@ -16805,6 +16832,7 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 	wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
 	wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
 
+	ucfg_vdev_mgr_cdp_vdev_attach(vdev);
 p2p_self_peer_create:
 	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {
 		vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);

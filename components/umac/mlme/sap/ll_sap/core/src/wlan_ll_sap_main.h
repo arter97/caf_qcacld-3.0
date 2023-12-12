@@ -37,6 +37,16 @@
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_LL_SAP, params)
 
 /**
+ * struct ll_sap_psoc_priv_obj - ll_sap private psoc obj
+ * @tx_ops: Tx ops registered with Target IF interface
+ * @rx_ops: Rx  ops registered with Target IF interface
+ */
+struct ll_sap_psoc_priv_obj {
+	struct wlan_ll_sap_tx_ops tx_ops;
+	struct wlan_ll_sap_rx_ops rx_ops;
+};
+
+/**
  * struct ll_sap_vdev_priv_obj - ll sap private vdev obj
  * @bearer_switch_ctx: Bearer switch context
  */
@@ -101,5 +111,21 @@ void ll_sap_unregister_os_if_cb(void);
  * Return: global ll_sap osif callback
  */
 struct ll_sap_ops *ll_sap_get_osif_cbk(void);
+
+/**
+ * ll_sap_psoc_enable() - Enable ll_lt_sap psoc
+ * @psoc: objmgr psoc pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ll_sap_psoc_enable(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ll_sap_psoc_disable() - Disable ll_lt_sap psoc
+ * @psoc: objmgr psoc pointer
+ *
+ * Return: None
+ */
+QDF_STATUS ll_sap_psoc_disable(struct wlan_objmgr_psoc *psoc);
 
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

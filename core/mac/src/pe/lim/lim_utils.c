@@ -84,6 +84,7 @@
 #include "parser_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_epcs_api.h"
+#include "wlan_nan_api_i.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -3823,7 +3824,7 @@ uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
 	uint8_t cb_mode = mac->roam.configParam.channelBondingMode5GHz;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
-		if (session->force_24ghz_in_ht20) {
+		if (wlan_cm_get_force_20mhz_in_24ghz(session->vdev)) {
 			cb_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 			pe_debug_rl("vdev %d force 20 Mhz in 2.4 GHz",
 				    session->vdev_id);
@@ -3839,14 +3840,22 @@ static
 uint8_t lim_get_sta_cb_mode_for_24ghz(struct mac_context *mac,
 				      uint8_t vdev_id)
 {
-	struct pe_session *session;
+	struct wlan_objmgr_vdev *vdev;
 	uint8_t cb_mode = mac->roam.configParam.channelBondingMode24GHz;
 
-	session = pe_find_session_by_vdev_id(mac, vdev_id);
-	if (!session || !session->force_24ghz_in_ht20)
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc,
+						    vdev_id, WLAN_MLME_SB_ID);
+	if (!vdev)
 		return cb_mode;
 
-	return WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
+	if (!wlan_cm_get_force_20mhz_in_24ghz(vdev))
+		goto end;
+
+	cb_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+	return cb_mode;
 }
 
 void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
@@ -6042,6 +6051,7 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx, uint8_t vdev_id,
 	QDF_STATUS status_ht = QDF_STATUS_SUCCESS;
 	QDF_STATUS status_vht = QDF_STATUS_SUCCESS;
 	QDF_STATUS status_he = QDF_STATUS_SUCCESS;
+	QDF_STATUS status_eht = QDF_STATUS_SUCCESS;
 
 	/*
 	 * Note: Do not use Dot11f VHT structure, since 1 byte present flag in
@@ -6062,12 +6072,21 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx, uint8_t vdev_id,
 								vdev_id);
 	}
 
-	if (is_dot11mode_support_eht_cap(dot11_mode))
-		status_he = lim_send_eht_caps_ie(mac_ctx, device_mode, vdev_id);
+	if (is_dot11mode_support_eht_cap(dot11_mode)) {
+		if ((device_mode == QDF_NAN_DISC_MODE ||
+		     device_mode == QDF_NDI_MODE) &&
+		    !wlan_nan_is_eht_capable(mac_ctx->psoc))
+			goto end;
 
+		status_eht = lim_send_eht_caps_ie(mac_ctx, device_mode,
+						  vdev_id);
+	}
+
+end:
 	if (QDF_IS_STATUS_SUCCESS(status_ht) &&
 	    QDF_IS_STATUS_SUCCESS(status_vht) &&
-	    QDF_IS_STATUS_SUCCESS(status_he))
+	    QDF_IS_STATUS_SUCCESS(status_he) &&
+	    QDF_IS_STATUS_SUCCESS(status_eht))
 		return QDF_STATUS_SUCCESS;
 
 	return QDF_STATUS_E_FAILURE;

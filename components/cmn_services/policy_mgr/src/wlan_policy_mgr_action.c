@@ -1144,6 +1144,12 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 	struct scan_cache_entry *entry;
 	bool eht_capab =  false, check_sap_bw_downgrade = false;
 	enum phy_ch_width cur_bw = CH_WIDTH_INVALID;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev)
+		goto end;
 
 	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
 		/*
@@ -1155,7 +1161,8 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 		if (eht_capab &&
 		    QDF_IS_STATUS_SUCCESS(policy_mgr_get_sap_bw(psoc,
 								&cur_bw)) &&
-						cur_bw == CH_WIDTH_320MHZ)
+						cur_bw == CH_WIDTH_320MHZ &&
+		    !mlo_mgr_is_link_switch_in_progress(vdev))
 			check_sap_bw_downgrade = true;
 		else
 			goto end;
@@ -1214,6 +1221,9 @@ ch_width_update:
 	}
 
 end:
+	if (vdev)
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
 	return ch_freq;
 }
 
@@ -1226,7 +1236,6 @@ policy_mgr_change_hw_mode_sta_connect(struct wlan_objmgr_psoc *psoc,
 	uint32_t ch_freq;
 
 	ch_freq = policy_mgr_check_for_hw_mode_change(psoc, scan_list, vdev_id);
-
 	if (!ch_freq)
 		return QDF_STATUS_E_ALREADY;
 

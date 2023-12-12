@@ -5569,8 +5569,8 @@ lim_send_link_report_action_frame(struct mac_context *mac,
 			nStatus);
 	}
 
-	pe_warn("RRM: Sending Link Report to "QDF_MAC_ADDR_FMT" on vdev[%d]",
-		QDF_MAC_ADDR_REF(peer), vdev_id);
+	pe_warn_rl("RRM: Sending Link Report to "QDF_MAC_ADDR_FMT" on vdev[%d]",
+		   QDF_MAC_ADDR_REF(peer), vdev_id);
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -5589,7 +5589,7 @@ lim_send_link_report_action_frame(struct mac_context *mac,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 pe_session->peSessionId, qdf_status));
 	if (QDF_STATUS_SUCCESS != qdf_status) {
-		pe_err("wma_tx_frame FAILED! Status [%d]", qdf_status);
+		pe_err_rl("wma_tx_frame FAILED! Status [%d]", qdf_status);
 		status_code = QDF_STATUS_E_FAILURE;
 		/* Pkt will be freed up by the callback */
 		return status_code;

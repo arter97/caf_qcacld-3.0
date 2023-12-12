@@ -746,7 +746,8 @@ QDF_STATUS wma_register_roaming_callbacks(
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
 			uint16_t deauth_disassoc_frame_len,
-			uint16_t reason_code));
+			uint16_t reason_code),
+		set_ies_fn_t pe_roam_set_ie_cb);
 #else
 static inline QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
@@ -759,7 +760,8 @@ static inline QDF_STATUS wma_register_roaming_callbacks(
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
 			uint16_t deauth_disassoc_frame_len,
-			uint16_t reason_code))
+			uint16_t reason_code),
+		set_ies_fn_t pe_roam_set_ie_cb)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

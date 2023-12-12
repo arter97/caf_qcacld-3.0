@@ -247,6 +247,7 @@ _fixed_ipaths = [
     "components/target_if/pkt_capture/inc",
     "components/target_if/pmo/inc",
     "components/target_if/pmo/src",
+    "components/target_if/sap/ll_sap/inc",
     "components/target_if/tdls/inc",
     "components/target_if/wfa_config/inc",
     "components/tdls/dispatcher/inc",
@@ -263,6 +264,7 @@ _fixed_ipaths = [
     "components/wifi_pos/core/inc",
     "components/wifi_pos/dispatcher/inc",
     "components/wmi/inc",
+    "components/wmi/src",
     "core/bmi/inc",
     "core/cds/inc",
     "core/cds/src",
@@ -2109,11 +2111,14 @@ _conditional_srcs = {
     },
     "CONFIG_WLAN_FEATURE_LL_LT_SAP": {
         True: [
+            "components/target_if/sap/ll_sap/src/target_if_ll_sap.c",
             "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_api.c",
             "components/umac/mlme/sap/ll_sap/dispatcher/src/wlan_ll_sap_ucfg_api.c",
             "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_lt_sap_bearer_switch.c",
             "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_lt_sap_main.c",
             "components/umac/mlme/sap/ll_sap/core/src/wlan_ll_sap_main.c",
+            "components/wmi/src/wmi_unified_ll_sap_api.c",
+            "components/wmi/src/wmi_unified_ll_sap_tlv.c",
             "components/cmn_services/policy_mgr/src/wlan_policy_mgr_ll_sap.c",
             "os_if/mlme/sap/ll_sap/src/os_if_ll_sap.c",
         ],
@@ -2197,7 +2202,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     )
 
     copts.append("-Wno-format")
-    copts.append("-Wno-array-bounds")
+    copts.append("-fstrict-flex-arrays=0")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 

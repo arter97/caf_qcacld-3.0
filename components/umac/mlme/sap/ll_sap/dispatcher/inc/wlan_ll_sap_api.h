@@ -162,6 +162,16 @@ wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
 				uint8_t vdev_id,
 				enum sap_csa_reason_code *csa_reason);
 
+/**
+ * wlan_ll_sap_fw_bearer_switch_req() - FW bearer switch request
+ * @psoc: Pointer to psoc object
+ * @req_type: Bearer switch request type
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_ll_sap_fw_bearer_switch_req(struct wlan_objmgr_psoc *psoc,
+				 enum bearer_switch_req_type req_type);
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
@@ -209,6 +219,15 @@ qdf_freq_t wlan_ll_lt_sap_override_freq(struct wlan_objmgr_psoc *psoc,
 					qdf_freq_t chan_freq)
 {
 	return chan_freq;
+}
+
+static inline
+qdf_freq_t wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
+					   qdf_freq_t chan_freq,
+					   uint8_t vdev_id,
+					   enum sap_csa_reason_code *csa_reason)
+{
+	return 0;
 }
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* _WLAN_LL_LT_SAP_API_H_ */

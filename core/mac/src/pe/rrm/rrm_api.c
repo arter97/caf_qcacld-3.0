@@ -347,15 +347,15 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 			pe_session->maxTxPower = LinkReport.txPower;
 		}
 	}
-	pe_warn("Link Request Tx Pwr: %d Link Report Tx Pwr: %d",
-		pLinkReq->MaxTxPower.maxTxPower, LinkReport.txPower);
+	pe_warn_rl("Link Request Tx Pwr: %d Link Report Tx Pwr: %d",
+		   pLinkReq->MaxTxPower.maxTxPower, LinkReport.txPower);
 
 	LinkReport.dialogToken = pLinkReq->DialogToken.token;
 	LinkReport.rxAntenna = 0;
 	LinkReport.txAntenna = 0;
 	currentRSSI = WMA_GET_RX_RSSI_RAW(pRxPacketInfo);
 
-	pe_info("Received Link report frame with %d", currentRSSI);
+	pe_info_rl("Received Link report frame with %d", currentRSSI);
 
 	rrm_calculate_and_fill_rcpi(&LinkReport.rcpi, currentRSSI);
 	LinkReport.rsni = WMA_GET_RX_SNR(pRxPacketInfo);

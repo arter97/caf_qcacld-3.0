@@ -82,6 +82,46 @@ bool __ll_lt_sap_is_bs_req_valid(struct wlan_bearer_switch_request *bs_req,
 }
 
 /**
+ * ll_lt_sap_deliver_audio_transport_switch_resp_to_fw() - Deliver audio
+ * transport switch response to FW
+ * @vdev: Vdev on which the request is received
+ * @req_type: Transport switch type for which the response is received
+ * @status: Status of the response
+ *
+ * Return: None
+ */
+static void
+ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(
+					struct wlan_objmgr_vdev *vdev,
+					enum bearer_switch_req_type req_type,
+					enum bearer_switch_status status)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
+	struct wlan_ll_sap_tx_ops *tx_ops;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+
+	psoc_ll_sap_obj = wlan_objmgr_psoc_get_comp_private_obj(
+						psoc,
+						WLAN_UMAC_COMP_LL_SAP);
+
+	if (!psoc_ll_sap_obj) {
+		ll_sap_err("psoc_ll_sap_obj is null");
+		return;
+	}
+
+	tx_ops = &psoc_ll_sap_obj->tx_ops;
+
+	if (!tx_ops->send_audio_transport_switch_resp) {
+		ll_sap_err("deliver_audio_transport_switch_resp op is NULL");
+		return;
+	}
+
+	tx_ops->send_audio_transport_switch_resp(psoc, req_type, status);
+}
+
+/**
  * bs_req_timeout_cb() - Callback which will be invoked on bearer switch req
  * timeout
  * @user_data: Bearer switch context
@@ -245,7 +285,11 @@ ll_lt_sap_bs_increament_ref_count(struct bearer_switch_info *bs_ctx,
 	uint32_t total_ref_count;
 
 	total_ref_count = qdf_atomic_inc_return(&bs_ctx->total_ref_count);
-	ref_count = qdf_atomic_inc_return(&bs_ctx->ref_count[bs_req->vdev_id][bs_req->source]);
+	if (bs_req->source == BEARER_SWITCH_REQ_FW)
+		ref_count = qdf_atomic_inc_return(&bs_ctx->fw_ref_count);
+	else
+		ref_count = qdf_atomic_inc_return(
+			&bs_ctx->ref_count[bs_req->vdev_id][bs_req->source]);
 
 	ll_sap_nofl_debug(BS_PREFIX_FMT "req_vdev %d src %d ref_count %d Total ref count %d",
 			  BS_PREFIX_REF(wlan_vdev_get_id(bs_ctx->vdev),
@@ -276,16 +320,27 @@ ll_lt_sap_bs_decreament_ref_count(struct bearer_switch_info *bs_ctx,
 	 * module did not requested for wlan to non wlan transition earlier, so
 	 * reject this operation.
 	 */
-	if (!qdf_atomic_read(&bs_ctx->ref_count[bs_req->vdev_id][bs_req->source])) {
+	if (bs_req->source == BEARER_SWITCH_REQ_FW) {
+		if (!qdf_atomic_read(&bs_ctx->fw_ref_count)) {
+			ll_sap_debug(BS_PREFIX_FMT "ref_count is zero for FW",
+				     BS_PREFIX_REF(
+						wlan_vdev_get_id(bs_ctx->vdev),
+						bs_req->request_id));
+			return QDF_STATUS_E_INVAL;
+		}
+		ref_count = qdf_atomic_dec_return(&bs_ctx->fw_ref_count);
+	} else if (!qdf_atomic_read(
+			&bs_ctx->ref_count[bs_req->vdev_id][bs_req->source])) {
 		ll_sap_debug(BS_PREFIX_FMT "req_vdev %d src %d ref_count is zero",
 			     BS_PREFIX_REF(wlan_vdev_get_id(bs_ctx->vdev),
 					   bs_req->request_id),
 			     bs_req->vdev_id, bs_req->source);
 		return QDF_STATUS_E_INVAL;
+	} else {
+		ref_count = qdf_atomic_dec_return(
+			&bs_ctx->ref_count[bs_req->vdev_id][bs_req->source]);
 	}
 	total_ref_count = qdf_atomic_dec_return(&bs_ctx->total_ref_count);
-	ref_count = qdf_atomic_dec_return(&bs_ctx->ref_count[bs_req->vdev_id][bs_req->source]);
-
 	ll_sap_nofl_debug(BS_PREFIX_FMT "req_vdev %d src %d ref_count %d Total ref count %d",
 			  BS_PREFIX_REF(wlan_vdev_get_id(bs_ctx->vdev),
 					bs_req->request_id),
@@ -850,11 +905,6 @@ ll_lt_sap_handle_bs_to_non_wlan_in_wlan_state(
 		ll_sap_err(BS_PREFIX_FMT "Failed to start timer",
 			   BS_PREFIX_REF(wlan_vdev_get_id(bs_ctx->vdev),
 					 bs_req->request_id));
-	/*
-	 * Todo, upon receiving response for non-wlan request, deliver event
-	 * WLAN_BS_SM_EV_SWITCH_TO_NON_WLAN_COMPLETED from the vendor command
-	 * path
-	 */
 }
 
 /**
@@ -956,6 +1006,12 @@ ll_lt_sap_handle_bs_to_wlan_timeout(
 				struct wlan_bearer_switch_request *bs_req)
 {
 	bs_sm_transition_to(bs_ctx, BEARER_WLAN);
+
+	if (bs_req->source == BEARER_SWITCH_REQ_FW)
+		ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(
+							bs_ctx->vdev,
+							bs_req->req_type,
+							WLAN_BS_STATUS_TIMEOUT);
 
 	bs_ctx->last_status = QDF_STATUS_E_TIMEOUT;
 
@@ -1717,6 +1773,9 @@ ll_lt_sap_deliver_audio_transport_switch_resp(
 				enum bearer_switch_req_type req_type,
 				enum bearer_switch_status status)
 {
+	ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(vdev, req_type,
+							   status);
+
 	if (req_type == WLAN_BS_REQ_TO_NON_WLAN)
 		ll_lt_sap_deliver_non_wlan_audio_transport_switch_resp(
 								vdev,

@@ -4682,6 +4682,18 @@ QDF_STATUS ucfg_mlme_set_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc,
 bool ucfg_mlme_get_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_mlme_get_update_chan_width_allowed  - Get value of INI
+ * is_update_chan_width_allowed
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_update_chan_width_allowed(struct wlan_objmgr_psoc *psoc,
+					bool *value);
+
+/**
  * ucfg_mlme_get_channel_bonding_24ghz() - get channel bonding mode of 24ghz
  * @psoc:   pointer to psoc object
  * @value:  pointer to the value which will be filled for the caller
@@ -4702,6 +4714,7 @@ ucfg_mlme_get_channel_bonding_24ghz(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_set_channel_bonding_24ghz(struct wlan_objmgr_psoc *psoc,
 				    uint32_t value);
+
 /**
  * ucfg_mlme_get_channel_bonding_5ghz() - get channel bonding mode of 5ghz
  * @psoc:   pointer to psoc object

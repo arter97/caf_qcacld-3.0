@@ -1653,6 +1653,9 @@ static void populate_dot11f_qcn_ie_he_params(struct mac_context *mac,
 {
 	uint16_t mcs_12_13_supp;
 
+	if (!lim_is_session_he_capable(pe_session))
+		return;
+
 	/* To fix WAPI IoT issue.*/
 	if (pe_session->encryptType == eSIR_ED_WPI)
 		return;
@@ -1733,7 +1736,8 @@ void populate_dot11f_qcn_ie(struct mac_context *mac,
 		qcn_ie->qcn_version.version = QCN_IE_VERSION_SUPPORTED;
 		qcn_ie->qcn_version.sub_version = QCN_IE_SUBVERSION_SUPPORTED;
 	}
-	if (mac->mlme_cfg->vht_caps.vht_cap_info.vht_mcs_10_11_supp) {
+	if (pe_session->vhtCapability &&
+	    mac->mlme_cfg->vht_caps.vht_cap_info.vht_mcs_10_11_supp) {
 		qcn_ie->present = 1;
 		qcn_ie->vht_mcs11_attr.present = 1;
 		qcn_ie->vht_mcs11_attr.vht_mcs_10_11_supp = 1;
@@ -3790,7 +3794,7 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mlo_partner_info partner_info;
 
-	if (ar->mlo_ie.present)
+	if (!ar->mlo_ie.present)
 		return status;
 
 	status = util_find_mlie(frame + WLAN_ASSOC_RSP_IES_OFFSET,

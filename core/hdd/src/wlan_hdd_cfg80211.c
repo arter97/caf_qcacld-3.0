@@ -4012,7 +4012,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	uint8_t vht_ch_width;
 	uint32_t channel_bonding_mode_2g;
 	uint32_t last_scan_ageout_time;
-	bool ll_lt_sap = false;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	/* ***Note*** Donot set SME config related to ACS operation here because
@@ -4039,8 +4038,11 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc,
 					    &channel_bonding_mode_2g);
 
-	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id))
+	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id)) {
 		is_ll_lt_sap = true;
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(hdd_ctx->psoc,
+							    true);
+	}
 
 	if (is_ll_lt_sap || sap_force_11n_for_11ac)
 		sap_force_11n = true;
@@ -4279,9 +4281,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	sap_config->acs_cfg.acs_mode = true;
 
-	ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
-						 link_info->vdev_id);
-
 	if (wlan_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev))
 		hdd_remove_6ghz_freq_from_acs_list(
 					sap_config->acs_cfg.freq_list,
@@ -4289,7 +4288,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	if ((is_external_acs_policy &&
 	    policy_mgr_is_force_scc(hdd_ctx->psoc) &&
-	    policy_mgr_get_connection_count(hdd_ctx->psoc)) || ll_lt_sap) {
+	    policy_mgr_get_connection_count(hdd_ctx->psoc)) || is_ll_lt_sap) {
 		if (adapter->device_mode == QDF_SAP_MODE)
 			is_vendor_unsafe_ch_present =
 				wlansap_filter_vendor_unsafe_ch_freq(sap_ctx,
@@ -4302,7 +4301,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		if (!sap_config->acs_cfg.ch_list_count &&
 		    sap_config->acs_cfg.master_ch_list_count &&
 		    !is_vendor_unsafe_ch_present &&
-		    !ll_lt_sap)
+		    !is_ll_lt_sap)
 			wlan_hdd_handle_zero_acs_list(
 				hdd_ctx,
 				sap_config->acs_cfg.freq_list,
@@ -5062,12 +5061,17 @@ static inline void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
 }
 #endif
 
-static inline void wlan_hdd_set_ll_lt_sap_feature(uint8_t *feature_flags)
+static inline void wlan_hdd_set_ll_lt_sap_feature(struct wlan_objmgr_psoc *psoc,
+						  uint8_t *feature_flags)
 {
 	/* To Do: Once FW feature capability changes for ll_lt_sap feature are
 	 * merged, then this feature will be set based on that feature set
 	 * capability
 	 */
+	if (!ucfg_is_ll_lt_sap_supported(psoc)) {
+		hdd_debug("ll_lt_sap feature is disabled in FW");
+		return;
+	}
 	wlan_hdd_cfg80211_set_feature(feature_flags,
 				      QCA_WLAN_VENDOR_FEATURE_ENHANCED_AUDIO_EXPERIENCE_OVER_WLAN);
 }
@@ -5194,7 +5198,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 				feature_flags,
 				QCA_WLAN_VENDOR_FEATURE_AP_ALLOWED_FREQ_LIST);
 	wlan_wifi_pos_cfg80211_set_features(hdd_ctx->psoc, feature_flags);
-	wlan_hdd_set_ll_lt_sap_feature(feature_flags);
+	wlan_hdd_set_ll_lt_sap_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
@@ -11096,6 +11100,20 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	struct nlattr *chn_bd = NULL;
 	struct nlattr *mlo_link_id;
 	enum eSirMacHTChannelWidth chwidth;
+	struct wlan_objmgr_psoc *psoc;
+	bool update_cw_allowed;
+
+	psoc = wlan_vdev_get_psoc(link_info->vdev);
+	if (!psoc) {
+		hdd_debug("psoc is null");
+		return -EINVAL;
+	}
+
+	ucfg_mlme_get_update_chan_width_allowed(psoc, &update_cw_allowed);
+	if (!update_cw_allowed) {
+		hdd_debug("update_channel_width is disabled via INI");
+		return -EINVAL;
+	}
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS])
 		goto skip_mlo;

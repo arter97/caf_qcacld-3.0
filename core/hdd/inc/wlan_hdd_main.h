@@ -2409,6 +2409,16 @@ struct hdd_chwidth_info {
 	int bonding_mode;
 };
 
+/**
+ * struct mac_addr_set_priv: Set MAC addr private context
+ * @fw_resp_status: F/W response status
+ * @pending_rsp_cnt: Pending response count
+ */
+struct mac_addr_set_priv {
+	uint32_t fw_resp_status;
+	qdf_atomic_t pending_rsp_cnt;
+};
+
 /*
  * Function declarations and documentation
  */
