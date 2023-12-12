@@ -13972,10 +13972,8 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 	if (SME_SESSION_ID_ANY == frame_ind->sessionId) {
 		for (i = 0; i < WLAN_MAX_VDEVS; i++) {
 			link_info = hdd_get_link_info_by_vdev(hdd_ctx, i);
-			if (link_info) {
-				adapter = link_info->adapter;
+			if (link_info)
 				break;
-			}
 		}
 	} else if (SME_SESSION_ID_BROADCAST == frame_ind->sessionId) {
 		num_adapters = 0;
@@ -13989,8 +13987,6 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 			/* dev_put has to be done here */
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 		}
-
-		adapter = NULL;
 
 		for (i = 0; i < num_adapters; i++) {
 			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
@@ -14008,7 +14004,7 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 				continue;
 			}
 
-			hdd_indicate_mgmt_frame_to_user(link_info->adapter,
+			hdd_indicate_mgmt_frame_to_user(link_info,
 							frame_ind->frame_len,
 							frame_ind->frameBuf,
 							frame_ind->frameType,
@@ -14018,28 +14014,23 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 		}
 
-		adapter = NULL;
+		return;
 	} else {
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx,
 						      frame_ind->sessionId);
-
 		if (!link_info) {
 			hdd_err("Invalid vdev");
 			return;
 		}
-
-		adapter = link_info->adapter;
 	}
 
-	if ((adapter) &&
-		(WLAN_HDD_ADAPTER_MAGIC == adapter->magic))
-		hdd_indicate_mgmt_frame_to_user(adapter,
-						frame_ind->frame_len,
-						frame_ind->frameBuf,
-						frame_ind->frameType,
-						frame_ind->rx_freq,
-						frame_ind->rxRssi,
-						frame_ind->rx_flags);
+	hdd_indicate_mgmt_frame_to_user(link_info,
+					frame_ind->frame_len,
+					frame_ind->frameBuf,
+					frame_ind->frameType,
+					frame_ind->rx_freq,
+					frame_ind->rxRssi,
+					frame_ind->rx_flags);
 }
 
 void hdd_acs_response_timeout_handler(void *context)

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -63,7 +63,7 @@ int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command);
 
 /**
  * hdd_indicate_mgmt_frame_to_user- send mgmt frame to user
- * @adapter: adapter pointer
+ * @link_info: pointer of link info
  * @frm_len: frame length
  * @pb_frames: frame bytes
  * @frame_type: frame type
@@ -71,7 +71,7 @@ int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command);
  * @rx_rssi: rssi
  * @rx_flags: rx flags of the frame
  */
-void hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
+void hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 				     uint32_t frm_len, uint8_t *pb_frames,
 				     uint8_t frame_type, uint32_t rx_freq,
 				     int8_t rx_rssi,

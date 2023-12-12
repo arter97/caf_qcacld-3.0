@@ -1135,8 +1135,47 @@ wlan_hdd_cfg80211_convert_rxmgmt_flags(enum rxmgmt_flags flag,
 
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+/**
+ * wlan_cfg80211_rx_mgmt_ext() - send rx mgmt to kernel
+ * @wdev: wireless device receiving the frame
+ * @link_info: pointer of link info
+ * @rx_freq: rx freq
+ * @rx_rssi: rx rssi
+ * @pb_frames: pointer of frame
+ * @frm_len: length of frame
+ * @nl80211_flag: rx mgmt flag
+ *
+ * Return: void
+ */
+static inline void
+wlan_cfg80211_rx_mgmt_ext(struct wireless_dev *wdev,
+			  struct wlan_hdd_link_info *link_info,
+			  uint32_t rx_freq,
+			  int8_t rx_rssi,
+			  uint8_t *pb_frames,
+			  uint32_t frm_len,
+			  enum nl80211_rxmgmt_flags nl80211_flag)
+{
+	struct cfg80211_rx_info info;
+
+	info.freq = MHZ_TO_KHZ(rx_freq);
+	info.sig_dbm = rx_rssi * 100;
+	info.buf = pb_frames;
+	info.len = frm_len;
+	info.flags = NL80211_RXMGMT_FLAG_ANSWERED | nl80211_flag;
+
+	if (wlan_vdev_mlme_is_mlo_ap(link_info->vdev)) {
+		info.have_link_id = true;
+		info.link_id = wlan_vdev_get_link_id(link_info->vdev);
+	}
+
+	cfg80211_rx_mgmt_ext(wdev, &info);
+}
+#endif
+
 static void
-__hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
+__hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 				  uint32_t frm_len, uint8_t *pb_frames,
 				  uint8_t frame_type, uint32_t rx_freq,
 				  int8_t rx_rssi, enum rxmgmt_flags rx_flags)
@@ -1149,6 +1188,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	enum nl80211_rxmgmt_flags nl80211_flag = 0;
 	bool is_pasn_auth_frame = false;
 	struct hdd_adapter *assoc_adapter;
+	struct hdd_adapter *adapter = link_info->adapter;
 	bool eht_capab;
 	struct hdd_ap_ctx *ap_ctx;
 	struct action_frm_hdr *action_hdr;
@@ -1186,7 +1226,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 		} else if (auth_algo == eSIR_FT_AUTH &&
 			   (adapter->device_mode == QDF_SAP_MODE ||
 			    adapter->device_mode == QDF_P2P_GO_MODE)) {
-			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 			ap_ctx->during_auth_offload = true;
 		}
 	}
@@ -1276,12 +1316,15 @@ check_adapter:
 
 	/* Indicate Frame Over Normal Interface */
 	hdd_debug("vdev %d (if_idx %d): Indicate Frame type %d len %d freq %d over NL80211",
-		  assoc_adapter->deflink->vdev_id, assoc_adapter->dev->ifindex,
+		  link_info->vdev_id, assoc_adapter->dev->ifindex,
 		  frame_type, frm_len, rx_freq);
 
 	wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+	wlan_cfg80211_rx_mgmt_ext(assoc_adapter->dev->ieee80211_ptr,
+				  link_info, rx_freq, rx_rssi, pb_frames,
+				  frm_len, nl80211_flag);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 	cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr,
 			 rx_freq, rx_rssi * 100, pb_frames,
 			 frm_len, NL80211_RXMGMT_FLAG_ANSWERED | nl80211_flag);
@@ -1297,19 +1340,31 @@ check_adapter:
 #endif /* LINUX_VERSION_CODE */
 }
 
-void hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
+void hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 				     uint32_t frm_len, uint8_t *pb_frames,
 				     uint8_t frame_type, uint32_t rx_freq,
 				     int8_t rx_rssi, enum rxmgmt_flags rx_flags)
 {
+	struct hdd_adapter *adapter;
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
+
+	if (!link_info) {
+		hdd_err("link info is null");
+		return;
+	}
+
+	adapter = link_info->adapter;
+	if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
+		hdd_err("invalid adapter");
+		return;
+	}
 
 	errno = osif_vdev_sync_op_start(adapter->dev, &vdev_sync);
 	if (errno)
 		return;
 
-	__hdd_indicate_mgmt_frame_to_user(adapter, frm_len, pb_frames,
+	__hdd_indicate_mgmt_frame_to_user(link_info, frm_len, pb_frames,
 					  frame_type, rx_freq,
 					  rx_rssi, rx_flags);
 	osif_vdev_sync_op_stop(vdev_sync);
