@@ -4186,7 +4186,7 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	 * b. SAP is configured on 6Ghz fixed channel from userspace.
 	 * c. SAP is configured by ACS range which includes any 6Ghz channel.
 	 */
-	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(
 				ap_ctx->operating_chan_freq))
 			capable |= CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED;
