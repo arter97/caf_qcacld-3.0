@@ -3738,30 +3738,15 @@ uint8_t *wma_get_vdev_address_by_vdev_id(uint8_t vdev_id)
 	return wlan_vdev_mlme_get_macaddr(vdev);
 }
 
-QDF_STATUS wma_get_connection_info(uint8_t vdev_id,
-		struct policy_mgr_vdev_entry_info *conn_table_entry)
-{
-	struct wma_txrx_node *wma_conn_table_entry;
-
-	wma_conn_table_entry = wma_get_interface_by_vdev_id(vdev_id);
-	if (!wma_conn_table_entry) {
-		wma_err("can't find vdev_id %d in WMA table", vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-	conn_table_entry->chan_width = wma_conn_table_entry->chan_width;
-	conn_table_entry->mac_id = wma_conn_table_entry->mac_id;
-	conn_table_entry->mhz = wma_conn_table_entry->ch_freq;
-	conn_table_entry->sub_type = wma_conn_table_entry->sub_type;
-	conn_table_entry->type = wma_conn_table_entry->type;
-	conn_table_entry->ch_flagext = wma_conn_table_entry->ch_flagext;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS wma_ndi_update_connection_info(uint8_t vdev_id,
 				struct nan_datapath_channel_info *ndp_chan_info)
 {
 	struct wma_txrx_node *wma_iface_entry;
+	tp_wma_handle wma;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma)
+		return QDF_STATUS_E_FAILURE;
 
 	wma_iface_entry = wma_get_interface_by_vdev_id(vdev_id);
 	if (!wma_iface_entry) {
@@ -3782,7 +3767,7 @@ QDF_STATUS wma_ndi_update_connection_info(uint8_t vdev_id,
 	wma_iface_entry->chan_width = ndp_chan_info->ch_width;
 	wma_iface_entry->ch_freq = ndp_chan_info->freq;
 	wma_iface_entry->nss = ndp_chan_info->nss;
-	wma_iface_entry->mac_id = ndp_chan_info->mac_id;
+	wlan_mlme_set_vdev_mac_id(wma->pdev, vdev_id, ndp_chan_info->mac_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3857,7 +3842,7 @@ void wma_update_intf_hw_mode_params(uint32_t vdev_id, uint32_t mac_id,
 			 cfgd_hw_mode_index);
 		return;
 	}
-	wma->interfaces[vdev_id].mac_id = mac_id;
+	wlan_mlme_set_vdev_mac_id(wma->pdev, vdev_id, mac_id);
 	if (mac_id == 0)
 		wma->interfaces[vdev_id].tx_streams =
 			hw_mode.mac0_tx_ss;

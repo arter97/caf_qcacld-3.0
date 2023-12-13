@@ -103,9 +103,9 @@ struct wma_ps_params {
 
 /**
  * enum wma_sta_ps_scheme_cfg - STA power save schemes
- * @WMA_STA_PS_OPM_CONSERVATIVE - Conservative OPM mode
- * @WMA_STA_PS_OPM_AGGRESSIVE - Aggressive OPM mode
- * @WMA_STA_PS_USER_DEF - User defined OPM mode
+ * @WMA_STA_PS_OPM_CONSERVATIVE: Conservative OPM mode
+ * @WMA_STA_PS_OPM_AGGRESSIVE: Aggressive OPM mode
+ * @WMA_STA_PS_USER_DEF: User defined OPM mode
  */
 enum wma_sta_ps_scheme_cfg {
 	WMA_STA_PS_OPM_CONSERVATIVE = 0,
@@ -208,8 +208,6 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle, void *scan_chan_info);
  */
 uint8_t *wma_get_vdev_address_by_vdev_id(uint8_t vdev_id);
 struct wma_txrx_node *wma_get_interface_by_vdev_id(uint8_t vdev_id);
-QDF_STATUS wma_get_connection_info(uint8_t vdev_id,
-		struct policy_mgr_vdev_entry_info *conn_table_entry);
 QDF_STATUS wma_ndi_update_connection_info(uint8_t vdev_id,
 		struct nan_datapath_channel_info *ndp_chan_info);
 

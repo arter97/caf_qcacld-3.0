@@ -392,7 +392,6 @@ struct policy_mgr_psoc_priv_obj {
 	qdf_mc_timer_t dbs_opportunistic_timer;
 	struct policy_mgr_hdd_cbacks hdd_cbacks;
 	struct policy_mgr_sme_cbacks sme_cbacks;
-	struct policy_mgr_wma_cbacks wma_cbacks;
 	struct policy_mgr_tdls_cbacks tdls_cbacks;
 	struct policy_mgr_cdp_cbacks cdp_cbacks;
 	struct policy_mgr_dp_cbacks dp_cbacks;

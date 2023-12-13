@@ -3446,7 +3446,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	void *wmi_handle;
 	QDF_STATUS qdf_status;
 	struct wmi_unified_attach_params *params;
-	struct policy_mgr_wma_cbacks wma_cbacks;
 	struct target_psoc_info *tgt_psoc_info;
 	int i;
 	bool val = 0;
@@ -3921,14 +3920,8 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 					      wma_vdev_get_dtim_period);
 	pmo_register_get_beacon_interval_callback(wma_handle->psoc,
 						  wma_vdev_get_beacon_interval);
-	wma_cbacks.wma_get_connection_info = wma_get_connection_info;
 	wma_register_nan_callbacks(wma_handle);
 	wma_register_pkt_capture_callbacks(wma_handle);
-	qdf_status = policy_mgr_register_wma_cb(wma_handle->psoc, &wma_cbacks);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		wma_err("Failed to register wma cb with Policy Manager");
-	}
-
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 			wmi_phyerr_event_id,
 			wma_unified_phyerr_rx_event_handler,

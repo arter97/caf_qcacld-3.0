@@ -1721,6 +1721,19 @@ QDF_STATUS policy_mgr_incr_connection_count(struct wlan_objmgr_psoc *psoc,
 					    enum QDF_OPMODE mode);
 
 /**
+ * policy_mgr_get_connection_table_entry_info() - get the vdev entry info for
+ * connection table
+ * @pdev: pdev pointer
+ * @vdev_id: vdev id
+ * @conn_table_entry: vdev entry info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_get_connection_table_entry_info(struct wlan_objmgr_pdev *pdev,
+	uint8_t vdev_id, struct policy_mgr_vdev_entry_info *conn_table_entry);
+
+/**
  * policy_mgr_update_connection_info() - updates the existing
  * connection in the current connections list
  * @psoc: PSOC object information
@@ -2281,17 +2294,6 @@ struct policy_mgr_dp_cbacks {
 	void (*hdd_v2_flow_pool_map)(int);
 	void (*hdd_v2_flow_pool_unmap)(int);
 	void (*hdd_ipa_set_perf_level_bw)(enum hw_mode_bandwidth bw);
-};
-
-/**
- * struct policy_mgr_wma_cbacks - WMA Callbacks to be invoked
- * from policy manager
- * @wma_get_connection_info: Get the connection related info
- *                         from wma table
- */
-struct policy_mgr_wma_cbacks {
-	QDF_STATUS (*wma_get_connection_info)(uint8_t vdev_id,
-		struct policy_mgr_vdev_entry_info *conn_table_entry);
 };
 
 /**
@@ -3280,20 +3282,6 @@ QDF_STATUS policy_mgr_register_cdp_cb(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS policy_mgr_register_dp_cb(struct wlan_objmgr_psoc *psoc,
 		struct policy_mgr_dp_cbacks *dp_cbacks);
-
-/**
- * policy_mgr_register_wma_cb() - register WMA callbacks
- * @psoc: PSOC object information
- * @wma_cbacks: function pointers from WMA
- *
- * API, allows WMA to register callbacks to be invoked by policy
- * mgr
- *
- * Return: SUCCESS,
- *         Failure (if registration fails)
- */
-QDF_STATUS policy_mgr_register_wma_cb(struct wlan_objmgr_psoc *psoc,
-		struct policy_mgr_wma_cbacks *wma_cbacks);
 
 /**
  * policy_mgr_find_if_fw_supports_dbs() - to find if FW/HW supports DBS

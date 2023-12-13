@@ -5303,17 +5303,15 @@ QDF_STATUS policy_mgr_incr_connection_count(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_err("Can't get NAN Connection info");
 			return status;
 		}
-	} else if (pm_ctx->wma_cbacks.wma_get_connection_info) {
-		status = pm_ctx->wma_cbacks.wma_get_connection_info(
-				vdev_id, &conn_table_entry);
-		if (QDF_STATUS_SUCCESS != status) {
+	} else {
+		status = policy_mgr_get_connection_table_entry_info(
+						pm_ctx->pdev,
+						vdev_id, &conn_table_entry);
+		if (QDF_IS_STATUS_ERROR(status)) {
 			policy_mgr_err("can't find vdev_id %d in connection table",
-			vdev_id);
+				       vdev_id);
 			return status;
 		}
-	} else {
-		policy_mgr_err("wma_get_connection_info is NULL");
-		return QDF_STATUS_E_FAILURE;
 	}
 
 	mode =  policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);

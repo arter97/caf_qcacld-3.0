@@ -5689,3 +5689,50 @@ wlan_mlme_send_csa_event_status_ind_cmd(struct wlan_objmgr_vdev *vdev,
 	return tx_ops->send_csa_event_status_ind(vdev, csa_status);
 }
 
+
+void wlan_mlme_set_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
+			       uint8_t vdev_id, uint32_t mac_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *vdev_mlme_priv;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev)
+		return;
+
+	vdev_mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!vdev_mlme_priv) {
+		mlme_legacy_err("vdev %d private object is NULL", vdev_id);
+		goto rel_ref;
+	}
+
+	vdev_mlme_priv->mac_id = mac_id;
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
+
+uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *vdev_mlme_priv;
+	uint32_t mac_id = 0;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev)
+		return mac_id;
+
+	vdev_mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!vdev_mlme_priv) {
+		mlme_legacy_err("vdev %d private object is NULL", vdev_id);
+		goto rel_ref;
+	}
+
+	mac_id = vdev_mlme_priv->mac_id;
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	return mac_id;
+}

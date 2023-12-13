@@ -448,6 +448,41 @@ exit:
 	return upgrade;
 }
 
+QDF_STATUS
+policy_mgr_get_connection_table_entry_info(struct wlan_objmgr_pdev *pdev,
+	uint8_t vdev_id, struct policy_mgr_vdev_entry_info *conn_table_entry)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_channel *chan;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	chan = wlan_vdev_get_active_channel(vdev);
+	if (!chan)
+		goto rel_ref;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		policy_mgr_err("vdev %d component object is NULL", vdev_id);
+		goto rel_ref;
+	}
+
+	conn_table_entry->type = vdev_mlme->mgmt.generic.type;
+	conn_table_entry->sub_type = vdev_mlme->mgmt.generic.subtype;
+	conn_table_entry->vdev_id = vdev_id;
+	conn_table_entry->mhz = chan->ch_freq;
+	conn_table_entry->chan_width = chan->ch_width;
+	conn_table_entry->ch_flagext = chan->ch_flagext;
+	conn_table_entry->mac_id = wlan_mlme_get_vdev_mac_id(pdev, vdev_id);
+
+	status = QDF_STATUS_SUCCESS;
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	return status;
+}
+
 QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 					uint32_t vdev_id)
 {
@@ -484,19 +519,15 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 			vdev_id);
 		return QDF_STATUS_NOT_INITIALIZED;
 	}
-	if (pm_ctx->wma_cbacks.wma_get_connection_info) {
-		status = pm_ctx->wma_cbacks.wma_get_connection_info(
-				vdev_id, &conn_table_entry);
-		if (QDF_STATUS_SUCCESS != status) {
-			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-			policy_mgr_err("can't find vdev_id %d in connection table",
-			vdev_id);
-			return status;
-		}
-	} else {
+
+	status = policy_mgr_get_connection_table_entry_info(pm_ctx->pdev,
+							    vdev_id,
+							    &conn_table_entry);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-		policy_mgr_err("wma_get_connection_info is NULL");
-		return QDF_STATUS_E_FAILURE;
+		policy_mgr_err("can't find vdev_id %d in connection table",
+			       vdev_id);
+		return status;
 	}
 
 	cur_freq = pm_conc_connection_list[conn_index].freq;

@@ -738,7 +738,6 @@ struct wma_txrx_node {
 	bool extscan_in_progress;
 #endif
 	uint32_t tx_streams;
-	uint32_t mac_id;
 	int32_t roam_synch_delay;
 	struct sme_rcpi_req *rcpi_req;
 	bool in_bmps;
@@ -747,7 +746,6 @@ struct wma_txrx_node {
 	struct roam_synch_frame_ind roam_synch_frame_ind;
 	bool is_waiting_for_key;
 	uint32_t ch_freq;
-	uint16_t ch_flagext;
 	struct sir_roam_scan_stats *roam_scan_stats_req;
 	struct wma_invalid_peer_params invalid_peers[INVALID_PEER_MAX_NUM];
 	uint8_t invalid_peer_idx;

@@ -822,6 +822,7 @@ struct enhance_roam_info {
  * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  * @disconnect_runtime_lock: runtime lock to complete disconnection
  * @best_6g_power_type: best 6g power type
+ * @mac_id: vdev mac_id
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -894,6 +895,7 @@ struct mlme_legacy_priv {
 	qdf_runtime_lock_t bss_color_change_runtime_lock;
 	qdf_runtime_lock_t disconnect_runtime_lock;
 	enum reg_6g_ap_type best_6g_power_type;
+	uint32_t mac_id;
 };
 
 /**
@@ -1980,5 +1982,26 @@ wlan_mlme_register_common_events(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS
 wlan_mlme_send_csa_event_status_ind_cmd(struct wlan_objmgr_vdev *vdev,
 					uint8_t csa_status);
+
+/**
+ * wlan_mlme_set_vdev_mac_id() - set mac id for the vdev
+ * @pdev: pdev obj
+ * @vdev_id: vdev id
+ * @mac_id: mac id on which vdev is present
+ *
+ *  Return: void
+ */
+void wlan_mlme_set_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
+			       uint8_t vdev_id, uint32_t mac_id);
+
+/**
+ * wlan_mlme_get_vdev_mac_id() - get mac id for the vdev
+ * @pdev: pdev obj
+ * @vdev_id: vdev id
+ *
+ *  Return: mac_id on which vdev is present
+ */
+uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id);
 
 #endif

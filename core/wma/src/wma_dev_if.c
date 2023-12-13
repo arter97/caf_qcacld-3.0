@@ -1307,6 +1307,7 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 	const struct wlan_mlme_ratemask *ratemask_cfg;
 	struct config_ratemask_params rparams = {0};
 	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint32_t mac_id;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma)
@@ -1360,19 +1361,14 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 				wma_err("soc level id received for mac id");
 				return -QDF_STATUS_E_INVAL;
 			}
-			wma->interfaces[rsp->vdev_id].mac_id =
-				WMA_PDEV_TO_MAC_MAP(rsp->mac_id);
+			mac_id = WMA_PDEV_TO_MAC_MAP(rsp->mac_id);
 		} else {
-			wma->interfaces[rsp->vdev_id].mac_id =
-			rsp->mac_id;
+			mac_id = rsp->mac_id;
 		}
-
+		wlan_mlme_set_vdev_mac_id(wma->pdev, rsp->vdev_id, mac_id);
 		wma_debug("vdev:%d tx ss=%d rx ss=%d chain mask=%d mac=%d",
-				rsp->vdev_id,
-				rsp->cfgd_tx_streams,
-				rsp->cfgd_rx_streams,
-				rsp->chain_mask,
-				wma->interfaces[rsp->vdev_id].mac_id);
+			  rsp->vdev_id, rsp->cfgd_tx_streams,
+			  rsp->cfgd_rx_streams, rsp->chain_mask, mac_id);
 
 		/* Fill bss_chan after vdev start */
 		qdf_mem_copy(iface->vdev->vdev_mlme.bss_chan,
@@ -1380,15 +1376,14 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 			     sizeof(struct wlan_channel));
 
 		if (wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev))
-			cdp_update_mac_id(dp_soc, rsp->vdev_id,
-					  wma->interfaces[rsp->vdev_id].mac_id);
+			cdp_update_mac_id(dp_soc, rsp->vdev_id, mac_id);
 
 	}
 
 	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id)) {
 		wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
 		wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
-							    iface->mac_id, rsp);
+							    mac_id, rsp);
 	}
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
@@ -3346,7 +3341,6 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 		CFG_TGT_DEFAULT_GTX_BW_MASK;
 	intr[vdev_id].chan_width = des_chan->ch_width;
 	intr[vdev_id].ch_freq = des_chan->ch_freq;
-	intr[vdev_id].ch_flagext = des_chan->ch_flagext;
 
 	/*
 	 * If the channel has DFS set, flip on radar reporting.

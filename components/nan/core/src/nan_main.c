@@ -1464,7 +1464,6 @@ wlan_nan_get_connection_info(struct wlan_objmgr_psoc *psoc,
 	conn_info->mhz = psoc_nan_obj->nan_social_ch_2g_freq;
 	conn_info->mac_id = psoc_nan_obj->nan_disc_mac_id;
 	conn_info->chan_width = CH_WIDTH_20MHZ;
-	conn_info->type = WMI_VDEV_TYPE_NAN;
 
 	return QDF_STATUS_SUCCESS;
 }

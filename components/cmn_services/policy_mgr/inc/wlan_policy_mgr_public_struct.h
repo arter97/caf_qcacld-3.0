@@ -1658,6 +1658,7 @@ struct policy_mgr_pcl_chan_weights {
  * used by policy manager
  * @type: type
  * @sub_type: sub type
+ * @vdev_id: vdev id
  * @mhz: channel frequency in MHz
  * @chan_width: channel bandwidth
  * @mac_id: the mac on which vdev is on
@@ -1666,6 +1667,7 @@ struct policy_mgr_pcl_chan_weights {
 struct policy_mgr_vdev_entry_info {
 	uint32_t type;
 	uint32_t sub_type;
+	uint8_t vdev_id;
 	uint32_t mhz;
 	uint32_t chan_width;
 	uint32_t mac_id;
