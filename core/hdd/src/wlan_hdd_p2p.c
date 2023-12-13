@@ -1139,22 +1139,22 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	struct action_frm_hdr *action_hdr;
 	tpSirMacVendorSpecificPublicActionFrameHdr vendor_specific;
 
-	hdd_debug("Frame Type = %d Frame Length = %d freq = %d",
-		  frame_type, frm_len, rx_freq);
-
 	if (!adapter) {
-		hdd_err("adapter is NULL");
+		hdd_err("adapter is NULL for frame %d len %d rx freq %d",
+			frame_type, frm_len, rx_freq);
 		return;
 	}
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	if (!frm_len) {
-		hdd_err("Frame Length is Invalid ZERO");
+		hdd_err("Frame Length is ZERO, for frame %d rx freq %d",
+			frame_type, rx_freq);
 		return;
 	}
 
 	if (!pb_frames) {
-		hdd_err("pbFrames is NULL");
+		hdd_err("pbFrames is NULL  for frame %d len %d rx freq %d",
+			frame_type, frm_len, rx_freq);
 		return;
 	}
 
@@ -1210,10 +1210,9 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 			 * frame with BCST as destination,
 			 * we are dropping action frame
 			 */
-			hdd_err("adapter for action frame is NULL Macaddr = "
-				QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(dest_addr));
-			hdd_debug("Frame Type = %d Frame Length = %d subType = %d",
-				  frame_type, frm_len, sub_type);
+			hdd_err("No adapter found for type %d subtype %d len %d freq %d, dest addr: "
+				QDF_MAC_ADDR_FMT, frame_type, sub_type, frm_len,
+				rx_freq, QDF_MAC_ADDR_REF(dest_addr));
 			/*
 			 * We will receive broadcast management frames
 			 * in OCB mode
@@ -1253,7 +1252,6 @@ check_adapter:
 	assoc_adapter = adapter;
 	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
 	if (hdd_adapter_is_link_adapter(adapter) && eht_capab) {
-		hdd_debug("adapter is not ml adapter move to ml adapter");
 		assoc_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
 		if (!assoc_adapter) {
 			hdd_err("Assoc adapter is NULL");
@@ -1262,9 +1260,9 @@ check_adapter:
 	}
 
 	/* Indicate Frame Over Normal Interface */
-	hdd_debug("Indicate Frame over NL80211 sessionid : %d, idx :%d",
-		   assoc_adapter->deflink->vdev_id,
-		   assoc_adapter->dev->ifindex);
+	hdd_debug("vdev %d (if_idx %d): Indicate Frame type %d len %d freq %d over NL80211",
+		  assoc_adapter->deflink->vdev_id, assoc_adapter->dev->ifindex,
+		  frame_type, frm_len, rx_freq);
 
 	wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
 

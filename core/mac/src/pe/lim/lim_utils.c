@@ -4684,10 +4684,9 @@ void lim_diag_mgmt_rx_event_report(struct mac_context *mac_ctx, void *mgmt_hdr,
 
 	WLAN_HOST_DIAG_EVENT_DEF(mgmt_event,
 				 struct host_event_wlan_mgmt_payload_type);
-	if (!session || !mac_hdr) {
-		pe_debug("not valid input");
+	if (!session || !mac_hdr)
 		return;
-	}
+
 	lim_diag_fill_mgmt_event_report(mac_ctx, mac_hdr, session,
 					result_code, reason_code, &mgmt_event);
 	pe_debug("RX frame: type:%d sub_type:%d seq_num:%d ssid:" QDF_SSID_FMT " selfmacaddr:" QDF_MAC_ADDR_FMT " bssid:" QDF_MAC_ADDR_FMT " channel:%d",
@@ -9890,10 +9889,8 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 
 	if (qdf_is_macaddr_broadcast(
 		(struct qdf_mac_addr *)(frame + 4)) &&
-		!vdev_id) {
-		pe_debug("Broadcast action frame");
+		!vdev_id)
 		vdev_id = SME_SESSION_ID_BROADCAST;
-	}
 
 	sme_mgmt_frame->frame_len = frame_len;
 	sme_mgmt_frame->sessionId = vdev_id;
