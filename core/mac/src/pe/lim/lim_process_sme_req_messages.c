@@ -85,6 +85,7 @@
 #define INVALID_TPE_POWER 100
 #define MAX_TX_PWR_COUNT_FOR_160MHZ 3
 #define MAX_NUM_TX_POWER_FOR_320MHZ 5
+#define PUNCTURED_CHAN_POWER 128
 
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
@@ -5623,6 +5624,23 @@ QDF_STATUS cm_process_preauth_req(struct scheduler_msg *msg)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+static uint16_t
+lim_get_punc_chan_bit_map(struct pe_session *session)
+{
+	if (session->eht_op.disabled_sub_chan_bitmap_present)
+		return *(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+
+	return 0;
+}
+#else
+static inline uint16_t
+lim_get_punc_chan_bit_map(struct pe_session *session)
+{
+	return 0;
+}
+#endif
+
 /**
  * lim_get_eirp_320_power_from_tpe_ie() - To get eirp power for 320 MHZ
  * @tpe: transmit power env Ie advertised by AP
@@ -5673,6 +5691,7 @@ static uint8_t
 lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 			 tDot11fIEtransmit_power_env *tpe, qdf_freq_t curr_freq,
 			 bool *tpe_updated, uint8_t existing_pwr_count,
+			 const struct bonded_channel_freq *bonded_freq,
 			 bool is_psd)
 {
 	struct vdev_mlme_obj *vdev_mlme;
@@ -5681,7 +5700,7 @@ lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 	uint8_t total_psd_power = 0;
 	uint8_t ext_power_updated = 0;
 	uint8_t i, j;
-	uint8_t eirp_pwr = 0;
+	uint8_t eirp_pwr = 0, psd_pwr = 0;
 	uint8_t ext_psd_count = 0;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
@@ -5701,12 +5720,12 @@ lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 		if (existing_pwr_count >= MAX_NUM_PWR_LEVEL) {
 			pe_debug("already updated %d psd powers",
 				 existing_pwr_count);
-			return 0;
+			return existing_pwr_count;
 		}
 
 		if (!ext_psd_count)  {
 			pe_debug("Ext psd count is 0");
-			return 0;
+			return existing_pwr_count;
 		}
 
 		total_psd_power = existing_pwr_count + ext_psd_count;
@@ -5714,26 +5733,38 @@ lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 		i = existing_pwr_count;
 		for (j = 0; j < ext_psd_count && i < total_psd_power; j++)
 		{
-			if (tpe->max_tx_pwr_interpret == LOCAL_EIRP_PSD) {
-				if (vdev_mlme->reg_tpc_obj.tpe[i] !=
-				    tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[j] ||
-				    vdev_mlme->reg_tpc_obj.frequency[i] != curr_freq)
-					*tpe_updated = true;
-			} else {
-				if (vdev_mlme->reg_tpc_obj.tpe[i] !=
-				    tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[j] ||
-				    vdev_mlme->reg_tpc_obj.frequency[i] != curr_freq)
-					*tpe_updated = true;
+			if (bonded_freq &&
+			    bonded_freq->start_freq <= curr_freq &&
+			    bonded_freq->end_freq >= curr_freq) {
+				/*
+				 * Above set of freq already added via legacy
+				 * TPE IE power. So skip all frequencies till
+				 * last freq of bonded channel pair.
+				 */
+				curr_freq = bonded_freq->end_freq + 20;
 			}
 
-			vdev_mlme->reg_tpc_obj.frequency[i] = curr_freq;
-			curr_freq += 20;
 			if (tpe->max_tx_pwr_interpret == LOCAL_EIRP_PSD)
-				vdev_mlme->reg_tpc_obj.tpe[i] =
-				tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[j];
+				psd_pwr =
+					tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[j];
 			else
-				vdev_mlme->reg_tpc_obj.tpe[i] =
+				psd_pwr =
 					tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power[j];
+
+			/* Don't add punctured power in tpe power array */
+			if (psd_pwr == PUNCTURED_CHAN_POWER) {
+				pe_debug("%d is punctured freq", curr_freq);
+				curr_freq += 20;
+				continue;
+			}
+
+			if (vdev_mlme->reg_tpc_obj.tpe[i] != psd_pwr ||
+			    vdev_mlme->reg_tpc_obj.frequency[i] != curr_freq)
+					*tpe_updated = true;
+
+			vdev_mlme->reg_tpc_obj.frequency[i] = curr_freq;
+			vdev_mlme->reg_tpc_obj.tpe[i] = psd_pwr;
+			curr_freq += 20;
 			i++;
 		}
 		ext_power_updated = i;
@@ -5773,10 +5804,10 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		      tDot11fIEhe_op *he_op, bool *has_tpe_updated)
 {
 	struct vdev_mlme_obj *vdev_mlme;
-	uint8_t i, local_tpe_count = 0, reg_tpe_count = 0, num_octets;
+	uint8_t i, local_tpe_count = 0, reg_tpe_count = 0, num_octets = 0;
 	uint8_t psd_index = 0, non_psd_index = 0;
 	uint8_t bw_num;
-	uint16_t bw_val, ch_width;
+	uint16_t bw_val, ch_width = 0;
 	qdf_freq_t curr_op_freq, curr_freq = 0;
 	enum reg_6g_client_type client_mobility_type;
 	struct ch_params ch_params = {0};
@@ -5793,6 +5824,10 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	uint8_t reg_eirp_idx = 0, reg_psd_idx = 0;
 	uint8_t min_count = 0;
 	uint8_t ext_power_updated = 0, eirp_power = 0;
+	uint16_t puncture_bit_map = 0;
+	const struct bonded_channel_freq *bonded_freq;
+	const struct bonded_channel_freq *bonded_freq_non_ext;
+	enum phy_ch_width ch_width_non_ext;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!vdev_mlme)
@@ -5906,13 +5941,58 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 				lim_update_ext_tpe_power(
 						mac, session, &single_tpe,
 						curr_freq, has_tpe_updated,
-						0, false);
+						0, NULL, false);
 			vdev_mlme->reg_tpc_obj.num_pwr_levels +=
 							ext_power_updated;
 		}
 	}
+	puncture_bit_map = lim_get_punc_chan_bit_map(session);
 
-	if (psd_set) {
+	if (psd_set && puncture_bit_map) {
+		single_tpe = tpe_ies[psd_index];
+		vdev_mlme->reg_tpc_obj.is_psd_power = true;
+
+		num_octets =
+			lim_get_num_tpe_octets(single_tpe.max_tx_pwr_count);
+
+		vdev_mlme->reg_tpc_obj.num_pwr_levels = num_octets;
+
+		bonded_freq = wlan_reg_get_bonded_chan_entry(
+					curr_op_freq, session->ch_width, 0);
+
+		ch_width_non_ext = single_tpe.max_tx_pwr_count - 1;
+
+		bonded_freq_non_ext = wlan_reg_get_bonded_chan_entry(
+					curr_op_freq, ch_width_non_ext, 0);
+		if (!bonded_freq_non_ext) {
+			pe_debug("tx pwr count don't match with any chan pair");
+			puncture_bit_map = 0;
+			goto non_punctured_psd_update;
+		}
+
+		curr_freq = bonded_freq_non_ext->start_freq;
+		for (i = 0; i < num_octets &&
+		     curr_freq <= bonded_freq_non_ext->end_freq; i++) {
+			if (vdev_mlme->reg_tpc_obj.tpe[i] !=
+			    single_tpe.tx_power[i] ||
+			    vdev_mlme->reg_tpc_obj.frequency[i] != curr_freq)
+				*has_tpe_updated = true;
+			vdev_mlme->reg_tpc_obj.frequency[i] = curr_freq;
+			curr_freq += 20;
+			vdev_mlme->reg_tpc_obj.tpe[i] = single_tpe.tx_power[i];
+		}
+
+		curr_freq = bonded_freq->start_freq;
+		ext_power_updated = lim_update_ext_tpe_power(
+					mac, session, &single_tpe, curr_freq,
+					has_tpe_updated, num_octets,
+					bonded_freq_non_ext, true);
+
+		vdev_mlme->reg_tpc_obj.num_pwr_levels = ext_power_updated;
+	}
+
+non_punctured_psd_update:
+	if (psd_set && !puncture_bit_map) {
 		single_tpe = tpe_ies[psd_index];
 		vdev_mlme->reg_tpc_obj.is_psd_power = true;
 		num_octets =
@@ -5964,7 +6044,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 			ext_power_updated =
 			lim_update_ext_tpe_power(mac, session, &single_tpe,
 						 curr_freq, has_tpe_updated,
-						 num_octets, true);
+						 num_octets, NULL, true);
 			vdev_mlme->reg_tpc_obj.num_pwr_levels =
 							ext_power_updated;
 	}
