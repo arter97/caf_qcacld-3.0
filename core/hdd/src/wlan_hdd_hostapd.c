@@ -2356,6 +2356,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 	qdf_freq_t dfs_freq;
 	struct wlan_hdd_link_info *link_info;
 	bool alt_pipe;
+	bool is_last_sta_info  = true;
 
 	link_info = (struct wlan_hdd_link_info *)sap_ctx->user_context;
 	if (!link_info) {
@@ -3053,6 +3054,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		if (wlan_vdev_mlme_is_mlo_vdev(link_info->vdev) &&
 		    !qdf_is_macaddr_zero(&stainfo->mld_addr)) {
 			qdf_copy_macaddr(&sta_addr, &stainfo->mld_addr);
+			is_last_sta_info =
+				hdd_mlo_is_last_sta_info(
+						&adapter->sta_info_list,
+						stainfo);
 		} else {
 			/* Copy legacy MAC address on
 			 * non-ML type client disassoc.
@@ -3107,13 +3112,15 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			 HDD_SAP_CLIENT_DISCONNECT_WAKE_LOCK_DURATION);
 
 		/*
-		 * Don't indicate delete station event if P2P GO and
-		 * SSR in progress. Since supplicant will change mode
-		 * fail and down during this time.
+		 * Don't indicate delete station event if:
+		 * 1. P2P GO and SSR in progress. Since supplicant will change
+		 *    mode fail and down during this time.
+		 * 2. for mlo client, if it is not last link
 		 */
 
-		if ((adapter->device_mode != QDF_P2P_GO_MODE) ||
-		     (!cds_is_driver_recovering())) {
+		if ((adapter->device_mode != QDF_P2P_GO_MODE ||
+		     (!cds_is_driver_recovering())) &&
+		     is_last_sta_info) {
 			cfg80211_del_sta(dev,
 					 (const u8 *)&sta_addr.bytes[0],
 					 GFP_KERNEL);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -371,3 +371,34 @@ hdd_get_next_sta_info_no_lock(struct hdd_sta_info_obj *sta_info_container,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+bool hdd_mlo_is_last_sta_info(struct hdd_sta_info_obj *sta_info_container,
+			      struct hdd_station_info *current_sta_info)
+{
+	struct hdd_station_info *sta_info = NULL;
+	int ret = true;
+
+	if (!sta_info_container || !current_sta_info) {
+		hdd_err("invalid parameter");
+		return true;
+	}
+
+	/* For non-mld client only 1 sta_info */
+	if (qdf_is_macaddr_zero(&current_sta_info->mld_addr))
+		return true;
+
+	qdf_spin_lock_bh(&sta_info_container->sta_obj_lock);
+	qdf_list_for_each(&sta_info_container->sta_obj, sta_info, sta_node) {
+		if (qdf_is_macaddr_equal(&sta_info->mld_addr,
+					 (struct qdf_mac_addr *)
+					 &current_sta_info->mld_addr) &&
+		    current_sta_info != sta_info) {
+			ret = false;
+			break;
+		}
+	}
+	qdf_spin_unlock_bh(&sta_info_container->sta_obj_lock);
+
+	return ret;
+}
+#endif

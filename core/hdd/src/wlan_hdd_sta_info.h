@@ -568,4 +568,25 @@ struct hdd_station_info *hdd_get_sta_info_by_mac(
  */
 void hdd_clear_cached_sta_info(struct hdd_adapter *hdd_adapter);
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_mlo_is_last_sta_info() - check if the sta info is the last one for mlo
+ * client
+ * @sta_info_container: The station info container obj that stores and maintains
+ *                      the sta_info obj.
+ * @current_sta_info: the sta info which is to check if the last one
+ *
+ * this is to check if the sta info is the last for mlo client.
+ *
+ * Return: bool
+ */
+bool hdd_mlo_is_last_sta_info(struct hdd_sta_info_obj *sta_info_container,
+			      struct hdd_station_info *current_sta_info);
+#else
+static inline bool
+hdd_mlo_is_last_sta_info(struct hdd_sta_info_obj *sta_info_container,
+			 struct hdd_station_info *current_sta_info) {
+	return true;
+}
+#endif
 #endif /* __WLAN_HDD_STA_INFO_H */
