@@ -866,7 +866,8 @@ enum {
 	IEEE80211_PARAM_ASSOC_REJECT = 818,
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
-	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* MLO Max Simultaneous Active links */
+	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* User configuration for MLO RMSL advertisement */
+	IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG = 822, /* MLO enable/disable EXTMLD CAP advertisement */
 #endif
 };
 
@@ -2608,6 +2609,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 		SET_PARAM, 1},
 	{"g_max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
 		GET_PARAM, 0},
+	{"extmldcap_enable_advertisement", IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG,
+		SET_PARAM, 1},
+	{"g_extmldcap_enable_advertisement", IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG,
+		GET_PARAM,0},
 #endif
 };
 
