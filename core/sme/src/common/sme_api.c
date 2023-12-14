@@ -14212,7 +14212,7 @@ QDF_STATUS sme_set_rx_set_blocksize(mac_handle_t mac_handle,
 	return status;
 }
 
-int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev)
+int sme_cli_set_command(int vdev_id, int param_id, uint32_t sval, int vpdev)
 {
 	return wma_cli_set_command(vdev_id, param_id, sval, vpdev);
 }
