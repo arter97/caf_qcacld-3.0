@@ -1638,6 +1638,17 @@ wlansap_override_csa_strict_for_sap(mac_handle_t mac_handle,
 				    bool strict);
 
 /**
+ * wlansap_validate_channel_post_csa() - Check SAP channel unsafe or not
+ * after CSA
+ * @mac_handle: global MAC context
+ * @sap_ctx: SAP context
+ *
+ * Return: bool
+ */
+bool wlansap_validate_channel_post_csa(mac_handle_t mac_handle,
+				       struct sap_context *sap_ctx);
+
+/**
  * sap_get_csa_reason_str() - Get csa reason in string
  * @reason: sap reason enum value
  *
