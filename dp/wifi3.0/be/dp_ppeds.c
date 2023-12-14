@@ -784,8 +784,13 @@ static void dp_ppeds_add_napi_ctxt(struct dp_soc_be *be_soc)
 
 	qdf_net_if_create_dummy_if((struct qdf_net_if *)&napi_ctxt->ndev);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0))
 	netif_napi_add(&napi_ctxt->ndev, &napi_ctxt->napi,
 		       dp_ppeds_tx_comp_poll, napi_budget);
+#else
+	netif_napi_add_weight(&napi_ctxt->ndev, &napi_ctxt->napi,
+			dp_ppeds_tx_comp_poll, napi_budget);
+#endif
 }
 
 /**
