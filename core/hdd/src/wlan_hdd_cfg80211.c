@@ -22064,14 +22064,23 @@ __wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
  * wlan_hdd_cfg80211_set_ap_channel_width() - set ap channel bandwidth
  * @wiphy: Pointer to wiphy
  * @dev: Pointer to network device
+ * @link_id: Link id for which channel width has to be applied
  * @chandef: Pointer to channel definition parameter
  *
  * Return: 0 for success, non-zero for failure
  */
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int
+wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
+				       struct net_device *dev,
+				       unsigned int link_id,
+				       struct cfg80211_chan_def *chandef)
+#else
 static int
 wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
 				       struct net_device *dev,
 				       struct cfg80211_chan_def *chandef)
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -23332,9 +23341,16 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
  *
  * Return: 0 for success, non zero for failure
  */
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 unsigned int link_id,
+					 struct cfg80211_chan_def *chandef)
+#else
 static int wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 					 struct wireless_dev *wdev,
 					 struct cfg80211_chan_def *chandef)
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -23512,10 +23528,18 @@ configure_fw:
 	return errno;
 }
 
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static int wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
+					      struct net_device *netdev,
+					      unsigned int link_id,
+					      const u8 *peer,
+				       const struct cfg80211_bitrate_mask *mask)
+#else
 static int wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 					      struct net_device *netdev,
 					      const u8 *peer,
 				       const struct cfg80211_bitrate_mask *mask)
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
