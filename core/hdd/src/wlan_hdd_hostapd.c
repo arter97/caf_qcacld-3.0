@@ -2060,10 +2060,27 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 	struct hdd_ap_ctx *ap_ctx;
 	uint8_t sta_cnt, sap_cnt;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct sap_context *sap_ctx;
+	bool ch_valid;
 
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	if (!sap_ctx) {
+		hdd_err("sap ctx is null");
+		return;
+	}
+
+	/*
+	 * During CSA, it might be possible that ch avoidance event to
+	 * avoid the sap frequency is received. So, check after CSA,
+	 * whether sap frequency is safe if not restart sap to a safe
+	 * channel.
+	 */
+	ch_valid =
+	wlansap_validate_channel_post_csa(hdd_ctx->mac_handle,
+					  sap_ctx);
 	if (ap_ctx->sap_context->csa_reason ==
-	    CSA_REASON_UNSAFE_CHANNEL)
+	    CSA_REASON_UNSAFE_CHANNEL || !ch_valid)
 		qdf_status = hdd_unsafe_channel_restart_sap(hdd_ctx);
 	else if (ap_ctx->sap_context->csa_reason == CSA_REASON_DCS)
 		qdf_status = hdd_dcs_hostapd_set_chan(
