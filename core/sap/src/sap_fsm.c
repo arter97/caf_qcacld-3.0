@@ -3679,22 +3679,6 @@ static void sap_check_and_update_vdev_ch_params(struct sap_context *sap_ctx)
 		  sap_ctx->ch_params.ch_width);
 }
 
-static qdf_freq_t sap_get_safe_channel_freq(struct sap_context *sap_ctx)
-{
-	qdf_freq_t freq;
-
-	freq = wlan_pre_cac_get_freq_before_pre_cac(sap_ctx->vdev);
-	if (!freq)
-		freq = wlansap_get_safe_channel_from_pcl_and_acs_range(
-								sap_ctx,
-								NULL);
-
-	sap_debug("new selected freq %d as target chan as current freq unsafe %d",
-		  freq, sap_ctx->chan_freq);
-
-	return freq;
-}
-
 /**
  * sap_fsm_send_csa_restart_req() - send csa start event
  * @mac_ctx: mac ctx
@@ -3737,21 +3721,10 @@ sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
 	return sme_csa_restart(mac_ctx, sap_ctx->sessionId);
 }
 
-/**
- * sap_fsm_validate_and_change_channel() - handle channel Avoid event event
- *                                         or channel list update during cac
- * @mac_ctx: global MAC context
- * @sap_ctx: SAP context
- *
- * Return: QDF_STATUS
- */
-static void sap_fsm_validate_and_change_channel(struct mac_context *mac_ctx,
-						struct sap_context *sap_ctx)
+bool wlansap_validate_channel_post_csa(mac_handle_t mac_handle,
+				       struct sap_context *sap_ctx)
 {
-	qdf_freq_t target_chan_freq;
-	struct ch_params ch_params = {0};
-	QDF_STATUS status;
-	enum phy_ch_width target_bw = sap_ctx->ch_params.ch_width;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
 	if (((!sap_ctx->acs_cfg || !sap_ctx->acs_cfg->acs_mode) &&
 	     (!policy_mgr_restrict_sap_on_unsafe_chan(mac_ctx->psoc) ||
@@ -3760,24 +3733,11 @@ static void sap_fsm_validate_and_change_channel(struct mac_context *mac_ctx,
 	    (policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, sap_ctx->chan_freq) &&
 	     !wlan_reg_is_disable_for_pwrmode(mac_ctx->pdev, sap_ctx->chan_freq,
 					      REG_CURRENT_PWR_MODE)))
-		return;
+		return true;
+	sap_debug("sap vdev %d on unsafe ch freq %d",
+		  sap_ctx->sessionId, sap_ctx->chan_freq);
 
-	/*
-	 * The selected channel is not safe channel. Hence,
-	 * change the sap channel to a safe channel.
-	 */
-	target_chan_freq = sap_get_safe_channel_freq(sap_ctx);
-	ch_params.ch_width = target_bw;
-	target_bw = wlansap_get_csa_chanwidth_from_phymode(
-			sap_ctx, target_chan_freq, &ch_params);
-	sap_debug("sap vdev %d change to safe ch freq %d bw %d from unsafe %d",
-		  sap_ctx->sessionId, target_chan_freq, target_bw,
-		  sap_ctx->chan_freq);
-	status = wlansap_set_channel_change_with_csa(
-			sap_ctx, target_chan_freq, target_bw, false);
-	if (QDF_IS_STATUS_ERROR(status))
-		sap_err("SAP set channel failed for freq: %d, bw: %d",
-			target_chan_freq, target_bw);
+	return false;
 }
 
 /**
@@ -3924,13 +3884,6 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 				wlansap_start_beacon_req(sap_ctx);
 			}
 		}
-		/*
-		 * During CSA, it might be possible that ch avoidance event to
-		 * avoid the sap frequency is received. So, check after CSA,
-		 * whether sap frequency is safe if not restart sap to a safe
-		 * channel.
-		 */
-		sap_fsm_validate_and_change_channel(mac_ctx, sap_ctx);
 	} else if (msg == eSAP_MAC_START_FAILS ||
 		 msg == eSAP_HDD_STOP_INFRA_BSS) {
 			qdf_status = sap_fsm_handle_start_failure(sap_ctx, msg,

@@ -3972,6 +3972,8 @@ static bool hdd_is_chan_switch_in_progress(void)
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_CHAN_SWITCH_IN_PROGRESS;
 	struct hdd_ap_ctx *ap_ctx;
 	struct wlan_hdd_link_info *link_info;
+	bool is_restart;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
@@ -3981,7 +3983,21 @@ static bool hdd_is_chan_switch_in_progress(void)
 
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
-			if (qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_OSIF_ID);
+			if (!vdev)
+				continue;
+			is_restart = false;
+			if (wlan_vdev_is_restart_progress(vdev) ==
+			    QDF_STATUS_SUCCESS) {
+				hdd_debug("vdev: %d restart in progress",
+					  wlan_vdev_get_id(vdev));
+				is_restart = true;
+			}
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+			if (is_restart ||
+			    qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
 				hdd_debug("channel switch progress for vdev_id %d",
 					  link_info->vdev_id);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
