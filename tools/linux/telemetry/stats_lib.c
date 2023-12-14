@@ -2291,7 +2291,7 @@ static int32_t build_child_sta_list(char *ifname,
 	cmd = QCA_NL80211_VENDOR_SUBCMD_SET_WIFI_CONFIGURATION;
 	wifi_cfg80211_send_generic_command(&g_sock_ctx.cfg80211_ctxt, cmd,
 					   QCA_NL80211_VENDOR_SUBCMD_LIST_STA,
-					   ifname, (char *)&buffer,
+					   ifname, MLO_INVALID_LINK_ID, (char *)&buffer,
 					   buffer.length);
 
 	free(buf);
