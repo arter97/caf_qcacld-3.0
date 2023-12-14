@@ -150,7 +150,7 @@ typedef struct sSirMbMsg {
 	 * NOTE: data[1] is not a place holder to store data
 	 * instead to dereference the message body.
 	 */
-	uint32_t data[1];
+	QDF_FLEX_ARRAY(uint32_t, data);
 } tSirMbMsg, *tpSirMbMsg;
 
 /**

@@ -1391,7 +1391,7 @@ void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
 	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
 	if (mac_id >= MAX_MAC) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
-		cp_stats_err("invalid mac_id %d", mac_id);
+		cp_stats_rl_err("invalid mac_id %d", mac_id);
 		return;
 	}
 

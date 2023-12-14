@@ -249,7 +249,7 @@ typedef struct sSirNeighborReportInd {
 	uint8_t measurement_idx;
 	uint16_t numNeighborReports;
 	tSirMacAddr bssId;      /* For the session. */
-	tSirNeighborBssDescription sNeighborBssDescription[1];
+	QDF_FLEX_ARRAY(tSirNeighborBssDescription, sNeighborBssDescription);
 } tSirNeighborReportInd, *tpSirNeighborReportInd;
 
 typedef struct eid_ext_info {

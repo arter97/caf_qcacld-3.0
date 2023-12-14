@@ -599,7 +599,7 @@ struct tdls_rx_mgmt_frame {
 	uint32_t vdev_id;
 	uint32_t frm_type;
 	uint32_t rx_rssi;
-	uint8_t buf[1];
+	QDF_FLEX_ARRAY(uint8_t, buf);
 };
 
 /**
@@ -1407,7 +1407,7 @@ struct tdls_send_mgmt_request {
 	struct qdf_mac_addr peer_mac;
 	enum wifi_traffic_ac ac;
 	/* Variable length. Dont add any field after this. */
-	uint8_t add_ie[1];
+	QDF_FLEX_ARRAY(uint8_t, add_ie);
 };
 
 /**

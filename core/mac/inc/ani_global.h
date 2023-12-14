@@ -588,7 +588,7 @@ struct mgmt_frm_reg_info {
 	uint16_t frameType;
 	uint16_t matchLen;
 	uint16_t sessionId;
-	uint8_t matchData[1];
+	QDF_FLEX_ARRAY(uint8_t, matchData);
 };
 
 typedef struct sRrmContext {
