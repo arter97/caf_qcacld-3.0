@@ -939,7 +939,7 @@ hdd_convert_phymode_to_80211mode(eCsrPhyMode mode);
 
 /**
  * hdd_send_update_owe_info_event - Send update OWE info event
- * @adapter: Pointer to adapter
+ * @link_info: Pointer to link info
  * @sta_addr: MAC address of peer STA
  * @owe_ie: OWE IE
  * @owe_ie_len: Length of OWE IE
@@ -950,15 +950,17 @@ hdd_convert_phymode_to_80211mode(eCsrPhyMode mode);
  */
 #if defined(CFG80211_EXTERNAL_DH_UPDATE_SUPPORT) || \
 (LINUX_VERSION_CODE > KERNEL_VERSION(5, 2, 0))
-void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
-				    uint8_t sta_addr[],
-				    uint8_t *owe_ie,
-				    uint32_t owe_ie_len);
+void
+hdd_send_update_owe_info_event(struct wlan_hdd_link_info *link_info,
+			       uint8_t sta_addr[],
+			       uint8_t *owe_ie,
+			       uint32_t owe_ie_len);
 #else
-static inline void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
-						  uint8_t sta_addr[],
-						  uint8_t *owe_ie,
-						  uint32_t owe_ie_len)
+static inline void
+hdd_send_update_owe_info_event(struct wlan_hdd_link_info *link_info,
+			       uint8_t sta_addr[],
+			       uint8_t *owe_ie,
+			       uint32_t owe_ie_len)
 {
 }
 #endif

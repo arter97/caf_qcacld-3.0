@@ -28669,7 +28669,7 @@ void hdd_set_rate_bw(struct rate_info *info, enum hdd_rate_info_bw hdd_bw)
 
 #ifdef WLAN_MLD_AP_OWE_INFO_SUPPORT
 static void
-hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
+hdd_ml_sap_owe_fill_ml_info(struct wlan_hdd_link_info *link_info,
 			    struct cfg80211_update_owe_info *owe_info,
 			    uint8_t *peer_mac)
 {
@@ -28677,8 +28677,9 @@ hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t *peer_mld_addr;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return;
 
@@ -28706,7 +28707,7 @@ hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
 }
 #elif defined(CFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT)
 static void
-hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
+hdd_ml_sap_owe_fill_ml_info(struct wlan_hdd_link_info *link_info,
 			    struct cfg80211_update_owe_info *owe_info,
 			    uint8_t *peer_mac)
 {
@@ -28714,8 +28715,9 @@ hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t *peer_mld_addr;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+	vdev = hdd_objmgr_get_vdev_by_user(link_info,
 					   WLAN_HDD_ID_OBJ_MGR);
 	if (!vdev)
 		return;
@@ -28744,26 +28746,27 @@ hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
 }
 #else
 static void
-hdd_ml_sap_owe_fill_ml_info(struct hdd_adapter *adapter,
+hdd_ml_sap_owe_fill_ml_info(struct wlan_hdd_link_info *link_info,
 			    struct cfg80211_update_owe_info *owe_info,
 			    uint8_t *peer_mac)
 {
 }
 #endif
 
-void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
+void hdd_send_update_owe_info_event(struct wlan_hdd_link_info *link_info,
 				    uint8_t sta_addr[],
 				    uint8_t *owe_ie,
 				    uint32_t owe_ie_len)
 {
 	struct cfg80211_update_owe_info owe_info;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct net_device *dev = adapter->dev;
 
 	hdd_enter_dev(dev);
 
 	qdf_mem_zero(&owe_info, sizeof(owe_info));
 	qdf_mem_copy(owe_info.peer, sta_addr, ETH_ALEN);
-	hdd_ml_sap_owe_fill_ml_info(adapter, &owe_info, sta_addr);
+	hdd_ml_sap_owe_fill_ml_info(link_info, &owe_info, sta_addr);
 	owe_info.ie = owe_ie;
 	owe_info.ie_len = owe_ie_len;
 

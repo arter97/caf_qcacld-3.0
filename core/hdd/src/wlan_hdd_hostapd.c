@@ -3203,10 +3203,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		break;
 	case eSAP_STA_ASSOC_IND:
 		if (sap_event->sapevt.sapAssocIndication.owe_ie) {
-			hdd_send_update_owe_info_event(adapter,
-			      sap_event->sapevt.sapAssocIndication.staMac.bytes,
-			      sap_event->sapevt.sapAssocIndication.owe_ie,
-			      sap_event->sapevt.sapAssocIndication.owe_ie_len);
+			hdd_send_update_owe_info_event(link_info,
+						       sap_event->sapevt.sapAssocIndication.staMac.bytes,
+						       sap_event->sapevt.sapAssocIndication.owe_ie,
+						       sap_event->sapevt.sapAssocIndication.owe_ie_len);
 			qdf_mem_free(
 				   sap_event->sapevt.sapAssocIndication.owe_ie);
 			sap_event->sapevt.sapAssocIndication.owe_ie = NULL;
