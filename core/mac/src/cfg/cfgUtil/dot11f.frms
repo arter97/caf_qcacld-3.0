@@ -2597,7 +2597,7 @@ IE transmit_power_env (EID_TRANSMIT_POWER_ENVELOPE)
                        ext_count: 4;
                        reserved: 4;
                }
-               max_tx_psd_power[8];
+               max_tx_psd_power[15];
        }
        ext_max_tx_power_reg_eirp (max_tx_pwr_interpret IS 2) {
                max_tx_power_for_320, 1;
@@ -2608,7 +2608,7 @@ IE transmit_power_env (EID_TRANSMIT_POWER_ENVELOPE)
                        ext_count: 4;
                        reserved: 4;
                }
-               max_tx_psd_power[8];
+               max_tx_psd_power[15];
        }
 
     };
