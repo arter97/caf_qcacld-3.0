@@ -1566,6 +1566,25 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id, uint8_t cc_mode);
 
 /**
+ * policy_mgr_handle_go_sap_fav_channel() - Get preferred force SCC
+ * channel frequency using favorite mandatory channel list for GO+SAP
+ * concurrency
+ * @psoc: Pointer to Psoc
+ * @vdev_id: vdev id
+ * @sap_ch_freq: sap/go channel starting channel frequency
+ * @intf_ch_freq: prefer force scc frequency
+ *
+ * SAP should move to 2.4 GHz if P2P GO is on 5G/6G. SAP should move to user
+ * configured channel after P2P GO is stopped
+ *
+ * Return: QDF_STATUS_SUCCESS if a valid favorite SAP channel is found
+ */
+QDF_STATUS
+policy_mgr_handle_go_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, qdf_freq_t sap_ch_freq,
+				     qdf_freq_t *intf_ch_freq);
+
+/**
  * policy_mgr_nan_sap_pre_enable_conc_check() - Check if NAN+SAP SCC is
  *                                              allowed in given ch
  * @psoc: PSOC object information
@@ -1887,7 +1906,7 @@ policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
  * @vdev_id: vdev id
  *
  * Based on vdev id ap profile set via vendor command is get and compared with
- * ht_ll_type AP type and is return true if profile set is throghput sensitive.
+ * ll_ht_type AP type and is return true if profile set is throghput sensitive.
  *
  * Return: true if it's present otherwise false
  */
@@ -4935,6 +4954,21 @@ policy_mgr_get_ml_sta_info_psoc(struct wlan_objmgr_psoc *psoc,
 void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * policy_mgr_handle_link_removal_on_standby() - Handle AP link removal for
+ * MLO STA standby links
+ * @vdev: objmgr vdev
+ * @reconfig_info: link reconfig info
+ *
+ * Handle link removal for ML STA standby links:
+ * Send force link command to target with link removal reason code
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_handle_link_removal_on_standby(struct wlan_objmgr_vdev *vdev,
+					  struct ml_rv_info *reconfig_info);
+
+/**
  * policy_mgr_is_mlo_sap_concurrency_allowed() - Check for mlo sap allowed
  *                                               concurrency combination
  * @psoc: PSOC object information
@@ -5349,7 +5383,7 @@ QDF_STATUS policy_mgr_get_sbs_cfg(struct wlan_objmgr_psoc *psoc, bool *sbs);
 qdf_freq_t policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_get_lt_ll_sap_freq()- Function to get LT LL sap freq if it's
+ * policy_mgr_get_ll_lt_sap_freq()- Function to get LT LL sap freq if it's
  * present
  * @psoc: PSOC object
  *
@@ -5360,22 +5394,23 @@ qdf_freq_t policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
  * Return: freq if it's LT LL SAP otherwise 0
  *
  */
-qdf_freq_t policy_mgr_get_lt_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
+qdf_freq_t policy_mgr_get_ll_lt_sap_freq(struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_get_ht_ll_sap_freq()- Function to get HT LL sap freq if it's
+ * policy_mgr_get_ll_ht_sap_freq()- Function to get LL HT sap freq if it's
  * present
  * @psoc: PSOC object
  *
  * Based on vdev id ap profile set via vendor command is get and compared with
- * ht_ll_type AP type and return freq for that SAP if profile set is throghput
+ * ll_ht_type AP type and return freq for that SAP if profile set is throghput
  * sensitive.
  *
  * Return: freq if it's HT LL SAP otherwise 0
  *
  */
-qdf_freq_t policy_mgr_get_ht_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
+qdf_freq_t policy_mgr_get_ll_ht_sap_freq(struct wlan_objmgr_psoc *psoc);
 
+#ifndef WLAN_FEATURE_LL_LT_SAP
 /**
  * policy_mgr_is_ll_sap_concurrency_valid() - Function to check whether
  * low latency SAP + STA/SAP/GC/GO concurrency allowed or not
@@ -5389,7 +5424,15 @@ qdf_freq_t policy_mgr_get_ht_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
 					    qdf_freq_t freq,
 					    enum policy_mgr_con_mode mode);
-
+#else
+static inline
+bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
+					    qdf_freq_t freq,
+					    enum policy_mgr_con_mode mode)
+{
+	return true;
+}
+#endif
 /**
  * policy_mgr_update_indoor_concurrency() - Function to update the indoor
  * concurrency related regulatory changes
@@ -5649,4 +5692,23 @@ void
 policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t *intf_ch_freq,
 				  uint8_t sap_vdev_id);
+
+#ifdef WLAN_FEATURE_LL_LT_SAP
+/**
+ * policy_mgr_get_pcl_ch_list_for_ll_sap() - Get PCL channel list for LL_LT_SAP
+ * @psoc: psoc object
+ * @pcl: pcl list
+ * @vdev_id: vdev id
+ * @info: pointer to connection_info structure
+ * @connection_count: total number of existing connection present
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
+					struct wlan_objmgr_psoc *psoc,
+					struct policy_mgr_pcl_list *pcl,
+					uint8_t vdev_id,
+					struct connection_info *info,
+					uint8_t *connection_count);
+#endif
 #endif /* __WLAN_POLICY_MGR_API_H */

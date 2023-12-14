@@ -1001,7 +1001,7 @@ ucfg_nan_disable_ndi(struct wlan_objmgr_psoc *psoc, uint32_t ndi_vdev_id)
 	int err;
 	static const struct osif_request_params params = {
 		.priv_size = 0,
-		.timeout_ms = 1000,
+		.timeout_ms = 2000,
 	};
 
 	if (!ucfg_is_ndi_dbs_supported(psoc))
@@ -1056,21 +1056,16 @@ ucfg_nan_disable_ndi(struct wlan_objmgr_psoc *psoc, uint32_t ndi_vdev_id)
 	if (err) {
 		nan_err("Disabling NDP's timed out waiting for confirmation");
 		status = QDF_STATUS_E_TIMEOUT;
-		goto cleanup;
 	}
 
+cleanup:
 	/*
 	 * Host can assume NDP delete is successful and
 	 * remove policy mgr entry
 	 */
 	policy_mgr_decr_session_set_pcl(psoc, QDF_NDI_MODE, ndi_vdev_id);
 
-cleanup:
-	/* Restore original NDI state in case of failure */
-	if (QDF_IS_STATUS_SUCCESS(status))
-		ucfg_nan_set_ndi_state(ndi_vdev, NAN_DATA_DISCONNECTED_STATE);
-	else
-		ucfg_nan_set_ndi_state(ndi_vdev, curr_ndi_state);
+	ucfg_nan_set_ndi_state(ndi_vdev, NAN_DATA_DISCONNECTED_STATE);
 
 	if (request)
 		osif_request_put(request);

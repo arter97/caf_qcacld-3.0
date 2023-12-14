@@ -701,7 +701,6 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		}
 
 		if (session->lim_non_ecsa_cap_num &&
-		    WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq) &&
 		    !is_6ghz_chsw)
 			populate_channel_switch_ann(mac_ctx, bcn_2, session);
 	}
@@ -928,7 +927,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		}
 	}
 
-	if (session->vhtCapability || session->gLimOperatingMode.present) {
+	if (session->vhtCapability && session->gLimOperatingMode.present) {
 		populate_dot11f_operating_mode(mac_ctx, &bcn_2->OperatingMode,
 					       session);
 		lim_strip_ie(mac_ctx, addn_ie, &addn_ielen,

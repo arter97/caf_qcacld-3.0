@@ -36,18 +36,27 @@
 bool ll_lt_sap_is_supported(void);
 
 /**
- * ll_lt_sap_get_sorted_user_config_acs_ch_list() - API to get sorted user
- * configured channel list
+ * ll_lt_sap_get_freq_list() - API to get frequency list for LL_LT_SAP
  * @psoc: Pointer to psoc object
+ * @freq_list: Pointer to wlan_ll_lt_sap_freq_list structure
  * @vdev_id: Vdev Id
- * @ch_info: Pointer to ch_info
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ll_lt_sap_get_sorted_user_config_acs_ch_list(
-					struct wlan_objmgr_psoc *psoc,
-					uint8_t vdev_id,
-					struct sap_sel_ch_info *ch_info);
+QDF_STATUS ll_lt_sap_get_freq_list(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_ll_lt_sap_freq_list *freq_list,
+				   uint8_t vdev_id);
+
+/**
+ * ll_lt_sap_get_valid_freq() - API to get valid frequency for LL_LT_SAP
+ * @psoc: Pointer to psoc object
+ * @vdev_id: Vdev Id of ll_lt_sap
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id);
+
 /*
  * ll_lt_sap_init() - Initialize ll_lt_sap infrastructure
  * @vdev: Pointer to vdev
@@ -65,24 +74,4 @@ QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev);
  * else error code
  */
 QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ll_lt_sap_switch_bearer_to_ble() - Switch audio transport to BLE
- * @psoc: Pointer to psoc
- * @bs_request: Pointer to bearer switch request
- * Return: QDF_STATUS_SUCCESS on successful bearer switch else failure
- */
-QDF_STATUS
-ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
-			       struct wlan_bearer_switch_request *bs_request);
-
-/**
- * ll_lt_sap_request_for_audio_transport_switch() - Handls audio transport
- * switch request from userspace
- * @req_type: requested transport switch type
- *
- * Return: True/False
- */
-QDF_STATUS ll_lt_sap_request_for_audio_transport_switch(
-					enum bearer_switch_req_type req_type);
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

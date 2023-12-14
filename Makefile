@@ -12,8 +12,14 @@ KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
 M ?= $(shell pwd)
 
 ifeq ($(WLAN_ROOT),)
+
+ifeq ($(WLAN_ROOT_MODULE_SOURCE_PATH),)
 # WLAN_ROOT must contain an absolute path (i.e. not a relative path)
 KBUILD_OPTIONS := WLAN_ROOT=$(shell cd $(KERNEL_SRC); readlink -e $(M))
+else
+# Honor what is passed from Make variable $(M), which could be a relative path.
+KBUILD_OPTIONS := WLAN_ROOT=$(M)
+endif
 
 # MODNAME should be qca_cld3_wlan for helium based wear target
 ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))

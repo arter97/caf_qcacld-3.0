@@ -7371,9 +7371,12 @@ hdd_vdev_configure_max_tdls_params(struct wlan_objmgr_psoc *psoc,
 	uint16_t max_peer_count;
 	bool target_bigtk_support = false;
 
-	/* Max peer can be tdls peers + self peer + bss peer */
+	/*
+	 * Max peer can be tdls peers + self peer + bss peer +
+	 * temp bss peer for roaming create/delete peer at same time
+	 */
 	max_peer_count = cfg_tdls_get_max_peer_count(psoc);
-	max_peer_count += 2;
+	max_peer_count += 3;
 	wlan_vdev_set_max_peer_count(vdev, max_peer_count);
 
 	ucfg_mlme_get_bigtk_support(psoc, &target_bigtk_support);
@@ -16218,8 +16221,9 @@ static void hdd_v2_flow_pool_map(int vdev_id)
 		return;
 	}
 
-	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
-		hdd_info("Link switch ongoing, do not invoke flow pool map");
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
+	    policy_mgr_is_set_link_in_progress(wlan_vdev_get_psoc(vdev))) {
+		hdd_info_rl("Link switch/set_link is ongoing, do not invoke flow pool map");
 		goto release_ref;
 	}
 

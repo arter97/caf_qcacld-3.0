@@ -996,9 +996,9 @@ static bool is_mcc_preferred(struct sap_context *sap_context,
 }
 
 /**
- * sap_process_force_scc_with_go_start - Check GO force SCC or not
- * psoc: psoc object
- * sap_context: sap_context
+ * sap_process_force_scc_with_go_start() - Check GO force SCC or not
+ * @psoc: psoc object
+ * @sap_context: sap_context
  *
  * This function checks the current SAP MCC or not with the GO's home channel.
  * If it is, skip the GO's force SCC. The SAP will do force SCC after
@@ -1014,6 +1014,10 @@ sap_process_force_scc_with_go_start(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_con_mode existing_vdev_mode = PM_MAX_NUM_OF_MODE;
 	uint32_t con_freq;
 	enum phy_ch_width ch_width;
+
+	if (sap_context->cc_switch_mode ==
+			QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)
+		return false;
 
 	existing_vdev_id =
 		policy_mgr_fetch_existing_con_info(psoc,
@@ -1033,9 +1037,9 @@ sap_process_force_scc_with_go_start(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_P2P_P2P_STA
 /**
- * sap_set_forcescc_required - set force scc flag for provided p2p go vdev
+ * sap_set_forcescc_required() - set force scc flag for provided p2p go vdev
  *
- * vdev_id - vdev_id for which flag needs to be set
+ * @vdev_id: vdev_id for which flag needs to be set
  *
  * Return: None
  */
@@ -1063,11 +1067,11 @@ static void sap_set_forcescc_required(uint8_t vdev_id)
 }
 
 /**
- * sap_process_liberal_scc_for_go - based on existing connections this
+ * sap_process_liberal_scc_for_go() - based on existing connections this
  * function decides current go should start on provided channel or not and
  * sets force scc required bit for existing GO.
  *
- * sap_context: sap_context
+ * @sap_context: sap_context
  *
  * Return: bool
  */
@@ -1331,14 +1335,14 @@ static void sap_sort_freq_list(struct chan_list *list,
 }
 
 /**
- * sap_acs_scan_freq_list_optimize - optimize the ACS scan freq list based
+ * sap_acs_scan_freq_list_optimize() - optimize the ACS scan freq list based
  * on when last scan was performed on particular frequency. If last scan
  * performed on particular frequency is less than configured last_scan_ageout
  * time, then skip that frequency from ACS scan freq list.
  *
- * sap_ctx: sap context
- * list: ACS scan frequency list
- * ch_count: number of frequency in list
+ * @sap_ctx: sap context
+ * @list: ACS scan frequency list
+ * @ch_count: number of frequency in list
  *
  * Return: None
  */
@@ -1386,7 +1390,7 @@ static void sap_acs_scan_freq_list_optimize(struct sap_context *sap_ctx,
 
 #ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 /**
- * sap_reset_clean_freq_array(): clear freq array that contains info
+ * sap_reset_clean_freq_array() - clear freq array that contains info
  * channel is free or not
  * @sap_context: sap context
  *
@@ -1404,14 +1408,14 @@ void sap_reset_clean_freq_array(struct sap_context *sap_context)
 #endif
 
 /**
- * wlansap_set_aux_scan_ctrl_ext_flag() – update aux scan policy
+ * wlansap_set_aux_scan_ctrl_ext_flag() - update aux scan policy
  * @req: pointer to scan request
  *
- * Set aux scan bits in scan_ctrl_ext_flag value depending on scan type.
+ * Set aux scan bits in scan_ctrl_ext_flag value depending on scan type
  *
  * Return: None
  */
-static void wlansap_set_aux_scan_ctrl_ext_flag(struct scan_start_request  *req)
+static void wlansap_set_aux_scan_ctrl_ext_flag(struct scan_start_request *req)
 {
 	sap_debug("Set Reliable Scan Flag");
 	req->scan_req.scan_ctrl_flags_ext |=
@@ -2169,6 +2173,7 @@ bool find_ch_freq_in_radar_hist(struct dfs_radar_history *radar_result,
 
 /**
  * sap_append_cac_history() - Add CAC history to list
+ * @mac_ctx: pointer to mac context
  * @radar_result: radar history buffer
  * @idx: current radar history element number
  * @max_elems: max elements number of radar history buffer.
@@ -3090,7 +3095,7 @@ QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 /**
  * sap_validate_dfs_nol() - Validate SAP channel with NOL list
  * @sap_ctx: SAP context
- * @sap_ctx: MAC context
+ * @mac_ctx: pointer to mac context
  *
  * Function will be called to validate SAP channel and bonded sub channels
  * included in DFS NOL or not.
@@ -3727,6 +3732,7 @@ sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
  * sap_fsm_validate_and_change_channel() - handle channel Avoid event event
  *                                         or channel list update during cac
  * @mac_ctx: global MAC context
+ * @sap_ctx: SAP context
  *
  * Return: QDF_STATUS
  */
@@ -4046,6 +4052,7 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
  * @sap_ctx: SAP context
  * @sap_event: SAP event buffer
  * @mac_ctx: global MAC context
+ * @mac_handle: Opaque handle to the global MAC context
  *
  * This function is called for state transition from "SAP_STOPPING"
  *
@@ -4960,7 +4967,7 @@ bool is_concurrent_sap_ready_for_channel_change(mac_handle_t mac_handle,
 /**
  * sap_is_conc_sap_doing_scc_dfs() - check if conc SAPs are doing SCC DFS
  * @mac_handle: Opaque handle to the global MAC context
- * @sap_context: current SAP persona's channel
+ * @given_sapctx: current SAP persona's channel
  *
  * If provided SAP's channel is DFS then Loop through each SAP or GO persona and
  * check if other beaconing entity's channel is same DFS channel. If they are

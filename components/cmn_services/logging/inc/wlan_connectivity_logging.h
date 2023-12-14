@@ -346,6 +346,7 @@ struct wlan_diag_mlo_cmn_info {
  * struct wlan_diag_mlo_setup - MLO setup structure
  * @diag_cmn: Common diag info
  * @version: structure version
+ * @num_links: Number of links associated for MLO setup
  * @reserved: Reserved field
  * @status: status code of the link. Non-zero value when link is rejected
  * @mlo_cmn_info: MLO common info
@@ -353,7 +354,8 @@ struct wlan_diag_mlo_cmn_info {
 struct wlan_diag_mlo_setup {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint32_t version:8;
-	uint32_t reserved:24;
+	uint32_t num_links:8;
+	uint32_t reserved:16;
 	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
 } qdf_packed;
 
@@ -379,13 +381,15 @@ struct wlan_diag_mlo_reconfig {
  * struct wlan_diag_mlo_t2lm_status - MLO T2LM status diag event structure
  * @diag_cmn: Common diag info
  * @version: structure version
+ * @num_links: Number of links associated for T2LM status
  * @reserved: Reserved field
  * @mlo_cmn_info: MLO common info
  */
 struct wlan_diag_mlo_t2lm_status {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint32_t version:8;
-	uint32_t reserved:24;
+	uint32_t num_links:8;
+	uint32_t reserved:16;
 	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
 } qdf_packed;
 
@@ -593,6 +597,7 @@ struct wlan_diag_roam_scan_done {
  * @diag_cmn: Common diag info
  * @version: Structure Version
  * @is_roam_successful: True if roamed successfully or false if roaming failed
+ * @is_mlo: Indicates whether the current connection is a MLO connection
  * @reserved: Reserved
  * @roam_fail_reason: Roam failure reason code defined in enum
  * wlan_roam_failure_reason_code
@@ -601,7 +606,8 @@ struct wlan_diag_roam_result {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint8_t version;
 	uint8_t is_roam_successful:1;
-	uint8_t reserved:7;
+	uint8_t is_mlo:1;
+	uint8_t reserved:6;
 	uint16_t roam_fail_reason;
 } qdf_packed;
 

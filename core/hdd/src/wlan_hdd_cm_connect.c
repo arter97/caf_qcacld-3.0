@@ -1684,7 +1684,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			 * In case of roaming from 3 Link or 2 Link to 1 link
 			 * AP, then reset the STA context for other links
 			 */
-			hdd_adapter_reset_station_ctx(adapter);
+			if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+				hdd_adapter_reset_station_ctx(adapter);
 		}
 		hdd_debug("is_roam_offload %d, is_roam %d, is_auth_required %d",
 			  is_roam_offload, is_roam, is_auth_required);

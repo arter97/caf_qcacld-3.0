@@ -5774,6 +5774,7 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U8},
 	[QCA_ATTR_ROAM_CONTROL_FULL_SCAN_6GHZ_ONLY_ON_PRIOR_DISCOVERY] = {
 			.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_CONNECTED_HIGH_RSSI_OFFSET] = {.type = NLA_U8},
 };
 
 /**
@@ -6549,6 +6550,31 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 							     vdev_id, value);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("Fail to decide inclusion of 6 GHz channels");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CONNECTED_HIGH_RSSI_OFFSET];
+	if (attr) {
+		value = nla_get_u8(attr);
+		if (!cfg_in_range(CFG_LFR_ROAM_SCAN_HI_RSSI_DELTA, value)) {
+			hdd_err("High RSSI offset value %d is out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("%s roam scan high RSSI with offset: %d for vdev %d",
+			  value ? "Enable" : "Disable", value, vdev_id);
+
+		if (!value &&
+		    !wlan_cm_get_roam_scan_high_rssi_offset(hdd_ctx->psoc)) {
+			hdd_debug("Roam scan high RSSI is already disabled");
+			return -EINVAL;
+		}
+
+		status = ucfg_cm_set_roam_scan_high_rssi_offset(hdd_ctx->psoc,
+								vdev_id, value);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Fail to set roam scan high RSSI offset for vdev %d",
+				vdev_id);
 	}
 
 	return qdf_status_to_os_return(status);
@@ -11698,6 +11724,27 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 
 #ifdef WLAN_FEATURE_11BE
 /**
+ * hdd_set_eht_emlsr_capability() - Set EMLSR capability for EHT STA
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int
+hdd_set_eht_emlsr_capability(struct wlan_hdd_link_info *link_info,
+			     const struct nlattr *attr)
+{
+	uint8_t cfg_val;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	cfg_val = nla_get_u8(attr);
+	hdd_debug("EMLSR capable: %d", cfg_val);
+	hdd_test_config_emlsr_mode(hdd_ctx, cfg_val);
+
+	return 0;
+}
+
+/**
  * hdd_set_eht_max_simultaneous_links() - Set EHT maximum number of
  * simultaneous links
  * @link_info: Link info pointer in HDD adapter
@@ -11799,6 +11846,13 @@ static int hdd_set_eht_mlo_mode(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 #else
+static inline int
+hdd_set_eht_emlsr_capability(struct wlan_hdd_link_info *link_info,
+			     const struct nlattr *attr)
+{
+	return 0;
+}
+
 static inline int
 hdd_set_eht_max_simultaneous_links(struct wlan_hdd_link_info *link_info,
 				   const struct nlattr *attr)
@@ -12159,6 +12213,8 @@ static const struct independent_setters independent_setters[] = {
 
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE,
 	 hdd_set_wfc_state},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_EML_CAPABILITY,
+	 hdd_set_eht_emlsr_capability},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_MLO_MAX_SIMULTANEOUS_LINKS,
 	 hdd_set_eht_max_simultaneous_links},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EPCS_CAPABILITY,
@@ -14151,9 +14207,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		} else {
 			hdd_update_channel_width(
 					link_info, eHT_CHANNEL_WIDTH_160MHZ,
-					link_id,
 					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE,
-					false);
+					link_id, false);
 			hdd_set_tx_stbc(link_info, 1);
 			hdd_set_11ax_rate(adapter, 0xFFFF, NULL);
 			status = wma_cli_set_command(
@@ -21773,6 +21828,65 @@ static void wlan_hdd_set_mfp_optional(struct wiphy *wiphy)
 }
 #endif
 
+/**
+ * wlan_hdd_iface_debug_string() - This API converts IFACE type to string
+ * @iface_type: interface type
+ *
+ * Return: name string
+ */
+static char *wlan_hdd_iface_debug_string(uint32_t iface_type)
+{
+	if (iface_type == BIT(NL80211_IFTYPE_STATION))
+		return "STA";
+	else if (iface_type == BIT(NL80211_IFTYPE_AP))
+		return "SAP";
+	else if (iface_type == (BIT(NL80211_IFTYPE_P2P_CLIENT) |
+		 BIT(NL80211_IFTYPE_P2P_GO)))
+		return "(P2P_CLI or P2P_GO)";
+	else if (iface_type == BIT(NL80211_IFTYPE_P2P_CLIENT))
+		return "P2P_CLIENT";
+	else if (iface_type == BIT(NL80211_IFTYPE_P2P_GO))
+		return "P2P_GO";
+	else if (iface_type == BIT(NL80211_IFTYPE_NAN))
+		return "NAN";
+	else if (iface_type == BIT(NL80211_IFTYPE_MONITOR))
+		return "MONITOR";
+
+	return "invalid iface";
+}
+
+#define IFACE_DUMP_SIZE 100
+/**
+ * wlan_hdd_dump_iface_combinations() - This API prints the IFACE combinations
+ * @num: number of combinations
+ * @combination: pointer to iface combination structure
+ *
+ * Return: void
+ */
+static void wlan_hdd_dump_iface_combinations(uint32_t num,
+			const struct ieee80211_iface_combination *combination)
+{
+	int i, j;
+	char buf[IFACE_DUMP_SIZE] = {0};
+	uint8_t len = 0;
+
+	hdd_debug("max combinations %d", num);
+
+	for (i = 0; i < num; i++) {
+		for (j = 0; j < combination[i].max_interfaces; j++) {
+			if (combination[i].limits[j].types)
+				len += qdf_scnprintf(buf + len,
+						     IFACE_DUMP_SIZE - len,
+						     " + %s",
+					wlan_hdd_iface_debug_string(
+					combination[i].limits[j].types));
+		}
+
+		hdd_nofl_debug("iface combination[%d]: %s", i, buf);
+		len = 0;
+	}
+}
+
 /*
  * In this function, wiphy structure is updated after QDF
  * initialization. In wlan_hdd_cfg80211_init, only the
@@ -21868,6 +21982,9 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 		}
 
 		wiphy->n_iface_combinations = iface_num;
+
+		wlan_hdd_dump_iface_combinations(wiphy->n_iface_combinations,
+						 wiphy->iface_combinations);
 	}
 
 	mac_spoofing_enabled = ucfg_scan_is_mac_spoofing_enabled(hdd_ctx->psoc);
@@ -28640,7 +28757,7 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 			nss = 0;
 			if (band == NL80211_BAND_5GHZ)
 				rate_index += 4;
-			if (rate_index >= 0 && rate_index < 4)
+			if (rate_index < 4)
 				bit_rate = hdd_assemble_rate_code(
 					WMI_RATE_PREAMBLE_CCK, nss,
 					hdd_legacy_rates[rate_index].hw_value);

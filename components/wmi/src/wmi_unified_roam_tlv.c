@@ -224,6 +224,7 @@ static QDF_STATUS send_roam_scan_offload_rssi_thresh_cmd_tlv(
 	rssi_threshold_fp->hirssi_upper_bound = roam_req->hi_rssi_scan_rssi_ub;
 	rssi_threshold_fp->rssi_thresh_offset_5g =
 		roam_req->rssi_thresh_offset_5g;
+	rssi_threshold_fp->flags = roam_req->flags;
 
 	buf_ptr += sizeof(wmi_roam_scan_rssi_threshold_fixed_param);
 	WMITLV_SET_HDR(buf_ptr,
@@ -3016,18 +3017,14 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 {
 	QDF_STATUS status;
 	uint8_t vdev_id = stats_info->vdev_id;
-	uint8_t band;
 
 	status = wmi_unified_extract_roam_scan_stats(
 			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
 
-	band = stats_info->scan[0].band;
-
 	status = wmi_unified_extract_roam_11kv_stats(
-			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0,
-			band);
+			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Roam 11kv stats extract failed vdev %d", vdev_id);
 
@@ -3065,7 +3062,7 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	struct roam_msg_info *roam_msg_info = NULL;
 	uint8_t vdev_id, i, num_btm = 0, num_frames = 0;
 	uint8_t num_tlv = 0, num_chan = 0, num_ap = 0, num_rpt = 0;
-	uint8_t num_trigger_reason = 0, band;
+	uint8_t num_trigger_reason = 0;
 	uint32_t rem_len;
 	QDF_STATUS status;
 
@@ -3254,14 +3251,12 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 			}
 		}
 
-		band = stats_info->scan[i].band;
-
 		/* BTM req/resp or Neighbor report/response info */
 		status = wmi_unified_extract_roam_11kv_stats(
 				      wmi_handle,
 				      evt_buf,
 				      &stats_info->data_11kv[i],
-				      i, num_rpt, band);
+				      i, num_rpt);
 		if (QDF_IS_STATUS_ERROR(status))
 			wmi_debug_rl("Roam 11kv stats extract fail vdev %d iter %d",
 				     vdev_id, i);
@@ -3842,7 +3837,7 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 	struct wlan_crypto_keys *all_keys;
 	struct wlan_crypto_key *dst_key, *pairwise;
 	struct wlan_crypto_key *key_alloc_buf[WMI_NUM_KEYS_ALLOCATED];
-	bool flush_keybuf;
+	bool flush_keybuf = true;
 	uint8_t total_num_tlv,  j = 0, k = 0;
 	uint8_t count = 0, total_links = 0, dst_key_count = 0;
 	uint8_t igtk_idx = 0, bigtk_idx = 0;
@@ -3873,7 +3868,6 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 	for (k = 0; k < WMI_NUM_KEYS_ALLOCATED; k++) {
 		key_alloc_buf[k] = qdf_mem_malloc(sizeof(*dst_key));
 		if (!key_alloc_buf[k]) {
-			flush_keybuf = true;
 			status = QDF_STATUS_E_NOMEM;
 			goto free_entries;
 		}
@@ -3934,7 +3928,6 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 		if (!is_valid_keyix(ml_keys->key_ix)) {
 			wmi_err_rl("invalid key index:%d", ml_keys->key_ix);
 			status = QDF_STATUS_E_INVAL;
-			flush_keybuf = true;
 			goto free_entries;
 		}
 
@@ -3946,12 +3939,12 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 				wmi_err_rl("Received key_len as 0 for tlv:%d",
 					   count);
 				status = QDF_STATUS_E_INVAL;
-				flush_keybuf = true;
 				goto free_entries;
 			}
 
 			if (ml_keys->key_flags & LTF_USAGE) {
-				struct wlan_crypto_ltf_keyseed_data key_seed;
+				struct wlan_crypto_ltf_keyseed_data key_seed
+					= {0};
 				uint8_t key_seed_len;
 
 				if (ml_keys->key_len >
@@ -4137,7 +4130,7 @@ free_keys:
 			continue;
 
 		wmi_debug("Free key allocated at idx:%d", k);
-		qdf_mem_zero(key_alloc_buf[k], sizeof(key_alloc_buf[k]));
+		qdf_mem_zero(key_alloc_buf[k], sizeof(*key_alloc_buf[k]));
 		qdf_mem_free(key_alloc_buf[k]);
 	}
 

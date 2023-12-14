@@ -1310,6 +1310,11 @@ wlan_hdd_connectivity_fail_event(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 		return;
 
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
+	     wlan_vdev_mlme_is_mlo_link_vdev(vdev)))
+		return;
+
 	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
 
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();

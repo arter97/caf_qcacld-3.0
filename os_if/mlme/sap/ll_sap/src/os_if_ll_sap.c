@@ -93,16 +93,16 @@ osif_convert_audio_transport_switch_status_type_from_qca_type
 }
 
 /**
- * wlan_osif_send_audio_transport_switch_req_event() - Send audio transport
- * switch event
+ * wlan_osif_send_audio_transport_switch_req() - Send audio transport
+ * switch request
  * @vdev: pointer to vdev structure.
  * @req_type: Request type.
  *
  * Return: None.
  */
-static void wlan_osif_send_audio_transport_switch_req_event(
-					struct wlan_objmgr_vdev *vdev,
-					enum bearer_switch_req_type req_type)
+static void
+wlan_osif_send_audio_transport_switch_req(struct wlan_objmgr_vdev *vdev,
+					  enum bearer_switch_req_type req_type)
 {
 	struct sk_buff *vendor_event;
 	struct wireless_dev *wdev;
@@ -199,7 +199,7 @@ QDF_STATUS osif_ll_lt_sap_deliver_audio_transport_switch_resp(
 
 static struct ll_sap_ops ll_sap_global_ops = {
 	.ll_sap_send_audio_transport_switch_req_cb =
-		wlan_osif_send_audio_transport_switch_req_event,
+		wlan_osif_send_audio_transport_switch_req,
 };
 
 QDF_STATUS osif_ll_sap_register_cb(void)

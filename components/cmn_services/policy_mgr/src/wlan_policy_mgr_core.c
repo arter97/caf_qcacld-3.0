@@ -4124,7 +4124,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_handle_sta_sap_fav_channel() - Get preferred force SCC
- * channel frequency using favorite mandatory channel list
+ * channel frequency using favorite mandatory channel list for STA+SAP
+ * concurrency
  * @psoc: Pointer to Psoc
  * @pm_ctx: pm ctx
  * @vdev_id: vdev id
@@ -4201,6 +4202,101 @@ policy_mgr_handle_sta_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
+QDF_STATUS
+policy_mgr_handle_go_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, qdf_freq_t sap_ch_freq,
+				     qdf_freq_t *intf_ch_freq)
+{
+	QDF_STATUS status;
+	uint8_t go_count;
+	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct policy_mgr_pcl_list pcl;
+	uint32_t i;
+
+	go_count = policy_mgr_get_mode_specific_conn_info(psoc,
+							  op_ch_freq_list,
+							  vdev_id_list,
+							  PM_P2P_GO_MODE);
+	if (!go_count)
+		return QDF_STATUS_E_FAILURE;
+
+	/* According to requirement, SAP should move to 2.4 GHz if P2P GO is
+	 * on 5G/6G.
+	 */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[0]) ||
+	    WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq))
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mem_zero(&pcl, sizeof(pcl));
+	status = policy_mgr_get_pcl_for_existing_conn(
+			psoc, PM_SAP_MODE, pcl.pcl_list, &pcl.pcl_len,
+			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list),
+			false, vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Unable to get PCL for SAP");
+		return status;
+	}
+
+	for (i = 0; i < pcl.pcl_len; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(pcl.pcl_list[i])) {
+			*intf_ch_freq = pcl.pcl_list[i];
+			policy_mgr_debug("sap move to %d because GO on %d",
+					 *intf_ch_freq, op_ch_freq_list[0]);
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * policy_mgr_handle_sap_fav_channel() - Get preferred force SCC
+ * channel frequency using favorite mandatory channel list
+ * @psoc: Pointer to Psoc
+ * @pm_ctx: pm ctx
+ * @vdev_id: vdev id
+ * @intf_ch_freq: prefer force scc frequency
+ * @sap_ch_freq: sap/go channel starting channel frequency
+ * @acs_band: acs band
+ *
+ * Return: QDF_STATUS_SUCCESS if a valid favorite mandatory force scc channel
+ * is found.
+ */
+static QDF_STATUS
+policy_mgr_handle_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
+				  struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  uint8_t vdev_id, qdf_freq_t sap_ch_freq,
+				  qdf_freq_t *intf_ch_freq,
+				  uint32_t acs_band)
+{
+	QDF_STATUS status;
+	uint8_t sta_count, go_count;
+
+	go_count = policy_mgr_mode_specific_connection_count(psoc,
+							     PM_P2P_GO_MODE,
+							     NULL);
+	if (go_count) {
+		status = policy_mgr_handle_go_sap_fav_channel(
+					psoc, vdev_id,
+					sap_ch_freq, intf_ch_freq);
+		if (QDF_IS_STATUS_SUCCESS(status) &&
+		    *intf_ch_freq && *intf_ch_freq != sap_ch_freq)
+			return QDF_STATUS_SUCCESS;
+	}
+
+	sta_count = policy_mgr_mode_specific_connection_count(psoc,
+							      PM_STA_MODE,
+							      NULL);
+	if (sta_count && sta_count < 2)
+		return policy_mgr_handle_sta_sap_fav_channel(
+					psoc, pm_ctx, vdev_id,
+					sap_ch_freq, intf_ch_freq,
+					acs_band);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t *intf_ch_freq,
 				  qdf_freq_t sap_ch_freq,
@@ -4236,11 +4332,11 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_debug("acs_band: %d", acs_band);
 	}
 
-	/* Handle STA + SAP mandaory freq cases */
-	if (sta_count && sta_count < 2 &&
-	    cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
-		status = policy_mgr_handle_sta_sap_fav_channel(psoc, pm_ctx,
-				vdev_id, sap_ch_freq, intf_ch_freq, acs_band);
+	/* Handle STA/P2P + SAP mandaory freq cases */
+	if (cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
+		status = policy_mgr_handle_sap_fav_channel(
+				psoc, pm_ctx, vdev_id, sap_ch_freq,
+				intf_ch_freq, acs_band);
 		if (QDF_IS_STATUS_SUCCESS(status))
 			return;
 		policy_mgr_debug("no mandatory channels (%d, %d)", sap_ch_freq,

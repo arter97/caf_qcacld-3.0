@@ -763,6 +763,58 @@
 
 /*
  * <ini>
+ * g_action_oui_enable_cts_2_self - Used to enable CTS2SELF for specified APs
+ *
+ * Default OUIs: (All values in Hex)
+ * OUI 1: 000C43
+ * OUI data Len: 04
+ * OUI Data : 07000000
+ * OUI data Mask: F0 - 11110000
+ * Info Mask : 21 - 0010 0001 Check for OUI and Band
+ * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
+ *
+ * OUI 2 : 000C43
+ * OUI data Len : 04
+ * OUI Data : 03000000
+ * OUI data Mask: F0 - 11110000
+ * Info Mask : 21 - 0010 0001 Check for OUI and Band
+ * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
+ *
+ * OUI 3 : 8CFDF0
+ * OUI data Len : 05
+ * OUI Data : 0101020100
+ * OUI data Mask: F8 - 11111000
+ * Info Mask : 21 - 0010 0001 Check for OUI and Band
+ * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
+ *
+ * OUI 4 : 8CFDF0
+ * OUI data Len : 05
+ * OUI Data : 0109020300
+ * OUI data Mask: F8 - 11111000
+ * Info Mask : 21 - 0010 0001 Check for OUI and Band
+ * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
+ *
+ * g_action_oui_enable_cts_2_self=000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0 8CFDF0 05 0101020100 F8 21 C0 8CFDF0 05 0109020300 F8 21 C0
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_ENABLE_CTS2SELF CFG_INI_STRING( \
+	"g_action_oui_enable_cts_2_self", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0 8CFDF0 05 0101020100 F8 21 C0 8CFDF0 05 0109020300 F8 21 C0", \
+	"Used to enable CTS2SELF frame for specified APs")
+
+/*
+ * <ini>
  * gActionOUISendSMPSFrameWithOMN - Used to send SMPS frame along with OMN
  * for specified APs
  *
@@ -807,6 +859,7 @@
 	CFG(CFG_ACTION_OUI_TAKE_ALL_BAND_INFO) \
 	CFG(CFG_ACTION_OUI_11BE_ALLOW_LIST) \
 	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_QOS_NULL_TX_RATE) \
+	CFG(CFG_ACTION_OUI_ENABLE_CTS2SELF) \
 	CFG(CFG_ACTION_OUI_ENABLE_CTS2SELF_WITH_QOS_NULL) \
 	CFG(CFG_ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN) \
 	CFG(CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ) \

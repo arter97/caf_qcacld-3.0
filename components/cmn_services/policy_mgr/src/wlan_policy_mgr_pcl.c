@@ -1339,6 +1339,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	bool srd_chan_enabled;
 
 	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	/* check the channel avoidance list for beaconing entities */
 	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
@@ -3822,6 +3826,10 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 	bool sta_sap_scc_on_5ghz_channel;
 	bool scc_on_indoor =
 		 policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc);
+	uint8_t go_count;
+	uint32_t go_op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t go_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t go_op_ch_freq_5g = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3855,12 +3863,24 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 	sta_sap_scc_on_5ghz_channel =
 		policy_mgr_is_connected_sta_5g(psoc, &sta_5GHz_freq);
 
+	go_count = policy_mgr_get_mode_specific_conn_info(
+				psoc, go_op_ch_freq_list,
+				go_vdev_id_list, PM_P2P_GO_MODE);
+	if (go_count && !WLAN_REG_IS_24GHZ_CH_FREQ(go_op_ch_freq_list[0])) {
+		go_op_ch_freq_5g = go_op_ch_freq_list[0];
+		policy_mgr_debug("go 5/6G present, SAP exclude 5/6G channels");
+	}
+
 	for (i = 0; i < *pcl_len_org; i++) {
 		found = false;
 		if (i >= NUM_CHANNELS) {
 			policy_mgr_debug("index is exceeding NUM_CHANNELS");
 			break;
 		}
+
+		if (go_op_ch_freq_5g &&
+		    !WLAN_REG_IS_24GHZ_CH_FREQ(pcl_list_org[i]))
+			continue;
 
 		if (scc_on_indoor && policy_mgr_is_force_scc(psoc) &&
 		    pcl_list_org[i] == indoor_sta_freq) {
@@ -3981,9 +4001,8 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 	mcc_to_scc_switch =
 		policy_mgr_get_mcc_to_scc_switch_mode(psoc);
 
-	sta_count =
-		policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
-							  NULL);
+	sta_count = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							      NULL);
 
 	if (!sta_count || mcc_to_scc_switch !=
 			QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)
@@ -4091,7 +4110,7 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 		if (user_config_freq && (pcl.pcl_list[i] == user_config_freq)) {
 			sap_new_freq = pcl.pcl_list[i];
 			policy_mgr_debug("Prefer starting SAP on user configured channel:%d",
-					 sap_ch_freq);
+					 sap_new_freq);
 			goto update_freq;
 		}
 	}
@@ -4801,5 +4820,59 @@ policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef WLAN_FEATURE_LL_LT_SAP
+QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
+					struct wlan_objmgr_psoc *psoc,
+					struct policy_mgr_pcl_list *pcl,
+					uint8_t vdev_id,
+					struct connection_info *info,
+					uint8_t *connection_count)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t num_cxn_del = 0;
+	struct policy_mgr_conc_connection_info pm_info = {0};
+	QDF_STATUS status;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	/*
+	 * Scenario: Standalone XPAN is present and CSA happens on
+	 * LL_LT_SAP interface.
+	 * During CSA, it will check the PCL list to get the new freq.
+	 * Since there is already LL_LT_SAP interface entry in PCL index.
+	 * It will lead to LL_LT_SAP + LL_LT_SAP concurrencies. To avoid
+	 * that, delete the existing connection entry from PCL index,
+	 * get the PCL list and restore it back.
+	 */
+	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, vdev_id,
+						      &pm_info, &num_cxn_del);
+
+	status = policy_mgr_get_pcl(psoc, PM_LL_LT_SAP_MODE, pcl->pcl_list,
+				    &pcl->pcl_len, pcl->weight_list,
+				    QDF_ARRAY_SIZE(pcl->weight_list),
+				    vdev_id);
+
+	/*
+	 * Get existing connection info before updating LL_LT_SAP freq list
+	 * This will help to avoid updation of SCC channel in LL_LT_SAP
+	 * freq list.
+	 */
+	*connection_count = policy_mgr_get_connection_info(psoc, info);
+
+	/* Restore the connection entry */
+	if (num_cxn_del > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, &pm_info,
+						     num_cxn_del);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return status;
 }
 #endif

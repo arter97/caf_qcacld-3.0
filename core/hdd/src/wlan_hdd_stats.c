@@ -99,6 +99,8 @@
 
 #define MAX_RSSI_MCS_INDEX 14
 
+#define MAX_HT_MCS_INDEX 7
+
 /* 11B, 11G Rate table include Basic rate and Extended rate
  * The IDX field is the rate index
  * The HI field is the rate when RSSI is strong or being ignored
@@ -5137,6 +5139,8 @@ static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
+	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+		return -EINVAL;
 	/**
 	 * HTT_DBG_EXT_STATS_PDEV_RX
 	 */
@@ -5839,16 +5843,19 @@ static void hdd_get_max_rate_ht(struct hdd_station_info *stainfo,
 	}
 
 	if (!report_max) {
-		for (i = 0; i < mcsidx; i++) {
+		for (i = 0; i < MAX_HT_MCS_INDEX && i < mcsidx; i++) {
 			if (rssi <= rssi_mcs_tbl[mode][i]) {
 				mcsidx = i;
 				break;
 			}
 		}
-		if (mcsidx < stats->tx_rate.mcs)
+		if (mcsidx < stats->tx_rate.mcs &&
+		    stats->tx_rate.mcs <= MAX_HT_MCS_INDEX)
 			mcsidx = stats->tx_rate.mcs;
 	}
 
+	if (mcsidx > MAX_HT_MCS_INDEX)
+		mcsidx = MAX_HT_MCS_INDEX;
 	tmprate = supported_mcs_rate[mcsidx].supported_rate[flag];
 
 	hdd_debug("tmprate %d mcsidx %d", tmprate, mcsidx);
@@ -9637,10 +9644,14 @@ static enum qca_wlan_roam_stats_frame_subtype
 hdd_convert_roam_frame_type(enum eroam_frame_subtype type)
 {
 	switch (type) {
-	case WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH:
-		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH;
-	case WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC:
-		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_RESP:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_RESP;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_REQ:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_REQ;
+	case WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_RESP:
+		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_RESP;
 	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1:
 		return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1;
 	case WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M2:
@@ -9658,7 +9669,7 @@ hdd_convert_roam_frame_type(enum eroam_frame_subtype type)
 		break;
 	}
 
-	return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH;
+	return QCA_WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ;
 };
 
 static enum qca_wlan_roam_stats_frame_status
@@ -9914,7 +9925,7 @@ static uint32_t hdd_get_roam_stats_individual_record_len(struct enhance_roam_inf
 
 	/* ROAM_STATS_FRAME_INFO */
 	len += nla_total_size(0);
-	for (i = 0; i < ROAM_FRAME_NUM; i++) {
+	for (i = 0; i < WLAN_ROAM_MAX_FRAME_INFO; i++) {
 		/* nest attribute */
 		len += nla_total_size(0);
 		/* ROAM_STATS_FRAME_SUBTYPE */
@@ -10293,7 +10304,7 @@ static int hdd_nla_put_roam_stats_info(struct sk_buff *skb,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < ROAM_FRAME_NUM; i++) {
+	for (i = 0; i < WLAN_ROAM_MAX_FRAME_INFO; i++) {
 		roam_frame = nla_nest_start(skb, i);
 		if (!roam_frame) {
 			hdd_err("nla_nest_start fail");
@@ -10321,6 +10332,15 @@ static int hdd_nla_put_roam_stats_info(struct sk_buff *skb,
 			hdd_err("frame[%u].timestamp put fail %d", i, ret);
 			return -EINVAL;
 		}
+		ret = nla_put(skb,
+			      QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FRAME_BSSID,
+			      QDF_MAC_ADDR_SIZE,
+			      info->timestamp[i].bssid.bytes);
+		if (ret) {
+			hdd_err("roam candidate AP bssid put fail");
+			return -EINVAL;
+		}
+
 		nla_nest_end(skb, roam_frame);
 	}
 	nla_nest_end(skb, roam_frame_info);
@@ -10330,14 +10350,7 @@ static int hdd_nla_put_roam_stats_info(struct sk_buff *skb,
 		hdd_err("roam original AP bssid put fail");
 		return -EINVAL;
 	}
-	if (info->trigger.roam_status) {
-		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ROAM_STATS_CANDIDATE_BSSID,
-			    QDF_MAC_ADDR_SIZE,
-			    info->scan.candidate_bssid.bytes)) {
-			hdd_err("roam candidate AP bssid put fail");
-			return -EINVAL;
-		}
-	} else {
+	if (!info->trigger.roam_status) {
 		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ROAM_STATS_ROAMED_BSSID,
 			    QDF_MAC_ADDR_SIZE, info->scan.roamed_bssid.bytes)) {
 			hdd_err("roam roamed AP bssid put fail");

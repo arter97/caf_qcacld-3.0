@@ -431,7 +431,7 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   enum wlan_main_tag tag)
 {
 	struct mlo_link_switch_context *link_ctx;
-	struct qdf_mac_addr peer_mac;
+	struct qdf_mac_addr peer_mac, peer_mld_mac;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!mlo_is_mld_sta(vdev))
@@ -447,16 +447,18 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 		return status;
 	}
 
-	qdf_mem_copy(data->diag_cmn.bssid,
-		     peer_mac.bytes,
-		     QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(data->diag_cmn.bssid, peer_mac.bytes, QDF_MAC_ADDR_SIZE);
 
-	qdf_mem_copy(data->mld_addr,
-		     wlan_vdev_mlme_get_mldaddr(vdev),
-		     QDF_MAC_ADDR_SIZE);
+	status = wlan_vdev_get_bss_peer_mld_mac(vdev, &peer_mld_mac);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		logging_err("vdev: %d failed to get mld mac address of peer",
+			    wlan_vdev_get_id(vdev));
+		return status;
+	}
 
-	if (tag == WLAN_ASSOC_REQ ||
-	    tag == WLAN_REASSOC_REQ) {
+	qdf_mem_copy(data->mld_addr, peer_mld_mac.bytes, QDF_MAC_ADDR_SIZE);
+
+	if (tag == WLAN_ASSOC_REQ || tag == WLAN_REASSOC_REQ) {
 		link_ctx = vdev->mlo_dev_ctx->link_ctx;
 		if (!link_ctx) {
 			logging_debug("vdev: %d link_ctx not found",
@@ -464,8 +466,7 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		data->supported_links =
-			wlan_populate_band_bitmap(link_ctx);
+		data->supported_links = wlan_populate_band_bitmap(link_ctx);
 	}
 
 	return status;
@@ -498,6 +499,7 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	uint i = 0;
 	struct mlo_link_switch_context *link_ctx = NULL;
 	struct wlan_channel *chan_info;
+	uint8_t num_links = 0;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
 				 struct wlan_diag_mlo_setup);
@@ -525,29 +527,43 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	}
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		wlan_diag_event.mlo_cmn_info[i].link_id =
+		if (link_ctx->links_info[i].link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		chan_info = link_ctx->links_info[i].link_chan_info;
+		if (!chan_info) {
+			logging_debug("link %d: chan_info not found",
+				      link_ctx->links_info[i].link_id);
+			continue;
+		}
+
+		wlan_diag_event.mlo_cmn_info[num_links].link_id =
 				link_ctx->links_info[i].link_id;
-		wlan_diag_event.mlo_cmn_info[i].vdev_id =
+		wlan_diag_event.mlo_cmn_info[num_links].vdev_id =
 				link_ctx->links_info[i].vdev_id;
 
-		qdf_mem_copy(wlan_diag_event.mlo_cmn_info[i].link_addr,
+		qdf_mem_copy(wlan_diag_event.mlo_cmn_info[num_links].link_addr,
 			     link_ctx->links_info[i].ap_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 
-		chan_info = link_ctx->links_info[i].link_chan_info;
-
-		wlan_diag_event.mlo_cmn_info[i].band =
+		wlan_diag_event.mlo_cmn_info[num_links].band =
 			wlan_convert_freq_to_diag_band(chan_info->ch_freq);
 
-		if (wlan_diag_event.mlo_cmn_info[i].band == WLAN_INVALID_BAND)
+		if (wlan_diag_event.mlo_cmn_info[num_links].band ==
+							 WLAN_INVALID_BAND)
 			wlan_diag_event.mlo_cmn_info[i].status =
 							REJECTED_LINK_STATUS;
+
+		num_links++;
 	}
+
+	wlan_diag_event.num_links = num_links;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_SETUP);
 }
 
 #define IS_LINK_SET(link_bitmap, link_id) ((link_bitmap) & (BIT(link_id)))
+#define DEFAULT_TID_MAP 0xFF
 
 static void
 wlan_populate_tid_link_id_bitmap(struct wlan_t2lm_info *t2lm,
@@ -566,6 +582,12 @@ wlan_populate_tid_link_id_bitmap(struct wlan_t2lm_info *t2lm,
 	buf->mlo_cmn_info[bss_link].vdev_id = link_info->vdev_id;
 
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
+		if (t2lm[dir].default_link_mapping) {
+			buf->mlo_cmn_info[bss_link].tid_ul = DEFAULT_TID_MAP;
+			buf->mlo_cmn_info[bss_link].tid_dl = DEFAULT_TID_MAP;
+			continue;
+		}
+
 		for (i = 0; i < T2LM_MAX_NUM_TIDS; i++) {
 			switch (t2lm[dir].direction) {
 			case WLAN_T2LM_DL_DIRECTION:
@@ -604,7 +626,7 @@ wlan_populate_tid_link_id_bitmap(struct wlan_t2lm_info *t2lm,
 void
 wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 {
-	uint8_t i = 0, dir;
+	uint8_t i = 0, dir, num_links = 0;
 	QDF_STATUS status;
 	struct mlo_link_info *link_info;
 	struct wlan_t2lm_info t2lm[WLAN_T2LM_MAX_DIRECTION] = {0};
@@ -643,13 +665,16 @@ wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS && i < MAX_BANDS; i++) {
 		if (qdf_is_macaddr_zero(&link_info->ap_link_addr) &&
-		    link_info->vdev_id == WLAN_INVALID_VDEV_ID)
+		    link_info->link_id == WLAN_INVALID_LINK_ID)
 			continue;
 
 		wlan_populate_tid_link_id_bitmap(t2lm, link_info,
-						 &wlan_diag_event, i);
+						 &wlan_diag_event, num_links);
 		link_info++;
+		num_links++;
 	}
+
+	wlan_diag_event.num_links = num_links;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_MLO_T2LM_STATUS);
@@ -693,7 +718,10 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return;
 	}
 
-	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
+	    (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	     (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
+	      wlan_vdev_mlme_is_mlo_link_vdev(vdev))))
 		goto out;
 
 	if (!wlan_cm_is_first_candidate_connect_attempt(vdev))
@@ -702,7 +730,7 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
 	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
-	wlan_diag_event.is_mlo = mlo_is_mld_sta(vdev);
+	wlan_diag_event.is_mlo = wlan_vdev_mlme_is_mlo_vdev(vdev);
 
 	if (wlan_diag_event.is_mlo) {
 		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
@@ -775,8 +803,9 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	if (opmode != QDF_STA_MODE)
 		goto out;
 
-	if (mlo_is_mld_sta(vdev) &&
-	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	     wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)))
 		goto out;
 
 	is_initial_connection = wlan_cm_is_vdev_connecting(vdev);

@@ -634,9 +634,13 @@ __wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 	if (!vdev)
 		return -EINVAL;
 
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		goto release_ref;
+
 	ret = wlan_handle_mlo_link_state_operation(wiphy, vdev, hdd_ctx,
 						   data, data_len);
 
+release_ref:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	return ret;
@@ -825,7 +829,6 @@ static QDF_STATUS wlan_hdd_link_state_request(struct wiphy *wiphy,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to post scheduler msg");
 		goto free_event;
-		return status;
 	}
 
 	status = osif_request_wait_for_response(request);
@@ -842,7 +845,7 @@ static QDF_STATUS wlan_hdd_link_state_request(struct wiphy *wiphy,
 	if (QDF_IS_STATUS_ERROR(link_state_event->status)) {
 		hdd_debug("ml_link_state_status failed %s",
 			  link_state_status_id_to_str(link_state_event->status));
-		return QDF_STATUS_E_INVAL;
+		goto free_event;
 	}
 
 	for (num_info = 0; num_info < link_state_event->num_mlo_vdev_link_info;

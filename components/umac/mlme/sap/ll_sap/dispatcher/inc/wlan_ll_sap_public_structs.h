@@ -16,11 +16,11 @@
 
 /**
  * DOC: contains ll_lt_sap structure definitions specific to the bearer
- * switch functionalities
+ * switch and channel selection functionalities
  */
 
-#ifndef _WLAN_LL_LT_SAP_BEARER_SWITCH_PUBLIC_STRUCTS_H_
-#define _WLAN_LL_LT_SAP_BEARER_SWITCH_PUBLIC_STRUCTS_H_
+#ifndef _WLAN_LL_SAP_PUBLIC_STRUCTS_H_
+#define _WLAN_LL_SAP_PUBLIC_STRUCTS_H_
 
 #include "wlan_objmgr_psoc_obj.h"
 #include <qdf_status.h>
@@ -68,7 +68,46 @@ enum bearer_switch_req_source {
 	BEARER_SWITCH_REQ_MAX,
 };
 
- /**
+/**
+ * struct wlan_ll_lt_sap_mac_freq: LL_LT_SAP mac frequency
+ * @freq_5GHz_low: Low 5GHz frequency
+ * @freq_5GHz_high: High 5GHz frequency
+ * @freq_6GHz: 6GHz frequency
+ * @weight_5GHz_low: Weight of 5GHz low frequency
+ * @weight_5GHz_high: Weight of 5GHz high frequency
+ * @weight_6GHz: Weight of 6GHz frequency
+ */
+struct wlan_ll_lt_sap_mac_freq {
+	qdf_freq_t freq_5GHz_low;
+	qdf_freq_t freq_5GHz_high;
+	qdf_freq_t freq_6GHz;
+	uint32_t weight_5GHz_low;
+	uint32_t weight_5GHz_high;
+	uint32_t weight_6GHz;
+};
+
+/**
+ * struct wlan_ll_lt_sap_freq_list: LL_LT_SAP frequency list structure
+ * @standalone_mac: Select frequency from mac which doesn't have any
+ * concurrent interface present.
+ * @shared_mac: Select frequency from mac which has one concurrent
+ * interface present.
+ * @best_freq: Best freq present in ACS final list. This freq can be
+ * use to bring LL_LT_SAP if none of the above channels are present
+ * @prev_freq: Previous/current freq on which LL_LT_SAP is present.
+ * This will be use to avoid SCC channel selection while updating this
+ * list. This freq should be filled by user.
+ * @weight_best_freq: Weight of best frequency
+ */
+struct wlan_ll_lt_sap_freq_list {
+	struct wlan_ll_lt_sap_mac_freq standalone_mac;
+	struct wlan_ll_lt_sap_mac_freq shared_mac;
+	qdf_freq_t best_freq;
+	qdf_freq_t prev_freq;
+	uint32_t weight_best_freq;
+};
+
+/**
  * typedef bearer_switch_requester_cb() - Callback function, which will
  * be invoked with the bearer switch request status.
  * @psoc: Psoc pointer
@@ -123,5 +162,4 @@ struct ll_sap_ops {
 					struct wlan_objmgr_vdev *vdev,
 					enum bearer_switch_req_type req_type);
 };
-
-#endif /* _WLAN_LL_LT_SAP_BEARER_SWITCH_PUBLIC_STRUCTS_H_ */
+#endif /* _WLAN_LL_SAP_PUBLIC_STRUCTS_H_ */

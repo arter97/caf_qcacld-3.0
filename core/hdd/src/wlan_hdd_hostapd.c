@@ -120,6 +120,7 @@
 #include "wlan_twt_ucfg_api.h"
 #include "wlan_vdev_mgr_ucfg_api.h"
 #include <wlan_psoc_mlme_ucfg_api.h>
+#include "wlan_ll_sap_api.h"
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -3930,16 +3931,35 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	else
 		ch_params.ch_width = CH_WIDTH_MAX;
 
-	intf_ch_freq = wlansap_get_chan_band_restrict(sap_context, &csa_reason);
-	if (intf_ch_freq && intf_ch_freq != sap_context->chan_freq) {
-		goto sap_restart;
-	} else if (!intf_ch_freq &&
-		  policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
-		schedule_work(&ap_adapter->sap_stop_bss_work);
-		wlansap_context_put(sap_context);
-		hdd_debug("stop ll_lt_sap, no channel found for csa");
-		return QDF_STATUS_E_FAILURE;
+	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
+		/*
+		 * Adding this feature flag temporarily, will remove this once
+		 * feature flag is enabled.
+		 */
+#ifdef WLAN_FEATURE_LL_LT_SAP
+		intf_ch_freq =
+			wlan_get_ll_lt_sap_restart_freq(hdd_ctx->pdev,
+							sap_context->chan_freq,
+							sap_context->vdev_id,
+							&csa_reason);
+#else
+		intf_ch_freq = wlansap_get_chan_band_restrict(sap_context,
+							      &csa_reason);
+#endif
+		if (!intf_ch_freq) {
+			schedule_work(&ap_adapter->sap_stop_bss_work);
+			wlansap_context_put(sap_context);
+			hdd_debug("vdev %d stop ll_lt_sap, no channel found for csa",
+				  vdev_id);
+			return QDF_STATUS_E_FAILURE;
+		}
+	} else {
+		intf_ch_freq = wlansap_get_chan_band_restrict(sap_context,
+							      &csa_reason);
 	}
+	if (intf_ch_freq && intf_ch_freq != sap_context->chan_freq)
+		goto sap_restart;
+
 	/*
 	 * If STA+SAP sessions are on DFS channel and STA+SAP SCC is
 	 * enabled on DFS channel then move the SAP out of DFS channel
@@ -6542,6 +6562,11 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		if (ret < 0)
 			goto error;
 	}
+
+	config->chan_freq = wlan_ll_lt_sap_override_freq(hdd_ctx->psoc,
+							 link_info->vdev_id,
+							 config->chan_freq);
+
 	if (!ret && wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, config->chan_freq))
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
 
@@ -7709,16 +7734,6 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 {}
 #endif
 
-static inline uint32_t
-wlan_util_get_centre_freq(struct wlan_hdd_link_info *link_info)
-{
-	struct wlan_channel *chan;
-
-	chan = wlan_vdev_get_active_channel(link_info->vdev);
-
-	return chan->ch_freq;
-}
-
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 static inline struct cfg80211_chan_def
 wlan_util_get_chan_def(struct wireless_dev *wdev, unsigned int link_id)
@@ -7787,6 +7802,8 @@ static void hdd_update_param_chandef(struct wlan_hdd_link_info *link_info,
 	struct wlan_channel *chan;
 
 	chan = wlan_vdev_get_active_channel(link_info->vdev);
+	if (!chan)
+		return;
 
 	hdd_create_chandef(link_info->adapter, chan, chandef);
 }
@@ -7892,7 +7909,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	if (QDF_STATUS_SUCCESS !=
 	    ucfg_policy_mgr_get_sap_mandt_chnl(hdd_ctx->psoc, &mandt_chnl_list))
 		hdd_err("can't get mandatory channel list");
-	if (mandt_chnl_list)
+	if (mandt_chnl_list && adapter->device_mode == QDF_SAP_MODE)
 		policy_mgr_init_sap_mandatory_chan(hdd_ctx->psoc,
 						   chandef->chan->center_freq);
 
@@ -8139,7 +8156,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
-		if (wlan_util_get_centre_freq(link_info) !=
+		if (wlan_get_operation_chan_freq(link_info->vdev) !=
 				params->chandef.chan->center_freq)
 			hdd_update_param_chandef(link_info, &params->chandef);
 

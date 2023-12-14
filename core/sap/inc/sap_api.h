@@ -20,7 +20,7 @@
 #ifndef WLAN_QCT_WLANSAP_H
 #define WLAN_QCT_WLANSAP_H
 
-/**
+/*
  * W L A N   S O F T A P  P A L   L A Y E R
  * E X T E R N A L  A P I
  *
@@ -350,11 +350,11 @@ typedef struct sap_MaxAssocExceededEvent_s {
 } tSap_MaxAssocExceededEvent;
 
 /**
- * sap_acs_ch_selected_s - the structure to hold the selected channels
- * @pri_chan_freq: Holds the ACS selected primary channel frequency
+ * struct sap_ch_selected_s - structure to hold the selected channels
+ * @pri_ch_freq: Holds the ACS selected primary channel frequency
  * @ht_sec_ch_freq: Holds the ACS selected secondary ht channel frequency
- * @vht_seg0_center_ch: Holds the ACS selected center channel of vht seg0
- * @vht_seg1_center_ch: Holds the ACS selected center channel of vht seg1
+ * @vht_seg0_center_ch_freq: Holds the ACS selected center channel of vht seg0
+ * @vht_seg1_center_ch_freq: Holds the ACS selected center channel of vht seg1
  * @ch_width: Holds the ACS selected channel bandwidth
  *
  * Holds the primary and secondary channel selected by ACS and is
@@ -726,7 +726,7 @@ typedef struct tagSapStruct {
 #endif
 } tSapStruct, *tpSapStruct;
 
-/**
+/*
  * struct sap_context - per-BSS Context for SAP
  *
  * struct sap_context is used to share per-BSS context between SAP and
@@ -1078,7 +1078,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 /**
  * wlansap_channel_change_request() - Send channel change request
  * @sap_ctx: Pointer to the SAP context
- * @target_channel: Target channel
+ * @target_chan_freq: Target channel
  *
  * This API is used to send an Indication to SME/PE to change the
  * current operating channel to a different target channel.
@@ -1326,8 +1326,8 @@ void wlansap_extend_to_acs_range(mac_handle_t mac_handle,
  *                                           phy_mode. This API is for son,
  *                                           There is no band switching when
  *                                           son phy mode is changed.
- * @sap_ctx:  Pointer to Sap Context
- * @sap_config:  Pointer to sap config
+ * @vdev:  Pointer to vdev object
+ * @config:  Pointer to sap config
  * @phy_mode: pointer to phy mode
  *
  * Return: QDF_STATUS
@@ -1418,7 +1418,8 @@ QDF_STATUS wlansap_acs_chselect(struct sap_context *sap_context,
 
 /**
  * sap_undo_acs() - Undo acs i.e free the allocated ch lists
- * @sap_ctx: pointer to the SAP context
+ * @sap_context: pointer to the SAP context
+ * @sap_cfg: pointer to the SAP confid structure
  *
  * This function will free the memory allocated to the sap ctx channel list, acs
  * cfg ch list and master ch list.
@@ -1468,7 +1469,7 @@ QDF_STATUS wlansap_release_vdev_ref(struct sap_context *sap_ctx);
 
 /**
  * sap_get_cac_dur_dfs_region() - get cac duration and dfs region.
- * @sap_ctxt: sap context
+ * @sap_ctx: sap context
  * @cac_duration_ms: pointer to cac duration
  * @dfs_region: pointer to dfs region
  * @chan_freq: channel frequency
@@ -1615,7 +1616,7 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 
 /**
  * wlansap_override_csa_strict_for_sap() - check user CSA strict or not
- * @mac: mac ctx
+ * @mac_handle: Opaque handle to the global MAC context
  * @sap_ctx: sap context
  * @target_chan_freq: target channel frequency in MHz
  * @strict: CSA strict flag
@@ -1775,7 +1776,7 @@ bool wlansap_filter_vendor_unsafe_ch_freq(
 
 /**
  * wlansap_dump_acs_ch_freq() - print acs channel frequency
- * @sap_ctx: sap context
+ * @sap_context: sap context
  *
  * This function is used to print acs channel frequecny
  *
@@ -1785,7 +1786,7 @@ void wlansap_dump_acs_ch_freq(struct sap_context *sap_context);
 
 /**
  * wlansap_set_acs_ch_freq() - set acs channel frequency
- * @sap_ctx: sap context
+ * @sap_context: sap context
  * @ch_freq: ch_freq to be set
  *
  * This function is used to set acs channel frequency
@@ -1895,6 +1896,7 @@ static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 /**
  * sap_cac_end_notify() - Notify CAC end to HDD
  * @mac_handle: Opaque handle to the global MAC context
+ * @roamInfo: pointer to the struct csr_roam_info
  *
  * Function will be called to notify eSAP_DFS_CAC_END event to HDD
  *
@@ -1958,6 +1960,14 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
  */
 QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
 				     struct sap_sel_ch_info *ch_info);
+
+/**
+ * wlansap_free_chan_info() - API to free allocated memory
+ * @ch_param: Pointer to sap_sel_ch_info structure
+ *
+ * Return: None
+ */
+void wlansap_free_chan_info(struct sap_sel_ch_info *ch_param);
 
 /**
  * wlansap_get_user_config_acs_ch_list() - Get user config ACS channel list

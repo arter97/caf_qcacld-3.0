@@ -1038,24 +1038,28 @@ enum roam_scan_dwell_type {
 /**
  * enum eroam_frame_subtype - Enhanced roam frame subtypes.
  *
- * @WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH: Pre-authentication frame
- * @WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC: Reassociation frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_RESP: Authentication resp frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_RESP: Reassociation resp frame
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1: EAPOL-Key M1 frame
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M2: EAPOL-Key M2 frame
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M3: EAPOL-Key M3 frame
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M4: EAPOL-Key M4 frame
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M1: EAPOL-Key GTK M1 frame
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M2: EAPOL-Key GTK M2 frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ: Authentication req frame
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_REQ: Reassociation req frame
  */
 enum eroam_frame_subtype {
-	WLAN_ROAM_STATS_FRAME_SUBTYPE_PREAUTH = 1,
-	WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC = 2,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_RESP = 1,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_RESP = 2,
 	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1 = 3,
 	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M2 = 4,
 	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M3 = 5,
 	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M4 = 6,
 	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M1 = 7,
 	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_GTK_M2 = 8,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_REQ = 9,
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_REQ = 10,
 };
 
 /**
@@ -1760,6 +1764,19 @@ struct wlan_roam_scan_offload_params {
 };
 
 /**
+ * enum wlan_roam_offload_scan_rssi_flags - Flags for roam scan RSSI threshold
+ * params, this enums will be used in flags param of the structure
+ * wlan_roam_offload_scan_rssi_params
+ * @ROAM_SCAN_RSSI_THRESHOLD_INVALID_FLAG: invalid flag
+ * @ROAM_SCAN_RSSI_THRESHOLD_FLAG_ROAM_HI_RSSI_EN_ON_5G: enable high RSSI roam
+ * trigger support to roam from 5 GHz to 6 GHz band
+ */
+enum wlan_roam_offload_scan_rssi_flags {
+	ROAM_SCAN_RSSI_THRESHOLD_INVALID_FLAG,
+	ROAM_SCAN_RSSI_THRESHOLD_FLAG_ROAM_HI_RSSI_EN_ON_5G = BIT(0),
+};
+
+/**
  * struct wlan_roam_offload_scan_rssi_params - structure containing
  *              parameters for roam offload scan based on RSSI
  * @rssi_thresh: rssi threshold
@@ -1796,6 +1813,7 @@ struct wlan_roam_scan_offload_params {
  *                                  roam
  * @roam_data_rssi_threshold: Bad data RSSI threshold to roam
  * @rx_data_inactivity_time: Rx duration to check data RSSI
+ * @flags: Flags for roam scan RSSI threshold params
  */
 struct wlan_roam_offload_scan_rssi_params {
 	int8_t rssi_thresh;
@@ -1827,6 +1845,7 @@ struct wlan_roam_offload_scan_rssi_params {
 	uint32_t roam_data_rssi_threshold_triggers;
 	int32_t roam_data_rssi_threshold;
 	uint32_t rx_data_inactivity_time;
+	uint32_t flags;
 };
 
 /**
@@ -2581,6 +2600,8 @@ struct roam_pmkid_req_event {
  * @send_roam_linkspeed_state: Send roam link speed good/poor state to FW
  * @send_roam_vendor_handoff_config: send vendor handoff config command to FW
  * @send_roam_mlo_config: send MLO config to FW
+ * @send_roam_scan_offload_rssi_params: Set the RSSI parameters for roam
+ * offload scan
  */
 struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_vdev_set_pcl_cmd)(struct wlan_objmgr_vdev *vdev,
@@ -2622,6 +2643,9 @@ struct wlan_cm_roam_tx_ops {
 						uint8_t value);
 	QDF_STATUS (*send_roam_mcc_disallow)(struct wlan_objmgr_vdev *vdev,
 					     uint8_t vdev_id, uint8_t value);
+	QDF_STATUS (*send_roam_scan_offload_rssi_params)(
+		struct wlan_objmgr_vdev *vdev,
+		struct wlan_roam_offload_scan_rssi_params *roam_rssi_params);
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 	QDF_STATUS (*send_roam_linkspeed_state)(struct wlan_objmgr_vdev *vdev,
 						uint8_t vdev_id, bool value);
