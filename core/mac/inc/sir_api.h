@@ -2873,7 +2873,7 @@ typedef struct {
 
 	uint32_t peer_event_number;
 	/* Variable  length field - Do not add anything after this */
-	uint8_t results[0];
+	uint8_t results[];
 } tSirLLStatsResults, *tpSirLLStatsResults;
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
@@ -3107,7 +3107,7 @@ struct wifi_peer_info {
 		uint32_t power_saving;
 		uint32_t num_rate;
 	};
-	struct wifi_rate_stat rate_stats[0];
+	struct wifi_rate_stat rate_stats[];
 };
 
 /**
@@ -3151,7 +3151,7 @@ struct wifi_interface_stats {
  */
 struct wifi_peer_stat {
 	uint32_t num_peers;
-	struct wifi_peer_info peer_info[0];
+	struct wifi_peer_info peer_info[];
 };
 
 /* wifi statistics bitmap  for getting statistics */
