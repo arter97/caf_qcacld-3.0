@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -579,6 +579,7 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 
 			sw_ft_entry->is_flow_tcp = proto_params.tcp_proto;
 			sw_ft_entry->is_flow_udp = proto_params.udp_proto;
+			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
 
 			is_fst_updated = true;
 			fisa_hdl->add_flow_count++;
@@ -755,6 +756,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 
 	sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 	sw_ft_entry->is_flow_udp = elem->is_udp_flow;
+	sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
 
 	fisa_hdl->add_flow_count++;
 	fisa_hdl->del_flow_count++;
@@ -810,6 +812,7 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	uint32_t lru_ft_entry_idx = 0;
 	uint32_t timestamp;
 	uint32_t reo_dest_indication;
+	uint64_t sw_timestamp;
 
 	/* Get the hash from TLV
 	 * FSE FT Toeplitz hash is same Common parser hash available in TLV
@@ -853,6 +856,8 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 			sw_ft_entry->is_flow_udp = elem->is_udp_flow;
 
+			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
+
 			is_fst_updated = true;
 			fisa_hdl->add_flow_count++;
 			break;
@@ -881,9 +886,20 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	 */
 	if ((skid_count > max_skid_length) &&
 	    wlan_dp_cfg_is_rx_fisa_lru_del_enabled(dp_cfg)) {
-		dp_fisa_debug("Max skid length reached flow cannot be added, evict exiting flow");
-		dp_fisa_rx_delete_flow(fisa_hdl, elem, lru_ft_entry_idx);
-		is_fst_updated = true;
+		dp_fisa_debug("Max skid length reached flow cannot be added, evict existing flow");
+
+		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
+				fisa_hdl->base)[lru_ft_entry_idx]);
+		sw_timestamp = qdf_get_log_timestamp();
+
+		if (qdf_log_timestamp_to_usecs(sw_timestamp -
+			sw_ft_entry->add_timestamp) >
+			FISA_FT_ENTRY_AGING_US) {
+			dp_fisa_rx_delete_flow(fisa_hdl, elem, lru_ft_entry_idx);
+			is_fst_updated = true;
+		} else {
+			dp_fisa_debug("skip update due to aging not complete");
+		}
 	}
 
 	/**
