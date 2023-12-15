@@ -554,7 +554,7 @@ static QDF_STATUS wma_self_peer_remove(tp_wma_handle wma_handle,
 	QDF_STATUS qdf_status;
 	uint8_t vdev_id = del_vdev_req->vdev_id;
 	struct wma_target_req *msg = NULL;
-	struct del_sta_self_rsp_params *sta_self_wmi_rsp;
+	struct del_sta_self_rsp_params *sta_self_wmi_rsp = NULL;
 
 	wma_debug("P2P Device: removing self peer "QDF_MAC_ADDR_FMT,
 		  QDF_MAC_ADDR_REF(del_vdev_req->self_mac_addr));
@@ -591,7 +591,8 @@ static QDF_STATUS wma_self_peer_remove(tp_wma_handle wma_handle,
 		wma_err("wma_remove_peer is failed");
 		wma_remove_req(wma_handle, vdev_id,
 			       WMA_DEL_P2P_SELF_STA_RSP_START);
-		qdf_mem_free(sta_self_wmi_rsp);
+		if (sta_self_wmi_rsp)
+			qdf_mem_free(sta_self_wmi_rsp);
 
 		goto error;
 	}
