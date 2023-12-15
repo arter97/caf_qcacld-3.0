@@ -2213,7 +2213,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     )
 
     copts.append("-Wno-format")
-    copts.append("-fstrict-flex-arrays=0")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 
