@@ -579,4 +579,16 @@ dp_swaf_peer_sla_configuration(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
  */
 QDF_STATUS
 dp_sawf_get_peer_msduq_info(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr);
+
+/**
+ * dp_sawf_reinject_handler - Re-inject handler
+ * @soc: SOC handle
+ * @nbuf: nbuf
+ * @htt_desc: HTT descriptor
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_sawf_reinject_handler(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			 uint32_t *htt_desc);
 #endif /* DP_SAWF_H*/

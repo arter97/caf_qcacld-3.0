@@ -1239,6 +1239,116 @@ fail:
 	return QDF_STATUS_E_INVAL;
 }
 
+QDF_STATUS
+dp_sawf_reinject_handler(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			 uint32_t *htt_desc)
+{
+	struct dp_peer *peer;
+	struct dp_peer_sawf *sawf;
+	struct dp_txrx_peer *txrx_peer;
+	struct dp_peer_sawf_stats *stats_ctx;
+	uint16_t peer_id;
+	uint8_t svc_id;
+	uint8_t msduq;
+	uint32_t metadata = 0;
+	struct dp_tx_msdu_info_s msdu_info;
+	uint32_t reinject_status;
+	uint8_t htt_q_idx;
+	uint8_t host_tid_queue;
+	uint8_t msduq_idx;
+	uint16_t peer_msduq;
+	uint8_t tid;
+	uint16_t data_length;
+	struct dp_vdev *vdev;
+
+	reinject_status = htt_desc[2];
+
+	peer_id = HTT_TX_WBM_REINJECT_SW_PEER_ID_GET(reinject_status);
+	data_length = HTT_TX_WBM_REINJECT_DATA_LEN_GET(reinject_status);
+
+	reinject_status = htt_desc[3];
+
+	tid = HTT_TX_WBM_REINJECT_TID_GET(reinject_status);
+
+	htt_q_idx = HTT_TX_WBM_REINJECT_MSDUQ_ID_GET(reinject_status);
+
+	dp_sawf_debug("peer_id %u data_length %u tid %u htt_q_idx %u",
+		      peer_id, data_length, tid, htt_q_idx);
+
+	host_tid_queue = htt_q_idx - DP_SAWF_DEFAULT_Q_PTID_MAX;
+
+	msduq_idx = tid + host_tid_queue * DP_SAWF_TID_MAX;
+	if (msduq_idx > DP_SAWF_Q_MAX - 1) {
+		dp_sawf_err("Invalid msduq idx, tid %u htt_q_idx %u",
+			    tid, htt_q_idx);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	msduq = msduq_idx + DP_SAWF_DEFAULT_Q_MAX;
+
+	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
+	if (!peer) {
+		dp_sawf_err("Invalid peer id %u", peer_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer) {
+		dp_sawf_err("NULL txrx_peer for peer id %u", peer_id);
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sawf = dp_peer_sawf_ctx_get(peer);
+	if (!sawf) {
+		dp_sawf_err("Invalid SAWF ctx for peer id %u", peer_id);
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	stats_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
+	if (!stats_ctx) {
+		dp_sawf_err("Invalid SAWF stats ctx for peer id %u", peer_id);
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev = peer->vdev;
+
+	svc_id = sawf->msduq[msduq_idx].svc_id;
+
+	DP_STATS_INC(stats_ctx, tx_stats[msduq_idx].reinject_pkt, 1);
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	peer_msduq = dp_sawf_msduq_peer_id_set(peer_id, msduq);
+	DP_SAWF_METADATA_SET(metadata, svc_id, peer_msduq);
+
+	qdf_nbuf_set_mark(nbuf, metadata);
+
+	qdf_nbuf_set_len(nbuf, data_length);
+
+	qdf_nbuf_set_fast_xmit(nbuf, 0);
+	nbuf->fast_recycled = 0;
+	nbuf->recycled_for_ds = 0;
+
+	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
+
+	dp_tx_get_queue(vdev, nbuf,
+			&msdu_info.tx_queue);
+
+	msdu_info.tid = HTT_TX_EXT_TID_INVALID;
+
+	nbuf = dp_tx_send_msdu_single(vdev, nbuf,
+				      &msdu_info,
+				      peer_id,
+				      NULL);
+	if (nbuf)
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef CONFIG_SAWF_STATS
 struct sawf_telemetry_params sawf_telemetry_cfg;
 
@@ -1837,6 +1947,7 @@ static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
 	dp_sawf_print_stats("queue_depth = %u", tx_stats->queue_depth);
 	dp_sawf_print_stats("throughput = %u", tx_stats->throughput);
 	dp_sawf_print_stats("ingress rate = %u", tx_stats->ingress_rate);
+	dp_sawf_print_stats("reinject packet = %u", tx_stats->reinject_pkt);
 }
 
 static void
