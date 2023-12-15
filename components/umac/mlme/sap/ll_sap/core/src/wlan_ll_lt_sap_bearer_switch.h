@@ -98,7 +98,11 @@ struct bs_state_sm {
  * @total_ref_count: Total reference counts
  * @last_status:status of the last bearer switch request
  * @requests: Array of bearer_switch_requests to cache the request information
- * @bs_request_timer: Bearer switch request timer
+ * @bs_request_timer: Bearer switch request timer, this timer monitors the
+ * bearer switch response
+ * @bs_wlan_request_timer: Bearer switch wlan request timer, host driver waits
+ * for this timer to expire before sending the bearer switch request to wlan,
+ * this is used to avoid the back to back bearer switch requests to userspace.
  */
 struct bearer_switch_info {
 	struct wlan_objmgr_vdev *vdev;
@@ -110,6 +114,7 @@ struct bearer_switch_info {
 	QDF_STATUS last_status;
 	struct wlan_bearer_switch_request requests[MAX_BEARER_SWITCH_REQUESTERS];
 	qdf_mc_timer_t bs_request_timer;
+	qdf_mc_timer_t bs_wlan_request_timer;
 };
 
 /**
@@ -221,22 +226,6 @@ static inline void bs_sm_transition_to(struct bearer_switch_info *bs_ctx,
 QDF_STATUS bs_sm_deliver_event(struct wlan_objmgr_psoc *psoc,
 			       enum wlan_bearer_switch_sm_evt event,
 			       uint16_t data_len, void *data);
-
-/**
- * bs_req_timer_init() - Initialize Bearer switch request timer
- * @bs_ctx: Bearer switch context
- *
- * Return: None
- */
-void bs_req_timer_init(struct bearer_switch_info *bs_ctx);
-
-/**
- * bs_req_timer_deinit() - De-initialize Bearer switch request timer
- * @bs_ctx: Bearer switch context
- *
- * Return: None
- */
-void bs_req_timer_deinit(struct bearer_switch_info *bs_ctx);
 
 /**
  * ll_lt_sap_is_bs_ctx_valid() - Check if bearer switch context is valid or not
