@@ -1386,6 +1386,16 @@ QDF_STATUS
 wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 				struct roam_scan_candidate_frame *candidate);
 
+/**
+ * wlan_cm_is_mbo_ap_without_pmf() - Check if the connected AP is MBO without
+ *                                   PMF
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev id
+ *
+ * Return: True if connected AP is MBO capable without PMF
+ */
+bool wlan_cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id);
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1653,6 +1663,13 @@ static inline uint8_t
 wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
+}
+
+static inline
+bool wlan_cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id)
+{
+	return false;
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
