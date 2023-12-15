@@ -1571,7 +1571,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	uint32_t pcl_list[NUM_CHANNELS], orig_len = *len;
 	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t i, pcl_len = 0;
-	bool sbs_mac0_modified_pcl;
+	bool sbs_mac0_modified_pcl = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
