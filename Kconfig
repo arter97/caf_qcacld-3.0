@@ -2073,5 +2073,9 @@ config DP_RX_PEEK_MSDU_DONE_WAR
 	bool "Enable DP_RX_PEEK_MSDU_DONE_WAR"
 	default n
 
+config WLAN_AUX_SUPPORT
+	bool "Enable WLAN_AUX_SUPPORT"
+	default n
+
 endmenu
 endif # QCA_CLD_WLAN

@@ -13090,8 +13090,7 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 	wlan_mlme_get_emlsr_mode_enabled(mac_ctx->psoc, &emlsr_enabled);
 
 	/* check if aux elmsr capable */
-	aux_emlsr_support = wlan_mlme_is_aux_emlsr_support(mac_ctx->psoc,
-							   WLAN_MLME_HW_MODE_MAX);
+	aux_emlsr_support = wlan_mlme_is_aux_emlsr_support(mac_ctx->psoc);
 
 	/* Check if STA supports EMLSR and vendor command prefers EMLSR mode */
 	if ((emlsr_cap && emlsr_enabled) ||

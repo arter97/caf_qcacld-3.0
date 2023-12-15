@@ -775,24 +775,29 @@ wlan_mlme_is_aux_cap_support(struct wlan_objmgr_psoc *psoc,
 }
 
 bool
-wlan_mlme_is_aux_scan_support(struct wlan_objmgr_psoc *psoc,
-			      enum wlan_mlme_hw_mode_config_type hw_mode_id)
+wlan_mlme_is_aux_scan_support(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_mlme_is_aux_cap_support(psoc, WLAN_MLME_AUX_MODE_SCAN_BIT,
-					    hw_mode_id);
+					    WLAN_MLME_HW_MODE_MAX);
 }
 
 bool
-wlan_mlme_is_aux_listen_support(struct wlan_objmgr_psoc *psoc,
-				enum wlan_mlme_hw_mode_config_type hw_mode_id)
+wlan_mlme_is_aux_listen_support(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_mlme_is_aux_cap_support(psoc, WLAN_MLME_AUX_MODE_LISTEN_BIT,
-					    hw_mode_id);
+					    WLAN_MLME_HW_MODE_MAX);
 }
 
 bool
-wlan_mlme_is_aux_emlsr_support(struct wlan_objmgr_psoc *psoc,
-			       enum wlan_mlme_hw_mode_config_type hw_mode_id)
+wlan_mlme_is_aux_emlsr_support(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_is_aux_cap_support(psoc, WLAN_MLME_AUX_MODE_EMLSR_BIT,
+					    WLAN_MLME_HW_MODE_MAX);
+}
+
+bool
+wlan_mlme_is_aux_emlsr_support_by_hwmode(struct wlan_objmgr_psoc *psoc,
+				enum wlan_mlme_hw_mode_config_type hw_mode_id)
 {
 	return wlan_mlme_is_aux_cap_support(psoc, WLAN_MLME_AUX_MODE_EMLSR_BIT,
 					    hw_mode_id);

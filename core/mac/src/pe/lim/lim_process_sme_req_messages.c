@@ -4493,8 +4493,7 @@ void lim_set_emlsr_caps(struct mac_context *mac_ctx, struct pe_session *session)
 
 	emlsr_allowed = emlsr_cap && emlsr_enabled && emlsr_band_check;
 	emlsr_aux_support = emlsr_enabled && WLAN_EMLSR_ENABLE &&
-			     wlan_mlme_is_aux_emlsr_support(mac_ctx->psoc,
-							    WLAN_MLME_HW_MODE_MAX);
+			     wlan_mlme_is_aux_emlsr_support(mac_ctx->psoc);
 
 	if (emlsr_allowed || emlsr_aux_support) {
 		wlan_vdev_obj_lock(session->vdev);
