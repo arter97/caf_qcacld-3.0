@@ -88,6 +88,7 @@
 #include <wlan_twt_api.h>
 #include "wlan_tdls_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_cm_api.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -907,6 +908,7 @@ QDF_STATUS pe_close(struct mac_context *mac)
 		return QDF_STATUS_SUCCESS;
 
 	qdf_hang_event_unregister_notifier(&pe_hang_event_notifier);
+	lim_cleanup_mlm(mac);
 	lim_cleanup(mac);
 	lim_unregister_scan_mbssid_callback(mac);
 	lim_unregister_sap_bcn_callback(mac);
@@ -973,7 +975,6 @@ QDF_STATUS pe_start(struct mac_context *mac)
 
 void pe_stop(struct mac_context *mac)
 {
-	lim_cleanup_mlm(mac);
 	pe_debug(" PE STOP: Set LIM state to eLIM_MLM_OFFLINE_STATE");
 	SET_LIM_MLM_STATE(mac, eLIM_MLM_OFFLINE_STATE);
 	return;
@@ -1368,7 +1369,8 @@ void pe_register_callbacks_with_wma(struct mac_context *mac,
 	status = wma_register_roaming_callbacks(
 			ready_req->csr_roam_auth_event_handle_cb,
 			ready_req->pe_roam_synch_cb,
-			ready_req->pe_disconnect_cb);
+			ready_req->pe_disconnect_cb,
+			ready_req->pe_roam_set_ie_cb);
 	if (status != QDF_STATUS_SUCCESS)
 		pe_err("Registering roaming callbacks with WMA failed");
 }
@@ -2175,7 +2177,7 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t *ie = NULL;
 	struct qdf_mac_addr bssid;
-	bool is_mlo_link = false;
+	bool is_mlo_link;
 	uint8_t vdev_id = session->vdev_id;
 	struct element_info frame;
 	struct cm_roam_values_copy mdie_cfg = {0};
@@ -2187,30 +2189,21 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	frame.ptr = NULL;
 	frame.len = 0;
 	if (is_multi_link_roam(roam_synch_ind)) {
-		if (roam_synch_ind->link_beacon_probe_resp_length) {
-			if (wlan_vdev_mlme_get_is_mlo_link(mac->psoc,
-							   vdev_id)) {
-				bcn_proberesp_ptr = (uint8_t *)roam_synch_ind +
-				roam_synch_ind->link_beacon_probe_resp_offset;
-				bcn_proberesp_len =
-				roam_synch_ind->link_beacon_probe_resp_length;
-			}
-		} else {
-			mlo_get_sta_link_mac_addr(vdev_id, roam_synch_ind,
-						  &bssid);
-			status = wlan_scan_get_entry_by_mac_addr(mac->pdev,
-								 &bssid,
-								 &frame);
-			if (QDF_IS_STATUS_ERROR(status) && !frame.len) {
-				pe_err("Failed to get scan entry for " QDF_MAC_ADDR_FMT,
-				       QDF_MAC_ADDR_REF(bssid.bytes));
-				return status;
-			}
-			bcn_proberesp_ptr = frame.ptr;
-			bcn_proberesp_len = frame.len;
+		mlo_get_sta_link_mac_addr(vdev_id, roam_synch_ind, &bssid);
+		is_mlo_link = wlan_vdev_mlme_get_is_mlo_link(mac->psoc, vdev_id);
+
+		status = wlan_scan_get_entry_by_mac_addr(mac->pdev, &bssid,
+							 &frame);
+		if (QDF_IS_STATUS_ERROR(status) || !frame.len) {
+			pe_err("Failed to get scan entry for " QDF_MAC_ADDR_FMT,
+			       QDF_MAC_ADDR_REF(bssid.bytes));
+			return status;
 		}
-		if (wlan_vdev_mlme_get_is_mlo_link(mac->psoc, vdev_id))
-			is_mlo_link = true;
+		bcn_proberesp_ptr = frame.ptr;
+		bcn_proberesp_len = frame.len;
+	} else {
+		bssid = roam_synch_ind->bssid;
+		is_mlo_link = false;
 	}
 
 	mac_hdr = (tpSirMacMgmtHdr)bcn_proberesp_ptr;
@@ -2226,11 +2219,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		status = QDF_STATUS_E_FAILURE;
 		goto done;
 	}
-
-	if (is_multi_link_roam(roam_synch_ind))
-		mlo_get_sta_link_mac_addr(vdev_id, roam_synch_ind, &bssid);
-	else
-		bssid = roam_synch_ind->bssid;
 
 	pe_debug("LFR3:Beacon/Prb Rsp: %d bssid " QDF_MAC_ADDR_FMT
 		 " beacon " QDF_MAC_ADDR_FMT,
@@ -3183,6 +3171,20 @@ roam_sync_fail:
 	pe_delete_session(mac_ctx, ft_session_ptr);
 	return status;
 }
+
+QDF_STATUS
+pe_set_ie_for_roam_invoke(struct mac_context *mac_ctx, uint8_t vdev_id,
+			  uint16_t dot11_mode, enum QDF_OPMODE opmode)
+{
+	QDF_STATUS status;
+
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	status = lim_send_ies_per_band(mac_ctx, vdev_id, dot11_mode, opmode);
+	return status;
+}
+
 #endif
 
 static bool lim_is_beacon_miss_scenario(struct mac_context *mac,
@@ -3221,8 +3223,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 	uint8_t *pBody;
 	tSirMacCapabilityInfo capabilityInfo;
 	tpSirMacMgmtHdr pHdr = NULL;
-	struct pe_session *pe_session = NULL;
-	uint8_t sessionId;
+	struct wlan_objmgr_vdev *vdev;
 
 	/*
 	 *
@@ -3264,10 +3265,12 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		struct tLimPreAuthNode *auth_node;
 
 		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-		pe_session = pe_find_session_by_bssid(mac, pHdr->bssId,
-							 &sessionId);
-		if (!pe_session)
+		vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+								 pHdr->da,
+								 WLAN_LEGACY_MAC_ID);
+		if (!vdev)
 			return eMGMT_DROP_NO_DROP;
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 		curr_seq_num = ((pHdr->seqControl.seqNumHi << 4) |
 				(pHdr->seqControl.seqNumLo));
@@ -3286,10 +3289,20 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		qdf_time_t *timestamp;
 
 		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-		pe_session = pe_find_session_by_bssid(mac, pHdr->bssId,
-				&sessionId);
-		if (!pe_session)
+		vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+								 pHdr->da,
+								 WLAN_LEGACY_MAC_ID);
+		if (!vdev)
 			return eMGMT_DROP_SPURIOUS_FRAME;
+
+		if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
+		    wlan_cm_is_vdev_roam_started(vdev) &&
+		    (subType == SIR_MAC_MGMT_DISASSOC ||
+		     subType == SIR_MAC_MGMT_DEAUTH)) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+			return eMGMT_DROP_DEAUTH_DURING_ROAM_STARTED;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 		peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
 						   pHdr->sa,
@@ -3297,7 +3310,6 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		if (!peer) {
 			if (subType == SIR_MAC_MGMT_ASSOC_REQ)
 				return eMGMT_DROP_NO_DROP;
-
 			return eMGMT_DROP_SPURIOUS_FRAME;
 		}
 
@@ -3307,7 +3319,6 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 			wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 			if (subType == SIR_MAC_MGMT_ASSOC_REQ)
 				return eMGMT_DROP_NO_DROP;
-
 			return eMGMT_DROP_SPURIOUS_FRAME;
 		}
 

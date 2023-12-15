@@ -307,8 +307,10 @@ void lim_process_mlm_join_cnf(struct mac_context *mac_ctx,
 		return;
 	}
 
-	wlan_connectivity_sta_info_event(mac_ctx->psoc, session_entry->vdev_id);
+	wlan_connectivity_sta_info_event(mac_ctx->psoc, session_entry->vdev_id,
+					 false);
 
+	session_entry->join_probe_cnt = 0;
 	if (session_entry->limSmeState != eLIM_SME_WT_JOIN_STATE) {
 		pe_err("received unexpected MLM_JOIN_CNF in state %X",
 			session_entry->limSmeState);
@@ -3003,7 +3005,7 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
 {
 	struct mlo_partner_info *partner_info;
 	struct mlo_link_info *partner_link_info;
-	struct wlan_channel channel;
+	struct wlan_channel channel = {0};
 	struct mlo_link_switch_context *link_ctx;
 	uint8_t i = 0;
 
@@ -3045,7 +3047,7 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
 
 		mlo_mgr_update_ap_link_info(session->vdev,
 					    partner_link_info->link_id,
-					    partner_link_info->ap_link_addr.bytes,
+					    partner_link_info->link_addr.bytes,
 					    channel);
 	}
 }
@@ -3090,6 +3092,16 @@ static void lim_process_switch_channel_join_req(
 	    (!session_entry->lim_join_req)) {
 		pe_err("invalid pointer!!");
 		goto error;
+	}
+
+	if (lim_connect_skip_join_for_gc(session_entry)) {
+		join_cnf.resultCode = eSIR_SME_SUCCESS;
+		join_cnf.protStatusCode = STATUS_SUCCESS;
+		join_cnf.sessionId = session_entry->peSessionId;
+		lim_post_sme_message(mac_ctx,
+				     LIM_MLM_JOIN_CNF,
+				     (uint32_t *)&join_cnf.resultCode);
+		return;
 	}
 
 	bss = &session_entry->lim_join_req->bssDescription;
@@ -3250,6 +3262,7 @@ static void lim_process_switch_channel_join_req(
 		goto error;
 	}
 
+	session_entry->join_probe_cnt++;
 	return;
 error:
 	if (session_entry) {

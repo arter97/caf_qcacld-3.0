@@ -472,7 +472,11 @@ wma_release_vdev_ref(struct wma_txrx_node *iface)
 	struct wlan_objmgr_vdev *vdev;
 
 	vdev = iface->vdev;
-
+	wma_debug("vdev state: %d", vdev->obj_state);
+	if (vdev->obj_state != WLAN_OBJ_STATE_LOGICALLY_DELETED) {
+		wma_debug("no vdev delete");
+		return;
+	}
 	iface->vdev_active = false;
 	iface->vdev = NULL;
 	if (vdev)
@@ -555,13 +559,6 @@ static QDF_STATUS wma_self_peer_remove(tp_wma_handle wma_handle,
 	wma_debug("P2P Device: removing self peer "QDF_MAC_ADDR_FMT,
 		  QDF_MAC_ADDR_REF(del_vdev_req->self_mac_addr));
 
-	qdf_status = wma_remove_peer(wma_handle, del_vdev_req->self_mac_addr,
-				     vdev_id, false);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		wma_err("wma_remove_peer is failed");
-		goto error;
-	}
-
 	if (wmi_service_enabled(wma_handle->wmi_handle,
 				wmi_service_sync_delete_cmds)) {
 		sta_self_wmi_rsp =
@@ -586,6 +583,17 @@ static QDF_STATUS wma_self_peer_remove(tp_wma_handle wma_handle,
 			qdf_status = QDF_STATUS_E_FAILURE;
 			goto error;
 		}
+	}
+
+	 qdf_status = wma_remove_peer(wma_handle, del_vdev_req->self_mac_addr,
+				      vdev_id, false);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		wma_err("wma_remove_peer is failed");
+		wma_remove_req(wma_handle, vdev_id,
+			       WMA_DEL_P2P_SELF_STA_RSP_START);
+		qdf_mem_free(sta_self_wmi_rsp);
+
+		goto error;
 	}
 
 error:
@@ -721,7 +729,6 @@ QDF_STATUS wma_vdev_detach(struct del_vdev_params *pdel_vdev_req_param)
 	iface = &wma_handle->interfaces[vdev_id];
 	if (!iface->vdev) {
 		wma_err("vdev %d is NULL", vdev_id);
-		mlme_vdev_self_peer_delete_resp(pdel_vdev_req_param);
 		return status;
 	}
 
@@ -4662,7 +4669,7 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	QDF_STATUS status;
 	int32_t ret;
 	struct wma_txrx_node *iface = NULL;
-	struct wma_target_req *msg;
+	struct wma_target_req *msg = NULL;
 	bool peer_assoc_cnf = false;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint32_t i, j;
@@ -4794,6 +4801,11 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	ret = wma_send_peer_assoc(wma, add_sta->nwType, add_sta);
 	if (ret) {
 		add_sta->status = QDF_STATUS_E_FAILURE;
+		if (msg) {
+			wma_remove_req(wma, add_sta->smesessionId,
+				       WMA_PEER_ASSOC_CNF_START);
+			peer_assoc_cnf = false;
+		}
 		wma_remove_peer(wma, add_sta->staMac, add_sta->smesessionId,
 				false);
 		goto send_rsp;

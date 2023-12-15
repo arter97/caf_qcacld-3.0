@@ -1637,9 +1637,13 @@ MLME_OBJS += $(WFA_TGT_IF_DIR)/src/target_if_wfa_testcmd.o \
 ####### LL_SAP #######
 LL_SAP_DIR := components/umac/mlme/sap/ll_sap
 LL_SAP_OS_IF_DIR := os_if/mlme/sap/ll_sap
+LL_SAP_TARGET_IF_DIR := components/target_if/sap/ll_sap
+LL_SAP_WMI_DIR := components/wmi/
 
 LL_SAP_INC := -I$(WLAN_ROOT)/$(LL_SAP_DIR)/dispatcher/inc \
-		-I$(WLAN_ROOT)/$(LL_SAP_OS_IF_DIR)/inc
+		-I$(WLAN_ROOT)/$(LL_SAP_OS_IF_DIR)/inc \
+		-I$(WLAN_ROOT)/$(LL_SAP_TARGET_IF_DIR)/inc \
+		-I$(WLAN_ROOT)/$(LL_SAP_WMI_DIR)/inc
 
 MLME_INC += $(LL_SAP_INC)
 
@@ -1649,7 +1653,10 @@ MLME_OBJS += $(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_ucfg_api.o \
 		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o \
 		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_main.o \
 		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_bearer_switch.o \
-		$(LL_SAP_OS_IF_DIR)/src/os_if_ll_sap.o
+		$(LL_SAP_OS_IF_DIR)/src/os_if_ll_sap.o \
+		$(LL_SAP_TARGET_IF_DIR)/src/target_if_ll_sap.o \
+		$(LL_SAP_WMI_DIR)/src/wmi_unified_ll_sap_api.o \
+		$(LL_SAP_WMI_DIR)/src/wmi_unified_ll_sap_tlv.o
 endif
 
 $(call add-wlan-objs,mlme,$(MLME_OBJS))
@@ -4065,6 +4072,9 @@ ccflags-$(CONFIG_FEATURE_WLAN_AP_AP_ACS_OPTIMIZE) += -DFEATURE_WLAN_AP_AP_ACS_OP
 #Enable 4address scheme
 ccflags-$(CONFIG_FEATURE_WLAN_STA_4ADDR_SCHEME) += -DFEATURE_WLAN_STA_4ADDR_SCHEME
 
+#Optimize GC connection speed by skipping JOIN
+ccflags-$(CONFIG_FEATURE_WLAN_GC_SKIP_JOIN) += -DFEATURE_WLAN_GC_SKIP_JOIN
+
 #enable MDM/SDX special config
 ccflags-$(CONFIG_MDM_PLATFORM) += -DMDM_PLATFORM
 
@@ -4303,6 +4313,8 @@ ccflags-$(CONFIG_DP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE) += -DDP_WAR_VALIDATE_RX_ERR
 ccflags-$(CONFIG_WLAN_DP_SRNG_USAGE_WM_TRACKING) += -DWLAN_DP_SRNG_USAGE_WM_TRACKING
 ccflags-$(CONFIG_WLAN_FEATURE_DP_CFG_EVENT_HISTORY) += -DWLAN_FEATURE_DP_CFG_EVENT_HISTORY
 ccflags-$(CONFIG_WLAN_DP_VDEV_NO_SELF_PEER) += -DWLAN_DP_VDEV_NO_SELF_PEER
+ccflags-$(CONFIG_DP_RX_MSDU_DONE_FAIL_HISTORY) += -DDP_RX_MSDU_DONE_FAIL_HISTORY
+ccflags-$(CONFIG_DP_RX_PEEK_MSDU_DONE_WAR) += -DDP_RX_PEEK_MSDU_DONE_WAR
 
 # Enable Low latency
 ccflags-$(CONFIG_WLAN_FEATURE_LL_MODE) += -DWLAN_FEATURE_LL_MODE

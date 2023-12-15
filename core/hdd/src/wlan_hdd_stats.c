@@ -7838,8 +7838,8 @@ wlan_hdd_update_mlo_sinfo(struct wlan_hdd_link_info *link_info,
 
 	/* Update the rate info for link with best RSSI */
 	if (sinfo->signal > hdd_sinfo->signal) {
-		hdd_debug_rl("Updating rates for link_id %d",
-			     sta_ctx->conn_info.ieee_link_id);
+		hdd_nofl_debug("Updating rates for link_id %d",
+			       sta_ctx->conn_info.ieee_link_id);
 		wlan_hdd_update_mlo_rate_info(hdd_sinfo, sinfo);
 	}
 
@@ -8001,16 +8001,15 @@ static int wlan_hdd_send_mlo_station_stats(struct hdd_adapter *adapter,
 		return wlan_hdd_get_sta_stats(adapter->deflink, mac, sinfo);
 	}
 
-	if (!wlan_is_mlo_aggregated_stats_allowed(adapter, mac)) {
-		link_info = hdd_get_link_info_by_bssid(hdd_ctx, mac);
-		if (!link_info) {
-			hdd_debug_rl("Invalid bssid");
-			return -EINVAL;
-		}
-		return wlan_hdd_get_sta_stats(link_info, mac, sinfo);
-	}
+	link_info = hdd_get_link_info_by_bssid(hdd_ctx, mac);
+	if (!link_info) {
+		if (wlan_is_mlo_aggregated_stats_allowed(adapter, mac))
+			return wlan_hdd_get_mlo_sta_stats(adapter, mac, sinfo);
 
-	return wlan_hdd_get_mlo_sta_stats(adapter, mac, sinfo);
+		hdd_debug_rl("Invalid bssid");
+		return -EINVAL;
+	}
+	return wlan_hdd_get_sta_stats(link_info, mac, sinfo);
 }
 
 /**
@@ -8048,8 +8047,8 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
 
-	hdd_debug_rl("Stats request on MAC: " QDF_MAC_ADDR_FMT,
-		     QDF_MAC_ADDR_REF(mac));
+	hdd_nofl_debug("Stats request on MAC: " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(mac));
 
 	if (!mac || qdf_is_macaddr_zero((struct qdf_mac_addr *)mac)) {
 		hdd_err("Invalid MAC addr");
@@ -8247,7 +8246,7 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 		    wlan_hdd_is_per_link_stats_supported(hdd_ctx))
 			return wlan_hdd_get_mlo_sta_stats(adapter, mac, sinfo);
 
-		hdd_debug("Sending Assoc Link stats");
+		hdd_nofl_debug("Sending Assoc Link stats");
 		errno = wlan_hdd_get_sta_stats(adapter->deflink, mac, sinfo);
 	}
 	return errno;

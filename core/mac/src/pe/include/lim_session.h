@@ -635,7 +635,6 @@ struct wlan_mlo_ie_info {
  * @deauth_retry:
  * @enable_bcast_probe_rsp:
  * @ht_client_cnt:
- * @force_24ghz_in_ht20:
  * @ch_switch_in_progress:
  * @he_with_wep_tkip:
  * @fils_info:
@@ -679,6 +678,7 @@ struct wlan_mlo_ie_info {
  * @is_oui_auth_assoc_6mbps_2ghz_enable: send auth/assoc req with 6 Mbps rate
  * @is_unexpected_peer_error: true if unexpected peer error
  * on 2.4 GHz
+ * @join_probe_cnt: join probe request count
  */
 struct pe_session {
 	uint8_t available;
@@ -957,7 +957,6 @@ struct pe_session {
 	struct deauth_retry_params deauth_retry;
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
-	bool force_24ghz_in_ht20;
 	bool ch_switch_in_progress;
 	bool he_with_wep_tkip;
 #ifdef WLAN_FEATURE_FILS_SK
@@ -1008,6 +1007,7 @@ struct pe_session {
 	uint8_t user_edca_set;
 	bool is_oui_auth_assoc_6mbps_2ghz_enable;
 	bool is_unexpected_peer_error;
+	uint8_t join_probe_cnt;
 };
 
 /*-------------------------------------------------------------------------

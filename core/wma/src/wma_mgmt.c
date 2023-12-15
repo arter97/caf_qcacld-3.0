@@ -1379,6 +1379,14 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 				params->msd_caps.med_sync_max_txop_num;
 		req->mlo_params.link_switch_in_progress =
 			wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
+		/*
+		 * Set max simultaneous links = 1 for MLSR, 2 for MLMR. The +1
+		 * is added as per the agreement with FW for backward
+		 * compatibility purposes. Our internal structures still
+		 * conform to the values as per spec i.e. 0 = MLSR, 1 = MLMR.
+		 */
+		req->mlo_params.max_num_simultaneous_links =
+			wlan_mlme_get_sta_mlo_simultaneous_links(psoc) + 1;
 	} else {
 		wma_debug("Peer MLO context is NULL");
 		req->mlo_params.mlo_enabled = false;
@@ -3930,7 +3938,8 @@ QDF_STATUS wma_register_roaming_callbacks(
 					uint8_t vdev_id,
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
-					uint16_t reason_code))
+					uint16_t reason_code),
+	set_ies_fn_t pe_roam_set_ie_cb)
 {
 
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -3941,6 +3950,7 @@ QDF_STATUS wma_register_roaming_callbacks(
 	wma->csr_roam_auth_event_handle_cb = csr_roam_auth_event_handle_cb;
 	wma->pe_roam_synch_cb = pe_roam_synch_cb;
 	wma->pe_disconnect_cb = pe_disconnect_cb;
+	wma->pe_roam_set_ie_cb = pe_roam_set_ie_cb;
 	wma_debug("Registered roam synch callbacks with WMA successfully");
 
 	return QDF_STATUS_SUCCESS;
@@ -4188,4 +4198,23 @@ wma_update_bss_peer_phy_mode(struct wlan_channel *des_chan,
 	des_chan->ch_phymode = new_phymode;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+cm_send_ies_for_roam_invoke(struct wlan_objmgr_vdev *vdev, uint16_t dot11_mode)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	enum QDF_OPMODE op_mode;
+	QDF_STATUS status;
+	uint8_t vdev_id;
+
+	if (!wma)
+		return QDF_STATUS_E_FAILURE;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	status = wma->pe_roam_set_ie_cb(wma->mac_context, vdev_id, dot11_mode,
+					op_mode);
+	return status;
 }

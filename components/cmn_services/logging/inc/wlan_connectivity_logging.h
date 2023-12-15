@@ -284,6 +284,46 @@ enum wlan_bcn_rpt_measurement_mode {
 };
 
 /**
+ * enum wlan_diag_connect_fail_reason - WLAN diag connect fail reason code
+ * @WLAN_DIAG_UNSPECIFIC_REASON: Unspecific reason
+ * @WLAN_DIAG_NO_CANDIDATE_FOUND: No candidate found
+ * @WLAN_DIAG_ABORT_DUE_TO_NEW_REQ_RECVD: Aborted as new command is
+ * received.
+ * @WLAN_DIAG_BSS_SELECT_IND_FAILED: Failed BSS select indication
+ * @WLAN_DIAG_PEER_CREATE_FAILED: peer create failed
+ * @WLAN_DIAG_JOIN_FAILED: Failed in joining state
+ * @WLAN_DIAG_JOIN_TIMEOUT: Did not receive beacon or probe response after
+ * unicast probe request
+ * @WLAN_DIAG_AUTH_FAILED: Auth rejected by AP
+ * @WLAN_DIAG_AUTH_TIMEOUT: No Auth resp from AP
+ * @WLAN_DIAG_ASSOC_FAILED: Assoc rejected by AP
+ * @WLAN_DIAG_ASSOC_TIMEOUT: No Assoc resp from AP
+ * @WLAN_DIAG_HW_MODE_FAILURE: failed to change HW mode
+ * @WLAN_DIAG_SER_FAILURE: Failed to serialize command
+ * @WLAN_DIAG_SER_TIMEOUT: Serialization cmd timeout
+ * @WLAN_DIAG_GENERIC_FAILURE: Generic failure apart from above
+ * @WLAN_DIAG_VALID_CANDIDATE_CHECK_FAIL: Valid Candidate Check fail
+ */
+enum wlan_diag_connect_fail_reason {
+	WLAN_DIAG_UNSPECIFIC_REASON = 0,
+	WLAN_DIAG_NO_CANDIDATE_FOUND = 1,
+	WLAN_DIAG_ABORT_DUE_TO_NEW_REQ_RECVD,
+	WLAN_DIAG_BSS_SELECT_IND_FAILED,
+	WLAN_DIAG_PEER_CREATE_FAILED,
+	WLAN_DIAG_JOIN_FAILED,
+	WLAN_DIAG_JOIN_TIMEOUT,
+	WLAN_DIAG_AUTH_FAILED,
+	WLAN_DIAG_AUTH_TIMEOUT,
+	WLAN_DIAG_ASSOC_FAILED,
+	WLAN_DIAG_ASSOC_TIMEOUT,
+	WLAN_DIAG_HW_MODE_FAILURE,
+	WLAN_DIAG_SER_FAILURE,
+	WLAN_DIAG_SER_TIMEOUT,
+	WLAN_DIAG_GENERIC_FAILURE,
+	WLAN_DIAG_VALID_CANDIDATE_CHECK_FAIL,
+};
+
+/**
  * struct wlan_connectivity_log_diag_cmn - Structure for diag event
  * @bssid: bssid
  * @vdev_id: Vdev id
@@ -327,6 +367,7 @@ struct wlan_diag_sta_info {
  * @vdev_id: vdev id associated with the link
  * @tid_ul: TID-to-link mapping information on the uplink
  * @tid_dl: TID-to-link mapping information on the downlink
+ * @status: MLO setup status. 0 - Success, 1 - failure
  * @link_addr: Link address of the link.
  */
 struct wlan_diag_mlo_cmn_info {
@@ -337,11 +378,12 @@ struct wlan_diag_mlo_cmn_info {
 	uint8_t tid_dl;
 	uint8_t status;
 	uint8_t link_addr[QDF_MAC_ADDR_SIZE];
-};
+} qdf_packed;
 
 #define DIAG_MLO_SETUP_VERSION 1
+#define DIAG_MLO_SETUP_VERSION_V2 2
 
-#define MAX_BANDS 3
+#define MAX_NUM_LINKS_PER_EVENT 3
 /**
  * struct wlan_diag_mlo_setup - MLO setup structure
  * @diag_cmn: Common diag info
@@ -353,10 +395,10 @@ struct wlan_diag_mlo_cmn_info {
  */
 struct wlan_diag_mlo_setup {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
-	uint32_t version:8;
-	uint32_t num_links:8;
-	uint32_t reserved:16;
-	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
+	uint8_t version;
+	uint8_t num_links;
+	uint16_t reserved;
+	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_NUM_LINKS_PER_EVENT];
 } qdf_packed;
 
 #define DIAG_MLO_RECONFIG_VERSION 1
@@ -376,6 +418,7 @@ struct wlan_diag_mlo_reconfig {
 } qdf_packed;
 
 #define DIAG_MLO_T2LM_STATUS_VERSION 1
+#define DIAG_MLO_T2LM_STATUS_VERSION_V2 2
 
 /**
  * struct wlan_diag_mlo_t2lm_status - MLO T2LM status diag event structure
@@ -387,10 +430,10 @@ struct wlan_diag_mlo_reconfig {
  */
 struct wlan_diag_mlo_t2lm_status {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
-	uint32_t version:8;
-	uint32_t num_links:8;
-	uint32_t reserved:16;
-	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_BANDS];
+	uint8_t version;
+	uint8_t num_links;
+	uint16_t reserved;
+	struct wlan_diag_mlo_cmn_info mlo_cmn_info[MAX_NUM_LINKS_PER_EVENT];
 } qdf_packed;
 
 #define DIAG_MLO_T2LM_REQ_RESP_VERSION 1
@@ -1385,10 +1428,13 @@ static inline void wlan_connectivity_logging_stop(void)
  * wlan_connectivity_sta_info_event() - APi to send STA info event
  * @psoc: Pointer to global psoc object
  * @vdev_id: Vdev id
+ * @is_roam: Is sta info event for roaming stats
+ *
+ * Return: None
  */
 void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id);
+				 uint8_t vdev_id, bool is_roam);
 
 /**
  * wlan_connectivity_connecting_event() - API to log connecting event
@@ -1493,10 +1539,11 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
  * wlan_connectivity_sta_info_event() - APi to send STA info event
  * @psoc: Pointer to global psoc object
  * @vdev_id: Vdev id
+ * @is_roam: Is sta info event for roaming stats
  */
 void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id);
+				 uint8_t vdev_id, bool is_roam);
 
 /**
  * wlan_convert_freq_to_diag_band() - API to convert frequency to band value
@@ -1597,7 +1644,7 @@ wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
 
 static inline void
 wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id)
+				 uint8_t vdev_id, bool is_roam)
 {}
 
 static inline void

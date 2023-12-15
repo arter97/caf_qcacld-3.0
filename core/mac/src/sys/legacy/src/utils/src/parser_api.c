@@ -1653,6 +1653,9 @@ static void populate_dot11f_qcn_ie_he_params(struct mac_context *mac,
 {
 	uint16_t mcs_12_13_supp;
 
+	if (!lim_is_session_he_capable(pe_session))
+		return;
+
 	/* To fix WAPI IoT issue.*/
 	if (pe_session->encryptType == eSIR_ED_WPI)
 		return;
@@ -1733,7 +1736,8 @@ void populate_dot11f_qcn_ie(struct mac_context *mac,
 		qcn_ie->qcn_version.version = QCN_IE_VERSION_SUPPORTED;
 		qcn_ie->qcn_version.sub_version = QCN_IE_SUBVERSION_SUPPORTED;
 	}
-	if (mac->mlme_cfg->vht_caps.vht_cap_info.vht_mcs_10_11_supp) {
+	if (pe_session->vhtCapability &&
+	    mac->mlme_cfg->vht_caps.vht_cap_info.vht_mcs_10_11_supp) {
 		qcn_ie->present = 1;
 		qcn_ie->vht_mcs11_attr.present = 1;
 		qcn_ie->vht_mcs11_attr.vht_mcs_10_11_supp = 1;
@@ -3790,7 +3794,7 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mlo_partner_info partner_info;
 
-	if (ar->mlo_ie.present)
+	if (!ar->mlo_ie.present)
 		return status;
 
 	status = util_find_mlie(frame + WLAN_ASSOC_RSP_IES_OFFSET,
@@ -4260,7 +4264,7 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 						 session_entry, ar, pAssocRsp);
 	sir_convert_assoc_resp_frame2_t2lm_struct(mac, frame, frame_len,
 						  session_entry, ar, pAssocRsp);
-	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d",
+	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d mlo %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
 		 ar->vendor_vht_ie.VHTCaps.present,
 		 ar->vendor_vht_ie.VHTOperation.present, ar->he_cap.present,
@@ -4269,7 +4273,8 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 		 ar->bss_max_idle_period.present,
 		 pAssocRsp->bss_max_idle_period.max_idle_period,
 		 ar->mu_edca_param_set.present, ar->WMMParams.present,
-		 ar->QosMapSet.present);
+		 ar->QosMapSet.present,
+		 ar->mlo_ie.present);
 
 	if (ar->WMMParams.present)
 		__print_wmm_params(mac, &ar->WMMParams);
@@ -11323,6 +11328,11 @@ sir_convert_mlo_probe_rsp_frame2_struct(uint8_t *ml_ie,
 	util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
 				      &mlo_ie_ptr->mlo_ie.common_info_length);
 
+	sta_prof = ml_ie + sizeof(struct wlan_ie_multilink) +
+		   mlo_ie_ptr->mlo_ie.common_info_length;
+	lim_store_mlo_ie_raw_info(ml_ie, sta_prof,
+				  ml_ie_total_len, &mlo_ie_ptr->mlo_ie);
+
 	util_get_bvmlie_mldmacaddr(ml_ie, ml_ie_total_len, &mld_mac_addr);
 	qdf_mem_copy(mlo_ie_ptr->mlo_ie.mld_mac_addr, mld_mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
@@ -11339,10 +11349,6 @@ sir_convert_mlo_probe_rsp_frame2_struct(uint8_t *ml_ie,
 						bss_param_change_cnt_found;
 	mlo_ie_ptr->mlo_ie.bss_param_change_count = bss_param_change_cnt;
 	mlo_ie_ptr->mlo_ie_present = true;
-	sta_prof = ml_ie + sizeof(struct wlan_ie_multilink) +
-		   mlo_ie_ptr->mlo_ie.common_info_length;
-	lim_store_mlo_ie_raw_info(ml_ie, sta_prof,
-				  ml_ie_total_len, &mlo_ie_ptr->mlo_ie);
 
 	return QDF_STATUS_SUCCESS;
 }

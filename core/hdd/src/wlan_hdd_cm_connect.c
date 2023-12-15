@@ -1102,10 +1102,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 				      rsp->connect_ies.bcn_probe_rsp.len,
 				      &hdd_sta_ctx->conn_info.hs20vendor_ie);
 
-	status = sme_unpack_assoc_rsp(mac_handle,
-				      rsp->connect_ies.assoc_rsp.ptr,
-				      rsp->connect_ies.assoc_rsp.len,
-				      assoc_resp);
+	status = sme_unpack_assoc_rsp(mac_handle, rsp, assoc_resp);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("could not parse assoc response");
 		qdf_mem_free(assoc_resp);
@@ -1680,12 +1677,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			if (is_auth_required)
 				wlan_acquire_peer_key_wakelock(hdd_ctx->pdev,
 							      rsp->bssid.bytes);
-			/*
-			 * In case of roaming from 3 Link or 2 Link to 1 link
-			 * AP, then reset the STA context for other links
-			 */
-			if (wlan_vdev_mlme_is_mlo_vdev(vdev))
-				hdd_adapter_reset_station_ctx(adapter);
 		}
 		hdd_debug("is_roam_offload %d, is_roam %d, is_auth_required %d",
 			  is_roam_offload, is_roam, is_auth_required);

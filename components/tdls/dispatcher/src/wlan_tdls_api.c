@@ -26,6 +26,7 @@
 #include "../../core/src/wlan_tdls_main.h"
 #include "../../core/src/wlan_tdls_ct.h"
 #include "../../core/src/wlan_tdls_mgmt.h"
+#include "wlan_tdls_peer.h"
 #include <wlan_objmgr_global_obj.h>
 #include <wlan_objmgr_cmn.h>
 #include "wlan_tdls_cfg_api.h"
@@ -469,4 +470,40 @@ void wlan_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 				 struct qdf_mac_addr *dest_mac_addr)
 {
 	tdls_update_rx_pkt_cnt(vdev, mac_addr, dest_mac_addr);
+}
+
+void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    uint8_t *peer_addr)
+{
+	struct tdls_soc_priv_obj *tdls_soc_obj;
+	struct tdls_vdev_priv_obj *tdls_vdev_obj;
+	struct tdls_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_TDLS_NB_ID);
+	if (!vdev)
+		return;
+
+	status = tdls_get_vdev_objects(vdev, &tdls_vdev_obj, &tdls_soc_obj);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("Failed to get TDLS objects");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+		return;
+	}
+
+	peer = tdls_get_peer(tdls_vdev_obj, peer_addr);
+	if (!peer) {
+		tdls_err("tdls_peer is NULL");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+		return;
+	}
+
+	peer->discovery_attempt++;
+	tdls_debug("vdev:%d peer discovery attempts:%d", vdev_id,
+		   peer->discovery_attempt);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
 }

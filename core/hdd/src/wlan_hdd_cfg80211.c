@@ -4012,7 +4012,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	uint8_t vht_ch_width;
 	uint32_t channel_bonding_mode_2g;
 	uint32_t last_scan_ageout_time;
-	bool ll_lt_sap = false;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	/* ***Note*** Donot set SME config related to ACS operation here because
@@ -4039,8 +4038,11 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc,
 					    &channel_bonding_mode_2g);
 
-	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id))
+	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id)) {
 		is_ll_lt_sap = true;
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(hdd_ctx->psoc,
+							    true);
+	}
 
 	if (is_ll_lt_sap || sap_force_11n_for_11ac)
 		sap_force_11n = true;
@@ -4279,9 +4281,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	sap_config->acs_cfg.acs_mode = true;
 
-	ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
-						 link_info->vdev_id);
-
 	if (wlan_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev))
 		hdd_remove_6ghz_freq_from_acs_list(
 					sap_config->acs_cfg.freq_list,
@@ -4289,7 +4288,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	if ((is_external_acs_policy &&
 	    policy_mgr_is_force_scc(hdd_ctx->psoc) &&
-	    policy_mgr_get_connection_count(hdd_ctx->psoc)) || ll_lt_sap) {
+	    policy_mgr_get_connection_count(hdd_ctx->psoc)) || is_ll_lt_sap) {
 		if (adapter->device_mode == QDF_SAP_MODE)
 			is_vendor_unsafe_ch_present =
 				wlansap_filter_vendor_unsafe_ch_freq(sap_ctx,
@@ -4302,7 +4301,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		if (!sap_config->acs_cfg.ch_list_count &&
 		    sap_config->acs_cfg.master_ch_list_count &&
 		    !is_vendor_unsafe_ch_present &&
-		    !ll_lt_sap)
+		    !is_ll_lt_sap)
 			wlan_hdd_handle_zero_acs_list(
 				hdd_ctx,
 				sap_config->acs_cfg.freq_list,
@@ -5062,12 +5061,17 @@ static inline void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
 }
 #endif
 
-static inline void wlan_hdd_set_ll_lt_sap_feature(uint8_t *feature_flags)
+static inline void wlan_hdd_set_ll_lt_sap_feature(struct wlan_objmgr_psoc *psoc,
+						  uint8_t *feature_flags)
 {
 	/* To Do: Once FW feature capability changes for ll_lt_sap feature are
 	 * merged, then this feature will be set based on that feature set
 	 * capability
 	 */
+	if (!ucfg_is_ll_lt_sap_supported(psoc)) {
+		hdd_debug("ll_lt_sap feature is disabled in FW");
+		return;
+	}
 	wlan_hdd_cfg80211_set_feature(feature_flags,
 				      QCA_WLAN_VENDOR_FEATURE_ENHANCED_AUDIO_EXPERIENCE_OVER_WLAN);
 }
@@ -5194,7 +5198,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 				feature_flags,
 				QCA_WLAN_VENDOR_FEATURE_AP_ALLOWED_FREQ_LIST);
 	wlan_wifi_pos_cfg80211_set_features(hdd_ctx->psoc, feature_flags);
-	wlan_hdd_set_ll_lt_sap_feature(feature_flags);
+	wlan_hdd_set_ll_lt_sap_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
@@ -9908,8 +9912,13 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL];
 	int ret;
 
-	if (!power_attr && !opm_attr)
+	hdd_enter_dev(adapter->dev);
+
+	if (!power_attr && !opm_attr) {
+		hdd_err_rl("power attr and opm attr is null");
 		return 0;
+	}
+
 
 	if (power_attr && opm_attr) {
 		hdd_err_rl("Invalid OPM set attribute");
@@ -9922,11 +9931,14 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 	}
 
 	opm_mode = power_attr ? nla_get_u8(power_attr) : nla_get_u8(opm_attr);
-	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED)
+	hdd_debug("opm_mode %d", opm_mode);
+
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) {
 		if (!ps_ito_attr || !spec_wake_attr) {
 			hdd_err_rl("Invalid User defined OPM attributes");
 			return -EINVAL;
 		}
+	}
 
 	ret = hdd_set_power_config(hdd_ctx, adapter, &opm_mode);
 	if (ret)
@@ -9936,19 +9948,34 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) {
 		ps_params.ps_ito = nla_get_u16(ps_ito_attr);
 		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
+
+		if (!ps_params.ps_ito)
+			return -EINVAL;
+
+		hdd_debug("ps_ito %d spec_wake %d opm_mode %d",
+			  ps_params.ps_ito, ps_params.spec_wake,
+			  ps_params.opm_mode);
+
 		ret = hdd_set_power_config_params(hdd_ctx, adapter,
 						  ps_params.ps_ito,
 						  ps_params.spec_wake);
+
 		if (ret)
 			return ret;
 	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_POWER_ID);
-	if (vdev) {
-		ucfg_pmo_set_ps_params(vdev, &ps_params);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		return 0;
 	}
 
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED)
+		ucfg_pmo_set_ps_params(vdev, &ps_params);
+	else
+		ucfg_pmo_core_vdev_set_ps_opm_mode(vdev, ps_params.opm_mode);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	return 0;
 }
 
@@ -11073,6 +11100,20 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	struct nlattr *chn_bd = NULL;
 	struct nlattr *mlo_link_id;
 	enum eSirMacHTChannelWidth chwidth;
+	struct wlan_objmgr_psoc *psoc;
+	bool update_cw_allowed;
+
+	psoc = wlan_vdev_get_psoc(link_info->vdev);
+	if (!psoc) {
+		hdd_debug("psoc is null");
+		return -EINVAL;
+	}
+
+	ucfg_mlme_get_update_chan_width_allowed(psoc, &update_cw_allowed);
+	if (!update_cw_allowed) {
+		hdd_debug("update_channel_width is disabled via INI");
+		return -EINVAL;
+	}
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS])
 		goto skip_mlo;
@@ -21904,6 +21945,7 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 	bool is_bigtk_supported;
 	bool is_ocv_supported;
 	uint8_t iface_num;
+	bool dbs_one_by_one, dbs_two_by_two;
 
 	if (!wiphy) {
 		hdd_err("Invalid wiphy");
@@ -21972,7 +22014,17 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 			}
 		}
 
-		if (!ucfg_policy_mgr_is_fw_supports_dbs(hdd_ctx->psoc)) {
+		status = ucfg_policy_mgr_get_dbs_hw_modes(hdd_ctx->psoc,
+							  &dbs_one_by_one,
+							  &dbs_two_by_two);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("HW mode failure");
+			return;
+		}
+
+		if (!ucfg_policy_mgr_is_fw_supports_dbs(hdd_ctx->psoc) ||
+		    (dbs_one_by_one && !dbs_two_by_two)) {
 			wiphy->iface_combinations =
 						wlan_hdd_derived_combination;
 			iface_num = ARRAY_SIZE(wlan_hdd_derived_combination);

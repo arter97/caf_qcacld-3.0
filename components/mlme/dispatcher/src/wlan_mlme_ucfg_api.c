@@ -1866,6 +1866,13 @@ ucfg_mlme_set_channel_bonding_24ghz(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
+ucfg_mlme_get_update_chan_width_allowed(struct wlan_objmgr_psoc *psoc,
+					   bool *value)
+{
+	return wlan_mlme_get_update_chan_width_allowed(psoc, value);
+}
+
+QDF_STATUS
 ucfg_mlme_get_channel_bonding_5ghz(struct wlan_objmgr_psoc *psoc,
 				   uint32_t *value)
 {

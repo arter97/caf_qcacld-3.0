@@ -653,7 +653,7 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
-	wlan_diag_event.version = DIAG_MLO_SETUP_VERSION;
+	wlan_diag_event.version = DIAG_MLO_SETUP_VERSION_V2;
 
 	if (!vdev->mlo_dev_ctx) {
 		logging_err("vdev: %d MLO dev ctx not found",
@@ -794,7 +794,7 @@ wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
-	wlan_diag_event.version = DIAG_MLO_T2LM_STATUS_VERSION;
+	wlan_diag_event.version = DIAG_MLO_T2LM_STATUS_VERSION_V2;
 
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++)
 		t2lm[dir].direction = WLAN_T2LM_INVALID_DIRECTION;
@@ -805,7 +805,8 @@ wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 		return;
 	}
 
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS && i < MAX_BANDS; i++) {
+	for (i = 0;
+	     i < WLAN_MAX_ML_BSS_LINKS && i < MAX_NUM_LINKS_PER_EVENT; i++) {
 		if (qdf_is_macaddr_zero(&link_info->ap_link_addr) &&
 		    link_info->link_id == WLAN_INVALID_LINK_ID)
 			continue;
@@ -846,7 +847,8 @@ wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
 }
 
 void
-wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+				 bool is_roam)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev = NULL;
@@ -866,7 +868,7 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	      wlan_vdev_mlme_is_mlo_link_vdev(vdev))))
 		goto out;
 
-	if (!wlan_cm_is_first_candidate_connect_attempt(vdev))
+	if (!is_roam && !wlan_cm_is_first_candidate_connect_attempt(vdev))
 		goto out;
 
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
@@ -1133,7 +1135,11 @@ void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 		wlan_convert_link_id_to_diag_band(&src->mld_addr,
 						  src->prev_link_bitmap);
 	wlan_diag_event.reason = src->reason_code;
-	wlan_diag_event.diag_cmn.fw_timestamp = src->fw_timestamp;
+	/*
+	 * FW timestamp received from FW in milliseconds and to be sent to
+	 * userspace in microseconds
+	 */
+	wlan_diag_event.diag_cmn.fw_timestamp = src->fw_timestamp * 1000;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_MLO_LINK_STATUS);

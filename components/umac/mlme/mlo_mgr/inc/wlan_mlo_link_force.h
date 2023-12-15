@@ -191,6 +191,19 @@ ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
 				uint32_t *associated_bitmap);
 
 /**
+ * convert_link_bitmap_to_link_ids() - Convert link bitmap to link ids
+ * @link_bitmap: PSOC object information
+ * @link_id_sz: link_ids array size
+ * @link_ids: link id array
+ *
+ * Return: num of link id in link_ids array converted from link bitmap
+ */
+uint32_t
+convert_link_bitmap_to_link_ids(uint32_t link_bitmap,
+				uint8_t link_id_sz,
+				uint8_t *link_ids);
+
+/**
  * ml_nlink_convert_link_bitmap_to_ids() - convert link bitmap
  * to link ids
  * @link_bitmap: link bitmap

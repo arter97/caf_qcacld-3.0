@@ -5677,8 +5677,15 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 {
 	uint32_t i;
 	struct policy_mgr_psoc_priv_obj *pm_ctx = NULL;
-	uint8_t sap_cnt, go_cnt;
+	uint8_t sap_cnt, go_cnt, ll_lt_sap_vdev_id;
 
+	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
+
+	if (ll_lt_sap_vdev_id != WLAN_INVALID_VDEV_ID) {
+		policy_mgr_debug("LL_LT_SAP vdev %d present avoid 4th port concurrency",
+				 ll_lt_sap_vdev_id);
+		return false;
+	}
 	/* new STA may just have ssid, no channel until bssid assigned */
 	if (ch_freq == 0 && mode == PM_STA_MODE)
 		return true;
@@ -6934,6 +6941,13 @@ bool policy_mgr_is_mlo_in_mode_emlsr(struct wlan_objmgr_psoc *psoc,
 	uint8_t i, mlo_idx = 0;
 	struct wlan_objmgr_vdev *temp_vdev;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
 
 	mode_num = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							  vdev_id_list,
@@ -6960,6 +6974,27 @@ bool policy_mgr_is_mlo_in_mode_emlsr(struct wlan_objmgr_psoc *psoc,
 
 		wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_POLICY_MGR_ID);
 	}
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_DISABLE_LINK; i++) {
+		if (!pm_disabled_ml_links[i].in_use)
+			continue;
+		if (pm_disabled_ml_links[i].mode != PM_STA_MODE)
+			continue;
+		temp_vdev =
+		wlan_objmgr_get_vdev_by_id_from_psoc(
+					psoc, pm_disabled_ml_links[i].vdev_id,
+					WLAN_POLICY_MGR_ID);
+		if (!temp_vdev) {
+			policy_mgr_err("invalid inactive vdev for id %d",
+				       pm_disabled_ml_links[i].vdev_id);
+			continue;
+		}
+		/* Check if existing vdev is eMLSR STA */
+		if (wlan_vdev_mlme_cap_get(temp_vdev, WLAN_VDEV_C_EMLSR_CAP))
+			emlsr_connection = true;
+		wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_POLICY_MGR_ID);
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 end:
 	if (num_mlo)
 		*num_mlo = mlo_idx;
@@ -8515,6 +8550,45 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 	return restart_required;
 }
 
+/**
+ * policy_mgr_is_new_force_allowed() - Check if the new force command is allowed
+ * @psoc: PSOC object information
+ * @active_link_bitmap: Active link bitmap
+ * @force_inactive_num_bitmap: Force inactive number bitmap
+ * @force_inactive_num: Number of links to be forced inactive
+ *
+ * If ML STA associates in 3-link (2.4 GHz + 5 GHz + 6 GHz), Host sends force
+ * inactive num command between 5 GHz and 6 GHz links to firmware as it's a DBS
+ * RD. This force has to be in effect at all times but any new force active num
+ * command request from the userspace (except for 5 GHz + 6 GHz links) should be
+ * honored. This API checks if the new force command can be allowed.
+ *
+ * Return: True if the new force command is allowed, else False
+ */
+static bool
+policy_mgr_is_new_force_allowed(struct wlan_objmgr_psoc *psoc,
+				uint32_t active_link_bitmap,
+				uint16_t force_inactive_num_bitmap,
+				uint8_t force_inactive_num)
+{
+	uint32_t link_bitmap = 0;
+	uint8_t link_num = 0;
+
+	link_bitmap = ~active_link_bitmap & force_inactive_num_bitmap;
+	if (force_inactive_num_bitmap) {
+		if (!link_bitmap) {
+			policy_mgr_err("New force bitmap not allowed");
+			return false;
+		}
+		link_num = convert_link_bitmap_to_link_ids(link_bitmap,
+							   0, NULL);
+		if (link_num < force_inactive_num)
+			return false;
+	}
+
+	return true;
+}
+
 void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 					 uint8_t session_id, uint8_t num_links,
 					 struct qdf_mac_addr active_link_addr[2])
@@ -8597,10 +8671,17 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		}
 		ml_nlink_get_curr_force_state(psoc, vdev, &curr);
 		if (curr.force_inactive_num || curr.force_active_num) {
-			policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
-					 curr.force_active_num,
-					 curr.force_inactive_num);
-			goto done;
+			if (curr.force_inactive_num) {
+				if (!policy_mgr_is_new_force_allowed(
+						psoc, active_link_bitmap,
+						curr.force_inactive_num_bitmap,
+						curr.force_inactive_num)) {
+					policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
+							 curr.force_active_num,
+							 curr.force_inactive_num);
+				goto done;
+				}
+			}
 		}
 		/* If current force inactive bitmap exists, we have to remove
 		 * the new active bitmap from the existing inactive bitmap,
@@ -12684,3 +12765,18 @@ policy_mgr_get_connection_max_channel_width(struct wlan_objmgr_psoc *psoc)
 	return bw;
 }
 
+bool policy_mgr_is_given_freq_5g_low(struct wlan_objmgr_psoc *psoc,
+				     qdf_freq_t given_freq)
+{
+	qdf_freq_t sbs_cut_off_freq;
+
+	sbs_cut_off_freq = policy_mgr_get_sbs_cut_off_freq(psoc);
+	if (!sbs_cut_off_freq)
+		return false;
+
+	if (given_freq < sbs_cut_off_freq &&
+	    WLAN_REG_IS_5GHZ_CH_FREQ(given_freq))
+		return true;
+
+	return false;
+}

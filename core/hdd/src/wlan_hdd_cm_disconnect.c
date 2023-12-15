@@ -612,7 +612,14 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	 * connect in max BW.
 	 */
 	hdd_cm_restore_ch_width(vdev, link_info);
-	hdd_cm_set_default_wlm_mode(adapter);
+
+	/*
+	 * same WLM configuration is applicable for all links, So no need to
+	 * restore it while processing disconnection due to link switch.
+	 */
+	if (rsp->req.req.source != CM_MLO_LINK_SWITCH_DISCONNECT)
+		hdd_cm_set_default_wlm_mode(adapter);
+
 	__hdd_cm_disconnect_handler_post_user_update(link_info, vdev,
 						     rsp->req.req.source);
 	wlan_twt_concurrency_update(hdd_ctx);

@@ -4813,6 +4813,9 @@ QDF_STATUS wma_stop(void)
 
 	if (wma_handle->ack_work_ctx) {
 		cds_flush_work(&wma_handle->ack_work_ctx->ack_cmp_work);
+		if (wma_handle->ack_work_ctx->frame)
+			qdf_nbuf_free(wma_handle->ack_work_ctx->frame);
+
 		qdf_mem_free(wma_handle->ack_work_ctx);
 		wma_handle->ack_work_ctx = NULL;
 	}

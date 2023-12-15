@@ -1199,6 +1199,7 @@ struct wlan_mlme_rates {
  * @enable_block_ack: enable block ack feature
  * @channel_bonding_mode_24ghz: configures Channel Bonding in 24 GHz
  * @channel_bonding_mode_5ghz:  configures Channel Bonding in 5 GHz
+ * @update_cw_allowed: to check update chan width allowed or not
  */
 struct wlan_mlme_feature_flag {
 	bool accept_short_slot_assoc;
@@ -1214,6 +1215,7 @@ struct wlan_mlme_feature_flag {
 	uint32_t enable_block_ack;
 	uint32_t channel_bonding_mode_24ghz;
 	uint32_t channel_bonding_mode_5ghz;
+	bool update_cw_allowed;
 };
 
 /**
@@ -1818,6 +1820,7 @@ enum station_prefer_bw {
  * @mlo_support_link_band:          band bitmap that sta mlo supports
  * @mlo_max_simultaneous_links:     number of simultaneous links
  * @mlo_prefer_percentage:          percentage to boost/reduce mlo scoring
+ * @mlo_5gl_5gh_mlsr:               enable/disable 5GL+5GH MLSR
  * @epcs_capability:                epcs capability enable or disable flag
  * @usr_disable_eht:                user disable the eht for STA
  * @eht_disable_punct_in_us_lpi:    Disable eht puncture in us lpi mode
@@ -1855,6 +1858,7 @@ struct wlan_mlme_sta_cfg {
 	uint8_t mlo_support_link_band;
 	uint8_t mlo_max_simultaneous_links;
 	int8_t mlo_prefer_percentage;
+	bool mlo_5gl_5gh_mlsr;
 #endif
 #ifdef WLAN_FEATURE_11BE
 	bool epcs_capability;

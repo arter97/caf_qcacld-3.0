@@ -63,6 +63,7 @@
 #include "wlan_pre_cac_api.h"
 #include <wlan_cmn_ieee80211.h>
 #include <target_if.h>
+#include "wlan_ll_sap_api.h"
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -1154,6 +1155,14 @@ sap_validate_chan(struct sap_context *sap_context,
 	if (!sap_context->chan_freq) {
 		sap_err("Invalid channel");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, sap_context->vdev_id)) {
+		sap_context->chan_freq = wlan_ll_lt_sap_override_freq(
+							mac_ctx->psoc,
+							sap_context->vdev_id,
+							sap_context->chan_freq);
+		return QDF_STATUS_SUCCESS;
 	}
 
 	if (sap_context->vdev &&

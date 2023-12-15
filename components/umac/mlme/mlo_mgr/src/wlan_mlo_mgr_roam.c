@@ -302,32 +302,55 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static struct mlo_link_info *
+mlo_mgr_get_link_info_by_self_addr(struct wlan_objmgr_vdev *vdev,
+				   struct qdf_mac_addr *self_addr)
+{
+	uint8_t iter;
+	struct mlo_link_info *mlo_link;
+
+	if (!vdev || !vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->link_ctx ||
+	    !self_addr || qdf_is_macaddr_zero(self_addr))
+		return NULL;
+
+	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
+		mlo_link = &vdev->mlo_dev_ctx->link_ctx->links_info[iter];
+
+		if (qdf_is_macaddr_equal(&mlo_link->link_addr, self_addr))
+			return mlo_link;
+	}
+
+	return NULL;
+}
+
 void mlo_mgr_roam_update_ap_link_info(struct wlan_objmgr_vdev *vdev,
 				      struct ml_setup_link_param *src_link_info,
 				      struct wlan_channel *channel)
 {
 	struct mlo_link_info *link_info;
-	uint8_t iter;
 
-	if (!vdev || !vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->link_ctx ||
-	    !src_link_info)
+	if (!src_link_info)
 		return;
 
-	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
-		link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[iter];
-		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
-			break;
+	link_info = mlo_mgr_get_link_info_by_self_addr(vdev,
+						       &src_link_info->self_link_addr);
+	if (!link_info) {
+		mlo_err("No link info found for vdev %d with " QDF_MAC_ADDR_FMT,
+			src_link_info->vdev_id,
+			QDF_MAC_ADDR_REF(src_link_info->self_link_addr.bytes));
+		QDF_BUG(0);
+		return;
 	}
 
-	if (iter == WLAN_MAX_ML_BSS_LINKS)
+	if (link_info->vdev_id != src_link_info->vdev_id) {
+		mlo_err("Host(%d)-FW(%d) VDEV-MAC addr mismatch",
+			link_info->vdev_id, src_link_info->vdev_id);
+		QDF_BUG(0);
 		return;
+	}
 
 	link_info->link_id = src_link_info->link_id;
-	link_info->vdev_id = src_link_info->vdev_id;
-	qdf_mem_copy(&link_info->ap_link_addr, src_link_info->link_addr.bytes,
-		     QDF_MAC_ADDR_SIZE);
-	qdf_mem_copy(&link_info->link_addr, src_link_info->self_link_addr.bytes,
-		     QDF_MAC_ADDR_SIZE);
+	qdf_copy_macaddr(&link_info->ap_link_addr, &src_link_info->link_addr);
 	qdf_mem_copy(link_info->link_chan_info, channel, sizeof(*channel));
 
 	mlo_debug("link_id: %d, vdev_id:%d freq:%d ap_link_addr: "QDF_MAC_ADDR_FMT", self_link_addr: "QDF_MAC_ADDR_FMT,

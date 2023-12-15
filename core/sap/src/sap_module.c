@@ -1496,6 +1496,8 @@ const char *sap_get_csa_reason_str(enum sap_csa_reason_code reason)
 		return "CSA_REASON_SAP_ACS";
 	case CSA_REASON_SAP_FIX_CH_CONC_WITH_GO:
 		return "SAP_FIX_CH_CONC_WITH_GO";
+	case CSA_REASON_CONCURRENT_LL_LT_SAP_EVENT:
+		return "CONCURRENT_LL_LT_SAP_EVENT";
 	default:
 		return "UNKNOWN";
 	}

@@ -241,7 +241,7 @@ cm_disconnect_complete_ind(struct wlan_objmgr_vdev *vdev,
 		mlme_err("vdev or rsp is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
-	cm_csr_diconnect_done_ind(vdev, rsp);
+	cm_csr_disconnect_done_ind(vdev, rsp);
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);

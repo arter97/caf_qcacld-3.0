@@ -428,6 +428,8 @@ struct assoc_channel_info {
  * @ext_cap_ie: Ext CAP IE
  * @assoc_btm_cap: BSS transition management cap used in (re)assoc req
  * @assoc_chan_info: store channel info at the time of association
+ * @force_20mhz_in_24ghz: Only 20 MHz BW allowed in 2.4 GHz
+ *
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -454,6 +456,7 @@ struct mlme_connect_info {
 	uint8_t ext_cap_ie[DOT11F_IE_EXTCAP_MAX_LEN + 2];
 	bool assoc_btm_cap;
 	struct assoc_channel_info assoc_chan_info;
+	bool force_20mhz_in_24ghz;
 };
 
 /** struct wait_for_key_timer - wait for key timer object
