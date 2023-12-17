@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -65,3 +65,13 @@ wmi_extract_audio_transport_switch_req_event(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+QDF_STATUS
+wmi_unified_get_tsf_stats_for_csa(wmi_unified_t wmi_hdl, uint8_t vdev_id)
+{
+	if (wmi_hdl->ops->get_tsf_stats_for_csa)
+		return wmi_hdl->ops->get_tsf_stats_for_csa(wmi_hdl, vdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif

@@ -209,6 +209,7 @@ struct ll_sap_oob_connect_response_event {
  * @send_audio_transport_switch_resp: function pointer to indicate audio
  * transport switch response to FW
  * @send_oob_connect_request: OOB connect request to FW
+ * @get_tsf_stats_for_csa: Get tsf stats for csa
  */
 struct wlan_ll_sap_tx_ops {
 	QDF_STATUS (*send_audio_transport_switch_resp)(
@@ -218,6 +219,11 @@ struct wlan_ll_sap_tx_ops {
 	QDF_STATUS (*send_oob_connect_request)(
 					struct wlan_objmgr_psoc *psoc,
 					struct ll_sap_oob_connect_request req);
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+	QDF_STATUS (*get_tsf_stats_for_csa)(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+#endif
 };
 
 /**

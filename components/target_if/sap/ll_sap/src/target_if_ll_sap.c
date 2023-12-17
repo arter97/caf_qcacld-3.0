@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -179,12 +179,69 @@ static int target_if_send_audio_transport_switch_req_event_handler(
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+/* Start TSF timer value */
+#define START_TSF_TIMER_TIMEOUT 1000
+/**
+ * target_if_get_tsf_stats_for_csa() - Get tsf stats for ll_sap csa
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS target_if_get_tsf_stats_for_csa(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	struct wmi_unified *wmi_handle;
+	struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj;
+	QDF_STATUS status;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	ll_sap_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
+							psoc,
+							WLAN_UMAC_COMP_LL_SAP);
+
+	if (!ll_sap_psoc_obj) {
+		target_if_err("psoc_ll_sap_obj is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = qdf_mc_timer_start(&ll_sap_psoc_obj->tsf_timer,
+				    START_TSF_TIMER_TIMEOUT);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ll_sap_err("Failed to start tsf timer");
+		return status;
+	}
+
+	ll_sap_psoc_obj->timer_vdev_id = vdev_id;
+
+	status = wmi_unified_get_tsf_stats_for_csa(wmi_handle, vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ll_sap_err("Failed to get tsf stats for csa");
+		if (QDF_TIMER_STATE_RUNNING == qdf_mc_timer_get_current_state(
+						&ll_sap_psoc_obj->tsf_timer))
+			qdf_mc_timer_stop(&ll_sap_psoc_obj->tsf_timer);
+	}
+
+	return status;
+}
+#endif
+
 void
 target_if_ll_sap_register_tx_ops(struct wlan_ll_sap_tx_ops *tx_ops)
 {
 	tx_ops->send_audio_transport_switch_resp =
 		target_if_send_audio_transport_switch_resp;
 	tx_ops->send_oob_connect_request = target_if_send_oob_connect_request;
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+	tx_ops->get_tsf_stats_for_csa =	target_if_get_tsf_stats_for_csa;
+#endif
 }
 
 void

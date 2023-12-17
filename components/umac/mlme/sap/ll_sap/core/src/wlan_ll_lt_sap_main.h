@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -89,4 +89,24 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 			       enum high_ap_availability_operation operation,
 			       uint32_t duration, uint16_t cookie);
 
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+/**
+ * ll_lt_sap_get_tsf_stats_for_csa() - Get tsf stats for csa
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev_id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id);
+#else
+static inline
+QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

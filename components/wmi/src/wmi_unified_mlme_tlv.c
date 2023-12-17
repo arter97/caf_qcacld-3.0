@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -69,6 +69,9 @@ static void wmi_mlme_attach_ll_lt_sap_tlv(struct wmi_ops *ops)
 	ops->send_oob_connect_request = oob_connect_request_tlv;
 	ops->extract_oob_connect_response_event =
 				extract_oob_connect_response_event_tlv;
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+	ops->get_tsf_stats_for_csa = get_tsf_stats_for_csa_tlv;
+#endif
 }
 #else
 static inline void wmi_mlme_attach_ll_lt_sap_tlv(struct wmi_ops *ops)

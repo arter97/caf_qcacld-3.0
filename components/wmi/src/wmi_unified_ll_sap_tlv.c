@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -230,3 +230,36 @@ QDF_STATUS extract_oob_connect_response_event_tlv(
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+QDF_STATUS get_tsf_stats_for_csa_tlv(wmi_unified_t wmi_hdl, uint8_t vdev_id)
+{
+	wmi_vdev_get_twt_session_stats_info_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	QDF_STATUS qdf_status;
+
+	buf = wmi_buf_alloc(wmi_hdl, sizeof(*cmd));
+	if (!buf)
+		return QDF_STATUS_E_FAILURE;
+
+	cmd = (wmi_vdev_get_twt_session_stats_info_cmd_fixed_param *)wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+	WMITLV_TAG_STRUC_wmi_vdev_get_twt_session_stats_info_cmd_fixed_param,
+	WMITLV_GET_STRUCT_TLVLEN
+	(wmi_vdev_get_twt_session_stats_info_cmd_fixed_param));
+
+	cmd->vdev_id = vdev_id;
+
+	wmi_nofl_debug("get tsf stats for vdev_id %d", cmd->vdev_id);
+
+	qdf_status = wmi_unified_cmd_send(
+				wmi_hdl, buf, sizeof(*cmd),
+				WMI_VDEV_GET_TWT_SESSION_STATS_INFO_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		wmi_buf_free(buf);
+
+	return qdf_status;
+}
+#endif

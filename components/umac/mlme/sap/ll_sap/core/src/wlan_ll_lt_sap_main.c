@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -537,3 +537,29 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id)
+{
+	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
+	struct wlan_ll_sap_tx_ops *tx_ops;
+
+	psoc_ll_sap_obj = wlan_objmgr_psoc_get_comp_private_obj(
+						psoc,
+						WLAN_UMAC_COMP_LL_SAP);
+	if (!psoc_ll_sap_obj) {
+		ll_sap_err("psoc_ll_sap_obj is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	tx_ops = &psoc_ll_sap_obj->tx_ops;
+	if (!tx_ops->get_tsf_stats_for_csa) {
+		ll_sap_err("get_tsf_stats_for_csa op is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return tx_ops->get_tsf_stats_for_csa(psoc, vdev_id);
+}
+#endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -101,6 +101,24 @@ wmi_extract_audio_transport_switch_req_event(
 				wmi_unified_t wmi_handle,
 				uint8_t *event, uint32_t len,
 				enum bearer_switch_req_type *req_type);
+
+#ifdef WLAN_FEATURE_LL_LT_SAP
+/**
+ * wmi_unified_get_tsf_stats_for_csa() - Get tsf stats for ll_sap csa
+ * @wmi_hdl: WMI handle
+ * @vdev_id: vdev_id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_unified_get_tsf_stats_for_csa(wmi_unified_t wmi_hdl, uint8_t vdev_id);
+#else
+static inline QDF_STATUS
+wmi_unified_get_tsf_stats_for_csa(wmi_unified_t wmi_hdl, uint8_t vdev_id)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 #endif
 
 #endif /* WMI_UNIFIED_LL_SAP_API_H*/

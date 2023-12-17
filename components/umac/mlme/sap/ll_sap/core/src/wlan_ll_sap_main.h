@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,10 +42,15 @@
  * struct ll_sap_psoc_priv_obj - ll_sap private psoc obj
  * @tx_ops: Tx ops registered with Target IF interface
  * @rx_ops: Rx  ops registered with Target IF interface
+ * @tsf_timer: TSF timer
+ * @timer_vdev_id: vdev id for which tsf timer needs to
+ * started
  */
 struct ll_sap_psoc_priv_obj {
 	struct wlan_ll_sap_tx_ops tx_ops;
 	struct wlan_ll_sap_rx_ops rx_ops;
+	qdf_mc_timer_t tsf_timer;
+	uint8_t timer_vdev_id;
 };
 
 /**
