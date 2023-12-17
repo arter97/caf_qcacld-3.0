@@ -1743,6 +1743,29 @@ void populate_dot11f_edca_pifs_param_set(struct mac_context *mac,
 	}
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+void populate_dot11f_ecsa_param_set_for_ll_sap(
+			struct wlan_objmgr_vdev *vdev,
+			tDot11fIEqcn_ie *qcn_ie)
+{
+	uint64_t target_tsf;
+
+	if (!vdev)
+		return;
+
+	qcn_ie->present = 1;
+	qcn_ie->ecsa_target_tsf_info_attr.present = 1;
+
+	qcn_ie->ecsa_target_tsf_info_attr.twt_ch_sw_mode = 0;
+
+	target_tsf = wlan_ll_sap_get_target_tsf(vdev,
+						TARGET_TSF_ECSA_ACTION_FRAME);
+
+	qdf_mem_copy(&qcn_ie->ecsa_target_tsf_info_attr.target_tsf, &target_tsf,
+		     sizeof(target_tsf));
+}
+#endif
+
 void populate_dot11f_qcn_ie(struct mac_context *mac,
 			    struct pe_session *pe_session,
 			    tDot11fIEqcn_ie *qcn_ie,

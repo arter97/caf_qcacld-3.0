@@ -190,6 +190,16 @@ QDF_STATUS wlan_ll_sap_get_tsf_stats_before_csa(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
 					struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_ll_sap_get_target_tsf() - Get target_tsf
+ * @vdev: vdev pointer
+ * @get_tsf: get target_tsf in different scenario
+ *
+ * Return: uint64_t
+ */
+uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
+				    enum ll_sap_get_target_tsf get_tsf);
 #else
 static inline
 QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
@@ -210,6 +220,13 @@ QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
 					struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
+				    enum ll_sap_get_target_tsf get_tsf)
+{
+	return 0;
 }
 #endif
 #else
@@ -295,6 +312,13 @@ QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
 					struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
+				    enum ll_sap_get_target_tsf get_tsf)
+{
+	return 0;
 }
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* _WLAN_LL_LT_SAP_API_H_ */

@@ -342,6 +342,33 @@ void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 }
 
 #ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
+				    enum ll_sap_get_target_tsf get_tsf)
+{
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+	if (!ll_sap_obj) {
+		ll_sap_err("vdev %d ll_sap obj null", wlan_vdev_get_id(vdev));
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	switch (get_tsf) {
+	case TARGET_TSF_ECSA_ACTION_FRAME:
+		return ll_sap_obj->target_tsf.twt_target_tsf;
+	case TARGET_TSF_VDEV_RESTART:
+		if (ll_sap_obj->target_tsf.twt_target_tsf)
+			return ll_sap_obj->target_tsf.twt_target_tsf;
+		else
+			return ll_sap_obj->target_tsf.non_twt_target_tsf;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
 QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
 {
 	if (!msg || !msg->bodyptr) {

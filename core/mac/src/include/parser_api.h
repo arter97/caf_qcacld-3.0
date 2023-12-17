@@ -1943,4 +1943,24 @@ void populate_dot11f_edca_pifs_param_set(
 QDF_STATUS populate_dot11f_bcn_prot_extcaps(struct mac_context *mac_ctx,
 					    struct pe_session *pe_session,
 					    tDot11fIEExtCap *dot11f);
+
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+/**
+ * populate_dot11f_ecsa_param_set() - populate ecsa action frame for ll_sap
+ * @vdev: vdev object
+ * @qcn_ie: qcn ie pointer
+ *
+ * Return: None
+ */
+void populate_dot11f_ecsa_param_set_for_ll_sap(
+			struct wlan_objmgr_vdev *vdev,
+			tDot11fIEqcn_ie *qcn_ie);
+#else
+static inline
+void populate_dot11f_ecsa_param_set_for_ll_sap(
+			struct wlan_objmgr_vdev *vdev,
+			tDot11fIEqcn_ie *qcn_ie)
+{
+}
+#endif
 #endif /* __PARSE_H__ */

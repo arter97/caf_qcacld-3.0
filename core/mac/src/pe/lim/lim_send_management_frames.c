@@ -5105,6 +5105,11 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 			 frm.WiderBWChanSwitchAnn.newCenterChanFreq1);
 	}
 
+	if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, session_entry->vdev_id))
+		populate_dot11f_ecsa_param_set_for_ll_sap(
+					session_entry->vdev,
+					&frm.qcn_ie);
+
 	if (lim_is_session_eht_capable(session_entry))
 		populate_dot11f_bw_ind_element(mac_ctx, session_entry,
 					       &frm.bw_ind_element);

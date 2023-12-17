@@ -214,6 +214,18 @@ struct ll_sap_oob_connect_response_event {
 };
 
 /**
+ * enum ll_sap_get_target_tsf: Get target_tsf for LL_SAP in different scenario
+ * @TARGET_TSF_ECSA_ACTION_FRAME: Get target_tsf when ECSA action frame has to
+ * be sent
+ * @TARGET_TSF_VDEV_RESTART: Get target_tsf when vdev_restart command has to be
+ * sent to firmware
+ */
+enum ll_sap_get_target_tsf {
+	TARGET_TSF_ECSA_ACTION_FRAME = 0,
+	TARGET_TSF_VDEV_RESTART = 1,
+};
+
+/**
  * struct wlan_ll_sap_tx_ops - defines southbound tx callbacks for
  * LL_SAP (low latency sap) component
  * @send_audio_transport_switch_resp: function pointer to indicate audio
