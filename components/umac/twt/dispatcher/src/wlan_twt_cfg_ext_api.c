@@ -103,3 +103,10 @@ wlan_twt_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 						      dialog_id, wake_dur,
 						      wake_interval);
 }
+
+bool
+wlan_is_twt_session_present(struct wlan_objmgr_psoc *psoc,
+			    uint8_t *peer_macaddr)
+{
+	return wlan_is_twt_session_present_for_given_peer(psoc, peer_macaddr);
+}

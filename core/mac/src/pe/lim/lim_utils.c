@@ -10063,7 +10063,8 @@ void lim_process_ap_ecsa_timeout(void *data)
 		return;
 	}
 
-	if (lim_is_csa_tx_pending(session->vdev_id))
+	if (lim_is_csa_tx_pending(session->vdev_id) ||
+	    policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, session->vdev_id))
 		return lim_send_csa_tx_complete(session->vdev_id);
 
 	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(mac_ctx->psoc,

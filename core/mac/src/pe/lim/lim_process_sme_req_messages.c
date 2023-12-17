@@ -77,6 +77,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_peer.h>
 #endif
+#include <wlan_ll_sap_api.h>
 
 /*
  * As per spec valid range is range –64 dBm to 63 dBm.
@@ -10198,6 +10199,36 @@ lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 }
 
 /**
+ * lim_handle_ll_lt_sap_csa() - Handle LL_LT_SAP CSA
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session_entry: Pointer to session entry
+ */
+static void lim_handle_ll_lt_sap_csa(struct mac_context *mac_ctx,
+				     struct pe_session *session_entry)
+{
+	uint8_t peer_count;
+
+	wlan_ll_sap_reset_target_tsf_before_csa(mac_ctx->psoc,
+						session_entry->vdev);
+
+	peer_count = wlan_vdev_get_peer_sta_count(session_entry->vdev);
+	if (!peer_count) {
+		pe_debug("Peer count is 0 for LL_LT_SAP, continue CSA directly");
+		lim_process_ap_ecsa_timeout(session_entry);
+	} else {
+		/**
+		 * For LL_LT_SAP CSA, target_tsf needs to be included while
+		 * sending action frame. To calculate target_tsf, host has
+		 * to query tsf stats(next_sp_start_tsf and curr_tsf) from
+		 * firmware. Once we get the response, calculate target_tsf
+		 * and include in qcn vendor ie and send action frame
+		 */
+		wlan_ll_sap_get_tsf_stats_before_csa(
+				mac_ctx->psoc, session_entry->vdev);
+	}
+}
+
+/**
  * lim_process_sme_dfs_csa_ie_request() - process sme dfs csa ie req
  *
  * @mac_ctx: Pointer to Global MAC structure
@@ -10219,8 +10250,6 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	enum phy_ch_width ch_width;
 	uint32_t target_ch_freq;
 	bool is_vdev_ll_lt_sap = false;
-	uint8_t peer_count;
-	uint16_t max_wait_for_bcn_tx_complete;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -10273,7 +10302,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 						session_entry->vdev_id);
 
 	if (is_vdev_ll_lt_sap) {
-		session_entry->gLimChannelSwitch.switchCount = 1;
+		session_entry->gLimChannelSwitch.switchCount = 0;
 		session_entry->gLimChannelSwitch.switchMode = 0;
 	} else {
 		session_entry->gLimChannelSwitch.switchCount =
@@ -10357,16 +10386,8 @@ skip_vht:
 	wlan_util_vdev_mgr_set_cac_timeout_for_vdev(
 		session_entry->vdev, dfs_csa_ie_req->new_chan_cac_ms);
 
-	peer_count = wlan_vdev_get_peer_sta_count(session_entry->vdev);
-
-	if (is_vdev_ll_lt_sap && !peer_count) {
-		pe_debug("Peer count is 0 for LL_LT_SAP, continue CSA directly");
-		/* initiate vdev restart if no peer connected on XPAN */
-		lim_send_csa_tx_complete(session_entry->vdev_id);
-		/* Clear CSA IE count and update beacon */
-		lim_send_dfs_chan_sw_ie_update(mac_ctx, session_entry);
-		return;
-	}
+	if (is_vdev_ll_lt_sap)
+		return lim_handle_ll_lt_sap_csa(mac_ctx, session_entry);
 
 	/* Send CSA IE request from here */
 	lim_send_dfs_chan_sw_ie_update(mac_ctx, session_entry);
@@ -10375,7 +10396,7 @@ skip_vht:
 	lim_notify_channel_switch_started(mac_ctx, session_entry);
 
 	/*
-	 * Wait for max_wait_for_bcn_tx_complete ms for tx complete for beacon.
+	 * Wait for MAX_WAIT_FOR_BCN_TX_COMPLETE ms for tx complete for beacon.
 	 * If tx complete for beacon is received before this timer expire,
 	 * stop this timer and then this will be restarted for every beacon
 	 * interval until switchCount become 0 and bcn template with new
@@ -10386,13 +10407,9 @@ skip_vht:
 	 * become 0 and bcn template with new switchCount will be sent to
 	 * firmware.
 	 */
-	if (is_vdev_ll_lt_sap)
-		max_wait_for_bcn_tx_complete = MAX_WAIT_FOR_BCN_TX_COMPLETE_FOR_LL_SAP;
-	else
-		max_wait_for_bcn_tx_complete = MAX_WAIT_FOR_BCN_TX_COMPLETE;
 
 	status = qdf_mc_timer_start(&session_entry->ap_ecsa_timer,
-				    max_wait_for_bcn_tx_complete);
+				    MAX_WAIT_FOR_BCN_TX_COMPLETE);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("cannot start ap_ecsa_timer");
@@ -10411,8 +10428,7 @@ skip_vht:
 	 */
 	if (CHAN_HOP_ALL_BANDS_ENABLE &&
 	    session_entry->lim_non_ecsa_cap_num &&
-	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(target_ch_freq) &&
-	    !is_vdev_ll_lt_sap)
+	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(target_ch_freq))
 		lim_send_chan_switch_action_frame
 			(mac_ctx,
 			 session_entry->gLimChannelSwitch.primaryChannel,

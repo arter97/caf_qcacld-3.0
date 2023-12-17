@@ -1858,7 +1858,7 @@ wlan_twt_cfg_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 
 	twt_debug("vdev:%d peer:" QDF_MAC_ADDR_FMT " dialog_id:%d wake_dur:%d wake_interval:%d",
 		  vdev_id, QDF_MAC_ADDR_REF(peer_mac->bytes),
-		  dialog_id, wake_dur, wake_interval);
+		  *dialog_id, wake_dur, wake_interval);
 
 	qdf_mutex_release(&peer_priv->twt_peer_lock);
 	wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
@@ -2378,4 +2378,34 @@ void wlan_twt_get_work_params(struct wlan_objmgr_vdev *vdev,
 	params->dialog_id = twt_vdev_priv->dialog_id;
 	params->is_ps_disabled = twt_vdev_priv->is_ps_disabled;
 	*next_action = twt_vdev_priv->next_action;
+}
+
+bool
+wlan_is_twt_session_present_for_given_peer(struct wlan_objmgr_psoc *psoc,
+					   uint8_t *peer_macaddr)
+{
+	struct twt_peer_priv_obj *peer_priv;
+	struct wlan_objmgr_peer *peer;
+	bool status = false;
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_macaddr,
+					   WLAN_TWT_ID);
+	if (!peer) {
+		twt_err("peer is null for " QDF_MAC_ADDR_FMT, peer_macaddr);
+		return status;
+	}
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_TWT);
+	if (!peer_priv) {
+		twt_err(" peer twt component object is NULL");
+		goto end;
+	}
+
+	if (peer_priv->num_twt_sessions)
+		status = true;
+
+end:
+	wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
+	return status;
 }

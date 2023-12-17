@@ -564,6 +564,61 @@ QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
 	return tx_ops->get_tsf_stats_for_csa(psoc, vdev_id);
 }
 
+/**
+ * ll_lt_sap_get_vdev_peer_entries() - Get vdev peer entries
+ * @vdev: vdev object
+ * @object: object pointer
+ * @arg: argument pointer
+ *
+ * Return: None
+ */
+static void ll_lt_sap_get_vdev_peer_entries(struct wlan_objmgr_vdev *vdev,
+					    void *object, void *arg)
+{
+	struct wlan_objmgr_peer *peer = (struct wlan_objmgr_peer *)object;
+	struct ll_sap_vdev_peer_entry *peer_entry =
+				(struct ll_sap_vdev_peer_entry *)arg;
+
+	if (wlan_peer_get_peer_type(peer) != WLAN_PEER_STA)
+		return;
+
+	peer_entry->num_peer++;
+	qdf_mem_copy(peer_entry->macaddr[peer_entry->num_peer].bytes,
+		     peer->macaddr, QDF_MAC_ADDR_SIZE);
+}
+
+/**
+ * ll_lt_sap_sent_ecsa_and_vdev_restart() - Send ecsa and vdev rstart for
+ * LL_LT_SAP
+ * @psoc: pointer to psoc object
+ * @vdev: pointer to vdev object
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS ll_lt_sap_sent_ecsa_and_vdev_restart(struct wlan_objmgr_psoc *psoc,
+						struct wlan_objmgr_vdev *vdev)
+{
+	struct ll_sap_vdev_peer_entry peer_entry;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	int i;
+
+	peer_entry.num_peer = 0;
+	wlan_objmgr_iterate_peerobj_list(vdev, ll_lt_sap_get_vdev_peer_entries,
+					 &peer_entry, WLAN_LL_SAP_ID);
+
+	for (i = 1; i <= peer_entry.num_peer; i++) {
+		if (wlan_is_twt_session_present(
+				psoc, peer_entry.macaddr[i].bytes))
+			wlan_ll_sap_send_action_frame(
+				vdev, peer_entry.macaddr[i].bytes);
+	}
+
+	wlan_ll_sap_send_continue_vdev_restart(vdev);
+
+	return status;
+}
+
 #define NON_TWT_TSF 500000
 /**
  * ll_lt_sap_calculate_target_tsf() - Calculate target_tsf
@@ -703,6 +758,14 @@ QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp)
 	 */
 	ll_sap_vdev_obj->target_tsf.twt_target_tsf = twt_target_tsf;
 	ll_sap_vdev_obj->target_tsf.non_twt_target_tsf = non_twt_target_tsf;
+
+	ll_sap_debug("vdev_id %d twt_target_tsf %ul and non_twt_target_tsf %ul",
+		     rsp->twt_params.vdev_id,
+		     ll_sap_vdev_obj->target_tsf.twt_target_tsf,
+		     ll_sap_vdev_obj->target_tsf.non_twt_target_tsf);
+
+	/* send csa param via action frame */
+	ll_lt_sap_sent_ecsa_and_vdev_restart(rsp->psoc, vdev);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
 

@@ -354,4 +354,47 @@ QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
+					struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev)
+{
+	struct ll_sap_vdev_priv_obj *ll_sap_vdev_obj;
+
+	ll_sap_vdev_obj = ll_sap_get_vdev_priv_obj(vdev);
+	if (!ll_sap_vdev_obj) {
+		ll_sap_err("vdev %d ll_sap obj null", wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* set below params as 0 before filling actual target tsf value to it */
+	ll_sap_vdev_obj->target_tsf.twt_target_tsf = 0;
+	ll_sap_vdev_obj->target_tsf.non_twt_target_tsf = 0;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_ll_sap_get_tsf_stats_before_csa(struct wlan_objmgr_psoc *psoc,
+						struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	uint8_t vdev_id;
+
+	if (!psoc || !vdev) {
+		ll_sap_err("psoc or vdev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	status = ll_lt_sap_get_tsf_stats_for_csa(psoc, vdev_id);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ll_sap_err("vdev %d get next_sp_start_tsf and curr_tsf failed",
+			   vdev_id);
+		//send gatt message
+	}
+
+	return status;
+}
 #endif

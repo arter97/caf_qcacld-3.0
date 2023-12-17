@@ -540,6 +540,71 @@ static inline void lim_nan_register_callbacks(struct mac_context *mac_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+QDF_STATUS lim_ll_sap_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
+{
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	session = pe_find_session_by_vdev_id(mac_ctx,
+					     wlan_vdev_get_id(vdev));
+
+	if (!session) {
+		pe_err("Session not found for vdev_id: %d",
+		       wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	lim_process_ap_ecsa_timeout(session);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS lim_ll_sap_send_ecsa_action_frame(struct wlan_objmgr_vdev *vdev,
+					     uint8_t *macaddr)
+{
+	struct mac_context *mac_ctx;
+	struct pe_session *session_entry;
+	qdf_freq_t new_channel_freq;
+	uint8_t sec_ch_offset, switch_mode;
+	uint8_t new_channel, ch_width, op_class;
+	int8_t switch_count;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	session_entry = pe_find_session_by_vdev_id(mac_ctx,
+						   wlan_vdev_get_id(vdev));
+	if (!session_entry) {
+		pe_err("Session not found for vdev_id: %d",
+		       wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	new_channel_freq = session_entry->gLimChannelSwitch.sw_target_freq;
+	ch_width = session_entry->gLimChannelSwitch.ch_width;
+	switch_count = session_entry->gLimChannelSwitch.switchCount;
+	switch_mode = session_entry->gLimChannelSwitch.switchMode;
+	sec_ch_offset = session_entry->gLimChannelSwitch.sec_ch_offset;
+	op_class = lim_op_class_from_bandwidth(mac_ctx, new_channel_freq,
+					       ch_width, sec_ch_offset);
+	new_channel = wlan_reg_freq_to_chan(mac_ctx->pdev, new_channel_freq);
+
+	/* send ecsa action frame */
+	lim_send_extended_chan_switch_action_frame(
+			mac_ctx, macaddr,
+			switch_mode, op_class, new_channel,
+			switch_count, session_entry);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 void lim_stop_pmfcomeback_timer(struct pe_session *session)
 {
 	if (session->opmode != QDF_STA_MODE)

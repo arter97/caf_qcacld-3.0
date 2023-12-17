@@ -169,9 +169,45 @@ void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg);
+
+/**
+ * wlan_ll_sap_get_tsf_stats_before_csa() - Get tsf stats from fw for LL_LT_SAP
+ * @psoc: psoc pointer
+ * @vdev: vdev pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_ll_sap_get_tsf_stats_before_csa(struct wlan_objmgr_psoc *psoc,
+						struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_ll_sap_reset_target_tsf_before_csa() - Reset target_tsf as 0 before CSA
+ * @psoc: psoc pointer
+ * @vdev: vdev pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
+					struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS wlan_ll_sap_get_tsf_stats_before_csa(struct wlan_objmgr_psoc *psoc,
+						struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
+					struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -242,6 +278,21 @@ void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 static inline
 QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS wlan_ll_sap_get_tsf_stats_before_csa(struct wlan_objmgr_psoc *psoc,
+						struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
+					struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

@@ -151,6 +151,17 @@ wlan_twt_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 				   uint32_t *wake_dur,
 				   uint32_t *wake_interval);
 
+/**
+ * wlan_is_twt_session_present() - Check whether TWT session is
+ * present for a given peer
+ * @psoc: psoc object
+ * @peer_macaddr: peer macaddr
+ *
+ * Return: boolean value
+ */
+bool
+wlan_is_twt_session_present(struct wlan_objmgr_psoc *psoc,
+			    uint8_t *peer_macaddr);
 #else
 static inline QDF_STATUS
 wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val)
@@ -213,6 +224,12 @@ wlan_twt_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_FAILURE;
 }
 
+static inline bool
+wlan_is_twt_session_present(struct wlan_objmgr_psoc *psoc,
+			    uint8_t *peer_macaddr)
+{
+	return false;
+}
 #ifdef FEATURE_SET
 static inline void
 wlan_twt_get_feature_info(struct wlan_objmgr_psoc *psoc,

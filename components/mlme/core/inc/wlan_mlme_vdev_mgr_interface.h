@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -605,6 +605,48 @@ void wlan_ll_sap_free_chan_info(struct sap_sel_ch_info *ch_param);
  */
 bool wlan_ll_sap_freq_present_in_pcl(struct policy_mgr_pcl_list *pcl,
 				     qdf_freq_t freq);
+
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+/**
+ * wlan_ll_sap_send_continue_vdev_restart() - Continue vdev restart
+ * @vdev: pointer to vdev object
+ *
+ * Return: None
+ */
+void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_ll_sap_send_action_frame() - Send csa param via action frame
+ * @vdev: pointer to vdev object
+ * @macaddr: peer mac addr
+ *
+ * Return: None
+ */
+void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
+				   uint8_t *macaddr);
+#else
+static inline
+void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
+				   uint8_t *macaddr)
+{
+}
+#endif
+#else
+static inline
+void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
+				   uint8_t *macaddr)
+{
+}
 #endif
 
 /**

@@ -978,5 +978,39 @@ lim_get_connected_akm(struct pe_session *session, int32_t ucast_cipher,
  * Return: Encryption type enum
  */
 tAniEdType lim_get_encrypt_ed_type(int32_t ucast_cipher);
+
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+/**
+ * lim_ll_sap_send_ecsa_action_frame() - Send ECSA action frame
+ * for LL_LT_SAP
+ * @vdev: vdev object
+ * @macaddr: peer mac addr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_ll_sap_send_ecsa_action_frame(struct wlan_objmgr_vdev *vdev,
+					     uint8_t *macaddr);
+
+/**
+ * lim_ll_sap_continue_vdev_restart() - Continue vdev restart for LL_SAP
+ * @vdev: pointer to vdev object
+ *
+ * Return: None
+ */
+QDF_STATUS lim_ll_sap_continue_vdev_restart(struct wlan_objmgr_vdev *vdev);
+#else
+static inline
+QDF_STATUS lim_ll_sap_send_ecsa_action_frame(struct wlan_objmgr_vdev *vdev,
+					     uint8_t *macaddr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS lim_ll_sap_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 /************************************************************/
 #endif /* __LIM_API_H */
