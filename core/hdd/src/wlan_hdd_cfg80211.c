@@ -28506,13 +28506,14 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 				      sta_ctx->conn_info.bssid.bytes,
 				      &peer_phymode);
 		ch_width = wlan_mlme_get_ch_width_from_phymode(peer_phymode);
-	}
 
-	ch_params.ch_width = ch_width;
-	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
-						chan_freq, 0, &ch_params,
-						REG_CURRENT_PWR_MODE);
-	chandef->center_freq1 = ch_params.mhz_freq_seg0;
+		ch_params.ch_width = ch_width;
+		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
+							chan_freq, 0,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
+		chandef->center_freq1 = ch_params.mhz_freq_seg0;
+	}
 
 	switch (ch_width) {
 	case CH_WIDTH_20MHZ:
