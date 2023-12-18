@@ -1540,6 +1540,10 @@
 #define QCA_WIFI_PEACH (1)
 #endif
 
+#ifdef CONFIG_CNSS_PEACH_V2
+#define QCA_WIFI_PEACH_V2 (1)
+#endif
+
 #ifdef CONFIG_INCLUDE_HAL_KIWI
 #define INCLUDE_HAL_KIWI (1)
 #endif

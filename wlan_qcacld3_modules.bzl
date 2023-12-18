@@ -7,11 +7,13 @@ _target_chipset_map = {
 	"kiwi-v2",
     ],
     "pineapple": [
+	"peach-v2",
 	"peach",
 	"kiwi-v2",
 	"qca6750",
     ],
     "sun": [
+	"peach-v2",
         "peach",
         "kiwi-v2",
     ],
@@ -28,11 +30,16 @@ _target_chipset_map = {
 _chipset_hw_map = {
     "kiwi-v2": "BERYLLIUM",
     "peach": "BERYLLIUM",
+    "peach-v2": "BERYLLIUM",
     "qca6750": "MOSELLE",
     "adrastea" : "ADRASTEA",
 }
 
 _chipset_header_map = {
+    "peach-v2": [
+        "api/hw/peach/v2",
+        "cmn/hal/wifi3.0/peach",
+    ],
     "peach": [
         "api/hw/peach/v1",
         "cmn/hal/wifi3.0/peach",
