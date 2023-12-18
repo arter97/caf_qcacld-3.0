@@ -8710,12 +8710,21 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx;
 	struct hdd_beacon_data *old, *new;
 	int status;
-	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	struct wlan_hdd_link_info *link_info;
+	int link_id;
 
 	hdd_enter();
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
+		return -EINVAL;
+	}
+
+	link_id = hdd_nb_get_link_id_from_params((void *)params,
+						 NB_CHANGE_BEACON);
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
 		return -EINVAL;
 	}
 
