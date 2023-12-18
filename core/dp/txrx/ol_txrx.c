@@ -2744,6 +2744,29 @@ static int ol_txrx_get_peer_state(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 }
 
 /**
+ * ol_txrx_get_info_by_peer_mac - get vdev id, state and device type of
+ * peer if already exists
+ * @soc_hdl: datapath soc handle
+ * @peer_mac: peer mac address
+ * @vdev_id: store vdev id that peer is under
+ * @param: store output dp peer info
+ *
+ * Get local peer state, type, vdev id of peer or
+ * primary vdevid for mld peer
+ *
+ * Return: None
+ */
+static void
+ol_txrx_get_info_by_peer_mac(struct cdp_soc_t *soc_hdl,
+			     uint8_t *peer_mac,
+			     uint8_t vdev_id,
+			     struct cdp_peer_output_param *param)
+{
+	param->vdev_id = vdev_id;
+	param->state = ol_txrx_get_peer_state(soc_hdl, vdev_id, peer_mac);
+}
+
+/**
  * ol_txrx_get_vdev_mac_addr() - Return mac addr of vdev
  * @soc_hdl: datapath soc handle
  x @vdev_id: virtual interface id
@@ -6518,6 +6541,7 @@ static struct cdp_peer_ops ol_ops_peer = {
 #endif /* CONFIG_HL_SUPPORT */
 	.peer_detach_force_delete = ol_txrx_peer_detach_force_delete,
 	.peer_flush_frags = ol_txrx_peer_flush_frags,
+	.get_info_by_peer_addr = ol_txrx_get_info_by_peer_mac,
 };
 
 static struct cdp_tx_delay_ops ol_ops_delay = {
