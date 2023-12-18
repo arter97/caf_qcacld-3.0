@@ -774,7 +774,12 @@ void lim_ap_mlo_sta_peer_ind(struct mac_context *mac,
 							pe_session->vdev);
 				qdf_mem_copy(linfo->link_addr.bytes,
 					     sta->staAddr, QDF_MAC_ADDR_SIZE);
+
+				/* Mlo mgr needs all link info including
+				 * the assoc peer. Increase it for assoc link.
+				 */
 				info.num_partner_links++;
+
 				wlan_mlo_peer_create(pe_session->vdev, peer,
 						     &info,
 						     assoc_req->assoc_req_buf,
