@@ -5806,10 +5806,9 @@ static bool policy_mgr_is_6g_channel_allowed(
 		policy_mgr_err("Invalid Context");
 		return false;
 	}
-	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq)) {
-		policy_mgr_rl_debug("Not a 6Ghz channel Freq");
+	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq))
 		return true;
-	}
+
 	/* Only STA/SAP is supported on 6Ghz currently */
 	if (!policy_mgr_is_6ghz_conc_mode_supported(psoc, mode)) {
 		policy_mgr_rl_debug("mode %d for 6ghz not supported", mode);
