@@ -1834,6 +1834,9 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	}
 	ucfg_dp_periodic_sta_stats_start(vdev);
 	wlan_twt_concurrency_update(hdd_ctx);
+
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev))
+		hdd_send_ps_config_to_fw(adapter);
 }
 
 static void hdd_cm_connect_success(struct wlan_objmgr_vdev *vdev,

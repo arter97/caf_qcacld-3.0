@@ -362,6 +362,17 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 			    struct wlan_objmgr_vdev *vdev,
 			    enum pmo_offload_trigger trigger);
+
+/**
+ * hdd_send_ps_config_to_fw() - Check user pwr save config set/reset PS
+ * @adapter: pointer to hdd adapter
+ *
+ * This function checks the power save configuration saved in MAC context
+ * and sends power save config to FW.
+ *
+ * Return: None
+ */
+void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter);
 #else /* WLAN_NS_OFFLOAD */
 static inline
 void hdd_enable_ns_offload(struct hdd_adapter *adapter,
@@ -374,6 +385,11 @@ static inline
 void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 			    struct wlan_objmgr_vdev *vdev,
 			    enum pmo_offload_trigger trigger)
+{
+}
+
+static inline
+void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter)
 {
 }
 #endif /* WLAN_NS_OFFLOAD */
