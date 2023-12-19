@@ -73,8 +73,7 @@ cm_is_peer_preset_on_other_sta(struct wlan_objmgr_psoc *psoc,
 	sync_ind = (struct roam_offload_synch_ind *)event;
 
 	if (wma_objmgr_peer_exist(wma, sync_ind->bssid.bytes, &peer_vdev_id)) {
-		if ((!wlan_vdev_mlme_is_mlo_vdev(vdev) &&
-		     vdev_id != peer_vdev_id) ||
+		if (vdev_id != peer_vdev_id &&
 		    !mlo_check_is_given_vdevs_on_same_mld(psoc, vdev_id,
 							  peer_vdev_id)) {
 			wma_debug("Peer " QDF_MAC_ADDR_FMT
