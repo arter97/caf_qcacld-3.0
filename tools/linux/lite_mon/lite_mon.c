@@ -933,7 +933,7 @@ int main(int argc, char *argv[])
 	lite_mon_printf(LITE_MON_TRACE_DEBUG, "Send VENDOR CMD cmd_type %d",
 			mon_config.cmdtype);
 	lite_mon_validate_interface(ifname);
-	send_command(&sock_ctx, ifname, &mon_config,
+	send_command(&sock_ctx, ifname, MLO_INVALID_LINK_ID, &mon_config,
 		     sizeof(struct lite_mon_config),
 		     lite_mon_handle_callback,
 		     QCA_NL80211_VENDOR_SUBCMD_LITE_MONITOR,
