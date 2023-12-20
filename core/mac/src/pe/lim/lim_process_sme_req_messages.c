@@ -1048,7 +1048,8 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		}
 
 		session->nss = session->vdev_nss;
-		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2)
+		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2 ||
+		    policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id))
 			session->nss = 1;
 
 		session->htCapability =
