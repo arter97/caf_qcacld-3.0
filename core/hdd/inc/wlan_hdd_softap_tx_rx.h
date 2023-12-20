@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -107,13 +107,13 @@ void hdd_softap_tx_timeout(struct net_device *dev);
 
 /**
  * hdd_softap_init_tx_rx_sta() - Initialize Tx/Rx for a softap station
- * @adapter: pointer to adapter context
+ * @link_info: pointer to link info
  * @sta_mac: pointer to the MAC address of the station
  *
  * Return: QDF_STATUS_E_FAILURE if any errors encountered,
  *	   QDF_STATUS_SUCCESS otherwise
  */
-QDF_STATUS hdd_softap_init_tx_rx_sta(struct hdd_adapter *adapter,
+QDF_STATUS hdd_softap_init_tx_rx_sta(struct wlan_hdd_link_info *link_info,
 				     struct qdf_mac_addr *sta_mac);
 
 /**

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -169,6 +169,7 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  * struct hdd_station_info - Per station structure kept in HDD for
  *                                     multiple station support for SoftAP
  * @sta_node: The sta_info node for the station info list maintained in adapter
+ * @link_info: the sta_info attach to link info
  * @in_use: Is the station entry in use?
  * @sta_id: Station ID reported back from HAL (through SAP).
  *           Broadcast uses station ID zero by default.
@@ -251,6 +252,7 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  */
 struct hdd_station_info {
 	qdf_list_node_t sta_node;
+	struct wlan_hdd_link_info *link_info;
 	bool in_use;
 	uint8_t sta_id;
 	eStationType sta_type;

@@ -412,10 +412,11 @@ static QDF_STATUS hdd_sta_info_re_attach(
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS hdd_softap_init_tx_rx_sta(struct hdd_adapter *adapter,
+QDF_STATUS hdd_softap_init_tx_rx_sta(struct wlan_hdd_link_info *link_info,
 				     struct qdf_mac_addr *sta_mac)
 {
 	struct hdd_station_info *sta_info;
+	struct hdd_adapter *adapter = link_info->adapter;
 	QDF_STATUS status;
 
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
@@ -437,6 +438,7 @@ QDF_STATUS hdd_softap_init_tx_rx_sta(struct hdd_adapter *adapter,
 		return QDF_STATUS_E_NOMEM;
 
 	sta_info->is_deauth_in_progress = false;
+	sta_info->link_info = link_info;
 	qdf_mem_copy(&sta_info->sta_mac, sta_mac, sizeof(struct qdf_mac_addr));
 
 	status = hdd_sta_info_attach(&adapter->sta_info_list, sta_info);
@@ -569,7 +571,7 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 			     QDF_MAC_ADDR_SIZE);
 	}
 
-	qdf_status = hdd_softap_init_tx_rx_sta(adapter, sta_mac);
+	qdf_status = hdd_softap_init_tx_rx_sta(link_info, sta_mac);
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   sta_mac->bytes,
 					   STA_INFO_SOFTAP_REGISTER_STA);
