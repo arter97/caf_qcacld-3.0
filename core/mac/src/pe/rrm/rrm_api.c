@@ -1520,6 +1520,10 @@ rrm_copy_ml_ie(uint8_t eid, uint8_t extn_eid,
 		extn_eid == WLAN_EXTN_ELEMID_MULTI_LINK) {
 		if (ml_ie && ml_len && pIes) {
 			qdf_mem_copy(pIes, ml_ie, ml_len);
+			pe_debug("Dump ML IE:");
+			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
+					   QDF_TRACE_LEVEL_DEBUG,
+					   ml_ie, ml_len);
 			return true;
 		}
 	}
@@ -1627,34 +1631,43 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 
 		i = 0;
 		do {
-			if (((!eids) || (*pBcnIes == eids[i])) ||
+			if ((!eids || (*pBcnIes == eids[i])) ||
 			    ((*pBcnIes == eid) &&
 			     (extn_eids && *(pBcnIes + 2) == extn_eids[i]))) {
 				if (((*pNumIes) + len) < pIesMaxSize) {
-						qdf_mem_copy(pIes, pBcnIes, len);
-						pIes += len;
-						*pNumIes += len;
-				} else {
-					if (rrm_copy_ml_ie(*pBcnIes, *(pBcnIes + 2), ml_copy, ml_len, pIes)) {
+					if ((rrm_copy_ml_ie(*pBcnIes,
+							    *(pBcnIes + 2),
+							    ml_copy, ml_len,
+							    pIes))) {
 						pIes += ml_len;
 						*pNumIes += ml_len;
-						start_offset = start_offset + len - ml_len;
-					} else {
-					/*
-					 * If max size of fragment is reached,
-					 * calculate the remaining length and
-					 * break. For first fragment, account
-					 * for the fixed fields also.
-					 */
-						rem_len = total_ies_len - *pNumIes -
-							  start_offset;
-					if (start_offset == 0)
-						rem_len = rem_len +
-						BEACON_FRAME_IES_OFFSET;
-					pe_debug("rem_len %d ies added %d",
-						 rem_len, *pNumIes);
+						pe_debug("ies_filled_len:%d last_filled_ie_len:%d",
+							 *pNumIes, ml_len);
+						break;
 					}
+
+					qdf_mem_copy(pIes, pBcnIes, len);
+					pIes += len;
+					*pNumIes += len;
+
+					pe_debug("ies_filled_len:%d last_filled_ie_len:%d",
+						 *pNumIes, len);
+					break;
 				}
+
+				/*
+				 * If max size of fragment is reached, calculate
+				 * the remaining length and break. For first
+				 * fragment, account for the fixed fields also.
+				 */
+				rem_len = total_ies_len - *pNumIes -
+					  start_offset;
+				if (start_offset == 0)
+					rem_len += BEACON_FRAME_IES_OFFSET;
+
+				pe_debug("rem_len %d ies added %d", rem_len,
+					 *pNumIes);
+
 				break;
 			}
 			i++;
@@ -1667,8 +1680,7 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 		BcnNumIes -= len;
 	}
 
-	if (ml_copy)
-		qdf_mem_free(ml_copy);
+	qdf_mem_free(ml_copy);
 
 	pe_debug("Total length of Ies added = %d rem_len %d",
 		 *pNumIes, rem_len);
