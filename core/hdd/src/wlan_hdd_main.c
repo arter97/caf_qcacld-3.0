@@ -250,6 +250,7 @@
 #include "cdp_txrx_mon.h"
 #include "os_if_ll_sap.h"
 #include "wlan_crypto_obj_mgr_i.h"
+#include "wlan_p2p_ucfg_api.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -5786,9 +5787,9 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 			hdd_info_rl("VDEV is not in disconnected state, set mac address isn't supported");
 			return false;
 		}
-		fallthrough;
-	case QDF_P2P_DEVICE_MODE:
 		return true;
+	case QDF_P2P_DEVICE_MODE:
+		return ucfg_is_p2p_device_dynamic_set_mac_addr_supported(adapter->hdd_ctx->psoc);
 	case QDF_SAP_MODE:
 		if (test_bit(SOFTAP_BSS_STARTED,
 			     &adapter->deflink->link_flags)) {
@@ -5814,7 +5815,7 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	void *cookie;
 	bool update_mld_addr;
 	uint32_t fw_resp_status;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct osif_request *request;
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_adapter *adapter = link_info->adapter;
@@ -5840,6 +5841,8 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	}
 	request = osif_request_alloc(&params);
 	if (!request) {
+		hdd_err("request alloc fail");
+		status = QDF_STATUS_E_NOMEM;
 		ret = -ENOMEM;
 		goto status_ret;
 	}
@@ -5902,12 +5905,8 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 					  update_self_peer, update_mld_addr,
 					  ret, skip_reattach);
 
-	if (QDF_IS_STATUS_ERROR(status))
-		ret = qdf_status_to_os_return(status);
-
 status_ret:
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to attach CDP vdev. status:%d", status);
 		ret = qdf_status_to_os_return(status);
 		goto allow_suspend;
 	} else if (!ret) {
