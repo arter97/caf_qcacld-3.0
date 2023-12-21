@@ -6175,12 +6175,28 @@ static void hdd_fill_sinfo_eht_rate_info(struct rate_info *rate_info,
 				RATE_INFO_FLAGS_EHT_MCS);
 	}
 }
+
+/**
+ * hdd_is_eht_flag_set() - Check if EHT flag is set
+ * @rate_info: Pointer to rate info
+ *
+ * Return: Return true if EHT flag is set, else return flase
+ */
+static bool hdd_is_eht_flag_set(struct rate_info *rate_info)
+{
+	return rate_info->flags & RATE_INFO_FLAGS_EHT_MCS;
+}
 #else
 static inline void hdd_fill_sinfo_eht_rate_info(struct rate_info *rate_info,
 						uint32_t rate_flags,
 						uint8_t mcsidx,
 						uint8_t nss)
 {
+}
+
+static inline bool hdd_is_eht_flag_set(struct rate_info *rate_info)
+{
+	return false;
 }
 #endif
 
@@ -6240,7 +6256,9 @@ static void hdd_fill_sinfo_rate_info(struct station_info *sinfo,
 					RATE_INFO_FLAGS_MCS);
 		}
 		if (rate_flags & TX_RATE_SGI) {
-			if (!(rate_info->flags & RATE_INFO_FLAGS_VHT_MCS))
+			if (!(rate_info->flags & RATE_INFO_FLAGS_VHT_MCS) &&
+			    !(rate_info->flags & RATE_INFO_FLAGS_HE_MCS) &&
+			    !(hdd_is_eht_flag_set(rate_info)))
 				rate_info->flags |= RATE_INFO_FLAGS_MCS;
 			rate_info->flags |= RATE_INFO_FLAGS_SHORT_GI;
 		}

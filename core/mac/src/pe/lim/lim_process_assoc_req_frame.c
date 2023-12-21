@@ -3058,10 +3058,8 @@ static void fill_mlm_assoc_ind_vht(tpSirAssocReq assocreq,
 		assocind->rx_stbc = assocreq->VHTCaps.rxSTBC;
 
 		/* ch width */
-		assocind->ch_width = stads->vhtSupportedChannelWidthSet ?
-			eHT_CHANNEL_WIDTH_80MHZ :
-			stads->htSupportedChannelWidthSet ?
-			eHT_CHANNEL_WIDTH_40MHZ : eHT_CHANNEL_WIDTH_20MHZ;
+		assocind->ch_width = lim_convert_channel_width_enum(
+							stads->ch_width);
 
 		/* mode */
 		assocind->mode = SIR_SME_PHY_MODE_VHT;
@@ -3070,13 +3068,7 @@ static void fill_mlm_assoc_ind_vht(tpSirAssocReq assocreq,
 	}
 }
 
-/**
- *lim_convert_channel_width_enum() - map between two channel width enums
- *@ch_width: channel width of enum type phy_ch_width
- *
- *Return: channel width of enum type tSirMacHTChannelWidth
- */
-static tSirMacHTChannelWidth
+tSirMacHTChannelWidth
 lim_convert_channel_width_enum(enum phy_ch_width ch_width)
 {
 	switch (ch_width) {
@@ -3115,7 +3107,32 @@ lim_convert_channel_width_enum(enum phy_ch_width ch_width)
 static uint32_t lim_convert_rate_flags_enum(uint32_t rate_flags,
 					    enum phy_ch_width ch_width)
 {
-	if (rate_flags & (TX_RATE_HE160 |
+	if (rate_flags & (TX_RATE_EHT320 |
+			  TX_RATE_EHT160 |
+			  TX_RATE_EHT80 |
+			  TX_RATE_EHT40 |
+			  TX_RATE_EHT20)) {
+		switch (ch_width) {
+		case CH_WIDTH_20MHZ:
+			rate_flags |= TX_RATE_EHT20;
+			break;
+		case CH_WIDTH_40MHZ:
+			rate_flags |= TX_RATE_EHT40;
+			break;
+		case CH_WIDTH_80MHZ:
+			rate_flags |= TX_RATE_EHT80;
+			break;
+		case CH_WIDTH_160MHZ:
+		case CH_WIDTH_80P80MHZ:
+			rate_flags |= TX_RATE_EHT160;
+			break;
+		case CH_WIDTH_320MHZ:
+			rate_flags |= TX_RATE_EHT320;
+			break;
+		default:
+			break;
+		}
+	} else if (rate_flags & (TX_RATE_HE160 |
 			  TX_RATE_HE80 |
 			  TX_RATE_HE40 |
 			  TX_RATE_HE20)) {
