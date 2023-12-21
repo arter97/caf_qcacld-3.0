@@ -7630,6 +7630,11 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 
 	wlan_dp_update_peer_map_unmap_version(&wlan_res_cfg->peer_map_unmap_version);
 
+	if (QDF_GLOBAL_MONITOR_MODE  == cds_get_conparam())
+		wlan_res_cfg->con_mode_monitor = true;
+	else
+		wlan_res_cfg->con_mode_monitor = false;
+
 	if (wmi_service_enabled(wmi_handle,
 				wmi_service_new_htt_msg_format)) {
 		cdp_cfg_set_new_htt_msg_format(soc, 1);
