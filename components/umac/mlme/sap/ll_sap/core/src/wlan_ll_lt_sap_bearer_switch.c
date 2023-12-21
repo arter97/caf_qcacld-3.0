@@ -262,6 +262,18 @@ ll_lt_sap_invoke_req_callback_f(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req,
 				QDF_STATUS status, const char *func)
 {
+	if (bs_req->source == BEARER_SWITCH_REQ_FW) {
+		if (status == QDF_STATUS_E_ALREADY ||
+		    status == QDF_STATUS_SUCCESS)
+			ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(
+						bs_ctx->vdev,
+						bs_req->req_type,
+						WLAN_BS_STATUS_COMPLETED);
+		else
+			ll_sap_err("Invalid response for FW request");
+		return;
+	}
+
 	if (!bs_req->requester_cb) {
 		ll_sap_err("%s BS_SM vdev %d NULL cbk, req_vdev %d src %d req %d arg val %d",
 			   func, wlan_vdev_get_id(bs_ctx->vdev), bs_req->vdev_id,
@@ -465,12 +477,20 @@ ll_lt_sap_invoke_bs_requester_cbks(struct bearer_switch_info *bs_ctx,
 		if (bs_ctx->requests[i].req_type == WLAN_BS_REQ_TO_WLAN)
 			continue;
 
-		bs_ctx->requests[i].requester_cb(psoc,
-						 bs_ctx->requests[i].vdev_id,
-						 bs_ctx->requests[i].request_id,
-						 status,
-						 bs_ctx->requests[i].arg_value,
-						 bs_ctx->requests[i].arg);
+		if ((bs_ctx->requests[i].source == BEARER_SWITCH_REQ_FW) &&
+		    (status == QDF_STATUS_E_TIMEOUT))
+			ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(
+						bs_ctx->vdev,
+						bs_ctx->requests[i].req_type,
+						WLAN_BS_STATUS_TIMEOUT);
+		else
+			bs_ctx->requests[i].requester_cb(
+						psoc,
+						bs_ctx->requests[i].vdev_id,
+						bs_ctx->requests[i].request_id,
+						status,
+						bs_ctx->requests[i].arg_value,
+						bs_ctx->requests[i].arg);
 		bs_ctx->requests[i].requester_cb = NULL;
 		bs_ctx->requests[i].arg = NULL;
 		bs_ctx->requests[i].arg_value = 0;
@@ -516,6 +536,27 @@ ll_lt_sap_find_first_valid_bs_non_wlan_req(struct bearer_switch_info *bs_ctx)
 	for (i = 0; i < MAX_BEARER_SWITCH_REQUESTERS; i++) {
 		if (bs_ctx->requests[i].requester_cb &&
 		    bs_ctx->requests[i].req_type == WLAN_BS_REQ_TO_NON_WLAN)
+			return &bs_ctx->requests[i];
+	}
+	return NULL;
+}
+
+/*
+ * ll_lt_sap_find_bs_req_by_id() - Find bearer switch request
+ * based on request id from the cached requests
+ * @bs_ctx: Bearer switch context
+ *
+ * Return: If found return bearer switch request, else return NULL
+ */
+static struct wlan_bearer_switch_request *
+ll_lt_sap_find_bs_req_by_id(struct bearer_switch_info *bs_ctx,
+			    wlan_bs_req_id request_id)
+{
+	uint8_t i;
+
+	for (i = 0; i < MAX_BEARER_SWITCH_REQUESTERS; i++) {
+		if (bs_ctx->requests[i].requester_cb &&
+		    bs_ctx->requests[i].request_id == request_id)
 			return &bs_ctx->requests[i];
 	}
 	return NULL;
@@ -621,10 +662,26 @@ ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state(
 				struct wlan_bearer_switch_request *bs_req)
 {
 	QDF_STATUS status;
+	bool is_bs_req_cached = false;
 
-	status = ll_lt_sap_bs_decreament_ref_count(bs_ctx, bs_req);
-	if (QDF_IS_STATUS_ERROR(status))
-		return;
+	if (ll_lt_sap_find_bs_req_by_id(bs_ctx, bs_req->request_id))
+		is_bs_req_cached = true;
+
+	/*
+	 * If the bearer switch request is already cached then don't decreament
+	 * the ref count as the ref count would have already been decremented
+	 * when the request was cached.
+	 * For example if bearer switch to wlan is received in non-wlan
+	 * requested state, then the ref count is decreamented and request is
+	 * cached. Once the response to the current non-wlan bearer switch
+	 * request is received then switch to wlan will be executed and this
+	 * function will be invoked
+	 */
+	if (!is_bs_req_cached) {
+		status = ll_lt_sap_bs_decreament_ref_count(bs_ctx, bs_req);
+		if (QDF_IS_STATUS_ERROR(status))
+			return;
+	}
 
 	/*
 	 * If host driver did not requested for non wlan bearer then don't send
@@ -638,7 +695,14 @@ ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state(
 	if (qdf_atomic_read(&bs_ctx->total_ref_count))
 		goto invoke_requester_cb;
 
-	ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
+	/*
+	 * If the request is not already cached, then only cache this request
+	 * For example if the bearer switch to wlan is received in non-wlan
+	 * requested state, then this request will be cached in non-wlan
+	 * requested state itself
+	 */
+	if (!is_bs_req_cached)
+		ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
 
 	status = qdf_mc_timer_start(&bs_ctx->bs_wlan_request_timer,
 				    BEARER_SWITCH_WLAN_REQ_TIMEOUT);
@@ -706,6 +770,8 @@ ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_state(
 	if (QDF_IS_STATUS_SUCCESS(bs_ctx->last_status))
 		return ll_lt_sap_invoke_req_callback(bs_ctx, bs_req,
 						     QDF_STATUS_E_ALREADY);
+
+	ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
 
 	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
 
@@ -1003,9 +1069,22 @@ ll_lt_sap_handle_bs_to_non_wlan_in_wlan_state(
 		return;
 	}
 
-	ll_lt_sap_bs_increament_ref_count(bs_ctx, bs_req);
+	/*
+	 * If bearer switch request is already cached and this function is
+	 * invoked after that, then don't increment the ref count and don't
+	 * cache the BS request again.
+	 * For example, if a bearer switch to wlan is already requested and
+	 * before response to this request is received, a non-wlan bearer switch
+	 * request is received, then that request is cached and state machine
+	 * waits for the ongoing requests completion, once the ongoing request
+	 * to wlan is completed then this cached request to non-wlan is executed
+	 * so in that case there is no need to cache this request again.
+	 */
+	if (!ll_lt_sap_find_bs_req_by_id(bs_ctx, bs_req->request_id)) {
+		ll_lt_sap_bs_increament_ref_count(bs_ctx, bs_req);
 
-	ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
+		ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
+	}
 
 	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
 
