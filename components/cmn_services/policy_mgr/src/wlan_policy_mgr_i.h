@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -360,6 +360,10 @@ struct policy_mgr_cfg {
  *              scan & connections
  * @radio_comb_num: radio combination number
  * @radio_combinations: radio combination list
+ * @rd_type: policy mgr rd type
+ * @low_high_cut_off_freq: 5G Low and high cut frequency, it will
+ * only be used to decide the frequency low or high when driver
+ * index the disallow mlo mode.
  * @hw_mode_change_in_progress: This is to track if HW mode
  *                            change is in progress
  * @enable_mcc_adaptive_scheduler: Enable MCC adaptive scheduler
@@ -412,6 +416,8 @@ struct policy_mgr_psoc_priv_obj {
 	struct dual_mac_config dual_mac_cfg;
 	uint32_t radio_comb_num;
 	struct radio_combination radio_combinations[MAX_RADIO_COMBINATION];
+	enum pm_rd_type rd_type;
+	qdf_freq_t low_high_cut_off_freq;
 	uint32_t hw_mode_change_in_progress;
 	struct policy_mgr_user_cfg user_cfg;
 	uint32_t unsafe_channel_list[NUM_CHANNELS];

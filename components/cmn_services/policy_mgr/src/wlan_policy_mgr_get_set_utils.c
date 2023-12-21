@@ -1706,6 +1706,45 @@ qdf_freq_t policy_mgr_get_sbs_cut_off_freq(struct wlan_objmgr_psoc *psoc)
 	return sbs_cut_off_freq;
 }
 
+void
+policy_mgr_init_5g_low_high_cut_freq(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	qdf_freq_t cut_freq;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return;
+	}
+
+	cut_freq = policy_mgr_get_sbs_cut_off_freq(psoc);
+	/* for dbs rd, cut_freq will be 0 from API
+	 * policy_mgr_get_sbs_cut_off_freq. Set a valid cut_freq
+	 * to WLAN_REG_MAX_5GHZ_CHAN_FREQ.
+	 */
+	if (!cut_freq)
+		cut_freq = WLAN_REG_MAX_5GHZ_CHAN_FREQ;
+
+	pm_ctx->low_high_cut_off_freq = cut_freq;
+
+	policy_mgr_debug("5g low high cutoff freq %d", cut_freq);
+}
+
+qdf_freq_t
+policy_mgr_get_5g_low_high_cut_freq(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return WLAN_REG_MAX_5GHZ_CHAN_FREQ;
+	}
+
+	return pm_ctx->low_high_cut_off_freq;
+}
+
 static bool
 policy_mgr_2_freq_same_mac_in_freq_range(
 				struct policy_mgr_psoc_priv_obj *pm_ctx,
@@ -1792,6 +1831,48 @@ policy_mgr_sbs_24_shared_with_low_5(struct policy_mgr_psoc_priv_obj *pm_ctx)
 	}
 
 	return false;
+}
+
+void policy_mgr_init_rd_type(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return;
+
+	pm_ctx->rd_type = pm_rd_none;
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc))
+		return;
+
+	pm_ctx->rd_type = pm_rd_dbs;
+
+	if (!policy_mgr_is_hw_sbs_capable(psoc))
+		return;
+
+	if (policy_mgr_sbs_24_shared_with_low_5(pm_ctx))
+		pm_ctx->rd_type = pm_rd_sbs_low_share;
+
+	if (policy_mgr_sbs_24_shared_with_high_5(pm_ctx)) {
+		if (pm_ctx->rd_type == pm_rd_sbs_low_share)
+			pm_ctx->rd_type = pm_rd_sbs_switchable;
+		else
+			pm_ctx->rd_type = pm_rd_sbs_upper_share;
+	}
+
+	policy_mgr_debug("rd %d", pm_ctx->rd_type);
+}
+
+enum pm_rd_type policy_mgr_get_rd_type(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return pm_rd_none;
+
+	return pm_ctx->rd_type;
 }
 
 bool

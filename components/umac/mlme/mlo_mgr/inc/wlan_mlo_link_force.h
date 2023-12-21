@@ -441,6 +441,20 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 				 uint16_t link_bitmap2);
 
 /**
+ * ml_nlink_populate_disallow_modes() - Populate disallow mlo modes
+ * to set link req
+ * @psoc: psoc object
+ * @vdev: vdev object
+ * @req: set link request
+ *
+ * Return: void
+ */
+void
+ml_nlink_populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_objmgr_vdev *vdev,
+				 struct mlo_link_set_active_req *req);
+
+/**
  * ml_is_nlink_service_supported() - support nlink or not
  * @psoc: psoc object
  *

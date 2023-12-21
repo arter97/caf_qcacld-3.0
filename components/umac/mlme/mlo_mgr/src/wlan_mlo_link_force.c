@@ -28,6 +28,434 @@
 #include "wlan_mlo_mgr_link_switch.h"
 #include "target_if.h"
 
+/* Exclude AP removed link */
+#define NLINK_EXCLUDE_REMOVED_LINK      0x01
+/* Include AP removed link only, can't work with other flags */
+#define NLINK_INCLUDE_REMOVED_LINK_ONLY 0x02
+/* Exclude QUITE link */
+#define NLINK_EXCLUDE_QUIET_LINK        0x04
+/* Exclude standby link information */
+#define NLINK_EXCLUDE_STANDBY_LINK      0x08
+/* Dump link information */
+#define NLINK_DUMP_LINK                 0x10
+
+static
+void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
+			    struct wlan_objmgr_vdev *vdev,
+			    uint8_t flag,
+			    uint8_t ml_num_link_sz,
+			    struct ml_link_info *ml_link_info,
+			    qdf_freq_t *ml_freq_lst,
+			    uint8_t *ml_vdev_lst,
+			    uint8_t *ml_linkid_lst,
+			    uint8_t *ml_num_link,
+			    uint32_t *ml_link_bitmap);
+
+enum home_channel_map_id {
+	HC_NONE,
+	HC_2G,
+	HC_5GL,
+	HC_5GH,
+	HC_BAND_MAX,
+	HC_5GL_5GH = HC_BAND_MAX,
+	HC_5GH_5GH,
+	HC_5GL_5GL,
+	HC_2G_5GL,
+	HC_2G_5GH,
+	HC_2G_2G,
+	HC_LEGACY_MAX,
+	/* todo: add all 3 link ml STA HC MAP */
+	HC_5GL_5GH_2G = HC_LEGACY_MAX,
+	HC_MAX_MAP_ID,
+};
+
+#define MAX_DISALLOW_MODE (MAX_DISALLOW_BMAP_COMB + 1)
+
+enum disallow_mlo_mode {
+	EMLSR_5GL_5GH = 1 << 0,
+	EMLSR_5GH_5GH = 1 << 1,
+	EMLSR_5GL_5GL = 1 << 2,
+	MLMR_5GL_5GH  = 1 << 3,
+	MLMR_5GH_5GH  = 1 << 4,
+	MLMR_5GL_5GL  = 1 << 5,
+	MLMR_2G_5GL   = 1 << 6,
+	MLMR_2G_5GH   = 1 << 7,
+};
+
+/**
+ * struct disallow_mlo_modes - ML disallow modes
+ * @allow_mcc: disallow modes for concurrency interface which allow MCC,
+ * such as p2p go/gc which has no miracast enabled.
+ * @disallow_mcc: diallow modes for concurrency interface which don't allow
+ * MCC such as SAP, STA or p2p go/gc which has miracast enabled.
+ */
+struct disallow_mlo_modes {
+	uint32_t allow_mcc;
+	uint32_t disallow_mcc;
+};
+
+typedef const struct disallow_mlo_modes
+disallow_mlo_mode_table_type[HC_MAX_MAP_ID][HC_LEGACY_MAX];
+
+static disallow_mlo_mode_table_type
+disallow_mlo_mode_table_sbs_low_share = {
+	/* MLO Links  |  Concrrency  | disallow mode bitmap  */
+	[HC_2G_5GL] = {[HC_NONE] =    {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {0, MLMR_2G_5GL} },
+	[HC_2G_5GH] = {[HC_NONE] =    {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, MLMR_2G_5GH},
+			[HC_5GH] =    {0, 0} },
+	[HC_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, MLMR_5GL_5GH},
+			[HC_5GL] =    {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GH] =    {EMLSR_5GL_5GH, EMLSR_5GL_5GH} },
+	[HC_5GH_5GH] = {[HC_NONE] =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_2G]  =    {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_5GL] =    {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_5GH] =    {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH} },
+	[HC_5GL_5GL] = {[HC_NONE] =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_2G]  =    {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_5GL] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GH] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL} },
+};
+
+#define HC_MAP_DATA(_HC_2G_, _HC_5GL_, _HC_5GH_) \
+	((_HC_2G_) & 0xFF | ((_HC_5GL_) & 0xFF) << 8 | \
+				((_HC_5GH_) & 0xFF) << 16)
+
+#define HC_MAP(_HC_, _HC_2G_, _HC_5GL_, _HC_5GH_) \
+	[_HC_] = HC_MAP_DATA((_HC_2G_), (_HC_5GL_), (_HC_5GH_))
+
+static const uint32_t home_channel_maps[HC_MAX_MAP_ID] = {
+	HC_MAP(HC_NONE, 0, 0, 0),
+	HC_MAP(HC_2G,   1, 0, 0),
+	HC_MAP(HC_5GL,  0, 1, 0),
+	HC_MAP(HC_5GH,  0, 0, 1),
+	HC_MAP(HC_5GL_5GH,  0, 1, 1),
+	HC_MAP(HC_5GH_5GH,  0, 0, 2),
+	HC_MAP(HC_5GL_5GL,  0, 2, 0),
+	HC_MAP(HC_2G_5GL,  1, 1, 0),
+	HC_MAP(HC_2G_5GH,  1, 0, 1),
+	HC_MAP(HC_2G_2G,  2, 0, 0),
+	HC_MAP(HC_5GL_5GH_2G,  1, 1, 1),
+};
+
+static enum home_channel_map_id
+get_hc_id(struct wlan_objmgr_psoc *psoc,
+	  uint8_t num_freq, qdf_freq_t *freq_lst)
+{
+	uint8_t hc[HC_BAND_MAX];
+	uint32_t hc_map;
+	uint8_t i;
+	qdf_freq_t sbs_cut_off_freq =
+		policy_mgr_get_5g_low_high_cut_freq(psoc);
+
+	qdf_mem_zero(hc, sizeof(hc));
+	for (i = 0; i < num_freq; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq_lst[i]))
+			hc[HC_2G]++;
+		else if (freq_lst[i] <= sbs_cut_off_freq)
+			hc[HC_5GL]++;
+		else
+			hc[HC_5GH]++;
+	}
+
+	hc_map = HC_MAP_DATA(hc[HC_2G], hc[HC_5GL], hc[HC_5GH]);
+	for (i = 0; i < HC_MAX_MAP_ID; i++)
+		if (home_channel_maps[i] == hc_map)
+			return i;
+
+	return HC_MAX_MAP_ID;
+}
+
+static
+uint32_t disallow_mode_2_link_bitmap(
+			struct wlan_objmgr_psoc *psoc,
+			uint8_t ml_num_link,
+			qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS],
+			uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS],
+			enum disallow_mlo_mode mode,
+			enum mlo_disallowed_mode *mlo_mode)
+{
+	uint32_t link_map[HC_BAND_MAX];
+	uint8_t i;
+	qdf_freq_t sbs_cut_off_freq =
+		policy_mgr_get_5g_low_high_cut_freq(psoc);
+
+	qdf_mem_zero(link_map, sizeof(link_map));
+
+	for (i = 0; i < ml_num_link; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i]))
+			link_map[HC_2G] |= 1 << ml_linkid_lst[i];
+		else if (ml_freq_lst[i] <= sbs_cut_off_freq)
+			link_map[HC_5GL] |= 1 << ml_linkid_lst[i];
+		else
+			link_map[HC_5GH] |= 1 << ml_linkid_lst[i];
+	}
+
+	*mlo_mode = MLO_DISALLOWED_MODE_NO_MLMR;
+
+	switch (mode) {
+	case EMLSR_5GL_5GH:
+		*mlo_mode = MLO_DISALLOWED_MODE_NO_EMLSR;
+		fallthrough;
+	case MLMR_5GL_5GH:
+		return link_map[HC_5GL] | link_map[HC_5GH];
+
+	case EMLSR_5GH_5GH:
+		*mlo_mode = MLO_DISALLOWED_MODE_NO_EMLSR;
+		fallthrough;
+	case MLMR_5GH_5GH:
+		return link_map[HC_5GH];
+
+	case EMLSR_5GL_5GL:
+		*mlo_mode = MLO_DISALLOWED_MODE_NO_EMLSR;
+		fallthrough;
+	case MLMR_5GL_5GL:
+		return link_map[HC_5GL];
+
+	case MLMR_2G_5GL:
+		return link_map[HC_2G] | link_map[HC_5GL];
+
+	case MLMR_2G_5GH:
+		return link_map[HC_2G] | link_map[HC_5GH];
+
+	default:
+		*mlo_mode = MLO_DISALLOWED_MODE_NO_RESTRICTION;
+		return link_map[HC_2G] | link_map[HC_5GL] | link_map[HC_5GH];
+	}
+}
+
+static uint8_t
+extract_disallow_mode(uint32_t disallow_mode_bitmap,
+		      enum disallow_mlo_mode disallow_mode[MAX_DISALLOW_MODE])
+{
+	uint8_t i = 0;
+	uint8_t n = 0;
+
+	while (disallow_mode_bitmap) {
+		if (disallow_mode_bitmap & 1) {
+			if (n >= MAX_DISALLOW_MODE) {
+				mlo_debug("unexpected disallow_mode_bitmap 0x%x",
+					  disallow_mode_bitmap);
+				return n;
+			}
+			disallow_mode[n++] = 1 << i;
+		}
+		i++;
+		disallow_mode_bitmap >>= 1;
+	}
+
+	return n;
+}
+
+static disallow_mlo_mode_table_type *
+get_disallow_mlo_mode_table(struct wlan_objmgr_psoc *psoc)
+{
+	enum pm_rd_type rd_type;
+	disallow_mlo_mode_table_type *disallow_mlo_mode_table;
+
+	rd_type = policy_mgr_get_rd_type(psoc);
+	switch (rd_type) {
+	case pm_rd_dbs:
+	case pm_rd_sbs_low_share:
+	case pm_rd_sbs_upper_share:
+	case pm_rd_sbs_switchable:
+	default:
+		/* todo: add separate tbl for different rd */
+		disallow_mlo_mode_table =
+			&disallow_mlo_mode_table_sbs_low_share;
+		break;
+	}
+
+	return disallow_mlo_mode_table;
+}
+
+static uint8_t
+populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
+			struct wlan_objmgr_vdev *vdev,
+			enum mlo_disallowed_mode
+			mlo_disallow_mode[MAX_DISALLOW_MODE],
+			uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE])
+{
+	struct disallow_mlo_modes mlo_modes;
+	uint8_t num_of_modes;
+	enum disallow_mlo_mode disallow_mode[MAX_DISALLOW_MODE];
+	uint32_t disallow_mode_bitmap;
+	uint8_t i;
+	enum home_channel_map_id ml_hc_id;
+	enum home_channel_map_id legacy_hc_id;
+	disallow_mlo_mode_table_type *disallow_tbl;
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t ml_vdev_lst[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS];
+	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t legacy_num;
+	qdf_freq_t legacy_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t legacy_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t allow_mcc;
+
+	legacy_num = policy_mgr_get_legacy_conn_info(
+					psoc, legacy_vdev_lst,
+					legacy_freq_lst, mode_lst,
+					QDF_ARRAY_SIZE(legacy_vdev_lst));
+	if (!legacy_num)
+		return 0;
+
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	if (ml_num_link < 2)
+		return 0;
+
+	allow_mcc = true;
+
+	switch (mode_lst[0]) {
+	case PM_P2P_CLIENT_MODE:
+	case PM_P2P_GO_MODE:
+		if (!policy_mgr_is_vdev_high_tput_or_low_latency(
+					psoc, legacy_vdev_lst[0]))
+			break;
+		fallthrough;
+	case PM_STA_MODE:
+	case PM_SAP_MODE:
+		allow_mcc = false;
+		break;
+	default:
+		mlo_debug("mode type %d", mode_lst[0]);
+		break;
+	}
+
+	ml_hc_id = get_hc_id(psoc, ml_num_link, ml_freq_lst);
+	if (ml_hc_id >= HC_MAX_MAP_ID) {
+		mlo_debug("invalid ml_hc_id, %d", ml_hc_id);
+		return 0;
+	}
+	legacy_hc_id = get_hc_id(psoc, legacy_num, legacy_freq_lst);
+	if (legacy_hc_id >= HC_LEGACY_MAX) {
+		mlo_debug("invalid legacy_hc_id %d", legacy_hc_id);
+		return 0;
+	}
+
+	disallow_tbl = get_disallow_mlo_mode_table(psoc);
+
+	mlo_modes = (*disallow_tbl)[ml_hc_id][legacy_hc_id];
+	if (allow_mcc)
+		disallow_mode_bitmap = mlo_modes.allow_mcc;
+	else
+		disallow_mode_bitmap = mlo_modes.disallow_mcc;
+
+	mlo_debug("ml_hc_id %d legacy_hc_id %d allow_mcc %d rd %d disallow_mode_bitmap 0x%x",
+		  ml_hc_id, legacy_hc_id, allow_mcc,
+		  policy_mgr_get_rd_type(psoc),
+		  disallow_mode_bitmap);
+
+	num_of_modes = extract_disallow_mode(disallow_mode_bitmap,
+					     disallow_mode);
+	for (i = 0; i < num_of_modes; i++) {
+		disallow_link_bitmap[i] =
+			disallow_mode_2_link_bitmap(
+					psoc,
+					ml_num_link,
+					ml_freq_lst,
+					ml_linkid_lst,
+					disallow_mode[i],
+					&mlo_disallow_mode[i]);
+		mlo_debug("[%d] disallow_mode 0x%x link bitmap 0x%x",
+			  i, disallow_mode[i],
+			  disallow_link_bitmap[i]);
+	}
+
+	return num_of_modes;
+}
+
+void
+ml_nlink_populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_objmgr_vdev *vdev,
+				 struct mlo_link_set_active_req *req)
+{
+	enum mlo_disallowed_mode mlo_disallow_mode[MAX_DISALLOW_MODE];
+	uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE];
+	uint8_t num_of_modes, i, j, k;
+	uint32_t num_disallow_mode_comb = 0;
+	struct ml_link_disallow_mode_bitmap *ml_link_disallow;
+	uint8_t link_ids[MAX_MLO_LINK_ID];
+	uint8_t num_ids;
+
+	num_of_modes = populate_disallow_modes(psoc, vdev,
+					       mlo_disallow_mode,
+					       disallow_link_bitmap);
+
+	/* Combine the MLO_DISALLOWED_MODE_NO_MLMR and
+	 * MLO_DISALLOWED_MODE_NO_EMLSR to MLO_DISALLOWED_MODE_NO_MLMR_EMLSR
+	 * if the link bitmap is same.
+	 */
+	for (i = 0; i < num_of_modes; i++) {
+		if (!disallow_link_bitmap[i])
+			continue;
+
+		if (num_disallow_mode_comb >= MAX_DISALLOW_BMAP_COMB) {
+			mlo_debug("unexpected num_disallow_mode_comb %d",
+				  num_disallow_mode_comb);
+			break;
+		}
+
+		for (j = i + 1; j < num_of_modes; j++) {
+			if (disallow_link_bitmap[i] !=
+			    disallow_link_bitmap[j])
+				continue;
+			if ((mlo_disallow_mode[i] ==
+				MLO_DISALLOWED_MODE_NO_MLMR &&
+			     mlo_disallow_mode[j] ==
+				MLO_DISALLOWED_MODE_NO_EMLSR) ||
+			    (mlo_disallow_mode[i] ==
+				MLO_DISALLOWED_MODE_NO_EMLSR &&
+			     mlo_disallow_mode[j] ==
+				MLO_DISALLOWED_MODE_NO_MLMR)) {
+				mlo_disallow_mode[i] =
+					MLO_DISALLOWED_MODE_NO_MLMR_EMLSR;
+				disallow_link_bitmap[j] = 0;
+			}
+		}
+
+		ml_link_disallow =
+		&req->param.disallow_mode_link_bmap[num_disallow_mode_comb];
+		ml_link_disallow->disallowed_mode = mlo_disallow_mode[i];
+
+		num_ids = convert_link_bitmap_to_link_ids(
+						disallow_link_bitmap[i],
+						QDF_ARRAY_SIZE(link_ids),
+						link_ids);
+		for (k = 0; k < 4; k++) {
+			if (k >= num_ids)
+				ml_link_disallow->ieee_link_id[k] = 0xff;
+			else
+				ml_link_disallow->ieee_link_id[k] =
+								link_ids[k];
+		}
+
+		mlo_debug("[%d] mode %d ieee_link_id_comb 0x%0x",
+			  num_disallow_mode_comb,
+			  ml_link_disallow->disallowed_mode,
+			  ml_link_disallow->ieee_link_id_comb);
+
+		num_disallow_mode_comb++;
+	}
+
+	req->param.num_disallow_mode_comb = num_disallow_mode_comb;
+}
+
 void
 ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
 			struct wlan_objmgr_psoc *psoc,
@@ -580,17 +1008,6 @@ bool ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc)
 			wmi_handle,
 			wmi_service_n_link_mlo_support);
 }
-
-/* Exclude AP removed link */
-#define NLINK_EXCLUDE_REMOVED_LINK      0x01
-/* Include AP removed link only, can't work with other flags */
-#define NLINK_INCLUDE_REMOVED_LINK_ONLY 0x02
-/* Exclude QUITE link */
-#define NLINK_EXCLUDE_QUIET_LINK        0x04
-/* Exclude standby link information */
-#define NLINK_EXCLUDE_STANDBY_LINK      0x08
-/* Dump link information */
-#define NLINK_DUMP_LINK                 0x10
 
 static void
 ml_nlink_get_standby_link_info(struct wlan_objmgr_psoc *psoc,

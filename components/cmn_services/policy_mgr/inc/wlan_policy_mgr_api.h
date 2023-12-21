@@ -4029,6 +4029,42 @@ uint32_t policy_mgr_get_hw_dbs_nss(struct wlan_objmgr_psoc *psoc,
 				   struct dbs_nss *nss_dbs);
 
 /**
+ * policy_mgr_init_rd_type() - Init policy mgr rd type
+ * @psoc: PSOC object information
+ *
+ * Return: void
+ */
+void
+policy_mgr_init_rd_type(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_rd_type() - Get policy mgr rd type
+ * @psoc: PSOC object information
+ *
+ * Return: void
+ */
+enum pm_rd_type
+policy_mgr_get_rd_type(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_init_5g_low_high_cut_freq() - Init 5G low and high cut frequency
+ * @psoc: PSOC object information
+ *
+ * Return: void
+ */
+void
+policy_mgr_init_5g_low_high_cut_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_5g_low_high_cut_freq() - Get 5G low and high cut frequency
+ * @psoc: PSOC object information
+ *
+ * Return: 5G low and high cut frequency
+ */
+qdf_freq_t
+policy_mgr_get_5g_low_high_cut_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_dnsc_set - Check if user has set
  * "Do_Not_Switch_Channel" for the vdev passed
  * @vdev: vdev pointer

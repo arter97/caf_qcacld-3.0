@@ -240,6 +240,22 @@ enum hw_mode_mac_band_cap {
 };
 
 /**
+ * enum pm_rd_type - rd type
+ * @pm_rd_none: unknown
+ * @pm_rd_dbs: dbs only
+ * @pm_rd_sbs_low_share: sbs lower shared
+ * @pm_rd_sbs_upper_share: sbs upper shared
+ * @pm_rd_sbs_switchable: sbs switchable
+ */
+enum pm_rd_type {
+	pm_rd_none,
+	pm_rd_dbs,
+	pm_rd_sbs_low_share,
+	pm_rd_sbs_upper_share,
+	pm_rd_sbs_switchable,
+};
+
+/**
  * enum force_1x1_type - enum to specify the type of forced 1x1 ini provided.
  * @FORCE_1X1_DISABLED: even if the AP is present in OUI, 1x1 will not be forced
  * @FORCE_1X1_ENABLED_FOR_AS: If antenna sharing supported, then only do 1x1.
