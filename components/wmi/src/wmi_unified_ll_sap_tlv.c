@@ -147,7 +147,7 @@ extract_audio_transport_switch_req_event_tlv(
 
 	wmi_nofl_debug("LL_LT_SAP FW requested bearer switch to %d", *req_type);
 
-	if (*req_type == WLAN_BS_REQ_TO_WLAN)
+	if (*req_type == WLAN_BS_REQ_INVALID)
 		return QDF_STATUS_E_INVAL;
 
 	return QDF_STATUS_SUCCESS;
