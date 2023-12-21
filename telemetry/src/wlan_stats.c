@@ -1532,10 +1532,30 @@ fill_advance_peer_sawftx_stats(struct advance_peer_data_sawftx *data,
 					tx_stats->dropped.fw_reason2;
 			data->tx[tidx][queues].dropped.fw_reason3 =
 					tx_stats->dropped.fw_reason3;
+			data->tx[tidx][queues].dropped.fw_rem_queue_disable =
+					tx_stats->dropped.fw_rem_queue_disable;
+			data->tx[tidx][queues].dropped.fw_rem_no_match =
+					tx_stats->dropped.fw_rem_no_match;
+			data->tx[tidx][queues].dropped.drop_threshold =
+					tx_stats->dropped.drop_threshold;
+			data->tx[tidx][queues].dropped.drop_link_desc_na =
+					tx_stats->dropped.drop_link_desc_na;
+			data->tx[tidx][queues].dropped.invalid_drop =
+					tx_stats->dropped.invalid_drop;
+			data->tx[tidx][queues].dropped.mcast_vdev_drop =
+					tx_stats->dropped.mcast_vdev_drop;
+			data->tx[tidx][queues].dropped.invalid_rr =
+					tx_stats->dropped.invalid_rr;
 			data->tx[tidx][queues].tx_failed =
 					tx_stats->tx_failed;
 			data->tx[tidx][queues].queue_depth =
 					tx_stats->queue_depth;
+			data->tx[tidx][queues].retry_count =
+					tx_stats->retry_count;
+			data->tx[tidx][queues].multiple_retry_count =
+					tx_stats->multiple_retry_count;
+			data->tx[tidx][queues].failed_retry_count =
+					tx_stats->failed_retry_count;
 			data->tx[tidx][queues].svc_intval_stats.success_cnt =
 					tx_stats->svc_intval_stats.success_cnt;
 			data->tx[tidx][queues].svc_intval_stats.failure_cnt =
@@ -1852,9 +1872,29 @@ get_advance_peer_data_sawftx(struct sawf_tx_stats *sawf_tx_stats,
 					sawf_tx_stats->dropped.fw_reason2;
 		data->tx[0][0].dropped.fw_reason3 =
 					sawf_tx_stats->dropped.fw_reason3;
+		data->tx[0][0].dropped.fw_rem_queue_disable =
+				sawf_tx_stats->dropped.fw_rem_queue_disable;
+		data->tx[0][0].dropped.fw_rem_no_match =
+				sawf_tx_stats->dropped.fw_rem_no_match;
+		data->tx[0][0].dropped.drop_threshold =
+				sawf_tx_stats->dropped.drop_threshold;
+		data->tx[0][0].dropped.drop_link_desc_na =
+				sawf_tx_stats->dropped.drop_link_desc_na;
+		data->tx[0][0].dropped.invalid_drop =
+				sawf_tx_stats->dropped.invalid_drop;
+		data->tx[0][0].dropped.mcast_vdev_drop =
+				sawf_tx_stats->dropped.mcast_vdev_drop;
+		data->tx[0][0].dropped.invalid_rr =
+				sawf_tx_stats->dropped.invalid_rr;
 		data->tx[0][0].tx_failed =
 					sawf_tx_stats->tx_failed;
 		data->tx[0][0].queue_depth = sawf_tx_stats->queue_depth;
+		data->tx[0][0].retry_count =
+				sawf_tx_stats->retry_count;
+		data->tx[0][0].multiple_retry_count =
+				sawf_tx_stats->multiple_retry_count;
+		data->tx[0][0].failed_retry_count =
+				sawf_tx_stats->failed_retry_count;
 		data->tx[0][0].svc_intval_stats.success_cnt =
 			sawf_tx_stats->svc_intval_stats.success_cnt;
 		data->tx[0][0].svc_intval_stats.failure_cnt =

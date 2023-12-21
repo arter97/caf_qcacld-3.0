@@ -254,6 +254,13 @@ struct sawf_tx_stats {
 		uint32_t fw_reason1;
 		uint32_t fw_reason2;
 		uint32_t fw_reason3;
+		uint32_t fw_rem_queue_disable;
+		uint32_t fw_rem_no_match;
+		uint32_t drop_threshold;
+		uint32_t drop_link_desc_na;
+		uint32_t invalid_drop;
+		uint32_t mcast_vdev_drop;
+		uint32_t invalid_rr;
 	} dropped;
 	struct sawf_fw_mpdu_stats svc_intval_stats;
 	struct sawf_fw_mpdu_stats burst_size_stats;

@@ -1602,10 +1602,30 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 			    data->tx[0][0].dropped.fw_reason2);
 		STATS_PRINT("Tx_info_drop_fw_reason3    = %u\n",
 			    data->tx[0][0].dropped.fw_reason3);
+		STATS_PRINT("Tx_info_fw_rem_queue_disable = %u\n",
+			data->tx[0][0].dropped.fw_rem_queue_disable);
+		STATS_PRINT("Tx_info_fw_rem_no_match    = %u\n",
+			data->tx[0][0].dropped.fw_rem_no_match);
+		STATS_PRINT("Tx_info_drop_threshold     = %u\n",
+			data->tx[0][0].dropped.drop_threshold);
+		STATS_PRINT("Tx_info_drop_link_desc_na  = %u\n",
+			data->tx[0][0].dropped.drop_link_desc_na);
+		STATS_PRINT("Tx_info_invalid_drop       = %u\n",
+			data->tx[0][0].dropped.invalid_drop);
+		STATS_PRINT("Tx_info_mcast_vdev_drop    = %u\n",
+			data->tx[0][0].dropped.mcast_vdev_drop);
+		STATS_PRINT("Tx_info_invalid_rr         = %u\n",
+			data->tx[0][0].dropped.invalid_rr);
 		STATS_PRINT("Tx_info_tx_failed          = %u\n",
 			    data->tx[0][0].tx_failed);
 		STATS_PRINT("Tx_info_queue_depth        = %u\n",
 			    data->tx[0][0].queue_depth);
+		STATS_PRINT("Tx_info_retry_count        = %u\n",
+			    data->tx[0][0].retry_count);
+		STATS_PRINT("Tx_info_multiple_retry_count = %u\n",
+			    data->tx[0][0].multiple_retry_count);
+		STATS_PRINT("Tx_info_failed_retry_count = %u\n",
+			    data->tx[0][0].failed_retry_count);
 		STATS_PRINT("Service_intvl_success_cnt  = %ju\n",
 			    data->tx[0][0].svc_intval_stats.success_cnt);
 		STATS_PRINT("Service_intvl_failure_cnt  = %ju\n",
@@ -1655,10 +1675,30 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 					    sawftx->dropped.fw_reason2);
 				STATS_PRINT("Tx_info_drop_Tx_fw_reason3 = %u\n",
 					    sawftx->dropped.fw_reason3);
+				STATS_PRINT("Tx_info_fw_rem_queue_disable = %u\n",
+					sawftx->dropped.fw_rem_queue_disable);
+				STATS_PRINT("Tx_info_fw_rem_no_match    = %u\n",
+					sawftx->dropped.fw_rem_no_match);
+				STATS_PRINT("Tx_info_drop_threshold     = %u\n",
+					sawftx->dropped.drop_threshold);
+				STATS_PRINT("Tx_info_drop_link_desc_na  = %u\n",
+					sawftx->dropped.drop_link_desc_na);
+				STATS_PRINT("Tx_info_invalid_drop       = %u\n",
+					sawftx->dropped.invalid_drop);
+				STATS_PRINT("Tx_info_mcast_vdev_drop    = %u\n",
+					sawftx->dropped.mcast_vdev_drop);
+				STATS_PRINT("Tx_info_invalid_rr         = %u\n",
+					sawftx->dropped.invalid_rr);
 				STATS_PRINT("Tx_info_tx_failed          = %u\n",
 					    sawftx->tx_failed);
 				STATS_PRINT("Tx_info_queue_depth        = %u\n",
 					    sawftx->queue_depth);
+				STATS_PRINT("Tx_info_retry_count        = %u\n",
+					    sawftx->retry_count);
+				STATS_PRINT("Tx_info_multiple_retry_count = %u\n",
+					    sawftx->multiple_retry_count);
+				STATS_PRINT("Tx_info_failed_retry_count = %u\n",
+					    sawftx->failed_retry_count);
 				STATS_PRINT("Service_intvl_success_cnt  = %ju\n",
 					sawftx->svc_intval_stats.success_cnt);
 				STATS_PRINT("Service_intvl_failure_cnt  = %ju\n",

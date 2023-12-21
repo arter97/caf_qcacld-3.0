@@ -1626,29 +1626,55 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 
 	length = qdf_nbuf_len(tx_desc->nbuf);
 
-	DP_STATS_INCC_PKT(stats_ctx, tx_stats[host_q_idx].tx_success, 1,
-			  length, (ts->status == HAL_TX_TQM_RR_FRAME_ACKED));
-
-	DP_STATS_INCC_PKT(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem, 1,
-			  length, (ts->status == HAL_TX_TQM_RR_REM_CMD_REM));
-
-	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem_notx, 1,
-		      (ts->status == HAL_TX_TQM_RR_REM_CMD_NOTX));
-
-	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem_tx, 1,
-		      (ts->status == HAL_TX_TQM_RR_REM_CMD_TX));
-
-	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.age_out, 1,
-		      (ts->status == HAL_TX_TQM_RR_REM_CMD_AGED));
-
-	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_reason1, 1,
-		      (ts->status == HAL_TX_TQM_RR_FW_REASON1));
-
-	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_reason2, 1,
-		      (ts->status == HAL_TX_TQM_RR_FW_REASON2));
-
-	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_reason3, 1,
-		      (ts->status == HAL_TX_TQM_RR_FW_REASON3));
+	switch (ts->status) {
+	case HAL_TX_TQM_RR_FRAME_ACKED:
+		DP_STATS_INC_PKT(stats_ctx, tx_stats[host_q_idx].tx_success, 1,
+			  length);
+		break;
+	case HAL_TX_TQM_RR_REM_CMD_REM:
+		DP_STATS_INC_PKT(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem, 1,
+			  length);
+		break;
+	case HAL_TX_TQM_RR_REM_CMD_NOTX:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem_notx, 1);
+		break;
+	case HAL_TX_TQM_RR_REM_CMD_TX:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem_tx, 1);
+		break;
+	case HAL_TX_TQM_RR_REM_CMD_AGED:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.age_out, 1);
+		break;
+	case HAL_TX_TQM_RR_FW_REASON1:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.fw_reason1, 1);
+		break;
+	case HAL_TX_TQM_RR_FW_REASON2:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.fw_reason2, 1);
+		break;
+	case HAL_TX_TQM_RR_FW_REASON3:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.fw_reason3, 1);
+		break;
+	case HAL_TX_TQM_RR_REM_CMD_DISABLE_QUEUE:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem_queue_disable, 1);
+		break;
+	case HAL_TX_TQM_RR_REM_CMD_TILL_NONMATCHING:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem_no_match, 1);
+		break;
+	case HAL_TX_TQM_RR_DROP_THRESHOLD:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.drop_threshold, 1);
+		break;
+	case HAL_TX_TQM_RR_LINK_DESC_UNAVAILABLE:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.drop_link_desc_na, 1);
+		break;
+	case HAL_TX_TQM_RR_DROP_OR_INVALID_MSDU:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.invalid_drop, 1);
+		break;
+	case HAL_TX_TQM_RR_MULTICAST_DROP:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.mcast_vdev_drop, 1);
+		break;
+	default:
+		DP_STATS_INC(stats_ctx, tx_stats[host_q_idx].dropped.invalid_rr, 1);
+		break;
+	}
 
 	tx_stats = &stats_ctx->stats.tx_stats[host_q_idx];
 
@@ -1658,7 +1684,14 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 				tx_stats->dropped.age_out +
 				tx_stats->dropped.fw_reason1 +
 				tx_stats->dropped.fw_reason2 +
-				tx_stats->dropped.fw_reason3;
+				tx_stats->dropped.fw_reason3 +
+				tx_stats->dropped.fw_rem_queue_disable +
+				tx_stats->dropped.fw_rem_no_match +
+				tx_stats->dropped.drop_threshold +
+				tx_stats->dropped.drop_link_desc_na +
+				tx_stats->dropped.invalid_drop +
+				tx_stats->dropped.mcast_vdev_drop +
+				tx_stats->dropped.invalid_rr;
 
 	DP_STATS_DEC(stats_ctx, tx_stats[host_q_idx].queue_depth, 1);
 
@@ -1940,6 +1973,20 @@ static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
 		       tx_stats->dropped.fw_reason2);
 	dp_sawf_print_stats("dropped: fw_reason3 = %u",
 		       tx_stats->dropped.fw_reason3);
+	dp_sawf_print_stats("dropped: fw_rem_queue_disable = %u",
+			tx_stats->dropped.fw_rem_queue_disable);
+	dp_sawf_print_stats("dropped: fw_rem_no_match = %u",
+			tx_stats->dropped.fw_rem_no_match);
+	dp_sawf_print_stats("dropped: drop_threshold = %u",
+			tx_stats->dropped.drop_threshold);
+	dp_sawf_print_stats("dropped: drop_link_desc_na = %u",
+			tx_stats->dropped.drop_link_desc_na);
+	dp_sawf_print_stats("dropped: invalid_drop = %u",
+			tx_stats->dropped.invalid_drop);
+	dp_sawf_print_stats("dropped: mcast_vdev_drop = %u",
+			tx_stats->dropped.mcast_vdev_drop);
+	dp_sawf_print_stats("dropped: invalid_rr = %u",
+			tx_stats->dropped.invalid_rr);
 	dp_sawf_print_stats("tx_failed = %u", tx_stats->tx_failed);
 	dp_sawf_print_stats("retry_count = %u", tx_stats->retry_count);
 	dp_sawf_print_stats("multiple_retry_count = %u", tx_stats->multiple_retry_count);
