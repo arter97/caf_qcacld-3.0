@@ -1185,7 +1185,7 @@ struct debug_data_tx_stats {
 	uint32_t pream_punct_cnt;
 	uint32_t num_ppdu_cookie_valid;
 	uint32_t fw_rem_notx;
-	uint32_t fw_rem_tx;
+	struct pkt_info fw_rem_tx;
 	uint32_t age_out;
 	uint32_t fw_reason1;
 	uint32_t fw_reason2;

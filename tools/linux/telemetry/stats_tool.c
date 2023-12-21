@@ -2638,7 +2638,7 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 	STATS_64(stdout, "Firmware discarded packets", tx->fw_rem.num);
 	STATS_64(stdout, "Firmware discarded bytes", tx->fw_rem.bytes);
 	STATS_32(stdout, "Firmware discard untransmitted", tx->fw_rem_notx);
-	STATS_32(stdout, "Firmware discard transmitted", tx->fw_rem_tx);
+	STATS_64(stdout, "Firmware discard transmitted", tx->fw_rem_tx.num);
 	STATS_32(stdout, "Aged out in mpdu/msdu queues", tx->age_out);
 	STATS_32(stdout, "Firmware discard untransmitted fw_reason1",
 		 tx->fw_reason1);

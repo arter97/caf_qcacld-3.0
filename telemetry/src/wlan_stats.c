@@ -47,7 +47,7 @@ static void fill_basic_data_tx_stats(struct basic_data_tx_stats *tx,
 	tx->tx_failed = cdp_tx->tx_failed;
 	tx->dropped_count = cdp_tx->dropped.fw_rem.num +
 			    cdp_tx->dropped.fw_rem_notx +
-			    cdp_tx->dropped.fw_rem_tx +
+			    cdp_tx->dropped.fw_rem_tx.num +
 			    cdp_tx->dropped.age_out +
 			    cdp_tx->dropped.fw_reason1 +
 			    cdp_tx->dropped.fw_reason2 +
@@ -3911,7 +3911,7 @@ static void fill_debug_data_tx_stats(struct debug_data_tx_stats *tx,
 	tx->pream_punct_cnt = cdp_tx->pream_punct_cnt;
 	tx->num_ppdu_cookie_valid = cdp_tx->num_ppdu_cookie_valid;
 	tx->fw_rem_notx = cdp_tx->dropped.fw_rem_notx;
-	tx->fw_rem_tx = cdp_tx->dropped.fw_rem_tx;
+	tx->fw_rem_tx.num = cdp_tx->dropped.fw_rem_tx.num;
 	tx->age_out = cdp_tx->dropped.age_out;
 	tx->fw_reason1 = cdp_tx->dropped.fw_reason1;
 	tx->fw_reason2 = cdp_tx->dropped.fw_reason2;
