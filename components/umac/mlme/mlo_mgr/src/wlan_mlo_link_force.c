@@ -1040,6 +1040,66 @@ ml_nlink_allow_conc(struct wlan_objmgr_psoc *psoc,
 	return allow;
 }
 
+static void
+ml_nlink_handle_legacy_sap_intf_emlsr(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct ml_link_force_state *force_cmd,
+				uint8_t sap_vdev_id,
+				qdf_freq_t sap_freq)
+{
+}
+
+/**
+ * ml_nlink_handle_legacy_intf_emlsr() - Check force inactive needed
+ * with legacy interface
+ * @psoc: PSOC object information
+ * @vdev: vdev object
+ * @force_cmd: force command to be returned
+ *
+ * Return: void
+ */
+static void
+ml_nlink_handle_legacy_intf_emlsr(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  struct ml_link_force_state *force_cmd)
+{
+	uint8_t vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t num_legacy_vdev;
+
+	num_legacy_vdev = policy_mgr_get_legacy_conn_info(
+					psoc, vdev_lst,
+					freq_lst, mode_lst,
+					QDF_ARRAY_SIZE(vdev_lst));
+	if (!num_legacy_vdev)
+		return;
+
+	if (num_legacy_vdev == 1) {
+		switch (mode_lst[0]) {
+		case PM_SAP_MODE:
+			ml_nlink_handle_legacy_sap_intf_emlsr(
+				psoc, vdev, force_cmd, vdev_lst[0],
+				freq_lst[0]);
+			break;
+		case PM_STA_MODE:
+		case PM_P2P_CLIENT_MODE:
+		case PM_P2P_GO_MODE:
+			break;
+		default:
+			/* unexpected legacy connection count */
+			mlo_debug("unexpected legacy intf mode %d",
+				  mode_lst[0]);
+			return;
+		}
+		ml_nlink_dump_force_state(force_cmd, "");
+		return;
+	}
+	/* todo handle 3 port conc */
+	ml_nlink_dump_force_state(force_cmd, "");
+}
+
 /**
  * ml_nlink_handle_mcc_links() - Check force inactive needed
  * if ML STA links are in MCC channels
@@ -2530,6 +2590,79 @@ end:
 }
 
 /**
+ * ml_nlink_state_change_emlsr() - Handle ML STA link force
+ * with concurrency internal function (HW EMLSR conc supported)
+ * @psoc: PSOC object information
+ * @reason: reason code of trigger force mode change.
+ * @evt: event type
+ * @data: event data
+ *
+ * This API handle link force for connected ML STA associated as MLMR and
+ * eMLSR.
+ * At present we only support one ML STA. so ml_nlink_get_affect_ml_sta
+ * is invoked to get one ML STA vdev from policy mgr table.
+ *
+ * The flow is to get current force command which has been sent to target
+ * and compute a new force command based on current connection table.
+ * If any difference between "current" and "new", driver sends update
+ * command to target. Driver will update the current force command
+ * record after get successful respone from target.
+ *
+ * Return: QDF_STATUS_SUCCESS if no new command updated to target.
+ *	   QDF_STATUS_E_PENDING if new command is sent to target.
+ *	   otherwise QDF_STATUS error code
+ */
+static QDF_STATUS
+ml_nlink_state_change_emlsr(struct wlan_objmgr_psoc *psoc,
+			    enum mlo_link_force_reason reason,
+			    enum ml_nlink_change_event_type evt,
+			    struct ml_nlink_change_event *data)
+{
+	struct ml_link_force_state force_state = {0};
+	struct ml_link_force_state legacy_intf_force_state = {0};
+	struct ml_link_force_state curr_force_state = {0};
+	struct wlan_objmgr_vdev *vdev = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	vdev = ml_nlink_get_affect_ml_sta(psoc);
+	if (!vdev)
+		goto end;
+	if (!ml_nlink_all_links_ready_for_state_change(psoc, vdev, evt))
+		goto end;
+
+	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
+
+	ml_nlink_handle_legacy_intf_emlsr(psoc, vdev, &legacy_intf_force_state);
+
+	force_state = legacy_intf_force_state;
+	ml_nlink_handle_dynamic_inactive(psoc, vdev, &curr_force_state,
+					 &legacy_intf_force_state);
+
+	ml_nlink_update_concurrency_link_request(psoc, vdev,
+						 &force_state,
+						 reason);
+	ml_nlink_handle_all_link_request(psoc, vdev, &force_state);
+
+	status =
+	ml_nlink_update_force_command_target(psoc, vdev, reason, evt,
+					     data, &curr_force_state,
+					     &force_state);
+end:
+	if (vdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+
+		if (status == QDF_STATUS_SUCCESS)
+			mlo_debug("exit no force state change");
+		else if (status == QDF_STATUS_E_PENDING)
+			mlo_debug("exit pending force state change");
+		else
+			mlo_err("exit err %d state change", status);
+	}
+
+	return status;
+}
+
+/**
  * ml_nlink_state_change_emlsr_no_conc() - Handle eMLSR STA link force
  * with vendor command request (HW no EMSR conc supported)
  * @psoc: PSOC object information
@@ -2603,14 +2736,15 @@ end:
 }
 
 /**
- * ml_nlink_state_change() - Handle ML STA link force
- * with concurrency internal function
+ * ml_nlink_state_change_mlmr() - Handle MLMR STA link force
+ * with concurrency internal function (no EMLSR Conc hw support)
  * @psoc: PSOC object information
  * @reason: reason code of trigger force mode change.
  * @evt: event type
  * @data: event data
  *
- * This API handle link force for connected ML STA.
+ * This API handle link force for connected ML STA associated as MLMR only
+ * (not EMLSR Conc hw support).
  * At present we only support one ML STA. so ml_nlink_get_affect_ml_sta
  * is invoked to get one ML STA vdev from policy mgr table.
  *
@@ -2624,29 +2758,17 @@ end:
  *	   QDF_STATUS_E_PENDING if new command is sent to target.
  *	   otherwise QDF_STATUS error code
  */
-static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
-					enum mlo_link_force_reason reason,
-					enum ml_nlink_change_event_type evt,
-					struct ml_nlink_change_event *data)
+static QDF_STATUS
+ml_nlink_state_change_mlmr(struct wlan_objmgr_psoc *psoc,
+			   enum mlo_link_force_reason reason,
+			   enum ml_nlink_change_event_type evt,
+			   struct ml_nlink_change_event *data)
 {
 	struct ml_link_force_state force_state = {0};
 	struct ml_link_force_state legacy_intf_force_state = {0};
 	struct ml_link_force_state curr_force_state = {0};
 	struct wlan_objmgr_vdev *vdev = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	/*
-	 * eMLSR is allowed in MCC mode also. So, don't disable any links
-	 * if current connection happens in eMLSR mode.
-	 * eMLSR concurrency is handled by wlan_handle_emlsr_sta_concurrency
-	 * ml_nlink_state_change_emlsr will only handle the vendor
-	 * command set link request, any other event will be ignored.
-	 */
-	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL)) {
-		status = ml_nlink_state_change_emlsr_no_conc(
-						psoc, reason, evt, data);
-		return status;
-	}
 
 	vdev = ml_nlink_get_affect_ml_sta(psoc);
 	if (!vdev)
@@ -2694,6 +2816,40 @@ end:
 			mlo_debug("exit pending force state change");
 		else
 			mlo_err("exit err %d state change", status);
+	}
+
+	return status;
+}
+
+/**
+ * ml_nlink_state_change() - Handle ML STA link force
+ * with concurrency internal function
+ * @psoc: PSOC object information
+ * @reason: reason code of trigger force mode change.
+ * @evt: event type
+ * @data: event data
+ *
+ * Return: QDF_STATUS_SUCCESS if no new command updated to target.
+ *	   QDF_STATUS_E_PENDING if new command is sent to target.
+ *	   otherwise QDF_STATUS error code
+ */
+static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
+					enum mlo_link_force_reason reason,
+					enum ml_nlink_change_event_type evt,
+					struct ml_nlink_change_event *data)
+{
+	QDF_STATUS status;
+
+	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL)) {
+		if (wlan_mlme_is_aux_emlsr_support(psoc))
+			status = ml_nlink_state_change_emlsr(
+					psoc, reason, evt, data);
+		else
+			status = ml_nlink_state_change_emlsr_no_conc(
+					psoc, reason, evt, data);
+	} else {
+		status = ml_nlink_state_change_mlmr(psoc, reason,
+						    evt, data);
 	}
 
 	return status;
