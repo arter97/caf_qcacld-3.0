@@ -712,7 +712,7 @@ static const struct ieee80211_txrx_stypes
 	},
 	[NL80211_IFTYPE_NAN] = {
 		.tx = 0xffff,
-		.rx = BIT(SIR_MAC_MGMT_AUTH),
+		.rx = BIT(SIR_MAC_MGMT_AUTH) | BIT(SIR_MAC_MGMT_ACTION),
 	},
 };
 
