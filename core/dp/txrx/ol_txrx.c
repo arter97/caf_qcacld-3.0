@@ -2723,11 +2723,12 @@ static int ol_txrx_get_opmode(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
  * @soc_hdl: datapath soc handle
  * @vdev_id: virtual interface id
  * @peer_mac: peer mac addr
+ * @slowpath: called from slow path or not
  *
  * Return: return peer state
  */
 static int ol_txrx_get_peer_state(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
-				  uint8_t *peer_mac)
+				  uint8_t *peer_mac, bool slowpath)
 {
 	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
 	ol_txrx_pdev_handle pdev =
@@ -2771,7 +2772,7 @@ ol_txrx_get_info_by_peer_mac(struct cdp_soc_t *soc_hdl,
 			     struct cdp_peer_output_param *param)
 {
 	param->vdev_id = vdev_id;
-	param->state = ol_txrx_get_peer_state(soc_hdl, vdev_id, peer_mac);
+	param->state = ol_txrx_get_peer_state(soc_hdl, vdev_id, peer_mac, false);
 }
 
 /**
