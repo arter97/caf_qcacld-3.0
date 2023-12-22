@@ -15,7 +15,7 @@
  */
 
 #ifndef _DP_FSE_H__
-#define _DP_FSE_H_
+#define _DP_FSE_H__
 
 /**
  * struct qca_fse_flow_info - FSE flow information

@@ -15,7 +15,7 @@
  */
 
 #ifndef _DP_SAWF_H__
-#define _DP_SAWF_H_
+#define _DP_SAWF_H__
 
 #define QCA_SAWF_SVID_VALID 0x1
 #define QCA_SAWF_DSCP_VALID 0x2
