@@ -444,7 +444,7 @@ static int target_if_dcc_get_stats_resp(ol_scn_t scn,
 	QDF_STATUS status;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
-	struct ocb_dcc_get_stats_response *response;
+	struct ocb_dcc_get_stats_response *response = NULL;
 	struct wlan_ocb_rx_ops *ocb_rx_ops;
 
 	target_if_debug("scn:%pK, data:%pK, datalen:%d",

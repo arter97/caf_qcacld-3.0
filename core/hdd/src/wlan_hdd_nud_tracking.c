@@ -438,7 +438,7 @@ static void hdd_nud_filter_netevent(struct neighbour *neigh)
 	if (0 != status)
 		return;
 
-	adapter = hdd_get_adapter_by_macaddr(hdd_ctx, netdev->dev_addr);
+	adapter = hdd_get_adapter_by_macaddr(hdd_ctx, (uint8_t *)(netdev->dev_addr));
 
 	if (!adapter)
 		return;

@@ -19541,7 +19541,7 @@ static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 #else
 static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 				     struct net_device *ndev,
-				     u8 key_index, bool pairwise,
+				     int link_id, u8 key_index, bool pairwise,
 				     const u8 *mac_addr,
 				     struct key_params *params)
 {
@@ -19684,7 +19684,7 @@ static int wlan_hdd_cfg80211_get_key(struct wiphy *wiphy,
 #else
 static int wlan_hdd_cfg80211_get_key(struct wiphy *wiphy,
 				     struct net_device *ndev,
-				     u8 key_index, bool pairwise,
+				     int link_id, u8 key_index, bool pairwise,
 				     const u8 *mac_addr, void *cookie,
 				     void (*callback)(void *cookie,
 						      struct key_params *)
@@ -19778,7 +19778,7 @@ static int wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 #else
 static int wlan_hdd_cfg80211_del_key(struct wiphy *wiphy,
 				     struct net_device *dev,
-				     u8 key_index,
+				     int link_id, u8 key_index,
 				     bool pairwise, const u8 *mac_addr)
 {
 	int errno;
@@ -19915,7 +19915,7 @@ static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 #else
 static int wlan_hdd_cfg80211_set_default_key(struct wiphy *wiphy,
 					     struct net_device *ndev,
-					     u8 key_index,
+					     int link_id, u8 key_index,
 					     bool unicast, bool multicast)
 {
 	int errno;
@@ -19972,7 +19972,7 @@ static int wlan_hdd_cfg80211_set_default_beacon_key(struct wiphy *wiphy,
 #else
 static int wlan_hdd_cfg80211_set_default_beacon_key(struct wiphy *wiphy,
 						    struct net_device *ndev,
-						    u8 key_index)
+						    int link_id, u8 key_index)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -20301,7 +20301,7 @@ static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 #else
 static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 					 struct net_device *netdev,
-					 u8 key_index)
+					 int link_id, u8 key_index)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -23395,7 +23395,7 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 	uint8_t rate_index;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	uint8_t vdev_id;
-	uint8_t gi_val;
+	uint8_t gi_val = 0;
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 0))
 	uint8_t auto_rate_he_gi = 0;
 #endif
