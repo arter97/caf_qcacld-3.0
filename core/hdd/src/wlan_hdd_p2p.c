@@ -1136,6 +1136,8 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	struct hdd_adapter *assoc_adapter;
 	bool eht_capab;
 	struct hdd_ap_ctx *ap_ctx;
+	struct action_frm_hdr *action_hdr;
+	tpSirMacVendorSpecificPublicActionFrameHdr vendor_specific;
 
 	hdd_debug("Frame Type = %d Frame Length = %d freq = %d",
 		  frame_type, frm_len, rx_freq);
@@ -1171,6 +1173,24 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 			    adapter->device_mode == QDF_P2P_GO_MODE)) {
 			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 			ap_ctx->during_auth_offload = true;
+		}
+	}
+
+	if (type == WLAN_FC0_TYPE_MGMT && sub_type == WLAN_FC0_STYPE_ACTION &&
+	    frm_len >= (sizeof(struct wlan_frame_hdr) +
+			sizeof(*vendor_specific))) {
+		action_hdr = (struct action_frm_hdr *)(pb_frames +
+						sizeof(struct wlan_frame_hdr));
+		vendor_specific =
+			(tpSirMacVendorSpecificPublicActionFrameHdr)action_hdr;
+		if (is_nan_oui(vendor_specific->Oui)) {
+			adapter = hdd_get_adapter(hdd_ctx, QDF_NAN_DISC_MODE);
+			if (!adapter) {
+				hdd_err("NAN adapter is null");
+				return;
+			}
+
+			goto check_adapter;
 		}
 	}
 
@@ -1212,6 +1232,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 		}
 	}
 
+check_adapter:
 	if (!adapter->dev) {
 		hdd_err("adapter->dev is NULL");
 		return;
