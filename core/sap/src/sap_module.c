@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3187,6 +3187,15 @@ QDF_STATUS wlansap_update_owe_info(struct sap_context *sap_ctx,
 		assoc_ind->owe_status = owe_status;
 		status = sme_update_owe_info(mac, assoc_ind);
 		qdf_mem_free(assoc_ind);
+	} else {
+		/*
+		 * To cover if owe_pending_assoc_ind_list is not null
+		 * on current link, but no node found with mac address
+		 * match case , then need to return QDF_STATUS_E_EXISTS
+		 * for failure case to look for match node in another link.
+		 */
+		status = QDF_STATUS_E_EXISTS;
+		sap_debug("No match owe node");
 	}
 
 	return status;

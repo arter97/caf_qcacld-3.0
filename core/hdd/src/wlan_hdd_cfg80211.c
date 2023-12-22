@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26468,6 +26468,7 @@ __wlan_hdd_cfg80211_update_owe_info(struct wiphy *wiphy,
 	QDF_STATUS status;
 	int errno;
 	struct sap_context *sap_ctx;
+	struct wlan_hdd_link_info *link_info = NULL;
 
 	hdd_enter_dev(dev);
 
@@ -26485,14 +26486,25 @@ __wlan_hdd_cfg80211_update_owe_info(struct wiphy *wiphy,
 
 	hdd_debug("owe_status %d", owe_info->status);
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
-	status = wlansap_update_owe_info(sap_ctx, owe_info->peer, owe_info->ie,
-					 owe_info->ie_len, owe_info->status);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to update OWE info");
-		errno = qdf_status_to_os_return(status);
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+		status = wlansap_update_owe_info(sap_ctx,
+						 owe_info->peer,
+						 owe_info->ie,
+						 owe_info->ie_len,
+						 owe_info->status);
+		if (QDF_IS_STATUS_ERROR(status) &&
+		    status != QDF_STATUS_E_EXISTS) {
+			hdd_err("Failed to update OWE info vdev id %d",
+				link_info->vdev_id);
+		} else {
+			hdd_debug("update OWE info vdev id %d success",
+				  link_info->vdev_id);
+			break;
+		}
 	}
 
+	errno = qdf_status_to_os_return(status);
 	hdd_exit();
 	return errno;
 }
