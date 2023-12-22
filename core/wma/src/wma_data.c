@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2297,6 +2297,43 @@ static void wma_update_tx_send_params(struct tx_send_params *tx_param,
 		 tx_param->preamble_type);
 }
 
+/**
+ * wma_is_mlo_link_agnostic(): get if agnostic support for pkt
+ * if send as agnostic, FW will choose which link will be used
+ * depends on link's active/inactive status.
+ *
+ * @vdev: objmgr of vdev
+ * @dest_addr: dest mlo address
+ * @frmType: type of frame
+ * @subtype: subtype of frame
+ * @action: type of action frame
+ *
+ * return: true if send as agnostic.
+ */
+static bool wma_is_mlo_link_agnostic(struct wlan_objmgr_vdev *vdev,
+				     uint8_t *dest_addr, eFrameType frmType,
+				     uint8_t subType,
+				     uint16_t action)
+{
+	bool mlo_link_agnostic = false;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		goto end;
+
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
+	    wlan_vdev_mlme_is_active(vdev) == QDF_STATUS_SUCCESS &&
+	    wlan_get_mlo_link_agnostic_flag(vdev, dest_addr) &&
+	    frmType == TXRX_FRM_802_11_MGMT &&
+	    subType != SIR_MAC_MGMT_PROBE_REQ &&
+	    subType != SIR_MAC_MGMT_AUTH &&
+	    action != (ACTION_CATEGORY_PUBLIC << 8 | TDLS_DISCOVERY_RESPONSE) &&
+	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE))
+		mlo_link_agnostic = true;
+
+end:
+	return mlo_link_agnostic;
+}
+
 QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 eFrameType frmType, eFrameTxDir txDir, uint8_t tid,
 			 wma_tx_dwnld_comp_callback tx_frm_download_comp_cb,
@@ -2333,7 +2370,6 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	uint8_t *mld_addr = NULL;
 	bool is_5g = false;
 	uint8_t pdev_id;
-	bool mlo_link_agnostic;
 
 	if (wma_validate_handle(wma_handle)) {
 		cds_packet_free((void *)tx_frame);
@@ -2716,9 +2752,6 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 	wh = (struct ieee80211_frame *)(qdf_nbuf_data(tx_frame));
 
-	mlo_link_agnostic =
-		wlan_get_mlo_link_agnostic_flag(iface->vdev, wh->i_addr1);
-
 	mgmt_param.tx_frame = tx_frame;
 	mgmt_param.frm_len = frmLen;
 	mgmt_param.vdev_id = vdev_id;
@@ -2728,16 +2761,9 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	mgmt_param.use_6mbps = use_6mbps;
 	mgmt_param.tx_type = tx_frm_index;
 	mgmt_param.peer_rssi = peer_rssi;
-	if (wlan_vdev_mlme_get_opmode(iface->vdev) == QDF_STA_MODE &&
-	    wlan_vdev_mlme_is_mlo_vdev(iface->vdev) &&
-	    (wlan_vdev_mlme_is_active(iface->vdev) == QDF_STATUS_SUCCESS) &&
-	    frmType == TXRX_FRM_802_11_MGMT &&
-	    pFc->subType != SIR_MAC_MGMT_PROBE_REQ &&
-	    pFc->subType != SIR_MAC_MGMT_AUTH &&
-	    action != (ACTION_CATEGORY_PUBLIC << 8 | TDLS_DISCOVERY_RESPONSE) &&
-	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE) &&
-	    mlo_link_agnostic)
-		mgmt_param.mlo_link_agnostic = true;
+	mgmt_param.mlo_link_agnostic =
+		wma_is_mlo_link_agnostic(iface->vdev, wh->i_addr1,
+					 frmType, pFc->subType, action);
 
 	if (tx_flag & HAL_USE_INCORRECT_KEY_PMF)
 		mgmt_param.tx_flags |= MGMT_TX_USE_INCORRECT_KEY;
