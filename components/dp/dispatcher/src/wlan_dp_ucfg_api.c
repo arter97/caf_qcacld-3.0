@@ -2887,3 +2887,8 @@ QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
 	return wlan_dp_lapb_handle_app_ind(nbuf);
 }
 #endif
+
+bool ucfg_dp_ml_mon_supported(void)
+{
+	return wlan_dp_ml_mon_supported();
+}

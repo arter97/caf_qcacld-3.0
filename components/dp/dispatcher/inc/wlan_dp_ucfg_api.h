@@ -1923,4 +1923,10 @@ QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
 }
 #endif
 
+/**
+ * ucfg_dp_ml_mon_supported() - API to get ML mon support
+ *
+ * Return: Return true if ML mon mode supported
+ */
+bool ucfg_dp_ml_mon_supported(void);
 #endif /* _WLAN_DP_UCFG_API_H_ */

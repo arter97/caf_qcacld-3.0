@@ -2789,3 +2789,25 @@ void wlan_dp_pdev_cfg_sync_profile(struct cdp_soc_t *cdp_soc, uint8_t pdev_id)
 	dp_err("pdev based config item not found in profile table");
 }
 #endif
+
+#ifdef FEATURE_ML_MONITOR_MODE_SUPPORT
+bool wlan_dp_ml_mon_supported(void)
+{
+	cdp_config_param_type val;
+	QDF_STATUS status;
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	if (!soc) {
+		dp_err("Unable to get dp_soc");
+		return false;
+	}
+
+	status = cdp_txrx_get_psoc_param(soc, CDP_FW_SUPPORT_ML_MON, &val);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to get psoc param status: %d", status);
+		return false;
+	}
+
+	return val.cdp_fw_support_ml_mon;
+}
+#endif

@@ -1072,4 +1072,17 @@ static inline void dp_flow_priortization_deinit(struct wlan_dp_intf *dp_intf)
 {
 }
 #endif
+#ifdef FEATURE_ML_MONITOR_MODE_SUPPORT
+/*
+ * wlan_dp_ml_mon_supported() - API to get ML mon support
+ *
+ * Return: Return true if ML mon mode supported
+ */
+bool wlan_dp_ml_mon_supported(void);
+#else
+static inline bool wlan_dp_ml_mon_supported(void)
+{
+	return false;
+}
+#endif
 #endif
