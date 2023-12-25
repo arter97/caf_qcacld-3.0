@@ -2553,7 +2553,6 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 				} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
 					   hdd_ctx->psoc)) {
 					hdd_softap_deauth_all_sta(adapter,
-								  hapd_state,
 								  &params);
 				}
 			} else if (QDF_P2P_GO_MODE == adapter->device_mode) {
@@ -2575,7 +2574,6 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 				} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
 					   hdd_ctx->psoc)) {
 					hdd_softap_deauth_all_sta(adapter,
-								  hapd_state,
 								  &params);
 				}
 			} else if (QDF_TDLS_MODE == adapter->device_mode &&
