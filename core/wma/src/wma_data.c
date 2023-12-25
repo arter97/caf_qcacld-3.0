@@ -2320,13 +2320,24 @@ static bool wma_is_mlo_link_agnostic(struct wlan_objmgr_vdev *vdev,
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		goto end;
 
+	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS)
+		goto end;
+
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
-	    wlan_vdev_mlme_is_active(vdev) == QDF_STATUS_SUCCESS &&
 	    wlan_get_mlo_link_agnostic_flag(vdev, dest_addr) &&
 	    frmType == TXRX_FRM_802_11_MGMT &&
 	    subType != SIR_MAC_MGMT_PROBE_REQ &&
 	    subType != SIR_MAC_MGMT_AUTH &&
 	    action != (ACTION_CATEGORY_PUBLIC << 8 | TDLS_DISCOVERY_RESPONSE) &&
+	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE))
+		mlo_link_agnostic = true;
+
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE &&
+	    frmType == TXRX_FRM_802_11_MGMT &&
+	    subType != SIR_MAC_MGMT_PROBE_RSP &&
+	    subType != SIR_MAC_MGMT_AUTH &&
+	    subType != SIR_MAC_MGMT_ASSOC_RSP &&
+	    subType != SIR_MAC_MGMT_REASSOC_RSP &&
 	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE))
 		mlo_link_agnostic = true;
 
