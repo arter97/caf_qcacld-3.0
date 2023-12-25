@@ -231,7 +231,16 @@ hdd_translate_wpa_to_csr_auth_type(uint8_t auth_suite[4]);
 eCsrEncryptionType
 hdd_translate_wpa_to_csr_encryption_type(uint8_t cipher_suite[4]);
 
-QDF_STATUS hdd_softap_sta_deauth(struct hdd_adapter *adapter,
+/**
+ * hdd_softap_sta_deauth() - handle deauth req from HDD
+ * @link_info: Pointer to hdd link info
+ * @param: Params to the operation
+ *
+ * This to take counter measure to handle deauth req from HDD
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_softap_sta_deauth(struct wlan_hdd_link_info *link_info,
 				 struct csr_del_sta_params *param);
 void hdd_softap_sta_disassoc(struct hdd_adapter *adapter,
 			     struct csr_del_sta_params *param);

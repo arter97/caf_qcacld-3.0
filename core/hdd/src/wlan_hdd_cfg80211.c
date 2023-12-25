@@ -25602,7 +25602,7 @@ static int wlan_hdd_set_txq_params(struct wiphy *wiphy,
 
 /**
  * hdd_softap_deauth_current_sta() - Deauth current sta
- * @adapter: pointer to adapter structure
+ * @link_info: pointer to hdd link info
  * @sta_info: pointer to the current station info structure
  * @hapd_state: pointer to hostapd state structure
  * @param: pointer to del sta params
@@ -25610,7 +25610,7 @@ static int wlan_hdd_set_txq_params(struct wiphy *wiphy,
  * Return: QDF_STATUS on success, corresponding QDF failure status on failure
  */
 static
-QDF_STATUS hdd_softap_deauth_current_sta(struct hdd_adapter *adapter,
+QDF_STATUS hdd_softap_deauth_current_sta(struct wlan_hdd_link_info *link_info,
 					 struct hdd_station_info *sta_info,
 					 struct hdd_hostapd_state *hapd_state,
 					 struct csr_del_sta_params *param)
@@ -25619,7 +25619,14 @@ QDF_STATUS hdd_softap_deauth_current_sta(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS qdf_status;
 	struct hdd_station_info *tmp = NULL;
+	struct hdd_adapter *adapter;
 
+	if (!link_info) {
+		hdd_err("link_info is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	adapter = link_info->adapter;
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -25630,11 +25637,11 @@ QDF_STATUS hdd_softap_deauth_current_sta(struct hdd_adapter *adapter,
 
 	if (!qdf_is_macaddr_broadcast(&param->peerMacAddr))
 		sme_send_disassoc_req_frame(hdd_ctx->mac_handle,
-					    adapter->deflink->vdev_id,
+					    link_info->vdev_id,
 					    (uint8_t *)&param->peerMacAddr,
 					    param->reason_code, 0);
 
-	qdf_status = hdd_softap_sta_deauth(adapter, param);
+	qdf_status = hdd_softap_sta_deauth(link_info, param);
 
 	if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		if (qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
@@ -25689,7 +25696,8 @@ QDF_STATUS hdd_softap_deauth_all_sta(struct hdd_adapter *adapter,
 		struct hdd_station_info bcast_sta_info;
 
 		qdf_set_macaddr_broadcast(&bcast_sta_info.sta_mac);
-		return hdd_softap_deauth_current_sta(adapter, &bcast_sta_info,
+		return hdd_softap_deauth_current_sta(adapter->link_info,
+						     &bcast_sta_info,
 						     hapd_state, param);
 	}
 
@@ -25710,7 +25718,8 @@ QDF_STATUS hdd_softap_deauth_all_sta(struct hdd_adapter *adapter,
 				     sta_info->sta_mac.bytes,
 				     QDF_MAC_ADDR_SIZE);
 			status =
-			    hdd_softap_deauth_current_sta(adapter, sta_info,
+			    hdd_softap_deauth_current_sta(sta_info->link_info,
+							  sta_info,
 							  hapd_state, param);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				hdd_put_sta_info_ref(
@@ -25750,6 +25759,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 	struct hdd_hostapd_state *hapd_state;
 	uint8_t *mac;
 	struct hdd_station_info *sta_info;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
@@ -25789,18 +25799,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 								     param)))
 			goto fn_end;
 	} else {
-		if (param->reason_code == REASON_1X_AUTH_FAILURE) {
-			struct wlan_objmgr_vdev *vdev;
-
-			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-							   WLAN_DP_ID);
-			if (vdev) {
-				ucfg_dp_softap_check_wait_for_tx_eap_pkt(vdev,
-						(struct qdf_mac_addr *)mac);
-				hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-			}
-		}
-
 		sta_info = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
 						mac,
@@ -25823,9 +25821,32 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 			return -ENOENT;
 		}
 
+		link_info = sta_info->link_info;
+		if (!link_info) {
+			hdd_debug("invalid link info" QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(mac));
+			hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info,
+					     true,
+					     STA_INFO_CFG80211_DEL_STATION);
+			return -ENOENT;
+		}
+
+		if (param->reason_code == REASON_1X_AUTH_FAILURE) {
+			struct wlan_objmgr_vdev *vdev;
+
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_DP_ID);
+			if (vdev) {
+				ucfg_dp_softap_check_wait_for_tx_eap_pkt(
+						vdev,
+						(struct qdf_mac_addr *)mac);
+				hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+			}
+		}
+
 		hdd_debug("ucast, Delete STA with MAC:" QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(mac));
-		hdd_softap_deauth_current_sta(adapter, sta_info, hapd_state,
+		hdd_softap_deauth_current_sta(link_info, sta_info, hapd_state,
 					      param);
 		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 				     STA_INFO_CFG80211_DEL_STATION);

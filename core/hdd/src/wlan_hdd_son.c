@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1488,7 +1488,7 @@ static void hdd_son_deauth_sta(struct wlan_objmgr_vdev *vdev,
 	hdd_debug("Peer - "QDF_MAC_ADDR_FMT" Ignore Frame - %u",
 		  QDF_MAC_ADDR_REF(peer_mac), ignore_frame);
 
-	status = hdd_softap_sta_deauth(link_info->adapter, &param);
+	status = hdd_softap_sta_deauth(link_info, &param);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Error in deauthenticating peer");
 }

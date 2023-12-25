@@ -18154,20 +18154,12 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	hdd_exit();
 }
 
-/**
- * hdd_softap_sta_deauth() - handle deauth req from HDD
- * @adapter: Pointer to the HDD adapter
- * @param: Params to the operation
- *
- * This to take counter measure to handle deauth req from HDD
- *
- * Return: None
- */
-QDF_STATUS hdd_softap_sta_deauth(struct hdd_adapter *adapter,
+QDF_STATUS hdd_softap_sta_deauth(struct wlan_hdd_link_info *link_info,
 				 struct csr_del_sta_params *param)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAULT;
 	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
 	bool is_sap_bcast_deauth_enabled = false;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -18188,7 +18180,7 @@ QDF_STATUS hdd_softap_sta_deauth(struct hdd_adapter *adapter,
 			return qdf_status;
 
 	qdf_status =
-		wlansap_deauth_sta(WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
+		wlansap_deauth_sta(WLAN_HDD_GET_SAP_CTX_PTR(link_info),
 				   param);
 
 	hdd_exit();
