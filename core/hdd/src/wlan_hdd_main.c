@@ -2821,7 +2821,6 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 
 	ucfg_ipa_set_dp_handle(hdd_ctx->psoc,
 			       cds_get_context(QDF_MODULE_ID_SOC));
-	ucfg_ipa_set_pdev_id(hdd_ctx->psoc, OL_TXRX_PDEV_ID);
 
 	status = ucfg_mlme_get_sub_20_chan_width(hdd_ctx->psoc,
 						 &sub_20_chan_width);
