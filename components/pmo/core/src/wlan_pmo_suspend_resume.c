@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1032,13 +1032,20 @@ QDF_STATUS pmo_core_txrx_suspend(struct wlan_objmgr_psoc *psoc)
 		goto out;
 	}
 
-	cdp_display_txrx_hw_info(dp_soc);
-	/* drain RX rings only */
-	cdp_drain_txrx(dp_soc, 1);
+	if (ret == -EOPNOTSUPP) {
+		/* For chips, which not support IRQ disable,
+		 * drain will not be called, display and check
+		 * rings HP/TP once again
+		 */
+		if (!cdp_display_txrx_hw_info(dp_soc)) {
+			pmo_err("Prevent suspend, ring not empty");
+			status = QDF_STATUS_E_AGAIN;
+		}
 
-	if (ret == -EOPNOTSUPP)
 		goto out;
+	}
 
+	cdp_drain_txrx(dp_soc, 0);
 	pmo_ctx->wow.txrx_suspended = true;
 out:
 	pmo_psoc_put_ref(psoc);
