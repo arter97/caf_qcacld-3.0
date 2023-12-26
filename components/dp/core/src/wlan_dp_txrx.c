@@ -48,8 +48,8 @@ uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *intf_ctx)
 {
 	struct wlan_dp_intf *dp_intf = (struct wlan_dp_intf *)intf_ctx;
 
-	if (!dp_intf) {
-		dp_err("DP Context is NULL");
+	if (qdf_unlikely(!dp_intf)) {
+		dp_err_rl("DP Context is NULL");
 		return 0;
 	}
 
