@@ -852,7 +852,6 @@ static void
 __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_buf)
 {
 	uint16_t size;
-	uint32_t val = 0;
 	tSirMacChanNum channel_number;
 	tLimMlmStartReq *mlm_start_req = NULL;
 	struct start_bss_config *sme_start_bss_req = NULL;
@@ -867,7 +866,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 	int32_t auth_mode;
 	int32_t akm;
 	int32_t rsn_caps;
-	bool cfg_value = false;
 	enum QDF_OPMODE opmode;
 	ePhyChanBondState cb_mode;
 	enum bss_type bss_type;
@@ -1157,68 +1155,14 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			goto free;
 		}
 
-		/* Copy SSID to the MLM start structure */
-		qdf_mem_copy((uint8_t *) &mlm_start_req->ssId,
-			     (uint8_t *) &sme_start_bss_req->ssId,
-			     sme_start_bss_req->ssId.length + 1);
-		mlm_start_req->ssidHidden = sme_start_bss_req->ssidHidden;
-
-		mlm_start_req->bssType = session->bssType;
-
 		/* Fill PE session Id from the session Table */
-		mlm_start_req->sessionId = session->peSessionId;
-
-		sir_copy_mac_addr(mlm_start_req->bssId, session->bssId);
-		/* store the channel num in mlmstart req structure */
-		mlm_start_req->oper_ch_freq = session->curr_op_freq;
-		mlm_start_req->beaconPeriod =
-			session->beaconParams.beaconInterval;
-		mlm_start_req->cac_duration_ms =
-			sme_start_bss_req->cac_duration_ms;
-		mlm_start_req->dfs_regdomain =
-			sme_start_bss_req->dfs_regdomain;
+		mlm_start_req->pe_session_id = session->peSessionId;
 		if (LIM_IS_AP_ROLE(session)) {
-			mlm_start_req->dtimPeriod = session->dtimPeriod;
-			mlm_start_req->wps_state = session->wps_state;
 			session->cac_duration_ms =
-				mlm_start_req->cac_duration_ms;
-			session->dfs_regdomain = mlm_start_req->dfs_regdomain;
-			mlm_start_req->cbMode = cb_mode;
-			qdf_status =
-				wlan_mlme_is_ap_obss_prot_enabled(mac_ctx->psoc,
-								  &cfg_value);
-			if (QDF_IS_STATUS_ERROR(qdf_status))
-				pe_err("Unable to get obssProtEnabled");
-			mlm_start_req->obssProtEnabled = cfg_value;
-		} else {
-			val = mac_ctx->mlme_cfg->sap_cfg.dtim_interval;
-			mlm_start_req->dtimPeriod = (uint8_t) val;
+				sme_start_bss_req->cac_duration_ms;
+			session->dfs_regdomain =
+					sme_start_bss_req->dfs_regdomain;
 		}
-
-		mlm_start_req->cfParamSet.cfpPeriod =
-			mac_ctx->mlme_cfg->rates.cfp_period;
-		mlm_start_req->cfParamSet.cfpMaxDuration =
-			mac_ctx->mlme_cfg->rates.cfp_max_duration;
-
-		/*
-		 * this may not be needed anymore now,
-		 * as rateSet is now included in the
-		 * session entry and MLM has session context.
-		 */
-		qdf_mem_copy((void *)&mlm_start_req->rateSet,
-			     (void *)&session->rateSet,
-			     sizeof(tSirMacRateSet));
-
-		/* Now populate the 11n related parameters */
-		mlm_start_req->nwType = session->nwType;
-		mlm_start_req->htCapable = session->htCapability;
-
-		mlm_start_req->htOperMode = mac_ctx->lim.gHTOperMode;
-		/* Unused */
-		mlm_start_req->dualCTSProtection =
-			mac_ctx->lim.gHTDualCTSProtection;
-		mlm_start_req->txChannelWidthSet =
-			session->htRecommendedTxWidthSet;
 
 		session->limRFBand = lim_get_rf_band(
 			sme_start_bss_req->oper_ch_freq);
@@ -1231,8 +1175,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 				mac_ctx->mlme_cfg->gen.enabled_11h;
 
 			if (session->lim11hEnable &&
-				(eSIR_INFRA_AP_MODE ==
-					mlm_start_req->bssType)) {
+			    session->bssType == eSIR_INFRA_AP_MODE) {
 				session->lim11hEnable =
 					mac_ctx->mlme_cfg->
 					dfs_cfg.dfs_master_capable;
@@ -1242,7 +1185,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		if (!session->lim11hEnable)
 			mac_ctx->mlme_cfg->power.local_power_constraint = 0;
 
-		mlm_start_req->beacon_tx_rate = session->beacon_tx_rate;
 		lim_save_max_mcs_idx(mac_ctx, session);
 		session->limPrevSmeState = session->limSmeState;
 		session->limSmeState = eLIM_SME_WT_START_BSS_STATE;

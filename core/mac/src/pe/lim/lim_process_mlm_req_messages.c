@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -311,7 +311,7 @@ lim_mlm_add_bss(struct mac_context *mac_ctx,
 		return eSIR_SME_INVALID_PARAMETERS;
 	}
 
-	qdf_mem_copy(mlme_obj->mgmt.generic.bssid, mlm_start_req->bssId,
+	qdf_mem_copy(mlme_obj->mgmt.generic.bssid, session->bssId,
 		     QDF_MAC_ADDR_SIZE);
 	if (lim_is_session_he_capable(session)) {
 		lim_decide_he_op(mac_ctx, &mlme_obj->proto.he_ops_info.he_ops,
@@ -337,12 +337,12 @@ lim_mlm_add_bss(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status))
 		goto send_fail_resp;
 
-	 addbss_param = qdf_mem_malloc(sizeof(struct bss_params));
+	addbss_param = qdf_mem_malloc(sizeof(struct bss_params));
 	if (!addbss_param)
 		goto send_fail_resp;
 
-	addbss_param->vhtCapable = mlm_start_req->htCapable;
-	addbss_param->htCapable = session->vhtCapability;
+	addbss_param->vhtCapable = session->vhtCapability;
+	addbss_param->htCapable = session->htCapability;
 	addbss_param->ch_width = session->ch_width;
 	update_rmfEnabled(addbss_param, session);
 	addbss_param->staContext.fShortGI20Mhz =
@@ -387,7 +387,7 @@ void lim_process_mlm_start_req(struct mac_context *mac_ctx,
 	}
 
 	session = pe_find_session_by_session_id(mac_ctx,
-				mlm_start_req->sessionId);
+				mlm_start_req->pe_session_id);
 	if (!session) {
 		pe_err("Session Does not exist for given sessionID");
 		mlm_start_cnf.resultCode = eSIR_SME_REFUSED;
@@ -412,7 +412,7 @@ void lim_process_mlm_start_req(struct mac_context *mac_ctx,
 
 end:
 	/* Update PE session Id */
-	mlm_start_cnf.sessionId = mlm_start_req->sessionId;
+	mlm_start_cnf.sessionId = mlm_start_req->pe_session_id;
 
 	/*
 	 * Respond immediately to LIM, only if MLME has not been

@@ -10370,7 +10370,7 @@ QDF_STATUS lim_ap_mlme_vdev_start_send(struct vdev_mlme_obj *vdev_mlme,
 		return QDF_STATUS_E_INVAL;
 
 	session = pe_find_session_by_session_id(mac_ctx,
-						start_req->sessionId);
+						start_req->pe_session_id);
 	if (!session) {
 		pe_err("session is NULL");
 		return QDF_STATUS_E_INVAL;

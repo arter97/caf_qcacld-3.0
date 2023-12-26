@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -171,29 +171,7 @@ enum eChannelChangeReasonCodes {
 };
 
 typedef struct sLimMlmStartReq {
-	tSirMacSSid ssId;
-	enum bss_type bssType;
-	tSirMacAddr bssId;
-	tSirMacBeaconInterval beaconPeriod;
-	uint8_t dtimPeriod;
-	tSirMacCfParamSet cfParamSet;
-	uint32_t oper_ch_freq;
-	ePhyChanBondState cbMode;
-	tSirMacRateSet rateSet;
-	uint8_t sessionId;      /* Added For BT-AMP Support */
-
-	/* Parameters reqd for new HAL (message) interface */
-	tSirNwType nwType;
-	uint8_t htCapable;
-	tSirMacHTOperatingMode htOperMode;
-	uint8_t dualCTSProtection;
-	uint8_t txChannelWidthSet;
-	uint8_t ssidHidden;
-	uint8_t wps_state;
-	uint8_t obssProtEnabled;
-	uint16_t beacon_tx_rate;
-	uint32_t cac_duration_ms;
-	uint32_t dfs_regdomain;
+	uint8_t pe_session_id;
 } tLimMlmStartReq, *tpLimMlmStartReq;
 
 typedef struct sLimMlmStartCnf {
