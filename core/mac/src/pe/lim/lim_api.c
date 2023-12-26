@@ -4245,11 +4245,10 @@ static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
 	}
 }
 
-static void
-lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
-			     struct pe_session *session_entry,
-			     struct mlo_link_info *link_info,
-			     struct element_info link_probe_rsp)
+static void lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
+					 struct pe_session *session_entry,
+					 struct mlo_link_info *link_info,
+					 struct element_info link_probe_rsp)
 {
 	uint8_t *new_rnr_ie = NULL;
 
@@ -4277,13 +4276,88 @@ lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
 			   new_rnr_ie[1] + MIN_IE_LEN);
 }
 
-QDF_STATUS
-lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
-				struct pe_session *session_entry,
-				tpSirProbeRespBeacon rcvd_probe_resp,
-				uint8_t *probe_rsp,
-				uint32_t probe_rsp_len,
-				int32_t rssi)
+static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
+{
+	struct scan_filter *filter;
+	qdf_list_t *scan_list = NULL;
+	struct wlan_objmgr_pdev *pdev;
+	uint8_t idx;
+	struct mlo_link_info *link_info;
+	struct scan_cache_entry *cur_entry;
+	struct scan_cache_node *link_node;
+	struct mlo_partner_info *partner_info;
+	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	pdev =  wlan_vdev_get_pdev(session->vdev);
+	if (!pdev) {
+		pe_err("PDEV NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	cur_entry =
+		wlan_cm_get_curr_candidate_entry(session->vdev, session->cm_id);
+	if (!cur_entry) {
+		pe_err("Current candidate NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	filter = qdf_mem_malloc(sizeof(*filter));
+	if (!filter) {
+		status = QDF_STATUS_E_NOMEM;
+		goto mem_free;
+	}
+
+	partner_info = &session->lim_join_req->partner_info;
+	for (idx = 0; idx < partner_info->num_partner_links; idx++) {
+		link_info = &partner_info->partner_link_info[idx];
+		qdf_copy_macaddr(&filter->bssid_list[idx],
+				 &link_info->link_addr);
+		filter->num_of_bssid++;
+
+		filter->chan_freq_list[idx] = link_info->chan_freq;
+		filter->num_of_channels++;
+	}
+
+	/* If no.of. scan entries fetched not equal to no.of partner links
+	 * then fail as common AKM is not determined.
+	 */
+	scan_list = wlan_scan_get_result(pdev, filter);
+	qdf_mem_free(filter);
+	if (!scan_list ||
+	    (qdf_list_size(scan_list) != partner_info->num_partner_links)) {
+		status = QDF_STATUS_E_INVAL;
+		goto mem_free;
+	}
+
+	qdf_list_peek_front(scan_list, &cur_node);
+	while (cur_node) {
+		qdf_list_peek_next(scan_list, cur_node, &next_node);
+		link_node = qdf_container_of(cur_node, struct scan_cache_node,
+					     node);
+
+		if (!wlan_scan_entries_contain_cmn_akm(cur_entry,
+						       link_node->entry)) {
+			status = QDF_STATUS_E_FAILURE;
+			break;
+		}
+
+		cur_node = next_node;
+		next_node = NULL;
+	}
+
+mem_free:
+	if (scan_list)
+		wlan_scan_purge_results(scan_list);
+	util_scan_free_cache_entry(cur_entry);
+	return status;
+}
+
+QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
+					   struct pe_session *session_entry,
+					   tpSirProbeRespBeacon rcvd_probe_resp,
+					   uint8_t *probe_rsp,
+					   uint32_t probe_rsp_len, int32_t rssi)
 {
 	struct element_info link_probe_rsp = {0};
 	struct qdf_mac_addr sta_link_addr;
@@ -4442,6 +4516,17 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 				goto end;
 			}
 		}
+		/*
+		 * If the partner link's AKM not matching current candidate
+		 * remove the partner links for this association.
+		 */
+		status = lim_check_partner_link_for_cmn_akm(session_entry);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Non overlapping partner link AKM %d",
+				 status);
+			lim_clear_ml_partner_info(session_entry);
+			goto end;
+		}
 	} else if (session_entry->lim_join_req->is_ml_probe_req_sent &&
 		   !rcvd_probe_resp->mlo_ie.mlo_ie_present) {
 		status =
@@ -4450,8 +4535,7 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 		if (QDF_IS_STATUS_ERROR(status))
 			lim_clear_ml_partner_info(session_entry);
 
-		status = QDF_STATUS_E_FAILURE;
-		return status;
+		return QDF_STATUS_E_FAILURE;
 	} else {
 		return status;
 	}
