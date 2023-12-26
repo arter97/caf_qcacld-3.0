@@ -7531,11 +7531,13 @@ int hdd_destroy_acs_timer(struct hdd_adapter *adapter)
  * __wlan_hdd_cfg80211_stop_ap() - stop soft ap
  * @wiphy: Pointer to wiphy structure
  * @dev: Pointer to net_device structure
+ * @link_id: link id from kernel
  *
  * Return: 0 for success non-zero for failure
  */
 static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
-					struct net_device *dev)
+					struct net_device *dev,
+					int link_id)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
@@ -7545,10 +7547,17 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	int ret;
 	mac_handle_t mac_handle;
 	struct hdd_ap_ctx *ap_ctx;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter_dev(dev);
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	/*
@@ -7571,12 +7580,12 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		goto exit;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		goto exit;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_STOP_AP,
-		   adapter->deflink->vdev_id, adapter->device_mode);
+		   link_info->vdev_id, adapter->device_mode);
 
 	if (!(adapter->device_mode == QDF_SAP_MODE ||
 	      adapter->device_mode == QDF_P2P_GO_MODE)) {
@@ -7614,7 +7623,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	 * This update is moved to start of this function to resolve stop_ap
 	 * call during SSR case. Adapter gets cleaned up as part of SSR.
 	 */
-	clear_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags);
+	clear_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
 	hdd_debug("Event flags 0x%lx(%s) Device_mode %s(%d)",
 		  adapter->event_flags, (adapter->dev)->name,
 		  qdf_opmode_str(adapter->device_mode), adapter->device_mode);
@@ -7622,10 +7631,10 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	if (adapter->device_mode == QDF_SAP_MODE) {
 		wlan_hdd_del_station(adapter, NULL);
 		mac_handle = hdd_ctx->mac_handle;
-		status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
+		status = wlan_hdd_flush_pmksa_cache(link_info);
 	}
 	policy_mgr_flush_deferred_csa(hdd_ctx->psoc,
-				      adapter->deflink->vdev_id);
+				      link_info->vdev_id);
 	cds_flush_work(&adapter->sap_stop_bss_work);
 	ap_ctx->sap_config.acs_cfg.acs_mode = false;
 	hdd_dcs_clear(adapter);
@@ -7635,12 +7644,12 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
 
-	wlan_hdd_cleanup_actionframe(adapter->deflink);
-	wlan_hdd_cleanup_remain_on_channel_ctx(adapter->deflink);
+	wlan_hdd_cleanup_actionframe(link_info);
+	wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
-			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+			WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 
 		hdd_place_marker(adapter, "TRY TO STOP", NULL);
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
@@ -7659,18 +7668,18 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 				QDF_ASSERT(0);
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 
 		/*BSS stopped, clear the active sessions for this device mode*/
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 						adapter->device_mode,
-						adapter->deflink->vdev_id);
+						link_info->vdev_id);
 		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
 					    false);
 		wlan_twt_concurrency_update(hdd_ctx);
-		wlan_set_sap_user_config_freq(adapter->deflink->vdev, 0);
+		wlan_set_sap_user_config_freq(link_info->vdev, 0);
 		status = ucfg_if_mgr_deliver_event(
-				adapter->deflink->vdev,
+				link_info->vdev,
 				WLAN_IF_MGR_EV_AP_STOP_BSS_COMPLETE, NULL);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("Stopping the BSS failed");
@@ -7696,8 +7705,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		goto exit;
 	}
 
-	qdf_copy_macaddr(&update_ie.bssid, &adapter->mac_addr);
-	update_ie.vdev_id = adapter->deflink->vdev_id;
+	qdf_copy_macaddr(&update_ie.bssid, &link_info->link_addr);
+	update_ie.vdev_id = link_info->vdev_id;
 	update_ie.ieBufferlength = 0;
 	update_ie.pAdditionIEBuffer = NULL;
 	update_ie.append = true;
@@ -7714,11 +7723,11 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		hdd_err("Could not pass on ASSOC_RSP data to PE");
 	}
 	/* Reset WNI_CFG_PROBE_RSP Flags */
-	wlan_hdd_reset_prob_rspies(adapter->deflink);
+	wlan_hdd_reset_prob_rspies(link_info);
 	hdd_destroy_acs_timer(adapter);
 
-	ucfg_p2p_status_stop_bss(adapter->deflink->vdev);
-	ucfg_ftm_time_sync_update_bss_state(adapter->deflink->vdev,
+	ucfg_p2p_status_stop_bss(link_info->vdev);
+	ucfg_ftm_time_sync_update_bss_state(link_info->vdev,
 					    FTM_TIME_SYNC_BSS_STOPPED);
 
 exit:
@@ -7734,12 +7743,32 @@ exit:
 	return 0;
 }
 
-#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) || \
+	defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
-			      unsigned int link_id)
+			      unsigned int link_id) {
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	/*
+	 * The stop_ap can be called in the same context through
+	 * wlan_hdd_del_virtual_intf. As vdev_trans is already taking place as
+	 * part of the del_vitrtual_intf, this vdev_op cannot start.
+	 * Return 0 in case op is not started so that the kernel frees the
+	 * beacon memory properly.
+	 */
+	if (errno)
+		return 0;
+
+	errno = __wlan_hdd_cfg80211_stop_ap(wiphy, dev, link_id);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
 #else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
-#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -7755,12 +7784,13 @@ int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
 	if (errno)
 		return 0;
 
-	errno = __wlan_hdd_cfg80211_stop_ap(wiphy, dev);
+	errno = __wlan_hdd_cfg80211_stop_ap(wiphy, dev, -1);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
 }
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
 /*
