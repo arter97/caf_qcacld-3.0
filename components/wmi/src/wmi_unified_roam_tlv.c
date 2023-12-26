@@ -4018,7 +4018,10 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 				dst_key = key_alloc_buf[dst_key_count];
 				*dst_key = *pairwise;
 				key_entry[j].keys.key[dst_key->keyix] = dst_key;
+
 				dst_key_count++;
+				if (dst_key_count >= WMI_NUM_KEYS_ALLOCATED)
+					break;
 			}
 
 			continue;
