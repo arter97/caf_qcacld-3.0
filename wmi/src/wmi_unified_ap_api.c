@@ -331,6 +331,17 @@ QDF_STATUS wmi_extract_dcs_awgn_info(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS wmi_extract_dcs_obss_intf_info(wmi_unified_t wmi_hdl, void *evt_buf,
+				     wmi_host_dcs_obss_intf_info *obss_intf_info)
+{
+	if (wmi_hdl && wmi_hdl->ops->extract_dcs_obss_intf_info) {
+		return wmi_hdl->ops->extract_dcs_obss_intf_info(wmi_hdl, evt_buf,
+							   obss_intf_info);
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_extract_dcs_cw_int(wmi_unified_t wmi_handle, void *evt_buf,
 				  wmi_host_ath_dcs_cw_int *cw_int)
 {
