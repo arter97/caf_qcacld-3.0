@@ -441,14 +441,40 @@ bool wlan_is_chan_history_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 #endif /* CONFIG_HOST_FIND_CHAN */
 
 #if defined(WLAN_DISP_CHAN_INFO)
-void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
+
+static void dfs_deliver_cac_state_events_for_curchan(struct wlan_dfs *dfs)
 {
 	struct dfs_channel *chan;
+	bool is_etsi_domain = false;
 
 	chan = dfs->dfs_curchan;
-	dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_STARTED);
-	dfs_update_cac_elements(dfs, NULL, 0, chan, WLAN_EV_CAC_STARTED);
+	if (utils_get_dfsdomain(dfs->dfs_pdev_obj) == DFS_ETSI_DOMAIN)
+		is_etsi_domain = true;
 
+	if (dfs->dfs_cac_timer_running) {
+		dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_STARTED);
+		dfs_update_cac_elements(dfs, NULL, 0, chan,
+					WLAN_EV_CAC_STARTED);
+		/* The "else if" case hits when we want to reset the cac
+		 * state of the curchan during last vap down or during channel
+		 * change. We reset the CAC state if the channel is not
+		 * radar infected and the domain is not ETSI. In ETSI,
+		 * we can cache the CAC done, hence we do not reset the
+		 * CAC state.
+		 */
+	} else if (!WLAN_IS_CHAN_RADAR(dfs, chan) && !is_etsi_domain) {
+		dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_RESET);
+		dfs_update_cac_elements(dfs, NULL, 0, chan, WLAN_EV_CAC_RESET);
+	}
+
+}
+
+void dfs_deliver_cac_state_events_for_prevchan(struct wlan_dfs *dfs)
+{
+	bool is_etsi_domain = false;
+
+	if (utils_get_dfsdomain(dfs->dfs_pdev_obj) == DFS_ETSI_DOMAIN)
+		is_etsi_domain = true;
 	/* The current channel has started CAC, so the CAC_DONE state of the
 	 * previous channel has to reset. So deliver the CAC_RESET event on
 	 * all the sub-channels of previous dfs channel. If the previous
@@ -457,20 +483,23 @@ void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 	 * state CAC_RESET event need not be delivered for this case too.
 	 */
 	if (!WLAN_IS_PRIMARY_OR_SECONDARY_CHAN_DFS(dfs->dfs_prevchan) ||
-	    utils_get_dfsdomain(dfs->dfs_pdev_obj) == DFS_ETSI_DOMAIN)
+	    is_etsi_domain)
 		return;
-
-	chan = dfs->dfs_prevchan;
-
 	/**
 	 * Do not change the state of NOL infected channels to
 	 * "CAC Required" within the NOL duration.
 	 */
-	if (WLAN_IS_CHAN_RADAR(dfs, chan))
+	if (WLAN_IS_CHAN_RADAR(dfs, dfs->dfs_prevchan))
 		return;
 
 	dfs_update_cac_elements(dfs, NULL, 0, dfs->dfs_prevchan, WLAN_EV_CAC_RESET);
-	dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_RESET);
+	dfs_send_dfs_events_for_chan(dfs, dfs->dfs_prevchan, WLAN_EV_CAC_RESET);
+}
+
+void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
+{
+	dfs_deliver_cac_state_events_for_curchan(dfs);
+	dfs_deliver_cac_state_events_for_prevchan(dfs);
 }
 #endif
 

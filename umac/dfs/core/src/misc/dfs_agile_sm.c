@@ -55,6 +55,37 @@
 #endif
 
 #ifdef QCA_SUPPORT_AGILE_DFS
+
+/**
+ * dfs_deliver_agile_user_events() - Deliver agile events to the userspace
+ * application
+ * @dfs: Pointer to struct wlan_dfs
+ * @event: DFS event
+ *
+ * Return: None
+ */
+static void
+dfs_deliver_agile_user_events(struct wlan_dfs *dfs,
+			      enum WLAN_DFS_EVENTS event)
+{
+	struct dfs_agile_cac_params adfs_param;
+	uint8_t n_sub_chans;
+	uint8_t i;
+	qdf_freq_t sub_chans[MAX_20MHZ_SUBCHANS];
+
+	dfs_fill_adfs_chan_params(dfs, &adfs_param);
+	n_sub_chans =
+		dfs_find_subchannels_for_center_freq(
+					 adfs_param.precac_center_freq_1,
+					 adfs_param.precac_center_freq_2,
+					 adfs_param.precac_chwidth,
+					 sub_chans);
+	for (i = 0; i < n_sub_chans; i++) {
+		utils_dfs_deliver_event(dfs->dfs_pdev_obj,
+					sub_chans[i], event);
+	}
+}
+
 /* dfs_agile_fill_rcac_timeouts_for_etsi() - Fill ADFS timeout params for ETSI
  * RCAC.
  *
@@ -138,6 +169,7 @@ static void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
 	if (dfs_tx_ops && dfs_tx_ops->dfs_ocac_abort_cmd)
 		dfs_tx_ops->dfs_ocac_abort_cmd(dfs->dfs_pdev_obj);
 
+	dfs_deliver_agile_user_events(dfs, WLAN_EV_CAC_RESET);
 	qdf_mem_zero(&dfs->dfs_rcac_param, sizeof(struct dfs_rcac_params));
 	dfs->dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
 	dfs_agile_cleanup_rcac(dfs);
@@ -152,9 +184,6 @@ void dfs_start_agile_engine(struct wlan_dfs *dfs)
 	struct dfs_agile_cac_params adfs_param;
 	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
 	struct dfs_soc_priv_obj *dfs_soc_obj = dfs->dfs_soc_obj;
-	uint8_t n_sub_chans;
-	uint8_t i;
-	qdf_freq_t sub_chans[MAX_20MHZ_SUBCHANS];
 
 	/* Fill the RCAC ADFS params and send it to FW.
 	 * FW does not use RCAC timeout values for RCAC feature.
@@ -170,20 +199,8 @@ void dfs_start_agile_engine(struct wlan_dfs *dfs)
 		 __func__, __LINE__, dfs->dfs_pdev_obj,
 		 dfs->dfs_agile_precac_freq_mhz);
 
+	dfs_deliver_agile_user_events(dfs, WLAN_EV_PCAC_STARTED);
 	dfs_tx_ops = wlan_psoc_get_dfs_txops(dfs_soc_obj->psoc);
-
-	n_sub_chans =
-	    dfs_find_subchannels_for_center_freq(
-						 adfs_param.precac_center_freq_1,
-						 adfs_param.precac_center_freq_2,
-						 adfs_param.precac_chwidth,
-						 sub_chans);
-	for (i = 0; i < n_sub_chans; i++)
-	    utils_dfs_deliver_event(dfs->dfs_pdev_obj,
-				    sub_chans[i],
-				    WLAN_EV_PCAC_STARTED);
-
-
 	if (dfs_tx_ops && dfs_tx_ops->dfs_agile_ch_cfg_cmd)
 		dfs_tx_ops->dfs_agile_ch_cfg_cmd(dfs->dfs_pdev_obj,
 						 &adfs_param);
@@ -422,6 +439,7 @@ static void dfs_abort_agile_precac(struct wlan_dfs *dfs)
 
 	dfs_cancel_precac_timer(dfs);
 	dfs->dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
+	dfs_deliver_agile_user_events(dfs, WLAN_EV_CAC_RESET);
 	dfs_agile_precac_cleanup(dfs);
 	/*Send the abort to F/W as well */
 	if (dfs_tx_ops && dfs_tx_ops->dfs_ocac_abort_cmd)
