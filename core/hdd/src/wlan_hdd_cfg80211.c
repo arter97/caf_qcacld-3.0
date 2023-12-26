@@ -25734,6 +25734,46 @@ static int wlan_hdd_set_txq_params(struct wiphy *wiphy,
 }
 
 /**
+ * hdd_softap_set_sta_info_deauth_flag() - set deauth flag for sta_info
+ * @adapter: pointer to adapter
+ * @sta_info_input: pointer to current station to be set
+ * @value: true or false for deauth
+ *
+ * Return: void
+ */
+static void
+hdd_softap_set_sta_info_deauth_flag(struct hdd_adapter *adapter,
+				    struct hdd_station_info *sta_info_input,
+				    bool value)
+{
+	struct hdd_station_info *sta_info, *tmp = NULL;
+
+	if (sta_info_input->is_deauth_in_progress == value)
+		return;
+
+	/* For legacy&mlo_client, both need to set input sta info */
+	sta_info_input->is_deauth_in_progress = value;
+
+	if (qdf_is_macaddr_zero(&sta_info_input->mld_addr))
+		return;
+
+	/* below is for mlo client, set it for other links also */
+	hdd_for_each_sta_ref_safe(
+			adapter->sta_info_list,
+			sta_info, tmp,
+			STA_INFO_SAP_SET_MLO_CLIENT_DEAUTH_FLAG) {
+		if (qdf_is_macaddr_equal(&sta_info_input->mld_addr,
+					 &sta_info->mld_addr))
+			sta_info->is_deauth_in_progress = value;
+
+		hdd_put_sta_info_ref(
+			&adapter->sta_info_list,
+			&sta_info, true,
+			STA_INFO_SAP_SET_MLO_CLIENT_DEAUTH_FLAG);
+	}
+}
+
+/**
  * hdd_softap_deauth_current_sta() - Deauth current sta
  * @link_info: pointer to hdd link info
  * @sta_info: pointer to the current station info structure
@@ -25788,14 +25828,18 @@ QDF_STATUS hdd_softap_deauth_current_sta(struct wlan_hdd_link_info *link_info,
 					adapter->sta_info_list,
 					sta_info, tmp,
 					STA_INFO_SOFTAP_DEAUTH_CURRENT_STA) {
-				sta_info->is_deauth_in_progress = true;
+				hdd_softap_set_sta_info_deauth_flag(adapter,
+								    sta_info,
+								    true);
 				hdd_put_sta_info_ref(
 					&adapter->sta_info_list,
 					&sta_info, true,
 					STA_INFO_SOFTAP_DEAUTH_CURRENT_STA);
 			}
 		} else {
-			sta_info->is_deauth_in_progress = true;
+			hdd_softap_set_sta_info_deauth_flag(adapter,
+							    sta_info,
+							    true);
 		}
 		qdf_status = qdf_wait_for_event_completion(
 						disassoc_event,
@@ -25803,7 +25847,9 @@ QDF_STATUS hdd_softap_deauth_current_sta(struct wlan_hdd_link_info *link_info,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_warn("Deauth time expired");
 	} else {
-		sta_info->is_deauth_in_progress = false;
+		hdd_softap_set_sta_info_deauth_flag(adapter,
+						    sta_info,
+						    false);
 		hdd_debug("STA removal failed for ::" QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
 		return QDF_STATUS_E_NOENT;

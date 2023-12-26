@@ -112,6 +112,7 @@ enum dhcp_nego_status {
  * @STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION: NL80211_CMD_GET_STATION dumpit
  *                                           handler for SoftAP
  * @STA_INFO_SON_GET_DATRATE_INFO: gets datarate info for a SON node
+ * @STA_INFO_SAP_SET_MLO_CLIENT_DEAUTH_FLAG: set deauth flag for mlo client
  * @STA_INFO_ID_MAX: Number of enumerators
  */
 /*
@@ -152,6 +153,7 @@ typedef enum {
 	STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK = 30,
 	STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION = 31,
 	STA_INFO_SON_GET_DATRATE_INFO = 32,
+	STA_INFO_SAP_SET_MLO_CLIENT_DEAUTH_FLAG = 33,
 	STA_INFO_ID_MAX,
 } wlan_sta_info_dbgid;
 
