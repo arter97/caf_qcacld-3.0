@@ -135,7 +135,7 @@ disallow_mlo_mode_table_type[HC_MAX_MAP_ID][HC_LEGACY_MAX];
 
 static disallow_mlo_mode_table_type
 disallow_mlo_mode_table_sbs_low_share = {
-	/* MLO Links  |  Concrrency  | disallow mode bitmap  */
+	/* MLO Links  |  Concurrency  | disallowed mode bitmap  */
 	[HC_2G_5GL] = {[HC_NONE] =    {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {0, 0},
@@ -159,6 +159,92 @@ disallow_mlo_mode_table_sbs_low_share = {
 					MLMR_5GL_5GL | EMLSR_5GL_5GL},
 			[HC_5GH] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
 					MLMR_5GL_5GL | EMLSR_5GL_5GL} },
+};
+
+static disallow_mlo_mode_table_type
+disallow_mlo_mode_table_sbs_upper_share = {
+	/* MLO Links  |  Concurrency | disallowed mode bitmap  */
+	[HC_2G_5GL] = {[HC_NONE]  =   {0, 0},
+			[HC_2G]   =   {0, 0},
+			[HC_5GL]  =   {0, 0},
+			[HC_5GH]  =   {0, MLMR_2G_5GL} },
+	[HC_2G_5GH] = {[HC_NONE]  =   {0, 0},
+			[HC_2G]   =   {0, 0},
+			[HC_5GL]  =   {0, MLMR_2G_5GH},
+			[HC_5GH]  =   {0, 0} },
+	[HC_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]   =   {0, MLMR_5GL_5GH},
+			[HC_5GL]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GH]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH} },
+	[HC_5GH_5GH] = {[HC_NONE] =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_2G]   =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_5GL]  =   {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+						MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GH]  =   {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+						MLMR_5GH_5GH | EMLSR_5GH_5GH} },
+	[HC_5GL_5GL] = {[HC_NONE] =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_2G]   =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_5GL]  =   {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+						MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GH]  =   {MLMR_5GL_5GL, MLMR_5GL_5GL} },
+};
+
+static disallow_mlo_mode_table_type
+disallow_mlo_mode_table_sbs_switchable = {
+	/* MLO Links  |  Concurrency | disallowed mode bitmap  */
+	[HC_2G_5GL] = {[HC_NONE]  =   {0, 0},
+			[HC_2G]   =   {0, 0},
+			[HC_5GL]  =   {0, 0},
+			[HC_5GH]  =   {0, MLMR_2G_5GL} },
+	[HC_2G_5GH] = {[HC_NONE]  =   {0, 0},
+			[HC_2G]   =   {0, 0},
+			[HC_5GL]  =   {0, MLMR_2G_5GH},
+			[HC_5GH]  =   {0, 0} },
+	[HC_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]   =   {0, MLMR_5GL_5GH},
+			[HC_5GL]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GH]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH} },
+	[HC_5GH_5GH] = {[HC_NONE] =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_2G]   =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_5GL]  =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_5GH]  =   {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+						MLMR_5GH_5GH | EMLSR_5GH_5GH} },
+	[HC_5GL_5GL] = {[HC_NONE] =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_2G]   =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_5GL]  =   {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+						MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GH]  =   {MLMR_5GL_5GL, MLMR_5GL_5GL} },
+};
+
+static disallow_mlo_mode_table_type
+disallow_mlo_mode_table_dbs = {
+	/* MLO Links  |  Concurrency | disallowed mode bitmap  */
+	[HC_2G_5GL] = {[HC_NONE] =    {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {0, MLMR_2G_5GL} },
+	[HC_2G_5GH] = {[HC_NONE] =    {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, MLMR_2G_5GH},
+			[HC_5GH] =    {0, 0} },
+	[HC_5GL_5GH] = {[HC_NONE] =   {MLMR_5GL_5GH, MLMR_5GL_5GH},
+			[HC_2G]  =    {MLMR_5GL_5GH, MLMR_5GL_5GH},
+			[HC_5GL] =    {MLMR_5GL_5GH | EMLSR_5GL_5GH,
+						MLMR_5GL_5GH | EMLSR_5GL_5GH},
+			[HC_5GH] =    {MLMR_5GL_5GH | EMLSR_5GL_5GH,
+						MLMR_5GL_5GH | EMLSR_5GL_5GH} },
+	[HC_5GH_5GH] = {[HC_NONE] =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_2G]  =    {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_5GL] =    {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+						MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GH] =    {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+						MLMR_5GH_5GH | EMLSR_5GH_5GH} },
+	[HC_5GL_5GL] = {[HC_NONE] =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_2G]  =    {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_5GL] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+						MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GH] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+						MLMR_5GL_5GL | EMLSR_5GL_5GL} },
 };
 
 #define HC_MAP_DATA(_HC_2G_, _HC_5GL_, _HC_5GH_) \
@@ -300,11 +386,20 @@ get_disallow_mlo_mode_table(struct wlan_objmgr_psoc *psoc)
 	rd_type = policy_mgr_get_rd_type(psoc);
 	switch (rd_type) {
 	case pm_rd_dbs:
-	case pm_rd_sbs_low_share:
+		disallow_mlo_mode_table =
+			&disallow_mlo_mode_table_dbs;
+		break;
 	case pm_rd_sbs_upper_share:
+		disallow_mlo_mode_table =
+			&disallow_mlo_mode_table_sbs_upper_share;
+		break;
 	case pm_rd_sbs_switchable:
+		disallow_mlo_mode_table =
+			&disallow_mlo_mode_table_sbs_switchable;
+		break;
+	case pm_rd_sbs_low_share:
 	default:
-		/* todo: add separate tbl for different rd */
+		/* SBS lower share is the default RD for GNG */
 		disallow_mlo_mode_table =
 			&disallow_mlo_mode_table_sbs_low_share;
 		break;
