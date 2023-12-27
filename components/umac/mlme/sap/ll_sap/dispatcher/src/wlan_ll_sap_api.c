@@ -23,6 +23,11 @@
 #include "wlan_reg_services_api.h"
 #include "wlan_dfs_utils_api.h"
 
+#define SET_HT_MCS3(mcs) do { \
+	mcs[0] = 0x0f;        \
+	mcs[1] = 0x00;        \
+	} while(0)
+
 wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_psoc *psoc)
 {
@@ -323,4 +328,15 @@ QDF_STATUS wlan_ll_sap_oob_connect_response(
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    uint8_t *mcs_set)
+
+{
+	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+		return;
+
+	/* LL_LT_SAP supports upto MSC 3 only */
+	SET_HT_MCS3(mcs_set);
 }

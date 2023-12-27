@@ -150,6 +150,17 @@ QDF_STATUS wlan_ll_sap_oob_connect_response(
 			struct wlan_objmgr_psoc *psoc,
 			struct ll_sap_oob_connect_response_event rsp);
 
+/**
+ * wlan_ll_lt_sap_get_mcs() - Get LL_LT_SAP MCS set
+ * @psoc: Pointer to psoc object
+ * @vdev_id: Vdev Id of LL_LT_SAP
+ * @mcs_set: pointer in which mcs_set needs to be filled
+ *
+ * Return: None
+ */
+void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    uint8_t *mcs_set);
+
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
@@ -207,5 +218,12 @@ qdf_freq_t wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
 {
 	return 0;
 }
+
+static inline
+void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    uint8_t *mcs_set)
+{
+}
+
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* _WLAN_LL_LT_SAP_API_H_ */

@@ -60,6 +60,7 @@
 #include <cdp_txrx_cfg.h>
 #include <cdp_txrx_cmn.h>
 #include <lim_mlo.h>
+#include "wlan_ll_sap_api.h"
 
 /**
  * lim_cmp_ssid() - utility function to compare SSIDs
@@ -2037,6 +2038,9 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 
 		if (session_entry->nss == NSS_1x1_MODE)
 			mcs_set[1] = 0;
+
+		wlan_ll_lt_sap_get_mcs(mac_ctx->psoc, session_entry->vdev_id,
+				       mcs_set);
 
 		for (i = 0; i < val_len; i++)
 			sta_ds->supportedRates.supportedMCSSet[i] =

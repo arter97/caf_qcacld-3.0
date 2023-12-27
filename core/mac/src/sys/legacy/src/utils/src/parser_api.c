@@ -60,6 +60,7 @@
 #include <wlan_mlo_t2lm.h>
 #endif
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_ll_sap_api.h"
 
 #ifdef WLAN_FEATURE_11BE
 #include "wlan_mlo_mgr_setup.h"
@@ -1087,6 +1088,9 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 					(pDot11f->supportedMCSSet[1] >>
 						disable_high_ht_mcs_2x2);
 		}
+
+		wlan_ll_lt_sap_get_mcs(mac->psoc, pe_session->vdev_id,
+				       pDot11f->supportedMCSSet);
 	}
 
 	/* If STA mode, session supported NSS > 1 and
