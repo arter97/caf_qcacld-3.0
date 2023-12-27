@@ -744,7 +744,8 @@ dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 }
 
 struct dp_peer *dp_sawf_get_peer(struct net_device *netdev, uint8_t *dest_mac,
-				 struct dp_soc **soc, enum dp_mod_id mod_id)
+				 struct dp_soc **soc, enum dp_mod_id mod_id,
+				 bool use_bss_peer)
 {
 	osif_dev *osdev;
 	struct dp_peer *peer = NULL;
@@ -785,6 +786,8 @@ struct dp_peer *dp_sawf_get_peer(struct net_device *netdev, uint8_t *dest_mac,
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
+		if (!use_bss_peer)
+			return NULL;
 		bss_peer = wlan_vdev_get_bsspeer(vdev);
 		if (!bss_peer) {
 			dp_sawf_err("NULL peer");
@@ -929,9 +932,9 @@ uint16_t dp_sawf_get_peer_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	struct dp_peer *mld_peer = NULL;
 	uint16_t queue_id = DP_SAWF_PEER_Q_INVALID;
 
-	peer = dp_sawf_get_peer(netdev, dest_mac, &soc, DP_MOD_ID_SAWF);
+	peer = dp_sawf_get_peer(netdev, dest_mac, &soc, DP_MOD_ID_SAWF, true);
 	if (!peer) {
-		dp_sawf_err("Peer is NULL");
+		dp_sawf_debug("Peer is NULL");
 		return DP_SAWF_PEER_Q_INVALID;
 	}
 
@@ -1030,9 +1033,9 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 
 	static_tid = wlan_service_id_tid(service_id);
 
-	peer = dp_sawf_get_peer(netdev, dest_mac, &soc, DP_MOD_ID_SAWF);
+	peer = dp_sawf_get_peer(netdev, dest_mac, &soc, DP_MOD_ID_SAWF, false);
 	if (!peer) {
-		dp_sawf_err("Peer is NULL");
+		dp_sawf_debug("Peer is NULL");
 		return DP_SAWF_PEER_Q_INVALID;
 	}
 
