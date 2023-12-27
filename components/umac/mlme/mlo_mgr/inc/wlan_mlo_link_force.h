@@ -34,6 +34,8 @@
  * @ml_nlink_connect_completion_evt: STA/CLI connect completion
  * @ml_nlink_disconnect_start_evt: STA/CLI disconnect start
  * @ml_nlink_disconnect_completion_evt: STA/CLI disconnect completion
+ * @ml_nlink_ap_start_evt: SAP/GO bss going to start event
+ * @ml_nlink_ap_start_failed_evt: SAP/GO bss start failed event
  * @ml_nlink_ap_started_evt: SAP/GO bss started
  * @ml_nlink_ap_stopped_evt: SAP/GO bss stopped
  * @ml_nlink_connection_updated_evt: connection home channel changed
@@ -50,6 +52,8 @@ enum ml_nlink_change_event_type {
 	ml_nlink_connect_completion_evt,
 	ml_nlink_disconnect_start_evt,
 	ml_nlink_disconnect_completion_evt,
+	ml_nlink_ap_start_evt,
+	ml_nlink_ap_start_failed_evt,
 	ml_nlink_ap_started_evt,
 	ml_nlink_ap_stopped_evt,
 	ml_nlink_connection_updated_evt,
@@ -151,6 +155,8 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_connect_completion_evt);
 	CASE_RETURN_STRING(ml_nlink_disconnect_start_evt);
 	CASE_RETURN_STRING(ml_nlink_disconnect_completion_evt);
+	CASE_RETURN_STRING(ml_nlink_ap_start_evt);
+	CASE_RETURN_STRING(ml_nlink_ap_start_failed_evt);
 	CASE_RETURN_STRING(ml_nlink_ap_started_evt);
 	CASE_RETURN_STRING(ml_nlink_ap_stopped_evt);
 	CASE_RETURN_STRING(ml_nlink_connection_updated_evt);

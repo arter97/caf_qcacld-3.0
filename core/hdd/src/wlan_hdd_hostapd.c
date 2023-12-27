@@ -7827,6 +7827,45 @@ wlan_hdd_is_ap_ap_force_scc_override(struct wlan_hdd_link_info *link_info,
 	return true;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static int
+wlan_hdd_post_start_ap_failed(struct wiphy *wiphy,
+			      struct net_device *dev,
+			      struct cfg80211_ap_settings *params)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	int status;
+
+	if (adapter->magic != WLAN_HDD_ADAPTER_MAGIC) {
+		hdd_err("HDD adapter magic is invalid");
+		return -ENODEV;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	status = wlan_hdd_validate_context(hdd_ctx);
+	if (status)
+		return status;
+
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+		return -EINVAL;
+
+	ucfg_policy_mgr_post_ap_start_failed(hdd_ctx->psoc,
+					     link_info->vdev_id);
+
+	return 0;
+}
+#else
+static inline int
+wlan_hdd_post_start_ap_failed(struct wiphy *wiphy,
+			      struct net_device *dev,
+			      struct cfg80211_ap_settings *params)
+{
+	return 0;
+}
+#endif
+
 #ifdef NDP_SAP_CONCURRENCY_ENABLE
 /**
  * hdd_sap_nan_check_and_disable_unsupported_ndi: Wrapper function for
@@ -8078,6 +8117,14 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		      params->chandef.chan->center_freq,
 		      params->chandef.width,
 		      cds_is_sub_20_mhz_enabled());
+
+	status =
+	ucfg_policy_mgr_pre_ap_start(hdd_ctx->psoc, link_info->vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("handle pre ap start failed %d", status);
+		return -EINVAL;
+	}
+
 	if (policy_mgr_is_hw_mode_change_in_progress(hdd_ctx->psoc)) {
 		status = policy_mgr_wait_for_connection_update(
 			hdd_ctx->psoc);
@@ -8444,6 +8491,9 @@ int wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		return errno;
 
 	errno = __wlan_hdd_cfg80211_start_ap(wiphy, dev, params);
+
+	if (errno)
+		wlan_hdd_post_start_ap_failed(wiphy, dev, params);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 

@@ -469,6 +469,30 @@ QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
+ * ucfg_policy_mgr_pre_ap_start() - handle ap start request
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id of starting ap
+ *
+ * Return: Failure in case of error otherwise success
+ */
+QDF_STATUS
+ucfg_policy_mgr_pre_ap_start(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id);
+
+/**
+ * ucfg_policy_mgr_post_ap_start_failed() - handle ap start
+ * failed
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id of starting ap
+ *
+ * Return: Failure in case of error otherwise success
+ */
+QDF_STATUS
+ucfg_policy_mgr_post_ap_start_failed(
+			     struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id);
+
+/**
  * ucfg_policy_mgr_clear_ml_links_settings_in_fw() - Process
  * QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE in default mode
  * @psoc: objmgr psoc
@@ -512,5 +536,20 @@ QDF_STATUS
 ucfg_policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint8_t num_links);
+#else
+static inline QDF_STATUS
+ucfg_policy_mgr_pre_ap_start(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_policy_mgr_post_ap_start_failed(
+			     struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 #endif //__WLAN_POLICY_MGR_UCFG

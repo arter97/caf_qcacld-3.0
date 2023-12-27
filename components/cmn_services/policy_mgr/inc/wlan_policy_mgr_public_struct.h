@@ -133,12 +133,14 @@ enum sap_csa_reason_code {
  * MLO_LINK_FORCE_MODE_INACTIVE_NUM, MLO_LINK_FORCE_MODE_NO_FORCE.
  * @link_ctrl_f_post_re_evaluate: run link state check again after command
  * response handled.
+ * @link_ctrl_f_sync_set_link: wait response for set link command
  */
 enum link_control_flags {
 	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
 	link_ctrl_f_overwrite_inactive_bitmap = 1 << 1,
 	link_ctrl_f_dynamic_force_link_num =    1 << 2,
 	link_ctrl_f_post_re_evaluate =          1 << 3,
+	link_ctrl_f_sync_set_link =             1 << 4,
 };
 
 /* Define the max number of consecutive re-evaluate number. usually, we have

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,6 +33,8 @@
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_tdls_tgt_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_mlme_api.h"
+#include "wlan_mlo_link_force.h"
 
 QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
@@ -52,8 +54,14 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 	wlan_tdls_notify_start_bss(psoc, vdev);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE ||
-	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
-		wlan_handle_emlsr_sta_concurrency(psoc, true, false);
+	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE) {
+		if (wlan_mlme_is_aux_emlsr_support(psoc))
+			ml_nlink_conn_change_notify(
+					psoc, wlan_vdev_get_id(vdev),
+					ml_nlink_ap_start_evt, NULL);
+		else
+			wlan_handle_emlsr_sta_concurrency(psoc, true, false);
+	}
 
 	if (policy_mgr_is_hw_mode_change_in_progress(psoc)) {
 		if (!QDF_IS_STATUS_SUCCESS(
@@ -94,6 +102,14 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
+
+	if (event_data &&
+	    event_data->status != QDF_STATUS_SUCCESS &&
+	    (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE ||
+	     wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE) &&
+	    wlan_mlme_is_aux_emlsr_support(psoc))
+		ml_nlink_conn_change_notify(psoc, wlan_vdev_get_id(vdev),
+					    ml_nlink_ap_start_failed_evt, NULL);
 
 	/*
 	 * Due to audio share glitch with P2P GO caused by
@@ -151,8 +167,9 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
 
-	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE ||
-	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
+	if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE ||
+	     wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE) &&
+	    !wlan_mlme_is_aux_emlsr_support(psoc))
 		wlan_handle_emlsr_sta_concurrency(psoc, false, true);
 	/*
 	 * Due to audio share glitch with P2P GO caused by

@@ -22,6 +22,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_nan_api.h"
 #include "wlan_mlo_link_force.h"
+#include "wlan_mlme_api.h"
 
 #ifdef WLAN_FEATURE_SR
 /**
@@ -382,6 +383,31 @@ QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS
+ucfg_policy_mgr_pre_ap_start(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id)
+{
+	if (wlan_mlme_is_aux_emlsr_support(psoc))
+		return ml_nlink_conn_change_notify(
+				psoc, vdev_id,
+				ml_nlink_ap_start_evt, NULL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_policy_mgr_post_ap_start_failed(
+			     struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id)
+{
+	if (wlan_mlme_is_aux_emlsr_support(psoc))
+		return ml_nlink_conn_change_notify(
+				psoc, vdev_id,
+				ml_nlink_ap_start_failed_evt, NULL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS
 ucfg_policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
 					      uint8_t vdev_id)
