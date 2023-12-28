@@ -5690,7 +5690,11 @@ lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 		}
 
 		total_psd_power = existing_pwr_count + ext_psd_count;
-
+		if (total_psd_power > MAX_NUM_PWR_LEVEL) {
+			pe_debug("total powers greater than max %d",
+				 MAX_NUM_PWR_LEVEL);
+			return existing_pwr_count;
+		}
 		i = existing_pwr_count;
 		for (j = 0; j < ext_psd_count && i < total_psd_power; j++)
 		{
