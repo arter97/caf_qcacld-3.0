@@ -320,7 +320,6 @@ uint8_t *wlan_crypto_tkip_decrypt(const uint8_t *tk,
 			   MAC2STR(hdr->addr2));
 		wpa_printf(MSG_DEBUG, "TKIP calculated ICV %08x  received ICV "
 			   "%08x", icv, rx_icv);
-		qdf_mem_free(plain);
 		return NULL;
 	}
 	plain_len -= 4;
@@ -330,7 +329,6 @@ uint8_t *wlan_crypto_tkip_decrypt(const uint8_t *tk,
 	if (plain_len < 8) {
 		wpa_printf(MSG_INFO, "TKIP: Not enough room for Michael MIC "
 			   "in a frame from " MACSTR, MAC2STR(hdr->addr2));
-		qdf_mem_free(plain);
 		return NULL;
 	}
 

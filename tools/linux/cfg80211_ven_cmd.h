@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -786,7 +786,7 @@ enum {
 	IEEE80211_PARAM_MBSS_GROUP                 = 749,
 	IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE = 750,  /* Discovery frame override with OOB */
 #ifdef WLAN_FEATURE_11BE
-	IEEE80211_PARAM_NSEP_PRIORITY_ACCESS       = 751, /* EHT NSEP Priority access support */
+	IEEE80211_PARAM_EPCS_PRIORITY_ACCESS       = 751, /* EHT EPCS Priority access support */
 	IEEE80211_PARAM_OM_CONTROL                 = 752, /* EHT OM control support */
 	IEEE80211_PARAM_TRIGGERED_TXOP_SHARING     = 753, /* EHT triggered TX op sharing support */
 	IEEE80211_PARAM_EHT_NDP_4X_EHT_LTF_AND_320NSGI          = 754, /* NDP With 4x EHT-LTF And 3.2 usGI */
@@ -855,6 +855,19 @@ enum {
 	IEEE80211_PARAM_GET_MLD_PEER = 797,
 #endif
 	IEEE80211_PARAM_MLD_NETDEV_NAME = 798, /* MLD Intf name */
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE = 813, /* Vendor Flags for WMI Interface */
+#endif
+	IEEE80211_PARAM_RSNXCAPS = 814, /*RSNXE Capabilities*/
+	IEEE80211_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY = 815,
+	IEEE80211_PARAM_RTT_11AZ_NTB_MAX_TIME_BW_MEAS = 816,
+	IEEE80211_PARAM_RTT_11AZ_NTB_MIN_TIME_BW_MEAS = 817,
+#ifdef ASSOC_REJECT_SUPPORT_ENABLED
+	IEEE80211_PARAM_ASSOC_REJECT = 818,
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* MLO Max Simultaneous Active links */
+#endif
 };
 
 enum {
@@ -1447,6 +1460,33 @@ enum _ol_ath_param_t {
 #ifdef QCA_R2P_UPDATE_ENABLED
 	OL_ATH_PARAM_R2P_HCHAN_RESTORE = 527,
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	OL_ATH_PARAM_FORCE_NON_ASSOC_PRIMARY_UMAC = 528,
+#endif
+	OL_ATH_PARAM_PROBE_RESP_RETRY_LIMIT = 529,
+	OL_ATH_PARAM_CTS_TIMEOUT = 530,
+	OL_ATH_PARAM_SLOT_TIME = 531,
+#ifdef WLAN_FEATURE_11BE_MLO
+	OL_ATH_PARAM_DOWNGRADE_320MHZ_OPCLASS = 532,
+#endif
+	OL_ATH_PARAM_RF_PATH_SWITCH = 533,
+#if QCA_AIRTIME_FAIRNESS
+	OL_ATH_PARAM_ATF_VO_TIMESLOT = 534,
+	OL_ATH_PARAM_ATF_VI_TIMESLOT = 535,
+#endif
+#ifdef CONFIG_AFC_SUPPORT
+	OL_ATH_PARAM_AFC_SEND_CMD = 536,
+#endif /* CONFIG_AFC_SUPPORT */
+	OL_ATH_PARAM_STANDBY_ACTIVE_MODE = 537,
+	OL_ATH_PARAM_SET_AWGN_EVENT = 538,
+#ifdef WLAN_FEATURE_11BE_MLO
+	OL_ATH_PARAM_DISABLE_EML = 539,
+#endif
+	OL_ATH_PARAM_DP_DEBUG_LOG = 540,
+	OL_ATH_PARAM_RTT_SKIP_VDEV_RESTART = 541,
+	OL_ATH_PARAM_ENABLE_DELAYED_LMR_FEEDBACK = 542,
+	OL_ATH_PARAM_ENABLE_SMALL_MRU = 543,
+	OL_ATH_PARAM_ENABLE_LARGE_MRU = 544,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -2470,8 +2510,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_spl_vap_scan",      IEEE80211_PARAM_SPL_VAP_SCAN, GET_PARAM, 0},
 	{"discfrm_6g_clear_usr_override", IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE, SET_PARAM, 1},
 #ifdef WLAN_FEATURE_11BE
-	{"set_eht_nsep_pri_access",   IEEE80211_PARAM_NSEP_PRIORITY_ACCESS, SET_PARAM, 1},
-	{"get_eht_nsep_pri_access",   IEEE80211_PARAM_NSEP_PRIORITY_ACCESS, GET_PARAM, 0},
+	{"set_eht_epcs_pri_access",   IEEE80211_PARAM_EPCS_PRIORITY_ACCESS, SET_PARAM, 1},
+	{"get_eht_epcs_pri_access",   IEEE80211_PARAM_EPCS_PRIORITY_ACCESS, GET_PARAM, 0},
 	{"set_eht_om_ctrl",           IEEE80211_PARAM_OM_CONTROL, SET_PARAM, 1},
 	{"get_eht_om_ctrl",           IEEE80211_PARAM_OM_CONTROL, GET_PARAM, 0},
 	{"set_eht_trig_txop_sharing", IEEE80211_PARAM_TRIGGERED_TXOP_SHARING, SET_PARAM, 1},
@@ -2549,6 +2589,28 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_ppevp_type",     IEEE80211_PARAM_PPEVP_TYPE, GET_PARAM, 0},
 #ifdef CONFIG_MLO_SINGLE_DEV
 	{"get_mld_peer",     IEEE80211_PARAM_GET_MLD_PEER, GET_PARAM, 0},
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"set_vendor_peer_mesh_override_flag",
+		IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE, SET_PARAM, 1},
+	{"get_vendor_peer_mesh_override_flag",
+		IEEE80211_PARAM_WLAN_PEER_MESH_OVERRIDE, GET_PARAM, 0},
+#endif
+	{"tb_max_sess_expiry", IEEE80211_PARAM_RTT_11AZ_TB_MAX_SESSION_EXPIRY,
+	 SET_PARAM, 1},
+	{"ntb_max_time_bw_meas", IEEE80211_PARAM_RTT_11AZ_NTB_MAX_TIME_BW_MEAS,
+	 SET_PARAM, 1},
+	{"ntb_min_time_bw_meas", IEEE80211_PARAM_RTT_11AZ_NTB_MIN_TIME_BW_MEAS,
+	 SET_PARAM, 1},
+#ifdef ASSOC_REJECT_SUPPORT_ENABLED
+	{"assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, SET_PARAM, 2},
+	{"g_assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, GET_PARAM, 0},
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
+		SET_PARAM, 1},
+	{"g_max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
+		GET_PARAM, 0},
 #endif
 };
 
@@ -3138,6 +3200,18 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_PDEV_STATS_TIMER, SET_PARAM, 1},
 	{"g_p_stats_tmr",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_PDEV_STATS_TIMER, GET_PARAM, 0},
+	{"presp_ret_lim",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PROBE_RESP_RETRY_LIMIT, SET_PARAM, 1},
+	{"g_presp_ret_lim",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PROBE_RESP_RETRY_LIMIT, GET_PARAM, 0},
+	{"cts_timeout",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CTS_TIMEOUT, SET_PARAM, 1},
+	{"g_cts_timeout",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CTS_TIMEOUT, GET_PARAM, 0},
+	{"slot_time",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SLOT_TIME, SET_PARAM, 1},
+	{"g_slot_time",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SLOT_TIME, GET_PARAM, 0},
 	{"acktimeout",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TXACKTIMEOUT, SET_PARAM, 1},
 	{"get_acktimeout",
@@ -3370,6 +3444,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_HW_MODE, SET_PARAM, 1},
 	{"get_hw_mode",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_HW_MODE, GET_PARAM, 0},
+	{"rf_path_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RF_PATH_SWITCH, SET_PARAM, 1},
+	{"get_rf_path_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RF_PATH_SWITCH, GET_PARAM, 0},
 #if DBDC_REPEATER_SUPPORT
 	{"samessid_disable",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SAME_SSID_DISABLE, SET_PARAM, 1},
@@ -3614,12 +3692,18 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_dcs_afc_chan_sel_config",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_AFC_CHAN_SEL_CONFIG,
 		GET_PARAM, 0},
+	{"afc_send_cmd",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_AFC_SEND_CMD, SET_PARAM, 1},
 #endif
+	{"rtt_skip_vdev_restart",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RTT_SKIP_VDEV_RESTART, SET_PARAM, 1},
 	{"enable_rtt",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RTT_ENABLE, SET_PARAM, 1},
 	{"switch_rtt_role",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SWITCH_RTT_ROLE,
 		SET_PARAM, 1},
+	{"enable_delayed_lmr_feedback",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_DELAYED_LMR_FEEDBACK, SET_PARAM, 1},
 	{"g_mbss_max_ngroups",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MBSS_GET_MAX_NGROUPS,
 		GET_PARAM, 0},
@@ -3668,6 +3752,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 		GET_PARAM, 0},
 	{"mlo_forced_umac_soc",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID,
+		SET_PARAM, 1},
+	{"g_non_assoc_prim_umac_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_NON_ASSOC_PRIMARY_UMAC,
+		GET_PARAM, 0},
+	{"non_assoc_prim_umac_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_NON_ASSOC_PRIMARY_UMAC,
 		SET_PARAM, 1},
 #endif
 	{"ipaucstats",
@@ -3748,6 +3838,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 #ifdef WLAN_FEATURE_11BE_MLO
 	{"get_mlo_vdev_count",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MLO_VDEV_COUNT, GET_PARAM, 0},
+	{"downgrade_320mhz_opclass",
+		 OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DOWNGRADE_320MHZ_OPCLASS, SET_PARAM, 1},
+	{"g_downgrade_320mhz_opclass",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DOWNGRADE_320MHZ_OPCLASS, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE_MLO */
 	{"bcn_rlimit",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_BCN_RATELIMIT, SET_PARAM, 1},
@@ -3796,6 +3890,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SCAN_BLANKING_MODE, GET_PARAM, 0},
 	{"set_i2r_lmr_feedback_policy",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_I2R_LMR_FEEDBACK_POLICY, SET_PARAM, 1},
+	{"standby_active",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_STANDBY_ACTIVE_MODE, SET_PARAM, 1},
+	{"g_standby_active",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_STANDBY_ACTIVE_MODE, GET_PARAM, 0},
 #ifdef WLAN_DISP_CHAN_INFO
 	{"list_5ghz_chan_info",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_LIST_5GHZ_CHAN_INFO,
@@ -3805,6 +3903,29 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"hchan_r2p_restore_en",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_R2P_HCHAN_RESTORE, SET_PARAM, 1},
 #endif
+#if QCA_AIRTIME_FAIRNESS
+	{"atfvotimeslot", OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ATF_VO_TIMESLOT,
+		SET_PARAM, 1},
+	{"atfvitimeslot", OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ATF_VI_TIMESLOT,
+		SET_PARAM, 1},
+#endif
+	{"set_awgn_event",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_AWGN_EVENT, SET_PARAM, 1},
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"disable_eml",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_EML, SET_PARAM, 1},
+	{"g_disable_eml",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_EML, GET_PARAM, 0},
+
+#endif
+	{"dp_debug_log",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DP_DEBUG_LOG, SET_PARAM, 1},
+	{"g_dp_debug_log",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DP_DEBUG_LOG, GET_PARAM, 0},
+	{"enable_small_mru",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_SMALL_MRU, SET_PARAM, 1},
+	{"enable_large_mru",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_LARGE_MRU, SET_PARAM, 1},
 };
 #endif
 

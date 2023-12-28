@@ -26,6 +26,7 @@
 #include "hal_rx_flow.h"
 #include "dp_htt.h"
 #include "dp_rx_tag.h"
+#include "cdp_txrx_cmn_struct.h"
 #if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
 #include <ppe_drv.h>
 #include <ppe_drv_sc.h>
@@ -118,6 +119,32 @@ void dp_rx_update_ppe_fse_fields(struct hal_rx_flow *flow,
 #define HW_RX_FSE_CACHE_INVALIDATE_DELAYED_FST_SETUP_MS (5000)
 
 /**
+ * dp_rx_flow_write_entry_metadata() - Update fse metadata
+ * @pdev: DP pdev instance
+ * @fse_metadata: FSE metadata
+ * @fse: fse entry
+ *
+ * Return: Success when flow is added, no-memory or already exists on error
+ */
+QDF_STATUS
+dp_rx_flow_write_entry_metadata(struct dp_pdev *pdev, uint32_t fse_metadata,
+				struct dp_rx_fse *fse)
+{
+	struct dp_soc *soc = pdev->soc;
+	struct dp_rx_fst *fst;
+	struct hal_rx_flow flow = { 0 };
+
+	flow.fse_metadata = fse_metadata;
+	fst = pdev->rx_fst;
+
+	if (hal_rx_flow_write_fse_metadata(soc->hal_soc, fst->hal_rx_fst,
+					   fse->flow_id, &flow))
+		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_E_INVAL;
+}
+
+/**
  * dp_rx_flow_get_fse() - Obtain flow search entry from flow hash
  * @fst: Rx FST Handle
  * @flow_hash: Computed hash value of flow
@@ -202,44 +229,94 @@ uint32_t dp_rx_flow_compute_flow_hash(struct dp_rx_fst *fst,
 
 /**
  * dp_rx_flow_alloc_entry() - Create DP and HAL flow entries in FST
- * @hal_soc_hdl: HAL SOC handle
+ * @pdev: Pdev handle
  * @fst: Rx FST Handle
  * @rx_flow_info: DP Rx Flow 5-tuple to be added to DP FST
  * @flow: HAL (HW) flow entry that is created
+ * @fse: fse entry
  *
- * Return: Computed Toeplitz hash
+ * Return: status - -1 : failure, 0 : add success, 1 : update success
  */
-struct dp_rx_fse *dp_rx_flow_alloc_entry(hal_soc_handle_t hal_soc,
-					 struct dp_rx_fst *fst,
-					 struct cdp_rx_flow_info *rx_flow_info,
-					 struct hal_rx_flow *flow)
+static
+int dp_rx_flow_alloc_entry(struct dp_pdev *pdev, struct dp_rx_fst *fst,
+			   struct cdp_rx_flow_info *rx_flow_info,
+			   struct hal_rx_flow *flow, struct dp_rx_fse **fse)
 {
-	struct dp_rx_fse *fse = NULL;
+	struct dp_soc *soc = pdev->soc;
 	uint32_t flow_hash;
 	uint32_t flow_idx;
 	QDF_STATUS status;
+	bool update_svc_id = false;
+	int ret = -1;
 
+	*fse = NULL;
 	flow_hash = dp_rx_flow_compute_flow_hash(fst, rx_flow_info, flow);
 
-	status = hal_rx_insert_flow_entry(hal_soc,
+	if (DP_RX_FLOW_INVALID_SVC_ID != rx_flow_info->svc_id)
+		update_svc_id = true;
+
+	status = hal_rx_insert_flow_entry(soc->hal_soc,
 					  fst->hal_rx_fst,
 					  flow_hash,
 					  &rx_flow_info->flow_tuple_info,
 					  &flow_idx);
 	if (status != QDF_STATUS_SUCCESS) {
+		if (status == QDF_STATUS_E_EXISTS) {
+			*fse = dp_rx_flow_get_fse(fst, flow_idx);
+			if (update_svc_id && (*fse)->is_valid) {
+				uint32_t meta;
+
+				meta = DP_RX_FSE_FLOW_UPDATE_TID(DP_RX_FSE_FLOW_MATCH_SFE, rx_flow_info->tid);
+				meta = DP_RX_FSE_FLOW_UPDATE_EVT_REQ(meta, 1);
+				dp_rx_flow_write_entry_metadata(pdev, meta,
+								*fse);
+
+				ret = 1;
+				goto update_n_send_wdi;
+			}
+		}
+
 		dp_err("Add entry failed with status %d for tuple with hash %u",
 		       status, flow_hash);
-		return NULL;
+
+		return ret;
 	}
 
-	fse = dp_rx_flow_get_fse(fst, flow_idx);
-	fse->is_ipv4_addr_entry = rx_flow_info->is_addr_ipv4;
-	fse->flow_hash = flow_hash;
-	fse->flow_id = flow_idx;
-	fse->stats.msdu_count = 0;
-	fse->is_valid = true;
+	*fse = dp_rx_flow_get_fse(fst, flow_idx);
+	(*fse)->is_ipv4_addr_entry = rx_flow_info->is_addr_ipv4;
+	(*fse)->flow_hash = flow_hash;
+	(*fse)->flow_id = flow_idx;
+	(*fse)->stats.msdu_count = 0;
+	(*fse)->is_valid = true;
 
-	return fse;
+	ret = 0;
+
+update_n_send_wdi:
+
+	if (rx_flow_info->dest_mac)
+		qdf_mem_copy(&((*fse)->dest_mac.raw[0]), rx_flow_info->dest_mac,
+			     QDF_MAC_ADDR_SIZE);
+
+	(*fse)->svc_id = rx_flow_info->svc_id;
+	(*fse)->tid = rx_flow_info->tid;
+
+	if (update_svc_id) {
+		struct fse_info_cookie cookie = {0};
+
+		/* send wdi event */
+		qdf_mem_copy(&cookie.tuple_info, &rx_flow_info->flow_tuple_info,
+			     sizeof(struct cdp_rx_flow_tuple_info));
+
+		cookie.svc_id = rx_flow_info->svc_id;
+		cookie.tid = rx_flow_info->tid;
+		cookie.dest_mac = rx_flow_info->dest_mac;
+
+		dp_wdi_event_handler(WDI_EVENT_FSE_UPDATE, soc, &cookie,
+				     HTT_INVALID_PEER, dp_rx_fse_event_add,
+				     pdev->pdev_id);
+	}
+
+	return ret;
 }
 
 /**
@@ -332,6 +409,84 @@ QDF_STATUS dp_rx_flow_send_htt_operation_cmd(struct dp_pdev *pdev,
 }
 
 /**
+ * dp_rx_flow_invalidate_fse_entry() - invalidate fse entry
+ * @pdev: pdev handle
+ * @fse: fse entry
+ * @rx_flow_info: Flow tuple info
+ * @delete_entry: flag to indicate if delete is needed if invalidate fails
+ *
+ * Return: Status
+ */
+QDF_STATUS
+dp_rx_flow_invalidate_fse_entry(struct dp_pdev *pdev, struct dp_rx_fse *fse,
+				struct cdp_rx_flow_info *rx_flow_info,
+				bool delete_entry)
+{
+	struct dp_soc *soc = pdev->soc;
+	struct dp_rx_fst *fst = pdev->rx_fst;
+	QDF_STATUS status =  QDF_STATUS_SUCCESS;
+	struct dp_soc *partner_soc;
+	int chip_id;
+
+	if (soc->is_rx_fse_full_cache_invalidate_war_enabled) {
+		qdf_atomic_set(&fst->is_cache_update_pending, 1);
+	} else {
+		struct wlan_cfg_dp_soc_ctxt *cfg = pdev->soc->wlan_cfg_ctx;
+
+		for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
+			if (chip_id >= soc->arch_ops.dp_soc_get_num_soc(soc))
+				return QDF_STATUS_SUCCESS;
+
+			if (soc->arch_ops.dp_get_soc_by_chip_id)
+				partner_soc =
+				soc->arch_ops.dp_get_soc_by_chip_id(soc,
+								   chip_id);
+			else
+				partner_soc = soc;
+
+			if (!partner_soc)
+				continue;
+
+			/**
+			 * unlike LI, BE SOC has only one DMAC so there is
+			 * no concept of FST per pdev, also there is only one
+			 * single FST table maintained across SOCs which are
+			 * part of one ML group.
+			 */
+			if (qdf_likely(
+			      !wlan_cfg_is_rx_flow_search_table_per_pdev(cfg)))
+				pdev = partner_soc->pdev_list[0];
+
+			/**
+			 * Send HTT cache invalidation command to firmware to
+			 * reflect the added flow
+			 */
+			status = dp_rx_flow_send_htt_operation_cmd(
+					pdev,
+					DP_HTT_FST_CACHE_INVALIDATE_ENTRY,
+					rx_flow_info);
+
+			if (QDF_STATUS_SUCCESS != status) {
+				dp_err("Send cache invalidate entry to fw failed: %u",
+				       status);
+				dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
+
+				if (delete_entry) {
+					/* Free DP FSE and HAL FSE */
+					hal_rx_flow_delete_entry(
+							soc->hal_soc,
+							fst->hal_rx_fst,
+							fse->hal_rx_fse);
+					fse->is_valid = false;
+				}
+			}
+		}
+	}
+
+	return status;
+}
+
+/**
  * dp_rx_flow_add_entry() - Add a flow entry to flow search table
  * @pdev: DP pdev instance
  * @rx_flow_info: DP flow paramaters
@@ -342,35 +497,40 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 				struct cdp_rx_flow_info *rx_flow_info)
 {
 	struct hal_rx_flow flow = { 0 };
-	struct dp_rx_fse *fse;
+	struct dp_rx_fse *fse = NULL;
 	struct dp_soc *soc = pdev->soc;
 	struct dp_rx_fst *fst;
-	uint8_t chip_id;
-	struct dp_soc *partner_soc;
-	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
+	struct cdp_rx_flow_tuple_info *flow_tuple_info =
+						&rx_flow_info->flow_tuple_info;
+	int ret;
 
 	fst = pdev->rx_fst;
 
 	/* Initialize unused bits in IPv6 address for IPv4 address */
 	if (rx_flow_info->is_addr_ipv4) {
-		rx_flow_info->flow_tuple_info.dest_ip_63_32 = 0;
-		rx_flow_info->flow_tuple_info.dest_ip_95_64 = 0;
-		rx_flow_info->flow_tuple_info.dest_ip_127_96 =
+		flow_tuple_info->dest_ip_63_32 = 0;
+		flow_tuple_info->dest_ip_95_64 = 0;
+		flow_tuple_info->dest_ip_127_96 =
 			HAL_IP_DA_SA_PREFIX_IPV4_COMPATIBLE_IPV6;
 
-		rx_flow_info->flow_tuple_info.src_ip_63_32 = 0;
-		rx_flow_info->flow_tuple_info.src_ip_95_64 = 0;
-		rx_flow_info->flow_tuple_info.src_ip_127_96 =
+		flow_tuple_info->src_ip_63_32 = 0;
+		flow_tuple_info->src_ip_95_64 = 0;
+		flow_tuple_info->src_ip_127_96 =
 			HAL_IP_DA_SA_PREFIX_IPV4_COMPATIBLE_IPV6;
 	}
 
 	/* Allocate entry in DP FST */
-	fse = dp_rx_flow_alloc_entry(soc->hal_soc, fst, rx_flow_info, &flow);
-	if (NULL == fse) {
+	ret = dp_rx_flow_alloc_entry(pdev, fst, rx_flow_info, &flow, &fse);
+	if (ret == -1) {
 		dp_err("RX FSE alloc failed");
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
 		return QDF_STATUS_E_NOMEM;
+	} else if (ret == 1) {
+		return dp_rx_flow_invalidate_fse_entry(pdev, fse, rx_flow_info,
+						       true);
+	} else {
 	}
+
 	dp_info("flow_addr = %pK, flow_id = %u, valid = %d, v4 = %d\n",
 		fse, fse->flow_id, fse->is_valid, fse->is_ipv4_addr_entry);
 
@@ -389,6 +549,20 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 			HAL_REO_DEST_IND_START_OFFSET;
 	} else {
 		flow.reo_destination_indication = pdev->reo_dest;
+	}
+
+	/**
+	 * If Round Robin flow to core distribution is enabled,
+	 * select reo_destination_indication in a round robin
+	 * fashion for all the incoming flows.
+	 */
+	if (wlan_cfg_is_rx_rr_enabled(soc->wlan_cfg_ctx)) {
+		flow.reo_destination_indication = fst->ring_id;
+		fst->ring_id += 1;
+		fst->ring_id = fst->ring_id % 4;
+
+		if (!fst->ring_id)
+			fst->ring_id = 1;
 	}
 
 	flow.reo_destination_handler = HAL_RX_FSE_REO_DEST_FT;
@@ -410,54 +584,7 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 		fst->num_entries, flow.reo_destination_indication,
 		flow.reo_destination_handler);
 
-	if (soc->is_rx_fse_full_cache_invalidate_war_enabled) {
-		qdf_atomic_set(&fst->is_cache_update_pending, 1);
-	} else {
-		QDF_STATUS status;
-
-		for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
-			if (chip_id >= soc->arch_ops.dp_soc_get_num_soc(soc))
-				return QDF_STATUS_SUCCESS;
-
-			partner_soc =
-			soc->arch_ops.dp_get_soc_by_chip_id(soc, chip_id);
-
-			if (!partner_soc)
-			    continue;
-
-			/**
-			 * unlike LI, BE SOC has only one DMAC so there is
-			 * no concept of FST per pdev, also there is only one
-			 * single FST table maintained across SOCs which are
-			 * part of one ML group.
-			 */
-			if (qdf_likely(
-			      !wlan_cfg_is_rx_flow_search_table_per_pdev(cfg)))
-				pdev = partner_soc->pdev_list[0];
-
-			/**
-			 * Send HTT cache invalidation command to firmware to
-			 * reflect the added flow
-			 */
-			status = dp_rx_flow_send_htt_operation_cmd(
-					pdev,
-					DP_HTT_FST_CACHE_INVALIDATE_ENTRY,
-					rx_flow_info);
-
-			if (QDF_STATUS_SUCCESS != status) {
-				dp_err("Send cache invalidate entry to fw failed: %u",
-				       status);
-				dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
-				/* Free DP FSE and HAL FSE */
-				hal_rx_flow_delete_entry(soc->hal_soc,
-							 fst->hal_rx_fst,
-							 fse->hal_rx_fse);
-				fse->is_valid = false;
-				return status;
-			}
-		}
-	}
-	return QDF_STATUS_SUCCESS;
+	return dp_rx_flow_invalidate_fse_entry(pdev, fse, rx_flow_info, true);
 }
 
 /**
@@ -475,9 +602,6 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	struct dp_soc *soc = pdev->soc;
 	struct dp_rx_fst *fst;
 	QDF_STATUS status;
-	uint8_t chip_id;
-	struct dp_soc *partner_soc;
-	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
 
 	fst = pdev->rx_fst;
 
@@ -485,7 +609,7 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	fse = dp_rx_flow_find_entry_by_tuple(soc->hal_soc, fst,
 					     rx_flow_info, &flow);
 
-	if (!fse) {
+	if (!fse || (fse->is_valid == false)) {
 		dp_err("RX flow delete entry failed");
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
 		return QDF_STATUS_E_INVAL;
@@ -496,55 +620,34 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 					  fse->hal_rx_fse);
 	qdf_assert_always(status == QDF_STATUS_SUCCESS);
 
+	if (fse->svc_id != DP_RX_FLOW_INVALID_SVC_ID) {
+		/* send WDI event */
+		struct fse_info_cookie cookie = {0};
+
+		/* send wdi event */
+		qdf_mem_copy(&cookie.tuple_info, &rx_flow_info->flow_tuple_info,
+			     sizeof(struct cdp_rx_flow_tuple_info));
+
+		cookie.svc_id = fse->svc_id;
+		cookie.tid = fse->tid;
+		cookie.dest_mac = &fse->dest_mac.raw[0];
+
+		dp_wdi_event_handler(WDI_EVENT_FSE_UPDATE, soc, &cookie,
+				     HTT_INVALID_PEER, dp_rx_fse_event_del,
+				     pdev->pdev_id);
+	}
+
 	/* Free the FSE in DP FST */
 	fse->is_valid = false;
+	fse->mismatch = false;
+	fse->svc_id = 0;
+	fse->tid = 0;
+	qdf_mem_zero(&fse->dest_mac.raw[0], QDF_MAC_ADDR_SIZE);
 
 	/* Decrement number of valid entries in table */
 	fst->num_entries--;
 
-	if (soc->is_rx_fse_full_cache_invalidate_war_enabled) {
-		qdf_atomic_set(&fst->is_cache_update_pending, 1);
-	} else {
-		for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
-
-			if (chip_id >= soc->arch_ops.dp_soc_get_num_soc(soc))
-				return QDF_STATUS_SUCCESS;
-
-			partner_soc =
-			soc->arch_ops.dp_get_soc_by_chip_id(soc, chip_id);
-
-			if (!partner_soc)
-			    continue;
-
-			/**
-			 * unlike LI, BE SOC has only one DMAC so there is
-			 * no concept of FST per pdev, also there is only one
-			 * single FST table maintained across SOCs which are
-			 * part of one ML group.
-			 */
-			if (qdf_likely(
-			      !wlan_cfg_is_rx_flow_search_table_per_pdev(cfg)))
-				pdev = partner_soc->pdev_list[0];
-
-			/**
-			 * Send HTT cache invalidation command to firmware to
-			 * reflect the added flow
-			 */
-			status = dp_rx_flow_send_htt_operation_cmd(
-					pdev,
-					DP_HTT_FST_CACHE_INVALIDATE_ENTRY,
-					rx_flow_info);
-
-			if (QDF_STATUS_SUCCESS != status) {
-				dp_err("Send cache invalidate entry to fw failed: %u",
-				       status);
-				dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
-				/* Do not add entry back in DP FSE and HAL FSE */
-				return status;
-			}
-		}
-	}
-	return QDF_STATUS_SUCCESS;
+	return dp_rx_flow_invalidate_fse_entry(pdev, fse, rx_flow_info, false);
 }
 
 /* dp_rx_flow_update_fse_stats() - Update a flow's statistics
@@ -695,6 +798,8 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	qdf_mem_set(fst, 0, sizeof(struct dp_rx_fst));
 
+	fst->ring_id = 1;
+
 	fst->max_skid_length = wlan_cfg_rx_fst_get_max_search(cfg);
 	fst->max_entries = wlan_cfg_get_rx_flow_search_table_size(cfg);
 	hash_key = wlan_cfg_rx_fst_get_hash_key(cfg);
@@ -806,6 +911,8 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 		soc->rx_fst = NULL;
 	}
 
+	if (soc->arch_ops.dp_set_rx_fst)
+		soc->arch_ops.dp_set_rx_fst(NULL);
 	dp_rx_ppe_fse_unregister();
 	if (qdf_likely(dp_fst)) {
 		hal_rx_fst_detach(soc->hal_soc, dp_fst->hal_rx_fst,

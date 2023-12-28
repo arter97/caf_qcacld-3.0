@@ -311,3 +311,14 @@ qal_vbus_rcu_read_unlock(void)
 }
 
 qdf_export_symbol(qal_vbus_rcu_read_unlock);
+
+int
+qal_vbus_of_get_named_gpio_flags(struct qdf_device_node *np,
+				 const char *list_name,
+				 int index, qdf_of_gpio_flags *flags)
+{
+	return of_get_named_gpio_flags((struct device_node *)np,
+				       list_name, index, flags);
+}
+
+qdf_export_symbol(qal_vbus_of_get_named_gpio_flags);

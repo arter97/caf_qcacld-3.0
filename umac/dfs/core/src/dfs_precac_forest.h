@@ -274,6 +274,15 @@ void dfs_unmark_rcac_done(struct wlan_dfs *dfs)
 bool dfs_is_precac_completed_count_non_zero(struct wlan_dfs *dfs);
 
 /*
+ * dfs_fill_adfs_completion_params() - Fill ADFS Completion params.
+ * @dfs: Pointer to wlan_dfs.
+ *
+ * Return: None.
+ */
+void dfs_fill_adfs_completion_params(struct wlan_dfs *dfs,
+				     enum ocac_status_type ocac_status);
+
+/*
  * dfs_fill_adfs_chan_params() - Fill the ADFS FW params.
  * @dfs: Pointer to wlan_dfs.
  * @adfs_param: Pointer to struct dfs_agile_cac_params.

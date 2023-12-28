@@ -144,6 +144,23 @@ bool wlan_reg_is_phymode_chwidth_allowed(struct wlan_objmgr_pdev *pdev,
 					 uint16_t input_puncture_bitmap);
 
 /**
+ * wlan_reg_get_max_channel_width() - Get the maximum channel width supported
+ * given a frequency and a global maximum channel width.
+ * @pdev: Pointer to PDEV object.
+ * @freq: Input frequency.
+ * @g_max_width: Global maximum channel width.
+ * @input_puncture_bitmap: Input puncture bitmap
+ *
+ * Return: Maximum channel width of type phy_ch_width.
+ */
+enum phy_ch_width
+wlan_reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
+			       qdf_freq_t freq,
+			       enum phy_ch_width g_max_width,
+			       enum supported_6g_pwr_types in_6g_pwr_mode,
+			       uint16_t input_puncture_bitmap);
+
+/**
  * wlan_reg_get_max_phymode_and_chwidth() - Find the maximum regmode and
  * channel width combo supported by the device.
  * @phy_in: Maximum reg_phymode.
@@ -250,6 +267,16 @@ wlan_reg_is_phymode_chwidth_allowed(struct wlan_objmgr_pdev *pdev,
 				    uint16_t input_puncture_bitmap)
 {
 	return false;
+}
+
+static inline enum phy_ch_width
+wlan_reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
+			  qdf_freq_t freq,
+			  enum phy_ch_width g_max_width,
+			  enum supported_6g_pwr_types in_6g_pwr_mode,
+			  uint16_t input_puncture_bitmap);
+{
+	return CH_WIDTH_INVALID;
 }
 
 static inline QDF_STATUS
@@ -517,4 +544,34 @@ wlan_reg_get_max_reg_eirp_from_list(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+/**
+ * wlan_quick_reg_set_ap_pwr_and_update_chan_list() - Set the AP power mode and
+ * recompute the current channel list based on the new AP power mode.
+ *
+ * @pdev: Pointer to pdev.
+ * @ap_pwr_type: The AP power type to update to.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+wlan_quick_reg_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
+					       enum reg_6g_ap_type ap_pwr_type);
+
+/**
+ * wlan_reg_is_freq_txable() - Check if the given frequency is tx-able.
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in MHz
+ * @in_6ghz_pwr_mode: Input AP power type
+ *
+ * An SP channel is tx-able if the channel is present in the AFC response.
+ * In case of non-OUTDOOR mode a channel is always tx-able (Assuming it is
+ * enabled by regulatory).
+ *
+ * Return: True if the frequency is tx-able, else false.
+ */
+bool
+wlan_reg_is_freq_txable(struct wlan_objmgr_pdev *pdev,
+			qdf_freq_t freq,
+			enum supported_6g_pwr_types in_6ghz_pwr_mode);
 #endif /* __WLAN_REG_CHANNEL_API_H */

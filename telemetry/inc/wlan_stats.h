@@ -93,6 +93,7 @@ enum stats_feat_index_e {
  * @serviceid: service id for checking the level of sawf stats
  * @mld_req: Flag to indicate if request is received for MLD interface
  * @mld_link: Flag to indicate if request is received for link stats on MLD
+ * @peer_type: type of peer
  * @intf_name: Interface name for which stats are requested
  */
 struct stats_config {
@@ -105,6 +106,7 @@ struct stats_config {
 	u_int8_t               serviceid;
 	bool                   mld_req;
 	bool                   mld_link;
+	enum stats_peer_type   peer_type;
 	char                   intf_name[IFNAMSIZ];
 };
 

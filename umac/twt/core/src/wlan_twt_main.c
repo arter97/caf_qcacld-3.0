@@ -203,6 +203,25 @@ wlan_twt_cfg_get_bcast_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
+wlan_twt_cfg_get_rtwt_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	struct twt_psoc_priv_obj *twt_psoc;
+	psoc_twt_ext_cfg_params_t *twt_cfg;
+
+	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							 WLAN_UMAC_COMP_TWT);
+	if (!twt_psoc) {
+		twt_err("null twt psoc priv obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	twt_cfg = &twt_psoc->cfg_params;
+	*val = twt_cfg->r_twt_enable;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_twt_cfg_set_requestor_flag(struct wlan_objmgr_psoc *psoc, bool val)
 {
 	return QDF_STATUS_SUCCESS;
@@ -212,6 +231,43 @@ QDF_STATUS
 wlan_twt_cfg_set_responder_flag(struct wlan_objmgr_psoc *psoc, bool val)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_twt_send_disable_cmd(struct wlan_objmgr_pdev *pdev)
+{
+
+	struct wlan_objmgr_psoc *psoc;
+	struct twt_psoc_priv_obj *twt_psoc;
+	psoc_twt_ext_cfg_params_t *twt_cfg;
+	struct twt_disable_param twt_param = { 0 };
+
+	if (!pdev) {
+		twt_err("null pdev");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							 WLAN_UMAC_COMP_TWT);
+	if (!twt_psoc) {
+		twt_err("null twt psoc priv obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	twt_cfg = &twt_psoc->cfg_params;
+
+	if (!twt_cfg->twt_enable) {
+		qdf_info("TWT INI is disabled. Do not send disable/ enable cmd to FW");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	twt_param.pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	/* Set ext_conf_present flag so that new format
+	 * is used to send cmd to FW */
+	twt_param.ext_conf_present = true;
+	twt_param.dis_reason_code = HOST_TWT_DISABLE_REASON_NONE;
+
+	return wlan_twt_responder_disable(psoc, &twt_param, NULL);
 }
 
 QDF_STATUS wlan_twt_send_enable_cmd(struct wlan_objmgr_pdev *pdev)

@@ -485,7 +485,7 @@ const char *mu_reception_mode[STATS_IF_TXRX_TYPE_MU_MAX] = {
 };
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static const char *opt_string = "BADarvsdcf:i:m:t:RIMh?";
+static const char *opt_string = "BADarvsdcf:i:l:m:t:RIMh?";
 
 static const struct option long_opts[] = {
 	{ "basic", no_argument, NULL, 'B' },
@@ -499,6 +499,7 @@ static const struct option long_opts[] = {
 	{ "ctrl", no_argument, NULL, 'c' },
 	{ "feature", required_argument, NULL, 'f' },
 	{ "ifname", required_argument, NULL, 'i' },
+	{ "linkpeer", required_argument, NULL, 'l'},
 	{ "stamacaddr", required_argument, NULL, 'm' },
 	{ "serviceid", required_argument, NULL, 't' },
 	{ "recursive", no_argument, NULL, 'R' },
@@ -753,6 +754,11 @@ void print_basic_vap_ctrl_rx(struct basic_vdev_ctrl_rx *rx)
 	STATS_64(stdout, "Rx Security Failure", rx->cs_rx_security_failure);
 }
 
+void print_basic_vap_ctrl_link(struct basic_vdev_ctrl_link *link)
+{
+	STATS_16(stdout, "Number of connected clients", link->cs_peer_count);
+}
+
 void print_basic_radio_data_tx(struct basic_pdev_data_tx *tx)
 {
 	struct pkt_info *pkt = NULL;
@@ -804,6 +810,7 @@ void print_basic_radio_ctrl_link(struct basic_pdev_ctrl_link *link)
 	STATS_32(stdout, "Channel Tx Power", link->cs_chan_tx_pwr);
 	STATS_16_SIGNED(stdout, "Channel NF", link->cs_chan_nf);
 	STATS_16_SIGNED(stdout, "Channel NF Sec80", link->cs_chan_nf_sec80);
+	STATS_16(stdout, "Number of connected clients", link->cs_peer_count);
 }
 
 void print_basic_ap_data_tx(struct basic_psoc_data_tx *tx)
@@ -1547,11 +1554,11 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 		STATS_PRINT("----TIDX: %d----   ", data->tid);
 		STATS_PRINT("----QUEUE: %d----\n", data->msduq);
 
-		STATS_PRINT("Tx_info_success_num        = %u\n",
+		STATS_PRINT("Tx_info_success_num        = %ju\n",
 			    data->tx[0][0].tx_success.num);
 		STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 			    data->tx[0][0].tx_success.bytes);
-		STATS_PRINT("Tx_info_ingress_num        = %u\n",
+		STATS_PRINT("Tx_info_ingress_num        = %ju\n",
 			    data->tx[0][0].tx_ingress.num);
 		STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
 			    data->tx[0][0].tx_ingress.bytes);
@@ -1560,7 +1567,7 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 		STATS_PRINT("Tx_info_ingress_rate       = %u\n",
 			    data->tx[0][0].ingress_rate);
 
-		STATS_PRINT("Tx_info_drop_num           = %u\n",
+		STATS_PRINT("Tx_info_drop_num           = %ju\n",
 			    data->tx[0][0].dropped.fw_rem.num);
 		STATS_PRINT("Tx_info_drop_bytes         = %ju\n",
 			     data->tx[0][0].dropped.fw_rem.bytes);
@@ -1599,11 +1606,11 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 				sawftx = &data->tx[tidx][queues];
 				STATS_PRINT("----TIDX: %d----   ", tidx);
 				STATS_PRINT("----QUEUE: %d----\n", queues);
-				STATS_PRINT("Tx_info_success_num        = %u\n",
+				STATS_PRINT("Tx_info_success_num        = %ju\n",
 					    sawftx->tx_success.num);
 				STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 					    sawftx->tx_success.bytes);
-				STATS_PRINT("Tx_info_ingress_num        = %u\n",
+				STATS_PRINT("Tx_info_ingress_num        = %ju\n",
 					    sawftx->tx_ingress.num);
 				STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
 					    sawftx->tx_ingress.bytes);
@@ -1612,7 +1619,7 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 				STATS_PRINT("Tx_info_ingress_rate       = %u\n",
 					    sawftx->ingress_rate);
 
-				STATS_PRINT("Tx_info_drop_num           = %u\n",
+				STATS_PRINT("Tx_info_drop_num           = %ju\n",
 					    sawftx->dropped.fw_rem.num);
 				STATS_PRINT("Tx_info_drop_bytes         = %ju\n",
 					    sawftx->dropped.fw_rem.bytes);
@@ -1780,6 +1787,11 @@ void print_advance_vap_ctrl_rx(struct advance_vdev_ctrl_rx *rx)
 	STATS_64(stdout, "Connections refuse Radio limit",
 		 rx->cs_sta_xceed_rlim);
 	STATS_64(stdout, "Connections refuse Vap limit", rx->cs_sta_xceed_vlim);
+}
+
+void print_advance_vap_ctrl_link(struct advance_vdev_ctrl_link *link)
+{
+	print_basic_vap_ctrl_link(&link->b_link);
 }
 
 void print_advance_radio_data_me(struct advance_pdev_data_me *me)
@@ -2151,6 +2163,10 @@ void print_basic_vap_ctrl(struct stats_obj *vap)
 		STATS_PRINT("Rx Stats\n");
 		print_basic_vap_ctrl_rx(ctrl->rx);
 	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_basic_vap_ctrl_link(ctrl->link);
+	}
 }
 
 void print_basic_radio_data(struct stats_obj *radio)
@@ -2377,6 +2393,10 @@ void print_advance_vap_ctrl(struct stats_obj *vap)
 	if (ctrl->rx) {
 		STATS_PRINT("Rx Stats\n");
 		print_advance_vap_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_advance_vap_ctrl_link(ctrl->link);
 	}
 }
 
@@ -3071,6 +3091,11 @@ void print_debug_vap_ctrl_wmi(struct debug_vdev_ctrl_wmi *wmi)
 	STATS_64(stdout, "Peer delete all resp", wmi->cs_peer_delete_all_resp);
 }
 
+void print_debug_vap_ctrl_link(struct debug_vdev_ctrl_link *link)
+{
+	print_basic_vap_ctrl_link(&link->b_link);
+}
+
 void print_debug_vap_data(struct stats_obj *vap)
 {
 	struct debug_vdev_data *data = vap->stats;
@@ -3116,6 +3141,10 @@ void print_debug_vap_ctrl(struct stats_obj *vap)
 	if (ctrl->wmi) {
 		STATS_PRINT("WMI Stats\n");
 		print_debug_vap_ctrl_wmi(ctrl->wmi);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_debug_vap_ctrl_link(ctrl->link);
 	}
 }
 
@@ -3394,6 +3423,8 @@ void print_debug_radio_data_monitor(struct debug_pdev_data_monitor *monitor)
 					  monitor->nondata_rx_ru_size[i]);
 		}
 		STATS_UNVLBL(stdout, "ul_ofdma_nodata_rx_ru_size", str_buf);
+
+		free(str_buf);
 	}
 }
 
@@ -3861,6 +3892,8 @@ int main(int argc, char *argv[])
 	u_int8_t is_serviceid_set = 0;
 	u_int8_t is_option_selected = 0;
 	u_int8_t is_ipa_stats_set = 0;
+	u_int8_t is_peer_type_set = 0;
+	enum stats_peer_type peer_type = STATS_WILD_PEER_TYPE;
 	bool is_mld_link = false;
 	bool recursion_temp = false;
 	char feat_flags[128] = {'\0'};
@@ -3979,6 +4012,22 @@ int main(int argc, char *argv[])
 			is_stamacaddr_set  = 1;
 			is_option_selected = 1;
 			break;
+		case 'l':
+			if (is_peer_type_set) {
+				STATS_ERR("Multiple Feature flag Arguments\n");
+				display_help();
+				return -EINVAL;
+			}
+			if ((bool)atoi(optarg)) {
+				peer_type = STATS_LINK_PEER_TYPE;
+			} else if ((bool)atoi(optarg) == 0) {
+				peer_type = STATS_MLD_PEER_TYPE;
+			} else {
+				STATS_ERR("Invalid Argument Value\n");
+				return -EINVAL;
+			}
+			is_peer_type_set = 1;
+			break;
 		case 't':
 			if (is_serviceid_set) {
 				STATS_ERR("Multiple Serviceid Arguments\n");
@@ -4070,6 +4119,7 @@ int main(int argc, char *argv[])
 	cmd.recursive = recursion_temp;
 	cmd.serviceid = servid_temp;
 	cmd.mld_link = is_mld_link;
+	cmd.peer_type = peer_type;
 
 	strlcpy(cmd.if_name, ifname_temp, IFNAME_LEN);
 

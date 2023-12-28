@@ -135,6 +135,7 @@ struct basic_vdev_data {
 struct basic_vdev_ctrl {
 	struct basic_vdev_ctrl_tx *tx;
 	struct basic_vdev_ctrl_rx *rx;
+	struct basic_vdev_ctrl_link *link;
 };
 
 /* Basic pdev data stats holder */
@@ -338,6 +339,7 @@ struct advance_vdev_data {
 struct advance_vdev_ctrl {
 	struct advance_vdev_ctrl_tx *tx;
 	struct advance_vdev_ctrl_rx *rx;
+	struct advance_vdev_ctrl_link *link;
 };
 
 /* Advance pdev data stats holder */
@@ -400,6 +402,7 @@ struct debug_vdev_ctrl {
 	struct debug_vdev_ctrl_tx *tx;
 	struct debug_vdev_ctrl_rx *rx;
 	struct debug_vdev_ctrl_wmi *wmi;
+	struct debug_vdev_ctrl_link *link;
 };
 
 /* Debug pdev data stats holder */
@@ -483,6 +486,7 @@ struct reply_buffer {
  * @sta_mac:   Station MAC address if Stats requested for STA object
  * @if_name:   Interface name on which Stats is requested
  * @reply:     Pointer to reply buffer provided by user
+ * @peer_type: type of peer
  */
 struct stats_command {
 	enum stats_level_e lvl;
@@ -495,6 +499,7 @@ struct stats_command {
 	u_int64_t feat_flag;
 	struct ether_addr sta_mac;
 	struct reply_buffer *reply;
+	enum stats_peer_type peer_type;
 	void (*async_callback)(struct stats_command *cmd, char *if_name);
 };
 

@@ -816,13 +816,14 @@ int dp_wrap_tx_process(struct net_device **dev, struct wlan_objmgr_vdev *vdev,
 		}
 		*dev = wvdev->dev;
 		vdev = wvdev->vdev;
-	}
-	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
-		eh = (struct ether_header *)((*skb)->data);
-		qwrap_err("Drop pkt, vdev is not up:"QDF_MAC_ADDR_FMT
-			  "vdevid:%d", QDF_MAC_ADDR_REF(eh->ether_shost),
-			  vdev->vdev_objmgr.vdev_id);
-		return QWRAP_TX_FAILURE;
+
+		if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
+			eh = (struct ether_header *)((*skb)->data);
+			qwrap_err("Drop pkt, vdev is not up:"QDF_MAC_ADDR_FMT
+				  "vdevid:%d", QDF_MAC_ADDR_REF(eh->ether_shost),
+				  vdev->vdev_objmgr.vdev_id);
+			return QWRAP_TX_FAILURE;
+		}
 	}
 	return QWRAP_TX_SUCCESS;
 }

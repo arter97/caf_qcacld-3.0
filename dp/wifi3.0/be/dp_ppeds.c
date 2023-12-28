@@ -417,6 +417,33 @@ static void dp_ppeds_setup_vp_entry_be(struct dp_soc_be *be_soc,
 }
 
 /**
+ * dp_tx_ppeds_vp_profile_update() - Update ppe vp profile with new bank data
+ * @be_soc: BE Soc handle
+ * @be_vdev: pointer to be_vdev structure
+ *
+ * The function updates the vp profile with new bank information
+ *
+ * Return: void
+ */
+void dp_tx_ppeds_vp_profile_update(struct dp_soc_be *be_soc,
+				   struct dp_vdev_be *be_vdev)
+{
+	struct dp_ppe_vp_profile *ppe_vp_profile;
+	int i;
+
+	/* Iterate through ppe vp profile and update for VAPs with same vdev_id */
+	for (i = 0; i < be_soc->num_ppe_vp_profiles; i++) {
+		if (!be_soc->ppe_vp_profile[i].is_configured)
+			continue;
+
+		if (be_soc->ppe_vp_profile[i].vdev_id == be_vdev->vdev.vdev_id) {
+			ppe_vp_profile = &be_soc->ppe_vp_profile[i];
+			dp_ppeds_setup_vp_entry_be(be_soc, be_vdev, ppe_vp_profile);
+		}
+	}
+}
+
+/**
  * dp_ppeds_alloc_vp_tbl_entry_be() - PPE VP entry alloc
  * @be_soc: BE SoC
  * @be_vdev: BE VAP
@@ -625,13 +652,10 @@ static void dp_ppeds_enable_txcomp_irq(struct dp_soc_be *be_soc)
 {
 	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
 
-	if (!dp_check_umac_reset_in_progress(soc)) {
-		dp_ppeds_enable_irq(&be_soc->soc,
-				    &be_soc->ppeds_wbm_release_ring);
-	}
+	dp_ppeds_enable_irq(&be_soc->soc,
+			    &be_soc->ppeds_wbm_release_ring);
 
-	if (soc->notify_fw_callback)
-		soc->notify_fw_callback(soc);
+	dp_umac_reset_trigger_pre_reset_notify_cb(soc);
 }
 
 static void dp_ppeds_tx_desc_reset(void *ctxt, void *elem, void *elem_list)
@@ -1048,7 +1072,7 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 	} else {
 		if (__dp_tx_limit_check(&be_soc->soc)) {
 			TX_DESC_LOCK_UNLOCK(&pool->lock);
-			return NULL;
+			goto failed;
 		}
 
 		tx_desc = pool->freelist;
@@ -1060,7 +1084,7 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 			tx_desc = dp_tx_borrow_tx_desc(&be_soc->soc);
 			if (!tx_desc) {
 				TX_DESC_LOCK_UNLOCK(&pool->lock);
-				return NULL;
+				goto failed;
 			}
 		} else {
 			tx_desc->flags = 0;
@@ -1078,6 +1102,9 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 	TX_DESC_LOCK_UNLOCK(&pool->lock);
 
 	return tx_desc;
+failed:
+	be_soc->ppeds_stats.tx.desc_alloc_failed++;
+	return NULL;
 }
 
 /**
@@ -1384,8 +1411,9 @@ void dp_ppeds_notify_napi_done(ppe_ds_wlan_handle_t *ppeds_handle)
 
 	qdf_atomic_clear_bit(DP_PPEDS_NAPI_DONE_BIT,
 			     &soc->service_rings_running);
-	if (soc && soc->notify_fw_callback)
-		soc->notify_fw_callback(soc);
+
+	if (soc)
+		dp_umac_reset_trigger_pre_reset_notify_cb(soc);
 }
 #endif
 
@@ -1617,6 +1645,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	vp_profile->to_fw = 0;
 	vp_profile->use_ppe_int_pri = 0;
 	vp_profile->drop_prec_enable = 0;
+	vp_profile->vdev_id = vdev_id;
 
 	/*
 	 * For the sta mode fill up the index reg number.

@@ -39,6 +39,7 @@
 #ifdef QCA_SUPPORT_AGILE_DFS
 #include <wlan_sm_engine.h> /* for struct wlan_sm */
 #endif
+#include <wlan_dfs_utils_api.h>
 
 /* Number of 20MHz sub-channels in 160 MHz segment */
 #define NUM_CHANNELS_160MHZ  8
@@ -54,6 +55,94 @@
 #endif
 
 #ifdef QCA_SUPPORT_AGILE_DFS
+/* dfs_agile_fill_rcac_timeouts_for_etsi() - Fill ADFS timeout params for ETSI
+ * RCAC.
+ *
+ * @dfs: Pointer to DFS object.
+ * @adfs_param: Pointer to ADFS params.
+ */
+static void
+dfs_agile_fill_rcac_timeouts(struct wlan_dfs *dfs,
+			     struct dfs_agile_cac_params *adfs_param)
+{
+	enum dfs_reg dfsdomain = utils_get_dfsdomain(dfs->dfs_pdev_obj);
+	uint32_t min_rcac_timeout;
+	uint16_t rcacfreq = adfs_param->precac_center_freq_1;
+	enum phy_ch_width chwidth = adfs_param->precac_chwidth;
+
+	if (dfsdomain == DFS_ETSI_REGION) {
+		/* In case of ETSI domain, RCAC should follow the OCAC timeout
+		 * rules:
+		 * 1) 6 minutes OCAC timeout for non-weather radar DFS channels
+		 * and,
+		 * 2) 60 minutes OCAC timeout for weather radar DFS channels.
+		 */
+		if (dfs_is_pcac_on_weather_channel_for_freq(dfs, chwidth,
+							    rcacfreq)) {
+			min_rcac_timeout = MIN_WEATHER_PRECAC_DURATION;
+		} else {
+			min_rcac_timeout = MIN_PRECAC_DURATION;
+		}
+	} else {
+		min_rcac_timeout = MIN_RCAC_DURATION;
+	}
+
+	adfs_param->min_precac_timeout = min_rcac_timeout;
+	adfs_param->max_precac_timeout = MAX_RCAC_DURATION;
+}
+
+#ifdef QCA_SUPPORT_ADFS_RCAC
+/* dfs_start_agile_rcac_timer() - Start host agile RCAC timer.
+ *
+ * @dfs: Pointer to struct wlan_dfs.
+ */
+static
+void dfs_start_agile_rcac_timer(struct wlan_dfs *dfs, uint32_t rcac_timeout)
+{
+	struct dfs_soc_priv_obj *dfs_soc_obj = dfs->dfs_soc_obj;
+
+	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		 "Host RCAC timeout = %d ms", rcac_timeout);
+
+	qdf_hrtimer_start(&dfs_soc_obj->dfs_rcac_timer,
+			  qdf_time_ms_to_ktime(rcac_timeout),
+			  QDF_HRTIMER_MODE_REL);
+}
+
+/* dfs_stop_agile_rcac_timer() - Cancel the RCAC timer.
+ *
+ * @dfs: Pointer to struct wlan_dfs.
+ */
+void dfs_stop_agile_rcac_timer(struct wlan_dfs *dfs)
+{
+	struct dfs_soc_priv_obj *dfs_soc_obj;
+
+	dfs_soc_obj = dfs->dfs_soc_obj;
+	qdf_hrtimer_cancel(&dfs_soc_obj->dfs_rcac_timer);
+}
+
+/**
+ * dfs_abort_agile_rcac() - Send abort Agile RCAC to F/W.
+ * @dfs: Pointer to struct wlan_dfs.
+ */
+static void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
+{
+
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
+
+	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
+	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
+
+	dfs_stop_agile_rcac_timer(dfs);
+	if (dfs_tx_ops && dfs_tx_ops->dfs_ocac_abort_cmd)
+		dfs_tx_ops->dfs_ocac_abort_cmd(dfs->dfs_pdev_obj);
+
+	qdf_mem_zero(&dfs->dfs_rcac_param, sizeof(struct dfs_rcac_params));
+	dfs->dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
+	dfs_agile_cleanup_rcac(dfs);
+}
+
 /* dfs_start_agile_engine() - Prepare ADFS params and program the agile
  *                            engine sending agile config cmd to FW.
  * @dfs: Pointer to struct wlan_dfs.
@@ -63,21 +152,37 @@ void dfs_start_agile_engine(struct wlan_dfs *dfs)
 	struct dfs_agile_cac_params adfs_param;
 	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
 	struct dfs_soc_priv_obj *dfs_soc_obj = dfs->dfs_soc_obj;
+	uint8_t n_sub_chans;
+	uint8_t i;
+	qdf_freq_t sub_chans[MAX_20MHZ_SUBCHANS];
 
 	/* Fill the RCAC ADFS params and send it to FW.
 	 * FW does not use RCAC timeout values for RCAC feature.
 	 * FW runs an infinite timer.
 	 */
 	dfs_fill_adfs_chan_params(dfs, &adfs_param);
-	adfs_param.min_precac_timeout = MIN_RCAC_DURATION;
-	adfs_param.max_precac_timeout = MAX_RCAC_DURATION;
 	adfs_param.ocac_mode = QUICK_RCAC_MODE;
+
+	dfs_agile_fill_rcac_timeouts(dfs, &adfs_param);
+	dfs_start_agile_rcac_timer(dfs, adfs_param.min_precac_timeout);
 
 	qdf_info("%s : %d RCAC channel request sent for pdev: %pK ch_freq: %d",
 		 __func__, __LINE__, dfs->dfs_pdev_obj,
 		 dfs->dfs_agile_precac_freq_mhz);
 
 	dfs_tx_ops = wlan_psoc_get_dfs_txops(dfs_soc_obj->psoc);
+
+	n_sub_chans =
+	    dfs_find_subchannels_for_center_freq(
+						 adfs_param.precac_center_freq_1,
+						 adfs_param.precac_center_freq_2,
+						 adfs_param.precac_chwidth,
+						 sub_chans);
+	for (i = 0; i < n_sub_chans; i++)
+	    utils_dfs_deliver_event(dfs->dfs_pdev_obj,
+				    sub_chans[i],
+				    WLAN_EV_PCAC_STARTED);
+
 
 	if (dfs_tx_ops && dfs_tx_ops->dfs_agile_ch_cfg_cmd)
 		dfs_tx_ops->dfs_agile_ch_cfg_cmd(dfs->dfs_pdev_obj,
@@ -86,6 +191,17 @@ void dfs_start_agile_engine(struct wlan_dfs *dfs)
 		dfs_err(NULL, WLAN_DEBUG_DFS_ALWAYS,
 			"dfs_tx_ops=%pK", dfs_tx_ops);
 }
+
+#else
+static inline void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
+{
+}
+
+static inline
+void dfs_start_agile_engine(struct wlan_dfs *dfs)
+{
+}
+#endif
 
 /**
  * --------------------- ROLLING CAC STATE MACHINE ----------------------
@@ -292,65 +408,6 @@ QDF_STATUS dfs_agile_sm_deliver_event(struct dfs_soc_priv_obj *dfs_soc_obj,
 				event_data);
 }
 
-#ifdef QCA_SUPPORT_ADFS_RCAC
-/* dfs_start_agile_rcac_timer() - Start host agile RCAC timer.
- *
- * @dfs: Pointer to struct wlan_dfs.
- */
-void dfs_start_agile_rcac_timer(struct wlan_dfs *dfs)
-{
-	struct dfs_soc_priv_obj *dfs_soc_obj = dfs->dfs_soc_obj;
-	uint32_t rcac_timeout = MIN_RCAC_DURATION;
-
-	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
-		 "Host RCAC timeout = %d ms", rcac_timeout);
-
-	qdf_hrtimer_start(&dfs_soc_obj->dfs_rcac_timer,
-			  qdf_time_ms_to_ktime(rcac_timeout),
-			  QDF_HRTIMER_MODE_REL);
-}
-
-
-/* dfs_stop_agile_rcac_timer() - Cancel the RCAC timer.
- *
- * @dfs: Pointer to struct wlan_dfs.
- */
-void dfs_stop_agile_rcac_timer(struct wlan_dfs *dfs)
-{
-	struct dfs_soc_priv_obj *dfs_soc_obj;
-
-	dfs_soc_obj = dfs->dfs_soc_obj;
-	qdf_hrtimer_cancel(&dfs_soc_obj->dfs_rcac_timer);
-}
-
-
-/**
- * dfs_abort_agile_rcac() - Send abort Agile RCAC to F/W.
- * @dfs: Pointer to struct wlan_dfs.
- */
-static void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
-{
-
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
-
-	dfs_stop_agile_rcac_timer(dfs);
-	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
-	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
-	if (dfs_tx_ops && dfs_tx_ops->dfs_ocac_abort_cmd)
-		dfs_tx_ops->dfs_ocac_abort_cmd(dfs->dfs_pdev_obj);
-
-	qdf_mem_zero(&dfs->dfs_rcac_param, sizeof(struct dfs_rcac_params));
-	dfs->dfs_agile_precac_freq_mhz = 0;
-	dfs->dfs_precac_chwidth = CH_WIDTH_INVALID;
-	dfs->dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
-}
-#else
-static inline void dfs_abort_agile_rcac(struct wlan_dfs *dfs)
-{
-}
-#endif
-
 /* dfs_abort_agile_precac() - Reset parameters of wlan_dfs and send abort
  * to F/W.
  * @dfs: Pointer to struct wlan_dfs.
@@ -503,9 +560,11 @@ static void dfs_agile_state_running_entry(void *ctx)
 
 	dfs_agile_set_curr_state(dfs_soc, DFS_AGILE_S_RUNNING);
 
+	qdf_mem_zero(&dfs->adfs_completion_status, sizeof(struct adfs_completion_params));
+
 	/* RCAC */
 	if (dfs_is_agile_rcac_enabled(dfs)) {
-		dfs_start_agile_rcac_timer(dfs);
+		dfs_soc->ocac_status = OCAC_RESET;
 		dfs_start_agile_engine(dfs);
 	}
 }
@@ -580,15 +639,38 @@ static bool dfs_agile_state_running_event(void *ctx,
 		status = true;
 		break;
 	case DFS_AGILE_SM_EV_AGILE_STOP:
-		if (dfs_is_rcac_domain(dfs))
+		if (dfs_is_agile_rcac_enabled(dfs))
 			dfs_abort_agile_rcac(dfs);
-		else if (dfs_is_precac_domain(dfs))
+		else if (dfs_is_agile_precac_enabled(dfs))
 			dfs_abort_agile_precac(dfs);
 
 		dfs_agile_sm_transition_to(dfs_soc, DFS_AGILE_S_INIT);
 		status = true;
 		break;
 	case DFS_AGILE_SM_EV_AGILE_DONE:
+		/* When the FW sends a delayed OCAC completion status, Host
+		 * might have changed the precac channel already before an
+		 * OCAC completion event is received. So the OCAC completion
+		 * status should be validated if it is on the currently
+		 * configured agile channel.
+		 */
+
+		/* Assume the previous agile channel was 64 (20Mhz) and
+		 * current agile channel is 100(20Mhz), if the event from the
+		 * FW is for previously configured agile channel 64(20Mhz)
+		 * then Host ignores the event.
+		 */
+		if (!dfs_is_ocac_complete_event_for_cur_agile_chan(dfs)) {
+			dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
+				  "OCAC completion event is received on a "
+				  "different channel %d %d that is not the "
+				  "current Agile channel %d",
+				  dfs->adfs_completion_status.center_freq1,
+				  dfs->adfs_completion_status.center_freq2,
+				  dfs->dfs_agile_precac_freq_mhz);
+			return true;
+		}
+
 		if (dfs_is_agile_precac_enabled(dfs)) {
 			if (dfs_soc->ocac_status == OCAC_SUCCESS) {
 				dfs_soc->ocac_status = OCAC_RESET;
@@ -636,8 +718,29 @@ static bool dfs_agile_state_running_event(void *ctx,
 					event_data);
 			}
 		} else if (dfs_is_agile_rcac_enabled(dfs)) {
-			dfs_agile_sm_transition_to(dfs_soc,
-						   DFS_AGILE_S_COMPLETE);
+			if (dfs_soc->ocac_status == OCAC_SUCCESS) {
+				dfs_agile_sm_transition_to(dfs_soc,
+						DFS_AGILE_S_COMPLETE);
+			} else if (dfs_soc->ocac_status == OCAC_CANCEL) {
+				/* OCAC completion with status OCAC_CANCEL
+				 * will be received from FW when rCAC channel
+				 * config fails. Handle this case by clearing
+				 * the status and restarting rCAC
+				 */
+				dfs_soc->ocac_status = OCAC_RESET;
+				dfs_stop_agile_rcac_timer(dfs);
+				dfs_agile_cleanup_rcac(dfs);
+				dfs_agile_sm_transition_to(dfs_soc,
+					DFS_AGILE_S_INIT);
+				dfs_agile_sm_deliver_event(dfs_soc,
+					DFS_AGILE_SM_EV_AGILE_START,
+					event_data_len,
+					event_data);
+			} else {
+				dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
+					  "Invalid OCAC completion status %d",
+					  dfs_soc->ocac_status);
+			}
 		}
 		status = true;
 		break;
@@ -912,6 +1015,12 @@ QDF_STATUS dfs_agile_sm_destroy(struct dfs_soc_priv_obj *dfs_soc_obj)
 #ifdef QCA_SUPPORT_ADFS_RCAC
 QDF_STATUS dfs_set_rcac_enable(struct wlan_dfs *dfs, bool rcac_en)
 {
+	if (!dfs_is_rcac_domain(dfs)) {
+		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			 "Rolling CAC: not supported in current DFS domain");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (rcac_en == dfs->dfs_agile_rcac_ucfg) {
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 			 "Rolling CAC: %d is already configured", rcac_en);
@@ -978,6 +1087,8 @@ dfs_rcac_timeout(qdf_hrtimer_data_t *arg)
 				   dfs_rcac_timer);
 	dfs = dfs_soc_obj->dfs_priv[dfs_soc_obj->cur_agile_dfs_index].dfs;
 
+	dfs_soc_obj->ocac_status = OCAC_SUCCESS;
+	dfs_fill_adfs_completion_params(dfs, OCAC_SUCCESS);
 	dfs_agile_sm_deliver_evt(dfs_soc_obj,
 				DFS_AGILE_SM_EV_AGILE_DONE,
 				0,
@@ -1064,6 +1175,7 @@ void dfs_punc_sm_stop(struct wlan_dfs *dfs,
 	dfs_punc_arr->punc_low_freq = 0;
 	dfs_punc_arr->punc_high_freq = 0;
 	dfs_cancel_punc_cac_timer(dfs_punc_arr);
+	dfs_punc_arr->dfs_is_unpunctured = true;
 	utils_dfs_puncturing_sm_deliver_evt(dfs->dfs_pdev_obj, indx, DFS_PUNC_SM_EV_STOP);
 }
 
@@ -1081,32 +1193,79 @@ bool is_punc_slot_empty(uint8_t indx, struct dfs_punc_unpunc *active_dfs_sm)
 static void
 dfs_process_punc_bitmap(struct wlan_dfs *dfs, uint16_t *punc_list, uint8_t n_punc_chans)
 {
-	uint8_t i = 0;
+	uint8_t i;
+	uint8_t indx;
 	struct dfs_punc_unpunc *active_dfs_sm = &dfs->dfs_punc_lst;
 	qdf_freq_t punc_low_freq = 0;
 	qdf_freq_t punc_high_freq = 0;
 
-	for (i = 0; i < n_punc_chans; i++) {
-		if (!is_punc_slot_empty(i, active_dfs_sm))
-			continue;
-
-		if (n_punc_chans == 1) {
-			punc_low_freq = punc_list[0] - 10;
-			punc_high_freq = punc_list[0] + 10;
-		} else if (n_punc_chans == 2) {
-			punc_low_freq = punc_list[0] - 10;
-			punc_high_freq = punc_list[1] + 10;
+	indx = 0;
+	for (i = 0; i < N_MAX_PUNC_SM; i++) {
+		if (is_punc_slot_empty(i, active_dfs_sm)) {
+			indx = i;
+			break;
 		}
-		active_dfs_sm->dfs_punc_arr[i].punc_low_freq = punc_low_freq;
-		active_dfs_sm->dfs_punc_arr[i].punc_high_freq = punc_high_freq;
-		dfs_debug(dfs, WLAN_DEBUG_DFS_PUNCTURING,
-			  "Lower frequency of SM %d = %d\n Higher frequency of SM %d = %d\n",
-			  i, active_dfs_sm->dfs_punc_arr[i].punc_low_freq, i,
-			  active_dfs_sm->dfs_punc_arr[i].punc_high_freq);
 	}
+
+	if (n_punc_chans == 1) {
+		punc_low_freq = punc_list[0] - 10;
+		punc_high_freq = punc_list[0] + 10;
+	} else if (n_punc_chans == 2) {
+		punc_low_freq = punc_list[0] - 10;
+		punc_high_freq = punc_list[1] + 10;
+	}
+	active_dfs_sm->dfs_punc_arr[indx].punc_low_freq = punc_low_freq;
+	active_dfs_sm->dfs_punc_arr[indx].punc_high_freq = punc_high_freq;
+	active_dfs_sm->dfs_punc_arr[indx].dfs_is_unpunctured = false;
+	dfs_debug(dfs, WLAN_DEBUG_DFS_PUNCTURING,
+		  "Lower frequency of SM %d = %d\n Higher frequency of SM %d = %d\n",
+		  indx, active_dfs_sm->dfs_punc_arr[indx].punc_low_freq, indx,
+		  active_dfs_sm->dfs_punc_arr[indx].punc_high_freq);
 }
 
-static inline uint8_t
+/**
+ * dfs_remove_static_punc_bitmap_for_320bw - Remove the 80BW puncture bitmap
+ * for 320 BW case. This is used to generate puncture channel list after
+ * radar event is received.
+ * @dfs_curr_radar_bitmap: Puncture bitmap generated by radar.
+ * @ch_width:              Current channel width.
+ *
+ * Return: Puncture radar bitmap.
+ */
+static uint16_t
+dfs_remove_static_punc_bitmap_for_320bw(uint16_t dfs_curr_radar_bitmap,
+					enum phy_ch_width ch_width)
+{
+	uint16_t left_punc = 0x000F;
+	uint16_t right_punc = 0xF000;
+	uint8_t no_of_bits = 16;
+	uint16_t msb = 1 << (no_of_bits - 1);
+	uint16_t temp;
+
+	if (ch_width == CH_WIDTH_320MHZ) {
+		temp = dfs_curr_radar_bitmap & msb;
+		/* Left side punctured */
+		if (temp == 0)
+			dfs_curr_radar_bitmap ^= left_punc;
+		/* Right side punctured */
+		else if (temp == 0x8000)
+			dfs_curr_radar_bitmap ^= right_punc;
+	}
+
+	return dfs_curr_radar_bitmap;
+}
+
+/**
+ * dfs_generate_punc_chan_list - Generate puncture channel list based
+ * on current radar bitmap.
+ * @dfs:                   structure to wlan_dfs.
+ * @ch_width:              Current channel width.
+ * @dfs_curr_radar_bitmap: Puncture bitmap generated by radar.
+ * @punc_list:             Pointer to puncture channel list.
+ *
+ * Return: No of punctured channels.
+ */
+static uint8_t
 dfs_generate_punc_chan_list(struct wlan_dfs *dfs,
 			    enum phy_ch_width ch_width,
 			    uint16_t dfs_curr_radar_bitmap,
@@ -1121,15 +1280,6 @@ dfs_generate_punc_chan_list(struct wlan_dfs *dfs,
 	    dfs_get_bonding_channel_without_seg_info_for_freq(dfs->dfs_curchan,
 							      cur_freq_list);
 
-	if (ch_width == CH_WIDTH_320MHZ) {
-	    /* Left side punctured */
-		if (dfs_curr_radar_bitmap & 0x000F)
-			dfs_curr_radar_bitmap ^= (uint16_t)(0x000F);
-		/* Right side punctured */
-		else if (dfs_curr_radar_bitmap & 0xF000)
-			dfs_curr_radar_bitmap ^= (uint16_t)(0xF000);
-	}
-
 	while (dfs_curr_radar_bitmap) {
 		if (dfs_curr_radar_bitmap & 1) {
 			punc_list[punc_indx] = cur_freq_list[i];
@@ -1139,7 +1289,51 @@ dfs_generate_punc_chan_list(struct wlan_dfs *dfs,
 		dfs_curr_radar_bitmap >>= 1;
 	}
 
+	if (!punc_indx)
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS, "No puncture channels");
+
 	return punc_indx;
+}
+
+/**
+ * dfs_generate_punc_chan_list - Generate puncture channel list based
+ * on current radar bitmap during VDEV restart.
+ * @dfs:                   structure to wlan_dfs.
+ * @ch_width:              Current channel width.
+ * @dfs_curr_radar_bitmap: Puncture bitmap generated by radar.
+ * @punc_list:             Pointer to puncture channel list.
+ *
+ * Return: No of punctured channels.
+ */
+static uint8_t
+dfs_generate_punc_chan_list_on_radar_event(struct wlan_dfs *dfs,
+					   enum phy_ch_width ch_width,
+					   uint16_t dfs_curr_radar_bitmap,
+					   uint16_t *punc_list)
+{
+	uint8_t punc_indx;
+
+	dfs_curr_radar_bitmap =
+		dfs_remove_static_punc_bitmap_for_320bw(dfs_curr_radar_bitmap,
+							ch_width);
+
+	punc_indx = dfs_generate_punc_chan_list(dfs,
+						ch_width,
+						dfs_curr_radar_bitmap,
+						punc_list);
+	return punc_indx;
+}
+
+void dfs_punc_sm_stop_all(struct wlan_dfs *dfs)
+{
+	uint8_t i;
+
+	for (i = 0 ; i < N_MAX_PUNC_SM; i++) {
+		struct dfs_punc_obj *dfs_punc_obj =
+		    &dfs->dfs_punc_lst.dfs_punc_arr[i];
+
+		dfs_punc_sm_stop(dfs, i, dfs_punc_obj);
+	}
 }
 
 void dfs_handle_radar_puncturing(struct wlan_dfs *dfs,
@@ -1155,6 +1349,10 @@ void dfs_handle_radar_puncturing(struct wlan_dfs *dfs,
 	dfs_curr_radar_bitmap = dfs_generate_radar_bitmap(dfs,
 							  freq_list,
 							  num_channels);
+
+	if (!dfs_curr_radar_bitmap)
+		return;
+
 	/* Check if the radar infected channels are already punctured by the
 	 * HOST. If already punctured by host then no need to add them to NOL
 	 * and no need to puncture them again.
@@ -1176,15 +1374,21 @@ void dfs_handle_radar_puncturing(struct wlan_dfs *dfs,
 
 	if (*dfs_radar_bitmap) {
 		uint8_t n_punc_chans;
-		uint16_t punc_list[MAX_20MHZ_SUBCHANS] = {0};
+		uint16_t punc_list[N_MAX_PUNC_SM] = {0};
 		/* We get the nearest pattern because, in case of 240 MHz, even
 		 * for a single 20 MHz  NOL we want to add a 40 MHz punct object
 		 */
 		dfs_curr_radar_bitmap =
 		    wlan_reg_find_nearest_puncture_pattern(ch_width,
 							   dfs_curr_radar_bitmap);
-		dfs->dfs_curchan->dfs_internal_radar_pattern = dfs_curr_radar_bitmap;
-		n_punc_chans = dfs_generate_punc_chan_list(dfs, ch_width, dfs_curr_radar_bitmap, punc_list);
+		n_punc_chans =
+		    dfs_generate_punc_chan_list(dfs,
+						ch_width,
+						dfs_curr_radar_bitmap,
+						punc_list);
+
+		if (!n_punc_chans)
+			return;
 
 		/* Init the puncture objects according to dfs_cur_radar_bitmap */
 		dfs_process_punc_bitmap(dfs, punc_list, n_punc_chans);
@@ -1194,18 +1398,24 @@ void dfs_handle_radar_puncturing(struct wlan_dfs *dfs,
 void dfs_handle_nol_puncture(struct wlan_dfs *dfs, qdf_freq_t nolfreq)
 {
 	uint8_t i;
-	uint8_t indx = 0;
+	int8_t indx = -1;
 
 	for (i = 0; i < N_MAX_PUNC_SM; i++) {
+		if (is_punc_slot_empty(i, &dfs->dfs_punc_lst))
+			continue;
+
 		if ((dfs->dfs_punc_lst.dfs_punc_arr[i].punc_low_freq < nolfreq) &&
 		    (nolfreq  < dfs->dfs_punc_lst.dfs_punc_arr[i].punc_high_freq)) {
 			indx = i;
 			break;
 		}
 	}
-	utils_dfs_puncturing_sm_deliver_evt(dfs->dfs_pdev_obj,
-					    indx,
-					    DFS_PUNC_SM_EV_NOL_EXPIRY);
+
+	if (indx != -1) {
+		utils_dfs_puncturing_sm_deliver_evt(dfs->dfs_pdev_obj,
+						    indx,
+						    DFS_PUNC_SM_EV_NOL_EXPIRY);
+	}
 }
 
 static inline
@@ -1220,7 +1430,7 @@ static inline
 bool is_found_in_cur_chan_punc_list(struct wlan_dfs *dfs,
 				    struct dfs_punc_obj *dfs_punc_arr,
 				    uint8_t n_punc_chans,
-				    qdf_freq_t dfs_curchan_punc_freq)
+				    uint16_t *dfs_curchan_punc_list)
 {
 	bool is_found = false;
 	uint8_t i;
@@ -1230,22 +1440,23 @@ bool is_found_in_cur_chan_punc_list(struct wlan_dfs *dfs,
 		qdf_freq_t punc_high_freq = dfs_punc_arr->punc_high_freq;
 
 		if (!punc_low_freq || !punc_high_freq) {
-		    dfs_info(dfs, WLAN_DEBUG_DFS_PUNCTURING, "low: %d, high: %d punc freqs", punc_low_freq, punc_high_freq);
+		    dfs_info(dfs, WLAN_DEBUG_DFS_PUNCTURING,
+			     "low: %d, high: %d punc freqs", punc_low_freq, punc_high_freq);
 		    return false;
 		}
 
 		/* If the puncture channel is non-dfs , Skip the channel. */
-		if (!wlan_reg_is_dfs_for_freq(dfs->dfs_pdev_obj, dfs_curchan_punc_freq)) {
+		if (!wlan_reg_is_dfs_for_freq(dfs->dfs_pdev_obj, dfs_curchan_punc_list[i])) {
 			dfs_info(dfs, WLAN_DEBUG_DFS, "ch=%d is not dfs, skip",
-				 dfs_curchan_punc_freq);
+				 dfs_curchan_punc_list[i]);
 			continue;
 		}
 
 		/* If current dfs channel is part of puncture channel list,
 		 * Send the chan is found in current puncture channel list.
 		 */
-		if (dfs_curchan_punc_freq > punc_low_freq ||
-		    dfs_curchan_punc_freq < punc_high_freq) {
+		if (dfs_curchan_punc_list[i] > punc_low_freq &&
+		    dfs_curchan_punc_list[i] < punc_high_freq) {
 			is_found = true;
 			break;
 		}
@@ -1261,32 +1472,71 @@ void dfs_handle_dfs_puncture_unpuncture(struct wlan_dfs *dfs)
 	uint16_t dfs_curchan_punc_list[MAX_20MHZ_SUBCHANS] = {0};
 	enum phy_ch_width ch_width;
 	uint16_t bw;
-	uint8_t i;
+	uint8_t i = 0;
 
 	bw = dfs_chan_to_ch_width(dfs->dfs_curchan);
 	ch_width = wlan_reg_find_chwidth_from_bw(bw);
 
-	n_punc_chans = dfs_generate_punc_chan_list(dfs,
-						   ch_width,
-						   dfs_punc_radar_bitmap,
-						   dfs_curchan_punc_list);
+	/* dfs_generate_punc_chan_list_on_radar_event is called to generate
+	 * the punctured channel list during VDEV restart. This is different
+	 * from dfs_generate_punc_chan_list because for 320BW case, the
+	 * radar bitmap is not yet calculated and we have to take care of the
+	 * one 80 BW segment which will be always punctured.
+	 */
+	n_punc_chans = dfs_generate_punc_chan_list_on_radar_event(dfs,
+								  ch_width,
+								  dfs_punc_radar_bitmap,
+								  dfs_curchan_punc_list);
+	/* if there is no puncture bitmap or number of punctured channel is
+	 * zero, then stop the puncture SM. This case happens when the current
+	 * channel receives an invalid puncture pattern, (eg three radar case)
+	 * AP moves to another channel. But the SMs already started running,
+	 * so in VDEV start, we check if there is no puncture bitmap or
+	 * punctured channels for the current channel, then send STOP event
+	 * for all the puncture SM.
+	 */
+	if (!dfs_punc_radar_bitmap || !n_punc_chans) {
+		struct dfs_punc_obj *dfs_punc_obj = &dfs->dfs_punc_lst.dfs_punc_arr[i];
+
+		for (i = 0 ; i < N_MAX_PUNC_SM; i++) {
+		    dfs_punc_sm_stop(dfs, i, dfs_punc_obj);
+		}
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS, "No radar puncturing found");
+		return;
+	}
 
 	if (n_punc_chans > N_MAX_PUNC_SM) {
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "Invalid punc pattern");
 		return;
 	}
 
-	for (i = 0 ; i < n_punc_chans; i++) {
+	for (i = 0 ; i < N_MAX_PUNC_SM; i++) {
 		bool is_found = false;
 		struct dfs_punc_obj *dfs_punc_obj = &dfs->dfs_punc_lst.dfs_punc_arr[i];
 
 		if (is_punc_obj_empty(dfs_punc_obj))
 			continue;
 
+		/* dfs_is_unpunctured should be checked before slot empty check.
+		 * In two radar puncture case, after unpuncturing the first
+		 * puncture channel, the first puncture SM becomes empty.
+		 * So if we check the slot empty first, it skips the first
+		 * punc SM and checks if the second SM is unpunctured or not.
+		 * since the second SM is punctured, the dfs_is_unpunctured
+		 * check fails, we unnecessarily send a radar event to second
+		 * puncture SM.
+		 */
+		if (dfs_punc_obj->dfs_is_unpunctured)
+			return;
+
+		if (is_punc_slot_empty(i, &dfs->dfs_punc_lst)) {
+			continue;
+		}
+
 		is_found = is_found_in_cur_chan_punc_list(dfs,
 							  dfs_punc_obj,
 							  n_punc_chans,
-							  dfs_curchan_punc_list[i]);
+							  dfs_curchan_punc_list);
 
 		if (is_found) {
 			utils_dfs_puncturing_sm_deliver_evt(dfs->dfs_pdev_obj,
@@ -1298,6 +1548,52 @@ void dfs_handle_dfs_puncture_unpuncture(struct wlan_dfs *dfs)
 	}
 }
 
+static uint8_t dfs_generate_punc_list_from_sm(struct dfs_punc_obj *dfs_punc,
+					      uint16_t *punc_lst_freq_list)
+{
+	qdf_freq_t punc_low_freq = dfs_punc->punc_low_freq;
+	qdf_freq_t punc_high_freq = dfs_punc->punc_high_freq;
+	qdf_freq_t punc_nol_freq = (punc_low_freq + punc_high_freq) / 2;
+	uint8_t n_punc_channels = 0;
+
+	if (punc_high_freq - punc_low_freq == 20) {
+		punc_lst_freq_list[0] = punc_nol_freq;
+		n_punc_channels = 1;
+	} else if (punc_high_freq - punc_low_freq == 40) {
+		punc_lst_freq_list[0] = punc_nol_freq - 10;
+		punc_lst_freq_list[1] = punc_nol_freq + 10;
+		n_punc_channels = 2;
+	}
+
+	return n_punc_channels;
+}
+
+static uint16_t dfs_generate_internal_radar_pattern(struct wlan_dfs *dfs)
+{
+	uint8_t i;
+	uint16_t punc_lst_freq_list[N_MAX_PUNC_SM] = {0};
+	uint16_t dfs_internal_radar_bitmap = 0;
+
+	for (i = 0; i < N_MAX_PUNC_SM; i++) {
+	    struct dfs_punc_obj *dfs_punc_obj = &dfs->dfs_punc_lst.dfs_punc_arr[i];
+	    uint16_t dfs_temp_radar_bitmap;
+	    uint8_t n_punc_channels;
+
+	    if (is_punc_obj_empty(dfs_punc_obj) ||
+		is_punc_slot_empty(i, &dfs->dfs_punc_lst))
+		continue;
+
+	    n_punc_channels =
+		dfs_generate_punc_list_from_sm(dfs_punc_obj, punc_lst_freq_list);
+	    dfs_temp_radar_bitmap = dfs_generate_radar_bitmap(dfs,
+							      punc_lst_freq_list,
+							      n_punc_channels);
+	    dfs_internal_radar_bitmap |= dfs_temp_radar_bitmap;
+	}
+
+	return dfs_internal_radar_bitmap;
+}
+
 bool dfs_is_ignore_radar_for_punctured_chans(struct wlan_dfs *dfs,
 					     uint16_t dfs_curr_radar_bitmap)
 {
@@ -1306,10 +1602,11 @@ bool dfs_is_ignore_radar_for_punctured_chans(struct wlan_dfs *dfs,
 	uint16_t bw;
 	enum phy_ch_width ch_width;
 	uint8_t n_punc_chans;
+	uint16_t internal_pattern = dfs_generate_internal_radar_pattern(dfs);
 	uint16_t punc_list[MAX_20MHZ_SUBCHANS] = {0};
 
-	if (dfs->dfs_curchan->dfs_internal_radar_pattern)
-		radar_punc_pattern =  dfs->dfs_curchan->dfs_internal_radar_pattern;
+	if (internal_pattern)
+		radar_punc_pattern = internal_pattern;
 
 	if (radar_punc_pattern) {
 		uint16_t intersect_radar_pattern;
@@ -1327,17 +1624,23 @@ bool dfs_is_ignore_radar_for_punctured_chans(struct wlan_dfs *dfs,
 							intersect_radar_pattern,
 							punc_list);
 
-			for (i = 0; i < n_punc_chans; i++) {
+			if (!n_punc_chans)
+				return false;
+
+			for (i = 0; i < N_MAX_PUNC_SM; i++) {
 				bool is_found = false;
 				struct dfs_punc_obj *dfs_punc_obj = &dfs->dfs_punc_lst.dfs_punc_arr[i];
 
 				if (is_punc_obj_empty(dfs_punc_obj))
 					continue;
+				if (is_punc_slot_empty(i, &dfs->dfs_punc_lst))
+				    continue;
+
 				is_found =
 				    is_found_in_cur_chan_punc_list(dfs,
 								   dfs_punc_obj,
 								   n_punc_chans,
-								   punc_list[i]);
+								   punc_list);
 
 				if (is_found) {
 					utils_dfs_puncturing_sm_deliver_evt(dfs->dfs_pdev_obj,
@@ -1550,7 +1853,6 @@ static bool dfs_puncturing_state_unpunctured_event(void *ctx,
 		break;
 	case DFS_PUNC_SM_EV_STOP:
 		dfs_debug(dfs, WLAN_DEBUG_DFS_PUNCTURING, "Punc sm stop triggered");
-		dfs_puncturing_sm_transition_to(dfs_punc, DFS_S_UNPUNCTURED);
 		status = true;
 		break;
 	default:
@@ -1595,10 +1897,10 @@ static bool dfs_is_weather_channel(struct dfs_punc_obj *dfs_punc_arr)
 	qdf_freq_t punc_high_freq = dfs_punc_arr->punc_high_freq;
 	qdf_freq_t punc_nol_freq = (punc_low_freq + punc_high_freq) / 2;
 
-	if (punc_high_freq - punc_low_freq == 20) {
+	if (punc_high_freq - punc_low_freq == DFS_CHWIDTH_20_VAL) {
 		if (DFS_IS_PUNC_CHAN_WEATHER_RADAR(punc_nol_freq))
 			return true;
-	} else if (punc_high_freq - punc_low_freq == 40) {
+	} else if (punc_high_freq - punc_low_freq == DFS_CHWIDTH_40_VAL) {
 		if (DFS_IS_PUNC_CHAN_OVERLAP_WEATHER_RADAR(punc_nol_freq))
 			return true;
 	}
@@ -1691,21 +1993,14 @@ uint16_t dfs_unpuncture_radar_bitmap(struct wlan_dfs *dfs,
 				     struct dfs_punc_obj *dfs_punc)
 {
 	uint8_t n_cur_channels;
-	uint16_t dfs_radar_bitmap = dfs->dfs_curchan->dfs_internal_radar_pattern;
+	uint16_t dfs_radar_bitmap = dfs_generate_internal_radar_pattern(dfs);
 	uint16_t bits = 0x1;
 	uint8_t i, j;
 	uint16_t cur_freq_list[MAX_20MHZ_SUBCHANS] = {0};
-	qdf_freq_t punc_low_freq = dfs_punc->punc_low_freq;
-	qdf_freq_t punc_high_freq = dfs_punc->punc_high_freq;
-	qdf_freq_t punc_nol_freq = (punc_low_freq + punc_high_freq) / 2;
 	uint16_t punc_lst_freq_list[N_MAX_PUNC_SM] = {0};
+	uint8_t n_punc_channels;
 
-	if (punc_high_freq - punc_low_freq == 20) {
-		punc_lst_freq_list[0] = punc_nol_freq;
-	} else if (punc_high_freq - punc_low_freq == 40) {
-		punc_lst_freq_list[0] = punc_nol_freq - 10;
-		punc_lst_freq_list[1] = punc_nol_freq + 10;
-	}
+	n_punc_channels = dfs_generate_punc_list_from_sm(dfs_punc, punc_lst_freq_list);
 
 	n_cur_channels =
 		dfs_get_bonding_channel_without_seg_info_for_freq(dfs->dfs_curchan,
@@ -1749,6 +2044,8 @@ static bool dfs_puncturing_state_cac_wait_event(void *ctx,
 	struct dfs_punc_obj *dfs_punc;
 	bool is_weather_chan = false;
 	uint16_t new_punc_pattern = 0x0;
+	uint16_t dfs_useronly_pattern;
+	uint16_t dfs_internal_pattern;
 
 	if (!event_data)
 		return false;
@@ -1766,15 +2063,18 @@ static bool dfs_puncturing_state_cac_wait_event(void *ctx,
 		break;
 	case DFS_PUNC_SM_EV_CAC_EXPIRY:
 		dfs_debug(dfs, WLAN_DEBUG_DFS_PUNCTURING, "CAC expiry received. Unpuncture the channe;");
-		new_punc_pattern =
-		    dfs->dfs_curchan->dfs_ch_punc_pattern ^
-		    dfs->dfs_curchan->dfs_internal_radar_pattern;
-		dfs->dfs_curchan->dfs_internal_radar_pattern =
-		    dfs_unpuncture_radar_bitmap(dfs, dfs_punc);
+		dfs_internal_pattern = dfs_generate_internal_radar_pattern(dfs);
+		dfs_useronly_pattern =
+		    dfs->dfs_curchan->dfs_ch_punc_pattern ^ dfs_internal_pattern;
+		dfs_internal_pattern = dfs_unpuncture_radar_bitmap(dfs, dfs_punc);
+		new_punc_pattern = dfs_useronly_pattern | dfs_internal_pattern;
 		dfs_puncturing_sm_transition_to(dfs_punc, DFS_S_UNPUNCTURED);
 		if (global_dfs_to_mlme.mlme_unpunc_chan_switch)
 			global_dfs_to_mlme.mlme_unpunc_chan_switch(dfs->dfs_pdev_obj,
 								   new_punc_pattern);
+		dfs_punc->punc_low_freq = 0;
+		dfs_punc->punc_high_freq = 0;
+		dfs_punc->dfs_is_unpunctured = true;
 		status = true;
 		break;
 	case DFS_PUNC_SM_EV_STOP:
@@ -1925,6 +2225,7 @@ QDF_STATUS dfs_punc_sm_create(struct dfs_punc_obj *dfs_punc)
 	dfs_punc->dfs_punc_sm_hdl = sm;
 	dfs_punc->punc_low_freq = 0;
 	dfs_punc->punc_high_freq = 0;
+	dfs_punc->dfs_is_unpunctured = true;
 
 	qdf_spinlock_create(&dfs_punc->dfs_punc_sm_lock);
 

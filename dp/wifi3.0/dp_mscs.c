@@ -42,9 +42,7 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 	uint8_t user_prio_bitmap;
 	uint8_t user_prio_limit;
 	uint8_t user_prio;
-	uint16_t peer_id;
 	int status = 0;
-	struct dp_ast_entry *ast_entry = NULL;
 	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
 
 	if (!dpsoc) {
@@ -53,22 +51,8 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 		return DP_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND;
 	}
 
-	/* Fetch ast_entry corresponding to src_mac_addr */
-	qdf_spin_lock_bh(&dpsoc->ast_lock);
-	ast_entry = dp_peer_ast_hash_find_soc(dpsoc, src_mac_addr);
-	if (!ast_entry) {
-		qdf_spin_unlock_bh(&dpsoc->ast_lock);
-		return DP_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND;
-	}
-
-	peer_id = ast_entry->peer_id;
-	qdf_spin_unlock_bh(&dpsoc->ast_lock);
-
-	/*
-	 * Find the MSCS peer from global soc
-	 */
-	src_peer = dp_peer_get_ref_by_id(dpsoc, peer_id, DP_MOD_ID_MSCS);
-
+	src_peer = dp_find_peer_by_macaddr(dpsoc, src_mac_addr, DP_VDEV_ALL,
+								DP_MOD_ID_MSCS);
 	if (!src_peer) {
 		dst_peer = dp_peer_find_hash_find(dpsoc, dst_mac_addr, 0,
 				DP_VDEV_ALL, DP_MOD_ID_MSCS);

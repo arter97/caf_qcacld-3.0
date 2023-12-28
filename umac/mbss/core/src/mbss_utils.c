@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -89,13 +90,13 @@ bool mbss_vdev_acs_in_progress(struct wlan_objmgr_vdev *vdev,
 				goto exit;
 			}
 		}
+	} else {
+		data = &mbss_ctx->mbss_acs.data[acs_src];
+		bitmap = data->vdevs_waiting_acs;
+		if (mbss_check_vdev_bit(vdev_id, bitmap))
+			status = true;
 	}
 
-	data = &mbss_ctx->mbss_acs.data[acs_src];
-	bitmap = data->vdevs_waiting_acs;
-
-	if (mbss_check_vdev_bit(vdev_id, bitmap))
-		status = true;
 exit:
 	mbss_unlock(mbss_ctx);
 err:
@@ -664,6 +665,37 @@ err:
 	status = QDF_STATUS_E_FAILURE;
 	return status;
 }
+
+QDF_STATUS
+mbss_start_bridge_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
+
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_start_bridge_vdevs_cb)
+		handler = ext_ops->mbss_start_bridge_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+
+err:
+	status = QDF_STATUS_E_FAILURE;
+	return status;
+}
 #endif
 
 QDF_STATUS wlan_mbss_sched_action_flush(struct scheduler_msg *msg)
@@ -704,6 +736,9 @@ wlan_mbss_sched_action(struct scheduler_msg *msg)
 		break;
 	case MBSS_SCHED_STA_VDEVS_START:
 		status = wlan_mbss_start_sta_vdevs(pdev, NULL);
+		break;
+	case MBSS_SCHED_BRIDGE_VDEVS_START:
+		status = wlan_mbss_start_bridge_vdevs(pdev, NULL);
 		break;
 	default:
 		mbss_err("Wrong action");

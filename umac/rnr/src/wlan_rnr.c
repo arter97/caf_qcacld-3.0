@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020,2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,11 +28,21 @@ uint8_t g_soc_id_map[MAX_6GHZ_SOCS] = {GLOBAL_SOC_SIZE, GLOBAL_SOC_SIZE, GLOBAL_
 
 void wlan_rnr_init_cnt(void)
 {
+	if (g_rnr_info.init_done)
+		return;
+
 	qdf_atomic_init(&(g_rnr_info.vdev_lower_band_cnt));
 	qdf_atomic_init(&(g_rnr_info.vdev_6ghz_band_cnt));
+	g_rnr_info.init_done = true;
 }
 
 qdf_export_symbol(wlan_rnr_init_cnt);
+
+void wlan_rnr_deinit_cnt(void)
+{
+	g_rnr_info.init_done = false;
+}
+qdf_export_symbol(wlan_rnr_deinit_cnt);
 
 void wlan_rnr_lower_band_vdev_inc(void)
 {

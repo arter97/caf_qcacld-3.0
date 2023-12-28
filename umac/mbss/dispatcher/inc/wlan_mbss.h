@@ -133,6 +133,8 @@ struct wlan_mbss_ext_cb {
 		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
 	void (*mbss_stop_standalone_ap_vdevs_cb)(
 		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_start_bridge_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
 #endif
 };
 
@@ -150,7 +152,8 @@ struct wlan_mbss_ops {
  * @MBSS_SCHED_PDEV_START: schedule AP/monitor VDEVs stop
  * @MBSS_SCHED_PDEV_STOP_START: schedule AP/monitor VDEVs stop start
  * @MBSS_SCHED_STA_VDEVS_STOP: schedule STA VDEVs stop
- * @MBSS_SCHED_STA_VDEVS_STOP_START: schedule STA VDEVs stop
+ * @MBSS_SCHED_STA_VDEVS_START: schedule STA VDEVs stop
+ * @MBSS_SCHED_BRIDGE_VDEVS_START: schedule BRIDGE VDEVs start
  */
 enum wlan_mbss_sched_actions {
 	MBSS_SCHED_PDEV_STOP = 0,
@@ -158,7 +161,8 @@ enum wlan_mbss_sched_actions {
 	MBSS_SCHED_PDEV_STOP_START = 2,
 	MBSS_SCHED_STA_VDEVS_STOP = 3,
 	MBSS_SCHED_STA_VDEVS_START = 4,
-	MBSS_SCHED_MAX = 5,
+	MBSS_SCHED_BRIDGE_VDEVS_START = 5,
+	MBSS_SCHED_MAX = 6,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -459,6 +463,16 @@ QDF_STATUS
 wlan_mbss_stop_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
 				   void *arg);
 #endif
+
+/* wlan_mbss_start_bridge_vdevs() - start all the bridge vdevs
+ *
+ * @pdev: pdev object
+ * @arg: argument to bridge vdev start function
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_start_bridge_vdevs(struct wlan_objmgr_pdev *pdev,
+				   void *arg);
 
 /* wlan_mbss_sched_action_flush() - flush callback to for scheduler mbss msg
  *

@@ -1947,6 +1947,23 @@ void dfs_unmark_precac_nol_for_freq(struct wlan_dfs *dfs, uint16_t chan_freq)
 		 chan_freq);
 }
 
+#define FIVEG_320_FREQ_START 5500
+#define FIVEG_320_FREQ_END   5720
+
+static bool
+dfs_is_subchan_within_precac_band(qdf_freq_t chan_center_freq,
+				  struct dfs_precac_entry *precac_entry)
+{
+	if (precac_entry->bw == BW_320) {
+		return (chan_center_freq >= FIVEG_320_FREQ_START) &&
+				(chan_center_freq <= FIVEG_320_FREQ_END);
+	} else {
+		return IS_WITHIN_RANGE(chan_center_freq,
+				       precac_entry->center_ch_freq,
+				       VHT160_FREQ_OFFSET);
+	}
+}
+
 #ifdef QCA_SUPPORT_ADFS_RCAC
 /**
  * dfs_unmark_rcac_done() - Unmark the CAC done channels from the RCAC list.
@@ -1989,11 +2006,14 @@ void dfs_unmark_rcac_done(struct wlan_dfs *dfs)
 				   &dfs->dfs_precac_list,
 				   pe_list,
 				   tmp_precac_entry) {
-			if (IS_WITHIN_RANGE(channels[i],
-					    precac_entry->center_ch_freq,
-					    VHT160_FREQ_OFFSET)) {
+
+			if (dfs_is_subchan_within_precac_band(channels[i],
+							      precac_entry)) {
 				dfs_unmark_tree_node_as_cac_done_for_freq
 					(precac_entry, channels[i]);
+				utils_dfs_deliver_event(dfs->dfs_pdev_obj, channels[i],
+							WLAN_EV_CAC_RESET);
+
 				break;
 			}
 		}

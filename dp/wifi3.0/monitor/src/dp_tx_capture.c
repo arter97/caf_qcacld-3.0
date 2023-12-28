@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -145,6 +145,59 @@
 				     WDI_NO_VAL,			\
 				     _pdev_id_);			\
 	}
+
+static char *ieee80211_frame_type_name[256];
+
+static void init_ieee80211_frame_type_name(void)
+{
+	int i;
+
+	for (i = 0; i < 256; i++)
+		ieee80211_frame_type_name[i] = "INVALID";
+
+	ieee80211_frame_type_name[0] = "Assoc-Req";
+	ieee80211_frame_type_name[0x10] = "Assoc-Resp";
+	ieee80211_frame_type_name[0x20] = "ReAssoc-Req";
+	ieee80211_frame_type_name[0x30] = "ReAssoc-Resp";
+	ieee80211_frame_type_name[0x40] = "Probe-Req";
+	ieee80211_frame_type_name[0x50] = "Probe-Resp";
+	ieee80211_frame_type_name[0x60] = "Timing-Adv";
+	ieee80211_frame_type_name[0x80] = "Beacon";
+	ieee80211_frame_type_name[0x90] = "ATIM";
+	ieee80211_frame_type_name[0xa0] = "Disassoc";
+	ieee80211_frame_type_name[0xb0] = "AUTH";
+	ieee80211_frame_type_name[0xc0] = "DeAuth";
+	ieee80211_frame_type_name[0xd0] = "Action";
+	ieee80211_frame_type_name[0xe0] = "Action-noACK";
+	ieee80211_frame_type_name[0x08] = "Data";
+	ieee80211_frame_type_name[0x18] = "Data+CF-ACK";
+	ieee80211_frame_type_name[0x28] = "Data+CF-Poll";
+	ieee80211_frame_type_name[0x38] = "Data+CF-ACK+CF-Poll ";
+	ieee80211_frame_type_name[0x48] = "Null";
+	ieee80211_frame_type_name[0x58] = "CF-ACK";
+	ieee80211_frame_type_name[0x68] = "CF-Poll";
+	ieee80211_frame_type_name[0x78] = "CF-ACK+CF-Poll";
+	ieee80211_frame_type_name[0x88] = "QoS Data";
+	ieee80211_frame_type_name[0x98] = "QoS Data+CF-CK ";
+	ieee80211_frame_type_name[0xa8] = "QoS Data+CF-Poll ";
+	ieee80211_frame_type_name[0xb8] = "QoS Data+CF-ACK+CF-Poll";
+	ieee80211_frame_type_name[0xc8] = "QoS Null";
+	ieee80211_frame_type_name[0xe8] = "Qos CF-Poll";
+	ieee80211_frame_type_name[0xf8] = "QoS CF-ACK+CF-Poll ";
+	ieee80211_frame_type_name[0x24] = "Trigger";
+	ieee80211_frame_type_name[0x44] = "BF Rep Poll";
+	ieee80211_frame_type_name[0x54] = "VHT NDPA";
+	ieee80211_frame_type_name[0x64] = "Ctrl Ext";
+	ieee80211_frame_type_name[0x74] = "Ctrl Wrap";
+	ieee80211_frame_type_name[0x84] = "BAR";
+	ieee80211_frame_type_name[0x94] = "BA";
+	ieee80211_frame_type_name[0xa4] = "PS-poll";
+	ieee80211_frame_type_name[0xb4] = "RTS";
+	ieee80211_frame_type_name[0xc4] = "CTS";
+	ieee80211_frame_type_name[0xd4] = "ACK";
+	ieee80211_frame_type_name[0xe4] = "CF-End";
+	ieee80211_frame_type_name[0xf4] = "CF-End+CF-ACK";
+}
 
 static inline bool dp_tx_capt_mem_check(struct dp_pdev *pdev, int buf_size)
 {
@@ -618,9 +671,12 @@ void dp_print_pdev_tx_capture_stats_1_0(struct dp_pdev *pdev)
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
 			if (ptr_tx_cap->ctl_mgmt_q[i][j].qlen)
-				DP_PRINT_STATS(" ctl_mgmt_q[%d][%d] = queue_len[%d]",
-					       i, j,
-					       ptr_tx_cap->ctl_mgmt_q[i][j].qlen);
+				DP_PRINT_STATS("ctl_mgmt_q[0x%x] (%s) = queue_len[%d]",
+					       (i << 2) | (j << 4),
+					       ieee80211_frame_type_name
+						[((i << 2) | (j << 4)) & 0xFF],
+					       ptr_tx_cap->
+							ctl_mgmt_q[i][j].qlen);
 		}
 	}
 	DP_PRINT_STATS(" mgmt control retry queue stats:");
@@ -844,6 +900,9 @@ void dp_peer_tid_queue_init(struct dp_peer *peer)
 	}
 
 	mon_peer->tx_capture.is_tid_initialized = 1;
+
+	dp_tx_capture_warn("peer id:%d TX capture data initialized",
+			   peer->peer_id);
 }
 
 /*
@@ -1094,6 +1153,8 @@ void dp_peer_tid_queue_cleanup(struct dp_peer *peer)
 	}
 
 	mon_peer->tx_capture.is_tid_initialized = 0;
+
+	dp_tx_capture_warn("peer id:%d TX capture data freed", peer->peer_id);
 }
 
 /*
@@ -1379,6 +1440,9 @@ bool dp_peer_tx_cap_search(struct dp_pdev *pdev,
 	uint8_t i = 0;
 	bool found = false;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+
+	if (qdf_unlikely(!mon_pdev))
+		return found;
 
 	tx_capture = &mon_pdev->tx_capture;
 
@@ -1678,6 +1742,7 @@ void dp_tx_ppdu_stats_attach_1_0(struct dp_pdev *pdev)
 
 	tx_capture = &mon_pdev->tx_capture;
 	ptr_log_info = &tx_capture->log_info;
+	init_ieee80211_frame_type_name();
 
 	/* Work queue setup for HTT stats and tx capture handling */
 	qdf_create_work(0, &mon_pdev->tx_capture.ppdu_stats_work,
@@ -1976,8 +2041,7 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if ((ts->tid >= DP_MAX_TIDS) ||
-	    (peer->bss_peer && ts->tid == DP_NON_QOS_TID)) {
+	if (ts->tid >= DP_MAX_TIDS) {
 		dp_tx_capture_err("%pK: peer_id %d, tid %d > NON_QOS_TID!",
 				  soc, ts->peer_id, ts->tid);
 		return QDF_STATUS_E_FAILURE;
@@ -2398,6 +2462,33 @@ dp_soc_is_tx_capture_set_in_pdev(struct dp_soc *soc)
 	return pdev_tx_capture;
 }
 
+/**
+ * dp_pdev_iterate_vdev_config_tx_ring_id() - API to set RBM ID during enqueue
+ * @pdev: DP_PDEV handle
+ * @rbm_override: flag to over ride RBM
+ *
+ * Return: void
+ */
+static void
+dp_pdev_iterate_vdev_config_tx_ring_id(struct dp_pdev *pdev,
+				       bool rbm_override)
+{
+	struct dp_vdev *vdev;
+	uint8_t rbm_id;
+
+	if (!pdev)
+		return;
+
+	rbm_id = wlan_cfg_get_tx_capt_rbm_id(pdev->soc->wlan_cfg_ctx,
+					     pdev->pdev_id);
+	qdf_spin_lock_bh(&pdev->vdev_list_lock);
+	DP_PDEV_ITERATE_VDEV_LIST(pdev, vdev) {
+		vdev->is_override_rbm_id = rbm_override;
+		vdev->rbm_id = rbm_id;
+	}
+	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
+}
+
 /*
  * dp_enh_tx_capture_disable()- API to disable enhanced tx capture
  * @pdev_handle: DP_PDEV handle
@@ -2414,8 +2505,10 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 	dp_peer_tx_cap_del_all_filter(pdev);
 	mon_pdev->tx_capture_enabled = CDP_TX_ENH_CAPTURE_DISABLED;
 
-	if (!dp_soc_is_tx_capture_set_in_pdev(pdev->soc))
+	if (!dp_soc_is_tx_capture_set_in_pdev(pdev->soc)) {
 		dp_soc_set_txrx_ring_map(pdev->soc);
+		dp_tx_capture_warn("stop single ring");
+	}
 
 	dp_h2t_cfg_stats_msg_send(pdev,
 				  DP_PPDU_STATS_CFG_ENH_STATS,
@@ -2423,6 +2516,8 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 
 	dp_pdev_iterate_peer(pdev, dp_peer_free_msdu_q, NULL,
 			     DP_MOD_ID_TX_CAPTURE);
+
+	dp_pdev_iterate_vdev_config_tx_ring_id(pdev, false);
 
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
@@ -2475,13 +2570,17 @@ dp_enh_tx_capture_enable(struct dp_pdev *pdev, uint8_t user_mode)
 	dp_pdev_iterate_peer(pdev, dp_peer_init_msdu_q, NULL,
 			     DP_MOD_ID_TX_CAPTURE);
 
-	if (!dp_soc_is_tx_capture_set_in_pdev(pdev->soc))
+	if (!dp_soc_is_tx_capture_set_in_pdev(pdev->soc)) {
 		dp_soc_set_txrx_ring_map_single(pdev->soc);
+		dp_tx_capture_warn("Single ring mode started");
+	}
 
 	if (!mon_pdev->pktlog_ppdu_stats)
 		dp_h2t_cfg_stats_msg_send(pdev,
 					  DP_PPDU_STATS_CFG_SNIFFER,
 					  pdev->pdev_id);
+
+	dp_pdev_iterate_vdev_config_tx_ring_id(pdev, true);
 
 	mon_pdev->tx_capture.msdu_threshold_drop = 0;
 	mon_pdev->tx_capture_enabled = user_mode;
@@ -2673,8 +2772,7 @@ void dp_peer_tx_wds_addr_add(struct dp_peer *peer, uint8_t *addr4_mac_addr)
  * @peer: Datapath peer
  * @data: ppdu_descriptor
  * @nbuf: 802.11 frame
- * @ether_type: ethernet type
- * @dst_addr: ether destination address
+ * @eh: Pointer to ethernet header
  * @usr_idx: user index
  * @is_amsdu: amsdu flag
  *
@@ -2684,8 +2782,7 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 					   struct dp_peer *peer,
 					   void *data,
 					   qdf_nbuf_t nbuf,
-					   uint16_t ether_type,
-					   uint8_t *dst_addr,
+					   qdf_ether_header_t *eh,
 					   uint8_t usr_idx,
 					   bool is_amsdu)
 {
@@ -2693,9 +2790,10 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 	struct cdp_tx_completion_ppdu_user *user;
 	uint32_t mpdu_buf_len, frame_size;
 	uint8_t *ptr_hdr;
-	uint16_t eth_type = qdf_htons(ether_type);
+	uint16_t eth_type = qdf_htons(eh->ether_type);
 	struct ieee80211_qosframe_addr4 *ptr_wh;
 	struct dp_mon_peer *mon_peer = peer->monitor_peer;
+	uint8_t *dst_addr = eh->ether_dhost;
 
 	ppdu_desc = (struct cdp_tx_completion_ppdu *)data;
 	user = &ppdu_desc->user[usr_idx];
@@ -2753,6 +2851,9 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 	ptr_hdr = (void *)qdf_nbuf_data(nbuf);
 	qdf_mem_copy(ptr_hdr, ptr_wh, frame_size);
 
+	ptr_wh = (struct ieee80211_qosframe_addr4 *)ptr_hdr;
+	qdf_mem_copy(ptr_wh->i_addr1, dst_addr, QDF_MAC_ADDR_SIZE);
+
 	ptr_hdr = ptr_hdr + frame_size;
 
 	/* update LLC */
@@ -2777,8 +2878,7 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
  * @peer: Datapath peer
  * @data: ppdu_descriptor
  * @nbuf: 802.11 frame
- * @ether_type: ethernet type
- * @src_addr: ether shost address
+ * @eh: Pointer to ethernet header
  * @usr_idx: user index
  * @is_amsdu: amsdu flag
  *
@@ -2788,8 +2888,7 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 				       struct dp_peer *peer,
 				       void *data,
 				       qdf_nbuf_t nbuf,
-				       uint16_t ether_type,
-				       uint8_t *src_addr,
+				       qdf_ether_header_t *eh,
 				       uint8_t usr_idx,
 				       bool is_amsdu)
 {
@@ -2797,7 +2896,9 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 	struct cdp_tx_completion_ppdu_user *user;
 	uint32_t mpdu_buf_len, frame_size;
 	uint8_t *ptr_hdr;
-	uint16_t eth_type = qdf_htons(ether_type);
+	uint16_t eth_type = qdf_htons(eh->ether_type);
+	uint8_t *src_addr = eh->ether_shost;
+	uint8_t *dst_addr = eh->ether_dhost;
 
 	struct ieee80211_qosframe *ptr_wh;
 	struct dp_mon_peer *mon_peer = peer->monitor_peer;
@@ -2855,6 +2956,9 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 
 	ptr_hdr = (void *)qdf_nbuf_data(nbuf);
 	qdf_mem_copy(ptr_hdr, ptr_wh, frame_size);
+
+	ptr_wh = (struct ieee80211_qosframe *)ptr_hdr;
+	qdf_mem_copy(ptr_wh->i_addr1, dst_addr, QDF_MAC_ADDR_SIZE);
 
 	if (!is_amsdu) {
 		ptr_hdr = ptr_hdr + frame_size;
@@ -3078,15 +3182,13 @@ dp_tx_mon_restitch_mpdu(struct dp_pdev *pdev, struct dp_peer *peer,
 			      IEEE80211_FC1_DIR_FROMDS)) {
 				dp_tx_update_80211_wds_hdr(pdev, peer,
 							   ppdu_desc, mpdu_nbuf,
-							   ether_type,
-							   eh->ether_dhost,
+							   eh,
 							   usr_idx,
 							   is_amsdu);
 			} else {
 				dp_tx_update_80211_hdr(pdev, peer,
 						       ppdu_desc, mpdu_nbuf,
-						       ether_type,
-						       eh->ether_shost,
+						       eh,
 						       usr_idx,
 						       is_amsdu);
 			}
@@ -3171,36 +3273,40 @@ free_ppdu_desc_mpdu_q:
  * return: status
  */
 static
-uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
-			    uint16_t tid, uint32_t num_msdu,
-			    qdf_nbuf_queue_t *head,
-			    qdf_nbuf_queue_t *head_xretries,
-			    uint32_t start_tsf, uint32_t end_tsf)
+QDF_STATUS dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
+			      uint16_t tid, uint32_t num_msdu,
+			      qdf_nbuf_queue_t *head,
+			      qdf_nbuf_queue_t *head_xretries,
+			      uint32_t start_tsf, uint32_t end_tsf)
 {
 	struct dp_tx_tid *tx_tid  = NULL;
 	uint32_t msdu_ppdu_id;
 	qdf_nbuf_t curr_msdu = NULL;
 	struct msdu_completion_info *ptr_msdu_info = NULL;
 	uint32_t wbm_tsf = 0xffff;
-	uint32_t matched = 0;
+	QDF_STATUS matched = QDF_STATUS_E_AGAIN;
 	qdf_nbuf_queue_t temp_defer_q;
 	struct dp_soc *soc = NULL;
 	struct dp_mon_soc *mon_soc = NULL;
+	bool is_mcast = false;
 
 	if (qdf_unlikely(!peer))
-		return 0;
+		return QDF_STATUS_E_INVAL;
+
+	if (peer->bss_peer && tid == DP_NON_QOS_TID)
+		is_mcast = true;
 
 	/* Non-QOS frames are being indicated with TID 0
 	 * in WBM completion path, an hence we should
 	 * TID 0 to reap MSDUs from completion path
 	 */
-	if (qdf_unlikely(tid == DP_NON_QOS_TID))
+	if (qdf_unlikely(tid == DP_NON_QOS_TID) && !is_mcast)
 		tid = 0;
 
 	tx_tid = &peer->monitor_peer->tx_capture.tx_tid[tid];
 
 	if (qdf_unlikely(!tx_tid))
-		return 0;
+		return QDF_STATUS_E_INVAL;
 
 	soc = peer->vdev->pdev->soc;
 	mon_soc = soc->monitor_soc;
@@ -3230,14 +3336,14 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 	if (qdf_nbuf_is_queue_empty(&tx_tid->defer_msdu_q)) {
 		/* release lock here */
 		qdf_spin_unlock_bh(&tx_tid->tid_lock);
-		return 0;
+		return QDF_STATUS_E_AGAIN;
 	}
 
 	curr_msdu = qdf_nbuf_queue_first(&tx_tid->defer_msdu_q);
 
 	while (curr_msdu) {
 		if (qdf_nbuf_queue_len(head) == num_msdu) {
-			matched = 1;
+			matched = QDF_STATUS_SUCCESS;
 			break;
 		}
 
@@ -3267,7 +3373,7 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 			/* PPDU being matched is older than MSDU at head of
 			 * completion queue. Return matched=1 to skip PPDU
 			 */
-			matched = 1;
+			matched = QDF_STATUS_SUCCESS;
 			break;
 		}
 
@@ -5856,8 +5962,7 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 	struct dp_peer *peer = NULL;
 	qdf_nbuf_queue_t head_msdu;
 	qdf_nbuf_queue_t head_xretries;
-	uint32_t retries = 0;
-	uint32_t ret = 0;
+	QDF_STATUS ret = 0;
 	uint32_t start_tsf = 0;
 	uint32_t end_tsf = 0;
 	uint32_t bar_start_tsf = 0;
@@ -5928,6 +6033,8 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 		for (usr_idx = 0; usr_idx < num_users;
 		     usr_idx++) {
 			uint32_t ppdu_id;
+			bool is_mcast = false;
+			uint32_t retries = 0;
 
 			peer = NULL;
 			user = &ppdu_desc->user[usr_idx];
@@ -5939,6 +6046,7 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 				goto free_nbuf_dec_ref;
 			}
 
+			is_mcast = user->is_mcast;
 			peer_id = user->peer_id;
 			peer = DP_TX_PEER_GET_REF(pdev, peer_id);
 
@@ -5959,10 +6067,10 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 			 * feature is enabled for this peer
 			 * or globally for all peers
 			 */
-			if (peer->bss_peer ||
+			if ((peer->bss_peer && !is_mcast) ||
 			    !(mon_peer->tx_capture.is_tid_initialized) ||
 			    !dp_peer_or_pdev_tx_cap_enabled(pdev,
-				peer, peer->mac_addr.raw) || user->is_mcast) {
+				peer, peer->mac_addr.raw)) {
 				user->skip = 1;
 				goto free_nbuf_dec_ref;
 			}
@@ -6011,7 +6119,8 @@ dequeue_msdu_again:
 						 start_tsf,
 						 end_tsf);
 
-			if (!ret && (++retries < 2)) {
+			if ((QDF_STATUS_E_AGAIN == ret) &&
+			    (++retries < 2)) {
 				/* wait for wbm to complete */
 				qdf_mdelay(2);
 				goto dequeue_msdu_again;
@@ -6451,6 +6560,9 @@ void dp_tx_ppdu_stats_process(void *context)
 
 				continue;
 			} else {
+				struct cdp_tx_completion_ppdu *ppdu_desc = NULL;
+				ppdu_desc = (struct cdp_tx_completion_ppdu *)qdf_nbuf_data(nbuf_ppdu);
+
 				tx_cap_debugfs_log_ppdu_desc(pdev, nbuf_ppdu);
 
 				/* process ppdu_info on tx capture turned on */
@@ -7379,7 +7491,7 @@ dp_peer_set_tx_capture_enabled_1_0(struct dp_pdev *pdev,
 void dp_peer_tx_capture_filter_check_1_0(struct dp_pdev *pdev,
 					 struct dp_peer *peer)
 {
-	if (!peer || !peer->monitor_peer)
+	if (!peer || !peer->monitor_peer || !pdev->monitor_pdev)
 		return;
 
 	if (dp_peer_tx_cap_search(pdev, peer->peer_id,

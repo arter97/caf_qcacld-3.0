@@ -662,6 +662,11 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 			STATS_ERR("failed to put serviceid\n");
 			return -EIO;
 		}
+		if (nla_put_u8(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_PEER_TYPE,
+			       cmd->peer_type)) {
+			STATS_ERR("failed to put p_link_peer flag\n");
+			return -EIO;
+		}
 	}
 
 	return ret;
@@ -856,6 +861,10 @@ static void parse_basic_vap(struct nlattr *rattr, struct stats_obj *obj)
 		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX],
 				(void **)&ctrl->rx,
 				sizeof(struct basic_vdev_ctrl_rx));
+
+		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK],
+				(void **)&ctrl->link,
+				sizeof(struct basic_vdev_ctrl_link));
 
 		obj->stats = ctrl;
 		break;
@@ -1137,6 +1146,10 @@ static void parse_advance_vap(struct nlattr *rattr, struct stats_obj *obj)
 		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX],
 				(void **)&ctrl->rx,
 				sizeof(struct advance_vdev_ctrl_rx));
+
+		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK],
+				(void **)&ctrl->link,
+				sizeof(struct advance_vdev_ctrl_link));
 
 		obj->stats = ctrl;
 		break;
@@ -1751,6 +1764,10 @@ static void parse_debug_vap(struct nlattr *rattr, struct stats_obj *obj)
 				(void **)&ctrl->wmi,
 				sizeof(struct debug_vdev_ctrl_wmi));
 
+		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK],
+				(void **)&ctrl->link,
+				sizeof(struct debug_vdev_ctrl_link));
+
 		obj->stats = ctrl;
 		break;
 	}
@@ -2305,6 +2322,7 @@ static int32_t build_child_vap_list(struct interface_list *if_list,
 						    ifname, (char *)&buffer,
 						    buffer.length);
 
+		strlcpy(mld_intf, (char *)buffer.data, IFNAME_LEN);
 		if (mld_intf[0] && is_interface_active(mld_intf, STATS_OBJ_VAP)) {
 			temp_obj->is_mld_slave = true;
 			strlcpy(temp_obj->mld_ifname, mld_intf, IFNAME_LEN);
@@ -2747,6 +2765,7 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	memcpy(&cmd, user_cmd, sizeof(struct stats_command));
 	cmd.recursive = user_cmd->recursive;
 	cmd.mld_link = user_cmd->mld_link;
+	cmd.peer_type = user_cmd->peer_type;
 	memset(&buffer, 0, sizeof(struct cfg80211_data));
 	buffer.data = &cmd;
 	buffer.length = sizeof(struct stats_command);
@@ -2917,6 +2936,8 @@ static void free_basic_vap(struct stats_obj *vap)
 				free(ctrl->tx);
 			if (ctrl->rx)
 				free(ctrl->rx);
+			if (ctrl->link)
+				free(ctrl->link);
 		}
 		break;
 	default:
@@ -3109,6 +3130,8 @@ static void free_advance_vap(struct stats_obj *vap)
 				free(ctrl->tx);
 			if (ctrl->rx)
 				free(ctrl->rx);
+			if (ctrl->link)
+				free(ctrl->link);
 		}
 		break;
 	default:
@@ -3292,6 +3315,8 @@ static void free_debug_vap(struct stats_obj *vap)
 				free(ctrl->rx);
 			if (ctrl->wmi)
 				free(ctrl->wmi);
+			if (ctrl->link)
+				free(ctrl->link);
 		}
 		break;
 	default:

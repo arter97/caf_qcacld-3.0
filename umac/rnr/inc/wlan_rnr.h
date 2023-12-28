@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020,2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,12 +40,14 @@ struct rnr_info_soc {
 
 /**
  * struct rnr_global_info - Global context for RNR
+ * @init_done:              Init done flag is set after initialised
  * @vdev_lower_band_cnt:    5ghz/2ghz vdev count
  * @vdev_6ghz_band_cnt:     6ghz vdev count
  * @pdev_6ghz_ctx:          6Ghz pdev context
  */
 struct rnr_global_info {
 #define EMA_AP_MAX_GROUPS 8
+	bool init_done;
 	qdf_atomic_t vdev_lower_band_cnt;
 	qdf_atomic_t vdev_6ghz_band_cnt;
 	/* This needs a revisit at a later point in time
@@ -173,6 +176,7 @@ int32_t wlan_lower_band_ap_cnt_get(void);
  * Return: int32_t
  */
 int32_t wlan_6ghz_band_ap_cnt_get(void);
+
 /**
  * wlan_rnr_init_cnt - Initialize counters for
  *			6Ghz vdev and lower band vdev
@@ -183,6 +187,16 @@ int32_t wlan_6ghz_band_ap_cnt_get(void);
  * Return: void
  */
 void wlan_rnr_init_cnt(void);
+
+/**
+ * wlan_rnr_deinit_cnt - De-Initialize rnr counters context
+ *                       for 6Ghz vdev and lower band vdev
+ *
+ * API to de-initialize init_done flag.
+ *
+ * Return: void
+ */
+void wlan_rnr_deinit_cnt(void);
 
 /**
  * wlan_rnr_set_bss_idx - Set bit corresponding to bss index
