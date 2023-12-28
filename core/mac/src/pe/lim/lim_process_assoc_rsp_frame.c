@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1263,6 +1263,16 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
+	if (subtype != LIM_REASSOC) {
+		aid = assoc_rsp->aid & 0x3FFF;
+		wlan_connectivity_mgmt_event(mac_ctx->psoc,
+					     (struct wlan_frame_hdr *)hdr,
+					     session_entry->vdev_id,
+					     assoc_rsp->status_code, 0, rssi,
+					     0, 0, 0, aid,
+					     WLAN_ASSOC_RSP);
+	}
+
 	if (lim_is_session_eht_capable(session_entry)) {
 		uint8_t ies_offset;
 
@@ -1472,16 +1482,6 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			      session_entry,
 			      (assoc_rsp->status_code ? QDF_STATUS_E_FAILURE :
 			       QDF_STATUS_SUCCESS), assoc_rsp->status_code);
-
-	if (subtype != LIM_REASSOC) {
-		aid = assoc_rsp->aid & 0x3FFF;
-		wlan_connectivity_mgmt_event(mac_ctx->psoc,
-					     (struct wlan_frame_hdr *)hdr,
-					     session_entry->vdev_id,
-					     assoc_rsp->status_code, 0, rssi,
-					     0, 0, 0, aid,
-					     WLAN_ASSOC_RSP);
-	}
 
 	ap_nss = lim_get_nss_supported_by_ap(&assoc_rsp->VHTCaps,
 					     &assoc_rsp->HTCaps,
