@@ -16704,6 +16704,7 @@ static int __wlan_hdd_cfg80211_ap_policy(struct hdd_adapter *adapter,
 	enum QDF_OPMODE device_mode;
 	uint8_t ap_config =
 		QCA_WLAN_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING;
+	enum host_concurrent_ap_policy current_ap_policy;
 
 	vdev_id = wlan_vdev_get_id(adapter->deflink->vdev);
 	device_mode = hdd_get_device_mode(vdev_id);
@@ -16740,10 +16741,20 @@ static int __wlan_hdd_cfg80211_ap_policy(struct hdd_adapter *adapter,
 		hdd_err("failed to set DP ap config");
 		return -EINVAL;
 	}
-	status = ucfg_mlme_set_ap_policy(adapter->deflink->vdev, ap_cfg_policy);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("failed to set MLME ap config");
-		return -EINVAL;
+
+	/*
+	 * Do not update the policy if the current policy is lossless as it is
+	 * getting used for the concurrency scenarios related to ll_lt_sap
+	 */
+	current_ap_policy = ucfg_mlme_get_ap_policy(adapter->deflink->vdev);
+	if (current_ap_policy !=
+		HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING) {
+		status = ucfg_mlme_set_ap_policy(adapter->deflink->vdev,
+						 ap_cfg_policy);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("failed to set MLME ap config");
+			return -EINVAL;
+		}
 	}
 
 	wlan_mlme_ll_lt_sap_send_oce_flags_fw(adapter->deflink->vdev);
