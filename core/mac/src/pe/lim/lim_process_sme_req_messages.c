@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5699,7 +5699,11 @@ lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 		}
 
 		total_psd_power = existing_pwr_count + ext_psd_count;
-
+		if (total_psd_power > MAX_NUM_PWR_LEVEL) {
+			pe_debug("total powers greater than max %d",
+				 MAX_NUM_PWR_LEVEL);
+			return existing_pwr_count;
+		}
 		i = existing_pwr_count;
 		for (j = 0; j < ext_psd_count && i < total_psd_power; j++)
 		{
