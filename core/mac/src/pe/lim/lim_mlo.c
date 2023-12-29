@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1065,6 +1065,11 @@ QDF_STATUS lim_fill_complete_mlo_ie(struct pe_session *session,
 	target[consumed++] = buf[index++];
 	target[consumed++] = buf[index++];
 	mlo_ie_total_len = pbuf - buf - MIN_IE_LEN;
+	if (mlo_ie_total_len > total_len - MIN_IE_LEN) {
+		pe_err("Invalid len: %u, %u", mlo_ie_total_len, total_len);
+		qdf_mem_free(buf);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	for (i = 0; i < mlo_ie_total_len; i++) {
 		if (i && (i % WLAN_MAX_IE_LEN) == 0) {
