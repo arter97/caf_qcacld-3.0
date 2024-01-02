@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,7 +42,6 @@
 #include "connection_mgr/core/src/wlan_cm_main.h"
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include "wlan_reg_ucfg_api.h"
-#include "wlan_connectivity_logging.h"
 #include "wlan_if_mgr_roam.h"
 #include "wlan_roam_debug.h"
 #include "wlan_mlo_mgr_roam.h"
@@ -7079,6 +7078,26 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 		cm_roam_btm_candidate_event(&btm_data->btm_cand[i], vdev_id, i);
 
 	return status;
+}
+
+QDF_STATUS
+cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
+			enum wlan_diag_btm_block_reason reason)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_btm_info);
+
+	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
+
+	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id, 0, NULL);
+
+	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_BLOCK_EVENT;
+	wlan_diag_event.version = DIAG_BTM_VERSION_2;
+	wlan_diag_event.token = token;
+	wlan_diag_event.sub_reason = reason;
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BTM);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 static enum wlan_diag_wifi_band

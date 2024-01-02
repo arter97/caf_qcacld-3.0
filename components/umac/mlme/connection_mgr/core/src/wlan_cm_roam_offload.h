@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,6 +28,7 @@
 
 #include "qdf_str.h"
 #include "wlan_cm_roam_public_struct.h"
+#include "wlan_connectivity_logging.h"
 
 #if defined(CONNECTIVITY_DIAG_EVENT) && \
 	defined(WLAN_FEATURE_ROAM_OFFLOAD)
@@ -673,6 +674,18 @@ cm_roam_neigh_rpt_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 void
 cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 			     uint8_t vdev_id);
+
+/**
+ * cm_roam_btm_block_event() - Send BTM block/drop logging event
+ * @vdev_id: vdev id
+ * @token: BTM token
+ * @reason: Reason for dropping the BTM frame
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
+			enum wlan_diag_btm_block_reason reason);
 #else
 static inline QDF_STATUS
 cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
@@ -724,6 +737,13 @@ static inline void
 cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 			     uint8_t vdev_id)
 {
+}
+
+static inline QDF_STATUS
+cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
+			enum wlan_diag_btm_block_reason reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* FEATURE_CONNECTIVITY_LOGGING */
 
