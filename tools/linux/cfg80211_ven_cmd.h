@@ -3360,7 +3360,7 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_cbs_bkscanen",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CBS, GET_PARAM, 0},
 	{"dcs_sim",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_SIM, SET_PARAM, 1},
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_SIM, SET_PARAM, 2},
 	{"cbs_dwellspt",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CBS_DWELL_SPLIT_TIME, SET_PARAM, 1},
 	{"g_cbs_dwellspt",
