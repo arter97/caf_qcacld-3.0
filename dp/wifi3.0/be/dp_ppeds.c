@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1770,6 +1770,62 @@ void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id, struct 
 	dp_ppeds_dealloc_ppe_vp_profile_be(be_soc, ppe_vp_profile_idx);
 
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+}
+
+/**
+ * dp_ppeds_detach_vp_profile() - detach ppe vp profile during vdev detach
+ * @be_soc: BE Soc handle
+ * @be_vdev: pointer to be_vdev structure
+ *
+ * The function detach the the vp profile during vdev detach
+ *
+ * Return: void
+ */
+void dp_ppeds_detach_vp_profile(struct dp_soc_be *be_soc,
+				struct dp_vdev_be *be_vdev)
+{
+	struct dp_ppe_vp_profile *ppe_vp_profile;
+	int num_ppe_vp_max, i;
+
+	if (!be_soc->ppeds_handle) {
+		dp_err("DS is not enabled on this SOC");
+		return;
+	}
+
+	num_ppe_vp_max =
+		hal_tx_get_num_ppe_vp_tbl_entries(be_soc->soc.hal_soc);
+
+	/* Iterate through ppe vp profile and
+	 * update for VAPs with same vdev_id
+	 */
+	for (i = 0; i < num_ppe_vp_max; i++) {
+		/* none of the profiles are configured */
+		if (!be_soc->num_ppe_vp_profiles)
+			break;
+
+		if (!be_soc->ppe_vp_profile[i].is_configured)
+			continue;
+
+		if (be_soc->ppe_vp_profile[i].vdev_id ==
+							be_vdev->vdev.vdev_id) {
+			ppe_vp_profile = &be_soc->ppe_vp_profile[i];
+
+			ppe_ds_wlan_vp_free(be_soc->ppeds_handle,
+					    ppe_vp_profile->vp_num);
+			/*
+			 * For STA mode ast index table reg
+			 * also needs to be cleaned.
+			 */
+			if (be_vdev->vdev.opmode == wlan_op_mode_sta) {
+				dp_ppeds_dealloc_vp_search_idx_tbl_entry_be(
+					be_soc,
+					ppe_vp_profile->search_idx_reg_num);
+			}
+
+			dp_ppeds_dealloc_vp_tbl_entry_be(be_soc, i);
+			dp_ppeds_dealloc_ppe_vp_profile_be(be_soc, i);
+		}
+	}
 }
 
 /*
