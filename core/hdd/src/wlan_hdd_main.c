@@ -9829,6 +9829,12 @@ static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
 		wlan_hdd_send_avoid_freq_for_dnbs(hdd_ctx, 0);
 
 	hdd_cancel_ip_notifier_work(adapter);
+
+	/* to do: sap vdev release moved to deinit ap session,
+	 * but as hdd_hostapd_stop_no_trans call hdd_stop_adapter
+	 * before hdd_deinit_adapter, so hdd_deinit_ap_mode will be
+	 * after vdev destroy. keep it here to avoid ref leak
+	 */
 	sap_release_vdev_ref(sap_ctx);
 
 	if (mode == QDF_SAP_MODE)
@@ -15122,26 +15128,18 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	}
 
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
-	status = sap_acquire_vdev_ref(hdd_ctx->psoc, sap_ctx,
-				      link_info->vdev_id);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Failed to get vdev ref for sap for session_id: %u",
-			link_info->vdev_id);
-		ret = qdf_status_to_os_return(status);
-		goto sap_vdev_destroy;
-	}
 
 	if (adapter->device_mode == QDF_SAP_MODE) {
 		status = hdd_vdev_configure_rtt_params(sap_ctx->vdev);
 		if (QDF_IS_STATUS_ERROR(status))
-			goto sap_release_ref;
+			goto sap_vdev_destroy;
 	}
 
 	status = hdd_init_ap_mode(link_info, is_ssr, rtnl_held);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Error Initializing the AP mode: %d", status);
 		ret = qdf_status_to_os_return(status);
-		goto sap_release_ref;
+		goto sap_vdev_destroy;
 	}
 
 	/* Register as a wireless device */
@@ -15181,8 +15179,6 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	hdd_exit();
 	return 0;
 
-sap_release_ref:
-	sap_release_vdev_ref(sap_ctx);
 sap_vdev_destroy:
 	hdd_vdev_destroy(link_info);
 sap_destroy_ctx:

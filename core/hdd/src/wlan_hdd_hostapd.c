@@ -289,6 +289,7 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 {
 	struct sap_context *sap_ctx;
 	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	QDF_STATUS status;
 
 	if (!adapter) {
@@ -302,12 +303,22 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 		hdd_err("can't allocate the sap_ctx");
 		return NULL;
 	}
+
+	status = sap_acquire_vdev_ref(hdd_ctx->psoc, sap_ctx,
+				      link_info->vdev_id);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Failed to get vdev ref for sap for session_id: %u",
+			link_info->vdev_id);
+		goto error;
+	}
+
 	status = sap_init_ctx(sap_ctx, adapter->device_mode,
 			       adapter->mac_addr.bytes,
 			       link_info->vdev_id, reinit);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wlansap_start failed!! status: %d", status);
 		link_info->session.ap.sap_context = NULL;
+		wlansap_release_vdev_ref(sap_ctx);
 		goto error;
 	}
 	return sap_ctx;
@@ -342,6 +353,9 @@ hdd_hostapd_deinit_sap_session(struct wlan_hdd_link_info *link_info)
 	}
 
 	wlan_hdd_undo_acs(link_info);
+
+	wlansap_release_vdev_ref(sap_ctx);
+
 	if (!QDF_IS_STATUS_SUCCESS(sap_deinit_ctx(sap_ctx))) {
 		hdd_err("Error stopping the sap session");
 		status = -EINVAL;
