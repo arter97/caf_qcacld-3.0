@@ -312,6 +312,7 @@ qal_vbus_rcu_read_unlock(void)
 
 qdf_export_symbol(qal_vbus_rcu_read_unlock);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 int
 qal_vbus_of_get_named_gpio_flags(struct qdf_device_node *np,
 				 const char *list_name,
@@ -320,5 +321,19 @@ qal_vbus_of_get_named_gpio_flags(struct qdf_device_node *np,
 	return of_get_named_gpio_flags((struct device_node *)np,
 				       list_name, index, flags);
 }
+#else
+int
+qal_vbus_of_get_named_gpio_flags(struct qdf_device_node *np,
+				 const char *list_name,
+				 int index, qdf_of_gpio_flags *flags)
+{
+	/*
+	 * flags not populated here. caller to initialize flags to
+	 * default value and handle accordingly. This function will
+	 * just return gpio number
+	 */
+	return of_get_named_gpio((struct device_node *)np, list_name, index);
+}
+#endif
 
 qdf_export_symbol(qal_vbus_of_get_named_gpio_flags);
