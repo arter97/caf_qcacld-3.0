@@ -168,6 +168,7 @@ enum wlan_main_tag {
  * @WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT: Beacon report response
  * @WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT: MLO T2LM request
  * @WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT: MLO T2LM response
+ * @WLAN_CONN_DIAG_BTM_BLOCK_EVENT: BTM-drop indication
  * @WLAN_CONN_DIAG_MAX: MAX tag
  */
 enum qca_conn_diag_log_event_type {
@@ -218,6 +219,7 @@ enum qca_conn_diag_log_event_type {
 	WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT,
 	WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT,
 	WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT,
+	WLAN_CONN_DIAG_BTM_BLOCK_EVENT,
 	WLAN_CONN_DIAG_MAX
 };
 
@@ -321,6 +323,17 @@ enum wlan_diag_connect_fail_reason {
 	WLAN_DIAG_SER_TIMEOUT,
 	WLAN_DIAG_GENERIC_FAILURE,
 	WLAN_DIAG_VALID_CANDIDATE_CHECK_FAIL,
+};
+
+/**
+ * enum wlan_diag_btm_block_reason - BTM drop/ignore reason code
+ * @WLAN_DIAG_BTM_BLOCK_MBO_WO_PMF: Connected to MBO without PMF capable AP
+ * @WLAN_DIAG_BTM_BLOCK_UNSUPPORTED_P2P_CONC: p2p go/cli is present which
+ *  restricts BTM roaming
+ */
+enum wlan_diag_btm_block_reason {
+	WLAN_DIAG_BTM_BLOCK_MBO_WO_PMF = 1,
+	WLAN_DIAG_BTM_BLOCK_UNSUPPORTED_P2P_CONC = 2,
 };
 
 /**
