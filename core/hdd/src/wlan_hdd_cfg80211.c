@@ -4033,6 +4033,117 @@ wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct hdd_adapter *adapter)
 	return prev_acs_freq_valid;
 }
 
+#ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+/**
+ * hdd_acs_has_common_channel() - Function to check if current ACS configure
+ * has common channel with given link
+ * @link_info: Pointer to link information
+ * @tb: Pointer to array of ACS attributes
+ *
+ * Return: true if current ACS configure has common channel with given link
+ */
+static bool hdd_acs_has_common_channel(struct wlan_hdd_link_info *link_info,
+				       struct nlattr *tb[])
+{
+	struct hdd_ap_ctx *ap_ctx;
+	struct sap_acs_cfg *acs_cfg;
+	uint32_t *freq_list, chan_cnt, i, j;
+	uint8_t *chan_list;
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	acs_cfg = &ap_ctx->sap_config.acs_cfg;
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_FREQ_LIST]) {
+		freq_list = nla_data(tb[QCA_WLAN_VENDOR_ATTR_ACS_FREQ_LIST]);
+		chan_cnt = nla_len(tb[QCA_WLAN_VENDOR_ATTR_ACS_FREQ_LIST]) /
+			   sizeof(uint32_t);
+		for (i = 0; i < chan_cnt; i++) {
+			for (j = 0; j < acs_cfg->master_ch_list_count; j++) {
+				if (acs_cfg->master_freq_list[j] ==
+				    freq_list[i])
+					return true;
+			}
+		}
+	} else if (tb[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST]) {
+		chan_list = nla_data(tb[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST]);
+		chan_cnt = nla_len(tb[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST]);
+		for (i = 0; i < chan_cnt; i++) {
+			for (j = 0; j < acs_cfg->master_ch_list_count; j++) {
+				if (acs_cfg->master_freq_list[j] ==
+				    wlan_reg_legacy_chan_to_freq(
+				    link_info->adapter->hdd_ctx->pdev,
+				    chan_list[i]))
+					return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
+ * hdd_wait_for_other_ap_acs_complete() - Function to wait for other AP ACS
+ * complete
+ * @hdd_ctx: HDD handle
+ * @own_adapter: Pointer to own adapter
+ * @tb: Pointer to array of ACS attributes
+ *
+ * If having common channel which is ACS in progress, will wait for other AP
+ * ACS complete or ACS_COMPLETE_TIMEOUT happen.
+ *
+ * Return: None
+ */
+static void hdd_wait_for_other_ap_acs_complete(struct hdd_context *hdd_ctx,
+					       struct hdd_adapter *own_adapter,
+					       struct nlattr *tb[])
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_ap_ctx *ap_ctx;
+	bool wait = false;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->device_mode != QDF_SAP_MODE ||
+		    own_adapter == adapter) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+				continue;
+
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+			if (qdf_atomic_read(&ap_ctx->acs_in_progress) > 0 &&
+			    hdd_acs_has_common_channel(link_info, tb)) {
+				wait = true;
+				break;
+			}
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+		if (wait) {
+			if (next_adapter)
+				hdd_adapter_dev_put_debug(next_adapter,
+							  dbgid);
+			break;
+		}
+	}
+
+	if (wait) {
+		hdd_debug("wait AP vdev %d ACS complete", link_info->vdev_id);
+		qdf_wait_for_event_completion(&link_info->acs_complete_event,
+					      ACS_COMPLETE_TIMEOUT);
+	}
+}
+#else
+static inline void
+hdd_wait_for_other_ap_acs_complete(struct hdd_context *hdd_ctx,
+				   struct hdd_adapter *own_adapter,
+				   struct nlattr *tb[])
+{
+}
+#endif
+
 /**
  * hdd_remove_6ghz_freq_from_acs_list(): Removed 6 GHz frequecies from ACS list
  * @org_freq_list: ACS frequecny list
@@ -4173,6 +4284,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		ret = -EINVAL;
 		goto out;
 	}
+
+	hdd_wait_for_other_ap_acs_complete(hdd_ctx, adapter, tb);
 
 	sap_config = &ap_ctx->sap_config;
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
