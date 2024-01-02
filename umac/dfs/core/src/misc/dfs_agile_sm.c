@@ -40,6 +40,7 @@
 #include <wlan_sm_engine.h> /* for struct wlan_sm */
 #endif
 #include <wlan_dfs_utils_api.h>
+#include <wlan_dfs_mlme_api.h>
 
 /* Number of 20MHz sub-channels in 160 MHz segment */
 #define NUM_CHANNELS_160MHZ  8
@@ -1123,7 +1124,13 @@ void dfs_prepare_agile_rcac_channel(struct wlan_dfs *dfs,
 				    bool *is_rcac_chan_available)
 {
 	qdf_freq_t rcac_ch_freq = 0;
+	struct wlan_objmgr_pdev *pdev = dfs->dfs_pdev_obj;
 
+	if (pdev && !dfs_mlme_is_pdev_valid(pdev)) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS_AGILE, "pdev: %p is not valid in current hwmode\n", pdev);
+		*is_rcac_chan_available = false;
+		return;
+	}
 	/* Find out a valid rcac_ch_freq */
 	dfs_set_agilecac_chan_for_freq(dfs, &rcac_ch_freq, 0, 0);
 
