@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1243,18 +1243,18 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 
 	measDuration = pBeaconReq->measurement_request.Beacon.meas_duration;
 
-	pe_nofl_info("RX: [802.11 BCN_RPT] seq:%d SSID:" QDF_SSID_FMT " BSSID:" QDF_MAC_ADDR_FMT " Token:%d op_class:%d ch:%d meas_mode:%d meas_duration:%d max_meas_dur: %d",
-		     mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
-		     QDF_SSID_REF(
+	pe_nofl_rl_info("RX: [802.11 BCN_RPT] seq:%d SSID:" QDF_SSID_FMT " BSSID:" QDF_MAC_ADDR_FMT " Token:%d op_class:%d ch:%d meas_mode:%d meas_duration:%d max_meas_dur: %d",
+			mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
+			QDF_SSID_REF(
 			pBeaconReq->measurement_request.Beacon.SSID.num_ssid,
 			pBeaconReq->measurement_request.Beacon.SSID.ssid),
-		     QDF_MAC_ADDR_REF(
+			QDF_MAC_ADDR_REF(
 			pBeaconReq->measurement_request.Beacon.BSSID),
-		     pBeaconReq->measurement_token,
-		     pBeaconReq->measurement_request.Beacon.regClass,
-		     pBeaconReq->measurement_request.Beacon.channel,
-		     pBeaconReq->measurement_request.Beacon.meas_mode,
-		     measDuration, maxMeasduration);
+			pBeaconReq->measurement_token,
+			pBeaconReq->measurement_request.Beacon.regClass,
+			pBeaconReq->measurement_request.Beacon.channel,
+			pBeaconReq->measurement_request.Beacon.meas_mode,
+			measDuration, maxMeasduration);
 
 	req_mode = (pBeaconReq->parallel << 0) | (pBeaconReq->enable << 1) |
 		   (pBeaconReq->request << 2) | (pBeaconReq->report << 3) |

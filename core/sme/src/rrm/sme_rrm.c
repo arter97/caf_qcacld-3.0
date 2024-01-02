@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1171,7 +1171,7 @@ static QDF_STATUS sme_rrm_fill_scan_channels(struct mac_context *mac,
 	if (sme_rrm_context->channelList.numOfChannels == 0) {
 		qdf_mem_free(sme_rrm_context->channelList.freq_list);
 		sme_rrm_context->channelList.freq_list = NULL;
-		sme_err("No channels populated with requested operation class and current country, Hence abort the rrm operation");
+		sme_err_rl("No channels populated with requested operation class and current country, Hence abort the rrm operation");
 		return QDF_STATUS_E_FAILURE;
 	}
 
