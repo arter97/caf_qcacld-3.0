@@ -885,10 +885,15 @@ enum {
 #endif
 	IEEE80211_PARAM_VDEV_UP = 819, /* Flag to indicate if vdev is in UP State*/
 #ifdef WLAN_FEATURE_11BE_MLO
-	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* MLO Max Simultaneous Active links */
+	/* User configuration for MLO RMSL advertisement */
+	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820,
 #endif
 	IEEE80211_PARAM_NOACK_MAP = 821, /* Get NoAck map for vdev */
 	IEEE80211_PARAM_SET_RTT_RESPONDER_ROLE = 822,
+#ifdef WLAN_FEATURE_11BE_MLO
+	/* MLO enable/disable EXTMLD CAP advertisement */
+	IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG = 823,
+#endif
 };
 
 enum {
@@ -2663,6 +2668,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 		SET_PARAM, 1},
 	{"g_max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
 		GET_PARAM, 0},
+	{"extmldcap_enable_advertisement", IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG,
+		SET_PARAM, 1},
+	{"g_extmldcap_enable_advertisement",
+		IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG, GET_PARAM, 0},
 #endif
 	{"get_noack_map", IEEE80211_PARAM_NOACK_MAP, GET_PARAM, 0},
 };
