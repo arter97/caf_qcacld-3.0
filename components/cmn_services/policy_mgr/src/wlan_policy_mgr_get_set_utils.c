@@ -6941,6 +6941,13 @@ bool policy_mgr_is_mlo_in_mode_emlsr(struct wlan_objmgr_psoc *psoc,
 	uint8_t i, mlo_idx = 0;
 	struct wlan_objmgr_vdev *temp_vdev;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
 
 	mode_num = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							  vdev_id_list,
@@ -6967,6 +6974,27 @@ bool policy_mgr_is_mlo_in_mode_emlsr(struct wlan_objmgr_psoc *psoc,
 
 		wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_POLICY_MGR_ID);
 	}
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_DISABLE_LINK; i++) {
+		if (!pm_disabled_ml_links[i].in_use)
+			continue;
+		if (pm_disabled_ml_links[i].mode != PM_STA_MODE)
+			continue;
+		temp_vdev =
+		wlan_objmgr_get_vdev_by_id_from_psoc(
+					psoc, pm_disabled_ml_links[i].vdev_id,
+					WLAN_POLICY_MGR_ID);
+		if (!temp_vdev) {
+			policy_mgr_err("invalid inactive vdev for id %d",
+				       pm_disabled_ml_links[i].vdev_id);
+			continue;
+		}
+		/* Check if existing vdev is eMLSR STA */
+		if (wlan_vdev_mlme_cap_get(temp_vdev, WLAN_VDEV_C_EMLSR_CAP))
+			emlsr_connection = true;
+		wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_POLICY_MGR_ID);
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 end:
 	if (num_mlo)
 		*num_mlo = mlo_idx;
@@ -8522,6 +8550,45 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 	return restart_required;
 }
 
+/**
+ * policy_mgr_is_new_force_allowed() - Check if the new force command is allowed
+ * @psoc: PSOC object information
+ * @active_link_bitmap: Active link bitmap
+ * @force_inactive_num_bitmap: Force inactive number bitmap
+ * @force_inactive_num: Number of links to be forced inactive
+ *
+ * If ML STA associates in 3-link (2.4 GHz + 5 GHz + 6 GHz), Host sends force
+ * inactive num command between 5 GHz and 6 GHz links to firmware as it's a DBS
+ * RD. This force has to be in effect at all times but any new force active num
+ * command request from the userspace (except for 5 GHz + 6 GHz links) should be
+ * honored. This API checks if the new force command can be allowed.
+ *
+ * Return: True if the new force command is allowed, else False
+ */
+static bool
+policy_mgr_is_new_force_allowed(struct wlan_objmgr_psoc *psoc,
+				uint32_t active_link_bitmap,
+				uint16_t force_inactive_num_bitmap,
+				uint8_t force_inactive_num)
+{
+	uint32_t link_bitmap = 0;
+	uint8_t link_num = 0;
+
+	link_bitmap = ~active_link_bitmap & force_inactive_num_bitmap;
+	if (force_inactive_num_bitmap) {
+		if (!link_bitmap) {
+			policy_mgr_err("New force bitmap not allowed");
+			return false;
+		}
+		link_num = convert_link_bitmap_to_link_ids(link_bitmap,
+							   0, NULL);
+		if (link_num < force_inactive_num)
+			return false;
+	}
+
+	return true;
+}
+
 void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 					 uint8_t session_id, uint8_t num_links,
 					 struct qdf_mac_addr active_link_addr[2])
@@ -8604,10 +8671,17 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		}
 		ml_nlink_get_curr_force_state(psoc, vdev, &curr);
 		if (curr.force_inactive_num || curr.force_active_num) {
-			policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
-					 curr.force_active_num,
-					 curr.force_inactive_num);
-			goto done;
+			if (curr.force_inactive_num) {
+				if (!policy_mgr_is_new_force_allowed(
+						psoc, active_link_bitmap,
+						curr.force_inactive_num_bitmap,
+						curr.force_inactive_num)) {
+					policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
+							 curr.force_active_num,
+							 curr.force_inactive_num);
+				goto done;
+				}
+			}
 		}
 		/* If current force inactive bitmap exists, we have to remove
 		 * the new active bitmap from the existing inactive bitmap,
@@ -8643,6 +8717,15 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 				     reason, mode, 0,
 				     active_link_bitmap, inactive_link_bitmap,
 				     link_ctrl_flags);
+	if (active_link_bitmap)
+		ml_nlink_vendor_command_set_link(
+			psoc, session_id,
+			LINK_CONTROL_MODE_USER,
+			MLO_LINK_FORCE_REASON_CONNECT,
+			MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
+			0, active_link_bitmap,
+			inactive_link_bitmap);
+
 done:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 }
@@ -8659,6 +8742,8 @@ void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t *link_mac_addr;
 	bool active_vdev_present = false;
+	uint16_t active_link_bitmap = 0;
+	uint16_t inactive_link_bitmap = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, session_id,
 						    WLAN_POLICY_MGR_ID);
@@ -8692,6 +8777,8 @@ void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 					 QDF_MAC_ADDR_SIZE)) {
 				active_vdev_lst[active_vdev_cnt] =
 					wlan_vdev_get_id(tmp_vdev_lst[idx]);
+				active_link_bitmap |=
+				1 << wlan_vdev_get_link_id(tmp_vdev_lst[idx]);
 				active_vdev_cnt++;
 				active_vdev_present = true;
 				policy_mgr_debug("Link address match");
@@ -8700,6 +8787,9 @@ void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 		if (!active_vdev_present) {
 			inactive_vdev_lst[inactive_vdev_cnt] =
 					wlan_vdev_get_id(tmp_vdev_lst[idx]);
+			inactive_link_bitmap |=
+			1 << wlan_vdev_get_link_id(tmp_vdev_lst[idx]);
+
 			inactive_vdev_cnt++;
 			policy_mgr_err("No link address match");
 		}
@@ -8732,6 +8822,15 @@ void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 					    MLO_LINK_FORCE_REASON_DISCONNECT,
 					    MLO_LINK_FORCE_MODE_ACTIVE,
 					    active_vdev_cnt, active_vdev_lst);
+	if (active_link_bitmap)
+		ml_nlink_vendor_command_set_link(
+			psoc, session_id,
+			LINK_CONTROL_MODE_USER,
+			MLO_LINK_FORCE_REASON_CONNECT,
+			MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
+			0, active_link_bitmap,
+			inactive_link_bitmap);
+
 ref_release:
 	for (idx = 0; idx < ml_vdev_cnt; idx++)
 		mlo_release_vdev_ref(tmp_vdev_lst[idx]);
@@ -8758,6 +8857,9 @@ policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t active_link_bitmap = 0;
+	uint32_t inactive_link_bitmap = 0;
+	bool update_vendor_cmd = false;
 
 	for (idx = 0; idx < num_links; idx++) {
 		if (config_state_list[idx] == 0)
@@ -8803,10 +8905,12 @@ policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 				if (config_state_list[link]) {
 					active_vdev_lst[active_vdev_cnt] =
 						wlan_vdev_get_id(vdev_lst[idx]);
+					active_link_bitmap |= 1 << link_id;
 					active_vdev_cnt++;
 				} else {
 					inactive_vdev_lst[inactive_vdev_cnt] =
 						wlan_vdev_get_id(vdev_lst[idx]);
+					inactive_link_bitmap |= 1 << link_id;
 					inactive_vdev_cnt++;
 				}
 			}
@@ -8865,6 +8969,10 @@ policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 					MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
 					active_vdev_cnt, active_vdev_lst,
 					inactive_vdev_cnt, inactive_vdev_lst);
+			if (status == QDF_STATUS_E_PENDING ||
+			    status == QDF_STATUS_SUCCESS)
+				update_vendor_cmd = true;
+
 			goto release_ml_vdev_ref;
 		}
 	} else {
@@ -8891,18 +8999,33 @@ policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 		 * active vdev count, send single WMI for all active vdevs
 		 * with force mode MLO_LINK_FORCE_MODE_ACTIVE.
 		 */
-		if (active_vdev_cnt && inactive_vdev_cnt)
+		if (active_vdev_cnt && inactive_vdev_cnt) {
 			status = policy_mgr_mlo_sta_set_link_ext(psoc,
 					MLO_LINK_FORCE_REASON_CONNECT,
 					MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
 					active_vdev_cnt, active_vdev_lst,
 					inactive_vdev_cnt, inactive_vdev_lst);
-		else if (active_vdev_cnt && !inactive_vdev_cnt)
+			if (status == QDF_STATUS_E_PENDING ||
+			    status == QDF_STATUS_SUCCESS)
+				update_vendor_cmd = true;
+		} else if (active_vdev_cnt && !inactive_vdev_cnt) {
 			status = policy_mgr_mlo_sta_set_link(psoc,
 					MLO_LINK_FORCE_REASON_DISCONNECT,
 					MLO_LINK_FORCE_MODE_ACTIVE,
 					active_vdev_cnt, active_vdev_lst);
+			if (status == QDF_STATUS_E_PENDING ||
+			    status == QDF_STATUS_SUCCESS)
+				update_vendor_cmd = true;
+		}
 	}
+	if (update_vendor_cmd)
+		ml_nlink_vendor_command_set_link(
+			psoc, vdev_id,
+			LINK_CONTROL_MODE_USER,
+			MLO_LINK_FORCE_REASON_CONNECT,
+			MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
+			0, active_link_bitmap,
+			inactive_link_bitmap);
 
 release_ml_vdev_ref:
 	for (idx = 0; idx < ml_vdev_cnt; idx++)
@@ -9032,13 +9155,15 @@ QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 						  uint8_t vdev_id,
 						  uint8_t force_active_cnt)
 {
-	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *vdev, *tmp_vdev;
 	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
 	uint8_t num_enabled_ml_sta = 0, conn_count;
 	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	uint16_t link_bitmap = 0;
+	uint8_t i;
 
 	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
 		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
@@ -9174,8 +9299,33 @@ set_link:
 					     MLO_LINK_FORCE_MODE_ACTIVE_NUM,
 					     num_ml_sta, ml_sta_vdev_lst,
 					     force_active_cnt);
-	if (QDF_IS_STATUS_SUCCESS(status))
+	if (QDF_IS_STATUS_SUCCESS(status)) {
 		policy_mgr_debug("vdev %d: link enable allowed", vdev_id);
+		for (i = 0; i < num_ml_sta; i++) {
+			if (i >= force_active_cnt)
+				break;
+			tmp_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+				psoc, ml_sta_vdev_lst[i],
+				WLAN_POLICY_MGR_ID);
+			if (!tmp_vdev) {
+				policy_mgr_err("vdev not found for vdev_id %d ",
+					       ml_sta_vdev_lst[i]);
+				continue;
+			}
+
+			link_bitmap |= 1 << wlan_vdev_get_link_id(tmp_vdev);
+			wlan_objmgr_vdev_release_ref(tmp_vdev,
+						     WLAN_POLICY_MGR_ID);
+		}
+		ml_nlink_vendor_command_set_link(
+			psoc, vdev_id,
+			LINK_CONTROL_MODE_MIXED,
+			MLO_LINK_FORCE_REASON_CONNECT,
+			MLO_LINK_FORCE_MODE_ACTIVE_NUM,
+			force_active_cnt,
+			link_bitmap,
+			0);
+	}
 
 release_vdev_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
@@ -9219,6 +9369,10 @@ policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("vdev: %d Invalid Context", vdev_id);
 		goto release_vdev_ref;
 	}
+	/* Clear all user vendor command setting for switching to "default" */
+	ml_nlink_vendor_command_set_link(psoc, vdev_id,
+					 LINK_CONTROL_MODE_DEFAULT,
+					 0, 0, 0, 0, 0);
 
 	policy_mgr_get_ml_sta_info(pm_ctx, &num_ml_sta, &num_disabled_ml_sta,
 				   ml_sta_vdev_lst, ml_freq_lst, &num_non_ml,

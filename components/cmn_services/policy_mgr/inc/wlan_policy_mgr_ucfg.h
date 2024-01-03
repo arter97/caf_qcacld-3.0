@@ -454,4 +454,17 @@ bool ucfg_policy_mgr_get_vdev_diff_freq_new_conn(struct wlan_objmgr_psoc *psoc,
 						 uint32_t new_freq,
 						 uint8_t *vdev_id);
 
+/**
+ * ucfg_policy_mgr_get_dbs_hw_modes() - to get the DBS HW modes
+ *
+ * @psoc: pointer to psoc
+ * @one_by_one_dbs: 1x1 DBS capability of HW
+ * @two_by_two_dbs: 2x2 DBS capability of HW
+ *
+ * Return: Failure in case of error otherwise success
+ */
+QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
+					    bool *one_by_one_dbs,
+					    bool *two_by_two_dbs);
+
 #endif //__WLAN_POLICY_MGR_UCFG

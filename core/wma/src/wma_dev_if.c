@@ -412,7 +412,7 @@ QDF_STATUS wma_vdev_detach_callback(struct vdev_delete_response *rsp)
 		return QDF_STATUS_E_FAILURE;
 
 	/* Sanitize the vdev id*/
-	if (rsp->vdev_id > wma->max_bssid) {
+	if (rsp->vdev_id >= wma->max_bssid) {
 		wma_err("vdev delete response with invalid vdev_id :%d",
 			rsp->vdev_id);
 		QDF_BUG(0);
@@ -729,7 +729,6 @@ QDF_STATUS wma_vdev_detach(struct del_vdev_params *pdel_vdev_req_param)
 	iface = &wma_handle->interfaces[vdev_id];
 	if (!iface->vdev) {
 		wma_err("vdev %d is NULL", vdev_id);
-		mlme_vdev_self_peer_delete_resp(pdel_vdev_req_param);
 		return status;
 	}
 

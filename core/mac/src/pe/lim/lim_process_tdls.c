@@ -98,6 +98,21 @@ static const uint8_t eth_890d_header[] = {
 	0x00, 0x00, 0x89, 0x0d,
 };
 
+#define ETH_ADDR_LEN 6 /* bytes */
+
+struct tdls_ethernet_hdr {
+	uint8_t dest_addr[ETH_ADDR_LEN];
+	uint8_t src_addr[ETH_ADDR_LEN];
+} qdf_packed;
+
+#define eth_890d_hdr_len 2 /* bytes */
+
+static const uint8_t eth_890d_tdls_discvory_frm_hdr[] = {
+	0x89, 0x0d, 0x02, 0x0c, 0x0a,
+};
+
+#define TDLS_ETHR_HDR_LEN (sizeof(struct tdls_ethernet_hdr))
+
 /*
  * type of links used in TDLS
  */
@@ -547,21 +562,45 @@ static uint32_t lim_prepare_tdls_frame_header(struct mac_context *mac, uint8_t *
  * @tx_complete: indicates tx success/failure
  * @params: tx completion params
  *
- * function will be invoked on receiving tx completion indication
+ * Function will be invoked on receiving tx completion indication
  *
- * return: success: eHAL_STATUS_SUCCESS failure: eHAL_STATUS_FAILURE
+ * Return: success: eHAL_STATUS_SUCCESS failure: eHAL_STATUS_FAILURE
  */
-static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context,
-					    qdf_nbuf_t buf,
-					    uint32_t tx_complete,
-					    void *params)
+static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
+					    uint32_t tx_complete, void *params)
 {
 	struct mac_context *mac_ctx = (struct mac_context *)context;
+	struct tdls_ethernet_hdr *ethernet_hdr;
+	tpSirMacActionFrameHdr action_hdr;
+	bool is_tdls_discvory_frm;
 
 	pe_debug("tdls_frm_session_id: %x tx_complete: %x",
-		mac_ctx->lim.tdls_frm_session_id, tx_complete);
+		 mac_ctx->lim.tdls_frm_session_id, tx_complete);
 
 	if (NO_SESSION != mac_ctx->lim.tdls_frm_session_id) {
+		if (buf &&
+		    (qdf_nbuf_len(buf) >= (TDLS_ETHR_HDR_LEN +
+					  eth_890d_hdr_len +
+					  PAYLOAD_TYPE_TDLS_SIZE +
+					  sizeof(*action_hdr)))) {
+			ethernet_hdr =
+				(struct tdls_ethernet_hdr *)qdf_nbuf_data(buf);
+			is_tdls_discvory_frm =
+				!qdf_mem_cmp(((uint8_t *)qdf_nbuf_data(buf) +
+				TDLS_ETHR_HDR_LEN),
+				eth_890d_tdls_discvory_frm_hdr,
+				sizeof(eth_890d_tdls_discvory_frm_hdr));
+
+			pe_debug("is_tdls_discvory_frm: %d",
+				 is_tdls_discvory_frm);
+			if (is_tdls_discvory_frm &&
+			    tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
+				wlan_tdls_increment_discovery_attempts(
+					mac_ctx->psoc,
+					mac_ctx->lim.tdls_frm_session_id,
+					ethernet_hdr->dest_addr);
+		}
+
 		lim_send_sme_mgmt_tx_completion(mac_ctx,
 				mac_ctx->lim.tdls_frm_session_id,
 				tx_complete);
@@ -3886,8 +3925,8 @@ lim_send_tdls_comp_mgmt_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 	struct tdls_send_mgmt_rsp *sme_rsp;
 	QDF_STATUS status;
 
-	pe_debug("Sending message %s with reasonCode %s",
-		lim_msg_str(msg_type), lim_result_code_str(result_code));
+	pe_debug("vdev:%d Sending message %s with reasonCode %s", vdev_id,
+		 lim_msg_str(msg_type), lim_result_code_str(result_code));
 
 	sme_rsp = qdf_mem_malloc(sizeof(*sme_rsp));
 	if (!sme_rsp)

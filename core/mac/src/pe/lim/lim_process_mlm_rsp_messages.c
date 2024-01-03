@@ -3005,7 +3005,7 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
 {
 	struct mlo_partner_info *partner_info;
 	struct mlo_link_info *partner_link_info;
-	struct wlan_channel channel;
+	struct wlan_channel channel = {0};
 	struct mlo_link_switch_context *link_ctx;
 	uint8_t i = 0;
 
@@ -3092,6 +3092,16 @@ static void lim_process_switch_channel_join_req(
 	    (!session_entry->lim_join_req)) {
 		pe_err("invalid pointer!!");
 		goto error;
+	}
+
+	if (lim_connect_skip_join_for_gc(session_entry)) {
+		join_cnf.resultCode = eSIR_SME_SUCCESS;
+		join_cnf.protStatusCode = STATUS_SUCCESS;
+		join_cnf.sessionId = session_entry->peSessionId;
+		lim_post_sme_message(mac_ctx,
+				     LIM_MLM_JOIN_CNF,
+				     (uint32_t *)&join_cnf.resultCode);
+		return;
 	}
 
 	bss = &session_entry->lim_join_req->bssDescription;

@@ -193,6 +193,19 @@ void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev)
 {}
 #endif /* WLAN_FEATURE_TDLS_CONCURRENCIES */
+
+/**
+ * wlan_tdls_increment_discovery_attempts() - Increment TDLS peer discovery
+ * attempts
+ * @psoc: Pointer to PSOC object
+ * @vdev_id: Vdev id
+ * @peer_addr: Peer mac address
+ *
+ * Return: None
+ */
+void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    uint8_t *peer_addr);
 #else
 
 #ifdef FEATURE_SET
@@ -266,6 +279,12 @@ void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 
 static inline
 void wlan_tdls_notify_start_bss_failure(struct wlan_objmgr_psoc *psoc)
+{}
+
+static inline
+void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    uint8_t *peer_addr)
 {}
 #endif
 #endif

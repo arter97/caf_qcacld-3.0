@@ -818,8 +818,8 @@ void tdls_ct_idle_handler(void *user_data)
  */
 static void
 tdls_ct_process_idle_and_discovery(struct tdls_peer *curr_peer,
-				struct tdls_vdev_priv_obj *tdls_vdev_obj,
-				struct tdls_soc_priv_obj *tdls_soc_obj)
+				   struct tdls_vdev_priv_obj *tdls_vdev_obj,
+				   struct tdls_soc_priv_obj *tdls_soc_obj)
 {
 	uint16_t valid_peers;
 
@@ -944,10 +944,10 @@ static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 					struct tdls_vdev_priv_obj *tdls_vdev,
 					struct tdls_soc_priv_obj *tdls_soc)
 {
-	if (TDLS_IS_EXTERNAL_CONTROL_ENABLED(
-			tdls_soc->tdls_configs.tdls_feature_flags) &&
-			(!curr_peer->is_forced_peer))
-			return;
+	if (!curr_peer->is_forced_peer &&
+	    TDLS_IS_EXTERNAL_CONTROL_ENABLED(
+				tdls_soc->tdls_configs.tdls_feature_flags))
+		return;
 
 	if (curr_peer->rx_pkt || curr_peer->tx_pkt)
 		tdls_debug(QDF_MAC_ADDR_FMT "link_status %d tdls_support %d tx %d rx %d vdev %d",
@@ -956,29 +956,31 @@ static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 			   curr_peer->tx_pkt, curr_peer->rx_pkt,
 			   wlan_vdev_get_id(tdls_vdev->vdev));
 
-	if (!TDLS_IS_LINK_CONNECTED(curr_peer) &&
-	    ((curr_peer->tx_pkt + curr_peer->rx_pkt) >=
-	    tdls_vdev->threshold_config.tx_packet_n)) {
-		/* Ignore discovery attempt if External Control is enabled, that
+	if (TDLS_IS_LINK_CONNECTED(curr_peer))
+		return;
+
+	if ((curr_peer->tx_pkt + curr_peer->rx_pkt) >=
+	     tdls_vdev->threshold_config.tx_packet_n) {
+		/*
+		 * Ignore discovery attempt if External Control is enabled, that
 		 * is, peer is forced. In that case, continue discovery attempt
 		 * regardless attempt count
 		 */
 		tdls_debug("TDLS UNKNOWN pre discover ");
 		if (curr_peer->is_forced_peer ||
-			curr_peer->discovery_attempt++ <
+		    curr_peer->discovery_attempt <
 		    tdls_vdev->threshold_config.discovery_tries_n) {
 			tdls_debug("TDLS UNKNOWN discover ");
 			tdls_vdev->curr_candidate = curr_peer;
 			tdls_implicit_send_discovery_request(tdls_vdev);
-		} else {
-			if (curr_peer->link_status != TDLS_LINK_CONNECTING) {
-				curr_peer->tdls_support =
-						TDLS_CAP_NOT_SUPPORTED;
-				tdls_set_peer_link_status(
-						curr_peer,
-						TDLS_LINK_IDLE,
-						TDLS_LINK_NOT_SUPPORTED);
-			}
+
+			return;
+		}
+
+		if (curr_peer->link_status != TDLS_LINK_CONNECTING) {
+			curr_peer->tdls_support = TDLS_CAP_NOT_SUPPORTED;
+			tdls_set_peer_link_status(curr_peer, TDLS_LINK_IDLE,
+						  TDLS_LINK_NOT_SUPPORTED);
 		}
 	}
 }

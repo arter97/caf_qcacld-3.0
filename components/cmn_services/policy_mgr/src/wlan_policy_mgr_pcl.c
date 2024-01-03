@@ -1039,8 +1039,11 @@ policy_mgr_modify_pcl_based_on_indoor(struct wlan_objmgr_psoc *psoc,
 
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (wlan_reg_is_freq_indoor_in_secondary_list(pm_ctx->pdev,
-							      pcl_list_org[i]))
+							pcl_list_org[i])) {
+			policy_mgr_debug("Remove freq: %d from PCL as it's indoor",
+					 pcl_list_org[i]);
 			continue;
+		}
 		pcl_list[pcl_len] = pcl_list_org[i];
 		weight_list[pcl_len++] = weight_list_org[i];
 	}
@@ -4314,6 +4317,21 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 	}
 
 	sap_new_freq = pcl.pcl_list[0];
+	/*
+	 * pcl_list carries multiple channel in ML-STA case depending on
+	 * the no.of links connected. Check if intf_ch_freq is carrying
+	 * any frequency from the list and pick it. If intf_ch_freq is not
+	 * present in the list, the frequency present at pcl_list[0] can
+	 * be picked as caller doesn't have any preferred/chosen channel
+	 * as such.
+	 */
+	for (i = 0; i < pcl.pcl_len; i++) {
+		if (pcl.pcl_list[i] == *intf_ch_freq) {
+			sap_new_freq = pcl.pcl_list[i];
+			break;
+		}
+	}
+
 	user_config_freq = policy_mgr_get_user_config_sap_freq(psoc, vdev_id);
 
 	for (i = 0; i < pcl.pcl_len; i++) {
@@ -4672,8 +4690,13 @@ QDF_STATUS policy_mgr_filter_passive_ch(struct wlan_objmgr_pdev *pdev,
 	}
 
 	for (ch_index = 0; ch_index < *ch_cnt; ch_index++) {
-		if (!wlan_reg_is_passive_for_freq(pdev, ch_freq_list[ch_index]))
-			ch_freq_list[target_ch_cnt++] = ch_freq_list[ch_index];
+		if (wlan_reg_is_passive_for_freq(pdev,
+						 ch_freq_list[ch_index])) {
+			policy_mgr_debug("Remove freq: %d from list as it's passive",
+					 ch_freq_list[ch_index]);
+			continue;
+		}
+		ch_freq_list[target_ch_cnt++] = ch_freq_list[ch_index];
 	}
 
 	*ch_cnt = target_ch_cnt;

@@ -473,6 +473,8 @@ wlan_vdev_get_tdls_vdev_obj(struct wlan_objmgr_vdev *vdev)
  * @mac: mac address of tdls peer
  * @link_state: tdls link state
  * @link_reason: reason
+ *
+ * Return: None
  */
 void tdls_set_link_status(struct tdls_vdev_priv_obj *vdev,
 			  const uint8_t *mac,

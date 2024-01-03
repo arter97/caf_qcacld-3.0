@@ -821,15 +821,6 @@ static void tdls_update_pmo_status(struct tdls_vdev_priv_obj *tdls_vdev,
 }
 #endif
 
-/**
- * tdls_set_link_status() - set link statue for TDLS peer
- * @vdev_obj: TDLS vdev object
- * @mac: MAC address of current TDLS peer
- * @link_status: link status
- * @link_reason: reason with link status
- *
- * Return: None.
- */
 void tdls_set_link_status(struct tdls_vdev_priv_obj *vdev_obj,
 			  const uint8_t *mac,
 			  enum tdls_link_state link_status,

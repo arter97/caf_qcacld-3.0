@@ -38,6 +38,7 @@
  * @ml_nlink_ap_stopped_evt: SAP/GO bss stopped
  * @ml_nlink_connection_updated_evt: connection home channel changed
  * @ml_nlink_tdls_request_evt: tdls request link enable/disable
+ * @ml_nlink_vendor_cmd_request_evt: vendor command request
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
@@ -52,6 +53,26 @@ enum ml_nlink_change_event_type {
 	ml_nlink_ap_stopped_evt,
 	ml_nlink_connection_updated_evt,
 	ml_nlink_tdls_request_evt,
+	ml_nlink_vendor_cmd_request_evt,
+};
+
+/**
+ * enum link_control_modes - the types of MLO links state
+ * control modes. This enum is internal mapping of
+ * qca_wlan_vendor_link_state_control_modes.
+ * @LINK_CONTROL_MODE_DEFAULT: MLO links state controlled
+ * by the driver.
+ * @LINK_CONTROL_MODE_USER: MLO links state controlled by
+ * user space.
+ * @LINK_CONTROL_MODE_MIXED: User space provides the
+ * desired number of MLO links to operate in active state at any given time.
+ * The driver will choose which MLO links should operate in the active state.
+ * See enum qca_wlan_vendor_link_state for active state definition.
+ */
+enum link_control_modes {
+	LINK_CONTROL_MODE_DEFAULT = 0,
+	LINK_CONTROL_MODE_USER = 1,
+	LINK_CONTROL_MODE_MIXED = 2,
 };
 
 /**
@@ -59,6 +80,7 @@ enum ml_nlink_change_event_type {
  * @evt: event parameters
  * @link_switch: link switch start parameters
  * @tdls: tdls parameters
+ * @vendor: vendor command set link parameters
  */
 struct ml_nlink_change_event {
 	union {
@@ -75,6 +97,14 @@ struct ml_nlink_change_event {
 			enum mlo_link_force_mode mode;
 			enum mlo_link_force_reason reason;
 		} tdls;
+		struct {
+			enum link_control_modes link_ctrl_mode;
+			uint8_t link_num;
+			uint32_t link_bitmap;
+			uint32_t link_bitmap2;
+			enum mlo_link_force_mode mode;
+			enum mlo_link_force_reason reason;
+		} vendor;
 	} evt;
 };
 
@@ -119,6 +149,7 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_ap_stopped_evt);
 	CASE_RETURN_STRING(ml_nlink_connection_updated_evt);
 	CASE_RETURN_STRING(ml_nlink_tdls_request_evt);
+	CASE_RETURN_STRING(ml_nlink_vendor_cmd_request_evt);
 	default:
 		return "Unknown";
 	}
@@ -189,6 +220,19 @@ ml_nlink_convert_vdev_bitmap_to_linkid_bitmap(
 				uint32_t *vdev_id_bitmap,
 				uint32_t *link_bitmap,
 				uint32_t *associated_bitmap);
+
+/**
+ * convert_link_bitmap_to_link_ids() - Convert link bitmap to link ids
+ * @link_bitmap: PSOC object information
+ * @link_id_sz: link_ids array size
+ * @link_ids: link id array
+ *
+ * Return: num of link id in link_ids array converted from link bitmap
+ */
+uint32_t
+convert_link_bitmap_to_link_ids(uint32_t link_bitmap,
+				uint8_t link_id_sz,
+				uint8_t *link_ids);
 
 /**
  * ml_nlink_convert_link_bitmap_to_ids() - convert link bitmap
@@ -338,6 +382,30 @@ ml_nlink_get_curr_force_state(struct wlan_objmgr_psoc *psoc,
 void
 ml_nlink_clr_force_state(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ml_nlink_vendor_command_set_link() - Update vendor command
+ * set link parameters
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ * @link_control_mode: link control mode: default, user, mix
+ * @reason: reason to set
+ * @mode: mode to set
+ * @link_num: number of link, valid for mode:
+ * @link_bitmap: link bitmap, valid for mode:
+ * @link_bitmap2: inactive link bitmap, only valid for mode
+ *
+ * Return: void
+ */
+void
+ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id,
+				 enum link_control_modes link_control_mode,
+				 enum mlo_link_force_reason reason,
+				 enum mlo_link_force_mode mode,
+				 uint8_t link_num,
+				 uint16_t link_bitmap,
+				 uint16_t link_bitmap2);
 
 /**
  * ml_is_nlink_service_supported() - support nlink or not
