@@ -3032,6 +3032,17 @@ void hdd_adapter_update_mlo_mgr_mac_addr(struct hdd_adapter *adapter);
 bool hdd_is_vdev_in_conn_state(struct wlan_hdd_link_info *link_info);
 
 /**
+ * hdd_vdev_configure_rtt_params() - config rtt parameters
+ *
+ * @vdev: obj of vdev
+ *
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev);
+
+/**
  * hdd_adapter_deregister_fc() - Deregisters flow control
  * callbacks
  * @adapter: HDD adapter

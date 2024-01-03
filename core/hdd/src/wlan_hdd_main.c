@@ -7345,7 +7345,7 @@ bool hdd_is_vdev_in_conn_state(struct wlan_hdd_link_info *link_info)
  * wmi_vdev_param_enable_disable_rtt_responder_role
  * wmi_vdev_param_enable_disable_rtt_initiator_role
  */
-static QDF_STATUS
+QDF_STATUS
 hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
@@ -15085,7 +15085,6 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	bool is_ssr = false;
 	int ret;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct sap_context *sap_ctx;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
@@ -15125,14 +15124,6 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 	if (ret) {
 		hdd_err("failed to create vdev, status:%d", ret);
 		goto sap_destroy_ctx;
-	}
-
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
-
-	if (adapter->device_mode == QDF_SAP_MODE) {
-		status = hdd_vdev_configure_rtt_params(sap_ctx->vdev);
-		if (QDF_IS_STATUS_ERROR(status))
-			goto sap_vdev_destroy;
 	}
 
 	status = hdd_init_ap_mode(link_info, is_ssr, rtnl_held);

@@ -4576,6 +4576,14 @@ QDF_STATUS hdd_init_ap_mode(struct wlan_hdd_link_info *link_info,
 	wlan_sap_set_acs_with_more_param(hdd_ctx->mac_handle,
 					 acs_with_more_param);
 
+	if (adapter->device_mode == QDF_SAP_MODE) {
+		status = hdd_vdev_configure_rtt_params(sap_ctx->vdev);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_err("vdev rtt configure failed");
+			goto error_deinit_sap_session;
+		}
+	}
+
 	/* Allocate the Wireless Extensions state structure */
 	phostapdBuf = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 
