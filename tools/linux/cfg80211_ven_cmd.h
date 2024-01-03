@@ -868,6 +868,11 @@ enum {
 #ifdef WLAN_FEATURE_11BE_MLO
 	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* MLO Max Simultaneous Active links */
 #endif
+	/* User config to set common PSD value for all 20MHz subchannels of the
+	 * current channel in the TPE IE
+	 */
+	IEEE80211_PARAM_TPE_COMMON_PSD = 821,
+	IEEE80211_PARAM_TPE_PWR_UNIT = 822, /* User config to choose PSD or EIRP in a TPE IE */
 };
 
 enum {
@@ -2611,6 +2616,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 		SET_PARAM, 1},
 	{"g_max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
 		GET_PARAM, 0},
+#endif
+#ifdef WLAN_FEATURE_11BE
+	{"set_tpe_common_psd", IEEE80211_PARAM_TPE_COMMON_PSD, SET_PARAM, 1},
+	{"get_tpe_common_psd", IEEE80211_PARAM_TPE_COMMON_PSD, GET_PARAM, 0},
+	{"set_tpe_pwr_unit",   IEEE80211_PARAM_TPE_PWR_UNIT, SET_PARAM, 1},
+	{"get_tpe_pwr_unit",   IEEE80211_PARAM_TPE_PWR_UNIT, GET_PARAM, 1},
 #endif
 };
 
