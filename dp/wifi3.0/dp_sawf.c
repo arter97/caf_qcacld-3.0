@@ -1593,7 +1593,7 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
 	if (!peer) {
-		dp_sawf_err("No peer for id %u", peer_id);
+		dp_sawf_debug("No peer for id %u", peer_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1603,7 +1603,7 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 						DP_MOD_ID_SAWF);
 		if (!primary_link_peer) {
 			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
-			qdf_warn("NULL peer");
+			dp_sawf_debug("NULL peer");
 			return QDF_STATUS_E_FAILURE;
 		}
 		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
@@ -1900,7 +1900,7 @@ dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_TX);
 	if (!peer) {
-		dp_sawf_err("Invalid peer_id %u", peer_id);
+		dp_sawf_debug("Invalid peer_id %u", peer_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
