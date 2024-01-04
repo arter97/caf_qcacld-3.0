@@ -894,7 +894,9 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 
 		if (qdf_log_timestamp_to_usecs(sw_timestamp - sw_ft_entry->add_timestamp) >
 			FISA_FT_ENTRY_AGING_US) {
+			qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
 			dp_fisa_rx_delete_flow(fisa_hdl, elem, lru_ft_entry_idx);
+			qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
 			is_fst_updated = true;
 		} else
 			dp_fisa_debug("skip update due to aging not complete");
@@ -1830,7 +1832,6 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 		      nbuf, qdf_nbuf_next(nbuf), qdf_nbuf_data(nbuf),
 		      qdf_nbuf_len(nbuf), qdf_nbuf_get_only_data_len(nbuf));
 
-	dp_rx_fisa_acquire_ft_lock(fisa_hdl, napi_id);
 	/* Packets of the flow are arriving on a different REO than
 	 * the one configured.
 	 */
@@ -1848,14 +1849,12 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 		 * currently active flow.
 		 */
 		if (cce_match) {
-			dp_rx_fisa_release_ft_lock(fisa_hdl, napi_id);
 			DP_STATS_INC(fisa_hdl, reo_mismatch.allow_cce_match,
 				     1);
 			return FISA_AGGR_NOT_ELIGIBLE;
 		}
 
 		if (fse_metadata != fisa_flow->metadata) {
-			dp_rx_fisa_release_ft_lock(fisa_hdl, napi_id);
 			DP_STATS_INC(fisa_hdl,
 				     reo_mismatch.allow_fse_metdata_mismatch,
 				     1);
@@ -1866,7 +1865,6 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 		       fisa_flow, fisa_flow->napi_id, nbuf, napi_id);
 		DP_STATS_INC(fisa_hdl, reo_mismatch.allow_non_aggr, 1);
 		QDF_BUG(0);
-		dp_rx_fisa_release_ft_lock(fisa_hdl, napi_id);
 		return FISA_AGGR_NOT_ELIGIBLE;
 	}
 
@@ -1983,14 +1981,12 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 		dp_rx_fisa_aggr_tcp(fisa_hdl, fisa_flow, nbuf);
 	}
 
-	dp_rx_fisa_release_ft_lock(fisa_hdl, napi_id);
 	fisa_flow->last_accessed_ts = qdf_get_log_timestamp();
 
 	return FISA_AGGR_DONE;
 
 invalid_fisa_assist:
 	/* Not eligible aggregation deliver frame without FISA */
-	dp_rx_fisa_release_ft_lock(fisa_hdl, napi_id);
 	return FISA_AGGR_NOT_ELIGIBLE;
 }
 
@@ -2087,6 +2083,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 	int fisa_ret;
 	uint8_t rx_ctx_id = QDF_NBUF_CB_RX_CTX_ID(nbuf_list);
 	uint32_t tlv_reo_dest_ind;
+	uint8_t reo_id;
 
 	head_nbuf = nbuf_list;
 
@@ -2127,35 +2124,42 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 			continue;
 		}
 
+		reo_id = QDF_NBUF_CB_RX_CTX_ID(head_nbuf);
+		dp_rx_fisa_acquire_ft_lock(dp_fisa_rx_hdl, reo_id);
+
 		/* Add new flow if the there is no ongoing flow */
 		fisa_flow = dp_rx_get_fisa_flow(dp_fisa_rx_hdl, vdev,
 						head_nbuf);
 
 		/* Do not FISA aggregate IPSec packets */
 		if (fisa_flow &&
-		    fisa_flow->rx_flow_tuple_info.is_exception)
+		    fisa_flow->rx_flow_tuple_info.is_exception) {
+			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
 			goto pull_nbuf;
+		}
 
 		/* Fragmented skb do not handle via fisa
 		 * get that flow and deliver that flow to rx_thread
 		 */
 		if (qdf_unlikely(qdf_nbuf_get_ext_list(head_nbuf))) {
 			dp_fisa_debug("Fragmented skb, will not be FISAed");
-			if (fisa_flow) {
-				dp_rx_fisa_acquire_ft_lock(dp_fisa_rx_hdl,
-							   fisa_flow->napi_id);
+			if (fisa_flow)
 				dp_rx_fisa_flush_flow(vdev, fisa_flow);
-				dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl,
-							   fisa_flow->napi_id);
-			}
+
+			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
 			goto pull_nbuf;
 		}
 
-		if (!fisa_flow)
+		if (!fisa_flow) {
+			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
 			goto pull_nbuf;
+		}
 
 		fisa_ret = dp_add_nbuf_to_fisa_flow(dp_fisa_rx_hdl, vdev,
 						    head_nbuf, fisa_flow);
+
+		dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
+
 		if (fisa_ret == FISA_AGGR_DONE)
 			goto next_msdu;
 
