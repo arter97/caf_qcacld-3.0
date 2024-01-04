@@ -249,7 +249,7 @@ void qca_sawf_3_link_peer_dl_flow_count(struct net_device *netdev, uint8_t *mac_
 	ol_txrx_soc_handle soc_txrx_handle;
 	osif_dev *osdev = NULL;
 
-	if (!netdev->ieee80211_ptr)
+	if (!netdev || !netdev->ieee80211_ptr)
 		return;
 
 	vdev = qca_sawf_get_vdev(netdev, mac_addr);
