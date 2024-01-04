@@ -200,6 +200,16 @@ QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
  */
 uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 				    enum ll_sap_get_target_tsf get_tsf);
+
+/**
+ * wlan_ll_sap_get_target_tsf_for_vdev_restart() - Get target_tsf for vdev
+ * restart
+ * @vdev: vdev pointer
+ *
+ * Return: uint64_t
+ */
+uint64_t
+wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
@@ -225,6 +235,12 @@ QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
 static inline
 uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 				    enum ll_sap_get_target_tsf get_tsf)
+{
+	return 0;
+}
+
+static inline uint64_t
+wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {
 	return 0;
 }
@@ -317,6 +333,12 @@ QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
 static inline
 uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 				    enum ll_sap_get_target_tsf get_tsf)
+{
+	return 0;
+}
+
+static inline uint64_t
+wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {
 	return 0;
 }

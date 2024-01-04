@@ -372,6 +372,22 @@ uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
+uint64_t
+wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return 0;
+
+	/* send target_tsf as 0 for non ll_sap vdev */
+	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
+		return 0;
+
+	return wlan_ll_sap_get_target_tsf(vdev, TARGET_TSF_VDEV_RESTART);
+}
+
 QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
 {
 	if (!msg || !msg->bodyptr) {
