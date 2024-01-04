@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1152,6 +1152,20 @@ static void mlme_init_pmf_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_PMF_SA_QUERY_RETRY_INTERVAL);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static inline void mlme_init_oem_eht_mlo_cfg(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_mlme_generic *gen)
+{
+	gen->oem_eht_mlo_crypto_bitmap =
+				cfg_get(psoc, CFG_OEM_EHT_MLO_CRYPTO_BITMAP);
+}
+#else
+static inline void mlme_init_oem_eht_mlo_cfg(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_mlme_generic *gen)
+{
+}
+#endif /* WLAN_FEATURE_11BE */
+
 #ifdef WLAN_FEATURE_LPSS
 static inline void
 mlme_init_lpass_support_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1377,6 +1391,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP);
 	gen->wls_6ghz_capable = cfg_get(psoc, CFG_WLS_6GHZ_CAPABLE);
 	mlme_init_pmf_cfg(psoc, gen);
+	mlme_init_oem_eht_mlo_cfg(psoc, gen);
 	mlme_init_lpass_support_cfg(psoc, gen);
 	gen->enabled_rf_test_mode = cfg_default(CFG_RF_TEST_MODE_SUPP_ENABLED);
 	gen->enabled_11h = cfg_get(psoc, CFG_11H_SUPPORT_ENABLED);
