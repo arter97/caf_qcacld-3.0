@@ -2246,22 +2246,22 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     if chipset == "qca6750":
         deps = [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
-            "//msm-kernel:all_headers",
-            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
-            "//vendor/qcom/opensource/dataipa:include_headers",
-            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ]
     else:
         deps = [
             "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
+        ]
+
+    deps = deps + [
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
             "//msm-kernel:all_headers",
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+        ]
+
+    if target != "niobe":
+        deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ]
