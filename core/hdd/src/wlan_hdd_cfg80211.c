@@ -12679,7 +12679,8 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	struct nlattr *mlo_bd_info = NULL;
 	uint32_t i = 0;
 	uint32_t link_id = 0;
-	struct wlan_objmgr_vdev *vdev, *link_vdev;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *link_vdev = NULL;
 	struct wlan_channel *bss_chan;
 	struct wlan_hdd_link_info *link_info_t;
 	struct hdd_station_ctx *sta_ctx;
@@ -12759,13 +12760,14 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 		nla_nest_end(skb, mlo_bd);
 		i++;
 
-		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
+		if (link_vdev)
+			hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 	}
 	nla_nest_end(skb, mlo_bd_info);
 end:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
-	if (ret)
+	if (link_vdev)
 		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 
 	return ret;
