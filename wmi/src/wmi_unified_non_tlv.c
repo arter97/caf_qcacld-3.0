@@ -422,12 +422,12 @@ static QDF_STATUS send_vdev_delete_cmd_non_tlv(wmi_unified_t wmi_handle,
 /**
  * send_vdev_stop_cmd_non_tlv() - send vdev stop command to fw
  * @wmi: wmi handle
- * @vdev_id: vdev id
+ * @params: VDEV stop params
  *
  * Return: 0 for success or erro code
  */
 static QDF_STATUS send_vdev_stop_cmd_non_tlv(wmi_unified_t wmi,
-					uint8_t vdev_id)
+					     struct vdev_stop_params *params)
 {
 	wmi_vdev_stop_cmd *cmd;
 	wmi_buf_t buf;
@@ -440,7 +440,7 @@ static QDF_STATUS send_vdev_stop_cmd_non_tlv(wmi_unified_t wmi,
 		return QDF_STATUS_E_NOMEM;
 	}
 	cmd = (wmi_vdev_stop_cmd *)wmi_buf_data(buf);
-	cmd->vdev_id = vdev_id;
+	cmd->vdev_id = params->vdev_id;
 
 	ret =  wmi_unified_cmd_send(wmi, buf, len, WMI_VDEV_STOP_CMDID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
