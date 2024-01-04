@@ -4116,8 +4116,19 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 	}
 
 	for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
-		if (key_entry[j].link_id != MLO_INVALID_LINK_IDX)
+		/*
+		 * Pairwise keys maybe copied for all the WLAN_MAX_ML_BSS_LINKS
+		 * but firmware might have roamed to AP with number of links
+		 * less than WLAN_MAX_ML_BSS_LINKS. So free the memory for those
+		 * links
+		 */
+		if (key_entry[j].link_id != MLO_INVALID_LINK_IDX) {
 			total_links++;
+		} else {
+			wmi_err_rl("Free keys for invalid entry at index:%d",
+				   j);
+			wlan_crypto_free_key(&key_entry[j].keys);
+		}
 	}
 
 	*num_entries = total_links;
