@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1219,8 +1219,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 			 * in OCB mode
 			 */
 			adapter = hdd_get_adapter(hdd_ctx, QDF_OCB_MODE);
-			if (!adapter || !qdf_is_macaddr_broadcast(
-			    (struct qdf_mac_addr *)dest_addr)) {
+			if (!adapter) {
 				/*
 				 * Under assumption that we don't
 				 * receive any action frame with BCST
