@@ -1492,6 +1492,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_ENABLE_DELAYED_LMR_FEEDBACK = 542,
 	OL_ATH_PARAM_ENABLE_SMALL_MRU = 543,
 	OL_ATH_PARAM_ENABLE_LARGE_MRU = 544,
+	OL_ATH_PARAM_DISPLAY_BAND_CHANS = 545,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -2617,12 +2618,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
 		GET_PARAM, 0},
 #endif
-#ifdef WLAN_FEATURE_11BE
-	{"set_tpe_common_psd", IEEE80211_PARAM_TPE_COMMON_PSD, SET_PARAM, 1},
-	{"get_tpe_common_psd", IEEE80211_PARAM_TPE_COMMON_PSD, GET_PARAM, 0},
-	{"set_tpe_pwr_unit",   IEEE80211_PARAM_TPE_PWR_UNIT, SET_PARAM, 1},
-	{"get_tpe_pwr_unit",   IEEE80211_PARAM_TPE_PWR_UNIT, GET_PARAM, 1},
-#endif
+	{"display_band_chans",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_BAND_CHANS, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
