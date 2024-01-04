@@ -4452,6 +4452,11 @@ void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 		return;
 	}
 
+	if (!sap_ctx->acs_cfg) {
+		sap_err("vdev %d acs_cfg is NULL", vdev_id);
+		return;
+	}
+
 	ch_count = sap_ctx->acs_cfg->master_ch_list_count;
 
 	if (!ch_count || ch_count > NUM_CHANNELS)
