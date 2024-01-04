@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -666,15 +666,15 @@ pkt_capture_mgmt_rx_data_cb(struct wlan_objmgr_psoc *psoc,
 
 	pfc = (tpSirMacFrameCtl)(qdf_nbuf_data(wbuf));
 
-	if (pfc->type == SIR_MAC_CTRL_FRAME  &&
+	if (pfc->type == WLAN_FC0_TYPE_CTRL  &&
 	    !vdev_priv->frame_filter.ctrl_rx_frame_filter)
 		goto exit;
 
-	if (pfc->type == SIR_MAC_MGMT_FRAME  &&
+	if (pfc->type == WLAN_FC0_TYPE_MGMT  &&
 	    !vdev_priv->frame_filter.mgmt_rx_frame_filter)
 		goto exit;
 
-	if (pfc->type == SIR_MAC_MGMT_FRAME) {
+	if (pfc->type == WLAN_FC0_TYPE_MGMT) {
 		if (pfc->subType == SIR_MAC_MGMT_BEACON) {
 			if (!pkt_capture_is_beacon_forward_enable(vdev, wbuf))
 				goto exit;

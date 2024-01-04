@@ -596,7 +596,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	 */
 	qdf_mem_zero((uint8_t *) &bcn_struct->macHdr, sizeof(tSirMacMgmtHdr));
 	mac = (tpSirMacMgmtHdr) &bcn_struct->macHdr;
-	mac->fc.type = SIR_MAC_MGMT_FRAME;
+	mac->fc.type = WLAN_FC0_TYPE_MGMT;
 	mac->fc.subType = SIR_MAC_MGMT_BEACON;
 
 	for (i = 0; i < 6; i++)

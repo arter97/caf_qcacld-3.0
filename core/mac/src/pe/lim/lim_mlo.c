@@ -637,7 +637,7 @@ QDF_STATUS lim_mlo_proc_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
 	pHdr = (tpSirMacMgmtHdr)qdf_nbuf_data(buf);
 	fc = pHdr->fc;
 
-	if (fc.type == SIR_MAC_MGMT_FRAME) {
+	if (fc.type == WLAN_FC0_TYPE_MGMT) {
 		if (fc.subType == SIR_MAC_MGMT_ASSOC_REQ) {
 			sub_type = LIM_ASSOC;
 		} else if (fc.subType == SIR_MAC_MGMT_REASSOC_REQ) {

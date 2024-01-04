@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -136,7 +136,7 @@ lim_collect_bss_description(struct mac_context *mac,
 
 	/* set the network type in bss description */
 	pBssDescr->nwType =
-		lim_get_nw_type(mac, chan_freq, SIR_MAC_MGMT_FRAME, pBPR);
+		lim_get_nw_type(mac, chan_freq, WLAN_FC0_TYPE_MGMT, pBPR);
 
 	/* Copy RSSI & SINR from BD */
 	pBssDescr->rssi = (int8_t) WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo);

@@ -4365,7 +4365,7 @@ tSirNwType lim_get_nw_type(struct mac_context *mac, uint32_t chan_freq, uint32_t
 	tSirNwType nwType = eSIR_11B_NW_TYPE;
 
 	/* Logic to be cleaned up for 11AC & 11AX */
-	if (type == SIR_MAC_DATA_FRAME) {
+	if (type == WLAN_FC0_TYPE_DATA) {
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
 			nwType = eSIR_11G_NW_TYPE;
 		} else {
@@ -9747,7 +9747,7 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 	}
 
 	hdr = WMA_GET_RX_MAC_HEADER(rxpktinfor);
-	if (hdr->fc.type == SIR_MAC_MGMT_FRAME) {
+	if (hdr->fc.type == WLAN_FC0_TYPE_MGMT) {
 		pe_debug("RxBd: %pK mHdr: %pK Type: %d Subtype: %d SizeFC: %zu",
 				rxpktinfor, hdr, hdr->fc.type, hdr->fc.subType,
 				sizeof(tSirMacFrameCtl));

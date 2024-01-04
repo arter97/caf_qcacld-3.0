@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -444,9 +444,11 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	pe_debug("BSSID: "QDF_MAC_ADDR_FMT,
 		 QDF_MAC_ADDR_REF(pe_session->limReAssocbssId));
 	/* Next, we fill out the buffer descriptor: */
-	lim_populate_mac_header(mac_ctx, frame, SIR_MAC_MGMT_FRAME,
-		SIR_MAC_MGMT_REASSOC_REQ, pe_session->limReAssocbssId,
-		pe_session->self_mac_addr);
+	lim_populate_mac_header(mac_ctx, frame, WLAN_FC0_TYPE_MGMT,
+				SIR_MAC_MGMT_REASSOC_REQ,
+				pe_session->limReAssocbssId,
+				pe_session->self_mac_addr);
+
 	mac_hdr = (tpSirMacMgmtHdr) frame;
 	/* That done, pack the ReAssoc Request: */
 	status = dot11f_pack_re_assoc_request(mac_ctx, frm, frame +
@@ -880,9 +882,11 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 	qdf_mem_zero(pFrame, nBytes);
 
 	/* Next, we fill out the buffer descriptor: */
-	lim_populate_mac_header(mac, pFrame, SIR_MAC_MGMT_FRAME,
-		SIR_MAC_MGMT_REASSOC_REQ, pe_session->limReAssocbssId,
-		pe_session->self_mac_addr);
+	lim_populate_mac_header(mac, pFrame, WLAN_FC0_TYPE_MGMT,
+				SIR_MAC_MGMT_REASSOC_REQ,
+				pe_session->limReAssocbssId,
+				pe_session->self_mac_addr);
+
 	pMacHdr = (tpSirMacMgmtHdr) pFrame;
 
 	/* That done, pack the Probe Request: */

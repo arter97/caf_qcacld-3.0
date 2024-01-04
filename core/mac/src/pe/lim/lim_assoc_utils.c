@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3214,12 +3214,12 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 	 * Check for SSID only in probe response. Beacons may not carry
 	 * SSID information in hidden SSID case
 	 */
-	if (((SIR_MAC_MGMT_FRAME == header->fc.type) &&
-		(SIR_MAC_MGMT_PROBE_RSP == header->fc.subType)) &&
-		current_ssid.length &&
-		(qdf_mem_cmp((uint8_t *) &beacon_probe_rsp->ssId,
-				  (uint8_t *) &current_ssid,
-				  (uint8_t) (1 + current_ssid.length)))) {
+	if ((WLAN_FC0_TYPE_MGMT == header->fc.type &&
+	     SIR_MAC_MGMT_PROBE_RSP == header->fc.subType) &&
+	    current_ssid.length &&
+	    qdf_mem_cmp((uint8_t *)&beacon_probe_rsp->ssId,
+			(uint8_t *)&current_ssid,
+			(uint8_t)(1 + current_ssid.length))) {
 		/*
 		 * Received SSID does not match with the one we've.
 		 * Ignore received Beacon frame

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2006,7 +2006,7 @@ hdd_indicate_unprot_mgmt_frame(struct wlan_hdd_link_info *link_info,
 	}
 
 	type = WLAN_HDD_GET_TYPE_FRM_FC(frame[0]);
-	if (type != SIR_MAC_MGMT_FRAME) {
+	if (type != WLAN_FC0_TYPE_MGMT) {
 		hdd_warn("Unexpected frame type %d", type);
 		return;
 	}

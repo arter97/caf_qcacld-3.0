@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -90,7 +90,7 @@ QDF_STATUS sys_bbt_process_message_core(struct mac_context *mac_ctx,
 	mac_ctx->sys.gSysFrameCount[type][subtype]++;
 	framecount = mac_ctx->sys.gSysFrameCount[type][subtype];
 
-	if (type == SIR_MAC_MGMT_FRAME) {
+	if (type == WLAN_FC0_TYPE_MGMT) {
 		tpSirMacMgmtHdr mac_hdr;
 
 		/*
@@ -145,7 +145,7 @@ QDF_STATUS sys_bbt_process_message_core(struct mac_context *mac_ctx,
 		}
 		mac_ctx->sys.gSysBbtPostedToLim++;
 #ifdef FEATURE_WLAN_ESE
-	} else if (type == SIR_MAC_DATA_FRAME) {
+	} else if (type == WLAN_FC0_TYPE_DATA) {
 		pe_debug("IAPP Frame...");
 		/* Post the message to PE Queue */
 		ret = lim_post_msg_api(mac_ctx, msg);

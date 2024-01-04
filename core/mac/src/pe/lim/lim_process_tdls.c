@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -499,7 +499,7 @@ static uint32_t lim_prepare_tdls_frame_header(struct mac_context *mac, uint8_t *
 	 * prepare 802.11 header
 	 */
 	pMacHdr->fc.protVer = SIR_MAC_PROTOCOL_VERSION;
-	pMacHdr->fc.type = SIR_MAC_DATA_FRAME;
+	pMacHdr->fc.type = WLAN_FC0_TYPE_DATA;
 
 	sta_ds = dph_lookup_hash_entry(mac, peerMac, &aid,
 					&pe_session->dph.dphHashTable);
@@ -1785,7 +1785,7 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 
 	/* Make public Action Frame */
 	lim_tdls_copy_self_mac(pe_session, selfaddr);
-	lim_populate_mac_header(mac, pFrame, SIR_MAC_MGMT_FRAME,
+	lim_populate_mac_header(mac, pFrame, WLAN_FC0_TYPE_MGMT,
 				SIR_MAC_MGMT_ACTION, peer_mac.bytes,
 				selfaddr);
 

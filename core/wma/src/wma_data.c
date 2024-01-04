@@ -2665,7 +2665,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 				(!is_wmi_mgmt_tx) && tx_frm_ota_comp_cb;
 
 	/* Fill the frame index to send */
-	if (pFc->type == SIR_MAC_MGMT_FRAME) {
+	if (pFc->type == WLAN_FC0_TYPE_MGMT) {
 		if (tx_frm_ota_comp_cb) {
 			if (downld_comp_required)
 				tx_frm_index =
@@ -2721,7 +2721,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		chanfreq = 0;
 	}
 
-	if (pFc->type == SIR_MAC_MGMT_FRAME) {
+	if (pFc->type == WLAN_FC0_TYPE_MGMT) {
 		if ((mac->mlme_cfg->gen.debug_packet_log &
 		    DEBUG_PKTLOG_TYPE_MGMT) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_REQ) &&

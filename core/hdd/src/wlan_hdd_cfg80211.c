@@ -22419,7 +22419,7 @@ int wlan_hdd_cfg80211_register_frames(struct hdd_adapter *adapter)
 {
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	/* Register for all P2P action, public action etc frames */
-	uint16_t type = (SIR_MAC_MGMT_FRAME << 2) | (SIR_MAC_MGMT_ACTION << 4);
+	uint16_t type = (WLAN_FC0_TYPE_MGMT << 2) | (SIR_MAC_MGMT_ACTION << 4);
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	hdd_enter();
@@ -22531,7 +22531,7 @@ void wlan_hdd_cfg80211_deregister_frames(struct hdd_adapter *adapter)
 {
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	/* Deregister for all P2P action, public action etc frames */
-	uint16_t type = (SIR_MAC_MGMT_FRAME << 2) | (SIR_MAC_MGMT_ACTION << 4);
+	uint16_t type = (WLAN_FC0_TYPE_MGMT << 2) | (SIR_MAC_MGMT_ACTION << 4);
 
 	hdd_enter();
 

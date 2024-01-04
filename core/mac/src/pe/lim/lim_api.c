@@ -1821,7 +1821,7 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 
 	hdr = (tpSirMacMgmtHdr)((uint8_t *)roam_synch +
 		roam_synch->reassoc_req_offset);
-	if (hdr->fc.type == SIR_MAC_MGMT_FRAME &&
+	if (hdr->fc.type == WLAN_FC0_TYPE_MGMT &&
 	    hdr->fc.subType == SIR_MAC_MGMT_ASSOC_REQ) {
 		ies_offset = WLAN_ASSOC_REQ_IES_OFFSET;
 		pe_debug("roam assoc req frm");
@@ -2254,7 +2254,7 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	}
 
 	bss_desc_ptr->nwType = lim_get_nw_type(mac, bss_desc_ptr->chan_freq,
-					       SIR_MAC_MGMT_FRAME,
+					       WLAN_FC0_TYPE_MGMT,
 					       parsed_frm_ptr);
 
 	bss_desc_ptr->sinr = 0;
@@ -2595,7 +2595,7 @@ lim_check_ft_initial_im_association(struct roam_offload_synch_ind *roam_synch,
 	assoc_req_ptr = (uint8_t *) roam_synch + roam_synch->reassoc_req_offset;
 	hdr = (tpSirMacMgmtHdr) assoc_req_ptr;
 
-	if (hdr->fc.type == SIR_MAC_MGMT_FRAME &&
+	if (hdr->fc.type == WLAN_FC0_TYPE_MGMT &&
 	    hdr->fc.subType == SIR_MAC_MGMT_ASSOC_REQ) {
 		roam_synch->is_assoc = true;
 		if (session_entry->is11Rconnection) {

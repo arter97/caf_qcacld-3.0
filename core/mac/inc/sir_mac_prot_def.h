@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,12 +48,6 @@
 
 /* / Current version of 802.11 */
 #define SIR_MAC_PROTOCOL_VERSION 0
-
-/* Frame Type definitions */
-
-#define SIR_MAC_MGMT_FRAME    0x0
-#define SIR_MAC_CTRL_FRAME    0x1
-#define SIR_MAC_DATA_FRAME    0x2
 
 /* Data frame subtype definitions */
 #define SIR_MAC_DATA_DATA                 0

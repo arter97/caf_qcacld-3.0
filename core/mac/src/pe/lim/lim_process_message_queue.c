@@ -529,7 +529,7 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 			status = lim_util_get_type_subtype(lim_msg->bodyptr,
 							   &type, &subtype);
 			if (QDF_IS_STATUS_SUCCESS(status) &&
-				(type == SIR_MAC_MGMT_FRAME) &&
+				(type == WLAN_FC0_TYPE_MGMT) &&
 				((subtype == SIR_MAC_MGMT_BEACON) ||
 				 (subtype == SIR_MAC_MGMT_PROBE_RSP)))
 				mgmt_pkt_defer = false;
@@ -1036,7 +1036,7 @@ static void lim_handle_unknown_a2_index_frames(struct mac_context *mac_ctx,
 	 * statements.
 	 */
 	if (LIM_IS_STA_ROLE(session_entry) &&
-		(mac_hdr->fc.type == SIR_MAC_MGMT_FRAME) &&
+		(mac_hdr->fc.type == WLAN_FC0_TYPE_MGMT) &&
 		(mac_hdr->fc.subType == SIR_MAC_MGMT_ACTION))
 		lim_process_action_frame(mac_ctx, rx_pkt_buffer, session_entry);
 #endif
@@ -1074,7 +1074,7 @@ lim_is_ignore_btm_frame(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	action_hdr = (tpSirMacActionFrameHdr)body;
 
 	if (frm_len < sizeof(*action_hdr) || !action_hdr ||
-	    fc.type != SIR_MAC_MGMT_FRAME || fc.subType != SIR_MAC_MGMT_ACTION)
+	    fc.type != WLAN_FC0_TYPE_MGMT || fc.subType != SIR_MAC_MGMT_ACTION)
 		return false;
 
 	action_id = action_hdr->actionID;
@@ -1144,13 +1144,14 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 	while (mgmt_frame) {
 		type = (mgmt_frame->frameType >> 2) & 0x03;
 		sub_type = (mgmt_frame->frameType >> 4) & 0x0f;
-		if ((type == SIR_MAC_MGMT_FRAME)
-		    && (fc.type == SIR_MAC_MGMT_FRAME)
-		    && (sub_type == SIR_MAC_MGMT_RESERVED15)) {
+		if (type == WLAN_FC0_TYPE_MGMT &&
+		    fc.type == WLAN_FC0_TYPE_MGMT &&
+		    sub_type == SIR_MAC_MGMT_RESERVED15) {
 			pe_debug("rcvd frm match for SIR_MAC_MGMT_RESERVED15");
 			match = true;
 			break;
 		}
+
 		if (mgmt_frame->frameType == frm_type) {
 			if (mgmt_frame->matchLen <= 0) {
 				match = true;
@@ -1201,9 +1202,9 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 			WMA_GET_RX_RSSI_NORMALIZED(buff_desc),
 			RXMGMT_FLAG_NONE);
 
-		if ((type == SIR_MAC_MGMT_FRAME)
-		    && (fc.type == SIR_MAC_MGMT_FRAME)
-		    && (sub_type == SIR_MAC_MGMT_RESERVED15))
+		if (type == WLAN_FC0_TYPE_MGMT &&
+		    fc.type == WLAN_FC0_TYPE_MGMT &&
+		    sub_type == SIR_MAC_MGMT_RESERVED15)
 			/* These packets needs to be processed by PE/SME
 			 * as well as HDD.If it returns true here,
 			 * the packet is forwarded to HDD only.
@@ -1230,7 +1231,7 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 static bool
 lim_is_mgmt_frame_loggable(uint8_t type, uint8_t subtype)
 {
-	if (type != SIR_MAC_MGMT_FRAME)
+	if (type != WLAN_FC0_TYPE_MGMT)
 		return false;
 
 	switch (subtype) {
@@ -1316,7 +1317,7 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR, pHdr,
 			   WMA_GET_RX_MPDU_HEADER_LEN(pRxPacketInfo));
 #endif
-	if (fc.type == SIR_MAC_MGMT_FRAME) {
+	if (fc.type == WLAN_FC0_TYPE_MGMT) {
 		if ((mac->mlme_cfg->gen.debug_packet_log &
 		    DEBUG_PKTLOG_TYPE_MGMT) &&
 		    (fc.subType != SIR_MAC_MGMT_PROBE_REQ) &&
@@ -1405,7 +1406,7 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 	}
 
 	switch (fc.type) {
-	case SIR_MAC_MGMT_FRAME:
+	case WLAN_FC0_TYPE_MGMT:
 	{
 		/* Received Management frame */
 		switch (fc.subType) {
@@ -1521,7 +1522,7 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 
 	}
 	break;
-	case SIR_MAC_DATA_FRAME:
+	case WLAN_FC0_TYPE_DATA:
 	{
 	}
 	break;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1650,7 +1650,7 @@ void lim_process_mlm_del_bss_rsp(struct mac_context *mac,
 	/* in the case of nested request the new request initiated from the response will take care of resetting */
 	/* the deferred flag. */
 	SET_LIM_PROCESS_DEFD_MESGS(mac, true);
-	mac->sys.gSysFrameCount[SIR_MAC_MGMT_FRAME][SIR_MAC_MGMT_DEAUTH] = 0;
+	mac->sys.gSysFrameCount[WLAN_FC0_TYPE_MGMT][SIR_MAC_MGMT_DEAUTH] = 0;
 
 	if (LIM_IS_AP_ROLE(pe_session) &&
 	    (pe_session->statypeForBss == STA_ENTRY_SELF)) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -371,7 +371,7 @@ static QDF_STATUS lim_populate_fd_tmpl_frame(struct mac_context *mac,
 
 	cur_phymode = des_chan->ch_phymode;
 
-	lim_populate_mac_header(mac, frm, SIR_MAC_MGMT_FRAME,
+	lim_populate_mac_header(mac, frm, WLAN_FC0_TYPE_MGMT,
 				SIR_MAC_MGMT_ACTION, broadcast_mac_addr.bytes,
 				pe_session->self_mac_addr);
 	mac_hdr = (tpSirMacMgmtHdr)frm;
@@ -804,10 +804,10 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	qdf_mem_zero(pFrame2Hal, nBytes);
 
 	/* Next, we fill out the buffer descriptor: */
-	lim_populate_mac_header(mac, pFrame2Hal, SIR_MAC_MGMT_FRAME,
-					     SIR_MAC_MGMT_PROBE_RSP,
-					     pe_session->self_mac_addr,
-					     pe_session->self_mac_addr);
+	lim_populate_mac_header(mac, pFrame2Hal, WLAN_FC0_TYPE_MGMT,
+				SIR_MAC_MGMT_PROBE_RSP,
+				pe_session->self_mac_addr,
+				pe_session->self_mac_addr);
 
 	pMacHdr = (tpSirMacMgmtHdr) pFrame2Hal;
 
@@ -927,8 +927,9 @@ int sch_gen_timing_advert_frame(struct mac_context *mac_ctx, tSirMacAddr self_ad
 	if (DOT11F_WARNED(ret))
 		pe_warn("Warning packing frame");
 
-	lim_populate_mac_header(mac_ctx, *buf, SIR_MAC_MGMT_FRAME,
-		SIR_MAC_MGMT_TIME_ADVERT, wildcard_bssid.bytes, self_addr);
+	lim_populate_mac_header(mac_ctx, *buf, WLAN_FC0_TYPE_MGMT,
+				SIR_MAC_MGMT_TIME_ADVERT, wildcard_bssid.bytes,
+				self_addr);
 
 	/* The timestamp field is right after the header */
 	*timestamp_offset = sizeof(tSirMacMgmtHdr);

@@ -262,7 +262,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE ||
 	     adapter->device_mode == QDF_NAN_DISC_MODE) &&
-	    (type == SIR_MAC_MGMT_FRAME &&
+	    (type == WLAN_FC0_TYPE_MGMT &&
 	    sub_type == SIR_MAC_MGMT_AUTH)) {
 		/* Request ROC for PASN authentication frame */
 		if (len > (sizeof(struct wlan_frame_hdr) +
@@ -299,7 +299,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	 */
 	if ((adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    (type == SIR_MAC_MGMT_FRAME) &&
+	    (type == WLAN_FC0_TYPE_MGMT) &&
 	    (sub_type == SIR_MAC_MGMT_ASSOC_RSP ||
 	     sub_type == SIR_MAC_MGMT_REASSOC_RSP)) {
 		assoc_resp = &((struct ieee80211_mgmt *)buf)->u.assoc_resp.variable[0];
@@ -1160,7 +1160,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 
 	type = WLAN_HDD_GET_TYPE_FRM_FC(pb_frames[0]);
 	sub_type = WLAN_HDD_GET_SUBTYPE_FRM_FC(pb_frames[0]);
-	if (type == SIR_MAC_MGMT_FRAME &&
+	if (type == WLAN_FC0_TYPE_MGMT &&
 	    sub_type == SIR_MAC_MGMT_AUTH &&
 	    frm_len > (sizeof(struct wlan_frame_hdr) +
 		       WLAN_AUTH_FRAME_MIN_LEN)) {
@@ -1195,7 +1195,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	}
 
 	/* Get adapter from Destination mac address of the frame */
-	if (type == SIR_MAC_MGMT_FRAME &&
+	if (type == WLAN_FC0_TYPE_MGMT &&
 	    sub_type != SIR_MAC_MGMT_PROBE_REQ && !is_pasn_auth_frame &&
 	    !qdf_is_macaddr_broadcast(
 	     (struct qdf_mac_addr *)&pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET])) {
