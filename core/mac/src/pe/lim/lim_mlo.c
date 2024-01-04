@@ -213,7 +213,7 @@ struct pe_session *pe_find_partner_session_by_link_id(
 	}
 
 	vdev = mlo_get_vdev_by_link_id(session->vdev, link_id,
-				       WLAN_LEGACY_MAC_ID);
+				       WLAN_MLO_MGR_ID);
 
 	if (!vdev) {
 		pe_err("vdev is null");
@@ -224,7 +224,7 @@ struct pe_session *pe_find_partner_session_by_link_id(
 			mac, vdev->vdev_objmgr.vdev_id);
 
 	if (!partner_session)
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 
 	return partner_session;
 }
