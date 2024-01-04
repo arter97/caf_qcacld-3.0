@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1416,6 +1416,47 @@ target_if_cm_roam_send_time_sync_cmd(wmi_unified_t wmi_handle)
 	return wmi_send_time_stamp_sync_cmd_tlv(wmi_handle);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static QDF_STATUS
+target_if_cm_roam_oem_eht_mlo_bitmap(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	wmi_unified_t wmi_handle;
+	uint32_t oem_eht_bitmap;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		target_if_err("psoc handle is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
+	if (!wmi_handle)
+		return status;
+
+	status = wlan_mlme_get_oem_eht_mlo_config(psoc, &oem_eht_bitmap);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = target_if_roam_set_param(wmi_handle,
+					  wlan_vdev_get_id(vdev),
+					  WMI_ROAM_PARAM_CRYPTO_EHT_CONFIG,
+					  oem_eht_bitmap);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_err("Failed to set roam oem eht bitmap");
+
+	return status;
+}
+#else
+static inline QDF_STATUS
+target_if_cm_roam_oem_eht_mlo_bitmap(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * target_if_cm_roam_send_mlo_config() - Send roam mlo related commands
@@ -1641,6 +1682,7 @@ target_if_cm_roam_send_start(struct wlan_objmgr_vdev *vdev,
 		target_if_cm_roam_rssi_diff_6ghz(vdev,
 						 req->wlan_roam_rssi_diff_6ghz);
 
+	status = target_if_cm_roam_oem_eht_mlo_bitmap(vdev);
 	/* add other wmi commands */
 end:
 	return status;
@@ -2145,6 +2187,8 @@ target_if_cm_roam_send_update_config(struct wlan_objmgr_vdev *vdev,
 		if (req->wlan_roam_rssi_diff_6ghz)
 			target_if_cm_roam_rssi_diff_6ghz(
 					vdev, req->wlan_roam_rssi_diff_6ghz);
+
+		status = target_if_cm_roam_oem_eht_mlo_bitmap(vdev);
 	}
 end:
 	return status;
