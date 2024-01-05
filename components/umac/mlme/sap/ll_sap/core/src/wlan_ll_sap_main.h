@@ -66,16 +66,6 @@ struct target_tsf {
 	uint64_t non_twt_target_tsf;
 };
 
-/**
- * struct ll_sap_chan_info - LL_LT_SAP channel info for CSA
- * @freq: channel frequency
- * @ch_width: channel width
- */
-struct ll_sap_chan_info {
-	qdf_freq_t freq;
-	enum phy_ch_width ch_width;
-};
-
  /**
   * struct ll_sap_vdev_peer_entry - ll_sap vdev peer entries
   * @macpeer: peer mac address
@@ -91,13 +81,11 @@ struct ll_sap_vdev_peer_entry {
  * @bearer_switch_ctx: Bearer switch context
  * @high_ap_availability_cookie: High AP availability cookie
  * @target_tsf: pointer to target_tsf structure
- * @chan_info: LL_LT_SAP channel info
  */
 struct ll_sap_vdev_priv_obj {
 	struct bearer_switch_info *bearer_switch_ctx;
 	uint16_t high_ap_availability_cookie[MAX_HIGH_AP_AVAILABILITY_REQUESTS];
 	struct target_tsf target_tsf;
-	struct ll_sap_chan_info chan_info;
 };
 
 /**

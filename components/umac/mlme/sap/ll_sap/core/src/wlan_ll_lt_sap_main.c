@@ -603,6 +603,7 @@ QDF_STATUS ll_lt_sap_sent_ecsa_and_vdev_restart(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	int i;
 
+	wlan_ll_sap_notify_chan_switch_started(vdev);
 	peer_entry.num_peer = 0;
 	wlan_objmgr_iterate_peerobj_list(vdev, ll_lt_sap_get_vdev_peer_entries,
 					 &peer_entry, WLAN_LL_SAP_ID);

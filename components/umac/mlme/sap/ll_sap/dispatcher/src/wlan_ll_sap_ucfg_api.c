@@ -23,6 +23,7 @@
 #include "../../core/src/wlan_ll_lt_sap_main.h"
 #include "../../core/src/wlan_ll_lt_sap_bearer_switch.h"
 #include <wlan_ll_sap_ucfg_api.h>
+#include "wlan_ll_sap_api.h"
 
 QDF_STATUS ucfg_ll_sap_init(void)
 {
@@ -102,3 +103,10 @@ void ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete(
 	ll_lt_sap_switch_bearer_on_p2p_go_complete(psoc, vdev_id, device_mode);
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+void ucfg_ll_lt_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
+				   uint64_t *target_tsf)
+{
+	*target_tsf = wlan_ll_sap_get_target_tsf(vdev, TARGET_TSF_GATT_MSG);
+}
+#endif

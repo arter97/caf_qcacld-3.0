@@ -1816,4 +1816,15 @@ void lim_process_sta_add_bss_rsp_pre_assoc(struct mac_context *mac_ctx,
 					   struct bss_params *add_bss_params,
 					   struct pe_session *session_entry,
 					   QDF_STATUS status);
+
+/**
+ * lim_notify_channel_switch_started() - Notify channel switch started
+ * @mac_ctx:  Pointer to mac context
+ * @session: PE session handle
+ *
+ * Return: None
+ */
+void
+lim_notify_channel_switch_started(struct mac_context *mac_ctx,
+				  struct pe_session *session);
 #endif /* __LIM_TYPES_H */

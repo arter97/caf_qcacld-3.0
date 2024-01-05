@@ -22,6 +22,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_dfs_utils_api.h"
+#include "wlan_mlme_vdev_mgr_interface.h"
 
 #define SET_HT_MCS3(mcs) do { \
 	mcs[0] = 0x0f;        \
@@ -362,6 +363,8 @@ uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 			return ll_sap_obj->target_tsf.twt_target_tsf;
 		else
 			return ll_sap_obj->target_tsf.non_twt_target_tsf;
+	case TARGET_TSF_GATT_MSG:
+		return ll_sap_obj->target_tsf.non_twt_target_tsf;
 	default:
 		break;
 	}
@@ -419,7 +422,12 @@ QDF_STATUS wlan_ll_sap_get_tsf_stats_before_csa(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		ll_sap_err("vdev %d get next_sp_start_tsf and curr_tsf failed",
 			   vdev_id);
-		//send gatt message
+		/*
+		 * In failure case, update target_tsf with 0 which
+		 * means immediate switch.
+		 */
+		wlan_ll_sap_notify_chan_switch_started(vdev);
+		wlan_ll_sap_send_continue_vdev_restart(vdev);
 	}
 
 	return status;

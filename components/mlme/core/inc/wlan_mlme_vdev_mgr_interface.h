@@ -624,6 +624,14 @@ void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev);
  */
 void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
 				   uint8_t *macaddr);
+
+/**
+ * wlan_ll_sap_notify_chan_switch_started() - Notify channel switch started
+ * @vdev: pointer to vdev object
+ *
+ * Return: None
+ */
+void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
@@ -633,6 +641,11 @@ void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
 static inline
 void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
 				   uint8_t *macaddr)
+{
+}
+
+static inline
+void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif
@@ -645,6 +658,11 @@ void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
 static inline
 void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
 				   uint8_t *macaddr)
+{
+}
+
+static inline
+void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif

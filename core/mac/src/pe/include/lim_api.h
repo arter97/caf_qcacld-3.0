@@ -998,6 +998,14 @@ QDF_STATUS lim_ll_sap_send_ecsa_action_frame(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 QDF_STATUS lim_ll_sap_continue_vdev_restart(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * lim_ll_sap_notify_chan_switch_started() - Notify channel switch started for
+ * LL_LT_SAP
+ *
+ * Return
+ */
+QDF_STATUS lim_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 QDF_STATUS lim_ll_sap_send_ecsa_action_frame(struct wlan_objmgr_vdev *vdev,
@@ -1008,6 +1016,12 @@ QDF_STATUS lim_ll_sap_send_ecsa_action_frame(struct wlan_objmgr_vdev *vdev,
 
 static inline
 QDF_STATUS lim_ll_sap_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS lim_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

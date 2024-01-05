@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,6 +28,8 @@
 #include "wlan_fwol_ucfg_api.h"
 #include <qca_vendor.h>
 #include <linux/errqueue.h>
+#include "wlan_hdd_ll_lt_sap.h"
+
 #if defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ) || \
 	defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC) || \
 	defined(WLAN_FEATURE_TSF_ACCURACY)
@@ -3305,6 +3307,7 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 	bool enable_auto_rpt;
 	enum hdd_tsf_auto_rpt_source source =
 		HDD_TSF_AUTO_RPT_SOURCE_UPLINK_DELAY;
+	uint64_t target_tsf = 0;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -3372,6 +3375,29 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 		status = hdd_handle_tsf_dynamic_start(adapter, attr);
 	} else if (tsf_cmd == QCA_TSF_SYNC_STOP) {
 		status = hdd_handle_tsf_dynamic_stop(adapter);
+	} else if (tsf_cmd == QCA_TSF_SYNC_GET_CSA_TIMESTAMP) {
+		status = wlan_hdd_ll_lt_sap_get_csa_timestamp(
+							hdd_ctx->psoc,
+							adapter->deflink->vdev,
+							&target_tsf);
+		if (status != 0)
+			goto end;
+
+		reply_skb =
+			wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
+							 sizeof(uint64_t) +
+							 NLMSG_HDRLEN,
+							 index, GFP_KERNEL);
+		if (hdd_wlan_nla_put_u64(reply_skb,
+					 QCA_WLAN_VENDOR_ATTR_TSF_TIMER_VALUE,
+					 target_tsf)) {
+			hdd_err("nla put fail");
+			wlan_cfg80211_vendor_free_skb(reply_skb);
+			status = -EINVAL;
+			goto end;
+		}
+		status = wlan_cfg80211_vendor_cmd_reply(reply_skb);
+		return status;
 	} else {
 		status = 0;
 	}

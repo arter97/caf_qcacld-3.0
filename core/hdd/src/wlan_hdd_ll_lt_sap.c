@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -281,3 +281,21 @@ int wlan_hdd_cfg80211_ll_lt_sap_high_ap_availability(struct wiphy *wiphy,
 	return errno;
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+int wlan_hdd_ll_lt_sap_get_csa_timestamp(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev,
+					 uint64_t *target_tsf)
+{
+	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+		return -EINVAL;
+
+	ucfg_ll_lt_sap_get_target_tsf(vdev, target_tsf);
+
+	return 0;
+}
+#endif

@@ -603,6 +603,29 @@ QDF_STATUS lim_ll_sap_send_ecsa_action_frame(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+lim_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
+{
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	session = pe_find_session_by_vdev_id(mac_ctx,
+					     wlan_vdev_get_id(vdev));
+	if (!session) {
+		pe_err("Session not found for vdev_id: %d",
+		       wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	lim_notify_channel_switch_started(mac_ctx, session);
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 void lim_stop_pmfcomeback_timer(struct pe_session *session)

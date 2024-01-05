@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -85,4 +85,26 @@ int wlan_hdd_cfg80211_ll_lt_sap_high_ap_availability(struct wiphy *wiphy,
 						     struct wireless_dev *wdev,
 						     const void *data,
 						     int data_len);
+
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+/**
+ * wlan_hdd_ll_lt_sap_get_csa_timestamp() - GET CSA timestamp for LL_LT_SAP
+ * @psoc: psoc object
+ * @vdev: vdev object
+ * @target_tsf: target_tsf parameter
+ *
+ * Return: int
+ */
+int wlan_hdd_ll_lt_sap_get_csa_timestamp(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev,
+					 uint64_t *target_tsf);
+#else
+static inline
+int wlan_hdd_ll_lt_sap_get_csa_timestamp(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev,
+					 uint64_t *target_tsf)
+{
+	return -EINVAL;
+}
+#endif
 #endif /* __WLAN_HDD_LL_LT_SAP_H */

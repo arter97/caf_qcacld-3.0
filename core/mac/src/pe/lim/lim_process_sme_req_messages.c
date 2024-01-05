@@ -10152,7 +10152,7 @@ void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 	}
 }
 
-static void
+void
 lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 				  struct pe_session *session)
 {
@@ -10202,6 +10202,8 @@ lim_notify_channel_switch_started(struct mac_context *mac_ctx,
  * lim_handle_ll_lt_sap_csa() - Handle LL_LT_SAP CSA
  * @mac_ctx: Pointer to Global MAC structure
  * @session_entry: Pointer to session entry
+ *
+ * Return: None
  */
 static void lim_handle_ll_lt_sap_csa(struct mac_context *mac_ctx,
 				     struct pe_session *session_entry)
@@ -10214,6 +10216,7 @@ static void lim_handle_ll_lt_sap_csa(struct mac_context *mac_ctx,
 	peer_count = wlan_vdev_get_peer_sta_count(session_entry->vdev);
 	if (!peer_count) {
 		pe_debug("Peer count is 0 for LL_LT_SAP, continue CSA directly");
+		lim_notify_channel_switch_started(mac_ctx, session_entry);
 		lim_process_ap_ecsa_timeout(session_entry);
 	} else {
 		/**

@@ -26,7 +26,38 @@ struct ll_sap_ops *global_ll_sap_ops;
 static
 void ll_sap_tsf_timer_timeout(void *user_data)
 {
-	//send gatt message
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev;
+	struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj;
+
+	psoc = (struct wlan_objmgr_psoc *)data;
+
+	if (!psoc) {
+		ll_sap_err("Invalid psoc");
+		return;
+	}
+
+	ll_sap_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
+							psoc,
+							WLAN_UMAC_COMP_LL_SAP);
+	if (!ll_sap_psoc_obj)
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+						psoc,
+						ll_sap_psoc_obj->timer_vdev_id,
+						WLAN_LL_SAP_ID);
+	if (!vdev)
+		return;
+
+	/*
+	 * In tsf_timer timeout case, update target_tsf with 0 which
+	 * means immediate switch.
+	 */
+	wlan_ll_sap_notify_chan_switch_started(vdev);
+	wlan_ll_sap_send_continue_vdev_restart(vdev);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
 }
 #else
 static inline

@@ -2361,6 +2361,11 @@ void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
 {
 	lim_ll_sap_send_ecsa_action_frame(vdev, macaddr);
 }
+
+void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
+{
+	lim_ll_sap_notify_chan_switch_started(vdev);
+}
 #endif
 #endif
 

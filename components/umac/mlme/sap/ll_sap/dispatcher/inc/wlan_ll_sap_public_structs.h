@@ -219,10 +219,12 @@ struct ll_sap_oob_connect_response_event {
  * be sent
  * @TARGET_TSF_VDEV_RESTART: Get target_tsf when vdev_restart command has to be
  * sent to firmware
+ * @TARGET_TSF_GATT_MSG: Indicate target_tsf to userspace
  */
 enum ll_sap_get_target_tsf {
 	TARGET_TSF_ECSA_ACTION_FRAME = 0,
 	TARGET_TSF_VDEV_RESTART = 1,
+	TARGET_TSF_GATT_MSG = 2,
 };
 
 /**
