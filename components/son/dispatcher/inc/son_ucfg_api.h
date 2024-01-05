@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -216,6 +216,17 @@ ucfg_son_vdev_get_supported_txrx_streams(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS ucfg_son_get_vht_cap(struct wlan_objmgr_psoc *psoc,
 				int32_t *vht_caps);
 
+/**
+ * ucfg_son_del_ast() - ucfg API to delete AST
+ * @vdev: vdev object
+ * @wds_macaddr: wds mac address
+ * @peer_macaddr: peer mac address
+ *
+ * Return: Returns QDF_STATUS_SUCCESS if succeed
+ */
+QDF_STATUS ucfg_son_del_ast(struct wlan_objmgr_vdev *vdev,
+			    struct qdf_mac_addr *wds_macaddr,
+			    struct qdf_mac_addr *peer_macaddr);
 #ifdef WLAN_FEATURE_SON
 /* ucfg_son_disable_cbs() - son cbs disable
  * @vdev: vdev pointer

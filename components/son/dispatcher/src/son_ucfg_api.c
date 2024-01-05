@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -159,3 +159,16 @@ QDF_STATUS ucfg_son_get_vht_cap(struct wlan_objmgr_psoc *psoc,
 	*vht_caps = target_cap->vht_cap_info;
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS ucfg_son_del_ast(struct wlan_objmgr_vdev *vdev,
+			    struct qdf_mac_addr *wds_macaddr,
+			    struct qdf_mac_addr *peer_macaddr)
+{
+	if (!vdev || !wds_macaddr || !peer_macaddr) {
+		son_err("invalid param");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wlan_son_del_ast(vdev, wds_macaddr, peer_macaddr);
+}
+
