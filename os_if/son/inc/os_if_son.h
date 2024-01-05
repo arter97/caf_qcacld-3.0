@@ -1,7 +1,7 @@
 
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -793,4 +793,16 @@ uint32_t os_if_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
  */
 int os_if_son_get_sta_stats(struct wlan_objmgr_vdev *vdev, uint8_t *mac_addr,
 			    struct ieee80211_nodestats *stats);
+
+/**
+ * os_if_son_del_ast() - Delete AST
+ * @vdev: vdev object
+ * @wds_macaddr: wds mac address
+ * @peer_macaddr: peer mac address
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int os_if_son_del_ast(struct wlan_objmgr_vdev *vdev,
+		      struct qdf_mac_addr *wds_macaddr,
+		      struct qdf_mac_addr *peer_macaddr);
 #endif

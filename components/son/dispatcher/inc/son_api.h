@@ -466,6 +466,18 @@ uint8_t wlan_son_get_node_tx_power(struct element_info assoc_req_ies);
 QDF_STATUS wlan_son_get_peer_rrm_info(struct element_info assoc_req_ies,
 				      uint8_t *rrmcaps,
 				      bool *is_beacon_meas_supported);
+
+/**
+ * wlan_son_del_ast() - Delete AST
+ * @vdev: vdev object
+ * @wds_macaddr: wds mac address
+ * @peer_macaddr: peer mac address
+ *
+ * Return: Returns QDF_STATUS_SUCCESS if succeed
+ */
+QDF_STATUS wlan_son_del_ast(struct wlan_objmgr_vdev *vdev,
+			    struct qdf_mac_addr *wds_macaddr,
+			    struct qdf_mac_addr *peer_macaddr);
 #else
 
 static inline bool wlan_son_peer_is_kickout_allow(struct wlan_objmgr_vdev *vdev,
@@ -554,6 +566,14 @@ QDF_STATUS wlan_son_get_peer_rrm_info(struct element_info assoc_req_ies,
 				      bool *is_beacon_meas_supported)
 {
 	return QDF_STATUS_E_INVAL;
+}
+
+static inline
+QDF_STATUS wlan_son_del_ast(struct wlan_objmgr_vdev *vdev,
+			    struct qdf_mac_addr *wds_macaddr,
+			    struct qdf_mac_addr *peer_macaddr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /*WLAN_FEATURE_SON*/
 #endif
