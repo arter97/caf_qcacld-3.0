@@ -1427,3 +1427,53 @@ wlan_son_vdev_get_supported_txrx_streams(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+wlan_son_del_ast(struct wlan_objmgr_vdev *vdev,
+		 struct qdf_mac_addr *wds_macaddr,
+		 struct qdf_mac_addr *peer_macaddr)
+{
+	ol_txrx_soc_handle soc;
+	bool ast_entry_found;
+	struct cdp_ast_entry_info wds_ast_entry = {0};
+	struct cdp_ast_entry_info peer_ast_entry = {0};
+
+	soc = wlan_psoc_get_dp_handle(wlan_vdev_get_psoc(vdev));
+	if (!soc) {
+		son_err("failed to get soc");
+		return QDF_STATUS_E_FAILURE;
+	}
+	son_debug("wds " QDF_MAC_ADDR_FMT " , peer " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(wds_macaddr->bytes),
+		  QDF_MAC_ADDR_REF(peer_macaddr->bytes));
+
+	ast_entry_found = cdp_peer_get_ast_info_by_soc(
+				soc, wds_macaddr->bytes,
+				&wds_ast_entry);
+
+	if (!ast_entry_found) {
+		son_err("wds ast_entry not found");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	son_debug("wds ast type %d, peer_id %d",
+		  wds_ast_entry.type, wds_ast_entry.peer_id);
+
+	ast_entry_found = cdp_peer_get_ast_info_by_soc(
+				soc, peer_macaddr->bytes,
+				&peer_ast_entry);
+
+	if (!ast_entry_found) {
+		son_err("peer ast_entry not found");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	son_debug("peer ast type %d, peer_id %d",
+		  peer_ast_entry.type, peer_ast_entry.peer_id);
+
+	if ((wds_ast_entry.type == CDP_TXRX_AST_TYPE_WDS) &&
+	    (wds_ast_entry.peer_id == peer_ast_entry.peer_id))
+		return cdp_peer_ast_delete_by_soc(soc, wds_macaddr->bytes,
+						  NULL, NULL);
+	return QDF_STATUS_E_FAILURE;
+}
