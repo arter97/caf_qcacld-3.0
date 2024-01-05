@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2010, Atheros Communications Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -444,6 +444,46 @@ enum {
 	IEEE80211_DBGREQ_SETACSUSERCHANLIST  =    21,
 	/*  Mesh config set and get */
 	IEEE80211_DBGREQ_MESH_SET_GET_CONFIG          = 117,
+};
+
+/**
+ * struct ieee80211_wlanconfig_ipa_wds - For deleting wds type ast entry
+ * @wds_ni_macaddr  : wds ni macaddress
+ * @wds_macaddr_cnt : wds node mac address cnt
+ * @wds_macaddr : wds node mac address
+ * @peer_macaddr : direct associated peer mac address
+ */
+struct ieee80211_wlanconfig_ipa_wds {
+	u_int8_t  wds_ni_macaddr[IEEE80211_ADDR_LEN];
+	u_int16_t wds_macaddr_cnt;
+	u_int8_t  wds_macaddr[IEEE80211_ADDR_LEN];
+	u_int8_t  peer_macaddr[IEEE80211_ADDR_LEN];
+};
+
+/* generic structure to support sub-ioctl due to limited ioctl */
+typedef enum {
+	IEEE80211_WLANCONFIG_NOP = 0,
+	IEEE80211_WLANCONFIG_IPA_WDS_REMOVE_ADDR = 81,
+} IEEE80211_WLANCONFIG_CMDTYPE;
+
+typedef enum {
+	IEEE80211_WLANCONFIG_OK		  = 0,
+	IEEE80211_WLANCONFIG_FAIL		= 1,
+} IEEE80211_WLANCONFIG_STATUS;
+
+struct ieee80211_wlanconfig_setmaxrate {
+	u_int8_t mac[IEEE80211_ADDR_LEN];
+	u_int8_t maxrate;
+};
+
+struct ieee80211_wlanconfig {
+	IEEE80211_WLANCONFIG_CMDTYPE cmdtype;  /* sub-command */
+	IEEE80211_WLANCONFIG_STATUS status;	 /* status code */
+	union {
+		struct ieee80211_wlanconfig_ipa_wds ipa_wds;
+	} data;
+
+	struct ieee80211_wlanconfig_setmaxrate smr;
 };
 
 #endif //_IEEE80211_IOCTL_H_
