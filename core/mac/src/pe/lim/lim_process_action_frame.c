@@ -1558,6 +1558,7 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	bool he_cap = false;
 	bool eht_cap = false;
 	uint8_t extd_buff_size = 0;
+	struct wlan_mlme_qos *qos_aggr;
 
 	if (mlo_is_any_link_disconnecting(session->vdev)) {
 		pe_err("Ignore ADDBA, vdev is in not in conncted state");
@@ -1603,8 +1604,12 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	else
 		buff_size = SIR_MAC_BA_DEFAULT_BUFF_SIZE;
 
-	if (mac_ctx->usr_cfg_ba_buff_size)
+	if (mac_ctx->usr_cfg_ba_buff_size) {
 		buff_size = mac_ctx->usr_cfg_ba_buff_size;
+	} else {
+		qos_aggr = &mac_ctx->mlme_cfg->qos_mlme_params;
+		buff_size = QDF_MIN(buff_size, qos_aggr->rx_aggregation_size);
+	}
 
 	if (addba_req->addba_extn_element.present)
 		extd_buff_size = addba_req->addba_extn_element.extd_buff_size;
