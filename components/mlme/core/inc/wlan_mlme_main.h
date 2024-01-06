@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -164,13 +164,10 @@ struct wlan_mlme_psoc_ext_obj {
 
 /**
  * struct wlan_disconnect_info - WLAN Disconnection Information
- * @self_discon_ies: Disconnect IEs to be sent in deauth/disassoc frames
- *                   originated from driver
  * @peer_discon_ies: Disconnect IEs received in deauth/disassoc frames
  *                       from peer
  */
 struct wlan_disconnect_info {
-	struct element_info self_discon_ies;
 	struct element_info peer_discon_ies;
 };
 
@@ -1054,32 +1051,6 @@ struct sae_auth_retry *mlme_get_sae_auth_retry(struct wlan_objmgr_vdev *vdev);
  * Return: None
  */
 void mlme_free_sae_auth_retry(struct wlan_objmgr_vdev *vdev);
-
-/**
- * mlme_set_self_disconnect_ies() - Set diconnect IEs configured from userspace
- * @vdev: vdev pointer
- * @ie: pointer for disconnect IEs
- *
- * Return: None
- */
-void mlme_set_self_disconnect_ies(struct wlan_objmgr_vdev *vdev,
-				  struct element_info *ie);
-
-/**
- * mlme_free_self_disconnect_ies() - Free the self diconnect IEs
- * @vdev: vdev pointer
- *
- * Return: None
- */
-void mlme_free_self_disconnect_ies(struct wlan_objmgr_vdev *vdev);
-
-/**
- * mlme_get_self_disconnect_ies() - Get diconnect IEs from vdev object
- * @vdev: vdev pointer
- *
- * Return: Returns a pointer to the self disconnect IEs present in vdev object
- */
-struct element_info *mlme_get_self_disconnect_ies(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlme_set_peer_disconnect_ies() - Cache disconnect IEs received from peer

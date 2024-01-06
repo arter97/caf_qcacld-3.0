@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -16491,36 +16491,6 @@ QDF_STATUS sme_set_vdev_sw_retry(uint8_t vdev_id, uint8_t sw_retry_count,
 		return status;
 	}
 
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS sme_set_disconnect_ies(mac_handle_t mac_handle, uint8_t vdev_id,
-				  uint8_t *ie_data, uint16_t ie_len)
-{
-	struct mac_context *mac_ctx;
-	struct wlan_objmgr_vdev *vdev;
-	struct element_info ie;
-
-	if (!ie_data || !ie_len) {
-		sme_debug("Got NULL disconnect IEs");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	mac_ctx = MAC_CONTEXT(mac_handle);
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
-						    vdev_id,
-						    WLAN_LEGACY_SME_ID);
-	if (!vdev) {
-		sme_err("Got NULL vdev obj, returning");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ie.ptr = ie_data;
-	ie.len = ie_len;
-
-	mlme_set_self_disconnect_ies(vdev, &ie);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 	return QDF_STATUS_SUCCESS;
 }
 

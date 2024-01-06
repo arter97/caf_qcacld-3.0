@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4123,72 +4123,6 @@ void mlme_free_sae_auth_retry(struct wlan_objmgr_vdev *vdev)
 		qdf_mem_free(mlme_priv->sae_retry.sae_auth.ptr);
 	mlme_priv->sae_retry.sae_auth.ptr = NULL;
 	mlme_priv->sae_retry.sae_auth.len = 0;
-}
-
-void mlme_set_self_disconnect_ies(struct wlan_objmgr_vdev *vdev,
-				  struct element_info *ie)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	if (!ie || !ie->len || !ie->ptr) {
-		mlme_legacy_debug("disocnnect IEs are NULL");
-		return;
-	}
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return;
-	}
-
-	if (mlme_priv->disconnect_info.self_discon_ies.ptr) {
-		qdf_mem_free(mlme_priv->disconnect_info.self_discon_ies.ptr);
-		mlme_priv->disconnect_info.self_discon_ies.len = 0;
-	}
-
-	mlme_priv->disconnect_info.self_discon_ies.ptr =
-				qdf_mem_malloc(ie->len);
-	if (!mlme_priv->disconnect_info.self_discon_ies.ptr)
-		return;
-
-	qdf_mem_copy(mlme_priv->disconnect_info.self_discon_ies.ptr,
-		     ie->ptr, ie->len);
-	mlme_priv->disconnect_info.self_discon_ies.len = ie->len;
-
-	mlme_legacy_debug("Self disconnect IEs");
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_MLME, QDF_TRACE_LEVEL_DEBUG,
-			   mlme_priv->disconnect_info.self_discon_ies.ptr,
-			   mlme_priv->disconnect_info.self_discon_ies.len);
-}
-
-void mlme_free_self_disconnect_ies(struct wlan_objmgr_vdev *vdev)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return;
-	}
-
-	if (mlme_priv->disconnect_info.self_discon_ies.ptr) {
-		qdf_mem_free(mlme_priv->disconnect_info.self_discon_ies.ptr);
-		mlme_priv->disconnect_info.self_discon_ies.ptr = NULL;
-		mlme_priv->disconnect_info.self_discon_ies.len = 0;
-	}
-}
-
-struct element_info *mlme_get_self_disconnect_ies(struct wlan_objmgr_vdev *vdev)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return NULL;
-	}
-
-	return &mlme_priv->disconnect_info.self_discon_ies;
 }
 
 void mlme_set_peer_disconnect_ies(struct wlan_objmgr_vdev *vdev,

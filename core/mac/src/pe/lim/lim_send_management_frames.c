@@ -4184,30 +4184,6 @@ static QDF_STATUS lim_deauth_tx_complete_cnf_handler(void *context,
 }
 
 /**
- * lim_append_ies_to_frame() - Append IEs to the frame
- *
- * @frame: Pointer to the frame buffer that needs to be populated
- * @frame_len: Pointer for current frame length
- * @ie: pointer for disconnect IEs
- *
- * This function is called by lim_send_disassoc_mgmt_frame and
- * lim_send_deauth_mgmt_frame APIs as part of disconnection.
- * Append IEs and update frame length.
- *
- * Return: None
- */
-static void
-lim_append_ies_to_frame(uint8_t *frame, uint32_t *frame_len,
-			struct element_info *ie)
-{
-	if (!ie || !ie->len || !ie->ptr)
-		return;
-	qdf_mem_copy(frame, ie->ptr, ie->len);
-	*frame_len += ie->len;
-	pe_debug("Appended IEs len: %u", ie->len);
-}
-
-/**
  * \brief This function is called to send Disassociate frame.
  *
  *
@@ -4237,7 +4213,6 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 	uint8_t txFlag = 0;
 	uint32_t val = 0;
 	uint8_t smeSessionId = 0;
-	struct element_info *discon_ie;
 
 	if (!pe_session) {
 		return;
@@ -4285,10 +4260,6 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 
 	nBytes = nPayload + sizeof(tSirMacMgmtHdr);
 
-	discon_ie = mlme_get_self_disconnect_ies(pe_session->vdev);
-	if (discon_ie && discon_ie->len)
-		nBytes += discon_ie->len;
-
 	qdf_status = cds_packet_alloc((uint16_t) nBytes, (void **)&pFrame,
 				      (void **)&pPacket);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -4331,11 +4302,6 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 		pe_warn("There were warnings while packing a Disassociation (0x%08x)",
 			nStatus);
 	}
-
-	/* Copy disconnect IEs to the end of the frame */
-	lim_append_ies_to_frame(pFrame + sizeof(tSirMacMgmtHdr) + nPayload,
-				&nPayload, discon_ie);
-	mlme_free_self_disconnect_ies(pe_session->vdev);
 
 	pe_nofl_info("Disassoc TX: vdev %d seq %d reason %u and waitForAck %d to " QDF_MAC_ADDR_FMT " From " QDF_MAC_ADDR_FMT,
 		     pe_session->vdev_id, mac->mgmtSeqNum, nReason, waitForAck,
@@ -4457,7 +4423,6 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 	tpDphHashNode sta;
 #endif
 	uint8_t smeSessionId = 0;
-	struct element_info *discon_ie;
 	bool drop_deauth = false;
 
 	if (!pe_session) {
@@ -4515,10 +4480,6 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 	}
 
 	nBytes = nPayload + sizeof(tSirMacMgmtHdr);
-	discon_ie = mlme_get_self_disconnect_ies(pe_session->vdev);
-	if (discon_ie && discon_ie->len)
-		nBytes += discon_ie->len;
-
 	qdf_status = cds_packet_alloc((uint16_t) nBytes, (void **)&pFrame,
 				      (void **)&pPacket);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -4555,11 +4516,6 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 			nStatus);
 	}
 
-	/* Copy disconnect IEs to the end of the frame */
-	lim_append_ies_to_frame(pFrame + sizeof(tSirMacMgmtHdr) + nPayload,
-				&nPayload, discon_ie);
-	mlme_free_self_disconnect_ies(pe_session->vdev);
-
 	pe_nofl_rl_info("Deauth TX: vdev %d seq_num %d reason %u waitForAck %d to " QDF_MAC_ADDR_FMT " from " QDF_MAC_ADDR_FMT,
 			pe_session->vdev_id, mac->mgmtSeqNum, nReason, waitForAck,
 			QDF_MAC_ADDR_REF(pMacHdr->da),
@@ -4572,9 +4528,8 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 
 	txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
 #ifdef FEATURE_WLAN_TDLS
-	sta =
-		dph_lookup_hash_entry(mac, peer, &aid,
-				      &pe_session->dph.dphHashTable);
+	sta = dph_lookup_hash_entry(mac, peer, &aid,
+				    &pe_session->dph.dphHashTable);
 #endif
 
 	pe_session->deauth_disassoc_rc = nReason;

@@ -8600,9 +8600,6 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_ACCESS_POLICY_IE_LIST] = {
 		.type = NLA_BINARY,
 		.len = WLAN_MAX_IE_LEN + 2},
-	[QCA_WLAN_VENDOR_ATTR_DISCONNECT_IES] = {
-		.type = NLA_BINARY,
-		.len = SIR_MAC_MAX_ADD_IE_LENGTH + 2},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_ROAM_REASON] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_MSDU_AGGREGATION] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_MSDU_AGGREGATION] = {.type = NLA_U8 },
@@ -11093,40 +11090,6 @@ static int hdd_config_gtx(struct wlan_hdd_link_info *link_info,
 	return errno;
 }
 
-/**
- * hdd_config_disconnect_ies() - Configure disconnect IEs
- * @link_info: Link info pointer in HDD adapter
- * @attr: array of pointer to struct nlattr
- *
- * Return: 0 on success; error number otherwise
- */
-static int hdd_config_disconnect_ies(struct wlan_hdd_link_info *link_info,
-				     const struct nlattr *attr)
-{
-	struct hdd_adapter *adapter = link_info->adapter;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	QDF_STATUS status;
-
-	hdd_debug("IE len %u session %u device mode %u",
-		  nla_len(attr), link_info->vdev_id,
-		  adapter->device_mode);
-	if (!nla_len(attr) ||
-	    nla_len(attr) > SIR_MAC_MAX_ADD_IE_LENGTH + 2 ||
-	    !wlan_is_ie_valid(nla_data(attr), nla_len(attr))) {
-		hdd_err("Invalid disconnect IEs");
-		return -EINVAL;
-	}
-
-	status = sme_set_disconnect_ies(hdd_ctx->mac_handle,
-					link_info->vdev_id,
-					nla_data(attr),
-					nla_len(attr));
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err("Failed to set disconnect_ies");
-
-	return qdf_status_to_os_return(status);
-}
-
 #ifdef WLAN_FEATURE_ELNA
 /**
  * hdd_set_elna_bypass() - Set eLNA bypass
@@ -12323,8 +12286,6 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_rsn_ie},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_GTX,
 	 hdd_config_gtx},
-	{QCA_WLAN_VENDOR_ATTR_DISCONNECT_IES,
-	 hdd_config_disconnect_ies},
 #ifdef WLAN_FEATURE_ELNA
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_ELNA_BYPASS,
 	 hdd_set_elna_bypass},

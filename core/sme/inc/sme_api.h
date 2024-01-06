@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4454,18 +4454,6 @@ QDF_STATUS sme_register_bcn_recv_pause_ind_cb(mac_handle_t mac_handle,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-
-/**
- * sme_set_disconnect_ies() - set disconnect IEs
- * @mac_handle: handle returned by mac_open
- * @vdev_id: vdev id
- * @ie_data: Disconnect IE data
- * @ie_len: Disconnect IE length
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_set_disconnect_ies(mac_handle_t mac_handle, uint8_t vdev_id,
-				  uint8_t *ie_data, uint16_t ie_len);
 
 /**
  * sme_set_vdev_sw_retry() - set sw retry threshold per vdev

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -903,9 +903,7 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 {
 	struct element_info *vsie_info = NULL;
 
-	if (is_tx)
-		vsie_info = mlme_get_self_disconnect_ies(vdev);
-	else
+	if (!is_tx)
 		vsie_info = mlme_get_peer_disconnect_ies(vdev);
 
 	if (!vsie_info)
