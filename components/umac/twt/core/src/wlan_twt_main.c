@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1814,6 +1814,56 @@ wlan_twt_clear_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 
 	qdf_mutex_release(&peer_priv->twt_peer_lock);
 	wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
+}
+
+QDF_STATUS
+wlan_twt_cfg_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id,
+				       struct qdf_mac_addr *peer_mac,
+				       uint32_t *dialog_id,
+				       uint32_t *wake_dur,
+				       uint32_t *wake_interval)
+{
+	struct twt_peer_priv_obj *peer_priv;
+	struct wlan_objmgr_peer *peer;
+	uint8_t i;
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac->bytes,
+					   WLAN_TWT_ID);
+
+	if (!peer) {
+		twt_err("Peer object not found "QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_mac->bytes));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_TWT);
+	if (!peer_priv) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
+		twt_err(" peer twt component object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mutex_acquire(&peer_priv->twt_peer_lock);
+
+	for (i = 0; i < peer_priv->num_twt_sessions; i++) {
+		if (peer_priv->session_info[i].dialog_id == *dialog_id) {
+			*wake_dur = peer_priv->session_info[i].wake_dur;
+			*wake_interval =
+				peer_priv->session_info[i].wake_interval;
+			break;
+		}
+	}
+
+	twt_debug("vdev:%d peer:" QDF_MAC_ADDR_FMT " dialog_id:%d wake_dur:%d wake_interval:%d",
+		  vdev_id, QDF_MAC_ADDR_REF(peer_mac->bytes),
+		  dialog_id, wake_dur, wake_interval);
+
+	qdf_mutex_release(&peer_priv->twt_peer_lock);
+	wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /*

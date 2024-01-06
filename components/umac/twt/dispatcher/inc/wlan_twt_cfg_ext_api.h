@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -131,6 +131,26 @@ void wlan_twt_get_feature_info(struct wlan_objmgr_psoc *psoc,
 			       struct wlan_twt_features *twt_feature_set);
 #endif
 
+/**
+ * wlan_twt_get_wake_dur_and_interval() - Get TWT wake duration and wake
+ * interval of peer.
+ * @psoc: Pointer to psoc object
+ * @vdev_id: Vdev Id
+ * @peer_mac: Peer mac address
+ * @dialog_id: Dialog Id
+ * @wake_dur: TWT wake duration
+ * @wake_interval: TWT wake interval
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   struct qdf_mac_addr *peer_mac,
+				   uint32_t *dialog_id,
+				   uint32_t *wake_dur,
+				   uint32_t *wake_interval);
+
 #else
 static inline QDF_STATUS
 wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val)
@@ -180,6 +200,17 @@ static inline QDF_STATUS
 wlan_twt_get_bcast_responder_cfg(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   struct qdf_mac_addr *peer_mac,
+				   uint32_t *dialog_id,
+				   uint32_t *wake_dur,
+				   uint32_t *wake_interval)
+{
+	return QDF_STATUS_E_FAILURE;
 }
 
 #ifdef FEATURE_SET

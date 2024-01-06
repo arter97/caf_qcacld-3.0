@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -18,6 +18,7 @@
 #include <wlan_twt_cfg_ext_api.h>
 #include "twt/core/src/wlan_twt_cfg.h"
 #include "wlan_mlme_api.h"
+#include <../../core/src/wlan_twt_main.h>
 
 QDF_STATUS
 wlan_twt_cfg_get_req_flag(struct wlan_objmgr_psoc *psoc, bool *val)
@@ -89,3 +90,16 @@ void wlan_twt_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	}
 }
 #endif
+
+QDF_STATUS
+wlan_twt_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   struct qdf_mac_addr *peer_mac,
+				   uint32_t *dialog_id,
+				   uint32_t *wake_dur,
+				   uint32_t *wake_interval)
+{
+	return wlan_twt_cfg_get_wake_dur_and_interval(psoc, vdev_id, peer_mac,
+						      dialog_id, wake_dur,
+						      wake_interval);
+}
