@@ -54,13 +54,25 @@ struct ll_sap_psoc_priv_obj {
 };
 
 /**
+ * struct target_tsf: Target TSF param
+ * @twt_target_tsf: Get target_tsf for twt session present
+ * @non_twt_target_tsf: Get target_tsf for non twt session present
+ */
+struct target_tsf {
+	uint64_t twt_target_tsf;
+	uint64_t non_twt_target_tsf;
+};
+
+/**
  * struct ll_sap_vdev_priv_obj - ll sap private vdev obj
  * @bearer_switch_ctx: Bearer switch context
  * @high_ap_availability_cookie: High AP availability cookie
+ * @target_tsf: pointer to target_tsf structure
  */
 struct ll_sap_vdev_priv_obj {
 	struct bearer_switch_info *bearer_switch_ctx;
 	uint16_t high_ap_availability_cookie[MAX_HIGH_AP_AVAILABILITY_REQUESTS];
+	struct target_tsf target_tsf;
 };
 
 /**

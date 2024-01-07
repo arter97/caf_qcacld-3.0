@@ -23,6 +23,7 @@
 #include "wlan_ll_lt_sap_bearer_switch.h"
 #include "wlan_scan_api.h"
 #include "target_if.h"
+#include "wlan_twt_cfg_ext_api.h"
 
 bool ll_lt_sap_is_supported(struct wlan_objmgr_psoc *psoc)
 {
@@ -561,5 +562,150 @@ QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
 	}
 
 	return tx_ops->get_tsf_stats_for_csa(psoc, vdev_id);
+}
+
+#define NON_TWT_TSF 500000
+/**
+ * ll_lt_sap_calculate_target_tsf() - Calculate target_tsf
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev_id
+ * @peer_mac: peer macaddr for twt_stats received from firmware
+ * @tsf: next_sp_start_tsf or curr_tsf passed by caller
+ * @dialog_id: dialog_id of peer
+ * @get_twt_target_tsf: flag to check whether to calculate
+ * tsf based on twt or non twt
+ *
+ * Return: uint64_t
+ */
+static
+uint64_t ll_lt_sap_calculate_target_tsf(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					struct qdf_mac_addr peer_mac,
+					uint32_t *dialog_id, uint64_t tsf,
+					bool get_twt_target_tsf)
+{
+	uint32_t wake_dur = 0, wake_interval = 0;
+	uint64_t target_tsf;
+
+	if (get_twt_target_tsf) {
+		wlan_twt_get_wake_dur_and_interval(psoc, vdev_id, &peer_mac,
+						   dialog_id, &wake_dur,
+						   &wake_interval);
+		/* target_tsf will be next_sp_start_tsf + 2TWT SI */
+		target_tsf = tsf + (2 * wake_interval);
+	} else {
+		/*
+		 * TWT session is not present with any EB
+		 * target_tsf will be curr_tsf + 500ms
+		 */
+		target_tsf = tsf + NON_TWT_TSF;
+	}
+
+	return target_tsf;
+}
+
+/**
+ * ll_lt_sap_obtain_target_tsf() - Obtain target tsf to perform CSA
+ * @psoc: psoc object
+ * @twt_params: twt params
+ * @twt_target_tsf: twt target tsf to fill
+ * @non_twt_target_tsf: non twt target tsf to fill
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS ll_lt_sap_obtain_target_tsf(
+				struct wlan_objmgr_psoc *psoc,
+				struct twt_session_stats_info *twt_params,
+				uint64_t *twt_target_tsf,
+				uint64_t *non_twt_target_tsf)
+{
+	uint64_t next_sp_start_tsf = 0, curr_tsf = 0;
+
+	next_sp_start_tsf = (uint64_t)twt_params->sp_tsf_us_hi << 32 |
+				twt_params->sp_tsf_us_lo;
+
+	curr_tsf = ((uint64_t)twt_params->curr_tsf_us_hi << 32 |
+			twt_params->curr_tsf_us_lo);
+
+	if (next_sp_start_tsf)
+		/* TWT session is present with atleast one EB */
+		*twt_target_tsf = ll_lt_sap_calculate_target_tsf(
+					psoc, twt_params->vdev_id,
+					twt_params->peer_mac,
+					&twt_params->dialog_id,
+					next_sp_start_tsf, true);
+
+	*non_twt_target_tsf = ll_lt_sap_calculate_target_tsf(
+				psoc, twt_params->vdev_id,
+				twt_params->peer_mac,
+				&twt_params->dialog_id,
+				curr_tsf, false);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp)
+{
+	struct ll_sap_vdev_priv_obj *ll_sap_vdev_obj;
+	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
+	struct wlan_objmgr_vdev *vdev;
+	uint64_t twt_target_tsf = 0;
+	uint64_t non_twt_target_tsf = 0;
+
+	if (!rsp) {
+		ll_sap_err("vdev %d rsp is null", rsp->twt_params.vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	psoc_ll_sap_obj = wlan_objmgr_psoc_get_comp_private_obj(
+							rsp->psoc,
+							WLAN_UMAC_COMP_LL_SAP);
+	if (!psoc_ll_sap_obj) {
+		ll_sap_err("psoc_ll_sap_obj is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/*
+	 * stop target_tsf timer after getting response from firmware
+	 */
+	if (QDF_TIMER_STATE_RUNNING == qdf_mc_timer_get_current_state(
+					&psoc_ll_sap_obj->tsf_timer))
+		qdf_mc_timer_stop(&psoc_ll_sap_obj->tsf_timer);
+
+	if (rsp->twt_params.vdev_id == WLAN_INVALID_VDEV_ID) {
+		ll_sap_err("Invalid vdev %d", rsp->twt_params.vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(rsp->psoc,
+						    rsp->twt_params.vdev_id,
+						    WLAN_LL_SAP_ID);
+
+	if (!vdev) {
+		ll_sap_err("vdev %d is null", rsp->twt_params.vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ll_sap_vdev_obj = ll_sap_get_vdev_priv_obj(vdev);
+	if (!ll_sap_vdev_obj) {
+		ll_sap_err("vdev %d ll_sap obj null", rsp->twt_params.vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ll_lt_sap_obtain_target_tsf(rsp->psoc, &rsp->twt_params,
+				    &twt_target_tsf, &non_twt_target_tsf);
+
+	/*
+	 * Store target_tsf in ll_sap vdev private object. This can be use
+	 * to by multiple place to perform ll_sap CSA.
+	 */
+	ll_sap_vdev_obj->target_tsf.twt_target_tsf = twt_target_tsf;
+	ll_sap_vdev_obj->target_tsf.non_twt_target_tsf = non_twt_target_tsf;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif

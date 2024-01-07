@@ -340,3 +340,18 @@ void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	/* LL_LT_SAP supports upto MSC 3 only */
 	SET_HT_MCS3(mcs_set);
 }
+
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
+{
+	if (!msg || !msg->bodyptr) {
+		ll_sap_err("msg: 0x%pK", msg);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	ll_lt_sap_continue_csa_after_tsf_rsp(msg->bodyptr);
+	qdf_mem_free(msg->bodyptr);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif

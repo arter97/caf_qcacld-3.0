@@ -231,6 +231,78 @@ QDF_STATUS target_if_get_tsf_stats_for_csa(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+
+bool target_if_ll_sap_is_twt_event_type_query_rsp(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t *evt_buf,
+				struct twt_session_stats_event_param *params,
+				struct twt_session_stats_info *twt_params)
+{
+	struct wmi_unified *wmi_hdl;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	wmi_hdl = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_hdl) {
+		target_if_err("wmi_handle is null!");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = wmi_extract_twt_session_stats_data(
+				wmi_hdl, evt_buf,
+				params, twt_params, 0);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("Unable to extract twt params");
+		return false;
+	}
+
+	if (twt_params->event_type == HOST_TWT_SESSION_QUERY_RSP)
+		return true;
+
+	return false;
+}
+
+QDF_STATUS target_if_ll_sap_continue_csa_after_tsf_rsp(
+				struct wlan_objmgr_psoc *psoc,
+				struct twt_session_stats_info *twt_params)
+{
+	struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj;
+	struct ll_sap_csa_tsf_rsp *rsp;
+	struct scheduler_msg msg = {0};
+	QDF_STATUS status;
+
+	ll_sap_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
+						psoc,
+						WLAN_UMAC_COMP_LL_SAP);
+
+	if (!ll_sap_psoc_obj) {
+		target_if_err("psoc_ll_sap_obj is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	rsp = qdf_mem_malloc(sizeof(*rsp));
+	if (!rsp)
+		return QDF_STATUS_E_NOMEM;
+
+	rsp->psoc = psoc;
+	qdf_mem_copy(&rsp->twt_params, twt_params,
+		     sizeof(struct twt_session_stats_info));
+
+	msg.bodyptr = rsp;
+	msg.callback = wlan_ll_lt_sap_continue_csa_after_tsf_rsp;
+	msg.flush_callback = NULL;
+	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_LL_SAP,
+					QDF_MODULE_ID_TARGET_IF, &msg);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("vdev_id %d failed to post tsf stats rsp",
+			      twt_params->vdev_id);
+		qdf_mem_free(rsp);
+	}
+
+	return status;
+}
 #endif
 
 void

@@ -136,6 +136,16 @@ struct wlan_ll_lt_sap_freq_list {
 };
 
 /**
+ * struct ll_sap_csa_tsf_rsp - LL_SAP csa tsf response
+ * @psoc: psoc object
+ * @twt_params: TWT params
+ */
+struct ll_sap_csa_tsf_rsp {
+	struct wlan_objmgr_psoc *psoc;
+	struct twt_session_stats_info twt_params;
+};
+
+/**
  * typedef bearer_switch_requester_cb() - Callback function, which will
  * be invoked with the bearer switch request status.
  * @psoc: Psoc pointer

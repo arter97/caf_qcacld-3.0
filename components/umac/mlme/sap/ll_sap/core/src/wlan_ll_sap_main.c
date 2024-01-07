@@ -26,7 +26,7 @@ struct ll_sap_ops *global_ll_sap_ops;
 static
 void ll_sap_tsf_timer_timeout(void *user_data)
 {
-	//TODO
+	//send gatt message
 }
 #else
 static inline

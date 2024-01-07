@@ -100,13 +100,28 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id);
+
+/**
+ * ll_lt_sap_continue_csa_after_tsf_rsp() - Continue CSA after getting rsp
+ * from firmware
+ * @rsp: pointer to ll_sap_csa_tsf_rsp
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp);
 #else
 static inline
 QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id)
 {
-	return QDF_STATUS_E_FAILURE;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

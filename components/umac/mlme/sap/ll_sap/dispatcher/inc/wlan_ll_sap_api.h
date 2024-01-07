@@ -161,6 +161,21 @@ QDF_STATUS wlan_ll_sap_oob_connect_response(
 void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			    uint8_t *mcs_set);
 
+#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+/**
+ * wlan_ll_lt_sap_continue_csa_after_tsf_rsp() - ll_sap process command function
+ * @msg: scheduler msg
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg);
+#else
+static inline
+QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
@@ -225,5 +240,10 @@ void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 {
 }
 
+static inline
+QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* _WLAN_LL_LT_SAP_API_H_ */
