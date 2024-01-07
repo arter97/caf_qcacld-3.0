@@ -2031,6 +2031,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"enable_rtt",          IEEE80211_PARAM_RTT_ENABLE, SET_PARAM, 1},
 	{"switch_rtt_role",     IEEE80211_PARAM_SWITCH_RTT_ROLE, SET_PARAM, 1},
 	{"set_rtt_responder_role", IEEE80211_PARAM_SET_RTT_RESPONDER_ROLE, SET_PARAM, 1},
+	{"get_rtt_responder_role", IEEE80211_PARAM_SET_RTT_RESPONDER_ROLE, GET_PARAM, 0},
 	{"enable_lci",          IEEE80211_PARAM_LCI_ENABLE, SET_PARAM, 1},
 	{"athnewind",           IEEE80211_PARAM_VAP_ENHIND, SET_PARAM, 1},
 	{"get_athnewind",       IEEE80211_PARAM_VAP_ENHIND, GET_PARAM, 0},
