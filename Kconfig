@@ -721,6 +721,14 @@ config NO_RX_PKT_HDR_TLV
 	bool "Enable NO_RX_PKT_HDR_TLV"
 	default n
 
+config WORD_BASED_TLV
+	bool "Enable WORD_BASED_TLV"
+	default n
+
+config DP_RX_BUFFER_OPTIMIZATION
+	bool "Enable DP_RX_BUFFER_OPTIMIZATION"
+	default n
+
 config OBSS_PD
 	bool "Enable OBSS_PD"
 	default n
