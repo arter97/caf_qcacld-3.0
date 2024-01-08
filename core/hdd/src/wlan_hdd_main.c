@@ -6010,6 +6010,42 @@ hdd_register_netdevice(struct hdd_adapter *adapter, struct net_device *dev,
 }
 #endif
 
+#ifdef CNSS_GENL
+static void hdd_set_cld80211_nl_reg_pid(struct hdd_context *hdd_ctx)
+{
+	hdd_ctx->nl_reg_pid = current->pid;
+}
+
+static void
+hdd_set_adapter_ifindex_to_cld80211(struct hdd_adapter *adapter, bool set)
+{
+	struct net_device *dev = adapter->dev;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+
+	set_cld_radio_info(hdd_ctx->nl_reg_pid, dev->ifindex, set);
+}
+
+static void
+hdd_set_nl_deregister_to_cld80211(struct hdd_context *hdd_ctx)
+{
+	set_cld_deregister_pid(hdd_ctx->nl_reg_pid, current->pid);
+}
+#else
+static void hdd_set_cld80211_nl_reg_pid(struct hdd_context *hdd_ctx)
+{
+}
+
+static void
+hdd_set_adapter_ifindex_to_cld80211(struct hdd_adapter *adapter, bool set)
+{
+}
+
+static void
+hdd_set_nl_deregister_to_cld80211(struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 static QDF_STATUS
 hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_held,
 		       struct hdd_adapter_create_param *params)
@@ -6046,6 +6082,8 @@ hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_held,
 		}
 	}
 	set_bit(NET_DEVICE_REGISTERED, &adapter->event_flags);
+
+	hdd_set_adapter_ifindex_to_cld80211(adapter, true);
 
 	hdd_exit();
 
@@ -6878,6 +6916,8 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 		 * Note that the adapter is no longer valid at this point
 		 * since the memory has been reclaimed
 		 */
+
+		hdd_set_adapter_ifindex_to_cld80211(adapter, false);
 	}
 }
 
@@ -9414,6 +9454,7 @@ void hdd_unregister_notifiers(struct hdd_context *hdd_ctx)
  */
 static void hdd_exit_netlink_services(struct hdd_context *hdd_ctx)
 {
+	hdd_set_nl_deregister_to_cld80211(hdd_ctx);
 	spectral_scan_deactivate_service();
 	cnss_diag_deactivate_service();
 	hdd_close_cesium_nl_sock();
@@ -9442,6 +9483,8 @@ static int hdd_init_netlink_services(struct hdd_context *hdd_ctx)
 		goto out;
 	}
 	cds_set_radio_index(hdd_ctx->radio_index);
+
+	hdd_set_cld80211_nl_reg_pid(hdd_ctx);
 
 	ret = hdd_activate_wifi_pos(hdd_ctx);
 	if (ret) {
