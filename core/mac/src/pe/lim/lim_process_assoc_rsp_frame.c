@@ -1096,7 +1096,7 @@ lim_gen_link_specific_probe_resp_from_assoc_resp(uint8_t *rx_pkt_info,
 						 uint32_t frame_len,
 						 struct pe_session *session)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct bss_description *bss;
 	struct scan_cache_entry *scan_entry;
 	struct mlo_partner_info *lim_partner_info;
