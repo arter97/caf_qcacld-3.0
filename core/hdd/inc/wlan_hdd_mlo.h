@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -280,6 +280,7 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_handle_mlo_link_state_operation() - mlo link state operation
+ * @adapter: HDD adapter
  * @wiphy: wiphy pointer
  * @vdev: vdev handler
  * @hdd_ctx: hdd context
@@ -290,7 +291,8 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev);
  *
  * Return: 0 on success and error number otherwise.
  */
-int wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
+int wlan_handle_mlo_link_state_operation(struct hdd_adapter *adapter,
+					 struct wiphy *wiphy,
 					 struct wlan_objmgr_vdev *vdev,
 					 struct hdd_context *hdd_ctx,
 					 const void *data, int data_len);
@@ -323,6 +325,13 @@ QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
 int wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 					    struct wireless_dev *wdev,
 					    const void *data, int data_len);
+/**
+ * hdd_update_link_state_cached_timestamp() - update link state cached timestamp
+ * @adapter: HDD adapter
+ *
+ * Return: none
+ */
+void hdd_update_link_state_cached_timestamp(struct hdd_adapter *adapter);
 
 /**
  * hdd_derive_link_address_from_mld() - Function to derive link address from
@@ -404,7 +413,8 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev)
 }
 
 static inline int
-wlan_handle_mlo_link_state_operation(struct wiphy *wiphy,
+wlan_handle_mlo_link_state_operation(struct hdd_adapter *adapter,
+				     struct wiphy *wiphy,
 				     struct wlan_objmgr_vdev *vdev,
 				     struct hdd_context *hdd_ctx,
 				     const void *data, int data_len)
@@ -435,6 +445,12 @@ QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline
+void hdd_update_link_state_cached_timestamp(struct hdd_adapter *adapter)
+{
+}
+
 #define FEATURE_ML_LINK_STATE_COMMANDS
 #endif
 #endif
