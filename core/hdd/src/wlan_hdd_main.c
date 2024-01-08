@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -7174,11 +7174,8 @@ static int hdd_vdev_destroy_event_wait(struct hdd_context *hdd_ctx,
 		if (cdp_mlo_dev_ctxt_detach(wlan_psoc_get_dp_handle(psoc),
 					    wlan_vdev_get_id(vdev),
 					    (uint8_t *)mld_addr)
-					    != QDF_STATUS_SUCCESS) {
+					    != QDF_STATUS_SUCCESS)
 			obj_mgr_err("Failed to detach DP vdev from DP MLO Dev ctxt");
-			QDF_BUG(0);
-			return QDF_STATUS_E_FAILURE;
-		}
 	}
 
 	/* close sme session (destroy vdev in firmware via legacy API) */
