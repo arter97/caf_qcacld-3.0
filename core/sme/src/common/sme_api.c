@@ -12434,7 +12434,7 @@ uint32_t sme_get_wni_dot11_mode(mac_handle_t mac_handle)
  *
  * Return: QDF_STATUS_SUCCESS on success, non-zero error code on failure.
  */
-QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, tSirMacAddr bss_id,
+QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, uint8_t *bss_id,
 				  uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -14026,7 +14026,7 @@ QDF_STATUS sme_set_rx_set_blocksize(mac_handle_t mac_handle,
 	return status;
 }
 
-int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev)
+int sme_cli_set_command(int vdev_id, int param_id, uint32_t sval, int vpdev)
 {
 	return wma_cli_set_command(vdev_id, param_id, sval, vpdev);
 }
