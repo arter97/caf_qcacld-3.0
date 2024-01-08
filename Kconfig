@@ -9,6 +9,22 @@ config QCA_CLD_WLAN
 
 if QCA_CLD_WLAN != n
 
+config WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+	bool "Enable WLAN_FEATURE_NO_STA_SAP_CONCURRENCY"
+	default n
+
+config WLAN_FEATURE_NO_STA_NAN_CONCURRENCY
+	bool "Enable WLAN_FEATURE_NO_STA_NAN_CONCURRENCY"
+	default n
+
+config WLAN_FEATURE_NO_SAP_NAN_CONCURRENCY
+	bool "Enable WLAN_FEATURE_NO_SAP_NAN_CONCURRENCY"
+	default n
+
+config WLAN_FEATURE_NO_P2P_CONCURRENCY
+	bool "Enable WLAN_FEATURE_NO_P2P_CONCURRENCY"
+	default n
+
 config 160MHZ_SUPPORT
 	bool "Enable 160MHZ_SUPPORT"
 	default n
@@ -129,6 +145,10 @@ config CONVERGED_P2P_ENABLE
 
 config CP_STATS
 	bool "Enable CP_STATS"
+	default n
+
+config QCA_TARGET_IF_MLME
+	bool "Enable TARGET_IF MLME"
 	default n
 
 config DCS
@@ -1106,6 +1126,11 @@ config WLAN_DISABLE_EXPORT_SYMBOL
 	bool "Enable WLAN_DISABLE_EXPORT_SYMBOL"
 	default n
 
+config WLAN_MULTI_CHIP_SUPPORT
+	bool "Enable WLAN_MULTI_CHIP_SUPPORT"
+	select WLAN_DISABLE_EXPORT_SYMBOL
+	default n
+
 config WLAN_DL_MODES
 	bool "Enable WLAN_DL_MODES"
 	default n
@@ -1638,6 +1663,11 @@ config WLAN_TSF_UPLINK_DELAY
 	depends on WLAN_TSF_AUTO_REPORT
 	default n
 
+config WLAN_TX_LATENCY_STATS
+	bool "Enable WLAN_TX_LATENCY_STATS"
+	depends on WLAN_TSF_AUTO_REPORT
+	default n
+
 config WLAN_TWT_CONVERGED
 	bool "Enable WLAN_TWT_CONVERGED"
 	default n
@@ -1879,6 +1909,8 @@ config FEATURE_WLAN_CH_AVOID_EXT
 
 config WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE
 	bool "enable CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE"
+	default n
+
 config 4_BYTES_TLV_TAG
 	bool "enable 4_BYTES_TLV_TAG"
 	default n

@@ -625,12 +625,15 @@ CONFIG_DISABLE_CHANNEL_LIST :=y
 #Flag to enable Dynamic Voltage WDCVS (Config Voltage Mode)
 CONFIG_WLAN_DYNAMIC_CVM := y
 
+CONFIG_FEATURE_SET := y
+
 CONFIG_WIFI_POS_CONVERGED := y
 ifneq ($(CONFIG_WIFI_POS_CONVERGED), y)
 CONFIG_WIFI_POS_LEGACY := y
 endif
 
 CONFIG_CP_STATS := y
+CONFIG_QCA_TARGET_IF_MLME := y
 
 #Flag to enable compilation of DCS module
 CONFIG_DCS := y

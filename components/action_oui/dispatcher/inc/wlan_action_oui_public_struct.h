@@ -103,7 +103,6 @@
  * @ACTION_OUI_SWITCH_TO_11N_MODE: connect in 11n
  * @ACTION_OUI_CONNECT_1X1_WITH_1_CHAIN: connect in 1x1 & disable diversity gain
  * @ACTION_OUI_DISABLE_AGGRESSIVE_TX: disable aggressive TX in firmware
- * @ACTION_OUI_FORCE_MAX_NSS: Force Max NSS connection with few IOT APs
  * @ACTION_OUI_DISABLE_AGGRESSIVE_EDCA: disable aggressive EDCA with the ap
  * @ACTION_OUI_DISABLE_TWT: disable TWT with the ap
  * @ACTION_OUI_EXTEND_WOW_ITO: extend ITO under WOW mode if vendor OUI is
@@ -125,6 +124,7 @@
  * on 2.4 GHz
  * @ACTION_OUI_DISABLE_BFORMEE: disable SU/MU beam formee capability for
  * specified AP
+ * @ACTION_OUI_ENABLE_CTS2SELF: enable cts to self for specified AP's
  * @ACTION_OUI_MAXIMUM_ID: maximum number of action oui types
  */
 enum action_oui_id {
@@ -148,8 +148,8 @@ enum action_oui_id {
 	ACTION_OUI_TAKE_ALL_BAND_INFO,
 	ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ,
 	ACTION_OUI_DISABLE_BFORMEE,
-	ACTION_OUI_FORCE_MAX_NSS,
 	ACTION_OUI_DISABLE_AGGRESSIVE_EDCA,
+	ACTION_OUI_ENABLE_CTS2SELF,
 	ACTION_OUI_MAXIMUM_ID
 };
 

@@ -940,6 +940,7 @@ lim_process_assoc_rsp_t2lm(struct pe_session *session,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_t2lm_context *t2lm_ctx;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!session || !assoc_rsp) {
 		pe_err("invalid input parameters");
@@ -949,6 +950,15 @@ lim_process_assoc_rsp_t2lm(struct pe_session *session,
 	vdev = session->vdev;
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	if (!wlan_mlme_get_t2lm_negotiation_supported(psoc)) {
+		pe_err_rl("T2LM negotiation not supported");
+		return;
+	}
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
 	if (!mlo_dev_ctx) {
@@ -1051,12 +1061,41 @@ static inline void lim_cache_emlsr_params(struct pe_session *session_entry,
 #endif
 
 /**
+ * lim_send_join_fail_on_vdev() - Send join failure for link vdev
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session_entry: Session entry
+ * @result_code: result code to send in join result
+ *
+ * This function sends join failure when bssid of assoc/reassoc
+ * resp doesn't match with current bssid
+ */
+static
+void lim_send_join_fail_on_vdev(struct mac_context *mac_ctx,
+				struct pe_session *session_entry,
+				enum eSirResultCodes result_code)
+{
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev))
+		return;
+
+	session_entry->limSmeState = eLIM_SME_JOIN_FAILURE_STATE;
+	MTRACE(mac_trace(mac_ctx, TRACE_CODE_SME_STATE,
+			 session_entry->peSessionId,
+			 session_entry->limSmeState));
+
+	/* Send Join response to Host */
+	lim_handle_sme_join_result(
+			mac_ctx, result_code, STATUS_UNSPECIFIED_FAILURE,
+			session_entry);
+}
+
+/**
  * lim_process_assoc_rsp_frame() - Processes assoc response
  * @mac_ctx: Pointer to Global MAC structure
  * @rx_packet_info    - A pointer to Rx packet info structure
  * @frame_body_length - frame body length of reassoc/assoc response frame
  * @sub_type - Indicates whether it is Association Response (=0) or
  *                   Reassociation Response (=1) frame
+ * @session_entry: Session entry
  *
  * This function is called by limProcessMessageQueue() upon
  * Re/Association Response frame reception.
@@ -1159,6 +1198,18 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			 */
 			pe_warn("received AssocRsp from unexpected peer "QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(hdr->sa));
+
+			if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry)) {
+				session_entry->is_unexpected_peer_error = true;
+				qdf_mem_free(beacon);
+				return;
+			}
+			/*
+			 * Send Assoc failure to avoid connection in
+			 * progress state for link vdev.
+			 */
+			lim_send_join_fail_on_vdev(mac_ctx, session_entry,
+						   eSIR_SME_ASSOC_REFUSED);
 			qdf_mem_free(beacon);
 			return;
 		}
@@ -1173,6 +1224,19 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			 */
 			pe_warn("received ReassocRsp from unexpected peer "QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(hdr->sa));
+
+			if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry)) {
+				session_entry->is_unexpected_peer_error = true;
+				qdf_mem_free(beacon);
+				return;
+			}
+
+			/*
+			 * Send Reassoc failure to avoid connection in
+			 * progress state for link vdev.
+			 */
+			lim_send_join_fail_on_vdev(mac_ctx, session_entry,
+						   eSIR_SME_REASSOC_REFUSED);
 			qdf_mem_free(beacon);
 			return;
 		}
@@ -1384,7 +1448,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				&assoc_rsp->obss_scanparams);
 
 	if (lim_is_session_he_capable(session_entry)) {
-		lim_set_twt_peer_capabilities(
+		if (!wlan_cm_is_vdev_roaming(session_entry->vdev))
+			lim_set_twt_peer_capabilities(
 				mac_ctx,
 				(struct qdf_mac_addr *)current_bssid,
 				&assoc_rsp->he_cap,
@@ -1619,6 +1684,13 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	lim_update_iot_aggr_sz(mac_ctx, ie, ie_len, session_entry);
 
 	lim_extract_ap_capabilities(mac_ctx, ie, ie_len, beacon);
+
+	if (session_entry->opmode == QDF_STA_MODE) {
+		lim_enable_cts_to_self_for_exempted_iot_ap(
+			mac_ctx, session_entry,
+			ie, ie_len);
+	}
+
 	lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp,
 				   session_entry, beacon);
 
@@ -1673,31 +1745,33 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 #endif
 	lim_update_stads_ext_cap(mac_ctx, session_entry, assoc_rsp, sta_ds);
 	/* Update the BSS Entry, this entry was added during preassoc. */
-	if (QDF_STATUS_SUCCESS == lim_sta_send_add_bss(mac_ctx, assoc_rsp,
-			beacon,
-			&session_entry->lim_join_req->bssDescription, true,
-			 session_entry)) {
+	if (QDF_STATUS_SUCCESS ==
+	    lim_sta_send_add_bss(mac_ctx, assoc_rsp, beacon,
+				 &session_entry->lim_join_req->bssDescription,
+				 true, session_entry)) {
 		clean_up_ft_sha384(assoc_rsp, sha384_akm);
 		if (session_entry->limAssocResponseData != assoc_rsp)
 			qdf_mem_free(assoc_rsp);
+
 		qdf_mem_free(beacon);
+
 		return;
-	} else {
-		pe_err("could not update the bss entry");
-		assoc_cnf.resultCode = eSIR_SME_RESOURCES_UNAVAILABLE;
-		assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
 	}
 
+	pe_err("vdev:%d could not update the bss entry",
+	       session_entry->vdev_id);
+	assoc_cnf.resultCode = eSIR_SME_RESOURCES_UNAVAILABLE;
+	assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
+
 assocReject:
-	if ((subtype == LIM_ASSOC)
-		|| ((subtype == LIM_REASSOC)
-		&& (session_entry->limMlmState ==
-		    eLIM_MLM_WT_FT_REASSOC_RSP_STATE))) {
+	if (subtype == LIM_ASSOC ||
+	    (subtype == LIM_REASSOC &&
+	     session_entry->limMlmState == eLIM_MLM_WT_FT_REASSOC_RSP_STATE)) {
 		pe_err("Assoc Rejected by the peer mlmestate: %d sessionid: %d Reason: %d MACADDR:"
-			QDF_MAC_ADDR_FMT,
-			session_entry->limMlmState,
-			session_entry->peSessionId,
-			assoc_cnf.resultCode, QDF_MAC_ADDR_REF(hdr->sa));
+			QDF_MAC_ADDR_FMT, session_entry->limMlmState,
+			session_entry->peSessionId, assoc_cnf.resultCode,
+			QDF_MAC_ADDR_REF(hdr->sa));
+
 		session_entry->limMlmState = eLIM_MLM_IDLE_STATE;
 		MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
 			session_entry->peSessionId,
@@ -1706,6 +1780,7 @@ assocReject:
 			qdf_mem_free(session_entry->pLimMlmJoinReq);
 			session_entry->pLimMlmJoinReq = NULL;
 		}
+
 		if (subtype == LIM_ASSOC) {
 			lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
 				(uint32_t *) &assoc_cnf);
@@ -1725,5 +1800,6 @@ assocReject:
 	qdf_mem_free(assoc_rsp->sha384_ft_subelem.gtk);
 	qdf_mem_free(assoc_rsp->sha384_ft_subelem.igtk);
 	qdf_mem_free(assoc_rsp);
+
 	return;
 }

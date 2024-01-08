@@ -80,6 +80,7 @@ static char *tdls_get_cmd_type_str(enum tdls_command_type cmd_type)
 	CASE_RETURN_STRING(TDLS_CMD_SET_SECOFFCHANOFFSET);
 	CASE_RETURN_STRING(TDLS_DELETE_ALL_PEERS_INDICATION);
 	CASE_RETURN_STRING(TDLS_CMD_START_BSS);
+	CASE_RETURN_STRING(TDLS_CMD_SET_LINK_UNFORCE);
 	default:
 		return "Invalid TDLS command";
 	}
@@ -582,6 +583,17 @@ QDF_STATUS tdls_handle_start_bss(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
+static void tdls_handle_link_unforce(struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_action_frame_request req = {0};
+
+	req.vdev = vdev;
+	req.tdls_mgmt.frame_type = TDLS_MAX_ACTION_CODE;
+
+	tdls_debug("set vdev %d unforce", wlan_vdev_get_id(vdev));
+	tdls_set_link_mode(&req);
+}
+
 QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -667,6 +679,9 @@ QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 		break;
 	case TDLS_CMD_START_BSS:
 		tdls_handle_start_bss(msg->bodyptr);
+		break;
+	case TDLS_CMD_SET_LINK_UNFORCE:
+		tdls_handle_link_unforce(msg->bodyptr);
 		break;
 	default:
 		break;
@@ -982,7 +997,16 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 	     tdls_is_concurrency_allowed(tdls_soc_obj->soc))) {
 		state = true;
 	} else {
-		tdls_warn("Concurrent sessions exist disable TDLS");
+		tdls_warn("vdev:%d Concurrent sessions exist disable TDLS",
+			  wlan_vdev_get_id(vdev));
+		state = false;
+		goto exit;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_CLIENT_MODE && sta_count) {
+		tdls_warn("vdev:%d Concurrent STA exists. TDLS not allowed for P2P vdev",
+			  wlan_vdev_get_id(vdev));
+		state = false;
 		goto exit;
 	}
 
@@ -1002,6 +1026,11 @@ exit:
 #ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
 bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 {
+	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL)) {
+		tdls_debug("eMLSR STA present. Don't allow TDLS");
+		return false;
+	}
+
 	if (!wlan_psoc_nif_fw_ext2_cap_get(psoc,
 					   WLAN_TDLS_CONCURRENCIES_SUPPORT)) {
 		tdls_debug("fw cap is not advertised");
@@ -1492,7 +1521,8 @@ void tdls_process_enable_for_vdev(struct wlan_objmgr_vdev *vdev)
 							      NULL);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	if (opmode == QDF_P2P_CLIENT_MODE && sta_count) {
-		tdls_debug("STA + P2P concurrency. Don't allow TDLS on P2P vdev");
+		tdls_debug("STA + P2P concurrency. Don't allow TDLS on P2P vdev:%d",
+			   wlan_vdev_get_id(vdev));
 		return;
 	}
 
@@ -1812,18 +1842,17 @@ static void tdls_set_mode_in_vdev(struct tdls_vdev_priv_obj *tdls_vdev,
 				  enum tdls_feature_mode tdls_mode,
 				  enum tdls_disable_sources source)
 {
-	if (!tdls_vdev)
-		return;
-	tdls_debug("enter tdls mode is %d", tdls_mode);
+	tdls_debug("set tdls mode: %d source:%d", tdls_mode,
+		   source);
 
-	if (TDLS_SUPPORT_IMP_MODE == tdls_mode ||
-	    TDLS_SUPPORT_EXT_CONTROL == tdls_mode) {
-		clear_bit((unsigned long)source,
-			  &tdls_soc->tdls_source_bitmap);
+	switch (tdls_mode) {
+	case TDLS_SUPPORT_IMP_MODE:
+		fallthrough;
+	case TDLS_SUPPORT_EXT_CONTROL:
+		clear_bit((unsigned long)source, &tdls_soc->tdls_source_bitmap);
 		/*
 		 * Check if any TDLS source bit is set and if
-		 * bitmap is not zero then we should not
-		 * enable TDLS
+		 * bitmap is not zero then we should not enable TDLS
 		 */
 		if (tdls_soc->tdls_source_bitmap) {
 			tdls_notice("Don't enable TDLS, source bitmap: %lu",
@@ -1831,12 +1860,15 @@ static void tdls_set_mode_in_vdev(struct tdls_vdev_priv_obj *tdls_vdev,
 			return;
 		}
 		tdls_implicit_enable(tdls_vdev);
-		/* tdls implicit mode is enabled, so
-		 * enable the connection tracker
+		/*
+		 * tdls implicit mode is enabled, so enable the connection
+		 * tracker
 		 */
-		tdls_soc->enable_tdls_connection_tracker =
-			true;
-	} else if (TDLS_SUPPORT_DISABLED == tdls_mode) {
+		tdls_soc->enable_tdls_connection_tracker = true;
+
+		return;
+
+	case TDLS_SUPPORT_DISABLED:
 		set_bit((unsigned long)source,
 			&tdls_soc->tdls_source_bitmap);
 		tdls_implicit_disable(tdls_vdev);
@@ -1844,7 +1876,10 @@ static void tdls_set_mode_in_vdev(struct tdls_vdev_priv_obj *tdls_vdev,
 		 * stop the connection tracker.
 		 */
 		tdls_soc->enable_tdls_connection_tracker = false;
-	} else if (TDLS_SUPPORT_EXP_TRIG_ONLY == tdls_mode) {
+
+		return;
+
+	case TDLS_SUPPORT_EXP_TRIG_ONLY:
 		clear_bit((unsigned long)source,
 			  &tdls_soc->tdls_source_bitmap);
 		tdls_implicit_disable(tdls_vdev);
@@ -1860,8 +1895,11 @@ static void tdls_set_mode_in_vdev(struct tdls_vdev_priv_obj *tdls_vdev,
 		 */
 		if (tdls_soc->tdls_source_bitmap)
 			return;
+
+		return;
+	default:
+		return;
 	}
-	tdls_debug("exit ");
 }
 
 /**
@@ -1917,12 +1955,15 @@ static void tdls_set_current_mode(struct tdls_soc_priv_obj *tdls_soc,
 							QDF_STA_MODE,
 							WLAN_TDLS_NB_ID);
 	if (vdev) {
-		tdls_debug("set mode in tdls vdev ");
+		tdls_debug("set mode in tdls STA vdev:%d",
+			   wlan_vdev_get_id(vdev));
 		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
 		if (tdls_vdev)
 			tdls_set_mode_in_vdev(tdls_vdev, tdls_soc,
 					      tdls_mode, source);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+
+		goto exit;
 	}
 
 	/* get p2p client vdev */
@@ -1930,7 +1971,8 @@ static void tdls_set_current_mode(struct tdls_soc_priv_obj *tdls_soc,
 							QDF_P2P_CLIENT_MODE,
 							WLAN_TDLS_NB_ID);
 	if (vdev) {
-		tdls_debug("set mode in tdls vdev ");
+		tdls_debug("set mode in tdls P2P cli vdev:%d",
+			   wlan_vdev_get_id(vdev));
 		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
 		if (tdls_vdev)
 			tdls_set_mode_in_vdev(tdls_vdev, tdls_soc,
@@ -1938,11 +1980,11 @@ static void tdls_set_current_mode(struct tdls_soc_priv_obj *tdls_soc,
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
 	}
 
+exit:
 	if (!update_last)
 		tdls_soc->tdls_last_mode = tdls_soc->tdls_current_mode;
 
 	tdls_soc->tdls_current_mode = tdls_mode;
-
 }
 
 QDF_STATUS tdls_set_operation_mode(struct tdls_set_mode_params *tdls_set_mode)
@@ -2037,6 +2079,21 @@ void tdls_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 
 	tdls_soc = (struct tdls_soc_priv_obj *) arg;
 	tdls_post_scan_done_msg(tdls_soc);
+}
+
+void tdls_set_link_unforce(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+
+	msg.callback = tdls_process_cmd;
+	msg.type = TDLS_CMD_SET_LINK_UNFORCE;
+	msg.bodyptr = vdev;
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		tdls_err("failed to set tdls link mode");
 }
 
 /**

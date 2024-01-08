@@ -774,6 +774,12 @@ wma_roam_update_vdev(tp_wma_handle wma,
 					 vdev_id,
 					 mac_addr.bytes);
 
+	if (wlan_vdev_mlme_get_opmode(wma->interfaces[vdev_id].vdev) ==
+								QDF_STA_MODE)
+		wlan_cdp_set_peer_freq(wma->psoc, mac_addr.bytes,
+				       wma->interfaces[vdev_id].ch_freq,
+				       vdev_id);
+
 	/* Update new peer's uc cipher */
 	uc_cipher = wlan_crypto_get_param(wma->interfaces[vdev_id].vdev,
 					   WLAN_CRYPTO_PARAM_UCAST_CIPHER);

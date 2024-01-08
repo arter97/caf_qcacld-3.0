@@ -521,6 +521,22 @@ static uint16_t sch_get_tim_size(uint32_t max_aid)
 	return tim_size;
 }
 
+#ifdef SAP_MULTI_LINK_EMULATION
+static void omit_caps_for_2link_sap(tDot11fBeacon2 *bcn_2)
+{
+	qdf_mem_zero(&bcn_2->HTCaps, sizeof(bcn_2->HTCaps));
+	qdf_mem_zero(&bcn_2->EDCAParamSet, sizeof(bcn_2->EDCAParamSet));
+	qdf_mem_zero(&bcn_2->PowerConstraints, sizeof(bcn_2->PowerConstraints));
+	qdf_mem_zero(&bcn_2->TPCReport, sizeof(bcn_2->TPCReport));
+
+	pe_debug("Removed caps from beacon/probe rsp");
+}
+#else
+static inline void omit_caps_for_2link_sap(tDot11fBeacon2 *bcn_2)
+{
+}
+#endif
+
 /**
  * sch_set_fixed_beacon_fields() - sets the fixed params in beacon frame
  * @mac_ctx:       mac global context
@@ -919,6 +935,8 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			     WLAN_ELEMID_OP_MODE_NOTIFY, ONE_BYTE, NULL, 0,
 			     NULL, SIR_MAC_VHT_OPMODE_SIZE - 2);
 	}
+
+	omit_caps_for_2link_sap(bcn_2);
 
 	n_status = dot11f_pack_beacon2(mac_ctx, bcn_2,
 				       session->pSchBeaconFrameEnd,

@@ -361,6 +361,8 @@ hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id)
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
+	hdd_debug("old_link_id:%d new_link_id:%d",
+		  sta_ctx->conn_info.ieee_link_id, link_id);
 	sta_ctx->conn_info.ieee_link_id = link_id;
 }
 
@@ -370,6 +372,7 @@ hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info)
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
+	hdd_debug("clear link id:%d", sta_ctx->conn_info.ieee_link_id);
 	sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
 }
 #endif
@@ -894,8 +897,6 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	hdd_update_scan_ie_for_connect(adapter, &params);
 	hdd_update_action_oui_for_connect(hdd_ctx, req);
 
-	wlan_hdd_connectivity_event_connecting(hdd_ctx, req,
-					       adapter->deflink->vdev_id);
 	status = osif_cm_connect(ndev, vdev, req, &params);
 
 	if (status || ucfg_cm_is_vdev_roaming(vdev)) {
@@ -1679,6 +1680,12 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			if (is_auth_required)
 				wlan_acquire_peer_key_wakelock(hdd_ctx->pdev,
 							      rsp->bssid.bytes);
+			/*
+			 * In case of roaming from 3 Link or 2 Link to 1 link
+			 * AP, then reset the STA context for other links
+			 */
+			if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+				hdd_adapter_reset_station_ctx(adapter);
 		}
 		hdd_debug("is_roam_offload %d, is_roam %d, is_auth_required %d",
 			  is_roam_offload, is_roam, is_auth_required);

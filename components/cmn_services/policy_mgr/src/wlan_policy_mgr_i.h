@@ -350,6 +350,7 @@ struct policy_mgr_cfg {
  * @no_of_open_sessions: Number of active vdevs
  * @no_of_active_sessions: Number of active connections
  * @sta_ap_intf_check_work: delayed sap restart work
+ * @work_fail_count: sta_ap work schedule fail count
  * @nan_sap_conc_work: Info related to nan sap conc work
  * @num_dbs_hw_modes: Number of different HW modes supported
  * @hw_mode: List of HW modes supported
@@ -377,7 +378,7 @@ struct policy_mgr_cfg {
  * @valid_ch_freq_list_count: number of valid frequencies
  * @dynamic_mcc_adaptive_sched: disable/enable mcc adaptive scheduler feature
  * @dynamic_dfs_master_disabled: current state of dynamic dfs master
- * @set_link_in_progress: To track if set link is in progress
+ * @link_in_progress: To track if set link is in progress
  * @set_link_update_done_evt: qdf event to synchronize set link
  * @active_vdev_bitmap: Active vdev id bitmap
  * @inactive_vdev_bitmap: Inactive vdev id bitmap
@@ -403,6 +404,7 @@ struct policy_mgr_psoc_priv_obj {
 	uint8_t no_of_open_sessions[QDF_MAX_NO_OF_MODE];
 	uint8_t no_of_active_sessions[QDF_MAX_NO_OF_MODE];
 	struct qdf_delayed_work sta_ap_intf_check_work;
+	uint8_t work_fail_count;
 	qdf_work_t nan_sap_conc_work;
 	uint32_t num_dbs_hw_modes;
 	struct dbs_hw_mode_info hw_mode;
@@ -426,7 +428,7 @@ struct policy_mgr_psoc_priv_obj {
 	bool dynamic_mcc_adaptive_sched;
 	bool dynamic_dfs_master_disabled;
 #ifdef WLAN_FEATURE_11BE_MLO
-	bool set_link_in_progress;
+	qdf_atomic_t link_in_progress;
 	qdf_event_t set_link_update_done_evt;
 #endif
 	uint32_t active_vdev_bitmap;
@@ -1183,4 +1185,17 @@ policy_mgr_set_freq_restriction_mask(struct policy_mgr_psoc_priv_obj *pm_ctx,
 {
 }
 #endif
+
+/**
+ * policy_mgr_get_connection_max_channel_width() - Get max channel width
+ * among vdevs in use
+ * @psoc: PSOC object pointer
+ *
+ * This function returns max channel width among in-use vdevs
+ *
+ * Return: enum hw_mode_bandwidth
+ */
+enum hw_mode_bandwidth
+policy_mgr_get_connection_max_channel_width(struct wlan_objmgr_psoc *psoc);
+
 #endif

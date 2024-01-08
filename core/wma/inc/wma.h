@@ -442,6 +442,8 @@ enum wma_rx_exec_ctx {
  * @noa_sub_ie_len: NOA sub IE length
  * @noa_ie: NOA IE
  * @p2p_ie_offset: p2p IE offset
+ * @csa_count_offset: Offset of Switch count field in CSA IE
+ * @ecsa_count_offset: Offset of Switch count field in ECSA IE
  * @lock: lock
  */
 struct beacon_info {
@@ -455,6 +457,8 @@ struct beacon_info {
 	uint16_t noa_sub_ie_len;
 	uint8_t *noa_ie;
 	uint16_t p2p_ie_offset;
+	uint16_t csa_count_offset;
+	uint16_t ecsa_count_offset;
 	qdf_spinlock_t lock;
 };
 
@@ -765,11 +769,13 @@ struct mac_ss_bw_info {
 /**
  * struct wma_ini_config - Structure to hold wma ini configuration
  * @max_no_of_peers: Max Number of supported
+ * @exclude_selftx_from_cca_busy: Exclude self tx time from cca busy time flag.
  *
  * Placeholder for WMA ini parameters.
  */
 struct wma_ini_config {
 	uint8_t max_no_of_peers;
+	bool exclude_selftx_from_cca_busy;
 };
 
 /**
@@ -1476,8 +1482,29 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle,
 uint32_t wma_get_vht_ch_width(void);
 
 #ifdef WLAN_FEATURE_11BE
+/**
+ * wma_get_orig_eht_ch_width() - Get original EHT channel width supported
+ *
+ * API to get original EHT channel width
+ *
+ * Return: void
+ */
+uint32_t wma_get_orig_eht_ch_width(void);
+
+/**
+ * wma_get_orig_eht_ch_width() - Get current EHT channel width supported
+ *
+ * API to get current EHT channel width
+ *
+ * Return: void
+ */
 uint32_t wma_get_eht_ch_width(void);
 #else
+static inline uint32_t wma_get_orig_eht_ch_width(void)
+{
+	return 0;
+}
+
 static inline uint32_t wma_get_eht_ch_width(void)
 {
 	return 0;

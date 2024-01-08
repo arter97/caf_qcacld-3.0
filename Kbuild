@@ -936,8 +936,14 @@ CLD_WMI_MC_CP_STATS_OBJS :=	$(WMI_DIR)/src/wmi_unified_mc_cp_stats_tlv.o \
 				$(WMI_DIR)/src/wmi_unified_mc_cp_stats_api.o
 endif
 
+ifeq ($(CONFIG_QCA_TARGET_IF_MLME), y)
+CLD_WMI_MLME_OBJS += $(WMI_DIR)/src/wmi_unified_mlme_tlv.o \
+		     $(WMI_DIR)/src/wmi_unified_mlme_api.o
+endif
+
 CLD_WMI_OBJS :=	$(CLD_WMI_ROAM_OBJS) \
-		$(CLD_WMI_MC_CP_STATS_OBJS)
+		$(CLD_WMI_MC_CP_STATS_OBJS) \
+		$(CLD_WMI_MLME_OBJS)
 
 $(call add-wlan-objs,cld_wmi,$(CLD_WMI_OBJS))
 
@@ -1630,15 +1636,20 @@ MLME_OBJS += $(WFA_TGT_IF_DIR)/src/target_if_wfa_testcmd.o \
 
 ####### LL_SAP #######
 LL_SAP_DIR := components/umac/mlme/sap/ll_sap
+LL_SAP_OS_IF_DIR := os_if/mlme/sap/ll_sap
 
 LL_SAP_INC := -I$(WLAN_ROOT)/$(LL_SAP_DIR)/dispatcher/inc \
+		-I$(WLAN_ROOT)/$(LL_SAP_OS_IF_DIR)/inc
 
 MLME_INC += $(LL_SAP_INC)
 
 ifeq ($(CONFIG_WLAN_FEATURE_LL_LT_SAP), y)
 MLME_OBJS += $(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_ucfg_api.o \
+		$(LL_SAP_DIR)/dispatcher/src/wlan_ll_sap_api.o \
 		$(LL_SAP_DIR)/core/src/wlan_ll_sap_main.o \
-		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_main.o
+		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_main.o \
+		$(LL_SAP_DIR)/core/src/wlan_ll_lt_sap_bearer_switch.o \
+		$(LL_SAP_OS_IF_DIR)/src/os_if_ll_sap.o
 endif
 
 $(call add-wlan-objs,mlme,$(MLME_OBJS))
@@ -1744,9 +1755,14 @@ $(call add-wlan-objs,wlan_pre_cac,$(WLAN_PRE_CAC_OBJS))
 CLD_TARGET_IF_DIR := components/target_if
 
 CLD_TARGET_IF_INC := -I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/pmo/inc \
+		     -I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/mlme/inc \
+
+ifeq ($(CONFIG_QCA_TARGET_IF_MLME), y)
+CLD_TARGET_IF_OBJ := $(CLD_TARGET_IF_DIR)/mlme/src/target_if_mlme.o
+endif
 
 ifeq ($(CONFIG_POWER_MANAGEMENT_OFFLOAD), y)
-CLD_TARGET_IF_OBJ := $(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_arp.o \
+CLD_TARGET_IF_OBJ += $(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_arp.o \
 		$(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_gtk.o \
 		$(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_hw_filter.o \
 		$(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_lphb.o \
@@ -1833,7 +1849,10 @@ POLICY_MGR_OBJS := $(POLICY_MGR_DIR)/src/wlan_policy_mgr_action.o \
 	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_get_set_utils.o \
 	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_init_deinit.o \
 	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_ucfg.o \
-	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_pcl.o \
+	$(POLICY_MGR_DIR)/src/wlan_policy_mgr_pcl.o
+ifeq ($(CONFIG_WLAN_FEATURE_LL_LT_SAP), y)
+POLICY_MGR_OBJS += $(POLICY_MGR_DIR)/src/wlan_policy_mgr_ll_sap.o
+endif
 
 $(call add-wlan-objs,policy_mgr,$(POLICY_MGR_OBJS))
 
@@ -3416,6 +3435,7 @@ ccflags-$(CONFIG_FEATURE_WLAN_SCAN_PNO) += -DFEATURE_WLAN_SCAN_PNO
 ccflags-$(CONFIG_WLAN_FEATURE_PACKET_FILTERING) += -DWLAN_FEATURE_PACKET_FILTERING
 ccflags-$(CONFIG_DHCP_SERVER_OFFLOAD) += -DDHCP_SERVER_OFFLOAD
 ccflags-$(CONFIG_WLAN_NS_OFFLOAD) += -DWLAN_NS_OFFLOAD
+ccflags-$(CONFIG_QCA_TARGET_IF_MLME) += -DQCA_TARGET_IF_MLME
 ccflags-$(CONFIG_WLAN_DYNAMIC_ARP_NS_OFFLOAD) += -DFEATURE_WLAN_DYNAMIC_ARP_NS_OFFLOAD
 ccflags-$(CONFIG_WLAN_FEATURE_ICMP_OFFLOAD) += -DWLAN_FEATURE_ICMP_OFFLOAD
 ccflags-$(CONFIG_FEATURE_WLAN_RA_FILTERING) += -DFEATURE_WLAN_RA_FILTERING
@@ -4130,6 +4150,12 @@ ccflags-y += -DWLAN_FEATURE_TSF_UPLINK_DELAY
 CONFIG_WLAN_TSF_AUTO_REPORT := y
 endif
 
+# Enable tx latency stats feature
+ifeq ($(CONFIG_WLAN_TX_LATENCY_STATS), y)
+ccflags-y += -DWLAN_FEATURE_TX_LATENCY_STATS
+CONFIG_WLAN_TSF_AUTO_REPORT := y
+endif
+
 # Enable TSF auto report feature
 ccflags-$(CONFIG_WLAN_TSF_AUTO_REPORT) += -DWLAN_FEATURE_TSF_AUTO_REPORT
 
@@ -4181,6 +4207,7 @@ ccflags-$(CONFIG_DP_RX_UDP_OVER_PEER_ROAM) += -DDP_RX_UDP_OVER_PEER_ROAM
 cppflags-$(CONFIG_WLAN_BOOST_CPU_FREQ_IN_ROAM) += -DWLAN_BOOST_CPU_FREQ_IN_ROAM
 
 ccflags-$(CONFIG_QCA_WIFI_EMULATION) += -DQCA_WIFI_EMULATION
+ccflags-$(CONFIG_SAP_MULTI_LINK_EMULATION) += -DSAP_MULTI_LINK_EMULATION
 ccflags-$(CONFIG_SHADOW_V2) += -DCONFIG_SHADOW_V2
 ccflags-$(CONFIG_SHADOW_V3) += -DCONFIG_SHADOW_V3
 ccflags-$(CONFIG_QCA6290_HEADERS_DEF) += -DQCA6290_HEADERS_DEF
@@ -4638,6 +4665,17 @@ else
 CONFIG_WLAN_MAX_ML_DEFAULT_LINK  ?= 1
 endif
 ccflags-y += -DWLAN_MAX_ML_DEFAULT_LINK=$(CONFIG_WLAN_MAX_ML_DEFAULT_LINK)
+
+ifdef CONFIG_WLAN_FEATURE_11BE_MLO
+ifndef CONFIG_WLAN_DEFAULT_REC_LINK_VALUE
+CONFIG_WLAN_DEFAULT_REC_LINK_VALUE  ?= 2
+endif
+else
+ifndef CONFIG_WLAN_DEFAULT_REC_LINK_VALUE
+CONFIG_WLAN_DEFAULT_REC_LINK_VALUE  ?= 2
+endif
+endif
+ccflags-y += -DWLAN_DEFAULT_REC_LINK_VALUE=$(CONFIG_WLAN_DEFAULT_REC_LINK_VALUE)
 
 ifdef CONFIG_WLAN_FEATURE_11BE_MLO
 CONFIG_WLAN_MAX_ML_BSS_LINKS ?= 3

@@ -1387,6 +1387,19 @@ enum wlan_mlme_hw_mode_config_type {
 	WLAN_MLME_HW_MODE_MAX,
 };
 
+/**
+ * enum wlan_mlme_aux_caps_bit - Bit mapping for aux capability
+ *
+ * @WLAN_MLME_AUX_MODE_SCAN_BIT: if set, aux scan is supported
+ * @WLAN_MLME_AUX_MODE_LISTEN_BIT: if set, aux listen is supported
+ * @WLAN_MLME_AUX_MODE_EMLSR_BIT: if set, aux emlsr is supported
+ */
+enum wlan_mlme_aux_caps_bit {
+	WLAN_MLME_AUX_MODE_SCAN_BIT = 0,
+	WLAN_MLME_AUX_MODE_LISTEN_BIT = 1,
+	WLAN_MLME_AUX_MODE_EMLSR_BIT = 2,
+};
+
 /* struct wlan_mlme_aux_dev_caps - wlan mlme aux dev capability
  *
  * @supported_modes_bitmap: indicate which mode this AUX supports for the
@@ -1463,6 +1476,7 @@ struct wlan_mlme_aux_dev_caps {
  * connection, bypass strict power levels
  * @sr_enable_modes: modes for which SR(Spatial Reuse) is enabled
  * @wlan_mlme_aux0_dev_caps: capability for aux0
+ * @bt_profile_con: Bluetooth connection profile
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1530,6 +1544,7 @@ struct wlan_mlme_generic {
 #endif
 	struct wlan_mlme_aux_dev_caps
 		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX];
+	bool bt_profile_con;
 };
 
 /**
@@ -1620,6 +1635,7 @@ struct wlan_mlme_acs {
  * @disable_btwt_usr_cfg: User config param to enable/disable the BTWT support
  * @enable_twt_24ghz: Enable/disable host TWT when STA is connected in
  * 2.4Ghz
+ * @disable_twt_info_frame: Enable/disable TWT info frame
  * @req_flag: requestor flag enable/disable
  * @res_flag: responder flag enable/disable
  * @twt_res_svc_cap: responder service capability
@@ -1637,6 +1653,7 @@ struct wlan_mlme_cfg_twt {
 	uint32_t twt_congestion_timeout;
 	bool disable_btwt_usr_cfg;
 	bool enable_twt_24ghz;
+	bool disable_twt_info_frame;
 	bool req_flag;
 	bool res_flag;
 	bool twt_res_svc_cap;
@@ -1946,6 +1963,8 @@ struct fw_scan_channels {
  * @roam_trigger_bitmap: Bitmap of roaming triggers.
  * @sta_roam_disable: STA roaming disabled by interfaces
  * @roam_info_stats_num: STA roaming information cache number
+ * @roam_high_rssi_delta: Delta change in high RSSI at which roam scan is
+ * triggered in 2.4/5 GHz.
  * @early_stop_scan_enable: Set early stop scan
  * @enable_5g_band_pref: Enable preference for 5G from INI
  * @ese_enabled: Enable ESE feature
@@ -2075,6 +2094,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_trigger_bitmap;
 	uint32_t sta_roam_disable;
 	uint32_t roam_info_stats_num;
+	uint8_t roam_high_rssi_delta;
 #endif
 	bool early_stop_scan_enable;
 	bool enable_5g_band_pref;
