@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3451,8 +3451,10 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 		sme_radio_tx_mem_free();
 		ret = -ETIMEDOUT;
 	} else {
-		if (QDF_IS_STATUS_SUCCESS(vdev_req_status))
+		if (QDF_IS_STATUS_SUCCESS(vdev_req_status)) {
 			hdd_update_station_stats_cached_timestamp(adapter);
+			hdd_update_link_state_cached_timestamp(adapter);
+		}
 
 		adapter->ll_stats_failure_count = 0;
 	}
@@ -9297,6 +9299,7 @@ int wlan_hdd_get_station_stats(struct wlan_hdd_link_info *link_info)
 
 	/* update get stats cached time stamp */
 	hdd_update_station_stats_cached_timestamp(link_info->adapter);
+	hdd_update_link_state_cached_timestamp(link_info->adapter);
 	copy_station_stats_to_adapter(link_info, stats);
 out:
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);

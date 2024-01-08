@@ -1729,6 +1729,35 @@ hdd_init_get_sta_in_ll_stats_config(struct hdd_adapter *adapter)
 }
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 
+#ifdef WLAN_FEATURE_11BE_MLO
+
+static void
+hdd_init_link_state_cfg(struct hdd_config *config,
+			struct wlan_objmgr_psoc *psoc)
+{
+	config->link_state_cache_expiry_time =
+		cfg_get(psoc, CFG_LINK_STATE_CACHE_EXPIRY);
+}
+
+static void
+hdd_init_link_state_config(struct hdd_adapter *adapter)
+{
+	adapter->link_state_cached_timestamp = 0;
+}
+
+#else
+static void
+hdd_init_link_state_cfg(struct hdd_config *config,
+			struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static void
+hdd_init_link_state_config(struct hdd_adapter *adapter)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 #ifdef WLAN_FEATURE_IGMP_OFFLOAD
 static void
 hdd_intersect_igmp_offload_setting(struct wlan_objmgr_psoc *psoc,
@@ -6952,6 +6981,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 
 	qdf_atomic_init(&adapter->is_ll_stats_req_pending);
 	hdd_init_get_sta_in_ll_stats_config(adapter);
+	hdd_init_link_state_config(adapter);
 
 	return adapter;
 
@@ -14547,6 +14577,7 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 
 	config->exclude_selftx_from_cca_busy =
 			cfg_get(psoc, CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME);
+	hdd_init_link_state_cfg(config, psoc);
 }
 
 #ifdef CONNECTION_ROAMING_CFG
