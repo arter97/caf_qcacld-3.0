@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1194,6 +1194,40 @@ struct dhcp_server {
 #define CFG_WLAN_CLUB_GET_STA_IN_LL_STA_REQ
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/*
+ * <ini>
+ * link_state_cache_expiry_time - Expiry time for cached ml link state
+ *
+ * @Min: 0
+ * @Max: 5000
+ * Default: 400
+ *
+ * This ini is used as duration in milliseconds for which cached ml link state
+ * are valid. Driver sends the cached information as response, if it gets the
+ * ml link state request with in this duration. Otherwise driver sends new
+ * request to the firmware to get the updated ml link state.
+ *
+ * Supported Feature: MLO STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LINK_STATE_CACHE_EXPIRY  CFG_INI_UINT( \
+			"link_state_cache_expiry_time", \
+			0, \
+			5000, \
+			400, \
+			CFG_VALUE_OR_DEFAULT, \
+			"link state cache expiry")
+
+#define CFG_LINK_STATE_CACHE_EXPIRY_ALL \
+	CFG(CFG_LINK_STATE_CACHE_EXPIRY)
+#else
+#define CFG_LINK_STATE_CACHE_EXPIRY_ALL
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 /**
  * enum host_log_level - Debug verbose level imposed by user
  * @HOST_LOG_LEVEL_NONE: no trace will be logged.
@@ -1348,5 +1382,6 @@ enum host_log_level {
 	SAR_SAFETY_FEATURE_ALL \
 	CFG_GET_WIFI_FEATURES_ALL \
 	CFG_CPU_CXPC_THRESHOLD_ALL \
-	CFG(CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME)
+	CFG(CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME) \
+	CFG_LINK_STATE_CACHE_EXPIRY_ALL
 #endif

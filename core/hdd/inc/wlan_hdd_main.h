@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1295,6 +1295,7 @@ struct wlan_hdd_tx_power {
  * @link_info: Data structure to hold link specific information
  * @tx_power: Structure to hold connection tx Power info
  * @tx_latency_cfg: configuration for per-link transmit latency statistics
+ * @link_state_cached_timestamp: link state cached timestamp
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1488,6 +1489,9 @@ struct hdd_adapter {
 	struct wlan_hdd_tx_power tx_power;
 #ifdef WLAN_FEATURE_TX_LATENCY_STATS
 	struct cdp_tx_latency_config tx_latency_cfg;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	qdf_time_t link_state_cached_timestamp;
 #endif
 };
 
