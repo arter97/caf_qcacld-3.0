@@ -28,6 +28,8 @@
 #include <wlan_cmn.h>
 #include "sme_api.h"
 
+#define DISABLE_MCS_12_13_2G_40M 1
+
 #define ASSEMBLE_RATECODE_V1(_pream, _nss, _rate) \
 		(((1) << 28) | ((_pream) << 8) | ((_nss) << 5) | (_rate))
 
