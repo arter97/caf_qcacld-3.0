@@ -6010,6 +6010,42 @@ hdd_register_netdevice(struct hdd_adapter *adapter, struct net_device *dev,
 }
 #endif
 
+#ifdef CNSS_GENL
+static void hdd_set_cld80211_nl_reg_pid(struct hdd_context *hdd_ctx)
+{
+	hdd_ctx->nl_reg_pid = current->pid;
+}
+
+static void
+hdd_set_adapter_ifindex_to_cld80211(struct hdd_adapter *adapter, bool set)
+{
+	struct net_device *dev = adapter->dev;
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+
+	set_cld_radio_info(hdd_ctx->nl_reg_pid, dev->ifindex, set);
+}
+
+static void
+hdd_set_nl_deregister_to_cld80211(struct hdd_context *hdd_ctx)
+{
+	set_cld_deregister_pid(hdd_ctx->nl_reg_pid, current->pid);
+}
+#else
+static void hdd_set_cld80211_nl_reg_pid(struct hdd_context *hdd_ctx)
+{
+}
+
+static void
+hdd_set_adapter_ifindex_to_cld80211(struct hdd_adapter *adapter, bool set)
+{
+}
+
+static void
+hdd_set_nl_deregister_to_cld80211(struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 static QDF_STATUS
 hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_held,
 		       struct hdd_adapter_create_param *params)
@@ -6046,6 +6082,8 @@ hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_held,
 		}
 	}
 	set_bit(NET_DEVICE_REGISTERED, &adapter->event_flags);
+
+	hdd_set_adapter_ifindex_to_cld80211(adapter, true);
 
 	hdd_exit();
 
@@ -6878,6 +6916,8 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 		 * Note that the adapter is no longer valid at this point
 		 * since the memory has been reclaimed
 		 */
+
+		hdd_set_adapter_ifindex_to_cld80211(adapter, false);
 	}
 }
 
@@ -9414,6 +9454,7 @@ void hdd_unregister_notifiers(struct hdd_context *hdd_ctx)
  */
 static void hdd_exit_netlink_services(struct hdd_context *hdd_ctx)
 {
+	hdd_set_nl_deregister_to_cld80211(hdd_ctx);
 	spectral_scan_deactivate_service();
 	cnss_diag_deactivate_service();
 	hdd_close_cesium_nl_sock();
@@ -9442,6 +9483,8 @@ static int hdd_init_netlink_services(struct hdd_context *hdd_ctx)
 		goto out;
 	}
 	cds_set_radio_index(hdd_ctx->radio_index);
+
+	hdd_set_cld80211_nl_reg_pid(hdd_ctx);
 
 	ret = hdd_activate_wifi_pos(hdd_ctx);
 	if (ret) {
@@ -18165,7 +18208,7 @@ static void hdd_distroy_wifi_feature_interface(void)
 
 void hdd_driver_unload(void)
 {
-	struct osif_driver_sync *driver_sync;
+	struct osif_driver_sync *driver_sync = NULL;
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
 	void *hif_ctx;
@@ -18189,12 +18232,14 @@ void hdd_driver_unload(void)
 	 * the driver load/unload flag to further ensure that any upcoming
 	 * trans are rejected via wlan_hdd_validate_context.
 	 */
-	status = osif_driver_sync_trans_start_wait(&driver_sync);
-	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Unable to unload wlan; status:%u", status);
-		hdd_place_marker(NULL, "UNLOAD FAILURE", NULL);
-		return;
+	if (!cds_is_pcie_link_resume_fail()) {
+		status = osif_driver_sync_trans_start_wait(&driver_sync);
+		QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Unable to unload wlan; status:%u", status);
+			hdd_place_marker(NULL, "UNLOAD FAILURE", NULL);
+			return;
+		}
 	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
@@ -18223,7 +18268,8 @@ void hdd_driver_unload(void)
 	 * Stop the trans before calling unregister_driver as that involves a
 	 * call to pld_remove which in itself is a psoc transaction
 	 */
-	osif_driver_sync_trans_stop(driver_sync);
+	if (driver_sync)
+		osif_driver_sync_trans_stop(driver_sync);
 
 	hdd_distroy_wifi_feature_interface();
 	if (!soft_unload)
@@ -18232,16 +18278,19 @@ void hdd_driver_unload(void)
 	/* trigger SoC remove */
 	wlan_hdd_unregister_driver();
 
-	status = osif_driver_sync_trans_start_wait(&driver_sync);
-	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Unable to unload wlan; status:%u", status);
-		hdd_place_marker(NULL, "UNLOAD FAILURE", NULL);
-		return;
+	if (!cds_is_pcie_link_resume_fail()) {
+		status = osif_driver_sync_trans_start_wait(&driver_sync);
+		QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Unable to unload wlan; status:%u", status);
+			hdd_place_marker(NULL, "UNLOAD FAILURE", NULL);
+			return;
+		}
 	}
 
 	osif_driver_sync_unregister();
-	osif_driver_sync_wait_for_ops(driver_sync);
+	if (driver_sync)
+		osif_driver_sync_wait_for_ops(driver_sync);
 
 	hdd_driver_mode_change_unregister();
 	pld_deinit();
@@ -18251,8 +18300,10 @@ void hdd_driver_unload(void)
 	hdd_component_cb_deinit();
 	hdd_deinit();
 
-	osif_driver_sync_trans_stop(driver_sync);
-	osif_driver_sync_destroy(driver_sync);
+	if (driver_sync) {
+		osif_driver_sync_trans_stop(driver_sync);
+		osif_driver_sync_destroy(driver_sync);
+	}
 
 	osif_sync_deinit();
 

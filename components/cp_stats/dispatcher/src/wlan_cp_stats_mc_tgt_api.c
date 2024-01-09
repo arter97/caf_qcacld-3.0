@@ -1121,6 +1121,60 @@ tgt_send_peer_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+tgt_send_pdev_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
+			  struct stats_event *ev,
+			  struct request_info *last_req)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct pdev_mc_cp_stats *pdev_mc_stats;
+	struct pdev_cp_stats *pdev_cp_stats_priv;
+	int pdev_id;
+
+	if (!ev || !last_req)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req->vdev_id,
+						    WLAN_CP_STATS_ID);
+	if (!vdev) {
+		cp_stats_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cp_stats_err("pdev is null");
+		goto end;
+	}
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	if (pdev_id != last_req->pdev_id) {
+		cp_stats_err("pdev_id: %d invalid", pdev_id);
+		goto end;
+	}
+
+	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
+	if (!pdev_cp_stats_priv) {
+		cp_stats_err("pdev_cp_stats_priv is null");
+		goto end;
+	}
+
+	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
+	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
+	qdf_mem_copy(ev->pdev_stats,
+		     pdev_mc_stats,
+		     sizeof(*pdev_mc_stats));
+	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+
+	return QDF_STATUS_SUCCESS;
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+	return QDF_STATUS_E_NULL_VALUE;
+}
+
 static void
 tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 				       struct request_info *last_req)
@@ -1157,6 +1211,17 @@ tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 	status = tgt_send_peer_mc_cp_stats(psoc, &info, last_req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cp_stats_err("tgt_send_peer_mc_cp_stats failed");
+		goto end;
+	}
+
+	info.num_pdev_stats = 1;
+	info.pdev_stats = qdf_mem_malloc(sizeof(*info.pdev_stats));
+	if (!info.pdev_stats)
+		goto end;
+
+	status = tgt_send_pdev_mc_cp_stats(psoc, &info, last_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("tgt_send_pdev_mc_cp_stats failed");
 		goto end;
 	}
 end:
