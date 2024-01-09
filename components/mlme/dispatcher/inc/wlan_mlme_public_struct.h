@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -222,6 +222,7 @@ struct mlme_edca_ac_vo {
 /**
  * enum mlme_dot11_mode - Dot11 mode of the vdev
  * @MLME_DOT11_MODE_ALL: vdev supports all dot11 modes
+ * @MLME_DOT11_MODE_ABG: vdev supports just 11A, 11B and 11G modes
  * @MLME_DOT11_MODE_11A: vdev just supports 11A mode
  * @MLME_DOT11_MODE_11B: vdev supports 11B mode, and modes above it
  * @MLME_DOT11_MODE_11G: vdev supports 11G mode, and modes above it
@@ -234,10 +235,11 @@ struct mlme_edca_ac_vo {
  * @MLME_DOT11_MODE_11AX_ONLY: vdev just supports 11AX mode
  * @MLME_DOT11_MODE_11BE: vdev supports 11BE mode, and modes above it
  * @MLME_DOT11_MODE_11BE_ONLY: vdev just supports 11BE mode
- * @MLME_DOT11_MODE_ABG: vdev supports just 11A, 11B and 11G modes
  */
 enum mlme_dot11_mode {
 	MLME_DOT11_MODE_ALL,
+	/* Initial dot11 modes should come first */
+	MLME_DOT11_MODE_ABG,
 	MLME_DOT11_MODE_11A,
 	MLME_DOT11_MODE_11B,
 	MLME_DOT11_MODE_11G,
@@ -250,7 +252,6 @@ enum mlme_dot11_mode {
 	MLME_DOT11_MODE_11AX_ONLY,
 	MLME_DOT11_MODE_11BE,
 	MLME_DOT11_MODE_11BE_ONLY,
-	MLME_DOT11_MODE_ABG
 };
 
 /**
