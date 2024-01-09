@@ -13240,7 +13240,6 @@ policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 	if (policy_mgr_get_connection_count_with_mlo(psoc) == 1) {
 		num_disallow_mode_comb = 1;
 		req->param.num_disallow_mode_comb = num_disallow_mode_comb;
-
 		if (emlsr_mode == WLAN_EMLSR_MODE_ENTER)
 			policy_mgr_update_disallow_mode_elmsr_enter(vdev,
 								    req,
@@ -13250,7 +13249,10 @@ policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_fill_disallowed_mode_info(vdev,
 							     req,
 							     num_disallow_mode_comb);
+	} else {
+		ml_nlink_populate_disallow_modes(psoc, vdev, req);
 	}
+
 	return true;
 }
 

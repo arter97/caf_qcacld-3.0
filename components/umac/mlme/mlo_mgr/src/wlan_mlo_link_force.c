@@ -69,9 +69,28 @@ enum home_channel_map_id {
 	HC_MAX_MAP_ID,
 };
 
+static inline const char *hc_id_to_string(uint32_t idx)
+{
+	switch (idx) {
+	CASE_RETURN_STRING(HC_NONE);
+	CASE_RETURN_STRING(HC_2G);
+	CASE_RETURN_STRING(HC_5GL);
+	CASE_RETURN_STRING(HC_5GH);
+	CASE_RETURN_STRING(HC_5GL_5GH);
+	CASE_RETURN_STRING(HC_5GH_5GH);
+	CASE_RETURN_STRING(HC_5GL_5GL);
+	CASE_RETURN_STRING(HC_2G_5GL);
+	CASE_RETURN_STRING(HC_2G_5GH);
+	CASE_RETURN_STRING(HC_2G_2G);
+	default:
+		return "Unknown";
+	}
+};
+
 #define MAX_DISALLOW_MODE (MAX_DISALLOW_BMAP_COMB + 1)
 
 enum disallow_mlo_mode {
+	NO_RESTRICTION = 0,
 	EMLSR_5GL_5GH = 1 << 0,
 	EMLSR_5GH_5GH = 1 << 1,
 	EMLSR_5GL_5GL = 1 << 2,
@@ -80,6 +99,23 @@ enum disallow_mlo_mode {
 	MLMR_5GL_5GL  = 1 << 5,
 	MLMR_2G_5GL   = 1 << 6,
 	MLMR_2G_5GH   = 1 << 7,
+};
+
+static inline const char *disallow_to_string(uint32_t disallow_id)
+{
+	switch (disallow_id) {
+	CASE_RETURN_STRING(NO_RESTRICTION);
+	CASE_RETURN_STRING(EMLSR_5GL_5GH);
+	CASE_RETURN_STRING(EMLSR_5GH_5GH);
+	CASE_RETURN_STRING(EMLSR_5GL_5GL);
+	CASE_RETURN_STRING(MLMR_5GL_5GH);
+	CASE_RETURN_STRING(MLMR_5GH_5GH);
+	CASE_RETURN_STRING(MLMR_5GL_5GL);
+	CASE_RETURN_STRING(MLMR_2G_5GL);
+	CASE_RETURN_STRING(MLMR_2G_5GH);
+	default:
+		return "Unknown";
+	}
 };
 
 /**
@@ -349,6 +385,11 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	}
 
 	disallow_tbl = get_disallow_mlo_mode_table(psoc);
+	if (!disallow_tbl) {
+		mlo_debug("invalid disallow_tbl rd %d",
+			  policy_mgr_get_rd_type(psoc));
+		return 0;
+	}
 
 	mlo_modes = (*disallow_tbl)[ml_hc_id][legacy_hc_id];
 	if (allow_mcc)
@@ -356,8 +397,10 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	else
 		disallow_mode_bitmap = mlo_modes.disallow_mcc;
 
-	mlo_debug("ml_hc_id %d legacy_hc_id %d allow_mcc %d rd %d disallow_mode_bitmap 0x%x",
-		  ml_hc_id, legacy_hc_id, allow_mcc,
+	mlo_debug("ml %s legacy %s allow_mcc %d rd %d disallow_mode_bitmap 0x%x",
+		  hc_id_to_string(ml_hc_id),
+		  hc_id_to_string(legacy_hc_id),
+		  allow_mcc,
 		  policy_mgr_get_rd_type(psoc),
 		  disallow_mode_bitmap);
 
@@ -372,8 +415,9 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 					ml_linkid_lst,
 					disallow_mode[i],
 					&mlo_disallow_mode[i]);
-		mlo_debug("[%d] disallow_mode 0x%x link bitmap 0x%x",
+		mlo_debug("[%d] disallow_mode 0x%x %s link bitmap 0x%x",
 			  i, disallow_mode[i],
+			  disallow_to_string(disallow_mode[i]),
 			  disallow_link_bitmap[i]);
 	}
 
@@ -1651,6 +1695,17 @@ ml_nlink_handle_comm_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 	hc_id_2_link_bitmap(psoc, ml_num_link, ml_freq_lst, ml_linkid_lst,
 			    force_inactive_num_hc_id,
 			    &force_inactive_num_bitmap);
+
+	mlo_debug("ml %s legacy %s %s inactive mcc %s inactive num %s rd %d",
+		  hc_id_to_string(ml_link_hc_id),
+		  hc_id_to_string(non_ml_hc_id),
+		  device_mode_to_string(pm_mode),
+		  hc_id_to_string(force_inactive_hc_id),
+		  hc_id_to_string(force_inactive_num_hc_id),
+		  policy_mgr_get_rd_type(psoc));
+	mlo_debug("scc link 0x%x force_inactive_bitmap 0x%x force_inactive_num_bitmap 0x%x",
+		  scc_link_bitmap, force_inactive_bitmap,
+		  force_inactive_num_bitmap);
 
 	if (force_inactive_bitmap) {
 		if (scc_link_bitmap)
