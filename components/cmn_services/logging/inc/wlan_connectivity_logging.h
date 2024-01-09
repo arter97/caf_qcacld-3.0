@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1314,7 +1314,7 @@ void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev);
  * @token: dialog Token
  * @t2lm_status: T2LM response status code. Refer enum wlan_t2lm_resp_frm_type
  * @tx_status: TX status
- * @freq: Frame received/transmitted frequency
+ * @freq: frequency on which frame was transmitted/received
  * @is_rx: Flag to inidcate packet being received
  * @subtype: Determine whether the evnt sent is for t2lm request
  * or t2lm response
