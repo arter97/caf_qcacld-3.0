@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -309,6 +309,7 @@ void lim_process_mlm_join_cnf(struct mac_context *mac_ctx,
 
 	wlan_connectivity_sta_info_event(mac_ctx->psoc, session_entry->vdev_id,
 					 false);
+	wlan_connectivity_connecting_event(session_entry->vdev, NULL);
 
 	session_entry->join_probe_cnt = 0;
 	if (session_entry->limSmeState != eLIM_SME_WT_JOIN_STATE) {
