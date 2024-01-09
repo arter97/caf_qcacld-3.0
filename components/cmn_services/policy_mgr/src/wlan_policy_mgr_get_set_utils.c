@@ -6286,7 +6286,8 @@ policy_mgr_mlo_sta_set_link_by_linkid(struct wlan_objmgr_psoc *psoc,
 	return policy_mgr_mlo_sta_set_nlink(psoc, wlan_vdev_get_id(vdev),
 					    reason, mode,
 					    link_num, link_bitmap,
-					    link_bitmap2, link_control_flags);
+					    link_bitmap2, link_control_flags,
+					    WLAN_EMLSR_MODE_MAX);
 }
 
 /**
@@ -6428,7 +6429,8 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 			     uint8_t link_num,
 			     uint16_t link_bitmap,
 			     uint16_t link_bitmap2,
-			     uint32_t link_control_flags)
+			     uint32_t link_control_flags,
+			     enum wlan_emlsr_action_mode emlsr_mode)
 {
 	struct mlo_link_set_active_req *req;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -6471,7 +6473,12 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 	req->param.force_cmd.ieee_link_id_bitmap = link_bitmap;
 	req->param.force_cmd.ieee_link_id_bitmap2 = link_bitmap2;
 	req->param.force_cmd.link_num = link_num;
-	policy_mgr_update_disallowed_mode_bitmap(psoc, vdev, req);
+	policy_mgr_update_disallowed_mode_bitmap(psoc,
+						 vdev,
+						 req,
+						 emlsr_mode,
+						 link_bitmap,
+						 link_bitmap2);
 
 	if (link_control_flags & link_ctrl_f_overwrite_active_bitmap)
 		req->param.control_flags.overwrite_force_active_bitmap = true;
@@ -7048,7 +7055,7 @@ static void policy_mgr_restore_no_force(struct wlan_objmgr_psoc *psoc,
 					psoc, mlo_vdev_lst[0],
 					MLO_LINK_FORCE_REASON_DISCONNECT,
 					MLO_LINK_FORCE_MODE_NO_FORCE,
-					0, 0, 0, 0);
+					0, 0, 0, 0, WLAN_EMLSR_MODE_MAX);
 		else
 			status = policy_mgr_mlo_sta_set_link(
 					psoc,
@@ -8338,7 +8345,8 @@ policy_mgr_handle_link_removal_on_standby(struct wlan_objmgr_vdev *vdev,
 			0,
 			removal_link_bitmap,
 			0,
-			0);
+			0,
+			WLAN_EMLSR_MODE_MAX);
 	if (status == QDF_STATUS_E_PENDING)
 		status = QDF_STATUS_SUCCESS;
 	else
@@ -8614,7 +8622,8 @@ policy_mgr_is_new_force_allowed(struct wlan_objmgr_psoc *psoc,
 
 void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 					 uint8_t session_id, uint8_t num_links,
-					 struct qdf_mac_addr active_link_addr[2])
+					 struct qdf_mac_addr active_link_addr[2],
+					 enum wlan_emlsr_action_mode emlsr_mode)
 {
 	uint8_t *link_mac_addr;
 	uint32_t link_ctrl_flags;
@@ -8726,7 +8735,7 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_mlo_sta_set_nlink(psoc, wlan_vdev_get_id(vdev),
 				     reason, mode, 0,
 				     active_link_bitmap, inactive_link_bitmap,
-				     link_ctrl_flags);
+				     link_ctrl_flags, emlsr_mode);
 	if (active_link_bitmap)
 		ml_nlink_vendor_command_set_link(
 			psoc, session_id,
@@ -12884,14 +12893,133 @@ policy_mgr_get_connection_max_channel_width(struct wlan_objmgr_psoc *psoc)
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static bool
+policy_mgr_match_link_id(uint8_t link_id,
+			 uint16_t link_id_bitmap,
+			 uint16_t ch_freq)
+{
+	uint8_t i;
+	uint8_t cnt;
+	uint8_t bit_mask = 1;
+	uint8_t link_id_info[4];
+	uint8_t valid_link_count;
+
+	for (i = 0, cnt = 0; i < 16; i++) {
+		if (link_id_bitmap & bit_mask) {
+			link_id_info[cnt++] = i;
+			link_id_bitmap &= ~bit_mask;
+		}
+		bit_mask = bit_mask << 1;
+	}
+
+	for (i = 0, valid_link_count = 0; i < cnt; i++) {
+		if (link_id_info[i] == link_id &&
+		    (wlan_reg_is_5ghz_ch_freq(ch_freq) ||
+		     wlan_reg_is_6ghz_chan_freq(ch_freq)))
+			policy_mgr_debug("Match found: link_id %d freq %d", link_id, ch_freq);
+			valid_link_count++;
+	}
+
+	if (valid_link_count < 2)
+		return false;
+	else
+		return true;
+}
+
+static void
+policy_mgr_fill_disallowed_mode_info(struct wlan_objmgr_vdev *vdev,
+				     struct mlo_link_set_active_req *req,
+				     uint8_t num_disallow_mode_comb)
+{
+	uint8_t i, j, k;
+	uint8_t link_id;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	if (!vdev)
+		return;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		return;
+
+	for (j = 0; j < num_disallow_mode_comb; j++) {
+		for (i = 0, k = 0;
+			(i < WLAN_UMAC_MLO_MAX_VDEVS || k < WLAN_UMAC_MLO_MAX_VDEVS);
+			 i++, k++) {
+			if (!mlo_dev_ctx->wlan_vdev_list[i])
+				continue;
+			link_id = wlan_vdev_get_link_id(mlo_dev_ctx->wlan_vdev_list[i]);
+			req->param.disallow_mode_link_bmap[j].ieee_link_id[k] = link_id;
+		}
+		req->param.disallow_mode_link_bmap[j].disallowed_mode = MLO_DISALLOWED_MODE_NO_RESTRICTION;
+		policy_mgr_debug("ieee_link_id_comb 0%x, disallowed mode %d",
+				 req->param.disallow_mode_link_bmap[j].ieee_link_id_comb,
+				 req->param.disallow_mode_link_bmap[j].disallowed_mode);
+	}
+}
+
+static bool
+policy_mgr_update_disallow_mode_elmsr_enter(struct wlan_objmgr_vdev *vdev,
+					    struct mlo_link_set_active_req *req,
+					    uint16_t link_bitmap,
+					    uint8_t num_disallow_mode_comb)
+{
+	uint8_t i, j, k;
+	uint8_t link_id;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_channel *chan;
+
+	if (!vdev)
+		return false;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		return false;
+
+	if (!link_bitmap)
+		return false;
+
+	for (j = 0; j < num_disallow_mode_comb; j++) {
+		for (i = 0, k = 0;
+			(i < WLAN_UMAC_MLO_MAX_VDEVS || k < WLAN_UMAC_MLO_MAX_VDEVS);
+			 i++, k++) {
+			if (!mlo_dev_ctx->wlan_vdev_list[i])
+				continue;
+			link_id = wlan_vdev_get_link_id(mlo_dev_ctx->wlan_vdev_list[i]);
+			chan = wlan_vdev_mlme_get_bss_chan(mlo_dev_ctx->wlan_vdev_list[i]);
+			if (!policy_mgr_match_link_id(link_id, link_bitmap, chan->ch_freq)) {
+				policy_mgr_err("Link id does not match %d ch_freq %d", link_id, chan->ch_freq);
+				return false;
+			}
+			req->param.disallow_mode_link_bmap[j].ieee_link_id[k] = link_id;
+		}
+		req->param.disallow_mode_link_bmap[j].disallowed_mode = MLO_DISALLOWED_MODE_NO_MLMR;
+		policy_mgr_debug("ieee_link_id_comb 0%x, disallowed mode %d",
+				 req->param.disallow_mode_link_bmap[j].ieee_link_id_comb,
+				 req->param.disallow_mode_link_bmap[j].disallowed_mode);
+	}
+	return true;
+}
+
+static void
+policy_mgr_update_disallow_mode_elmsr_exit(struct wlan_objmgr_vdev *vdev,
+					   struct mlo_link_set_active_req *req,
+					   uint16_t link_bitmap,
+					   uint8_t num_disallow_mode_comb)
+{
+	if (link_bitmap)
+		policy_mgr_fill_disallowed_mode_info(vdev, req, num_disallow_mode_comb);
+}
+
 bool
 policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev,
-					 struct mlo_link_set_active_req *req)
+					 struct mlo_link_set_active_req *req,
+					 enum wlan_emlsr_action_mode emlsr_mode,
+					 uint16_t active_link_bmap,
+					 uint16_t inactive_link_bmap)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	uint8_t i, j, k;
-	uint8_t link_id;
 	uint8_t num_disallow_mode_comb;
 
 	if (!vdev)
@@ -12911,22 +13039,21 @@ policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 	if (policy_mgr_get_connection_count_with_mlo(psoc) == 1) {
 		num_disallow_mode_comb = 1;
 		req->param.num_disallow_mode_comb = num_disallow_mode_comb;
-		for (j = 0; j < num_disallow_mode_comb; j++) {
-			for (i = 0, k = 0;
-				(i < WLAN_UMAC_MLO_MAX_VDEVS || k < WLAN_UMAC_MLO_MAX_VDEVS);
-			     i++, k++) {
-				if (!mlo_dev_ctx->wlan_vdev_list[i])
-					continue;
 
-				link_id = wlan_vdev_get_link_id(mlo_dev_ctx->wlan_vdev_list[i]);
-				req->param.disallow_mode_link_bmap[j].disallowed_mode = MLO_DISALLOWED_MODE_NO_RESTRICTION;
-				req->param.disallow_mode_link_bmap[j].ieee_link_id[k] = link_id;
-				policy_mgr_debug("ieee_link_id_comb 0%x, disallowed mode %d, link_id %d",
-						 req->param.disallow_mode_link_bmap[j].ieee_link_id_comb,
-						 req->param.disallow_mode_link_bmap[j].disallowed_mode,
-						 link_id);
-			}
-		}
+		if (emlsr_mode == WLAN_EMLSR_MODE_ENTER)
+			policy_mgr_update_disallow_mode_elmsr_enter(vdev,
+								    req,
+								    active_link_bmap,
+								    num_disallow_mode_comb);
+		else if (emlsr_mode == WLAN_EMLSR_MODE_EXIT)
+			policy_mgr_update_disallow_mode_elmsr_exit(vdev,
+								   req,
+								   inactive_link_bmap,
+								   num_disallow_mode_comb);
+		else
+			policy_mgr_fill_disallowed_mode_info(vdev,
+							     req,
+							     num_disallow_mode_comb);
 	}
 	return true;
 }

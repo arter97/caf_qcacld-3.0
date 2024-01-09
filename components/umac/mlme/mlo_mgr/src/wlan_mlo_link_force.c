@@ -1804,7 +1804,8 @@ ml_nlink_update_no_force_for_all(struct wlan_objmgr_psoc *psoc,
 						psoc, wlan_vdev_get_id(vdev),
 						reason,
 						MLO_LINK_FORCE_MODE_NO_FORCE,
-						0, 0, 0, 0);
+						0, 0, 0, 0,
+						WLAN_EMLSR_MODE_MAX);
 	}
 
 end:
@@ -1842,7 +1843,8 @@ ml_nlink_update_force_inactive(struct wlan_objmgr_psoc *psoc,
 				new->force_inactive_bitmap,
 				0,
 				link_ctrl_f_overwrite_inactive_bitmap |
-				link_ctrl_f_post_re_evaluate);
+				link_ctrl_f_post_re_evaluate,
+				WLAN_EMLSR_MODE_MAX);
 	}
 
 end:
@@ -1869,7 +1871,8 @@ ml_nlink_update_force_inactive_num(struct wlan_objmgr_psoc *psoc,
 					new->force_inactive_num_bitmap,
 					0,
 					link_ctrl_f_dynamic_force_link_num |
-					link_ctrl_f_post_re_evaluate);
+					link_ctrl_f_post_re_evaluate,
+					WLAN_EMLSR_MODE_MAX);
 	}
 
 	return status;
@@ -2174,7 +2177,8 @@ ml_nlink_tdls_event_handler(struct wlan_objmgr_psoc *psoc,
 				0,
 				data->evt.tdls.link_bitmap,
 				0,
-				0);
+				0,
+				WLAN_EMLSR_MODE_MAX);
 	else
 		status =
 		policy_mgr_mlo_sta_set_link(psoc,
