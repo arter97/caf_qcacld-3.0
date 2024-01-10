@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1703,8 +1703,8 @@ void sap_release_vdev_ref(struct sap_context *sap_ctx)
 
 	vdev = sap_ctx->vdev;
 	if (vdev) {
-		sap_ctx->vdev = NULL;
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SAP_ID);
+		sap_ctx->vdev = NULL;
 	}
 }
 
