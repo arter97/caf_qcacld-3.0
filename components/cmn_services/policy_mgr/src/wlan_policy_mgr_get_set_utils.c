@@ -8546,9 +8546,8 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 /**
  * policy_mgr_is_new_force_allowed() - Check if the new force command is allowed
  * @psoc: PSOC object information
- * @active_link_bitmap: Active link bitmap
- * @force_inactive_num_bitmap: Force inactive number bitmap
- * @force_inactive_num: Number of links to be forced inactive
+ * @vdev: ml sta vdev object
+ * @active_link_bitmap: Active link bitmap from user request
  *
  * If ML STA associates in 3-link (2.4 GHz + 5 GHz + 6 GHz), Host sends force
  * inactive num command between 5 GHz and 6 GHz links to firmware as it's a DBS
@@ -8560,23 +8559,54 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
  */
 static bool
 policy_mgr_is_new_force_allowed(struct wlan_objmgr_psoc *psoc,
-				uint32_t active_link_bitmap,
-				uint16_t force_inactive_num_bitmap,
-				uint8_t force_inactive_num)
+				struct wlan_objmgr_vdev *vdev,
+				uint32_t active_link_bitmap)
 {
 	uint32_t link_bitmap = 0;
 	uint8_t link_num = 0;
+	struct set_link_req conc_link_req;
 
-	link_bitmap = ~active_link_bitmap & force_inactive_num_bitmap;
-	if (force_inactive_num_bitmap) {
+	qdf_mem_zero(&conc_link_req, sizeof(conc_link_req));
+	ml_nlink_get_force_link_request(psoc, vdev, &conc_link_req,
+					SET_LINK_FROM_CONCURRENCY);
+	/* If force inactive num is present due to MCC link(DBS RD) or
+	 * concurrency with legacy intf, don't allow force active if
+	 * left inactive link number doesn't meet concurrency
+	 * requirement.
+	 */
+	if (conc_link_req.force_inactive_num_bitmap ||
+	    conc_link_req.force_inactive_num) {
+		link_bitmap = ~active_link_bitmap &
+		conc_link_req.force_inactive_num_bitmap;
 		if (!link_bitmap) {
-			policy_mgr_err("New force bitmap not allowed");
+			policy_mgr_err("New force bitmap 0x%x not allowed due to force_inactive_num_bitmap 0x%x",
+				       active_link_bitmap,
+				       conc_link_req.
+				       force_inactive_num_bitmap);
 			return false;
 		}
 		link_num = convert_link_bitmap_to_link_ids(link_bitmap,
 							   0, NULL);
-		if (link_num < force_inactive_num)
+		if (link_num < conc_link_req.force_inactive_num) {
+			policy_mgr_debug("force inact num exists with %d don't allow act bitmap 0x%x",
+					 conc_link_req.force_active_num,
+					 active_link_bitmap);
 			return false;
+		}
+	}
+	/* If force inactive bitmap is present due to link removal or
+	 * concurrency with legacy intf, don't allow force active if
+	 * it is conflict with existing concurrency requirement.
+	 */
+	if (conc_link_req.force_inactive_bitmap) {
+		link_bitmap = active_link_bitmap &
+			conc_link_req.force_inactive_bitmap;
+		if (link_bitmap) {
+			policy_mgr_err("New force act bitmap 0x%x not allowed due to conc force inact bitmap 0x%x",
+				       active_link_bitmap,
+				       conc_link_req.force_inactive_bitmap);
+			return false;
+		}
 	}
 
 	return true;
@@ -8658,26 +8688,17 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
 		goto done;
 	} else {
-		ml_nlink_get_curr_force_state(psoc, vdev, &curr);
-		if (curr.force_inactive_num || curr.force_active_num) {
-			if (curr.force_inactive_num) {
-				if (!policy_mgr_is_new_force_allowed(
-						psoc, active_link_bitmap,
-						curr.force_inactive_num_bitmap,
-						curr.force_inactive_num)) {
-					policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
-							 curr.force_active_num,
-							 curr.force_inactive_num);
-					goto done;
-				}
-			}
-		}
+		if (!policy_mgr_is_new_force_allowed(
+			psoc, vdev, active_link_bitmap))
+			goto done;
+
 		/* If current force inactive bitmap exists, we have to remove
 		 * the new active bitmap from the existing inactive bitmap,
 		 * e.g. a link id can't be present in active bitmap and
 		 * inactive bitmap at same time, so update inactive bitmap
 		 * as well.
 		 */
+		ml_nlink_get_curr_force_state(psoc, vdev, &curr);
 		if (curr.force_inactive_bitmap && !inactive_link_cnt) {
 			inactive_link_bitmap = curr.force_inactive_bitmap &
 						~active_link_bitmap;

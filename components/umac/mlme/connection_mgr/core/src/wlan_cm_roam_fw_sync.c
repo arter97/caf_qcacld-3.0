@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1215,6 +1215,7 @@ cm_get_and_disable_link_from_roam_ind(struct wlan_objmgr_psoc *psoc,
 			ml_nlink_set_curr_force_inactive_state(
 				psoc, vdev, 1 << synch_data->ml_link[i].link_id,
 				LINK_ADD);
+			ml_nlink_init_concurrency_link_request(psoc, vdev);
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 			break;
 		}
