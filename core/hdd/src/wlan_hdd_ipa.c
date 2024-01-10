@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -388,6 +388,14 @@ QDF_STATUS hdd_ipa_get_tx_pipe(struct hdd_context *hdd_ctx,
 	if (qdf_unlikely(!hdd_ctx || !link || !tx_pipe)) {
 		hdd_debug("Invalid parameters");
 		return QDF_STATUS_E_INVAL;
+	}
+
+	/* IPA two tx pipes feature is disabled by user configuration.
+	 * This leaves us with only the primary tx pipe.
+	 */
+	if (!ucfg_ipa_is_two_tx_pipes_enabled()) {
+		*tx_pipe = false;
+		return QDF_STATUS_SUCCESS;
 	}
 
 	hdd_ipa_fill_connection_info(link, &conn);
