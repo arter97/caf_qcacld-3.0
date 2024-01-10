@@ -3493,6 +3493,7 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 	uint32_t first_valid_dfs_5g_freq = 0;
 	uint32_t first_valid_non_dfs_5g_freq = 0;
 	uint32_t first_valid_6g_freq = 0;
+	uint8_t vdev_id;
 
 	if (!sap_ctx) {
 		sap_err("NULL parameter");
@@ -3524,10 +3525,11 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 	}
 
 	if (pcl_len) {
+		vdev_id = sap_ctx->vdev_id;
 		status = policy_mgr_get_valid_chans_from_range(mac->psoc,
 							       pcl_freqs,
 							       &pcl_len,
-							       mode);
+							       mode, vdev_id);
 		if (QDF_IS_STATUS_ERROR(status) || !pcl_len) {
 			sap_err("failed to get valid channel: %d len %d",
 				status, pcl_len);

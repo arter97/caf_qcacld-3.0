@@ -1323,11 +1323,23 @@ end:
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * policy_mgr_pcl_modification_for_sap() - Modify SAPs PCL
+ * @psoc: PSOC object information
+ * @pcl_channels: Pointer to the preferred channel freq list to be modify
+ * @pcl_weight: Pointer to the weights of the preferred channel list
+ * @len: Pointer to the length of the preferred channel list
+ * @weight_len: weight len
+ * @mode: connection mode
+ * @vdev_id: VDEV ID
+ *
+ * Return: QDF_STATUS
+ */
 static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
 			uint32_t *len, uint32_t weight_len,
-			enum policy_mgr_con_mode mode)
+			enum policy_mgr_con_mode mode, uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -1353,7 +1365,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 
 	if (policy_mgr_is_sap_mandatory_channel_set(psoc)) {
 		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
-				psoc, pcl_channels, pcl_weight, len);
+				psoc, pcl_channels, pcl_weight, len, vdev_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			policy_mgr_err(
 				"failed to get mandatory modified pcl for SAP");
@@ -1562,10 +1574,21 @@ static bool policy_mgr_is_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
+/**
+ * policy_mgr_pcl_modification_for_ll_lt_sap() - Modify LL LT SAPs PCL
+ * @psoc: PSOC object information
+ * @pcl_channels: Pointer to the preferred channel freq list to be modify
+ * @pcl_weight: Pointer to the weights of the preferred channel list
+ * @len: Pointer to the length of the preferred channel list
+ * @weight_len: weight len
+ * @vdev_id: VDEV ID
+ *
+ * Return: QDF_STATUS
+ */
 static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len, uint32_t weight_len)
+			uint32_t *len, uint32_t weight_len, uint8_t vdev_id)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t pcl_list[NUM_CHANNELS], orig_len = *len;
@@ -1581,7 +1604,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 
 	policy_mgr_pcl_modification_for_sap(
 		psoc, pcl_channels, pcl_weight, len, weight_len,
-		PM_LL_LT_SAP_MODE);
+		PM_LL_LT_SAP_MODE, vdev_id);
 
 	for (i = 0; i < *len; i++) {
 		/* Remove passive/dfs/6G invalid channel for LL_LT_SAP */
@@ -1625,24 +1648,40 @@ static inline QDF_STATUS
 policy_mgr_pcl_modification_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
 					  uint32_t *pcl_channels,
 					  uint8_t *pcl_weight,
-					  uint32_t *len, uint32_t weight_len)
+					  uint32_t *len, uint32_t weight_len,
+					  uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
 #endif
 
+/**
+ * policy_mgr_mode_specific_modification_on_pcl() - Modify SAPs PCL based on
+ * mode
+ * @psoc: PSOC object information
+ * @pcl_channels: Pointer to the preferred channel freq list to be modify
+ * @pcl_weight: Pointer to the weights of the preferred channel list
+ * @len: Pointer to the length of the preferred channel list
+ * @weight_len: weight len
+ * @mode: connection mode
+ * @vdev_id: VDEV ID
+ *
+ * Return: QDF_STATUS
+ */
 static QDF_STATUS policy_mgr_mode_specific_modification_on_pcl(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
 			uint32_t *len, uint32_t weight_len,
-			enum policy_mgr_con_mode mode)
+			enum policy_mgr_con_mode mode, uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	switch (mode) {
 	case PM_SAP_MODE:
-		status = policy_mgr_pcl_modification_for_sap(
-			psoc, pcl_channels, pcl_weight, len, weight_len, mode);
+		status = policy_mgr_pcl_modification_for_sap(psoc, pcl_channels,
+							     pcl_weight, len,
+							     weight_len, mode,
+							     vdev_id);
 		break;
 	case PM_P2P_GO_MODE:
 		status = policy_mgr_pcl_modification_for_p2p_go(
@@ -1654,8 +1693,12 @@ static QDF_STATUS policy_mgr_mode_specific_modification_on_pcl(
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_LL_LT_SAP_MODE:
-		status = policy_mgr_pcl_modification_for_ll_lt_sap(
-			psoc, pcl_channels, pcl_weight, len, weight_len);
+		status = policy_mgr_pcl_modification_for_ll_lt_sap(psoc,
+								   pcl_channels,
+								   pcl_weight,
+								   len,
+								   weight_len,
+								   vdev_id);
 		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
@@ -1832,7 +1875,7 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 	orig_pcl_len = *len;
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 	policy_mgr_mode_specific_modification_on_pcl(
-		psoc, pcl_channels, pcl_weight, len, weight_len, mode);
+		psoc, pcl_channels, pcl_weight, len, weight_len, mode, vdev_id);
 
 	status = policy_mgr_modify_pcl_based_on_dnbs(psoc, pcl_channels,
 						pcl_weight, len);
@@ -3871,7 +3914,8 @@ static void policy_mgr_remove_dsrc_channels(uint32_t *ch_freq_list,
 
 QDF_STATUS policy_mgr_get_valid_chans_from_range(
 		struct wlan_objmgr_psoc *psoc, uint32_t *ch_freq_list,
-		uint32_t *ch_cnt, enum policy_mgr_con_mode mode)
+		uint32_t *ch_cnt, enum policy_mgr_con_mode mode,
+		uint8_t vdev_id)
 {
 	uint8_t ch_weight_list[NUM_CHANNELS] = {0};
 	uint32_t ch_weight_len;
@@ -3896,7 +3940,7 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 
 	status = policy_mgr_mode_specific_modification_on_pcl(
 			psoc, ch_freq_list, ch_weight_list, ch_cnt,
-			ch_weight_len, mode);
+			ch_weight_len, mode, vdev_id);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get modified pcl for mode %d", mode);
@@ -4038,7 +4082,8 @@ uint32_t policy_mgr_is_sta_on_indoor_channel(struct wlan_objmgr_psoc *psoc)
 
 QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 		struct wlan_objmgr_psoc *psoc, uint32_t *pcl_list_org,
-		uint8_t *weight_list_org, uint32_t *pcl_len_org)
+		uint8_t *weight_list_org, uint32_t *pcl_len_org,
+		uint8_t vdev_id)
 {
 	uint32_t i, j, pcl_len = 0;
 	bool found;
@@ -4055,6 +4100,7 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 	uint32_t go_op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t go_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t go_op_ch_freq_5g = 0;
+	uint32_t conn_flag = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -4093,6 +4139,8 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 		policy_mgr_debug("go 5/6G present, SAP exclude 5/6G channels");
 	}
 
+	policy_mgr_get_ap_6ghz_capable(psoc, vdev_id, &conn_flag);
+
 	for (i = 0; i < *pcl_len_org; i++) {
 		found = false;
 		if (i >= NUM_CHANNELS) {
@@ -4105,7 +4153,10 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 			continue;
 
 		if (scc_on_indoor && policy_mgr_is_force_scc(psoc) &&
-		    pcl_list_org[i] == indoor_sta_freq) {
+		    pcl_list_org[i] == indoor_sta_freq &&
+		    (WLAN_REG_IS_5GHZ_CH_FREQ(pcl_list_org[i]) ||
+		    (WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl_list_org[i]) &&
+		     (conn_flag & CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED)))) {
 			policy_mgr_debug("indoor chan:%d", pcl_list_org[i]);
 			found = true;
 			goto update_pcl;
@@ -4269,7 +4320,7 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 	status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 							psoc, pcl.pcl_list,
 							pcl.weight_list,
-							&pcl.pcl_len);
+							&pcl.pcl_len, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("Unable to modify SAP PCL");
 		return status;

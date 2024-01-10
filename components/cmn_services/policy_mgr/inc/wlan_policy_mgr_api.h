@@ -2705,6 +2705,7 @@ QDF_STATUS policy_mgr_restart_opportunistic_timer(
  * @pcl_list_org: Pointer to the preferred channel freq list to be trimmed
  * @weight_list_org: Pointer to the weights of the preferred channel list
  * @pcl_len_org: Pointer to the length of the preferred channel list
+ * @vdev_id: VDEV ID
  *
  * Modifies the preferred channel list of SAP based on the mandatory channel
  *
@@ -2712,7 +2713,8 @@ QDF_STATUS policy_mgr_restart_opportunistic_timer(
  */
 QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 		struct wlan_objmgr_psoc *psoc, uint32_t *pcl_list_org,
-		uint8_t *weight_list_org, uint32_t *pcl_len_org);
+		uint8_t *weight_list_org, uint32_t *pcl_len_org,
+		uint8_t vdev_id);
 
 /**
  * policy_mgr_update_and_wait_for_connection_update() - Update and wait for
@@ -2759,13 +2761,15 @@ bool policy_mgr_list_has_24GHz_channel(uint32_t *ch_freq_list,
  * @ch_list: Pointer to the channel frequency list
  * @ch_cnt: Pointer to the length of the channel list
  * @mode: Device mode
+ * @vdev_id: VDEV ID
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS policy_mgr_get_valid_chans_from_range(struct wlan_objmgr_psoc *psoc,
 						 uint32_t *ch_list,
 						 uint32_t *ch_cnt,
-						 enum policy_mgr_con_mode mode);
+						 enum policy_mgr_con_mode mode,
+						 uint8_t vdev_id);
 /**
  * policy_mgr_get_valid_chans() - Get the valid channel list
  * @psoc: PSOC object information
