@@ -1550,21 +1550,68 @@ QDF_STATUS dp_ppeds_vp_setup_on_fw_recovery(struct cdp_soc_t *soc_hdl,
 }
 
 /**
- * dp_ppeds_attach_vdev_be() - PPE DS table entry alloc
+ * dp_ppeds_entry_alloc_vdev_be() - allocate the PPE DS VP entry
  * @soc_hdl: CDP SoC Tx/Rx handle
- * @vdev_id: vdev id
  * @vp_arg: PPE VP opaque
  * @ppe_vp_num: Allocated PPE VP number
  * @vp_params: PPE VP ds related params
  *
- * Allocate a DS VP port and attach to BE VAP
+ * Allocate a DS VP port
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_ppeds_entry_alloc_vdev_be(struct cdp_soc_t *soc_hdl,
+					void *vp_arg, int32_t *ppe_vp_num,
+					struct cdp_ds_vp_params *vp_params)
+{
+	struct net_device *dev = vp_params->dev;
+	struct dp_soc *soc = NULL;
+	struct dp_soc_be *be_soc = NULL;
+	int16_t vp_num;
+	QDF_STATUS ret;
+
+	soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	/*
+	 * Enable once PPEDS module is ready
+	 */
+	if (!be_soc->ppeds_handle) {
+		dp_err("%p: DS is not enabled on this SOC", soc);
+		ret = QDF_STATUS_E_INVAL;
+		goto fail;
+	}
+
+	vp_num = ppe_ds_wlan_vp_alloc(be_soc->ppeds_handle, dev, vp_arg);
+	if (vp_num < 0) {
+		dp_err("vp alloc failed dev %s\n", dev->name);
+		ret = QDF_STATUS_E_FAULT;
+		goto fail;
+	}
+
+	*ppe_vp_num = vp_num;
+
+	return QDF_STATUS_SUCCESS;
+
+fail:
+	return ret;
+}
+
+/**
+ * dp_ppeds_attach_vdev_be() - PPE DS table entry alloc
+ * @soc_hdl: CDP SoC Tx/Rx handle
+ * @vdev_id: vdev id
+ * @vp_arg: PPE VP opaque
+ * @vp_num: PPE VP number
+ * @vp_params: PPE VP ds related params
+ *
+ * attach DS VP port
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
-				   void *vp_arg, int32_t *ppe_vp_num, struct cdp_ds_vp_params *vp_params)
+				   void *vp_arg, int32_t vp_num, struct cdp_ds_vp_params *vp_params)
 {
-	struct net_device *dev = vp_params->dev;
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_soc_be *be_soc;
 	struct dp_vdev *vdev;
@@ -1574,7 +1621,6 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	uint32_t peer_id;
 	int8_t ppe_vp_idx;
 	int8_t ppe_vp_profile_idx;
-	int16_t vp_num;
 	int16_t ppe_vp_search_tbl_idx = -1;
 	bool wds_ext_mode = vp_params->wds_ext_mode;
 	QDF_STATUS ret;
@@ -1608,13 +1654,6 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		goto fail1;
 	}
 
-	vp_num = ppe_ds_wlan_vp_alloc(be_soc->ppeds_handle, dev, vp_arg);
-	if (vp_num < 0) {
-		dp_err("vp alloc failed\n");
-		ret = QDF_STATUS_E_FAULT;
-		goto fail1;
-	}
-
 	/*
 	 * Allocate a PPE-VP profile for a vap / wds_ext node.
 	 */
@@ -1622,7 +1661,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	if (!vp_profile) {
 		dp_err("%p: Failed to allocate VP profile for VP :%d", be_soc, vp_num);
 		ret = QDF_STATUS_E_RESOURCES;
-		goto fail2;
+		goto fail1;
 	}
 
 	be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
@@ -1630,7 +1669,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	if (ppe_vp_idx < 0) {
 		dp_err("%p: Failed to allocate PPE VP idx for vdev_id:%d", be_soc, vdev->vdev_id);
 		ret = QDF_STATUS_E_RESOURCES;
-		goto fail3;
+		goto fail2;
 	}
 
 	/*
@@ -1642,7 +1681,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			dp_err("%p: Failed to allocate PPE VP search table idx for vdev_id:%d",
 				be_soc, vdev->vdev_id);
 			ret = QDF_STATUS_E_RESOURCES;
-			goto fail4;
+			goto fail3;
 		}
 
 		vp_profile->search_idx_reg_num = ppe_vp_search_tbl_idx;
@@ -1666,7 +1705,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		if (!dp_peer) {
 			dp_err("%p: No peer found for WDS ext\n", vdev);
 			ret = QDF_STATUS_E_INVAL;
-			goto fail5;
+			goto fail4;
 		}
 
 		tgt_peer = dp_peer;
@@ -1682,7 +1721,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			if (!mld_peer) {
 				dp_err("%p: No MLD peer for WDS ext\n", vdev);
 				ret = QDF_STATUS_E_INVAL;
-				goto fail5;
+				goto fail4;
 			}
 
 			tgt_peer = mld_peer;
@@ -1691,34 +1730,57 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		if (dp_peer_setup_ppeds_be(soc, tgt_peer, be_vdev,
 					   (void *)vp_profile) != QDF_STATUS_SUCCESS) {
 			ret = QDF_STATUS_E_RESOURCES;
-			goto fail5;
+			goto fail4;
 		}
 
 		dp_peer_unref_delete(dp_peer, DP_MOD_ID_CDP);
 	}
 
 	vp_params->ppe_vp_profile_idx = ppe_vp_profile_idx;
-	*ppe_vp_num = vp_num;
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 
 	return QDF_STATUS_SUCCESS;
 
-fail5:
+fail4:
 	if (dp_peer)
 		dp_peer_unref_delete(dp_peer, DP_MOD_ID_CDP);
 
 	if (!wds_ext_mode)
 		dp_ppeds_dealloc_vp_search_idx_tbl_entry_be(be_soc, vp_profile->search_idx_reg_num);
-fail4:
-	dp_ppeds_dealloc_vp_tbl_entry_be(be_soc, vp_profile->ppe_vp_num_idx);
 fail3:
-	dp_ppeds_dealloc_ppe_vp_profile_be(be_soc, ppe_vp_profile_idx);
+	dp_ppeds_dealloc_vp_tbl_entry_be(be_soc, vp_profile->ppe_vp_num_idx);
 fail2:
-	ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_num);
+	dp_ppeds_dealloc_ppe_vp_profile_be(be_soc, ppe_vp_profile_idx);
 fail1:
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 fail0:
 	return ret;
+}
+
+/**
+ * dp_ppeds_entry_free_vdev_be() - Free the PPE DS port
+ * @soc_hdl: CDP SoC Tx/Rx handle
+ * @vp_num: vp number
+ *
+ * Free the PPE DS port
+ *
+ * Return: void
+ */
+void dp_ppeds_entry_free_vdev_be(struct cdp_soc_t *soc_hdl, int32_t vp_num)
+{
+
+	struct dp_soc *soc;
+	struct dp_soc_be *be_soc;
+
+	soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	if (!soc) {
+		dp_err("CDP soch handle is NULL");
+		return;
+	}
+
+	be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_num);
 }
 
 /**
@@ -1764,8 +1826,6 @@ void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id, struct 
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 		return;
 	}
-
-	ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_profile->vp_num);
 
 	/*
 	 * For STA mode ast index table reg also needs to be cleaned
