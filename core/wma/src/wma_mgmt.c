@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1357,6 +1357,7 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 			link_id_bitmap = 1 << params->link_id;
 			ml_nlink_set_curr_force_inactive_state(
 					psoc, vdev, link_id_bitmap, LINK_ADD);
+			ml_nlink_init_concurrency_link_request(psoc, vdev);
 		}
 		wma_debug("assoc_link %d" QDF_MAC_ADDR_FMT ", force inactive %d link id %d",
 			  req->mlo_params.mlo_assoc_link,
