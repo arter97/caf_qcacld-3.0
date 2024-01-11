@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -228,6 +228,7 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 	struct ch_params ch_params = {0};
 	uint8_t i;
 	enum sap_csa_reason_code csa_reason;
+	QDF_STATUS status;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -324,4 +325,12 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_change_sap_channel_with_csa(psoc, sap_info.vdev_id,
 					       restart_freq,
 					       ch_params.ch_width, true);
+
+	if (policy_mgr_is_chan_switch_in_progress(psoc)) {
+		status = policy_mgr_wait_chan_switch_complete_evt(psoc);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			policy_mgr_err("wait for csa event failed!!");
+			return;
+		}
+	}
 }
