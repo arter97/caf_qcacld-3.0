@@ -1595,6 +1595,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t i, pcl_len = 0;
 	bool sbs_mac0_modified_pcl = false;
+	bool modified_pcl_6_ghz = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1614,10 +1615,13 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 					pcl_channels[i]) ||
 		    wlan_reg_is_dfs_for_freq(
 					pm_ctx->pdev,
-					pcl_channels[i]) ||
-		    !policy_mgr_is_6G_chan_valid_for_ll_sap(pcl_channels[i]))
+					pcl_channels[i]))
 			continue;
-
+		if (wlan_reg_is_6ghz_chan_freq(pcl_channels[i]) &&
+		    !policy_mgr_is_6G_chan_valid_for_ll_sap(pcl_channels[i])) {
+			modified_pcl_6_ghz = true;
+			continue;
+		}
 		/* Remove mac0 frequencies for static SBS case */
 		if (policy_mgr_is_sbs_mac0_freq(psoc, pcl_channels[i])) {
 			sbs_mac0_modified_pcl = true;
@@ -1637,8 +1641,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
 	*len = pcl_len;
 
-	policy_mgr_debug("sbs_mac0_modified_pcl %d, PCL after ll sap modification",
-			 sbs_mac0_modified_pcl);
+	policy_mgr_debug("Modified PCL: sbs_mac0 %d 6Ghz %d",
+			 sbs_mac0_modified_pcl, modified_pcl_6_ghz);
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 
 	return QDF_STATUS_SUCCESS;

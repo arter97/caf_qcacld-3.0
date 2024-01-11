@@ -1077,7 +1077,14 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		session->vhtCapability =
 			IS_DOT11_MODE_VHT(session->dot11mode);
 
-		if (IS_DOT11_MODE_HE(session->dot11mode)) {
+		if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq) &&
+		    IS_DOT11_MODE_HT(session->dot11mode) &&
+		    policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
+						 session->vdev_id)) {
+			pe_debug("For LL LT vdev %d allow 6 Ghz freq %d for dot11mode %d",
+				 session->vdev_id, session->curr_op_freq,
+				 session->dot11mode);
+		} else if (IS_DOT11_MODE_HE(session->dot11mode)) {
 			lim_update_session_he_capable(mac_ctx, session);
 			lim_copy_bss_he_cap(session);
 		} else if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
@@ -9673,9 +9680,16 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		      ch_change_req->ch_width, ch_change_req->nw_type,
 		      ch_change_req->dot11mode);
 
-	if (IS_DOT11_MODE_HE(ch_change_req->dot11mode) &&
-		((QDF_MONITOR_MODE == session_entry->opmode) ||
-		lim_is_session_he_capable(session_entry))) {
+	if (wlan_reg_is_6ghz_chan_freq(target_freq) &&
+	    IS_DOT11_MODE_HT(session_entry->dot11mode) &&
+	    policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
+					 session_entry->vdev_id)) {
+		pe_debug("For LL LT vdev %d allow 6 Ghz freq %d for dot11mode %d",
+			 session_entry->vdev_id, target_freq,
+			 session_entry->dot11mode);
+	} else if (IS_DOT11_MODE_HE(ch_change_req->dot11mode) &&
+	     (session_entry->opmode == QDF_MONITOR_MODE ||
+	      lim_is_session_he_capable(session_entry))) {
 		lim_update_session_he_capable_chan_switch
 			(mac_ctx, session_entry, target_freq);
 		is_new_ch_2g = wlan_reg_is_24ghz_ch_freq(target_freq);

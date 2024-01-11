@@ -7777,7 +7777,9 @@ populate_dot11f_he_operation(struct mac_context *mac_ctx,
 
 	he_op->present = 1;
 	he_op->vht_oper_present = 0;
-	if (session->he_6ghz_band) {
+	if (session->he_6ghz_band ||
+	    (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, session->vdev_id) &&
+	    WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq))) {
 		he_op->oper_info_6g_present = 1;
 		if (session->bssType != eSIR_INFRA_AP_MODE) {
 			he_op->oper_info_6g.info.ch_width = session->ch_width;

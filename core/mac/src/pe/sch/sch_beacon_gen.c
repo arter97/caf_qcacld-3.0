@@ -772,6 +772,11 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 					    &bcn_2->he_6ghz_band_cap);
 		populate_dot11f_he_bss_color_change(mac_ctx, session,
 					&bcn_2->bss_color_change);
+	} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq) &&
+		   policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
+						session->vdev_id)) {
+		populate_dot11f_he_operation(mac_ctx, session,
+					     &bcn_2->he_op);
 	}
 
 	if (lim_is_session_eht_capable(session)) {
