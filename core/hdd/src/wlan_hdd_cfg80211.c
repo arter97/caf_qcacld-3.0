@@ -844,10 +844,17 @@ wlan_hdd_sta_ap_iface_limit[] = {
 	   .max = 1,
 	   .types = BIT(NL80211_IFTYPE_STATION)
 	},
+#ifdef WLAN_FEATURE_LL_LT_SAP
+	{
+	   .max = 2,
+	   .types = BIT(NL80211_IFTYPE_AP)
+	},
+#else
 	{
 	   .max = 1,
 	   .types = BIT(NL80211_IFTYPE_AP)
 	},
+#endif /* WLAN_FEATURE_LL_LT_SAP */
 };
 #endif /* WLAN_FEATURE_NO_STA_SAP_CONCURRENCY */
 
@@ -1010,7 +1017,11 @@ static struct ieee80211_iface_combination
 	{
 		.limits = wlan_hdd_sta_ap_iface_limit,
 		.num_different_channels = 2,
+#ifdef WLAN_FEATURE_LL_LT_SAP
+		.max_interfaces = 3,
+#else
 		.max_interfaces = 2,
+#endif
 		.n_limits = ARRAY_SIZE(wlan_hdd_sta_ap_iface_limit),
 		.beacon_int_infra_match = true,
 	},
