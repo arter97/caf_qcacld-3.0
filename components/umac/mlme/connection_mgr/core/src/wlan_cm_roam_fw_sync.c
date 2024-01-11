@@ -1584,13 +1584,16 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 
 	roam_req = cm_get_first_roam_command(vdev);
 	if (roam_req) {
-		mlme_debug("Roam req found, get cm id to remove it, after disconnect");
+		mlme_debug("Roam req found, get cm id to remove it, before disconnect");
 		cm_id = roam_req->cm_id;
 	}
 	/* CPU freq is boosted during roam sync to improve roam latency,
 	 * upon HO failure reset that request to restore cpu freq back to normal
 	 */
 	mlme_cm_osif_perfd_reset_cpufreq();
+
+	cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_HO_FAIL,
+			    sizeof(wlan_cm_id), &cm_id);
 
 	qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
 	if (cm_ho_fail_is_avoid_list_candidate(vdev, ind)) {
@@ -1614,7 +1617,8 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 			       WLAN_LOG_INDICATOR_HOST_DRIVER,
 			       WLAN_LOG_REASON_ROAM_HO_FAILURE, false, false);
 
-	cm_remove_cmd(cm_ctx, &cm_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		cm_remove_cmd(cm_ctx, &cm_id);
 
 error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
