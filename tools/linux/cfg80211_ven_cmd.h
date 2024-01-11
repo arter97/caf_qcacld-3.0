@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1516,6 +1516,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_ACS_SEC20_WEIGHTAGE = 549,
 	OL_ATH_PARAM_DISPLAY_BAND_CHANS = 550,
 	OL_ATH_PARAM_ALL_CHAN_UTIL = 551,
+	OL_ATH_PARAM_DYNAMIC_WSI_REMAP = 552,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3999,6 +4000,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_BAND_CHANS, GET_PARAM, 0},
 	{"g_ch_util_all",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ALL_CHAN_UTIL, GET_PARAM, 0},
+	{"dynamic_wsi_remap",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DYNAMIC_WSI_REMAP, SET_PARAM, 1},
 };
 #endif
 
