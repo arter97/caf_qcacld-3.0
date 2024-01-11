@@ -83,16 +83,19 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	dl_wfds->iommu_cfg.shadow_wrptr_paddr = info->shadow_wrptr_mem_paddr;
 	dl_wfds->iommu_cfg.shadow_wrptr_map_size = info->shadow_wrptr_mem_size;
 
-	pld_audio_smmu_map(qdf_dev->dev,
-			   qdf_mem_paddr_from_dmaaddr(qdf_dev,
-						      info->shadow_rdptr_mem_paddr),
-			   info->shadow_rdptr_mem_paddr,
-			   info->shadow_rdptr_mem_size);
-	pld_audio_smmu_map(qdf_dev->dev,
-			   qdf_mem_paddr_from_dmaaddr(qdf_dev,
-						      info->shadow_wrptr_mem_paddr),
-			   info->shadow_wrptr_mem_paddr,
-			   info->shadow_wrptr_mem_size);
+	if (!dl_wfds->is_audio_shared_iommu_group)
+		pld_audio_smmu_map(qdf_dev->dev,
+				   qdf_mem_paddr_from_dmaaddr(qdf_dev,
+							      info->shadow_rdptr_mem_paddr),
+				   info->shadow_rdptr_mem_paddr,
+				   info->shadow_rdptr_mem_size);
+
+	if (!dl_wfds->is_audio_shared_iommu_group)
+		pld_audio_smmu_map(qdf_dev->dev,
+				   qdf_mem_paddr_from_dmaaddr(qdf_dev,
+							      info->shadow_wrptr_mem_paddr),
+				   info->shadow_wrptr_mem_paddr,
+				   info->shadow_wrptr_mem_size);
 
 	info->ce_info_len = QMI_WFDS_CE_MAX_SRNG;
 	status = hif_get_direct_link_ce_srng_info(hif_ctx, ce_info,
@@ -122,11 +125,12 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 		dl_wfds->iommu_cfg.direct_link_srng_ring_map_size[i] =
 			srng_info->entry_size * srng_info->num_entries * 4;
 
-		pld_audio_smmu_map(qdf_dev->dev,
-				   qdf_mem_paddr_from_dmaaddr(qdf_dev,
-							      srng_info->ring_base_paddr),
-				   srng_info->ring_base_paddr,
-				   dl_wfds->iommu_cfg.direct_link_srng_ring_map_size[i]);
+		if (!dl_wfds->is_audio_shared_iommu_group)
+			pld_audio_smmu_map(qdf_dev->dev,
+					   qdf_mem_paddr_from_dmaaddr(qdf_dev,
+								      srng_info->ring_base_paddr),
+					   srng_info->ring_base_paddr,
+					   dl_wfds->iommu_cfg.direct_link_srng_ring_map_size[i]);
 	}
 
 	refill_ring = direct_link_ctx->direct_link_refill_ring_hdl->hal_srng;
@@ -143,11 +147,12 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	dl_wfds->iommu_cfg.direct_link_refill_ring_map_size =
 		srng_params.entry_size * srng_params.num_entries * 4;
 
-	pld_audio_smmu_map(qdf_dev->dev,
-			   qdf_mem_paddr_from_dmaaddr(qdf_dev,
-						      srng_params.ring_base_paddr),
-			   srng_params.ring_base_paddr,
-			   dl_wfds->iommu_cfg.direct_link_refill_ring_map_size);
+	if (!dl_wfds->is_audio_shared_iommu_group)
+		pld_audio_smmu_map(qdf_dev->dev,
+				   qdf_mem_paddr_from_dmaaddr(qdf_dev,
+							      srng_params.ring_base_paddr),
+				   srng_params.ring_base_paddr,
+				   dl_wfds->iommu_cfg.direct_link_refill_ring_map_size);
 
 	info->rx_refill_ring.hp_paddr =
 				hal_srng_get_hp_addr(hal_soc, refill_ring);
@@ -166,10 +171,13 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	if (fw_lpass_mem_iova) {
 		dl_wfds->fw_lpass_shared_mem_pa = fw_lpass_mem_iova;
 		dl_wfds->fw_lpass_shared_mem_size = fw_lpass_mem_size;
-		pld_audio_smmu_map(qdf_dev->dev,
-				   qdf_mem_paddr_from_dmaaddr(qdf_dev,
-							      fw_lpass_mem_iova),
-				   fw_lpass_mem_iova, fw_lpass_mem_size);
+
+		if (!dl_wfds->is_audio_shared_iommu_group)
+			pld_audio_smmu_map(qdf_dev->dev,
+					   qdf_mem_paddr_from_dmaaddr(qdf_dev,
+								      fw_lpass_mem_iova),
+					   fw_lpass_mem_iova,
+					   fw_lpass_mem_size);
 
 		info->fw_shared_wrmem_paddr_valid = 1;
 		info->fw_shared_wrmem_paddr = fw_lpass_mem_iova;
@@ -197,11 +205,12 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 		info->apss_shared_wrmem_size_valid = 1;
 		info->apss_shared_wrmem_size = DP_WFDS_APSS_LPASS_SHARED_MEM_SIZE;
 
-		pld_audio_smmu_map(qdf_dev->dev,
-				   qdf_mem_paddr_from_dmaaddr(qdf_dev,
-							      info->apss_shared_wrmem_paddr),
-				   info->apss_shared_wrmem_paddr,
-				   info->apss_shared_wrmem_size);
+		if (!dl_wfds->is_audio_shared_iommu_group)
+			pld_audio_smmu_map(qdf_dev->dev,
+					   qdf_mem_paddr_from_dmaaddr(qdf_dev,
+								      info->apss_shared_wrmem_paddr),
+					   info->apss_shared_wrmem_paddr,
+					   info->apss_shared_wrmem_size);
 	} else {
 		dp_err("Unable to allocate apss_lpass shared memory");
 	}
@@ -269,10 +278,11 @@ dp_wfds_req_mem_msg(struct dp_direct_link_wfds_context *dl_wfds)
 			while (num_pages--) {
 				info->mem_arena_page_info[i].page_dma_addr[num_pages] =
 							dma_addr[num_pages];
-				pld_audio_smmu_map(qdf_dev->dev,
-						   qdf_mem_paddr_from_dmaaddr(qdf_dev, dma_addr[num_pages]),
-						   dma_addr[num_pages],
-						   buf_size);
+				if (!dl_wfds->is_audio_shared_iommu_group)
+					pld_audio_smmu_map(qdf_dev->dev,
+							   qdf_mem_paddr_from_dmaaddr(qdf_dev, dma_addr[num_pages]),
+							   dma_addr[num_pages],
+							   buf_size);
 			}
 
 			qdf_mem_free(dma_addr);
@@ -290,10 +300,11 @@ dp_wfds_req_mem_msg(struct dp_direct_link_wfds_context *dl_wfds)
 			info->mem_arena_page_info[i].page_dma_addr[num_pages] =
 					pages->dma_pages[num_pages].page_p_addr;
 
-			pld_audio_smmu_map(qdf_dev->dev,
-					qdf_mem_paddr_from_dmaaddr(qdf_dev, pages->dma_pages[num_pages].page_p_addr),
-					pages->dma_pages[num_pages].page_p_addr,
-					pages->page_size);
+			if (!dl_wfds->is_audio_shared_iommu_group)
+				pld_audio_smmu_map(qdf_dev->dev,
+						qdf_mem_paddr_from_dmaaddr(qdf_dev, pages->dma_pages[num_pages].page_p_addr),
+						pages->dma_pages[num_pages].page_p_addr,
+						pages->page_size);
 		}
 	}
 
@@ -771,6 +782,7 @@ QDF_STATUS dp_wfds_init(struct dp_direct_link_context *dp_direct_link_ctx)
 {
 	struct dp_direct_link_wfds_context *dl_wfds;
 	QDF_STATUS status;
+	qdf_device_t qdf_dev = dp_direct_link_ctx->dp_ctx->qdf_dev;
 
 	dl_wfds = qdf_mem_malloc(sizeof(*dl_wfds));
 	if (!dl_wfds) {
@@ -806,6 +818,8 @@ QDF_STATUS dp_wfds_init(struct dp_direct_link_context *dp_direct_link_ctx)
 	dp_direct_link_ctx->dl_wfds = dl_wfds;
 	dl_wfds->direct_link_ctx = dp_direct_link_ctx;
 	gp_dl_wfds_ctx = dl_wfds;
+	dl_wfds->is_audio_shared_iommu_group =
+			pld_is_audio_shared_iommu_group(qdf_dev->dev);
 	dp_debug("WFDS QMI init successful");
 
 	return status;

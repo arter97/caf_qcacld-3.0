@@ -689,6 +689,22 @@ static void dp_set_rx_mode_value(struct wlan_dp_psoc_context *dp_ctx)
 		dp_ctx->rps, dp_ctx->dynamic_rps);
 }
 
+#ifdef FEATURE_DIRECT_LINK
+static
+void dp_direct_link_cfg_init(struct wlan_dp_psoc_cfg *config,
+			     struct wlan_objmgr_psoc *psoc)
+{
+	config->is_direct_link_enabled =
+			cfg_get(psoc, CFG_DP_DIRECT_LINK_ENABLE);
+}
+#else
+static inline
+void dp_direct_link_cfg_init(struct wlan_dp_psoc_cfg *config,
+			     struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 /**
  * dp_cfg_init() - initialize target specific configuration
  * @ctx: dp context handle
@@ -743,6 +759,7 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_nud_tracking_cfg_update(config, psoc);
 	dp_trace_cfg_update(config, psoc);
 	dp_fisa_cfg_init(config, psoc);
+	dp_direct_link_cfg_init(config, psoc);
 }
 
 /**
@@ -2395,10 +2412,16 @@ dp_direct_link_refill_ring_deinit(struct dp_direct_link_context *dlink_ctx)
 QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct dp_direct_link_context *dp_direct_link_ctx;
+	bool is_direct_link_fw_support;
 	QDF_STATUS status;
 
-	if (!pld_is_direct_link_supported(dp_ctx->qdf_dev->dev)) {
-		dp_info("FW does not support Direct Link");
+	is_direct_link_fw_support =
+		pld_is_direct_link_supported(dp_ctx->qdf_dev->dev);
+	if (!is_direct_link_fw_support ||
+	    !dp_ctx->dp_cfg.is_direct_link_enabled) {
+		dp_info("Direct Link is not supported FW cap:%d ini:%d",
+			is_direct_link_fw_support,
+			dp_ctx->dp_cfg.is_direct_link_enabled);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -2440,9 +2463,6 @@ QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)
 void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx, bool is_ssr)
 {
 	struct wlan_dp_intf *dp_intf;
-
-	if (!pld_is_direct_link_supported(dp_ctx->qdf_dev->dev))
-		return;
 
 	if (!dp_ctx->dp_direct_link_ctx)
 		return;

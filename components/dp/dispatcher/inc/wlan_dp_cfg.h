@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1334,6 +1334,32 @@
 #define CFG_DP_HL_BUNDLE
 #endif
 
+#ifdef FEATURE_DIRECT_LINK
+/*
+ * <ini>
+ * dp_direct_link_enable - Control direct link datapath
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable Direct Link datapath feature
+ *
+ * Supported Feature: Direct Link
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_DIRECT_LINK_ENABLE \
+	CFG_INI_BOOL("dp_direct_link_enable", false, \
+		     "Enable/Disable Direct Link datapath")
+
+#define CFG_DP_DIRECT_LINK \
+	CFG(CFG_DP_DIRECT_LINK_ENABLE)
+#else
+#define CFG_DP_DIRECT_LINK
+#endif
+
 #define CFG_DP_ALL \
 	CFG(CFG_DP_RX_THREAD_CPU_MASK) \
 	CFG(CFG_DP_RX_THREAD_UL_CPU_MASK) \
@@ -1359,6 +1385,7 @@
 	CFG_DP_ENABLE_NUD_TRACKING_ALL \
 	CFG_DP_CONFIG_DP_TRACE_ALL \
 	CFG_DP_HL_BUNDLE \
-	CFG_DP_FISA
+	CFG_DP_FISA \
+	CFG_DP_DIRECT_LINK
 
 #endif /* WLAN_DP_CFG_H__ */

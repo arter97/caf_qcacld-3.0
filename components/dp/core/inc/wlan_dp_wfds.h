@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -123,6 +123,7 @@ struct dp_direct_link_iommu_config {
  * @apss_lpass_shared_mem_size: APSS and LPASS shared mem region size
  * @fw_lpass_shared_mem_pa: FW and LPASS shared mem region physical addr
  * @fw_lpass_shared_mem_size: FW and LPASS shared mem region physical size
+ * @is_audio_shared_iommu_group: whether iommu group is shared with audio or not
  */
 struct dp_direct_link_wfds_context {
 	struct dp_direct_link_context *direct_link_ctx;
@@ -142,6 +143,7 @@ struct dp_direct_link_wfds_context {
 	uint32_t apss_lpass_shared_mem_size;
 	qdf_dma_addr_t fw_lpass_shared_mem_pa;
 	uint32_t fw_lpass_shared_mem_size;
+	bool is_audio_shared_iommu_group;
 };
 
 /**
