@@ -7330,6 +7330,15 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 {
 	struct mac_context *mac = session->mac_ctx;
 	tDot11fIEhe_cap *he_config;
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t max_ampdu_len_exp;
+
+	psoc = wlan_vdev_get_psoc(session->vdev);
+	if (!psoc) {
+		pe_err("Failed to get psoc");
+		return;
+	}
+	max_ampdu_len_exp = cfg_get(psoc, CFG_HE_MAX_AMPDU_LEN);
 
 	he_config = &mlme_priv->he_config;
 	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
@@ -7339,7 +7348,9 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			mac->he_cap_2g.tx_he_mcs_map_lt_80;
 		he_config->rx_he_mcs_map_lt_80 =
 			mac->he_cap_2g.rx_he_mcs_map_lt_80;
-
+		he_config->max_ampdu_len_exp_ext =
+			QDF_MIN(max_ampdu_len_exp,
+				mac->he_cap_2g.max_ampdu_len_exp_ext);
 	} else {
 		he_config->bfee_sts_lt_80 =
 			mac->he_cap_5g.bfee_sts_lt_80;
@@ -7350,6 +7361,9 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 
 		he_config->num_sounding_lt_80 =
 			mac->he_cap_5g.num_sounding_lt_80;
+		he_config->max_ampdu_len_exp_ext =
+			QDF_MIN(max_ampdu_len_exp,
+				mac->he_cap_5g.max_ampdu_len_exp_ext);
 		if (he_config->chan_width_2 ||
 		    he_config->chan_width_3) {
 			he_config->bfee_sts_gt_80 =
