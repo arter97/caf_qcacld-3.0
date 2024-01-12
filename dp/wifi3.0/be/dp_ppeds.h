@@ -264,17 +264,6 @@ void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
 void dp_tx_ppeds_vp_profile_update(struct dp_soc_be *be_soc,
 				   struct dp_vdev_be *be_vdev);
 
-/**
- * dp_ppeds_detach_vp_profile() - detach ppe vp profile during vdev detach
- * @be_soc: BE Soc handle
- * @be_vdev: pointer to be_vdev structure
- *
- * The function detach the the vp profile during vdev detach
- *
- * Return: void
- */
-void dp_ppeds_detach_vp_profile(struct dp_soc_be *be_soc,
-				struct dp_vdev_be *be_vdev);
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
  * dp_ppeds_handle_attached() - Check if ppeds handle attached
