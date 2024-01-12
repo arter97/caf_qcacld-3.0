@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -200,6 +200,26 @@ ucfg_pmo_is_ns_offloaded(struct wlan_objmgr_psoc *psoc);
  */
 uint8_t
 ucfg_pmo_get_sta_dynamic_dtim(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_sta_teles_dtim() - Get telescopic dtim
+ * @psoc: pointer to psoc object
+ *
+ * Return: telescopic dtim
+ */
+uint8_t
+ucfg_pmo_get_sta_teles_dtim(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_set_sta_teles_dtim() - Set telescopic dtim
+ * @psoc: pointer to psoc object
+ * @val:  telescopic dtim
+ *
+ * Return: None
+ */
+void
+ucfg_pmo_set_sta_teles_dtim(struct wlan_objmgr_psoc *psoc,
+			    uint8_t val);
 
 /**
  * ucfg_pmo_get_sta_mod_dtim() - Get modulated dtim
@@ -2058,6 +2078,18 @@ static inline bool ucfg_pmo_is_ns_offloaded(struct wlan_objmgr_psoc *psoc)
 
 static inline uint8_t
 ucfg_pmo_get_sta_dynamic_dtim(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint8_t
+ucfg_pmo_get_sta_teles_dtim(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint8_t
+ucfg_pmo_set_sta_teles_dtim(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
 }

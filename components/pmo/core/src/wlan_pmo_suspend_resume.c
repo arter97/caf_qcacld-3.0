@@ -123,6 +123,8 @@ static QDF_STATUS pmo_core_calculate_listen_interval(
 
 	if (psoc_cfg->sta_dynamic_dtim) {
 		*listen_interval = psoc_cfg->sta_dynamic_dtim;
+	} else if (psoc_cfg->sta_teles_dtim) {
+		*listen_interval = psoc_cfg->sta_teles_dtim;
 	} else if ((psoc_cfg->sta_mod_dtim) &&
 		   (psoc_cfg->sta_max_li_mod_dtim)) {
 		/*
@@ -172,8 +174,9 @@ static QDF_STATUS pmo_core_calculate_listen_interval(
 		}
 	}
 
-	pmo_info("sta dynamic dtim %d sta mod dtim %d sta_max_li_mod_dtim %d max_dtim %d",
-		 psoc_cfg->sta_dynamic_dtim, psoc_cfg->sta_mod_dtim,
+	pmo_info("sta dynamic dtim %d teles dtim %d sta mod dtim %d sta_max_li_mod_dtim %d max_dtim %d",
+		 psoc_cfg->sta_dynamic_dtim, psoc_cfg->sta_teles_dtim,
+		 psoc_cfg->sta_mod_dtim,
 		 psoc_cfg->sta_max_li_mod_dtim, max_dtim);
 
 	return QDF_STATUS_SUCCESS;
@@ -851,6 +854,11 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	if (psoc_cfg->is_mod_dtim_on_sys_suspend_enabled) {
 		pmo_debug("mod DTIM enabled");
 		param.flags |= WMI_WOW_FLAG_MOD_DTIM_ON_SYS_SUSPEND;
+	}
+
+	if (psoc_cfg->is_teles_dtim_only_on_sys_suspend_enabled) {
+		pmo_debug("teles DTIM enabled");
+		param.flags |= WMI_WOW_FLAG_TELES_DTIM_ON_SYS_SUSPEND;
 	}
 
 	if (psoc_cfg->sta_forced_dtim) {

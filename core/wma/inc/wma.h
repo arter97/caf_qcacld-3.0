@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -864,6 +864,7 @@ struct wma_wlm_stats_data {
  * @staMaxLIModDtim: station max listen interval
  * @sta_max_li_mod_dtim_ms: station max listen interval in ms
  * @staModDtim: station mode DTIM
+ * @staTelesDtim: station tetescopic DTIM
  * @staDynamicDtim: station dynamic DTIM
  * @hw_bd_id: hardware board id
  * @hw_bd_info: hardware board info
@@ -991,6 +992,7 @@ typedef struct {
 	uint8_t staMaxLIModDtim;
 	uint16_t sta_max_li_mod_dtim_ms;
 	uint8_t staModDtim;
+	uint8_t staTelesDtim;
 	uint8_t staDynamicDtim;
 	uint32_t hw_bd_id;
 	uint32_t hw_bd_info[HW_BD_INFO_SIZE];

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021,2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -248,10 +248,13 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_PMO_ENABLE_HOST_NSOFFLOAD);
 	psoc_cfg->sta_dynamic_dtim = cfg_get(psoc, CFG_PMO_ENABLE_DYNAMIC_DTIM);
 	wlan_pmo_get_igmp_version_support_cfg(psoc, psoc_cfg);
+	psoc_cfg->sta_teles_dtim = cfg_get(psoc, CFG_PMO_ENABLE_TELESCOPIC_DTIM);
 	psoc_cfg->sta_mod_dtim = cfg_get(psoc, CFG_PMO_ENABLE_MODULATED_DTIM);
 	psoc_cfg->enable_mc_list = cfg_get(psoc, CFG_PMO_MC_ADDR_LIST_ENABLE);
 	psoc_cfg->power_save_mode = cfg_get(psoc, CFG_PMO_POWERSAVE_MODE);
 	psoc_cfg->sta_forced_dtim = cfg_get(psoc, CFG_PMO_ENABLE_FORCED_DTIM);
+	psoc_cfg->is_teles_dtim_only_on_sys_suspend_enabled =
+			cfg_get(psoc, CFG_PMO_TELES_DTIM_ONLY_ON_SYS_SUSPEND);
 	psoc_cfg->is_mod_dtim_on_sys_suspend_enabled =
 			cfg_get(psoc, CFG_PMO_MOD_DTIM_ON_SYS_SUSPEND);
 	psoc_cfg->is_bus_suspend_enabled_in_sap_mode =

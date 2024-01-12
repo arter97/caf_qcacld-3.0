@@ -5295,6 +5295,15 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			wma_debug("failed to send wmi_vdev_param_dyndtim_cnt");
 			goto out;
 		}
+		status = mlme_check_index_setparam(
+						setparam,
+						wmi_vdev_param_telesdtim_cnt,
+						wma->staTelesDtim, index++,
+						MAX_VDEV_STA_REQ_PARAMS);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug("failed to send wmi_vdev_param_telescopic_dtim_cnt");
+			goto out;
+		}
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
 							params->smesessionId,
 							WLAN_LEGACY_WMA_ID);

@@ -354,6 +354,7 @@ struct pmo_icmp_offload {
  * @lpass_enable: true when lpass is enabled else false
  * @max_ps_poll: max power save poll
  * @sta_dynamic_dtim: station dynamic DTIM value
+ * @sta_teles_dtim: station telescopic DTIM value
  * @sta_mod_dtim: station modulated DTIM value
  * @sta_max_li_mod_dtim: station max listen interval DTIM value
  * @sta_forced_dtim: station forced DTIM value
@@ -392,6 +393,9 @@ struct pmo_icmp_offload {
  * @ito_repeat_count: Indicates ito repeated count
  * @is_mod_dtim_on_sys_suspend_enabled: true when mod dtim is enabled for
  * system suspend wow else false
+ * @is_teles_dtim_only_on_sys_suspend_enabled: true when tele dtim is enable
+ *  for system suspend wow, false when tele dtim is enable for system suspend
+ *  or run time PM.
  * @is_bus_suspend_enabled_in_sap_mode: Can bus suspend in SoftAP mode
  * @is_bus_suspend_enabled_in_go_mode: Can bus suspend in P2P GO mode
  * @wow_suspend_type: What wow suspend type is currently happening
@@ -434,6 +438,7 @@ struct pmo_psoc_cfg {
 	bool lpass_enable;
 	uint8_t max_ps_poll;
 	uint8_t sta_dynamic_dtim;
+	uint8_t sta_teles_dtim;
 	uint8_t sta_mod_dtim;
 	uint8_t sta_max_li_mod_dtim;
 	bool sta_forced_dtim;
@@ -476,6 +481,7 @@ struct pmo_psoc_cfg {
 	enum active_apf_mode active_mc_bc_apf_mode;
 	uint8_t ito_repeat_count;
 	bool is_mod_dtim_on_sys_suspend_enabled;
+	bool is_teles_dtim_only_on_sys_suspend_enabled;
 	bool is_bus_suspend_enabled_in_sap_mode;
 	bool is_bus_suspend_enabled_in_go_mode;
 	enum qdf_suspend_type wow_suspend_type;
