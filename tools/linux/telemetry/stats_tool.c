@@ -2141,6 +2141,7 @@ void print_advance_radio_ctrl_rx(struct advance_pdev_ctrl_rx *rx)
 void print_advance_radio_ctrl_link(struct advance_pdev_ctrl_link *link)
 {
 	print_basic_radio_ctrl_link(&link->b_link);
+	STATS_8(stdout, "DCS Total Utilized", link->dcs_total_util);
 	STATS_8(stdout, "DCS Tx Utilized", link->dcs_ap_tx_util);
 	STATS_8(stdout, "DCS Rx Utilized", link->dcs_ap_rx_util);
 	STATS_8(stdout, "DCS Self BSS Utilized", link->dcs_self_bss_util);

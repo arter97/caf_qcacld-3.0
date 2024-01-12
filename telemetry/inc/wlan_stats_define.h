@@ -946,6 +946,7 @@ struct advance_pdev_ctrl_link {
 	u_int8_t dcs_obss_rx_util;
 	u_int8_t dcs_free_medium;
 	u_int8_t dcs_non_wifi_util;
+	u_int8_t dcs_total_util;
 };
 
 /* Advance Psoc Data */

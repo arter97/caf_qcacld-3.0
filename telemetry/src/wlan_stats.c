@@ -3541,6 +3541,7 @@ static QDF_STATUS get_advance_pdev_ctrl_link(struct unified_stats *stats,
 	}
 	fill_basic_pdev_ctrl_link(&ctrl->b_link, cp_stats, pdev);
 
+	ctrl->dcs_total_util = cp_stats->stats.chan_stats.dcs_total_util;
 	ctrl->dcs_ap_tx_util = cp_stats->stats.chan_stats.dcs_ap_tx_util;
 	ctrl->dcs_ap_rx_util = cp_stats->stats.chan_stats.dcs_ap_rx_util;
 	ctrl->dcs_self_bss_util = cp_stats->stats.chan_stats.dcs_self_bss_util;
