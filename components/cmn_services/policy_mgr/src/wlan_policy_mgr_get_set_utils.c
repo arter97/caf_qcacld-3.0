@@ -5014,6 +5014,8 @@ policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 		policy_mgr_handle_force_active_inactive_resp(psoc, vdev, req,
 							     resp);
 		break;
+	case MLO_LINK_FORCE_MODE_NON_FORCE_UPDATE:
+		break;
 	default:
 		policy_mgr_err("Invalid request req mode %d",
 			       req->param.force_mode);

@@ -3192,6 +3192,34 @@ ml_nlink_update_force_active_num(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
+static QDF_STATUS
+ml_nlink_update_non_force_disallow_bitmap(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				enum ml_nlink_change_event_type evt,
+				struct ml_nlink_change_event *data,
+				enum mlo_link_force_reason reason,
+				uint32_t link_control_flags)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	/* Send "no force update" to clear any MLMR EMLSR restriction
+	 * when become MLO standalone
+	 */
+	if ((policy_mgr_get_connection_count_with_mlo(psoc) == 1) &&
+	    (evt == ml_nlink_disconnect_completion_evt ||
+	     evt == ml_nlink_ap_stopped_evt))
+		status = policy_mgr_mlo_sta_set_nlink(
+					psoc, wlan_vdev_get_id(vdev), reason,
+					MLO_LINK_FORCE_MODE_NON_FORCE_UPDATE,
+					0,
+					0,
+					0,
+					link_control_flags);
+
+	return status;
+}
+
 static bool
 ml_nlink_all_links_ready_for_state_change(struct wlan_objmgr_psoc *psoc,
 					  struct wlan_objmgr_vdev *vdev,
@@ -3354,6 +3382,16 @@ ml_nlink_state_change_emlsr(struct wlan_objmgr_psoc *psoc,
 	ml_nlink_update_force_command_target(psoc, vdev, reason, evt,
 					     data, &curr_force_state,
 					     &force_state);
+
+	if (status == QDF_STATUS_E_PENDING || status != QDF_STATUS_SUCCESS)
+		goto end;
+
+	status = ml_nlink_update_non_force_disallow_bitmap(psoc, vdev,
+							   evt,
+							   data,
+							   reason,
+							   0);
+
 end:
 	if (vdev) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
