@@ -385,14 +385,6 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 				return;
 			}
 		}
-	} else if (he_op->vht_oper_present) {
-		ch_width = he_op->vht_oper.info.chan_width;
-		ccfs0 = he_op->vht_oper.info.center_freq_seg0;
-		ccfs1 = he_op->vht_oper.info.center_freq_seg1;
-		ori_bw = wlan_mlme_convert_vht_op_bw_to_phy_ch_width(ch_width,
-								     chan_id,
-								     ccfs0,
-								     ccfs1);
 	} else if (he_op->oper_info_6g_present) {
 		ch_width = he_op->oper_info_6g.info.ch_width;
 		ccfs0 = he_op->oper_info_6g.info.center_freq_seg0;
@@ -401,16 +393,7 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 									 chan_id,
 									 ccfs0,
 									 ccfs1);
-	} else if (bcn_ptr->VHTOperation.present) {
-		ch_width = bcn_ptr->VHTOperation.chanWidth;
-		ccfs0 = bcn_ptr->VHTOperation.chan_center_freq_seg0;
-		ccfs1 = bcn_ptr->VHTOperation.chan_center_freq_seg1;
-		ori_bw = wlan_mlme_convert_vht_op_bw_to_phy_ch_width(ch_width,
-								     chan_id,
-								     ccfs0,
-								     ccfs1);
 	} else {
-		pe_err("Invalid operation");
 		return;
 	}
 

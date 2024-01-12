@@ -1339,6 +1339,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	bool srd_chan_enabled;
 
 	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	/* check the channel avoidance list for beaconing entities */
 	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
