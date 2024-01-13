@@ -3104,6 +3104,8 @@ static bool is_sap_afc_dcs_skip_acs(struct sap_context *sap_ctx)
 }
 #endif
 
+#define AFC_DCS_WAIT_DELAY_MS 200
+
 qdf_freq_t sap_afc_dcs_sel_chan(struct sap_context *sap_ctx,
 				qdf_freq_t cur_freq,
 				enum phy_ch_width cur_bw,
@@ -3128,6 +3130,9 @@ qdf_freq_t sap_afc_dcs_sel_chan(struct sap_context *sap_ctx,
 	mac_ctx = MAC_CONTEXT(mac_handle);
 	if (!mac_ctx)
 		return SAP_CHANNEL_NOT_SELECTED;
+
+	qdf_sleep(AFC_DCS_WAIT_DELAY_MS);
+	sap_debug("wait afc update regulatory done");
 
 	/*
 	 * If AFC response received after SAP started, SP channels are
