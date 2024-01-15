@@ -394,7 +394,8 @@ void qca_sawf_peer_config_ul(struct net_device *netdev, uint8_t *mac_addr,
 
 static inline
 void qca_sawf_peer_dl_flow_count(struct net_device *netdev, uint8_t *mac_addr,
-				 uint8_t svc_id, uint8_t start_or_stop)
+				 uint8_t svc_id, uint8_t start_or_stop,
+				 uint16_t flow_count)
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct wlan_objmgr_psoc *psoc = NULL;
@@ -427,7 +428,7 @@ void qca_sawf_peer_dl_flow_count(struct net_device *netdev, uint8_t *mac_addr,
 
 	cdp_sawf_peer_flow_count(soc_txrx_handle, mac_addr,
 				 svc_id, direction, start_or_stop,
-				 peer_mac_addr, peer_id);
+				 peer_mac_addr, peer_id, flow_count);
 }
 
 
@@ -479,11 +480,11 @@ void qca_sawf_config_ul(struct net_device *dst_dev, struct net_device *src_dev,
 
 	if (wlan_service_id_valid(fw_service_id))
 		qca_sawf_peer_dl_flow_count(dst_dev, dst_mac, fw_service_id,
-								add_or_sub);
+								add_or_sub, 1);
 
 	if (wlan_service_id_valid(rv_service_id))
 		qca_sawf_peer_dl_flow_count(src_dev, src_mac, rv_service_id,
-								add_or_sub);
+								add_or_sub, 1);
 	if (fw_mark_metadata != DP_SAWF_META_DATA_INVALID &&
 	    add_or_sub == FLOW_STOP)
 		qca_sawf_3_link_peer_dl_flow_count(dst_dev, dst_mac,
@@ -507,6 +508,37 @@ void qca_sawf_mcast_connection_sync(qca_sawf_mcast_sync_param_t *params)
 {
 
 }
+
+#ifdef SAWF_ADMISSION_CONTROL
+bool qca_sawf_register_flow_deprioritize_callback(void (*sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *params))
+{
+	return wlan_sawf_set_flow_deprioritize_callback(sawf_flow_deprioritize_callback);
+}
+
+void qca_sawf_unregister_flow_deprioritize_callback(void)
+{
+	wlan_sawf_set_flow_deprioritize_callback(NULL);
+}
+
+void qca_sawf_flow_deprioritize_response(struct qca_sawf_flow_deprioritize_resp_params *params)
+{
+	if (wlan_service_id_valid(params->service_id))
+		qca_sawf_peer_dl_flow_count(params->netdev, params->mac_addr,
+					    params->service_id, FLOW_DEPRIORITIZE,
+					    params->success_count);
+}
+#else
+bool qca_sawf_register_flow_deprioritize_callback(void (*sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *params))
+{
+	return true;
+}
+
+void qca_sawf_unregister_flow_deprioritize_callback(void)
+{}
+
+void qca_sawf_flow_deprioritize_response(struct qca_sawf_flow_deprioritize_resp_params *params)
+{}
+#endif
 #else
 
 #include "qdf_module.h"
@@ -544,11 +576,24 @@ void qca_sawf_config_ul(struct net_device *dst_dev, struct net_device *src_dev,
 /* Forward declaration */
 struct qca_sawf_connection_sync_param;
 typedef struct qca_sawf_connection_sync_param qca_sawf_mcast_sync_param_t;
+struct qca_sawf_flow_deprioritize_params;
+struct qca_sawf_flow_deprioritize_resp_params;
 
 void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *params)
 {}
 
 void qca_sawf_mcast_connection_sync(qca_sawf_mcast_sync_param_t *params)
+{}
+
+bool qca_sawf_register_flow_deprioritize_callback(void (*sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *params))
+{
+	return true;
+}
+
+void qca_sawf_unregister_flow_deprioritize_callback(void)
+{}
+
+void qca_sawf_flow_deprioritize_response(struct qca_sawf_flow_deprioritize_resp_params *params)
 {}
 #endif
 
@@ -566,3 +611,6 @@ qdf_export_symbol(qca_sawf_get_msdu_queue);
 qdf_export_symbol(qca_sawf_config_ul);
 qdf_export_symbol(qca_sawf_connection_sync);
 qdf_export_symbol(qca_sawf_mcast_connection_sync);
+qdf_export_symbol(qca_sawf_register_flow_deprioritize_callback);
+qdf_export_symbol(qca_sawf_unregister_flow_deprioritize_callback);
+qdf_export_symbol(qca_sawf_flow_deprioritize_response);

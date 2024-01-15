@@ -86,6 +86,7 @@
 
 #define SAWF_FLOW_START 1
 #define SAWF_FLOW_STOP  2
+#define SAWF_FLOW_DEPRIORITIZE 3
 #define DP_RETRY_COUNT 7
 
 uint16_t dp_sawf_msduq_peer_id_set(uint16_t peer_id, uint8_t msduq)
@@ -646,7 +647,7 @@ QDF_STATUS
 dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 			uint8_t svc_id, uint8_t direction,
 			uint8_t start_or_stop, uint8_t *peer_mac,
-			uint16_t peer_id)
+			uint16_t peer_id, uint16_t flow_count)
 {
 	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_peer *peer, *mld_peer, *primary_link_peer;
@@ -712,18 +713,21 @@ dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 			 * Increment MSDUQ refcount and send add notification
 			 * when refcount is 1
 			 */
-			if (qdf_atomic_inc_return(&msduq->ref_count) == 1) {
+			qdf_atomic_add(flow_count, &msduq->ref_count);
+			if (qdf_atomic_read(&msduq->ref_count) == 1) {
 				dp_sawf_peer_msduq_event_notify(dpsoc, peer, q_idx,
 								svc_id,
 								SAWF_PEER_MSDUQ_ADD_EVENT);
 			}
-		} else if (start_or_stop == SAWF_FLOW_STOP) {
-			if (qdf_atomic_read(&msduq->ref_count)) {
+		} else if (start_or_stop == SAWF_FLOW_STOP ||
+			   start_or_stop == SAWF_FLOW_DEPRIORITIZE) {
+			if ((qdf_atomic_read(&msduq->ref_count) >= flow_count)) {
 				/*
 				 * Decrement MSDUQ refcount and send delete
 				 * notification when refcount becomes 0
 				 */
-				if (qdf_atomic_dec_and_test(&msduq->ref_count)) {
+				qdf_atomic_sub(flow_count, &msduq->ref_count);
+				if (!qdf_atomic_read(&msduq->ref_count)) {
 					    dp_sawf_peer_msduq_event_notify(dpsoc, peer,
 									    q_idx, svc_id,
 									    SAWF_PEER_MSDUQ_DELETE_EVENT);

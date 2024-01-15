@@ -1557,4 +1557,38 @@ error_cleanup:
 }
 
 qdf_export_symbol(wlan_sawf_send_peer_msduq_event_nl);
+
+#ifdef SAWF_ADMISSION_CONTROL
+bool wlan_sawf_set_flow_deprioritize_callback(void (*sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *params))
+{
+	struct sawf_ctx *sawf_ctx;
+
+	sawf_ctx = wlan_get_sawf_ctx();
+	if (!sawf_ctx) {
+		sawf_err("Invalid sawf ctx");
+		return false;
+	}
+
+	sawf_ctx->wlan_sawf_flow_deprioritize_callback = sawf_flow_deprioritize_callback;
+	return true;
+}
+
+qdf_export_symbol(wlan_sawf_set_flow_deprioritize_callback);
+
+void wlan_sawf_flow_deprioritize(struct qca_sawf_flow_deprioritize_params *deprio_params)
+{
+	struct sawf_ctx *sawf_ctx;
+
+	sawf_ctx = wlan_get_sawf_ctx();
+	if (!sawf_ctx) {
+		sawf_err("Invalid sawf ctx");
+		return;
+	}
+
+	if (sawf_ctx->wlan_sawf_flow_deprioritize_callback)
+		sawf_ctx->wlan_sawf_flow_deprioritize_callback(deprio_params);
+}
+
+qdf_export_symbol(wlan_sawf_flow_deprioritize);
+#endif
 #endif

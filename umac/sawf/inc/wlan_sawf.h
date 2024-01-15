@@ -283,14 +283,22 @@ enum telemetry_sawf_param {
 	SAWF_PARAM_MAX,
 };
 
+/* Forward declaration of structure */
+struct qca_sawf_flow_deprioritize_params;
+
 /**
  * struct sawf_ctx- SAWF context
  * @lock: Lock to add or delete entry from sawf params structure
  * @svc_classes: List of all service classes
+ * @wlan_sawf_flow_deprioritize_callback: function ptr to flow
+ *     deprioritization callback
  */
 struct sawf_ctx {
 	qdf_spinlock_t lock;
 	struct wlan_sawf_svc_class_params svc_classes[SAWF_SVC_CLASS_MAX];
+#ifdef SAWF_ADMISSION_CONTROL
+	void (*wlan_sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *);
+#endif
 };
 
 struct psoc_peer_iter {
@@ -728,6 +736,25 @@ void wlan_sawf_notify_breach(uint8_t *mac_addr,
 			     bool set_clear,
 			     uint8_t tid,
 			     uint8_t queue_id);
+
+#ifdef SAWF_ADMISSION_CONTROL
+/* wlan_sawf_set_flow_deprioritize_callback()- Set flow deprioritization
+ *    function callback
+ *
+ * @sawf_flow_deprioritize_callback: callback function address
+ *
+ * Return: bool
+ */
+bool wlan_sawf_set_flow_deprioritize_callback(void (*sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *params));
+
+/* wlan_sawf_flow_deprioritize() - Flow deprioritization call
+ *
+ * params: Structure filled with flow deprioritization parameters
+ *
+ * Return: None
+ */
+void wlan_sawf_flow_deprioritize(struct qca_sawf_flow_deprioritize_params *params);
+#endif
 #else
 static inline
 int wlan_sawf_get_tput_stats(void *soc, void *arg, uint64_t *in_bytes,

@@ -25,7 +25,9 @@
 #define QCA_SAWF_SVC_ID_INVALID 0xFF
 #define FLOW_START 1
 #define FLOW_STOP  2
+#define FLOW_DEPRIORITIZE  3
 #define QCA_SAWF_MCAST_IF_MAX 16
+#define MAC_ADDR_SIZE 6
 
 /* qca_sawf_metadata_param
  *
@@ -108,6 +110,42 @@ typedef struct qca_sawf_mcast_connection_sync_param {
 	uint16_t ip_version;
 } qca_sawf_mcast_sync_param_t;
 
+/*
+ * qca_sawf_flow_deprioritize_params
+ *
+ * @peer_mac: peer mac address
+ * @mark_metadata: mark metadata
+ * @netdev_info_valid: flag to indicate if netdev info is valid
+ * @netdev_ifindex: netdev interface index
+ * @netdev_mac: netdev mac address
+ */
+struct qca_sawf_flow_deprioritize_params {
+	uint8_t peer_mac[MAC_ADDR_SIZE];
+	uint32_t mark_metadata;
+	bool netdev_info_valid;
+	uint32_t netdev_ifindex;
+	uint8_t netdev_mac[MAC_ADDR_SIZE];
+};
+
+/*
+ * qca_sawf_flow_deprioritize_resp_params
+ *
+ * @netdev: netdev pointer
+ * @mac_addr: peer mac addr
+ * @service_id: service id
+ * @success_count: no. of flows successfully deprioritized
+ * @fail_count: no. of flows which failed to deprioritize
+ * @mark_metadata: mark metadata
+ */
+struct qca_sawf_flow_deprioritize_resp_params {
+	struct net_device *netdev;
+	uint8_t *mac_addr;
+	uint8_t service_id;
+	uint16_t success_count;
+	uint16_t fail_count;
+	uint32_t mark_metadata;
+};
+
 uint16_t qca_sawf_get_msduq(struct net_device *netdev,
 			    uint8_t *peer_mac, uint32_t service_id);
 uint16_t qca_sawf_get_msduq_v2(struct net_device *netdev, uint8_t *peer_mac,
@@ -158,4 +196,31 @@ void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *param);
  * Return: void
  */
 void qca_sawf_mcast_connection_sync(qca_sawf_mcast_sync_param_t *params);
+
+/*
+ * qca_sawf_register_flow_deprioritize_callback() - Flow deprioritization
+ * registration function
+ *
+ * sawf_flow_deprioritize_callback: callback function address
+ *
+ * Return: bool
+ */
+bool qca_sawf_register_flow_deprioritize_callback(void (*sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *params));
+
+/*
+ * qca_sawf_unregister_flow_deprioritize_callback() - Flow deprioritization
+ * unregistration function
+ *
+ * Return: None
+ */
+void qca_sawf_unregister_flow_deprioritize_callback(void);
+
+/*
+ * qca_sawf_flow_deprioritize_response() - Flow deprioritization response
+ * handler
+ *
+ * @params: flow deprioritization response params
+ * Return: None
+ */
+void qca_sawf_flow_deprioritize_response(struct qca_sawf_flow_deprioritize_resp_params *params);
 #endif
