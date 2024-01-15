@@ -102,6 +102,7 @@
 #include "wifi_pos_pasn_api.h"
 #ifdef DCS_INTERFERENCE_DETECTION
 #include <wlan_dcs_ucfg_api.h>
+#include <target_if_dcs.h>
 #endif
 
 #ifdef FEATURE_STA_MODE_VOTE_LINK
@@ -1175,7 +1176,7 @@ static void wma_dcs_clear_vdev_starting(struct mac_context *mac_ctx,
 }
 
 /**
- * wma_send_dcs_cmd_for_vdev() - Send DCS command
+ * wma_send_dcs_cmd() - Send DCS command
  * @psoc: pointer to psoc object
  * @mac_id: mac_id
  * @vdev_id: vdev_id
@@ -1187,8 +1188,12 @@ static void wma_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 			     uint32_t mac_id, uint8_t vdev_id)
 {
 	/* Send DCS command only for low latency sap*/
-	if (policy_mgr_is_vdev_ll_sap(psoc, vdev_id))
-		ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
+	if (policy_mgr_is_vdev_ll_sap(psoc, vdev_id)) {
+		if (target_if_vdev_level_dcs_is_supported(psoc))
+			ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
+		else
+			ucfg_wlan_dcs_cmd(psoc, mac_id, true);
+	}
 }
 #else
 static void wma_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
