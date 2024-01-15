@@ -6055,4 +6055,21 @@ QDF_STATUS policy_mgr_modify_pcl_for_vlp_channels(struct wlan_objmgr_psoc *psoc,
 						  struct wlan_objmgr_pdev *pdev,
 						  struct weighed_pcl *pcl,
 						  uint32_t num_pcl);
+
+#ifdef AUTO_PLATFORM
+/**
+ * policy_mgr_is_3vifs_mcc_to_scc_enabled() - Check if 3vifs mcc to scc is
+ * enabled.
+ * @psoc: psoc pointer
+ *
+ * Return: true/false.
+ */
+bool policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
 #endif /* __WLAN_POLICY_MGR_API_H */
