@@ -3739,6 +3739,7 @@ bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_two_connection_mode third_index = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool ret = false;
+	bool force_scc = policy_mgr_is_force_scc(psoc);
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3746,9 +3747,9 @@ bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 			return false;
 	}
 
-	if (pm_conc_connection_list[0].freq != ch_freq ||
+	if (!force_scc && (pm_conc_connection_list[0].freq != ch_freq ||
 	    pm_conc_connection_list[0].freq !=
-				pm_conc_connection_list[1].freq) {
+				pm_conc_connection_list[1].freq)) {
 		policy_mgr_debug("No MCC support in 3vif in same mac: %d %d %d",
 				 pm_conc_connection_list[0].freq,
 				 pm_conc_connection_list[1].freq,

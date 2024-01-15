@@ -2096,7 +2096,7 @@ policy_mgr_is_supported_hw_mode(struct wlan_objmgr_psoc *psoc,
 static bool
 policy_mgr_mac_freq_list_allow(uint8_t mac_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS],
 			       uint8_t mac_mode_list[MAX_NUMBER_OF_CONC_CONNECTIONS],
-			       uint8_t mac_freq_num)
+			       uint8_t mac_freq_num, bool force_scc)
 {
 	uint8_t sta = 0, ap = 0, i;
 
@@ -2109,8 +2109,8 @@ policy_mgr_mac_freq_list_allow(uint8_t mac_freq_list[MAX_NUMBER_OF_CONC_CONNECTI
 		 * 3 vifs are in SCC and 3 vifs are :
 		 * 1 STA + 2 APs, or 3 APs
 		 */
-		if (mac_freq_list[0] != mac_freq_list[1] ||
-		    mac_freq_list[0] != mac_freq_list[2])
+		if (!force_scc && (mac_freq_list[0] != mac_freq_list[1] ||
+		    mac_freq_list[0] != mac_freq_list[2]))
 			return false;
 		for (i = 0; i < mac_freq_num; i++) {
 			if (mac_mode_list[i] == PM_STA_MODE ||
@@ -2197,6 +2197,7 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t ml_sta_link1_freq = 0;
 	uint8_t i, j;
 	struct policy_mgr_freq_range *freq_range;
+	bool force_scc = policy_mgr_is_force_scc(psoc);
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2248,7 +2249,7 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 			 * MAC.
 			 */
 			if (!policy_mgr_mac_freq_list_allow(
-				mac_freq_list, mac_mode_list, mac_freq_num))
+				mac_freq_list, mac_mode_list, mac_freq_num, force_scc))
 				break;
 		}
 
@@ -6842,7 +6843,13 @@ policy_mgr_allow_concurrency_csa(struct wlan_objmgr_psoc *psoc,
 	bool allow = false;
 	struct policy_mgr_conc_connection_info
 			info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct policy_mgr_conc_connection_info
+			info_sap[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct policy_mgr_conc_connection_info
+			info_go[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t num_cxn_del = 0;
+	uint8_t num_cxn_del_sap = 0;
+	uint8_t num_cxn_del_go = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t old_ch_freq, conc_ext_flags;
 	QDF_STATUS status;
@@ -6892,6 +6899,13 @@ policy_mgr_allow_concurrency_csa(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_store_and_del_conn_info_by_vdev_id(
 			psoc, vdev_id, info, &num_cxn_del);
 
+	if (reason == CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL) {
+		policy_mgr_store_and_del_conn_info_by_chan_and_mode(
+			psoc, old_ch_freq, PM_SAP_MODE, info_sap, &num_cxn_del_sap);
+		policy_mgr_store_and_del_conn_info_by_chan_and_mode(
+			psoc, old_ch_freq, PM_P2P_GO_MODE, info_go, &num_cxn_del_go);
+	}
+
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_POLICY_MGR_ID);
 	conc_ext_flags = policy_mgr_get_conc_ext_flags(vdev, false);
@@ -6903,6 +6917,11 @@ policy_mgr_allow_concurrency_csa(struct wlan_objmgr_psoc *psoc,
 	/* Restore the connection entry */
 	if (num_cxn_del > 0)
 		policy_mgr_restore_deleted_conn_info(psoc, info, num_cxn_del);
+	if (num_cxn_del_sap > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, info_sap, num_cxn_del_sap);
+	if (num_cxn_del_go > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, info_go, num_cxn_del_go);
+
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	if (!allow)
