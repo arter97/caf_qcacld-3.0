@@ -44,16 +44,16 @@
 #include <qdf_trace.h>
 #include <qdf_net_stats.h>
 
-uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *intf_ctx)
+uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *link_ctx)
 {
-	struct wlan_dp_intf *dp_intf = (struct wlan_dp_intf *)intf_ctx;
+	struct wlan_dp_link *dp_link = (struct wlan_dp_link *)link_ctx;
 
-	if (!dp_intf) {
-		dp_err("DP Context is NULL");
+	if (qdf_unlikely(!dp_link)) {
+		dp_err_rl("DP Link is NULL");
 		return 0;
 	}
 
-	return dp_intf->pkt_type_bitmap;
+	return dp_link->dp_intf->pkt_type_bitmap;
 }
 
 #if defined(WLAN_SUPPORT_RX_FISA)
@@ -685,7 +685,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 
 	/* check whether need to linearize nbuf, like non-linear udp data */
 	if (dp_nbuf_nontso_linearize(nbuf) != QDF_STATUS_SUCCESS) {
-		dp_err(" nbuf %pK linearize failed. drop the pkt", nbuf);
+		dp_err_rl(" nbuf %pK linearize failed. drop the pkt", nbuf);
 		goto drop_pkt_and_release_nbuf;
 	}
 
@@ -693,7 +693,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 	 * If a transmit function is not registered, drop packet
 	 */
 	if (!dp_intf->txrx_ops.tx.tx) {
-		dp_err("TX function not registered by the data path");
+		dp_err_rl("TX function not registered by the data path");
 		goto drop_pkt_and_release_nbuf;
 	}
 
@@ -849,14 +849,14 @@ QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 
 	/* Sanity check on inputs */
 	if ((!context) || (!rxbuf)) {
-		dp_err("Null params being passed");
+		dp_err_rl("Null params being passed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	dp_link = (struct wlan_dp_link *)context;
 	dp_intf = dp_link->dp_intf;
 	if (!dp_intf) {
-		dp_err("dp_intf is NULL for dp_link %pK", dp_link);
+		dp_err_rl("dp_intf is NULL for dp_link %pK", dp_link);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1375,7 +1375,7 @@ QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 	qdf_nbuf_t head_ptr;
 
 	if (qdf_unlikely(!link_ctx || !nbuf_list)) {
-		dp_err("Null params being passed");
+		dp_err_rl("Null params being passed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1661,7 +1661,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 
 	/* Sanity check on inputs */
 	if (qdf_unlikely((!dp_link_context) || (!rxBuf))) {
-		dp_err("Null params being passed");
+		dp_err_rl("Null params being passed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
