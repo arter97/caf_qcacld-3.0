@@ -2823,12 +2823,6 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 		return -EINVAL;
 	}
 
-	if ((user_cmd->obj != STATS_OBJ_STA) &&
-	    (user_cmd->peer_type != STATS_WILD_PEER_TYPE)) {
-		STATS_ERR("invalid l flag usage!\n");
-		return -EINVAL;
-	}
-
 	if ((user_cmd->obj == STATS_OBJ_STA) &&
 	    !root_obj->is_mlo && (user_cmd->peer_type != STATS_WILD_PEER_TYPE)) {
 		STATS_ERR("invalid l flag usage!\n");

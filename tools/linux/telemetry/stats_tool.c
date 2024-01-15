@@ -4299,6 +4299,12 @@ int main(int argc, char *argv[])
 		STATS_WARN("No valid option selected\n"
 			   "Will display only default stats\n");
 
+	if ((obj_temp != STATS_OBJ_STA) &&
+	    (peer_type != STATS_WILD_PEER_TYPE)) {
+		STATS_ERR("invalid l flag usage!\n");
+		return -EINVAL;
+	}
+
 	if (feat_flags[0])
 		feat_temp = libstats_get_feature_flag(feat_flags);
 	if (!feat_temp)
