@@ -2398,6 +2398,17 @@ bool policy_mgr_is_any_mode_active_on_band_along_with_session(
 		enum policy_mgr_band band);
 
 /**
+ * policy_mgr_get_bw_by_session_id() - Get channel width for a given session ID
+ * @psoc: PSOC object information
+ * @session_id: Session ID
+ *
+ * Return: channel width of the session
+ */
+enum phy_ch_width
+policy_mgr_get_bw_by_session_id(struct wlan_objmgr_psoc *psoc,
+				uint8_t session_id);
+
+/**
  * policy_mgr_get_chan_by_session_id() - Get channel for a given session ID
  * @psoc: PSOC object information
  * @session_id: Session ID
@@ -2623,6 +2634,16 @@ void policy_mgr_checkn_update_hw_mode_single_mac_mode(
  * Return: None
  */
 void policy_mgr_dump_connection_status_info(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_mode_get_macid_by_vdev_id() - get macid from vdev_id
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id to get PCL
+ *
+ * Return: mac id
+ */
+uint32_t policy_mgr_mode_get_macid_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					      uint32_t vdev_id);
 
 /**
  * policy_mgr_mode_specific_vdev_id() - provides the
@@ -4688,4 +4709,44 @@ qdf_freq_t policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
 					    qdf_freq_t freq,
 					    enum policy_mgr_con_mode mode);
+
+/**
+ * policy_mgr_update_indoor_concurrency() - Function to update the indoor
+ * concurrency related regulatory changes
+ *
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id
+ * @discon_freq: disconnect frequency
+ * @type: enum indoor_conc_update_type
+ *
+ * Return: None
+ */
+void
+policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id,
+				     uint32_t discon_freq,
+				     enum indoor_conc_update_type type);
+/**
+ * policy_mgr_is_conc_sap_present_on_sta_freq() - Function to check if
+ * SAP or GO exists on the STA frequency
+ *
+ * @psoc: pointer to psoc
+ * @mode: interface mode
+ * @ch_freq: channel frequency
+ *
+ * Return: AP mode exists
+ */
+bool
+policy_mgr_is_conc_sap_present_on_sta_freq(struct wlan_objmgr_psoc *psoc,
+					   enum policy_mgr_con_mode mode,
+					   uint32_t ch_freq);
+
+/**
+ * policy_mgr_get_connection_count_with_ch_freq() - Get number of active
+ * connections on the channel frequecy
+ * @ch_freq: channel frequency
+ *
+ * Return: number of active connection on the specific frequency
+ */
+uint32_t policy_mgr_get_connection_count_with_ch_freq(uint32_t ch_freq);
 #endif /* __WLAN_POLICY_MGR_API_H */

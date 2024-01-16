@@ -715,6 +715,7 @@ QDF_STATUS wma_sr_update(tp_wma_handle wma, uint8_t vdev_id, bool enable)
 	struct wlan_objmgr_vdev *vdev, *conc_vdev;
 	uint8_t sr_ctrl;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wma_txrx_node *wma_conn_table_entry;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,
 						    WLAN_LEGACY_WMA_ID);
@@ -722,9 +723,18 @@ QDF_STATUS wma_sr_update(tp_wma_handle wma, uint8_t vdev_id, bool enable)
 		wma_err("Can't get vdev by vdev_id:%d", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
-	policy_mgr_get_mac_id_by_session_id(wma->psoc, vdev_id, &mac_id);
+	wma_conn_table_entry = wma_get_interface_by_vdev_id(vdev_id);
+	if (!wma_conn_table_entry) {
+		wma_err("can't find vdev_id %d in WMA table", vdev_id);
+		status = QDF_STATUS_E_FAILURE;
+		goto release_ref;
+	}
+
+	mac_id = wma_conn_table_entry->mac_id;
 	conc_vdev_id = policy_mgr_get_conc_vdev_on_same_mac(wma->psoc, vdev_id,
 							    mac_id);
+	wma_debug("vdev_id %d conc_vdev_id: %d: mac_id: %d", vdev_id,
+		  conc_vdev_id, mac_id);
 	if (conc_vdev_id != WLAN_INVALID_VDEV_ID &&
 	    !policy_mgr_sr_same_mac_conc_enabled(wma->psoc)) {
 		/*

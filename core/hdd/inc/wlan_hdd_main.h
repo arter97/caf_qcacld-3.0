@@ -1031,6 +1031,7 @@ struct wlm_multi_client_info_table {
  * @set_mac_addr_req_ctx: Set MAC address command request context
  * @delta_qtime: delta between host qtime and monotonic time
  * @traffic_end_ind_en: traffic end indication feature enable/disable
+ * @tx_pwr: connection tx power sent by firmware
  */
 struct hdd_adapter {
 	/* Magic cookie for adapter sanity verification.  Note that this
@@ -1326,6 +1327,7 @@ struct hdd_adapter {
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	bool is_dbam_configured;
 #endif
+	int tx_pwr;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
@@ -1717,6 +1719,7 @@ enum wlan_state_ctrl_str_id {
  * @hdd_dual_sta_policy: Concurrent STA policy configuration
  * @is_wlan_disabled: if wlan is disabled by userspace
  * @pm_notifier: PM notifier of hdd modules
+ * @nl_reg_pid: hdd_init_netlink_services process id
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2046,6 +2049,10 @@ struct hdd_context {
 	uint8_t file_name[HDD_MAX_FILE_NAME_LEN];
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	enum coex_dbam_config_mode dbam_mode;
+#endif
+
+#ifdef CNSS_GENL
+	int nl_reg_pid;
 #endif
 };
 
@@ -3503,6 +3510,12 @@ static inline int wlan_hdd_nl_init(struct hdd_context *hdd_ctx)
 	int proto;
 
 	proto = wlan_hdd_get_host_log_nl_proto(hdd_ctx);
+	hdd_ctx->radio_index = pld_get_pci_slot(hdd_ctx->parent_dev);
+	if (hdd_ctx->radio_index < 0) {
+		hdd_debug("Invalid radio index %d, force to 0",
+			  hdd_ctx->radio_index);
+		hdd_ctx->radio_index = 0;
+	}
 	return nl_srv_init(hdd_ctx->wiphy, proto);
 }
 #endif

@@ -430,6 +430,46 @@ static struct ieee80211_supported_band wlan_hdd_band_5_ghz = {
 	.vht_cap.vht_supported = 1,
 };
 
+enum hdd_hw_rate_cck {
+	HDD_HW_RATE_CCK_LP_11M = 0,
+	HDD_HW_RATE_CCK_LP_5_5M,
+	HDD_HW_RATE_CCK_LP_2M,
+	HDD_HW_RATE_CCK_LP_1M,
+	HDD_HW_RATE_CCK_SP_11M,
+	HDD_HW_RATE_CCK_SP_5_5M,
+	HDD_HW_RATE_CCK_SP_2M,
+};
+
+enum hdd_hw_rate_ofdm {
+	HDD_HW_RATE_OFDM_48M = 0,
+	HDD_HW_RATE_OFDM_24M,
+	HDD_HW_RATE_OFDM_12M,
+	HDD_HW_RATE_OFDM_6M,
+	HDD_HW_RATE_OFDM_54M,
+	HDD_HW_RATE_OFDM_36M,
+	HDD_HW_RATE_OFDM_18M,
+	HDD_HW_RATE_OFDM_9M,
+};
+
+static struct ieee80211_rate hdd_legacy_rates[] = {
+	{ .bitrate = 10,
+	  .hw_value = HDD_HW_RATE_CCK_LP_1M },
+	{ .bitrate = 20,
+	  .hw_value = HDD_HW_RATE_CCK_LP_2M },
+	{ .bitrate = 55,
+	  .hw_value = HDD_HW_RATE_CCK_LP_5_5M },
+	{ .bitrate = 110,
+	  .hw_value = HDD_HW_RATE_CCK_LP_11M },
+	{ .bitrate = 60, .hw_value = HDD_HW_RATE_OFDM_6M },
+	{ .bitrate = 90, .hw_value = HDD_HW_RATE_OFDM_9M },
+	{ .bitrate = 120, .hw_value = HDD_HW_RATE_OFDM_12M },
+	{ .bitrate = 180, .hw_value = HDD_HW_RATE_OFDM_18M },
+	{ .bitrate = 240, .hw_value = HDD_HW_RATE_OFDM_24M },
+	{ .bitrate = 360, .hw_value = HDD_HW_RATE_OFDM_36M },
+	{ .bitrate = 480, .hw_value = HDD_HW_RATE_OFDM_48M },
+	{ .bitrate = 540, .hw_value = HDD_HW_RATE_OFDM_54M },
+};
+
 #if defined(CONFIG_BAND_6GHZ) && (defined(CFG80211_6GHZ_BAND_SUPPORTED) || \
 	(KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE))
 
@@ -12128,7 +12168,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 					status);
 		} else {
 			hdd_update_channel_width(
-					adapter, eHT_CHANNEL_WIDTH_80MHZ,
+					adapter, eHT_CHANNEL_WIDTH_160MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE);
 			hdd_set_tx_stbc(adapter, 1);
 			hdd_set_11ax_rate(adapter, 0xFFFF, NULL);
@@ -18611,7 +18651,8 @@ static QDF_STATUS
 wlan_hdd_iftype_data_alloc_6ghz(struct hdd_context *hdd_ctx)
 {
 	hdd_ctx->iftype_data_6g =
-			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_6g));
+			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_6g) *
+				       EHT_OPMODE_SUPPORTED);
 
 	if (!hdd_ctx->iftype_data_6g)
 		return QDF_STATUS_E_NOMEM;
@@ -18642,13 +18683,15 @@ static QDF_STATUS
 wlan_hdd_iftype_data_alloc(struct hdd_context *hdd_ctx)
 {
 	hdd_ctx->iftype_data_2g =
-			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_2g));
+			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_2g) *
+				       EHT_OPMODE_SUPPORTED);
 
 	if (!hdd_ctx->iftype_data_2g)
 		return QDF_STATUS_E_NOMEM;
 
 	hdd_ctx->iftype_data_5g =
-			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_5g));
+			qdf_mem_malloc(sizeof(*hdd_ctx->iftype_data_5g) *
+				       EHT_OPMODE_SUPPORTED);
 	if (!hdd_ctx->iftype_data_5g) {
 		qdf_mem_free(hdd_ctx->iftype_data_2g);
 		hdd_ctx->iftype_data_2g = NULL;
@@ -24835,6 +24878,55 @@ static int wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+static int
+hdd_check_he_bitmask_for_single_rate(enum nl80211_band band,
+				     const struct cfg80211_bitrate_mask *mask)
+{
+	int he_rates = 0, i;
+
+	for (i = 0; i < QDF_ARRAY_SIZE(mask->control[band].he_mcs); i++)
+		he_rates += qdf_get_hweight16(mask->control[band].he_mcs[i]);
+
+	return he_rates;
+}
+
+static void
+hdd_get_he_bitrate_params_for_band(enum nl80211_band band,
+				   const struct cfg80211_bitrate_mask *mask,
+				   uint8_t *nss, uint8_t *rate_index,
+				   int *bit_rate)
+{
+	int i;
+
+	for (i = 0; i < QDF_ARRAY_SIZE(mask->control[band].he_mcs); i++) {
+		if (qdf_get_hweight16(mask->control[band].he_mcs[i]) == 1) {
+			*nss = i;
+			*rate_index = (ffs(mask->control[band].he_mcs[i]) - 1);
+			*bit_rate = hdd_assemble_rate_code(WMI_RATE_PREAMBLE_HE,
+							   *nss, *rate_index);
+			break;
+		}
+	}
+}
+#else
+static inline int
+hdd_check_he_bitmask_for_single_rate(enum nl80211_band band,
+				     const struct cfg80211_bitrate_mask *mask)
+{
+	return 0;
+}
+
+static inline void
+hdd_get_he_bitrate_params_for_band(enum nl80211_band band,
+				   const struct cfg80211_bitrate_mask *mask,
+				   uint8_t *nss, uint8_t *rate_index,
+				   int *bit_rate)
+
+{
+}
+#endif
+
 static bool hdd_check_bitmask_for_single_rate(enum nl80211_band band,
 				const struct cfg80211_bitrate_mask *mask)
 {
@@ -24847,6 +24939,8 @@ static bool hdd_check_bitmask_for_single_rate(enum nl80211_band band,
 
 	for (i = 0; i < QDF_ARRAY_SIZE(mask->control[band].vht_mcs); i++)
 		num_rates += qdf_get_hweight16(mask->control[band].vht_mcs[i]);
+
+	num_rates += hdd_check_he_bitmask_for_single_rate(band, mask);
 
 	return num_rates ? true : false;
 }
@@ -24894,7 +24988,7 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 			continue;
 		}
 
-		if (!hweight32(mask->control[band].legacy)) {
+		if (!qdf_get_hweight32(mask->control[band].legacy)) {
 			hdd_err("Legacy bit rate setting not supported for band %u",
 				band);
 			errno = -EINVAL;
@@ -24925,9 +25019,27 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 				bit_rate = hdd_assemble_rate_code(
 						WMI_RATE_PREAMBLE_VHT,
 						nss, rate_index);
-				break;
+				goto configure_fw;
 			}
 		}
+
+		if (qdf_get_hweight32(mask->control[band].legacy) == 1) {
+			rate_index = (ffs(mask->control[band].legacy) - 1);
+			nss = 0;
+			if (band == NL80211_BAND_5GHZ)
+				rate_index += 4;
+			if (rate_index >= 0 && rate_index < 4)
+				bit_rate = hdd_assemble_rate_code(
+					WMI_RATE_PREAMBLE_CCK, nss,
+					hdd_legacy_rates[rate_index].hw_value);
+			else if (rate_index >= 4 && rate_index < 12)
+				bit_rate = hdd_assemble_rate_code(
+					WMI_RATE_PREAMBLE_OFDM, nss,
+					hdd_legacy_rates[rate_index].hw_value);
+		}
+
+		hdd_get_he_bitrate_params_for_band(band, mask, &nss,
+						   &rate_index, &bit_rate);
 
 configure_fw:
 		if (bit_rate != -1) {

@@ -2535,10 +2535,24 @@ void wlan_cm_append_assoc_ies(struct wlan_roam_scan_offload_params *rso_mode_cfg
 		return;
 	}
 
-	rso_mode_cfg->assoc_ie[curr_length] = ie_id;
-	rso_mode_cfg->assoc_ie[curr_length + 1] = ie_len;
-	qdf_mem_copy(&rso_mode_cfg->assoc_ie[curr_length + 2], ie_data, ie_len);
-	rso_mode_cfg->assoc_ie_length += (ie_len + 2);
+	if ((MAX_ASSOC_IE_LENGTH -2) < curr_length) {
+		mlme_err("idx will be out of rang for id and ie_len");
+		return;
+	}
+
+	rso_mode_cfg->assoc_ie[curr_length++] = ie_id;
+	rso_mode_cfg->assoc_ie[curr_length++] = ie_len;
+
+	if (ie_len == 0) {
+		rso_mode_cfg->assoc_ie_length += 2;
+		return;
+	}
+
+	if (curr_length < (MAX_ASSOC_IE_LENGTH -1) &&
+	    (MAX_ASSOC_IE_LENGTH - curr_length -1) >= ie_len) {
+		qdf_mem_copy(&rso_mode_cfg->assoc_ie[curr_length], ie_data, ie_len);
+		rso_mode_cfg->assoc_ie_length += (ie_len + 2);
+	}
 }
 
 void wlan_add_supported_5Ghz_channels(struct wlan_objmgr_psoc *psoc,
@@ -2551,6 +2565,7 @@ void wlan_add_supported_5Ghz_channels(struct wlan_objmgr_psoc *psoc,
 	uint32_t size = 0;
 	uint32_t *freq_list;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	*num_chnl = 0;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -2558,7 +2573,6 @@ void wlan_add_supported_5Ghz_channels(struct wlan_objmgr_psoc *psoc,
 
 	if (!chan_list) {
 		mlme_err("chan_list buffer NULL");
-		*num_chnl = 0;
 		return;
 	}
 	size = mlme_obj->cfg.reg.valid_channel_list_num;
@@ -5744,6 +5758,10 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 		status = mlme_get_fw_scan_channels(psoc, chan_freq, &num_chan);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto out;
+		if (num_chan > NUM_CHANNELS) {
+			mlme_err("unexpected num chan %d", num_chan);
+			goto out;
+		}
 
 		status = wlan_mlme_get_band_capability(psoc, &band_capability);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -5753,8 +5771,7 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 			policy_mgr_get_connected_roaming_vdev_band_mask(psoc,
 									vdev_id);
 
-		if (num_chan > WLAN_MAX_LOGGING_FREQ)
-			num_chan = WLAN_MAX_LOGGING_FREQ;
+		num_chan = QDF_MIN(WLAN_MAX_LOGGING_FREQ, NUM_CHANNELS);
 
 		for (i = 0; i < num_chan; i++) {
 			if (!wlan_is_valid_frequency(chan_freq[i],

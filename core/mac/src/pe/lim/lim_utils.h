@@ -1094,6 +1094,18 @@ void lim_strip_eht_ies_from_add_ies(struct mac_context *mac_ctx,
 				    struct pe_session *session);
 
 /**
+ * lim_strip_wapi_ies_from_add_ies() - This function strip WAPI IE from add_ie
+ * @mac_ctx: pointer to mac context
+ * @pe_session: pointer to PE session
+ *
+ * This API is to strip WAPI IE from add_ie
+ *
+ * Return: none
+ */
+void lim_strip_wapi_ies_from_add_ies(struct mac_context *mac_ctx,
+				     struct pe_session *session);
+
+/**
  * lim_del_pmf_sa_query_timer() - This function deletes SA query timer
  * @mac_ctx: pointer to mac context
  * @pe_session: pointer to PE session
@@ -1768,6 +1780,9 @@ lim_update_he_6ghz_band_caps(struct mac_context *mac,
 #ifdef WLAN_FEATURE_11BE
 static inline bool lim_is_session_eht_capable(struct pe_session *session)
 {
+	if (!session)
+		return false;
+
 	return session->eht_capable;
 }
 

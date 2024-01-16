@@ -3110,6 +3110,16 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t nss);
 
+/**
+ * sme_update_eht_cap_mcs() - updates EHT MCS capability based on user request
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: SME session id
+ * @mcs: MCS value
+ *
+ * Return: None
+ */
+void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t session_id,
+			    uint8_t mcs);
 #else
 static inline void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 					  struct wma_tgt_cfg *cfg,
@@ -3119,6 +3129,11 @@ static inline void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 static inline void sme_update_eht_cap_nss(mac_handle_t mac_handle,
 					  uint8_t session_id,
 					  uint8_t nss)
+{}
+
+static inline void sme_update_eht_cap_mcs(mac_handle_t mac_handle,
+					  uint8_t session_id,
+					  uint8_t mcs)
 {}
 #endif
 
@@ -3662,6 +3677,17 @@ static inline void sme_set_ru_242_tone_tx_cfg(mac_handle_t mac_handle,
 }
 #endif
 
+/**
+ * sme_set_nss_capability() - sets HE, EHT NSS capability based on user request
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @nss: Number of spatial streams value
+ * @op_mode: Operation mode of the vdev
+ *
+ * Return: None
+ */
+void sme_set_nss_capability(mac_handle_t mac_handle, uint8_t vdev_id,
+			    uint8_t nss, enum QDF_OPMODE op_mode);
 #ifdef WLAN_FEATURE_11BE
 
 /**
