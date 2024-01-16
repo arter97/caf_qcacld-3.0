@@ -1131,7 +1131,7 @@ static QDF_STATUS pe_drop_pending_rx_mgmt_frames(struct mac_context *mac_ctx,
 		if (!(mac_ctx->rx_packet_drop_counter % 100))
 			pe_debug("No.of pending RX management frames reaches to 1/4th of threshold, rx_packet_drop_counter: %d",
 				mac_ctx->rx_packet_drop_counter);
-			mac_ctx->rx_packet_drop_counter++;
+		mac_ctx->rx_packet_drop_counter++;
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -4549,7 +4549,7 @@ void lim_update_vdev_sr_elements(struct pe_session *session_entry,
 				   srp_ie->srg_info.info.srg_color);
 	lim_store_array_to_bit_map(&srg_partial_bssid_bit_map,
 				   srp_ie->srg_info.info.srg_partial_bssid);
-	pe_debug("Spatial Reuse Control field: %x Non-SRG Max PD Offset: %x SRG range %d - %d srg_color_bit_map:%lu srg_partial_bssid_bit_map: %lu",
+	pe_debug("Spatial Reuse Control field: %x Non-SRG Max PD Offset: %x SRG range %d - %d srg_color_bit_map:%llu srg_partial_bssid_bit_map: %llu",
 		 sr_ctrl, non_srg_max_pd_offset, srg_min_pd_offset,
 		 srg_max_pd_offset, srg_color_bit_map,
 		 srg_partial_bssid_bit_map);
