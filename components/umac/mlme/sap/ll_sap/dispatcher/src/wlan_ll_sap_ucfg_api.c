@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -84,3 +84,21 @@ QDF_STATUS ucfg_ll_sap_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
 	return ll_sap_psoc_disable(psoc);
 }
+
+void ucfg_ll_lt_sap_switch_bearer_for_p2p_go_start(struct wlan_objmgr_psoc *psoc,
+						   uint8_t vdev_id,
+						   qdf_freq_t oper_freq,
+						   enum QDF_OPMODE device_mode)
+{
+	ll_lt_sap_switch_bearer_for_p2p_go_start(psoc, vdev_id, oper_freq,
+						 device_mode);
+}
+
+void ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						enum QDF_OPMODE device_mode)
+{
+	ll_lt_sap_switch_bearer_on_p2p_go_complete(psoc, vdev_id, device_mode);
+}
+

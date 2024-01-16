@@ -122,6 +122,7 @@
 #include "wlan_vdev_mgr_ucfg_api.h"
 #include <wlan_psoc_mlme_ucfg_api.h>
 #include "wlan_ll_sap_api.h"
+#include "wlan_ll_sap_ucfg_api.h"
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -8269,12 +8270,23 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		/* Enable/disable non-srg obss pd spatial reuse */
 		hdd_update_he_obss_pd(link_info, params);
 
+		ucfg_ll_lt_sap_switch_bearer_for_p2p_go_start(
+					hdd_ctx->psoc,
+					adapter->deflink->vdev_id,
+					params->chandef.chan->center_freq,
+					adapter->device_mode);
+
 		hdd_place_marker(adapter, "TRY TO START", NULL);
+
 		status = wlan_hdd_cfg80211_start_bss(link_info, &params->beacon,
 						     params->ssid,
 						     params->ssid_len,
 						     params->hidden_ssid, true);
 
+		ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete(
+						hdd_ctx->psoc,
+						adapter->deflink->vdev_id,
+						adapter->device_mode);
 		if (status != 0) {
 			hdd_err("Error Start bss Failed");
 			goto err_start_bss;

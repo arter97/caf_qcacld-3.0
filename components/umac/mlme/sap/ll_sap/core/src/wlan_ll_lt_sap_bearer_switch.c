@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1646,6 +1646,28 @@ static const char *bs_sm_event_names[] = {
 };
 
 /**
+ * bs_events_init() - Initialize events related to Bearer switch
+ * @bs_ctx: Bearer switch context
+ *
+ * Return: None
+ */
+static void bs_events_init(struct bearer_switch_info *bs_ctx)
+{
+	qdf_event_create(&bs_ctx->p2p_go_bs_copletion_event);
+}
+
+/**
+ * bs_events_deinit () - De-Initialize events related to Bearer switch
+ * @bs_ctx: Bearer switch context
+ *
+ * Return: None
+ */
+static void bs_events_deinit(struct bearer_switch_info *bs_ctx)
+{
+	qdf_event_destroy(&bs_ctx->p2p_go_bs_copletion_event);
+}
+
+/**
  * bs_timers_init() - Initialize Bearer switch request timers
  * @bs_ctx: Bearer switch context
  *
@@ -1705,13 +1727,16 @@ QDF_STATUS bs_sm_create(struct bearer_switch_info *bs_ctx)
 
 	bs_timers_init(bs_ctx);
 
+	bs_events_init(bs_ctx);
+
 	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS bs_sm_destroy(struct bearer_switch_info *bs_ctx)
 {
-	bs_lock_destroy(bs_ctx);
+	bs_events_deinit(bs_ctx);
 	bs_timers_deinit(bs_ctx);
+	bs_lock_destroy(bs_ctx);
 	wlan_sm_delete(bs_ctx->sm.sm_hdl);
 
 	return QDF_STATUS_SUCCESS;
@@ -2027,4 +2052,132 @@ ll_lt_sap_deliver_audio_transport_switch_resp(
 	else
 		ll_sap_err("Vdev %d Invalid req_type %d ",
 			   wlan_vdev_get_id(vdev), req_type);
+}
+
+static void p2p_go_start_bearer_switch_requester_cb(struct wlan_objmgr_psoc *psoc,
+						    uint8_t vdev_id,
+						    wlan_bs_req_id request_id,
+						    QDF_STATUS status,
+						    uint32_t req_value,
+						    void *request_params)
+{
+	struct bearer_switch_info *bearer_switch_ctx = request_params;
+
+	qdf_event_set(&bearer_switch_ctx->p2p_go_bs_copletion_event);
+}
+
+void ll_lt_sap_switch_bearer_for_p2p_go_start(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      qdf_freq_t oper_freq,
+					      enum QDF_OPMODE device_mode)
+{
+	struct wlan_bearer_switch_request bs_request = {0};
+	qdf_freq_t ll_lt_sap_freq = 0;
+	QDF_STATUS status;
+	struct bearer_switch_info *bearer_switch_ctx;
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+	uint8_t ll_lt_sap_vdev_id;
+	struct wlan_objmgr_vdev *ll_lt_sap_vdev;
+
+	if (device_mode != QDF_P2P_GO_MODE)
+		return;
+
+	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
+	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID)
+		return;
+
+	ll_lt_sap_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							      ll_lt_sap_vdev_id,
+							      WLAN_LL_SAP_ID);
+	if (!ll_lt_sap_vdev)
+		return;
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(ll_lt_sap_vdev);
+
+	if (!ll_sap_obj) {
+		ll_sap_err("BS_SM vdev %d ll_sap obj null", ll_lt_sap_vdev_id);
+		goto rel_ref;
+	}
+
+	bearer_switch_ctx = ll_sap_obj->bearer_switch_ctx;
+
+	if (!bearer_switch_ctx)
+		goto rel_ref;
+
+	ll_lt_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
+
+	if (!ll_lt_sap_freq)
+		goto rel_ref;
+
+	/*If P2P_GO is not coming in MCC, then do not do the bearer switch */
+	if (!policy_mgr_2_freq_always_on_same_mac(psoc, oper_freq,
+						  ll_lt_sap_freq))
+		goto rel_ref;
+
+	ll_sap_debug("P2P GO freq %d on same mac with ll_lt sap %d", oper_freq,
+		     ll_lt_sap_freq);
+
+	bs_request.vdev_id = vdev_id;
+	bs_request.request_id = ll_lt_sap_bearer_switch_get_id(psoc);
+	bs_request.req_type = WLAN_BS_REQ_TO_NON_WLAN;
+	bs_request.source = BEARER_SWITCH_REQ_P2P_GO;
+	bs_request.requester_cb = p2p_go_start_bearer_switch_requester_cb;
+	bs_request.arg = bearer_switch_ctx;
+
+	status = ll_lt_sap_switch_bearer_to_ble(psoc, &bs_request);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ll_sap_err("bearer switch to non-wlan failed for vdev %d",
+			   vdev_id);
+		goto rel_ref;
+	}
+
+	/*
+	 * Wait for bearer switch completion here as start bss should complete
+	 * in the same context
+	 */
+	qdf_event_reset(&bearer_switch_ctx->p2p_go_bs_copletion_event);
+	status = qdf_wait_for_event_completion(
+				&bearer_switch_ctx->p2p_go_bs_copletion_event,
+				BEARER_SWITCH_TIMEOUT);
+	if (QDF_IS_STATUS_ERROR(status))
+		ll_sap_err("bearer switch to non-wlan failed for vdev %d",
+			   vdev_id);
+rel_ref:
+	wlan_objmgr_vdev_release_ref(ll_lt_sap_vdev, WLAN_LL_SAP_ID);
+}
+
+static void p2p_go_complete_bearer_switch_requester_cb(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						wlan_bs_req_id request_id,
+						QDF_STATUS status,
+						uint32_t req_value,
+						void *request_params)
+{
+	/* Drop this response as no action is required */
+}
+
+void ll_lt_sap_switch_bearer_on_p2p_go_complete(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						enum QDF_OPMODE device_mode)
+{
+	struct wlan_bearer_switch_request bs_request = {0};
+	uint8_t ll_lt_sap_vdev_id;
+
+	if (device_mode != QDF_P2P_GO_MODE)
+		return;
+
+	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
+	/* LL_LT SAP is not present, bearer switch is not required */
+	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID)
+		return;
+
+	bs_request.vdev_id = vdev_id;
+	bs_request.request_id = ll_lt_sap_bearer_switch_get_id(psoc);
+	bs_request.req_type = WLAN_BS_REQ_TO_WLAN;
+	bs_request.source = BEARER_SWITCH_REQ_P2P_GO;
+	bs_request.requester_cb = p2p_go_complete_bearer_switch_requester_cb;
+
+	ll_lt_sap_switch_bearer_to_wlan(psoc, &bs_request);
 }

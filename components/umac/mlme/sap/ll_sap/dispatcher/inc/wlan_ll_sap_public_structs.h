@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -63,12 +63,14 @@ enum bearer_switch_status {
  * @BEARER_SWITCH_REQ_CONNECT: Bearer switch requester is connect
  * @BEARER_SWITCH_REQ_CSA: Bearer switch requester is CSA
  * @BEARER_SWITCH_REQ_FW: Bearer switch requester is FW
+ * @BEARER_SWITCH_REQ_P2P_GO: Bearer switch requester is P2P_GO
  * @BEARER_SWITCH_REQ_MAX: Indicates MAX bearer switch requester
  */
 enum bearer_switch_req_source {
 	BEARER_SWITCH_REQ_CONNECT,
 	BEARER_SWITCH_REQ_CSA,
 	BEARER_SWITCH_REQ_FW,
+	BEARER_SWITCH_REQ_P2P_GO,
 	BEARER_SWITCH_REQ_MAX,
 };
 

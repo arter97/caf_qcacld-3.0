@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,6 +120,43 @@ QDF_STATUS ucfg_ll_sap_psoc_enable(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS ucfg_ll_sap_psoc_disable(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * ucfg_ll_lt_sap_switch_bearer_for_p2p_go_start() - Switch the bearer for
+ * P2P GO start
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id of the current vdev
+ * @oper_freq: Frequency on which P2P_GO wants to come up
+ * @device_mode: Device mode of the current vdev
+ *
+ * This API checks if LL_LT_SAP is present and P2P_GO is coming up in MCC with
+ * LL_LT_SAP, then it switches the bearer as P2P GO vdev start takes some time
+ * and till then LL_LT_SAP will not be able to stay on that channel continuously
+ *
+ * Return: None
+ */
+void ucfg_ll_lt_sap_switch_bearer_for_p2p_go_start(struct wlan_objmgr_psoc *psoc,
+						   uint8_t vdev_id,
+						   qdf_freq_t oper_freq,
+						   enum QDF_OPMODE device_mode);
+
+/**
+ * ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete() - Switch the bearer back to
+ * wlan P2P GO start complete
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id of the current vdev
+ * @device_mode: Device mode of the current vdev
+ *
+ * This API checks if LL_LT_SAP is present and P2P_GO is coming up in MCC with
+ * LL_LT_SAP, then it switches the bearer as P2P GO vdev start takes some time
+ * and till then LL_LT_SAP will not be able to stay on that channel continuously
+ *
+ * Return: None
+ */
+void ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						enum QDF_OPMODE device_mode);
+
 #else
 static inline QDF_STATUS ucfg_ll_sap_init(void)
 {
@@ -177,6 +214,21 @@ static inline QDF_STATUS ucfg_ll_sap_psoc_enable(struct wlan_objmgr_psoc *psoc)
 static inline QDF_STATUS ucfg_ll_sap_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline void ucfg_ll_lt_sap_switch_bearer_for_p2p_go_start(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						qdf_freq_t oper_freq,
+						enum QDF_OPMODE device_mode)
+{
+}
+
+static inline void ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						enum QDF_OPMODE device_mode)
+{
 }
 
 #endif /* WLAN_FEATURE_LL_LT_SAP */

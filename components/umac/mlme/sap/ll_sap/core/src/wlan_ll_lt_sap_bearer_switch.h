@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include "wlan_cmn.h"
 #include "wlan_ll_sap_main.h"
 #include "wlan_sm_engine.h"
+#include "qdf_event.h"
 
 /**
  * enum wlan_bearer_switch_sm_state - Bearer switch states
@@ -103,6 +104,7 @@ struct bs_state_sm {
  * @bs_wlan_request_timer: Bearer switch wlan request timer, host driver waits
  * for this timer to expire before sending the bearer switch request to wlan,
  * this is used to avoid the back to back bearer switch requests to userspace.
+ * @p2p_go_bs_copletion_event: Bearer switch request for P2P GO is completed
  */
 struct bearer_switch_info {
 	struct wlan_objmgr_vdev *vdev;
@@ -115,6 +117,7 @@ struct bearer_switch_info {
 	struct wlan_bearer_switch_request requests[MAX_BEARER_SWITCH_REQUESTERS];
 	qdf_mc_timer_t bs_request_timer;
 	qdf_mc_timer_t bs_wlan_request_timer;
+	qdf_event_t p2p_go_bs_copletion_event;
 };
 
 /**
@@ -296,5 +299,40 @@ void
 ll_lt_sap_deliver_audio_transport_switch_resp(struct wlan_objmgr_vdev *vdev,
 					enum bearer_switch_req_type req_type,
 					enum bearer_switch_status status);
+
+/**
+ * ll_lt_sap_switch_bearer_for_p2p_go_start() - Switch the bearer if P2P GO is
+ * coming up in mcc
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id of the current vdev
+ * @oper_freq: Frequency on which P2P_GO wants to come up
+ * @device_mode: Device mode of the current vdev
+ *
+ * This API checks if LL_LT_SAP is present and P2P_GO is coming up in MCC with
+ * LL_LT_SAP, then it switches the bearer as P2P GO vdev start takes some time
+ * and till then LL_LT_SAP will not be able to stay on that channel continuously
+ *
+ * Return: None
+ */
+void ll_lt_sap_switch_bearer_for_p2p_go_start(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      qdf_freq_t oper_freq,
+					      enum QDF_OPMODE device_mode);
+
+/**
+ * ll_lt_sap_switch_bearer_on_p2p_go_complete() - Switch the bearer if P2P GO is
+ * started
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id of the current vdev
+ * @device_mode: Device mode of the current vdev
+ *
+ * This API switches the bearer back to wlan, once P2P GO is started
+ *
+ * Return: None
+ */
+
+void ll_lt_sap_switch_bearer_on_p2p_go_complete(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						enum QDF_OPMODE device_mode);
 
 #endif /* _WLAN_LL_LT_SAP_BEARER_SWITCH_H_ */
