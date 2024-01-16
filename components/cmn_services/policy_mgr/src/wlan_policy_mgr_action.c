@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2566,7 +2566,9 @@ policy_mgr_handle_sap_plus_go_force_scc(struct wlan_objmgr_psoc *psoc)
 	if (!((vdev_con_mode == PM_P2P_GO_MODE &&
 	       existing_vdev_mode == PM_SAP_MODE) ||
 	      (vdev_con_mode == PM_SAP_MODE &&
-	       existing_vdev_mode == PM_P2P_GO_MODE)))
+	       existing_vdev_mode == PM_P2P_GO_MODE) ||
+	      (vdev_con_mode == PM_SAP_MODE &&
+	       existing_vdev_mode == PM_SAP_MODE)))
 		goto force_scc_done;
 
 	if (!pm_ctx->hdd_cbacks.wlan_check_cc_intf_cb)
@@ -2683,7 +2685,9 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 	if (!((vdev_con_mode == PM_P2P_GO_MODE &&
 	       existing_vdev_mode == PM_SAP_MODE) ||
 	      (vdev_con_mode == PM_SAP_MODE &&
-	       existing_vdev_mode == PM_P2P_GO_MODE)))
+	       existing_vdev_mode == PM_P2P_GO_MODE) ||
+	      (vdev_con_mode == PM_SAP_MODE &&
+	       existing_vdev_mode == PM_SAP_MODE)))
 		return QDF_STATUS_SUCCESS;
 
 	work_info->sap_plus_go_force_scc.reason = reason_code;
