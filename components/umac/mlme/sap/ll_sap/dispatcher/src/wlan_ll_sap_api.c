@@ -310,6 +310,14 @@ QDF_STATUS wlan_ll_sap_oob_connect_response(
 				vdev,
 				rsp.connect_resp_type,
 				ll_sap_obj->high_ap_availability_cookie[i]);
+
+		/* Reset the cookie once request is completed or cancelled */
+		if (rsp.connect_resp_type ==
+			HIGH_AP_AVAILABILITY_OPERATION_COMPLETED ||
+		    rsp.connect_resp_type ==
+			HIGH_AP_AVAILABILITY_OPERATION_CANCELLED)
+			ll_sap_obj->high_ap_availability_cookie[i] =
+							LL_SAP_INVALID_COOKIE;
 	}
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
