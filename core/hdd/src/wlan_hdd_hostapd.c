@@ -4470,7 +4470,7 @@ void hdd_sap_destroy_ctx_all(struct hdd_context *hdd_ctx, bool is_ssr)
 	}
 }
 
-static void
+void
 hdd_indicate_peers_deleted(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct wlan_hdd_link_info *link_info;
@@ -4489,11 +4489,12 @@ hdd_indicate_peers_deleted(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	hdd_sap_indicate_disconnect_for_sta(link_info->adapter);
 }
 
-QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
+QDF_STATUS hdd_init_ap_mode(struct wlan_hdd_link_info *link_info,
 			    bool reinit,
 			    bool rtnl_held)
 {
 	struct hdd_hostapd_state *phostapdBuf;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct sap_context *sap_ctx;
@@ -4507,19 +4508,19 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 	hdd_enter();
 
 	hdd_debug("SSR in progress: %d", reinit);
-	qdf_atomic_init(&adapter->deflink->session.ap.acs_in_progress);
+	qdf_atomic_init(&link_info->session.ap.acs_in_progress);
 
-	sap_ctx = hdd_hostapd_init_sap_session(adapter->deflink, reinit);
+	sap_ctx = hdd_hostapd_init_sap_session(link_info, reinit);
 	if (!sap_ctx) {
 		hdd_err("Invalid sap_ctx");
 		goto error_release_vdev;
 	}
 
 	if (!reinit) {
-		adapter->deflink->session.ap.sap_config.chan_freq =
+		link_info->session.ap.sap_config.chan_freq =
 					      hdd_ctx->acs_policy.acs_chan_freq;
 		acs_dfs_mode = hdd_ctx->acs_policy.acs_dfs_mode;
-		adapter->deflink->session.ap.sap_config.acs_dfs_mode =
+		link_info->session.ap.sap_config.acs_dfs_mode =
 			wlan_hdd_get_dfs_mode(acs_dfs_mode);
 	}
 
@@ -4532,7 +4533,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 					 acs_with_more_param);
 
 	/* Allocate the Wireless Extensions state structure */
-	phostapdBuf = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+	phostapdBuf = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 
 	/* Zero the memory.  This zeros the profile structure. */
 	memset(phostapdBuf, 0, sizeof(struct hdd_hostapd_state));
@@ -4561,26 +4562,11 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 		goto error_deinit_sap_session;
 	}
 
-	/* Register as a wireless device */
-	hdd_register_hostapd_wext(adapter->dev);
-
-	/* Cache station count initialize to zero */
-	qdf_atomic_init(&adapter->cache_sta_count);
-
-	status = hdd_wmm_adapter_init(adapter);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("hdd_wmm_adapter_init() failed code: %08d [x%08x]",
-		       status, status);
-		goto error_release_softap_tx_rx;
-	}
-
-	set_bit(WMM_INIT_DONE, &adapter->event_flags);
-
 	status = ucfg_get_enable_sifs_burst(hdd_ctx->psoc, &enable_sifs_burst);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("Failed to get sifs burst value, use default");
 
-	ret = wma_cli_set_command(adapter->deflink->vdev_id,
+	ret = wma_cli_set_command(link_info->vdev_id,
 				  wmi_pdev_param_burst_enable,
 				  enable_sifs_burst,
 				  PDEV_CMD);
@@ -4588,7 +4574,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 		hdd_err("wmi_pdev_param_burst_enable set failed: %d", ret);
 
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	ucfg_mlme_is_6g_sap_fd_enabled(hdd_ctx->psoc, &is_6g_sap_fd_enabled);
 	hdd_debug("6g sap fd enabled %d", is_6g_sap_fd_enabled);
 	if (is_6g_sap_fd_enabled && vdev)
@@ -4598,32 +4584,22 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter,
 	if (vdev)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
-	hdd_set_netdev_flags(adapter);
-
 	if (!reinit) {
-		adapter->deflink->session.ap.sap_config.acs_cfg.acs_mode =
+		link_info->session.ap.sap_config.acs_cfg.acs_mode =
 									false;
 		wlansap_dcs_set_vdev_wlan_interference_mitigation(sap_ctx,
 								  false);
 		wlansap_dcs_set_vdev_starting(sap_ctx, false);
-		qdf_mem_zero(&adapter->deflink->session.ap.sap_config.acs_cfg,
+		qdf_mem_zero(&link_info->session.ap.sap_config.acs_cfg,
 			     sizeof(struct sap_acs_cfg));
 	}
 
-	sme_set_del_peers_ind_callback(hdd_ctx->mac_handle,
-				       &hdd_indicate_peers_deleted);
-	/* rcpi info initialization */
-	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
-
-	hdd_tsf_auto_report_init(adapter);
 	hdd_exit();
 
 	return status;
 
-error_release_softap_tx_rx:
-	hdd_wext_unregister(adapter->dev, rtnl_held);
 error_deinit_sap_session:
-	hdd_hostapd_deinit_sap_session(adapter->deflink);
+	hdd_hostapd_deinit_sap_session(link_info);
 error_release_vdev:
 	hdd_exit();
 	return status;

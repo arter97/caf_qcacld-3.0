@@ -93,6 +93,7 @@
 #endif
 
 #include <wlan_hdd_hostapd.h>
+#include <wlan_hdd_hostapd_wext.h>
 #include <wlan_hdd_softap_tx_rx.h>
 #include <wlan_hdd_green_ap.h>
 #include "qwlan_version.h"
@@ -15133,12 +15134,35 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 			goto sap_release_ref;
 	}
 
-	status = hdd_init_ap_mode(adapter, is_ssr, rtnl_held);
+	status = hdd_init_ap_mode(link_info, is_ssr, rtnl_held);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Error Initializing the AP mode: %d", status);
 		ret = qdf_status_to_os_return(status);
 		goto sap_release_ref;
 	}
+
+	/* Register as a wireless device */
+	hdd_register_hostapd_wext(adapter->dev);
+
+	/* Cache station count initialize to zero */
+	qdf_atomic_init(&adapter->cache_sta_count);
+
+	status = hdd_wmm_adapter_init(adapter);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("hdd_wmm_adapter_init() failed code: %08d [x%08x]",
+			status, status);
+	}
+
+	set_bit(WMM_INIT_DONE, &adapter->event_flags);
+
+	hdd_set_netdev_flags(adapter);
+
+	sme_set_del_peers_ind_callback(hdd_ctx->mac_handle,
+				       &hdd_indicate_peers_deleted);
+	/* rcpi info initialization */
+	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
+
+	hdd_tsf_auto_report_init(adapter);
 
 	hdd_register_tx_flow_control(adapter,
 		hdd_softap_tx_resume_timer_expired_handler,
