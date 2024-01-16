@@ -29,7 +29,6 @@
 #include <wlan_reg_channel_api.h>
 
 #define NEXT_20_CH_OFFSET 20
-#define SP_AP_AND_CLIENT_POWER_DIFF_IN_DBM 6
 
 #ifdef CONFIG_HOST_FIND_CHAN
 

@@ -28,11 +28,8 @@
 
 #include <reg_services_public_struct.h>
 
-enum ht40_intol {
-	HT40_INTOL_PLUS = 0,
-	HT40_INTOL_MINUS = 1,
-};
-
+#define SP_AP_AND_CLIENT_POWER_DIFF_IN_DBM 6
+#define CONV_20MHZ_EIRP_TO_PSD_IN_DBM 13
 #define IS_HT40_INTOL_MINUS (_bitmap) ((_bitmap) & BIT(HT40_INTOL_MINUS))
 #define IS_HT40_INTOL_PLUS (_bitmap) ((_bitmap) & BIT(HT40_INTOL_PLUS))
 
@@ -44,6 +41,11 @@ enum ht40_intol {
 #define WLAN_CHAN_DFS_CFREQ2       0x0004  /* DFS set on secondary segment */
 #define WLAN_CHAN_DISALLOW_ADHOC   0x0040  /* ad-hoc is not allowed */
 #define WLAN_CHAN_PSC              0x0400  /* 6GHz PSC frequency */
+
+enum ht40_intol {
+	HT40_INTOL_PLUS = 0,
+	HT40_INTOL_MINUS = 1,
+};
 
 /**
  * wlan_reg_set_chan_blocked() - Set is_chan_hop_blocked to true for a frequency
