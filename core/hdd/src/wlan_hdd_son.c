@@ -154,13 +154,13 @@ static int hdd_son_set_chwidth(struct wlan_objmgr_vdev *vdev,
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info) {
-		hdd_err("null adapter");
+		hdd_err("null adapter for %d", wlan_vdev_get_id(vdev));
 		return -EINVAL;
 	}
 
 	chwidth = hdd_son_chan_width_to_chan_width(son_chwidth);
 
-	return hdd_set_mac_chan_width(link_info->adapter, chwidth, link_id);
+	return hdd_set_mac_chan_width(link_info, chwidth, link_id, false);
 }
 
 /**

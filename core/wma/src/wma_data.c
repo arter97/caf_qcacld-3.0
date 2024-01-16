@@ -963,23 +963,27 @@ static void wma_data_tx_ack_work_handler(void *ack_work)
 	wma_handle = work->wma_handle;
 	if (!wma_handle || cds_is_load_or_unload_in_progress()) {
 		wma_err("Driver load/unload in progress");
-		goto end;
+		goto free_frame;
 	}
+
+	wma_debug("Data Tx Ack Cb Status %d", work->status);
 	ack_cb = wma_handle->umac_data_ota_ack_cb;
-
-	if (work->status)
-		wma_debug("Data Tx Ack Cb Status %d", work->status);
-	else
-		wma_debug("Data Tx Ack Cb Status %d", work->status);
-
-	/* Call the Ack Cb registered by UMAC */
-	if (ack_cb)
-		ack_cb(wma_handle->mac_context, NULL, work->status, NULL);
-	else
+	if (!ack_cb) {
 		wma_err("Data Tx Ack Cb is NULL");
+		goto free_frame;
+	}
+
+	ack_cb(wma_handle->mac_context, work->frame, work->status,
+	       NULL);
+	goto end;
+
+free_frame:
+	if (work->frame)
+		qdf_nbuf_free(work->frame);
 
 end:
 	qdf_mem_free(work);
+
 	if (wma_handle) {
 		wma_handle->umac_data_ota_ack_cb = NULL;
 		wma_handle->last_umac_data_nbuf = NULL;
@@ -1002,38 +1006,59 @@ void
 wma_data_tx_ack_comp_hdlr(void *wma_context, qdf_nbuf_t netbuf, int32_t status)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) wma_context;
+	struct wma_tx_ack_work_ctx *ack_work;
+	QDF_STATUS qdf_status;
 
 	if (wma_validate_handle(wma_handle))
 		return;
+
+	if (!netbuf) {
+		wma_debug("netbuf is NULL");
+		return;
+	}
 
 	/*
 	 * if netBuf does not match with pending nbuf then just free the
 	 * netbuf and do not call ack cb
 	 */
 	if (wma_handle->last_umac_data_nbuf != netbuf) {
-		if (wma_handle->umac_data_ota_ack_cb) {
-			wma_err("nbuf does not match but umac_data_ota_ack_cb is not null");
-		} else {
-			wma_err("nbuf does not match and umac_data_ota_ack_cb is also null");
-		}
+		wma_err("nbuf does not match but umac_data_ota_ack_cb is %s null",
+			wma_handle->umac_data_ota_ack_cb ? "not" : "");
 		goto free_nbuf;
 	}
 
-	if (wma_handle->umac_data_ota_ack_cb) {
-		struct wma_tx_ack_work_ctx *ack_work;
+	if (!wma_handle->umac_data_ota_ack_cb) {
+		wma_err_rl("ota_ack cb not registered");
+		goto free_nbuf;
+	}
 
-		ack_work = qdf_mem_malloc(sizeof(struct wma_tx_ack_work_ctx));
+	ack_work = qdf_mem_malloc(sizeof(struct wma_tx_ack_work_ctx));
+	if (ack_work) {
 		wma_handle->ack_work_ctx = ack_work;
-		if (ack_work) {
-			ack_work->wma_handle = wma_handle;
-			ack_work->sub_type = 0;
-			ack_work->status = status;
 
-			qdf_create_work(0, &ack_work->ack_cmp_work,
-					wma_data_tx_ack_work_handler,
-					ack_work);
-			qdf_sched_work(0, &ack_work->ack_cmp_work);
+		ack_work->wma_handle = wma_handle;
+		ack_work->sub_type = 0;
+		ack_work->status = status;
+		ack_work->frame = netbuf;
+
+		/*
+		 * free of the netbuf will be done by the scheduled work so
+		 * just do unmap here
+		 */
+		qdf_nbuf_unmap_single(wma_handle->qdf_dev, netbuf,
+				      QDF_DMA_TO_DEVICE);
+
+		qdf_status = qdf_create_work(0, &ack_work->ack_cmp_work,
+					     wma_data_tx_ack_work_handler,
+					     ack_work);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			qdf_nbuf_free(netbuf);
+			wma_err("Failed to create TX ack work");
+			return;
 		}
+
+		qdf_sched_work(0, &ack_work->ack_cmp_work);
+		return;
 	}
 
 free_nbuf:
@@ -2314,6 +2339,11 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (vdev_id >= wma_handle->max_bssid) {
+		wma_err("tx packet with invalid vdev_id :%d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	iface = &wma_handle->interfaces[vdev_id];
 
 	if (!soc) {
@@ -2345,7 +2375,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if ((iface && (iface->rmfEnabled || tx_flag & HAL_USE_PMF)) &&
+	if (((iface->rmfEnabled || tx_flag & HAL_USE_PMF)) &&
 	    (frmType == TXRX_FRM_802_11_MGMT) &&
 	    (pFc->subType == SIR_MAC_MGMT_DISASSOC ||
 	     pFc->subType == SIR_MAC_MGMT_DEAUTH ||
@@ -2692,12 +2722,12 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	mgmt_param.use_6mbps = use_6mbps;
 	mgmt_param.tx_type = tx_frm_index;
 	mgmt_param.peer_rssi = peer_rssi;
-	if (iface && wlan_vdev_mlme_get_opmode(iface->vdev) == QDF_STA_MODE &&
+	if (wlan_vdev_mlme_get_opmode(iface->vdev) == QDF_STA_MODE &&
 	    wlan_vdev_mlme_is_mlo_vdev(iface->vdev) &&
+	    (wlan_vdev_mlme_is_active(iface->vdev) == QDF_STATUS_SUCCESS) &&
 	    frmType == TXRX_FRM_802_11_MGMT &&
 	    pFc->subType != SIR_MAC_MGMT_PROBE_REQ &&
 	    pFc->subType != SIR_MAC_MGMT_AUTH &&
-	    pFc->subType != SIR_MAC_MGMT_ASSOC_REQ &&
 	    action != (ACTION_CATEGORY_PUBLIC << 8 | TDLS_DISCOVERY_RESPONSE) &&
 	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE))
 		mgmt_param.mlo_link_agnostic = true;
@@ -2782,7 +2812,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_MGMT_NB_ID);
 	if (status != QDF_STATUS_SUCCESS) {
-		wma_err("mgmt tx failed");
+		wma_err_rl("mgmt tx failed");
 		qdf_nbuf_free((qdf_nbuf_t)tx_frame);
 		goto error;
 	}

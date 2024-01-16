@@ -473,6 +473,7 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 	if (sync_frame_ind->bcn_probe_rsp_len) {
 		roam_candidate.frame_length = sync_frame_ind->bcn_probe_rsp_len;
 		roam_candidate.frame = sync_frame_ind->bcn_probe_rsp;
+		roam_candidate.rssi = sync_frame_ind->rssi;
 		roam_candidate.roam_offload_candidate_frm = false;
 		wlan_cm_add_all_link_probe_rsp_to_scan_db(psoc,
 							  &roam_candidate);
@@ -482,6 +483,7 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 		roam_candidate.frame_length =
 					sync_frame_ind->link_bcn_probe_rsp_len;
 		roam_candidate.frame = sync_frame_ind->link_bcn_probe_rsp;
+		roam_candidate.rssi = sync_frame_ind->rssi;
 		roam_candidate.roam_offload_candidate_frm = false;
 		wlan_cm_add_all_link_probe_rsp_to_scan_db(psoc,
 							  &roam_candidate);

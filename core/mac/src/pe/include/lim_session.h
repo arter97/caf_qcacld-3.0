@@ -635,7 +635,6 @@ struct wlan_mlo_ie_info {
  * @deauth_retry:
  * @enable_bcast_probe_rsp:
  * @ht_client_cnt:
- * @force_24ghz_in_ht20:
  * @ch_switch_in_progress:
  * @he_with_wep_tkip:
  * @fils_info:
@@ -677,7 +676,9 @@ struct wlan_mlo_ie_info {
  * @mlo_ie:
  * @user_edca_set:
  * @is_oui_auth_assoc_6mbps_2ghz_enable: send auth/assoc req with 6 Mbps rate
+ * @is_unexpected_peer_error: true if unexpected peer error
  * on 2.4 GHz
+ * @join_probe_cnt: join probe request count
  */
 struct pe_session {
 	uint8_t available;
@@ -956,7 +957,6 @@ struct pe_session {
 	struct deauth_retry_params deauth_retry;
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
-	bool force_24ghz_in_ht20;
 	bool ch_switch_in_progress;
 	bool he_with_wep_tkip;
 #ifdef WLAN_FEATURE_FILS_SK
@@ -1006,6 +1006,8 @@ struct pe_session {
 #endif /* WLAN_FEATURE_11BE */
 	uint8_t user_edca_set;
 	bool is_oui_auth_assoc_6mbps_2ghz_enable;
+	bool is_unexpected_peer_error;
+	uint8_t join_probe_cnt;
 };
 
 /*-------------------------------------------------------------------------
@@ -1174,6 +1176,53 @@ struct pe_session *pe_find_session_by_scan_id(struct mac_context *mac_ctx,
 				       uint32_t scan_id);
 
 uint8_t pe_get_active_session_count(struct mac_context *mac_ctx);
+
+/**
+ * lim_dump_session_info() - Dump the key parameters of PE session
+ * @mac_ctx: Global MAC context
+ * @pe_session: PE session
+ *
+ * Dumps the fields from the @pe_session for debugging.
+ *
+ * Return: void
+ */
+void lim_dump_session_info(struct mac_context *mac_ctx,
+			   struct pe_session *pe_session);
+
+#ifdef WLAN_FEATURE_11AX
+/**
+ * lim_dump_he_info() - Dump HE fields in PE session
+ * @mac: Global MAC context
+ * @session: PE session
+ *
+ * Dumps the fields related to HE from the @session for debugging
+ *
+ * Return: void
+ */
+void lim_dump_he_info(struct mac_context *mac, struct pe_session *session);
+#else
+static inline void lim_dump_he_info(struct mac_context *mac,
+				    struct pe_session *session)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_dump_eht_info() - Dump EHT fields in PE session
+ * @session: PE session
+ *
+ * Dumps the fields related to EHT from @session for debugging
+ *
+ * Return: void
+ */
+void lim_dump_eht_info(struct pe_session *session);
+#else
+static inline void lim_dump_eht_info(struct pe_session *session)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_FILS_SK
 /**
  * pe_delete_fils_info: API to delete fils session info

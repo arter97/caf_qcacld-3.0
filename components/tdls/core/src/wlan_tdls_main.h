@@ -473,6 +473,8 @@ wlan_vdev_get_tdls_vdev_obj(struct wlan_objmgr_vdev *vdev)
  * @mac: mac address of tdls peer
  * @link_state: tdls link state
  * @link_reason: reason
+ *
+ * Return: None
  */
 void tdls_set_link_status(struct tdls_vdev_priv_obj *vdev,
 			  const uint8_t *mac,
@@ -810,6 +812,14 @@ void wlan_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
 void tdls_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 			struct scan_event *event,
 			void *arg);
+
+/**
+ * tdls_set_link_unforce() - set link unforce
+ * @vdev: vdev object
+ *
+ * Return: void
+ */
+void tdls_set_link_unforce(struct wlan_objmgr_vdev *vdev);
 
 /**
  * tdls_scan_callback() - callback for TDLS scan operation

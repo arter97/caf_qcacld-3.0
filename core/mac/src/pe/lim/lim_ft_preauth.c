@@ -324,6 +324,7 @@ QDF_STATUS lim_ft_setup_auth_session(struct mac_context *mac,
 	struct pe_session *ft_session = NULL;
 	uint8_t sessionId = 0;
 	struct sSirFTPreAuthReq *req;
+	QDF_STATUS status;
 
 	ft_session =
 		pe_find_session_by_bssid(mac, pe_session->limReAssocbssId,
@@ -342,9 +343,13 @@ QDF_STATUS lim_ft_setup_auth_session(struct mac_context *mac,
 
 	req = pe_session->ftPEContext.pFTPreAuthReq;
 	if (req && req->pbssDescription) {
-		lim_fill_ft_session(mac,
-				    req->pbssDescription, ft_session,
-				    pe_session, WLAN_PHYMODE_AUTO);
+		status = lim_fill_ft_session(mac,
+					     req->pbssDescription, ft_session,
+					     pe_session, WLAN_PHYMODE_AUTO);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_err("Failed to fill ft session for vdev id %d",
+			       ft_session->vdev_id);
+
 		lim_ft_prepare_add_bss_req(mac, ft_session,
 					   req->pbssDescription);
 	}

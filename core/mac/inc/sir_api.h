@@ -640,6 +640,22 @@ typedef QDF_STATUS
 		     uint8_t session_id, uint8_t reason,
 		     enum wlan_cm_rso_control_requestor requestor);
 
+/**
+ * typedef set_ies_fn_t - Set IEs routine pointer
+ * @mac_ctx: Global MAC context
+ * @vdev_id: vdev id
+ * @dot11_mode: dot11 mode
+ * @opmode: device opmode
+ *
+ * This type is for callbacks registered with WMA to set the IEs for a
+ * given vdev id to the firmware.
+ *
+ * Return: Success or Failure
+ */
+typedef QDF_STATUS
+(*set_ies_fn_t)(struct mac_context *mac_ctx, uint8_t vdev_id,
+		uint16_t dot11_mode, enum QDF_OPMODE device_mode);
+
 /* / Definition for indicating all modules ready on STA */
 struct sme_ready_req {
 	uint16_t messageType;   /* eWNI_SME_SYS_READY_IND */
@@ -657,6 +673,7 @@ struct sme_ready_req {
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
 					uint16_t reason_code);
+	set_ies_fn_t pe_roam_set_ie_cb;
 };
 
 /**
@@ -4369,24 +4386,6 @@ struct wow_pulse_mode {
  * Return: QDF status
  */
 QDF_STATUS umac_send_mb_message_to_mac(void *msg);
-
-/* Max supported bandwidth is 320Mhz, so max 16 subbands fo 20Mhz */
-#define MAX_WIDE_BAND_SCAN_CHAN 16
-
-/**
- * struct wide_band_scan_chan_info - wide band scan channel info
- * @vdev_id: vdev id
- * @num_chan: number of channels (for each subbands fo 20Mhz)
- * @is_wide_band_scan: wide band scan or not
- * @cca_busy_subband_info: CCA busy for each possible 20Mhz subbands
- * of the wideband scan channel
- */
-struct wide_band_scan_chan_info {
-	uint32_t vdev_id;
-	uint8_t num_chan;
-	bool is_wide_band_scan;
-	uint32_t cca_busy_subband_info[MAX_WIDE_BAND_SCAN_CHAN];
-};
 
 /**
  * struct scan_chan_info - channel info

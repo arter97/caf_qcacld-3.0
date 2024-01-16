@@ -442,6 +442,8 @@ enum wma_rx_exec_ctx {
  * @noa_sub_ie_len: NOA sub IE length
  * @noa_ie: NOA IE
  * @p2p_ie_offset: p2p IE offset
+ * @csa_count_offset: Offset of Switch count field in CSA IE
+ * @ecsa_count_offset: Offset of Switch count field in ECSA IE
  * @lock: lock
  */
 struct beacon_info {
@@ -455,6 +457,8 @@ struct beacon_info {
 	uint16_t noa_sub_ie_len;
 	uint8_t *noa_ie;
 	uint16_t p2p_ie_offset;
+	uint16_t csa_count_offset;
+	uint16_t ecsa_count_offset;
 	qdf_spinlock_t lock;
 };
 
@@ -765,11 +769,13 @@ struct mac_ss_bw_info {
 /**
  * struct wma_ini_config - Structure to hold wma ini configuration
  * @max_no_of_peers: Max Number of supported
+ * @exclude_selftx_from_cca_busy: Exclude self tx time from cca busy time flag.
  *
  * Placeholder for WMA ini parameters.
  */
 struct wma_ini_config {
 	uint8_t max_no_of_peers;
+	bool exclude_selftx_from_cca_busy;
 };
 
 /**
@@ -883,6 +889,7 @@ struct wma_wlm_stats_data {
  * @pe_roam_synch_cb: pe callback for firmware Roam Sync events
  * @csr_roam_auth_event_handle_cb: CSR callback for target authentication
  * offload event.
+ * @pe_roam_set_ie_cb: PE callback to set IEs to firmware.
  * @wmi_cmd_rsp_wake_lock: wmi command response wake lock
  * @wmi_cmd_rsp_runtime_lock: wmi command response bus lock
  * @active_uc_apf_mode: Setting that determines how APF is applied in
@@ -1011,6 +1018,9 @@ typedef struct {
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
 					uint16_t reason_code);
+	QDF_STATUS (*pe_roam_set_ie_cb)(struct mac_context *mac_ctx,
+					uint8_t vdev_id, uint16_t dot11_mode,
+					enum QDF_OPMODE device_mode);
 	qdf_wake_lock_t wmi_cmd_rsp_wake_lock;
 	qdf_runtime_lock_t wmi_cmd_rsp_runtime_lock;
 	qdf_runtime_lock_t sap_prevent_runtime_pm_lock;
@@ -1114,12 +1124,14 @@ enum frame_index {
  * @sub_type: sub type
  * @status: status
  * @ack_cmp_work: work structure
+ * @frame: frame nbuf
  */
 struct wma_tx_ack_work_ctx {
 	tp_wma_handle wma_handle;
 	uint16_t sub_type;
 	int32_t status;
 	qdf_work_t ack_cmp_work;
+	qdf_nbuf_t frame;
 };
 
 /**
@@ -1476,8 +1488,29 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle,
 uint32_t wma_get_vht_ch_width(void);
 
 #ifdef WLAN_FEATURE_11BE
+/**
+ * wma_get_orig_eht_ch_width() - Get original EHT channel width supported
+ *
+ * API to get original EHT channel width
+ *
+ * Return: void
+ */
+uint32_t wma_get_orig_eht_ch_width(void);
+
+/**
+ * wma_get_orig_eht_ch_width() - Get current EHT channel width supported
+ *
+ * API to get current EHT channel width
+ *
+ * Return: void
+ */
 uint32_t wma_get_eht_ch_width(void);
 #else
+static inline uint32_t wma_get_orig_eht_ch_width(void)
+{
+	return 0;
+}
+
 static inline uint32_t wma_get_eht_ch_width(void)
 {
 	return 0;

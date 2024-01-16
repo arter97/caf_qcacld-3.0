@@ -51,6 +51,8 @@
 #include "wlan_lmac_if_def.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlme_main.h"
+#include <wlan_mlo_mgr_link_switch.h>
 
 static void
 ap_beacon_process_5_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
@@ -685,6 +687,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 			return;
 
 		session->best_6g_power_type = pwr_type_6g;
+		mlme_set_best_6g_power_type(session->vdev, pwr_type_6g);
 	}
 
 	/*
@@ -1025,12 +1028,32 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (!session)
 		return;
+
+	/*
+	 * Drop the beacon/probe response from current connected AP in
+	 * below cases to avoid responding to the changes in beacon(e.g. doing
+	 * VDEV_RESTART to update to the latest capabilities),
+	 * 1. vdev is not in connected state: vdev might be transitioning
+	 * 2. Link switch is in progress: Current link or one of the partner
+	 *                                links are getting replaced.
+	 *
+	 * New beacons/probe rsps can be considered once post these operations.
+	 */
+	if (LIM_IS_STA_ROLE(session) &&
+	    (!wlan_cm_is_vdev_connected(session->vdev) ||
+	     mlo_mgr_is_link_switch_in_progress(session->vdev))) {
+		pe_debug_rl("vdev %d, drop beacon", session->vdev_id);
+		return;
+	}
+
 	/* Convert the beacon frame into a structure */
 	if (sir_convert_beacon_frame2_struct(mac_ctx, (uint8_t *) rx_pkt_info,
 		&bcn) != QDF_STATUS_SUCCESS) {
 		pe_err_rl("beacon parsing failed");
 		return;
 	}
+
+	session->dtimPeriod = bcn.tim.dtimPeriod;
 
 	sch_send_beacon_report(mac_ctx, &bcn, session);
 	__sch_beacon_process_for_session(mac_ctx, &bcn, rx_pkt_info, session);

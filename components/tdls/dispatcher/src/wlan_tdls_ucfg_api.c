@@ -528,6 +528,7 @@ bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev)
 	if (!tdls_link_vdev) {
 		wlan_vdev_mlme_feat_ext2_cap_set(vdev,
 						 WLAN_VDEV_FEXT2_MLO_STA_TDLS);
+		tdls_set_remain_links_unforce(vdev);
 		return true;
 	}
 

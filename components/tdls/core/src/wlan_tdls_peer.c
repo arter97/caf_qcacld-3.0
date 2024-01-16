@@ -821,15 +821,6 @@ static void tdls_update_pmo_status(struct tdls_vdev_priv_obj *tdls_vdev,
 }
 #endif
 
-/**
- * tdls_set_link_status() - set link statue for TDLS peer
- * @vdev_obj: TDLS vdev object
- * @mac: MAC address of current TDLS peer
- * @link_status: link status
- * @link_reason: reason with link status
- *
- * Return: None.
- */
 void tdls_set_link_status(struct tdls_vdev_priv_obj *vdev_obj,
 			  const uint8_t *mac,
 			  enum tdls_link_state link_status,
@@ -886,11 +877,11 @@ void tdls_set_peer_link_status(struct tdls_peer *peer,
 	struct tdls_vdev_priv_obj *vdev_obj;
 	enum tdls_link_state old_status;
 
-	tdls_debug("state %d reason %d peer:" QDF_MAC_ADDR_FMT,
-		   link_status, link_reason,
+	vdev_obj = peer->vdev_priv;
+	tdls_debug("vdev %d state %d reason %d peer:" QDF_MAC_ADDR_FMT,
+		   wlan_vdev_get_id(vdev_obj->vdev), link_status, link_reason,
 		   QDF_MAC_ADDR_REF(peer->peer_mac.bytes));
 
-	vdev_obj = peer->vdev_priv;
 	old_status = peer->link_status;
 	peer->link_status = link_status;
 	tdls_update_pmo_status(vdev_obj, old_status, link_status);

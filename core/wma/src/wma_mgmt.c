@@ -1158,6 +1158,9 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 	qdf_mem_copy(&mlo_params->mac_addr, &ml_info->self_mac_addr,
 		     QDF_MAC_ADDR_SIZE);
 
+	mlo_params->rec_max_simultaneous_links =
+		ml_info->rec_max_simultaneous_links;
+
 	/* Fill partner link info */
 	ml_links->num_links = ml_info->num_links;
 	for (i = 0; i < ml_links->num_links; i++) {
@@ -1376,6 +1379,14 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 				params->msd_caps.med_sync_max_txop_num;
 		req->mlo_params.link_switch_in_progress =
 			wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
+		/*
+		 * Set max simultaneous links = 1 for MLSR, 2 for MLMR. The +1
+		 * is added as per the agreement with FW for backward
+		 * compatibility purposes. Our internal structures still
+		 * conform to the values as per spec i.e. 0 = MLSR, 1 = MLMR.
+		 */
+		req->mlo_params.max_num_simultaneous_links =
+			wlan_mlme_get_sta_mlo_simultaneous_links(psoc) + 1;
 	} else {
 		wma_debug("Peer MLO context is NULL");
 		req->mlo_params.mlo_enabled = false;
@@ -2082,8 +2093,6 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 	struct ieee80211_frame *wh;
 	struct wmi_probe_resp_params params;
 
-	wma_debug("Send probe response template for vdev %d", vdev_id);
-
 	/*
 	 * Make the TSF offset negative so probe response in the same
 	 * staggered batch have the same TSF.
@@ -2172,7 +2181,8 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wma_nofl_debug("Send beacon template for vdev %d", vdev_id);
+	wma_nofl_debug("vdev %d: bcn update reason %d", vdev_id,
+		       bcn_info->reason);
 
 	if (bcn_info->p2pIeOffset) {
 		p2p_ie = bcn_info->beacon + bcn_info->p2pIeOffset;
@@ -2299,6 +2309,16 @@ static QDF_STATUS wma_store_bcn_tmpl(tp_wma_handle wma, uint8_t vdev_id,
 	else
 		bcn->p2p_ie_offset = bcn_info->p2pIeOffset;
 
+	if (bcn_info->csa_count_offset > 3)
+		bcn->csa_count_offset = bcn_info->csa_count_offset - 4;
+	else
+		bcn->csa_count_offset = bcn_info->csa_count_offset;
+
+	if (bcn_info->ecsa_count_offset > 3)
+		bcn->ecsa_count_offset = bcn_info->ecsa_count_offset - 4;
+	else
+		bcn->ecsa_count_offset = bcn_info->ecsa_count_offset;
+
 	bcn_payload = qdf_nbuf_data(bcn->buf);
 	if (bcn->tim_ie_offset) {
 		tim_ie = (struct beacon_tim_ie *)
@@ -2376,8 +2396,12 @@ int wma_tbttoffset_update_event_handler(void *handle, uint8_t *event,
 		bcn_info.p2pIeOffset = bcn->p2p_ie_offset;
 		bcn_info.beaconLength = bcn->len;
 		bcn_info.timIeOffset = bcn->tim_ie_offset;
+		bcn_info.csa_count_offset = bcn->csa_count_offset;
+		bcn_info.ecsa_count_offset = bcn->ecsa_count_offset;
 		qdf_spin_unlock_bh(&bcn->lock);
 
+		wma_err_rl("Update beacon template for vdev %d due to TBTT offset update",
+			   if_id);
 		/* Update beacon template in firmware */
 		wma_unified_bcn_tmpl_send(wma, if_id, &bcn_info, 0);
 	}
@@ -2437,7 +2461,6 @@ void wma_send_probe_rsp_tmpl(tp_wma_handle wma,
 
 	if (wmi_service_enabled(wma->wmi_handle,
 				   wmi_service_beacon_offload)) {
-		wma_nofl_debug("Beacon Offload Enabled Sending Unified command");
 		if (wmi_unified_probe_rsp_tmpl_send(wma, vdev_id,
 						    probe_rsp_info) < 0) {
 			wma_err("wmi_unified_probe_rsp_tmpl_send Failed");
@@ -2492,7 +2515,6 @@ void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 	uint8_t *p2p_ie;
 	struct sAniBeaconStruct *beacon;
 
-	wma_nofl_debug("Beacon update reason %d", bcn_info->reason);
 	beacon = (struct sAniBeaconStruct *) (bcn_info->beacon);
 	if (wma_find_vdev_id_by_addr(wma, beacon->macHdr.sa, &vdev_id)) {
 		wma_err("failed to get vdev id");
@@ -3916,7 +3938,8 @@ QDF_STATUS wma_register_roaming_callbacks(
 					uint8_t vdev_id,
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
-					uint16_t reason_code))
+					uint16_t reason_code),
+	set_ies_fn_t pe_roam_set_ie_cb)
 {
 
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -3927,6 +3950,7 @@ QDF_STATUS wma_register_roaming_callbacks(
 	wma->csr_roam_auth_event_handle_cb = csr_roam_auth_event_handle_cb;
 	wma->pe_roam_synch_cb = pe_roam_synch_cb;
 	wma->pe_disconnect_cb = pe_disconnect_cb;
+	wma->pe_roam_set_ie_cb = pe_roam_set_ie_cb;
 	wma_debug("Registered roam synch callbacks with WMA successfully");
 
 	return QDF_STATUS_SUCCESS;
@@ -4174,4 +4198,23 @@ wma_update_bss_peer_phy_mode(struct wlan_channel *des_chan,
 	des_chan->ch_phymode = new_phymode;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+cm_send_ies_for_roam_invoke(struct wlan_objmgr_vdev *vdev, uint16_t dot11_mode)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	enum QDF_OPMODE op_mode;
+	QDF_STATUS status;
+	uint8_t vdev_id;
+
+	if (!wma)
+		return QDF_STATUS_E_FAILURE;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	status = wma->pe_roam_set_ie_cb(wma->mac_context, vdev_id, dot11_mode,
+					op_mode);
+	return status;
 }

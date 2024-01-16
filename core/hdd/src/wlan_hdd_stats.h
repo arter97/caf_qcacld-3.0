@@ -43,7 +43,7 @@
 #define WLAN_WAIT_TIME_LL_STATS 800
 #endif
 
-#define WLAN_HDD_TGT_NOISE_FLOOR_DBM     (-96)
+#define WLAN_HDD_TGT_NOISE_FLOOR_DBM     (-128)
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 extern const struct nla_policy qca_wlan_vendor_ll_ext_policy[
@@ -703,5 +703,96 @@ int wlan_hdd_cfg80211_get_roam_stats(struct wiphy *wiphy,
 #else
 #define FEATURE_ROAM_STATS_COMMANDS
 #define FEATURE_ROAM_STATS_EVENTS
+#endif
+
+#ifdef WLAN_FEATURE_TX_LATENCY_STATS
+/**
+ * hdd_tx_latency_register_cb() - register callback function for transmit
+ * latency stats
+ * @soc: pointer to soc context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_tx_latency_register_cb(void *soc);
+
+/**
+ * hdd_tx_latency_restore_config() - restore tx latency stats config for a link
+ * @link_info: link specific information
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_tx_latency_restore_config(struct wlan_hdd_link_info *link_info);
+
+/**
+ * wlan_hdd_cfg80211_tx_latency - configure/retrieve per-link transmit latency
+ * statistics
+ * @wiphy: wiphy handle
+ * @wdev: wdev handle
+ * @data: user layer input
+ * @data_len: length of user layer input
+ *
+ * return: 0 success, einval failure
+ */
+int wlan_hdd_cfg80211_tx_latency(struct wiphy *wiphy,
+				 struct wireless_dev *wdev,
+				 const void *data, int data_len);
+
+/**
+ * hdd_tx_latency_record_ingress_ts() - Record driver ingress timestamp in CB
+ * @adapter: pointer to hdd vdev/net_device context
+ * @skb: sk buff
+ *
+ * Return: None
+ */
+static inline void
+hdd_tx_latency_record_ingress_ts(struct hdd_adapter *adapter,
+				 struct sk_buff *skb)
+{
+	if (adapter->tx_latency_cfg.enable)
+		qdf_nbuf_set_tx_ts(skb);
+}
+
+extern const struct nla_policy
+	tx_latency_policy[QCA_WLAN_VENDOR_ATTR_TX_LATENCY_MAX + 1];
+
+#define FEATURE_TX_LATENCY_STATS_COMMANDS	\
+	{	\
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,	\
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TX_LATENCY,	\
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |	\
+		 WIPHY_VENDOR_CMD_NEED_NETDEV |	\
+		 WIPHY_VENDOR_CMD_NEED_RUNNING,	\
+	.doit = wlan_hdd_cfg80211_tx_latency,	\
+	vendor_command_policy(tx_latency_policy,	\
+			      QCA_WLAN_VENDOR_ATTR_TX_LATENCY_MAX)	\
+	},	\
+
+#define FEATURE_TX_LATENCY_STATS_EVENTS	\
+	[QCA_NL80211_VENDOR_SUBCMD_TX_LATENCY_INDEX] = {	\
+		.vendor_id = QCA_NL80211_VENDOR_ID,	\
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_TX_LATENCY,	\
+	},	\
+
+#else
+static inline QDF_STATUS hdd_tx_latency_register_cb(void *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+hdd_tx_latency_restore_config(struct wlan_hdd_link_info *link_info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+hdd_tx_latency_record_ingress_ts(struct hdd_adapter *adapter,
+				 struct sk_buff *skb)
+{
+}
+
+#define FEATURE_TX_LATENCY_STATS_COMMANDS
+#define FEATURE_TX_LATENCY_STATS_EVENTS
 #endif
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */

@@ -35,6 +35,7 @@
  * @is_add_virtual_iface: is netdev create request from add virtual interface
  * @is_single_link: Is the adapter single link ML
  * @num_sessions: No of session to create on start adapter
+ * @is_pre_cac_adapter: is a pre cac adapter with associated netdev
  * @unused: Reserved spare bits
  */
 struct hdd_adapter_create_param {
@@ -44,7 +45,8 @@ struct hdd_adapter_create_param {
 		 is_add_virtual_iface:1,
 		 is_single_link:1,
 		 num_sessions:4,
-		 unused:23;
+		 is_pre_cac_adapter:1,
+		 unused:22;
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO

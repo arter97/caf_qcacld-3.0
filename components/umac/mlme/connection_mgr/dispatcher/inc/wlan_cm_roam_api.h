@@ -1276,6 +1276,29 @@ wlan_cm_roam_set_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc,
  */
 uint8_t wlan_cm_roam_get_full_scan_6ghz_on_disc(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_cm_set_roam_scan_high_rssi_offset() - Set the delta change in high RSSI
+ * at which roam scan is triggered in 2.4/5 GHz.
+ * @psoc: PSOC pointer
+ * @roam_high_rssi_delta: Set the High RSSI delta for roam scan trigger
+ * * 1-16 - Set an offset value in this range
+ * * 0    - Disable
+ *
+ * Return: none
+ */
+void
+wlan_cm_set_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc,
+				       uint8_t roam_high_rssi_delta);
+
+/**
+ * wlan_cm_get_roam_scan_high_rssi_offset() - Get the delta change in high RSSI
+ * at which roam scan is triggered in 2.4/5 GHz.
+ * @psoc: PSOC pointer
+ *
+ * Return: High RSSI delta for roam scan trigger
+ */
+uint8_t wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_FEATURE_ROAM_INFO_STATS
 /**
  * mlme_cm_alloc_roam_stats_info() - alloc roam stats info buffer
@@ -1624,6 +1647,12 @@ wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 				struct roam_scan_candidate_frame *candidate)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline uint8_t
+wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
@@ -2050,6 +2079,40 @@ wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_vdev *vdev);
  * Return: bool, true: self mld roam supported
  */
 bool wlan_cm_is_self_mld_roam_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_cm_set_force_20mhz_in_24ghz() - Sets the config to (dis)allow
+ * the 40 MHz connection in 2.4 GHz
+ *
+ * @vdev: pointer to vdev
+ * @is_40mhz_cap: is 40 MHz supported
+ *
+ * Return: None
+ */
+void
+wlan_cm_set_force_20mhz_in_24ghz(struct wlan_objmgr_vdev *vdev,
+				 bool is_40mhz_cap);
+
+/**
+ * wlan_cm_get_force_20mhz_in_24ghz - Gets the 40 MHz (dis)allowed on 2.4 GHz
+ * config
+ * @vdev: pointer to vdev
+ *
+ * Return: 40 MHz allowed on 2.4 GHz
+ */
+bool
+wlan_cm_get_force_20mhz_in_24ghz(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * cm_send_ies_for_roam_invoke - Send IEs to firmware based on the reassoc
+ * req received from the userspace
+ * @vdev: vdev
+ * @dot11_mode: dot11 mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_send_ies_for_roam_invoke(struct wlan_objmgr_vdev *vdev, uint16_t dot11_mode);
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**

@@ -257,12 +257,14 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
  * after updating to user space
  * @link_info: Link info pointer in HDD adapter
  * @vdev: vdev ptr
+ * @source: Disconnect source
  *
  * Return: None
  */
 void
 __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_info,
-					     struct wlan_objmgr_vdev *vdev);
+					     struct wlan_objmgr_vdev *vdev,
+					     enum wlan_cm_source source);
 
 /**
  * hdd_cm_set_peer_authenticate() - set peer as authenticated

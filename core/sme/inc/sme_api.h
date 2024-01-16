@@ -958,6 +958,15 @@ QDF_STATUS sme_hide_ssid(mac_handle_t mac_handle, uint8_t sessionId,
 		uint8_t ssidHidden);
 
 /**
+ * sme_set_listen_interval() - Set the listen interval
+ * @mac_handle: The handle returned by mac_open
+ * @vdev_id: vdev identifier
+ *
+ * Return: None
+ */
+void sme_set_listen_interval(mac_handle_t mac_handle, uint8_t vdev_id);
+
+/**
  * sme_update_roam_scan_n_probes() - Update no.of roam scan probes
  * @mac_handle: The handle returned by mac_open
  * @vdev_id: vdev identifier
@@ -1202,6 +1211,18 @@ QDF_STATUS sme_set_wlm_latency_level(mac_handle_t mac_handle,
 QDF_STATUS sme_set_idle_powersave_config(bool value);
 QDF_STATUS sme_notify_modem_power_state(mac_handle_t mac_handle,
 					uint32_t value);
+
+/**
+ * sme_set_peer_ampdu() - API to set peer A-MPDU count to target
+ * @mac_handle: mac handle
+ * @vdev_id: vdev id
+ * @peer_mac: peer mac address
+ * @cfg: A-MPDU count to configure
+ *
+ * Return: 0 if success, otherwise error code
+ */
+int sme_set_peer_ampdu(mac_handle_t mac_handle, uint8_t vdev_id,
+		       struct qdf_mac_addr *peer_mac, uint16_t cfg);
 
 /*SME API to convert convert the ini value to the ENUM used in csr and MAC*/
 ePhyChanBondState sme_get_cb_phy_state_from_cb_ini_value(uint32_t cb_ini_value);
@@ -2890,14 +2911,13 @@ uint32_t sme_unpack_rsn_ie(mac_handle_t mac_handle, uint8_t *buf,
 /**
  * sme_unpack_assoc_rsp() - wrapper to unpack assoc response
  * @mac_handle: handle returned by mac_open
- * @frame: assoc response buffer pointer
- * @frame_len: assoc response buffer length
+ * @rsp: Pointer to connect rsp
  * @assoc_resp: output assoc response structure
  *
  * Return: parse status
  */
 QDF_STATUS sme_unpack_assoc_rsp(mac_handle_t mac_handle,
-				uint8_t *frame, uint32_t frame_len,
+				struct wlan_cm_connect_resp *rsp,
 				struct sDot11fAssocResponse *assoc_resp);
 
 /**

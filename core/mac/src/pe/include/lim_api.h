@@ -151,6 +151,7 @@ typedef enum eMgmtFrmDropReason {
 	eMGMT_DROP_SPURIOUS_FRAME,
 	eMGMT_DROP_DUPLICATE_AUTH_FRAME,
 	eMGMT_DROP_EXCESSIVE_MGMT_FRAME,
+	eMGMT_DROP_DEAUTH_DURING_ROAM_STARTED,
 } tMgmtFrmDropReason;
 
 /**
@@ -370,6 +371,10 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 		       uint16_t deauth_disassoc_frame_len,
 		       uint16_t reason_code);
 
+QDF_STATUS
+pe_set_ie_for_roam_invoke(struct mac_context *mac_ctx, uint8_t vdev_id,
+			  uint16_t dot11_mode, enum QDF_OPMODE opmode);
+
 #else
 static inline QDF_STATUS
 pe_roam_synch_callback(struct mac_context *mac_ctx,
@@ -386,6 +391,13 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 		       uint8_t *deauth_disassoc_frame,
 		       uint16_t deauth_disassoc_frame_len,
 		       uint16_t reason_code)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+pe_set_ie_for_roam_invoke(struct mac_context *mac_ctx, uint8_t vdev_id,
+			  uint16_t dot11_mode, enum QDF_OPMODE opmode)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -602,6 +614,23 @@ void lim_set_twt_ext_capabilities(struct mac_context *mac_ctx,
  * Return: void
  */
 void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq);
+
+#define FW_CTS2SELF_PROFILE 34
+
+/**
+ * lim_enable_cts_to_self_for_exempted_iot_ap() - enable cts to self for iot ap
+ * @mac_ctx: mac context
+ * @session: pe session
+ * @ie_ptr: ie pointer
+ * @ie_len: ie length
+ *
+ * Return: true on success else false
+ */
+bool lim_enable_cts_to_self_for_exempted_iot_ap(
+				       struct mac_context *mac_ctx,
+				       struct pe_session *session,
+				       uint8_t *ie_ptr,
+				       uint16_t ie_len);
 
 /**
  * lim_fill_pe_session() - Lim fill pe session

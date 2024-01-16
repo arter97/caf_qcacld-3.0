@@ -313,27 +313,6 @@ QDF_STATUS sme_ps_process_command(struct mac_context *mac_ctx, uint32_t session_
 	return status;
 }
 
-#ifdef QCA_WIFI_EMULATION
-static QDF_STATUS sme_ps_enable_user_check(bool usr_cfg_ps_enable,
-					   enum sme_ps_cmd command,
-					   uint32_t session_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#else
-static QDF_STATUS sme_ps_enable_user_check(bool usr_cfg_ps_enable,
-					   enum sme_ps_cmd command,
-					   uint32_t session_id)
-{
-	if (command == SME_PS_ENABLE && !usr_cfg_ps_enable) {
-		sme_debug("vdev:%d Cannot initiate PS. PS is disabled by usr(ioctl)",
-			  session_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 /**
  * sme_enable_sta_ps_check(): Checks if it is ok to enable power save or not.
  * @mac_ctx: global mac context
@@ -346,37 +325,38 @@ static QDF_STATUS sme_ps_enable_user_check(bool usr_cfg_ps_enable,
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
-				   uint32_t session_id, enum sme_ps_cmd command)
+				   uint32_t vdev_id, enum sme_ps_cmd command)
 {
-	struct wlan_mlme_powersave *powersave_params;
 	bool usr_cfg_ps_enable;
 
-	QDF_BUG(session_id < WLAN_MAX_VDEVS);
-	if (session_id >= WLAN_MAX_VDEVS)
+	QDF_BUG(vdev_id < WLAN_MAX_VDEVS);
+	if (vdev_id >= WLAN_MAX_VDEVS)
 		return QDF_STATUS_E_INVAL;
 
-	/* Check if Sta Ps is enabled. */
-	powersave_params = &mac_ctx->mlme_cfg->ps_params;
-	if (!powersave_params->is_bmps_enabled) {
-		sme_debug("Cannot initiate PS. PS is disabled in ini");
+	if (!mac_ctx->mlme_cfg->ps_params.is_bmps_enabled) {
+		sme_debug("vdev:%d power save mode is disabled via ini", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	usr_cfg_ps_enable = mlme_get_user_ps(mac_ctx->psoc, session_id);
-
-	if (sme_ps_enable_user_check(usr_cfg_ps_enable, command, session_id)
-	    != QDF_STATUS_SUCCESS)
+	usr_cfg_ps_enable = mlme_get_user_ps(mac_ctx->psoc, vdev_id);
+	if (command == SME_PS_ENABLE && !usr_cfg_ps_enable) {
+		sme_debug("vdev:%d power save mode is disabled by usr(ioctl)",
+			  vdev_id);
 		return QDF_STATUS_E_FAILURE;
+	}
 
-	/* Check whether the given session is Infra and in Connected State
-	 * also if command is power save disable  there is not need to check
-	 * for connected state as firmware can handle this
+	/*
+	 * If command is power save disable there is not need to check for
+	 * connected or roaming state as firmware can handle this
 	 */
-	if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id)) {
-		sme_debug("vdev:%d STA not infra/connected state",
-			  session_id);
+	if (command == SME_PS_DISABLE)
+		return QDF_STATUS_SUCCESS;
+
+	/* If command is power save enable, check whether the given session is
+	 * in connected or roaming state or not
+	 */
+	if (!cm_is_vdevid_active(mac_ctx->pdev, vdev_id))
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -384,12 +364,12 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 /**
  * sme_ps_enable_disable(): function to enable/disable PS.
  * @mac_handle: Opaque handle to the global MAC context
- * @session_id: session id
+ * @vdev_id: session id
  * sme_ps_cmd: power save message
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_ps_enable_disable(mac_handle_t mac_handle, uint32_t session_id,
+QDF_STATUS sme_ps_enable_disable(mac_handle_t mac_handle, uint32_t vdev_id,
 				 enum sme_ps_cmd command)
 {
 	QDF_STATUS status;
@@ -401,19 +381,19 @@ QDF_STATUS sme_ps_enable_disable(mac_handle_t mac_handle, uint32_t session_id,
 		return status;
 	}
 
-	status =  sme_enable_sta_ps_check(mac_ctx, session_id, command);
-	if (status != QDF_STATUS_SUCCESS) {
+	status =  sme_enable_sta_ps_check(mac_ctx, vdev_id, command);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		/*
 		 * In non associated state driver won't handle the power save
-		 * But kernel expects return status success even
-		 * in the disconnected state.
+		 * But kernel expects return status success even in the
+		 * disconnected state.
 		 */
-		if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id))
+		if (!cm_is_vdevid_active(mac_ctx->pdev, vdev_id))
 			status = QDF_STATUS_SUCCESS;
 		sme_release_global_lock(&mac_ctx->sme);
 		return status;
 	}
-	status = sme_ps_process_command(mac_ctx, session_id, command);
+	status = sme_ps_process_command(mac_ctx, vdev_id, command);
 	sme_release_global_lock(&mac_ctx->sme);
 
 	return status;

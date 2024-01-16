@@ -99,7 +99,7 @@
  * Usage: Internal
  *
  */
-#define CFG_STA_BSS_MAX_IDLE_PERIOD CFG_UINT( \
+#define CFG_STA_BSS_MAX_IDLE_PERIOD CFG_INI_UINT( \
 	"bss_max_idle_period", \
 	0, \
 	100, \
@@ -718,6 +718,59 @@
 #define CFG_MLO_SAME_LINK_MLD_ADDR_CFG
 #endif
 
+/*
+ * <ini>
+ * eht_disable_punct_in_us_lpi - Flag to Disable eht puncture in US LPI mode
+ * @Min: false
+ * @Max: true
+ * @Default: false
+ *
+ * Related: None
+ *
+ * Supported Feature: 802.11be protocol
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_EHT_DISABLE_PUNCT_IN_US_LPI \
+	CFG_BOOL("eht_disable_punct_in_us_lpi", \
+		 false, \
+		 "Disable eht puncture in US LPI mode")
+
+#ifdef WLAN_FEATURE_11BE
+#define CFG_EHT_DISABLE_PUNCT_IN_US_LPI_CFG CFG(CFG_EHT_DISABLE_PUNCT_IN_US_LPI)
+#else
+#define CFG_EHT_DISABLE_PUNCT_IN_US_LPI_CFG
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/*
+ * <cfg>
+ * mlo_5gl_5gh_mlsr - enable/disable 5GL+5GH MLSR
+ * @Min: false
+ * @Max: true
+ * @Default: true
+ *
+ * Related: None
+ *
+ * Supported Feature: 5GL+5GH MLSR
+ *
+ * Usage: Internal
+ *
+ * </cfg>
+ */
+
+#define CFG_MLO_MLO_5GL_5GH_MLSR CFG_BOOL( \
+		"mlo_5gl_5gh_mlsr",\
+		0, \
+		"enable 5GL+5GH MLSR")
+
+#define CFG_MLO_MLO_5GL_5GH_MLSR_CFG CFG(CFG_MLO_MLO_5GL_5GH_MLSR)
+#else
+#define CFG_MLO_MLO_5GL_5GH_MLSR_CFG
+#endif
+
 #define CFG_STA_ALL \
 	CFG(CFG_INFRA_STA_KEEP_ALIVE_PERIOD) \
 	CFG(CFG_STA_BSS_MAX_IDLE_PERIOD) \
@@ -743,5 +796,6 @@
 	CFG_MLO_MAX_SIMULTANEOUS_LINKS_CFG \
 	CFG_MLO_SUPPORT_LINK_BAND_CFG \
 	CFG_MLO_PREFER_PERCENTAGE_CFG \
-	CFG_MLO_SAME_LINK_MLD_ADDR_CFG
+	CFG_MLO_SAME_LINK_MLD_ADDR_CFG \
+	CFG_EHT_DISABLE_PUNCT_IN_US_LPI_CFG
 #endif /* CFG_MLME_STA_H__ */

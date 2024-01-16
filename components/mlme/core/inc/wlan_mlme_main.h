@@ -130,11 +130,23 @@ struct wlan_mlme_rx_ops {
 };
 
 /**
+ * struct wlan_mlme_tx_ops - structure of mlme tx function pointers
+ * @send_csa_event_status_ind: Tx ops function to send csa event indication
+ *
+ */
+struct wlan_mlme_tx_ops {
+	QDF_STATUS
+		(*send_csa_event_status_ind)(struct wlan_objmgr_vdev *vdev,
+					     uint8_t csa_status);
+};
+
+/**
  * struct wlan_mlme_psoc_ext_obj -MLME ext psoc priv object
  * @cfg:     cfg items
  * @rso_tx_ops: Roam Tx ops to send roam offload commands to firmware
  * @rso_rx_ops: Roam Rx ops to receive roam offload events from firmware
  * @mlme_rx_ops: mlme Rx ops to receive events from firmware
+ * @mlme_tx_ops: mlme tx ops
  * @wfa_testcmd: WFA config tx ops to send to FW
  * @disconnect_stats_param: Peer disconnect stats related params for SAP case
  * @scan_requester_id: mlme scan requester id
@@ -144,6 +156,7 @@ struct wlan_mlme_psoc_ext_obj {
 	struct wlan_cm_roam_tx_ops rso_tx_ops;
 	struct wlan_cm_roam_rx_ops rso_rx_ops;
 	struct wlan_mlme_rx_ops mlme_rx_ops;
+	struct wlan_mlme_tx_ops mlme_tx_ops;
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
 	struct peer_disconnect_stats_param disconnect_stats_param;
 	wlan_scan_requester scan_requester_id;
@@ -387,10 +400,12 @@ struct ft_context {
  * struct assoc_channel_info - store channel info at the time of association
  * @assoc_ch_width: channel width at the time of initial connection
  * @sec_2g_freq: secondary 2 GHz freq
+ * @cen320_freq: 320 MHz center freq
  */
 struct assoc_channel_info {
 	enum phy_ch_width assoc_ch_width;
 	qdf_freq_t sec_2g_freq;
+	qdf_freq_t cen320_freq;
 };
 
 /**
@@ -413,6 +428,8 @@ struct assoc_channel_info {
  * @ext_cap_ie: Ext CAP IE
  * @assoc_btm_cap: BSS transition management cap used in (re)assoc req
  * @assoc_chan_info: store channel info at the time of association
+ * @force_20mhz_in_24ghz: Only 20 MHz BW allowed in 2.4 GHz
+ *
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -439,6 +456,7 @@ struct mlme_connect_info {
 	uint8_t ext_cap_ie[DOT11F_IE_EXTCAP_MAX_LEN + 2];
 	bool assoc_btm_cap;
 	struct assoc_channel_info assoc_chan_info;
+	bool force_20mhz_in_24ghz;
 };
 
 /** struct wait_for_key_timer - wait for key timer object
@@ -703,12 +721,6 @@ struct roam_scan_chn {
  *  For non-MLO scenario, it indicates the original connected AP BSSID.
  *  For MLO scenario, it indicates the original BSSID of the link
  *  for which the reassociation occurred during the roam.
- * @candidate_bssid: roam candidate AP BSSID when roam failed.
- *  If the firmware updates more than one candidate AP BSSID
- *  to the driver, the driver only fills the last candidate AP BSSID.
- *  For non-MLO scenario, it indicates the last candidate AP BSSID.
- *  For MLO scenario, it indicates the AP BSSID which may be the primary
- *  link BSSID or a nonprimary link BSSID.
  * @roamed_bssid: roamed AP BSSID when roam succeeds.
  *  For non-MLO case, it indicates new AP BSSID which has been
  *  successfully roamed.
@@ -720,7 +732,6 @@ struct eroam_scan_info {
 	struct roam_scan_chn roam_chn[MAX_ROAM_SCAN_CHAN];
 	uint32_t total_scan_time;
 	struct qdf_mac_addr original_bssid;
-	struct qdf_mac_addr candidate_bssid;
 	struct qdf_mac_addr roamed_bssid;
 };
 
@@ -731,15 +742,15 @@ struct eroam_scan_info {
  * @timestamp: timestamp of the auth/assoc/eapol-M1/M2/M3/M4 frame,
  *  if status is successful, indicate received or send success,
  *  if status is failed, timestamp indicate roaming fail at that time
+ * @bssid: Source address for auth/assoc/eapol frame.
  */
 struct eroam_frame_info {
 	enum eroam_frame_subtype frame_type;
 	enum eroam_frame_status status;
 	uint64_t timestamp;
-};
+	struct qdf_mac_addr bssid;
 
-/* Key frame num during roaming: PREAUTH/PREASSOC/EAPOL M1-M4 */
-#define ROAM_FRAME_NUM 6
+};
 
 /**
  * struct enhance_roam_info - enhance roam information
@@ -750,7 +761,7 @@ struct eroam_frame_info {
 struct enhance_roam_info {
 	struct eroam_trigger_info trigger;
 	struct eroam_scan_info scan;
-	struct eroam_frame_info timestamp[ROAM_FRAME_NUM];
+	struct eroam_frame_info timestamp[WLAN_ROAM_MAX_FRAME_INFO];
 };
 
 /**
@@ -810,6 +821,7 @@ struct enhance_roam_info {
  *				operation on bss color collision detection
  * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  * @disconnect_runtime_lock: runtime lock to complete disconnection
+ * @best_6g_power_type: best 6g power type
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -881,6 +893,7 @@ struct mlme_legacy_priv {
 	qdf_wake_lock_t bss_color_change_wakelock;
 	qdf_runtime_lock_t bss_color_change_runtime_lock;
 	qdf_runtime_lock_t disconnect_runtime_lock;
+	enum reg_6g_ap_type best_6g_power_type;
 };
 
 /**
@@ -1102,6 +1115,24 @@ void mlme_set_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev, bool flag);
 bool mlme_get_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlme_set_best_6g_power_type() - Set best 6g power type
+ * @vdev: vdev pointer
+ * @best_6g_power_type: best 6g power type
+ *
+ * Return: None
+ */
+void mlme_set_best_6g_power_type(struct wlan_objmgr_vdev *vdev,
+				 enum reg_6g_ap_type best_6g_power_type);
+
+/**
+ * mlme_get_best_6g_power_type() - Get best 6g power type
+ * @vdev: vdev pointer
+ *
+ * Return: value of best 6g power type
+ */
+enum reg_6g_ap_type mlme_get_best_6g_power_type(struct wlan_objmgr_vdev *vdev);
+
+/**
  * mlme_set_reconn_after_assoc_timeout_flag() - Set reconn after assoc timeout
  * flag
  * @psoc: soc object
@@ -1203,6 +1234,7 @@ QDF_STATUS wlan_mlme_get_bssid_vdev_id(struct wlan_objmgr_pdev *pdev,
  * @req: pointer to scan request
  * @scan_ch_width: Channel width for which to trigger a wide band scan
  * @scan_freq: frequency for which to trigger a wide band RRM scan
+ * @cen320_freq: 320 MHz center freq
  *
  * Return: QDF_STATUS
  */
@@ -1210,7 +1242,8 @@ QDF_STATUS
 mlme_update_freq_in_scan_start_req(struct wlan_objmgr_vdev *vdev,
 				   struct scan_start_request *req,
 				   enum phy_ch_width scan_ch_width,
-				   qdf_freq_t scan_freq);
+				   qdf_freq_t scan_freq,
+				   qdf_freq_t cen320_freq);
 
 /**
  * wlan_get_operation_chan_freq() - get operating chan freq of
@@ -1919,4 +1952,16 @@ wlan_mlme_register_common_events(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * wlan_mlme_send_csa_event_status_ind_cmd() - send csa event status indication
+ * @vdev: vdev obj
+ * @csa_status: csa status
+ *
+ *  Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind_cmd(struct wlan_objmgr_vdev *vdev,
+					uint8_t csa_status);
+
 #endif

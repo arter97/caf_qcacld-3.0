@@ -362,3 +362,10 @@ bool ucfg_policy_mgr_get_vdev_diff_freq_new_conn(struct wlan_objmgr_psoc *psoc,
 	return policy_mgr_get_vdev_diff_freq_new_conn(psoc, new_freq, vdev_id);
 }
 
+QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
+					    bool *one_by_one_dbs,
+					    bool *two_by_two_dbs)
+{
+	return policy_mgr_get_dbs_hw_modes(psoc, one_by_one_dbs,
+					   two_by_two_dbs);
+}

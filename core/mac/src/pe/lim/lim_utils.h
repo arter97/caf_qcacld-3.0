@@ -107,7 +107,9 @@
 /* To check if HT 20mhz detection bit set */
 #define OBSS_DETECTION_IS_HT_20MHZ(_m) ((_m) & OBSS_DETECTION_HT_20MHZ_BIT_MASK)
 
+#define MAX_WAIT_FOR_BCN_TX_COMPLETE_FOR_LL_SAP 500
 #define MAX_WAIT_FOR_BCN_TX_COMPLETE 4000
+
 #define MAX_WAKELOCK_FOR_CSA         5000
 #define MAX_WAIT_FOR_CH_WIDTH_UPDATE_COMPLETE 200
 
@@ -1011,15 +1013,11 @@ void lim_set_protected_bit(struct mac_context *mac,
 	struct pe_session *pe_session,
 	tSirMacAddr peer, tpSirMacMgmtHdr pMacHdr);
 
-void lim_set_ht_caps(struct mac_context *p_mac,
-		struct pe_session *p_session_ntry,
-		uint8_t *p_ie_start,
-		uint32_t num_bytes);
+void lim_set_ht_caps(struct mac_context *p_mac, uint8_t *p_ie_start,
+		     uint32_t num_bytes);
 
-void lim_set_vht_caps(struct mac_context *p_mac,
-		struct pe_session *p_session_entry,
-		uint8_t *p_ie_start,
-		uint32_t num_bytes);
+void lim_set_vht_caps(struct mac_context *p_mac, uint8_t *p_ie_start,
+		      uint32_t num_bytes);
 bool lim_validate_received_frame_a1_addr(struct mac_context *mac_ctx,
 		tSirMacAddr a1, struct pe_session *session);
 void lim_set_stads_rtt_cap(tpDphHashNode sta_ds, struct s_ext_cap *ext_cap,
@@ -1034,7 +1032,6 @@ QDF_STATUS lim_send_ext_cap_ie(struct mac_context *mac_ctx, uint32_t session_id,
  * lim_send_ies_per_band() - gets ht and vht capability and send to firmware via
  * wma
  * @mac_ctx: global mac context
- * @session: pe session. This can be NULL. In that case self cap will be sent
  * @vdev_id: vdev for which IE is targeted
  * @dot11_mode: vdev dot11 mode
  * @device_mode: device mode
@@ -1044,7 +1041,7 @@ QDF_STATUS lim_send_ext_cap_ie(struct mac_context *mac_ctx, uint32_t session_id,
  * Return: status of operation
  */
 QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
-				 struct pe_session *session, uint8_t vdev_id,
+				 uint8_t vdev_id,
 				 enum csr_cfgdot11mode dot11_mode,
 				 enum QDF_OPMODE device_mode);
 
@@ -1524,20 +1521,18 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 /**
  * lim_set_he_caps() - update HE caps to be sent to FW as part of scan IE
  * @mac: pointer to MAC
- * @session: pointer to PE session
  * @ie_start: pointer to start of IE buffer
  * @num_bytes: length of IE buffer
  * @band: 2g or 5g band
  *
  * Return: None
  */
-void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
-		     uint8_t *ie_start, uint32_t num_bytes, uint8_t band);
+void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
+		     uint32_t num_bytes, uint8_t band);
 
 /**
  * lim_send_he_caps_ie() - gets HE capability and send to firmware via wma
  * @mac_ctx: global mac context
- * @session: pe session. This can be NULL. In that case self cap will be sent
  * @device_mode: VDEV op mode
  * @vdev_id: vdev for which IE is targeted
  *
@@ -1546,7 +1541,6 @@ void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
  * Return: QDF_STATUS
  */
 QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
-			       struct pe_session *session,
 			       enum QDF_OPMODE device_mode,
 			       uint8_t vdev_id);
 
@@ -1772,7 +1766,6 @@ static inline void lim_set_he_caps(struct mac_context *mac, struct pe_session *s
 }
 
 static inline QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
-					     struct pe_session *session,
 					     enum QDF_OPMODE device_mode,
 					     uint8_t vdev_id)
 {
@@ -2063,7 +2056,6 @@ void lim_log_eht_cap(struct mac_context *mac, tDot11fIEeht_cap *eht_cap);
 /**
  * lim_set_eht_caps() - update EHT caps to be sent to FW as part of scan IE
  * @mac: pointer to MAC
- * @session: pointer to PE session
  * @ie_start: pointer to start of IE buffer
  * @num_bytes: length of IE buffer
  * @band: 2g or 5g band
@@ -2071,14 +2063,12 @@ void lim_log_eht_cap(struct mac_context *mac, tDot11fIEeht_cap *eht_cap);
  *
  * Return: None
  */
-void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band,
-		      uint8_t vdev_id);
+void lim_set_eht_caps(struct mac_context *mac, uint8_t *ie_start,
+		      uint32_t num_bytes, uint8_t band, uint8_t vdev_id);
 
 /**
  * lim_send_eht_caps_ie() - gets EHT capability and send to firmware via wma
  * @mac_ctx: global mac context
- * @session: pe session. This can be NULL. In that case self cap will be sent
  * @device_mode: VDEV op mode
  * @vdev_id: vdev for which IE is targeted
  *
@@ -2087,7 +2077,6 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
  * Return: QDF_STATUS
  */
 QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
-				struct pe_session *session,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id);
 /**
@@ -2152,6 +2141,26 @@ bool lim_is_session_chwidth_320mhz(struct pe_session *session);
  */
 void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session);
+
+/**
+ * lim_update_des_chan_puncture() - set puncture_bitmap of des_chan
+ * @des_chan: pointer to wlan_channel
+ * @ch_params: pointer to ch_params
+ *
+ * Return: void
+ */
+void lim_update_des_chan_puncture(struct wlan_channel *des_chan,
+				  struct ch_params *ch_params);
+
+/**
+ * lim_overwrite_sta_puncture() - overwrite STA puncture with AP puncture
+ * @session: session
+ * @@ch_param: pointer to ch_params
+ *
+ * Return: void
+ */
+void lim_overwrite_sta_puncture(struct pe_session *session,
+				struct ch_params *ch_param);
 #else
 static inline
 void lim_update_tdls_sta_eht_capable(struct mac_context *mac,
@@ -2299,14 +2308,13 @@ lim_log_eht_cap(struct mac_context *mac, tDot11fIEeht_cap *eht_cap)
 }
 
 static inline void
-lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
-		 uint8_t *ie_start, uint32_t num_bytes, uint8_t band,
-		 uint8_t vdev_id)
+lim_set_eht_caps(struct mac_context *mac, uint8_t *ie_start,
+		 uint32_t num_bytes, uint8_t band, uint8_t vdev_id)
 {
 }
 
 static inline QDF_STATUS
-lim_send_eht_caps_ie(struct mac_context *mac_ctx, struct pe_session *session,
+lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 		     enum QDF_OPMODE device_mode, uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
@@ -2340,6 +2348,18 @@ lim_is_session_chwidth_320mhz(struct pe_session *session)
 
 static inline void
 lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
+{
+}
+
+static inline void
+lim_update_des_chan_puncture(struct wlan_channel *des_chan,
+			     struct ch_params *ch_params)
+{
+}
+
+static inline void
+lim_overwrite_sta_puncture(struct pe_session *session,
+			   struct ch_params *ch_param)
 {
 }
 #endif /* WLAN_FEATURE_11BE */
@@ -2433,7 +2453,6 @@ lim_extract_msd_caps(struct mac_context *mac_ctx,
 /**
  * lim_send_he_6g_band_caps_ie() - Send HE 6ghz band caps to FW
  * @mac_ctx: Global MAC context
- * @session: session ptr
  * @vdev_id: vdev id
  *
  * Send HE 6ghz band capabilities IE to firmware
@@ -2441,12 +2460,10 @@ lim_extract_msd_caps(struct mac_context *mac_ctx,
  * Return: QDF_STATUS_SUCCESS on success
  */
 QDF_STATUS lim_send_he_6g_band_caps_ie(struct mac_context *mac_ctx,
-				       struct pe_session *session,
 				       uint8_t vdev_id);
 #else
 static inline
 QDF_STATUS lim_send_he_6g_band_caps_ie(struct mac_context *mac_ctx,
-				       struct pe_session *session,
 				       uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
@@ -3217,11 +3234,13 @@ uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
  *
  * @mac_ctx:    Pointer to Global MAC structure
  * @pe_session: Pointer to session
+ * @bss_desc: Pointer to bss description
  *
  * Return: TPC status
  */
 bool
-lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session);
+lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
+		  struct bss_description *bss_desc);
 
 /**
  * lim_update_tx_power() - Function to update the TX power for
@@ -3252,6 +3271,23 @@ bool
 lim_skip_tpc_update_for_sta(struct mac_context *mac,
 			    struct pe_session *sta_session,
 			    struct pe_session *sap_session);
+
+#ifdef FEATURE_WLAN_GC_SKIP_JOIN
+static inline bool
+lim_connect_skip_join_for_gc(struct pe_session *pe_session)
+{
+	if (pe_session->opmode == QDF_P2P_CLIENT_MODE)
+		return true;
+	else
+		return false;
+}
+#else
+static inline bool
+lim_connect_skip_join_for_gc(struct pe_session *pe_session)
+{
+	return false;
+}
+#endif
 
 /**
  * lim_get_concurrent_session() - Function to get the concurrent session pointer

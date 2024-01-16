@@ -1784,11 +1784,23 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 		return false;
 	}
 
+	/*
+	 * This is a temporary check and will be removed once ll_lt_sap CSA
+	 * support is added.
+	 */
+	if (policy_mgr_get_ll_lt_sap_freq(mac_ctx->psoc) == csa_freq) {
+		pe_err("CSA not allowed on LL_LT_SAP freq %d", csa_freq);
+		lim_tear_down_link_with_ap(mac_ctx, session_entry->peSessionId,
+					   REASON_CHANNEL_SWITCH_FAILED,
+					   eLIM_HOST_DISASSOC);
+		return false;
+	}
+
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_freq) &&
 	    wlan_reg_get_bw_value(new_ch_width) > 20) {
-		if (csa_params->sec_chan_offset == PHY_DOUBLE_CHANNEL_LOW_PRIMARY)
+		if (csa_params->new_ch_freq_seg1 == csa_params->channel + 2)
 			sec_ch_2g_freq = csa_freq + HT40_SEC_OFFSET;
-		else if (csa_params->sec_chan_offset == PHY_DOUBLE_CHANNEL_HIGH_PRIMARY)
+		else if (csa_params->new_ch_freq_seg1 == csa_params->channel - 2)
 			sec_ch_2g_freq = csa_freq - HT40_SEC_OFFSET;
 	}
 
@@ -1799,8 +1811,9 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 						REG_CURRENT_PWR_MODE);
 	if (chan_state == CHANNEL_STATE_INVALID ||
 	    chan_state == CHANNEL_STATE_DISABLE) {
-		pe_err("Invalid csa_freq:%d for provided ch_width:%d. Disconnect",
-		       csa_freq, new_ch_width);
+		pe_err("Invalid csa_freq %d ch_width %d ccfs0 %d ccfs1 %d sec_ch %d. Disconnect",
+		       csa_freq, new_ch_width, csa_params->new_ch_freq_seg1,
+		       csa_params->new_ch_freq_seg2, sec_ch_2g_freq);
 		lim_tear_down_link_with_ap(mac_ctx,
 					   session_entry->peSessionId,
 					   REASON_CHANNEL_SWITCH_FAILED,
@@ -1941,6 +1954,29 @@ static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
 
 #endif
 
+/**
+ * lim_sta_follow_csa() - Check if STA needs to follow CSA
+ * @session_entry: Session pointer
+ * @csa_params: Pointer to CSA params
+ * @lim_ch_switch: Pointer to lim channel switch info
+ * @ch_params: Channel params
+ *
+ * Return: True if CSA is required, else return false.
+ */
+static bool lim_sta_follow_csa(struct pe_session *session_entry,
+			       struct csa_offload_params *csa_params,
+			       tLimChannelSwitchInfo *lim_ch_switch,
+			       struct ch_params ch_params)
+{
+	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
+	    session_entry->ch_width == ch_params.ch_width &&
+	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
+		pe_debug("Ignore CSA, no change in ch, bw and puncture");
+		return false;
+	}
+	return true;
+}
+
 void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 			      struct csa_offload_params *csa_params)
 {
@@ -1982,6 +2018,26 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 		goto err;
 	}
 
+	lim_ch_switch = &session_entry->gLimChannelSwitch;
+	ch_params.ch_width = csa_params->new_ch_width;
+
+	if (IS_DOT11_MODE_EHT(session_entry->dot11mode))
+		lim_set_csa_chan_param_11be(session_entry, csa_params,
+					    &ch_params);
+	else
+		wlan_reg_set_channel_params_for_pwrmode(
+					     mac_ctx->pdev,
+					     csa_params->csa_chan_freq,
+					     0, &ch_params,
+					     REG_CURRENT_PWR_MODE);
+	lim_set_chan_sw_puncture(lim_ch_switch, &ch_params);
+
+	if (!lim_sta_follow_csa(session_entry, csa_params,
+				lim_ch_switch, ch_params))
+		goto err;
+	else
+		qdf_mem_zero(&ch_params, sizeof(struct ch_params));
+
 	if (!lim_is_csa_channel_allowed(mac_ctx, session_entry,
 					session_entry->curr_op_freq,
 					csa_params)) {
@@ -1996,7 +2052,6 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	lim_update_tdls_set_state_for_fw(session_entry, false);
 	lim_delete_tdls_peers(mac_ctx, session_entry);
 
-	lim_ch_switch = &session_entry->gLimChannelSwitch;
 	lim_ch_switch->switchMode = csa_params->switch_mode;
 	/* timer already started by firmware, switch immediately */
 	lim_ch_switch->switchCount = 0;
@@ -2016,13 +2071,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	chnl_switch_info =
 		&session_entry->gLimWiderBWChannelSwitch;
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_params->csa_chan_freq)) {
-		channel_bonding_mode =
-			mac_ctx->roam.configParam.channelBondingMode24GHz;
-	} else {
-		channel_bonding_mode =
-			mac_ctx->roam.configParam.channelBondingMode5GHz;
-	}
+	channel_bonding_mode = lim_get_cb_mode_for_freq(mac_ctx, session_entry,
+						   csa_params->csa_chan_freq);
 
 	pe_debug("Session %d vdev %d: vht: %d ht: %d he %d cbmode %d",
 		 session_entry->peSessionId, session_entry->vdev_id,
@@ -2240,17 +2290,9 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 		 lim_ch_switch->sec_ch_offset, session_entry->curr_op_freq,
 		 session_entry->ch_width);
 
-	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
-	    session_entry->ch_width == lim_ch_switch->ch_width &&
-	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
-		pe_debug("Ignore CSA, no change in ch, bw and puncture");
+	if (!lim_sta_follow_csa(session_entry, csa_params,
+				lim_ch_switch, ch_params))
 		goto err;
-	}
-
-	if (!wlan_cm_is_vdev_connected(session_entry->vdev)) {
-		pe_info_rl("Ignore CSA, vdev is in not in conncted state");
-		goto err;
-	}
 
 	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
 		link_id = wlan_vdev_get_link_id(session_entry->vdev);
@@ -2271,6 +2313,11 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 						   session_entry->smeSessionId,
 						   REASON_DRIVER_DISABLED,
 						   RSO_CHANNEL_SWITCH);
+
+	if (mlo_is_any_link_disconnecting(session_entry->vdev)) {
+		pe_info_rl("Ignore CSA, vdev is in not in conncted state");
+		goto err;
+	}
 
 	lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
 
@@ -2734,16 +2781,15 @@ void lim_nss_or_ch_width_update_rsp(struct mac_context *mac_ctx,
 	QDF_STATUS qdf_status = QDF_STATUS_E_INVAL;
 
 	rsp = qdf_mem_malloc(sizeof(*rsp));
-	if (!rsp)
-		return;
+	if (rsp) {
+		rsp->vdev_id = vdev_id;
+		rsp->status = status;
+		rsp->reason = reason;
+	}
 
-	rsp->vdev_id = vdev_id;
-	rsp->status = status;
-	rsp->reason = reason;
-
-	if (rsp->reason == REASON_NSS_UPDATE)
+	if (reason == REASON_NSS_UPDATE)
 		msg.type = eWNI_SME_NSS_UPDATE_RSP;
-	else if (rsp->reason == REASON_CH_WIDTH_UPDATE)
+	else if (reason == REASON_CH_WIDTH_UPDATE)
 		msg.type = eWNI_SME_SAP_CH_WIDTH_UPDATE_RSP;
 	else
 		goto done;

@@ -1688,6 +1688,31 @@ IE reporting_reason (EID_REPORTING_REASON)
    }
 }
 
+const SUB_EID_BANDWIDTH_INDICATION     = 164;
+IE bw_indication (SUB_EID_BANDWIDTH_INDICATION)
+{
+   {
+       reserved: 1;
+       disabled_sub_chan_bitmap_present: 1;
+       reserved_1: 6;
+   }
+   {
+       channel_width: 3;
+       reserved_2: 5;
+   }
+   ccfs0, 1;
+   ccfs1, 1;
+   disabled_sub_chan_bitmap[2][0..1] COUNTIS disabled_sub_chan_bitmap_present;
+}
+
+const SUB_EID_WIDE_BW_CHANNEL_SWITCH     = 163;
+IE wide_bw_chan_switch (SUB_EID_WIDE_BW_CHANNEL_SWITCH)
+{
+   new_chan_width,           1;
+   new_center_chan_freq0,    1;
+   new_center_chan_freq1,    1;
+}
+
 IE MeasurementReport (EID_MEAS_REPORT)    // 7.3.2.22
 {
     token, 1;
@@ -1744,6 +1769,8 @@ IE MeasurementReport (EID_MEAS_REPORT)    // 7.3.2.22
             meas_start_time,   8;
             meas_duration,     2;
             chan_load,         1;
+            OPTIE wide_bw_chan_switch;
+            OPTIE bw_indication;
         }
        Beacon (type IS 5)
        {
@@ -1809,13 +1836,13 @@ IE MeasurementReport (EID_MEAS_REPORT)    // 7.3.2.22
                 }
                 dot11_bss_average_access_delay (group_id IS 10)
                 {
-                        ap_average_access_delay, 2;
-                        average_access_delay_besteffort, 2;
-                        average_access_delay_background, 2;
-                        average_access_delay_video, 2;
-                        average_access_delay_voice, 2;
+                        ap_average_access_delay, 1;
+                        average_access_delay_besteffort, 1;
+                        average_access_delay_background, 1;
+                        average_access_delay_video, 1;
+                        average_access_delay_voice, 1;
                         station_count, 2;
-                        channel_utilization, 2;
+                        channel_utilization, 1;
                 }
             };
             OPTIE reporting_reason;
@@ -2559,6 +2586,32 @@ IE transmit_power_env (EID_TRANSMIT_POWER_ENVELOPE)
         max_tx_pwr_category:          2;
     }
     tx_power[1..8];
+    OPTIONAL UNION ext_max_tx_power (DISCRIMINATOR max_tx_pwr_interpret)
+    {
+       ext_max_tx_power_local_eirp (max_tx_pwr_interpret IS 0) {
+               max_tx_power_for_320, 1;
+       }
+       ext_max_tx_power_local_psd (max_tx_pwr_interpret IS 1) {
+               //ext_transmit_psd_info, 1;
+               {
+                       ext_count: 4;
+                       reserved: 4;
+               }
+               max_tx_psd_power[8];
+       }
+       ext_max_tx_power_reg_eirp (max_tx_pwr_interpret IS 2) {
+               max_tx_power_for_320, 1;
+       }
+       ext_max_tx_power_reg_psd (max_tx_pwr_interpret IS 3) {
+               //ext_transmit_psd_info, 1;
+               {
+                       ext_count: 4;
+                       reserved: 4;
+               }
+               max_tx_psd_power[8];
+       }
+
+    };
 }
 
 IE bw_ind_element (EID_EXTN_ID_ELEMENT) OUI (0x87)
@@ -3129,6 +3182,8 @@ IE MeasurementRequest (EID_MEAS_REQUEST)  // 7.3.2.21
            randomization_intv,      2;
            meas_duration,           2;
            OPTIE rrm_reporting;
+           OPTIE wide_bw_chan_switch;
+           OPTIE bw_indication;
        }
        Beacon (measurement_type IS 5)
        {

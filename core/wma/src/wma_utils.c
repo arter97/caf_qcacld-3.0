@@ -2214,13 +2214,21 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 	uint8_t *info;
 	uint32_t stats_len = 0;
 	int ret;
-
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	struct wma_ini_config *cfg = wma_get_ini_handle(wma_handle);
+	bool exclude_selftx_from_cca_busy;
 
 	if (!mac) {
 		wma_debug("NULL mac ptr. Exiting");
 		return -EINVAL;
 	}
+
+	if (!cfg) {
+		wma_err("NULL WMA ini handle");
+		return 0;
+	}
+
+	exclude_selftx_from_cca_busy = cfg->exclude_selftx_from_cca_busy;
 
 	if (!mac->sme.link_layer_stats_cb) {
 		wma_debug("HDD callback is null");
@@ -2385,6 +2393,12 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 		}
 
 		for (count = 0; count < radio_stats->num_channels; count++) {
+			if (exclude_selftx_from_cca_busy &&
+			    channel_stats->cca_busy_time >=
+			    channel_stats->tx_time)
+				channel_stats->cca_busy_time -=
+						channel_stats->tx_time;
+
 			ret = qdf_scnprintf(info + stats_len,
 					WMI_MAX_RADIO_STATS_LOGS - stats_len,
 					" %d[%d][%d][%d]",
@@ -2409,7 +2423,7 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 
 			if (stats_len >= (WMI_MAX_RADIO_STATS_LOGS -
 					WMI_MAX_RADIO_SINGLE_STATS_LEN)) {
-				wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][rx time][tx time] :%s",
+				wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][tx time][rx time] :%s",
 					       info);
 				stats_len = 0;
 			}
@@ -2425,7 +2439,7 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 		}
 
 		if (stats_len)
-			wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][rx time][tx time] :%s",
+			wmi_nofl_debug("freq[width][freq0][freq1][awake time][cca busy time][tx time][rx time] :%s",
 				       info);
 
 		qdf_mem_free(info);
@@ -3850,12 +3864,6 @@ void wma_update_intf_hw_mode_params(uint32_t vdev_id, uint32_t mac_id,
 	else
 		wma->interfaces[vdev_id].tx_streams =
 			hw_mode.mac1_tx_ss;
-
-	wma_debug("vdev %d, update tx ss:%d mac %d hw_mode_id %d",
-		 vdev_id,
-		 wma->interfaces[vdev_id].tx_streams,
-		 mac_id,
-		 cfgd_hw_mode_index);
 }
 
 /**
@@ -5163,12 +5171,32 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 }
 #endif
 
-/**
- * wma_get_eht_ch_width - return eht channel width
- *
- * Return: return eht channel width
- */
 #ifdef WLAN_FEATURE_11BE
+uint32_t wma_get_orig_eht_ch_width(void)
+{
+	tDot11fIEeht_cap eht_cap;
+	tp_wma_handle wma;
+	QDF_STATUS status;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (qdf_unlikely(!wma)) {
+		wma_err_rl("wma handle is NULL");
+		goto vht_ch_width;
+	}
+
+	status = mlme_cfg_get_orig_eht_caps(wma->psoc, &eht_cap);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err_rl("Failed to get eht caps");
+		goto vht_ch_width;
+	}
+
+	if (eht_cap.support_320mhz_6ghz)
+		return WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ;
+
+vht_ch_width:
+	return wma_get_vht_ch_width();
+}
+
 uint32_t wma_get_eht_ch_width(void)
 {
 	tDot11fIEeht_cap eht_cap;

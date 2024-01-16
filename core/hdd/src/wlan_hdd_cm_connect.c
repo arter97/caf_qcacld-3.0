@@ -361,6 +361,8 @@ hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id)
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
+	hdd_debug("old_link_id:%d new_link_id:%d",
+		  sta_ctx->conn_info.ieee_link_id, link_id);
 	sta_ctx->conn_info.ieee_link_id = link_id;
 }
 
@@ -370,6 +372,7 @@ hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info)
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
+	hdd_debug("clear link id:%d", sta_ctx->conn_info.ieee_link_id);
 	sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
 }
 #endif
@@ -894,8 +897,6 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	hdd_update_scan_ie_for_connect(adapter, &params);
 	hdd_update_action_oui_for_connect(hdd_ctx, req);
 
-	wlan_hdd_connectivity_event_connecting(hdd_ctx, req,
-					       adapter->deflink->vdev_id);
 	status = osif_cm_connect(ndev, vdev, req, &params);
 
 	if (status || ucfg_cm_is_vdev_roaming(vdev)) {
@@ -1101,10 +1102,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 				      rsp->connect_ies.bcn_probe_rsp.len,
 				      &hdd_sta_ctx->conn_info.hs20vendor_ie);
 
-	status = sme_unpack_assoc_rsp(mac_handle,
-				      rsp->connect_ies.assoc_rsp.ptr,
-				      rsp->connect_ies.assoc_rsp.len,
-				      assoc_resp);
+	status = sme_unpack_assoc_rsp(mac_handle, rsp, assoc_resp);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("could not parse assoc response");
 		qdf_mem_free(assoc_resp);

@@ -95,6 +95,15 @@ void ucfg_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id, uint8_t value);
 
 /**
+ * ucfg_mlme_set_bt_profile_con() - set Bluetooth connection profile
+ * @psoc: Pointer to psoc object
+ * @bt_profile_con: Bluetooth connection profile indicator
+ *
+ * Return: None
+ */
+void ucfg_mlme_set_bt_profile_con(struct wlan_objmgr_psoc *psoc,
+				  bool bt_profile_con);
+/**
  * ucfg_mlme_get_ml_link_control_mode() - get ml_link_control_mode
  * @psoc: pointer to psoc object
  * @vdev_id: vdev id
@@ -3181,6 +3190,24 @@ ucfg_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 /**
+ * ucfg_mlme_set_t2lm_negotiation_supported() - Enables/disables t2lm
+ * negotiation support value
+ * @psoc: psoc context
+ * @value: data to be set
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers to set the
+ * t2lm negotiation supported value
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
+					 bool value)
+{
+	return wlan_mlme_set_t2lm_negotiation_supported(psoc, value);
+}
+
+/**
  * ucfg_mlme_get_opr_rate() - Get operational rate set
  * @vdev: pointer to vdev object
  * @buf: buffer to get rates set
@@ -3877,6 +3904,51 @@ void ucfg_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * ucfg_mlme_get_eht_mld_id() - Get the MLD ID of the requested BSS
+ * @psoc: pointer to psoc object
+ *
+ * This API gives the MLD ID of the requested BSS
+ *
+ * Return: MLD ID of the requested BSS
+ */
+static inline uint8_t
+ucfg_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_eht_mld_id(psoc);
+}
+
+/**
+ * ucfg_mlme_set_eht_mld_id() - Set MLD ID of the requested BSS information
+ * @psoc: pointer to psoc object
+ * @value: set MLD ID
+ *
+ * This API sets the MLD ID of the requested BSS information within the ML
+ * probe request.
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc,
+			 uint8_t value)
+{
+	return wlan_mlme_set_eht_mld_id(psoc, value);
+}
+#else
+static inline uint8_t
+ucfg_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline QDF_STATUS
+ucfg_mlme_set_eht_mld_id(struct wlan_objmgr_psoc *psoc, uint8_t value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 
 /**
  * ucfg_mlme_get_80211e_is_enabled() - Enable 802.11e feature
@@ -4610,6 +4682,18 @@ QDF_STATUS ucfg_mlme_set_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc,
 bool ucfg_mlme_get_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_mlme_get_update_chan_width_allowed  - Get value of INI
+ * is_update_chan_width_allowed
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_update_chan_width_allowed(struct wlan_objmgr_psoc *psoc,
+					bool *value);
+
+/**
  * ucfg_mlme_get_channel_bonding_24ghz() - get channel bonding mode of 24ghz
  * @psoc:   pointer to psoc object
  * @value:  pointer to the value which will be filled for the caller
@@ -4630,6 +4714,7 @@ ucfg_mlme_get_channel_bonding_24ghz(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_set_channel_bonding_24ghz(struct wlan_objmgr_psoc *psoc,
 				    uint32_t value);
+
 /**
  * ucfg_mlme_get_channel_bonding_5ghz() - get channel bonding mode of 5ghz
  * @psoc:   pointer to psoc object
@@ -4832,17 +4917,17 @@ QDF_STATUS ucfg_mlme_update_bss_rate_flags(struct wlan_objmgr_psoc *psoc,
  * ucfg_mlme_send_ch_width_update_with_notify() - Send chwidth with notify
  * capability of FW
  * @psoc: pointer to psoc object
- * @vdev_id: Vdev id
+ * @link_vdev: Link VDEV object
  * @ch_width: channel width to update
- * @link_id: mlo link id
+ * @link_vdev_id: vdev id for each link
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 ucfg_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
-					   uint8_t vdev_id,
+					   struct wlan_objmgr_vdev *link_vdev,
 					   enum phy_ch_width ch_width,
-					   uint8_t link_id);
+					   uint8_t link_vdev_id);
 
 /**
  * ucfg_mlme_is_chwidth_with_notify_supported() - Get chwidth with notify

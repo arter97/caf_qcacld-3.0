@@ -447,7 +447,7 @@ cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 
 		channel.ch_freq = ml_link->channel.mhz;
 		channel.ch_cfreq1 = ml_link->channel.band_center_freq1;
-		channel.ch_cfreq1 = ml_link->channel.band_center_freq2;
+		channel.ch_cfreq2 = ml_link->channel.band_center_freq2;
 
 		/*
 		 * Update Link switch context for each vdev with roamed AP link
@@ -1115,8 +1115,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
 
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
-	    roam_synch_data->auth_status == ROAM_AUTH_STATUS_CONNECTED)
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp);
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
@@ -1382,6 +1381,7 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	wlan_cm_id cm_id = CM_ID_INVALID;
 	struct cnx_mgr *cm_ctx;
+	struct cm_roam_req *roam_req = NULL;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
 						    vdev_id,
@@ -1396,6 +1396,10 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 		status = QDF_STATUS_E_NULL_VALUE;
 		goto error;
 	}
+
+	roam_req = cm_get_first_roam_command(vdev);
+	if (roam_req)
+		cm_id = roam_req->cm_id;
 
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_INVOKE_FAIL,
 				     sizeof(wlan_cm_id), &cm_id);
@@ -1422,6 +1426,58 @@ static void cm_ho_fail_diag_event(void)
 }
 #else
 static inline void cm_ho_fail_diag_event(void) {}
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static bool
+cm_ho_fail_is_avoid_list_candidate(struct wlan_objmgr_vdev *vdev,
+				   struct cm_ho_fail_ind *ho_fail_ind)
+{
+	uint8_t link_info_iter = 0;
+	struct qdf_mac_addr peer_macaddr = {0};
+	struct mlo_link_info *mlo_link_info;
+	uint32_t akm;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		wlan_vdev_get_bss_peer_mac(vdev, &peer_macaddr);
+		akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+		if (WLAN_CRYPTO_IS_WPA_WPA2(akm))
+			return true;
+
+		if (qdf_is_macaddr_equal(&peer_macaddr, &ho_fail_ind->bssid))
+			return false;
+		else
+			return true;
+	}
+
+	mlo_link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
+	     link_info_iter++, mlo_link_info++) {
+		if (qdf_is_macaddr_equal(&mlo_link_info->ap_link_addr,
+					 &ho_fail_ind->bssid))
+			return false;
+	}
+
+	return true;
+}
+#else
+static bool
+cm_ho_fail_is_avoid_list_candidate(struct wlan_objmgr_vdev *vdev,
+				   struct cm_ho_fail_ind *ho_fail_ind)
+{
+	struct qdf_mac_addr peer_macaddr = {0};
+	uint32_t akm;
+
+	akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	if (WLAN_CRYPTO_IS_WPA_WPA2(akm))
+		return true;
+
+	wlan_vdev_get_bss_peer_mac(vdev, &peer_macaddr);
+	if (qdf_is_macaddr_equal(&peer_macaddr, &ho_fail_ind->bssid))
+		return false;
+	else
+		return true;
+}
 #endif
 
 static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
@@ -1490,11 +1546,13 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 			    sizeof(wlan_cm_id), &cm_id);
 
 	qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
-	ap_info.bssid = ind->bssid;
-	ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
-	ap_info.reject_reason = REASON_ROAM_HO_FAILURE;
-	ap_info.source = ADDED_BY_DRIVER;
-	wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
+	if (cm_ho_fail_is_avoid_list_candidate(vdev, ind)) {
+		ap_info.bssid = ind->bssid;
+		ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
+		ap_info.reject_reason = REASON_ROAM_HO_FAILURE;
+		ap_info.source = ADDED_BY_DRIVER;
+		wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
+	}
 
 	cm_ho_fail_diag_event();
 	wlan_roam_debug_log(ind->vdev_id,

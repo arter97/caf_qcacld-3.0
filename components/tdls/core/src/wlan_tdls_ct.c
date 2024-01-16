@@ -97,13 +97,14 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 	struct wlan_objmgr_vdev *tdls_link_vdev;
 	struct tdls_rx_mgmt_frame *rx_mgmt;
 	uint8_t *mac;
+	bool unforce = true;
 
-	if (!user_data) {
-		tdls_err("discovery time out data is null");
+	vdev = user_data;
+	if (!vdev) {
+		tdls_err("discovery time out vdev is null");
 		return;
 	}
 
-	vdev = (struct wlan_objmgr_vdev *)user_data;
 	tdls_soc = wlan_vdev_get_tdls_soc_obj(vdev);
 	if (!tdls_soc)
 		return;
@@ -132,6 +133,8 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 				tdls_notice("[TDLS] TDLS Discovery Response,"
 					    "QDF_MAC_ADDR_FMT RSSI[%d]<---OTA",
 					    rx_mgmt->rx_rssi);
+				tdls_debug("discovery resp on vdev %d",
+					   wlan_vdev_get_id(tdls_vdev->vdev));
 				tdls_recv_discovery_resp(tdls_vdev, mac);
 				tdls_set_rssi(tdls_vdev->vdev, mac,
 					      rx_mgmt->rx_rssi);
@@ -161,6 +164,15 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 		while (QDF_IS_STATUS_SUCCESS(status)) {
 			peer = qdf_container_of(p_node, struct tdls_peer,
 						node);
+
+			tdls_debug("Peer: " QDF_MAC_ADDR_FMT "link status %d, vdev id %d",
+				   QDF_MAC_ADDR_REF(peer->peer_mac.bytes),
+				   peer->link_status, wlan_vdev_get_id(vdev));
+
+			if (peer->link_status != TDLS_LINK_DISCOVERING &&
+			    peer->link_status != TDLS_LINK_IDLE)
+				unforce = false;
+
 			if (TDLS_LINK_DISCOVERING != peer->link_status) {
 				status = qdf_list_peek_next(head, p_node,
 							    &p_node);
@@ -172,6 +184,12 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 						  TDLS_LINK_IDLE,
 						  TDLS_LINK_NOT_SUPPORTED);
 		}
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && unforce) {
+		tdls_debug("try to set vdev %d to unforce",
+			   wlan_vdev_get_id(vdev));
+		tdls_set_link_unforce(vdev);
 	}
 
 	tdls_vdev->discovery_sent_cnt = 0;
@@ -195,6 +213,16 @@ static void tdls_reset_tx_rx(struct tdls_vdev_priv_obj *tdls_vdev)
 	qdf_list_node_t *p_node;
 	struct tdls_peer *peer;
 	QDF_STATUS status;
+	struct tdls_soc_priv_obj *tdls_soc;
+
+	tdls_soc = wlan_vdev_get_tdls_soc_obj(tdls_vdev->vdev);
+	if (!tdls_soc)
+		return;
+
+	/* reset stale connection tracker */
+	qdf_spin_lock_bh(&tdls_soc->tdls_ct_spinlock);
+	tdls_vdev->valid_mac_entries = 0;
+	qdf_spin_unlock_bh(&tdls_soc->tdls_ct_spinlock);
 
 	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
 		head = &tdls_vdev->peer_list[i];
@@ -223,9 +251,11 @@ void tdls_implicit_disable(struct tdls_vdev_priv_obj *tdls_vdev)
  */
 void tdls_implicit_enable(struct tdls_vdev_priv_obj *tdls_vdev)
 {
-	tdls_debug("Enable Implicit TDLS");
 	if (!tdls_vdev)
 		return;
+
+	tdls_debug("vdev:%d Enable Implicit TDLS",
+		   wlan_vdev_get_id(tdls_vdev->vdev));
 
 	tdls_peer_reset_discovery_processed(tdls_vdev);
 	tdls_reset_tx_rx(tdls_vdev);
@@ -788,8 +818,8 @@ void tdls_ct_idle_handler(void *user_data)
  */
 static void
 tdls_ct_process_idle_and_discovery(struct tdls_peer *curr_peer,
-				struct tdls_vdev_priv_obj *tdls_vdev_obj,
-				struct tdls_soc_priv_obj *tdls_soc_obj)
+				   struct tdls_vdev_priv_obj *tdls_vdev_obj,
+				   struct tdls_soc_priv_obj *tdls_soc_obj)
 {
 	uint16_t valid_peers;
 
@@ -914,10 +944,10 @@ static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 					struct tdls_vdev_priv_obj *tdls_vdev,
 					struct tdls_soc_priv_obj *tdls_soc)
 {
-	if (TDLS_IS_EXTERNAL_CONTROL_ENABLED(
-			tdls_soc->tdls_configs.tdls_feature_flags) &&
-			(!curr_peer->is_forced_peer))
-			return;
+	if (!curr_peer->is_forced_peer &&
+	    TDLS_IS_EXTERNAL_CONTROL_ENABLED(
+				tdls_soc->tdls_configs.tdls_feature_flags))
+		return;
 
 	if (curr_peer->rx_pkt || curr_peer->tx_pkt)
 		tdls_debug(QDF_MAC_ADDR_FMT "link_status %d tdls_support %d tx %d rx %d vdev %d",
@@ -926,29 +956,31 @@ static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 			   curr_peer->tx_pkt, curr_peer->rx_pkt,
 			   wlan_vdev_get_id(tdls_vdev->vdev));
 
-	if (!TDLS_IS_LINK_CONNECTED(curr_peer) &&
-	    ((curr_peer->tx_pkt + curr_peer->rx_pkt) >=
-	    tdls_vdev->threshold_config.tx_packet_n)) {
-		/* Ignore discovery attempt if External Control is enabled, that
+	if (TDLS_IS_LINK_CONNECTED(curr_peer))
+		return;
+
+	if ((curr_peer->tx_pkt + curr_peer->rx_pkt) >=
+	     tdls_vdev->threshold_config.tx_packet_n) {
+		/*
+		 * Ignore discovery attempt if External Control is enabled, that
 		 * is, peer is forced. In that case, continue discovery attempt
 		 * regardless attempt count
 		 */
 		tdls_debug("TDLS UNKNOWN pre discover ");
 		if (curr_peer->is_forced_peer ||
-			curr_peer->discovery_attempt++ <
+		    curr_peer->discovery_attempt <
 		    tdls_vdev->threshold_config.discovery_tries_n) {
 			tdls_debug("TDLS UNKNOWN discover ");
 			tdls_vdev->curr_candidate = curr_peer;
 			tdls_implicit_send_discovery_request(tdls_vdev);
-		} else {
-			if (curr_peer->link_status != TDLS_LINK_CONNECTING) {
-				curr_peer->tdls_support =
-						TDLS_CAP_NOT_SUPPORTED;
-				tdls_set_peer_link_status(
-						curr_peer,
-						TDLS_LINK_IDLE,
-						TDLS_LINK_NOT_SUPPORTED);
-			}
+
+			return;
+		}
+
+		if (curr_peer->link_status != TDLS_LINK_CONNECTING) {
+			curr_peer->tdls_support = TDLS_CAP_NOT_SUPPORTED;
+			tdls_set_peer_link_status(curr_peer, TDLS_LINK_IDLE,
+						  TDLS_LINK_NOT_SUPPORTED);
 		}
 	}
 }
@@ -1032,6 +1064,7 @@ void tdls_ct_handler(void *user_data)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_vdev *link_vdev;
+	QDF_STATUS status;
 
 	if (!user_data)
 		return;
@@ -1042,8 +1075,9 @@ void tdls_ct_handler(void *user_data)
 
 	link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
 	if (link_vdev) {
-		if (wlan_objmgr_vdev_try_get_ref(link_vdev, WLAN_TDLS_NB_ID) ==
-		    QDF_STATUS_SUCCESS) {
+		status = wlan_objmgr_vdev_try_get_ref(link_vdev,
+						      WLAN_TDLS_NB_ID);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
 			tdls_ct_process_handler(link_vdev);
 			wlan_objmgr_vdev_release_ref(link_vdev,
 						     WLAN_TDLS_NB_ID);
@@ -1456,6 +1490,14 @@ void tdls_disable_offchan_and_teardown_links(
 	QDF_STATUS status;
 	uint8_t vdev_id;
 	bool tdls_in_progress = false;
+	bool is_mlo_vdev;
+
+	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
+	if (is_mlo_vdev) {
+		tdls_debug("try to set vdev %d to unforce",
+			   wlan_vdev_get_id(vdev));
+		tdls_set_link_unforce(vdev);
+	}
 
 	status = tdls_get_vdev_objects(vdev, &tdls_vdev, &tdls_soc);
 	if (QDF_STATUS_SUCCESS != status) {

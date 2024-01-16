@@ -224,6 +224,7 @@ static QDF_STATUS send_roam_scan_offload_rssi_thresh_cmd_tlv(
 	rssi_threshold_fp->hirssi_upper_bound = roam_req->hi_rssi_scan_rssi_ub;
 	rssi_threshold_fp->rssi_thresh_offset_5g =
 		roam_req->rssi_thresh_offset_5g;
+	rssi_threshold_fp->flags = roam_req->flags;
 
 	buf_ptr += sizeof(wmi_roam_scan_rssi_threshold_fixed_param);
 	WMITLV_SET_HDR(buf_ptr,
@@ -2078,6 +2079,9 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		dst_buf->assoc_id =
 			WMI_GET_ASSOC_ID(src_data->frame_info_ext);
 
+		dst_buf->band =
+			WMI_GET_MLO_BITMAP_BAND_INFO(src_data->frame_info_ext);
+
 		dst_buf++;
 		src_data++;
 	}
@@ -2275,7 +2279,7 @@ wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
 						   link->link_addr.bytes);
 			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->self_link_addr,
 						   link->self_link_addr.bytes);
-			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT "self_addr:" QDF_MAC_ADDR_FMT,
+			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr: " QDF_MAC_ADDR_FMT " self_addr:" QDF_MAC_ADDR_FMT,
 				  link->link_id, link->vdev_id,
 				  link->flags,
 				  QDF_MAC_ADDR_REF(link->link_addr.bytes),
@@ -2345,7 +2349,7 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 	roam_sync_ind->roamed_vdev_id = synch_event->vdev_id;
 	roam_sync_ind->auth_status = synch_event->auth_status;
 	roam_sync_ind->roam_reason = synch_event->roam_reason;
-	roam_sync_ind->rssi = synch_event->rssi;
+	roam_sync_ind->rssi = -1 * synch_event->rssi;
 	roam_sync_ind->is_beacon = synch_event->is_beacon;
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&synch_event->bssid,
@@ -3013,13 +3017,14 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 {
 	QDF_STATUS status;
 	uint8_t vdev_id = stats_info->vdev_id;
-	uint8_t band;
 
-	band = stats_info->scan[0].band;
+	status = wmi_unified_extract_roam_scan_stats(
+			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
+	if (QDF_IS_STATUS_ERROR(status))
+		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
 
 	status = wmi_unified_extract_roam_11kv_stats(
-			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0,
-			band);
+			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Roam 11kv stats extract failed vdev %d", vdev_id);
 
@@ -3028,11 +3033,6 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	if (QDF_IS_STATUS_ERROR(status))
 		wmi_debug("Extract roamtrigger stats failed vdev %d",
 			  vdev_id);
-
-	status = wmi_unified_extract_roam_scan_stats(
-			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
-	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
 
 	status = wmi_unified_extract_roam_btm_response(
 			wmi_handle, evt_buf, &stats_info->btm_rsp[0], 0);
@@ -3062,7 +3062,7 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	struct roam_msg_info *roam_msg_info = NULL;
 	uint8_t vdev_id, i, num_btm = 0, num_frames = 0;
 	uint8_t num_tlv = 0, num_chan = 0, num_ap = 0, num_rpt = 0;
-	uint8_t num_trigger_reason = 0, band;
+	uint8_t num_trigger_reason = 0;
 	uint32_t rem_len;
 	QDF_STATUS status;
 
@@ -3251,14 +3251,12 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 			}
 		}
 
-		band = stats_info->scan[i].band;
-
 		/* BTM req/resp or Neighbor report/response info */
 		status = wmi_unified_extract_roam_11kv_stats(
 				      wmi_handle,
 				      evt_buf,
 				      &stats_info->data_11kv[i],
-				      i, num_rpt, band);
+				      i, num_rpt);
 		if (QDF_IS_STATUS_ERROR(status))
 			wmi_debug_rl("Roam 11kv stats extract fail vdev %d iter %d",
 				     vdev_id, i);
@@ -4134,7 +4132,7 @@ free_keys:
 			continue;
 
 		wmi_debug("Free key allocated at idx:%d", k);
-		qdf_mem_zero(key_alloc_buf[k], sizeof(key_alloc_buf[k]));
+		qdf_mem_zero(key_alloc_buf[k], sizeof(*key_alloc_buf[k]));
 		qdf_mem_free(key_alloc_buf[k]);
 	}
 
@@ -5081,12 +5079,16 @@ send_roam_mlo_config_tlv(wmi_unified_t wmi_handle,
 	cmd->support_link_num = req->support_link_num;
 	cmd->support_link_band = convert_support_link_band_to_wmi(
 						req->support_link_band);
+	if (!req->mlo_5gl_5gh_mlsr)
+		cmd->disallow_connect_modes |= WMI_ROAM_MLO_CONNECTION_MODE_5GL_5GH_MLSR;
+
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(req->partner_link_addr.bytes,
 				   &cmd->partner_link_addr);
 
-	wmi_debug("RSO_CFG MLO: vdev_id:%d support_link_num:%d support_link_band:0x%0x link addr:"QDF_MAC_ADDR_FMT,
+	wmi_debug("RSO_CFG MLO: vdev_id:%d support_link_num:%d support_link_band:0x%0x disallow_connect_mode %d link addr:"QDF_MAC_ADDR_FMT,
 		  cmd->vdev_id, cmd->support_link_num,
 		  cmd->support_link_band,
+		  cmd->disallow_connect_modes,
 		  QDF_MAC_ADDR_REF(req->partner_link_addr.bytes));
 
 	wmi_mtrace(WMI_ROAM_MLO_CONFIG_CMDID, cmd->vdev_id, 0);

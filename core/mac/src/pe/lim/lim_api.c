@@ -88,6 +88,7 @@
 #include <wlan_twt_api.h>
 #include "wlan_tdls_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include "wlan_cm_api.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -907,6 +908,7 @@ QDF_STATUS pe_close(struct mac_context *mac)
 		return QDF_STATUS_SUCCESS;
 
 	qdf_hang_event_unregister_notifier(&pe_hang_event_notifier);
+	lim_cleanup_mlm(mac);
 	lim_cleanup(mac);
 	lim_unregister_scan_mbssid_callback(mac);
 	lim_unregister_sap_bcn_callback(mac);
@@ -973,7 +975,6 @@ QDF_STATUS pe_start(struct mac_context *mac)
 
 void pe_stop(struct mac_context *mac)
 {
-	lim_cleanup_mlm(mac);
 	pe_debug(" PE STOP: Set LIM state to eLIM_MLM_OFFLINE_STATE");
 	SET_LIM_MLM_STATE(mac, eLIM_MLM_OFFLINE_STATE);
 	return;
@@ -1368,7 +1369,8 @@ void pe_register_callbacks_with_wma(struct mac_context *mac,
 	status = wma_register_roaming_callbacks(
 			ready_req->csr_roam_auth_event_handle_cb,
 			ready_req->pe_roam_synch_cb,
-			ready_req->pe_disconnect_cb);
+			ready_req->pe_disconnect_cb,
+			ready_req->pe_roam_set_ie_cb);
 	if (status != QDF_STATUS_SUCCESS)
 		pe_err("Registering roaming callbacks with WMA failed");
 }
@@ -2175,9 +2177,10 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t *ie = NULL;
 	struct qdf_mac_addr bssid;
-	bool is_mlo_link = false;
+	bool is_mlo_link;
 	uint8_t vdev_id = session->vdev_id;
 	struct element_info frame;
+	struct cm_roam_values_copy mdie_cfg = {0};
 
 	bcn_proberesp_ptr = (uint8_t *)roam_synch_ind +
 		roam_synch_ind->beacon_probe_resp_offset;
@@ -2186,30 +2189,21 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	frame.ptr = NULL;
 	frame.len = 0;
 	if (is_multi_link_roam(roam_synch_ind)) {
-		if (roam_synch_ind->link_beacon_probe_resp_length) {
-			if (wlan_vdev_mlme_get_is_mlo_link(mac->psoc,
-							   vdev_id)) {
-				bcn_proberesp_ptr = (uint8_t *)roam_synch_ind +
-				roam_synch_ind->link_beacon_probe_resp_offset;
-				bcn_proberesp_len =
-				roam_synch_ind->link_beacon_probe_resp_length;
-			}
-		} else {
-			mlo_get_sta_link_mac_addr(vdev_id, roam_synch_ind,
-						  &bssid);
-			status = wlan_scan_get_entry_by_mac_addr(mac->pdev,
-								 &bssid,
-								 &frame);
-			if (QDF_IS_STATUS_ERROR(status) && !frame.len) {
-				pe_err("Failed to get scan entry for " QDF_MAC_ADDR_FMT,
-				       QDF_MAC_ADDR_REF(bssid.bytes));
-				return status;
-			}
-			bcn_proberesp_ptr = frame.ptr;
-			bcn_proberesp_len = frame.len;
+		mlo_get_sta_link_mac_addr(vdev_id, roam_synch_ind, &bssid);
+		is_mlo_link = wlan_vdev_mlme_get_is_mlo_link(mac->psoc, vdev_id);
+
+		status = wlan_scan_get_entry_by_mac_addr(mac->pdev, &bssid,
+							 &frame);
+		if (QDF_IS_STATUS_ERROR(status) || !frame.len) {
+			pe_err("Failed to get scan entry for " QDF_MAC_ADDR_FMT,
+			       QDF_MAC_ADDR_REF(bssid.bytes));
+			return status;
 		}
-		if (wlan_vdev_mlme_get_is_mlo_link(mac->psoc, vdev_id))
-			is_mlo_link = true;
+		bcn_proberesp_ptr = frame.ptr;
+		bcn_proberesp_len = frame.len;
+	} else {
+		bssid = roam_synch_ind->bssid;
+		is_mlo_link = false;
 	}
 
 	mac_hdr = (tpSirMacMgmtHdr)bcn_proberesp_ptr;
@@ -2225,11 +2219,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		status = QDF_STATUS_E_FAILURE;
 		goto done;
 	}
-
-	if (is_multi_link_roam(roam_synch_ind))
-		mlo_get_sta_link_mac_addr(vdev_id, roam_synch_ind, &bssid);
-	else
-		bssid = roam_synch_ind->bssid;
 
 	pe_debug("LFR3:Beacon/Prb Rsp: %d bssid " QDF_MAC_ADDR_FMT
 		 " beacon " QDF_MAC_ADDR_FMT,
@@ -2297,11 +2286,9 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		bss_desc_ptr->chan_freq = roam_synch_ind->chan_freq;
 	}
 
-	bss_desc_ptr->nwType = lim_get_nw_type(
-			mac,
-			bss_desc_ptr->chan_freq,
-			SIR_MAC_MGMT_FRAME,
-			parsed_frm_ptr);
+	bss_desc_ptr->nwType = lim_get_nw_type(mac, bss_desc_ptr->chan_freq,
+					       SIR_MAC_MGMT_FRAME,
+					       parsed_frm_ptr);
 
 	bss_desc_ptr->sinr = 0;
 	bss_desc_ptr->beaconInterval = parsed_frm_ptr->beaconInterval;
@@ -2325,10 +2312,18 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		qdf_mem_copy((uint8_t *)bss_desc_ptr->mdie,
 				(uint8_t *)parsed_frm_ptr->mdie,
 				SIR_MDIE_SIZE);
+
+		mdie_cfg.bool_value = true;
+		mdie_cfg.uint_value =
+			(bss_desc_ptr->mdie[1] << 8) | (bss_desc_ptr->mdie[0]);
+
+		wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					   MOBILITY_DOMAIN, &mdie_cfg);
 	}
-	pe_debug("chan: %d rssi: %d ie_len %d",
+	pe_debug("chan: %d rssi: %d ie_len %d mdie_present:%d mdie = %02x %02x %02x",
 		 bss_desc_ptr->chan_freq,
-		 bss_desc_ptr->rssi, ie_len);
+		 bss_desc_ptr->rssi, ie_len, bss_desc_ptr->mdiePresent,
+		 bss_desc_ptr->mdie[0], bss_desc_ptr->mdie[1], bss_desc_ptr->mdie[2]);
 
 	if (ie_len) {
 		qdf_mem_copy(&bss_desc_ptr->ieFields,
@@ -2568,6 +2563,7 @@ lim_fill_roamed_peer_twt_caps(struct mac_context *mac_ctx,
 	uint32_t status;
 	tDot11fReAssocResponse *reassoc_rsp;
 	struct pe_session *pe_session;
+	struct qdf_mac_addr mac_addr;
 
 	pe_session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!pe_session) {
@@ -2597,11 +2593,17 @@ lim_fill_roamed_peer_twt_caps(struct mac_context *mac_ctx,
 			 status, len);
 	}
 
-	if (lim_is_session_he_capable(pe_session))
+	if (lim_is_session_he_capable(pe_session)) {
+		if (is_multi_link_roam(roam_synch))
+			mlo_get_sta_link_mac_addr(vdev_id, roam_synch,
+						  &mac_addr);
+		else
+			qdf_copy_macaddr(&mac_addr, &roam_synch->bssid);
 		lim_set_twt_peer_capabilities(mac_ctx,
-					      &roam_synch->bssid,
+					      &mac_addr,
 					      &reassoc_rsp->he_cap,
 					      &reassoc_rsp->he_op);
+	}
 	qdf_mem_free(reassoc_rsp);
 }
 #endif
@@ -2655,9 +2657,9 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 {
 	struct element_info link_reassoc_rsp;
 	struct qdf_mac_addr sta_link_addr;
+	struct mlo_partner_info *ml_partner_info;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint8_t idx = 0;
-	uint8_t link_id;
+	uint8_t idx = 0, num_partner_links, link_id, link_vdev_id;
 
 	link_reassoc_rsp.ptr = qdf_mem_malloc(reassoc_rsp_len);
 	if (!link_reassoc_rsp.ptr)
@@ -2668,30 +2670,32 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 
 	link_reassoc_rsp.len = reassoc_rsp_len;
 
-	for (idx = 0;
-	     idx < session_entry->ml_partner_info.num_partner_links;
-	     idx++) {
-		link_id =
-		 session_entry->ml_partner_info.partner_link_info[idx].link_id;
-		status =
-		 util_gen_link_assoc_rsp(reassoc_rsp + WLAN_MAC_HDR_LEN_3A,
-					 reassoc_rsp_len - WLAN_MAC_HDR_LEN_3A,
-					 true,
-					 link_id,
-					 sta_link_addr,
-					 link_reassoc_rsp.ptr,
-					 reassoc_rsp_len,
-					 (qdf_size_t *)&link_reassoc_rsp.len);
+	ml_partner_info = &session_entry->ml_partner_info;
+	num_partner_links = ml_partner_info->num_partner_links;
+	for (idx = 0; idx < num_partner_links; idx++) {
+		link_vdev_id = ml_partner_info->partner_link_info[idx].vdev_id;
+		if (link_vdev_id == WLAN_INVALID_VDEV_ID)
+			continue;
 
+		if (link_vdev_id != session_entry->vdev_id)
+			continue;
+
+		link_id = ml_partner_info->partner_link_info[idx].link_id;
+		status = util_gen_link_assoc_rsp(
+					reassoc_rsp + WLAN_MAC_HDR_LEN_3A,
+					reassoc_rsp_len - WLAN_MAC_HDR_LEN_3A,
+					true, link_id, sta_link_addr,
+					link_reassoc_rsp.ptr, reassoc_rsp_len,
+					(qdf_size_t *)&link_reassoc_rsp.len);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("MLO ROAM: Link reassoc generation failed %d",
-			       status);
+			pe_err("MLO ROAM: link_id:%d vdev:%d Reassoc generation failed %d",
+			       link_id, link_vdev_id, status);
 			goto end;
 		}
 
 		lim_process_assoc_rsp_frame(mac_ctx, link_reassoc_rsp.ptr,
-				    link_reassoc_rsp.len - SIR_MAC_HDR_LEN_3A,
-				    LIM_REASSOC, session_entry);
+					    link_reassoc_rsp.len - WLAN_MAC_HDR_LEN_3A,
+					    LIM_REASSOC, session_entry);
 	}
 end:
 	qdf_mem_free(link_reassoc_rsp.ptr);
@@ -2868,6 +2872,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	struct bss_description *bss_desc = NULL;
 	uint16_t ric_tspec_len;
 	struct qdf_mac_addr bssid;
+	uint8_t *oui_ie_ptr;
+	uint16_t oui_ie_len;
 
 	if (!roam_sync_ind_ptr) {
 		pe_err("LFR3:roam_sync_ind_ptr is NULL");
@@ -2968,8 +2974,15 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	ft_session_ptr->csaOffloadEnable = session_ptr->csaOffloadEnable;
 
 	/* Next routine will update nss and vdev_nss with AP's capabilities */
-	lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr,
-			    session_ptr, roam_sync_ind_ptr->phy_mode);
+	status = lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr,
+				     session_ptr, roam_sync_ind_ptr->phy_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to fill ft session for vdev id %d",
+		       ft_session_ptr->vdev_id);
+		qdf_mem_free(bss_desc);
+		goto roam_sync_fail;
+	}
+
 	roam_sync_ind_ptr->ssid.length =
 		qdf_min((qdf_size_t)ft_session_ptr->ssId.length,
 			sizeof(roam_sync_ind_ptr->ssid.ssid));
@@ -2983,7 +2996,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	/* Next routine may update nss based on dot11Mode */
 
 	lim_ft_prepare_add_bss_req(mac_ctx, ft_session_ptr, bss_desc);
-	qdf_mem_free(bss_desc);
+	lim_set_tpc_power(mac_ctx, ft_session_ptr, bss_desc);
 
 	if (session_ptr->is11Rconnection)
 		lim_fill_fils_ft(session_ptr, ft_session_ptr);
@@ -3004,6 +3017,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	if (!sta_ds && !is_multi_link_roam(roam_sync_ind_ptr)) {
 		pe_err("LFR3:failed to lookup hash entry");
 		ft_session_ptr->bRoamSynchInProgress = false;
+		qdf_mem_free(bss_desc);
 		goto roam_sync_fail;
 	}
 
@@ -3018,6 +3032,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		pe_err("LFR3:failed to add hash entry for "QDF_MAC_ADDR_FMT,
 		       QDF_MAC_ADDR_REF(add_bss_params->staContext.staMac));
 		ft_session_ptr->bRoamSynchInProgress = false;
+		qdf_mem_free(bss_desc);
 		goto roam_sync_fail;
 	}
 
@@ -3035,13 +3050,32 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 						ft_session_ptr,
 						reassoc_resp,
 						roam_sync_ind_ptr->reassoc_resp_length);
-		if (QDF_IS_STATUS_ERROR(status))
+		if (ft_session_ptr->is_unexpected_peer_error)
+			status = QDF_STATUS_E_FAILURE;
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			qdf_mem_free(bss_desc);
 			goto roam_sync_fail;
-	}
-	else
+		}
+	} else {
 		lim_process_assoc_rsp_frame(mac_ctx, reassoc_resp,
 					    roam_sync_ind_ptr->reassoc_resp_length - SIR_MAC_HDR_LEN_3A,
 					    LIM_REASSOC, ft_session_ptr);
+		if (ft_session_ptr->is_unexpected_peer_error) {
+			status = QDF_STATUS_E_FAILURE;
+			qdf_mem_free(bss_desc);
+			goto roam_sync_fail;
+		}
+	}
+
+	oui_ie_ptr = (uint8_t *)&bss_desc->ieFields[0];
+	oui_ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+	lim_enable_cts_to_self_for_exempted_iot_ap(mac_ctx,
+						   ft_session_ptr,
+						   oui_ie_ptr, oui_ie_len);
+	qdf_mem_free(bss_desc);
+	oui_ie_len = 0;
+	oui_ie_ptr = NULL;
 
 	lim_check_ft_initial_im_association(roam_sync_ind_ptr, ft_session_ptr);
 
@@ -3117,6 +3151,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr, aid,
 					  session_ptr);
 	}
+
 	pe_delete_session(mac_ctx, session_ptr);
 	return QDF_STATUS_SUCCESS;
 
@@ -3136,6 +3171,20 @@ roam_sync_fail:
 	pe_delete_session(mac_ctx, ft_session_ptr);
 	return status;
 }
+
+QDF_STATUS
+pe_set_ie_for_roam_invoke(struct mac_context *mac_ctx, uint8_t vdev_id,
+			  uint16_t dot11_mode, enum QDF_OPMODE opmode)
+{
+	QDF_STATUS status;
+
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	status = lim_send_ies_per_band(mac_ctx, vdev_id, dot11_mode, opmode);
+	return status;
+}
+
 #endif
 
 static bool lim_is_beacon_miss_scenario(struct mac_context *mac,
@@ -3174,8 +3223,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 	uint8_t *pBody;
 	tSirMacCapabilityInfo capabilityInfo;
 	tpSirMacMgmtHdr pHdr = NULL;
-	struct pe_session *pe_session = NULL;
-	uint8_t sessionId;
+	struct wlan_objmgr_vdev *vdev;
 
 	/*
 	 *
@@ -3217,10 +3265,12 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		struct tLimPreAuthNode *auth_node;
 
 		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-		pe_session = pe_find_session_by_bssid(mac, pHdr->bssId,
-							 &sessionId);
-		if (!pe_session)
+		vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+								 pHdr->da,
+								 WLAN_LEGACY_MAC_ID);
+		if (!vdev)
 			return eMGMT_DROP_NO_DROP;
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 		curr_seq_num = ((pHdr->seqControl.seqNumHi << 4) |
 				(pHdr->seqControl.seqNumLo));
@@ -3239,10 +3289,20 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		qdf_time_t *timestamp;
 
 		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-		pe_session = pe_find_session_by_bssid(mac, pHdr->bssId,
-				&sessionId);
-		if (!pe_session)
+		vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+								 pHdr->da,
+								 WLAN_LEGACY_MAC_ID);
+		if (!vdev)
 			return eMGMT_DROP_SPURIOUS_FRAME;
+
+		if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
+		    wlan_cm_is_vdev_roam_started(vdev) &&
+		    (subType == SIR_MAC_MGMT_DISASSOC ||
+		     subType == SIR_MAC_MGMT_DEAUTH)) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+			return eMGMT_DROP_DEAUTH_DURING_ROAM_STARTED;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 		peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
 						   pHdr->sa,
@@ -3250,7 +3310,6 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		if (!peer) {
 			if (subType == SIR_MAC_MGMT_ASSOC_REQ)
 				return eMGMT_DROP_NO_DROP;
-
 			return eMGMT_DROP_SPURIOUS_FRAME;
 		}
 
@@ -3260,7 +3319,6 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 			wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 			if (subType == SIR_MAC_MGMT_ASSOC_REQ)
 				return eMGMT_DROP_NO_DROP;
-
 			return eMGMT_DROP_SPURIOUS_FRAME;
 		}
 
@@ -3473,6 +3531,8 @@ static const struct rsn_oui_akm_type_map rsn_oui_akm_type_mapping_table[] = {
 	{ANI_AKM_TYPE_DPP_RSN,              {0x50, 0x6F, 0x9A, 0x02} },
 	{ANI_AKM_TYPE_WPA,                  {0x00, 0x50, 0xF2, 0x01} },
 	{ANI_AKM_TYPE_WPA_PSK,              {0x00, 0x50, 0xF2, 0x02} },
+	{ANI_AKM_TYPE_SAE_EXT_KEY,          {0x00, 0x0F, 0xAC, 0x18} },
+	{ANI_AKM_TYPE_FT_SAE_EXT_KEY,       {0x00, 0x0F, 0xAC, 0x19} },
 	/* Add akm type above here */
 	{ANI_AKM_TYPE_UNKNOWN, {0} },
 };
@@ -3549,6 +3609,10 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 	}
 
 	pe_join_req = pe_session->lim_join_req;
+
+	mlo_roam_copy_partner_info(&pe_join_req->partner_info,
+				   sync_ind, vdev_id, false);
+
 	bss_desc = &pe_session->lim_join_req->bssDescription;
 
 	status = lim_roam_fill_bss_descr(mac_ctx, sync_ind, bss_desc,
@@ -3869,6 +3933,9 @@ lim_clear_ml_partner_info(struct pe_session *session_entry)
 	}
 	pe_debug_rl("Clear Partner Link/s information");
 	for (idx = 0; idx < partner_info->num_partner_links; idx++) {
+		mlo_mgr_clear_ap_link_info(session_entry->vdev,
+			partner_info->partner_link_info[idx].link_addr.bytes);
+
 		partner_info->partner_link_info[idx].link_id = 0;
 		qdf_zero_macaddr(
 			&partner_info->partner_link_info[idx].link_addr);
@@ -4005,6 +4072,7 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	struct wlan_objmgr_pdev *pdev;
 	struct scan_cache_entry *cache_entry;
 	struct wlan_channel channel;
+	bool is_security_allowed;
 
 	pdev = mac_ctx->pdev;
 	if (!pdev) {
@@ -4016,6 +4084,22 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 							   freq);
 	if (!cache_entry)
 		return QDF_STATUS_E_FAILURE;
+
+	/**
+	 * Reject all the partner link if any partner link  doesn’t pass the
+	 * security check and proceed connection with single link.
+	 */
+	is_security_allowed =
+		wlan_cm_is_eht_allowed_for_current_security(
+					wlan_pdev_get_psoc(mac_ctx->pdev),
+					cache_entry);
+
+	if (!is_security_allowed) {
+		mlme_debug("current security is not valid for partner link link_addr:" QDF_MAC_ADDR_FMT,
+			   QDF_MAC_ADDR_REF(link_addr->bytes));
+		util_scan_free_cache_entry(cache_entry);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	channel.ch_freq = cache_entry->channel.chan_freq;
 	channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);
@@ -4212,11 +4296,7 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 							 link_info->chan_freq);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				pe_err("failed to update mlo_mgr %d", status);
-				status =
-				   lim_check_scan_db_for_join_req_partner_info(
-					session_entry, mac_ctx);
-				if (QDF_IS_STATUS_ERROR(status))
-					lim_clear_ml_partner_info(session_entry);
+				lim_clear_ml_partner_info(session_entry);
 
 				goto end;
 			}

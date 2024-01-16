@@ -594,10 +594,6 @@ pkt_capture_is_beacon_forward_enable(struct wlan_objmgr_vdev *vdev,
 		return false;
 	}
 
-	if (vdev_priv->frame_filter.mgmt_rx_frame_filter &
-	    PKT_CAPTURE_MGMT_CONNECT_NO_BEACON)
-		return false;
-
 	mac_hdr = (tpSirMacMgmtHdr)(qdf_nbuf_data(wbuf));
 	wlan_vdev_get_bss_peer_mac(vdev, &connected_bssid);
 
@@ -745,7 +741,6 @@ pkt_capture_mgmt_rx_data_cb(struct wlan_objmgr_psoc *psoc,
 
 	/* Convert rate from Mbps to 500 Kbps */
 	txrx_status.rate = txrx_status.rate * 2;
-	txrx_status.add_rtap_ext = true;
 
 	wh = (struct ieee80211_frame *)qdf_nbuf_data(nbuf);
 	wh->i_fc[1] &= ~IEEE80211_FC1_WEP;

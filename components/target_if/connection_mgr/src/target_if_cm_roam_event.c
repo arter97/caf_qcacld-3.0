@@ -228,7 +228,6 @@ target_if_cm_roam_sync_frame_event(ol_scn_t scn,
 	}
 
 	frame_ind_ptr = qdf_mem_malloc(sizeof(*frame_ind_ptr));
-
 	if (!frame_ind_ptr)
 		return -ENOMEM;
 

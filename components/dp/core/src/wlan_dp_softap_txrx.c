@@ -867,7 +867,7 @@ QDF_STATUS dp_softap_rx_packet_cbk(void *link_ctx, qdf_nbuf_t rx_buf)
 			is_eapol = true;
 
 		if (qdf_unlikely(is_eapol &&
-		    !(!qdf_mem_cmp(dp_intf->mac_addr.bytes,
+		    !(!qdf_mem_cmp(dp_link->mac_addr.bytes,
 				   qdf_nbuf_data(nbuf) +
 				   QDF_NBUF_DEST_MAC_OFFSET,
 				   QDF_MAC_ADDR_SIZE) ||

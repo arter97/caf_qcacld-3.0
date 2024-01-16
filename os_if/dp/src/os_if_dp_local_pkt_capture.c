@@ -97,6 +97,23 @@ bool os_if_local_pkt_capture_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
+bool os_if_lpc_mon_intf_creation_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	if (ucfg_dp_is_local_pkt_capture_enabled(psoc)) {
+		if (policy_mgr_is_mlo_sta_present(psoc)) {
+			osif_err("MLO STA present, lpc interface creation not allowed");
+			return false;
+		}
+
+		if (!os_if_local_pkt_capture_concurrency_allowed(psoc)) {
+			osif_err("Concurrency check failed, lpc interface creation not allowed");
+			return false;
+		}
+	}
+
+	return true;
+}
+
 static QDF_STATUS os_if_start_capture_allowed(struct wlan_objmgr_vdev *vdev)
 {
 	enum QDF_OPMODE mode = wlan_vdev_mlme_get_opmode(vdev);

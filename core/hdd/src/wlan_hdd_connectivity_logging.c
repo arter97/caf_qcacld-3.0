@@ -1299,59 +1299,52 @@ void wlan_hdd_start_connectivity_logging(struct hdd_context *hdd_ctx)
 #endif
 
 #ifdef CONNECTIVITY_DIAG_EVENT
-void wlan_hdd_connectivity_event_connecting(struct hdd_context *hdd_ctx,
-					    struct cfg80211_connect_params *req,
-					    uint8_t vdev_id)
+static enum wlan_diag_connect_fail_reason
+wlan_hdd_convert_con_fail_reason_to_diag_reason(
+				enum wlan_cm_connect_fail_reason reason)
 {
-	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_connect);
+	switch (reason) {
+	case CM_NO_CANDIDATE_FOUND:
+		return WLAN_DIAG_NO_CANDIDATE_FOUND;
+	case CM_ABORT_DUE_TO_NEW_REQ_RECVD:
+		return WLAN_DIAG_ABORT_DUE_TO_NEW_REQ_RECVD;
+	case CM_BSS_SELECT_IND_FAILED:
+		return WLAN_DIAG_BSS_SELECT_IND_FAILED;
+	case CM_PEER_CREATE_FAILED:
+		return WLAN_DIAG_PEER_CREATE_FAILED;
+	case CM_JOIN_FAILED:
+		return WLAN_DIAG_JOIN_FAILED;
+	case CM_JOIN_TIMEOUT:
+		return WLAN_DIAG_JOIN_TIMEOUT;
+	case CM_AUTH_FAILED:
+		return WLAN_DIAG_AUTH_FAILED;
+	case CM_AUTH_TIMEOUT:
+		return WLAN_DIAG_AUTH_TIMEOUT;
+	case CM_ASSOC_FAILED:
+		return WLAN_DIAG_ASSOC_FAILED;
+	case CM_ASSOC_TIMEOUT:
+		return WLAN_DIAG_ASSOC_TIMEOUT;
+	case CM_HW_MODE_FAILURE:
+		return WLAN_DIAG_HW_MODE_FAILURE;
+	case CM_SER_FAILURE:
+		return WLAN_DIAG_SER_FAILURE;
+	case CM_SER_TIMEOUT:
+		return WLAN_DIAG_SER_TIMEOUT;
+	case CM_GENERIC_FAILURE:
+		return WLAN_DIAG_GENERIC_FAILURE;
+	case CM_VALID_CANDIDATE_CHECK_FAIL:
+		return WLAN_DIAG_VALID_CANDIDATE_CHECK_FAIL;
+	default:
+		hdd_err("Invalid connect fail reason code");
+	}
 
-	qdf_mem_zero(&wlan_diag_event, sizeof(struct wlan_diag_connect));
-
-	if (wlan_get_opmode_from_vdev_id(hdd_ctx->pdev, vdev_id) !=
-	    QDF_STA_MODE)
-		return;
-
-	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
-	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
-	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
-	wlan_diag_event.subtype = WLAN_CONN_DIAG_CONNECTING_EVENT;
-
-	wlan_diag_event.version = DIAG_CONN_VERSION;
-	wlan_diag_event.ssid_len = req->ssid_len;
-	if (req->ssid_len > WLAN_SSID_MAX_LEN)
-		wlan_diag_event.ssid_len = WLAN_SSID_MAX_LEN;
-	qdf_mem_copy(wlan_diag_event.ssid, req->ssid,
-		     wlan_diag_event.ssid_len);
-
-	if (req->bssid)
-		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid, req->bssid,
-			     QDF_MAC_ADDR_SIZE);
-	else if (req->bssid_hint)
-		qdf_mem_copy(wlan_diag_event.bssid_hint, req->bssid_hint,
-			     QDF_MAC_ADDR_SIZE);
-
-	if (req->channel)
-		wlan_diag_event.freq = req->channel->center_freq;
-
-	if (req->channel_hint)
-		wlan_diag_event.freq_hint = req->channel_hint->center_freq;
-
-	wlan_diag_event.pairwise_cipher = req->crypto.ciphers_pairwise[0];
-	wlan_diag_event.grp_cipher = req->crypto.cipher_group;
-	wlan_diag_event.akm = req->crypto.akm_suites[0];
-	wlan_diag_event.auth_algo = req->auth_type;
-	if (hdd_ctx->bt_profile_con)
-		wlan_diag_event.bt_coex = true;
-
-	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_CONN);
+	return WLAN_DIAG_UNSPECIFIC_REASON;
 }
 
 void
 wlan_hdd_connectivity_fail_event(struct wlan_objmgr_vdev *vdev,
 				 struct wlan_cm_connect_resp *rsp)
 {
-	uint8_t op_mode;
-
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_connect);
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(struct wlan_diag_connect));
@@ -1359,10 +1352,12 @@ wlan_hdd_connectivity_fail_event(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 		return;
 
-	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
-	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	if (op_mode != QDF_STA_MODE)
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
+	     wlan_vdev_mlme_is_mlo_link_vdev(vdev)))
 		return;
+
+	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
 
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
@@ -1372,7 +1367,8 @@ wlan_hdd_connectivity_fail_event(struct wlan_objmgr_vdev *vdev,
 
 	wlan_diag_event.version = DIAG_CONN_VERSION;
 	wlan_diag_event.freq = rsp->freq;
-	wlan_diag_event.reason = rsp->reason;
+	wlan_diag_event.reason =
+	wlan_hdd_convert_con_fail_reason_to_diag_reason(rsp->reason);
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_CONN);
 }
