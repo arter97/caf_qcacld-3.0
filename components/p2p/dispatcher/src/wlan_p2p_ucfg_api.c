@@ -693,3 +693,11 @@ ucfg_p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc)
 {
 	return p2p_get_mgmt_frm_registration_update(psoc);
 }
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+				    struct p2p_usd_attr_params *param)
+{
+	return p2p_send_usd_params(psoc, param);
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

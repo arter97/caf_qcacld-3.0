@@ -661,4 +661,15 @@ p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc);
  */
 const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
 						  uint32_t assoc_ie_len);
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * p2p_send_usd_params() - Sent USD parameters to target
+ * @psoc: pointer to PSOC object
+ * @param: pointer to USD attributes parameters structure
+ *
+ * Return: QDF status
+ */
+QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+			       struct p2p_usd_attr_params *param);
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* _WLAN_P2P_MAIN_H_ */

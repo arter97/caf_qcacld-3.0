@@ -225,6 +225,7 @@
 #include "os_if_telemetry.h"
 #endif
 #include "wlan_p2p_ucfg_api.h"
+#include "wlan_cfg80211_p2p.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -22818,6 +22819,8 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	},
 
 	FEATURE_P2P_LISTEN_OFFLOAD_VENDOR_COMMANDS
+
+	FEATURE_P2P_SECURE_USD_VENDOR_COMMANDS
 
 	FEATURE_SAP_COND_CHAN_SWITCH_VENDOR_COMMANDS
 	{
