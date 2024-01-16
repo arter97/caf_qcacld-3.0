@@ -796,7 +796,7 @@ rrm_update_vdev_stats(tpSirMacRadioMeasureReport rrm_report, uint8_t vdev_id)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	pe_nofl_debug("counter stats count: fragment (tx: %d rx: %d) group tx: %d mac stats count: retry : %d multiple retry: %d frame duplicate %d",
+	pe_nofl_debug("counter stats count: fragment (tx: %d rx: %d) group tx: %llu mac stats count: retry : %d multiple retry: %d frame duplicate %d",
 		      stats->tx.fragment_count, stats->rx.fragment_count,
 		      stats->tx.mcast.num, stats->tx.retry_count,
 		      stats->tx.multiple_retry_count,
@@ -1619,7 +1619,8 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 		i = 0;
 		do {
 			if (((!eids) || (*pBcnIes == eids[i])) ||
-				((*pBcnIes == eid) && *(pBcnIes + 2) == extn_eids[i])) {
+			    ((*pBcnIes == eid) &&
+			     (extn_eids && *(pBcnIes + 2) == extn_eids[i]))) {
 				if (((*pNumIes) + len) < pIesMaxSize) {
 						qdf_mem_copy(pIes, pBcnIes, len);
 						pIes += len;
@@ -2055,9 +2056,9 @@ rrm_process_channel_load_req(struct mac_context *mac,
 {
 	struct scheduler_msg msg = {0};
 	struct ch_load_ind *load_ind;
-	struct bw_ind_element bw_ind;
-	struct wide_bw_chan_switch wide_bw;
-	struct rrm_reporting rrm_report;
+	struct bw_ind_element bw_ind = {0};
+	struct wide_bw_chan_switch wide_bw = {0};
+	struct rrm_reporting rrm_report = {0};
 	uint8_t op_class, channel;
 	uint16_t randomization_intv, meas_duration, max_meas_duration;
 	bool is_rrm_reporting, is_wide_bw_chan_switch;
@@ -2337,7 +2338,7 @@ rrm_process_chan_load_report_xmit(struct mac_context *mac_ctx,
 		     sizeof(channel_load_report->bw_ind));
 	qdf_mem_copy(&channel_load_report->wide_bw, &chan_load_ind->wide_bw,
 		     sizeof(channel_load_report->wide_bw));
-	pe_err("send chan load report for bssId:"QDF_MAC_ADDR_FMT" reg_class:%d, channel:%d, measStartTime:%llu, measDuration:%d, chan_load:%d",
+	pe_err("send chan load report for bssId:"QDF_MAC_ADDR_FMT" reg_class:%d, channel:%d, measStartTime:%lu, measDuration:%d, chan_load:%d",
 	       QDF_MAC_ADDR_REF(sessionBssId.bytes),
 	       channel_load_report->op_class,
 	       channel_load_report->channel,

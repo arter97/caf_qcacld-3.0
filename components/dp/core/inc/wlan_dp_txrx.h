@@ -49,11 +49,11 @@
 
 /**
  * wlan_dp_intf_get_pkt_type_bitmap_value() - Get packt type bitmap info
- * @intf_ctx: DP interface context
+ * @link_ctx: DP link context
  *
  * Return: bitmap information
  */
-uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *intf_ctx);
+uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *link_ctx);
 
 #if defined(WLAN_SUPPORT_RX_FISA)
 /**
