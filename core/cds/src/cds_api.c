@@ -124,7 +124,7 @@ cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
 				     reason_code, cdp_reason_code);
 }
 
-static struct ol_if_ops  dp_ol_if_ops = {
+static struct ol_if_ops dp_ol_if_ops = {
 	.peer_set_default_routing = target_if_peer_set_default_routing,
 	.peer_rx_reorder_queue_setup = target_if_peer_rx_reorder_queue_setup,
 	.peer_rx_reorder_queue_remove = target_if_peer_rx_reorder_queue_remove,
@@ -148,13 +148,19 @@ static struct ol_if_ops  dp_ol_if_ops = {
 	.dp_get_tx_inqueue = dp_get_tx_inqueue,
 	.dp_send_unit_test_cmd = wma_form_unit_test_cmd_and_send,
 	.dp_print_fisa_stats = wlan_dp_print_fisa_rx_stats,
-    /* TODO: Add any other control path calls required to OL_IF/WMA layer */
+
+#ifdef IPA_WDS_EASYMESH_FEATURE
+	.peer_map_event = wlan_dp_send_ipa_wds_peer_map_event,
+	.peer_unmap_event = wlan_dp_send_ipa_wds_peer_unmap_event,
+	.peer_send_wds_disconnect = wlan_dp_send_ipa_wds_peer_disconnect,
+#endif
+	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
-#else
-static struct ol_if_ops  dp_ol_if_ops = {
+#else /* !QCA_WIFI_QCA8074 */
+static struct ol_if_ops dp_ol_if_ops = {
 	.dp_rx_get_pending = cds_get_rx_thread_pending,
 };
-#endif
+#endif /* QCA_WIFI_QCA8074 */
 
 static void cds_trigger_recovery_work(void *param);
 

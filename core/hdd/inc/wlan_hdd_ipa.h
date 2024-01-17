@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -77,7 +77,25 @@ QDF_STATUS hdd_ipa_get_tx_pipe(struct hdd_context *hdd_ctx,
  */
 void hdd_ipa_set_perf_level_bw(enum hw_mode_bandwidth bw);
 
-#else
+#ifdef IPA_WDS_EASYMESH_FEATURE
+/**
+ * hdd_ipa_peer_map_unmap_event() - Handle peer map and unmap event
+ * @vdev_id: vdev id of SAP vdev with wds enabled
+ * @peer_id: peer id of repeater STA connected to SAP
+ * @wds_macaddr: mac address of wds peer
+ * @map: true for map event, false for unmap event
+ *
+ * This routine handles wds peer map and unmap event from datapath layer
+ * and then notify IPA with WLAN_IPA_CLIENT_CONNECT_EX for map event and
+ * WLAN_IPA_CLIENT_DISCONNECT for unmap event respectively.
+ *
+ * Return: 0 for success and other error codes
+ */
+int hdd_ipa_peer_map_unmap_event(uint8_t vdev_id, uint16_t peer_id,
+				 uint8_t *wds_macaddr, bool map);
+#endif /* IPA_WDS_EASYMESH_FEATURE */
+
+#else /* !IPA_OFFLOAD */
 static inline
 void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t skb, qdf_netdev_t dev)
 {
@@ -99,5 +117,5 @@ static inline void hdd_ipa_set_perf_level_bw(enum hw_mode_bandwidth bw)
 {
 }
 
-#endif
+#endif /* IPA_OFFLOAD */
 #endif /* HDD_IPA_H__ */

@@ -639,6 +639,7 @@ union wlan_tp_data {
  * @link_monitoring_cb: Callback API to handle link speed change
  * @dp_register_lpass_ssr_notifier: Callback to register for lpass SSR notif
  * @dp_unregister_lpass_ssr_notifier: Callback to unregister for lpass SSR notif
+ * @wlan_dp_ipa_wds_peer_cb: Callback to handle IPA WDS peer events
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -731,6 +732,11 @@ struct wlan_dp_psoc_callbacks {
 	QDF_STATUS
 	(*dp_register_lpass_ssr_notifier)(struct wlan_objmgr_psoc *psoc);
 	void (*dp_unregister_lpass_ssr_notifier)(struct wlan_objmgr_psoc *psoc);
+#endif
+
+#ifdef IPA_WDS_EASYMESH_FEATURE
+	int (*wlan_dp_ipa_wds_peer_cb)(uint8_t vdev_id, uint16_t peer_id,
+				       uint8_t *wds_macaddr, bool map);
 #endif
 };
 

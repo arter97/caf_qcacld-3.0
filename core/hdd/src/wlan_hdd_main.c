@@ -12808,6 +12808,19 @@ void wlan_hdd_link_speed_update(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef IPA_WDS_EASYMESH_FEATURE
+static void
+hdd_dp_register_ipa_wds_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
+{
+	cb_obj->wlan_dp_ipa_wds_peer_cb = hdd_ipa_peer_map_unmap_event;
+}
+#else /* !IPA_WDS_EASYMESH_FEATURE */
+static inline void
+hdd_dp_register_ipa_wds_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
+{
+}
+#endif /* IPA_WDS_EASYMESH_FEATURE */
+
 /**
  * hdd_dp_register_callbacks() - Register DP callbacks with HDD
  * @hdd_ctx: HDD context
@@ -12851,6 +12864,8 @@ static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.dp_tsf_timestamp_rx = hdd_tsf_timestamp_rx;
 	cb_obj.dp_gro_rx_legacy_get_napi = hdd_legacy_gro_get_napi;
 	cb_obj.link_monitoring_cb = wlan_hdd_link_speed_update;
+
+	hdd_dp_register_ipa_wds_callbacks(&cb_obj);
 
 	os_if_dp_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }

@@ -78,3 +78,78 @@ void wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
 {
 	__wlan_dp_update_def_link(psoc, intf_mac, vdev);
 }
+
+#ifdef IPA_WDS_EASYMESH_FEATURE
+int wlan_dp_send_ipa_wds_peer_map_event(struct cdp_ctrl_objmgr_psoc *cpsoc,
+					uint16_t peer_id, uint16_t hw_peer_id,
+					uint8_t vdev_id, uint8_t *wds_mac_addr,
+					enum cdp_txrx_ast_entry_type peer_type,
+					uint32_t tx_ast_hashidx)
+{
+	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)cpsoc;
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	if (peer_type != CDP_TXRX_AST_TYPE_WDS)
+		return 0;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (qdf_unlikely(!dp_ctx)) {
+		dp_err_rl("Invalid psoc private object");
+		return 0;
+	}
+
+	/* With CDP_TXRX_AST_TYPE_WDS, it can be inferred that WDS AST
+	 * learning is enabled on the vdev.
+	 */
+	if (dp_ctx->dp_ops.wlan_dp_ipa_wds_peer_cb)
+		return dp_ctx->dp_ops.wlan_dp_ipa_wds_peer_cb(vdev_id,
+							      peer_id,
+							      wds_mac_addr,
+							      true);
+
+	return 0;
+}
+
+int wlan_dp_send_ipa_wds_peer_unmap_event(struct cdp_ctrl_objmgr_psoc *cpsoc,
+					  uint16_t peer_id, uint8_t vdev_id,
+					  uint8_t *wds_mac_addr)
+{
+	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)cpsoc;
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (qdf_unlikely(!dp_ctx)) {
+		dp_err_rl("Invalid psoc private object");
+		return 0;
+	}
+
+	if (dp_ctx->dp_ops.wlan_dp_ipa_wds_peer_cb)
+		return dp_ctx->dp_ops.wlan_dp_ipa_wds_peer_cb(vdev_id,
+							      peer_id,
+							      wds_mac_addr,
+							      false);
+
+	return 0;
+}
+
+void wlan_dp_send_ipa_wds_peer_disconnect(struct cdp_ctrl_objmgr_psoc *cpsoc,
+					  uint8_t *wds_mac_addr,
+					  uint8_t vdev_id)
+{
+	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)cpsoc;
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (qdf_unlikely(!dp_ctx)) {
+		dp_err_rl("Invalid psoc private object");
+		return;
+	}
+
+	/* IPA component does not care about peer_id in the disconnect case.
+	 * Hence put a dummy 0 here for peer_id.
+	 */
+	if (dp_ctx->dp_ops.wlan_dp_ipa_wds_peer_cb)
+		dp_ctx->dp_ops.wlan_dp_ipa_wds_peer_cb(vdev_id, 0, wds_mac_addr,
+						       false);
+}
+#endif /* IPA_WDS_EASYMESH_FEATURE */
