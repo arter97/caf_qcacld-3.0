@@ -315,6 +315,18 @@ QDF_STATUS wmi_extract_dcs_awgn_info(wmi_unified_t wmi_handle,
 				     void *evt_buf,
 				     struct wmi_host_dcs_awgn_info *awgn_info);
 
+/**
+ * wmi_extract_dcs_obss_intf_info() - extract DCS OBSS interference info from event
+ * @wmi_hdl: WMI handle
+ * @evt_buf: Pointer to event buffer
+ * @obss_intf_info: Pointer to hold OBSS interference info
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_extract_dcs_obss_intf_info(wmi_unified_t wmi_hdl, void *evt_buf,
+			  wmi_host_dcs_obss_intf_info *obss_intf_info);
+
 /*
  * wmi_extract_dcs_cw_int() - extract dcs cw interference from event
  * @wmi_handle: wmi handle
