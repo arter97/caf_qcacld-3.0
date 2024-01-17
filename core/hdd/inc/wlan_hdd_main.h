@@ -2024,6 +2024,7 @@ enum wlan_state_ctrl_str_id {
  * @original_channels:
  * @cache_channel_lock:
  * @sar_version:
+ * @sar_flag: SAR flags supported by firmware
  * @dynamic_mac_list:
  * @dynamic_nss_chains_support: Per vdev dynamic nss chains update capability
  * @hw_macaddr:
@@ -2282,6 +2283,7 @@ struct hdd_context {
 	qdf_mutex_t cache_channel_lock;
 #endif
 	enum sar_version sar_version;
+	enum sar_flag sar_flag;
 	struct hdd_dynamic_mac dynamic_mac_list[QDF_MAX_CONCURRENCY_PERSONA];
 	bool dynamic_nss_chains_support;
 	struct qdf_mac_addr hw_macaddr;
