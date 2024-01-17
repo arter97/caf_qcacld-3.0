@@ -1986,12 +1986,14 @@ enum roam_rt_stats_params {
  *  Invalid value or 0 will use max supported value by fw.
  * @support_link_band: Configure the band bitmap of mlo connection supports
  * The bits of the bitmap are defined by the enum reg_wifi_band
+ * @mlo_5gl_5gh_mlsr: 5GL+5GH MLSR support
  */
 struct wlan_roam_mlo_config {
 	uint8_t vdev_id;
 	struct qdf_mac_addr partner_link_addr;
 	uint32_t support_link_num;
 	uint32_t support_link_band;
+	uint32_t mlo_5gl_5gh_mlsr;
 };
 
 /**

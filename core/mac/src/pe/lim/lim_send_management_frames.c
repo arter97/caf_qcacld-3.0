@@ -7496,8 +7496,10 @@ static QDF_STATUS lim_update_mld_to_link_address(struct mac_context *mac_ctx,
 	struct qdf_mac_addr *self_link_addr;
 	struct tLimPreAuthNode *pre_auth_node;
 	struct qdf_mac_addr peer_link_addr;
+	struct wlan_objmgr_peer *bss_peer = NULL;
 	struct qdf_mac_addr *peer_roaming_link_addr;
 	enum QDF_OPMODE opmode;
+	uint8_t *peer_mld_addr = NULL;
 	QDF_STATUS status;
 
 	if (!wlan_cm_is_sae_auth_addr_conversion_required(vdev))
@@ -7539,16 +7541,33 @@ static QDF_STATUS lim_update_mld_to_link_address(struct mac_context *mac_ctx,
 							    &peer_link_addr);
 			if (QDF_IS_STATUS_ERROR(status))
 				return status;
+			bss_peer = wlan_objmgr_vdev_try_get_bsspeer(
+						vdev, WLAN_MLME_OBJMGR_ID);
+			if (bss_peer) {
+				peer_mld_addr =
+					wlan_peer_mlme_get_mldaddr(bss_peer);
+				wlan_objmgr_peer_release_ref(
+						bss_peer, WLAN_MLME_OBJMGR_ID);
+			}
 		} else {
 			peer_roaming_link_addr =
 				wlan_cm_roaming_get_peer_link_addr(vdev);
 			if (!peer_roaming_link_addr)
 				return QDF_STATUS_E_FAILURE;
 			peer_link_addr = *peer_roaming_link_addr;
+			peer_mld_addr = (uint8_t *)
+					wlan_cm_roaming_get_peer_mld_addr(vdev);
 		}
+		if (!peer_mld_addr)
+			return QDF_STATUS_SUCCESS;
 
-		qdf_mem_copy(mac_hdr->da, peer_link_addr.bytes,
-			     QDF_MAC_ADDR_SIZE);
+		pe_debug("dest address"QDF_MAC_ADDR_FMT"mld addr"QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(mac_hdr->da),
+			 QDF_MAC_ADDR_REF(peer_mld_addr));
+		if (!qdf_mem_cmp(mac_hdr->da, peer_mld_addr, QDF_MAC_ADDR_SIZE))
+			qdf_mem_copy(mac_hdr->da, peer_link_addr.bytes,
+				     QDF_MAC_ADDR_SIZE);
+
 		qdf_mem_copy(mac_hdr->bssId, peer_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 		break;

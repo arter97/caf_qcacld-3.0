@@ -2060,10 +2060,27 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 	struct hdd_ap_ctx *ap_ctx;
 	uint8_t sta_cnt, sap_cnt;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct sap_context *sap_ctx;
+	bool ch_valid;
 
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	if (!sap_ctx) {
+		hdd_err("sap ctx is null");
+		return;
+	}
+
+	/*
+	 * During CSA, it might be possible that ch avoidance event to
+	 * avoid the sap frequency is received. So, check after CSA,
+	 * whether sap frequency is safe if not restart sap to a safe
+	 * channel.
+	 */
+	ch_valid =
+	wlansap_validate_channel_post_csa(hdd_ctx->mac_handle,
+					  sap_ctx);
 	if (ap_ctx->sap_context->csa_reason ==
-	    CSA_REASON_UNSAFE_CHANNEL)
+	    CSA_REASON_UNSAFE_CHANNEL || !ch_valid)
 		qdf_status = hdd_unsafe_channel_restart_sap(hdd_ctx);
 	else if (ap_ctx->sap_context->csa_reason == CSA_REASON_DCS)
 		qdf_status = hdd_dcs_hostapd_set_chan(
@@ -7736,16 +7753,6 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 {}
 #endif
 
-static inline uint32_t
-wlan_util_get_centre_freq(struct wlan_hdd_link_info *link_info)
-{
-	struct wlan_channel *chan;
-
-	chan = wlan_vdev_get_active_channel(link_info->vdev);
-
-	return chan->ch_freq;
-}
-
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 static inline struct cfg80211_chan_def
 wlan_util_get_chan_def(struct wireless_dev *wdev, unsigned int link_id)
@@ -7814,6 +7821,8 @@ static void hdd_update_param_chandef(struct wlan_hdd_link_info *link_info,
 	struct wlan_channel *chan;
 
 	chan = wlan_vdev_get_active_channel(link_info->vdev);
+	if (!chan)
+		return;
 
 	hdd_create_chandef(link_info->adapter, chan, chandef);
 }
@@ -8166,7 +8175,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
-		if (wlan_util_get_centre_freq(link_info) !=
+		if (wlan_get_operation_chan_freq(link_info->vdev) !=
 				params->chandef.chan->center_freq)
 			hdd_update_param_chandef(link_info, &params->chandef);
 

@@ -38,6 +38,8 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlo_mgr_link_switch.h"
+#include <wlan_action_oui_main.h>
+
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline bool
@@ -799,22 +801,51 @@ static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
 				    struct validate_bss_data *candidate_info)
 {
 	struct scan_cache_entry *scan_entry = candidate_info->scan_entry;
+	struct action_oui_search_attr attr;
+	int8_t i, allowed_partner_links = 0;
+	uint8_t mlo_support_link_num;
 
 	if (!(scan_entry->ie_list.multi_link_bv || scan_entry->ie_list.ehtcap ||
 	      scan_entry->ie_list.ehtop))
 		return;
 
-	if (mlme_get_bss_11be_allowed(psoc, &candidate_info->peer_addr,
-				      util_scan_entry_ie_data(scan_entry),
-				      util_scan_entry_ie_len(scan_entry)) &&
-	    (!wlan_vdev_mlme_get_user_dis_eht_flag(vdev)))
+	attr.ie_data = util_scan_entry_ie_data(scan_entry);
+	attr.ie_length = util_scan_entry_ie_len(scan_entry);
+
+	if (!mlme_get_bss_11be_allowed(psoc, &candidate_info->peer_addr,
+				       attr.ie_data, attr.ie_length) ||
+	    wlan_vdev_mlme_get_user_dis_eht_flag(vdev)) {
+		scan_entry->ie_list.multi_link_bv = NULL;
+		scan_entry->ie_list.ehtcap = NULL;
+		scan_entry->ie_list.ehtop = NULL;
+		qdf_mem_zero(&scan_entry->ml_info, sizeof(scan_entry->ml_info));
+		candidate_info->is_mlo = false;
+		return;
+	}
+
+	mlo_support_link_num = wlan_mlme_get_sta_mlo_conn_max_num(psoc);
+
+	if (mlo_support_link_num <= WLAN_MAX_ML_DEFAULT_LINK)
 		return;
 
-	scan_entry->ie_list.multi_link_bv = NULL;
-	scan_entry->ie_list.ehtcap = NULL;
-	scan_entry->ie_list.ehtop = NULL;
-	qdf_mem_zero(&scan_entry->ml_info, sizeof(scan_entry->ml_info));
-	candidate_info->is_mlo = false;
+	if (!wlan_action_oui_search(psoc, &attr,
+				    ACTION_OUI_RESTRICT_MAX_MLO_LINKS))
+		return;
+
+	for (i = 0; i < scan_entry->ml_info.num_links; i++) {
+		if (i < WLAN_MAX_ML_DEFAULT_LINK - 1) {
+			allowed_partner_links++;
+			continue;
+		}
+
+		scan_entry->ml_info.link_info[i].is_valid_link = false;
+	}
+
+	if (allowed_partner_links != scan_entry->ml_info.num_links)
+		ifmgr_nofl_debug("Downgrade " QDF_MAC_ADDR_FMT " partner links from %d to %d",
+				 QDF_MAC_ADDR_REF(scan_entry->ml_info.mld_mac_addr.bytes),
+				 scan_entry->ml_info.num_links,
+				 allowed_partner_links);
 }
 #else
 static inline uint32_t

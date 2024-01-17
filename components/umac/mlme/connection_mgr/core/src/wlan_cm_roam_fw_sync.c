@@ -49,6 +49,44 @@
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_mlo_link_force.h"
 #include <wlan_psoc_mlme_api.h>
+#include <wma.h>
+
+/*
+ * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
+ * @psoc: Pointer to psoc
+ * @vdev: pointer to vdev
+ * @vdev_id: vdev id
+ * @event: Roam sync event pointer
+ *
+ * Return: True is peer found on other STA else return false
+ */
+static bool
+cm_is_peer_preset_on_other_sta(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_vdev *vdev,
+			       uint8_t vdev_id, void *event)
+{
+	bool peer_exists_other_sta = false;
+	struct roam_offload_synch_ind *sync_ind;
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	uint8_t peer_vdev_id;
+
+	sync_ind = (struct roam_offload_synch_ind *)event;
+
+	if (wma_objmgr_peer_exist(wma, sync_ind->bssid.bytes, &peer_vdev_id)) {
+		if ((!wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+		     vdev_id != peer_vdev_id) ||
+		    !mlo_check_is_given_vdevs_on_same_mld(psoc, vdev_id,
+							  peer_vdev_id)) {
+			wma_debug("Peer " QDF_MAC_ADDR_FMT
+				" already exists on vdev %d, current vdev %d",
+				QDF_MAC_ADDR_REF(sync_ind->bssid.bytes),
+				peer_vdev_id, vdev_id);
+			peer_exists_other_sta = true;
+		}
+	}
+
+	return peer_exists_other_sta;
+}
 
 QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			       void *event, uint32_t event_data_len)
@@ -66,12 +104,16 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	if (mlo_is_mld_disconnecting_connecting(vdev) ||
 	    cm_is_vdev_connecting(vdev) ||
-	    cm_is_vdev_disconnecting(vdev)) {
+	    cm_is_vdev_disconnecting(vdev) ||
+	    cm_is_peer_preset_on_other_sta(psoc, vdev, vdev_id, event)) {
 		mlme_err("vdev %d Roam sync not handled in connecting/disconnecting state",
 			 vdev_id);
+		status = wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+						   vdev_id,
+						   WLAN_ROAM_RSO_STOPPED,
+						   REASON_ROAM_SYNCH_FAILED);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
-		return cm_roam_stop_req(psoc, vdev_id,
-					REASON_ROAM_SYNCH_FAILED, NULL, false);
+		return status;
 	}
 	mlo_sta_stop_reconfig_timer(vdev);
 	wlan_clear_mlo_sta_link_removed_flag(vdev);
@@ -81,8 +123,9 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Roam sync was not handled");
-		cm_roam_stop_req(psoc, vdev_id, REASON_ROAM_SYNCH_FAILED,
-				 NULL, false);
+		wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+					  vdev_id, WLAN_ROAM_RSO_STOPPED,
+					  REASON_ROAM_SYNCH_FAILED);
 	}
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
@@ -1265,14 +1308,21 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	if (ucfg_pkt_capture_get_pktcap_mode(psoc))
 		ucfg_pkt_capture_record_channel(cm_ctx->vdev);
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(roam_synch_data->chan_freq)) {
-		wlan_cm_set_disable_hi_rssi(pdev,
-					    vdev_id, false);
-	} else {
-		wlan_cm_set_disable_hi_rssi(pdev,
-					    vdev_id, true);
-		mlme_debug("Disabling HI_RSSI, AP freq=%d rssi %d",
-			   roam_synch_data->chan_freq, roam_synch_data->rssi);
+	/*
+	 * Firmware will take care of checking hi_scan rssi delta, take care of
+	 * legacy -> legacy hi-rssi roam also if self mld roam supported.
+	 */
+	if (!wlan_cm_is_self_mld_roam_supported(psoc)) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(roam_synch_data->chan_freq)) {
+			wlan_cm_set_disable_hi_rssi(pdev,
+						    vdev_id, false);
+		} else {
+			wlan_cm_set_disable_hi_rssi(pdev,
+						    vdev_id, true);
+			mlme_debug("Disabling HI_RSSI, AP freq=%d rssi %d vdev id %d",
+				   roam_synch_data->chan_freq,
+				   roam_synch_data->rssi, vdev_id);
+		}
 	}
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
 
@@ -1534,16 +1584,13 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 
 	roam_req = cm_get_first_roam_command(vdev);
 	if (roam_req) {
-		mlme_debug("Roam req found, get cm id to remove it, before disconnect");
+		mlme_debug("Roam req found, get cm id to remove it, after disconnect");
 		cm_id = roam_req->cm_id;
 	}
 	/* CPU freq is boosted during roam sync to improve roam latency,
 	 * upon HO failure reset that request to restore cpu freq back to normal
 	 */
 	mlme_cm_osif_perfd_reset_cpufreq();
-
-	cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_HO_FAIL,
-			    sizeof(wlan_cm_id), &cm_id);
 
 	qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
 	if (cm_ho_fail_is_avoid_list_candidate(vdev, ind)) {
@@ -1567,8 +1614,7 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 			       WLAN_LOG_INDICATOR_HOST_DRIVER,
 			       WLAN_LOG_REASON_ROAM_HO_FAILURE, false, false);
 
-	if (QDF_IS_STATUS_ERROR(status))
-		cm_remove_cmd(cm_ctx, &cm_id);
+	cm_remove_cmd(cm_ctx, &cm_id);
 
 error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);

@@ -463,12 +463,12 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 	 * Channel change is successful. If the new channel is a DFS channel,
 	 * then we will to perform channel availability check for 60 seconds
 	 */
-	sap_nofl_debug("sap_fsm: vdev %d: sapdfs: SAP CSA: freq %d state %d",
+	sap_nofl_debug("sap_fsm: vdev %d: sapdfs: SAP CSA: freq %d state %d evt freq %d",
 		       sap_ctx->vdev_id,
 		       mac_ctx->sap.SapDfsInfo.target_chan_freq,
-		       sap_ctx->fsm_state);
+		       sap_ctx->fsm_state,
+		       csr_roam_info->channelChangeRespEvent->new_op_freq);
 	target_chan_freq = mac_ctx->sap.SapDfsInfo.target_chan_freq;
-
 	/* If SAP is not in starting or started state don't proceed further */
 	if (sap_ctx->fsm_state == SAP_INIT ||
 	    sap_ctx->fsm_state == SAP_STOPPING) {

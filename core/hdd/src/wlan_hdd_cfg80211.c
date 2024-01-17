@@ -11093,8 +11093,8 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 				 struct nlattr *tb[])
 {
 	int rem;
-	uint8_t nl80211_chwidth = 0xFF;
-	uint8_t link_id = 0xFF;
+	uint8_t nl80211_chwidth = CH_WIDTH_INVALID;
+	uint8_t link_id = WLAN_INVALID_LINK_ID;
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
 	struct nlattr *curr_attr;
 	struct nlattr *chn_bd = NULL;
@@ -11149,7 +11149,7 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
-	if (link_id != 0xFF)
+	if (link_id != WLAN_INVALID_LINK_ID)
 		goto set_chan_width;
 
 skip_mlo:
@@ -11166,7 +11166,9 @@ skip_mlo:
 		hdd_err("Invalid channel width %u", chwidth);
 		return -EINVAL;
 	}
+
 set_chan_width:
+	hdd_debug("channel width:%u, link_id:%u", chwidth, link_id);
 	return hdd_set_mac_chan_width(link_info, chwidth, link_id, true);
 }
 
@@ -12581,6 +12583,7 @@ static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
  *
  * Return: 0 on success; error number otherwise
  */
+#ifdef WLAN_FEATURE_11BE_MLO
 static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 				     struct sk_buff *skb,
 				     const struct nlattr *attr)
@@ -12592,7 +12595,10 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	uint32_t link_id = 0;
 	struct wlan_objmgr_vdev *vdev, *link_vdev;
 	struct wlan_channel *bss_chan;
+	struct wlan_hdd_link_info *link_info_t;
+	struct hdd_station_ctx *sta_ctx;
 	uint8_t nl80211_chwidth;
+	uint8_t chn_width;
 	int8_t ret = 0;
 
 	chwidth = wma_cli_get_command(link_info->vdev_id,
@@ -12606,46 +12612,70 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	if (!vdev)
 		return -EINVAL;
 
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		mlo_bd_info = nla_nest_start(skb, CONFIG_MLO_LINKS);
-		for (link_id = 0; link_id < WLAN_MAX_LINK_ID; link_id++) {
-			link_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
-							    WLAN_OSIF_ID);
-			if (!link_vdev)
-				continue;
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		hdd_err("not mlo vdev");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EINVAL;
+	}
 
-			mlo_bd = nla_nest_start(skb, i);
-			if (!mlo_bd) {
-				hdd_err("nla_nest_start fail");
-				ret = -EINVAL;
-				goto end;
-			}
+	mlo_bd_info = nla_nest_start(skb, CONFIG_MLO_LINKS);
+	if (!mlo_bd_info) {
+		hdd_err("nla_nest_start error");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EINVAL;
+	}
+
+	hdd_adapter_for_each_link_info(link_info->adapter, link_info_t) {
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info_t);
+		if (sta_ctx->conn_info.ieee_link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		link_id = sta_ctx->conn_info.ieee_link_id;
+
+		mlo_bd = nla_nest_start(skb, i);
+		if (!mlo_bd) {
+			hdd_err("nla_nest_start fail");
+			ret = -EINVAL;
+			goto end;
+		}
+
+		if (nla_put_u8(skb, CONFIG_MLO_LINK_ID, link_id)) {
+			hdd_err("nla_put failure");
+			ret = -EINVAL;
+			goto end;
+		}
+
+		link_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
+						    WLAN_OSIF_ID);
+
+		if (link_vdev) {
 			bss_chan = wlan_vdev_mlme_get_bss_chan(link_vdev);
 			if (!bss_chan) {
 				hdd_err("fail to get bss_chan info");
 				ret = -EINVAL;
 				goto end;
 			}
-			if (nla_put_u8(skb, CONFIG_MLO_LINK_ID, link_id)) {
-				hdd_err("nla_put failure");
-				ret = -EINVAL;
-				goto end;
-			}
-
-			nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(bss_chan->ch_width);
-			if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH,
-				       nl80211_chwidth)) {
-				hdd_err("nla_put failure");
-				ret = -EINVAL;
-				goto end;
-			}
-			nla_nest_end(skb, mlo_bd);
-			i++;
-			hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
+			chn_width = bss_chan->ch_width;
+		} else if (link_info_t->vdev_id == WLAN_INVALID_VDEV_ID) {
+			chn_width = sta_ctx->user_cfg_chn_width;
+		} else {
+			chn_width = CH_WIDTH_INVALID;
 		}
-		nla_nest_end(skb, mlo_bd_info);
-	}
 
+		hdd_debug("get link_id:%u ch width:%u", link_id, chn_width);
+
+		nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(chn_width);
+		if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH, nl80211_chwidth)) {
+			hdd_err("nla_put failure");
+			ret = -EINVAL;
+			goto end;
+		}
+		nla_nest_end(skb, mlo_bd);
+		i++;
+
+		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
+	}
+	nla_nest_end(skb, mlo_bd_info);
 end:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
@@ -12654,6 +12684,14 @@ end:
 
 	return ret;
 }
+#else
+static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
+				     struct sk_buff *skb,
+				     const struct nlattr *attr)
+{
+	return 0;
+}
+#endif
 
 /**
  * hdd_get_dynamic_bw() - Get dynamic bandwidth disabled / enabled
@@ -20852,6 +20890,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_AFC_VENDOR_COMMANDS
 	FEATURE_LL_LT_SAP_VENDOR_COMMANDS
 	FEATURE_TX_LATENCY_STATS_COMMANDS
+	FEATURE_REGULATORY_TPC_INFO_VENDOR_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
@@ -21907,20 +21946,22 @@ static char *wlan_hdd_iface_debug_string(uint32_t iface_type)
 static void wlan_hdd_dump_iface_combinations(uint32_t num,
 			const struct ieee80211_iface_combination *combination)
 {
-	int i, j;
+	int i, j, k;
 	char buf[IFACE_DUMP_SIZE] = {0};
 	uint8_t len = 0;
 
 	hdd_debug("max combinations %d", num);
 
 	for (i = 0; i < num; i++) {
-		for (j = 0; j < combination[i].max_interfaces; j++) {
-			if (combination[i].limits[j].types)
-				len += qdf_scnprintf(buf + len,
-						     IFACE_DUMP_SIZE - len,
-						     " + %s",
-					wlan_hdd_iface_debug_string(
-					combination[i].limits[j].types));
+		for (j = 0; j < combination[i].n_limits; j++) {
+			for (k = 0; k < combination[i].limits[j].max; k++) {
+				if (combination[i].limits[j].types)
+					len += qdf_scnprintf(buf + len,
+					       IFACE_DUMP_SIZE - len,
+					       k == 0 && j == 0 ? "%s" : "+%s",
+					       wlan_hdd_iface_debug_string(
+					       combination[i].limits[j].types));
+			}
 		}
 
 		hdd_nofl_debug("iface combination[%d]: %s", i, buf);
@@ -23476,7 +23517,7 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 	ol_txrx_soc_handle soc_txrx_handle;
 	uint16_t *vlan_map = sap_ctx->vlan_map;
 	uint8_t found = 0;
-	bool keyindex_valid;
+	bool keyindex_valid = true;
 	int i = 0;
 
 	psoc = wlan_vdev_get_psoc(vdev);
@@ -23498,7 +23539,9 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 		}
 	}
 
-	keyindex_valid = (i + key_index - 1) < (2 * MAX_VLAN) ? true : false;
+	/* Below check is to avoid OOB for array vlan_map access */
+	if (((i + key_index) == 0) || ((i + key_index - 1) >= (2 * MAX_VLAN)))
+		keyindex_valid = false;
 
 	if (found && keyindex_valid) {
 		soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);

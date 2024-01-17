@@ -51,6 +51,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_vdev_mgr_api.h"
 
 #ifdef WLAN_FEATURE_SAE
 #define CM_IS_FW_FT_SAE_SUPPORTED(fw_akm_bitmap) \
@@ -2926,6 +2927,44 @@ cm_roam_scan_offload_fill_rso_configs(struct wlan_objmgr_psoc *psoc,
 	cm_roam_scan_offload_add_fils_params(psoc, rso_mode_cfg, vdev_id);
 }
 
+bool cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	struct wlan_objmgr_peer *peer;
+	uint8_t bssid[QDF_MAC_ADDR_SIZE];
+	struct cm_roam_values_copy temp;
+	bool is_pmf_enabled, mbo_oce_enabled_ap, is_open_connection;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL for vdev %d", vdev_id);
+		return false;
+	}
+	is_open_connection = cm_is_open_mode(vdev);
+	wlan_vdev_mgr_get_param_bssid(vdev, bssid);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, bssid, WLAN_MLME_CM_ID);
+	if (!peer) {
+		mlme_debug("Peer of peer_mac "QDF_MAC_ADDR_FMT" not found",
+			   QDF_MAC_ADDR_REF(bssid));
+		return false;
+	}
+	is_pmf_enabled = mlme_get_peer_pmf_status(peer);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
+
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id, MBO_OCE_ENABLED_AP, &temp);
+	mbo_oce_enabled_ap = !!temp.uint_value;
+
+	mlme_debug("vdev %d, is_pmf_enabled %d mbo_oce_enabled_ap:%d is_open_connection: %d for "QDF_MAC_ADDR_FMT,
+		   vdev_id, is_pmf_enabled, mbo_oce_enabled_ap,
+		   is_open_connection, QDF_MAC_ADDR_REF(bssid));
+
+	return !is_pmf_enabled && mbo_oce_enabled_ap && !is_open_connection;
+}
+
 /**
  * cm_update_btm_offload_config() - Update btm config param to fw
  * @psoc: psoc
@@ -2943,12 +2982,9 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct wlan_mlme_btm *btm_cfg;
-	struct wlan_objmgr_peer *peer;
-	uint8_t bssid[QDF_MAC_ADDR_SIZE];
+	bool is_hs_20_ap;
 	struct cm_roam_values_copy temp;
-	bool is_hs_20_ap, is_pmf_enabled, is_open_connection = false;
 	uint8_t vdev_id;
-	uint32_t mbo_oce_enabled_ap;
 	bool abridge_flag;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
@@ -2983,45 +3019,19 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	ucfg_wlan_vdev_mgr_get_param_bssid(vdev, bssid);
-	peer = wlan_objmgr_get_peer(psoc,
-				    wlan_objmgr_pdev_get_pdev_id(
-					wlan_vdev_get_pdev(vdev)),
-				    bssid,
-				    WLAN_MLME_CM_ID);
-	if (!peer) {
-		mlme_debug("Peer of peer_mac "QDF_MAC_ADDR_FMT" not found",
-			   QDF_MAC_ADDR_REF(bssid));
-		return;
-	}
-
-	is_pmf_enabled = mlme_get_peer_pmf_status(peer);
-
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
-
-	if (cm_is_open_mode(vdev))
-		is_open_connection = true;
-
-	wlan_cm_roam_cfg_get_value(psoc, vdev_id, MBO_OCE_ENABLED_AP, &temp);
-	mbo_oce_enabled_ap = temp.uint_value;
-
 	abridge_flag = wlan_mlme_get_btm_abridge_flag(psoc);
 	if (!abridge_flag)
 		MLME_CLEAR_BIT(*btm_offload_config,
 			       BTM_OFFLOAD_CONFIG_BIT_7);
-	mlme_debug("Abridge flag: %d, btm offload: %u", abridge_flag,
-		   *btm_offload_config);
-
 	/*
 	 * If peer does not support PMF in case of OCE/MBO
 	 * Connection, Disable BTM offload to firmware.
 	 */
-	if (mbo_oce_enabled_ap && (!is_pmf_enabled && !is_open_connection))
+	if (cm_is_mbo_ap_without_pmf(psoc, vdev_id))
 		*btm_offload_config = 0;
 
-	mlme_debug("is_open:%d is_pmf_enabled %d btm_offload_cfg:%d for "QDF_MAC_ADDR_FMT,
-		   is_open_connection, is_pmf_enabled, *btm_offload_config,
-		   QDF_MAC_ADDR_REF(bssid));
+	mlme_debug("Abridge flag: %d, btm offload: %u", abridge_flag,
+		   *btm_offload_config);
 }
 
 /**
@@ -3085,6 +3095,8 @@ cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
 		wlan_mlme_get_sta_mlo_conn_max_num(psoc);
 	roam_mlo_params->support_link_band =
 		wlan_mlme_get_sta_mlo_conn_band_bmp(psoc);
+	roam_mlo_params->mlo_5gl_5gh_mlsr =
+		wlan_mlme_is_5gl_5gh_mlsr_supported(psoc);
 
 	/*
 	 * Update the supported link band based on roam_band_bitmap
@@ -6285,7 +6297,8 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 			 ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ)
 			scan_band_mask = BIT(REG_BAND_5G) | BIT(REG_BAND_6G);
 
-		band_mask &= scan_band_mask;
+		if (scan_band_mask)
+			band_mask &= scan_band_mask;
 
 		for (i = 0; i < num_chan; i++) {
 			if (!wlan_is_valid_frequency(chan_freq[i],
@@ -7027,6 +7040,16 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_btm_info);
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
+
+	/* The BTM req and BTM candidate event is logged twice
+	 * for both partial and full scan but the OTA frame is received
+	 * is received only once on the device. Restricting the
+	 * BTM req and BTM candidate event to be logged only for partial scan
+	 */
+	if (trigger_info->present &&
+	    trigger_info->scan_type == ROAM_STATS_SCAN_TYPE_FULL &&
+	    btm_data->disassoc_timer)
+		return status;
 
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
 			  (uint64_t)btm_data->timestamp,

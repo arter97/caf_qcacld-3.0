@@ -2570,6 +2570,14 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	psoc = wmi_handle->soc->wmi_psoc;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, synch_event->vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		wmi_err("For vdev:%d object is NULL", synch_event->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (synch_event->bcn_probe_rsp_len >
 		param_buf->num_bcn_probe_rsp_frame ||
 		synch_event->reassoc_req_len >
@@ -2585,19 +2593,10 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		goto abort_roam;
 	}
 
-	psoc = wmi_handle->soc->wmi_psoc;
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, synch_event->vdev_id,
-						    WLAN_MLME_SB_ID);
-	if (!vdev) {
-		wmi_err("For vdev:%d object is NULL", synch_event->vdev_id);
-		status = QDF_STATUS_E_FAILURE;
-		goto abort_roam;
-	}
-
 	rso_cfg = wlan_cm_get_rso_config(vdev);
 	if (!rso_cfg) {
 		status = QDF_STATUS_E_FAILURE;
-		goto end;
+		goto abort_roam;
 	}
 
 	/*
@@ -2642,18 +2641,18 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 		if (synch_event->bcn_probe_rsp_len > WMI_SVC_MSG_MAX_SIZE) {
 			status = QDF_STATUS_E_FAILURE;
-			goto end;
+			goto abort_roam;
 		}
 		if (synch_event->reassoc_rsp_len >
 			(WMI_SVC_MSG_MAX_SIZE - synch_event->bcn_probe_rsp_len)) {
 			status = QDF_STATUS_E_FAILURE;
-			goto end;
+			goto abort_roam;
 		}
 		if (synch_event->reassoc_req_len >
 			WMI_SVC_MSG_MAX_SIZE - (synch_event->bcn_probe_rsp_len +
 			synch_event->reassoc_rsp_len)) {
 			status = QDF_STATUS_E_FAILURE;
-			goto end;
+			goto abort_roam;
 		}
 		roam_synch_data_len = bcn_probe_rsp_len +
 			reassoc_rsp_len + reassoc_req_len;
@@ -2666,7 +2665,7 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			(sizeof(*synch_event) + sizeof(wmi_channel) +
 			 sizeof(wmi_key_material) + sizeof(uint32_t))) {
 			status = QDF_STATUS_E_FAILURE;
-			goto end;
+			goto abort_roam;
 		}
 		roam_synch_data_len += sizeof(struct roam_offload_synch_ind);
 	}
@@ -2675,21 +2674,22 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	if (!roam_sync) {
 		QDF_ASSERT(roam_sync);
 		status = QDF_STATUS_E_NOMEM;
-		goto end;
+		goto abort_roam;
 	}
 
 	*roam_sync_ind = roam_sync;
 	status = wmi_fill_roam_sync_buffer(wmi_handle, vdev, rso_cfg,
 					   roam_sync, param_buf);
 
-end:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 abort_roam:
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wmi_err("%d Failed to extract roam sync ind", status);
-		wlan_cm_roam_stop_req(psoc, synch_event->vdev_id,
-				      REASON_ROAM_SYNCH_FAILED);
+		wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+					  synch_event->vdev_id,
+					  WLAN_ROAM_RSO_STOPPED,
+					  REASON_ROAM_SYNCH_FAILED);
 	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 	return status;
 }
 
@@ -3837,7 +3837,7 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 	struct wlan_crypto_keys *all_keys;
 	struct wlan_crypto_key *dst_key, *pairwise;
 	struct wlan_crypto_key *key_alloc_buf[WMI_NUM_KEYS_ALLOCATED];
-	bool flush_keybuf;
+	bool flush_keybuf = true;
 	uint8_t total_num_tlv,  j = 0, k = 0;
 	uint8_t count = 0, total_links = 0, dst_key_count = 0;
 	uint8_t igtk_idx = 0, bigtk_idx = 0;
@@ -3868,7 +3868,6 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 	for (k = 0; k < WMI_NUM_KEYS_ALLOCATED; k++) {
 		key_alloc_buf[k] = qdf_mem_malloc(sizeof(*dst_key));
 		if (!key_alloc_buf[k]) {
-			flush_keybuf = true;
 			status = QDF_STATUS_E_NOMEM;
 			goto free_entries;
 		}
@@ -3929,7 +3928,6 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 		if (!is_valid_keyix(ml_keys->key_ix)) {
 			wmi_err_rl("invalid key index:%d", ml_keys->key_ix);
 			status = QDF_STATUS_E_INVAL;
-			flush_keybuf = true;
 			goto free_entries;
 		}
 
@@ -3941,12 +3939,12 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 				wmi_err_rl("Received key_len as 0 for tlv:%d",
 					   count);
 				status = QDF_STATUS_E_INVAL;
-				flush_keybuf = true;
 				goto free_entries;
 			}
 
 			if (ml_keys->key_flags & LTF_USAGE) {
-				struct wlan_crypto_ltf_keyseed_data key_seed;
+				struct wlan_crypto_ltf_keyseed_data key_seed
+					= {0};
 				uint8_t key_seed_len;
 
 				if (ml_keys->key_len >
@@ -5079,12 +5077,16 @@ send_roam_mlo_config_tlv(wmi_unified_t wmi_handle,
 	cmd->support_link_num = req->support_link_num;
 	cmd->support_link_band = convert_support_link_band_to_wmi(
 						req->support_link_band);
+	if (!req->mlo_5gl_5gh_mlsr)
+		cmd->disallow_connect_modes |= WMI_ROAM_MLO_CONNECTION_MODE_5GL_5GH_MLSR;
+
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(req->partner_link_addr.bytes,
 				   &cmd->partner_link_addr);
 
-	wmi_debug("RSO_CFG MLO: vdev_id:%d support_link_num:%d support_link_band:0x%0x link addr:"QDF_MAC_ADDR_FMT,
+	wmi_debug("RSO_CFG MLO: vdev_id:%d support_link_num:%d support_link_band:0x%0x disallow_connect_mode %d link addr:"QDF_MAC_ADDR_FMT,
 		  cmd->vdev_id, cmd->support_link_num,
 		  cmd->support_link_band,
+		  cmd->disallow_connect_modes,
 		  QDF_MAC_ADDR_REF(req->partner_link_addr.bytes));
 
 	wmi_mtrace(WMI_ROAM_MLO_CONFIG_CMDID, cmd->vdev_id, 0);

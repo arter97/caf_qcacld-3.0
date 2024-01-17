@@ -45,6 +45,7 @@
 #include <cdp_txrx_misc.h>
 #include "wlan_fwol_ucfg_api.h"
 #include "wlan_dp_ucfg_api.h"
+#include "wlan_hdd_sysfs.h"
 
 /**
  * hdd_nan_datapath_target_config() - Configure NAN datapath features
@@ -861,6 +862,7 @@ int hdd_ndi_start(const char *iface_name, uint16_t transaction_id)
 		goto err_handler;
 	}
 
+	hdd_create_adapter_sysfs_files(adapter);
 	hdd_exit();
 	return 0;
 

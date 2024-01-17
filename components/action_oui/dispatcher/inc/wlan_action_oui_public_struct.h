@@ -125,6 +125,8 @@
  * @ACTION_OUI_DISABLE_BFORMEE: disable SU/MU beam formee capability for
  * specified AP
  * @ACTION_OUI_ENABLE_CTS2SELF: enable cts to self for specified AP's
+ * @ACTION_OUI_RESTRICT_MAX_MLO_LINKS: Downgrade MLO if particular AP
+ *                                     build present.
  * @ACTION_OUI_MAXIMUM_ID: maximum number of action oui types
  */
 enum action_oui_id {
@@ -150,6 +152,7 @@ enum action_oui_id {
 	ACTION_OUI_DISABLE_BFORMEE,
 	ACTION_OUI_DISABLE_AGGRESSIVE_EDCA,
 	ACTION_OUI_ENABLE_CTS2SELF,
+	ACTION_OUI_RESTRICT_MAX_MLO_LINKS,
 	ACTION_OUI_MAXIMUM_ID
 };
 

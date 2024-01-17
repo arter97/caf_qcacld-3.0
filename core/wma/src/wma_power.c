@@ -1696,5 +1696,35 @@ QDF_STATUS wma_set_tx_power_scale_decr_db(uint8_t vdev_id, int value)
 
 	return ret;
 }
+
+/**
+ * wma_enable_disable_imps() - enable/disable FW IMPS feature
+ * @pdev_id: pdev id
+ * @param_val: value
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code.
+ */
+QDF_STATUS wma_enable_disable_imps(uint32_t pdev_id, uint32_t param_val)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct pdev_params pparam = {0};
+	QDF_STATUS status;
+
+	if (!wma)
+		return QDF_STATUS_E_FAILURE;
+
+	pparam.is_host_pdev_id = false;
+
+	/* Enable-disable IMPS */
+	pparam.param_id = WMI_PDEV_PARAM_IDLE_PS_CONFIG;
+	pparam.param_value = param_val;
+	status = wmi_unified_pdev_param_send(wma->wmi_handle,
+					     &pparam, pdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Unable to enable/disable:(%d) IMPS",
+			param_val);
+
+	return status;
+}
 #endif /* FEATURE_TX_POWER */
 
