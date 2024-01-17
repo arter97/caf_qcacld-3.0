@@ -6015,6 +6015,13 @@ wma_update_sar_version(struct wlan_psoc_host_service_ext_param *param,
 	cfg->sar_version = param ? param->sar_version : SAR_VERSION_1;
 }
 
+static void
+wma_update_sar_flag(struct wlan_psoc_host_service_ext2_param *param,
+		    struct wma_tgt_cfg *cfg)
+{
+	cfg->sar_flag = param ? param->sar_flag : SAR_SET_CTL_GROUPING_DISABLE;
+}
+
 /**
  * wma_update_hdd_band_cap() - update band cap which hdd understands
  * @supported_band: supported band which has been given by FW
@@ -6408,6 +6415,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	void *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	target_resource_config *wlan_res_cfg;
 	struct wlan_psoc_host_service_ext_param *service_ext_param;
+	struct wlan_psoc_host_service_ext2_param *service_ext2_param;
 	struct target_psoc_info *tgt_hdl;
 	struct wmi_unified *wmi_handle;
 	uint8_t i;
@@ -6429,6 +6437,8 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 
 	service_ext_param =
 			target_psoc_get_service_ext_param(tgt_hdl);
+	service_ext2_param =
+			target_psoc_get_service_ext2_param(tgt_hdl);
 	wmi_handle = get_wmi_unified_hdl_from_psoc(wma_handle->psoc);
 	if (wmi_validate_handle(wmi_handle))
 		return -EINVAL;
@@ -6489,6 +6499,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	wma_update_hdd_band_cap(target_if_get_phy_capability(tgt_hdl),
 				&tgt_cfg, wma_handle->psoc);
 	wma_update_sar_version(service_ext_param, &tgt_cfg);
+	wma_update_sar_flag(service_ext2_param, &tgt_cfg);
 	tgt_cfg.fine_time_measurement_cap =
 		target_if_get_wmi_fw_sub_feat_caps(tgt_hdl);
 	tgt_cfg.wmi_max_len = wmi_get_max_msg_len(wma_handle->wmi_handle)
