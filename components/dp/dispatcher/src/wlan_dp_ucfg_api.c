@@ -2150,6 +2150,22 @@ ucfg_dp_req_set_arp_stats(struct wlan_objmgr_psoc *psoc,
 	return sb_ops->dp_set_arp_req_stats(psoc, params);
 }
 
+#ifdef IPA_WDS_EASYMESH_FEATURE
+static void
+ucfg_dp_register_ipa_wds_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
+				 struct wlan_dp_psoc_callbacks *cb_obj)
+{
+	dp_ctx->dp_ops.wlan_dp_ipa_wds_peer_cb =
+		cb_obj->wlan_dp_ipa_wds_peer_cb;
+}
+#else /* !IPA_WDS_EASYMESH_FEATURE */
+static inline void
+ucfg_dp_register_ipa_wds_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
+				 struct wlan_dp_psoc_callbacks *cb_obj)
+{
+}
+#endif /* IPA_WDS_EASYMESH_FEATURE */
+
 void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_dp_psoc_callbacks *cb_obj)
 {
@@ -2225,7 +2241,8 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	dp_ctx->dp_ops.osif_dp_process_mic_error =
 		cb_obj->osif_dp_process_mic_error;
 	dp_ctx->dp_ops.link_monitoring_cb = cb_obj->link_monitoring_cb;
-	}
+	ucfg_dp_register_ipa_wds_hdd_cbs(dp_ctx, cb_obj);
+}
 
 void ucfg_dp_register_event_handler(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_dp_psoc_nb_ops *cb_obj)
