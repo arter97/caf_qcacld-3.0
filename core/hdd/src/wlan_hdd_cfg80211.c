@@ -12093,7 +12093,7 @@ hdd_set_master_channel_list(struct wlan_hdd_link_info *link_info,
 	if (!freq_list)
 		return -ENOMEM;
 
-	sap_config = &link_info->adapter->deflink->session.ap.sap_config;
+	sap_config = &link_info->session.ap.sap_config;
 
 	nla_for_each_nested(nested_attr, attr, tmp) {
 		freq = nla_get_u32(nested_attr);
@@ -13257,6 +13257,8 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx  = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
 	int errno, ret;
+	int link_id = -1;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
 
@@ -13275,11 +13277,20 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	ret = hdd_set_independent_configuration(adapter->deflink, tb);
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID]) {
+		link_id = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID]);
+		if (link_id > WLAN_MAX_LINK_ID) {
+			hdd_err("invalid link_id: %d", link_id);
+			return -EINVAL;
+		}
+		link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	}
+
+	ret = hdd_set_independent_configuration(link_info, tb);
 	if (ret)
 		errno = ret;
 
-	ret = hdd_set_interdependent_configuration(adapter->deflink, tb);
+	ret = hdd_set_interdependent_configuration(link_info, tb);
 	if (ret)
 		errno = ret;
 
