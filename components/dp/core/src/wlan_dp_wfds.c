@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -610,13 +610,17 @@ QDF_STATUS dp_wfds_new_server(void)
 	if (!dl_wfds || !htc_handle)
 		return QDF_STATUS_E_INVAL;
 
+	dp_ctx = dl_wfds->direct_link_ctx->dp_ctx;
+	if (!pld_audio_is_direct_link_supported(dp_ctx->qdf_dev->dev)) {
+		dp_info("Audio Direct link cap not supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
 	qdf_atomic_set(&dl_wfds->wfds_state, DP_WFDS_SVC_CONNECTED);
 
 	htc_vote_link_up(htc_handle, HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
 	dp_debug("Connected to WFDS QMI service, state: 0x%x",
 		 qdf_atomic_read(&dl_wfds->wfds_state));
-
-	dp_ctx = dl_wfds->direct_link_ctx->dp_ctx;
 
 	dp_rx_handle_buf_pool_audio_smmu_mapping(wlan_psoc_get_dp_handle(dp_ctx->psoc),
 						 wlan_objmgr_pdev_get_pdev_id(dp_ctx->pdev),

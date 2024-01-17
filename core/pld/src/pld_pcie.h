@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -492,6 +492,11 @@ static inline bool pld_pcie_is_direct_link_supported(struct device *dev)
 	return false;
 }
 
+static inline bool pld_pcie_audio_is_direct_link_supported(struct device *dev)
+{
+	return false;
+}
+
 static inline
 int pld_pcie_audio_smmu_map(struct device *dev, phys_addr_t paddr,
 			    dma_addr_t iova, size_t size)
@@ -945,6 +950,11 @@ static inline bool pld_pcie_is_direct_link_supported(struct device *dev)
 	return cnss_get_fw_cap(dev, CNSS_FW_CAP_DIRECT_LINK_SUPPORT);
 }
 
+static inline bool pld_pcie_audio_is_direct_link_supported(struct device *dev)
+{
+	return cnss_audio_is_direct_link_supported(dev);
+}
+
 static inline
 int pld_pcie_audio_smmu_map(struct device *dev, phys_addr_t paddr,
 			    dma_addr_t iova, size_t size)
@@ -966,6 +976,11 @@ int pld_pcie_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
 }
 #else
 static inline bool pld_pcie_is_direct_link_supported(struct device *dev)
+{
+	return false;
+}
+
+static inline bool pld_pcie_audio_is_direct_link_supported(struct device *dev)
 {
 	return false;
 }

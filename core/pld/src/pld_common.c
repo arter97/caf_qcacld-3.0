@@ -888,6 +888,27 @@ bool pld_is_direct_link_supported(struct device *dev)
 	return ret;
 }
 
+bool pld_audio_is_direct_link_supported(struct device *dev)
+{
+	bool ret = false;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_audio_is_direct_link_supported(dev);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+	case PLD_BUS_TYPE_SDIO:
+	default:
+		break;
+	}
+
+	return ret;
+}
+
 int pld_get_platform_cap(struct device *dev, struct pld_platform_cap *cap)
 {
 	int ret = 0;
