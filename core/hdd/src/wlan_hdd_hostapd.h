@@ -68,13 +68,15 @@ void *hdd_filter_ft_info(const uint8_t *frame,
  * @target_bw: Target bandwidth to move.
  * If no bandwidth is specified, the value is CH_WIDTH_MAX
  * @forced: Force to switch channel, ignore SCC/MCC check
+ * @allow_blocking: the calling thread allows be blocked
  *
  * Return: 0 for success, non zero for failure
  */
 int hdd_softap_set_channel_change(struct net_device *dev,
-					int target_chan_freq,
-					enum phy_ch_width target_bw,
-					bool forced);
+				  int target_chan_freq,
+				  enum phy_ch_width target_bw,
+				  bool forced,
+				  bool allow_blocking);
 /**
  * hdd_stop_sap_set_tx_power() - Function to set tx power
  * for unsafe channel if restriction bit mask is set else stop the SAP.

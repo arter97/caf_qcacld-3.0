@@ -424,6 +424,7 @@ QDF_STATUS policy_mgr_psoc_close(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	policy_mgr_flush_deferred_csa(psoc,  WLAN_INVALID_VDEV_ID);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_mutex_destroy(
 		&pm_ctx->qdf_conc_list_lock))) {
 		policy_mgr_err("Failed to destroy qdf_conc_list_lock");

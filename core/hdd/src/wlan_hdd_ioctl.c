@@ -6619,7 +6619,8 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 		chan_number = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
 							   chan_number);
 
-	status = hdd_softap_set_channel_change(dev, chan_number, width, false);
+	status = hdd_softap_set_channel_change(dev, chan_number, width, false,
+					       true);
 	if (status) {
 		hdd_err("Set channel change fail");
 		return status;

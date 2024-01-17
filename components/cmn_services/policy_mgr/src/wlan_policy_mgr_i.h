@@ -25,6 +25,7 @@
 #include "qdf_mc_timer.h"
 #include "qdf_lock.h"
 #include "qdf_defer.h"
+#include "qdf_threads.h"
 #include "wlan_reg_services_api.h"
 #include "cds_ieee80211_common_i.h"
 #include "qdf_delayed_work.h"
@@ -371,6 +372,7 @@ struct policy_mgr_cfg {
  * @user_cfg:
  * @unsafe_channel_list: LTE coex channel freq avoidance list
  * @unsafe_channel_count: LTE coex channel avoidance list count
+ * @defer_thread: the current sta_ap_intf_check_work thread object ptr
  * @sta_ap_intf_check_work_info: Info related to sta_ap_intf_check_work
  * @cur_conc_system_pref:
  * @opportunistic_update_done_evt: qdf event to synchronize host
@@ -422,6 +424,7 @@ struct policy_mgr_psoc_priv_obj {
 	struct policy_mgr_user_cfg user_cfg;
 	uint32_t unsafe_channel_list[NUM_CHANNELS];
 	uint16_t unsafe_channel_count;
+	qdf_thread_t *defer_thread;
 	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
 	uint8_t cur_conc_system_pref;
 	qdf_event_t opportunistic_update_done_evt;

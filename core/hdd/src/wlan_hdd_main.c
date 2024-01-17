@@ -9783,6 +9783,7 @@ static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_INIT_DEINIT_ID);
 
+	policy_mgr_flush_deferred_csa(hdd_ctx->psoc, link_info->vdev_id);
 	if (mode == QDF_SAP_MODE) {
 		wlan_hdd_scan_abort(link_info);
 		hdd_abort_ongoing_sta_connection(hdd_ctx);

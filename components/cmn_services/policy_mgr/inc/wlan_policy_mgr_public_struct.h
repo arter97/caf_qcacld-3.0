@@ -134,6 +134,8 @@ enum sap_csa_reason_code {
  * @link_ctrl_f_post_re_evaluate: run link state check again after command
  * response handled.
  * @link_ctrl_f_sync_set_link: wait response for set link command
+ * @link_ctrl_f_dont_update_disallow_bitmap: dont need to call
+ * ml_nlink_update_disallow_modes again.
  */
 enum link_control_flags {
 	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
@@ -141,6 +143,7 @@ enum link_control_flags {
 	link_ctrl_f_dynamic_force_link_num =    1 << 2,
 	link_ctrl_f_post_re_evaluate =          1 << 3,
 	link_ctrl_f_sync_set_link =             1 << 4,
+	link_ctrl_f_dont_update_disallow_bitmap = 1 << 5,
 };
 
 /* Define the max number of consecutive re-evaluate number. usually, we have
@@ -1865,6 +1868,24 @@ struct connection_info {
 };
 
 /**
+ * struct defer_csa_request - deferred CSA request
+ * @target_chan_freq: target channel frequency
+ * @vdev_id: vdev id
+ * @csa_reason: csa reason
+ * @curr_ch_freq: current home channel frequency
+ * @target_bw: bandwidth
+ * @forced: forced CSA
+ */
+struct defer_csa_request {
+	uint32_t target_chan_freq;
+	uint8_t vdev_id;
+	enum sap_csa_reason_code csa_reason;
+	uint32_t curr_ch_freq;
+	enum phy_ch_width target_bw;
+	bool forced;
+};
+
+/**
  * struct go_plus_go_force_scc - structure to hold p2p go
  * params for forcescc restart
  *
@@ -1896,6 +1917,7 @@ struct sap_plus_go_force_scc {
  * struct sta_ap_intf_check_work_ctx - sta_ap_intf_check_work
  * related info
  * @psoc: pointer to PSOC object information
+ * @defer_csa_request: deferred csa request
  * @go_plus_go_force_scc: structure to hold params of
  *			  curr and first p2p go ctx
  * @sap_plus_go_force_scc: sap p2p force SCC ctx
@@ -1903,6 +1925,7 @@ struct sap_plus_go_force_scc {
  */
 struct sta_ap_intf_check_work_ctx {
 	struct wlan_objmgr_psoc *psoc;
+	struct defer_csa_request defer_csa_request;
 	struct go_plus_go_force_scc go_plus_go_force_scc;
 	struct sap_plus_go_force_scc sap_plus_go_force_scc;
 	uint8_t nan_force_scc_in_progress;

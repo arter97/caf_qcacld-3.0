@@ -133,7 +133,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 		wlan_hdd_set_sap_csa_reason(psoc, link_info->vdev_id,
 					    CSA_REASON_DCS);
 		ret = hdd_softap_set_channel_change(adapter->dev, tgt_freq,
-						    tgt_width, true);
+						    tgt_width, true, false);
 		status = qdf_status_from_os_return(ret);
 		break;
 	default:

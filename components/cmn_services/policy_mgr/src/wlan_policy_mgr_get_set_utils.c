@@ -6567,7 +6567,8 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 	req->param.force_cmd.link_num = link_num;
 	policy_mgr_update_disallowed_mode_bitmap(psoc,
 						 vdev,
-						 req);
+						 req,
+						 link_control_flags);
 
 	if (link_control_flags & link_ctrl_f_overwrite_active_bitmap)
 		req->param.control_flags.overwrite_force_active_bitmap = true;
@@ -13180,7 +13181,8 @@ err:
 bool
 policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev,
-					 struct mlo_link_set_active_req *req)
+					 struct mlo_link_set_active_req *req,
+					 uint32_t link_control_flags)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	uint8_t num_disallow_mode_comb;
@@ -13207,6 +13209,9 @@ policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 
 	policy_mgr_init_disallow_mode_bmap(req);
 	if (policy_mgr_get_connection_count_with_mlo(psoc) == 1) {
+		ml_nlink_clr_emlsr_mode_disable_req(
+				psoc, vdev,
+				ML_EMLSR_DISALLOW_BY_CONCURENCY);
 		num_disallow_mode_comb = 1;
 		req->param.num_disallow_mode_comb = num_disallow_mode_comb;
 		if (emlsr_mode == WLAN_EMLSR_MODE_ENTER)
@@ -13219,7 +13224,8 @@ policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 							     req,
 							     num_disallow_mode_comb);
 	} else {
-		ml_nlink_populate_disallow_modes(psoc, vdev, req);
+		ml_nlink_populate_disallow_modes(psoc, vdev, req,
+						 link_control_flags);
 	}
 
 	return true;

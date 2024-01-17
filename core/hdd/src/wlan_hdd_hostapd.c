@@ -3311,7 +3311,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 					    CSA_REASON_PEER_ACTION_FRAME);
 		if (hdd_softap_set_channel_change(dev,
 			 sap_event->sapevt.sap_chan_cng_ind.new_chan_freq,
-			 CH_WIDTH_MAX, false))
+			 CH_WIDTH_MAX, false, false))
 			return QDF_STATUS_E_FAILURE;
 		else
 			return QDF_STATUS_SUCCESS;
@@ -3670,7 +3670,8 @@ next_adapter:
 }
 
 int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
-				  enum phy_ch_width target_bw, bool forced)
+				  enum phy_ch_width target_bw, bool forced,
+				  bool allow_blocking)
 {
 	QDF_STATUS status;
 	int ret = 0;
@@ -3849,6 +3850,31 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	}
 
 	/*
+	 * For eMLSR ML STA concurrency, host needs to disallow eMLSR
+	 * mode by set link request before SAP CSA from 2.4G to 5G/6G
+	 * If set link is required for such case, the CSA will be pending
+	 * in workqueue info. And after set link response, the CSA will
+	 * be executed in workqueue thread.
+	 */
+	status =
+	policy_mgr_ap_csa_request(hdd_ctx->psoc, link_info->vdev_id,
+				  sap_ctx->chan_freq, sap_ctx->csa_reason,
+				  target_chan_freq, target_bw, forced,
+				  allow_blocking);
+	if (status == QDF_STATUS_E_PENDING || status != QDF_STATUS_SUCCESS) {
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
+		hdd_debug("defer csa request status %d", status);
+		if (status == QDF_STATUS_E_PENDING)
+			ret = 0;
+		else if (status == QDF_STATUS_E_BUSY)
+			ret = -EBUSY;
+		else
+			ret = -EINVAL;
+
+		return ret;
+	}
+
+	/*
 	 * Reject channel change req  if reassoc in progress on any adapter.
 	 * sme_is_any_session_in_middle_of_roaming is for LFR2 and
 	 * hdd_is_roaming_in_progress is for LFR3
@@ -3857,7 +3883,8 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	    hdd_is_roaming_in_progress(hdd_ctx)) {
 		hdd_info("Channel switch not allowed as reassoc in progress");
 		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto end;
 	}
 	/* Disable Roaming on all adapters before doing channel change */
 	wlan_hdd_set_roaming_state(link_info, RSO_SAP_CHANNEL_CHANGE, false);
@@ -3871,7 +3898,8 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
 		wlan_hdd_set_roaming_state(link_info, RSO_SAP_CHANNEL_CHANGE,
 					   true);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto end;
 	}
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		is_p2p_go_session = true;
@@ -3908,10 +3936,13 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 
 		ret = -EINVAL;
 	}
+end:
+	if (ret)
+		policy_mgr_ap_csa_end(hdd_ctx->psoc, link_info->vdev_id,
+				      true, true);
 
 	return ret;
 }
-
 
 #if defined(FEATURE_WLAN_CH_AVOID) && defined(FEATURE_WLAN_CH_AVOID_EXT)
 /**
@@ -4024,7 +4055,7 @@ QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
 	}
 
 	ret = hdd_softap_set_channel_change(dev, target_chan_freq,
-					    target_bw, forced);
+					    target_bw, forced, false);
 	if (ret && ret != -EBUSY) {
 		hdd_err("channel switch failed");
 		hdd_stop_sap_set_tx_power(psoc, ap_adapter);
@@ -6034,7 +6065,7 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 	go_bw = wlansap_get_chan_width(WLAN_HDD_GET_SAP_CTX_PTR(go_link_info));
 	ret = hdd_softap_set_channel_change(go_link_info->adapter->dev,
 					    go_new_ch_freq, go_bw,
-					    false);
+					    false, true);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d", go_new_ch_freq, ret);
 		return;
@@ -6132,7 +6163,7 @@ hdd_handle_p2p_go_for_3rd_ap_conc(struct hdd_context *hdd_ctx,
 
 	ret = hdd_softap_set_channel_change(go_link_info->adapter->dev,
 					    go_new_ch_freq, CH_WIDTH_80MHZ,
-					    false);
+					    false, true);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d", go_new_ch_freq, ret);
 		return false;
@@ -7533,7 +7564,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		mac_handle = hdd_ctx->mac_handle;
 		status = wlan_hdd_flush_pmksa_cache(adapter->deflink);
 	}
-
+	policy_mgr_flush_deferred_csa(hdd_ctx->psoc,
+				      adapter->deflink->vdev_id);
 	cds_flush_work(&adapter->sap_stop_bss_work);
 	ap_ctx->sap_config.acs_cfg.acs_mode = false;
 	hdd_dcs_clear(adapter);

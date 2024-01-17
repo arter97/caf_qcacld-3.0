@@ -648,6 +648,7 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	qdf_list_node_t *cur_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
 	bool is_6ghz_cap = false;
+	int ret;
 
 	ap_adapter = hdd_get_sap_adapter_of_dfs(hdd_ctx);
 	/* probably no dfs sap running, no handling required */
@@ -783,11 +784,9 @@ def_chan:
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->deflink->vdev_id,
 				    CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
 
-	status = wlansap_set_channel_change_with_csa(
-			WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter->deflink), ch_freq,
-			ch_bw, false);
-
-	if (QDF_STATUS_SUCCESS != status) {
+	ret = hdd_softap_set_channel_change(ap_adapter->dev, ch_freq,
+					    ch_bw, false, true);
+	if (ret) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");
 		return false;
 	}

@@ -3441,6 +3441,8 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		/* If MCC upgrade/DBS downgrade happened during channel switch,
 		 * the policy manager connection table needs to be updated.
 		 */
+		policy_mgr_ap_csa_end(mac->psoc, pe_session->smeSessionId,
+				      QDF_IS_STATUS_ERROR(status), false);
 		policy_mgr_update_connection_info(mac->psoc,
 						pe_session->smeSessionId);
 		lim_check_conc_power_for_csa(mac, pe_session);
