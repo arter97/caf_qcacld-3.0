@@ -2083,7 +2083,9 @@ policy_mgr_handle_sap_plus_go_force_scc(struct wlan_objmgr_psoc *psoc)
 	if (!((vdev_con_mode == PM_P2P_GO_MODE &&
 	       existing_vdev_mode == PM_SAP_MODE) ||
 	      (vdev_con_mode == PM_SAP_MODE &&
-	       existing_vdev_mode == PM_P2P_GO_MODE)))
+	       existing_vdev_mode == PM_P2P_GO_MODE) ||
+	      (vdev_con_mode == PM_SAP_MODE &&
+	       existing_vdev_mode == PM_SAP_MODE)))
 		goto force_scc_done;
 
 	if (!pm_ctx->hdd_cbacks.wlan_check_cc_intf_cb)
@@ -2194,7 +2196,9 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 	if (!((vdev_con_mode == PM_P2P_GO_MODE &&
 	       existing_vdev_mode == PM_SAP_MODE) ||
 	      (vdev_con_mode == PM_SAP_MODE &&
-	       existing_vdev_mode == PM_P2P_GO_MODE)))
+	       existing_vdev_mode == PM_P2P_GO_MODE) ||
+	      (vdev_con_mode == PM_SAP_MODE &&
+	       existing_vdev_mode == PM_SAP_MODE)))
 		return;
 
 	work_info->sap_plus_go_force_scc.reason = reason_code;
