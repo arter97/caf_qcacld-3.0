@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -12904,6 +12904,9 @@ static int __hdd_psoc_idle_restart(struct hdd_context *hdd_ctx)
 		return ret;
 
 	ret = hdd_wlan_start_modules(hdd_ctx, false);
+
+	if (!qdf_is_fw_down())
+		cds_set_recovery_in_progress(false);
 
 	hdd_soc_idle_restart_unlock();
 
