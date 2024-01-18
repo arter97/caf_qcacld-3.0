@@ -7346,8 +7346,10 @@ __wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 		return -ENOMEM;
 
 	rso_usr_cfg = qdf_mem_malloc(sizeof(*rso_usr_cfg));
-	if (!rso_usr_cfg)
+	if (!rso_usr_cfg) {
+		qdf_mem_free(rso_config);
 		return -ENOMEM;
+	}
 
 	ret = hdd_set_ext_roam_params(hdd_ctx, data, data_len,
 				      adapter->deflink->vdev_id, rso_config,
