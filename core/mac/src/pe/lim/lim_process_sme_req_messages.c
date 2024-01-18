@@ -10152,6 +10152,52 @@ void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 	}
 }
 
+static void
+lim_notify_channel_switch_started(struct mac_context *mac_ctx,
+				  struct pe_session *session)
+{
+	struct switch_channel_ind *pSirSmeSwitchChInd;
+	struct scheduler_msg msg = {0};
+	struct ch_params ch_params = {0};
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	pSirSmeSwitchChInd = qdf_mem_malloc(sizeof(*pSirSmeSwitchChInd));
+	if (!pSirSmeSwitchChInd)
+		return;
+
+	pSirSmeSwitchChInd->messageType = eWNI_SME_CH_SWITCH_STARTED_NOTIFY;
+	pSirSmeSwitchChInd->length = sizeof(*pSirSmeSwitchChInd);
+	pSirSmeSwitchChInd->sessionId = session->vdev_id;
+	pSirSmeSwitchChInd->freq =
+			session->gLimChannelSwitch.sw_target_freq;
+	pSirSmeSwitchChInd->status = status;
+	qdf_mem_copy(pSirSmeSwitchChInd->bssid.bytes, session->bssId,
+		     QDF_MAC_ADDR_SIZE);
+
+	pSirSmeSwitchChInd->ch_phymode =
+			wma_chan_phy_mode(
+				session->gLimChannelSwitch.sw_target_freq,
+				session->gLimChannelSwitch.ch_width,
+				session->dot11mode);
+
+	wlan_reg_set_channel_params_for_pwrmode(
+				wlan_vdev_get_pdev(session->vdev),
+				session->gLimChannelSwitch.sw_target_freq,
+				session->gLimChannelSwitch.sec_ch_offset,
+				&ch_params, REG_CURRENT_PWR_MODE);
+
+	pSirSmeSwitchChInd->chan_params = ch_params;
+
+	msg.type = eWNI_SME_CH_SWITCH_STARTED_NOTIFY;
+	msg.bodyptr = pSirSmeSwitchChInd;
+
+	status = mac_ctx->lim.sme_msg_callback(mac_ctx, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("channel switch started notify failed");
+		qdf_mem_free(pSirSmeSwitchChInd);
+	}
+}
+
 /**
  * lim_process_sme_dfs_csa_ie_request() - process sme dfs csa ie req
  *
@@ -10325,6 +10371,9 @@ skip_vht:
 
 	/* Send CSA IE request from here */
 	lim_send_dfs_chan_sw_ie_update(mac_ctx, session_entry);
+
+	/* Indicate channel switch started notification to upper layer */
+	lim_notify_channel_switch_started(mac_ctx, session_entry);
 
 	/*
 	 * Wait for max_wait_for_bcn_tx_complete ms for tx complete for beacon.

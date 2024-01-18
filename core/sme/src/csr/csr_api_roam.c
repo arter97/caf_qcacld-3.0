@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3187,6 +3187,7 @@ void csr_roaming_state_msg_processor(struct mac_context *mac, void *msg_buf)
 	case eWNI_SME_UPPER_LAYER_ASSOC_CNF:
 		csr_roam_joined_state_msg_processor(mac, pSmeRsp);
 		break;
+
 	default:
 		sme_debug("Unexpected message type: %d[0x%X] received in substate %s",
 			pSmeRsp->messageType, pSmeRsp->messageType,
@@ -4418,6 +4419,32 @@ csr_roam_chk_lnk_max_assoc_exceeded(struct mac_context *mac_ctx, tSirSmeRsp *msg
 	qdf_mem_free(roam_info);
 }
 
+static void
+csr_roam_channel_switch_started_notify(struct mac_context *mac,
+				       tSirSmeRsp *msg_ptr)
+{
+	struct csr_roam_info *roam_info;
+	struct switch_channel_ind *pSirSmeSwitchChInd;
+
+	pSirSmeSwitchChInd = (struct switch_channel_ind *)msg_ptr;
+	if (!pSirSmeSwitchChInd) {
+		sme_err("ch_switch_started_ind is null");
+		return;
+	}
+
+	roam_info = qdf_mem_malloc(sizeof(*roam_info));
+	if (!roam_info)
+		return;
+
+	roam_info->pSirSmeSwitchChInd = pSirSmeSwitchChInd;
+
+	csr_roam_call_callback(mac, pSirSmeSwitchChInd->sessionId,
+			       roam_info, eCSR_ROAM_CHANNEL_SWITCH_STARTED_IND,
+			       eCSR_ROAM_RESULT_CHANNEL_SWITCH_STARTED_NOTIFY);
+
+	qdf_mem_free(roam_info);
+}
+
 void csr_roam_check_for_link_status_change(struct mac_context *mac,
 						tSirSmeRsp *pSirMsg)
 {
@@ -4471,6 +4498,9 @@ void csr_roam_check_for_link_status_change(struct mac_context *mac,
 		break;
 	case eWNI_SME_MAX_ASSOC_EXCEEDED:
 		csr_roam_chk_lnk_max_assoc_exceeded(mac, pSirMsg);
+		break;
+	case eWNI_SME_CH_SWITCH_STARTED_NOTIFY:
+		csr_roam_channel_switch_started_notify(mac, pSirMsg);
 		break;
 	default:
 		break;

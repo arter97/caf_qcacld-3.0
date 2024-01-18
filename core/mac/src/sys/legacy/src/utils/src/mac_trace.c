@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -313,6 +313,7 @@ uint8_t *mac_trace_get_sme_msg_string(uint16_t sme_msg)
 		CASE_RETURN_STRING(eWNI_SME_HIDDEN_SSID_RESTART_RSP);
 		CASE_RETURN_STRING(eWNI_SME_STA_CSA_CONTINUE_REQ);
 		CASE_RETURN_STRING(eWNI_SME_ANTENNA_ISOLATION_RSP);
+		CASE_RETURN_STRING(eWNI_SME_CH_SWITCH_STARTED_NOTIFY);
 	default:
 		return (uint8_t *) "UNKNOWN";
 		break;

@@ -2125,6 +2125,116 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 				ap_ctx->sap_config.acs_cfg.acs_mode);
 }
 
+/**
+ * hdd_copy_chan_params() - Copy ch_param info to wlan_channel
+ * structure
+ * @pdev: pointer to pdev level
+ * @ch_params: pointer to structure ch_params
+ * @chan_info: pointer to structuer wlan_channel
+ * @freq: channel frequency
+ *
+ * Return: None
+ */
+static void hdd_copy_chan_params(struct wlan_objmgr_pdev *pdev,
+				 struct ch_params *ch_params,
+				 struct wlan_channel *chan_info,
+				 qdf_freq_t freq)
+{
+	chan_info->ch_freq = freq;
+	chan_info->ch_ieee = wlan_reg_freq_to_chan(pdev, chan_info->ch_freq);
+	chan_info->ch_flagext = 0;
+	if (wlan_reg_is_dfs_for_freq(pdev, chan_info->ch_freq))
+		chan_info->ch_flagext |= IEEE80211_CHAN_DFS;
+
+	chan_info->ch_width = ch_params->ch_width;
+	chan_info->ch_freq_seg1 = ch_params->center_freq_seg0;
+	chan_info->ch_freq_seg2 = ch_params->center_freq_seg1;
+	chan_info->ch_cfreq1 = ch_params->mhz_freq_seg0;
+	chan_info->ch_cfreq2 = ch_params->mhz_freq_seg1;
+}
+
+/**
+ * hdd_chan_change_started_notify() - Notify channel switch started to userspace
+ * @link_info: pointer to link_info
+ * @freq: channel frequency
+ * @ch_params: channel params
+ *
+ * Return: None
+ */
+static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
+					   qdf_freq_t freq,
+					   struct ch_params *ch_params)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev;
+	uint16_t link_id = 0;
+	struct wlan_channel chan;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct net_device *dev;
+	struct cfg80211_chan_def chandef;
+	uint16_t puncture_bitmap = 0;
+	uint8_t vdev_id;
+	int ch_switch_count;
+
+	if (!mac_handle) {
+		hdd_err("mac_handle is NULL");
+		return;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("psoc is NULL");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		hdd_err("pdev is NULL");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return;
+	}
+
+	dev = adapter->dev;
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	mutex_lock(&dev->ieee80211_ptr->mtx);
+	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS) {
+		hdd_debug("Vdev %d mode %d not UP", vdev_id,
+			  adapter->device_mode);
+		goto exit;
+	}
+
+	hdd_copy_chan_params(pdev, ch_params, &chan, freq);
+	status = hdd_create_chandef(adapter, &chan, &chandef);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Vdev %d failed to create channel def", vdev_id);
+		goto exit;
+	}
+
+	puncture_bitmap = wlan_hdd_get_puncture_bitmap(link_info);
+	ucfg_mlme_get_sap_chn_switch_bcn_count(psoc, &ch_switch_count);
+
+	hdd_debug("channel switch started notify: vdev %d chan:%d width:%d freq1:%d freq2:%d punct 0x%x ch_switch_count %d",
+		  vdev_id, chandef.chan->center_freq, chandef.width,
+		  chandef.center_freq1, chandef.center_freq2,
+		  puncture_bitmap, ch_switch_count);
+
+	wlan_cfg80211_ch_switch_started_notify(dev, &chandef, link_id,
+					       ch_switch_count, false,
+					       puncture_bitmap);
+
+exit:
+	mutex_unlock(&dev->ieee80211_ptr->mtx);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+}
 QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				    void *context)
 {
@@ -3121,6 +3231,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		schedule_work(&adapter->sap_stop_bss_work);
 		return QDF_STATUS_SUCCESS;
 
+	case eSAP_CHANNEL_SWITCH_STARTED_NOTIFY:
+		hdd_chan_change_started_notify(
+			link_info,
+			sap_event->sapevt.ch_sw_started_notify.freq,
+			&sap_event->sapevt.ch_sw_started_notify.ch_params);
+		return QDF_STATUS_SUCCESS;
 	case eSAP_CHANNEL_CHANGE_RESP:
 		/*
 		 * Set the ch_switch_in_progress flag to zero and also enable
@@ -3456,117 +3572,6 @@ next_adapter:
 	return false;
 }
 
-/**
- * hdd_copy_chan_params() - Copy ch_param info to wlan_channel
- * structure
- * @pdev: pointer to pdev level
- * @ch_params: pointer to structure ch_params
- * @chan_info: pointer to structuer wlan_channel
- * @freq: channel frequency
- *
- * Return: None
- */
-static void hdd_copy_chan_params(struct wlan_objmgr_pdev *pdev,
-				 struct ch_params *ch_params,
-				 struct wlan_channel *chan_info,
-				 qdf_freq_t freq)
-{
-	chan_info->ch_freq = freq;
-	chan_info->ch_ieee = wlan_reg_freq_to_chan(pdev, chan_info->ch_freq);
-	chan_info->ch_flagext = 0;
-	if (wlan_reg_is_dfs_for_freq(pdev, chan_info->ch_freq))
-		chan_info->ch_flagext |= IEEE80211_CHAN_DFS;
-
-	chan_info->ch_width = ch_params->ch_width;
-	chan_info->ch_freq_seg1 = ch_params->center_freq_seg0;
-	chan_info->ch_freq_seg2 = ch_params->center_freq_seg1;
-	chan_info->ch_cfreq1 = ch_params->mhz_freq_seg0;
-	chan_info->ch_cfreq2 = ch_params->mhz_freq_seg1;
-}
-
-/**
- * hdd_chan_change_started_notify() - Notify channel switch started to userspace
- * @link_info: pointer to link_info
- * @freq: channel frequency
- * @ch_params: channel params
- *
- * Return: None
- */
-static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
-					   qdf_freq_t freq,
-					   struct ch_params *ch_params)
-{
-	struct hdd_adapter *adapter = link_info->adapter;
-	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_pdev *pdev;
-	struct wlan_objmgr_vdev *vdev;
-	uint16_t link_id = 0;
-	struct wlan_channel chan;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct net_device *dev;
-	struct cfg80211_chan_def chandef;
-	uint16_t puncture_bitmap = 0;
-	uint8_t vdev_id;
-	int ch_switch_count;
-
-	if (!mac_handle) {
-		hdd_err("mac_handle is NULL");
-		return;
-	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		hdd_err("psoc is NULL");
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		return;
-	}
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		hdd_err("pdev is NULL");
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		return;
-	}
-
-	dev = adapter->dev;
-	vdev_id = wlan_vdev_get_id(vdev);
-
-	mutex_lock(&dev->ieee80211_ptr->mtx);
-	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS) {
-		hdd_debug("Vdev %d mode %d not UP", vdev_id,
-			  adapter->device_mode);
-		goto exit;
-	}
-
-	hdd_copy_chan_params(pdev, ch_params, &chan, freq);
-	status = hdd_create_chandef(adapter, &chan, &chandef);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_debug("Vdev %d failed to create channel def", vdev_id);
-		goto exit;
-	}
-
-	puncture_bitmap = wlan_hdd_get_puncture_bitmap(link_info);
-	ucfg_mlme_get_sap_chn_switch_bcn_count(psoc, &ch_switch_count);
-
-	hdd_debug("channel switch started notify: vdev %d chan:%d width:%d freq1:%d freq2:%d punct 0x%x ch_switch_count %d",
-		  vdev_id, chandef.chan->center_freq, chandef.width,
-		  chandef.center_freq1, chandef.center_freq2,
-		  puncture_bitmap, ch_switch_count);
-
-	wlan_cfg80211_ch_switch_started_notify(dev, &chandef, link_id,
-					       ch_switch_count, false,
-					       puncture_bitmap);
-
-exit:
-	mutex_unlock(&dev->ieee80211_ptr->mtx);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-}
-
 int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 				  enum phy_ch_width target_bw, bool forced)
 {
@@ -3782,10 +3787,6 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	strict = is_p2p_go_session;
 	strict = strict || forced;
 	hdd_place_marker(adapter, "CHANNEL CHANGE", NULL);
-
-	/* Notify channel switch start to userspace */
-	hdd_chan_change_started_notify(link_info, target_chan_freq,
-				       &ch_params);
 
 	status = wlansap_set_channel_change_with_csa(
 		WLAN_HDD_GET_SAP_CTX_PTR(link_info),

@@ -2431,6 +2431,7 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 	tSap_StationDisassocCompleteEvent *disassoc_comp;
 	tSap_StationSetKeyCompleteEvent *key_complete;
 	tSap_StationMICFailureEvent *mic_failure;
+	struct ch_switch_started_notify *ch_switch_started_notify;
 
 	/* Format the Start BSS Complete event to return... */
 	if (!sap_ctx->sap_event_cb)
@@ -2837,6 +2838,21 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 			  "eSAP_CHANNEL_CHANGE_RESP");
 		break;
 
+	case eSAP_CHANNEL_SWITCH_STARTED_NOTIFY:
+		if (!csr_roaminfo) {
+			sap_debug("Invalid CSR Roam Info");
+			qdf_mem_free(sap_ap_event);
+			return QDF_STATUS_E_INVAL;
+		}
+		sap_ap_event->sapHddEventCode =
+				eSAP_CHANNEL_SWITCH_STARTED_NOTIFY;
+		ch_switch_started_notify =
+				&sap_ap_event->sapevt.ch_sw_started_notify;
+		ch_switch_started_notify->freq =
+				csr_roaminfo->pSirSmeSwitchChInd->freq;
+		ch_switch_started_notify->ch_params =
+				csr_roaminfo->pSirSmeSwitchChInd->chan_params;
+		break;
 	default:
 		sap_err("SAP Unknown callback event = %d", sap_hddevent);
 		break;

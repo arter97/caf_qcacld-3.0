@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -286,6 +286,8 @@ typedef enum {
 	eCSR_ROAM_CAC_COMPLETE_IND = 48,
 	eCSR_ROAM_SAE_COMPUTE = 49,
 	eCSR_ROAM_CHANNEL_INFO_EVENT_IND = 50,
+	/* Channel switch started indication from lower layers */
+	eCSR_ROAM_CHANNEL_SWITCH_STARTED_IND = 51,
 } eRoamCmdStatus;
 
 /* comment inside indicates what roaming callback gets */
@@ -364,6 +366,7 @@ typedef enum {
 	/* If Scan for SSID failed to found proper BSS */
 	eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE,
 	eCSR_ROAM_RESULT_INVOKE_FAILED,
+	eCSR_ROAM_RESULT_CHANNEL_SWITCH_STARTED_NOTIFY,
 } eCsrRoamResult;
 
 typedef enum {
@@ -599,6 +602,7 @@ struct csr_roam_info {
 #ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 	uint32_t chan_info_freq;
 #endif
+	struct switch_channel_ind *pSirSmeSwitchChInd;
 };
 
 typedef struct sSirSmeAssocIndToUpperLayerCnf {

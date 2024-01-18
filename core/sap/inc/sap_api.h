@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -185,6 +185,8 @@ typedef enum {
 	eSAP_DFS_NEXT_CHANNEL_REQ,
 	/* Event sent channel switch status to upper layer */
 	eSAP_CHANNEL_CHANGE_RESP,
+	/* Notify channel switch started to upper layer */
+	eSAP_CHANNEL_SWITCH_STARTED_NOTIFY,
 } eSapHddEvent;
 
 typedef enum {
@@ -400,6 +402,18 @@ struct sap_ch_change_rsp {
 	eSapStatus ch_change_rsp_status;
 };
 
+/**
+ * struct ch_switch_started_notify - channel switch started notify
+ * @vdev_id: vdev_id
+ * @freq: Frequency
+ * @ch_width: channel width
+ *
+ */
+struct ch_switch_started_notify {
+	qdf_freq_t freq;
+	struct ch_params ch_params;
+};
+
 /*
  * This struct will be filled in and passed to sap_event_cb that is
  * provided during wlansap_start_bss call The event id corresponding to
@@ -436,6 +450,7 @@ struct sap_event {
 		struct sap_ch_change_ind sap_chan_cng_ind;
 		struct sap_ch_change_rsp sap_chan_cng_rsp;
 		struct sap_acs_scan_complete_event sap_acs_scan_comp;
+		struct ch_switch_started_notify ch_sw_started_notify;
 	} sapevt;
 };
 
