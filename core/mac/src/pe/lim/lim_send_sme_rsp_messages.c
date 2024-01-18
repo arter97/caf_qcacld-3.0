@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1916,9 +1916,16 @@ static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
 				 uint8_t link_id,
 				 struct csa_offload_params *csa_params)
 {
+	struct wlan_objmgr_pdev *pdev;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 
-	mlo_mgr_update_csa_link_info(vdev->mlo_dev_ctx,
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		pe_err("pdev is null");
+		return;
+	}
+
+	mlo_mgr_update_csa_link_info(pdev, vdev->mlo_dev_ctx,
 				     csa_params, link_id);
 	pe_debug("vdev_id: %d link id %d mlo csa sta param updated ",
 		 vdev_id, link_id);
