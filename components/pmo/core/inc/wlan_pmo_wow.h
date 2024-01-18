@@ -31,6 +31,8 @@
 #include "wlan_pmo_common_public_struct.h"
 #include "wlan_pmo_obj_mgmt_public_struct.h"
 #include "wlan_objmgr_psoc_obj.h"
+#include "wlan_pmo_ucfg_api.h"
+#include "wlan_hdd_main.h"
 
 /**
  * DOC: wlan_pmo_wowl
@@ -110,7 +112,7 @@
 #define PMO_WOW_MAX_EVENT_BM_LEN 4
 
 #define PMO_WOW_FILTERS_ARP_NS		2
-#define PMO_WOW_FILTERS_PKT_OR_APF	6
+#define PMO_WOW_FILTERS_PKT_OR_APF	12
 
 /**
  * pmo_get_and_increment_wow_default_ptrn() -Get and increment wow default ptrn
@@ -124,6 +126,13 @@ static inline uint8_t pmo_get_and_increment_wow_default_ptrn(
 		struct pmo_vdev_priv_obj *vdev_ctx)
 {
 	uint8_t count;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		QDF_DEBUG_PANIC("HDD context invalid");
+	if (!hdd_ctx->psoc)
+		QDF_DEBUG_PANIC("PSOC context is null");
 
 	if (vdev_ctx->pmo_psoc_ctx->caps.unified_wow) {
 		qdf_spin_lock_bh(&vdev_ctx->pmo_vdev_lock);
@@ -134,6 +143,9 @@ static inline uint8_t pmo_get_and_increment_wow_default_ptrn(
 		count = vdev_ctx->pmo_psoc_ctx->wow.ptrn_id_def++;
 		qdf_spin_unlock_bh(&vdev_ctx->pmo_psoc_ctx->lock);
 	}
+
+	if (count > ucfg_pmo_get_num_wow_filters(hdd_ctx->psoc))
+		QDF_DEBUG_PANIC("WoW patterns count exceeds supported amount");
 
 	return count;
 }
