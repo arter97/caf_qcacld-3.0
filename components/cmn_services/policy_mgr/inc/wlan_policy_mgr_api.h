@@ -5841,4 +5841,20 @@ QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
 					struct connection_info *info,
 					uint8_t *connection_count);
 #endif
+
+/**
+ * policy_mgr_mon_sbs_mac0_freq() - Check if the given frequency is
+ * sbs frequency on mac0 for static and dynamic sbs case.
+ * @psoc: psoc pointer
+ * @freq: Frequency which needs to be checked.
+ *
+ * This API should only be used in case of monitor mode as current API
+ * in dynamic SBS enable case considers SBS Lower share frequency range
+ * and behavior in other modes of operation can be different.
+ *
+ * Return: true/false.
+ */
+bool policy_mgr_mon_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
+				  qdf_freq_t freq);
+
 #endif /* __WLAN_POLICY_MGR_API_H */

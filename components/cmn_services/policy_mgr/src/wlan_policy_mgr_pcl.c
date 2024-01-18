@@ -1510,6 +1510,18 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 	return QDF_STATUS_SUCCESS;
 }
 
+static bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return false;
+
+	return (policy_mgr_is_hw_sbs_capable(psoc) &&
+		policy_mgr_can_2ghz_share_low_high_5ghz_sbs(pm_ctx));
+}
+
 #ifdef WLAN_FEATURE_LL_LT_SAP
 #ifdef WLAN_FEATURE_LL_LT_SAP_6G_SUPPORT
 static bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
@@ -1532,18 +1544,6 @@ static inline bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 	return false;
 }
 #endif
-
-static bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx)
-		return false;
-
-	return (policy_mgr_is_hw_sbs_capable(psoc) &&
-		policy_mgr_can_2ghz_share_low_high_5ghz_sbs(pm_ctx));
-}
 
 /**
  * policy_mgr_is_sbs_mac0_freq() - Check if the given frequency is
@@ -5183,3 +5183,29 @@ QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
 	return status;
 }
 #endif
+
+bool policy_mgr_mon_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
+				  qdf_freq_t freq)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_freq_range *freq_range;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return false;
+
+	/*
+	 * For dynamic sbs enable case API assumes that MAC0 will be
+	 * on SBS Low share.
+	 */
+	if (policy_mgr_is_dynamic_sbs_enabled(psoc))
+		freq_range =
+			pm_ctx->hw_mode.freq_range_caps[MODE_SBS_LOWER_SHARE];
+	else
+		freq_range = pm_ctx->hw_mode.freq_range_caps[MODE_SBS];
+
+	if (policy_mgr_is_freq_on_mac_id(freq_range, freq, 0))
+		return true;
+
+	return false;
+}
