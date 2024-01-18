@@ -14178,6 +14178,9 @@ static int __hdd_psoc_idle_restart(struct hdd_context *hdd_ctx)
 
 	ret = hdd_wlan_start_modules(hdd_ctx, false);
 
+	if (!qdf_is_fw_down())
+		cds_set_recovery_in_progress(false);
+
 	hdd_soc_idle_restart_unlock();
 
 	return ret;
