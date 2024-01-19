@@ -584,4 +584,13 @@ void libstats_async_event_deinit(void);
  */
 int8_t libstats_async_send_stats_req(struct stats_command *cmd);
 
+/**
+ * libstats_receive_event(): Non blocking receive API to receive the event
+ *                       for non blocking stats request
+ * @buf: Buffer provided by the application to hold reply
+ *
+ * Return: 0 on Success, Error code on Failure
+ */
+int8_t libstats_receive_event(struct reply_buffer *buf);
+
 #endif /* _STATS_LIB_H_ */
