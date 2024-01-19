@@ -30,8 +30,10 @@
  * @ml_nlink_link_switch_pre_completion_evt: link switch pre-completion
  * @ml_nlink_roam_sync_start_evt: roam sync start
  * @ml_nlink_roam_sync_completion_evt: roam sync completion
+ * @ml_nlink_connect_pre_start_evt: STA/CLI pre connect start
  * @ml_nlink_connect_start_evt: STA/CLI connect start
  * @ml_nlink_connect_completion_evt: STA/CLI connect completion
+ * @ml_nlink_connect_failed_evt: STA/CLI connect failed
  * @ml_nlink_disconnect_start_evt: STA/CLI disconnect start
  * @ml_nlink_disconnect_completion_evt: STA/CLI disconnect completion
  * @ml_nlink_ap_start_evt: SAP/GO bss going to start event
@@ -50,8 +52,10 @@ enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_pre_completion_evt,
 	ml_nlink_roam_sync_start_evt,
 	ml_nlink_roam_sync_completion_evt,
+	ml_nlink_connect_pre_start_evt,
 	ml_nlink_connect_start_evt,
 	ml_nlink_connect_completion_evt,
+	ml_nlink_connect_failed_evt,
 	ml_nlink_disconnect_start_evt,
 	ml_nlink_disconnect_completion_evt,
 	ml_nlink_ap_start_evt,
@@ -183,8 +187,10 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_link_switch_pre_completion_evt);
 	CASE_RETURN_STRING(ml_nlink_roam_sync_start_evt);
 	CASE_RETURN_STRING(ml_nlink_roam_sync_completion_evt);
+	CASE_RETURN_STRING(ml_nlink_connect_pre_start_evt);
 	CASE_RETURN_STRING(ml_nlink_connect_start_evt);
 	CASE_RETURN_STRING(ml_nlink_connect_completion_evt);
+	CASE_RETURN_STRING(ml_nlink_connect_failed_evt);
 	CASE_RETURN_STRING(ml_nlink_disconnect_start_evt);
 	CASE_RETURN_STRING(ml_nlink_disconnect_completion_evt);
 	CASE_RETURN_STRING(ml_nlink_ap_start_evt);

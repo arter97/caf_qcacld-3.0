@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -72,7 +72,8 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 
-	if (op_mode == QDF_STA_MODE || op_mode == QDF_P2P_CLIENT_MODE)
+	if ((op_mode == QDF_STA_MODE || op_mode == QDF_P2P_CLIENT_MODE) &&
+	    !wlan_mlme_is_aux_emlsr_support(psoc))
 		wlan_handle_emlsr_sta_concurrency(psoc, true, false);
 
 	if (op_mode == QDF_P2P_CLIENT_MODE || sap_cnt || sta_cnt) {
@@ -183,7 +184,8 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
-	    wlan_vdev_mlme_is_mlo_vdev(vdev))
+	    wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_mlme_is_aux_emlsr_support(psoc))
 		wlan_handle_emlsr_sta_concurrency(psoc, false, true);
 
 	if (!wlan_cm_is_vdev_roaming(vdev))
@@ -241,8 +243,9 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 
 	qdf_runtime_pm_allow_suspend(&mlme_priv->disconnect_runtime_lock);
 
-	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE ||
-	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_CLIENT_MODE)
+	if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE ||
+	     wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_CLIENT_MODE) &&
+	     !wlan_mlme_is_aux_emlsr_support(psoc))
 		wlan_handle_emlsr_sta_concurrency(psoc, false, true);
 
 	status = if_mgr_enable_roaming_after_p2p_disconnect(pdev, vdev,

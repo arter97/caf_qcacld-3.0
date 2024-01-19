@@ -45,6 +45,7 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_dp_api.h"
+#include "wlan_policy_mgr_ucfg.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
@@ -1838,6 +1839,11 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 				mlme_debug("Failed to take next action after connect");
 		}
 	}
+
+	if (QDF_IS_STATUS_ERROR(rsp->connect_status) &&
+	    !(rsp->cm_id & CM_ID_LSWITCH_BIT))
+		ucfg_policy_mgr_post_sta_p2p_start_failed(wlan_vdev_get_psoc(vdev),
+							  wlan_vdev_get_id(vdev));
 
 	mlo_roam_connect_complete(vdev);
 

@@ -1863,10 +1863,68 @@ sap_force_inactive_table_dbs_rd = {
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
 };
 
+static force_inactive_table_type
+sta_p2p_force_inactive_table_lowshare_rd = {
+	/* MLO Links  |  Concurrency  | force inactive mode bitmap */
+	[HC_2G_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL, 0},
+			[HC_5GH] =    {0, HC_2G_5GL} },
+	[HC_2G_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {0, HC_2G_5GH},
+			[HC_5GH] =    {HC_5GH, 0} },
+	[HC_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL, 0},
+			[HC_5GH] =    {HC_5GH, 0} },
+	[HC_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
+			[HC_5GH] =    {0, HC_5GL_5GL} },
+	[HC_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+};
+
+static force_inactive_table_type
+sta_p2p_force_inactive_table_dbs_rd = {
+	/* MLO Links  |  Concrrency  | force inactive mode bitmap */
+	[HC_2G_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL, 0},
+			[HC_5GH] =    {HC_5GL, 0} },
+	[HC_2G_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GH, 0},
+			[HC_5GH] =    {HC_5GH, 0} },
+	[HC_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GH, HC_5GL_5GH},
+			[HC_5GH] =    {HC_5GL_5GH, HC_5GL_5GH} },
+	[HC_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
+			[HC_5GH] =    {HC_5GL_5GL, HC_5GL_5GL} },
+	[HC_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GH_5GH, HC_5GH_5GH},
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+};
+
 static force_inactive_table_type *sap_tbl[] = {
 	NULL,
 	&sap_force_inactive_table_dbs_rd,
 	&sap_force_inactive_table_lowshare_rd,
+	NULL, /* todo: high share*/
+	NULL, /* todo: switchable*/
+};
+
+static force_inactive_table_type *sta_p2p_tbl[] = {
+	NULL,
+	&sta_p2p_force_inactive_table_dbs_rd,
+	&sta_p2p_force_inactive_table_lowshare_rd,
 	NULL, /* todo: high share*/
 	NULL, /* todo: switchable*/
 };
@@ -1876,13 +1934,15 @@ get_force_inactive_table(struct wlan_objmgr_psoc *psoc,
 			 enum policy_mgr_con_mode pm_mode)
 {
 	enum pm_rd_type rd_type;
-	force_inactive_table_type *force_inactive_table;
+	force_inactive_table_type *force_inactive_table = NULL;
 
 	rd_type = policy_mgr_get_rd_type(psoc);
 	if (pm_mode == PM_SAP_MODE)
 		force_inactive_table = sap_tbl[rd_type];
-	else
-		force_inactive_table = NULL; /* todo: add sta/p2p table */
+	else if (pm_mode == PM_STA_MODE ||
+		 pm_mode == PM_P2P_CLIENT_MODE ||
+		 pm_mode == PM_P2P_GO_MODE)
+		force_inactive_table = sta_p2p_tbl[rd_type];
 
 	return force_inactive_table;
 }
@@ -3613,7 +3673,8 @@ ml_nlink_update_force_command_target(struct wlan_objmgr_psoc *psoc,
 					   data->evt.post_set_link.post_re_evaluate_loops);
 
 	if (evt == ml_nlink_ap_start_evt ||
-	    evt == ml_nlink_ap_csa_start_evt)
+	    evt == ml_nlink_ap_csa_start_evt ||
+	    evt == ml_nlink_connect_pre_start_evt)
 		link_control_flags |= link_ctrl_f_sync_set_link;
 	else
 		link_control_flags |= link_ctrl_f_post_re_evaluate;
@@ -4001,7 +4062,9 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 	/* todo: add sta/gc support */
 	if (!(op_mode == QDF_SAP_MODE ||
-	      op_mode == QDF_P2P_GO_MODE)) {
+	      op_mode == QDF_P2P_GO_MODE ||
+	      op_mode == QDF_STA_MODE ||
+	      op_mode == QDF_P2P_CLIENT_MODE)) {
 		mlo_debug("op_mode: %d", op_mode);
 		goto end;
 	}
@@ -4062,6 +4125,8 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 			force_inactive_bitmap = 0;
 	} else if (evt == ml_nlink_ap_start_evt) {
 		disable_request = ML_EMLSR_DOWNGRADE_BY_AP_START;
+	} else if (evt == ml_nlink_connect_pre_start_evt) {
+		disable_request = ML_EMLSR_DOWNGRADE_BY_STA_START;
 	} else {
 		mlo_debug("not handled for evt %d", evt);
 		goto end;
@@ -4126,7 +4191,9 @@ ml_nlink_undo_emlsr_downgrade(struct wlan_objmgr_psoc *psoc,
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 	/* todo: add sta/gc support */
 	if (!(op_mode == QDF_SAP_MODE ||
-	      op_mode == QDF_P2P_GO_MODE)) {
+	      op_mode == QDF_P2P_GO_MODE ||
+	      op_mode == QDF_STA_MODE ||
+	      op_mode == QDF_P2P_CLIENT_MODE)) {
 		mlo_debug("op_mode: %d", op_mode);
 		goto end;
 	}
@@ -4139,6 +4206,9 @@ ml_nlink_undo_emlsr_downgrade(struct wlan_objmgr_psoc *psoc,
 	if (evt == ml_nlink_ap_started_evt ||
 	    evt == ml_nlink_ap_start_failed_evt) {
 		request = ML_EMLSR_DOWNGRADE_BY_AP_START;
+	} else if (evt == ml_nlink_connect_completion_evt ||
+		   evt == ml_nlink_connect_failed_evt) {
+		request = ML_EMLSR_DOWNGRADE_BY_STA_START;
 	} else {
 		mlo_debug("not handled for evt %d", evt);
 		goto end;
@@ -4182,7 +4252,9 @@ ml_nlink_undo_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 	/* todo: add sta/gc support */
 	if (!(op_mode == QDF_SAP_MODE ||
-	      op_mode == QDF_P2P_GO_MODE)) {
+	      op_mode == QDF_P2P_GO_MODE ||
+	      op_mode == QDF_STA_MODE ||
+	      op_mode == QDF_P2P_CLIENT_MODE)) {
 		mlo_debug("op_mode: %d", op_mode);
 		goto end;
 	}
@@ -4697,6 +4769,8 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		ml_nlink_reset_disallow_modes(psoc, vdev);
 		break;
 	case ml_nlink_connect_completion_evt:
+		status = ml_nlink_undo_emlsr_downgrade(
+			psoc, vdev, evt, data);
 		status = ml_nlink_state_change_handler(
 			psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
 			evt, data);
@@ -4713,10 +4787,12 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			psoc, vdev, MLO_LINK_FORCE_REASON_DISCONNECT,
 			evt, data);
 		break;
+	case ml_nlink_connect_pre_start_evt:
 	case ml_nlink_ap_start_evt:
 		status = ml_nlink_emlsr_downgrade_handler(
 			psoc, vdev, evt, data);
 		break;
+	case ml_nlink_connect_failed_evt:
 	case ml_nlink_ap_start_failed_evt:
 		status = ml_nlink_undo_emlsr_downgrade_handler(
 			psoc, vdev, evt, data);
