@@ -87,6 +87,7 @@ enum stats_feat_index_e {
  * struct stats_config: Structure to hold user configurations
  * @wiphy:  Pointer to wiphy structure which came as part of User request
  * @feat:  Feat flag set to dedicated bit of this field
+ * @request_id: Indicate the request ID of non-blocking stats request
  * @lvl:  Requested level of Stats (i.e. Basic, Advance or Debug)
  * @obj:  Requested stats for object (i.e. AP, Radio, Vap or STA)
  * @type:  Requested stats category
@@ -101,6 +102,7 @@ enum stats_feat_index_e {
 struct stats_config {
 	struct wiphy           *wiphy;
 	u_int64_t              feat;
+	u_int64_t              request_id;
 	enum stats_level_e     lvl;
 	enum stats_object_e    obj;
 	enum stats_type_e      type;

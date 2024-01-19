@@ -449,6 +449,7 @@ struct debug_psoc_data {
  * @stats: Stats based on above meta information
  * @next: Next stats_obj
  * @parent: Parent stats_obj
+ * @request_id: Request ID of non-blocking stats request
  */
 struct stats_obj {
 	enum stats_level_e lvl;
@@ -463,6 +464,7 @@ struct stats_obj {
 	void *stats;
 	struct stats_obj *next;
 	struct stats_obj *parent;
+	uint64_t request_id;
 };
 
 /**
@@ -484,6 +486,7 @@ struct reply_buffer {
  * @mld_link:  Stats for mld link
  * @serviceid: Stats serviceid
  * @feat_flag: Stats requested for combination of Features
+ * @request_id:Request ID of non blocking stats request from application
  * @sta_mac:   Station MAC address if Stats requested for STA object
  * @if_name:   Interface name on which Stats is requested
  * @reply:     Pointer to reply buffer provided by user
@@ -498,6 +501,7 @@ struct stats_command {
 	uint8_t serviceid;
 	char if_name[IFNAME_LEN];
 	u_int64_t feat_flag;
+	uint64_t request_id;
 	struct ether_addr sta_mac;
 	struct reply_buffer *reply;
 	enum stats_peer_type peer_type;
