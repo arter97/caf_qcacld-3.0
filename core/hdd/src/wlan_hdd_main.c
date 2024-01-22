@@ -10268,6 +10268,65 @@ static inline bool wlan_hdd_is_mon_channel_bw_valid(enum phy_ch_width ch_width)
 }
 #endif
 
+/*
+ * wlan_hdd_mon_adjust_freq_seq() - Check and update frequecy sequence
+ * @adapter: adapter handle
+ * mon_link_info: Monitor link info handle
+ *
+ * For monitor mode currently FW does not support vdev migration.
+ * So to avoid vdev migration in case of multi-link monitor mode
+ * host has to send vdev start in predefined sequence to avoid vdev
+ * migration.
+ * Below table contains order need which vdev start needs to be done
+ * to avoid vdev migration:
+ *  _____________________________________________________________
+ * |   Chip Type     | Allowed combination | 1st Vdev | 2nd Vdev |
+ * |-------------------------------------------------------------|
+ * |     DBS Only    |       2G+5G         |    2G    |    5G    |
+ * |-------------------------------------------------------------|
+ * |                 |       2G+5G         |    2G    |    5G    |
+ * | SBS Lower share |-------------------------------------------|
+ * |                 |       5GL+5GH       |    5GL   |    5GH   |
+ * |-------------------------------------------------------------|
+ * |                 |       2G+5G         |    2G    |    5G    |
+ * | SBS Upper share |-------------------------------------------|
+ * |                 |       5GL+5GH       |    5GH   |    5GL   |
+ * |-------------------------------------------------------------|
+ * |                 |       2G+5G         |    2G    |    5G    |
+ * | SBS Switchable  |-------------------------------------------|
+ * |                 |       5GL+5GH       |    5GL   |    5GH   |
+ * |_____________________________________________________________|
+ *
+ * Return: None
+ */
+static inline void
+wlan_hdd_mon_adjust_freq_seq(struct hdd_adapter *adapter,
+			     struct hdd_monitor_ctx *mon_params)
+{
+	qdf_freq_t freq;
+	uint32_t bandwidth;
+	struct hdd_monitor_ctx *next_param = mon_params + 1;
+
+	if (next_param && next_param->freq) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(next_param->freq)) {
+			goto swap;
+		} else if (!WLAN_REG_IS_24GHZ_CH_FREQ(mon_params->freq)) {
+			if (policy_mgr_mon_sbs_mac0_freq(adapter->hdd_ctx->psoc,
+							 next_param->freq))
+				goto swap;
+		}
+	}
+	return;
+
+swap:
+	freq = next_param->freq;
+	bandwidth = next_param->bandwidth;
+	next_param->freq = mon_params->freq;
+	next_param->bandwidth = mon_params->bandwidth;
+	mon_params->freq = freq;
+	mon_params->bandwidth = bandwidth;
+}
+
 int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
 				 struct hdd_monitor_ctx *mon_params,
 				 uint8_t num_params)
@@ -10375,6 +10434,8 @@ int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
 			return -EINVAL;
 		}
 	}
+
+	wlan_hdd_mon_adjust_freq_seq(adapter, mon_params);
 
 	index = 0;
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
