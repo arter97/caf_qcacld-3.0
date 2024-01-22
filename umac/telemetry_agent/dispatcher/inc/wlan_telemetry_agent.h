@@ -38,7 +38,7 @@ void wlan_telemetry_emesh_application_init_deinit_notify
 	(enum agent_notification_event);
 
 void wlan_telemetry_agent_application_init_notify
-	(enum agent_notification_event);
+	(enum agent_notification_event, uint64_t data);
 QDF_STATUS wlan_telemetry_agent_init(void);
 QDF_STATUS wlan_telemetry_agent_deinit(void);
 
@@ -265,7 +265,7 @@ QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
  */
 QDF_STATUS telemetry_sawf_reset_peer_stats(uint8_t *peer_mac);
 #else
-#define wlan_telemetry_agent_application_init_notify(param)
+#define wlan_telemetry_agent_application_init_notify(param, data)
 #define wlan_telemetry_emesh_application_init_deinit_notify(param)
 
 static inline
