@@ -1097,12 +1097,11 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 	if (wlan_get_vendor_ie_ptr_from_oui(HS20_OUI_TYPE,
 					    HS20_OUI_TYPE_SIZE,
 					    req->assoc_ie.ptr,
-					    req->assoc_ie.len)) {
+					    req->assoc_ie.len))
 		src_cfg.bool_value = true;
-		wlan_cm_roam_cfg_set_value(wlan_vdev_get_psoc(vdev),
-					   wlan_vdev_get_id(vdev),
-					   HS_20_AP, &src_cfg);
-	}
+	wlan_cm_roam_cfg_set_value(wlan_vdev_get_psoc(vdev),
+				   wlan_vdev_get_id(vdev),
+				   HS_20_AP, &src_cfg);
 	if (req->source != CM_MLO_LINK_SWITCH_CONNECT)
 		ml_nlink_conn_change_notify(
 			psoc, wlan_vdev_get_id(vdev),
