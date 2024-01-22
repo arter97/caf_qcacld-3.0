@@ -70,6 +70,11 @@ cm_is_peer_preset_on_other_sta(struct wlan_objmgr_psoc *psoc,
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	uint8_t peer_vdev_id;
 
+	if (!wma) {
+		wma_err("wma_handle is NULL");
+		return false;
+	}
+
 	sync_ind = (struct roam_offload_synch_ind *)event;
 
 	if (wma_objmgr_peer_exist(wma, sync_ind->bssid.bytes, &peer_vdev_id)) {
