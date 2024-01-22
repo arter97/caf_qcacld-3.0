@@ -39,6 +39,7 @@
  * @ml_nlink_connection_updated_evt: connection home channel changed
  * @ml_nlink_tdls_request_evt: tdls request link enable/disable
  * @ml_nlink_vendor_cmd_request_evt: vendor command request
+ * @ml_nlink_post_set_link_evt: re-schedule event to update link state
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
@@ -54,6 +55,7 @@ enum ml_nlink_change_event_type {
 	ml_nlink_connection_updated_evt,
 	ml_nlink_tdls_request_evt,
 	ml_nlink_vendor_cmd_request_evt,
+	ml_nlink_post_set_link_evt,
 };
 
 /**
@@ -81,6 +83,7 @@ enum link_control_modes {
  * @link_switch: link switch start parameters
  * @tdls: tdls parameters
  * @vendor: vendor command set link parameters
+ * @post_set_link: post set link event parameters
  */
 struct ml_nlink_change_event {
 	union {
@@ -105,6 +108,9 @@ struct ml_nlink_change_event {
 			enum mlo_link_force_mode mode;
 			enum mlo_link_force_reason reason;
 		} vendor;
+		struct {
+			uint8_t post_re_evaluate_loops;
+		} post_set_link;
 	} evt;
 };
 
@@ -150,6 +156,7 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_connection_updated_evt);
 	CASE_RETURN_STRING(ml_nlink_tdls_request_evt);
 	CASE_RETURN_STRING(ml_nlink_vendor_cmd_request_evt);
+	CASE_RETURN_STRING(ml_nlink_post_set_link_evt);
 	default:
 		return "Unknown";
 	}
@@ -344,6 +351,21 @@ ml_nlink_set_dynamic_inactive_links(struct wlan_objmgr_psoc *psoc,
 				    uint16_t dynamic_link_bitmap);
 
 /**
+ * ml_nlink_init_concurrency_link_request() - Init concurrency force
+ * link request
+ * @psoc: psoc object
+ * @vdev: vdev object
+ *
+ * When ML STA associated or Roam, initialize the concurrency
+ * force link request based on "current" force link state
+ *
+ * Return: None
+ */
+void ml_nlink_init_concurrency_link_request(
+	struct wlan_objmgr_psoc *psoc,
+	struct wlan_objmgr_vdev *vdev);
+
+/**
  * ml_nlink_get_dynamic_inactive_links() - get link dynamic inactive
  * link bitmap
  * @psoc: psoc object
@@ -358,38 +380,6 @@ ml_nlink_get_dynamic_inactive_links(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint16_t *dynamic_link_bitmap,
 				    uint16_t *force_link_bitmap);
-
-/**
- * ml_nlink_init_concurrency_link_request() - Init concurrency force
- * link request
- * link bitmap
- * @psoc: psoc object
- * @vdev: vdev object
- *
- * When ML STA associated or Roam, initialize the concurrency
- * force link request based on "current" force link state
- *
- * Return: None
- */
-void ml_nlink_init_concurrency_link_request(
-	struct wlan_objmgr_psoc *psoc,
-	struct wlan_objmgr_vdev *vdev);
-
-/**
- * ml_nlink_get_force_link_request() - get link request of source
- * link bitmap
- * @psoc: psoc object
- * @vdev: vdev object
- * @req: set link request
- * @source: the source to query
- *
- * Return: None
- */
-void
-ml_nlink_get_force_link_request(struct wlan_objmgr_psoc *psoc,
-				struct wlan_objmgr_vdev *vdev,
-				struct set_link_req *req,
-				enum set_link_source source);
 
 /**
  * ml_nlink_get_curr_force_state() - get link force state
@@ -438,9 +428,9 @@ ml_nlink_clr_requested_emlsr_mode(struct wlan_objmgr_psoc *psoc,
  * @link_bitmap: link bitmap, valid for mode:
  * @link_bitmap2: inactive link bitmap, only valid for mode
  *
- * Return: void
+ * Return: QDF_STATUS
  */
-void
+QDF_STATUS
 ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id,
 				 enum link_control_modes link_control_mode,
@@ -468,6 +458,37 @@ bool ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc);
 uint32_t
 ml_nlink_get_standby_link_bitmap(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ml_nlink_convert_vdev_ids_to_link_bitmap() - convert vdev id list
+ * to link id bitmap
+ * @psoc: psoc
+ * @mlo_vdev_lst: vdev id list
+ * @num_ml_vdev: number of vdev id in list
+ *
+ * Return: link id bitmap
+ */
+uint32_t
+ml_nlink_convert_vdev_ids_to_link_bitmap(
+	struct wlan_objmgr_psoc *psoc,
+	uint8_t *mlo_vdev_lst,
+	uint8_t num_ml_vdev);
+
+/**
+ * ml_nlink_update_force_link_request() - update force link request
+ * for source
+ * @psoc: psoc
+ * @vdev: vdev object
+ * @req: force link request
+ * @source: source of request
+ *
+ * Return: void
+ */
+void
+ml_nlink_update_force_link_request(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev,
+				   struct set_link_req *req,
+				   enum set_link_source source);
 #else
 static inline QDF_STATUS
 ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,

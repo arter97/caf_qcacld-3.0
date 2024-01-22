@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -140,6 +140,23 @@ enum link_control_flags {
 	link_ctrl_f_dynamic_force_link_num =    1 << 2,
 	link_ctrl_f_post_re_evaluate =          1 << 3,
 };
+
+/* Define the max number of consecutive re-evaluate number. usually, we have
+ * to update force active_inactive bitmap, force active number, force inactive
+ * number to target, so post re-evaluate should not exceed 3.
+ */
+#define MAX_RE_EVALUATE_LOOPS 3
+#define link_ctrl_f_loop_count_pos          30
+#define link_ctrl_f_loop_count_bits          2
+
+#define SET_POST_RE_EVALUATE_LOOPS(_FLAGS_, _COUNT_) \
+	QDF_SET_BITS(_FLAGS_, link_ctrl_f_loop_count_pos, \
+		     link_ctrl_f_loop_count_bits, \
+		     _COUNT_)
+
+#define GET_POST_RE_EVALUATE_LOOPS(_FLAGS_) \
+	QDF_GET_BITS(_FLAGS_, link_ctrl_f_loop_count_pos, \
+		     link_ctrl_f_loop_count_bits)
 
 /**
  * enum hw_mode_ss_config - Possible spatial stream configuration
