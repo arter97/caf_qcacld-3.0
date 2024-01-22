@@ -81,7 +81,6 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_result *res,
 			       struct wmi_roam_scan_data *scan_data,
 			       uint8_t vdev_id);
-
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING) && \
     defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
