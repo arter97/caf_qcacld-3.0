@@ -11865,11 +11865,13 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 
 	hdd_debug("number of links to force enable: %d", num_links);
 
-	if (num_links >= 1)
+	if (num_links >= 1) {
+		if (adapter->deflink->vdev->mlo_dev_ctx->sta_ctx)
+			adapter->deflink->vdev->mlo_dev_ctx->sta_ctx->emlsr_mode_req = emlsr_mode;
 		sme_activate_mlo_links(hdd_ctx->mac_handle,
 				       adapter->deflink->vdev_id,
-				       num_links, active_link_addr,
-				       emlsr_mode);
+				       num_links, active_link_addr);
+	}
 
 	return 0;
 }
@@ -12144,8 +12146,7 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 		}
 		sme_activate_mlo_links(hdd_ctx->mac_handle,
 				       link_info->vdev_id, num_links,
-				       active_link_addr,
-				       WLAN_EMLSR_MODE_MAX);
+				       active_link_addr);
 	}
 	hdd_debug("number of links to force active: %d", num_links);
 

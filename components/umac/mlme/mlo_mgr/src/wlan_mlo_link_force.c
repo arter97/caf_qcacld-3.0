@@ -221,6 +221,21 @@ ml_nlink_clr_force_state(struct wlan_objmgr_psoc *psoc,
 	mlo_dev_lock_release(mlo_dev_ctx);
 }
 
+void
+ml_nlink_clr_requested_emlsr_mode(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx)
+		return;
+
+	mlo_dev_lock_acquire(mlo_dev_ctx);
+	mlo_sta_reset_requested_emlsr_mode(mlo_dev_ctx);
+	mlo_dev_lock_release(mlo_dev_ctx);
+}
+
 static void
 ml_nlink_update_link_bitmap(uint16_t *curr_link_bitmap,
 			    uint16_t link_bitmap,
@@ -1804,8 +1819,7 @@ ml_nlink_update_no_force_for_all(struct wlan_objmgr_psoc *psoc,
 						psoc, wlan_vdev_get_id(vdev),
 						reason,
 						MLO_LINK_FORCE_MODE_NO_FORCE,
-						0, 0, 0, 0,
-						WLAN_EMLSR_MODE_MAX);
+						0, 0, 0, 0);
 	}
 
 end:
@@ -1843,8 +1857,7 @@ ml_nlink_update_force_inactive(struct wlan_objmgr_psoc *psoc,
 				new->force_inactive_bitmap,
 				0,
 				link_ctrl_f_overwrite_inactive_bitmap |
-				link_ctrl_f_post_re_evaluate,
-				WLAN_EMLSR_MODE_MAX);
+				link_ctrl_f_post_re_evaluate);
 	}
 
 end:
@@ -1871,8 +1884,7 @@ ml_nlink_update_force_inactive_num(struct wlan_objmgr_psoc *psoc,
 					new->force_inactive_num_bitmap,
 					0,
 					link_ctrl_f_dynamic_force_link_num |
-					link_ctrl_f_post_re_evaluate,
-					WLAN_EMLSR_MODE_MAX);
+					link_ctrl_f_post_re_evaluate);
 	}
 
 	return status;
@@ -2177,8 +2189,7 @@ ml_nlink_tdls_event_handler(struct wlan_objmgr_psoc *psoc,
 				0,
 				data->evt.tdls.link_bitmap,
 				0,
-				0,
-				WLAN_EMLSR_MODE_MAX);
+				0);
 	else
 		status =
 		policy_mgr_mlo_sta_set_link(psoc,
@@ -2359,6 +2370,7 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 				psoc, vdev);
 		break;
 	case ml_nlink_roam_sync_start_evt:
+		ml_nlink_clr_requested_emlsr_mode(psoc, vdev);
 		ml_nlink_clr_force_state(psoc, vdev);
 		break;
 	case ml_nlink_roam_sync_completion_evt:
@@ -2367,6 +2379,7 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			evt, data);
 		break;
 	case ml_nlink_connect_start_evt:
+		ml_nlink_clr_requested_emlsr_mode(psoc, vdev);
 		ml_nlink_clr_force_state(psoc, vdev);
 		break;
 	case ml_nlink_connect_completion_evt:
@@ -2375,6 +2388,7 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			evt, data);
 		break;
 	case ml_nlink_disconnect_start_evt:
+		ml_nlink_clr_requested_emlsr_mode(psoc, vdev);
 		ml_nlink_clr_force_state(psoc, vdev);
 		break;
 	case ml_nlink_disconnect_completion_evt:

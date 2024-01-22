@@ -15711,8 +15711,7 @@ void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t vdev_id,
 
 void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t num_links,
-			    struct qdf_mac_addr active_link_addr[2],
-			    enum wlan_emlsr_action_mode emlsr_mode)
+			    struct qdf_mac_addr active_link_addr[2])
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
@@ -15727,8 +15726,7 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 	if (ml_is_nlink_service_supported(mac_ctx->psoc)) {
 		policy_mgr_activate_mlo_links_nlink(mac_ctx->psoc, session_id,
 						    num_links,
-						    active_link_addr,
-						    emlsr_mode);
+						    active_link_addr);
 	} else {
 		policy_mgr_activate_mlo_links(mac_ctx->psoc, session_id,
 					      num_links, active_link_addr);

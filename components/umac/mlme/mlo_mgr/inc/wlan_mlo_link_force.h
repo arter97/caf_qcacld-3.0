@@ -416,6 +416,17 @@ ml_nlink_clr_force_state(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev);
 
 /**
+ * ml_nlink_clr_requested_emlsr_mode() - clear the requested emlsr mode
+ * @psoc: psoc object
+ * @vdev: vdev object
+ *
+ * Return: None
+ */
+void
+ml_nlink_clr_requested_emlsr_mode(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev);
+
+/**
  * ml_nlink_vendor_command_set_link() - Update vendor command
  * set link parameters
  * @psoc: psoc object

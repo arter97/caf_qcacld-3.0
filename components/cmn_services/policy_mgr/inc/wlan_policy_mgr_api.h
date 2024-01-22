@@ -1177,7 +1177,6 @@ polic_mgr_send_pcl_to_fw(struct wlan_objmgr_psoc *psoc,
  * @link_bitmap2: inactive link bitmap, only valid for mode
  * MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE
  * @link_control_flags: bitmap of enum link_control_flags.
- * @emlsr_mode: EMLSR action mode
  *
  * Interface to set link mode for MLO STA
  *
@@ -1191,8 +1190,7 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 			     uint8_t link_num,
 			     uint16_t link_bitmap,
 			     uint16_t link_bitmap2,
-			     uint32_t link_control_flags,
-			     enum wlan_emlsr_action_mode emlsr_mode);
+			     uint32_t link_control_flags);
 
 /**
  * policy_mgr_mlo_sta_set_link() - Set link mode for MLO STA
@@ -1328,9 +1326,6 @@ bool policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc);
  * @psoc: PSOC object information
  * @vdev: Vdev object pointer
  * @req: Pointer to mlo link set active
- * @emlsr_mode: Emlsr action mode
- * @active_link_bmap: Active link bitmap
- * @inactive_link_bmap: Inactive link bitmap
  *
  * This API is to update the disallowed mode bitmap. It conveys which mode
  * the HW can operate for links. This helps FW to understand the
@@ -1341,10 +1336,7 @@ bool policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc);
 bool
 policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev,
-					 struct mlo_link_set_active_req *req,
-					 enum wlan_emlsr_action_mode emlsr_mode,
-					 uint16_t active_link_bmap,
-					 uint16_t inactive_link_bmap);
+					 struct mlo_link_set_active_req *req);
 
 /**
  * policy_mgr_init_disallow_mode_bmap() - Initialize the disallowed
@@ -1363,10 +1355,7 @@ policy_mgr_init_disallow_mode_bmap(struct mlo_link_set_active_req *req);
 static inline bool
 policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev,
-					 struct mlo_link_set_active_req *req,
-					 enum wlan_emlsr_action_mode emlsr_mode,
-					 uint16_t active_link_bmap,
-					 uint16_t inactive_link_bmap)
+					 struct mlo_link_set_active_req *req)
 {
 	return false;
 }
@@ -5191,14 +5180,12 @@ policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
  * @session_id: session id
  * @num_links: number of links to be forced active
  * @active_link_addr: link mac address of links to be forced active
- * @emlsr_mode: EMLSR action mode
  *
  * Return: void
  */
 void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 					 uint8_t session_id, uint8_t num_links,
-					 struct qdf_mac_addr *active_link_addr,
-					 enum wlan_emlsr_action_mode emlsr_mode);
+					 struct qdf_mac_addr *active_link_addr);
 
 /**
  * policy_mgr_activate_mlo_links() - Force active ML links based on user
