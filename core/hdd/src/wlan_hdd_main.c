@@ -7636,8 +7636,12 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 		qdf_ether_addr_copy(vdev_params->macaddr,
 				    link_info->link_addr.bytes);
 	} else {
-		qdf_ether_addr_copy(vdev_params->macaddr,
-				    adapter->mac_addr.bytes);
+		if (QDF_MONITOR_MODE == adapter->device_mode)
+			qdf_ether_addr_copy(vdev_params->macaddr,
+					    link_info->link_addr.bytes);
+		else
+			qdf_ether_addr_copy(vdev_params->macaddr,
+					    adapter->mac_addr.bytes);
 	}
 	return 0;
 }
@@ -9614,23 +9618,6 @@ hdd_monitor_mode_release_wakelock(struct wlan_hdd_link_info *link_info)
 }
 
 static void
-hdd_monitor_mode_disable_and_delete(struct wlan_hdd_link_info *link_info)
-{
-	QDF_STATUS status;
-	struct hdd_adapter *adapter = link_info->adapter;
-	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
-
-	status = hdd_disable_monitor_mode();
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err_rl("datapath reset failed for montior mode");
-	hdd_set_idle_ps_config(hdd_ctx, true);
-	status = hdd_monitor_mode_vdev_status(adapter);
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err_rl("stop failed montior mode");
-	sme_delete_mon_session(hdd_ctx->mac_handle, link_info->vdev_id);
-}
-
-static void
 hdd_stop_and_close_pre_cac_adapter(struct hdd_context *hdd_ctx,
 				   struct wlan_objmgr_vdev *vdev)
 {
@@ -9711,18 +9698,19 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 	hdd_cancel_ip_notifier_work(adapter);
 }
 
-static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
+static int
+wlan_hdd_delete_mon_link(struct hdd_adapter *adapter,
+			 struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	QDF_STATUS status;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info,
 					   WLAN_INIT_DEINIT_ID);
 	if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
-	    vdev &&
-	    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
-					PACKET_CAPTURE_MODE_DISABLE) {
+	    vdev && ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+	    PACKET_CAPTURE_MODE_DISABLE) {
 		struct hdd_adapter *sta_adapter;
 
 		ucfg_pkt_capture_deregister_callbacks(vdev);
@@ -9731,7 +9719,8 @@ static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
 
 		sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 		if (!sta_adapter) {
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+			hdd_objmgr_put_vdev_by_user(vdev,
+						    WLAN_INIT_DEINIT_ID);
 			hdd_err("No station interface found");
 			return -EINVAL;
 		}
@@ -9740,12 +9729,37 @@ static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
 
 	hdd_monitor_mode_release_wakelock(link_info);
 	wlan_hdd_scan_abort(link_info);
-	hdd_adapter_deregister_fc(adapter);
-	hdd_monitor_mode_disable_and_delete(link_info);
+
+	status = hdd_monitor_mode_vdev_status(adapter);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("stop failed montior mode");
+	sme_delete_mon_session(hdd_ctx->mac_handle, link_info->vdev_id);
+
 	if (vdev)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
 
 	hdd_vdev_destroy(link_info);
+	return 0;
+}
+
+static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_hdd_link_info *link_info;
+	int status;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		status = wlan_hdd_delete_mon_link(adapter, link_info);
+		if (status)
+			return status;
+	}
+
+	hdd_adapter_deregister_fc(adapter);
+	status = hdd_disable_monitor_mode();
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("datapath reset failed for montior mode");
+
+	hdd_set_idle_ps_config(hdd_ctx, true);
 
 	return 0;
 }
@@ -14944,8 +14958,10 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 	enum QDF_OPMODE opmode = adapter->device_mode;
 	struct qdf_mac_addr link_addrs[WLAN_MAX_ML_BSS_LINKS] = {0};
 	struct wlan_hdd_link_info *link_info;
+	uint8_t num_sessions;
 
-	if (opmode != QDF_STA_MODE && opmode != QDF_SAP_MODE)
+	if (opmode != QDF_STA_MODE && opmode != QDF_SAP_MODE &&
+	    opmode != QDF_MONITOR_MODE)
 		return QDF_STATUS_SUCCESS;
 
 	if (opmode == QDF_SAP_MODE) {
@@ -14954,13 +14970,17 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (!hdd_adapter_is_ml_adapter(adapter))
+	if (!hdd_adapter_is_ml_adapter(adapter) && opmode != QDF_MONITOR_MODE)
 		return QDF_STATUS_SUCCESS;
+
+	if (opmode == QDF_MONITOR_MODE)
+		num_sessions = MAX_MAC;
+	else
+		num_sessions = WLAN_MAX_ML_BSS_LINKS;
 
 	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
 						  &adapter->mac_addr,
-						  &link_addrs[0],
-						  WLAN_MAX_ML_BSS_LINKS);
+						  &link_addrs[0], num_sessions);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
@@ -17571,12 +17591,24 @@ static QDF_STATUS hdd_open_adapters_for_ftm_mode(struct hdd_context *hdd_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline void
+hdd_monitor_set_num_sessions(struct hdd_adapter_create_param *params)
+{
+	if (QDF_GLOBAL_MONITOR_MODE == hdd_get_conparam() &&
+	    ucfg_dp_ml_mon_supported())
+		params->num_sessions = MAX_MAC;
+	else
+		params->num_sessions = 1;
+}
+
 static QDF_STATUS
 hdd_open_adapters_for_monitor_mode(struct hdd_context *hdd_ctx)
 {
 	QDF_STATUS status;
 	uint8_t *mac_addr;
 	struct hdd_adapter_create_param params = {0};
+
+	hdd_monitor_set_num_sessions(&params);
 
 	mac_addr = wlan_hdd_get_intf_addr(hdd_ctx, QDF_MONITOR_MODE);
 	if (!mac_addr)

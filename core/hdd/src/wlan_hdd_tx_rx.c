@@ -1305,37 +1305,32 @@ void hdd_print_netdev_txq_status(struct net_device *dev)
 }
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
-/**
- * hdd_set_mon_rx_cb() - Set Monitor mode Rx callback
- * @dev:        Pointer to net_device structure
- *
- * Return: 0 for success; non-zero for failure
- */
-int hdd_set_mon_rx_cb(struct net_device *dev)
+static
+QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
+				  struct wlan_hdd_link_info *link_info)
 {
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct hdd_context *hdd_ctx =  WLAN_HDD_GET_CTX(adapter);
-	int ret;
 	QDF_STATUS qdf_status;
 	struct ol_txrx_desc_type sta_desc = {0};
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_objmgr_vdev *vdev;
 
-	WLAN_ADDR_COPY(sta_desc.peer_addr.bytes, adapter->mac_addr.bytes);
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (!vdev) {
 		hdd_err("failed to get vdev");
-		return -EINVAL;
+		return QDF_STATUS_E_INVAL;
 	}
+
+	WLAN_ADDR_COPY(sta_desc.peer_addr.bytes,
+		       link_info->link_addr.bytes);
 
 	qdf_status = ucfg_dp_mon_register_txrx_ops(vdev);
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		hdd_err("failed to register txrx ops. Status= %d [0x%08X]",
 			qdf_status, qdf_status);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
-		goto exit;
+		return qdf_status;
 	}
+
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 
 	/* peer is created wma_vdev_attach->wma_create_peer */
@@ -1343,15 +1338,31 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		hdd_err("cdp_peer_register() failed to register. Status= %d [0x%08X]",
 			qdf_status, qdf_status);
-		goto exit;
+		return qdf_status;
 	}
 
 	qdf_status = sme_create_mon_session(hdd_ctx->mac_handle,
-					    adapter->mac_addr.bytes,
-					    adapter->deflink->vdev_id);
+					    link_info->link_addr.bytes,
+					    link_info->vdev_id);
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		hdd_err("sme_create_mon_session() failed to register. Status= %d [0x%08X]",
 			qdf_status, qdf_status);
+	}
+	return qdf_status;
+}
+
+int hdd_set_mon_rx_cb(struct net_device *dev)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx =  WLAN_HDD_GET_CTX(adapter);
+	int ret;
+	QDF_STATUS qdf_status;
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		qdf_status = wlan_hdd_init_mon_link(hdd_ctx, link_info);
+		if (QDF_STATUS_SUCCESS != qdf_status)
+			goto exit;
 	}
 
 exit:
