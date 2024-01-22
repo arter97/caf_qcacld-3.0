@@ -31,6 +31,7 @@
 #include "wlan_osif_request_manager.h"
 #include "wlan_hdd_object_manager.h"
 #include <wlan_osif_priv.h>
+#include "wlan_policy_mgr_ucfg.h"
 
 /*max time in ms, caller may wait for link state request get serviced */
 #define WLAN_WAIT_TIME_LINK_STATE 800
@@ -1090,8 +1091,9 @@ int wlan_handle_mlo_link_state_operation(struct hdd_adapter *adapter,
 	switch (ml_link_control_mode) {
 	case QCA_WLAN_VENDOR_LINK_STATE_CONTROL_MODE_DEFAULT:
 		/* clear mlo link(s) settings in fw as per driver */
-		status = policy_mgr_clear_ml_links_settings_in_fw(hdd_ctx->psoc,
-								  vdev_id);
+		status =
+		ucfg_policy_mgr_clear_ml_links_settings_in_fw(hdd_ctx->psoc,
+							      vdev_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EINVAL;
 		break;
@@ -1141,12 +1143,13 @@ int wlan_handle_mlo_link_state_operation(struct hdd_adapter *adapter,
 			if (num_links >= MLD_MAX_SUPPORTED_LINKS)
 				break;
 		}
-
-		status = policy_mgr_update_mlo_links_based_on_linkid(
-						hdd_ctx->psoc,
-						vdev_id, num_links,
-						link_id_list,
-						config_state_list);
+		status =
+		ucfg_policy_mgr_update_mlo_links_based_on_linkid(
+							hdd_ctx->psoc,
+							vdev_id,
+							num_links,
+							link_id_list,
+							config_state_list);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EINVAL;
 		break;
@@ -1163,8 +1166,11 @@ int wlan_handle_mlo_link_state_operation(struct hdd_adapter *adapter,
 			  ml_active_num_links);
 		if (ml_active_num_links > MLD_MAX_SUPPORTED_LINKS)
 			return -EINVAL;
-		status = policy_mgr_update_active_mlo_num_links(hdd_ctx->psoc,
-						vdev_id, ml_active_num_links);
+		status =
+		ucfg_policy_mgr_update_active_mlo_num_links(
+							hdd_ctx->psoc,
+							vdev_id,
+							ml_active_num_links);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EINVAL;
 		break;
