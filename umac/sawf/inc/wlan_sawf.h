@@ -259,7 +259,6 @@ struct wlan_sawf_svc_class_params {
 	uint32_t peer_count;
 	uint32_t disabled_modes;
 	uint16_t enabled_param_mask;
-	uint8_t type_ref_count[WLAN_SAWF_SVC_TYPE_MAX];
 };
 
 /**
@@ -612,81 +611,6 @@ bool wlan_service_id_scs_valid(uint8_t sawf_rule_type, uint8_t svc_id);
  * Return: enabled_param_mask
  */
 uint16_t wlan_service_id_get_enabled_param_mask(uint8_t svc_id);
-
-/* wlan_service_id_inc_type_ref_count_nolock() - Increment type ref count
- * Caller has to take care of acquiring lock
- *
- * @svc_id: service class id
- * @type: Type of procedure
- *
- * Return: void
- */
-void wlan_service_id_inc_type_ref_count_nolock(uint8_t svc_id, uint8_t type);
-
-/* wlan_service_id_inc_type_ref_count() - Increment type ref count
- *
- * @svc_id: service class id
- * @type: Type of procedure
- *
- * Return: void
- */
-void wlan_service_id_inc_type_ref_count(uint8_t svc_id, uint8_t type);
-
-/* wlan_service_id_get_type_ref_count_nolock() - Get type ref count
- *
- * @svc_id: service class id
- * @type: Type of procedure
- *
- * Return: ref count value
- */
-uint32_t wlan_service_id_get_type_ref_count_nolock(uint8_t svc_id,
-						   uint8_t type);
-
-/* wlan_service_id_get_type_ref_count() - Get type ref count
- *
- * @svc_id: service class id
- * @type: Type of procedure
- * Caller has to take care of acquiring lock
- *
- * Return: ref count value
- */
-uint32_t wlan_service_id_get_type_ref_count(uint8_t svc_id, uint8_t type);
-
-/* wlan_service_id_dec_type_ref_count_nolock() - Decrement type ref count
- * Caller has to take care of acquiring lock
- *
- * @svc_id: service class id
- * @type: Type of procedure
- *
- * Return: void
- */
-void wlan_service_id_dec_type_ref_count_nolock(uint8_t svc_id, uint8_t type);
-
-/* wlan_service_id_dec_type_ref_count() - Decrement type ref count
- *
- * @svc_id: service class id
- * @type: Type of procedure
- *
- * Return: void
- */
-void wlan_service_id_dec_type_ref_count(uint8_t svc_id, uint8_t type);
-
-/* wlan_service_id_get_total_type_ref_count_nolock() - Get total type ref count
- * Caller has to take care of acquiring lock
- *
- * @svc_id: service class id
- *
- * Return: total ref count
- */
-uint32_t wlan_service_id_get_total_type_ref_count_nolock(uint8_t svc_id);
-
-/* wlan_service_id_get_total_type_ref_count() - Get total type ref count
- *
- * @svc_id: service class id
- *
- * Return: total ref count
- */
-uint32_t wlan_service_id_get_total_type_ref_count(uint8_t svc_id);
 
 /*
  * wlan_sawf_create_epcs_svc() - Create service class for EPCS
