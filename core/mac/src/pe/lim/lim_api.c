@@ -89,6 +89,7 @@
 #include "wlan_tdls_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_cm_api.h"
+#include "wlan_mlme_api.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -4206,6 +4207,16 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	channel.ch_phymode = cache_entry->phy_mode;
 	channel.ch_cfreq1 = cache_entry->channel.cfreq0;
 	channel.ch_cfreq2 = cache_entry->channel.cfreq1;
+	channel.ch_width =
+		wlan_mlme_get_ch_width_from_phymode(cache_entry->phy_mode);
+
+	/*
+	 * Supplicant needs non zero center_freq1 in case of 20 MHz connection
+	 * also as a response of get_channel request. In case of 20 MHz channel
+	 * width central frequency is same as channel frequency
+	 */
+	if (channel.ch_width == CH_WIDTH_20MHZ)
+		channel.ch_cfreq1 = channel.ch_freq;
 
 	util_scan_free_cache_entry(cache_entry);
 
