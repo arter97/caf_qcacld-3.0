@@ -9892,6 +9892,9 @@ hdd_convert_roam_failures_reason(enum wlan_roam_failure_reason_code fail)
 	case ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO:
 	case ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT:
 	case ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT:
+	case ROAM_FAIL_REASON_SCAN_CANCEL:
+	case ROAM_FAIL_REASON_SCREEN_ACTIVITY:
+	case ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN:
 	case ROAM_FAIL_REASON_UNKNOWN:
 		hdd_err("Invalid roam failures reason");
 		break;
