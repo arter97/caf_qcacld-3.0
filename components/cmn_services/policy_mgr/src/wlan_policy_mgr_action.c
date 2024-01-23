@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1871,8 +1871,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	QDF_STATUS status;
 	uint32_t sta_gc_present = 0;
 	qdf_freq_t user_config_freq = 0;
-	tQDF_MCC_TO_SCC_SWITCH_MODE cc_mode =
-				policy_mgr_get_mcc_to_scc_switch_mode(psoc);
+	enum reg_wifi_band user_band, op_band;
 
 	if (intf_ch_freq)
 		*intf_ch_freq = 0;
@@ -1966,26 +1965,14 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		/*
 		 * STA got disconnected & SAP has previously moved to 2.4 GHz
 		 * due to concurrency, then move SAP back to user configured
-		 * frequency.
-		 * if SCC to MCC switch mode is
-		 * QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL, then don't move
-		 * SAP to user configured frequency whenever standalone SAP is
-		 * currently not on the user configured frequency.
-		 * Else move the SAP only when SAP is on 2.4 GHz band and user
-		 * configured frequency is on any other bands.
-		 * And for QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL, if GO
-		 * is on 5/6 GHz, SAP is not allowed to move back to 5/6 GHz.
-		 * If GO is not present on 5/6 GHz, SAP need to moved to
-		 * user configured frequency.
+		 * frequency if the user configured band is better than
+		 * the current operating band.
 		 */
+		op_band = wlan_reg_freq_to_band(op_ch_freq_list[i]);
+		user_band = wlan_reg_freq_to_band(user_config_freq);
+
 		if (!sta_gc_present && user_config_freq &&
-		    cc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
-			policy_mgr_debug("Don't move sap to user configured freq: %d",
-					 user_config_freq);
-			break;
-		} else if (!sta_gc_present && user_config_freq &&
-			   WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[i]) &&
-			   !WLAN_REG_IS_24GHZ_CH_FREQ(user_config_freq)) {
+		    op_band < user_band) {
 			curr_sap_freq = op_ch_freq_list[i];
 			policy_mgr_debug("Move sap to user configured freq: %d",
 					 user_config_freq);

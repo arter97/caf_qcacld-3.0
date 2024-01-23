@@ -11961,6 +11961,49 @@ bool policy_mgr_is_sap_go_on_2g(struct wlan_objmgr_psoc *psoc)
 	return ret;
 }
 
+static inline bool
+policy_mgr_is_chan_eligible_for_sap(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				    uint8_t vdev_id, qdf_freq_t freq)
+{
+	struct wlan_objmgr_vdev *vdev;
+	enum channel_state ch_state;
+	enum reg_6g_ap_type sta_connected_pwr_type;
+	uint32_t ap_power_type_6g = 0;
+	bool is_eligible = false;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(pm_ctx->psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev)
+		return false;
+
+	ch_state = wlan_reg_get_channel_state_for_pwrmode(pm_ctx->pdev,
+							  freq,
+							  REG_CURRENT_PWR_MODE);
+	sta_connected_pwr_type = mlme_get_best_6g_power_type(vdev);
+	wlan_reg_get_cur_6g_ap_pwr_type(pm_ctx->pdev, &ap_power_type_6g);
+
+	/*
+	 * If the SAP user configured frequency is 6 GHz,
+	 * move the SAP to STA SCC in 6 GHz only if:
+	 * a) The channel is PSC
+	 * b) The channel supports AP in VLP power type
+	 * c) The DUT is configured to operate SAP in VLP only
+	 * d) The STA is connected to the 6 GHz AP in
+	 *    either VLP or LPI.
+	 *    - If the STA is in LPI, then lim_update_tx_power()
+	 *	would move the STA to VLP.
+	 */
+	if (WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(freq) &&
+	    ap_power_type_6g == REG_VERY_LOW_POWER_AP &&
+	    ch_state == CHANNEL_STATE_ENABLE &&
+	    (sta_connected_pwr_type == REG_VERY_LOW_POWER_AP ||
+	     sta_connected_pwr_type == REG_INDOOR_AP))
+		is_eligible = true;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	return is_eligible;
+}
+
 bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id,
 					qdf_freq_t freq,
@@ -12138,14 +12181,20 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 		}
 
 		if (scc_mode == QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL &&
-		    connection[i].freq == freq &&
-		    WLAN_REG_IS_24GHZ_CH_FREQ(freq) &&
-		    !num_5_or_6_conn &&
-		    user_config_freq &&
-		    !WLAN_REG_IS_24GHZ_CH_FREQ(user_config_freq)) {
-			policy_mgr_debug("SAP move to user configure %d from %d",
-					 user_config_freq, freq);
-			restart_required = true;
+		    WLAN_REG_IS_24GHZ_CH_FREQ(freq) && user_config_freq) {
+			if (connection[i].freq == freq && !num_5_or_6_conn &&
+			    !WLAN_REG_IS_24GHZ_CH_FREQ(user_config_freq)) {
+				policy_mgr_debug("SAP move to user configure %d from %d",
+						 user_config_freq, freq);
+				restart_required = true;
+			} else if (connection[i].freq != freq &&
+				   WLAN_REG_IS_6GHZ_CHAN_FREQ(user_config_freq) &&
+				   policy_mgr_is_chan_eligible_for_sap(pm_ctx,
+								       connection[i].vdev_id,
+								       connection[i].freq)) {
+				policy_mgr_debug("Move SAP to STA 6 GHz channel");
+				restart_required = true;
+			}
 		}
 	}
 
