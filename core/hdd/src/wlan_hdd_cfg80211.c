@@ -2375,6 +2375,7 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 	int status;
 	QDF_STATUS qdf_status;
 	struct hdd_adapter *adapter = link_info->adapter;
+	struct qdf_mac_addr *link_mac_addr;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	status = wlan_hdd_validate_context(hdd_ctx);
@@ -2447,8 +2448,13 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 
 	acs_event_callback = hdd_hostapd_sap_event_cb;
 
+	link_mac_addr = hdd_adapter_get_link_mac_addr(link_info);
+	if (!link_mac_addr) {
+		hdd_err("link_mac_addr is null");
+		return -EINVAL;
+	}
 	qdf_mem_copy(sap_config->self_macaddr.bytes,
-		adapter->mac_addr.bytes, sizeof(struct qdf_mac_addr));
+		link_mac_addr->bytes, sizeof(struct qdf_mac_addr));
 
 	qdf_status = wlansap_acs_chselect(sap_ctx, acs_event_callback,
 					  sap_config);
