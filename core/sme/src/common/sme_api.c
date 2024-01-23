@@ -4058,8 +4058,10 @@ QDF_STATUS sme_neighbor_report_request(
 	return status;
 }
 
-void sme_register_ssr_on_pagefault_cb(mac_handle_t mac_handle,
-				      void (*hdd_ssr_on_pagefault_cb)(void))
+void
+sme_register_pagefault_cb(mac_handle_t mac_handle,
+			  QDF_STATUS (*hdd_pagefault_action_cb)(void *buf,
+								uint32_t data))
 {
 	QDF_STATUS status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -4068,7 +4070,7 @@ void sme_register_ssr_on_pagefault_cb(mac_handle_t mac_handle,
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		mac->sme.ssr_on_pagefault_cb = hdd_ssr_on_pagefault_cb;
+		mac->sme.pagefault_action_cb = hdd_pagefault_action_cb;
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -4084,7 +4086,7 @@ void sme_deregister_ssr_on_pagefault_cb(mac_handle_t mac_handle)
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		mac->sme.ssr_on_pagefault_cb = NULL;
+		mac->sme.pagefault_action_cb = NULL;
 		sme_release_global_lock(&mac->sme);
 	}
 
