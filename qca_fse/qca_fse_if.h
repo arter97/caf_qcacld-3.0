@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,8 @@
  * @dest_ip:  Dest IP address
  * @dest_port: Dest port
  * @protocl: Protocol
+ * @ring_id: ring_id to receive the rx on
+ * @drop_flow: drop the flow
  * @src_dev: Source Netdev
  * @dest_dev: Dest Netdev
  * @src_mac: Source MAC
@@ -38,6 +40,8 @@ struct qca_fse_flow_info {
 	uint32_t dest_port;
 	uint8_t protocol;
 	uint8_t version;
+	uint8_t ring_id;
+	uint8_t drop_flow;
 	struct net_device *src_dev;
 	struct net_device *dest_dev;
 	uint8_t *src_mac;
