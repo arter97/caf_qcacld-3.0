@@ -3977,7 +3977,7 @@ wlan_hdd_is_prev_acs_freq_present_in_acs_config(struct sap_config *sap_cfg)
 }
 
 static bool
-wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct hdd_adapter *adapter)
+wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_context *hdd_ctx;
 	struct sap_config *sap_config;
@@ -3985,19 +3985,19 @@ wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct hdd_adapter *adapter)
 	bool prev_acs_freq_valid = false;
 	struct sap_context *sap_ctx;
 
-	if (!adapter) {
-		hdd_err("adapter is NULL");
+	if (!link_info) {
+		hdd_err("link_info is NULL");
 		return prev_acs_freq_valid;
 	}
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != status) {
 		hdd_err("Invalid HDD context");
 		return prev_acs_freq_valid;
 	}
 
-	sap_config = &adapter->deflink->session.ap.sap_config;
+	sap_config = &link_info->session.ap.sap_config;
 	if (!sap_config) {
 		hdd_err("SAP config is NULL");
 		return prev_acs_freq_valid;
@@ -4008,16 +4008,16 @@ wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct hdd_adapter *adapter)
 
 	if (!policy_mgr_is_vdev_ll_lt_sap(
 				hdd_ctx->psoc,
-				adapter->deflink->vdev_id))
+				link_info->vdev_id))
 		return prev_acs_freq_valid;
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (wlan_hdd_is_prev_acs_freq_present_in_acs_config(sap_config)) {
 		wlansap_update_ll_lt_sap_acs_result(sap_ctx,
 						    sap_config->last_acs_freq);
 
 		hdd_debug("vdev %d, return prev ACS freq %d stored at %lu, current time %lu",
-			  adapter->deflink->vdev_id, sap_config->last_acs_freq,
+			  link_info->vdev_id, sap_config->last_acs_freq,
 			  sap_config->last_acs_complete_time,
 			  qdf_get_time_of_the_day_ms());
 
@@ -4025,7 +4025,7 @@ wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(struct hdd_adapter *adapter)
 		 * Reason for not storing the last acs frequency is to avoid
 		 * storing the same freq again and again
 		 */
-		wlan_hdd_cfg80211_acs_ch_select_evt(adapter->deflink, false);
+		wlan_hdd_cfg80211_acs_ch_select_evt(link_info, false);
 		wlansap_dcs_set_wlan_interference_mitigation_on_band(sap_ctx,
 								    sap_config);
 
@@ -4594,7 +4594,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	sap_dump_acs_channel(&sap_config->acs_cfg);
 
-	if (wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(adapter)) {
+	if (wlan_hdd_ll_lt_sap_get_valid_last_acs_freq(adapter->deflink)) {
 		ret = 0;
 		goto out;
 	}
