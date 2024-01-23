@@ -23424,7 +23424,7 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 	ol_txrx_soc_handle soc_txrx_handle;
 	uint16_t *vlan_map = sap_ctx->vlan_map;
 	uint8_t found = 0;
-	bool keyindex_valid;
+	bool keyindex_valid = true;
 	int i = 0;
 
 	psoc = wlan_vdev_get_psoc(vdev);
@@ -23446,7 +23446,9 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 		}
 	}
 
-	keyindex_valid = (i + key_index - 1) < (2 * MAX_VLAN) ? true : false;
+	/* Below check is to avoid OOB for array vlan_map access */
+	if (((i + key_index) == 0) || ((i + key_index - 1) >= (2 * MAX_VLAN)))
+		keyindex_valid = false;
 
 	if (found && keyindex_valid) {
 		soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
@@ -28506,13 +28508,14 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 				      sta_ctx->conn_info.bssid.bytes,
 				      &peer_phymode);
 		ch_width = wlan_mlme_get_ch_width_from_phymode(peer_phymode);
-	}
 
-	ch_params.ch_width = ch_width;
-	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
-						chan_freq, 0, &ch_params,
-						REG_CURRENT_PWR_MODE);
-	chandef->center_freq1 = ch_params.mhz_freq_seg0;
+		ch_params.ch_width = ch_width;
+		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
+							chan_freq, 0,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
+		chandef->center_freq1 = ch_params.mhz_freq_seg0;
+	}
 
 	switch (ch_width) {
 	case CH_WIDTH_20MHZ:
