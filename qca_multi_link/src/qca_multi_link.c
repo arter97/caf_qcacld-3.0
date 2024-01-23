@@ -17,6 +17,7 @@
 
 #include "qca_multi_link.h"
 #include <br_private.h>
+#include <qdf_net_if.h>
 
 static bool is_initialized;
 qca_multi_link_parameters_t qca_multi_link_cfg;
@@ -845,7 +846,7 @@ static qca_multi_link_status_t qca_multi_link_secondary_ap_rx(struct net_device 
 
 		qca_multi_link_tbl_add_or_refresh_entry(ap_dev, eh->ether_shost,
 						       QCA_MULTI_LINK_ENTRY_USER_ADDED);
-		dev_hold(sta_dev);
+		qdf_net_if_hold_dev((struct qdf_net_if *)sta_dev);
 		QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG,
 			FL("shost %pM dhost %pM \n"), eh->ether_shost, eh->ether_dhost);
 
@@ -853,7 +854,7 @@ static qca_multi_link_status_t qca_multi_link_secondary_ap_rx(struct net_device 
 		 * For packets destined to sources on RootAP directly enq to STA vap.
 		 */
 		sta_dev->netdev_ops->ndo_start_xmit(nbuf, sta_dev);
-		dev_put(sta_dev);
+		qdf_net_if_release_dev((struct qdf_net_if *)sta_dev);
 		return QCA_MULTI_LINK_PKT_CONSUMED;
 	}
 
@@ -904,9 +905,9 @@ bool qca_multi_link_ap_rx(struct net_device *net_dev, qdf_nbuf_t nbuf)
 	if (is_primary) {
 		goto end;
 	} else {
-		dev_hold(ap_dev);
+		qdf_net_if_hold_dev((struct qdf_net_if *)ap_dev);
 		status = qca_multi_link_secondary_ap_rx(ap_dev, nbuf);
-		dev_put(ap_dev);
+		qdf_net_if_release_dev((struct qdf_net_if *)ap_dev);
 	}
 
 	if (status == QCA_MULTI_LINK_PKT_ALLOW) {
@@ -1156,9 +1157,9 @@ set_prim_dev:
 			/*
 			 * For packets destined to sources on RootAP directly enq to STA vap.
 			 */
-			dev_hold(ap_dev);
+			qdf_net_if_hold_dev((struct qdf_net_if *)ap_dev);
 			ap_dev->netdev_ops->ndo_start_xmit(nbuf, ap_dev);
-			dev_put(ap_dev);
+			qdf_net_if_release_dev((struct qdf_net_if *)ap_dev);
 			return QCA_MULTI_LINK_PKT_CONSUMED;
 		}
 	}
@@ -1335,13 +1336,13 @@ bool qca_multi_link_sta_rx(struct net_device *net_dev, qdf_nbuf_t nbuf, struct n
 		goto end;
 	}
 
-	dev_hold(sta_dev);
+	qdf_net_if_hold_dev((struct qdf_net_if *)sta_dev);
 	if (is_primary) {
 		status = qca_multi_link_primary_sta_rx(sta_dev, nbuf, mld_ndev);
 	} else {
 		status = qca_multi_link_secondary_sta_rx(sta_dev, nbuf, prim_dev, mld_ndev);
 	}
-	dev_put(sta_dev);
+	qdf_net_if_release_dev((struct qdf_net_if *)sta_dev);
 
 	if (status == QCA_MULTI_LINK_PKT_ALLOW) {
 		goto end;
@@ -1568,13 +1569,13 @@ static qca_multi_link_status_t qca_multi_link_primary_sta_tx(struct net_device *
 				FL("Null STA device found %pM - Give to bridge\n"), eh->ether_shost);
 			return QCA_MULTI_LINK_PKT_DROP;
 		}
-		dev_hold(sec_sta_dev);
+		qdf_net_if_hold_dev((struct qdf_net_if *)sec_sta_dev);
 
 		/*
 		 * Perform Tx on secondary sta for packets arriving from the secondary ap vap.
 		 */
 		sec_sta_dev->netdev_ops->ndo_start_xmit(nbuf, sec_sta_dev);
-		dev_put(sec_sta_dev);
+		qdf_net_if_release_dev((struct qdf_net_if *)sec_sta_dev);
 		return QCA_MULTI_LINK_PKT_CONSUMED;
 	}
 
@@ -1619,13 +1620,13 @@ bool qca_multi_link_sta_tx(struct net_device *net_dev, qdf_nbuf_t nbuf, struct n
 	sta_wiphy = sta_dev->ieee80211_ptr->wiphy;
 	is_primary = qca_multi_link_is_primary_radio(sta_wiphy);
 
-	dev_hold(net_dev);
+	qdf_net_if_hold_dev((struct qdf_net_if *)net_dev);
 	if (is_primary) {
 		status = qca_multi_link_primary_sta_tx(sta_dev, nbuf, mld_ndev);
 	} else {
 		status = qca_multi_link_secondary_sta_tx(sta_dev, nbuf, mld_ndev);
 	}
-	dev_put(net_dev);
+	qdf_net_if_release_dev((struct qdf_net_if *)net_dev);
 
 	if (status == QCA_MULTI_LINK_PKT_ALLOW) {
 		goto end;

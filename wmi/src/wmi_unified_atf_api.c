@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,12 +31,37 @@ QDF_STATUS wmi_unified_set_bwf_cmd_send(wmi_unified_t wmi_handle,
 }
 
 #ifdef WLAN_ATF_ENABLE
+#ifdef WLAN_ATF_INCREASED_STA
 QDF_STATUS
-wmi_unified_set_atf_cmd_send(wmi_unified_t wmi_handle,
-			     struct set_atf_params *param)
+wmi_unified_set_atf_peer_list_cmd_send_v2(wmi_unified_t wmi_handle,
+					  struct atf_peer_params_v2 *param)
 {
-	if (wmi_handle->ops->send_set_atf_cmd)
-		return wmi_handle->ops->send_set_atf_cmd(wmi_handle, param);
+	if (wmi_handle->ops->send_atf_peer_list_cmd_v2)
+		return wmi_handle->ops->send_atf_peer_list_cmd_v2(wmi_handle,
+								  param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_set_atf_groupping_cmd_send_v2(wmi_unified_t wmi_handle,
+					  struct atf_grouping_params_v2 *param)
+{
+	if (wmi_handle->ops->send_set_atf_grouping_cmd_v2)
+		return wmi_handle->ops->send_set_atf_grouping_cmd_v2(wmi_handle,
+								     param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
+QDF_STATUS
+wmi_unified_set_atf_peer_list_cmd_send(wmi_unified_t wmi_handle,
+				       struct set_atf_params *param)
+{
+	if (wmi_handle->ops->send_atf_peer_list_cmd)
+		return wmi_handle->ops->send_atf_peer_list_cmd(wmi_handle,
+							       param);
 
 	return QDF_STATUS_E_FAILURE;
 }

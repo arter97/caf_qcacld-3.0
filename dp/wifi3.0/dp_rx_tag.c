@@ -705,7 +705,7 @@ dp_dump_rx_flow_tag_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 }
 
 #if defined (WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
-#if defined (WLAN_FEATURE_11BE_MLO) || (QCA_SUPPORT_WDS_EXTENDED)
+#if defined (CONFIG_MLO_SINGLE_DEV) || (QCA_SUPPORT_WDS_EXTENDED)
 static inline
 wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 {
@@ -734,10 +734,7 @@ wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	case OSIF_NETDEV_TYPE_WDS_EXT:
 		osifp = (osif_peer_dev *)(osdev);
-		if (!osifp->parent_netdev)
-			return NULL;
-
-		osdev = ath_netdev_priv(osifp->parent_netdev);
+		osdev = osif_wds_ext_get_parent_osif(osifp);
 		if (!osdev)
 			return NULL;
 
@@ -754,7 +751,136 @@ wlan_if_t dp_rx_get_vap_osif_dev(osif_dev *osdev)
 	return osdev->os_if;
 }
 #endif
+#endif
 
+QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc_hdl,
+				    uint32_t *src_ip, uint32_t src_port,
+				    uint32_t *dest_ip, uint32_t dest_port,
+				    uint8_t protocol, uint8_t version,
+				    uint32_t svc_id, uint8_t tid,
+				    uint8_t *dest_mac, uint8_t pdev_id)
+{
+	struct cdp_rx_flow_info flow_info = { 0 };
+	struct wlan_cfg_dp_soc_ctxt *cfg;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	QDF_STATUS status;
+
+	if (qdf_unlikely(!soc))
+		return QDF_STATUS_E_FAILURE;
+
+	cfg = soc->wlan_cfg_ctx;
+
+	if (qdf_unlikely(!wlan_cfg_is_rx_flow_tag_enabled(cfg))) {
+		dp_err("RX Flow tag feature disabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	flow_info.flow_tuple_info.src_port = src_port;
+	flow_info.flow_tuple_info.dest_port = dest_port;
+	flow_info.flow_tuple_info.l4_protocol = protocol;
+
+	/*
+	 * Set FSE metadata to indicate that the SFE flow rule
+	 * is matched in FSE.
+	 */
+	if (DP_RX_FLOW_INVALID_SVC_ID != svc_id) {
+		flow_info.fse_metadata =
+			DP_RX_FSE_FLOW_UPDATE_TID(DP_RX_FSE_FLOW_MATCH_SFE,
+						  tid);
+		flow_info.fse_metadata =
+			DP_RX_FSE_FLOW_UPDATE_EVT_REQ(flow_info.fse_metadata,
+						      1);
+	}
+
+	if (version == 4) {
+		flow_info.is_addr_ipv4 = 1;
+		flow_info.flow_tuple_info.src_ip_31_0 = src_ip[0];
+		flow_info.flow_tuple_info.dest_ip_31_0 = dest_ip[0];
+	} else if (version == 6) {
+		flow_info.flow_tuple_info.src_ip_31_0 = src_ip[3];
+		flow_info.flow_tuple_info.src_ip_63_32 = src_ip[2];
+		flow_info.flow_tuple_info.src_ip_95_64 = src_ip[1];
+		flow_info.flow_tuple_info.src_ip_127_96 = src_ip[0];
+
+		flow_info.flow_tuple_info.dest_ip_31_0 = dest_ip[3];
+		flow_info.flow_tuple_info.dest_ip_63_32 = dest_ip[2];
+		flow_info.flow_tuple_info.dest_ip_95_64 = dest_ip[1];
+		flow_info.flow_tuple_info.dest_ip_127_96 = dest_ip[0];
+	}
+
+	flow_info.op_code = CDP_FLOW_FST_ENTRY_ADD;
+	flow_info.svc_id = svc_id;
+	flow_info.tid = tid;
+	flow_info.dest_mac = dest_mac;
+	status = dp_rx_flow_add_entry(soc->pdev_list[pdev_id], &flow_info);
+
+	if (status == QDF_STATUS_SUCCESS) {
+		if (version == 4)
+			qdf_atomic_inc(&soc->ipv4_fse_cnt);
+		else if (version == 6)
+			qdf_atomic_inc(&soc->ipv6_fse_cnt);
+	}
+
+	return status;
+}
+qdf_export_symbol(dp_rx_sfe_add_flow_entry);
+
+QDF_STATUS dp_rx_sfe_delete_flow_entry(struct cdp_soc_t *soc_hdl,
+				       uint32_t *src_ip, uint32_t src_port,
+				       uint32_t *dest_ip, uint32_t dest_port,
+				       uint8_t protocol, uint8_t version,
+				       uint8_t pdev_id)
+{
+	struct cdp_rx_flow_info flow_info = { 0 };
+	struct wlan_cfg_dp_soc_ctxt *cfg;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	QDF_STATUS status;
+
+	if (qdf_unlikely(!soc))
+		return QDF_STATUS_E_FAILURE;
+
+	cfg = soc->wlan_cfg_ctx;
+
+	if (qdf_unlikely(!wlan_cfg_is_rx_flow_tag_enabled(cfg))) {
+		dp_err("RX Flow tag feature disabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	flow_info.flow_tuple_info.src_port = src_port;
+	flow_info.flow_tuple_info.dest_port = dest_port;
+	flow_info.flow_tuple_info.l4_protocol = protocol;
+
+	if (version == 4) {
+		flow_info.is_addr_ipv4 = 1;
+		flow_info.flow_tuple_info.src_ip_31_0 = src_ip[0];
+		flow_info.flow_tuple_info.dest_ip_31_0 = dest_ip[0];
+	} else if (version == 6) {
+		flow_info.flow_tuple_info.src_ip_31_0 = src_ip[3];
+		flow_info.flow_tuple_info.src_ip_63_32 = src_ip[2];
+		flow_info.flow_tuple_info.src_ip_95_64 = src_ip[1];
+		flow_info.flow_tuple_info.src_ip_127_96 = src_ip[0];
+
+		flow_info.flow_tuple_info.dest_ip_31_0 = dest_ip[3];
+		flow_info.flow_tuple_info.dest_ip_63_32 = dest_ip[2];
+		flow_info.flow_tuple_info.dest_ip_95_64 = dest_ip[1];
+		flow_info.flow_tuple_info.dest_ip_127_96 = dest_ip[0];
+	}
+
+	flow_info.op_code = CDP_FLOW_FST_ENTRY_DEL;
+	status = dp_rx_flow_delete_entry(soc->pdev_list[pdev_id], &flow_info);
+
+	if (status == QDF_STATUS_SUCCESS) {
+		if (version == 4)
+			qdf_atomic_dec(&soc->ipv4_fse_cnt);
+		else if (version == 6)
+			qdf_atomic_dec(&soc->ipv6_fse_cnt);
+	}
+
+	return status;
+}
+qdf_export_symbol(dp_rx_sfe_delete_flow_entry);
+
+#if defined (WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
 bool
 dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 {
@@ -797,7 +923,9 @@ dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	flow_info.flow_tuple_info.src_port = ppe_flow_info->tuple.src_port;
 	flow_info.flow_tuple_info.dest_port = ppe_flow_info->tuple.dest_port;
 	flow_info.flow_tuple_info.l4_protocol = ppe_flow_info->tuple.protocol;
-	flow_info.fse_metadata = ppe_flow_info->vp_num;
+	flow_info.fse_metadata =
+		DP_RX_FSE_FLOW_UPDATE_VP_NUM(flow_info.fse_metadata,
+					     ppe_flow_info->vp_num);
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4) {
 		flow_info.is_addr_ipv4 = 1;
@@ -849,10 +977,21 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	wlan_if_t vap;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_cfg_dp_soc_ctxt *cfg;
+	struct wlan_objmgr_pdev *pdev = NULL;
 	struct dp_soc *soc = NULL;
 	QDF_STATUS status;
 
 	if (!ppe_flow_info->dev)
+		return QDF_STATUS_E_FAILURE;
+
+	/*
+	 * In case of fw recovery, VAPs will go down but VP's will
+	 * still be there. Hence this callback might get triggered even if VAP object
+	 * is down in recovery mode. So we check the recovery mode using the netdev
+	 * queue and return if netdev queue is stopped.
+	 */
+	if ((ppe_flow_info->dev->reg_state >= NETREG_UNREGISTERING) ||
+	    (netif_queue_stopped(ppe_flow_info->dev)))
 		return QDF_STATUS_E_FAILURE;
 
 	osdev = ath_netdev_priv(ppe_flow_info->dev);
@@ -867,8 +1006,12 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
 	soc = (struct dp_soc *)wlan_psoc_get_dp_handle
-		(wlan_pdev_get_psoc(wlan_vdev_get_pdev(vdev)));
+		(wlan_pdev_get_psoc(pdev));
 
 	if (qdf_unlikely(!soc))
 		return QDF_STATUS_E_FAILURE;
@@ -883,7 +1026,9 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	flow_info.flow_tuple_info.src_port = ppe_flow_info->tuple.src_port;
 	flow_info.flow_tuple_info.dest_port = ppe_flow_info->tuple.dest_port;
 	flow_info.flow_tuple_info.l4_protocol = ppe_flow_info->tuple.protocol;
-	flow_info.fse_metadata = ppe_flow_info->vp_num;
+	flow_info.fse_metadata =
+		DP_RX_FSE_FLOW_UPDATE_VP_NUM(flow_info.fse_metadata,
+					     ppe_flow_info->vp_num);
 
 	if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4) {
 		flow_info.is_addr_ipv4 = 1;

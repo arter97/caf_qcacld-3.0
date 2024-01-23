@@ -40,6 +40,9 @@
 #define SCS_FILTER_ATTR_LEN_MAX              12
 #define SCS_TCLAS10_SPI_SIZE                 4
 
+/* Below macro to be in-sync with WLAN host driver side macro */
+#define SAWF_SVC_CLASS_MAX                   128
+
 enum scs_rule_config_request {
 	SCS_RULE_CONFIG_REQUEST_TYPE_ADD,
 	SCS_RULE_CONFIG_REQUEST_TYPE_REMOVE,
@@ -430,7 +433,13 @@ done:
 		val16 = nla_get_u16(tb);
 		rule->service_class_id = (uint8_t)val16;
 		rule->flags |= SP_RULE_FLAG_MATCH_SERVICE_CLASS_ID;
-		rule->classifier_type = SAWF_SCS_SPM_RULE_CLASSIFIER_TYPE;
+
+		/* Classifier type based on svc class id range */
+		if (rule->service_class_id <= SAWF_SVC_CLASS_MAX)
+			rule->classifier_type = SAWF_SCS_SPM_RULE_CLASSIFIER_TYPE;
+		else
+			rule->classifier_type = SCS_SPM_RULE_CLASSIFIER_TYPE;
+
 		PRINT_IF_VERB("Service Class ID: %u", rule->service_class_id);
 	} else {
 		rule->classifier_type = SCS_SPM_RULE_CLASSIFIER_TYPE;

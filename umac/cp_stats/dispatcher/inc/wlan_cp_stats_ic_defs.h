@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -162,7 +162,7 @@ struct pdev_80211_stats {
 	struct pdev_dcs_chan_stats chan_stats;
 	uint32_t avg_chan_lat_per_ac[WIFI_AC_MAX];
 	uint32_t estimated_air_time_per_ac;
-#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 	uint8_t pdev_freetime_per_sec;
 	struct ctrl_path_pmlo_telemetry_stats_struct telemetry_stats;
 #endif

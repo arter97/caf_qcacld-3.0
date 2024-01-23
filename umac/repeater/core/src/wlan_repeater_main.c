@@ -162,6 +162,7 @@ wlan_rptr_core_register_ext_cb(struct rptr_ext_cbacks *ext_cbacks)
 				ext_cbacks->vdev_pwrsave_force_sleep;
 		g_priv->ext_cbacks.send_wds_cmd = ext_cbacks->send_wds_cmd;
 		g_priv->ext_cbacks.get_stavap = ext_cbacks->get_stavap;
+		g_priv->ext_cbacks.check_rpt_max_phy = ext_cbacks->check_rpt_max_phy;
 		g_priv->ext_cbacks.peer_disassoc = ext_cbacks->peer_disassoc;
 		g_priv->ext_cbacks.pdev_update_beacon =
 				ext_cbacks->pdev_update_beacon;
@@ -198,6 +199,10 @@ wlan_rptr_core_register_ext_cb(struct rptr_ext_cbacks *ext_cbacks)
 				ext_cbacks->nss_dbdc_process_mac_db_down;
 		g_priv->ext_cbacks.nss_prep_mac_db_store_stavap =
 				ext_cbacks->nss_prep_mac_db_store_stavap;
+#endif
+#ifdef CONFIG_AFC_SUPPORT
+		g_priv->ext_cbacks.vdev_is_6g_txable_chan_available =
+				ext_cbacks->vdev_is_6g_txable_chan_available;
 #endif
 		return QDF_STATUS_SUCCESS;
 	}
@@ -1483,6 +1488,7 @@ QDF_STATUS wlan_repeater_init(void)
 					wlan_vdev_pwrsave_force_sleep;
 	rptr_ext_cbacks.send_wds_cmd = wlan_send_wds_cmd;
 	rptr_ext_cbacks.get_stavap = wlan_get_stavap;
+	rptr_ext_cbacks.check_rpt_max_phy = wlan_check_rpt_max_phy;
 	rptr_ext_cbacks.target_lithium = wlan_target_lithium;
 	rptr_ext_cbacks.peer_disassoc = wlan_peer_disassoc;
 	rptr_ext_cbacks.pdev_update_beacon = wlan_pdev_update_beacon;
@@ -1511,6 +1517,10 @@ QDF_STATUS wlan_repeater_init(void)
 		wlan_nss_dbdc_process_mac_db_down;
 	rptr_ext_cbacks.nss_prep_mac_db_store_stavap =
 		wlan_nss_prep_mac_db_store_stavap;
+#endif
+#ifdef CONFIG_AFC_SUPPORT
+	rptr_ext_cbacks.vdev_is_6g_txable_chan_available =
+		wlan_is_6g_txable_chan_available;
 #endif
 	wlan_rptr_core_register_ext_cb(&rptr_ext_cbacks);
 	qdf_spinlock_create(&gp_rptr_ctx->rptr_global_lock);

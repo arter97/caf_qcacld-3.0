@@ -333,6 +333,7 @@ dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 {
 	qdf_nbuf_t  nbuf_ref;
 	dp_vdev_dms_me_t *dms_me = (dp_vdev_dms_me_t *)arg;
+	uint8_t xmit_type = qdf_nbuf_get_vdev_xmit_type(dms_me->nbuf);
 
 	if (peer->bss_peer || !dp_peer_is_primary_link_peer(peer))
 		return;
@@ -351,7 +352,7 @@ dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 					dms_me->tx_exc_metadata);
 	if (nbuf_ref) {
 		qdf_nbuf_free(nbuf_ref);
-		DP_STATS_INC(dms_me->vdev, tx_i.mcast_en.dropped_send_fail, 1);
+		DP_STATS_INC(dms_me->vdev, tx_i[xmit_type].mcast_en.dropped_send_fail, 1);
 	}
 }
 
@@ -359,6 +360,8 @@ dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
  * dp_tx_me_dms_pkt_handler: function to send dms packet
  * @soc: Datapath soc handle
  * @vdev: DP vdev handler
+ * @tid : transmit TID
+ * @is_igmp: flag to indicate igmp packet
  * @nbuf: Multicast nbuf
  *
  * return: no of converted packets
@@ -366,16 +369,18 @@ dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 static uint16_t
 dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
 			 struct dp_vdev *vdev,
+			 uint8_t tid,
+			 bool is_igmp,
 			 qdf_nbuf_t nbuf)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct cdp_tx_exception_metadata tx_exc_param = {0};
 	dp_vdev_dms_me_t dms_me;
-
+	uint8_t xmit_type = qdf_nbuf_get_vdev_xmit_type(nbuf);
 	tx_exc_param.sec_type = vdev->sec_type;
 	tx_exc_param.tx_encap_type = vdev->tx_encap_type;
 	tx_exc_param.peer_id = HTT_INVALID_PEER;
-	tx_exc_param.tid = HTT_TX_EXT_TID_INVALID;
+	tx_exc_param.tid = tid;
 
 	dms_me.soc_hdl = soc_hdl;
 	dms_me.vdev = vdev;
@@ -387,7 +392,13 @@ dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
 			     &dms_me, DP_MOD_ID_MCAST2UCAST);
 
 	qdf_nbuf_free(nbuf);
-	DP_STATS_INC(vdev, tx_i.mcast_en.ucast, dms_me.num_pkt_sent);
+
+	if (is_igmp) {
+		DP_STATS_INC(vdev, tx_i[xmit_type].igmp_mcast_en.igmp_ucast_converted,
+			     dms_me.num_pkt_sent);
+	} else {
+		DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.ucast, dms_me.num_pkt_sent);
+	}
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_MCAST2UCAST);
 
 	/* only bss peer is present, free the buffer*/
@@ -443,6 +454,7 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	uint8_t curr_mac_cnt = 0;
 	struct dp_vdev *vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
 						     DP_MOD_ID_MCAST2UCAST);
+	uint8_t xmit_type = qdf_nbuf_get_vdev_xmit_type(nbuf);
 
 	if (!vdev)
 		goto free_return;
@@ -453,7 +465,8 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		goto free_return;
 
 	if (is_dms_pkt)
-		return dp_tx_me_dms_pkt_handler(soc_hdl, vdev, nbuf);
+		return dp_tx_me_dms_pkt_handler(soc_hdl, vdev, tid, is_igmp,
+						nbuf);
 
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 
@@ -472,7 +485,7 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	if (status) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				"Mapping failure Error:%d", status);
-		DP_STATS_INC(vdev, tx_i.mcast_en.dropped_map_error, 1);
+		DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.dropped_map_error, 1);
 		qdf_nbuf_free(nbuf);
 		return 1;
 	}
@@ -505,7 +518,7 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		if (!seg_info_new) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 					"alloc failed");
-			DP_STATS_INC(vdev, tx_i.mcast_en.fail_seg_alloc, 1);
+			DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.fail_seg_alloc, 1);
 			goto fail_seg_alloc;
 		}
 
@@ -520,7 +533,7 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		if (new_mac_idx < (new_mac_cnt - 1)) {
 			nbuf_clone = qdf_nbuf_clone((qdf_nbuf_t)nbuf);
 			if (!nbuf_clone) {
-				DP_STATS_INC(vdev, tx_i.mcast_en.clone_fail, 1);
+				DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.clone_fail, 1);
 				goto fail_clone;
 			}
 		} else {
@@ -541,7 +554,7 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		if (status) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 					"Mapping failure Error:%d", status);
-			DP_STATS_INC(vdev, tx_i.mcast_en.dropped_map_error, 1);
+			DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.dropped_map_error, 1);
 			mc_uc_buf->paddr_macbuf = 0;
 			goto fail_map;
 		}
@@ -593,10 +606,10 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	}
 
 	if (is_igmp) {
-		DP_STATS_INC(vdev, tx_i.igmp_mcast_en.igmp_ucast_converted,
+		DP_STATS_INC(vdev, tx_i[xmit_type].igmp_mcast_en.igmp_ucast_converted,
 			     curr_mac_cnt);
 	} else {
-		DP_STATS_INC(vdev, tx_i.mcast_en.ucast, curr_mac_cnt);
+		DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.ucast, curr_mac_cnt);
 	}
 
 	dp_tx_send_msdu_multiple(vdev, nbuf, &msdu_info);

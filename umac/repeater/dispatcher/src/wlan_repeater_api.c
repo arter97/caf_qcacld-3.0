@@ -38,9 +38,6 @@
 #include <wlan_pdev_mlme.h>
 #define IE_CONTENT_SIZE 1
 #include <ieee80211_api.h>
-#if QCA_AIRTIME_FAIRNESS
-#include <wlan_atf_utils_api.h>
-#endif
 
 extern bool
 wlan_rptr_is_psta_vdev(struct wlan_objmgr_vdev *vdev);
@@ -1208,9 +1205,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
 	bool max_priority_stavap_disconnected = 0;
 	struct dbdc_flags flags;
-#if QCA_AIRTIME_FAIRNESS
-	struct ieee80211vap *vap = wlan_vdev_get_vap(vdev);
-#endif
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ext_cb = &g_priv->ext_cbacks;
@@ -1228,12 +1222,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	g_priv->num_stavaps_up--;
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
-
-#if QCA_AIRTIME_FAIRNESS
-	/* Trigger peer join leave for atf peers */
-	if (vap && vap->iv_bss)
-		wlan_atf_peer_join_leave(vap->iv_bss->peer_obj, 0);
-#endif
 
 	if (wiphy && dev)
 		qca_multi_link_remove_station_vap(wiphy);
@@ -1404,8 +1392,10 @@ wlan_rptr_afc_is_stop_ap_allowed(struct wlan_objmgr_vdev *vdev,
 		if (wlan_reg_is_afc_power_event_received(pdev) &&
 		    !wlan_reg_is_afc_done(pdev, freq)) {
 			/* For standalone AP dont process stop_ap */
-			if (!sta_vdev)
-				return false;
+			if (!sta_vdev && ext_cb->vdev_is_6g_txable_chan_available) {
+				return !(ext_cb->vdev_is_6g_txable_chan_available(vdev,
+										 REG_BEST_PWR_MODE));
+			}
 		}
 	}
 	return true;
@@ -2012,7 +2002,7 @@ wlan_rptr_disconnect_sec_stavap_cb(struct wlan_objmgr_psoc *psoc,
 	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
 	sta_vdev = ext_cb->get_stavap(pdev);
 	wiphy = pdev_ospriv->wiphy;
-	if (wlan_cm_is_vdev_connected(sta_vdev) &&
+	if (sta_vdev && wlan_cm_is_vdev_connected(sta_vdev) &&
 	    !(qca_multi_link_is_primary_radio(wiphy))) {
 		wlan_mlme_cm_stop(sta_vdev, CM_SB_DISCONNECT,
 				  REASON_DISASSOC_NETWORK_LEAVING, NULL);
@@ -2020,6 +2010,26 @@ wlan_rptr_disconnect_sec_stavap_cb(struct wlan_objmgr_psoc *psoc,
 #endif
 }
 #endif
+
+/**
+ * wlan_rptr_check_rpt_max_phy - Check repeater max phy feature is enabled.
+ * param: pdev: pdev object manager
+ *
+ * ret: true/false
+ */
+bool wlan_rptr_check_rpt_max_phy(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_global_priv *g_priv = NULL;
+	struct rptr_ext_cbacks *ext_cb = NULL;
+	bool is_rpt_max_phy;
+
+	g_priv = wlan_rptr_get_global_ctx();
+	ext_cb = &g_priv->ext_cbacks;
+
+	is_rpt_max_phy = ext_cb->check_rpt_max_phy(pdev);
+
+	return is_rpt_max_phy;
+}
 
 /**
  * wlan_rptr_pdev_extd_ioctl - NB api for extd ioctl call

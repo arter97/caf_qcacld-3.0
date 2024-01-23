@@ -219,6 +219,22 @@ ucfg_dfs_set_dfs_puncture(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 ucfg_dfs_get_dfs_puncture(struct wlan_objmgr_pdev *pdev,
 			  bool *is_dfs_punc_en);
+#else
+static inline QDF_STATUS
+ucfg_dfs_set_dfs_puncture(struct wlan_objmgr_pdev *pdev,
+			  bool is_dfs_punc_en)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_dfs_get_dfs_puncture(struct wlan_objmgr_pdev *pdev,
+			  bool *is_dfs_punc_en)
+{
+	*is_dfs_punc_en = false;
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* QCA_DFS_BW_PUNCTURE */
 
 #ifdef WLAN_DISP_CHAN_INFO

@@ -29,6 +29,8 @@
 #define DP_RX_MON_PF_TAG_SIZE (4)
 #endif
 
+#define DP_RX_FLOW_INVALID_SVC_ID	0xFFFFFFFF
+
 #ifdef WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG
 /**
  * dp_update_pdev_rx_protocol_tag - Add/remove a protocol tag that should be
@@ -160,6 +162,21 @@ void dp_rx_mon_update_protocol_flow_tag(struct dp_soc *soc,
 					struct dp_pdev *dp_pdev,
 					qdf_nbuf_t msdu, void *rx_desc);
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG || WLAN_SUPPORT_RX_FLOW_TAG */
+
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc,
+				    uint32_t *src_ip, uint32_t src_port,
+				    uint32_t *dest_ip, uint32_t dest_port,
+				    uint8_t protocol, uint8_t version,
+				    uint32_t svc_id, uint8_t tid,
+				    uint8_t *dest_mac, uint8_t pdev_id);
+
+QDF_STATUS dp_rx_sfe_delete_flow_entry(struct cdp_soc_t *soc,
+				       uint32_t *src_ip, uint32_t src_port,
+				       uint32_t *dest_ip, uint32_t dest_port,
+				       uint8_t protocol, uint8_t version,
+				       uint8_t pdev_id);
+#endif
 
 #if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
 bool dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info);

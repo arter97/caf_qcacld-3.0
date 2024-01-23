@@ -51,11 +51,9 @@ bool dp_scs_peer_lookup_n_rule_match(struct cdp_soc_t *soc_hdl,
 {
 	bool status = false;
 	uint16_t scs_peer_id = 0;
-	uint16_t connected_peer_id = 0;
 	struct dp_peer *peer = NULL;
 	struct dp_vdev *vdev = NULL;
 	struct cdp_soc_t *cdp_soc = NULL;
-	struct dp_ast_entry *ast_entry = NULL;
 	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
 
 	if (!dpsoc) {
@@ -66,30 +64,15 @@ bool dp_scs_peer_lookup_n_rule_match(struct cdp_soc_t *soc_hdl,
 
 	cdp_soc = &dpsoc->cdp_soc;
 
-	/* Fetch ast_entry corresponding to dst_mac_addr */
-	qdf_spin_lock_bh(&dpsoc->ast_lock);
-	ast_entry = dp_peer_ast_hash_find_soc(dpsoc, dst_mac_addr);
-	if (!ast_entry) {
-		qdf_spin_unlock_bh(&dpsoc->ast_lock);
-		return false;
-	}
-
-	connected_peer_id = ast_entry->peer_id;
-	qdf_spin_unlock_bh(&dpsoc->ast_lock);
-
-	if (connected_peer_id == HTT_INVALID_PEER)
+	peer = dp_find_peer_by_macaddr(dpsoc, dst_mac_addr, DP_VDEV_ALL,
+								DP_MOD_ID_SCS);
+	if (!peer)
 		return false;
 
 	/* Fetch peer_id from scs rule_id */
 	scs_peer_id = dp_scs_fetch_peer_id_frm_rule_id(rule_id);
-
 	/* Check if scs_peer is same as connected_peer_id */
-	if (connected_peer_id != scs_peer_id)
-		return false;
-
-	peer = dp_peer_get_ref_by_id(dpsoc, connected_peer_id, DP_MOD_ID_SCS);
-
-	if (!peer)
+	if (peer->peer_id != scs_peer_id)
 		return false;
 
 	vdev = peer->vdev;

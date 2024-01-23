@@ -1219,6 +1219,20 @@ struct wmi_peer_latency_config_params {
 };
 #endif
 
+#ifdef WLAN_WSI_STATS_SUPPORT
+/**
+ * struct wmi_wsi_stats_info_params - WSI stats info
+ * @pdev_id: PDEV ID
+ * @wsi_ingress_load_info: Ingress count for the PSOC
+ * @wsi_egress_load_info: Egress count for the PSOC
+ */
+struct wmi_wsi_stats_info_params {
+	uint32_t pdev_id;
+	uint32_t wsi_ingress_load_info;
+	uint32_t wsi_egress_load_info;
+};
+#endif
+
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 /**
  * struct wmi_trigger_ul_ofdma_su_params - SU manual trigger ul_ofdma info
@@ -1329,23 +1343,25 @@ struct wmi_sawf_params {
  * struct wmi_txbf_sounding_trig_param - TXBF souding parameters
  * @pdev_id: pdev id
  * @vde_id: vdev id
- * @feedback_type: single user/multi user feedback type,[0]Range[0-SU, 1-MU]
- * @ng: [2:1] Ng -Range[0-1]
- * @codebook: [3] Codebook -Range[0-1]
- * @bw: [6:4] Bandwidth -Range[0-4]
- * @reserved: [31:7] reserved
- * @sounding_repeats: sounding repetations,Range[[0-3]-MU, [0-5]-SU]
- * @num_sounding_peers: number of peers, Range[1- SU, [1-3]-MU]
+ * @[1-0]feedback_type: single user/multi user feedback type,Range[0-SU, 1-MU, 2-CQI]
+ * @ng: [3:2] Ng -Range[0-1]
+ * @codebook: [4] Codebook -Range[0-1]
+ * @bw: [7:5] Bandwidth -Range[0-4]
+ * @cqi_triggered_type -[8] Rnage[0-1]
+ * @reserved: [31:9] reserved
+ * @sounding_repeats: sounding repetations,Range[[0-3]-MU, [0-5]-SU/CQI]
+ * @num_sounding_peers: number of peers, Range[1- SU, [1-3]-MUi/CQI]
  * @macaddr: mac address of peers
  */
 struct wmi_txbf_sounding_trig_param {
 	u_int32_t  pdev_id;
 	u_int32_t  vdev_id;
-	u_int32_t  feedback_type :1,
-		   ng            :2,
-		   codebook      :1,
-		   bw            :3,
-		   reserved      :25;
+	u_int32_t  feedback_type      :2,
+		   ng                 :2,
+		   codebook           :1,
+		   bw                 :3,
+		   cqi_triggered_type :1,
+		   reserved           :23;
 	u_int32_t  sounding_repeats;
 	u_int8_t   num_sounding_peers;
 	u_int8_t   macaddr[MAX_MU_TXBF_SOUNDING_USER][QDF_MAC_ADDR_SIZE];

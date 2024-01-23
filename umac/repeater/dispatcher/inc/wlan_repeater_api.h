@@ -101,6 +101,7 @@ struct dbdc_flags {
  * @vdev_pwrsave_force_sleep:       set powersave force sleep
  * @send_wds_cmd:                   send wds command
  * @get_stavap:                     get stavap pointer
+ * @check_rpt_max_phy:              Check repeater max phy enabled
  * @peer_disassoc:                  disconnect peer
  * @pdev_update_beacon:             update beacon
  * @target_lithium:                 check target type
@@ -132,6 +133,7 @@ struct rptr_ext_cbacks {
 					 bool enable);
 	int (*send_wds_cmd)(struct wlan_objmgr_vdev *vdev, uint8_t value);
 	struct wlan_objmgr_vdev *(*get_stavap)(struct wlan_objmgr_pdev *pdev);
+	bool (*check_rpt_max_phy)(struct wlan_objmgr_pdev *pdev);
 	void (*peer_disassoc)(struct wlan_objmgr_peer *peer);
 	void (*pdev_update_beacon)(struct wlan_objmgr_pdev *pdev);
 	bool (*target_lithium)(struct wlan_objmgr_pdev *pdev);
@@ -160,6 +162,10 @@ struct rptr_ext_cbacks {
 	void (*nss_dbdc_process_mac_db_down)(struct wlan_objmgr_vdev *vdev);
 	void (*nss_prep_mac_db_store_stavap)(struct wlan_objmgr_vdev *vdev,
 					     u8 num_sta);
+#endif
+#ifdef CONFIG_AFC_SUPPORT
+	bool (*vdev_is_6g_txable_chan_available)(struct wlan_objmgr_vdev *vdev,
+						 u8 pwr_mode);
 #endif
 };
 
@@ -238,6 +244,16 @@ void wlan_rptr_pdev_set_feat_cap(struct wlan_objmgr_pdev *pdev,
  */
 void wlan_rptr_pdev_clear_feat_cap(struct wlan_objmgr_pdev *pdev,
 				   uint32_t cap);
+
+/**
+ * wlan_rptr_is_psta_vdev() - checks if vdev is a PSTA or not
+ * @vdev: vdev object
+ *
+ * api to check if vdev is PSTA or not
+ *
+ * return: 1 if PSTA else 0
+ */
+bool wlan_rptr_is_psta_vdev(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_rptr_pdev_is_feat_cap_set() - get feature caps

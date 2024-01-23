@@ -938,3 +938,21 @@ uint16_t wlan_service_id_get_enabled_param_mask(uint8_t svc_id)
 }
 
 qdf_export_symbol(wlan_service_id_get_enabled_param_mask);
+
+#ifdef WLAN_SUPPORT_SCS
+bool wlan_service_id_scs_valid(uint8_t sawf_rule_type, uint8_t service_id)
+{
+	if ((service_id >= SAWF_SCS_SVC_CLASS_MIN) &&
+	    (service_id <= SAWF_SCS_SVC_CLASS_MAX))
+		return true;
+	else
+		return false;
+}
+#else
+bool wlan_service_id_scs_valid(uint8_t sawf_rule_type, uint8_t service_id)
+{
+	return false;
+}
+#endif
+
+qdf_export_symbol(wlan_service_id_scs_valid);

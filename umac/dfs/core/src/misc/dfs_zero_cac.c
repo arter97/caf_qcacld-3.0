@@ -644,6 +644,24 @@ void dfs_find_pdev_for_agile_precac(struct wlan_objmgr_pdev *pdev,
 	   (dfs_soc_obj->cur_agile_dfs_index + 1) % dfs_soc_obj->num_dfs_privs;
 }
 
+void dfs_fill_adfs_completion_params(struct wlan_dfs *dfs,
+				     enum ocac_status_type ocac_status)
+{
+	struct adfs_completion_params *adfs_completion_status;
+	qdf_freq_t ch_freq = dfs->dfs_agile_precac_freq_mhz;
+
+	adfs_completion_status = &dfs->adfs_completion_status;
+
+	adfs_completion_status->ocac_status = ocac_status;
+	adfs_completion_status->center_freq1 =
+		(ch_freq == RESTRICTED_80P80_CHAN_CENTER_FREQ) ?
+		(RESTRICTED_80P80_LEFT_80_CENTER_FREQ) : ch_freq;
+	adfs_completion_status->center_freq2 =
+		(ch_freq == RESTRICTED_80P80_CHAN_CENTER_FREQ) ?
+		(RESTRICTED_80P80_RIGHT_80_CENTER_FREQ) : 0;
+	adfs_completion_status->chan_width = dfs->dfs_precac_chwidth;
+}
+
 void dfs_fill_adfs_chan_params(struct wlan_dfs *dfs,
 			       struct dfs_agile_cac_params *adfs_param)
 {
@@ -667,6 +685,7 @@ void dfs_agile_precac_cleanup(struct wlan_dfs *dfs)
 	dfs_soc_obj->precac_state_started = 0;
 	dfs->dfs_agile_precac_freq_mhz = 0;
 	dfs->dfs_precac_chwidth = CH_WIDTH_INVALID;
+	dfs_soc_obj->ocac_status = OCAC_RESET;
 }
 
 /*
@@ -863,18 +882,18 @@ uint8_t dfs_find_subchannels_for_center_freq(qdf_freq_t pri_center_freq,
  * return: True if the channel on which OCAC completion event received is same
  * as currently configured agile channel in host. False otherwise.
  */
-static bool
-dfs_is_ocac_complete_event_for_cur_agile_chan(struct wlan_dfs *dfs,
-					      uint32_t center_freq_mhz1,
-					      uint32_t center_freq_mhz2,
-					      enum phy_ch_width chwidth)
+bool
+dfs_is_ocac_complete_event_for_cur_agile_chan(struct wlan_dfs *dfs)
 {
+	struct adfs_completion_params *adfs_completion_status;
+
+	adfs_completion_status = &dfs->adfs_completion_status;
 	if (IS_HOST_AGILE_CURCHAN_165MHZ(dfs) &&
-	    IS_OCAC_EVENT_ON_165_MHZ_CHAN(center_freq_mhz1,
-					  center_freq_mhz2,
-					  chwidth))
+	    IS_OCAC_EVENT_ON_165_MHZ_CHAN(adfs_completion_status->center_freq1,
+					  adfs_completion_status->center_freq2,
+					  adfs_completion_status->chan_width))
 		return true;
-	else if (dfs->dfs_agile_precac_freq_mhz == center_freq_mhz1)
+	else if (dfs->dfs_agile_precac_freq_mhz == adfs_completion_status->center_freq1)
 		return true;
 	else
 		return false;
@@ -893,40 +912,18 @@ dfs_is_ocac_complete_event_for_cur_agile_chan(struct wlan_dfs *dfs,
  */
 #ifdef QCA_SUPPORT_AGILE_DFS
 void dfs_process_ocac_complete(struct wlan_objmgr_pdev *pdev,
-			       uint32_t ocac_status,
+			       enum ocac_status_type ocac_status,
 			       uint32_t center_freq_mhz1,
 			       uint32_t center_freq_mhz2,
 			       enum phy_ch_width chwidth)
 {
 	struct wlan_dfs *dfs = NULL;
 	struct dfs_soc_priv_obj *dfs_soc_obj;
+	struct adfs_completion_params *adfs_completion_status;
 
 	dfs = wlan_pdev_get_dfs_obj(pdev);
 	dfs_soc_obj = dfs->dfs_soc_obj;
-
-	/* When the FW sends a delayed OCAC completion status, Host might
-	 * have changed the precac channel already before an OCAC
-	 * completion event is received. So the OCAC completion status
-	 * should be validated if it is on the currently configured agile
-	 * channel.
-	 */
-
-	/* Assume the previous agile channel was 64 (20Mhz) and current
-	 * agile channel is 100(20Mhz), if the event from the FW is for
-	 * previously configured agile channel 64(20Mhz) then Host ignores
-	 * the event.
-	 */
-	if (!dfs_is_ocac_complete_event_for_cur_agile_chan(dfs,
-							  center_freq_mhz1,
-							  center_freq_mhz2,
-							  chwidth)) {
-	    dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
-		    "OCAC completion event is received on a different channel %d %d that is not the current Agile channel %d",
-		    center_freq_mhz1,
-		    center_freq_mhz2,
-		    dfs->dfs_agile_precac_freq_mhz);
-	    return;
-	}
+	adfs_completion_status = &dfs->adfs_completion_status;
 
 	if (ocac_status == OCAC_RESET) {
 		dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
@@ -943,6 +940,10 @@ void dfs_process_ocac_complete(struct wlan_objmgr_pdev *pdev,
 		dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS, "Error Unknown");
 	}
 
+	adfs_completion_status->ocac_status = ocac_status;
+	adfs_completion_status->center_freq1 = center_freq_mhz1;
+	adfs_completion_status->center_freq2 = center_freq_mhz2;
+	adfs_completion_status->chan_width = chwidth;
 	dfs_soc_obj->ocac_status = ocac_status;
 	dfs_cancel_precac_timer(dfs);
 	dfs_agile_sm_deliver_evt(dfs_soc_obj,
@@ -1215,6 +1216,9 @@ bool dfs_is_rcac_done_on_subchan_list(struct wlan_dfs *dfs,
 {
 	uint8_t i;
 
+	if (n_subchans >= MAX_20MHZ_SUBCHANS)
+		return false;
+
 	for (i = 0; i < n_subchans; i++) {
 		if (!dfs_is_precac_done_on_non_80p80_chan_for_freq(dfs,
 							target_freq_list[i]))
@@ -1246,6 +1250,9 @@ bool dfs_is_rcac_cac_done(struct wlan_dfs *dfs,
 								 target_freq_list,
 								 cur_freq_list,
 								 &n_subchans);
+	if (subtract_chan_idx >= MAX_20MHZ_SUBCHANS)
+		return false;
+
 	return dfs_is_rcac_done_on_subchan_list(dfs,
 						&target_freq_list[subtract_chan_idx],
 						n_subchans);
@@ -1544,7 +1551,7 @@ qdf_freq_t dfs_configure_deschan_for_precac(struct wlan_dfs *dfs)
  *
  * Return: True if weather channel, else false.
  */
-static bool dfs_is_pcac_on_weather_channel_for_freq(struct wlan_dfs *dfs,
+bool dfs_is_pcac_on_weather_channel_for_freq(struct wlan_dfs *dfs,
 						    enum phy_ch_width chwidth,
 						    uint16_t precac_freq)
 {
@@ -1592,7 +1599,7 @@ static bool dfs_is_pcac_on_weather_channel_for_freq(struct wlan_dfs *dfs,
  */
 #define EXTRA_TIME_IN_MS 2000
 void dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
-				  uint8_t ocac_status,
+				  enum ocac_status_type ocac_status,
 				  struct dfs_agile_cac_params *adfs_param)
 {
 	uint16_t pcacfreq = adfs_param->precac_center_freq_1;
@@ -2065,9 +2072,10 @@ bool dfs_is_rcac_domain(struct wlan_dfs *dfs)
 {
 	enum dfs_reg dfsdomain = utils_get_dfsdomain(dfs->dfs_pdev_obj);
 
-	if (dfsdomain == DFS_FCC_REGION ||
-	    dfsdomain == DFS_MKK_REGION ||
-	    dfsdomain == DFS_MKKN_REGION)
+	if (dfsdomain == DFS_FCC_REGION  ||
+	    dfsdomain == DFS_MKK_REGION  ||
+	    dfsdomain == DFS_MKKN_REGION ||
+	    dfsdomain == DFS_ETSI_REGION)
 		return true;
 
 	return false;
@@ -2076,17 +2084,21 @@ bool dfs_is_rcac_domain(struct wlan_dfs *dfs)
 
 bool dfs_is_agile_rcac_enabled(struct wlan_dfs *dfs)
 {
-	enum dfs_reg dfsdomain;
 	bool rcac_enabled = false;
+	bool is_rcac_applicable_on_cur_dfs_domain = dfs_is_rcac_domain(dfs);
 
-	dfsdomain = utils_get_dfsdomain(dfs->dfs_pdev_obj);
-	if ((dfsdomain == DFS_FCC_REGION ||
-	     dfsdomain == DFS_MKK_REGION ||
-	     dfsdomain == DFS_MKKN_REGION) &&
+	if (is_rcac_applicable_on_cur_dfs_domain &&
 	    dfs->dfs_agile_rcac_ucfg && dfs->dfs_fw_adfs_support_non_160)
 	    rcac_enabled = true;
 
 	return rcac_enabled;
+}
+
+void dfs_agile_cleanup_rcac(struct wlan_dfs *dfs)
+{
+	dfs->dfs_agile_precac_freq_mhz = 0;
+	dfs->dfs_precac_chwidth = CH_WIDTH_INVALID;
+	dfs->dfs_soc_obj->ocac_status = OCAC_RESET;
 }
 #endif
 
@@ -2728,7 +2740,7 @@ void dfs_reset_agile_config(struct dfs_soc_priv_obj *dfs_soc)
 	dfs_soc->cur_agile_dfs_index = PCAC_DFS_INDEX_ZERO;
 	dfs_soc->dfs_precac_timer_running = PCAC_TIMER_NOT_RUNNING;
 	dfs_soc->precac_state_started = PRECAC_NOT_STARTED;
-	dfs_soc->ocac_status = OCAC_SUCCESS;
+	dfs_soc->ocac_status = OCAC_RESET;
 }
 
 void dfs_set_fw_adfs_support(struct wlan_dfs *dfs,
@@ -2884,54 +2896,6 @@ void dfs_translate_radar_params_for_agile_chan(struct wlan_dfs *dfs,
 	}
 }
 
-#ifdef QCA_SUPPORT_ADFS_RCAC
-/*
- * dfs_convert_wlan_phymode_to_chwidth() - Map phymode to
- * channel width.
- * @phymode: phymode of type wlan_phymode.
- *
- * Return channel width of type phy_ch_width
- */
-static enum phy_ch_width
-dfs_convert_wlan_phymode_to_chwidth(enum wlan_phymode phymode)
-{
-		switch (phymode) {
-		case WLAN_PHYMODE_11NA_HT20:
-		case WLAN_PHYMODE_11NG_HT20:
-		case WLAN_PHYMODE_11AC_VHT20:
-		case WLAN_PHYMODE_11AC_VHT20_2G:
-		case WLAN_PHYMODE_11AXA_HE20:
-		case WLAN_PHYMODE_11AXG_HE20:
-		    return CH_WIDTH_20MHZ;
-		case WLAN_PHYMODE_11NA_HT40:
-		case WLAN_PHYMODE_11NG_HT40PLUS:
-		case WLAN_PHYMODE_11NG_HT40MINUS:
-		case WLAN_PHYMODE_11NG_HT40:
-		case WLAN_PHYMODE_11AC_VHT40:
-		case WLAN_PHYMODE_11AC_VHT40PLUS_2G:
-		case WLAN_PHYMODE_11AC_VHT40MINUS_2G:
-		case WLAN_PHYMODE_11AC_VHT40_2G:
-		case WLAN_PHYMODE_11AXG_HE40PLUS:
-		case WLAN_PHYMODE_11AXG_HE40MINUS:
-		case WLAN_PHYMODE_11AXG_HE40:
-		    return CH_WIDTH_40MHZ;
-		case WLAN_PHYMODE_11AC_VHT80:
-		case WLAN_PHYMODE_11AC_VHT80_2G:
-		case WLAN_PHYMODE_11AXA_HE80:
-		case WLAN_PHYMODE_11AXG_HE80:
-		    return CH_WIDTH_80MHZ;
-		case WLAN_PHYMODE_11AC_VHT160:
-		case WLAN_PHYMODE_11AXA_HE160:
-		    return CH_WIDTH_160MHZ;
-		case WLAN_PHYMODE_11AC_VHT80_80:
-		case WLAN_PHYMODE_11AXA_HE80_80:
-		    return CH_WIDTH_80P80MHZ;
-		default:
-		    return CH_WIDTH_INVALID;
-		}
-}
-#endif
-
 #if defined(QCA_SUPPORT_ADFS_RCAC) && \
     defined(WLAN_DFS_PRECAC_AUTO_CHAN_SUPPORT) && \
     defined(QCA_SUPPORT_AGILE_DFS)
@@ -2986,7 +2950,7 @@ bool dfs_restart_rcac_on_nol_expiry(struct wlan_dfs *dfs)
 					      &chan->dfs_ch_mhz_freq_seg2))
 	    goto exit;
 
-	des_ch_width = dfs_convert_wlan_phymode_to_chwidth(des_mode);
+	des_ch_width = utils_dfs_convert_wlan_phymode_to_chwidth(des_mode);
 
 	/* Validate the preferred rcac channel.
 	 * The NOL list is per 20Mhz subchannel of a channel.

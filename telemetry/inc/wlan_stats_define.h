@@ -69,7 +69,9 @@
 	(STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX |       \
 	 STATS_FEAT_FLG_LINK)
 #define STATS_BASIC_RADIO_DATA_MASK    (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
-#define STATS_BASIC_VAP_CTRL_MASK      (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
+#define STATS_BASIC_VAP_CTRL_MASK                      \
+	(STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX |       \
+	 STATS_FEAT_FLG_LINK)
 #define STATS_BASIC_VAP_DATA_MASK      (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
 #define STATS_BASIC_STA_CTRL_MASK                      \
 	(STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX |       \
@@ -168,6 +170,20 @@ enum stats_object_e {
 	STATS_OBJ_RADIO,
 	STATS_OBJ_AP,
 	STATS_OBJ_MAX = STATS_OBJ_AP,
+};
+
+/**
+ * enum stats_peer_type - Peer type
+ * @STATS_INVALID_PEER_TYPE: invalid peer type
+ * @STATS_LINK_PEER_TYPE: legacy peer or link peer for MLO connection
+ * @STATS_MLD_PEER_TYPE: MLD peer for MLO connection
+ * @STATS_WILD_PEER_TYPE: used to set peer type for same mld/link mac addr
+ */
+enum stats_peer_type {
+	STATS_INVALID_PEER_TYPE,
+	STATS_LINK_PEER_TYPE,
+	STATS_MLD_PEER_TYPE,
+	STATS_WILD_PEER_TYPE,
 };
 
 /**
@@ -316,6 +332,10 @@ struct basic_vdev_ctrl_rx {
 	u_int64_t cs_rx_security_failure;
 };
 
+struct basic_vdev_ctrl_link {
+	uint16_t cs_peer_count;
+};
+
 /* Basic Pdev Data */
 struct basic_pdev_data_tx {
 	struct basic_data_tx_stats tx;
@@ -348,6 +368,7 @@ struct basic_pdev_ctrl_link {
 	u_int32_t cs_chan_tx_pwr;
 	int16_t cs_chan_nf;
 	int16_t cs_chan_nf_sec80;
+	uint16_t cs_peer_count;
 };
 
 /* Basic psoc Data */
@@ -539,7 +560,7 @@ struct stats_if_sawf_fw_mpdu_stats {
 };
 
 struct stats_if_pkt_info {
-	uint32_t num;
+	uint64_t num;
 	uint64_t bytes;
 };
 
@@ -777,6 +798,10 @@ struct advance_vdev_ctrl_rx {
 	u_int64_t cs_wc_probe_req_drops;
 	u_int64_t cs_sta_xceed_rlim;
 	u_int64_t cs_sta_xceed_vlim;
+};
+
+struct advance_vdev_ctrl_link {
+	struct basic_vdev_ctrl_link b_link;
 };
 
 /* Advance Pdev Data */
@@ -1346,6 +1371,10 @@ struct debug_vdev_ctrl_wmi {
 	uint64_t cs_peer_delete_resp;
 	uint64_t cs_peer_delete_all_req;
 	uint64_t cs_peer_delete_all_resp;
+};
+
+struct debug_vdev_ctrl_link {
+	struct basic_vdev_ctrl_link b_link;
 };
 
 /* Debug Radio data */

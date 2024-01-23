@@ -54,6 +54,23 @@ bool reg_is_phymode_chwidth_allowed(
 		uint16_t input_puncture_bitmap);
 
 /**
+ * reg_get_max_channel_width() - Get the maximum channel width supported
+ * given a frequency and a global maximum channel width.
+ * @pdev: Pointer to PDEV object.
+ * @freq: Input frequency.
+ * @g_max_width: Global maximum channel width.
+ * @input_puncture_bitmap: Input puncture bitmap
+ *
+ * Return: Maximum channel width of type phy_ch_width.
+ */
+enum phy_ch_width
+reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
+			  qdf_freq_t freq,
+			  enum phy_ch_width g_max_width,
+			  enum supported_6g_pwr_types in_6g_pwr_mode,
+			  uint16_t input_puncture_bitmap);
+
+/**
  * reg_set_chan_blocked() - Set is_chan_hop_blocked to true for a frequency
  * in the current chan list.
  * @pdev: Pointer to pdev.
@@ -147,6 +164,16 @@ static inline bool reg_is_phymode_chwidth_allowed(
 		uint16_t input_puncture_bitmap)
 {
 	return false;
+}
+
+static inline enum phy_ch_width
+reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
+			  qdf_freq_t freq,
+			  enum phy_ch_width g_max_width,
+			  enum supported_6g_pwr_types in_6g_pwr_mode,
+			  uint16_t input_puncture_bitmap);
+{
+	return CH_WIDTH_INVALID;
 }
 
 static inline
@@ -382,4 +409,30 @@ QDF_STATUS reg_get_max_reg_eirp_from_list(struct wlan_objmgr_pdev *pdev,
 					  struct channel_power *chan_eirp_list,
 					  uint8_t num_6g_chans);
 #endif
+
+/**
+ * reg_quick_set_ap_pwr_and_update_chan_list() - Set the AP power mode and
+ * recompute the current channel list.
+ *
+ * @pdev: Pointer to pdev.
+ * @ap_pwr_type: The AP power type to update to.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+reg_quick_set_ap_pwr_and_update_chan_list(struct wlan_objmgr_pdev *pdev,
+					  enum reg_6g_ap_type ap_pwr_type);
+
+/**
+ * reg_is_freq_txable() - Check if the given frequency is tx-able.
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in MHz
+ * @in_6ghz_pwr_mode: Input AP power type
+ *
+ * Return: True if the frequency is tx-able, else false.
+ */
+bool
+reg_is_freq_txable(struct wlan_objmgr_pdev *pdev,
+		   qdf_freq_t freq,
+		   enum supported_6g_pwr_types in_6ghz_pwr_mode);
 #endif /* __REG_CHANNEL_H_ */

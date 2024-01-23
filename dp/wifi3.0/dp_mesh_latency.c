@@ -79,8 +79,6 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 	uint8_t tid, ac, msduq;
 	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct cdp_soc_t *cdp_soc = NULL;
-	struct dp_ast_entry *ase = NULL;
-	uint16_t peer_id;
 
 	if (!dpsoc) {
 		QDF_TRACE(QDF_MODULE_ID_DP_CDP, QDF_TRACE_LEVEL_ERROR,
@@ -89,21 +87,8 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 	}
 
 	cdp_soc = &dpsoc->cdp_soc;
-	if (!dpsoc->ast_offload_support) {
-		qdf_spin_lock_bh(&dpsoc->ast_lock);
-		ase = dp_peer_ast_hash_find_soc(dpsoc, peer_mac);
-		if (!ase) {
-			qdf_spin_unlock_bh(&dpsoc->ast_lock);
-			return QDF_STATUS_E_INVAL;
-		}
-		peer_id = ase->peer_id;
-		qdf_spin_unlock_bh(&dpsoc->ast_lock);
-		peer = dp_peer_get_ref_by_id(dpsoc, peer_id, DP_MOD_ID_AST);
-	} else {
-		QDF_TRACE(QDF_MODULE_ID_DP_CDP, QDF_TRACE_LEVEL_ERROR,
-				"%s: Mesh Latency support for WIFI7 peers need to be added\n", __func__);
-	}
-
+	peer = dp_find_peer_by_macaddr(dpsoc, peer_mac, DP_VDEV_ALL,
+								DP_MOD_ID_MESH);
 	if (!peer) {
 		return QDF_STATUS_E_INVAL;
 	}
@@ -112,7 +97,7 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 		/*
 		 * No VAP found with this peer mac
 		 */
-		dp_peer_unref_delete(peer, DP_MOD_ID_AST);
+		dp_peer_unref_delete(peer, DP_MOD_ID_MESH);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -140,7 +125,7 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 	/*
 	 * Unref the peer
 	 */
-	dp_peer_unref_delete(peer, DP_MOD_ID_AST);
+	dp_peer_unref_delete(peer, DP_MOD_ID_MESH);
 	return status;
 }
 

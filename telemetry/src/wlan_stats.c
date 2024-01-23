@@ -54,6 +54,13 @@ static void fill_basic_data_tx_stats(struct basic_data_tx_stats *tx,
 			    cdp_tx->dropped.fw_reason3;
 }
 
+static void update_basic_peer_data_rx_stats(struct basic_data_rx_stats *rx,
+					    struct cdp_rx_stats *cdp_rx)
+{
+	rx->to_stack.num = cdp_rx->rx_success.num;
+	rx->to_stack.bytes = cdp_rx->rx_success.bytes;
+}
+
 static void fill_basic_data_rx_stats(struct basic_data_rx_stats *rx,
 				     struct cdp_rx_stats *cdp_rx)
 {
@@ -83,6 +90,9 @@ static void fill_basic_peer_data_rx(struct basic_peer_data_rx *data,
 				    struct cdp_rx_stats *rx)
 {
 	fill_basic_data_rx_stats(&data->rx, rx);
+
+	/* update to_stack with rx_success for link level support */
+	update_basic_peer_data_rx_stats(&data->rx, rx);
 }
 
 static void fill_basic_peer_ctrl_rx(struct basic_peer_ctrl_rx *ctrl,
@@ -183,6 +193,13 @@ static void fill_basic_vdev_ctrl_rx(struct basic_vdev_ctrl_rx *ctrl,
 				       cp_stats->mcast_stats.cs_rx_wpimic;
 }
 
+static void fill_basic_vdev_ctrl_link(struct basic_vdev_ctrl_link *ctrl,
+				      struct wlan_objmgr_vdev *vdev)
+{
+	/* Deduct 1 for BSS peer */
+	ctrl->cs_peer_count = wlan_vdev_get_peer_count(vdev) - 1;
+}
+
 static void fill_basic_pdev_data_tx(struct basic_pdev_data_tx *data,
 				    struct cdp_pdev_stats *pdev_stats)
 {
@@ -240,11 +257,14 @@ static void fill_basic_pdev_ctrl_rx(struct basic_pdev_ctrl_rx *ctrl,
 }
 
 static void fill_basic_pdev_ctrl_link(struct basic_pdev_ctrl_link *ctrl,
-				      struct pdev_ic_cp_stats *cp_stats)
+				      struct pdev_ic_cp_stats *cp_stats,
+				      struct wlan_objmgr_pdev *pdev)
 {
 	ctrl->cs_chan_tx_pwr = cp_stats->stats.cs_chan_tx_pwr;
 	ctrl->cs_chan_nf = cp_stats->stats.cs_chan_nf;
 	ctrl->cs_chan_nf_sec80 = cp_stats->stats.cs_chan_nf_sec80;
+	ctrl->cs_peer_count = wlan_pdev_get_peer_count(pdev) -
+				wlan_pdev_get_vdev_count(pdev);
 }
 
 static void fill_basic_psoc_data_tx(struct basic_psoc_data_tx *data,
@@ -529,6 +549,28 @@ static QDF_STATUS get_basic_vdev_ctrl_rx(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS get_basic_vdev_ctrl_link(struct unified_stats *stats,
+					   struct wlan_objmgr_vdev *vdev)
+{
+	struct basic_vdev_ctrl_link *ctrl;
+
+	if (!stats || !vdev) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+	ctrl = qdf_mem_malloc(sizeof(struct basic_vdev_ctrl_link));
+	if (!ctrl) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	fill_basic_vdev_ctrl_link(ctrl, vdev);
+
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct basic_vdev_ctrl_link);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS get_basic_pdev_data_tx(struct unified_stats *stats,
 					 struct cdp_pdev_stats *pdev_stats)
 {
@@ -618,11 +660,12 @@ static QDF_STATUS get_basic_pdev_ctrl_rx(struct unified_stats *stats,
 }
 
 static QDF_STATUS get_basic_pdev_ctrl_link(struct unified_stats *stats,
-					   struct pdev_ic_cp_stats *cp_stats)
+					   struct pdev_ic_cp_stats *cp_stats,
+					   struct wlan_objmgr_pdev *pdev)
 {
 	struct basic_pdev_ctrl_link *ctrl = NULL;
 
-	if (!stats || !cp_stats) {
+	if (!stats || !cp_stats || !pdev) {
 		qdf_err("Invalid Input");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -631,7 +674,7 @@ static QDF_STATUS get_basic_pdev_ctrl_link(struct unified_stats *stats,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_pdev_ctrl_link(ctrl, cp_stats);
+	fill_basic_pdev_ctrl_link(ctrl, cp_stats, pdev);
 
 	stats->feat[INX_FEAT_LINK] = ctrl;
 	stats->size[INX_FEAT_LINK] = sizeof(struct basic_pdev_ctrl_link);
@@ -687,7 +730,8 @@ static QDF_STATUS get_basic_peer_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
 				      uint8_t *peer_mac,
 				      struct unified_stats *stats,
-				      uint32_t feat)
+				      uint32_t feat,
+				      enum stats_peer_type peer_type)
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct cdp_peer_stats *peer_stats = NULL;
@@ -700,8 +744,9 @@ static QDF_STATUS get_basic_peer_data(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NOMEM;
 	}
 	vdev_id = wlan_vdev_get_id(vdev);
-	ret = cdp_host_get_peer_stats(wlan_psoc_get_dp_handle(psoc), vdev_id,
-				      peer_mac, peer_stats);
+	ret = cdp_host_get_peer_stats_based_on_peer_type(
+				wlan_psoc_get_dp_handle(psoc), vdev_id,
+				peer_mac, peer_stats, peer_type);
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to fetch stats!");
 		goto get_failed;
@@ -1068,6 +1113,13 @@ static QDF_STATUS get_basic_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		else
 			stats_collected = true;
 	}
+	if (feat & STATS_FEAT_FLG_LINK) {
+		ret = get_basic_vdev_ctrl_link(stats, vdev);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch vdev Basic LINK stats!");
+		else
+			stats_collected = true;
+	}
 
 get_failed:
 	qdf_mem_free(cp_stats);
@@ -1275,7 +1327,7 @@ static QDF_STATUS get_basic_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 	if (feat & STATS_FEAT_FLG_LINK) {
-		ret = get_basic_pdev_ctrl_link(stats, pdev_cp_stats);
+		ret = get_basic_pdev_ctrl_link(stats, pdev_cp_stats, pdev);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch pdev Basic LINK stats!");
 		else
@@ -2241,8 +2293,9 @@ static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 			qdf_err("Failed allocation!");
 			return QDF_STATUS_E_NOMEM;
 		}
-		ret = cdp_host_get_peer_stats(dp_soc, vdev_id,
-					      peer_mac, peer_stats);
+		ret = cdp_host_get_peer_stats_based_on_peer_type(dp_soc,
+						vdev_id, peer_mac,
+						peer_stats, cfg->peer_type);
 		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch stats!");
 			goto get_failed;
@@ -2725,6 +2778,28 @@ static QDF_STATUS get_advance_vdev_ctrl_rx(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS get_advance_vdev_ctrl_link(struct unified_stats *stats,
+					     struct wlan_objmgr_vdev *vdev)
+{
+	struct advance_vdev_ctrl_link *ctrl;
+
+	if (!stats || !vdev) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+	ctrl = qdf_mem_malloc(sizeof(struct advance_vdev_ctrl_link));
+	if (!ctrl) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	fill_basic_vdev_ctrl_link(&ctrl->b_link, vdev);
+
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct advance_vdev_ctrl_link);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS get_advance_vdev_data(struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_vdev *vdev,
 					struct unified_stats *stats,
@@ -2864,8 +2939,7 @@ static QDF_STATUS get_advance_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 
 		mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
 		for (i = 0; i < num_links; i++) {
-			status = wlan_cfg80211_get_vdev_cp_stats(vdev_list[i],
-								 temp_cp_stats);
+			status = get_vdev_cp_stats(vdev_list[i], temp_cp_stats);
 			mlo_release_vdev_ref(vdev_list[i]);
 			if (status != QDF_STATUS_SUCCESS) {
 				ret = status;
@@ -2877,7 +2951,7 @@ static QDF_STATUS get_advance_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 	} else
 #endif
 	{
-		ret = wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
+		ret = get_vdev_cp_stats(vdev, cp_stats);
 	}
 
 	if (QDF_STATUS_SUCCESS != ret) {
@@ -2895,6 +2969,13 @@ static QDF_STATUS get_advance_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		ret = get_advance_vdev_ctrl_rx(stats, cp_stats);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch vdev Advance RX Stats!");
+		else
+			stats_collected = true;
+	}
+	if (feat & STATS_FEAT_FLG_LINK) {
+		ret = get_advance_vdev_ctrl_link(stats, vdev);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch vdev Advance LINK Stats!");
 		else
 			stats_collected = true;
 	}
@@ -3350,11 +3431,12 @@ static QDF_STATUS get_advance_pdev_ctrl_rx(struct unified_stats *stats,
 }
 
 static QDF_STATUS get_advance_pdev_ctrl_link(struct unified_stats *stats,
-					     struct pdev_ic_cp_stats *cp_stats)
+					     struct pdev_ic_cp_stats *cp_stats,
+					     struct wlan_objmgr_pdev *pdev)
 {
 	struct advance_pdev_ctrl_link *ctrl = NULL;
 
-	if (!stats || !cp_stats) {
+	if (!stats || !cp_stats || !pdev) {
 		qdf_err("Invalid Input");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -3363,7 +3445,7 @@ static QDF_STATUS get_advance_pdev_ctrl_link(struct unified_stats *stats,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_pdev_ctrl_link(&ctrl->b_link, cp_stats);
+	fill_basic_pdev_ctrl_link(&ctrl->b_link, cp_stats, pdev);
 
 	ctrl->dcs_ap_tx_util = cp_stats->stats.chan_stats.dcs_ap_tx_util;
 	ctrl->dcs_ap_rx_util = cp_stats->stats.chan_stats.dcs_ap_rx_util;
@@ -3606,7 +3688,7 @@ static QDF_STATUS get_advance_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 	if (feat & STATS_FEAT_FLG_LINK) {
-		ret = get_advance_pdev_ctrl_link(stats, pdev_cp_stats);
+		ret = get_advance_pdev_ctrl_link(stats, pdev_cp_stats, pdev);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch pdev Advance LINK Stats!");
 		else
@@ -4067,6 +4149,24 @@ get_pdev_tx_capture_stats(void *dp_soc_handle, uint8_t pdev_id,
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH */
 
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
+static QDF_STATUS get_peer_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t vdev_id,
+				uint8_t *addr,
+				struct cdp_peer_deter_stats *deter)
+{
+	return cdp_get_peer_deter_stats(soc, vdev_id,
+					addr, deter);
+}
+static QDF_STATUS get_pdev_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id,
+				struct cdp_pdev_deter_stats *deter)
+{
+	return cdp_get_pdev_deter_stats(soc, pdev_id, deter);
+}
+
 static QDF_STATUS
 get_debug_peer_deter_stats(struct unified_stats *stats,
 			   struct cdp_peer_deter_stats *deter)
@@ -4098,12 +4198,38 @@ get_debug_peer_deter_stats(struct unified_stats *stats,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS get_peer_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t vdev_id,
+				uint8_t *addr,
+				struct cdp_peer_deter_stats *deter)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS get_pdev_deter_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id,
+				struct cdp_pdev_deter_stats *stats)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+get_debug_peer_deter_stats(struct unified_stats *stats,
+			   struct cdp_peer_deter_stats *deter)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_vdev *vdev,
 				      uint8_t *peer_mac,
 				      struct unified_stats *stats,
-				      uint32_t feat)
+				      uint32_t feat,
+				      enum stats_peer_type peer_type)
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct cdp_peer_stats *peer_stats = NULL;
@@ -4121,8 +4247,9 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 			qdf_err("Failed allocation!");
 			return QDF_STATUS_E_NOMEM;
 		}
-		ret = cdp_host_get_peer_stats(dp_soc, vdev_id, peer_mac,
-					      peer_stats);
+		ret = cdp_host_get_peer_stats_based_on_peer_type(dp_soc,
+						vdev_id, peer_mac,
+						peer_stats, peer_type);
 		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch stats!");
 			goto get_failed;
@@ -4177,8 +4304,8 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 			ret = QDF_STATUS_E_NOMEM;
 			goto get_failed;
 		}
-		ret = cdp_get_peer_deter_stats(dp_soc, vdev_id,
-					       peer_mac, deter);
+		ret = get_peer_deter_stats(dp_soc, vdev_id,
+					   peer_mac, deter);
 		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_debug_peer_deter_stats(stats, deter);
 		if (ret != QDF_STATUS_SUCCESS)
@@ -4735,6 +4862,28 @@ static QDF_STATUS get_debug_vdev_ctrl_wmi(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS get_debug_vdev_ctrl_link(struct unified_stats *stats,
+					   struct wlan_objmgr_vdev *vdev)
+{
+	struct debug_vdev_ctrl_link *ctrl;
+
+	if (!stats || !vdev) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+	ctrl = qdf_mem_malloc(sizeof(struct debug_vdev_ctrl_link));
+	if (!ctrl) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	fill_basic_vdev_ctrl_link(&ctrl->b_link, vdev);
+
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct debug_vdev_ctrl_link);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 				      struct unified_stats *stats,
 				      uint32_t feat, bool mld_req)
@@ -4768,8 +4917,7 @@ static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		}
 		mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
 		for (i = 0; i < num_links; i++) {
-			status = wlan_cfg80211_get_vdev_cp_stats(vdev_list[i],
-								 temp_cp_stats);
+			status = get_vdev_cp_stats(vdev_list[i], temp_cp_stats);
 			mlo_release_vdev_ref(vdev_list[i]);
 			if (status != QDF_STATUS_SUCCESS) {
 				ret = status;
@@ -4781,7 +4929,7 @@ static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 	} else
 #endif
 	{
-		ret = wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
+		ret = get_vdev_cp_stats(vdev, cp_stats);
 	}
 
 	if (QDF_STATUS_SUCCESS != ret) {
@@ -4806,6 +4954,13 @@ static QDF_STATUS get_debug_vdev_ctrl(struct wlan_objmgr_vdev *vdev,
 		ret = get_debug_vdev_ctrl_wmi(stats, cp_stats);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch vdev Debug WMI Stats!");
+		else
+			stats_collected = true;
+	}
+	if (feat & STATS_FEAT_FLG_LINK) {
+		ret = get_debug_vdev_ctrl_link(stats, vdev);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch vdev Debug LINK Stats!");
 		else
 			stats_collected = true;
 	}
@@ -5281,11 +5436,12 @@ static QDF_STATUS get_debug_pdev_ctrl_wmi(struct unified_stats *stats,
 }
 
 static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
-					   struct pdev_ic_cp_stats *cp_stats)
+					   struct pdev_ic_cp_stats *cp_stats,
+					   struct wlan_objmgr_pdev *pdev)
 {
 	struct debug_pdev_ctrl_link *ctrl = NULL;
 
-	if (!stats || !cp_stats) {
+	if (!stats || !cp_stats || !pdev) {
 		qdf_err("Invalid Input");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -5294,7 +5450,7 @@ static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_pdev_ctrl_link(&ctrl->b_link, cp_stats);
+	fill_basic_pdev_ctrl_link(&ctrl->b_link, cp_stats, pdev);
 
 	stats->feat[INX_FEAT_LINK] = ctrl;
 	stats->size[INX_FEAT_LINK] = sizeof(struct debug_pdev_ctrl_link);
@@ -5302,6 +5458,7 @@ static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_CONFIG_TELEMETRY_AGENT
 static QDF_STATUS
 get_debug_pdev_deter_stats(struct unified_stats *stats,
 			   struct cdp_pdev_deter_stats *deter)
@@ -5356,6 +5513,14 @@ get_debug_pdev_deter_stats(struct unified_stats *stats,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS
+get_debug_pdev_deter_stats(struct unified_stats *stats,
+			   struct cdp_pdev_deter_stats *deter)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 static void aggregate_debug_pdev_ctrl_tx(struct debug_pdev_ctrl_tx *tx,
 					 struct vdev_ic_cp_stats *cp_stats)
@@ -5548,7 +5713,7 @@ static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 			ret = QDF_STATUS_E_NOMEM;
 			goto get_failed;
 		}
-		ret = cdp_get_pdev_deter_stats(dp_soc, pdev_id, deter);
+		ret = get_pdev_deter_stats(dp_soc, pdev_id, deter);
 		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_debug_pdev_deter_stats(stats, deter);
 		if (ret != QDF_STATUS_SUCCESS)
@@ -5620,7 +5785,7 @@ static QDF_STATUS get_debug_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 			stats_collected = true;
 	}
 	if (feat & STATS_FEAT_FLG_LINK) {
-		ret = get_debug_pdev_ctrl_link(stats, pdev_cp_stats);
+		ret = get_debug_pdev_ctrl_link(stats, pdev_cp_stats, pdev);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch pdev Debug LINK Stats!");
 		else
@@ -5892,7 +6057,7 @@ QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
 	case STATS_LVL_BASIC:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_basic_peer_data(psoc, vdev, peer_mac, stats,
-						  cfg->feat);
+						  cfg->feat, cfg->peer_type);
 		else
 			ret = get_basic_peer_ctrl(psoc, peer_mac, stats,
 						  cfg->feat);
@@ -5911,7 +6076,7 @@ QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
 	case STATS_LVL_DEBUG:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_debug_peer_data(psoc, vdev, peer_mac, stats,
-						  cfg->feat);
+						  cfg->feat, cfg->peer_type);
 		else
 			ret = get_debug_peer_ctrl(psoc, peer_mac, stats,
 						  cfg->feat);

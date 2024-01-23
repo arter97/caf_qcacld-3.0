@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -251,6 +251,18 @@ void *dp_get_ppe_ds_ctxt(struct dp_soc *soc);
  */
 void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
 					  struct dp_vdev *vdev, bool peer_map);
+
+/**
+ * dp_tx_ppeds_vp_profile_update() - Update ppe vp profile with new bank data
+ * @be_soc: BE Soc handle
+ * @be_vdev: pointer to be_vdev structure
+ *
+ * The function updates the vp profile with new bank information
+ *
+ * Return: void
+ */
+void dp_tx_ppeds_vp_profile_update(struct dp_soc_be *be_soc,
+				   struct dp_vdev_be *be_vdev);
 
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
