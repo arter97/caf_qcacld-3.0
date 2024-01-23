@@ -17791,37 +17791,75 @@ QDF_STATUS hdd_md_bl_evt_cb(void *ctx, struct sir_md_bl_evt *event)
 }
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
-/**
- * hdd_ssr_on_pagefault_cb - Callback to trigger SSR because
- * of host wake up by firmware with reason pagefault
- *
- * Return: None
- */
-static void hdd_ssr_on_pagefault_cb(void)
+static QDF_STATUS hdd_ssr_on_pagefault_cb(struct hdd_context *hdd_ctx)
 {
 	uint32_t ssr_frequency_on_pagefault;
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	qdf_time_t curr_time;
+	qdf_time_t curr_time, ssr_threshold;
 
 	hdd_enter();
 
 	if (!hdd_ctx)
-		return;
+		return QDF_STATUS_E_NULL_VALUE;
 
 	ssr_frequency_on_pagefault =
 		ucfg_pmo_get_ssr_frequency_on_pagefault(hdd_ctx->psoc);
 
-	curr_time = qdf_get_time_of_the_day_ms();
+	curr_time = qdf_get_system_uptime();
+	ssr_threshold = qdf_system_msecs_to_ticks(ssr_frequency_on_pagefault);
 
 	if (!hdd_ctx->last_pagefault_ssr_time ||
-	    (curr_time - hdd_ctx->last_pagefault_ssr_time) >=
-					ssr_frequency_on_pagefault) {
+	    (curr_time - hdd_ctx->last_pagefault_ssr_time) >= ssr_threshold) {
 		hdd_info("curr_time %lu last_pagefault_ssr_time %lu ssr_frequency %d",
 			 curr_time, hdd_ctx->last_pagefault_ssr_time,
-			 ssr_frequency_on_pagefault);
+			 ssr_threshold);
 		hdd_ctx->last_pagefault_ssr_time = curr_time;
 		cds_trigger_recovery(QDF_HOST_WAKEUP_REASON_PAGEFAULT);
+
+		return QDF_STATUS_SUCCESS;
 	}
+
+	return QDF_STATUS_E_AGAIN;
+}
+
+#define FW_PAGE_FAULT_IDX QCA_NL80211_VENDOR_SUBCMD_FW_PAGE_FAULT_REPORT_INDEX
+static QDF_STATUS hdd_send_pagefault_report_to_user(struct hdd_context *hdd_ctx,
+						    void *buf, uint32_t buf_len)
+{
+	struct sk_buff *event_buf;
+	int flags = cds_get_gfp_flags();
+	uint8_t *ev_data = buf;
+	uint16_t event_len = NLMSG_HDRLEN + buf_len;
+
+	event_buf = wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
+						     event_len,
+						     FW_PAGE_FAULT_IDX, flags);
+	if (!event_buf) {
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	if (nla_put(event_buf, QCA_WLAN_VENDOR_ATTR_FW_PAGE_FAULT_REPORT_DATA,
+		    buf_len, ev_data)) {
+		hdd_debug("Failed to fill pagefault blob data");
+		wlan_cfg80211_vendor_free_skb(event_buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_cfg80211_vendor_event(event_buf, flags);
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS hdd_pagefault_action_cb(void *buf, uint32_t buf_len)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	if (wlan_pmo_enable_ssr_on_page_fault(hdd_ctx->psoc))
+		return hdd_ssr_on_pagefault_cb(hdd_ctx);
+
+	return hdd_send_pagefault_report_to_user(hdd_ctx, buf, buf_len);
 }
 
 /**
@@ -17935,7 +17973,7 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 	sme_smem_oem_event_init(mac_handle,
 				hdd_oem_event_smem_cb);
 
-	sme_register_ssr_on_pagefault_cb(mac_handle, hdd_ssr_on_pagefault_cb);
+	sme_register_pagefault_cb(mac_handle, hdd_pagefault_action_cb);
 
 	hdd_exit();
 

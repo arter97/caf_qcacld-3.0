@@ -3430,6 +3430,78 @@ wma_set_exclude_selftx_from_cca_busy_time(bool exclude_selftx_from_cca_busy,
 	cfg->exclude_selftx_from_cca_busy = exclude_selftx_from_cca_busy;
 }
 
+static void wma_deinit_pagefault_wakeup_history(tp_wma_handle wma)
+{
+	struct wma_pf_sym *pf_sym_entry;
+	int8_t idx, max_sym_count = WLAN_WMA_MAX_PF_SYM;
+	bool is_ssr = false;
+
+	if (wlan_pmo_enable_ssr_on_page_fault(wma->psoc)) {
+		is_ssr = true;
+		max_sym_count = 0x1;
+	}
+
+	for (idx = 0; idx < max_sym_count; idx++) {
+		pf_sym_entry = &wma->wma_pf_hist.wma_pf_sym[idx];
+		pf_sym_entry->pf_sym.symbol = 0x0;
+		pf_sym_entry->pf_sym.count = 0x0;
+		qdf_mem_free(pf_sym_entry->pf_ev_ts);
+		pf_sym_entry->pf_ev_ts = NULL;
+	}
+
+	if (!is_ssr) {
+		qdf_mem_free(wma->wma_pf_hist.pf_notify_buf_ptr);
+		wma->wma_pf_hist.pf_notify_buf_ptr = NULL;
+		wma->wma_pf_hist.pf_notify_buf_len = 0x0;
+	}
+	qdf_spinlock_destroy(&wma->wma_pf_hist.lock);
+}
+
+static QDF_STATUS wma_init_pagefault_wakeup_history(tp_wma_handle wma)
+{
+	struct wma_pf_sym *pf_sym_entry;
+	int8_t idx, idx2, max_sym_count = WLAN_WMA_MAX_PF_SYM;
+	uint8_t max_pf_count;
+	bool is_ssr = false;
+
+	if (wlan_pmo_enable_ssr_on_page_fault(wma->psoc)) {
+		is_ssr = true;
+		max_sym_count = 0x1;
+	}
+
+	max_pf_count = wlan_pmo_get_min_pagefault_wakeups_for_action(wma->psoc);
+	for (idx = 0; idx < max_sym_count; idx++) {
+		pf_sym_entry = &wma->wma_pf_hist.wma_pf_sym[idx];
+		pf_sym_entry->pf_sym.symbol = 0x0;
+		pf_sym_entry->pf_sym.count = 0x0;
+		pf_sym_entry->pf_ev_ts = qdf_mem_malloc(max_pf_count *
+							sizeof(qdf_time_t));
+		if (!pf_sym_entry->pf_ev_ts)
+			goto mem_err;
+	}
+
+	if (!is_ssr) {
+		wma->wma_pf_hist.pf_notify_buf_len = 0x0;
+		wma->wma_pf_hist.pf_notify_buf_ptr =
+				qdf_mem_malloc(WLAN_WMA_PF_APPS_NOTIFY_BUF_LEN);
+		if (!wma->wma_pf_hist.pf_notify_buf_ptr)
+			goto mem_err;
+	}
+
+	qdf_spinlock_create(&wma->wma_pf_hist.lock);
+
+	return QDF_STATUS_SUCCESS;
+
+mem_err:
+	for (idx2 = --idx; idx2 >= 0; idx2--) {
+		pf_sym_entry = &wma->wma_pf_hist.wma_pf_sym[idx2];
+		qdf_mem_free(pf_sym_entry->pf_ev_ts);
+		pf_sym_entry->pf_ev_ts = NULL;
+	}
+
+	return QDF_STATUS_E_NOMEM;
+}
+
 /**
  * wma_open() - Allocate wma context and initialize it.
  * @psoc: psoc object
@@ -3534,12 +3606,9 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	}
 	wma_handle->psoc = psoc;
 
-	if (wlan_pmo_enable_ssr_on_page_fault(psoc)) {
-		wma_handle->pagefault_wakeups_ts =
-			qdf_mem_malloc(
-			wlan_pmo_get_max_pagefault_wakeups_for_ssr(psoc) *
-			sizeof(qdf_time_t));
-		if (!wma_handle->pagefault_wakeups_ts)
+	if (!wlan_pmo_no_op_on_page_fault(psoc)) {
+		qdf_status = wma_init_pagefault_wakeup_history(wma_handle);
+		if (QDF_IS_STATUS_ERROR(qdf_status))
 			goto err_wma_handle;
 	}
 
@@ -4947,8 +5016,8 @@ QDF_STATUS wma_close(void)
 	if (wmi_validate_handle(wmi_handle))
 		return QDF_STATUS_E_INVAL;
 
-	if (wlan_pmo_enable_ssr_on_page_fault(wma_handle->psoc))
-		qdf_mem_free(wma_handle->pagefault_wakeups_ts);
+	if (!wlan_pmo_no_op_on_page_fault(wma_handle->psoc))
+		wma_deinit_pagefault_wakeup_history(wma_handle);
 
 	qdf_atomic_set(&wma_handle->sap_num_clients_connected, 0);
 	qdf_atomic_set(&wma_handle->go_num_clients_connected, 0);

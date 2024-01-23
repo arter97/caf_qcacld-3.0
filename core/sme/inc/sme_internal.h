@@ -511,7 +511,7 @@ struct sme_context {
 	int smem_id;
 #endif
 
-	void (*ssr_on_pagefault_cb)(void);
+	QDF_STATUS (*pagefault_action_cb)(void *buf, uint32_t data);
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 	void (*latency_level_event_handler_cb)

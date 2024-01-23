@@ -762,14 +762,16 @@ QDF_STATUS sme_neighbor_report_request(mac_handle_t mac_handle,
 		tpRrmNeighborRspCallbackInfo callbackInfo);
 
 /**
- * sme_register_ssr_on_pagefault_cb() - Register cb to trigger SSR on pagefault
+ * sme_register_pagefault_cb() - Register cb to handle host action on pagefault
  * @mac_handle: Opaque handle to the global MAC context.
- * @hdd_ssr_on_pagefault_cb: Callback which needs to be registered
+ * @hdd_pagefault_action_cb: Callback which needs to be registered
  *
  * Return: None
  */
-void sme_register_ssr_on_pagefault_cb(mac_handle_t mac_handle,
-				      void (*hdd_ssr_on_pagefault_cb)(void));
+void
+sme_register_pagefault_cb(mac_handle_t mac_handle,
+			  QDF_STATUS (*hdd_pagefault_action_cb)(void *buf,
+								uint32_t buf_len));
 
 /**
  * sme_deregister_ssr_on_pagefault_cb() - Deregister cb to trigger SSR on
