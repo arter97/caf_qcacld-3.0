@@ -20598,6 +20598,7 @@ void hdd_driver_unload(void)
 	osif_sync_deinit();
 
 	hdd_qdf_deinit();
+	qdf_mem_check_prealloc_leaks();
 	hdd_place_marker(NULL, "UNLOAD DONE", NULL);
 }
 
