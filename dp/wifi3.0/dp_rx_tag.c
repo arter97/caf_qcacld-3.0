@@ -763,7 +763,6 @@ QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc_hdl,
 	struct cdp_rx_flow_info flow_info = { 0 };
 	struct wlan_cfg_dp_soc_ctxt *cfg;
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
-	QDF_STATUS status;
 
 	if (qdf_unlikely(!soc))
 		return QDF_STATUS_E_FAILURE;
@@ -812,16 +811,7 @@ QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc_hdl,
 	flow_info.svc_id = svc_id;
 	flow_info.tid = tid;
 	flow_info.dest_mac = dest_mac;
-	status = dp_rx_flow_add_entry(soc->pdev_list[pdev_id], &flow_info);
-
-	if (status == QDF_STATUS_SUCCESS) {
-		if (version == 4)
-			qdf_atomic_inc(&soc->ipv4_fse_cnt);
-		else if (version == 6)
-			qdf_atomic_inc(&soc->ipv6_fse_cnt);
-	}
-
-	return status;
+	return dp_rx_flow_add_entry(soc->pdev_list[pdev_id], &flow_info);
 }
 qdf_export_symbol(dp_rx_sfe_add_flow_entry);
 
@@ -834,7 +824,6 @@ QDF_STATUS dp_rx_sfe_delete_flow_entry(struct cdp_soc_t *soc_hdl,
 	struct cdp_rx_flow_info flow_info = { 0 };
 	struct wlan_cfg_dp_soc_ctxt *cfg;
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
-	QDF_STATUS status;
 
 	if (qdf_unlikely(!soc))
 		return QDF_STATUS_E_FAILURE;
@@ -867,16 +856,7 @@ QDF_STATUS dp_rx_sfe_delete_flow_entry(struct cdp_soc_t *soc_hdl,
 	}
 
 	flow_info.op_code = CDP_FLOW_FST_ENTRY_DEL;
-	status = dp_rx_flow_delete_entry(soc->pdev_list[pdev_id], &flow_info);
-
-	if (status == QDF_STATUS_SUCCESS) {
-		if (version == 4)
-			qdf_atomic_dec(&soc->ipv4_fse_cnt);
-		else if (version == 6)
-			qdf_atomic_dec(&soc->ipv6_fse_cnt);
-	}
-
-	return status;
+	return dp_rx_flow_delete_entry(soc->pdev_list[pdev_id], &flow_info);
 }
 qdf_export_symbol(dp_rx_sfe_delete_flow_entry);
 
@@ -890,7 +870,6 @@ dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_cfg_dp_soc_ctxt *cfg;
 	struct dp_soc *soc = NULL;
-	QDF_STATUS status;
 
 	if (!ppe_flow_info->dev)
 		return QDF_STATUS_E_FAILURE;
@@ -957,16 +936,7 @@ dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 		flow_info.use_ppe_ds = 1;
 
 	flow_info.op_code = CDP_FLOW_FST_ENTRY_ADD;
-	status = dp_rx_flow_add_entry(soc->pdev_list[0], &flow_info);
-
-	if (status == QDF_STATUS_SUCCESS) {
-		if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4)
-			qdf_atomic_inc(&soc->ipv4_fse_cnt);
-		else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV6)
-			qdf_atomic_inc(&soc->ipv6_fse_cnt);
-	}
-
-	return status;
+	return dp_rx_flow_add_entry(soc->pdev_list[0], &flow_info);
 }
 
 bool
@@ -979,7 +949,6 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 	struct wlan_cfg_dp_soc_ctxt *cfg;
 	struct wlan_objmgr_pdev *pdev = NULL;
 	struct dp_soc *soc = NULL;
-	QDF_STATUS status;
 
 	if (!ppe_flow_info->dev)
 		return QDF_STATUS_E_FAILURE;
@@ -1060,16 +1029,7 @@ dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info)
 		flow_info.use_ppe_ds = 1;
 
 	flow_info.op_code = CDP_FLOW_FST_ENTRY_DEL;
-	status = dp_rx_flow_delete_entry(soc->pdev_list[0], &flow_info);
-
-	if (status == QDF_STATUS_SUCCESS) {
-		if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4)
-			qdf_atomic_dec(&soc->ipv4_fse_cnt);
-		else if (ppe_flow_info->flags & PPE_DRV_FSE_IPV4)
-			qdf_atomic_dec(&soc->ipv6_fse_cnt);
-	}
-
-	return status;
+	return dp_rx_flow_delete_entry(soc->pdev_list[0], &flow_info);
 }
 #endif
 #endif /* WLAN_SUPPORT_RX_FLOW_TAG */
