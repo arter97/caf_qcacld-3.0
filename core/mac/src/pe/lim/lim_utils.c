@@ -11562,10 +11562,8 @@ lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
 		return false;
 	}
 
-	if (sta_session->curr_op_freq != sap_session->curr_op_freq) {
-		pe_err("STA and SAP are not in same frequency, do not change TPC power");
+	if (sta_session->curr_op_freq != sap_session->curr_op_freq)
 		return false;
-	}
 
 	wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_power_type_6g);
 
