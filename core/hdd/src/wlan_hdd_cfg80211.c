@@ -3804,7 +3804,7 @@ static uint16_t wlan_hdd_update_bw_from_mlme(struct hdd_context *hdd_ctx,
 /**
  *  wlan_hdd_check_is_acs_request_same() - API to compare ongoing ACS and
  *					current received ACS request
- * @adapter: hdd adapter
+ * @link_info: pointer of hdd link info
  * @data: ACS data
  * @data_len: ACS data length
  *
@@ -3813,8 +3813,9 @@ static uint16_t wlan_hdd_update_bw_from_mlme(struct hdd_context *hdd_ctx,
  *
  * Return: true only if ACS request received is same as ongoing ACS
  */
-static bool wlan_hdd_check_is_acs_request_same(struct hdd_adapter *adapter,
-					       const void *data, int data_len)
+static bool
+wlan_hdd_check_is_acs_request_same(struct wlan_hdd_link_info *link_info,
+				   const void *data, int data_len)
 {
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_ACS_MAX + 1];
 	uint8_t hw_mode, ht_enabled, ht40_enabled, vht_enabled, eht_enabled;
@@ -3824,6 +3825,8 @@ static bool wlan_hdd_check_is_acs_request_same(struct hdd_adapter *adapter,
 	uint16_t ch_width;
 	int ret, i, j;
 	struct wlan_objmgr_psoc *psoc;
+	struct hdd_adapter *adapter = link_info->adapter;
+
 
 	ret = wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_ACS_MAX, data,
 				      data_len,
@@ -3836,7 +3839,7 @@ static bool wlan_hdd_check_is_acs_request_same(struct hdd_adapter *adapter,
 	if (!tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE])
 		return false;
 
-	sap_config = &adapter->deflink->session.ap.sap_config;
+	sap_config = &link_info->session.ap.sap_config;
 
 	hw_mode = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE]);
 	if (sap_config->acs_cfg.master_acs_cfg.hw_mode != hw_mode)
@@ -3869,7 +3872,7 @@ static bool wlan_hdd_check_is_acs_request_same(struct hdd_adapter *adapter,
 		last_scan_ageout_time =
 		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_ACS_LAST_SCAN_AGEOUT_TIME]);
 	} else {
-		psoc = wlan_vdev_get_psoc(adapter->deflink->vdev);
+		psoc = wlan_vdev_get_psoc(link_info->vdev);
 		if (psoc)
 			wlan_scan_get_last_scan_ageout_time(
 							psoc,
@@ -4277,7 +4280,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
 	if (qdf_atomic_read(&ap_ctx->acs_in_progress) > 0) {
-		if (wlan_hdd_check_is_acs_request_same(adapter,
+		if (wlan_hdd_check_is_acs_request_same(adapter->link_info,
 						       data, data_len)) {
 			hdd_debug("Same ACS req as ongoing is received, return success");
 			ret = 0;
