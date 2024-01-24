@@ -49,6 +49,7 @@
 #include "wlan_hdd_eht.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_cm_roam_ucfg_api.h"
+#include "wlan_mlo_mgr_peer.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
 #define HDD_INFO_SIGNAL                 STATION_INFO_SIGNAL
@@ -6485,7 +6486,7 @@ static void hdd_fill_rate_info(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_hdd_fill_station_info() - fill station_info struct
  * @psoc: psoc context
- * @adapter: The HDD adapter structure
+ * @link: link info structure
  * @sinfo: station_info struct pointer
  * @stainfo: stainfo pointer
  * @stats: fw txrx status pointer
@@ -6495,7 +6496,7 @@ static void hdd_fill_rate_info(struct wlan_objmgr_psoc *psoc,
  * Return: None
  */
 static void wlan_hdd_fill_station_info(struct wlan_objmgr_psoc *psoc,
-				       struct hdd_adapter *adapter,
+				       struct wlan_hdd_link_info *link,
 				       struct station_info *sinfo,
 				       struct hdd_station_info *stainfo,
 				       struct hdd_fw_txrx_stats *stats)
@@ -6504,13 +6505,16 @@ static void wlan_hdd_fill_station_info(struct wlan_objmgr_psoc *psoc,
 	struct cdp_peer_stats *peer_stats;
 	QDF_STATUS status;
 
+	if (!link)
+		return;
+
 	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
 	if (!peer_stats)
 		return;
 
 	status =
 		cdp_host_get_peer_stats(cds_get_context(QDF_MODULE_ID_SOC),
-					adapter->deflink->vdev_id,
+					link->vdev_id,
 					stainfo->sta_mac.bytes,
 					peer_stats);
 
@@ -6771,32 +6775,54 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 }
 
 /**
- * wlan_hdd_get_station_remote() - NL80211_CMD_GET_STATION handler for SoftAP
- * @wiphy: pointer to wiphy
- * @dev: pointer to net_device structure
- * @stainfo: request peer station info
- * @sinfo: pointer to station_info struct
+ * wlan_hdd_get_link_peer_stats_sap() - get link peer stats
+ * @adapter: Link info pointer of SAP adapter to get stats for
+ * @stainfo: mac address of sta
+ * @sinfo: kernel station_info struct to populate
  *
- * This function will get remote peer info from fw and fill sinfo struct
+ * Fetch the peer-level stats for the given sta info. This is to
+ * support "station dump" and "station get" for link peer.
  *
- * Return: 0 on success, otherwise error value
+ * Return: 0 if success otherwise errno
  */
-static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
-				       struct net_device *dev,
-				       struct hdd_station_info *stainfo,
-				       struct station_info *sinfo)
+static int
+wlan_hdd_get_link_peer_stats_sap(struct hdd_adapter *adapter,
+				 struct hdd_station_info *stainfo,
+				 struct station_info *sinfo)
 {
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct hdd_context *hddctx = wiphy_priv(wiphy);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct stats_event *stats;
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_hdd_link_info *link = NULL;
 	struct hdd_fw_txrx_stats txrx_stats;
-	int i, status;
+	int status = 0;
+	int i = 0;
 
-	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(adapter->deflink->vdev,
+	hdd_enter();
+
+	peer = wlan_objmgr_get_peer_by_mac(adapter->hdd_ctx->psoc,
+					   stainfo->sta_mac.bytes,
+					   WLAN_OSIF_STATS_ID);
+	if (!peer) {
+		hdd_err("Peer not found with MAC " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(stainfo->sta_mac.bytes));
+		return -EINVAL;
+	}
+
+	vdev = wlan_peer_get_vdev(peer);
+
+	if (!vdev) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
+		return -EINVAL;
+	}
+
+	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(vdev,
 							 stainfo->sta_mac.bytes,
 							 &status);
 	if (status || !stats) {
 		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 		hdd_err("fail to get peer info from fw");
 		return -EPERM;
 	}
@@ -6814,11 +6840,175 @@ static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
 	txrx_stats.tx_failed = stats->peer_stats_info_ext->tx_failed;
 	txrx_stats.tx_succeed = stats->peer_stats_info_ext->tx_succeed;
 	txrx_stats.rssi = stats->peer_stats_info_ext->rssi;
+
 	wlan_hdd_fill_rate_info(&txrx_stats, stats->peer_stats_info_ext);
-	wlan_hdd_fill_station_info(hddctx->psoc, adapter,
+	link = hdd_get_link_info_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
+
+	wlan_hdd_fill_station_info(hdd_ctx->psoc, link,
 				   sinfo, stainfo, &txrx_stats);
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+	wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 
+	hdd_exit();
+	return status;
+}
+
+#ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+static void
+wlan_hdd_update_mlo_rate_info(struct wlan_hdd_station_stats_info *hdd_sinfo,
+			      struct station_info *sinfo);
+
+/*
+ * wlan_hdd_update_mlo_sinfo() - Populate mlo stats station info
+ * @link_info: Link info pointer of STA adapter
+ * @hdd_sinfo: Pointer to hdd stats station info struct
+ * @sinfo: Pointer to kernel station info struct
+ *
+ * Return: none
+ */
+static void
+wlan_hdd_update_mld_peer_sinfo(struct hdd_adapter *adapter,
+			       struct wlan_hdd_station_stats_info *hdd_sinfo,
+			       struct station_info *sinfo)
+{
+	/* Update the rate info for link with best RSSI */
+	if (sinfo->signal > hdd_sinfo->signal)
+		wlan_hdd_update_mlo_rate_info(hdd_sinfo, sinfo);
+
+	/* Send cumulative Tx/Rx packets and bytes data
+	 * of all active links to userspace
+	 */
+	hdd_sinfo->rx_bytes += sinfo->rx_bytes;
+	hdd_sinfo->tx_bytes += sinfo->tx_bytes;
+	hdd_sinfo->rx_packets += sinfo->rx_packets;
+	hdd_sinfo->tx_packets += sinfo->tx_packets;
+	hdd_sinfo->tx_retries += sinfo->tx_retries;
+	hdd_sinfo->tx_failed += sinfo->tx_failed;
+	hdd_sinfo->rx_mpdu_count += sinfo->rx_mpdu_count;
+	hdd_sinfo->fcs_err_count += sinfo->fcs_err_count;
+}
+
+/*
+ * wlan_hdd_get_mld_peer_stats() - Populate mlo level peer stats
+ * @adapter: The HDD adapter structure
+ * @mac: mld device mac address
+ * @sinfo: Pointer to kernel station info struct
+ *
+ * Return: 0 if get stats success otherwise error code.
+ */
+static int
+wlan_hdd_get_mld_peer_stats(struct hdd_adapter *adapter,
+			    struct qdf_mac_addr *mac,
+			    struct station_info *sinfo)
+{
+	struct wlan_hdd_station_stats_info hdd_sinfo = {0};
+	struct wlan_mlo_dev_context *ap_mlo_dev_ctx = NULL;
+	struct wlan_mlo_peer_context *ml_peer = NULL;
+	struct wlan_mlo_peer_list *mlo_peer_list;
+	struct wlan_mlo_link_peer_entry *link_peer;
+	int i = 0;
+	struct hdd_station_info *stainfo;
+
+	if (!mac)
+		return -EINVAL;
+	/* try to find if it is mld peer */
+	ap_mlo_dev_ctx = adapter->deflink->vdev->mlo_dev_ctx;
+	if (!ap_mlo_dev_ctx) {
+		hdd_err("no ap mlo dev ctxt");
+		return -EINVAL;
+	}
+
+	ml_peer = mlo_get_mlpeer(ap_mlo_dev_ctx,
+				 (struct qdf_mac_addr *)mac);
+	if (!ml_peer) {
+		hdd_err("Not a valid mld peer");
+		return -EINVAL;
+	}
+	/* Initialize the signal value to a default RSSI of -128dBm */
+	hdd_sinfo.signal = WLAN_INVALID_RSSI_VALUE;
+
+	mlo_peer_list = &ap_mlo_dev_ctx->mlo_peer_list;
+	if (!mlo_peer_list)
+		return -EINVAL;
+	ml_peerlist_lock_acquire(mlo_peer_list);
+	/* polling all link peer under mld peer */
+	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
+		link_peer = &ml_peer->peer_list[i];
+		if (!link_peer)
+			continue;
+
+		stainfo = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
+						  link_peer->link_addr.bytes,
+						  STA_INFO_WLAN_HDD_CFG80211_GET_STATION);
+		if (!stainfo) {
+			hdd_debug("Peer " QDF_MAC_ADDR_FMT " not found",
+				  QDF_MAC_ADDR_REF(link_peer->link_addr.bytes));
+			continue;
+		}
+		/* get stats per link peer */
+		wlan_hdd_get_link_peer_stats_sap(adapter, stainfo, sinfo);
+
+		hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo,
+				     true,
+				     STA_INFO_WLAN_HDD_CFG80211_GET_STATION);
+		/* update link peer stats to hdd_sinfo */
+		wlan_hdd_update_mld_peer_sinfo(adapter, &hdd_sinfo, sinfo);
+	}
+	ml_peerlist_lock_release(mlo_peer_list);
+
+	wlan_hdd_copy_hdd_stats_to_sinfo(sinfo, &hdd_sinfo);
+	hdd_debug("Sending aggregated mld peer stats");
+	return 0;
+}
+#else
+static int
+wlan_hdd_get_mld_peer_stats(struct hdd_adapter *adapter,
+			    struct qdf_mac_addr *mac,
+			    struct station_info *sinfo)
+{
+	return -EINVAL;
+}
+#endif
+
+/**
+ * wlan_hdd_get_station_remote() - NL80211_CMD_GET_STATION handler for SoftAP
+ * @wiphy: pointer to wiphy
+ * @dev: pointer to net_device structure
+ * @stainfo: request peer station info
+ * @mac: original sta mac address
+ * @sinfo: pointer to station_info struct
+ *
+ * This function will get remote peer info from fw and fill sinfo struct
+ *
+ * Return: 0 on success, otherwise error value
+ */
+static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
+				       struct net_device *dev,
+				       struct hdd_station_info *stainfo,
+				       const uint8_t *mac,
+				       struct station_info *sinfo)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	int status;
+
+	/*
+	 * if the link addr is as same as mld addr,
+	 * then return the link peer stats. Otherwise
+	 * return aggregated stats for mld peer if user
+	 * space actually want to get the mld level stats.
+	 */
+	if (qdf_is_macaddr_equal(&stainfo->mld_addr,
+				 (struct qdf_mac_addr *)mac) &&
+	    !qdf_is_macaddr_equal(&stainfo->sta_mac,
+				  (struct qdf_mac_addr *)mac)) {
+		/* if mac is mld address, should go here */
+		hdd_debug("Get stats with mld level " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(stainfo->mld_addr.bytes));
+		return wlan_hdd_get_mld_peer_stats(adapter,
+					&stainfo->mld_addr, sinfo);
+	}
+
+	status = wlan_hdd_get_link_peer_stats_sap(adapter, stainfo, sinfo);
 	return status;
 }
 
@@ -8078,7 +8268,9 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 			}
 
 			errno = wlan_hdd_get_station_remote(wiphy, dev,
-							    stainfo, sinfo);
+							    stainfo,
+							    mac,
+							    sinfo);
 			hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo,
 					     true,
 					STA_INFO_WLAN_HDD_CFG80211_GET_STATION
@@ -8235,7 +8427,9 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 			qdf_mem_copy(mac, &stainfo->sta_mac.bytes,
 				     QDF_MAC_ADDR_SIZE);
 			errno = wlan_hdd_get_station_remote(wiphy, dev,
-							    stainfo, sinfo);
+							    stainfo,
+							    mac,
+							    sinfo);
 			hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo,
 					     true,
 					STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION
