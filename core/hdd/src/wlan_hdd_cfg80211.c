@@ -215,6 +215,7 @@
 #include "wlan_policy_mgr_ll_sap.h"
 #include "os_if_dp_svc.h"
 #include "wlan_osif_fpm.h"
+#include "wlan_mlo_mgr_ap.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -3171,6 +3172,7 @@ wlan_hdd_cfg80211_do_acs_policy[QCA_WLAN_VENDOR_ATTR_ACS_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_ACS_EDMG_ENABLED] = { .type = NLA_FLAG },
 	[QCA_WLAN_VENDOR_ATTR_ACS_EDMG_CHANNEL] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_ACS_LAST_SCAN_AGEOUT_TIME] = { .type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_ACS_LINK_ID] = { .type = NLA_U8 },
 };
 
 int hdd_start_vendor_acs(struct hdd_adapter *adapter)
@@ -3941,7 +3943,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	uint8_t vht_ch_width;
 	uint32_t channel_bonding_mode_2g;
 	uint32_t last_scan_ageout_time;
-	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	struct wlan_hdd_link_info *link_info;
+	int link_id = -1;
 
 	/* ***Note*** Donot set SME config related to ACS operation here because
 	 * ACS operation is not synchronouse and ACS for Second AP may come when
@@ -3961,6 +3964,24 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return ret;
+
+	ret = wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_ACS_MAX, data,
+				      data_len,
+				      wlan_hdd_cfg80211_do_acs_policy);
+	if (ret) {
+		hdd_err("Invalid ATTR");
+		return -EINVAL;
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_LINK_ID])
+		link_id =
+			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_ACS_LINK_ID]);
+
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
 
 	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		hdd_err("ignore do_acs because sap is started, vdev %d",
@@ -3998,7 +4019,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
 	if (qdf_atomic_read(&ap_ctx->acs_in_progress) > 0) {
-		if (wlan_hdd_check_is_acs_request_same(adapter->link_info,
+		if (wlan_hdd_check_is_acs_request_same(link_info,
 						       data, data_len)) {
 			hdd_debug("Same ACS req as ongoing is received, return success");
 			ret = 0;
@@ -4012,14 +4033,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	}
 
 	hdd_reg_wait_for_country_change(hdd_ctx);
-
-	ret = wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_ACS_MAX, data,
-					 data_len,
-					 wlan_hdd_cfg80211_do_acs_policy);
-	if (ret) {
-		hdd_err("Invalid ATTR");
-		goto out;
-	}
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE]) {
 		hdd_err("Attr hw_mode failed");
@@ -4634,8 +4647,20 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
-	hdd_debug("ACS result for %s: PRI_CH_FREQ: %d SEC_CH_FREQ: %d VHT_SEG0: %d VHT_SEG1: %d ACS_BW: %d punc support: %d punc bitmap: %d",
-		  adapter->dev->name, sap_cfg->acs_cfg.pri_ch_freq,
+	if (wlan_vdev_mlme_is_mlo_ap(link_info->vdev)) {
+		ret_val = nla_put_u8(vendor_event,
+				     QCA_WLAN_VENDOR_ATTR_ACS_LINK_ID,
+				     wlan_vdev_get_link_id(link_info->vdev));
+
+		if (ret_val) {
+			hdd_err("QCA_WLAN_VENDOR_ATTR_ACS_LINK_ID put fail");
+			wlan_cfg80211_vendor_free_skb(vendor_event);
+			return;
+		}
+	}
+	hdd_debug("ACS result for %s: vdev_id: %d PRI_CH_FREQ: %d SEC_CH_FREQ: %d VHT_SEG0: %d VHT_SEG1: %d ACS_BW: %d punc support: %d punc bitmap: %d",
+		  adapter->dev->name, link_info->vdev_id,
+		  sap_cfg->acs_cfg.pri_ch_freq,
 		  sap_cfg->acs_cfg.ht_sec_ch_freq,
 		  sap_cfg->acs_cfg.vht_seg0_center_ch_freq,
 		  sap_cfg->acs_cfg.vht_seg1_center_ch_freq, ch_width,
