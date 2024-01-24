@@ -35,7 +35,9 @@
 #ifdef CONFIG_MLO_SINGLE_DEV
 #include "cdp_txrx_mlo.h"
 #include "wlan_mlo_mgr_ap.h"
+#include <wlan_mlo_mgr_peer.h>
 #endif
+#include <wlan_objmgr_global_obj_i.h>
 
 static void fill_basic_data_tx_stats(struct basic_data_tx_stats *tx,
 				     struct cdp_tx_stats *cdp_tx)
@@ -6449,4 +6451,65 @@ void wlan_stats_free_unified_stats(struct unified_stats *stats)
 		stats->feat[inx] = NULL;
 		stats->size[inx] = 0;
 	}
+}
+
+struct wlan_objmgr_vdev *wlan_stats_get_vdev_from_sta_mac(uint8_t *mac)
+{
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct wlan_mlo_dev_context *mld_dev = NULL;
+	struct wlan_mlo_peer_context *ml_peer = NULL;
+#endif
+	struct qdf_mac_addr mac_addr = QDF_MAC_ADDR_ZERO_INIT;
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	uint8_t idx;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!mac) {
+		qdf_err("mac is NULL!");
+		return NULL;
+	}
+
+	qdf_mem_copy(mac_addr.bytes, mac, QDF_MAC_ADDR_SIZE);
+#ifdef WLAN_FEATURE_11BE_MLO
+	ml_peer = wlan_mlo_get_mlpeer_by_peer_mladdr(&mac_addr, &mld_dev);
+	if (mld_dev && ml_peer)
+		peer = wlan_mlo_peer_get_assoc_peer(ml_peer);
+#endif
+
+	if (peer) {
+		vdev = wlan_peer_get_vdev(peer);
+	} else {
+		for (idx = 0; idx < WLAN_OBJMGR_MAX_DEVICES; idx++) {
+			psoc = g_umac_glb_obj->psoc[idx];
+			if (!psoc)
+				continue;
+			peer = wlan_objmgr_get_peer_by_mac(psoc, mac,
+							   WLAN_MLME_SB_ID);
+			if (peer) {
+				vdev = wlan_peer_get_vdev(peer);
+				wlan_objmgr_peer_release_ref(peer,
+							     WLAN_MLME_SB_ID);
+				break;
+			}
+		}
+	}
+
+	return vdev;
+}
+
+uint32_t wlan_stats_get_tlv_counts_and_total_length(struct unified_stats *stats,
+						    uint8_t *tlv_count)
+{
+	uint32_t total_len = 0;
+	uint8_t inx;
+
+	for (inx = 0; inx < INX_FEAT_MAX; inx++) {
+		if (!stats->feat[inx] || !stats->size[inx])
+			continue;
+		total_len += stats->size[inx];
+		(*tlv_count)++;
+	}
+
+	return total_len;
 }
