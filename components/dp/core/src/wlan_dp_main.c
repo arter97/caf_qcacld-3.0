@@ -2468,7 +2468,7 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	struct direct_link_info *config = &dp_intf->direct_link_config;
 	struct wlan_dp_link *dp_link, *dp_link_next;
 	void *htc_handle;
-	bool prev_ll, update_ll, vote_link;
+	bool prev_ll, update_ll;
 	cdp_config_param_type vdev_param = {0};
 	QDF_STATUS status;
 
@@ -2491,7 +2491,6 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	qdf_mutex_acquire(&dp_ctx->dp_direct_link_lock);
 	prev_ll = config->low_latency;
 	update_ll = config_direct_link ? enable_low_latency : prev_ll;
-	vote_link = config->config_set ^ config_direct_link;
 	config->config_set = config_direct_link;
 	config->low_latency = enable_low_latency;
 	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
@@ -2505,9 +2504,6 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	}
 
 	if (config_direct_link) {
-		if (vote_link)
-			htc_vote_link_up(htc_handle,
-					 HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
 		if (update_ll)
 			hif_prevent_link_low_power_states(
 						htc_get_hif_device(htc_handle));
@@ -2517,9 +2513,6 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 		dp_info("Direct link config set. Low link latency enabled: %d",
 			enable_low_latency);
 	} else {
-		if (vote_link)
-			htc_vote_link_down(htc_handle,
-					   HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
 		if (update_ll)
 			hif_allow_link_low_power_states(
 						htc_get_hif_device(htc_handle));
