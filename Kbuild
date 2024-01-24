@@ -2659,9 +2659,9 @@ endif
 
 ifeq ($(CONFIG_WLAN_SUPPORT_SERVICE_CLASS), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_svc.o
+WLAN_DP_COMP_OBJS += $(DP_COMP_OS_IF_DIR)/os_if_dp_svc.o
 WLAN_DP_COMP_OBJS += $(DP_COMP_UCFG_DIR)/wlan_dp_svc_ucfg_api.o
 endif
-###########################################################
 
 ifeq ($(CONFIG_WLAN_SUPPORT_LAPB), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_lapb_flow.o
