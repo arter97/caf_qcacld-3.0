@@ -6570,7 +6570,6 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 				      struct hdd_priv_data *priv_data)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
-	struct net_device *dev = adapter->dev;
 	int status;
 	uint32_t chan_number = 0, chan_bw = 0;
 	uint8_t *value = command;
@@ -6619,8 +6618,8 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 		chan_number = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
 							   chan_number);
 
-	status = hdd_softap_set_channel_change(dev, chan_number, width, false,
-					       true);
+	status = hdd_softap_set_channel_change(link_info, chan_number,
+					       width, false, true);
 	if (status) {
 		hdd_err("Set channel change fail");
 		return status;

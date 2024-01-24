@@ -63,7 +63,7 @@ void *hdd_filter_ft_info(const uint8_t *frame,
  * This function to support SAP channel change with CSA IE
  * set in the beacons.
  *
- * @dev: pointer to the net device.
+ * @link_info: pointer to hdd link info.
  * @target_chan_freq: target channel frequency.
  * @target_bw: Target bandwidth to move.
  * If no bandwidth is specified, the value is CH_WIDTH_MAX
@@ -72,11 +72,12 @@ void *hdd_filter_ft_info(const uint8_t *frame,
  *
  * Return: 0 for success, non zero for failure
  */
-int hdd_softap_set_channel_change(struct net_device *dev,
+int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 				  int target_chan_freq,
 				  enum phy_ch_width target_bw,
 				  bool forced,
 				  bool allow_blocking);
+
 /**
  * hdd_stop_sap_set_tx_power() - Function to set tx power
  * for unsafe channel if restriction bit mask is set else stop the SAP.
@@ -95,7 +96,7 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 /**
  * hdd_sap_restart_with_channel_switch() - SAP channel change with E/CSA
  * @psoc: psoc common object
- * @ap_adapter: HDD adapter
+ * @link_info: hdd link info
  * @target_chan_freq: Channel frequency to which switch must happen
  * @target_bw: Bandwidth of the target channel
  * @forced: Force to switch channel, ignore SCC/MCC check
@@ -105,10 +106,10 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS_SUCCESS if successfully
  */
 QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
-					       struct hdd_adapter *ap_adapter,
-					       uint32_t target_chan_freq,
-					       uint32_t target_bw,
-					       bool forced);
+					struct wlan_hdd_link_info *link_info,
+					uint32_t target_chan_freq,
+					uint32_t target_bw,
+					bool forced);
 
 /**
  * hdd_sap_restart_chan_switch_cb() - Function to restart SAP with

@@ -2359,6 +2359,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 	struct wlan_hdd_link_info *link_info;
 	bool alt_pipe;
 	bool is_last_sta_info  = true;
+	uint32_t new_chan_freq;
 
 	link_info = (struct wlan_hdd_link_info *)sap_ctx->user_context;
 	if (!link_info) {
@@ -3306,14 +3307,17 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 
 		return QDF_STATUS_SUCCESS;
 	case eSAP_ECSA_CHANGE_CHAN_IND:
+		new_chan_freq =
+			sap_event->sapevt.sap_chan_cng_ind.new_chan_freq;
 		hdd_debug("Channel change indication from peer for channel freq %d",
-			  sap_event->sapevt.sap_chan_cng_ind.new_chan_freq);
+			  new_chan_freq);
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
 					    link_info->vdev_id,
 					    CSA_REASON_PEER_ACTION_FRAME);
-		if (hdd_softap_set_channel_change(dev,
-			 sap_event->sapevt.sap_chan_cng_ind.new_chan_freq,
-			 CH_WIDTH_MAX, false, false))
+
+		if (hdd_softap_set_channel_change(link_info,
+						  new_chan_freq,
+						  CH_WIDTH_MAX, false, false))
 			return QDF_STATUS_E_FAILURE;
 		else
 			return QDF_STATUS_SUCCESS;
@@ -3671,16 +3675,17 @@ next_adapter:
 	return false;
 }
 
-int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
+int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
+				  int target_chan_freq,
 				  enum phy_ch_width target_bw, bool forced,
 				  bool allow_blocking)
 {
 	QDF_STATUS status;
 	int ret = 0;
-	struct hdd_adapter *adapter = (netdev_priv(dev));
-	struct hdd_beacon_data *beacon = adapter->deflink->session.ap.beacon;
+	struct hdd_adapter *adapter = NULL;
+	struct hdd_beacon_data *beacon;
 	struct hdd_context *hdd_ctx = NULL;
-	struct hdd_adapter *sta_adapter;
+	struct hdd_adapter *sta_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 	struct sap_context *sap_ctx;
 	struct hdd_ap_ctx *ap_ctx;
@@ -3695,9 +3700,13 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	struct wlan_crypto_params crypto_params = {0};
 	bool capable, is_wps;
 	int32_t keymgmt;
-	struct wlan_hdd_link_info *link_info;
 	enum policy_mgr_con_mode pm_con_mode;
 
+	if (!link_info)
+		return -EINVAL;
+
+	beacon = link_info->session.ap.beacon;
+	adapter = link_info->adapter;
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
@@ -3707,7 +3716,6 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	    adapter->device_mode != QDF_P2P_GO_MODE)
 		return -EINVAL;
 
-	link_info = adapter->deflink;
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx)
 		return -EINVAL;
@@ -4041,26 +4049,26 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
-					       struct hdd_adapter *ap_adapter,
-					       uint32_t target_chan_freq,
-					       uint32_t target_bw,
-					       bool forced)
+					struct wlan_hdd_link_info *link_info,
+					uint32_t target_chan_freq,
+					uint32_t target_bw,
+					bool forced)
 {
-	struct net_device *dev = ap_adapter->dev;
 	int ret;
 
 	hdd_enter();
 
-	if (!dev) {
-		hdd_err("Invalid dev pointer");
+	if (!link_info) {
+		hdd_err("Invalid link_info");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	ret = hdd_softap_set_channel_change(dev, target_chan_freq,
+	ret = hdd_softap_set_channel_change(link_info,
+					    target_chan_freq,
 					    target_bw, forced, false);
 	if (ret && ret != -EBUSY) {
 		hdd_err("channel switch failed");
-		hdd_stop_sap_set_tx_power(psoc, ap_adapter);
+		hdd_stop_sap_set_tx_power(psoc, link_info->adapter);
 	}
 
 	return qdf_status_from_os_return(ret);
@@ -4078,7 +4086,7 @@ QDF_STATUS hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	return hdd_sap_restart_with_channel_switch(psoc, link_info->adapter,
+	return hdd_sap_restart_with_channel_switch(psoc, link_info,
 						   ch_freq, channel_bw, forced);
 }
 
@@ -6065,7 +6073,7 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
 	go_bw = wlansap_get_chan_width(WLAN_HDD_GET_SAP_CTX_PTR(go_link_info));
-	ret = hdd_softap_set_channel_change(go_link_info->adapter->dev,
+	ret = hdd_softap_set_channel_change(go_link_info,
 					    go_new_ch_freq, go_bw,
 					    false, true);
 	if (ret) {
@@ -6163,7 +6171,7 @@ hdd_handle_p2p_go_for_3rd_ap_conc(struct hdd_context *hdd_ctx,
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
 
-	ret = hdd_softap_set_channel_change(go_link_info->adapter->dev,
+	ret = hdd_softap_set_channel_change(go_link_info,
 					    go_new_ch_freq, CH_WIDTH_80MHZ,
 					    false, true);
 	if (ret) {

@@ -27599,7 +27599,7 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	qdf_event_reset(&hostapd_state->qdf_event);
 
 	ret =
-	hdd_softap_set_channel_change(dev,
+	hdd_softap_set_channel_change(adapter->link_info,
 				      csa_params->chandef.chan->center_freq,
 				      ch_width, false, true);
 	if (ret) {
