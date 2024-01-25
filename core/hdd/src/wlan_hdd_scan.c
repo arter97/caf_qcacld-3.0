@@ -429,6 +429,7 @@ wlan_hdd_enqueue_blocked_scan_request(struct net_device *dev,
 
 /**
  * __wlan_hdd_cfg80211_scan() - API to process cfg80211 scan request
+ * @link_info: Pointer of hdd link info
  * @wiphy: Pointer to wiphy
  * @request: Pointer to scan request
  * @source: scan request source(NL/Vendor scan)
@@ -438,7 +439,8 @@ wlan_hdd_enqueue_blocked_scan_request(struct net_device *dev,
  *
  * Return: 0 for success, non zero for failure
  */
-static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
+static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
+				    struct wiphy *wiphy,
 				    struct cfg80211_scan_request *request,
 				    uint8_t source)
 {
@@ -470,7 +472,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
 
 	status = wlan_hdd_validate_context(hdd_ctx);
@@ -479,10 +481,10 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_SCAN,
-		   adapter->deflink->vdev_id, request->n_channels);
+		   link_info->vdev_id, request->n_channels);
 
 	if (!sme_is_session_id_valid(hdd_ctx->mac_handle,
-				     adapter->deflink->vdev_id))
+				     link_info->vdev_id))
 		return -EINVAL;
 
 	qdf_status = ucfg_mlme_get_self_recovery(hdd_ctx->psoc, &self_recovery);
@@ -494,7 +496,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	enable_connected_scan = ucfg_scan_is_connected_scan_enabled(
 							hdd_ctx->psoc);
 	if (!enable_connected_scan &&
-	    hdd_cm_is_vdev_associated(adapter->deflink)) {
+	    hdd_cm_is_vdev_associated(link_info)) {
 		hdd_info("enable_connected_scan is false, Aborting scan");
 		if (wlan_hdd_enqueue_blocked_scan_request(dev, request, source))
 			return -EAGAIN;
@@ -649,7 +651,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_SCAN_ID);
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_SCAN_ID);
 	if (!vdev) {
 		status = -EINVAL;
 		goto error;
@@ -702,12 +704,15 @@ int wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
+	struct net_device *dev = request->wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
 	errno = osif_vdev_sync_op_start(request->wdev->netdev, &vdev_sync);
 	if (errno)
 		return errno;
 
-	errno = __wlan_hdd_cfg80211_scan(wiphy, request, NL_SCAN);
+	errno = __wlan_hdd_cfg80211_scan(adapter->deflink, wiphy,
+					 request, NL_SCAN);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
@@ -927,6 +932,7 @@ struct nla_policy scan_policy[QCA_WLAN_VENDOR_ATTR_SCAN_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_SCAN_SSIDS] = {.type = NLA_NESTED},
 	[QCA_WLAN_VENDOR_ATTR_SCAN_SUPP_RATES] = {.type = NLA_NESTED},
 	[QCA_WLAN_VENDOR_ATTR_SCAN_BSSID] = {.type = NLA_BINARY},
+	[QCA_WLAN_VENDOR_ATTR_SCAN_LINK_ID] = {.type = NLA_U8},
 };
 
 /**
@@ -956,6 +962,8 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 	int ret;
+	struct wlan_hdd_link_info *link_info;
+	int link_id = -1;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -1133,6 +1141,14 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 			nla_data(tb[QCA_WLAN_VENDOR_ATTR_SCAN_BSSID]));
 	}
 
+	if (tb[QCA_WLAN_VENDOR_ATTR_SCAN_LINK_ID]) {
+		link_id =
+			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_SCAN_LINK_ID]);
+	}
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info)
+		goto error;
+
 	/* Check if external acs was requested on this adapter */
 	hdd_process_vendor_acs_response(adapter);
 
@@ -1143,7 +1159,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	request->wiphy = wiphy;
 	request->scan_start = jiffies;
 
-	ret = __wlan_hdd_cfg80211_scan(wiphy, request, VENDOR_SCAN);
+	ret = __wlan_hdd_cfg80211_scan(link_info, wiphy, request, VENDOR_SCAN);
 	if (0 != ret) {
 		hdd_err("Scan Failed. Ret = %d", ret);
 		qdf_mem_free(request);
