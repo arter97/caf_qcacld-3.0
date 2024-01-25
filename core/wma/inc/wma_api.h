@@ -288,6 +288,7 @@ QDF_STATUS wma_send_dbs_scan_selection_params(WMA_HANDLE handle,
 			struct wmi_dbs_scan_sel_params *dbs_scan_params);
 QDF_STATUS wma_set_tx_power_scale(uint8_t vdev_id, int value);
 QDF_STATUS wma_set_tx_power_scale_decr_db(uint8_t vdev_id, int value);
+QDF_STATUS wma_enable_disable_imps(uint32_t pdev_id, uint32_t param_val);
 
 bool wma_is_csa_offload_enabled(void);
 /**

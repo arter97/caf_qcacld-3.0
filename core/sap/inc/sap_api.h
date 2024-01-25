@@ -59,7 +59,9 @@ extern "C" {
 #define       SAP_WPS_ENABLED_CONFIGURED   2
 
 #define       MAX_CHANNEL_LIST_LEN         256
+#ifndef QDF_MAX_NO_OF_SAP_MODE
 #define       QDF_MAX_NO_OF_SAP_MODE       2    /* max # of SAP */
+#endif
 #define       SAP_MAX_NUM_SESSION          5
 #define       SAP_MAX_OBSS_STA_CNT         1    /* max # of OBSS STA */
 #define       SAP_ACS_WEIGHT_MAX           (26664)
@@ -1634,6 +1636,17 @@ wlansap_override_csa_strict_for_sap(mac_handle_t mac_handle,
 				    struct sap_context *sap_ctx,
 				    uint32_t target_chan_freq,
 				    bool strict);
+
+/**
+ * wlansap_validate_channel_post_csa() - Check SAP channel unsafe or not
+ * after CSA
+ * @mac_handle: global MAC context
+ * @sap_ctx: SAP context
+ *
+ * Return: bool
+ */
+bool wlansap_validate_channel_post_csa(mac_handle_t mac_handle,
+				       struct sap_context *sap_ctx);
 
 /**
  * sap_get_csa_reason_str() - Get csa reason in string

@@ -1129,12 +1129,14 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 		 * userspace after processing the BTM frame from AP so the
 		 * audio glitches are not seen in P2P connection.
 		 */
-		if (cfg_p2p_is_roam_config_disabled(mac_ctx->psoc) &&
-		    session_entry && LIM_IS_STA_ROLE(session_entry) &&
-		    (policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
+		if (session_entry && LIM_IS_STA_ROLE(session_entry) &&
+		    ((cfg_p2p_is_roam_config_disabled(mac_ctx->psoc) &&
+		      (policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
 						PM_P2P_CLIENT_MODE, NULL) ||
-		     policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
-						PM_P2P_GO_MODE, NULL))) {
+		       policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
+						PM_P2P_GO_MODE, NULL))) ||
+		     wlan_cm_is_mbo_ap_without_pmf(mac_ctx->psoc,
+						   session_entry->vdev_id))) {
 			if (frm_len >= sizeof(*action_hdr) && action_hdr &&
 			    fc.type == SIR_MAC_MGMT_FRAME &&
 			    fc.subType == SIR_MAC_MGMT_ACTION) {
@@ -1144,7 +1146,8 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 				    (actionID == WNM_BSS_TM_QUERY ||
 				     actionID == WNM_BSS_TM_REQUEST ||
 				     actionID == WNM_BSS_TM_RESPONSE)) {
-					pe_debug("p2p session active drop BTM frame");
+					pe_debug("Drop the BTM frame as p2p session is active or rcvd from MBO AP without PMF, vdev %d",
+						 session_entry->vdev_id);
 					return match;
 				}
 			}

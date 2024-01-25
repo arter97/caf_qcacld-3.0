@@ -855,6 +855,29 @@
 				CFG_VALUE_OR_DEFAULT, \
 				"He Configure MCS_12_13 bits")
 
+/*
+ * <ini>
+ * disable_mcs_12_13_sap - Bitmask to disable HE MCS 12 13 support for SAP
+ * @Min: 0
+ * @Max: 4095
+ * @Default: 0
+ *
+ * This ini is used to disable HE MCS_12_13 for SAP.
+ * Currently only support is present to disable 2.4 GHz 40 MHz SAP for value
+ * 2 i.e. 2nd bit set.
+ *
+ * Related: NA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DISABLE_MCS_12_13_SAP CFG_INI_UINT( \
+			"disable_mcs_12_13_sap", \
+			0, 4095, 0, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Disable HE MCS_12_13 for SAP")
+
 #define CFG_HE_CAPS_ALL \
 	CFG(CFG_HE_CONTROL) \
 	CFG(CFG_HE_FRAGMENTATION) \
@@ -945,7 +968,8 @@
 	CFG(CFG_ENABLE_UL_MIMO) \
 	CFG(CFG_ENABLE_UL_OFDMA) \
 	CFG(CFG_HE_STA_OBSSPD) \
-	CFG(CFG_HE_MCS_12_13_SUPPORT)
+	CFG(CFG_HE_MCS_12_13_SUPPORT) \
+	CFG(CFG_DISABLE_MCS_12_13_SAP)
 
 #endif /* __CFG_MLME_HE_CAPS_H */
 

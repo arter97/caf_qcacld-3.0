@@ -2198,6 +2198,9 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 		QDF_GET_BITS(mcs_12_13,
 			     HE_MCS12_13_5G_INDEX * HE_MCS12_13_BITS,
 			     HE_MCS12_13_BITS);
+
+	mlme_cfg->he_caps.disable_sap_mcs_12_13 = cfg_get(psoc,
+						CFG_DISABLE_MCS_12_13_SAP);
 }
 #else
 static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2692,6 +2695,35 @@ void wlan_clear_mlo_sta_link_removed_flag(struct wlan_objmgr_vdev *vdev)
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++)
 		qdf_atomic_clear_bit(LS_F_AP_REMOVAL_BIT,
 				     &link_info[i].link_status_flags);
+}
+
+bool wlan_get_mlo_link_agnostic_flag(struct wlan_objmgr_vdev *vdev,
+				     uint8_t *dest_addr)
+{
+	struct wlan_objmgr_peer *bss_peer = NULL;
+	bool mlo_link_agnostic = false;
+	uint8_t *peer_mld_addr = NULL;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return mlo_link_agnostic;
+
+	bss_peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLME_OBJMGR_ID);
+	if (bss_peer) {
+		peer_mld_addr = wlan_peer_mlme_get_mldaddr(bss_peer);
+		if (!qdf_mem_cmp(bss_peer->macaddr, dest_addr,
+				 QDF_MAC_ADDR_SIZE) ||
+		    (peer_mld_addr && !qdf_mem_cmp(peer_mld_addr, dest_addr,
+						   QDF_MAC_ADDR_SIZE))) {
+			mlme_legacy_debug("dest address" QDF_MAC_ADDR_FMT "bss peer address"
+					  QDF_MAC_ADDR_FMT "mld addr" QDF_MAC_ADDR_FMT,
+					  QDF_MAC_ADDR_REF(dest_addr),
+					  QDF_MAC_ADDR_REF(bss_peer->macaddr),
+					  QDF_MAC_ADDR_REF(peer_mld_addr));
+			mlo_link_agnostic = true;
+		}
+		wlan_objmgr_peer_release_ref(bss_peer, WLAN_MLME_OBJMGR_ID);
+	}
+	return mlo_link_agnostic;
 }
 
 bool wlan_drop_mgmt_frame_on_link_removal(struct wlan_objmgr_vdev *vdev)

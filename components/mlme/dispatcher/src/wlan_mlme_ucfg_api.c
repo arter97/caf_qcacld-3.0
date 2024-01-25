@@ -1732,6 +1732,24 @@ ucfg_mlme_get_current_tx_power_level(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS ucfg_wlan_mlme_get_reg_tpc_info(struct wlan_objmgr_vdev *vdev,
+					   struct reg_tpc_power_info *tpc_info)
+{
+	struct vdev_mlme_obj *mlme_obj;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
+
+	if (!mlme_obj) {
+		mlme_legacy_err("vdev component object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_copy(tpc_info, &mlme_obj->reg_tpc_obj,
+		     sizeof(struct reg_tpc_power_info));
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS
 ucfg_mlme_set_obss_detection_offload_enabled(struct wlan_objmgr_psoc *psoc,
 					     uint8_t value)

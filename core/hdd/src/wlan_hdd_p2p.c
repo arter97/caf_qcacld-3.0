@@ -643,6 +643,40 @@ int hdd_set_p2p_ps(struct net_device *dev, void *msgData)
 }
 
 /**
+ * hdd_allow_new_intf() - Allow new intf created or not
+ * @hdd_ctx: hdd context
+ * @mode: qdf opmode of new interface
+ *
+ * Return: true if allowed, otherwise false
+ */
+static bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
+			       enum QDF_OPMODE mode)
+{
+	struct hdd_adapter *adapter = NULL;
+	struct hdd_adapter *next_adapter = NULL;
+	uint8_t num_active_adapter = 0;
+
+	if (mode != QDF_SAP_MODE)
+		return true;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   NET_DEV_HOLD_ALLOW_NEW_INTF) {
+		if (hdd_is_interface_up(adapter) &&
+		    adapter->device_mode == mode)
+			num_active_adapter++;
+
+		hdd_adapter_dev_put_debug(adapter,
+					  NET_DEV_HOLD_ALLOW_NEW_INTF);
+	}
+
+	if (num_active_adapter >= QDF_MAX_NO_OF_SAP_MODE)
+		hdd_err("sap max allowed intf %d, curr %d",
+			QDF_MAX_NO_OF_SAP_MODE, num_active_adapter);
+
+	return num_active_adapter < QDF_MAX_NO_OF_SAP_MODE;
+}
+
+/**
  * __wlan_hdd_add_virtual_intf() - Add virtual interface
  * @wiphy: wiphy pointer
  * @name: User-visible name of the interface
@@ -703,6 +737,9 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 
 	if (wlan_hdd_is_mon_concurrency())
 		return ERR_PTR(-EINVAL);
+
+	if (!hdd_allow_new_intf(hdd_ctx, mode))
+		return ERR_PTR(-EOPNOTSUPP);
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_ADD_VIRTUAL_INTF,

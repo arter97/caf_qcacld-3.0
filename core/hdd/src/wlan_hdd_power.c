@@ -679,16 +679,7 @@ static inline void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter)
 {}
 #endif
 
-/**
- * hdd_send_ps_config_to_fw() - Check user pwr save config set/reset PS
- * @adapter: pointer to hdd adapter
- *
- * This function checks the power save configuration saved in MAC context
- * and sends power save config to FW.
- *
- * Return: None
- */
-static void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter)
+void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
 	bool is_mlo_vdev;

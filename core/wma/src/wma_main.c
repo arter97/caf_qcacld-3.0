@@ -449,8 +449,8 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 					mlme_feature_set.roaming_ctrl_get_cu;
 	feature_set->vendor_req_2_version =
 			mlme_feature_set.vendor_req_2_version;
-	feature_set->sta_dual_p2p_support =
-					mlme_feature_set.sta_dual_p2p_support;
+	feature_set->iface_combinations = mlme_feature_set.iface_combinations;
+
 	if (mlme_feature_set.enable2x2)
 		feature_set->num_antennas = WMI_HOST_MIMO_2X2;
 	else

@@ -602,6 +602,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	struct vdev_mlme_obj *mlme_obj;
 	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 	bool ap_constraint_change = false, tpe_change = false;
+	bool allow_tpc = false;
 	int8_t regMax = 0, maxTxPower = 0;
 	QDF_STATUS status;
 	bool skip_tpe = false, is_sap_go_switched_ch;
@@ -714,10 +715,11 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 				bcn->localPowerConstraint.localPowerConstraints;
 				is_power_constraint_abs = false;
 			}
+			allow_tpc = true;
 		}
 
-		if (local_constraint !=
-				mlme_obj->reg_tpc_obj.ap_constraint_power) {
+		if (allow_tpc && local_constraint !=
+		    mlme_obj->reg_tpc_obj.ap_constraint_power) {
 			mlme_obj->reg_tpc_obj.ap_constraint_power =
 							local_constraint;
 			mlme_obj->reg_tpc_obj.is_power_constraint_abs =
@@ -725,15 +727,14 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 			ap_constraint_change = true;
 		}
 
-		if ((ap_constraint_change && local_constraint) ||
-		    (tpe_change && !skip_tpe)) {
+		if (ap_constraint_change || (tpe_change && !skip_tpe)) {
 			lim_calculate_tpc(mac_ctx, session);
 
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac_ctx->psoc,
 						      session->vdev_id,
 						      &mlme_obj->reg_tpc_obj);
-			}
+		}
 	} else if (!session->sta_follows_sap_power) {
 		/* Obtain the Max Tx power for the current regulatory  */
 		regMax = wlan_reg_get_channel_reg_power_for_freq(

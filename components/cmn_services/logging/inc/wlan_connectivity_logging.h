@@ -481,24 +481,28 @@ struct wlan_diag_mlo_t2lm_teardown {
 } qdf_packed;
 
 #define DIAG_MLO_LINK_STATUS_VERSION 1
+#define DIAG_MLO_LINK_STATUS_VERSION_2 2
 /**
  * struct wlan_diag_mlo_link_status - MLO Link status diag event structure
  * @diag_cmn: Common diag info
  * @version: structure version
- * @active_link: List of current active links. BIT 0: 2.4GHz BIT 1: 5GHz
- * BIT 2: 6GHz
- * @prev_active_link: List of inactive links. BIT 0: 2.4GHz BIT 1: 5GHz
- * BIT 2: 6GHz
+ * @active_link: List of current active links. BIT 0: 2.4 GHz BIT 1: 5 GHz
+ * BIT 2: 6 GHz
+ * @prev_active_link: List of previous active links. BIT 0: 2.4 G Hz
+ * BIT 1: 5 GHz BIT 2: 6 GHz
+ * @associated_links: Links associated in the current connection.
+ * BIT 0: 2.4 GHz BIT 1: 5 GHz BIT 2: 6 GHz
+ * @reserved: Reserved field
  * @reason: Reason for changed link status. Refer
  * enum wlan_diag_mlo_link_switch_reason
- * @reserved: Reserved field
  */
 struct wlan_diag_mlo_link_status {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint8_t version;
 	uint8_t active_link:5;
 	uint8_t prev_active_link:5;
-	uint8_t reserved:6;
+	uint8_t associated_links:5;
+	uint8_t reserved:1;
 	uint8_t reason;
 } qdf_packed;
 
@@ -1439,11 +1443,13 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_connectivity_connecting_event() - API to log connecting event
  * @vdev: vdev pointer
+ * @con_req: Connection request parameter
  *
  * Return: None
  */
 void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req);
 
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
@@ -1517,11 +1523,13 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_connectivity_connecting_event() - API to log connecting event
  * @vdev: vdev pointer
+ * @con_req: Connection request parameter
  *
  * Return: None
  */
 void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req);
 
 /**
  * wlan_populate_vsie() - Populate VSIE field for logging
@@ -1662,7 +1670,8 @@ wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 }
 
 static inline void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req)
 {
 }
 #endif

@@ -28,6 +28,8 @@
 #include <wlan_cmn.h>
 #include "sme_api.h"
 
+#define DISABLE_MCS_12_13_2G_40M 1
+
 #define ASSEMBLE_RATECODE_V1(_pream, _nss, _rate) \
 		(((1) << 28) | ((_pream) << 8) | ((_nss) << 5) | (_rate))
 
@@ -1210,7 +1212,7 @@ void wlan_mlme_chan_stats_scan_event_cb(struct wlan_objmgr_vdev *vdev,
  * channel bandwidth
  * @psoc: pointer to psoc object
  * @vdev: pointer to vdev object
- * @vdev_id: vdev id
+ * @link_id: mlo link id
  * @ch_width: channel width to update
  *
  * Return: none
@@ -1218,7 +1220,7 @@ void wlan_mlme_chan_stats_scan_event_cb(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_objmgr_vdev *vdev,
-					   uint8_t vdev_id,
+					   uint8_t link_id,
 					   enum phy_ch_width ch_width);
 
 /**

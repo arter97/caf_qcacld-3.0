@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5352,7 +5352,6 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 	bool params_update_required = false;
 	uint8_t i;
 	tpDphHashNode sta_ds = NULL;
-	QDF_STATUS status;
 	uint16_t assoc_id;
 
 	if (sta_session && sap_session &&
@@ -5419,10 +5418,7 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 				     sap_session->vdev_id, false);
 
 		sap_session->gLimEdcaParamSetCount++;
-		status = sch_set_fixed_beacon_fields(mac, sap_session);
-		if (QDF_IS_STATUS_ERROR(status))
-			pe_debug("Unable to set beacon fields!");
-
+		csr_update_beacon(mac);
 	} else if (!sap_session && sta_session) {
 	/*
 	 * Enable A-EDCA for standalone STA. The original EDCA parameters are
@@ -7085,6 +7081,7 @@ void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
 {
 	tDot11fIEhe_cap *rcvd_he = &assoc_req->he_cap;
 	tDot11fIEhe_cap *peer_he = &sta_ds->he_config;
+	struct wlan_mlme_cfg *mlme_cfg = mac_ctx->mlme_cfg;
 
 	if (!sta_ds->mlmStaContext.he_capable)
 		return;
@@ -7094,6 +7091,15 @@ void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
 		return;
 
 	lim_intersect_he_caps(rcvd_he, peer_he, session);
+
+	if ((mlme_cfg->he_caps.disable_sap_mcs_12_13 &
+	     BIT(DISABLE_MCS_12_13_2G_40M)) &&
+	    LIM_IS_AP_ROLE(session) &&
+	    wlan_reg_is_24ghz_ch_freq(session->curr_op_freq) &&
+	    session->ch_width == CH_WIDTH_40MHZ) {
+		sta_ds->he_mcs_12_13_map = 0;
+		return;
+	}
 
 	/* If MCS 12/13 is supported from assoc QCN IE */
 	if (assoc_req->qcn_ie.present &&

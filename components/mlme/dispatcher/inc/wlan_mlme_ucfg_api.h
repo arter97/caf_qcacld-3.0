@@ -4605,6 +4605,17 @@ ucfg_mlme_get_current_tx_power_level(struct wlan_objmgr_psoc *psoc,
 				     uint8_t *value);
 
 /**
+ * ucfg_wlan_mlme_get_reg_tpc_info() - get current regulatory tpc info
+ * @vdev:   pointer to vdev object
+ * @tpc_info:  pointer to tpc info buffer
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_wlan_mlme_get_reg_tpc_info(struct wlan_objmgr_vdev *vdev,
+				struct reg_tpc_power_info *tpc_info);
+
+/**
  * ucfg_mlme_set_obss_detection_offload_enabled() - Enable obss offload
  * @psoc:   pointer to psoc object
  * @value:  enable or disable

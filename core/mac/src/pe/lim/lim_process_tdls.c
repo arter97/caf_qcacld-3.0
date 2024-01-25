@@ -4178,6 +4178,7 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 	struct pe_session *pe_session;
 	uint8_t session_id;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	tSirMacAddr peer;
 
 	pe_debug("TDLS Delete STA Request Received");
 	pe_session =
@@ -4220,6 +4221,9 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 		goto lim_tdls_del_sta_error;
 	}
 
+	qdf_mem_copy(peer, del_sta_req->peermac.bytes, sizeof(tSirMacAddr));
+	lim_send_deauth_mgmt_frame(mac, REASON_DEAUTH_NETWORK_LEAVING,
+				   peer, pe_session, false);
 	status = lim_tdls_del_sta(mac, del_sta_req->peermac,
 				  pe_session, true);
 	if (status == QDF_STATUS_SUCCESS)

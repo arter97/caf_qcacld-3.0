@@ -535,6 +535,7 @@ typedef enum {
 	NET_DEV_HOLD_START_PRE_CAC_TRANS = 60,
 	NET_DEV_HOLD_IS_ANY_STA_CONNECTED = 61,
 	NET_DEV_HOLD_GET_ADAPTER_BY_BSSID = 62,
+	NET_DEV_HOLD_ALLOW_NEW_INTF = 63,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
@@ -749,6 +750,7 @@ struct hdd_mon_set_ch_info {
  * @ch_info: monitor mode channel information
  * @ap_supports_immediate_power_save: Does the current AP allow our STA
  *    to immediately go into power save?
+ * @user_cfg_chn_width: max channel bandwidth set by user space
  */
 struct hdd_station_ctx {
 	uint32_t reg_phymode;
@@ -757,6 +759,7 @@ struct hdd_station_ctx {
 	struct hdd_connection_info cache_conn_info;
 	struct hdd_mon_set_ch_info ch_info;
 	bool ap_supports_immediate_power_save;
+	uint8_t user_cfg_chn_width;
 };
 
 /**

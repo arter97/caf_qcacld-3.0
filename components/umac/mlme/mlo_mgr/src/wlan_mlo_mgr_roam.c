@@ -1019,6 +1019,9 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 		sta_ctx->assoc_rsp.ptr = NULL;
 		sta_ctx->assoc_rsp.len = 0;
 	}
+
+	sta_ctx->ml_partner_info = reassoc_rsp->ml_parnter_info;
+
 	sta_ctx->copied_reassoc_rsp = qdf_mem_malloc(
 			sizeof(struct wlan_cm_connect_resp));
 	if (!sta_ctx->copied_reassoc_rsp)
