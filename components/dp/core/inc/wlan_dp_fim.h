@@ -71,7 +71,7 @@ struct fim_node {
 	uint32_t metadata;
 	uint32_t hash;
 	unsigned long last_timestamp;
-	uint32_t policy_id;
+	uint64_t policy_id;
 	uint8_t prio;
 	struct fim_per_flow_stats stats;
 };

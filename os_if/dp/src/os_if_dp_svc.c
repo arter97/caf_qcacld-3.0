@@ -132,7 +132,7 @@ os_if_dp_service_class_set_cmd(struct nlattr *svc_params[])
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_SDWF_SVC_ID;
 	if (!tb[cmd_id]) {
-		dp_err("service class id is missing");
+		osif_err("service class id is missing");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -159,7 +159,7 @@ os_if_dp_service_class_set_cmd(struct nlattr *svc_params[])
 
 	status = svc_validate_data(&svc_data);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("Invalid input data");
+		osif_err("Invalid input data");
 		return status;
 	}
 

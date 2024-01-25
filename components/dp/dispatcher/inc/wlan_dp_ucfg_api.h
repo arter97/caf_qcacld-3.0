@@ -1775,7 +1775,7 @@ QDF_STATUS ucfg_fpm_policy_update(struct fpm_table *fpm,
  *
  * Return: 0 if FPM policy removed successfully
  */
-QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint32_t cookie);
+QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint64_t cookie);
 
 /*
  * ucfg_fpm_policy_get() - Get FPM policy array
@@ -1845,7 +1845,7 @@ QDF_STATUS ucfg_fpm_policy_update(struct fpm_table *fpm,
 }
 
 static inline
-QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint32_t cookie)
+QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint64_t cookie)
 {
 	return QDF_STATUS_SUCCESS;
 }
