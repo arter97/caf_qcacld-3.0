@@ -1143,8 +1143,8 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 
 	puncture_bitmap = wlan_hdd_get_puncture_bitmap(link_info);
 
-	hdd_debug("notify: vdev %d chan:%d width:%d freq1:%d freq2:%d punct 0x%x",
-		  vdev_id, chandef.chan->center_freq, chandef.width,
+	hdd_debug("notify: link_id %d vdev_id %d chan:%d width:%d freq1:%d freq2:%d punct 0x%x",
+		  link_id, vdev_id, chandef.chan->center_freq, chandef.width,
 		  chandef.center_freq1, chandef.center_freq2,
 		  puncture_bitmap);
 
@@ -2234,11 +2234,14 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 		goto exit;
 	}
 
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		link_id = wlan_vdev_get_link_id(vdev);
+
 	puncture_bitmap = wlan_hdd_get_puncture_bitmap(link_info);
 	ucfg_mlme_get_sap_chn_switch_bcn_count(psoc, &ch_switch_count);
 
-	hdd_debug("channel switch started notify: vdev %d chan:%d width:%d freq1:%d freq2:%d punct 0x%x ch_switch_count %d",
-		  vdev_id, chandef.chan->center_freq, chandef.width,
+	hdd_debug("channel switch started notify: link_id %d, vdev_id %d chan:%d width:%d freq1:%d freq2:%d punct 0x%x ch_switch_count %d",
+		  link_id, vdev_id, chandef.chan->center_freq, chandef.width,
 		  chandef.center_freq1, chandef.center_freq2,
 		  puncture_bitmap, ch_switch_count);
 

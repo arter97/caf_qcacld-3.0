@@ -27715,9 +27715,8 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	enum phy_ch_width ch_width;
 	bool status;
 	struct hdd_hostapd_state *hostapd_state;
-
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
-		return -EINVAL;
+	struct wlan_hdd_link_info *link_info;
+	int link_id;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -27729,25 +27728,37 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 		(QDF_SAP_MODE != adapter->device_mode))
 		return -ENOTSUPP;
 
+	link_id = hdd_nb_get_link_id_from_params((void *)csa_params,
+						 NB_CHANNEL_SWITCH);
+
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+		return -EINVAL;
+
 	status = policy_mgr_is_sap_allowed_on_dfs_freq(
 					hdd_ctx->pdev,
-					adapter->deflink->vdev_id,
+					link_info->vdev_id,
 					csa_params->chandef.chan->center_freq);
 	if (!status)
 		return -EINVAL;
 
-	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, adapter->deflink->vdev_id,
+	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 				    CSA_REASON_USER_INITIATED);
 
 	ch_width = hdd_map_nl_chan_width(csa_params->chandef.width);
 	hdd_debug("Freq %d width %d ch_width %d",
 		  csa_params->chandef.chan->center_freq,
 		  csa_params->chandef.width, ch_width);
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
 
 	ret =
-	hdd_softap_set_channel_change(adapter->link_info,
+	hdd_softap_set_channel_change(link_info,
 				      csa_params->chandef.chan->center_freq,
 				      ch_width, false, true);
 	if (ret) {
