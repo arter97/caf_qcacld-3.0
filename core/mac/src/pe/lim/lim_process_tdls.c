@@ -510,7 +510,7 @@ static uint32_t lim_prepare_tdls_frame_header(struct mac_context *mac, uint8_t *
 		((IS_QOS_ENABLED(pe_session) &&
 		(tdlsLinkType == TDLS_LINK_AP)) ||
 		((tdlsLinkType == TDLS_LINK_DIRECT) && qos_mode))
-		? SIR_MAC_DATA_QOS_DATA : SIR_MAC_DATA_DATA;
+		? WLAN_FC0_STYPE_DATA : WLAN_FC0_STYPE_QOS_DATA;
 
 	/*
 	 * TL is not setting up below fields, so we are doing it here
@@ -535,7 +535,7 @@ static uint32_t lim_prepare_tdls_frame_header(struct mac_context *mac, uint8_t *
 		QDF_MAC_ADDR_REF(pMacHdr->addr2),
 		QDF_MAC_ADDR_REF(pMacHdr->addr3));
 
-	if (pMacHdr->fc.subType == SIR_MAC_DATA_QOS_DATA) {
+	if (pMacHdr->fc.subType == WLAN_FC0_STYPE_QOS_DATA) {
 		pMacHdr->qosControl.tid = tid;
 		header_offset += sizeof(tSirMacDataHdr3a);
 	} else
