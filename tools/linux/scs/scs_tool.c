@@ -29,9 +29,6 @@
 #include <qca_vendor.h>
 #include <cfg80211_external.h>
 
-#define SCS_SPM_RULE_CLASSIFIER_TYPE         2
-#define SAWF_SCS_SPM_RULE_CLASSIFIER_TYPE    4
-
 #define SCS_ATTR_FLOW_LABEL_LENGTH           3
 
 #define SCS_ATTR_CLASSIFIER_TYPE_TCLAS4      4
@@ -543,13 +540,13 @@ done:
 
 		/* Classifier type based on svc class id range */
 		if (rule->service_class_id <= SAWF_SVC_CLASS_MAX)
-			rule->classifier_type = SAWF_SCS_SPM_RULE_CLASSIFIER_TYPE;
+			rule->classifier_type = SPM_RULE_TYPE_SAWF_SCS;
 		else
-			rule->classifier_type = SCS_SPM_RULE_CLASSIFIER_TYPE;
+			rule->classifier_type = SPM_RULE_TYPE_SCS;
 
 		PRINT_IF_VERB("Service Class ID: %u", rule->service_class_id);
 	} else {
-		rule->classifier_type = SCS_SPM_RULE_CLASSIFIER_TYPE;
+		rule->classifier_type = SPM_RULE_TYPE_SCS;
 	}
 
 	PRINT_IF_VERB("Rule Type: %u", rule->classifier_type);
