@@ -23362,7 +23362,7 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 	ol_txrx_soc_handle soc_txrx_handle;
 	uint16_t *vlan_map = sap_ctx->vlan_map;
 	uint8_t found = 0;
-	bool keyindex_valid;
+	bool keyindex_valid = true;
 	int i = 0;
 
 	psoc = wlan_vdev_get_psoc(vdev);
@@ -23384,7 +23384,9 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 		}
 	}
 
-	keyindex_valid = (i + key_index - 1) < (2 * MAX_VLAN) ? true : false;
+	/* Below check is to avoid OOB for array vlan_map access */
+	if (((i + key_index) == 0) || ((i + key_index - 1) >= (2 * MAX_VLAN)))
+		keyindex_valid = false;
 
 	if (found && keyindex_valid) {
 		soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
@@ -28695,7 +28697,7 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 			nss = 0;
 			if (band == NL80211_BAND_5GHZ)
 				rate_index += 4;
-			if (rate_index >= 0 && rate_index < 4)
+			if (rate_index < 4)
 				bit_rate = hdd_assemble_rate_code(
 					WMI_RATE_PREAMBLE_CCK, nss,
 					hdd_legacy_rates[rate_index].hw_value);

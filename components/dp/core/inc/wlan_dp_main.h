@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -966,6 +966,14 @@ QDF_STATUS wlan_dp_select_profile_cfg(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+/**
+ * wlan_dp_link_cdp_vdev_delete_notification() - CDP vdev delete notification
+ * @context: osif_vdev handle
+ *
+ * Return: None
+ */
+void wlan_dp_link_cdp_vdev_delete_notification(void *context);
 
 /* DP CFG APIs - START */
 
