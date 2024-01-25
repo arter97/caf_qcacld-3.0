@@ -1346,27 +1346,27 @@ enum host_log_level {
 
 /*
  * <ini>
- * gEnableSmemQms - enable shared memory qms
+ * gEnableSmemMailbox - enable shared memory mailbox
  * @Min: 0
  * @Max: 1
  * @Default: 0
  *
- * This ini is used to enable shared memory qms
+ * This ini is used to enable shared memory mailbox
  *
- * 0: shared memory qms is disabled
- * 1: shared memory qms is enabled
+ * 0: shared memory mailbox is disabled
+ * 1: shared memory mailbox is enabled
  * Related: None
  *
  * Supported Feature: Power Save
  *
- * Usage: External
+ * Usage: Internal
  *
  * </ini>
  */
-#define CFG_ENABLE_SMEM_QMS CFG_INI_BOOL( \
-		"gEnableSmemQms", \
+#define CFG_ENABLE_SMEM_MAILBOX CFG_INI_BOOL( \
+		"gEnableSmemMailbox", \
 		0, \
-		"This ini is used to enable shared memory qms")
+		"This ini is used to enable shared memory mailbox")
 
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
@@ -1408,5 +1408,5 @@ enum host_log_level {
 	CFG_CPU_CXPC_THRESHOLD_ALL \
 	CFG(CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME) \
 	CFG_LINK_STATE_CACHE_EXPIRY_ALL \
-	CFG(CFG_ENABLE_SMEM_QMS)
+	CFG(CFG_ENABLE_SMEM_MAILBOX)
 #endif

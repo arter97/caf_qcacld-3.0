@@ -5159,8 +5159,8 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 			pmac->sme.oem_data_async_event_handler_cb(
 					&oem_event_data);
 	} else if (event->event_cause == WMI_OEM_DATA_EVT_CAUSE_QMS) {
-		if (!cfg_get(wma->psoc, CFG_ENABLE_SMEM_QMS)) {
-			QDF_DEBUG_PANIC("Received unsupported SMEM QMS event");
+		if (!cfg_get(wma->psoc, CFG_ENABLE_SMEM_MAILBOX)) {
+			QDF_DEBUG_PANIC("SMEM Mailbox event unsupported");
 			return QDF_STATUS_E_FAULT;
 		}
 		if (pmo_get_wow_suspend_type(wma->psoc) ==

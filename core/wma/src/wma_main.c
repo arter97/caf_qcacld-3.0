@@ -573,6 +573,21 @@ static bool wma_is_feature_set_supported(tp_wma_handle wma_handle)
 
 #endif
 
+static bool wma_is_smem_mailbox_supported(tp_wma_handle wma_handle)
+{
+	bool is_feature_enabled_from_fw;
+
+	is_feature_enabled_from_fw =
+		wmi_service_enabled(wma_handle->wmi_handle,
+				    wmi_service_smem_mailbox_dlkm_support);
+
+	if (!is_feature_enabled_from_fw)
+		wma_debug("SMEM mailbox feature is disabled from fw");
+
+	return (is_feature_enabled_from_fw &&
+		cfg_get(wma_handle->psoc, CFG_ENABLE_SMEM_MAILBOX));
+}
+
 /**
  * wma_set_default_tgt_config() - set default tgt config
  * @wma_handle: wma handle
@@ -684,8 +699,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 
 	tgt_cfg->notify_frame_support = DP_MARK_NOTIFY_FRAME_SUPPORT;
 
-	if (cfg_get(wma_handle->psoc, CFG_ENABLE_SMEM_QMS))
-		tgt_cfg->is_qms_smem_supported = true;
+	if (wma_is_smem_mailbox_supported(wma_handle))
+		tgt_cfg->is_smem_mailbox_supported = true;
 
 }
 
