@@ -189,15 +189,6 @@ static const int beacon_filter_table[] = {
 	WLAN_ELEMID_QUIET_CHANNEL,
 	WLAN_ELEMID_TWT,
 	WLAN_ELEMID_VHT_TX_PWR_ENVLP,
-#ifdef WLAN_FEATURE_11AX_BSS_COLOR
-	/*
-	 * EID: 221 vendor IE is being used temporarily by 11AX
-	 * bss-color-change IE till it gets any fixed number. This
-	 * vendor EID needs to be replaced with bss-color-change IE
-	 * number.
-	 */
-	WLAN_ELEMID_VENDOR,
-#endif
 };
 
 /*
@@ -209,6 +200,9 @@ static const int beacon_filter_extn_table[] = {
 	WLAN_EXTN_ELEMID_MUEDCA,
 #ifdef WLAN_FEATURE_11BE
 	WLAN_EXTN_ELEMID_EHTOP,
+#endif
+#ifdef WLAN_FEATURE_11AX_BSS_COLOR
+	WLAN_EXTN_ELEMID_BSS_COLOR_CHANGE_ANNOUNCE,
 #endif
 };
 

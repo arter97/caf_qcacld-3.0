@@ -51,6 +51,9 @@ void pmo_register_wow_wakeup_events(struct wlan_objmgr_vdev *vdev)
 	switch (vdev_opmode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
+		pmo_set_wow_event_bitmap(WOW_BEACON_EVENT,
+					 PMO_WOW_MAX_EVENT_BM_LEN,
+					 event_bitmap);
 		/* set power on failure event only for STA and P2P_CLI mode*/
 		psoc_ctx =  pmo_vdev_get_psoc_priv(vdev);
 		if (psoc_ctx->psoc_cfg.auto_power_save_fail_mode ==
