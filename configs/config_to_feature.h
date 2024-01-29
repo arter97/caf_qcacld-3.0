@@ -1158,6 +1158,9 @@
 #ifdef CONFIG_IPA_OFFLOAD
 #define IPA_OPT_WIFI_DP (1)
 #endif
+#ifdef CONFIG_IPA_OPT_WIFI_DP_CTRL
+#define IPA_OPT_WIFI_DP_CTRL (1)
+#endif
 #endif
 #ifdef CONFIG_WDI3_IPA_OVER_GSI
 #define IPA_WDI3_GSI (1)

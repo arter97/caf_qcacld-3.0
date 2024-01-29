@@ -2112,6 +2112,11 @@ config QCA_WIFI_WCN7750
 	bool "Enable QCA_WIFI_WCN7750"
 	default n
 
+config IPA_OPT_WIFI_DP_CTRL
+	bool "Enable IPA_OPT_WIFI_DP_CTRL"
+	depends on IPA_OPT_WIFI_DP
+	default n
+
 menu "Optional Configs"
 
 if CNSS_KIWI_V2
