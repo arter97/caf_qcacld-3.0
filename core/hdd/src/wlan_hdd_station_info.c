@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1793,14 +1793,33 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 	struct cdp_peer_stats *peer_stats;
 	struct cds_vdev_dp_stats dp_stats;
 	struct stats_event *stats;
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_objmgr_vdev *vdev = NULL;
 	QDF_STATUS status;
 	int i, ret = 0;
+
+	peer = wlan_objmgr_get_peer_by_mac(adapter->hdd_ctx->psoc,
+					   stainfo->sta_mac.bytes,
+					   WLAN_OSIF_STATS_ID);
+	if (!peer) {
+		hdd_err("Peer not found with MAC " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(stainfo->sta_mac.bytes));
+		return -EINVAL;
+	}
+
+	vdev = wlan_peer_get_vdev(peer);
+
+	if (!vdev) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
+		return -EINVAL;
+	}
+	wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 
 	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
 	if (!peer_stats)
 		return -ENOMEM;
 
-	status = cdp_host_get_peer_stats(soc, adapter->deflink->vdev_id,
+	status = cdp_host_get_peer_stats(soc, wlan_vdev_get_id(vdev),
 					 stainfo->sta_mac.bytes, peer_stats);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("cdp_host_get_peer_stats failed");
@@ -1819,7 +1838,7 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 	qdf_mem_free(peer_stats);
 	peer_stats = NULL;
 
-	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(adapter->deflink->vdev,
+	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(vdev,
 							 stainfo->sta_mac.bytes,
 							 &ret);
 	if (ret || !stats) {
@@ -1828,7 +1847,7 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	if (cds_dp_get_vdev_stats(adapter->deflink->vdev_id, &dp_stats))
+	if (cds_dp_get_vdev_stats(wlan_vdev_get_id(vdev), &dp_stats))
 		stainfo->tx_retry_succeed =
 					dp_stats.tx_mpdu_success_with_retries;
 	else
