@@ -73,7 +73,13 @@ QDF_STATUS ll_lt_sap_get_sorted_user_config_acs_ch_list(
 	if (!filter)
 		goto rel_ref;
 
-	wlan_sap_get_user_config_acs_ch_list(vdev_id, filter);
+	status = wlan_sap_get_user_config_acs_ch_list(vdev_id, filter);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ll_sap_err("vdev %d failed to get user config acs ch_list",
+			   vdev_id);
+		qdf_mem_free(filter);
+		goto rel_ref;
+	}
 
 	list = wlan_scan_get_result(pdev, filter);
 
@@ -83,6 +89,11 @@ QDF_STATUS ll_lt_sap_get_sorted_user_config_acs_ch_list(
 		goto rel_ref;
 
 	status = wlan_ll_sap_sort_channel_list(vdev_id, list, ch_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ll_sap_err("vdev %d failed to sort sap channel list",
+			   vdev_id);
+		goto rel_ref;
+	}
 
 	wlan_scan_purge_results(list);
 

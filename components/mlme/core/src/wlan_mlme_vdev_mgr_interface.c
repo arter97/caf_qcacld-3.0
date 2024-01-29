@@ -2372,11 +2372,11 @@ void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
 #endif
 #endif
 
-void
+QDF_STATUS
 wlan_sap_get_user_config_acs_ch_list(uint8_t vdev_id,
 				     struct scan_filter *filter)
 {
-	wlansap_get_user_config_acs_ch_list(vdev_id, filter);
+	return wlansap_get_user_config_acs_ch_list(vdev_id, filter);
 }
 
 static struct vdev_mlme_ops sta_mlme_ops = {

@@ -4413,15 +4413,21 @@ QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
 				     struct sap_sel_ch_info *ch_info)
 {
 	struct mac_context *mac_ctx;
+	QDF_STATUS status;
 
 	mac_ctx = sap_get_mac_context();
 	if (!mac_ctx) {
 		sap_err("Invalid MAC context");
-		return QDF_STATUS_E_FAILURE;
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	sap_sort_channel_list(mac_ctx, vdev_id, list,
-			      ch_info, NULL, NULL);
+	status = sap_sort_channel_list(mac_ctx, vdev_id, list,
+				       ch_info, NULL, NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_err("vdev %d failed to sort sap channel list",
+			vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4431,8 +4437,8 @@ void wlansap_free_chan_info(struct sap_sel_ch_info *ch_param)
 	sap_chan_sel_exit(ch_param);
 }
 
-void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
-					 struct scan_filter *filter)
+QDF_STATUS wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
+					       struct scan_filter *filter)
 {
 	struct mac_context *mac_ctx;
 	struct sap_context *sap_ctx;
@@ -4441,31 +4447,33 @@ void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 	mac_ctx = sap_get_mac_context();
 	if (!mac_ctx) {
 		sap_err("Invalid MAC context");
-		return;
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	if (vdev_id >= SAP_MAX_NUM_SESSION)
-		return;
+		return QDF_STATUS_E_INVAL;
 
 	sap_ctx = mac_ctx->sap.sapCtxList[vdev_id].sap_context;
 
 	if (!sap_ctx) {
 		sap_err("vdev %d sap_ctx is NULL", vdev_id);
-		return;
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	if (!sap_ctx->acs_cfg) {
 		sap_err("vdev %d acs_cfg is NULL", vdev_id);
-		return;
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	ch_count = sap_ctx->acs_cfg->master_ch_list_count;
 
 	if (!ch_count || ch_count > NUM_CHANNELS)
-		return;
+		return QDF_STATUS_E_INVAL;
 
 	filter->num_of_channels = ch_count;
 	qdf_mem_copy(filter->chan_freq_list, sap_ctx->acs_cfg->master_freq_list,
 		     filter->num_of_channels *
 		     sizeof(filter->chan_freq_list[0]));
+
+	return QDF_STATUS_SUCCESS;
 }

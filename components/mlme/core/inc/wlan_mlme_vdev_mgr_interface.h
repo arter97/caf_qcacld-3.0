@@ -672,10 +672,10 @@ void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
  * @vdev_id: Vdev Id
  * @filter: Filter to apply to get scan result
  *
- * Return: None
+ * Return: QDF_STATUS
  *
  */
-void
+QDF_STATUS
 wlan_sap_get_user_config_acs_ch_list(uint8_t vdev_id,
 				     struct scan_filter *filter);
 #endif

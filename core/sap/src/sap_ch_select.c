@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2855,9 +2855,10 @@ sap_acs_next_lower_bandwidth(enum phy_ch_width ch_width)
 	return wlan_reg_get_next_lower_bandwidth(ch_width);
 }
 
-void sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
-			   qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
-			   v_REGDOMAIN_t *domain, uint32_t *operating_band)
+QDF_STATUS
+sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
+		      qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
+		      v_REGDOMAIN_t *domain, uint32_t *operating_band)
 {
 	uint8_t country[CDS_COUNTRY_CODE_LEN + 1];
 	struct sap_context *sap_ctx;
@@ -2866,12 +2867,17 @@ void sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
 	uint32_t op_band;
 
 	sap_ctx = mac_ctx->sap.sapCtxList[vdev_id].sap_context;
+	if (!sap_ctx->acs_cfg) {
+		sap_err("vdev %d sap acs_cfg is null", vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
 	cur_bw = sap_ctx->acs_cfg->ch_width;
 
 	/* Initialize the structure pointed by spect_info */
 	if (!sap_chan_sel_init(mac_ctx, ch_info, sap_ctx, false)) {
 		sap_err("vdev %d ch select initialization failed", vdev_id);
-		return;
+		return SAP_CHANNEL_NOT_SELECTED;
 	}
 
 	/* Compute the weight of the entire spectrum in the operating band */
@@ -2897,6 +2903,8 @@ void sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
 		*domain = reg_domain;
 	if (operating_band)
 		*operating_band = op_band;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 uint32_t sap_select_channel(mac_handle_t mac_handle,
@@ -2914,11 +2922,17 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 	uint32_t operating_band = 0;
 	struct mac_context *mac_ctx;
 	uint32_t best_chan_freq = 0;
+	QDF_STATUS status;
 
 	mac_ctx = MAC_CONTEXT(mac_handle);
 
-	sap_sort_channel_list(mac_ctx, sap_ctx->vdev_id, scan_list,
-			      spect_info, &domain, &operating_band);
+	status = sap_sort_channel_list(mac_ctx, sap_ctx->vdev_id, scan_list,
+				       spect_info, &domain, &operating_band);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_err("vdev %d failed to sort sap channel list",
+			sap_ctx->vdev_id);
+		return 0;
+	}
 
 	/*Loop till get the best channel in the given range */
 	for (count = 0; count < spect_info->num_ch; count++) {

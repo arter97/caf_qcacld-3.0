@@ -6765,6 +6765,12 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	config->chan_freq = wlan_ll_lt_sap_override_freq(hdd_ctx->psoc,
 							 link_info->vdev_id,
 							 config->chan_freq);
+	if (!config->chan_freq) {
+		hdd_err("vdev %d invalid ch_freq: %d", link_info->vdev_id,
+			config->chan_freq);
+		ret = -EINVAL;
+		goto error;
+	}
 
 	if (!ret && wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, config->chan_freq))
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;

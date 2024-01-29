@@ -406,7 +406,7 @@ struct sap_ch_change_rsp {
  * struct ch_switch_started_notify - channel switch started notify
  * @vdev_id: vdev_id
  * @freq: Frequency
- * @ch_width: channel width
+ * @ch_params: ch_params
  *
  */
 struct ch_switch_started_notify {
@@ -2005,10 +2005,10 @@ void wlansap_free_chan_info(struct sap_sel_ch_info *ch_param);
  * @vdev_id: Vdev Id
  * @filter: Filter to apply to get scan result
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
-					 struct scan_filter *filter);
+QDF_STATUS wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
+					       struct scan_filter *filter);
 #ifdef __cplusplus
 }
 #endif
