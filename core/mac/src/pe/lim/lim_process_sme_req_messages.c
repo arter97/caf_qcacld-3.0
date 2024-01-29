@@ -5589,23 +5589,6 @@ QDF_STATUS cm_process_preauth_req(struct scheduler_msg *msg)
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BE
-static uint16_t
-lim_get_punc_chan_bit_map(struct pe_session *session)
-{
-	if (session->eht_op.disabled_sub_chan_bitmap_present)
-		return *(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
-
-	return 0;
-}
-#else
-static inline uint16_t
-lim_get_punc_chan_bit_map(struct pe_session *session)
-{
-	return 0;
-}
-#endif
-
 /**
  * lim_get_eirp_320_power_from_tpe_ie() - To get eirp power for 320 MHZ
  * @tpe: transmit power env Ie advertised by AP
