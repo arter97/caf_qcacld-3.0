@@ -10471,7 +10471,23 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 		adapter->monitor_mode_vdev_up_in_progress = true;
 		mon_ctx = WLAN_HDD_GET_MONITOR_CTX_PTR(link_info);
 
-		if (!wlan_vdev_is_up_active_state(link_info->vdev)) {
+		if (!mon_ctx->freq) {
+			if (QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up_active_state(link_info->vdev))) {
+				hdd_debug("Del vdev %d", link_info->vdev_id);
+				wlan_hdd_delete_mon_link(adapter, link_info);
+			}
+			adapter->monitor_mode_vdev_up_in_progress = false;
+			return 0;
+		} else if (wlan_hdd_validate_vdev_id(link_info->vdev_id)) {
+			hdd_debug("Create mon vdev");
+			ret = hdd_vdev_create(link_info);
+			if (ret) {
+				adapter->monitor_mode_vdev_up_in_progress = false;
+				return ret;
+			}
+
+			wlan_hdd_init_mon_link(hdd_ctx, link_info);
+		} else if (QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up_active_state(link_info->vdev))) {
 			des_chan = wlan_vdev_mlme_get_des_chan(link_info->vdev);
 			if (des_chan->ch_freq == mon_ctx->freq &&
 			    des_chan->ch_width == mon_ctx->bandwidth) {
@@ -10514,8 +10530,10 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 		qdf_mem_zero(&ch_params, sizeof(struct ch_params));
 
 		req = qdf_mem_malloc(sizeof(struct channel_change_req));
-		if (!req)
+		if (!req) {
+			adapter->monitor_mode_vdev_up_in_progress = false;
 			return -ENOMEM;
+		}
 
 		req->vdev_id = link_info->vdev_id;
 		req->target_chan_freq = mon_ctx->freq;

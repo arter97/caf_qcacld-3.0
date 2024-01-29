@@ -1305,7 +1305,6 @@ void hdd_print_netdev_txq_status(struct net_device *dev)
 }
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
-static
 QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
 				  struct wlan_hdd_link_info *link_info)
 {

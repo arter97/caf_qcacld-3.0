@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -285,8 +285,31 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		enum netif_action_type action, enum netif_reason_type reason);
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
+/**
+ * wlan_hdd_init_mon_link() -Initialize mon link
+ * @hdd_ctx: HDD Context handle
+ * @link_info: Link Information.
+ *
+ * Return: 0 for success; non-zero for failure
+ */
+QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
+				  struct wlan_hdd_link_info *link_info);
+
+/**
+ * hdd_set_mon_rx_cb() - Set Monitor mode Rx callback
+ * @dev:        Pointer to net_device structure
+ *
+ * Return: 0 for success; non-zero for failure
+ */
 int hdd_set_mon_rx_cb(struct net_device *dev);
 #else
+static inline
+QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
+				  struct wlan_hdd_link_info *link_info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline
 int hdd_set_mon_rx_cb(struct net_device *dev)
 {
