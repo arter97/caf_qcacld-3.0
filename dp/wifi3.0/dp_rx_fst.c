@@ -594,13 +594,17 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 			HAL_IP_DA_SA_PREFIX_IPV4_COMPATIBLE_IPV6;
 	}
 
+	qdf_spin_lock_bh(&fst->fst_lock);
+
 	/* Allocate entry in DP FST */
 	ret = dp_rx_flow_alloc_entry(pdev, fst, rx_flow_info, &flow, &fse);
 	if (ret == -1) {
 		dp_err("RX FSE alloc failed");
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
+		qdf_spin_unlock_bh(&fst->fst_lock);
 		return QDF_STATUS_E_NOMEM;
 	} else if (ret == 1) {
+		qdf_spin_unlock_bh(&fst->fst_lock);
 		return dp_rx_flow_invalidate_fse_entry(pdev, fse, rx_flow_info,
 						       true);
 	} else {
@@ -638,15 +642,23 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
 		/* Free up the FSE entry as returning failure */
 		fse->is_valid = false;
+		qdf_spin_unlock_bh(&fst->fst_lock);
 		return QDF_STATUS_E_EXISTS;
 	}
 
 	/* Increment number of valid entries in table */
 	fst->num_entries++;
+
+	if (rx_flow_info->is_addr_ipv4)
+		fst->ipv4_fse_cnt++;
+	else
+		fst->ipv6_fse_cnt++;
+
 	dp_info("FST num_entries = %d, reo_dest_ind = %d, reo_dest_hand = %u",
 		fst->num_entries, flow.reo_destination_indication,
 		flow.reo_destination_handler);
 
+	qdf_spin_unlock_bh(&fst->fst_lock);
 	return dp_rx_flow_invalidate_fse_entry(pdev, fse, rx_flow_info, true);
 }
 
@@ -668,6 +680,7 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 
 	fst = pdev->rx_fst;
 
+	qdf_spin_lock_bh(&fst->fst_lock);
 	/* Find the given flow entry DP FST */
 	fse = dp_rx_flow_find_entry_by_tuple(soc->hal_soc, fst,
 					     rx_flow_info, &flow);
@@ -675,6 +688,7 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	if (!fse || (fse->is_valid == false)) {
 		dp_err("RX flow delete entry failed");
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
+		qdf_spin_unlock_bh(&fst->fst_lock);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -710,6 +724,12 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	/* Decrement number of valid entries in table */
 	fst->num_entries--;
 
+	if (rx_flow_info->is_addr_ipv4)
+		fst->ipv4_fse_cnt--;
+	else
+		fst->ipv6_fse_cnt--;
+
+	qdf_spin_unlock_bh(&fst->fst_lock);
 	return dp_rx_flow_invalidate_fse_entry(pdev, fse, rx_flow_info, false);
 }
 
@@ -946,10 +966,8 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 		qdf_atomic_set(&fst->is_cache_update_pending, false);
 	}
 
-	qdf_atomic_init(&soc->ipv4_fse_cnt);
-	qdf_atomic_init(&soc->ipv6_fse_cnt);
-
 	dp_rx_ppe_fse_register();
+	qdf_spinlock_create(&fst->fst_lock);
 
 	QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_INFO,
 		  "Rx FST attach successful, #entries:%d\n",
@@ -991,6 +1009,8 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 		qdf_mem_free(dp_fst->base);
 		qdf_mem_free(dp_fst);
 	}
+
+	qdf_spinlock_destroy(&dp_fst->fst_lock);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 		  "Rx FST detached for pdev %u\n", pdev->pdev_id);
