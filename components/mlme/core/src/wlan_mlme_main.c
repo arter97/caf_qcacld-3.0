@@ -3261,6 +3261,8 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_subnet_detection(psoc, lfr);
 	lfr->rso_user_config.cat_rssi_offset = DEFAULT_RSSI_DB_GAP;
 	mlme_init_bmiss_timeout(psoc, lfr);
+	lfr->hs20_btm_offload_disable = cfg_get(psoc,
+						CFG_HS_20_BTM_OFFLOAD_DISABLE);
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,

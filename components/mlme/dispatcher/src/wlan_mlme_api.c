@@ -8343,3 +8343,21 @@ rel_pdev:
 	return status;
 }
 #endif
+
+QDF_STATUS
+wlan_mlme_is_hs_20_btm_offload_disabled(struct wlan_objmgr_psoc *psoc,
+					bool *val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*val = cfg_default(CFG_HS_20_BTM_OFFLOAD_DISABLE);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = mlme_obj->cfg.lfr.hs20_btm_offload_disable;
+
+	return QDF_STATUS_SUCCESS;
+}
+
