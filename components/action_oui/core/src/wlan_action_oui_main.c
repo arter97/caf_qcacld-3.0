@@ -283,6 +283,10 @@ static QDF_STATUS action_oui_send_config(struct wlan_objmgr_psoc *psoc)
 	for (id = 0; id < ACTION_OUI_MAXIMUM_ID; id++) {
 		if (id >= ACTION_OUI_HOST_ONLY)
 			continue;
+		if (id == ACTION_OUI_CONNECT_1X1 &&
+		    policy_mgr_is_hw_dbs_2x2_capable(psoc)) {
+			continue;
+		}
 		status = action_oui_send(psoc_priv, id);
 		if (!QDF_IS_STATUS_SUCCESS(status))
 			action_oui_err("Failed to send: %u", id);
