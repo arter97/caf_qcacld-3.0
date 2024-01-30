@@ -2315,6 +2315,8 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 						    tid, q_idx);
 				dp_sawf_dump_tx_stats(src);
 				dp_sawf_copy_tx_stats(dst, src);
+				dst->tid = tid;
+				dst->msduq = q_idx;
 
 				dst++;
 			}
