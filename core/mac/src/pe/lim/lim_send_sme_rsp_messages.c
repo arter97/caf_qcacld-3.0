@@ -2344,10 +2344,12 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 			WLAN_PE_DIAG_SWITCH_CHL_IND_EVENT, session_entry,
 			QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
 #endif
+free:
+	qdf_mem_free(csa_params);
+	return;
 send_event:
 	if (send_status)
 		wlan_mlme_send_csa_event_status_ind(session_entry->vdev, 0);
-free:
 	qdf_mem_free(csa_params);
 }
 
