@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1690,6 +1690,11 @@ target_if_set_pdev_stats_update_period(struct wlan_objmgr_psoc *psoc,
 	struct pdev_params pdev_param = {0};
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+
+	if (!wmi_handle) {
+		cp_stats_err("wmi_handle is null");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	pdev_param.param_id = wmi_pdev_param_pdev_stats_update_period;
 	pdev_param.param_value = val;
