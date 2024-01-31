@@ -15195,6 +15195,14 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 
 	if (opmode == QDF_SAP_MODE) {
 		link_info = adapter->deflink;
+
+		/* For multi link sap, link_addr is from hostapd,
+		 * In SSR, link_addr is needed for recover sap, so
+		 * not to clear it.
+		 */
+		if (cds_is_driver_recovering())
+			return QDF_STATUS_SUCCESS;
+
 		qdf_copy_macaddr(&link_info->link_addr, &adapter->mac_addr);
 		return QDF_STATUS_SUCCESS;
 	}
