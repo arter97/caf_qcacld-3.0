@@ -1142,6 +1142,7 @@ struct hdd_monitor_ctx {
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
  * @ch_chng_info: Channel change info
+ * @sap_stop_bss_work: stop sap work
  */
 struct wlan_hdd_link_info {
 	struct hdd_adapter *adapter;
@@ -1184,6 +1185,7 @@ struct wlan_hdd_link_info {
 
 	unsigned long link_flags;
 	struct freq_change_info ch_chng_info;
+	struct work_struct  sap_stop_bss_work;
 };
 
 /**
@@ -1235,7 +1237,6 @@ struct wlan_hdd_tx_power {
  * @cache_sta_info_list:
  * @cache_sta_count: number of currently cached stations
  * @wapi_info:
- * @sap_stop_bss_work:
  * @tsf: structure containing tsf related information
  * @mc_addr_list: multicast address list
  * @mc_list_lock: spin lock for multicast list
@@ -1384,8 +1385,6 @@ struct hdd_adapter {
 #ifdef FEATURE_WLAN_WAPI
 	struct hdd_wapi_info wapi_info;
 #endif
-
-	struct work_struct  sap_stop_bss_work;
 
 #ifdef WLAN_FEATURE_TSF
 	struct hdd_vdev_tsf tsf;
@@ -3788,7 +3787,16 @@ QDF_STATUS hdd_post_cds_enable_config(struct hdd_context *hdd_ctx);
 
 QDF_STATUS hdd_abort_mac_scan_all_adapters(struct hdd_context *hdd_ctx);
 
-void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter);
+/**
+ * wlan_hdd_stop_sap() - This function stops bss of SAP.
+ * @link_info: pointer of hdd link info
+ *
+ * This function will stop the sap of current link. and it will notify
+ * kernel that sap stopped.
+ *
+ * Return: None
+ */
+void wlan_hdd_stop_sap(struct wlan_hdd_link_info *link_info);
 
 /**
  * wlan_hdd_start_sap() - this function starts bss of SAP.

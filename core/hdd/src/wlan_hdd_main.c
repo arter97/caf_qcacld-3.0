@@ -9175,8 +9175,6 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 
 	hdd_init_completion(adapter);
 	INIT_WORK(&adapter->scan_block_work, wlan_hdd_cfg80211_scan_block_cb);
-	INIT_WORK(&adapter->sap_stop_bss_work,
-		  hdd_stop_sap_due_to_invalid_channel);
 	qdf_list_create(&adapter->blocked_scan_request_q, WLAN_MAX_SCAN_COUNT);
 	qdf_mutex_create(&adapter->blocked_scan_request_q_lock);
 	qdf_spinlock_create(&adapter->mc_list_lock);
@@ -9796,7 +9794,7 @@ static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
 		hdd_stop_and_close_pre_cac_adapter(hdd_ctx, vdev);
 	}
 	wlansap_cleanup_cac_timer(sap_ctx);
-	cds_flush_work(&adapter->sap_stop_bss_work);
+	cds_flush_work(&link_info->sap_stop_bss_work);
 
 	if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
 		hdd_info("ACS in progress, wait for complete");
@@ -18789,36 +18787,29 @@ static void hdd_inform_stop_sap(struct hdd_adapter *adapter)
 }
 #endif
 
-/**
- * wlan_hdd_stop_sap() - This function stops bss of SAP.
- * @ap_adapter: SAP adapter
- *
- * This function will process the stopping of sap adapter.
- *
- * Return: None
- */
-void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
+void wlan_hdd_stop_sap(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct hdd_hostapd_state *hostapd_state;
 	QDF_STATUS qdf_status;
 	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *ap_adapter = link_info->adapter;
 
 	if (!ap_adapter) {
 		hdd_err("ap_adapter is NULL here");
 		return;
 	}
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		wlan_hdd_del_station(ap_adapter, NULL);
 		hostapd_state =
-			WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
+			WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 		hdd_debug("Now doing SAP STOPBSS");
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(hdd_ap_ctx->
@@ -18832,10 +18823,10 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
 				return;
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->deflink->link_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 						ap_adapter->device_mode,
-						ap_adapter->deflink->vdev_id);
+						link_info->vdev_id);
 		hdd_green_ap_start_state_mc(hdd_ctx, ap_adapter->device_mode,
 					    false);
 		hdd_inform_stop_sap(ap_adapter);

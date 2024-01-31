@@ -122,7 +122,7 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 
 		/* stop sap if got invalid freq or width */
 		if (tgt_freq == 0 || tgt_width == CH_WIDTH_INVALID) {
-			schedule_work(&adapter->sap_stop_bss_work);
+			schedule_work(&link_info->sap_stop_bss_work);
 			return QDF_STATUS_SUCCESS;
 		}
 

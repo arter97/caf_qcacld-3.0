@@ -43,7 +43,7 @@ static void wlan_hdd_pre_cac_failure(struct hdd_adapter *adapter)
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	wlan_hdd_stop_sap(adapter);
+	wlan_hdd_stop_sap(adapter->deflink);
 	hdd_stop_adapter(hdd_ctx, adapter);
 
 	hdd_exit();

@@ -1719,19 +1719,21 @@ exit:
 
 void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work)
 {
-	struct hdd_adapter *sap_adapter = container_of(work, struct hdd_adapter,
-						       sap_stop_bss_work);
+	struct wlan_hdd_link_info *link_info =
+				container_of(work, struct wlan_hdd_link_info,
+					     sap_stop_bss_work);
 	struct osif_vdev_sync *vdev_sync;
 	struct sap_context *sap_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
 
-	if (osif_vdev_sync_op_start(sap_adapter->dev, &vdev_sync))
+	if (osif_vdev_sync_op_start(adapter->dev, &vdev_sync))
 		return;
 
 	hdd_debug("work started for sap session[%d]",
-		  sap_adapter->deflink->vdev_id);
+		  link_info->vdev_id);
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(sap_adapter->deflink);
-	wlan_hdd_stop_sap(sap_adapter);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+	wlan_hdd_stop_sap(link_info);
 	wlansap_cleanup_cac_timer(sap_ctx);
 	hdd_debug("work finished for sap");
 
@@ -3341,7 +3343,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 	case eSAP_STOP_BSS_DUE_TO_NO_CHNL:
 		hdd_debug("Stop sap session[%d]",
 			  link_info->vdev_id);
-		schedule_work(&adapter->sap_stop_bss_work);
+		schedule_work(&link_info->sap_stop_bss_work);
 		return QDF_STATUS_SUCCESS;
 
 	case eSAP_CHANNEL_SWITCH_STARTED_NOTIFY:
@@ -3393,7 +3395,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			 */
 			hdd_debug("SAP[vdev%d] channel switch fail, will stop",
 				  link_info->vdev_id);
-			schedule_work(&adapter->sap_stop_bss_work);
+			schedule_work(&link_info->sap_stop_bss_work);
 			return QDF_STATUS_SUCCESS;
 		} else {
 			return hdd_hostapd_chan_change(link_info, sap_event);
@@ -4024,7 +4026,7 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 
 	if (sap_ctx->csa_reason == CSA_REASON_UNSAFE_CHANNEL) {
 		if (restriction_mask & BIT(QDF_SAP_MODE)) {
-			schedule_work(&adapter->sap_stop_bss_work);
+			schedule_work(&adapter->deflink->sap_stop_bss_work);
 		} else {
 			unsafe_chan_count = unsafe_ch_list->chan_cnt;
 			qdf_copy_macaddr(&bssid, &adapter->mac_addr);
@@ -4233,7 +4235,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 							      &csa_reason);
 #endif
 		if (!intf_ch_freq) {
-			schedule_work(&ap_adapter->sap_stop_bss_work);
+			schedule_work(&link_info->sap_stop_bss_work);
 			wlansap_context_put(sap_context);
 			hdd_debug("vdev %d stop ll_lt_sap, no channel found for csa",
 				  vdev_id);
@@ -4309,7 +4311,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		    policy_mgr_valid_sap_conc_channel_check(
 		    hdd_ctx->psoc, &intf_ch_freq, sap_ch_freq, vdev_id,
 		    &ch_params))) {
-			schedule_work(&ap_adapter->sap_stop_bss_work);
+			schedule_work(&link_info->sap_stop_bss_work);
 			wlansap_context_put(sap_context);
 			hdd_debug("can't move sap to chan(freq): %u, stopping SAP",
 				  intf_ch_freq);
@@ -4739,6 +4741,9 @@ QDF_STATUS hdd_init_ap_mode(struct wlan_hdd_link_info *link_info,
 		qdf_mem_zero(&link_info->session.ap.sap_config.acs_cfg,
 			     sizeof(struct sap_acs_cfg));
 	}
+
+	INIT_WORK(&link_info->sap_stop_bss_work,
+		  hdd_stop_sap_due_to_invalid_channel);
 
 	hdd_exit();
 
@@ -7638,7 +7643,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	}
 	policy_mgr_flush_deferred_csa(hdd_ctx->psoc,
 				      link_info->vdev_id);
-	cds_flush_work(&adapter->sap_stop_bss_work);
+	cds_flush_work(&link_info->sap_stop_bss_work);
+
 	ap_ctx->sap_config.acs_cfg.acs_mode = false;
 	hdd_dcs_clear(adapter);
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
