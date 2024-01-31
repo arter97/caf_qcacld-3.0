@@ -8927,6 +8927,13 @@ void hdd_adapter_disable_all_links(struct hdd_adapter *adapter)
 	uint8_t idx_pos;
 	struct wlan_hdd_link_info *link_info;
 
+	/* For multi link sap, active_links is used to restore
+	 * sap in SSR, and clear link info for rmmod. so
+	 * not clear it.
+	 */
+	if (adapter->device_mode == QDF_SAP_MODE)
+		return;
+
 	hdd_adapter_for_each_link_info(adapter, link_info) {
 		qdf_zero_macaddr(&link_info->link_addr);
 		idx_pos = hdd_adapter_get_index_of_link_info(link_info);
