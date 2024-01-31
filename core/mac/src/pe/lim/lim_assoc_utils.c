@@ -61,6 +61,9 @@
 #include <cdp_txrx_cmn.h>
 #include <lim_mlo.h>
 #include "wlan_ll_sap_api.h"
+#include "sir_mac_prot_def.h"
+#include "wlan_action_oui_public_struct.h"
+#include "wlan_action_oui_main.h"
 
 /**
  * lim_cmp_ssid() - utility function to compare SSIDs
@@ -3672,6 +3675,38 @@ void lim_sta_add_bss_update_ht_parameter(uint32_t bss_chan_freq,
 		add_bss->ch_width = CH_WIDTH_20MHZ;
 }
 
+/**
+ * lim_limit_bw_for_iot_ap() - limit sta vdev band width for iot ap
+ *@mac_ctx: mac context
+ *@session: pe session
+ *@bss_desc: bss descriptor
+ *
+ * When connect IoT AP, limit sta vdev band width
+ *
+ * Return: None
+ */
+static void
+lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
+			struct pe_session *session,
+			struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr;
+	uint16_t ie_len;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+
+	if (wlan_action_oui_search(mac_ctx->psoc,
+				   &vendor_ap_search_attr,
+				   ACTION_OUI_LIMIT_BW)) {
+		pe_debug("Limit vdev %d bw to 40M for IoT AP",
+			 session->vdev_id);
+		wma_set_vdev_bw(session->vdev_id, eHT_CHANNEL_WIDTH_40MHZ);
+	}
+}
+
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp,
 				   tpSchBeaconStruct pBeaconStruct,
 				   struct bss_description *bssDescription,
@@ -4122,6 +4157,8 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		       retCode);
 	}
 	qdf_mem_free(pAddBssParams);
+
+	lim_limit_bw_for_iot_ap(mac, pe_session, bssDescription);
 
 returnFailure:
 	/* Clean-up will be done by the caller... */

@@ -4532,6 +4532,22 @@ send_fail_resp:
 }
 #endif
 
+QDF_STATUS wma_set_vdev_bw(uint8_t vdev_id, uint8_t bw)
+{
+	QDF_STATUS status;
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma)
+		return QDF_STATUS_E_INVAL;
+
+	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
+				    wmi_vdev_param_chwidth, bw);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("failed to set vdev bw, status: %d", status);
+
+	return status;
+}
+
 QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 {
 	struct wma_target_req *msg;
