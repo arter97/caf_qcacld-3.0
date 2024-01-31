@@ -86,29 +86,31 @@ void wlan_print_service_class(struct wlan_sawf_svc_class_params *params)
 	char buf[512];
 	int nb;
 
-	nb = snprintf(buf, sizeof(buf), "\n%s\nService ID: %d\nApp Name: %s\n"
+	nb = snprintf(buf, sizeof(buf), "\n%s\nService ID: %d\n"
+		      "Service Class Type: %d\nApp Name: %s\n"
 		      "Min throughput: %d\nMax throughput: %d\n"
 		      "Burst Size: %d\nService Interval: %d\n"
 		      "Delay Bound: %d\nMSDU TTL: %d\nPriority: %d\n"
 		      "TID: %d\nMSDU Loss Rate: %d\n"
 		      "UL Burst Size: %d\nUL Service Interval: %d\n"
 		      "UL Min throughput: %d\nUL Max Latency: %d\n"
-		      "Service class type: %d\nRef Count: %d\nPeer Count: %d\n"
+		      "Ref Count: %d\nPeer Count: %d\n"
 		      "Disabled_Modes: %u\nEnabled Params Mask: 0x%04X\n"
-		      "[def %u|scs %u|epcs %u]",
+		      "[def %u|scs %u|epcs %u|stc %u]",
 		      SAWF_LINE_FORMAT,
-		      params->svc_id, params->app_name,
+		      params->svc_id, params->svc_type, params->app_name,
 		      params->min_thruput_rate, params->max_thruput_rate,
 		      params->burst_size, params->service_interval,
 		      params->delay_bound, params->msdu_ttl, params->priority,
 		      params->tid, params->msdu_rate_loss,
 		      params->ul_burst_size, params->ul_service_interval,
 		      params->ul_min_tput, params->ul_max_latency,
-		      params->type, params->ref_count, params->peer_count,
+		      params->ref_count, params->peer_count,
 		      params->disabled_modes, params->enabled_param_mask,
 		      params->type_ref_count[WLAN_SAWF_SVC_TYPE_DEF],
 		      params->type_ref_count[WLAN_SAWF_SVC_TYPE_SCS],
-		      params->type_ref_count[WLAN_SAWF_SVC_TYPE_EPCS]);
+		      params->type_ref_count[WLAN_SAWF_SVC_TYPE_EPCS],
+		      params->type_ref_count[WLAN_SAWF_SVC_TYPE_STC]);
 
 	if (nb > 0 && nb >= sizeof(buf))
 		sawf_err("Small buffer (buffer size %zu required size %d)",
@@ -229,6 +231,7 @@ void wlan_update_sawf_params_nolock(struct wlan_sawf_svc_class_params *params)
 
 	new_param = &sawf->svc_classes[params->svc_id - 1];
 	new_param->svc_id = params->svc_id;
+	new_param->svc_type = params->svc_type;
 	new_param->min_thruput_rate = params->min_thruput_rate;
 	new_param->max_thruput_rate = params->max_thruput_rate;
 	new_param->burst_size = params->burst_size;
@@ -633,9 +636,9 @@ uint8_t wlan_service_id_get_type_nolock(uint8_t svc_id)
 	}
 
 	if (wlan_service_id_configured_nolock(svc_id))
-		return sawf->svc_classes[svc_id - 1].type;
+		return sawf->svc_classes[svc_id - 1].svc_type;
 err:
-	return SAWF_INVALID_TYPE;
+	return WLAN_SAWF_SVC_TYPE_INVALID;
 }
 
 qdf_export_symbol(wlan_service_id_get_type_nolock);
@@ -656,7 +659,7 @@ uint8_t wlan_service_id_get_type(uint8_t svc_id)
 	qdf_spin_unlock_bh(&sawf->lock);
 	return type;
 err:
-	return SAWF_INVALID_TYPE;
+	return WLAN_SAWF_SVC_TYPE_INVALID;
 }
 
 qdf_export_symbol(wlan_service_id_get_type);
@@ -671,7 +674,7 @@ void wlan_service_id_set_type_nolock(uint8_t svc_id, uint8_t type)
 		return;
 	}
 
-	sawf->svc_classes[svc_id - 1].type = type;
+	sawf->svc_classes[svc_id - 1].svc_type = type;
 }
 
 qdf_export_symbol(wlan_service_id_set_type_nolock);
@@ -1319,6 +1322,7 @@ QDF_STATUS wlan_sawf_create_epcs_svc(void)
 		  svc->type_ref_count[WLAN_SAWF_SVC_TYPE_EPCS]);
 
 	svc->tid = EPCS_TID;
+	svc->svc_type = WLAN_SAWF_SVC_TYPE_EPCS;
 
 	if (!svc->configured) {
 		wlan_sawf_send_create_svc_to_target(svc);

@@ -139,12 +139,6 @@ enum sawf_rule_type {
 #define SAWF_MAX_MSDU_TTL (10 * 1000)
 
 /*
- * Priority limit 0 - 127.
- */
-#define SAWF_MIN_PRIORITY 0
-#define SAWF_MAX_PRIORITY 127
-
-/*
  * TID limit 0 - 7
  */
 #define SAWF_MIN_TID 0
@@ -161,11 +155,6 @@ enum sawf_rule_type {
 
 #define SAWF_INVALID_TID 0xFF
 
-#define SERVICE_CLASS_TYPE_SAWF     1
-#define SERVICE_CLASS_TYPE_SCS      2
-#define SERVICE_CLASS_TYPE_SAWF_SCS 3
-#define SAWF_INVALID_TYPE 0xFF
-
 #define SAWF_INVALID_SERVICE_CLASS_ID                  0xFF
 #define SAWF_SVC_CLASS_PARAM_DEFAULT_MIN_THRUPUT       0
 #define SAWF_SVC_CLASS_PARAM_DEFAULT_MAX_THRUPUT       0xFFFFFFFF
@@ -177,23 +166,55 @@ enum sawf_rule_type {
 #define SAWF_SVC_CLASS_PARAM_DEFAULT_TID               0xFFFFFFFF
 #define SAWF_SVC_CLASS_PARAM_DEFAULT_MSDU_LOSS_RATE    0
 
+#define WLAN_SAWF_SVC_TYPE_INVALID 0xFF
+
+/*
+ * Priority order of service class (from highest to lowest where lower value
+ * indicates higher priority):
+ * EPCS based service class
+ * User defined service class
+ * 11BE SCS based service class
+ * Machine learning STC based service class
+ */
+
+/*
+ * Priority range for user defined service classes: 0-127
+ */
+#define SAWF_DEF_MIN_PRIORITY 0
+#define SAWF_DEF_MAX_PRIORITY 127
+
+/*
+ * Default priority value for 11BE SCS based service class
+ */
+#define SAWF_SCS_SVC_CLASS_DEFAULT_PRIORITY (SAWF_DEF_MAX_PRIORITY + 1)
+
+/*
+ * Default priority value for STC based service class
+ */
+#define SAWF_STC_SVC_CLASS_DEFAULT_PRIORITY (SAWF_SCS_SVC_CLASS_DEFAULT_PRIORITY + 1)
+
+#define SAWF_MIN_PRIORITY SAWF_DEF_MIN_PRIORITY
+#define SAWF_MAX_PRIORITY SAWF_STC_SVC_CLASS_DEFAULT_PRIORITY
 /*
  * Enum for SAWF service class type
  * WLAN_SAWF_SVC_TYPE_DEF: Default service class type
  * WLAN_SAWF_SVC_TYPE_SCS: SCS type
  * WLAN_SAWF_SVC_TYPE_EPCS: EPCS type
+ * WLAN_SAWF_SVC_TYPE_STC: STC type
  * WLAN_SAWF_SVC_TYPE_MAX: Max service class type
  */
 enum wlan_sawf_svc_type {
 	WLAN_SAWF_SVC_TYPE_DEF,
 	WLAN_SAWF_SVC_TYPE_SCS,
 	WLAN_SAWF_SVC_TYPE_EPCS,
+	WLAN_SAWF_SVC_TYPE_STC,
 	WLAN_SAWF_SVC_TYPE_MAX,
 };
 
 /**
  * struct wlan_sawf_svc_class_params- Service Class Parameters
  * @svc_id: Service ID
+ * @svc_type: Service Class Type: SAWF/SCS/STC/EPCS
  * @app_name: Service class name
  * @min_thruput_rate: min throughput in kilobits per second
  * @max_thruput_rate: max throughput in kilobits per second
@@ -209,7 +230,6 @@ enum wlan_sawf_svc_type {
  * @ul_burst_size: Uplink Burst Size
  * @ul_min_tput: Uplink min_throughput
  * @ul_max_latency: Uplink max latency
- * @type: type of service class
  * @ref_count: Number of sawf/scs procedures using the service class
  * @peer_count: Number of peers having initialized a flow in this service class
  * @disabled_modes: Scheduler disable modes
@@ -219,6 +239,7 @@ enum wlan_sawf_svc_type {
 
 struct wlan_sawf_svc_class_params {
 	uint8_t svc_id;
+	uint8_t svc_type;
 	char app_name[WLAN_MAX_SVC_CLASS_NAME];
 	uint32_t min_thruput_rate;
 	uint32_t max_thruput_rate;
@@ -234,7 +255,6 @@ struct wlan_sawf_svc_class_params {
 	uint32_t ul_burst_size;
 	uint32_t ul_min_tput;
 	uint32_t ul_max_latency;
-	uint8_t type;
 	uint32_t ref_count;
 	uint32_t peer_count;
 	uint32_t disabled_modes;
