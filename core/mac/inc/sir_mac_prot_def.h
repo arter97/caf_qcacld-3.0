@@ -181,6 +181,19 @@
 /* min size of wme oui header: oui(3) + type + subtype + version */
 #define SIR_MAC_OUI_WME_HDR_MIN       6
 
+/* Multi-AP OUI definitions */
+#define SIR_MAC_MULTI_AP_OUI "\x50\x6f\x9a\x1b"
+#define SIR_MAC_MULTI_AP_OUI_SIZE 4
+#define SIR_MULTI_AP_ELEM_OFFSET  (2 + SIR_MAC_MULTI_AP_OUI_SIZE)
+
+#define SIR_MULTI_AP_EXT_SUB_TYPE   0x06
+#define SIR_MULTI_AP_FRONTHAUL_BSS  0x20
+#define SIR_MULTI_AP_BACKHAUL_STA   0x80
+#define SIR_MULTI_AP_OUI_R1_LEN     7
+#define SIR_MULTI_AP_EXT_SUB_LEN    1
+
+#define SIR_MAP_CAPABILITY_VAP_TYPE 2
+
 /* ----------------------------------------------------------------------------- */
 
 /* OFFSET definitions for fixed fields in Management frames */

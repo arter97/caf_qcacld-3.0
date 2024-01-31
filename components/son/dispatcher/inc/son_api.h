@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -358,6 +358,14 @@ void wlan_son_ind_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
 				QDF_STATUS status);
 
 /**
+ * wlan_get_multi_ap_cap() - get multi-ap cap
+ * @vdev: pointer to vdev
+ *
+ * Return: multi-ap cap which config by son
+ */
+int wlan_get_multi_ap_cap(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_son_deliver_tx_power() - notify son module of tx power
  * @vdev: vdev
  * @max_pwr: max power in dBm unit
@@ -474,6 +482,11 @@ void wlan_son_ind_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
 				uint8_t *frame, uint16_t frame_len,
 				QDF_STATUS status)
 {
+}
+
+static inline int wlan_get_multi_ap_cap(struct wlan_objmgr_vdev *vdev)
+{
+	return 0;
 }
 
 static inline
