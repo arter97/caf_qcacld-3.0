@@ -4129,6 +4129,7 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 			wmi_err_rl("Free keys for invalid entry at index:%d",
 				   j);
 			wlan_crypto_free_key(&key_entry[j].keys);
+			key_alloc_buf[j] = NULL;
 		}
 	}
 
