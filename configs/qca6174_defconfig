@@ -749,3 +749,5 @@ CONFIG_WLAN_FW_OFFLOAD := y
 
 CONFIG_FEATURE_SG := y
 
+#Enable thermal throttle
+CONFIG_FW_THERMAL_THROTTLE := y
