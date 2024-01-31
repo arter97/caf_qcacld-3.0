@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2372,6 +2373,46 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+static bool lim_check_multi_ap(struct mac_context *mac_ctx, tSirMacAddr sa,
+			       struct pe_session *session, uint8_t *frm_body,
+			       uint32_t frame_len, uint8_t sub_type)
+{
+	const u8 *multi_ap_ie = NULL;
+	u8 multi_ap_value = 0;
+	uint32_t map_cap = 0;
+
+	map_cap = wlan_get_multi_ap_cap(session->vdev);
+
+	if (!map_cap || map_cap & SIR_MULTI_AP_FRONTHAUL_BSS) {
+		pe_err("ignore multi-ap ie check map_cap :%u", map_cap);
+		return true;
+	}
+
+	multi_ap_ie = wlan_get_vendor_ie_ptr_from_oui(SIR_MAC_MULTI_AP_OUI,
+						      SIR_MAC_MULTI_AP_OUI_SIZE,
+						      frm_body + LIM_ASSOC_REQ_IE_OFFSET,
+						      frame_len - LIM_ASSOC_REQ_IE_OFFSET);
+
+	if (multi_ap_ie) {
+		if (multi_ap_ie[1] >= SIR_MULTI_AP_OUI_R1_LEN &&
+		    multi_ap_ie[6] == SIR_MULTI_AP_EXT_SUB_TYPE &&
+		    multi_ap_ie[7] == SIR_MULTI_AP_EXT_SUB_LEN)
+			multi_ap_value = multi_ap_ie[8];
+		else
+			pe_err("Multi-AP IE missed or invalid subelement");
+	}
+
+	if (!(multi_ap_value & SIR_MULTI_AP_BACKHAUL_STA)) {
+		lim_send_assoc_rsp_mgmt_frame(mac_ctx,
+					      STATUS_ASSOC_DENIED_UNSPEC,
+					      1, sa, sub_type, 0,
+					      session, false);
+		pe_err("SOFTAP send denied status assoc rsp");
+		return false;
+	}
+	return true;
+}
+
 QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 				      uint8_t *frm_body, uint32_t frame_len,
 				      uint8_t sub_type,
@@ -2491,6 +2532,12 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 					  &pmf_connection,
 					  &akm_type))
 		goto error;
+
+	if (!lim_check_multi_ap(mac_ctx, sa, session,
+				frm_body, frame_len, sub_type)) {
+		pe_debug("Backhal BSS reject client connect it");
+		goto error;
+	}
 
 	/* Extract pre-auth context for the STA, if any. */
 	sta_pre_auth_ctx = lim_search_pre_auth_list(mac_ctx, sa);
