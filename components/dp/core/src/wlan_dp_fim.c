@@ -66,16 +66,16 @@ static void dp_fim_parse_skb_flow_info(struct sk_buff *skb,
 {
 	qdf_nbuf_flow_dissect_flow_keys(skb, keys);
 
-	if (qdf_flow_is_frag(keys)) {
-		flow->flags |= FLOW_INFO_PRESENT_IP_FRAGMENT;
-		return;
-	} else if (qdf_flow_is_first_frag(keys)) {
+	if (qdf_unlikely(qdf_flow_is_first_frag(keys))) {
 		if (skb->protocol == htons(ETH_P_IP)) {
 			qdf_nbuf_flow_get_ports(skb, keys);
 		} else {
 			flow->flags |= FLOW_INFO_PRESENT_IP_FRAGMENT;
 			return;
 		}
+	} else if (qdf_flow_is_frag(keys)) {
+		flow->flags |= FLOW_INFO_PRESENT_IP_FRAGMENT;
+		return;
 	}
 
 	flow->src_port = qdf_ntohs(qdf_flow_parse_src_port(keys));
