@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -193,8 +193,9 @@ wlan_hdd_set_mcc_fixed_quota(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	if (mcc_quota.op_mode != QDF_P2P_GO_MODE) {
-		hdd_debug("Support only P2P GO mode now");
+	if (mcc_quota.op_mode != QDF_P2P_GO_MODE &&
+	    mcc_quota.op_mode != QDF_P2P_CLIENT_MODE) {
+		hdd_debug("Support only P2P GO/GC mode now");
 		return -EOPNOTSUPP;
 	}
 
