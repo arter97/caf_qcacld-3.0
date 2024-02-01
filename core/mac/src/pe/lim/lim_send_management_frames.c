@@ -6244,9 +6244,10 @@ bool lim_tdls_peer_support_he(tpDphHashNode sta_ds)
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static
-void lim_prepare_tdls_with_mlo(struct pe_session *session,
-			       tSirMacAddr peer_mac, tSirMacAddr self_mac,
-			       uint16_t *action)
+void lim_update_addba_resp_mlo_params(struct pe_session *session,
+				      tSirMacAddr peer_mac,
+				      tSirMacAddr self_mac,
+				      uint16_t *action)
 {
 	uint8_t *mld_addr;
 
@@ -6255,6 +6256,9 @@ void lim_prepare_tdls_with_mlo(struct pe_session *session,
 		mld_addr = wlan_vdev_mlme_get_mldaddr(session->vdev);
 		sir_copy_mac_addr(self_mac, mld_addr);
 		*action = ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE;
+	} else if (wlan_vdev_mlme_is_mlo_ap(session->vdev)) {
+		sir_copy_mac_addr(self_mac, session->self_mac_addr);
+		*action = ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE;
 	} else {
 		sir_copy_mac_addr(self_mac, session->self_mac_addr);
 		*action = 0;
@@ -6262,9 +6266,10 @@ void lim_prepare_tdls_with_mlo(struct pe_session *session,
 }
 #else
 static
-void lim_prepare_tdls_with_mlo(struct pe_session *session,
-			       tSirMacAddr peer_mac, tSirMacAddr self_mac,
-			       uint16_t *action)
+void lim_update_addba_resp_mlo_params(struct pe_session *session,
+				      tSirMacAddr peer_mac,
+				      tSirMacAddr self_mac,
+				      uint16_t *action)
 {
 	sir_copy_mac_addr(self_mac, session->self_mac_addr);
 	*action = 0;
@@ -6418,7 +6423,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	 * for TDLS MLO case, it needs to use MLD mac address for TA and
 	 * set action code to send out from specific vdev in fw.
 	 */
-	lim_prepare_tdls_with_mlo(session, peer_mac, self_mac, &action);
+	lim_update_addba_resp_mlo_params(session, peer_mac, self_mac, &action);
 	pe_debug("Sending a ADDBA Response from "QDF_MAC_ADDR_FMT" to "QDF_MAC_ADDR_FMT,
 		 QDF_MAC_ADDR_REF(self_mac),
 		 QDF_MAC_ADDR_REF(peer_mac));
