@@ -360,7 +360,7 @@ static int osif_fpm_del(struct fpm_table *fpm, struct nlattr **fpm_attr)
 
 static int osif_fpm_query(struct fpm_table *fpm, struct wiphy *wiphy)
 {
-	struct dp_policy policy[DP_MAX_POLICY] = {0};
+	struct dp_policy *policy;
 	struct nlattr *tab_attr, *entry_attr, *config_attr;
 	uint8_t proto;
 	struct sk_buff *skb = NULL;
@@ -370,8 +370,15 @@ static int osif_fpm_query(struct fpm_table *fpm, struct wiphy *wiphy)
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       NLMSG_DEFAULT_SIZE);
 	if (!skb) {
-		osif_err("alloc failed");
-		return QDF_STATUS_E_NOMEM;
+		osif_err("nl reply skb alloc failed");
+		return -ENOMEM;
+	}
+
+	policy = qdf_mem_malloc(sizeof(struct dp_policy) * DP_MAX_POLICY);
+	if (!policy) {
+		osif_err("policy memory alloc failed");
+		wlan_cfg80211_vendor_free_skb(skb);
+		return -ENOMEM;
 	}
 
 	count = ucfg_fpm_policy_get(fpm, policy, DP_MAX_POLICY);
@@ -510,9 +517,11 @@ static int osif_fpm_query(struct fpm_table *fpm, struct wiphy *wiphy)
 
 	nla_nest_end(skb, tab_attr);
 nl_done:
+	qdf_mem_free(policy);
 	return wlan_cfg80211_vendor_cmd_reply(skb);
 
 free_skb:
+	qdf_mem_free(policy);
 	wlan_cfg80211_vendor_free_skb(skb);
 	return -EMSGSIZE;
 }
