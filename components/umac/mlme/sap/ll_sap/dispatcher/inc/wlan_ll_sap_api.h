@@ -161,7 +161,6 @@ QDF_STATUS wlan_ll_sap_oob_connect_response(
 void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			    uint8_t *mcs_set);
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 /**
  * wlan_ll_lt_sap_continue_csa_after_tsf_rsp() - ll_sap process command function
  * @msg: scheduler msg
@@ -210,41 +209,6 @@ uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
  */
 uint64_t
 wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev);
-#else
-static inline
-QDF_STATUS wlan_ll_lt_sap_continue_csa_after_tsf_rsp(struct scheduler_msg *msg)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-QDF_STATUS wlan_ll_sap_get_tsf_stats_before_csa(struct wlan_objmgr_psoc *psoc,
-						struct wlan_objmgr_vdev *vdev)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
-					struct wlan_objmgr_psoc *psoc,
-					struct wlan_objmgr_vdev *vdev)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
-				    enum ll_sap_get_target_tsf get_tsf)
-{
-	return 0;
-}
-
-static inline uint64_t
-wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
-{
-	return 0;
-}
-#endif
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)

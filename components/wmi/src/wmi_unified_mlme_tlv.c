@@ -69,9 +69,7 @@ static void wmi_mlme_attach_ll_lt_sap_tlv(struct wmi_ops *ops)
 	ops->send_oob_connect_request = oob_connect_request_tlv;
 	ops->extract_oob_connect_response_event =
 				extract_oob_connect_response_event_tlv;
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 	ops->get_tsf_stats_for_csa = get_tsf_stats_for_csa_tlv;
-#endif
 }
 #else
 static inline void wmi_mlme_attach_ll_lt_sap_tlv(struct wmi_ops *ops)

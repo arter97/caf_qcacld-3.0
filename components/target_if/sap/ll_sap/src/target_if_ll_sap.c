@@ -179,7 +179,6 @@ static int target_if_send_audio_transport_switch_req_event_handler(
 	return 0;
 }
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 /* Start TSF timer value */
 #define START_TSF_TIMER_TIMEOUT 1000
 /**
@@ -303,7 +302,6 @@ QDF_STATUS target_if_ll_sap_continue_csa_after_tsf_rsp(
 
 	return status;
 }
-#endif
 
 void
 target_if_ll_sap_register_tx_ops(struct wlan_ll_sap_tx_ops *tx_ops)
@@ -311,9 +309,7 @@ target_if_ll_sap_register_tx_ops(struct wlan_ll_sap_tx_ops *tx_ops)
 	tx_ops->send_audio_transport_switch_resp =
 		target_if_send_audio_transport_switch_resp;
 	tx_ops->send_oob_connect_request = target_if_send_oob_connect_request;
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 	tx_ops->get_tsf_stats_for_csa =	target_if_get_tsf_stats_for_csa;
-#endif
 }
 
 void

@@ -65,7 +65,6 @@ wmi_extract_audio_transport_switch_req_event(
 	return QDF_STATUS_E_FAILURE;
 }
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 QDF_STATUS
 wmi_unified_get_tsf_stats_for_csa(wmi_unified_t wmi_hdl, uint8_t vdev_id)
 {
@@ -74,4 +73,3 @@ wmi_unified_get_tsf_stats_for_csa(wmi_unified_t wmi_hdl, uint8_t vdev_id)
 
 	return QDF_STATUS_E_FAILURE;
 }
-#endif

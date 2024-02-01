@@ -606,7 +606,6 @@ void wlan_ll_sap_free_chan_info(struct sap_sel_ch_info *ch_param);
 bool wlan_ll_sap_freq_present_in_pcl(struct policy_mgr_pcl_list *pcl,
 				     qdf_freq_t freq);
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 /**
  * wlan_ll_sap_send_continue_vdev_restart() - Continue vdev restart
  * @vdev: pointer to vdev object
@@ -632,23 +631,6 @@ void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev);
-#else
-static inline
-void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
-{
-}
-
-static inline
-void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
-				   uint8_t *macaddr)
-{
-}
-
-static inline
-void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
-{
-}
-#endif
 #else
 static inline
 void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)

@@ -979,7 +979,7 @@ lim_get_connected_akm(struct pe_session *session, int32_t ucast_cipher,
  */
 tAniEdType lim_get_encrypt_ed_type(int32_t ucast_cipher);
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+#ifdef WLAN_FEATURE_LL_LT_SAP
 /**
  * lim_ll_sap_send_ecsa_action_frame() - Send ECSA action frame
  * for LL_LT_SAP

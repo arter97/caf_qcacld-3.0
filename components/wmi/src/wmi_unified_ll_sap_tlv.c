@@ -231,7 +231,6 @@ QDF_STATUS extract_oob_connect_response_event_tlv(
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 QDF_STATUS get_tsf_stats_for_csa_tlv(wmi_unified_t wmi_hdl, uint8_t vdev_id)
 {
 	wmi_vdev_get_twt_session_stats_info_cmd_fixed_param *cmd;
@@ -262,4 +261,3 @@ QDF_STATUS get_tsf_stats_for_csa_tlv(wmi_unified_t wmi_hdl, uint8_t vdev_id)
 
 	return qdf_status;
 }
-#endif

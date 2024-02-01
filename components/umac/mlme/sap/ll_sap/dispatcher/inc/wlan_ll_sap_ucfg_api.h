@@ -157,7 +157,6 @@ void ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete(
 						uint8_t vdev_id,
 						enum QDF_OPMODE device_mode);
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 /**
  * ucfg_ll_lt_sap_get_target_tsf() - API to get target_tsf
  * @vdev: vdev object
@@ -165,13 +164,6 @@ void ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete(
  */
 void ucfg_ll_lt_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 				   uint64_t *target_tsf);
-#else
-static inline
-void ucfg_ll_lt_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
-				   uint64_t *target_tsf)
-{
-}
-#endif
 
 /**
  * ucfg_ll_sap_get_valid_freq_for_csa() - Wrapper api to get valid freq for

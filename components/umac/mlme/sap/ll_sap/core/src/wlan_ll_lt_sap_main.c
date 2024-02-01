@@ -551,7 +551,6 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id)
@@ -789,4 +788,3 @@ QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp)
 
 	return QDF_STATUS_SUCCESS;
 }
-#endif

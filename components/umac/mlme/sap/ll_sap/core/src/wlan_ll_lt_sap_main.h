@@ -90,7 +90,6 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 			       enum high_ap_availability_operation operation,
 			       uint32_t duration, uint16_t cookie);
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 /**
  * ll_lt_sap_get_tsf_stats_for_csa() - Get tsf stats for csa
  * @psoc: pointer to psoc object
@@ -110,19 +109,4 @@ QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
  * Return: QDF_STATUS
  */
 QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp);
-#else
-static inline
-QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
-				struct wlan_objmgr_psoc *psoc,
-				uint8_t vdev_id)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

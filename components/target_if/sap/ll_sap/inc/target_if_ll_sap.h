@@ -57,7 +57,6 @@ QDF_STATUS target_if_ll_sap_register_events(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 target_if_ll_sap_deregister_events(struct wlan_objmgr_psoc *psoc);
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 /**
  * target_if_ll_sap_continue_csa_after_tsf_rsp() - Continue CSA after getting
  * rsp of tsf stats from fw
@@ -83,23 +82,4 @@ bool target_if_ll_sap_is_twt_event_type_query_rsp(
 				uint8_t *evt_buf,
 				struct twt_session_stats_event_param *params,
 				struct twt_session_stats_info *twt_params);
-#else
-static inline
-QDF_STATUS target_if_ll_sap_continue_csa_after_tsf_rsp(
-				struct wlan_objmgr_psoc *psoc,
-				struct twt_session_stats_info *twt_params)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline
-bool target_if_ll_sap_is_twt_event_type_query_rsp(
-				struct wlan_objmgr_psoc *psoc,
-				uint8_t *evt_buf,
-				struct twt_session_stats_event_param *params,
-				struct twt_session_stats_info *twt_params)
-{
-	return false;
-}
-#endif
 #endif /* TARGET_IF_LL_SAP_H */

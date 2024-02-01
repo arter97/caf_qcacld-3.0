@@ -342,7 +342,6 @@ void wlan_ll_lt_sap_get_mcs(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	SET_HT_MCS3(mcs_set);
 }
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 				    enum ll_sap_get_target_tsf get_tsf)
 {
@@ -448,4 +447,3 @@ QDF_STATUS wlan_ll_sap_get_tsf_stats_before_csa(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
-#endif

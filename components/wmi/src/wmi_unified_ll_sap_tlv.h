@@ -76,7 +76,6 @@ QDF_STATUS extract_oob_connect_response_event_tlv(
 			uint8_t *event, uint32_t len,
 			struct wmi_oob_connect_response_event *response);
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 /**
  * get_tsf_stats_for_csa_tlv() - Get tsf stats for ll_sap csa from fw
  * @wmi_handle: WMI handle
@@ -85,12 +84,5 @@ QDF_STATUS extract_oob_connect_response_event_tlv(
  * Return: QDF_STATUS
  */
 QDF_STATUS get_tsf_stats_for_csa_tlv(wmi_unified_t wmi_handle, uint8_t vdev_id);
-#else
-static inline
-QDF_STATUS get_tsf_stats_for_csa_tlv(wmi_unified_t wmi_handle, uint8_t vdev_id)
-{
-	return QDF_STATUS_E_FAILURE;
-}
-#endif
 #endif
 #endif  /* WMI_UNIFIED_LL_SAP_TLV_H */

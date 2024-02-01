@@ -541,7 +541,7 @@ static inline void lim_nan_register_callbacks(struct mac_context *mac_ctx)
 }
 #endif
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+#ifdef WLAN_FEATURE_LL_LT_SAP
 QDF_STATUS lim_ll_sap_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {
 	struct mac_context *mac_ctx;

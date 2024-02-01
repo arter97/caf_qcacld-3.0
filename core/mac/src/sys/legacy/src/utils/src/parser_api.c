@@ -1743,7 +1743,7 @@ void populate_dot11f_edca_pifs_param_set(struct mac_context *mac,
 	}
 }
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+#ifdef WLAN_FEATURE_LL_LT_SAP
 void populate_dot11f_ecsa_param_set_for_ll_sap(
 			struct wlan_objmgr_vdev *vdev,
 			tDot11fIEqcn_ie *qcn_ie)

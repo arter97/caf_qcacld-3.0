@@ -1944,7 +1944,7 @@ QDF_STATUS populate_dot11f_bcn_prot_extcaps(struct mac_context *mac_ctx,
 					    struct pe_session *pe_session,
 					    tDot11fIEExtCap *dot11f);
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+#ifdef WLAN_FEATURE_LL_LT_SAP
 /**
  * populate_dot11f_ecsa_param_set() - populate ecsa action frame for ll_sap
  * @vdev: vdev object

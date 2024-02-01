@@ -243,11 +243,9 @@ struct wlan_ll_sap_tx_ops {
 	QDF_STATUS (*send_oob_connect_request)(
 					struct wlan_objmgr_psoc *psoc,
 					struct ll_sap_oob_connect_request req);
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
 	QDF_STATUS (*get_tsf_stats_for_csa)(
 					struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
-#endif
 };
 
 /**

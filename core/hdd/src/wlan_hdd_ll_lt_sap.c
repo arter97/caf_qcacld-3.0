@@ -281,7 +281,7 @@ int wlan_hdd_cfg80211_ll_lt_sap_high_ap_availability(struct wiphy *wiphy,
 	return errno;
 }
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+#ifdef WLAN_FEATURE_LL_LT_SAP
 int wlan_hdd_ll_lt_sap_get_csa_timestamp(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev,
 					 uint64_t *target_tsf)

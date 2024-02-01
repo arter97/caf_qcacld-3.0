@@ -86,7 +86,7 @@ int wlan_hdd_cfg80211_ll_lt_sap_high_ap_availability(struct wiphy *wiphy,
 						     const void *data,
 						     int data_len);
 
-#ifdef WLAN_FEATURE_LL_LT_SAP_CSA
+#ifdef WLAN_FEATURE_LL_LT_SAP
 /**
  * wlan_hdd_ll_lt_sap_get_csa_timestamp() - GET CSA timestamp for LL_LT_SAP
  * @psoc: psoc object
