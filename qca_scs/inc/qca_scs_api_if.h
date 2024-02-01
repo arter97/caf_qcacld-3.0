@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -113,19 +113,19 @@ typedef enum {
 #define SCS_API_SCS_OUTPUT_TID_MASK 0x7
 
 /* Size */
-#define SCS_API_IPV4_LEN		4
-#define SCS_API_IPV6_LEN		16
-#define SCS_API_MAC_ADDR_SIZE		6
-#define SCS_API_REQ_BUF_MAX_SIZE	2500
-#define SCS_API_DATA_BUF_MAX_SIZE	3100
-#define SCS_API_RESP_BUF_MAX_SIZE	100
-#define SCS_API_SCS_MAX_SIZE		10
-#define SCS_API_TCLAS_MAX_SIZE		5
-#define SCS_API_TCLAS10_FILTER_LEN	12
-#define SCS_API_FLOW_LABEL_SIZE		3
-#define SCS_API_MIN_QOS_ATTR_LEN	21
-#define SCS_API_SAWF_SCS_SVC_CLASS_MIN	129
-#define WIFI_IFACE_PREFIX_LEN		4
+#define SCS_API_IPV4_LEN                4
+#define SCS_API_IPV6_LEN                16
+#define SCS_API_MAC_ADDR_SIZE           6
+#define SCS_API_REQ_BUF_MAX_SIZE        2500
+#define SCS_API_DATA_BUF_MAX_SIZE       3100
+#define SCS_API_RESP_BUF_MAX_SIZE       100
+#define SCS_API_SCS_MAX_SIZE            10
+#define SCS_API_TCLAS_MAX_SIZE          5
+#define SCS_API_TCLAS10_FILTER_LEN      12
+#define SCS_API_FLOW_LABEL_SIZE         3
+#define SCS_API_MIN_QOS_ATTR_LEN        21
+#define SCS_API_SAWF_SCS_SVC_CLASS_MIN  129
+#define WIFI_IFACE_PREFIX_LEN           4
 
 /* SCS API message types */
 enum scs_api_msg_type {

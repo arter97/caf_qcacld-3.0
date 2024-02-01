@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -64,7 +64,7 @@ process_nl_msg_send_scs_api_app_reg(const char *ifname,
 	if (nlmsg) {
 		nl_ven_data = (struct nlattr *)start_vendor_data(nlmsg);
 		if (!nl_ven_data) {
-			PRINT_IF_VERB("Failed to get vender data");
+			PRINT_IF_VERB("Failed to get vendor data");
 			goto error_cleanup;
 		}
 
@@ -77,7 +77,7 @@ process_nl_msg_send_scs_api_app_reg(const char *ifname,
 
 		if (nla_put(
 			nlmsg,
-			QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_SCS_REGISTRATION_DATA,
+			QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_DATA,
 			sizeof(struct scs_api_info), scs_api_app_info)) {
 			PRINT_IF_VERB("nla_put fail for SCS Registration data");
 			goto error_cleanup;
@@ -137,7 +137,7 @@ static int process_nl_msg_send_scs_api_data(char *ifname,
 	if (nlmsg) {
 		nl_ven_data = (struct nlattr *)start_vendor_data(nlmsg);
 		if (!nl_ven_data) {
-			PRINT_IF_VERB("Failed to get vender data");
+			PRINT_IF_VERB("Failed to get vendor data");
 			goto error_cleanup;
 		}
 
@@ -171,7 +171,7 @@ static int process_nl_msg_send_scs_api_data(char *ifname,
 		}
 
 		if (nla_put(nlmsg,
-			    QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_SCS_PARSED_DATA,
+			    QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_DATA,
 			    size, parsed_scs_data)) {
 			PRINT_IF_VERB("nla_put fail for Parsed SCS data");
 			goto error_cleanup;
@@ -231,7 +231,7 @@ process_nl_msg_send_scs_api_response_data(char *ifname,
 	if (nlmsg) {
 		nl_ven_data = (struct nlattr *)start_vendor_data(nlmsg);
 		if (!nl_ven_data) {
-			PRINT_IF_VERB("Failed to get vender data");
+			PRINT_IF_VERB("Failed to get vendor data");
 			goto error_cleanup;
 		}
 
@@ -272,7 +272,7 @@ process_nl_msg_send_scs_api_response_data(char *ifname,
 		}
 
 		if (nla_put(nlmsg,
-			    QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_SCS_RESPONSE, size,
+			    QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_DATA, size,
 			    app_resp)) {
 			PRINT_IF_VERB("nla_put fail for SCS Response data");
 			goto error_cleanup;
@@ -871,7 +871,7 @@ static void process_nl_msg_recv_scs_api_scs_req(uint8_t *data, size_t len,
 			      mld_mac_addr[5]);
 	}
 
-	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_SCS_REQUEST];
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_DATA];
 	if (tb) {
 		PRINT_IF_VERB("Length of SCS request frame: %d", nla_len(tb));
 		if (nla_len(tb) > SCS_API_REQ_BUF_MAX_SIZE) {
@@ -954,7 +954,7 @@ static void process_nl_msg_recv_scs_api_driver_response(uint8_t *data,
 		return;
 	}
 
-	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_DRIVER_RESPONSE];
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_DATA];
 	if (tb) {
 		PRINT_IF_VERB("Length of SCS Driver response: %d", nla_len(tb));
 		if (nla_len(tb) > SCS_API_RESP_BUF_MAX_SIZE) {
