@@ -59,6 +59,7 @@
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include <wlan_mlo_mgr_sta.h>
 #include <spatial_reuse_api.h>
+#include <wlan_mlo_mgr_cmn.h>
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -1932,6 +1933,12 @@ static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
 		 vdev_id, link_id);
 }
 
+static bool
+lim_mlo_is_csa_allow(struct wlan_objmgr_vdev *vdev, uint16_t csa_freq)
+{
+	return wlan_mlo_is_csa_allow(vdev, csa_freq);
+}
+
 #else
 static void lim_set_csa_chan_param_11be(struct pe_session *session,
 					struct csa_offload_params *csa_param,
@@ -1960,6 +1967,11 @@ static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
 {
 }
 
+static bool
+lim_mlo_is_csa_allow(struct wlan_objmgr_vdev *vdev, uint16_t csa_freq)
+{
+	return true;
+}
 #endif
 
 /**
@@ -2052,6 +2064,12 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 					session_entry->curr_op_freq,
 					csa_params)) {
 		pe_debug("Channel switch is not allowed");
+		goto send_event;
+	}
+
+	if (!lim_mlo_is_csa_allow(session_entry->vdev,
+				  csa_params->csa_chan_freq)) {
+		pe_debug("Channel switch for MLO vdev is not allowed");
 		goto send_event;
 	}
 	/*
