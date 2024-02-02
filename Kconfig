@@ -476,6 +476,11 @@ config FEATURE_SET
 	bool "Enable FEATURE_SET"
 	default n
 
+config FEATURE_SMEM_MAILBOX
+	bool "Enable FEATURE_SMEM_MAILBOX"
+	depends on FEATURE_OEM_DATA
+	default n
+
 config FEATURE_STATION_INFO
 	bool "Enable FEATURE_STATION_INFO"
 	default n

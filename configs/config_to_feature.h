@@ -3033,4 +3033,8 @@
 #endif
 #endif
 
+#ifdef CONFIG_FEATURE_SMEM_MAILBOX
+#define FEATURE_SMEM_MAILBOX (1)
+#endif
+
 #endif /* CONFIG_TO_FEATURE_H */

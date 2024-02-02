@@ -505,10 +505,10 @@ struct sme_context {
 	/* async oem event callback */
 	void (*oem_data_async_event_handler_cb)
 			(const struct oem_data *oem_event_data);
+#ifdef FEATURE_SMEM_MAILBOX
 	void (*oem_data_smem_event_handler_cb)
-			(const struct oem_data *oem_event_data,
-			 int smem_id);
-	int smem_id;
+			(const struct oem_data *oem_event_data);
+#endif
 #endif
 
 	QDF_STATUS (*pagefault_action_cb)(void *buf, uint32_t data);

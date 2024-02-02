@@ -1218,30 +1218,6 @@ void hdd_oem_event_async_cb(const struct oem_data *oem_event_data)
 	hdd_exit();
 }
 
-void hdd_oem_event_smem_cb(const struct oem_data *oem_event_data,
-			   int smem_id)
-{
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct wlan_hdd_link_info *link_info;
-	struct wireless_dev *wdev = NULL;
-
-	hdd_enter();
-
-	if (!hdd_ctx)
-		return;
-
-	if (oem_event_data->file_name) {
-		hdd_copy_file_name_and_oem_data(hdd_ctx, oem_event_data);
-		return;
-	}
-
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, oem_event_data->vdev_id);
-	if (link_info)
-		wdev = &link_info->adapter->wdev;
-
-	pld_oem_event_smem_write(smem_id, 1, (uint8_t *)oem_event_data);
-	hdd_exit();
-}
 
 void hdd_oem_event_handler_cb(const struct oem_data *oem_event_data,
 			      uint8_t vdev_id)
@@ -1519,6 +1495,37 @@ int wlan_hdd_cfg80211_oem_data_handler(struct wiphy *wiphy,
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return ret;
+}
+#endif
+
+#ifdef FEATURE_SMEM_MAILBOX
+void hdd_oem_event_smem_cb(const struct oem_data *oem_event_data)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	qdf_device_t qdf_dev;
+	struct wlan_hdd_link_info *link_info;
+	struct wireless_dev *wdev = NULL;
+
+	hdd_enter();
+
+	if (!hdd_ctx)
+		return;
+	qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	if (!qdf_dev)
+		return;
+
+	if (oem_event_data->file_name) {
+		hdd_copy_file_name_and_oem_data(hdd_ctx, oem_event_data);
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, oem_event_data->vdev_id);
+	if (link_info)
+		wdev = &link_info->adapter->wdev;
+
+	pld_oem_event_smem_write(qdf_dev->dev, 1, (const __u8 *)oem_event_data,
+				 oem_event_data->data_len);
+	hdd_exit();
 }
 #endif
 #endif

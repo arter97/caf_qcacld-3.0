@@ -37,6 +37,14 @@
 #endif
 #endif
 
+#ifdef CNSS_UTILS
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss_utils.h"
+#else
+#include <net/cnss_utils.h>
+#endif
+#endif
+
 #ifdef CONFIG_CNSS_OUT_OF_TREE
 #ifdef CONFIG_PLD_SNOC_ICNSS
 #ifdef CONFIG_PLD_SNOC_ICNSS2
@@ -2866,20 +2874,10 @@ int pld_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
 }
 #endif
 
-#ifdef FEATURE_OEM_DATA
-
-int pld_oem_event_smem_start(char *name)
+#ifdef FEATURE_SMEM_MAILBOX
+int pld_oem_event_smem_write(struct device *dev, int flags, const __u8 *data,
+			     uint32_t len)
 {
-	return 0;
-}
-
-int pld_oem_event_smem_stop(int id)
-{
-	return 0;
-}
-
-int pld_oem_event_smem_write(int id, int flags, const __u8 *data)
-{
-	return 0;
+	return cnss_utils_smem_mailbox_write(dev, flags, data, len);
 }
 #endif

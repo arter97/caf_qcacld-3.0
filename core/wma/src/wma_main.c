@@ -574,6 +574,7 @@ static bool wma_is_feature_set_supported(tp_wma_handle wma_handle)
 
 #endif
 
+#ifdef FEATURE_SMEM_MAILBOX
 static bool wma_is_smem_mailbox_supported(tp_wma_handle wma_handle)
 {
 	bool is_feature_enabled_from_fw;
@@ -588,6 +589,25 @@ static bool wma_is_smem_mailbox_supported(tp_wma_handle wma_handle)
 	return (is_feature_enabled_from_fw &&
 		cfg_get(wma_handle->psoc, CFG_ENABLE_SMEM_MAILBOX));
 }
+
+static void wma_set_smem_mailbox_feature(tp_wma_handle wma_handle,
+					 target_resource_config *tgt_cfg)
+{
+	if (cfg_get(wma_handle->psoc, CFG_ENABLE_SMEM_MAILBOX))
+		tgt_cfg->is_smem_mailbox_supported = true;
+}
+
+#else
+static bool wma_is_smem_mailbox_supported(tp_wma_handle wma_handle)
+{
+	return false;
+}
+
+static void wma_set_smem_mailbox_feature(tp_wma_handle wma_handle,
+					 target_resource_config *tgt_cfg)
+{
+}
+#endif
 
 /**
  * wma_set_default_tgt_config() - set default tgt config
@@ -701,8 +721,7 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	tgt_cfg->notify_frame_support = DP_MARK_NOTIFY_FRAME_SUPPORT;
 
 	if (wma_is_smem_mailbox_supported(wma_handle))
-		tgt_cfg->is_smem_mailbox_supported = true;
-
+		wma_set_smem_mailbox_feature(wma_handle, tgt_cfg);
 }
 
 /**

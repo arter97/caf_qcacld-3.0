@@ -5092,6 +5092,38 @@ int wma_latency_level_event_handler(void *wma_ctx, uint8_t *event_buff,
 }
 #endif
 
+#ifdef FEATURE_SMEM_MAILBOX
+static int wma_oem_smem_event_handler(tp_wma_handle wma,
+				      struct mac_context *pmac,
+				      struct oem_data *oem_event_data)
+{
+	if (!cfg_get(wma->psoc, CFG_ENABLE_SMEM_MAILBOX)) {
+		QDF_DEBUG_PANIC("SMEM MAILBOX support not enabled");
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (pmo_get_wow_suspend_type(wma->psoc) ==
+	    QDF_SYSTEM_SUSPEND) {
+		if (pmac->sme.oem_data_smem_event_handler_cb)
+			pmac->sme.oem_data_smem_event_handler_cb(
+				oem_event_data);
+	} else {
+		if (pmac->sme.oem_data_async_event_handler_cb)
+			pmac->sme.oem_data_async_event_handler_cb(
+					oem_event_data);
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+#elif defined FEATURE_OEM_DATA
+static int wma_oem_smem_event_handler(tp_wma_handle wma,
+				      struct mac_context *pmac,
+				      struct oem_data *oem_event_data)
+{
+	QDF_DEBUG_PANIC("SMEM MAILBOX support not included");
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 #ifdef FEATURE_OEM_DATA
 int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 {
@@ -5159,21 +5191,8 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 			pmac->sme.oem_data_async_event_handler_cb(
 					&oem_event_data);
 	} else if (event->event_cause == WMI_OEM_DATA_EVT_CAUSE_QMS) {
-		if (!cfg_get(wma->psoc, CFG_ENABLE_SMEM_MAILBOX)) {
-			QDF_DEBUG_PANIC("SMEM Mailbox event unsupported");
-			return QDF_STATUS_E_FAULT;
-		}
-		if (pmo_get_wow_suspend_type(wma->psoc) ==
-		    QDF_SYSTEM_SUSPEND) {
-			if (pmac->sme.oem_data_smem_event_handler_cb)
-				pmac->sme.oem_data_smem_event_handler_cb(
-					&oem_event_data,
-					pmac->sme.smem_id);
-		} else {
-			if (pmac->sme.oem_data_async_event_handler_cb)
-				pmac->sme.oem_data_async_event_handler_cb(
-						&oem_event_data);
-		}
+		if (wma_oem_smem_event_handler(wma, pmac, &oem_event_data))
+			return QDF_STATUS_E_FAILURE;
 	} else {
 		return QDF_STATUS_E_FAILURE;
 	}
