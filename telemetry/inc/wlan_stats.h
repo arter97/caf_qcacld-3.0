@@ -116,6 +116,38 @@ struct stats_config {
 };
 
 /**
+ * struct stats_list_entry: Structure used to represent an entry in
+ * the non-blocking stats work list
+ * @node : linked list node
+ * @pdev : Pointer to the PDEV object of the request
+ * @vdev : Pointer to the VDEV object of the request
+ * @cfg  : User configuration for the request
+ * @mac  : Mac address of peer for peer stats
+ */
+struct stats_list_entry {
+	qdf_list_node_t node;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev;
+	struct stats_config *cfg;
+	uint8_t *mac;
+};
+
+/**
+ * struct stats_work_context: Structure representing the context of stat work
+ * @work           : Instance of work
+ * @list_lock      : lock for the work list
+ * @nb_stats_work_list: queue of non-blocking stats requests
+ * @num_entries    : number of entries in the queue
+ * @is_initialized : flag to track init and deinit of context
+ */
+struct stats_work_context {
+	qdf_work_t work;
+	qdf_spinlock_t list_lock;
+	qdf_list_t nb_stats_work_list;
+	bool is_initialized;
+};
+
+/**
  * struct multi_reply_ctx: Structure to manage multi reply message
  * @next_copy_from: Copy from this index
  * @pending: Flag to detect pending data from previous reply
@@ -248,4 +280,26 @@ struct wlan_objmgr_vdev *wlan_stats_get_vdev_from_sta_mac(uint8_t *mac);
  */
 uint32_t wlan_stats_get_tlv_counts_and_total_length(struct unified_stats *stats,
 						    uint8_t *tlv_count);
+
+/**
+ * wlan_stats_nb_stats_work_attach: API to allocate work for handling
+ *                       non-blocking stats request
+ */
+void wlan_stats_nb_stats_work_attach(void);
+
+/**
+ * wlan_stats_schedule_nb_stats_work: API to queue for scheduling non-blocking
+ *                         stats request
+ * Return: QDF_STATUS_SUCCESS for success and Error code for failure
+ */
+QDF_STATUS wlan_stats_schedule_nb_stats_work(struct wlan_objmgr_pdev *pdev,
+					     struct wlan_objmgr_vdev *vdev,
+					     struct stats_config *cfg,
+					     uint8_t *mac);
+
+/**
+ * wlan_stats_nb_stats_work_detach: API to deallocate work for handling
+ *                       non-blocking stats request
+ */
+void wlan_stats_nb_stats_work_detach(void);
 #endif /* _WLAN_STATS_H_ */
