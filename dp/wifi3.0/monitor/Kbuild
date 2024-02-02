@@ -38,6 +38,7 @@ INCS += -I$(obj)/$(DEPTH)/include \
         -I$(obj)/$(DEPTH)/cmn_dev/umac/thermal/dispatcher/inc/ \
         -I$(obj)/$(DEPTH)/cmn_dev/umac/green_ap/dispatcher/inc/ \
         -I$(obj)/$(DEPTH)/cmn_dev/umac/cfr/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/wifi_radar/dispatcher/inc/ \
         -I$(obj)/$(DEPTH)/cmn_dev/target_if/init_deinit/inc/ \
         -I$(obj)/$(DEPTH)/cmn_dev/umac/mlme/vdev_mgr/dispatcher/inc/ \
         -I$(obj)/$(DEPTH)/cmn_dev/umac/mlme/connection_mgr/dispatcher/inc/ \
