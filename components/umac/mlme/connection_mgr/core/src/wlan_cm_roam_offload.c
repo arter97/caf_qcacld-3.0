@@ -3519,9 +3519,12 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (!pdev)
 		goto rel_vdev_ref;
 
+	mlme_debug("vdev:%d process rso stop for reason: %d", vdev_id, reason);
+
 	stop_req->btm_config.vdev_id = vdev_id;
-	MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
-		     BTM_OFFLOAD_CONFIG_BIT_0);
+	if (reason == REASON_SUPPLICANT_DISABLED_ROAMING)
+		MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
+			     BTM_OFFLOAD_CONFIG_BIT_0);
 	stop_req->disconnect_params.vdev_id = vdev_id;
 	stop_req->idle_params.vdev_id = vdev_id;
 	stop_req->roam_triggers.vdev_id = vdev_id;
