@@ -447,7 +447,7 @@ cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 
 		channel.ch_freq = ml_link->channel.mhz;
 		channel.ch_cfreq1 = ml_link->channel.band_center_freq1;
-		channel.ch_cfreq1 = ml_link->channel.band_center_freq2;
+		channel.ch_cfreq2 = ml_link->channel.band_center_freq2;
 
 		/*
 		 * Update Link switch context for each vdev with roamed AP link
