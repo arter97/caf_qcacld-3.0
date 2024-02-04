@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1427,6 +1427,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	bool extracted_flag = false;
 	uint8_t retry_int;
 	uint16_t max_retries;
+	struct element_info ie;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -1766,6 +1767,11 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
 	    pe_session->opmode == QDF_P2P_GO_MODE)
 		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+
+	ie.ptr = frame + sizeof(tSirMacMgmtHdr) + WLAN_ASSOC_RSP_IES_OFFSET;
+	ie.len = payload - WLAN_ASSOC_RSP_IES_OFFSET;
+
+	mlme_set_peer_assoc_rsp_ie(mac_ctx->psoc, peer_addr, &ie);
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
@@ -2197,6 +2203,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	bool bss_mfp_capable, frag_ie_present = false;
 	int8_t peer_rssi = 0;
 	uint16_t fils_hlp_ie_len = 0;
+	struct cm_roam_values_copy mdie_cfg = {0};
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -2457,7 +2464,17 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			(unsigned int) bssdescr->mdie[2]);
 		populate_mdie(mac_ctx, &frm->MobilityDomain,
 			pe_session->lim_join_req->bssDescription.mdie);
+		if (bssdescr->mdiePresent) {
+			mdie_cfg.bool_value = true;
+			mdie_cfg.uint_value =
+				(bssdescr->mdie[1] << 8) | (bssdescr->mdie[0]);
+		} else {
+			mdie_cfg.bool_value = false;
+			mdie_cfg.uint_value = 0;
+		}
 
+		wlan_cm_roam_cfg_set_value(mac_ctx->psoc, vdev_id,
+					   MOBILITY_DOMAIN, &mdie_cfg);
 		/*
 		 * IEEE80211-ai [13.2.4 FT initial mobility domain association
 		 * over FILS in an RSN]
