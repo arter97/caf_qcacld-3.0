@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2098,7 +2098,7 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 		is_eht_allowed =
 			wlan_cm_is_eht_allowed_for_current_security(
 					wlan_pdev_get_psoc(mac_ctx->pdev),
-					scan_entry);
+					scan_entry, false);
 		util_scan_free_cache_entry(scan_entry);
 		if (!is_eht_allowed) {
 			pe_debug("Downgrade to 11ax mode due to AP security validation failure");
@@ -9168,10 +9168,9 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		break;
 
 	case eWNI_SME_ASSOC_CNF:
-		if (pMsg->type == eWNI_SME_ASSOC_CNF)
-			pe_debug("Received ASSOC_CNF message");
-			__lim_process_sme_assoc_cnf_new(mac, pMsg->type,
-							msg_buf);
+		pe_debug("Received ASSOC_CNF message");
+		__lim_process_sme_assoc_cnf_new(mac, pMsg->type,
+						msg_buf);
 		break;
 
 	case eWNI_SME_ADDTS_REQ:

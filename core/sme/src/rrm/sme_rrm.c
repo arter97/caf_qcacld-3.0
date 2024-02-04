@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1171,7 +1171,7 @@ static QDF_STATUS sme_rrm_fill_scan_channels(struct mac_context *mac,
 	if (sme_rrm_context->channelList.numOfChannels == 0) {
 		qdf_mem_free(sme_rrm_context->channelList.freq_list);
 		sme_rrm_context->channelList.freq_list = NULL;
-		sme_err("No channels populated with requested operation class and current country, Hence abort the rrm operation");
+		sme_err_rl("No channels populated with requested operation class and current country, Hence abort the rrm operation");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1230,13 +1230,7 @@ sme_rrm_fill_freq_list_for_channel_load(struct mac_context *mac_ctx,
 
 	bw_ind = &sme_rrm_ctx->chan_load_req_info.bw_ind;
 	wide_bw = &sme_rrm_ctx->chan_load_req_info.wide_bw;
-
-	if (bw_ind->is_bw_ind_element) {
-		chan_width = bw_ind->channel_width;
-		cen320_freq = bw_ind->center_freq;
-	} else if (wide_bw->is_wide_bw_chan_switch){
-		chan_width = wide_bw->channel_width;
-	} else {
+	if (!bw_ind->is_bw_ind_element && !wide_bw->is_wide_bw_chan_switch) {
 		if (wlan_reg_is_6ghz_op_class(mac_ctx->pdev,
 					      sme_rrm_ctx->regClass))
 			c_space =
@@ -1274,6 +1268,14 @@ sme_rrm_fill_freq_list_for_channel_load(struct mac_context *mac_ctx,
 			sme_err("invalid chan_space: %d", c_space);
 			return QDF_STATUS_E_FAILURE;
 		}
+	} else {
+		if (bw_ind->is_bw_ind_element) {
+			chan_width = bw_ind->channel_width;
+			cen320_freq = bw_ind->center_freq;
+		}
+
+		if (wide_bw->is_wide_bw_chan_switch)
+			chan_width = wide_bw->channel_width;
 	}
 
 	sme_rrm_ctx->chan_load_req_info.req_chan_width = chan_width;
@@ -1390,6 +1392,7 @@ static QDF_STATUS sme_rrm_process_chan_load_req_ind(struct mac_context *mac,
 	struct ch_load_ind *chan_load;
 	tpRrmSMEContext sme_rrm_ctx;
 	tpRrmPEContext rrm_ctx;
+	struct channel_load_req_info *req_info;
 
 	chan_load = (struct ch_load_ind *)msg_buf;
 	sme_rrm_ctx = &mac->rrm.rrmSmeContext[chan_load->measurement_idx];
@@ -1406,27 +1409,27 @@ static QDF_STATUS sme_rrm_process_chan_load_req_ind(struct mac_context *mac,
 		     (uint8_t *)&chan_load->meas_duration,
 		     SIR_ESE_MAX_MEAS_IE_REQS);
 	sme_rrm_ctx->measurement_type = RRM_CHANNEL_LOAD;
-	sme_rrm_ctx->chan_load_req_info.channel = chan_load->channel;
-	sme_rrm_ctx->chan_load_req_info.req_freq = chan_load->req_freq;
+	req_info = &sme_rrm_ctx->chan_load_req_info;
+	req_info->channel = chan_load->channel;
+	req_info->req_freq = chan_load->req_freq;
 
-	qdf_mem_copy(&sme_rrm_ctx->chan_load_req_info.bw_ind,
-			&chan_load->bw_ind,
-			sizeof(sme_rrm_ctx->chan_load_req_info.bw_ind));
-	qdf_mem_copy(&sme_rrm_ctx->chan_load_req_info.wide_bw,
-			&chan_load->wide_bw,
-			sizeof(sme_rrm_ctx->chan_load_req_info.wide_bw));
+	qdf_mem_copy(&req_info->bw_ind, &chan_load->bw_ind,
+		     sizeof(req_info->bw_ind));
+	qdf_mem_copy(&req_info->wide_bw, &chan_load->wide_bw,
+		     sizeof(req_info->wide_bw));
 
-	sme_debug("idx:%d, token: %d randnIntvl: %d meas_duration %d, rrm_ctx dur %d reg_class: %d, type: %d, channel: %d, freq:%d, [bw_ind cw:%d, ccfs0:%d], [wide_bw cw:%d]",
+	sme_debug("idx:%d, token: %d randnIntvl: %d meas_duration %d, rrm_ctx dur %d reg_class: %d, type: %d, channel: %d, freq: %d, [bw_ind present: %d, cw: %d, ccfs0: %d], [wide_bw present: %d, cw: %d]",
 		  chan_load->measurement_idx, sme_rrm_ctx->token,
 		  sme_rrm_ctx->randnIntvl,
 		  chan_load->meas_duration,
 		  sme_rrm_ctx->duration[0], sme_rrm_ctx->regClass,
 		  sme_rrm_ctx->measurement_type,
-		  sme_rrm_ctx->chan_load_req_info.channel,
-		  sme_rrm_ctx->chan_load_req_info.req_freq,
-		  sme_rrm_ctx->chan_load_req_info.bw_ind.channel_width,
-		  sme_rrm_ctx->chan_load_req_info.bw_ind.center_freq,
-		  sme_rrm_ctx->chan_load_req_info.wide_bw.channel_width);
+		  req_info->channel, req_info->req_freq,
+		  req_info->bw_ind.is_bw_ind_element,
+		  req_info->bw_ind.channel_width,
+		  req_info->bw_ind.center_freq,
+		  req_info->wide_bw.is_wide_bw_chan_switch,
+		  req_info->wide_bw.channel_width);
 
 	return sme_rrm_issue_chan_load_measurement_scan(mac,
 						chan_load->measurement_idx);

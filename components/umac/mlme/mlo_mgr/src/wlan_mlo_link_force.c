@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -385,6 +385,61 @@ ml_nlink_update_force_link_request(struct wlan_objmgr_psoc *psoc,
 }
 
 static void
+ml_nlink_update_concurrency_link_request(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct ml_link_force_state *force_state,
+				enum mlo_link_force_reason reason)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct set_link_req *req;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
+		mlo_err("mlo_ctx or sta_ctx null");
+		return;
+	}
+	mlo_dev_lock_acquire(mlo_dev_ctx);
+	req =
+	&mlo_dev_ctx->sta_ctx->link_force_ctx.reqs[SET_LINK_FROM_CONCURRENCY];
+	req->reason = reason;
+	req->force_active_bitmap = force_state->force_active_bitmap;
+	req->force_inactive_bitmap = force_state->force_inactive_bitmap;
+	req->force_active_num = force_state->force_active_num;
+	req->force_inactive_num = force_state->force_inactive_num;
+	req->force_inactive_num_bitmap =
+		force_state->force_inactive_num_bitmap;
+	mlo_dev_lock_release(mlo_dev_ctx);
+}
+
+void ml_nlink_init_concurrency_link_request(
+	struct wlan_objmgr_psoc *psoc,
+	struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct set_link_req *req;
+	struct ml_link_force_state *force_state;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
+		mlo_err("mlo_ctx or sta_ctx null");
+		return;
+	}
+	mlo_dev_lock_acquire(mlo_dev_ctx);
+	force_state = &mlo_dev_ctx->sta_ctx->link_force_ctx.force_state;
+	req =
+	&mlo_dev_ctx->sta_ctx->link_force_ctx.reqs[SET_LINK_FROM_CONCURRENCY];
+	req->reason = MLO_LINK_FORCE_REASON_CONNECT;
+	req->force_active_bitmap = force_state->force_active_bitmap;
+	req->force_inactive_bitmap = force_state->force_inactive_bitmap;
+	req->force_active_num = force_state->force_active_num;
+	req->force_inactive_num = force_state->force_inactive_num;
+	req->force_inactive_num_bitmap =
+		force_state->force_inactive_num_bitmap;
+	mlo_dev_lock_release(mlo_dev_ctx);
+}
+
+void
 ml_nlink_get_force_link_request(struct wlan_objmgr_psoc *psoc,
 				struct wlan_objmgr_vdev *vdev,
 				struct set_link_req *req,
@@ -1777,7 +1832,7 @@ ml_nlink_update_force_inactive(struct wlan_objmgr_psoc *psoc,
 		/* Check non forced links allowed by conc */
 		if (!ml_nlink_allow_conc(psoc, vdev, no_force_links,
 					 new->force_inactive_bitmap)) {
-			status = QDF_STATUS_E_INVAL;
+			status = QDF_STATUS_E_NOSUPPORT;
 			goto end;
 		}
 		status = policy_mgr_mlo_sta_set_nlink(
@@ -1951,6 +2006,10 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 	ml_nlink_handle_dynamic_inactive(psoc, vdev, &curr_force_state,
 					 &force_state);
 
+	ml_nlink_update_concurrency_link_request(psoc, vdev,
+						 &force_state,
+						 reason);
+
 	status = ml_nlink_update_no_force_for_all(psoc, vdev,
 						  &curr_force_state,
 						  &force_state,
@@ -1962,7 +2021,8 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 						&curr_force_state,
 						&force_state,
 						reason);
-	if (status == QDF_STATUS_E_PENDING || status != QDF_STATUS_SUCCESS)
+	if (status == QDF_STATUS_E_PENDING ||
+	    (status != QDF_STATUS_SUCCESS && status != QDF_STATUS_E_NOSUPPORT))
 		goto end;
 
 	status = ml_nlink_update_force_inactive_num(psoc, vdev,

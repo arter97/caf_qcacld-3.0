@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1065,6 +1065,85 @@ static struct ieee80211_iface_combination
 		.beacon_int_min_gcd = 1,
 #endif
 	},
+#ifndef WLAN_FEATURE_NO_P2P_CONCURRENCY
+	/* P2P */
+	{
+		.limits = wlan_hdd_p2p_iface_limit,
+		.num_different_channels = 2,
+		.max_interfaces = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_p2p_iface_limit),
+	},
+
+	/* SAP + P2P */
+	{
+		.limits = wlan_hdd_sap_p2p_iface_limit,
+		.num_different_channels = 2,
+		/* 1-SAP + 1-P2P */
+		.max_interfaces = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sap_p2p_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+	/* P2P + P2P */
+	{
+		.limits = wlan_hdd_p2p_p2p_iface_limit,
+		.num_different_channels = 2,
+		/* 2-P2P */
+		.max_interfaces = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_p2p_p2p_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+#endif
+	/* STA + P2P */
+	{
+		.limits = wlan_hdd_sta_p2p_iface_limit,
+		.num_different_channels = 2,
+		.max_interfaces = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_p2p_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+#ifndef WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+	/* STA + SAP */
+	{
+		.limits = wlan_hdd_sta_ap_iface_limit,
+		.num_different_channels = 2,
+		.max_interfaces = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_ap_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+#endif /* WLAN_FEATURE_NO_STA_SAP_CONCURRENCY */
+	/* Monitor */
+	{
+		.limits = wlan_hdd_mon_iface_limit,
+		.max_interfaces = 2,
+		.num_different_channels = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_mon_iface_limit),
+	},
+#if defined(WLAN_FEATURE_NAN) && \
+	   (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
+#ifndef WLAN_FEATURE_NO_STA_NAN_CONCURRENCY
+	/* NAN + STA */
+	{
+		.limits = wlan_hdd_sta_nan_iface_limit,
+		.max_interfaces = 2,
+		.num_different_channels = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_nan_iface_limit),
+	},
+#endif /* WLAN_FEATURE_NO_STA_NAN_CONCURRENCY */
+#ifndef WLAN_FEATURE_NO_SAP_NAN_CONCURRENCY
+	/* NAN + SAP */
+	{
+		.limits = wlan_hdd_sap_nan_iface_limit,
+		.num_different_channels = 2,
+		.max_interfaces = 2,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sap_nan_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+#endif /* !WLAN_FEATURE_NO_SAP_NAN_CONCURRENCY */
+#endif /* WLAN_FEATURE_NAN */
+};
+
+static struct ieee80211_iface_combination
+	wlan_hdd_non_dbs_iface_combination[] = {
 #ifndef WLAN_FEATURE_NO_P2P_CONCURRENCY
 	/* P2P */
 	{
@@ -12593,7 +12672,8 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	struct nlattr *mlo_bd_info = NULL;
 	uint32_t i = 0;
 	uint32_t link_id = 0;
-	struct wlan_objmgr_vdev *vdev, *link_vdev;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *link_vdev = NULL;
 	struct wlan_channel *bss_chan;
 	struct wlan_hdd_link_info *link_info_t;
 	struct hdd_station_ctx *sta_ctx;
@@ -12667,13 +12747,14 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 		nla_nest_end(skb, mlo_bd);
 		i++;
 
-		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
+		if (link_vdev)
+			hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 	}
 	nla_nest_end(skb, mlo_bd_info);
 end:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
-	if (ret)
+	if (link_vdev)
 		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 
 	return ret;
@@ -22058,12 +22139,19 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 			return;
 		}
 
-		if (!ucfg_policy_mgr_is_fw_supports_dbs(hdd_ctx->psoc) ||
-		    (dbs_one_by_one && !dbs_two_by_two)) {
+		if (!ucfg_policy_mgr_is_fw_supports_dbs(hdd_ctx->psoc)) {
+			/* Update IFACE combination for non-DBS target */
+			wiphy->iface_combinations =
+					wlan_hdd_non_dbs_iface_combination;
+			iface_num =
+				ARRAY_SIZE(wlan_hdd_non_dbs_iface_combination);
+		} else if (dbs_one_by_one && !dbs_two_by_two) {
+			/* Update IFACE combination for 1x1 DBS target */
 			wiphy->iface_combinations =
 						wlan_hdd_derived_combination;
 			iface_num = ARRAY_SIZE(wlan_hdd_derived_combination);
 		} else {
+			/* Update IFACE combination for DBS target */
 			wiphy->iface_combinations = wlan_hdd_iface_combination;
 			iface_num = ARRAY_SIZE(wlan_hdd_iface_combination);
 		}

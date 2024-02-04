@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3306,8 +3306,7 @@ QDF_STATUS sme_get_network_params(struct mac_context *mac,
 		csr_translate_to_wni_cfg_dot11_mode(mac, dot11_mode);
 
 	dot11_cfg->nw_type =
-		csr_convert_mode_to_nw_type(dot11_cfg->dot11_mode,
-					    dot11_cfg->p_band);
+		csr_convert_mode_to_nw_type(dot11_mode, dot11_cfg->p_band);
 
 	/* If INI is enabled, use the rates from hostapd */
 	if (!cds_is_sub_20_mhz_enabled() && chan_switch_hostapd_rate_enabled &&
@@ -12669,7 +12668,7 @@ uint32_t sme_get_wni_dot11_mode(mac_handle_t mac_handle)
  *
  * Return: QDF_STATUS_SUCCESS on success, non-zero error code on failure.
  */
-QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, tSirMacAddr bss_id,
+QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, uint8_t *bss_id,
 				  uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;

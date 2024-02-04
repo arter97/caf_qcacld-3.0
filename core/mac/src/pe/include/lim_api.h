@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -649,6 +649,23 @@ lim_fill_pe_session(struct mac_context *mac_ctx,
 		    struct bss_description *bss_desc);
 
 #ifdef WLAN_FEATURE_11BE_MLO
+/*
+ * lim_add_bcn_probe() - Add the generated probe resp to scan DB
+ * @vdev: VDEV object manager
+ * @bcn_probe: Pointer to bcn/probe
+ * @len: Length of frame.
+ * @freq: Freq on frame.
+ * @rssi: RSSI of the frame.
+ *
+ * Prepares the meta data to add the generated bcn/probe frame to
+ * scan DB.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
+		  uint32_t len, qdf_freq_t freq, int32_t rssi);
+
 /**
  * lim_update_mlo_mgr_info() - API to update mlo_mgr link info
  * @mac_ctx: Pointer to mac context
@@ -714,6 +731,13 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 			     uint32_t probe_rsp_len);
 
 #else
+static inline QDF_STATUS
+lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
+		  uint32_t len, qdf_freq_t freq, int32_t rssi)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline QDF_STATUS
 lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 			struct wlan_objmgr_vdev *vdev,

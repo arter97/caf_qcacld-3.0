@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -358,6 +358,38 @@ ml_nlink_get_dynamic_inactive_links(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint16_t *dynamic_link_bitmap,
 				    uint16_t *force_link_bitmap);
+
+/**
+ * ml_nlink_init_concurrency_link_request() - Init concurrency force
+ * link request
+ * link bitmap
+ * @psoc: psoc object
+ * @vdev: vdev object
+ *
+ * When ML STA associated or Roam, initialize the concurrency
+ * force link request based on "current" force link state
+ *
+ * Return: None
+ */
+void ml_nlink_init_concurrency_link_request(
+	struct wlan_objmgr_psoc *psoc,
+	struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ml_nlink_get_force_link_request() - get link request of source
+ * link bitmap
+ * @psoc: psoc object
+ * @vdev: vdev object
+ * @req: set link request
+ * @source: the source to query
+ *
+ * Return: None
+ */
+void
+ml_nlink_get_force_link_request(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct set_link_req *req,
+				enum set_link_source source);
 
 /**
  * ml_nlink_get_curr_force_state() - get link force state

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1064,8 +1064,8 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 	if (hdd_adapter_is_link_adapter(adapter))
 		return;
 
-	hdd_debug("netif_control's vdev_id: %d, action: %d, reason: %d",
-		  adapter->deflink->vdev_id, action, reason);
+	hdd_debug_rl("netif_control's vdev_id: %d, action: %d, reason: %d",
+		     adapter->deflink->vdev_id, action, reason);
 
 	switch (action) {
 
