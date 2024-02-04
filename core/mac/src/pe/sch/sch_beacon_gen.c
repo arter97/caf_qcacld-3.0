@@ -130,6 +130,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d DSParams changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT2);
 	}
 
 	qdf_mem_copy(&link_ie->link_wmm_params, &bcn_2->WMMParams,
@@ -145,6 +147,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d EDCAParamSet changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT2);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_csa, &bcn_2->ChanSwitchAnn,
@@ -155,6 +159,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d csa added, critical update",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT1);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_ecsa, &bcn_2->ext_chan_switch_ann,
@@ -165,6 +171,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d ecsa added, critical update",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT1);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_swt_time, &bcn_2->max_chan_switch_time,
@@ -175,6 +183,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 			     sizeof(bcn_2->max_chan_switch_time));
 		pe_debug("vdev id %d max channel switch time added",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT1);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_quiet, &bcn_2->Quiet,
@@ -185,6 +195,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d quiet added, critical update",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT1);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_ht_info, &bcn_2->HTInfo,
@@ -194,6 +206,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d HTInfo changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT2);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_vht_op, &bcn_2->VHTOperation,
@@ -203,6 +217,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d VHTOperation changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT2);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_he_op, &bcn_2->he_op,
@@ -212,6 +228,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d he_op changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT2);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_eht_op, &bcn_2->eht_op,
@@ -221,6 +239,8 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d eht_op changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT2);
 	}
 
 	/*
@@ -238,6 +258,16 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		    bcn_2->OperatingMode.present ||
 		    bcn_2->bss_color_change.present)
 			session->mlo_link_info.bss_param_change = true;
+
+		if (bcn_2->ChanSwitchAnn.present ||
+		    bcn_2->ext_chan_switch_ann.present ||
+		    bcn_2->Quiet.present)
+			wlan_vdev_mlme_op_flags_set(session->vdev,
+						    WLAN_VDEV_OP_CU_CAT1);
+		else
+			wlan_vdev_mlme_op_flags_set(session->vdev,
+						    WLAN_VDEV_OP_CU_CAT2);
+
 		if (session->mlo_link_info.bss_param_change) {
 			link_ie->bss_param_change_cnt++;
 			offset = sizeof(tAniBeaconStruct);
