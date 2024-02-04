@@ -88,7 +88,7 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #endif
 
 /* FW response timeout values in milli seconds */
-#define SIR_PEER_ASSOC_TIMEOUT           (4000) /* 4 seconds */
+#define SIR_PEER_ASSOC_TIMEOUT           (10000) /* 10 seconds */
 
 #ifdef FEATURE_RUNTIME_PM
 /* Add extra PMO_RESUME_TIMEOUT for runtime PM resume timeout */
