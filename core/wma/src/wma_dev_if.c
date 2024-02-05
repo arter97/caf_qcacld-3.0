@@ -4828,6 +4828,110 @@ static void wma_get_mld_info_ap(tpAddStaParams add_sta,
 		*is_assoc_peer = false;
 	}
 }
+
+static inline QDF_STATUS
+wma_check_for_mlo_peer_conflict(struct wlan_mlo_peer_context *peer_1,
+				struct wlan_mlo_peer_context *peer_2)
+{
+	if (!peer_1 && !peer_2)
+		return QDF_STATUS_SUCCESS;
+
+	if (!peer_2) {
+		wma_err("ML-peer with same mac address exists for a different AID");
+		return QDF_STATUS_E_ALREADY;
+	} else if (peer_1 == peer_2) {
+		return QDF_STATUS_SUCCESS;
+	}
+
+	/* Two ML-peers exists with different AID */
+	QDF_ASSERT(0);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+wma_validate_mac_for_conflict_on_same_ml_ctx(tp_wma_handle wma,
+					     tpAddStaParams add_sta,
+					     uint8_t *peer_mld)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_mlo_peer_context *ml_peer, *tmp_ml_peer;
+	struct qdf_mac_addr sta_addr = {0};
+	struct wlan_objmgr_peer *peer;
+	QDF_STATUS status =  QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+						    add_sta->smesessionId,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	/* Not an ML-SAP, therefore skip the validation */
+	if (!vdev->mlo_dev_ctx)
+		goto release_ref;
+
+	qdf_mem_copy(&sta_addr.bytes[0], add_sta->staMac,
+		     sizeof(tSirMacAddr));
+
+	ml_peer = wlan_mlo_get_mlpeer(vdev->mlo_dev_ctx,
+				      &sta_addr);
+	/*
+	 * ML-peer exists on the ML-dev with same address.
+	 * If the AID is different, then another ML-STA
+	 * is already associated to this SAP using the
+	 * same MLD mac
+	 */
+	if (ml_peer) {
+		tmp_ml_peer = wlan_mlo_get_mlpeer_by_aid(vdev->mlo_dev_ctx,
+							 add_sta->assocId);
+
+		status = wma_check_for_mlo_peer_conflict(ml_peer, tmp_ml_peer);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("Link mac address conflicts with another MLO peer on same interface");
+			goto release_ref;
+		}
+	}
+
+	/*
+	 * ML-peer exists on the ML-dev with same MLD address.
+	 * If the AID is different, reject the peer create
+	 */
+	ml_peer = wlan_mlo_get_mlpeer(vdev->mlo_dev_ctx,
+				      (struct qdf_mac_addr *)peer_mld);
+	if (ml_peer) {
+		tmp_ml_peer = wlan_mlo_get_mlpeer_by_aid(vdev->mlo_dev_ctx,
+							 add_sta->assocId);
+		status = wma_check_for_mlo_peer_conflict(ml_peer, tmp_ml_peer);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("MLD mac address conflicts with another MLO peer on same interface");
+			goto release_ref;
+		}
+	}
+
+	/*
+	 * If the link address of another ML-peer(with different AID) matches
+	 * with the MLD address of the incoming peer, reject the peer create.
+	 *
+	 * Note: Legacy MLD mac - link mac conflict is taken care at
+	 * wma_create_peer_validate_mld_address()
+	 */
+	peer = wlan_objmgr_get_peer_by_mac(wma->psoc, peer_mld,
+					   WLAN_LEGACY_WMA_ID);
+	if (!peer) {
+		goto release_ref;
+	} else {
+		if (peer->mlo_peer_ctx &&
+		    peer->mlo_peer_ctx->assoc_id != add_sta->assocId) {
+			wma_err("MLD mac address conflicts with link mac address of another ML-peer on same interface");
+			status = QDF_STATUS_E_FAILURE;
+		}
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+	}
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+	return status;
+}
 #else
 static void wma_get_mld_info_ap(tpAddStaParams add_sta,
 				uint8_t **peer_mld_addr,
@@ -4835,6 +4939,14 @@ static void wma_get_mld_info_ap(tpAddStaParams add_sta,
 {
 	*peer_mld_addr = NULL;
 	*is_assoc_peer = false;
+}
+
+static QDF_STATUS
+wma_validate_mac_for_conflict_on_same_ml_ctx(tp_wma_handle wma,
+					     tpAddStaParams add_sta,
+					     uint8_t *peer_mld)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -4941,6 +5053,15 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	wma_delete_invalid_peer_entries(add_sta->smesessionId, add_sta->staMac);
 
 	wma_get_mld_info_ap(add_sta, &peer_mld_addr, &is_assoc_peer);
+
+	status = wma_validate_mac_for_conflict_on_same_ml_ctx(wma, add_sta,
+							      peer_mld_addr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Conflict detected with mac address, peer create failed");
+		add_sta->status = status;
+		goto send_rsp;
+	}
+
 	status = wma_create_peer(wma, add_sta->staMac, WMI_PEER_TYPE_DEFAULT,
 				 add_sta->smesessionId, peer_mld_addr,
 				 is_assoc_peer);
