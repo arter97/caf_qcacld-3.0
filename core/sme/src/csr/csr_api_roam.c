@@ -5807,8 +5807,9 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 	 * Update the IEs after connection to reconfigure
 	 * any capability that changed during connection.
 	 */
-	sme_set_vdev_ies_per_band(mac_handle, vdev_id,
-				  wlan_vdev_mlme_get_opmode(vdev));
+	if (mlme_obj->cfg.obss_ht40.is_override_ht20_40_24g)
+		sme_set_vdev_ies_per_band(mac_handle, vdev_id,
+					  wlan_vdev_mlme_get_opmode(vdev));
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -5863,12 +5864,13 @@ QDF_STATUS cm_csr_handle_diconnect_req(struct wlan_objmgr_vdev *vdev,
 }
 
 QDF_STATUS
-cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
-			  struct wlan_cm_discon_rsp *rsp)
+cm_csr_disconnect_done_ind(struct wlan_objmgr_vdev *vdev,
+			   struct wlan_cm_discon_rsp *rsp)
 {
 	mac_handle_t mac_handle;
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
 	/*
 	 * This API is to update legacy struct and should be removed once
@@ -5881,6 +5883,10 @@ cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
 
+	mlme_obj = mlme_get_psoc_ext_obj(mac_ctx->psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
 	cm_csr_set_idle(vdev_id);
 	if (cm_is_vdev_roaming(vdev))
 		sme_qos_update_hand_off(vdev_id, false);
@@ -5891,8 +5897,12 @@ cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
 	 * any connection specific capability change and
 	 * to reset back to self cap
 	 */
-	sme_set_vdev_ies_per_band(mac_handle, vdev_id,
-				  wlan_vdev_mlme_get_opmode(vdev));
+	if (mlme_obj->cfg.obss_ht40.is_override_ht20_40_24g) {
+		wlan_cm_set_force_20mhz_in_24ghz(vdev, true);
+		sme_set_vdev_ies_per_band(mac_handle, vdev_id,
+					  wlan_vdev_mlme_get_opmode(vdev));
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 

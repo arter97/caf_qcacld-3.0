@@ -427,6 +427,7 @@ static bool __lim_process_sme_sys_ready_ind(struct mac_context *mac,
 	if (ANI_DRIVER_TYPE(mac) != QDF_DRIVER_TYPE_MFG) {
 		ready_req->pe_roam_synch_cb = pe_roam_synch_callback;
 		ready_req->pe_disconnect_cb = pe_disconnect_callback;
+		ready_req->pe_roam_set_ie_cb = pe_set_ie_for_roam_invoke;
 		pe_register_mgmt_rx_frm_callback(mac);
 		pe_register_callbacks_with_wma(mac, ready_req);
 		mac->lim.sme_msg_callback = ready_req->sme_msg_cb;
@@ -3135,10 +3136,9 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	cb_mode = wlan_get_cb_mode(mac_ctx, session->curr_op_freq, ie_struct,
 				   session);
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
-	    session->force_24ghz_in_ht20) {
+	    wlan_cm_get_force_20mhz_in_24ghz(session->vdev))
 		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
-		pe_debug("force_24ghz_in_ht20 is set so set cbmode to 0");
-	}
+
 	status = wlan_get_rate_set(mac_ctx, ie_struct, session);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Get rate failed vdev id %d", session->vdev_id);
@@ -4404,8 +4404,6 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	session->ssId.length = req->entry->ssid.length;
 	qdf_mem_copy(session->ssId.ssId, req->entry->ssid.ssid,
 		     session->ssId.length);
-
-	session->force_24ghz_in_ht20 = req->force_24ghz_in_ht20;
 
 	status = lim_fill_pe_session(mac_ctx, session, bss_desc);
 	if (QDF_IS_STATUS_ERROR(status)) {

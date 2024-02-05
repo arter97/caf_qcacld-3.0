@@ -1369,9 +1369,6 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 			   req->bss->entry->bssid.bytes,
 			   req->bss->entry->neg_sec_info.key_mgmt,
 			   req->bss->entry->channel.chan_freq);
-	if (mlme_obj->cfg.obss_ht40.is_override_ht20_40_24g &&
-	    !(req->ht_caps & WLAN_HTCAP_C_CHWIDTH40))
-		join_req->force_24ghz_in_ht20 = true;
 
 	msg.bodyptr = join_req;
 	msg.type = CM_CONNECT_REQ;
