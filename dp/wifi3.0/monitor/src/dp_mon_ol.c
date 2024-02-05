@@ -43,6 +43,9 @@
 
 #define _HT_SGI_PRESENT 0x80
 
+int wlan_cfg80211_set_mon_fcs_cap(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  struct wlan_cfg8011_genric_params *params);
 void monitor_osif_process_rx_mpdu(osif_dev *osifp, qdf_nbuf_t mpdu_ind);
 void monitor_osif_deliver_tx_capture_data(osif_dev *osifp, struct sk_buff *skb);
 int wlan_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
@@ -1726,6 +1729,7 @@ static struct mon_ops monitor_ops = {
 	.mon_set_lite_monitor_config = wlan_set_lite_monitor_config,
 	.mon_get_lite_monitor_config = wlan_get_lite_monitor_config,
 #endif /* QCA_SUPPORT_LITE_MONITOR */
+	.mon_cfg80211_set_mon_fcs_cap = wlan_cfg80211_set_mon_fcs_cap,
 };
 
 /**

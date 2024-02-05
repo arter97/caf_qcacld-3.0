@@ -78,6 +78,9 @@ struct mon_ops {
 	int (*mon_get_lite_monitor_config)(void *vscn,
 					   struct lite_mon_config *config);
 #endif /* QCA_SUPPORT_LITE_MONITOR */
+	int (*mon_cfg80211_set_mon_fcs_cap)(struct wiphy *wiphy,
+					    struct wireless_dev *wdev,
+					    struct wlan_cfg8011_genric_params *params);
 };
 
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
@@ -184,6 +187,28 @@ monitor_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
 	return soc->soc_mon_ops->mon_cfg80211_set_peer_pkt_capture_params(wiphy,
 									  wdev,
 									  params);
+}
+
+static inline int
+monitor_cfg80211_set_mon_fcs_cap(struct ol_ath_softc_net80211 *scn,
+				 struct wiphy *wiphy,
+				 struct wireless_dev *wdev,
+				 struct wlan_cfg8011_genric_params *params)
+{
+	ol_ath_soc_softc_t *soc;
+
+	if (!scn || !scn->soc)
+		return -EOPNOTSUPP;
+
+	soc = scn->soc;
+
+	if (!soc->soc_mon_ops ||
+	    !soc->soc_mon_ops->mon_cfg80211_set_mon_fcs_cap)
+		return -EOPNOTSUPP;
+
+	return soc->soc_mon_ops->mon_cfg80211_set_mon_fcs_cap(wiphy,
+							      wdev,
+							      params);
 }
 
 static inline

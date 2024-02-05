@@ -20,9 +20,10 @@
 #ifdef QCA_SUPPORT_LITE_MONITOR
 #include <dp_lite_mon_pub.h>
 #endif
+#include <cdp_txrx_ctrl.h>
 
 void *extract_command(struct ieee80211com *ic, struct wireless_dev *wdev,
-		      int *cmd_type);
+		      int *cmd_type, uint8_t link_id);
 int cfg80211_reply_command(struct wiphy *wiphy, int length,
 			   void *data, u_int32_t flag);
 
@@ -62,7 +63,7 @@ int wlan_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	cmd = extract_command(ic, wdev, &cmd_type);
+	cmd = extract_command(ic, wdev, &cmd_type, params->link_id);
 	if (!cmd_type) {
 		dp_mon_err("Command on invalid interface");
 		return -EINVAL;
@@ -154,7 +155,7 @@ wlan_cfg80211_set_phyrx_error_mask(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	cmd = extract_command(ic, wdev, &cmd_type);
+	cmd = extract_command(ic, wdev, &cmd_type, params->link_id);
 	if (!cmd_type) {
 		dp_mon_err("Command on invalid interface");
 		return -EINVAL;
@@ -210,7 +211,7 @@ wlan_cfg80211_get_phyrx_error_mask(struct wiphy *wiphy,
 	ic = cfg_ctx->ic_list[0];
 #endif
 
-	cmd = extract_command(ic, wdev, &cmd_type);
+	cmd = extract_command(ic, wdev, &cmd_type, params->link_id);
 
 	if (!cmd_type) {
 		qdf_err(" Command on Invalid interface");
@@ -302,7 +303,7 @@ int wlan_cfg80211_lite_monitor_config(struct wiphy *wiphy,
 		return -EOPNOTSUPP;
 	}
 
-	cmd = extract_command(ic, wdev, &cmd_type);
+	cmd = extract_command(ic, wdev, &cmd_type, params->link_id);
 	if (!cmd_type) {
 		dp_mon_err("Command on invalid interface");
 		return -EINVAL;
@@ -366,3 +367,54 @@ int wlan_cfg80211_lite_monitor_config(struct wiphy *wiphy,
 	return retval;
 }
 #endif /* QCA_SUPPORT_LITE_MONITOR */
+
+int wlan_cfg80211_set_mon_fcs_cap(struct wiphy *wiphy,
+		struct wireless_dev *wdev,
+		struct wlan_cfg8011_genric_params *params)
+{
+	struct cfg80211_context *cfg_ctx = NULL;
+	struct ieee80211com *ic = NULL;
+	ol_txrx_soc_handle soc_txrx_handle;
+	struct wlan_objmgr_psoc *psoc;
+	wlan_if_t vap = NULL;
+	int cmd_type, retval = 0;
+	void *cmd;
+	cdp_config_param_type value = {0};
+	uint8_t pdev_id;
+
+	cfg_ctx = (struct cfg80211_context *)wiphy_priv(wiphy);
+	if (cfg_ctx == NULL) {
+		qdf_err("Invalid Context");
+		return -EINVAL;
+	}
+
+	ic = wlan_cfg80211_get_ic_ptr(wiphy, wdev, params->link_id);
+
+	if (ic == NULL) {
+		qdf_err("Invalid Interface");
+		return -EINVAL;
+	}
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(ic->ic_pdev_obj);
+	psoc = wlan_pdev_get_psoc(ic->ic_pdev_obj);
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+
+	cmd = extract_command(ic, wdev, &cmd_type, params->link_id);
+	if (cmd_type) {
+		qdf_err("Command on Invalid Interface");
+		return -EINVAL;
+	}
+	vap = (wlan_if_t)cmd;
+	if (!vap) {
+		qdf_err("VAP is null");
+		return -EINVAL;
+	}
+	if (vap->iv_opmode != IEEE80211_M_MONITOR) {
+		qdf_err("Feature supported only on monitor VAP.");
+		return -EINVAL;
+	}
+
+	value.cdp_pdev_param_mon_fcs_cap = params->value;
+	cdp_txrx_set_pdev_param(soc_txrx_handle, pdev_id, CDP_CONFIG_MON_FCS_CAP, value);
+
+	return retval;
+}
