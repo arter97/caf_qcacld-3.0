@@ -109,6 +109,13 @@ qdf_freq_t wlan_ll_lt_sap_override_freq(struct wlan_objmgr_psoc *psoc,
 					qdf_freq_t chan_freq);
 
 /**
+ * wlan_ll_lt_sap_extract_ll_sap_cap() - Extract LL LT SAP capability
+ * @psoc: Pointer to psoc object
+ *
+ */
+void wlan_ll_lt_sap_extract_ll_sap_cap(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_get_ll_lt_sap_restart_freq() - Get restart frequency on which LL_LT_SAP
  * can be re-started
  * @pdev: Pointer to pdev object
@@ -222,6 +229,11 @@ wlan_ll_lt_sap_switch_bearer_to_ble(
 				struct wlan_bearer_switch_request *bs_request)
 {
 	return QDF_STATUS_E_FAILURE;
+}
+
+static inline void
+wlan_ll_lt_sap_extract_ll_sap_cap(struct wlan_objmgr_psoc *psoc)
+{
 }
 
 static inline QDF_STATUS

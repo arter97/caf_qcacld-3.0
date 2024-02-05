@@ -265,6 +265,13 @@ ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
 			       struct wlan_bearer_switch_request *bs_request);
 
 /**
+ * ll_lt_sap_extract_ll_sap_cap() - Extract LL LT SAP capabilities
+ * @psoc: Pointer to psoc object
+ *
+ */
+void ll_lt_sap_extract_ll_sap_cap(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ll_lt_sap_switch_bearer_to_wlan() - Switch audio transport to BLE
  * @psoc: Pointer to psoc
  * @bs_request: Pointer to bearer switch request

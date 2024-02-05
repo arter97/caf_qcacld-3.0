@@ -110,6 +110,7 @@
 #include <ftm_time_sync_ucfg_api.h>
 #include "wlan_ipa_ucfg_api.h"
 #include "wma_eht.h"
+#include "wlan_ll_sap_api.h"
 
 #ifdef DIRECT_BUF_RX_ENABLE
 #include <target_if_direct_buf_rx_api.h>
@@ -6688,12 +6689,27 @@ static void wma_set_fwol_caps(struct wlan_objmgr_psoc *psoc)
 	wma_set_thermal_stats_fw_cap(wma, &cap_info);
 	ucfg_fwol_update_fw_cap_info(psoc, &cap_info);
 }
+
+#ifdef WLAN_FEATURE_LL_LT_SAP
+static void
+wma_set_ll_sap_caps(struct wlan_objmgr_psoc *psoc)
+{
+	wlan_ll_lt_sap_extract_ll_sap_cap(psoc);
+}
+#else
+static void
+wma_set_ll_sap_caps(struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 static void wma_set_component_caps(struct wlan_objmgr_psoc *psoc)
 {
 	wma_set_pmo_caps(psoc);
 	wma_set_mlme_caps(psoc);
 	wma_set_mc_cp_caps(psoc);
 	wma_set_fwol_caps(psoc);
+	wma_set_ll_sap_caps(psoc);
 }
 
 #if defined(WLAN_FEATURE_GTK_OFFLOAD) && defined(WLAN_POWER_MANAGEMENT_OFFLOAD)

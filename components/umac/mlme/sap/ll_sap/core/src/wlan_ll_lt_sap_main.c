@@ -27,15 +27,41 @@
 
 bool ll_lt_sap_is_supported(struct wlan_objmgr_psoc *psoc)
 {
+	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
+
+	psoc_ll_sap_obj =
+		wlan_objmgr_psoc_get_comp_private_obj(psoc,
+						      WLAN_UMAC_COMP_LL_SAP);
+	if (!psoc_ll_sap_obj) {
+		ll_sap_err("Invalid psoc ll sap priv obj");
+		return false;
+	}
+
+	return psoc_ll_sap_obj->is_ll_lt_sap_supported;
+}
+
+void ll_lt_sap_extract_ll_sap_cap(struct wlan_objmgr_psoc *psoc)
+{
 	struct wmi_unified *wmi_handle;
+	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 	if (!wmi_handle) {
 		ll_sap_err("Invalid WMI handle");
-		return false;
+		return;
 	}
 
-	return wmi_service_enabled(wmi_handle, wmi_service_xpan_support);
+	psoc_ll_sap_obj =
+		wlan_objmgr_psoc_get_comp_private_obj(psoc,
+						      WLAN_UMAC_COMP_LL_SAP);
+	if (!psoc_ll_sap_obj) {
+		ll_sap_err("Invalid psoc ll sap priv obj");
+		return;
+	}
+
+	psoc_ll_sap_obj->is_ll_lt_sap_supported =
+		wmi_service_enabled(wmi_handle, wmi_service_xpan_support);
+
 }
 
 /**

@@ -42,6 +42,12 @@ wlan_ll_lt_sap_switch_bearer_to_ble(struct wlan_objmgr_psoc *psoc,
 	return ll_lt_sap_switch_bearer_to_ble(psoc, bs_request);
 }
 
+void
+wlan_ll_lt_sap_extract_ll_sap_cap(struct wlan_objmgr_psoc *psoc)
+{
+	ll_lt_sap_extract_ll_sap_cap(psoc);
+}
+
 static void
 connect_start_bearer_switch_requester_cb(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id,
