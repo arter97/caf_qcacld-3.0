@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,9 @@
 #include <qdf_types.h>
 
 #define P2P_MAX_NOA_DESC 4
+
+#define P2P_MC_ADDR      "\x51\x6F\x9A\x02"
+#define P2P_MC_ADDR_SIZE 4
 
 #define HEADER_LEN_P2P_IE  6
 

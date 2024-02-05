@@ -1275,16 +1275,29 @@ __hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 	}
 
 	/* Get adapter from Destination mac address of the frame */
+	dest_addr = &pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET];
 	if (type == WLAN_FC0_TYPE_MGMT &&
 	    sub_type != SIR_MAC_MGMT_PROBE_REQ && !is_pasn_auth_frame &&
-	    !qdf_is_macaddr_broadcast(
-	     (struct qdf_mac_addr *)&pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET])) {
-		dest_addr = &pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET];
+	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)dest_addr)) {
 		adapter = hdd_get_adapter_by_macaddr(hdd_ctx, dest_addr);
 		if (!adapter)
 			adapter = hdd_get_adapter_by_rand_macaddr(hdd_ctx,
 								  dest_addr);
 		if (!adapter) {
+			/* check if it is P2P MC address */
+			if (!qdf_mem_cmp(dest_addr,
+					 P2P_MC_ADDR, P2P_MC_ADDR_SIZE)) {
+				adapter = hdd_get_adapter(hdd_ctx,
+							  QDF_P2P_DEVICE_MODE);
+				if (!adapter) {
+					hdd_err("P2P adapter is null for frame %d len %d rx freq %d",
+						frame_type, frm_len, rx_freq);
+					return;
+				}
+
+				goto check_adapter;
+			}
+
 			/*
 			 * Under assumption that we don't receive any action
 			 * frame with BCST as destination,
