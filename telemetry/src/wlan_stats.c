@@ -73,16 +73,21 @@ static void stats_evt_work_handler(void *ctx)
 
 		switch (list_entry->cfg->obj) {
 		case STATS_OBJ_STA:
-			qdf_err("stats of STA requested.");
+			stats_peer_setup(list_entry->vdev,
+					 list_entry->mac,
+					 list_entry->cfg);
 			break;
 		case STATS_OBJ_VAP:
-			qdf_err("stats of VAP requested.");
+			stats_vdev_setup(list_entry->vdev,
+					 list_entry->cfg);
 			break;
 		case STATS_OBJ_RADIO:
-			qdf_err("stats of Radio requested.");
+			stats_pdev_setup(list_entry->pdev,
+					 list_entry->cfg);
 			break;
 		case STATS_OBJ_AP:
-			qdf_err("stats of AP requested.");
+			stats_psoc_setup(list_entry->pdev,
+					 list_entry->cfg);
 			break;
 		default:
 			qdf_err("Unknown stats command.%d",
