@@ -1047,11 +1047,12 @@ QDF_STATUS pmo_core_txrx_suspend(struct wlan_objmgr_psoc *psoc)
 
 	status = cdp_drain_txrx(dp_soc, 0);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		pmo_err("Prevent suspend unable to drain txrx");
+		pmo_err("Prevent suspend unable to drain txrx status:%u",
+			status);
 		ret = hif_enable_grp_irqs(hif_ctx);
 		if (ret && ret != -EOPNOTSUPP) {
 			pmo_err("Failed to enable grp irqs: %d", ret);
-			QDF_BUG(0);
+			qdf_trigger_self_recovery(psoc, QDF_ENABLE_IRQ_FAILURE);
 		}
 		goto out;
 	}
