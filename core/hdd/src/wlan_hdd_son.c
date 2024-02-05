@@ -499,7 +499,7 @@ static int hdd_son_set_bandwidth(struct wlan_objmgr_vdev *vdev,
  */
 static uint32_t hdd_phymode_chwidth_to_son_bandwidth(
 					eCsrPhyMode phymode,
-					enum eSirMacHTChannelWidth chwidth)
+					enum phy_ch_width chwidth)
 {
 	uint32_t son_bandwidth = NONHT;
 
@@ -515,32 +515,32 @@ static uint32_t hdd_phymode_chwidth_to_son_bandwidth(
 	case eCSR_DOT11_MODE_11n:
 	case eCSR_DOT11_MODE_11n_ONLY:
 		son_bandwidth = HT20;
-		if (chwidth == eHT_CHANNEL_WIDTH_40MHZ)
+		if (chwidth == CH_WIDTH_40MHZ)
 			son_bandwidth = HT40;
 		break;
 	case eCSR_DOT11_MODE_11ac:
 	case eCSR_DOT11_MODE_11ac_ONLY:
 		son_bandwidth = VHT20;
-		if (chwidth == eHT_CHANNEL_WIDTH_40MHZ)
+		if (chwidth == CH_WIDTH_40MHZ)
 			son_bandwidth = VHT40;
-		else if (chwidth == eHT_CHANNEL_WIDTH_80MHZ)
+		else if (chwidth == CH_WIDTH_80MHZ)
 			son_bandwidth = VHT80;
-		else if (chwidth == eHT_CHANNEL_WIDTH_160MHZ)
+		else if (chwidth == CH_WIDTH_160MHZ)
 			son_bandwidth = VHT160;
-		else if (chwidth == eHT_CHANNEL_WIDTH_80P80MHZ)
+		else if (chwidth == CH_WIDTH_80P80MHZ)
 			son_bandwidth = VHT80_80;
 		break;
 	case eCSR_DOT11_MODE_11ax:
 	case eCSR_DOT11_MODE_11ax_ONLY:
 	case eCSR_DOT11_MODE_AUTO:
 		son_bandwidth = HE20;
-		if (chwidth == eHT_CHANNEL_WIDTH_40MHZ)
+		if (chwidth == CH_WIDTH_40MHZ)
 			son_bandwidth = HE40;
-		else if (chwidth == eHT_CHANNEL_WIDTH_80MHZ)
+		else if (chwidth == CH_WIDTH_80MHZ)
 			son_bandwidth = HE80;
-		else if (chwidth == eHT_CHANNEL_WIDTH_160MHZ)
+		else if (chwidth == CH_WIDTH_160MHZ)
 			son_bandwidth = HE160;
-		else if (chwidth == eHT_CHANNEL_WIDTH_80P80MHZ)
+		else if (chwidth == CH_WIDTH_80P80MHZ)
 			son_bandwidth = HE80_80;
 		break;
 	default:
@@ -558,7 +558,7 @@ static uint32_t hdd_phymode_chwidth_to_son_bandwidth(
  */
 static uint32_t hdd_son_get_bandwidth(struct wlan_objmgr_vdev *vdev)
 {
-	enum eSirMacHTChannelWidth chwidth;
+	struct wlan_channel *des_chan;
 	eCsrPhyMode phymode;
 	struct hdd_context *hdd_ctx;
 	struct wlan_hdd_link_info *link_info;
@@ -574,10 +574,9 @@ static uint32_t hdd_son_get_bandwidth(struct wlan_objmgr_vdev *vdev)
 		return NONHT;
 	}
 
-	chwidth = wma_cli_get_command(link_info->vdev_id,
-				      wmi_vdev_param_chwidth, VDEV_CMD);
+	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 
-	if (chwidth < 0) {
+	if (!des_chan) {
 		hdd_err("Failed to get chwidth");
 		return NONHT;
 	}
@@ -590,7 +589,8 @@ static uint32_t hdd_son_get_bandwidth(struct wlan_objmgr_vdev *vdev)
 
 	phymode = sme_get_phy_mode(hdd_ctx->mac_handle);
 
-	return hdd_phymode_chwidth_to_son_bandwidth(phymode, chwidth);
+	return hdd_phymode_chwidth_to_son_bandwidth(phymode,
+						    des_chan->ch_width);
 }
 
 /**
