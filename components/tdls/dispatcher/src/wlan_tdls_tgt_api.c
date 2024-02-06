@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,18 +49,6 @@ QDF_STATUS tgt_tdls_set_fw_state(struct wlan_objmgr_psoc *psoc,
 	tdls_ops = wlan_psoc_get_tdls_txops(psoc);
 	if (tdls_ops && tdls_ops->update_fw_state)
 		return tdls_ops->update_fw_state(psoc, tdls_param);
-	else
-		return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS tgt_tdls_set_peer_state(struct wlan_objmgr_psoc *psoc,
-				   struct tdls_peer_update_state *peer_param)
-{
-	struct wlan_lmac_if_tdls_tx_ops *tdls_ops = NULL;
-
-	tdls_ops = wlan_psoc_get_tdls_txops(psoc);
-	if (tdls_ops && tdls_ops->update_peer_state)
-		return tdls_ops->update_peer_state(psoc, peer_param);
 	else
 		return QDF_STATUS_SUCCESS;
 }

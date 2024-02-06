@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,16 +37,6 @@
  */
 QDF_STATUS tgt_tdls_set_fw_state(struct wlan_objmgr_psoc *psoc,
 				 struct tdls_info *tdls_param);
-
-/**
- * tgt_tdls_set_peer_state() - invoke lmac tdls update peer state
- * @psoc: soc object
- * @peer_param: update tdls peer parameters
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS tgt_tdls_set_peer_state(struct wlan_objmgr_psoc *psoc,
-				   struct tdls_peer_update_state *peer_param);
 
 /**
  * tgt_tdls_set_offchan_mode() - invoke lmac tdls set off-channel mode

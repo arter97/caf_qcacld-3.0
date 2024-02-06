@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -41,17 +41,6 @@ struct sta_uapsd_trig_params;
 QDF_STATUS
 target_if_tdls_update_fw_state(struct wlan_objmgr_psoc *psoc,
 			       struct tdls_info *param);
-
-/**
- * target_if_tdls_update_peer_state() - lmac handler to update tdls peer state
- * @psoc: psoc object
- * @peer_params: tdls peer state params
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-target_if_tdls_update_peer_state(struct wlan_objmgr_psoc *psoc,
-				 struct tdls_peer_update_state *peer_params);
 
 /**
  * target_if_tdls_set_offchan_mode() - lmac handler to set tdls off channel mode
