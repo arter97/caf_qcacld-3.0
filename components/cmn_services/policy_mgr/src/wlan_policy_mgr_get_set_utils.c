@@ -12976,6 +12976,7 @@ bool policy_mgr_is_freq_on_mac_id(struct policy_mgr_freq_range *freq_range,
 }
 
 bool policy_mgr_get_vdev_same_freq_new_conn(struct wlan_objmgr_psoc *psoc,
+					    uint8_t self_vdev_id,
 					    uint32_t new_freq,
 					    uint8_t *vdev_id)
 {
@@ -12992,7 +12993,8 @@ bool policy_mgr_get_vdev_same_freq_new_conn(struct wlan_objmgr_psoc *psoc,
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
 		if (pm_conc_connection_list[i].in_use &&
-		    pm_conc_connection_list[i].freq == new_freq) {
+		    pm_conc_connection_list[i].freq == new_freq &&
+		    pm_conc_connection_list[i].vdev_id != self_vdev_id) {
 			match = true;
 			*vdev_id = pm_conc_connection_list[i].vdev_id;
 			policy_mgr_debug("new_freq %d matched with vdev_id %d",

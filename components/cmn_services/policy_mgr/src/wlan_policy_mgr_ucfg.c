@@ -361,10 +361,12 @@ bool ucfg_policy_mgr_is_hw_sbs_capable(struct wlan_objmgr_psoc *psoc)
 }
 
 bool ucfg_policy_mgr_get_vdev_same_freq_new_conn(struct wlan_objmgr_psoc *psoc,
+						 uint8_t self_vdev_id,
 						 uint32_t new_freq,
 						 uint8_t *vdev_id)
 {
-	return policy_mgr_get_vdev_same_freq_new_conn(psoc, new_freq, vdev_id);
+	return policy_mgr_get_vdev_same_freq_new_conn(psoc, self_vdev_id,
+						      new_freq, vdev_id);
 }
 
 bool ucfg_policy_mgr_get_vdev_diff_freq_new_conn(struct wlan_objmgr_psoc *psoc,

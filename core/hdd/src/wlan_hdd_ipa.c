@@ -347,11 +347,13 @@ hdd_ipa_get_tx_pipe_multi_conn(struct hdd_context *hdd_ctx,
 			       bool *tx_pipe)
 {
 	uint32_t new_freq = conn->ch_freq;
+	uint8_t self_vid = conn->vdev_id;
 	QDF_STATUS status;
 	uint8_t vdev_id;
 	bool pipe;
 
 	if (ucfg_policy_mgr_get_vdev_same_freq_new_conn(hdd_ctx->psoc,
+							self_vid,
 							new_freq,
 							&vdev_id)) {
 		/* Inherit the pipe selection of the connection that has
