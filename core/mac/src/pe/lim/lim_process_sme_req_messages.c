@@ -6386,6 +6386,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 			}
 		} else {
 			max_tx_power = reg_max - local_constraint;
+			if (!max_tx_power)
+				max_tx_power = reg_max;
 		}
 
 		/* If TPE is present */
