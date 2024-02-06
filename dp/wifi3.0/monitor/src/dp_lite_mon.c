@@ -999,10 +999,20 @@ bool dp_lite_mon_get_filter_ucast_data(struct cdp_pdev *pdev_handle)
 {
 	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev((struct dp_pdev *)pdev_handle);
 	struct dp_mon_pdev_be *be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
-	struct dp_lite_mon_config mon_config = be_mon_pdev->lite_mon_rx_config->rx_config;
+	struct dp_lite_mon_config *mon_config;
 
-	if ((mon_config.data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_UCAST) ||
-	    (mon_config.data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_UCAST))
+	if (!be_mon_pdev->lite_mon_rx_config)
+		return false;
+
+	mon_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+	/* if lite mon is not enabled then full monitor is enabled
+	 * which enables all filters, hence return true
+	 */
+	if (!mon_config->enable)
+		return true;
+
+	if ((mon_config->data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_UCAST) ||
+	    (mon_config->data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_UCAST))
 		return true;
 
 	return false;
@@ -1018,10 +1028,20 @@ bool dp_lite_mon_get_filter_mcast_data(struct cdp_pdev *pdev_handle)
 {
 	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev((struct dp_pdev *)pdev_handle);
 	struct dp_mon_pdev_be *be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
-	struct dp_lite_mon_config mon_config = be_mon_pdev->lite_mon_rx_config->rx_config;
+	struct dp_lite_mon_config *mon_config;
 
-	if ((mon_config.data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_MCAST) ||
-	    (mon_config.data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_MCAST))
+	if (!be_mon_pdev->lite_mon_rx_config)
+		return false;
+
+	mon_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+	/* if lite mon is not enabled then full monitor is enabled
+	 * which enables all filters, hence return true
+	 */
+	if (!mon_config->enable)
+		return true;
+
+	if ((mon_config->data_filter[LITE_MON_MODE_FILTER_FP] & FILTER_DATA_MCAST) ||
+	    (mon_config->data_filter[LITE_MON_MODE_FILTER_MO] & FILTER_DATA_MCAST))
 		return true;
 
 	return false;
@@ -1037,14 +1057,23 @@ bool dp_lite_mon_get_filter_non_data(struct cdp_pdev *pdev_handle)
 {
 	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev((struct dp_pdev *)pdev_handle);
 	struct dp_mon_pdev_be *be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
-	struct dp_lite_mon_config mon_config = be_mon_pdev->lite_mon_rx_config->rx_config;
+	struct dp_lite_mon_config *mon_config;
 
-	if ((mon_config.mgmt_filter[LITE_MON_MODE_FILTER_FP] & FILTER_MGMT_ALL) ||
-	    (mon_config.mgmt_filter[LITE_MON_MODE_FILTER_MO] & FILTER_MGMT_ALL)) {
-		if ((mon_config.ctrl_filter[LITE_MON_MODE_FILTER_FP] & FILTER_CTRL_ALL) ||
-		    (mon_config.ctrl_filter[LITE_MON_MODE_FILTER_MO] & FILTER_CTRL_ALL)) {
+	if (!be_mon_pdev->lite_mon_rx_config)
+		return false;
+
+	mon_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+	/* if lite mon is not enabled then full monitor is enabled
+	 * which enables all filters, hence return true
+	 */
+	if (!mon_config->enable)
+		return true;
+
+	if ((mon_config->mgmt_filter[LITE_MON_MODE_FILTER_FP] & FILTER_MGMT_ALL) ||
+	    (mon_config->mgmt_filter[LITE_MON_MODE_FILTER_MO] & FILTER_MGMT_ALL)) {
+		if ((mon_config->ctrl_filter[LITE_MON_MODE_FILTER_FP] & FILTER_CTRL_ALL) ||
+		    (mon_config->ctrl_filter[LITE_MON_MODE_FILTER_MO] & FILTER_CTRL_ALL))
 			return true;
-		}
 	}
 
 	return false;
