@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,7 +43,11 @@ static void scs_api_hex_ascii_dump(uint8_t *buf, uint8_t len)
 	printf("\n");
 }
 
-#define SCS_API_PKT_HEXDUMP(buf, len) scs_api_hex_ascii_dump(buf, len)
+#define SCS_API_PKT_HEXDUMP(buf, len) \
+	do { \
+		if (verbose) \
+			scs_api_hex_ascii_dump(buf, len); \
+	} while (0)
 
 #define PRINT_IF_VERB(fmt, ...) \
 	do { \
