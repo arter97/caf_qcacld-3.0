@@ -192,7 +192,7 @@ static inline void dp_sawf_dec_peer_count(struct dp_soc *soc, struct dp_peer *pe
 			 * then disable that service class
 			 */
 			if (!wlan_service_id_get_peer_count(svc_id) &&
-			    !wlan_service_id_get_total_type_ref_count(svc_id)) {
+			    !wlan_service_id_get_ref_count(svc_id)) {
 				wlan_disable_service_class(svc_id);
 				if (soc->cdp_soc.ol_ops->disable_sawf_svc)
 					cdp_soc->ol_ops->disable_sawf_svc(svc_id);
