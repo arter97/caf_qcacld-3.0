@@ -495,6 +495,11 @@ void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *params)
 			   params->rv_service_id, params->start_or_stop,
 			   params->fw_mark_metadata, params->rv_mark_metadata);
 }
+
+void qca_sawf_mcast_connection_sync(qca_sawf_mcast_sync_param_t *params)
+{
+
+}
 #else
 
 #include "qdf_module.h"
@@ -531,8 +536,12 @@ void qca_sawf_config_ul(struct net_device *dst_dev, struct net_device *src_dev,
 
 /* Forward declaration */
 struct qca_sawf_connection_sync_param;
+typedef struct qca_sawf_connection_sync_param qca_sawf_mcast_sync_param_t;
 
 void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *params)
+{}
+
+void qca_sawf_mcast_connection_sync(qca_sawf_mcast_sync_param_t *params)
 {}
 #endif
 
@@ -549,3 +558,4 @@ qdf_export_symbol(qca_sawf_get_mark_metadata);
 qdf_export_symbol(qca_sawf_get_msdu_queue);
 qdf_export_symbol(qca_sawf_config_ul);
 qdf_export_symbol(qca_sawf_connection_sync);
+qdf_export_symbol(qca_sawf_mcast_connection_sync);

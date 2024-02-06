@@ -23,6 +23,7 @@
 #define QCA_SAWF_SVC_ID_INVALID 0xFF
 #define FLOW_START 1
 #define FLOW_STOP  2
+#define QCA_SAWF_MCAST_IF_MAX 16
 
 /* qca_sawf_metadata_param
  *
@@ -34,7 +35,7 @@
  * @sawf_rule_type: Rule type
  * @pcp: pcp value
  * @valid_flag: flag to indicate if pcp is valid or not
- *
+ * @mcast_flag: flag to indicate if query is for multicast
  */
 struct qca_sawf_metadata_param {
 	struct net_device *netdev;
@@ -45,6 +46,7 @@ struct qca_sawf_metadata_param {
 	uint8_t sawf_rule_type;
 	uint32_t pcp;
 	uint32_t valid_flag;
+	uint8_t mcast_flag:1;
 };
 
 /*
@@ -71,6 +73,38 @@ struct qca_sawf_connection_sync_param {
 	uint32_t fw_mark_metadata;
 	uint32_t rv_mark_metadata;
 };
+
+/*
+ * qca_sawf_ip_addr
+ *
+ * @v4_addr: ipv4 IP address
+ * @v6_addr: ipv6 IP addr
+ */
+union qca_sawf_ip_addr {
+		u_int32_t v4_addr;
+		struct in6_addr v6_addr;
+};
+
+/*
+ * qca_sawf_mcast_connection_sync_param
+ *
+ * @src: src IP addr
+ * @dest: src IP addr
+ * @src_dev_name: source netdev name
+ * @dest_dev_name: destination netdev names
+ * @dest_dev_count: destination netdev count
+ * @add_or_sub: 1:start, 2:stop
+ * @ip_version: ipv6/ipv4
+ */
+typedef struct qca_sawf_mcast_connection_sync_param {
+	union qca_sawf_ip_addr src;
+	union qca_sawf_ip_addr dest;
+	int32_t src_ifindex;
+	int32_t dest_ifindex[QCA_SAWF_MCAST_IF_MAX];
+	uint32_t dest_dev_count;
+	uint8_t add_or_sub;
+	uint16_t ip_version;
+} qca_sawf_mcast_sync_param_t;
 
 uint16_t qca_sawf_get_msduq(struct net_device *netdev,
 			    uint8_t *peer_mac, uint32_t service_id);
@@ -113,4 +147,13 @@ void qca_sawf_config_ul(struct net_device *dst_dev, struct net_device *src_dev,
  * Return: void
  */
 void qca_sawf_connection_sync(struct qca_sawf_connection_sync_param *param);
+
+/*
+ * qca_sawf_mcast_connection_sync() - Update connection status
+ *
+ * @param: connection sync parameters
+ *
+ * Return: void
+ */
+void qca_sawf_mcast_connection_sync(qca_sawf_mcast_sync_param_t *params);
 #endif
