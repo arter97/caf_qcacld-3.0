@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3040,6 +3040,11 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 	int dbm;
 
 	hdd_enter();
+
+	if (mbm < 0) {
+		hdd_err("tx power < 0, not supported");
+		return -EINVAL;
+	}
 
 	if (!wdev) {
 		hdd_err("wdev is null, set tx power failed");
