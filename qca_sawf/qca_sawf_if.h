@@ -17,6 +17,8 @@
 #ifndef _DP_SAWF_H__
 #define _DP_SAWF_H_
 
+#include <linux/in6.h>
+
 #define QCA_SAWF_SVID_VALID 0x1
 #define QCA_SAWF_DSCP_VALID 0x2
 #define QCA_SAWF_PCP_VALID  0x4
