@@ -574,4 +574,27 @@ bool
 wlan_reg_is_freq_txable(struct wlan_objmgr_pdev *pdev,
 			qdf_freq_t freq,
 			enum supported_6g_pwr_types in_6ghz_pwr_mode);
+
+/**
+ * wlan_reg_is_freq_full_rate_supptd() - Verifies if the given
+ * input freq supports full rate as per channel map definition.
+ * @pdev: Pointer to wlan_objmgr_pdev
+ * @freq: Channel center frequency in MHZ
+ *
+ * Return: True if the frequency supports full rate (20MHZ), false
+ * otherwise.
+ */
+
+#ifdef CONFIG_HALF_QUARTER_RATE_FOR_ALL_CHANS
+bool
+wlan_reg_is_freq_full_rate_supptd(struct wlan_objmgr_pdev *pdev,
+				  qdf_freq_t freq);
+#else
+static inline bool
+wlan_reg_is_freq_full_rate_supptd(struct wlan_objmgr_pdev *pdev,
+				  qdf_freq_t freq)
+{
+	return true;
+}
+#endif
 #endif /* __WLAN_REG_CHANNEL_API_H */

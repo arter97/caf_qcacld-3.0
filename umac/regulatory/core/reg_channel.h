@@ -31,6 +31,8 @@
 #define NEXT_20_CH_OFFSET 20
 #define SP_AP_AND_CLIENT_POWER_DIFF_IN_DBM 6
 
+#define HALF_RATE_BW  BW_10_MHZ
+
 #ifdef CONFIG_HOST_FIND_CHAN
 
 /**
@@ -435,4 +437,25 @@ bool
 reg_is_freq_txable(struct wlan_objmgr_pdev *pdev,
 		   qdf_freq_t freq,
 		   enum supported_6g_pwr_types in_6ghz_pwr_mode);
+
+/**
+ * reg_is_freq_full_rate_supported () - Verifies if the given freq
+ * supports full rate.
+ * @pdev: Pointer to pdev
+ * @freq: Channel center frequency.
+ *
+ * Return: True if the freq supports full rate, false otherwise
+ */
+#ifdef CONFIG_HALF_QUARTER_RATE_FOR_ALL_CHANS
+bool
+reg_is_freq_full_rate_supported(struct wlan_objmgr_pdev *pdev,
+				qdf_freq_t freq);
+#else
+static inline bool
+reg_is_freq_full_rate_supported(struct wlan_objmgr_pdev *pdev,
+				qdf_freq_t freq)
+{
+	return true;
+}
+#endif
 #endif /* __REG_CHANNEL_H_ */

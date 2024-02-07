@@ -374,3 +374,12 @@ wlan_reg_is_freq_txable(struct wlan_objmgr_pdev *pdev,
 }
 
 qdf_export_symbol(wlan_reg_is_freq_txable);
+
+#ifdef CONFIG_HALF_QUARTER_RATE_FOR_ALL_CHANS
+bool
+wlan_reg_is_freq_full_rate_supptd(struct wlan_objmgr_pdev *pdev,
+				  qdf_freq_t freq)
+{
+	return reg_is_freq_full_rate_supported(pdev, freq);
+}
+#endif
