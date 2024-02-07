@@ -583,9 +583,6 @@ wlansap_set_scan_acs_channel_params(struct sap_config *config,
 		sap_err("get_auto_channel_weight failed");
 
 	psap_ctx->auto_channel_select_weight = auto_channel_select_weight;
-	sap_debug("auto_channel_select_weight %d",
-		  psap_ctx->auto_channel_select_weight);
-
 	psap_ctx->user_context = pusr_context;
 	psap_ctx->enableOverLapCh = config->enOverLapCh;
 	psap_ctx->acs_cfg = &config->acs_cfg;
@@ -4298,9 +4295,9 @@ void wlansap_dump_acs_ch_freq(struct sap_context *sap_context)
 	}
 
 	if (sap_context->fsm_state == SAP_STARTED)
-		sap_info("ACS dump DCS freq=%d", sap_context->dcs_ch_freq);
+		sap_info("DCS freq %d", sap_context->dcs_ch_freq);
 	else
-		sap_info("ACS dump ch_freq=%d", sap_context->chan_freq);
+		sap_info("ACS freq %d", sap_context->chan_freq);
 }
 
 void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
@@ -4313,12 +4310,10 @@ void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
 
 	if (sap_context->fsm_state == SAP_STARTED) {
 		sap_context->dcs_ch_freq = ch_freq;
-		sap_debug("ACS configuring dcs_ch_freq=%d",
-			  sap_context->dcs_ch_freq);
+		sap_debug("Configuring DCS freq %d", sap_context->dcs_ch_freq);
 	} else {
 		sap_context->chan_freq = ch_freq;
-		sap_debug("ACS configuring ch_freq=%d",
-			  sap_context->chan_freq);
+		sap_debug("configuring ACS freq %d", sap_context->chan_freq);
 	}
 }
 #else
@@ -4341,7 +4336,7 @@ void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
 	}
 
 	sap_context->chan_freq = ch_freq;
-	sap_debug("ACS configuring ch_freq=%d", sap_context->chan_freq);
+	sap_debug("Configuring freq %d", sap_context->chan_freq);
 }
 #endif
 

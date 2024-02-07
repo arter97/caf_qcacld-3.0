@@ -859,11 +859,8 @@ sap_dfs_is_channel_in_nol_list(struct sap_context *sap_context,
 			wlan_reg_get_channel_state_from_secondary_list_for_freq(
 								pdev, ch_freq);
 		if (CHANNEL_STATE_ENABLE != ch_state &&
-		    CHANNEL_STATE_DFS != ch_state) {
-			sap_err_rl("Invalid ch freq = %d, ch state=%d", ch_freq,
-				   ch_state);
+		    CHANNEL_STATE_DFS != ch_state)
 			return true;
-		}
 	} /* loop for bonded channels */
 
 	return false;
@@ -1343,6 +1340,13 @@ static void sap_sort_freq_list(struct chan_list *list,
 	}
 }
 
+
+/*
+ * Consider 4 char for freq, 25 char for time and 1 for EOS
+ * which makes total of 30 chars.
+ */
+#define SAP_SKIP_SCAN_FREQ_LOG_LEN 30
+
 /**
  * sap_acs_scan_freq_list_optimize() - optimize the ACS scan freq list based
  * on when last scan was performed on particular frequency. If last scan
@@ -1361,19 +1365,35 @@ static void sap_acs_scan_freq_list_optimize(struct sap_context *sap_ctx,
 {
 	int loop_count = 0, j = 0;
 	uint32_t ts_last_scan;
+	uint32_t age_time;
+	uint32_t len = 0;
+	uint8_t *info;
 
 	sap_ctx->partial_acs_scan = false;
+
+	info = qdf_mem_malloc(SAP_MAX_CHANNEL_INFO_LOG);
+	if (!info)
+		return;
+	age_time = sap_ctx->acs_cfg->last_scan_ageout_time;
 
 	while (loop_count < *ch_count) {
 		ts_last_scan = scm_get_last_scan_time_per_channel(
 				sap_ctx->vdev, list->chan[loop_count].freq);
 
 		if (qdf_system_time_before(
-		    qdf_get_time_of_the_day_ms(),
-		    ts_last_scan + sap_ctx->acs_cfg->last_scan_ageout_time)) {
-			sap_info("ACS chan %d skipped from scan as last scan ts %lu\n",
-				 list->chan[loop_count].freq,
-				 qdf_get_time_of_the_day_ms() - ts_last_scan);
+		    qdf_get_time_of_the_day_ms(), ts_last_scan + age_time)) {
+			len += qdf_scnprintf(info + len,
+					     SAP_MAX_CHANNEL_INFO_LOG - len,
+					     "%d[%lu] ",
+					     list->chan[loop_count].freq,
+					     qdf_get_time_of_the_day_ms() -
+					     ts_last_scan);
+			if (len >= SAP_MAX_CHANNEL_INFO_LOG -
+			    SAP_SKIP_SCAN_FREQ_LOG_LEN) {
+				sap_nofl_debug("ACS Skip scan freq with age less than %d: %s",
+					       age_time, info);
+				len = 0;
+			}
 
 			for (j = loop_count; j < *ch_count - 1; j++)
 				list->chan[j].freq = list->chan[j + 1].freq;
@@ -1384,8 +1404,14 @@ static void sap_acs_scan_freq_list_optimize(struct sap_context *sap_ctx,
 		}
 		loop_count++;
 	}
+
+	if (len)
+		sap_nofl_debug("ACS Skip scan freq with age time %d: %s",
+			       age_time, info);
+	qdf_mem_free(info);
+
 	if (*ch_count == 0)
-		sap_info("All ACS freq channels are scanned recently, skip ACS scan\n");
+		sap_info("All ACS freq channels are scanned recently, skip ACS scan");
 	else
 		sap_sort_freq_list(list, *ch_count);
 }
@@ -1569,9 +1595,8 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 			wlansap_set_aux_scan_ctrl_ext_flag(req);
 		qdf_ret_status = wlan_scan_start(req);
 		if (qdf_ret_status != QDF_STATUS_SUCCESS) {
-			sap_err("scan request  fail %d!!!", qdf_ret_status);
-			sap_info("SAP Configuring default ch, Ch_freq=%d",
-				  sap_context->chan_freq);
+			sap_info("scan request fail %d SAP Configuring default ch, Ch_freq=%d",
+				 qdf_ret_status, sap_context->chan_freq);
 			default_op_freq = sap_select_default_oper_chan(
 						mac_ctx, sap_context->acs_cfg);
 			wlansap_set_acs_ch_freq(sap_context, default_op_freq);
@@ -4352,21 +4377,11 @@ void sap_dump_acs_channel(struct sap_acs_cfg *acs_cfg)
 #ifdef SOFTAP_CHANNEL_RANGE
 
 /*
- * Consider 3 char for ACS, 5 char for Range, 4 char for Freq,
- * 9 char Normalize, 6 char for factor, 2 char for number of
- * channels to print, 1 char for colon, 2 char for parenthesis,
- * 5 char for space and 1 char to end string which
- * makes total of 38 chars.
+ * 4 char for Freq, 3 char for normalize factor, 2 for bracket, 1 for space and
+ * 1 for EOS.
  */
-#define SAP_FREQ_IN_RANGE_LIST_LEN 38
+#define SAP_FREQ_NORMALIZE_FACTOR_LEN 11
 
-/*
- * Consider 3 char for ACS, 4 char for Freq, 9 char Normalize,
- * 6 char for factor, 2 char for number of channels to print,
- * 1 char for colon, 2 char for parenthesis, 4 char for space
- * and 1 char to end string which makes total of 32 chars.
- */
-#define SAP_FREQ_IN_WEIGHT_LIST_LEN 32
 /**
  * sap_get_freq_list() - get the list of channel frequency
  * @sap_ctx: sap context
@@ -4395,7 +4410,7 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 	struct acs_weight *weight_list;
 	struct acs_weight_range *range_list;
 	bool freq_present_in_list = false;
-	uint8_t i, range_num_chan, weight_num_chan;
+	uint8_t i, range_num_chan = 0, weight_num_chan = 0;
 	bool srd_chan_enabled;
 	enum QDF_OPMODE vdev_opmode;
 	uint8_t *info, *buffer;
@@ -4420,15 +4435,14 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 	end_ch_freq = sap_ctx->acs_cfg->end_ch_freq;
 	ch_width = sap_ctx->acs_cfg->ch_width;
 
-	sap_debug("startChannel %d, EndChannel %d, ch_width %d, HW:%d",
-		  start_ch_freq, end_ch_freq, ch_width,
-		  sap_ctx->acs_cfg->hw_mode);
-
 	wlansap_extend_to_acs_range(MAC_HANDLE(mac_ctx),
 				    &start_ch_freq, &end_ch_freq,
 				    &band_start_ch, &band_end_ch);
 
-	sap_debug("expanded startChannel %d,EndChannel %d band_start_ch %d, band_end_ch %d",
+	sap_debug("Chan %d -> %d, width %d HW %d, expanded chan %d -> %d, band chan %d -> %d",
+		  sap_ctx->acs_cfg->start_ch_freq,
+		  sap_ctx->acs_cfg->end_ch_freq, ch_width,
+		  sap_ctx->acs_cfg->hw_mode,
 		  start_ch_freq, end_ch_freq, band_start_ch, band_end_ch);
 
 	en_lte_coex = mac_ctx->mlme_cfg->sap_cfg.enable_lte_coex;
@@ -4497,10 +4511,8 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 			if (sap_dfs_is_channel_in_nol_list(
 					sap_ctx,
 					chan_freq,
-					PHY_SINGLE_CHANNEL_CENTERED)) {
-				sap_debug("Ch freq %d in NOL list", chan_freq);
+					PHY_SINGLE_CHANNEL_CENTERED))
 				continue;
-			}
 		}
 		/* Skip DSRC channels */
 		if (wlan_reg_is_dsrc_freq(WLAN_REG_CH_TO_FREQ(loop_count)))
@@ -4524,11 +4536,7 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 					WLAN_REG_CH_TO_FREQ(loop_count))) {
 			if (!dfs_master_enable)
 				continue;
-			if (wlansap_dcs_is_wlan_interference_mitigation_enabled(
-								sap_ctx))
-				sap_debug("dfs chan_freq %d added when dcs enabled",
-					  WLAN_REG_CH_TO_FREQ(loop_count));
-			else if (policy_mgr_disallow_mcc(
+			if (policy_mgr_disallow_mcc(
 					mac_ctx->psoc,
 					WLAN_REG_CH_TO_FREQ(loop_count)))
 				continue;
@@ -4546,11 +4554,8 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 		if (!srd_chan_enabled &&
 		    wlan_reg_is_etsi_srd_chan_for_freq(
 					mac_ctx->pdev,
-					WLAN_REG_CH_TO_FREQ(loop_count))) {
-			sap_debug("vdev opmode %d not allowed on SRD freq %d",
-				  vdev_opmode, WLAN_REG_CH_TO_FREQ(loop_count));
+					WLAN_REG_CH_TO_FREQ(loop_count)))
 			continue;
-		}
 
 		/* Check if the freq is present in range list */
 		for (i = 0; i < mac_ctx->mlme_cfg->acs.num_weight_range; i++) {
@@ -4563,7 +4568,7 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 						     "%d[%d] ", chan_freq,
 						     normalize_factor);
 				range_num_chan++;
-				if (len >= SAP_MAX_CHANNEL_INFO_LOG - SAP_FREQ_IN_RANGE_LIST_LEN) {
+				if (len >= SAP_MAX_CHANNEL_INFO_LOG - SAP_FREQ_NORMALIZE_FACTOR_LEN) {
 					sap_nofl_debug("ACS Range Freq Normalize factor(%d): %s",
 						       range_num_chan, info);
 					len = 0;
@@ -4587,7 +4592,7 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 						"%d[%d] ", chan_freq,
 						normalize_factor);
 				weight_num_chan++;
-				if (len >= SAP_MAX_CHANNEL_INFO_LOG - SAP_FREQ_IN_WEIGHT_LIST_LEN) {
+				if (len >= SAP_MAX_CHANNEL_INFO_LOG - SAP_FREQ_NORMALIZE_FACTOR_LEN) {
 					sap_nofl_debug("ACS Freq Normalize factor(%d): %s",
 						       weight_num_chan, buffer);
 					buff_len = 0;
@@ -4618,16 +4623,10 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 				list[ch_count] =
 					WLAN_REG_CH_TO_FREQ(loop_count);
 				ch_count++;
-				sap_debug("%d %d added to ACS ch range",
-					  ch_count, ch_freq);
-			} else {
-				sap_debug("%d %d skipped from ACS ch range",
-					  ch_count, ch_freq);
 			}
 		} else {
 			list[ch_count] = WLAN_REG_CH_TO_FREQ(loop_count);
 			ch_count++;
-			sap_debug("%d added to ACS ch range", ch_count);
 		}
 #else
 		list[ch_count] = WLAN_REG_CH_TO_FREQ(loop_count);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2017-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -79,7 +79,10 @@
 #define SAP_24GHZ_FOURTH_OVERLAP_CHAN_RSSI_EFFECT_PRIMARY     (-40)     /* In 2.4GHZ, Effect of Primary  Channel RSSI on Fourth Overlapping Channel */
 
 /* Maximum character to print in single line */
-#define SAP_MAX_CHANNEL_INFO_LOG 300
+#define SAP_MAX_CHANNEL_INFO_LOG 200
+
+/* size to print freq */
+#define SAP_FREQ_LOG_LEN 6
 
 typedef enum {
 	CHANNEL_1 = 1,
@@ -97,4 +100,20 @@ typedef enum {
 	CHANNEL_13,
 	CHANNEL_14
 } tSapChannel;
+
+/**
+ * struct chan_stats_weight_info - channel stats weight info
+ * @nf_weight: Noise Floor weight
+ * @chan_free_weight: channel clear count weight
+ * @tx_power_range_weight: Tx power range weight
+ * @tx_power_tput_weight: Tx power Tput weight
+ */
+struct chan_stats_weight_info {
+	uint32_t nf_weight;
+	uint32_t chan_free_weight;
+	uint32_t tx_power_range_weight;
+	uint32_t tx_power_tput_weight;
+};
+
+
 #endif /* if !defined __SAP_CH_SELECT_H */

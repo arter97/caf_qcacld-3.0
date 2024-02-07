@@ -1478,8 +1478,6 @@ ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 
-	cp_stats_err("Channel %d status info not exist", chan_freq);
-
 	return NULL;
 }
 
