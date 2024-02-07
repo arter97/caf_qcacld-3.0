@@ -2293,7 +2293,8 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 		*is_wifi3_0_target = true;
 	} else if (params->target_type == TARGET_TYPE_KIWI ||
 		   params->target_type == TARGET_TYPE_MANGO ||
-		   params->target_type == TARGET_TYPE_PEACH) {
+		   params->target_type == TARGET_TYPE_PEACH ||
+		   params->target_type == TARGET_TYPE_WCN7750) {
 		dp_soc = cdp_soc_attach(BERYLLIUM_DP, hif_context,
 					params->target_psoc,
 					htc_ctx, qdf_ctx,
