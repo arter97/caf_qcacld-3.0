@@ -1749,13 +1749,7 @@ QDF_STATUS bs_sm_destroy(struct bearer_switch_info *bs_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * bs_get_state() - Get current state of the bearer switch state machine
- * @bearer_switch_ctx: lBearer switch context
- *
- * Return: Current state of the bearer switch state machine
- */
-static enum wlan_bearer_switch_sm_state
+enum wlan_bearer_switch_sm_state
 bs_get_state(struct bearer_switch_info *bearer_switch_ctx)
 {
 	if (!bearer_switch_ctx || !bearer_switch_ctx->vdev)
@@ -1764,48 +1758,11 @@ bs_get_state(struct bearer_switch_info *bearer_switch_ctx)
 	return bearer_switch_ctx->sm.bs_state;
 }
 
-/**
- * bs_sm_print_state_event() - Print BS_SM state and event
- * @bearer_switch_ctx: lBearer switch context
- * @event: Event which needs to be printed
- *
- * Return: None
- */
-static void
-bs_sm_print_state_event(struct bearer_switch_info *bearer_switch_ctx,
-			enum wlan_bearer_switch_sm_evt event)
-{
-	enum wlan_bearer_switch_sm_state state;
-
-	state = bs_get_state(bearer_switch_ctx);
-
-	ll_sap_debug("[%s]%s, %s", bearer_switch_ctx->sm.sm_hdl->name,
-		     bs_sm_info[state].name, bs_sm_event_names[event]);
-}
-
-/**
- * bs_sm_print_state() - Print BS_SM state
- * @bearer_switch_ctx: lBearer switch context
- *
- * Return: None
- */
-static void
-bs_sm_print_state(struct bearer_switch_info *bearer_switch_ctx)
-{
-	enum wlan_bearer_switch_sm_state state;
-
-	state = bs_get_state(bearer_switch_ctx);
-
-	ll_sap_debug("[%s]%s", bearer_switch_ctx->sm.sm_hdl->name,
-		     bs_sm_info[state].name);
-}
-
 QDF_STATUS bs_sm_deliver_event(struct wlan_objmgr_psoc *psoc,
 			       enum wlan_bearer_switch_sm_evt event,
 			       uint16_t data_len, void *data)
 {
 	QDF_STATUS status;
-	enum wlan_bearer_switch_sm_state state_entry, state_exit;
 	struct bearer_switch_info *bearer_switch_ctx;
 	struct wlan_objmgr_vdev *vdev;
 	struct ll_sap_vdev_priv_obj *ll_sap_obj;
@@ -1836,19 +1793,8 @@ QDF_STATUS bs_sm_deliver_event(struct wlan_objmgr_psoc *psoc,
 	}
 
 	bs_lock_acquire(bearer_switch_ctx);
-
-	/* store entry state and sub state for prints */
-	state_entry = bs_get_state(bearer_switch_ctx);
-	bs_sm_print_state_event(bearer_switch_ctx, event);
-
 	status = wlan_sm_dispatch(bearer_switch_ctx->sm.sm_hdl,
 				  event, data_len, data);
-	/* Take exit state, exit substate for prints */
-	state_exit = bs_get_state(bearer_switch_ctx);
-
-	/* If no state change, don't print */
-	if (!(state_entry == state_exit))
-		bs_sm_print_state(bearer_switch_ctx);
 	bs_lock_release(bearer_switch_ctx);
 
 rel_ref:

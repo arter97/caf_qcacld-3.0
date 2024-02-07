@@ -214,6 +214,15 @@ static inline void bs_sm_transition_to(struct bearer_switch_info *bs_ctx,
 }
 
 /**
+ * bs_get_state() - Get current state of the bearer switch state machine
+ * @bearer_switch_ctx: Bearer switch context
+ *
+ * Return: Current state of the bearer switch state machine
+ */
+enum wlan_bearer_switch_sm_state
+bs_get_state(struct bearer_switch_info *bearer_switch_ctx);
+
+/**
  * bs_sm_deliver_event() - Delivers event to Bearer switch SM
  * @psoc: Pointer to psoc
  * @event: BS event
