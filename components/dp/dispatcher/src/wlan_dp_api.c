@@ -71,3 +71,10 @@ bool wlan_dp_fpm_is_tid_override(qdf_nbuf_t nbuf, uint8_t *tid)
 	return fpm_is_tid_override(nbuf, tid);
 }
 #endif
+
+void wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
+			     struct qdf_mac_addr *intf_mac,
+			     struct wlan_objmgr_vdev *vdev)
+{
+	__wlan_dp_update_def_link(psoc, intf_mac, vdev);
+}

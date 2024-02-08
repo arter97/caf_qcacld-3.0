@@ -1193,4 +1193,15 @@ static inline bool wlan_dp_ml_mon_supported(void)
 	return false;
 }
 #endif
+
+/**
+ * __wlan_dp_update_def_link() - update DP interface default link
+ * @psoc: psoc handle
+ * @intf_mac: interface MAC address
+ * @vdev: objmgr vdev handle to set the def_link in dp_intf
+ *
+ */
+void __wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
+			       struct qdf_mac_addr *intf_mac,
+			       struct wlan_objmgr_vdev *vdev);
 #endif
