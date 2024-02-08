@@ -91,7 +91,9 @@ static QDF_STATUS mlme_vdev_start_is_allowed(struct wlan_objmgr_pdev *pdev,
 	}
 
 	qdf_spin_lock_bh(&pdev_mlme->vdev_restart_lock);
-	if (wlan_pdev_mlme_op_get(pdev, WLAN_PDEV_OP_RESTART_INPROGRESS)) {
+	if (wlan_pdev_mlme_op_get(pdev, WLAN_PDEV_OP_RESTART_INPROGRESS) &&
+	    !wlan_util_map_index_is_set(pdev_mlme->restart_pend_vdev_bmap,
+					wlan_vdev_get_id(vdev))) {
 		wlan_util_change_map_index(pdev_mlme->start_send_vdev_arr,
 					   wlan_vdev_get_id(vdev), 1);
 		status = QDF_STATUS_E_FAILURE;

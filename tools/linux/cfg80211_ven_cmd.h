@@ -866,7 +866,15 @@ enum {
 	IEEE80211_PARAM_ASSOC_REJECT = 818,
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
-	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* MLO Max Simultaneous Active links */
+	IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS = 820, /* User configuration for MLO RMSL advertisement */
+#endif
+	/* User config to set common PSD value for all 20MHz subchannels of the
+	 * current channel in the TPE IE
+	 */
+	IEEE80211_PARAM_TPE_COMMON_PSD = 821,
+	IEEE80211_PARAM_TPE_PWR_UNIT = 822, /* User config to choose PSD or EIRP in a TPE IE */
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG = 823, /* MLO enable/disable EXTMLD CAP advertisement */
 #endif
 };
 
@@ -1487,6 +1495,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_ENABLE_DELAYED_LMR_FEEDBACK = 542,
 	OL_ATH_PARAM_ENABLE_SMALL_MRU = 543,
 	OL_ATH_PARAM_ENABLE_LARGE_MRU = 544,
+	OL_ATH_PARAM_DISPLAY_BAND_CHANS = 545,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -2611,7 +2620,13 @@ struct vendor_commands vap_vendor_cmds[] = {
 		SET_PARAM, 1},
 	{"g_max_recom_active_links", IEEE80211_PARAM_MLO_MAX_RECOM_ACTIVE_LINKS,
 		GET_PARAM, 0},
+	{"extmldcap_enable_advertisement", IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG,
+		SET_PARAM, 1},
+	{"g_extmldcap_enable_advertisement", IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG,
+		GET_PARAM,0},
 #endif
+	{"display_band_chans",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_BAND_CHANS, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
