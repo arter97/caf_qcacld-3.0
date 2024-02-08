@@ -249,6 +249,8 @@ dp_sawf_get_peer_msduq_info(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 	struct dp_peer_sawf *sawf_ctx;
 	struct dp_sawf_msduq *msduq;
 	int q_idx;
+	struct sawf_tx_stats tx_stats;
+	struct sawf_delay_stats delay_stats;
 
 	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
 
@@ -287,6 +289,16 @@ dp_sawf_get_peer_msduq_info(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 				 msduq->svc_id);
 	}
 	dp_sawf_nofl_err("------------------------------------");
+
+	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
+		msduq = &sawf_ctx->msduq[q_idx];
+		if (!msduq->is_used)
+			continue;
+		dp_sawf_get_peer_tx_stats(soc_hdl, msduq->svc_id, mac_addr,
+					  &tx_stats);
+		dp_sawf_get_peer_delay_stats(soc_hdl, msduq->svc_id, mac_addr,
+					     &delay_stats);
+	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 
@@ -1095,7 +1107,8 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 				peer->sawf->sla_mask |=
 					wlan_service_id_get_enabled_param_mask(
 							service_id);
-				if (!peer->sawf->telemetry_ctx) {
+				if (txrx_peer->sawf_stats &&
+				    !peer->sawf->telemetry_ctx) {
 					tmetry_ctx = telemetry_sawf_peer_ctx_alloc(
 							soc, txrx_peer->sawf_stats,
 							peer->mac_addr.raw,
@@ -1143,7 +1156,8 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 			if (dp_sawf(peer, q_id, is_used) == 0) {
 				dp_sawf(peer, q_id, is_used) = 1;
 				dp_sawf(peer, q_id, svc_id) = service_id;
-				if (!peer->sawf->telemetry_ctx) {
+				if (txrx_peer->sawf_stats &&
+				    !peer->sawf->telemetry_ctx) {
 					tmetry_ctx = telemetry_sawf_peer_ctx_alloc(
 							soc, txrx_peer->sawf_stats,
 							peer->mac_addr.raw,
@@ -1384,6 +1398,11 @@ dp_peer_sawf_stats_ctx_alloc(struct dp_soc *soc,
 	struct dp_peer_sawf_stats *ctx;
 	struct sawf_stats *stats;
 	uint8_t q_idx;
+	uint8_t stats_cfg;
+
+	stats_cfg = wlan_cfg_get_sawf_stats_config(soc->wlan_cfg_ctx);
+	if (!stats_cfg)
+		return QDF_STATUS_SUCCESS;
 
 	ctx = qdf_mem_malloc(sizeof(struct dp_peer_sawf_stats));
 	if (!ctx) {
@@ -1407,6 +1426,12 @@ QDF_STATUS
 dp_peer_sawf_stats_ctx_free(struct dp_soc *soc,
 			    struct dp_txrx_peer *txrx_peer)
 {
+	uint8_t stats_cfg;
+
+	stats_cfg = wlan_cfg_get_sawf_stats_config(soc->wlan_cfg_ctx);
+	if (!stats_cfg)
+		return QDF_STATUS_SUCCESS;
+
 	if (!txrx_peer->sawf_stats) {
 		dp_sawf_err("Failed to free peer SAWF stats");
 		return QDF_STATUS_E_FAILURE;
@@ -1592,7 +1617,7 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 
 	stats_cfg = wlan_cfg_get_sawf_stats_config(soc->wlan_cfg_ctx);
 	if (!stats_cfg)
-		return QDF_STATUS_E_FAILURE;
+		return QDF_STATUS_SUCCESS;
 
 	if (!dp_sawf_tag_valid_get(tx_desc->nbuf))
 		return QDF_STATUS_E_INVAL;
@@ -2109,6 +2134,7 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 	uint16_t host_q_id, host_q_idx;
 	QDF_STATUS status;
 	uint32_t nwdelay_avg, swdelay_avg, hwdelay_avg;
+	uint8_t stats_cfg;
 
 	stats = (struct sawf_delay_stats *)data;
 	if (!stats) {
@@ -2119,6 +2145,12 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 	dp_soc = cdp_soc_t_to_dp_soc(soc);
 	if (!dp_soc) {
 		dp_sawf_err("Invalid soc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	stats_cfg = wlan_cfg_get_sawf_stats_config(dp_soc->wlan_cfg_ctx);
+	if (!stats_cfg) {
+		dp_sawf_debug("sawf stats is disabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -2260,6 +2292,7 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 	uint16_t host_q_id, host_q_idx;
 	uint32_t throughput, ingress_rate;
 	QDF_STATUS status;
+	uint8_t stats_cfg;
 
 	stats = (struct sawf_tx_stats *)data;
 	if (!stats) {
@@ -2270,6 +2303,12 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 	dp_soc = cdp_soc_t_to_dp_soc(soc);
 	if (!dp_soc) {
 		dp_sawf_err("Invalid soc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	stats_cfg = wlan_cfg_get_sawf_stats_config(dp_soc->wlan_cfg_ctx);
+	if (!stats_cfg) {
+		dp_sawf_debug("sawf stats is disabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
