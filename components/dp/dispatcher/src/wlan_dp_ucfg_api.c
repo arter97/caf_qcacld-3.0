@@ -162,6 +162,14 @@ QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
+void ucfg_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
+			     struct qdf_mac_addr *intf_mac,
+			     struct wlan_objmgr_vdev *vdev)
+
+{
+	__wlan_dp_update_def_link(psoc, intf_mac, vdev);
+}
+
 void ucfg_dp_update_intf_mac(struct wlan_objmgr_psoc *psoc,
 			     struct qdf_mac_addr *cur_mac,
 			     struct qdf_mac_addr *new_mac,

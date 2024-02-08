@@ -2775,3 +2775,50 @@ void wlan_dp_pdev_cfg_sync_profile(struct cdp_soc_t *cdp_soc, uint8_t pdev_id)
 	dp_err("pdev based config item not found in profile table");
 }
 #endif
+
+void __wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
+			       struct qdf_mac_addr *intf_mac,
+			       struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct qdf_mac_addr zero_addr = QDF_MAC_ADDR_ZERO_INIT;
+
+	dp_ctx =  dp_psoc_get_priv(psoc);
+
+	dp_intf = dp_get_intf_by_macaddr(dp_ctx, intf_mac);
+	if (!dp_intf) {
+		dp_err("DP interface not found addr:" QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(intf_mac->bytes));
+		QDF_BUG(0);
+		return;
+	}
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (dp_link && dp_link->dp_intf == dp_intf) {
+		dp_info("change dp_intf %pK(" QDF_MAC_ADDR_FMT
+			") def_link %d(" QDF_MAC_ADDR_FMT ") -> %d("
+			 QDF_MAC_ADDR_FMT ")",
+			dp_intf, QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes),
+			dp_intf->def_link->link_id,
+			QDF_MAC_ADDR_REF(dp_intf->def_link->mac_addr.bytes),
+			dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
+		dp_intf->def_link = dp_link;
+		return;
+	}
+
+	dp_info("Update failed dp_intf %pK(" QDF_MAC_ADDR_FMT ") from %pK("
+		QDF_MAC_ADDR_FMT ") to %pK(" QDF_MAC_ADDR_FMT ") (intf %pK("
+		QDF_MAC_ADDR_FMT ") id %d) ",
+		dp_intf, QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes),
+		dp_intf->def_link,
+		QDF_MAC_ADDR_REF(dp_intf->def_link->mac_addr.bytes),
+		dp_link, dp_link ? QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes) :
+					QDF_MAC_ADDR_REF(zero_addr.bytes),
+		dp_link ? dp_link->dp_intf : NULL,
+		dp_link ? QDF_MAC_ADDR_REF(dp_link->dp_intf->mac_addr.bytes) :
+				QDF_MAC_ADDR_REF(zero_addr.bytes),
+		dp_link ? dp_link->link_id : WLAN_INVALID_LINK_ID);
+}

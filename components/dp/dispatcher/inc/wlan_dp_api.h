@@ -103,4 +103,14 @@ wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 bool wlan_dp_fpm_is_tid_override(qdf_nbuf_t nbuf, uint8_t *tid);
 #endif
 
+/**
+ * wlan_dp_update_def_link() - update DP interface default link
+ * @psoc: psoc handle
+ * @intf_mac: interface MAC address
+ * @vdev: objmgr vdev handle to set the def_link in dp_intf
+ *
+ */
+void wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
+			     struct qdf_mac_addr *intf_mac,
+			     struct wlan_objmgr_vdev *vdev);
 #endif
