@@ -2161,7 +2161,11 @@ static int32_t send_nl_command(struct stats_command *cmd,
 		}
 		end_vendor_data(nlmsg, nl_ven_data);
 
-		ret = send_nlmsg(&g_sock_ctx.cfg80211_ctxt, nlmsg, buffer);
+		if (is_async_req())
+			ret = send_nlmsg_nb(&g_sock_ctx.cfg80211_ctxt, nlmsg);
+		else
+			ret = send_nlmsg(&g_sock_ctx.cfg80211_ctxt, nlmsg,
+					 buffer);
 		if (ret < 0)
 			STATS_ERR("Couldn't send NL command, ret = %d\n", ret);
 	} else {
@@ -2450,6 +2454,178 @@ static int32_t build_child_radio_list(struct interface_list *if_list,
 	return 0;
 }
 
+static void mark_active_interfaces(struct interface_list *if_list,
+				   enum stats_object_e obj, bool get_hwaddr)
+{
+	char *ifname = NULL;
+	uint8_t inx = 0;
+
+	if (!if_list)
+		return;
+
+	switch (obj) {
+	case STATS_OBJ_RADIO:
+		for (inx = 0; inx < if_list->r_count; inx++) {
+			ifname = if_list->radio[inx].name;
+			if (!is_interface_active(ifname, obj)) {
+				if_list->radio[inx].active = false;
+				continue;
+			}
+			if_list->radio[inx].active = true;
+			if (get_hwaddr)
+				get_hw_address(ifname,
+					       if_list->radio[inx].hw_addr);
+		}
+		break;
+	case STATS_OBJ_VAP:
+		for (inx = 0; inx < if_list->v_count; inx++) {
+			ifname = if_list->vap[inx].name;
+			if (!is_interface_active(ifname, obj)) {
+				if_list->vap[inx].active = false;
+				continue;
+			}
+			if_list->vap[inx].active = true;
+			if (get_hwaddr)
+				get_hw_address(ifname,
+					       if_list->vap[inx].hw_addr);
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+static uint8_t get_soc_count_and_index(struct stats_command *cmd,
+				       struct interface_list *if_list,
+				       uint8_t *inx)
+{
+	uint8_t sinx = 0;
+	uint8_t soc_count = 0;
+
+	/**
+	 * If user specifies soc interface name, then pick that particular soc
+	 * and send the index of matching interface name and soc count + 1 so
+	 * that the loop will run only once.
+	 * Else index will remain 0 and loop should run for total soc count.
+	 */
+	if ((cmd->obj == STATS_OBJ_AP) && cmd->if_name[0]) {
+		for (sinx = 0; sinx < if_list->s_count; sinx++) {
+			if (!strncmp(cmd->if_name,
+				     if_list->soc[sinx].name, 4)) {
+				soc_count = sinx + 1;
+				break;
+			}
+		}
+	} else {
+		soc_count = if_list->s_count;
+	}
+
+	/* User specificed soc ifname index or 0 */
+	*inx = sinx;
+
+	return soc_count;
+}
+
+static void get_first_active_soc_ifname(struct stats_command *cmd,
+					struct interface_list *if_list,
+					char *r_ifname)
+{
+	struct soc_ifnames soc_if[MAX_RADIO_NUM] = {0};
+	uint8_t if_count = 0;
+	uint8_t inx = 0;
+	uint8_t loop_count = 0;
+
+	mark_active_interfaces(if_list, STATS_OBJ_RADIO, false);
+
+	/* If user specifies soc interface name, then build object for that.
+	 * Else for the 1st soc which has one active radio interface.
+	 */
+	loop_count = get_soc_count_and_index(cmd, if_list, &inx);
+
+	for (; inx < loop_count; inx++) {
+		if (get_active_radio_intf_for_soc(if_list, soc_if,
+						  if_list->soc[inx].name,
+						  &if_count) || !if_count)
+			continue;
+
+		strlcpy(r_ifname, soc_if[0].ifname, IFNAME_LEN);
+		break;
+	}
+
+}
+
+static void get_first_active_vap_ifname(struct interface_list *if_list,
+					char *v_ifname)
+{
+	uint8_t inx = 0;
+	char *ifname = NULL;
+
+	for (inx = 0; inx < if_list->v_count; inx++) {
+		ifname = if_list->vap[inx].name;
+		if (is_interface_active(ifname, STATS_OBJ_VAP))
+			break;
+	}
+	v_ifname = ifname;
+}
+
+static void *build_async_object(struct stats_command *cmd)
+{
+	struct object_list *temp_obj = NULL;
+	char ifname[IFNAME_LEN] = {'\0'};
+	struct interface_list if_list = {0};
+	int8_t ret = 0;
+	bool free_if_list = false;
+
+	if ((cmd->obj == STATS_OBJ_AP) || (cmd->obj == STATS_OBJ_STA)) {
+		ret = fetch_all_interfaces(&if_list);
+		free_if_list = true;
+		if (ret < 0) {
+			STATS_ERR("Unable to fetch Interfaces!\n");
+			goto error_handle;
+		}
+	}
+
+	memset(ifname, '\0', sizeof(ifname));
+
+	switch (cmd->obj) {
+	case STATS_OBJ_AP:
+		get_first_active_soc_ifname(cmd, &if_list, ifname);
+		if (ifname[0] == '\0') {
+			STATS_ERR("Unable to get active radio!\n");
+			goto error_handle;
+		}
+		break;
+	case STATS_OBJ_STA:
+		get_first_active_vap_ifname(&if_list, ifname);
+		if (ifname[0] == '\0') {
+			STATS_ERR("Unable to get active vap!\n");
+			goto error_handle;
+		}
+		break;
+	case STATS_OBJ_VAP:
+	case STATS_OBJ_RADIO:
+		if (!is_interface_active(cmd->if_name, cmd->obj)) {
+			STATS_ERR("Inactive interface %s\n",
+				  cmd->if_name);
+			goto error_handle;
+		}
+		strlcpy(ifname, cmd->if_name, IFNAME_LEN);
+		break;
+	default:
+		goto error_handle;
+	}
+
+	temp_obj = alloc_object(cmd->obj, ifname);
+	if (!temp_obj)
+		STATS_ERR("Failed to allocate object for OBJ %d!", cmd->obj);
+
+error_handle:
+	if (free_if_list)
+		free_interface_list(&if_list);
+
+	return temp_obj;
+}
+
 static void *build_object_list(struct stats_command *cmd)
 {
 	struct interface_list if_list = {0};
@@ -2457,10 +2633,8 @@ static void *build_object_list(struct stats_command *cmd)
 	struct object_list *req_obj_list = NULL;
 	struct object_list *temp_obj = NULL;
 	struct object_list *curr_obj = NULL;
-	char *ifname = NULL;
 	int32_t ret = 0;
 	uint8_t inx = 0;
-	uint8_t sinx = 0;
 	uint8_t loop_count = 0;
 	uint8_t if_count = 0;
 
@@ -2472,43 +2646,18 @@ static void *build_object_list(struct stats_command *cmd)
 	}
 
 	/* Check Radio is active or not and get HW address */
-	for (inx = 0; inx < if_list.r_count; inx++) {
-		ifname = if_list.radio[inx].name;
-		if (!is_interface_active(ifname, STATS_OBJ_RADIO)) {
-			if_list.radio[inx].active = false;
-			continue;
-		}
-		if_list.radio[inx].active = true;
-		get_hw_address(ifname, if_list.radio[inx].hw_addr);
-	}
+	mark_active_interfaces(&if_list, STATS_OBJ_RADIO, true);
 
 	/* Check Vap is active or not and get HW address */
-	for (inx = 0; inx < if_list.v_count; inx++) {
-		ifname = if_list.vap[inx].name;
-		if (!is_interface_active(ifname, STATS_OBJ_VAP)) {
-			if_list.vap[inx].active = false;
-			continue;
-		}
-		if_list.vap[inx].active = true;
-		get_hw_address(ifname, if_list.vap[inx].hw_addr);
-	}
+	mark_active_interfaces(&if_list, STATS_OBJ_VAP, true);
 
 	/**
 	 * If user specifies soc, then build object hierarchy only for
-	 * that particular soc.
+	 * that particular soc. Else for all.
 	 */
-	if ((cmd->obj == STATS_OBJ_AP) && cmd->if_name[0]) {
-		for (sinx = 0; sinx < if_list.s_count; sinx++) {
-			if (!strncmp(cmd->if_name,
-			    if_list.soc[sinx].name, 4)) {
-				loop_count = sinx + 1;
-				break;
-			}
-		}
-	} else {
-		loop_count = if_list.s_count;
-	}
-	for (inx = sinx; inx < loop_count; inx++) {
+	loop_count = get_soc_count_and_index(cmd, &if_list, &inx);
+
+	for (; inx < loop_count; inx++) {
 		if (get_active_radio_intf_for_soc(&if_list, soc_if,
 						  if_list.soc[inx].name,
 						  &if_count) || !if_count)
@@ -2535,7 +2684,9 @@ static void *build_object_list(struct stats_command *cmd)
 		memset(soc_if, 0, (MAX_RADIO_NUM * sizeof(struct soc_ifnames)));
 	}
 
+	/* Free read interfaces from sys entries */
 	free_interface_list(&if_list);
+
 	if ((ret < 0) && req_obj_list) {
 		STATS_ERR("Failed to build Object List! Clean existing\n");
 		free_object_list(req_obj_list);
@@ -3950,4 +4101,26 @@ void libstats_async_event_deinit(void)
 
 	g_nb_ctx.async_req = false;
 	stats_lib_deinit();
+}
+
+int8_t libstats_async_send_stats_req(struct stats_command *cmd)
+{
+	int8_t ret = 0;
+	struct object_list *req_obj_list = NULL;
+
+	if (is_valid_cmd(cmd)) {
+		STATS_ERR("Invalid command\n");
+		return -EINVAL;
+	}
+
+	req_obj_list = build_async_object(cmd);
+	if (!req_obj_list) {
+		STATS_ERR("Failed to build Object Hierarchy!\n");
+		return -EPERM;
+	}
+
+	ret = send_request_per_object(cmd, req_obj_list);
+	free_object_list(req_obj_list);
+
+	return ret;
 }

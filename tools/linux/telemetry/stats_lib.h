@@ -572,4 +572,12 @@ int8_t libstats_async_event_init(void);
  *
  */
 void libstats_async_event_deinit(void);
+
+/**
+ * libstats_async_send_stats_req(): Send request for non blocking stats
+ *
+ * Return: Num of bytes sent on Success, Error code on Failure
+ */
+int8_t libstats_async_send_stats_req(struct stats_command *cmd);
+
 #endif /* _STATS_LIB_H_ */
