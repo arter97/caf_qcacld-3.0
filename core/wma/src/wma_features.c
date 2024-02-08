@@ -5913,11 +5913,14 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	channel_status->channel_id = cds_freq_to_chan(event->freq);
 	channel_status->cmd_flags = event->cmd_flags;
 
-	wma_debug("freq %d, nf %d, rcc %u, ch_rcc:%u, cc %u, tx_r %d, tx_t %d, chan_id:%d, flags:%d, cap: %d, num_tlvs:%d",
+	wma_debug("freq %d, nf %d, rcc %u, cc %u, tx_r %d, tx_t %d, tx_frm_cnt %u rx_frm_cnt %u my_bss_rx_cycle_count %u mac_clk_mhz %u rx_11b_mode_data_duration %d chan_id:%d, flags:%d, cap: %d, num_tlvs:%d",
 		  event->freq, event->noise_floor,
-		  event->rx_clear_count, channel_status->rx_clear_count,
-		  event->cycle_count, event->chan_tx_pwr_range,
-		  event->chan_tx_pwr_tp, channel_status->channel_id,
+		  event->rx_clear_count, event->cycle_count,
+		  event->chan_tx_pwr_range, event->chan_tx_pwr_tp,
+		  event->tx_frame_cnt, event->rx_frame_count,
+		  event->my_bss_rx_cycle_count, event->mac_clk_mhz,
+		  event->rx_11b_mode_data_duration,
+		  channel_status->channel_id,
 		  channel_status->cmd_flags, is_cca_busy_info, num_tlvs);
 
 	sme_msg.type = eWNI_SME_CHAN_INFO_EVENT;
