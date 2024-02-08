@@ -11531,6 +11531,8 @@ void hdd_wlan_exit(struct hdd_context *hdd_ctx)
 		hdd_lpass_notify_stop(hdd_ctx);
 	}
 
+	wlan_hdd_free_iface_combination_mem(hdd_ctx);
+
 	hdd_deinit_regulatory_update_event(hdd_ctx);
 #ifdef FEATURE_WLAN_CH_AVOID
 	mutex_destroy(&hdd_ctx->avoid_freq_lock);
@@ -17600,17 +17602,23 @@ int hdd_wlan_startup(struct hdd_context *hdd_ctx)
 	osif_request_manager_init();
 	hdd_driver_memdump_init();
 
+	errno = wlan_hdd_alloc_iface_combination_mem(hdd_ctx);
+	if (errno) {
+		hdd_err("failed to alloc iface combination mem");
+		goto memdump_deinit;
+	}
+
 	errno = hdd_init_regulatory_update_event(hdd_ctx);
 	if (errno) {
 		hdd_err("Failed to initialize regulatory update event; errno:%d",
 			errno);
-		goto memdump_deinit;
+		goto free_iface_comb;
 	}
 
 	errno = hdd_wlan_start_modules(hdd_ctx, false);
 	if (errno) {
 		hdd_err("Failed to start modules; errno:%d", errno);
-		goto memdump_deinit;
+		goto free_iface_comb;
 	}
 
 	if (hdd_get_conparam() == QDF_GLOBAL_EPPING_MODE)
@@ -17669,6 +17677,9 @@ unregister_wiphy:
 
 stop_modules:
 	hdd_wlan_stop_modules(hdd_ctx, false);
+
+free_iface_comb:
+	wlan_hdd_free_iface_combination_mem(hdd_ctx);
 
 memdump_deinit:
 	hdd_driver_memdump_deinit();

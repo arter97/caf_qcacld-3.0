@@ -7330,135 +7330,191 @@ wlan_mlme_get_adaptive11r_enabled(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 #endif
 
-#if defined(WLAN_FEATURE_P2P_P2P_STA) && \
-	!defined(WLAN_FEATURE_NO_P2P_CONCURRENCY)
+#if defined(WLAN_FEATURE_P2P_P2P_STA)
+
+/**
+ * wlan_mlme_get_p2p_p2p_host_conc_support() - This API checks if P2P
+ * concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if P2P concurrency is allowed otherwise false
+ */
 static bool
-wlan_mlme_get_p2p_p2p_host_conc_support(void)
+wlan_mlme_get_p2p_p2p_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
+	bool no_p2p_concurrency = cfg_get(psoc, CFG_NO_P2P_CONCURRENCY);
+
+	if (no_p2p_concurrency)
+		return false;
+
 	return true;
 }
 #else
 static bool
-wlan_mlme_get_p2p_p2p_host_conc_support(void)
+wlan_mlme_get_p2p_p2p_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
 #endif
 
-#ifndef WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+/**
+ * wlan_mlme_get_sta_sap_host_conc_support() - This API checks if STA and SAP
+ * concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if STA and SAP concurrency is allowed otherwise false
+ */
 static bool
-wlan_mlme_get_sta_sap_host_conc_support(void)
+wlan_mlme_get_sta_sap_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
-	return true;
-}
-#else
-static bool
-wlan_mlme_get_sta_sap_host_conc_support(void)
-{
-	return false;
-}
-#endif
+	bool no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
 
-#ifndef WLAN_FEATURE_NO_STA_NAN_CONCURRENCY
-static bool
-wlan_mlme_get_sta_nan_host_conc_support(void)
-{
-	return true;
-}
-#else
-static bool
-wlan_mlme_get_sta_nan_host_conc_support(void)
-{
-	return false;
-}
-#endif
+	if (no_sta_sap_concurrency)
+		return false;
 
-#ifdef FEATURE_WLAN_TDLS
-static bool
-wlan_mlme_get_sta_tdls_host_conc_support(void)
-{
 	return true;
 }
-#else
-static bool
-wlan_mlme_get_sta_tdls_host_conc_support(void)
-{
-	return false;
-}
-#endif
 
-#if !defined(WLAN_FEATURE_NO_STA_SAP_CONCURRENCY) && \
-	(!defined(WLAN_FEATURE_NO_P2P_CONCURRENCY) || \
-	 defined(WLAN_FEATURE_STA_SAP_P2P_CONCURRENCY))
+/**
+ * wlan_mlme_get_sta_nan_host_conc_support() - This API checks if STA and NAN
+ * concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if STA and NAN concurrency is allowed otherwise false
+ */
 static bool
-wlan_mlme_get_sta_sap_p2p_host_conc_support(void)
+wlan_mlme_get_sta_nan_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
+	bool no_sta_nan_concurrency = cfg_get(psoc, CFG_NO_STA_NAN_CONCURRENCY);
+
+	if (no_sta_nan_concurrency)
+		return false;
+
 	return true;
 }
-#else
+
+/**
+ * wlan_mlme_get_sta_sap_p2p_host_conc_support() - This API checks if
+ * STA-SAP-P2P concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if STA-SAP-P2P concurrency is allowed otherwise false
+ */
 static bool
-wlan_mlme_get_sta_sap_p2p_host_conc_support(void)
+wlan_mlme_get_sta_sap_p2p_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
-	return false;
+	bool no_p2p_concurrency = cfg_get(psoc, CFG_NO_P2P_CONCURRENCY);
+	bool no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
+	bool sta_sap_p2p_concurrenecy = cfg_get(psoc,
+						CFG_STA_SAP_P2P_CONCURRENCY);
+
+	if ((no_p2p_concurrency && !sta_sap_p2p_concurrenecy) ||
+	    no_sta_sap_concurrency)
+		return false;
+
+	return true;
 }
-#endif
 
 #if defined(FEATURE_WLAN_TDLS)
+/**
+ * wlan_mlme_get_sta_tdls_host_conc_support() - This API checks if STA-TDLS
+ * concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if STA-TDLS concurrency is allowed otherwise false
+ */
 static bool
-wlan_mlme_get_sta_p2p_tdls_host_conc_support(void)
+wlan_mlme_get_sta_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
+	return true;
+}
+
+static bool
+wlan_mlme_get_sta_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+
+/**
+ * wlan_mlme_get_sta_sap_tdls_host_conc_support() - This API checks if
+ * STA-SAP-TDLS concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if STA-SAP-TDLS concurrency is allowed otherwise false
+ */
+static bool
+wlan_mlme_get_sta_sap_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	bool no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
+
+	if (no_sta_sap_concurrency)
+		return false;
+
+	return true;
+}
+
+/**
+ * wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support() - This API checks if
+ * STA-SAP-P2P-TDLS concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if STA-SAP-P2P-TDLS concurrency is allowed otherwise false
+ */
+static bool
+wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	bool no_p2p_concurrency = cfg_get(psoc, CFG_NO_P2P_CONCURRENCY);
+	bool no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
+	bool sta_sap_p2p_concurrenecy = cfg_get(psoc,
+						CFG_STA_SAP_P2P_CONCURRENCY);
+
+	if ((no_p2p_concurrency && !sta_sap_p2p_concurrenecy) ||
+	    no_sta_sap_concurrency)
+		return false;
+
 	return true;
 }
 #else
 static bool
-wlan_mlme_get_sta_p2p_tdls_host_conc_support(void)
+wlan_mlme_get_sta_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static bool
+wlan_mlme_get_sta_sap_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static bool
+wlan_mlme_get_sta_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
 #endif
 
-#if defined(FEATURE_WLAN_TDLS) && !defined(WLAN_FEATURE_NO_STA_SAP_CONCURRENCY)
+#if defined(FEATURE_WLAN_TDLS) && defined(WLAN_FEATURE_P2P_P2P_STA)
+/**
+ * wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support() - This API checks if
+ * STA-P2P-P2P-TDLS concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if STA-P2P-P2P-TDLS concurrency is allowed otherwise false
+ */
 static bool
-wlan_mlme_get_sta_sap_tdls_host_conc_support(void)
+wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
+	bool no_p2p_concurrency = cfg_get(psoc, CFG_NO_P2P_CONCURRENCY);
+
+	if (no_p2p_concurrency)
+		return false;
+
 	return true;
 }
 #else
 static bool
-wlan_mlme_get_sta_sap_tdls_host_conc_support(void)
-{
-	return false;
-}
-#endif
-
-#if defined(FEATURE_WLAN_TDLS) && \
-	!defined(WLAN_FEATURE_NO_STA_SAP_CONCURRENCY) && \
-	(!defined(WLAN_FEATURE_NO_P2P_CONCURRENCY) || \
-	 defined(WLAN_FEATURE_STA_SAP_P2P_CONCURRENCY))
-
-static bool
-wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(void)
-{
-	return true;
-}
-#else
-static bool
-wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(void)
-{
-	return false;
-}
-#endif
-
-#if defined(FEATURE_WLAN_TDLS) && defined(WLAN_FEATURE_P2P_P2P_STA) && \
-	!defined(WLAN_FEATURE_NO_P2P_CONCURRENCY)
-static bool
-wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support(void)
-{
-	return true;
-}
-#else
-static bool
-wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support(void)
+wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -7466,40 +7522,42 @@ wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support(void)
 
 /**
  * wlan_mlme_set_iface_combinations() - Set interface combinations
+ * @psoc: PSOC object
  * @mlme_feature_set: Pointer to wlan_mlme_features
  *
  * Return: None
  */
 static void
-wlan_mlme_set_iface_combinations(struct wlan_mlme_features *mlme_feature_set)
+wlan_mlme_set_iface_combinations(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_mlme_features *mlme_feature_set)
 {
 	mlme_feature_set->iface_combinations = 0;
 	mlme_feature_set->iface_combinations |= MLME_IFACE_STA_P2P_SUPPORT;
-	if (wlan_mlme_get_sta_sap_host_conc_support())
+	if (wlan_mlme_get_sta_sap_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_SAP_SUPPORT;
-	if (wlan_mlme_get_sta_nan_host_conc_support())
+	if (wlan_mlme_get_sta_nan_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_NAN_SUPPORT;
-	if (wlan_mlme_get_sta_tdls_host_conc_support())
+	if (wlan_mlme_get_sta_tdls_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_TDLS_SUPPORT;
-	if (wlan_mlme_get_p2p_p2p_host_conc_support())
+	if (wlan_mlme_get_p2p_p2p_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_DUAL_P2P_SUPPORT;
-	if (wlan_mlme_get_sta_sap_p2p_host_conc_support())
+	if (wlan_mlme_get_sta_sap_p2p_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_SAP_P2P_SUPPORT;
-	if (wlan_mlme_get_sta_p2p_tdls_host_conc_support())
+	if (wlan_mlme_get_sta_p2p_tdls_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_P2P_TDLS_SUPPORT;
-	if (wlan_mlme_get_sta_sap_tdls_host_conc_support())
+	if (wlan_mlme_get_sta_sap_tdls_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_SAP_TDLS_SUPPORT;
-	if (wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support())
+	if (wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_SAP_P2P_TDLS_SUPPORT;
-	if (wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support())
+	if (wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_P2P_P2P_TDLS_SUPPORT;
 	mlme_debug("iface combinations = %x",
@@ -7552,7 +7610,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 
 	mlme_feature_set->vendor_req_2_version =
 					WMI_HOST_VENDOR1_REQ2_VERSION_3_50;
-	wlan_mlme_set_iface_combinations(mlme_feature_set);
+	wlan_mlme_set_iface_combinations(psoc, mlme_feature_set);
 	wlan_mlme_get_vht_enable2x2(psoc, &mlme_feature_set->enable2x2);
 }
 #endif

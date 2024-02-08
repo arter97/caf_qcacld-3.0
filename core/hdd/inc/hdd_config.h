@@ -1368,6 +1368,129 @@ enum host_log_level {
 		0, \
 		"This ini is used to enable shared memory mailbox")
 
+/*
+ * <ini>
+ * g_no_p2p_concurrency - disable P2P concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will not allow P2P iface to be included in the iface combinations.
+ *
+ * 0: enable P2P concurrency
+ * 1: disable P2P concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_NO_P2P_CONCURRENCY CFG_INI_BOOL( \
+		"g_no_p2p_concurrency", \
+		0, \
+		"This ini is used to disable P2P concurrency")
+
+/*
+ * <ini>
+ * g_no_sap_nan_concurrency - disable SAP-NAN concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will not allow SAP-NAN Concurrency to be included in the
+ * iface combinations.
+ *
+ * 0: enable SAP-NAN concurrency
+ * 1: disable SAP-NAN concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_NO_SAP_NAN_CONCURRENCY CFG_INI_BOOL( \
+		"g_no_sap_nan_concurrency", \
+		0, \
+		"This ini is used to disable SAP-NAN concurrency")
+
+/*
+ * <ini>
+ * g_no_sta_nan_concurrency - disable STA-NAN concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will not allow STA-NAN Concurrency to be included in the
+ * iface combinations.
+ *
+ * 0: enable STA-NAN concurrency
+ * 1: disable STA-NAN concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_NO_STA_NAN_CONCURRENCY CFG_INI_BOOL( \
+		"g_no_sta_nan_concurrency", \
+		0, \
+		"This ini is used to disable STA-NAN concurrency")
+/*
+ * <ini>
+ * g_no_sta_sap_concurrency - disable STA-SAP concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will not allow STA-SAP concurrency to be included in the
+ * iface combinations.
+ *
+ * 0: enable STA-SAP concurrency
+ * 1: disable STA-SAP concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_NO_STA_SAP_CONCURRENCY CFG_INI_BOOL( \
+		"g_no_sta_sap_concurrency", \
+		0, \
+		"This ini is used to disable STA-SAP concurrency")
+
+/*
+ * <ini>
+ * g_sta_sap_p2p_concurrency - enable STA-SAP-P2P concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will not allow STA-SAP-P2P concurrency to be included in the
+ * iface combinations.
+ *
+ * 0: disable STA-SAP-P2P concurrency
+ * 1: enable STA-SAP-P2P concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STA_SAP_P2P_CONCURRENCY CFG_INI_BOOL( \
+		"g_sta_sap_p2p_concurrency", \
+		0, \
+		"This ini is used to enable STA-SAP-P2P concurrency")
+
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
@@ -1408,5 +1531,10 @@ enum host_log_level {
 	CFG_CPU_CXPC_THRESHOLD_ALL \
 	CFG(CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME) \
 	CFG_LINK_STATE_CACHE_EXPIRY_ALL \
-	CFG(CFG_ENABLE_SMEM_MAILBOX)
+	CFG(CFG_ENABLE_SMEM_MAILBOX) \
+	CFG(CFG_NO_STA_SAP_CONCURRENCY) \
+	CFG(CFG_NO_STA_NAN_CONCURRENCY) \
+	CFG(CFG_NO_SAP_NAN_CONCURRENCY) \
+	CFG(CFG_NO_P2P_CONCURRENCY) \
+	CFG(CFG_STA_SAP_P2P_CONCURRENCY)
 #endif

@@ -2067,6 +2067,7 @@ enum wlan_state_ctrl_str_id {
  * @num_mlo_peers: Total number of MLO peers
  * @more_peer_data: more mlo peer data in peer stats
  * @lpc_info: Local packet capture info
+ * @combination: interface combination register to wiphy
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2351,6 +2352,8 @@ struct hdd_context {
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 	struct hdd_lpc_info lpc_info;
 #endif
+
+	struct ieee80211_iface_combination *combination;
 };
 
 /**
@@ -5587,5 +5590,23 @@ hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
 	return false;
 }
 #endif
+
+/**
+ * wlan_hdd_alloc_iface_combination_mem() - This API will allocate memory for
+ * interface combinations
+ * @hdd_ctx: HDD context
+ *
+ * Return: 0 on success and -ENOMEM on failure
+ */
+int wlan_hdd_alloc_iface_combination_mem(struct hdd_context *hdd_ctx);
+
+/**
+ * wlan_hdd_free_iface_combination_mem() - This API will free memory for
+ * interface combinations
+ * @hdd_ctx: HDD context
+ *
+ * Return: none
+ */
+void wlan_hdd_free_iface_combination_mem(struct hdd_context *hdd_ctx);
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
