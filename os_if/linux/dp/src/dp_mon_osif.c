@@ -61,9 +61,6 @@ void *monitor_osif_get_vdev_by_name(char *name)
 	char dev_name[IFNAME_SIZE];
 	void *data = NULL;
 
-	if (strncmp(name, "ath", 3) != 0)
-		return NULL;
-
 	if (strlcpy(dev_name, name, IFNAME_SIZE) >= IFNAME_SIZE)
 		return NULL;
 

@@ -22,6 +22,8 @@
 #ifdef WLAN_SUPPORT_SCS
 #include <qca_scs_if.h>
 #endif
+#include <cdp_txrx_ctrl.h>
+
 uint16_t qca_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 			    uint32_t service_id)
 {
@@ -175,6 +177,7 @@ uint32_t qca_sawf_get_peer_msduq(struct net_device *netdev, uint8_t *peer_mac,
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct wlan_objmgr_psoc *psoc = NULL;
 	ol_txrx_soc_handle soc_txrx_handle;
+	cdp_config_param_type val = {0};
 
 	if (!netdev->ieee80211_ptr)
 		return DP_SAWF_PEER_Q_INVALID;
@@ -182,6 +185,10 @@ uint32_t qca_sawf_get_peer_msduq(struct net_device *netdev, uint8_t *peer_mac,
 	vdev = qca_sawf_get_vdev(netdev, peer_mac);
 	if (!vdev)
 		return DP_SAWF_PEER_Q_INVALID;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) || !vdev->mlo_dev_ctx)
+		return DP_SAWF_PEER_Q_INVALID;
+
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc)
 		return DP_SAWF_PEER_Q_INVALID;
@@ -191,6 +198,16 @@ uint32_t qca_sawf_get_peer_msduq(struct net_device *netdev, uint8_t *peer_mac,
 
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) {
+		if (vdev->mlo_dev_ctx->mlo_max_recom_simult_links != 3)
+			return DP_SAWF_PEER_Q_INVALID;
+	} else if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
+		cdp_txrx_get_vdev_param(soc_txrx_handle,
+					wlan_vdev_get_id(vdev),
+					CDP_ENABLE_WDS, &val);
+		if (!val.cdp_vdev_param_wds)
+			return DP_SAWF_PEER_Q_INVALID;
+	}
 	/* Check enable config else return DP_SAWF_PEER_Q_INVALID */
 
 	osdev = ath_netdev_priv(netdev);
@@ -232,7 +249,7 @@ void qca_sawf_3_link_peer_dl_flow_count(struct net_device *netdev, uint8_t *mac_
 	ol_txrx_soc_handle soc_txrx_handle;
 	osif_dev *osdev = NULL;
 
-	if (!netdev->ieee80211_ptr)
+	if (!netdev || !netdev->ieee80211_ptr)
 		return;
 
 	vdev = qca_sawf_get_vdev(netdev, mac_addr);
