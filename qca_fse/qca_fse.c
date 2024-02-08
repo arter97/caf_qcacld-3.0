@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -204,7 +204,8 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 				       fse_info->dest_ip, fse_info->dest_port,
 				       fse_info->protocol, fse_info->version,
 				       fse_info->fw_svc_id, tid,
-				       peer_mac_addr, pdev_id);
+				       peer_mac_addr, pdev_id,
+				       fse_info->drop_flow, fse_info->ring_id);
 	}
 
 	if (ret != QDF_STATUS_SUCCESS) {
@@ -257,7 +258,8 @@ bool qca_fse_add_rule(struct qca_fse_flow_info *fse_info)
 				       fse_info->src_ip, fse_info->src_port,
 				       fse_info->protocol, fse_info->version,
 				       fse_info->rv_svc_id, tid,
-				       peer_mac_addr, pdev_id);
+				       peer_mac_addr, pdev_id,
+				       fse_info->drop_flow, fse_info->ring_id);
 	}
 
 	if (ret != QDF_STATUS_SUCCESS) {

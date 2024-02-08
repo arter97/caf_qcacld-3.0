@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -613,27 +614,39 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 	dp_info("flow_addr = %pK, flow_id = %u, valid = %d, v4 = %d\n",
 		fse, fse->flow_id, fse->is_valid, fse->is_ipv4_addr_entry);
 
-	/* Initialize other parameters for HW flow & populate HW FSE entry */
-	flow.reo_destination_indication = (fse->flow_hash &
+	if (rx_flow_info->drop) {
+		flow.drop = 1;
+	} else if (rx_flow_info->ring_id > 0 &&
+		rx_flow_info->ring_id < HAL_REO_DEST_IND_DROP_RING_ID) {
+		flow.reo_destination_indication = rx_flow_info->ring_id;
+	} else {
+		/* Initialize other parameters for HW flow & populate HW FSE
+		 * entry
+		 */
+		flow.reo_destination_indication = (fse->flow_hash &
 				HAL_REO_DEST_IND_HASH_MASK);
 
-	/**
-	 * Reo destination of each flow is mapped to match the same used
-	 * by RX Hash algorithm. If RX Hash is disabled, then the REO
-	 * destination below is directly got from pdev, rather than using
-	 * dp_peer_setup_get_reo_hash since we do not have vdev handle here.
-	 */
-	if (wlan_cfg_is_rx_hash_enabled(soc->wlan_cfg_ctx)) {
-		flow.reo_destination_indication |=
-			HAL_REO_DEST_IND_START_OFFSET;
-	} else {
-		flow.reo_destination_indication = pdev->reo_dest;
+		/**
+		 * Reo destination of each flow is mapped to match the same used
+		 * by RX Hash algorithm. If RX Hash is disabled, then the REO
+		 * destination below is directly got from pdev, rather than
+		 * using dp_peer_setup_get_reo_hash since we do not have vdev
+		 * handle here.
+		 */
+		if (wlan_cfg_is_rx_hash_enabled(soc->wlan_cfg_ctx)) {
+			flow.reo_destination_indication |=
+				HAL_REO_DEST_IND_START_OFFSET;
+		} else {
+			flow.reo_destination_indication = pdev->reo_dest;
+		}
+
+		dp_rx_set_rr_reo_indication(&flow, &(fst->ring_id), cfg);
 	}
 
-	dp_rx_set_rr_reo_indication(&flow, &(fst->ring_id), cfg);
-
 	flow.reo_destination_handler = HAL_RX_FSE_REO_DEST_FT;
-	flow.fse_metadata = rx_flow_info->fse_metadata;
+	flow.fse_metadata =
+		DP_RX_FSE_FLOW_UPDATE_DROP_BIT(rx_flow_info->fse_metadata,
+					       rx_flow_info->drop);
 	dp_rx_update_ppe_fse_fields(&flow, rx_flow_info);
 	fse->hal_rx_fse = hal_rx_flow_setup_fse(soc->hal_soc, fst->hal_rx_fst,
 						fse->flow_id, &flow);

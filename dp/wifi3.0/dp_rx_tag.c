@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -758,7 +759,8 @@ QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc_hdl,
 				    uint32_t *dest_ip, uint32_t dest_port,
 				    uint8_t protocol, uint8_t version,
 				    uint32_t svc_id, uint8_t tid,
-				    uint8_t *dest_mac, uint8_t pdev_id)
+				    uint8_t *dest_mac, uint8_t pdev_id,
+				    bool drop_flow, uint8_t ring_id)
 {
 	struct cdp_rx_flow_info flow_info = { 0 };
 	struct wlan_cfg_dp_soc_ctxt *cfg;
@@ -777,7 +779,8 @@ QDF_STATUS dp_rx_sfe_add_flow_entry(struct cdp_soc_t *soc_hdl,
 	flow_info.flow_tuple_info.src_port = src_port;
 	flow_info.flow_tuple_info.dest_port = dest_port;
 	flow_info.flow_tuple_info.l4_protocol = protocol;
-
+	flow_info.drop = drop_flow;
+	flow_info.ring_id = ring_id;
 	/*
 	 * Set FSE metadata to indicate that the SFE flow rule
 	 * is matched in FSE.
