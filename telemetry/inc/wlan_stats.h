@@ -220,4 +220,28 @@ bool wlan_stats_is_recursive_valid(struct stats_config *cfg,
  */
 void wlan_stats_free_unified_stats(struct unified_stats *stats);
 
+/**
+ * wlan_stats_get_vdev_from_sta_mac(): Function for peer lookup
+ * @mac: Mac address of peer
+ *
+ * This function helps to search peer from MLD context or across psoc.
+ * If found returns vdev for MLD assoc peer or legacy peer.
+ *
+ * Return: vdev pointer in success or NULL in failure
+ */
+struct wlan_objmgr_vdev *wlan_stats_get_vdev_from_sta_mac(uint8_t *mac);
+
+/**
+ * wlan_stats_get_tlv_counts_and_total_length(): Function to get valid feature
+ * counts and total size of stats packed
+ * @stats: Pointer to unified_stats
+ * @tlv_count: Pointer to hold valid feature counts
+ *
+ * This function is useful to pre-calculate the buffer size before allocation
+ * to pack entire stats data.
+ *
+ * Return: Total length of stats data packed
+ */
+uint32_t wlan_stats_get_tlv_counts_and_total_length(struct unified_stats *stats,
+						    uint8_t *tlv_count);
 #endif /* _WLAN_STATS_H_ */
