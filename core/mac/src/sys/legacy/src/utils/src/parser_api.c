@@ -13122,6 +13122,12 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		mlo_ie->mld_capab_and_op_info.aar_support = 0;
 	}
 
+	if (wlan_mlme_get_sta_mlo_conn_max_num(psoc) == 3) {
+		wlan_vdev_mlme_cap_clear(pe_session->vdev,
+					 WLAN_VDEV_C_EMLSR_CAP);
+		pe_debug("EMLSR is not supported for 3-link association until FW support is added");
+	}
+
 	/* Check if STA supports EMLSR and vendor command prefers EMLSR mode */
 	if (wlan_vdev_mlme_cap_get(pe_session->vdev, WLAN_VDEV_C_EMLSR_CAP)) {
 		wlan_mlme_get_eml_params(psoc, &eml_cap);
