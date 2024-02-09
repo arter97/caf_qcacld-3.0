@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -893,15 +893,20 @@ wlan_pmo_get_go_mode_bus_suspend(struct wlan_objmgr_psoc *psoc)
 	return pmo_psoc_ctx->psoc_cfg.is_bus_suspend_enabled_in_go_mode;
 }
 
+bool wlan_pmo_no_op_on_page_fault(struct wlan_objmgr_psoc *psoc)
+{
+	return pmo_no_op_on_page_fault(psoc);
+}
+
 bool wlan_pmo_enable_ssr_on_page_fault(struct wlan_objmgr_psoc *psoc)
 {
 	return pmo_enable_ssr_on_page_fault(psoc);
 }
 
 uint8_t
-wlan_pmo_get_max_pagefault_wakeups_for_ssr(struct wlan_objmgr_psoc *psoc)
+wlan_pmo_get_min_pagefault_wakeups_for_action(struct wlan_objmgr_psoc *psoc)
 {
-	return pmo_get_max_pagefault_wakeups_for_ssr(psoc);
+	return pmo_get_min_pagefault_wakeups_for_action(psoc);
 }
 
 uint32_t
