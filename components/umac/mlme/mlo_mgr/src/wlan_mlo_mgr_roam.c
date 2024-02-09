@@ -1056,7 +1056,6 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 		sta_ctx->copied_reassoc_rsp->roaming_info = NULL;
 		qdf_mem_free(sta_ctx->copied_reassoc_rsp);
 		sta_ctx->copied_reassoc_rsp = NULL;
-		connect_ies->assoc_rsp.len = 0;
 		return QDF_STATUS_E_NOMEM;
 	}
 
