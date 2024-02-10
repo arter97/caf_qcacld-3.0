@@ -2935,9 +2935,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		pe_err("LFR3:roam_sync_ind_ptr is NULL");
 		return status;
 	}
-	session_ptr = pe_find_session_by_vdev_id(mac_ctx,
-				vdev_id);
-
+	session_ptr = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session_ptr) {
 		pe_err("LFR3:Unable to find session");
 		return status;
@@ -3209,6 +3207,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	}
 
 	pe_delete_session(mac_ctx, session_ptr);
+
 	return QDF_STATUS_SUCCESS;
 
 roam_sync_fail:

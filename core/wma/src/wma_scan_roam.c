@@ -91,6 +91,7 @@
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlo_mgr_roam.h"
 #include "lim_mlo.h"
+#include "wlan_dp_api.h"
 #ifdef FEATURE_WLAN_EXTSCAN
 #define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION WAKELOCK_DURATION_RECOMMENDED
 
@@ -3145,15 +3146,35 @@ QDF_STATUS wma_send_ht40_obss_scanind(tp_wma_handle wma,
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-void cm_roam_update_vdev(struct roam_offload_synch_ind *sync_ind,
-			 uint8_t vdev_id)
+void cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
+			 struct roam_offload_synch_ind *sync_ind)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct qdf_mac_addr *self_mac_addr;
+	uint8_t vdev_id;
 
 	if (!wma)
 		return;
 
+	vdev_id = wlan_vdev_get_id(vdev);
+
 	wma_roam_update_vdev(wma, sync_ind, vdev_id);
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		self_mac_addr =
+			(struct qdf_mac_addr *)wlan_vdev_mlme_get_macaddr(vdev);
+		goto update_deflink;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return;
+
+	self_mac_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+
+update_deflink:
+	/* Set the assoc vdev as DP deflink after roaming */
+	wlan_dp_update_def_link(wma->psoc, self_mac_addr, vdev);
 }
 
 QDF_STATUS

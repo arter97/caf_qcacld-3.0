@@ -1948,8 +1948,8 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
 
 /**
  * cm_roam_update_vdev() - Update the STA and BSS
+ * @vdev: Pointer to the vdev object
  * @sync_ind: Information needed for roam sync propagation
- * @vdev_id: vdev id
  *
  * This function will perform all the vdev related operations with
  * respect to the self sta and the peer after roaming and completes
@@ -1957,8 +1957,8 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
  *
  * Return: None
  */
-void cm_roam_update_vdev(struct roam_offload_synch_ind *sync_ind,
-			 uint8_t vdev_id);
+void cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
+			 struct roam_offload_synch_ind *sync_ind);
 
 /**
  * cm_roam_pe_sync_callback() - Callback registered at pe, gets invoked when
