@@ -71,7 +71,6 @@ wlan_ll_sap_switch_bearer_on_sta_connect_start(struct wlan_objmgr_psoc *psoc,
 	uint32_t ch_freq = 0;
 	struct scan_cache_entry *entry;
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_bearer_switch_request bs_request = {0};
 	qdf_freq_t ll_lt_sap_freq;
 	bool is_bearer_switch_required = false;
 	QDF_STATUS status = QDF_STATUS_E_ALREADY;
@@ -119,17 +118,11 @@ wlan_ll_sap_switch_bearer_on_sta_connect_start(struct wlan_objmgr_psoc *psoc,
 	if (!is_bearer_switch_required)
 		goto rel_ref;
 
-	bs_request.vdev_id = vdev_id;
-	bs_request.request_id = ll_lt_sap_bearer_switch_get_id(psoc);
-	bs_request.req_type = WLAN_BS_REQ_TO_NON_WLAN;
-	bs_request.source = BEARER_SWITCH_REQ_CONNECT;
-	bs_request.requester_cb = connect_start_bearer_switch_requester_cb;
-	bs_request.arg_value = cm_id;
-
-	status = ll_lt_sap_switch_bearer_to_ble(psoc, &bs_request);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		status = QDF_STATUS_E_ALREADY;
+	status = ll_lt_sap_switch_bearer(
+				psoc, vdev_id, WLAN_BS_REQ_TO_NON_WLAN,
+				BEARER_SWITCH_REQ_CONNECT,
+				connect_start_bearer_switch_requester_cb,
+				cm_id, NULL);
 rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
 
@@ -151,7 +144,6 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_complete(
 						struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id)
 {
-	struct wlan_bearer_switch_request bs_request = {0};
 	QDF_STATUS status = QDF_STATUS_E_ALREADY;
 	uint8_t ll_lt_sap_vdev_id;
 
@@ -160,18 +152,60 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_complete(
 	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID)
 		return status;
 
-	bs_request.vdev_id = vdev_id;
-	bs_request.request_id = ll_lt_sap_bearer_switch_get_id(psoc);
-	bs_request.req_type = WLAN_BS_REQ_TO_WLAN;
-	bs_request.source = BEARER_SWITCH_REQ_CONNECT;
-	bs_request.requester_cb = connect_complete_bearer_switch_requester_cb;
-
-	status = ll_lt_sap_switch_bearer_to_wlan(psoc, &bs_request);
+	status = ll_lt_sap_switch_bearer(
+				psoc, vdev_id, WLAN_BS_REQ_TO_WLAN,
+				BEARER_SWITCH_REQ_CONNECT,
+				connect_complete_bearer_switch_requester_cb,
+				0, NULL);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_ALREADY;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+static void ll_sap_csa_bearer_switch_requester_cb(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					wlan_bs_req_id request_id,
+					QDF_STATUS status,
+					uint32_t req_value,
+					void *request_params)
+{
+	wlan_ll_sap_csa_bearer_switch_rsp(vdev_id);
+}
+
+QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+	return ll_lt_sap_switch_bearer(
+				psoc, vdev_id, WLAN_BS_REQ_TO_NON_WLAN,
+				BEARER_SWITCH_REQ_CSA,
+				ll_sap_csa_bearer_switch_requester_cb,
+				0, NULL);
+}
+
+static void wlan_ll_sap_csa_complete_bearer_switch_requester_cb(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						wlan_bs_req_id request_id,
+						QDF_STATUS status,
+						uint32_t req_value,
+						void *request_params)
+{
+	/* Drop this response as no action is required */
+}
+
+QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id)
+{
+	return ll_lt_sap_switch_bearer(
+			psoc, vdev_id, WLAN_BS_REQ_TO_WLAN,
+			BEARER_SWITCH_REQ_CSA,
+			wlan_ll_sap_csa_complete_bearer_switch_requester_cb,
+			0, NULL);
 }
 
 QDF_STATUS wlan_ll_lt_sap_get_freq_list(
@@ -452,4 +486,14 @@ QDF_STATUS wlan_ll_sap_get_tsf_stats_before_csa(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return status;
+}
+
+bool wlan_ll_sap_is_bearer_switch_req_on_csa(struct wlan_objmgr_psoc *psoc,
+					     uint8_t vdev_id)
+{
+	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id) &&
+	    ll_lt_sap_get_bearer_switch_cap_for_csa(psoc))
+		return true;
+
+	return false;
 }

@@ -64,6 +64,22 @@ void ll_lt_sap_extract_ll_sap_cap(struct wlan_objmgr_psoc *psoc)
 
 }
 
+bool ll_lt_sap_get_bearer_switch_cap_for_csa(struct wlan_objmgr_psoc *psoc)
+{
+	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
+
+	psoc_ll_sap_obj =
+		wlan_objmgr_psoc_get_comp_private_obj(psoc,
+						      WLAN_UMAC_COMP_LL_SAP);
+
+	if (!psoc_ll_sap_obj) {
+		ll_sap_err("Invalid psoc ll sap priv obj");
+		return false;
+	}
+
+	return psoc_ll_sap_obj->is_beared_switch_required;
+}
+
 /**
  * ll_lt_sap_get_sorted_user_config_acs_ch_list() - API to get sorted user
  * configured ACS channel list

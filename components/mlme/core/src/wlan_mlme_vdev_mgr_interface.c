@@ -2368,6 +2368,11 @@ void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
 {
 	lim_ll_sap_notify_chan_switch_started(vdev);
 }
+
+void wlan_ll_sap_csa_bearer_switch_rsp(uint8_t vdev_id)
+{
+	csr_send_csa_restart_req(vdev_id);
+}
 #endif
 
 QDF_STATUS

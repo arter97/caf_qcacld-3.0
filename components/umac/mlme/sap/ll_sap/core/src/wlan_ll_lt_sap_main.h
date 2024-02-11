@@ -109,4 +109,13 @@ QDF_STATUS ll_lt_sap_get_tsf_stats_for_csa(
  * Return: QDF_STATUS
  */
 QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp);
+
+/**
+ * ll_lt_sap_get_bearer_switch_cap_for_csa() - Get bearer switch service
+ * capability for LL_LT_SAP CSA
+ * @psoc: pointer to psoc object
+ *
+ * Return: True/False
+ */
+bool ll_lt_sap_get_bearer_switch_cap_for_csa(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

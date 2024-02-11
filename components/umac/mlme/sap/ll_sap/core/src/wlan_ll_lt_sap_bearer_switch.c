@@ -2066,12 +2066,55 @@ static void p2p_go_start_bearer_switch_requester_cb(struct wlan_objmgr_psoc *pso
 	qdf_event_set(&bearer_switch_ctx->p2p_go_bs_copletion_event);
 }
 
+static void p2p_go_complete_bearer_switch_requester_cb(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						wlan_bs_req_id request_id,
+						QDF_STATUS status,
+						uint32_t req_value,
+						void *request_params)
+{
+	/* Drop this response as no action is required */
+}
+
+QDF_STATUS
+ll_lt_sap_switch_bearer(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			enum bearer_switch_req_type req_type,
+			enum bearer_switch_req_source source,
+			bearer_switch_requester_cb requester_cb,
+			uint32_t arg_value, void *arg)
+{
+	struct wlan_bearer_switch_request bs_request = {0};
+	QDF_STATUS status;
+
+	bs_request.vdev_id = vdev_id;
+	bs_request.request_id = ll_lt_sap_bearer_switch_get_id(psoc);
+	bs_request.req_type = req_type;
+	bs_request.source = source;
+	bs_request.requester_cb = requester_cb;
+	bs_request.arg_value = arg_value;
+	bs_request.arg = arg;
+
+	if (bs_request.req_type == WLAN_BS_REQ_TO_NON_WLAN)
+		status = ll_lt_sap_switch_bearer_to_ble(psoc, &bs_request);
+	else if (bs_request.req_type == WLAN_BS_REQ_TO_WLAN)
+		status = ll_lt_sap_switch_bearer_to_wlan(psoc, &bs_request);
+	else
+		status = QDF_STATUS_E_INVAL;
+
+	if (QDF_IS_STATUS_ERROR(status))
+		ll_sap_err("vdev %d beaer_switch failed for req_type %d source %d status %d",
+			   bs_request.vdev_id, bs_request.req_type,
+			   bs_request.source, status);
+
+	return status;
+}
+
 void ll_lt_sap_switch_bearer_for_p2p_go_start(struct wlan_objmgr_psoc *psoc,
 					      uint8_t vdev_id,
 					      qdf_freq_t oper_freq,
 					      enum QDF_OPMODE device_mode)
 {
-	struct wlan_bearer_switch_request bs_request = {0};
 	qdf_freq_t ll_lt_sap_freq = 0;
 	QDF_STATUS status;
 	struct bearer_switch_info *bearer_switch_ctx;
@@ -2117,20 +2160,14 @@ void ll_lt_sap_switch_bearer_for_p2p_go_start(struct wlan_objmgr_psoc *psoc,
 	ll_sap_debug("P2P GO freq %d on same mac with ll_lt sap %d", oper_freq,
 		     ll_lt_sap_freq);
 
-	bs_request.vdev_id = vdev_id;
-	bs_request.request_id = ll_lt_sap_bearer_switch_get_id(psoc);
-	bs_request.req_type = WLAN_BS_REQ_TO_NON_WLAN;
-	bs_request.source = BEARER_SWITCH_REQ_P2P_GO;
-	bs_request.requester_cb = p2p_go_start_bearer_switch_requester_cb;
-	bs_request.arg = bearer_switch_ctx;
+	status = ll_lt_sap_switch_bearer(
+				psoc, vdev_id, WLAN_BS_REQ_TO_NON_WLAN,
+				BEARER_SWITCH_REQ_P2P_GO,
+				p2p_go_start_bearer_switch_requester_cb,
+				0, bearer_switch_ctx);
 
-	status = ll_lt_sap_switch_bearer_to_ble(psoc, &bs_request);
-
-	if (QDF_IS_STATUS_ERROR(status)) {
-		ll_sap_err("bearer switch to non-wlan failed for vdev %d",
-			   vdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
 		goto rel_ref;
-	}
 
 	/*
 	 * Wait for bearer switch completion here as start bss should complete
@@ -2147,22 +2184,10 @@ rel_ref:
 	wlan_objmgr_vdev_release_ref(ll_lt_sap_vdev, WLAN_LL_SAP_ID);
 }
 
-static void p2p_go_complete_bearer_switch_requester_cb(
-						struct wlan_objmgr_psoc *psoc,
-						uint8_t vdev_id,
-						wlan_bs_req_id request_id,
-						QDF_STATUS status,
-						uint32_t req_value,
-						void *request_params)
-{
-	/* Drop this response as no action is required */
-}
-
 void ll_lt_sap_switch_bearer_on_p2p_go_complete(struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id,
 						enum QDF_OPMODE device_mode)
 {
-	struct wlan_bearer_switch_request bs_request = {0};
 	uint8_t ll_lt_sap_vdev_id;
 
 	if (device_mode != QDF_P2P_GO_MODE)
@@ -2173,11 +2198,8 @@ void ll_lt_sap_switch_bearer_on_p2p_go_complete(struct wlan_objmgr_psoc *psoc,
 	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID)
 		return;
 
-	bs_request.vdev_id = vdev_id;
-	bs_request.request_id = ll_lt_sap_bearer_switch_get_id(psoc);
-	bs_request.req_type = WLAN_BS_REQ_TO_WLAN;
-	bs_request.source = BEARER_SWITCH_REQ_P2P_GO;
-	bs_request.requester_cb = p2p_go_complete_bearer_switch_requester_cb;
-
-	ll_lt_sap_switch_bearer_to_wlan(psoc, &bs_request);
+	ll_lt_sap_switch_bearer(psoc, vdev_id, WLAN_BS_REQ_TO_WLAN,
+				BEARER_SWITCH_REQ_P2P_GO,
+				p2p_go_complete_bearer_switch_requester_cb,
+				0, NULL);
 }

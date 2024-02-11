@@ -992,4 +992,13 @@ csr_convert_mode_to_nw_type(enum csr_cfgdot11mode dot11_mode,
 enum csr_cfgdot11mode
 csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac,
 				   struct bss_dot11_config *dot11_cfg);
+
+/**
+ * csr_send_csa_restart_req() - send csa restart req to lim
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS csr_send_csa_restart_req(uint8_t vdev_id);
+
 #endif

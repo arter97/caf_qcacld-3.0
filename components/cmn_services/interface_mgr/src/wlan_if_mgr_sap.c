@@ -35,6 +35,7 @@
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_mlme_api.h"
 #include "wlan_mlo_link_force.h"
+#include "wlan_ll_sap_api.h"
 
 QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
@@ -205,6 +206,7 @@ if_mgr_ap_csa_complete(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t vdev_id;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -214,11 +216,17 @@ if_mgr_ap_csa_complete(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
 
+	vdev_id = wlan_vdev_get_id(vdev);
+
 	status = wlan_p2p_check_and_force_scc_go_plus_go(psoc, vdev);
 	if (QDF_IS_STATUS_ERROR(status))
 		ifmgr_err("force scc failure with status: %d", status);
 
-	wlan_tdls_notify_channel_switch_complete(psoc, wlan_vdev_get_id(vdev));
+	wlan_tdls_notify_channel_switch_complete(psoc, vdev_id);
+
+	if (wlan_ll_sap_is_bearer_switch_req_on_csa(psoc, vdev_id))
+		wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete(
+							psoc, vdev_id);
 
 	return status;
 }
@@ -230,10 +238,12 @@ if_mgr_ap_csa_start(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	enum QDF_OPMODE op_mode;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t vdev_id;
 
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 	if (op_mode != QDF_SAP_MODE && op_mode != QDF_P2P_GO_MODE)
-		return QDF_STATUS_SUCCESS;
+		return status;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -243,10 +253,15 @@ if_mgr_ap_csa_start(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
 
+	vdev_id = wlan_vdev_get_id(vdev);
+
 	/*
 	 * Disable TDLS off-channel before VDEV restart
 	 */
 	wlan_tdls_notify_channel_switch_start(psoc, vdev);
 
-	return QDF_STATUS_SUCCESS;
+	if (wlan_ll_sap_is_bearer_switch_req_on_csa(psoc, vdev_id))
+		status = wlan_ll_sap_switch_bearer_on_ll_sap_csa(psoc, vdev_id);
+
+	return status;
 }

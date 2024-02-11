@@ -342,4 +342,20 @@ void ll_lt_sap_switch_bearer_on_p2p_go_complete(struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id,
 						enum QDF_OPMODE device_mode);
 
+/**
+ * ll_lt_sap_switch_bearer() - LL_LT_SAP bearer switch request
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id of the current vdev
+ * @req_type: request type
+ * @source: source of bearer switch req
+ * @requester_cb: requester callback
+ * @arg_value: arg value
+ * @arg: argument
+ */
+QDF_STATUS
+ll_lt_sap_switch_bearer(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			enum bearer_switch_req_type req_type,
+			enum bearer_switch_req_source source,
+			bearer_switch_requester_cb requester_cb,
+			uint32_t arg_value, void *arg);
 #endif /* _WLAN_LL_LT_SAP_BEARER_SWITCH_H_ */

@@ -631,6 +631,14 @@ void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_ll_sap_csa_bearer_switch_rsp() - LL_LT_SAP csa bearer switch rsp
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void wlan_ll_sap_csa_bearer_switch_rsp(uint8_t vdev_id);
 #else
 static inline
 void wlan_ll_sap_send_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
@@ -645,6 +653,11 @@ void wlan_ll_sap_send_action_frame(struct wlan_objmgr_vdev *vdev,
 
 static inline
 void wlan_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void wlan_ll_sap_csa_bearer_switch_rsp(uint8_t vdev_id)
 {
 }
 #endif

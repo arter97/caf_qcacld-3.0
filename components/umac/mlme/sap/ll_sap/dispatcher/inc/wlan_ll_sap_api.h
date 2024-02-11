@@ -79,6 +79,30 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_sta_connect_complete(
 						uint8_t vdev_id);
 
 /**
+ * wlan_ll_sap_switch_bearer_on_ll_sap_csa() - Switch bearer when LL_LT_SAP
+ * csa starts
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id
+ * Return: QDF_STATUS_SUCCESS on successful bearer switch
+ *	   else failure
+ */
+QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+
+/**
+ * wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete() - Switch bearer
+ * when LL_LT_SAP csa completes
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id
+ * Return: QDF_STATUS_SUCCESS on successful bearer switch
+ *         else failure
+ */
+QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id);
+
+/**
  * wlan_ll_lt_sap_get_freq_list() - Get frequency list for LL_LT_SAP
  * @psoc: Pointer to psoc object
  * @freq_list: Pointer to wlan_ll_lt_sap_freq_list structure
@@ -216,6 +240,15 @@ uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
  */
 uint64_t
 wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_ll_sap_is_bearer_switch_req_on_csa() - Check whether bearer switch
+ * is required for LL_LT_SAP CSA or not
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ */
+bool wlan_ll_sap_is_bearer_switch_req_on_csa(struct wlan_objmgr_psoc *psoc,
+					     uint8_t vdev_id);
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
@@ -251,6 +284,22 @@ wlan_ll_sap_switch_bearer_on_sta_connect_complete(struct wlan_objmgr_psoc *psoc,
 						  uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static inline
@@ -317,6 +366,13 @@ static inline uint64_t
 wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {
 	return 0;
+}
+
+static inline
+bool wlan_ll_sap_is_bearer_switch_req_on_csa(struct wlan_objmgr_psoc *psoc,
+					     uint8_t vdev_id)
+{
+	return false;
 }
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* _WLAN_LL_LT_SAP_API_H_ */
