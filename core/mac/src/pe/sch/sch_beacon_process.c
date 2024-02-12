@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -474,10 +474,13 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 			bcn->HTInfo.recommendedTxWidthSet : false;
 
 	if (bcn->OperatingMode.present) {
-		pe_debug("OMN IE is present in the beacon, update NSS/Ch width");
 		lim_update_nss(mac_ctx, sta_ds, bcn->OperatingMode.rxNSS,
 			       session);
 		ch_width = bcn->OperatingMode.chanWidth;
+		pe_debug("OMN IE present in bcn/probe rsp, omn_ie_ch_width: %d",
+			 ch_width);
+		lim_update_omn_ie_ch_width(session->vdev, ch_width);
+
 	} else {
 		bcn_vht_chwidth = lim_get_vht_ch_width(vht_caps, vht_op,
 						       &bcn->HTInfo);
@@ -485,6 +488,7 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 			lim_convert_vht_chwidth_to_phy_chwidth(bcn_vht_chwidth,
 							       is_40);
 	}
+
 	lim_update_channel_width(mac_ctx, sta_ds, session, ch_width, &ch_bw);
 }
 
