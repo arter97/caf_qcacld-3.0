@@ -709,8 +709,7 @@ QDF_STATUS tdls_process_evt(struct scheduler_msg *msg)
 	}
 	event = &notify->event;
 
-	tdls_debug("evt type: %s(%d)",
-		   tdls_get_event_type_str(event->message_type),
+	tdls_debug(" %s(%d)", tdls_get_event_type_str(event->message_type),
 		   event->message_type);
 
 	switch (event->message_type) {

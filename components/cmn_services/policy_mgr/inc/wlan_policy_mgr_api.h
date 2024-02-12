@@ -4829,7 +4829,7 @@ bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/*
+/**
  * policy_mgr_is_ml_sta_links_in_mcc() - Check ML links are in MCC or not
  * @psoc: psoc ctx
  * @ml_freq_lst: ML STA freq list
@@ -4848,6 +4848,21 @@ policy_mgr_is_ml_sta_links_in_mcc(struct wlan_objmgr_psoc *psoc,
 				  uint8_t *ml_linkid_lst,
 				  uint8_t num_ml_sta,
 				  uint32_t *affected_linkid_bitmap);
+
+/**
+ * policy_mgr_is_ml_links_in_mcc_allowed() - Check ML links are in MCC or not
+ * @psoc: psoc ctx
+ * @vdev: Pointer to vdev object
+ * @ml_sta_vdev_lst: ML STA vdev id list
+ * @num_ml_sta: Number of total ML STA links
+ *
+ * Return: QDF_STATUS_SUCCESS if ML link in MCC is allowed
+ */
+QDF_STATUS
+policy_mgr_is_ml_links_in_mcc_allowed(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev,
+				      uint8_t *ml_sta_vdev_lst,
+				      uint8_t *num_ml_sta);
 
 /**
  * policy_mgr_is_vdev_high_tput_or_low_latency() - Check vdev has
