@@ -581,7 +581,7 @@ ol_ath_ucfg_set_peer_pkt_capture_mon_2_0(void *vscn,
 
 	ni = ieee80211_find_node(ic, peer_info->peer_mac, WLAN_MLME_SB_ID);
 	if (!ni && action == LITE_MON_PEER_ADD) {
-		qdf_err("VAP doesn't exist");
+		qdf_info("Node doesn't exist");
 		return -EINVAL;
 	}
 
