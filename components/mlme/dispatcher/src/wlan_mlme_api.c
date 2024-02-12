@@ -7852,7 +7852,7 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status;
 	wmi_host_channel_width wmi_chan_width;
-	enum phy_ch_width associated_ch_width;
+	enum phy_ch_width associated_ch_width, omn_ie_ch_width;
 	struct wlan_channel *des_chan;
 	struct mlme_legacy_priv *mlme_priv;
 	qdf_freq_t sec_2g_freq = 0;
@@ -7864,6 +7864,14 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
 		return QDF_STATUS_E_INVAL;
+
+	omn_ie_ch_width =
+		mlme_priv->connect_info.assoc_chan_info.omn_ie_ch_width;
+	if (omn_ie_ch_width != CH_WIDTH_INVALID && ch_width > omn_ie_ch_width) {
+		mlme_debug("vdev %d: Invalid new chwidth:%d, omn_ie_cw:%d",
+			   vdev_id, ch_width, omn_ie_ch_width);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	associated_ch_width =
 		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
