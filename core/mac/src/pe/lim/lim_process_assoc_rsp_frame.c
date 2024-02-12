@@ -1092,7 +1092,8 @@ void lim_send_join_fail_on_vdev(struct mac_context *mac_ctx,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static QDF_STATUS
-lim_gen_link_specific_probe_resp_from_assoc_resp(uint8_t *rx_pkt_info,
+lim_gen_link_specific_probe_resp_from_assoc_resp(struct mac_context *mac_ctx,
+						 uint8_t *rx_pkt_info,
 						 uint32_t frame_len,
 						 struct pe_session *session)
 {
@@ -1186,6 +1187,17 @@ lim_gen_link_specific_probe_resp_from_assoc_resp(uint8_t *rx_pkt_info,
 				goto mem_free;
 			}
 		}
+
+		status = lim_update_mlo_mgr_info(mac_ctx,
+						 session->vdev,
+						 &link_info->link_addr,
+						 link_info->link_id,
+						 link_info->chan_freq);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("failed to update mlo_mgr %d for link_id: %d",
+				 status, link_info->link_id);
+			goto mem_free;
+		}
 	}
 
 mem_free:
@@ -1196,7 +1208,8 @@ mem_free:
 }
 #else /* WLAN_FEATURE_11BE_MLO */
 static inline QDF_STATUS
-lim_gen_link_specific_probe_resp_from_assoc_resp(uint8_t *rx_pkt_info,
+lim_gen_link_specific_probe_resp_from_assoc_resp(struct mac_context *mac_ctx,
+						 uint8_t *rx_pkt_info,
 						 uint32_t frame_len,
 						 struct pe_session *session)
 {
@@ -1867,7 +1880,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	 * Any failure during partner link probe resp generation, treat
 	 * it as connect failure and send deauth to AP.
 	 */
-	status = lim_gen_link_specific_probe_resp_from_assoc_resp(rx_pkt_info,
+	status = lim_gen_link_specific_probe_resp_from_assoc_resp(mac_ctx,
+								  rx_pkt_info,
 								  frame_body_len,
 								  session_entry);
 	if (QDF_IS_STATUS_ERROR(status)) {
