@@ -162,6 +162,24 @@ struct async_context {
 	struct stats_command *cmd;
 };
 
+/**
+ * struct nb_stats_context: Defines the global context for non blocking stats
+ * @async_req:    Flag set for non blocking stats request
+ * @reply:        Reply buffer for non blocking stats
+ */
+struct nb_stats_context {
+	bool async_req;
+	struct reply_buffer *reply;
+};
+
+/* Global context to hold non blocking stats context */
+static struct nb_stats_context g_nb_ctx = {0};
+
+static bool is_async_req(void)
+{
+	return g_nb_ctx.async_req;
+}
+
 /* Global socket context to create nl80211 command and event interface */
 static struct socket_context g_sock_ctx = {0};
 /* Global parent vap to build child sta object list */
@@ -573,6 +591,11 @@ static bool is_vap_radiochild(const char *rif_name, const uint8_t *rhw_addr,
 static int is_valid_cmd(struct stats_command *cmd)
 {
 	u_int8_t *sta_mac = cmd->sta_mac.ether_addr_octet;
+
+	if (is_async_req() && cmd->recursive) {
+		STATS_WARN("Recursive is not supported for asyncs request\n");
+		return -EINVAL;
+	}
 
 	switch (cmd->obj) {
 	case STATS_OBJ_AP:
@@ -3870,4 +3893,33 @@ int32_t libstats_request_async_stop(struct stats_command *cmd)
 	libstats_free_reply_buffer(cmd);
 
 	return ret;
+}
+
+int8_t libstats_async_event_init(void)
+{
+	int8_t ret = 0;
+
+	if (g_nb_ctx.async_req)
+		return ret;
+
+	g_nb_ctx.async_req = true;
+
+	ret = stats_lib_init(true);
+	if (ret) {
+		STATS_ERR("Unable to initialise (%d)!\n", ret);
+		return ret;
+	}
+
+	nl_socket_set_nonblocking(g_sock_ctx.cfg80211_ctxt.event_sock);
+
+	return ret;
+}
+
+void libstats_async_event_deinit(void)
+{
+	if (!g_nb_ctx.async_req)
+		return;
+
+	g_nb_ctx.async_req = false;
+	stats_lib_deinit();
 }
