@@ -3102,15 +3102,16 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 
 	ch_width = wmi_get_ch_width_from_phy_mode(wma_handle->wmi_handle,
 						  fw_phymode);
-	wma_debug("ch_width: %d, fw phymode: %d peer_phymode %d",
-		  ch_width, fw_phymode, peer_phymode);
+	wma_debug("ch_width: %d, fw phymode: %d peer_phymode: %d, op_mode: %d",
+		  ch_width, fw_phymode, peer_phymode,
+		  update_vht_opmode->opMode);
+
 	if (ch_width < update_vht_opmode->opMode) {
 		wma_err("Invalid peer bw update %d, self bw %d",
 			update_vht_opmode->opMode, ch_width);
 		return;
 	}
 
-	wma_debug("opMode = %d", update_vht_opmode->opMode);
 	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
 			   WMI_HOST_PEER_CHWIDTH, update_vht_opmode->opMode,
 			   update_vht_opmode->smesessionId);

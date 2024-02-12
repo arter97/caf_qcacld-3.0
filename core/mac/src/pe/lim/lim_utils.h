@@ -3203,7 +3203,7 @@ void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
  * @ch_width: Channel width in operating mode notification
  * @new_ch_width: Final channel bandwifdth
  *
- * function to update channel width
+ * function to send WMI_PEER_SET_PARAM_CMDID to FW to update ch_width
  *
  * Return: Success or Failure
  */
