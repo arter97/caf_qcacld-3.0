@@ -141,6 +141,10 @@ PERF_PWR_OFFLOAD_INC += -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qca8074/v1/
 
 INCS += $(PERF_PWR_OFFLOAD_INC)
 
+ifeq ($(strip ${WLAN_SUPPORT_TELEMETRY}),1)
+INCS += -I$(obj)/$(DEPTH)/component_dev/telemetry/inc
+endif
+
 ccflags-y+= $(INCS) $(COPTS)
 
 ifeq ($(strip ${QCA_PARTNER_MAKE_F_SUPPORT}),1)
