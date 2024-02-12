@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -710,8 +710,7 @@ QDF_STATUS tdls_process_evt(struct scheduler_msg *msg)
 	}
 	event = &notify->event;
 
-	tdls_debug("evt type: %s(%d)",
-		   tdls_get_event_type_str(event->message_type),
+	tdls_debug(" %s(%d)", tdls_get_event_type_str(event->message_type),
 		   event->message_type);
 
 	switch (event->message_type) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -472,8 +472,8 @@ void tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 	return;
 }
 
-void tdls_implicit_send_discovery_request(
-				struct tdls_vdev_priv_obj *tdls_vdev_obj)
+void
+tdls_implicit_send_discovery_request(struct tdls_vdev_priv_obj *tdls_vdev_obj)
 {
 	struct tdls_peer *curr_peer;
 	struct tdls_peer *temp_peer;
@@ -572,13 +572,16 @@ int tdls_recv_discovery_resp(struct tdls_vdev_priv_obj *tdls_vdev,
 			qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
 	}
 
-	tdls_debug("vdev:%d Discovery(%u) Response from " QDF_MAC_ADDR_FMT
+	tdls_debug("[TDLS] vdev:%d action:%d (%s) sent_count:%u from peer=" QDF_MAC_ADDR_FMT
 		   " link_status %d", wlan_vdev_get_id(tdls_vdev->vdev),
+		   TDLS_DISCOVERY_RESPONSE,
+		   "TDLS_DISCOVERY_RESPONSE",
 		   tdls_vdev->discovery_sent_cnt,
 		   QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
 		   curr_peer->link_status);
 
-	/* Since peer link status bases on vdev and stream goes through
+	/*
+	 * Since peer link status bases on vdev and stream goes through
 	 * vdev0 (assoc link) at start, rx/tx pkt count on vdev0, but
 	 * it choices vdev1 as tdls link, the peer status does not change on
 	 * vdev1 though it has been changed for vdev0 per the rx/tx pkt count.
