@@ -1132,17 +1132,6 @@ exit:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
-void hdd_chan_change_notify_work_handler(void *data)
-{
-	struct wlan_hdd_link_info *link_info =
-			(struct wlan_hdd_link_info *)data;
-
-	if (!link_info)
-		return;
-
-	hdd_chan_change_notify_update(link_info);
-}
-
 /**
  * hdd_send_radar_event() - Function to send radar events to user space
  * @hdd_context:	HDD context
@@ -1879,7 +1868,8 @@ static QDF_STATUS hdd_hostapd_chan_change(struct wlan_hdd_link_info *link_info,
 	}
 
 	hdd_fill_channel_change_puncture(ap_ctx, &sap_ch_param);
-	qdf_sched_work(0, &link_info->chan_change_notify_work);
+	link_info->ch_chng_info.ch_chng_type = CHAN_SWITCH_COMPLETE_NOTIFY;
+	qdf_sched_work(0, &link_info->ch_chng_info.chan_change_notify_work);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2237,6 +2227,39 @@ exit:
 	mutex_unlock(&dev->ieee80211_ptr->mtx);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
+
+void hdd_chan_change_notify_work_handler(void *data)
+{
+	struct wlan_hdd_link_info *link_info =
+			(struct wlan_hdd_link_info *)data;
+	enum chan_change_notify_type ch_chng_type;
+
+	if (!link_info)
+		return;
+
+	ch_chng_type = link_info->ch_chng_info.ch_chng_type;
+	if (ch_chng_type == CHAN_SWITCH_START_NOTIFY)
+		hdd_chan_change_started_notify(
+				link_info,
+				link_info->ch_chng_info.freq,
+				&link_info->ch_chng_info.ch_params);
+	else if (ch_chng_type == CHAN_SWITCH_COMPLETE_NOTIFY)
+		hdd_chan_change_notify_update(link_info);
+}
+
+static
+void hdd_hostapd_chan_change_started(struct wlan_hdd_link_info *link_info,
+				     qdf_freq_t freq,
+				     struct ch_params *ch_params)
+{
+	link_info->ch_chng_info.freq = freq;
+	qdf_mem_copy(&link_info->ch_chng_info.ch_params, ch_params,
+		     sizeof(*ch_params));
+	link_info->ch_chng_info.ch_chng_type = CHAN_SWITCH_START_NOTIFY;
+
+	qdf_sched_work(0, &link_info->ch_chng_info.chan_change_notify_work);
+}
+
 QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				    void *context)
 {
@@ -3234,7 +3257,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		return QDF_STATUS_SUCCESS;
 
 	case eSAP_CHANNEL_SWITCH_STARTED_NOTIFY:
-		hdd_chan_change_started_notify(
+		hdd_hostapd_chan_change_started(
 			link_info,
 			sap_event->sapevt.ch_sw_started_notify.freq,
 			&sap_event->sapevt.ch_sw_started_notify.ch_params);

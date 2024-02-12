@@ -2424,7 +2424,10 @@ hdd_roam_channel_switch_handler(struct wlan_hdd_link_info *link_info,
 			notify = false;
 	}
 	if (notify) {
-		qdf_sched_work(0, &link_info->chan_change_notify_work);
+		link_info->ch_chng_info.ch_chng_type =
+					CHAN_SWITCH_COMPLETE_NOTIFY;
+		qdf_sched_work(
+			0, &link_info->ch_chng_info.chan_change_notify_work);
 	} else {
 		hdd_err("BSS "QDF_MAC_ADDR_FMT" no connected with vdev %d (%d)",
 			QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes),

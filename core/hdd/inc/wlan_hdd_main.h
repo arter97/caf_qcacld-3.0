@@ -1075,6 +1075,30 @@ enum udp_qos_upgrade {
 	UDP_QOS_UPGRADE_MAX
 };
 
+/**
+ * enum chan_change_notify_type - channel change notify type
+ * @CHAN_SWITCH_START_NOTIFY: Notify CSA during start
+ * @CHAN_SWITCH_COMPLETE_NOTIFY: Notify CSA after complete
+ */
+enum chan_change_notify_type {
+	CHAN_SWITCH_START_NOTIFY,
+	CHAN_SWITCH_COMPLETE_NOTIFY
+};
+
+/**
+ * struct freq_change_info - Frequency change notify
+ * @freq: Frequency
+ * @ch_params: channel params
+ * @ch_chng_type: Channel change notify type
+ * @chan_change_notify_work: Channel change notify work
+ */
+struct freq_change_info {
+	qdf_freq_t freq;
+	struct ch_params ch_params;
+	enum chan_change_notify_type ch_chng_type;
+	qdf_work_t chan_change_notify_work;
+};
+
 #define WLAN_HDD_DEFLINK_IDX	0
 
 /**
@@ -1115,7 +1139,7 @@ enum udp_qos_upgrade {
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
- * @chan_change_notify_work: Channel change notify work
+ * @ch_chng_info: Channel change info
  */
 struct wlan_hdd_link_info {
 	struct hdd_adapter *adapter;
@@ -1156,7 +1180,7 @@ struct wlan_hdd_link_info {
 #endif /* WLAN_FEATURE_MSCS */
 
 	unsigned long link_flags;
-	qdf_work_t chan_change_notify_work;
+	struct freq_change_info ch_chng_info;
 };
 
 /**
