@@ -90,6 +90,12 @@ struct sAvoidChannelIE {
 };
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
+/*
+ * Host driver uses TBTT info of length 13
+ * in the RNR IE for legacy SAPs.
+ */
+#define CURRENT_RNR_TBTT_INFO_LEN 13
+
 typedef struct sSirCountryInformation {
 	uint8_t countryString[COUNTRY_STRING_LENGTH];
 	uint8_t numIntervals;   /* number of channel intervals */
@@ -1946,18 +1952,21 @@ void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 			    tDot11fIEreduced_neighbor_report *dot11f);
 
 /**
- * populate_dot11f_rnr_tbtt_info_7() - populate rnr with tbtt_info length 7
+ * populate_dot11f_rnr_tbtt_info() - populate rnr for the tbtt_len specified
  * @mac_ctx: pointer to mac_context
  * @pe_session: pe session
  * @rnr_session: session to populate in rnr ie
  * @dot11f: tDot11fIEreduced_neighbor_report to be filled
+ * @tbtt_len: length of the TBTT params
  *
- * Return: none
+ * Return: QDF STATUS
  */
-void populate_dot11f_rnr_tbtt_info_7(struct mac_context *mac_ctx,
-				     struct pe_session *pe_session,
-				     struct pe_session *rnr_session,
-				     tDot11fIEreduced_neighbor_report *dot11f);
+QDF_STATUS
+populate_dot11f_rnr_tbtt_info(struct mac_context *mac_ctx,
+			      struct pe_session *pe_session,
+			      struct pe_session *rnr_session,
+			      tDot11fIEreduced_neighbor_report *dot11f,
+			      uint8_t tbtt_len);
 
 /**
  * populate_dot11f_edca_pifs_param_set() - populate edca/pifs param ie

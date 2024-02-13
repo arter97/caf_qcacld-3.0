@@ -3390,4 +3390,24 @@ lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40);
 void lim_update_cu_flag(tSirMacCapabilityInfo *pcap_info,
 			struct pe_session *pe_session);
 
+/*
+ * lim_cmp_ssid() - Compare two SSIDs.
+ * @ssid: first ssid
+ * @pe_session: pointer to session
+ *
+ * Return: qdf_mem_cmp of ssids
+ */
+uint32_t lim_cmp_ssid(tSirMacSSid *ssid, struct pe_session *pe_session);
+
+/*
+ * lim_configure_fd_for_existing_6ghz_sap() - Based on the concurrent
+ * legacy SAP interface UP/DOWN, configure the FD for the 6 GHz SAPs.
+ * @session: pointer to pe_session
+ * @is_sap_starting: true if SAP is starting, false if SAP is stopping
+ *
+ * Return: None
+ */
+void
+lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
+				       bool is_sap_starting);
 #endif /* __LIM_UTILS_H */

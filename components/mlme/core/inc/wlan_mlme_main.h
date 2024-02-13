@@ -475,6 +475,7 @@ struct wait_for_key_timer {
  * concurrent STA
  * @ap_policy: Concurrent ap policy config
  * @oper_ch_width: SAP current operating ch_width
+ * @psd_20mhz: PSD power(dBm/MHz) of SAP operating in 20 MHz
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
@@ -483,6 +484,7 @@ struct mlme_ap_config {
 #endif
 	enum host_concurrent_ap_policy ap_policy;
 	enum phy_ch_width oper_ch_width;
+	uint8_t psd_20mhz;
 };
 
 /**
@@ -1977,4 +1979,23 @@ void wlan_mlme_set_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
 uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id);
 
+/**
+ * wlan_mlme_get_sap_psd_for_20mhz() - Get the PSD power for 20 MHz
+ * frequency
+ * @vdev: pointer to vdev object
+ *
+ * Return: psd power
+ */
+uint8_t wlan_mlme_get_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_set_sap_psd_for_20mhz() - Set the PSD power for 20 MHz
+ * frequency
+ * @vdev: pointer to vdev object
+ * @psd_power : psd power
+ *
+ * Return: None
+ */
+QDF_STATUS wlan_mlme_set_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev,
+					   uint8_t psd_power);
 #endif
