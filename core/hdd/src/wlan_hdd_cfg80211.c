@@ -8667,17 +8667,11 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID] = {
+		.type = NLA_U8},
 };
 
 #define WLAN_MAX_LINK_ID 15
-
-static const struct nla_policy bandwidth_mlo_policy[
-			QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH] = {
-		.type = NLA_U8 },
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID] = {
-		.type = NLA_U8 },
-};
 
 static const struct nla_policy
 qca_wlan_vendor_attr_omi_tx_policy [QCA_WLAN_VENDOR_ATTR_OMI_MAX + 1] = {
@@ -11230,7 +11224,7 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		if (wlan_cfg80211_nla_parse_nested(tb2,
 						QCA_WLAN_VENDOR_ATTR_CONFIG_MAX,
 						   curr_attr,
-						   bandwidth_mlo_policy)){
+						  wlan_hdd_wifi_config_policy)){
 			hdd_err_rl("nla_parse failed");
 			return -EINVAL;
 		}
@@ -11239,7 +11233,7 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
 
 		if (!chn_bd || !mlo_link_id)
-			return -EINVAL;
+			return 0;
 
 		nl80211_chwidth = nla_get_u8(chn_bd);
 		chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
