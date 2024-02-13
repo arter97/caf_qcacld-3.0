@@ -395,7 +395,7 @@ struct pmo_psoc_cfg {
 	bool ap_arpns_support;
 	bool d0_wow_supported;
 	bool ra_ratelimit_enable;
-#if FEATURE_WLAN_RA_FILTERING
+#ifdef FEATURE_WLAN_RA_FILTERING
 	uint16_t ra_ratelimit_interval;
 #endif
 	bool magic_ptrn_enable;
