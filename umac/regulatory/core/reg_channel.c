@@ -1254,12 +1254,12 @@ QDF_STATUS reg_get_client_psd_for_ap(struct wlan_objmgr_pdev *pdev,
 				     enum reg_6g_ap_type ap_pwr_type,
 				     enum reg_6g_client_type client_type,
 				     qdf_freq_t chan_freq,
-				     uint16_t *reg_psd)
+				     int16_t *reg_psd)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	struct regulatory_channel *master_chan_list, *afc_chan_list;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	uint16_t afc_psd = 0;
+	int16_t afc_psd = 0;
 	bool is_psd;
 
 	pdev_priv_obj = reg_get_pdev_obj(pdev);
