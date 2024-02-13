@@ -1825,7 +1825,8 @@ static void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
 
 	twt_responder =
 		adapter->deflink->session.ap.sap_config.cfg80211_twt_responder;
-	wlan_hdd_configure_twt_responder(hdd_ctx, twt_responder);
+	wlan_hdd_configure_twt_responder(hdd_ctx, twt_responder,
+					 adapter->deflink->vdev_id);
 }
 #else
 static inline void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,

@@ -500,12 +500,13 @@ bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
  * wlan_hdd_configure_twt_responder() - configure twt responder in sap_config
  * @hdd_ctx: Pointer to hdd context
  * @twt_responder: twt responder configure value
+ * @vdev_id: Vdev id
  *
  * Return: none
  */
 void
 wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				 bool twt_responder);
+				 bool twt_responder, uint8_t vdev_id);
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * wlan_hdd_mlo_reset() - reset mlo configuration if start bss fails

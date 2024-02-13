@@ -1332,10 +1332,13 @@ int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 
 	/* P2P-GO-NOA and TWT do not go hand in hand */
 	if (ps_config->duration) {
-		hdd_send_twt_role_disable_cmd(hdd_ctx, TWT_RESPONDER);
+		hdd_send_twt_role_disable_cmd(hdd_ctx, TWT_RESPONDER,
+					      adapter->deflink->vdev_id);
 	} else {
-		hdd_send_twt_requestor_enable_cmd(hdd_ctx);
-		hdd_send_twt_responder_enable_cmd(hdd_ctx);
+		hdd_send_twt_requestor_enable_cmd(hdd_ctx,
+						  adapter->deflink->vdev_id);
+		hdd_send_twt_responder_enable_cmd(hdd_ctx,
+						  adapter->deflink->vdev_id);
 	}
 
 	return qdf_status_to_os_return(status);

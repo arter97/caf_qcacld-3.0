@@ -8021,7 +8021,7 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 	  defined(CFG80211_TWT_RESPONDER_SUPPORT))
 #ifdef WLAN_TWT_CONV_SUPPORTED
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				      bool twt_responder)
+				      bool twt_responder, uint8_t vdev_id)
 {
 	bool twt_res_svc_cap, enable_twt, twt_res_cfg;
 	uint32_t reason;
@@ -8039,10 +8039,10 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 					    twt_responder)));
 	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
 	if (enable_twt && twt_responder) {
-		hdd_send_twt_responder_enable_cmd(hdd_ctx);
+		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
-		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason);
+		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason, vdev_id);
 	}
 
 }
@@ -8055,12 +8055,13 @@ wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
 
 	adapter->deflink->session.ap.sap_config.cfg80211_twt_responder =
 							params->twt_responder;
-	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder);
+	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder,
+					 adapter->deflink->vdev_id);
 }
 
 #else
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				      bool twt_responder)
+				      bool twt_responder, uint8_t vdev_id)
 {
 	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
@@ -8072,10 +8073,10 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 					    (enable_twt && twt_responder)));
 	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
 	if (enable_twt && twt_responder) {
-		hdd_send_twt_responder_enable_cmd(hdd_ctx);
+		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
-		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason);
+		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason, vdev_id);
 	}
 }
 
@@ -8087,7 +8088,8 @@ wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
 
 	adapter->deflink->session.ap.sap_config.cfg80211_twt_responder =
 							params->twt_responder;
-	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder);
+	wlan_hdd_configure_twt_responder(hdd_ctx, params->twt_responder,
+					 adapter->deflink->vdev_id);
 }
 #endif
 #else
@@ -8097,7 +8099,7 @@ wlan_hdd_update_twt_responder(struct hdd_adapter *adapter,
 {}
 
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				      bool twt_responder)
+				      bool twt_responder, uint8_t vdev_id)
 {}
 #endif
 

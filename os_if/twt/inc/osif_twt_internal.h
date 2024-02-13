@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -39,47 +39,47 @@ struct twt_conc_context {
  * osif_twt_send_requestor_enable_cmd() - Send TWT requestor enable command to
  * target
  * @psoc: pointer to global psoc structure
- * @pdev_id: pdev id
+ * @mac_id: mac id
  *
  * Return: errno
  */
 int osif_twt_send_requestor_enable_cmd(struct wlan_objmgr_psoc *psoc,
-				       uint8_t pdev_id);
+				       uint8_t mac_id);
 
 /**
  * osif_twt_send_responder_enable_cmd() - Send TWT responder enable command to
  * target
  * @psoc: pointer to global psoc structure
- * @pdev_id: pdev id
+ * @mac_id: mac id
  *
  * Return: errno
  */
 int osif_twt_send_responder_enable_cmd(struct wlan_objmgr_psoc *psoc,
-				       uint8_t pdev_id);
+				       uint8_t mac_id);
 
 /**
  * osif_twt_send_requestor_disable_cmd() - Send TWT requestor disable command
  * to target
  * @psoc: pointer to global psoc structure
- * @pdev_id: pdev id
+ * @mac_id: mac id
  * @reason: disable reason code
  *
  * Return: errno
  */
 int osif_twt_send_requestor_disable_cmd(struct wlan_objmgr_psoc *psoc,
-					uint8_t pdev_id, uint32_t reason);
+					uint8_t mac_id, uint32_t reason);
 
 /**
  * osif_twt_send_responder_disable_cmd() - Send TWT responder disable command
  * to target
  * @psoc: pointer to global psoc structure
- * @pdev_id: pdev id
+ * @mac_id: mac id
  * @reason: disable reason code
  *
  * Return: errno
  */
 int osif_twt_send_responder_disable_cmd(struct wlan_objmgr_psoc *psoc,
-					uint8_t pdev_id, uint32_t reason);
+					uint8_t mac_id, uint32_t reason);
 
 /**
  * osif_twt_concurrency_update_handler() - Handle TWT concurrency scenario
