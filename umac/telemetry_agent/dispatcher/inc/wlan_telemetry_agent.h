@@ -88,6 +88,22 @@ QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
 					 uint8_t msduq_idx);
 
 /**
+ * telemetry_sawf_update_msduq_info - Update msduq info
+ * @telemetry_ctx: opaque telemetry ctx
+ * @hostq_id: queue-id used in host
+ * @tid: tid no
+ * @msduq_idx: msdu-queue id
+ * @svc_id: service class id
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS telemetry_sawf_update_msduq_info(void *telemetry_ctx,
+					    uint8_t hostq_id,
+					    uint8_t tid,
+					    uint8_t msduq_idx,
+					    uint8_t svc_id);
+
+/**
  * telemetry_sawf_set_mov_avg_params - Set moving average params
  * @num_pkt: no of pkts
  * @num_win: no of windows
@@ -302,6 +318,16 @@ QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
 					 uint8_t hostq_id,
 					 uint8_t tid,
 					 uint8_t msduq_idx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_update_msduq_info(void *telemetry_ctx,
+					    uint8_t hostq_id,
+					    uint8_t tid,
+					    uint8_t msduq_idx,
+					    uint8_t svc_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
