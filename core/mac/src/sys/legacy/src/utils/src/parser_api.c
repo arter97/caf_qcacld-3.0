@@ -13027,13 +13027,16 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 }
 #endif
 
-void populate_dot11f_rnr_tbtt_info_7(struct mac_context *mac_ctx,
-				     struct pe_session *pe_session,
-				     struct pe_session *rnr_session,
-				     tDot11fIEreduced_neighbor_report *dot11f)
+QDF_STATUS
+populate_dot11f_rnr_tbtt_info(struct mac_context *mac_ctx,
+			      struct pe_session *pe_session,
+			      struct pe_session *rnr_session,
+			      tDot11fIEreduced_neighbor_report *dot11f,
+			      uint8_t tbtt_len)
 {
 	uint8_t reg_class;
 	uint8_t ch_offset;
+	uint8_t psd_power;
 
 	dot11f->present = 1;
 	dot11f->tbtt_type = 0;
@@ -13058,15 +13061,63 @@ void populate_dot11f_rnr_tbtt_info_7(struct mac_context *mac_ctx,
 						rnr_session->ch_width,
 						ch_offset);
 
+	psd_power = wlan_mlme_get_sap_psd_for_20mhz(rnr_session->vdev);
+
 	dot11f->op_class = reg_class;
 	dot11f->channel_num = wlan_reg_freq_to_chan(mac_ctx->pdev,
 						    rnr_session->curr_op_freq);
 	dot11f->tbtt_info_count = 0;
-	dot11f->tbtt_info_len = 7;
-	dot11f->tbtt_info.tbtt_info_7.tbtt_offset =
-			WLAN_RNR_TBTT_OFFSET_INVALID;
-	qdf_mem_copy(dot11f->tbtt_info.tbtt_info_7.bssid,
-		     rnr_session->self_mac_addr, sizeof(tSirMacAddr));
+	dot11f->tbtt_info_len = tbtt_len;
+
+	switch (tbtt_len) {
+	case 7:
+		dot11f->tbtt_info.tbtt_info_7.tbtt_offset =
+						WLAN_RNR_TBTT_OFFSET_INVALID;
+		qdf_mem_copy(dot11f->tbtt_info.tbtt_info_7.bssid,
+			     rnr_session->self_mac_addr, sizeof(tSirMacAddr));
+		break;
+	case 9:
+		dot11f->tbtt_info.tbtt_info_9.tbtt_offset =
+						WLAN_RNR_TBTT_OFFSET_INVALID;
+		qdf_mem_copy(dot11f->tbtt_info.tbtt_info_9.bssid,
+			     rnr_session->self_mac_addr, sizeof(tSirMacAddr));
+		dot11f->tbtt_info.tbtt_info_9.bss_params =
+							WLAN_RNR_BSS_PARAM_COLOCATED_AP;
+		if (!lim_cmp_ssid(&rnr_session->ssId, pe_session))
+			dot11f->tbtt_info.tbtt_info_9.bss_params |=
+							WLAN_RNR_BSS_PARAM_SAME_SSID;
+		if (psd_power)
+			dot11f->tbtt_info.tbtt_info_9.psd_20mhz = psd_power;
+		else
+			dot11f->tbtt_info.tbtt_info_9.psd_20mhz = 127;
+		break;
+	case 13:
+		dot11f->tbtt_info.tbtt_info_13.tbtt_offset =
+						WLAN_RNR_TBTT_OFFSET_INVALID;
+		qdf_mem_copy(dot11f->tbtt_info.tbtt_info_13.bssid,
+			     rnr_session->self_mac_addr, sizeof(tSirMacAddr));
+
+		dot11f->tbtt_info.tbtt_info_13.short_ssid =
+			wlan_construct_shortssid(rnr_session->ssId.ssId,
+						 rnr_session->ssId.length);
+
+		dot11f->tbtt_info.tbtt_info_13.bss_params =
+						WLAN_RNR_BSS_PARAM_COLOCATED_AP;
+		if (!lim_cmp_ssid(&rnr_session->ssId, pe_session))
+			dot11f->tbtt_info.tbtt_info_13.bss_params |=
+							WLAN_RNR_BSS_PARAM_SAME_SSID;
+
+		if (psd_power)
+			dot11f->tbtt_info.tbtt_info_13.psd_20mhz = psd_power;
+		else
+			dot11f->tbtt_info.tbtt_info_13.psd_20mhz = 127;
+		break;
+	default:
+		dot11f->tbtt_info_len = 0;
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -13135,7 +13186,8 @@ void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 		pe_err("Invalid co located session");
 		return;
 	}
-	populate_dot11f_rnr_tbtt_info_7(mac_ctx, session, co_session, dot11f);
+	populate_dot11f_rnr_tbtt_info(mac_ctx, session, co_session, dot11f,
+				      CURRENT_RNR_TBTT_INFO_LEN);
 	pe_debug("vdev id %d populate RNR IE with 6G vdev id %d op class %d chan num %d",
 		 wlan_vdev_get_id(session->vdev),
 		 wlan_vdev_get_id(co_session->vdev),

@@ -6364,6 +6364,10 @@ void lim_calculate_tpc(struct mac_context *mac,
 	mlme_obj->reg_tpc_obj.power_type_6g = ap_power_type_6g;
 	mlme_obj->reg_tpc_obj.is_psd_power = is_psd_power;
 
+	if (LIM_IS_AP_ROLE(session) && is_psd_power)
+		wlan_mlme_set_sap_psd_for_20mhz(session->vdev,
+						(uint8_t)psd_power);
+
 	pe_debug("num_pwr_levels: %d, is_psd_power: %d, total eirp_power: %d, ap_pwr_type: %d",
 		 num_pwr_levels, is_psd_power, reg_max, ap_power_type_6g);
 }
