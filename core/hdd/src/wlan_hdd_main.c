@@ -10238,6 +10238,7 @@ int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter, qdf_freq_t freq,
 				 uint32_t bandwidth)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_monitor_ctx *mon_ctx;
 	struct ch_params ch_params;
 	enum phy_ch_width max_fw_bw;
 	enum phy_ch_width ch_width;
@@ -10300,8 +10301,9 @@ int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter, qdf_freq_t freq,
 		return -EINVAL;
 	}
 
-	adapter->mon_chan_freq = freq;
-	adapter->mon_bandwidth = bandwidth;
+	mon_ctx = WLAN_HDD_GET_MONITOR_CTX_PTR(adapter->deflink);
+	mon_ctx->freq = freq;
+	mon_ctx->bandwidth = bandwidth;
 
 	return ret;
 }
@@ -10310,6 +10312,7 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx;
+	struct hdd_monitor_ctx *mon_ctx;
 	struct hdd_mon_set_ch_info *ch_info;
 	QDF_STATUS status;
 	struct channel_change_req *req;
@@ -10318,8 +10321,9 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 	qdf_freq_t freq;
 	uint32_t bandwidth;
 
-	freq = adapter->mon_chan_freq;
-	bandwidth = adapter->mon_bandwidth;
+	mon_ctx = WLAN_HDD_GET_MONITOR_CTX_PTR(adapter->deflink);
+	freq = mon_ctx->freq;
+	bandwidth = mon_ctx->bandwidth;
 	ret = hdd_validate_channel_and_bandwidth(adapter, freq, bandwidth);
 	if (ret) {
 		hdd_err("Invalid Freq %d and BW %d combo", freq, bandwidth);

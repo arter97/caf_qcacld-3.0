@@ -1099,6 +1099,16 @@ struct freq_change_info {
 	qdf_work_t chan_change_notify_work;
 };
 
+/**
+ * struct hdd_monitor_ctx - Monitor specific information
+ * @freq: Monitor Frequency
+ * @bandwidth: Monitor bandwidth
+ */
+struct hdd_monitor_ctx {
+	qdf_freq_t freq;
+	enum phy_ch_width bandwidth;
+};
+
 #define WLAN_HDD_DEFLINK_IDX	0
 
 /**
@@ -1152,6 +1162,7 @@ struct wlan_hdd_link_info {
 	union {
 		struct hdd_station_ctx station;
 		struct hdd_ap_ctx ap;
+		struct hdd_monitor_ctx monitor;
 	} session;
 
 	qdf_event_t acs_complete_event;
@@ -1270,8 +1281,6 @@ struct wlan_hdd_tx_power {
  * @debugfs_phy: debugfs entry
  * @lfr_fw_status:
  * @active_ac:
- * @mon_chan_freq:
- * @mon_bandwidth:
  * @latency_level: 0 - normal, 1 - xr, 2 - low, 3 - ultralow
  * @multi_client_ll_support: to check multi client ll support in driver
  * @client_info: To store multi client id information
@@ -1444,8 +1453,6 @@ struct hdd_adapter {
 	struct dentry *debugfs_phy;
 	struct lfr_firmware_status lfr_fw_status;
 	uint8_t active_ac;
-	uint32_t mon_chan_freq;
-	uint32_t mon_bandwidth;
 	uint16_t latency_level;
 #ifdef MULTI_CLIENT_LL_SUPPORT
 	bool multi_client_ll_support;
@@ -1521,6 +1528,7 @@ struct hdd_adapter {
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
 #define WLAN_HDD_GET_AP_CTX_PTR(link_info) (&(link_info)->session.ap)
+#define WLAN_HDD_GET_MONITOR_CTX_PTR(link_info) (&(link_info)->session.monitor)
 #define WLAN_HDD_GET_CTX(adapter) ((adapter)->hdd_ctx)
 #define WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info) \
 		(&(WLAN_HDD_GET_AP_CTX_PTR((link_info))->hostapd_state))
