@@ -34,7 +34,7 @@
 #include "wlan_policy_mgr_ucfg.h"
 
 /*max time in ms, caller may wait for link state request get serviced */
-#define WLAN_WAIT_TIME_LINK_STATE 800
+#define WLAN_WAIT_TIME_LINK_STATE 3000
 
 #if defined(CFG80211_11BE_BASIC)
 #ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
