@@ -310,6 +310,26 @@ wlan_reg_get_client_psd_for_ap(struct wlan_objmgr_pdev *pdev,
 	return reg_get_client_psd_for_ap(pdev, ap_pwr_type, client_type,
 					 chan_freq, reg_psd);
 }
+QDF_STATUS
+wlan_reg_get_client_psd_for_compap(struct wlan_objmgr_pdev *pdev,
+				   enum reg_6g_ap_type ap_pwr_type,
+				   enum reg_6g_client_type client_type,
+				   qdf_freq_t chan_freq,
+				   int16_t *reg_psd)
+{
+	int16_t max_reg_psd_lpi, max_reg_psd_sp;
+	QDF_STATUS status;
+
+	status = reg_get_client_psd_for_ap(pdev, ap_pwr_type,
+					   client_type,
+					   chan_freq, &max_reg_psd_lpi);
+	status = reg_get_client_psd_for_ap(pdev, REG_STANDARD_POWER_AP,
+					   client_type,
+					   chan_freq, &max_reg_psd_sp);
+
+	*reg_psd = QDF_MAX((int8_t)max_reg_psd_lpi, (int8_t)max_reg_psd_sp);
+	return status;
+}
 #endif
 
 struct regulatory_channel
