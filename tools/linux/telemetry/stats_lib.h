@@ -529,6 +529,14 @@ int32_t libstats_request_handle(struct stats_command *cmd);
 void libstats_free_reply_buffer(struct stats_command *cmd);
 
 /**
+ * libstats_free_reply_buffer_object(): Function to free all reply objects
+ * @reply: Pointer to reply buffer structure
+ *
+ * Return: None
+ */
+void libstats_free_reply_buffer_object(struct reply_buffer *reply);
+
+/**
  * libstats_is_ifname_valid(): Function to check interface name
  * @ifname: Pointer to Interface name to be checked
  * @obj: Type of object Radio/VAP/SoC
@@ -552,6 +560,7 @@ int32_t libstats_request_async_start(struct stats_command *cmd);
  * Return: 0 on Success, -1 on Failure
  */
 int32_t libstats_request_async_stop(struct stats_command *cmd);
+
 /**
  * libstats_async_event_init(): Initialization for non blocking stats
  *
