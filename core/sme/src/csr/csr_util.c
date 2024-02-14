@@ -625,24 +625,13 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	enum QDF_OPMODE op_mode;
 	enum phy_ch_width ch_width;
 	enum channel_state state;
-
-#ifdef WLAN_FEATURE_LL_LT_SAP
 	qdf_freq_t new_sap_freq = 0;
 	bool is_ll_lt_sap_present = false;
-#endif
 
 	if (mac_ctx->roam.configParam.cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
 		return 0;
 
-	/*
-	 * This is temporary code and will be removed once this feature flag
-	 * is enabled
-	 */
-#ifndef WLAN_FEATURE_LL_LT_SAP
-		if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id))
-			return 0;
-#else
 	policy_mgr_ll_lt_sap_get_valid_freq(
 				mac_ctx->psoc, mac_ctx->pdev,
 				vdev_id, sap_ch_freq,
@@ -661,7 +650,6 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			  new_sap_freq, vdev_id);
 		return new_sap_freq;
 	}
-#endif
 
 	if (sap_ch_freq != 0) {
 		sap_cfreq = sap_ch_freq;

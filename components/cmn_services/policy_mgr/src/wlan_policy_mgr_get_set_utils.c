@@ -9742,24 +9742,6 @@ static bool policy_mgr_is_third_conn_sta_p2p_p2p_valid(
 	return true;
 }
 
-static bool policy_mgr_is_sap_go_allowed_with_ll_sap(
-					struct wlan_objmgr_psoc *psoc,
-					qdf_freq_t freq,
-					enum policy_mgr_con_mode mode)
-{
-	/**
-	 * Scenario: When ll SAP(whose profile is set as gaming or
-	 * lossless audio) is present on 5GHz channel and SAP/GO
-	 * is trying to come up.
-	 * Validate the ch_freq of SAP/GO for both DBS and SBS case
-	 */
-	if ((mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE) &&
-	    !policy_mgr_is_ll_sap_concurrency_valid(psoc, freq, mode))
-		return false;
-
-	return true;
-}
-
 bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				       enum policy_mgr_con_mode mode,
 				       uint32_t ch_freq,
@@ -9908,12 +9890,6 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	/* Allow sta+p2p+p2p only if firmware supports the capability */
 	if (!policy_mgr_is_third_conn_sta_p2p_p2p_valid(psoc, mode)) {
 		policy_mgr_err("Don't allow third connection as GO or GC or STA with old fw");
-		return status;
-	}
-
-	/* Validate ll sap + sap/go concurrency */
-	if (!policy_mgr_is_sap_go_allowed_with_ll_sap(psoc, ch_freq, mode)) {
-		policy_mgr_err("LL SAP concurrency is not valid");
 		return status;
 	}
 
@@ -12805,37 +12781,6 @@ qdf_freq_t policy_mgr_get_ll_lt_sap_freq(struct wlan_objmgr_psoc *psoc)
 {
 	return _policy_mgr_get_ll_sap_freq(psoc, LL_AP_TYPE_LT);
 }
-
-#ifndef WLAN_FEATURE_LL_LT_SAP
-bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
-					    qdf_freq_t freq,
-					    enum policy_mgr_con_mode mode)
-{
-	qdf_freq_t ll_sap_freq;
-
-	ll_sap_freq = policy_mgr_get_ll_sap_freq(psoc);
-	if (!ll_sap_freq)
-		return true;
-
-	/*
-	 * Scenario: When low latency SAP with 5GHz channel(whose
-	 * profile is set as gaming or lossless audio or XR) is present
-	 * on SBS/DBS hardware and the other interface like
-	 * STA/SAP/GC/GO trying to form connection.
-	 * Allow connection on those freq which are mutually exclusive
-	 * to LL SAP mac
-	 */
-
-	if (policy_mgr_2_freq_always_on_same_mac(psoc, ll_sap_freq,
-						 freq)) {
-		policy_mgr_debug("Invalid LL-SAP concurrency for SBS/DBS hw, ll-sap freq %d, conc_freq %d, conc_mode %d",
-				 ll_sap_freq, freq, mode);
-		return false;
-	}
-
-	return true;
-}
-#endif
 
 bool
 policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,

@@ -3702,59 +3702,6 @@ wlan_hdd_check_is_acs_request_same(struct wlan_hdd_link_info *link_info,
 	return true;
 }
 
-#ifndef WLAN_FEATURE_LL_LT_SAP
-/**
- * hdd_remove_passive_dfs_acs_channel_for_ll_sap(): Remove passive/dfs channel
- * for LL SAP
- * @sap_config: Pointer to sap_config
- * @psoc: Pointer to psoc
- * @pdev: Pointer to pdev
- * @vdev_id: Vdev Id
- *
- * This function will remove passive/dfs acs channel for low latency SAP
- * which are configured through userspace.
- *
- * Return: void
- */
-static void hdd_remove_passive_dfs_acs_channel_for_ll_sap(
-					struct sap_config *sap_config,
-					struct wlan_objmgr_psoc *psoc,
-					struct wlan_objmgr_pdev *pdev,
-					uint8_t vdev_id)
-{
-	uint32_t i, ch_cnt = 0;
-	uint32_t freq = 0;
-
-	if (!policy_mgr_is_vdev_ll_sap(psoc, vdev_id))
-		return;
-
-	for (i = 0; i < sap_config->acs_cfg.ch_list_count; i++) {
-		freq = sap_config->acs_cfg.freq_list[i];
-
-		/* Remove passive/dfs channel for LL SAP */
-		if (wlan_reg_is_passive_for_freq(pdev, freq) ||
-		    wlan_reg_is_dfs_for_freq(pdev, freq))
-			continue;
-
-		sap_config->acs_cfg.freq_list[ch_cnt++] = freq;
-	}
-
-	if (ch_cnt != sap_config->acs_cfg.ch_list_count) {
-		hdd_debug("New count after modification %d", ch_cnt);
-		sap_config->acs_cfg.ch_list_count = ch_cnt;
-		sap_dump_acs_channel(&sap_config->acs_cfg);
-	}
-}
-#else
-static inline void
-hdd_remove_passive_dfs_acs_channel_for_ll_sap(struct sap_config *sap_config,
-					      struct wlan_objmgr_psoc *psoc,
-					      struct wlan_objmgr_pdev *pdev,
-					      uint8_t vdev_id)
-{
-}
-#endif
-
 /* Stored ACS Frequency timeout in msec */
 #define STORED_ACS_FREQ_TIMEOUT 5000
 static bool
@@ -4253,12 +4200,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 						     adapter->device_mode,
 						     adapter->deflink->vdev_id);
 
-	/* Remove passive/dfs acs channel for ll sap */
-	hdd_remove_passive_dfs_acs_channel_for_ll_sap(
-						sap_config, hdd_ctx->psoc,
-						hdd_ctx->pdev,
-						link_info->vdev_id);
-
 	/* consult policy manager to get PCL */
 	qdf_status = policy_mgr_get_pcl(hdd_ctx->psoc, pm_mode,
 					sap_config->acs_cfg.pcl_chan_freq,
@@ -4267,13 +4208,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					pcl_channels_weight_list,
 					NUM_CHANNELS,
 					link_info->vdev_id);
-
-	policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
-				hdd_ctx->psoc,
-				link_info->vdev_id,
-				sap_config->acs_cfg.pcl_chan_freq,
-				sap_config->acs_cfg.pcl_channels_weight_list,
-				&sap_config->acs_cfg.pcl_ch_count);
 
 	sap_config->acs_cfg.band = hw_mode;
 

@@ -1864,91 +1864,6 @@ policy_mgr_change_hw_mode_sta_connect(struct wlan_objmgr_psoc *psoc,
 bool policy_mgr_is_dbs_allowed_for_concurrency(
 		struct wlan_objmgr_psoc *psoc, enum QDF_OPMODE new_conn_mode);
 
-#ifndef WLAN_FEATURE_LL_LT_SAP
-/**
- * policy_mgr_get_pcl_chlist_for_ll_sap() - Get pcl channel list for LL SAP
- * @psoc: PSOC object information
- * @len: length of the PCL
- * @pcl_channels: Preferred channel freq list
- * @pcl_weight: Weights of the PCL
- *
- * This function provides the preferred channel list on which the ll sap
- * can come.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-policy_mgr_get_pcl_chlist_for_ll_sap(struct wlan_objmgr_psoc *psoc,
-				     uint32_t *len, uint32_t *pcl_channels,
-				     uint8_t *pcl_weight);
-
-/**
- * policy_mgr_get_pcl_ch_for_sap_go_with_ll_sap_present() - Get pcl channel
- * list for SAP/GO when LL SAP is present
- * @psoc: PSOC object information
- * @len: length of the PCL
- * @pcl_channels: Preferred channel freq list
- * @pcl_weight: Weights of the PCL
- *
- * This function provides the preferred channel list for SAP/GO when LL SAP
- * is present
- *
- * Return: QDF_STATUS
- */
-
-QDF_STATUS
-policy_mgr_get_pcl_ch_for_sap_go_with_ll_sap_present(
-					struct wlan_objmgr_psoc *psoc,
-					uint32_t *len, uint32_t *pcl_channels,
-					uint8_t *pcl_weight);
-
-/**
- * policy_mgr_get_pcl_channel_for_ll_sap_concurrency() - Get pcl channel list
- * for LL SAP concurrency
- * @psoc: PSOC object information
- * @vdev_id: Vdev id
- * @pcl_channels: Preferred channel freq list
- * @pcl_weight: Weights of the PCL
- * @len: length of the PCL
- *
- * Return: QDF_STATUS
- */
-
-QDF_STATUS
-policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
-					struct wlan_objmgr_psoc *psoc,
-					uint32_t vdev_id,
-					uint32_t *pcl_channels,
-					uint8_t *pcl_weight, uint32_t *len);
-#else
-static inline QDF_STATUS
-policy_mgr_get_pcl_chlist_for_ll_sap(struct wlan_objmgr_psoc *psoc,
-				     uint32_t *len, uint32_t *pcl_channels,
-				     uint8_t *pcl_weight)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-policy_mgr_get_pcl_ch_for_sap_go_with_ll_sap_present(
-					struct wlan_objmgr_psoc *psoc,
-					uint32_t *len, uint32_t *pcl_channels,
-					uint8_t *pcl_weight)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
-					struct wlan_objmgr_psoc *psoc,
-					uint32_t vdev_id,
-					uint32_t *pcl_channels,
-					uint8_t *pcl_weight, uint32_t *len)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 /**
  * policy_mgr_is_vdev_ll_sap() - Check whether given vdev is LL SAP or not
  * @psoc: psoc object
@@ -5554,29 +5469,6 @@ qdf_freq_t policy_mgr_get_ll_lt_sap_freq(struct wlan_objmgr_psoc *psoc);
  */
 qdf_freq_t policy_mgr_get_ll_ht_sap_freq(struct wlan_objmgr_psoc *psoc);
 
-#ifndef WLAN_FEATURE_LL_LT_SAP
-/**
- * policy_mgr_is_ll_sap_concurrency_valid() - Function to check whether
- * low latency SAP + STA/SAP/GC/GO concurrency allowed or not
- * @psoc: PSOC object
- * @freq: Channel frequency
- * @mode: Device mode
- *
- * Return: True if concurrency are allowed otherwise false
- *
- */
-bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
-					    qdf_freq_t freq,
-					    enum policy_mgr_con_mode mode);
-#else
-static inline
-bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
-					    qdf_freq_t freq,
-					    enum policy_mgr_con_mode mode)
-{
-	return true;
-}
-#endif
 /**
  * policy_mgr_update_indoor_concurrency() - Function to update the indoor
  * concurrency related regulatory changes
