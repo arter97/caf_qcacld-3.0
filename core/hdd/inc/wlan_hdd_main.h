@@ -4801,17 +4801,31 @@ static inline void hdd_driver_mem_cleanup(void)
 /**
  * wlan_hdd_set_mon_chan() - Set capture channel on the monitor mode interface.
  * @adapter: Handle to adapter
+ *
+ * Return: 0 on success else error code.
+ */
+int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter);
+
+/**
+ * wlan_hdd_validate_mon_params() - Validate freq and bw for monitor interface.
+ * @adapter: Handle to adapter
  * @freq: Monitor mode frequency (MHz)
  * @bandwidth: Capture channel bandwidth
  *
  * Return: 0 on success else error code.
  */
-int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
-			  uint32_t bandwidth);
+int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter, qdf_freq_t freq,
+				 uint32_t bandwidth);
 #else
 static inline
-int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
-			  uint32_t bandwidth)
+int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
+{
+	return 0;
+}
+
+static inline
+int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter, qdf_freq_t freq,
+				 uint32_t bandwidth)
 {
 	return 0;
 }

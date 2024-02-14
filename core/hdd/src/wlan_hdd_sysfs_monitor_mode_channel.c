@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -76,12 +77,14 @@ __hdd_sysfs_monitor_mode_channel_store(struct net_device *net_dev,
 		return -EINVAL;
 
 	if (val1 > 256)
-		ret = wlan_hdd_set_mon_chan(adapter, val1, val2);
+		ret = wlan_hdd_validate_mon_params(adapter, val1, val2);
 	else
-		ret = wlan_hdd_set_mon_chan(adapter,
-					    wlan_reg_legacy_chan_to_freq(
-							hdd_ctx->pdev, val1),
-					    val2);
+		ret = wlan_hdd_validate_mon_params(adapter, wlan_reg_legacy_chan_to_freq(
+						   hdd_ctx->pdev, val1), val2);
+	if (ret)
+		return count;
+
+	ret = wlan_hdd_set_mon_chan(adapter);
 
 	return count;
 }

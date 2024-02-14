@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -8602,14 +8602,16 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		break;
 	case WE_SET_MON_MODE_CHAN:
 		if (value[1] > 256)
-			ret = wlan_hdd_set_mon_chan(adapter, value[1],
-						    value[2]);
+			ret = wlan_hdd_validate_mon_params(adapter, value[1],
+							   value[2]);
 		else
-			ret = wlan_hdd_set_mon_chan(
-						adapter,
-						wlan_reg_legacy_chan_to_freq(
-						hdd_ctx->pdev, value[1]),
-						value[2]);
+			ret = wlan_hdd_validate_mon_params(adapter,
+							   wlan_reg_legacy_chan_to_freq(
+							   hdd_ctx->pdev, value[1]),
+							   value[2]);
+		if (ret)
+			return ret;
+		ret = wlan_hdd_set_mon_chan(adapter);
 		break;
 	case WE_SET_WLAN_SUSPEND:
 		ret = hdd_wlan_fake_apps_suspend(hdd_ctx->wiphy, dev,

@@ -10234,15 +10234,10 @@ static inline bool wlan_hdd_is_mon_channel_bw_valid(enum phy_ch_width ch_width)
 }
 #endif
 
-int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
-			  uint32_t bandwidth)
+int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter, qdf_freq_t freq,
+				 uint32_t bandwidth)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *sta_ctx;
-	struct hdd_mon_set_ch_info *ch_info;
-	QDF_STATUS status;
-	struct qdf_mac_addr bssid;
-	struct channel_change_req *req;
 	struct ch_params ch_params;
 	enum phy_ch_width max_fw_bw;
 	enum phy_ch_width ch_width;
@@ -10258,9 +10253,6 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 		hdd_err_rl("Not supported, adapter is not in monitor mode");
 		return -EINVAL;
 	}
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	ch_info = &sta_ctx->ch_info;
 
 	/* Verify the BW before accepting this request */
 	ch_width = bandwidth;
@@ -10287,13 +10279,11 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 
 	ret = hdd_validate_channel_and_bandwidth(adapter, freq, bandwidth);
 	if (ret) {
-		hdd_err("Invalid CH and BW combo");
+		hdd_err("Invalid Freq %d and BW %d combo", freq, bandwidth);
 		return ret;
 	}
 
 	hdd_debug("Set monitor mode frequency %d", freq);
-	qdf_mem_copy(bssid.bytes, adapter->mac_addr.bytes,
-		     QDF_MAC_ADDR_SIZE);
 
 	ch_params.ch_width = bandwidth;
 	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev, freq, 0,
@@ -10309,6 +10299,35 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 		hdd_err("Failed to change hw mode");
 		return -EINVAL;
 	}
+
+	adapter->mon_chan_freq = freq;
+	adapter->mon_bandwidth = bandwidth;
+
+	return ret;
+}
+
+int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_station_ctx *sta_ctx;
+	struct hdd_mon_set_ch_info *ch_info;
+	QDF_STATUS status;
+	struct channel_change_req *req;
+	struct ch_params ch_params;
+	int ret;
+	qdf_freq_t freq;
+	uint32_t bandwidth;
+
+	freq = adapter->mon_chan_freq;
+	bandwidth = adapter->mon_bandwidth;
+	ret = hdd_validate_channel_and_bandwidth(adapter, freq, bandwidth);
+	if (ret) {
+		hdd_err("Invalid Freq %d and BW %d combo", freq, bandwidth);
+		return ret;
+	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	ch_info = &sta_ctx->ch_info;
 
 	if (adapter->monitor_mode_vdev_up_in_progress) {
 		hdd_err_rl("monitor mode vdev up in progress");
@@ -10329,9 +10348,9 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 		return -ENOMEM;
 	req->vdev_id = adapter->deflink->vdev_id;
 	req->target_chan_freq = freq;
-	req->ch_width = ch_width;
+	req->ch_width = bandwidth;
 
-	ch_params.ch_width = ch_width;
+	ch_params.ch_width = bandwidth;
 	hdd_select_cbmode(adapter, freq, 0, &ch_params);
 
 	req->sec_ch_offset = ch_params.sec_ch_offset;
@@ -10348,9 +10367,6 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 		adapter->monitor_mode_vdev_up_in_progress = false;
 		return qdf_status_to_os_return(status);
 	}
-
-	adapter->mon_chan_freq = freq;
-	adapter->mon_bandwidth = bandwidth;
 
 	/* block on a completion variable until vdev up success*/
 	status = qdf_wait_for_event_completion(
@@ -10527,9 +10543,7 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 			hdd_start_station_adapter(adapter);
 			hdd_set_mon_rx_cb(adapter->dev);
 
-			wlan_hdd_set_mon_chan(
-					adapter, adapter->mon_chan_freq,
-					adapter->mon_bandwidth);
+			wlan_hdd_set_mon_chan(adapter);
 			break;
 		case QDF_NDI_MODE:
 			hdd_ndi_start(adapter->dev->name, 0);
