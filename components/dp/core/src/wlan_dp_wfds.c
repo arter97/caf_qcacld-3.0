@@ -839,21 +839,21 @@ void dp_wfds_deinit(struct dp_direct_link_context *dp_direct_link_ctx,
 
 	dp_debug("WFDS QMI deinit");
 
-	qdf_flush_workqueue(0, dl_wfds->wfds_wq);
-	qdf_destroy_workqueue(0, dl_wfds->wfds_wq);
-
-	qdf_flush_work(&dl_wfds->wfds_work);
-	qdf_destroy_work(0, &dl_wfds->wfds_work);
-
-	qdf_spinlock_destroy(&dl_wfds->wfds_event_list_lock);
-	qdf_list_destroy(&dl_wfds->wfds_event_list);
-
 	if (qdf_atomic_read(&dl_wfds->wfds_state) !=
 	    DP_WFDS_SVC_DISCONNECTED)
 		wlan_qmi_wfds_send_misc_req_msg(dp_direct_link_ctx->dp_ctx->psoc,
 						is_ssr);
 
 	wlan_qmi_wfds_deinit(dp_direct_link_ctx->dp_ctx->psoc);
+
+	qdf_flush_work(&dl_wfds->wfds_work);
+	qdf_destroy_work(0, &dl_wfds->wfds_work);
+
+	qdf_flush_workqueue(0, dl_wfds->wfds_wq);
+	qdf_destroy_workqueue(0, dl_wfds->wfds_wq);
+
+	qdf_spinlock_destroy(&dl_wfds->wfds_event_list_lock);
+	qdf_list_destroy(&dl_wfds->wfds_event_list);
 	gp_dl_wfds_ctx = NULL;
 
 	qdf_mem_free(dl_wfds);
