@@ -8542,7 +8542,9 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 	int ret;
 	uint8_t dual_mac_feature = DISABLE_DBS_CXN_AND_SCAN;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_monitor_ctx mon_ctx[MAX_MAC] = { 0 };
 	QDF_STATUS status;
+	uint8_t index = 0;
 
 	hdd_enter_dev(dev);
 
@@ -8602,15 +8604,16 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		break;
 	case WE_SET_MON_MODE_CHAN:
 		if (value[1] > 256)
-			ret = wlan_hdd_validate_mon_params(adapter, value[1],
-							   value[2]);
+			mon_ctx[index].freq = value[1];
 		else
-			ret = wlan_hdd_validate_mon_params(adapter,
-							   wlan_reg_legacy_chan_to_freq(
-							   hdd_ctx->pdev, value[1]),
-							   value[2]);
+			mon_ctx[index].freq = wlan_reg_legacy_chan_to_freq(
+						hdd_ctx->pdev, value[1]);
+		mon_ctx[index].bandwidth = value[2];
+
+		ret = wlan_hdd_validate_mon_params(adapter, mon_ctx, MAX_MAC);
 		if (ret)
 			return ret;
+
 		ret = wlan_hdd_set_mon_chan(adapter);
 		break;
 	case WE_SET_WLAN_SUSPEND:

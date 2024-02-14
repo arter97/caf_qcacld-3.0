@@ -4821,13 +4821,14 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter);
 /**
  * wlan_hdd_validate_mon_params() - Validate freq and bw for monitor interface.
  * @adapter: Handle to adapter
- * @freq: Monitor mode frequency (MHz)
- * @bandwidth: Capture channel bandwidth
+ * @mon_params: Monitor input parameters
+ * @num_params: Number of input params
  *
  * Return: 0 on success else error code.
  */
-int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter, qdf_freq_t freq,
-				 uint32_t bandwidth);
+int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
+				 struct hdd_monitor_ctx *mon_params,
+				 uint8_t num_params);
 #else
 static inline
 int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
@@ -4836,8 +4837,9 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 }
 
 static inline
-int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter, qdf_freq_t freq,
-				 uint32_t bandwidth)
+int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
+				 struct hdd_monitor_ctx *mon_params,
+				 uint8_t num_params)
 {
 	return 0;
 }

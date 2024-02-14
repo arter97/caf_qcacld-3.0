@@ -35,8 +35,9 @@ __hdd_sysfs_monitor_mode_channel_store(struct net_device *net_dev,
 	struct hdd_adapter *adapter = netdev_priv(net_dev);
 	char buf_local[MAX_SYSFS_USER_COMMAND_SIZE_LENGTH + 1];
 	struct hdd_context *hdd_ctx;
+	struct hdd_monitor_ctx mon_ctx[MAX_MAC] = { 0 };
 	char *sptr, *token;
-	uint32_t val1, val2;
+	uint32_t val1, val2, val3, val4, index = 0;
 	int ret;
 
 	if (hdd_validate_adapter(adapter))
@@ -76,11 +77,43 @@ __hdd_sysfs_monitor_mode_channel_store(struct net_device *net_dev,
 	if (kstrtou32(token, 0, &val2))
 		return -EINVAL;
 
+	if (!val1)
+		return -EINVAL;
+
 	if (val1 > 256)
-		ret = wlan_hdd_validate_mon_params(adapter, val1, val2);
+		mon_ctx[index].freq = val1;
 	else
-		ret = wlan_hdd_validate_mon_params(adapter, wlan_reg_legacy_chan_to_freq(
-						   hdd_ctx->pdev, val1), val2);
+		mon_ctx[index].freq = wlan_reg_legacy_chan_to_freq(
+							hdd_ctx->pdev, val1);
+	mon_ctx[index].bandwidth = val2;
+	index++;
+
+	/* Get val3 */
+	token = strsep(&sptr, " ");
+	if (!token)
+		goto set_mon_channel;
+	if (kstrtou32(token, 0, &val3))
+		goto set_mon_channel;
+
+	/* Get val4 */
+	token = strsep(&sptr, " ");
+	if (!token)
+		goto set_mon_channel;
+	if (kstrtou32(token, 0, &val4))
+		goto set_mon_channel;
+
+	if (!val3)
+		return -EINVAL;
+
+	if (val3 > 256)
+		mon_ctx[index].freq = val3;
+	else
+		mon_ctx[index].freq = wlan_reg_legacy_chan_to_freq(
+						hdd_ctx->pdev, val3);
+	mon_ctx[index].bandwidth = val4;
+
+set_mon_channel:
+	ret = wlan_hdd_validate_mon_params(adapter, mon_ctx, MAX_MAC);
 	if (ret)
 		return count;
 
