@@ -3519,9 +3519,12 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (!pdev)
 		goto rel_vdev_ref;
 
+	mlme_debug("vdev:%d process rso stop for reason: %d", vdev_id, reason);
+
 	stop_req->btm_config.vdev_id = vdev_id;
-	MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
-		     BTM_OFFLOAD_CONFIG_BIT_0);
+	if (reason == REASON_SUPPLICANT_DISABLED_ROAMING)
+		MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
+			     BTM_OFFLOAD_CONFIG_BIT_0);
 	stop_req->disconnect_params.vdev_id = vdev_id;
 	stop_req->idle_params.vdev_id = vdev_id;
 	stop_req->roam_triggers.vdev_id = vdev_id;
@@ -7039,7 +7042,8 @@ wlan_convert_bitmap_to_band(uint8_t bitmap)
 	enum wlan_diag_wifi_band band = WLAN_INVALID_BAND;
 
 	for (i = WLAN_24GHZ_BAND; i <= WLAN_6GHZ_BAND; i++) {
-		if (qdf_test_bit(i, (unsigned long *)&bitmap)) {
+		/* 2.4 GHz band will be populated at 0th bit in the bitmap*/
+		if (qdf_test_bit((i - 1), (unsigned long *)&bitmap)) {
 			band = i;
 			break;
 		}

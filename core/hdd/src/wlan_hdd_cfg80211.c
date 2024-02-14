@@ -7131,8 +7131,10 @@ __wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 		return -ENOMEM;
 
 	rso_usr_cfg = qdf_mem_malloc(sizeof(*rso_usr_cfg));
-	if (!rso_usr_cfg)
+	if (!rso_usr_cfg) {
+		qdf_mem_free(rso_config);
 		return -ENOMEM;
+	}
 
 	ret = hdd_set_ext_roam_params(hdd_ctx, data, data_len,
 				      adapter->deflink->vdev_id, rso_config,
@@ -28697,7 +28699,7 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 			nss = 0;
 			if (band == NL80211_BAND_5GHZ)
 				rate_index += 4;
-			if (rate_index >= 0 && rate_index < 4)
+			if (rate_index < 4)
 				bit_rate = hdd_assemble_rate_code(
 					WMI_RATE_PREAMBLE_CCK, nss,
 					hdd_legacy_rates[rate_index].hw_value);
