@@ -1256,6 +1256,7 @@ fail:
 	return QDF_STATUS_E_INVAL;
 }
 
+#ifndef QCA_HOST_MODE_WIFI_DISABLED
 #ifdef CONFIG_SAWF_STATS
 static QDF_STATUS
 dp_sawf_inc_reinject_pkt(struct dp_peer *peer, uint8_t msduq_idx)
@@ -1387,6 +1388,14 @@ dp_sawf_reinject_handler(struct dp_soc *soc, qdf_nbuf_t nbuf,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else /* QCA_HOST_MODE_WIFI_DISABLED */
+QDF_STATUS
+dp_sawf_reinject_handler(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			 uint32_t *htt_desc)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
 #ifdef CONFIG_SAWF_STATS
 struct sawf_telemetry_params sawf_telemetry_cfg;

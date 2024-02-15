@@ -115,6 +115,7 @@ QDF_STATUS qca_fse_get_sawf_params(struct net_device *dev,
 
 	osdev = ath_netdev_priv(dev);
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
 	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
 		osif_peer_dev *osifp;
 
@@ -122,6 +123,7 @@ QDF_STATUS qca_fse_get_sawf_params(struct net_device *dev,
 
 		peer_mac_addr = osifp->peer_mac_addr;
 	}
+#endif
 
 	status = wlan_sawf_get_uplink_params(svc_id, &tid,
 					     NULL, NULL, NULL, NULL);

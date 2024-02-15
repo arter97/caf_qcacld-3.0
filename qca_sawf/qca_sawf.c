@@ -15,6 +15,7 @@
  */
 
 #ifdef CONFIG_SAWF
+#include <osif_private.h>
 #include <dp_sawf.h>
 #include <wlan_sawf.h>
 #include <cdp_txrx_sawf.h>
@@ -265,12 +266,14 @@ void qca_sawf_3_link_peer_dl_flow_count(struct net_device *netdev, uint8_t *mac_
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 
 	osdev = ath_netdev_priv(netdev);
+#ifdef QCA_SUPPORT_WDS_EXTENDED
 	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
 		osif_peer_dev *osifp = NULL;
 
 		osifp = ath_netdev_priv(netdev);
 		peer_id = osifp->peer_id;
 	}
+#endif
 
 	cdp_sawf_3_link_peer_flow_count(soc_txrx_handle, mac_addr, peer_id,
 					mark_metadata);
@@ -373,12 +376,14 @@ void qca_sawf_peer_config_ul(struct net_device *netdev, uint8_t *mac_addr,
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 
 	osdev = ath_netdev_priv(netdev);
+#ifdef QCA_SUPPORT_WDS_EXTENDED
 	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
 		osif_peer_dev *osifp = NULL;
 
 		osifp = ath_netdev_priv(netdev);
 		peer_id = osifp->peer_id;
 	}
+#endif
 
 	cdp_sawf_peer_config_ul(soc_txrx_handle,
 				mac_addr, tid,
@@ -411,12 +416,14 @@ void qca_sawf_peer_dl_flow_count(struct net_device *netdev, uint8_t *mac_addr,
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 
 	osdev = ath_netdev_priv(netdev);
+#ifdef QCA_SUPPORT_WDS_EXTENDED
 	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
 		osif_peer_dev *osifp = NULL;
 
 		osifp = ath_netdev_priv(netdev);
 		peer_id = osifp->peer_id;
 	}
+#endif
 
 	cdp_sawf_peer_flow_count(soc_txrx_handle, mac_addr,
 				 svc_id, direction, start_or_stop,
