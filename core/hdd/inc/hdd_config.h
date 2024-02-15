@@ -165,8 +165,8 @@ enum hdd_dot11_mode {
  * <ini>
  * cpu_cxpc_threshold - PM QOS threshold
  * @Min: 0
- * @Max: 15000
- * @Default: 10000
+ * @Max: 20000
+ * @Default: 17000
  *
  * This ini is used to set PM QOS threshold value
  *
@@ -181,8 +181,8 @@ enum hdd_dot11_mode {
  #define CFG_CPU_CXPC_THRESHOLD CFG_INI_UINT( \
 			"cpu_cxpc_threshold", \
 			0, \
-			15000, \
-			10000, \
+			20000, \
+			17000, \
 			CFG_VALUE_OR_DEFAULT, \
 			"PM QOS threshold")
 #define CFG_CPU_CXPC_THRESHOLD_ALL CFG(CFG_CPU_CXPC_THRESHOLD)
