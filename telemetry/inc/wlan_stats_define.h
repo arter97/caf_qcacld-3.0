@@ -202,6 +202,19 @@ enum stats_type_e {
 	STATS_TYPE_MAX = STATS_TYPE_CTRL,
 };
 
+/**
+ * enum stats_info_attr: Defines the bitmap for the
+ *                       telemetric info attribute
+ * @STATS_INFO_AGGREGATE:   Indicate aggregation flag for driver
+ * @STATS_INFO_ASYNC_REQ:   Indicate the request for non-blocking stats
+ * @STATS_INFO_STATUS_FAIL: Indicate failure in processing req
+ */
+enum stats_info_attr {
+	STATS_INFO_AGGREGATE = 1,
+	STATS_INFO_ASYNC_REQ = 2,
+	STATS_INFO_STATUS_FAIL = 4,
+};
+
 enum stats_if_wme_ac {
 	STATS_IF_WME_AC_BE = 0,
 	STATS_IF_WME_AC_BK,

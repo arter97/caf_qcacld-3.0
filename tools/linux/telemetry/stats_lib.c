@@ -625,6 +625,12 @@ static int is_valid_cmd(struct stats_command *cmd)
 static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 {
 	int32_t ret = 0;
+	uint8_t info = 0;
+
+	if (cmd->recursive)
+		info |= STATS_INFO_AGGREGATE;
+	if (is_async_req())
+		info |= STATS_INFO_ASYNC_REQ;
 
 	if (nla_put_u8(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_LEVEL,
 		       cmd->lvl)) {
@@ -641,9 +647,9 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 		STATS_ERR("failed to put stats category type\n");
 		return -EIO;
 	}
-	if (!cmd->recursive &&
-	    nla_put_flag(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_AGGREGATE)) {
-		STATS_ERR("failed to put aggregate flag\n");
+	if (nla_put_u8(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_INFO,
+		       info)) {
+		STATS_ERR("failed to put stats info\n");
 		return -EIO;
 	}
 	if (nla_put_u64(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_FEATURE_FLAG,
