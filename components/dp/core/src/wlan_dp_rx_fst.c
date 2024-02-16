@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -417,7 +417,7 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 					 &soc_param);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("Unable to fetch RX pkt tlv size");
-		return status;
+		goto free_rx_fst;
 	}
 
 	fst->rx_pkt_tlv_size = soc_param.rx_pkt_tlv_size;
@@ -428,7 +428,7 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 					 &soc_param);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("Unable to fetch fisa params");
-		return status;
+		goto free_rx_fst;
 	}
 
 	fst->max_skid_length = soc_param.fisa_params.rx_flow_max_search;
@@ -444,8 +444,10 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	fst->base = (uint8_t *)dp_context_alloc_mem(soc, DP_FISA_RX_FT_TYPE,
 				DP_RX_GET_SW_FT_ENTRY_SIZE * fst->max_entries);
 
-	if (!fst->base)
+	if (!fst->base) {
+		status = QDF_STATUS_E_NOMEM;
 		goto free_rx_fst;
+	}
 
 	ft_entry = (struct dp_fisa_rx_sw_ft *)fst->base;
 
@@ -518,7 +520,7 @@ free_hist:
 	dp_context_free_mem(soc, DP_FISA_RX_FT_TYPE, fst->base);
 free_rx_fst:
 	qdf_mem_free(fst);
-	return QDF_STATUS_E_NOMEM;
+	return status;
 }
 
 /**
