@@ -1209,6 +1209,107 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 qdf_export_symbol(dp_sawf_get_msduq);
 
 QDF_STATUS
+dp_sawf_get_peer_msduq_svc_params(struct cdp_soc_t *soc, uint8_t *mac,
+				  void *data)
+{
+	uint16_t peer_id, msduq_peer_id;
+	struct dp_soc *dp_soc;
+	struct dp_peer *peer = NULL, *primary_link_peer = NULL;
+	struct dp_txrx_peer *txrx_peer;
+	struct dp_peer_sawf *sawf_ctx;
+	struct dp_sawf_msduq *msduq = NULL;
+	struct sawf_msduq_svc_params *dst;
+	uint8_t index = 0, type = 0, tid = 0, queue_id = 0;
+	uint32_t service_interval = 0, burst_size = 0,
+		min_throughput = 0, max_latency = 0, priority = 0;
+
+	dst = (struct sawf_msduq_svc_params *)data;
+	if (!dst) {
+		dp_sawf_err("Invalid data to fill");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dp_soc = cdp_soc_t_to_dp_soc(soc);
+	if (!dp_soc) {
+		dp_sawf_err("Invalid soc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	peer = dp_peer_find_hash_find(dp_soc, mac, 0,
+				      DP_VDEV_ALL, DP_MOD_ID_SAWF);
+	if (!peer) {
+		dp_sawf_err("Invalid peer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer) {
+		dp_sawf_err("txrx peer is NULL");
+		goto fail;
+	}
+
+	primary_link_peer = dp_get_primary_link_peer_by_id(dp_soc,
+							   txrx_peer->peer_id,
+							   DP_MOD_ID_SAWF);
+	if (!primary_link_peer) {
+		dp_sawf_err("No primary link peer found");
+		goto fail;
+	}
+
+	peer_id = primary_link_peer->peer_id;
+
+	sawf_ctx = dp_peer_sawf_ctx_get(primary_link_peer);
+	if (!sawf_ctx) {
+		dp_sawf_err("sawf_ctx doesn't exist");
+		goto fail;
+	}
+
+	for (index = 0; index < DP_SAWF_Q_MAX; index++) {
+		msduq = &sawf_ctx->msduq[index];
+
+		/* Check if msduq is used and flow count is non-zero */
+		if (msduq->is_used && qdf_atomic_read(&msduq->ref_count)) {
+			dst->is_used = true;
+			dst->svc_id = msduq->svc_id;
+
+			wlan_sawf_get_downlink_params(msduq->svc_id, &tid,
+						      &service_interval,
+						      &burst_size, &min_throughput,
+						      &max_latency, &priority,
+						      &type);
+
+			dst->svc_type = type;
+			dst->svc_tid = tid;
+			dst->svc_ac = TID_TO_WME_AC(tid);
+			dst->priority = priority;
+			dst->service_interval = service_interval;
+			dst->burst_size = burst_size;
+			dst->min_throughput = min_throughput;
+			dst->delay_bound = max_latency;
+
+			queue_id = index;
+			queue_id = queue_id + DP_SAWF_DEFAULT_Q_MAX;
+			msduq_peer_id = dp_sawf_msduq_peer_id_set(peer_id, queue_id);
+
+			DP_SAWF_METADATA_SET(dst->mark_metadata, dst->svc_id,
+					     msduq_peer_id);
+		}
+		dst++;
+	}
+
+	dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_SAWF);
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	return QDF_STATUS_SUCCESS;
+fail:
+	if (primary_link_peer)
+		dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_SAWF);
+	if (peer)
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
 dp_swaf_peer_sla_configuration(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 			       uint16_t *arg_sla_mask)
 {

@@ -408,6 +408,18 @@ QDF_STATUS
 dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 			  uint32_t svc_id, uint8_t *mac, void *data);
 
+/**
+ * dp_sawf_get_peer_msduq_svc_params - get peer msduq svc info
+ * @soc: soc handle
+ * @mac: mac address
+ * @data: data to be filled
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_sawf_get_peer_msduq_svc_params(struct cdp_soc_t *soc, uint8_t *mac,
+				  void *data);
+
 struct dp_sawf_msduq {
 	qdf_atomic_t ref_count;
 	uint8_t htt_msduq;
