@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1416,7 +1416,7 @@ static bool handle_csa_standby_link(wmi_csa_event_fixed_param *csa_event,
 		return is_csa_standby;
 	}
 
-	mlo_mgr_update_csa_link_info(mldev, &csa_param, link_id);
+	mlo_mgr_update_csa_link_info(pdev, mldev, &csa_param, link_id);
 
 	params.link_id = link_info->link_id;
 	params.chan = qdf_mem_malloc(sizeof(struct wlan_channel));

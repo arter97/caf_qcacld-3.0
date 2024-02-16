@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,8 @@
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_cmn.h>
 #include "sme_api.h"
+
+#define DISABLE_MCS_12_13_2G_40M 1
 
 #define ASSEMBLE_RATECODE_V1(_pream, _nss, _rate) \
 		(((1) << 28) | ((_pream) << 8) | ((_nss) << 5) | (_rate))
@@ -2693,6 +2695,18 @@ bool mlme_get_bss_11be_allowed(struct wlan_objmgr_psoc *psoc,
 			       struct qdf_mac_addr *bssid,
 			       uint8_t *ie_data,
 			       uint32_t ie_length);
+
+/**
+ * wlan_mlme_get_oem_eht_mlo_config() - Get the OEM EHT configuration.
+ * @psoc: PSOC object manager.
+ * @oem_eht_cfg: Pointer to fill OEM cfg
+ *
+ * Returns success of retrieving OEM cfg else failure.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS wlan_mlme_get_oem_eht_mlo_config(struct wlan_objmgr_psoc *psoc,
+					    uint32_t *oem_eht_cfg);
 #else
 static inline
 bool mlme_get_bss_11be_allowed(struct wlan_objmgr_psoc *psoc,
@@ -2701,6 +2715,14 @@ bool mlme_get_bss_11be_allowed(struct wlan_objmgr_psoc *psoc,
 			       uint32_t ie_length)
 {
 	return false;
+}
+
+static inline QDF_STATUS
+wlan_mlme_get_oem_eht_mlo_config(struct wlan_objmgr_psoc *psoc,
+				 uint32_t *oem_eht_cfg)
+{
+	*oem_eht_cfg = 0x0;
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -4934,4 +4956,15 @@ wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS
 wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
 				    uint8_t csa_status);
+
+/**
+ * wlan_mlme_is_hs_20_btm_offload_disabled() - Get BTM offload is enable/disable
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_is_hs_20_btm_offload_disabled(struct wlan_objmgr_psoc *psoc,
+					bool *val);
 #endif /* _WLAN_MLME_API_H_ */

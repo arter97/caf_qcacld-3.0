@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5804,12 +5804,12 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 						 pe_session);
 	}
 
-	pe_nofl_info("TX: type:%d seq_no:%d dialog_token:%d no. of APs:%d is_last_rpt:%d num_report:%d peer:"QDF_MAC_ADDR_FMT,
-		     frm->MeasurementReport[0].type,
-		     (pMacHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET |
-		     pMacHdr->seqControl.seqNumLo),
-		     dialog_token, frm->num_MeasurementReport,
-		     is_last_report, num_report, QDF_MAC_ADDR_REF(peer));
+	pe_nofl_rl_info("TX: type:%d seq_no:%d dialog_token:%d no. of APs:%d is_last_rpt:%d num_report:%d peer:"QDF_MAC_ADDR_FMT,
+			frm->MeasurementReport[0].type,
+			(pMacHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET |
+			pMacHdr->seqControl.seqNumLo),
+			dialog_token, frm->num_MeasurementReport,
+			is_last_report, num_report, QDF_MAC_ADDR_REF(peer));
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -5825,8 +5825,8 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 pe_session->peSessionId, qdf_status));
 	if (QDF_STATUS_SUCCESS != qdf_status) {
-		pe_nofl_err("TX: [802.11 RRM] Send FAILED! err_status [%d]",
-			    qdf_status);
+		pe_nofl_rl_err("TX: [802.11 RRM] Send FAILED! err_status [%d]",
+			       qdf_status);
 		status_code = QDF_STATUS_E_FAILURE;
 		/* Pkt will be freed up by the callback */
 	}
@@ -6915,9 +6915,79 @@ lim_mgmt_t2lm_rsp_tx_complete(void *context, qdf_nbuf_t buf,
 					      rsp.DialogToken.token,
 					      rsp.Status.status,
 					      qdf_tx_complete,
-					      mgmt_params->chanfreq,
+					      (qdf_freq_t)mgmt_params->chanfreq,
 					      false,
-					      WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT);
+					      WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
+out:
+	qdf_nbuf_free(buf);
+
+	return status;
+}
+
+static QDF_STATUS
+lim_mgmt_t2lm_req_tx_complete(void *context, qdf_nbuf_t buf,
+			      uint32_t tx_status, void *params)
+{
+	struct mac_context *mac_ctx = (struct mac_context *)context;
+	struct pe_session *pe_session;
+	struct wlan_frame_hdr *mac_hdr;
+	struct wmi_mgmt_params *mgmt_params;
+	tDot11ft2lm_neg_req req = {0};
+	enum qdf_dp_tx_rx_status qdf_tx_complete;
+	uint32_t extract_status;
+	uint8_t *frame_ptr;
+	uint8_t ff_offset;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!params) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	frame_ptr = qdf_nbuf_data(buf);
+	mac_hdr = (struct wlan_frame_hdr *)frame_ptr;
+
+	ff_offset = sizeof(*mac_hdr);
+	if (wlan_crypto_is_data_protected(frame_ptr))
+		ff_offset += IEEE80211_CCMP_MICLEN;
+
+	if (qdf_nbuf_len(buf) < (ff_offset + sizeof(struct action_frm_hdr))) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	mgmt_params = params;
+	pe_session = pe_find_session_by_vdev_id(mac_ctx, mgmt_params->vdev_id);
+	if (!pe_session || pe_session->opmode != QDF_STA_MODE) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	if (tx_status == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
+		qdf_tx_complete = QDF_TX_RX_STATUS_OK;
+	else if (tx_status  == WMI_MGMT_TX_COMP_TYPE_DISCARD)
+		qdf_tx_complete = QDF_TX_RX_STATUS_FW_DISCARD;
+	else
+		qdf_tx_complete = QDF_TX_RX_STATUS_NO_ACK;
+
+	extract_status =
+		dot11f_unpack_t2lm_neg_req(mac_ctx,
+					   frame_ptr + ff_offset,
+					   sizeof(req), &req, false);
+	if (DOT11F_FAILED(extract_status)) {
+		pe_err("Failed to unpack T2LM negotiation request (0x%08x)",
+		       extract_status);
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	wlan_connectivity_t2lm_req_resp_event(pe_session->vdev,
+					      req.DialogToken.token,
+					      false,
+					      qdf_tx_complete,
+					      (qdf_freq_t)mgmt_params->chanfreq,
+					      false,
+					      WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
 out:
 	qdf_nbuf_free(buf);
 
@@ -7163,10 +7233,13 @@ lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 session->peSessionId, mgmt_hdr->fc.subType));
-	qdf_status = wma_tx_frame(mac_ctx, pkt_ptr, (uint16_t)num_bytes,
-				  TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
-				  lim_tx_complete, frame_ptr, tx_flag,
-				  vdev_id, 0, RATEID_DEFAULT, 0);
+	qdf_status = wma_tx_frameWithTxComplete(
+			mac_ctx, pkt_ptr, (uint16_t)num_bytes,
+			 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
+			 lim_tx_complete, frame_ptr,
+			 lim_mgmt_t2lm_req_tx_complete, tx_flag,
+			 vdev_id, 0, session->curr_op_freq,
+			 RATEID_DEFAULT, 0, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 session->peSessionId, qdf_status));
 	if (qdf_status != QDF_STATUS_SUCCESS) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1152,6 +1152,20 @@ static void mlme_init_pmf_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_PMF_SA_QUERY_RETRY_INTERVAL);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static inline void mlme_init_oem_eht_mlo_cfg(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_mlme_generic *gen)
+{
+	gen->oem_eht_mlo_crypto_bitmap =
+				cfg_get(psoc, CFG_OEM_EHT_MLO_CRYPTO_BITMAP);
+}
+#else
+static inline void mlme_init_oem_eht_mlo_cfg(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_mlme_generic *gen)
+{
+}
+#endif /* WLAN_FEATURE_11BE */
+
 #ifdef WLAN_FEATURE_LPSS
 static inline void
 mlme_init_lpass_support_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1377,6 +1391,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP);
 	gen->wls_6ghz_capable = cfg_get(psoc, CFG_WLS_6GHZ_CAPABLE);
 	mlme_init_pmf_cfg(psoc, gen);
+	mlme_init_oem_eht_mlo_cfg(psoc, gen);
 	mlme_init_lpass_support_cfg(psoc, gen);
 	gen->enabled_rf_test_mode = cfg_default(CFG_RF_TEST_MODE_SUPP_ENABLED);
 	gen->enabled_11h = cfg_get(psoc, CFG_11H_SUPPORT_ENABLED);
@@ -2198,6 +2213,9 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 		QDF_GET_BITS(mcs_12_13,
 			     HE_MCS12_13_5G_INDEX * HE_MCS12_13_BITS,
 			     HE_MCS12_13_BITS);
+
+	mlme_cfg->he_caps.disable_sap_mcs_12_13 = cfg_get(psoc,
+						CFG_DISABLE_MCS_12_13_SAP);
 }
 #else
 static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2565,7 +2583,10 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 	sta->mlo_same_link_mld_address =
 		cfg_default(CFG_MLO_SAME_LINK_MLD_ADDR);
 	sta->mlo_5gl_5gh_mlsr =
-		cfg_default(CFG_MLO_MLO_5GL_5GH_MLSR);
+		cfg_get(psoc, CFG_MLO_MLO_5GL_5GH_MLSR);
+
+	mlme_debug("mlo_support_link_num: %d, mlo_support_link_band: 0x%x",
+		   sta->mlo_support_link_num, sta->mlo_support_link_band);
 }
 
 static bool
@@ -3243,6 +3264,8 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_subnet_detection(psoc, lfr);
 	lfr->rso_user_config.cat_rssi_offset = DEFAULT_RSSI_DB_GAP;
 	mlme_init_bmiss_timeout(psoc, lfr);
+	lfr->hs20_btm_offload_disable = cfg_get(psoc,
+						CFG_HS_20_BTM_OFFLOAD_DISABLE);
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,

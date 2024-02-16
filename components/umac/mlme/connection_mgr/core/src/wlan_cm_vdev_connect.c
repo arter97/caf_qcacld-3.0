@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1097,12 +1097,11 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 	if (wlan_get_vendor_ie_ptr_from_oui(HS20_OUI_TYPE,
 					    HS20_OUI_TYPE_SIZE,
 					    req->assoc_ie.ptr,
-					    req->assoc_ie.len)) {
+					    req->assoc_ie.len))
 		src_cfg.bool_value = true;
-		wlan_cm_roam_cfg_set_value(wlan_vdev_get_psoc(vdev),
-					   wlan_vdev_get_id(vdev),
-					   HS_20_AP, &src_cfg);
-	}
+	wlan_cm_roam_cfg_set_value(wlan_vdev_get_psoc(vdev),
+				   wlan_vdev_get_id(vdev),
+				   HS_20_AP, &src_cfg);
 	if (req->source != CM_MLO_LINK_SWITCH_CONNECT)
 		ml_nlink_conn_change_notify(
 			psoc, wlan_vdev_get_id(vdev),
@@ -1162,14 +1161,55 @@ set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
 }
 #endif
 
+static void
+cm_check_ml_missing_partner_entries(struct cm_connect_req *conn_req)
+{
+	uint8_t idx;
+	struct scan_cache_entry *entry, *partner_entry;
+	qdf_list_t *candidate_list = conn_req->candidate_list;
+	struct qdf_mac_addr *mld_addr;
+	struct partner_link_info *partner_info;
+
+	entry = conn_req->cur_candidate->entry;
+	mld_addr = util_scan_entry_mldaddr(entry);
+
+	/*
+	 * If the entry is not one of following, return gracefully:
+	 *   -AP is not ML type
+	 *   -AP is SLO
+	 */
+	if (!mld_addr || !entry->ml_info.num_links)
+		return;
+
+	for (idx = 0; idx < entry->ml_info.num_links; idx++) {
+		if (!entry->ml_info.link_info[idx].is_valid_link)
+			continue;
+
+		partner_info = &entry->ml_info.link_info[idx];
+		partner_entry = cm_get_entry(candidate_list,
+					     &partner_info->link_addr);
+		/*
+		 * If partner entry is not found in candidate list or if
+		 * the MLD address of the entry is not equal to current
+		 * candidate MLD address, treat it as entry not found.
+		 */
+		if (!partner_entry ||
+		    !qdf_is_macaddr_equal(mld_addr,
+					  &partner_entry->ml_info.mld_mac_addr)) {
+			partner_info->is_scan_entry_not_found = true;
+		}
+	}
+}
+
 QDF_STATUS
 cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
-		       struct scan_cache_entry *scan_entry,
-		       struct mlo_partner_info *partner_info)
+		       struct cm_connect_req *conn_req)
 {
 	uint8_t i, j = 0;
 	uint8_t mlo_support_link_num;
 	struct wlan_objmgr_psoc *psoc;
+	struct scan_cache_entry *scan_entry = conn_req->cur_candidate->entry;
+	struct mlo_partner_info *partner_info = &conn_req->req.ml_parnter_info;
 
 	/* Initialize number of partner links as zero */
 	partner_info->num_partner_links = 0;
@@ -1208,24 +1248,23 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 		if (mlo_support_link_num && j >= mlo_support_link_num - 1)
 			break;
 
-		if (scan_entry->ml_info.link_info[i].is_valid_link) {
-			partner_info->partner_link_info[j].link_addr =
-				scan_entry->ml_info.link_info[i].link_addr;
-			partner_info->partner_link_info[j].link_id =
-				scan_entry->ml_info.link_info[i].link_id;
-			partner_info->partner_link_info[j].chan_freq =
-				scan_entry->ml_info.link_info[i].freq;
-			j++;
+		if (!scan_entry->ml_info.link_info[i].is_valid_link)
 			continue;
-		}
 
-		scan_entry->ml_info.link_info[i].is_valid_link = false;
+		partner_info->partner_link_info[j].link_addr =
+				scan_entry->ml_info.link_info[i].link_addr;
+		partner_info->partner_link_info[j].link_id =
+				scan_entry->ml_info.link_info[i].link_id;
+		partner_info->partner_link_info[j].chan_freq =
+				scan_entry->ml_info.link_info[i].freq;
+		j++;
 	}
 
 	partner_info->num_partner_links = j;
 	mlme_debug("sta and ap intersect num of partner link: %d", j);
 
 	set_partner_info_for_2link_sap(scan_entry, partner_info);
+	cm_check_ml_missing_partner_entries(conn_req);
 
 	return QDF_STATUS_SUCCESS;
 }

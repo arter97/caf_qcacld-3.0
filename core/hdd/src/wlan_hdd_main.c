@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1051,8 +1051,11 @@ static int hdd_netdev_notifier_call(struct notifier_block *nb,
 	}
 
 	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
-	if (errno)
+	if (errno) {
+		hdd_debug("%s New Net Device State = %lu, flags 0x%x NOTIFY_DONE",
+			  net_dev->name, state, net_dev->flags);
 		return NOTIFY_DONE;
+	}
 
 	errno = __hdd_netdev_notifier_call(net_dev, state);
 
@@ -1724,6 +1727,35 @@ hdd_init_get_sta_in_ll_stats_config(struct hdd_adapter *adapter)
 {
 }
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
+
+#ifdef WLAN_FEATURE_11BE_MLO
+
+static void
+hdd_init_link_state_cfg(struct hdd_config *config,
+			struct wlan_objmgr_psoc *psoc)
+{
+	config->link_state_cache_expiry_time =
+		cfg_get(psoc, CFG_LINK_STATE_CACHE_EXPIRY);
+}
+
+static void
+hdd_init_link_state_config(struct hdd_adapter *adapter)
+{
+	adapter->link_state_cached_timestamp = 0;
+}
+
+#else
+static void
+hdd_init_link_state_cfg(struct hdd_config *config,
+			struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static void
+hdd_init_link_state_config(struct hdd_adapter *adapter)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 
 #ifdef WLAN_FEATURE_IGMP_OFFLOAD
 static void
@@ -6943,6 +6975,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 
 	qdf_atomic_init(&adapter->is_ll_stats_req_pending);
 	hdd_init_get_sta_in_ll_stats_config(adapter);
+	hdd_init_link_state_config(adapter);
 
 	return adapter;
 
@@ -14135,6 +14168,9 @@ static int __hdd_psoc_idle_restart(struct hdd_context *hdd_ctx)
 
 	ret = hdd_wlan_start_modules(hdd_ctx, false);
 
+	if (!qdf_is_fw_down())
+		cds_set_recovery_in_progress(false);
+
 	hdd_soc_idle_restart_unlock();
 
 	return ret;
@@ -14534,6 +14570,7 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 
 	config->exclude_selftx_from_cca_busy =
 			cfg_get(psoc, CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME);
+	hdd_init_link_state_cfg(config, psoc);
 }
 
 #ifdef CONNECTION_ROAMING_CFG
@@ -20006,6 +20043,35 @@ static int __hdd_driver_mode_change(struct hdd_context *hdd_ctx,
 	return 0;
 }
 
+static void hdd_pre_mode_change(enum QDF_GLOBAL_MODE mode)
+{
+	struct osif_psoc_sync *psoc_sync;
+	struct hdd_context *hdd_ctx;
+	int errno;
+	enum QDF_GLOBAL_MODE curr_mode;
+
+	curr_mode = hdd_get_conparam();
+	if (curr_mode != QDF_GLOBAL_MISSION_MODE)
+		return;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return;
+
+	errno = osif_psoc_sync_op_start(hdd_ctx->parent_dev, &psoc_sync);
+	if (errno) {
+		hdd_err("psoc op start failed");
+		return;
+	}
+
+	hdd_debug("cleanup scan queue");
+	if (hdd_ctx && hdd_ctx->pdev)
+		wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+}
+
 static int hdd_driver_mode_change(enum QDF_GLOBAL_MODE mode)
 {
 	struct osif_driver_sync *driver_sync;
@@ -20014,6 +20080,8 @@ static int hdd_driver_mode_change(enum QDF_GLOBAL_MODE mode)
 	int errno;
 
 	hdd_enter();
+
+	hdd_pre_mode_change(mode);
 
 	status = osif_driver_sync_trans_start_wait(&driver_sync);
 	if (QDF_IS_STATUS_ERROR(status)) {

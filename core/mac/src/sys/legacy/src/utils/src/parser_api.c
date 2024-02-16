@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1651,7 +1651,7 @@ static void populate_dot11f_qcn_ie_he_params(struct mac_context *mac,
 					     tDot11fIEqcn_ie *qcn_ie,
 					     uint8_t attr_id)
 {
-	uint16_t mcs_12_13_supp;
+	uint16_t mcs_12_13_supp = 0;
 
 	if (!lim_is_session_he_capable(pe_session))
 		return;
@@ -1659,10 +1659,16 @@ static void populate_dot11f_qcn_ie_he_params(struct mac_context *mac,
 	/* To fix WAPI IoT issue.*/
 	if (pe_session->encryptType == eSIR_ED_WPI)
 		return;
-	if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq))
-		mcs_12_13_supp = mac->mlme_cfg->he_caps.he_mcs_12_13_supp_2g;
-	else
+
+	if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
+		if (!(LIM_IS_AP_ROLE(pe_session) &&
+		      pe_session->ch_width == CH_WIDTH_40MHZ &&
+		      (mac->mlme_cfg->he_caps.disable_sap_mcs_12_13 &
+		       BIT(DISABLE_MCS_12_13_2G_40M))))
+			mcs_12_13_supp = mac->mlme_cfg->he_caps.he_mcs_12_13_supp_2g;
+	} else {
 		mcs_12_13_supp = mac->mlme_cfg->he_caps.he_mcs_12_13_supp_5g;
+	}
 
 	if (!mcs_12_13_supp)
 		return;
@@ -12171,11 +12177,19 @@ QDF_STATUS populate_dot11f_btm_extended_caps(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		p_ext_cap->bss_transition = 0;
 		pe_debug("Disable btm for roaming not suppprted");
-	} else {
-		p_ext_cap->bss_transition = 1;
-		pe_debug("Enable btm for roaming suppprted");
 	}
 
+	if (!pe_session->lim_join_req)
+		goto compute_len;
+
+	if (p_ext_cap->bss_transition && !cm_is_open_mode(pe_session->vdev) &&
+	    pe_session->lim_join_req->bssDescription.mbo_oce_enabled_ap &&
+	    !pe_session->limRmfEnabled) {
+		pe_debug("Disable BTM as the MBO AP doesn't support PMF");
+		p_ext_cap->bss_transition = 0;
+	}
+
+compute_len:
 	dot11f->num_bytes = lim_compute_ext_cap_ie_length(dot11f);
 	if (!dot11f->num_bytes) {
 		dot11f->present = 0;

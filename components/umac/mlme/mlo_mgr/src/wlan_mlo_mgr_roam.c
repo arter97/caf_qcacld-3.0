@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1019,6 +1019,9 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 		sta_ctx->assoc_rsp.ptr = NULL;
 		sta_ctx->assoc_rsp.len = 0;
 	}
+
+	sta_ctx->ml_partner_info = reassoc_rsp->ml_parnter_info;
+
 	sta_ctx->copied_reassoc_rsp = qdf_mem_malloc(
 			sizeof(struct wlan_cm_connect_resp));
 	if (!sta_ctx->copied_reassoc_rsp)
@@ -1234,6 +1237,7 @@ mlo_roam_prepare_and_send_link_connect_req(struct wlan_objmgr_vdev *assoc_vdev,
 
 	req.ssid.length = ssid.length;
 	qdf_mem_copy(&req.ssid.ssid, &ssid.ssid, ssid.length);
+	qdf_copy_macaddr(&req.mld_addr, &rsp->mld_addr);
 
 	req.ml_parnter_info = rsp->ml_parnter_info;
 

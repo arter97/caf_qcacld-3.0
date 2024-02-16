@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,6 +26,10 @@
 #include "wlan_dp_public_struct.h"
 #include "wlan_dp_priv.h"
 #include "wlan_dp_objmgr.h"
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
+#include "wlan_fpm_table.h"
+#include "wlan_dp_fim.h"
+#endif
 
 #define NUM_RX_QUEUES 5
 
@@ -967,6 +971,14 @@ QDF_STATUS wlan_dp_select_profile_cfg(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
+/**
+ * wlan_dp_link_cdp_vdev_delete_notification() - CDP vdev delete notification
+ * @context: osif_vdev handle
+ *
+ * Return: None
+ */
+void wlan_dp_link_cdp_vdev_delete_notification(void *context);
+
 /* DP CFG APIs - START */
 
 #ifdef WLAN_SUPPORT_RX_FISA
@@ -1009,4 +1021,39 @@ bool wlan_dp_cfg_is_rx_fisa_lru_del_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 
 
 /* DP CFG APIs - END */
+
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
+
+/**
+ * dp_flow_priortization_init() - Initialize FPM and FIM modules
+ * @dp_intf: DP interface handle
+ *
+ * Return: void
+ */
+static inline void dp_flow_priortization_init(struct wlan_dp_intf *dp_intf)
+{
+	dp_fpm_init(dp_intf);
+	dp_fim_init(dp_intf);
+}
+
+/**
+ * dp_flow_priortization_deinit() - Deinitialize FPM and FIM modules
+ * @dp_intf: DP interface handle
+ *
+ * Return: void
+ */
+static inline void dp_flow_priortization_deinit(struct wlan_dp_intf *dp_intf)
+{
+	dp_fim_deinit(dp_intf);
+	dp_fpm_deinit(dp_intf);
+}
+#else
+static inline void dp_flow_priortization_init(struct wlan_dp_intf *dp_intf)
+{
+}
+
+static inline void dp_flow_priortization_deinit(struct wlan_dp_intf *dp_intf)
+{
+}
+#endif
 #endif

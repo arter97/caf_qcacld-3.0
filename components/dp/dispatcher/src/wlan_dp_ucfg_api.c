@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,6 +42,9 @@
 #include <cdp_txrx_host_stats.h>
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_public_api.h"
+#endif
+#ifdef WLAN_SUPPORT_LAPB
+#include "wlan_dp_lapb_flow.h"
 #endif
 
 #ifdef FEATURE_DIRECT_LINK
@@ -1176,6 +1179,7 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.tx.tx_comp = dp_sta_notify_tx_comp_cb;
 	txrx_ops.tx.tx = NULL;
 	txrx_ops.get_tsf_time = wlan_dp_get_tsf_time;
+	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev_register(soc, dp_link->link_id, (ol_osif_vdev_handle)dp_link,
 			  &txrx_ops);
 	if (!txrx_ops.tx.tx) {
@@ -1183,6 +1187,7 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	dp_link->cdp_vdev_registered = 1;
 	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
@@ -1227,6 +1232,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.tx.tx_comp = dp_sta_notify_tx_comp_cb;
 	txrx_ops.tx.tx = NULL;
 
+	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev_register(soc, dp_link->link_id, (ol_osif_vdev_handle)dp_link,
 			  &txrx_ops);
 
@@ -1235,6 +1241,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	dp_link->cdp_vdev_registered = 1;
 	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
@@ -1259,6 +1266,7 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
 	txrx_ops.rx.rx = dp_rx_packet_cbk;
 	txrx_ops.rx.stats_rx = dp_tx_rx_collect_connectivity_stats_info;
+	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 
 	cdp_vdev_register(soc, dp_link->link_id, (ol_osif_vdev_handle)dp_link,
 			  &txrx_ops);
@@ -1267,6 +1275,7 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	dp_link->cdp_vdev_registered = 1;
 	dp_intf->txrx_ops = txrx_ops;
 
 	qdf_copy_macaddr(&dp_link->conn_info.peer_macaddr,
@@ -1293,10 +1302,12 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
 	txrx_ops.rx.rx = dp_mon_rx_packet_cbk;
 	dp_monitor_set_rx_monitor_cb(&txrx_ops, dp_rx_monitor_callback);
+	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev_register(soc, dp_link->link_id,
 			  (ol_osif_vdev_handle)dp_link,
 			  &txrx_ops);
 
+	dp_link->cdp_vdev_registered = 1;
 	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
@@ -1333,6 +1344,7 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 	}
 
 	txrx_ops->get_tsf_time = wlan_dp_get_tsf_time;
+	txrx_ops->vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev_register(soc,
 			  dp_link->link_id,
 			  (ol_osif_vdev_handle)dp_link,
@@ -1342,6 +1354,7 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	dp_link->cdp_vdev_registered = 1;
 	dp_intf->txrx_ops = *txrx_ops;
 	dp_intf->sap_tx_block_mask &= ~DP_TX_FN_CLR;
 
@@ -2801,3 +2814,10 @@ QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 {
 	return cdp_host_get_vdev_stats(soc, vdev_id, buf, true);
 }
+
+#ifdef WLAN_SUPPORT_LAPB
+QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
+{
+	return wlan_dp_lapb_handle_app_ind(nbuf);
+}
+#endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -91,4 +91,16 @@ wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
+
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
+/**
+ * wlan_dp_fpm_is_tid_override() - check network buffer marked with tid override
+ * @nbuf: pointer to network buffer
+ * @tid: buffer to get tid id skb marked with tid override tag
+ *
+ * Return: True if skb marked with tid override tag
+ */
+bool wlan_dp_fpm_is_tid_override(qdf_nbuf_t nbuf, uint8_t *tid);
+#endif
+
 #endif

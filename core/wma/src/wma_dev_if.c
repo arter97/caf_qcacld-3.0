@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4491,6 +4491,22 @@ send_fail_resp:
 }
 #endif
 
+QDF_STATUS wma_set_vdev_bw(uint8_t vdev_id, uint8_t bw)
+{
+	QDF_STATUS status;
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma)
+		return QDF_STATUS_E_INVAL;
+
+	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
+				    wmi_vdev_param_chwidth, bw);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("failed to set vdev bw, status: %d", status);
+
+	return status;
+}
+
 QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 {
 	struct wma_target_req *msg;
@@ -5068,7 +5084,7 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 	}
 
 	if (cdp_peer_state_get(soc, params->smesessionId,
-			       params->bssId) == OL_TXRX_PEER_STATE_DISC) {
+			       params->bssId, true) == OL_TXRX_PEER_STATE_DISC) {
 		/*
 		 * This is the case for reassociation.
 		 * peer state update and peer_assoc is required since it

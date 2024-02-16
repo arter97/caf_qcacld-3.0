@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -434,6 +434,7 @@ struct fisa_pkt_hist {
  * @last_accessed_ts: Timestamp when the flow was last accessed
  * @pkt_hist: FISA aggreagtion packets history
  * @same_mld_vdev_mismatch: Packets flushed after vdev_mismatch on same MLD
+ * @add_timestamp: FISA entry created timestamp
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -482,6 +483,7 @@ struct dp_fisa_rx_sw_ft {
 	struct fisa_pkt_hist pkt_hist;
 #endif
 	uint64_t same_mld_vdev_mismatch;
+	uint64_t add_timestamp;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)
@@ -622,6 +624,8 @@ struct dp_rx_fst {
  * @def_link: Pointer to default link (usually used for TX operation)
  * @dp_link_list_lock: Lock to protect dp_link_list operatiosn
  * @dp_link_list: List of dp_links for this DP interface
+ * @fpm_ctx: Flow policy manager context
+ * @fim_ctx: Flow identification manager context
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -690,6 +694,10 @@ struct wlan_dp_intf {
 	struct wlan_dp_link *def_link;
 	qdf_spinlock_t dp_link_list_lock;
 	qdf_list_t dp_link_list;
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
+	struct fpm_table *fpm_ctx;
+	struct fim_vdev_ctx *fim_ctx;
+#endif
 };
 
 /**
@@ -701,6 +709,11 @@ struct wlan_dp_intf {
  * @vdev: object manager vdev context
  * @vdev_lock: vdev spin lock
  * @conn_info: STA connection information
+ * @destroyed: flag to indicate dp_link destroyed (logical delete)
+ * @cdp_vdev_registered: flag to indicate if corresponding CDP vdev
+ *			 is registered
+ * @cdp_vdev_deleted: flag to indicate if corresponding CDP vdev is deleted
+ * @inactive_list_elem: list node for membership in dp link inactive list
  */
 struct wlan_dp_link {
 	qdf_list_node_t node;
@@ -710,6 +723,10 @@ struct wlan_dp_link {
 	struct wlan_objmgr_vdev *vdev;
 	qdf_spinlock_t vdev_lock;
 	struct wlan_dp_conn_info conn_info;
+	uint8_t destroyed : 1,
+		cdp_vdev_registered : 1,
+		cdp_vdev_deleted : 1;
+	TAILQ_ENTRY(wlan_dp_link) inactive_list_elem;
 };
 
 /**
@@ -805,6 +822,9 @@ struct dp_direct_link_context {
  * @skip_fisa_param.skip_fisa: Flag to skip FISA aggr inside @skip_fisa_param
  * @skip_fisa_param.fisa_force_flush: Force flush inside @skip_fisa_param
  * @fst_cmem_size: CMEM size for FISA flow table
+ * @inactive_dp_link_list: inactive DP links list
+ * @dp_link_del_lock: DP link delete operation lock
+ * @svc_ctx: service class context
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -904,6 +924,11 @@ struct wlan_dp_psoc_context {
 	 */
 	uint64_t fst_cmem_size;
 
+#endif
+	TAILQ_HEAD(, wlan_dp_link) inactive_dp_link_list;
+	qdf_spinlock_t dp_link_del_lock;
+#ifdef WLAN_SUPPORT_SERVICE_CLASS
+	struct dp_svc_ctx *svc_ctx;
 #endif
 };
 
