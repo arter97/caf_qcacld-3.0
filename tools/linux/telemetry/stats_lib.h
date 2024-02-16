@@ -552,4 +552,15 @@ int32_t libstats_request_async_start(struct stats_command *cmd);
  * Return: 0 on Success, -1 on Failure
  */
 int32_t libstats_request_async_stop(struct stats_command *cmd);
+/**
+ * libstats_async_event_init(): Initialization for non blocking stats
+ *
+ * Return: 0 on Success, Error code on Failure
+ */
+int8_t libstats_async_event_init(void);
+/**
+ * libstats_async_event_deinit(): Deinitialization for non blocking stats
+ *
+ */
+void libstats_async_event_deinit(void);
 #endif /* _STATS_LIB_H_ */
