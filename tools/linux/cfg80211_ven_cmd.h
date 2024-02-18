@@ -894,6 +894,12 @@ enum {
 	/* MLO enable/disable EXTMLD CAP advertisement */
 	IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG = 823,
 #endif
+	/* User config to set common PSD value for all 20MHz subchannels of the
+	 * current channel in the TPE IE
+	 */
+	IEEE80211_PARAM_TPE_COMMON_PSD = 824,
+	IEEE80211_PARAM_TPE_PWR_UNIT = 825, /* User config to choose PSD or EIRP in a TPE IE */
+	IEEE80211_PARAM_TPE_PUNC_PWR = 826, /* User config to set the PSD power of the punctured channel */
 };
 
 enum {
@@ -2677,6 +2683,14 @@ struct vendor_commands vap_vendor_cmds[] = {
 		IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG, GET_PARAM, 0},
 #endif
 	{"get_noack_map", IEEE80211_PARAM_NOACK_MAP, GET_PARAM, 0},
+#ifdef WLAN_FEATURE_11BE
+	{"set_tpe_common_psd", IEEE80211_PARAM_TPE_COMMON_PSD, SET_PARAM, 1},
+	{"get_tpe_common_psd", IEEE80211_PARAM_TPE_COMMON_PSD, GET_PARAM, 0},
+	{"set_tpe_pwr_unit",   IEEE80211_PARAM_TPE_PWR_UNIT, SET_PARAM, 1},
+	{"get_tpe_pwr_unit",   IEEE80211_PARAM_TPE_PWR_UNIT, GET_PARAM, 1},
+	{"set_tpe_punc_chan_power", IEEE80211_PARAM_TPE_PUNC_PWR, SET_PARAM, 1},
+	{"get_tpe_punc_chan_power", IEEE80211_PARAM_TPE_PUNC_PWR, GET_PARAM, 0},
+#endif
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
