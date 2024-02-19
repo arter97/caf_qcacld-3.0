@@ -1829,12 +1829,13 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	} else if (cnx_count > 2) {
 		is_allowed =
 		policy_mgr_allow_concurrency_csa(
-			mac_ctx->psoc, csa_freq,
+			mac_ctx->psoc,
 			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
 							     mode,
 							     session_entry->vdev_id),
-			session_entry->vdev_id,
-			policy_mgr_get_bw(new_ch_width), false,
+			csa_freq,
+			policy_mgr_get_bw(new_ch_width),
+			session_entry->vdev_id, false,
 			CSA_REASON_UNKNOWN);
 	}
 
