@@ -28805,7 +28805,7 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	chan_info->ch_freq = des_chan->ch_freq;
 	chan_info->ch_cfreq1 = des_chan->ch_cfreq1;
-	chan_info->ch_cfreq2 = 0;
+	chan_info->ch_cfreq2 = des_chan->ch_cfreq2;
 	chan_info->ch_width = des_chan->ch_width;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
@@ -28822,6 +28822,7 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 						&ch_params,
 						REG_CURRENT_PWR_MODE);
 	chan_info->ch_cfreq1 = ch_params.mhz_freq_seg0;
+	chan_info->ch_cfreq2 = ch_params.mhz_freq_seg1;
 
 	hdd_debug("vdev: %d, freq: %d, freq1: %d, freq2: %d, ch_width: %d",
 		  vdev_id, chan_info->ch_freq, chan_info->ch_cfreq1,
