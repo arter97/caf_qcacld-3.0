@@ -62,6 +62,11 @@ void ll_lt_sap_extract_ll_sap_cap(struct wlan_objmgr_psoc *psoc)
 	psoc_ll_sap_obj->is_ll_lt_sap_supported =
 		wmi_service_enabled(wmi_handle, wmi_service_xpan_support);
 
+	/**
+	 * This will be filled based on firmware service capability
+	 * later when firmware provides it.
+	 */
+	psoc_ll_sap_obj->is_beared_switch_required = true;
 }
 
 bool ll_lt_sap_get_bearer_switch_cap_for_csa(struct wlan_objmgr_psoc *psoc)
