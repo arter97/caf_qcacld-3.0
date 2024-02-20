@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019,2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +31,8 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)
 #include <linux/reset.h>
 #endif
+
+#define OF_GPIO_ACTIVE_LOW 0x1
 
 QDF_STATUS
 qal_vbus_get_iorsc(int devnum, uint32_t flag, char *devname)
@@ -312,28 +315,27 @@ qal_vbus_rcu_read_unlock(void)
 
 qdf_export_symbol(qal_vbus_rcu_read_unlock);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 int
 qal_vbus_of_get_named_gpio_flags(struct qdf_device_node *np,
 				 const char *list_name,
-				 int index, qdf_of_gpio_flags *flags)
+				 int index, unsigned int *active_low)
 {
-	return of_get_named_gpio_flags((struct device_node *)np,
-				       list_name, index, flags);
+	int gpio;
+	struct gpio_desc *gpio_desc;
+
+	*active_low = 0;
+	gpio = of_get_named_gpio((struct device_node *)np, list_name, index);
+	if (!gpio_is_valid(gpio))
+		return -EINVAL;
+
+	gpio_desc = gpio_to_desc(gpio);
+
+	if (IS_ERR(gpio_desc))
+		return -EINVAL;
+
+	*active_low = !!(gpiod_is_active_low(gpio_desc) & OF_GPIO_ACTIVE_LOW);
+
+	return gpio;
 }
-#else
-int
-qal_vbus_of_get_named_gpio_flags(struct qdf_device_node *np,
-				 const char *list_name,
-				 int index, qdf_of_gpio_flags *flags)
-{
-	/*
-	 * flags not populated here. caller to initialize flags to
-	 * default value and handle accordingly. This function will
-	 * just return gpio number
-	 */
-	return of_get_named_gpio((struct device_node *)np, list_name, index);
-}
-#endif
 
 qdf_export_symbol(qal_vbus_of_get_named_gpio_flags);
