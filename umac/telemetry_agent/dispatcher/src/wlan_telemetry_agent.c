@@ -483,6 +483,8 @@ int register_telemetry_agent_ops(struct telemetry_agent_ops *agent_ops)
 	g_agent_ops->agent_get_deter_pdev_stats = wifi_driver_get_deter_pdev_stats;
 	g_agent_ops->agent_get_deter_peer_stats = wifi_driver_get_deter_peer_stats;
 	g_agent_ops->agent_get_erp_pdev_stats = wifi_driver_get_erp_pdev_stats;
+	g_agent_ops->agent_get_admctrl_pdev_stats = wifi_driver_get_admctrl_pdev_stats;
+	g_agent_ops->agent_get_admctrl_peer_stats = wifi_driver_get_admctrl_peer_stats;
 	/* SAWF ops */
 	g_agent_ops->sawf_get_tput_stats = wlan_sawf_get_tput_stats;
 	g_agent_ops->sawf_get_mpdu_stats = wlan_sawf_get_mpdu_stats;

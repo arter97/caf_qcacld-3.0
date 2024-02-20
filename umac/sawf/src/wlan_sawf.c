@@ -581,7 +581,7 @@ static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
 		goto error_cleanup;
 	}
 
-	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_HW_LINK_ID,
+	if (nla_put_u16(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_HW_LINK_ID,
 		       hw_link_id)) {
 		sawf_err("nla put fail");
 		goto error_cleanup;
