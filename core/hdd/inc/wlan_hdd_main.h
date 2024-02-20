@@ -2241,6 +2241,7 @@ struct hdd_context {
 #ifdef THERMAL_STATS_SUPPORT
 	bool is_therm_stats_in_progress;
 #endif
+	int bus_pm_state;
 };
 
 /**

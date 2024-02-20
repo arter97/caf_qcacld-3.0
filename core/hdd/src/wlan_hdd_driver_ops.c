@@ -1160,6 +1160,16 @@ hdd_to_pmo_wow_enable_params(struct wow_enable_params *in_params,
 	return 0;
 }
 
+int wlan_hdd_pld_get_bus_pm_state(struct device *dev,
+				enum pld_bus_type bus_type)
+{
+	struct hdd_context *hdd_ctx;
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	hdd_err("wow bus pm state %s\n",
+		(hdd_ctx->bus_pm_state == PLD_BUS_SUSPEND) ? "SUSPEND" : "RESUME");
+	return hdd_ctx->bus_pm_state;
+}
+
 /**
  * __wlan_hdd_bus_suspend() - handles platform supsend
  * @wow_params: collection of wow enable override parameters
@@ -1276,7 +1286,7 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 	param.policy = BBM_NON_PERSISTENT_POLICY;
 	param.policy_info.flag = BBM_APPS_SUSPEND;
 	hdd_bbm_apply_independent_policy(hdd_ctx, &param);
-
+	hdd_ctx->bus_pm_state = PLD_BUS_SUSPEND;
 	hdd_info("bus suspend succeeded");
 	return 0;
 
@@ -1483,6 +1493,7 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 		goto out;
 	}
 
+	hdd_ctx->bus_pm_state = PLD_BUS_RESUME;
 	hdd_info("bus resume succeeded");
 	return 0;
 
@@ -2193,6 +2204,7 @@ struct pld_driver_ops wlan_drv_ops = {
 	.runtime_resume = wlan_hdd_pld_runtime_resume,
 #endif
 	.set_curr_therm_cdev_state = wlan_hdd_pld_set_thermal_mitigation,
+	.get_bus_pm_state = wlan_hdd_pld_get_bus_pm_state,
 };
 
 int wlan_hdd_register_driver(void)

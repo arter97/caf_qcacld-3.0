@@ -442,6 +442,15 @@ enum cnss_driver_mode pld_pcie_get_mode(void)
 #endif
 #endif
 
+int pld_pcie_get_bus_pm_state(struct pci_dev *pdev, const struct pci_device_id *id)
+{
+	struct pld_context *pld_context;
+
+	pld_context = pld_get_global_context();
+	return pld_context->ops->get_bus_pm_state(&pdev->dev,
+					 PLD_BUS_TYPE_PCIE);
+}
+
 #ifdef CONFIG_PM
 #ifdef CONFIG_PLD_PCIE_CNSS
 /**
@@ -686,6 +695,7 @@ struct cnss_wlan_driver pld_pcie_ops = {
 #ifdef FEATURE_GET_DRIVER_MODE
 	.get_driver_mode  = pld_pcie_get_mode,
 #endif
+	.get_bus_pm_state = pld_pcie_get_bus_pm_state,
 };
 
 /**
