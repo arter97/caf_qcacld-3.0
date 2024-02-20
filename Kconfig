@@ -2100,10 +2100,21 @@ config CONNECTION_ROAMING_CFG
 	bool "Enable connection_roaming ini"
 	default n
 
+config CNSS_WCN7750
+	bool "Enable CNSS_WCN7750"
+	default n
+
+config WCN7750_HEADERS_DEF
+	bool "Enable WCN7750_HEADERS_DEF"
+	default n
+
+config QCA_WIFI_WCN7750
+	bool "Enable QCA_WIFI_WCN7750"
+	default n
+
 menu "Optional Configs"
 
 if CNSS_KIWI_V2
-
 config CFG_BMISS_OFFLOAD_MAX_VDEV
 	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
 
@@ -2113,11 +2124,18 @@ config CFG_MAX_STA_VDEVS
 config ROME_IF
 	string "Enable ROME_IF"
 	default pci
-
 endif
 
 if CNSS_QCA6750
+config ROME_IF
+	string "Enable ROME_IF"
+	default ipci
 
+config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
+        int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
+endif
+
+if CNSS_WCN7750
 config ROME_IF
 	string "Enable ROME_IF"
 	default ipci
@@ -2125,6 +2143,11 @@ config ROME_IF
 config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
         int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
 
+config CFG_BMISS_OFFLOAD_MAX_VDEV
+        int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
+
+config CFG_MAX_STA_VDEVS
+        int "Enable CFG_MAX_STA_VDEVS"
 endif
 
 config DP_RX_MSDU_DONE_FAIL_HISTORY
@@ -2138,6 +2161,6 @@ config DP_RX_PEEK_MSDU_DONE_WAR
 config WLAN_AUX_SUPPORT
 	bool "Enable WLAN_AUX_SUPPORT"
 	default n
-
 endmenu
+
 endif # QCA_CLD_WLAN

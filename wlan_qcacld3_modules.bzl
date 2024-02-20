@@ -27,6 +27,7 @@ _chipset_hw_map = {
     "peach": "BERYLLIUM",
     "peach-v2": "BERYLLIUM",
     "qca6750": "MOSELLE",
+    "wcn7750": "BERYLLIUM",
 }
 
 _chipset_header_map = {
@@ -45,6 +46,10 @@ _chipset_header_map = {
     "qca6750" : [
         "api/hw/qca6750/v1",
         "cmn/hal/wifi3.0/qca6750",
+    ],
+    "wcn7750" : [
+        "api/hw/wcn7750/v1",
+        "cmn/hal/wifi3.0/wcn7750",
     ],
 }
 
@@ -718,6 +723,12 @@ _conditional_srcs = {
         True: [
             "cmn/hal/wifi3.0/qca6750/hal_6750.c",
             "cmn/hif/src/qca6750def.c",
+        ],
+    },
+    "CONFIG_WCN7750_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/wcn7750/hal_wcn7750.c",
+            "cmn/hif/src/wcn7750def.c",
         ],
     },
     "CONFIG_CP_STATS": {
@@ -2272,7 +2283,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
-    if chipset == "qca6750":
+    if chipset == "qca6750" or chipset == "wcn7750":
         deps = [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
