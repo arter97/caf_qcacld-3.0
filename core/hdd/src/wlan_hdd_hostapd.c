@@ -2274,6 +2274,48 @@ void hdd_hostapd_chan_change_started(struct wlan_hdd_link_info *link_info,
 	qdf_sched_work(0, &link_info->ch_chng_info.chan_change_notify_work);
 }
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_sap_is_recv_assoc_link() - get if assoc link
+ * check if it is assoc link for mlo sta connection.
+ * for legacy sap/legacy client, expect always true;
+ * only for mlo sta in multi link sap mode, return false for non-assoc link.
+ * @psoc: pointer of psoc
+ * @peer_mac: peer link mac
+ *
+ * Return: true if assoc link
+ */
+static bool
+hdd_sap_is_recv_assoc_link(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac)
+{
+	struct wlan_objmgr_peer *sta_peer;
+	bool is_assoc_peer = true;
+
+	sta_peer = wlan_objmgr_get_peer_by_mac(psoc,
+					       peer_mac, WLAN_OSIF_ID);
+	if (!sta_peer) {
+		hdd_err("Peer not found with MAC " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_mac));
+		goto end;
+	}
+
+	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)sta_peer->mldaddr))
+		is_assoc_peer = wlan_peer_mlme_is_assoc_peer(sta_peer);
+
+	wlan_objmgr_peer_release_ref(sta_peer, WLAN_OSIF_ID);
+
+end:
+	hdd_debug("is_assoc_peer %d", is_assoc_peer);
+	return is_assoc_peer;
+}
+#else
+static bool
+hdd_sap_is_recv_assoc_link(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac)
+{
+	return true;
+}
+#endif
+
 QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 				    struct sap_event *sap_event)
 {
@@ -2908,7 +2950,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			hdd_hostapd_sap_fill_peer_ml_info(link_info, sta_info,
 							  event->staMac.bytes);
 
-			if (notify_new_sta)
+			if (notify_new_sta &&
+			    hdd_sap_is_recv_assoc_link(hdd_ctx->psoc,
+						       event->staMac.bytes))
 				cfg80211_new_sta(dev,
 						 (const u8 *)&event->
 						 staMac.bytes[0],
