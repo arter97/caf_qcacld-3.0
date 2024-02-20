@@ -67,6 +67,8 @@
 #include "wlan_mlo_mgr_setup.h"
 #endif
 
+#include <wlan_vdev_mgr_utils_api.h>
+
 #define RSN_OUI_SIZE 4
 /* ////////////////////////////////////////////////////////////////////// */
 #ifdef WLAN_FEATURE_FILS_SK_SAP
@@ -240,7 +242,13 @@ populate_dot11f_max_chan_switch_time(struct mac_context *mac,
 				     tDot11fIEmax_chan_switch_time *pDot11f,
 				     struct pe_session *pe_session)
 {
-	uint32_t switch_time = pe_session->cac_duration_ms;
+	uint32_t switch_time = 0;
+
+	switch_time = wlan_utils_get_vdev_remaining_channel_switch_time(pe_session->vdev);
+	/* switch_time is zero if mgmt.ap.last_bcn_ts_ms is 0 in above API */
+	if (!switch_time)
+		wlan_util_vdev_mgr_compute_max_channel_switch_time(pe_session->vdev,
+								   &switch_time);
 
 	if (!switch_time) {
 		pDot11f->present = 0;

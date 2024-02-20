@@ -10024,6 +10024,42 @@ void lim_send_csa_tx_complete(uint8_t vdev_id)
 		qdf_mem_free(chan_switch_tx_rsp);
 }
 
+/**
+ * lim_update_ap_csa_info() - Updates timestamp for last csa beacon time
+ * stamp and max channel switch time.
+ *
+ * @session: pointer to pe_session
+ *
+ * Return: None
+ */
+static void
+lim_update_ap_csa_info(struct pe_session *session)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct vdev_mlme_obj *vdev_mlme = NULL;
+	unsigned long current_time = qdf_mc_timer_get_system_time();
+	uint32_t max_stime = 0;
+
+	vdev = session->vdev;
+	if (!vdev) {
+		pe_err("VDEV is NULL");
+		return;
+	}
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		pe_err("VDEV_%d: VDEV_MLME is NULL", session->vdev_id);
+		return;
+	}
+
+	if (session->gLimChannelSwitch.switchCount == 0)
+		vdev_mlme->mgmt.ap.last_bcn_ts_ms = current_time;
+
+	wlan_util_vdev_mgr_compute_max_channel_switch_time(session->vdev,
+							   &max_stime);
+	vdev_mlme->mgmt.ap.max_chan_switch_time = max_stime;
+}
+
 void lim_process_ap_ecsa_timeout(void *data)
 {
 	struct pe_session *session = (struct pe_session *)data;
@@ -10079,6 +10115,8 @@ void lim_process_ap_ecsa_timeout(void *data)
 	if (session->gLimChannelSwitch.switchCount)
 		/* Decrement the beacon switch count */
 		session->gLimChannelSwitch.switchCount--;
+
+	lim_update_ap_csa_info(session);
 
 	/*
 	 * Send only g_sap_chanswitch_beacon_cnt beacons with CSA IE Set in
