@@ -6626,6 +6626,7 @@ lim_send_epcs_action_rsp_frame(struct wlan_objmgr_vdev *vdev,
 
 	/* Update A3 with the BSSID */
 	mgmt_hdr = (tpSirMacMgmtHdr)frame_ptr;
+	mgmt_hdr->fc.moreFrag = 0;
 	sir_copy_mac_addr(mgmt_hdr->bssId, session->bssId);
 
 	lim_set_protected_bit(mac_ctx, session, peer_mac, mgmt_hdr);
