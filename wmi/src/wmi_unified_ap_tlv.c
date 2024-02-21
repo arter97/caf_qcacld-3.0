@@ -4135,6 +4135,8 @@ send_set_rate_upper_cap_cmd_tlv(struct wmi_unified *wmi_handle, uint8_t pdev_id,
 	WMI_PDEV_UPPER_CAP_MCS_SET(value, param->upper_cap_mcs);
 	WMI_PDEV_UPPER_CAP_NSS_VALID_SET(value, param->en_nss_cap);
 	WMI_PDEV_UPPER_CAP_MCS_VALID_SET(value, param->en_mcs_cap);
+	WMI_PDEV_UPPER_CAP_DL_DIR_SET(value,param->dl_dir);
+	WMI_PDEV_UPPER_CAP_UL_DIR_SET(value,param->ul_dir);
 
 	wmi_info("pdev_id:%u param_value:0x%.8x", pdev_id, value);
 

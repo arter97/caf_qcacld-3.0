@@ -1304,6 +1304,8 @@ struct wmi_rc_params {
 	uint16_t max_mcs_probe_intvl;
 	uint16_t min_nss_probe_intvl;
 	uint16_t max_nss_probe_intvl;
+	uint8_t dl_dir;
+	uint8_t ul_dir;
 };
 
 /**
