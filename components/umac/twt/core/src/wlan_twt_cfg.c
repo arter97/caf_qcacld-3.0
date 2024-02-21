@@ -446,8 +446,8 @@ wlan_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc)
 
 	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
 
-	if (twt_psoc_obj->twt_pmo_disabled)
+	if (!twt_psoc_obj || twt_psoc_obj->twt_pmo_disabled)
 		return false;
-	else
-		return true;
+
+	return true;
 }

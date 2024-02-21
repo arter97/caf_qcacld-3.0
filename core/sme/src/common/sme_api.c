@@ -7773,6 +7773,11 @@ int sme_set_peer_ampdu(mac_handle_t mac_handle, uint8_t vdev_id,
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 						    vdev_id,
 						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("vdev null");
+		return -EINVAL;
+	}
+
 	status = wlan_vdev_is_up(vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sme_debug("vdev id %d not up", vdev_id);
