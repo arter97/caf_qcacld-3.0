@@ -67,6 +67,9 @@
 /* Mld hybrid non-bonding Mode value */
 #define STATS_MLD_MODE_HYBRID_NONBOND  2
 
+#define STATS_REQUEST_ID_MASK   0xFFFFFFFF
+#define STATS_PID_SHIFT         32
+
 #define SET_FLAG(_flg, _mask)              \
 	do {                               \
 		if (!(_flg))               \
@@ -647,15 +650,37 @@ static int is_valid_cmd(struct stats_command *cmd)
 	return 0;
 }
 
+static uint64_t generate_request_id(uint32_t req_id)
+{
+	uint64_t gen_request_id;
+	uint64_t pid;
+
+	/* To have a unique request ID for an application,
+	 * the request ID of the command is compounded with
+	 * the PID of the requesting application such that
+	 * the upper 32 bits represent the PID and the lower
+	 * 32 bits represent the request ID provided for the
+	 * command by the application.
+	 */
+
+	pid = getpid();
+	gen_request_id = pid << STATS_PID_SHIFT | (req_id & STATS_REQUEST_ID_MASK);
+
+	return gen_request_id;
+}
+
 static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 {
 	int32_t ret = 0;
 	uint8_t info = 0;
+	uint64_t request_id = 0;
 
 	if (cmd->recursive)
 		info |= STATS_INFO_AGGREGATE;
-	if (is_async_req())
+	if (is_async_req()) {
 		info |= STATS_INFO_ASYNC_REQ;
+		request_id = generate_request_id(cmd->request_id);
+	}
 
 	if (nla_put_u8(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_LEVEL,
 		       cmd->lvl)) {
@@ -679,7 +704,7 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 	}
 	if (is_async_req() &&
 	    nla_put_u64(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_REQUEST_ID,
-			cmd->request_id)) {
+			request_id)) {
 		STATS_ERR("failed to put request id\n");
 		return -EIO;
 	}
