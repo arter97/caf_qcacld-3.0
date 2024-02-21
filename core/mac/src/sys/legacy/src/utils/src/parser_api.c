@@ -11094,6 +11094,29 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 			non_inher_ie_lists[non_inher_len++] =
 				DOT11F_EID_VHTOPERATION;
 		}
+
+		/* The max channel switch time IE will be added in the
+		 * Assoc response only if the Assoc request is received
+		 * between the last beacon in the CSA triggered channel
+		 * and the first beacon in the new channel. Hence,
+		 * add the remaining max channel switch time.
+		 */
+		if (wlan_utils_get_vdev_remaining_channel_switch_time(link_session->vdev)) {
+			populate_dot11f_max_chan_switch_time(mac_ctx,
+							     &link_ie->link_swt_time,
+							     link_session);
+
+			if (link_ie->link_swt_time.present) {
+				sta_len_consumed = 0;
+				dot11f_pack_ie_max_chan_switch_time(mac_ctx,
+								    &link_ie->link_swt_time,
+								    sta_data,
+								    sta_len_left,
+								    &sta_len_consumed);
+				sta_data += sta_len_consumed;
+				sta_len_left -= sta_len_consumed;
+			}
+		}
 		/* Check every 221 EID whether it's the same with assoc link */
 		same_ie = false;
 		// P2PAssocRes is different or not
