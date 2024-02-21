@@ -32,10 +32,11 @@ qdf_export_symbol(g_agent_ops);
 
 void wlan_telemetry_agent_application_init_notify(
 		enum agent_notification_event event,
-		uint64_t data)
+		enum rm_services service_id,
+		uint8_t *service_data)
 {
 	if (g_agent_ops)
-		g_agent_ops->agent_notify_app_event(event, data);
+		g_agent_ops->agent_notify_app_event(event, service_id, service_data);
 }
 
 void wlan_telemetry_emesh_application_init_deinit_notify(
