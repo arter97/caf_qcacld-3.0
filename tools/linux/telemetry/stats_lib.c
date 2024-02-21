@@ -180,6 +180,8 @@ static bool is_async_req(void)
 	return g_nb_ctx.async_req;
 }
 
+static bool g_stats_init;
+
 /* Global socket context to create nl80211 command and event interface */
 static struct socket_context g_sock_ctx = {0};
 /* Global parent vap to build child sta object list */
@@ -3772,6 +3774,9 @@ static int stats_lib_socket_init(void)
 
 static int stats_lib_init(bool enable_event)
 {
+	if (g_stats_init)
+		return 0;
+
 	g_sock_ctx.cfg80211 = is_cfg80211_mode_enabled();
 
 	if (!g_sock_ctx.cfg80211) {
@@ -3792,18 +3797,25 @@ static int stats_lib_init(bool enable_event)
 	g_sock_ctx.sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (g_sock_ctx.sock_fd < 0) {
 		STATS_ERR("socket creation failed\n");
+		destroy_socket_context(&g_sock_ctx);
 		return -EIO;
 	}
+
+	g_stats_init = true;
 
 	return 0;
 }
 
 static void stats_lib_deinit(void)
 {
+	if (!g_stats_init)
+		return;
+
 	if (!g_sock_ctx.cfg80211)
 		return;
 	destroy_socket_context(&g_sock_ctx);
 	close(g_sock_ctx.sock_fd);
+	g_stats_init = false;
 }
 
 u_int64_t libstats_get_feature_flag(char *feat_flags)
