@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,7 +48,7 @@ uint32_t qca_wifi_get_metadata_info(
 
 		sawf_key = qca_sawf_get_mark_metadata(
 						&wifi_info->sawf_param);
-		if (sawf_key == DP_SAWF_META_DATA_INVALID)
+		if (sawf_key != DP_SAWF_META_DATA_INVALID)
 			wifi_key |= sawf_key;
 	}
 
