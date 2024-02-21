@@ -1218,6 +1218,14 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(struct mac_context *mac,
 			sizeof(beacon2->ext_chan_switch_ann));
 	}
 
+	/* Max Channel Switch Time DOT11F_EID_MAX_CHAN_SWITCH_TIME */
+	if (beacon2->max_chan_switch_time.present) {
+		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,
+					DOT11F_EID_MAX_CHAN_SWITCH_TIME);
+		qdf_mem_copy((void *)&prb_rsp->max_chan_switch_time,
+			     (void *)&beacon2->max_chan_switch_time,
+			     sizeof(beacon2->max_chan_switch_time));
+	}
 	/* Supported operating class */
 	if (beacon2->SuppOperatingClasses.present) {
 		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,
