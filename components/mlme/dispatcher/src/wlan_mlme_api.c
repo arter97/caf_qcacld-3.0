@@ -1564,18 +1564,26 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 					      uint8_t value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct target_psoc_info *tgt_hdl;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
 
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		mlme_err("target psoc info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (!value)
 		mlme_obj->cfg.sta.mlo_support_link_num =
-					  cfg_default(CFG_MLO_SUPPORT_LINK_NUM);
+				target_if_res_cfg_get_num_max_mlo_link(tgt_hdl);
 	else
 		mlme_obj->cfg.sta.mlo_support_link_num = value;
 
-	mlme_legacy_debug("mlo_support_link_num %d", value);
+	mlme_legacy_debug("mlo_support_link_num user input %d intersected value :%d",
+			  value, mlme_obj->cfg.sta.mlo_support_link_num);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -8338,3 +8346,21 @@ rel_pdev:
 	return status;
 }
 #endif
+
+QDF_STATUS
+wlan_mlme_is_hs_20_btm_offload_disabled(struct wlan_objmgr_psoc *psoc,
+					bool *val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*val = cfg_default(CFG_HS_20_BTM_OFFLOAD_DISABLE);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = mlme_obj->cfg.lfr.hs20_btm_offload_disable;
+
+	return QDF_STATUS_SUCCESS;
+}
+

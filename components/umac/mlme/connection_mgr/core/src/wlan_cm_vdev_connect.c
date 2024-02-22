@@ -1097,12 +1097,11 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 	if (wlan_get_vendor_ie_ptr_from_oui(HS20_OUI_TYPE,
 					    HS20_OUI_TYPE_SIZE,
 					    req->assoc_ie.ptr,
-					    req->assoc_ie.len)) {
+					    req->assoc_ie.len))
 		src_cfg.bool_value = true;
-		wlan_cm_roam_cfg_set_value(wlan_vdev_get_psoc(vdev),
-					   wlan_vdev_get_id(vdev),
-					   HS_20_AP, &src_cfg);
-	}
+	wlan_cm_roam_cfg_set_value(wlan_vdev_get_psoc(vdev),
+				   wlan_vdev_get_id(vdev),
+				   HS_20_AP, &src_cfg);
 	if (req->source != CM_MLO_LINK_SWITCH_CONNECT)
 		ml_nlink_conn_change_notify(
 			psoc, wlan_vdev_get_id(vdev),
@@ -1163,7 +1162,7 @@ set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
 #endif
 
 static void
-cm_check_nontx_mbssid_partner_entries(struct cm_connect_req *conn_req)
+cm_check_ml_missing_partner_entries(struct cm_connect_req *conn_req)
 {
 	uint8_t idx;
 	struct scan_cache_entry *entry, *partner_entry;
@@ -1178,15 +1177,9 @@ cm_check_nontx_mbssid_partner_entries(struct cm_connect_req *conn_req)
 	 * If the entry is not one of following, return gracefully:
 	 *   -AP is not ML type
 	 *   -AP is SLO
-	 *   -AP is not a member of MBSSID set
-	 *   -AP BSSID equals to TxBSSID in MBSSID set
 	 */
-	if (!mld_addr || !entry->ml_info.num_links ||
-	    !entry->mbssid_info.profile_num ||
-	    !qdf_mem_cmp(entry->mbssid_info.trans_bssid, &entry->bssid,
-			 QDF_MAC_ADDR_SIZE)) {
+	if (!mld_addr || !entry->ml_info.num_links)
 		return;
-	}
 
 	for (idx = 0; idx < entry->ml_info.num_links; idx++) {
 		if (!entry->ml_info.link_info[idx].is_valid_link)
@@ -1271,7 +1264,7 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	mlme_debug("sta and ap intersect num of partner link: %d", j);
 
 	set_partner_info_for_2link_sap(scan_entry, partner_info);
-	cm_check_nontx_mbssid_partner_entries(conn_req);
+	cm_check_ml_missing_partner_entries(conn_req);
 
 	return QDF_STATUS_SUCCESS;
 }

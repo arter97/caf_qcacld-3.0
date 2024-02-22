@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -7226,6 +7226,16 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		hdd_err("stop ap is given on device modes other than SAP/GO. Hence return");
 		goto exit;
 	}
+
+	/*
+	 * Reset sap mandatory channel list.If band is changed then
+	 * frequencies of new selected band can be removed in pcl
+	 * modification based on sap mandatory channel list.
+	 */
+	status = policy_mgr_reset_sap_mandatory_channels(hdd_ctx->psoc);
+	/* Don't go to exit in case of failure. Clean up & stop BSS */
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("failed to reset mandatory channels");
 
 	/*
 	 * For STA+SAP/GO concurrency support from GUI, In case if

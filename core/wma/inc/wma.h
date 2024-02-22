@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2481,6 +2481,15 @@ void wma_add_bss_lfr3(tp_wma_handle wma, struct bss_params *add_bss);
 QDF_STATUS wma_add_bss_lfr2_vdev_start(struct wlan_objmgr_vdev *vdev,
 				       struct bss_params *add_bss);
 #endif
+
+/**
+ * wma_set_vdev_bw() - wma send vdev bw
+ * @vdev_id: vdev id
+ * @bw: band width
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_set_vdev_bw(uint8_t vdev_id, uint8_t bw);
 
 /**
  * wma_send_peer_assoc_req() - wma send peer assoc req when sta connect
