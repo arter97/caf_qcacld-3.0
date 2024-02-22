@@ -2745,7 +2745,7 @@ void wlan_cm_append_assoc_ies(struct wlan_roam_scan_offload_params *rso_mode_cfg
 	rso_mode_cfg->assoc_ie_length += (ie_len + 2);
 }
 
-void wlan_add_supported_5Ghz_channels(struct wlan_objmgr_psoc *psoc,
+void wlan_add_supported_5ghz_channels(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_pdev *pdev,
 				      uint8_t *chan_list,
 				      uint8_t *num_chnl,
@@ -2776,6 +2776,44 @@ void wlan_add_supported_5Ghz_channels(struct wlan_objmgr_psoc *psoc,
 				wlan_reg_freq_to_chan(pdev,
 						      freq_list[i]);
 				j++;
+
+			if (supp_chan_ie) {
+				chan_list[j] = 1;
+				j++;
+			}
+		}
+	}
+	*num_chnl = (uint8_t)j;
+}
+
+void wlan_add_supported_6ghz_channels(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_pdev *pdev,
+				      uint8_t *chan_list,
+				      uint8_t *num_chnl,
+				      bool supp_chan_ie)
+{
+	uint16_t i, j = 0;
+	uint32_t size = 0;
+	uint32_t *freq_list;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	if (!chan_list) {
+		mlme_err("chan_list buffer NULL");
+		*num_chnl = 0;
+		return;
+	}
+	size = mlme_obj->cfg.reg.valid_channel_list_num;
+	freq_list = mlme_obj->cfg.reg.valid_channel_freq_list;
+	for (i = 0, j = 0; i < size; i++) {
+		/* Only add 6ghz channels.*/
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(freq_list[i])) {
+			chan_list[j] = wlan_reg_freq_to_chan(pdev,
+							     freq_list[i]);
+			j++;
 
 			if (supp_chan_ie) {
 				chan_list[j] = 1;
@@ -2832,8 +2870,8 @@ static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 		power_caps_populated = true;
 
 		/* Append Supported channels IE */
-		wlan_add_supported_5Ghz_channels(psoc, pdev, supp_chan_ie,
-						&supp_chan_ie_len, true);
+		wlan_add_supported_5ghz_channels(psoc, pdev, supp_chan_ie,
+						 &supp_chan_ie_len, true);
 
 		wlan_cm_append_assoc_ies(rso_mode_cfg,
 					 WLAN_ELEMID_SUPPCHAN,

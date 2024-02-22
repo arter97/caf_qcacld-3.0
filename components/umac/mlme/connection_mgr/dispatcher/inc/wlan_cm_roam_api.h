@@ -469,7 +469,7 @@ void wlan_cm_append_assoc_ies(struct wlan_roam_scan_offload_params *rso_mode_cfg
 			      uint8_t ie_id, uint8_t ie_len,
 			      const uint8_t *ie_data);
 /**
- * wlan_add_supported_5Ghz_channels()- Add valid 5Ghz channels
+ * wlan_add_supported_5ghz_channels()- Add valid 5GHz channels
  * in Join req.
  * @psoc: psoc ptr
  * @pdev: pdev
@@ -477,7 +477,7 @@ void wlan_cm_append_assoc_ies(struct wlan_roam_scan_offload_params *rso_mode_cfg
  * @num_chnl: Pointer to number of channels value to update
  * @supp_chan_ie: Boolean to check if we need to populate as IE
  *
- * This function is called to update valid 5Ghz channels
+ * This function is called to update valid 5GHz channels
  * in Join req. If @supp_chan_ie is true, supported channels IE
  * format[chan num 1, num of channels 1, chan num 2, num of
  * channels 2, ..] is populated. Else, @chan_list would be a list
@@ -485,11 +485,35 @@ void wlan_cm_append_assoc_ies(struct wlan_roam_scan_offload_params *rso_mode_cfg
  *
  * Return: void
  */
-void wlan_add_supported_5Ghz_channels(struct wlan_objmgr_psoc *psoc,
+void wlan_add_supported_5ghz_channels(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_pdev *pdev,
 				      uint8_t *chan_list,
 				      uint8_t *num_chnl,
 				      bool supp_chan_ie);
+
+/**
+ * wlan_add_supported_6ghz_channels()- Add valid 6GHz channels
+ * in Join req.
+ * @psoc: psoc ptr
+ * @pdev: pdev
+ * @chan_list: Pointer to channel list buffer to populate
+ * @num_chnl: Pointer to number of channels value to update
+ * @supp_chan_ie: Boolean to check if we need to populate as IE
+ *
+ * This function is called to update valid 6GHz channels
+ * in Join req. If @supp_chan_ie is true, supported channels IE
+ * format[chan num 1, num of channels 1, chan num 2, num of
+ * channels 2, ..] is populated. Else, @chan_list would be a list
+ * of supported channels[chan num 1, chan num 2..]
+ *
+ * Return: void
+ */
+void wlan_add_supported_6ghz_channels(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_pdev *pdev,
+				      uint8_t *chan_list,
+				      uint8_t *num_chnl,
+				      bool supp_chan_ie);
+
 #ifdef WLAN_ADAPTIVE_11R
 /**
  * wlan_get_adaptive_11r_enabled() - Function to check if adaptive 11r

@@ -2137,10 +2137,16 @@ populate_dot11f_supp_channels(struct mac_context *mac,
 	uint8_t channel, opclass, base_opclass;
 	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
-	wlan_add_supported_5Ghz_channels(mac->psoc, mac->pdev,
-					 supportedChannels.channelList,
-					 &supportedChannels.numChnl,
-					 false);
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq))
+		wlan_add_supported_5ghz_channels(mac->psoc, mac->pdev,
+						 supportedChannels.channelList,
+						 &supportedChannels.numChnl,
+						 false);
+	else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq))
+		wlan_add_supported_6ghz_channels(mac->psoc, mac->pdev,
+						 supportedChannels.channelList,
+						 &supportedChannels.numChnl,
+						 false);
 
 	p = supportedChannels.channelList;
 	pDot11f->num_bands = supportedChannels.numChnl;
