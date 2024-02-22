@@ -1349,7 +1349,7 @@ enum host_log_level {
  * gEnableSmemMailbox - enable shared memory mailbox
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to enable shared memory mailbox
  *
@@ -1365,7 +1365,7 @@ enum host_log_level {
  */
 #define CFG_ENABLE_SMEM_MAILBOX CFG_INI_BOOL( \
 		"gEnableSmemMailbox", \
-		0, \
+		1, \
 		"This ini is used to enable shared memory mailbox")
 
 /*
