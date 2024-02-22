@@ -1644,4 +1644,12 @@ ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 				  struct cdp_vdev_stats *buf);
 
+/*
+ * ucfg_dp_set_mon_conf_flags(): Set monitor configuration flags
+ * @psoc: psoc handle
+ * @flags: monitor configuration flags
+ *
+ * Return: None
+ */
+void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags);
 #endif /* _WLAN_DP_UCFG_API_H_ */

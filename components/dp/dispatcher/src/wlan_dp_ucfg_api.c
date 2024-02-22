@@ -43,6 +43,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_public_api.h"
 #endif
+#include "cdp_txrx_ctrl.h"
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -2818,4 +2819,22 @@ QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 				  struct cdp_vdev_stats *buf)
 {
 	return cdp_host_get_vdev_stats(soc, vdev_id, buf, true);
+}
+
+void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags)
+{
+	cdp_config_param_type val;
+	QDF_STATUS status;
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx) {
+		dp_err("Failed to set flag %d, dp_ctx NULL", flags);
+		return;
+	}
+
+	val.cdp_monitor_flag = flags;
+	status = cdp_txrx_set_psoc_param(dp_ctx->cdp_soc,
+					 CDP_MONITOR_FLAG, val);
+	if (QDF_IS_STATUS_ERROR(status))
+		dp_err("Failed to set flag %d status %d", flags, status);
 }
