@@ -975,6 +975,7 @@ QDF_STATUS os_if_son_vdev_ops(struct wlan_objmgr_vdev *vdev,
 {
 	union wlan_mlme_vdev_data *in = (union wlan_mlme_vdev_data *)data;
 	union wlan_mlme_vdev_data *out = (union wlan_mlme_vdev_data *)ret;
+	struct wlan_channel *chan;
 
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
@@ -1006,9 +1007,14 @@ QDF_STATUS os_if_son_vdev_ops(struct wlan_objmgr_vdev *vdev,
 	case VDEV_GET_CHAN:
 		if (!out)
 			return QDF_STATUS_E_INVAL;
-		qdf_mem_copy(&out->chan,
-			     wlan_vdev_get_active_channel(vdev),
-			     sizeof(out->chan));
+		chan = wlan_vdev_get_active_channel(vdev);
+		if (!chan) {
+			osif_err("failed to get active chan");
+			return QDF_STATUS_E_INVAL;
+		}
+		out->chan.ic_freq = chan->ch_freq;
+		out->chan.ic_ieee = chan->ch_ieee;
+		out->chan.ic_flags = chan->ch_flags;
 		break;
 	case VDEV_GET_CHAN_WIDTH:
 		break;
