@@ -685,7 +685,7 @@ static bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
  * @name: User-visible name of the interface
  * @name_assign_type: the name of assign type of the netdev
  * @type: (virtual) interface types
- * @flags: monitor configuration flags (not used)
+ * @flags: monitor configuration flags
  * @params: virtual interface parameters (not used)
  *
  * Return: the pointer of wireless dev, otherwise ERR_PTR.
@@ -729,6 +729,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 		return ERR_PTR(qdf_status_to_os_return(status));
 
 	if (mode == QDF_MONITOR_MODE &&
+	    !(QDF_MONITOR_FLAG_OTHER_BSS & *flags) &&
 	    !os_if_lpc_mon_intf_creation_allowed(hdd_ctx->psoc))
 		return ERR_PTR(-EOPNOTSUPP);
 
@@ -781,8 +782,17 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 
 	adapter = NULL;
 	if (type == NL80211_IFTYPE_MONITOR) {
-		if (ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc) ||
-		    ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
+		/*
+		 * if QDF_MONITOR_FLAG_OTHER_BSS bit is set in monitor flags
+		 * driver will assume current mode as STA + Monitor Mode.
+		 * So if QDF_MONITOR_FLAG_OTHER_BSS bit is set in monitor
+		 * interface flag STA+MON concurrency is not supported
+		 * reject the request.
+		 **/
+		if ((ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc) &&
+		     !(QDF_MONITOR_FLAG_OTHER_BSS & *flags)) ||
+		    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) &&
+		     (QDF_MONITOR_FLAG_OTHER_BSS & *flags)) ||
 		    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
 						PACKET_CAPTURE_MODE_DISABLE) {
 			ret = wlan_hdd_add_monitor_check(hdd_ctx,
@@ -790,6 +800,8 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 							 name_assign_type);
 			if (ret)
 				return ERR_PTR(-EINVAL);
+
+			ucfg_dp_set_mon_conf_flags(hdd_ctx->psoc, *flags);
 
 			if (adapter) {
 				hdd_exit();
@@ -1017,6 +1029,9 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	errno = hdd_trigger_psoc_idle_restart(hdd_ctx);
 	if (errno)
 		return errno;
+
+	if (wlan_hdd_is_session_type_monitor(adapter->device_mode))
+		ucfg_dp_set_mon_conf_flags(hdd_ctx->psoc, 0);
 
 	if (adapter->device_mode == QDF_SAP_MODE &&
 	    ucfg_pre_cac_is_active(hdd_ctx->psoc)) {
