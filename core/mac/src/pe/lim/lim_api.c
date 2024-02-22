@@ -4074,6 +4074,7 @@ lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	util_scan_free_cache_entry(cache_entry);
 	return QDF_STATUS_SUCCESS;
 }
 #else
