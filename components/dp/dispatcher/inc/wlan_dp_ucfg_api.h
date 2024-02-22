@@ -1944,4 +1944,13 @@ bool ucfg_dp_ml_mon_supported(void);
 QDF_STATUS ucfg_dp_hlp_state_update(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr *peer_addr);
 #endif
+
+/*
+ * ucfg_dp_set_mon_conf_flags(): Set monitor configuration flags
+ * @psoc: psoc handle
+ * @flags: monitor configuration flags
+ *
+ * Return: None
+ */
+void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags);
 #endif /* _WLAN_DP_UCFG_API_H_ */
