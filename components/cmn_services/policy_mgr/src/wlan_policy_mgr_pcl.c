@@ -42,6 +42,7 @@
 #include "wlan_scan_api.h"
 #include "wlan_nan_api.h"
 #include "wlan_mlo_link_force.h"
+#include "wlan_ll_sap_api.h"
 
 /*
  * first_connection_pcl_table - table which provides PCL for the
@@ -1565,6 +1566,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t i, pcl_len = 0;
 	bool modified_pcl_6_ghz = false;
+	bool avoid_list_modified_pcl = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1592,6 +1594,12 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			continue;
 		}
 
+		if (wlan_ll_lt_sap_is_freq_in_avoid_list(psoc,
+							 pcl_channels[i])) {
+			avoid_list_modified_pcl = true;
+			continue;
+		}
+
 		pcl_list[pcl_len] = pcl_channels[i];
 		weight_list[pcl_len++] = pcl_weight[i];
 	}
@@ -1605,7 +1613,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
 	*len = pcl_len;
 
-	policy_mgr_debug("Modified PCL: 6Ghz %d", modified_pcl_6_ghz);
+	policy_mgr_debug("Modified PCL: 6Ghz %d avoid_list %d",
+			 modified_pcl_6_ghz, avoid_list_modified_pcl);
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 
 	return QDF_STATUS_SUCCESS;

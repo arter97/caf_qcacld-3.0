@@ -41,6 +41,31 @@
 /* Maximum number of peers for SAP */
 #define SAP_MAX_NUM_PEERS 32
 
+/* Maximum channel to store */
+#define MAX_CHAN_TO_STORE 3
+
+/**
+ * struct store_freq_list - Stored freq list which needs to be avoided before
+ * selecting new freq for CSA
+ * @freq: Avoided frequency
+ * @timestamp: time on which freq stored
+ */
+struct store_freq_list {
+	qdf_freq_t freq;
+	qdf_time_t timestamp;
+};
+
+/**
+ * struct wlan_ll_lt_sap_avoid_freq - Avoid freq to be picked by CSA.
+ * @freq_list: Freq list which needs to be avoided before
+ * selecting new freq for CSA
+ * @stored_num_ch: Total number of channel stored
+ */
+struct wlan_ll_lt_sap_avoid_freq {
+	struct store_freq_list freq_list[MAX_CHAN_TO_STORE];
+	uint8_t stored_num_ch;
+};
+
 /**
  * struct ll_sap_psoc_priv_obj - ll_sap private psoc obj
  * @tx_ops: Tx ops registered with Target IF interface
@@ -51,6 +76,7 @@
  * @is_ll_lt_sap_supported: Flag to check whether LL SAP is supported
  * @is_beared_switch_required: Flag to check whether bearer switch
  * is required or not
+ * @avoid_freq: Avoid freq to be picked by CSA
  */
 struct ll_sap_psoc_priv_obj {
 	struct wlan_ll_sap_tx_ops tx_ops;
@@ -59,6 +85,7 @@ struct ll_sap_psoc_priv_obj {
 	uint8_t timer_vdev_id;
 	bool is_ll_lt_sap_supported;
 	bool is_beared_switch_required;
+	struct wlan_ll_lt_sap_avoid_freq avoid_freq;
 };
 
 /**

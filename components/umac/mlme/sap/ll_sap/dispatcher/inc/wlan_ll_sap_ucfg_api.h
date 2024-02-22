@@ -171,12 +171,14 @@ void ucfg_ll_lt_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
  * @psoc: Pointer to psoc
  * @vdev_id: Vdev ID
  * @curr_freq: current frequency
+ * @csa_src: csa source
  *
  * Return: Frequency
  */
 qdf_freq_t
 ucfg_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
-				   uint8_t vdev_id, qdf_freq_t curr_freq);
+				   uint8_t vdev_id, qdf_freq_t curr_freq,
+				   enum ll_sap_csa_source csa_src);
 #else
 static inline QDF_STATUS ucfg_ll_sap_init(void)
 {
@@ -253,7 +255,8 @@ static inline void ucfg_ll_lt_sap_switch_bearer_on_p2p_go_complete(
 
 static inline qdf_freq_t
 ucfg_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
-				   uint8_t vdev_id, qdf_freq_t curr_freq)
+				   uint8_t vdev_id, qdf_freq_t curr_freq,
+				   enum ll_sap_csa_source csa_src)
 {
 	return 0;
 }

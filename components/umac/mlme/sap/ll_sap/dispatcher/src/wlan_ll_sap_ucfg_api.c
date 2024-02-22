@@ -111,7 +111,9 @@ void ucfg_ll_lt_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 
 qdf_freq_t
 ucfg_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
-				   uint8_t vdev_id, qdf_freq_t curr_freq)
+				   uint8_t vdev_id, qdf_freq_t curr_freq,
+				   enum ll_sap_csa_source csa_src)
 {
-	return ll_lt_sap_get_valid_freq(psoc, vdev_id, curr_freq);
+	return ll_lt_sap_get_valid_freq(psoc, vdev_id, curr_freq,
+					csa_src);
 }

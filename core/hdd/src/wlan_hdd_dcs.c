@@ -269,7 +269,8 @@ hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
 	 * dcs overall time for LL_LT_SAP.
 	 */
 	restart_freq = ucfg_ll_sap_get_valid_freq_for_csa(psoc, vdev_id,
-							  curr_freq);
+							  curr_freq,
+							  LL_SAP_CSA_DCS);
 
 	hdd_debug("vdev_id %d freq %d selected for LL_LT_SAP DCS",
 		  vdev_id, restart_freq);

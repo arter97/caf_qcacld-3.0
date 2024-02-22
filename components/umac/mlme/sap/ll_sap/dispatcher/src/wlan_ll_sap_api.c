@@ -211,9 +211,11 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete(
 QDF_STATUS wlan_ll_lt_sap_get_freq_list(
 				struct wlan_objmgr_psoc *psoc,
 				struct wlan_ll_lt_sap_freq_list *freq_list,
-				uint8_t vdev_id)
+				uint8_t vdev_id,
+				enum ll_sap_csa_source csa_src)
 {
-	return ll_lt_sap_get_freq_list(psoc, freq_list, vdev_id);
+	return ll_lt_sap_get_freq_list(psoc, freq_list, vdev_id,
+				       csa_src);
 }
 
 qdf_freq_t wlan_ll_lt_sap_override_freq(struct wlan_objmgr_psoc *psoc,
@@ -232,7 +234,8 @@ qdf_freq_t wlan_ll_lt_sap_override_freq(struct wlan_objmgr_psoc *psoc,
 	if (!policy_mgr_get_connection_count_with_ch_freq(chan_freq))
 		return chan_freq;
 
-	freq = ll_lt_sap_get_valid_freq(psoc, vdev_id, 0);
+	freq = ll_lt_sap_get_valid_freq(psoc, vdev_id, 0,
+					LL_SAP_CSA_CONCURENCY);
 
 	ll_sap_debug("Vdev %d ll_lt_sap old freq %d new freq %d", vdev_id,
 		     chan_freq, freq);
@@ -266,7 +269,8 @@ qdf_freq_t wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
 	return chan_freq;
 
 get_new_ll_lt_sap_freq:
-	restart_freq = ll_lt_sap_get_valid_freq(psoc, vdev_id, 0);
+	restart_freq = ll_lt_sap_get_valid_freq(psoc, vdev_id, 0,
+						LL_SAP_CSA_CONCURENCY);
 
 	ll_sap_debug("vdev %d old freq %d restart freq %d CSA reason %d ",
 		     vdev_id, chan_freq, restart_freq, *csa_reason);
@@ -496,4 +500,20 @@ bool wlan_ll_sap_is_bearer_switch_req_on_csa(struct wlan_objmgr_psoc *psoc,
 		return true;
 
 	return false;
+}
+
+bool wlan_ll_lt_sap_is_freq_in_avoid_list(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t freq)
+{
+	struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj;
+
+	ll_sap_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
+							psoc,
+							WLAN_UMAC_COMP_LL_SAP);
+	if (!ll_sap_psoc_obj) {
+		ll_sap_err("psoc_ll_sap_obj is null");
+		return false;
+	}
+
+	return ll_lt_sap_is_freq_in_avoid_list(ll_sap_psoc_obj, freq);
 }

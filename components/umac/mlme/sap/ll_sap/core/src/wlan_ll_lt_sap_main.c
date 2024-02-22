@@ -229,6 +229,147 @@ QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev)
 }
 
 static
+uint8_t ll_lt_sap_get_oldest_entry_index(struct wlan_ll_lt_sap_avoid_freq *list)
+{
+	uint8_t oldest_entry_idx = 0, i;
+	qdf_time_t oldest_entry_timestamp;
+
+	oldest_entry_timestamp = list->freq_list[0].timestamp;
+	for (i = 1; i < MAX_CHAN_TO_STORE; i++) {
+		if (qdf_system_time_after(
+				oldest_entry_timestamp,
+				list->freq_list[i].timestamp)) {
+			oldest_entry_idx = i;
+			oldest_entry_timestamp = list->freq_list[i].timestamp;
+		}
+	}
+
+	return oldest_entry_idx;
+}
+
+static
+void ll_lt_sap_store_curr_chan_in_db(
+			struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj,
+			qdf_freq_t freq)
+{
+	uint8_t i;
+
+	if (ll_sap_psoc_obj->avoid_freq.stored_num_ch >= MAX_CHAN_TO_STORE) {
+		i = ll_lt_sap_get_oldest_entry_index(
+					&ll_sap_psoc_obj->avoid_freq);
+		ll_sap_psoc_obj->avoid_freq.freq_list[i].freq = freq;
+		ll_sap_psoc_obj->avoid_freq.freq_list[i].timestamp =
+						qdf_get_time_of_the_day_ms();
+		return;
+	}
+
+	for (i = 0; i < MAX_CHAN_TO_STORE; i++) {
+		if (!ll_sap_psoc_obj->avoid_freq.freq_list[i].freq &&
+		    !ll_sap_psoc_obj->avoid_freq.freq_list[i].timestamp) {
+			ll_sap_psoc_obj->avoid_freq.freq_list[i].freq = freq;
+			ll_sap_psoc_obj->avoid_freq.freq_list[i].timestamp =
+						qdf_get_time_of_the_day_ms();
+			ll_sap_psoc_obj->avoid_freq.stored_num_ch++;
+			return;
+		}
+	}
+}
+
+bool ll_lt_sap_is_freq_in_avoid_list(
+			struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj,
+			qdf_freq_t freq)
+{
+	uint8_t i;
+
+	for (i = 0; i < MAX_CHAN_TO_STORE; i++) {
+		if (freq == ll_sap_psoc_obj->avoid_freq.freq_list[i].freq)
+			return true;
+	}
+
+	return false;
+}
+
+/* DCS database ageout time in ms to store channel */
+#define DCS_DB_AGEOUT_TIME (5 * 60 * 1000)
+static
+void ll_lt_sap_flush_old_entries(struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj)
+{
+	uint8_t i;
+
+	for (i = 0; i < MAX_CHAN_TO_STORE; i++) {
+		if (ll_sap_psoc_obj->avoid_freq.freq_list[i].timestamp &&
+		    (qdf_system_time_after(
+			       qdf_get_time_of_the_day_ms(),
+			       ll_sap_psoc_obj->avoid_freq.freq_list[i].timestamp +
+			       DCS_DB_AGEOUT_TIME))) {
+			ll_sap_psoc_obj->avoid_freq.freq_list[i].timestamp = 0;
+			ll_sap_psoc_obj->avoid_freq.freq_list[i].freq = 0;
+			ll_sap_psoc_obj->avoid_freq.stored_num_ch--;
+		}
+	}
+}
+
+#define LL_SAP_MAX_FREQ_LIST_INFO_LOG 100
+static void
+ll_lt_sap_dump_stored_freq_list(struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj)
+{
+	uint8_t *freq_list;
+	uint8_t i = 0, len = 0;
+
+	freq_list = qdf_mem_malloc(LL_SAP_MAX_FREQ_LIST_INFO_LOG);
+	if (!freq_list)
+		return;
+
+	for (i = 0; i < MAX_CHAN_TO_STORE; i++) {
+		if (ll_sap_psoc_obj->avoid_freq.freq_list[i].freq)
+			len += qdf_scnprintf(
+				freq_list + len,
+				LL_SAP_MAX_FREQ_LIST_INFO_LOG - len,
+				"%d[%u] ",
+				ll_sap_psoc_obj->avoid_freq.freq_list[i].freq,
+				ll_sap_psoc_obj->avoid_freq.freq_list[i].timestamp);
+	}
+
+	ll_sap_nofl_debug("freq[timestamp]: %s", freq_list);
+
+	qdf_mem_free(freq_list);
+}
+
+static void
+ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
+					qdf_freq_t freq,
+					enum ll_sap_csa_source csa_src)
+{
+	struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj;
+
+	ll_sap_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
+							psoc,
+							WLAN_UMAC_COMP_LL_SAP);
+	if (!ll_sap_psoc_obj) {
+		ll_sap_err("psoc_ll_sap_obj is null");
+		return;
+	}
+
+	if (ll_sap_psoc_obj->avoid_freq.stored_num_ch) {
+		ll_sap_debug("stored list before modification");
+		ll_lt_sap_dump_stored_freq_list(ll_sap_psoc_obj);
+	}
+	/*
+	 * Reset frequency and it's timestamp if stored channel
+	 * timestamp is greater than DCS_DB_AGEOUT_TIME
+	 */
+	ll_lt_sap_flush_old_entries(ll_sap_psoc_obj);
+
+	if (freq && csa_src == LL_SAP_CSA_DCS)
+		ll_lt_sap_store_curr_chan_in_db(ll_sap_psoc_obj, freq);
+
+	if (ll_sap_psoc_obj->avoid_freq.stored_num_ch) {
+		ll_sap_debug("stored list after modification");
+		ll_lt_sap_dump_stored_freq_list(ll_sap_psoc_obj);
+	}
+}
+
+static
 void ll_lt_sap_update_mac_freq(struct wlan_ll_lt_sap_mac_freq *freq_list,
 			       qdf_freq_t sbs_cut_off_freq,
 			       qdf_freq_t given_freq, uint32_t given_weight)
@@ -441,7 +582,8 @@ QDF_STATUS ll_lt_sap_get_allowed_freq_list(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id,
 				struct sap_sel_ch_info *ch_param,
-				struct wlan_ll_lt_sap_freq_list *freq_list)
+				struct wlan_ll_lt_sap_freq_list *freq_list,
+				enum ll_sap_csa_source csa_src)
 {
 	struct connection_info conn_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t count;
@@ -451,6 +593,9 @@ QDF_STATUS ll_lt_sap_get_allowed_freq_list(
 	pcl = qdf_mem_malloc(sizeof(*pcl));
 	if (!pcl)
 		return QDF_STATUS_E_FAILURE;
+
+	ll_lt_store_to_avoid_list_and_flush_old(psoc, freq_list->prev_freq,
+						csa_src);
 
 	status = policy_mgr_get_pcl_ch_list_for_ll_sap(psoc, pcl, vdev_id,
 						       conn_info, &count);
@@ -468,7 +613,8 @@ end:
 
 QDF_STATUS ll_lt_sap_get_freq_list(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_ll_lt_sap_freq_list *freq_list,
-				   uint8_t vdev_id)
+				   uint8_t vdev_id,
+				   enum ll_sap_csa_source csa_src)
 {
 	struct sap_sel_ch_info ch_param = { NULL, 0 };
 	QDF_STATUS status;
@@ -486,7 +632,7 @@ QDF_STATUS ll_lt_sap_get_freq_list(struct wlan_objmgr_psoc *psoc,
 		goto release_mem;
 
 	status = ll_lt_sap_get_allowed_freq_list(psoc, vdev_id, &ch_param,
-						 freq_list);
+						 freq_list, csa_src);
 
 release_mem:
 	wlan_ll_sap_free_chan_info(&ch_param);
@@ -494,14 +640,15 @@ release_mem:
 }
 
 qdf_freq_t ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id, qdf_freq_t curr_freq)
+				    uint8_t vdev_id, qdf_freq_t curr_freq,
+				    enum ll_sap_csa_source csa_src)
 {
 	struct wlan_ll_lt_sap_freq_list freq_list;
 
 	qdf_mem_zero(&freq_list, sizeof(freq_list));
 
 	freq_list.prev_freq = curr_freq;
-	ll_lt_sap_get_freq_list(psoc, &freq_list, vdev_id);
+	ll_lt_sap_get_freq_list(psoc, &freq_list, vdev_id, csa_src);
 
 	if (freq_list.standalone_mac.freq_5GHz_low)
 		return freq_list.standalone_mac.freq_5GHz_low;

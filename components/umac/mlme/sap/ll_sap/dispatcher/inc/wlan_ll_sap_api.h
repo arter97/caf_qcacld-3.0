@@ -107,13 +107,15 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete(
  * @psoc: Pointer to psoc object
  * @freq_list: Pointer to wlan_ll_lt_sap_freq_list structure
  * @vdev_id: Vdev Id
+ * @csa_src: csa source
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_ll_lt_sap_get_freq_list(
 				struct wlan_objmgr_psoc *psoc,
 				struct wlan_ll_lt_sap_freq_list *freq_list,
-				uint8_t vdev_id);
+				uint8_t vdev_id,
+				enum ll_sap_csa_source csa_src);
 
 /**
  * wlan_ll_lt_sap_override_freq() - Return frequency on which LL_LT_SAP can
@@ -249,6 +251,17 @@ wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev);
  */
 bool wlan_ll_sap_is_bearer_switch_req_on_csa(struct wlan_objmgr_psoc *psoc,
 					     uint8_t vdev_id);
+
+/**
+ * wlan_ll_lt_sap_is_freq_in_avoid_list() - Check whether given freq is present
+ * in avoided list or not
+ * @psoc: pointer to psoc
+ * @freq: given freq
+ *
+ * Return: True/False
+ */
+bool wlan_ll_lt_sap_is_freq_in_avoid_list(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t freq);
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
@@ -306,7 +319,8 @@ static inline
 QDF_STATUS wlan_ll_lt_sap_get_freq_list(
 				struct wlan_objmgr_psoc *psoc,
 				struct wlan_ll_lt_sap_freq_list *freq_list,
-				uint8_t vdev_id)
+				uint8_t vdev_id,
+				enum ll_sap_csa_source csa_src)
 {
 	return QDF_STATUS_E_FAILURE;
 }
@@ -371,6 +385,13 @@ wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
 static inline
 bool wlan_ll_sap_is_bearer_switch_req_on_csa(struct wlan_objmgr_psoc *psoc,
 					     uint8_t vdev_id)
+{
+	return false;
+}
+
+static inline
+bool wlan_ll_lt_sap_is_freq_in_avoid_list(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t freq)
 {
 	return false;
 }

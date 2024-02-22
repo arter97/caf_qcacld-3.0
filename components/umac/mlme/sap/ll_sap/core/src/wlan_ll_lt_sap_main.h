@@ -40,23 +40,26 @@ bool ll_lt_sap_is_supported(struct wlan_objmgr_psoc *psoc);
  * @psoc: Pointer to psoc object
  * @freq_list: Pointer to wlan_ll_lt_sap_freq_list structure
  * @vdev_id: Vdev Id
+ * @src: ll_sap csa source
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS ll_lt_sap_get_freq_list(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_ll_lt_sap_freq_list *freq_list,
-				   uint8_t vdev_id);
+				   uint8_t vdev_id, enum ll_sap_csa_source src);
 
 /**
  * ll_lt_sap_get_valid_freq() - API to get valid frequency for LL_LT_SAP
  * @psoc: Pointer to psoc object
  * @vdev_id: Vdev Id of ll_lt_sap
  * @curr_freq: current frequency
+ * @csa_src: LL_SAP csa source
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id, qdf_freq_t curr_freq);
+				    uint8_t vdev_id, qdf_freq_t curr_freq,
+				    enum ll_sap_csa_source csa_src);
 
 /*
  * ll_lt_sap_init() - Initialize ll_lt_sap infrastructure
@@ -118,4 +121,16 @@ QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp);
  * Return: True/False
  */
 bool ll_lt_sap_get_bearer_switch_cap_for_csa(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ll_lt_sap_is_freq_in_avoid_list() - Check whether given frequency is in
+ * avoided list or not
+ * @ll_sap_psoc_obj: pointer to ll_sap_psoc object
+ * @freq: given frequency
+ *
+ * Return: True/False
+ */
+bool ll_lt_sap_is_freq_in_avoid_list(
+			struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj,
+			qdf_freq_t freq);
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

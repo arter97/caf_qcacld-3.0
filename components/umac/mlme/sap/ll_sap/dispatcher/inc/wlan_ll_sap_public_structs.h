@@ -228,6 +228,16 @@ enum ll_sap_get_target_tsf {
 };
 
 /**
+ * enum ll_sap_csa_source: LL_SAP CSA source
+ * @LL_SAP_CSA_CONCURENCY: LL_SAP CSA due to concurrency
+ * @LL_SAP_CSA_DCS: LL_SAP CSA due to DCS triggred
+ */
+enum ll_sap_csa_source {
+	LL_SAP_CSA_CONCURENCY = 0,
+	LL_SAP_CSA_DCS = 1,
+};
+
+/**
  * struct wlan_ll_sap_tx_ops - defines southbound tx callbacks for
  * LL_SAP (low latency sap) component
  * @send_audio_transport_switch_resp: function pointer to indicate audio
