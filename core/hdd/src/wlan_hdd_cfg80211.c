@@ -3605,37 +3605,63 @@ wlan_hdd_check_is_acs_request_same(struct wlan_hdd_link_info *link_info,
 		return false;
 	}
 
-	if (!tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE])
+	if (!tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE]) {
+		hdd_err("HW mode not present");
 		return false;
+	}
 
 	sap_config = &link_info->session.ap.sap_config;
 
 	hw_mode = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE]);
-	if (sap_config->acs_cfg.master_acs_cfg.hw_mode != hw_mode)
+	if (sap_config->acs_cfg.master_acs_cfg.hw_mode != hw_mode) {
+		hdd_info_rl("HW mode: Current: %d received: %d",
+			    sap_config->acs_cfg.master_acs_cfg.hw_mode,
+			    hw_mode);
 		return false;
+	}
 
 	ht_enabled = nla_get_flag(tb[QCA_WLAN_VENDOR_ATTR_ACS_HT_ENABLED]);
-	if (sap_config->acs_cfg.master_acs_cfg.ht != ht_enabled)
+	if (sap_config->acs_cfg.master_acs_cfg.ht != ht_enabled) {
+		hdd_info_rl("HT: Current param: %d received param: %d",
+			    sap_config->acs_cfg.master_acs_cfg.ht,
+			    ht_enabled);
 		return false;
+	}
 
 	ht40_enabled = nla_get_flag(tb[QCA_WLAN_VENDOR_ATTR_ACS_HT40_ENABLED]);
-	if (sap_config->acs_cfg.master_acs_cfg.ht40 != ht40_enabled)
+	if (sap_config->acs_cfg.master_acs_cfg.ht40 != ht40_enabled) {
+		hdd_info_rl("HT 40: Current: %d received: %d",
+			    sap_config->acs_cfg.master_acs_cfg.ht40,
+			    ht40_enabled);
 		return false;
+	}
 
 	vht_enabled = nla_get_flag(tb[QCA_WLAN_VENDOR_ATTR_ACS_VHT_ENABLED]);
-	if (sap_config->acs_cfg.master_acs_cfg.vht != vht_enabled)
+	if (sap_config->acs_cfg.master_acs_cfg.vht != vht_enabled) {
+		hdd_info_rl("VHT: Current: %d received: %d",
+			    sap_config->acs_cfg.master_acs_cfg.vht,
+			    vht_enabled);
 		return false;
+	}
 
 	eht_enabled = nla_get_flag(tb[QCA_WLAN_VENDOR_ATTR_ACS_EHT_ENABLED]);
-	if (sap_config->acs_cfg.master_acs_cfg.eht != eht_enabled)
+	if (sap_config->acs_cfg.master_acs_cfg.eht != eht_enabled) {
+		hdd_info_rl("EHT: Current: %d received: %d",
+			    sap_config->acs_cfg.master_acs_cfg.eht,
+			    eht_enabled);
 		return false;
+	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_CHWIDTH])
 		ch_width = nla_get_u16(tb[QCA_WLAN_VENDOR_ATTR_ACS_CHWIDTH]);
 	else
 		ch_width = 0;
-	if (sap_config->acs_cfg.master_acs_cfg.ch_width != ch_width)
+	if (sap_config->acs_cfg.master_acs_cfg.ch_width != ch_width) {
+		hdd_info_rl("CH Width: Current param: %d received param: %d",
+			    sap_config->acs_cfg.master_acs_cfg.ch_width,
+			    ch_width);
 		return false;
+	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_LAST_SCAN_AGEOUT_TIME]) {
 		last_scan_ageout_time =
@@ -3647,8 +3673,13 @@ wlan_hdd_check_is_acs_request_same(struct wlan_hdd_link_info *link_info,
 							psoc,
 							&last_scan_ageout_time);
 	}
-	if (sap_config->acs_cfg.last_scan_ageout_time != last_scan_ageout_time)
+	if (sap_config->acs_cfg.last_scan_ageout_time !=
+	    last_scan_ageout_time) {
+		hdd_info_rl("last_scan_ageout_time: Current: %d received: %d",
+			    sap_config->acs_cfg.last_scan_ageout_time,
+			    last_scan_ageout_time);
 		return false;
+	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_FREQ_LIST]) {
 		uint32_t *freq =
@@ -3657,23 +3688,34 @@ wlan_hdd_check_is_acs_request_same(struct wlan_hdd_link_info *link_info,
 		ch_list_count = nla_len(
 				tb[QCA_WLAN_VENDOR_ATTR_ACS_FREQ_LIST]) /
 				sizeof(uint32_t);
-		if (sap_config->acs_cfg.master_ch_list_count != ch_list_count)
+		if (sap_config->acs_cfg.master_ch_list_count != ch_list_count) {
+			hdd_info_rl("Freq List Count: Current: %d received: %d",
+				    sap_config->acs_cfg.master_ch_list_count,
+				    ch_list_count);
 			return false;
+		}
 		for (i = 0; i < ch_list_count; i++) {
 			j = 0;
 			while (j < ch_list_count && freq[i] !=
 			       sap_config->acs_cfg.master_freq_list[j])
 				j++;
-			if (j == ch_list_count)
+			if (j == ch_list_count) {
+				hdd_err("Freq: %d is not present in the current freq list",
+					freq[i]);
 				return false;
+			}
 		}
 	} else if (tb[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST]) {
 		uint8_t *tmp = nla_data(tb[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST]);
 
 		ch_list_count = nla_len(
 					tb[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST]);
-		if (sap_config->acs_cfg.master_ch_list_count != ch_list_count)
+		if (sap_config->acs_cfg.master_ch_list_count != ch_list_count) {
+			hdd_err("ch list count: Current param: %d received param: %d",
+				sap_config->acs_cfg.master_ch_list_count,
+				ch_list_count);
 			return false;
+		}
 		for (i = 0; i < ch_list_count; i++) {
 			j = 0;
 			while (j < ch_list_count &&
@@ -3681,8 +3723,11 @@ wlan_hdd_check_is_acs_request_same(struct wlan_hdd_link_info *link_info,
 			       adapter->hdd_ctx->pdev, tmp[i]) !=
 			       sap_config->acs_cfg.master_freq_list[j])
 				j++;
-			if (j == ch_list_count)
+			if (j == ch_list_count) {
+				hdd_err("Channel: %d is not present in the current channel list",
+					tmp[i]);
 				return false;
+			}
 		}
 	}
 
@@ -4023,11 +4068,13 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	if (qdf_atomic_read(&ap_ctx->acs_in_progress) > 0) {
 		if (wlan_hdd_check_is_acs_request_same(link_info,
 						       data, data_len)) {
-			hdd_debug("Same ACS req as ongoing is received, return success");
+			hdd_debug("vdev %d: Same ACS req as ongoing is received, return success",
+				  link_info->vdev_id);
 			ret = 0;
 			goto out;
 		}
-		hdd_err("ACS rejected as previous ACS req already in progress");
+		hdd_err("vdev %d: ACS rejected as previous ACS req already in progress",
+			link_info->vdev_id);
 		return -EINVAL;
 	} else {
 		qdf_atomic_set(&ap_ctx->acs_in_progress, 1);
