@@ -3727,10 +3727,9 @@ static void free_ap(struct stats_obj *ap)
 	free(ap);
 }
 
-void libstats_free_reply_buffer(struct stats_command *cmd)
+void libstats_free_reply_buffer_object(struct reply_buffer *reply)
 {
 	struct stats_obj *obj;
-	struct reply_buffer *reply = cmd->reply;
 
 	if (!reply || !reply->obj_head)
 		return;
@@ -3756,6 +3755,12 @@ void libstats_free_reply_buffer(struct stats_command *cmd)
 		}
 	}
 	reply->obj_last = NULL;
+}
+
+void libstats_free_reply_buffer(struct stats_command *cmd)
+{
+	if (cmd)
+		libstats_free_reply_buffer_object(cmd->reply);
 }
 
 static void
