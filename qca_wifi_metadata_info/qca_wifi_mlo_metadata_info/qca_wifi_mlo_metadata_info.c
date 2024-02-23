@@ -41,6 +41,9 @@ uint32_t qca_mlo_get_mark_metadata(struct qca_mlo_metadata_param *mlo_param)
 	wlan_if_t vap = NULL;
 	uint32_t mlo_key = 0;
 
+	/* only when DS is enabled valid node id will be updated */
+	mlo_param->out_ppe_ds_node_id = MLO_METADATA_INVALID_DS_NODE_ID;
+
 	if (qdf_unlikely(!dest_dev)) {
 		qdf_err("dest_dev is NULL");
 		return mlo_key;
@@ -80,8 +83,6 @@ uint32_t qca_mlo_get_mark_metadata(struct qca_mlo_metadata_param *mlo_param)
 
 	if (vap->cp.icp_flags & IEEE80211_PPE_VP_DS_ACCEL)
 		mlo_param->out_ppe_ds_node_id = osdev->mlo_link_id;
-	else
-		mlo_param->out_ppe_ds_node_id = MLO_METADATA_INVALID_DS_NODE_ID;
 
 	qca_mlo_metadata_set_primary_link_id(&mlo_key, osdev->mlo_link_id);
 	qca_mlo_metadata_set_tag(&mlo_key);
@@ -91,9 +92,6 @@ uint32_t qca_mlo_get_mark_metadata(struct qca_mlo_metadata_param *mlo_param)
 #else
 uint32_t qca_mlo_get_mark_metadata(struct qca_mlo_metadata_param *mlo_param)
 {
-	uint32_t mlo_key;
-
-	qca_mlo_metadata_set_primary_link_id(&mlo_key, INVALID_MLO_METADATA);
-	return mlo_key;
+	return 0;
 }
 #endif
