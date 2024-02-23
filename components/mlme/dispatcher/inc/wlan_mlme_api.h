@@ -4987,6 +4987,25 @@ enum phy_ch_width
 wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * wlan_mlme_set_ap_nss() - Set AP advertised NSS
+ * @vdev: VDEV object
+ * @ap_nss: AP advertised NSS
+ *
+ * Return: None
+ */
+void wlan_mlme_set_ap_nss(struct wlan_objmgr_vdev *vdev, uint8_t ap_nss);
+
+/**
+ * wlan_mlme_get_ap_nss() - Get AP advertised NSS
+ * @vdev: VDEV object
+ *
+ * API to get the Number of Spatial Streams advertised by AP
+ *
+ * Return: ap nss value
+ */
+uint8_t wlan_mlme_get_ap_nss(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_mlme_send_csa_event_status_ind() - send csa event status ind
  * @vdev: vdev obj
  * @csa_status: csa status

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -160,6 +160,7 @@ struct hdd_conn_flag {
  * @ieee_link_id: AP Link Id valid for MLO connection
  * @eht_operation: EHT operation info
  * @eht_oper_len: length of @eht_operation
+ * @ap_nss: AP advertised nss
  */
 struct hdd_connection_info {
 	eConnectionState conn_state;
@@ -208,6 +209,7 @@ struct hdd_connection_info {
 	struct ieee80211_eht_operation eht_operation;
 	uint32_t eht_oper_len;
 #endif
+	uint8_t ap_nss;
 };
 
 /* Forward declarations */

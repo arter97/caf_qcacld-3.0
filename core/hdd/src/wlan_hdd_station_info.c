@@ -456,7 +456,7 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 	}
 
 	if (nla_put_u8(skb, NL80211_RATE_INFO_VHT_NSS,
-		      sta_ctx->cache_conn_info.txrate.nss)) {
+		      sta_ctx->cache_conn_info.ap_nss)) {
 		hdd_err("put fail");
 		goto fail;
 	}
@@ -465,7 +465,7 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 	hdd_nofl_debug(
 		"STA Tx rate info:: bitrate:%d, bitrate_compat:%d, NSS:%d",
 		bitrate, bitrate_compat,
-		sta_ctx->cache_conn_info.txrate.nss);
+		sta_ctx->cache_conn_info.ap_nss);
 
 	return 0;
 fail:

@@ -1621,6 +1621,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	ap_nss = lim_get_nss_supported_by_ap(&assoc_rsp->VHTCaps,
 					     &assoc_rsp->HTCaps,
 					     &assoc_rsp->he_cap);
+	wlan_mlme_set_ap_nss(session_entry->vdev, ap_nss);
+	pe_debug("AP supported NSS = %u", ap_nss);
 
 	if (subtype == LIM_REASSOC) {
 		pe_debug("Successfully Reassociated with BSS");

@@ -1396,6 +1396,7 @@ static void hdd_cm_save_connect_info(struct wlan_hdd_link_info *link_info,
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (vdev) {
 		sta_ctx->conn_info.nss = wlan_vdev_mlme_get_nss(vdev);
+		sta_ctx->conn_info.ap_nss = wlan_mlme_get_ap_nss(vdev);
 		ucfg_wlan_vdev_mgr_get_param(vdev, WLAN_MLME_CFG_RATE_FLAGS,
 					     &sta_ctx->conn_info.rate_flags);
 		hdd_wmm_cm_connect(vdev, adapter, bcn_ie,
