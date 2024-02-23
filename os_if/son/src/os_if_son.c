@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1774,25 +1774,14 @@ QDF_STATUS os_if_son_get_node_datarate_info(struct wlan_objmgr_vdev *vdev,
 					    uint8_t *mac_addr,
 					    wlan_node_info *node_info)
 {
-	int8_t max_tx_power;
-	int8_t min_tx_power;
-	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		osif_err("null posc");
-		return QDF_STATUS_E_INVAL;
-	}
 
 	if (WLAN_ADDR_EQ(wlan_vdev_mlme_get_macaddr(vdev), mac_addr) ==
 							   QDF_STATUS_SUCCESS) {
 		node_info->max_chwidth = os_if_son_get_chwidth(vdev);
 		node_info->phymode = os_if_son_get_phymode(vdev);
 		node_info->num_streams = os_if_son_get_rx_streams(vdev);
-		ucfg_son_get_min_and_max_power(psoc, &max_tx_power,
-					       &min_tx_power);
-		node_info->max_txpower = max_tx_power;
+		node_info->max_txpower = 0;
 		node_info->max_MCS = ucfg_mlme_get_vdev_max_mcs_idx(vdev);
 		if (node_info->max_MCS == INVALID_MCS_NSS_INDEX) {
 			osif_err("invalid mcs index");
