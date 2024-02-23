@@ -2839,3 +2839,34 @@ int hdd_son_send_get_wifi_generic_command(struct wiphy *wiphy,
 	return os_if_son_parse_generic_nl_cmd(wiphy, wdev, tb,
 					      OS_IF_SON_VENDOR_GET_CMD);
 }
+
+void hdd_son_send_module_status_event(
+	       enum hdd_wlan_module_status_evt_type event_type)
+{
+	enum osif_son_status_evt_type os_if_event;
+
+	switch (event_type) {
+	case HDD_WLAN_STATUS_EVT_UP:
+		os_if_event = OSIF_SON_STATUS_EVT_UP;
+		break;
+	case HDD_WLAN_STATUS_EVT_DOWN:
+		os_if_event = OSIF_SON_STATUS_EVT_DOWN;
+		break;
+	case HDD_WLAN_STATUS_EVT_REINIT_DONE:
+		os_if_event = OSIF_SON_STATUS_EVT_REINIT_DONE;
+		break;
+	case HDD_WLAN_STATUS_EVT_DUMP_READY:
+		os_if_event = OSIF_SON_STATUS_EVT_DUMP_READY;
+		break;
+	case HDD_WLAN_STATUS_EVT_TARGET_ASSERT:
+		os_if_event = OSIF_SON_STATUS_EVT_TARGET_ASSERT;
+		break;
+	default:
+		hdd_err("invalid event type");
+		return;
+	}
+
+	os_if_son_send_status_nlink_msg(OSIF_SON_STATUS_EVENT_ID,
+					os_if_event,
+					OSIF_SON_WLAN_MODULE_NAME);
+}

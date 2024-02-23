@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,6 +35,21 @@ enum assoc_disassoc_event {
 	ALD_DISASSOC_EVENT,
 };
 
+/*
+ * hdd_wlan_module_status_evt_type - wlan modules status type
+ * @HDD_WLAN_STATUS_EVT_UP: Module up event
+ * @HDD_WLAN_STATUS_EVT_DOWN: Module down event
+ * @HDD_WLAN_STATUS_EVT_REINIT_DONE: Module reinit done event
+ * @HDD_WLAN_STATUS_EVT_DUMP_READY: Module dump ready event
+ * @HDD_WLAN_STATUS_EVT_TARGET_ASSERT: Target assert event
+ */
+enum hdd_wlan_module_status_evt_type {
+	HDD_WLAN_STATUS_EVT_UP,
+	HDD_WLAN_STATUS_EVT_DOWN,
+	HDD_WLAN_STATUS_EVT_REINIT_DONE,
+	HDD_WLAN_STATUS_EVT_DUMP_READY,
+	HDD_WLAN_STATUS_EVT_TARGET_ASSERT,
+};
 #ifdef WLAN_FEATURE_SON
 
 /**
@@ -131,6 +146,16 @@ uint32_t hdd_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
  */
 int hdd_son_deliver_chan_change_event(struct hdd_adapter *adapter,
 				      qdf_freq_t freq);
+
+/**
+ * hdd_son_send_module_status_event() - send module status event
+ * to userspace
+ * @event_type: event type
+ *
+ * Return: void
+ */
+void hdd_son_send_module_status_event(
+		enum hdd_wlan_module_status_evt_type event_type);
 #else
 
 static inline void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
@@ -193,6 +218,12 @@ int hdd_son_deliver_chan_change_event(struct hdd_adapter *adapter,
 				      qdf_freq_t freq)
 {
 	return 0;
+}
+
+static inline void
+hdd_son_send_module_status_event(
+		enum hdd_wlan_module_status_evt_type event_type)
+{
 }
 #endif /* WLAN_FEATURE_SON */
 #endif

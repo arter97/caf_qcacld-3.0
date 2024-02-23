@@ -5193,6 +5193,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		hdd_hif_set_enable_detection(hif_ctx, true);
 
 		wlan_hdd_start_connectivity_logging(hdd_ctx);
+		hdd_son_send_module_status_event(HDD_WLAN_STATUS_EVT_UP);
 
 		break;
 
@@ -17310,7 +17311,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 		goto done;
 	case DRIVER_MODULES_ENABLED:
 		hdd_debug("Wlan transitioning (CLOSED <- ENABLED)");
-
+		hdd_son_send_module_status_event(HDD_WLAN_STATUS_EVT_DOWN);
 		if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
 			hdd_disable_power_management(hdd_ctx);
 			break;
