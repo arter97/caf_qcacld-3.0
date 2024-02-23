@@ -490,9 +490,10 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		msduq = &sawf_ctx->msduq[msduq_index];
 		msduq->remapped_tid = remapped_tid;
 		msduq->htt_msduq = host_tid_queue;
-		telemetry_sawf_updt_tid_msduq(peer->sawf->telemetry_ctx,
-					      msduq_index,
-					      remapped_tid, host_tid_queue);
+		telemetry_sawf_update_msduq_info(peer->sawf->telemetry_ctx,
+						 msduq_index,
+						 remapped_tid, host_tid_queue,
+						 msduq->svc_id);
 	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
