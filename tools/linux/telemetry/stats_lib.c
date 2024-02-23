@@ -1952,11 +1952,10 @@ static void parse_debug_ap(struct nlattr *rattr, struct stats_obj *obj)
 }
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static void stats_response_handler(struct cfg80211_data *buffer)
+static void stats_netlink_parser(struct reply_buffer *reply,
+				 void *data, int32_t len)
 {
 	bool add_pending;
-	struct stats_command *cmd;
-	struct reply_buffer *reply;
 	struct nlattr *attr;
 	struct stats_obj *obj;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_STATS_MAX + 1] = {0};
@@ -1971,27 +1970,11 @@ static void stats_response_handler(struct cfg80211_data *buffer)
 	[QCA_WLAN_VENDOR_ATTR_STATS_SERVICEID] = { .type = NLA_U8 },
 	};
 
-	if (!buffer) {
-		STATS_ERR("Buffer not valid\n");
-		return;
-	}
-	if (!buffer->nl_vendordata) {
-		STATS_ERR("Vendor Data is null\n");
-		return;
-	}
-	if (!buffer->data) {
-		STATS_ERR("User Data is null\n");
-		return;
-	}
-	cmd = buffer->data;
-	reply = cmd->reply;
 	if (!reply) {
 		STATS_ERR("User reply buffer in null\n");
 		return;
 	}
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_STATS_MAX,
-		      buffer->nl_vendordata, buffer->nl_vendordata_len,
-		      policy)) {
+	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_STATS_MAX, data, len, policy)) {
 		STATS_ERR("NLA Parsing failed\n");
 		return;
 	}
@@ -2107,6 +2090,28 @@ static void stats_response_handler(struct cfg80211_data *buffer)
 	/* Add into the list */
 	if (add_pending)
 		add_stats_obj(reply, obj);
+}
+
+static void stats_response_handler(struct cfg80211_data *buffer)
+{
+	struct stats_command *cmd;
+
+	if (!buffer) {
+		STATS_ERR("Buffer not valid\n");
+		return;
+	}
+	if (!buffer->nl_vendordata) {
+		STATS_ERR("Vendor Data is null\n");
+		return;
+	}
+	if (!buffer->data) {
+		STATS_ERR("User Data is null\n");
+		return;
+	}
+	cmd = buffer->data;
+
+	stats_netlink_parser(cmd->reply, buffer->nl_vendordata,
+			     buffer->nl_vendordata_len);
 }
 
 static int32_t send_nl_command_no_response(struct stats_command *cmd,
