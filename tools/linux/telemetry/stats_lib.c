@@ -669,6 +669,19 @@ static uint64_t generate_request_id(uint32_t req_id)
 	return gen_request_id;
 }
 
+static bool is_invalid_pid(uint64_t req_id)
+{
+	if ((req_id >> STATS_PID_SHIFT) == getpid())
+		return false;
+	else
+		return true;
+}
+
+static inline uint32_t extract_request_id(uint64_t req_id)
+{
+	return (req_id & STATS_REQUEST_ID_MASK);
+}
+
 static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 {
 	int32_t ret = 0;
@@ -1989,16 +2002,18 @@ static void stats_netlink_parser(struct reply_buffer *reply,
 	bool add_pending;
 	struct nlattr *attr;
 	struct stats_obj *obj;
+	uint64_t req_id = 0;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_STATS_MAX + 1] = {0};
 	struct nla_policy policy[QCA_WLAN_VENDOR_ATTR_STATS_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_STATS_LEVEL] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_OBJECT] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_STATS_SERVICEID] = { .type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_STATS_REQUEST_ID] = { .type = NLA_U64 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_PARENT_IF] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_STATS_TYPE] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_RECURSIVE] = { .type = NLA_NESTED },
 	[QCA_WLAN_VENDOR_ATTR_STATS_MULTI_REPLY] = { .type = NLA_FLAG },
-	[QCA_WLAN_VENDOR_ATTR_STATS_SERVICEID] = { .type = NLA_U8 },
 	};
 
 	if (!reply) {
@@ -2020,6 +2035,15 @@ static void stats_netlink_parser(struct reply_buffer *reply,
 	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID]) {
 		STATS_ERR("NLA Parsing failed for Stats Object ID\n");
 		return;
+	}
+	if (is_async_req()) {
+		if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_REQUEST_ID]) {
+			STATS_ERR("No Request ID in async stats response\n");
+			return;
+		}
+		req_id = nla_get_u64(tb[QCA_WLAN_VENDOR_ATTR_STATS_REQUEST_ID]);
+		if (is_invalid_pid(req_id))
+			return;
 	}
 	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_TYPE]) {
 		STATS_ERR("NLA Parsing failed for Stats Type\n");
@@ -2058,6 +2082,10 @@ static void stats_netlink_parser(struct reply_buffer *reply,
 			       IFNAME_LEN);
 		}
 	}
+
+	if (is_async_req())
+		obj->request_id = extract_request_id(req_id);
+
 	attr = tb[QCA_WLAN_VENDOR_ATTR_STATS_RECURSIVE];
 	if (obj->lvl == STATS_LVL_BASIC) {
 		switch (obj->obj_type) {
@@ -2143,6 +2171,16 @@ static void stats_response_handler(struct cfg80211_data *buffer)
 
 	stats_netlink_parser(cmd->reply, buffer->nl_vendordata,
 			     buffer->nl_vendordata_len);
+}
+
+static void stats_nb_event_handler(uint8_t *buf, size_t len, char *ifname)
+{
+	if (!buf) {
+		STATS_ERR("Event Data not valid\n");
+		return;
+	}
+
+	stats_netlink_parser(g_nb_ctx.reply, buf, len);
 }
 
 static int32_t send_nl_command_no_response(struct stats_command *cmd,
@@ -3966,6 +4004,8 @@ stats_lib_drv_cfg80211_event_callback(char *ifname, uint32_t cmdid,
 {
 	if (cmdid == QCA_NL80211_VENDOR_SUBCMD_PEER_STATS_CACHE_FLUSH)
 		parse_advance_sta_rdk(data, len, ifname);
+	if (cmdid == QCA_NL80211_VENDOR_SUBCMD_TELEMETRIC_DATA)
+		stats_nb_event_handler(data, len, ifname);
 }
 
 static int stats_lib_socket_init(void)
