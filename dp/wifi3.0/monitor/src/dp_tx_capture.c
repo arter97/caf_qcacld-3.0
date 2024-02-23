@@ -7165,8 +7165,9 @@ dp_bar_send_ack_frm_to_stack(struct dp_soc *soc,
 	uint16_t bar_ctl;
 	uint32_t user_id;
 	uint8_t tid;
+	uint8_t mac_id = 0;
 	qdf_frag_t addr;
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_mac *mon_mac = dp_get_mon_mac(pdev, mac_id);
 
 	if (!nbuf)
 		return QDF_STATUS_E_INVAL;
@@ -7196,7 +7197,7 @@ dp_bar_send_ack_frm_to_stack(struct dp_soc *soc,
 	tid = (bar_ctl >> DP_IEEE80211_BAR_CTL_TID_S) &
 		DP_IEEE80211_BAR_CTL_TID_M;
 
-	ppdu_info = &mon_pdev->ppdu_info;
+	ppdu_info = &mon_mac->ppdu_info;
 	user_id = ppdu_info->rx_info.user_id;
 	rx_status = &ppdu_info->rx_status;
 	rx_user_status =  &ppdu_info->rx_user_status[user_id];
@@ -7295,8 +7296,9 @@ QDF_STATUS dp_send_noack_frame_to_stack(struct dp_soc *soc,
 					struct dp_pdev *pdev,
 					qdf_nbuf_t mon_mpdu)
 {
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
-	struct hal_rx_ppdu_info *ppdu_info = &mon_pdev->ppdu_info;
+	uint8_t mac_id = 0;
+	struct dp_mon_mac *mon_mac = dp_get_mon_mac(pdev, mac_id);
+	struct hal_rx_ppdu_info *ppdu_info = &mon_mac->ppdu_info;
 	struct mon_rx_user_status *rx_user_status =
 				&ppdu_info->rx_user_status[0];
 	struct dp_ast_entry *ast_entry;
@@ -7379,8 +7381,9 @@ QDF_STATUS dp_handle_tx_capture_from_dest(struct dp_soc *soc,
 					  struct dp_pdev *pdev,
 					  qdf_nbuf_t mon_mpdu)
 {
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
-	struct hal_rx_ppdu_info *ppdu_info = &mon_pdev->ppdu_info;
+	uint8_t mac_id = 0;
+	struct dp_mon_mac *mon_mac = dp_get_mon_mac(pdev, mac_id);
+	struct hal_rx_ppdu_info *ppdu_info = &mon_mac->ppdu_info;
 
 	/*
 	 * The below switch case can be extended to
