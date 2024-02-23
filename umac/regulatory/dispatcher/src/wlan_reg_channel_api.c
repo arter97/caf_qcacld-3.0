@@ -305,7 +305,7 @@ wlan_reg_get_client_psd_for_ap(struct wlan_objmgr_pdev *pdev,
 			       enum reg_6g_ap_type ap_pwr_type,
 			       enum reg_6g_client_type client_type,
 			       qdf_freq_t chan_freq,
-			       uint16_t *reg_psd)
+			       int16_t *reg_psd)
 {
 	return reg_get_client_psd_for_ap(pdev, ap_pwr_type, client_type,
 					 chan_freq, reg_psd);
