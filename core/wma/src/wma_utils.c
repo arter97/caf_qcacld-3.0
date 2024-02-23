@@ -5190,7 +5190,7 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 		if (pmac->sme.oem_data_async_event_handler_cb)
 			pmac->sme.oem_data_async_event_handler_cb(
 					&oem_event_data);
-	} else if (event->event_cause == WMI_OEM_DATA_EVT_CAUSE_QMS) {
+	} else if (event->event_cause == WMI_OEM_DATA_EVT_CAUSE_SMEM_MAILBOX) {
 		if (wma_oem_smem_event_handler(wma, pmac, &oem_event_data))
 			return QDF_STATUS_E_FAILURE;
 	} else {

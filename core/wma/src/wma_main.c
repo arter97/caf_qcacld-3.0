@@ -578,16 +578,22 @@ static bool wma_is_feature_set_supported(tp_wma_handle wma_handle)
 static bool wma_is_smem_mailbox_supported(tp_wma_handle wma_handle)
 {
 	bool is_feature_enabled_from_fw;
+	bool is_feature_enabled_from_cfg;
 
 	is_feature_enabled_from_fw =
 		wmi_service_enabled(wma_handle->wmi_handle,
 				    wmi_service_smem_mailbox_dlkm_support);
 
+	is_feature_enabled_from_cfg =
+		cfg_get(wma_handle->psoc, CFG_ENABLE_SMEM_MAILBOX);
+
 	if (!is_feature_enabled_from_fw)
 		wma_debug("SMEM mailbox feature is disabled from fw");
 
-	return (is_feature_enabled_from_fw &&
-		cfg_get(wma_handle->psoc, CFG_ENABLE_SMEM_MAILBOX));
+	wma_debug("SMEM mailbox feature cfg value: %d",
+		  is_feature_enabled_from_cfg);
+
+	return is_feature_enabled_from_fw && is_feature_enabled_from_cfg;
 }
 
 static void wma_set_smem_mailbox_feature(tp_wma_handle wma_handle,
