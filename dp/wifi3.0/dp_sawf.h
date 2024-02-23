@@ -27,6 +27,7 @@
 #include "cdp_txrx_cmn_struct.h"
 #include "cdp_txrx_hist_struct.h"
 #include "cdp_txrx_extd_struct.h"
+#include "cdp_txrx_sawf.h"
 
 #define dp_sawf_alert(params...) \
 	QDF_TRACE_FATAL(QDF_MODULE_ID_DP_SAWF, params)
@@ -408,7 +409,7 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 			  uint32_t svc_id, uint8_t *mac, void *data);
 
 struct dp_sawf_msduq {
-	uint8_t ref_count;
+	qdf_atomic_t ref_count;
 	uint8_t htt_msduq;
 	uint8_t remapped_tid;
 	bool is_used;
@@ -591,4 +592,18 @@ dp_sawf_get_peer_msduq_info(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr);
 QDF_STATUS
 dp_sawf_reinject_handler(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			 uint32_t *htt_desc);
+
+/**
+ * dp_sawf_peer_msduq_event_notify - Notifier for peer msduq event
+ * @soc: SOC handle
+ * @peer: peer handle
+ * @queue_id: msduq id
+ * @svc_id: service class id
+ * @event_type: event type (add/delete/update)
+ *
+ * Return: void
+ */
+void dp_sawf_peer_msduq_event_notify(struct dp_soc *soc, struct dp_peer *peer,
+				     uint8_t queue_id, uint8_t svc_id,
+				     enum cdp_sawf_peer_msduq_event event_type);
 #endif /* DP_SAWF_H*/
