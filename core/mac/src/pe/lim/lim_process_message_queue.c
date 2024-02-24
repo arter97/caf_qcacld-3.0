@@ -1047,10 +1047,23 @@ static bool
 lim_is_ignore_btm_frame(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			tSirMacFrameCtl fc, uint8_t *body, uint16_t frm_len)
 {
-	bool is_sta_roam_disabled_by_p2p, is_mbo_wo_pmf;
+	bool is_sta_roam_disabled_by_p2p, is_mbo_wo_pmf, is_disable_btm;
 	uint8_t action_id, category, token = 0;
 	tpSirMacActionFrameHdr action_hdr;
 	enum wlan_diag_btm_block_reason reason;
+	struct cm_roam_values_copy temp;
+
+	/*
+	 * Drop BTM frame, if BTM roam disabled by userspace via vendor
+	 * command QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT
+	 */
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id, IS_DISABLE_BTM, &temp);
+	is_disable_btm = temp.bool_value;
+	if (is_disable_btm) {
+		pe_debug("Drop BTM frame. vdev:%d BTM roam disabled by user",
+			 vdev_id);
+		return true;
+	}
 
 	/*
 	 * Drop BTM frame received on STA interface if concurrent
