@@ -8515,6 +8515,7 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT] = {.type = NLA_U8},
 };
 
 #define WLAN_MAX_LINK_ID 15
@@ -11717,6 +11718,53 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 }
 #endif
 
+/**
+ * hdd_set_btm_support_config() - Update BTM support policy
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_set_btm_support_config(struct wlan_hdd_link_info *link_info,
+				      const struct nlattr *attr)
+{
+	uint8_t cfg_val;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	enum QDF_OPMODE op_mode = adapter->device_mode;
+	bool is_vdev_in_conn_state, is_disable_btm;
+
+	is_vdev_in_conn_state = hdd_is_vdev_in_conn_state(link_info);
+	cfg_val = nla_get_u8(attr);
+
+	hdd_debug("vdev: %d, cfg_val: %d for op_mode: %d, conn_state:%d",
+		  link_info->vdev_id, cfg_val, op_mode,
+		  is_vdev_in_conn_state);
+
+	/*
+	 * Change in BTM support configuration is applicable only for STA
+	 * interface and not allowed in connected state.
+	 */
+	if (op_mode != QDF_STA_MODE || is_vdev_in_conn_state)
+		return -EINVAL;
+
+	switch (cfg_val) {
+	case QCA_WLAN_BTM_SUPPORT_DISABLE:
+		is_disable_btm = true;
+		break;
+	case QCA_WLAN_BTM_SUPPORT_DEFAULT:
+		is_disable_btm = false;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ucfg_cm_set_btm_config(hdd_ctx->psoc, link_info->vdev_id,
+			       is_disable_btm);
+
+	return 0;
+}
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * hdd_set_eht_emlsr_capability() - Set EMLSR capability for EHT STA
@@ -12230,6 +12278,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_t2lm_negotiation_support},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE,
 	 hdd_set_coex_traffic_shaping_mode},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT,
+	 hdd_set_btm_support_config},
 };
 
 #ifdef WLAN_FEATURE_ELNA

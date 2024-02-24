@@ -912,6 +912,17 @@ QDF_STATUS wlan_cm_set_roam_band_bitmask(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id,
 					 uint32_t roam_band_bitmask);
 
+/**
+ * wlan_cm_set_btm_config() - Set btm roaming disable flag for vdev
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @is_disable_btm: to check whether btm roaming is disabled or not
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, bool is_disable_btm);
+
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 /**
  * struct roam_link_speed_cfg - link speed state config
@@ -1528,6 +1539,13 @@ wlan_cm_set_roam_band_bitmask(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			      uint32_t roam_band_bitmask)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS wlan_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						bool is_disable_btm)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline

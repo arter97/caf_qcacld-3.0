@@ -1298,6 +1298,9 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	case RSSI_CHANGE_THRESHOLD:
 		rso_cfg->rescan_rssi_delta  = src_config->uint_value;
 		break;
+	case IS_DISABLE_BTM:
+		rso_cfg->is_disable_btm  = src_config->bool_value;
+		break;
 	case BEACON_RSSI_WEIGHT:
 		rso_cfg->beacon_rssi_weight = src_config->uint_value;
 		break;
@@ -1623,6 +1626,7 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
+	rso_cfg->is_disable_btm = false;
 
 	return status;
 }
@@ -1652,6 +1656,7 @@ void wlan_cm_rso_config_deinit(struct wlan_objmgr_vdev *vdev,
 	cm_flush_roam_channel_list(&cfg_params->pref_chan_info);
 
 	qdf_mutex_destroy(&rso_cfg->cm_rso_lock);
+	rso_cfg->is_disable_btm = false;
 
 	cm_deinit_reassoc_timer(rso_cfg);
 }
@@ -2330,6 +2335,16 @@ QDF_STATUS wlan_cm_set_roam_band_bitmask(struct wlan_objmgr_psoc *psoc,
 
 	src_config.uint_value = roam_band_bitmask;
 	return wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_BAND,
+					  &src_config);
+}
+
+QDF_STATUS wlan_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, bool is_disable_btm)
+{
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.bool_value = is_disable_btm;
+	return wlan_cm_roam_cfg_set_value(psoc, vdev_id, IS_DISABLE_BTM,
 					  &src_config);
 }
 
