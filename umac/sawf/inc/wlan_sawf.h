@@ -71,6 +71,10 @@
 #define WLAN_MAX_SVC_CLASS_NAME 64
 #define DISABLED_MODE_MAX_LEN 128
 
+/* Reserve service classes for STC type towards the end of the valid range */
+#define MAX_NUM_SAWF_STC_SVC_CLASS 8
+#define SAWF_STC_SVC_CLASS_MIN (SAWF_SVC_CLASS_MAX - MAX_NUM_SAWF_STC_SVC_CLASS + 1)
+
 /*
  * Service class defined for Pre-11BE SCS (Only TID based service class
  * without other QoS attributes)
