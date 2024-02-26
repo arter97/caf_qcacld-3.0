@@ -15009,6 +15009,27 @@ static void hdd_restore_info_for_ssr(struct hdd_adapter *adapter)
 	}
 }
 
+/**
+ * hdd_sap_set_acs_with_more_param() - set is_acs_with_more_param from ini to
+ * mac_ctx.
+ * @hdd_ctx: HDD context
+ *
+ * Return: void
+ */
+static void hdd_sap_set_acs_with_more_param(struct hdd_context *hdd_ctx)
+{
+	bool acs_with_more_param = 0;
+	QDF_STATUS status;
+
+	status = ucfg_mlme_get_acs_with_more_param(hdd_ctx->psoc,
+						   &acs_with_more_param);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("can't get sap acs with more param, use def");
+
+	wlan_sap_set_acs_with_more_param(hdd_ctx->mac_handle,
+					 acs_with_more_param);
+}
+
 void hdd_adapter_reset_station_ctx(struct hdd_adapter *adapter)
 {
 	struct wlan_hdd_link_info *link_info;
@@ -15150,6 +15171,8 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 		ret = qdf_status_to_os_return(status);
 		goto sap_vdev_destroy;
 	}
+
+	hdd_sap_set_acs_with_more_param(hdd_ctx);
 
 	/* Register as a wireless device */
 	hdd_register_hostapd_wext(adapter->dev);

@@ -4544,7 +4544,6 @@ QDF_STATUS hdd_init_ap_mode(struct wlan_hdd_link_info *link_info,
 	struct sap_context *sap_ctx;
 	int ret;
 	enum dfs_mode acs_dfs_mode;
-	bool acs_with_more_param = 0;
 	uint8_t enable_sifs_burst = 0;
 	bool is_6g_sap_fd_enabled = 0;
 	struct wlan_objmgr_vdev *vdev;
@@ -4567,14 +4566,6 @@ QDF_STATUS hdd_init_ap_mode(struct wlan_hdd_link_info *link_info,
 		link_info->session.ap.sap_config.acs_dfs_mode =
 			wlan_hdd_get_dfs_mode(acs_dfs_mode);
 	}
-
-	status = ucfg_mlme_get_acs_with_more_param(hdd_ctx->psoc,
-						   &acs_with_more_param);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("can't get sap acs with more param, use def");
-
-	wlan_sap_set_acs_with_more_param(hdd_ctx->mac_handle,
-					 acs_with_more_param);
 
 	if (adapter->device_mode == QDF_SAP_MODE) {
 		status = hdd_vdev_configure_rtt_params(sap_ctx->vdev);
