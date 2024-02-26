@@ -795,6 +795,25 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 				uint32_t request_id);
 
 #ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * policy_mgr_allow_non_force_link_bitmap() - Check non force
+ * link bitmap are allowed or not.
+ * @psoc: PSOC object information
+ * @vdev: vdev object
+ * @no_forced_bitmap: no force link bitmap
+ * @force_inactive_bitmap: force inactive link bimap
+ *
+ * Check the non force link bitmap are allowed or not.
+ *
+ * Return: true if allow to "no force" and force inactive links.
+ */
+bool
+policy_mgr_allow_non_force_link_bitmap(
+		struct wlan_objmgr_psoc *psoc,
+		struct wlan_objmgr_vdev *vdev,
+		uint16_t no_forced_bitmap,
+		uint16_t force_inactive_bitmap);
+
 void
 policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx);
 

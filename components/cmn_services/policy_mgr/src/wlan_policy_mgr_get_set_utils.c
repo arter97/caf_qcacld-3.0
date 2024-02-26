@@ -4983,6 +4983,7 @@ policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct ml_nlink_change_event data;
+	bool reschedule_workqueue = true;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -5066,8 +5067,13 @@ complete_evnt:
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	/* reschedule force scc workqueue after link state changes */
+	if (req &&
+	    (req->param.control_flags.dont_reschedule_workqueue ||
+	     req->param.force_mode == MLO_LINK_FORCE_MODE_NON_FORCE_UPDATE))
+		reschedule_workqueue = false;
+
 	if (req && resp && !resp->status &&
-	    status == QDF_STATUS_SUCCESS)
+	    status == QDF_STATUS_SUCCESS && reschedule_workqueue)
 		policy_mgr_check_concurrent_intf_and_restart_sap(psoc, false);
 }
 #else
@@ -6604,6 +6610,8 @@ policy_mgr_mlo_sta_set_nlink(struct wlan_objmgr_psoc *psoc,
 		req->param.control_flags.post_re_evaluate_loops =
 			GET_POST_RE_EVALUATE_LOOPS(link_control_flags);
 	}
+	if (link_control_flags & link_ctrl_f_dont_reschedule_workqueue)
+		req->param.control_flags.dont_reschedule_workqueue = true;
 
 	status =
 	wlan_vdev_get_bss_peer_mld_mac(vdev,
@@ -13088,6 +13096,111 @@ policy_mgr_get_connection_max_channel_width(struct wlan_objmgr_psoc *psoc)
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+bool policy_mgr_allow_non_force_link_bitmap(
+			struct wlan_objmgr_psoc *psoc,
+			struct wlan_objmgr_vdev *vdev,
+			uint16_t no_forced_bitmap,
+			uint16_t force_inactive_bitmap)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t vdev_id_num = 0;
+	uint8_t vdev_ids[WLAN_MLO_MAX_VDEVS];
+	uint32_t vdev_id_bitmap_sz;
+	uint32_t vdev_id_bitmap[MLO_VDEV_BITMAP_SZ];
+	uint8_t i;
+	union conc_ext_flag conc_ext_flags;
+	struct wlan_objmgr_vdev *ml_vdev;
+	bool allow = true;
+	qdf_freq_t freq = 0;
+	struct wlan_channel *bss_chan;
+	struct policy_mgr_conc_connection_info
+			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	uint8_t num_del, num_del_total = 0;
+	uint8_t vdev_id_num2 = 0;
+	uint8_t vdev_ids2[WLAN_MLO_MAX_VDEVS];
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
+		psoc, vdev, no_forced_bitmap, NULL, &vdev_id_bitmap_sz,
+		vdev_id_bitmap,	&vdev_id_num, vdev_ids);
+	if (!vdev_id_num)
+		return true;
+
+	vdev_id_num2 = 0;
+	if (force_inactive_bitmap)
+		ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
+			psoc, vdev, force_inactive_bitmap, NULL,
+			&vdev_id_bitmap_sz,
+			vdev_id_bitmap, &vdev_id_num2, vdev_ids2);
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	/* remove the force inactive link's vdev from connection
+	 * table.
+	 */
+	for (i = 0; i < vdev_id_num2; i++) {
+		if (num_del_total >= QDF_ARRAY_SIZE(info))
+			break;
+		num_del = 0;
+		policy_mgr_store_and_del_conn_info_by_vdev_id(
+			psoc, vdev_ids2[i], &info[num_del_total],
+			&num_del);
+		num_del_total += num_del;
+	}
+
+	for (i = 0; i < vdev_id_num; i++) {
+		ml_vdev =
+		wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						     vdev_ids[i],
+						     WLAN_MLO_MGR_ID);
+		if (!ml_vdev) {
+			mlo_err("invalid vdev id %d ", vdev_ids[i]);
+			continue;
+		}
+
+		/* If link is active, no need to check allow conc */
+		if (!policy_mgr_vdev_is_force_inactive(psoc, vdev_ids[i])) {
+			wlan_objmgr_vdev_release_ref(ml_vdev,
+						     WLAN_MLO_MGR_ID);
+			continue;
+		}
+
+		conc_ext_flags.value =
+		policy_mgr_get_conc_ext_flags(ml_vdev, true);
+
+		bss_chan = wlan_vdev_mlme_get_bss_chan(ml_vdev);
+		if (bss_chan)
+			freq = bss_chan->ch_freq;
+
+		if (!policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
+						       freq,
+						       HW_MODE_20_MHZ,
+						       conc_ext_flags.value,
+						       NULL)) {
+			wlan_objmgr_vdev_release_ref(ml_vdev,
+						     WLAN_MLO_MGR_ID);
+			break;
+		}
+		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
+	}
+	if (num_del_total > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, info,
+						     num_del_total);
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	if (i < vdev_id_num) {
+		mlo_err("not allow - vdev %d freq %d active due to conc",
+			vdev_ids[i], freq);
+		allow = false;
+	}
+
+	return allow;
+}
+
 static bool
 policy_mgr_match_link_id(uint8_t link_id,
 			 uint16_t link_id_bitmap,
