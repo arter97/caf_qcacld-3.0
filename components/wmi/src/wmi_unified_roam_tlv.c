@@ -2070,9 +2070,18 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 					     WLAN_FRAME_INFO_AUTH_ALG_OFFSET,
 					     4);
 
-		if (!dst_buf->is_rsp)
+		if (!dst_buf->is_rsp) {
 			dst_buf->tx_status = wmi_get_converted_tx_status(
 							src_data->status_code);
+			/* wmi_roam_frame_info->status_code sent from the fw
+			 * denotes the tx_status of the transmitted frames.
+			 * To Do: Need a separate field for status code or
+			 * use existing field of wmi_roam_frame_info tlv
+			 * to send the tx status of transmitted frame from the
+			 * FW.
+			 */
+			dst_buf->status_code = 0;
+		}
 
 		dst_buf->retry_count = src_data->retry_count;
 		dst_buf->rssi = (-1) * src_data->rssi_dbm_abs;
