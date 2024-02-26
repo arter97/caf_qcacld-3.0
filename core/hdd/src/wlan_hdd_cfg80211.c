@@ -25302,9 +25302,8 @@ void hdd_mon_select_cbmode(struct hdd_adapter *adapter,
 			   uint32_t op_freq,
 			   struct ch_params *ch_params)
 {
-	struct hdd_station_ctx *station_ctx =
-			 WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	struct hdd_mon_set_ch_info *ch_info = &station_ctx->ch_info;
+	struct hdd_monitor_ctx *mon_ctx =
+			 WLAN_HDD_GET_MONITOR_CTX_PTR(adapter->deflink);
 	enum hdd_dot11_mode hdd_dot11_mode;
 	uint8_t ini_dot11_mode =
 			(WLAN_HDD_GET_CTX(adapter))->config->dot11Mode;
@@ -25350,14 +25349,14 @@ void hdd_mon_select_cbmode(struct hdd_adapter *adapter,
 		hdd_dot11_mode = ini_dot11_mode;
 		break;
 	}
-	ch_info->channel_width = ch_params->ch_width;
-	ch_info->phy_mode =
+	mon_ctx->bandwidth = ch_params->ch_width;
+	mon_ctx->phy_mode =
 		hdd_cfg_xlate_to_csr_phy_mode(hdd_dot11_mode);
-	ch_info->freq = op_freq;
-	ch_info->cb_mode = ch_params->ch_width;
+	mon_ctx->freq = op_freq;
+	mon_ctx->cb_mode = ch_params->ch_width;
 	hdd_debug("ch_info width %d, phymode %d channel freq %d",
-		  ch_info->channel_width, ch_info->phy_mode,
-		  ch_info->freq);
+		  mon_ctx->bandwidth, mon_ctx->phy_mode,
+		  mon_ctx->freq);
 }
 #else
 static
@@ -27723,8 +27722,7 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter;
-	struct hdd_station_ctx *sta_ctx;
-	struct hdd_mon_set_ch_info *ch_info;
+	struct hdd_monitor_ctx *mon_ctx;
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
 	struct qdf_mac_addr bssid;
@@ -27782,8 +27780,8 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 			ch_width, max_fw_bw);
 		return -EINVAL;
 	}
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
-	ch_info = &sta_ctx->ch_info;
+
+	mon_ctx = WLAN_HDD_GET_MONITOR_CTX_PTR(adapter->deflink);
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chandef->chan->center_freq) &&
 	    chandef->width == NL80211_CHAN_WIDTH_40 &&
@@ -27840,7 +27838,7 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 	req->center_freq_seg0 = ch_params.center_freq_seg0;
 	req->center_freq_seg1 = ch_params.center_freq_seg1;
 
-	sme_fill_channel_change_request(mac_handle, req, ch_info->phy_mode);
+	sme_fill_channel_change_request(mac_handle, req, mon_ctx->phy_mode);
 	status = sme_send_channel_change_req(mac_handle, req);
 	qdf_mem_free(req);
 

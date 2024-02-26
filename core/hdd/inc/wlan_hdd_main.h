@@ -730,26 +730,11 @@ struct hdd_beacon_data {
 };
 
 /**
- * struct hdd_mon_set_ch_info - Holds monitor mode channel switch params
- * @freq: Channel frequency.
- * @cb_mode: Channel bonding
- * @channel_width: Channel width 0/1/2 for 20/40/80MHz respectively.
- * @phy_mode: PHY mode
- */
-struct hdd_mon_set_ch_info {
-	uint32_t freq;
-	uint8_t cb_mode;
-	uint32_t channel_width;
-	eCsrPhyMode phy_mode;
-};
-
-/**
  * struct hdd_station_ctx -- STA-specific information
  * @roam_profile: current roaming profile
  * @conn_info: current connection information
  * @cache_conn_info: prev connection info
  * @reg_phymode: reg phymode
- * @ch_info: monitor mode channel information
  * @ap_supports_immediate_power_save: Does the current AP allow our STA
  *    to immediately go into power save?
  * @user_cfg_chn_width: max channel bandwidth set by user space
@@ -759,7 +744,6 @@ struct hdd_station_ctx {
 	struct csr_roam_profile roam_profile;
 	struct hdd_connection_info conn_info;
 	struct hdd_connection_info cache_conn_info;
-	struct hdd_mon_set_ch_info ch_info;
 	bool ap_supports_immediate_power_save;
 	uint8_t user_cfg_chn_width;
 };
@@ -1105,10 +1089,14 @@ struct freq_change_info {
  * struct hdd_monitor_ctx - Monitor specific information
  * @freq: Monitor Frequency
  * @bandwidth: Monitor bandwidth
+ * @cb_mode: Channel bonding
+ * @phy_mode: PHY mode
  */
 struct hdd_monitor_ctx {
 	qdf_freq_t freq;
 	enum phy_ch_width bandwidth;
+	uint8_t cb_mode;
+	eCsrPhyMode phy_mode;
 };
 
 #define WLAN_HDD_DEFLINK_IDX	0

@@ -10454,9 +10454,7 @@ int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
 int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct hdd_station_ctx *sta_ctx;
 	struct hdd_monitor_ctx *mon_ctx;
-	struct hdd_mon_set_ch_info *ch_info;
 	struct wlan_hdd_link_info *link_info;
 	QDF_STATUS status;
 	struct channel_change_req *req;
@@ -10495,9 +10493,6 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 			return ret;
 		}
 
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-		ch_info = &sta_ctx->ch_info;
-
 		hdd_debug("Set vdev %u monitor mode frequency %d",
 			  link_info->vdev_id, mon_ctx->freq);
 
@@ -10535,7 +10530,7 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 		req->center_freq_seg1 = ch_params.center_freq_seg1;
 
 		sme_fill_channel_change_request(hdd_ctx->mac_handle, req,
-						ch_info->phy_mode);
+						mon_ctx->phy_mode);
 		status = sme_send_channel_change_req(hdd_ctx->mac_handle, req);
 		qdf_mem_free(req);
 		if (status) {
