@@ -216,7 +216,9 @@
 #include "os_if_dp_svc.h"
 #include "wlan_osif_fpm.h"
 #include "wlan_mlo_mgr_ap.h"
-
+#ifdef WLAN_FEATURE_11BE_MLO_TTLM
+#include "wlan_t2lm_api.h"
+#endif
 /*
  * A value of 100 (milliseconds) can be sent to FW.
  * FW would enable Tx beamforming based on this.
@@ -30568,7 +30570,7 @@ __wlan_hdd_cfg80211_get_t2lm_mapping_status(struct wiphy *wiphy,
 	}
 
 	if (!wlan_cm_is_vdev_connected(vdev)) {
-		hdd_err("Not associated!, vdev %d", wlan_vdev_get_id(vdev));
+		hdd_debug("Not associated!, vdev %d", wlan_vdev_get_id(vdev));
 		ret = -EAGAIN;
 		goto vdev_release;
 	}
@@ -30696,6 +30698,178 @@ QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO_TTLM
+#define WLAN_TTLM_DEFAULT_MAPPING     0x7FFF
+
+static void hdd_get_connected_link_id(struct wlan_objmgr_vdev *vdev,
+				      uint16_t *connected_link_id)
+{
+	uint8_t i, link_id;
+	struct mlo_link_info *link_info = NULL;
+
+	if (!vdev->mlo_dev_ctx) {
+		hdd_err("MLO dev context failed");
+		return;
+	}
+
+	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_id = link_info[i].link_id;
+		if (link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		*connected_link_id |= BIT(link_id);
+	}
+}
+
+static int
+hdd_validate_ttlm_params(struct wlan_objmgr_vdev *vdev,
+			 struct cfg80211_ttlm_params *params)
+{
+	int tid, i;
+	uint16_t t2lm_map;
+	uint16_t connected_link_id = 0;
+	uint16_t provisioned_links = 0;
+
+	t2lm_map = params->dlink[0];
+
+	for (tid = 0; tid < T2LM_MAX_NUM_TIDS; tid++) {
+		if (params->ulink[tid] != params->dlink[tid])
+			return -EINVAL;
+
+		if (params->ulink[tid] != t2lm_map)
+			return -EINVAL;
+
+		if (params->dlink[tid] != t2lm_map)
+			return -EINVAL;
+	}
+
+	if (t2lm_map == WLAN_TTLM_DEFAULT_MAPPING)
+		return 0;
+
+	hdd_get_connected_link_id(vdev, &connected_link_id);
+	/* Check if the configured hw_link_id map is valid */
+	for (tid = 0; tid < T2LM_MAX_NUM_TIDS; tid++) {
+		provisioned_links = params->dlink[tid];
+
+		for (i = 0; i < WLAN_T2LM_MAX_NUM_LINKS; i++) {
+			if (!(provisioned_links & BIT(i)))
+				continue;
+
+			if (!(connected_link_id & BIT(i))) {
+				hdd_err("TTLM mapping link_id: %d is not connected", i);
+				return -EINVAL;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static int
+hdd_fill_ttlm_params(struct cfg80211_ttlm_params *params,
+		     struct wlan_t2lm_info *t2lm)
+{
+	int i;
+
+	t2lm->direction = WLAN_T2LM_BIDI_DIRECTION;
+	if (params->dlink[0] == WLAN_TTLM_DEFAULT_MAPPING) {
+		t2lm->default_link_mapping = 1;
+	} else {
+		for (i = 0; i < T2LM_MAX_NUM_TIDS; i++)
+			t2lm->ieee_link_map_tid[i] = params->dlink[i];
+	}
+
+	return 0;
+}
+
+static void hdd_print_ttlm_params(struct wlan_t2lm_info *t2lm)
+{
+	int i;
+
+	hdd_debug("Userspace TTLM mapping");
+	if (t2lm->default_link_mapping)
+		hdd_debug("Default mapping: %d", t2lm->default_link_mapping);
+
+	for (i = 0; i < T2LM_MAX_NUM_TIDS; i++)
+		hdd_debug("TID[%d]: %d", i, t2lm->ieee_link_map_tid[i]);
+}
+
+static int
+__wlan_hdd_cfg80211_set_ttlm_mapping(struct wiphy *wiphy,
+				     struct net_device *net_dev,
+				     struct cfg80211_ttlm_params *params)
+{
+	struct wlan_t2lm_info t2lm = {0};
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(net_dev);
+	struct wlan_objmgr_vdev *vdev;
+	int ret;
+
+	hdd_enter();
+
+	if (hdd_validate_adapter(adapter))
+		return -EINVAL;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Vdev is null return");
+		return -EINVAL;
+	}
+
+	if (!wlan_cm_is_vdev_connected(vdev)) {
+		hdd_debug("Not associated!, vdev %d", wlan_vdev_get_id(vdev));
+		ret = -EAGAIN;
+		goto vdev_release;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		hdd_err("failed due to non-ML connection");
+		ret = -EINVAL;
+		goto vdev_release;
+	}
+
+	ret = hdd_validate_ttlm_params(vdev, params);
+	if (ret) {
+		hdd_err("TTLM parameters are not valid");
+		goto vdev_release;
+	}
+
+	ret = hdd_fill_ttlm_params(params, &t2lm);
+	if (ret) {
+		hdd_err("Failed to fill TTLM params");
+		goto vdev_release;
+	}
+
+	hdd_print_ttlm_params(&t2lm);
+
+	ret = wlan_mlo_set_ttlm_mapping(vdev, &t2lm);
+
+vdev_release:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	hdd_exit();
+
+	return ret;
+}
+
+static int wlan_hdd_cfg80211_set_ttlm_mapping(struct wiphy *wiphy,
+					      struct net_device *net_dev,
+					      struct cfg80211_ttlm_params *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_set_ttlm_mapping(wiphy, net_dev, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif
 QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 					       struct wlan_t2lm_info *t2lm)
 {
@@ -30827,5 +31001,8 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
 	.get_link_tid_map_status = wlan_hdd_cfg80211_get_t2lm_mapping_status,
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO_TTLM
+	.set_ttlm = wlan_hdd_cfg80211_set_ttlm_mapping,
 #endif
 };

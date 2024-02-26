@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -269,6 +269,14 @@ QDF_STATUS wlan_update_t2lm_mapping(
 QDF_STATUS
 wlan_t2lm_init_default_mapping(struct wlan_t2lm_context *t2lm_ctx);
 
+/**
+ * t2lm_gen_dialog_token() - Generate TTLM dialog token
+ * @t2lm_policy: T2LM structure
+ *
+ * Return: Dialog token
+ */
+uint8_t
+t2lm_gen_dialog_token(struct wlan_mlo_peer_t2lm_policy *t2lm_policy);
 #else
 static inline QDF_STATUS
 wlan_t2lm_init_default_mapping(struct wlan_t2lm_context *t2lm_ctx)
@@ -363,6 +371,31 @@ QDF_STATUS wlan_t2lm_deliver_event(struct wlan_objmgr_vdev *vdev,
 				   void *event_data,
 				   uint32_t frame_len,
 				   uint8_t *dialog_token)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+uint8_t t2lm_gen_dialog_token(struct wlan_mlo_peer_t2lm_policy *t2lm_policy)
+{
+	return 0;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO_TTLM
+/**
+ * wlan_mlo_set_ttlm_mapping() - API to send the set TTLM req
+ * @vdev: vdev
+ * @t2lm: TTLM info parameters
+ *
+ * Return: success if event is handled else failure
+ */
+QDF_STATUS wlan_mlo_set_ttlm_mapping(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_t2lm_info *t2lm);
+#else
+static inline
+QDF_STATUS wlan_mlo_set_ttlm_mapping(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_t2lm_info *t2lm)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

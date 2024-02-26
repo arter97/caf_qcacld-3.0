@@ -119,7 +119,7 @@ bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
 	return is_valid_link_mask;
 }
 
-static uint8_t
+uint8_t
 t2lm_gen_dialog_token(struct wlan_mlo_peer_t2lm_policy *t2lm_policy)
 {
 	if (!t2lm_policy)
@@ -976,3 +976,18 @@ wlan_update_t2lm_mapping(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_TTLM
+QDF_STATUS wlan_mlo_set_ttlm_mapping(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_t2lm_info *t2lm)
+{
+	struct wlan_objmgr_peer *bss_peer;
+
+	bss_peer = wlan_vdev_get_bsspeer(vdev);
+	if (!bss_peer)
+		return QDF_STATUS_E_INVAL;
+
+	return ttlm_sm_deliver_event(bss_peer->mlo_peer_ctx,
+				    WLAN_TTLM_SM_EV_TX_ACTION_REQ,
+				    sizeof(*t2lm), t2lm);
+}
+#endif
