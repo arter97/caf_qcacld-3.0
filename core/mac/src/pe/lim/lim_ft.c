@@ -393,7 +393,7 @@ static uint8_t lim_convert_phymode_to_dot11mode(enum wlan_phymode phymode)
 
 /**
  * lim_calculate_dot11_mode() - calculate dot11 mode.
- * @mac_context: mac context
+ * @mac_ctx: mac context
  * @bcn: beacon structure
  * @band: reg_wifi_band
  *
@@ -515,7 +515,7 @@ static void lim_fill_dot11mode(struct mac_context *mac_ctx,
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
  * lim_fill_session_power_info() - to fill power info in session
- * @mac_ctx: pointer to mac ctx
+ * @mac: pointer to mac ctx
  * @pbssDescription: Pointer to pbssDescription
  * @ft_session: Pointer to FT session
  * @pe_session: Pointer to PE session
@@ -727,7 +727,7 @@ lim_fill_ft_session(struct mac_context *mac,
 	if (ft_session->htRecommendedTxWidthSet) {
 		ft_session->ch_width = CH_WIDTH_40MHZ;
 		if (ft_session->vhtCapabilityPresentInBeacon &&
-				pBeaconStruct->VHTOperation.chanWidth) {
+		    pBeaconStruct->VHTOperation.chanWidth) {
 			ft_session->ch_width =
 				pBeaconStruct->VHTOperation.chanWidth + 1;
 			ft_session->ch_center_freq_seg0 =
@@ -735,13 +735,13 @@ lim_fill_ft_session(struct mac_context *mac,
 			ft_session->ch_center_freq_seg1 =
 			pBeaconStruct->VHTOperation.chan_center_freq_seg1;
 		} else if (ft_session->vhtCapabilityPresentInBeacon &&
-			   pBeaconStruct->vendor_vht_ie.VHTOperation.chanWidth){
+			   pBeaconStruct->vendor_vht_ie.VHTOperation.chanWidth) {
 			ft_session->ch_width =
-			pBeaconStruct->vendor_vht_ie.VHTOperation.chanWidth + 1;
+				pBeaconStruct->vendor_vht_ie.VHTOperation.chanWidth + 1;
 			ft_session->ch_center_freq_seg0 =
-		pBeaconStruct->vendor_vht_ie.VHTOperation.chan_center_freq_seg0;
+				pBeaconStruct->vendor_vht_ie.VHTOperation.chan_center_freq_seg0;
 			ft_session->ch_center_freq_seg1 =
-		pBeaconStruct->vendor_vht_ie.VHTOperation.chan_center_freq_seg1;
+				pBeaconStruct->vendor_vht_ie.VHTOperation.chan_center_freq_seg1;
 
 		} else {
 			if (pBeaconStruct->HTInfo.secondaryChannelOffset ==
