@@ -11090,13 +11090,23 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	struct nlattr *mlo_link_id;
 	enum eSirMacHTChannelWidth chwidth;
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev;
 	bool update_cw_allowed;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
 
 	psoc = wlan_vdev_get_psoc(link_info->vdev);
 	if (!psoc) {
 		hdd_debug("psoc is null");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return -EINVAL;
 	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	ucfg_mlme_get_update_chan_width_allowed(psoc, &update_cw_allowed);
 	if (!update_cw_allowed) {
