@@ -924,7 +924,7 @@ wlan_hdd_cached_link_state_request(struct hdd_adapter *adapter,
 		link_state_event.link_info[link_iter].vdev_id =
 				link_info->vdev_id;
 		link_state_event.link_info[link_iter].chan_freq =
-				sta_ctx->ch_info.freq;
+				sta_ctx->conn_info.chan_freq;
 
 		if (sta_ctx->conn_info.ieee_link_id == WLAN_INVALID_LINK_ID)
 			continue;
