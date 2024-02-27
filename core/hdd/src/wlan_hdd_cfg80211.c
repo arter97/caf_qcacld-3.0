@@ -28841,6 +28841,7 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 	bool is_legacy_phymode = false;
 	struct wlan_channel chan_info;
 	int ret = 0;
+	struct ch_params ch_params = {0};
 
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("vdev not associated");
@@ -28861,6 +28862,15 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 		ret = mlo_mgr_get_per_link_chan_info(vdev, link_id, &chan_info);
 		if (ret != 0)
 			goto release;
+
+		ch_params.ch_width = chan_info.ch_width;
+		ch_params.center_freq_seg1 = chan_info.ch_cfreq2;
+		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
+							chan_info.ch_freq, 0,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
+		chan_info.ch_cfreq1 = ch_params.mhz_freq_seg0;
+		chan_info.ch_cfreq2 = ch_params.mhz_freq_seg1;
 	} else {
 		ret = wlan_hdd_cfg80211_get_vdev_chan_info(hdd_ctx, vdev,
 							   link_id,
