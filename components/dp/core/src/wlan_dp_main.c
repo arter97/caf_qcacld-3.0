@@ -232,6 +232,11 @@ bool is_dp_link_valid(struct wlan_dp_link *dp_link)
 		return false;
 	}
 
+	if (dp_link->magic != WLAN_DP_LINK_MAGIC) {
+		dp_err("dp_link %pK bad magic %llx", dp_link, dp_link->magic);
+		return false;
+	}
+
 	dp_intf = dp_link->dp_intf;
 	ret = is_dp_intf_valid(dp_intf);
 	if (ret)
@@ -1197,6 +1202,7 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	}
 
 	/* Update Parent interface details */
+	dp_link->magic = WLAN_DP_LINK_MAGIC;
 	dp_link->dp_intf = dp_intf;
 	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
 	qdf_list_insert_front(&dp_intf->dp_link_list, &dp_link->node);
@@ -1257,12 +1263,20 @@ static void dp_link_handle_cdp_vdev_delete(struct wlan_dp_psoc_context *dp_ctx,
 
 	if (!dp_link->cdp_vdev_registered || dp_link->cdp_vdev_deleted) {
 		/* CDP vdev is not created/registered or already deleted */
+		dp_info("Free dp_link %pK id %d (" QDF_MAC_ADDR_FMT ")",
+			dp_link, dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
+		dp_link->magic = 0;
 		qdf_mem_free(dp_link);
 	} else {
 		/*
 		 * Add it to inactive dp_link list, and it will be freed when
 		 * the CDP vdev gets deleted
 		 */
+		dp_info("Add to inactive list dp_link %pK id %d ("
+			QDF_MAC_ADDR_FMT ")",
+			dp_link, dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		TAILQ_INSERT_TAIL(&dp_ctx->inactive_dp_link_list, dp_link,
 				  inactive_list_elem);
 		dp_link->destroyed = 1;
@@ -2015,12 +2029,11 @@ void wlan_dp_link_cdp_vdev_delete_notification(void *context)
 	struct wlan_dp_psoc_context *dp_ctx = NULL;
 	uint8_t found = 0;
 
-	/* TODO - What will happen if cdp vdev was never created ? */
-
 	/* dp_link will not be freed before this point. */
-	if (!dp_link)
+	if (!is_dp_link_valid(dp_link))
 		return;
 
+	dp_info("dp_link %pK id %d", dp_link, dp_link->link_id);
 	dp_intf = dp_link->dp_intf;
 	dp_ctx = dp_intf->dp_ctx;
 
@@ -2045,9 +2058,17 @@ void wlan_dp_link_cdp_vdev_delete_notification(void *context)
 		else
 			qdf_assert_always(0);
 
+		dp_info("Free dp_link %pK id %d (" QDF_MAC_ADDR_FMT ")",
+			dp_link, dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
+		dp_link->magic = 0;
 		qdf_mem_free(dp_link);
 	} else {
 		/* dp_link not yet destroyed */
+		dp_info("CDP vdev delete for dp_link %pK id %d ("
+			QDF_MAC_ADDR_FMT ")",
+			dp_link, dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		dp_link->cdp_vdev_deleted = 1;
 	}
 
