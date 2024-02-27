@@ -716,9 +716,12 @@ struct wlan_dp_intf {
 #endif
 };
 
+#define WLAN_DP_LINK_MAGIC 0x5F44505F4C494E4B	/* "_DP_LINK" in ASCII */
+
 /**
  * struct wlan_dp_link - DP link (corresponds to objmgr vdev)
  * @node: list node for membership in the DP links list
+ * @magic: magic number to identify validity of dp_link
  * @link_id: ID for this DP link (Same as vdev_id)
  * @mac_addr: mac address of this link
  * @dp_intf: Parent DP interface for this DP link
@@ -733,6 +736,7 @@ struct wlan_dp_intf {
  */
 struct wlan_dp_link {
 	qdf_list_node_t node;
+	uint64_t magic;
 	uint8_t link_id;
 	struct qdf_mac_addr mac_addr;
 	struct wlan_dp_intf *dp_intf;
