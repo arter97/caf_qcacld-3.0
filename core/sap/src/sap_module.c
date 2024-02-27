@@ -2656,8 +2656,10 @@ QDF_STATUS wlansap_acs_chselect(struct sap_context *sap_context,
 
 	sap_context->acs_cfg = &config->acs_cfg;
 	sap_context->ch_width_orig = config->acs_cfg.ch_width;
-	sap_context->csr_roamProfile.phyMode = config->acs_cfg.hw_mode;
-	sap_context->phyMode = config->acs_cfg.hw_mode;
+	if (sap_context->fsm_state != SAP_STARTED) {
+		sap_context->csr_roamProfile.phyMode = config->acs_cfg.hw_mode;
+		sap_context->phyMode = config->acs_cfg.hw_mode;
+	}
 
 	/*
 	 * Now, configure the scan and ACS channel params
