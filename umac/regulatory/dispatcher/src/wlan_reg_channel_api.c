@@ -330,6 +330,12 @@ wlan_reg_get_client_psd_for_compap(struct wlan_objmgr_pdev *pdev,
 	*reg_psd = QDF_MAX((int8_t)max_reg_psd_lpi, (int8_t)max_reg_psd_sp);
 	return status;
 }
+
+bool
+wlan_reg_is_composite_allowed(struct wlan_objmgr_pdev *pdev)
+{
+       return reg_is_composite_allowed(pdev);
+}
 #endif
 
 struct regulatory_channel
