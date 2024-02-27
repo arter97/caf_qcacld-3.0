@@ -2055,6 +2055,10 @@ config WLAN_FEATURE_MULTI_LINK_SAP
 	bool "Enable multi link sap"
 	default n
 
+config CONNECTION_ROAMING_CFG
+	bool "Enable connection_roaming ini"
+	default n
+
 menu "Optional Configs"
 
 if CNSS_KIWI_V2
