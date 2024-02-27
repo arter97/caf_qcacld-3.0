@@ -677,6 +677,12 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 		STATS_ERR("failed to put stats info\n");
 		return -EIO;
 	}
+	if (is_async_req() &&
+	    nla_put_u64(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_REQUEST_ID,
+			cmd->request_id)) {
+		STATS_ERR("failed to put request id\n");
+		return -EIO;
+	}
 	if (nla_put_u64(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_FEATURE_FLAG,
 			cmd->feat_flag)) {
 		STATS_ERR("failed to put feature flag\n");
