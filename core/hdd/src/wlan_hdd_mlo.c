@@ -472,8 +472,8 @@ hdd_mlo_dev_ctxt_update(struct hdd_adapter *adapter,
 {
 	struct wlan_objmgr_psoc *psoc;
 
-	if (!qdf_is_macaddr_zero(old_mld) ||
-	    !qdf_is_macaddr_zero(new_addr))
+	if (qdf_is_macaddr_zero(old_mld) ||
+	    qdf_is_macaddr_zero(new_addr))
 		return;
 
 	psoc = wlan_vdev_get_psoc(adapter->deflink->vdev);
@@ -559,7 +559,9 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 			hdd_err("Failed to detach DP vdev %d from DP MLO Dev ctxt",
 				link_info->vdev_id);
 
-		hdd_debug("detach vdev_id %d", link_info->vdev_id);
+		hdd_debug("detach vdev_id %d" QDF_MAC_ADDR_FMT,
+			  link_info->vdev_id,
+			  QDF_MAC_ADDR_REF(&old_mld->bytes));
 		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[i++]);
 	}
 
@@ -579,10 +581,12 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 					    link_info->vdev_id,
 					    (uint8_t *)&mac_addr.bytes[0])
 					    != QDF_STATUS_SUCCESS)
-			hdd_err("Failed to detach DP vdev %d from DP MLO Dev ctxt",
+			hdd_err("Failed to attach DP vdev %d from DP MLO Dev ctxt",
 				link_info->vdev_id);
 
-		hdd_debug("attach vdev_id %d", link_info->vdev_id);
+		hdd_debug("attach vdev_id %d" QDF_MAC_ADDR_FMT,
+			  link_info->vdev_id,
+			  QDF_MAC_ADDR_REF(&mac_addr.bytes));
 		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[idx]);
 	}
 
