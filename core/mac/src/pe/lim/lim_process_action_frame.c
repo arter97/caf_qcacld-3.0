@@ -53,6 +53,7 @@
 #include <cdp_txrx_peer_ops.h>
 #include "dot11f.h"
 #include "wlan_p2p_cfg_api.h"
+#include "son_api.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
@@ -375,6 +376,10 @@ update_nss:
 		lim_set_nss_change(mac_ctx, session, sta_ptr->vhtSupportedRxNss,
 			mac_hdr->sa);
 	}
+	wlan_son_deliver_opmode(session->vdev,
+				ch_bw,
+				sta_ptr->vhtSupportedRxNss,
+				mac_hdr->sa);
 
 end:
 	qdf_mem_free(operating_mode_frm);
@@ -1150,6 +1155,9 @@ __lim_process_sm_power_save_update(struct mac_context *mac, uint8_t *pRxPacketIn
 	pSta->htMIMOPSState = state;
 	lim_post_sm_state_update(mac, pSta->htMIMOPSState,
 				 pSta->staAddr, pe_session->smeSessionId);
+	wlan_son_deliver_smps(pe_session->vdev,
+			      (eSIR_HT_MIMO_PS_STATIC == state) ? 1 : 0,
+			      pSta->staAddr);
 }
 
 
@@ -1918,6 +1926,17 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		break;
 
 	case ACTION_CATEGORY_RRM:
+
+		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
+		    LIM_IS_AP_ROLE(session) &&
+		    action_hdr->actionID == RRM_RADIO_MEASURE_RPT) {
+			mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
+			wlan_son_deliver_rrm_rpt(session->vdev,
+				 mac_hdr->sa,
+				 body_ptr + sizeof(tSirMacActionFrameHdr),
+				 frame_len - sizeof(tSirMacActionFrameHdr));
+		}
+
 		/* Ignore RRM measurement request until DHCP is set */
 		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
 		    mac_ctx->roam.roamSession[session->smeSessionId].dhcp_done) {
