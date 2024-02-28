@@ -778,7 +778,7 @@ static uint32_t sap_weight_channel_free(struct sap_context *sap_ctx,
 
 	rx_clear_count = channel_stat->rx_clear_count -
 			channel_stat->tx_frame_count -
-			channel_stat->rx_frame_count;
+			channel_stat->bss_rx_cycle_count;
 	cycle_count = channel_stat->cycle_count;
 
 	/* LSH 4, otherwise it is always 0. */
