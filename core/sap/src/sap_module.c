@@ -3827,7 +3827,7 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 	uint32_t *acs_cfg_freq_list;
 	uint32_t *master_freq_list;
 	uint32_t i;
-	bool old_acs_2g_only = true, acs_2g_only_new = true;
+	bool old_acs_2g_only = false, acs_2g_only_new = true;
 
 	acs_cfg_freq_list = qdf_mem_malloc(count * sizeof(uint32_t));
 	if (!acs_cfg_freq_list)
@@ -3844,6 +3844,7 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 		return -ENOMEM;
 
 	if (sap_config->acs_cfg.master_ch_list_count) {
+		old_acs_2g_only = true;
 		for (i = 0; i < sap_config->acs_cfg.master_ch_list_count; i++)
 			if (sap_config->acs_cfg.master_freq_list &&
 			    !WLAN_REG_IS_24GHZ_CH_FREQ(
