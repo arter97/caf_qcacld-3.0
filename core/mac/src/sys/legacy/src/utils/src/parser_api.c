@@ -9790,8 +9790,10 @@ static void
 populate_dot11f_revise_eht_caps(struct pe_session *session,
 				tDot11fIEeht_cap *eht_cap)
 {
-	if (session->ch_width != CH_WIDTH_320MHZ)
+	if (session->ch_width != CH_WIDTH_320MHZ) {
 		eht_cap->support_320mhz_6ghz = 0;
+		eht_cap->bfee_ss_320mhz = 0;
+	}
 
 	if (wlan_epcs_get_config(session->vdev))
 		eht_cap->epcs_pri_access = 1;
@@ -9814,6 +9816,7 @@ QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
 
 	/** TODO: String items needs attention. **/
 	qdf_mem_copy(eht_cap, &session->eht_config, sizeof(*eht_cap));
+
 	populate_dot11f_revise_eht_caps(session, eht_cap);
 
 	populate_dot11f_rtwt_eht_cap(mac_ctx, eht_cap);
