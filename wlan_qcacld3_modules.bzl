@@ -17,6 +17,9 @@ _target_chipset_map = {
         "peach",
         "kiwi-v2",
     ],
+    "volcano": [
+        "qca6750",
+    ],
 }
 
 _chipset_hw_map = {
