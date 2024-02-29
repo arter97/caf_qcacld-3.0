@@ -308,7 +308,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 			if (bd_id_filename[i]) {
 				BMI_DBG("%s: Trying to load %s",
 					 __func__, bd_id_filename[i]);
-				status = request_firmware(&fw_entry,
+				status = request_firmware_direct(&fw_entry,
 							  bd_id_filename[i],
 							  qdf_dev->dev);
 				if (!status)
@@ -321,7 +321,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 			/* bd.board_id not exits, using bd.bin */
 			BMI_DBG("%s: Trying to load default %s",
 				 __func__, bd_filename[i]);
-			status = request_firmware(&fw_entry, bd_filename[i],
+			status = request_firmware_direct(&fw_entry, bd_filename[i],
 						  qdf_dev->dev);
 			if (!status)
 				break;
@@ -329,7 +329,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 				__func__, bd_filename[i], status);
 		}
 	} else {
-		status = request_firmware(&fw_entry, filename, qdf_dev->dev);
+		status = request_firmware_direct(&fw_entry, filename, qdf_dev->dev);
 	}
 
 	if (status) {
@@ -575,6 +575,77 @@ static inline void ol_get_ramdump_mem(struct device *dev,
 				      struct ramdump_info *info) { }
 static inline void ol_release_ramdump_mem(struct device *dev,
 					  struct ramdump_info *info) { }
+#endif
+
+#ifdef TARGET_DUMP_FOR_NON_QC_PLATFORM
+int ol_write_ramdump_to_file(uint32_t file_no, int8_t *buf, uint32_t size)
+{
+	int ret = 0;
+	struct file *fp;
+	mm_segment_t old_fs;
+	loff_t pos = 0;
+
+	pr_err("%s: ENTER\n", __func__);
+
+	/* change to KERNEL_DS address limit */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	if (file_no == 0) {
+		/* open file to write */
+		fp = filp_open("/home/root/ramdump_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
+		if (!fp) {
+			pr_err("%s: open file error\n", __FUNCTION__);
+			ret = -1;
+			goto exit;
+		}
+	} else if (file_no == 1) {
+		/* open file to write */
+		fp = filp_open("/home/root/axi_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
+		if (!fp) {
+			pr_err("%s: open file error\n", __FUNCTION__);
+			ret = -1;
+			goto exit;
+		}
+	} else if (file_no == 2) {
+		/* open file to write */
+		fp = filp_open("/home/root/register_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
+		if (!fp) {
+			pr_err("%s: open file error\n", __FUNCTION__);
+			ret = -1;
+			goto exit;
+		}
+	} else if (file_no == 3) {
+		/* open file to write */
+		fp = filp_open("/home/root/iram1_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
+		if (!fp) {
+			pr_err("%s: open file error\n", __FUNCTION__);
+			ret = -1;
+			goto exit;
+		}
+	} else if (file_no == 4) {
+		/* open file to write */
+		fp = filp_open("/home/root/iram2_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
+		if (!fp) {
+			pr_err("%s: open file error\n", __FUNCTION__);
+			ret = -1;
+			goto exit;
+		}
+	}
+
+	/* Write buf to file */
+	kernel_write(fp, buf, size, &pos);
+
+exit:
+	/* close file before return */
+	if (fp)
+		filp_close(fp, current->files);
+	/* restore previous address limit */
+	set_fs(old_fs);
+
+	pr_err("%s: EXIT\n", __func__);
+
+	return ret;
+}
 #endif
 
 int ol_copy_ramdump(struct hif_opaque_softc *scn)
@@ -1919,6 +1990,10 @@ static int ol_target_coredump(void *inst, void *memory_block,
 
 		if (result == -EIO)
 			return ol_dump_ce_register(scn, memory_block);
+
+#ifdef TARGET_DUMP_FOR_NON_QC_PLATFORM
+		ol_write_ramdump_to_file(section_count, buffer_loc, result);
+#endif
 
 		BMI_INFO("%s: Section:%d Bytes Read:%0x", __func__,
 			 section_count, result);

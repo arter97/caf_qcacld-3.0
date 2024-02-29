@@ -4190,6 +4190,9 @@ cppflags-$(CONFIG_FEATURE_MCL_REPEATER) += -DFEATURE_MCL_REPEATER
 
 ccflags-$(CONFIG_IPA_WDI3_TX_TWO_PIPES) += -DIPA_WDI3_TX_TWO_PIPES
 
+#Flag to enable customer ramdump
+ccflags-y += -DTARGET_DUMP_FOR_NON_QC_PLATFORM
+
 KBUILD_CPPFLAGS += $(cppflags-y)
 
 # Currently, for versions of gcc which support it, the kernel Makefile
