@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4487,9 +4487,24 @@ policy_mgr_update_dynamic_inactive_bitmap(
 		inactive_links |= candidate_inactive_links;
 	}
 
-	/* 3. If there are links inactive from fw event's
+	/* 3. If standby link is present (may not be force inactive),
+	 * select the standby link as dynamic inactive link.
+	 */
+	if (num < force_inactive_num &&
+	    num < QDF_ARRAY_SIZE(link_ids)) {
+		candidate_inactive_links =
+			force_inactive_num_bitmap &
+			standby_links;
+		num += ml_nlink_convert_link_bitmap_to_ids(
+				candidate_inactive_links,
+				QDF_ARRAY_SIZE(link_ids) - num,
+				&link_ids[num]);
+		inactive_links |= candidate_inactive_links;
+	}
+
+	/* 4. If there are links inactive from fw event's
 	 * curr_inactive_linkid_bitmap, select the current inactive
-	 * links as third option. note: those link may not be force
+	 * links as last option. note: those link may not be force
 	 * inactive.
 	 */
 	if (num < force_inactive_num &&
@@ -7150,27 +7165,6 @@ policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-static bool
-policy_mgr_is_ml_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
-{
-	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
-	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	uint8_t num_enabled_ml_sta, conn_count;
-
-	conn_count = policy_mgr_get_connection_count(psoc);
-	policy_mgr_get_ml_sta_info_psoc(psoc, &num_ml_sta,
-					&num_disabled_ml_sta,
-					ml_sta_vdev_lst, ml_freq_lst,
-					&num_non_ml,
-					NULL, NULL);
-	num_enabled_ml_sta = num_ml_sta;
-	if (num_ml_sta >= num_disabled_ml_sta)
-		num_enabled_ml_sta = num_ml_sta - num_disabled_ml_sta;
-
-	return conn_count > num_enabled_ml_sta;
-}
-
 static uint8_t
 policy_mgr_get_affected_links_for_sta_sta(struct wlan_objmgr_psoc *psoc,
 					  uint8_t num_ml, qdf_freq_t *freq_list,
@@ -8553,9 +8547,8 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 /**
  * policy_mgr_is_new_force_allowed() - Check if the new force command is allowed
  * @psoc: PSOC object information
- * @active_link_bitmap: Active link bitmap
- * @force_inactive_num_bitmap: Force inactive number bitmap
- * @force_inactive_num: Number of links to be forced inactive
+ * @vdev: ml sta vdev object
+ * @active_link_bitmap: Active link bitmap from user request
  *
  * If ML STA associates in 3-link (2.4 GHz + 5 GHz + 6 GHz), Host sends force
  * inactive num command between 5 GHz and 6 GHz links to firmware as it's a DBS
@@ -8567,23 +8560,54 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
  */
 static bool
 policy_mgr_is_new_force_allowed(struct wlan_objmgr_psoc *psoc,
-				uint32_t active_link_bitmap,
-				uint16_t force_inactive_num_bitmap,
-				uint8_t force_inactive_num)
+				struct wlan_objmgr_vdev *vdev,
+				uint32_t active_link_bitmap)
 {
 	uint32_t link_bitmap = 0;
 	uint8_t link_num = 0;
+	struct set_link_req conc_link_req;
 
-	link_bitmap = ~active_link_bitmap & force_inactive_num_bitmap;
-	if (force_inactive_num_bitmap) {
+	qdf_mem_zero(&conc_link_req, sizeof(conc_link_req));
+	ml_nlink_get_force_link_request(psoc, vdev, &conc_link_req,
+					SET_LINK_FROM_CONCURRENCY);
+	/* If force inactive num is present due to MCC link(DBS RD) or
+	 * concurrency with legacy intf, don't allow force active if
+	 * left inactive link number doesn't meet concurrency
+	 * requirement.
+	 */
+	if (conc_link_req.force_inactive_num_bitmap ||
+	    conc_link_req.force_inactive_num) {
+		link_bitmap = ~active_link_bitmap &
+		conc_link_req.force_inactive_num_bitmap;
 		if (!link_bitmap) {
-			policy_mgr_err("New force bitmap not allowed");
+			policy_mgr_err("New force bitmap 0x%x not allowed due to force_inactive_num_bitmap 0x%x",
+				       active_link_bitmap,
+				       conc_link_req.
+				       force_inactive_num_bitmap);
 			return false;
 		}
 		link_num = convert_link_bitmap_to_link_ids(link_bitmap,
 							   0, NULL);
-		if (link_num < force_inactive_num)
+		if (link_num < conc_link_req.force_inactive_num) {
+			policy_mgr_debug("force inact num exists with %d don't allow act bitmap 0x%x",
+					 conc_link_req.force_active_num,
+					 active_link_bitmap);
 			return false;
+		}
+	}
+	/* If force inactive bitmap is present due to link removal or
+	 * concurrency with legacy intf, don't allow force active if
+	 * it is conflict with existing concurrency requirement.
+	 */
+	if (conc_link_req.force_inactive_bitmap) {
+		link_bitmap = active_link_bitmap &
+			conc_link_req.force_inactive_bitmap;
+		if (link_bitmap) {
+			policy_mgr_err("New force act bitmap 0x%x not allowed due to conc force inact bitmap 0x%x",
+				       active_link_bitmap,
+				       conc_link_req.force_inactive_bitmap);
+			return false;
+		}
 	}
 
 	return true;
@@ -8665,30 +8689,17 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
 		goto done;
 	} else {
-		if (policy_mgr_is_ml_sta_concurrency_present(psoc)) {
-			policy_mgr_debug("Concurrency exists, don't enter EMLSR mode");
-				goto done;
-		}
-		ml_nlink_get_curr_force_state(psoc, vdev, &curr);
-		if (curr.force_inactive_num || curr.force_active_num) {
-			if (curr.force_inactive_num) {
-				if (!policy_mgr_is_new_force_allowed(
-						psoc, active_link_bitmap,
-						curr.force_inactive_num_bitmap,
-						curr.force_inactive_num)) {
-					policy_mgr_debug("force num exists with act %d %d don't enter EMLSR mode",
-							 curr.force_active_num,
-							 curr.force_inactive_num);
-				goto done;
-				}
-			}
-		}
+		if (!policy_mgr_is_new_force_allowed(
+			psoc, vdev, active_link_bitmap))
+			goto done;
+
 		/* If current force inactive bitmap exists, we have to remove
 		 * the new active bitmap from the existing inactive bitmap,
 		 * e.g. a link id can't be present in active bitmap and
 		 * inactive bitmap at same time, so update inactive bitmap
 		 * as well.
 		 */
+		ml_nlink_get_curr_force_state(psoc, vdev, &curr);
 		if (curr.force_inactive_bitmap && !inactive_link_cnt) {
 			inactive_link_bitmap = curr.force_inactive_bitmap &
 						~active_link_bitmap;
@@ -8732,7 +8743,7 @@ done:
 
 void policy_mgr_activate_mlo_links(struct wlan_objmgr_psoc *psoc,
 				   uint8_t session_id, uint8_t num_links,
-				   struct qdf_mac_addr active_link_addr[2])
+				   struct qdf_mac_addr *active_link_addr)
 {
 	uint8_t idx, link, active_vdev_cnt = 0, inactive_vdev_cnt = 0;
 	uint16_t ml_vdev_cnt = 0;
@@ -11228,7 +11239,9 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	uint32_t sta_sap_scc_on_dfs_chan;
-	uint32_t sta_cnt, gc_cnt;
+	uint32_t sta_cnt, gc_cnt, idx;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct wlan_objmgr_vdev *vdev;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
@@ -11236,10 +11249,12 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
-	sta_cnt = policy_mgr_mode_specific_connection_count(psoc,
-							    PM_STA_MODE, NULL);
-	gc_cnt = policy_mgr_mode_specific_connection_count(psoc,
-						PM_P2P_CLIENT_MODE, NULL);
+	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
+							 vdev_id_list,
+							 PM_STA_MODE);
+	gc_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
+							&vdev_id_list[sta_cnt],
+							PM_P2P_CLIENT_MODE);
 
 	policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, sta_cnt %u, gc_cnt %u",
 			 sta_sap_scc_on_dfs_chan, sta_cnt, gc_cnt);
@@ -11253,6 +11268,30 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	    !policy_mgr_get_dfs_master_dynamic_enabled(psoc, vdev_id)) {
 		policy_mgr_err("SAP not allowed on DFS channel if no dfs master capability!!");
 		return false;
+	}
+
+	/*
+	 * Check if any of the concurrent STA/ML-STA link/P2P client are in
+	 * disconnecting state and disallow current SAP CSA. Concurrencies
+	 * would be re-evaluated upon disconnect completion and SAP would be
+	 * moved to right channel.
+	 */
+	for (idx = 0; idx < sta_cnt + gc_cnt; idx++) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    vdev_id_list[idx],
+							    WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("Invalid vdev");
+			return false;
+		}
+		if (wlan_cm_is_vdev_disconnecting(vdev) ||
+		    mlo_is_any_link_disconnecting(vdev)) {
+			policy_mgr_err("SAP is not allowed to move to DFS channel at this time, vdev %d",
+				       vdev_id_list[idx]);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			return false;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 	}
 
 	return true;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -168,6 +168,7 @@ enum wlan_main_tag {
  * @WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT: Beacon report response
  * @WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT: MLO T2LM request
  * @WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT: MLO T2LM response
+ * @WLAN_CONN_DIAG_BTM_BLOCK_EVENT: BTM-drop indication
  * @WLAN_CONN_DIAG_MAX: MAX tag
  */
 enum qca_conn_diag_log_event_type {
@@ -218,6 +219,7 @@ enum qca_conn_diag_log_event_type {
 	WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT,
 	WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT,
 	WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT,
+	WLAN_CONN_DIAG_BTM_BLOCK_EVENT,
 	WLAN_CONN_DIAG_MAX
 };
 
@@ -321,6 +323,17 @@ enum wlan_diag_connect_fail_reason {
 	WLAN_DIAG_SER_TIMEOUT,
 	WLAN_DIAG_GENERIC_FAILURE,
 	WLAN_DIAG_VALID_CANDIDATE_CHECK_FAIL,
+};
+
+/**
+ * enum wlan_diag_btm_block_reason - BTM drop/ignore reason code
+ * @WLAN_DIAG_BTM_BLOCK_MBO_WO_PMF: Connected to MBO without PMF capable AP
+ * @WLAN_DIAG_BTM_BLOCK_UNSUPPORTED_P2P_CONC: p2p go/cli is present which
+ *  restricts BTM roaming
+ */
+enum wlan_diag_btm_block_reason {
+	WLAN_DIAG_BTM_BLOCK_MBO_WO_PMF = 1,
+	WLAN_DIAG_BTM_BLOCK_UNSUPPORTED_P2P_CONC = 2,
 };
 
 /**
@@ -481,24 +494,28 @@ struct wlan_diag_mlo_t2lm_teardown {
 } qdf_packed;
 
 #define DIAG_MLO_LINK_STATUS_VERSION 1
+#define DIAG_MLO_LINK_STATUS_VERSION_2 2
 /**
  * struct wlan_diag_mlo_link_status - MLO Link status diag event structure
  * @diag_cmn: Common diag info
  * @version: structure version
- * @active_link: List of current active links. BIT 0: 2.4GHz BIT 1: 5GHz
- * BIT 2: 6GHz
- * @prev_active_link: List of inactive links. BIT 0: 2.4GHz BIT 1: 5GHz
- * BIT 2: 6GHz
+ * @active_link: List of current active links. BIT 0: 2.4 GHz BIT 1: 5 GHz
+ * BIT 2: 6 GHz
+ * @prev_active_link: List of previous active links. BIT 0: 2.4 G Hz
+ * BIT 1: 5 GHz BIT 2: 6 GHz
+ * @associated_links: Links associated in the current connection.
+ * BIT 0: 2.4 GHz BIT 1: 5 GHz BIT 2: 6 GHz
+ * @reserved: Reserved field
  * @reason: Reason for changed link status. Refer
  * enum wlan_diag_mlo_link_switch_reason
- * @reserved: Reserved field
  */
 struct wlan_diag_mlo_link_status {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
 	uint8_t version;
 	uint8_t active_link:5;
 	uint8_t prev_active_link:5;
-	uint8_t reserved:6;
+	uint8_t associated_links:5;
+	uint8_t reserved:1;
 	uint8_t reason;
 } qdf_packed;
 
@@ -1310,7 +1327,7 @@ void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev);
  * @token: dialog Token
  * @t2lm_status: T2LM response status code. Refer enum wlan_t2lm_resp_frm_type
  * @tx_status: TX status
- * @freq: Frame received/transmitted frequency
+ * @freq: frequency on which frame was transmitted/received
  * @is_rx: Flag to inidcate packet being received
  * @subtype: Determine whether the evnt sent is for t2lm request
  * or t2lm response
@@ -1439,11 +1456,13 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_connectivity_connecting_event() - API to log connecting event
  * @vdev: vdev pointer
+ * @con_req: Connection request parameter
  *
  * Return: None
  */
 void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req);
 
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
@@ -1517,11 +1536,13 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_connectivity_connecting_event() - API to log connecting event
  * @vdev: vdev pointer
+ * @con_req: Connection request parameter
  *
  * Return: None
  */
 void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev);
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req);
 
 /**
  * wlan_populate_vsie() - Populate VSIE field for logging
@@ -1662,7 +1683,8 @@ wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)
 }
 
 static inline void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req)
 {
 }
 #endif

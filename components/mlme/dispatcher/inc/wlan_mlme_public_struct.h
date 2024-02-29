@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -222,6 +222,7 @@ struct mlme_edca_ac_vo {
 /**
  * enum mlme_dot11_mode - Dot11 mode of the vdev
  * @MLME_DOT11_MODE_ALL: vdev supports all dot11 modes
+ * @MLME_DOT11_MODE_ABG: vdev supports just 11A, 11B and 11G modes
  * @MLME_DOT11_MODE_11A: vdev just supports 11A mode
  * @MLME_DOT11_MODE_11B: vdev supports 11B mode, and modes above it
  * @MLME_DOT11_MODE_11G: vdev supports 11G mode, and modes above it
@@ -234,10 +235,11 @@ struct mlme_edca_ac_vo {
  * @MLME_DOT11_MODE_11AX_ONLY: vdev just supports 11AX mode
  * @MLME_DOT11_MODE_11BE: vdev supports 11BE mode, and modes above it
  * @MLME_DOT11_MODE_11BE_ONLY: vdev just supports 11BE mode
- * @MLME_DOT11_MODE_ABG: vdev supports just 11A, 11B and 11G modes
  */
 enum mlme_dot11_mode {
 	MLME_DOT11_MODE_ALL,
+	/* Initial dot11 modes should come first */
+	MLME_DOT11_MODE_ABG,
 	MLME_DOT11_MODE_11A,
 	MLME_DOT11_MODE_11B,
 	MLME_DOT11_MODE_11G,
@@ -250,7 +252,6 @@ enum mlme_dot11_mode {
 	MLME_DOT11_MODE_11AX_ONLY,
 	MLME_DOT11_MODE_11BE,
 	MLME_DOT11_MODE_11BE_ONLY,
-	MLME_DOT11_MODE_ABG
 };
 
 /**
@@ -1064,6 +1065,7 @@ struct wlan_mlme_qos {
  * @he_sta_obsspd:
  * @he_mcs_12_13_supp_2g:
  * @he_mcs_12_13_supp_5g:
+ * @disable_sap_mcs_12_13: Bitmap to disable he mcs 12 13 for SAP
  */
 struct wlan_mlme_he_caps {
 	tDot11fIEhe_cap dot11_he_cap;
@@ -1077,6 +1079,7 @@ struct wlan_mlme_he_caps {
 	uint32_t he_sta_obsspd;
 	uint16_t he_mcs_12_13_supp_2g;
 	uint16_t he_mcs_12_13_supp_5g;
+	uint32_t disable_sap_mcs_12_13;
 };
 #endif
 
@@ -1476,6 +1479,8 @@ struct wlan_mlme_aux_dev_caps {
  * @t2lm_negotiation_support: T2LM negotiation supported enum value
  * @enable_emlsr_mode: 11BE eMLSR mode support
  * @mld_id: MLD ID of requested BSS within ML probe request frame
+ * @oem_eht_mlo_crypto_bitmap: Bitmap of APs allowed by OEMs to connect
+ * in EHT/MLO.
  * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
  * connection, bypass strict power levels
  * @sr_enable_modes: modes for which SR(Spatial Reuse) is enabled
@@ -1538,6 +1543,9 @@ struct wlan_mlme_generic {
 	bool enable_emlsr_mode;
 	enum t2lm_negotiation_support t2lm_negotiation_support;
 	uint8_t mld_id;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	uint32_t oem_eht_mlo_crypto_bitmap;
 #endif
 #ifdef WLAN_FEATURE_MCC_QUOTA
 	struct wlan_user_mcc_quota user_mcc_quota;
@@ -2961,6 +2969,42 @@ struct wlan_change_bi {
 
 #ifdef FEATURE_SET
 /**
+ * enum wlan_mlme_iface_combinations - Iface combinations
+ * @MLME_IFACE_STA_P2P_SUPPORT: STA + P2P concurrency bit
+ * @MLME_IFACE_STA_SAP_SUPPORT: STA + SAP concurrency bit
+ * @MLME_IFACE_STA_NAN_SUPPORT: STA + NAN concurrency bit
+ * @MLME_IFACE_STA_TDLS_SUPPORT: STA + TDLS concurrency bit
+ * @MLME_IFACE_STA_DUAL_P2P_SUPPORT: STA + P2P + P2P concurrency bit
+ * @MLME_IFACE_STA_SAP_P2P_SUPPORT: STA + SAP + P2P concurrency bit
+ * @MLME_IFACE_STA_SAP_NAN_SUPPORT: STA + SAP + NAN concurrency bit
+ * @MLME_IFACE_STA_P2P_NAN_SUPPORT: STA + P2P + NAN concurrency bit
+ * @MLME_IFACE_STA_P2P_TDLS_SUPPORT: STA + P2P + TDLS concurrency bit
+ * @MLME_IFACE_STA_SAP_TDLS_SUPPORT: STA + SAP + TDLS concurrency bit
+ * @MLME_IFACE_STA_NAN_TDLS_SUPPORT: STA + NAN + TDLS concurrency bit
+ * @MLME_IFACE_STA_SAP_P2P_TDLS_SUPPORT: STA + SAP + P2P + TDLS concurrency bit
+ * @MLME_IFACE_STA_SAP_NAN_TDLS_SUPPORT: STA + SAP + NAN + TDLS concurrency bit
+ * @MLME_IFACE_STA_P2P_P2P_TDLS_SUPPORT: STA + P2P + P2P + TDLS concurrency bit
+ * @MLME_IFACE_STA_P2P_NAN_TDLS_SUPPORT: STA + P2P + NAN + TDLS concurrency bit
+ */
+enum wlan_mlme_iface_combinations {
+	MLME_IFACE_STA_P2P_SUPPORT = 0x1,
+	MLME_IFACE_STA_SAP_SUPPORT = 0x2,
+	MLME_IFACE_STA_NAN_SUPPORT = 0x4,
+	MLME_IFACE_STA_TDLS_SUPPORT = 0x8,
+	MLME_IFACE_STA_DUAL_P2P_SUPPORT = 0x10,
+	MLME_IFACE_STA_SAP_P2P_SUPPORT = 0x20,
+	MLME_IFACE_STA_SAP_NAN_SUPPORT = 0x40,
+	MLME_IFACE_STA_P2P_NAN_SUPPORT = 0x80,
+	MLME_IFACE_STA_P2P_TDLS_SUPPORT = 0x100,
+	MLME_IFACE_STA_SAP_TDLS_SUPPORT = 0x200,
+	MLME_IFACE_STA_NAN_TDLS_SUPPORT = 0x400,
+	MLME_IFACE_STA_SAP_P2P_TDLS_SUPPORT = 0x800,
+	MLME_IFACE_STA_SAP_NAN_TDLS_SUPPORT = 0x1000,
+	MLME_IFACE_STA_P2P_P2P_TDLS_SUPPORT = 0x2000,
+	MLME_IFACE_STA_P2P_NAN_TDLS_SUPPORT = 0x4000,
+};
+
+/**
  * struct wlan_mlme_features - Mlme feature set structure
  * @enable_wifi_optimizer: indicates wifi optimizer is enabled or disabled
  * @sap_max_num_clients: maximum number of SoftAP clients
@@ -2979,8 +3023,8 @@ struct wlan_change_bi {
  * @roaming_ctrl_get_cu: Roaming ctrl get cu enabled or disabled
  * @vendor_req_1_version: Vendor requirement version 1
  * @vendor_req_2_version: Vendor requirement version 2
- * @sta_dual_p2p_support: STA + dual p2p support enabled or not
  * @enable2x2: Enable 2x2
+ * @iface_combinations: iface combination bitmask
  */
 struct wlan_mlme_features {
 	bool enable_wifi_optimizer;
@@ -2999,8 +3043,8 @@ struct wlan_mlme_features {
 	bool roaming_ctrl_get_cu;
 	WMI_HOST_VENDOR1_REQ1_VERSION vendor_req_1_version;
 	WMI_HOST_VENDOR1_REQ2_VERSION vendor_req_2_version;
-	bool sta_dual_p2p_support;
 	bool enable2x2;
+	uint32_t iface_combinations;
 };
 #endif
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3306,8 +3306,7 @@ QDF_STATUS sme_get_network_params(struct mac_context *mac,
 		csr_translate_to_wni_cfg_dot11_mode(mac, dot11_mode);
 
 	dot11_cfg->nw_type =
-		csr_convert_mode_to_nw_type(dot11_cfg->dot11_mode,
-					    dot11_cfg->p_band);
+		csr_convert_mode_to_nw_type(dot11_mode, dot11_cfg->p_band);
 
 	/* If INI is enabled, use the rates from hostapd */
 	if (!cds_is_sub_20_mhz_enabled() && chan_switch_hostapd_rate_enabled &&
@@ -4402,6 +4401,7 @@ sme_store_nss_chains_cfg_in_vdev(struct wlan_objmgr_vdev *vdev,
 static void
 sme_populate_user_config(struct wlan_mlme_nss_chains *dynamic_cfg,
 			 struct wlan_mlme_nss_chains *user_cfg,
+			 struct wlan_mlme_nss_chains *ini_cfg,
 			 enum nss_chains_band_info band)
 {
 	if (!user_cfg->num_rx_chains[band])
@@ -4420,17 +4420,23 @@ sme_populate_user_config(struct wlan_mlme_nss_chains *dynamic_cfg,
 		user_cfg->tx_nss[band] =
 			dynamic_cfg->tx_nss[band];
 
-	if (!user_cfg->num_tx_chains_11a)
+	if (!user_cfg->num_tx_chains_11a) {
 		user_cfg->num_tx_chains_11a =
-			dynamic_cfg->num_tx_chains_11a;
+			QDF_MIN(user_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ],
+				ini_cfg->num_tx_chains_11a);
+	}
 
-	if (!user_cfg->num_tx_chains_11b)
+	if (!user_cfg->num_tx_chains_11b) {
 		user_cfg->num_tx_chains_11b =
-			dynamic_cfg->num_tx_chains_11b;
+			QDF_MIN(user_cfg->num_tx_chains[NSS_CHAINS_BAND_2GHZ],
+				ini_cfg->num_tx_chains_11b);
+	}
 
-	if (!user_cfg->num_tx_chains_11g)
+	if (!user_cfg->num_tx_chains_11g) {
 		user_cfg->num_tx_chains_11g =
-			dynamic_cfg->num_tx_chains_11g;
+			QDF_MIN(user_cfg->num_tx_chains[NSS_CHAINS_BAND_2GHZ],
+				ini_cfg->num_tx_chains_11g);
+	}
 
 	if (!user_cfg->disable_rx_mrc[band])
 		user_cfg->disable_rx_mrc[band] =
@@ -4543,7 +4549,7 @@ sme_validate_nss_chains_config(struct wlan_objmgr_vdev *vdev,
 
 	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX; band++) {
 		sme_populate_user_config(dynamic_cfg,
-					 user_cfg, band);
+					 user_cfg, ini_cfg, band);
 		status = sme_validate_from_ini_config(user_cfg,
 						      ini_cfg,
 						      band);
@@ -4742,6 +4748,30 @@ sme_update_nss_in_mlme_cfg(mac_handle_t mac_handle,
 					   vdev_op_mode, band);
 }
 
+static void sme_dump_nss_cfg(struct wlan_mlme_nss_chains *user_cfg)
+{
+	sme_debug("num_tx_chains 2g %d 5g %d",
+		  user_cfg->num_tx_chains[NSS_CHAINS_BAND_2GHZ],
+		  user_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ]);
+
+	sme_debug("num_rx_chains 2g %d 5g %d",
+		  user_cfg->num_rx_chains[NSS_CHAINS_BAND_2GHZ],
+		  user_cfg->num_rx_chains[NSS_CHAINS_BAND_5GHZ]);
+
+	sme_debug("tx_nss 2g %d 5g %d",
+		  user_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ],
+		  user_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ]);
+	sme_debug("rx_nss 2g %d 5g %d",
+		  user_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ],
+		  user_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ]);
+	sme_debug("num_tx_chains_11b %d",
+		  user_cfg->num_tx_chains_11b);
+	sme_debug("num_tx_chains_11g %d",
+		  user_cfg->num_tx_chains_11g);
+	sme_debug("num_tx_chains_11a %d",
+		  user_cfg->num_tx_chains_11a);
+}
+
 QDF_STATUS
 sme_nss_chains_update(mac_handle_t mac_handle,
 		      struct wlan_mlme_nss_chains *user_cfg,
@@ -4782,6 +4812,11 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 
 	status = sme_validate_nss_chains_config(vdev, user_cfg,
 						dynamic_cfg);
+	sme_debug("dynamic_cfg");
+	sme_dump_nss_cfg(dynamic_cfg);
+	sme_debug("user_cfg");
+	sme_dump_nss_cfg(user_cfg);
+
 	if (QDF_IS_STATUS_ERROR(status))
 		goto release_lock;
 
@@ -12633,7 +12668,7 @@ uint32_t sme_get_wni_dot11_mode(mac_handle_t mac_handle)
  *
  * Return: QDF_STATUS_SUCCESS on success, non-zero error code on failure.
  */
-QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, tSirMacAddr bss_id,
+QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, uint8_t *bss_id,
 				  uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -14952,8 +14987,10 @@ void sme_set_bss_max_idle_period(mac_handle_t mac_handle, uint16_t cfg_val)
 #ifdef WLAN_FEATURE_11BE
 static void sme_set_eht_mcs_info(struct mac_context *mac_ctx)
 {
-	mac_ctx->eht_cap_2g.bw_le_80_rx_max_nss_for_mcs_0_to_9 = 1;
-	mac_ctx->eht_cap_2g.bw_le_80_tx_max_nss_for_mcs_0_to_9 = 1;
+	if (mac_ctx->usr_eht_testbed_cfg) {
+		mac_ctx->eht_cap_2g.bw_le_80_rx_max_nss_for_mcs_0_to_9 = 1;
+		mac_ctx->eht_cap_2g.bw_le_80_tx_max_nss_for_mcs_0_to_9 = 1;
+	}
 }
 #else
 #ifdef WLAN_FEATURE_11AX

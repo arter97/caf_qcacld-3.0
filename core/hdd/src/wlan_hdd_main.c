@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -249,6 +249,7 @@
 #include <wlan_mlo_mgr_link_switch.h>
 #include "cdp_txrx_mon.h"
 #include "os_if_ll_sap.h"
+#include "wlan_p2p_ucfg_api.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -1050,8 +1051,11 @@ static int hdd_netdev_notifier_call(struct notifier_block *nb,
 	}
 
 	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
-	if (errno)
+	if (errno) {
+		hdd_debug("%s New Net Device State = %lu, flags 0x%x NOTIFY_DONE",
+			  net_dev->name, state, net_dev->flags);
 		return NOTIFY_DONE;
+	}
 
 	errno = __hdd_netdev_notifier_call(net_dev, state);
 
@@ -1723,6 +1727,35 @@ hdd_init_get_sta_in_ll_stats_config(struct hdd_adapter *adapter)
 {
 }
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
+
+#ifdef WLAN_FEATURE_11BE_MLO
+
+static void
+hdd_init_link_state_cfg(struct hdd_config *config,
+			struct wlan_objmgr_psoc *psoc)
+{
+	config->link_state_cache_expiry_time =
+		cfg_get(psoc, CFG_LINK_STATE_CACHE_EXPIRY);
+}
+
+static void
+hdd_init_link_state_config(struct hdd_adapter *adapter)
+{
+	adapter->link_state_cached_timestamp = 0;
+}
+
+#else
+static void
+hdd_init_link_state_cfg(struct hdd_config *config,
+			struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static void
+hdd_init_link_state_config(struct hdd_adapter *adapter)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 
 #ifdef WLAN_FEATURE_IGMP_OFFLOAD
 static void
@@ -2690,6 +2723,9 @@ static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
 
 	ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
 
+	if (wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 1))
+		hdd_err("IMPS feature enable failed");
+
 	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (!sta_adapter) {
 		hdd_debug("STA adapter does not exist");
@@ -2707,6 +2743,9 @@ static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 		return;
 
 	ucfg_fwol_set_ilp_config(hdd_ctx->psoc, hdd_ctx->pdev, 0);
+
+	if (wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 0))
+		hdd_err("IMPS feature disable failed");
 
 	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (!sta_adapter) {
@@ -3962,6 +4001,8 @@ static bool hdd_is_chan_switch_in_progress(void)
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_CHAN_SWITCH_IN_PROGRESS;
 	struct hdd_ap_ctx *ap_ctx;
 	struct wlan_hdd_link_info *link_info;
+	bool is_restart;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
@@ -3971,7 +4012,21 @@ static bool hdd_is_chan_switch_in_progress(void)
 
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
-			if (qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_OSIF_ID);
+			if (!vdev)
+				continue;
+			is_restart = false;
+			if (wlan_vdev_is_restart_progress(vdev) ==
+			    QDF_STATUS_SUCCESS) {
+				hdd_debug("vdev: %d restart in progress",
+					  wlan_vdev_get_id(vdev));
+				is_restart = true;
+			}
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+			if (is_restart ||
+			    qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
 				hdd_debug("channel switch progress for vdev_id %d",
 					  link_info->vdev_id);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
@@ -5760,9 +5815,9 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 			hdd_info_rl("VDEV is not in disconnected state, set mac address isn't supported");
 			return false;
 		}
-		fallthrough;
-	case QDF_P2P_DEVICE_MODE:
 		return true;
+	case QDF_P2P_DEVICE_MODE:
+		return ucfg_is_p2p_device_dynamic_set_mac_addr_supported(adapter->hdd_ctx->psoc);
 	case QDF_SAP_MODE:
 		if (test_bit(SOFTAP_BSS_STARTED,
 			     &adapter->deflink->link_flags)) {
@@ -5787,7 +5842,7 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	void *cookie;
 	bool update_mld_addr;
 	uint32_t fw_resp_status;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct osif_request *request;
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_adapter *adapter = link_info->adapter;
@@ -5812,6 +5867,8 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 	}
 	request = osif_request_alloc(&params);
 	if (!request) {
+		hdd_err("request alloc fail");
+		status = QDF_STATUS_E_NOMEM;
 		ret = -ENOMEM;
 		goto status_ret;
 	}
@@ -5874,12 +5931,8 @@ int hdd_dynamic_mac_address_set(struct wlan_hdd_link_info *link_info,
 					  update_self_peer, update_mld_addr,
 					  ret);
 
-	if (QDF_IS_STATUS_ERROR(status))
-		ret = qdf_status_to_os_return(status);
-
 status_ret:
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to attach CDP vdev. status:%d", status);
 		ret = qdf_status_to_os_return(status);
 		goto allow_suspend;
 	} else if (!ret) {
@@ -6922,6 +6975,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 
 	qdf_atomic_init(&adapter->is_ll_stats_req_pending);
 	hdd_init_get_sta_in_ll_stats_config(adapter);
+	hdd_init_link_state_config(adapter);
 
 	return adapter;
 
@@ -7416,9 +7470,12 @@ hdd_vdev_configure_max_tdls_params(struct wlan_objmgr_psoc *psoc,
 	uint16_t max_peer_count;
 	bool target_bigtk_support = false;
 
-	/* Max peer can be tdls peers + self peer + bss peer */
+	/*
+	 * Max peer can be tdls peers + self peer + bss peer +
+	 * temp bss peer for roaming create/delete peer at same time
+	 */
 	max_peer_count = cfg_tdls_get_max_peer_count(psoc);
-	max_peer_count += 2;
+	max_peer_count += 3;
 	wlan_vdev_set_max_peer_count(vdev, max_peer_count);
 
 	ucfg_mlme_get_bigtk_support(psoc, &target_bigtk_support);
@@ -7786,6 +7843,7 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_START_PRE_CAC_TRANS",
 		"NET_DEV_HOLD_IS_ANY_STA_CONNECTED",
 		"NET_DEV_HOLD_GET_ADAPTER_BY_BSSID",
+		"NET_DEV_HOLD_ALLOW_NEW_INTF",
 		"NET_DEV_HOLD_ID_MAX"};
 	int32_t num_dbg_strings = QDF_ARRAY_SIZE(strings);
 
@@ -8117,6 +8175,166 @@ void hdd_adapter_update_mlo_mgr_mac_addr(struct hdd_adapter *adapter)
 	mlo_mgr_update_link_info_mac_addr(adapter->deflink->vdev, &link_mac);
 }
 
+#ifdef FEATURE_COEX
+/**
+ * hdd_send_coex_config_params() - Send coex config params to FW
+ * @hdd_ctx: HDD context
+ * @adapter: Primary adapter context
+ *
+ * This function is used to send all coex config related params to FW
+ *
+ * Return: 0 on success and -EINVAL on failure
+ */
+static int hdd_send_coex_config_params(struct hdd_context *hdd_ctx,
+				       struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct coex_config_params coex_cfg_params = {0};
+	struct coex_multi_config *coex_multi_cfg = NULL;
+	struct wlan_fwol_coex_config config = {0};
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	enum coex_btc_chain_mode btc_chain_mode;
+	QDF_STATUS status;
+	uint32_t i = 0;
+
+	if (!adapter) {
+		hdd_err("adapter is invalid");
+		goto err;
+	}
+
+	if (!psoc) {
+		hdd_err("HDD psoc is invalid");
+		goto err;
+	}
+
+	status = ucfg_fwol_get_coex_config_params(psoc, &config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Unable to get coex config params");
+		goto err;
+	}
+
+	coex_multi_cfg = qdf_mem_malloc(sizeof(*coex_multi_cfg));
+	if (!coex_multi_cfg)
+		goto err;
+
+	coex_multi_cfg->vdev_id = adapter->deflink->vdev_id;
+
+	coex_multi_cfg->cfg_items[i].config_type = WMI_COEX_CONFIG_TX_POWER;
+	coex_multi_cfg->cfg_items[i].config_arg1 = config.max_tx_power_for_btc;
+
+	wma_nofl_debug("TXP[W][send_coex_cfg]: %d",
+		       config.max_tx_power_for_btc);
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+					WMI_COEX_CONFIG_HANDOVER_RSSI;
+	coex_multi_cfg->cfg_items[i].config_arg1 =
+					config.wlan_low_rssi_threshold;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type = WMI_COEX_CONFIG_BTC_MODE;
+
+	/* Modify BTC_MODE according to BTC_CHAIN_MODE */
+	status = ucfg_coex_psoc_get_btc_chain_mode(psoc, &btc_chain_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get btc chain mode");
+		btc_chain_mode = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
+	}
+
+	if (btc_chain_mode <= WLAN_COEX_BTC_CHAIN_MODE_HYBRID)
+		coex_multi_cfg->cfg_items[i].config_arg1 = btc_chain_mode;
+	else
+		coex_multi_cfg->cfg_items[i].config_arg1 = config.btc_mode;
+
+	hdd_debug("Configured BTC mode is %d, BTC chain mode is 0x%x, set BTC mode to %d",
+		  config.btc_mode, btc_chain_mode,
+		  coex_multi_cfg->cfg_items[i].config_arg1);
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_ANTENNA_ISOLATION;
+	coex_multi_cfg->cfg_items[i].config_arg1 = config.antenna_isolation;
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_BT_LOW_RSSI_THRESHOLD;
+	coex_multi_cfg->cfg_items[i].config_arg1 = config.bt_low_rssi_threshold;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_BT_INTERFERENCE_LEVEL;
+	coex_multi_cfg->cfg_items[i].config_arg1 =
+				config.bt_interference_low_ll;
+	coex_multi_cfg->cfg_items[i].config_arg2 =
+				config.bt_interference_low_ul;
+	coex_multi_cfg->cfg_items[i].config_arg3 =
+				config.bt_interference_medium_ll;
+	coex_multi_cfg->cfg_items[i].config_arg4 =
+				config.bt_interference_medium_ul;
+	coex_multi_cfg->cfg_items[i].config_arg5 =
+				config.bt_interference_high_ll;
+	coex_multi_cfg->cfg_items[i].config_arg6 =
+				config.bt_interference_high_ul;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	if (wlan_hdd_mpta_helper_enable(&coex_cfg_params, &config))
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_BT_SCO_ALLOW_WLAN_2G_SCAN;
+	coex_multi_cfg->cfg_items[i].config_arg1 =
+				config.bt_sco_allow_wlan_2g_scan;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_LE_SCAN_POLICY;
+	coex_multi_cfg->cfg_items[i].config_arg1 = config.ble_scan_coex_policy;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+
+#ifdef FEATURE_COEX_TPUT_SHAPING_CONFIG
+	coex_multi_cfg->cfg_items[i].config_type =
+				WMI_COEX_CONFIG_ENABLE_TPUT_SHAPING;
+	coex_multi_cfg->cfg_items[i].config_arg1 =
+				config.coex_tput_shaping_enable;
+
+	if (++i > COEX_MULTI_CONFIG_MAX_CNT)
+		goto err;
+#endif
+
+	coex_multi_cfg->num_configs = i;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_COEX_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		goto err;
+	}
+
+	ucfg_coex_send_multi_config(vdev, coex_multi_cfg);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_COEX_ID);
+	qdf_mem_free(coex_multi_cfg);
+
+	return 0;
+err:
+	qdf_mem_free(coex_multi_cfg);
+	return -EINVAL;
+}
+#else
 /**
  * hdd_send_coex_config_params() - Send coex config params to FW
  * @hdd_ctx: HDD context
@@ -8267,6 +8485,7 @@ static int hdd_send_coex_config_params(struct hdd_context *hdd_ctx,
 err:
 	return -EINVAL;
 }
+#endif
 
 /**
  * hdd_send_coex_traffic_shaping_mode() - Send coex traffic shaping mode
@@ -9277,6 +9496,7 @@ static void hdd_stop_and_cleanup_ndi(struct wlan_hdd_link_info *link_info)
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 
+	hdd_destroy_adapter_sysfs_files(adapter);
 	/* For NDI do not use roam_profile */
 	INIT_COMPLETION(adapter->disconnect_comp_var);
 	hdd_peer_cleanup(link_info);
@@ -14347,6 +14567,7 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 
 	config->exclude_selftx_from_cca_busy =
 			cfg_get(psoc, CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME);
+	hdd_init_link_state_cfg(config, psoc);
 }
 
 #ifdef CONNECTION_ROAMING_CFG
@@ -14739,6 +14960,7 @@ void hdd_adapter_reset_station_ctx(struct hdd_adapter *adapter)
 		qdf_mem_zero(&sta_ctx->conn_info.bssid, QDF_MAC_ADDR_SIZE);
 
 		hdd_cm_clear_ieee_link_id(link_info);
+		sta_ctx->user_cfg_chn_width = CH_WIDTH_INVALID;
 	}
 }
 
@@ -19818,6 +20040,35 @@ static int __hdd_driver_mode_change(struct hdd_context *hdd_ctx,
 	return 0;
 }
 
+static void hdd_pre_mode_change(enum QDF_GLOBAL_MODE mode)
+{
+	struct osif_psoc_sync *psoc_sync;
+	struct hdd_context *hdd_ctx;
+	int errno;
+	enum QDF_GLOBAL_MODE curr_mode;
+
+	curr_mode = hdd_get_conparam();
+	if (curr_mode != QDF_GLOBAL_MISSION_MODE)
+		return;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return;
+
+	errno = osif_psoc_sync_op_start(hdd_ctx->parent_dev, &psoc_sync);
+	if (errno) {
+		hdd_err("psoc op start failed");
+		return;
+	}
+
+	hdd_debug("cleanup scan queue");
+	if (hdd_ctx && hdd_ctx->pdev)
+		wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+}
+
 static int hdd_driver_mode_change(enum QDF_GLOBAL_MODE mode)
 {
 	struct osif_driver_sync *driver_sync;
@@ -19826,6 +20077,8 @@ static int hdd_driver_mode_change(enum QDF_GLOBAL_MODE mode)
 	int errno;
 
 	hdd_enter();
+
+	hdd_pre_mode_change(mode);
 
 	status = osif_driver_sync_trans_start_wait(&driver_sync);
 	if (QDF_IS_STATUS_ERROR(status)) {

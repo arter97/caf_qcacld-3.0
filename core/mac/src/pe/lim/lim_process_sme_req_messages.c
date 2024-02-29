@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2098,7 +2098,7 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 		is_eht_allowed =
 			wlan_cm_is_eht_allowed_for_current_security(
 					wlan_pdev_get_psoc(mac_ctx->pdev),
-					scan_entry);
+					scan_entry, false);
 		util_scan_free_cache_entry(scan_entry);
 		if (!is_eht_allowed) {
 			pe_debug("Downgrade to 11ax mode due to AP security validation failure");
@@ -3222,7 +3222,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	ePhyChanBondState cb_mode;
 	const uint8_t *vendor_ie;
 	uint16_t ie_len;
-	int8_t local_power_constraint;
+	int8_t local_power_constraint = 0;
 	struct vdev_mlme_obj *mlme_obj;
 	bool is_pwr_constraint = false;
 	tSirMacCapabilityInfo *ap_cap_info;
@@ -6294,19 +6294,23 @@ void lim_calculate_tpc(struct mac_context *mac,
 
 		/* max tx power calculation */
 		max_tx_power = mlme_obj->reg_tpc_obj.reg_max[i];
-		/* If AP local power constraint is present */
-		if (mlme_obj->reg_tpc_obj.ap_constraint_power) {
-			local_constraint =
-				mlme_obj->reg_tpc_obj.ap_constraint_power;
-			pe_debug("local constraint: %d power constraint absolute %d",
-				 local_constraint,
-				 mlme_obj->reg_tpc_obj.is_power_constraint_abs);
-			if (mlme_obj->reg_tpc_obj.is_power_constraint_abs)
+
+		local_constraint = mlme_obj->reg_tpc_obj.ap_constraint_power;
+		pe_debug("local constraint: %d power constraint absolute %d",
+			 local_constraint,
+			 mlme_obj->reg_tpc_obj.is_power_constraint_abs);
+		if (mlme_obj->reg_tpc_obj.is_power_constraint_abs) {
+			if (!local_constraint) {
+				pe_debug("ignore abs ap constraint power 0!");
+				max_tx_power = reg_max;
+			} else {
 				max_tx_power = QDF_MIN(reg_max,
 						       local_constraint);
-			else
-				max_tx_power = reg_max - local_constraint;
+			}
+		} else {
+			max_tx_power = reg_max - local_constraint;
 		}
+
 		/* If TPE is present */
 		if (is_tpe_present && !skip_tpe) {
 			if (!is_psd_power && mlme_obj->reg_tpc_obj.eirp_power)
@@ -9164,10 +9168,9 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		break;
 
 	case eWNI_SME_ASSOC_CNF:
-		if (pMsg->type == eWNI_SME_ASSOC_CNF)
-			pe_debug("Received ASSOC_CNF message");
-			__lim_process_sme_assoc_cnf_new(mac, pMsg->type,
-							msg_buf);
+		pe_debug("Received ASSOC_CNF message");
+		__lim_process_sme_assoc_cnf_new(mac, pMsg->type,
+						msg_buf);
 		break;
 
 	case eWNI_SME_ADDTS_REQ:

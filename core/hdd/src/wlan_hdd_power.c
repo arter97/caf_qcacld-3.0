@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -679,16 +679,7 @@ static inline void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter)
 {}
 #endif
 
-/**
- * hdd_send_ps_config_to_fw() - Check user pwr save config set/reset PS
- * @adapter: pointer to hdd adapter
- *
- * This function checks the power save configuration saved in MAC context
- * and sends power save config to FW.
- *
- * Return: None
- */
-static void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter)
+void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
 	bool is_mlo_vdev;
@@ -1221,7 +1212,9 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 	return NOTIFY_DONE;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+/** cpuidle_governor_latency_req() is not exported by upstream kernel **/
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) && \
+	defined(__ANDROID_COMMON_KERNEL__))
 bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 {
 	long long curr_val_ns;

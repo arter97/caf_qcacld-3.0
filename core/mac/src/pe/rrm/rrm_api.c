@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1240,18 +1240,18 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 
 	measDuration = pBeaconReq->measurement_request.Beacon.meas_duration;
 
-	pe_nofl_info("RX: [802.11 BCN_RPT] seq:%d SSID:" QDF_SSID_FMT " BSSID:" QDF_MAC_ADDR_FMT " Token:%d op_class:%d ch:%d meas_mode:%d meas_duration:%d max_meas_dur: %d",
-		     mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
-		     QDF_SSID_REF(
+	pe_nofl_rl_info("RX: [802.11 BCN_RPT] seq:%d SSID:" QDF_SSID_FMT " BSSID:" QDF_MAC_ADDR_FMT " Token:%d op_class:%d ch:%d meas_mode:%d meas_duration:%d max_meas_dur: %d",
+			mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
+			QDF_SSID_REF(
 			pBeaconReq->measurement_request.Beacon.SSID.num_ssid,
 			pBeaconReq->measurement_request.Beacon.SSID.ssid),
-		     QDF_MAC_ADDR_REF(
+			QDF_MAC_ADDR_REF(
 			pBeaconReq->measurement_request.Beacon.BSSID),
-		     pBeaconReq->measurement_token,
-		     pBeaconReq->measurement_request.Beacon.regClass,
-		     pBeaconReq->measurement_request.Beacon.channel,
-		     pBeaconReq->measurement_request.Beacon.meas_mode,
-		     measDuration, maxMeasduration);
+			pBeaconReq->measurement_token,
+			pBeaconReq->measurement_request.Beacon.regClass,
+			pBeaconReq->measurement_request.Beacon.channel,
+			pBeaconReq->measurement_request.Beacon.meas_mode,
+			measDuration, maxMeasduration);
 
 	req_mode = (pBeaconReq->parallel << 0) | (pBeaconReq->enable << 1) |
 		   (pBeaconReq->request << 2) | (pBeaconReq->report << 3) |
@@ -2061,8 +2061,8 @@ rrm_process_channel_load_req(struct mac_context *mac,
 {
 	struct scheduler_msg msg = {0};
 	struct ch_load_ind *load_ind;
-	struct bw_ind_element bw_ind;
-	struct wide_bw_chan_switch wide_bw;
+	struct bw_ind_element bw_ind = {0};
+	struct wide_bw_chan_switch wide_bw = {0};
 	struct rrm_reporting rrm_report;
 	uint8_t op_class, channel;
 	uint16_t randomization_intv, meas_duration, max_meas_duration;
@@ -2110,7 +2110,10 @@ rrm_process_channel_load_req(struct mac_context *mac,
 			pe_debug("Dropping req: invalid is_bw_ind_element IE");
 			return eRRM_REFUSED;
 		}
-	} else if (is_wide_bw_chan_switch) {
+	}
+
+	if (is_wide_bw_chan_switch) {
+		wide_bw.is_wide_bw_chan_switch = true;
 		wide_bw.channel_width = chan_load_req->measurement_request.channel_load.wide_bw_chan_switch.new_chan_width;
 		wide_bw.center_chan_freq0 = chan_load_req->measurement_request.channel_load.wide_bw_chan_switch.new_center_chan_freq0;
 		wide_bw.center_chan_freq1 = chan_load_req->measurement_request.channel_load.wide_bw_chan_switch.new_center_chan_freq1;
@@ -2118,12 +2121,10 @@ rrm_process_channel_load_req(struct mac_context *mac,
 			 wide_bw.channel_width, wide_bw.center_chan_freq0,
 			 wide_bw.center_chan_freq1);
 		if (wide_bw.channel_width < CH_WIDTH_20MHZ ||
-		    bw_ind.channel_width >= CH_WIDTH_320MHZ) {
+		    wide_bw.channel_width >= CH_WIDTH_320MHZ) {
 			pe_debug("Dropping req: invalid wide_bw IE");
 			return eRRM_REFUSED;
 		}
-	} else {
-		pe_debug("IE(s) are NULL in channel load request");
 	}
 
 	op_class = chan_load_req->measurement_request.channel_load.op_class;
@@ -2198,24 +2199,11 @@ rrm_process_channel_load_req(struct mac_context *mac,
 	load_ind->meas_duration = meas_duration;
 	curr_req->token = chan_load_req->measurement_token;
 
-	if (is_wide_bw_chan_switch) {
-		load_ind->wide_bw.is_wide_bw_chan_switch = true;
-		load_ind->wide_bw.channel_width = wide_bw.channel_width;
-		load_ind->wide_bw.center_chan_freq0 = wide_bw.center_chan_freq0;
-		load_ind->wide_bw.center_chan_freq1 = wide_bw.center_chan_freq1;
-	} else {
-		load_ind->wide_bw.channel_width = CH_WIDTH_INVALID;
-	}
+	if (is_wide_bw_chan_switch)
+		load_ind->wide_bw = wide_bw;
 
-	if (bw_ind.is_bw_ind_element) {
-		load_ind->bw_ind.is_bw_ind_element = true;
-		load_ind->bw_ind.channel_width = bw_ind.channel_width;
-		load_ind->bw_ind.ccfi0 = bw_ind.ccfi0;
-		load_ind->bw_ind.ccfi1 = bw_ind.ccfi1;
-		load_ind->bw_ind.center_freq = bw_ind.center_freq;
-	} else {
-		load_ind->bw_ind.is_bw_ind_element = false;
-	}
+	if (is_bw_ind)
+		load_ind->bw_ind = bw_ind;
 
 	/* Send request to SME. */
 	msg.type = eWNI_SME_CHAN_LOAD_REQ_IND;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -892,7 +892,6 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_STA_INFO);
-	wlan_connectivity_connecting_event(vdev);
 out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
@@ -1023,18 +1022,27 @@ out:
 }
 
 void
-wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev)
+wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_connect_req *con_req)
 {
 	QDF_STATUS status;
 	struct wlan_cm_connect_req req;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_connect);
 
-	status = wlan_cm_get_active_connect_req_param(vdev, &req);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		logging_err("vdev: %d failed to get active cmd request",
-			    wlan_vdev_get_id(vdev));
+	if (!wlan_cm_is_first_candidate_connect_attempt(vdev))
 		return;
+
+	/* for candidate not found case*/
+	if (con_req) {
+		req = *con_req;
+	} else {
+		status = wlan_cm_get_active_connect_req_param(vdev, &req);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			logging_err("vdev: %d failed to get active cmd request",
+				    wlan_vdev_get_id(vdev));
+			return;
+		}
 	}
 
 	wlan_diag_event.version = DIAG_CONN_VERSION;
@@ -1091,7 +1099,7 @@ wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
 	mlpeer = wlan_mlo_get_mlpeer_by_peer_mladdr(peer_mld, &mldev);
 	if (!mlpeer) {
 		logging_err("ml peer not found");
-		goto out;
+		return 0;
 	}
 
 	for (i = 0; i < MAX_MLO_LINK_ID; i++) {
@@ -1099,7 +1107,7 @@ wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
 			link_info = mlo_mgr_get_ap_link_by_link_id(mldev, i);
 			if (!link_info) {
 				logging_err("link: %d info does not exist", i);
-				continue;
+				return 0;
 			}
 
 			freq = link_info->link_chan_info->ch_freq;
@@ -1111,29 +1119,85 @@ wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
 		}
 	}
 
-out:
+	return band_bitmap;
+}
+
+static uint8_t
+wlan_get_supported_link_band_bitmap(struct mlo_link_switch_context *link_ctx)
+{
+	uint8_t band_bitmap = 0, i = 0;
+	struct mlo_link_info link_info;
+	struct wlan_channel *chan_info;
+	enum wlan_diag_wifi_band band;
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = link_ctx->links_info[i];
+
+		chan_info = link_info.link_chan_info;
+		if (!chan_info)
+			continue;
+
+		band = wlan_convert_freq_to_diag_band(chan_info->ch_freq);
+		if (band == WLAN_INVALID_BAND)
+			continue;
+
+		band_bitmap |= BIT(band - 1);
+	}
+
 	return band_bitmap;
 }
 
 void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 					     struct mlo_link_switch_params *src)
 {
+	struct wlan_mlo_peer_context *ml_peer = NULL;
+	struct wlan_mlo_dev_context *mld_ctx = NULL;
+
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
 				 struct wlan_diag_mlo_link_status);
 
 	qdf_mem_zero(&wlan_diag_event,
 		     sizeof(struct wlan_diag_mlo_link_status));
 
+	ml_peer = wlan_mlo_get_mlpeer_by_peer_mladdr(&src->mld_addr, &mld_ctx);
+
+	if (!mld_ctx) {
+		logging_err("mlo dev ctx for mld_mac: "
+			    QDF_MAC_ADDR_FMT
+			    " not found",
+			    QDF_MAC_ADDR_REF(src->mld_addr.bytes));
+		return;
+	}
+
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
-	wlan_diag_event.version = DIAG_MLO_LINK_STATUS_VERSION;
+	wlan_diag_event.version = DIAG_MLO_LINK_STATUS_VERSION_2;
 
 	wlan_diag_event.active_link =
 		wlan_convert_link_id_to_diag_band(&src->mld_addr,
 						  src->active_link_bitmap);
+	if (!wlan_diag_event.active_link)
+		return;
 	wlan_diag_event.prev_active_link =
 		wlan_convert_link_id_to_diag_band(&src->mld_addr,
 						  src->prev_link_bitmap);
+	if (!wlan_diag_event.prev_active_link)
+		return;
+
+	if (!mld_ctx->link_ctx) {
+		logging_err("link ctx for mld_mac: "
+			    QDF_MAC_ADDR_FMT
+			    " not found",
+			    QDF_MAC_ADDR_REF(src->mld_addr.bytes));
+		return;
+	}
+
+	wlan_diag_event.associated_links =
+			wlan_get_supported_link_band_bitmap(mld_ctx->link_ctx);
+
+	if (!wlan_diag_event.associated_links)
+		return;
+
 	wlan_diag_event.reason = src->reason_code;
 	/*
 	 * FW timestamp received from FW in milliseconds and to be sent to

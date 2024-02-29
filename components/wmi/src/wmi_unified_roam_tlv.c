@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2570,6 +2570,14 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	psoc = wmi_handle->soc->wmi_psoc;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, synch_event->vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		wmi_err("For vdev:%d object is NULL", synch_event->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (synch_event->bcn_probe_rsp_len >
 		param_buf->num_bcn_probe_rsp_frame ||
 		synch_event->reassoc_req_len >
@@ -2585,19 +2593,10 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		goto abort_roam;
 	}
 
-	psoc = wmi_handle->soc->wmi_psoc;
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, synch_event->vdev_id,
-						    WLAN_MLME_SB_ID);
-	if (!vdev) {
-		wmi_err("For vdev:%d object is NULL", synch_event->vdev_id);
-		status = QDF_STATUS_E_FAILURE;
-		goto abort_roam;
-	}
-
 	rso_cfg = wlan_cm_get_rso_config(vdev);
 	if (!rso_cfg) {
 		status = QDF_STATUS_E_FAILURE;
-		goto end;
+		goto abort_roam;
 	}
 
 	/*
@@ -2642,18 +2641,18 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 		if (synch_event->bcn_probe_rsp_len > WMI_SVC_MSG_MAX_SIZE) {
 			status = QDF_STATUS_E_FAILURE;
-			goto end;
+			goto abort_roam;
 		}
 		if (synch_event->reassoc_rsp_len >
 			(WMI_SVC_MSG_MAX_SIZE - synch_event->bcn_probe_rsp_len)) {
 			status = QDF_STATUS_E_FAILURE;
-			goto end;
+			goto abort_roam;
 		}
 		if (synch_event->reassoc_req_len >
 			WMI_SVC_MSG_MAX_SIZE - (synch_event->bcn_probe_rsp_len +
 			synch_event->reassoc_rsp_len)) {
 			status = QDF_STATUS_E_FAILURE;
-			goto end;
+			goto abort_roam;
 		}
 		roam_synch_data_len = bcn_probe_rsp_len +
 			reassoc_rsp_len + reassoc_req_len;
@@ -2666,7 +2665,7 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			(sizeof(*synch_event) + sizeof(wmi_channel) +
 			 sizeof(wmi_key_material) + sizeof(uint32_t))) {
 			status = QDF_STATUS_E_FAILURE;
-			goto end;
+			goto abort_roam;
 		}
 		roam_synch_data_len += sizeof(struct roam_offload_synch_ind);
 	}
@@ -2675,21 +2674,22 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	if (!roam_sync) {
 		QDF_ASSERT(roam_sync);
 		status = QDF_STATUS_E_NOMEM;
-		goto end;
+		goto abort_roam;
 	}
 
 	*roam_sync_ind = roam_sync;
 	status = wmi_fill_roam_sync_buffer(wmi_handle, vdev, rso_cfg,
 					   roam_sync, param_buf);
 
-end:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 abort_roam:
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wmi_err("%d Failed to extract roam sync ind", status);
-		wlan_cm_roam_stop_req(psoc, synch_event->vdev_id,
-				      REASON_ROAM_SYNCH_FAILED);
+		wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+					  synch_event->vdev_id,
+					  WLAN_ROAM_RSO_STOPPED,
+					  REASON_ROAM_SYNCH_FAILED);
 	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 	return status;
 }
 
@@ -3756,16 +3756,33 @@ enum wlan_crypto_cipher_type wlan_wmi_cipher_to_crypto(uint8_t cipher)
 		return WLAN_CRYPTO_CIPHER_NONE;
 	case WMI_CIPHER_WEP:
 		return WLAN_CRYPTO_CIPHER_WEP;
-	case WMI_CIPHER_WAPI:
-		return WLAN_CRYPTO_CIPHER_WAPI_SMS4;
+	case WMI_CIPHER_TKIP:
+		return WLAN_CRYPTO_CIPHER_TKIP;
+	case WMI_CIPHER_AES_OCB:
+		return WLAN_CRYPTO_CIPHER_AES_OCB;
 	case WMI_CIPHER_AES_CCM:
 		return WLAN_CRYPTO_CIPHER_AES_CCM;
+	case WMI_CIPHER_WAPI:
+		return WLAN_CRYPTO_CIPHER_WAPI_SMS4;
+	case WMI_CIPHER_CKIP:
+		return WLAN_CRYPTO_CIPHER_CKIP;
 	case WMI_CIPHER_AES_CMAC:
 		return WLAN_CRYPTO_CIPHER_AES_CMAC;
-	case WMI_CIPHER_AES_GMAC:
-		return WLAN_CRYPTO_CIPHER_AES_GMAC;
 	case WMI_CIPHER_AES_GCM:
 		return WLAN_CRYPTO_CIPHER_AES_GCM;
+	case WMI_CIPHER_AES_GMAC:
+		return WLAN_CRYPTO_CIPHER_AES_GMAC;
+	case WMI_CIPHER_WAPI_GCM_SM4:
+		return WLAN_CRYPTO_CIPHER_WAPI_GCM4;
+	case WMI_CIPHER_BIP_CMAC_128:
+		return WLAN_CRYPTO_CIPHER_AES_CMAC;
+	case WMI_CIPHER_BIP_CMAC_256:
+		return	WLAN_CRYPTO_CIPHER_AES_CMAC_256;
+	case WMI_CIPHER_BIP_GMAC_128:
+		return	WLAN_CRYPTO_CIPHER_AES_GMAC;
+	case WMI_CIPHER_BIP_GMAC_256:
+		return WLAN_CRYPTO_CIPHER_AES_GMAC_256;
+
 	default:
 		return 0;
 	}
@@ -4128,10 +4145,12 @@ free_keys:
 		if (!key_alloc_buf[k])
 			continue;
 
+		wmi_err_rl("flush keybuf :%d, key is valid", flush_keybuf,
+			   key_alloc_buf[k]->valid);
 		if (!flush_keybuf && key_alloc_buf[k]->valid)
 			continue;
 
-		wmi_debug("Free key allocated at idx:%d", k);
+		wmi_err("Free key allocated at idx:%d", k);
 		qdf_mem_zero(key_alloc_buf[k], sizeof(*key_alloc_buf[k]));
 		qdf_mem_free(key_alloc_buf[k]);
 	}

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -4733,6 +4733,18 @@ wlan_cm_get_roam_scan_high_rssi_offset(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.lfr.roam_high_rssi_delta;
 }
 
+bool wlan_cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id)
+{
+	return cm_is_mbo_ap_without_pmf(psoc, vdev_id);
+}
+
+QDF_STATUS
+wlan_cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
+			     enum wlan_diag_btm_block_reason reason)
+{
+	return cm_roam_btm_block_event(vdev_id, token, reason);
+}
 #else
 QDF_STATUS
 cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,

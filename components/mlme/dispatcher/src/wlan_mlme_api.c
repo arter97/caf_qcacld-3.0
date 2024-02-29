@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4840,6 +4840,20 @@ bool mlme_get_bss_11be_allowed(struct wlan_objmgr_psoc *psoc,
 
 	return false;
 }
+
+QDF_STATUS wlan_mlme_get_oem_eht_mlo_config(struct wlan_objmgr_psoc *psoc,
+					    uint32_t *oem_eht_cfg)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*oem_eht_cfg = mlme_obj->cfg.gen.oem_eht_mlo_crypto_bitmap;
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 QDF_STATUS wlan_mlme_is_sap_uapsd_enabled(struct wlan_objmgr_psoc *psoc,
@@ -7303,7 +7317,8 @@ wlan_mlme_get_adaptive11r_enabled(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 #endif
 
-#ifdef WLAN_FEATURE_P2P_P2P_STA
+#if defined(WLAN_FEATURE_P2P_P2P_STA) && \
+	!defined(WLAN_FEATURE_NO_P2P_CONCURRENCY)
 static bool
 wlan_mlme_get_p2p_p2p_host_conc_support(void)
 {
@@ -7316,6 +7331,167 @@ wlan_mlme_get_p2p_p2p_host_conc_support(void)
 	return false;
 }
 #endif
+
+#ifndef WLAN_FEATURE_NO_STA_SAP_CONCURRENCY
+static bool
+wlan_mlme_get_sta_sap_host_conc_support(void)
+{
+	return true;
+}
+#else
+static bool
+wlan_mlme_get_sta_sap_host_conc_support(void)
+{
+	return false;
+}
+#endif
+
+#ifndef WLAN_FEATURE_NO_STA_NAN_CONCURRENCY
+static bool
+wlan_mlme_get_sta_nan_host_conc_support(void)
+{
+	return true;
+}
+#else
+static bool
+wlan_mlme_get_sta_nan_host_conc_support(void)
+{
+	return false;
+}
+#endif
+
+#ifdef FEATURE_WLAN_TDLS
+static bool
+wlan_mlme_get_sta_tdls_host_conc_support(void)
+{
+	return true;
+}
+#else
+static bool
+wlan_mlme_get_sta_tdls_host_conc_support(void)
+{
+	return false;
+}
+#endif
+
+#if !defined(WLAN_FEATURE_NO_STA_SAP_CONCURRENCY) && \
+	(!defined(WLAN_FEATURE_NO_P2P_CONCURRENCY) || \
+	 defined(WLAN_FEATURE_STA_SAP_P2P_CONCURRENCY))
+static bool
+wlan_mlme_get_sta_sap_p2p_host_conc_support(void)
+{
+	return true;
+}
+#else
+static bool
+wlan_mlme_get_sta_sap_p2p_host_conc_support(void)
+{
+	return false;
+}
+#endif
+
+#if defined(FEATURE_WLAN_TDLS)
+static bool
+wlan_mlme_get_sta_p2p_tdls_host_conc_support(void)
+{
+	return true;
+}
+#else
+static bool
+wlan_mlme_get_sta_p2p_tdls_host_conc_support(void)
+{
+	return false;
+}
+#endif
+
+#if defined(FEATURE_WLAN_TDLS) && !defined(WLAN_FEATURE_NO_STA_SAP_CONCURRENCY)
+static bool
+wlan_mlme_get_sta_sap_tdls_host_conc_support(void)
+{
+	return true;
+}
+#else
+static bool
+wlan_mlme_get_sta_sap_tdls_host_conc_support(void)
+{
+	return false;
+}
+#endif
+
+#if defined(FEATURE_WLAN_TDLS) && \
+	!defined(WLAN_FEATURE_NO_STA_SAP_CONCURRENCY) && \
+	(!defined(WLAN_FEATURE_NO_P2P_CONCURRENCY) || \
+	 defined(WLAN_FEATURE_STA_SAP_P2P_CONCURRENCY))
+
+static bool
+wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(void)
+{
+	return true;
+}
+#else
+static bool
+wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(void)
+{
+	return false;
+}
+#endif
+
+#if defined(FEATURE_WLAN_TDLS) && defined(WLAN_FEATURE_P2P_P2P_STA) && \
+	!defined(WLAN_FEATURE_NO_P2P_CONCURRENCY)
+static bool
+wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support(void)
+{
+	return true;
+}
+#else
+static bool
+wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support(void)
+{
+	return false;
+}
+#endif
+
+/**
+ * wlan_mlme_set_iface_combinations() - Set interface combinations
+ * @mlme_feature_set: Pointer to wlan_mlme_features
+ *
+ * Return: None
+ */
+static void
+wlan_mlme_set_iface_combinations(struct wlan_mlme_features *mlme_feature_set)
+{
+	mlme_feature_set->iface_combinations = 0;
+	mlme_feature_set->iface_combinations |= MLME_IFACE_STA_P2P_SUPPORT;
+	if (wlan_mlme_get_sta_sap_host_conc_support())
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_SAP_SUPPORT;
+	if (wlan_mlme_get_sta_nan_host_conc_support())
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_NAN_SUPPORT;
+	if (wlan_mlme_get_sta_tdls_host_conc_support())
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_TDLS_SUPPORT;
+	if (wlan_mlme_get_p2p_p2p_host_conc_support())
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_DUAL_P2P_SUPPORT;
+	if (wlan_mlme_get_sta_sap_p2p_host_conc_support())
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_SAP_P2P_SUPPORT;
+	if (wlan_mlme_get_sta_p2p_tdls_host_conc_support())
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_P2P_TDLS_SUPPORT;
+	if (wlan_mlme_get_sta_sap_tdls_host_conc_support())
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_SAP_TDLS_SUPPORT;
+	if (wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support())
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_SAP_P2P_TDLS_SUPPORT;
+	if (wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support())
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_P2P_P2P_TDLS_SUPPORT;
+	mlme_debug("iface combinations = %x",
+		   mlme_feature_set->iface_combinations);
+}
 
 void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 				struct wlan_mlme_features *mlme_feature_set)
@@ -7363,8 +7539,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 
 	mlme_feature_set->vendor_req_2_version =
 					WMI_HOST_VENDOR1_REQ2_VERSION_3_50;
-	mlme_feature_set->sta_dual_p2p_support =
-				wlan_mlme_get_p2p_p2p_host_conc_support();
+	wlan_mlme_set_iface_combinations(mlme_feature_set);
 	wlan_mlme_get_vht_enable2x2(psoc, &mlme_feature_set->enable2x2);
 }
 #endif

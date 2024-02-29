@@ -47,6 +47,8 @@
 #include <wlan_lmac_if_def.h>
 #include "target_if_mlme.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_cp_stats_mc_tgt_api.h"
+#include "wlan_objmgr_pdev_obj.h"
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -1822,6 +1824,31 @@ static QDF_STATUS mon_mlme_vdev_disconnect_peers(
 		uint16_t data_len, void *data,
 		bool is_disconnect_legacy_only)
 {
+	struct wlan_objmgr_psoc *psoc = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	uint32_t pdev_id;
+
+	psoc = wlan_vdev_get_psoc(vdev_mlme->vdev);
+	if (!psoc) {
+		mlme_legacy_debug("Invalid psoc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev_mlme->vdev);
+	if (!pdev) {
+		mlme_legacy_debug("Invalid pdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	if (pdev_id == WLAN_INVALID_PDEV_ID) {
+		mlme_legacy_debug("Invalid pdev id");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Cancel periodic pdev stats update */
+	tgt_set_pdev_stats_update_period(psoc, pdev_id, 0);
+
 	mlme_legacy_debug("vdev id = %d",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
 	return wlan_vdev_mlme_sm_deliver_evt(

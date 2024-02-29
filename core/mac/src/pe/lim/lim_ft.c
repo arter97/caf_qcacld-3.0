@@ -529,7 +529,7 @@ static QDF_STATUS lim_fill_session_power_info(
 				struct pe_session *pe_session)
 {
 	uint8_t currentBssUapsd;
-	int8_t localPowerConstraint;
+	int8_t localPowerConstraint = 0;
 	int8_t regMax = 0;
 	bool is_pwr_constraint = false;
 	struct vdev_mlme_obj *mlme_obj;

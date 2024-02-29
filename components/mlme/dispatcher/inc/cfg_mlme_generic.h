@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -233,6 +233,32 @@ enum wlan_epcs_frame {
 		200, \
 		CFG_VALUE_OR_DEFAULT, \
 		"PMF SA query retry interval for SAP")
+
+#ifdef WLAN_FEATURE_11BE
+/*
+ * oem_eht_mlo_crypto_bitmap - OEM control to allow various EHT connection
+ * options using bitmap based on following ENUM (Name of ENUM to be added)
+ * @Min: 0x0
+ * @Max: 0xFFFFFFFF
+ * @Default: 0x0
+ *
+ * This INI is used to control the driver candidate selection and EHT
+ * connection choice based on OEM configuration. The bitmap follows the
+ * implementation from this ENUM (name of the ENUM to be added)
+ */
+#define CFG_OEM_EHT_MLO_CRYPTO_BITMAP CFG_INI_UINT( \
+		"oem_eht_mlo_crypto_bitmap", \
+		0x0, \
+		0xFFFFFFFF, \
+		0x0, \
+		CFG_VALUE_OR_DEFAULT, \
+		"OEM control to allow/disallow crypto to EHT configuration")
+
+#define CFG_OEM_EHT_MLO_CRYPTO_BITMAP_SUPPORTED \
+			CFG(CFG_OEM_EHT_MLO_CRYPTO_BITMAP)
+#else
+#define CFG_OEM_EHT_MLO_CRYPTO_BITMAP_SUPPORTED
+#endif
 
 /*
  * <ini>
@@ -1235,6 +1261,7 @@ enum wlan_epcs_frame {
 	CFG(CFG_ENABLE_DEBUG_PACKET_LOG) \
 	CFG(CFG_PMF_SA_QUERY_MAX_RETRIES) \
 	CFG(CFG_PMF_SA_QUERY_RETRY_INTERVAL) \
+	CFG_OEM_EHT_MLO_CRYPTO_BITMAP_SUPPORTED \
 	CFG(CFG_ENABLE_RTT_MAC_RANDOMIZATION) \
 	CFG(CFG_RTT3_ENABLE) \
 	CFG(CFG_11H_SUPPORT_ENABLED) \

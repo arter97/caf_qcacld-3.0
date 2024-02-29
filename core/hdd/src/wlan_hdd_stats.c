@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3451,8 +3451,10 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 		sme_radio_tx_mem_free();
 		ret = -ETIMEDOUT;
 	} else {
-		if (QDF_IS_STATUS_SUCCESS(vdev_req_status))
+		if (QDF_IS_STATUS_SUCCESS(vdev_req_status)) {
 			hdd_update_station_stats_cached_timestamp(adapter);
+			hdd_update_link_state_cached_timestamp(adapter);
+		}
 
 		adapter->ll_stats_failure_count = 0;
 	}
@@ -7458,10 +7460,10 @@ static void wlan_hdd_update_rssi(struct wlan_hdd_link_info *link_info,
 	}
 
 	/* If RSSi is reported as positive then it is invalid */
-	if (link_info->rssi > 0) {
-		hdd_debug_rl("RSSI invalid %d", link_info->rssi);
-		link_info->rssi = 0;
-		link_info->hdd_stats.summary_stat.rssi = 0;
+	if (link_info->rssi >= 0) {
+		hdd_debug_rl("Invalid RSSI %d, reset to -1", link_info->rssi);
+		link_info->rssi = -1;
+		link_info->hdd_stats.summary_stat.rssi = -1;
 	}
 
 	sinfo->signal = link_info->rssi;
@@ -9106,6 +9108,64 @@ int wlan_hdd_get_link_speed(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
+int wlan_hdd_get_sap_go_peer_linkspeed(struct wlan_hdd_link_info *link_info,
+				       uint32_t *link_speed,
+				       uint8_t *command,
+				       uint8_t command_len)
+{
+	int ret;
+	struct qdf_mac_addr mac_address;
+	char macaddr_string[MAC_ADDRESS_STR_LEN + 1];
+	uint8_t *value = command;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_station_info *sta_info, *tmp = NULL;
+
+	value = value + command_len;
+	ret = sscanf(value, "%17s", &macaddr_string);
+
+	if (ret != 1)
+		return -EINVAL;
+
+	macaddr_string[MAC_ADDRESS_STR_LEN - 1] = '\0';
+	if (!mac_pton(macaddr_string, mac_address.bytes)) {
+		hdd_err("String to Hex conversion Failed");
+		return -EINVAL;
+	}
+
+	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
+				  STA_INFO_GET_SOFTAP_LINKSPEED) {
+		if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
+			if (qdf_is_macaddr_equal(&mac_address,
+						 &sta_info->sta_mac)) {
+				ret = wlan_hdd_get_linkspeed_for_peermac(
+							adapter->deflink,
+							&mac_address,
+							link_speed);
+				hdd_put_sta_info_ref(
+						&adapter->sta_info_list,
+						&sta_info, true,
+						STA_INFO_GET_SOFTAP_LINKSPEED);
+				if (tmp)
+					hdd_put_sta_info_ref(
+						&adapter->sta_info_list,
+						&tmp, true,
+						STA_INFO_GET_SOFTAP_LINKSPEED);
+				break;
+			}
+		}
+		hdd_put_sta_info_ref(&adapter->sta_info_list,
+				     &sta_info, true,
+				     STA_INFO_GET_SOFTAP_LINKSPEED);
+	}
+
+	if (ret) {
+		hdd_err("Unable to retrieve SAP/GO linkspeed");
+		return ret;
+	}
+
+	*link_speed = (*link_speed) / 500;
+	return 0;
+}
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 /**
  * wlan_hdd_get_per_peer_stats - get per peer stats if supported by FW
@@ -9233,6 +9293,7 @@ int wlan_hdd_get_station_stats(struct wlan_hdd_link_info *link_info)
 
 	/* update get stats cached time stamp */
 	hdd_update_station_stats_cached_timestamp(link_info->adapter);
+	hdd_update_link_state_cached_timestamp(link_info->adapter);
 	copy_station_stats_to_adapter(link_info, stats);
 out:
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
