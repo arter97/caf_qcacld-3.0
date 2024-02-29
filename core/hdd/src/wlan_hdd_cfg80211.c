@@ -4977,7 +4977,8 @@ static void wlan_hdd_cfg80211_set_feature(uint8_t *feature_flags,
  *
  * Return: None
  **/
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
 {
 	wlan_hdd_cfg80211_set_feature(feature_flags,
