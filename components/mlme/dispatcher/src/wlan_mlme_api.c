@@ -7531,6 +7531,12 @@ wlan_mlme_get_sta_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
+
+static bool
+wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif
 
 #if defined(FEATURE_WLAN_TDLS) && defined(WLAN_FEATURE_P2P_P2P_STA)
