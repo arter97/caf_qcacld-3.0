@@ -4155,3 +4155,18 @@ int8_t libstats_async_send_stats_req(struct stats_command *cmd)
 
 	return ret;
 }
+
+int8_t libstats_receive_event(struct reply_buffer *buf)
+{
+	int8_t ret = 0;
+
+	if (!buf) {
+		STATS_ERR("Reply buffer is not provided.\n");
+		return -EINVAL;
+	}
+
+	g_nb_ctx.reply = buf;
+	ret = recv_nlmsg_nb(&g_sock_ctx.cfg80211_ctxt);
+
+	return ret;
+}
