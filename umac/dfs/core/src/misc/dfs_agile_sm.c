@@ -1045,7 +1045,6 @@ QDF_STATUS dfs_set_rcac_enable(struct wlan_dfs *dfs, bool rcac_en)
 			 "Rolling CAC: %d is already configured", rcac_en);
 		return QDF_STATUS_SUCCESS;
 	}
-	dfs->dfs_agile_rcac_ucfg = rcac_en;
 
 	/* RCAC config is changed. Reset the preCAC tree. */
 	dfs_reset_precac_lists(dfs);
@@ -1056,6 +1055,8 @@ QDF_STATUS dfs_set_rcac_enable(struct wlan_dfs *dfs, bool rcac_en)
 					0,
 					(void *)dfs);
 	}
+
+	dfs->dfs_agile_rcac_ucfg = rcac_en;
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "rolling cac is %d", rcac_en);
 
 	return QDF_STATUS_SUCCESS;
