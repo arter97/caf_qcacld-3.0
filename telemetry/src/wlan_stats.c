@@ -39,6 +39,155 @@
 #endif
 #include <wlan_objmgr_global_obj_i.h>
 
+/* Maximum number of asynchronous requests that can be scheduled by driver */
+#define WLAN_STATS_ASYNC_LIST_SIZE 8
+
+/* Global structure for stats work*/
+static struct stats_work_context g_stats_ctx = {0};
+
+static void free_list_entry(struct stats_list_entry *list_entry)
+{
+	qdf_mem_free(list_entry->cfg);
+	qdf_mem_free(list_entry);
+}
+
+static void stats_evt_work_handler(void *ctx)
+{
+	struct stats_list_entry *list_entry = NULL;
+	struct stats_work_context *work_ctx = (struct stats_work_context *)ctx;
+	qdf_list_node_t *cur_node = NULL;
+	qdf_list_t temp_list;
+
+	qdf_list_create(&temp_list, WLAN_STATS_ASYNC_LIST_SIZE);
+	qdf_spin_lock_bh(&work_ctx->list_lock);
+	qdf_list_join(&temp_list, &work_ctx->nb_stats_work_list);
+	qdf_spin_unlock_bh(&work_ctx->list_lock);
+
+	while (!qdf_list_remove_front(&temp_list, &cur_node)) {
+		if (!cur_node)
+			continue;
+		list_entry = qdf_container_of(cur_node, struct stats_list_entry,
+					      node);
+		if (!list_entry)
+			continue;
+
+		switch (list_entry->cfg->obj) {
+		case STATS_OBJ_STA:
+			qdf_err("stats of STA requested.");
+			break;
+		case STATS_OBJ_VAP:
+			qdf_err("stats of VAP requested.");
+			break;
+		case STATS_OBJ_RADIO:
+			qdf_err("stats of Radio requested.");
+			break;
+		case STATS_OBJ_AP:
+			qdf_err("stats of AP requested.");
+			break;
+		default:
+			qdf_err("Unknown stats command.%d",
+				list_entry->cfg->obj);
+			break;
+		}
+		free_list_entry(list_entry);
+		cur_node = NULL;
+		list_entry = NULL;
+	}
+	qdf_list_destroy(&temp_list);
+}
+
+void wlan_stats_nb_stats_work_attach(void)
+{
+	if (g_stats_ctx.is_initialized)
+		return;
+
+	g_stats_ctx.is_initialized = true;
+	qdf_create_work(0, &g_stats_ctx.work, stats_evt_work_handler,
+			&g_stats_ctx);
+	qdf_spinlock_create(&g_stats_ctx.list_lock);
+	qdf_list_create(&g_stats_ctx.nb_stats_work_list,
+			WLAN_STATS_ASYNC_LIST_SIZE);
+}
+
+void wlan_stats_nb_stats_work_detach(void)
+{
+	qdf_list_t *list = &g_stats_ctx.nb_stats_work_list;
+	qdf_list_node_t *cur_node = NULL;
+	struct stats_list_entry *list_entry = NULL;
+
+	if (!g_stats_ctx.is_initialized)
+		return;
+
+	g_stats_ctx.is_initialized = false;
+	qdf_flush_work(&g_stats_ctx.work);
+	qdf_disable_work(&g_stats_ctx.work);
+
+	qdf_spin_lock_bh(&g_stats_ctx.list_lock);
+
+	//Flush the queue until list is empty. Remove the nodes from the end
+	while (!qdf_list_remove_front(list, &cur_node)) {
+		if (cur_node) {
+			list_entry = qdf_container_of(cur_node,
+						      struct stats_list_entry,
+						      node);
+			if (!list_entry)
+				continue;
+			free_list_entry(list_entry);
+			cur_node = NULL;
+			list_entry = NULL;
+		}
+	}
+
+	qdf_spin_unlock_bh(&g_stats_ctx.list_lock);
+
+	/* destroy list */
+	qdf_list_destroy(list);
+	qdf_spinlock_destroy(&g_stats_ctx.list_lock);
+}
+
+QDF_STATUS wlan_stats_schedule_nb_stats_work(struct wlan_objmgr_pdev *pdev,
+					     struct wlan_objmgr_vdev *vdev,
+					     struct stats_config *cfg,
+					     uint8_t *mac)
+{
+	struct stats_list_entry *entry = NULL;
+	struct stats_config *stats_cfg = NULL;
+
+	if (!g_stats_ctx.is_initialized) {
+		qdf_err("Stats context is already detached");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (qdf_list_size(&g_stats_ctx.nb_stats_work_list) >=
+			  WLAN_STATS_ASYNC_LIST_SIZE) {
+		qdf_err("Not Scheduling stats work as MAX_SIZE reached");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	stats_cfg = qdf_mem_malloc(sizeof(struct stats_config));
+	entry = qdf_mem_malloc(sizeof(struct stats_list_entry));
+
+	if (!stats_cfg || !entry) {
+		qdf_err("Memory not allocated.");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mem_zero(entry, sizeof(struct stats_list_entry));
+	qdf_mem_copy(stats_cfg, cfg, sizeof(struct stats_config));
+
+	entry->pdev = pdev;
+	entry->vdev = vdev;
+	entry->mac = mac;
+	entry->cfg = stats_cfg;
+
+	qdf_spin_lock_bh(&g_stats_ctx.list_lock);
+	qdf_list_insert_back(&g_stats_ctx.nb_stats_work_list, &entry->node);
+	qdf_spin_unlock_bh(&g_stats_ctx.list_lock);
+	qdf_sched_work(0, &g_stats_ctx.work);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void fill_basic_data_tx_stats(struct basic_data_tx_stats *tx,
 				     struct cdp_tx_stats *cdp_tx)
 {
