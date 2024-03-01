@@ -339,6 +339,21 @@ QDF_STATUS reg_get_client_psd_for_ap(struct wlan_objmgr_pdev *pdev,
 				     enum reg_6g_client_type client_type,
 				     qdf_freq_t chan_freq,
 				     int16_t *reg_psd);
+
+/**
+ * reg_is_composite_allowed() - Check if composite AP allowed or not
+ * @pdev: Pointer to pdev
+ *
+ * Return: bool
+ */
+bool
+reg_is_composite_allowed(struct wlan_objmgr_pdev *pdev);
+#else
+static inline bool
+reg_is_composite_allowed(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
 #endif
 
 /**
