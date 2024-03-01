@@ -1236,7 +1236,7 @@ reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
  */
 static QDF_STATUS reg_get_afc_psd(qdf_freq_t freq,
 				  struct regulatory_channel *afc_chan_list,
-				  uint16_t *afc_psd)
+				  int16_t *afc_psd)
 {
 	uint8_t i;
 
