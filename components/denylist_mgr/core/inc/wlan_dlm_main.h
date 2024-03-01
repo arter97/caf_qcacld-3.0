@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -61,19 +61,26 @@ struct dlm_pdev_priv_obj {
  * would happen for the BSSID which is in deny list.
  * @bad_bssid_counter_reset_time: Timer after which the bssid would be removed
  * from the reject list when connected, and data stall is not seen with the AP.
+ * @monitor_con_stability_time: Timer for which connection stability needs to
+ * be monitored.
  * @bad_bssid_counter_thresh: This is the threshold count which is incremented
  * after every NUD fail, and after this much count, the BSSID would be moved to
  * denylist.
  * @delta_rssi: This is the rssi threshold, only when rssi
  * improves by this value the entry for BSSID should be removed from deny
  * list manager list.
+ * @max_11be_con_failure_allowed: Maximum allowed 11BE failures per MLO AP.
  */
 struct dlm_config {
 	qdf_time_t avoid_list_exipry_time;
 	qdf_time_t deny_list_exipry_time;
 	qdf_time_t bad_bssid_counter_reset_time;
+	qdf_time_t monitor_con_stability_time;
 	uint8_t bad_bssid_counter_thresh;
 	uint32_t delta_rssi;
+#ifdef WLAN_FEATURE_11BE_MLO
+	uint8_t max_11be_con_failure_allowed;
+#endif
 };
 
 /**

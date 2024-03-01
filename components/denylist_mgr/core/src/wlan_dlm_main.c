@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -157,6 +157,19 @@ dlm_psoc_object_destroyed_notification(struct wlan_objmgr_psoc *psoc, void *arg)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void dlm_init_max_11be_connection_trial(struct wlan_objmgr_psoc *psoc,
+					       struct dlm_config *dlm_cfg)
+{
+	dlm_cfg->max_11be_con_failure_allowed =
+			cfg_get(psoc, CFG_MAX_11BE_CON_FAIL_ALLOWED_PER_AP);
+}
+#else
+static void dlm_init_max_11be_connection_trial(struct wlan_objmgr_psoc *psoc,
+					       struct dlm_config *dlm_cfg)
+{}
+#endif
+
 static void
 dlm_init_cfg(struct wlan_objmgr_psoc *psoc, struct dlm_config *dlm_cfg)
 {
@@ -170,6 +183,10 @@ dlm_init_cfg(struct wlan_objmgr_psoc *psoc, struct dlm_config *dlm_cfg)
 				cfg_get(psoc, CFG_BAD_BSSID_COUNTER_THRESHOLD);
 	dlm_cfg->delta_rssi =
 				cfg_get(psoc, CFG_DENYLIST_RSSI_THRESHOLD);
+	dlm_cfg->monitor_con_stability_time =
+			cfg_get(psoc,
+				CFG_MONITOR_CON_STABILITY_POST_CONNECTION_TIME);
+	dlm_init_max_11be_connection_trial(psoc, dlm_cfg);
 }
 
 QDF_STATUS

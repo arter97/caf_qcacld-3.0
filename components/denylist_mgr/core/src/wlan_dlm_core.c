@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,7 @@
 #include <wlan_scan_utils_api.h>
 #include "wlan_dlm_tgt_api.h"
 #include <wlan_cm_bss_score_param.h>
+#include "cfg_ucfg_api.h"
 
 #define SECONDS_TO_MS(params)       ((params) * 1000)
 #define MINUTES_TO_MS(params)       (SECONDS_TO_MS(params) * 60)
@@ -1468,6 +1469,47 @@ int32_t dlm_get_rssi_denylist_threshold(struct wlan_objmgr_pdev *pdev)
 	}
 
 	cfg = &dlm_psoc_obj->dlm_cfg;
+
 	return cfg->delta_rssi;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+uint8_t dlm_get_max_allowed_11be_failure(struct wlan_objmgr_pdev *pdev)
+{
+	struct dlm_pdev_priv_obj *dlm_ctx;
+	struct dlm_psoc_priv_obj *dlm_psoc_obj;
+	struct dlm_config *cfg;
+
+	dlm_ctx = dlm_get_pdev_obj(pdev);
+	dlm_psoc_obj = dlm_get_psoc_obj(wlan_pdev_get_psoc(pdev));
+
+	if (!dlm_ctx || !dlm_psoc_obj) {
+		dlm_err("%s is NULL", dlm_ctx ? "dlm_ctx" : "dlm_psoc_obj");
+		return cfg_default(CFG_MAX_11BE_CON_FAIL_ALLOWED_PER_AP);
+	}
+
+	cfg = &dlm_psoc_obj->dlm_cfg;
+
+	return cfg->max_11be_con_failure_allowed;
+}
+#endif
+
+qdf_time_t dlm_get_connection_monitor_time(struct wlan_objmgr_pdev *pdev)
+{
+	struct dlm_pdev_priv_obj *dlm_ctx;
+	struct dlm_psoc_priv_obj *dlm_psoc_obj;
+	struct dlm_config *cfg;
+
+	dlm_ctx = dlm_get_pdev_obj(pdev);
+	dlm_psoc_obj = dlm_get_psoc_obj(wlan_pdev_get_psoc(pdev));
+
+	if (!dlm_ctx || !dlm_psoc_obj) {
+		dlm_err("%s is NULL", dlm_ctx ? "dlm_ctx" : "dlm_psoc_obj");
+		return cfg_default(
+				CFG_MONITOR_CON_STABILITY_POST_CONNECTION_TIME);
+	}
+
+	cfg = &dlm_psoc_obj->dlm_cfg;
+
+	return cfg->monitor_con_stability_time;
+}

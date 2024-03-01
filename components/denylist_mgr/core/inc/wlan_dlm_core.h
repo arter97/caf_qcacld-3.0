@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -330,4 +330,33 @@ bool dlm_is_bssid_in_reject_list(struct wlan_objmgr_pdev *pdev,
  */
 int32_t
 dlm_get_rssi_denylist_threshold(struct wlan_objmgr_pdev *pdev);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * dlm_get_max_allowed_11be_failure() - Get max allowed 11BE connection
+ * failure per AP
+ * @pdev: pdev object
+ *
+ * This API will get the maximum allowed 11BE failure per AP value configured
+ * via CFG_MAX_11BE_CON_FAIL_ALLOWED_PER_AP.
+ *
+ * Return: max allowed 11BE failure
+ */
+uint8_t
+dlm_get_max_allowed_11be_failure(struct wlan_objmgr_pdev *pdev);
+#endif
+
+/**
+ * dlm_get_connection_monitor_time() - Get the connection monitor time post
+ * connection success.
+ * @pdev: pdev object
+ *
+ * This API will get the connection monitor time configured via
+ * CFG_MONITOR_CON_STABILITY_POST_CONNECTION_TIME.
+ *
+ * Return: connection monitor time value
+ */
+qdf_time_t
+dlm_get_connection_monitor_time(struct wlan_objmgr_pdev *pdev);
+
 #endif
