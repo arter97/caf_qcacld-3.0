@@ -52,6 +52,7 @@ INCS += -I$(obj)/$(DEPTH)/include \
         -I$(obj)/$(DEPTH)/cmn_dev/umac/cmn_services/crypto/inc/ \
         -I$(obj)/$(DEPTH)/cmn_dev/fwcommon \
         -I$(obj)/$(DEPTH)/cmn_dev/spectral/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/component_dev/spectral/dispatcher/inc/ \
         -I$(obj)/$(DEPTH)/cmn_dev/umac/cmn_services/utils/inc/ \
         -I$(obj)/$(DEPTH)/cmn_dev/qdf/inc \
         -I$(obj)/$(DEPTH)/cmn_dev/qdf/linux/src \
