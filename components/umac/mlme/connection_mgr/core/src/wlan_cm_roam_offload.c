@@ -6061,6 +6061,7 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 	/* Ignore BSSID and channel validation for FW host roam */
 	if (source == CM_ROAMING_FW)
 		goto send_evt;
+
 	if (source == CM_ROAMING_LINK_REMOVAL) {
 		cm_req->roam_req.req.forced_roaming = true;
 		goto send_evt;
@@ -6448,6 +6449,12 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 				break;
 			}
 		}
+	} else if (data->current_rssi) {
+		/* Reassoc reject case */
+		wlan_diag_event.rssi = (-1) * data->current_rssi;
+		wlan_diag_event.rssi_thresh =
+				(-1) * data->rssi_trig_data.threshold;
+		wlan_diag_event.cu = scan_data->ap[0].cu_load;
 	}
 
 	if (data->trigger_reason == ROAM_TRIGGER_REASON_PERIODIC ||
@@ -6789,6 +6796,102 @@ cm_find_roam_candidate(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if (defined(CONNECTIVITY_DIAG_EVENT) && defined(WLAN_FEATURE_ROAM_OFFLOAD))
+/**
+ * cm_roam_reject_reassoc_event() - Send connectivity diag log
+ * event while rejecting reassoc request to connected BSSID
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to vdev object
+ * @bssid: connected BSSID
+ *
+ * Return: None
+ */
+static inline void
+cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *bssid)
+{
+	uint8_t vdev_id;
+	struct wmi_roam_trigger_info *trigger_data;
+	struct wmi_roam_scan_data *scan_data;
+	struct cm_roam_values_copy rssi_threshold = {0};
+	struct wlan_channel *bss_chan;
+	struct scan_cache_entry *entry;
+	int8_t rssi = 0;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	/*
+	 * Send roam scan start and roam cancelled for rejecting
+	 * reassoc command received for roaming to already
+	 * connected bssid.
+	 */
+	trigger_data = qdf_mem_malloc(sizeof(*trigger_data));
+	if (!trigger_data)
+		return;
+
+	scan_data = qdf_mem_malloc(sizeof(*scan_data));
+	if (!scan_data) {
+		qdf_mem_free(trigger_data);
+		return;
+	}
+
+	/*
+	 * Parameters to be sent:
+	 * -> Roam scan start event:
+	 *    1. Reason = User triggered
+	 *    2. RSSI
+	 *    3. CU
+	 *    4. full_scan
+	 *    5. RSSI Threshold
+	 *
+	 * -> Roam cancel Event:
+	 *  1. vdev_id
+	 *  2. Reason code value
+	 *  3. Reason code string
+	 */
+	trigger_data->present = true;
+	trigger_data->trigger_reason = ROAM_TRIGGER_REASON_FORCED;
+
+	/* Get RSSI from scan entry */
+	cm_get_rssi_snr_by_bssid(wlan_vdev_get_pdev(vdev), bssid, &rssi, NULL);
+	trigger_data->current_rssi = qdf_abs(rssi);
+
+	/* Get RSSI threshold configuration from RSO config */
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id, NEIGHBOUR_LOOKUP_THRESHOLD,
+				   &rssi_threshold);
+	trigger_data->rssi_trig_data.threshold = rssi_threshold.uint_value;
+
+	/* Get CU load info from QBSS Load IE in scan entry */
+	entry = wlan_scan_get_entry_by_bssid(wlan_vdev_get_pdev(vdev), bssid);
+	if (entry)
+		scan_data->ap[0].cu_load = entry->qbss_chan_load;
+	else
+		scan_data->ap[0].cu_load = 0;
+
+	/* Fill the band info from operating channel */
+	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
+	if (bss_chan)
+		scan_data->band =
+			wlan_convert_freq_to_diag_band(bss_chan->ch_freq);
+	else
+		mlme_debug("vdev:%d bss_chan is null", vdev_id);
+
+	cm_roam_trigger_info_event(trigger_data, scan_data, vdev_id, false);
+
+	qdf_mem_free(trigger_data);
+	qdf_mem_free(scan_data);
+
+	cm_roam_cancel_event(vdev_id, ROAM_FAIL_REASON_REASSOC_TO_SAME_AP, 0);
+}
+#else
+static inline void
+cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *bssid)
+{}
+#endif
+
 QDF_STATUS
 cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 {
@@ -6833,10 +6936,21 @@ cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 
 	wlan_vdev_get_bss_peer_mac(cm_ctx->vdev, &connected_bssid);
 	wlan_mlme_get_self_bss_roam(psoc, &enable_self_bss_roam);
-	if (!enable_self_bss_roam &&
-	    qdf_is_macaddr_equal(&roam_req->req.bssid, &connected_bssid)) {
-		mlme_err(CM_PREFIX_FMT "self bss roam disabled",
-			 CM_PREFIX_REF(vdev_id, cm_id));
+	if ((!enable_self_bss_roam ||
+	     cm_roam_get_roam_score_algo(psoc) == VENDOR_ROAM_SCORE_ALGORITHM_1) &&
+	     qdf_is_macaddr_equal(&roam_req->req.bssid, &connected_bssid)) {
+		mlme_err(CM_PREFIX_FMT "self bss roam disabled. invoke_src:%d",
+			 CM_PREFIX_REF(vdev_id, cm_id),
+			 req->roam_req.req.source);
+		/*
+		 * Send roam cancel event when roam invoke triggered by
+		 * userspace reassoc command is rejected
+		 */
+		if (req->roam_req.req.source == CM_ROAMING_USER ||
+		    req->roam_req.req.source == CM_ROAMING_HOST)
+			cm_roam_reject_reassoc_event(psoc, cm_ctx->vdev,
+						     &connected_bssid);
+
 		status = QDF_STATUS_E_FAILURE;
 		goto roam_err;
 	}

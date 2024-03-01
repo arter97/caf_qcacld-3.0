@@ -2317,6 +2317,14 @@ QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
 #endif /* WLAN_FEATURE_11BE_MLO && WLAN_FEATURE_ROAM_OFFLOAD */
 
 /**
+ * cm_roam_get_roam_score_algo() - Get vendor roam score algorithm value
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: Vendor Roam score algorithm value
+ */
+uint32_t cm_roam_get_roam_score_algo(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_update_peer_phy_mode() - update phymode in peer object
  * @des_chan: wlan_channel pointer contain new ch_freq
  * @vdev: vdev pointer

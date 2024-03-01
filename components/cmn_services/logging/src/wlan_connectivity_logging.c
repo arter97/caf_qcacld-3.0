@@ -614,25 +614,6 @@ wlan_populate_roam_mld_log_param(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-enum wlan_diag_wifi_band
-wlan_convert_freq_to_diag_band(uint16_t ch_freq)
-{
-	enum reg_wifi_band band;
-
-	band = wlan_reg_freq_to_band((qdf_freq_t)ch_freq);
-
-	switch (band) {
-	case REG_BAND_2G:
-		return WLAN_24GHZ_BAND;
-	case REG_BAND_5G:
-		return WLAN_5GHZ_BAND;
-	case REG_BAND_6G:
-		return WLAN_6GHZ_BAND;
-	default:
-		return WLAN_INVALID_BAND;
-	}
-}
-
 #define REJECTED_LINK_STATUS 1
 
 void
@@ -831,6 +812,25 @@ wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+enum wlan_diag_wifi_band
+wlan_convert_freq_to_diag_band(uint16_t ch_freq)
+{
+	enum reg_wifi_band band;
+
+	band = wlan_reg_freq_to_band((qdf_freq_t)ch_freq);
+
+	switch (band) {
+	case REG_BAND_2G:
+		return WLAN_24GHZ_BAND;
+	case REG_BAND_5G:
+		return WLAN_5GHZ_BAND;
+	case REG_BAND_6G:
+		return WLAN_6GHZ_BAND;
+	default:
+		return WLAN_INVALID_BAND;
+	}
+}
 
 void
 wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,

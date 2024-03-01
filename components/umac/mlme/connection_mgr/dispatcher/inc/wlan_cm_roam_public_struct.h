@@ -116,6 +116,8 @@
 /* Default value of WTC reason code */
 #define DISABLE_VENDOR_BTM_CONFIG 2
 
+#define VENDOR_ROAM_SCORE_ALGORITHM_1 1
+
 #ifdef WLAN_FEATURE_HOST_ROAM
 #define MAX_FTIE_SIZE CM_MAX_FTIE_SIZE
 #else
@@ -425,6 +427,8 @@ enum roam_fail_params {
  * @ROAM_FAIL_REASON_SCREEN_ACTIVITY: Roam fail reason screen activity happened
  * @ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN: Roam fail due to other priority
  * roam scan started.
+ * @ROAM_FAIL_REASON_REASSOC_TO_SAME_AP: Host internal reason code. Reassoc
+ * command rejected due to reassociation request received for same AP.
  * @ROAM_FAIL_REASON_UNKNOWN: Default reason
  */
 enum wlan_roam_failure_reason_code {
@@ -468,6 +472,7 @@ enum wlan_roam_failure_reason_code {
 	ROAM_FAIL_REASON_SCAN_CANCEL,
 	ROAM_FAIL_REASON_SCREEN_ACTIVITY,
 	ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN,
+	ROAM_FAIL_REASON_REASSOC_TO_SAME_AP,
 	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 

@@ -37,6 +37,7 @@
 #include "wlan_connectivity_logging.h"
 #include "target_if.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_psoc_mlme_api.h"
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
 #define BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN 15
@@ -5413,3 +5414,16 @@ QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+uint32_t cm_roam_get_roam_score_algo(struct wlan_objmgr_psoc *psoc)
+{
+	struct psoc_mlme_obj *mlme_psoc_obj;
+	struct scoring_cfg *score_config;
+
+	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
+	if (!mlme_psoc_obj)
+		return 0;
+
+	score_config = &mlme_psoc_obj->psoc_cfg.score_config;
+
+	return score_config->vendor_roam_score_algorithm;
+}

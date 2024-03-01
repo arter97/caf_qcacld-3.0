@@ -10107,6 +10107,7 @@ hdd_convert_roam_failures_reason(enum wlan_roam_failure_reason_code fail)
 	case ROAM_FAIL_REASON_SCAN_CANCEL:
 	case ROAM_FAIL_REASON_SCREEN_ACTIVITY:
 	case ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN:
+	case ROAM_FAIL_REASON_REASSOC_TO_SAME_AP:
 	case ROAM_FAIL_REASON_UNKNOWN:
 		hdd_err("Invalid roam failures reason");
 		break;
