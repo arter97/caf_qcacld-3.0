@@ -42,6 +42,15 @@ QDF_STATUS os_if_spectral_streamfs_init(struct wlan_objmgr_pdev *pdev);
  * Return: None
  */
 QDF_STATUS os_if_spectral_streamfs_deinit(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * os_if_spectral_streamfs_reset_channel() - Reset spectral streamfs channel
+ * @pdev: Pointer to pdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+os_if_spectral_streamfs_reset_channel(struct wlan_objmgr_pdev *pdev);
 #else
 static inline
 QDF_STATUS os_if_spectral_streamfs_init(struct wlan_objmgr_pdev *pdev)
@@ -53,6 +62,12 @@ static inline
 QDF_STATUS os_if_spectral_streamfs_deinit(struct wlan_objmgr_pdev *pdev)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline  QDF_STATUS
+os_if_spectral_streamfs_reset_channel(struct wlan_objmgr_pdev *pdev)
+{
+    return QDF_STATUS_SUCCESS;
 }
 #endif
 #endif /* _OS_IF_SPECTRAL_STREAMFS_H */

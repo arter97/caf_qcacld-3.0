@@ -355,9 +355,11 @@ os_if_spectral_streamfs_init(struct wlan_objmgr_pdev *pdev)
 		wlan_spectral_get_phy_ch_width;
 	spectral_buf_cb.convert_to_nl_ch_width =
 		wlan_spectral_get_nl80211_chwidth;
+	spectral_buf_cb.reset_transport_channel =
+		os_if_spectral_streamfs_reset_channel;
 
-	if (sptrl_ctx->sptrlc_use_nl_bcast)
-		sptrl_ctx->sptrlc_use_nl_bcast(pdev, false);
+	if (sptrl_ctx->sptrlc_use_broadcast)
+		sptrl_ctx->sptrlc_use_broadcast(pdev, false);
 
 	if (sptrl_ctx->sptrlc_register_buffer_cb)
 		sptrl_ctx->sptrlc_register_buffer_cb(pdev, &spectral_buf_cb);
@@ -402,3 +404,37 @@ QDF_STATUS os_if_spectral_streamfs_deinit(struct wlan_objmgr_pdev *pdev)
 }
 
 qdf_export_symbol(os_if_spectral_streamfs_deinit);
+
+/**
+ * os_if_spectral_streamfs_reset_channel() - Reset spectral streamfs channel
+ * @pdev: Pointer to pdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+os_if_spectral_streamfs_reset_channel(struct wlan_objmgr_pdev *pdev)
+{
+	struct pdev_spectral *ps = NULL;
+	struct pdev_spectral_streamfs *pss = NULL;
+
+	ps = wlan_objmgr_pdev_get_comp_private_obj(pdev,
+						   WLAN_UMAC_COMP_SPECTRAL);
+
+	if (!ps) {
+		spectral_err("PDEV SPECTRAL object is NULL!");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	pss = &ps->streamfs_obj;
+
+	if (!pss->chan_ptr) {
+		spectral_err("Streamfs channel pointer is NULL!");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	qdf_streamfs_reset(pss->chan_ptr);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(os_if_spectral_streamfs_reset_channel);
