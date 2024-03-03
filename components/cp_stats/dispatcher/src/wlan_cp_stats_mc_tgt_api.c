@@ -126,6 +126,7 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	struct pdev_mc_cp_stats *pdev_mc_stats;
 	struct pdev_cp_stats *pdev_cp_stats_priv;
 	bool pending = false;
+	bool hw_dbs_capable;
 
 	if (!ev->pdev_stats)
 		return;
@@ -167,6 +168,7 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
+	hw_dbs_capable = policy_mgr_is_hw_dbs_capable(psoc);
 	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, last_req.vdev_id);
 
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
@@ -175,7 +177,12 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	    pdev_mc_stats->max_pwr != ev->pdev_stats[pdev_id].max_pwr)
 		wlan_son_deliver_tx_power(vdev,
 					  ev->pdev_stats[pdev_id].max_pwr);
-	if (mac_id == ev->mac_seq_num)
+
+	/* 
+	 * hw_dbs_capable false mean single mac, max power from mac0
+	 * hw_dbs_capable true mean dual mac, max power per mac_id
+	 */
+	if (!hw_dbs_capable || mac_id == ev->mac_seq_num)
 		max_pwr = pdev_mc_stats->max_pwr =
 			ev->pdev_stats[pdev_id].max_pwr;
 
@@ -183,7 +190,13 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	if (is_station_stats)
 		goto end;
 
-	if (mac_id == ev->mac_seq_num) {
+	if ((!hw_dbs_capable &&
+	     tgt_mc_cp_stats_is_last_event(ev, TYPE_CONNECTION_TX_POWER)) ||
+	     (hw_dbs_capable && mac_id == ev->mac_seq_num)) {
+		/*
+		 * single mac, 2 events reported, only the last one is valid
+		 * dual mac, mac_seq_num indicate mac id of tx power event
+		 */
 		ucfg_mc_cp_stats_reset_pending_req(psoc,
 						   TYPE_CONNECTION_TX_POWER,
 						   &last_req,
@@ -1108,6 +1121,60 @@ tgt_send_peer_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+tgt_send_pdev_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
+			  struct stats_event *ev,
+			  struct request_info *last_req)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct pdev_mc_cp_stats *pdev_mc_stats;
+	struct pdev_cp_stats *pdev_cp_stats_priv;
+	int pdev_id;
+
+	if (!ev || !last_req)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req->vdev_id,
+						    WLAN_CP_STATS_ID);
+	if (!vdev) {
+		cp_stats_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cp_stats_err("pdev is null");
+		goto end;
+	}
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	if (pdev_id != last_req->pdev_id) {
+		cp_stats_err("pdev_id: %d invalid", pdev_id);
+		goto end;
+	}
+
+	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
+	if (!pdev_cp_stats_priv) {
+		cp_stats_err("pdev_cp_stats_priv is null");
+		goto end;
+	}
+
+	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
+	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
+	qdf_mem_copy(ev->pdev_stats,
+		     pdev_mc_stats,
+		     sizeof(*pdev_mc_stats));
+	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+
+	return QDF_STATUS_SUCCESS;
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+	return QDF_STATUS_E_NULL_VALUE;
+}
+
 static void
 tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 				       struct request_info *last_req)
@@ -1144,6 +1211,17 @@ tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 	status = tgt_send_peer_mc_cp_stats(psoc, &info, last_req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cp_stats_err("tgt_send_peer_mc_cp_stats failed");
+		goto end;
+	}
+
+	info.num_pdev_stats = 1;
+	info.pdev_stats = qdf_mem_malloc(sizeof(*info.pdev_stats));
+	if (!info.pdev_stats)
+		goto end;
+
+	status = tgt_send_pdev_mc_cp_stats(psoc, &info, last_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("tgt_send_pdev_mc_cp_stats failed");
 		goto end;
 	}
 end:

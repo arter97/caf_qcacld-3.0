@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3912,7 +3912,8 @@ bool policy_mgr_allow_same_mac_same_freq(struct wlan_objmgr_psoc *psoc,
 
 bool policy_mgr_allow_new_home_channel(
 	struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode,
-	qdf_freq_t ch_freq, uint32_t num_connections, bool is_dfs_ch)
+	qdf_freq_t ch_freq, uint32_t num_connections, bool is_dfs_ch,
+	uint32_t ext_flags)
 {
 	bool status = true;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -3931,10 +3932,8 @@ bool policy_mgr_allow_new_home_channel(
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	if (num_connections == 3) {
 		status = policy_mgr_allow_4th_new_freq(psoc,
-						pm_conc_connection_list[0].freq,
-						pm_conc_connection_list[1].freq,
-						pm_conc_connection_list[2].freq,
-						ch_freq);
+						       ch_freq, mode,
+						       ext_flags);
 	} else if (num_connections == 2) {
 	/* No SCC or MCC combination is allowed with / on DFS channel */
 		on_same_mac = policy_mgr_2_freq_always_on_same_mac(psoc,
@@ -4370,8 +4369,11 @@ void policy_mgr_check_scc_sbs_channel(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	QDF_STATUS status;
 	struct policy_mgr_conc_connection_info
-			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
-	uint8_t num_cxn_del = 0;
+			info_sap[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	struct policy_mgr_conc_connection_info
+			info_go[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	uint8_t num_cxn_del_sap = 0;
+	uint8_t num_cxn_del_go = 0;
 	bool same_band_present = false;
 	bool sbs_mlo_present = false;
 	bool allow_6ghz = true, sta_sap_scc_on_indoor_channel_allowed;
@@ -4525,12 +4527,14 @@ sbs_check:
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	/*
-	 * For SAP restart case SAP entry might be present in table,
+	 * For SAP restart case SAP/GO entry might be present in table,
 	 * so delete it temporary
 	 */
-	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, vdev_id, info,
-						      &num_cxn_del);
 
+	policy_mgr_store_and_del_conn_info_by_chan_and_mode(psoc, sap_ch_freq,
+							PM_SAP_MODE, info_sap, &num_cxn_del_sap);
+	policy_mgr_store_and_del_conn_info_by_chan_and_mode(psoc, sap_ch_freq,
+							PM_P2P_GO_MODE, info_go, &num_cxn_del_go);
 	/*
 	 * If at least one interface is in same band OR HW mode is SBS OR
 	 * SBS MLO is present, try set SBS/DBS/SCC.
@@ -4570,8 +4574,10 @@ sbs_check:
 		break;
 	}
 	/* Restore the connection entry */
-	if (num_cxn_del > 0)
-		policy_mgr_restore_deleted_conn_info(psoc, info, num_cxn_del);
+	if (num_cxn_del_sap > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, info_sap, num_cxn_del_sap);
+	if (num_cxn_del_go > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, info_go, num_cxn_del_go);
 
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 }

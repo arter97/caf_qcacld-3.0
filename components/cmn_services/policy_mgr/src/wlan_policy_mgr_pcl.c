@@ -2773,6 +2773,13 @@ enum policy_mgr_three_connection_mode
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq)) {
 			index = PM_STA_SAP_SCC_5_SAP_24_DBS;
+		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq)) {
+	   		index = PM_SAP_SAP_SCC_5_STA_24_DBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -3548,14 +3555,7 @@ uint32_t policy_mgr_mode_specific_get_channel(
 	return freq;
 }
 
-/**
- * policy_mgr_get_connection_count_with_ch_freq() - Get number of active
- * connections on the channel frequecy
- * @ch_freq: channel frequency
- *
- * Return: number of active connection on the specific frequency
- */
-static uint32_t policy_mgr_get_connection_count_with_ch_freq(uint32_t ch_freq)
+uint32_t policy_mgr_get_connection_count_with_ch_freq(uint32_t ch_freq)
 {
 	uint32_t i;
 	uint32_t count = 0;
@@ -3746,6 +3746,7 @@ bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_two_connection_mode third_index = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool ret = false;
+	bool force_scc = policy_mgr_is_force_scc(psoc);
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3753,9 +3754,9 @@ bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 			return false;
 	}
 
-	if (pm_conc_connection_list[0].freq != ch_freq ||
+	if (!force_scc && (pm_conc_connection_list[0].freq != ch_freq ||
 	    pm_conc_connection_list[0].freq !=
-				pm_conc_connection_list[1].freq) {
+				pm_conc_connection_list[1].freq)) {
 		policy_mgr_debug("No MCC support in 3vif in same mac: %d %d %d",
 				 pm_conc_connection_list[0].freq,
 				 pm_conc_connection_list[1].freq,

@@ -2398,6 +2398,17 @@ bool policy_mgr_is_any_mode_active_on_band_along_with_session(
 		enum policy_mgr_band band);
 
 /**
+ * policy_mgr_get_bw_by_session_id() - Get channel width for a given session ID
+ * @psoc: PSOC object information
+ * @session_id: Session ID
+ *
+ * Return: channel width of the session
+ */
+enum phy_ch_width
+policy_mgr_get_bw_by_session_id(struct wlan_objmgr_psoc *psoc,
+				uint8_t session_id);
+
+/**
  * policy_mgr_get_chan_by_session_id() - Get channel for a given session ID
  * @psoc: PSOC object information
  * @session_id: Session ID
@@ -2993,26 +3004,26 @@ policy_mgr_are_3_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_allow_4th_new_freq() - Function to check whether 4th freq can
- * be allowed wthout leading to 3 home freq on same mac
+ * be allowed with existing 3 vifs
  * @psoc: Pointer to Psoc
- * @freq1: Frequency 1
- * @freq2: Frequency 2
- * @freq3: Frequency 3
- * @new_ch_freq: freq to check with reference to freq1 freq2 and freq3
+ * @ch_freq: new channel frequency
+ * @mode: new device mode
+ * @ext_flags: extended flags for concurrency check
  *
- * Return:True if all 4 freq can be allowed without causing 3 home frequency
- * on same mac
+ * Return:True if 4th freq can be allowed with existing 3 vifs
  */
 #ifdef FEATURE_FOURTH_CONNECTION
 bool
 policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
-			      qdf_freq_t freq1, qdf_freq_t freq2,
-			      qdf_freq_t freq3, qdf_freq_t new_ch_freq);
+			      qdf_freq_t ch_freq,
+			      enum policy_mgr_con_mode mode,
+			      uint32_t ext_flags);
 #else
 static inline bool
 policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
-			      qdf_freq_t freq1, qdf_freq_t freq2,
-			      qdf_freq_t freq3, qdf_freq_t new_ch_freq)
+			      qdf_freq_t ch_freq,
+			      enum policy_mgr_con_mode mode,
+			      uint32_t ext_flags)
 {
 	return false;
 }
@@ -4390,6 +4401,30 @@ bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
 
 #ifdef WLAN_FEATURE_11BE_MLO
+/*
+ * policy_mgr_get_ml_sta_info_psoc() - Get number of ML STA vdev ids and
+ * freq list
+ * @pm_ctx: pm_ctx ctx
+ * @num_ml_sta: Return number of ML STA present
+ * @num_disabled_ml_sta: Return number of disabled ML STA links
+ * @ml_vdev_lst: Return ML STA vdev id list
+ * @ml_freq_lst: Return ML STA freq list
+ * @num_non_ml: Return number of non-ML STA present
+ * @non_ml_vdev_lst: Return non-ML STA vdev id list
+ * @non_ml_freq_lst: Return non-ML STA freq list
+ *
+ * Return: void
+ */
+void
+policy_mgr_get_ml_sta_info_psoc(struct wlan_objmgr_psoc *psoc,
+				uint8_t *num_ml_sta,
+				uint8_t *num_disabled_ml_sta,
+				uint8_t *ml_vdev_lst,
+				qdf_freq_t *ml_freq_lst,
+				uint8_t *num_non_ml,
+				uint8_t *non_ml_vdev_lst,
+				qdf_freq_t *non_ml_freq_lst);
+
 /**
  * policy_mgr_is_mlo_sap_concurrency_allowed() - Check for mlo sap allowed
  *                                               concurrency combination
@@ -4698,4 +4733,44 @@ qdf_freq_t policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
 					    qdf_freq_t freq,
 					    enum policy_mgr_con_mode mode);
+
+/**
+ * policy_mgr_update_indoor_concurrency() - Function to update the indoor
+ * concurrency related regulatory changes
+ *
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id
+ * @discon_freq: disconnect frequency
+ * @type: enum indoor_conc_update_type
+ *
+ * Return: None
+ */
+void
+policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id,
+				     uint32_t discon_freq,
+				     enum indoor_conc_update_type type);
+/**
+ * policy_mgr_is_conc_sap_present_on_sta_freq() - Function to check if
+ * SAP or GO exists on the STA frequency
+ *
+ * @psoc: pointer to psoc
+ * @mode: interface mode
+ * @ch_freq: channel frequency
+ *
+ * Return: AP mode exists
+ */
+bool
+policy_mgr_is_conc_sap_present_on_sta_freq(struct wlan_objmgr_psoc *psoc,
+					   enum policy_mgr_con_mode mode,
+					   uint32_t ch_freq);
+
+/**
+ * policy_mgr_get_connection_count_with_ch_freq() - Get number of active
+ * connections on the channel frequecy
+ * @ch_freq: channel frequency
+ *
+ * Return: number of active connection on the specific frequency
+ */
+uint32_t policy_mgr_get_connection_count_with_ch_freq(uint32_t ch_freq);
 #endif /* __WLAN_POLICY_MGR_API_H */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1014,6 +1014,7 @@ enum policy_mgr_three_connection_mode {
 	PM_NDI_NDI_NAN_DISC_24_SMM,
 	PM_SAP_SAP_SCC_24_SAP_5_DBS,
 	PM_SAP_SAP_SCC_5_SAP_24_DBS,
+	PM_SAP_SAP_SCC_5_STA_24_DBS,
 	PM_STA_STA_5_NAN_DISC_24_DBS,
 	PM_NAN_DISC_24_STA_STA_5_DBS,
 	PM_STA_STA_24_NAN_DISC_24_SMM,
@@ -1634,6 +1635,26 @@ struct sta_ap_intf_check_work_ctx {
 	struct wlan_objmgr_psoc *psoc;
 	struct go_plus_go_force_scc go_plus_go_force_scc;
 	struct sap_plus_go_force_scc sap_plus_go_force_scc;
+};
+
+/**
+ * enum indoor_conc_update_type - Indoor concurrency update type
+ * @CONNECT - On a new STA connection
+ * @DISCONNECT_WITHOUT_CONCURRENCY - On a STA disconnection with no active
+ * sessions on the same frequency
+ * @DISCONNECT_WITH_CONCURRENCY - On a STA disconnection with an active
+ * session on the same frequency
+ * @SWITCH_WITH_CONCURRENCY - On a STA roam or CSA to a different channel
+ * with a concurrent SAP on previous frequency
+ * @SWITCH_WITHOUT_CONCURRENCY - On a STA roam or CSA to a different channel
+ * without any concurrent SAP on previous frequency
+ */
+enum indoor_conc_update_type {
+	CONNECT,
+	DISCONNECT_WITHOUT_CONCURRENCY,
+	DISCONNECT_WITH_CONCURRENCY,
+	SWITCH_WITHOUT_CONCURRENCY,
+	SWITCH_WITH_CONCURRENCY,
 };
 
 #endif /* __WLAN_POLICY_MGR_PUBLIC_STRUCT_H */
