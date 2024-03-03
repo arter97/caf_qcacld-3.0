@@ -3234,6 +3234,11 @@ static QDF_STATUS wma_wow_pagefault_action_cb(void *buf)
 {
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
+	if (!mac) {
+		wma_err("NULL mac ptr");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	return mac->sme.pagefault_action_cb(buf, WLAN_WMA_PF_APPS_NOTIFY_BUF_LEN);
 }
 
