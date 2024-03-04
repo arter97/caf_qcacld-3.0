@@ -151,7 +151,7 @@ static QDF_STATUS sys_mc_process_msg(struct scheduler_msg *pMsg)
 		/* Process all the new SYS messages.. */
 		switch (pMsg->type) {
 		case SYS_MSG_ID_UMAC_STOP:
-			QDF_TRACE(QDF_MODULE_ID_SYS, QDF_TRACE_LEVEL_ERROR,
+			QDF_TRACE(QDF_MODULE_ID_SYS, QDF_TRACE_LEVEL_DEBUG,
 				"Processing SYS MC STOP");
 			mac_handle = cds_get_context(QDF_MODULE_ID_PE);
 			if (!mac_handle) {

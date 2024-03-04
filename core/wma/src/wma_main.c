@@ -5916,7 +5916,7 @@ int wma_rx_service_ready_event(void *handle, uint8_t *cmd_param_info,
 		}
 
 	} else {
-		wma_err("FW doesnot support WMI_SERVICE_MGMT_TX_WMI, Use HTT interface for Management Tx");
+		wma_debug("FW doesnot support WMI_SERVICE_MGMT_TX_WMI, Use HTT interface for Management Tx");
 	}
 
 	status = wma_register_gtk_offload_event(wma_handle);

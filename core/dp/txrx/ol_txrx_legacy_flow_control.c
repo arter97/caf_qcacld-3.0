@@ -445,7 +445,7 @@ int ol_txrx_deregister_tx_flow_control_cb(struct cdp_soc_t *soc_hdl,
 		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
 
 	if (!vdev) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
 			  "%s: Invalid vdev_id", __func__);
 		return -EINVAL;
 	}
