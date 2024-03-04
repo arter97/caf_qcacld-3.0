@@ -1801,16 +1801,15 @@ wlan_twt_clear_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 			peer_priv->session_info[i].dialog_id = TWT_ALL_SESSIONS_DIALOG_ID;
 			peer_priv->session_info[i].wake_dur = 0;
 			peer_priv->session_info[i].wake_interval = 0;
+			twt_debug("vdev:%d peer:" QDF_MAC_ADDR_FMT
+				  " dialog_id:%d wake_dur:%d wake_interval:%d",
+				  vdev_id, QDF_MAC_ADDR_REF(peer_mac->bytes),
+				  peer_priv->session_info[i].dialog_id,
+				  peer_priv->session_info[i].wake_dur,
+				  peer_priv->session_info[i].wake_interval);
 			break;
 		}
 	}
-
-	twt_debug("vdev:%d peer:" QDF_MAC_ADDR_FMT " dialog_id:%d wake_dur:%d wake_interval:%d",
-		  vdev_id,
-		  QDF_MAC_ADDR_REF(peer_mac->bytes),
-		  peer_priv->session_info[i].dialog_id,
-		  peer_priv->session_info[i].wake_dur,
-		  peer_priv->session_info[i].wake_interval);
 
 	qdf_mutex_release(&peer_priv->twt_peer_lock);
 	wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
