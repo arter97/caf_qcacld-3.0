@@ -619,7 +619,7 @@ static void pld_ipci_populate_hw_cap_info(struct icnss_soc_info *icnss_info,
 
 int pld_ipci_get_soc_info(struct device *dev, struct pld_soc_info *info)
 {
-	int errno;
+	int errno = 0, i = 0;
 	struct icnss_soc_info icnss_info = {0};
 
 	if (!info || !dev)
@@ -643,6 +643,10 @@ int pld_ipci_get_soc_info(struct device *dev, struct pld_soc_info *info)
 
 	pld_ipci_populate_hw_cap_info(&icnss_info, info);
 
+	for (i = 0; i < PLD_MAX_DEV_MEM_NUM; i++) {
+		info->dev_mem_info[i].start = icnss_info.dev_mem_info[i].start;
+		info->dev_mem_info[i].size = icnss_info.dev_mem_info[i].size;
+	}
 	return 0;
 }
 
