@@ -45,6 +45,12 @@ dp_peer_age_ast_entries(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 {
 	struct dp_ast_entry *ase, *temp_ase;
 
+#ifdef IOT_DRONE_MESH
+	/* Don't Age out the AST entries if IoT Mesh is enabled */
+	if (peer->vdev->pdev->iot_mesh_en)
+		return;
+#endif
+
 	DP_PEER_ITERATE_ASE_LIST(peer, ase, temp_ase) {
 		/*
 		 * Do not expire static ast entries and HM WDS entries
