@@ -416,8 +416,8 @@ wlan_reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				     enum reg_6g_ap_type ap_pwr_type,
 				     enum reg_6g_client_type client_type,
 				     qdf_freq_t chan_freq,
-				     bool *is_psd, uint16_t *reg_eirp,
-				     uint16_t *reg_psd);
+				     bool *is_psd, int16_t *reg_eirp,
+				     int16_t *reg_psd);
 
 #ifdef CONFIG_AFC_SUPPORT
 /**
