@@ -1508,11 +1508,15 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 		weight_config->beamforming_cap_weightage;
 
 	/*
-	 * Don’t consider pcl weightage for STA connection,
-	 * if primary interface is configured.
+	 * Don’t consider pcl weightage if:
+	 * a) primary interface is configured (or)
+	 * b) HW is non-DBS
 	 */
-	if (policy_mgr_is_pcl_weightage_required(psoc))
+	if (policy_mgr_is_pcl_weightage_required(psoc) &&
+	    policy_mgr_is_hw_dbs_capable(psoc))
 		req_score_params->pcl_weightage = weight_config->pcl_weightage;
+	else
+		req_score_params->pcl_weightage = 0;
 
 	req_score_params->oce_wan_weightage = weight_config->oce_wan_weightage;
 	req_score_params->oce_ap_tx_pwr_weightage =
