@@ -11290,6 +11290,25 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 		return false;
 	}
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("Invalid vdev");
+		return false;
+	}
+	/* Allow the current CSA to continue if it's already started. This is
+	 * possible when SAP CSA started to move to STA channel but STA got
+	 * disconnected.
+	 */
+	if (!wlan_vdev_mlme_is_init_state(vdev) &&
+	    !wlan_vdev_is_up_active_state(vdev)) {
+		policy_mgr_debug("SAP is not yet UP: vdev %d", vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return true;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
 	/*
 	 * Check if any of the concurrent STA/ML-STA link/P2P client are in
 	 * disconnecting state and disallow current SAP CSA. Concurrencies
