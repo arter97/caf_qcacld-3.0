@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -407,6 +407,27 @@ void wlan_son_ind_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
 					      frame, frame_len,
 					      &assocstatus);
 	wlan_objmgr_peer_release_ref(peer, WLAN_SON_ID);
+}
+
+int wlan_get_multi_ap_cap(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_rx_ops *rx_ops;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		son_err("invalid psoc");
+		return false;
+	}
+	rx_ops = wlan_psoc_get_lmac_if_rxops(psoc);
+
+	if (!rx_ops || !rx_ops->son_rx_ops.get_son_config) {
+		son_err("invalid rx ops");
+		return false;
+	}
+
+	return rx_ops->son_rx_ops.get_son_config(vdev,
+						 SIR_MAP_CAPABILITY_VAP_TYPE);
 }
 
 static int wlan_son_deliver_mlme_event(struct wlan_objmgr_vdev *vdev,
