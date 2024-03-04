@@ -4176,7 +4176,10 @@ int8_t libstats_receive_event(struct reply_buffer *buf)
 	}
 
 	g_nb_ctx.reply = buf;
+
 	ret = recv_nlmsg_nb(&g_sock_ctx.cfg80211_ctxt);
+	if (ret == -NLE_AGAIN)
+		ret = -EAGAIN;
 
 	return ret;
 }
