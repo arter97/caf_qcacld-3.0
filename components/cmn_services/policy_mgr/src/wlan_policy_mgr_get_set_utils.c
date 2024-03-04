@@ -1768,20 +1768,35 @@ policy_mgr_get_5g_low_high_cut_freq(struct wlan_objmgr_psoc *psoc)
 }
 
 static bool
-policy_mgr_2_freq_same_mac_in_freq_range(
+policy_mgr_2_freq_same_mac_id_in_freq_range(
 				struct policy_mgr_psoc_priv_obj *pm_ctx,
 				struct policy_mgr_freq_range *freq_range,
-				qdf_freq_t freq_1, qdf_freq_t freq_2)
+				qdf_freq_t freq_1, qdf_freq_t freq_2,
+				uint8_t *mac_id)
 {
 	uint8_t i;
 
 	for (i = 0; i < MAX_MAC; i++) {
 		if (IS_FREQ_ON_MAC_ID(freq_range, freq_1, i) &&
-		    IS_FREQ_ON_MAC_ID(freq_range, freq_2, i))
+		    IS_FREQ_ON_MAC_ID(freq_range, freq_2, i)) {
+			if (mac_id)
+				*mac_id = i;
 			return true;
+		}
 	}
 
 	return false;
+}
+
+static bool
+policy_mgr_2_freq_same_mac_in_freq_range(
+				struct policy_mgr_psoc_priv_obj *pm_ctx,
+				struct policy_mgr_freq_range *freq_range,
+				qdf_freq_t freq_1, qdf_freq_t freq_2)
+{
+	return policy_mgr_2_freq_same_mac_id_in_freq_range(
+			pm_ctx, freq_range,
+			freq_1, freq_2, NULL);
 }
 
 bool policy_mgr_can_2ghz_share_low_high_5ghz_sbs(
@@ -2353,6 +2368,8 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t ml_sta_link1_freq = 0;
 	uint8_t i, j;
 	struct policy_mgr_freq_range *freq_range;
+	bool emlsr_links_with_aux = false;
+	uint8_t mac_id;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2368,6 +2385,13 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_ml_sta_active_freq(psoc, ch_freq, mode, ext_flags,
 				      &ml_sta_link0_freq,
 				      &ml_sta_link1_freq);
+	if (ml_sta_link0_freq &&
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(ml_sta_link0_freq) &&
+	    ml_sta_link1_freq &&
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(ml_sta_link1_freq) &&
+	    policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) &&
+	    wlan_mlme_is_aux_emlsr_support(psoc))
+		emlsr_links_with_aux = true;
 
 	/* Check if any hw mode can support the 4th channel frequency
 	 * and device mode.
@@ -2380,13 +2404,18 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 		/* If ml sta present, the two links should be in
 		 * different mac always. Skip the hw mode which
 		 * causes they in same mac.
+		 * Emlsr links with aux supported hw, the two links
+		 * can be eMLSR mode in mac 1.
 		 */
+		mac_id = 0;
 		if (ml_sta_link0_freq && ml_sta_link1_freq &&
-		    policy_mgr_2_freq_same_mac_in_freq_range(pm_ctx,
-							     freq_range,
-							     ml_sta_link0_freq,
-							     ml_sta_link1_freq))
-			continue;
+		    policy_mgr_2_freq_same_mac_id_in_freq_range(
+				pm_ctx, freq_range, ml_sta_link0_freq,
+				ml_sta_link1_freq, &mac_id)) {
+			if (!(emlsr_links_with_aux && mac_id == 1))
+				continue;
+		}
+
 		for (i = 0; i < MAX_MAC; i++) {
 			/* Get the freq list which are in the MAC
 			 * supported freq range.
@@ -6016,10 +6045,11 @@ bool policy_mgr_vdev_is_force_inactive(struct wlan_objmgr_psoc *psoc,
  * Internal macro, not expected used other code.
  * Bigger value have higher priority.
  */
-#define PRIORITY_STA	3
-#define PRIORITY_SAP	2
-#define PRIORITY_P2P	1
-#define PRIORITY_OTHER	0
+#define PRIORITY_STA            4
+#define PRIORITY_2G_ONLY_SAP    3
+#define PRIORITY_P2P            2
+#define PRIORITY_SAP            1
+#define PRIORITY_OTHER          0
 
 uint8_t
 policy_mgr_get_legacy_conn_info(struct wlan_objmgr_psoc *psoc,
@@ -6083,7 +6113,7 @@ policy_mgr_get_legacy_conn_info(struct wlan_objmgr_psoc *psoc,
 		else if (pm_conc_connection_list[conn_index].mode ==
 							PM_SAP_MODE &&
 			 policy_mgr_is_acs_2ghz_only_sap(psoc, vdev_id))
-			has_priority[j] = PRIORITY_SAP;
+			has_priority[j] = PRIORITY_2G_ONLY_SAP;
 		else if ((pm_conc_connection_list[conn_index].mode ==
 							PM_P2P_CLIENT_MODE ||
 			  pm_conc_connection_list[conn_index].mode ==
@@ -6091,6 +6121,9 @@ policy_mgr_get_legacy_conn_info(struct wlan_objmgr_psoc *psoc,
 			 policy_mgr_is_vdev_high_tput_or_low_latency(
 							psoc, vdev_id))
 			has_priority[j] = PRIORITY_P2P;
+		else if (pm_conc_connection_list[conn_index].mode ==
+							PM_SAP_MODE)
+			has_priority[j] = PRIORITY_SAP;
 		else
 			has_priority[j] = PRIORITY_OTHER;
 

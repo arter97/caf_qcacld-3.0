@@ -3556,13 +3556,34 @@ policy_mgr_get_index_for_ml_sta_sap(
 			qdf_freq_t sap_freq, qdf_freq_t *sta_freq_list,
 			uint8_t *ml_sta_idx)
 {
+	bool emlsr_links_with_aux = false;
+
+	if (sta_freq_list[ml_sta_idx[0]] &&
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(sta_freq_list[ml_sta_idx[0]]) &&
+	    sta_freq_list[ml_sta_idx[1]] &&
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(sta_freq_list[ml_sta_idx[1]]) &&
+	    policy_mgr_is_mlo_in_mode_emlsr(pm_ctx->psoc, NULL, NULL) &&
+	    wlan_mlme_is_aux_emlsr_support(pm_ctx->psoc))
+		emlsr_links_with_aux = true;
+
 	/*
 	 * P2P GO/P2P CLI are treated as SAP to optimize as pcl
 	 * table is same for all three.
 	 */
-	policy_mgr_debug("channel: sap0: %d, ML STA link0: %d, ML STA link1: %d",
+	policy_mgr_debug("channel: sap0: %d, ML STA link0: %d, ML STA link1: %d aux emlsr %d",
 			 sap_freq, sta_freq_list[ml_sta_idx[0]],
-			 sta_freq_list[ml_sta_idx[1]]);
+			 sta_freq_list[ml_sta_idx[1]],
+			 emlsr_links_with_aux);
+	if (emlsr_links_with_aux) {
+		/* eMLSR STA 2 links on 5/6 GHz, 2nd conn on 2.4 GHz,
+		 * 3th conn can be 2.4 GHz to keep eMLSR support on ML STA.
+		 */
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(sap_freq)) {
+			*index = PM_5_SCC_MCC_PLUS_24_DBS;
+			return;
+		}
+	}
+
 	if (policy_mgr_is_current_hwmode_sbs(pm_ctx->psoc) ||
 	    policy_mgr_are_sbs_chan(pm_ctx->psoc, sta_freq_list[ml_sta_idx[0]],
 				    sta_freq_list[ml_sta_idx[1]])) {

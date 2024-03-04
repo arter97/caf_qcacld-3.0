@@ -144,26 +144,64 @@ disallow_mlo_mode_table_sbs_low_share = {
 	[HC_2G_5GL] = {[HC_NONE] =    {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {0, 0},
-			[HC_5GH] =    {0, MLMR_2G_5GL} },
+			[HC_5GH] =    {0, MLMR_2G_5GL},
+			[HC_5GL_5GH] = {0, 0},
+			[HC_5GH_5GH] = {MLMR_2G_5GL, MLMR_2G_5GL},
+			[HC_5GL_5GL] = {0, 0},
+			[HC_2G_5GL] = {0, 0},
+			[HC_2G_5GH] = {0, 0},
+			[HC_2G_2G] = {0, 0} },
 	[HC_2G_5GH] = {[HC_NONE] =    {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {0, MLMR_2G_5GH},
-			[HC_5GH] =    {0, 0} },
+			[HC_5GH] =    {0, 0},
+			[HC_5GL_5GH] = {0, 0},
+			[HC_5GH_5GH] = {0, 0},
+			[HC_5GL_5GL] = {MLMR_2G_5GH, MLMR_2G_5GH},
+			[HC_2G_5GL] = {0, 0},
+			[HC_2G_5GH] = {0, 0},
+			[HC_2G_2G] = {0, 0} },
 	[HC_5GL_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {0, MLMR_5GL_5GH},
 			[HC_5GL] =    {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
-			[HC_5GH] =    {EMLSR_5GL_5GH, EMLSR_5GL_5GH} },
+			[HC_5GH] =    {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GL_5GH] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GH_5GH] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GL_5GL] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_2G_5GL] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_2G_5GH] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_2G_2G] = {MLMR_5GL_5GH, MLMR_5GL_5GH} },
 	[HC_5GH_5GH] = {[HC_NONE] =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_2G]  =    {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_5GL] =    {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_5GH] =    {MLMR_5GH_5GH | EMLSR_5GH_5GH,
-					MLMR_5GH_5GH | EMLSR_5GH_5GH} },
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GL_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GH_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GL_5GL] = {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_2G_5GL] = {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_2G_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_2G_2G] = {MLMR_5GL_5GH, MLMR_5GL_5GH} },
 	[HC_5GL_5GL] = {[HC_NONE] =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_2G]  =    {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_5GL] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
 					MLMR_5GL_5GL | EMLSR_5GL_5GL},
 			[HC_5GH] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
-					MLMR_5GL_5GL | EMLSR_5GL_5GL} },
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GL_5GH] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GH_5GH] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GL_5GL] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_5GL] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_5GH] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_2G] = {MLMR_5GL_5GL, MLMR_5GL_5GL} },
 };
 
 static disallow_mlo_mode_table_type
@@ -2051,7 +2089,9 @@ ml_nlink_handle_comm_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 
 	force_inactive_tlb = get_force_inactive_table(psoc, pm_mode);
 	if (!force_inactive_tlb) {
-		mlo_debug("unable to get force inactive tbl for sap");
+		mlo_debug("unable to get force inactive tbl for %s rd %d",
+			  device_mode_to_string(pm_mode),
+			  policy_mgr_get_rd_type(psoc));
 		return;
 	}
 
@@ -2102,61 +2142,6 @@ ml_nlink_handle_comm_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 			force_cmd->force_inactive_num = 0;
 		}
 	}
-}
-
-/**
- * ml_nlink_handle_legacy_intf_emlsr() - Check force inactive needed
- * with legacy interface for eMLSR connection
- * @psoc: PSOC object information
- * @vdev: vdev object
- * @force_cmd: force command to be returned
- *
- * Return: void
- */
-static void
-ml_nlink_handle_legacy_intf_emlsr(struct wlan_objmgr_psoc *psoc,
-				  struct wlan_objmgr_vdev *vdev,
-				  struct ml_link_force_state *force_cmd)
-{
-	uint8_t vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	qdf_freq_t freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t num_legacy_vdev;
-
-	num_legacy_vdev = policy_mgr_get_legacy_conn_info(
-					psoc, vdev_lst,
-					freq_lst, mode_lst,
-					QDF_ARRAY_SIZE(vdev_lst));
-	if (!num_legacy_vdev)
-		return;
-
-	/* handle 2 port case with 2 ml sta links.
-	 * todo: 2 port case with 3 ml sta links
-	 */
-	if (num_legacy_vdev == 1) {
-		switch (mode_lst[0]) {
-		case PM_P2P_CLIENT_MODE:
-		case PM_P2P_GO_MODE:
-		case PM_STA_MODE:
-		case PM_SAP_MODE:
-			ml_nlink_handle_comm_intf_emlsr(
-				psoc, vdev, force_cmd, vdev_lst[0],
-				freq_lst[0], mode_lst[0]);
-			break;
-		default:
-			/* unexpected legacy connection mode */
-			mlo_debug("unexpected legacy intf mode %d",
-				  mode_lst[0]);
-			return;
-		}
-		ml_nlink_dump_force_state(force_cmd, "");
-		return;
-	}
-
-	/* handle 3 port case with 2 ml sta links.
-	 * todo: 3 port case with 3 ml sta links
-	 */
-	ml_nlink_dump_force_state(force_cmd, "");
 }
 
 /**
@@ -2695,6 +2680,454 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 }
 
 static void
+ml_nlink_handle_legacy_intf_3_ports_emlsr(
+				    struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_vdev *vdev,
+				    struct ml_link_force_state *force_cmd,
+				    uint8_t num_legacy_vdev,
+				    uint8_t *vdev_lst,
+				    qdf_freq_t *freq_lst,
+				    enum policy_mgr_con_mode *mode_lst)
+{
+	enum home_channel_map_id ml_link_hc_id = HC_NONE;
+	enum home_channel_map_id non_ml_hc_id = HC_NONE;
+	enum home_channel_map_id force_inactive_hc_id = HC_NONE;
+	enum home_channel_map_id force_inactive_num_hc_id = HC_NONE;
+	struct force_inactive_modes force_modes;
+	force_inactive_table_type *force_inactive_tlb;
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint32_t force_inactive_link_bitmap = 0;
+	uint32_t force_inactive_link_bitmap2 = 0;
+	uint32_t force_inactive_link_bitmap3 = 0;
+	uint32_t force_inactive_num_bitmap = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t i = 0, j = 0;
+	uint32_t scc_link_bitmap = 0;
+	uint32_t vdev_inactive_links = 0;
+	bool disallow_mcc = false;
+	qdf_freq_t legacy_intf_freq1;
+	qdf_freq_t legacy_intf_freq2;
+	enum policy_mgr_con_mode legacy_pm_mode;
+	uint8_t legacy_vdev_id;
+	enum home_channel_map_id force_inact_hc_id;
+	enum home_channel_map_id force_inact_hc_id2;
+	enum pm_rd_type rd_type = policy_mgr_get_rd_type(psoc);
+
+	if (num_legacy_vdev < 2)
+		return;
+
+	legacy_intf_freq1 = freq_lst[0];
+	legacy_intf_freq2 = freq_lst[1];
+	legacy_pm_mode = mode_lst[0];
+	legacy_vdev_id = vdev_lst[0];
+
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK |
+				NLINK_EXCLUDE_STANDBY_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	if (ml_num_link < 2)
+		return;
+
+	switch (legacy_pm_mode) {
+	case PM_P2P_CLIENT_MODE:
+	case PM_P2P_GO_MODE:
+		if (!policy_mgr_is_vdev_high_tput_or_low_latency(
+					psoc, legacy_vdev_id))
+			break;
+		fallthrough;
+	case PM_STA_MODE:
+		disallow_mcc = true;
+		break;
+	case PM_SAP_MODE:
+		break;
+	default:
+		/* unexpected legacy connection mode */
+		mlo_debug("unexpected legacy intf mode %d",
+			  legacy_pm_mode);
+		return;
+	}
+
+	for (i = 0; i < ml_num_link; i++) {
+		if (ml_vdev_lst[i] == WLAN_INVALID_VDEV_ID) {
+			/*standby link will be handled later. */
+			continue;
+		}
+		if (ml_freq_lst[i] == legacy_intf_freq1 ||
+		    ml_freq_lst[i] == legacy_intf_freq2) {
+			scc_link_bitmap |= 1 << ml_linkid_lst[i];
+		}
+		if (policy_mgr_vdev_is_force_inactive(psoc, ml_vdev_lst[i]))
+			vdev_inactive_links |= 1 << ml_linkid_lst[i];
+	}
+
+	ml_link_hc_id = get_hc_id(psoc, ml_num_link, ml_freq_lst);
+	if (ml_link_hc_id >= HC_MAX_MAP_ID) {
+		mlo_debug("invalid ml_link_hc_id");
+		return;
+	}
+
+	/* 1. Handle the 2 legacy intf are SCC or MCC firstly.
+	 * If the legacy intf  home channel are always in same suband (SCC
+	 * or MCC), such as 2G + 2G, 5GL + 5GL, or 5GH + 5GH,
+	 * the force inactive action is similar to one home channel
+	 * case in same subband.
+	 */
+	if (policy_mgr_2_freq_always_on_same_mac(
+			psoc, legacy_intf_freq1, legacy_intf_freq2)) {
+		non_ml_hc_id = get_hc_id(psoc, 1, freq_lst);
+		if (non_ml_hc_id >= HC_BAND_MAX) {
+			mlo_debug("invalid non_ml_hc_id %d", non_ml_hc_id);
+			return;
+		}
+
+		force_inactive_tlb =
+			get_force_inactive_table(psoc, PM_STA_MODE);
+		if (!force_inactive_tlb) {
+			mlo_debug("unable to get force inactive tbl");
+			return;
+		}
+		force_modes =
+		(*force_inactive_tlb)[ml_link_hc_id][non_ml_hc_id];
+
+		force_inactive_hc_id = force_modes.force_inactive_hc_id;
+		force_inactive_num_hc_id =
+				force_modes.force_inactive_num_hc_id;
+
+		hc_id_2_link_bitmap(psoc, ml_num_link, ml_freq_lst,
+				    ml_linkid_lst, force_inactive_hc_id,
+				    &force_inactive_link_bitmap);
+		hc_id_2_link_bitmap(psoc, ml_num_link, ml_freq_lst,
+				    ml_linkid_lst, force_inactive_num_hc_id,
+				    &force_inactive_num_bitmap);
+
+		mlo_debug("ml %s legacy %s mode %s %s inact %s inact num %s rd %d",
+			  hc_id_to_string(ml_link_hc_id),
+			  hc_id_to_string(non_ml_hc_id),
+			  device_mode_to_string(mode_lst[0]),
+			  device_mode_to_string(mode_lst[1]),
+			  hc_id_to_string(force_inactive_hc_id),
+			  hc_id_to_string(force_inactive_num_hc_id),
+			  policy_mgr_get_rd_type(psoc));
+		mlo_debug("scc link 0x%x force inact 0x%x force inact num 0x%x",
+			  scc_link_bitmap, force_inactive_link_bitmap,
+			  force_inactive_num_bitmap);
+
+		/* 3 vdev on same mac MCC is not supported, if 2 legacy intf
+		 * are MCC already, then to force inactive all MCC and SCC ML
+		 * links.
+		 * If 2 legacy intf are SCC, and SCC links not allowed by
+		 * concurrency, force inactive SCC links as well.
+		 */
+		if (force_inactive_link_bitmap) {
+			if (legacy_intf_freq1 != legacy_intf_freq2)
+				force_inactive_link_bitmap |= scc_link_bitmap;
+			else if (scc_link_bitmap &&
+				 !ml_nlink_allow_conc(
+						psoc, vdev, scc_link_bitmap,
+						force_inactive_link_bitmap &
+						~scc_link_bitmap))
+				force_inactive_link_bitmap |= scc_link_bitmap;
+			else
+				force_inactive_link_bitmap &= ~scc_link_bitmap;
+
+			/* Apply the force inactive bitmap only when there are
+			 * available ml links after force inactive the bitmap.
+			 */
+			if (ml_link_bitmap & ~force_inactive_link_bitmap)
+				force_cmd->force_inactive_bitmap =
+					force_inactive_link_bitmap;
+		}
+		if (force_inactive_num_bitmap) {
+			force_cmd->force_inactive_num =
+				convert_link_bitmap_to_link_ids(
+					force_inactive_num_bitmap, 0, NULL);
+
+			if (force_cmd->force_inactive_num > 1) {
+				force_cmd->force_inactive_num--;
+				force_cmd->force_inactive_num_bitmap =
+						force_inactive_num_bitmap;
+			} else {
+				force_cmd->force_inactive_num = 0;
+			}
+		}
+
+		mlo_debug("avail 0x%x disallow_mcc %d final 0x%x inact num 0x%x",
+			  ml_link_bitmap, disallow_mcc,
+			  force_cmd->force_inactive_bitmap,
+			  force_cmd->force_inactive_num_bitmap);
+		return;
+	}
+
+	/* 2. Handle the 2 legacy intf are DBS or SBS, such as 2G + 5L,
+	 * 2G + 5GH, 5GL + 5GH in SBS hw, or 2G + 5G in DBS HW.
+	 */
+	force_inactive_link_bitmap = 0;
+
+	/* If 2 legacy intf's frequency are on DBS or SBS mode, to avoid
+	 * MCC, ML STA will not support EMLSR.
+	 * All MCC ML STA links have to be forced to MLSR.
+	 */
+	ml_nlink_handle_mcc_links(psoc, vdev, force_cmd);
+
+	/* 2 legacy intf are DBS or SBS channels,
+	 * Basic rule is :
+	 * 1.try to force inactive MCC links in same sub band of
+	 * legacy intf 1.
+	 * 2.try to force inactive links which will cause the 2
+	 * legacy intf working in same mac (MCC).
+	 * for example GC and GO, here is expected result.
+	 * legacy intf 1: GC Low latecy (Need avoid MCC)
+	 * Legacy intf 2: GO
+	 * GC dbs with GO in SBS RD
+	 * 2G		 | 5GL		| 5GH		 | force inactive links
+	 * -------------------------------------------------------------------
+	 * ML STA+GC MCC | ML STA	| GO		 | 2G link
+	 * ML STA+GC SCC | ML STA	| GO		 | 5GL link
+	 * ML STA+GC MCC |		| GO + ML STA	 | 2G link
+	 * ML STA+GC SCC |		| GO + ML STA	 | none
+	 * GC		 | ML STA	| GO + ML STA	 | 5GL link
+	 * 2 ML STA+GC	 |		| GO		 | 2G MCC link if one
+	 *						 | link SCC or none if
+	 *						 | MCC with both links
+	 * GC		 | 2 ML STA	| GO		 | none
+	 * GC		 |		| GO + 2 ML STA  | none
+	 *
+	 * ML STA+GC MCC | ML STA + GO	|		 | 2G link
+	 * ML STA+GC SCC | ML STA + GO	|		 | none
+	 * ML STA+GC MCC | GO		| ML STA	 | 2G link
+	 * ML STA+GC SCC | GO		| ML STA	 | 5GH link
+	 * GC		 | ML STA + GO	| ML STA	 | 5GH link
+	 * 2 ML STA+GC	 | GO		|		 | 2G MCC link if one
+	 *						 | link SCC or none if
+	 *						 | MCC with both links
+	 * GC		 | 2 ML STA + GO|		 | none
+	 * GC		 | GO		| 2 ML STA	 | none
+	 *
+	 * GO		 | ML STA	| ML STA+GC MCC  | 5GH link
+	 * GO		 | ML STA	| ML STA+GC SCC  | 5GL link
+	 * GO + ML STA	 |		| ML STA+GC MCC  | 5GH link
+	 * GO + ML STA	 |		| ML STA+GC SCC  | none
+	 * GO + ML STA	 | ML STA	| GC		 | 5GL link
+	 * 2 ML STA+GO	 |		| GC		 | none
+	 * GO		 | 2 ML STA	| GC		 | none
+	 * GO		 |		| GC + 2 ML STA  | 5GH MCC link if one
+	 *						 | link SCC or none if
+	 *						 | MCC with both links
+	 * GO		 | ML STA+GC MCC| ML STA	 | 5GL link
+	 * GO		 | ML STA+GC SCC| ML STA	 | 5GH link
+	 * GO + ML STA	 | ML STA+GC MCC|		 | 5GL link
+	 * GO + ML STA	 | ML STA+GC SCC|		 | none
+	 * GO + ML STA	 | GC		| ML STA	 | 5GH link
+	 * 2 ML STA+GO	 | GC		|		 | none
+	 * GO		 | GC + 2 ML STA|		 | 5GL MCC link if one
+	 *						 | link SCC or none if
+	 *						 | MCC with both links
+	 * GO		 | GC		| 2 ML STA	 | none
+	 *
+	 * GC SBS with GO in SBS RD
+	 * ML STA	 | ML STA+GC MCC| GO		 | 5GL link
+	 * ML STA	 | ML STA+GC SCC| GO		 | 2G link
+	 *		 | ML STA+GC MCC| GO + ML STA	 | 5GL link
+	 *		 | ML STA+GC SCC| GO + ML STA	 | none
+	 * ML STA	 | GC		| GO + ML STA	 | 2G link
+	 * 2 ML STA	 | GC		| GO		 | none
+	 *		 | GC+2 ML STA	| GO		 | 5GL MCC link if one
+	 *						 | link SCC or none if
+	 *						 | MCC with both links
+	 *		 | GC		| GO + 2 ML STA  | none
+	 *
+	 * ML STA	 | GO		| GC + ML STA MCC| 5GH link
+	 * ML STA	 | GO		| GC + ML STA SCC| 2G link
+	 *		 | GO + ML STA	| GC + ML STA MCC| 5GH link
+	 *		 | GO + ML STA	| GC + ML STA SCC| none
+	 * ML STA	 | ML STA+GO	| GC		 | 2G link
+	 * 2 ML STA	 | GO		| GC		 | none
+	 *		 | 2 ML STA+GO	| GC		 | none
+	 *		 | GO		| GC + 2 ML STA  | 5GH MCC link if one
+	 *						 | link SCC or none if
+	 *						 | MCC with both links
+	 */
+	non_ml_hc_id = get_hc_id(psoc, num_legacy_vdev, freq_lst);
+	if (non_ml_hc_id >= HC_LEGACY_MAX) {
+		mlo_debug("unexpected non_ml_hc_id %d", non_ml_hc_id);
+		return;
+	}
+
+	force_inact_hc_id = HC_NONE;
+	force_inact_hc_id2 = HC_NONE;
+
+	if (rd_type == pm_rd_sbs_low_share ||
+	    rd_type == pm_rd_sbs_upper_share ||
+	    rd_type == pm_rd_sbs_switchable) {
+		/* SBS rd */
+		if (mode_lst[0] == PM_SAP_MODE &&
+		    mode_lst[1] == PM_SAP_MODE) {
+			if (non_ml_hc_id == HC_5GL_5GH)
+				force_inact_hc_id2 = HC_2G;
+			else if (non_ml_hc_id == HC_2G_5GL)
+				force_inact_hc_id2 = HC_5GH;
+			else if (non_ml_hc_id == HC_2G_5GH)
+				force_inact_hc_id2 = HC_5GL;
+			else
+				mlo_debug("SAP+SAP, unexpected non_ml_hc_id %d",
+					  non_ml_hc_id);
+		} else if (disallow_mcc) {
+			force_inact_hc_id =
+				get_hc_id(psoc, 1, freq_lst);
+			if (force_inact_hc_id >= HC_LEGACY_MAX) {
+				mlo_debug("disallow_mcc %d invalid force_inact_hc_id %d",
+					  disallow_mcc,
+					  force_inact_hc_id);
+				return;
+			}
+
+			if (non_ml_hc_id == HC_5GL_5GH)
+				force_inact_hc_id2 = HC_2G;
+			else if (non_ml_hc_id == HC_2G_5GL)
+				force_inact_hc_id2 = HC_5GH;
+			else if (non_ml_hc_id == HC_2G_5GH)
+				force_inact_hc_id2 = HC_5GL;
+			else
+				mlo_debug("disallow_mcc %d unexpected non_ml_hc_id %d",
+					  disallow_mcc,
+					  non_ml_hc_id);
+		} else if (mode_lst[0] == PM_SAP_MODE ||
+			   mode_lst[1] == PM_SAP_MODE) {
+			if (non_ml_hc_id == HC_5GL_5GH)
+				force_inact_hc_id2 = HC_2G;
+			else if (non_ml_hc_id == HC_2G_5GL)
+				force_inact_hc_id2 = HC_5GH;
+			else if (non_ml_hc_id == HC_2G_5GH)
+				force_inact_hc_id2 = HC_5GL;
+			else
+				mlo_debug("one SAP unexpected non_ml_hc_id %d",
+					  non_ml_hc_id);
+		} else {
+			/* HC_NONE for force_inact_hc_id, force_inact_hc_id2 */
+		}
+	} else {
+		/* DBS rd */
+		if (mode_lst[0] == PM_SAP_MODE &&
+		    mode_lst[1] == PM_SAP_MODE) {
+			if (non_ml_hc_id == HC_2G_5GL)
+				force_inact_hc_id2 = HC_NONE;
+			else if (non_ml_hc_id == HC_2G_5GH)
+				force_inact_hc_id2 = HC_NONE;
+			else
+				mlo_debug("SAP+SAP, unexpected non_ml_hc_id %d",
+					  non_ml_hc_id);
+		} else if (disallow_mcc) {
+			force_inact_hc_id =
+				get_hc_id(psoc, 1, freq_lst);
+			if (force_inact_hc_id >= HC_LEGACY_MAX) {
+				mlo_debug("disallow_mcc %d invalid force_inact_hc_id %d",
+					  disallow_mcc,
+					  force_inact_hc_id);
+				return;
+			}
+
+			if (non_ml_hc_id == HC_2G_5GL)
+				force_inact_hc_id2 = HC_NONE;
+			else if (non_ml_hc_id == HC_2G_5GH)
+				force_inact_hc_id2 = HC_NONE;
+			else
+				mlo_debug("disallow_mcc %d unexpected non_ml_hc_id %d",
+					  disallow_mcc,
+					  non_ml_hc_id);
+		} else if (mode_lst[0] == PM_SAP_MODE ||
+			   mode_lst[1] == PM_SAP_MODE) {
+			if (non_ml_hc_id == HC_2G_5GL)
+				force_inact_hc_id2 = HC_NONE;
+			else if (non_ml_hc_id == HC_2G_5GH)
+				force_inact_hc_id2 = HC_NONE;
+			else
+				mlo_debug("one SAP unexpected non_ml_hc_id %d",
+					  non_ml_hc_id);
+		} else {
+			/* HC_NONE for force_inact_hc_id, force_inact_hc_id2 */
+		}
+	}
+
+	hc_id_2_link_bitmap(psoc, ml_num_link, ml_freq_lst, ml_linkid_lst,
+			    force_inact_hc_id,
+			    &force_inactive_link_bitmap);
+	hc_id_2_link_bitmap(psoc, ml_num_link, ml_freq_lst, ml_linkid_lst,
+			    force_inact_hc_id2,
+			    &force_inactive_link_bitmap2);
+
+	for (i = 0; i < num_legacy_vdev; i++) {
+		if (mode_lst[i] != PM_SAP_MODE ||
+		    !WLAN_REG_IS_5GHZ_CH_FREQ(freq_lst[i]))
+			continue;
+		for (j = 0; j < ml_num_link; j++) {
+			if (ml_vdev_lst[j] == WLAN_INVALID_VDEV_ID) {
+				/*standby link will be handled later. */
+				continue;
+			}
+			if (WLAN_REG_IS_6GHZ_CHAN_FREQ(ml_freq_lst[j]) &&
+			    policy_mgr_2_freq_always_on_same_mac(
+					psoc, ml_freq_lst[j], freq_lst[i])) {
+				force_inactive_link_bitmap3 |=
+					1 << ml_linkid_lst[j];
+				break;
+			}
+		}
+		if (force_inactive_link_bitmap3)
+			break;
+	}
+
+	mlo_debug("ml %s legacy %s mode %s %s inact %s inact2 %s rd %d",
+		  hc_id_to_string(ml_link_hc_id),
+		  hc_id_to_string(non_ml_hc_id),
+		  device_mode_to_string(mode_lst[0]),
+		  device_mode_to_string(mode_lst[1]),
+		  hc_id_to_string(force_inact_hc_id),
+		  hc_id_to_string(force_inact_hc_id2),
+		  policy_mgr_get_rd_type(psoc));
+	mlo_debug("scc link 0x%x force inact 0x%x inact2 0x%x inact3 0x%x",
+		  scc_link_bitmap, force_inactive_link_bitmap,
+		  force_inactive_link_bitmap2, force_inactive_link_bitmap3);
+
+	force_inactive_link_bitmap &= ~scc_link_bitmap;
+	force_inactive_link_bitmap2 &= ~scc_link_bitmap;
+	force_inactive_link_bitmap3 &= ~scc_link_bitmap;
+
+	if (ml_link_bitmap & ~force_inactive_link_bitmap)
+		force_cmd->force_inactive_bitmap |=
+			force_inactive_link_bitmap;
+
+	if (ml_link_bitmap & ~force_inactive_link_bitmap &
+	    ~force_inactive_link_bitmap2)
+		force_cmd->force_inactive_bitmap |=
+			force_inactive_link_bitmap2;
+
+	if (ml_link_bitmap & ~force_inactive_link_bitmap &
+	    ~force_inactive_link_bitmap2 & ~force_inactive_link_bitmap3)
+		force_cmd->force_inactive_bitmap |=
+			force_inactive_link_bitmap3;
+
+	if (vdev_inactive_links &&
+	    !(force_cmd->force_inactive_bitmap & vdev_inactive_links) &&
+	    !ml_nlink_allow_conc(psoc, vdev, vdev_inactive_links,
+				 force_cmd->force_inactive_bitmap)) {
+		force_cmd->force_inactive_bitmap |= vdev_inactive_links;
+		force_inactive_link_bitmap |= vdev_inactive_links;
+	}
+
+	mlo_debug("avail 0x%x disallow_mcc %d inact vdev link 0x%x final 0x%x inact num 0x%x",
+		  ml_link_bitmap, disallow_mcc,
+		  vdev_inactive_links,
+		  force_cmd->force_inactive_bitmap,
+		  force_cmd->force_inactive_num_bitmap);
+}
+
+static void
 ml_nlink_handle_standby_link_3_ports(
 		struct wlan_objmgr_psoc *psoc,
 		struct wlan_objmgr_vdev *vdev,
@@ -2740,6 +3173,80 @@ ml_nlink_handle_standby_link_3_ports(
 
 	if (force_inactive_link_bitmap)
 		force_cmd->force_inactive_bitmap |= force_inactive_link_bitmap;
+}
+
+/**
+ * ml_nlink_handle_legacy_intf_emlsr() - Check force inactive needed
+ * with legacy interface for eMLSR connection
+ * @psoc: PSOC object information
+ * @vdev: vdev object
+ * @force_cmd: force command to be returned
+ *
+ * Return: void
+ */
+static void
+ml_nlink_handle_legacy_intf_emlsr(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  struct ml_link_force_state *force_cmd)
+{
+	uint8_t vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t num_legacy_vdev;
+
+	num_legacy_vdev = policy_mgr_get_legacy_conn_info(
+					psoc, vdev_lst,
+					freq_lst, mode_lst,
+					QDF_ARRAY_SIZE(vdev_lst));
+	if (!num_legacy_vdev)
+		return;
+
+	/* handle 2 port case with 2 ml sta links.
+	 * todo: 2 port case with 3 ml sta links
+	 */
+	if (num_legacy_vdev == 1) {
+		switch (mode_lst[0]) {
+		case PM_P2P_CLIENT_MODE:
+		case PM_P2P_GO_MODE:
+		case PM_STA_MODE:
+		case PM_SAP_MODE:
+			ml_nlink_handle_comm_intf_emlsr(
+				psoc, vdev, force_cmd, vdev_lst[0],
+				freq_lst[0], mode_lst[0]);
+			break;
+		default:
+			/* unexpected legacy connection mode */
+			mlo_debug("unexpected legacy intf mode %d",
+				  mode_lst[0]);
+			return;
+		}
+		ml_nlink_dump_force_state(force_cmd, "");
+		return;
+	}
+
+	/* handle 3 port case with 2 ml sta links.
+	 */
+	switch (mode_lst[0]) {
+	case PM_P2P_CLIENT_MODE:
+	case PM_P2P_GO_MODE:
+	case PM_STA_MODE:
+	case PM_SAP_MODE:
+		ml_nlink_handle_legacy_intf_3_ports_emlsr(
+			psoc, vdev, force_cmd, num_legacy_vdev,
+			vdev_lst, freq_lst, mode_lst);
+		break;
+	default:
+		/* unexpected legacy connection count */
+		mlo_debug("unexpected legacy intf mode %d", mode_lst[0]);
+		return;
+	}
+	ml_nlink_handle_standby_link_3_ports(psoc, vdev, force_cmd,
+					     num_legacy_vdev,
+					     vdev_lst,
+					     freq_lst,
+					     mode_lst);
+
+	ml_nlink_dump_force_state(force_cmd, "");
 }
 
 /**
