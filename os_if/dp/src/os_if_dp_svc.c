@@ -137,7 +137,7 @@ os_if_dp_service_class_set_cmd(struct nlattr *svc_params[])
 	}
 
 	svc_data.svc_id = nla_get_u8(tb[cmd_id]);
-	svc_data.flags |= DP_SVC_FLAGS_SVC_ID;
+	svc_data.flags = DP_SVC_FLAGS_SVC_ID;
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_SDWF_SVC_BUFFER_LATENCY_TOLERANCE;
 	if (tb[cmd_id]) {
