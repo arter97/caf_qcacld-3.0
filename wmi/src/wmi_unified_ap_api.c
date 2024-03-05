@@ -1072,3 +1072,15 @@ QDF_STATUS wmi_unified_txbf_sounding_trig_info_cmd_send(struct wmi_unified *wmi_
 	return QDF_STATUS_E_FAILURE;
 }
 #endif
+#ifdef WLAN_SUPPORT_TX_PKT_CAP_CUSTOM_CLASSIFY
+QDF_STATUS wmi_unified_set_tx_pkt_cap_custom_classify(
+		wmi_unified_t wmi_handle,
+		struct wmi_tx_pkt_cap_custom_classify_info *param)
+{
+	if (wmi_handle->ops->set_tx_pkt_cap_custom_classify)
+		return wmi_handle->ops->set_tx_pkt_cap_custom_classify(
+							wmi_handle, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_SUPPORT_TX_PKT_CAP_CUSTOM_CLASSIFY */

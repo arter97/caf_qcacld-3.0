@@ -2371,6 +2371,52 @@ static QDF_STATUS set_rx_pkt_type_routing_tag_update_tlv(
 }
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
 
+#ifdef WLAN_SUPPORT_TX_PKT_CAP_CUSTOM_CLASSIFY
+/**
+ * set_tx_pkt_cap_custom_classify_update_tlv() - set tx pkt cap protocol
+ * @wmi_handle: wmi handle
+ * @param: pointer to protocol information struct
+ *
+ * @return:QDF_STATUS_SUCCESS for success or
+ *			QDF_STATUS_E_NOMEM/QDF_STATUS_E_FAILURE on failure
+*/
+static QDF_STATUS set_tx_pkt_cap_custom_classify_update_tlv(
+			wmi_unified_t wmi_hdl,
+			struct wmi_tx_pkt_cap_custom_classify_info *param)
+{
+	wmi_soc_tx_packet_custom_classify_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	QDF_STATUS status;
+	uint32_t len = sizeof(wmi_soc_tx_packet_custom_classify_cmd_fixed_param);
+
+	buf = wmi_buf_alloc(wmi_hdl, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd = (wmi_soc_tx_packet_custom_classify_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_soc_tx_packet_custom_classify_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+		       (wmi_soc_tx_packet_custom_classify_cmd_fixed_param));
+
+	cmd->packet_bitmap = (param->pkt_type_bitmap << 1);
+	wmi_info("Set TX PKT CUSTOM CLASSIFY - bitmap %u",
+		 cmd->packet_bitmap);
+
+	wmi_mtrace(WMI_SOC_TX_PACKET_CUSTOM_CLASSIFY_CMDID, NO_SESSION, 0);
+	status = wmi_unified_cmd_send(wmi_hdl, buf, len,
+				      WMI_SOC_TX_PACKET_CUSTOM_CLASSIFY_CMDID);
+	if (status != QDF_STATUS_SUCCESS) {
+		wmi_err("Send wmi tx packet custom classify cmd failed");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_SUPPORT_TX_PKT_CAP_CUSTOM_CLASSIFY */
+
 /**
  * send_peer_vlan_config_cmd_tlv() - Send PEER vlan hw acceleration cmd to fw
  * @wmi: wmi handle
@@ -4752,4 +4798,8 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 #ifdef WLAN_FEATURE_11BE
 	ops->send_mu_on_off_cmd = send_mu_on_off_cmd_tlv;
 #endif /* WLAN_FEATURE_11BE */
+#ifdef WLAN_SUPPORT_TX_PKT_CAP_CUSTOM_CLASSIFY
+	ops->set_tx_pkt_cap_custom_classify =
+				set_tx_pkt_cap_custom_classify_update_tlv;
+#endif
 }
