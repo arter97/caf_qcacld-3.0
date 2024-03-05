@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -268,7 +268,11 @@ static void __dsc_psoc_trans_stop(struct dsc_psoc *psoc)
 
 	__dsc_driver_lock(psoc);
 
-	__dsc_trans_stop(&psoc->trans);
+	if (__dsc_trans_active(&psoc->trans))
+		__dsc_trans_stop(&psoc->trans);
+	else
+		__dsc_trans_stop(&psoc->driver->trans);
+
 	__dsc_psoc_trigger_trans(psoc);
 
 	__dsc_driver_unlock(psoc);
