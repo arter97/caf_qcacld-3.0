@@ -2152,5 +2152,41 @@ config WLAN_AUX_SUPPORT
 	bool "Enable WLAN_AUX_SUPPORT"
 	default n
 
+config TX_DESC_HI_PRIO_RESERVE
+	bool "Enable CONFIG_TX_DESC_HI_PRIO_RESERVE"
+	default n
+
+config FEATURE_WLAN_AUTO_SHUTDOWN
+	bool "Enable FEATURE_WLAN_AUTO_SHUTDOWN"
+	default n
+
+config FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+	bool "Enable FEATURE_WLAN_AP_AP_ACS_OPTIMIZE"
+	default n
+
+config FEATURE_WLAN_STA_4ADDR_SCHEME
+	bool "Enable FEATURE_WLAN_STA_4ADDR_SCHEME"
+	default n
+
+config MDM_PLATFORM
+	bool "Enable MDM_PLATFORM"
+	default n
+
+config DFS_FCC_TYPE4_DURATION_CHECK
+	bool "Enable CONFIG_DFS_FCC_TYPE4_DURATION_CHECK"
+	default n
+
+config FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE
+	bool "Enable FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE"
+	default n
+
+config FEATURE_AP_MCC_CH_AVOIDANCE
+	bool "Enable FEATURE_AP_MCC_CH_AVOIDANCE"
+	default n
+
+config WLAN_WEXT_SUPPORT_ENABLE
+	bool "Enable WLAN_WEXT_SUPPORT_ENABLE"
+	default n
+
 endmenu
 endif # QCA_CLD_WLAN
