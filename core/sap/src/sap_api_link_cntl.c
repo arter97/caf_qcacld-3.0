@@ -413,8 +413,7 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 	wlan_sap_filter_non_preferred_channels(mac_ctx->pdev, sap_ctx);
 	if (!sap_ctx->acs_cfg->ch_list_count) {
 		oper_channel =
-			sap_select_default_oper_chan(mac_ctx,
-						     sap_ctx->acs_cfg);
+			sap_select_default_oper_chan(mac_ctx, sap_ctx);
 		sap_ctx->chan_freq = oper_channel;
 		sap_ctx->acs_cfg->pri_ch_freq = oper_channel;
 		sap_config_acs_result(mac_handle, sap_ctx,
@@ -427,8 +426,7 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 		sap_err("ACS scan failued (%d), choose default channel",
 			scan_status);
 		oper_channel =
-			sap_select_default_oper_chan(mac_ctx,
-						     sap_ctx->acs_cfg);
+			sap_select_default_oper_chan(mac_ctx, sap_ctx);
 		wlansap_set_acs_ch_freq(sap_ctx, oper_channel);
 		sap_ctx->acs_cfg->pri_ch_freq = oper_channel;
 		sap_config_acs_result(mac_handle, sap_ctx,
@@ -444,8 +442,7 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 
 	if (oper_channel == SAP_CHANNEL_NOT_SELECTED) {
 		sap_info("No suitable channel, so select default channel");
-		oper_channel = sap_select_default_oper_chan(mac_ctx,
-							    sap_ctx->acs_cfg);
+		oper_channel = sap_select_default_oper_chan(mac_ctx, sap_ctx);
 	}
 
 	wlansap_set_acs_ch_freq(sap_ctx, oper_channel);

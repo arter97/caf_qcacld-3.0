@@ -918,10 +918,11 @@ sap_chan_bond_dfs_sub_chan(struct sap_context *sap_context,
 }
 
 uint32_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
-				      struct sap_acs_cfg *acs_cfg)
+				      struct sap_context *sap_ctx)
 {
 	uint16_t i;
 	uint32_t freq0 = 0, freq1 = 0, freq2 = 0, default_freq;
+	struct sap_acs_cfg *acs_cfg = sap_ctx->acs_cfg;
 
 	if (!acs_cfg)
 		return 0;
@@ -930,7 +931,8 @@ uint32_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
 		if (mac_ctx->mlme_cfg->acs.force_sap_start) {
 			sap_debug("SAP forced, freq selected %d",
 				  acs_cfg->master_freq_list[0]);
-			return acs_cfg->master_freq_list[0];
+			default_freq = acs_cfg->master_freq_list[0];
+			goto selected_default_freq;
 		} else {
 			sap_debug("No channel left for operation");
 			return 0;
@@ -973,6 +975,16 @@ uint32_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
 
 	sap_debug("default freq %d chosen from %d %d %d %d", default_freq,
 		  freq0, freq1, freq2, acs_cfg->freq_list[0]);
+
+selected_default_freq:
+
+	/*
+	 * Check if the selected frequency is valid for ll_lt sap or not,
+	 * If it is not valid for ll_lt_sap, then overwrite this frequency
+	 */
+	default_freq = wlan_ll_lt_sap_override_freq(mac_ctx->psoc,
+						    sap_ctx->vdev_id,
+						    default_freq);
 
 	return default_freq;
 }
@@ -1603,7 +1615,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 			sap_info("scan request fail %d SAP Configuring default ch, Ch_freq=%d",
 				 qdf_ret_status, sap_context->chan_freq);
 			default_op_freq = sap_select_default_oper_chan(
-						mac_ctx, sap_context->acs_cfg);
+						mac_ctx, sap_context);
 			wlansap_set_acs_ch_freq(sap_context, default_op_freq);
 
 			if (sap_context->freq_list) {

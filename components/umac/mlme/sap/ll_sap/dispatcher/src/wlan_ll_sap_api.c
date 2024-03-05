@@ -227,6 +227,8 @@ qdf_freq_t wlan_ll_lt_sap_override_freq(struct wlan_objmgr_psoc *psoc,
 	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
 		return chan_freq;
 
+	if (wlan_reg_is_24ghz_ch_freq(chan_freq))
+		goto get_valid_freq;
 	/*
 	 * If already any concurrent interface is present on this frequency,
 	 * select a different frequency to start ll_lt_sap
@@ -234,6 +236,7 @@ qdf_freq_t wlan_ll_lt_sap_override_freq(struct wlan_objmgr_psoc *psoc,
 	if (!policy_mgr_get_connection_count_with_ch_freq(chan_freq))
 		return chan_freq;
 
+get_valid_freq:
 	freq = ll_lt_sap_get_valid_freq(psoc, vdev_id, 0,
 					LL_SAP_CSA_CONCURENCY);
 
