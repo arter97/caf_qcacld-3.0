@@ -71,29 +71,9 @@ static void stats_evt_work_handler(void *ctx)
 		if (!list_entry)
 			continue;
 
-		switch (list_entry->cfg->obj) {
-		case STATS_OBJ_STA:
-			stats_peer_setup(list_entry->vdev,
-					 list_entry->mac,
-					 list_entry->cfg);
-			break;
-		case STATS_OBJ_VAP:
-			stats_vdev_setup(list_entry->vdev,
-					 list_entry->cfg);
-			break;
-		case STATS_OBJ_RADIO:
-			stats_pdev_setup(list_entry->pdev,
-					 list_entry->cfg);
-			break;
-		case STATS_OBJ_AP:
-			stats_psoc_setup(list_entry->pdev,
-					 list_entry->cfg);
-			break;
-		default:
-			qdf_err("Unknown stats command.%d",
-				list_entry->cfg->obj);
-			break;
-		}
+		telemetric_reply_setup(list_entry->pdev, list_entry->vdev,
+				       list_entry->cfg, list_entry->mac);
+
 		free_list_entry(list_entry);
 		cur_node = NULL;
 		list_entry = NULL;
@@ -182,7 +162,7 @@ QDF_STATUS wlan_stats_schedule_nb_stats_work(struct wlan_objmgr_pdev *pdev,
 
 	entry->pdev = pdev;
 	entry->vdev = vdev;
-	entry->mac = mac;
+	qdf_mem_copy(entry->mac, mac, QDF_MAC_ADDR_SIZE);
 	entry->cfg = stats_cfg;
 
 	qdf_spin_lock_bh(&g_stats_ctx.list_lock);

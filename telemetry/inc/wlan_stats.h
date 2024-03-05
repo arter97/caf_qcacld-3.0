@@ -129,7 +129,7 @@ struct stats_list_entry {
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_vdev *vdev;
 	struct stats_config *cfg;
-	uint8_t *mac;
+	uint8_t mac[QDF_MAC_ADDR_SIZE];
 };
 
 /**

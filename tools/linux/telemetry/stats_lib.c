@@ -669,17 +669,17 @@ static uint64_t generate_request_id(uint32_t req_id)
 	return gen_request_id;
 }
 
-static bool is_invalid_pid(uint64_t req_id)
+static bool is_invalid_pid(uint64_t resp_id)
 {
-	if ((req_id >> STATS_PID_SHIFT) == getpid())
+	if ((resp_id >> STATS_PID_SHIFT) == getpid())
 		return false;
 	else
 		return true;
 }
 
-static inline uint32_t extract_request_id(uint64_t req_id)
+static inline uint32_t extract_response_id(uint64_t resp_id)
 {
-	return (req_id & STATS_REQUEST_ID_MASK);
+	return (resp_id & STATS_REQUEST_ID_MASK);
 }
 
 static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
@@ -2002,7 +2002,7 @@ static void stats_netlink_parser(struct reply_buffer *reply,
 	bool add_pending;
 	struct nlattr *attr;
 	struct stats_obj *obj;
-	uint64_t req_id = 0;
+	uint64_t resp_id = 0;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_STATS_MAX + 1] = {0};
 	struct nla_policy policy[QCA_WLAN_VENDOR_ATTR_STATS_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_STATS_LEVEL] = { .type = NLA_U8 },
@@ -2041,8 +2041,8 @@ static void stats_netlink_parser(struct reply_buffer *reply,
 			STATS_ERR("No Request ID in async stats response\n");
 			return;
 		}
-		req_id = nla_get_u64(tb[QCA_WLAN_VENDOR_ATTR_STATS_REQUEST_ID]);
-		if (is_invalid_pid(req_id))
+		resp_id = nla_get_u64(tb[QCA_WLAN_VENDOR_ATTR_STATS_REQUEST_ID]);
+		if (is_invalid_pid(resp_id))
 			return;
 	}
 	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_TYPE]) {
@@ -2084,7 +2084,7 @@ static void stats_netlink_parser(struct reply_buffer *reply,
 	}
 
 	if (is_async_req())
-		obj->request_id = extract_request_id(req_id);
+		obj->response_id = extract_response_id(resp_id);
 
 	attr = tb[QCA_WLAN_VENDOR_ATTR_STATS_RECURSIVE];
 	if (obj->lvl == STATS_LVL_BASIC) {
@@ -2638,10 +2638,11 @@ static void get_first_active_vap_ifname(struct interface_list *if_list,
 
 	for (inx = 0; inx < if_list->v_count; inx++) {
 		ifname = if_list->vap[inx].name;
-		if (is_interface_active(ifname, STATS_OBJ_VAP))
+		if (is_interface_active(ifname, STATS_OBJ_VAP)) {
+			strlcpy(v_ifname, ifname, IFNAME_LEN);
 			break;
+		}
 	}
-	v_ifname = ifname;
 }
 
 static void *build_async_object(struct stats_command *cmd)
@@ -2695,8 +2696,9 @@ static void *build_async_object(struct stats_command *cmd)
 	if (!temp_obj)
 		STATS_ERR("Failed to allocate object for OBJ %d!", cmd->obj);
 
-	if (temp_obj->obj_type == STATS_OBJ_VAP)
-		fill_mld_interface(temp_obj);
+	if (temp_obj->obj_type == STATS_OBJ_STA)
+		memcpy(temp_obj->hw_addr, cmd->sta_mac.ether_addr_octet,
+		       ETH_ALEN);
 
 error_handle:
 	if (free_if_list)
@@ -3063,7 +3065,9 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 		return -EINVAL;
 	}
 
-	mldev_mode = get_mldev_mode(obj_list->ifname);
+	/* Async stats don't need to fetch MLD mode */
+	if (!is_async_req())
+		mldev_mode = get_mldev_mode(obj_list->ifname);
 	/**
 	 * Based on user request find the requested subtree in root_obj.
 	 **/
@@ -4155,9 +4159,9 @@ int32_t libstats_request_async_stop(struct stats_command *cmd)
 	return ret;
 }
 
-int8_t libstats_async_event_init(void)
+int32_t libstats_async_event_init(void)
 {
-	int8_t ret = 0;
+	int32_t ret = 0;
 
 	if (g_nb_ctx.async_req)
 		return ret;
@@ -4184,9 +4188,9 @@ void libstats_async_event_deinit(void)
 	stats_lib_deinit();
 }
 
-int8_t libstats_async_send_stats_req(struct stats_command *cmd)
+int32_t libstats_async_send_stats_req(struct stats_command *cmd)
 {
-	int8_t ret = 0;
+	int32_t ret = 0;
 	struct object_list *req_obj_list = NULL;
 
 	if (is_valid_cmd(cmd)) {
@@ -4206,9 +4210,9 @@ int8_t libstats_async_send_stats_req(struct stats_command *cmd)
 	return ret;
 }
 
-int8_t libstats_receive_event(struct reply_buffer *buf)
+int32_t libstats_receive_event(struct reply_buffer *buf)
 {
-	int8_t ret = 0;
+	int32_t ret = 0;
 
 	if (!buf) {
 		STATS_ERR("Reply buffer is not provided.\n");
