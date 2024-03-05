@@ -602,7 +602,6 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 	ol_txrx_soc_handle soc_txrx_handle;
 	struct wlan_objmgr_psoc *psoc = NULL;
 	u8 vdev_id;
-	cdp_config_param_type val = {0};
 	struct wlan_vdev_state_event event;
 	struct wlan_lmac_if_rx_ops *rx_ops = NULL;
 
@@ -630,14 +629,6 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 			*/
 			ext_cb->vdev_set_param(vdev,
 					       IEEE80211_AUTO_ASSOC, 1);
-			/*
-			 * DISABLE DA LEARN at SOC level if extap is
-			 *  enabled on any VAP
-			*/
-			val.cdp_vdev_param_da_war = 0;
-			cdp_txrx_set_vdev_param(soc_txrx_handle,
-						vdev_id,
-						CDP_ENABLE_DA_WAR, val);
 			if (opmode == QDF_STA_MODE) {
 				ext_cb->vdev_set_powersave(vdev,
 							   IEEE80211_PWRSAVE_NONE);
@@ -649,10 +640,6 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 			}
 		} else {
 			dp_extap_disable(vdev);
-			val.cdp_vdev_param_da_war = 1;
-			cdp_txrx_set_vdev_param(soc_txrx_handle,
-						vdev_id,
-						CDP_ENABLE_DA_WAR, val);
 			if (opmode == QDF_STA_MODE)
 				wlan_rptr_pdev_clear_eir(pdev);
 		}
@@ -1101,7 +1088,6 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 			       struct net_device *dev)
 {
 	struct rptr_ext_cbacks *ext_cb = NULL;
-	cdp_config_param_type val = {0};
 	u8 vdev_id;
 	ol_txrx_soc_handle soc_txrx_handle;
 	struct wlan_objmgr_psoc *psoc = NULL;
@@ -1152,11 +1138,6 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	if (g_priv->global_feature_caps & wlan_rptr_global_f_s_ssid)
 		wlan_rptr_s_ssid_vdev_connection_up(vdev, &disconnect_rptr_clients);
 #endif
-
-	val.cdp_vdev_param_da_war = 0;
-	cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id, CDP_ENABLE_DA_WAR,
-			val);
-
 	ext_cb->max_pri_stavap_process_up(vdev);
 
 	if (qca_multi_link_get_num_sta() > 1) {
@@ -1208,7 +1189,6 @@ void
 wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 				 struct net_device *dev)
 {
-	cdp_config_param_type val = {0};
 	u8 vdev_id;
 	ol_txrx_soc_handle soc_txrx_handle;
 	struct wlan_objmgr_psoc *psoc = NULL;
@@ -1247,14 +1227,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	if (g_priv->global_feature_caps & wlan_rptr_global_f_s_ssid)
 		wlan_rptr_s_ssid_vdev_connection_down(vdev);
 #endif
-
-	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
-	if (g_priv->num_stavaps_up == 0) {
-		val.cdp_vdev_param_da_war = 1;
-		cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id, CDP_ENABLE_DA_WAR,
-				val);
-	}
-	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
 	ext_cb->max_pri_stavap_process_down(vdev, &max_priority_stavap_disconnected);
 
