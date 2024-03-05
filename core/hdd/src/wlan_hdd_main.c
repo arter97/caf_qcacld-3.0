@@ -3976,7 +3976,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 
 		status = wbuff_module_init();
 		if (QDF_IS_STATUS_ERROR(status))
-			hdd_err("WBUFF init unsuccessful; status: %d", status);
+			hdd_debug("WBUFF init unsuccessful; status: %d", status);
 
 		status = cds_open(hdd_ctx->psoc);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -13481,7 +13481,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 		hdd_warn("Error in setting Voltage Corner mode config to FW");
 
 	if (hdd_rx_ol_init(hdd_ctx))
-		hdd_err("Unable to initialize Rx LRO/GRO in fw");
+		hdd_debug("Unable to initialize Rx LRO/GRO in fw");
 
 	if (hdd_adaptive_dwelltime_init(hdd_ctx))
 		hdd_err("Unable to send adaptive dwelltime setting to FW");
@@ -14067,7 +14067,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 
 		qdf_status = wbuff_module_deinit();
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-			hdd_err("WBUFF de-init unsuccessful; status: %d",
+			hdd_debug("WBUFF de-init unsuccessful; status: %d",
 				qdf_status);
 
 		hdd_component_pdev_close(hdd_ctx->pdev);
