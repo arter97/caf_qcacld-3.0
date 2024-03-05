@@ -2153,7 +2153,7 @@ void wlan_dp_link_cdp_vdev_delete_notification(void *context)
 	uint8_t found = 0;
 
 	/* dp_link will not be freed before this point. */
-	if (!is_dp_link_valid(dp_link))
+	if (!dp_link)
 		return;
 
 	dp_info("dp_link %pK id %d", dp_link, dp_link->link_id);
