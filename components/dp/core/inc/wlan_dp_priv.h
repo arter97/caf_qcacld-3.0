@@ -626,7 +626,6 @@ struct dp_rx_fst {
  * @runtime_disable_rx_thread: Runtime Rx thread flag
  * @rx_stack: function pointer Rx packet handover
  * @tx_fn: function pointer to send Tx packet
- * @bss_state: AP BSS state
  * @qdf_sta_eap_frm_done_event: EAP frame event management
  * @traffic_end_ind: store traffic end indication info
  * @direct_link_config: direct link configuration parameters
@@ -681,7 +680,7 @@ struct wlan_dp_intf {
 	struct dp_nud_tracking_info nud_tracking;
 #endif
 	qdf_atomic_t num_active_task;
-	uint32_t sap_tx_block_mask;
+	bool sap_tx_block_mask;
 
 	qdf_atomic_t gro_disallowed;
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
@@ -696,7 +695,6 @@ struct wlan_dp_intf {
 
 	bool runtime_disable_rx_thread;
 
-	enum bss_intf_state bss_state;
 	qdf_event_t qdf_sta_eap_frm_done_event;
 	struct dp_traffic_end_indication traffic_end_ind;
 #ifdef FEATURE_DIRECT_LINK
@@ -728,6 +726,8 @@ struct wlan_dp_intf {
  * @vdev: object manager vdev context
  * @vdev_lock: vdev spin lock
  * @conn_info: STA connection information
+ * @sap_tx_block_mask: SAP TX block mask
+ * @bss_state: AP BSS state
  * @destroyed: flag to indicate dp_link destroyed (logical delete)
  * @cdp_vdev_registered: flag to indicate if corresponding CDP vdev
  *			 is registered
@@ -743,6 +743,8 @@ struct wlan_dp_link {
 	struct wlan_objmgr_vdev *vdev;
 	qdf_spinlock_t vdev_lock;
 	struct wlan_dp_conn_info conn_info;
+	uint32_t sap_tx_block_mask;
+	enum bss_intf_state bss_state;
 	uint8_t destroyed : 1,
 		cdp_vdev_registered : 1,
 		cdp_vdev_deleted : 1;

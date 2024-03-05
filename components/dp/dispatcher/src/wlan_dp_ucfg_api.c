@@ -543,6 +543,7 @@ ucfg_dp_suspend_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 {
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_intf *dp_intf, *dp_intf_next = NULL;
+	struct wlan_dp_link *dp_link, *dp_link_next = NULL;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	QDF_STATUS status;
 
@@ -562,7 +563,12 @@ ucfg_dp_suspend_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 	dp_ctx->is_suspend = true;
 	cdp_set_tx_pause(soc, true);
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
-		dp_intf->sap_tx_block_mask |= WLAN_DP_SUSPEND;
+		dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
+			dp_link->sap_tx_block_mask |= WLAN_DP_SUSPEND;
+			dp_debug("sap_tx_block_mask 0x%x",
+				 dp_link->sap_tx_block_mask);
+		}
+		dp_intf->sap_tx_block_mask = true;
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -581,6 +587,7 @@ ucfg_dp_resume_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 {
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_intf *dp_intf, *dp_intf_next = NULL;
+	struct wlan_dp_link *dp_link, *dp_link_next = NULL;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	dp_ctx = dp_psoc_get_priv(psoc);
@@ -592,7 +599,14 @@ ucfg_dp_resume_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 	dp_ctx->is_suspend = false;
 	cdp_set_tx_pause(soc, false);
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
-		dp_intf->sap_tx_block_mask &= ~WLAN_DP_SUSPEND;
+		dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
+			dp_link->sap_tx_block_mask &= ~WLAN_DP_SUSPEND;
+			dp_debug("sap_tx_block_mask 0x%x",
+				 dp_link->sap_tx_block_mask);
+			/* if one of the link is active, then allow tx */
+			if (!qdf_unlikely(dp_link->sap_tx_block_mask))
+				dp_intf->sap_tx_block_mask = false;
+		}
 	}
 	if (dp_ctx->enable_dp_rx_threads)
 		dp_txrx_resume(cds_get_context(QDF_MODULE_ID_SOC));
@@ -855,9 +869,30 @@ void ucfg_dp_update_dhcp_state_on_disassoc(struct wlan_objmgr_vdev *vdev,
 	wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
 }
 
+/**
+ * ucfg_dp_update_intf_tx_block_mask() - Update tx block mask for DP interface
+ * @dp_intf: pointer to DP component interface handle
+ *
+ * Return: None
+ */
+static
+void ucfg_dp_update_intf_tx_block_mask(struct wlan_dp_intf *dp_intf)
+{
+	struct wlan_dp_link *dp_link;
+	struct wlan_dp_link *dp_link_next;
+
+	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
+		/*
+		 * as long as there is one active link
+		 * should not block tx
+		 */
+		if (!qdf_unlikely(dp_link->sap_tx_block_mask))
+			 dp_intf->sap_tx_block_mask = false;
+	}
+}
+
 void ucfg_dp_set_dfs_cac_tx(struct wlan_objmgr_vdev *vdev, bool tx_block)
 {
-	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -866,16 +901,15 @@ void ucfg_dp_set_dfs_cac_tx(struct wlan_objmgr_vdev *vdev, bool tx_block)
 		return;
 	}
 
-	dp_intf = dp_link->dp_intf;
 	if (tx_block)
-		dp_intf->sap_tx_block_mask |= DP_TX_DFS_CAC_BLOCK;
+		dp_link->sap_tx_block_mask |= DP_TX_DFS_CAC_BLOCK;
 	else
-		dp_intf->sap_tx_block_mask &= ~DP_TX_DFS_CAC_BLOCK;
+		dp_link->sap_tx_block_mask &= ~DP_TX_DFS_CAC_BLOCK;
+	ucfg_dp_update_intf_tx_block_mask(dp_link->dp_intf);
 }
 
 void ucfg_dp_set_bss_state_start(struct wlan_objmgr_vdev *vdev, bool start)
 {
-	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -884,14 +918,14 @@ void ucfg_dp_set_bss_state_start(struct wlan_objmgr_vdev *vdev, bool start)
 		return;
 	}
 
-	dp_intf = dp_link->dp_intf;
 	if (start) {
-		dp_intf->sap_tx_block_mask &= ~DP_TX_SAP_STOP;
-		dp_intf->bss_state = BSS_INTF_START;
+		dp_link->sap_tx_block_mask &= ~DP_TX_SAP_STOP;
+		dp_link->bss_state = BSS_INTF_START;
 	} else {
-		dp_intf->sap_tx_block_mask |= DP_TX_SAP_STOP;
-		dp_intf->bss_state = BSS_INTF_STOP;
+		dp_link->sap_tx_block_mask |= DP_TX_SAP_STOP;
+		dp_link->bss_state = BSS_INTF_STOP;
 	}
+	ucfg_dp_update_intf_tx_block_mask(dp_link->dp_intf);
 }
 
 QDF_STATUS ucfg_dp_lro_set_reset(struct wlan_objmgr_vdev *vdev,
@@ -1385,7 +1419,7 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 
 	dp_link->cdp_vdev_registered = 1;
 	dp_intf->txrx_ops = *txrx_ops;
-	dp_intf->sap_tx_block_mask &= ~DP_TX_FN_CLR;
+	dp_link->sap_tx_block_mask &= ~DP_TX_FN_CLR;
 
 	return QDF_STATUS_SUCCESS;
 }

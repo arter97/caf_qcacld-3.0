@@ -1350,13 +1350,18 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		return status;
 	}
 
+	dp_intf->device_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (dp_intf->device_mode == QDF_SAP_MODE ||
+	    dp_intf->device_mode == QDF_P2P_GO_MODE)
+		dp_link->sap_tx_block_mask = DP_TX_FN_CLR |
+					     DP_TX_SAP_STOP;
 	if (dp_intf->num_links == 1) {
 		/*
 		 * Interface level operations to be done only
 		 * when the first link is created
 		 */
 		dp_intf->def_link = dp_link;
-		dp_intf->device_mode = wlan_vdev_mlme_get_opmode(vdev);
 		qdf_atomic_init(&dp_intf->num_active_task);
 		dp_nud_ignore_tracking(dp_intf, false);
 		dp_mic_enable_work(dp_intf);
@@ -1364,9 +1369,7 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 		if (dp_intf->device_mode == QDF_SAP_MODE ||
 		    dp_intf->device_mode == QDF_P2P_GO_MODE) {
-			dp_intf->sap_tx_block_mask = DP_TX_FN_CLR |
-						     DP_TX_SAP_STOP;
-
+			dp_intf->sap_tx_block_mask = true;
 			status = qdf_event_create(&dp_intf->qdf_sta_eap_frm_done_event);
 			if (!QDF_IS_STATUS_SUCCESS(status)) {
 				dp_err("eap frm done event init failed!!");
@@ -1434,6 +1437,9 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	qdf_list_remove_node(&dp_intf->dp_link_list, &dp_link->node);
 	dp_intf->num_links--;
 	qdf_spin_unlock_bh(&dp_intf->dp_link_list_lock);
+	if (dp_intf->device_mode == QDF_SAP_MODE ||
+	    dp_intf->device_mode == QDF_P2P_GO_MODE)
+		dp_link->sap_tx_block_mask |= DP_TX_FN_CLR;
 
 	if (dp_intf->num_links == 0) {
 		/*
@@ -1454,7 +1460,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 				return status;
 			}
 			dp_intf->txrx_ops.tx.tx = NULL;
-			dp_intf->sap_tx_block_mask |= DP_TX_FN_CLR;
+			dp_intf->sap_tx_block_mask = true;
 		}
 	}
 

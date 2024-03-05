@@ -99,7 +99,7 @@ static inline void dp_softap_dump_nbuf(qdf_nbuf_t nbuf)
 
 /**
  * dp_softap_inspect_tx_eap_pkt() - Inspect eap pkt tx/tx-completion
- * @dp_intf: pointer to DP interface
+ * @dp_link: pointer to DP link
  * @nbuf: pointer to n/w buffer
  * @tx_comp: tx sending or tx completion
  *
@@ -107,10 +107,11 @@ static inline void dp_softap_dump_nbuf(qdf_nbuf_t nbuf)
  *
  * Return: void
  */
-static void dp_softap_inspect_tx_eap_pkt(struct wlan_dp_intf *dp_intf,
+static void dp_softap_inspect_tx_eap_pkt(struct wlan_dp_link *dp_link,
 					 qdf_nbuf_t nbuf,
 					 bool tx_comp)
 {
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	struct qdf_mac_addr *mac_addr;
 	uint8_t *data;
 	uint8_t auth_type, eap_code;
@@ -131,7 +132,7 @@ static void dp_softap_inspect_tx_eap_pkt(struct wlan_dp_intf *dp_intf,
 	if (dp_intf->device_mode != QDF_P2P_GO_MODE)
 		return;
 
-	if (dp_intf->bss_state != BSS_INTF_START) {
+	if (dp_link->bss_state != BSS_INTF_START) {
 		dp_debug("BSS intf state is not START");
 		return;
 	}
@@ -822,7 +823,7 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 
 	if (qdf_unlikely(QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) ==
 			 QDF_NBUF_CB_PACKET_TYPE_EAPOL)) {
-		dp_softap_inspect_tx_eap_pkt(dp_intf, nbuf, false);
+		dp_softap_inspect_tx_eap_pkt(dp_link, nbuf, false);
 		dp_event_eapol_log(nbuf, QDF_TX);
 	}
 
@@ -920,7 +921,7 @@ void dp_softap_notify_tx_compl_cbk(qdf_nbuf_t nbuf,
 		dp_softap_notify_dhcp_ind(context, nbuf);
 	} else if (QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) ==
 						QDF_NBUF_CB_PACKET_TYPE_EAPOL) {
-		dp_softap_inspect_tx_eap_pkt(dp_intf, nbuf, true);
+		dp_softap_inspect_tx_eap_pkt(dp_link, nbuf, true);
 	}
 }
 
