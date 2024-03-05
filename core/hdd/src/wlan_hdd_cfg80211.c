@@ -8588,6 +8588,10 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL] = {
 		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_2GHZ] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_2GHZ] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ] = {.type = NLA_U8},
 };
 
 #define WLAN_MAX_LINK_ID 15
@@ -9641,6 +9645,154 @@ static int hdd_config_tx_rx_nss(struct wlan_hdd_link_info *link_info,
 	}
 
 	return 0;
+}
+
+static int hdd_set_tx_rx_nss_per_band(struct wlan_hdd_link_info *link_info,
+				      uint8_t tx_nss_2g, uint8_t rx_nss_2g,
+				      uint8_t tx_nss_5g, uint8_t rx_nss_5g)
+{
+	struct wlan_mlme_nss_chains user_cfg;
+	mac_handle_t mac_handle;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("Invalid hdd_ctx");
+		return -EINVAL;
+	}
+
+	mac_handle = hdd_ctx->mac_handle;
+	if (!mac_handle) {
+		hdd_err("NULL MAC handle");
+		return -EINVAL;
+	}
+
+	if (!hdd_ctx->dynamic_nss_chains_support) {
+		hdd_err("Dynamic nss chain update is not supported");
+		return -EINVAL;
+	}
+
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
+		hdd_err("Can't update nss values in disconnected state");
+		return -EINVAL;
+	}
+
+	qdf_mem_zero(&user_cfg, sizeof(user_cfg));
+	user_cfg.rx_nss[NSS_CHAINS_BAND_2GHZ] = rx_nss_2g;
+	user_cfg.tx_nss[NSS_CHAINS_BAND_2GHZ] = tx_nss_2g;
+	user_cfg.rx_nss[NSS_CHAINS_BAND_5GHZ] = rx_nss_5g;
+	user_cfg.tx_nss[NSS_CHAINS_BAND_5GHZ] = tx_nss_5g;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	/* For STA tx/rx nss value is updated at the time of connection,
+	 * for SAP case nss values will not get update, so can skip check
+	 * for SAP/P2P_GO mode.
+	 */
+	if (link_info->adapter->device_mode != QDF_SAP_MODE &&
+	    link_info->adapter->device_mode != QDF_P2P_GO_MODE &&
+	    (tx_nss_2g > wlan_vdev_mlme_get_nss(vdev) ||
+	    rx_nss_2g > wlan_vdev_mlme_get_nss(vdev) ||
+	    tx_nss_5g > wlan_vdev_mlme_get_nss(vdev) ||
+	    rx_nss_5g > wlan_vdev_mlme_get_nss(vdev))) {
+		hdd_err("Given tx nss/rx nss is greater than intersected nss = %d",
+			wlan_vdev_mlme_get_nss(vdev));
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EINVAL;
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	status = sme_nss_chains_update(mac_handle, &user_cfg,
+				       link_info->vdev_id);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return -EINVAL;
+
+	return 0;
+}
+
+static int hdd_config_tx_rx_nss_per_band(struct wlan_hdd_link_info *link_info,
+					 struct nlattr *tb[])
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	uint8_t tx_nss_2g, tx_nss_5g, rx_nss_2g, rx_nss_5g;
+	struct nlattr *tx_nss_attr_2g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_2GHZ];
+	struct nlattr *tx_nss_attr_5g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ];
+	struct nlattr *rx_nss_attr_2g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_2GHZ];
+	struct nlattr *rx_nss_attr_5g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ];
+
+	if (!tx_nss_attr_2g && !rx_nss_attr_2g &&
+	    !tx_nss_attr_5g && !rx_nss_attr_5g)
+		return 0;
+
+	/* if one is present, both must be present */
+	if (!tx_nss_attr_2g || !rx_nss_attr_2g) {
+		hdd_err("Missing attribute for %s",
+			tx_nss_attr_2g ? "RX_NSS_2G" : "TX_NSS_2G");
+		return -EINVAL;
+	}
+
+	/* if one is present, both must be present */
+	if (!tx_nss_attr_5g || !rx_nss_attr_5g) {
+		hdd_err("Missing attribute for %s",
+			tx_nss_attr_5g ? "RX_NSS_5G" : "TX_NSS_5G");
+		return -EINVAL;
+	}
+
+	tx_nss_2g = nla_get_u8(tx_nss_attr_2g);
+	rx_nss_2g = nla_get_u8(rx_nss_attr_2g);
+	tx_nss_5g = nla_get_u8(tx_nss_attr_5g);
+	rx_nss_5g = nla_get_u8(rx_nss_attr_5g);
+
+	hdd_debug("2.4GHz Band: tx_nss %d rx_nss %d", tx_nss_2g, rx_nss_2g);
+	hdd_debug("5/6GHz Band: tx_nss %d rx_nss %d", tx_nss_5g, rx_nss_5g);
+
+	/* Only allow NSS for tx_rx_nss for 1x1, 1x2, 2x2 */
+	if (!((tx_nss_2g == 1 && rx_nss_2g == 2) ||
+	      (tx_nss_2g == 1 && rx_nss_2g == 1) ||
+	      (tx_nss_2g == 2 && rx_nss_2g == 2))) {
+		hdd_err("Invalid Tx_Rx_Nss for 2.4GHz band (%d, %d)",
+			tx_nss_2g, rx_nss_2g);
+		return -EINVAL;
+	}
+
+	if (!((tx_nss_5g == 1 && rx_nss_5g == 2) ||
+	      (tx_nss_5g == 1 && rx_nss_5g == 1) ||
+	      (tx_nss_5g == 2 && rx_nss_5g == 2))) {
+		hdd_err("Invalid Tx_Rx_Nss for 5/6GHz band (%d, %d)",
+			tx_nss_5g, rx_nss_5g);
+		return -EINVAL;
+	}
+
+	if ((tx_nss_2g == 2 || rx_nss_2g || tx_nss_5g || rx_nss_5g == 2) &&
+	    hdd_ctx->num_rf_chains != 2) {
+		hdd_err("No support for 2 spatial streams");
+		return -EINVAL;
+	}
+
+	if (tx_nss_2g > MAX_VDEV_NSS || rx_nss_2g > MAX_VDEV_NSS) {
+		hdd_debug("Cannot support tx_rx_nss: (%d,%d) for 2.4GHz band",
+			  tx_nss_2g, rx_nss_2g);
+		return -EINVAL;
+	}
+
+	if (tx_nss_5g > MAX_VDEV_NSS || rx_nss_5g > MAX_VDEV_NSS) {
+		hdd_debug("Cannot support tx_rx_nss: (%d,%d) for 5/6GHz band",
+			  tx_nss_5g, rx_nss_5g);
+		return -EINVAL;
+	}
+
+	return hdd_set_tx_rx_nss_per_band(link_info, tx_nss_2g, rx_nss_2g,
+					  tx_nss_5g, rx_nss_5g);
 }
 
 #ifdef WLAN_FEATURE_SON
@@ -13494,6 +13646,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_set_channel_width,
 	hdd_config_peer_ampdu,
 	hdd_set_ul_mu_config,
+	hdd_config_tx_rx_nss_per_band,
 };
 
 /**
