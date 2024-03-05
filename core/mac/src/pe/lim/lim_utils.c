@@ -7769,9 +7769,12 @@ void lim_update_session_he_capable(struct mac_context *mac, struct pe_session *s
 		session->vhtCapability = 0;
 		session->he_6ghz_band = 1;
 	}
-	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq) &&
-	    !mac->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)
-		session->vhtCapability = 0;
+
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
+		session->he_config.ul_mu = mac->he_cap_2g.ul_mu;
+		if (!mac->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)
+			session->vhtCapability = 0;
+	}
 
 	if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
 		session->he_config.ul_mu = mac->he_cap_5g.ul_mu;
