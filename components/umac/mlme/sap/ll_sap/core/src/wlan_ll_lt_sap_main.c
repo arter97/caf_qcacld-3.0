@@ -740,7 +740,7 @@ QDF_STATUS ll_lt_sap_obtain_target_tsf(
 	curr_tsf = ((uint64_t)twt_params->curr_tsf_us_hi << 32 |
 			twt_params->curr_tsf_us_lo);
 
-	if (next_sp_start_tsf)
+	if (next_sp_start_tsf && !ll_lt_sap_get_bearer_switch_cap_for_csa(psoc))
 		/* TWT session is present with atleast one EB */
 		*twt_target_tsf = ll_lt_sap_calculate_target_tsf(
 					psoc, twt_params->vdev_id,
