@@ -2998,7 +2998,7 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id, IS_DISABLE_BTM, &temp);
 	is_disable_btm = temp.bool_value;
-	assoc_btm_cap = wlan_cm_get_assoc_btm_cap(vdev);
+	assoc_btm_cap = wlan_cm_get_assoc_btm_cap(psoc, vdev_id);
 	if (!assoc_btm_cap || is_disable_btm) {
 		mlme_debug("disable btm offload vdev:%d btm_cap: %d is_btm: %d",
 			   vdev_id, assoc_btm_cap, is_disable_btm);
