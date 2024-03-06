@@ -30,6 +30,7 @@
 #include "cds_ieee80211_common_i.h"
 #include "qdf_delayed_work.h"
 #define DBS_OPPORTUNISTIC_TIME   5
+#define EMLSR_OPPORTUNISTIC_TIME   5
 
 #define POLICY_MGR_SER_CMD_TIMEOUT 4000
 
@@ -386,6 +387,8 @@ struct policy_mgr_cfg {
  * @dynamic_dfs_master_disabled: current state of dynamic dfs master
  * @link_in_progress: To track if set link is in progress
  * @set_link_update_done_evt: qdf event to synchronize set link
+ * @emlsr_opportunistic_timer: Timer to restore eMLSR mode
+ * which were previously disabled by AP start/STA start/CSA.
  * @active_vdev_bitmap: Active vdev id bitmap
  * @inactive_vdev_bitmap: Inactive vdev id bitmap
  * @restriction_mask:
@@ -438,6 +441,7 @@ struct policy_mgr_psoc_priv_obj {
 #ifdef WLAN_FEATURE_11BE_MLO
 	qdf_atomic_t link_in_progress;
 	qdf_event_t set_link_update_done_evt;
+	qdf_mc_timer_t emlsr_opportunistic_timer;
 #endif
 	uint32_t active_vdev_bitmap;
 	uint32_t inactive_vdev_bitmap;

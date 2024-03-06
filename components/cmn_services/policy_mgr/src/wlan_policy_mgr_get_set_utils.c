@@ -5988,6 +5988,59 @@ static bool policy_mgr_is_6g_channel_allowed(
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS policy_mgr_restart_emlsr_opportunistic_timer(
+		struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	struct policy_mgr_psoc_priv_obj *policy_mgr_ctx;
+
+	policy_mgr_ctx = policy_mgr_get_context(psoc);
+	if (!policy_mgr_ctx) {
+		policy_mgr_err("Invalid context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mc_timer_stop(&policy_mgr_ctx->emlsr_opportunistic_timer);
+
+	status = qdf_mc_timer_start(
+			&policy_mgr_ctx->emlsr_opportunistic_timer,
+			EMLSR_OPPORTUNISTIC_TIME * 1000);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to start emlsr timer, %d", status);
+		return status;
+	}
+	policymgr_nofl_debug("emlsr timer restarted");
+
+	return status;
+}
+
+QDF_STATUS policy_mgr_stop_emlsr_opportunistic_timer(
+		struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct policy_mgr_psoc_priv_obj *policy_mgr_ctx;
+
+	policy_mgr_ctx = policy_mgr_get_context(psoc);
+	if (!policy_mgr_ctx) {
+		policy_mgr_err("Invalid context");
+		return status;
+	}
+	if (QDF_TIMER_STATE_RUNNING !=
+		qdf_mc_timer_get_current_state(
+				&policy_mgr_ctx->emlsr_opportunistic_timer))
+		return QDF_STATUS_SUCCESS;
+
+	status = qdf_mc_timer_stop(&policy_mgr_ctx->emlsr_opportunistic_timer);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		policy_mgr_err("failed to stop emlsr timer, %d", status);
+	else
+		policymgr_nofl_debug("emlsr timer stopped");
+
+	return status;
+}
+
 static bool policy_mgr_is_acs_2ghz_only_sap(struct wlan_objmgr_psoc *psoc,
 					    uint8_t sap_vdev_id)
 {
@@ -13356,6 +13409,7 @@ policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 	uint8_t num_disallow_mode_comb;
 	uint16_t active_link_bmap = 0;
 	enum wlan_emlsr_action_mode emlsr_mode = WLAN_EMLSR_MODE_MAX;
+	uint32_t emlsr_disable_req;
 
 	if (!vdev)
 		return false;
@@ -13375,8 +13429,17 @@ policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 	    req->param.force_mode == MLO_LINK_FORCE_MODE_ACTIVE)
 		active_link_bmap = req->param.force_cmd.ieee_link_id_bitmap;
 
+	/* If emlsr is disabled by ap start/conn start/csa/opportunistic
+	 * timer, use ml_nlink_populate_disallow_modes to populate the
+	 * disallow bitmap which will consider the current disable requests.
+	 */
+	emlsr_disable_req = ml_nlink_get_emlsr_mode_disable_req(psoc, vdev);
+	emlsr_disable_req &= ML_EMLSR_DISABLE_MASK_ALL &
+	    ~ML_EMLSR_DISALLOW_BY_CONCURENCY;
+
 	policy_mgr_init_disallow_mode_bmap(req);
-	if (policy_mgr_get_connection_count_with_mlo(psoc) == 1) {
+	if (!emlsr_disable_req &&
+	    policy_mgr_get_connection_count_with_mlo(psoc) == 1) {
 		ml_nlink_clr_emlsr_mode_disable_req(
 				psoc, vdev,
 				ML_EMLSR_DISALLOW_BY_CONCURENCY);

@@ -486,7 +486,7 @@ override_emlsr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 	/* If eMLSR is disallowed by AP CSA or other part, force add
 	 * eMLSR disallow bitmap always.
 	 */
-	emlsr_disable_req_flags &= ML_EMLSR_DISALLOW_MASK_ALL;
+	emlsr_disable_req_flags &= ML_EMLSR_DISABLE_MASK_ALL;
 	if (emlsr_disable_req_flags & ~ML_EMLSR_DISALLOW_BY_CONCURENCY) {
 		disallow_mode_bitmap |= EMLSR_5GL_5GH;
 		mlo_debug("disallow_mode_bitmap 0x%x req 0x%x",
@@ -500,6 +500,7 @@ override_emlsr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 static uint8_t
 populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			struct wlan_objmgr_vdev *vdev,
+			bool initial_connected,
 			enum mlo_disallowed_mode
 			mlo_disallow_mode[MAX_DISALLOW_MODE],
 			uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE])
@@ -507,7 +508,7 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	struct disallow_mlo_modes mlo_modes;
 	uint8_t num_of_modes = 0;
 	enum disallow_mlo_mode disallow_mode[MAX_DISALLOW_MODE];
-	uint32_t disallow_mode_bitmap;
+	uint32_t disallow_mode_bitmap = 0;
 	uint8_t i;
 	enum home_channel_map_id ml_hc_id;
 	enum home_channel_map_id legacy_hc_id;
@@ -524,13 +525,6 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t allow_mcc;
 
-	legacy_num = policy_mgr_get_legacy_conn_info(
-					psoc, legacy_vdev_lst,
-					legacy_freq_lst, mode_lst,
-					QDF_ARRAY_SIZE(legacy_vdev_lst));
-	if (!legacy_num)
-		goto end;
-
 	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
 			       ml_link_info, ml_freq_lst, ml_vdev_lst,
@@ -538,6 +532,16 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			       &ml_link_bitmap);
 	if (ml_num_link < 2)
 		goto end;
+
+	if (initial_connected)
+		goto no_legacy_intf;
+
+	legacy_num = policy_mgr_get_legacy_conn_info(
+					psoc, legacy_vdev_lst,
+					legacy_freq_lst, mode_lst,
+					QDF_ARRAY_SIZE(legacy_vdev_lst));
+	if (!legacy_num)
+		goto no_legacy_intf;
 
 	allow_mcc = true;
 
@@ -588,6 +592,7 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 		  policy_mgr_get_rd_type(psoc),
 		  disallow_mode_bitmap);
 
+no_legacy_intf:
 	disallow_mode_bitmap =
 	override_emlsr_disallow_mode(psoc, vdev, ml_num_link,
 				     ml_freq_lst, disallow_mode_bitmap);
@@ -626,6 +631,7 @@ end:
 static void
 ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			       struct wlan_objmgr_vdev *vdev,
+			       bool initial_connected,
 			       bool *disallow_changed)
 {
 	enum mlo_disallowed_mode mlo_disallow_mode[MAX_DISALLOW_MODE];
@@ -648,6 +654,7 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	}
 
 	num_of_modes = populate_disallow_modes(psoc, vdev,
+					       initial_connected,
 					       mlo_disallow_mode,
 					       disallow_link_bitmap);
 
@@ -735,10 +742,8 @@ ml_nlink_reset_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	struct wlan_link_force_context *link_force_ctx;
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
-	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
-		mlo_err("mlo_ctx or sta_ctx null");
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx)
 		return;
-	}
 
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	link_force_ctx = &mlo_dev_ctx->sta_ctx->link_force_ctx;
@@ -764,7 +769,7 @@ ml_nlink_populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (!(link_control_flags & link_ctrl_f_dont_update_disallow_bitmap))
-		ml_nlink_update_disallow_modes(psoc, vdev, NULL);
+		ml_nlink_update_disallow_modes(psoc, vdev, false, NULL);
 
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	link_force_ctx = &mlo_dev_ctx->sta_ctx->link_force_ctx;
@@ -774,6 +779,43 @@ ml_nlink_populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 		     &link_force_ctx->disallow_mode_link_bmap[0],
 		     sizeof(req->param.disallow_mode_link_bmap));
 	mlo_dev_lock_release(mlo_dev_ctx);
+}
+
+static void
+ml_nlink_init_disallow_modes(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint8_t ml_vdev_lst[WLAN_MAX_ML_BSS_LINKS];
+	qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS];
+	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
+
+	if (!mlo_is_mld_sta(vdev))
+		return;
+
+	if (!policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) ||
+	    !wlan_mlme_is_aux_emlsr_support(psoc))
+		return;
+
+	if (mlo_mgr_is_link_switch_in_progress(vdev))
+		return;
+
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_STANDBY_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	if (ml_num_link < 2)
+		return;
+
+	/* Fill an initial disallow mode bitmap to dev context after
+	 * ML STA initial connect completion.
+	 */
+	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) &&
+	    wlan_mlme_is_aux_emlsr_support(psoc))
+		ml_nlink_update_disallow_modes(psoc, vdev, true, NULL);
 }
 
 void
@@ -966,10 +1008,8 @@ ml_nlink_clr_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 	struct wlan_link_force_context *link_force_ctx;
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
-	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
-		mlo_err("mlo_ctx or sta_ctx null");
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx)
 		return 0;
-	}
 
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	link_force_ctx = &mlo_dev_ctx->sta_ctx->link_force_ctx;
@@ -983,7 +1023,7 @@ ml_nlink_clr_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 	return old_flags;
 }
 
-static uint32_t
+uint32_t
 ml_nlink_get_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev)
 {
@@ -992,10 +1032,8 @@ ml_nlink_get_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 	struct wlan_link_force_context *link_force_ctx;
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
-	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
-		mlo_err("mlo_ctx or sta_ctx null");
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx)
 		return 0;
-	}
 
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	link_force_ctx = &mlo_dev_ctx->sta_ctx->link_force_ctx;
@@ -4083,7 +4121,8 @@ ml_nlink_update_non_force_disallow_bitmap(
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool disallow_mode_changed = false;
 
-	ml_nlink_update_disallow_modes(psoc, vdev, &disallow_mode_changed);
+	ml_nlink_update_disallow_modes(psoc, vdev, false,
+				       &disallow_mode_changed);
 	link_control_flags |= link_ctrl_f_dont_update_disallow_bitmap;
 
 	/* In middle of transition, no need schedule force scc workqueue */
@@ -4096,12 +4135,9 @@ ml_nlink_update_non_force_disallow_bitmap(
 		link_control_flags |= link_ctrl_f_dont_reschedule_workqueue;
 
 	/* Send "no force update" to clear any MLMR EMLSR restriction
-	 * when become MLO standalone.
+	 * when become MLO standalone
 	 */
-	if (disallow_mode_changed ||
-	    ((policy_mgr_get_connection_count_with_mlo(psoc) == 1) &&
-	     (evt == ml_nlink_disconnect_completion_evt ||
-	      evt == ml_nlink_ap_stopped_evt))) {
+	if (disallow_mode_changed) {
 		status = policy_mgr_mlo_sta_set_nlink(
 					psoc, wlan_vdev_get_id(vdev), reason,
 					MLO_LINK_FORCE_MODE_NON_FORCE_UPDATE,
@@ -4587,6 +4623,9 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	uint32_t tgt_ch_freq = 0;
 	bool csa_to_scc = false;
 
+	if (mlo_is_mld_sta(vdev))
+		return QDF_STATUS_SUCCESS;
+
 	if (!wlan_mlme_is_aux_emlsr_support(psoc) ||
 	    !policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL))
 		return QDF_STATUS_SUCCESS;
@@ -4704,17 +4743,19 @@ end:
 }
 
 static QDF_STATUS
-ml_nlink_undo_emlsr_downgrade(struct wlan_objmgr_psoc *psoc,
-			      struct wlan_objmgr_vdev *vdev,
-			      enum ml_nlink_change_event_type evt,
-			      struct ml_nlink_change_event *data)
+ml_nlink_undo_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev,
+				      enum ml_nlink_change_event_type evt,
+				      struct ml_nlink_change_event *data)
 {
-	struct set_link_req req;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *ml_vdev = NULL;
 	enum QDF_OPMODE op_mode;
-	uint32_t old_emlsr_disable_req, downgrade_req;
+	uint32_t old_emlsr_disable_req;
 	enum ml_emlsr_disable_request request = 0;
+
+	if (mlo_is_mld_sta(vdev))
+		return QDF_STATUS_SUCCESS;
 
 	if (!wlan_mlme_is_aux_emlsr_support(psoc) ||
 	    !policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL))
@@ -4748,69 +4789,11 @@ ml_nlink_undo_emlsr_downgrade(struct wlan_objmgr_psoc *psoc,
 
 	old_emlsr_disable_req =
 	ml_nlink_clr_emlsr_mode_disable_req(psoc, ml_vdev, request);
-	if (old_emlsr_disable_req) {
-		downgrade_req =
-			old_emlsr_disable_req & ML_EMLSR_DOWNGRADE_MASK_ALL;
-		if (!(downgrade_req & ~request)) {
-			qdf_mem_zero(&req, sizeof(req));
-			ml_nlink_update_force_link_request(
-					psoc, ml_vdev, &req,
-					SET_LINK_FROM_EMLSR_DOWNGRADE);
-		}
-	}
+	if (old_emlsr_disable_req & request)
+		ml_nlink_set_emlsr_mode_disable_req(
+					psoc, ml_vdev,
+					ML_EMLSR_DOWNGRADE_BY_OPP_TIMER);
 
-end:
-	if (ml_vdev)
-		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
-
-	return status;
-}
-
-static QDF_STATUS
-ml_nlink_undo_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_objmgr_vdev *vdev,
-				      enum ml_nlink_change_event_type evt,
-				      struct ml_nlink_change_event *data)
-{
-	struct set_link_req req;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct wlan_objmgr_vdev *ml_vdev = NULL;
-	enum QDF_OPMODE op_mode;
-
-	if (!wlan_mlme_is_aux_emlsr_support(psoc) ||
-	    !policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL))
-		return QDF_STATUS_SUCCESS;
-
-	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	/* todo: add sta/gc support */
-	if (!(op_mode == QDF_SAP_MODE ||
-	      op_mode == QDF_P2P_GO_MODE ||
-	      op_mode == QDF_STA_MODE ||
-	      op_mode == QDF_P2P_CLIENT_MODE)) {
-		mlo_debug("op_mode: %d", op_mode);
-		goto end;
-	}
-
-	ml_vdev = ml_nlink_get_affect_ml_sta(psoc);
-	if (!ml_vdev)
-		goto end;
-
-	qdf_mem_zero(&req, sizeof(req));
-	ml_nlink_get_force_link_request(psoc, ml_vdev, &req,
-					SET_LINK_FROM_EMLSR_DOWNGRADE);
-	/* clear the eMLSR downgrade request */
-	ml_nlink_undo_emlsr_downgrade(psoc, vdev, evt, data);
-
-	/* if no eMLSR downgrade request previously, skip the state change */
-	if (!req.force_inactive_num_bitmap &&
-	    !req.force_inactive_bitmap)
-		goto end;
-
-	status = ml_nlink_state_change(psoc, MLO_LINK_FORCE_REASON_CONNECT,
-				       evt, data);
-
-	if (status == QDF_STATUS_E_PENDING)
-		status = QDF_STATUS_SUCCESS;
 end:
 	if (ml_vdev)
 		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
@@ -5164,8 +5147,7 @@ ml_nlink_ap_csa_end_handler(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *ml_vdev = NULL;
-	uint32_t old_emlsr_disable_req, disable_req;
-	struct set_link_req req;
+	uint32_t old_emlsr_disable_req;
 
 	mlo_debug("vdev %d csa result %d ", wlan_vdev_get_id(vdev),
 		  data->evt.csa_end.csa_failed);
@@ -5184,36 +5166,141 @@ ml_nlink_ap_csa_end_handler(struct wlan_objmgr_psoc *psoc,
 			ML_EMLSR_DISALLOW_BY_AP_CSA |
 			ML_EMLSR_DOWNGRADE_BY_AP_CSA);
 
-	if (old_emlsr_disable_req & ML_EMLSR_DOWNGRADE_BY_AP_CSA) {
-		disable_req = old_emlsr_disable_req &
-					ML_EMLSR_DOWNGRADE_MASK_ALL;
-		if (!(disable_req & ~ML_EMLSR_DOWNGRADE_BY_AP_CSA)) {
-			qdf_mem_zero(&req, sizeof(req));
-			ml_nlink_update_force_link_request(
-					psoc, ml_vdev, &req,
-					SET_LINK_FROM_EMLSR_DOWNGRADE);
-			if (data->evt.csa_end.update_target)
-				status = ml_nlink_state_change(
-						psoc,
-						MLO_LINK_FORCE_REASON_CONNECT,
-						evt, data);
-		}
+	if (old_emlsr_disable_req & ML_EMLSR_DOWNGRADE_BY_AP_CSA)
+		ml_nlink_set_emlsr_mode_disable_req(
+					psoc, ml_vdev,
+					ML_EMLSR_DOWNGRADE_BY_OPP_TIMER);
+
+	if (old_emlsr_disable_req & ML_EMLSR_DISALLOW_BY_AP_CSA)
+		ml_nlink_set_emlsr_mode_disable_req(
+					psoc, ml_vdev,
+					ML_EMLSR_DISALLOW_BY_OPP_TIMER);
+
+end:
+	if (ml_vdev)
+		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
+
+	return status;
+}
+
+static QDF_STATUS ml_nlink_emlsr_opportunistic_timer_handler(
+		struct wlan_objmgr_psoc *psoc,
+		struct wlan_objmgr_vdev *vdev,
+		enum ml_nlink_change_event_type evt,
+		struct ml_nlink_change_event *data)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *ml_vdev = NULL;
+	uint32_t disable_req;
+	struct set_link_req req;
+
+	if (!psoc) {
+		mlo_err("psoc null");
+		return QDF_STATUS_E_INVAL;
 	}
-	if (old_emlsr_disable_req & ML_EMLSR_DISALLOW_BY_AP_CSA) {
-		disable_req = old_emlsr_disable_req &
-					ML_EMLSR_DISALLOW_MASK_ALL;
-		if (!(disable_req & ~ML_EMLSR_DISALLOW_BY_AP_CSA) &&
-		    data->evt.csa_end.update_target)
-			status = ml_nlink_update_non_force_disallow_bitmap(
-						psoc, ml_vdev, evt, data,
-						MLO_LINK_FORCE_REASON_CONNECT,
-						0);
+
+	if (!policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) ||
+	    !wlan_mlme_is_aux_emlsr_support(psoc))
+		return QDF_STATUS_SUCCESS;
+
+	ml_vdev = ml_nlink_get_affect_ml_sta(psoc);
+	if (!ml_vdev)
+		goto end;
+
+	disable_req = ml_nlink_get_emlsr_mode_disable_req(psoc, ml_vdev);
+	if (disable_req &
+	    ~(ML_EMLSR_DISALLOW_BY_OPP_TIMER |
+	      ML_EMLSR_DOWNGRADE_BY_OPP_TIMER |
+	      ML_EMLSR_DISALLOW_BY_CONCURENCY)) {
+		mlo_debug("emlsr disabled by req 0x%x", disable_req);
+		goto end;
+	}
+
+	disable_req =
+	ml_nlink_clr_emlsr_mode_disable_req(
+			psoc, ml_vdev,
+			ML_EMLSR_DISALLOW_BY_OPP_TIMER |
+			ML_EMLSR_DOWNGRADE_BY_OPP_TIMER);
+
+	if (disable_req & ML_EMLSR_DOWNGRADE_BY_OPP_TIMER) {
+		qdf_mem_zero(&req, sizeof(req));
+		ml_nlink_update_force_link_request(
+				psoc, ml_vdev, &req,
+				SET_LINK_FROM_EMLSR_DOWNGRADE);
+		status = ml_nlink_state_change(
+					psoc,
+					MLO_LINK_FORCE_REASON_CONNECT,
+					evt, data);
+	} else if ((disable_req & ML_EMLSR_DISALLOW_BY_OPP_TIMER) &&
+		   !(disable_req & ML_EMLSR_DISALLOW_BY_CONCURENCY)) {
+		status = ml_nlink_update_non_force_disallow_bitmap(
+					psoc, ml_vdev, evt, data,
+					MLO_LINK_FORCE_REASON_CONNECT,
+					0);
 	}
 end:
 	if (ml_vdev)
 		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
 
 	return status;
+}
+
+static void ml_nlink_check_stop_start_emlsr_timer(
+		struct wlan_objmgr_psoc *psoc,
+		struct wlan_objmgr_vdev *vdev,
+		enum ml_nlink_change_event_type evt,
+		struct ml_nlink_change_event *data)
+{
+	struct wlan_objmgr_vdev *ml_vdev = NULL;
+	uint32_t old_emlsr_disable_req;
+
+	if (!policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) ||
+	    !wlan_mlme_is_aux_emlsr_support(psoc))
+		return;
+
+	switch (evt) {
+	case ml_nlink_roam_sync_start_evt:
+	case ml_nlink_roam_sync_completion_evt:
+	case ml_nlink_connect_pre_start_evt:
+	case ml_nlink_connect_start_evt:
+	case ml_nlink_disconnect_start_evt:
+	case ml_nlink_disconnect_completion_evt:
+	case ml_nlink_connect_failed_evt:
+		if (!mlo_is_mld_sta(vdev))
+			break;
+		/* MLO STA association is changed, link state
+		 * should be reset, so stop emlsr timer
+		 */
+		policy_mgr_stop_emlsr_opportunistic_timer(psoc);
+		return;
+	case ml_nlink_link_switch_start_evt:
+	case ml_nlink_link_switch_pre_completion_evt:
+	case ml_nlink_connect_completion_evt:
+	case ml_nlink_ap_start_evt:
+	case ml_nlink_ap_started_evt:
+	case ml_nlink_ap_stopped_evt:
+	case ml_nlink_ap_csa_start_evt:
+	case ml_nlink_ap_csa_end_evt:
+	case ml_nlink_ap_start_failed_evt:
+		break;
+	default:
+		return;
+	}
+
+	ml_vdev = ml_nlink_get_affect_ml_sta(psoc);
+	if (!ml_vdev)
+		goto end;
+
+	old_emlsr_disable_req =
+		ml_nlink_get_emlsr_mode_disable_req(psoc, ml_vdev);
+
+	if (old_emlsr_disable_req & ML_EMLSR_DISABLE_MASK_ALL &
+	    ~ML_EMLSR_DISALLOW_BY_CONCURENCY)
+		policy_mgr_restart_emlsr_opportunistic_timer(psoc);
+
+end:
+	if (ml_vdev)
+		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
 }
 
 QDF_STATUS
@@ -5301,10 +5388,11 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		ml_nlink_reset_disallow_modes(psoc, vdev);
 		break;
 	case ml_nlink_connect_completion_evt:
-		status = ml_nlink_undo_emlsr_downgrade(
+		ml_nlink_init_disallow_modes(psoc, vdev);
+		status = ml_nlink_undo_emlsr_downgrade_handler(
 			psoc, vdev, evt, data);
 		status = ml_nlink_state_change_handler(
-			psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
+			psoc, vdev, MLO_LINK_FORCE_REASON_DISCONNECT,
 			evt, data);
 		break;
 	case ml_nlink_disconnect_start_evt:
@@ -5330,10 +5418,10 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			psoc, vdev, evt, data);
 		break;
 	case ml_nlink_ap_started_evt:
-		status = ml_nlink_undo_emlsr_downgrade(
+		status = ml_nlink_undo_emlsr_downgrade_handler(
 			psoc, vdev, evt, data);
 		status = ml_nlink_state_change_handler(
-			psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
+			psoc, vdev, MLO_LINK_FORCE_REASON_DISCONNECT,
 			evt, data);
 		break;
 	case ml_nlink_ap_stopped_evt:
@@ -5347,6 +5435,10 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		break;
 	case ml_nlink_ap_csa_end_evt:
 		status = ml_nlink_ap_csa_end_handler(
+			psoc, vdev, evt, data);
+		break;
+	case ml_nlink_emlsr_timeout_evt:
+		status = ml_nlink_emlsr_opportunistic_timer_handler(
 			psoc, vdev, evt, data);
 		break;
 	case ml_nlink_connection_updated_evt:
@@ -5372,6 +5464,8 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 	default:
 		break;
 	}
+
+	ml_nlink_check_stop_start_emlsr_timer(psoc, vdev, evt, data);
 
 	if (vdev)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);

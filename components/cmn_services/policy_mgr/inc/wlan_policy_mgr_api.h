@@ -4835,6 +4835,26 @@ bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
+ * policy_mgr_restart_emlsr_opportunistic_timer() - restart
+ * emlsr opopportunistic timer
+ * @psoc: psoc object
+ *
+ * Return: QDF_STATUS_SUCCESS if start timer successfully.
+ */
+QDF_STATUS policy_mgr_restart_emlsr_opportunistic_timer(
+		struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_stop_emlsr_opportunistic_timer() - stop
+ * emlsr opopportunistic timer
+ * @psoc: psoc object
+ *
+ * Return: QDF_STATUS_SUCCESS if start timer successfully.
+ */
+QDF_STATUS policy_mgr_stop_emlsr_opportunistic_timer(
+		struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_ap_csa_request() - Defer SAP/GO csa if eMLSR STA present
  * @psoc: psoc ctx
  * @vdev_id: SAP or GO vdev id

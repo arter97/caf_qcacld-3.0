@@ -38,6 +38,9 @@
 #include "qdf_trace.h"
 #include "wlan_objmgr_global_obj.h"
 #include "target_if.h"
+#ifdef WLAN_FEATURE_11BE_MLO
+#include "wlan_mlo_link_force.h"
+#endif
 
 static QDF_STATUS policy_mgr_psoc_obj_create_cb(struct wlan_objmgr_psoc *psoc,
 		void *data)
@@ -141,6 +144,61 @@ static void policy_mgr_vdev_obj_status_cb(struct wlan_objmgr_vdev *vdev,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static void pm_emlsr_opportunistic_timer_handler(void *ctx)
+{
+	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)ctx;
+	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
+
+	if (!psoc) {
+		policy_mgr_err("Invalid Context");
+		return;
+	}
+	policy_mgr_get_mode_specific_conn_info(psoc, NULL, &vdev_id,
+					       PM_STA_MODE);
+	if (vdev_id == WLAN_INVALID_VDEV_ID) {
+		policymgr_nofl_debug("emlsr timeout, no sta active");
+		return;
+	}
+
+	ml_nlink_conn_change_notify(psoc, vdev_id,
+				    ml_nlink_emlsr_timeout_evt,
+				    NULL);
+}
+
+static QDF_STATUS
+policy_mgr_init_emlsr_timer(struct policy_mgr_psoc_priv_obj *pm_ctx)
+{
+	QDF_STATUS status;
+
+	status = qdf_mc_timer_init(&pm_ctx->emlsr_opportunistic_timer,
+				   QDF_TIMER_TYPE_SW,
+				   pm_emlsr_opportunistic_timer_handler,
+				   (void *)pm_ctx->psoc);
+	if (QDF_IS_STATUS_ERROR(status))
+		policy_mgr_err("Failed to init emlsr opportunistic timer");
+
+	return status;
+}
+
+static QDF_STATUS
+policy_mgr_deinit_emlsr_timer(struct policy_mgr_psoc_priv_obj *pm_ctx)
+{
+	QDF_STATUS status;
+
+	if (QDF_TIMER_STATE_RUNNING ==
+			qdf_mc_timer_get_current_state(
+				&pm_ctx->emlsr_opportunistic_timer)) {
+		qdf_mc_timer_stop(&pm_ctx->emlsr_opportunistic_timer);
+	}
+
+	status = qdf_mc_timer_destroy(
+			&pm_ctx->emlsr_opportunistic_timer);
+	if (QDF_IS_STATUS_ERROR(status))
+		policy_mgr_err("Cannot deallocate emlsr opportunistic timer");
+
+	return status;
+}
+
 static QDF_STATUS policy_mgr_register_link_switch_notifier(void)
 {
 	QDF_STATUS status;
@@ -172,6 +230,18 @@ static QDF_STATUS policy_mgr_unregister_link_switch_notifier(void)
 	return status;
 }
 #else
+static inline QDF_STATUS
+policy_mgr_init_emlsr_timer(struct policy_mgr_psoc_priv_obj *pm_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+policy_mgr_deinit_emlsr_timer(struct policy_mgr_psoc_priv_obj *pm_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS policy_mgr_register_link_switch_notifier(void)
 {
 	return QDF_STATUS_SUCCESS;
@@ -376,16 +446,21 @@ QDF_STATUS policy_mgr_deinit(void)
 QDF_STATUS policy_mgr_psoc_open(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	QDF_STATUS status;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
 		return QDF_STATUS_E_FAILURE;
 	}
+	status = policy_mgr_init_emlsr_timer(pm_ctx);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_mutex_create(
 		&pm_ctx->qdf_conc_list_lock))) {
 		policy_mgr_err("Failed to init qdf_conc_list_lock");
+		policy_mgr_deinit_emlsr_timer(pm_ctx);
 		QDF_ASSERT(0);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -394,6 +469,7 @@ QDF_STATUS policy_mgr_psoc_open(struct wlan_objmgr_psoc *psoc)
 		sizeof(struct sta_ap_intf_check_work_ctx));
 	if (!pm_ctx->sta_ap_intf_check_work_info) {
 		qdf_mutex_destroy(&pm_ctx->qdf_conc_list_lock);
+		policy_mgr_deinit_emlsr_timer(pm_ctx);
 		return QDF_STATUS_E_FAILURE;
 	}
 	pm_ctx->sta_ap_intf_check_work_info->psoc = psoc;
@@ -408,6 +484,7 @@ QDF_STATUS policy_mgr_psoc_open(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_err("Failed to create dealyed work queue");
 		qdf_mutex_destroy(&pm_ctx->qdf_conc_list_lock);
 		qdf_mem_free(pm_ctx->sta_ap_intf_check_work_info);
+		policy_mgr_deinit_emlsr_timer(pm_ctx);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -443,6 +520,8 @@ QDF_STATUS policy_mgr_psoc_close(struct wlan_objmgr_psoc *psoc)
 		qdf_mem_free(pm_ctx->sta_ap_intf_check_work_info);
 		pm_ctx->sta_ap_intf_check_work_info = NULL;
 	}
+
+	policy_mgr_deinit_emlsr_timer(pm_ctx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -517,7 +596,6 @@ policy_mgr_deinit_ml_link_update(struct policy_mgr_psoc_priv_obj *pm_ctx)
 
 	return QDF_STATUS_SUCCESS;
 }
-
 #else
 static inline void policy_mgr_memzero_disabled_ml_list(void) {}
 
@@ -565,7 +643,6 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_err("Failed to init DBS opportunistic timer");
 		return status;
 	}
-
 	status = policy_mgr_init_ml_link_update(pm_ctx);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
