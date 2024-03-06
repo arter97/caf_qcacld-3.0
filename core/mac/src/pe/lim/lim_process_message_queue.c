@@ -1066,6 +1066,17 @@ lim_is_ignore_btm_frame(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	/*
+	 * When DUT associated to BTM disabled AP and receives BTM req frame
+	 * from connected AP then instead of forwarding the BTM req frame to
+	 * supplicant, host should drop it
+	 */
+	if (!wlan_cm_get_assoc_btm_cap(psoc, vdev_id)) {
+		pe_debug("Drop BTM frame. vdev:%d BTM not supported by AP",
+			 vdev_id);
+		return true;
+	}
+
+	/*
 	 * Drop BTM frame received on STA interface if concurrent
 	 * P2P connection is active and p2p_disable_roam ini is
 	 * enabled. This will help to avoid scan triggered by
@@ -1405,10 +1416,8 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 	}
 
 	/* Check if frame is registered by HDD */
-	if (lim_check_mgmt_registered_frames(mac, pRxPacketInfo, pe_session)) {
-		pe_debug("Received frame is passed to SME");
+	if (lim_check_mgmt_registered_frames(mac, pRxPacketInfo, pe_session))
 		goto end;
-	}
 
 	if (fc.protVer != SIR_MAC_PROTOCOL_VERSION) {   /* Received Frame with non-zero Protocol Version */
 		pe_err("Unexpected frame with protVersion %d received",
