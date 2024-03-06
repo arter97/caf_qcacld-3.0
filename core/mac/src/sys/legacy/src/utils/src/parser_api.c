@@ -10886,11 +10886,16 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 		/*
 		 * 1 Bytes for STA Info Length + 6 bytes for STA MAC Address +
 		 * 2 Bytes for Becon Interval + 2 Bytes for DTIM Info +
-		 * 8 Bytes for TSF Offset + 1 byte BPCC
+		 * 8 Bytes for TSF Offset[optional] + 1 byte BPCC
 		 */
 		len = WLAN_ML_BV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE +
 		      QDF_MAC_ADDR_SIZE + WLAN_BEACONINTERVAL_LEN +
-		      sizeof(struct wlan_ml_bv_linfo_perstaprof_stainfo_dtiminfo);
+		      sizeof(struct wlan_ml_bv_linfo_perstaprof_stainfo_dtiminfo) +
+		      WLAN_ML_BSSPARAMCHNGCNT_SIZE;
+
+		if (mlo_get_tsf_sync_support())
+			len += WLAN_TIMESTAMP_LEN;
+
 		*sta_data = len;
 
 		/* STA Info Length */
