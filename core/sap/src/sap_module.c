@@ -1324,6 +1324,7 @@ wlansap_5g_original_bw_validate(
 	enum phy_ch_width ch_width)
 {
 	if (sap_context->csa_reason != CSA_REASON_USER_INITIATED &&
+	    sap_context->csa_reason != CSA_REASON_PRE_CAC_SUCCESS &&
 	    WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
 	    ch_width >= CH_WIDTH_160MHZ &&
 	    sap_context->ch_width_orig < CH_WIDTH_160MHZ)
