@@ -2212,7 +2212,8 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	mutex_lock(&dev->ieee80211_ptr->mtx);
-	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS) {
+	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS &&
+	    wlan_vdev_is_restart_progress(vdev) != QDF_STATUS_SUCCESS) {
 		hdd_debug("Vdev %d mode %d not UP", vdev_id,
 			  adapter->device_mode);
 		goto exit;
