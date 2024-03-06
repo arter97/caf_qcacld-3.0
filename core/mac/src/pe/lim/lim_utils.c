@@ -4977,7 +4977,7 @@ bool lim_check_vht_op_mode_change(struct mac_context *mac,
 	csa_param->new_ch_freq_seg2 = ch_params.center_freq_seg1;
 	qdf_copy_macaddr(&csa_param->bssid,
 			 (struct qdf_mac_addr *)pe_session->bssId);
-	lim_handle_sta_csa_param(mac, csa_param);
+	lim_handle_sta_csa_param(mac, csa_param, false);
 
 	return true;
 }
