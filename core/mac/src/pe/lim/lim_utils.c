@@ -10582,8 +10582,11 @@ void lim_apply_puncture(struct mac_context *mac,
 {
 	uint16_t puncture_bitmap;
 
-	puncture_bitmap =
-		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+	if (mlme_is_chan_switch_in_progress(session->vdev))
+		puncture_bitmap = session->gLimChannelSwitch.puncture_bitmap;
+	else
+		puncture_bitmap =
+			*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
 
 	if (puncture_bitmap) {
 		pe_debug("Apply puncture to reg: bitmap 0x%x, freq: %d, bw %d, mhz_freq_seg1: %d",
@@ -10599,7 +10602,6 @@ void lim_apply_puncture(struct mac_context *mac,
 	}
 }
 
-static
 void lim_remove_puncture(struct mac_context *mac,
 			 struct pe_session *session)
 {
@@ -10621,11 +10623,6 @@ void lim_apply_puncture(struct mac_context *mac,
 {
 }
 
-static inline
-void lim_remove_puncture(struct mac_context *mac,
-			 struct pe_session *session)
-{
-}
 #endif
 
 QDF_STATUS lim_ap_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
@@ -11056,6 +11053,8 @@ static void lim_update_ap_puncture(struct pe_session *session,
 		session->eht_op.disabled_sub_chan_bitmap_present = true;
 		pe_debug("vdev %d, puncture %d", session->vdev_id,
 			 ch_params->reg_punc_bitmap);
+	} else if (session->eht_op.disabled_sub_chan_bitmap_present) {
+		session->eht_op.disabled_sub_chan_bitmap_present = false;
 	}
 }
 
@@ -11118,8 +11117,8 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 		if (ch_params.mhz_freq_seg0 ==  session->curr_op_freq - 10)
 			sec_chan_freq = session->curr_op_freq - 20;
 	}
-	if (LIM_IS_AP_ROLE(session) &&
-	    !mlme_is_chan_switch_in_progress(mlme_obj->vdev))
+
+	if (LIM_IS_AP_ROLE(session))
 		lim_apply_puncture(mac, session, ch_params.mhz_freq_seg1);
 
 	if (LIM_IS_STA_ROLE(session))
@@ -11767,6 +11766,23 @@ next:
 	}
 
 	return NULL;
+}
+
+uint8_t lim_convert_phy_chwidth_to_vht_chwidth(enum phy_ch_width ch_width)
+{
+	switch (ch_width) {
+	case CH_WIDTH_80P80MHZ:
+		return WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
+	case CH_WIDTH_320MHZ:
+	case CH_WIDTH_160MHZ:
+		return WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+	case CH_WIDTH_80MHZ:
+		return WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	case CH_WIDTH_40MHZ:
+	case CH_WIDTH_20MHZ:
+	default:
+		return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+	}
 }
 
 void

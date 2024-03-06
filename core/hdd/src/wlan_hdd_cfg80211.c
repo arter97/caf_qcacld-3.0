@@ -30014,6 +30014,28 @@ wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
 #endif
 
 #ifdef CHANNEL_SWITCH_SUPPORTED
+#if defined(NL80211_EXT_FEATURE_PUNCT_SUPPORT) && \
+			defined(CFG80211_RU_PUNC_CHANDEF)
+static inline uint16_t
+wlan_hdd_cfg80211_get_csa_punct_bitmap(struct cfg80211_csa_settings *csa_params)
+{
+	return csa_params->chandef.punctured;
+}
+#elif defined(NL80211_EXT_FEATURE_PUNCT_SUPPORT) && \
+			defined(CFG80211_RU_PUNCT_NOTIFY)
+static inline uint16_t
+wlan_hdd_cfg80211_get_csa_punct_bitmap(struct cfg80211_csa_settings *csa_params)
+{
+	return csa_params->punct_bitmap;
+}
+#else
+static inline uint16_t
+wlan_hdd_cfg80211_get_csa_punct_bitmap(struct cfg80211_csa_settings *csa_params)
+{
+	return NO_SCHANS_PUNC;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_channel_switch()- function to switch
  * channel in SAP/GO
@@ -30031,12 +30053,12 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
-	int ret;
+	int ret, link_id;
 	enum phy_ch_width ch_width;
 	bool status;
 	struct hdd_hostapd_state *hostapd_state;
 	struct wlan_hdd_link_info *link_info;
-	int link_id;
+	uint16_t csa_punct_bitmap;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -30071,16 +30093,17 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 				    CSA_REASON_USER_INITIATED);
 
 	ch_width = hdd_map_nl_chan_width(csa_params->chandef.width);
-	hdd_debug("Freq %d width %d ch_width %d",
+	csa_punct_bitmap = wlan_hdd_cfg80211_get_csa_punct_bitmap(csa_params);
+	hdd_debug("Freq %d width %d ch_width %d punct_bitmap 0x%x",
 		  csa_params->chandef.chan->center_freq,
-		  csa_params->chandef.width, ch_width);
+		  csa_params->chandef.width, ch_width, csa_punct_bitmap);
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
 
 	ret =
 	hdd_softap_set_channel_change(link_info,
 				      csa_params->chandef.chan->center_freq,
-				      ch_width, false, true);
+				      ch_width, csa_punct_bitmap, false, true);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d",
 			csa_params->chandef.chan->center_freq, ret);

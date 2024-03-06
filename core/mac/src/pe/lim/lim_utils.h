@@ -226,6 +226,32 @@ bool lim_create_peer_idxpool(struct pe_session *pe_session,
  * Return: Void
  */
 void lim_free_peer_idxpool(struct pe_session *pe_session);
+#ifdef WLAN_FEATURE_11BE
+static inline uint16_t lim_get_chan_switch_puncture(struct pe_session *session)
+{
+	return session ? session->gLimChannelSwitch.puncture_bitmap :
+			 NO_SCHANS_PUNC;
+}
+
+static inline void lim_set_chan_switch_puncture(struct pe_session *session,
+						uint16_t punct_bitmap)
+{
+	if (!session)
+		return;
+
+	session->gLimChannelSwitch.puncture_bitmap = punct_bitmap;
+}
+#else
+static inline uint16_t lim_get_chan_switch_puncture(struct pe_session *session)
+{
+	return 0;
+}
+
+static inline void lim_set_chan_switch_puncture(struct pe_session *session,
+						uint16_t punct_bitmap)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
@@ -298,7 +324,23 @@ void lim_strip_mlo_ie(struct mac_context *mac_ctx,
  */
 void lim_set_emlsr_caps(struct mac_context *mac_ctx,
 			struct pe_session *session);
+
+/**
+ * lim_remove_puncture() - Remove the existing puncturing in the regulatory
+ * @mac_ctx: Global mac pointer
+ * @session: PE session of BSS
+ *
+ * Removes the current puncturing bitmap from global regulatory.
+ */
+void lim_remove_puncture(struct mac_context *mac_ctx,
+			 struct pe_session *session);
 #else
+static inline
+void lim_remove_puncture(struct mac_context *mac,
+			 struct pe_session *session)
+{
+}
+
 static inline uint16_t lim_assign_mlo_conn_idx(struct mac_context *mac,
 					       struct pe_session *pe_session,
 					       uint16_t partner_peer_idx)
@@ -3438,6 +3480,17 @@ lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
 				enum QDF_OPMODE opmode,
 				qdf_freq_t start_freq,
 				qdf_freq_t end_freq);
+
+/**
+ * @ch_width: phy channel width
+ *
+ * Convert the current PHY channel width to VHT speicifc BW. 320MHz is not
+ * supported in VHT so return 160MHz for 320MHz input.
+ *
+ * Return: phy chwidth
+ */
+uint8_t
+lim_convert_phy_chwidth_to_vht_chwidth(enum phy_ch_width ch_width);
 
 /**
  * lim_update_cu_flag() - Update cu flag in capability information

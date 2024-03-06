@@ -829,7 +829,7 @@ def_chan:
 				    CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
 
 	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq,
-					    ch_bw, false, true);
+					    ch_bw, NO_SCHANS_PUNC, false, true);
 	if (ret) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");
 		return false;

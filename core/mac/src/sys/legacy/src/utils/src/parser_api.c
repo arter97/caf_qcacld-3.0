@@ -69,6 +69,7 @@
 
 #include <wlan_vdev_mgr_utils_api.h>
 
+#define BW_160 160
 #define RSN_OUI_SIZE 4
 /* ////////////////////////////////////////////////////////////////////// */
 #ifdef WLAN_FEATURE_FILS_SK_SAP
@@ -219,13 +220,28 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 	uint32_t sw_target_freq;
 	uint8_t primary_channel;
 	enum phy_ch_width ch_width;
+	uint16_t punct_bitmap;
+	struct ch_params ch_params = {0};
 
-	ch_width = session_entry->gLimChannelSwitch.ch_width;
-	ch_offset = session_entry->gLimChannelSwitch.sec_ch_offset;
-
-	dot_11_ptr->switch_mode = session_entry->gLimChannelSwitch.switchMode;
 	sw_target_freq = session_entry->gLimChannelSwitch.sw_target_freq;
 	primary_channel = session_entry->gLimChannelSwitch.primaryChannel;
+	punct_bitmap = lim_get_chan_switch_puncture(session_entry);
+	if (punct_bitmap != NO_SCHANS_PUNC) {
+		ch_params.ch_width = session_entry->gLimChannelSwitch.ch_width;
+		wlan_reg_set_non_eht_ch_params(&ch_params, true);
+		wlan_reg_set_input_punc_bitmap(&ch_params, punct_bitmap);
+		wlan_reg_set_channel_params_for_pwrmode(mac_ptr->pdev,
+							sw_target_freq, 0,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
+		ch_width = ch_params.ch_width;
+		ch_offset = ch_params.sec_ch_offset;
+	} else  {
+		ch_width = session_entry->gLimChannelSwitch.ch_width;
+		ch_offset = session_entry->gLimChannelSwitch.sec_ch_offset;
+	}
+
+	dot_11_ptr->switch_mode = session_entry->gLimChannelSwitch.switchMode;
 	dot_11_ptr->new_reg_class =
 		lim_op_class_from_bandwidth(mac_ptr, sw_target_freq, ch_width,
 					    ch_offset);
@@ -567,7 +583,11 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 				    tDot11fIEChannelSwitchWrapper *pDot11f,
 				    struct pe_session *pe_session)
 {
-	uint16_t num_tpe;
+	uint16_t num_tpe, punct_bitmap;
+	qdf_freq_t target_freq;
+	uint8_t ccfs0, ccfs1;
+	enum phy_ch_width ch_width;
+	struct ch_params ch_params = {0};
 	/*
 	 * The new country subelement is present only when
 	 * 1. AP performs Extended Channel switching to new country.
@@ -589,12 +609,31 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	/*
 	 * Add the Wide Channel Bandwidth Sublement.
 	 */
-	pDot11f->WiderBWChanSwitchAnn.newChanWidth =
-		pe_session->gLimWiderBWChannelSwitch.newChanWidth;
-	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq0 =
-		pe_session->gLimWiderBWChannelSwitch.newCenterChanFreq0;
-	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq1 =
-		pe_session->gLimWiderBWChannelSwitch.newCenterChanFreq1;
+
+	target_freq = pe_session->gLimChannelSwitch.sw_target_freq;
+	punct_bitmap = lim_get_chan_switch_puncture(pe_session);
+	if (punct_bitmap != NO_SCHANS_PUNC) {
+		ch_params.ch_width = pe_session->gLimChannelSwitch.ch_width;
+		wlan_reg_set_non_eht_ch_params(&ch_params, true);
+		wlan_reg_set_input_punc_bitmap(&ch_params, punct_bitmap);
+
+		wlan_reg_set_channel_params_for_pwrmode(mac->pdev,
+							target_freq, 0,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
+		ch_width =
+		    lim_convert_phy_chwidth_to_vht_chwidth(ch_params.ch_width);
+		ccfs0 = ch_params.center_freq_seg0;
+		ccfs1 = ch_params.center_freq_seg1;
+	} else {
+		ch_width = pe_session->gLimWiderBWChannelSwitch.newChanWidth;
+		ccfs0 = pe_session->gLimWiderBWChannelSwitch.newCenterChanFreq0;
+		ccfs1 = pe_session->gLimWiderBWChannelSwitch.newCenterChanFreq1;
+	}
+
+	pDot11f->WiderBWChanSwitchAnn.newChanWidth = ch_width;
+	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq0 = ccfs0;
+	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq1 = ccfs1;
 	pDot11f->WiderBWChanSwitchAnn.present = 1;
 
 	/*
@@ -10252,18 +10291,29 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
 					  struct pe_session *session,
 					  tDot11fIEbw_ind_element *bw_ind)
 {
+	uint16_t punct_bitmap;
 	tLimChannelSwitchInfo *ch_switch;
 
 	ch_switch = &session->gLimChannelSwitch;
+	punct_bitmap = lim_get_chan_switch_puncture(session);
+	/*
+	 * Fill BW Indication IE when:
+	 * 1) Any subchannel is punctured and/or
+	 * 2) If the target channel width is more than 160MHz.
+	 */
+	if (punct_bitmap == NO_SCHANS_PUNC &&
+	    wlan_reg_get_bw_value(ch_switch->ch_width) > BW_160)
+		return QDF_STATUS_SUCCESS;
+
 	bw_ind->present = true;
 	bw_ind->channel_width =	wlan_mlme_convert_phy_ch_width_to_eht_op_bw(
 							ch_switch->ch_width);
-	if (ch_switch->puncture_bitmap) {
-		bw_ind->disabled_sub_chan_bitmap_present = 1;
+	if (punct_bitmap) {
+		bw_ind->disabled_sub_chan_bitmap_present = true;
 		bw_ind->disabled_sub_chan_bitmap[0][0] =
-				QDF_GET_BITS(ch_switch->puncture_bitmap, 0, 8);
+					QDF_GET_BITS(punct_bitmap, 0, 8);
 		bw_ind->disabled_sub_chan_bitmap[0][1] =
-				QDF_GET_BITS(ch_switch->puncture_bitmap, 8, 8);
+					QDF_GET_BITS(punct_bitmap, 8, 8);
 	}
 	bw_ind->ccfs0 = ch_switch->ch_center_freq_seg0;
 	bw_ind->ccfs1 = ch_switch->ch_center_freq_seg1;

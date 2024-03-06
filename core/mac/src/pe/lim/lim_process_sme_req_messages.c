@@ -10524,6 +10524,10 @@ lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 	if (!pSirSmeSwitchChInd)
 		return;
 
+	/* Remove the existing puncturing if any */
+	if (LIM_IS_AP_ROLE(session))
+		lim_remove_puncture(mac_ctx, session);
+
 	pSirSmeSwitchChInd->messageType = eWNI_SME_CH_SWITCH_STARTED_NOTIFY;
 	pSirSmeSwitchChInd->length = sizeof(*pSirSmeSwitchChInd);
 	pSirSmeSwitchChInd->sessionId = session->vdev_id;
@@ -10611,6 +10615,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	QDF_STATUS status;
 	enum phy_ch_width ch_width;
 	uint32_t target_ch_freq;
+	uint16_t punct_bitmap;
 	bool is_vdev_ll_lt_sap = false;
 
 	if (!msg_buf) {
@@ -10658,6 +10663,10 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	session_entry->gLimChannelSwitch.ch_width = ch_width;
 	session_entry->gLimChannelSwitch.sec_ch_offset =
 				 dfs_csa_ie_req->ch_params.sec_ch_offset;
+	session_entry->gLimChannelSwitch.ch_center_freq_seg0 =
+				dfs_csa_ie_req->ch_params.center_freq_seg0;
+	session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
+				dfs_csa_ie_req->ch_params.center_freq_seg1;
 
 	is_vdev_ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(
 						mac_ctx->psoc,
@@ -10706,6 +10715,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 			WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 		break;
 	case CH_WIDTH_160MHZ:
+	case CH_WIDTH_320MHZ:
 		session_entry->dfsIncludeChanWrapperIe = true;
 		wider_bw_ch_switch->newChanWidth =
 			WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
@@ -10733,6 +10743,20 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 		pe_err("Invalid Channel Width");
 		break;
 	}
+
+	/* If puncturing pattern is present then Beacon should contain
+	 * Channel Switch Wrapper IE is mandatory as it needs to have
+	 * Bandwidth Indication subelement in this IE
+	 */
+	punct_bitmap =
+		wlan_reg_get_input_punc_bitmap(&dfs_csa_ie_req->ch_params);
+	if (punct_bitmap != NO_SCHANS_PUNC) {
+		session_entry->dfsIncludeChanWrapperIe = true;
+		lim_set_chan_switch_puncture(session_entry, punct_bitmap);
+	} else {
+		lim_set_chan_switch_puncture(session_entry, NO_SCHANS_PUNC);
+	}
+
 	/* Fetch the center channel based on the channel width */
 	wider_bw_ch_switch->newCenterChanFreq0 =
 		dfs_csa_ie_req->ch_params.center_freq_seg0;
