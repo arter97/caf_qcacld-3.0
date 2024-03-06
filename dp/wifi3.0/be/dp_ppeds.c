@@ -260,9 +260,13 @@ static int dp_ppeds_alloc_vp_search_idx_tbl_entry_be(struct dp_soc_be *be_soc,
 
 	/*
 	 * As we already found the current count not maxed out, we should
-	 * always find an non configured entry.
+	 * always find a non configured entry.
 	 */
-	qdf_assert_always(!(i == num_ppe_vp_search_idx_max));
+	if (dp_assert_always_internal(!(i == num_ppe_vp_search_idx_max))) {
+		qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
+		dp_err("Table entry index crosses max allowed");
+		return -ENOSPC;
+	}
 
 	be_soc->ppe_vp_search_idx_tbl[i].is_configured = true;
 	qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
@@ -479,9 +483,13 @@ static int dp_ppeds_alloc_vp_tbl_entry_be(struct dp_soc_be *be_soc,
 
 	/*
 	 * As we already found the current count not maxed out, we should
-	 * always find an non configured entry.
+	 * always find a non configured entry.
 	 */
-	qdf_assert_always(!(i == num_ppe_vp_max));
+	if (dp_assert_always_internal(!(i == num_ppe_vp_max))) {
+		qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
+		dp_err("Table entry index crosses max allowed");
+		return -ENOSPC;
+	}
 
 	be_soc->ppe_vp_tbl[i].is_configured = true;
 	qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
@@ -526,7 +534,11 @@ static int dp_ppeds_alloc_ppe_vp_profile_be(struct dp_soc_be *be_soc,
 	 * As we already found the current count not maxed out, we should
 	 * always find an non configured entry.
 	 */
-	qdf_assert_always(!(i == num_ppe_vp_max));
+	if (!dp_assert_always_internal(!(i == num_ppe_vp_max))) {
+		dp_err("Table entry index crosses max allowed");
+		qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
+		return -ENOSPC;
+	}
 
 	be_soc->ppe_vp_profile[i].is_configured = true;
 	*ppe_vp_profile = &be_soc->ppe_vp_profile[i];
@@ -671,11 +683,6 @@ static void dp_ppeds_tx_desc_reset(void *ctxt, void *elem, void *elem_list)
 		dp_ppeds_tx_desc_free_nolock(soc, tx_desc);
 
 		if (nbuf) {
-			if (!nbuf_list) {
-				dp_err("potential memory leak");
-				qdf_assert_always(0);
-			}
-
 			nbuf->next = *nbuf_list;
 			*nbuf_list = nbuf;
 		}

@@ -358,13 +358,14 @@ dp_rx_flow_find_entry_by_tuple(hal_soc_handle_t hal_soc_hdl,
 
 /**
  * dp_rx_flow_find_entry_by_flowid() - Find DP FSE matching a given flow index
+ * @soc: soc handle
  * @fst: Rx FST Handle
  * @flow_id: Flow index of the requested flow
  *
  * Return: Pointer to the DP FSE entry
  */
 struct dp_rx_fse *
-dp_rx_flow_find_entry_by_flowid(struct dp_rx_fst *fst,
+dp_rx_flow_find_entry_by_flowid(struct dp_soc *soc, struct dp_rx_fst *fst,
 				uint32_t flow_id)
 {
 	struct dp_rx_fse *fse = NULL;
@@ -374,8 +375,11 @@ dp_rx_flow_find_entry_by_flowid(struct dp_rx_fst *fst,
 		return NULL;
 
 	dp_info("flow_idx= %d, flow_addr = %pK", flow_id, fse);
-	qdf_assert_always(fse->flow_id == hal_rx_get_hal_hash(fst->hal_rx_fst,
-							      flow_id));
+	if (dp_assert_always_internal_stat((fse->flow_id ==
+			hal_rx_get_hal_hash(fst->hal_rx_fst, flow_id)),
+			soc, rx.err.invalid_fse_flow_id)) {
+		return NULL;
+	}
 
 	return fse;
 }
@@ -708,7 +712,11 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	/* Delete the FSE in HW FST */
 	status = hal_rx_flow_delete_entry(soc->hal_soc, fst->hal_rx_fst,
 					  fse->hal_rx_fse);
-	qdf_assert_always(status == QDF_STATUS_SUCCESS);
+	if (dp_assert_always_internal_stat((status == QDF_STATUS_SUCCESS),
+				soc, rx.err.hw_fst_del_failed)) {
+		dp_err("RX HW flow delete entry failed");
+		return status;
+	}
 
 	if (fse->svc_id != DP_RX_FLOW_INVALID_SVC_ID) {
 		/* send WDI event */
@@ -756,7 +764,7 @@ QDF_STATUS dp_rx_flow_update_fse_stats(struct dp_pdev *pdev, uint32_t flow_id)
 {
 	struct dp_rx_fse *fse;
 
-	fse = dp_rx_flow_find_entry_by_flowid(pdev->rx_fst, flow_id);
+	fse = dp_rx_flow_find_entry_by_flowid(pdev->soc, pdev->rx_fst, flow_id);
 
 	if (NULL == fse) {
 		dp_err("Flow not found, flow ID %u", flow_id);
@@ -816,7 +824,12 @@ void dp_rx_flow_cache_invalidate_timer_handler(void *ctx)
 
 	fst = pdev->rx_fst;
 
-	qdf_assert_always(fst);
+	if (dp_assert_always_internal_stat(fst,
+			pdev->soc, rx.err.cache_invl_fail_no_fst)) {
+		dp_err("cache invalidate failed");
+		return;
+	}
+
 	is_update_pending = qdf_atomic_read(&fst->is_cache_update_pending);
 	qdf_atomic_set(&fst->is_cache_update_pending, 0);
 
@@ -969,14 +982,15 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 				(void *)pdev,
 				QDF_TIMER_TYPE_SW);
 
-		qdf_assert_always(status == QDF_STATUS_SUCCESS);
+		if (dp_assert_always_internal(status == QDF_STATUS_SUCCESS)) {
+			dp_err("Cache invalidate timer start failed");
+		} else {
+			/* Start the timer */
+			qdf_timer_start(&fst->cache_invalidate_timer,
+					HW_RX_FSE_CACHE_INVALIDATE_DELAYED_FST_SETUP_MS);
 
-		/* Start the timer */
-		qdf_timer_start(
-			&fst->cache_invalidate_timer,
-			HW_RX_FSE_CACHE_INVALIDATE_DELAYED_FST_SETUP_MS);
-
-		qdf_atomic_set(&fst->is_cache_update_pending, false);
+			qdf_atomic_set(&fst->is_cache_update_pending, false);
+		}
 	}
 
 	dp_rx_ppe_fse_register();
@@ -1092,7 +1106,7 @@ QDF_STATUS dp_mon_rx_update_rx_flow_tag_stats(struct dp_pdev *pdev,
 {
 	struct dp_rx_fse *fse;
 
-	fse = dp_rx_flow_find_entry_by_flowid(pdev->rx_fst, flow_id);
+	fse = dp_rx_flow_find_entry_by_flowid(pdev->soc, pdev->rx_fst, flow_id);
 
 	if (!fse) {
 		dp_err("Flow not found, flow ID %u", flow_id);
