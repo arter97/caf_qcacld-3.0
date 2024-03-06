@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -77,6 +77,7 @@ bool ucfg_pre_cac_is_active(struct wlan_objmgr_psoc *psoc);
  * @pdev: pdev object manager
  * @chan_freq: Channel frequency requested by userspace
  * @pre_cac_chan_freq: Pointer to the pre CAC channel frequency storage
+ * @cac_ch_width: bandwidth of channel frequency pre_cac_chan_freq
  *
  * Validates the channel provided by userspace. If user provided channel 0,
  * a valid outdoor channel must be selected from the regulatory channel.
@@ -85,7 +86,8 @@ bool ucfg_pre_cac_is_active(struct wlan_objmgr_psoc *psoc);
  */
 int ucfg_pre_cac_validate_and_get_freq(struct wlan_objmgr_pdev *pdev,
 				       uint32_t chan_freq,
-				       uint32_t *pre_cac_chan_freq);
+				       uint32_t *pre_cac_chan_freq,
+				       enum phy_ch_width cac_ch_width);
 
 #if defined(FEATURE_SAP_COND_CHAN_SWITCH)
 /**
@@ -226,7 +228,8 @@ ucfg_pre_cac_is_active(struct wlan_objmgr_psoc *psoc)
 static inline int
 ucfg_pre_cac_validate_and_get_freq(struct wlan_objmgr_pdev *pdev,
 				   uint32_t chan_freq,
-				   uint32_t *pre_cac_chan_freq)
+				   uint32_t *pre_cac_chan_freq,
+				   enum phy_ch_width cac_ch_width)
 {
 	return 0;
 }
