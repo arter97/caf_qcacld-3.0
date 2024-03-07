@@ -25698,6 +25698,8 @@ static int __wlan_hdd_set_txq_params(struct wiphy *wiphy,
 		[IEEE80211_AC_BE] = QCA_WLAN_AC_BE,
 		[IEEE80211_AC_BK] = QCA_WLAN_AC_BK,
 	};
+	struct wlan_hdd_link_info *link_info;
+	int link_id;
 
 	hdd_enter();
 
@@ -25719,8 +25721,11 @@ static int __wlan_hdd_set_txq_params(struct wiphy *wiphy,
 	txq_edca_params.aci.aci =
 			ieee_ac_to_qca_ac[params->ac];
 
+	link_id = hdd_nb_get_link_id_from_params(params, NB_SET_TXQ);
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+
 	status = sme_update_session_txq_edca_params(mac_handle,
-						    adapter->deflink->vdev_id,
+						    link_info->vdev_id,
 						    &txq_edca_params);
 
 	hdd_exit();
