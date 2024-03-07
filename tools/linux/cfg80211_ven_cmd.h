@@ -147,6 +147,7 @@ enum {
 	IEEE80211_PARAM_RADIO        = 104,    /* radio on/off */
 	IEEE80211_PARAM_NETWORK_SLEEP    = 105,    /* set network sleep enable/disable */
 	IEEE80211_PARAM_DROPUNENC_EAPOL    = 106,
+	IEEE80211_PARAM_ME6_WAR    = 107, /* Enable DMS war */
 
 	/*
 	 * Unassociated power consumpion improve
@@ -1645,6 +1646,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_stafwd",          IEEE80211_PARAM_STA_FORWARD, GET_PARAM, 0},
 	{"mcastenhance",        IEEE80211_PARAM_ME, SET_PARAM, 1},
 	{"g_mcastenhance",      IEEE80211_PARAM_ME, GET_PARAM, 0},
+	{"me6_war",             IEEE80211_PARAM_ME6_WAR, SET_PARAM, 1},
+	{"g_me6_war",           IEEE80211_PARAM_ME6_WAR, GET_PARAM, 0},
 	{"medump_dummy",        95, SET_PARAM, 1},
 	{"medump",              95, GET_PARAM, 0},
 	{"medebug",             96, SET_PARAM, 1},
