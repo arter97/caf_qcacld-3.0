@@ -1883,6 +1883,7 @@ enum wlan_state_ctrl_str_id {
 };
 
 #define MAX_TGT_HW_NAME_LEN 32
+#define HDD_MAX_IFACE_TYPE 2
 
 /**
  * struct hdd_context - hdd shared driver and psoc/device context
@@ -2079,6 +2080,9 @@ enum wlan_state_ctrl_str_id {
  * @more_peer_data: more mlo peer data in peer stats
  * @lpc_info: Local packet capture info
  * @combination: interface combination register to wiphy
+ * @wlan_hdd_akm_suites: Supported AKM suites for various interfaces
+ * @sta_akms: Station mode supported AKMs
+ * @ap_akms: AP mode supported AKMs
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2366,6 +2370,12 @@ struct hdd_context {
 #endif
 
 	struct ieee80211_iface_combination *combination;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)) || \
+	defined(CFG80211_IFTYPE_AKM_SUITES_SUPPORT)
+	struct wiphy_iftype_akm_suites wlan_hdd_akm_suites[HDD_MAX_IFACE_TYPE];
+	uint32_t *sta_akms;
+	uint32_t *ap_akms;
+#endif
 };
 
 /**

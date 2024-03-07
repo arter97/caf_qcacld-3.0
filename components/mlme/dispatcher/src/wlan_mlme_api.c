@@ -3360,10 +3360,13 @@ QDF_STATUS wlan_mlme_get_fils_enabled_info(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
 
-	if (!mlme_obj)
+	if (!mlme_obj) {
+		*value = cfg_get(psoc, CFG_IS_FILS_ENABLED);
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	*value = mlme_obj->cfg.oce.fils_enabled;
+
 	return QDF_STATUS_SUCCESS;
 }
 

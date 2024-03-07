@@ -609,7 +609,7 @@ wlan_hdd_populate_6g_chan_info(struct hdd_context *hdd_ctx, uint32_t index)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)) || \
 	defined(CFG80211_IFTYPE_AKM_SUITES_SUPPORT)
-/*akm suits supported by sta*/
+/* akm suites supported by sta */
 static const u32 hdd_sta_akm_suites[] = {
 	WLAN_AKM_SUITE_8021X,
 	WLAN_AKM_SUITE_PSK,
@@ -622,10 +622,6 @@ static const u32 hdd_sta_akm_suites[] = {
 	WLAN_AKM_SUITE_FT_OVER_SAE,
 	WLAN_AKM_SUITE_EAP_SHA256,
 	WLAN_AKM_SUITE_EAP_SHA384,
-	WLAN_AKM_SUITE_FILS_SHA256,
-	WLAN_AKM_SUITE_FILS_SHA384,
-	WLAN_AKM_SUITE_FT_FILS_SHA256,
-	WLAN_AKM_SUITE_FT_FILS_SHA384,
 	WLAN_AKM_SUITE_OWE,
 	WLAN_AKM_SUITE_DPP_RSN,
 	WLAN_AKM_SUITE_FT_EAP_SHA_384,
@@ -637,30 +633,19 @@ static const u32 hdd_sta_akm_suites[] = {
 	WLAN_AKM_SUITE_FT_SAE_EXT_KEY,
 };
 
-/*akm suits supported by AP*/
+/*  STA FILS AKM suites */
+static const u32 hdd_sta_fils_akm_suites[] = {
+	WLAN_AKM_SUITE_FILS_SHA256,
+	WLAN_AKM_SUITE_FILS_SHA384,
+	WLAN_AKM_SUITE_FT_FILS_SHA256,
+	WLAN_AKM_SUITE_FT_FILS_SHA384,
+};
+
+/* AKM suites supported by AP*/
 static const u32 hdd_ap_akm_suites[] = {
 	WLAN_AKM_SUITE_PSK,
 	WLAN_AKM_SUITE_SAE,
 	WLAN_AKM_SUITE_OWE,
-};
-
-/* This structure contain information what akm suits are
- * supported for each mode
- */
-static const struct wiphy_iftype_akm_suites
-	wlan_hdd_akm_suites[] = {
-	{
-		.iftypes_mask = BIT(NL80211_IFTYPE_STATION) |
-				BIT(NL80211_IFTYPE_P2P_CLIENT),
-		.akm_suites = hdd_sta_akm_suites,
-		.n_akm_suites = (sizeof(hdd_sta_akm_suites) / sizeof(u32)),
-	},
-	{
-		.iftypes_mask = BIT(NL80211_IFTYPE_AP) |
-				BIT(NL80211_IFTYPE_P2P_GO),
-		.akm_suites = hdd_ap_akm_suites,
-		.n_akm_suites = (sizeof(hdd_ap_akm_suites) / sizeof(u32)),
-	},
 };
 #endif
 
@@ -21422,22 +21407,73 @@ static void wlan_hdd_set_nan_secure_mode(struct wiphy *wiphy)
 #endif
 
 /**
- * wlan_hdd_update_akm_suit_info() - Populate akm suits supported by driver
+ * wlan_hdd_update_akm_suite_info() - Populate akm suits supported by driver
  * @wiphy: wiphy
  *
  * Return: void
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)) || \
-	defined(CFG80211_IFTYPE_AKM_SUITES_SUPPORT)
-static void
-wlan_hdd_update_akm_suit_info(struct wiphy *wiphy)
+			defined(CFG80211_IFTYPE_AKM_SUITES_SUPPORT)
+static QDF_STATUS
+wlan_hdd_update_akm_suite_info(struct wiphy *wiphy)
 {
-	wiphy->iftype_akm_suites = wlan_hdd_akm_suites;
-	wiphy->num_iftype_akm_suites = QDF_ARRAY_SIZE(wlan_hdd_akm_suites);
+	bool is_fils_enabled = false;
+	struct wiphy_iftype_akm_suites *akm_suites;
+	uint16_t len;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+
+	akm_suites = &hdd_ctx->wlan_hdd_akm_suites[0];
+
+	/* STA & P2P Client interface info */
+	akm_suites[0].iftypes_mask = BIT(NL80211_IFTYPE_STATION) |
+				     BIT(NL80211_IFTYPE_P2P_CLIENT);
+
+	len = sizeof(hdd_sta_akm_suites);
+
+	is_fils_enabled = cfg_get(hdd_ctx->psoc, CFG_IS_FILS_ENABLED);
+	if (is_fils_enabled)
+		len += sizeof(hdd_sta_fils_akm_suites);
+
+	hdd_ctx->sta_akms = qdf_mem_malloc(len);
+	if (!hdd_ctx->sta_akms)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(hdd_ctx->sta_akms, hdd_sta_akm_suites,
+		     sizeof(hdd_sta_akm_suites));
+
+	if (is_fils_enabled)
+		qdf_mem_copy(hdd_ctx->sta_akms +
+			     QDF_ARRAY_SIZE(hdd_sta_akm_suites),
+			     hdd_sta_fils_akm_suites,
+			     sizeof(hdd_sta_fils_akm_suites));
+
+	akm_suites[0].akm_suites = hdd_ctx->sta_akms;
+	akm_suites[0].n_akm_suites = len / sizeof(u32);
+
+	hdd_ctx->ap_akms = qdf_mem_malloc(sizeof(hdd_ap_akm_suites));
+	if (!hdd_ctx->ap_akms) {
+		qdf_mem_free(hdd_ctx->sta_akms);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(hdd_ctx->ap_akms, hdd_ap_akm_suites,
+		     sizeof(hdd_ap_akm_suites));
+
+	/* SAP & P2P Go interface info */
+	akm_suites[1].iftypes_mask = BIT(NL80211_IFTYPE_AP) |
+				     BIT(NL80211_IFTYPE_P2P_GO);
+	akm_suites[1].akm_suites = hdd_ctx->ap_akms;
+	akm_suites[1].n_akm_suites = sizeof(hdd_ap_akm_suites) / sizeof(u32);
+
+	wiphy->iftype_akm_suites = akm_suites;
+	wiphy->num_iftype_akm_suites =
+		QDF_ARRAY_SIZE(hdd_ctx->wlan_hdd_akm_suites);
+
+	return QDF_STATUS_SUCCESS;
 }
 #else
 static void
-wlan_hdd_update_akm_suit_info(struct wiphy *wiphy)
+wlan_hdd_update_akm_suite_info(struct wiphy *wiphy)
 {
 }
 #endif
@@ -21518,13 +21554,14 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	uint32_t *cipher_suites;
+	QDF_STATUS status;
+
 	hdd_enter();
 
 	/* Now bind the underlying wlan device with wiphy */
 	set_wiphy_dev(wiphy, dev);
 
 	wiphy->mgmt_stypes = wlan_hdd_txrx_stypes;
-	wlan_hdd_update_akm_suit_info(wiphy);
 	wiphy->flags |= WIPHY_FLAG_HAVE_AP_SME
 			| WIPHY_FLAG_AP_PROBE_RESP_OFFLOAD
 			| WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL
@@ -21612,8 +21649,14 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 		qdf_mem_copy(cipher_suites, &hdd_cipher_suites,
 			     sizeof(hdd_cipher_suites));
 	}
+
 	wiphy->cipher_suites = cipher_suites;
 	cipher_suites = NULL;
+
+	status = wlan_hdd_update_akm_suite_info(wiphy);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto mem_fail_akm_suites;
+
 	/*signal strength in mBm (100*dBm) */
 	wiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
 	wiphy->max_remain_on_channel_duration = MAX_REMAIN_ON_CHANNEL_DURATION;
@@ -21655,6 +21698,12 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 	hdd_exit();
 	return 0;
 
+mem_fail_akm_suites:
+	cipher_suites = (uint32_t *)wiphy->cipher_suites;
+	qdf_mem_free(cipher_suites);
+	wiphy->cipher_suites = NULL;
+	wiphy->n_cipher_suites = 0;
+
 mem_fail_cipher_suites:
 	wlan_hdd_iftype_data_mem_free(hdd_ctx);
 mem_fail_iftype_data:
@@ -21666,6 +21715,16 @@ mem_fail_5g:
 	hdd_ctx->channels_2ghz = NULL;
 
 	return -ENOMEM;
+}
+
+static inline
+void hdd_reset_akm_suites(struct hdd_context *hdd_ctx)
+{
+	qdf_mem_free(hdd_ctx->sta_akms);
+	hdd_ctx->sta_akms = NULL;
+
+	qdf_mem_free(hdd_ctx->ap_akms);
+	hdd_ctx->ap_akms = NULL;
 }
 
 /**
@@ -21700,6 +21759,9 @@ void wlan_hdd_cfg80211_deinit(struct wiphy *wiphy)
 	wiphy->n_cipher_suites = 0;
 	qdf_mem_free((uint32_t *)cipher_suites);
 	cipher_suites = NULL;
+
+	hdd_reset_akm_suites(hdd_ctx);
+
 	hdd_reset_global_reg_params();
 }
 
