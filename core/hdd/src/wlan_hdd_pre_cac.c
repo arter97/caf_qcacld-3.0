@@ -392,7 +392,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		goto stop_close_pre_cac_adapter;
 	}
 
-	ret = wlan_hdd_set_channel(link_info, wiphy, dev,
+	ret = wlan_hdd_set_channel(pre_cac_link_info, wiphy, dev,
 				   &chandef, channel_type);
 	if (ret != 0) {
 		hdd_err("failed to set channel");
