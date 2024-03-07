@@ -2030,6 +2030,9 @@ wma_vdev_nss_chain_params_send(uint8_t vdev_id,
 	vdev_user_cfg.num_tx_chains_11a = user_cfg->num_tx_chains_11a;
 	vdev_user_cfg.num_tx_chains_11b = user_cfg->num_tx_chains_11b;
 	vdev_user_cfg.num_tx_chains_11g = user_cfg->num_tx_chains_11g;
+	vdev_user_cfg.fast_chain_selection = user_cfg->fast_chain_selection;
+	vdev_user_cfg.better_chain_rssi_threshold =
+					user_cfg->better_chain_rssi_threshold;
 
 	return wmi_unified_vdev_nss_chain_params_send(wma_handle->wmi_handle,
 						      vdev_id,

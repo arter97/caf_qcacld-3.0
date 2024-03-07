@@ -3447,6 +3447,10 @@ static void mlme_init_nss_chains(struct wlan_objmgr_psoc *psoc,
 	nss_chains->restart_sap_on_dyn_nss_chains_cfg =
 			cfg_get(psoc,
 				CFG_RESTART_SAP_ON_DYNAMIC_NSS_CHAINS_CONFIG);
+	nss_chains->fast_chain_selection =
+				cfg_get(psoc, CFG_FAST_CHAIN_SELECTION_CONFIG);
+	nss_chains->better_chain_rssi_threshold =
+			cfg_get(psoc, CFG_BETTER_CHAIN_RSSI_THRESHOLD_CONFIG);
 }
 
 static void mlme_init_wep_cfg(struct wlan_mlme_wep_cfg *wep_params)

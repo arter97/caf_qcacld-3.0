@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -575,6 +575,48 @@
 				"restart_sap_on_dynamic_nss_chains_config", \
 				0, \
 				"Restart SAP on dynamic nss chain config")
+/*
+ * <ini>
+ * fast_chain_selection - Whether fast chain selection is needed
+ * when TX chain num is 1
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Related: STA.
+ *
+ * Supported Feature: Dynamic chainmask
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_FAST_CHAIN_SELECTION_CONFIG CFG_INI_BOOL( \
+				"FastChainSelection", \
+				0, \
+				"Enable fast chain selection when num Tx chains is 1")
+/*
+ * <ini>
+ * better_chain_rssi_threshold - RSSI delta threshold to determine better chain
+ * @Min: 0
+ * @Max: 10
+ * @Default: 0
+ *
+ * Related: STA.
+ *
+ * Supported Feature: Dynamic chainmask
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_BETTER_CHAIN_RSSI_THRESHOLD_CONFIG CFG_INI_UINT( \
+				"BetterChainRssiThreshold", \
+				0, \
+				10, \
+				0, \
+				CFG_VALUE_OR_DEFAULT, \
+				"RSSI delta threshold to determine better chain")
 
 #define CFG_NSS_CHAINS_ALL \
 	CFG(CFG_NUM_TX_CHAINS_2G) \
@@ -593,7 +635,9 @@
 	CFG(CFG_DISABLE_TX_MRC_5G) \
 	CFG(CFG_DISABLE_RX_MRC_5G) \
 	CFG(CFG_ENABLE_DYNAMIC_NSS_CHAIN_CONFIG) \
-	CFG(CFG_RESTART_SAP_ON_DYNAMIC_NSS_CHAINS_CONFIG)
+	CFG(CFG_RESTART_SAP_ON_DYNAMIC_NSS_CHAINS_CONFIG) \
+	CFG(CFG_FAST_CHAIN_SELECTION_CONFIG) \
+	CFG(CFG_BETTER_CHAIN_RSSI_THRESHOLD_CONFIG)
 
 #endif /* __CFG_MLME_NSS_CHAINS */
 

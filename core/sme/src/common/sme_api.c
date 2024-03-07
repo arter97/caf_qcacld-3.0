@@ -4297,6 +4297,19 @@ static uint8_t sme_get_nss_chain_shift(enum QDF_OPMODE device_mode)
 }
 
 static void
+sme_fill_vdev_chain_ini_params(struct mac_context *mac_ctx,
+			       struct wlan_mlme_nss_chains *vdev_ini_cfg)
+{
+	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
+					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
+
+	vdev_ini_cfg->fast_chain_selection =
+				nss_chains_ini_cfg->fast_chain_selection;
+	vdev_ini_cfg->better_chain_rssi_threshold =
+				nss_chains_ini_cfg->better_chain_rssi_threshold;
+}
+
+static void
 sme_check_nss_chain_ini_param(struct wlan_mlme_nss_chains *vdev_ini_cfg,
 			      uint8_t rf_chains_supported,
 			      enum nss_chains_band_info band)
@@ -4395,7 +4408,6 @@ sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 	 */
 	sme_check_nss_chain_ini_param(vdev_ini_cfg, rf_chains_supported,
 				      band);
-
 }
 
 void sme_populate_nss_chain_params(mac_handle_t mac_handle,
@@ -4410,6 +4422,7 @@ void sme_populate_nss_chain_params(mac_handle_t mac_handle,
 		sme_fill_nss_chain_params(mac_ctx, vdev_ini_cfg,
 					  device_mode, band,
 					  rf_chains_supported);
+	sme_fill_vdev_chain_ini_params(mac_ctx, vdev_ini_cfg);
 }
 
 void
@@ -4851,6 +4864,8 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 
 	status = sme_validate_nss_chains_config(vdev, user_cfg,
 						dynamic_cfg);
+
+	sme_fill_vdev_chain_ini_params(mac_ctx, user_cfg);
 	sme_debug("dynamic_cfg");
 	sme_dump_nss_cfg(dynamic_cfg);
 	sme_debug("user_cfg");

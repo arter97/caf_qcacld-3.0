@@ -1755,6 +1755,8 @@ enum dot11p_mode {
  * @enable_dynamic_nss_chains_cfg:   enable the dynamic nss chain config to FW
  * @restart_sap_on_dyn_nss_chains_cfg: restart SAP on dynamic NSS chains
  * update
+ * @fast_chain_selection:	     enable fast chain selection config to FW
+ * @better_chain_rssi_threshold:     rssi threshold for better chain selection
  */
 struct wlan_mlme_nss_chains {
 	uint32_t num_tx_chains[NSS_CHAINS_BAND_MAX];
@@ -1768,6 +1770,8 @@ struct wlan_mlme_nss_chains {
 	bool disable_tx_mrc[NSS_CHAINS_BAND_MAX];
 	bool enable_dynamic_nss_chains_cfg;
 	bool restart_sap_on_dyn_nss_chains_cfg;
+	bool fast_chain_selection;
+	uint32_t better_chain_rssi_threshold;
 };
 
 /**
