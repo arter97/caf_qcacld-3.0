@@ -813,12 +813,13 @@ static uint32_t hdd_add_prev_connected_bss_ies(
 					struct hdd_station_ctx *hdd_sta_ctx)
 {
 	struct element_info *bcn_ie = &hdd_sta_ctx->conn_info.prev_ap_bcn_ie;
+	int status = 0;
 
 	if (bcn_ie->len) {
 		if (nla_put(skb, BEACON_IES, bcn_ie->len, bcn_ie->ptr)) {
 			hdd_err("Failed to put beacon IEs: bytes left: %d, ie_len: %u ",
 				skb_tailroom(skb), bcn_ie->len);
-			return -EINVAL;
+			status = -EINVAL;
 		}
 
 		hdd_nofl_debug("Beacon IEs len: %u", bcn_ie->len);
@@ -828,7 +829,7 @@ static uint32_t hdd_add_prev_connected_bss_ies(
 		bcn_ie->len = 0;
 	}
 
-	return 0;
+	return status;
 }
 
 /**
