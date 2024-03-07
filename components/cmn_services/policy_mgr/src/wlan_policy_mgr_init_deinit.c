@@ -476,6 +476,21 @@ policy_mgr_deinit_ml_link_update(struct policy_mgr_psoc_priv_obj *pm_ctx)
 }
 #endif
 
+#ifdef FEATURE_FOURTH_CONNECTION
+static void
+policy_mgr_set_next_action_4th_conn_table(struct wlan_objmgr_psoc *psoc)
+{
+	if (policy_mgr_is_hw_dbs_2x2_capable(psoc))
+		next_action_four_connection_table =
+		&pm_next_action_four_connection_dbs_2x2_table;
+}
+#else
+static void
+policy_mgr_set_next_action_4th_conn_table(struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS status;
@@ -614,6 +629,9 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		next_action_three_connection_table =
 		&pm_next_action_three_connection_dbs_1x1_table;
 	}
+
+	policy_mgr_set_next_action_4th_conn_table(psoc);
+
 	policy_mgr_debug("is DBS Capable %d, is SBS Capable %d",
 			 policy_mgr_is_hw_dbs_capable(psoc),
 			 policy_mgr_is_hw_sbs_capable(psoc));
