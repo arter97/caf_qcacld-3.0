@@ -55,6 +55,12 @@ typedef const enum policy_mgr_conc_next_action
 	policy_mgr_next_action_three_connection_table_type
 	[PM_MAX_TWO_CONNECTION_MODE][POLICY_MGR_MAX_BAND];
 
+#ifdef FEATURE_FOURTH_CONNECTION
+typedef const enum policy_mgr_conc_next_action
+	policy_mgr_next_action_four_connection_table_type
+	[PM_MAX_THREE_CONNECTION_MODE][POLICY_MGR_MAX_BAND];
+#endif
+
 #define PM_FW_MODE_STA_STA_BIT_POS       0
 #define PM_FW_MODE_STA_P2P_BIT_POS       1
 
