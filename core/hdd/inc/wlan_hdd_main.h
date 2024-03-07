@@ -2488,6 +2488,16 @@ struct mac_addr_set_priv {
 	qdf_atomic_t pending_rsp_cnt;
 };
 
+/**
+ * struct mlo_ulmu_config: Set ULMU MLO config
+ * @vdev_id: vdev id calculated from link info
+ * @ulmu: ulmu value from command params
+ */
+struct mlo_ulmu_config {
+	uint8_t vdev_id;
+	uint8_t ulmu;
+};
+
 /*
  * Function declarations and documentation
  */

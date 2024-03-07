@@ -11484,21 +11484,98 @@ static int hdd_set_wfc_state(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * hdd_parse_ul_mu_mlo_config() - Parse UL MU command arguments for ML case
+ * @link_info: Link info pointer in HDD adapter
+ * @tb: array of pointer to struct nlattr
+ * @mlo_ulmu_cfg: array of struct mlo_ulmu_config
+ *
+ * Return: num of links on success, negative on failure
+ */
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+static int hdd_parse_ul_mu_mlo_config(struct wlan_hdd_link_info *link_info,
+				      struct nlattr *tb[],
+				      struct mlo_ulmu_config mlo_ulmu_cfg[])
+{
+	struct nlattr *curr_attr = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS];
+	uint8_t num_links = 0, link_id, ulmu;
+	int rem;
+	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
+	struct nlattr *ulmu_attr = NULL, *mlo_link_id = NULL;
+	struct wlan_hdd_link_info *link;
+
+	nla_for_each_nested(curr_attr,
+			    tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS], rem) {
+		if (num_links > WLAN_MAX_LINK_ID) {
+			hdd_debug("invalid link_id:%u", link_id);
+			return -EINVAL;
+		}
+		if (wlan_cfg80211_nla_parse(tb2,
+					    QCA_WLAN_VENDOR_ATTR_CONFIG_MAX,
+					    nla_data(curr_attr),
+					    nla_len(curr_attr),
+					    wlan_hdd_wifi_config_policy)) {
+			hdd_err_rl("nla_parse failed");
+			return -EINVAL;
+		}
+
+		ulmu_attr = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG];
+		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
+
+		if (!ulmu_attr || !mlo_link_id)
+			return 0;
+
+		ulmu = nla_get_u8(ulmu_attr);
+		if (ulmu != QCA_UL_MU_SUSPEND && ulmu != QCA_UL_MU_ENABLE) {
+			hdd_err("Invalid ulmu value: %d", ulmu);
+			return -EINVAL;
+		}
+		link_id = nla_get_u8(mlo_link_id);
+		if (link_id > WLAN_MAX_LINK_ID) {
+			hdd_err("invalid link_id:%u", link_id);
+			return -EINVAL;
+		}
+		mlo_ulmu_cfg[num_links].ulmu = ulmu;
+		link = hdd_get_link_info_by_ieee_link_id(link_info->adapter,
+							 link_id);
+		if (!link) {
+			hdd_err("Invalid link ID: %d", link_id);
+			return -EINVAL;
+		}
+		mlo_ulmu_cfg[num_links].vdev_id = link->vdev_id;
+		num_links++;
+	}
+	return num_links;
+}
+#else
+static int hdd_parse_ul_mu_mlo_config(struct wlan_hdd_link_info *link_info,
+				      struct nlattr *tb[],
+				      struct mlo_ulmu_config mlo_ulmu_cfg[])
+{
+	return 0;
+}
+#endif
+
+/**
  * hdd_set_ul_mu_config() - Configure UL MU i.e suspend/enable
  * @link_info: Link info pointer in HDD adapter
- * @attr: pointer to nla attr
+ * @tb: array of pointer to struct nlattr
  *
  * Return: 0 on success, negative on failure
  */
 
 static int hdd_set_ul_mu_config(struct wlan_hdd_link_info *link_info,
-				const struct nlattr *attr)
+				struct nlattr *tb[])
 {
 	uint8_t ulmu;
 	uint8_t ulmu_disable;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	int errno;
 	QDF_STATUS qdf_status;
+	struct mlo_ulmu_config mlo_ulmu_cfg[WLAN_MAX_LINK_ID + 1] = {0};
+	struct nlattr *curr_attr = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS];
+	struct nlattr *ulmu_attr = NULL;
+	uint8_t i;
+	int8_t num_links = 0;
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno) {
@@ -11506,28 +11583,47 @@ static int hdd_set_ul_mu_config(struct wlan_hdd_link_info *link_info,
 		return errno;
 	}
 
-	ulmu = nla_get_u8(attr);
+	if (!curr_attr)
+		goto skip_mlo_ulmu;
+
+	num_links = hdd_parse_ul_mu_mlo_config(link_info, tb, mlo_ulmu_cfg);
+	if (num_links > 0)
+		goto set_ulmu;
+	else
+		return num_links;
+
+skip_mlo_ulmu:
+
+	ulmu_attr = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG];
+	if (!ulmu_attr)
+		return 0;
+
+	ulmu = nla_get_u8(ulmu_attr);
 	if (ulmu != QCA_UL_MU_SUSPEND && ulmu != QCA_UL_MU_ENABLE) {
 		hdd_err("Invalid ulmu value, ulmu : %d", ulmu);
 		return -EINVAL;
 	}
 
+	mlo_ulmu_cfg[0].ulmu = ulmu;
+	mlo_ulmu_cfg[0].vdev_id = link_info->vdev_id;
 	hdd_debug("UL MU value : %d", ulmu);
+	num_links = 1;
 
-	if (ulmu == QCA_UL_MU_SUSPEND)
-		ulmu_disable = 1;
-	else
-		ulmu_disable = 0;
-
-	qdf_status = ucfg_mlme_set_ul_mu_config(hdd_ctx->psoc,
-						link_info->vdev_id,
-						ulmu_disable);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		errno = -EINVAL;
-		hdd_err("Failed to set UL MU, errno : %d", errno);
+set_ulmu:
+	for (i = 0; i < num_links; i++) {
+		if (mlo_ulmu_cfg[i].ulmu == QCA_UL_MU_SUSPEND)
+			ulmu_disable = 1;
+		else
+			ulmu_disable = 0;
+		qdf_status = ucfg_mlme_set_ul_mu_config(hdd_ctx->psoc,
+							mlo_ulmu_cfg[i].vdev_id,
+							ulmu_disable);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			hdd_err("Failed to set MLO UL MU");
+			return -EINVAL;
+		}
 	}
-
-	return errno;
+	return 0;
 }
 
 /**
@@ -12262,8 +12358,6 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_link_force_active},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EMLSR_MODE_SWITCH,
 	 hdd_set_emlsr_mode},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG,
-	 hdd_set_ul_mu_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_AP_ALLOWED_FREQ_LIST,
 	 hdd_set_master_channel_list},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_TTLM_NEGOTIATION_SUPPORT,
@@ -13204,6 +13298,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_power,
 	hdd_set_channel_width,
 	hdd_config_peer_ampdu,
+	hdd_set_ul_mu_config,
 };
 
 /**
