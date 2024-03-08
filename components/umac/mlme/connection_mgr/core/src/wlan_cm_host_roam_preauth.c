@@ -429,6 +429,7 @@ QDF_STATUS cm_preauth_active(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 
 	cm_ctx->active_cm_id = *cm_id;
 	roam_req = &cm_req->roam_req;
+	cm_update_per_peer_crypto_params_for_roam(cm_ctx->vdev, roam_req);
 
 	status = cm_issue_preauth_req(cm_ctx, roam_req);
 	if (QDF_IS_STATUS_ERROR(status))
