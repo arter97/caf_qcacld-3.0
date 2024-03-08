@@ -31331,7 +31331,8 @@ static void wlan_hdd_print_vendor_t2lm_info(struct wlan_t2lm_info *t2lm)
 {
 	int tid, value = 0;
 
-	hdd_debug("default mapping: %d", t2lm->default_link_mapping);
+	hdd_debug("default mapping: %d direction:%d",
+		  t2lm->default_link_mapping, t2lm->direction);
 
 	if (t2lm->direction == WLAN_T2LM_INVALID_DIRECTION)
 		return;

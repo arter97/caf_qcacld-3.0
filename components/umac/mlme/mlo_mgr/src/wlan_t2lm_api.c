@@ -73,7 +73,7 @@ uint16_t t2lm_get_connected_link_id(struct wlan_objmgr_vdev *vdev)
 
 static
 bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
-				 struct wlan_t2lm_onging_negotiation_info *t2lm,
+				 struct wlan_t2lm_onging_negotiation_info *t2lm_req,
 				 enum wlan_t2lm_direction *valid_dir)
 {
 	uint8_t i, tid = 0;
@@ -86,12 +86,13 @@ bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
 
 	/* Check if the configured hw_link_id map is valid */
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
-		if (t2lm->t2lm_info[dir].direction ==
+		if (t2lm_req->t2lm_info[dir].direction ==
 		    WLAN_T2LM_INVALID_DIRECTION)
 			continue;
 
-		if (t2lm->t2lm_info[dir].default_link_mapping &&
-		    t2lm->t2lm_info[dir].direction == WLAN_T2LM_BIDI_DIRECTION) {
+		if (t2lm_req->t2lm_info[dir].default_link_mapping &&
+		    t2lm_req->t2lm_info[dir].direction ==
+					WLAN_T2LM_BIDI_DIRECTION) {
 			is_valid_link_mask = true;
 			*valid_dir = dir;
 			continue;
@@ -99,7 +100,7 @@ bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
 
 		for (tid = 0; tid < T2LM_MAX_NUM_TIDS; tid++) {
 			provisioned_links =
-				t2lm->t2lm_info[dir].ieee_link_map_tid[tid];
+				t2lm_req->t2lm_info[dir].ieee_link_map_tid[tid];
 
 			for (i = 0; i < WLAN_T2LM_MAX_NUM_LINKS; i++) {
 				if (!(provisioned_links & BIT(i)))
@@ -135,17 +136,81 @@ t2lm_gen_dialog_token(struct wlan_mlo_peer_t2lm_policy *t2lm_policy)
 	return t2lm_policy->self_gen_dialog_token;
 }
 
+QDF_STATUS ttlm_valid_n_copy_for_rx_req(struct wlan_objmgr_vdev *vdev,
+					struct wlan_objmgr_peer *peer,
+					struct wlan_t2lm_onging_negotiation_info *t2lm_req)
+{
+	enum wlan_t2lm_direction dir = WLAN_T2LM_MAX_DIRECTION;
+	bool valid_map = false;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_mlo_peer_context *ml_peer;
+	struct wlan_t2lm_info *t2lm;
+
+	ml_peer = peer->mlo_peer_ctx;
+	if (!ml_peer)
+		return QDF_STATUS_E_FAILURE;
+
+	/*
+	 * Check if ML vdevs are connected and link id matches with T2LM
+	 * negotiation action request link id
+	 */
+	valid_map = t2lm_is_valid_t2lm_link_map(vdev, t2lm_req, &dir);
+	if (!valid_map) {
+		t2lm_err("reject t2lm conf");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	t2lm_debug("Link match found, accept t2lm conf dir:%d", dir);
+
+	if (t2lm_req->t2lm_info[dir].direction != WLAN_T2LM_INVALID_DIRECTION) {
+		wlan_t2lm_clear_peer_negotiation(peer);
+		/* Apply T2LM config to peer T2LM ctx */
+		t2lm = &ml_peer->t2lm_policy.t2lm_negotiated_info.t2lm_info[dir];
+		qdf_mem_copy(t2lm, &t2lm_req->t2lm_info[dir],
+			     sizeof(struct wlan_t2lm_info));
+	}
+
+	wlan_connectivity_t2lm_req_resp_event(
+				vdev, t2lm_req->dialog_token, 0, 0,
+				wlan_vdev_mlme_get_bss_chan(vdev)->ch_freq,
+				true, WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
+
+	return status;
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO_TTLM
+static QDF_STATUS
+ttlm_handle_rx_req_in_sm(struct wlan_objmgr_vdev *vdev,
+			 struct wlan_objmgr_peer *peer,
+			 struct wlan_t2lm_onging_negotiation_info *t2lm_req)
+{
+	struct wlan_mlo_peer_context *ml_peer;
+
+	ml_peer = peer->mlo_peer_ctx;
+	if (!ml_peer)
+		return QDF_STATUS_E_FAILURE;
+
+	return ttlm_sm_deliver_event(ml_peer, WLAN_TTLM_SM_EV_RX_ACTION_REQ,
+				     sizeof(struct wlan_t2lm_onging_negotiation_info),
+				     t2lm_req);
+}
+#else
+static QDF_STATUS
+ttlm_handle_rx_req_in_sm(struct wlan_objmgr_vdev *vdev,
+			 struct wlan_objmgr_peer *peer,
+			 struct wlan_t2lm_onging_negotiation_info *t2lm_req)
+{
+	return ttlm_valid_n_copy_for_rx_req(vdev, peer, t2lm_req);
+}
+#endif
+
 QDF_STATUS t2lm_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 			      struct wlan_objmgr_peer *peer,
 			      void *event_data, uint32_t frame_len,
 			      uint8_t *token)
 {
 	struct wlan_t2lm_onging_negotiation_info t2lm_req = {0};
-	struct wlan_t2lm_info *t2lm_info;
-	enum wlan_t2lm_direction dir = WLAN_T2LM_MAX_DIRECTION;
-	bool valid_map = false;
 	QDF_STATUS status;
-	struct wlan_mlo_peer_context *ml_peer;
 	struct wlan_objmgr_psoc *psoc;
 
 	if (!vdev)
@@ -160,10 +225,6 @@ QDF_STATUS t2lm_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
-	ml_peer = peer->mlo_peer_ctx;
-	if (!ml_peer)
-		return QDF_STATUS_E_FAILURE;
-
 	status = wlan_mlo_parse_t2lm_action_frame(&t2lm_req, event_data,
 						  frame_len,
 						  WLAN_T2LM_CATEGORY_REQUEST);
@@ -172,38 +233,9 @@ QDF_STATUS t2lm_handle_rx_req(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	/*
-	 * Check if ML vdevs are connected and link id matches with T2LM
-	 * negotiation action request link id
-	 */
-	valid_map = t2lm_is_valid_t2lm_link_map(vdev, &t2lm_req, &dir);
-	if (valid_map) {
-		mlme_debug("Link match found,accept t2lm conf");
-		status = QDF_STATUS_SUCCESS;
-	} else {
-		status = QDF_STATUS_E_FAILURE;
-		mlme_err("reject t2lm conf");
-	}
-
-	if (dir >= WLAN_T2LM_MAX_DIRECTION) {
-		mlme_err("Received T2LM IE has invalid direction");
-		status = QDF_STATUS_E_INVAL;
-	}
-
-	if (QDF_IS_STATUS_SUCCESS(status) &&
-	    t2lm_req.t2lm_info[dir].direction != WLAN_T2LM_INVALID_DIRECTION) {
-		wlan_t2lm_clear_peer_negotiation(peer);
-		/* Apply T2LM config to peer T2LM ctx */
-		t2lm_info = &ml_peer->t2lm_policy.t2lm_negotiated_info.t2lm_info[dir];
-		qdf_mem_copy(t2lm_info, &t2lm_req.t2lm_info[dir],
-			     sizeof(struct wlan_t2lm_info));
-	}
+	status = ttlm_handle_rx_req_in_sm(vdev, peer, &t2lm_req);
 
 	*token = t2lm_req.dialog_token;
-	wlan_connectivity_t2lm_req_resp_event(
-			vdev, *token, 0, 0,
-			wlan_vdev_mlme_get_bss_chan(vdev)->ch_freq,
-			true, WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
 
 	return status;
 }

@@ -1557,6 +1557,20 @@ lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_send_ttlm_action_rsp_frame() - Send TTLM Action response frame
+ * @token: TTLM dialog token
+ * @status_code: TTLM response status code
+ * @peer_mac: Peer mac address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+lim_send_ttlm_action_rsp_frame(uint8_t token,
+			       enum wlan_t2lm_resp_frm_type status_code,
+			       tSirMacAddr peer_mac);
+#endif
 /**
  * lim_process_join_failure_timeout() - This function is called to process
  * JoinFailureTimeout

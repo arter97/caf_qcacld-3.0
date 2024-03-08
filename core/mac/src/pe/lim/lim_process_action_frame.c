@@ -1721,6 +1721,46 @@ error:
 	return;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#ifdef WLAN_FEATURE_11BE_MLO_TTLM
+static void
+lim_prepare_n_send_ttlm_action_rsp_frame(struct wlan_objmgr_peer *peer,
+					 uint8_t token,
+					 enum wlan_t2lm_resp_frm_type status_code,
+					 tSirMacAddr peer_mac)
+{
+	struct ttlm_rsp_info ttlm_rsp_info = {0};
+
+	if (!peer || !peer->mlo_peer_ctx)
+		return;
+
+	ttlm_rsp_info.token = token;
+	ttlm_rsp_info.t2lm_resp_type = status_code;
+	qdf_mem_copy(&ttlm_rsp_info.dest_addr, peer_mac, QDF_MAC_ADDR_SIZE);
+
+	ttlm_sm_deliver_event(peer->mlo_peer_ctx, WLAN_TTLM_SM_EV_TX_ACTION_RSP,
+			      sizeof(struct ttlm_rsp_info), &ttlm_rsp_info);
+}
+#else
+static void
+lim_prepare_n_send_ttlm_action_rsp_frame(struct wlan_objmgr_peer *peer,
+					 uint8_t token,
+					 enum wlan_t2lm_resp_frm_type status_code,
+					 tSirMacAddr peer_mac)
+{
+	lim_send_ttlm_action_rsp_frame(token, status_code, peer_mac);
+}
+#endif
+#else
+static inline void
+lim_prepare_n_send_ttlm_action_rsp_frame(struct wlan_objmgr_peer *peer,
+					 uint8_t token,
+					 enum wlan_t2lm_resp_frm_type status_code,
+					 tSirMacAddr peer_mac)
+{
+}
+#endif
+
 /**
  * lim_process_action_frame() - to process action frames
  * @mac_ctx: Pointer to Global MAC structure
@@ -2216,19 +2256,14 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 				status_code =
 				WLAN_T2LM_RESP_TYPE_DENIED_TID_TO_LINK_MAPPING;
 
-			if (status == QDF_STATUS_E_NOSUPPORT)
+			if (status == QDF_STATUS_E_NOSUPPORT) {
 				pe_err("STA does not support T2LM drop frame");
-			else if (lim_send_t2lm_action_rsp_frame(
-					mac_ctx, mac_hdr->sa, session, token,
-					status_code) != QDF_STATUS_SUCCESS) {
-				pe_err("T2LM action response frame not sent");
-			} else {
-				wlan_send_peer_level_tid_to_link_mapping(
-								session->vdev,
-								peer);
-				wlan_connectivity_t2lm_status_event(
-								session->vdev);
+				break;
 			}
+			lim_prepare_n_send_ttlm_action_rsp_frame(peer,
+								 token,
+								 status_code,
+								 mac_hdr->sa);
 			break;
 		case EHT_T2LM_RESPONSE:
 			wlan_t2lm_deliver_event(session->vdev, peer,

@@ -62,6 +62,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_t2lm_api.h"
 #include "wlan_connectivity_logging.h"
+#include "wlan_mlo_mgr_ap.h"
 
 /**
  *
@@ -7338,6 +7339,67 @@ lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
 error_t2lm_req:
 	cds_packet_free((void *)pkt_ptr);
 	return qdf_status;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS
+lim_send_ttlm_action_rsp_frame(uint8_t token,
+			       enum wlan_t2lm_resp_frm_type status_code,
+			       tSirMacAddr peer_mac)
+{
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+	struct wlan_mlo_peer_context *ml_peer;
+	uint8_t vdev_id = 0;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_peer *peer;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc, peer_mac,
+					   WLAN_LEGACY_MAC_ID);
+	if (!peer) {
+		pe_err("Peer is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ml_peer = peer->mlo_peer_ctx;
+	if (!ml_peer) {
+		status = QDF_STATUS_E_FAILURE;
+		goto peer_release;
+	}
+
+	vdev = mlo_get_first_vdev_by_ml_peer(ml_peer);
+	if (!vdev) {
+		status = QDF_STATUS_E_FAILURE;
+		goto peer_release;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("session not found for given vdev_id %d", vdev_id);
+		goto vdev_release;
+	}
+
+	if (lim_send_t2lm_action_rsp_frame(mac_ctx, peer_mac, session, token,
+					   status_code) != QDF_STATUS_SUCCESS) {
+		pe_err("T2LM action response frame not sent");
+	} else {
+		wlan_send_peer_level_tid_to_link_mapping(vdev, peer);
+		wlan_connectivity_t2lm_status_event(vdev);
+	}
+
+vdev_release:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+peer_release:
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+
+	return status;
 }
 #endif
 

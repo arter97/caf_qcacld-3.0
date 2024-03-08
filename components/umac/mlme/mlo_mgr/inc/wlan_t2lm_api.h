@@ -86,6 +86,17 @@ QDF_STATUS t2lm_deliver_event(struct wlan_objmgr_vdev *vdev,
 			      uint8_t *dialog_token);
 
 /**
+ * ttlm_valid_n_copy_for_rx_req() - valid and copy TTLM info for RX req
+ * @vdev: Vdev object
+ * @peer: peer object
+ * @t2lm_req: Ongoing T2LM req info
+ *
+ * return QDF_STATUS
+ */
+QDF_STATUS ttlm_valid_n_copy_for_rx_req(struct wlan_objmgr_vdev *vdev,
+					struct wlan_objmgr_peer *peer,
+					struct wlan_t2lm_onging_negotiation_info *t2lm_req);
+/**
  * t2lm_handle_rx_req - Handler for parsing T2LM action frame
  * @vdev: vdev pointer
  * @peer: pointer to peer
@@ -295,6 +306,14 @@ static inline QDF_STATUS wlan_update_t2lm_mapping(
 static inline QDF_STATUS
 wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 				      struct mlo_link_disable_request_evt_params *params)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+ttlm_valid_n_copy_for_rx_req(struct wlan_objmgr_vdev *vdev,
+			     struct wlan_objmgr_peer *peer,
+			     struct wlan_t2lm_onging_negotiation_info *t2lm_req)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
