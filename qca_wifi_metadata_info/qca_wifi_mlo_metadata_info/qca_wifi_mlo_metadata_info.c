@@ -31,6 +31,39 @@ void qca_mlo_metadata_set_primary_link_id(uint32_t *key, uint8_t link_id)
 	*key |= (link_id << MLO_METADATA_LINK_ID_SHIFT);
 }
 
+static inline
+uint8_t qca_mlo_get_ds_node_id(osif_dev *osdev)
+{
+	wlan_if_t vap = NULL;
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	osif_peer_dev *osifp;
+	osif_dev *osif_parent = NULL;
+#endif
+	switch (osdev->dev_type) {
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	case OSIF_NETDEV_TYPE_WDS_EXT:
+		osifp = (osif_peer_dev *)(osdev);
+		osif_parent = osif_wds_ext_get_parent_osif(osifp);
+		if (!osif_parent)
+			return MLO_METADATA_INVALID_DS_NODE_ID;
+
+		vap = osif_parent->os_if;
+		break;
+#endif
+	case OSIF_NETDEV_TYPE_VAP:
+		vap = osdev->os_if;
+		break;
+	}
+
+	if (!vap)
+		return MLO_METADATA_INVALID_DS_NODE_ID;
+
+	if (vap->cp.icp_flags & IEEE80211_PPE_VP_DS_ACCEL)
+		return osdev->mlo_link_id;
+
+	return MLO_METADATA_INVALID_DS_NODE_ID;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 uint32_t qca_mlo_get_mark_metadata(struct qca_mlo_metadata_param *mlo_param)
 {
@@ -38,7 +71,6 @@ uint32_t qca_mlo_get_mark_metadata(struct qca_mlo_metadata_param *mlo_param)
 	uint8_t *dest_mac = mlo_param->in_dest_mac;
 	struct osif_mldev *mldev = NULL;
 	osif_dev  *osdev = NULL;
-	wlan_if_t vap = NULL;
 	uint32_t mlo_key = 0;
 
 	/* only when DS is enabled valid node id will be updated */
@@ -60,6 +92,9 @@ uint32_t qca_mlo_get_mark_metadata(struct qca_mlo_metadata_param *mlo_param)
 
 	if (mldev->dev_type != OSIF_NETDEV_TYPE_MLO) {
 		qdf_err("dest_dev is not a mlo dev %s", dest_dev->name);
+		/* for non mlo vaps return the valid DS node id */
+		mlo_param->out_ppe_ds_node_id =
+				qca_mlo_get_ds_node_id((osif_dev *)mldev);
 		return mlo_key;
 	}
 
@@ -74,16 +109,9 @@ uint32_t qca_mlo_get_mark_metadata(struct qca_mlo_metadata_param *mlo_param)
 		return mlo_key;
 	}
 
-	vap = osdev->os_if;
-	if (!vap) {
-		qdf_err("vap is NULL dev = %s, mac =" QDF_MAC_ADDR_FMT,
-			dest_dev->name, QDF_MAC_ADDR_REF(dest_mac));
-		return mlo_key;
-	}
 
-	if (vap->cp.icp_flags & IEEE80211_PPE_VP_DS_ACCEL)
-		mlo_param->out_ppe_ds_node_id = osdev->mlo_link_id;
-
+	mlo_param->out_ppe_ds_node_id =
+			qca_mlo_get_ds_node_id(osdev);
 	qca_mlo_metadata_set_primary_link_id(&mlo_key, osdev->mlo_link_id);
 	qca_mlo_metadata_set_tag(&mlo_key);
 	return mlo_key;
