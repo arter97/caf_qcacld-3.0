@@ -248,17 +248,8 @@ tdls_remove_first_idle_peer(qdf_list_t *head) {
 	return QDF_STATUS_E_INVAL;
 }
 
-/**
- * tdls_add_peer() - add TDLS peer in TDLS vdev object
- * @vdev_obj: TDLS vdev object
- * @macaddr: MAC address of peer
- *
- * Allocate memory for the new peer, and add it to hash table.
- *
- * Return: new added TDLS peer, NULL if failed.
- */
-static struct tdls_peer *tdls_add_peer(struct tdls_vdev_priv_obj *vdev_obj,
-				       const uint8_t *macaddr)
+struct tdls_peer *tdls_add_peer(struct tdls_vdev_priv_obj *vdev_obj,
+				const uint8_t *macaddr)
 {
 	struct tdls_peer *peer;
 	struct tdls_soc_priv_obj *soc_obj;
