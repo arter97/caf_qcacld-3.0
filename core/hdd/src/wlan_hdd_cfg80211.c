@@ -3970,6 +3970,12 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	if (ret)
 		return ret;
 
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		hdd_err("ignore do_acs because sap is started, vdev %d",
+			link_info->vdev_id);
+		return -EINVAL;
+	}
+
 	ucfg_mlme_get_sap_force_11n_for_11ac(hdd_ctx->psoc,
 					     &sap_force_11n_for_11ac);
 	ucfg_mlme_get_go_force_11n_for_11ac(hdd_ctx->psoc,
