@@ -8646,6 +8646,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL] = {
+		.type = NLA_U16},
 };
 
 #define WLAN_MAX_LINK_ID 15
@@ -11767,6 +11769,81 @@ hdd_set_coex_traffic_shaping_mode(struct wlan_hdd_link_info *link_info,
 	return ret;
 }
 
+#define STA_KEEPALIVE_INTERVAL_MAX 60
+#define STA_KEEPALIVE_INTERVAL_MIN 5
+
+int hdd_vdev_send_sta_keep_alive_interval(
+				struct wlan_hdd_link_info *link_info,
+				struct hdd_context *hdd_ctx,
+				uint16_t keep_alive_interval)
+{
+	struct keep_alive_req request;
+
+	qdf_mem_zero(&request, sizeof(request));
+
+	request.timePeriod = keep_alive_interval;
+	request.packetType = WLAN_KEEP_ALIVE_NULL_PKT;
+
+	if (QDF_STATUS_SUCCESS !=
+	    sme_set_keep_alive(hdd_ctx->mac_handle, link_info->vdev_id,
+			       &request)) {
+		hdd_err("Failure to execute Keep Alive");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+void wlan_hdd_save_sta_keep_alive_interval(struct hdd_adapter *adapter,
+					   uint16_t keep_alive_interval)
+{
+	adapter->keep_alive_interval = keep_alive_interval;
+}
+
+/**
+ * hdd_vdev_set_sta_keep_alive_interval() - Set sta keep alive interval
+ * @link_info: Link info pointer.
+ * @attr: NL attribute pointer.
+ *
+ * Return: 0 on success, negative on failure.
+ */
+static int hdd_vdev_set_sta_keep_alive_interval(
+				struct wlan_hdd_link_info *link_info,
+				const struct nlattr *attr)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	enum QDF_OPMODE device_mode = link_info->adapter->device_mode;
+	uint16_t keep_alive_interval;
+
+	keep_alive_interval = nla_get_u16(attr);
+	if (keep_alive_interval > STA_KEEPALIVE_INTERVAL_MAX ||
+	    keep_alive_interval < STA_KEEPALIVE_INTERVAL_MIN) {
+		hdd_err("Sta keep alive period: %d is out of range",
+			keep_alive_interval);
+		return -EINVAL;
+	}
+
+	hdd_debug("sta keep alive interval = %u", keep_alive_interval);
+
+	if (device_mode != QDF_STA_MODE) {
+		hdd_debug("This command is not supported for %s device mode",
+			  device_mode_to_string(device_mode));
+		return -EINVAL;
+	}
+
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
+		hdd_debug("Vdev (id %d) not in connected/started state, cannot accept command",
+			  link_info->vdev_id);
+		return -EINVAL;
+	}
+
+	wlan_hdd_save_sta_keep_alive_interval(adapter, keep_alive_interval);
+
+	return hdd_vdev_send_sta_keep_alive_interval(link_info, hdd_ctx,
+						     keep_alive_interval);
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static int hdd_test_config_emlsr_mode(struct hdd_context *hdd_ctx,
 				      bool cfg_val)
@@ -12472,6 +12549,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_coex_traffic_shaping_mode},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT,
 	 hdd_set_btm_support_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL,
+	 hdd_vdev_set_sta_keep_alive_interval},
 };
 
 #ifdef WLAN_FEATURE_ELNA
