@@ -72,6 +72,8 @@
 #define STATS_IF_GET_PEER_RIX(_val) \
 	(((_val) >> STATS_IF_PEER_RIX_OFFSET) & STATS_IF_PEER_RIX_MASK)
 #define STATS_IF_ASYNC_MODE          "async"
+/* Time in seconds for application to loop to receive non-blocking stats event*/
+#define ASYNC_STATS_TIMEOUT 5
 
 static bool g_run_loop;
 static bool g_ipa_mode;
@@ -483,7 +485,7 @@ const char *mu_reception_mode[STATS_IF_TXRX_TYPE_MU_MAX] = {
 };
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static const char *opt_string = "BADarvsdcf:i:l:m:t:RIMh?";
+static const char *opt_string = "BADarvsdcf:i:l:m:t:RIMEh?";
 
 static const struct option long_opts[] = {
 	{ "basic", no_argument, NULL, 'B' },
@@ -503,6 +505,7 @@ static const struct option long_opts[] = {
 	{ "recursive", no_argument, NULL, 'R' },
 	{ "ipa", no_argument, NULL, 'I' },
 	{ "mldlink", no_argument, NULL, 'M' },
+	{ "asyncreq", no_argument, NULL, 'E' },
 	{ "help", no_argument, NULL, 'h' },
 	{ NULL, no_argument, NULL, 0 },
 };
@@ -567,7 +570,7 @@ static void display_help(void)
 {
 	STATS_PRINT("\nwifitelemetry : Displays Statistics of Access Point\n");
 	STATS_PRINT("\nUsage:\n"
-		    "Process Mode: wifitelemetry [Level] [Object] [StatsType] [FeatureName] [[-i interface_name] | [-m StationMACAddress]] [-R] [-I] [-M] [-h | ?]\n"
+		    "Process Mode: wifitelemetry [Level] [Object] [StatsType] [FeatureName] [[-i interface_name] | [-m StationMACAddress]] [-R] [-I] [-M] [-E] [-h | ?]\n"
 		    "Daemon Mode: wifitelemetry async\n"
 		    "    Note: User must run wifitelemetry in background. Excecute another instance in process mode to trigger stats request.\n"
 		    "\n"
@@ -620,6 +623,7 @@ static void display_help(void)
 		    "    -R or --recursive:  Recursive display\n"
 		    "    -I or --ipa is required to get Tx and Rx stats in IPA architecture\n"
 		    "    -M or --mldlink indicates to get link stats for MLD\n"
+		    "    -E or --asyncreq: Asynchronous stats request. It is a non-blocking request where stats data is received asynchronously as an event \n"
 		    "    -h or --help:       Usage display\n");
 }
 
@@ -4066,6 +4070,58 @@ int handle_async_request(int argc, char *argv[])
 	return 0;
 }
 
+bool is_async_timed_out(time_t start_time, time_t curr_time)
+{
+	if (curr_time - start_time >= ASYNC_STATS_TIMEOUT)
+		return true;
+
+	return false;
+}
+
+/**
+ * Returns 0 on success, -EAGAIN if event not received within the timeout
+ * */
+int stats_async_receive(struct reply_buffer *reply)
+{
+	int status = 0;
+	time_t start_time = time(NULL);
+	bool time_out = false;
+
+	do {
+		status = libstats_receive_event(reply);
+		time_out = is_async_timed_out(start_time, time(NULL));
+	} while ((status == -EAGAIN) && !time_out);
+
+	return status;
+}
+int stats_async_request_handle(struct stats_command *cmd,
+			       struct reply_buffer *reply)
+{
+	int status = 0;
+
+	status = libstats_async_event_init();
+	if (status) {
+		STATS_ERR("Async stats initialization fails:%d\n", status);
+		return status;
+	}
+
+	status = libstats_async_send_stats_req(cmd);
+	if (status < 0) {
+		STATS_ERR("Async stats send request fails: %d.\n", status);
+		return status;
+	}
+
+	status = stats_async_receive(reply);
+	if (status) {
+		STATS_ERR("Async stats response is not received: %d.\n", status);
+		return status;
+	}
+
+	libstats_async_event_deinit();
+
+	return status;
+}
+
 int main(int argc, char *argv[])
 {
 	struct stats_command cmd;
@@ -4089,6 +4145,7 @@ int main(int argc, char *argv[])
 	enum stats_peer_type peer_type = STATS_WILD_PEER_TYPE;
 	bool is_mld_link = false;
 	bool recursion_temp = false;
+	bool is_async_req = false;
 	char feat_flags[128] = {'\0'};
 	char ifname_temp[IFNAME_LEN] = {'\0'};
 	char stamacaddr_temp[USER_MAC_ADDR_LEN] = {'\0'};
@@ -4286,6 +4343,9 @@ int main(int argc, char *argv[])
 		case 'R':
 			recursion_temp = true;
 			break;
+		case 'E':
+			is_async_req = true;
+			break;
 		default:
 			STATS_ERR("Unrecognized option\n");
 			display_help();
@@ -4336,19 +4396,32 @@ int main(int argc, char *argv[])
 		return -ENOMEM;
 	}
 	memset(reply, 0, sizeof(struct reply_buffer));
-	cmd.reply = reply;
 
-	ret = libstats_request_handle(&cmd);
+	if (is_async_req) {
+		/* Handling non-blocking stats request */
+		cmd.request_id = 0;
+		ret = stats_async_request_handle(&cmd, reply);
+		if (!ret)
+			print_response(reply);
 
-	/* Print Output */
-	if (!ret)
-		print_response(cmd.reply);
+		libstats_free_reply_buffer_object(reply);
+		free(reply);
+		reply = NULL;
+	} else {
+		cmd.reply = reply;
 
-	/* Cleanup */
-	libstats_free_reply_buffer(&cmd);
-	if (cmd.reply)
-		free(cmd.reply);
-	cmd.reply = NULL;
+		ret = libstats_request_handle(&cmd);
+
+		/* Print Output */
+		if (!ret)
+			print_response(cmd.reply);
+
+		/* Cleanup */
+		libstats_free_reply_buffer(&cmd);
+		if (cmd.reply)
+			free(cmd.reply);
+		cmd.reply = NULL;
+	}
 
 	return 0;
 }
