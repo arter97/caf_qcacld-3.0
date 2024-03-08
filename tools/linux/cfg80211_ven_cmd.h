@@ -904,6 +904,7 @@ enum {
 #ifdef WLAN_FEATURE_11BE_MLO
 	IEEE80211_PARAM_MLO_LINK_REJ_FLAG = 827,
 #endif
+	IEEE80211_PARAM_GTX_ENABLE = 828, /* User config to enable/disable green tx */
 };
 
 enum {
@@ -2699,6 +2700,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"set_tpe_punc_chan_power", IEEE80211_PARAM_TPE_PUNC_PWR, SET_PARAM, 1},
 	{"get_tpe_punc_chan_power", IEEE80211_PARAM_TPE_PUNC_PWR, GET_PARAM, 0},
 #endif
+	{"gtx_enable", IEEE80211_PARAM_GTX_ENABLE, SET_PARAM, 1},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
