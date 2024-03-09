@@ -110,9 +110,6 @@ static void
 dp_lite_mon_reset_config(struct dp_pdev *pdev,
 			 struct dp_lite_mon_config *config)
 {
-	/* free peers */
-	dp_lite_mon_free_peers(pdev, config);
-
 	/* reset config */
 	config->enable = 0;
 	config->level = 0;
@@ -291,6 +288,8 @@ dp_lite_mon_disable_tx(struct dp_pdev *pdev)
 	if (status != QDF_STATUS_SUCCESS)
 		dp_mon_err("Failed to reset tx lite mon filters");
 
+	/*free peer*/
+	dp_lite_mon_free_peers(pdev, &lite_mon_tx_config->tx_config);
 	/* reset tx lite mon config */
 	dp_lite_mon_reset_config(pdev, &lite_mon_tx_config->tx_config);
 	lite_mon_tx_config->subtype_filtering = false;
@@ -329,6 +328,8 @@ dp_lite_mon_disable_rx(struct dp_pdev *pdev)
 	if (status != QDF_STATUS_SUCCESS)
 		dp_mon_err("Failed to reset rx lite mon filters");
 
+	/*free peer*/
+	dp_lite_mon_free_peers(pdev, &lite_mon_rx_config->rx_config);
 	/* reset rx lite mon config */
 	dp_lite_mon_reset_config(pdev, &lite_mon_rx_config->rx_config);
 	qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
