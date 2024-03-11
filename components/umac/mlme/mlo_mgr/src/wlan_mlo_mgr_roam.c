@@ -323,6 +323,25 @@ mlo_mgr_get_link_info_by_self_addr(struct wlan_objmgr_vdev *vdev,
 	return NULL;
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+uint8_t mlo_mgr_num_roam_links(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_cm_connect_resp *reassoc_rsp;
+
+	if (!vdev->mlo_dev_ctx)
+		return 1;
+
+	if (!vdev->mlo_dev_ctx->sta_ctx)
+		return 0;
+
+	reassoc_rsp = vdev->mlo_dev_ctx->sta_ctx->copied_reassoc_rsp;
+	if (!reassoc_rsp || !reassoc_rsp->roaming_info)
+		return 0;
+
+	return reassoc_rsp->roaming_info->num_setup_links;
+}
+#endif
+
 void mlo_mgr_roam_update_ap_link_info(struct wlan_objmgr_vdev *vdev,
 				      struct ml_setup_link_param *src_link_info,
 				      struct wlan_channel *channel)
