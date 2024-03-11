@@ -1172,6 +1172,10 @@ config WLAN_FEATURE_11BE_MLO
 	bool "Enable WLAN_FEATURE_11BE_MLO"
 	default n
 
+config WLAN_FEATURE_PEER_TRANS_HIST
+	bool "Enable Peer transition history"
+	default n
+
 config WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 	bool "Enable WLAN_HDD_MULTI_VDEV_SINGLE_NDEV"
 	default n
