@@ -69,4 +69,17 @@ static size_t quiet_mlo_params_size(
 	return WMI_TLV_HDR_SIZE;
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * send_mu_on_off_cmd_tlv() - send mu on off params to FW
+ * @wmi_handle: WMI handle
+ * @param: structure containing mu on/off info
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+send_mu_on_off_cmd_tlv(wmi_unified_t wmi_handle,
+		       struct wmi_host_mu_on_off_params *param);
+#endif /* WLAN_FEATURE_11BE */
 #endif

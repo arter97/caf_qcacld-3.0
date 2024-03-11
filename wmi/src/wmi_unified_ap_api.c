@@ -607,6 +607,19 @@ wmi_extract_ul_ofdma_trig_rx_peer_userinfo(
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+QDF_STATUS wmi_extract_sched_mode_probe_resp_event(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct wlan_host_sched_mode_probe_resp_event *resp)
+{
+	if (wmi_handle->ops->extract_sched_mode_probe_resp_event)
+		return wmi_handle->ops->extract_sched_mode_probe_resp_event
+			(wmi_handle, evt_buf, resp);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_FEATURE_11BE */
+
 QDF_STATUS wmi_extract_chan_info_event(
 		wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_host_chan_info_event *chan_info)
@@ -1035,6 +1048,19 @@ QDF_STATUS wmi_unified_link_recmnd_info_send(
 	return QDF_STATUS_E_FAILURE;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE
+QDF_STATUS
+wmi_unified_send_mu_on_off_cmd(wmi_unified_t wmi_handle,
+			       struct wmi_host_mu_on_off_params *params)
+{
+	if (wmi_handle->ops->send_mu_on_off_cmd)
+		return wmi_handle->ops->send_mu_on_off_cmd(wmi_handle, params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_FEATURE_11BE */
+
 #ifdef QCA_STANDALONE_SOUNDING_TRIGGER
 QDF_STATUS wmi_unified_txbf_sounding_trig_info_cmd_send(struct wmi_unified *wmi_handle,
 							struct wmi_txbf_sounding_trig_param *sounding_params)

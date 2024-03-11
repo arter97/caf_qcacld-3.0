@@ -2980,6 +2980,38 @@ extract_ul_ofdma_trig_rx_peer_userinfo_tlv(
 }
 #endif /* QCA_MANUAL_TRIGGERED_ULOFDMA */
 
+#ifdef WLAN_FEATURE_11BE
+static QDF_STATUS
+extract_sched_mode_probe_resp_event_tlv(wmi_unified_t wmi_handle,
+					void *evt_buf,
+					struct wlan_host_sched_mode_probe_resp_event *resp_ev)
+{
+	WMI_VDEV_SCHED_MODE_PROBE_RESP_EVENTID_param_tlvs *param_buf;
+	wmi_vdev_sched_mode_probe_resp_fixed_param *ev;
+
+	param_buf = (WMI_VDEV_SCHED_MODE_PROBE_RESP_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		wmi_err("Invalid buf sched mode probe response");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ev = (wmi_vdev_sched_mode_probe_resp_fixed_param *)param_buf->fixed_param;
+	if (!ev) {
+		wmi_err("null ev");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	resp_ev->vdev_id = ev->vdev_id;
+	resp_ev->tput_mbps_on = ev->tput_mbps_on;
+	resp_ev->tput_mbps_off = ev->tput_mbps_off;
+
+	wmi_info("Vdev ID: %d, Tput ON: %d, Tput Off: %d",
+		 ev->vdev_id, ev->tput_mbps_on, ev->tput_mbps_off);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BE */
+
 /**
  * extract_chan_info_event_tlv() - extract chan information from event
  * @wmi_handle: wmi handle
@@ -4646,6 +4678,10 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_wmm_update_cmd = send_wmm_update_cmd_tlv;
 	ops->extract_mgmt_tx_compl_param = extract_mgmt_tx_compl_param_tlv;
 	ops->extract_chan_info_event = extract_chan_info_event_tlv;
+#ifdef WLAN_FEATURE_11BE
+	ops->extract_sched_mode_probe_resp_event =
+		extract_sched_mode_probe_resp_event_tlv;
+#endif /* WLAN_FEATURE_11BE */
 	ops->extract_scan_blanking_params = extract_scan_blanking_params_tlv;
 #ifdef QCA_MANUAL_TRIGGERED_ULOFDMA
 	ops->extract_ulofdma_trigger_feedback_event =
@@ -4713,4 +4749,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_wmi_link_recommendation_cmd =
 		send_wmi_link_recommendation_cmd_tlv;
 #endif
+#ifdef WLAN_FEATURE_11BE
+	ops->send_mu_on_off_cmd = send_mu_on_off_cmd_tlv;
+#endif /* WLAN_FEATURE_11BE */
 }
