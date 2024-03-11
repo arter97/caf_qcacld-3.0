@@ -257,6 +257,7 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 {
 	QDF_STATUS qdf_status;
 	enum wlan_status_code wlan_status;
+	struct qdf_mac_addr *mld_mac;
 
 	if (sub_type == LIM_ASSOC)
 		wlan_status = sir_convert_assoc_req_frame2_struct(mac_ctx,
@@ -279,6 +280,18 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {
 			pe_err("Failed to extract eht cap");
 			return false;
+		}
+
+		/*
+		 * If EHT capability is not present but MLO is parsed
+		 * suceesssfully, remove the ML info from assoc request.
+		 */
+		mld_mac = (struct qdf_mac_addr *)assoc_req->mld_mac;
+		if (!assoc_req->eht_cap.present &&
+		    !qdf_is_macaddr_zero(mld_mac)) {
+			qdf_zero_macaddr(mld_mac);
+			qdf_mem_zero(&assoc_req->mlo_info,
+				     sizeof(assoc_req->mlo_info));
 		}
 
 		return true;

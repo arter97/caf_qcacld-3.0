@@ -197,6 +197,20 @@ static inline QDF_STATUS lim_add_ft_sta_self(struct mac_context *mac,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+static inline bool
+lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
+{
+	return add_sta_params->eht_capable;
+}
+#else
+static inline bool
+lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
+{
+	return false;
+}
+#endif
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 static inline bool lim_is_roam_synch_in_progress(struct wlan_objmgr_psoc *psoc,
 						 struct pe_session *pe_session)

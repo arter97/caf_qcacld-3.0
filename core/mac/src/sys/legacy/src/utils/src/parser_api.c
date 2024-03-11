@@ -4752,6 +4752,11 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 	sir_convert_reassoc_req_frame2_eht_struct(ar, pAssocReq);
 	sir_convert_reassoc_req_frame2_mlo_struct(pFrame, nFrame,
 						  ar, pAssocReq);
+	pe_debug("ht %d vht %d opmode %d vendor vht %d he %d he 6ghband %d eht %d",
+		 ar->HTCaps.present, ar->VHTCaps.present,
+		 ar->OperatingMode.present, ar->vendor_vht_ie.VHTCaps.present,
+		 ar->he_cap.present, ar->he_6ghz_band_cap.present,
+		 ar->eht_cap.present);
 	qdf_mem_free(ar);
 
 	return STATUS_SUCCESS;
