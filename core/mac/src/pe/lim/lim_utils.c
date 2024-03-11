@@ -8311,14 +8311,17 @@ void lim_update_sta_mlo_info(struct pe_session *session,
 			     tpAddStaParams add_sta_params,
 			     tpDphHashNode sta_ds)
 {
-	if (lim_is_mlo_conn(session, sta_ds)) {
+	if (lim_is_add_sta_params_eht_capable(add_sta_params) &&
+	    lim_is_mlo_conn(session, sta_ds)) {
 		WLAN_ADDR_COPY(add_sta_params->mld_mac_addr, sta_ds->mld_addr);
 		add_sta_params->is_assoc_peer = lim_is_mlo_recv_assoc(sta_ds);
+		pe_debug("mld mac " QDF_MAC_ADDR_FMT " assoc peer %d",
+			 QDF_MAC_ADDR_REF(add_sta_params->mld_mac_addr),
+			 add_sta_params->is_assoc_peer);
+		return;
 	}
-	pe_debug("is mlo connection: %d mld mac " QDF_MAC_ADDR_FMT " assoc peer %d",
-		 lim_is_mlo_conn(session, sta_ds),
-		 QDF_MAC_ADDR_REF(add_sta_params->mld_mac_addr),
-		 add_sta_params->is_assoc_peer);
+
+	pe_debug("is not mlo capable");
 }
 
 void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,

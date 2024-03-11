@@ -2216,11 +2216,6 @@ static void lim_add_tdls_sta_6ghz_he_cap(struct mac_context *mac_ctx,
 #endif /* FEATURE_WLAN_TDLS */
 
 #ifdef WLAN_FEATURE_11BE
-static bool lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
-{
-	return add_sta_params->eht_capable;
-}
-
 static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 						  tpSirAssocRsp assoc_rsp)
 {
@@ -2232,11 +2227,6 @@ static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 	return false;
 }
 #else
-static bool lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
-{
-	return false;
-}
-
 static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 						  tpSirAssocRsp assoc_rsp)
 {
