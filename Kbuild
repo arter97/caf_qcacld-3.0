@@ -3347,6 +3347,11 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT
 endif
 
+found = $(shell if grep -qF "bool pcie_switch_attached;" $(WLAN_PLATFORM_INC)/cnss2.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DPCIE_SWITCH_SUPPORT
+endif
+
 ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))
 	ccflags-y += -DWLAN_WEAR_CHIPSET
 endif

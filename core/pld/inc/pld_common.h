@@ -440,6 +440,7 @@ struct pld_dev_mem_info {
  * @device_version: WLAN device version info
  * @dev_mem_info: WLAN device memory info
  * @fw_build_id: Firmware build identifier
+ * @pcie_switch_attached: WLAN attached to PCIe swtich or not
  *
  * pld_soc_info is used to store WLAN SOC information.
  */
@@ -455,6 +456,7 @@ struct pld_soc_info {
 	struct pld_device_version device_version;
 	struct pld_dev_mem_info dev_mem_info[PLD_MAX_DEV_MEM_NUM];
 	char fw_build_id[PLD_WLFW_MAX_BUILD_ID_LEN + 1];
+	bool pcie_switch_attached;
 };
 
 /**

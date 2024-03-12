@@ -19550,6 +19550,9 @@ static int hdd_update_pmo_config(struct hdd_context *hdd_ctx)
 	struct pmo_psoc_cfg psoc_cfg = {0};
 	QDF_STATUS status;
 	enum pmo_wow_enable_type wow_enable;
+#ifdef PCIE_SWITCH_SUPPORT
+	struct pld_soc_info info;
+#endif
 
 	ucfg_pmo_get_psoc_config(hdd_ctx->psoc, &psoc_cfg);
 
@@ -19571,6 +19574,16 @@ static int hdd_update_pmo_config(struct hdd_context *hdd_ctx)
 					     &psoc_cfg.sta_max_li_mod_dtim);
 
 	hdd_lpass_populate_pmo_config(&psoc_cfg, hdd_ctx);
+
+#ifdef PCIE_SWITCH_SUPPORT
+	/* Currently, WOW is not supported if chip is attached to PCIe switch */
+	if(!pld_get_soc_info(hdd_ctx->parent_dev, &info)
+	   && (info.pcie_switch_attached)
+	   && (psoc_cfg.suspend_mode == PMO_SUSPEND_WOW)) {
+		psoc_cfg.suspend_mode = PMO_SUSPEND_SHUTDOWN;
+		hdd_info("Update suspend mode to shutdown");
+	}
+#endif
 
 	status = ucfg_pmo_update_psoc_config(hdd_ctx->psoc, &psoc_cfg);
 	if (QDF_IS_STATUS_ERROR(status))
