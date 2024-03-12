@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -554,6 +554,9 @@ struct cds_config_info *cds_get_ini_config(void);
 bool cds_is_5_mhz_enabled(void);
 bool cds_is_10_mhz_enabled(void);
 bool cds_is_sub_20_mhz_enabled(void);
+QDF_STATUS cds_set_sub_20_support(bool enable);
+QDF_STATUS cds_set_sub_20_channel_width(uint32_t value);
+
 bool cds_is_self_recovery_enabled(void);
 bool cds_is_fw_down(void);
 enum QDF_GLOBAL_MODE cds_get_conparam(void);

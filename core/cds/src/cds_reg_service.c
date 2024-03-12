@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,8 +35,7 @@
 
 uint32_t cds_get_vendor_reg_flags(struct wlan_objmgr_pdev *pdev,
 		qdf_freq_t freq, uint16_t bandwidth,
-		bool is_ht_enabled, bool is_vht_enabled,
-		uint8_t sub_20_channel_width)
+		bool is_ht_enabled, bool is_vht_enabled)
 {
 	uint32_t flags = 0;
 	enum channel_state state;
@@ -143,7 +142,7 @@ uint32_t cds_get_vendor_reg_flags(struct wlan_objmgr_pdev *pdev,
 							bandwidth, 0,
 							REG_CURRENT_PWR_MODE) !=
 		     CHANNEL_STATE_INVALID &&
-		     sub_20_channel_width == WLAN_SUB_20_CH_WIDTH_10)
+		     cds_is_10_mhz_enabled())
 			flags |= IEEE80211_CHAN_HALF;
 		bandwidth = CH_WIDTH_5MHZ;
 		fallthrough;
@@ -153,7 +152,7 @@ uint32_t cds_get_vendor_reg_flags(struct wlan_objmgr_pdev *pdev,
 							bandwidth, 0,
 							REG_CURRENT_PWR_MODE) !=
 		    CHANNEL_STATE_INVALID &&
-		    sub_20_channel_width == WLAN_SUB_20_CH_WIDTH_5)
+		    cds_is_5_mhz_enabled())
 			flags |= IEEE80211_CHAN_QUARTER;
 		break;
 	default:

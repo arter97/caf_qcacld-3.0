@@ -2772,7 +2772,6 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	int ret;
 	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
 	uint32_t temp_band_cap, band_capability;
-	struct cds_config_info *cds_cfg = cds_get_ini_config();
 	uint8_t antenna_mode;
 	uint8_t sub_20_chan_width;
 	QDF_STATUS status;
@@ -2822,23 +2821,23 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	ucfg_ipa_set_dp_handle(hdd_ctx->psoc,
 			       cds_get_context(QDF_MODULE_ID_SOC));
 
-	status = ucfg_mlme_get_sub_20_chan_width(hdd_ctx->psoc,
-						 &sub_20_chan_width);
+	status = cds_set_sub_20_support(cfg->sub_20_support);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to get sub_20_chan_width config");
+		hdd_err("Failed to set sub20MHz channel width support");
 		ret = qdf_status_to_os_return(status);
 		goto pdev_close;
 	}
 
-	if (cds_cfg) {
-		if (sub_20_chan_width !=
-		    WLAN_SUB_20_CH_WIDTH_NONE && !cfg->sub_20_support) {
-			hdd_err("User requested sub 20 MHz channel width but unsupported by FW.");
-			cds_cfg->sub_20_channel_width =
-				WLAN_SUB_20_CH_WIDTH_NONE;
-		} else {
-			cds_cfg->sub_20_channel_width = sub_20_chan_width;
+	if (cfg->sub_20_support) {
+		status = ucfg_mlme_get_sub_20_chan_width(hdd_ctx->psoc,
+							 &sub_20_chan_width);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to get sub20MHz channel width config");
+			ret = qdf_status_to_os_return(status);
+			goto pdev_close;
 		}
+
+		cds_set_sub_20_channel_width(sub_20_chan_width);
 	}
 
 	status = ucfg_mlme_get_band_capability(hdd_ctx->psoc, &band_capability);

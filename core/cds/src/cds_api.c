@@ -2716,11 +2716,12 @@ bool cds_is_5_mhz_enabled(void)
 	if (!p_cds_context)
 		return false;
 
-	if (p_cds_context->cds_cfg)
-		return (p_cds_context->cds_cfg->sub_20_channel_width ==
-						WLAN_SUB_20_CH_WIDTH_5);
+	if (!p_cds_context->cds_cfg)
+		return false;
 
-	return false;
+	return (p_cds_context->cds_cfg->sub_20_support &&
+		p_cds_context->cds_cfg->sub_20_channel_width ==
+		WLAN_SUB_20_CH_WIDTH_5);
 }
 
 /**
@@ -2736,11 +2737,12 @@ bool cds_is_10_mhz_enabled(void)
 	if (!p_cds_context)
 		return false;
 
-	if (p_cds_context->cds_cfg)
-		return (p_cds_context->cds_cfg->sub_20_channel_width ==
-						WLAN_SUB_20_CH_WIDTH_10);
+	if (!p_cds_context->cds_cfg)
+		return false;
 
-	return false;
+	return (p_cds_context->cds_cfg->sub_20_support &&
+		p_cds_context->cds_cfg->sub_20_channel_width ==
+		WLAN_SUB_20_CH_WIDTH_10);
 }
 
 /**
@@ -2756,10 +2758,55 @@ bool cds_is_sub_20_mhz_enabled(void)
 	if (!p_cds_context)
 		return false;
 
-	if (p_cds_context->cds_cfg)
-		return p_cds_context->cds_cfg->sub_20_channel_width;
+	if (!p_cds_context->cds_cfg)
+		return false;
 
-	return false;
+	return (p_cds_context->cds_cfg->sub_20_support &&
+		p_cds_context->cds_cfg->sub_20_channel_width !=
+		WLAN_SUB_20_CH_WIDTH_NONE);
+}
+
+/**
+ * cds_set_sub_20_support() - API to set sub 20 MHz ch width support
+ * @enable: pending sub 20 MHz ch width enable state
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cds_set_sub_20_support(bool enable)
+{
+	struct cds_context *p_cds_context;
+
+	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
+	if (!p_cds_context || !p_cds_context->cds_cfg)
+		return QDF_STATUS_NOT_INITIALIZED;
+
+	p_cds_context->cds_cfg->sub_20_support = enable;
+	cds_debug("sub 20 MHz channel width support: %d", enable);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * cds_set_sub_20_channel_width() - API to set sub 20 MHz ch width
+ * @value: pending sub 20 MHz ch width to set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cds_set_sub_20_channel_width(uint32_t value)
+{
+	struct cds_context *p_cds_context;
+
+	if (value > WLAN_SUB_20_CH_WIDTH_10)
+		return QDF_STATUS_E_INVAL;
+
+	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
+	if (!p_cds_context || !p_cds_context->cds_cfg)
+		return QDF_STATUS_NOT_INITIALIZED;
+
+	if (!p_cds_context->cds_cfg->sub_20_support)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	p_cds_context->cds_cfg->sub_20_channel_width = value;
+	return QDF_STATUS_SUCCESS;
 }
 
 /**

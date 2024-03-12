@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -86,7 +86,8 @@ struct wlan_cds_feature_set {
  * @enable_dp_rx_threads: enable dp rx threads
  * @is_lpass_enabled: Indicate whether LPASS is enabled or not
  * @tx_chain_mask_cck: Tx chain mask enabled or not
- * @sub_20_channel_width: Sub 20 MHz ch width, ini intersected with fw cap
+ * @sub_20_support: Sub 20 MHz channel width support(fw cap)
+ * @sub_20_channel_width: Sub 20 MHz ch width
  * @max_msdus_per_rxinorderind:
  * @self_recovery_enabled:
  * @fw_timeout_crash: Indicate whether crash host when fw timesout or not
@@ -122,6 +123,7 @@ struct cds_config_info {
 #ifdef WLAN_FEATURE_LPSS
 	bool is_lpass_enabled;
 #endif
+	bool sub_20_support;
 	enum cfg_sub_20_channel_width sub_20_channel_width;
 	uint8_t max_msdus_per_rxinorderind;
 	bool self_recovery_enabled;
