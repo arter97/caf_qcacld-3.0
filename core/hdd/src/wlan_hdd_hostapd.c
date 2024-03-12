@@ -907,9 +907,10 @@ static void hdd_clear_all_sta(struct hdd_adapter *adapter)
 	}
 }
 
-static int hdd_stop_bss_link(struct hdd_adapter *adapter)
+static int hdd_stop_bss_link(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter = link_info->adapter;
 	int errno;
 	QDF_STATUS status;
 
@@ -920,16 +921,16 @@ static int hdd_stop_bss_link(struct hdd_adapter *adapter)
 	if (errno)
 		return errno;
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		status = wlansap_stop_bss(
-			WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink));
+			WLAN_HDD_GET_SAP_CTX_PTR(link_info));
 		if (QDF_IS_STATUS_SUCCESS(status))
 			hdd_debug("Deleting SAP/P2P link!!!!!!");
 
-		clear_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
+		clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 					adapter->device_mode,
-					adapter->deflink->vdev_id);
+					link_info->vdev_id);
 		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
 					    false);
 		errno = (status == QDF_STATUS_SUCCESS) ? 0 : -EBUSY;
@@ -2520,7 +2521,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 				hdd_warn("Failed to register BC STA %d",
 				       qdf_status);
-				hdd_stop_bss_link(adapter);
+				hdd_stop_bss_link(link_info);
 			}
 		}
 
@@ -3217,7 +3218,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		return QDF_STATUS_SUCCESS;
 
 	case eSAP_MAC_TRIG_STOP_BSS_EVENT:
-		ret = hdd_stop_bss_link(adapter);
+		ret = hdd_stop_bss_link(link_info);
 		if (ret)
 			hdd_warn("hdd_stop_bss_link failed %d", ret);
 		return QDF_STATUS_SUCCESS;
