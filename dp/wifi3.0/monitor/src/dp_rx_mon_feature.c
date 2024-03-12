@@ -414,11 +414,13 @@ dp_rx_handle_enh_capture(struct dp_soc *soc, struct dp_pdev *pdev,
 {
 	qdf_nbuf_t  mpdu_head;
 	uint32_t user;
+	uint8_t mac_id = 0;
 	qdf_nbuf_queue_t *mpdu_q;
 	struct cdp_rx_indication_mpdu *mpdu_ind;
 	struct cdp_rx_indication_mpdu_info *mpdu_info;
 	struct msdu_list *msdu_list;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_mac *mon_mac = dp_get_mon_mac(pdev, mac_id);
 
 	if (!mon_pdev)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -439,7 +441,7 @@ dp_rx_handle_enh_capture(struct dp_soc *soc, struct dp_pdev *pdev,
 			mpdu_ind = &mon_pdev->mpdu_ind;
 			mpdu_info = &mpdu_ind->mpdu_info;
 			dp_rx_populate_cdp_indication_mpdu_info(
-					pdev, &mon_pdev->ppdu_info,
+					pdev, &mon_mac->ppdu_info,
 					mpdu_info, user);
 
 			while ((mpdu_head = qdf_nbuf_queue_remove(mpdu_q))) {
@@ -613,8 +615,10 @@ dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 	uint32_t rx_enh_capture_peer;
 	bool is_mpdu_hdr = false;
 	uint8_t user_id;
+	uint8_t mac_id = 0;
 	enum dp_mon_filter_action action = DP_MON_FILTER_SET;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_mac *mon_mac = dp_get_mon_mac(pdev, mac_id);
 
 	rx_enh_capture_peer =
 		(val & CDP_RX_ENH_CAPTURE_PEER_MASK)
@@ -644,7 +648,7 @@ dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 	 */
 	if (mon_pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED &&
 	    rx_cap_mode != CDP_RX_ENH_CAPTURE_DISABLED) {
-		mon_pdev->rx_enh_monitor_vdev = mon_pdev->mvdev;
+		mon_pdev->rx_enh_monitor_vdev = mon_mac->mvdev;
 	}
 
 	/*
@@ -655,7 +659,7 @@ dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 
 	if (mon_pdev->rx_enh_capture_mode != CDP_RX_ENH_CAPTURE_DISABLED &&
 	    rx_cap_mode == CDP_RX_ENH_CAPTURE_DISABLED) {
-		mon_pdev->mvdev = mon_pdev->rx_enh_monitor_vdev;
+		mon_mac->mvdev = mon_pdev->rx_enh_monitor_vdev;
 		mon_pdev->rx_enh_monitor_vdev = NULL;
 		action = DP_MON_FILTER_CLEAR;
 	}
@@ -676,7 +680,7 @@ dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 	/*
 	 * Restore the monitor filters if previously monitor mode was enabled.
 	 */
-	if (mon_pdev->mvdev) {
+	if (mon_mac->mvdev) {
 		mon_pdev->monitor_configured = true;
 		dp_mon_filter_setup_mon_mode(pdev);
 	}

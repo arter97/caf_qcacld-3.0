@@ -400,14 +400,14 @@ dp_lite_mon_set_rx_config(struct dp_pdev_be *be_pdev,
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 
 		/* restore full mon filter if enabled */
-		qdf_spin_lock_bh(&be_mon_pdev->mon_pdev.mon_lock);
+		qdf_spin_lock_bh(&be_mon_pdev->mon_pdev.mon_mac.mon_lock);
 		if (be_mon_pdev->mon_pdev.monitor_configured) {
 			dp_mon_filter_setup_mon_mode(&be_pdev->pdev);
 			if (dp_mon_filter_update(&be_pdev->pdev) !=
 							QDF_STATUS_SUCCESS)
 				dp_mon_info("failed to setup full mon filters");
 		}
-		qdf_spin_unlock_bh(&be_mon_pdev->mon_pdev.mon_lock);
+		qdf_spin_unlock_bh(&be_mon_pdev->mon_pdev.mon_mac.mon_lock);
 	} else {
 		/* validate configuration */
 		/* if level is MPDU/PPDU and data pkt is full len, then
@@ -423,14 +423,14 @@ dp_lite_mon_set_rx_config(struct dp_pdev_be *be_pdev,
 		}
 
 		/* reset full mon filters if enabled */
-		qdf_spin_lock_bh(&be_mon_pdev->mon_pdev.mon_lock);
+		qdf_spin_lock_bh(&be_mon_pdev->mon_pdev.mon_mac.mon_lock);
 		if (be_mon_pdev->mon_pdev.monitor_configured) {
 			dp_mon_filter_reset_mon_mode(&be_pdev->pdev);
 			if (dp_mon_filter_update(&be_pdev->pdev) !=
 							QDF_STATUS_SUCCESS)
 				dp_mon_info("failed to reset full mon filters");
 		}
-		qdf_spin_unlock_bh(&be_mon_pdev->mon_pdev.mon_lock);
+		qdf_spin_unlock_bh(&be_mon_pdev->mon_pdev.mon_mac.mon_lock);
 
 		qdf_spin_lock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 		/* store rx lite mon config */
@@ -1708,7 +1708,7 @@ dp_lite_mon_add_meta_header_to_headroom(struct dp_pdev_be *be_pdev,
 					  DP_RX_MON_TLV_ROOM,
 					  4, FALSE);
 		if (qdf_likely(tmp_nbuf)) {
-			be_mon_pdev->mon_pdev.rx_mon_stats.parent_buf_alloc++;
+			be_mon_pdev->mon_pdev.mon_mac.rx_mon_stats.parent_buf_alloc++;
 			tmp_dp = qdf_nbuf_push_head(tmp_nbuf, (pull_bytes + sizeof(dbg_sign)));
 			if (qdf_likely(tmp_dp)) {
 				/* copy the dbg signature first */
@@ -1793,7 +1793,7 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 	if (config->level == CDP_LITE_MON_LEVEL_PPDU && mpdu_id != 0) {
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 		dp_mon_debug("level is PPDU drop subsequent mpdu");
-		dp_mon_free_parent_nbuf(&be_mon_pdev->mon_pdev, mon_mpdu);
+		dp_mon_free_parent_nbuf(pdev, mon_mpdu);
 		goto done;
 	}
 
@@ -1804,7 +1804,7 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 		/* mpdu did not pass filter check drop and return success */
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 		dp_mon_debug("filter check did not pass, drop mpdu");
-		dp_mon_free_parent_nbuf(&be_mon_pdev->mon_pdev, mon_mpdu);
+		dp_mon_free_parent_nbuf(pdev, mon_mpdu);
 		goto done;
 	}
 
@@ -1832,7 +1832,7 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 	if (mpdu_meta->full_pkt) {
 		if (qdf_unlikely(mpdu_meta->truncated)) {
 			qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
-			dp_mon_free_parent_nbuf(&be_mon_pdev->mon_pdev, mon_mpdu);
+			dp_mon_free_parent_nbuf(pdev, mon_mpdu);
 			goto done;
 		}
 		/* full pkt, restitch required */
