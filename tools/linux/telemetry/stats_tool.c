@@ -74,6 +74,8 @@
 #define STATS_IF_ASYNC_MODE          "async"
 /* Time in seconds for application to loop to receive non-blocking stats event*/
 #define ASYNC_STATS_TIMEOUT 5
+/* Maximum Test Simulation count */
+#define MAX_TEST_ITERATION 20
 
 static bool g_run_loop;
 static bool g_ipa_mode;
@@ -485,7 +487,7 @@ const char *mu_reception_mode[STATS_IF_TXRX_TYPE_MU_MAX] = {
 };
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static const char *opt_string = "BADarvsdcf:i:l:m:t:RIMEh?";
+static const char *opt_string = "BADarvsdcf:i:l:m:t:T:RIMEh?";
 
 static const struct option long_opts[] = {
 	{ "basic", no_argument, NULL, 'B' },
@@ -506,6 +508,7 @@ static const struct option long_opts[] = {
 	{ "ipa", no_argument, NULL, 'I' },
 	{ "mldlink", no_argument, NULL, 'M' },
 	{ "asyncreq", no_argument, NULL, 'E' },
+	{ "test", required_argument, NULL, 'T' },
 	{ "help", no_argument, NULL, 'h' },
 	{ NULL, no_argument, NULL, 0 },
 };
@@ -570,7 +573,7 @@ static void display_help(void)
 {
 	STATS_PRINT("\nwifitelemetry : Displays Statistics of Access Point\n");
 	STATS_PRINT("\nUsage:\n"
-		    "Process Mode: wifitelemetry [Level] [Object] [StatsType] [FeatureName] [[-i interface_name] | [-m StationMACAddress]] [-R] [-I] [-M] [-E] [-h | ?]\n"
+		    "Process Mode: wifitelemetry [Level] [Object] [StatsType] [FeatureName] [[-i interface_name] | [-m StationMACAddress]] [-R] [-I] [-M] [-E] [-T] [-h | ?]\n"
 		    "Daemon Mode: wifitelemetry async\n"
 		    "    Note: User must run wifitelemetry in background. Excecute another instance in process mode to trigger stats request.\n"
 		    "\n"
@@ -624,7 +627,8 @@ static void display_help(void)
 		    "    -I or --ipa is required to get Tx and Rx stats in IPA architecture\n"
 		    "    -M or --mldlink indicates to get link stats for MLD\n"
 		    "    -E or --asyncreq: Asynchronous stats request. It is a non-blocking request where stats data is received asynchronously as an event \n"
-		    "    -h or --help:       Usage display\n");
+		    "    -T or --test <iteration>: Option to simulate same command till the specified iteration count exhaust. Iteration count range 1-%d\n"
+		    "    -h or --help:       Usage display\n", MAX_TEST_ITERATION);
 }
 
 static char *macaddr_to_str(u_int8_t *addr)
@@ -4126,6 +4130,63 @@ int stats_async_request_handle(struct stats_command *cmd,
 	return status;
 }
 
+int stats_request_simulation_test(struct stats_command *cmd, uint8_t count)
+{
+	struct reply_buffer *reply;
+	uint8_t request_id = 0, remaining = 0;
+	int status = 0;
+
+	STATS_PRINT("Test Mode Simulation with %d count:\n", count);
+	status = libstats_async_event_init();
+	if (status) {
+		STATS_ERR("Async stats initialization fails:%d\n", status);
+		return status;
+	}
+
+	do {
+		while (request_id < count) {
+			cmd->request_id = ++request_id;
+			STATS_PRINT("STATS Req ID: <%d>\n", cmd->request_id);
+			status = libstats_async_send_stats_req(cmd);
+			if (status < 0) {
+				STATS_ERR("Async stats send request<%d> failed %d.\n",
+					  status, request_id);
+				break;
+			}
+		}
+		/* Keep remaining count to retry */
+		remaining = count - request_id;
+
+		/* Try receiving all requested stats */
+		while (request_id) {
+			reply = malloc(sizeof(struct reply_buffer));
+			if (!reply) {
+				STATS_ERR("Failed to allocate memory\n");
+				return -ENOMEM;
+			}
+			memset(reply, 0, sizeof(struct reply_buffer));
+
+			status = stats_async_receive(reply);
+			if (!status)
+				print_response(reply, true);
+			else
+				STATS_ERR("Async stats response is not received: %d.\n",
+					  status);
+
+			libstats_free_reply_buffer_object(reply);
+			free(reply);
+			request_id--;
+		}
+
+		/* Restore request_id to continue */
+		request_id = count - remaining;
+	} while (remaining);
+
+	libstats_async_event_deinit();
+
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	struct stats_command cmd;
@@ -4155,6 +4216,8 @@ int main(int argc, char *argv[])
 	char stamacaddr_temp[USER_MAC_ADDR_LEN] = {'\0'};
 	struct ether_addr *ret_eth_addr = NULL;
 	u_int8_t servid_temp = 0;
+	bool is_test_mode = false;
+	uint8_t test_iterate = 0;
 
 	memset(&cmd, 0, sizeof(struct stats_command));
 
@@ -4350,6 +4413,15 @@ int main(int argc, char *argv[])
 		case 'E':
 			is_async_req = true;
 			break;
+		case 'T':
+			is_test_mode = true;
+			test_iterate = atoi(optarg);
+			if (!test_iterate || test_iterate > MAX_TEST_ITERATION) {
+				STATS_ERR("Invalid Iteration count\n");
+				display_help();
+				return -EINVAL;
+			}
+			break;
 		default:
 			STATS_ERR("Unrecognized option\n");
 			display_help();
@@ -4394,6 +4466,16 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	/* Test mode handling */
+	if (is_test_mode) {
+		if (!is_async_req) {
+			STATS_ERR("Test mode is supported in Async request!\n");
+			return -EINVAL;
+		}
+		return stats_request_simulation_test(&cmd, test_iterate);
+	}
+
+	/* Handle Normal case */
 	reply = (struct reply_buffer *)malloc(sizeof(struct reply_buffer));
 	if (!reply) {
 		STATS_ERR("Failed to allocate memory\n");
