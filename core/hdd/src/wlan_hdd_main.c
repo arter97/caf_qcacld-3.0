@@ -10077,14 +10077,9 @@ static QDF_STATUS
 hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx,
 				     unsigned long event)
 {
-#define SHUTDOWN_IN_SUSPEND_RETRY 10
+#define SHUTDOWN_IN_SUSPEND_RETRY 30
 
 	int count = 0;
-
-	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) != PMO_SUSPEND_SHUTDOWN) {
-		hdd_debug("shutdown in suspend not supported");
-		return 0;
-	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver Modules not Enabled ");
@@ -10107,8 +10102,6 @@ hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx,
 		hdd_err("some adapters not stopped");
 		return -EBUSY;
 	}
-
-	hdd_debug("call pld idle shutdown directly");
 	return pld_idle_shutdown(hdd_ctx->parent_dev, hdd_psoc_idle_shutdown);
 }
 
