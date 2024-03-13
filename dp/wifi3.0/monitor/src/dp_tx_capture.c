@@ -1032,11 +1032,9 @@ void dp_peer_tx_cap_tid_queue_flush(struct dp_soc *soc, struct dp_peer *peer,
 			len--;
 		}
 
-		if (len) {
+		if (len)
 			dp_tx_capture_alert("Actual_len: %d pending len:%d !!!",
 					    actual_len, len);
-			QDF_BUG(0);
-		}
 
 		/* free xretry ppdu user alone */
 		TX_CAP_NBUF_QUEUE_FREE(&xretry_user->mpdu_q);
@@ -1141,11 +1139,9 @@ void dp_peer_tid_queue_cleanup(struct dp_peer *peer)
 			len--;
 		}
 
-		if (len) {
+		if (len)
 			dp_tx_capture_alert("Actual_len: %d pending len:%d !!!",
 					    actual_len, len);
-			QDF_BUG(0);
-		}
 
 		TX_CAP_NBUF_QUEUE_FREE(&xretry_user->mpdu_q);
 		qdf_mem_free(xretry_ppdu);
@@ -1951,7 +1947,7 @@ dp_drop_enq_msdu_on_thresh(struct dp_pdev *pdev,
 		/* free head */
 		nbuf = qdf_nbuf_queue_remove(ptr_msdu_comp_q);
 		if (qdf_unlikely(!nbuf)) {
-			qdf_assert_always(0);
+			dp_assert_always_internal(0);
 			break;
 		}
 
@@ -3519,7 +3515,7 @@ get_mpdu_clone_from_next_ppdu(struct dp_tx_cap_nbuf_list nbuf_list[],
 		dp_tx_capture_err("missed seq_no[%d] ppdu_id[%d] [%d] found but queue empty!!!",
 				  missed_seq_no, ppdu_id, ppdu_desc_cnt);
 		if (mpdu_q_len)
-			qdf_assert_always(0);
+			dp_assert_always_internal(0);
 
 		return NULL;
 	}
@@ -4348,7 +4344,7 @@ check_subseq_ppdu_to_pending_q(struct dp_tx_cap_nbuf_list nbuf_ppdu_list[],
 				tmp_pend_nbuf = qdf_nbuf_clone(
 						ptr_nbuf_list->nbuf_ppdu);
 				if (qdf_unlikely(!tmp_pend_nbuf)) {
-					qdf_assert_always(0);
+					dp_assert_always_internal(0);
 					continue;
 				}
 				qdf_nbuf_free(ptr_nbuf_list->nbuf_ppdu);
@@ -5201,7 +5197,7 @@ insert_mgmt_buf_to_queue:
 							    type,
 							    subtype,
 							    retry_len);
-					qdf_assert_always(0);
+					dp_assert_always_internal(0);
 					break;
 				}
 
@@ -5218,7 +5214,7 @@ insert_mgmt_buf_to_queue:
 							     0, 0);
 				if (qdf_unlikely(!tmp_mgmt_ctl_nbuf)) {
 					dp_tx_capture_alert("%pK: No memory to do copy!!", pdev->soc);
-					qdf_assert_always(0);
+					dp_assert_always_internal(0);
 				}
 
 				dp_update_tx_cap_info(pdev, nbuf_retry_ppdu,
@@ -5528,7 +5524,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 
 		if (!dp_tx_cap_nbuf_list_get_ref(ptr_nbuf_list)) {
 			if (ptr_nbuf_list->nbuf_ppdu)
-				qdf_assert_always(0);
+				dp_assert_always_internal(0);
 			continue;
 		}
 
@@ -5580,7 +5576,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 				 */
 				tmp_nbuf_ppdu = qdf_nbuf_clone(nbuf_ppdu);
 				if (qdf_unlikely(!tmp_nbuf_ppdu)) {
-					qdf_assert_always(0);
+					dp_assert_always_internal(0);
 					continue;
 				}
 
@@ -5673,7 +5669,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 				dp_ppdu_desc_free_all(pdev, ptr_nbuf_list, num_users);
 				DP_TX_PEER_DEL_REF(peer);
 				dp_print_pdev_tx_capture_stats_1_0(pdev);
-				qdf_assert_always(0);
+				dp_assert_always_internal(0);
 				return;
 			}
 
@@ -5681,7 +5677,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 			    CDP_BA_256_BIT_MAP_SIZE_DWORDS *
 				SEQ_SEG_SZ_BITS(user->failed_bitmap))) {
 				DP_TX_PEER_DEL_REF(peer);
-				qdf_assert_always(0);
+				dp_assert_always_internal(0);
 				return;
 			}
 			/* Fill seq holes within current schedule list */
@@ -5904,7 +5900,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 				tmp_nbuf = qdf_nbuf_queue_remove(tmp_ppdu_q);
 				if (qdf_unlikely(!tmp_nbuf)) {
 					DP_TX_PEER_DEL_REF(peer);
-					qdf_assert_always(0);
+					dp_assert_always_internal(0);
 					return;
 				}
 
