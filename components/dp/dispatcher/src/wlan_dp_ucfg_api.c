@@ -304,6 +304,11 @@ void ucfg_dp_set_cmn_dp_handle(struct wlan_objmgr_psoc *psoc,
 
 	dp_ctx = dp_psoc_get_priv(psoc);
 
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
 	dp_ctx->cdp_soc = soc;
 
 	soc_param.hal_soc_hdl = NULL;

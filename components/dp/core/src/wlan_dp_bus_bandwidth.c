@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -652,6 +652,11 @@ void dp_reset_tcp_delack(struct wlan_objmgr_psoc *psoc)
 
 	enum wlan_tp_level next_level = WLAN_SVC_TP_LOW;
 	struct wlan_rx_tp_data rx_tp_data = {0};
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
 
 	if (!dp_ctx->en_tcp_delack_no_lro)
 		return;
@@ -2063,6 +2068,11 @@ static void dp_bus_bw_work_handler(void *context)
 	struct wlan_dp_psoc_context *dp_ctx = context;
 	struct qdf_op_sync *op_sync;
 
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
 	if (qdf_op_protect(&op_sync))
 		return;
 
@@ -2099,7 +2109,14 @@ int dp_bus_bandwidth_init(struct wlan_objmgr_psoc *psoc)
 void dp_bus_bandwidth_deinit(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-	hdd_cb_handle ctx = dp_ctx->dp_ops.callback_ctx;
+	hdd_cb_handle ctx;
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
+	ctx = dp_ctx->dp_ops.callback_ctx;
 
 	if (QDF_GLOBAL_FTM_MODE == cds_get_conparam())
 		return;
@@ -2129,6 +2146,11 @@ static void __dp_bus_bw_compute_timer_start(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
 	if (QDF_GLOBAL_FTM_MODE == cds_get_conparam())
 		return;
 
@@ -2152,9 +2174,16 @@ void dp_bus_bw_compute_timer_start(struct wlan_objmgr_psoc *psoc)
 void dp_bus_bw_compute_timer_try_start(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-	hdd_cb_handle ctx = dp_ctx->dp_ops.callback_ctx;
+	hdd_cb_handle ctx;
 
 	dp_enter();
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
+	ctx = dp_ctx->dp_ops.callback_ctx;
 
 	if (dp_ctx->dp_ops.dp_any_adapter_connected(ctx))
 		__dp_bus_bw_compute_timer_start(psoc);
@@ -2236,9 +2265,16 @@ void dp_bus_bw_compute_timer_stop(struct wlan_objmgr_psoc *psoc)
 void dp_bus_bw_compute_timer_try_stop(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-	hdd_cb_handle ctx = dp_ctx->dp_ops.callback_ctx;
+	hdd_cb_handle ctx;
 
 	dp_enter();
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
+	ctx = dp_ctx->dp_ops.callback_ctx;
 
 	if (!dp_ctx->dp_ops.dp_any_adapter_connected(ctx))
 		__dp_bus_bw_compute_timer_stop(psoc);
