@@ -4142,6 +4142,7 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 	struct scan_cache_entry *cur_entry;
 	struct scan_cache_node *link_node;
 	struct mlo_partner_info *partner_info;
+	struct qdf_mac_addr mld_addr = {0};
 	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -4173,16 +4174,23 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 
 		filter->chan_freq_list[idx] = link_info->chan_freq;
 		filter->num_of_channels++;
+		pe_debug("Filter BSSID: " QDF_MAC_ADDR_FMT ", freq: %d",
+			 QDF_MAC_ADDR_REF(filter->bssid_list[idx].bytes),
+			 filter->chan_freq_list[idx]);
 	}
+
+	wlan_vdev_get_bss_peer_mld_mac(session->vdev, &mld_addr);
+	filter->match_mld_addr = true;
+	qdf_copy_macaddr(&filter->mld_addr, &mld_addr);
 
 	/* If no.of. scan entries fetched not equal to no.of partner links
 	 * then fail as common AKM is not determined.
 	 */
 	scan_list = wlan_scan_get_result(pdev, filter);
 	qdf_mem_free(filter);
-	if (!scan_list ||
-	    (qdf_list_size(scan_list) != partner_info->num_partner_links)) {
-		status = QDF_STATUS_E_INVAL;
+	if (!scan_list) {
+		pe_debug("Empty scan list");
+		status = QDF_STATUS_E_NULL_VALUE;
 		goto mem_free;
 	}
 
@@ -4192,6 +4200,10 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 		link_node = qdf_container_of(cur_node, struct scan_cache_node,
 					     node);
 
+		pe_debug("Entry BSSID: " QDF_MAC_ADDR_FMT ", freq %d",
+			 QDF_MAC_ADDR_REF(link_node->entry->bssid.bytes),
+			 link_node->entry->channel.chan_freq);
+
 		if (!wlan_scan_entries_contain_cmn_akm(cur_entry,
 						       link_node->entry)) {
 			status = QDF_STATUS_E_FAILURE;
@@ -4200,6 +4212,13 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 
 		cur_node = next_node;
 		next_node = NULL;
+	}
+
+	if (qdf_list_size(scan_list) != partner_info->num_partner_links) {
+		pe_err("Scan list (%d), actual partner links (%d)",
+		       qdf_list_size(scan_list),
+		       partner_info->num_partner_links);
+		status = QDF_STATUS_E_INVAL;
 	}
 
 mem_free:
@@ -4371,7 +4390,7 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 		 */
 		status = lim_check_partner_link_for_cmn_akm(session_entry);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_debug("Non overlapping partner link AKM %d",
+			pe_debug("Non overlapping partner link AKM, status(%d)",
 				 status);
 			lim_clear_ml_partner_info(session_entry);
 			goto end;
