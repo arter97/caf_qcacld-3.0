@@ -780,21 +780,7 @@
  * Info Mask : 21 - 0010 0001 Check for OUI and Band
  * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
  *
- * OUI 3 : 8CFDF0
- * OUI data Len : 05
- * OUI Data : 0101020100
- * OUI data Mask: F8 - 11111000
- * Info Mask : 21 - 0010 0001 Check for OUI and Band
- * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
- *
- * OUI 4 : 8CFDF0
- * OUI data Len : 05
- * OUI Data : 0109020300
- * OUI data Mask: F8 - 11111000
- * Info Mask : 21 - 0010 0001 Check for OUI and Band
- * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
- *
- * g_action_oui_enable_cts_2_self=000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0 8CFDF0 05 0101020100 F8 21 C0 8CFDF0 05 0109020300 F8 21 C0
+ * g_action_oui_enable_cts_2_self=000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0
  *
  * Refer to gEnableActionOUI for more detail about the format.
  *
@@ -810,7 +796,7 @@
 	"g_action_oui_enable_cts_2_self", \
 	0, \
 	ACTION_OUI_MAX_STR_LEN, \
-	"000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0 8CFDF0 05 0101020100 F8 21 C0 8CFDF0 05 0109020300 F8 21 C0", \
+	"000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0", \
 	"Used to enable CTS2SELF frame for specified APs")
 
 /*

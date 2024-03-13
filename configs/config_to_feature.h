@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -278,13 +278,7 @@
 #define WMI_DBR_SUPPORT (1)
 #endif
 
-#ifndef CONFIG_CNSS_QCA6750
-#ifdef CONFIG_DIRECT_BUF_RX_ENABLE
-#define DBR_MULTI_SRNG_ENABLE (1)
-#endif
-#endif
-
-#ifndef CONFIG_CNSS_WCN6450
+#if !defined(CONFIG_CNSS_QCA6750) && !defined(CONFIG_CNSS_WCN6450)
 #ifdef CONFIG_DIRECT_BUF_RX_ENABLE
 #define DBR_MULTI_SRNG_ENABLE (1)
 #endif
@@ -2949,6 +2943,18 @@
 
 #ifdef CONFIG_BCN_RATECODE_ENABLE
 #define WLAN_BCN_RATECODE_ENABLE (1)
+#endif
+
+#ifdef CONFIG_WLAN_SUPPORT_SERVICE_CLASS
+#define WLAN_SUPPORT_SERVICE_CLASS (1)
+#endif
+
+#ifdef CONFIG_WLAN_SUPPORT_FLOW_PRIORTIZATION
+#define WLAN_SUPPORT_FLOW_PRIORTIZATION (1)
+#endif
+
+#ifdef CONFIG_WLAN_SUPPORT_LAPB
+#define WLAN_SUPPORT_LAPB (1)
 #endif
 
 #ifdef CONFIG_QDF_TIMER_MULTIPLIER_FRAC_ENABLE

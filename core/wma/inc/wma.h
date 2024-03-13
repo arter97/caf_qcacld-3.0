@@ -49,6 +49,7 @@
 #include "wmi.h"
 #include "wlan_cm_roam_public_struct.h"
 #include "target_if.h"
+#include <qdf_hang_event_notifier.h>
 
 /* Platform specific configuration for max. no. of fragments */
 #define QCA_OL_11AC_TX_MAX_FRAGS            2
@@ -802,6 +803,63 @@ struct wma_wlm_stats_data {
 };
 #endif
 
+#define WLAN_WMA_MAX_PF_SYM 50
+#define WLAN_WMA_PF_APPS_NOTIFY_BUF_LEN QDF_HANG_EVENT_DATA_SIZE
+#define WLAN_WMA_PF_SYM_LEN 4
+#define WLAN_WMA_PF_SYM_CNT_LEN 1
+#define WLAN_WMA_PF_SYM_FLAGS_LEN 1
+#define WLAN_WMA_PER_PF_SYM_NOTIFY_BUF_LEN  (WLAN_WMA_PF_SYM_LEN + \
+					     WLAN_WMA_PF_SYM_CNT_LEN + \
+					     WLAN_WMA_PF_SYM_FLAGS_LEN)
+
+/*
+ * struct wow_pf_sym - WOW PF wakeup symbol info
+ * @symbol: Address of PF symbol
+ * @count: Count of PF symbol
+ * @flags: Flags associated with @symbol
+ */
+struct wow_pf_sym {
+	uint32_t symbol;
+	uint8_t count;
+	uint8_t flags;
+};
+
+/*
+ * struct wow_pf_wakeup_ev_data - WOW PF wakeup event data
+ * @pf_sym: Array of each unique PF symbol in wakeup event payload
+ * @num_pf_syms: Total unique symbols in event.
+ * @pending_pf_syms: Pending PF symbols to process
+ */
+struct wow_pf_wakeup_ev_data {
+	struct wow_pf_sym *pf_sym;
+	uint8_t num_pf_syms;
+	uint8_t pending_pf_syms;
+};
+
+/**
+ * struct wma_pf_sym - Per symbol PF data in PF symbol history
+ * @pf_sym: PF symbol info
+ * @pf_event_ts: Array of page fault event ts
+ */
+struct wma_pf_sym {
+	struct wow_pf_sym pf_sym;
+	qdf_time_t *pf_ev_ts;
+};
+
+/*
+ * struct wma_pf_sym_hist - System level FW PF symbol history
+ * @wma_pf_sym: Array of symbols in history.
+ * @pf_notify_buf_ptr: Pointer to APPS notify buffer
+ * @pf_notify_buf_len: Current data length of @pf_notify_buf_ptr
+ * @lock: Lock to access PF symbol history
+ */
+struct wma_pf_sym_hist {
+	struct wma_pf_sym wma_pf_sym[WLAN_WMA_MAX_PF_SYM];
+	uint8_t *pf_notify_buf_ptr;
+	uint32_t pf_notify_buf_len;
+	qdf_spinlock_t lock;
+};
+
 /**
  * struct t_wma_handle - wma context
  * @wmi_handle: wmi handle
@@ -920,10 +978,7 @@ struct wma_wlm_stats_data {
  * * @fw_therm_throt_support: FW Supports thermal throttling?
  * @eht_cap: 802.11be capabilities
  * @set_hw_mode_resp_status: Set HW mode response status
- * @pagefault_wakeups_ts: Stores timestamps at which host wakes up by fw
- * because of pagefaults
- * @num_page_fault_wakeups: Stores the number of times host wakes up by fw
- * because of pagefaults
+ * @wma_pf_hist: PF symbol history
  *
  * This structure is the global wma context.  It contains global wma
  * module parameters and handles of other modules.
@@ -1060,8 +1115,7 @@ typedef struct {
 	qdf_wake_lock_t sap_d3_wow_wake_lock;
 	qdf_wake_lock_t go_d3_wow_wake_lock;
 	enum set_hw_mode_status set_hw_mode_resp_status;
-	qdf_time_t *pagefault_wakeups_ts;
-	uint8_t num_page_fault_wakeups;
+	struct wma_pf_sym_hist wma_pf_hist;
 } t_wma_handle, *tp_wma_handle;
 
 /**

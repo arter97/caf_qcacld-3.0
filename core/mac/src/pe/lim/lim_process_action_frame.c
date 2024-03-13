@@ -2294,8 +2294,10 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 
 
 	pe_debug("Received an action frame category: %d action_id: %d",
-		 action_hdr->category, action_hdr->category ==
-		 ACTION_CATEGORY_PUBLIC ? action_hdr->actionID : 255);
+		 action_hdr->category, (action_hdr->category ==
+		 ACTION_CATEGORY_PUBLIC || action_hdr->category ==
+		 ACTION_CATEGORY_PROTECTED_DUAL_OF_PUBLIC_ACTION) ?
+		 action_hdr->actionID : 255);
 
 	if (frame_len < sizeof(*action_hdr)) {
 		pe_debug("frame_len %d less than action frame header len",
@@ -2305,6 +2307,7 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 
 	switch (action_hdr->category) {
 	case ACTION_CATEGORY_PUBLIC:
+	case ACTION_CATEGORY_PROTECTED_DUAL_OF_PUBLIC_ACTION:
 		if (action_hdr->actionID == PUB_ACTION_VENDOR_SPECIFIC) {
 			vendor_specific =
 				(tpSirMacVendorSpecificPublicActionFrameHdr)

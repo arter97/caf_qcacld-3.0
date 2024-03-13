@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -325,7 +325,9 @@ static u32 hdd_to_nl_sar_version(enum sar_version hdd_sar_version)
 	case (SAR_VERSION_3):
 		return QCA_WLAN_VENDOR_SAR_VERSION_3;
 	case (SAR_VERSION_4):
+		return QCA_WLAN_VENDOR_SAR_VERSION_4;
 	case (SAR_VERSION_5):
+		return QCA_WLAN_VENDOR_SAR_VERSION_5;
 	case (SAR_VERSION_6):
 		return QCA_WLAN_VENDOR_SAR_VERSION_1;
 	default:
