@@ -74,6 +74,7 @@
 /* Reserve service classes for STC type towards the end of the valid range */
 #define MAX_NUM_SAWF_STC_SVC_CLASS 8
 #define SAWF_STC_SVC_CLASS_MIN (SAWF_SVC_CLASS_MAX - MAX_NUM_SAWF_STC_SVC_CLASS + 1)
+#define SAWF_STC_SVC_CLASS_MAX SAWF_SVC_CLASS_MAX
 
 /*
  * Service class defined for Pre-11BE SCS (Only TID based service class
