@@ -3987,9 +3987,12 @@ void print_debug_stats(struct stats_obj *obj)
 }
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-void print_response(struct reply_buffer *reply)
+void print_response(struct reply_buffer *reply, bool is_async)
 {
 	struct stats_obj *obj = reply->obj_head;
+
+	if (is_async && obj)
+		STATS_PRINT("STATS Resp ID: <%d>\n", obj->response_id);
 
 	while (obj) {
 		switch (obj->lvl) {
@@ -4018,7 +4021,7 @@ void stats_async_response_handler(struct stats_command *cmd, char *ifname)
 	if (!cmd || !cmd->reply)
 		return;
 
-	print_response(cmd->reply);
+	print_response(cmd->reply, false);
 }
 
 void stop_handler(int val)
@@ -4094,6 +4097,7 @@ int stats_async_receive(struct reply_buffer *reply)
 
 	return status;
 }
+
 int stats_async_request_handle(struct stats_command *cmd,
 			       struct reply_buffer *reply)
 {
@@ -4402,7 +4406,7 @@ int main(int argc, char *argv[])
 		cmd.request_id = 0;
 		ret = stats_async_request_handle(&cmd, reply);
 		if (!ret)
-			print_response(reply);
+			print_response(reply, true);
 
 		libstats_free_reply_buffer_object(reply);
 		free(reply);
@@ -4414,7 +4418,7 @@ int main(int argc, char *argv[])
 
 		/* Print Output */
 		if (!ret)
-			print_response(cmd.reply);
+			print_response(cmd.reply, false);
 
 		/* Cleanup */
 		libstats_free_reply_buffer(&cmd);

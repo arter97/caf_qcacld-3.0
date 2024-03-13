@@ -449,7 +449,7 @@ struct debug_psoc_data {
  * @stats: Stats based on above meta information
  * @next: Next stats_obj
  * @parent: Parent stats_obj
- * @request_id: Request ID of non-blocking stats request
+ * @response_id: Response ID of non-blocking stats request
  */
 struct stats_obj {
 	enum stats_level_e lvl;
@@ -464,7 +464,7 @@ struct stats_obj {
 	void *stats;
 	struct stats_obj *next;
 	struct stats_obj *parent;
-	uint64_t request_id;
+	uint32_t response_id;
 };
 
 /**
@@ -501,7 +501,7 @@ struct stats_command {
 	uint8_t serviceid;
 	char if_name[IFNAME_LEN];
 	u_int64_t feat_flag;
-	uint64_t request_id;
+	uint32_t request_id;
 	struct ether_addr sta_mac;
 	struct reply_buffer *reply;
 	enum stats_peer_type peer_type;
@@ -570,7 +570,8 @@ int32_t libstats_request_async_stop(struct stats_command *cmd);
  *
  * Return: 0 on Success, Error code on Failure
  */
-int8_t libstats_async_event_init(void);
+int32_t libstats_async_event_init(void);
+
 /**
  * libstats_async_event_deinit(): Deinitialization for non blocking stats
  *
@@ -582,7 +583,7 @@ void libstats_async_event_deinit(void);
  *
  * Return: Num of bytes sent on Success, Error code on Failure
  */
-int8_t libstats_async_send_stats_req(struct stats_command *cmd);
+int32_t libstats_async_send_stats_req(struct stats_command *cmd);
 
 /**
  * libstats_receive_event(): Non blocking receive API to receive the event
@@ -591,6 +592,6 @@ int8_t libstats_async_send_stats_req(struct stats_command *cmd);
  *
  * Return: 0 on Success, Error code on Failure
  */
-int8_t libstats_receive_event(struct reply_buffer *buf);
+int32_t libstats_receive_event(struct reply_buffer *buf);
 
 #endif /* _STATS_LIB_H_ */
