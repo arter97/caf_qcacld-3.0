@@ -3351,7 +3351,7 @@ wlansap_select_chan_with_best_bandwidth(struct sap_context *sap_ctx,
 	enum phy_ch_width ch_width;
 	uint32_t center_freq, bw_val, bw_start, bw_end;
 	uint16_t i, j;
-	uint16_t  unsafe_chan[NUM_CHANNELS];
+	uint16_t  unsafe_chan[NUM_CHANNELS] = {0};
 	uint16_t  unsafe_chan_cnt = 0;
 	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
