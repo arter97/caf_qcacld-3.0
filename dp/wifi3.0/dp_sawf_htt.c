@@ -426,6 +426,7 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 	struct dp_sawf_msduq *msduq;
 	struct dp_sawf_msduq_tid_map *msduq_map;
 	uint8_t host_tid_queue;
+	uint32_t tgt_opaque_id;
 	uint8_t msduq_index = 0;
 	struct dp_peer *primary_link_peer = NULL;
 
@@ -463,6 +464,7 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	/* dword2 */
 	msg_word++;
 	remapped_tid = HTT_T2H_SAWF_MSDUQ_INFO_HTT_REMAP_TID_GET(*msg_word);
 
@@ -473,8 +475,12 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	qdf_info("|TID Q:%d|Remapped TID:%d|Host Q:%d|",
-		 tid_queue, remapped_tid, host_queue);
+	/* dword3 */
+	msg_word++;
+	tgt_opaque_id = HTT_T2H_SAWF_MSDUQ_INFO_HTT_TGT_OPAQUE_ID_GET(*msg_word);
+
+	qdf_info("|TID Q:%d|Remapped TID:%d|Host Q:%d|tgt_opaque_id: %d |",
+		 tid_queue, remapped_tid, host_queue, tgt_opaque_id);
 
 	host_tid_queue = tid_queue - DP_SAWF_DEFAULT_Q_PTID_MAX;
 
@@ -490,6 +496,7 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		msduq = &sawf_ctx->msduq[msduq_index];
 		msduq->remapped_tid = remapped_tid;
 		msduq->htt_msduq = host_tid_queue;
+		msduq->tgt_opaque_id = tgt_opaque_id;
 		telemetry_sawf_update_msduq_info(peer->sawf->telemetry_ctx,
 						 msduq_index,
 						 remapped_tid, host_tid_queue,
