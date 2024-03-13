@@ -6219,7 +6219,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 	bool is_tpe_present = false, is_6ghz_freq = false;
 	uint8_t i = 0;
 	int8_t max_tx_power;
-	uint16_t reg_max = 0, psd_power = 0;
+	uint16_t reg_max = 0, reg_psd_pwr_max = 0;
 	uint16_t tx_power_within_bw = 0, psd_power_within_bw = 0;
 	uint16_t local_constraint, bw_val = 0;
 	uint32_t num_pwr_levels, ap_power_type_6g = 0;
@@ -6309,11 +6309,13 @@ void lim_calculate_tpc(struct mac_context *mac,
 					wlan_reg_get_client_power_for_connecting_ap(
 					mac->pdev, ap_power_type_6g,
 					mlme_obj->reg_tpc_obj.frequency[i],
-					is_psd_power, &reg_max, &psd_power);
+					is_psd_power, &reg_max,
+					&reg_psd_pwr_max);
 				} else {
 					wlan_reg_get_client_power_for_connecting_ap(
 					mac->pdev, ap_power_type_6g, oper_freq,
-					is_psd_power, &reg_max, &psd_power);
+					is_psd_power, &reg_max,
+					&reg_psd_pwr_max);
 				}
 			}
 		} else {
@@ -6330,7 +6332,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 					wlan_reg_get_client_power_for_connecting_ap
 					(mac->pdev, ap_power_type_6g,
 					 mlme_obj->reg_tpc_obj.frequency[i],
-					 is_psd_power, &reg_max, &psd_power);
+					 is_psd_power, &reg_max,
+					 &reg_psd_pwr_max);
 				} else {
 					if (wlan_reg_decide_6ghz_power_within_bw_for_freq(
 							mac->pdev, oper_freq,
@@ -6344,7 +6347,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 							QDF_STATUS_SUCCESS) {
 						pe_debug("get pwr attr from secondary list");
 						reg_max = tx_power_within_bw;
-						psd_power = psd_power_within_bw;
+						reg_psd_pwr_max =
+							psd_power_within_bw;
 					} else {
 						wlan_reg_get_cur_6g_ap_pwr_type(
 							mac->pdev,
@@ -6355,7 +6359,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 							frequency[i],
 							&is_psd_power,
 							&reg_max,
-							&psd_power);
+							&reg_psd_pwr_max);
 					}
 				}
 			}
@@ -6383,7 +6387,10 @@ void lim_calculate_tpc(struct mac_context *mac,
 		pe_debug("local constraint: %d power constraint absolute %d",
 			 local_constraint,
 			 mlme_obj->reg_tpc_obj.is_power_constraint_abs);
-		if (mlme_obj->reg_tpc_obj.is_power_constraint_abs) {
+
+		if (is_psd_power) {
+			max_tx_power = reg_psd_pwr_max;
+		} else if (mlme_obj->reg_tpc_obj.is_power_constraint_abs) {
 			if (!local_constraint) {
 				pe_debug("ignore abs ap constraint power 0!");
 				max_tx_power = reg_max;
@@ -6416,11 +6423,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 			pe_debug("TPE: %d", tpe_power);
 		}
 
-		if (is_psd_power)
-			mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
-						(uint8_t)psd_power;
-		else
-			mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
+		mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
 						(uint8_t)max_tx_power;
 
 		pe_debug("freq: %d reg power: %d, max_tx_power(eirp/psd): %d",
@@ -6435,7 +6438,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 
 	if (LIM_IS_AP_ROLE(session) && is_psd_power)
 		wlan_mlme_set_sap_psd_for_20mhz(session->vdev,
-						(uint8_t)psd_power);
+						(uint8_t)reg_psd_pwr_max);
 
 	pe_debug("num_pwr_levels: %d, is_psd_power: %d, total eirp_power: %d, ap_pwr_type: %d",
 		 num_pwr_levels, is_psd_power, reg_max, ap_power_type_6g);
