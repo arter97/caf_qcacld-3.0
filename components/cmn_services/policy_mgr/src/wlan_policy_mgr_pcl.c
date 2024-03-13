@@ -1545,35 +1545,6 @@ static inline bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 #endif
 
 /**
- * policy_mgr_is_sbs_mac0_freq() - Check if the given frequency is
- * sbs frequency on mac0 for static sbs case.
- * @psoc: psoc pointer
- * @freq: Frequency which needs to be checked.
- *
- * Return: true/false.
- */
-static bool policy_mgr_is_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
-					qdf_freq_t freq)
-{
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	struct policy_mgr_freq_range *freq_range;
-
-	if (policy_mgr_is_dynamic_sbs_enabled(psoc))
-		return false;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx)
-		return false;
-
-	freq_range = pm_ctx->hw_mode.freq_range_caps[MODE_SBS];
-
-	if (policy_mgr_is_freq_on_mac_id(freq_range, freq, 0))
-		return true;
-
-	return false;
-}
-
-/**
  * policy_mgr_pcl_modification_for_ll_lt_sap() - Modify LL LT SAPs PCL
  * @psoc: PSOC object information
  * @pcl_channels: Pointer to the preferred channel freq list to be modify
@@ -1593,7 +1564,6 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	uint32_t pcl_list[NUM_CHANNELS], orig_len = *len;
 	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t i, pcl_len = 0;
-	bool sbs_mac0_modified_pcl = false;
 	bool modified_pcl_6_ghz = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -1621,11 +1591,6 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			modified_pcl_6_ghz = true;
 			continue;
 		}
-		/* Remove mac0 frequencies for static SBS case */
-		if (policy_mgr_is_sbs_mac0_freq(psoc, pcl_channels[i])) {
-			sbs_mac0_modified_pcl = true;
-			continue;
-		}
 
 		pcl_list[pcl_len] = pcl_channels[i];
 		weight_list[pcl_len++] = pcl_weight[i];
@@ -1640,8 +1605,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
 	*len = pcl_len;
 
-	policy_mgr_debug("Modified PCL: sbs_mac0 %d 6Ghz %d",
-			 sbs_mac0_modified_pcl, modified_pcl_6_ghz);
+	policy_mgr_debug("Modified PCL: 6Ghz %d", modified_pcl_6_ghz);
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 
 	return QDF_STATUS_SUCCESS;
