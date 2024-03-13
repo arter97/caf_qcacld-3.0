@@ -39,6 +39,8 @@
 	QDF_TRACE_INFO(QDF_MODULE_ID_DP_SAWF, params)
 #define dp_sawf_debug(params...) \
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_SAWF, params)
+#define dp_sawf_trace(params...) \
+	__QDF_TRACE_FL(QDF_TRACE_LEVEL_TRACE, QDF_MODULE_ID_DP_SAWF, ## params)
 
 #define dp_sawf_nofl_alert(params...) \
 	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_DP_SAWF, params)
@@ -74,6 +76,7 @@
 #define WLAN_TX_DELAY_MASK 0x1FFFFFFF
 #define DP_SAWF_DEFINED_Q_PTID_MAX 2
 #define DP_SAWF_DEFAULT_Q_PTID_MAX 2
+#define DP_SAWF_TID_MIN 0
 #define DP_SAWF_TID_MAX 8
 #define DP_SAWF_DEFAULT_QUEUE_MIN 0
 #define DP_SAWF_DEFAULT_QUEUE_MAX (DP_SAWF_DEFAULT_QUEUE_MIN + DP_SAWF_TID_MAX)
@@ -82,6 +85,7 @@
 #define dp_sawf(peer, msduq_num, field) ((peer)->sawf->msduq[msduq_num].field)
 #define DP_SAWF_DEFAULT_Q_INVALID 0xff
 #define DP_SAWF_PEER_Q_INVALID 0xffff
+#define DP_SAWF_Q_INVALID 0xff
 #define DP_SAWF_TAG_SHIFT 24
 #define DP_SAWF_SERVICE_CLASS_SHIFT 16
 #define DP_SAWF_QUEUE_ID_SHIFT 0
