@@ -122,6 +122,46 @@ void dp_tx_me_alloc_descriptor(struct cdp_soc_t *soc, uint8_t pdev_id)
 	qdf_atomic_inc(&pdev->mc_num_vap_attached);
 }
 
+#ifdef GLOBAL_ASSERT_AVOIDANCE
+static inline void dp_tx_me_force_free_descs(struct dp_pdev *pdev)
+{
+	int i;
+	uint16_t num_pool_elems = MAX_ME_BUF_CHUNK;
+	struct dp_tx_me_buf_t *me_desc =
+				(struct dp_tx_me_buf_t *)pdev->me_buf.vaddr;
+
+	for (i = 0; i < num_pool_elems; i++) {
+		if (me_desc->paddr_macbuf) {
+			qdf_mem_unmap_nbytes_single(pdev->soc->osdev,
+					me_desc->paddr_macbuf,
+					QDF_DMA_TO_DEVICE,
+					QDF_MAC_ADDR_SIZE);
+
+			me_desc->paddr_macbuf = 0;
+			pdev->me_buf.buf_in_use--;
+		}
+
+		me_desc = (struct dp_tx_me_buf_t *)
+			((char *)me_desc + pdev->me_buf.size);
+	}
+
+	if (pdev->me_buf.buf_in_use != 0) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+				"Post flush me buf in use count %d",
+				pdev->me_buf.buf_in_use);
+
+		pdev->me_buf.buf_in_use = 0;
+	}
+
+	return;
+}
+#else
+static inline void dp_tx_me_force_free_descs(struct dp_pdev *pdev)
+{
+	qdf_assert_always(0);
+}
+#endif
+
 /**
  * dp_tx_me_exit():Free memory and other cleanup required for
  * multicast unicast conversion
@@ -156,7 +196,8 @@ dp_tx_me_exit(struct dp_pdev *pdev)
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
 				  "ME frames after waiting %ds!!",
 				  wait_time);
-			qdf_assert_always(0);
+
+			dp_tx_me_force_free_descs(pdev);
 		}
 
 		qdf_mem_free(pdev->me_buf.vaddr);
