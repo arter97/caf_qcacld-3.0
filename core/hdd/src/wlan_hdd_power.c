@@ -1836,6 +1836,7 @@ static inline void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
 static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
@@ -1844,13 +1845,17 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 		if (adapter->device_mode != QDF_SAP_MODE)
 			goto next_adapter;
 
-		if (test_bit(SOFTAP_INIT_DONE, &adapter->deflink->link_flags)) {
-			hdd_debug("Restart prev SAP session, event_flags 0x%lx, link_flags 0x%lx(%s)",
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
+				continue;
+
+			hdd_debug("Restart prev SAP session(vdev %d), event_flags 0x%lx, link_flags 0x%lx(%s)",
+				  link_info->vdev_id,
 				  adapter->event_flags,
-				  adapter->deflink->link_flags,
+				  link_info->link_flags,
 				  adapter->dev->name);
 			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
-			wlan_hdd_start_sap(adapter->deflink, true);
+			wlan_hdd_start_sap(link_info, true);
 		}
 next_adapter:
 		hdd_adapter_dev_put_debug(adapter,

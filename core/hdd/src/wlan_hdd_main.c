@@ -9815,7 +9815,7 @@ static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
 	return 0;
 }
 
-static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
+static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 {
 	enum QDF_OPMODE mode;
 	struct hdd_ap_ctx *ap_ctx;
@@ -9823,7 +9823,7 @@ static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
 	struct sap_config *sap_config;
 	struct hdd_hostapd_state *hostapd_state;
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	struct hdd_adapter *adapter = link_info->adapter;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint8_t link_id;
@@ -9907,13 +9907,9 @@ static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
 							link_id);
 		}
 	}
-	/* Clear all the cached sta info */
-	hdd_clear_cached_sta_info(adapter);
 
 	if (vdev && policy_mgr_is_dnsc_set(vdev))
 		wlan_hdd_send_avoid_freq_for_dnbs(hdd_ctx, 0);
-
-	hdd_cancel_ip_notifier_work(adapter);
 
 	/* to do: sap vdev release moved to deinit ap session,
 	 * but as hdd_hostapd_stop_no_trans call hdd_stop_adapter
@@ -9929,6 +9925,20 @@ static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
 	hdd_vdev_destroy(link_info);
 	mutex_unlock(&hdd_ctx->sap_lock);
+}
+
+static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info)
+		hdd_stop_sap_go_per_link(link_info);
+
+	/* Clear all the cached sta info */
+	hdd_clear_cached_sta_info(adapter);
+
+	hdd_cancel_ip_notifier_work(adapter);
 	ucfg_ipa_flush(hdd_ctx->pdev);
 }
 
@@ -15496,13 +15506,13 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 {
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter();
 
-	if (test_bit(SME_SESSION_OPENED, &link_info->link_flags)) {
+	if (test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
 		hdd_err("session is already opened, %d",
-			link_info->vdev_id);
+			adapter->deflink->vdev_id);
 		return qdf_status_to_os_return(QDF_STATUS_SUCCESS);
 	}
 
@@ -15518,10 +15528,12 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 		return qdf_status_to_os_return(status);
 	}
 
-	status = hdd_start_ap_link(link_info);
-	if (QDF_STATUS_SUCCESS != status) {
-		hdd_err("fail to start ap link %d", status);
-		return qdf_status_to_os_return(status);
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		status = hdd_start_ap_link(link_info);
+		if (QDF_STATUS_SUCCESS != status) {
+			hdd_err("fail to start ap link %d", status);
+			goto stop_ap_link;
+		}
 	}
 
 	hdd_sap_set_acs_with_more_param(hdd_ctx);
@@ -15562,6 +15574,13 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 
 	hdd_exit();
 	return 0;
+
+stop_ap_link:
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		hdd_stop_ap_link(link_info);
+	}
+
+	return qdf_status_to_os_return(status);
 }
 
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
