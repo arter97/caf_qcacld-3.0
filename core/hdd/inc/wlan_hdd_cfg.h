@@ -204,7 +204,7 @@ struct hdd_config {
 	bool get_wifi_features;
 #endif
 #ifdef FEATURE_RUNTIME_PM
-	uint16_t cpu_cxpc_threshold;
+	unsigned long cpu_cxpc_threshold;
 #endif
 	bool exclude_selftx_from_cca_busy;
 #ifdef WLAN_FEATURE_11BE_MLO
