@@ -901,6 +901,9 @@ enum {
 	IEEE80211_PARAM_TPE_COMMON_PSD = 824,
 	IEEE80211_PARAM_TPE_PWR_UNIT = 825, /* User config to choose PSD or EIRP in a TPE IE */
 	IEEE80211_PARAM_TPE_PUNC_PWR = 826, /* User config to set the PSD power of the punctured channel */
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_MLO_LINK_REJ_FLAG = 827,
+#endif
 };
 
 enum {
@@ -2684,6 +2687,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 		SET_PARAM, 1},
 	{"g_extmldcap_enable_advertisement",
 		IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG, GET_PARAM, 0},
+	{"mlo_link_rej", IEEE80211_PARAM_MLO_LINK_REJ_FLAG, SET_PARAM, 1},
+	{"g_mlo_link_rej", IEEE80211_PARAM_MLO_LINK_REJ_FLAG, GET_PARAM, 0},
 #endif
 	{"get_noack_map", IEEE80211_PARAM_NOACK_MAP, GET_PARAM, 0},
 #ifdef WLAN_FEATURE_11BE
