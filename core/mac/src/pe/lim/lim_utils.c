@@ -11240,11 +11240,8 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 	mlme_obj->proto.vht_info.allow_vht = !!session->vhtCapability;
 	mlme_obj->ext_vdev_ptr->connect_info.uapsd_per_ac_bitmask =
 						session->gUapsdPerAcBitmask;
-
-	if (cds_is_5_mhz_enabled())
-		mlme_obj->mgmt.rate_info.quarter_rate = 1;
-	else if (cds_is_10_mhz_enabled())
-		mlme_obj->mgmt.rate_info.half_rate = 1;
+	mlme_obj->mgmt.rate_info.quarter_rate = cds_is_5_mhz_enabled();
+	mlme_obj->mgmt.rate_info.half_rate = cds_is_10_mhz_enabled();
 
 	if (session->nss == 2) {
 		mlme_obj->mgmt.chainmask_info.num_rx_chain = 2;
