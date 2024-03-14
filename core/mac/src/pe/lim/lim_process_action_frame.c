@@ -1589,10 +1589,16 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 
 	sta_ds = dph_lookup_hash_entry(mac_ctx, mac_hdr->sa, &aid,
 				       &session->dph.dphHashTable);
-	if (sta_ds && lim_is_session_he_capable(session))
+	if (sta_ds &&
+	    (lim_is_session_he_capable(session) ||
+	     sta_ds->staType == STA_ENTRY_TDLS_PEER))
 		he_cap = lim_is_sta_he_capable(sta_ds);
-	if (sta_ds && lim_is_session_eht_capable(session))
+
+	if (sta_ds &&
+	    (lim_is_session_eht_capable(session) ||
+	     sta_ds->staType == STA_ENTRY_TDLS_PEER))
 		eht_cap = lim_is_sta_eht_capable(sta_ds);
+
 	if (sta_ds && sta_ds->staType == STA_ENTRY_NDI_PEER)
 		he_cap = lim_is_session_he_capable(session);
 
