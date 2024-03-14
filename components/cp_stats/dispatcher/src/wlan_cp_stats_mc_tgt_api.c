@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -172,7 +172,8 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
 	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
 	if (!is_station_stats &&
-	    pdev_mc_stats->max_pwr != ev->pdev_stats[pdev_id].max_pwr)
+	    pdev_mc_stats->max_pwr != ev->pdev_stats[pdev_id].max_pwr &&
+	    mac_id == ev->mac_seq_num)
 		wlan_son_deliver_tx_power(vdev,
 					  ev->pdev_stats[pdev_id].max_pwr);
 	if (mac_id == ev->mac_seq_num)
