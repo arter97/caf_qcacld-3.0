@@ -1710,6 +1710,78 @@ wlan_rptr_pdev_ext_connection_cb(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+void sta_disassoc_denied_peer_iter_cb(void *arg, struct ieee80211_node *ni)
+{
+	struct ieee80211vap *vap = (struct ieee80211vap *)arg;
+	struct wlan_objmgr_vdev *vdev = vap->vdev_obj;
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+	struct wlan_rptr_pdev_priv *pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	wlan_rptr_same_ssid_feature_t   *ss_info = &g_priv->ss_info;
+	u_int8_t  macaddr[QDF_MAC_ADDR_SIZE], i;
+
+	if(vap && ni) {
+		qdf_mem_copy(macaddr, ni->ni_macaddr, QDF_MAC_ADDR_SIZE);
+		for (i=0; i < MAX_RADIO_CNT; i++) {
+			if (OS_MEMCMP(macaddr, &ss_info->denied_client_list[i][0],QDF_MAC_ADDR_SIZE) == 0) {
+				/* Assumption here is Some RE STA is scanning and able to find
+				 * this RE as preferred SSID but as the STA MAC is on the denied
+				 * list of this RE, we have to disconnect the STA. We also have
+				 * to increment the custom channel reset counter to go for a
+				 * full scan as Root AP might have moved to another channel and
+				 * thus we are not able to find it in current channel.
+				 */
+				sta_disassoc(NULL, ni);
+				pdev_priv->num_desired_ssid_search_fail_cnt++;
+				return;
+			}
+		}
+	}
+}
+
+QDF_STATUS
+wlan_rptr_set_custom_scan_chan_list_from_ic(struct ieee80211com *ic)
+{
+	struct chan_list *chan_list = NULL;
+	enum wlan_band band;
+
+	qdf_print("Set custom chan list from ic freq:%u flags:%llu chan:%u",
+		ic->ic_curchan->ic_freq, ic->ic_curchan->ic_flags, ic->ic_curchan->ic_ieee);
+
+	chan_list = qdf_mem_malloc(sizeof(*chan_list));
+
+	if (chan_list) {
+		chan_list->num_chan =  1;
+		chan_list->chan[0].freq = ic->ic_curchan->ic_freq;
+		band = wlan_reg_freq_to_band(chan_list->chan[0].freq);
+		if (band == WLAN_BAND_2_4_GHZ)
+			chan_list->chan[0].phymode = SCAN_PHY_MODE_11G;
+		else
+			chan_list->chan[0].phymode = SCAN_PHY_MODE_11A;
+		ucfg_scan_set_custom_scan_chan_list(ic->ic_pdev_obj, chan_list);
+		qdf_mem_free(chan_list);
+		return QDF_STATUS_SUCCESS;
+	}
+	return QDF_STATUS_E_NULL_VALUE;
+}
+
+int32_t wlan_rptr_ioctl_get_rssi_based_bssid(struct wlan_objmgr_pdev *pdev, caddr_t param)
+{
+	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+	struct iface_config_t *iface_config = (struct iface_config_t *)param;
+	int enable_rssi_based_bssid;
+
+	if(g_priv->rssi_based_bssid)
+		enable_rssi_based_bssid = 1;
+	else
+		enable_rssi_based_bssid = 0;
+
+	iface_config->enable_rssi_based_bssid = enable_rssi_based_bssid;
+	return 0;
+}
+qdf_export_symbol(wlan_rptr_ioctl_get_rssi_based_bssid);
+#endif
 /**
  * wlan_rptr_validate_stavap_connection - Validate stavap connection
  * @vdev- vdev object manager
@@ -1727,6 +1799,10 @@ wlan_rptr_validate_stavap_connection(struct wlan_objmgr_vdev *vdev,
 	int i, flag = QDF_STATUS_SUCCESS;
 	struct iterate_info iterate_msg;
 	struct ext_connection_info ext_con_msg;
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+	struct ieee80211vap *tmp_vap;
+	struct ieee80211com *tmp_ic;
+#endif
 
 	pdev = wlan_vdev_get_pdev(vdev);
 
@@ -1810,6 +1886,20 @@ wlan_rptr_validate_stavap_connection(struct wlan_objmgr_vdev *vdev,
 					break;
 				}
 			}
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+			/*make sure we are not allowing STAs in denied list*/
+			for (i=0; i < MAX_RADIO_CNT; i++) {
+				tmp_ic = wlan_vdev_get_ic(vdev);
+				if (tmp_ic) {
+					TAILQ_FOREACH(tmp_vap, &tmp_ic->ic_vaps, iv_next) {
+						if ((tmp_vap->iv_opmode == IEEE80211_M_HOSTAP) &&
+							(wlan_vdev_is_up(tmp_vap->vdev_obj) == QDF_STATUS_SUCCESS)) {
+							wlan_iterate_station_list(tmp_vap, sta_disassoc_denied_peer_iter_cb, tmp_vap);
+						}
+					}
+				}
+			}
+#endif
 		}
 	}
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);

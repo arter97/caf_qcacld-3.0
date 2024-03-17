@@ -33,6 +33,11 @@
 #define RPTR_PDEV_LOCK(_x)    qdf_spin_lock_bh(_x)
 #define RPTR_PDEV_UNLOCK(_x)  qdf_spin_unlock_bh(_x)
 
+#if REPEATER_SAME_SSID && CONFIG_DRONE_MESH_SUPPORT
+#define MESH_SUPPORT_RSSI_LOW -90
+#define MAX_NUM_DESIRED_SSID_SEARCH_THRESHOLD 1
+#endif
+
 #if REPEATER_SAME_SSID
 #define ROOTAP_ACCESS_MASK 0x0F
 #define STAVAP_CONNECTION_MASK 0xF0
@@ -93,6 +98,10 @@ struct wlan_rptr_global_priv {
 #if REPEATER_SAME_SSID
 	wlan_rptr_same_ssid_feature_t   ss_info;
 	u8     preferred_mlo_bssid[QDF_MAC_ADDR_SIZE];
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+	bool   rssi_based_bssid;
+#endif
+
 #endif
 	u8     num_stavaps_up;
 	u16    disconnect_timeout;
@@ -172,6 +181,10 @@ struct wlan_rptr_pdev_priv {
 #if REPEATER_SAME_SSID
 	enum wlan_rptr_ext_connection_type  extender_connection;
 	u8     preferred_bssid[QDF_MAC_ADDR_SIZE];
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+	int8_t     max_rssi;
+	u8     num_desired_ssid_search_fail_cnt;
+#endif
 #endif
 	u8     preferredUplink;
 	u8     nscanpsta;
