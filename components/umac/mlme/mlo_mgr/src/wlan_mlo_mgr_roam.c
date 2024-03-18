@@ -885,7 +885,8 @@ mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 		if (!mlo_dev_ctx->wlan_vdev_list[i])
 			continue;
 
-		if (qdf_test_bit(i, sta_ctx->wlan_connected_links) &&
+		if ((qdf_test_bit(i, sta_ctx->wlan_connected_links) ||
+		     qdf_test_bit(i, sta_ctx->wlan_connect_req_links)) &&
 		    !QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(mlo_dev_ctx->wlan_vdev_list[i]))) {
 			mlo_debug("Vdev id %d is not in up state",
 				  wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]));
@@ -1451,7 +1452,6 @@ mlo_roam_link_connect_notify(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		}
 
 		if (mlo_check_connect_req_bmap(link_vdev)) {
-			mlo_update_connect_req_links(link_vdev, false);
 			status = mlo_roam_prepare_and_send_link_connect_req(assoc_vdev,
 							link_vdev,
 							rsp,
@@ -1459,8 +1459,10 @@ mlo_roam_link_connect_notify(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 							partner_info.partner_link_info[i].chan_freq);
 			if (QDF_IS_STATUS_ERROR(status))
 				goto err;
-			else
+			else {
+				mlo_update_connect_req_links(link_vdev, false);
 				goto end;
+			}
 		}
 	}
 err:
