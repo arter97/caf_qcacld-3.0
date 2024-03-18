@@ -905,6 +905,8 @@ enum {
 	IEEE80211_PARAM_MLO_LINK_REJ_FLAG = 827,
 #endif
 	IEEE80211_PARAM_GTX_ENABLE = 828, /* User config to enable/disable green tx */
+	IEEE80211_PARAM_SHORT_GI20 = 829,
+	IEEE80211_PARAM_SHORT_GI40 = 830,
 };
 
 enum {
