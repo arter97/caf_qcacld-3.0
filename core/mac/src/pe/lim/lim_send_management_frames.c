@@ -669,6 +669,9 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	tDot11fIEExtCap extracted_ext_cap = {0};
 	bool extracted_ext_cap_flag = false;
 	uint16_t mlo_ie_len = 0;
+	uint16_t tpe_ie_len = 0;
+	tDot11fIEtransmit_power_env *transmit_power_env = NULL;
+	uint16_t num_transmit_power_env = 0;
 
 	/* We don't answer requests in this case*/
 	if (ANI_DRIVER_TYPE(mac_ctx) == QDF_DRIVER_TYPE_MFG)
@@ -779,11 +782,6 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_vht_caps(mac_ctx, pe_session, &frm->VHTCaps);
 		populate_dot11f_vht_operation(mac_ctx, pe_session,
 			&frm->VHTOperation);
-		populate_dot11f_tx_power_env(mac_ctx,
-					     &frm->transmit_power_env[0],
-					     pe_session->ch_width,
-					     pe_session->curr_op_freq,
-					     &frm->num_transmit_power_env, false);
 		/*
 		 * we do not support multi users yet.
 		 * populate_dot11f_vht_ext_bss_load( mac_ctx,
@@ -792,13 +790,23 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		is_vht_enabled = true;
 	}
 
-	if (wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq)) {
+	if (pe_session->vhtCapability ||
+	    wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq)) {
+		transmit_power_env = qdf_mem_malloc(
+					WLAN_MAX_NUM_TPE_IE *
+					sizeof(tDot11fIEtransmit_power_env));
+		if (!transmit_power_env)
+			goto err_ret;
+
 		populate_dot11f_tx_power_env(mac_ctx,
-					     &frm->transmit_power_env[0],
+					     transmit_power_env,
 					     pe_session->ch_width,
 					     pe_session->curr_op_freq,
-					     &frm->num_transmit_power_env,
+					     &num_transmit_power_env,
 					     false);
+		tpe_ie_len = lim_get_tpe_ie_length(pe_session->ch_width,
+						   transmit_power_env,
+						   num_transmit_power_env);
 	}
 
 	if (lim_is_session_he_capable(pe_session)) {
@@ -930,7 +938,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			status);
 	}
 
-	bytes += payload + sizeof(tSirMacMgmtHdr) + mlo_ie_len;
+	bytes += payload + sizeof(tSirMacMgmtHdr) + mlo_ie_len + tpe_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				      (void **)&packet);
@@ -961,6 +969,19 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			goto err_ret;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Probe Response pack warning (0x%08x)", status);
+	}
+
+	if (tpe_ie_len) {
+		qdf_status = lim_fill_complete_tpe_ie(
+					pe_session->ch_width, tpe_ie_len,
+					transmit_power_env,
+					num_transmit_power_env, frame +
+					sizeof(tSirMacMgmtHdr) + payload);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_debug("assemble tpe ie error");
+			tpe_ie_len = 0;
+		}
+		payload += tpe_ie_len;
 	}
 
 	if (mlo_ie_len) {
@@ -999,8 +1020,9 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 	if (add_ie)
 		qdf_mem_free(add_ie);
-
+	qdf_mem_free(transmit_power_env);
 	qdf_mem_free(frm);
+
 	return;
 
 err_ret:
@@ -1010,6 +1032,9 @@ err_ret:
 		qdf_mem_free(frm);
 	if (packet)
 		cds_packet_free((void *)packet);
+	if (transmit_power_env)
+		qdf_mem_free(transmit_power_env);
+
 	return;
 
 } /* End lim_send_probe_rsp_mgmt_frame. */
