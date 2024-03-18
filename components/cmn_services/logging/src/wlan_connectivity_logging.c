@@ -986,8 +986,8 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	wlan_diag_event.auth_seq_num = auth_seq;
 	wlan_diag_event.assoc_id = aid;
 
-	if (tag == WLAN_DEAUTH_TX || tag == WLAN_DISASSOC_TX)
-		wlan_populate_vsie(vdev, &wlan_diag_event, true);
+	if (tag == WLAN_DEAUTH_RX || tag == WLAN_DISASSOC_RX)
+		wlan_populate_vsie(vdev, &wlan_diag_event, false);
 
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
 	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
