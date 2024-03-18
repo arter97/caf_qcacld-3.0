@@ -241,7 +241,14 @@ static struct sdio_device_id pld_sdio_id_table[] = {
 static int pld_sdio_reinit(struct sdio_func *sdio_func,
 			   const struct sdio_device_id *id)
 {
-	/* TODO */
+	struct pld_context *pld_context;
+	struct device *dev = &sdio_func->dev;
+
+	pld_context = pld_get_global_context();
+	if (pld_context->ops->reinit)
+		return pld_context->ops->reinit(dev, PLD_BUS_TYPE_SDIO,
+		       sdio_func, (void *)id);
+
 	return -ENODEV;
 }
 
@@ -255,7 +262,12 @@ static int pld_sdio_reinit(struct sdio_func *sdio_func,
  */
 static void pld_sdio_shutdown(struct sdio_func *sdio_func)
 {
-	/* TODO */
+	struct pld_context *pld_context;
+	struct device *dev = &sdio_func->dev;
+
+	pld_context = pld_get_global_context();
+	if (pld_context->ops->shutdown)
+		pld_context->ops->shutdown(dev, PLD_BUS_TYPE_SDIO);
 }
 
 /**
@@ -269,7 +281,12 @@ static void pld_sdio_shutdown(struct sdio_func *sdio_func)
  */
 static void pld_sdio_crash_shutdown(struct sdio_func *sdio_func)
 {
-	/* TODO */
+	struct pld_context *pld_context;
+	struct device *dev = &sdio_func->dev;
+
+	pld_context = pld_get_global_context();
+	if (pld_context->ops->crash_shutdown)
+		pld_context->ops->crash_shutdown(dev, PLD_BUS_TYPE_SDIO);
 }
 
 #ifdef CONFIG_PLD_SDIO_CNSS2
