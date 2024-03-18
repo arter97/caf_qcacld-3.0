@@ -5711,3 +5711,46 @@ wlan_mlme_send_csa_event_status_ind_cmd(struct wlan_objmgr_vdev *vdev,
 	return tx_ops->send_csa_event_status_ind(vdev, csa_status);
 }
 
+uint8_t
+wlan_mlme_get_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return 0;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE) {
+		mlme_debug("Invalid opmode %d", opmode);
+		return 0;
+	}
+
+	return mlme_priv->mlme_ap.psd_20mhz;
+}
+
+QDF_STATUS
+wlan_mlme_set_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev,
+				uint8_t psd_power)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE) {
+		mlme_debug("Invalid opmode %d", opmode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv->mlme_ap.psd_20mhz = psd_power;
+	return QDF_STATUS_SUCCESS;
+}
