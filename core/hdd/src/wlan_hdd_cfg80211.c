@@ -24153,8 +24153,15 @@ done:
 		wma_set_peer_ucast_cipher(mac_address.bytes,
 					  ucast_cipher, cipher_cap);
 
-	cdp_peer_flush_frags(cds_get_context(QDF_MODULE_ID_SOC),
-			     wlan_vdev_get_id(vdev), mac_address.bytes);
+	/*
+	 * The mac address is zero when set broadcast key,
+	 * so we need to skip peer search in the dp side to
+	 * avoid any unnecessary operation since it will
+	 * definitely search failure.
+	 */
+	if (!qdf_is_macaddr_zero(&mac_address))
+		cdp_peer_flush_frags(cds_get_context(QDF_MODULE_ID_SOC),
+				     wlan_vdev_get_id(vdev), mac_address.bytes);
 
 	switch (adapter->device_mode) {
 	case QDF_SAP_MODE:
