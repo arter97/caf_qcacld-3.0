@@ -39,6 +39,7 @@
 #include <qdf_types.h>
 #include "htc_api.h"
 #include "wlan_dp_wfds.h"
+#include "wlan_dp_load_balance.h"
 
 #ifndef NUM_TX_RX_HISTOGRAM
 #define NUM_TX_RX_HISTOGRAM 128
@@ -855,6 +856,7 @@ struct dp_direct_link_context {
  * @inactive_dp_link_list: inactive DP links list
  * @dp_link_del_lock: DP link delete operation lock
  * @svc_ctx: service class context
+ * @lb_data: wlan load balance data structure
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -959,6 +961,9 @@ struct wlan_dp_psoc_context {
 	qdf_spinlock_t dp_link_del_lock;
 #ifdef WLAN_SUPPORT_SERVICE_CLASS
 	struct dp_svc_ctx *svc_ctx;
+#endif
+#ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
+	struct wlan_dp_lb_data lb_data;
 #endif
 };
 
