@@ -2122,12 +2122,12 @@ wlan_cm_set_assoc_btm_cap(struct wlan_objmgr_vdev *vdev, bool val);
 
 /**
  * wlan_cm_get_assoc_btm_cap() - Get the assoc BTM capability
- * @vdev: pointer to vdev
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id
  *
  * Return: BTM cap
  */
-bool
-wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_vdev *vdev);
+bool wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 
 /**
  * wlan_cm_is_self_mld_roam_supported() - Is self mld roam supported
