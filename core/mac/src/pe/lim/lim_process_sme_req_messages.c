@@ -78,14 +78,6 @@
 #include <wlan_mlo_mgr_peer.h>
 #endif
 
-/*
- * As per spec valid range is range –64 dBm to 63 dBm.
- * Powers in range of 64 - 191 will be invalid.
- */
-#define INVALID_TPE_POWER 100
-#define MAX_TX_PWR_COUNT_FOR_160MHZ 3
-#define MAX_NUM_TX_POWER_FOR_320MHZ 5
-
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
 static bool __lim_process_sme_start_bss_req(struct mac_context *,
@@ -5786,6 +5778,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	uint8_t reg_eirp_idx = 0, reg_psd_idx = 0;
 	uint8_t min_count = 0;
 	uint8_t ext_power_updated = 0, eirp_power = 0;
+	uint8_t expect_num;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!vdev_mlme)
@@ -5857,6 +5850,17 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 
 	if (non_psd_set && !psd_set) {
 		single_tpe = tpe_ies[non_psd_index];
+		if (single_tpe.max_tx_pwr_count >
+		    MAX_TX_PWR_COUNT_FOR_160MHZ) {
+			pe_debug("Invalid max tx pwr count: %d",
+				 single_tpe.max_tx_pwr_count);
+			single_tpe.max_tx_pwr_count =
+				MAX_TX_PWR_COUNT_FOR_160MHZ;
+		}
+		expect_num = lim_get_num_pwr_levels(false, session->ch_width);
+		single_tpe.max_tx_pwr_count =
+			QDF_MIN(single_tpe.max_tx_pwr_count, expect_num - 1);
+
 		vdev_mlme->reg_tpc_obj.is_psd_power = false;
 		vdev_mlme->reg_tpc_obj.eirp_power = 0;
 		bw_num = sizeof(get_next_higher_bw) /
@@ -5907,9 +5911,20 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 
 	if (psd_set) {
 		single_tpe = tpe_ies[psd_index];
+		if (single_tpe.max_tx_pwr_count >
+		    MAX_TX_PWR_COUNT_FOR_160MHZ_PSD) {
+			pe_debug("Invalid max tx pwr count psd: %d",
+				 single_tpe.max_tx_pwr_count);
+			single_tpe.max_tx_pwr_count =
+				MAX_TX_PWR_COUNT_FOR_160MHZ_PSD;
+		}
+		expect_num = lim_get_num_pwr_levels(true, session->ch_width);
+
 		vdev_mlme->reg_tpc_obj.is_psd_power = true;
 		num_octets =
 			lim_get_num_tpe_octets(single_tpe.max_tx_pwr_count);
+		num_octets = QDF_MIN(num_octets, expect_num);
+
 		vdev_mlme->reg_tpc_obj.num_pwr_levels = num_octets;
 
 		ch_params.ch_width = session->ch_width;
