@@ -114,10 +114,28 @@ struct dlm_reject_ap_timestamp {
 	qdf_time_t driver_monitor_timestamp;
 };
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * struct dlm_reject_mlo_ap_info - structure to hold mlo AP info in rejectlist
+ * @mld_addr: AP mld address
+ * @tried_links: bitmap of tried partner links combination
+ * @tried_link_count: no of combination for bssid/assoc link specified in
+ * reject_ap_info
+ * @link_action: link combinations that need to avoided
+ */
+struct dlm_reject_mlo_ap_info {
+	struct qdf_mac_addr mld_addr;
+	uint16_t tried_links[MAX_CONNECTION_TRIAL_PER_ASSOC_LINK];
+	uint8_t tried_link_count;
+	uint8_t link_action;
+};
+#endif
+
 /**
  * struct dlm_reject_ap - Structure of a node added to denylist manager
  * @node: Node of the entry
  * @bssid: Bssid of the AP entry.
+ * @dlm_reject_mlo_ap_info: dlm reject ap info
  * @rssi_reject_params: Rssi reject params of the AP entry.
  * @bad_bssid_counter: It represent how many times data stall happened.
  * @ap_timestamp: AP timestamp.
@@ -141,12 +159,20 @@ struct dlm_reject_ap_timestamp {
  * @btm_mbo_retry: BTM MBO retry reason
  * @reassoc_rssi_reject: Reassociation RSSI rejection reason
  * @no_more_stas: AP reached STA capacity reason
+ * @basic_rates_mismatched: rate mismatch
+ * @eht_not_supported:EHT not supported
+ * @tx_link_denied: TX LINK not accepted by AP
+ * @same_address_present_in_ap: same MLD address present in AP
+ * @other: other reasons
  * @source: source of the rejection
  * @connect_timestamp: Timestamp when the STA got connected with this BSSID
  */
 struct dlm_reject_ap {
 	qdf_list_node_t node;
 	struct qdf_mac_addr bssid;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct dlm_reject_mlo_ap_info dlm_reject_mlo_ap_info;
+#endif
 	struct dlm_rssi_disallow_params rssi_reject_params;
 	uint8_t bad_bssid_counter;
 	struct dlm_reject_ap_timestamp ap_timestamp;
@@ -174,7 +200,12 @@ struct dlm_reject_ap {
 				 btm_bss_termination:1,
 				 btm_mbo_retry:1,
 				 reassoc_rssi_reject:1,
-				 no_more_stas:1;
+				 no_more_stas:1,
+				 basic_rates_mismatched:1,
+				 eht_not_supported:1,
+				 tx_link_denied:1,
+				 same_address_present_in_ap:1,
+				 other:1;
 		};
 		uint32_t reject_ap_reason;
 	};
