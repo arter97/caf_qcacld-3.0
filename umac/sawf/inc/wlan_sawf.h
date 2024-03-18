@@ -301,9 +301,7 @@ struct qca_sawf_flow_deprioritize_params;
 struct sawf_ctx {
 	qdf_spinlock_t lock;
 	struct wlan_sawf_svc_class_params svc_classes[SAWF_SVC_CLASS_MAX];
-#ifdef SAWF_ADMISSION_CONTROL
 	void (*wlan_sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *);
-#endif
 };
 
 struct psoc_peer_iter {
@@ -742,7 +740,6 @@ void wlan_sawf_notify_breach(uint8_t *mac_addr,
 			     uint8_t tid,
 			     uint8_t queue_id);
 
-#ifdef SAWF_ADMISSION_CONTROL
 /* wlan_sawf_set_flow_deprioritize_callback()- Set flow deprioritization
  *    function callback
  *
@@ -759,7 +756,6 @@ bool wlan_sawf_set_flow_deprioritize_callback(void (*sawf_flow_deprioritize_call
  * Return: None
  */
 void wlan_sawf_flow_deprioritize(struct qca_sawf_flow_deprioritize_params *params);
-#endif
 #else
 static inline
 int wlan_sawf_get_tput_stats(void *soc, void *arg, uint64_t *in_bytes,

@@ -1557,8 +1557,8 @@ error_cleanup:
 }
 
 qdf_export_symbol(wlan_sawf_send_peer_msduq_event_nl);
+#endif
 
-#ifdef SAWF_ADMISSION_CONTROL
 bool wlan_sawf_set_flow_deprioritize_callback(void (*sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *params))
 {
 	struct sawf_ctx *sawf_ctx;
@@ -1590,5 +1590,3 @@ void wlan_sawf_flow_deprioritize(struct qca_sawf_flow_deprioritize_params *depri
 }
 
 qdf_export_symbol(wlan_sawf_flow_deprioritize);
-#endif
-#endif
