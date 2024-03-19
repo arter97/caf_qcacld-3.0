@@ -977,6 +977,12 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	 * is set/enabled.
 	 */
 	value = QDF_MIN(he_cap->flex_twt_sched, (twt_req || twt_resp));
+	/*
+	 * mlme obj will have intersected flex_twt_sched value
+	 * taken from ini value, FW capability and twt req/resp
+	 */
+	value = QDF_MIN(value,
+			mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched);
 	mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched = value;
 
 	mlme_obj->cfg.he_caps.dot11_he_cap.ba_32bit_bitmap =

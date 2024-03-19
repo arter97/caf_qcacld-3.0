@@ -2034,7 +2034,7 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	 */
 	he_caps->dot11_he_cap.broadcast_twt = 0;
 
-	is_twt_enabled = wlan_twt_cfg_is_twt_enabled(psoc);
+	is_twt_enabled = cfg_get(psoc, CFG_ENABLE_TWT);
 
 	if (is_twt_enabled)
 		he_caps->dot11_he_cap.flex_twt_sched =
