@@ -341,12 +341,14 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
  * Version 4 - WMI_HOST_VENDOR1_REQ1_VERSION_3_40 updated.
  * Version 5 - INI based 11BE support updated
  * Version 6 - sta dump info updated
+ * Version 7 - NAN standard plus feature support updated
+ * Version 8 - INI based NAN EHT capability support updated
  *
  * Return: None
  */
 static void wma_update_set_feature_version(struct target_feature_set *fs)
 {
-	fs->feature_set_version = 6;
+	fs->feature_set_version = 8;
 }
 
 /**
@@ -506,6 +508,7 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->peer_bigdata_assocreject_info_support = true;
 	feature_set->peer_getstainfo_support = true;
 	feature_set->sta_dump_support = true;
+	feature_set->is_nan_eht_cap_enable = cfg_nan_is_eht_cap_enable(psoc);
 	wma_update_set_feature_version(feature_set);
 }
 
