@@ -89,7 +89,6 @@
  * MCL platform.
  */
 #define WMA_SET_VDEV_IE_SOURCE_HOST 0x0
-#define CH_WR_IE_MAX_LEN 29
 
 /*
  * Max AMPDU Tx Aggr supported size
@@ -1222,9 +1221,7 @@ wma_parse_ch_switch_wrapper_ie(uint8_t *ch_wr_ie, uint8_t sub_ele_id,
 	struct extn_ie_header *extn_ie;
 
 	ele = (struct ie_header *)ch_wr_ie;
-	if (ele->ie_id != WLAN_ELEMID_CHAN_SWITCH_WRAP ||
-	    ele->ie_len == 0 || ele->ie_len > (CH_WR_IE_MAX_LEN -
-					       sizeof(struct ie_header))) {
+	if (ele->ie_id != WLAN_ELEMID_CHAN_SWITCH_WRAP || ele->ie_len == 0) {
 		wma_debug("Invalid len: %d", ele->ie_len);
 		return NULL;
 	}
