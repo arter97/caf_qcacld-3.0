@@ -1718,10 +1718,22 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				pe_session);
 			goto free;
 		}
-		if ((sir_convert_auth_frame2_struct(mac_ctx, plainbody,
-				frame_len - 8, rx_auth_frame) != QDF_STATUS_SUCCESS)
-				|| (!is_auth_valid(mac_ctx, rx_auth_frame,
-							pe_session))) {
+		qdf_status = sir_convert_auth_frame2_struct(mac_ctx, plainbody,
+							    frame_len - 8, rx_auth_frame);
+		if (QDF_IS_STATUS_SUCCESS(qdf_status) && pe_session->opmode == QDF_SAP_MODE &&
+		    rx_auth_frame->authTransactionSeqNumber != SIR_MAC_AUTH_FRAME_1 &&
+		    rx_auth_frame->authTransactionSeqNumber != SIR_MAC_AUTH_FRAME_3) {
+			pe_debug("received Authentication frame from peer with wrong seq num %d: "
+			       QDF_MAC_ADDR_FMT, rx_auth_frame->authTransactionSeqNumber,
+			       QDF_MAC_ADDR_REF(mac_hdr->sa));
+			auth_frame->authTransactionSeqNumber = SIR_MAC_AUTH_FRAME_2;
+			auth_frame->authStatusCode = STATUS_UNKNOWN_AUTH_TRANSACTION;
+			lim_send_auth_mgmt_frame(mac_ctx, auth_frame, mac_hdr->sa,
+						 LIM_WEP_IN_FC, pe_session);
+			goto free;
+		}
+		if (qdf_status != QDF_STATUS_SUCCESS ||
+		    !is_auth_valid(mac_ctx, rx_auth_frame, pe_session)) {
 			pe_err("failed to convert Auth Frame to structure or Auth is not valid");
 			goto free;
 		}
@@ -1741,14 +1753,27 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			lim_process_ft_auth_frame(mac_ctx,
 						  rx_pkt_info, pe_session);
 		goto free;
-	} else if ((sir_convert_auth_frame2_struct(mac_ctx, body_ptr,
-				frame_len, rx_auth_frame) != QDF_STATUS_SUCCESS)
-				|| (!is_auth_valid(mac_ctx, rx_auth_frame,
-						pe_session))) {
-		pe_err("failed to convert Auth Frame to structure or Auth is not valid");
-		goto free;
+	} else {
+		qdf_status = sir_convert_auth_frame2_struct(mac_ctx, body_ptr,
+							    frame_len, rx_auth_frame);
+		if (QDF_IS_STATUS_SUCCESS(qdf_status) && pe_session->opmode == QDF_SAP_MODE &&
+		    rx_auth_frame->authTransactionSeqNumber != SIR_MAC_AUTH_FRAME_1 &&
+		    rx_auth_frame->authTransactionSeqNumber != SIR_MAC_AUTH_FRAME_3) {
+			pe_debug("received Authentication frame from peer with wrong seq num %d: "
+			       QDF_MAC_ADDR_FMT, rx_auth_frame->authTransactionSeqNumber,
+			       QDF_MAC_ADDR_REF(mac_hdr->sa));
+			auth_frame->authTransactionSeqNumber = SIR_MAC_AUTH_FRAME_2;
+			auth_frame->authStatusCode = STATUS_UNKNOWN_AUTH_TRANSACTION;
+			lim_send_auth_mgmt_frame(mac_ctx, auth_frame, mac_hdr->sa,
+						 LIM_NO_WEP_IN_FC, pe_session);
+			goto free;
+		}
+		if (qdf_status != QDF_STATUS_SUCCESS ||
+		    !is_auth_valid(mac_ctx, rx_auth_frame, pe_session)) {
+			pe_err("failed to convert Auth Frame to structure or Auth is not valid");
+			goto free;
+		}
 	}
-
 	rx_auth_frm_body = rx_auth_frame;
 
 	if (!lim_is_valid_fils_auth_frame(mac_ctx, pe_session,

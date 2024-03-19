@@ -18208,7 +18208,7 @@ static void hdd_distroy_wifi_feature_interface(void)
 
 void hdd_driver_unload(void)
 {
-	struct osif_driver_sync *driver_sync;
+	struct osif_driver_sync *driver_sync = NULL;
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
 	void *hif_ctx;
@@ -18232,12 +18232,14 @@ void hdd_driver_unload(void)
 	 * the driver load/unload flag to further ensure that any upcoming
 	 * trans are rejected via wlan_hdd_validate_context.
 	 */
-	status = osif_driver_sync_trans_start_wait(&driver_sync);
-	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Unable to unload wlan; status:%u", status);
-		hdd_place_marker(NULL, "UNLOAD FAILURE", NULL);
-		return;
+	if (!cds_is_pcie_link_resume_fail()) {
+		status = osif_driver_sync_trans_start_wait(&driver_sync);
+		QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Unable to unload wlan; status:%u", status);
+			hdd_place_marker(NULL, "UNLOAD FAILURE", NULL);
+			return;
+		}
 	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
@@ -18266,7 +18268,8 @@ void hdd_driver_unload(void)
 	 * Stop the trans before calling unregister_driver as that involves a
 	 * call to pld_remove which in itself is a psoc transaction
 	 */
-	osif_driver_sync_trans_stop(driver_sync);
+	if (driver_sync)
+		osif_driver_sync_trans_stop(driver_sync);
 
 	hdd_distroy_wifi_feature_interface();
 	if (!soft_unload)
@@ -18275,16 +18278,19 @@ void hdd_driver_unload(void)
 	/* trigger SoC remove */
 	wlan_hdd_unregister_driver();
 
-	status = osif_driver_sync_trans_start_wait(&driver_sync);
-	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Unable to unload wlan; status:%u", status);
-		hdd_place_marker(NULL, "UNLOAD FAILURE", NULL);
-		return;
+	if (!cds_is_pcie_link_resume_fail()) {
+		status = osif_driver_sync_trans_start_wait(&driver_sync);
+		QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Unable to unload wlan; status:%u", status);
+			hdd_place_marker(NULL, "UNLOAD FAILURE", NULL);
+			return;
+		}
 	}
 
 	osif_driver_sync_unregister();
-	osif_driver_sync_wait_for_ops(driver_sync);
+	if (driver_sync)
+		osif_driver_sync_wait_for_ops(driver_sync);
 
 	hdd_driver_mode_change_unregister();
 	pld_deinit();
@@ -18294,8 +18300,10 @@ void hdd_driver_unload(void)
 	hdd_component_cb_deinit();
 	hdd_deinit();
 
-	osif_driver_sync_trans_stop(driver_sync);
-	osif_driver_sync_destroy(driver_sync);
+	if (driver_sync) {
+		osif_driver_sync_trans_stop(driver_sync);
+		osif_driver_sync_destroy(driver_sync);
+	}
 
 	osif_sync_deinit();
 

@@ -1053,6 +1053,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	bool srd_chan_enabled;
 
 	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	if (policy_mgr_is_sap_mandatory_channel_set(psoc)) {
 		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
@@ -2773,6 +2777,13 @@ enum policy_mgr_three_connection_mode
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq)) {
 			index = PM_STA_SAP_SCC_5_SAP_24_DBS;
+		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq)) {
+	   		index = PM_SAP_SAP_SCC_5_STA_24_DBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -3739,6 +3750,7 @@ bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_two_connection_mode third_index = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool ret = false;
+	bool force_scc = policy_mgr_is_force_scc(psoc);
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3746,9 +3758,9 @@ bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 			return false;
 	}
 
-	if (pm_conc_connection_list[0].freq != ch_freq ||
+	if (!force_scc && (pm_conc_connection_list[0].freq != ch_freq ||
 	    pm_conc_connection_list[0].freq !=
-				pm_conc_connection_list[1].freq) {
+				pm_conc_connection_list[1].freq)) {
 		policy_mgr_debug("No MCC support in 3vif in same mac: %d %d %d",
 				 pm_conc_connection_list[0].freq,
 				 pm_conc_connection_list[1].freq,
