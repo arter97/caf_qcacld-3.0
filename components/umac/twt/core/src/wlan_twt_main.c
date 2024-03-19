@@ -2391,7 +2391,8 @@ wlan_is_twt_session_present_for_given_peer(struct wlan_objmgr_psoc *psoc,
 	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_macaddr,
 					   WLAN_TWT_ID);
 	if (!peer) {
-		twt_err("peer is null for " QDF_MAC_ADDR_FMT, peer_macaddr);
+		twt_err("peer is null for " QDF_MAC_ADDR_FMT,
+					QDF_MAC_ADDR_REF(peer_macaddr));
 		return status;
 	}
 
