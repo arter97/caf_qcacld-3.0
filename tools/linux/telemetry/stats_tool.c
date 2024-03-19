@@ -899,6 +899,8 @@ void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 	STATS_32(stdout, "Tx Failed Retry Count", tx->failed_retry_count);
 	STATS_32(stdout, "Tx Total Retry Count", tx->retry_count);
 	STATS_32(stdout, "Tx Multiple Retry Count", tx->multiple_retry_count);
+	STATS_32(stdout, "Tx mpdu_retries", tx->mpdu_retries);
+	STATS_32(stdout, "Tx total_mpdu_retries", tx->total_mpdu_retries);
 	STATS_32(stdout, "Tx Release Source Not TQM", tx->release_src_not_tqm);
 	STATS_32(stdout, "Tx Invalid Link ID Packet Count", tx->inval_link_id);
 	STATS_32(stdout, "Tx PPDUs", tx->tx_ppdus);
