@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1592,6 +1592,7 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	tpDphHashNode sta_ds;
 	uint16_t aid, buff_size;
 	bool he_cap = false;
+	struct wlan_mlme_qos *qos_aggr;
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
@@ -1628,8 +1629,12 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	else
 		buff_size = SIR_MAC_BA_DEFAULT_BUFF_SIZE;
 
-	if (mac_ctx->usr_cfg_ba_buff_size)
+	if (mac_ctx->usr_cfg_ba_buff_size) {
 		buff_size = mac_ctx->usr_cfg_ba_buff_size;
+	} else {
+		qos_aggr = &mac_ctx->mlme_cfg->qos_mlme_params;
+		buff_size = QDF_MIN(buff_size, qos_aggr->rx_aggregation_size);
+	}
 
 	if (addba_req->addba_param_set.buff_size)
 		buff_size = QDF_MIN(buff_size,

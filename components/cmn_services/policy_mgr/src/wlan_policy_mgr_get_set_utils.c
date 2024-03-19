@@ -5053,10 +5053,12 @@ bool policy_mgr_go_scc_enforced(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-#ifdef WLAN_FEATURE_P2P_P2P_STA
 uint8_t
-policy_mgr_check_forcescc_for_other_go(struct wlan_objmgr_psoc *psoc,
-				       uint8_t vdev_id, uint32_t freq)
+policy_mgr_fetch_existing_con_info(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, uint32_t freq,
+				   enum policy_mgr_con_mode *mode,
+				   uint32_t *existing_con_freq,
+				   enum phy_ch_width *existing_ch_width)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t conn_index;
@@ -5070,25 +5072,38 @@ policy_mgr_check_forcescc_for_other_go(struct wlan_objmgr_psoc *psoc,
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
 	     conn_index++) {
-		if (pm_conc_connection_list[conn_index].mode ==
-		    PM_P2P_GO_MODE &&
+		if ((pm_conc_connection_list[conn_index].mode ==
+		    PM_P2P_GO_MODE ||
+		    pm_conc_connection_list[conn_index].mode ==
+		    PM_SAP_MODE ||
+		    pm_conc_connection_list[conn_index].mode ==
+		    PM_P2P_CLIENT_MODE ||
+		    pm_conc_connection_list[conn_index].mode ==
+		    PM_STA_MODE) &&
 		    pm_conc_connection_list[conn_index].in_use &&
-		    wlan_reg_is_same_band_freqs(
-				freq,
-				pm_conc_connection_list[conn_index].freq) &&
+		    WLAN_REG_IS_SAME_BAND_FREQS(
+		    freq, pm_conc_connection_list[conn_index].freq) &&
 		    freq != pm_conc_connection_list[conn_index].freq &&
 		    vdev_id != pm_conc_connection_list[conn_index].vdev_id) {
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 			policy_mgr_debug(
-				"Existing p2p go vdev_id is %d",
+				"Existing vdev_id for mode %d is %d",
+				pm_conc_connection_list[conn_index].mode,
 				pm_conc_connection_list[conn_index].vdev_id);
+			*mode = pm_conc_connection_list[conn_index].mode;
+			*existing_con_freq =
+				pm_conc_connection_list[conn_index].freq;
+			*existing_ch_width = policy_mgr_get_ch_width(
+					pm_conc_connection_list[conn_index].bw);
 			return pm_conc_connection_list[conn_index].vdev_id;
 		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
 	return WLAN_UMAC_VDEV_ID_MAX;
 }
 
+#ifdef WLAN_FEATURE_P2P_P2P_STA
 bool policy_mgr_is_go_scc_strict(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;

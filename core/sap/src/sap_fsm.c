@@ -907,6 +907,42 @@ static bool is_mcc_preferred(struct sap_context *sap_context,
 	return false;
 }
 
+/**
+ * sap_process_force_scc_with_go_start - Check GO force SCC or not
+ * psoc: psoc object
+ * sap_context: sap_context
+ *
+ * This function checks the current SAP MCC or not with the GO's home channel.
+ * If it is, skip the GO's force SCC. The SAP will do force SCC after
+ * GO's started.
+ *
+ * Return: true if skip GO's force SCC
+ */
+static bool
+sap_process_force_scc_with_go_start(struct wlan_objmgr_psoc *psoc,
+				    struct sap_context *sap_context)
+{
+	uint8_t existing_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	enum policy_mgr_con_mode existing_vdev_mode = PM_MAX_NUM_OF_MODE;
+	uint32_t con_freq;
+	enum phy_ch_width ch_width;
+
+	existing_vdev_id =
+		policy_mgr_fetch_existing_con_info(psoc,
+						   sap_context->sessionId,
+						   sap_context->chan_freq,
+						   &existing_vdev_mode,
+						   &con_freq, &ch_width);
+	if (existing_vdev_id < WLAN_UMAC_VDEV_ID_MAX &&
+	    existing_vdev_mode == PM_SAP_MODE) {
+		sap_debug("concurrent sap vdev: %d on freq %d, skip GO force scc",
+			  existing_vdev_id, con_freq);
+		return true;
+	}
+
+	return false;
+}
+
 #ifdef WLAN_FEATURE_P2P_P2P_STA
 /**
  * sap_set_forcescc_required - set force scc flag for provided p2p go vdev
@@ -937,9 +973,64 @@ static void sap_set_forcescc_required(uint8_t vdev_id)
 		}
 	}
 }
+
+/**
+ * sap_process_liberal_scc_for_go - based on existing connections this
+ * function decides current go should start on provided channel or not and
+ * sets force scc required bit for existing GO.
+ *
+ * sap_context: sap_context
+ *
+ * Return: bool
+ */
+static bool sap_process_liberal_scc_for_go(struct sap_context *sap_context)
+{
+	uint8_t existing_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	enum policy_mgr_con_mode existing_vdev_mode = PM_MAX_NUM_OF_MODE;
+	uint32_t con_freq;
+	enum phy_ch_width ch_width;
+	struct mac_context *mac_ctx;
+	mac_handle_t mac_handle;
+
+	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
+	mac_ctx = MAC_CONTEXT(mac_handle);
+	if (!mac_ctx) {
+		sap_alert("invalid MAC handle");
+		return true;
+	}
+
+	existing_vdev_id =
+		policy_mgr_fetch_existing_con_info(
+				mac_ctx->psoc,
+				sap_context->sessionId,
+				sap_context->chan_freq,
+				&existing_vdev_mode,
+				&con_freq, &ch_width);
+
+	if (existing_vdev_id <
+			WLAN_UMAC_VDEV_ID_MAX &&
+			existing_vdev_mode == PM_P2P_GO_MODE) {
+		sap_debug("set forcescc flag for go vdev: %d",
+			  existing_vdev_id);
+		sap_set_forcescc_required(
+				existing_vdev_id);
+		return true;
+	}
+	if (existing_vdev_id < WLAN_UMAC_VDEV_ID_MAX &&
+	    (existing_vdev_mode == PM_STA_MODE ||
+	    existing_vdev_mode == PM_P2P_CLIENT_MODE)) {
+		sap_debug("don't override channel, start go on %d",
+			  sap_context->chan_freq);
+		return true;
+	}
+
+	return false;
+}
 #else
-static void sap_set_forcescc_required(uint8_t vdev_id)
-{}
+static bool sap_process_liberal_scc_for_go(struct sap_context *sap_context)
+{
+	return false;
+}
 #endif
 
 QDF_STATUS
@@ -958,7 +1049,7 @@ sap_validate_chan(struct sap_context *sap_context,
 	bool go_force_scc;
 	struct ch_params ch_params;
 	bool is_go_scc_strict = false;
-	uint8_t first_p2p_go_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	bool start_sap_on_provided_freq = false;
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
 	mac_ctx = MAC_CONTEXT(mac_handle);
@@ -977,35 +1068,37 @@ sap_validate_chan(struct sap_context *sap_context,
 	    sap_context->vdev->vdev_mlme.vdev_opmode == QDF_P2P_GO_MODE) {
 	       /*
 		* check whether go_force_scc is enabled or not.
-		* If it not enabled then don't any force scc on existing and new
-		* p2p go vdevs.
+		* If it not enabled then don't any force scc on existing go and
+		* new p2p go vdevs.
 		* Otherwise, if it is enabled then check whether it's in strict
 		* mode or liberal mode.
-		* For strict mode, do force scc on newly p2p go to existing p2p
-		* go channel.
-		* For liberal mode, first form new p2p go on requested channel.
-		* Once set key is done, do force scc on existing p2p go to new
-		* p2p go channel.
+		* For strict mode, do force scc on newly p2p go to existing vdev
+		* channel.
+		* For liberal first form new p2p go on requested channel and
+		* follow below rules:
+		* a.) If Existing vdev mode is P2P GO Once set key is done, do
+		* force scc for existing p2p go and move that go to new p2p
+		* go's channel.
+		*
+		* b.) If Existing vdev mode is P2P CLI/STA Once set key is
+		* done, do force scc for p2p go and move go to cli/sta channel.
 		*/
 		go_force_scc = policy_mgr_go_scc_enforced(mac_ctx->psoc);
-		sap_debug("go force scc value %d", go_force_scc);
+		sap_debug("go force scc enabled %d", go_force_scc);
+
+		if (sap_process_force_scc_with_go_start(mac_ctx->psoc,
+							sap_context))
+			goto validation_done;
+
 		if (go_force_scc) {
 			is_go_scc_strict =
 				policy_mgr_is_go_scc_strict(mac_ctx->psoc);
 			if (!is_go_scc_strict) {
 				sap_debug("liberal mode is enabled");
-				first_p2p_go_vdev_id =
-					policy_mgr_check_forcescc_for_other_go(
-						mac_ctx->psoc,
-						sap_context->sessionId,
-						sap_context->chan_freq);
-
-				if (first_p2p_go_vdev_id <
-				    WLAN_UMAC_VDEV_ID_MAX) {
-					sap_set_forcescc_required(
-							first_p2p_go_vdev_id);
+				start_sap_on_provided_freq =
+				sap_process_liberal_scc_for_go(sap_context);
+				if (start_sap_on_provided_freq)
 					goto validation_done;
-				}
 			}
 		} else {
 			goto validation_done;
