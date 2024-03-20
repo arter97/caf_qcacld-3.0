@@ -257,12 +257,11 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 
 	if (sap_info.mode == PM_SAP_MODE) {
 		/*
-		 * For SBS case, no need to restart concurrent SAP as LL_LT_SAP
-		 * and concurrent SAP can be on different MACs
+		 * For dynamice SBS case, no need to restart concurrent SAP as
+		 * LL_LT_SAP and concurrent SAP can be on different MACs
 		 */
-		if (policy_mgr_is_hw_sbs_capable(psoc))
+		if (policy_mgr_is_dynamic_sbs_enabled(psoc))
 			return;
-
 		/*
 		 * If concurrent SAP is 2.4 GHz and ll_lt_sap is getting enabled
 		 * then there is no need to restart the concurrent SAP

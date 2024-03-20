@@ -5865,4 +5865,12 @@ QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
 bool policy_mgr_mon_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t freq);
 
+/**
+ * policy_mgr_is_dynamic_sbs_enabled() - Check if dynamic sbs is enabled
+ * @psoc: psoc pointer
+ *
+ * Return: true/false.
+ */
+bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc);
+
 #endif /* __WLAN_POLICY_MGR_API_H */

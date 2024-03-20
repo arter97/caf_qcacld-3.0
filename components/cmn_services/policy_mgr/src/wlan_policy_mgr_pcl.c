@@ -43,6 +43,7 @@
 #include "wlan_nan_api.h"
 #include "wlan_mlo_link_force.h"
 #include "wlan_ll_sap_api.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 /*
  * first_connection_pcl_table - table which provides PCL for the
@@ -1220,6 +1221,41 @@ static bool policy_mgr_channel_mcc_with_non_sap(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * policy_mgr_channel_mcc_with_ll_lt_sap_in_static_sbs() - Helper function to
+ * check if channel is MCC with LL_LT_SAP in static sbs case.
+ * @psoc: pointer to SOC
+ * @chan_freq: channel frequency to check
+ *
+ * Return: true if MCC with LL_LT_SAP in static sbs case, otherwise false.
+ */
+static bool policy_mgr_channel_mcc_with_ll_lt_sap_in_static_sbs(
+						struct wlan_objmgr_psoc *psoc,
+						qdf_freq_t chan_freq)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	if (policy_mgr_is_dynamic_sbs_enabled(psoc))
+		return false;
+
+	/*
+	 * If dynamic SBS is not enabled then if current frequency is 5 GHz
+	 * or 6Ghz it will always result in MCC with LL_LT_SAP as LL_LT_SAP
+	 * will always be allowed on 5 GHz or 6GHz
+	 */
+	if (wlan_reg_is_5ghz_ch_freq(chan_freq) ||
+	    wlan_reg_is_6ghz_chan_freq(chan_freq))
+		return true;
+
+	return false;
+}
+
+/**
  * policy_mgr_modify_sap_pcl_filter_mcc() - API to filter out MCC channel with
  * existing non-SAP connection frequency from SAP PCL list.
  * @psoc: pointer to SOC
@@ -1239,6 +1275,7 @@ policy_mgr_modify_sap_pcl_filter_mcc(struct wlan_objmgr_psoc *psoc,
 {
 	uint32_t i, pcl_len = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t ll_lt_sap_vdev_id;
 
 	if (mode == PM_LL_LT_SAP_MODE)
 		return QDF_STATUS_SUCCESS;
@@ -1259,8 +1296,18 @@ policy_mgr_modify_sap_pcl_filter_mcc(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	ll_lt_sap_vdev_id =
+			wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
+
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (policy_mgr_channel_mcc_with_non_sap(psoc, pcl_list_org[i]))
+			continue;
+
+		/* Filter MCC with LL_LT_SAP */
+		if (ll_lt_sap_vdev_id != WLAN_INVALID_VDEV_ID &&
+		    (policy_mgr_channel_mcc_with_ll_lt_sap_in_static_sbs(
+							psoc,
+							pcl_list_org[i])))
 			continue;
 
 		pcl_list_org[pcl_len] = pcl_list_org[i];
@@ -1510,7 +1557,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 	return QDF_STATUS_SUCCESS;
 }
 
-static bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
+bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
