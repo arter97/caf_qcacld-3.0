@@ -1881,6 +1881,14 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	if (!hdd_ctx)
 		return QDF_STATUS_E_FAILURE;
 
+	if (ucfg_ipa_is_enabled()) {
+		ucfg_ipa_uc_force_pipe_shutdown(hdd_ctx->pdev);
+
+		if (pld_is_fw_rejuvenate(hdd_ctx->parent_dev) ||
+		    pld_is_pdr(hdd_ctx->parent_dev))
+			ucfg_ipa_fw_rejuvenate_send_msg(hdd_ctx->pdev);
+	}
+
 	hdd_set_connection_in_progress(false);
 
 	hdd_debug("Invoking packetdump deregistration API");

@@ -6488,6 +6488,33 @@ cm_populate_roam_success_mlo_param(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+/**
+ * cm_roam_cancel_event() - Send roam cancelled diag event
+ * @vdev_id: Vdev id
+ * @reason: Roam failure reason code
+ * @fw_timestamp: Firmware timestamp
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+cm_roam_cancel_event(uint8_t vdev_id, enum wlan_roam_failure_reason_code reason,
+		     uint64_t fw_timestamp)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_roam_result);
+
+	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
+
+	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id, fw_timestamp,
+			  NULL);
+
+	wlan_diag_event.version = DIAG_ROAM_RESULT_VERSION;
+	wlan_diag_event.roam_fail_reason = reason;
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_ROAM_CANCEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_trigger_info *trigger,
 			       struct wmi_roam_result *res,
@@ -6496,6 +6523,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t i;
 	struct qdf_mac_addr bssid = {0};
+	enum wlan_roam_failure_reason_code roam_cancel_reason;
 	bool roam_abort = (res->fail_reason == ROAM_FAIL_REASON_SYNC ||
 			   res->fail_reason == ROAM_FAIL_REASON_DISCONNECT ||
 			   res->fail_reason == ROAM_FAIL_REASON_HOST ||
@@ -6505,9 +6533,30 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 				ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO);
 	bool is_full_scan = (scan_data->present &&
 			scan_data->type == WLAN_ROAM_SCAN_TYPE_FULL_SCAN);
+	bool is_roam_cancel =
+		(res->fail_reason == ROAM_FAIL_REASON_SCAN_CANCEL);
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
 				 struct wlan_diag_roam_result);
+
+	if (is_roam_cancel) {
+		if (res->roam_abort_reason ==
+		    WMI_ROAM_SCAN_CANCEL_IDLE_SCREEN_ON) {
+			roam_cancel_reason = ROAM_FAIL_REASON_SCREEN_ACTIVITY;
+		} else if (res->roam_abort_reason ==
+			 WMI_ROAM_SCAN_CANCEL_OTHER_PRIORITY_ROAM_SCAN) {
+			roam_cancel_reason =
+				ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN;
+		} else {
+			mlme_debug("vdev:%d Unsupported abort reason:%d",
+				   vdev_id, res->roam_abort_reason);
+			return;
+		}
+
+		cm_roam_cancel_event(vdev_id, roam_cancel_reason,
+				     res->timestamp);
+		return;
+	}
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
@@ -6582,7 +6631,6 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 				       trigger->trigger_reason,
 				       wlan_diag_event.is_roam_successful,
 				       is_full_scan, res->fail_reason);
-
 }
 
 #endif
