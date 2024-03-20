@@ -556,6 +556,8 @@ static QDF_STATUS tdls_process_rx_mgmt(
 				return QDF_STATUS_SUCCESS;
 			} else if (status == QDF_STATUS_SUCCESS) {
 				vdev = tdls_process_mlo_choice_tdls_vdev(vdev);
+				if (!vdev)
+					return QDF_STATUS_SUCCESS;
 				tdls_vdev =
 				     wlan_objmgr_vdev_get_comp_private_obj(vdev,
 							   WLAN_UMAC_COMP_TDLS);
