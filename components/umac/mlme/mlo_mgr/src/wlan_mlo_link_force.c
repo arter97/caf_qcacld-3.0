@@ -4656,10 +4656,15 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 		tgt_ch_freq = data->evt.csa_start.tgt_ch_freq;
 
 	for (i = 0; i < ml_num_link; i++) {
-		if (ml_vdev_lst[i] == WLAN_INVALID_VDEV_ID)
+		/* force inactive num = 2 amongst all links for 3-link ML STA */
+		force_inactive_num_bitmap |= 1 << ml_linkid_lst[i];
+		force_inactive_num++;
+
+		if ((ml_num_link > 2) || (ml_vdev_lst[i] ==
+		    WLAN_INVALID_VDEV_ID) ||
+		    policy_mgr_vdev_is_force_inactive(psoc, ml_vdev_lst[i]))
 			continue;
-		if (policy_mgr_vdev_is_force_inactive(psoc, ml_vdev_lst[i]))
-			continue;
+
 		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i])) {
 			/* ML STA 5GH+5GH, if SAP CSA to SCC channel of ML STA,
 			 * downgrade EMLSR to MLSR by force inactive the other
@@ -4674,9 +4679,6 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 					force_inactive_bitmap |=
 					1 << ml_linkid_lst[i];
 			}
-
-			force_inactive_num_bitmap |= 1 << ml_linkid_lst[i];
-			force_inactive_num++;
 		}
 	}
 	/* small optimization, if 5G links num is less then 2, eMLSR is
@@ -5409,8 +5411,8 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		break;
 	case ml_nlink_connect_pre_start_evt:
 	case ml_nlink_ap_start_evt:
-		status = ml_nlink_emlsr_downgrade_handler(
-			psoc, vdev, evt, data);
+		status = ml_nlink_emlsr_downgrade_handler(psoc, vdev, evt,
+							  data);
 		break;
 	case ml_nlink_connect_failed_evt:
 	case ml_nlink_ap_start_failed_evt:
