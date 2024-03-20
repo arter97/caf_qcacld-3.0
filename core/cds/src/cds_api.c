@@ -3125,3 +3125,14 @@ int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
 	return 0;
 }
 #endif
+
+bool cds_is_pm_fw_debug_enable(void)
+{
+	struct cds_context *cds_ctx = cds_get_global_context();
+
+	if (cds_ctx && cds_ctx->cds_cfg &&
+	    cds_ctx->cds_cfg->is_pm_fw_debug_enable)
+		return true;
+
+	return false;
+}

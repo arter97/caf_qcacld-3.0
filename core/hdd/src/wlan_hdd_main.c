@@ -15829,6 +15829,11 @@ static int hdd_update_cds_config(struct hdd_context *hdd_ctx)
 	bool fw_timeout_crash;
 	QDF_STATUS status;
 
+	if (!hdd_ctx->psoc) {
+		hdd_err("psoc is null");
+		return -EINVAL;
+	}
+
 	cds_cfg = qdf_mem_malloc(sizeof(*cds_cfg));
 	if (!cds_cfg)
 		return -ENOMEM;
@@ -15896,6 +15901,8 @@ static int hdd_update_cds_config(struct hdd_context *hdd_ctx)
 		hdd_tsf_is_tsf64_tx_set(hdd_ctx);
 	hdd_txrx_populate_cds_config(cds_cfg, hdd_ctx);
 	hdd_lpass_populate_cds_config(cds_cfg, hdd_ctx);
+	cds_cfg->is_pm_fw_debug_enable =
+				ucfg_pmo_is_fw_debug_enable(hdd_ctx->psoc);
 	cds_init_ini_config(cds_cfg);
 	return 0;
 
