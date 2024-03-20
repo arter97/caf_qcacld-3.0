@@ -92,12 +92,14 @@ struct soc_ifnames {
  * @active: flag to indicate that the interface is up and running
  * @name: Name of the interface
  * @hw_addr: Hardware address of the interface
+ * @link_id: Link id of MLD interface
  */
 struct interface {
 	bool added;
 	bool active;
 	char *name;
 	uint8_t hw_addr[ETH_ALEN];
+	uint8_t link_id;
 };
 
 /**
@@ -105,17 +107,21 @@ struct interface {
  * @s_count: Number of socs
  * @r_count: Number of radios
  * @v_count: Number of vaps
+ * @m_count: Number of MLDs
  * @soc: Array of Soc Interface details
  * @radio: Array of Radio interface details
  * @vap: Array of vap interface details
+ * @mld: Array of mld interface details
  */
 struct interface_list {
 	uint8_t s_count;
 	uint8_t r_count;
 	uint8_t v_count;
+	uint8_t m_count;
 	struct interface soc[MAX_SOC_NUM];
 	struct interface radio[MAX_RADIO_NUM];
 	struct interface vap[MAX_VAP_NUM];
+	struct interface mld[MAX_VAP_NUM];
 };
 
 /**
@@ -133,6 +139,7 @@ struct interface_list {
  * @is_mld_slave: Flag to indicate if object is part of MLD group
  * @mld_ifname: MLD interface name
  * @is_mld_processed: Flag to indicate if obj is already procesed for MLD req
+ * @link_id: Link id of MLD interface
  */
 struct object_list {
 	bool nlsent;
@@ -148,6 +155,7 @@ struct object_list {
 	bool is_mld_slave;
 	char mld_ifname[IFNAME_LEN];
 	bool is_mld_processed;
+	uint8_t link_id;
 };
 
 /**
@@ -306,6 +314,10 @@ int libstats_is_ifname_valid(const char *ifname, enum stats_object_e obj)
 			str = "mld";
 			size = 4;
 			break;
+		case STATS_OBJ_LINK:
+			str = "link";
+			size = 5;
+			break;
 		default:
 			return 0;
 		}
@@ -367,6 +379,11 @@ static void free_interface_list(struct interface_list *if_list)
 			free(if_list->vap[inx].name);
 	}
 	if_list->v_count = 0;
+	for (inx = 0; inx < MAX_VAP_NUM; inx++) {
+		if (if_list->mld[inx].name)
+			free(if_list->mld[inx].name);
+	}
+	if_list->m_count = 0;
 }
 
 static int get_active_radio_intf_for_soc(struct interface_list *if_list,
@@ -442,6 +459,7 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 	u_int8_t rinx = 0;
 	u_int8_t vinx = 0;
 	u_int8_t sinx = 0;
+	u_int8_t minx = 0;
 	ssize_t size = 0;
 
 	dir = opendir(PATH_SYSNET_DEV);
@@ -513,6 +531,23 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 			strlcpy(if_list->vap[vinx].name, temp_name, size);
 			if_list->vap[vinx].added = false;
 			vinx++;
+#ifdef ENABLE_CFG80211_BACKPORTS_MLO
+		} else if (libstats_is_ifname_valid(temp_name, STATS_OBJ_MLD)) {
+			if (minx >= MAX_VAP_NUM) {
+				STATS_WARN("MLD Interfaces exceeded limit\n");
+				continue;
+			}
+			size = strlen(temp_name) + 1;
+			if_list->mld[minx].name = (char *)malloc(size);
+			if (!if_list->mld[minx].name) {
+				STATS_ERR("Unable to Allocate Memory!\n");
+				closedir(dir);
+				return -ENOMEM;
+			}
+			strlcpy(if_list->mld[minx].name, temp_name, size);
+			if_list->mld[minx].added = false;
+			minx++;
+#endif
 		}
 	}
 
@@ -520,6 +555,7 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 	if_list->s_count = sinx;
 	if_list->r_count = rinx;
 	if_list->v_count = vinx;
+	if_list->m_count = minx;
 
 	return 0;
 }
@@ -733,6 +769,12 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 	if (cmd->mld_link &&
 	    nla_put_flag(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_MLD_LINK)) {
 		STATS_ERR("failed to put mld link flag\n");
+		return -EIO;
+	}
+	if (cmd->link_id != MLO_INVALID_LINK_ID &&
+	    nla_put_u8(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_LINK_ID,
+		       cmd->link_id)) {
+		STATS_ERR("failed to put LINK ID\n");
 		return -EIO;
 	}
 	if (cmd->obj == STATS_OBJ_STA) {
@@ -2013,6 +2055,7 @@ static void stats_netlink_parser(struct reply_buffer *reply,
 	[QCA_WLAN_VENDOR_ATTR_STATS_OBJECT] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_STATS_SERVICEID] = { .type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_STATS_LINK_ID] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_REQUEST_ID] = { .type = NLA_U64 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_PARENT_IF] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_STATS_TYPE] = { .type = NLA_U8 },
@@ -2069,6 +2112,12 @@ static void stats_netlink_parser(struct reply_buffer *reply,
 	obj->lvl = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_LEVEL]);
 	obj->obj_type = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJECT]);
 	obj->type = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_TYPE]);
+	if (tb[QCA_WLAN_VENDOR_ATTR_STATS_LINK_ID]) {
+		obj->link_id =
+			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_LINK_ID]);
+	} else {
+		obj->link_id = MLO_INVALID_LINK_ID;
+	}
 	if (tb[QCA_WLAN_VENDOR_ATTR_STATS_PARENT_IF])
 		strlcpy(obj->pif_name, nla_get_string(
 			tb[QCA_WLAN_VENDOR_ATTR_STATS_PARENT_IF]),
@@ -2259,6 +2308,7 @@ static void *alloc_object(enum stats_object_e obj_type, char *ifname)
 	memset(temp_obj, 0, sizeof(struct object_list));
 	temp_obj->obj_type = obj_type;
 	strlcpy(temp_obj->ifname, ifname, IFNAME_LEN);
+	temp_obj->link_id = MLO_INVALID_LINK_ID;
 
 	return temp_obj;
 }
@@ -2323,6 +2373,7 @@ static void get_sta_info(struct cfg80211_data *buffer)
 		if (!temp_obj)
 			break;
 		temp_obj->parent = parent_obj;
+		temp_obj->link_id = parent_obj->link_id;
 		if (!parent_obj->child)
 			parent_obj->child = temp_obj;
 		else
@@ -2339,7 +2390,7 @@ static void get_sta_info(struct cfg80211_data *buffer)
 	buffer->length = LIST_STATION_CFG_ALLOC_SIZE;
 }
 
-static uint32_t get_mldev_mode(char *ifname)
+static uint32_t get_mldev_mode(char *ifname, uint8_t link_id)
 {
 	struct cfg80211_data buffer = {0};
 	uint32_t mldev_mode = 0;
@@ -2375,7 +2426,7 @@ static uint32_t get_vap_opmode(char *ifname)
 	return opmode;
 }
 
-static int32_t build_child_sta_list(char *ifname,
+static int32_t build_child_sta_list(char *ifname, uint8_t link_id,
 				    struct object_list *parent_obj)
 {
 	struct cfg80211_data buffer = {0};
@@ -2402,7 +2453,7 @@ static int32_t build_child_sta_list(char *ifname,
 	cmd = QCA_NL80211_VENDOR_SUBCMD_SET_WIFI_CONFIGURATION;
 	wifi_cfg80211_send_generic_command(&g_sock_ctx.cfg80211_ctxt, cmd,
 					   QCA_NL80211_VENDOR_SUBCMD_LIST_STA,
-					   ifname, MLO_INVALID_LINK_ID, (char *)&buffer,
+					   ifname, link_id, (char *)&buffer,
 					   buffer.length);
 
 	free(buf);
@@ -2434,6 +2485,100 @@ static void fill_mld_interface(struct object_list *obj)
 		obj->is_mld_slave = true;
 		strlcpy(obj->mld_ifname, mld_intf, IFNAME_LEN);
 	}
+}
+
+static int find_link_vaps(struct interface_list *if_list, uint8_t inx,
+			  char *rifname, struct object_list *parent_obj,
+			  struct object_list **curr_obj)
+{
+	char path[100] = {'\0'};
+	uint8_t path_size = sizeof(path);
+	char *ifname = NULL;
+	DIR *dir = NULL;
+	char temp_name[IFNAME_LEN] = {'\0'};
+	char parent[IFNAME_LEN] = {'\0'};
+	struct object_list *temp_obj = NULL;
+	uint8_t link_id = 0xFF;
+	int ret = 0;
+
+	ifname = if_list->mld[inx].name;
+	if (!if_list->mld[inx].active)
+		return 0;
+
+	if ((strlcpy(path, PATH_SYSNET_DEV, path_size) >= path_size) ||
+	    (strlcat(path, ifname, path_size) >= path_size)) {
+		return -EIO;
+	}
+
+	dir = opendir(path);
+	if (!dir)
+		return -EIO;
+
+	while (1) {
+		struct dirent *entry;
+		char *d_name;
+
+		entry = readdir(dir);
+		if (!entry)
+			break;
+		d_name = entry->d_name;
+		if (entry->d_type & (DT_DIR | DT_LNK)) {
+			if (strlcpy(temp_name, d_name, 100) >= 100) {
+				STATS_ERR("Unable to fetch interface name\n");
+				ret = -EIO;
+				break;
+			}
+		} else {
+			continue;
+		}
+
+		if (libstats_is_ifname_valid(temp_name, STATS_OBJ_LINK)) {
+			/* Current assumption is that link number directly
+			 * corresponds to wifi. Eg link0->wifi0, link1->wifi1
+			 * once a parent object is introduced inside each link,
+			 * this logic will be changed.
+			 */
+			if (!strncmp(temp_name, "link0", IFNAME_LEN)) {
+				strlcpy(parent, "wifi0", IFNAME_LEN);
+				link_id = 0;
+			} else if (!strncmp(temp_name, "link1", IFNAME_LEN)) {
+				strlcpy(parent, "wifi1", IFNAME_LEN);
+				link_id = 1;
+			} else if (!strncmp(temp_name, "link2", IFNAME_LEN)) {
+				strlcpy(parent, "wifi2", IFNAME_LEN);
+				link_id = 2;
+			}
+
+			if (!strncmp(parent, rifname, IFNAME_LEN)) {
+				temp_obj = alloc_object(STATS_OBJ_VAP, ifname);
+				if (!temp_obj) {
+					STATS_ERR("Allocation failed for %s object\n",
+						  ifname);
+					ret = -EIO;
+					break;
+				}
+
+				temp_obj->parent = parent_obj;
+				temp_obj->link_id = link_id;
+				temp_obj->is_mld_slave = true;
+				strlcpy(temp_obj->mld_ifname, ifname, IFNAME_LEN);
+
+				if (!parent_obj->child)
+					parent_obj->child = temp_obj;
+				else if (*curr_obj)
+					(*curr_obj)->next = temp_obj;
+				*curr_obj = temp_obj;
+
+				if (build_child_sta_list(ifname, link_id,
+							 *curr_obj))
+					ret = -EIO;
+					break;
+			}
+		}
+	}
+
+	closedir(dir);
+	return ret;
 }
 
 static int32_t build_child_vap_list(struct interface_list *if_list,
@@ -2474,7 +2619,16 @@ static int32_t build_child_vap_list(struct interface_list *if_list,
 
 		fill_mld_interface(temp_obj);
 
-		build_child_sta_list(ifname, curr_obj);
+		build_child_sta_list(ifname, MLO_INVALID_LINK_ID, curr_obj);
+	}
+
+	for (inx = 0; inx < if_list->m_count; inx++) {
+		if (find_link_vaps(if_list, inx, rifname, parent_obj,
+				   &curr_obj)) {
+			STATS_ERR("Failed to build hierarchy for %s",
+				  if_list->mld[inx].name);
+			continue;
+		}
 	}
 
 	return 0;
@@ -2566,6 +2720,19 @@ static void mark_active_interfaces(struct interface_list *if_list,
 			if (get_hwaddr)
 				get_hw_address(ifname,
 					       if_list->vap[inx].hw_addr);
+		}
+		break;
+	case STATS_OBJ_MLD:
+		for (inx = 0; inx < if_list->m_count; inx++) {
+			ifname = if_list->mld[inx].name;
+			if (!is_interface_active(ifname, obj)) {
+				if_list->mld[inx].active = false;
+				continue;
+			}
+			if_list->mld[inx].active = true;
+			if (get_hwaddr)
+				get_hw_address(ifname,
+					       if_list->mld[inx].hw_addr);
 		}
 		break;
 	default:
@@ -2738,6 +2905,9 @@ static void *build_object_list(struct stats_command *cmd)
 	/* Check Vap is active or not and get HW address */
 	mark_active_interfaces(&if_list, STATS_OBJ_VAP, true);
 
+	/* Check MLD is active or not and get HW address */
+	mark_active_interfaces(&if_list, STATS_OBJ_MLD, true);
+
 	/**
 	 * If user specifies soc, then build object hierarchy only for
 	 * that particular soc. Else for all.
@@ -2817,11 +2987,13 @@ static struct object_list *find_head_object(struct stats_command *cmd,
 				if (temp_obj->is_mld_processed)
 					goto next_object;
 				if (!strncmp(temp_obj->ifname, cmd->if_name,
-					      IFNAME_LEN))
+					     IFNAME_LEN) &&
+					     temp_obj->link_id == cmd->link_id)
 					break;
 				if ((temp_obj->is_mld_slave &&
 				    !strncmp(temp_obj->mld_ifname, cmd->if_name,
-					     IFNAME_LEN))) {
+					     IFNAME_LEN)) &&
+					     temp_obj->link_id == cmd->link_id) {
 					*is_mld_req = true;
 					temp_obj->is_mld_processed = true;
 					break;
@@ -3070,7 +3242,8 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 
 	/* Async stats don't need to fetch MLD mode */
 	if (!is_async_req())
-		mldev_mode = get_mldev_mode(obj_list->ifname);
+		mldev_mode = get_mldev_mode(obj_list->ifname,
+					    obj_list->link_id);
 	/**
 	 * Based on user request find the requested subtree in root_obj.
 	 **/
@@ -3082,8 +3255,10 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 
 	temp_obj = root_obj;
 
-	if (user_cmd->feat_flag == STATS_FEAT_FLG_EXT)
+	if (user_cmd->feat_flag == STATS_FEAT_FLG_EXT) {
+		user_cmd->link_id = temp_obj->link_id;
 		return send_nl_command_no_response(user_cmd, temp_obj->ifname);
+	}
 
 	if ((user_cmd->obj == STATS_OBJ_STA) &&
 	    (user_cmd->type == STATS_TYPE_CTRL) && root_obj->take_mld_addr) {
@@ -3116,6 +3291,7 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 		if (!temp_obj->nlsent) {
 			temp_obj->nlsent = true;
 			cmd.obj = temp_obj->obj_type;
+			cmd.link_id = temp_obj->link_id;
 			if (temp_obj->obj_type == STATS_OBJ_STA) {
 				if (temp_obj->take_mld_addr)
 					memcpy(cmd.sta_mac.ether_addr_octet,

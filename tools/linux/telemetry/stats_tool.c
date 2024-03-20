@@ -487,7 +487,7 @@ const char *mu_reception_mode[STATS_IF_TXRX_TYPE_MU_MAX] = {
 };
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static const char *opt_string = "BADarvsdcf:i:l:m:t:T:RIMEh?";
+static const char *opt_string = "BADarvsdcf:i:l:m:t:T:L:RIMEh?";
 
 static const struct option long_opts[] = {
 	{ "basic", no_argument, NULL, 'B' },
@@ -509,6 +509,7 @@ static const struct option long_opts[] = {
 	{ "mldlink", no_argument, NULL, 'M' },
 	{ "asyncreq", no_argument, NULL, 'E' },
 	{ "test", required_argument, NULL, 'T' },
+	{ "linkid", required_argument, NULL, 'L' },
 	{ "help", no_argument, NULL, 'h' },
 	{ NULL, no_argument, NULL, 0 },
 };
@@ -2183,8 +2184,14 @@ void print_basic_sta_data(struct stats_obj *sta)
 {
 	struct basic_peer_data *data = sta->stats;
 
-	STATS_PRINT("Basic Data STATS For STA %s (Parent %s)\n",
-		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (sta->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Basic Data STATS For STA %s (Parent Vap %s)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	} else {
+		STATS_PRINT("Basic Data STATS For STA %s (Parent MLD %s Link %d)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name,
+			    sta->link_id);
+	}
 	if (data->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_basic_sta_data_tx(data->tx);
@@ -2207,8 +2214,14 @@ void print_basic_sta_ctrl(struct stats_obj *sta)
 {
 	struct basic_peer_ctrl *ctrl = sta->stats;
 
-	STATS_PRINT("Basic Control STATS For STA %s (Parent %s)\n",
-		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (sta->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Basic Control STATS For STA %s (Parent %s)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	} else {
+		STATS_PRINT("Basic Control STATS For STA %s (Parent %s Link %d)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name,
+			    sta->link_id);
+	}
 	if (ctrl->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_basic_sta_ctrl_tx(ctrl->tx);
@@ -2231,8 +2244,13 @@ void print_basic_vap_data(struct stats_obj *vap)
 {
 	struct basic_vdev_data *data = vap->stats;
 
-	STATS_PRINT("Basic Data STATS For VAP %s (Parent %s)\n",
-		    vap->u_id.if_name, vap->pif_name);
+	if (vap->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Basic Data STATS For VAP %s (Parent %s)\n",
+			    vap->u_id.if_name, vap->pif_name);
+	} else {
+		STATS_PRINT("Basic Data STATS For MLD %s Link %d (Parent %s)\n",
+			    vap->u_id.if_name, vap->link_id, vap->pif_name);
+	}
 	if (data->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_basic_vap_data_tx(data->tx);
@@ -2247,8 +2265,14 @@ void print_basic_vap_ctrl(struct stats_obj *vap)
 {
 	struct basic_vdev_ctrl *ctrl = vap->stats;
 
-	STATS_PRINT("Basic Control STATS For VAP %s (Parent %s)\n",
-		    vap->u_id.if_name, vap->pif_name);
+	if (vap->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Basic Control STATS For VAP %s (Parent %s)\n",
+			    vap->u_id.if_name, vap->pif_name);
+	} else {
+		STATS_PRINT("Basic Control STATS For MLD %s Link %d (Parent %s)\n",
+			    vap->u_id.if_name, vap->link_id, vap->pif_name);
+	}
+
 	if (ctrl->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_basic_vap_ctrl_tx(ctrl->tx);
@@ -2352,9 +2376,16 @@ void print_advance_sta_data(struct stats_obj *sta)
 	if (data->rdk)
 		print_advance_sta_data_rdk(data->rdk, sta->u_id.mac_addr,
 					   sta->pif_name);
-	else
-		STATS_PRINT("Advance Data STATS For STA %s (Parent %s)\n",
-			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	else {
+		if (sta->link_id == MLO_INVALID_LINK_ID) {
+			STATS_PRINT("Advance Data STATS For STA %s (Parent Vap %s)\n",
+				    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+		} else {
+			STATS_PRINT("Advance Data STATS For STA %s (Parent MLD %s Link %d)\n",
+				    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name,
+				    sta->link_id);
+		}
+	}
 
 	if (data->tx) {
 		STATS_PRINT("Tx Stats\n");
@@ -2410,8 +2441,14 @@ void print_advance_sta_ctrl(struct stats_obj *sta)
 {
 	struct advance_peer_ctrl *ctrl = sta->stats;
 
-	STATS_PRINT("Advance Control STATS For STA %s (Parent %s)\n",
-		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (sta->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Advance Control STATS For STA %s (Parent Vap %s)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	} else {
+		STATS_PRINT("Advance Control STATS For STA %s (Parent MLD %s Link %d)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name,
+			    sta->link_id);
+	}
 	if (ctrl->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_advance_sta_ctrl_tx(ctrl->tx);
@@ -2438,8 +2475,13 @@ void print_advance_vap_data(struct stats_obj *vap)
 {
 	struct advance_vdev_data *data = vap->stats;
 
-	STATS_PRINT("Advance Data STATS for Vap %s (Parent %s)\n",
-		    vap->u_id.if_name, vap->pif_name);
+	if (vap->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Advance Data STATS for Vap %s (Parent %s)\n",
+			    vap->u_id.if_name, vap->pif_name);
+	} else {
+		STATS_PRINT("Advance Data STATS for Vap %s Link %d (Parent %s)\n",
+			    vap->u_id.if_name, vap->link_id, vap->pif_name);
+	}
 	if (data->me) {
 		STATS_PRINT("ME Stats\n");
 		print_advance_vap_data_me(data->me);
@@ -2478,8 +2520,13 @@ void print_advance_vap_ctrl(struct stats_obj *vap)
 {
 	struct advance_vdev_ctrl *ctrl = vap->stats;
 
-	STATS_PRINT("Advance Control STATS for Vap %s (Parent %s)\n",
-		    vap->u_id.if_name, vap->pif_name);
+	if (vap->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Advance Control STATS for Vap %s (Parent %s)\n",
+			    vap->u_id.if_name, vap->pif_name);
+	} else {
+		STATS_PRINT("Advance Control STATS for Vap %s Link %d (Parent %s)\n",
+			    vap->u_id.if_name, vap->link_id, vap->pif_name);
+	}
 	if (ctrl->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_advance_vap_ctrl_tx(ctrl->tx);
@@ -3042,8 +3089,14 @@ void print_debug_sta_data(struct stats_obj *sta)
 {
 	struct debug_peer_data *data = sta->stats;
 
-	STATS_PRINT("Debug Data STATS For STA %s (Parent %s)\n",
-		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (sta->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Debug Data STATS For STA %s (Parent Vap %s)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	} else {
+		STATS_PRINT("Debug Data STATS For STA %s (Parent MLD %s Link %d)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name,
+			    sta->link_id);
+	}
 	if (data->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_debug_sta_data_tx(data->tx);
@@ -3074,8 +3127,14 @@ void print_debug_sta_ctrl(struct stats_obj *sta)
 {
 	struct debug_peer_ctrl *ctrl = sta->stats;
 
-	STATS_PRINT("Debug Control STATS For STA %s (Parent %s)\n",
-		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (sta->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Debug Control STATS For STA %s (Parent %s)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	} else {
+		STATS_PRINT("Debug Control STATS For STA %s (Parent %s Link %d)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name,
+			    sta->link_id);
+	}
 	if (ctrl->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_debug_sta_ctrl_tx(ctrl->tx);
@@ -3235,8 +3294,13 @@ void print_debug_vap_data(struct stats_obj *vap)
 {
 	struct debug_vdev_data *data = vap->stats;
 
-	STATS_PRINT("Debug Data STATS for Vap %s (Parent %s)\n",
-		    vap->u_id.if_name, vap->pif_name);
+	if (vap->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Debug Data STATS for Vap %s (Parent %s)\n",
+			    vap->u_id.if_name, vap->pif_name);
+	} else {
+		STATS_PRINT("Debug Data STATS for MLD %s Link %d (Parent %s)\n",
+			    vap->u_id.if_name, vap->link_id, vap->pif_name);
+	}
 	if (data->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_debug_vap_data_tx(data->tx);
@@ -3263,8 +3327,13 @@ void print_debug_vap_ctrl(struct stats_obj *vap)
 {
 	struct debug_vdev_ctrl *ctrl = vap->stats;
 
-	STATS_PRINT("Debug Control STATS for Vap %s (Parent %s)\n",
-		    vap->u_id.if_name, vap->pif_name);
+	if (vap->link_id == MLO_INVALID_LINK_ID) {
+		STATS_PRINT("Debug Control STATS for Vap %s (Parent %s)\n",
+			    vap->u_id.if_name, vap->pif_name);
+	} else {
+		STATS_PRINT("Debug Control STATS for MLD %s Link %d (Parent %s)\n",
+			    vap->u_id.if_name, vap->link_id, vap->pif_name);
+	}
 	if (ctrl->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_debug_vap_ctrl_tx(ctrl->tx);
@@ -4220,6 +4289,7 @@ int main(int argc, char *argv[])
 	u_int8_t servid_temp = 0;
 	bool is_test_mode = false;
 	uint8_t test_iterate = 0;
+	uint8_t link_id = MLO_INVALID_LINK_ID;
 
 	memset(&cmd, 0, sizeof(struct stats_command));
 
@@ -4424,6 +4494,9 @@ int main(int argc, char *argv[])
 				return -EINVAL;
 			}
 			break;
+		case 'L':
+			link_id = atoi(optarg);
+			break;
 		default:
 			STATS_ERR("Unrecognized option\n");
 			display_help();
@@ -4444,6 +4517,12 @@ int main(int argc, char *argv[])
 		return -EINVAL;
 	}
 
+	if (link_id != MLO_INVALID_LINK_ID && obj_temp != STATS_OBJ_VAP) {
+		STATS_ERR("Link_id %d invalid for level %d",
+			  link_id, level_temp);
+		return -EINVAL;
+	}
+
 	if (feat_flags[0])
 		feat_temp = libstats_get_feature_flag(feat_flags);
 	if (!feat_temp)
@@ -4457,6 +4536,7 @@ int main(int argc, char *argv[])
 	cmd.serviceid = servid_temp;
 	cmd.mld_link = is_mld_link;
 	cmd.peer_type = peer_type;
+	cmd.link_id = link_id;
 
 	strlcpy(cmd.if_name, ifname_temp, IFNAME_LEN);
 
