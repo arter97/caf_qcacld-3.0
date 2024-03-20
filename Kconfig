@@ -1289,6 +1289,11 @@ config WLAN_FEATURE_LL_LT_SAP
 	bool "Enable Low latency low throughput SAP feature"
 	default n
 
+config WLAN_FEATURE_VDEV_DCS
+	bool "Enable WLAN_FEATURE_VDEV_DCS"
+	depends on WLAN_FEATURE_LL_LT_SAP
+	default n
+
 config WLAN_FEATURE_GET_USABLE_CHAN_LIST
 	bool "Enable WLAN_FEATURE_GET_USABLE_CHAN_LIST"
 	default n
