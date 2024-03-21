@@ -777,6 +777,23 @@ ucfg_pmo_set_sta_teles_dtim(struct wlan_objmgr_psoc *psoc,
 }
 
 uint8_t
+ucfg_pmo_get_sta_min_teles_dtim(struct wlan_objmgr_psoc *psoc)
+{
+	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
+
+	return pmo_psoc_ctx->psoc_cfg.min_teles_dtim;
+}
+
+void
+ucfg_pmo_set_sta_min_teles_dtim(struct wlan_objmgr_psoc *psoc,
+				uint8_t val)
+{
+	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
+
+	pmo_psoc_ctx->psoc_cfg.min_teles_dtim = val;
+}
+
+uint8_t
 ucfg_pmo_get_sta_mod_dtim(struct wlan_objmgr_psoc *psoc)
 {
 	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);

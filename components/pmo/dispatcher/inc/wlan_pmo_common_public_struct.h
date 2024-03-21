@@ -372,6 +372,7 @@ enum pmo_page_fault_action {
  * @max_ps_poll: max power save poll
  * @sta_dynamic_dtim: station dynamic DTIM value
  * @sta_teles_dtim: station telescopic DTIM value
+ * @min_teles_dtim: minimum telescopic DTIM level
  * @sta_mod_dtim: station modulated DTIM value
  * @sta_max_li_mod_dtim: station max listen interval DTIM value
  * @sta_forced_dtim: station forced DTIM value
@@ -456,6 +457,7 @@ struct pmo_psoc_cfg {
 	uint8_t max_ps_poll;
 	uint8_t sta_dynamic_dtim;
 	uint8_t sta_teles_dtim;
+	uint8_t min_teles_dtim;
 	uint8_t sta_mod_dtim;
 	uint8_t sta_max_li_mod_dtim;
 	bool sta_forced_dtim;

@@ -3933,6 +3933,8 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_handle->sta_max_li_mod_dtim_ms = cds_cfg->sta_maxlimod_dtim_ms;
 	wma_handle->staModDtim = ucfg_pmo_get_sta_mod_dtim(wma_handle->psoc);
 	wma_handle->staTelesDtim = ucfg_pmo_get_sta_teles_dtim(wma_handle->psoc);
+	wma_handle->minTelesDtimlvl =
+			ucfg_pmo_get_sta_min_teles_dtim(wma_handle->psoc);
 	wma_handle->staDynamicDtim =
 			ucfg_pmo_get_sta_dynamic_dtim(wma_handle->psoc);
 

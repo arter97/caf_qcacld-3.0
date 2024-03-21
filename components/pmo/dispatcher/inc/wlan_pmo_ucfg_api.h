@@ -222,6 +222,26 @@ ucfg_pmo_set_sta_teles_dtim(struct wlan_objmgr_psoc *psoc,
 			    uint8_t val);
 
 /**
+ * ucfg_pmo_get_sta_min_teles_dtim() - Get minimum telescopic dtim level
+ * @psoc: pointer to psoc object
+ *
+ * Return: minimum telescopic dtim level
+ */
+uint8_t
+ucfg_pmo_get_sta_min_teles_dtim(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_set_sta_min_teles_dtim() - Set minimum telescopic dtim level
+ * @psoc: pointer to psoc object
+ * @val:  minimum telescopic dtim level
+ *
+ * Return: None
+ */
+void
+ucfg_pmo_set_sta_min_teles_dtim(struct wlan_objmgr_psoc *psoc,
+				uint8_t val);
+
+/**
  * ucfg_pmo_get_sta_mod_dtim() - Get modulated dtim
  * @psoc: pointer to psoc object
  *
@@ -2089,7 +2109,19 @@ ucfg_pmo_get_sta_teles_dtim(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline uint8_t
-ucfg_pmo_set_sta_teles_dtim(struct wlan_objmgr_psoc *psoc)
+ucfg_pmo_set_sta_teles_dtim(struct wlan_objmgr_psoc *psoc, uint8_t val)
+{
+	return 0;
+}
+
+static inline uint8_t
+ucfg_pmo_get_sta_min_teles_dtim(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint8_t
+ucfg_pmo_set_sta_min_teles_dtim(struct wlan_objmgr_psoc *psoc, uint8_t val)
 {
 	return 0;
 }

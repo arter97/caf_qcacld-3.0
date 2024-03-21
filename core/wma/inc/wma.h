@@ -923,6 +923,7 @@ struct wma_pf_sym_hist {
  * @sta_max_li_mod_dtim_ms: station max listen interval in ms
  * @staModDtim: station mode DTIM
  * @staTelesDtim: station tetescopic DTIM
+ * @minTelesDtimlvl: minimum telescopic DTIM level
  * @staDynamicDtim: station dynamic DTIM
  * @hw_bd_id: hardware board id
  * @hw_bd_info: hardware board info
@@ -1048,6 +1049,7 @@ typedef struct {
 	uint16_t sta_max_li_mod_dtim_ms;
 	uint8_t staModDtim;
 	uint8_t staTelesDtim;
+	uint8_t minTelesDtimlvl;
 	uint8_t staDynamicDtim;
 	uint32_t hw_bd_id;
 	uint32_t hw_bd_info[HW_BD_INFO_SIZE];

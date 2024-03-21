@@ -249,6 +249,7 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 	psoc_cfg->sta_dynamic_dtim = cfg_get(psoc, CFG_PMO_ENABLE_DYNAMIC_DTIM);
 	wlan_pmo_get_igmp_version_support_cfg(psoc, psoc_cfg);
 	psoc_cfg->sta_teles_dtim = cfg_get(psoc, CFG_PMO_ENABLE_TELESCOPIC_DTIM);
+	psoc_cfg->min_teles_dtim = cfg_get(psoc, CFG_PMO_MIN_TELESDTIM_LVL);
 	psoc_cfg->sta_mod_dtim = cfg_get(psoc, CFG_PMO_ENABLE_MODULATED_DTIM);
 	psoc_cfg->enable_mc_list = cfg_get(psoc, CFG_PMO_MC_ADDR_LIST_ENABLE);
 	psoc_cfg->power_save_mode = cfg_get(psoc, CFG_PMO_POWERSAVE_MODE);
