@@ -1207,4 +1207,18 @@ static inline QDF_STATUS wmi_unified_link_recmnd_info_send(
 QDF_STATUS wmi_unified_send_mu_on_off_cmd(wmi_unified_t wmi,
 				  struct wmi_host_mu_on_off_params *params);
 #endif /* WLAN_FEATURE_11BE */
+
+#ifdef WLAN_SUPPORT_TX_PKT_CAP_CUSTOM_CLASSIFY
+/**
+ * wmi_unified_set_tx_pkt_cap_custom_classify() - api to add
+ * the protocols to be classified by tx packet capture
+ * @wmi_hdl: wmi handle
+ * @param: Packet type information
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wmi_unified_set_tx_pkt_cap_custom_classify(
+		wmi_unified_t wmi_handle,
+		struct wmi_tx_pkt_cap_custom_classify_info *param);
+#endif /* WLAN_SUPPORT_TX_PKT_CAP_CUSTOM_CLASSIFY */
 #endif /* _WMI_UNIFIED_AP_API_H_ */

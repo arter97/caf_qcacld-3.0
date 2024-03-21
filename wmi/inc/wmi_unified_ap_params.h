@@ -1379,4 +1379,16 @@ struct wmi_host_standalone_sounding_evt_params {
 };
 #endif /* QCA_STANDALONE_SOUNDING_TRIGGER */
 
+#ifdef WLAN_SUPPORT_TX_PKT_CAP_CUSTOM_CLASSIFY
+/**
+ * struct wmi_tx_pkt_cap_custom_classify_info - TX Packet Classification params
+ * @pdev_id: pdev id
+ * @pkt_type_bitmap: Bitmap of protocol that is being configured
+ */
+struct wmi_tx_pkt_cap_custom_classify_info {
+	uint32_t      pdev_id;
+	uint32_t      pkt_type_bitmap;
+};
+#endif /* WLAN_SUPPORT_TX_PKT_CAP_CUSTOM_CLASSIFY */
+
 #endif
