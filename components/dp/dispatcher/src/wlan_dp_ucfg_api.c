@@ -1127,6 +1127,8 @@ ucfg_dp_update_config(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_DP_TCP_UDP_CKSUM_OFFLOAD);
 	params.ipa_enable = req->ipa_enable;
 	dp_ctx->dp_cfg.gro_enable = cfg_get(psoc, CFG_DP_GRO);
+	dp_ctx->dp_cfg.wlm_rx_aggr_control =
+		cfg_get(psoc, CFG_DP_WLM_RX_AGGR_CTRL);
 	params.gro_enable = dp_ctx->dp_cfg.gro_enable;
 	params.tx_comp_loop_pkt_limit = cfg_get(psoc,
 						CFG_DP_TX_COMP_LOOP_PKT_LIMIT);

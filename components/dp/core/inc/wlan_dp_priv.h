@@ -139,6 +139,7 @@ struct dp_rtpm_tput_policy_context {
  * @is_rx_fisa_enabled: flag to enable/disable FISA Rx
  * @is_rx_fisa_lru_del_enabled: flag to enable/disable FST entry delete
  * @is_direct_link_enabled: indicates whether direct link is enabled or not
+ * @wlm_rx_aggr_control: Control Rx aggregation based on WLM state
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -213,6 +214,7 @@ struct wlan_dp_psoc_cfg {
 #ifdef FEATURE_DIRECT_LINK
 	bool is_direct_link_enabled;
 #endif
+	bool wlm_rx_aggr_control;
 };
 
 /**

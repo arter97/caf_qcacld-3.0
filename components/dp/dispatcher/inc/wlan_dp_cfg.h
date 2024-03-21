@@ -1360,6 +1360,25 @@
 #define CFG_DP_DIRECT_LINK
 #endif
 
+/*
+ * <ini>
+ * dp_wlm_rx_aggr_control - WLM Rx aggregation Control
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable DP WLM Rx aggregation Control feature
+ *
+ * Supported Feature: All modes
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DP_WLM_RX_AGGR_CTRL \
+	CFG_INI_BOOL("dp_wlm_rx_aggr_control", false, \
+		     "Enable/Disable WLM Rx aggregation Control")
+
 #define CFG_DP_ALL \
 	CFG(CFG_DP_RX_THREAD_CPU_MASK) \
 	CFG(CFG_DP_RX_THREAD_UL_CPU_MASK) \
@@ -1379,6 +1398,7 @@
 	CFG(CFG_DP_ICMP_REQ_TO_FW_MARK_INTERVAL) \
 	CFG(CFG_ENABLE_DIRECT_LINK_UT_CMD) \
 	CFG(CFG_DP_APPLY_MEM_PROFILE) \
+	CFG(CFG_DP_WLM_RX_AGGR_CTRL) \
 	CFG_DP_ENABLE_FASTPATH_ALL \
 	CFG_DP_BUS_BANDWIDTH \
 	CFG_DP_DRIVER_TCP_DELACK \
