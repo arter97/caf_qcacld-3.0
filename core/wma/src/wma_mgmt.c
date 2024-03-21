@@ -2083,6 +2083,11 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
+static void
+wma_critical_update_set_notify_probe_rsp_tmpl(struct wlan_objmgr_pdev *pdev,
+					      uint8_t vdev_id,
+					      struct wmi_probe_resp_params *prb_tmpl_param);
+
 /**
  * wmi_unified_probe_rsp_tmpl_send() - send probe response template to fw
  * @wma: wma handle
@@ -2111,6 +2116,11 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 
 	params.prb_rsp_template_len = probe_rsp_info->probeRespTemplateLen;
 	params.prb_rsp_template_frm = probe_rsp_info->probeRespTemplate;
+
+	/* will be clear in the wma_unified_bcn_tmpl_send() */
+	wma_critical_update_set_notify_probe_rsp_tmpl(wma->pdev,
+						      vdev_id,
+						      &params);
 
 	return wmi_unified_probe_rsp_tmpl_send_cmd(wma->wmi_handle, vdev_id,
 						   &params);
@@ -2224,7 +2234,8 @@ static void wma_cu_bitmap_clear(struct wlan_objmgr_pdev *pdev,
 }
 
 /**
- * wma_cu_bitmap_set() - Update cu flag for vdev in the beacon template
+ * wma_critical_update_set_notify_bcn_tmpl() - Update cu flag for vdev in
+ * the beacon template
  * @pdev: objmgr pdev
  * @vdev_id: vdev id
  * @bcn_tmpl_param: beacon template parameter
@@ -2232,9 +2243,9 @@ static void wma_cu_bitmap_clear(struct wlan_objmgr_pdev *pdev,
  * Return: None
  */
 static void
-wma_critical_update_set_notify(struct wlan_objmgr_pdev *pdev,
-			       uint8_t vdev_id,
-			       struct beacon_tmpl_params *bcn_tmpl_param)
+wma_critical_update_set_notify_bcn_tmpl(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id,
+					struct beacon_tmpl_params *bcn_tmpl_param)
 {
 	unsigned long vdev_bmap_cu_cat1 = 0;
 	unsigned long vdev_bmap_cu_cat2 = 0;
@@ -2261,6 +2272,47 @@ wma_critical_update_set_notify(struct wlan_objmgr_pdev *pdev,
 			  bcn_tmpl_param->cu_ml_info.cu_vdev_map_cat2_hi);
 	}
 }
+
+/**
+ * wma_critical_update_set_notify_probe_rsp_tmpl() - Update cu flag for vdev
+ * in the probe response template
+ * @pdev: objmgr pdev
+ * @vdev_id: vdev id
+ * @prb_tmpl_param: probe response template parameter
+ *
+ * Return: None
+ */
+static void
+wma_critical_update_set_notify_probe_rsp_tmpl(struct wlan_objmgr_pdev *pdev,
+					      uint8_t vdev_id,
+					      struct wmi_probe_resp_params *prb_tmpl_param)
+{
+	unsigned long vdev_bmap_cu_cat1 = 0;
+	unsigned long vdev_bmap_cu_cat2 = 0;
+
+	wma_cu_bitmap_set(pdev, vdev_id,
+			  &vdev_bmap_cu_cat1,
+			  &vdev_bmap_cu_cat2);
+
+	if (vdev_bmap_cu_cat1 || vdev_bmap_cu_cat2) {
+		prb_tmpl_param->cu_ml_info.cu_vdev_map_cat1_lo =
+			CU_VDEV_BITMAP_LOWER32(vdev_bmap_cu_cat1);
+		prb_tmpl_param->cu_ml_info.cu_vdev_map_cat1_hi =
+			CU_VDEV_BITMAP_UPPER32(vdev_bmap_cu_cat1);
+		prb_tmpl_param->cu_ml_info.cu_vdev_map_cat2_lo =
+			CU_VDEV_BITMAP_LOWER32(vdev_bmap_cu_cat2);
+		prb_tmpl_param->cu_ml_info.cu_vdev_map_cat2_hi =
+			CU_VDEV_BITMAP_UPPER32(vdev_bmap_cu_cat2);
+
+		wma_debug("hw_link_id:%d cat1 lo:0x%x hi:0x%x cat2 lo:0x%x hi:0x%x",
+			  prb_tmpl_param->cu_ml_info.hw_link_id,
+			  prb_tmpl_param->cu_ml_info.cu_vdev_map_cat1_lo,
+			  prb_tmpl_param->cu_ml_info.cu_vdev_map_cat1_hi,
+			  prb_tmpl_param->cu_ml_info.cu_vdev_map_cat2_lo,
+			  prb_tmpl_param->cu_ml_info.cu_vdev_map_cat2_hi);
+	}
+}
+
 #else
 static void wma_cu_bitmap_clear(struct wlan_objmgr_pdev *pdev,
 				uint8_t vdev_id)
@@ -2268,9 +2320,16 @@ static void wma_cu_bitmap_clear(struct wlan_objmgr_pdev *pdev,
 }
 
 static void
-wma_critical_update_set_notify(struct wlan_objmgr_pdev *pdev,
-			       uint8_t vdev_id,
-			       struct beacon_tmpl_params *bcn_tmpl_param)
+wma_critical_update_set_notify_bcn_tmpl(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id,
+					struct beacon_tmpl_params *bcn_tmpl_param)
+{
+}
+
+static void
+wma_critical_update_set_notify_probe_rsp_tmpl(struct wlan_objmgr_pdev *pdev,
+					      uint8_t vdev_id,
+					      struct wmi_probe_resp_params *prb_tmpl_param)
 {
 }
 #endif
@@ -2368,7 +2427,7 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 			bcn_info->ecsa_count_offset - bytes_to_strip;
 
 	wma_upt_mlo_partner_info(&params, bcn_info, bytes_to_strip);
-	wma_critical_update_set_notify(wma->pdev, vdev_id, &params);
+	wma_critical_update_set_notify_bcn_tmpl(wma->pdev, vdev_id, &params);
 
 	ret = wmi_unified_beacon_tmpl_send_cmd(wma->wmi_handle,
 				 &params);
