@@ -6567,6 +6567,14 @@ static int wlan_hdd_update_rnrie(struct hdd_beacon_data *beacon,
 	mac_handle_t mac_handle;
 	struct hdd_adapter *adapter = link_info->adapter;
 
+	/* update rnrie if sap already running */
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	if (!mac_handle) {
+		hdd_debug("NULL MAC context and reset rnrie buf");
+		ret = -EINVAL;
+		goto fail;
+	}
+
 	config->rnrielen = 0;
 	qdf_mem_zero(&config->rnrie[0], sizeof(config->rnrie));
 	ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_REDUCED_NEIGHBOR_REPORT,
@@ -6574,10 +6582,12 @@ static int wlan_hdd_update_rnrie(struct hdd_beacon_data *beacon,
 				      beacon->tail_len);
 
 	/* although no rnrie, should not block bss start */
-	if (!ie || !ie[1])
-		return ret;
+	if (!ie || !ie[TAG_LEN_POS]) {
+		hdd_debug("No rnr ie");
+		goto clean_rnrie;
+	}
 
-	config->rnrielen = ie[1] + 2;
+	config->rnrielen = ie[TAG_LEN_POS] + 2;
 	hdd_debug("RNR IEs length %d, vdev id %d", config->rnrielen,
 		  link_info->vdev_id);
 
@@ -6591,14 +6601,6 @@ static int wlan_hdd_update_rnrie(struct hdd_beacon_data *beacon,
 
 	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
 		return ret;
-
-	/* update rnrie if sap already running */
-	mac_handle = hdd_adapter_get_mac_handle(adapter);
-	if (!mac_handle) {
-		hdd_debug("NULL MAC context and reset rnrie buf");
-		ret = -EINVAL;
-		goto fail;
-	}
 
 	update_ie.vdev_id = link_info->vdev_id;
 	update_ie.iebufferlength = config->rnrielen;
@@ -6623,6 +6625,21 @@ static int wlan_hdd_update_rnrie(struct hdd_beacon_data *beacon,
 
 	qdf_mem_free(update_ie.piebuffer);
 
+	return ret;
+
+clean_rnrie:
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		hdd_debug("clean up rnrie while softap is running");
+		update_ie.vdev_id = link_info->vdev_id;
+		update_ie.iebufferlength = config->rnrielen;
+		update_ie.piebuffer = NULL;
+		if (sme_update_rnr_ie(mac_handle, &update_ie) ==
+				      QDF_STATUS_E_FAILURE) {
+		hdd_err("Update rnrie failure");
+		ret = -EINVAL;
+		goto fail;
+		}
+	}
 	return ret;
 fail:
 	config->rnrielen = 0;
