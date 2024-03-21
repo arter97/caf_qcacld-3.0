@@ -797,6 +797,36 @@ wlan_t2lm_set_link_mapping_of_tids(uint8_t link_id,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_TTLM
+static QDF_STATUS
+wlan_ttlm_populate_link_disable_in_sm(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_objmgr_peer *peer,
+				      struct wlan_t2lm_onging_negotiation_info *t2lm_neg)
+{
+	struct wlan_mlo_peer_context *ml_peer;
+
+	ml_peer = peer->mlo_peer_ctx;
+	if (!ml_peer)
+		return QDF_STATUS_E_FAILURE;
+
+	return ttlm_sm_deliver_event(ml_peer, WLAN_TTLM_SM_EV_BTM_LINK_DISABLE,
+				     sizeof(struct wlan_t2lm_onging_negotiation_info),
+				     t2lm_neg);
+}
+#else
+static inline QDF_STATUS
+wlan_ttlm_populate_link_disable_in_sm(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_objmgr_peer *peer,
+				      struct wlan_t2lm_onging_negotiation_info *t2lm_neg)
+{
+	return t2lm_deliver_event(vdev, peer,
+				  WLAN_T2LM_EV_ACTION_FRAME_TX_REQ,
+				  t2lm_neg,
+				  0,
+				  &t2lm_neg->dialog_token);
+}
+#endif
+
 QDF_STATUS
 wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 				      struct mlo_link_disable_request_evt_params *params)
@@ -865,11 +895,7 @@ wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
-	status = t2lm_deliver_event(vdev, peer,
-				    WLAN_T2LM_EV_ACTION_FRAME_TX_REQ,
-				    &t2lm_neg,
-				    0,
-				    &t2lm_neg.dialog_token);
+	status = wlan_ttlm_populate_link_disable_in_sm(vdev, peer, &t2lm_neg);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
 	return status;
