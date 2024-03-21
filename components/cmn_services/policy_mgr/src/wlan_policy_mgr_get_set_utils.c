@@ -3716,6 +3716,7 @@ static inline bool policy_mgr_is_concurrency_allowed_4_port(
 {return false; }
 #endif
 
+#ifndef TUFELLO_DUAL_FW_SUPPORT
 bool
 policy_mgr_allow_multiple_sta_connections(struct wlan_objmgr_psoc *psoc)
 {
@@ -3734,6 +3735,13 @@ policy_mgr_allow_multiple_sta_connections(struct wlan_objmgr_psoc *psoc)
 
 	return true;
 }
+#else
+bool
+policy_mgr_allow_multiple_sta_connections(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+#endif
 
 #if defined(CONFIG_BAND_6GHZ) && defined(WLAN_FEATURE_11AX)
 bool policy_mgr_is_6ghz_conc_mode_supported(

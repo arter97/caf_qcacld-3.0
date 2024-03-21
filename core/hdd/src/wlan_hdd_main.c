@@ -6048,10 +6048,15 @@ static const struct net_device_ops wlan_drv_ops = {
 	.ndo_set_features = hdd_set_features,
 	.ndo_tx_timeout = hdd_tx_timeout,
 	.ndo_get_stats = hdd_get_stats,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
 	.ndo_do_ioctl = hdd_ioctl,
+#endif
 	.ndo_set_mac_address = hdd_set_mac_address,
 	.ndo_select_queue = hdd_select_queue,
 	.ndo_set_rx_mode = hdd_set_multicast_list,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	.ndo_siocdevprivate = hdd_dev_private_ioctl,
+#endif
 };
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
@@ -6244,7 +6249,32 @@ free_net_dev:
 	return NULL;
 }
 
-static QDF_STATUS hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_held)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+static int
+hdd_register_netdevice(struct hdd_adapter *adapter, struct net_device *dev,
+		       struct hdd_adapter_create_param *params)
+{
+	int ret;
+
+	if (params->is_add_virtual_iface)
+		ret = wlan_cfg80211_register_netdevice(dev);
+	else
+		ret = register_netdevice(dev);
+
+	return ret;
+}
+#else
+static int
+hdd_register_netdevice(struct hdd_adapter *adapter, struct net_device *dev,
+		       struct hdd_adapter_create_param *params)
+{
+	return register_netdevice(dev);
+}
+#endif
+
+static QDF_STATUS
+hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_held,
+		       struct hdd_adapter_create_param *params)
 {
 	struct net_device *dev = adapter->dev;
 	int ret;
@@ -6263,7 +6293,7 @@ static QDF_STATUS hdd_register_interface(struct hdd_adapter *adapter, bool rtnl_
 			}
 		}
 
-		ret = register_netdevice(dev);
+		ret = hdd_register_netdevice(adapter, dev, params);
 		if (ret) {
 			hdd_err("register_netdevice(%s) failed, err = 0x%x",
 				dev->name, ret);
@@ -6978,6 +7008,25 @@ void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+static void
+hdd_unregister_netdevice(struct hdd_adapter *adapter, struct net_device *dev)
+{
+	if (adapter->is_virtual_iface) {
+		wlan_cfg80211_unregister_netdevice(dev);
+		adapter->is_virtual_iface = false;
+	} else {
+		unregister_netdevice(dev);
+	}
+}
+#else
+static void
+hdd_unregister_netdevice(struct hdd_adapter *adapter, struct net_device *dev)
+{
+	unregister_netdevice(dev);
+}
+#endif
+
 static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter,
 				bool rtnl_held)
@@ -7016,7 +7065,7 @@ static void hdd_cleanup_adapter(struct hdd_context *hdd_ctx,
 
 	if (test_bit(NET_DEVICE_REGISTERED, &adapter->event_flags)) {
 		if (rtnl_held)
-			unregister_netdevice(dev);
+			hdd_unregister_netdevice(adapter, dev);
 		else
 			unregister_netdev(dev);
 		/*
@@ -7647,7 +7696,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 			break;
 		}
 
-		status = hdd_register_interface(adapter, rtnl_held);
+		status = hdd_register_interface(adapter, rtnl_held, params);
 		if (QDF_STATUS_SUCCESS != status)
 			goto err_free_netdev;
 
@@ -7683,7 +7732,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 			NL80211_IFTYPE_P2P_GO;
 		adapter->device_mode = session_type;
 
-		status = hdd_register_interface(adapter, rtnl_held);
+		status = hdd_register_interface(adapter, rtnl_held, params);
 		if (QDF_STATUS_SUCCESS != status)
 			goto err_free_netdev;
 
@@ -7724,7 +7773,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 
 		adapter->wdev.iftype = NL80211_IFTYPE_STATION;
 		adapter->device_mode = session_type;
-		status = hdd_register_interface(adapter, rtnl_held);
+		status = hdd_register_interface(adapter, rtnl_held, params);
 		if (QDF_STATUS_SUCCESS != status)
 			goto err_free_netdev;
 
