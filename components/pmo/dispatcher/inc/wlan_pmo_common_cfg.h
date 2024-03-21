@@ -193,6 +193,29 @@
 
 /*
  * <ini>
+ * gMinTelesDTIMLevel - Configure minimum DTIM level of Telescopic DTIM
+ * @Min: 0
+ * @Max: 3
+ * @Default: 1
+ *
+ * The value of this INI is used to set minimum allowed DTIM level
+ * used by Telescopic DTIM.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_PMO_MIN_TELESDTIM_LVL CFG_INI_UINT( \
+	"gMinTelesDTIMLevel", \
+	0, \
+	3, \
+	1, \
+	CFG_VALUE_OR_DEFAULT, \
+	"minimum Telescopic DTIM level")
+
+
+/*
+ * <ini>
  * gEnableModulatedDTIM/ConDTIMSkipping_Number - Enable/Disable modulated DTIM
  * feature
  * @Min: 0
@@ -832,6 +855,7 @@
 	CFG(CFG_PMO_ENABLE_IGMP_OFFLOAD) \
 	CFG(CFG_PMO_ENABLE_DYNAMIC_DTIM) \
 	CFG(CFG_PMO_ENABLE_TELESCOPIC_DTIM) \
+	CFG(CFG_PMO_MIN_TELESDTIM_LVL) \
 	CFG(CFG_PMO_ENABLE_MODULATED_DTIM) \
 	CFG(CFG_PMO_ENABLE_FORCED_DTIM) \
 	CFG(CFG_PMO_MC_ADDR_LIST_ENABLE) \
