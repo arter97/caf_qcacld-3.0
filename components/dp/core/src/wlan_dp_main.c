@@ -95,6 +95,7 @@ void dp_free_ctx(void)
 
 	dp_ctx =  dp_get_context();
 
+	qdf_spinlock_destroy(&dp_ctx->dp_link_del_lock);
 	qdf_spinlock_destroy(&dp_ctx->intf_list_lock);
 	qdf_list_destroy(&dp_ctx->intf_list);
 	dp_detach_ctx();
