@@ -3430,7 +3430,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		}
 
 		/* Check any other sap need restart */
-		hdd_hostapd_check_channel_post_csa(hdd_ctx, adapter);
+		if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+						  link_info->vdev_id))
+			hdd_hostapd_check_channel_post_csa(hdd_ctx, adapter);
 
 		qdf_status = qdf_event_set(&hostapd_state->qdf_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
