@@ -13185,7 +13185,8 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		mlo_ie->mld_capab_and_op_info.aar_support = 0;
 	}
 
-	if (wlan_mlme_get_sta_mlo_conn_max_num(psoc) == 3) {
+	if (partner_info->num_partner_links == 2 &&
+	    wlan_mlme_is_aux_emlsr_support(psoc)) {
 		wlan_vdev_mlme_cap_clear(pe_session->vdev,
 					 WLAN_VDEV_C_EMLSR_CAP);
 		pe_debug("EMLSR is not supported for 3-link association until FW support is added");
