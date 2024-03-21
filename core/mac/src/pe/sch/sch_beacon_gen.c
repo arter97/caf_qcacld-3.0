@@ -264,7 +264,10 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		    bcn_2->Quiet.present)
 			wlan_vdev_mlme_op_flags_set(session->vdev,
 						    WLAN_VDEV_OP_CU_CAT1);
-		else
+		else if (bcn_2->WiderBWChanSwitchAnn.present ||
+			 bcn_2->ChannelSwitchWrapper.present ||
+			 bcn_2->OperatingMode.present ||
+			 bcn_2->bss_color_change.present)
 			wlan_vdev_mlme_op_flags_set(session->vdev,
 						    WLAN_VDEV_OP_CU_CAT2);
 
