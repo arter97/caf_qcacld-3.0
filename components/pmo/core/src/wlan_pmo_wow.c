@@ -347,86 +347,151 @@ bool pmo_core_is_wow_applicable(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
+bool pmo_wow_wakeup_event_enabled(struct pmo_psoc_cfg *pmo_cfg, WOW_WAKE_EVENT_TYPE event)
+{
+	uint64_t mask;
+	bool cond, mask_enabled;
+	mask = ((uint64_t)pmo_cfg->wow_wakeup_event_mask_h32 << 32 |
+			  pmo_cfg->wow_wakeup_event_mask);
+
+	ASSERT(event < sizeof(uint64__t) * 8);
+
+	mask_enabled = ((uint64_t)1 << event) & mask ?
+			true: false;
+
+	if (event == WOW_PATTERN_MATCH_EVENT) {
+		cond = pmo_cfg->ptrn_match_enable_all_vdev ?
+			true : false;
+		return mask_enabled && cond ? true : false;
+	}
+
+	if (event == WOW_MAGIC_PKT_RECVD_EVENT) {
+		cond = pmo_cfg->magic_ptrn_enable ?
+			true : false;
+		return mask_enabled && cond ? true : false;
+	}
+
+	if (mask_enabled)
+		return true;
+
+	return false;
+}
+
 void pmo_set_sta_wow_bitmask(struct pmo_psoc_cfg *pmo_cfg, uint32_t *bitmask, uint32_t wow_bitmap_size)
 {
 
-	pmo_set_wow_event_bitmap(WOW_CSA_IE_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_CLIENT_KICKOUT_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_CSA_IE_EVENT))
+		pmo_set_wow_event_bitmap(WOW_CSA_IE_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
 
-	if (pmo_cfg->ptrn_match_enable_all_vdev)
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_CLIENT_KICKOUT_EVENT))
+		pmo_set_wow_event_bitmap(WOW_CLIENT_KICKOUT_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_PATTERN_MATCH_EVENT))
 		pmo_set_wow_event_bitmap(WOW_PATTERN_MATCH_EVENT,
 					 wow_bitmap_size,
 					 bitmask);
 
-	if (pmo_cfg->magic_ptrn_enable)
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_MAGIC_PKT_RECVD_EVENT))
 		pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
 					 wow_bitmap_size,
 					 bitmask);
 
-	pmo_set_wow_event_bitmap(WOW_DEAUTH_RECVD_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_DISASSOC_RECVD_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_BMISS_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_GTK_ERR_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_BETTER_AP_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_HTT_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_RA_MATCH_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_NLO_DETECTED_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_EXTSCAN_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_OEM_RESPONSE_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_TDLS_CONN_TRACKER_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_11D_SCAN_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_NLO_SCAN_COMPLETE_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_DEAUTH_RECVD_EVENT))
+		pmo_set_wow_event_bitmap(WOW_DEAUTH_RECVD_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_DISASSOC_RECVD_EVENT))
+		pmo_set_wow_event_bitmap(WOW_DISASSOC_RECVD_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_BMISS_EVENT))
+		pmo_set_wow_event_bitmap(WOW_BMISS_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_GTK_ERR_EVENT))
+		pmo_set_wow_event_bitmap(WOW_GTK_ERR_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_BETTER_AP_EVENT))
+		pmo_set_wow_event_bitmap(WOW_BETTER_AP_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_HTT_EVENT))
+		pmo_set_wow_event_bitmap(WOW_HTT_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_RA_MATCH_EVENT))
+		pmo_set_wow_event_bitmap(WOW_RA_MATCH_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_NLO_DETECTED_EVENT))
+		pmo_set_wow_event_bitmap(WOW_NLO_DETECTED_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_EXTSCAN_EVENT))
+		pmo_set_wow_event_bitmap(WOW_EXTSCAN_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_OEM_RESPONSE_EVENT))
+		pmo_set_wow_event_bitmap(WOW_OEM_RESPONSE_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_TDLS_CONN_TRACKER_EVENT))
+		pmo_set_wow_event_bitmap(WOW_TDLS_CONN_TRACKER_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_11D_SCAN_EVENT))
+		pmo_set_wow_event_bitmap(WOW_11D_SCAN_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_NLO_SCAN_COMPLETE_EVENT))
+		pmo_set_wow_event_bitmap(WOW_NLO_SCAN_COMPLETE_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
 	/*
 	 * WPA3 roaming offloads SAE authentication to wpa_supplicant
 	 * Firmware will send WMI_ROAM_PREAUTH_STATUS_CMDID
 	 */
-	pmo_set_wow_event_bitmap(WOW_ROAM_PREAUTH_START_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_ROAM_PMKID_REQUEST_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
-	pmo_set_wow_event_bitmap(WOW_VDEV_DISCONNECT_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_ROAM_PREAUTH_START_EVENT))
+		pmo_set_wow_event_bitmap(WOW_ROAM_PREAUTH_START_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
 
-	pmo_set_wow_event_bitmap(WOW_TWT_EVENT,
-				 wow_bitmap_size,
-				 bitmask);
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_ROAM_PMKID_REQUEST_EVENT))
+		pmo_set_wow_event_bitmap(WOW_ROAM_PMKID_REQUEST_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
 
-	pmo_set_wow_event_bitmap(WOW_DCS_INTERFERENCE_DET,
-				 wow_bitmap_size,
-				 bitmask);
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_VDEV_DISCONNECT_EVENT))
+		pmo_set_wow_event_bitmap(WOW_VDEV_DISCONNECT_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_TWT_EVENT))
+		pmo_set_wow_event_bitmap(WOW_TWT_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_DCS_INTERFERENCE_DET))
+		pmo_set_wow_event_bitmap(WOW_DCS_INTERFERENCE_DET,
+					 wow_bitmap_size,
+					 bitmask);
 }
 
 void pmo_set_sap_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)

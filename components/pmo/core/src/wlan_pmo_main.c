@@ -268,6 +268,8 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 	psoc_cfg->max_ps_poll = cfg_get(psoc, CFG_PMO_MAX_PS_POLL);
 
 	psoc_cfg->wow_enable = cfg_get(psoc, CFG_PMO_WOW_ENABLE);
+	psoc_cfg->wow_wakeup_event_mask = cfg_get(psoc, CFG_WOW_WAKEUP_EVENT_MASK);
+	psoc_cfg->wow_wakeup_event_mask_h32 = cfg_get(psoc, CFG_WOW_WAKEUP_EVENT_MASK_H32);
 	psoc_cfg->suspend_mode = cfg_get(psoc, CFG_PMO_SUSPEND_MODE);
 
 	wlan_extwow_init_cfg(psoc, psoc_cfg);
