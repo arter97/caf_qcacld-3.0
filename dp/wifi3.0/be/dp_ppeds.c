@@ -534,7 +534,7 @@ static int dp_ppeds_alloc_ppe_vp_profile_be(struct dp_soc_be *be_soc,
 	 * As we already found the current count not maxed out, we should
 	 * always find an non configured entry.
 	 */
-	if (!dp_assert_always_internal(!(i == num_ppe_vp_max))) {
+	if (dp_assert_always_internal(!(i == num_ppe_vp_max))) {
 		dp_err("Table entry index crosses max allowed");
 		qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
 		return -ENOSPC;
