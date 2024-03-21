@@ -661,8 +661,8 @@
  * <cfg>
  * RoamCommon_Mlo_TpPrefer - percentage to boost mlo scoring
  *
- * @Min: -20
- * @Max: +20
+ * @Min: 0
+ * @Max: +30
  * @Default: 10
  *
  * This cfg is used to boost/reduce the mlo weightage with configured
@@ -676,8 +676,8 @@
  */
 #define CFG_MLO_PREFER_PERCENTAGE CFG_INI_INT(\
 			"RoamCommon_Mlo_TpPrefer", \
-			-20, \
-			20, \
+			0, \
+			30, \
 			10,\
 			CFG_VALUE_OR_DEFAULT, \
 			"mlo prefer percentage")

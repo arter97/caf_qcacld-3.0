@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,7 +36,7 @@
 #define RoamBTM_Delta_max 20
 #define RoamBTM_Delta_default 0
 #define RoamEmergency_TargetMinRSSI_min -127
-#define RoamEmergency_TargetMinRSSI_max 0
+#define RoamEmergency_TargetMinRSSI_max -70
 #define RoamEmergency_TargetMinRSSI_default -70
 #else
 #define RoamCommon_Delta_min 0
