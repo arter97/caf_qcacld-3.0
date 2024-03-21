@@ -4872,6 +4872,34 @@ hdd_populate_feature_set_cds_config(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#ifdef CONFIG_AFC_SUPPORT
+#define AFC_WAIT_ONE_TIME_MS  60
+#define AFC_MAX_WAIT_CNT      10
+static void hdd_delay_for_afc_update(struct wlan_objmgr_pdev *pdev)
+{
+	uint32_t cnt = 0;
+	if (!wlan_reg_is_afc_expiry_event_received(pdev))
+		return;
+
+	if (wlan_reg_is_afc_power_event_received(pdev))
+		return;
+
+	hdd_debug("start waiting...");
+	while (cnt++ < AFC_MAX_WAIT_CNT) {
+		qdf_sleep(AFC_WAIT_ONE_TIME_MS);
+		if (wlan_reg_is_afc_power_event_received(pdev)) {
+			hdd_debug("afc power event received");
+			break;
+		}
+	}
+	hdd_debug("waiting end, wait count: %d", cnt);
+}
+#else
+static inline void hdd_delay_for_afc_update(struct wlan_objmgr_pdev *pdev)
+{
+}
+#endif
+
 int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 {
 	int ret = 0;
@@ -5164,6 +5192,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 							THERMAL_MONITOR_WPSS);
 	}
 
+	hdd_delay_for_afc_update(hdd_ctx->pdev);
 	hdd_exit();
 
 	return 0;
