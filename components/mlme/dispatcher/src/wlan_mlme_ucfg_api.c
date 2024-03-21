@@ -1959,7 +1959,13 @@ bool ucfg_mlme_validate_scan_period(struct wlan_objmgr_psoc *psoc,
 bool ucfg_mlme_get_coex_unsafe_chan_nb_user_prefer(
 		struct wlan_objmgr_psoc *psoc)
 {
-	return wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(psoc);
+	return wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(psoc);
+}
+
+bool ucfg_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(psoc);
 }
 
 bool ucfg_mlme_get_coex_unsafe_chan_reg_disable(

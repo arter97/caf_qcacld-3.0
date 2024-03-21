@@ -314,7 +314,9 @@ wlansap_filter_unsafe_ch(struct wlan_objmgr_psoc *psoc,
 	 */
 	for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++) {
 		freq = sap_ctx->acs_cfg->freq_list[i];
-		if (!policy_mgr_is_sap_freq_allowed(psoc, freq)) {
+		if (!policy_mgr_is_sap_freq_allowed(psoc,
+				wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
+				freq)) {
 			if (info) {
 				len += qdf_scnprintf(info + len,
 						SAP_MAX_CHANNEL_INFO_LOG - len,
@@ -1763,7 +1765,8 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 		goto exit;
 
 	if (!policy_mgr_is_sap_freq_allowed(mac->psoc,
-					    roam_info->chan_info_freq))
+				wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
+				roam_info->chan_info_freq))
 		goto exit;
 	if (sap_ctx->acs_cfg->ch_width > CH_WIDTH_20MHZ) {
 		sap_mark_freq_as_clean(sap_ctx->clean_channel_array,

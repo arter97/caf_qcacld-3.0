@@ -520,7 +520,8 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 			}
 		}
 
-		if (!policy_mgr_is_sap_freq_allowed(mac->psoc, *ch_list)) {
+		if (!policy_mgr_is_sap_freq_allowed(mac->psoc,
+			wlan_vdev_mlme_get_opmode(sap_ctx->vdev), *ch_list)) {
 			if (sap_acs_is_puncture_applicable(sap_ctx->acs_cfg)) {
 				ch_support_puncture = true;
 				len += qdf_scnprintf(
