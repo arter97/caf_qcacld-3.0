@@ -1886,4 +1886,12 @@ QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
 }
 #endif
 
+/*
+ * ucfg_dp_set_mon_conf_flags(): Set monitor configuration flags
+ * @psoc: psoc handle
+ * @flags: monitor configuration flags
+ *
+ * Return: None
+ */
+void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags);
 #endif /* _WLAN_DP_UCFG_API_H_ */
