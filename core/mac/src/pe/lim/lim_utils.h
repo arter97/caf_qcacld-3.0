@@ -3658,4 +3658,33 @@ lim_cp_stats_cstats_log_csa_evt(struct pe_session *pe_session,
 {
 }
 #endif /* WLAN_CHIPSET_STATS */
+
+#define MAX_TX_PSD_POWER 15
+
+/**
+ * lim_get_tpe_ie_length() : Get the tpe ie length
+ * @ch_width: phy channel width
+ * @tpe_ie: pointer to dot11f TPE IE structure
+ * @num_tpe: number of TPE IE
+ *
+ * Return: tpe ie length
+ */
+uint16_t lim_get_tpe_ie_length(enum phy_ch_width ch_width,
+			       tDot11fIEtransmit_power_env *tpe_ie,
+			       uint16_t num_tpe);
+
+/**
+ * lim_fill_complete_tpe_ie() : fill tpe ie to target buffer
+ * @ch_width: phy channel width
+ * @tpe_ie_len: the total bytes to fill target buffer
+ * @tpe_ptr: pointer to dot11f TPE IE structure
+ * @num_tpe: number of TPE IE
+ * @target: the buffer to fill data
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width ch_width,
+				    uint16_t tpe_ie_len,
+				    tDot11fIEtransmit_power_env *tpe_ptr,
+				    uint16_t num_tpe, uint8_t *target);
 #endif /* __LIM_UTILS_H */
