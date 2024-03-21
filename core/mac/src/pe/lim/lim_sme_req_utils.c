@@ -290,6 +290,10 @@ uint32_t lim_populate_rnr_entry(struct mac_context *mac_ctx,
 		     (sizeof(tDot11fIEreduced_neighbor_report) *
 		      MAX_NUM_RNR_ENTRY));
 
+	if (!ie) {
+		pe_debug("remove rnrie");
+		return 0;
+	}
 	rnr_ie_len = ie[TAG_LEN_POS];
 	data = ie + MIN_IE_LEN;
 

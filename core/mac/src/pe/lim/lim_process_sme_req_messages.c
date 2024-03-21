@@ -10161,16 +10161,19 @@ static void lim_process_update_rnr_ies(struct mac_context *mac_ctx,
 	update_ie = &update_add_ies->updateie;
 	/* skip update_ie null check since it is static */
 
-	/* if len is 0, upper layer requested freeing of buffer */
-	if (update_ie->iebufferlength == 0)
-		goto end;
-
 	/* incoming message has smeSession, use BSSID to find PE session */
 	session_entry = pe_find_session_by_vdev_id(mac_ctx, update_ie->vdev_id);
 
 	if (!session_entry) {
 		pe_debug("Session not found for given vdev id %d",
 			 update_ie->vdev_id);
+		goto end;
+	}
+
+	/* if len is 0, upper layer requested freeing of buffer */
+	if (update_ie->iebufferlength == 0) {
+		/* just want to clean up rnrie in the pe session */
+		ret = lim_populate_rnr_entry(mac_ctx, session_entry, NULL);
 		goto end;
 	}
 
