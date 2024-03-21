@@ -17,6 +17,21 @@
  */
 
 #include <dp_types.h>
+#include "dp_sawf.h"
+
+#define DP_SAWF_MSDUQ_INDICATION_SHIFT 4
+
+#define DP_SAWF_MSDUQ_ID_MASK 0x0F
+#define DP_SAWF_MSDUQ_INDICATION_MASK 0xF0
+
+#define DP_SAWF_MSDUQ_COOKIE_CREATE(q_id, q_ind) \
+	(((q_ind) << DP_SAWF_MSDUQ_INDICATION_SHIFT) | (q_id))
+
+#define DP_SAWF_GET_MSDUQ_ID_FROM_COOKIE(cookie) \
+	((cookie) & DP_SAWF_MSDUQ_ID_MASK)
+
+#define DP_SAWF_GET_MSDUQ_INDICATION_FROM_COOKIE(cookie) \
+	(((cookie) & DP_SAWF_MSDUQ_INDICATION_MASK) >> DP_SAWF_MSDUQ_INDICATION_SHIFT)
 
 QDF_STATUS
 dp_htt_h2t_sawf_def_queues_map_req(struct htt_soc *soc,
@@ -35,6 +50,37 @@ QDF_STATUS
 dp_htt_sawf_def_queues_map_report_conf(struct htt_soc *soc,
 				       uint32_t *msg_word,
 				       qdf_nbuf_t htt_t2h_msg);
+/*
+ * dp_htt_sawf_msduq_recfg_req() - Send HTT Deactivate/Reactivate
+ * to FW
+ * @soc: HTT SOC handle
+ * @msduq: MSDU-Q structure
+ * @q_id: Queue Id for MSDU-Q
+ * q_ind: Indication for Deactivate/Reactivate
+ * peer: Peer to send the HTT
+ *
+ * H2T HTT messgae to FW for De/Re Activate MSDUQ
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+dp_htt_sawf_msduq_recfg_req(struct htt_soc *soc, struct dp_sawf_msduq *msduq,
+			    uint8_t q_id, HTT_MSDUQ_DEACTIVATE_E q_ind,
+			    struct dp_peer *peer);
+
+/*
+ * dp_htt_sawf_msduq_recfg_ind() - handler for HTT Deactivate/Reactivate
+ * response from FW
+ * @soc: HTT SOC handle
+ * @msg_word: Resp given from target
+ *
+ * T2H Response handler for HTT message
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+
+QDF_STATUS
+dp_htt_sawf_msduq_recfg_ind(struct htt_soc *soc, uint32_t *msg_word);
 
 QDF_STATUS
 dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
