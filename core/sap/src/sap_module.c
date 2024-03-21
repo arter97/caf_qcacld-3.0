@@ -1020,7 +1020,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 
 	switch (list_type) {
 	case eSAP_WHITE_LIST:
-		if (cmd == ADD_STA_TO_ACL) {
+		if (cmd == ADD_STA_TO_ACL || cmd == ADD_STA_TO_ACL_NO_DEAUTH) {
 			/* error check */
 			/* if list is already at max, return failure */
 			if (sap_ctx->nAcceptMac == MAX_ACL_MAC_ADDRESS) {
@@ -1050,7 +1050,8 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 				sap_debug("size of accept and deny lists %d %d",
 					  sap_ctx->nAcceptMac,
 					  sap_ctx->nDenyMac);
-		} else if (cmd == DELETE_STA_FROM_ACL) {
+		} else if (cmd == DELETE_STA_FROM_ACL ||
+			   cmd == DELETE_STA_FROM_ACL_NO_DEAUTH) {
 			if (sta_white_list) {
 
 				struct csr_del_sta_params delStaParams;
@@ -1059,15 +1060,21 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 				sap_remove_mac_from_acl(sap_ctx->acceptMacList,
 						    &sap_ctx->nAcceptMac,
 						    staWLIndex);
-				/* If a client is deleted from white list and it is connected, send deauth */
-				wlansap_populate_del_sta_params(peer_sta_mac,
-					eCsrForcedDeauthSta,
-					SIR_MAC_MGMT_DEAUTH,
-					&delStaParams);
-				wlansap_deauth_sta(sap_ctx, &delStaParams);
-				sap_debug("size of accept and deny lists %d %d",
-					  sap_ctx->nAcceptMac,
-					  sap_ctx->nDenyMac);
+				/* If a client is deleted from allow list and */
+				/* it is connected, send deauth
+				 */
+				if (cmd == DELETE_STA_FROM_ACL) {
+					wlansap_populate_del_sta_params(
+						peer_sta_mac,
+						eCsrForcedDeauthSta,
+						SIR_MAC_MGMT_DEAUTH,
+						&delStaParams);
+					wlansap_deauth_sta(sap_ctx,
+							   &delStaParams);
+					sap_debug("size of accept and deny lists %d %d",
+						  sap_ctx->nAcceptMac,
+						  sap_ctx->nDenyMac);
+				}
 			} else {
 				sap_warn("MAC address to be deleted is not present in the white list "
 					 QDF_MAC_ADDR_FMT,
@@ -1082,7 +1089,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 
 	case eSAP_BLACK_LIST:
 
-		if (cmd == ADD_STA_TO_ACL) {
+		if (cmd == ADD_STA_TO_ACL || cmd == ADD_STA_TO_ACL_NO_DEAUTH) {
 			struct csr_del_sta_params delStaParams;
 			/* error check */
 			/* if list is already at max, return failure */
@@ -1106,19 +1113,25 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 						    &sap_ctx->nAcceptMac,
 						    staWLIndex);
 			}
-			/* If we are adding a client to the black list; if its connected, send deauth */
-			wlansap_populate_del_sta_params(peer_sta_mac,
-				eCsrForcedDeauthSta,
-				SIR_MAC_MGMT_DEAUTH,
-				&delStaParams);
-			wlansap_deauth_sta(sap_ctx, &delStaParams);
+			/* If we are adding a client to the deny list; */
+			/* if its connected, send deauth
+			 */
+			if (cmd == ADD_STA_TO_ACL) {
+				wlansap_populate_del_sta_params(
+					peer_sta_mac,
+					eCsrForcedDeauthSta,
+					SIR_MAC_MGMT_DEAUTH,
+					&delStaParams);
+				wlansap_deauth_sta(sap_ctx, &delStaParams);
+			}
 			sap_info("... Now add to black list");
 			sap_add_mac_to_acl(sap_ctx->denyMacList,
 				       &sap_ctx->nDenyMac, peer_sta_mac);
 			sap_debug("size of accept and deny lists %d %d",
 				  sap_ctx->nAcceptMac,
 				  sap_ctx->nDenyMac);
-		} else if (cmd == DELETE_STA_FROM_ACL) {
+		} else if (cmd == DELETE_STA_FROM_ACL ||
+			   cmd == DELETE_STA_FROM_ACL_NO_DEAUTH) {
 			if (sta_black_list) {
 				sap_info("Delete from black list");
 				sap_remove_mac_from_acl(sap_ctx->denyMacList,
@@ -2227,6 +2240,144 @@ wlansap_reset_sap_config_add_ie(struct sap_config *config,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_SON
+QDF_STATUS
+wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
+				      struct sap_config *config,
+				      enum qca_wlan_vendor_phy_mode phy_mode)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_channel *des_chan;
+
+	if (!vdev || !config) {
+		sap_err("Invalid input parameters");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		sap_err("Invalid pdev parameters");
+		return QDF_STATUS_E_FAULT;
+	}
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		sap_err("Invalid psoc parameters");
+		return QDF_STATUS_E_FAULT;
+	}
+	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
+	if (!des_chan) {
+		sap_err("Invalid desired channel");
+		return QDF_STATUS_E_FAULT;
+	}
+	config->sap_orig_hw_mode = config->SapHw_mode;
+	config->ch_width_orig = config->ch_params.ch_width;
+	switch (phy_mode) {
+	case QCA_WLAN_VENDOR_PHY_MODE_11A:
+		config->SapHw_mode = eCSR_DOT11_MODE_11a;
+		config->ch_params.ch_width = CH_WIDTH_20MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11B:
+		config->SapHw_mode = eCSR_DOT11_MODE_11b;
+		config->ch_params.ch_width = CH_WIDTH_20MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11G:
+		config->SapHw_mode = eCSR_DOT11_MODE_11g;
+		config->ch_params.ch_width = CH_WIDTH_20MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11AGN:
+	case QCA_WLAN_VENDOR_PHY_MODE_11NG_HT20:
+	case QCA_WLAN_VENDOR_PHY_MODE_11NA_HT20:
+		config->SapHw_mode = eCSR_DOT11_MODE_11n;
+		config->ch_params.ch_width = CH_WIDTH_20MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11NG_HT40PLUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11NG_HT40MINUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11NG_HT40:
+	case QCA_WLAN_VENDOR_PHY_MODE_11NA_HT40PLUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11NA_HT40MINUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11NA_HT40:
+		config->SapHw_mode = eCSR_DOT11_MODE_11n;
+		config->ch_params.ch_width = CH_WIDTH_40MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT20:
+		config->SapHw_mode = eCSR_DOT11_MODE_11ac;
+		config->ch_params.ch_width = CH_WIDTH_20MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT40PLUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT40MINUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT40:
+		config->SapHw_mode = eCSR_DOT11_MODE_11ac;
+		config->ch_params.ch_width = CH_WIDTH_40MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT80:
+		config->SapHw_mode = eCSR_DOT11_MODE_11ac;
+		config->ch_params.ch_width = CH_WIDTH_80MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT160:
+		config->SapHw_mode = eCSR_DOT11_MODE_11ac;
+		config->ch_params.ch_width = CH_WIDTH_160MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE20:
+		config->SapHw_mode = eCSR_DOT11_MODE_11ax;
+		config->ch_params.ch_width = CH_WIDTH_20MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE40:
+	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE40PLUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE40MINUS:
+		config->SapHw_mode = eCSR_DOT11_MODE_11ax;
+		config->ch_params.ch_width = CH_WIDTH_40MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE80:
+		config->SapHw_mode = eCSR_DOT11_MODE_11ax;
+		config->ch_params.ch_width = CH_WIDTH_80MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE160:
+		config->SapHw_mode = eCSR_DOT11_MODE_11ax;
+		config->ch_params.ch_width = CH_WIDTH_160MHZ;
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_AUTO:
+		config->SapHw_mode = eCSR_DOT11_MODE_AUTO;
+		break;
+	default:
+		sap_err("Invalid phy mode %d to configure", phy_mode);
+		break;
+	}
+
+	if (config->ch_params.ch_width == CH_WIDTH_80P80MHZ &&
+	    ucfg_mlme_get_restricted_80p80_bw_supp(psoc)) {
+		if (!((config->ch_params.center_freq_seg0 == 138 &&
+		       config->ch_params.center_freq_seg1 == 155) ||
+		      (config->ch_params.center_freq_seg1 == 138 &&
+		       config->ch_params.center_freq_seg0 == 155))) {
+			sap_debug("Falling back to 80 from 80p80 as non supported freq_seq0 %d and freq_seq1 %d",
+				  config->ch_params.mhz_freq_seg0,
+				  config->ch_params.mhz_freq_seg1);
+			config->ch_params.center_freq_seg1 = 0;
+			config->ch_params.mhz_freq_seg1 = 0;
+			config->ch_width_orig = CH_WIDTH_80MHZ;
+			config->ch_params.ch_width = config->ch_width_orig;
+		}
+	}
+
+	config->chan_freq = des_chan->ch_freq;
+	config->sec_ch_freq = 0;
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq) &&
+	    (config->ch_params.ch_width == CH_WIDTH_40MHZ) &&
+	    (des_chan->ch_width == CH_WIDTH_40MHZ)) {
+		if (des_chan->ch_cfreq1 == des_chan->ch_freq + BW_10_MHZ)
+			config->sec_ch_freq = des_chan->ch_freq + BW_20_MHZ;
+		if (des_chan->ch_cfreq1 == des_chan->ch_freq - BW_10_MHZ)
+			config->sec_ch_freq = des_chan->ch_freq - BW_20_MHZ;
+	}
+	wlan_reg_set_channel_params_for_freq(pdev, config->chan_freq,
+					     config->sec_ch_freq,
+					     &config->ch_params);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 #define ACS_WLAN_20M_CH_INC 20
 #define ACS_2G_EXTEND ACS_WLAN_20M_CH_INC

@@ -177,14 +177,16 @@ struct hdd_apf_context {
 #define HDD_IS_RATE_LIMIT_REQ(flag, rate)\
 	do {\
 		static ulong __last_ticks;\
+		static bool __first_time = true;\
 		ulong __ticks = jiffies;\
 		flag = false; \
-		if (!time_after(__ticks,\
+		if (!__first_time && !time_after(__ticks,\
 		    __last_ticks + rate * HZ)) {\
 			flag = true; \
 		} \
 		else { \
 			__last_ticks = __ticks;\
+			__first_time = false; \
 		} \
 	} while (0)
 
@@ -2615,18 +2617,13 @@ void hdd_adapter_dev_put_debug(struct hdd_adapter *adapter,
 							next_adapter, dbgid))
 
 /**
- * wlan_hdd_get_adapter_by_vdev_id_from_objmgr() - Fetch adapter from objmgr
- * using vdev_id.
- * @hdd_ctx: the global HDD context
- * @adapter: an hdd_adapter double pointer to store the address of the adapter
+ * wlan_hdd_get_adapter_from_objmgr() - Fetch adapter from objmgr
  * @vdev: the vdev whose corresponding adapter has to be fetched
  *
- * Return: QDF_STATUS
+ * Return: the address of the adapter
  */
-QDF_STATUS
-wlan_hdd_get_adapter_by_vdev_id_from_objmgr(struct hdd_context *hdd_ctx,
-					    struct hdd_adapter **adapter,
-					    struct wlan_objmgr_vdev *vdev);
+struct hdd_adapter *
+wlan_hdd_get_adapter_from_objmgr(struct wlan_objmgr_vdev *vdev);
 
 struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 				     uint8_t session_type,
@@ -3373,6 +3370,44 @@ void hdd_acs_response_timeout_handler(void *context);
  * Return: Status of ACS Start procedure
  */
 int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter);
+
+/**
+ * wlan_hdd_trim_acs_channel_list() - Trims ACS channel list with
+ * intersection of PCL
+ * @pcl: preferred channel list
+ * @pcl_count: Preferred channel list count
+ * @org_ch_list: ACS channel list from user space
+ * @org_ch_list_count: ACS channel count from user space
+ *
+ * Return: None
+ */
+void wlan_hdd_trim_acs_channel_list(uint32_t *pcl, uint8_t pcl_count,
+				    uint32_t *org_freq_list,
+				    uint8_t *org_ch_list_count);
+
+/**
+ * wlan_hdd_handle_zero_acs_list() - Handle worst case of acs channel
+ * trimmed to zero
+ * @hdd_ctx: struct hdd_context
+ * @org_ch_list: ACS channel list from user space
+ * @org_ch_list_count: ACS channel count from user space
+ *
+ * When all chan in ACS freq list is filtered out
+ * by wlan_hdd_trim_acs_channel_list, the hostapd start will fail.
+ * This happens when PCL is PM_24G_SCC_CH_SBS_CH, and SAP acs range includes
+ * 5G channel list. One example is STA active on 6Ghz chan. Hostapd
+ * start SAP on 5G ACS range. The intersection of PCL and ACS range is zero.
+ * Instead of ACS failure, this API selects one channel from ACS range
+ * and report to Hostapd. When hostapd do start_ap, the driver will
+ * force SCC to 6G or move SAP to 2G based on SAP's configuration.
+ *
+ * Return: None
+ */
+void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
+				   uint32_t *acs_freq_list,
+				   uint8_t *acs_ch_list_count,
+				   uint32_t *org_freq_list,
+				   uint8_t org_ch_list_count);
 
 /**
  * hdd_cfg80211_update_acs_config() - update acs config to application
@@ -4642,6 +4677,13 @@ int hdd_psoc_idle_shutdown(struct device *dev);
  * Return: 0 for success non-zero error code for failure
  */
 int hdd_psoc_idle_restart(struct device *dev);
+
+/**
+ * hdd_adapter_is_ap() - whether adapter is ap or not
+ * @adapter: adapter to check
+ * Return: true if it is AP
+ */
+bool hdd_adapter_is_ap(struct hdd_adapter *adapter);
 
 /**
  * hdd_common_roam_callback() - common sme roam callback

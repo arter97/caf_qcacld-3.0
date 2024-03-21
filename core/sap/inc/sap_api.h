@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -119,6 +119,10 @@ typedef enum {
 typedef enum {
 	ADD_STA_TO_ACL = 0,       /* cmd to add STA to access control list */
 	DELETE_STA_FROM_ACL = 1,  /* cmd to del STA from access control list */
+	/* only add STA to ACL, do not trigger deauth */
+	ADD_STA_TO_ACL_NO_DEAUTH = 2,
+	/* only delete STA from ACL, do not trigger deauth */
+	DELETE_STA_FROM_ACL_NO_DEAUTH = 3,
 } eSapACLCmdType;
 
 typedef enum {
@@ -275,9 +279,12 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
 	uint8_t max_mcs_idx;
+	uint8_t max_real_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 	uint8_t ecsa_capable;
+	uint32_t ext_cap;
+	uint8_t supported_band;
 	tDot11fIEHTCaps ht_caps;
 	tDot11fIEVHTCaps vht_caps;
 	tSirMacCapabilityInfo capability_info;
@@ -1323,6 +1330,24 @@ void wlansap_extend_to_acs_range(mac_handle_t mac_handle,
 				 uint32_t *end_ch_freq,
 				 uint32_t *bandStartChannel,
 				 uint32_t *bandEndChannel);
+
+#ifdef WLAN_FEATURE_SON
+/**
+ * wlansap_son_update_sap_config_phymode() - update sap config according to
+ *                                           phy_mode. This API is for son,
+ *                                           There is no band switching when
+ *                                           son phy mode is changed.
+ * @sap_ctx:  Pointer to Sap Context
+ * @sap_config:  Pointer to sap config
+ * @phy_mode: pointer to phy mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
+				      struct sap_config *config,
+				      enum qca_wlan_vendor_phy_mode phy_mode);
+#endif
 
 /**
  * wlansap_set_dfs_nol() - Set dfs nol

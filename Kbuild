@@ -206,6 +206,10 @@ ifeq ($(CONFIG_IPA_OFFLOAD), y)
 HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_ipa.o
 endif
 
+ifeq ($(CONFIG_QCACLD_FEATURE_SON), y)
+HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_son.o
+endif
+
 ifeq ($(CONFIG_QCACLD_FEATURE_NAN), y)
 HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_nan.o
 HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_nan_datapath.o
@@ -413,6 +417,12 @@ endif
 ifeq ($(CONFIG_WLAN_DUMP_IN_PROGRESS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dump_in_progress.o
 endif
+ifeq ($(CONFIG_WLAN_SYSFS_WDS_MODE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_wds_mode.o
+endif
+ifeq ($(CONFIG_WLAN_SYSFS_ROAM_TRIGGER_BITMAP), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_roam_trigger_bitmap.o
+endif
 endif
 
 ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
@@ -493,6 +503,10 @@ endif
 
 ifeq ($(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_connectivity_logging.o
+endif
+
+ifeq ($(CONFIG_FEATURE_WDS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_wds.o
 endif
 
 $(call add-wlan-objs,hdd,$(HDD_OBJS))
@@ -1901,6 +1915,11 @@ ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_11be_tlv.o
 endif
 
+ifeq ($(CONFIG_FEATURE_WDS), y)
+WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_wds_api.o
+WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_wds_tlv.o
+endif
+
 $(call add-wlan-objs,wmi,$(WMI_OBJS))
 
 ########### FWLOG ###########
@@ -2060,6 +2079,11 @@ endif
 
 ifeq ($(CONFIG_FEATURE_MEC), y)
 DP_OBJS += $(DP_SRC)/dp_txrx_wds.o
+endif
+
+ifeq ($(CONFIG_QCACLD_FEATURE_SON), y)
+DP_OBJS += $(WLAN_COMMON_ROOT)/dp/cmn_dp_api/dp_ratetable.o
+DP_INC += -I$(WLAN_COMMON_INC)/dp/cmn_dp_api
 endif
 
 endif #LITHIUM
@@ -2326,6 +2350,28 @@ WLAN_NAN_OBJS := $(NAN_CORE_DIR)/nan_main.o \
 endif
 
 $(call add-wlan-objs,nan,$(WLAN_NAN_OBJS))
+
+#######################################################
+
+######################### SON #########################
+#SON_CORE_DIR := components/son/core/src
+#SON_CORE_INC := -I$(WLAN_ROOT)/components/son/core/inc
+SON_UCFG_DIR := components/son/dispatcher/src
+SON_UCFG_INC := -I$(WLAN_ROOT)/components/son/dispatcher/inc
+SON_TGT_DIR  := $(WLAN_COMMON_ROOT)/target_if/son/src
+SON_TGT_INC  := -I$(WLAN_COMMON_INC)/target_if/son/inc/
+
+SON_OS_IF_DIR  := os_if/son/src
+SON_OS_IF_INC  := -I$(WLAN_ROOT)/os_if/son/inc
+
+ifeq ($(CONFIG_QCACLD_FEATURE_SON), y)
+WLAN_SON_OBJS := $(SON_UCFG_DIR)/son_ucfg_api.o \
+		 $(SON_UCFG_DIR)/son_api.o \
+		 $(SON_OS_IF_DIR)/os_if_son.o \
+		 $(SON_TGT_DIR)/target_if_son.o
+endif
+
+$(call add-wlan-objs,son,$(WLAN_SON_OBJS))
 
 #######################################################
 
@@ -2807,6 +2853,11 @@ INCS +=		$(NAN_CORE_INC)
 INCS +=		$(NAN_UCFG_INC)
 INCS +=		$(NAN_TGT_INC)
 INCS +=		$(NAN_OS_IF_INC)
+################ SON ################
+INCS +=		$(SON_CORE_INC)
+INCS +=		$(SON_UCFG_INC)
+INCS +=		$(SON_TGT_INC)
+INCS +=		$(SON_OS_IF_INC)
 ##########################################
 INCS +=		$(UMAC_OBJMGR_INC)
 INCS +=		$(UMAC_MGMT_TXRX_INC)
@@ -3215,6 +3266,7 @@ cppflags-$(CONFIG_WLAN_LOG_EXIT) += -DWLAN_LOG_EXIT
 cppflags-$(WLAN_OPEN_SOURCE) += -DWLAN_OPEN_SOURCE
 cppflags-$(CONFIG_FEATURE_STATS_EXT) += -DWLAN_FEATURE_STATS_EXT
 cppflags-$(CONFIG_QCACLD_FEATURE_NAN) += -DWLAN_FEATURE_NAN
+cppflags-$(CONFIG_QCACLD_FEATURE_SON) += -DWLAN_FEATURE_SON
 cppflags-$(CONFIG_NDP_SAP_CONCURRENCY_ENABLE) += -DNDP_SAP_CONCURRENCY_ENABLE
 
 ifeq ($(CONFIG_DFS_FCC_TYPE4_DURATION_CHECK), y)
@@ -3380,6 +3432,9 @@ cppflags-$(CONFIG_CHECKSUM_OFFLOAD) += -DCHECKSUM_OFFLOAD
 
 #Enable IPA Offload support
 cppflags-$(CONFIG_IPA_OFFLOAD) += -DIPA_OFFLOAD
+ifeq ($(CONFIG_IPA_OFFLOAD), y)
+cppflags-$(CONFIG_IPA_WDS_EASYMESH) += -DIPA_WDS_EASYMESH_FEATURE
+endif
 
 cppflags-$(CONFIG_WDI3_IPA_OVER_GSI) += -DIPA_WDI3_GSI
 cppflags-$(CONFIG_WDI2_IPA_OVER_GSI) += -DIPA_WDI2_GSI
@@ -3856,6 +3911,9 @@ cppflags-$(CONFIG_EMULATION_2_0) += -DCONFIG_WCN7850_EMULATION_2_0
 cppflags-$(CONFIG_WORD_BASED_TLV) += -DCONFIG_WORD_BASED_TLV
 cppflags-$(CONFIG_WLAN_SKIP_BAR_UPDATE) += -DWLAN_SKIP_BAR_UPDATE
 
+cppflags-$(CONFIG_QCACLD_FEATURE_SON) += -DFEATURE_PERPKT_INFO
+cppflags-$(CONFIG_QCACLD_FEATURE_SON) += -DQCA_ENHANCED_STATS_SUPPORT
+
 ifdef CONFIG_MAX_LOGS_PER_SEC
 ccflags-y += -DWLAN_MAX_LOGS_PER_SEC=$(CONFIG_MAX_LOGS_PER_SEC)
 endif
@@ -4095,6 +4153,10 @@ cppflags-$(CONFIG_RX_FISA_HISTORY) += -DWLAN_SUPPORT_RX_FISA_HIST
 
 cppflags-$(CONFIG_DP_SWLM) += -DWLAN_DP_FEATURE_SW_LATENCY_MGR
 
+cppflags-$(CONFIG_WLAN_SYSFS_WDS_MODE) += -DFEATURE_SYSFS_WDS_MODE
+
+cppflags-$(CONFIG_WLAN_SYSFS_ROAM_TRIGGER_BITMAP) += -DFEATURE_SYSFS_ROAM_TRIGGER_BITMAP
+
 cppflags-$(CONFIG_RX_DEFRAG_DO_NOT_REINJECT) += -DRX_DEFRAG_DO_NOT_REINJECT
 
 cppflags-$(CONFIG_HANDLE_BC_EAP_TX_FRM) += -DHANDLE_BROADCAST_EAPOL_TX_FRAME
@@ -4172,6 +4234,8 @@ endif
 cppflags-$(CONFIG_FEATURE_WDS) += -DFEATURE_WDS
 cppflags-$(CONFIG_FEATURE_MEC) += -DFEATURE_MEC
 cppflags-$(CONFIG_FEATURE_MCL_REPEATER) += -DFEATURE_MCL_REPEATER
+cppflags-$(CONFIG_WDS_CONV_TARGET_IF_OPS_ENABLE) += -DWDS_CONV_TARGET_IF_OPS_ENABLE
+cppflags-$(CONFIG_BYPASS_WDS_OL_OPS) += -DBYPASS_OL_OPS
 
 ccflags-$(CONFIG_IPA_WDI3_TX_TWO_PIPES) += -DIPA_WDI3_TX_TWO_PIPES
 ccflags-$(CONFIG_IPA_STATIC_VOTING) += -DIPA_STATIC_VOTING

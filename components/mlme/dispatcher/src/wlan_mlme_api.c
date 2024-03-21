@@ -4329,6 +4329,18 @@ uint32_t wlan_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.lfr.roam_trigger_bitmap;
 }
 
+void wlan_mlme_set_roaming_triggers(struct wlan_objmgr_psoc *psoc,
+				    uint32_t trigger_bitmap)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	mlme_obj->cfg.lfr.roam_trigger_bitmap = trigger_bitmap;
+}
+
 QDF_STATUS
 wlan_mlme_get_roaming_offload(struct wlan_objmgr_psoc *psoc,
 			      bool *val)
@@ -5090,6 +5102,18 @@ wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)
 
 	return mlme_obj->cfg.gen.wds_mode;
 }
+
+void wlan_mlme_set_wds_mode(struct wlan_objmgr_psoc *psoc,
+			    enum wlan_wds_mode mode)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+	if (mode <= WLAN_WDS_MODE_MAX)
+		mlme_obj->cfg.gen.wds_mode = mode;
+}
 #endif
 
 bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc)
@@ -5252,3 +5276,116 @@ wlan_mlme_get_p2p_p2p_conc_support(struct wlan_objmgr_psoc *psoc)
 					    WLAN_SOC_EXT_P2P_P2P_CONC_SUPPORT);
 }
 #endif
+
+enum phy_ch_width mlme_get_vht_ch_width(void)
+{
+	enum phy_ch_width bandwidth = CH_WIDTH_INVALID;
+	uint32_t fw_ch_wd = wma_get_vht_ch_width();
+
+	if (fw_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+		bandwidth = CH_WIDTH_80P80MHZ;
+	else if (fw_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		bandwidth = CH_WIDTH_160MHZ;
+	else
+		bandwidth = CH_WIDTH_80MHZ;
+
+	return bandwidth;
+}
+
+uint8_t mlme_get_max_he_mcs_idx(enum phy_ch_width mcs_ch_width,
+				u_int16_t *hecap_rxmcsnssmap,
+				u_int16_t *hecap_txmcsnssmap)
+{
+	uint8_t rx_max_mcs, tx_max_mcs, max_mcs = INVALID_MCS_NSS_INDEX;
+
+	switch (mcs_ch_width) {
+	case CH_WIDTH_80P80MHZ:
+		if (hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80_80] &&
+		    hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80_80]) {
+			rx_max_mcs = hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80_80] & 0x03;
+			tx_max_mcs = hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80_80] & 0x03;
+			max_mcs = rx_max_mcs < tx_max_mcs ? rx_max_mcs : tx_max_mcs;
+			if (max_mcs < 0x03)
+				max_mcs = 7 + 2 * max_mcs;
+		}
+		fallthrough;
+	case CH_WIDTH_160MHZ:
+		if (hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_160] &&
+		    hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_160]) {
+			rx_max_mcs = hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_160] & 0x03;
+			tx_max_mcs = hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_160] & 0x03;
+			max_mcs = rx_max_mcs < tx_max_mcs ? rx_max_mcs : tx_max_mcs;
+			if (max_mcs < 0x03)
+				max_mcs = 7 + 2 * max_mcs;
+		}
+		fallthrough;
+	default:
+		if (hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80] &&
+		    hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80]) {
+			rx_max_mcs = hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80] & 0x03;
+			tx_max_mcs = hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80] & 0x03;
+			max_mcs = rx_max_mcs < tx_max_mcs ? rx_max_mcs : tx_max_mcs;
+			if (max_mcs < 0x03)
+				max_mcs = 7 + 2 * max_mcs;
+		}
+	}
+
+	return max_mcs;
+}
+
+uint8_t mlme_get_max_vht_mcs_idx(u_int16_t rx_vht_mcs_map,
+				 u_int16_t tx_vht_mcs_map)
+{
+	uint8_t rx_max_mcs, tx_max_mcs, max_mcs = INVALID_MCS_NSS_INDEX;
+
+	if (rx_vht_mcs_map && tx_vht_mcs_map) {
+		rx_max_mcs = rx_vht_mcs_map & 0x03;
+		tx_max_mcs = tx_vht_mcs_map & 0x03;
+		max_mcs = rx_max_mcs < tx_max_mcs ? rx_max_mcs : tx_max_mcs;
+		if (max_mcs < 0x03)
+			return 7 + max_mcs;
+	}
+
+	return max_mcs;
+}
+
+#ifdef WLAN_FEATURE_SON
+QDF_STATUS mlme_save_vdev_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
+				      uint8_t max_mcs_idx)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev) {
+		mlme_legacy_err("invalid vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->max_mcs_index = max_mcs_idx;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint8_t mlme_get_vdev_max_mcs_idx(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev) {
+		mlme_legacy_err("invalid vdev");
+		return INVALID_MCS_NSS_INDEX;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return INVALID_MCS_NSS_INDEX;
+	}
+
+	return mlme_priv->max_mcs_index;
+}
+#endif /* WLAN_FEATURE_SON */

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -110,6 +111,7 @@ enum dhcp_nego_status {
  * @STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK: Update rx mcbc stats for IPA case
  * @STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION: NL80211_CMD_GET_STATION dumpit
  *                                           handler for SoftAP
+ * @STA_INFO_SON_GET_DATRATE_INFO: gets datarate info for a SON node
  *
  */
 /*
@@ -149,7 +151,7 @@ typedef enum {
 	STA_INFO_SHOW = 29,
 	STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK = 30,
 	STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION = 31,
-
+	STA_INFO_SON_GET_DATRATE_INFO = 32,
 	STA_INFO_ID_MAX,
 } wlan_sta_info_dbgid;
 
@@ -179,6 +181,8 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  * @nss: Number of spatial streams supported
  * @rate_flags: Rate Flags for this connection
  * @ecsa_capable: Extended CSA capabilities
+ * @ext_cap: The first 4 bytes of Extended capabilities IE
+ * @supported_band: sta band capabilities bitmap from supporting opclass
  * @max_phy_rate: Calcuated maximum phy rate based on mode, nss, mcs etc.
  * @tx_packets: The number of frames from host to firmware
  * @tx_bytes: Bytes send to current station
@@ -197,7 +201,10 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  * @mode: Mode of the connection
  * @max_supp_idx: Max supported rate index of the station
  * @max_ext_idx: Max extended supported rate index of the station
- * @max_mcs_idx: Max supported mcs index of the station
+ * @max_mcs_idx: Max supported mcs index from ht cap of the station
+ * @max_real_mcs_idx: Max supported mcs index from biggest cap of the station.
+ *                    For example, if station supports HE , first check he cap,
+ *                    then vht cap and so on.
  * @rx_mcs_map: VHT Rx mcs map
  * @tx_mcs_map: VHT Tx mcs map
  * @freq : Frequency of the current station
@@ -245,6 +252,8 @@ struct hdd_station_info {
 	uint8_t   nss;
 	uint32_t  rate_flags;
 	uint8_t   ecsa_capable;
+	uint32_t ext_cap;
+	uint8_t supported_band;
 	uint32_t max_phy_rate;
 	uint32_t tx_packets;
 	uint64_t tx_bytes;
@@ -265,6 +274,7 @@ struct hdd_station_info {
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
 	uint8_t max_mcs_idx;
+	uint8_t max_real_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 	uint32_t freq;

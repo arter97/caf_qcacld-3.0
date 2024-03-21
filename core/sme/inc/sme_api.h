@@ -1170,6 +1170,8 @@ bool sme_is_feature_supported_by_fw(enum cap_bitmap feature);
 
 QDF_STATUS sme_set_phy_mode(mac_handle_t mac_handle, eCsrPhyMode phyMode);
 eCsrPhyMode sme_get_phy_mode(mac_handle_t mac_handle);
+uint32_t sme_get_11b_data_duration(mac_handle_t mac_handle,
+				   uint32_t chan_freq);
 
 QDF_STATUS sme_add_periodic_tx_ptrn(mac_handle_t mac_handle,
 		tSirAddPeriodicTxPtrn *addPeriodicTxPtrnParams);
@@ -1213,6 +1215,17 @@ QDF_STATUS sme_notify_ht2040_mode(mac_handle_t mac_handle,
 				  uint8_t channel_type);
 QDF_STATUS sme_set_ht2040_mode(mac_handle_t mac_handle, uint8_t sessionId,
 			       uint8_t channel_type, bool obssEnabled);
+
+/**
+ * sme_get_ht2040_mode() - get ht operation mode
+ * @mac_handle: pointer to mac context
+ * @vdev_id: vdev id
+ * @channel_type: channel type to provide
+ *
+ * Return QDF_STATUS
+ */
+QDF_STATUS sme_get_ht2040_mode(mac_handle_t mac_handle, uint8_t vdev_id,
+			       enum eSirMacHTChannelType *channel_type);
 #endif
 
 /**

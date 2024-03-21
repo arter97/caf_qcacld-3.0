@@ -105,6 +105,8 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_ap.h>
 #endif
+#include "wlan_hdd_son.h"
+#include "wlan_hdd_wds.h"
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -690,6 +692,29 @@ QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
 		}
 	}
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS hdd_get_sap_ht2040_mode(struct hdd_adapter *adapter,
+				   enum eSirMacHTChannelType *channel_type)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	mac_handle_t mac_handle;
+
+	hdd_debug("get HT20/40 mode vdev_id %d", adapter->vdev_id);
+
+	if (adapter->device_mode == QDF_SAP_MODE) {
+		mac_handle = adapter->hdd_ctx->mac_handle;
+		if (!mac_handle) {
+			hdd_err("mac handle is null");
+			return status;
+		}
+		status = sme_get_ht2040_mode(mac_handle, adapter->vdev_id,
+					     channel_type);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to get HT20/40 mode");
+	}
+
+	return status;
 }
 #endif
 
@@ -1573,6 +1598,7 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 	stainfo->max_supp_idx = event->max_supp_idx;
 	stainfo->max_ext_idx = event->max_ext_idx;
 	stainfo->max_mcs_idx = event->max_mcs_idx;
+	stainfo->max_real_mcs_idx = event->max_real_mcs_idx;
 	stainfo->rx_mcs_map = event->rx_mcs_map;
 	stainfo->tx_mcs_map = event->tx_mcs_map;
 	stainfo->assoc_ts = qdf_system_ticks();
@@ -1595,6 +1621,8 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 	 */
 	is_dot11_mode_abgn = true;
 	stainfo->ecsa_capable = event->ecsa_capable;
+	stainfo->ext_cap = event->ext_cap;
+	stainfo->supported_band = event->supported_band;
 
 	if (event->vht_caps.present) {
 		stainfo->vht_present = true;
@@ -1930,6 +1958,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	struct sap_config *sap_config;
 	struct sap_context *sap_ctx = NULL;
 	uint8_t pdev_id;
+	struct wlan_objmgr_vdev *vdev;
+	qdf_freq_t dfs_freq;
 
 	dev = context;
 	if (!dev) {
@@ -2140,6 +2170,17 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		if (!wlan_reg_is_6ghz_chan_freq(ap_ctx->operating_chan_freq))
 			wlan_reg_set_ap_pwr_and_update_chan_list(hdd_ctx->pdev,
 								 REG_INDOOR_AP);
+
+		/*
+		 * Enable wds source port learning on the dp vdev in AP mode
+		 * when WDS feature is enabled.
+		 */
+		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+		if (vdev) {
+			if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE)
+				hdd_wds_config_dp_repeater_mode(vdev);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		}
 		/*
 		 * set this event at the very end because once this events
 		 * get set, caller thread is waiting to do further processing.
@@ -2224,6 +2265,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		} else {
 			hdd_debug("Sent CAC end (interrupted) to user space");
 		}
+		dfs_freq = wlan_reg_chan_band_to_freq(hdd_ctx->pdev,
+						      dfs_info.channel,
+						      BIT(REG_BAND_5G));
+		hdd_son_deliver_cac_status_event(adapter, dfs_freq, true);
 		break;
 	case eSAP_DFS_CAC_END:
 		wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
@@ -2241,6 +2286,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		} else {
 			hdd_debug("Sent CAC end to user space");
 		}
+		dfs_freq = wlan_reg_chan_band_to_freq(hdd_ctx->pdev,
+						      dfs_info.channel,
+						      BIT(REG_BAND_5G));
+		hdd_son_deliver_cac_status_event(adapter, dfs_freq, false);
 		break;
 	case eSAP_DFS_RADAR_DETECT:
 	{
@@ -2267,6 +2316,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		} else {
 			hdd_debug("Sent radar detected to user space");
 		}
+		dfs_freq = wlan_reg_chan_band_to_freq(hdd_ctx->pdev,
+						      dfs_info.channel,
+						      BIT(REG_BAND_5G));
+		hdd_son_deliver_cac_status_event(adapter, dfs_freq, true);
 		break;
 	}
 	case eSAP_DFS_RADAR_DETECT_DURING_PRE_CAC:
@@ -2279,6 +2332,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				wlan_hdd_sap_pre_cac_failure,
 				(void *)adapter);
 		qdf_sched_work(0, &hdd_ctx->sap_pre_cac_work);
+		dfs_freq = wlan_reg_chan_band_to_freq(hdd_ctx->pdev,
+						      dfs_info.channel,
+						      BIT(REG_BAND_5G));
+		hdd_son_deliver_cac_status_event(adapter, dfs_freq, true);
 		break;
 	case eSAP_DFS_PRE_CAC_END:
 		hdd_debug("pre cac end notification received:%d",
@@ -2506,6 +2563,11 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			cfg80211_new_sta(dev,
 				(const u8 *)&event->staMac.bytes[0],
 				sta_info, GFP_KERNEL);
+
+			if (adapter->device_mode == QDF_SAP_MODE &&
+			    ucfg_mlme_get_wds_mode(hdd_ctx->psoc))
+				hdd_softap_ind_l2_update(adapter,
+							 &event->staMac);
 			qdf_mem_free(sta_info);
 		}
 		/* Lets abort scan to ensure smooth authentication for client */
@@ -2527,6 +2589,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		}
 
 		hdd_green_ap_add_sta(hdd_ctx);
+		hdd_son_deliver_assoc_disassoc_event(adapter,
+						     event->staMac,
+						     event->status,
+						     ALD_ASSOC_EVENT);
 		break;
 
 	case eSAP_STA_DISASSOC_EVENT:
@@ -2674,7 +2740,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			hdd_bus_bw_compute_reset_prev_txrx_stats(adapter);
 			hdd_bus_bw_compute_timer_try_stop(hdd_ctx);
 		}
-
+		hdd_son_deliver_assoc_disassoc_event(adapter,
+						     disassoc_comp->staMac,
+						     disassoc_comp->reason_code,
+						     ALD_DISASSOC_EVENT);
 		hdd_green_ap_del_sta(hdd_ctx);
 		break;
 
@@ -2783,11 +2852,14 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				hdd_debug("set hw mode change not done");
 		}
 
+		hdd_son_deliver_chan_change_event(
+			adapter, sap_event->sapevt.sap_ch_selected.pri_ch_freq);
 		return hdd_hostapd_chan_change(adapter, sap_event);
 	case eSAP_ACS_SCAN_SUCCESS_EVENT:
 		return hdd_handle_acs_scan_event(sap_event, adapter);
 
 	case eSAP_ACS_CHANNEL_SELECTED:
+		hdd_son_deliver_acs_complete_event(adapter);
 		ap_ctx->sap_config.acs_cfg.pri_ch_freq =
 			sap_event->sapevt.sap_ch_selected.pri_ch_freq;
 		ap_ctx->sap_config.acs_cfg.ht_sec_ch_freq =
@@ -6271,7 +6343,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	hdd_abort_ongoing_sta_connection(hdd_ctx);
 
 	if (adapter->device_mode == QDF_SAP_MODE) {
-		wlan_hdd_del_station(adapter);
+		wlan_hdd_del_station(adapter, NULL);
 		mac_handle = hdd_ctx->mac_handle;
 		status = wlan_hdd_flush_pmksa_cache(adapter);
 		if (QDF_IS_STATUS_ERROR(status))

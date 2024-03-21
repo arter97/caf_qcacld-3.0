@@ -247,7 +247,16 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 	 */
 	flag |= DFS_RANDOM_CH_FLAG_NO_6GHZ_CH;
 
-	if (QDF_IS_STATUS_ERROR(utils_dfs_get_vdev_random_channel_for_freq(
+	if (sap_ctx->candidate_freq &&
+	    sap_ctx->chan_freq != sap_ctx->candidate_freq &&
+	    !utils_dfs_is_freq_in_nol(pdev, sap_ctx->candidate_freq)) {
+		chan_freq = sap_ctx->candidate_freq;
+		wlan_reg_set_channel_params_for_freq(pdev, chan_freq, 0,
+						     ch_params);
+		sap_debug("random chan select candidate freq=%d", chan_freq);
+		sap_ctx->candidate_freq = 0;
+	} else if (QDF_IS_STATUS_ERROR(
+				utils_dfs_get_vdev_random_channel_for_freq(
 					pdev, sap_ctx->vdev, flag, ch_params,
 					&hw_mode, &chan_freq, &acs_info))) {
 		/* No available channel found */
@@ -2259,9 +2268,13 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 		reassoc_complete->max_supp_idx = csr_roaminfo->max_supp_idx;
 		reassoc_complete->max_ext_idx = csr_roaminfo->max_ext_idx;
 		reassoc_complete->max_mcs_idx = csr_roaminfo->max_mcs_idx;
+		reassoc_complete->max_real_mcs_idx =
+						csr_roaminfo->max_real_mcs_idx;
 		reassoc_complete->rx_mcs_map = csr_roaminfo->rx_mcs_map;
 		reassoc_complete->tx_mcs_map = csr_roaminfo->tx_mcs_map;
 		reassoc_complete->ecsa_capable = csr_roaminfo->ecsa_capable;
+		reassoc_complete->ext_cap = csr_roaminfo->ext_cap;
+		reassoc_complete->supported_band = csr_roaminfo->supported_band;
 		if (csr_roaminfo->ht_caps.present)
 			reassoc_complete->ht_caps = csr_roaminfo->ht_caps;
 		if (csr_roaminfo->vht_caps.present)

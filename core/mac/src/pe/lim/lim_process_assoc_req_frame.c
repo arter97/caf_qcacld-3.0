@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,6 +45,7 @@
 #include "wlan_utility.h"
 #include "wlan_crypto_global_api.h"
 #include "lim_mlo.h"
+#include <son_api.h>
 
 /**
  * lim_convert_supported_channels - Parses channel support IE
@@ -2371,6 +2373,46 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+static bool lim_check_multi_ap(struct mac_context *mac_ctx, tSirMacAddr sa,
+			       struct pe_session *session, uint8_t *frm_body,
+			       uint32_t frame_len, uint8_t sub_type)
+{
+	const u8 *multi_ap_ie = NULL;
+	u8 multi_ap_value = 0;
+	uint32_t map_cap = 0;
+
+	map_cap = wlan_get_multi_ap_cap(session->vdev);
+
+	if (!map_cap || map_cap & SIR_MULTI_AP_FRONTHAUL_BSS) {
+		pe_err("ignore multi-ap ie check map_cap :%u", map_cap);
+		return true;
+	}
+
+	multi_ap_ie = wlan_get_vendor_ie_ptr_from_oui(SIR_MAC_MULTI_AP_OUI,
+						      SIR_MAC_MULTI_AP_OUI_SIZE,
+						      frm_body + LIM_ASSOC_REQ_IE_OFFSET,
+						      frame_len - LIM_ASSOC_REQ_IE_OFFSET);
+
+	if (multi_ap_ie) {
+		if (multi_ap_ie[1] >= SIR_MULTI_AP_OUI_R1_LEN &&
+		    multi_ap_ie[6] == SIR_MULTI_AP_EXT_SUB_TYPE &&
+		    multi_ap_ie[7] == SIR_MULTI_AP_EXT_SUB_LEN)
+			multi_ap_value = multi_ap_ie[8];
+		else
+			pe_err("Multi-AP IE missed or invalid subelement");
+	}
+
+	if (!(multi_ap_value & SIR_MULTI_AP_BACKHAUL_STA)) {
+		lim_send_assoc_rsp_mgmt_frame(mac_ctx,
+					      STATUS_ASSOC_DENIED_UNSPEC,
+					      1, sa, sub_type, 0,
+					      session, false);
+		pe_err("SOFTAP send denied status assoc rsp");
+		return false;
+	}
+	return true;
+}
+
 QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 				      uint8_t *frm_body, uint32_t frame_len,
 				      uint8_t sub_type,
@@ -2409,7 +2451,7 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 				STATUS_UNSPECIFIED_FAILURE,
 				1, sa,
 				sub_type, 0, session, false);
-		return status;
+		goto error;
 	}
 	/* check for the presence of vendor IE */
 	if (session->access_policy_vendor_ie &&
@@ -2418,7 +2460,7 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 		if (frame_len <= LIM_ASSOC_REQ_IE_OFFSET) {
 			pe_debug("Received action frame of invalid len %d",
 				 frame_len);
-			return QDF_STATUS_E_INVAL;
+			goto error;
 		}
 		if (!wlan_get_vendor_ie_ptr_from_oui(
 				&session->access_policy_vendor_ie[2],
@@ -2430,7 +2472,7 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 				lim_send_assoc_rsp_mgmt_frame(
 					mac_ctx, STATUS_UNSPECIFIED_FAILURE,
 					1, sa, sub_type, 0, session, false);
-			return QDF_STATUS_E_INVAL;
+			goto error;
 		}
 	}
 
@@ -2490,6 +2532,12 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 					  &pmf_connection,
 					  &akm_type))
 		goto error;
+
+	if (!lim_check_multi_ap(mac_ctx, sa, session,
+				frm_body, frame_len, sub_type)) {
+		pe_debug("Backhal BSS reject client connect it");
+		goto error;
+	}
 
 	/* Extract pre-auth context for the STA, if any. */
 	sta_pre_auth_ctx = lim_search_pre_auth_list(mac_ctx, sa);
@@ -2836,20 +2884,6 @@ static void lim_fill_assoc_ind_vht_info(struct mac_context *mac_ctx,
 	return;
 }
 
-static uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset)
-{
-	uint8_t maxidx;
-	int i;
-
-	maxidx = rateset->rate[0] & 0x7f;
-	for (i = 1; i < rateset->numRates; i++) {
-		if ((rateset->rate[i] & 0x7f) > maxidx)
-			maxidx = rateset->rate[i] & 0x7f;
-	}
-
-	return maxidx;
-}
-
 static void fill_mlm_assoc_ind_vht(tpSirAssocReq assocreq,
 		tpDphHashNode stads,
 		tpLimMlmAssocInd assocind)
@@ -2928,6 +2962,42 @@ static void lim_fill_assoc_ind_he_bw_info(tpLimMlmAssocInd assoc_ind,
 	}
 }
 
+/**
+ * lim_fill_assoc_ind_real_max_mcs_idx() - fill max real mcs index to assoc ind
+ * @assoc_ind: assoc_ind to fill
+ * @assoc_req: pointer to tpSirAssocReq
+ * @sta_ds: pointer to tpDphHashNode
+ * @session: pointer to session
+ *
+ * Return: void
+ */
+static void lim_fill_assoc_ind_real_max_mcs_idx(tpLimMlmAssocInd assoc_ind,
+						tpSirAssocReq assoc_req,
+						tpDphHashNode sta_ds,
+						struct pe_session *session)
+{
+	assoc_ind->max_real_mcs_idx = INVALID_MCS_NSS_INDEX;
+
+	if (lim_is_sta_he_capable(sta_ds) &&
+	    lim_is_session_he_capable(session))
+		assoc_ind->max_real_mcs_idx = lim_get_he_max_mcs_idx(
+					sta_ds->ch_width, &assoc_req->he_cap);
+
+	if (assoc_ind->max_real_mcs_idx == INVALID_MCS_NSS_INDEX &&
+	    sta_ds->mlmStaContext.vhtCapability)
+		assoc_ind->max_real_mcs_idx =
+				lim_get_vht_max_mcs_idx(&assoc_req->VHTCaps);
+
+	if (assoc_ind->max_real_mcs_idx == INVALID_MCS_NSS_INDEX)
+		assoc_ind->max_real_mcs_idx = assoc_ind->max_mcs_idx;
+
+	if (assoc_ind->max_real_mcs_idx == INVALID_MCS_NSS_INDEX)
+		assoc_ind->max_real_mcs_idx = assoc_ind->max_ext_idx;
+
+	if (assoc_ind->max_real_mcs_idx == INVALID_MCS_NSS_INDEX)
+		assoc_ind->max_real_mcs_idx = assoc_ind->max_supp_idx;
+}
+
 bool lim_fill_lim_assoc_ind_params(
 		tpLimMlmAssocInd assoc_ind,
 		struct mac_context *mac_ctx,
@@ -2938,10 +3008,11 @@ bool lim_fill_lim_assoc_ind_params(
 	uint16_t rsn_len;
 	uint32_t phy_mode;
 	const uint8_t *wpsie = NULL;
-	uint8_t maxidx, i;
 	bool wme_enable;
 	struct wlan_objmgr_vdev *vdev;
 	struct vdev_mlme_obj *mlme_obj;
+	uint8_t country_iso[REG_ALPHA2_LEN + 1];
+	tDot11fIESuppOperatingClasses *oper_class;
 
 	if (!session_entry->parsedAssocReq) {
 		pe_err(" Parsed Assoc req is NULL");
@@ -3094,9 +3165,9 @@ bool lim_fill_lim_assoc_ind_params(
 	assoc_ind->rx_stbc = false;
 	assoc_ind->ch_width = eHT_CHANNEL_WIDTH_20MHZ;
 	assoc_ind->mode = SIR_SME_PHY_MODE_LEGACY;
-	assoc_ind->max_supp_idx = 0xff;
-	assoc_ind->max_ext_idx = 0xff;
-	assoc_ind->max_mcs_idx = 0xff;
+	assoc_ind->max_supp_idx = INVALID_MCS_NSS_INDEX;
+	assoc_ind->max_ext_idx = INVALID_MCS_NSS_INDEX;
+	assoc_ind->max_mcs_idx = INVALID_MCS_NSS_INDEX;
 	assoc_ind->rx_mcs_map = 0xff;
 	assoc_ind->tx_mcs_map = 0xff;
 
@@ -3126,18 +3197,34 @@ bool lim_fill_lim_assoc_ind_params(
 			eHT_CHANNEL_WIDTH_20MHZ;
 		/* mode */
 		assoc_ind->mode = SIR_SME_PHY_MODE_HT;
-		maxidx = 0;
-		for (i = 0; i < 8; i++) {
-			if (assoc_req->HTCaps.supportedMCSSet[0] &
-			    (1 << i))
-				maxidx = i;
-		}
-		assoc_ind->max_mcs_idx = maxidx;
+		assoc_ind->max_mcs_idx = lim_get_ht_max_mcs_idx(
+						&assoc_req->HTCaps);
 	}
 	fill_mlm_assoc_ind_vht(assoc_req, sta_ds, assoc_ind);
-	if (assoc_req->ExtCap.present)
+	if (assoc_req->ExtCap.present) {
 		assoc_ind->ecsa_capable =
 		((struct s_ext_cap *)assoc_req->ExtCap.bytes)->ext_chan_switch;
+		if (assoc_req->ExtCap.num_bytes >= sizeof(assoc_ind->ext_cap))
+			qdf_mem_copy(&assoc_ind->ext_cap,
+				     assoc_req->ExtCap.bytes,
+				     sizeof(assoc_ind->ext_cap));
+		else
+			qdf_mem_copy(&assoc_ind->ext_cap,
+				     assoc_req->ExtCap.bytes,
+				     assoc_req->ExtCap.num_bytes);
+	}
+
+	if (assoc_req->supp_operating_classes.present) {
+		oper_class = &assoc_req->supp_operating_classes;
+		qdf_mem_zero(country_iso, sizeof(country_iso));
+		country_iso[2] = OP_CLASS_GLOBAL;
+		assoc_ind->supported_band =
+				wlan_reg_get_band_cap_from_op_class(
+						country_iso,
+						oper_class->num_classes,
+						oper_class->classes);
+	}
+
 	/* updates VHT information in assoc indication */
 	if (assoc_req->VHTCaps.present)
 		qdf_mem_copy(&assoc_ind->vht_caps, &assoc_req->VHTCaps,
@@ -3154,6 +3241,8 @@ bool lim_fill_lim_assoc_ind_params(
 				assoc_req->is_sae_authenticated;
 	/* updates HE bandwidth in assoc indication */
 	lim_fill_assoc_ind_he_bw_info(assoc_ind, sta_ds, session_entry);
+	lim_fill_assoc_ind_real_max_mcs_idx(assoc_ind, assoc_req,
+					    sta_ds, session_entry);
 
 	vdev = session_entry->vdev;
 	if (!vdev)
@@ -3208,6 +3297,12 @@ QDF_STATUS lim_send_mlm_assoc_ind(struct mac_context *mac_ctx,
 		 QDF_MAC_ADDR_FMT, session_entry->peSessionId,
 		 assoc_req->ssId.ssId, sub_type, sta_ds->assocId,
 		 QDF_MAC_ADDR_REF(sta_ds->staAddr));
+
+	wlan_son_ind_assoc_req_frm(session_entry->vdev, sta_ds->staAddr,
+				   assoc_req->reassocRequest,
+				   qdf_nbuf_data(assoc_req->assoc_req_buf),
+				   qdf_nbuf_len(assoc_req->assoc_req_buf),
+				   QDF_STATUS_SUCCESS);
 
 	if (sub_type == LIM_ASSOC || sub_type == LIM_REASSOC) {
 		temp = sizeof(tLimMlmAssocInd);

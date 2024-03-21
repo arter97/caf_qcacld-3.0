@@ -79,6 +79,8 @@
 #include <wlan_hdd_sysfs_dump_in_progress.h>
 #include "wma_api.h"
 #include "wlan_hdd_eht.h"
+#include <wlan_hdd_sysfs_wds_mode.h>
+#include <wlan_hdd_sysfs_roam_trigger_bitmap.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -849,12 +851,16 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_dp_aggregation_create(driver_kobject);
 		hdd_sysfs_dp_swlm_create(driver_kobject);
 		hdd_sysfs_create_wakeup_logs_to_console();
+		hdd_sysfs_wds_mode_create(driver_kobject);
+		hdd_sysfs_roam_trigger_bitmap_create(driver_kobject);
 	}
 }
 
 void hdd_destroy_sysfs_files(void)
 {
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_roam_trigger_bitmap_destroy(driver_kobject);
+		hdd_sysfs_wds_mode_destroy(driver_kobject);
 		hdd_sysfs_destroy_wakeup_logs_to_console();
 		hdd_sysfs_dp_swlm_destroy(driver_kobject);
 		hdd_sysfs_dp_aggregation_destroy(driver_kobject);

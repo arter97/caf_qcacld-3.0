@@ -2706,6 +2706,16 @@ wlan_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 uint32_t wlan_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_mlme_set_roaming_triggers  - Set the roaming triggers bitmap
+ * @psoc: Pointer to PSOC object
+ * @trigger_bitmap: Roaming triggers bitmap to set
+ *
+ * Return: void
+ */
+void wlan_mlme_set_roaming_triggers(struct wlan_objmgr_psoc *psoc,
+				    uint32_t trigger_bitmap);
+
+/**
  * wlan_mlme_get_roaming_offload() - Get roaming offload setting
  * @psoc: pointer to psoc object
  * @val:  Pointer to enable/disable roaming offload
@@ -2809,6 +2819,12 @@ static inline
 uint32_t wlan_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
 {
 	return 0xFFFF;
+}
+
+static inline
+void wlan_mlme_set_roaming_triggers(struct wlan_objmgr_psoc *psoc,
+				    uint32_t trigger_bitmap)
+{
 }
 
 static inline QDF_STATUS
@@ -3235,11 +3251,26 @@ bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc);
  */
 enum wlan_wds_mode
 wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_wds_mode() - Set wds mode
+ * @psoc: pointer to psoc object
+ * @mode: wds mode to set
+ *
+ * Return: void
+ */
+void wlan_mlme_set_wds_mode(struct wlan_objmgr_psoc *psoc,
+			    enum wlan_wds_mode mode);
 #else
 static inline enum wlan_wds_mode
 wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return WLAN_WDS_MODE_DISABLED;
+}
+
+static inline void wlan_mlme_set_wds_mode(struct wlan_objmgr_psoc *psoc,
+					  enum wlan_wds_mode mode)
+{
 }
 #endif
 
@@ -3377,4 +3408,53 @@ wlan_mlme_get_p2p_p2p_conc_support(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif
+
+/**
+ * mlme_get_vht_ch_width() - get vht channel width of fw capability
+ *
+ * Return: vht channel width
+ */
+enum phy_ch_width mlme_get_vht_ch_width(void);
+
+/**
+ * mlme_get_max_he_mcs_idx() -  get max mcs index from he cap information
+ * @mcs_ch_width: channel width
+ * @hecap_rxmcsnssmap: rx mcs map from he cap
+ * @hecap_txmcsnssmap: tx mcs map from he cap
+ *
+ * Return: the maximum MCS supported
+ */
+uint8_t mlme_get_max_he_mcs_idx(enum phy_ch_width mcs_ch_width,
+				u_int16_t *hecap_rxmcsnssmap,
+				u_int16_t *hecap_txmcsnssmap);
+
+/**
+ * mlme_get_max_vht_mcs_idx() -  get max mcs index from vht cap information
+ * @rx_vht_mcs_map: rx mcs map from vht cap
+ * @tx_vht_mcs_map: tx mcs map from vht cap
+ *
+ * Return: the maximum MCS supported
+ */
+uint8_t mlme_get_max_vht_mcs_idx(u_int16_t rx_vht_mcs_map,
+				 u_int16_t tx_vht_mcs_map);
+
+#ifdef WLAN_FEATURE_SON
+/**
+ * mlme_set_vdev_max_mcs_idx() - Save max mcs index of vdev
+ * @vdev: pointer to vdev object
+ * @max_mcs_idx: max_mcs_idx to save
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS mlme_save_vdev_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
+				      uint8_t max_mcs_idx);
+
+/**
+ * mlme_get_vdev_max_mcs_idx() - Get max mcs index of vdev
+ * @vdev: pointer to vdev object
+ *
+ * Return max mcs index of vdev
+ */
+uint8_t mlme_get_vdev_max_mcs_idx(struct wlan_objmgr_vdev *vdev);
+#endif /* WLAN_FEATURE_SON */
 #endif /* _WLAN_MLME_API_H_ */

@@ -174,7 +174,7 @@
 #include "qdf_util.h"
 #include "wlan_hdd_mdns_offload.h"
 #include "wlan_cfg80211_afc.h"
-
+#include "wlan_hdd_son.h"
 
 #define g_mode_rates_size (12)
 #define a_mode_rates_size (8)
@@ -2929,19 +2929,9 @@ static void hdd_avoid_acs_channels(struct hdd_context *hdd_ctx,
 }
 #endif
 
-/**
- * wlan_hdd_trim_acs_channel_list() - Trims ACS channel list with
- * intersection of PCL
- * @pcl: preferred channel list
- * @pcl_count: Preferred channel list count
- * @org_ch_list: ACS channel list from user space
- * @org_ch_list_count: ACS channel count from user space
- *
- * Return: None
- */
-static void wlan_hdd_trim_acs_channel_list(uint32_t *pcl, uint8_t pcl_count,
-					   uint32_t *org_freq_list,
-					   uint8_t *org_ch_list_count)
+void wlan_hdd_trim_acs_channel_list(uint32_t *pcl, uint8_t pcl_count,
+				    uint32_t *org_freq_list,
+				    uint8_t *org_ch_list_count)
 {
 	uint16_t i, j, ch_list_count = 0;
 
@@ -2967,29 +2957,11 @@ static void wlan_hdd_trim_acs_channel_list(uint32_t *pcl, uint8_t pcl_count,
 	*org_ch_list_count = ch_list_count;
 }
 
-/**
- * wlan_hdd_handle_zero_acs_list() - Handle worst case of acs channel
- * trimmed to zero
- * @hdd_ctx: struct hdd_context
- * @org_ch_list: ACS channel list from user space
- * @org_ch_list_count: ACS channel count from user space
- *
- * When all chan in ACS freq list is filtered out
- * by wlan_hdd_trim_acs_channel_list, the hostapd start will fail.
- * This happens when PCL is PM_24G_SCC_CH_SBS_CH, and SAP acs range includes
- * 5G channel list. One example is STA active on 6Ghz chan. Hostapd
- * start SAP on 5G ACS range. The intersection of PCL and ACS range is zero.
- * Instead of ACS failure, this API selects one channel from ACS range
- * and report to Hostapd. When hostapd do start_ap, the driver will
- * force SCC to 6G or move SAP to 2G based on SAP's configuration.
- *
- * Return: None
- */
-static void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
-					  uint32_t *acs_freq_list,
-					  uint8_t *acs_ch_list_count,
-					  uint32_t *org_freq_list,
-					  uint8_t org_ch_list_count)
+void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
+				   uint32_t *acs_freq_list,
+				   uint8_t *acs_ch_list_count,
+				   uint32_t *org_freq_list,
+				   uint8_t org_ch_list_count)
 {
 	uint16_t i, sta_count;
 	uint32_t acs_chan_default = 0;
@@ -6913,7 +6885,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_DEFAULT_IES] = {.type = NLA_BINARY},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_VALUE] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA] = {.type = NLA_BINARY,
+						      .len = 5000 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_LENGTH] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_FLAGS] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_IFINDEX] = {.type = NLA_U32},
@@ -7378,19 +7351,11 @@ static int wlan_hdd_cfg80211_wifi_set_rx_blocksize(struct hdd_adapter *adapter,
 	return ret_val;
 }
 
-/**
- * hdd_config_phy_mode() - set PHY mode
- * @adapter: hdd adapter
- * @attr: nla attr sent from userspace
- *
- * Return: 0 on success; error number otherwise
- */
-static int hdd_config_phy_mode(struct hdd_adapter *adapter,
-			       const struct nlattr *attr)
+int hdd_set_phy_mode(struct hdd_adapter *adapter,
+		     enum qca_wlan_vendor_phy_mode vendor_phy_mode)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
-	enum qca_wlan_vendor_phy_mode vendor_phy_mode;
 	eCsrPhyMode phymode;
 	uint8_t supported_band;
 	uint32_t bonding_mode;
@@ -7400,8 +7365,6 @@ static int hdd_config_phy_mode(struct hdd_adapter *adapter,
 		hdd_err("psoc is NULL");
 		return -EINVAL;
 	}
-
-	vendor_phy_mode = nla_get_u32(attr);
 
 	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &phymode);
 	if (ret < 0)
@@ -7418,6 +7381,23 @@ static int hdd_config_phy_mode(struct hdd_adapter *adapter,
 
 	return hdd_update_phymode(adapter, phymode, supported_band,
 				  bonding_mode);
+}
+
+/**
+ * hdd_config_phy_mode() - set PHY mode
+ * @adapter: hdd adapter
+ * @attr: nla attr sent from userspace
+ *
+ * Return: 0 on success; error number otherwise
+ */
+static int hdd_config_phy_mode(struct hdd_adapter *adapter,
+			       const struct nlattr *attr)
+{
+	enum qca_wlan_vendor_phy_mode vendor_phy_mode;
+
+	vendor_phy_mode = nla_get_u32(attr);
+
+	return hdd_set_phy_mode(adapter, vendor_phy_mode);
 }
 
 /**
@@ -7829,6 +7809,37 @@ static int hdd_config_tx_rx_nss(struct hdd_adapter *adapter,
 
 	return 0;
 }
+
+#ifdef WLAN_FEATURE_SON
+static int hdd_process_generic_set_cmd(struct hdd_adapter *adapter,
+				       struct nlattr *tb[])
+{
+	struct wireless_dev *wdev;
+	struct wiphy *wiphy;
+
+	if (!adapter)
+		return 0;
+
+	wdev = &adapter->wdev;
+	if (!wdev || !wdev->wiphy)
+		return 0;
+	wiphy = wdev->wiphy;
+
+	/* Generic command is used by EasyMesh,
+	 * route the command to SON module if it is Generic
+	 */
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND])
+		return hdd_son_send_set_wifi_generic_command(wiphy, wdev, tb);
+
+	return 0;
+}
+#else
+static int hdd_process_generic_set_cmd(struct hdd_adapter *adapter,
+				       struct nlattr *tb[])
+{
+	return -EINVAL;
+}
+#endif
 
 static int hdd_config_ani(struct hdd_adapter *adapter,
 			  struct nlattr *tb[])
@@ -8862,12 +8873,19 @@ static int hdd_set_elna_bypass(struct hdd_adapter *adapter,
 }
 #endif
 
-static uint32_t hdd_nl80211_chwidth_to_bonding_mode(uint8_t nl80211_chwidth)
+/**
+ * hdd_mac_chwidth_to_bonding_mode() - get bonding_mode from chan width
+ * @chwidth: chan width
+ *
+ * Return: bonding mode
+ */
+static uint32_t hdd_mac_chwidth_to_bonding_mode(
+			enum eSirMacHTChannelWidth chwidth)
 {
 	uint32_t bonding_mode;
 
-	switch (nl80211_chwidth) {
-	case NL80211_CHAN_WIDTH_20:
+	switch (chwidth) {
+	case eHT_CHANNEL_WIDTH_20MHZ:
 		bonding_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 		break;
 	default:
@@ -8875,6 +8893,16 @@ static uint32_t hdd_nl80211_chwidth_to_bonding_mode(uint8_t nl80211_chwidth)
 	}
 
 	return bonding_mode;
+}
+
+int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
+			   enum eSirMacHTChannelWidth chwidth)
+{
+	uint32_t bonding_mode;
+
+	bonding_mode = hdd_mac_chwidth_to_bonding_mode(chwidth);
+
+	return hdd_update_channel_width(adapter, chwidth, bonding_mode);
 }
 
 /**
@@ -8890,7 +8918,6 @@ static int hdd_set_channel_width(struct hdd_adapter *adapter,
 {
 	uint8_t nl80211_chwidth;
 	enum eSirMacHTChannelWidth chwidth;
-	uint32_t bonding_mode;
 
 	nl80211_chwidth = nla_get_u8(attr);
 	chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
@@ -8899,9 +8926,7 @@ static int hdd_set_channel_width(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	bonding_mode = hdd_nl80211_chwidth_to_bonding_mode(nl80211_chwidth);
-
-	return hdd_update_channel_width(adapter, chwidth, bonding_mode);
+	return hdd_set_mac_chan_width(adapter, chwidth);
 }
 
 /**
@@ -9741,6 +9766,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_vdev_chains,
 	hdd_config_ani,
 	hdd_config_tx_rx_nss,
+	hdd_process_generic_set_cmd,
 };
 
 /**
@@ -9903,6 +9929,19 @@ __wlan_hdd_cfg80211_wifi_configuration_get(struct wiphy *wiphy,
 		hdd_err("invalid attr");
 		return -EINVAL;
 	}
+
+	/* Generic command is used by EasyMesh,
+	 * route the command to SON module if it is Generic
+	 *
+	 * GENERIC_COMMAND to get configs can not be done as part of dispatch
+	 * table because, for each command sent as part of GENERIC command,
+	 * return value is different and is handled in SON module as well.
+	 * Hence having return type with dispatch table is not possible as
+	 * we will not be able to generalize the return for each of get sub
+	 * command sent as part of GENERIC command.
+	 */
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND])
+		return hdd_son_send_get_wifi_generic_command(wiphy, wdev, tb);
 
 	ret = hdd_get_configuration(adapter, tb);
 	if (ret)
@@ -19981,17 +20020,11 @@ fn_end:
 }
 
 #if defined(USE_CFG80211_DEL_STA_V2)
-/**
- * wlan_hdd_del_station() - delete station wrapper
- * @adapter: pointer to the hdd adapter
- *
- * Return: Errno
- */
-int wlan_hdd_del_station(struct hdd_adapter *adapter)
+int wlan_hdd_del_station(struct hdd_adapter *adapter, const uint8_t *mac)
 {
 	struct station_del_parameters del_sta;
 
-	del_sta.mac = NULL;
+	del_sta.mac = mac;
 	del_sta.subtype = IEEE80211_STYPE_DEAUTH >> 4;
 	del_sta.reason_code = WLAN_REASON_DEAUTH_LEAVING;
 
@@ -19999,10 +20032,10 @@ int wlan_hdd_del_station(struct hdd_adapter *adapter)
 					     adapter->dev, &del_sta);
 }
 #else
-int wlan_hdd_del_station(struct hdd_adapter *adapter)
+int wlan_hdd_del_station(struct hdd_adapter *adapter, const uint8_t *mac)
 {
 	return wlan_hdd_cfg80211_del_station(adapter->wdev.wiphy,
-					     adapter->dev, NULL);
+					     adapter->dev, mac);
 }
 #endif
 

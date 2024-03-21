@@ -48,11 +48,29 @@
 #include "wlan_hdd_sta_info.h"
 #include "ol_defines.h"
 #include <wlan_hdd_sar_limits.h>
+#include "wlan_hdd_wds.h"
+#include <cdp_txrx_ctrl.h>
+#ifdef FEATURE_WDS
+#include <net/llc_pdu.h>
+#endif
 
 /* Preprocessor definitions and constants */
 #undef QCA_HDD_SAP_DUMP_SK_BUFF
 
 /* Type declarations */
+#ifdef FEATURE_WDS
+/**
+ * Layer-2 update frame format
+ * @eh: ethernet header
+ * @l2_update_pdu: llc pdu format
+ * @l2_update_xid_info: xid command information field
+ */
+struct l2_update_frame {
+	struct ethhdr eh;
+	struct llc_pdu_un l2_update_pdu;
+	struct llc_xid_info l2_update_xid_info;
+} qdf_packed;
+#endif
 
 /* Function definitions and documenation */
 #ifdef QCA_HDD_SAP_DUMP_SK_BUFF
@@ -568,7 +586,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	struct hdd_adapter *adapter = (struct hdd_adapter *) netdev_priv(dev);
 	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
-	struct qdf_mac_addr *dest_mac_addr, *mac_addr;
+	struct qdf_mac_addr *dest_mac_addr;
+	struct qdf_mac_addr mac_addr;
 	static struct qdf_mac_addr bcast_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint32_t num_seg;
@@ -631,14 +650,21 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 
 	/* In case of mcast, fetch the bcast sta_info. Else use the pkt addr */
 	if (QDF_NBUF_CB_GET_IS_MCAST(skb))
-		mac_addr = &bcast_mac_addr;
+		qdf_copy_macaddr(&mac_addr, &bcast_mac_addr);
 	else
-		mac_addr = dest_mac_addr;
+		qdf_copy_macaddr(&mac_addr, dest_mac_addr);
 
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
-					   mac_addr->bytes,
+					   mac_addr.bytes,
 					   STA_INFO_SOFTAP_HARD_START_XMIT);
 
+	/* Find wds node behind a directly associated station */
+	if (!sta_info) {
+		hdd_wds_replace_peer_mac(soc, adapter, mac_addr.bytes);
+		sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
+						   mac_addr.bytes,
+						   STA_INFO_SOFTAP_HARD_START_XMIT);
+	}
 	if (!QDF_NBUF_CB_GET_IS_BCAST(skb) && !QDF_NBUF_CB_GET_IS_MCAST(skb)) {
 		if (!sta_info) {
 			QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_HDD_SAP_DATA,
@@ -1598,3 +1624,49 @@ QDF_STATUS hdd_softap_change_sta_state(struct hdd_adapter *adapter,
 
 	return status;
 }
+
+#ifdef FEATURE_WDS
+QDF_STATUS hdd_softap_ind_l2_update(struct hdd_adapter *adapter,
+				    struct qdf_mac_addr *sta_mac)
+{
+	qdf_nbuf_t nbuf;
+	struct l2_update_frame *msg;
+
+	nbuf = qdf_nbuf_alloc(NULL, sizeof(*msg), 0, 4, false);
+	if (!nbuf)
+		return QDF_STATUS_E_FAILURE;
+
+	msg = (struct l2_update_frame *)qdf_nbuf_data(nbuf);
+
+	/* 802.2 LLC XID update frame carried over 802.3 */
+	ether_addr_copy(msg->eh.h_source, sta_mac->bytes);
+	eth_broadcast_addr(msg->eh.h_dest);
+	/* packet length - dummy 802.3 packet */
+	msg->eh.h_proto = htons(sizeof(*msg) - sizeof(struct ethhdr));
+
+	/* null DSAP and a null SSAP is a way to solicit a response from any
+	 * station (i.e., any DA)
+	 */
+	msg->l2_update_pdu.dsap = LLC_NULL_SAP;
+	msg->l2_update_pdu.ssap = LLC_NULL_SAP;
+
+	/*
+	 * unsolicited XID response frame to announce presence.
+	 * lsb.11110101.
+	 */
+	msg->l2_update_pdu.ctrl_1 = LLC_PDU_TYPE_U | LLC_1_PDU_CMD_XID;
+
+	/* XID information field 129.1.0 to indicate connectionless service */
+	msg->l2_update_xid_info.fmt_id = LLC_XID_FMT_ID;
+	msg->l2_update_xid_info.type = LLC_XID_NULL_CLASS_1;
+	msg->l2_update_xid_info.rw = 0;
+
+	qdf_nbuf_set_pktlen(nbuf, sizeof(*msg));
+	nbuf->dev = adapter->dev;
+	nbuf->protocol = eth_type_trans(nbuf, adapter->dev);
+	qdf_net_buf_debug_release_skb(nbuf);
+	netif_rx_ni(nbuf);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
