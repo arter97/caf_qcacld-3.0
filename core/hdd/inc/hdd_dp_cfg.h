@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -361,7 +361,7 @@
  *
  * @Min: 0
  * @Max: 10000
- * @Default: 1200
+ * @Default: 0
  *
  * This ini specifies the Voice pkt count threshold to
  * Send MSCS action frame to AP
@@ -375,7 +375,7 @@
 		"mscs_pkt_threshold", \
 		0, \
 		10000, \
-		1200, \
+		0, \
 		CFG_VALUE_OR_DEFAULT, \
 		"Voice pkt count threshold")
 
