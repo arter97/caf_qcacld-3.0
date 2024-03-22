@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,6 +38,7 @@
 
 #define WCN6750_DEVICE_ID 0x6750
 #define WCN6450_DEVICE_ID 0x6450
+#define WCN7750_DEVICE_ID 0x7750
 /**
  * pld_ipci_probe() - Probe function for platform driver
  * @dev: device
@@ -487,6 +488,8 @@ static struct device_info pld_ipci_dev_info[] = {
 	{ "wcn6750", WCN6750_DEVICE_ID },
 #elif defined(QCA_WIFI_WCN6450)
 	{ "wcn6450", WCN6450_DEVICE_ID },
+#elif defined(QCA_WIFI_WCN7750)
+	{ "wcn7750", WCN7750_DEVICE_ID },
 #endif
 	{ { 0 } }
 };
