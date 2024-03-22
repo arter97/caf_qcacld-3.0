@@ -8538,3 +8538,32 @@ wlan_mlme_is_hs_20_btm_offload_disabled(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS wlan_mlme_set_disconnect_receive(struct wlan_objmgr_vdev *vdev,
+					    bool set_disconnect_receive)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv->is_disconnect_received = set_disconnect_receive;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool wlan_mlme_get_is_disconnect_receive(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	return mlme_priv->is_disconnect_received;
+}
+

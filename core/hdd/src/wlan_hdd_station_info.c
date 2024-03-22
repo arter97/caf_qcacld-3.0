@@ -1679,6 +1679,34 @@ static int hdd_get_station_remote(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * hdd_get_link_info_disconnect_receive() - get link_info on which disconnect
+ * received.
+ * @adapter: hostapd interface
+ *
+ * This function loop through the vdev's and get on which vdev disconnect
+ * received OTA.
+ *
+ * Return: link_info pointer on success, otherwise NULL
+ */
+static struct wlan_hdd_link_info
+*hdd_get_link_info_disconnect_receive(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info = NULL;
+	uint8_t i;
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &adapter->link_info[i];
+		if (link_info && link_info->vdev) {
+			if (wlan_mlme_get_is_disconnect_receive(
+							link_info->vdev))
+				return link_info;
+		}
+	}
+
+	return NULL;
+}
+
+/**
  * __hdd_cfg80211_get_station_cmd() - Handle get station vendor cmd
  * @wiphy: corestack handler
  * @wdev: wireless device
@@ -1701,6 +1729,7 @@ __hdd_cfg80211_get_station_cmd(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_GET_STATION_MAX + 1];
 	int32_t status;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter_dev(dev);
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
@@ -1724,7 +1753,12 @@ __hdd_cfg80211_get_station_cmd(struct wiphy *wiphy,
 
 	/* Parse and fetch Command Type*/
 	if (tb[STATION_INFO]) {
-		status = hdd_get_station_info(adapter->deflink);
+		link_info = hdd_get_link_info_disconnect_receive(adapter);
+		if (!link_info) {
+			hdd_debug("Populate stats on Assoc vdev");
+			link_info = adapter->deflink;
+		}
+		status = hdd_get_station_info(link_info);
 	} else if (tb[STATION_ASSOC_FAIL_REASON]) {
 		status = hdd_get_station_assoc_fail(adapter->deflink);
 	} else if (tb[STATION_REMOTE]) {

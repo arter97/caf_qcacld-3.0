@@ -2529,19 +2529,14 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 		       uint16_t deauth_disassoc_frame_len,
 		       uint16_t reason_code)
 {
-	struct pe_session *session;
+	struct pe_session *session = NULL;
 	uint8_t *extracted_frm = NULL;
 	uint16_t extracted_frm_len;
 	bool is_pmf_connection;
-
-	session = pe_find_session_by_vdev_id(mac, vdev_id);
-	if (!session) {
-		pe_err("LFR3: Vdev %d doesn't exist", vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (!lim_is_sb_disconnect_allowed(session))
-		return QDF_STATUS_SUCCESS;
+	struct wlan_frame_hdr *mac_hdr;
+	struct qdf_mac_addr discon_bssid;
+	uint8_t session_id;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!deauth_disassoc_frame ||
 	    deauth_disassoc_frame_len <
@@ -2551,6 +2546,26 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 		goto end;
 	}
 
+	mac_hdr = (struct wlan_frame_hdr *)deauth_disassoc_frame;
+	qdf_mem_copy(discon_bssid.bytes, (mac_hdr->i_addr3),
+		     QDF_MAC_ADDR_SIZE);
+	session = pe_find_session_by_bssid(mac,
+					   discon_bssid.bytes, &session_id);
+	if (!session)
+		goto end;
+
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+							 session->self_mac_addr,
+							 WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("VDEV is NULL");
+		goto end;
+	}
+	wlan_mlme_set_disconnect_receive(vdev, true);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	if (!lim_is_sb_disconnect_allowed(session))
+		return QDF_STATUS_SUCCESS;
 	/*
 	 * Use vdev pmf status instead of peer pmf capability as
 	 * the firmware might roam to new AP in powersave case and
@@ -2580,6 +2595,13 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 	reason_code = sir_read_u16(extracted_frm +
 				   sizeof(struct wlan_frame_hdr));
 end:
+	if (!session) {
+		session = pe_find_session_by_vdev_id(mac, vdev_id);
+		if (!session) {
+			pe_err("LFR3: Vdev %d doesn't exist", vdev_id);
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
 	lim_tear_down_link_with_ap(mac, session->peSessionId,
 				   reason_code,
 				   eLIM_PEER_ENTITY_DEAUTH);

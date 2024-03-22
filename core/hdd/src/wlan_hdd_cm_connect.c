@@ -1800,6 +1800,20 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
 }
 
+static void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info = NULL;
+	uint8_t i;
+
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &adapter->link_info[i];
+		if (link_info && link_info->vdev) {
+			wlan_mlme_set_disconnect_receive(
+						link_info->vdev, false);
+		}
+	}
+}
+
 static void
 hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 					struct wlan_cm_connect_resp *rsp)
@@ -1845,6 +1859,7 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 
 	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev))
 		hdd_send_ps_config_to_fw(adapter);
+	hdd_clear_disconnect_receive(adapter);
 }
 
 static void hdd_cm_connect_success(struct wlan_objmgr_vdev *vdev,
