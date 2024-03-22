@@ -475,69 +475,21 @@ void dfs_cancel_precac_timer(struct wlan_dfs *dfs)
 	dfs_soc_obj->dfs_precac_timer_running = 0;
 }
 
-void dfs_set_precac_enable(struct wlan_dfs *dfs, uint32_t value)
+void dfs_set_precac_enable(struct wlan_dfs *dfs, bool precac_en)
 {
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_lmac_if_target_tx_ops *tgt_tx_ops;
-	uint32_t target_type;
-	struct target_psoc_info *tgt_hdl;
-	struct tgt_info *info;
-	struct wlan_lmac_if_tx_ops *tx_ops;
-
-	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
-	if (!psoc) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "psoc is NULL");
-		dfs->dfs_agile_precac_ucfg = 0;
+	if (precac_en == dfs->dfs_agile_precac_ucfg) {
+		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			 "PreCAC : %d is already configured", precac_en);
 		return;
 	}
 
-	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
-	if (!tx_ops) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "tx_ops is NULL");
+	if (utils_get_dfsdomain(dfs->dfs_pdev_obj) != DFS_ETSI_DOMAIN) {
+		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			 "preCAC: not supported in current DFS domain");
 		return;
 	}
 
-	tgt_tx_ops = &tx_ops->target_tx_ops;
-	target_type = lmac_get_target_type(dfs->dfs_pdev_obj);
-
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
-	if (!tgt_hdl) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "target_psoc_info is null");
-		return;
-	}
-
-	info = (struct tgt_info *)(&tgt_hdl->info);
-
-	if (!info) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "tgt_info is null");
-		return;
-	}
-
-	/*
-	 * If
-	 * 1) The chip is CASCADE,
-	 * 2) The user has enabled Pre-CAC and
-	 * 3) The regdomain the ETSI,
-	 * then enable preCAC.
-	 *
-	 * OR
-	 *
-	 * If
-	 * 1) The chip has agile_capability enabled
-	 * 2) The user has enabled Pre-CAC and
-	 * 3) The regdomain the ETSI,
-	 * then enable Agile preCAC.
-	 */
-
-	if ((1 == value) &&
-	    (utils_get_dfsdomain(dfs->dfs_pdev_obj) == DFS_ETSI_DOMAIN)) {
-		dfs->dfs_agile_precac_ucfg = value;
-	} else {
-		dfs->dfs_agile_precac_ucfg = 0;
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "preCAC disabled");
-	}
-
-	if (dfs_is_precac_timer_running(dfs)) {
+	if (dfs_is_precac_timer_running(dfs) && !precac_en) {
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 			 "Precac flag changed. Cancel the precac timer");
 #ifdef QCA_SUPPORT_AGILE_DFS
@@ -546,6 +498,9 @@ void dfs_set_precac_enable(struct wlan_dfs *dfs, uint32_t value)
 					 0, (void *)dfs);
 #endif
 	}
+
+	dfs->dfs_agile_precac_ucfg = precac_en;
+	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "preCAC is %d", precac_en);
 }
 #endif
 
