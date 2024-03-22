@@ -1154,12 +1154,45 @@ exit:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * hdd_radar_event_put_link_id() - put mlo link id into event buffer
+ * @vendor_event: buffer of radar event
+ * @link_info:	pointer of link_info
+ *
+ * This function put link_id to radar event. userspace will parse such info
+ * for cac start/radar detect/cac end and identify which link of multi link
+ * sap.
+ *
+ * Return: 0 for success, others fail
+ *
+ */
+static inline int
+hdd_radar_event_put_link_id(struct sk_buff *vendor_event,
+			    struct wlan_hdd_link_info *link_info)
+{
+	int ret = 0;
+
+	if (wlan_vdev_mlme_is_mlo_ap(link_info->vdev)) {
+		ret = nla_put_u8(vendor_event, NL80211_ATTR_MLO_LINK_ID,
+				 wlan_vdev_get_link_id(link_info->vdev));
+	}
+	return ret;
+}
+#else
+static inline int
+hdd_radar_event_put_link_id(struct sk_buff *vendor_event,
+			    struct wlan_hdd_link_info *link_info)
+{
+	return 0;
+}
+#endif
+
 /**
  * hdd_send_radar_event() - Function to send radar events to user space
- * @hdd_context:	HDD context
+ * @link_info:	pointer of link_info
  * @event:		Type of radar event
  * @dfs_info:		Structure containing DFS channel and country
- * @wdev:		Wireless device structure
  *
  * This function is used to send radar events such as CAC start, CAC
  * end etc., to userspace
@@ -1167,22 +1200,25 @@ exit:
  * Return: Success on sending notifying userspace
  *
  */
-static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
+static QDF_STATUS hdd_send_radar_event(struct wlan_hdd_link_info *link_info,
 				       eSapHddEvent event,
-				       struct wlan_dfs_info dfs_info,
-				       struct wireless_dev *wdev)
+				       struct wlan_dfs_info dfs_info)
 {
 
 	struct sk_buff *vendor_event;
 	enum qca_nl80211_vendor_subcmds_index index;
 	uint32_t freq, ret;
 	uint32_t data_size;
+	struct wiphy *wiphy;
+	struct wireless_dev *wdev;
 
-	if (!hdd_context) {
-		hdd_err("HDD context is NULL");
+	if (!link_info) {
+		hdd_err("link_info is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	wdev = &link_info->adapter->wdev;
+	wiphy = wdev->wiphy;
 	freq = cds_chan_to_freq(dfs_info.channel);
 
 	switch (event) {
@@ -1205,7 +1241,7 @@ static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	vendor_event = wlan_cfg80211_vendor_event_alloc(hdd_context->wiphy,
+	vendor_event = wlan_cfg80211_vendor_event_alloc(wiphy,
 							wdev,
 							data_size +
 							NLMSG_HDRLEN,
@@ -1224,6 +1260,11 @@ static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (hdd_radar_event_put_link_id(vendor_event, link_info)) {
+		hdd_err("radar event put link_id fail");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		return QDF_STATUS_E_FAILURE;
+	}
 	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 	return QDF_STATUS_SUCCESS;
 }
@@ -2685,8 +2726,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 					    sizeof(struct wlan_dfs_info));
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_IN_PROGRESS;
 		if (QDF_STATUS_SUCCESS !=
-			hdd_send_radar_event(hdd_ctx, eSAP_DFS_CAC_START,
-				dfs_info, &adapter->wdev)) {
+			hdd_send_radar_event(link_info, eSAP_DFS_CAC_START,
+					     dfs_info)) {
 			hdd_err("Unable to indicate CAC start NL event");
 		} else {
 			hdd_debug("Sent CAC start to user space");
@@ -2705,8 +2746,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		 * management.
 		 */
 		if (QDF_STATUS_SUCCESS !=
-			hdd_send_radar_event(hdd_ctx, eSAP_DFS_CAC_END,
-				dfs_info, &adapter->wdev)) {
+			hdd_send_radar_event(link_info, eSAP_DFS_CAC_END,
+					     dfs_info)) {
 			hdd_err("Unable to indicate CAC end (interrupted) event");
 		} else {
 			hdd_debug("Sent CAC end (interrupted) to user space");
@@ -2733,8 +2774,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_ALREADY_DONE;
 		if (QDF_STATUS_SUCCESS !=
-			hdd_send_radar_event(hdd_ctx, eSAP_DFS_CAC_END,
-				dfs_info, &adapter->wdev)) {
+			hdd_send_radar_event(link_info, eSAP_DFS_CAC_END,
+					     dfs_info)) {
 			hdd_err("Unable to indicate CAC end NL event");
 		} else {
 			hdd_debug("Sent CAC end to user space");
@@ -2761,8 +2802,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 					IEEE80211_CHAN_RADAR_DFS;
 		}
 		if (QDF_STATUS_SUCCESS !=
-			hdd_send_radar_event(hdd_ctx, eSAP_DFS_RADAR_DETECT,
-				dfs_info, &adapter->wdev)) {
+			hdd_send_radar_event(link_info, eSAP_DFS_RADAR_DETECT,
+					     dfs_info)) {
 			hdd_err("Unable to indicate Radar detect NL event");
 		} else {
 			hdd_debug("Sent radar detected to user space");
