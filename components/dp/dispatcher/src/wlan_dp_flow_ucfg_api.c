@@ -24,9 +24,12 @@ QDF_STATUS ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 
+	if (qdf_unlikely(!vdev))
+		return QDF_STATUS_E_INVAL;
+
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (qdf_unlikely(!dp_link)) {
-		dp_err("DP link not found");
+		dp_err_rl("DP link not found");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -46,7 +49,7 @@ void ucfg_dp_fim_display_hash_table(struct wlan_objmgr_vdev *vdev)
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (qdf_unlikely(!dp_link)) {
-		dp_err("DP link not found");
+		dp_err_rl("DP link not found");
 		return;
 	}
 
@@ -66,7 +69,7 @@ void ucfg_dp_fim_display_stats(struct wlan_objmgr_vdev *vdev)
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (qdf_unlikely(!dp_link)) {
-		dp_err("DP link not found");
+		dp_err_rl("DP link not found");
 		return;
 	}
 
@@ -86,7 +89,7 @@ void ucfg_dp_fim_clear_stats(struct wlan_objmgr_vdev *vdev)
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (qdf_unlikely(!dp_link)) {
-		dp_err("DP link not found");
+		dp_err_rl("DP link not found");
 		return;
 	}
 
@@ -106,7 +109,7 @@ void ucfg_dp_fim_clear_hash_table(struct wlan_objmgr_vdev *vdev)
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (qdf_unlikely(!dp_link)) {
-		dp_err("DP link not found");
+		dp_err_rl("DP link not found");
 		return;
 	}
 
@@ -132,7 +135,7 @@ ucfg_fpm_policy_get_ctx_by_vdev(struct wlan_objmgr_vdev *vdev)
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (qdf_unlikely(!dp_link)) {
-		dp_err("DP link not found");
+		dp_err_rl("DP link not found");
 		return NULL;
 	}
 
@@ -176,7 +179,7 @@ void ucfg_dp_fpm_display_policy(struct wlan_objmgr_vdev *vdev)
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (qdf_unlikely(!dp_link)) {
-		dp_err("DP link not found");
+		dp_err_rl("DP link not found");
 		return;
 	}
 
