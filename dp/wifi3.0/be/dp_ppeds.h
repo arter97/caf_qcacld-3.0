@@ -106,6 +106,14 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc);
 void dp_ppeds_stop_soc_be(struct dp_soc *soc);
 
 /**
+ * dp_ppeds_get_node_id_be() - get the ppe vp node id.
+ * @soc: CDP SoC Tx/Rx handle
+ *
+ * Return: node id on success, MAX value on failure
+ */
+uint32_t dp_ppeds_get_node_id_be(struct cdp_soc_t *soc_hdl);
+
+/**
  * dp_ppeds_stats_sync_be() - sync stats for DS mode.
  * @soc: CDP SoC Tx/Rx handle
  * @vdev_id: vdev id

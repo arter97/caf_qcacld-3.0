@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,7 +33,7 @@
 struct qca_mlo_metadata_param {
 	struct net_device *in_dest_dev;
 	uint8_t *in_dest_mac;
-	uint8_t  out_ppe_ds_node_id;
+	uint32_t out_ppe_ds_node_id;
 };
 
 /*

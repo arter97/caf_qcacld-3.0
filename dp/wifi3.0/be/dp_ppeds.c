@@ -1450,6 +1450,18 @@ static struct ppe_ds_wlan_ops ppeds_ops = {
 #endif
 };
 
+uint32_t dp_ppeds_get_node_id_be(struct cdp_soc_t *soc_hdl)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (!be_soc->ppeds_handle) {
+		dp_err("%p: DS is not enabled on this SOC", soc);
+		return PPE_VP_DS_INVALID_NODE_ID;
+	}
+	return be_soc->dp_ppeds_node_id;
+}
+
 void dp_ppeds_stats_sync_be(struct cdp_soc_t *soc_hdl,
 			    uint16_t vdev_id,
 			    struct cdp_ds_vp_params *vp_params,
@@ -2246,6 +2258,8 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc)
 		return QDF_STATUS_SUCCESS;
 	}
 
+	be_soc->dp_ppeds_node_id =
+				ppe_ds_wlan_get_node_id(be_soc->ppeds_handle);
 	return QDF_STATUS_SUCCESS;
 }
 
