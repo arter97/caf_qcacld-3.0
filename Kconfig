@@ -1941,6 +1941,10 @@ config DYNAMIC_DEBUG
 	bool "enable CONFIG_DYNAMIC_DEBUG"
 	default n
 
+config WLAN_CHIPSET_STATS
+	bool "enable WLAN_CHIPSET_STATS"
+	default n
+
 config DP_MLO_LINK_STATS_SUPPORT
 	bool "enable CONFIG_DP_MLO_LINK_STATS_SUPPORT"
 	default n
