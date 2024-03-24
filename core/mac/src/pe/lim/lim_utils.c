@@ -1993,7 +1993,7 @@ lim_util_count_sta_add(struct mac_context *mac,
 		return;
 
 	/* get here only if this is the first ANI peer in the BSS */
-	sch_edca_profile_update(mac, pe_session);
+	sch_edca_profile_update(mac, pe_session, NULL);
 }
 
 void
@@ -2029,7 +2029,7 @@ lim_util_count_sta_del(struct mac_context *mac,
 		return;
 
 	/* get here only if this is the last ANI peer in the BSS */
-	sch_edca_profile_update(mac, pe_session);
+	sch_edca_profile_update(mac, pe_session, NULL);
 }
 
 /**
@@ -5468,7 +5468,7 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 			lim_send_edca_params(mac,
 					     sap_session->gLimEdcaParamsActive,
 					     sap_session->vdev_id, false);
-			sch_qos_update_broadcast(mac, sap_session);
+			sch_qos_update_broadcast(mac, sap_session, NULL);
 
 	/*
 	 * In case of mcc, where cb can come from scc to mcc switch where we

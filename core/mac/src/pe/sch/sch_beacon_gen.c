@@ -195,8 +195,16 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 					    WLAN_VDEV_OP_CU_CAT2);
 	}
 
-	qdf_mem_copy(&link_ie->link_wmm_params, &bcn_2->WMMParams,
-		     sizeof(bcn_2->WMMParams));
+	if (qdf_mem_cmp(&link_ie->link_wmm_params, &bcn_2->WMMParams,
+			sizeof(bcn_2->WMMParams))) {
+		qdf_mem_copy(&link_ie->link_wmm_params, &bcn_2->WMMParams,
+			     sizeof(bcn_2->WMMParams));
+		bss_param_change = true;
+		pe_debug("vdev id %d WMMParamSet changed, critical update",
+			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT2);
+	}
 
 	qdf_mem_copy(&link_ie->link_wmm_caps, &bcn_2->WMMCaps,
 		     sizeof(bcn_2->WMMCaps));

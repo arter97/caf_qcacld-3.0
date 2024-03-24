@@ -695,6 +695,20 @@ QDF_STATUS
 wlan_parse_ftie_sha384(uint8_t *frame, uint32_t frame_len,
 		       struct sSirAssocRsp *assoc_rsp);
 
+/**
+ * wlan_parse_wmm_params() - API to parse WMM params from the frame.
+ * @frame: Pointer to IEs section of the beacon/probe resp frame
+ * @frame_len: Length of @frame buffer
+ * @wmm_params: Pointer to save parsed WMM params.
+ *
+ * The API will look for Vendor OUI containing WMM params and converts
+ * the IE data to internal data structure at @wmm_params.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_parse_wmm_params(const uint8_t *frame, uint32_t frame_len,
+				 tDot11fIEWMMParams *wmm_params);
+
 QDF_STATUS
 sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 				struct pe_session *session_entry,

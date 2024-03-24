@@ -70,6 +70,10 @@
 #include <wlan_vdev_mgr_utils_api.h>
 
 #define BW_160 160
+
+#define WMM_OUI_TYPE   "\x00\x50\xf2\x02\x01"
+#define WMM_OUI_TYPE_SIZE  5
+
 #define RSN_OUI_SIZE 4
 /* ////////////////////////////////////////////////////////////////////// */
 #ifdef WLAN_FEATURE_FILS_SK_SAP
@@ -4061,6 +4065,29 @@ QDF_STATUS wlan_parse_ftie_sha384(uint8_t *frame, uint32_t frame_len,
 		pos += len;
 	}
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_parse_wmm_params(const uint8_t *frame, uint32_t frame_len,
+				 tDot11fIEWMMParams *wmm_params)
+{
+	const uint8_t *ie;
+	uint32_t ret;
+
+	ie = wlan_get_vendor_ie_ptr_from_oui(WMM_OUI_TYPE, WMM_OUI_TYPE_SIZE,
+					     frame, frame_len);
+
+	if (!ie)
+		return QDF_STATUS_E_INVAL;
+
+	ret = dot11f_unpack_ie_wmm_params(NULL,
+					  (uint8_t *)ie + MIN_IE_LEN + WMM_OUI_TYPE_SIZE,
+					  ie[TAG_LEN_POS] - WMM_OUI_TYPE_SIZE,
+					  wmm_params, false);
+
+	if (DOT11F_SUCCEEDED(ret))
+		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_E_FAILURE;
 }
 
 #ifdef WLAN_FEATURE_11BE

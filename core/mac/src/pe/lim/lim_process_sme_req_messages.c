@@ -8136,8 +8136,9 @@ static void lim_process_sme_set_addba_accept(struct mac_context *mac_ctx,
 		mac_ctx->reject_addba_req = 0;
 }
 
-static void lim_process_sme_update_edca_params(struct mac_context *mac_ctx,
-					       uint32_t vdev_id)
+static void
+lim_process_sme_update_active_edca_params(struct mac_context *mac_ctx,
+					  uint32_t vdev_id)
 {
 	struct pe_session *pe_session;
 	tpDphHashNode sta_ds_ptr;
@@ -8255,6 +8256,111 @@ lim_process_sme_cfg_action_frm_in_tb_ppdu(struct mac_context *mac_ctx,
 	}
 
 	lim_send_action_frm_tb_ppdu_cfg(mac_ctx, msg->vdev_id, msg->cfg);
+}
+
+#define EDCA_GET_CW_WMM_TO_INI(_ptr, _val)		\
+	do {						\
+		*(_ptr) = ((BIT(_val) - 1) >> 8) & 0xFF;\
+		*(_ptr + 1) = (BIT(_val) - 1) & 0xFF;	\
+	} while (0)
+
+static void lim_parse_and_update_wmm_params(struct mac_context *mac_ctx,
+					    struct pe_session *pe_session,
+					    const uint8_t *ie, uint16_t ie_len)
+{
+	tDot11fIEWMMParams wmm_params;
+	uint32_t *ac_params;
+	uint32_t params[QCA_WLAN_AC_ALL][CFG_EDCA_DATA_LEN];
+	QDF_STATUS status;
+
+	status = wlan_parse_wmm_params(ie, ie_len, &wmm_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Error parsing IE for WMM params %d", ie_len);
+		return;
+	}
+
+	/* Fill Best effort AC params */
+	ac_params = &params[QCA_WLAN_AC_BE][0];
+	ac_params[CFG_EDCA_PROFILE_ACM_IDX] = wmm_params.acbe_acm;
+	ac_params[CFG_EDCA_PROFILE_AIFSN_IDX] = wmm_params.acbe_aifsn;
+	ac_params[CFG_EDCA_PROFILE_TXOPA_IDX] = wmm_params.acbe_txoplimit;
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+			       wmm_params.acbe_acwmin);
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMAXA_IDX,
+			       wmm_params.acbe_acwmax);
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMINB_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMING_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	/* Fill Background AC params */
+	ac_params = &params[QCA_WLAN_AC_BK][0];
+	ac_params[CFG_EDCA_PROFILE_ACM_IDX] = wmm_params.acbk_acm;
+	ac_params[CFG_EDCA_PROFILE_AIFSN_IDX] = wmm_params.acbk_aifsn;
+	ac_params[CFG_EDCA_PROFILE_TXOPA_IDX] = wmm_params.acbk_txoplimit;
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+			       wmm_params.acbk_acwmin);
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMAXA_IDX,
+			       wmm_params.acbk_acwmax);
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMINB_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMING_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	/* Fill Video AC params */
+	ac_params = &params[QCA_WLAN_AC_VI][0];
+	ac_params[CFG_EDCA_PROFILE_ACM_IDX] = wmm_params.acvi_acm;
+	ac_params[CFG_EDCA_PROFILE_AIFSN_IDX] = wmm_params.acvi_aifsn;
+	ac_params[CFG_EDCA_PROFILE_TXOPA_IDX] = wmm_params.acvi_txoplimit;
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+			       wmm_params.acvi_acwmin);
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMAXA_IDX,
+			       wmm_params.acvi_acwmax);
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMINB_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMING_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	/* Fill Voice AC params */
+	ac_params = &params[QCA_WLAN_AC_VO][0];
+	ac_params[CFG_EDCA_PROFILE_ACM_IDX] = wmm_params.acvo_acm;
+	ac_params[CFG_EDCA_PROFILE_AIFSN_IDX] = wmm_params.acvo_aifsn;
+	ac_params[CFG_EDCA_PROFILE_TXOPA_IDX] = wmm_params.acvo_txoplimit;
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+			       wmm_params.acvo_acwmin);
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMAXA_IDX,
+			       wmm_params.acvo_acwmax);
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMINB_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMING_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	pe_session->user_edca_set = true;
+	sch_edca_profile_update(mac_ctx, pe_session, params);
 }
 
 static void
@@ -9597,8 +9703,8 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		lim_process_sme_set_addba_accept(mac,
 					(struct sme_addba_accept *)msg_buf);
 		break;
-	case eWNI_SME_UPDATE_EDCA_PROFILE:
-		lim_process_sme_update_edca_params(mac, pMsg->bodyval);
+	case eWNI_SME_UPDATE_EDCA_ACTIVE_PROFILE:
+		lim_process_sme_update_active_edca_params(mac, pMsg->bodyval);
 		break;
 	case WNI_SME_UPDATE_MU_EDCA_PARAMS:
 		lim_process_sme_update_mu_edca_params(mac, pMsg->bodyval);
@@ -10284,6 +10390,14 @@ static void lim_process_update_add_ies(struct mac_context *mac_ctx,
 				lim_handle_param_update(mac_ctx,
 						update_add_ies->updateType);
 			break;
+		case eUPDATE_IE_EDCA_PARAMS:
+			/*
+			 * If size is zero, then set user set edca to false
+			 * so the default params will be taken.
+			 */
+			session_entry->user_edca_set = false;
+			sch_edca_profile_update(mac_ctx, session_entry, NULL);
+			break;
 		default:
 			break;
 		}
@@ -10347,6 +10461,12 @@ static void lim_process_update_add_ies(struct mac_context *mac_ctx,
 		if (update_ie->notify)
 			lim_handle_param_update(mac_ctx,
 					update_add_ies->updateType);
+		break;
+	case eUPDATE_IE_EDCA_PARAMS:
+		lim_parse_and_update_wmm_params(mac_ctx,
+						session_entry,
+						update_ie->pAdditionIEBuffer,
+						update_ie->ieBufferlength);
 		break;
 	default:
 		pe_err("unhandled buffer type %d", update_add_ies->updateType);

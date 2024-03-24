@@ -5775,6 +5775,20 @@ wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info)
 						 eUPDATE_IE_PROBE_BCN);
 	}
 
+	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		update_ie.ieBufferlength = beacon->tail_len;
+		update_ie.pAdditionIEBuffer = beacon->tail;
+		update_ie.append = false;
+		update_ie.notify = false;
+		if (sme_update_add_ie(mac_handle,
+				      &update_ie,
+				      eUPDATE_IE_EDCA_PARAMS) ==
+		    QDF_STATUS_E_FAILURE) {
+			hdd_err("Could not pass on Add Ie Assoc Response data");
+			ret = -EINVAL;
+			goto done;
+		}
+	}
 done:
 	qdf_mem_free(genie);
 	qdf_mem_free(proberesp_ies);
