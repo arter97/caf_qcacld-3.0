@@ -69,6 +69,10 @@ dp_lite_mon_free_peers(struct dp_pdev *pdev,
 	struct dp_lite_mon_peer *temp_peer = NULL;
 	struct dp_soc *soc = pdev->soc;
 	enum cdp_tx_filter_action cmd;
+	bool hw_filter_ovrd = false;
+
+	hw_filter_ovrd =
+		wlan_cfg_get_txmon_disable_hw_filter(soc->wlan_cfg_ctx);
 
 	TAILQ_FOREACH_SAFE(peer, &config->peer_list,
 			   peer_list_elem, temp_peer) {
@@ -87,6 +91,15 @@ dp_lite_mon_free_peers(struct dp_pdev *pdev,
 					cmd = CDP_TX_FILTER_ACTION_CLEAR_FILTERING;
 				else
 					cmd = CDP_TX_FILTER_ACTION_DEL;
+
+				/*
+				 * if hw filter override is set, no need to
+				 * send any command or setting to hw. As
+				 * filtering is done in software.
+				 */
+				if (hw_filter_ovrd)
+					goto free_peer_hw_override;
+
 				soc->cdp_soc.ol_ops->config_lite_mon_tx_peer(soc->ctrl_psoc,
 								  pdev->pdev_id,
 								  peer->vdev_id,
@@ -94,6 +107,7 @@ dp_lite_mon_free_peers(struct dp_pdev *pdev,
 								  &peer->peer_mac.raw[0]);
 			}
 		}
+free_peer_hw_override:
 		config->peer_count--;
 		qdf_mem_free(peer);
 	}
@@ -295,6 +309,7 @@ dp_lite_mon_disable_tx(struct dp_pdev *pdev)
 	dp_lite_mon_reset_config(pdev, &lite_mon_tx_config->tx_config);
 	lite_mon_tx_config->subtype_filtering = false;
 	lite_mon_tx_config->sw_peer_filtering = false;
+	lite_mon_tx_config->disable_hw_filter = false;
 	qdf_spin_unlock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
 }
 
@@ -547,6 +562,10 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 
 		/* setupt tx lite mon filters */
 		dp_mon_filter_setup_tx_lite_mon(&be_pdev->pdev);
+
+		lite_mon_tx_config->sw_peer_filtering =
+			wlan_cfg_get_txmon_sw_peer_filtering(soc->wlan_cfg_ctx);
+
 		status = dp_tx_mon_filter_update(&be_pdev->pdev);
 		if (status != QDF_STATUS_SUCCESS) {
 			dp_mon_err("Failed to setup tx lite mon filters");
@@ -725,6 +744,80 @@ dp_lite_mon_update_peers(struct dp_lite_mon_config *config,
 	return status;
 }
 
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
+/**
+ * dp_lite_mon_hw_filter_config - update hw filter config
+ * @soc: dp soc
+ * @be_pdev: be dp pdev
+ * @lite_mon_tx_config: new lite mon tx config
+ * @disable_hw_filter: flag to disable hw filter
+ *
+ * Return: void
+ */
+static inline void
+dp_lite_mon_hw_filter_config(struct dp_soc *soc,
+			     struct dp_pdev_be *be_pdev,
+			     struct dp_lite_mon_tx_config *lite_mon_tx_config,
+			     bool disable_hw_filter)
+{
+	struct dp_pdev *pdev = &(be_pdev->pdev);
+	struct dp_mon_pdev *mon_pdev = NULL;
+	struct dp_mon_pdev_be *mon_pdev_be = NULL;
+	bool hw_filter_cfg = false;
+
+	hw_filter_cfg = wlan_cfg_get_txmon_disable_hw_filter(soc->wlan_cfg_ctx);
+
+	if (!hw_filter_cfg)
+		return;
+
+	mon_pdev = pdev->monitor_pdev;
+	if (!mon_pdev)
+		return;
+
+	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	if (!mon_pdev_be)
+		return;
+
+	if (disable_hw_filter) {
+		/* set the hw filter config */
+		lite_mon_tx_config->disable_hw_filter = hw_filter_cfg;
+
+		/* set tx mon mode to 1 and filter length to full pkt */
+		mon_pdev_be->tx_mon_mode = 1;
+		mon_pdev_be->tx_mon_filter_length = DEFAULT_DMA_LENGTH;
+		dp_mon_filter_setup_tx_mon_mode(pdev);
+		dp_tx_mon_filter_update(pdev);
+	} else {
+		/* set the hw filter config as there is no peer */
+		lite_mon_tx_config->disable_hw_filter = false;
+
+		/* reset tx mon mode and filter length to 0 */
+		mon_pdev_be->tx_mon_mode = 0;
+		mon_pdev_be->tx_mon_filter_length = 0;
+		dp_mon_filter_reset_tx_mon_mode(pdev);
+		dp_tx_mon_filter_update(pdev);
+	}
+}
+#else
+/**
+ * dp_lite_mon_hw_filter_config - update hw filter config
+ * @soc: dp soc
+ * @be_pdev: be dp pdev
+ * @lite_mon_tx_config: new lite mon tx config
+ * @disable_hw_filter: flag to disable hw filter
+ *
+ * Return: void
+ */
+static inline void
+dp_lite_mon_hw_filter_config(struct dp_soc *soc,
+			     struct dp_pdev_be *be_pdev,
+			     struct dp_lite_mon_tx_config *lite_mon_tx_config,
+			     bool disable_hw_filter)
+{
+	return;
+}
+#endif
+
 /**
  * dp_lite_mon_set_tx_peer_config - Update lite mon tx peer list
  * @soc: dp soc
@@ -775,20 +868,47 @@ dp_lite_mon_set_tx_peer_config(struct dp_soc *soc,
 			/* Indicate the first peer addition using
 			 * ENABLE_FILTERING command.
 			 */
-			if (peer_count == 1)
+			if (peer_count == 1) {
 				cmd = CDP_TX_FILTER_ACTION_ENABLE_FILTERING;
-			else
+
+				/*
+				 * for the first peer entry, update the
+				 * type based filtering to enable all filter.
+				 * So that all filtering is done in software.
+				 */
+				dp_lite_mon_hw_filter_config(soc,
+							     be_pdev,
+							     lite_mon_tx_config,
+							     1);
+			} else {
 				cmd = CDP_TX_FILTER_ACTION_ADD;
+			}
 		} else if (peer_config->action == CDP_LITE_MON_PEER_REMOVE) {
 			/* Indicate the last peer deletion using
 			 * CLEAR_FILTERING command.
 			 */
-			if (peer_count == 0)
+			if (peer_count == 0) {
 				cmd = CDP_TX_FILTER_ACTION_CLEAR_FILTERING;
-			else
+
+				/*
+				 * for the last peer delete, enable previous
+				 * filter setting that is been set before.
+				 */
+				dp_lite_mon_hw_filter_config(soc,
+							     be_pdev,
+							     lite_mon_tx_config,
+							     0);
+			} else {
 				cmd = CDP_TX_FILTER_ACTION_DEL;
+			}
 		}
-		if (soc->cdp_soc.ol_ops->config_lite_mon_tx_peer)
+
+		/*
+		 * On sw filtering enable, peer filter done in sw.
+		 * so no need to send wmi command to firmware.
+		 */
+		if (soc->cdp_soc.ol_ops->config_lite_mon_tx_peer &&
+		    !wlan_cfg_get_txmon_disable_hw_filter(soc->wlan_cfg_ctx))
 			soc->cdp_soc.ol_ops->config_lite_mon_tx_peer(soc->ctrl_psoc,
 								     be_pdev->pdev.pdev_id,
 								     peer_config->vdev_id,
