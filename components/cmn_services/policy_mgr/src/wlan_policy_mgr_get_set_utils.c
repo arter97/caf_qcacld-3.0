@@ -309,13 +309,18 @@ policy_mgr_get_dfs_sta_sap_go_scc_movement(struct wlan_objmgr_psoc *psoc,
 
 bool
 policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
-					     bool always_update_target)
+					     bool always_update_target,
+					     struct wlan_channel *des_chan)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	qdf_freq_t sta_5g_freqs[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ap_5g_freqs[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint16_t ap_ch_flagext[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t num_5g_sta = 0, num_5g_ap = 0;
 	bool sta_on_5g = false;
 	bool sta_on_2g = false;
 	bool ap_on_5g = false;
-	uint32_t i;
+	uint32_t i, j;
 	bool enable = true;
 	bool curr_enabled;
 
@@ -342,6 +347,11 @@ policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
+	if (des_chan && WLAN_REG_IS_5GHZ_CH_FREQ(des_chan->ch_freq)) {
+		ap_5g_freqs[num_5g_ap] = des_chan->ch_freq;
+		ap_ch_flagext[num_5g_ap++] = des_chan->ch_flagext;
+	}
+
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
 		if (!pm_conc_connection_list[i].in_use)
@@ -350,6 +360,10 @@ policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 		     pm_conc_connection_list[i].mode == PM_P2P_GO_MODE) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 		     pm_conc_connection_list[i].freq)) {
+			ap_5g_freqs[num_5g_ap] =
+				pm_conc_connection_list[i].freq;
+			ap_ch_flagext[num_5g_ap++] =
+				pm_conc_connection_list[i].ch_flagext;
 			ap_on_5g = true;
 			continue;
 		}
@@ -357,10 +371,13 @@ policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 		if (!(pm_conc_connection_list[i].mode == PM_STA_MODE ||
 		      pm_conc_connection_list[i].mode == PM_P2P_CLIENT_MODE))
 			continue;
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(pm_conc_connection_list[i].freq))
+		if (WLAN_REG_IS_5GHZ_CH_FREQ(pm_conc_connection_list[i].freq)) {
 			sta_on_5g = true;
-		else
+			sta_5g_freqs[num_5g_sta++] =
+				pm_conc_connection_list[i].freq;
+		} else {
 			sta_on_2g = true;
+		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
@@ -370,6 +387,25 @@ policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 		enable = true;
 	else
 		enable = false;
+
+	if (policy_mgr_is_hw_sbs_capable(psoc)) {
+		enable = true;
+		for (i = 0; i < num_5g_sta; i++) {
+			for (j = 0; j < num_5g_ap; j++) {
+				if (policy_mgr_2_freq_always_on_same_mac(
+				    psoc, sta_5g_freqs[i], ap_5g_freqs[j]) &&
+				    ap_ch_flagext[j] & (IEEE80211_CHAN_DFS |
+				    IEEE80211_CHAN_DFS_CFREQ2)) {
+					policy_mgr_debug("sta %d ap(dfs) %d on same mac",
+							 sta_5g_freqs[i],
+							 ap_5g_freqs[j]);
+					enable = false;
+					break;
+				}
+			}
+		}
+	}
+
 end:
 	curr_enabled = !pm_ctx->dynamic_dfs_master_disabled;
 	pm_ctx->dynamic_dfs_master_disabled = !enable;
@@ -5074,7 +5110,7 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 						conn_6ghz_flag);
 	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE ||
 	    mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)
-		policy_mgr_update_dfs_master_dynamic_enabled(psoc, false);
+		policy_mgr_update_dfs_master_dynamic_enabled(psoc, false, NULL);
 
 	policy_mgr_dump_current_concurrency(psoc);
 
@@ -5260,7 +5296,7 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 
 	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE ||
 	    mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)
-		policy_mgr_update_dfs_master_dynamic_enabled(psoc, false);
+		policy_mgr_update_dfs_master_dynamic_enabled(psoc, false, NULL);
 
 	if (!pm_ctx->last_disconn_sta_freq) {
 		if (policy_mgr_update_indoor_concurrency(psoc, session_id,

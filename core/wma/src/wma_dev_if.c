@@ -1308,9 +1308,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id))
-		policy_mgr_update_dfs_master_dynamic_enabled(psoc, true);
-
 	iface = &wma->interfaces[rsp->vdev_id];
 	if (!iface->vdev) {
 		wma_err("Invalid vdev");
@@ -1339,6 +1336,12 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 				rsp->cfgd_rx_streams,
 				rsp->chain_mask,
 				wma->interfaces[rsp->vdev_id].mac_id);
+
+		if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id))
+			policy_mgr_update_dfs_master_dynamic_enabled(
+					psoc,
+					true,
+					iface->vdev->vdev_mlme.des_chan);
 
 		/* Fill bss_chan after vdev start */
 		qdf_mem_copy(iface->vdev->vdev_mlme.bss_chan,

@@ -395,6 +395,7 @@ policy_mgr_get_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
  * or not on AP interface when STA+SAP(GO) concurrency
  * @psoc: pointer to psoc
  * @always_update_target: force update the setting to target
+ * @des_chan: New SAP(GO) channel to be started
  *
  * This API is used to check AP dfs master functionality enabled or not when
  * STA+SAP(GO) concurrency.
@@ -414,7 +415,8 @@ policy_mgr_get_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
  */
 bool
 policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
-					     bool always_update_target);
+					     bool always_update_target,
+					     struct wlan_channel *des_chan);
 
 /**
  * policy_mgr_get_can_skip_radar_event - Can skip DFS Radar event or not
