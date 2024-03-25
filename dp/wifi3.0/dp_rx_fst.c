@@ -714,6 +714,7 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 					  fse->hal_rx_fse);
 	if (dp_assert_always_internal_stat((status == QDF_STATUS_SUCCESS),
 				soc, rx.err.hw_fst_del_failed)) {
+		qdf_spin_unlock_bh(&fst->fst_lock);
 		dp_err("RX HW flow delete entry failed");
 		return status;
 	}
