@@ -2740,9 +2740,47 @@ lim_verify_dot11_mode_with_crypto(struct pe_session *session)
 		session->mac_ctx->roam.configParam.wep_tkip_in_he;
 }
 
+#if defined(FEATURE_DENYLIST_MGR) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * lim_intersect_phy_mode_to_scan_phy_mode: API to intersect phy mode with scan
+ * phy mode
+ * @intersected_dot11_mode: intersected dot11 mode
+ * @scan_phy_mode: scan phy mode
+ *
+ * This API checks the phy mode of scan entry because scan entry mode
+ * may be different based on additional scan entries.
+ *
+ * Return: dot11 mode
+ */
+static enum mlme_dot11_mode
+lim_intersect_phy_mode_to_scan_phy_mode(
+				enum mlme_dot11_mode intersected_dot11_mode,
+				enum wlan_phymode scan_phy_mode)
+{
+	if (intersected_dot11_mode == MLME_DOT11_MODE_11BE &&
+	    IS_WLAN_PHYMODE_HE(scan_phy_mode))
+		return MLME_DOT11_MODE_11AX;
+
+	else
+		return intersected_dot11_mode;
+}
+#else
+static inline enum mlme_dot11_mode
+lim_intersect_phy_mode_to_scan_phy_mode(
+				enum mlme_dot11_mode intersected_dot11_mode,
+				enum wlan_phymode scan_phy_mode)
+{
+	/*
+	 * Keep dot11 mode same as inetrsected mode, so that always intersected
+	 * mode is chosen in case of deny list feature is not enabled.
+	 */
+	return intersected_dot11_mode;
+}
+#endif
+
 static QDF_STATUS
 lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
-		    tDot11fBeaconIEs *ie_struct)
+		    tDot11fBeaconIEs *ie_struct, enum wlan_phymode phy_mode)
 {
 	struct bss_description *bss_desc =
 					&session->lim_join_req->bssDescription;
@@ -2768,10 +2806,12 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 						       ie_struct, bss_desc);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+	intersected_mode = lim_intersect_phy_mode_to_scan_phy_mode(
+						intersected_mode, phy_mode);
 
-	pe_debug("vdev id %d opmode %d self dot11mode %d bss_dot11 mode %d intersected %d",
+	pe_debug("vdev id %d opmode %d self dot11mode %d bss_dot11 mode %d intersected %d bss phy mode %d",
 		 session->vdev_id, session->opmode, self_dot11_mode,
-		 bss_dot11_mode, intersected_mode);
+		 bss_dot11_mode, intersected_mode, phy_mode);
 
 	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev) &&
 	    !IS_DOT11_MODE_EHT(intersected_mode))
@@ -3183,7 +3223,8 @@ lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
 
 QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
-		    struct bss_description *bss_desc)
+		    struct bss_description *bss_desc,
+		    enum wlan_phymode phy_mode)
 {
 	uint8_t bss_chan_id;
 	tDot11fBeaconIEs *ie_struct;
@@ -3252,7 +3293,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 
 	session->enable_session_twt_support =
 					lim_enable_twt(mac_ctx, ie_struct);
-	status = lim_fill_dot11_mode(mac_ctx, session, ie_struct);
+	status = lim_fill_dot11_mode(mac_ctx, session, ie_struct, phy_mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		status = QDF_STATUS_E_FAILURE;
 		goto send;
@@ -4543,7 +4584,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 		     session->ssId.length);
 	session->ssidHidden = req->is_ssid_hidden;
 
-	status = lim_fill_pe_session(mac_ctx, session, bss_desc);
+	status = lim_fill_pe_session(mac_ctx, session, bss_desc,
+				     req->entry->phy_mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to fill pe session vdev id %d",
 		       session->vdev_id);

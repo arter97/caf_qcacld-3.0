@@ -3699,7 +3699,8 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 		goto end;
 	}
 
-	status = lim_fill_pe_session(mac_ctx, pe_session, bss_desc);
+	status = lim_fill_pe_session(mac_ctx, pe_session, bss_desc,
+				     sync_ind->phy_mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to fill pe session vdev id %d",
 		       pe_session->vdev_id);

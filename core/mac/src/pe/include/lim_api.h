@@ -637,6 +637,7 @@ bool lim_enable_cts_to_self_for_exempted_iot_ap(
  * @mac_ctx: Pointer to mac context
  * @session: pe session
  * @bss_desc: Pointer to bss description
+ * @phy_mode: phy mode of scan entry
  *
  * This api will fill lim pe session with info
  * from bss description
@@ -646,7 +647,8 @@ bool lim_enable_cts_to_self_for_exempted_iot_ap(
 QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx,
 		    struct pe_session *session,
-		    struct bss_description *bss_desc);
+		    struct bss_description *bss_desc,
+		    enum wlan_phymode phy_mode);
 
 /**
  * lim_update_omn_ie_ch_width() - update omn_ie_ch_width in struct
