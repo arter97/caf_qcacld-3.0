@@ -165,6 +165,10 @@ static uint8_t *sap_hdd_event_to_string(eSapHddEvent event)
 #endif
 	CASE_RETURN_STRING(eSAP_ACS_CHANNEL_SELECTED);
 	CASE_RETURN_STRING(eSAP_ECSA_CHANGE_CHAN_IND);
+	CASE_RETURN_STRING(eSAP_CHANNEL_CHANGE_RESP);
+	CASE_RETURN_STRING(eSAP_DFS_NEXT_CHANNEL_REQ);
+	CASE_RETURN_STRING(eSAP_STOP_BSS_DUE_TO_NO_CHNL);
+	CASE_RETURN_STRING(eSAP_CHANNEL_SWITCH_STARTED_NOTIFY);
 	default:
 		return "eSAP_HDD_EVENT_UNKNOWN";
 	}
@@ -2473,8 +2477,8 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 	if (!sap_ap_event)
 		return QDF_STATUS_E_NOMEM;
 
-	sap_debug("SAP event callback event = %s",
-		  sap_hdd_event_to_string(sap_hddevent));
+	sap_debug("SAP event callback event = %s(%d)",
+		  sap_hdd_event_to_string(sap_hddevent), sap_hddevent);
 
 	switch (sap_hddevent) {
 	case eSAP_STA_ASSOC_IND:
@@ -2826,15 +2830,11 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 			qdf_mem_free(sap_ap_event);
 			return QDF_STATUS_E_INVAL;
 		}
-		sap_debug("SAP event callback event = %s",
-			  "eSAP_ECSA_CHANGE_CHAN_IND");
 		sap_ap_event->sapHddEventCode = eSAP_ECSA_CHANGE_CHAN_IND;
 		sap_ap_event->sapevt.sap_chan_cng_ind.new_chan_freq =
 					   csr_roaminfo->target_chan_freq;
 		break;
 	case eSAP_DFS_NEXT_CHANNEL_REQ:
-		sap_debug("SAP event callback event = %s",
-			  "eSAP_DFS_NEXT_CHANNEL_REQ");
 		sap_ap_event->sapHddEventCode = eSAP_DFS_NEXT_CHANNEL_REQ;
 		break;
 	case eSAP_STOP_BSS_DUE_TO_NO_CHNL:
@@ -2861,8 +2861,6 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 				sap_ctx->ch_params.mhz_freq_seg1;
 		sap_update_cac_history(mac_ctx, sap_ctx,
 				       sap_hddevent);
-		sap_debug("SAP event callback event = %s",
-			  "eSAP_CHANNEL_CHANGE_RESP");
 		break;
 
 	case eSAP_CHANNEL_SWITCH_STARTED_NOTIFY:
