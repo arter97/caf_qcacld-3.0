@@ -3307,6 +3307,15 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		ap_ctx->sap_config.acs_cfg.ch_width =
 			sap_event->sapevt.sap_ch_selected.ch_width;
 
+		/* In csa, sometimes it will only send eSAP_CHANNEL_CHANGE_EVENT
+		 * and without eSAP_START_BSS_EVENT, sap_config won't updated.
+		 * so set the channel info here. otherwise if change_beacon
+		 * comes, it will not correct.
+		 */
+		sap_config->chan_freq = sap_ctx->chan_freq;
+		sap_config->ch_params = sap_ctx->ch_params;
+		sap_config->sec_ch_freq = sap_ctx->sec_ch_freq;
+
 		cdp_hl_fc_set_td_limit(cds_get_context(QDF_MODULE_ID_SOC),
 				       link_info->vdev_id,
 				       ap_ctx->operating_chan_freq);
