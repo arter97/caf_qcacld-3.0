@@ -1634,7 +1634,9 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 	if (((sap_ctx->acs_cfg && sap_ctx->acs_cfg->acs_mode) ||
 	     policy_mgr_restrict_sap_on_unsafe_chan(mac->psoc) ||
 	     sap_ctx->csa_reason != CSA_REASON_USER_INITIATED) &&
-	    !policy_mgr_is_sap_freq_allowed(mac->psoc, target_chan_freq)) {
+	    !policy_mgr_is_sap_freq_allowed(mac->psoc,
+			wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
+			target_chan_freq)) {
 		sap_err("%u is unsafe channel freq", target_chan_freq);
 		return QDF_STATUS_E_FAULT;
 	}
@@ -4079,7 +4081,8 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		*csa_reason = CSA_REASON_CHAN_PASSIVE;
 		return wlansap_get_safe_channel_from_pcl_for_sap(sap_ctx);
 	} else if (!policy_mgr_is_sap_freq_allowed(mac->psoc,
-						   sap_ctx->chan_freq)) {
+			wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
+			sap_ctx->chan_freq)) {
 		sap_debug("channel is unsafe");
 		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
 		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx,
