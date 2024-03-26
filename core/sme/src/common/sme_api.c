@@ -12355,37 +12355,6 @@ QDF_STATUS sme_ht40_stop_obss_scan(mac_handle_t mac_handle, uint32_t vdev_id)
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * sme_update_mimo_power_save() - Update MIMO power save
- * configuration
- * @mac_handle: The handle returned by macOpen
- * @is_ht_smps_enabled: enable/disable ht smps
- * @ht_smps_mode: smps mode disabled/static/dynamic
- * @send_smps_action: flag to send smps force mode command
- * to FW
- *
- * Return: QDF_STATUS if SME update mimo power save
- * configuration success else failure status
- */
-QDF_STATUS sme_update_mimo_power_save(mac_handle_t mac_handle,
-				      uint8_t is_ht_smps_enabled,
-				      uint8_t ht_smps_mode,
-				      bool send_smps_action)
-{
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-
-	sme_debug("SMPS enable: %d mode: %d send action: %d",
-		is_ht_smps_enabled, ht_smps_mode,
-		send_smps_action);
-	mac_ctx->mlme_cfg->ht_caps.enable_smps =
-		is_ht_smps_enabled;
-	mac_ctx->mlme_cfg->ht_caps.smps = ht_smps_mode;
-	mac_ctx->roam.configParam.send_smps_action =
-		send_smps_action;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #ifdef WLAN_BCN_RECV_FEATURE
 QDF_STATUS sme_handle_bcn_recv_start(mac_handle_t mac_handle,
 				     uint32_t vdev_id, uint32_t nth_value,
