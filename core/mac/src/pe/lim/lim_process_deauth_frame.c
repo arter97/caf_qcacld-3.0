@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -41,6 +41,7 @@
 #include "lim_send_messages.h"
 #include "wlan_connectivity_logging.h"
 #include "cds_ieee80211_common.h"
+#include <lim_mlo.h>
 
 /**
  * lim_process_deauth_frame
@@ -626,6 +627,7 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 	if (LIM_IS_STA_ROLE(pe_session))
 		wma_tx_abort(pe_session->smeSessionId);
 
+	lim_mlo_sta_notify_peer_disconn(pe_session);
 	lim_update_lost_link_info(mac_ctx, pe_session, frame_rssi);
 
 	/* / Deauthentication from peer MAC entity */

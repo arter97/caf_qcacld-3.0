@@ -46,6 +46,7 @@
 #include "lim_session.h"
 #include "lim_ser_des_utils.h"
 #include "wlan_dlm_api.h"
+#include <lim_mlo.h>
 
 /**
  * lim_delete_sta_util - utility function for deleting station context
@@ -461,6 +462,8 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 		sta->mlmStaContext.cleanupTrigger;
 
 	if (LIM_IS_STA_ROLE(pe_session)) {
+		lim_mlo_sta_notify_peer_disconn(pe_session);
+
 		lim_connectivity_bmiss_disconn_event(sta, mac->psoc, reasonCode,
 						     pe_session->vdev_id);
 

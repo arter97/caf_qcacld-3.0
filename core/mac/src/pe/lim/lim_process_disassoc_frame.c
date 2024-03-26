@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,6 +44,7 @@
 #include "sch_api.h"
 #include "wlan_dlm_api.h"
 #include "wlan_connectivity_logging.h"
+#include <lim_mlo.h>
 
 /**
  * lim_process_disassoc_frame
@@ -422,6 +423,7 @@ void lim_perform_disassoc(struct mac_context *mac_ctx, int32_t frame_rssi,
 		return;
 	}
 
+	lim_mlo_sta_notify_peer_disconn(pe_session);
 	lim_update_lost_link_info(mac_ctx, pe_session, frame_rssi);
 	lim_post_sme_message(mac_ctx, LIM_MLM_DISASSOC_IND,
 			(uint32_t *) &mlmDisassocInd);
