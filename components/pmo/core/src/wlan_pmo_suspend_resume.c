@@ -1407,7 +1407,13 @@ QDF_STATUS pmo_core_psoc_send_host_wakeup_ind_to_fw(
 
 	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
 
-	hif_set_ep_intermediate_vote_access(hif_ctx);
+	status = hif_set_ep_intermediate_vote_access(hif_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pmo_err("Unable to set EP intermediate access error:%u",
+			status);
+		qdf_trigger_self_recovery(psoc, QDF_RESUME_TIMEOUT);
+		goto out;
+	}
 
 	qdf_event_reset(&psoc_ctx->wow.target_resume);
 
