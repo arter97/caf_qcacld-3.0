@@ -39,6 +39,9 @@
 /* Dump link information */
 #define NLINK_DUMP_LINK                 0x10
 
+/* Compute disallowed mode bitmap 2 links at a time */
+#define MAX_DISALLOW_MODE_LINK_NUM     2
+
 static
 void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 			    struct wlan_objmgr_vdev *vdev,
@@ -503,7 +506,10 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			bool initial_connected,
 			enum mlo_disallowed_mode
 			mlo_disallow_mode[MAX_DISALLOW_MODE],
-			uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE])
+			uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE],
+			uint8_t ml_num_link,
+			qdf_freq_t ml_freq_lst[MAX_DISALLOW_MODE_LINK_NUM],
+			uint8_t ml_linkid_lst[MAX_DISALLOW_MODE_LINK_NUM])
 {
 	struct disallow_mlo_modes mlo_modes;
 	uint8_t num_of_modes = 0;
@@ -513,25 +519,11 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	enum home_channel_map_id ml_hc_id;
 	enum home_channel_map_id legacy_hc_id;
 	disallow_mlo_mode_table_type *disallow_tbl;
-	uint8_t ml_num_link = 0;
-	uint32_t ml_link_bitmap = 0;
-	qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS];
-	uint8_t ml_vdev_lst[WLAN_MAX_ML_BSS_LINKS];
-	uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS];
-	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
 	uint8_t legacy_num;
 	qdf_freq_t legacy_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t legacy_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t allow_mcc;
-
-	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
-			       QDF_ARRAY_SIZE(ml_linkid_lst),
-			       ml_link_info, ml_freq_lst, ml_vdev_lst,
-			       ml_linkid_lst, &ml_num_link,
-			       &ml_link_bitmap);
-	if (ml_num_link < 2)
-		goto end;
 
 	if (initial_connected)
 		goto no_legacy_intf;
@@ -635,8 +627,10 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			       bool *disallow_changed)
 {
 	enum mlo_disallowed_mode mlo_disallow_mode[MAX_DISALLOW_MODE];
+	enum mlo_disallowed_mode tmp_mlo_disallow_mode[MAX_DISALLOW_MODE];
 	uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE];
-	uint8_t num_of_modes, i, j, k;
+	uint32_t tmp_disallow_link_bitmap[MAX_DISALLOW_MODE];
+	uint8_t num_of_modes = 0, tmp_num_of_modes, i, j, k;
 	struct ml_link_disallow_mode_bitmap *ml_link_disallow;
 	uint8_t link_ids[MAX_MLO_LINK_ID];
 	uint8_t num_ids;
@@ -646,6 +640,14 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_link_force_context *link_force_ctx;
 	bool disallow_mode_changed = false;
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t dual_freq_lst[MAX_DISALLOW_MODE_LINK_NUM];
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t dual_linkid_lst[MAX_DISALLOW_MODE_LINK_NUM];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
 	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
@@ -653,10 +655,43 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	num_of_modes = populate_disallow_modes(psoc, vdev,
-					       initial_connected,
-					       mlo_disallow_mode,
-					       disallow_link_bitmap);
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	if (ml_num_link < 2)
+		return;
+
+	for (i = 0; i < ml_num_link; i++) {
+		for (j = i + 1; j < ml_num_link; j++) {
+			dual_freq_lst[0] = ml_freq_lst[i];
+			dual_freq_lst[1] = ml_freq_lst[j];
+			dual_linkid_lst[0] = ml_linkid_lst[i];
+			dual_linkid_lst[1] = ml_linkid_lst[j];
+			tmp_num_of_modes =
+				populate_disallow_modes(
+					psoc, vdev, initial_connected,
+					tmp_mlo_disallow_mode,
+					tmp_disallow_link_bitmap,
+					MAX_DISALLOW_MODE_LINK_NUM,
+					dual_freq_lst, dual_linkid_lst);
+
+			/* Combine the 3 disallowed mode bitmaps into one for 3-link */
+			for (k = 0; k < tmp_num_of_modes; k++) {
+				if (num_of_modes < MAX_DISALLOW_MODE) {
+					disallow_link_bitmap[num_of_modes] =
+						tmp_disallow_link_bitmap[k];
+					mlo_disallow_mode[num_of_modes] =
+						tmp_mlo_disallow_mode[k];
+					num_of_modes++;
+				} else {
+					mlo_err("max disallowed modes exceeded limits");
+					break;
+				}
+			}
+		}
+	}
 
 	/* Combine the MLO_DISALLOWED_MODE_NO_MLMR and
 	 * MLO_DISALLOWED_MODE_NO_EMLSR to MLO_DISALLOWED_MODE_NO_MLMR_EMLSR
@@ -855,7 +890,6 @@ ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	sta_ctx = mlo_dev_ctx->sta_ctx;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		/*todo: add standby link */
 		if (!mlo_dev_ctx->wlan_vdev_list[i])
 			continue;
 		vdev_id = wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]);
@@ -2296,7 +2330,6 @@ ml_nlink_handle_legacy_sta_intf(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	for (i = 0; i < ml_num_link; i++) {
-		/*todo add removed link to force_inactive_link_bitmap*/
 		if (ml_freq_lst[i] == non_ml_sta_freq) {
 			scc_link_bitmap = 1 << ml_linkid_lst[i];
 		} else if (policy_mgr_2_freq_always_on_same_mac(
@@ -4631,7 +4664,6 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_SUCCESS;
 
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	/* todo: add sta/gc support */
 	if (!(op_mode == QDF_SAP_MODE ||
 	      op_mode == QDF_P2P_GO_MODE ||
 	      op_mode == QDF_STA_MODE ||
@@ -4764,7 +4796,6 @@ ml_nlink_undo_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_SUCCESS;
 
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	/* todo: add sta/gc support */
 	if (!(op_mode == QDF_SAP_MODE ||
 	      op_mode == QDF_P2P_GO_MODE ||
 	      op_mode == QDF_STA_MODE ||
