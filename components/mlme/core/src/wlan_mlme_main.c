@@ -1712,6 +1712,7 @@ static void mlme_init_ht_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_SHORT_GI_20MHZ);
 	u1.ht_cap_info.short_gi_40_mhz =
 				cfg_get(psoc, CFG_SHORT_GI_40MHZ);
+	u1.ht_cap_info.mimo_power_save = cfg_get(psoc, CFG_HT_SMPS_MODE);
 	ht_caps->ht_cap_info = u1.ht_cap_info;
 
 	/* HT Capapabilties - AMPDU Params */
