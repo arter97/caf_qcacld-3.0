@@ -972,7 +972,6 @@ struct wma_pf_sym_hist {
  * @tx_fail_cnt: Number of TX failures
  * @wlm_data: Data required for WLM req and resp handling
  * @he_cap: 802.11ax capabilities
- * @bandcapability: band capability configured through ini
  * @tx_bfee_8ss_enabled: Is Tx Beamformee support for 8x8 enabled?
  * @in_imps: Is device in Idle Mode Power Save?
  * @dynamic_nss_chains_update: per vdev nss, chains update
@@ -1105,7 +1104,6 @@ typedef struct {
 #ifdef WLAN_FEATURE_11AX
 	struct he_capability he_cap;
 #endif
-	uint8_t bandcapability;
 	bool tx_bfee_8ss_enabled;
 	bool in_imps;
 	bool dynamic_nss_chains_support;

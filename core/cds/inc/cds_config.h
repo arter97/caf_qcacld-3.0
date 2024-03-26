@@ -94,7 +94,6 @@ struct wlan_cds_feature_set {
  * @ac_specs:
  * @ito_repeat_count: Indicates ito repeated count
  * @force_target_assert_enabled: Indicate whether target assert enabled or not
- * @bandcapability: Configured band by user
  * @rps_enabled: RPS enabled in SAP mode
  * Structure for holding cds ini parameters.
  * @num_vdevs: Configured max number of VDEVs can be supported in the stack.
@@ -131,7 +130,6 @@ struct cds_config_info {
 	struct ol_tx_sched_wrr_ac_specs_t ac_specs[QCA_WLAN_AC_ALL];
 	uint8_t ito_repeat_count;
 	bool force_target_assert_enabled;
-	uint8_t bandcapability;
 	bool rps_enabled;
 	uint32_t num_vdevs;
 	bool enable_tx_compl_tsf64;
