@@ -3137,6 +3137,21 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		session->maxTxPower = lim_get_max_tx_power(mac_ctx, mlme_obj);
 		session->def_max_tx_pwr = session->maxTxPower;
 	}
+
+	/*
+	 * for mdm platform which QCA_NL80211_VENDOR_SUBCMD_LL_STATS_GET
+	 * will not call from android framework every 3 seconds, and tx
+	 * power will never update. So we use iw dev get tx power need
+	 * set maxTxPower non-zero value, that firmware can calc a non-zero
+	 * tx power, and update to host driver.
+	 */
+	if (LIM_IS_STA_ROLE(session) && session->maxTxPower == 0) {
+		session->maxTxPower =
+			wlan_reg_get_channel_reg_power_for_freq(mac_ctx->pdev,
+							session->curr_op_freq);
+		pe_debug("session->maxTxPower %u", session->maxTxPower);
+	}
+
 	session->limRFBand = lim_get_rf_band(session->curr_op_freq);
 
 	/* Initialize 11h Enable Flag */
