@@ -5550,16 +5550,18 @@ wma_update_target_ht_cap(struct target_psoc_info *tgt_hdl,
 
 	cfg->ht_sgi_40 = !!(ht_cap_info & WMI_HT_CAP_HT40_SGI);
 
+	cfg->dynamic_smps = !!(ht_cap_info & WMI_HT_CAP_DYNAMIC_SMPS);
+
 	/* RF chains */
 	cfg->num_rf_chains = target_if_get_num_rf_chains(tgt_hdl);
 
 	wma_nofl_debug("ht_cap_info - %x ht_rx_stbc - %d, ht_tx_stbc - %d\n"
 		 "mpdu_density - %d ht_rx_ldpc - %d ht_sgi_20 - %d\n"
-		 "ht_sgi_40 - %d num_rf_chains - %d",
+		 "ht_sgi_40 - %d num_rf_chains - %d dynamic_smps - %d",
 		 ht_cap_info,
 		 cfg->ht_rx_stbc, cfg->ht_tx_stbc, cfg->mpdu_density,
 		 cfg->ht_rx_ldpc, cfg->ht_sgi_20, cfg->ht_sgi_40,
-		 cfg->num_rf_chains);
+		 cfg->num_rf_chains, cfg->dynamic_smps);
 
 }
 
@@ -5694,6 +5696,7 @@ static void wma_derive_ext_ht_cap(
 		ht_cap->ht_rx_ldpc = (!!(value & WMI_HT_CAP_RX_LDPC));
 		ht_cap->ht_sgi_20 = (!!(value & WMI_HT_CAP_HT20_SGI));
 		ht_cap->ht_sgi_40 = (!!(value & WMI_HT_CAP_HT40_SGI));
+		ht_cap->dynamic_smps = (!!(value & WMI_HT_CAP_DYNAMIC_SMPS));
 		ht_cap->num_rf_chains =
 			QDF_MAX(wma_get_num_of_setbits_from_bitmask(tx_chain),
 				wma_get_num_of_setbits_from_bitmask(rx_chain));
@@ -5710,6 +5713,9 @@ static void wma_derive_ext_ht_cap(
 					(!!(value & WMI_HT_CAP_HT20_SGI)));
 		ht_cap->ht_sgi_40 = QDF_MIN(ht_cap->ht_sgi_40,
 					(!!(value & WMI_HT_CAP_HT40_SGI)));
+		ht_cap->dynamic_smps = QDF_MIN(ht_cap->dynamic_smps,
+					(!!(value & WMI_HT_CAP_DYNAMIC_SMPS)));
+
 		ht_cap->num_rf_chains =
 			QDF_MAX(ht_cap->num_rf_chains,
 				QDF_MAX(wma_get_num_of_setbits_from_bitmask(
@@ -5781,11 +5787,11 @@ static void wma_update_target_ext_ht_cap(struct target_psoc_info *tgt_hdl,
 
 	wma_nofl_debug("[ext ht cap] ht_rx_stbc - %d, ht_tx_stbc - %d\n"
 			"mpdu_density - %d ht_rx_ldpc - %d ht_sgi_20 - %d\n"
-			"ht_sgi_40 - %d num_rf_chains - %d",
+			"ht_sgi_40 - %d num_rf_chains - %d dynamic_smps - %d",
 			ht_cap->ht_rx_stbc, ht_cap->ht_tx_stbc,
 			ht_cap->mpdu_density, ht_cap->ht_rx_ldpc,
 			ht_cap->ht_sgi_20, ht_cap->ht_sgi_40,
-			ht_cap->num_rf_chains);
+			ht_cap->num_rf_chains, ht_cap->dynamic_smps);
 }
 
 /**

@@ -2188,6 +2188,15 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	if (ht_cap_info.short_gi_40_mhz && !cfg->ht_sgi_40)
 		ht_cap_info.short_gi_40_mhz = cfg->ht_sgi_40;
 
+	hdd_debug("gHtSMPS ini: %d, dynamic_smps fw cap: %d",
+		  ht_cap_info.mimo_power_save, cfg->dynamic_smps);
+	if (ht_cap_info.mimo_power_save == HDD_SMPS_MODE_DYNAMIC) {
+		if (cfg->dynamic_smps)
+			ht_cap_info.mimo_power_save = HDD_SMPS_MODE_DYNAMIC;
+		else
+			ht_cap_info.mimo_power_save = HDD_SMPS_MODE_DISABLED;
+	}
+
 	hdd_ctx->num_rf_chains = cfg->num_rf_chains;
 	hdd_ctx->ht_tx_stbc_supported = cfg->ht_tx_stbc;
 
