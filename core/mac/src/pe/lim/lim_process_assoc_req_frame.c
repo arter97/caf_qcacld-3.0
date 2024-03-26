@@ -1294,6 +1294,8 @@ static bool lim_process_assoc_req_no_sta_ctx(struct mac_context *mac_ctx,
 			pe_err("can't get partner auth type");
 			return false;
 		}
+		if (*auth_type == eSIR_AUTH_TYPE_SAE)
+			assoc_req->is_sae_authenticated = true;
 	} else {
 		/* Delete 'pre-auth' context of STA */
 		*auth_type = sta_pre_auth_ctx->authType;
