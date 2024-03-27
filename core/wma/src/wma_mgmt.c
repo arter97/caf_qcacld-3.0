@@ -2936,16 +2936,17 @@ static inline void wma_mgmt_pktdump_rx_handler(
  * @wma_handle: wma handle
  * @desc_id: descriptor id
  * @status: status
+ * @vdev_id: vdev id
  *
  * Return: 0 for success or error code
  */
 static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
-					  uint32_t desc_id, uint32_t status)
+					  uint32_t desc_id, uint32_t status,
+					  uint32_t vdev_id)
 {
 	struct wlan_objmgr_pdev *pdev;
 	qdf_nbuf_t buf = NULL;
 	QDF_STATUS ret;
-	uint8_t vdev_id = 0;
 	struct wmi_mgmt_params mgmt_params = {};
 
 	if (wma_validate_handle(wma_handle))
@@ -2966,10 +2967,13 @@ static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 	if (buf)
 		wma_mgmt_unmap_buf(wma_handle, buf);
 
-	vdev_id = mgmt_txrx_get_vdev_id(pdev, desc_id);
-	mgmt_params.vdev_id = vdev_id;
+	if (vdev_id == INVALID_VDEV_ID)
+		mgmt_params.vdev_id = mgmt_txrx_get_vdev_id(pdev, desc_id);
+	else
+		mgmt_params.vdev_id = vdev_id;
 
-	wma_mgmt_pktdump_tx_handler(wma_handle, buf, vdev_id, status);
+	wma_mgmt_pktdump_tx_handler(wma_handle, buf, mgmt_params.vdev_id,
+				    status);
 	ret = mgmt_txrx_tx_completion_handler(pdev, desc_id, status,
 					      &mgmt_params);
 
@@ -3016,6 +3020,7 @@ int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 	tp_wma_handle wma_handle = (tp_wma_handle)handle;
 	WMI_MGMT_TX_COMPLETION_EVENTID_param_tlvs *param_buf;
 	wmi_mgmt_tx_compl_event_fixed_param *cmpl_params;
+	uint32_t vdev_id = INVALID_VDEV_ID;
 
 	param_buf = (WMI_MGMT_TX_COMPLETION_EVENTID_param_tlvs *)
 		cmpl_event_params;
@@ -3037,9 +3042,11 @@ int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 						    cmpl_params->status,
 						    &params);
 	}
+	if (WMI_VDEV_ID_VALID_FROM_INFO_GET(cmpl_params->info))
+		vdev_id = WMI_VDEV_ID_FROM_INFO_GET(cmpl_params->info);
 
 	wma_process_mgmt_tx_completion(wma_handle, cmpl_params->desc_id,
-				       cmpl_params->status);
+				       cmpl_params->status, vdev_id);
 
 	return 0;
 }
@@ -3113,7 +3120,8 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle, uint8_t *buf,
 		}
 
 		wma_process_mgmt_tx_completion(wma_handle,
-					       desc_ids[i], status[i]);
+					       desc_ids[i], status[i],
+					       INVALID_VDEV_ID);
 	}
 	return 0;
 }

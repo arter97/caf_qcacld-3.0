@@ -331,6 +331,7 @@ lim_process_disassoc_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 					WMA_GET_RX_MPDU_LEN(pRxPacketInfo));
 	lim_perform_disassoc(mac, frame_rssi, reasonCode,
 			     pe_session, pHdr->sa);
+	lim_update_disconnect_vdev_id(mac, pe_session->vdev_id);
 
 	if (mac->mlme_cfg->gen.fatal_event_trigger &&
 	    (reasonCode != REASON_UNSPEC_FAILURE &&

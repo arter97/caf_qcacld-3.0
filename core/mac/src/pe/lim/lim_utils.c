@@ -11900,3 +11900,19 @@ rel_vdev:
 		}
 	}
 }
+
+void lim_update_disconnect_vdev_id(struct mac_context *mac,  uint8_t vdev_id)
+{
+	struct pe_session *session;
+
+	session = pe_find_session_by_vdev_id(mac, vdev_id);
+	if (!session) {
+		pe_err("Session is NULL");
+		return;
+	}
+
+	if (session->vdev) {
+		wlan_mlme_set_disconnect_receive(session->vdev, true);
+		pe_debug("disconnect received on vdev id %d", vdev_id);
+	}
+}

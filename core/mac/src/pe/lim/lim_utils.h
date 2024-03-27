@@ -3430,4 +3430,14 @@ uint32_t lim_cmp_ssid(tSirMacSSid *ssid, struct pe_session *pe_session);
 void
 lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
 				       bool is_sap_starting);
+
+/**
+ * lim_update_disconnect_vdev_id() - Update the disconnect received on vdev id
+ * in vdev objmgr.
+ * @mac: pointer to global mac context
+ * @vdev_id: VDEV ID on which disconnect was received
+ *
+ * Return: None
+ */
+void lim_update_disconnect_vdev_id(struct mac_context *mac,  uint8_t vdev_id);
 #endif /* __LIM_UTILS_H */

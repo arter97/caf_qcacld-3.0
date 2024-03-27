@@ -4049,9 +4049,11 @@ static QDF_STATUS lim_disassoc_tx_complete_cnf_handler(void *context,
 						       uint32_t tx_success,
 						       void *params)
 {
-	struct mac_context *max_ctx = (struct mac_context *)context;
+	struct mac_context *mac_ctx = (struct mac_context *)context;
 	QDF_STATUS status_code;
 	struct scheduler_msg msg = {0};
+	struct wmi_mgmt_params *mgmt_params =
+				(struct wmi_mgmt_params *)params;
 
 	if (params)
 		wlan_send_tx_complete_event(context, buf, params, tx_success,
@@ -4059,13 +4061,16 @@ static QDF_STATUS lim_disassoc_tx_complete_cnf_handler(void *context,
 
 	pe_debug("tx_success: %d", tx_success);
 
+	if (mgmt_params)
+		lim_update_disconnect_vdev_id(mac_ctx, mgmt_params->vdev_id);
+
 	if (buf)
 		qdf_nbuf_free(buf);
 	msg.type = (uint16_t) WMA_DISASSOC_TX_COMP;
 	msg.bodyptr = params;
 	msg.bodyval = tx_success;
 
-	status_code = lim_post_msg_high_priority(max_ctx, &msg);
+	status_code = lim_post_msg_high_priority(mac_ctx, &msg);
 	if (status_code != QDF_STATUS_SUCCESS)
 		pe_err("posting message: %X to LIM failed, reason: %d",
 		       msg.type, status_code);
@@ -4157,6 +4162,8 @@ static QDF_STATUS lim_deauth_tx_complete_cnf_handler(void *context,
 		status_code = lim_ap_delete_sta_upon_deauth_tx(mac_ctx, session,
 							       (uint8_t *)mac_hdr->da);
 	}
+	if (mgmt_params)
+		lim_update_disconnect_vdev_id(mac_ctx, mgmt_params->vdev_id);
 
 	if (buf)
 		qdf_nbuf_free(buf);

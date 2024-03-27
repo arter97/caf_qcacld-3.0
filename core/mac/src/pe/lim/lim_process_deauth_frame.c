@@ -317,6 +317,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 					WMA_GET_RX_MPDU_LEN(pRxPacketInfo));
 	lim_perform_deauth(mac, pe_session, reasonCode, pHdr->sa,
 			   frame_rssi);
+	lim_update_disconnect_vdev_id(mac, pe_session->vdev_id);
 
 	if (mac->mlme_cfg->gen.fatal_event_trigger &&
 	    (reasonCode != REASON_UNSPEC_FAILURE &&
