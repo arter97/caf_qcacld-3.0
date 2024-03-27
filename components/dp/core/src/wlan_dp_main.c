@@ -3020,3 +3020,26 @@ void __wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
 				QDF_MAC_ADDR_REF(zero_addr.bytes),
 		dp_link ? dp_link->link_id : WLAN_INVALID_LINK_ID);
 }
+
+#ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
+void wlan_dp_rx_aggr_dis_req(struct wlan_dp_intf *dp_intf,
+			     enum ctrl_rx_aggr_client_id id, bool disable)
+{
+	if (id >= CTRL_RX_AGGR_ID_MAX) {
+		dp_err("Invalid client id: %u", id);
+		return;
+	}
+
+	if (id == CTRL_RX_AGGR_ID_WLM &&
+	    !dp_intf->dp_ctx->dp_cfg.wlm_rx_aggr_control) {
+		dp_info("wlm rx aggregation control feature not enabled");
+		return;
+	}
+
+	if (dp_intf->disable_rx_aggr[id] == disable)
+		return;
+
+	dp_intf->disable_rx_aggr[id] = disable;
+	dp_info("Module: %u disable: %u", id, disable);
+}
+#endif

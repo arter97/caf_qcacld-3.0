@@ -1953,4 +1953,16 @@ QDF_STATUS ucfg_dp_hlp_state_update(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags);
+
+/**
+ * ucfg_dp_rx_aggr_dis_req() -  Request Rx aggregation  disable
+ * @vdev: vdev mapped to DP interface
+ * @id: Client ID
+ * @disable: Disable aggregation
+ *
+ * Return: None
+ */
+void
+ucfg_dp_rx_aggr_dis_req(struct wlan_objmgr_vdev *vdev,
+			enum ctrl_rx_aggr_client_id id, bool disable);
 #endif /* _WLAN_DP_UCFG_API_H_ */

@@ -1204,4 +1204,24 @@ static inline bool wlan_dp_ml_mon_supported(void)
 void __wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
 			       struct qdf_mac_addr *intf_mac,
 			       struct wlan_objmgr_vdev *vdev);
+
+#ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
+/**
+ * wlan_dp_rx_aggr_dis_req() -  Request Rx aggregation  disable
+ * @dp_intf: DP interface handle
+ * @id: Client ID
+ * @disable: Disable aggregation
+ *
+ * Return: None
+ */
+void wlan_dp_rx_aggr_dis_req(struct wlan_dp_intf *dp_intf,
+			     enum ctrl_rx_aggr_client_id id,
+			     bool disable);
+#else
+static inline void
+wlan_dp_rx_aggr_dis_req(struct wlan_dp_intf *dp_intf,
+			enum ctrl_rx_aggr_client_id id, bool disable)
+{
+}
+#endif
 #endif

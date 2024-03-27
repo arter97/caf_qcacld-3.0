@@ -639,6 +639,7 @@ struct dp_rx_fst {
  * @fim_ctx: Flow identification manager context
  * @hlp_list_lock: Lock to protect hlp link_list operation
  * @hlp_list: List of HLP peers for HLP response handling
+ * @disable_rx_aggr: Disable Rx aggregation
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -713,6 +714,9 @@ struct wlan_dp_intf {
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 	qdf_spinlock_t hlp_list_lock;
 	qdf_list_t hlp_list;
+#endif
+#ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
+	bool disable_rx_aggr[CTRL_RX_AGGR_ID_MAX];
 #endif
 };
 

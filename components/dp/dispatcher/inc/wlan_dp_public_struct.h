@@ -912,4 +912,15 @@ struct fpm_table {
 	qdf_atomic_notif_head fpm_policy_event_notif_head;
 };
 
+/* enum ctrl_rx_aggr_client_id - Rx aggregation control client ID
+ * @CTRL_RX_AGGR_ID_WLM: WLM Mode
+ * @CTRL_RX_AGGR_ID_QDISK: QDISK Filter configuration
+ * @CTRL_RX_AGGR_ID_MAX: Max ID
+ */
+enum ctrl_rx_aggr_client_id {
+	CTRL_RX_AGGR_ID_WLM,
+	CTRL_RX_AGGR_ID_QDISK,
+	CTRL_RX_AGGR_ID_MAX
+};
+
 #endif /* end  of _WLAN_DP_PUBLIC_STRUCT_H_ */

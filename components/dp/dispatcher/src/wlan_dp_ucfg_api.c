@@ -3032,3 +3032,19 @@ void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags)
 	if (QDF_IS_STATUS_ERROR(status))
 		dp_err("Failed to set flag %d status %d", flags, status);
 }
+
+void
+ucfg_dp_rx_aggr_dis_req(struct wlan_objmgr_vdev *vdev,
+			enum ctrl_rx_aggr_client_id id, bool disable)
+{
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err("DP link Null, vdev_id: %u client id:%u disable:%u",
+		       wlan_vdev_get_id(vdev), id, disable);
+		return;
+	}
+
+	wlan_dp_rx_aggr_dis_req(dp_link->dp_intf, id, disable);
+}
