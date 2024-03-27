@@ -16678,7 +16678,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	bool rf_test_mode;
 	bool std_6ghz_conn_policy;
 	uint32_t fw_data_stall_evt;
-	bool disable_vlp_sta_conn_sp_ap;
+	bool disable_vlp_sta_conn_sp_ap, relaxed_lpi_conn_policy;
 
 	hdd_enter();
 
@@ -16784,6 +16784,16 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	}
 	if (std_6ghz_conn_policy)
 		wlan_cm_set_standard_6ghz_conn_policy(hdd_ctx->psoc, true);
+
+	status = ucfg_mlme_is_relaxed_lpi_conn_policy_enabled(hdd_ctx->psoc,
+						&relaxed_lpi_conn_policy);
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Get relaxed LPI connection policy failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (relaxed_lpi_conn_policy)
+		wlan_cm_set_relaxed_lpi_conn_policy(hdd_ctx->psoc, true);
 
 	status = ucfg_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
 						hdd_ctx->psoc,

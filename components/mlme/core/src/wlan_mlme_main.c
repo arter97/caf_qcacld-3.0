@@ -1250,6 +1250,28 @@ static void mlme_init_standard_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * mlme_init_relaxed_lpi_conn_policy() - initialize relaxed lpi
+ *                                       policy connection flag
+ * @psoc: Pointer to PSOC
+ * @gen: pointer to generic CFG items
+ *
+ * Return: None
+ */
+static void mlme_init_relaxed_lpi_conn_policy(struct wlan_objmgr_psoc *psoc,
+					      struct wlan_mlme_generic *gen)
+{
+	gen->relaxed_lpi_conn_policy =
+		cfg_get(psoc, CFG_RELAXED_LPI_CONNECTION_POLICY);
+}
+#else
+static void mlme_init_relaxed_lpi_conn_policy(struct wlan_objmgr_psoc *psoc,
+					      struct wlan_mlme_generic *gen)
+{
+}
+#endif
+
 /**
  * mlme_init_mgmt_hw_tx_retry_count_cfg() - initialize mgmt hw tx retry count
  * @psoc: Pointer to PSOC
@@ -1423,6 +1445,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_tl2m_negotiation_support(psoc, gen);
 	mlme_init_standard_6ghz_conn_policy(psoc, gen);
 	mlme_init_disable_vlp_sta_conn_to_sp_ap(psoc, gen);
+	mlme_init_relaxed_lpi_conn_policy(psoc, gen);
 }
 
 static void mlme_init_edca_ani_cfg(struct wlan_objmgr_psoc *psoc,

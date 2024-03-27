@@ -390,6 +390,30 @@ enum wlan_epcs_frame {
 #define CFG_6GHZ_STD_CONN_POLICY
 #endif
 
+#ifdef CONFIG_BAND_6GHZ
+/*
+ * relaxed_lpi_conn_policy - Enable relaxed LPI connection policy
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to set relaxed LPI connection policy where STA can connect
+ * in LPI with a 6 GHz AP which didn't advertise 6 GHz power info or invalid
+ * power type.
+ *
+ * Related: None
+ *
+ * Supported feature: STA
+ */
+#define CFG_RELAXED_LPI_CONNECTION_POLICY CFG_INI_BOOL( \
+		"relaxed_lpi_conn_policy", \
+		0, \
+		"Relaxed LPI connection policy")
+#define CFG_RELAXED_LPI_CONN_POLICY CFG(CFG_RELAXED_LPI_CONNECTION_POLICY)
+#else
+#define CFG_RELAXED_LPI_CONN_POLICY
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /*
  * emlsr_mode_enable - Enable eMLSR mode support
@@ -1299,6 +1323,7 @@ enum wlan_epcs_frame {
 	CFG_6GHZ_STD_CONN_POLICY \
 	CFG_EMLSR_MODE_ENABLED \
 	CFG_SR_ENABLE_MODES_ALL \
-	CFG_T2LM_NEGOTIATION_SUPPORTED\
-	CFG_DIS_VLP_STA_CONN_TO_SP_AP
+	CFG_T2LM_NEGOTIATION_SUPPORTED \
+	CFG_DIS_VLP_STA_CONN_TO_SP_AP \
+	CFG_RELAXED_LPI_CONN_POLICY
 #endif /* __CFG_MLME_GENERIC_H */

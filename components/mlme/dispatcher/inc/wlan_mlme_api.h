@@ -2855,6 +2855,17 @@ QDF_STATUS
 wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool *value);
 
+/**
+ * wlan_mlme_is_relaxed_lpi_conn_policy_enabled() - Get relaxed LPI connection
+ *                                                  flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_is_relaxed_lpi_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					     bool *value);
 #else
 static inline QDF_STATUS
 wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
@@ -2868,6 +2879,14 @@ wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
 static inline QDF_STATUS
 wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool *value)
+{
+	*value = false;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_mlme_is_relaxed_lpi_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					     bool *value)
 {
 	*value = false;
 	return QDF_STATUS_SUCCESS;

@@ -3115,6 +3115,21 @@ ucfg_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_is_relaxed_lpi_conn_policy_enabled() - Get relaxed lpi connection
+ *                                                  policy flag
+ * @psoc: pointer to psoc object
+ * @value: pointer to hold the value of flag
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_is_relaxed_lpi_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					     bool *value)
+{
+	return wlan_mlme_is_relaxed_lpi_conn_policy_enabled(psoc, value);
+}
+
+/**
  * ucfg_mlme_set_eht_mode() - Set EHT mode of operation
  * @psoc: pointer to psoc object
  * @value: EHT mode value that needs to be set from the caller
