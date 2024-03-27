@@ -865,6 +865,7 @@ enum {
 #ifdef ASSOC_REJECT_SUPPORT_ENABLED
 	IEEE80211_PARAM_ASSOC_REJECT = 818,
 #endif
+	IEEE80211_PARAM_LIST_REG_CHAN = 819,
 };
 
 enum {
@@ -1568,6 +1569,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eospdrop",        IEEE80211_PARAM_EOSPDROP, GET_PARAM, 0},
 	{"chanbw",              IEEE80211_PARAM_CHANBW, SET_PARAM, 1},
 	{"get_chanbw",          IEEE80211_PARAM_CHANBW, GET_PARAM, 0},
+	{"list_reg_chan",       IEEE80211_PARAM_LIST_REG_CHAN, GET_PARAM, 0},
 	{"shpreamble",          IEEE80211_PARAM_SHORTPREAMBLE, SET_PARAM, 1},
 	{"get_shpreamble",      IEEE80211_PARAM_SHORTPREAMBLE, GET_PARAM, 0},
 	{"extprotmode",         IEEE80211_PARAM_CWM_EXTPROTMODE, SET_PARAM, 1},
