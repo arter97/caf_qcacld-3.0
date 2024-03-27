@@ -1259,6 +1259,10 @@ static void dp_link_handle_cdp_vdev_delete(struct wlan_dp_psoc_context *dp_ctx,
 {
 	qdf_spin_lock_bh(&dp_ctx->dp_link_del_lock);
 
+	dp_info("CDP vdev registered %d, vdev deleted %d",
+		dp_link->cdp_vdev_registered,
+		dp_link->cdp_vdev_deleted);
+
 	if (!dp_link->cdp_vdev_registered || dp_link->cdp_vdev_deleted) {
 		/* CDP vdev is not created/registered or already deleted */
 		dp_info("Free dp_link %pK id %d (" QDF_MAC_ADDR_FMT ")",
