@@ -101,6 +101,67 @@ static void sch_get_csa_ecsa_count_offset(const uint8_t *ie, uint32_t ie_len,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+
+static void
+lim_update_cu_for_additional_inclusion_type_ie(struct mlo_link_ie *link_ie,
+					       struct pe_session *session,
+					       tDot11fBeacon2 *bcn_2,
+					       bool *bss_param_change)
+{
+	if (qdf_mem_cmp(&link_ie->link_bss_color_change,
+			&bcn_2->bss_color_change,
+			sizeof(bcn_2->bss_color_change))) {
+		session->mlo_link_info.upt_bcn_mlo_ie = true;
+
+		if (link_ie->link_bss_color_change.present !=
+		    bcn_2->bss_color_change.present) {
+			*bss_param_change = true;
+			wlan_vdev_mlme_op_flags_set(session->vdev,
+						    WLAN_VDEV_OP_CU_CAT2);
+		}
+		qdf_mem_copy(&link_ie->link_bss_color_change,
+			     &bcn_2->bss_color_change,
+			     sizeof(bcn_2->bss_color_change));
+		pe_debug("vdev id %d bss color change changed",
+			 wlan_vdev_get_id(session->vdev));
+	}
+
+	if (qdf_mem_cmp(&link_ie->link_operatingmode, &bcn_2->OperatingMode,
+			sizeof(bcn_2->OperatingMode))) {
+		session->mlo_link_info.upt_bcn_mlo_ie = true;
+
+		if (link_ie->link_operatingmode.present !=
+		    bcn_2->OperatingMode.present) {
+			*bss_param_change = true;
+			wlan_vdev_mlme_op_flags_set(session->vdev,
+						    WLAN_VDEV_OP_CU_CAT2);
+		}
+		qdf_mem_copy(&link_ie->link_operatingmode,
+			     &bcn_2->OperatingMode,
+			     sizeof(bcn_2->OperatingMode));
+		pe_debug("vdev id %d operating mode changed",
+			 wlan_vdev_get_id(session->vdev));
+	}
+
+	if (qdf_mem_cmp(&link_ie->link_widerbwchanswitchann,
+			&bcn_2->WiderBWChanSwitchAnn,
+			sizeof(bcn_2->WiderBWChanSwitchAnn))) {
+		session->mlo_link_info.upt_bcn_mlo_ie = true;
+
+		if (link_ie->link_widerbwchanswitchann.present !=
+		    bcn_2->WiderBWChanSwitchAnn.present) {
+			*bss_param_change = true;
+			wlan_vdev_mlme_op_flags_set(session->vdev,
+						    WLAN_VDEV_OP_CU_CAT2);
+		}
+		qdf_mem_copy(&link_ie->link_widerbwchanswitchann,
+			     &bcn_2->WiderBWChanSwitchAnn,
+			     sizeof(bcn_2->WiderBWChanSwitchAnn));
+		pe_debug("vdev id %d wide bandwidth channel switch changed",
+			 wlan_vdev_get_id(session->vdev));
+	}
+}
+
 /**
  * lim_update_link_info() - update mlo_link_info
  * @mac_ctx: mac context
@@ -119,15 +180,15 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 	uint16_t offset;
 	uint8_t *ptr;
 	uint32_t n_bytes;
+	bool bss_param_change = false;
 
 	session->mlo_link_info.upt_bcn_mlo_ie = false;
-	session->mlo_link_info.bss_param_change = false;
 
 	if (qdf_mem_cmp(&link_ie->link_ds, &bcn_1->DSParams,
 			sizeof(bcn_1->DSParams))) {
 		qdf_mem_copy(&link_ie->link_ds, &bcn_1->DSParams,
 			     sizeof(bcn_1->DSParams));
-		session->mlo_link_info.bss_param_change = true;
+		bss_param_change = true;
 		pe_debug("vdev id %d DSParams changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
 		wlan_vdev_mlme_op_flags_set(session->vdev,
@@ -140,70 +201,106 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 	qdf_mem_copy(&link_ie->link_wmm_caps, &bcn_2->WMMCaps,
 		     sizeof(bcn_2->WMMCaps));
 
+	/* Modification of the EDCA parameters element */
 	if (qdf_mem_cmp(&link_ie->link_edca, &bcn_2->EDCAParamSet,
 			sizeof(bcn_2->EDCAParamSet))) {
 		qdf_mem_copy(&link_ie->link_edca, &bcn_2->EDCAParamSet,
 			     sizeof(bcn_2->EDCAParamSet));
-		session->mlo_link_info.bss_param_change = true;
+		bss_param_change = true;
 		pe_debug("vdev id %d EDCAParamSet changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
 		wlan_vdev_mlme_op_flags_set(session->vdev,
 					    WLAN_VDEV_OP_CU_CAT2);
 	}
-
+	/*
+	 * The following events about the BSS parameters of the
+	 * AP shall classify as a critical update:
+	 * Inclusion of a Channel Switch Announcement element
+	 * Inclusion of an Extended Channel Switch Announcement element
+	 * Inclusion of a Quiet element
+	 * Inclusion of a Channel Switch Wrapper element
+	 * Inclusion of the BSS Color Change Announcement element
+	 * Inclusion of a Wide Bandwidth Channel Switch element
+	 */
 	if (qdf_mem_cmp(&link_ie->link_csa, &bcn_2->ChanSwitchAnn,
 			sizeof(bcn_2->ChanSwitchAnn))) {
 		session->mlo_link_info.upt_bcn_mlo_ie = true;
+		if (link_ie->link_csa.present !=
+		    bcn_2->ChanSwitchAnn.present) {
+			bss_param_change = true;
+			wlan_vdev_mlme_op_flags_set(session->vdev,
+						    WLAN_VDEV_OP_CU_CAT1);
+		}
 		qdf_mem_copy(&link_ie->link_csa, &bcn_2->ChanSwitchAnn,
 			     sizeof(bcn_2->ChanSwitchAnn));
-		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d csa added, critical update",
 			 wlan_vdev_get_id(session->vdev));
-		wlan_vdev_mlme_op_flags_set(session->vdev,
-					    WLAN_VDEV_OP_CU_CAT1);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_ecsa, &bcn_2->ext_chan_switch_ann,
 			sizeof(bcn_2->ext_chan_switch_ann))) {
 		session->mlo_link_info.upt_bcn_mlo_ie = true;
+		if (link_ie->link_ecsa.present !=
+		    bcn_2->ext_chan_switch_ann.present) {
+			bss_param_change = true;
+			wlan_vdev_mlme_op_flags_set(session->vdev,
+						    WLAN_VDEV_OP_CU_CAT1);
+		}
 		qdf_mem_copy(&link_ie->link_ecsa, &bcn_2->ext_chan_switch_ann,
 			     sizeof(bcn_2->ext_chan_switch_ann));
-		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d ecsa added, critical update",
 			 wlan_vdev_get_id(session->vdev));
-		wlan_vdev_mlme_op_flags_set(session->vdev,
-					    WLAN_VDEV_OP_CU_CAT1);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_swt_time, &bcn_2->max_chan_switch_time,
 			sizeof(bcn_2->max_chan_switch_time))) {
 		session->mlo_link_info.upt_bcn_mlo_ie = true;
+		if (link_ie->link_swt_time.present !=
+		    bcn_2->max_chan_switch_time.present) {
+			bss_param_change = true;
+			wlan_vdev_mlme_op_flags_set(session->vdev,
+						    WLAN_VDEV_OP_CU_CAT1);
+		}
 		qdf_mem_copy(&link_ie->link_swt_time,
 			     &bcn_2->max_chan_switch_time,
 			     sizeof(bcn_2->max_chan_switch_time));
 		pe_debug("vdev id %d max channel switch time added",
 			 wlan_vdev_get_id(session->vdev));
-		wlan_vdev_mlme_op_flags_set(session->vdev,
-					    WLAN_VDEV_OP_CU_CAT1);
 	}
 
 	if (qdf_mem_cmp(&link_ie->link_quiet, &bcn_2->Quiet,
 			sizeof(bcn_2->Quiet))) {
 		session->mlo_link_info.upt_bcn_mlo_ie = true;
+		if (link_ie->link_quiet.present != bcn_2->Quiet.present) {
+			bss_param_change = true;
+			wlan_vdev_mlme_op_flags_set(session->vdev,
+						    WLAN_VDEV_OP_CU_CAT1);
+		}
 		qdf_mem_copy(&link_ie->link_quiet, &bcn_2->Quiet,
 			     sizeof(bcn_2->Quiet));
-		session->mlo_link_info.bss_param_change = true;
 		pe_debug("vdev id %d quiet added, critical update",
 			 wlan_vdev_get_id(session->vdev));
-		wlan_vdev_mlme_op_flags_set(session->vdev,
-					    WLAN_VDEV_OP_CU_CAT1);
 	}
+
+	lim_update_cu_for_additional_inclusion_type_ie(link_ie,
+						       session,
+						       bcn_2,
+						       &bss_param_change);
+
+	/*
+	 * The following events about the BSS parameters of the AP
+	 * shall classify as a critical update:
+	 * Modification of the HT Operation element
+	 * Modification of the VHT Operation element
+	 * Modification of the HE Operation element
+	 * Modification of the EHT Operation element
+	 */
 
 	if (qdf_mem_cmp(&link_ie->link_ht_info, &bcn_2->HTInfo,
 			sizeof(bcn_2->HTInfo))) {
 		qdf_mem_copy(&link_ie->link_ht_info, &bcn_2->HTInfo,
 			     sizeof(bcn_2->HTInfo));
-		session->mlo_link_info.bss_param_change = true;
+		bss_param_change = true;
 		pe_debug("vdev id %d HTInfo changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
 		wlan_vdev_mlme_op_flags_set(session->vdev,
@@ -214,7 +311,7 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 			sizeof(bcn_2->VHTOperation))) {
 		qdf_mem_copy(&link_ie->link_vht_op, &bcn_2->VHTOperation,
 			     sizeof(bcn_2->VHTOperation));
-		session->mlo_link_info.bss_param_change = true;
+		bss_param_change = true;
 		pe_debug("vdev id %d VHTOperation changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
 		wlan_vdev_mlme_op_flags_set(session->vdev,
@@ -225,7 +322,7 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 			sizeof(bcn_2->he_op))) {
 		qdf_mem_copy(&link_ie->link_he_op, &bcn_2->he_op,
 			     sizeof(bcn_2->he_op));
-		session->mlo_link_info.bss_param_change = true;
+		bss_param_change = true;
 		pe_debug("vdev id %d he_op changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
 		wlan_vdev_mlme_op_flags_set(session->vdev,
@@ -236,7 +333,7 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 			sizeof(bcn_2->eht_op))) {
 		qdf_mem_copy(&link_ie->link_eht_op, &bcn_2->eht_op,
 			     sizeof(bcn_2->eht_op));
-		session->mlo_link_info.bss_param_change = true;
+		bss_param_change = true;
 		pe_debug("vdev id %d eht_op changed, critical update",
 			 wlan_vdev_get_id(session->vdev));
 		wlan_vdev_mlme_op_flags_set(session->vdev,
@@ -257,22 +354,9 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 		    bcn_2->ChannelSwitchWrapper.present ||
 		    bcn_2->OperatingMode.present ||
 		    bcn_2->bss_color_change.present)
-			session->mlo_link_info.bss_param_change = true;
+			bss_param_change = true;
 
-		if (bcn_2->ChanSwitchAnn.present ||
-		    bcn_2->ext_chan_switch_ann.present ||
-		    bcn_2->Quiet.present)
-			wlan_vdev_mlme_op_flags_set(session->vdev,
-						    WLAN_VDEV_OP_CU_CAT1);
-		else if (bcn_2->WiderBWChanSwitchAnn.present ||
-			 bcn_2->ChannelSwitchWrapper.present ||
-			 bcn_2->OperatingMode.present ||
-			 bcn_2->bss_color_change.present)
-			wlan_vdev_mlme_op_flags_set(session->vdev,
-						    WLAN_VDEV_OP_CU_CAT2);
-
-		if (session->mlo_link_info.bss_param_change) {
-			link_ie->bss_param_change_cnt++;
+		if (bss_param_change) {
 			offset = sizeof(tAniBeaconStruct);
 			bcn_1->Capabilities.criticalUpdateFlag = 1;
 			ptr = session->pSchBeaconFrameBegin + offset;

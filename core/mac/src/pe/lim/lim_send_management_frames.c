@@ -711,9 +711,15 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		cfg = mac_ctx->mlme_cfg->sap_cfg.beacon_interval;
 		frm->BeaconInterval.interval = (uint16_t) cfg;
 	}
-
+	/*
+	 * set it to true to make it has possible to
+	 * get cu flag from fw side if probe request
+	 * offload to host in the mlo sap case (if probe
+	 * request carry on wps ie or p2p ie, it will
+	 * offload to host).
+	 */
 	populate_dot11f_capabilities(mac_ctx, &frm->Capabilities,
-				     pe_session, false);
+				     pe_session, true);
 	populate_dot11f_ssid(mac_ctx, (tSirMacSSid *) ssid, &frm->SSID);
 	populate_dot11f_supp_rates(mac_ctx, POPULATE_DOT11F_RATES_OPERATIONAL,
 		&frm->SuppRates, pe_session);

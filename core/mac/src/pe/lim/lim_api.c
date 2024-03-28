@@ -3907,6 +3907,8 @@ lim_update_cuflag_bpcc_each_link(struct mlo_mgmt_ml_info *cu_params)
 			cu_flag = cu_params->cu_vdev_map[hw_link_id];
 			if (qdf_test_bit(index, (unsigned long *)&cu_flag))
 				session_entry->mlo_link_info.bss_param_change = true;
+			else
+				session_entry->mlo_link_info.bss_param_change = false;
 
 			bpcc_index = hw_link_id * MAX_AP_MLDS_PER_LINK + index;
 			if (bpcc_index >=

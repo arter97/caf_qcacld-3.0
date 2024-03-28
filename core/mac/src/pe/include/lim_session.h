@@ -268,7 +268,10 @@ struct wlan_mlo_ie {
  * @link_csa: csa IE
  * @link_ecsa:ecsa IE
  * @link_swt_time: switch time IE
+ * @link_bss_color_change: bss color change IE
  * @link_quiet: quiet IE
+ * @link_operatingmode: operating mode IE
+ * @link_widerbwchanswitchann: wide bandwidth channel switch IE
  * @link_ht_cap: ht cap IE
  * @link_ht_info: ht info IE
  * @link_cap: link caps IE
@@ -292,7 +295,10 @@ struct mlo_link_ie {
 	tDot11fIEChanSwitchAnn               link_csa;
 	tDot11fIEext_chan_switch_ann         link_ecsa;
 	tDot11fIEmax_chan_switch_time        link_swt_time;
+	tDot11fIEbss_color_change            link_bss_color_change;
 	tDot11fIEQuiet                       link_quiet;
+	tDot11fIEOperatingMode               link_operatingmode;
+	tDot11fIEWiderBWChanSwitchAnn        link_widerbwchanswitchann;
 	tDot11fIEHTCaps                      link_ht_cap;
 	tDot11fIEHTInfo                      link_ht_info;
 	tDot11fFfCapabilities                link_cap;
