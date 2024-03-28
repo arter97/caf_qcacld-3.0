@@ -110,6 +110,40 @@
 #define DP_SAWF_DELAY_BOUND_MS_MULTIPLER 1000
 
 /**
+ * msduq_state - status of MSDUQ
+ * @SAWF_MSDUQ_UNUSED : unused MSDUQ
+ * @SAWF_MSDUQ_DEACTIVATE_PENDING : De-Activate pending resp from tgt
+ * @SAWF_MSDUQ_DEACTIVATED : De-Activate an MSDUQ
+ * @SAWF_MSDUQ_REACTIVATE_PENDING : Re-Activate pending resp from tgt
+ * @SAWF_MSDUQ_IN_USE : MSDUQ is in use
+ */
+enum msduq_state {
+	SAWF_MSDUQ_UNUSED,
+	SAWF_MSDUQ_DEACTIVATE_PENDING,
+	SAWF_MSDUQ_DEACTIVATED,
+	SAWF_MSDUQ_REACTIVATE_PENDING,
+	SAWF_MSDUQ_IN_USE,
+};
+
+static inline char *dp_sawf_msduq_state_to_string(enum msduq_state q_state)
+{
+	switch (q_state) {
+	case SAWF_MSDUQ_UNUSED:
+		return "UNUSED";
+	case SAWF_MSDUQ_DEACTIVATE_PENDING:
+		return "DEACTIVATE_PENDING";
+	case SAWF_MSDUQ_DEACTIVATED:
+		return "DEACTIVATED";
+	case SAWF_MSDUQ_REACTIVATE_PENDING:
+		return "REACTIVATE_PENDING";
+	case SAWF_MSDUQ_IN_USE:
+		return "IN_USE";
+	default:
+		return "UNKNOWN_STATE";
+	}
+}
+
+/**
  * sawf_stats_level - sawf stats level
  * @SAWF_STATS_BASIC : sawf basic stats
  * @SAWF_STATS_ADVNCD : sawf advanced stats
@@ -426,12 +460,12 @@ dp_sawf_get_peer_msduq_svc_params(struct cdp_soc_t *soc, uint8_t *mac,
 
 struct dp_sawf_msduq {
 	qdf_atomic_t ref_count;
+	uint32_t tgt_opaque_id;
+	uint32_t svc_id;
 	uint8_t htt_msduq;
 	uint8_t remapped_tid;
+	uint8_t q_state;
 	bool is_used;
-	bool del_in_progress;
-	uint32_t tx_flow_number;
-	uint32_t svc_id;
 };
 
 struct dp_sawf_msduq_tid_map {
@@ -441,6 +475,7 @@ struct dp_sawf_msduq_tid_map {
 struct dp_peer_sawf {
 	/* qdf_bitmap queue_usage; */
 	struct dp_sawf_msduq msduq[DP_SAWF_Q_MAX];
+	qdf_spinlock_t sawf_peer_lock;
 	struct dp_sawf_msduq_tid_map
 	       msduq_map[DP_SAWF_TID_MAX][DP_SAWF_DEFINED_Q_PTID_MAX];
 	struct sawf_def_queue_report tid_reports[DP_SAWF_TID_MAX];

@@ -176,6 +176,8 @@ dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 	for (index = 0; index < DP_SAWF_Q_MAX; index++)
 		qdf_atomic_init(&sawf_ctx->msduq[index].ref_count);
 
+	qdf_spinlock_create(&sawf_ctx->sawf_peer_lock);
+
 	peer->sawf = sawf_ctx;
 
 	return QDF_STATUS_SUCCESS;
@@ -226,10 +228,9 @@ dp_peer_sawf_ctx_free(struct dp_soc *soc,
 	if (peer->sawf->telemetry_ctx)
 		telemetry_sawf_peer_ctx_free(peer->sawf->telemetry_ctx);
 
-	if (peer->sawf) {
-		dp_sawf_dec_peer_count(soc, peer);
-		qdf_mem_free(peer->sawf);
-	}
+	dp_sawf_dec_peer_count(soc, peer);
+	qdf_spinlock_destroy(&peer->sawf->sawf_peer_lock);
+	qdf_mem_free(peer->sawf);
 
 	return QDF_STATUS_SUCCESS;
 }
