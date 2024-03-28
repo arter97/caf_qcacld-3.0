@@ -72,8 +72,13 @@ enum home_channel_map_id {
 	HC_2G_5GH,
 	HC_2G_2G,
 	HC_LEGACY_MAX,
-	/* todo: add all 3 link ml STA HC MAP */
-	HC_5GL_5GH_2G = HC_LEGACY_MAX,
+	HC_2G_5GL_5GH = HC_LEGACY_MAX,
+	HC_2G_5GL_5GL,
+	HC_2G_5GH_5GH,
+	HC_5GL_5GL_5GH,
+	HC_5GL_5GH_5GH,
+	HC_5GL_5GL_5GL,
+	HC_5GH_5GH_5GH,
 	HC_MAX_MAP_ID,
 };
 
@@ -90,6 +95,13 @@ static inline const char *hc_id_to_string(uint32_t idx)
 	CASE_RETURN_STRING(HC_2G_5GL);
 	CASE_RETURN_STRING(HC_2G_5GH);
 	CASE_RETURN_STRING(HC_2G_2G);
+	CASE_RETURN_STRING(HC_2G_5GL_5GH);
+	CASE_RETURN_STRING(HC_2G_5GL_5GL);
+	CASE_RETURN_STRING(HC_2G_5GH_5GH);
+	CASE_RETURN_STRING(HC_5GL_5GL_5GH);
+	CASE_RETURN_STRING(HC_5GL_5GH_5GH);
+	CASE_RETURN_STRING(HC_5GL_5GL_5GL);
+	CASE_RETURN_STRING(HC_5GH_5GH_5GH);
 	default:
 		return "Unknown";
 	}
@@ -311,7 +323,13 @@ static const uint32_t home_channel_maps[HC_MAX_MAP_ID] = {
 	HC_MAP(HC_2G_5GL,  1, 1, 0),
 	HC_MAP(HC_2G_5GH,  1, 0, 1),
 	HC_MAP(HC_2G_2G,  2, 0, 0),
-	HC_MAP(HC_5GL_5GH_2G,  1, 1, 1),
+	HC_MAP(HC_2G_5GL_5GH,  1, 1, 1),
+	HC_MAP(HC_2G_5GL_5GL,  1, 2, 0),
+	HC_MAP(HC_2G_5GH_5GH,  1, 0, 2),
+	HC_MAP(HC_5GL_5GL_5GH,  0, 2, 1),
+	HC_MAP(HC_5GL_5GH_5GH,  0, 1, 2),
+	HC_MAP(HC_5GL_5GL_5GL,  0, 3, 0),
+	HC_MAP(HC_5GH_5GH_5GH,  0, 0, 3),
 };
 
 static enum home_channel_map_id
@@ -1897,6 +1915,34 @@ sap_force_inactive_table_lowshare_rd = {
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {0, 0},
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_2G_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {0, 0} },
+	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
+			[HC_5GH] =    {0, HC_5GL_5GL} },
+	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
+			[HC_5GH] =    {0, 0} },
+	[HC_5GL_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_5GL_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL},
+			[HC_5GH] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL} },
+	[HC_5GH_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH} },
 };
 
 static force_inactive_table_type
@@ -1914,6 +1960,34 @@ sap_force_inactive_table_dbs_rd = {
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {HC_5GH_5GH, HC_5GH_5GH},
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_2G_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GH, HC_5GL_5GH},
+			[HC_5GH] =    {HC_5GL_5GH, HC_5GL_5GH} },
+	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
+			[HC_5GH] =    {0, HC_5GL_5GL} },
+	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, HC_5GH_5GH},
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GH, HC_5GL_5GL_5GH},
+			[HC_5GH] =    {HC_5GL_5GL_5GH, HC_5GL_5GL_5GH} },
+	[HC_5GL_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GH_5GH, HC_5GL_5GH_5GH},
+			[HC_5GH] =    {HC_5GL_5GH_5GH, HC_5GL_5GH_5GH} },
+	[HC_5GL_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL},
+			[HC_5GH] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL} },
+	[HC_5GH_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH},
+			[HC_5GH] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH} },
 };
 
 static force_inactive_table_type
@@ -1939,6 +2013,34 @@ sta_p2p_force_inactive_table_lowshare_rd = {
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {0, 0},
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_2G_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL, HC_2G_5GH},
+			[HC_5GH] =    {HC_5GH, HC_2G_5GL} },
+	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL_5GL, 0},
+			[HC_5GH] =    {0, HC_2G_5GL_5GL} },
+	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_2G, 0},
+			[HC_5GH] =    {HC_5GH_5GH, 0} },
+	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, 0},
+			[HC_5GH] =    {HC_5GH, HC_5GL_5GL} },
+	[HC_5GL_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL, 0},
+			[HC_5GH] =    {HC_5GH_5GH, 0} },
+	[HC_5GL_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL},
+			[HC_5GH] =    {0, HC_5GL_5GL_5GL} },
+	[HC_5GH_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH} },
 };
 
 static force_inactive_table_type
@@ -1959,11 +2061,39 @@ sta_p2p_force_inactive_table_dbs_rd = {
 	[HC_5GL_5GL] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
-			[HC_5GH] =    {HC_5GL_5GL, HC_5GL_5GL} },
+			[HC_5GH] =    {0, HC_5GL_5GL} },
 	[HC_5GH_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {0, 0},
-			[HC_5GL] =    {HC_5GH_5GH, HC_5GH_5GH},
+			[HC_5GL] =    {0, HC_5GH_5GH},
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_2G_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL_5GH, 0},
+			[HC_5GH] =    {HC_5GL_5GH, 0} },
+	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL_5GL, 0},
+			[HC_5GH] =    {HC_5GL_5GL, 0} },
+	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GH_5GH, 0},
+			[HC_5GH] =    {HC_5GH_5GH, 0} },
+	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GH, HC_5GL_5GL_5GH},
+			[HC_5GH] =    {HC_5GL_5GL_5GH, HC_5GL_5GL_5GH} },
+	[HC_5GL_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GH_5GH, HC_5GL_5GH_5GH},
+			[HC_5GH] =    {HC_5GL_5GH_5GH, HC_5GL_5GH_5GH} },
+	[HC_5GL_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL},
+			[HC_5GH] =    {0, HC_5GL_5GL_5GL} },
+	[HC_5GH_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, HC_5GH_5GH_5GH},
+			[HC_5GH] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH} },
 };
 
 static force_inactive_table_type *sap_tbl[] = {
@@ -2048,6 +2178,27 @@ static void hc_id_2_link_bitmap(
 		break;
 	case HC_2G_5GH:
 		*link_bitmap = link_map[HC_2G] | link_map[HC_5GH];
+		break;
+	case HC_2G_5GL_5GH:
+		*link_bitmap = link_map[HC_2G] | link_map[HC_5GL] | link_map[HC_5GH];
+		break;
+	case HC_2G_5GL_5GL:
+		*link_bitmap = link_map[HC_2G] | link_map[HC_5GL];
+		break;
+	case HC_2G_5GH_5GH:
+		*link_bitmap = link_map[HC_2G] | link_map[HC_5GH];
+		break;
+	case HC_5GL_5GL_5GH:
+		*link_bitmap = link_map[HC_5GL] | link_map[HC_5GH];
+		break;
+	case HC_5GL_5GH_5GH:
+		*link_bitmap = link_map[HC_5GL] | link_map[HC_5GH];
+		break;
+	case HC_5GL_5GL_5GL:
+		*link_bitmap = link_map[HC_5GL];
+		break;
+	case HC_5GH_5GH_5GH:
+		*link_bitmap = link_map[HC_5GH];
 		break;
 	default:
 		return;
@@ -3273,7 +3424,6 @@ ml_nlink_handle_legacy_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	/* handle 2 port case with 2 ml sta links.
-	 * todo: 2 port case with 3 ml sta links
 	 */
 	if (num_legacy_vdev == 1) {
 		switch (mode_lst[0]) {
