@@ -1018,10 +1018,6 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 	if (!reassoc_rsp)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	/* Store reassoc rsp only if roamed to 2 link AP */
-	if (reassoc_rsp->ml_parnter_info.num_partner_links < 2)
-		return QDF_STATUS_E_INVAL;
-
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	if (!mlo_dev_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -1031,6 +1027,11 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NULL_VALUE;
 
 	wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
+
+	/* Store reassoc rsp only if roamed to 2 link AP */
+	if (reassoc_rsp->ml_parnter_info.num_partner_links < 2)
+		return QDF_STATUS_E_INVAL;
+
 	/* Free assoc rsp, so that reassoc rsp can be used during
 	 * reassociation.
 	 */
