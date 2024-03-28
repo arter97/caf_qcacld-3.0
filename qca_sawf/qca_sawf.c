@@ -511,7 +511,6 @@ void qca_sawf_mcast_connection_sync(qca_sawf_mcast_sync_param_t *params)
 
 }
 
-#ifdef SAWF_ADMISSION_CONTROL
 bool qca_sawf_register_flow_deprioritize_callback(void (*sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *params))
 {
 	return wlan_sawf_set_flow_deprioritize_callback(sawf_flow_deprioritize_callback);
@@ -529,18 +528,6 @@ void qca_sawf_flow_deprioritize_response(struct qca_sawf_flow_deprioritize_resp_
 					    params->service_id, FLOW_DEPRIORITIZE,
 					    params->success_count);
 }
-#else
-bool qca_sawf_register_flow_deprioritize_callback(void (*sawf_flow_deprioritize_callback)(struct qca_sawf_flow_deprioritize_params *params))
-{
-	return true;
-}
-
-void qca_sawf_unregister_flow_deprioritize_callback(void)
-{}
-
-void qca_sawf_flow_deprioritize_response(struct qca_sawf_flow_deprioritize_resp_params *params)
-{}
-#endif
 #else
 
 #include "qdf_module.h"
