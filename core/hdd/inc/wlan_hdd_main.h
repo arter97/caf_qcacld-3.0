@@ -175,6 +175,8 @@ struct hdd_apf_context {
 #define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC)
 #endif
 
+//#define NUM_TX_QUEUES_MASK 0x1F
+
 #define NUM_RX_QUEUES 5
 
 /*
