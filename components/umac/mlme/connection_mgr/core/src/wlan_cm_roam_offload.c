@@ -6889,6 +6889,7 @@ cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
 		scan_data->ap[0].cu_load = entry->qbss_chan_load;
 	else
 		scan_data->ap[0].cu_load = 0;
+	util_scan_free_cache_entry(entry);
 
 	/* Fill the band info from operating channel */
 	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
