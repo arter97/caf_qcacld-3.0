@@ -46,6 +46,7 @@
 #endif
 #include <cdp_txrx_ctrl.h>
 #include "wlan_dp_svc.h"
+#include "wlan_dp_stc.h"
 
 #ifdef WLAN_DP_PROFILE_SUPPORT
 /* Memory profile table based on supported caps */
@@ -2469,10 +2470,23 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
 		if (qdf_status == QDF_STATUS_E_NOSUPPORT)
 			return QDF_STATUS_SUCCESS;
 
-		wlan_dp_txrx_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC),
-					 OL_TXRX_PDEV_ID, false);
-		return qdf_status;
+		goto fisa_attach_fail;
 	}
+
+	qdf_status = wlan_dp_stc_attach(dp_ctx);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		dp_err("Failed to attach STC: %d", qdf_status);
+		goto stc_attach_fail;
+	}
+
+	return qdf_status;
+
+stc_attach_fail:
+	wlan_dp_rx_fisa_detach(dp_ctx);
+
+fisa_attach_fail:
+	wlan_dp_txrx_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC),
+				 OL_TXRX_PDEV_ID, false);
 
 	return qdf_status;
 }
@@ -2483,6 +2497,7 @@ QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	struct wlan_dp_psoc_context *dp_ctx;
 
 	dp_ctx =  dp_get_context();
+	wlan_dp_stc_detach(dp_ctx);
 	wlan_dp_rx_fisa_detach(dp_ctx);
 	return cdp_pdev_detach(soc, pdev_id, force);
 }

@@ -816,6 +816,10 @@ struct dp_direct_link_context {
 };
 #endif
 
+#ifdef WLAN_DP_FEATURE_STC
+struct wlan_dp_stc;
+#endif
+
 /**
  * struct wlan_dp_psoc_context - psoc related data required for DP
  * @psoc: object manager psoc context
@@ -888,6 +892,7 @@ struct dp_direct_link_context {
  * @svc_ctx: service class context
  * @lb_data: wlan load balance data structure
  * @cpuhp_event_handle: event handle for cpu hotplug
+ * @dp_stc: STC context
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -996,6 +1001,9 @@ struct wlan_dp_psoc_context {
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
 	struct wlan_dp_lb_data lb_data;
 	struct qdf_cpuhp_handler *cpuhp_event_handle;
+#endif
+#ifdef WLAN_DP_FEATURE_STC
+	struct wlan_dp_stc *dp_stc;
 #endif
 };
 
