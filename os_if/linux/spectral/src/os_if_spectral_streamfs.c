@@ -26,10 +26,12 @@
 #include <qdf_net_if.h>
 #include <wlan_osif_priv.h>
 #include <wlan_spectral_ucfg_api.h>
+#include <cfg_ucfg_api.h>
+#include <cfg_spectral.h>
 
-#define STREAMFS_DATA_CHANNEL         "data_channel"
-#define STREAMFS_SUB_BUF_COUNT        (2000)
-
+#define STREAMFS_DATA_CHANNEL_FILE                 "data_channel"
+#define STREAMFS_DATA_SUB_BUFFER_SIZE_FILE         "data_sub_buffer_size"
+#define STREAMFS_DATA_NUM_SUB_BUFFERS_FILE         "data_num_sub_buffers"
 
 /**
  * spectral_get_dev_name() - Get net device name from pdev
@@ -58,6 +60,96 @@ static char *spectral_get_dev_name(struct wlan_objmgr_pdev *pdev)
 }
 
 /**
+ * os_if_spectral_streamfs_sub_buffer_debugfs_init() - Creates the debugfs
+ * files for streamfs channel properties.
+ * @pdev: objmgr pdev
+ *
+ *  Return: QDF_STATUS
+ */
+static QDF_STATUS
+os_if_spectral_streamfs_sub_buffer_debugfs_init
+			(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct pdev_spectral *ps;
+	struct pdev_spectral_streamfs *pss;
+
+	ps = wlan_objmgr_pdev_get_comp_private_obj(pdev,
+						   WLAN_UMAC_COMP_SPECTRAL);
+
+	if (!ps) {
+		spectral_err("PDEV SPECTRAL object is NULL!");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	pss = &ps->streamfs_obj;
+
+	pss->n_subbuf = cfg_get(psoc, CFG_SPECTRAL_STREAMFS_NUM_BUFFERS);
+	pss->n_subbuf_ptr = debugfs_create_u32
+				(STREAMFS_DATA_NUM_SUB_BUFFERS_FILE,
+				 QDF_FILE_USR_READ,
+				 pss->dir_ptr,
+				 &pss->n_subbuf);
+
+	if (!pss->n_subbuf_ptr) {
+		spectral_err("Couldn't create debugfs file for 'n_subbuf'");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	pss->subbuf_size = cfg_get(psoc, CFG_SPECTRAL_STREAMFS_BUFFER_SIZE);
+	pss->subbuf_size_ptr = debugfs_create_u32
+					(STREAMFS_DATA_SUB_BUFFER_SIZE_FILE,
+					 QDF_FILE_USR_READ,
+					 pss->dir_ptr,
+					 &pss->subbuf_size);
+
+	if (!pss->subbuf_size_ptr) {
+		spectral_err
+			("Couldn't create debugfs file for 'subbuf_size'");
+		debugfs_remove(pss->n_subbuf_ptr);
+		pss->n_subbuf_ptr = NULL;
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * os_if_spectral_streamfs_sub_buffer_debugfs_deinit() - Destroys the debugfs
+ * files for streamfs channel properties.
+ * @pdev: objmgr pdev
+ *
+ *  Return: QDF_STATUS
+ */
+static void
+os_if_spectral_streamfs_sub_buffer_debugfs_deinit
+			(struct wlan_objmgr_pdev *pdev)
+{
+	struct pdev_spectral *ps;
+	struct pdev_spectral_streamfs *pss;
+
+	ps = wlan_objmgr_pdev_get_comp_private_obj(pdev,
+						   WLAN_UMAC_COMP_SPECTRAL);
+
+	if (!ps) {
+		spectral_err("PDEV SPECTRAL object is NULL!");
+		return;
+	}
+
+	pss = &ps->streamfs_obj;
+
+	debugfs_remove(pss->n_subbuf_ptr);
+	pss->n_subbuf_ptr = NULL;
+	pss->n_subbuf = 0;
+
+	debugfs_remove(pss->subbuf_size_ptr);
+	pss->subbuf_size_ptr = NULL;
+	pss->subbuf_size = 0;
+}
+
+/**
  * os_if_spectral_streamfs_init_channel() - Initialize streamfs channel for
  * spectral module for a given pdev
  * @pdev : Pointer to pdev
@@ -67,16 +159,18 @@ static char *spectral_get_dev_name(struct wlan_objmgr_pdev *pdev)
 static QDF_STATUS
 os_if_spectral_streamfs_init_channel(struct wlan_objmgr_pdev *pdev)
 {
-	struct pdev_spectral *ps = NULL;
-	struct pdev_spectral_streamfs *pss = NULL;
+	struct pdev_spectral *ps;
+	struct pdev_spectral_streamfs *pss;
 	char *devname;
 	enum spectral_msg_type msg_type = SPECTRAL_MSG_NORMAL_MODE;
 	qdf_dentry_t spectral_dir_ptr;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!pdev) {
 		spectral_err("PDEV is NULL!");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
 	ps = wlan_objmgr_pdev_get_comp_private_obj(pdev,
 						   WLAN_UMAC_COMP_SPECTRAL);
 
@@ -84,6 +178,8 @@ os_if_spectral_streamfs_init_channel(struct wlan_objmgr_pdev *pdev)
 		spectral_err("PDEV SPECTRAL object is NULL!");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	ps->transport_mode = SPECTRAL_DATA_TRANSPORT_RELAY;
 
 	devname = spectral_get_dev_name(pdev);
 	if (!devname) {
@@ -108,24 +204,36 @@ os_if_spectral_streamfs_init_channel(struct wlan_objmgr_pdev *pdev)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	pss->chan_ptr = qdf_streamfs_open(STREAMFS_DATA_CHANNEL,
-					 pss->dir_ptr,
-					 MAX_SPECTRAL_PAYLOAD,
-					 STREAMFS_SUB_BUF_COUNT, NULL);
+	status = os_if_spectral_streamfs_sub_buffer_debugfs_init(pdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		spectral_err
+			("Failed to initialise streamfs sub buffer debugfs files.");
+		goto cleanup;
+	}
+
+	pss->chan_ptr = qdf_streamfs_open(STREAMFS_DATA_CHANNEL_FILE,
+					  pss->dir_ptr,
+					  pss->subbuf_size,
+					  pss->n_subbuf, NULL);
 
 	if (!pss->chan_ptr) {
 		spectral_err("Chan create failed");
-
-		qdf_streamfs_remove_dir_recursive(pss->dir_ptr);
-		pss->dir_ptr = NULL;
-
-		return QDF_STATUS_E_FAILURE;
+		status = QDF_STATUS_E_FAILURE;
+		goto cleanup_debugfs;
 	}
 
 	for (; msg_type < SPECTRAL_MSG_TYPE_MAX; msg_type++)
 		pss->streamfs_buf[msg_type] = NULL;
 
 	return QDF_STATUS_SUCCESS;
+
+cleanup_debugfs:
+	os_if_spectral_streamfs_sub_buffer_debugfs_deinit(pdev);
+cleanup:
+	qdf_streamfs_remove_dir_recursive(pss->dir_ptr);
+	pss->dir_ptr = NULL;
+
+	return status;
 }
 
 /**
@@ -161,6 +269,8 @@ os_if_spectral_deinit_channel(struct wlan_objmgr_pdev *pdev)
 		qdf_streamfs_close(pss->chan_ptr);
 		pss->chan_ptr = NULL;
 	}
+
+	os_if_spectral_streamfs_sub_buffer_debugfs_deinit(pdev);
 
 	if (pss->dir_ptr) {
 		qdf_streamfs_remove_dir_recursive(pss->dir_ptr);
@@ -237,13 +347,13 @@ os_if_spectral_streamfs_alloc_buf(struct wlan_objmgr_pdev *pdev,
 		if (!pss->streamfs_buf[smsg_type]) {
 			spectral_err(
 				"alloc sub-buffer(len=%u, msg_type=%u) failed",
-				MAX_SPECTRAL_PAYLOAD, smsg_type);
+				pss->subbuf_size, smsg_type);
 			return NULL;
 		}
 		buf = pss->streamfs_buf[smsg_type];
 
 		/* Set sub-buffer memory to zero after allocating */
-		memset(buf, 0, MAX_SPECTRAL_PAYLOAD);
+		qdf_mem_zero(buf, pss->subbuf_size);
 		break;
 	case SPECTRAL_MSG_BUF_SAVED:
 		if (!pss->streamfs_buf[smsg_type]) {
@@ -297,7 +407,7 @@ os_if_spectral_streamfs_send_msg(struct wlan_objmgr_pdev *pdev,
 	pss = &ps->streamfs_obj;
 
 	 /* Move sub-buffer pointer, as the data has been written. */
-	qdf_streamfs_reserve(pss->chan_ptr, MAX_SPECTRAL_PAYLOAD);
+	qdf_streamfs_reserve(pss->chan_ptr, pss->subbuf_size);
 
 	/* Switch to next subbuffer */
 	qdf_streamfs_flush(pss->chan_ptr);
