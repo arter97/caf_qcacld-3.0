@@ -46,6 +46,18 @@ static struct nl_ctxt g_nl_ctxt = {
 	},
 };
 
+struct nla_policy
+qca_wlan_vendor_scs_api_app_policy[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_TYPE] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_PEER_MAC] = {.type = NLA_BINARY,
+					.maxlen = SCS_API_MAC_ADDR_SIZE },
+	[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_MLD_MAC] = {.type = NLA_BINARY,
+					.maxlen = SCS_API_MAC_ADDR_SIZE },
+	[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_DIALOG_TOKEN] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_TOTAL_SCS_IDX] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_DATA] = {.type = NLA_BINARY },
+};
+
 static int
 process_nl_msg_send_scs_api_app_reg(const char *ifname,
 				    struct scs_api_info *scs_api_app_info)
@@ -844,7 +856,8 @@ static void process_nl_msg_recv_scs_api_scs_req(uint8_t *data, size_t len,
 	PRINT_IF_VERB("Received NL message - SCS Frame from driver");
 
 	nla_parse(tb_array, QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_MAX,
-		  (struct nlattr *)data, len, NULL);
+		  (struct nlattr *)data, len,
+		  qca_wlan_vendor_scs_api_app_policy);
 
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_PEER_MAC];
 	if (tb) {
@@ -905,7 +918,8 @@ static void process_nl_msg_recv_scs_api_driver_response(uint8_t *data,
 	PRINT_IF_VERB("Received NL message - SCS driver response");
 
 	nla_parse(tb_array, QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_MAX,
-		  (struct nlattr *)data, len, NULL);
+		  (struct nlattr *)data, len,
+		  qca_wlan_vendor_scs_api_app_policy);
 
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_PEER_MAC];
 	if (tb) {
@@ -1002,7 +1016,8 @@ static void scs_api_nl_cb(void *cbd, uint8_t *data, size_t len, char *ifname)
 	uint8_t msg_type = 0;
 
 	nla_parse(tb_array, QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_MAX,
-		  (struct nlattr *)data, len, NULL);
+		  (struct nlattr *)data, len,
+		  qca_wlan_vendor_scs_api_app_policy);
 
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_API_MSG_TYPE];
 	if (tb) {
