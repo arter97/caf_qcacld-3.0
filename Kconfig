@@ -2187,6 +2187,10 @@ config WLAN_MCC_MIN_CHANNEL_QUOTA
         int "Enable WLAN_MCC_MIN_CHANNEL_QUOTA"
         default 20
 
+config WLAN_DP_FEATURE_STC
+	bool "Enable WLAN_DP_FEATURE_STC"
+	default n
+
 if CNSS_KIWI_V2
 config CFG_BMISS_OFFLOAD_MAX_VDEV
 	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"

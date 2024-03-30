@@ -2213,6 +2213,16 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_lapb_flow.c",
         ],
     },
+    "CONFIG_WLAN_DP_FEATURE_STC": {
+        True: [
+            "components/dp/core/src/wlan_dp_stc.c",
+            "components/dp/dispatcher/src/wlan_dp_stc_ucfg_api.c",
+            "os_if/dp/src/os_if_dp_stc.c",
+	    "components/dp/core/src/wlan_dp_spm.c",
+	    "components/dp/core/src/wlan_dp_sawfish_fpm.c",
+	    "components/dp/dispatcher/src/wlan_dp_flow_ucfg_api.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
