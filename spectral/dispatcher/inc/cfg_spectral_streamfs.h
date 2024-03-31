@@ -25,12 +25,12 @@
 
 /*
  * <ini>
- * spectral_streamfs_num_bufs - Maximum no. of sub-buffers allocated.
- * @min: 512
- * @max: 2048
- * @Default: 512
+ * spectral_streamfs_num_bufs - Number of sub-buffers allocated.
+ * @min: SPECTRAL_STREAMFS_MIN_SUBBUFS
+ * @max: SPECTRAL_STREAMFS_MX_SUBBUFS
+ * @Default: SPECTRAL_STREAMFS_MIN_SUBBUFS
  *
- * This ini is used to set the maximum number of streamfs sub-buffers in a
+ * This ini is used to set number of streamfs sub-buffers in a
  * channel buffer.
  *
  * Related: None
@@ -43,20 +43,21 @@
  */
 
 #define CFG_SPECTRAL_STREAMFS_NUM_BUFFERS \
-	CFG_INI_UINT("spectral_streamfs_num_bufs", 512, \
-			2048, 512, \
-			CFG_VALUE_OR_DEFAULT, \
+	CFG_INI_UINT("spectral_streamfs_num_bufs",\
+			SPECTRAL_STREAMFS_MIN_SUBBUFS, \
+			SPECTRAL_STREAMFS_MAX_SUBBUFS, \
+			SPECTRAL_STREAMFS_MIN_SUBBUFS, \
+			CFG_VALUE_OR_CLAMP, \
 			"Spectral streamfs no. of buffers")
 
 /*
  * <ini>
- * spectral_streamfs_databuf_size - Maximum size of sub-buffer
- * allocated in bytes.
- * @min: 16
- * @max: 4096
- * @Default: 512
+ * spectral_streamfs_databuf_size - Size of sub-buffer allocated in bytes.
+ * @min: SPECTRAL_MIN_REPORT_SIZE
+ * @max: SPECTRAL_MAX_REPORT_SIZE
+ * @Default: SPECTRAL_MIN_REPORT_SIZE
  *
- * This ini is used to set the maximum size of each streamfs sub-buffer.
+ * This ini is used to set the size of each streamfs sub-buffer.
  *
  * Related: None
  *
@@ -68,9 +69,11 @@
  */
 
 #define CFG_SPECTRAL_STREAMFS_BUFFER_SIZE \
-	CFG_INI_UINT("spectral_streamfs_databuf_size", 16, \
-			4096, 512, \
-			CFG_VALUE_OR_DEFAULT, \
+	CFG_INI_UINT("spectral_streamfs_databuf_size",\
+			SPECTRAL_MIN_REPORT_SIZE, \
+			SPECTRAL_MAX_REPORT_SIZE, \
+			SPECTRAL_MAX_REPORT_SIZE, \
+			CFG_VALUE_OR_CLAMP, \
 			"Spectral streamfs buffer size")
 
 
