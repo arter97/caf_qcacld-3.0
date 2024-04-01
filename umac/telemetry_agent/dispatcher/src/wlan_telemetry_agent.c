@@ -274,6 +274,19 @@ QDF_STATUS telemetry_sawf_update_msduq_info(void *telemetry_ctx,
 
 qdf_export_symbol(telemetry_sawf_update_msduq_info);
 
+QDF_STATUS telemetry_sawf_clear_msduq_info(void *telemetry_ctx,
+					   uint8_t hostq_id)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_clear_msduq_info(telemetry_ctx, hostq_id))
+			return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(telemetry_sawf_clear_msduq_info);
+
 QDF_STATUS telemetry_sawf_set_mov_avg_params(uint32_t num_pkt,
 					     uint32_t num_win)
 {

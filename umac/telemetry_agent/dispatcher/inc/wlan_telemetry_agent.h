@@ -106,6 +106,16 @@ QDF_STATUS telemetry_sawf_update_msduq_info(void *telemetry_ctx,
 					    uint8_t svc_id);
 
 /**
+ * telemetry_sawf_update_msduq_info - Clear msduq active bit
+ * @telemetry_ctx: opaque telemetry ctx
+ * @hostq_id: queue-id used in host
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS telemetry_sawf_clear_msduq_info(void *telemetry_ctx,
+					   uint8_t hostq_id);
+
+/**
  * telemetry_sawf_set_mov_avg_params - Set moving average params
  * @num_pkt: no of pkts
  * @num_win: no of windows
@@ -320,6 +330,13 @@ QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
 					 uint8_t hostq_id,
 					 uint8_t tid,
 					 uint8_t msduq_idx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_clear_msduq_info(void *telemetry_ctx,
+					   uint8_t hostq_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
