@@ -13706,7 +13706,8 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 							    link_info->vdev_id,
 							    CSA_REASON_UNSAFE_CHANNEL);
 				hdd_err("Unable to find safe chan, Stop the SAP if restriction mask is set else set txpower");
-				hdd_stop_sap_set_tx_power(hdd_ctx->psoc, adapter);
+				hdd_stop_sap_set_tx_power(hdd_ctx->psoc,
+							  link_info);
 				continue;
 			}
 			/*

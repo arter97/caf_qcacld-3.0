@@ -82,7 +82,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
  * hdd_stop_sap_set_tx_power() - Function to set tx power
  * for unsafe channel if restriction bit mask is set else stop the SAP.
  * @psoc: PSOC object information
- * @adapter: AP/SAP adapter
+ * @link_info: pointer of link info
  *
  * This function set tx power/stop the SAP interface
  *
@@ -90,7 +90,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
  *
  */
 void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
-			       struct hdd_adapter *adapter);
+			       struct wlan_hdd_link_info *link_info);
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 /**

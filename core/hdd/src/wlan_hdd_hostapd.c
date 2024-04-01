@@ -3989,16 +3989,18 @@ uint32_t wlan_hdd_get_sap_restriction_mask(struct hdd_context *hdd_ctx)
 #endif
 
 void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
-			       struct hdd_adapter *adapter)
+			       struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev =
-		hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+		hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	struct wlan_objmgr_pdev *pdev;
+	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct qdf_mac_addr bssid;
 	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
 	int32_t set_tx_power, tx_power = 0;
 	struct sap_context *sap_ctx;
+	struct sap_config *sap_config;
 	uint32_t restriction_mask;
 	int ch_loop, unsafe_chan_count;
 	struct unsafe_ch_list *unsafe_ch_list;
@@ -4017,19 +4019,22 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 	}
 
 	restriction_mask = wlan_hdd_get_sap_restriction_mask(hdd_ctx);
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+	sap_config = &link_info->session.ap.sap_config;
 	chan_freq = sap_ctx->chan_freq;
 	unsafe_ch_list = &psoc_priv_obj->unsafe_chan_list;
 
-	hdd_debug("Restriction_mask %d CSA reason %d ", restriction_mask,
+	hdd_debug("vdev id %d Restriction_mask %d CSA reason %d ",
+		  link_info->vdev_id,
+		  restriction_mask,
 		  sap_ctx->csa_reason);
 
 	if (sap_ctx->csa_reason == CSA_REASON_UNSAFE_CHANNEL) {
 		if (restriction_mask & BIT(QDF_SAP_MODE)) {
-			schedule_work(&adapter->deflink->sap_stop_bss_work);
+			schedule_work(&link_info->sap_stop_bss_work);
 		} else {
 			unsafe_chan_count = unsafe_ch_list->chan_cnt;
-			qdf_copy_macaddr(&bssid, &adapter->mac_addr);
+			qdf_copy_macaddr(&bssid, &sap_config->self_macaddr);
 			set_tx_power =
 			wlan_reg_get_channel_reg_power_for_freq(pdev,
 								chan_freq);
@@ -4050,7 +4055,7 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 
 			if (QDF_STATUS_SUCCESS !=
 				sme_set_tx_power(hdd_ctx->mac_handle,
-						 adapter->deflink->vdev_id,
+						 link_info->vdev_id,
 						 bssid, adapter->device_mode,
 						 set_tx_power)) {
 				hdd_err("Setting tx power failed");
@@ -4080,7 +4085,7 @@ QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
 					    target_bw, forced, false);
 	if (ret && ret != -EBUSY) {
 		hdd_err("channel switch failed");
-		hdd_stop_sap_set_tx_power(psoc, link_info->adapter);
+		hdd_stop_sap_set_tx_power(psoc, link_info);
 	}
 
 	return qdf_status_from_os_return(ret);
@@ -4323,7 +4328,7 @@ sap_restart:
 	if (!intf_ch_freq) {
 		hdd_debug("Unable to find safe channel, Hence stop the SAP or Set Tx power");
 		sap_context->csa_reason = csa_reason;
-		hdd_stop_sap_set_tx_power(psoc, ap_adapter);
+		hdd_stop_sap_set_tx_power(psoc, link_info);
 		wlansap_context_put(sap_context);
 		return QDF_STATUS_E_FAILURE;
 	} else {
