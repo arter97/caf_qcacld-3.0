@@ -2231,10 +2231,9 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			}
 			break;
 		case EHT_T2LM_RESPONSE:
-			wlan_t2lm_deliver_event(
-					session->vdev, peer,
-					WLAN_T2LM_EV_ACTION_FRAME_RX_RESP,
-					(void *)body_ptr, frame_len, &token);
+			wlan_t2lm_deliver_event(session->vdev, peer,
+						WLAN_T2LM_EV_ACTION_FRAME_RX_RESP,
+						(void *)body_ptr, frame_len, &token);
 			break;
 		case EHT_T2LM_TEARDOWN:
 			wlan_t2lm_deliver_event(

@@ -30872,7 +30872,9 @@ static int hdd_mlo_set_ttlm_mapping(struct wlan_objmgr_vdev *vdev,
 		goto cleanup;
 	}
 
-	wlan_mlo_set_ttlm_mapping(vdev, t2lm);
+	status = wlan_mlo_set_ttlm_mapping(vdev, t2lm);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto cleanup;
 
 	status = hdd_ttlm_tx_wait_response(request);
 	if (QDF_IS_STATUS_ERROR(status))
