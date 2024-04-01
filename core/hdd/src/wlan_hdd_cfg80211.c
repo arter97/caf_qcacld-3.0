@@ -30700,6 +30700,7 @@ QDF_STATUS hdd_tid_to_link_map(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_FEATURE_11BE_MLO_TTLM
 #define WLAN_TTLM_DEFAULT_MAPPING     0x7FFF
+#define TTLM_TX_WAIT_COMPLETE_TIMEOUT 1000
 
 static void hdd_get_connected_link_id(struct wlan_objmgr_vdev *vdev,
 				      uint16_t *connected_link_id)
@@ -30795,6 +30796,94 @@ static void hdd_print_ttlm_params(struct wlan_t2lm_info *t2lm)
 		hdd_debug("TID[%d]: %d", i, t2lm->ieee_link_map_tid[i]);
 }
 
+static inline
+void ttlm_send_cmd_resp_cb(struct ttlm_comp_priv *ev, void *cookie)
+{
+	struct ttlm_comp_priv *priv;
+	struct osif_request *request;
+
+	request = osif_request_get(cookie);
+	if (!request) {
+		hdd_err("Obsolete request");
+		return;
+	}
+
+	priv = osif_request_priv(request);
+
+	*priv = *ev;
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+static QDF_STATUS hdd_ttlm_tx_wait_response(struct osif_request *request)
+{
+	struct ttlm_comp_priv *ttlm_priv;
+	int ret = 0;
+
+	ttlm_priv = osif_request_priv(request);
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		hdd_err("TTLM TX wait response timed out");
+		ttlm_sm_deliver_event(ttlm_priv->ml_peer,
+				      WLAN_TTLM_SM_EV_TIMEOUT,
+				      0, NULL);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hdd_debug("TTLM mapping info: dialog_token %d status %d",
+		  ttlm_priv->dialog_token, ttlm_priv->status);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static int hdd_mlo_set_ttlm_mapping(struct wlan_objmgr_vdev *vdev,
+				    struct wlan_t2lm_info *t2lm)
+{
+	int ret = 0;
+	QDF_STATUS status;
+	struct ttlm_comp_priv *ttlm_priv;
+	struct ttlm_send_cmd_info info;
+	void *cookie;
+	struct osif_request *request;
+	static const struct osif_request_params params = {
+				.priv_size = sizeof(*ttlm_priv),
+				.timeout_ms = TTLM_TX_WAIT_COMPLETE_TIMEOUT,
+	};
+
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("Request allocation failure");
+		return -EINVAL;
+	}
+
+	cookie = osif_request_cookie(request);
+
+	info.cookie = cookie;
+	info.ttlm_send_cmd_resp_cb = ttlm_send_cmd_resp_cb;
+
+	status = mlo_ttlm_send_cmd_register_resp_cb(vdev, &info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to register resp callback: %d", status);
+		goto cleanup;
+	}
+
+	wlan_mlo_set_ttlm_mapping(vdev, t2lm);
+
+	status = hdd_ttlm_tx_wait_response(request);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto cleanup;
+
+	ttlm_priv = osif_request_priv(request);
+	status = ttlm_priv->status;
+
+cleanup:
+	osif_request_put(request);
+
+	ret = qdf_status_to_os_return(status);
+
+	return ret;
+}
+
 static int
 __wlan_hdd_cfg80211_set_ttlm_mapping(struct wiphy *wiphy,
 				     struct net_device *net_dev,
@@ -30842,7 +30931,7 @@ __wlan_hdd_cfg80211_set_ttlm_mapping(struct wiphy *wiphy,
 
 	hdd_print_ttlm_params(&t2lm);
 
-	ret = wlan_mlo_set_ttlm_mapping(vdev, &t2lm);
+	ret = hdd_mlo_set_ttlm_mapping(vdev, &t2lm);
 
 vdev_release:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
