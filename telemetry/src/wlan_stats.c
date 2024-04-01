@@ -6628,6 +6628,9 @@ struct wlan_objmgr_vdev *wlan_stats_get_vdev_from_sta_mac(uint8_t *mac)
 			}
 		}
 	}
+	/* Discard BSS Peer */
+	if (vdev && (wlan_vdev_get_selfpeer(vdev) == peer))
+		vdev = NULL;
 
 	return vdev;
 }
