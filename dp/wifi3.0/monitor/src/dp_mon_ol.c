@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -135,6 +135,12 @@ static int ol_ath_set_rx_monitor_filter_mon_2_0(struct ieee80211com *ic,
 			mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_MO] = filter_val->mo_mgmt;
 			mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_MO] = filter_val->mo_data;
 			mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_MO] = filter_val->mo_ctrl;
+		}
+
+		if (filter_val->mode & RX_MON_FILTER_PASS_OTHER) {
+			mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_FPMO] = filter_val->fpmo_mgmt;
+			mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_FPMO] = filter_val->fpmo_data;
+			mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_FPMO] = filter_val->fpmo_ctrl;
 		}
 
 		mon_config->data.filter_config.len[LITE_MON_TYPE_DATA] = LITE_MON_LEN_ALL;
