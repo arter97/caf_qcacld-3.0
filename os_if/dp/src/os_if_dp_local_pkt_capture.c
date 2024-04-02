@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -73,7 +73,7 @@ bool os_if_local_pkt_capture_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t num_connections, sta_count;
 
-	num_connections = policy_mgr_get_connection_count(psoc);
+	num_connections = policy_mgr_get_connection_count_with_mlo(psoc);
 	osif_debug("Total connections %d", num_connections);
 
 	/*
@@ -91,7 +91,7 @@ bool os_if_local_pkt_capture_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 							      PM_STA_MODE,
 							      NULL);
 	osif_debug("sta_count %d", sta_count);
-	if (sta_count == 1)
+	if (sta_count)
 		return true;
 
 	return false;
@@ -100,11 +100,6 @@ bool os_if_local_pkt_capture_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 bool os_if_lpc_mon_intf_creation_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	if (ucfg_dp_is_local_pkt_capture_enabled(psoc)) {
-		if (policy_mgr_is_mlo_sta_present(psoc)) {
-			osif_err("MLO STA present, lpc interface creation not allowed");
-			return false;
-		}
-
 		if (!os_if_local_pkt_capture_concurrency_allowed(psoc)) {
 			osif_err("Concurrency check failed, lpc interface creation not allowed");
 			return false;
@@ -132,16 +127,6 @@ static QDF_STATUS os_if_start_capture_allowed(struct wlan_objmgr_vdev *vdev)
 
 	if (mode != QDF_MONITOR_MODE) {
 		osif_err("Operation not permitted in mode: %d", mode);
-		return QDF_STATUS_E_PERM;
-	}
-
-	/*
-	 * Whether STA interface is present or not, is already checked
-	 * while creating monitor interface
-	 */
-
-	if (policy_mgr_is_mlo_sta_present(psoc)) {
-		osif_err("MLO STA present, start capture is not permitted");
 		return QDF_STATUS_E_PERM;
 	}
 
