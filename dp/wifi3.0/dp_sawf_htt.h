@@ -64,9 +64,9 @@ dp_htt_sawf_def_queues_map_report_conf(struct htt_soc *soc,
  * Return: QDF_STATUS_SUCCESS on success
  */
 QDF_STATUS
-dp_htt_sawf_msduq_recfg_req(struct htt_soc *soc, struct dp_sawf_msduq *msduq,
-			    uint8_t q_id, HTT_MSDUQ_DEACTIVATE_E q_ind,
-			    struct dp_peer *peer);
+dp_htt_sawf_msduq_recfg_req(struct htt_soc *soc, struct dp_peer *peer,
+			    struct dp_sawf_msduq *msduq, uint8_t q_id,
+			    HTT_MSDUQ_DEACTIVATE_E q_ind);
 
 /*
  * dp_htt_sawf_msduq_recfg_ind() - handler for HTT Deactivate/Reactivate

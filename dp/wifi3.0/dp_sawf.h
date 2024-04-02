@@ -108,6 +108,7 @@
 #define DP_SAWF_MAX_DYNAMIC_AST 2
 
 #define DP_SAWF_DELAY_BOUND_MS_MULTIPLER 1000
+#define DP_SAWF_MSDUQ_TIMER_MS 20000
 
 /**
  * msduq_state - status of MSDUQ
@@ -474,7 +475,9 @@ struct dp_sawf_msduq {
 	uint8_t htt_msduq;
 	uint8_t remapped_tid;
 	uint8_t q_state;
-	bool is_used;
+	uint8_t is_deactivation_needed:1,
+		no_resp_ind:1,
+		reserved:6;
 };
 
 struct dp_sawf_msduq_tid_map {
@@ -504,6 +507,7 @@ QDF_STATUS
 dp_sawf_3_link_peer_set_tid_weight(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 				   uint16_t peer_id, uint8_t tid_weight[]);
 #endif
+void dp_sawf_msduq_timer_handler(void *arg);
 uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 			   uint32_t service_id);
 bool dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
@@ -689,4 +693,34 @@ void dp_sawf_peer_msduq_event_notify(struct dp_soc *soc, struct dp_peer *peer,
 QDF_STATUS
 dp_sawf_notify_deactivate_msduq(struct dp_soc *soc, struct dp_peer *peer,
 				uint8_t q_id, uint8_t svc_id);
+
+/**
+ * dp_sawf_notify_nw_manager() - Check for MSDUQ with no resp to notify
+ * NW Manager.
+ * @soc: SOC handle
+ * @peer: dp peer handle
+ * @no_resp_q: Array to indicate MSDUQ with no response
+ *
+ * Checks for the MSDUQ with no response from tgt and notify NW Manager.
+ *
+ * Return: Void
+ */
+void dp_sawf_notify_nw_manager(struct dp_soc *soc, struct dp_peer *peer,
+			       uint8_t *no_resp_q);
+
+/**
+ * dp_soc_sawf_msduq_timer_init() - Initialize the SAWF msduq timer.
+ * @soc: data path SOC handle
+ *
+ * Return: void
+ */
+void dp_soc_sawf_msduq_timer_init(struct dp_soc *soc);
+
+/**
+ * dp_soc_sawf_msduq_timer_deinit() - De-Initialize the SAWF msduq timer.
+ * @soc: data path SoC handle
+ *
+ * Return: void
+ */
+void dp_soc_sawf_msduq_timer_deinit(struct dp_soc *soc);
 #endif /* DP_SAWF_H*/
