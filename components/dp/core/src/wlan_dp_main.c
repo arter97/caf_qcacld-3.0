@@ -2345,11 +2345,24 @@ err_soc_detach:
 	return dp_soc;
 }
 
+static inline
+void wlan_dp_check_inactive_dp_links(struct wlan_dp_psoc_context *dp_ctx)
+{
+	if (TAILQ_EMPTY(&dp_ctx->inactive_dp_link_list))
+		return;
+
+	dp_err("Inactive dp links still present!");
+	qdf_assert(0);
+}
+
 void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
 {
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
 	cdp_soc_deinit(soc);
+	wlan_dp_check_inactive_dp_links(dp_ctx);
 	cdp_soc_detach(soc);
-	wlan_dp_svc_deinit(dp_get_context());
+	wlan_dp_svc_deinit(dp_ctx);
 }
 
 QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
