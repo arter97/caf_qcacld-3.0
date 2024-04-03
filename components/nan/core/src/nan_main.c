@@ -109,6 +109,357 @@ void nan_update_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
 	nan_debug("Pasn peer count:%d", nan_vdev_obj->num_pasn_peers);
 }
 
+/**
+ * nan_add_peer_in_migrated_addr_list() - add peer address in the migrated list
+ * @psoc: pointer to psoc object
+ * @vdev_id: VDEV ID
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   struct qdf_mac_addr *peer_mac_addr)
+{
+	struct nan_vdev_priv_obj *nan_vdev_priv;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t idx;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	nan_vdev_priv = nan_get_vdev_priv_obj(vdev);
+	if (!nan_vdev_priv) {
+		nan_err("NAN vdev priv obj is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto ref_rel;
+	}
+
+	idx = nan_vdev_priv->num_peer_migrated++;
+	if (nan_vdev_priv->num_peer_migrated > MAX_NAN_MIGRATED_PEERS) {
+		nan_err("num migrated peers %d more than max migrated peers",
+			nan_vdev_priv->num_peer_migrated);
+		status = QDF_STATUS_E_FAILURE;
+		goto ref_rel;
+	}
+
+	qdf_mem_copy(nan_vdev_priv->peer_migrated_addr_list[idx].bytes,
+		     peer_mac_addr->bytes, QDF_MAC_ADDR_SIZE);
+
+	nan_debug("add peer to migrated list at index %d", idx);
+
+ref_rel:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	return status;
+}
+
+/**
+ * nan_remove_peer_in_migrated_addr_list() - remove peer address from the
+ * migrated list
+ * @psoc: pointer to psoc object
+ * @vdev_id: VDEV ID
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+nan_remove_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      struct qdf_mac_addr *peer_mac_addr)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct nan_vdev_priv_obj *nan_vdev_priv;
+	uint8_t i = 0, idx;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	nan_vdev_priv = nan_get_vdev_priv_obj(vdev);
+	if (!nan_vdev_priv) {
+		nan_err("NAN vdev priv obj is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto ref_rel;
+	}
+
+	idx = nan_vdev_priv->num_peer_migrated;
+	if (idx > MAX_NAN_MIGRATED_PEERS) {
+		nan_err("idx %d more than max migrated peers", idx);
+		status = QDF_STATUS_E_FAILURE;
+		goto ref_rel;
+	}
+
+	if (!idx) {
+		nan_debug("last migrated peer removed");
+		goto ref_rel;
+	}
+
+	for (i = 0; i < idx; i++) {
+		if (qdf_is_macaddr_equal(
+				peer_mac_addr,
+				&nan_vdev_priv->peer_migrated_addr_list[i])) {
+			/*
+			 * move the peer address from last position to
+			 * position i
+			 */
+			qdf_mem_copy(
+			nan_vdev_priv->peer_migrated_addr_list[i].bytes,
+			nan_vdev_priv->peer_migrated_addr_list[idx - 1].bytes,
+			QDF_MAC_ADDR_SIZE);
+			break;
+		}
+	}
+
+	nan_debug("peer remove from migrated list at index %d with max peer %d",
+		  i, idx);
+	nan_vdev_priv->num_peer_migrated--;
+
+ref_rel:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	return status;
+}
+
+/**
+ * nan_is_peer_migrated() - check if peer is migrated from NAN to NDP or not
+ * @psoc: pointer to psoc object
+ * @vdev_id: VDEV ID
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: true if peer is migrated otherwise false
+ */
+static bool
+nan_is_peer_migrated(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+		     struct qdf_mac_addr *peer_mac_addr)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct nan_vdev_priv_obj *nan_vdev_priv;
+	uint8_t i;
+	bool is_peer_migrated = false;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("vdev is null");
+		return false;
+	}
+
+	nan_vdev_priv = nan_get_vdev_priv_obj(vdev);
+	if (!nan_vdev_priv) {
+		nan_err("NAN vdev priv obj is null");
+		goto ref_rel;
+	}
+
+	if (!nan_vdev_priv->num_peer_migrated &&
+	    nan_vdev_priv->num_peer_migrated > MAX_NAN_MIGRATED_PEERS)
+		goto ref_rel;
+
+	for (i = 0; i < nan_vdev_priv->num_peer_migrated; i++) {
+		if (qdf_is_macaddr_equal(
+				peer_mac_addr,
+				&nan_vdev_priv->peer_migrated_addr_list[i])) {
+			nan_debug("peer found");
+			is_peer_migrated = true;
+			goto ref_rel;
+		}
+	}
+
+ref_rel:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	return is_peer_migrated;
+}
+
+/**
+ * nan_set_ndi_vdev_id_for_migrated_peer() - This API caches NDI VDEV ID in
+ * NAN peer private object
+ * @psoc: pointer to psoc object
+ * @peer_mac_addr: peer mac address
+ * @ndi_vdev_id: NDI VDEV ID
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+nan_set_ndi_vdev_id_for_migrated_peer(struct wlan_objmgr_psoc *psoc,
+				      struct qdf_mac_addr *peer_mac_addr,
+				      uint8_t ndi_vdev_id)
+{
+	struct wlan_objmgr_peer *peer;
+	struct nan_peer_priv_obj *nan_peer_priv;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac_addr->bytes,
+					   WLAN_NAN_ID);
+	if (!peer) {
+		nan_err("peer is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	nan_peer_priv = nan_get_peer_priv_obj(peer);
+	if (!nan_peer_priv) {
+		nan_err("NAN peer priv obj is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto ref_rel;
+	}
+
+	nan_peer_priv->ndi_vdev_id = ndi_vdev_id;
+
+ref_rel:
+	wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
+	return status;
+}
+
+/**
+ * nan_get_ndi_vdev_id_from_migrated_peer() - This API retrieves NDI VDEV ID
+ * from the NAN peer private object
+ * @psoc: pointer to psoc object
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: NDI VDEV ID
+ */
+static uint8_t
+nan_get_ndi_vdev_id_from_migrated_peer(struct wlan_objmgr_psoc *psoc,
+				       struct qdf_mac_addr *peer_mac_addr)
+{
+	struct wlan_objmgr_peer *peer;
+	struct nan_peer_priv_obj *nan_peer_priv;
+	uint8_t vdev_id = INVALID_VDEV_ID;
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac_addr->bytes,
+					   WLAN_NAN_ID);
+	if (!peer) {
+		nan_err("peer is null");
+		return vdev_id;
+	}
+
+	nan_peer_priv = nan_get_peer_priv_obj(peer);
+	if (!nan_peer_priv) {
+		nan_err("NAN peer priv obj is null");
+		goto ref_rel;
+	}
+
+	vdev_id = nan_peer_priv->ndi_vdev_id;
+
+ref_rel:
+	wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
+	return vdev_id;
+}
+
+/**
+ * ndi_cleanup_pasn_peer_from_nan() - This API will delete the NAN PASN peer
+ * for peer migration
+ * @psoc: pointer to psoc object
+ * @nan_vdev_id: NAN VDEV ID
+ * @ndi_vdev_id: NDI VDEV ID
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+ndi_cleanup_pasn_peer_from_nan(struct wlan_objmgr_psoc *psoc,
+			       uint8_t nan_vdev_id, uint8_t ndi_vdev_id,
+			       struct qdf_mac_addr *peer_mac_addr)
+{
+	QDF_STATUS status;
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct nan_pasn_peer_ops *peer_ops;
+
+	if (nan_is_pairing_allowed(psoc)) {
+		nan_debug(" NAN pairing is not allowed");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer_ops = &psoc_nan_obj->cb_obj.pasn_peer_ops;
+	if (!peer_ops->nan_pasn_peer_delete_cb) {
+		nan_err("NAN PASN peer delete ops is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = peer_ops->nan_pasn_peer_delete_cb(psoc, nan_vdev_id,
+						   peer_mac_addr,
+						   NAN_PASN_PEER_DELETE,
+						   false);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("NAN PASN peer delete request fails");
+		return status;
+	}
+
+	status = nan_add_peer_in_migrated_addr_list(psoc, nan_vdev_id,
+						    peer_mac_addr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("fail to add peer addr in migrated list");
+		return status;
+	}
+
+	status = nan_set_ndi_vdev_id_for_migrated_peer(psoc, peer_mac_addr,
+						       ndi_vdev_id);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		nan_err("fail to add ndi vdev id in NAN peer");
+
+	return status;
+}
+
+QDF_STATUS ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
+				    uint8_t nan_vdev_id,
+				    struct qdf_mac_addr *peer_mac_addr)
+{
+	QDF_STATUS status;
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct nan_pasn_peer_ops *peer_ops;
+
+	if (!nan_is_pairing_allowed(psoc)) {
+		nan_debug(" NAN pairing is not allowed");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!nan_is_peer_migrated(psoc, nan_vdev_id, peer_mac_addr)) {
+		nan_debug("NAN PASN peer is not migrated");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer_ops = &psoc_nan_obj->cb_obj.pasn_peer_ops;
+	if (!peer_ops->nan_pasn_peer_create_cb) {
+		nan_err("NAN PASN peer create ops is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = peer_ops->nan_pasn_peer_create_cb(psoc, peer_mac_addr,
+						   nan_vdev_id,
+						   NAN_PASN_PEER_CREATE);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("NAN PASN peer create request fails");
+		return status;
+	}
+
+	status = nan_remove_peer_in_migrated_addr_list(psoc, nan_vdev_id,
+						       peer_mac_addr);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		nan_err("fail to remove peer addr in migrated list");
+
+	return status;
+}
+
 QDF_STATUS nan_set_discovery_state(struct wlan_objmgr_psoc *psoc,
 				   enum nan_disc_state new_state)
 {
@@ -742,12 +1093,15 @@ static QDF_STATUS nan_handle_initiator_rsp(
 static QDF_STATUS nan_handle_ndp_ind(
 				struct nan_datapath_indication_event *ndp_ind)
 {
-	uint8_t vdev_id;
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct wlan_objmgr_vdev *nan_vdev;
+	uint8_t nan_vdev_id;
+	uint8_t ndi_vdev_id;
+	bool is_peer_migrated = false;
 
-	vdev_id = wlan_vdev_get_id(ndp_ind->vdev);
+	ndi_vdev_id = wlan_vdev_get_id(ndp_ind->vdev);
 	psoc = wlan_vdev_get_psoc(ndp_ind->vdev);
 	if (!psoc) {
 		nan_err("psoc is null");
@@ -762,14 +1116,38 @@ static QDF_STATUS nan_handle_ndp_ind(
 
 	nan_debug("role: %d, vdev: %d, csid: %d, peer_mac_addr "
 		QDF_MAC_ADDR_FMT,
-		ndp_ind->role, vdev_id, ndp_ind->ncs_sk_type,
+		ndp_ind->role, ndi_vdev_id, ndp_ind->ncs_sk_type,
 		QDF_MAC_ADDR_REF(ndp_ind->peer_mac_addr.bytes));
 
 	if ((ndp_ind->role == NAN_DATAPATH_ROLE_INITIATOR) ||
 	    ((NAN_DATAPATH_ROLE_RESPONDER == ndp_ind->role) &&
 	    (NAN_DATAPATH_ACCEPT_POLICY_ALL == ndp_ind->policy))) {
-		status = psoc_nan_obj->cb_obj.add_ndi_peer(vdev_id,
-						ndp_ind->peer_mac_addr);
+		nan_vdev =
+		wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc,
+							 QDF_NAN_DISC_MODE,
+							 WLAN_NAN_ID);
+		if (!nan_vdev) {
+			nan_err("vdev is null");
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+
+		nan_vdev_id = wlan_vdev_get_id(nan_vdev);
+		wlan_objmgr_vdev_release_ref(nan_vdev, WLAN_NAN_ID);
+
+		if (nan_is_peer_exist_for_opmode(psoc, &ndp_ind->peer_mac_addr,
+						 QDF_NAN_DISC_MODE)) {
+			status = ndi_cleanup_pasn_peer_from_nan(
+						psoc, nan_vdev_id, ndi_vdev_id,
+						&ndp_ind->peer_mac_addr);
+
+			if (QDF_IS_STATUS_SUCCESS(status))
+				is_peer_migrated = true;
+		}
+
+		if (!is_peer_migrated)
+			status = psoc_nan_obj->cb_obj.add_ndi_peer(ndi_vdev_id,
+							ndp_ind->peer_mac_addr);
+
 		if (QDF_IS_STATUS_ERROR(status)) {
 			nan_err("Couldn't add ndi peer, ndp_role: %d",
 				ndp_ind->role);
@@ -791,8 +1169,14 @@ static QDF_STATUS nan_handle_responder_rsp(
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct wlan_objmgr_vdev *nan_vdev;
+	uint8_t nan_vdev_id;
+	uint8_t ndi_vdev_id;
+	bool is_peer_migrated = false;
 
 	*vdev = rsp->vdev;
+	ndi_vdev_id = wlan_vdev_get_id(rsp->vdev);
+
 	psoc = wlan_vdev_get_psoc(rsp->vdev);
 	if (!psoc) {
 		nan_err("psoc is null");
@@ -806,14 +1190,38 @@ static QDF_STATUS nan_handle_responder_rsp(
 	}
 
 	if (QDF_IS_STATUS_SUCCESS(rsp->status) && rsp->create_peer) {
-		status = psoc_nan_obj->cb_obj.add_ndi_peer(
-						wlan_vdev_get_id(rsp->vdev),
-						rsp->peer_mac_addr);
+		nan_vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(
+							psoc,
+							QDF_NAN_DISC_MODE,
+							WLAN_NAN_ID);
+		if (!nan_vdev) {
+			nan_err("vdev is null");
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+
+		nan_vdev_id = wlan_vdev_get_id(nan_vdev);
+		if (nan_is_peer_exist_for_opmode(psoc, &rsp->peer_mac_addr,
+						 QDF_NAN_DISC_MODE)) {
+			status = ndi_cleanup_pasn_peer_from_nan(
+							psoc, nan_vdev_id,
+							ndi_vdev_id,
+							&rsp->peer_mac_addr);
+
+			if (QDF_IS_STATUS_SUCCESS(status))
+				is_peer_migrated = true;
+		}
+
+		wlan_objmgr_vdev_release_ref(nan_vdev, WLAN_NAN_ID);
+
+		if (!is_peer_migrated)
+			status = psoc_nan_obj->cb_obj.add_ndi_peer(ndi_vdev_id,
+							rsp->peer_mac_addr);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			nan_err("Couldn't add ndi peer");
 			rsp->status = QDF_STATUS_E_FAILURE;
 		}
 	}
+
 	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, rsp->vdev,
 						     NDP_RESPONDER_RSP, rsp);
 
@@ -1793,7 +2201,9 @@ void nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
 	struct nan_psoc_priv_obj *psoc_nan_obj;
 	struct nan_pasn_peer_ops *peer_ops;
 	uint8_t *cookie;
+	uint8_t ndi_vdev_id;
 	struct qdf_mac_addr peer_mac_addr;
+	bool is_peer_migrated;
 
 	nan_debug("Received peer delete response for " QDF_MAC_ADDR_FMT " and vdev id %d",
 		  QDF_MAC_ADDR_REF(peer_mac), vdev_id);
@@ -1817,6 +2227,17 @@ void nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
 
 	qdf_mem_copy(peer_mac_addr.bytes, peer_mac, QDF_MAC_ADDR_SIZE);
 
+	is_peer_migrated = nan_is_peer_migrated(psoc, vdev_id, &peer_mac_addr);
+	if (is_peer_migrated) {
+		ndi_vdev_id = nan_get_ndi_vdev_id_from_migrated_peer(
+								psoc,
+								&peer_mac_addr);
+		if (ndi_vdev_id == INVALID_VDEV_ID) {
+			nan_err("vdev id is invalid");
+			return;
+		}
+	}
+
 	peer_ops->nan_pasn_peer_delete_cb(psoc, vdev_id, &peer_mac_addr,
 					  NAN_PASN_PEER_DELETE, true);
 
@@ -1824,6 +2245,9 @@ void nan_pasn_peer_handle_del_rsp(struct wlan_objmgr_psoc *psoc,
 		cookie = (uint8_t *)psoc_nan_obj->nan_pairing_create_ctx;
 		psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb(cookie);
 	}
+
+	if (is_peer_migrated)
+		psoc_nan_obj->cb_obj.add_ndi_peer(ndi_vdev_id, peer_mac_addr);
 }
 
 /**

@@ -159,6 +159,7 @@ struct nan_psoc_priv_obj {
 	void *nan_delete_all_peer_ctx;
 };
 
+#define MAX_NAN_MIGRATED_PEERS 5
 /**
  * struct nan_vdev_priv_obj - nan private vdev obj
  * @lock: lock to be acquired before reading or writing to object
@@ -176,6 +177,8 @@ struct nan_psoc_priv_obj {
  * @num_pasn_peers: Number of NAN PASN peers
  * @is_delete_all_pasn_peer_in_progress: flag to track the deletion of all
  * pasn peers
+ * @num_peer_migrated: Number of peers migrated
+ * @peer_migrated_addr_list: list containing migrated peer mac address
  */
 struct nan_vdev_priv_obj {
 	qdf_spinlock_t lock;
@@ -191,6 +194,8 @@ struct nan_vdev_priv_obj {
 	struct qdf_mac_addr peer_mc_addr_list[MAX_NDP_SESSIONS];
 	uint8_t num_pasn_peers;
 	bool is_delete_all_pasn_peer_in_progress;
+	uint8_t num_peer_migrated;
+	struct qdf_mac_addr peer_migrated_addr_list[MAX_NAN_MIGRATED_PEERS];
 };
 
 /**
@@ -198,11 +203,13 @@ struct nan_vdev_priv_obj {
  * @lock: lock to be acquired before reading or writing to object
  * @active_ndp_sessions: number of active ndp sessions for this peer
  * @home_chan_info: Home channel info for the NDP associated with the Peer
+ * @ndi_vdev_id: NDI vdev ID
  */
 struct nan_peer_priv_obj {
 	qdf_spinlock_t lock;
 	uint32_t active_ndp_sessions;
 	struct nan_datapath_channel_info home_chan_info;
+	uint8_t ndi_vdev_id;
 };
 
 /**
@@ -429,5 +436,17 @@ QDF_STATUS nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS nan_cleanup_pasn_peers(struct wlan_objmgr_psoc *psoc);
 
+/*
+ * ndi_add_pasn_peer_to_nan(): This API will add PASN peer to NAN VDEV on
+ * peer migration
+ * @psoc: pointer to PSOC object
+ * @nan_vdev_id: VDEV ID
+ * @peer_mac: address of peer
+ *
+ * Return: Success when handled response, otherwise error
+ */
+QDF_STATUS
+ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc, uint8_t nan_vdev_id,
+			 struct qdf_mac_addr *peer_mac);
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

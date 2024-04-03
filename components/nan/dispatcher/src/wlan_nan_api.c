@@ -97,3 +97,10 @@ QDF_STATUS wlan_nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
 {
 	return nan_handle_delete_all_pasn_peers(psoc, vdev_id);
 }
+
+QDF_STATUS wlan_ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id,
+					 struct qdf_mac_addr *peer_mac)
+{
+	return ndi_add_pasn_peer_to_nan(psoc, vdev_id, peer_mac);
+}
