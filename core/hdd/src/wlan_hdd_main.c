@@ -8571,6 +8571,36 @@ int hdd_send_coex_traffic_shaping_mode(uint8_t vdev_id, uint8_t mode)
 	return 0;
 }
 
+/**
+ * hdd_set_dynamic_bw_param() - Set dynamic bandwidth param to firmware
+ * @adapter: pointer to adapter
+ * @psoc: pointer to psoc
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS hdd_set_dynamic_bw_param(struct hdd_adapter *adapter,
+					   struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_hdd_link_info *link_info;
+	bool dynamic_bw_switch;
+	uint8_t vdev_id;
+	QDF_STATUS status;
+
+	status = ucfg_get_dynamic_bw_switch_value(psoc,	&dynamic_bw_switch);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return QDF_STATUS_E_FAILURE;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		vdev_id = link_info->vdev_id;
+		sme_set_smps_cfg(vdev_id,
+				 HDD_STA_SMPS_PARAM_DYNAMIC_BW_SWITCH,
+				 dynamic_bw_switch);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #define MAX_PDEV_SET_FW_PARAMS 7
 /* params being sent:
  * 1.wmi_pdev_param_dtim_synth
@@ -8723,6 +8753,11 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 		sme_set_smps_cfg(adapter->deflink->vdev_id,
 				 HDD_STA_SMPS_PARAM_DTIM_1CHRX_ENABLE,
 				 enable_dtim_1chrx);
+
+		status = hdd_set_dynamic_bw_param(adapter, hdd_ctx->psoc);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			return -EINVAL;
 	}
 
 	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);

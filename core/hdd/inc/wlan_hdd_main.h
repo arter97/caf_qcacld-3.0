@@ -1687,6 +1687,11 @@ struct suspend_resume_stats {
  * @HDD_STA_SMPS_PARAM_LOWER_BRSSI_THRESH:  Lower threshold for beacon-RSSI.
  * Used to increase RX chainmask.
  * @HDD_STA_SMPS_PARAM_DTIM_1CHRX_ENABLE: Enable/Disable DTIM 1chRx feature
+ * @HDD_STA_SMPS_PARAM_DYNAMIC_BW_SWITCH: Enable/Disable dynamic bandwidth
+ * switch. When host sends this param, firmware downgrades the bandwidth
+ * for those vdev whose bw is greater than 80Mhz(160Mhz/320 Mhz) when
+ * there is no traffic going on. If traffic comes up then fw will restore
+ * the original bandwidth
  */
 enum hdd_sta_smps_param {
 	HDD_STA_SMPS_PARAM_UPPER_RSSI_THRESH = 0,
@@ -1694,7 +1699,8 @@ enum hdd_sta_smps_param {
 	HDD_STA_SMPS_PARAM_LOWER_RSSI_THRESH = 2,
 	HDD_STA_SMPS_PARAM_UPPER_BRSSI_THRESH = 3,
 	HDD_STA_SMPS_PARAM_LOWER_BRSSI_THRESH = 4,
-	HDD_STA_SMPS_PARAM_DTIM_1CHRX_ENABLE = 5
+	HDD_STA_SMPS_PARAM_DTIM_1CHRX_ENABLE = 5,
+	HDD_STA_SMPS_PARAM_DYNAMIC_BW_SWITCH = 6
 };
 
 /**

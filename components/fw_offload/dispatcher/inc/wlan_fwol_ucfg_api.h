@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -299,6 +299,16 @@ QDF_STATUS ucfg_get_lower_brssi_thresh(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS ucfg_get_enable_dtim_1chrx(struct wlan_objmgr_psoc *psoc,
 				      bool *enable_dtim_1chrx);
+
+/**
+ * ucfg_get_dynamic_bw_switch_value() - Assigns dynamic_bw_switch value
+ * @psoc: pointer to the psoc object
+ * @dynamic_bw_switch: pointer to return dynamic_bw_switch value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_get_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
+					    bool *dynamic_bw_switch);
 
 /**
  * ucfg_get_alternative_chainmask_enabled() - Assigns alt chainmask_enabled
@@ -937,6 +947,13 @@ ucfg_get_lower_brssi_thresh(struct wlan_objmgr_psoc *psoc,
 static inline QDF_STATUS
 ucfg_get_enable_dtim_1chrx(struct wlan_objmgr_psoc *psoc,
 			   bool *enable_dtim_1chrx)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline QDF_STATUS
+ucfg_get_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
+				 bool *enable_dtim_1chrx)
 {
 	return QDF_STATUS_E_FAILURE;
 }

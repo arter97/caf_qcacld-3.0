@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012 - 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -229,6 +229,7 @@ struct wlan_fwol_tsf_accuracy_configs {
  * @upper_brssi_thresh: Upper BRSSI threshold
  * @lower_brssi_thresh: Lower BRSSI threshold
  * @enable_dtim_1chrx: Enable/disable DTIM 1 CHRX
+ * @dynamic_bw_switch: Enable/Disable dynamic bandwidth switch
  * @alternative_chainmask_enabled: Alternate chainmask
  * @smart_chainmask_enabled: Enable/disable chainmask
  * @get_rts_profile: Set the RTS profile
@@ -273,6 +274,7 @@ struct wlan_fwol_cfg {
 	uint16_t upper_brssi_thresh;
 	uint16_t lower_brssi_thresh;
 	bool enable_dtim_1chrx;
+	bool dynamic_bw_switch;
 	bool alternative_chainmask_enabled;
 	bool smart_chainmask_enabled;
 	uint16_t get_rts_profile;
