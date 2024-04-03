@@ -3,6 +3,10 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
+    "anorak": [
+	"qca6490",
+	"kiwi-v2",
+    ],
     "niobe": [
 	"kiwi-v2",
     ],
@@ -24,6 +28,7 @@ _chipset_hw_map = {
     "kiwi-v2": "BERYLLIUM",
     "peach": "BERYLLIUM",
     "qca6750": "MOSELLE",
+    "qca6490": "LITHIUM",
 }
 
 _chipset_header_map = {
@@ -39,6 +44,10 @@ _chipset_header_map = {
         "api/hw/qca6750/v1",
         "cmn/hal/wifi3.0/qca6750",
     ],
+    "qca6490": [
+        "api/hw/qca6490/v1",
+        "cmn/hal/wifi3.0/qca6490",
+    ],
 }
 
 _hw_header_map = {
@@ -47,7 +56,10 @@ _hw_header_map = {
     ],
     "MOSELLE" : [
         "cmn/hal/wifi3.0/li",
-	],
+    ],
+    "LITHIUM": [
+        "cmn/hal/wifi3.0/li",
+    ],
 }
 
 _fixed_includes = [
@@ -696,6 +708,12 @@ _conditional_srcs = {
         True: [
             "cmn/hal/wifi3.0/kiwi/hal_kiwi.c",
             "cmn/hif/src/kiwidef.c",
+        ],
+    },
+    "CONFIG_QCA6490_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qca6490/hal_6490.c",
+            "cmn/hif/src/qca6490def.c",
         ],
     },
     "CONFIG_QCA6750_HEADERS_DEF": {
@@ -2275,8 +2293,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
             "//msm-kernel:all_headers",
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
-            "//vendor/qcom/opensource/dataipa:include_headers",
-            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ]
     else:
         deps = [
@@ -2286,6 +2302,10 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
             "//msm-kernel:all_headers",
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+        ]
+
+    if target != "anorak":
+        deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ]
