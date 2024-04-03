@@ -3,6 +3,10 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
+    "anorak": [
+	"qca6490",
+	"kiwi-v2",
+    ],
     "niobe": [
 	"kiwi-v2",
     ],
@@ -31,6 +35,7 @@ _chipset_hw_map = {
     "peach-v2": "BERYLLIUM",
     "qca6750": "MOSELLE",
     "wcn7750": "BERYLLIUM",
+    "qca6490": "LITHIUM",
 }
 
 _chipset_header_map = {
@@ -54,6 +59,10 @@ _chipset_header_map = {
         "api/hw/wcn7750/v1",
         "cmn/hal/wifi3.0/wcn7750",
     ],
+    "qca6490": [
+        "api/hw/qca6490/v1",
+        "cmn/hal/wifi3.0/qca6490",
+    ],
 }
 
 _hw_header_map = {
@@ -62,7 +71,10 @@ _hw_header_map = {
     ],
     "MOSELLE" : [
         "cmn/hal/wifi3.0/li",
-	],
+    ],
+    "LITHIUM": [
+        "cmn/hal/wifi3.0/li",
+    ],
 }
 
 _fixed_includes = [
@@ -723,6 +735,12 @@ _conditional_srcs = {
     "CONFIG_INCLUDE_HAL_PEACH": {
         True: [
             "cmn/hal/wifi3.0/peach/hal_peach.c",
+        ],
+    },
+    "CONFIG_QCA6490_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qca6490/hal_6490.c",
+            "cmn/hif/src/qca6490def.c",
         ],
     },
     "CONFIG_QCA6750_HEADERS_DEF": {
@@ -2332,7 +2350,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
         ]
 
-    if target != "x1e80100":
+    if target != "x1e80100" and target != "anorak":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),

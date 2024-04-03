@@ -137,7 +137,7 @@ config CP_STATS
 	default n
 
 config QCA_TARGET_IF_MLME
-	bool "Enable TARGET_IF MLME"
+	bool "Enable CONFIG_TARGET_IF_MLME"
 	default n
 
 config DCS
@@ -227,6 +227,14 @@ config DP_LFR
 
 config DP_MEM_PRE_ALLOC
 	bool "Enable DP_MEM_PRE_ALLOC"
+	default n
+
+config DBR_HOLD_LARGE_MEM
+	bool "Enable DP_MEM_PRE_ALLOC"
+	default n
+
+config DUMP_REO_QUEUE_INFO_IN_DDR
+	bool "Enable DUMP_REO_QUEUE_INFO_IN_DDR"
 	default n
 
 config DP_PKT_ADD_TIMESTAMP
@@ -663,6 +671,10 @@ config KIWI_HEADERS_DEF
 	bool "Enable KIWI_HEADERS_DEF"
 	default n
 
+config QCA6490_HEADERS_DEF
+	bool "Enable QCA6490_HEADERS_DEF"
+	default n
+
 config LEAK_DETECTION
 	bool "Enable LEAK_DETECTION"
 	default n
@@ -820,6 +832,10 @@ config QCA_WIFI_FTM_NL80211
 
 config QCA_WIFI_KIWI
 	bool "Enable QCA_WIFI_KIWI"
+	default n
+
+config QCA_WIFI_QCA6490
+	bool "Enable QCA_WIFI_QCA6490"
 	default n
 
 config QCA_WIFI_MONITOR_MODE_NO_MSDU_START_TLV_SUPPORT
@@ -986,6 +1002,14 @@ config SHADOW_V3
 
 config SMMU_S1_UNMAP
 	bool "Enable SMMU_S1_UNMAP"
+	default n
+
+config CHANNEL_HOPPING_ALL_BANDS
+	bool "Enable CHANNEL_HOPPING_ALL_BANDS"
+	default n
+
+config HIF_DETECTION_LATENCY_ENABLE
+	bool "Enable HIF_DETECTION_LATENCY_ENABLE"
 	default n
 
 config SMP
@@ -2066,10 +2090,6 @@ config QCA6750_HEADERS_DEF
 	bool "Enable QCA6750_HEADERS_DEF"
 	default n
 
-config QCA_TARGET_IF_MLME
-	bool "Enable QCA_TARGET_IF_MLME"
-	default n
-
 config QCA_WIFI_QCA6750
 	bool "Enable QCA_WIFI_QCA6750"
 	default n
@@ -2164,6 +2184,10 @@ config ROME_IF
 	string "Enable ROME_IF"
 	default pci
 endif
+
+config WLAN_MCC_MIN_CHANNEL_QUOTA
+	int "Enable WLAN_MCC_MIN_CHANNEL_QUOTA"
+	default 20
 
 if CNSS_QCA6750
 config ROME_IF
