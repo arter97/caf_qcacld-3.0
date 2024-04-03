@@ -198,8 +198,15 @@ enum sawf_rule_type {
  */
 #define SAWF_STC_SVC_CLASS_DEFAULT_PRIORITY (SAWF_SCS_SVC_CLASS_DEFAULT_PRIORITY + 1)
 
+/*
+ * One extra priority is added for HH flows categorized by IFLI and RM
+ */
+#define SAWF_HH_PRIORITY SAWF_STC_SVC_CLASS_DEFAULT_PRIORITY + 1
+
 #define SAWF_MIN_PRIORITY SAWF_DEF_MIN_PRIORITY
-#define SAWF_MAX_PRIORITY SAWF_STC_SVC_CLASS_DEFAULT_PRIORITY
+#define SAWF_MAX_PRIORITY SAWF_HH_PRIORITY
+
+
 /*
  * Enum for SAWF service class type
  * WLAN_SAWF_SVC_TYPE_DEF: Default service class type
