@@ -829,6 +829,41 @@ int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
  * Return: void
  */
 void hdd_register_cstats_ops(void);
+
+/**
+ * hdd_cstats_log_ndi_delete_req_evt() - Chipset stats for ndi delete
+ *
+ * @vdev: pointer to vdev object
+ * @transaction_id: transaction ID
+ *
+ * Return : void
+ */
+void hdd_cstats_log_ndi_delete_req_evt(struct wlan_objmgr_vdev *vdev,
+				       uint16_t transaction_id);
+
+/**
+ * hdd_cstats_log_ndi_create_resp_evt() - Chipset stats for ndi create
+ * response
+ * @li: pointer link_info object
+ * @ndi_rsp: pointer to nan_datapath_inf_create_rsp object
+ *
+ * Return : void
+ */
+void
+hdd_cstats_log_ndi_create_resp_evt(struct wlan_hdd_link_info *li,
+				   struct nan_datapath_inf_create_rsp *ndi_rsp);
+
+/**
+ * hdd_cstats_log_ndi_create_req_evt() - Chipset stats for ndi create
+ * request
+ *
+ * @vdev: pointer vdve object
+ * @transaction_id : Transaction ID
+ *
+ * Return : void
+ */
+void hdd_cstats_log_ndi_create_req_evt(struct wlan_objmgr_vdev *vdev,
+				       uint16_t transaction_id);
 #else
 static inline void hdd_register_cstats_ops(void)
 {
@@ -840,5 +875,23 @@ hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
 {
 	return 0;
 }
-#endif
+
+static inline void
+hdd_cstats_log_ndi_delete_req_evt(struct wlan_objmgr_vdev *vdev,
+				  uint16_t transaction_id)
+{
+}
+
+static inline void
+hdd_cstats_log_ndi_create_resp_evt(struct wlan_hdd_link_info *li,
+				   struct nan_datapath_inf_create_rsp *ndi_rsp)
+{
+}
+
+static inline void
+hdd_cstats_log_ndi_create_req_evt(struct wlan_objmgr_vdev *vdev,
+				  uint16_t transaction_id)
+{
+}
+#endif /* WLAN_CHIPSET_STATS */
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */
