@@ -58,6 +58,7 @@
 #include <net/cnss_nl.h>
 #endif
 #endif
+#include "wlan_nan_api.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
 #define HDD_INFO_SIGNAL                 STATION_INFO_SIGNAL
@@ -11627,4 +11628,77 @@ void hdd_register_cstats_ops(void)
 {
 	ucfg_cp_stats_cstats_register_tx_rx_ops(&cstats_ops);
 }
-#endif
+
+void
+hdd_cstats_log_ndi_delete_req_evt(struct wlan_objmgr_vdev *vdev,
+				  uint16_t transaction_id)
+{
+	struct cstats_nan_ndi_delete_req stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDI_DELETE_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndi_delete_req) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.transaction_id = transaction_id;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndi_delete_req), &stat);
+}
+
+void
+hdd_cstats_log_ndi_create_resp_evt(struct wlan_hdd_link_info *li,
+				   struct nan_datapath_inf_create_rsp *ndi_rsp)
+{
+	struct cstats_nan_ndi_create_resp stat = {0};
+	struct wlan_objmgr_vdev *vdev;
+	struct nan_vdev_priv_obj *priv_obj;
+
+	vdev = hdd_objmgr_get_vdev_by_user(li, WLAN_OSIF_NAN_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return;
+	}
+
+	priv_obj = nan_get_vdev_priv_obj(vdev);
+	if (!priv_obj) {
+		hdd_err("priv_obj is null")
+		return;
+	}
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDI_CREATE_RESP_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndi_create_resp) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.status = ndi_rsp->status;
+	stat.reason = ndi_rsp->reason;
+	qdf_spin_lock_bh(&priv_obj->lock);
+	stat.transaction_id = priv_obj->ndp_create_transaction_id;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndi_create_resp),
+			       &stat);
+}
+
+void hdd_cstats_log_ndi_create_req_evt(struct wlan_objmgr_vdev *vdev,
+				       uint16_t transaction_id)
+{
+	struct cstats_nan_ndi_create_req stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDI_CREATE_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndi_create_req) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.transaction_id = transaction_id;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndi_create_req), &stat);
+}
+#endif /* WLAN_CHIPSET_STATS */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -46,6 +46,7 @@
 #include "wlan_fwol_ucfg_api.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_hdd_sysfs.h"
+#include "wlan_hdd_stats.h"
 
 /**
  * hdd_nan_datapath_target_config() - Configure NAN datapath features
@@ -848,6 +849,8 @@ int hdd_ndi_start(const char *iface_name, uint16_t transaction_id)
 		ret = -EINVAL;
 		goto err_handler;
 	}
+
+	hdd_cstats_log_ndi_create_req_evt(vdev, transaction_id);
 	/*
 	 * Create transaction id is required to be saved since the firmware
 	 * does not honor the transaction id for create request
@@ -938,7 +941,9 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 
 	os_if_nan_set_ndp_delete_transaction_id(vdev, transaction_id);
 	os_if_nan_set_ndi_state(vdev, NAN_DATA_NDI_DELETING_STATE);
+	hdd_cstats_log_ndi_delete_req_evt(vdev, transaction_id);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
+
 	/* Delete the interface */
 	adapter->is_virtual_iface = true;
 	ret = hdd_delete_ndi_intf(hdd_ctx->wiphy, &adapter->wdev);
@@ -1038,6 +1043,8 @@ hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 		hdd_alert("NDI interface creation failed with reason %d",
 			ndi_rsp->reason /* create_reason */);
 	}
+
+	hdd_cstats_log_ndi_create_resp_evt(link_info, ndi_rsp);
 
 	hdd_save_peer(sta_ctx, &bc_mac_addr);
 	qdf_copy_macaddr(&roam_info->bssid, &bc_mac_addr);
