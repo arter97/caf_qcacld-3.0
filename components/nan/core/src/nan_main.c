@@ -1376,6 +1376,8 @@ static QDF_STATUS nan_handle_enable_rsp(struct nan_event_params *nan_event)
 		/* NAN Enable has failed, restore changes */
 		goto fail;
 	}
+
+	nan_cstats_log_nan_enable_resp_evt(nan_event);
 fail:
 	psoc_nan_obj->nan_social_ch_2g_freq = 0;
 	psoc_nan_obj->nan_social_ch_5g_freq = 0;
@@ -1434,6 +1436,7 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 
 		nan_handle_emlsr_concurrency(psoc, false);
 		policy_mgr_nan_sap_post_disable_conc_check(psoc);
+		nan_cstats_log_nan_disable_resp_evt(vdev_id, psoc);
 	} else {
 		/* Should not happen, NAN state can always be disabled */
 		nan_err("Cannot set NAN state to disabled!");

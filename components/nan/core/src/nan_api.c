@@ -511,3 +511,57 @@ bool wlan_is_mlo_sta_nan_ndi_allowed(struct wlan_objmgr_psoc *psoc)
 	return psoc_nan_obj->nan_caps.mlo_sta_nan_ndi_allowed;
 }
 #endif
+
+#if defined(WLAN_FEATURE_NAN) && defined(WLAN_CHIPSET_STATS)
+void nan_cstats_log_nan_enable_resp_evt(struct nan_event_params *nan_event)
+{
+	struct cstats_nan_disc_enable_resp stat = {0};
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(nan_event->psoc,
+						    nan_event->vdev_id,
+						    WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("Invalid vdev!");
+		return;
+	}
+
+	stat.cmn.hdr.evt_id =
+		WLAN_CHIPSET_STATS_NAN_DISCOVERY_ENABLE_RESP_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_disc_enable_resp) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.is_enable_success = nan_event->is_nan_enable_success;
+	stat.mac_id = nan_event->mac_id;
+	stat.disc_state = nan_get_discovery_state(nan_event->psoc);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_disc_enable_resp),
+			       &stat);
+}
+
+void nan_cstats_log_nan_disable_resp_evt(uint8_t vdev_id,
+					 struct wlan_objmgr_psoc *psoc)
+{
+	struct cstats_nan_disc_disable_resp stat = {0};
+
+	stat.cmn.hdr.evt_id =
+	   WLAN_CHIPSET_STATS_NAN_DISCOVERY_DISABLE_RESP_EVENT_ID;
+	stat.cmn.hdr.length =
+		sizeof(struct cstats_nan_disc_disable_resp) -
+		sizeof(struct cstats_hdr);
+	stat.cmn.opmode = QDF_NAN_DISC_MODE;
+	stat.cmn.vdev_id = vdev_id;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.disc_state = nan_get_discovery_state(psoc);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_disc_disable_resp),
+			       &stat);
+}
+#endif /* WLAN_CHIPSET_STATS */
