@@ -2416,6 +2416,9 @@ static void fill_mld_interface(struct object_list *obj)
 	if (!obj)
 		return;
 
+	if (!libstats_is_ifname_valid(obj->ifname, STATS_OBJ_VAP))
+		return;
+
 	buffer.data = mld_intf;
 	buffer.length = sizeof(mld_intf);
 	wifi_cfg80211_send_getparam_command(&g_sock_ctx.cfg80211_ctxt,
@@ -2695,6 +2698,9 @@ static void *build_async_object(struct stats_command *cmd)
 	temp_obj = alloc_object(cmd->obj, ifname);
 	if (!temp_obj)
 		STATS_ERR("Failed to allocate object for OBJ %d!", cmd->obj);
+
+	if (temp_obj->obj_type == STATS_OBJ_VAP)
+		fill_mld_interface(temp_obj);
 
 	if (temp_obj->obj_type == STATS_OBJ_STA)
 		memcpy(temp_obj->hw_addr, cmd->sta_mac.ether_addr_octet,
