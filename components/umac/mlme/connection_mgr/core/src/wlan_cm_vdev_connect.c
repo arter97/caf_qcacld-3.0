@@ -1713,6 +1713,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	bool pairwise;
 	uint8_t vdev_id, link_id;
 	bool key_present = false;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint16_t max_key_index = WLAN_CRYPTO_MAXKEYIDX +
 				 WLAN_CRYPTO_MAXIGTKKEYIDX +
 				 WLAN_CRYPTO_MAXBIGTKKEYIDX;
@@ -1751,12 +1752,20 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 			continue;
 
 		pairwise = crypto_key->key_type ? WLAN_CRYPTO_KEY_TYPE_UNICAST : WLAN_CRYPTO_KEY_TYPE_GROUP;
-		mlo_debug("MLO:send keys for vdev_id %d link_id %d , key_idx %d, pairwise %d",
-			  vdev_id, link_id, i, pairwise);
-		mlme_cm_osif_send_keys(vdev, i, pairwise,
-				       crypto_key->cipher_type);
+		status = mlme_cm_osif_send_keys(vdev, i, pairwise,
+						crypto_key->cipher_type);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlo_err("MLO: fail to send key for vdev_id %d link_id %d , key_idx %d, pairwise %d",
+				vdev_id, link_id, i, pairwise);
+			goto err;
+		} else {
+			mlo_debug("MLO: send keys for vdev_id %d link_id %d , key_idx %d, pairwise %d",
+				  vdev_id, link_id, i, pairwise);
+		}
 		key_present = true;
 	}
+
+err:
 	wlan_crypto_release_lock();
 
 	if (!key_present && mlo_mgr_is_link_switch_in_progress(vdev)) {
