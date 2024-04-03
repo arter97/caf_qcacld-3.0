@@ -8449,13 +8449,14 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_config = &ap_ctx->sap_config;
 
-	hdd_nofl_info("%s(vdevid-%d): START AP: mode %s(%d) %d bw %d sub20 %d",
+	hdd_nofl_info("%s(vdevid-%d): START AP: mode %s(%d) %d bw %d (5MHz %d 10MHz %d)",
 		      dev->name, link_info->vdev_id,
 		      qdf_opmode_str(adapter->device_mode),
 		      adapter->device_mode,
 		      params->chandef.chan->center_freq,
 		      params->chandef.width,
-		      cds_is_sub_20_mhz_enabled());
+		      cds_is_5_mhz_enabled(),
+		      cds_is_10_mhz_enabled());
 
 	status =
 	ucfg_policy_mgr_pre_ap_start(hdd_ctx->psoc, link_info->vdev_id);

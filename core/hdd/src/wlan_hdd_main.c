@@ -2778,13 +2778,48 @@ static inline void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 }
 #endif
 
+/**
+ * hdd_update_sub_20_config() - Update sub 20 MHz channel width config
+ * @hdd_ctx: Pointer to the HDD context
+ * @sub_20_fw_support: fw support for sub 20 MHz channel width
+ *
+ * Update sub 20 MHz channel width config according to FW capability
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_update_sub_20_config(struct hdd_context *hdd_ctx, bool sub_20_fw_support)
+{
+	QDF_STATUS status;
+	struct hdd_config *config = hdd_ctx->config;
+
+	status = cds_set_sub_20_support(sub_20_fw_support);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to set sub20MHz channel width support");
+		return status;
+	}
+
+	if (!sub_20_fw_support)
+		config->sub_20_ch_width = WLAN_SUB_20_CH_WIDTH_NONE;
+
+	hdd_debug("sub20MHz channel width %u (fw support %u)",
+		  config->sub_20_ch_width, sub_20_fw_support);
+	status = ucfg_mlme_set_sub_20_chan_width(hdd_ctx->psoc,
+						 config->sub_20_ch_width);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to set sub20MHz channel width config");
+		return status;
+	}
+
+	return status;
+}
+
 int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 {
 	int ret;
 	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
 	uint32_t temp_band_cap, band_capability;
 	uint8_t antenna_mode;
-	uint8_t sub_20_chan_width;
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
 	bool bval = false;
@@ -2832,23 +2867,11 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	ucfg_ipa_set_dp_handle(hdd_ctx->psoc,
 			       cds_get_context(QDF_MODULE_ID_SOC));
 
-	status = cds_set_sub_20_support(cfg->sub_20_support);
+	status = hdd_update_sub_20_config(hdd_ctx, cfg->sub_20_support);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to set sub20MHz channel width support");
+		hdd_err("Failed to update sub20MHz channel width config");
 		ret = qdf_status_to_os_return(status);
 		goto pdev_close;
-	}
-
-	if (cfg->sub_20_support) {
-		status = ucfg_mlme_get_sub_20_chan_width(hdd_ctx->psoc,
-							 &sub_20_chan_width);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("Failed to get sub20MHz channel width config");
-			ret = qdf_status_to_os_return(status);
-			goto pdev_close;
-		}
-
-		cds_set_sub_20_channel_width(sub_20_chan_width);
 	}
 
 	status = ucfg_mlme_get_band_capability(hdd_ctx->psoc, &band_capability);
@@ -14928,6 +14951,7 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 	config->exclude_selftx_from_cca_busy =
 			cfg_get(psoc, CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME);
 	hdd_init_link_state_cfg(config, psoc);
+	config->sub_20_ch_width = cfg_get(psoc, CFG_SUB_20_CHANNEL_WIDTH);
 }
 
 #ifdef CONNECTION_ROAMING_CFG
@@ -15730,7 +15754,7 @@ static int hdd_update_cds_config(struct hdd_context *hdd_ctx)
 		ucfg_dp_is_rx_common_thread_enabled(hdd_ctx->psoc);
 	ucfg_mlme_get_sap_max_peers(hdd_ctx->psoc, &value);
 	cds_cfg->max_station = value;
-	cds_cfg->sub_20_channel_width = WLAN_SUB_20_CH_WIDTH_NONE;
+	cds_cfg->sub_20_channel_width = hdd_ctx->config->sub_20_ch_width;
 	cds_cfg->max_msdus_per_rxinorderind =
 		cfg_get(hdd_ctx->psoc, CFG_DP_MAX_MSDUS_PER_RXIND);
 	cds_cfg->self_recovery_enabled = self_recovery;
@@ -22586,6 +22610,74 @@ int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width)
 
 	hdd_err("Invalid ch_width %d", ch_width);
 	return -EINVAL;
+}
+
+QDF_STATUS
+hdd_update_sub20_chan_width(struct wlan_hdd_link_info *link_info,
+			    enum cfg_sub_20_channel_width sub_20_ch_width)
+{
+	QDF_STATUS status;
+	enum hdd_dot11_mode dot11_mode;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	if (ucfg_policy_mgr_get_connection_count(hdd_ctx->psoc)) {
+		hdd_info("sub20MHz chan width updating is not allowed when connection is present");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = cds_set_sub_20_channel_width(sub_20_ch_width);
+	if (status == QDF_STATUS_E_ALREADY) {
+		hdd_debug("sub20MHz chan width is already %u", sub_20_ch_width);
+		status = QDF_STATUS_SUCCESS;
+		goto out;
+	} else if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to set sub20MHz chan width: %u", status);
+		goto out;
+	}
+
+	hdd_debug("sub20MHz chan width to set: %u", sub_20_ch_width);
+	status = ucfg_mlme_set_sub_20_chan_width(hdd_ctx->psoc,
+						 sub_20_ch_width);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to set mlme sub20MHz chan width: %u", status);
+		goto out;
+	}
+
+	hdd_update_vdev_nss(hdd_ctx);
+	status = hdd_update_score_config(hdd_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to update score config: %u", status);
+		goto out;
+	}
+
+	dot11_mode = hdd_ctx->config->dot11Mode;
+	status = sme_set_phy_mode(hdd_ctx->mac_handle,
+				  hdd_cfg_xlate_to_csr_phy_mode(dot11_mode));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to set phy mode: %u", status);
+		goto out;
+	}
+
+	if (!hdd_update_config_cfg(hdd_ctx)) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	status = hdd_set_policy_mgr_user_cfg(hdd_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to set policy mgr user config: %u", status);
+		goto out;
+	}
+
+	status = sme_update_channel_list(hdd_ctx->mac_handle);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to update channel list: %u", status);
+		goto out;
+	}
+
+	hdd_ctx->config->sub_20_ch_width = sub_20_ch_width;
+out:
+	return status;
 }
 
 /* Register the module init/exit functions */

@@ -678,6 +678,12 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 	params.mld_id = ucfg_mlme_get_eht_mld_id(hdd_ctx->psoc);
 	hdd_debug("MLD ID: %d", params.mld_id);
 
+	if (cds_is_10_mhz_enabled())
+		params.half_rate = true;
+
+	if (cds_is_5_mhz_enabled())
+		params.quarter_rate = true;
+
 	status = wlan_cfg80211_scan(vdev, request, &params);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
 error:

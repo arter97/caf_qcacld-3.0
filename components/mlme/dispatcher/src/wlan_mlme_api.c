@@ -541,6 +541,25 @@ QDF_STATUS wlan_mlme_get_sub_20_chan_width(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS wlan_mlme_set_sub_20_chan_width(struct wlan_objmgr_psoc *psoc,
+					   uint8_t sub_20_chan_width)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!cfg_in_range(CFG_SUB_20_CHANNEL_WIDTH, sub_20_chan_width)) {
+		mlme_legacy_debug("Failed to set CFG_SUB_20_CHANNEL_WIDTH with %d",
+				  sub_20_chan_width);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_obj->cfg.gen.sub_20_chan_width = sub_20_chan_width;
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_mlme_get_fw_timeout_crash(struct wlan_objmgr_psoc *psoc,
 					  bool *fw_timeout_crash)
 {
