@@ -763,7 +763,7 @@
 
 #define CFG_MLO_MLO_5GL_5GH_MLSR CFG_INI_BOOL( \
 		"mlo_5gl_5gh_mlsr",\
-		0, \
+		1, \
 		"enable 5GL+5GH MLSR")
 
 #define CFG_MLO_MLO_5GL_5GH_MLSR_CFG CFG(CFG_MLO_MLO_5GL_5GH_MLSR)
