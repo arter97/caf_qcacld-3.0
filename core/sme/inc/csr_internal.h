@@ -404,12 +404,12 @@ struct csr_roamstruct {
  * The function return the min of supported dot11 mode and vdev type dot11mode
  * for given vdev type.
  *
- * Return:csr_cfgdot11mode
+ * Return: mlme_dot11_mode
  */
-enum csr_cfgdot11mode
+enum mlme_dot11_mode
 csr_get_vdev_dot11_mode(struct mac_context *mac,
 			uint8_t vdev_id,
-			enum csr_cfgdot11mode curr_dot11_mode);
+			enum mlme_dot11_mode curr_dot11_mode);
 
 QDF_STATUS csr_get_channel_and_power_list(struct mac_context *mac);
 
