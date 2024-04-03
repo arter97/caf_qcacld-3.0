@@ -103,6 +103,18 @@
 	 DP_SAWF_SERVICE_CLASS_SET(srvc_id) | \
 	 DP_SAWF_QUEUE_ID_SET(queue_id));
 
+#ifdef CONFIG_SAWF
+#ifdef SAWF_MSDUQ_DEBUG
+#define DP_SAWF_MSDUQ_STATS_INC(htt_ind_dbg, result) \
+	do { \
+		msduq->htt_ind_dbg.result++; \
+	} while (0)
+
+#else
+#define DP_SAWF_MSDUQ_STATS_INC(htt_ind_dbg, result)
+#endif
+#endif
+
 #define DP_SAWF_QUEUE_ID_GET(metadata) metadata & 0xFFFF
 #define DP_SAWF_INVALID_AST_IDX 0xffff
 #define DP_SAWF_MAX_DYNAMIC_AST 2
@@ -468,6 +480,13 @@ QDF_STATUS
 dp_sawf_get_peer_msduq_svc_params(struct cdp_soc_t *soc, uint8_t *mac,
 				  void *data);
 
+#ifdef SAWF_MSDUQ_DEBUG
+struct msduq_htt_stats {
+	uint16_t recv_failure;
+	uint16_t timeout;
+};
+#endif
+
 struct dp_sawf_msduq {
 	qdf_atomic_t ref_count;
 	uint32_t tgt_opaque_id;
@@ -478,6 +497,10 @@ struct dp_sawf_msduq {
 	uint8_t is_deactivation_needed:1,
 		no_resp_ind:1,
 		reserved:6;
+#ifdef SAWF_MSDUQ_DEBUG
+	struct msduq_htt_stats deactivate_stats;
+	struct msduq_htt_stats reactivate_stats;
+#endif
 };
 
 struct dp_sawf_msduq_tid_map {

@@ -420,9 +420,13 @@ dp_htt_sawf_msduq_recfg_ind(struct htt_soc *soc, uint32_t *msg_word)
 	switch (curr_q_state) {
 	case SAWF_MSDUQ_DEACTIVATE_PENDING:
 		new_q_state = is_success ? SAWF_MSDUQ_DEACTIVATED : SAWF_MSDUQ_IN_USE;
+		if (!is_success)
+			DP_SAWF_MSDUQ_STATS_INC(deactivate_stats, recv_failure);
 		break;
 	case SAWF_MSDUQ_REACTIVATE_PENDING:
 		new_q_state = is_success ? SAWF_MSDUQ_IN_USE : SAWF_MSDUQ_DEACTIVATED;
+		if (!is_success)
+			DP_SAWF_MSDUQ_STATS_INC(reactivate_stats, recv_failure);
 		break;
 	default:
 		dp_sawf_err("Invalid q_state:%d", curr_q_state);
