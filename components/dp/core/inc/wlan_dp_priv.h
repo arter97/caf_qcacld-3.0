@@ -679,6 +679,7 @@ struct dp_rx_fst {
  * @hlp_list_lock: Lock to protect hlp link_list operation
  * @hlp_list: List of HLP peers for HLP response handling
  * @disable_rx_aggr: Disable Rx aggregation
+ * @spm_intf_ctx: SPM interface context
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -756,6 +757,9 @@ struct wlan_dp_intf {
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
 	bool disable_rx_aggr[CTRL_RX_AGGR_ID_MAX];
+#endif
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_FEATURE_MLSTC)
+	struct wlan_dp_spm_intf_context *spm_intf_ctx;
 #endif
 };
 
@@ -901,6 +905,7 @@ struct wlan_dp_stc;
  * @lb_data: wlan load balance data structure
  * @cpuhp_event_handle: event handle for cpu hotplug
  * @dp_stc: STC context
+ * @spm_ctx: Servicy policy manager context
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1012,6 +1017,9 @@ struct wlan_dp_psoc_context {
 #endif
 #ifdef WLAN_DP_FEATURE_STC
 	struct wlan_dp_stc *dp_stc;
+#endif
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_FEATURE_MLSTC)
+	struct wlan_dp_spm_context *spm_ctx;
 #endif
 };
 

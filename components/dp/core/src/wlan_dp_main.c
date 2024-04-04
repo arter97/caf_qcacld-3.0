@@ -47,6 +47,7 @@
 #include <cdp_txrx_ctrl.h>
 #include "wlan_dp_svc.h"
 #include "wlan_dp_stc.h"
+#include "wlan_dp_spm.h"
 
 #ifdef WLAN_DP_PROFILE_SUPPORT
 /* Memory profile table based on supported caps */
@@ -1411,7 +1412,7 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		dp_nud_ignore_tracking(dp_intf, false);
 		dp_mic_enable_work(dp_intf);
 		dp_flow_priortization_init(dp_intf);
-
+		wlan_dp_spm_intf_ctx_init(dp_intf);
 		if (dp_intf->device_mode == QDF_SAP_MODE ||
 		    dp_intf->device_mode == QDF_P2P_GO_MODE) {
 			dp_intf->sap_tx_block_mask = true;
@@ -1495,6 +1496,7 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		 * Interface level operations are stopped when last
 		 * link is deleted
 		 */
+		wlan_dp_spm_intf_ctx_deinit(dp_intf);
 		dp_flow_priortization_deinit(dp_intf);
 		dp_nud_ignore_tracking(dp_intf, true);
 		dp_nud_reset_tracking(dp_intf);
