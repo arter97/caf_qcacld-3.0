@@ -125,6 +125,9 @@ void wlan_dp_spm_ctx_deinit(struct wlan_dp_psoc_context *dp_ctx)
 	dp_info("Deinitialized SPM context!");
 }
 #else
+/* Flow Unique ID generator */
+static uint64_t flow_guid_gen;
+
 /**
  * wlan_dp_spm_get_context(): Get SPM context from DP PSOC interface
  *
@@ -220,8 +223,8 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 	return QDF_STATUS_SUCCESS;
 
 fail_flow_rec_freelist:
-	qdf_mem_free(spm_intf_ctx);
-	spm_intf_ctx = NULL;
+	qdf_mem_free(spm_intf);
+	spm_intf = NULL;
 
 fail_intf_alloc:
 	return QDF_STATUS_E_FAILURE;
@@ -252,4 +255,67 @@ void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 	if (spm_ctx)
 		spm_ctx->spm_intf = NULL;
 	dp_info("SPM interface deinitialized!");
+}
+
+QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
+					  uint16_t *flow_id,
+					  struct flow_info *flow_info,
+					  uint64_t cookie_sk, uint16_t peer_id)
+{
+	struct wlan_dp_spm_intf_context *spm_intf;
+	struct wlan_dp_spm_flow_info *flow_rec = NULL;
+
+	if (!dp_intf->spm_intf_ctx) {
+		dp_info("Feature not supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	spm_intf = dp_intf->spm_intf_ctx;
+
+	qdf_list_remove_front(&spm_intf->o_flow_rec_freelist,
+			      (qdf_list_node_t **)&flow_rec);
+
+	if (!flow_rec) {
+		dp_info_rl("records freelist size: %u, Active flow table full!",
+			   spm_intf->o_flow_rec_freelist.count);
+		return QDF_STATUS_E_EMPTY;
+	}
+
+	/* Copy data to flow record */
+	flow_rec->guid = flow_guid_gen++;
+	flow_rec->peer_id = peer_id;
+	qdf_mem_copy(&flow_rec->info, flow_info, sizeof(struct flow_info));
+	flow_rec->svc_id = WLAN_DP_SPM_INVALID_METADATA;
+	flow_rec->svc_metadata = WLAN_DP_SPM_INVALID_METADATA;
+	flow_rec->flags |= DP_SPM_FLOW_FLAG_IN_USE;
+	flow_rec->cookie = cookie_sk;
+	flow_rec->active_ts = qdf_sched_clock();
+
+	/* put the flow record in table and fill stats */
+	spm_intf->origin_aft[flow_rec->id] = flow_rec;
+	spm_intf->o_stats.active++;
+
+	*flow_id = flow_rec->id;
+
+	/* Trigger flow retiring event at threshold */
+	if (spm_intf->o_flow_rec_freelist.count < 10)
+		wlan_dp_spm_flow_retire(dp_intf->spm_intf_ctx, false);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
+				 uint16_t flow_id, uint64_t flow_guid)
+{
+	struct wlan_dp_spm_flow_info *flow_rec = NULL;
+
+	if (flow_id >= WLAN_DP_SPM_FLOW_REC_TBL_MAX)
+		return;
+
+	flow_rec = spm_intf->origin_aft[flow_id];
+
+	if (flow_rec && flow_rec->guid == flow_guid)
+		flow_rec->active_ts = qdf_sched_clock();
+	else
+		dp_info("Flow %u with guid %lu not found", flow_id, flow_guid);
 }

@@ -192,6 +192,32 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf);
  * Return: None
  */
 void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf);
+
+/**
+ * wlan_dp_spm_get_flow_id_origin() - Get flow ID for a new flow
+ * @dp_intf: DP interface
+ * @flow_id: ID place holder.
+ * @flow_info: Flow related information
+ * @cookie_sk: Sock structure pointer to be used as cookie
+ * @peer_id: Peer ID
+ *
+ * Return: Success if flow is successfully added to flow table
+ */
+QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
+					  uint16_t *flow_id,
+					  struct flow_info *flow_info,
+					  uint64_t cookie_sk, uint16_t peer_id);
+
+/**
+ * wlan_dp_spm_set_flow_active(): Set active ts for a flow
+ * @spm_intf: SPM interface
+ * @flow_id: Flow ID
+ * @flow_guid: Flow Unique ID
+ *
+ * Return: None
+ */
+void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
+				 uint16_t flow_id, uint64_t flow_guid);
 #else
 static inline
 QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
@@ -201,6 +227,21 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 
 static inline
 void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
+{
+}
+
+static inline
+QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
+					  uint16_t *flow_id,
+					  struct flow_info *flow_info,
+					  uint64_t cookie_sk, uint16_t peer_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
+				 uint16_t flow_id, uint64_t flow_guid)
 {
 }
 #endif
