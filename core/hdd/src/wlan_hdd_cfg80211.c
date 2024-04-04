@@ -23566,6 +23566,57 @@ hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter)
 #endif
 
 /**
+ * hdd_adapter_reset_ml_cap() - reset mlo adapter info
+ * @hdd_ctx: HDD context
+ * @adapter: HDD adapter
+ *
+ * This function reset mlo related adapter info
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS hdd_adapter_reset_ml_cap(struct hdd_context *hdd_ctx,
+					   struct hdd_adapter *adapter)
+{
+	bool eht_capab;
+	QDF_STATUS status;
+
+	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+	if (!eht_capab)
+		return QDF_STATUS_SUCCESS;
+
+	/* if interface is change from STA to SAP,
+	 * then enable is_ml_adapter as default
+	 */
+	if (QDF_SAP_MODE == adapter->device_mode)
+		hdd_adapter_set_ml_adapter(adapter);
+
+	if (!hdd_adapter_is_ml_adapter(adapter))
+		return QDF_STATUS_SUCCESS;
+
+	switch (adapter->device_mode) {
+	case QDF_SAP_MODE:
+		hdd_adapter_set_sl_ml_adapter(adapter);
+		adapter->active_links = 0x1;
+		break;
+	case QDF_STA_MODE:
+		hdd_adapter_clear_sl_ml_adapter(adapter);
+
+		status = hdd_adapter_update_mac_on_mode_change(adapter);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
+
+		adapter->active_links =
+				(1 << adapter->num_links_on_create) - 1;
+		break;
+	default:
+		hdd_adapter_clear_sl_ml_adapter(adapter);
+		adapter->active_links = 0x1;
+		break;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * __wlan_hdd_cfg80211_change_iface() - change interface cfg80211 op
  * @wiphy: Pointer to the wiphy structure
  * @ndev: Pointer to the net device
@@ -23589,7 +23640,6 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 	QDF_STATUS status;
 	int errno;
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
-	bool eht_capab;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter();
@@ -23726,28 +23776,10 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 		goto err;
 	}
 
-	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (eht_capab && hdd_adapter_is_ml_adapter(adapter)) {
-		switch (adapter->device_mode) {
-		case QDF_SAP_MODE:
-			hdd_adapter_set_sl_ml_adapter(adapter);
-			adapter->active_links = 0x1;
-			break;
-		case QDF_STA_MODE:
-			hdd_adapter_clear_sl_ml_adapter(adapter);
-
-			status = hdd_adapter_update_mac_on_mode_change(adapter);
-			if (QDF_IS_STATUS_ERROR(status))
-				goto err;
-
-			adapter->active_links =
-					(1 << adapter->num_links_on_create) - 1;
-			break;
-		default:
-			hdd_adapter_clear_sl_ml_adapter(adapter);
-			adapter->active_links = 0x1;
-			break;
-		}
+	status = hdd_adapter_reset_ml_cap(hdd_ctx, adapter);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		errno = -EINVAL;
+		goto err;
 	}
 
 	/* restart the adapter if it was up before the change iface request */
