@@ -45,6 +45,7 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_dp_api.h"
+#include <wlan_cp_stats_chipset_stats.h>
 
 #ifdef WLAN_FEATURE_FILS_SK
 void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
@@ -1724,6 +1725,70 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	mlo_defer_set_keys(vdev, link_id, false);
 }
 
+#ifdef WLAN_CHIPSET_STATS
+void cm_cp_stats_cstats_log_connect_event(struct wlan_objmgr_vdev *vdev,
+					  struct wlan_cm_connect_resp *rsp)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_channel *des_chan;
+	enum phy_ch_width ch_width = CH_WIDTH_20MHZ;
+	struct wlan_crypto_params *crypto_params;
+	struct cstats_sta_connect_resp stat = {0};
+
+	if (QDF_IS_STATUS_SUCCESS(rsp->connect_status)) {
+		stat.cmn.hdr.evt_id =
+			WLAN_CHIPSET_STATS_STA_CONNECT_SUCCESS_EVENT_ID;
+	} else {
+		stat.cmn.hdr.evt_id =
+			WLAN_CHIPSET_STATS_STA_CONNECT_FAIL_EVENT_ID;
+	}
+
+	wlan_mlme_get_sta_ch_width(vdev, &ch_width);
+	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_err("vdev component object is NULL");
+		return;
+	}
+
+	crypto_params = wlan_crypto_vdev_get_crypto_params(vdev);
+	if (!crypto_params) {
+		mlme_err("crypto params is null");
+		return;
+	}
+
+	cm_diag_get_auth_type(&stat.auth_type,
+			      crypto_params->authmodeset,
+			      crypto_params->key_mgmt,
+			      crypto_params->ucastcipherset);
+
+	stat.cmn.hdr.length = sizeof(struct cstats_sta_connect_resp) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.freq = rsp->freq;
+	stat.chnl_bw = cm_get_diag_ch_width(ch_width);
+	stat.dot11mode = cm_diag_dot11_mode_from_phy_mode(des_chan->ch_phymode);
+	stat.qos_capability = vdev_mlme->ext_vdev_ptr->connect_info.qos_enabled;
+	stat.encryption_type =
+			cm_get_diag_enc_type(crypto_params->ucastcipherset);
+	stat.result_code = rsp->connect_status;
+	stat.ssid_len = rsp->ssid.length;
+	qdf_mem_copy(stat.ssid, rsp->ssid.ssid, rsp->ssid.length);
+	CSTATS_MAC_COPY(stat.bssid, rsp->bssid.bytes);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_sta_connect_resp), &stat);
+}
+#else
+static inline void
+cm_cp_stats_cstats_log_connect_event(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_cm_connect_resp *rsp)
+{
+}
+#endif /* WLAN_CHIPSET_STATS */
+
 QDF_STATUS
 cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			struct wlan_cm_connect_resp *rsp)
@@ -1756,6 +1821,8 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 	}
 
 	cm_csr_connect_done_ind(vdev, rsp);
+
+	cm_cp_stats_cstats_log_connect_event(vdev, rsp);
 
 	cm_connect_info(vdev, QDF_IS_STATUS_SUCCESS(rsp->connect_status) ?
 			true : false, &rsp->bssid, &rsp->ssid,
