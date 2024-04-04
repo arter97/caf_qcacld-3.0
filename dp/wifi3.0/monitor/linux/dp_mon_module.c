@@ -195,6 +195,8 @@ int monitor_mod_init(void)
 
 #ifndef QCA_SINGLE_WIFI_3_0
 module_init(monitor_mod_init);
+#else
+qdf_export_symbol(monitor_mod_init);
 #endif
 /**
  * monitor_mod_exit() - module remove
@@ -282,4 +284,6 @@ void monitor_mod_exit(void)
 
 #ifndef QCA_SINGLE_WIFI_3_0
 module_exit(monitor_mod_exit);
+#else
+qdf_export_symbol(monitor_mod_exit);
 #endif
