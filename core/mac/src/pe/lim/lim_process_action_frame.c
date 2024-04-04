@@ -2266,8 +2266,8 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		}
 		break;
 	default:
-		pe_warn_rl("Action category: %d not handled",
-			action_hdr->category);
+		pe_debug_rl("Action category: %d not handled",
+			    action_hdr->category);
 		break;
 	}
 
