@@ -495,10 +495,145 @@ void wlan_dp_spm_ctx_deinit(struct wlan_dp_psoc_context *dp_ctx)
 	dp_ctx->spm_ctx = NULL;
 	dp_info("Deinitialized SPM context!");
 }
-#else
-/* Flow Unique ID generator */
-static uint64_t flow_guid_gen;
 
+QDF_STATUS wlan_dp_spm_svc_class_create(struct dp_svc_data *data)
+{
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_svc_class *svc_class_new;
+
+	if (!spm_ctx) {
+		dp_info("Feature not supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	if (data->svc_id > spm_ctx->max_supported_svc_class) {
+		dp_err("Invalid svc ID %u", data->svc_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (spm_ctx->svc_class_db[data->svc_id]) {
+		dp_err("Svc already exists for id: %u", data->svc_id);
+		return QDF_STATUS_E_ALREADY;
+	}
+
+	svc_class_new = (struct wlan_dp_spm_svc_class *)
+				qdf_mem_malloc(sizeof(*svc_class_new));
+	if (!svc_class_new) {
+		dp_err("Unable to allocate svc class");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	svc_class_new->id = data->svc_id;
+	svc_class_new->tid = data->tid;
+	svc_class_new->msdu_loss_rate = data->msdu_loss_rate;
+	qdf_list_create(&svc_class_new->policy_list, 0);
+
+	spm_ctx->svc_class_db[data->svc_id] = svc_class_new;
+	/* TBD: send service class WMI cmd to FW */
+
+	dp_info("New service class %u: TID: %u, MSDU loss rate: %u",
+		svc_class_new->id, svc_class_new->tid,
+		svc_class_new->msdu_loss_rate);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void wlan_dp_spm_svc_class_delete(uint32_t svc_id)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_svc_class *svc_class;
+
+	if (!spm_ctx) {
+		dp_info("Feature not supported");
+		return;
+	}
+
+	svc_class = spm_ctx->svc_class_db[svc_id];
+	if (!spm_ctx->svc_class_db[svc_id]) {
+		dp_err("Service %u not present", svc_id);
+		return;
+	}
+
+	if (!svc_class->policy_list.count) {
+		dp_info("No policies attached for service: %u", svc_id);
+	/**
+	 * TBD: Will be implemented when message interface is set for SAWFISH
+	 * if (svc_class->queue_info.metadata != WLAN_DP_SPM_INVALID_METADATA) {
+	 * dp_htt_send_svc_map_msg()
+	 */
+		qdf_mem_free(svc_class);
+		spm_ctx->svc_class_db[svc_id] = NULL;
+		dp_info("Deleted svc class %u: TID: %u MSDU loss rate %u Policies attached %u Metadata: %u",
+			svc_class->id, svc_class->tid,
+			svc_class->msdu_loss_rate,
+			svc_class->policy_list.count,
+			svc_class->queue_info.metadata);
+	} else {
+		wlan_dp_spm_event_post(WLAN_DP_SPM_EVENT_SERVICE_DELETE,
+				       (void *)svc_class);
+	}
+}
+
+uint8_t wlan_dp_spm_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
+			    uint16_t table_size)
+{
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_svc_class *svc_class = NULL;
+	int i = 0;
+
+	if (!spm_ctx) {
+		dp_info("Feature not supported");
+		return i;
+	}
+
+	if (svc_id != WLAN_DP_SPM_INVALID_METADATA) {
+		if (svc_id < spm_ctx->max_supported_svc_class) {
+			svc_class = spm_ctx->svc_class_db[svc_id];
+			svc_table[0].svc_id = svc_class->id;
+			svc_table[0].tid = svc_class->tid;
+			svc_table[0].msdu_loss_rate = svc_class->msdu_loss_rate;
+			i++;
+		}
+	} else {
+		for (i = 0; i < spm_ctx->max_supported_svc_class; i++) {
+			if (spm_ctx->svc_class_db[svc_id]) {
+				svc_class = spm_ctx->svc_class_db[svc_id];
+				svc_table[i].svc_id = svc_class->id;
+				svc_table[i].tid = svc_class->tid;
+				svc_table[i].msdu_loss_rate =
+						svc_class->msdu_loss_rate;
+			}
+		}
+	}
+
+	return i;
+}
+
+void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg)
+{
+	/* TBD: Will be implemented when message interface is set for SAWFISH */
+}
+
+uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
+				      uint16_t flow_id, uint64_t cookie)
+{
+	struct wlan_dp_spm_flow_info *flow;
+
+	flow = spm_intf->origin_aft[flow_id];
+
+	qdf_assert(flow);
+
+	if (flow->cookie != cookie) {
+		dp_info("Flow cookie %lu mismatch against table %lu", cookie,
+			flow->cookie);
+		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
+	}
+
+	flow->active_ts = qdf_sched_clock();
+	return flow->svc_metadata;
+}
+#else
 /**
  * wlan_dp_spm_get_context(): Get SPM context from DP PSOC interface
  *
@@ -542,6 +677,8 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 	}
 }
 #endif
+/* Flow Unique ID generator */
+static uint64_t flow_guid_gen;
 
 QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 {

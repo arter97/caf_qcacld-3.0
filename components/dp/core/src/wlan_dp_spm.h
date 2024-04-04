@@ -192,6 +192,53 @@ QDF_STATUS wlan_dp_spm_ctx_init(struct wlan_dp_psoc_context *dp_ctx,
  */
 void wlan_dp_spm_ctx_deinit(struct wlan_dp_psoc_context *dp_ctx);
 
+/**
+ * wlan_dp_spm_svc_class_create(): Create new service class and attach to
+ *                                 database
+ * @data: Service class parameters
+ *
+ * Return: Success if created, else failure code
+ */
+QDF_STATUS wlan_dp_spm_svc_class_create(struct dp_svc_data *data);
+
+/**
+ * wlan_dp_spm_svc_class_delete(): Delete service class and detach from database
+ * @svc_id: Service class ID
+ *
+ * Return: None
+ */
+void wlan_dp_spm_svc_class_delete(uint32_t svc_id);
+
+/**
+ * wlan_dp_spm_svc_get(): Send service info to middleware
+ * @svc_id: If specific svc id is required
+ * @svc_table: service table to be filled
+ * @table_size: Table size
+ *
+ * Return: Number of services being sent
+ */
+uint8_t wlan_dp_spm_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
+			    uint16_t table_size);
+
+/**
+ * wlan_dp_spm_svc_set_queue_info(): Set queue info for service class
+ * @msg_word: Pointer to htt msg word.
+ * @htt_t2h_msg: HTT message nbuf
+ *
+ * Return: None
+ */
+void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg);
+
+/**
+ * wlan_dp_spm_svc_get_metadata() - Get service metadata for flow:
+ * @spm_intf: SPM interface
+ * @flow_id: Flow ID
+ * @cookie: sock address or hash value depending on traffic
+ *
+ * Return: Service metadata for the flow
+ */
+uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
+				      uint16_t flow_id, uint64_t cookie);
 #else
 static inline
 QDF_STATUS wlan_dp_spm_ctx_init(struct wlan_dp_psoc_context *dp_ctx,
@@ -202,6 +249,36 @@ QDF_STATUS wlan_dp_spm_ctx_init(struct wlan_dp_psoc_context *dp_ctx,
 
 static inline
 QDF_STATUS wlan_dp_spm_ctx_deinit(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_spm_svc_class_create(struct dp_svc_data *data)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void wlan_dp_spm_svc_class_delete(uint32_t svc_id)
+{
+}
+
+static inline
+uint8_t wlan_dp_spm_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
+			    uint16_t table_size)
+{
+	return 0;
+}
+
+static inline
+void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg)
+{
+}
+
+static inline
+uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
+				      uint16_t flow_id, uint64_t cookie)
 {
 	return QDF_STATUS_SUCCESS;
 }
