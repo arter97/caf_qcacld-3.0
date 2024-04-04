@@ -4087,13 +4087,15 @@ lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 					wlan_pdev_get_psoc(mac_ctx->pdev),
 					cache_entry);
 
+	util_scan_free_cache_entry(cache_entry);
+
 	if (!is_security_allowed) {
 		mlme_debug("current security is not valid for partner link link_addr:" QDF_MAC_ADDR_FMT,
 			   QDF_MAC_ADDR_REF(link_addr->bytes));
-		util_scan_free_cache_entry(cache_entry);
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	util_scan_free_cache_entry(cache_entry);
 	return QDF_STATUS_SUCCESS;
 }
 #else
