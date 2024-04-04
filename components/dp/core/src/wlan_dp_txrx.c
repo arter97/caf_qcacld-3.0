@@ -43,6 +43,7 @@
 #include "wlan_tdls_api.h"
 #include <qdf_trace.h>
 #include <qdf_net_stats.h>
+#include <wlan_dp_stc.h>
 
 uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *link_ctx)
 {
@@ -118,12 +119,15 @@ void dp_event_eapol_log(qdf_nbuf_t nbuf, enum qdf_proto_dir dir)
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
 static int dp_intf_is_tx_allowed(qdf_nbuf_t nbuf,
-				 uint8_t intf_id, void *soc,
-				 uint8_t *peer_mac)
+				 uint8_t link_id, void *soc,
+				 uint8_t *peer_mac,
+				 struct cdp_peer_output_param *peer_info)
 {
 	enum ol_txrx_peer_state peer_state;
 
-	peer_state = cdp_peer_state_get(soc, intf_id, peer_mac, false);
+	cdp_peer_get_info_by_peer_addr(soc, peer_mac, link_id,
+				       peer_info);
+	peer_state = peer_info->state;
 	if (qdf_likely(OL_TXRX_PEER_STATE_AUTH == peer_state))
 		return true;
 	if (OL_TXRX_PEER_STATE_CONN == peer_state &&
@@ -584,6 +588,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 	uint8_t pkt_type;
 	struct qdf_mac_addr mac_addr_tx_allowed = QDF_MAC_ADDR_ZERO_INIT;
 	int cpu = qdf_get_smp_processor_id();
+	struct cdp_peer_output_param peer_info = {0};
 
 	stats = &dp_intf->dp_stats.tx_rx_stats;
 	++stats->per_cpu[cpu].tx_called;
@@ -684,12 +689,15 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 			     QDF_TX));
 
 	if (!dp_intf_is_tx_allowed(nbuf, dp_link->link_id, soc,
-				   mac_addr_tx_allowed.bytes)) {
+				   mac_addr_tx_allowed.bytes,
+				   &peer_info)) {
 		dp_info("Tx not allowed for sta:" QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(mac_addr_tx_allowed.bytes));
 		goto drop_pkt_and_release_nbuf;
 	}
 
+	wlan_dp_stc_mark_ping_ts(dp_ctx, &mac_addr_tx_allowed,
+				 peer_info.peer_id);
 	/* check whether need to linearize nbuf, like non-linear udp data */
 	if (dp_nbuf_nontso_linearize(nbuf) != QDF_STATUS_SUCCESS) {
 		dp_err_rl(" nbuf %pK linearize failed. drop the pkt", nbuf);
