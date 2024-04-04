@@ -240,17 +240,17 @@ enum wlan_epcs_frame {
  * options using bitmap based on following ENUM (Name of ENUM to be added)
  * @Min: 0x0
  * @Max: 0xFFFFFFFF
- * @Default: 0x0
+ * @Default: 0x20008 - To allow MLO WPA2-PMF cap APs and WPA3-SAE w/o H2E cap
  *
  * This INI is used to control the driver candidate selection and EHT
  * connection choice based on OEM configuration. The bitmap follows the
- * implementation from this ENUM (name of the ENUM to be added)
+ * implementation from wlan_crypto_oem_eht_mlo_config enum
  */
 #define CFG_OEM_EHT_MLO_CRYPTO_BITMAP CFG_INI_UINT( \
 		"oem_eht_mlo_crypto_bitmap", \
 		0x0, \
 		0xFFFFFFFF, \
-		0x0, \
+		0x20008, \
 		CFG_VALUE_OR_DEFAULT, \
 		"OEM control to allow/disallow crypto to EHT configuration")
 
