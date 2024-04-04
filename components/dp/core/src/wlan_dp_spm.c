@@ -633,6 +633,105 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
 	flow->active_ts = qdf_sched_clock();
 	return flow->svc_metadata;
 }
+
+QDF_STATUS wlan_dp_spm_policy_add(struct dp_policy *policy)
+{
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_svc_class *svc_class;
+	struct wlan_dp_spm_policy_info *new_policy;
+
+	if (!spm_ctx) {
+		dp_info("Feature not supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	if (!spm_ctx->svc_class_db[policy->svc_id]) {
+		dp_info("Service class not present");
+		return QDF_STATUS_E_EMPTY;
+	}
+	svc_class = spm_ctx->svc_class_db[policy->svc_id];
+
+	new_policy = (struct wlan_dp_spm_policy_info *)
+			qdf_mem_malloc(sizeof(*new_policy));
+	if (!new_policy) {
+		dp_info("Unable to allocate policy");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(&new_policy->flow, &policy->flow,
+		     sizeof(struct flow_info));
+	new_policy->id = policy->policy_id;
+
+	if ((policy->flags & DP_FLOW_TUPLE_FLAGS_SRC_PORT) &&
+	    (policy->flags & DP_FLOW_TUPLE_FLAGS_DST_PORT))
+		new_policy->is_5tuple = true;
+
+	new_policy->svc_id = policy->svc_id;
+
+	qdf_list_insert_back(&svc_class, &new_policy->node);
+
+	wlan_dp_spm_event_post(WLAN_DP_SPM_EVENT_POLICY_ADD,
+			       (void *)new_policy);
+
+	spm_ctx->policy_cnt++;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_dp_spm_policy_delete(uint32_t policy_id)
+{
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_svc_class **svc_class;
+	struct wlan_dp_spm_policy_info *policy, *delete_policy = NULL;
+	int i;
+
+	if (!spm_ctx) {
+		dp_info("Feature not supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	svc_class = spm_ctx->svc_class_db;
+	for (i = 0; i < spm_ctx->max_supported_svc_class; i++) {
+		if (!svc_class[i] || !svc_class[i]->policy_list.count)
+			continue;
+
+		qdf_list_for_each(&svc_class[i]->policy_list, policy, node) {
+			if (policy->id == policy_id) {
+				qdf_list_remove_node(&svc_class[i]->policy_list,
+						     &policy->node);
+				delete_policy = policy;
+				break;
+			}
+		}
+	}
+
+	dp_info("Deleting policy %u attached to svc id: %u", policy_id,
+		delete_policy->svc_id);
+
+	if (delete_policy) {
+		if (delete_policy->flows_attached) {
+			/* policy is deleted in the workqueue context*/
+			wlan_dp_spm_event_post(WLAN_DP_SPM_EVENT_POLICY_DELETE,
+					       (void *)delete_policy);
+		} else {
+			qdf_mem_free(delete_policy);
+			delete_policy = NULL;
+		}
+	} else {
+		return QDF_STATUS_E_INVAL;
+	}
+
+	spm_ctx->policy_cnt--;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_dp_spm_policy_update(struct dp_policy *policy)
+{
+	if (wlan_dp_spm_policy_delete(policy->policy_id))
+		return wlan_dp_spm_policy_add(policy);
+	else
+		return QDF_STATUS_E_INVAL;
+}
 #else
 /**
  * wlan_dp_spm_get_context(): Get SPM context from DP PSOC interface

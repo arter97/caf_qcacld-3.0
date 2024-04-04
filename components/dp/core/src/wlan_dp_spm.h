@@ -239,6 +239,30 @@ void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg);
  */
 uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
 				      uint16_t flow_id, uint64_t cookie);
+
+/**
+ * wlan_dp_spm_policy_add(): Add policy to a service
+ * @policy: Policy parameters
+ *
+ * Return: Success if added, else failure code
+ */
+QDF_STATUS wlan_dp_spm_policy_add(struct dp_policy *policy);
+
+/**
+ * wlan_dp_spm_policy_delete(): Delete policy to a service
+ * @policy_id: Policy ID to be deleted
+ *
+ * Return: Success if deleted, else failure code
+ */
+QDF_STATUS wlan_dp_spm_policy_delete(uint32_t policy_id);
+
+/**
+ * wlan_dp_spm_policy_update(): Update an existing policy
+ * @policy: Policy parameters
+ *
+ * Return: Success if updated, else failure code
+ */
+QDF_STATUS wlan_dp_spm_policy_update(struct dp_policy *policy);
 #else
 static inline
 QDF_STATUS wlan_dp_spm_ctx_init(struct wlan_dp_psoc_context *dp_ctx,
@@ -248,7 +272,7 @@ QDF_STATUS wlan_dp_spm_ctx_init(struct wlan_dp_psoc_context *dp_ctx,
 }
 
 static inline
-QDF_STATUS wlan_dp_spm_ctx_deinit(struct wlan_dp_psoc_context *dp_ctx)
+QDF_STATUS wlan_spm_ctx_deinit(struct wlan_dp_psoc_context *dp_ctx)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -279,6 +303,24 @@ void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg)
 static inline
 uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
 				      uint16_t flow_id, uint64_t cookie)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_dp_spm_policy_add(struct dp_policy *policy)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_dp_spm_policy_delete(uint32_t policy_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_dp_spm_policy_update(struct dp_policy *policy)
 {
 	return QDF_STATUS_SUCCESS;
 }
