@@ -25,6 +25,377 @@ struct wlan_dp_spm_context *wlan_dp_spm_get_context(void)
 	return dp_ctx ? dp_ctx->spm_ctx : NULL;
 }
 
+/**
+ * wlan_dp_spm_update_svc_metadata(): Update service metadata for a service
+ *                                    class
+ * @svc_class: Service class for which metadata is required
+ * @peer_id: Peer ID
+ *
+ * Return: Service metadata
+ */
+static inline uint8_t
+wlan_dp_spm_update_svc_metadata(struct wlan_dp_spm_svc_class *svc_class,
+				uint16_t peer_id)
+{
+	/**
+	 * TBD: Will be implemented when message interface is set for SAWFISH
+	 * (peer_id != svc_class->queue_info.peer_id ||
+	 *   !svc_class->queue_info.metadata) {
+	 * dp_htt_send_svc_map_msg()
+	 */
+
+	return WLAN_DP_SPM_INVALID_METADATA;
+}
+
+/**
+ * wlan_dp_spm_match_flow_to_policy(): Match flow to a policy's parameters
+ * @flow: Flow to be matched
+ * @policy: Policy which needs to be matched with
+ *
+ * Return: True/False
+ */
+static bool wlan_dp_spm_match_flow_to_policy(struct flow_info *flow,
+					struct wlan_dp_spm_policy_info *policy)
+{
+	struct flow_info *policy_flow = &policy->flow;
+
+	if (flow->flags & DP_FLOW_TUPLE_FLAGS_IPV4) {
+		if (flow->flags & DP_FLOW_TUPLE_FLAGS_SRC_IP)
+			if (flow->src_ip.ipv4_addr !=
+				policy_flow->src_ip.ipv4_addr)
+				return false;
+		if (flow->flags & DP_FLOW_TUPLE_FLAGS_DST_IP)
+			if (flow->dst_ip.ipv4_addr !=
+				policy_flow->dst_ip.ipv4_addr)
+				return false;
+	} else if (flow->flags & DP_FLOW_TUPLE_FLAGS_IPV6) {
+		if (flow->flags & DP_FLOW_TUPLE_FLAGS_SRC_IP)
+			if (qdf_mem_cmp(flow->src_ip.ipv6_addr,
+					policy_flow->src_ip.ipv6_addr,
+					sizeof(struct in6_addr)))
+				return false;
+		if (flow->flags & DP_FLOW_TUPLE_FLAGS_DST_IP)
+			if (qdf_mem_cmp(flow->dst_ip.ipv6_addr,
+					policy_flow->dst_ip.ipv6_addr,
+					sizeof(struct in6_addr)))
+				return false;
+	}
+
+	if (!policy->is_5tuple)
+		return true;
+
+	if (flow->flags & DP_FLOW_TUPLE_FLAGS_PROTO)
+		if (flow->proto != policy_flow->proto)
+			return false;
+
+	if (flow->flags & DP_FLOW_TUPLE_FLAGS_SRC_PORT)
+		if (flow->src_port != policy_flow->src_port)
+			return false;
+	if (flow->flags & DP_FLOW_TUPLE_FLAGS_DST_PORT)
+		if (flow->dst_port != policy_flow->dst_port)
+			return false;
+
+	return true;
+}
+
+/**
+ * wlan_dp_spm_flow_get_service(): Find service for an incoming flow
+ * @new_flow: Flow info
+ *
+ * Return: None
+ */
+static void wlan_dp_spm_flow_get_service(struct wlan_dp_spm_flow_info *new_flow)
+{
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_svc_class **svc_class;
+	struct wlan_dp_spm_policy_info *policy;
+	int i;
+
+	svc_class = spm_ctx->svc_class_db;
+	for (i = 0; i < spm_ctx->max_supported_svc_class; i++) {
+		if (!svc_class[i] || !svc_class[i]->policy_list.count)
+			continue;
+
+		qdf_list_for_each(&svc_class[i]->policy_list, policy, node) {
+			if (wlan_dp_spm_match_flow_to_policy(&new_flow->info,
+							     policy)) {
+				new_flow->svc_metadata =
+				wlan_dp_spm_update_svc_metadata(svc_class[i],
+							new_flow->peer_id);
+				/* If svc metadata is not present, this loop
+				 * will be repeated again, hence skipping here
+				 */
+				if (new_flow->svc_metadata ==
+						WLAN_DP_SPM_INVALID_METADATA)
+					return;
+				new_flow->flags |=
+						DP_SPM_FLOW_FLAG_SVC_METADATA;
+				new_flow->svc_id = i;
+				policy->flows_attached++;
+				return;
+			}
+		}
+	}
+}
+
+/**
+ * wlan_dp_spm_unmap_svc_to_flow(): Unmap flow from a service
+ * @svc_id: Service ID
+ * @flow: Flow info to be checked against policies
+ *
+ * Return: None
+ */
+static inline
+void wlan_dp_spm_unmap_svc_to_flow(uint16_t svc_id, struct flow_info *flow)
+{
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_svc_class *svc_class = spm_ctx->svc_class_db[svc_id];
+	struct wlan_dp_spm_policy_info *policy;
+
+	if (svc_id == WLAN_DP_SPM_INVALID_METADATA)
+		return;
+
+	qdf_list_for_each(&svc_class->policy_list, policy, node) {
+		if (wlan_dp_spm_match_flow_to_policy(flow, policy)) {
+			policy->flows_attached--;
+			return;
+		}
+	}
+}
+
+/**
+ * wlan_dp_spm_flow_retire(): Retire flows in active flow table
+ * @spm_intf: SPM interface
+ * @clear_tbl: Set to clear the entire table
+ *
+ * Return: None
+ */
+static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
+				    bool clear_tbl)
+{
+	struct wlan_dp_spm_flow_info *cursor;
+	uint64_t curr_ts = qdf_sched_clock();
+	int i;
+
+	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++, cursor++) {
+		cursor = spm_intf->origin_aft[i];
+		if (!cursor)
+			continue;
+
+		if (clear_tbl) {
+			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
+					     &cursor->node);
+		} else if ((curr_ts - cursor->active_ts) > (5000 * 1000)) {
+			wlan_dp_spm_unmap_svc_to_flow(cursor->svc_id,
+						      &cursor->info);
+			qdf_mem_zero(cursor,
+				     sizeof(struct wlan_dp_spm_flow_info));
+			cursor->id = i;
+			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
+					     &cursor->node);
+			spm_intf->o_stats.active--;
+			spm_intf->o_stats.deleted++;
+		}
+	}
+}
+
+/**
+ * wlan_dp_spm_match_policy_to_active_flows(): Match policy with active flows
+ * @policy: Policy parameters
+ * @is_add: Indicates if policy is being added or deleted
+ *
+ * Return: None
+ */
+static void
+wlan_dp_spm_match_policy_to_active_flows(struct wlan_dp_spm_policy_info *policy,
+					 bool is_add)
+{
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_flow_info **o_aft;
+	int i;
+
+	if (!spm_ctx || !spm_ctx->spm_intf) {
+		dp_info("Feature not supported");
+		return;
+	}
+
+	o_aft = spm_ctx->spm_intf->origin_aft;
+
+	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++) {
+		if (!o_aft[i])
+			continue;
+
+		if (wlan_dp_spm_match_flow_to_policy(&o_aft[i]->info, policy)) {
+			if (is_add) {
+				o_aft[i]->svc_metadata =
+				wlan_dp_spm_update_svc_metadata(
+					spm_ctx->svc_class_db[policy->svc_id],
+					o_aft[i]->peer_id);
+				/* If svc metadata is not present, this loop
+				 * will be repeated again, hence skipping here
+				 */
+				if (o_aft[i]->svc_metadata ==
+						WLAN_DP_SPM_INVALID_METADATA)
+					return;
+				o_aft[i]->flags |=
+						DP_SPM_FLOW_FLAG_SVC_METADATA;
+				o_aft[i]->svc_id = policy->svc_id;
+				policy->flows_attached++;
+			} else {
+				o_aft[i]->svc_id =
+						WLAN_DP_SPM_INVALID_METADATA;
+				o_aft[i]->svc_metadata =
+						WLAN_DP_SPM_INVALID_METADATA;
+				policy->flows_attached--;
+			}
+		}
+	}
+}
+
+/**
+ * wlan_dp_spm_svc_map(): Map flows to a queue when service is attached to a
+ *                        queue
+ * @svc_class: Service class
+ *
+ * Return: None
+ */
+void wlan_dp_spm_svc_map(struct wlan_dp_spm_svc_class *svc_class)
+{
+	struct wlan_dp_spm_policy_info *policy;
+
+	qdf_list_for_each(&svc_class->policy_list, policy, node) {
+		wlan_dp_spm_match_policy_to_active_flows(policy, true);
+	}
+}
+
+/**
+ * wlan_dp_spm_svc_delete(): Delete service and unmap all attached flows
+ * @svc_class: Service class
+ *
+ * Return: None
+ */
+void wlan_dp_spm_svc_delete(struct wlan_dp_spm_svc_class *svc_class)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_policy_info *policy;
+
+	if (!spm_ctx) {
+		dp_info("Feature not supported");
+		return;
+	}
+
+	while ((policy = qdf_list_first_entry_or_null(&svc_class->policy_list,
+						struct wlan_dp_spm_policy_info,
+						node))) {
+		qdf_list_remove_node(&svc_class->policy_list, &policy->node);
+		wlan_dp_spm_match_policy_to_active_flows(policy, false);
+	}
+	qdf_list_destroy(&svc_class->policy_list);
+
+	/**
+	 * TBD: Will be implemented when message interface is set for SAWFISH
+	 * if (svc_class->queue_info.metadata != WLAN_DP_SPM_INVALID_METADATA) {
+	 * dp_htt_send_svc_map_msg()
+	 */
+
+	dp_info("Deleted svc class %u: TID: %u MSDU loss rate %u Policies attached %u Metadata: %u",
+		svc_class->id, svc_class->tid, svc_class->msdu_loss_rate,
+		svc_class->policy_list.count, svc_class->queue_info.metadata);
+
+	spm_ctx->svc_class_db[svc_class->id] = NULL;
+	qdf_mem_free(svc_class);
+}
+
+/**
+ * wlan_dp_spm_work_handler(): SPM work handler
+ * @arg: NULL
+ *
+ * Return: None
+ */
+static void wlan_dp_spm_work_handler(void *arg)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_spm_context *spm_ctx;
+	struct wlan_dp_spm_event *evt;
+
+	if (!dp_ctx || dp_ctx->spm_ctx) {
+		dp_info("Feature not supported");
+		return;
+	}
+
+	spm_ctx = dp_ctx->spm_ctx;
+
+	qdf_spinlock_acquire(&spm_ctx->evt_lock);
+	while ((evt = qdf_list_first_entry_or_null(&spm_ctx->evt_list,
+						   struct wlan_dp_spm_event,
+						   node))) {
+		qdf_list_remove_node(&spm_ctx->evt_list, &evt->node);
+		qdf_spinlock_release(&spm_ctx->evt_lock);
+
+		switch (evt->type) {
+		case WLAN_DP_SPM_EVENT_ACTIVE_FLOW_ADD:
+			wlan_dp_spm_flow_get_service(
+				(struct wlan_dp_spm_flow_info *)evt->data);
+			break;
+		case WLAN_DP_SPM_EVENT_ACTIVE_FLOW_RETIRE:
+			wlan_dp_spm_flow_retire(
+			  (struct wlan_dp_spm_intf_context *)evt->data, false);
+			break;
+		case WLAN_DP_SPM_EVENT_POLICY_ADD:
+			wlan_dp_spm_match_policy_to_active_flows(
+			    (struct wlan_dp_spm_policy_info *)evt->data, true);
+			break;
+		case WLAN_DP_SPM_EVENT_POLICY_DELETE:
+			wlan_dp_spm_match_policy_to_active_flows(
+			   (struct wlan_dp_spm_policy_info *)evt->data, false);
+			qdf_mem_free(evt->data);
+			break;
+		case WLAN_DP_SPM_EVENT_SERVICE_MAP:
+			wlan_dp_spm_svc_map(
+				(struct wlan_dp_spm_svc_class *)evt->data);
+			break;
+		case WLAN_DP_SPM_EVENT_SERVICE_DELETE:
+			wlan_dp_spm_svc_delete(
+				(struct wlan_dp_spm_svc_class *)evt->data);
+			break;
+		default:
+			dp_info("Unknown %u event type", evt->type);
+		}
+		qdf_mem_free(evt);
+		qdf_spinlock_acquire(&spm_ctx->evt_lock);
+	}
+	qdf_spinlock_release(&spm_ctx->evt_lock);
+}
+
+/**
+ * wlan_dp_spm_event_post(): Post event to SPM work
+ * @type: Event type
+ * @data: Related Data
+ *
+ * Return: none
+ */
+static inline
+void wlan_dp_spm_event_post(enum wlan_dp_spm_event_type type, void *data)
+{
+	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_spm_event *evt = qdf_mem_malloc(sizeof(*evt));
+
+	if (!evt) {
+		dp_err("unable to alloc mem for type %u", type);
+		return;
+	}
+
+	evt->type = type;
+	evt->data = data;
+
+	qdf_spinlock_acquire(&spm_ctx->evt_lock);
+	qdf_list_insert_back(&spm_ctx->evt_list, &evt->node);
+	qdf_spinlock_release(&spm_ctx->evt_lock);
+
+	qdf_queue_work(0, spm_ctx->spm_wq, &spm_ctx->spm_work);
+}
+
 QDF_STATUS wlan_dp_spm_ctx_init(struct wlan_dp_psoc_context *dp_ctx,
 				uint32_t queues_per_tid, uint32_t num_tids)
 {
@@ -64,7 +435,7 @@ QDF_STATUS wlan_dp_spm_ctx_init(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_list_create(&ctx->evt_list, 0);
 
 	status = qdf_create_work(NULL, &ctx->spm_work,
-				 wlan_dp_spm_work_handler, dp_ctx);
+				 wlan_dp_spm_work_handler, NULL);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("Work creation failed");
 		goto fail_work_creation;
@@ -138,14 +509,12 @@ struct wlan_dp_spm_context *wlan_dp_spm_get_context(void)
 {
 	return NULL;
 }
-#endif
-/**
- * wlan_dp_spm_flow_retire(): Retire flows in active flow table
- * @spm_intf: SPM interface
- * @clear_tbl: If set, clear entire table
- *
- * Return: None
- */
+
+static inline
+void wlan_dp_spm_event_post(enum wlan_dp_spm_event_type type, void *data)
+{
+}
+
 static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 				    bool clear_tbl)
 {
@@ -172,6 +541,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 		}
 	}
 }
+#endif
 
 QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 {
@@ -298,8 +668,14 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	*flow_id = flow_rec->id;
 
 	/* Trigger flow retiring event at threshold */
-	if (spm_intf->o_flow_rec_freelist.count < 10)
-		wlan_dp_spm_flow_retire(dp_intf->spm_intf_ctx, false);
+	if (spm_intf->o_flow_rec_freelist.count < 10) {
+		if (!wlan_dp_spm_get_context())
+			wlan_dp_spm_flow_retire(dp_intf->spm_intf_ctx, false);
+		else
+			wlan_dp_spm_event_post(
+					WLAN_DP_SPM_EVENT_ACTIVE_FLOW_RETIRE,
+					dp_intf->spm_intf_ctx);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }

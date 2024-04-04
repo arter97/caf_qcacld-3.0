@@ -15,6 +15,37 @@
 #define WLAN_DP_SPM_INVALID_METADATA 0xFF
 
 /**
+ * enum wlan_dp_spm_event_type - SPM event type
+ * @WLAN_DP_SPM_EVENT_ACTIVE_FLOW_ADD: Addition of a new active flow
+ * @WLAN_DP_SPM_EVENT_ACTIVE_FLOW_RETIRE: Flow retiring from active flow tables
+ *                                   operation
+ * @WLAN_DP_SPM_EVENT_POLICY_ADD: Addition of a new policy
+ * @WLAN_DP_SPM_EVENT_POLICY_DELETE: Deletion of policy
+ * @WLAN_DP_SPM_EVENT_SERVICE_MAP: Map event from FW for service
+ * @WLAN_DP_SPM_EVENT_SERVICE_DELETE: Deletion of service
+ */
+enum wlan_dp_spm_event_type {
+	WLAN_DP_SPM_EVENT_ACTIVE_FLOW_ADD,
+	WLAN_DP_SPM_EVENT_ACTIVE_FLOW_RETIRE,
+	WLAN_DP_SPM_EVENT_POLICY_ADD,
+	WLAN_DP_SPM_EVENT_POLICY_DELETE,
+	WLAN_DP_SPM_EVENT_SERVICE_MAP,
+	WLAN_DP_SPM_EVENT_SERVICE_DELETE,
+};
+
+/**
+ * struct wlan_dp_spm_event - Service policy manager workqueue event structure
+ * @node: node used for list operations
+ * @type: Operation type
+ * @data: Pointer to event data
+ */
+struct wlan_dp_spm_event {
+	qdf_list_node_t node;
+	enum wlan_dp_spm_event_type type;
+	void *data;
+};
+
+/**
  * struct wlan_dp_spm_flow_tbl_stats - Flow tables statistics
  * @total: Total flows tracked count
  * @active: Current active flows count
