@@ -328,6 +328,13 @@ dp_htt_sawf_msduq_recfg_ind(struct htt_soc *soc, uint32_t *msg_word)
 		return status;
 	}
 
+	if (!dp_peer_is_primary_link_peer(peer)) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		dp_sawf_err("Non primary link peer, soc_id:%d, peer:%d",
+			    dp_get_chip_id(soc->dp_soc), peer->peer_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	sawf_ctx = dp_peer_sawf_ctx_get(peer);
 	if (!sawf_ctx) {
 		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
@@ -403,12 +410,29 @@ dp_htt_sawf_msduq_recfg_ind(struct htt_soc *soc, uint32_t *msg_word)
 		     dp_sawf_msduq_state_to_string(curr_q_state),
 		     dp_sawf_msduq_state_to_string(new_q_state));
 
-	status = QDF_STATUS_SUCCESS;
 	if (!is_success) {
 		status = QDF_STATUS_E_FAILURE;
 		dp_sawf_err("Resp Failed for q_id:%d | svc_id:%d | q_state:%s with error code: 0x%x ",
 			    q_id, msduq->svc_id, dp_sawf_msduq_state_to_string(curr_q_state),
 			    err_code);
+		if (new_q_state == SAWF_MSDUQ_DEACTIVATED) {
+			/* Notify NM Manager about Reactivate failure */
+			if (dp_sawf_notify_deactivate_msduq(soc->dp_soc, peer,
+							    q_id, msduq->svc_id) != QDF_STATUS_SUCCESS)
+				dp_sawf_err("NOTIFY REACTIVATE FAILURE to NW Manager failed");
+		}
+	} else {
+		status = QDF_STATUS_SUCCESS;
+		dp_sawf_debug("Resp Success for q_id:%d | svc_id:%d", q_id, msduq->svc_id);
+
+		if (new_q_state == SAWF_MSDUQ_IN_USE)
+			telemetry_sawf_update_msduq_info(peer->sawf->telemetry_ctx,
+							 q_id, msduq->remapped_tid,
+							 msduq->htt_msduq, msduq->svc_id);
+		else
+			telemetry_sawf_clear_msduq_info(peer->sawf->telemetry_ctx,
+							q_id);
+
 	}
 
 	return status;

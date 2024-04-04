@@ -175,6 +175,15 @@ struct sawf_def_queue_report {
 	uint8_t svc_class_id;
 };
 
+/* Structure to pass relevant information for deprio */
+struct dp_sawf_flow_deprioritize_params {
+	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
+	uint32_t mark_metadata;
+	bool netdev_info_valid;
+	uint32_t netdev_ifindex;
+	uint8_t netdev_mac[QDF_MAC_ADDR_SIZE];
+};
+
 /**
  * sawf_mov_avg_params - SAWF telemetry moving average params
  * @packet: num of packets per window
@@ -658,4 +667,23 @@ dp_sawf_reinject_handler(struct dp_soc *soc, qdf_nbuf_t nbuf,
 void dp_sawf_peer_msduq_event_notify(struct dp_soc *soc, struct dp_peer *peer,
 				     uint8_t queue_id, uint8_t svc_id,
 				     enum cdp_sawf_peer_msduq_event event_type);
+
+/**
+ * dp_sawf_notify_deactivate_msduq - Collects required params and notify
+ * reactivate failure to NW Manager
+ *
+ * @soc: SOC handle
+ * @peer: peer handle
+ * @q_id: MSDUQ ID
+ * @svc_id: Service class ID
+ *
+ * Required params were collected and passed to notify_deactivate_msduq to
+ * notify reactivate failure to NW Manager
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ *
+ */
+QDF_STATUS
+dp_sawf_notify_deactivate_msduq(struct dp_soc *soc, struct dp_peer *peer,
+				uint8_t q_id, uint8_t svc_id);
 #endif /* DP_SAWF_H*/
