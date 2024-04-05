@@ -3490,7 +3490,8 @@ static void cm_fill_stop_reason(struct wlan_roam_stop_config *stop_req,
 {
 	if (reason == REASON_ROAM_SYNCH_FAILED)
 		stop_req->reason = REASON_ROAM_SYNCH_FAILED;
-	else if (reason == REASON_DRIVER_DISABLED)
+	else if (reason == REASON_DRIVER_DISABLED ||
+		 reason == REASON_VDEV_RESTART_FROM_HOST)
 		stop_req->reason = REASON_ROAM_STOP_ALL;
 	else if (reason == REASON_SUPPLICANT_DISABLED_ROAMING)
 		stop_req->reason = REASON_SUPPLICANT_DISABLED_ROAMING;
@@ -4894,6 +4895,21 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 				   requested_state, *vdev_id);
 			*is_rso_skip = true;
 		}
+	}
+
+	/*
+	 * Send RSO STOP before triggering a vdev restart on an MLO vdev
+	 * Send RSO START after CSA is completed on an MLO vdev
+	 */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    mlo_check_if_all_vdev_up(vdev) &&
+	    reason == REASON_VDEV_RESTART_FROM_HOST) {
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+
+		*is_rso_skip = false;
+		*vdev_id = wlan_vdev_get_id(assoc_vdev);
+		mlme_debug("MLO_CSA: Send RSO on assoc vdev %d", *vdev_id);
+		goto end;
 	}
 
 	if (!wlan_vdev_mlme_get_is_mlo_link(wlan_pdev_get_psoc(pdev),
