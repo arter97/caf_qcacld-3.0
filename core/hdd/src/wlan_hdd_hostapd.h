@@ -565,4 +565,99 @@ bool hdd_sap_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
  */
 bool hdd_mlosap_check_support_link_num(struct hdd_adapter *adapter);
 #endif
+
+#ifdef WLAN_CHIPSET_STATS
+/*
+ * hdd_cp_stats_cstats_sap_go_start_event() - chipset stats for sap/go start
+ * event
+ *
+ * @link_info: pointer to link_info object
+ * @sap_event: pointer to sap_event object
+ *
+ * Return : void
+ */
+void
+hdd_cp_stats_cstats_sap_go_start_event(struct wlan_hdd_link_info *link_info,
+				       struct sap_event *sap_event);
+
+/**
+ * hdd_cp_stats_cstats_sap_go_stop_event() - chipset stats for sap/go stop event
+ *
+ * @link_info: pointer to link_info object
+ * @sap_event: pointer to sap_event object
+ *
+ * Return : void
+ */
+void
+hdd_cp_stats_cstats_sap_go_stop_event(struct wlan_hdd_link_info *link_info,
+				      struct sap_event *sap_event);
+
+/**
+ * hdd_cp_stats_cstats_log_sap_go_sta_disassoc_event() - chipset stats for
+ * sap/go STA disconnect event
+ *
+ * @li: pointer to link_info object
+ * @sap_evt: pointer to sap_event object
+ *
+ * Return : void
+ */
+void
+hdd_cp_stats_cstats_log_sap_go_sta_disassoc_event(struct wlan_hdd_link_info *li,
+						  struct sap_event *sap_evt);
+
+/**
+ * hdd_cp_stats_cstats_log_sap_go_sta_assoc_reassoc_event() - chipset stats for
+ * sap/go STA assoc event
+ *
+ * @li: pointer to link_info object
+ * @sap_evt: pointer to sap_event object
+ *
+ * Return : void
+ */
+void
+hdd_cp_stats_cstats_log_sap_go_sta_assoc_reassoc_event
+		     (struct wlan_hdd_link_info *li, struct sap_event *sap_evt);
+
+/**
+ * hdd_cp_stats_cstats_log_sap_go_dfs_event() - chipset stats for
+ * sap/go dfs event
+ *
+ * @li: pointer to link_info object
+ * @event_id: eSapHddEvent event
+ *
+ * Return : void
+ */
+void hdd_cp_stats_cstats_log_sap_go_dfs_event(struct wlan_hdd_link_info *li,
+					      eSapHddEvent event_id);
+#else
+static inline void
+hdd_cp_stats_cstats_sap_go_start_event(struct wlan_hdd_link_info *link_info,
+				       struct sap_event *sap_event)
+{
+}
+
+static inline void
+hdd_cp_stats_cstats_sap_go_stop_event(struct wlan_hdd_link_info *link_info,
+				      struct sap_event *sap_event)
+{
+}
+
+static inline void
+hdd_cp_stats_cstats_log_sap_go_sta_disassoc_event(struct wlan_hdd_link_info *li,
+						  struct sap_event *sap_evt)
+{
+}
+
+static inline void
+hdd_cp_stats_cstats_log_sap_go_sta_assoc_reassoc_event
+		     (struct wlan_hdd_link_info *li, struct sap_event *sap_evt)
+{
+}
+
+static inline void
+hdd_cp_stats_cstats_log_sap_go_dfs_event(struct wlan_hdd_link_info *li,
+					 eSapHddEvent event_id)
+{
+}
+#endif /* WLAN_CHIPSET_STATS */
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */

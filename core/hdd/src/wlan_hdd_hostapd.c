@@ -2496,6 +2496,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			      ap_ctx->operating_chan_freq,
 			      sap_config->ch_params.ch_width);
 
+		hdd_cp_stats_cstats_sap_go_start_event(link_info, sap_event);
+
 		sap_config->ch_params = ap_ctx->sap_context->ch_params;
 		sap_config->sec_ch_freq = ap_ctx->sap_context->sec_ch_freq;
 
@@ -2686,6 +2688,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		hdd_debug("BSS stop status = %s",
 		       sap_event->sapevt.sapStopBssCompleteEvent.
 		       status ? "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
+		hdd_cp_stats_cstats_sap_go_stop_event(link_info, sap_event);
 
 		hdd_hostapd_channel_allow_suspend(adapter,
 						  ap_ctx->operating_chan_freq,
@@ -2735,6 +2738,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 					    &dfs_info,
 					    sizeof(struct wlan_dfs_info));
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_IN_PROGRESS;
+
+		hdd_cp_stats_cstats_log_sap_go_dfs_event(link_info,
+							 eSAP_DFS_CAC_START);
+
 		if (QDF_STATUS_SUCCESS !=
 			hdd_send_radar_event(link_info, eSAP_DFS_CAC_START,
 					     dfs_info)) {
@@ -2755,6 +2762,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		 * space applications are waiting on CAC end for their state
 		 * management.
 		 */
+		hdd_cp_stats_cstats_log_sap_go_dfs_event
+					(link_info, eSAP_DFS_CAC_INTERRUPTED);
 		if (QDF_STATUS_SUCCESS !=
 			hdd_send_radar_event(link_info, eSAP_DFS_CAC_END,
 					     dfs_info)) {
@@ -2782,6 +2791,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		}
 
+		hdd_cp_stats_cstats_log_sap_go_dfs_event(link_info,
+							 eSAP_DFS_CAC_END);
+
 		hdd_ctx->dev_dfs_cac_status = DFS_CAC_ALREADY_DONE;
 		if (QDF_STATUS_SUCCESS !=
 			hdd_send_radar_event(link_info, eSAP_DFS_CAC_END,
@@ -2799,6 +2811,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 	{
 		int i;
 
+		hdd_cp_stats_cstats_log_sap_go_dfs_event(link_info,
+							 eSAP_DFS_RADAR_DETECT);
 		hdd_dfs_indicate_radar(hdd_ctx);
 		wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
 					WLAN_SVC_DFS_RADAR_DETECT_IND,
@@ -2892,7 +2906,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 	case eSAP_STA_ASSOC_EVENT:
 	case eSAP_STA_REASSOC_EVENT:
 		event = &sap_event->sapevt.sapStationAssocReassocCompleteEvent;
-
+		hdd_cp_stats_cstats_log_sap_go_sta_assoc_reassoc_event
+							 (link_info, sap_event);
 		/* Reset scan reject params on assoc */
 		hdd_init_scan_reject_params(hdd_ctx);
 		if (eSAP_STATUS_FAILURE == event->status) {
@@ -3092,6 +3107,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			      QDF_MAC_ADDR_REF(wrqu.addr.sa_data));
 		hdd_place_marker(adapter, "CLIENT DISASSOCIATED FROM SAP",
 				 wrqu.addr.sa_data);
+
+		hdd_cp_stats_cstats_log_sap_go_sta_disassoc_event(link_info,
+								  sap_event);
+
 		qdf_status = qdf_event_set(&hostapd_state->qdf_sta_disassoc_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_err("Station Deauth event Set failed");
@@ -9072,3 +9091,215 @@ bool hdd_mlosap_check_support_link_num(struct hdd_adapter *adapter)
 	return false;
 }
 #endif
+
+#ifdef WLAN_CHIPSET_STATS
+void
+hdd_cp_stats_cstats_sap_go_start_event(struct wlan_hdd_link_info *link_info,
+				       struct sap_event *sap_event)
+{
+	struct sap_config *sap_config;
+	struct hdd_ap_ctx *ap_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	struct cstats_sap_go_start stat = {0};
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+
+	sap_config = &ap_ctx->sap_config;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return;
+	}
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_SAP_GO_START_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_sap_go_start) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id =
+			sap_event->sapevt.sapStartBssCompleteEvent.sessionId;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.status = sap_event->sapevt.sapStartBssCompleteEvent.status;
+	stat.operating_chan_freq =
+		sap_event->sapevt.sapStartBssCompleteEvent.operating_chan_freq;
+	stat.ch_width = sap_event->sapevt.sapStartBssCompleteEvent.ch_width;
+	stat.staId = sap_event->sapevt.sapStartBssCompleteEvent.staId;
+
+	stat.ssid_len = sap_config->SSIDinfo.ssid.length;
+	qdf_mem_copy(stat.ssid, sap_config->SSIDinfo.ssid.ssId,
+		     sap_config->SSIDinfo.ssid.length);
+	CSTATS_MAC_COPY(stat.bssid, sap_config->self_macaddr.bytes);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_sap_go_start), &stat);
+}
+
+void hdd_cp_stats_cstats_sap_go_stop_event(struct wlan_hdd_link_info *link_info,
+					   struct sap_event *sap_event)
+{
+	struct sap_config *sap_config;
+	struct hdd_ap_ctx *ap_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	struct cstats_sap_go_stop stat = {0};
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+
+	sap_config = &ap_ctx->sap_config;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return;
+	}
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_SAP_GO_STOP_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_sap_go_stop) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.status = sap_event->sapevt.sapStopBssCompleteEvent.status;
+	CSTATS_MAC_COPY(stat.bssid, sap_config->self_macaddr.bytes);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_sap_go_stop), &stat);
+}
+
+void
+hdd_cp_stats_cstats_log_sap_go_sta_disassoc_event(struct wlan_hdd_link_info *li,
+						  struct sap_event *sap_evt)
+{
+	struct sap_config *sap_config;
+	struct hdd_ap_ctx *ap_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	tSap_StationDisassocCompleteEvent *disassoc_comp;
+	struct cstats_sap_go_sta_disassoc stat = {0};
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(li);
+
+	sap_config = &ap_ctx->sap_config;
+
+	vdev = hdd_objmgr_get_vdev_by_user(li, WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return;
+	}
+
+	disassoc_comp = &sap_evt->sapevt.sapStationDisassocCompleteEvent;
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_SAP_GO_STA_DISASSOC_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_sap_go_sta_disassoc) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.sta_id = disassoc_comp->staId;
+	stat.status = disassoc_comp->status;
+	stat.status_code = disassoc_comp->status_code;
+	stat.reason = disassoc_comp->reason;
+	stat.reason_code = disassoc_comp->reason_code;
+	CSTATS_MAC_COPY(stat.bssid, sap_config->self_macaddr.bytes);
+	CSTATS_MAC_COPY(stat.sta_mac, disassoc_comp->staMac.bytes);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_sap_go_sta_disassoc),
+			       &stat);
+}
+
+void hdd_cp_stats_cstats_log_sap_go_sta_assoc_reassoc_event(
+		struct wlan_hdd_link_info *li, struct sap_event *sap_evt)
+{
+	struct sap_config *sap_config;
+	struct hdd_ap_ctx *ap_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	tSap_StationAssocReassocCompleteEvent *event;
+	struct cstats_sap_go_sta_assoc_reassoc stat = {0};
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(li);
+
+	sap_config = &ap_ctx->sap_config;
+
+	vdev = hdd_objmgr_get_vdev_by_user(li, WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return;
+	}
+
+	event = &sap_evt->sapevt.sapStationAssocReassocCompleteEvent;
+
+	stat.cmn.hdr.evt_id =
+			WLAN_CHIPSET_STATS_SAP_GO_STA_ASSOC_REASSOC_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_sap_go_sta_assoc_reassoc) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+
+	stat.sta_id = event->staId;
+	stat.status = event->status;
+	stat.status_code = event->status_code;
+	CSTATS_MAC_COPY(stat.sta_mac, event->staMac.bytes);
+	CSTATS_MAC_COPY(stat.bssid, sap_config->self_macaddr.bytes);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_sap_go_sta_assoc_reassoc),
+			       &stat);
+}
+
+void hdd_cp_stats_cstats_log_sap_go_dfs_event(struct wlan_hdd_link_info *li,
+					      eSapHddEvent event_id)
+{
+	struct sap_config *sap_config;
+	struct hdd_ap_ctx *ap_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	struct cstats_sap_go_dfs_evt stat = {0};
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(li);
+
+	sap_config = &ap_ctx->sap_config;
+
+	vdev = hdd_objmgr_get_vdev_by_user(li, WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return;
+	}
+
+	if (event_id == eSAP_DFS_CAC_START) {
+		stat.cmn.hdr.evt_id =
+				   WLAN_CHIPSET_STATS_SAP_GO_CAC_START_EVENT_ID;
+	} else if (event_id == eSAP_DFS_CAC_END) {
+		stat.cmn.hdr.evt_id =
+				     WLAN_CHIPSET_STATS_SAP_GO_CAC_END_EVENT_ID;
+	} else if (event_id == eSAP_DFS_RADAR_DETECT) {
+		stat.cmn.hdr.evt_id =
+			      WLAN_CHIPSET_STATS_SAP_GO_RADAR_DETECTED_EVENT_ID;
+	} else if (event_id == eSAP_DFS_CAC_INTERRUPTED) {
+		stat.cmn.hdr.evt_id =
+			     WLAN_CHIPSET_STATS_SAP_GO_CAC_INTERRUPTED_EVENT_ID;
+	} else {
+		hdd_err("Invalid Event");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+		return;
+	}
+
+	stat.cmn.hdr.length = sizeof(struct cstats_sap_go_dfs_evt) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	CSTATS_MAC_COPY(stat.bssid, sap_config->self_macaddr.bytes);
+	stat.freq = ap_ctx->operating_chan_freq;
+	wlan_reg_get_cc_and_src(wlan_vdev_get_psoc(vdev), stat.cc);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_sap_go_dfs_evt), &stat);
+}
+#endif /* WLAN_CHIPSET_STATS */
