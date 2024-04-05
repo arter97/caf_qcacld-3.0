@@ -1027,6 +1027,7 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NULL_VALUE;
 
 	wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
+	sta_ctx->copied_reassoc_rsp = NULL;
 
 	/* Store reassoc rsp only if roamed to 2 link AP */
 	if (reassoc_rsp->ml_parnter_info.num_partner_links < 2)
