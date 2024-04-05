@@ -2333,7 +2333,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	if (mac_ctx->lim.stop_roaming_callback)
 		mac_ctx->lim.stop_roaming_callback(MAC_HANDLE(mac_ctx),
 						   session_entry->smeSessionId,
-						   REASON_DRIVER_DISABLED,
+						   REASON_VDEV_RESTART_FROM_HOST,
 						   RSO_CHANNEL_SWITCH);
 
 	if (mlo_is_any_link_disconnecting(session_entry->vdev)) {
