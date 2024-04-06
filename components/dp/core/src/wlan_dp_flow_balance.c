@@ -24,14 +24,330 @@
 /* units in percentage(%) */
 #define FLOW_THRASH_DETECT_THRES 90
 #define RING_OVERLOAD_THRESH 70
+#define ALLOWED_BUFFER_WT 5
+
+#define FLOW_WTG_TABEL_SIZE 10
+#define WTG_TBL_SEARCH_SKID_LEN 2
+
+static int wlan_dp_fb_sort_flow_map_tbl(const void *e1, const void *e2)
+{
+	struct wlan_dp_rx_ring_fm_tbl *elem1;
+	struct wlan_dp_rx_ring_fm_tbl *elem2;
+
+	elem1 = (struct wlan_dp_rx_ring_fm_tbl *)e1;
+	elem2 = (struct wlan_dp_rx_ring_fm_tbl *)e2;
+
+	if (elem1->ring_weightage > elem2->ring_weightage)
+		return -1;
+	else if (elem1->ring_weightage < elem2->ring_weightage)
+		return 1;
+	else
+		return 0;
+}
+
+static int wlan_dp_fb_sort_targeted_wtg_dist(const void *e1, const void *e2)
+{
+	uint32_t *elem1 = (uint32_t *)e1;
+	uint32_t *elem2 = (uint32_t *)e2;
+
+	if (*elem1 > *elem2)
+		return -1;
+	else if (*elem1 < *elem2)
+		return 1;
+	else
+		return 0;
+}
+
+static bool
+wlan_dp_fb_check_flow_balance_is_needed(struct wlan_dp_rx_ring_fm_tbl *map_tbl,
+					uint32_t *targeted_wtgs,
+					uint8_t num_rings)
+{
+	struct wlan_dp_rx_ring_fm_tbl *ring;
+	uint8_t cur_num_active_rings = 0;
+	int i;
+	bool do_balance = false;
+
+	/* Check if the current ring weightages are +-5% of the targeted
+	 * ring weightages. If yes, then no flow balance required
+	 */
+	for (i = 0; i < MAX_REO_DEST_RINGS; i++) {
+		ring = &map_tbl[i];
+
+		if (!ring->ring_weightage)
+			break;
+
+		cur_num_active_rings++;
+
+		/* Check current ring weight is +-5% of the targeted weight */
+		if ((targeted_wtgs[i] - ALLOWED_BUFFER_WT <=
+		     ring->ring_weightage) &&
+		    (targeted_wtgs[i] + ALLOWED_BUFFER_WT >=
+		     ring->ring_weightage)) {
+			continue;
+		} else {
+			do_balance = true;
+			break;
+		}
+	}
+
+	if ((num_rings == cur_num_active_rings) && !do_balance)
+		return false;
+	else
+		return true;
+}
+
+static inline void
+wlan_dp_fb_update_cur_ring_wtgs(struct wlan_dp_rx_ring_fm_tbl *map_tbl,
+				struct wlan_dp_rx_ring_wtg *balanced_wtgs,
+				uint8_t num_rings)
+{
+	struct wlan_dp_rx_ring_fm_tbl *ring;
+	struct wlan_dp_rx_ring_wtg *ring_wtg;
+	int i;
+
+	for (i = 0; i < num_rings; i++) {
+		ring = &map_tbl[i];
+		ring_wtg = &balanced_wtgs[i];
+		ring_wtg->weight = ring->ring_weightage;
+		ring_wtg->ring_id = ring->ring_id;
+	}
+}
+
+/**
+ * wlan_dp_fb_add_flow_to_fwt() - Add element to the flow weightage table
+ * @flow_wtg_tbl: pointer to the flow weightage table base
+ * @flow: flow info
+ * @napi_id: current napi id of the flow
+ *
+ * Return: none
+ */
+static void wlan_dp_fb_add_flow_to_fwt(struct wlan_dp_fwt_elem **flow_wtg_tbl,
+				       struct wlan_dp_flow *flow,
+				       uint8_t napi_id)
+{
+	struct wlan_dp_fwt_elem *fwt_elem;
+	uint32_t index;
+
+	fwt_elem = qdf_mem_malloc(sizeof(*fwt_elem));
+	if (!fwt_elem) {
+		dp_err("failed to allocate memory for flow wtg elem");
+		return;
+	}
+
+	fwt_elem->flow_id = flow->flow_id;
+	fwt_elem->weightage = flow->flow_wtg;
+	fwt_elem->napi_id = napi_id;
+
+	index = (flow->flow_wtg / FLOW_WTG_TABEL_SIZE);
+
+	if (index == FLOW_WTG_TABEL_SIZE)
+		index -= 1;
+
+	if (flow_wtg_tbl[index]) {
+		fwt_elem->next = flow_wtg_tbl[index];
+		flow_wtg_tbl[index] = fwt_elem;
+	} else {
+		flow_wtg_tbl[index] = fwt_elem;
+	}
+}
+
+/**
+ * wlan_dp_fb_get_flow_from_fwt() - Get flow from the flow weightage table
+ * @flow_wtg_tbl: pointer to the flow weightage table base
+ * @weight: flow weight
+ * @skid_len: how many entries can be searched above the index
+ * @first_search: first weight search for the ring
+ *
+ * Return: flow element on success, NULL on search failure
+ */
+static struct wlan_dp_fwt_elem*
+wlan_dp_fb_get_flow_from_fwt(struct wlan_dp_fwt_elem **flow_wtg_tbl,
+			     int weight, int skid_len, bool first_search)
+{
+	struct wlan_dp_fwt_elem *fwt_elem = NULL;
+	int index, tmp;
+	int max_skid;
+
+	index = weight / FLOW_WTG_TABEL_SIZE;
+	if (index >= FLOW_WTG_TABEL_SIZE)
+		index = FLOW_WTG_TABEL_SIZE - 1;
+
+	/* check for lesser weights until 0th index */
+	for (tmp = index; tmp >= 0; tmp--) {
+		if (!flow_wtg_tbl[tmp])
+			continue;
+
+		goto found_element;
+	}
+
+	/* if the get flow called for the fist time for a ring then iterate
+	 * through the entire table and find the best possible weight,
+	 * else search until skid length above the index.
+	 */
+	max_skid = !first_search ? index + skid_len : FLOW_WTG_TABEL_SIZE;
+	if (max_skid > FLOW_WTG_TABEL_SIZE)
+		max_skid = FLOW_WTG_TABEL_SIZE;
+
+	for (tmp = index + 1; tmp < max_skid; tmp++) {
+		if (!flow_wtg_tbl[tmp])
+			continue;
+
+		goto found_element;
+	}
+
+	return fwt_elem;
+
+found_element:
+	fwt_elem = flow_wtg_tbl[tmp];
+	flow_wtg_tbl[tmp] = fwt_elem->next;
+	return fwt_elem;
+}
+
+/**
+ * wlan_dp_fb_do_flow_balance() - Core API for flow balance
+ * 1. Firstly check whether the number of current active rings are equal to the
+ * number of rings decided for the flow balance, and the current ring wightages
+ * are +-5% of the targeted ring weightages. flow balance is not required in
+ * this case.
+ * 2. Loop through the ring flow map table and add the flow weights grater
+ * than the targeted ring weightages.
+ * 3. Loop for the number of requested rings for the flow balance, get the
+ * weightgs from the flow weightage table until targeted weightage reached
+ * for each ring.
+ * 4. Add flow info to the migrate list if the existing napi id is not equal
+ * to the new napi id.
+ * 5. Update the FST table for the migrated list.
+ *
+ * @dp_ctx: dp context
+ * @map_tbl: per ring per flow map table
+ * @targeted_wtgs: per ring targeted weightage for the decided number of rings
+ * @num_rings: number of rings decided for the flow balance
+ * @balanced_wtgs: ring weightages after flow balance
+ *
+ * Return: none
+ */
 
 static void
 wlan_dp_fb_do_flow_balance(struct wlan_dp_psoc_context *dp_ctx,
 			   struct wlan_dp_rx_ring_fm_tbl *map_tbl,
-			   uint32_t *targeted_weightages,
+			   uint32_t *targeted_wtgs,
 			   uint8_t num_rings,
 			   struct wlan_dp_rx_ring_wtg *balanced_wtgs)
 {
+	struct dp_rx_fst *rx_fst = dp_ctx->rx_fst;
+	struct wlan_dp_fwt_elem *flow_wtg_tbl[FLOW_WTG_TABEL_SIZE] = {NULL};
+	struct wlan_dp_fwt_elem *fwt_elem;
+	struct wlan_dp_mig_flow *mig_list;
+	struct wlan_dp_flow *flow;
+	struct wlan_dp_rx_ring_fm_tbl *ring;
+	struct wlan_dp_rx_ring_wtg *ring_wtg;
+	uint32_t flow_wtg_tbl_depth = 0;
+	uint32_t mig_flow_idx = 0;
+	int ring_idx = 0;
+	int i;
+	int delta;
+	bool do_balance;
+	bool first_search;
+
+	/* Check the current ring weightages are already meeting the targeted
+	 * weightages, update the current ring weightages in the balanced
+	 * weightages and return in that case.
+	 */
+	do_balance = wlan_dp_fb_check_flow_balance_is_needed(map_tbl,
+							     targeted_wtgs,
+							     num_rings);
+	if (!do_balance) {
+		wlan_dp_fb_update_cur_ring_wtgs(map_tbl,
+						balanced_wtgs, num_rings);
+		return;
+	}
+
+	qdf_sort(map_tbl, MAX_REO_DEST_RINGS, sizeof(*map_tbl),
+		 wlan_dp_fb_sort_flow_map_tbl, NULL);
+
+	qdf_sort(targeted_wtgs, MAX_REO_DEST_RINGS, sizeof(uint32_t),
+		 wlan_dp_fb_sort_targeted_wtg_dist, NULL);
+
+	mig_list =
+		(struct wlan_dp_mig_flow *)qdf_mem_malloc(rx_fst->max_entries *
+							  sizeof(*mig_list));
+
+	/* move the weightages more than then targeted weightage of the ring
+	 * to the flow weightage table.
+	 */
+	for (i = 0; i < MAX_REO_DEST_RINGS; i++) {
+		ring = &map_tbl[i];
+
+		while (ring->ring_weightage >
+		       (targeted_wtgs[i] + ALLOWED_BUFFER_WT)) {
+			flow = &ring->flow_list[ring->num_flows - 1];
+			ring->ring_weightage -= flow->flow_wtg;
+			wlan_dp_fb_add_flow_to_fwt(flow_wtg_tbl, flow,
+						   ring->ring_id);
+			ring->num_flows--;
+			flow_wtg_tbl_depth++;
+		}
+	}
+
+	/* Get the weightages from flow weightage table and map the flows
+	 * to the rings till the targeted ring weightages met.
+	 */
+	for (i = 0; i < num_rings; i++) {
+get_next_ring:
+		if (ring_idx > MAX_REO_DEST_RINGS)
+			break;
+
+		ring = &map_tbl[ring_idx];
+		ring_wtg = &balanced_wtgs[i];
+
+		if (wlan_dp_check_is_ring_ipa_rx(dp_ctx->cdp_soc,
+						 ring->ring_id)) {
+			ring_idx++;
+			goto get_next_ring;
+		}
+
+		ring_idx++;
+		delta = targeted_wtgs[i] - ring->ring_weightage;
+		if (delta <= ALLOWED_BUFFER_WT) {
+			ring_wtg->weight = ring->ring_weightage;
+			ring_wtg->ring_id = ring->ring_id;
+			continue;
+		}
+
+		first_search = true;
+
+		while (delta > ALLOWED_BUFFER_WT && flow_wtg_tbl_depth) {
+			fwt_elem =
+			 wlan_dp_fb_get_flow_from_fwt(flow_wtg_tbl, delta,
+						      WTG_TBL_SEARCH_SKID_LEN,
+						      first_search);
+			if (!fwt_elem)
+				break;
+
+			first_search = false;
+			flow_wtg_tbl_depth--;
+			ring->ring_weightage += fwt_elem->weightage;
+
+			if (fwt_elem->napi_id != ring->ring_id) {
+				mig_list[mig_flow_idx].flow_id =
+							fwt_elem->flow_id;
+				mig_list[mig_flow_idx].napi_id = ring->ring_id;
+				mig_flow_idx++;
+			}
+
+			delta -= fwt_elem->weightage;
+			qdf_mem_free(fwt_elem);
+		}
+
+		ring_wtg->weight = ring->ring_weightage;
+		ring_wtg->ring_id = ring->ring_id;
+	}
+
+	if (mig_flow_idx)
+		dp_fisa_update_fst_table(dp_ctx, mig_list, mig_flow_idx);
+
+	qdf_mem_free(mig_list);
 }
 
 static inline int

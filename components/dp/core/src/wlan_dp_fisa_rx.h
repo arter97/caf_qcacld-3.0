@@ -292,5 +292,8 @@ dp_fisa_flow_balance_build_flow_map_tbl(struct wlan_dp_psoc_context *dp_ctx,
 					struct wlan_dp_rx_ring_fm_tbl *map_tbl,
 					uint32_t *total_flow_avg_pkts,
 					uint32_t *total_num_flows);
+void dp_fisa_update_fst_table(struct wlan_dp_psoc_context *dp_ctx,
+			      struct wlan_dp_mig_flow *migrate_list,
+			      uint32_t mig_flow_cnt);
 #endif
 #endif

@@ -279,6 +279,57 @@ dp_fisa_flow_balance_build_flow_map_tbl(struct wlan_dp_psoc_context *dp_ctx,
 
 	qdf_spin_unlock_bh(&rx_fst->dp_rx_fst_lock);
 }
+
+#define DP_RX_HASH_START_VALUE 16
+
+/**
+ * dp_fisa_update_fst_table - Update fst table for the migrated flows
+ * @dp_ctx: dp context
+ * @migrate_list: migrated flows list
+ * @mig_flow_cnt: migrated flows count
+ *
+ * Return: none
+ */
+void dp_fisa_update_fst_table(struct wlan_dp_psoc_context *dp_ctx,
+			      struct wlan_dp_mig_flow *migrate_list,
+			      uint32_t mig_flow_cnt)
+{
+	struct dp_rx_fst *rx_fst = dp_ctx->rx_fst;
+	struct dp_fisa_rx_sw_ft *sw_ft_entry;
+	struct dp_fisa_rx_sw_ft *sw_ft_base;
+	struct wlan_dp_mig_flow *flow_details;
+	int i;
+	uint16_t flow_index;
+
+	sw_ft_base = (struct dp_fisa_rx_sw_ft *)rx_fst->base;
+
+	for (i = 0; i < mig_flow_cnt; i++) {
+		flow_details = &migrate_list[i];
+		flow_index = flow_details->flow_id;
+
+		sw_ft_entry = &sw_ft_base[flow_index];
+		sw_ft_entry->is_mig = true;
+		sw_ft_entry->prev_napi_id = sw_ft_entry->napi_id;
+		sw_ft_entry->napi_id = flow_details->napi_id;
+
+		/* Handle the case of hash based routing enabled/disabled */
+		if (flow_details->napi_id > 3)
+			sw_ft_entry->reo_dest_indication =
+						DP_RX_HASH_START_VALUE + flow_details->napi_id - 1;
+		else
+			sw_ft_entry->reo_dest_indication =
+						DP_RX_HASH_START_VALUE + flow_details->napi_id;
+
+		hal_rx_flow_cmem_update_reo_dst_ind(dp_ctx->hal_soc,
+						    rx_fst->cmem_ba, flow_index,
+						    sw_ft_entry->reo_dest_indication);
+	}
+
+	if (rx_fst->fse_cache_flush_allow &&
+	    qdf_atomic_inc_return(&rx_fst->fse_cache_flush_posted) == 1)
+		qdf_timer_start(&rx_fst->fse_cache_flush_timer,
+				FSE_CACHE_FLUSH_TIME_OUT);
+}
 #else
 static inline void
 dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow)

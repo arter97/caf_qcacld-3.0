@@ -25,6 +25,30 @@
 #define FLOW_BALANCE_THRESH 180000
 
 /**
+ * struct wlan_dp_mig_flow - migrate flow details
+ * @flow_id: flow id
+ * @napi_id: napi id to which flow is going to migrate
+ */
+struct wlan_dp_mig_flow {
+	uint16_t flow_id;
+	uint8_t napi_id;
+};
+
+/**
+ * struct wlan_dp_fwt_elem - flow weightage table element information
+ * @flow_id: flow id
+ * @weightage: weightage of the flow in percentage
+ * @napi_id: napi id to which flow is mapped currently
+ * @next: pointer to the next flow weightage table element
+ */
+struct wlan_dp_fwt_elem {
+	uint16_t flow_id;
+	uint8_t weightage;
+	uint8_t napi_id;
+	struct wlan_dp_fwt_elem *next;
+};
+
+/**
  * struct wlan_dp_flow - structure holding flow information
  * @avg_pkt_cnt: per second average packet count received on this flow
  * @flow_id: flow id
