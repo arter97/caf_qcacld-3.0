@@ -2025,11 +2025,12 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev, target_chan_freq,
 						0, ch_params,
 						REG_CURRENT_PWR_MODE);
-	sap_ctx->ch_params = *ch_params;
+	sap_ctx->ch_params_before_ch_switch = sap_ctx->ch_params;
 	sap_ctx->freq_before_ch_switch = sap_ctx->chan_freq;
 	/* Update the channel as this will be used to
 	 * send event to supplicant
 	 */
+	sap_ctx->ch_params = *ch_params;
 	sap_ctx->chan_freq = target_chan_freq;
 	wlansap_get_sec_channel(ch_params->sec_ch_offset, sap_ctx->chan_freq,
 				&sap_ctx->sec_ch_freq);
