@@ -357,11 +357,13 @@ struct fils_peer_hlp_node {
  * @allow_fse_metdata_mismatch: packet allowed since it belongs to same flow,
  *			only fse_metadata is not same.
  * @allow_non_aggr: packet allowed due to any other reason.
+ * @allow_mig_mismatch: packet allowed due to migrated flow
  */
 struct dp_fisa_reo_mismatch_stats {
 	uint32_t allow_cce_match;
 	uint32_t allow_fse_metdata_mismatch;
 	uint32_t allow_non_aggr;
+	uint32_t allow_mig_mismatch;
 };
 
 /**
@@ -427,6 +429,8 @@ struct fisa_pkt_hist {
  * @head_skb_l4_hdr_offset: L4 header offset
  * @rx_flow_tuple_info: RX tuple information
  * @napi_id: NAPI ID (REO ID) on which the flow is being received
+ * @prev_napi_id: previous NAPI ID before flow migration
+ * @is_mig: flag indicating whether flow is migrated or not
  * @vdev: VDEV handle corresponding to the FLOW
  * @dp_intf: DP interface handle corresponding to the flow
  * @bytes_aggregated: Number of bytes currently aggregated
@@ -477,6 +481,8 @@ struct dp_fisa_rx_sw_ft {
 	uint32_t head_skb_l4_hdr_offset;
 	struct cdp_rx_flow_tuple_info rx_flow_tuple_info;
 	uint8_t napi_id;
+	uint8_t prev_napi_id;
+	bool is_mig;
 	struct dp_vdev *vdev;
 	struct wlan_dp_intf *dp_intf;
 	uint64_t bytes_aggregated;
@@ -561,6 +567,7 @@ struct fse_cache_flush_history {
  * @rx_hash_enabled: Flag to indicate if Hash based routing supported
  * @rx_toeplitz_hash_key: hash key
  * @rx_pkt_tlv_size: RX packet TLV size
+ * @add_tcp_flow_to_fst: Add tcp flow to the FST table
  */
 struct dp_rx_fst {
 	uint8_t *base;
@@ -597,6 +604,7 @@ struct dp_rx_fst {
 	bool rx_hash_enabled;
 	uint8_t *rx_toeplitz_hash_key;
 	uint16_t rx_pkt_tlv_size;
+	bool add_tcp_flow_to_fst;
 };
 
 /**

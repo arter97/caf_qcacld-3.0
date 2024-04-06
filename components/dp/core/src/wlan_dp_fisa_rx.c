@@ -325,7 +325,8 @@ wlan_dp_get_flow_tuple_from_nbuf(struct wlan_dp_psoc_context *dp_ctx,
 
 	flow_tuple_info->dest_port = qdf_ntohs(tcph->dest);
 	flow_tuple_info->src_port = qdf_ntohs(tcph->source);
-	if (dp_fisa_is_ipsec_connection(flow_tuple_info))
+	if (dp_fisa_is_ipsec_connection(flow_tuple_info) ||
+	    QDF_NBUF_CB_RX_TCP_PROTO(nbuf))
 		flow_tuple_info->is_exception = 1;
 	else
 		flow_tuple_info->is_exception = 0;
@@ -679,6 +680,8 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 			sw_ft_entry->is_flow_tcp = proto_params.tcp_proto;
 			sw_ft_entry->is_flow_udp = proto_params.udp_proto;
 			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
+			if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf))
+				sw_ft_entry->rx_flow_tuple_info.is_exception = true;
 
 			is_fst_updated = true;
 			fisa_hdl->add_flow_count++;
@@ -1320,7 +1323,8 @@ dp_rx_get_fisa_flow(struct dp_rx_fst *fisa_hdl, struct dp_vdev *vdev,
 	hal_soc_handle_t hal_soc_hdl = fisa_hdl->dp_ctx->hal_soc;
 	QDF_STATUS status;
 
-	if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf))
+	if (!fisa_hdl->add_tcp_flow_to_fst &&
+	    QDF_NBUF_CB_RX_TCP_PROTO(nbuf))
 		return sw_ft_entry;
 
 	rx_tlv_hdr = qdf_nbuf_data(nbuf);
@@ -1937,6 +1941,12 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 	 * the one configured.
 	 */
 	if (qdf_unlikely(fisa_flow->napi_id != napi_id)) {
+		if (fisa_flow->is_mig && (fisa_flow->prev_napi_id == napi_id)) {
+			DP_STATS_INC(fisa_hdl,
+				     reo_mismatch.allow_mig_mismatch, 1);
+			return FISA_AGGR_NOT_ELIGIBLE;
+		}
+
 		fse_metadata =
 			hal_rx_msdu_fse_metadata_get(hal_soc_hdl, rx_tlv_hdr);
 		cce_match = hal_rx_msdu_cce_match_get(hal_soc_hdl, rx_tlv_hdr);
@@ -2094,13 +2104,16 @@ invalid_fisa_assist:
 /**
  * dp_is_nbuf_bypass_fisa() - FISA bypass check for RX frame
  * @nbuf: RX nbuf pointer
+ * @vdev: vdev pointer
+ * @add_tcp_flow_to_fst: add tcp flow to the fst table
  *
  * Return: true if FISA should be bypassed else false
  */
-static bool dp_is_nbuf_bypass_fisa(qdf_nbuf_t nbuf)
+static bool dp_is_nbuf_bypass_fisa(qdf_nbuf_t nbuf, struct dp_vdev *vdev,
+				   bool add_tcp_flow_to_fst)
 {
 	/* RX frame from non-regular path or DHCP packet */
-	if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf) ||
+	if ((!add_tcp_flow_to_fst && QDF_NBUF_CB_RX_TCP_PROTO(nbuf)) ||
 	    qdf_nbuf_is_exc_frame(nbuf) ||
 	    qdf_nbuf_is_ipv4_dhcp_pkt(nbuf) ||
 	    qdf_nbuf_is_da_mcbc(nbuf))
@@ -2193,7 +2206,8 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		qdf_nbuf_set_next(head_nbuf, NULL);
 
 		/* bypass FISA check */
-		if (dp_is_nbuf_bypass_fisa(head_nbuf))
+		if (dp_is_nbuf_bypass_fisa(head_nbuf, vdev,
+					   dp_fisa_rx_hdl->add_tcp_flow_to_fst))
 			goto deliver_nbuf;
 
 		if (dp_fisa_disallowed_for_vdev(soc, vdev, rx_ctx_id))
