@@ -1921,6 +1921,13 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		      frm.vendor_vht_ie.present, frm.he_cap.present,
 		      frm.eht_cap.present);
 
+	lim_cp_stats_cstats_log_assoc_resp_evt(pe_session, CSTATS_DIR_TX,
+					       status_code, aid, mac_hdr->bssId,
+					       mac_hdr->da, frm.HTCaps.present,
+					       frm.VHTCaps.present,
+					       frm.he_cap.present,
+					       frm.eht_cap.present, false);
+
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
 	    pe_session->opmode == QDF_P2P_GO_MODE)
@@ -2174,6 +2181,9 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 					mac_hdr, params->vdev_id, status,
 					qdf_tx_complete, mac->lim.bss_rssi,
 					algo, type, seq, 0, WLAN_AUTH_REQ);
+			lim_cp_stats_cstats_log_auth_evt(pe_session,
+							 CSTATS_DIR_TX, algo,
+							 seq, status);
 			return;
 		}
 
@@ -3060,6 +3070,16 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	pe_nofl_info("Assoc req TX: vdev %d to "QDF_MAC_ADDR_FMT" seq num %d",
 		     pe_session->vdev_id, QDF_MAC_ADDR_REF(pe_session->bssId),
 		     mac_ctx->mgmtSeqNum);
+
+	lim_cp_stats_cstats_log_assoc_req_evt(pe_session, CSTATS_DIR_TX,
+					      pe_session->bssId,
+					      mac_hdr->sa,
+					      frm->SSID.num_ssid,
+					      frm->SSID.ssid,
+					      frm->HTCaps.present,
+					      frm->VHTCaps.present,
+					      frm->he_cap.present,
+					      frm->eht_cap.present, false);
 
 	min_rid = lim_get_min_session_txrate(pe_session, NULL);
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_ASSOC_START_EVENT,
@@ -4360,6 +4380,9 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 					     mac->lim.bss_rssi, 0, 0, 0, 0,
 					     WLAN_DISASSOC_TX);
 
+		lim_cp_stats_cstats_log_disassoc_evt(pe_session, CSTATS_DIR_TX,
+						     nReason);
+
 		/* Queue Disassociation frame in high priority WQ */
 		qdf_status = wma_tx_frame(mac, pPacket, (uint16_t) nBytes,
 					TXRX_FRM_802_11_MGMT,
@@ -4622,6 +4645,9 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 					     QDF_TX_RX_STATUS_OK,
 					     mac->lim.bss_rssi, 0, 0, 0, 0,
 					     WLAN_DEAUTH_TX);
+
+		lim_cp_stats_cstats_log_deauth_evt(pe_session, CSTATS_DIR_TX,
+						   nReason);
 
 		/* Queue Disassociation frame in high priority WQ */
 		qdf_status =

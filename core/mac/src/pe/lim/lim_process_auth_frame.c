@@ -856,6 +856,10 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 				auth_algo, sae_auth_seq, sae_auth_seq, 0,
 				WLAN_AUTH_RESP);
 
+		lim_cp_stats_cstats_log_auth_evt(pe_session, CSTATS_DIR_RX,
+						 auth_algo, sae_auth_seq,
+						 sae_status_code);
+
 		status = lim_update_link_to_mld_address(mac_ctx,
 							pe_session->vdev,
 							mac_hdr);
@@ -2115,6 +2119,12 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				     auth_alg, 0,
 				     rx_auth_frm_body->authTransactionSeqNumber,
 				     0, WLAN_AUTH_RESP);
+
+	lim_cp_stats_cstats_log_auth_evt
+			(pe_session, CSTATS_DIR_RX, auth_alg,
+			 rx_auth_frm_body->authTransactionSeqNumber,
+			 rx_auth_frm_body->authStatusCode);
+
 	switch (rx_auth_frm_body->authTransactionSeqNumber) {
 	case SIR_MAC_AUTH_FRAME_1:
 		lim_process_auth_frame_type1(mac_ctx,
