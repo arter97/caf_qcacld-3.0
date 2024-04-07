@@ -901,6 +901,15 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 		pe_warn("warning packing a Re-AssocReq: (0x%08x)", nStatus);
 	}
 
+	lim_cp_stats_cstats_log_assoc_req_evt(pe_session, CSTATS_DIR_TX,
+					      pMacHdr->bssId, pMacHdr->sa,
+					      frm->SSID.num_ssid,
+					      frm->SSID.ssid,
+					      frm->HTCaps.present,
+					      frm->VHTCaps.present,
+					      frm->he_cap.present,
+					      frm->eht_cap.present, true);
+
 	pe_debug("*** Sending Re-Association Request length: %d" "to", nBytes);
 
 	if (pe_session->assoc_req) {

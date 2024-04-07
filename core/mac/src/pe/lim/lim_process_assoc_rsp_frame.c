@@ -1269,6 +1269,22 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
+	if (subtype == LIM_REASSOC) {
+		lim_cp_stats_cstats_log_assoc_resp_evt
+			(session_entry, CSTATS_DIR_RX, assoc_rsp->status_code,
+			 assoc_rsp->aid, hdr->bssId, hdr->da,
+			 assoc_rsp->HTCaps.present,
+			 assoc_rsp->VHTCaps.present, assoc_rsp->he_cap.present,
+			 assoc_rsp->eht_op.present, true);
+	} else if (subtype == LIM_ASSOC) {
+		lim_cp_stats_cstats_log_assoc_resp_evt
+			(session_entry, CSTATS_DIR_RX, assoc_rsp->status_code,
+			 assoc_rsp->aid, hdr->bssId, hdr->da,
+			 assoc_rsp->HTCaps.present,
+			 assoc_rsp->VHTCaps.present, assoc_rsp->he_cap.present,
+			 assoc_rsp->eht_op.present, false);
+	}
+
 	if (subtype != LIM_REASSOC) {
 		aid = assoc_rsp->aid & 0x3FFF;
 		wlan_connectivity_mgmt_event(mac_ctx->psoc,
