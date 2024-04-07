@@ -91,7 +91,7 @@
 #include <cdp_txrx_ctrl.h>
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include "wlan_dp_ucfg_api.h"
-
+#include "son_api.h"
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
 #define HDD_SSR_BRING_UP_TIME 3000000
@@ -3357,20 +3357,20 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 
 	HDD_IS_RATE_LIMIT_REQ(is_rate_limited,
 			      hdd_ctx->config->nb_commands_interval);
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED ||
 	    is_rate_limited) {
 		/* Send cached data to upperlayer*/
-		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-						   WLAN_OSIF_POWER_ID);
-		if (!vdev) {
-			hdd_err("vdev is NULL");
-			return -EINVAL;
-		}
 		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		hdd_debug("Modules not enabled/rate limited, cached tx power = %d",
 			  *dbm);
-		return 0;
+		goto deliver_son;
 	}
 
 	status = wlan_hdd_tx_power_request_needed(adapter);
@@ -3380,14 +3380,21 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		 */
 		*dbm = adapter->tx_power.tx_pwr;
 		hdd_nofl_debug("cached tx_power: %d", *dbm);
-		return 0;
+		ret = 0;
+		goto end;
 	}
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_GET_TXPOWER,
 		   adapter->deflink->vdev_id, adapter->device_mode);
 
-	return wlan_hdd_get_tx_power(adapter, dbm);
+	ret = wlan_hdd_get_tx_power(adapter, dbm);
+deliver_son:
+	if (adapter->device_mode == QDF_SAP_MODE)
+		wlan_son_deliver_tx_power(vdev, *dbm);
+end:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	return ret;
 }
 
 int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
