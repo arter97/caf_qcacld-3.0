@@ -3423,6 +3423,20 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT
 endif
 
+found = $(shell if grep -qF "CFG80211_MULTI_LINK_SAP" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ifeq ($(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG), y)
+CONFIG_WLAN_FEATURE_MULTI_LINK_SAP := y
+endif
+endif
+
+ifeq ($(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP), y)
+CONFIG_WLAN_DP_MLO_DEV_CTX := y
+CONFIG_QCA_DP_TX_FW_METADATA_V2 := y
+CONFIG_WLAN_DP_TXPOOL_SHARE := y
+CONFIG_WLAN_MCAST_MLO_SAP := y
+endif
+
 ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))
 	ccflags-y += -DWLAN_WEAR_CHIPSET
 endif
