@@ -2230,11 +2230,8 @@ static int32_t send_nl_command(struct stats_command *cmd,
 		}
 		end_vendor_data(nlmsg, nl_ven_data);
 
-		if (is_async_req())
-			ret = send_nlmsg_nb(&g_sock_ctx.cfg80211_ctxt, nlmsg);
-		else
-			ret = send_nlmsg(&g_sock_ctx.cfg80211_ctxt, nlmsg,
-					 buffer);
+		ret = send_nlmsg(&g_sock_ctx.cfg80211_ctxt, nlmsg,
+				 buffer);
 		if (ret < 0)
 			STATS_ERR("Couldn't send NL command, ret = %d\n", ret);
 	} else {
