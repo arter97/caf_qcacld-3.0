@@ -3752,6 +3752,7 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 /**
  * policy_mgr_is_sap_freq_allowed - Check if the channel is allowed for sap
  * @psoc: PSOC object information
+ * @opmode: Current op_mode, helps to check whether it's P2P_GO/SAP
  * @sap_freq: channel frequency to be checked
  *
  * Check the factors as below to decide whether the channel is allowed or not:
@@ -3762,6 +3763,7 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
  * Return: true for allowed, else false
  */
 bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
+				    enum QDF_OPMODE opmode,
 				    uint32_t sap_freq);
 
 /**
