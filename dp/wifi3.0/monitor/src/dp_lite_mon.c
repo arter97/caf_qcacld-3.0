@@ -496,12 +496,15 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 			(struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
 	struct dp_lite_mon_tx_config *lite_mon_tx_config;
 	struct dp_soc *soc = (struct dp_soc *)be_pdev->pdev.soc;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint16_t num_of_buffers;
 
 	if (!be_mon_pdev || !be_mon_pdev->lite_mon_tx_config)
 		return QDF_STATUS_E_FAILURE;
 
+	mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 	soc_cfg_ctx = soc->wlan_cfg_ctx;
 	lite_mon_tx_config = be_mon_pdev->lite_mon_tx_config;
 	if (lite_mon_tx_config->tx_config.enable == !config->disable) {
@@ -549,17 +552,25 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 					  &lite_mon_tx_config->tx_config,
 					  config);
 
+		/* get threshold from ini */
+		mon_soc_be->tx_mon_ring_fill_level =
+		wlan_cfg_get_dp_soc_tx_mon_ring_fill_level(soc->wlan_cfg_ctx);
+
+		num_of_buffers =
+			wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
 		/* If length is full packet, then add extra buffers into
 		 * monitor buffer ring
 		 */
-		if (dp_lite_mon_is_full_len_configured(config->len[WLAN_FC0_TYPE_DATA],
-						       config->len[WLAN_FC0_TYPE_MGMT],
-						       config->len[WLAN_FC0_TYPE_CTRL])) {
-			num_of_buffers = wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
-			dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev, num_of_buffers);
-		} else {
-			dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev, DP_MON_RING_FILL_LEVEL_DEFAULT);
+		if (CDP_LITE_MON_LEN_FULL == config->len[WLAN_FC0_TYPE_DATA]) {
+			/*
+			 * overwrite tx_mon_ring_fill_level, as full capture
+			 * need more data buffer
+			 */
+			mon_soc_be->tx_mon_ring_fill_level = 0;
 		}
+
+		dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev,
+							  num_of_buffers);
 
 		/* setupt tx lite mon filters */
 		dp_mon_filter_setup_tx_lite_mon(&be_pdev->pdev);
@@ -764,6 +775,9 @@ dp_lite_mon_hw_filter_config(struct dp_soc *soc,
 	struct dp_pdev *pdev = &(be_pdev->pdev);
 	struct dp_mon_pdev *mon_pdev = NULL;
 	struct dp_mon_pdev_be *mon_pdev_be = NULL;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = NULL;
+	uint16_t num_of_buffers = 0;
 	bool hw_filter_cfg = false;
 
 	hw_filter_cfg = wlan_cfg_get_txmon_disable_hw_filter(soc->wlan_cfg_ctx);
@@ -779,6 +793,9 @@ dp_lite_mon_hw_filter_config(struct dp_soc *soc,
 	if (!mon_pdev_be)
 		return;
 
+	mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+	mon_soc_be->tx_mon_ring_fill_level =
+		wlan_cfg_get_dp_soc_tx_mon_ring_fill_level(soc->wlan_cfg_ctx);
 	if (disable_hw_filter) {
 		/* set the hw filter config */
 		lite_mon_tx_config->disable_hw_filter = hw_filter_cfg;
@@ -788,6 +805,7 @@ dp_lite_mon_hw_filter_config(struct dp_soc *soc,
 		mon_pdev_be->tx_mon_filter_length = DEFAULT_DMA_LENGTH;
 		dp_mon_filter_setup_tx_mon_mode(pdev);
 		dp_tx_mon_filter_update(pdev);
+		mon_soc_be->tx_mon_ring_fill_level = 0;
 	} else {
 		/* set the hw filter config as there is no peer */
 		lite_mon_tx_config->disable_hw_filter = false;
@@ -798,6 +816,11 @@ dp_lite_mon_hw_filter_config(struct dp_soc *soc,
 		dp_mon_filter_reset_tx_mon_mode(pdev);
 		dp_tx_mon_filter_update(pdev);
 	}
+
+	num_of_buffers =
+		wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc->wlan_cfg_ctx);
+	dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev,
+						  num_of_buffers);
 }
 #else
 /**
