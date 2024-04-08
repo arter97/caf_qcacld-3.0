@@ -12010,4 +12010,194 @@ void lim_cp_stats_cstats_log_assoc_req_evt(struct pe_session *pe_session,
 
 	wlan_cstats_host_stats(sizeof(struct cstats_assoc_req_mgmt_frm), &stat);
 }
+
+void lim_cp_stats_cstats_log_disc_req_evt(tDot11fTDLSDisReq *frm,
+					  struct pe_session *pe_session)
+{
+	struct cstats_tdls_disc_req stat = {0};
+
+	stat.cmn.hdr.evt_id =
+			WLAN_CHIPSET_STATS_STA_TDLS_DISCOVERY_REQ_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_tdls_disc_req) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = pe_session->opmode;
+	stat.cmn.vdev_id = pe_session->vdev_id;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.act_category = frm->Category.category;
+	stat.act = frm->Action.action;
+	stat.dt = frm->DialogToken.token;
+	stat.direction = CSTATS_DIR_TX;
+
+	CSTATS_MAC_COPY(stat.init_sta_addr, frm->LinkIdentifier.InitStaAddr);
+	CSTATS_MAC_COPY(stat.bssid, frm->LinkIdentifier.bssid);
+	CSTATS_MAC_COPY(stat.resp_sta_addr, frm->LinkIdentifier.RespStaAddr);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_tdls_disc_req), &stat);
+}
+
+void lim_cp_stats_cstats_log_disc_resp_evt(tDot11fTDLSDisRsp *frm,
+					   struct pe_session *pe_session)
+{
+	struct cstats_tdls_disc_resp stat = {0};
+
+	stat.cmn.hdr.evt_id =
+			WLAN_CHIPSET_STATS_STA_TDLS_DISCOVERY_RESP_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_tdls_disc_resp) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = pe_session->opmode;
+	stat.cmn.vdev_id = pe_session->vdev_id;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+
+	stat.act_category = frm->Category.category;
+	stat.act = frm->Action.action;
+	stat.dt = frm->DialogToken.token;
+	stat.direction = CSTATS_DIR_TX;
+
+	if (frm->HTCaps.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_HT);
+
+	if (frm->VHTCaps.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_VHT);
+
+	if (frm->he_cap.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_HE);
+
+	CSTATS_MAC_COPY(stat.init_sta_addr, frm->LinkIdentifier.InitStaAddr);
+	CSTATS_MAC_COPY(stat.bssid, frm->LinkIdentifier.bssid);
+	CSTATS_MAC_COPY(stat.resp_sta_addr, frm->LinkIdentifier.RespStaAddr);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_tdls_disc_resp), &stat);
+}
+
+void lim_cp_stats_cstats_log_setup_req_evt(tDot11fTDLSSetupReq *frm,
+					   struct pe_session *pe_session)
+{
+	struct cstats_tdls_setup_req stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_STA_TDLS_SETUP_REQ_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_tdls_setup_req) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = pe_session->opmode;
+	stat.cmn.vdev_id = pe_session->vdev_id;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+
+	stat.act_category = frm->Category.category;
+	stat.act = frm->Action.action;
+	stat.dt = frm->DialogToken.token;
+	stat.direction = CSTATS_DIR_TX;
+
+	if (frm->HTCaps.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_HT);
+
+	if (frm->VHTCaps.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_VHT);
+
+	if (frm->he_cap.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_HE);
+
+	CSTATS_MAC_COPY(stat.init_sta_addr, frm->LinkIdentifier.InitStaAddr);
+	CSTATS_MAC_COPY(stat.bssid, frm->LinkIdentifier.bssid);
+	CSTATS_MAC_COPY(stat.resp_sta_addr, frm->LinkIdentifier.RespStaAddr);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_tdls_setup_req), &stat);
+}
+
+void
+lim_cp_stats_cstats_log_setup_resp_evt(tDot11fTDLSSetupRsp *frm,
+				       struct pe_session *pe_session)
+{
+	struct cstats_tdls_setup_resp stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_STA_TDLS_SETUP_RESP_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_tdls_setup_resp) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = pe_session->opmode;
+	stat.cmn.vdev_id = pe_session->vdev_id;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+
+	stat.act_category = frm->Category.category;
+	stat.act = frm->Action.action;
+	stat.dt = frm->DialogToken.token;
+	stat.direction = CSTATS_DIR_TX;
+
+	if (frm->HTCaps.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_HT);
+
+	if (frm->VHTCaps.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_VHT);
+
+	if (frm->he_cap.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_HE);
+
+	stat.status = frm->Status.status;
+
+	CSTATS_MAC_COPY(stat.init_sta_addr, frm->LinkIdentifier.InitStaAddr);
+	CSTATS_MAC_COPY(stat.bssid, frm->LinkIdentifier.bssid);
+	CSTATS_MAC_COPY(stat.resp_sta_addr, frm->LinkIdentifier.RespStaAddr);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_tdls_setup_resp), &stat);
+}
+
+void
+lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
+					  struct pe_session *pe_session)
+{
+	struct cstats_tdls_setup_confirm stat = {0};
+
+	stat.cmn.hdr.evt_id =
+			     WLAN_CHIPSET_STATS_STA_TDLS_SETUP_CONFIRM_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_tdls_setup_confirm) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = pe_session->opmode;
+	stat.cmn.vdev_id = pe_session->vdev_id;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+
+	stat.act_category = frm->Category.category;
+	stat.act = frm->Action.action;
+	stat.dt = frm->DialogToken.token;
+	stat.direction = CSTATS_DIR_TX;
+
+	if (frm->HTInfo.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_HT);
+
+	if (frm->VHTOperation.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_VHT);
+
+	if (frm->he_op.present)
+		CSTATS_SET_BIT(stat.flags, CSTATS_FLAG_HE);
+
+	stat.status = frm->Status.status;
+
+	CSTATS_MAC_COPY(stat.init_sta_addr, frm->LinkIdentifier.InitStaAddr);
+	CSTATS_MAC_COPY(stat.bssid, frm->LinkIdentifier.bssid);
+	CSTATS_MAC_COPY(stat.resp_sta_addr, frm->LinkIdentifier.RespStaAddr);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_tdls_setup_confirm), &stat);
+}
+
+void
+lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
+				      struct pe_session *pe_session)
+{
+	struct cstats_tdls_tear_down stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_STA_TDLS_TEARDOWN_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_tdls_setup_confirm) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = pe_session->opmode;
+	stat.cmn.vdev_id = pe_session->vdev_id;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+
+	stat.act_category = frm->Category.category;
+	stat.act = frm->Action.action;
+	stat.direction = CSTATS_DIR_TX;
+
+	stat.reason = frm->Reason.code;
+
+	CSTATS_MAC_COPY(stat.init_sta_addr, frm->LinkIdentifier.InitStaAddr);
+	CSTATS_MAC_COPY(stat.bssid, frm->LinkIdentifier.bssid);
+	CSTATS_MAC_COPY(stat.resp_sta_addr, frm->LinkIdentifier.RespStaAddr);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_tdls_tear_down), &stat);
+}
 #endif /* WLAN_CHIPSET_STATS */
