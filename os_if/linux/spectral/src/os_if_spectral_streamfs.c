@@ -87,31 +87,19 @@ os_if_spectral_streamfs_sub_buffer_debugfs_init
 	pss = &ps->streamfs_obj;
 
 	pss->n_subbuf = cfg_get(psoc, CFG_SPECTRAL_STREAMFS_NUM_BUFFERS);
-	pss->n_subbuf_ptr = debugfs_create_u32
-				(STREAMFS_DATA_NUM_SUB_BUFFERS_FILE,
-				 QDF_FILE_USR_READ,
-				 pss->dir_ptr,
-				 &pss->n_subbuf);
+	qdf_debugfs_create_u32
+			(STREAMFS_DATA_NUM_SUB_BUFFERS_FILE,
+			 QDF_FILE_USR_READ,
+			 pss->dir_ptr,
+			 &pss->n_subbuf);
 
-	if (!pss->n_subbuf_ptr) {
-		spectral_err("Couldn't create debugfs file for 'n_subbuf'");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
 
 	pss->subbuf_size = cfg_get(psoc, CFG_SPECTRAL_STREAMFS_BUFFER_SIZE);
-	pss->subbuf_size_ptr = debugfs_create_u32
-					(STREAMFS_DATA_SUB_BUFFER_SIZE_FILE,
-					 QDF_FILE_USR_READ,
-					 pss->dir_ptr,
-					 &pss->subbuf_size);
-
-	if (!pss->subbuf_size_ptr) {
-		spectral_err
-			("Couldn't create debugfs file for 'subbuf_size'");
-		debugfs_remove(pss->n_subbuf_ptr);
-		pss->n_subbuf_ptr = NULL;
-		return QDF_STATUS_E_NULL_VALUE;
-	}
+	qdf_debugfs_create_u32
+			(STREAMFS_DATA_SUB_BUFFER_SIZE_FILE,
+			 QDF_FILE_USR_READ,
+			 pss->dir_ptr,
+			 &pss->subbuf_size);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -140,12 +128,7 @@ os_if_spectral_streamfs_sub_buffer_debugfs_deinit
 
 	pss = &ps->streamfs_obj;
 
-	debugfs_remove(pss->n_subbuf_ptr);
-	pss->n_subbuf_ptr = NULL;
 	pss->n_subbuf = 0;
-
-	debugfs_remove(pss->subbuf_size_ptr);
-	pss->subbuf_size_ptr = NULL;
 	pss->subbuf_size = 0;
 }
 
