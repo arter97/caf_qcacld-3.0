@@ -3492,6 +3492,73 @@ void lim_cp_stats_cstats_log_assoc_req_evt(struct pe_session *pe_session,
 					   uint8_t *ssid, bool is_ht,
 					   bool is_vht, bool is_he,
 					   bool is_eht, bool is_reassoc);
+
+/**
+ * lim_cp_stats_cstats_log_disc_req_evt() : chipset stats for TDLS disc req
+ *
+ * @frm: pointer to tDot11fTDLSDisReq
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_disc_req_evt(tDot11fTDLSDisReq *frm,
+					  struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_disc_resp_evt() : chipset stats for TDLS disc resp
+ *
+ * @frm: pointer to tDot11fTDLSDisRsp
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_disc_resp_evt(tDot11fTDLSDisRsp *frm,
+					   struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_setup_req_evt() : chipset stats for TDLS setup req
+ *
+ * @frm: pointer to tDot11fTDLSSetupReq
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_setup_req_evt(tDot11fTDLSSetupReq *frm,
+					   struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_setup_resp_evt() : chipset stats for TDLS setup resp
+ *
+ * @frm: pointer to tDot11fTDLSSetupRsp
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_setup_resp_evt(tDot11fTDLSSetupRsp *frm,
+					    struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_setup_confirm_evt() : chipset stats for TDLS setup
+ * confirm
+ *
+ * @frm: pointer to tDot11fTDLSSetupCnf
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
+					       struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_tear_down_evt() : chipset stats for TDLS teardown
+ *
+ * @frm: pointer to tDot11fTDLSSetupCnf
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
+					   struct pe_session *pe_session);
 #else
 static inline void
 lim_cp_stats_cstats_log_assoc_resp_evt(struct pe_session *session_entry,
@@ -3529,6 +3596,42 @@ lim_cp_stats_cstats_log_assoc_req_evt(struct pe_session *pe_session,
 				      uint8_t *ssid, bool is_ht,
 				      bool is_vht, bool is_he,
 				      bool is_eht, bool is_reassoc)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_disc_req_evt(tDot11fTDLSDisReq *frm,
+				     struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_disc_resp_evt(tDot11fTDLSDisRsp *frm,
+				      struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_setup_req_evt(tDot11fTDLSSetupReq *frm,
+				      struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_setup_resp_evt(tDot11fTDLSSetupRsp *frm,
+				       struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
+					  struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
+				      struct pe_session *pe_session)
 {
 }
 #endif /* WLAN_CHIPSET_STATS */
