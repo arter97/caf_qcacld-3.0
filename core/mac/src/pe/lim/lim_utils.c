@@ -39,6 +39,8 @@
 #include "dot11fdefs.h"
 #include "wmm_apsd.h"
 #include "lim_trace.h"
+#include "wlan_vdev_mlme_api.h"
+#include "../../core/src/vdev_mgr_ops.h"
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 #include "host_diag_core_event.h"
@@ -4977,7 +4979,7 @@ bool lim_check_vht_op_mode_change(struct mac_context *mac,
 	csa_param->new_ch_freq_seg2 = ch_params.center_freq_seg1;
 	qdf_copy_macaddr(&csa_param->bssid,
 			 (struct qdf_mac_addr *)pe_session->bssId);
-	lim_handle_sta_csa_param(mac, csa_param);
+	lim_handle_sta_csa_param(mac, csa_param, false);
 
 	return true;
 }
@@ -6186,6 +6188,7 @@ QDF_STATUS lim_send_ext_cap_ie(struct mac_context *mac_ctx,
 	struct vdev_ie_info *vdev_ie;
 	struct scheduler_msg msg = {0};
 	QDF_STATUS status;
+	struct pe_session *session_entry;
 
 	dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
 	if (IS_DOT11_MODE_VHT(dot11mode))
@@ -6206,6 +6209,12 @@ QDF_STATUS lim_send_ext_cap_ie(struct mac_context *mac_ctx,
 			num_bytes = extra_extcap->num_bytes;
 		lim_merge_extcap_struct(&ext_cap_data, extra_extcap, true);
 	}
+
+	/* After merging extcap, check whether disable btm bit require or not */
+	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (session_entry)
+		populate_dot11f_btm_extended_caps(mac_ctx, session_entry,
+						  &ext_cap_data);
 
 	/* Allocate memory for the WMI request, and copy the parameter */
 	vdev_ie = qdf_mem_malloc(sizeof(*vdev_ie) + num_bytes);
@@ -10462,6 +10471,8 @@ QDF_STATUS lim_ap_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 	if (LIM_IS_NDI_ROLE(session))
 		return QDF_STATUS_SUCCESS;
 
+	if (!wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev))
+		lim_configure_fd_for_existing_6ghz_sap(session, true);
 
 	msg.type = SIR_HAL_SEND_AP_VDEV_UP;
 	msg.bodyval = session->smeSessionId;
@@ -10626,7 +10637,9 @@ QDF_STATUS lim_ap_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 	if (!wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev)) {
 		mlme_set_notify_co_located_ap_update_rnr(vdev_mlme->vdev, true);
 		lim_ap_mlme_vdev_rnr_notify(session);
+		lim_configure_fd_for_existing_6ghz_sap(session, false);
 	}
+
 	status =  lim_send_vdev_stop(session);
 
 	return status;
@@ -11723,4 +11736,110 @@ lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40)
 			break;
 	}
 	return CH_WIDTH_20MHZ;
+}
+
+void
+lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
+				       bool is_sap_starting)
+{
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_obj *mlme_obj;
+	uint8_t vdev_num, i;
+	bool is_legacy_sap_present = false;
+
+	if (session->opmode != QDF_SAP_MODE)
+		return;
+
+	vdev_num = policy_mgr_get_sap_mode_info(session->mac_ctx->psoc,
+						freq_list, vdev_id_list);
+
+	for (i = 0; i < vdev_num; i++) {
+		if (vdev_id_list[i] ==  session->vdev_id)
+			continue;
+
+		if (!wlan_reg_is_6ghz_chan_freq(freq_list[i])) {
+			is_legacy_sap_present = true;
+			break;
+		}
+	}
+
+	if (is_sap_starting) {
+		/*
+		 * The SAP which is coming up is also in 6 GHz, therefore do not
+		 * modify the FD config for other 6 GHz SAPs.
+		 * vdev start will enable/disable the FD config for this SAP.
+		 */
+		if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
+			wlan_mlme_disable_fd_in_6ghz_band(session->vdev,
+							  is_legacy_sap_present);
+			return;
+		}
+
+		/*
+		 * Atleast one legacy SAP is present, disable FD for all the
+		 * existing 6 GHz SAPs.
+		 */
+		for (i = 0; i < vdev_num; i++) {
+			if (!wlan_reg_is_6ghz_chan_freq(freq_list[i]))
+				continue;
+			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+							session->mac_ctx->psoc,
+							vdev_id_list[i],
+							WLAN_LEGACY_MAC_ID);
+			if (!vdev)
+				continue;
+
+			mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
+			if (!mlme_obj) {
+				pe_err("Unable to get mlme obj for vdev %d",
+				       vdev_id_list[i]);
+				goto rel;
+			}
+
+			if (!wlan_mlme_is_fd_disabled_in_6ghz_band(vdev))  {
+				wlan_mlme_disable_fd_in_6ghz_band(vdev, true);
+				vdev_mgr_configure_fd_for_sap(mlme_obj);
+			}
+rel:
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		}
+	} else {
+		if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
+			wlan_mlme_disable_fd_in_6ghz_band(session->vdev, false);
+			return;
+		}
+
+		if (is_legacy_sap_present)
+			return;
+		/*
+		 * If no other legacy SAP is present, and the last legacy SAP
+		 * is going down, re-enable FD for all the 6 GHz SAP.
+		 */
+		for (i = 0; i < vdev_num; i++) {
+			if (!wlan_reg_is_6ghz_chan_freq(freq_list[i]))
+				continue;
+			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+							session->mac_ctx->psoc,
+							vdev_id_list[i],
+							WLAN_LEGACY_MAC_ID);
+			if (!vdev)
+				continue;
+
+			mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
+			if (!mlme_obj) {
+				pe_err("Unable to get mlme obj for vdev %d",
+				       vdev_id_list[i]);
+				goto rel_vdev;
+			}
+
+			if (wlan_mlme_is_fd_disabled_in_6ghz_band(vdev)) {
+				wlan_mlme_disable_fd_in_6ghz_band(vdev, false);
+				vdev_mgr_configure_fd_for_sap(mlme_obj);
+			}
+rel_vdev:
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		}
+	}
 }

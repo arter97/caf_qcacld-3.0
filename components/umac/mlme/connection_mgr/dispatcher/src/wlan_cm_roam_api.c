@@ -787,6 +787,9 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 	case RSSI_CHANGE_THRESHOLD:
 		dst_config->int_value = rso_cfg->rescan_rssi_delta;
 		break;
+	case IS_DISABLE_BTM:
+		dst_config->bool_value = rso_cfg->is_disable_btm;
+		break;
 	case BEACON_RSSI_WEIGHT:
 		dst_config->uint_value = rso_cfg->beacon_rssi_weight;
 		break;
@@ -1298,6 +1301,9 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	case RSSI_CHANGE_THRESHOLD:
 		rso_cfg->rescan_rssi_delta  = src_config->uint_value;
 		break;
+	case IS_DISABLE_BTM:
+		rso_cfg->is_disable_btm  = src_config->bool_value;
+		break;
 	case BEACON_RSSI_WEIGHT:
 		rso_cfg->beacon_rssi_weight = src_config->uint_value;
 		break;
@@ -1623,6 +1629,7 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
+	rso_cfg->is_disable_btm = false;
 
 	return status;
 }
@@ -1652,6 +1659,7 @@ void wlan_cm_rso_config_deinit(struct wlan_objmgr_vdev *vdev,
 	cm_flush_roam_channel_list(&cfg_params->pref_chan_info);
 
 	qdf_mutex_destroy(&rso_cfg->cm_rso_lock);
+	rso_cfg->is_disable_btm = false;
 
 	cm_deinit_reassoc_timer(rso_cfg);
 }
@@ -2333,6 +2341,16 @@ QDF_STATUS wlan_cm_set_roam_band_bitmask(struct wlan_objmgr_psoc *psoc,
 
 	src_config.uint_value = roam_band_bitmask;
 	return wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_BAND,
+					  &src_config);
+}
+
+QDF_STATUS wlan_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, bool is_disable_btm)
+{
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.bool_value = is_disable_btm;
+	return wlan_cm_roam_cfg_set_value(psoc, vdev_id, IS_DISABLE_BTM,
 					  &src_config);
 }
 
@@ -4917,19 +4935,30 @@ wlan_cm_set_assoc_btm_cap(struct wlan_objmgr_vdev *vdev, bool val)
 	mlme_priv->connect_info.assoc_btm_cap = val;
 }
 
-bool
-wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_vdev *vdev)
+bool wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_objmgr_vdev *vdev;
+	bool assoc_btm_cap = true;
 
-	if (!vdev)
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		mlme_err("vdev is NULL");
 		return true;
+	}
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv)
-		return true;
+	if (!mlme_priv) {
+		mlme_err("mlme_priv is NULL");
+		goto release_ref;
+	}
 
-	return mlme_priv->connect_info.assoc_btm_cap;
+	assoc_btm_cap = mlme_priv->connect_info.assoc_btm_cap;
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	return assoc_btm_cap;
 }
 
 bool wlan_cm_is_self_mld_roam_supported(struct wlan_objmgr_psoc *psoc)

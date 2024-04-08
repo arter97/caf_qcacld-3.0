@@ -648,7 +648,7 @@
  *
  * </cfg>
  */
-#define CFG_MLO_SUPPORT_LINK_BAND CFG_UINT( \
+#define CFG_MLO_SUPPORT_LINK_BAND CFG_INI_UINT( \
 			"mlo_support_link_band", \
 			0x1, \
 			0x77, \

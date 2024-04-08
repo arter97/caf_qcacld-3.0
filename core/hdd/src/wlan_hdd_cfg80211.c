@@ -5136,7 +5136,8 @@ static void wlan_hdd_cfg80211_set_feature(uint8_t *feature_flags,
  *
  * Return: None
  **/
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
+(defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
 {
 	wlan_hdd_cfg80211_set_feature(feature_flags,
@@ -8666,17 +8667,12 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID] = {
+		.type = NLA_U8},
 };
 
 #define WLAN_MAX_LINK_ID 15
-
-static const struct nla_policy bandwidth_mlo_policy[
-			QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH] = {
-		.type = NLA_U8 },
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID] = {
-		.type = NLA_U8 },
-};
 
 static const struct nla_policy
 qca_wlan_vendor_attr_omi_tx_policy [QCA_WLAN_VENDOR_ATTR_OMI_MAX + 1] = {
@@ -11229,7 +11225,7 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		if (wlan_cfg80211_nla_parse_nested(tb2,
 						QCA_WLAN_VENDOR_ATTR_CONFIG_MAX,
 						   curr_attr,
-						   bandwidth_mlo_policy)){
+						  wlan_hdd_wifi_config_policy)){
 			hdd_err_rl("nla_parse failed");
 			return -EINVAL;
 		}
@@ -11238,7 +11234,7 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
 
 		if (!chn_bd || !mlo_link_id)
-			return -EINVAL;
+			return 0;
 
 		nl80211_chwidth = nla_get_u8(chn_bd);
 		chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
@@ -11872,6 +11868,53 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 }
 #endif
 
+/**
+ * hdd_set_btm_support_config() - Update BTM support policy
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_set_btm_support_config(struct wlan_hdd_link_info *link_info,
+				      const struct nlattr *attr)
+{
+	uint8_t cfg_val;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	enum QDF_OPMODE op_mode = adapter->device_mode;
+	bool is_vdev_in_conn_state, is_disable_btm;
+
+	is_vdev_in_conn_state = hdd_is_vdev_in_conn_state(link_info);
+	cfg_val = nla_get_u8(attr);
+
+	hdd_debug("vdev: %d, cfg_val: %d for op_mode: %d, conn_state:%d",
+		  link_info->vdev_id, cfg_val, op_mode,
+		  is_vdev_in_conn_state);
+
+	/*
+	 * Change in BTM support configuration is applicable only for STA
+	 * interface and not allowed in connected state.
+	 */
+	if (op_mode != QDF_STA_MODE || is_vdev_in_conn_state)
+		return -EINVAL;
+
+	switch (cfg_val) {
+	case QCA_WLAN_BTM_SUPPORT_DISABLE:
+		is_disable_btm = true;
+		break;
+	case QCA_WLAN_BTM_SUPPORT_DEFAULT:
+		is_disable_btm = false;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ucfg_cm_set_btm_config(hdd_ctx->psoc, link_info->vdev_id,
+			       is_disable_btm);
+
+	return 0;
+}
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * hdd_set_eht_emlsr_capability() - Set EMLSR capability for EHT STA
@@ -12387,6 +12430,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_t2lm_negotiation_support},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE,
 	 hdd_set_coex_traffic_shaping_mode},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT,
+	 hdd_set_btm_support_config},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -28841,6 +28886,7 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 	bool is_legacy_phymode = false;
 	struct wlan_channel chan_info;
 	int ret = 0;
+	struct ch_params ch_params = {0};
 
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("vdev not associated");
@@ -28861,6 +28907,15 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 		ret = mlo_mgr_get_per_link_chan_info(vdev, link_id, &chan_info);
 		if (ret != 0)
 			goto release;
+
+		ch_params.ch_width = chan_info.ch_width;
+		ch_params.center_freq_seg1 = chan_info.ch_cfreq2;
+		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
+							chan_info.ch_freq, 0,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
+		chan_info.ch_cfreq1 = ch_params.mhz_freq_seg0;
+		chan_info.ch_cfreq2 = ch_params.mhz_freq_seg1;
 	} else {
 		ret = wlan_hdd_cfg80211_get_vdev_chan_info(hdd_ctx, vdev,
 							   link_id,

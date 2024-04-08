@@ -46,6 +46,7 @@
 #ifdef WLAN_SUPPORT_LAPB
 #include "wlan_dp_lapb_flow.h"
 #endif
+#include "cdp_txrx_ctrl.h"
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -160,6 +161,14 @@ QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
 						      new_mac_addr);
 
 	return status;
+}
+
+void ucfg_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
+			     struct qdf_mac_addr *intf_mac,
+			     struct wlan_objmgr_vdev *vdev)
+
+{
+	__wlan_dp_update_def_link(psoc, intf_mac, vdev);
 }
 
 void ucfg_dp_update_intf_mac(struct wlan_objmgr_psoc *psoc,
@@ -2821,3 +2830,21 @@ QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
 	return wlan_dp_lapb_handle_app_ind(nbuf);
 }
 #endif
+
+void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags)
+{
+	cdp_config_param_type val;
+	QDF_STATUS status;
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx) {
+		dp_err("Failed to set flag %d, dp_ctx NULL", flags);
+		return;
+	}
+
+	val.cdp_monitor_flag = flags;
+	status = cdp_txrx_set_psoc_param(dp_ctx->cdp_soc,
+					 CDP_MONITOR_FLAG, val);
+	if (QDF_IS_STATUS_ERROR(status))
+		dp_err("Failed to set flag %d status %d", flags, status);
+}

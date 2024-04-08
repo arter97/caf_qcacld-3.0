@@ -76,6 +76,17 @@ QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
 					bool is_link_switch);
 
 /**
+ * ucfg_dp_update_def_link() - update DP interface default link
+ * @psoc: psoc handle
+ * @intf_mac: interface MAC address
+ * @vdev: objmgr vdev handle to set the def_link in dp_intf
+ *
+ */
+void ucfg_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
+			     struct qdf_mac_addr *intf_mac,
+			     struct wlan_objmgr_vdev *vdev);
+
+/**
  * ucfg_dp_update_intf_mac() - update DP interface MAC address
  * @psoc: psoc handle
  * @cur_mac: Current MAC address
@@ -1875,4 +1886,12 @@ QDF_STATUS ucfg_dp_lapb_handle_app_ind(qdf_nbuf_t nbuf)
 }
 #endif
 
+/*
+ * ucfg_dp_set_mon_conf_flags(): Set monitor configuration flags
+ * @psoc: psoc handle
+ * @flags: monitor configuration flags
+ *
+ * Return: None
+ */
+void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags);
 #endif /* _WLAN_DP_UCFG_API_H_ */

@@ -3801,6 +3801,20 @@ lim_mlo_roam_delete_link_peer(struct pe_session *pe_session,
 }
 #endif
 
+void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
+				enum phy_ch_width ch_width)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return;
+	}
+
+	mlme_priv->connect_info.assoc_chan_info.omn_ie_ch_width = ch_width;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool
 lim_match_link_info(uint8_t req_link_id,

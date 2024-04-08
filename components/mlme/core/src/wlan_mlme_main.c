@@ -864,6 +864,8 @@ QDF_STATUS mlme_init_connect_chan_info_config(struct vdev_mlme_obj *vdev_mlme)
 
 	mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
 							CH_WIDTH_INVALID;
+	mlme_priv->connect_info.assoc_chan_info.omn_ie_ch_width =
+							CH_WIDTH_INVALID;
 	mlme_priv->connect_info.assoc_chan_info.sec_2g_freq = 0;
 	mlme_priv->connect_info.assoc_chan_info.cen320_freq = 0;
 
@@ -2575,7 +2577,7 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 	sta->mlo_support_link_num =
 		cfg_get(psoc, CFG_MLO_SUPPORT_LINK_NUM);
 	sta->mlo_support_link_band =
-		cfg_default(CFG_MLO_SUPPORT_LINK_BAND);
+		cfg_get(psoc, CFG_MLO_SUPPORT_LINK_BAND);
 	sta->mlo_max_simultaneous_links =
 		cfg_default(CFG_MLO_MAX_SIMULTANEOUS_LINKS);
 	sta->mlo_prefer_percentage =
@@ -5709,3 +5711,46 @@ wlan_mlme_send_csa_event_status_ind_cmd(struct wlan_objmgr_vdev *vdev,
 	return tx_ops->send_csa_event_status_ind(vdev, csa_status);
 }
 
+uint8_t
+wlan_mlme_get_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return 0;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE) {
+		mlme_debug("Invalid opmode %d", opmode);
+		return 0;
+	}
+
+	return mlme_priv->mlme_ap.psd_20mhz;
+}
+
+QDF_STATUS
+wlan_mlme_set_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev,
+				uint8_t psd_power)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE) {
+		mlme_debug("Invalid opmode %d", opmode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv->mlme_ap.psd_20mhz = psd_power;
+	return QDF_STATUS_SUCCESS;
+}
