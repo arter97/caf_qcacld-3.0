@@ -2417,7 +2417,7 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 						pm_ctx->pdev,
 						band_mask,
 						channel_list,
-						REG_CURRENT_PWR_MODE);
+						REG_CURRENT_PWR_MODE, false);
 		for (chn_idx = 0; chn_idx < num_chan; chn_idx++) {
 			if (wlan_reg_is_enable_in_secondary_list_for_freq(
 					pm_ctx->pdev,

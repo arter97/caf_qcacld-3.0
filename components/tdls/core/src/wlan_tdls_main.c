@@ -869,7 +869,8 @@ uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
 	num_chan = wlan_reg_get_band_channel_list_for_pwrmode(pdev,
 							      band_mask,
 							      chan,
-							      REG_CLI_DEF_VLP);
+							      REG_CLI_DEF_VLP,
+							      false);
 
 	for (chn_idx = 0; chn_idx < num_chan; chn_idx++) {
 		if (chan[chn_idx].center_freq == freq) {
@@ -915,7 +916,8 @@ bool tdls_is_6g_freq_allowed(struct wlan_objmgr_vdev *vdev,
 	num_chan = wlan_reg_get_band_channel_list_for_pwrmode(pdev,
 							      band_mask,
 							      chan,
-							      REG_CLI_DEF_VLP);
+							      REG_CLI_DEF_VLP,
+							      false);
 	tdls_debug("Country IE:%c%c freq %d num_chan %d", country_code[0],
 			   country_code[1], freq, num_chan);
 	if (!num_chan)
