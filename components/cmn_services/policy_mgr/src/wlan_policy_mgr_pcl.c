@@ -1570,27 +1570,14 @@ bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
 }
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
-#ifdef WLAN_FEATURE_LL_LT_SAP_6G_SUPPORT
 static bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 {
-	if (!wlan_reg_is_6ghz_chan_freq(freq))
-		return true;
-
 	if (wlan_reg_is_6ghz_psc_chan_freq(freq) &&
 	    wlan_reg_is_6ghz_unii5_chan_freq(freq))
 		return true;
 
 	return false;
 }
-#else
-static inline bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
-{
-	if (!wlan_reg_is_6ghz_chan_freq(freq))
-		return true;
-
-	return false;
-}
-#endif
 
 /**
  * policy_mgr_pcl_modification_for_ll_lt_sap() - Modify LL LT SAPs PCL
