@@ -2220,6 +2220,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/uapi/linux/nl80211.h",
             "flag": "CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA",
         },
+	{
+		"pattern": "NL80211_CMD_SET_TID_TO_LINK_MAPPING",
+		"file": "include/uapi/linux/nl80211.h",
+		"flag": "WLAN_FEATURE_11BE_MLO_TTLM",
+	},
     ]
 
     cmd = 'touch "$@"\n'

@@ -1197,6 +1197,10 @@ config WLAN_FEATURE_11BE
 	bool "Enable WLAN_FEATURE_11BE"
 	default n
 
+config WLAN_FEATURE_11BE_MLO_TTLM
+	bool "Enable CONFIG_WLAN_FEATURE_11BE_MLO_TTLM"
+	default n
+
 config WLAN_FEATURE_11BE_MLO
 	bool "Enable WLAN_FEATURE_11BE_MLO"
 	default n
