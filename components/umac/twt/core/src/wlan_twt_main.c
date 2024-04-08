@@ -932,7 +932,7 @@ bool wlan_twt_is_max_sessions_reached(struct wlan_objmgr_psoc *psoc,
 				peer_priv->session_info[i].dialog_id;
 
 		if (existing_session_dialog_id != TWT_ALL_SESSIONS_DIALOG_ID &&
-			existing_session_dialog_id != dialog_id)
+		    existing_session_dialog_id != dialog_id)
 			num_twt_sessions++;
 	}
 
@@ -1172,8 +1172,10 @@ QDF_STATUS wlan_twt_setup_req(struct wlan_objmgr_psoc *psoc,
 			      void *context)
 {
 	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 	bool cmd_in_progress, notify_in_progress;
 	enum wlan_twt_commands active_cmd = WLAN_TWT_NONE;
+	enum QDF_OPMODE mode;
 
 	if (wlan_twt_is_max_sessions_reached(psoc, &req->peer_macaddr,
 					     req->dialog_id)) {
@@ -1189,6 +1191,23 @@ QDF_STATUS wlan_twt_setup_req(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_ALREADY;
 	}
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, req->vdev_id,
+						    WLAN_TWT_ID);
+	if (!vdev) {
+		twt_err("vdev:%d is NULL", req->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/*
+	 * Avoid checking user PS config for P2P Go mode as
+	 * only Broadcast TWT is supported on P2P GO role.
+	 */
+	mode = wlan_vdev_mlme_get_opmode(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+
+	if (mode == QDF_P2P_GO_MODE)
+		goto add_session;
+
 	if (!mlme_get_user_ps(psoc, req->vdev_id)) {
 		twt_warn("Power save mode disable");
 		return QDF_STATUS_E_AGAIN;
@@ -1200,6 +1219,7 @@ QDF_STATUS wlan_twt_setup_req(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_BUSY;
 	}
 
+add_session:
 	cmd_in_progress = wlan_twt_is_command_in_progress(
 					psoc, &req->peer_macaddr, req->dialog_id,
 					WLAN_TWT_ANY, &active_cmd);
@@ -1966,6 +1986,7 @@ wlan_twt_setup_complete_event_handler(struct wlan_objmgr_psoc *psoc,
 
 	switch (opmode) {
 	case QDF_SAP_MODE:
+	case QDF_P2P_GO_MODE:
 		wlan_twt_set_wake_dur_and_interval(
 					psoc, vdev_id,
 					&event->params.peer_macaddr,
