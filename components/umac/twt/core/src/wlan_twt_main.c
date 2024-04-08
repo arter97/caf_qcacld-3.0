@@ -1177,7 +1177,17 @@ QDF_STATUS wlan_twt_setup_req(struct wlan_objmgr_psoc *psoc,
 	enum wlan_twt_commands active_cmd = WLAN_TWT_NONE;
 	enum QDF_OPMODE mode;
 
-	if (wlan_twt_is_max_sessions_reached(psoc, &req->peer_macaddr,
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, req->vdev_id,
+						    WLAN_TWT_ID);
+	if (!vdev) {
+		twt_err("vdev:%d is NULL", req->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+	mode = wlan_vdev_mlme_get_opmode(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+
+	if (mode != QDF_P2P_GO_MODE && mode != QDF_SAP_MODE &&
+	    wlan_twt_is_max_sessions_reached(psoc, &req->peer_macaddr,
 					     req->dialog_id)) {
 		twt_err("TWT add failed(dialog_id:%d), another TWT already exists (max reached)",
 			req->dialog_id);
@@ -1191,22 +1201,14 @@ QDF_STATUS wlan_twt_setup_req(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_ALREADY;
 	}
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, req->vdev_id,
-						    WLAN_TWT_ID);
-	if (!vdev) {
-		twt_err("vdev:%d is NULL", req->vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	/*
 	 * Avoid checking user PS config for P2P Go mode as
 	 * only Broadcast TWT is supported on P2P GO role.
 	 */
-	mode = wlan_vdev_mlme_get_opmode(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
-
-	if (mode == QDF_P2P_GO_MODE)
+	if (mode == QDF_P2P_GO_MODE || mode == QDF_SAP_MODE) {
+		twt_err("Goto Add session for p2pGo");
 		goto add_session;
+	}
 
 	if (!mlme_get_user_ps(psoc, req->vdev_id)) {
 		twt_warn("Power save mode disable");
@@ -1443,6 +1445,22 @@ QDF_STATUS wlan_twt_ac_pdev_param_send(struct wlan_objmgr_psoc *psoc,
 	status = tgt_twt_ac_pdev_param_send(psoc, twt_ac);
 	if (QDF_IS_STATUS_ERROR(status))
 		twt_err("failed (status=%d)", status);
+
+	return status;
+}
+
+QDF_STATUS
+wlan_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  bool unavailability_mode)
+{
+	QDF_STATUS status;
+
+	status = tgt_twt_send_unavailability_mode(psoc, vdev,
+						  unavailability_mode);
+	if (QDF_IS_STATUS_ERROR(status))
+		twt_err("vdev:%d failed to send unavailability mode",
+			wlan_vdev_get_id(vdev));
 
 	return status;
 }
@@ -1997,6 +2015,7 @@ wlan_twt_setup_complete_event_handler(struct wlan_objmgr_psoc *psoc,
 							      false);
 		break;
 	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
 		is_evt_allowed = wlan_twt_is_command_in_progress(
 						psoc,
 						&event->params.peer_macaddr,

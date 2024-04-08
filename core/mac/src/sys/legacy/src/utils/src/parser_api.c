@@ -8169,6 +8169,9 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 		he_cap->twt_responder =
 			twt_responder && twt_get_responder_flag(mac);
 		he_cap->broadcast_twt = bcast_responder;
+		pe_debug("vdev:%d bcast_responder:%d twt_responder:%d",
+			 session->vdev_id, he_cap->broadcast_twt,
+			 he_cap->twt_responder);
 		break;
 	default:
 		break;

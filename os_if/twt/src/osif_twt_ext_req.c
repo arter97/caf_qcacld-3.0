@@ -72,6 +72,7 @@ qca_wlan_vendor_twt_add_dialog_policy[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX + 1] = 
 	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_BCAST_PERSISTENCE] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_TIME_TSF] = {.type = NLA_U64 },
 	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_ANNOUNCE_TIMEOUT] = {.type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_RESPONDER_PM_MODE] = {.type = NLA_U8 },
 };
 
 static const struct nla_policy
@@ -94,6 +95,8 @@ qca_wlan_vendor_twt_nudge_dialog_policy[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAX + 1] 
 static const struct nla_policy
 qca_wlan_vendor_twt_set_param_policy[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_AP_AC_VALUE] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_UNAVAILABILITY_MODE] = {
+						.type = NLA_FLAG},
 };
 
 static const struct nla_policy
@@ -117,7 +120,7 @@ static int osif_is_twt_command_allowed(struct wlan_objmgr_psoc *psoc,
 	enum QDF_OPMODE mode = wlan_vdev_mlme_get_opmode(vdev);
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 
-	if (mode == QDF_P2P_GO_MODE)
+	if (mode == QDF_P2P_GO_MODE || mode == QDF_SAP_MODE)
 		return 0;
 
 	if (mode != QDF_STA_MODE &&
@@ -373,9 +376,6 @@ osif_twt_parse_add_dialog_attrs(struct nlattr **tb,
 		  params->flag_flow_type,
 		  params->flag_protection,
 		  params->wake_time_tsf);
-	osif_debug("twt: peer mac_addr "
-		  QDF_MAC_ADDR_FMT,
-		  QDF_MAC_ADDR_REF(params->peer_macaddr.bytes));
 	osif_debug("twt: announce timeout(in us) %u",
 		   params->announce_timeout_us);
 	return 0;
@@ -496,6 +496,7 @@ osif_send_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	int twt_cmd, ret = 0;
 	struct osif_request *request;
 	struct twt_ack_context *ack_priv;
+	enum QDF_OPMODE opmode;
 	void *context;
 	static const struct osif_request_params params = {
 				.priv_size = sizeof(*ack_priv),
@@ -514,6 +515,13 @@ osif_send_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		ret = qdf_status_to_os_return(status);
 		osif_err("Failed to send add dialog command");
+		goto cleanup;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (twt_params->flag_bcast &&
+	    (opmode == QDF_P2P_GO_MODE || opmode == QDF_SAP_MODE)) {
+		ret = 0;
 		goto cleanup;
 	}
 
@@ -1109,18 +1117,24 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 				    vdev_id);
 			return -EOPNOTSUPP;
 		}
+	} else {
+		qdf_mem_copy(params.peer_macaddr.bytes,
+			     wlan_vdev_mlme_get_macaddr(vdev),
+			     QDF_MAC_ADDR_SIZE);
 	}
 
 	ret = osif_is_twt_command_allowed(psoc, vdev, WLAN_TWT_SETUP);
-	if (ret)
+	if (ret) {
+		osif_err("TWT setup command not allowed");
 		return ret;
+	}
 
 	/*
 	 * For initiating broadcast TWT, userspace would send broadcast
 	 * TWT with dialog ID 0 and the parameters will be sent via
 	 * the TWT_ADD_DIALOG command to the firmware
 	 */
-	if (mode == QDF_P2P_GO_MODE)
+	if (mode == QDF_P2P_GO_MODE || mode == QDF_SAP_MODE)
 		return osif_send_twt_setup_req(vdev, psoc, &params);
 
 	ucfg_twt_cfg_get_congestion_timeout(psoc, &congestion_timeout);
@@ -2482,13 +2496,36 @@ static int osif_twt_add_ac_config(struct wlan_objmgr_vdev *vdev,
 	if (device_mode == QDF_SAP_MODE && is_responder_en) {
 		ret = ucfg_twt_ac_pdev_param_send(psoc,
 						  osif_twt_convert_ac_value(twt_ac));
-	} else {
-		osif_err_rl("Undesired device mode. Mode: %d and responder: %d",
-			    device_mode, is_responder_en);
-		return -EINVAL;
+		return ret;
 	}
 
-	return ret;
+	osif_err_rl("Undesired device mode. Mode: %d and responder: %d",
+		    device_mode, is_responder_en);
+
+	return -EINVAL;
+}
+
+static int osif_twt_send_unavailability_mode(struct wlan_objmgr_vdev *vdev,
+					     bool unavailability_mode)
+{
+	struct wlan_objmgr_psoc *psoc;
+	bool is_requestor_enabled;
+	QDF_STATUS status;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return -EINVAL;
+
+	ucfg_twt_cfg_get_requestor(psoc, &is_requestor_enabled);
+	if (!is_requestor_enabled)
+		return -EINVAL;
+
+	status = ucfg_twt_send_unavailability_mode(psoc, vdev,
+						   unavailability_mode);
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
+	return 0;
 }
 
 int osif_twt_set_param(struct wlan_objmgr_vdev *vdev,
@@ -2496,7 +2533,7 @@ int osif_twt_set_param(struct wlan_objmgr_vdev *vdev,
 {
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_MAX + 1];
 	int ret;
-	int cmd_id;
+	int attr_id;
 	enum qca_wlan_ac_type twt_ac;
 
 	ret = wlan_cfg80211_nla_parse_nested
@@ -2507,10 +2544,9 @@ int osif_twt_set_param(struct wlan_objmgr_vdev *vdev,
 	if (ret)
 		return ret;
 
-	cmd_id = QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_AP_AC_VALUE;
-
-	if (tb[cmd_id]) {
-		twt_ac = nla_get_u8(tb[cmd_id]);
+	attr_id = QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_AP_AC_VALUE;
+	if (tb[attr_id]) {
+		twt_ac = nla_get_u8(tb[attr_id]);
 		osif_debug("TWT_AC_CONFIG_VALUE: %d", twt_ac);
 		ret = osif_twt_add_ac_config(vdev, twt_ac);
 
@@ -2519,6 +2555,26 @@ int osif_twt_set_param(struct wlan_objmgr_vdev *vdev,
 				 ret);
 			return ret;
 		}
+	}
+
+	attr_id = QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_UNAVAILABILITY_MODE;
+	if (tb[attr_id] && nla_get_flag(tb[attr_id])) {
+		osif_debug("vdev:%d unavailability_mode set",
+			   wlan_vdev_get_id(vdev));
+
+		ret = osif_twt_send_unavailability_mode(vdev, true);
+		if (ret)
+			return ret;
+	}
+
+	attr_id = QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_UNAVAILABILITY_MODE;
+	if (tb[attr_id] && nla_get_flag(tb[attr_id])) {
+		osif_debug("vdev:%d unavailability_mode set",
+			   wlan_vdev_get_id(vdev));
+
+		ret = osif_twt_send_unavailability_mode(vdev, true);
+		if (ret)
+			return ret;
 	}
 
 	return ret;
