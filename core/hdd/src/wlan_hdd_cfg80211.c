@@ -26400,6 +26400,7 @@ QDF_STATUS hdd_softap_deauth_all_sta(struct hdd_adapter *adapter,
 	bool is_sap_bcast_deauth_enabled = false;
 	struct hdd_context *hdd_ctx;
 	struct hdd_station_info *sta_info, *tmp = NULL;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx) {
@@ -26416,9 +26417,15 @@ QDF_STATUS hdd_softap_deauth_all_sta(struct hdd_adapter *adapter,
 		struct hdd_station_info bcast_sta_info;
 
 		qdf_set_macaddr_broadcast(&bcast_sta_info.sta_mac);
-		return hdd_softap_deauth_current_sta(adapter->link_info,
-						     &bcast_sta_info,
-						     param);
+
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			hdd_debug("send broadcast deauth on vdev %d",
+				  link_info->vdev_id);
+			hdd_softap_deauth_current_sta(link_info,
+						      &bcast_sta_info,
+						      param);
+		}
+		return QDF_STATUS_SUCCESS;
 	}
 
 	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
