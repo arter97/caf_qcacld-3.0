@@ -167,6 +167,7 @@ struct nan_psoc_priv_obj {
  * @ndp_init_done: Flag to indicate NDP initialization complete after first peer
  *		   connection.
  * @peer_mc_addr_list: Peer multicast address list
+ * @num_pasn_peers: Number of NAN PASN peers
  */
 struct nan_vdev_priv_obj {
 	qdf_spinlock_t lock;
@@ -180,6 +181,7 @@ struct nan_vdev_priv_obj {
 	void *disable_context;
 	bool ndp_init_done;
 	struct qdf_mac_addr peer_mc_addr_list[MAX_NDP_SESSIONS];
+	uint8_t num_pasn_peers;
 };
 
 /**
@@ -334,5 +336,28 @@ bool nan_is_sta_sta_concurrency_present(struct wlan_objmgr_psoc *psoc);
  * Return: Boolean flag indicating whether the NAN pairing allowed or not
  */
 bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * nan_is_peer_exist_for_opmode() - check whether peer is exist or not for given
+ * opmode.
+ * @psoc: pointer to psoc object
+ * @peer_mac_addr: peer mac address
+ * @opmode: OP mode
+ *
+ * Return: Boolean flag indicating whether the peer exists or not
+ */
+bool nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
+				  struct qdf_mac_addr *peer_mac_addr,
+				  enum QDF_OPMODE opmode);
+
+/**
+ * nan_update_pasn_peer_count() - Increment or Decrement pasn peer count
+ * @vdev: Pointer to vdev object
+ * @is_increment: flag to indicate if peer count needs to be incremented
+ *
+ * Return: None
+ */
+void nan_update_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
+				bool is_increment);
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

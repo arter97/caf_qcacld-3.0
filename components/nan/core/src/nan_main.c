@@ -58,6 +58,57 @@ bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc)
 	return psoc_nan_obj->nan_caps.nan_pairing_peer_create_cap;
 }
 
+bool nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
+				  struct qdf_mac_addr *peer_mac_addr,
+				  enum QDF_OPMODE opmode)
+{
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
+	bool is_peer_exist = false;
+
+	if (!peer_mac_addr || qdf_is_macaddr_zero(peer_mac_addr))
+		return false;
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac_addr->bytes,
+					   WLAN_NAN_ID);
+	if (!peer)
+		return false;
+
+	vdev = wlan_peer_get_vdev(peer);
+	wlan_objmgr_vdev_get_ref(vdev, WLAN_NAN_ID);
+	if (!vdev)
+		goto peer_ref_rel;
+
+	/* peer exist for given interface */
+	if (wlan_vdev_mlme_get_opmode(vdev) == opmode)
+		is_peer_exist = true;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+peer_ref_rel:
+	wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
+	return is_peer_exist;
+}
+
+void nan_update_pasn_peer_count(struct wlan_objmgr_vdev *vdev,
+				bool is_increment)
+{
+	struct nan_vdev_priv_obj *nan_vdev_obj;
+
+	nan_vdev_obj = nan_get_vdev_priv_obj(vdev);
+	if (!nan_vdev_obj) {
+		nan_err("NAN vdev priv obj is null");
+		return;
+	}
+
+	if (is_increment)
+		nan_vdev_obj->num_pasn_peers++;
+	else if (nan_vdev_obj->num_pasn_peers)
+		nan_vdev_obj->num_pasn_peers--;
+
+	nan_debug("Pasn peer count:%d", nan_vdev_obj->num_pasn_peers);
+}
+
 QDF_STATUS nan_set_discovery_state(struct wlan_objmgr_psoc *psoc,
 				   enum nan_disc_state new_state)
 {
