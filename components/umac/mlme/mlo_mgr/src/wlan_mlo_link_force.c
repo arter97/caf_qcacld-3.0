@@ -596,7 +596,8 @@ override_emlsr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 			     struct wlan_objmgr_vdev *vdev,
 			     uint8_t ml_num_link,
 			     qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS],
-			     uint32_t disallow_mode_bitmap)
+			     uint32_t disallow_mode_bitmap,
+			     bool *conc_emlsr_allow)
 {
 	uint8_t num_5g_links = 0;
 	uint32_t emlsr_disable_req_flags;
@@ -605,16 +606,9 @@ override_emlsr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 	if ((disallow_mode_bitmap & EMLSR_5GL_5GH) ||
 	    (disallow_mode_bitmap & EMLSR_5GH_5GH) ||
 	    (disallow_mode_bitmap & EMLSR_5GL_5GL)) {
-		ml_nlink_set_emlsr_mode_disable_req(
-				psoc, vdev,
-				ML_EMLSR_DISALLOW_BY_CONCURENCY);
+		*conc_emlsr_allow = false;
 		return disallow_mode_bitmap;
 	}
-
-	emlsr_disable_req_flags =
-	ml_nlink_clr_emlsr_mode_disable_req(
-			psoc, vdev,
-			ML_EMLSR_DISALLOW_BY_CONCURENCY);
 
 	for (i = 0; i < ml_num_link; i++) {
 		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i]))
@@ -626,6 +620,9 @@ override_emlsr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 	/* If eMLSR is disallowed by AP CSA or other part, force add
 	 * eMLSR disallow bitmap always.
 	 */
+	emlsr_disable_req_flags =
+	ml_nlink_get_emlsr_mode_disable_req(psoc, vdev);
+
 	emlsr_disable_req_flags &= ML_EMLSR_DISABLE_MASK_ALL;
 	if (emlsr_disable_req_flags & ~ML_EMLSR_DISALLOW_BY_CONCURENCY) {
 		disallow_mode_bitmap |= EMLSR_5GL_5GH;
@@ -644,6 +641,7 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			enum mlo_disallowed_mode
 			mlo_disallow_mode[MAX_DISALLOW_MODE],
 			uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE],
+			bool *conc_emlsr_allow,
 			uint8_t ml_num_link,
 			qdf_freq_t ml_freq_lst[MAX_DISALLOW_MODE_LINK_NUM],
 			uint8_t ml_linkid_lst[MAX_DISALLOW_MODE_LINK_NUM])
@@ -724,7 +722,8 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 no_legacy_intf:
 	disallow_mode_bitmap =
 	override_emlsr_disallow_mode(psoc, vdev, ml_num_link,
-				     ml_freq_lst, disallow_mode_bitmap);
+				     ml_freq_lst, disallow_mode_bitmap,
+				     conc_emlsr_allow);
 
 	num_of_modes = extract_disallow_mode(disallow_mode_bitmap,
 					     disallow_mode);
@@ -749,11 +748,6 @@ no_legacy_intf:
 	}
 
 end:
-	if (!num_of_modes)
-		ml_nlink_clr_emlsr_mode_disable_req(
-				psoc, vdev,
-				ML_EMLSR_DISALLOW_BY_CONCURENCY);
-
 	return num_of_modes;
 }
 
@@ -785,6 +779,7 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t dual_linkid_lst[MAX_DISALLOW_MODE_LINK_NUM];
 	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	bool conc_emlsr_allow = true;
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
 	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
@@ -811,6 +806,7 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 					psoc, vdev, initial_connected,
 					tmp_mlo_disallow_mode,
 					tmp_disallow_link_bitmap,
+					&conc_emlsr_allow,
 					MAX_DISALLOW_MODE_LINK_NUM,
 					dual_freq_lst, dual_linkid_lst);
 
@@ -829,6 +825,15 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			}
 		}
 	}
+
+	if (conc_emlsr_allow)
+		ml_nlink_clr_emlsr_mode_disable_req(
+				psoc, vdev,
+				ML_EMLSR_DISALLOW_BY_CONCURENCY);
+	else
+		ml_nlink_set_emlsr_mode_disable_req(
+				psoc, vdev,
+				ML_EMLSR_DISALLOW_BY_CONCURENCY);
 
 	/* Combine the MLO_DISALLOWED_MODE_NO_MLMR and
 	 * MLO_DISALLOWED_MODE_NO_EMLSR to MLO_DISALLOWED_MODE_NO_MLMR_EMLSR
