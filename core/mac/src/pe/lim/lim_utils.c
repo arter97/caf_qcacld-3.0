@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3774,11 +3774,17 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 						   struct pe_session *pe_session)
 {
 	qdf_freq_t chan_freq;
+	uint32_t self_cb_mode = mac->roam.configParam.channelBondingMode5GHz;
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq))
+		self_cb_mode = mac->roam.configParam.channelBondingMode24GHz;
 
 	/* If self capability is set to '20Mhz only', then do not change the CB mode. */
-	if (!lim_get_ht_capability
-		    (mac, eHT_SUPPORTED_CHANNEL_WIDTH_SET, pe_session))
+	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) {
+		pe_debug("self_cb_mode 0 for freq %d",
+			 pe_session->curr_op_freq);
 		return;
+	}
 
 	if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) &&
 	    pe_session->force_24ghz_in_ht20) {
@@ -6350,7 +6356,7 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
 
 	pe_debug("source extended capabilities length:%d", src->num_bytes);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   src, src->num_bytes);
+			   src->bytes, src->num_bytes);
 
 	/* Return if strip the capabilities from @dst which not present */
 	if (!dst->present && !add)
@@ -6373,7 +6379,7 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
 		pe_debug("destination extended capabilities length: %d",
 			 dst->num_bytes);
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-				   dst, dst->num_bytes);
+				   dst->bytes, dst->num_bytes);
 	}
 }
 
@@ -10247,7 +10253,7 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session)
 	    session->opmode == QDF_P2P_GO_MODE)
 		mlme_obj->reg_tpc_obj.num_pwr_levels = 0;
 
-	lim_calculate_tpc(mac_ctx, session, 0, false);
+	lim_calculate_tpc(mac_ctx, session);
 
 	tx_ops->set_tpc_power(mac_ctx->psoc, session->vdev_id,
 			      &mlme_obj->reg_tpc_obj);
@@ -10384,7 +10390,7 @@ lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
 
 	wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_power_type_6g);
 
-	if (sta_session->ap_power_type_6g == REG_INDOOR_AP &&
+	if (sta_session->best_6g_power_type == REG_INDOOR_AP &&
 	    !wlan_reg_is_freq_indoor(mac_ctx->pdev,
 				     sap_session->curr_op_freq) &&
 	    ap_power_type_6g == REG_VERY_LOW_POWER_AP) {
