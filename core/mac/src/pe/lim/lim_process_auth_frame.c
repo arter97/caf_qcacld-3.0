@@ -49,6 +49,7 @@
 #include <wlan_mlo_mgr_main.h>
 #include "wlan_nan_api_i.h"
 #include <utils_mlo.h>
+#include "lim_session_utils.h"
 /**
  * is_auth_valid
  *
@@ -879,6 +880,14 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 					 QDF_MAC_ADDR_REF(mac_hdr->sa));
 				lim_delete_pre_auth_node(mac_ctx, mac_hdr->sa);
 			}
+
+			if (pe_get_current_stas_count(mac_ctx) ==
+				mac_ctx->mlme_cfg->sap_cfg.assoc_sta_limit) {
+				pe_err("Max Sta count reached : %d",
+				       mac_ctx->lim.maxStation);
+				return;
+			}
+
 			/* case: when SAP receives auth SAE 1st frame with
 			 * SA, DA and bssid as link address. Driver needs to
 			 * get the STA MLD address and save it in preauth node
