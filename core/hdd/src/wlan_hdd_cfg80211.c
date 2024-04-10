@@ -26376,12 +26376,12 @@ QDF_STATUS hdd_softap_deauth_current_sta(struct wlan_hdd_link_info *link_info,
 			hdd_softap_set_sta_info_deauth_flag(adapter,
 							    sta_info,
 							    true);
-		}
-		qdf_status = qdf_wait_for_event_completion(
+			qdf_status = qdf_wait_for_event_completion(
 						disassoc_event,
 						SME_PEER_DISCONNECT_TIMEOUT);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-			hdd_warn("Deauth time expired");
+			if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+				hdd_warn("Deauth time expired");
+		}
 	} else {
 		hdd_softap_set_sta_info_deauth_flag(adapter,
 						    sta_info,
