@@ -2709,6 +2709,37 @@ policy_mgr_get_third_connection_pcl_table_index_sta_nan(
 }
 
 static enum policy_mgr_two_connection_mode
+policy_mgr_get_third_conn_pcl_table_index_p2p_nan(struct wlan_objmgr_psoc *psoc)
+{
+	enum policy_mgr_two_connection_mode index = PM_MAX_TWO_CONNECTION_MODE;
+	/* SCC */
+	if (pm_conc_connection_list[0].freq ==
+		pm_conc_connection_list[1].freq) {
+		/* Policy mgr only considers NAN Disc ch in 2.4GHz */
+		if (POLICY_MGR_ONE_ONE == pm_conc_connection_list[0].chain_mask)
+			index = PM_NAN_DISC_P2P_SCC_24_1x1;
+		else
+			index = PM_NAN_DISC_P2P_SCC_24_2x2;
+	/* MCC */
+	} else if (policy_mgr_are_2_freq_on_same_mac(psoc,
+			pm_conc_connection_list[0].freq,
+			pm_conc_connection_list[1].freq)) {
+		/* Policy mgr only considers NAN Disc ch in 2.4 GHz */
+		if (POLICY_MGR_ONE_ONE == pm_conc_connection_list[0].chain_mask)
+			index = PM_NAN_DISC_P2P_MCC_24_1x1;
+		else
+			index = PM_NAN_DISC_P2P_MCC_24_2x2;
+	/* DBS */
+	} else {
+		if (POLICY_MGR_ONE_ONE == pm_conc_connection_list[0].chain_mask)
+			index = PM_NAN_DISC_P2P_DBS_1x1;
+		else
+			index = PM_NAN_DISC_P2P_DBS_2x2;
+	}
+	return index;
+}
+
+static enum policy_mgr_two_connection_mode
 policy_mgr_get_third_connection_pcl_table_index_sap_nan(
 					struct wlan_objmgr_psoc *psoc)
 {
@@ -3051,6 +3082,14 @@ policy_mgr_get_third_connection_pcl_table_index(
 		((PM_LL_LT_SAP_MODE == pm_conc_connection_list[0].mode) &&
 		 (PM_P2P_CLIENT_MODE == pm_conc_connection_list[1].mode)))
 		index = policy_mgr_get_third_connection_pcl_table_index_cli_ll_lt_sap(psoc);
+
+	else if ((PM_NAN_DISC_MODE == pm_conc_connection_list[0].mode &&
+		  (PM_P2P_GO_MODE == pm_conc_connection_list[1].mode ||
+		   PM_P2P_CLIENT_MODE == pm_conc_connection_list[1].mode)) ||
+		 (PM_NAN_DISC_MODE == pm_conc_connection_list[1].mode &&
+		  (PM_P2P_GO_MODE == pm_conc_connection_list[0].mode ||
+		   PM_P2P_CLIENT_MODE == pm_conc_connection_list[0].mode)))
+		index = policy_mgr_get_third_conn_pcl_table_index_p2p_nan(psoc);
 
 	policy_mgr_debug("mode0:%d mode1:%d freq0:%d freq1:%d chain:%d index:%d",
 			 pm_conc_connection_list[0].mode,

@@ -894,6 +894,13 @@ enum policy_mgr_one_connection_mode {
  * @PM_NAN_DISC_NDI_MCC_24_2x2: NAN & NDI connection on MCC using 2x2 on 2.4 GHz
  * @PM_NAN_DISC_NDI_DBS_1x1: NAN & NDI connection on DBS using 1x1
  * @PM_NAN_DISC_NDI_DBS_2x2: NAN & NDI connection on DBS using 2x2
+ * @PM_NAN_P2P: NAN & P2P(GO/CLI) connection generic index
+ * @PM_NAN_DISC_P2P_SCC_24_1x1: NAN & P2P connection on SCC using 1x1 on 2.4 GHz
+ * @PM_NAN_DISC_P2P_SCC_24_2x2: NAN & P2P connection on SCC using 2x2 on 2.4 GHz
+ * @PM_NAN_DISC_P2P_MCC_24_1x1: NAN & P2P connection on MCC using 1x1 on 2.4 GHz
+ * @PM_NAN_DISC_P2P_MCC_24_2x2: NAN & P2P connection on MCC using 2x2 on 2.4 GHz
+ * @PM_NAN_DISC_P2P_DBS_1x1: NAN & P2P connection on DBS using 1x1
+ * @PM_NAN_DISC_P2P_DBS_2x2: NAN & P2P connection on DBS using 2x2
  * @PM_STA_24_LL_LT_SAP_DBS_1x1: STA & LL_LT_SAP connection in DBS using 1x1
  * @PM_STA_24_LL_LT_SAP_DBS_2x2: STA & LL_LT_SAP connection in DBS using 2x2
  * @PM_STA_5_LL_LT_SAP_MCC_1x1: STA & LL_LT_SAP connection in MCC on 5 GHz
@@ -1110,6 +1117,13 @@ enum policy_mgr_two_connection_mode {
 	PM_NAN_DISC_NDI_MCC_24_2x2,
 	PM_NAN_DISC_NDI_DBS_1x1,
 	PM_NAN_DISC_NDI_DBS_2x2,
+	PM_NAN_P2P,
+	PM_NAN_DISC_P2P_SCC_24_1x1 = PM_NAN_P2P,
+	PM_NAN_DISC_P2P_SCC_24_2x2 = PM_NAN_P2P,
+	PM_NAN_DISC_P2P_MCC_24_1x1 = PM_NAN_P2P,
+	PM_NAN_DISC_P2P_MCC_24_2x2 = PM_NAN_P2P,
+	PM_NAN_DISC_P2P_DBS_1x1 = PM_NAN_P2P,
+	PM_NAN_DISC_P2P_DBS_2x2 = PM_NAN_P2P,
 	PM_STA_24_LL_LT_SAP_DBS_1x1,
 	PM_STA_24_LL_LT_SAP_DBS_2x2 = PM_STA_24_LL_LT_SAP_DBS_1x1,
 	PM_STA_5_LL_LT_SAP_MCC_1x1,
