@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -57,8 +57,8 @@
 /* Special station id for transmitting broadcast frames. */
 #define STA_ENTRY_BCAST             3
 #define STA_ENTRY_PEER              STA_ENTRY_OTHER
-#ifdef FEATURE_WLAN_TDLS
 #define STA_ENTRY_TDLS_PEER         4
+#ifdef FEATURE_WLAN_TDLS
 #define IS_TDLS_PEER(type) ((type) == STA_ENTRY_TDLS_PEER)
 #else /* !FEATURE_WLAN_TDLS */
 #define IS_TDLS_PEER(type) false
