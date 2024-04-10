@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -31,6 +31,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_cmn.h"
 #endif
+#include <wlan_cp_stats_chipset_stats.h>
 
 #define INVALID_MCS_IDX 255
 
@@ -807,5 +808,37 @@ hdd_tx_latency_record_ingress_ts(struct hdd_adapter *adapter,
 
 #define FEATURE_TX_LATENCY_STATS_COMMANDS
 #define FEATURE_TX_LATENCY_STATS_EVENTS
+#endif
+
+#ifdef WLAN_CHIPSET_STATS
+/**
+ * hdd_cstats_send_data_to_userspace() - Send chipsset stats to userspace
+ *
+ * @buff: Buffer to be sent
+ * @len: length of the buffer
+ * @type: Chipset stats type
+ *
+ * Return: 0 on success -ve value on error
+ */
+int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
+				      enum cstats_types type);
+
+/**
+ * hdd_register_cstats_ops() - Register chipset stats ops
+ *
+ * Return: void
+ */
+void hdd_register_cstats_ops(void);
+#else
+static inline void hdd_register_cstats_ops(void)
+{
+}
+
+static inline int
+hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
+				  enum cstats_types type)
+{
+	return 0;
+}
 #endif
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */

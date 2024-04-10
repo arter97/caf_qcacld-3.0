@@ -50,6 +50,15 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_cm_roam_ucfg_api.h"
 #include "wlan_mlo_mgr_peer.h"
+#include <wlan_cp_stats_chipset_stats.h>
+#include <wlan_cp_stats_ucfg_api.h>
+#ifdef CNSS_GENL
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss_nl.h"
+#else
+#include <net/cnss_nl.h>
+#endif
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
 #define HDD_INFO_SIGNAL                 STATION_INFO_SIGNAL
@@ -11766,5 +11775,75 @@ QDF_STATUS hdd_tx_latency_register_cb(void *soc)
 	hdd_debug("Register tx latency callback");
 	return cdp_host_tx_latency_stats_register_cb(soc,
 						     hdd_tx_latency_stats_cb);
+}
+#endif
+
+#ifdef WLAN_CHIPSET_STATS
+#ifdef CNSS_GENL
+static int nl_srv_bcast_cstats(struct sk_buff *skb)
+{
+	return nl_srv_bcast(skb, CLD80211_MCGRP_HOST_LOGS, ANI_NL_MSG_LOG);
+}
+#else
+static int nl_srv_bcast_cstats(struct sk_buff *skb)
+{
+	return nl_srv_bcast(skb);
+}
+#endif
+
+int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
+				      enum cstats_types type)
+{
+	struct sk_buff *skb = NULL;
+	struct nlmsghdr *nlh;
+	tAniNlHdr *wnl;
+	static int nlmsg_seq;
+	int tot_msg_len;
+	int ret = -1;
+
+	if (type == CSTATS_HOST_TYPE) {
+		*(unsigned short *)(buff) = ANI_NL_MSG_CSTATS_HOST_LOG_TYPE;
+		*(unsigned short *)(buff + 2) = len - sizeof(tAniHdr);
+	} else if (type == CSTATS_FW_TYPE) {
+		*(unsigned short *)(buff) = ANI_NL_MSG_CSTATS_FW_LOG_TYPE;
+		*(unsigned short *)(buff + 2) = len - sizeof(tAniHdr);
+	}
+
+	skb = dev_alloc_skb(MAX_CSTATS_NODE_LENGTH);
+	if (!skb) {
+		qdf_err("dev_alloc_skb() failed");
+		return -ENOMEM;
+	}
+
+	tot_msg_len = NLMSG_SPACE(len + sizeof(wnl->radio));
+
+	nlh = nlmsg_put(skb, 0, nlmsg_seq++,
+			ANI_NL_MSG_LOG,
+			len + sizeof(wnl->radio), NLM_F_REQUEST);
+	if (!nlh) {
+		qdf_err("nlmsg_put() failed for msg size[%d]", tot_msg_len);
+		dev_kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	wnl = (tAniNlHdr *)nlh;
+	wnl->radio = 0;
+
+	memcpy(nlmsg_data(nlh) + sizeof(wnl->radio), buff, len);
+
+	ret = nl_srv_bcast_cstats(skb);
+	if (ret < 0)
+		qdf_err("Send Failed %d", ret);
+
+	return ret;
+}
+
+struct cstats_tx_rx_ops cstats_ops = {
+	.cstats_send_data_to_usr = hdd_cstats_send_data_to_userspace,
+};
+
+void hdd_register_cstats_ops(void)
+{
+	ucfg_cp_stats_cstats_register_tx_rx_ops(&cstats_ops);
 }
 #endif
