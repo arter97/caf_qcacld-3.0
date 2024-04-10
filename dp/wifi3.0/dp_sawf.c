@@ -1062,6 +1062,58 @@ dp_sawf_3_link_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 }
 #endif /* WLAN_FEATURE_11BE_MLO_3_LINK_SUPPORT */
 
+QDF_STATUS
+dp_sawf_notify_deactivate_msduq(struct dp_soc *soc, struct dp_peer *peer,
+				uint8_t q_id, uint8_t svc_id)
+{
+	uint8_t pdev_id;
+	uint16_t peer_id, msduq_peer_id;
+	uint32_t host_q_id;
+	struct dp_sawf_flow_deprioritize_params result_params = {0};
+	bool is_mlo = false;
+
+	if (IS_DP_LEGACY_PEER(peer)) {
+		qdf_mem_copy(&result_params.peer_mac, &peer->mac_addr,
+			     QDF_MAC_ADDR_SIZE);
+	} else {
+#ifdef WLAN_FEATURE_11BE_MLO
+		struct dp_peer *mld_peer;
+
+		is_mlo = true;
+		if (IS_MLO_DP_LINK_PEER(peer))
+			mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
+		else if (IS_MLO_DP_MLD_PEER(peer))
+			mld_peer = peer;
+		else
+			mld_peer = NULL;
+
+		if (!mld_peer) {
+			dp_sawf_err("invalid mld_peer");
+			return QDF_STATUS_E_FAILURE;
+		}
+		qdf_mem_copy(&result_params.peer_mac, &mld_peer->mac_addr,
+			     QDF_MAC_ADDR_SIZE);
+#endif
+	}
+
+	pdev_id = peer->vdev->pdev->pdev_id;
+	peer_id = peer->peer_id;
+	host_q_id = q_id + DP_SAWF_DEFAULT_Q_MAX;
+	msduq_peer_id = dp_sawf_msduq_peer_id_set(peer_id, host_q_id);
+	DP_SAWF_METADATA_SET(result_params.mark_metadata, svc_id, msduq_peer_id);
+	dp_sawf_info("is_mlo:%d | peer_mac:%pM |msduq:%d |svc_id:%d |mark_metadata 0x%x",
+		     is_mlo, result_params.peer_mac, q_id, svc_id,
+		     result_params.mark_metadata);
+
+	if (soc->cdp_soc.ol_ops->notify_deactivate_msduq)
+		return soc->cdp_soc.ol_ops->notify_deactivate_msduq((void *)soc->ctrl_psoc,
+								    pdev_id,
+								    is_mlo,
+								    &result_params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 /*
  * dp_sawf_get_available_msduq() - To find the available MSDUQ based on MSDUQ
  * state.
