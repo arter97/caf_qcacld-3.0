@@ -1175,6 +1175,8 @@ wlan_cfg80211_rx_mgmt_ext(struct wireless_dev *wdev,
 			  enum nl80211_rxmgmt_flags nl80211_flag)
 {
 	struct cfg80211_rx_info info;
+	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
+	struct wlan_objmgr_vdev *vdev;
 
 	info.freq = MHZ_TO_KHZ(rx_freq);
 	info.sig_dbm = rx_rssi * 100;
@@ -1182,12 +1184,21 @@ wlan_cfg80211_rx_mgmt_ext(struct wireless_dev *wdev,
 	info.len = frm_len;
 	info.flags = NL80211_RXMGMT_FLAG_ANSWERED | nl80211_flag;
 
-	if (wlan_vdev_mlme_is_mlo_ap(link_info->vdev)) {
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc,
+						    link_info->vdev_id,
+						    WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev(%u) is NULL", link_info->vdev_id);
+		return;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_ap(vdev)) {
 		info.have_link_id = true;
 		info.link_id = wlan_vdev_get_link_id(link_info->vdev);
 	}
 
 	cfg80211_rx_mgmt_ext(wdev, &info);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 }
 #endif
 
