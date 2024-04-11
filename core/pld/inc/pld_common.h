@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1637,6 +1637,21 @@ int pld_qmi_send_put(struct device *dev);
 int pld_qmi_send(struct device *dev, int type, void *cmd,
 		 int cmd_len, void *cb_ctx,
 		 int (*cb)(void *ctx, void *event, int event_len));
+
+/**
+ * pld_qmi_indication() - Send data request over QMI
+ * @dev: device pointer
+ * @cb_ctx: context pointer if any to pass back in callback
+ * @cb: callback pointer to pass response back
+ *
+ * This API can be used to register for QMI events.
+ *
+ * Return: 0 if registration is successful
+ *         Non zero failure code for errors
+ */
+int pld_qmi_indication(struct device *dev, void *cb_ctx,
+		       int (*cb)(void *ctx, uint16_t type,
+				 void *event, int event_len));
 
 /**
  * pld_is_fw_dump_skipped() - get fw dump skipped status.
