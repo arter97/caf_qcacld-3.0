@@ -2762,27 +2762,56 @@ bool wlan_get_mlo_link_agnostic_flag(struct wlan_objmgr_vdev *vdev,
 				     uint8_t *dest_addr)
 {
 	struct wlan_objmgr_peer *bss_peer = NULL;
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_objmgr_pdev *pdev = vdev->vdev_objmgr.wlan_pdev;
 	bool mlo_link_agnostic = false;
 	uint8_t *peer_mld_addr = NULL;
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return mlo_link_agnostic;
 
-	bss_peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLME_OBJMGR_ID);
-	if (bss_peer) {
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
+		bss_peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
+							    WLAN_MLME_OBJMGR_ID);
+		if (!bss_peer)
+			return mlo_link_agnostic;
+
 		peer_mld_addr = wlan_peer_mlme_get_mldaddr(bss_peer);
-		if (!qdf_mem_cmp(bss_peer->macaddr, dest_addr,
+		if (!qdf_mem_cmp(bss_peer->macaddr,
+				 dest_addr,
 				 QDF_MAC_ADDR_SIZE) ||
-		    (peer_mld_addr && !qdf_mem_cmp(peer_mld_addr, dest_addr,
-						   QDF_MAC_ADDR_SIZE))) {
-			mlme_legacy_debug("dest address" QDF_MAC_ADDR_FMT "bss peer address"
-					  QDF_MAC_ADDR_FMT "mld addr" QDF_MAC_ADDR_FMT,
+		    (peer_mld_addr &&
+		     !qdf_mem_cmp(peer_mld_addr, dest_addr,
+				  QDF_MAC_ADDR_SIZE))) {
+			mlme_legacy_debug("dest address"
+					  QDF_MAC_ADDR_FMT
+					  "bss peer address"
+					  QDF_MAC_ADDR_FMT "mld addr"
+					  QDF_MAC_ADDR_FMT,
 					  QDF_MAC_ADDR_REF(dest_addr),
 					  QDF_MAC_ADDR_REF(bss_peer->macaddr),
 					  QDF_MAC_ADDR_REF(peer_mld_addr));
 			mlo_link_agnostic = true;
 		}
 		wlan_objmgr_peer_release_ref(bss_peer, WLAN_MLME_OBJMGR_ID);
+		return mlo_link_agnostic;
+	} else if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) {
+		/* link peer should be found in the peer list */
+		peer = wlan_objmgr_get_peer_by_mac(wlan_pdev_get_psoc(pdev),
+						   dest_addr, WLAN_MLME_OBJMGR_ID);
+		/* ff:ff:ff:ff:ff:ff will come here */
+		if (!peer)
+			return mlo_link_agnostic;
+
+		peer_mld_addr = wlan_peer_mlme_get_mldaddr(peer);
+		/* if it is mlo peer */
+		if (peer_mld_addr &&
+		    !qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_mld_addr))
+			mlo_link_agnostic = true;
+
+		wlan_objmgr_peer_release_ref(peer, WLAN_MLME_OBJMGR_ID);
+
+		return mlo_link_agnostic;
 	}
 	return mlo_link_agnostic;
 }

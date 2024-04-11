@@ -2333,6 +2333,7 @@ static bool wma_is_mlo_link_agnostic(struct wlan_objmgr_vdev *vdev,
 		mlo_link_agnostic = true;
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE &&
+	    wlan_get_mlo_link_agnostic_flag(vdev, dest_addr) &&
 	    frmType == TXRX_FRM_802_11_MGMT &&
 	    subType != SIR_MAC_MGMT_PROBE_RSP &&
 	    subType != SIR_MAC_MGMT_AUTH &&
