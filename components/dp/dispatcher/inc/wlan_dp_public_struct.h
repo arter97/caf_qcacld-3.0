@@ -600,6 +600,55 @@ union wlan_tp_data {
 	struct wlan_rx_tp_data rx_tp_data;
 };
 
+/*
+ * Flow tuple related flags
+ */
+#define DP_FLOW_TUPLE_FLAGS_IPV4	BIT(0)
+#define DP_FLOW_TUPLE_FLAGS_IPV6	BIT(1)
+#define DP_FLOW_TUPLE_FLAGS_SRC_IP	BIT(2)
+#define DP_FLOW_TUPLE_FLAGS_DST_IP	BIT(3)
+#define DP_FLOW_TUPLE_FLAGS_SRC_PORT	BIT(4)
+#define DP_FLOW_TUPLE_FLAGS_DST_PORT	BIT(5)
+#define DP_FLOW_TUPLE_FLAGS_PROTO	BIT(6)
+
+/*
+ * struct flow_info - Structure used for defining flow
+ * @proto: Flow proto
+ * @src_port: Source port
+ * @dst_port: Destination port
+ * @flags: Flags indicating available attributes of a flow
+ * @src_ip: Source IP (IPv4/IPv6)
+ * @dst_ip: Destination IP (IPv4/IPv6)
+ * @flow_label: Flow label if IPv6 is used for src_ip/dst_ip
+ */
+struct flow_info {
+	uint8_t proto;
+	uint16_t src_port;
+	uint16_t dst_port;
+	uint32_t flags;
+	union {
+		uint32_t ipv4_addr;             /* IPV4 address */
+		uint32_t ipv6_addr[4];          /* IPV6 address */
+	} src_ip;
+	union {
+		uint32_t ipv4_addr;             /* IPV4 address */
+		uint32_t ipv6_addr[4];          /* IPV6 address */
+	} dst_ip;
+	uint32_t flow_label;
+};
+
+/*
+ * struct wlan_dp_stc_flow_classify_result - Flow classification result
+ * @flow_tuple: tuple of the flow which is classified
+ * @cookie: cookie/identifier
+ * @traffic_type: traffic type classified
+ */
+struct wlan_dp_stc_flow_classify_result {
+	struct flow_info flow_tuple;
+	uint32_t cookie;
+	uint8_t traffic_type;
+};
+
 /**
  * struct wlan_dp_psoc_callbacks - struct containing callback
  * to non-converged driver
@@ -860,48 +909,11 @@ struct dp_svc_data {
 #define MAX_TID 8
 
 /*
- * Flow tuple related flags
- */
-#define DP_FLOW_TUPLE_FLAGS_IPV4	BIT(0)
-#define DP_FLOW_TUPLE_FLAGS_IPV6	BIT(1)
-#define DP_FLOW_TUPLE_FLAGS_SRC_IP	BIT(2)
-#define DP_FLOW_TUPLE_FLAGS_DST_IP	BIT(3)
-#define DP_FLOW_TUPLE_FLAGS_SRC_PORT	BIT(4)
-#define DP_FLOW_TUPLE_FLAGS_DST_PORT	BIT(5)
-#define DP_FLOW_TUPLE_FLAGS_PROTO	BIT(6)
-
-/*
  * Flow policy related flags
  */
 #define DP_POLICY_TO_TID_MAP	BIT(0)
 #define DP_POLICY_TO_SVC_MAP	BIT(1)
 #define DP_POLICY_UPDATE_PRIO	BIT(2)
-
-/*
- * struct flow_info - Structure used for defining flow
- * @proto: Flow proto
- * @src_port: Source port
- * @dst_port: Destination port
- * @flags: Flags indicating available attributes of a flow
- * @src_ip: Source IP (IPv4/IPv6)
- * @dst_ip: Destination IP (IPv4/IPv6)
- * @flow_label: Flow label if IPv6 is used for src_ip/dst_ip
- */
-struct flow_info {
-	uint8_t proto;
-	uint16_t src_port;
-	uint16_t dst_port;
-	uint32_t flags;
-	union {
-		uint32_t ipv4_addr;             /* IPV4 address */
-		uint32_t ipv6_addr[4];          /* IPV6 address */
-	} src_ip;
-	union {
-		uint32_t ipv4_addr;             /* IPV4 address */
-		uint32_t ipv6_addr[4];          /* IPV6 address */
-	} dst_ip;
-	uint32_t flow_label;
-};
 
 /* struct dp_policy - Structure used for defining flow policy.
  * @node: dp_policy node used in constructing hlist.

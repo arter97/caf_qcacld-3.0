@@ -1983,4 +1983,14 @@ void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags);
 void
 ucfg_dp_rx_aggr_dis_req(struct wlan_objmgr_vdev *vdev,
 			enum ctrl_rx_aggr_client_id id, bool disable);
+
+#ifdef WLAN_DP_FEATURE_STC
+/**
+ * ucfg_dp_flow_classify_result() - Indicate Flow classify result
+ * @flow_classify_result: Flow classify result
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_flow_classify_result(struct wlan_dp_stc_flow_classify_result *flow_classify_result);
+#endif /* WLAN_DP_FEATURE_STC */
 #endif /* _WLAN_DP_UCFG_API_H_ */

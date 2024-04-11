@@ -220,6 +220,7 @@
 #include "wlan_t2lm_api.h"
 #endif
 #include "wlan_dlm_api.h"
+#include "os_if_dp_stc.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -20586,6 +20587,64 @@ int wlan_hdd_cfg80211_service_class_cmd(struct wiphy *wiphy,
 }
 #endif
 
+#ifdef WLAN_DP_FEATURE_STC
+static inline int
+__wlan_hdd_cfg80211_flow_classify_report_cmd(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     const void *data, int data_len)
+{
+	struct hdd_context *hdd_ctx  = wiphy_priv(wiphy);
+	QDF_STATUS status;
+	enum QDF_GLOBAL_MODE curr_mode;
+	int errno;
+
+	curr_mode = hdd_get_conparam();
+	if (QDF_GLOBAL_FTM_MODE == curr_mode ||
+	    QDF_GLOBAL_MONITOR_MODE == curr_mode) {
+		hdd_err("Command not allowed in FTM/MONITOR mode");
+		return -EINVAL;
+	}
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	status = os_if_dp_flow_classify_result(wiphy, data, data_len);
+
+	return qdf_status_to_os_return(status);
+}
+
+/**
+ * wlan_hdd_cfg80211_flow_classify_report_cmd - provide the flow classification
+ * result
+ * @wiphy: wiphy handle
+ * @wdev: wdev handle
+ * @data: user layer input
+ * @data_len: length of user layer input
+ *
+ * return: 0 success, einval failure
+ */
+static inline int
+wlan_hdd_cfg80211_flow_classify_report_cmd(struct wiphy *wiphy,
+					   struct wireless_dev *wdev,
+					   const void *data, int data_len)
+{
+	struct osif_psoc_sync *psoc_sync;
+	int errno;
+
+	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_flow_classify_report_cmd(wiphy, wdev,
+							     data, data_len);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno;
+}
+#endif
+
 /**
  * wlan_hdd_cfg80211_get_chain_rssi() - get chain rssi
  * @wiphy: wiphy pointer
@@ -21972,6 +22031,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_LL_LT_SAP_VENDOR_COMMANDS
 	FEATURE_TX_LATENCY_STATS_COMMANDS
 	FEATURE_REGULATORY_TPC_INFO_VENDOR_COMMANDS
+	FEATURE_FLOW_CLASSIFY_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
