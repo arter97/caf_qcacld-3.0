@@ -908,6 +908,9 @@ enum {
 	IEEE80211_PARAM_SHORT_GI20 = 829,
 	IEEE80211_PARAM_SHORT_GI40 = 830,
 	IEEE80211_PARAM_HWCTS2SELF_OFDMA = 831, /* User config to enable/disable HWCTS2SELF before DL OFDMA sequence.*/
+#ifdef WLAN_FEATURE_11BE_MLO
+	IEEE80211_PARAM_MLO_LINK_REJ_TEST = 832,
+#endif
 };
 
 enum {
@@ -2693,6 +2696,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 		IEEE80211_PARAM_MLO_EXTMLDCAPOP_FLAG, GET_PARAM, 0},
 	{"mlo_link_rej", IEEE80211_PARAM_MLO_LINK_REJ_FLAG, SET_PARAM, 1},
 	{"g_mlo_link_rej", IEEE80211_PARAM_MLO_LINK_REJ_FLAG, GET_PARAM, 0},
+	{"mlo_lre_test_rej", IEEE80211_PARAM_MLO_LINK_REJ_TEST, SET_PARAM, 2},
+	{"g_mlo_lre_test_rej", IEEE80211_PARAM_MLO_LINK_REJ_TEST, GET_PARAM, 0},
 #endif
 	{"get_noack_map", IEEE80211_PARAM_NOACK_MAP, GET_PARAM, 0},
 #ifdef WLAN_FEATURE_11BE
