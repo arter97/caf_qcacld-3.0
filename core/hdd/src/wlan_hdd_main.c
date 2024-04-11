@@ -249,6 +249,10 @@
 #include "os_if_dp_local_pkt_capture.h"
 #include "cdp_txrx_mon.h"
 
+#ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+#include <linux/netpoll.h>
+#endif
+
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
 #endif
@@ -7259,6 +7263,8 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_START_PRE_CAC_TRANS",
 		"NET_DEV_HOLD_IS_ANY_STA_CONNECTED",
 		"NET_DEV_HOLD_GET_ADAPTER_BY_BSSID",
+		"NET_DEV_HOLD_SHUTDOWN_OPEN_INTERFACE",
+		"NET_DEV_HOLD_REOPEN_SUSPEND_INTERFACE",
 		"NET_DEV_HOLD_ID_MAX"};
 	int32_t num_dbg_strings = QDF_ARRAY_SIZE(strings);
 
@@ -10211,18 +10217,97 @@ out:
 }
 
 #ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
-static QDF_STATUS
-hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
+static int hdd_shutdown_open_interface(struct hdd_context *hdd_ctx)
 {
-#define SHUTDOWN_IN_SUSPEND_RETRY 10
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_SHUTDOWN_OPEN_INTERFACE;
 
-	int count = 0;
-
-	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) != PMO_SUSPEND_SHUTDOWN) {
-		hdd_debug("shutdown in suspend not supported");
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
+		hdd_info("FTM mode, don't close the module");
 		return 0;
 	}
 
+	if (!rtnl_trylock())
+		return -EBUSY;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		adapter->is_opened_before_suspend = false;
+		if (test_bit(DEVICE_IFACE_OPENED, &adapter->event_flags) ||
+		    test_bit(SME_SESSION_OPENED,
+			     &adapter->deflink->link_flags)) {
+			dev_close(adapter->dev);
+			adapter->is_opened_before_suspend = true;
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	rtnl_unlock();
+	return 0;
+}
+
+static int hdd_reopen_suspended_interface(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_REOPEN_SUSPEND_INTERFACE;
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
+		hdd_info("FTM mode, don't close the module");
+		return 0;
+	}
+
+	if (!rtnl_trylock())
+		return -EBUSY;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->is_opened_before_suspend &&
+		    !test_bit(DEVICE_IFACE_OPENED, &adapter->event_flags) &&
+		    !test_bit(SME_SESSION_OPENED,
+			     &adapter->deflink->link_flags)) {
+			adapter->is_opened_before_suspend = false;
+			dev_open(adapter->dev, NULL);
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	rtnl_unlock();
+	return 0;
+}
+
+static QDF_STATUS
+hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
+{
+#define SHUTDOWN_IN_SUSPEND_RETRY 30
+
+	int count = 0;
+	enum pmo_suspend_mode mode;
+
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		hdd_debug("Driver Modules not Enabled ");
+		return 0;
+	}
+
+	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
+	hdd_debug("suspend mode is %d", mode);
+
+	if (mode == PMO_SUSPEND_NONE || mode == PMO_SUSPEND_LEGENCY) {
+		hdd_debug("needn't shutdown in suspend");
+		return 0;
+	}
+
+	if (!hdd_is_any_interface_open(hdd_ctx)) {
+		return pld_idle_shutdown(hdd_ctx->parent_dev,
+					 hdd_psoc_idle_shutdown);
+	} else {
+		if (mode == PMO_SUSPEND_WOW)
+			return 0;
+	}
+
+	if(hdd_shutdown_open_interface(hdd_ctx))
+		hdd_err("adapters can't get rtnl lock, aborting shutdown from driver side");
+
+	/*try to wait interface down for PMO_SUSPEND_SHUTDOWN mode*/
 	while (hdd_is_any_interface_open(hdd_ctx) &&
 	       count < SHUTDOWN_IN_SUSPEND_RETRY) {
 		count++;
@@ -10233,9 +10318,32 @@ hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 		hdd_err("some adapters not stopped");
 		return -EBUSY;
 	}
-
-	hdd_debug("call pld idle shutdown directly");
 	return pld_idle_shutdown(hdd_ctx->parent_dev, hdd_psoc_idle_shutdown);
+}
+
+static QDF_STATUS
+hdd_reopen_wlan_in_post_suspend(struct hdd_context *hdd_ctx)
+{
+	int ret = 0;
+
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) != PMO_SUSPEND_SHUTDOWN) {
+		hdd_debug("shutdown in suspend not supported");
+		return 0;
+	}
+
+	ret = pld_idle_restart(hdd_ctx->parent_dev, hdd_psoc_idle_restart);
+	if(ret){
+		hdd_err("wlan idle restart fail, ret:%d", ret);
+		return ret;
+	}
+
+	ret = hdd_reopen_suspended_interface(hdd_ctx);
+	if(ret){
+		hdd_err("adapters can't get rtnl lock, aborting reopen");
+		return ret;
+	}
+
+	return ret;
 }
 
 static int hdd_pm_notify(struct notifier_block *b,
@@ -10257,6 +10365,8 @@ static int hdd_pm_notify(struct notifier_block *b,
 		break;
 	case PM_POST_SUSPEND:
 	case PM_POST_HIBERNATION:
+		if (0 != hdd_reopen_wlan_in_post_suspend(hdd_ctx))
+			return NOTIFY_STOP;
 		break;
 	}
 
@@ -19534,6 +19644,9 @@ static int hdd_update_pmo_config(struct hdd_context *hdd_ctx)
 	struct pmo_psoc_cfg psoc_cfg = {0};
 	QDF_STATUS status;
 	enum pmo_wow_enable_type wow_enable;
+#ifdef PCIE_SWITCH_SUPPORT
+	struct pld_soc_info info;
+#endif
 
 	ucfg_pmo_get_psoc_config(hdd_ctx->psoc, &psoc_cfg);
 
@@ -19555,6 +19668,16 @@ static int hdd_update_pmo_config(struct hdd_context *hdd_ctx)
 					     &psoc_cfg.sta_max_li_mod_dtim);
 
 	hdd_lpass_populate_pmo_config(&psoc_cfg, hdd_ctx);
+
+#ifdef PCIE_SWITCH_SUPPORT
+	/* Currently, WOW is not supported if chip is attached to PCIe switch */
+	if(!pld_get_soc_info(hdd_ctx->parent_dev, &info)
+	   && (info.pcie_switch_attached)
+	   && (psoc_cfg.suspend_mode == PMO_SUSPEND_WOW)) {
+		psoc_cfg.suspend_mode = PMO_SUSPEND_SHUTDOWN;
+		hdd_info("Update suspend mode to shutdown");
+	}
+#endif
 
 	status = ucfg_pmo_update_psoc_config(hdd_ctx->psoc, &psoc_cfg);
 	if (QDF_IS_STATUS_ERROR(status))

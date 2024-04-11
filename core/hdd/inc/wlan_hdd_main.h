@@ -535,7 +535,8 @@ typedef enum {
 	NET_DEV_HOLD_START_PRE_CAC_TRANS = 60,
 	NET_DEV_HOLD_IS_ANY_STA_CONNECTED = 61,
 	NET_DEV_HOLD_GET_ADAPTER_BY_BSSID = 62,
-
+	NET_DEV_HOLD_SHUTDOWN_OPEN_INTERFACE = 63,
+	NET_DEV_HOLD_REOPEN_SUSPEND_INTERFACE = 64,
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
 } wlan_net_dev_ref_dbgid;
@@ -1199,6 +1200,7 @@ struct wlan_hdd_tx_power {
  * @deflink: Default link pointing to the 0th index of the linkinfo array
  * @link_info: Data structure to hold link specific information
  * @tx_power: Structure to hold connection tx Power info
+ * @is_opened_before_suspend: If this adapter is opened before suspend
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1387,6 +1389,10 @@ struct hdd_adapter {
 	struct wlan_hdd_link_info *deflink;
 	struct wlan_hdd_link_info link_info[WLAN_MAX_MLD];
 	struct wlan_hdd_tx_power tx_power;
+#ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+	bool is_opened_before_suspend;
+#endif
+
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
