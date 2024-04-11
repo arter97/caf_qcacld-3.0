@@ -148,6 +148,7 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	tDot11fIEeht_cap *eht_cap = NULL;
 	struct bss_description *bss_desc = NULL;
 	tDot11fIEVHTOperation *vht_oper = NULL;
+	enum phy_ch_width omn_ie_ch_width;
 
 	lim_get_phy_mode(mac_ctx, &phy_mode, session_entry);
 	sta_ds->staType = STA_ENTRY_SELF;
@@ -314,8 +315,13 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 		 * OMN IE is present in the Assoc response, but the channel
 		 * width/Rx NSS update will happen through the peer_assoc cmd.
 		 */
-		pe_debug("OMN IE is present in the assoc rsp, update NSS/Ch width");
+		omn_ie_ch_width = assoc_rsp->oper_mode_ntf.chanWidth;
+		pe_debug("OMN IE present in re/assoc rsp, omn_ie_ch_width: %d",
+			 omn_ie_ch_width);
+		lim_update_omn_ie_ch_width(session_entry->vdev,
+					   omn_ie_ch_width);
 	}
+
 	if (lim_process_srp_ie(assoc_rsp, sta_ds) == QDF_STATUS_SUCCESS)
 		lim_update_vdev_sr_elements(session_entry, sta_ds);
 }

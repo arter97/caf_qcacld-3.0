@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -428,7 +428,7 @@ update_bw:
 		csa_param->new_ch_freq_seg2 = ccfs1;
 		qdf_copy_macaddr(&csa_param->bssid,
 				 (struct qdf_mac_addr *)session->bssId);
-		lim_handle_sta_csa_param(session->mac_ctx, csa_param);
+		lim_handle_sta_csa_param(session->mac_ctx, csa_param, false);
 	}
 }
 

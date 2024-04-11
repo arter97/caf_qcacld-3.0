@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3204,7 +3204,7 @@ void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
  * @ch_width: Channel width in operating mode notification
  * @new_ch_width: Final channel bandwifdth
  *
- * function to update channel width
+ * function to send WMI_PEER_SET_PARAM_CMDID to FW to update ch_width
  *
  * Return: Success or Failure
  */
@@ -3380,4 +3380,25 @@ lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
  */
 enum phy_ch_width
 lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40);
+
+/*
+ * lim_cmp_ssid() - Compare two SSIDs.
+ * @ssid: first ssid
+ * @pe_session: pointer to session
+ *
+ * Return: qdf_mem_cmp of ssids
+ */
+uint32_t lim_cmp_ssid(tSirMacSSid *ssid, struct pe_session *pe_session);
+
+/*
+ * lim_configure_fd_for_existing_6ghz_sap() - Based on the concurrent
+ * legacy SAP interface UP/DOWN, configure the FD for the 6 GHz SAPs.
+ * @session: pointer to pe_session
+ * @is_sap_starting: true if SAP is starting, false if SAP is stopping
+ *
+ * Return: None
+ */
+void
+lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
+				       bool is_sap_starting);
 #endif /* __LIM_UTILS_H */

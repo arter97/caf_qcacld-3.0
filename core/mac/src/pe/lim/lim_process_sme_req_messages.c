@@ -78,14 +78,6 @@
 #include <wlan_mlo_mgr_peer.h>
 #endif
 
-/*
- * As per spec valid range is range –64 dBm to 63 dBm.
- * Powers in range of 64 - 191 will be invalid.
- */
-#define INVALID_TPE_POWER 100
-#define MAX_TX_PWR_COUNT_FOR_160MHZ 3
-#define MAX_NUM_TX_POWER_FOR_320MHZ 5
-
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
 static bool __lim_process_sme_start_bss_req(struct mac_context *,
@@ -4798,8 +4790,7 @@ static void lim_prepare_and_send_deauth(struct mac_context *mac_ctx,
 	deauth_req.vdev_id = req->req.vdev_id;
 	qdf_mem_copy(deauth_req.bssid.bytes, pe_session->bssId,
 		     QDF_MAC_ADDR_SIZE);
-	deauth_req.bssid = deauth_req.bssid;
-	deauth_req.peer_macaddr = req->req.bssid;
+	deauth_req.peer_macaddr = deauth_req.bssid;
 	deauth_req.reasonCode = req->req.reason_code;
 
 	msg.bodyptr = &deauth_req;
@@ -5782,6 +5773,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	uint8_t reg_eirp_idx = 0, reg_psd_idx = 0;
 	uint8_t min_count = 0;
 	uint8_t ext_power_updated = 0, eirp_power = 0;
+	uint8_t expect_num;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!vdev_mlme)
@@ -5853,6 +5845,17 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 
 	if (non_psd_set && !psd_set) {
 		single_tpe = tpe_ies[non_psd_index];
+		if (single_tpe.max_tx_pwr_count >
+		    MAX_TX_PWR_COUNT_FOR_160MHZ) {
+			pe_debug("Invalid max tx pwr count: %d",
+				 single_tpe.max_tx_pwr_count);
+			single_tpe.max_tx_pwr_count =
+				MAX_TX_PWR_COUNT_FOR_160MHZ;
+		}
+		expect_num = lim_get_num_pwr_levels(false, session->ch_width);
+		single_tpe.max_tx_pwr_count =
+			QDF_MIN(single_tpe.max_tx_pwr_count, expect_num - 1);
+
 		vdev_mlme->reg_tpc_obj.is_psd_power = false;
 		vdev_mlme->reg_tpc_obj.eirp_power = 0;
 		bw_num = sizeof(get_next_higher_bw) /
@@ -5903,9 +5906,20 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 
 	if (psd_set) {
 		single_tpe = tpe_ies[psd_index];
+		if (single_tpe.max_tx_pwr_count >
+		    MAX_TX_PWR_COUNT_FOR_160MHZ_PSD) {
+			pe_debug("Invalid max tx pwr count psd: %d",
+				 single_tpe.max_tx_pwr_count);
+			single_tpe.max_tx_pwr_count =
+				MAX_TX_PWR_COUNT_FOR_160MHZ_PSD;
+		}
+		expect_num = lim_get_num_pwr_levels(true, session->ch_width);
+
 		vdev_mlme->reg_tpc_obj.is_psd_power = true;
 		num_octets =
 			lim_get_num_tpe_octets(single_tpe.max_tx_pwr_count);
+		num_octets = QDF_MIN(num_octets, expect_num);
+
 		vdev_mlme->reg_tpc_obj.num_pwr_levels = num_octets;
 
 		ch_params.ch_width = session->ch_width;
@@ -6135,7 +6149,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 	bool is_tpe_present = false, is_6ghz_freq = false;
 	uint8_t i = 0;
 	int8_t max_tx_power;
-	uint16_t reg_max = 0, psd_power = 0;
+	uint16_t reg_max = 0, reg_psd_pwr_max = 0;
 	uint16_t tx_power_within_bw = 0, psd_power_within_bw = 0;
 	uint16_t local_constraint, bw_val = 0;
 	uint32_t num_pwr_levels, ap_power_type_6g = 0;
@@ -6225,11 +6239,13 @@ void lim_calculate_tpc(struct mac_context *mac,
 					wlan_reg_get_client_power_for_connecting_ap(
 					mac->pdev, ap_power_type_6g,
 					mlme_obj->reg_tpc_obj.frequency[i],
-					is_psd_power, &reg_max, &psd_power);
+					is_psd_power, &reg_max,
+					&reg_psd_pwr_max);
 				} else {
 					wlan_reg_get_client_power_for_connecting_ap(
 					mac->pdev, ap_power_type_6g, oper_freq,
-					is_psd_power, &reg_max, &psd_power);
+					is_psd_power, &reg_max,
+					&reg_psd_pwr_max);
 				}
 			}
 		} else {
@@ -6246,7 +6262,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 					wlan_reg_get_client_power_for_connecting_ap
 					(mac->pdev, ap_power_type_6g,
 					 mlme_obj->reg_tpc_obj.frequency[i],
-					 is_psd_power, &reg_max, &psd_power);
+					 is_psd_power, &reg_max,
+					 &reg_psd_pwr_max);
 				} else {
 					if (wlan_reg_decide_6ghz_power_within_bw_for_freq(
 							mac->pdev, oper_freq,
@@ -6260,7 +6277,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 							QDF_STATUS_SUCCESS) {
 						pe_debug("get pwr attr from secondary list");
 						reg_max = tx_power_within_bw;
-						psd_power = psd_power_within_bw;
+						reg_psd_pwr_max =
+							psd_power_within_bw;
 					} else {
 						wlan_reg_get_cur_6g_ap_pwr_type(
 							mac->pdev,
@@ -6271,7 +6289,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 							frequency[i],
 							&is_psd_power,
 							&reg_max,
-							&psd_power);
+							&reg_psd_pwr_max);
 					}
 				}
 			}
@@ -6299,16 +6317,21 @@ void lim_calculate_tpc(struct mac_context *mac,
 		pe_debug("local constraint: %d power constraint absolute %d",
 			 local_constraint,
 			 mlme_obj->reg_tpc_obj.is_power_constraint_abs);
-		if (mlme_obj->reg_tpc_obj.is_power_constraint_abs) {
+
+		if (is_psd_power) {
+			max_tx_power = reg_psd_pwr_max;
+		} else if (mlme_obj->reg_tpc_obj.is_power_constraint_abs) {
 			if (!local_constraint) {
 				pe_debug("ignore abs ap constraint power 0!");
 				max_tx_power = reg_max;
 			} else {
 				max_tx_power = QDF_MIN(reg_max,
 						       local_constraint);
+				if (!max_tx_power)
+					max_tx_power = reg_max;
 			}
 		} else {
-			max_tx_power = reg_max - local_constraint;
+			max_tx_power = QDF_MIN(reg_max, local_constraint);
 			if (!max_tx_power)
 				max_tx_power = reg_max;
 		}
@@ -6330,11 +6353,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 			pe_debug("TPE: %d", tpe_power);
 		}
 
-		if (is_psd_power)
-			mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
-						(uint8_t)psd_power;
-		else
-			mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
+		mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
 						(uint8_t)max_tx_power;
 
 		pe_debug("freq: %d reg power: %d, max_tx_power(eirp/psd): %d",
@@ -6346,6 +6365,10 @@ void lim_calculate_tpc(struct mac_context *mac,
 	mlme_obj->reg_tpc_obj.eirp_power = reg_max;
 	mlme_obj->reg_tpc_obj.power_type_6g = ap_power_type_6g;
 	mlme_obj->reg_tpc_obj.is_psd_power = is_psd_power;
+
+	if (LIM_IS_AP_ROLE(session) && is_psd_power)
+		wlan_mlme_set_sap_psd_for_20mhz(session->vdev,
+						(uint8_t)reg_psd_pwr_max);
 
 	pe_debug("num_pwr_levels: %d, is_psd_power: %d, total eirp_power: %d, ap_pwr_type: %d",
 		 num_pwr_levels, is_psd_power, reg_max, ap_power_type_6g);

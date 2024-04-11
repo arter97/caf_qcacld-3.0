@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2197,30 +2197,24 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 		 ((dot11_hdr->seqControl.seqNumHi << 8) |
 		  (dot11_hdr->seqControl.seqNumLo << 4) |
 		  (dot11_hdr->seqControl.fragNum)), *(uint16_t *)(frm_body + 2));
+
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(mac->pdev);
-	vdev = wlan_objmgr_get_vdev_by_macaddr_from_psoc(
-			mac->psoc, pdev_id, dot11_hdr->da, WLAN_LEGACY_MAC_ID);
-
-	if (vdev) {
-		vdev_id = wlan_vdev_get_id(vdev);
-		lim_sae_auth_cleanup_retry(mac, vdev_id);
-		status = lim_update_link_to_mld_address(mac, vdev, dot11_hdr);
-
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-	} else {
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_psoc(mac->psoc, pdev_id,
+							 dot11_hdr->da,
+							 WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
 		vdev = wlan_objmgr_pdev_get_roam_vdev(mac->pdev,
 						      WLAN_LEGACY_MAC_ID);
 		if (!vdev) {
 			pe_err("not able to find roaming vdev");
 			return false;
 		}
-
-		vdev_id = wlan_vdev_get_id(vdev);
-		status = lim_update_link_to_mld_address(mac, vdev, dot11_hdr);
-
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 	}
 
+	vdev_id = wlan_vdev_get_id(vdev);
+	lim_sae_auth_cleanup_retry(mac, vdev_id);
+	status = lim_update_link_to_mld_address(mac, vdev, dot11_hdr);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("vdev:%d dropping auth frame BSSID: " QDF_MAC_ADDR_FMT ", SAE address conversion failure",
 		       vdev_id, QDF_MAC_ADDR_REF(dot11_hdr->bssId));
