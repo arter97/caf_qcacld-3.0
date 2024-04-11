@@ -1150,7 +1150,9 @@ wlan_hdd_cfg80211_convert_rxmgmt_flags(enum rxmgmt_flags flag,
 
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
+	defined(WLAN_FEATURE_MULTI_LINK_SAP)
+
 /**
  * wlan_cfg80211_rx_mgmt_ext() - send rx mgmt to kernel
  * @wdev: wireless device receiving the frame
@@ -1335,7 +1337,8 @@ check_adapter:
 		  frame_type, frm_len, rx_freq);
 
 	wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
+	defined(WLAN_FEATURE_MULTI_LINK_SAP)
 	wlan_cfg80211_rx_mgmt_ext(assoc_adapter->dev->ieee80211_ptr,
 				  link_info, rx_freq, rx_rssi, pb_frames,
 				  frm_len, nl80211_flag);
