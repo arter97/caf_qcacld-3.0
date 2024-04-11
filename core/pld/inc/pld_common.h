@@ -1661,6 +1661,21 @@ int pld_qmi_send(struct device *dev, int type, void *cmd,
 		 int (*cb)(void *ctx, void *event, int event_len));
 
 /**
+ * pld_qmi_indication() - Send data request over QMI
+ * @dev: device pointer
+ * @cb_ctx: context pointer if any to pass back in callback
+ * @cb: callback pointer to pass response back
+ *
+ * This API can be used to register for QMI events.
+ *
+ * Return: 0 if registration is successful
+ *         Non zero failure code for errors
+ */
+int pld_qmi_indication(struct device *dev, void *cb_ctx,
+		       int (*cb)(void *ctx, uint16_t type,
+				 void *event, int event_len));
+
+/**
  * pld_is_fw_dump_skipped() - get fw dump skipped status.
  * @dev: device
  *
