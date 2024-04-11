@@ -276,6 +276,18 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		goto release_intf_addr_and_return_failure;
 	}
 
+	pre_cac_adapter = hdd_get_adapter_by_iface_name(hdd_ctx,
+							SAP_PRE_CAC_IFNAME);
+	if (pre_cac_adapter) {
+		hdd_debug("pre cac SAP adapter is present");
+		if (test_bit(SME_SESSION_OPENED,
+			     &pre_cac_adapter->deflink->link_flags)) {
+			hdd_debug("pre cac is on-going");
+			return 0;
+		}
+		goto pre_cac_adapter_created;
+	}
+
 	hdd_debug("starting pre cac SAP  adapter");
 
 	mac_addr = wlan_hdd_get_intf_addr(hdd_ctx, QDF_SAP_MODE);
@@ -319,6 +331,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		goto release_intf_addr_and_return_failure;
 	}
 
+pre_cac_adapter_created:
 	pre_cac_link_info = pre_cac_adapter->deflink;
 	pre_cac_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(pre_cac_link_info);
 	sap_clear_global_dfs_param(mac_handle, pre_cac_ap_ctx->sap_context);
