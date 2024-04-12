@@ -3183,6 +3183,108 @@ hdd_set_tsf_ul_delay_report(struct hdd_adapter *adapter, bool ena)
 }
 #endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
 
+#ifdef WLAN_FEATURE_UL_JITTER
+#define TX_RX_NSS_VENDOR_SIZE 3
+#define SS_COUNT_JITTER 2
+QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
+			    struct sk_buff *skb)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	int **nss_stats;
+	struct nlattr *nss_nest, *nss;
+	int nestid;
+
+	nss_stats = qdf_mem_malloc(SS_COUNT_JITTER * sizeof(int *));
+	if (!nss_stats) {
+		hdd_err_rl("failed to allocate nss array");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	for (int i = 0; i < SS_COUNT_JITTER; i++) {
+		nss_stats[i] = qdf_mem_malloc(TX_RX_NSS_VENDOR_SIZE *
+					      sizeof(int));
+		if (!nss_stats[i]) {
+			hdd_err_rl("failed to allocate nss array");
+			status = QDF_STATUS_E_NOMEM;
+			goto free_mem1;
+		}
+	}
+
+	status = cdp_get_txrx_nss(soc, adapter->deflink->vdev_id, nss_stats);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("Get txrx nss failed");
+		status = QDF_STATUS_E_FAILURE;
+		goto free_mem2;
+	}
+
+	nestid = QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_NSS_PKT_COUNT;
+	nss_nest = nla_nest_start(skb, nestid);
+	if (!nss_nest) {
+		hdd_err("nla_nest_start failed");
+		wlan_cfg80211_vendor_free_skb(skb);
+		status = QDF_STATUS_E_FAILURE;
+		goto free_mem2;
+	}
+
+	for (int i = 0; i < SS_COUNT_JITTER; i++) {
+		nss = nla_nest_start(skb, i + 1);
+		if (!nss) {
+			hdd_err("nla_nest_start failed");
+			wlan_cfg80211_vendor_free_skb(skb);
+			status = QDF_STATUS_E_FAILURE;
+			goto free_mem2;
+		}
+		nla_put_u8(skb,
+			   QCA_WLAN_VENDOR_ATTR_NSS_PKT_NSS_VALUE,
+			   nss_stats[i][0]);
+		wlan_cfg80211_nla_put_u64(skb,
+			    QCA_WLAN_VENDOR_ATTR_NSS_PKT_TX_PACKET_COUNT,
+			    (u64)nss_stats[i][1]);
+		wlan_cfg80211_nla_put_u64(skb,
+			    QCA_WLAN_VENDOR_ATTR_NSS_PKT_RX_PACKET_COUNT,
+			    (u64)nss_stats[i][2]);
+		nla_nest_end(skb, nss);
+	}
+
+	nla_nest_end(skb, nss_nest);
+free_mem2:
+
+	for (int i = 0; i < SS_COUNT_JITTER; i++)
+		qdf_mem_free(nss_stats[i]);
+free_mem1:
+	qdf_mem_free(nss_stats);
+
+	return status;
+}
+
+QDF_STATUS hdd_add_uplink_jitter(struct hdd_adapter *adapter,
+				 struct sk_buff *skb)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t *ul_jitter;
+
+	ul_jitter = qdf_mem_malloc(sizeof(uint32_t));
+	if (hdd_tsf_auto_report_enabled(adapter)) {
+		status = cdp_get_uplink_jitter(soc, adapter->deflink->vdev_id,
+					       ul_jitter);
+		if (QDF_IS_STATUS_ERROR(status))
+			ul_jitter = 0;
+
+		if (nla_put_u32(skb,
+				QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_UPLINK_DELAY_JITTER,
+				*ul_jitter)) {
+			status = QDF_STATUS_E_FAILURE;
+			goto free_mem;
+		}
+	}
+free_mem:
+	qdf_mem_free(ul_jitter);
+
+	return status;
+}
+#endif
 /**
  * hdd_get_tsf_cb() - handle tsf callback
  * @pcb_cxt: pointer to the hdd_contex

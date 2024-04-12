@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -233,6 +233,42 @@ static inline QDF_STATUS hdd_add_uplink_delay(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+
+#ifdef WLAN_FEATURE_UL_JITTER
+/**
+ * hdd_get_txrx_nss() - get txrx nss
+ * @adapter: pointer to the adapter
+ * @skb: nbuf
+ *
+ * Return: status
+ */
+QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
+			    struct sk_buff *skb);
+
+/**
+ * hdd_add_uplink_jitter() - add uplink jitter
+ * @adapter: pointer to the adapter
+ * @skb: nbuf
+ *
+ * Return: status
+ */
+QDF_STATUS hdd_add_uplink_jitter(struct hdd_adapter *adapter,
+				 struct sk_buff *skb);
+
+#else
+static inline QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
+					  struct sk_buff *skb)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS hdd_add_uplink_jitter(struct hdd_adapter *adapter,
+					       struct sk_buff *skb)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_UL_JITTER */
+
 #ifdef WLAN_FEATURE_TSF
 /**
  * wlan_hdd_tsf_init() - set gpio and callbacks for
