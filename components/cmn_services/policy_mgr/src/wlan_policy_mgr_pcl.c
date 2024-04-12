@@ -70,6 +70,11 @@ policy_mgr_next_action_two_connection_table_type
 		*next_action_two_connection_table;
 policy_mgr_next_action_three_connection_table_type
 		*next_action_three_connection_table;
+#ifdef FEATURE_FOURTH_CONNECTION
+policy_mgr_next_action_four_connection_table_type
+		*next_action_four_connection_table;
+#endif
+
 policy_mgr_next_action_two_connection_table_type
 		*next_action_two_connection_2x2_2g_1x1_5g_table;
 policy_mgr_next_action_three_connection_table_type
@@ -2809,7 +2814,14 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sap[0]].freq) &&
 		    WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[1]].freq)) {
-	   		index = PM_SAP_SAP_SCC_5_STA_24_DBS;
+			index = PM_SAP_SAP_SCC_5_STA_24_DBS;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq)) {
+			index = PM_SAP_SAP_STA_SCC_5_DBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
