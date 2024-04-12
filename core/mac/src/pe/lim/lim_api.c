@@ -3878,7 +3878,7 @@ lim_mlo_roam_delete_link_peer(struct pe_session *pe_session,
 }
 #endif
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO)
 void
 lim_update_cuflag_bpcc_each_link(struct mlo_mgmt_ml_info *cu_params)
 {

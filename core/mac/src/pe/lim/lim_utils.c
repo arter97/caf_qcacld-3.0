@@ -10693,7 +10693,7 @@ void lim_send_start_bss_confirm(struct mac_context *mac_ctx,
 	}
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_MULTI_LINK_SAP)
+#if defined(WLAN_FEATURE_11BE_MLO)
 void lim_update_cu_flag(tSirMacCapabilityInfo *pcap_info,
 			struct pe_session *pe_session)
 {

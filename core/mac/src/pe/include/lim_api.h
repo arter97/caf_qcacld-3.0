@@ -968,7 +968,7 @@ lim_mlo_roam_delete_link_peer(struct pe_session *pe_session,
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD && WLAN_FEATURE_11BE_MLO */
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * lim_update_cuflag_bpcc_each_link() - Update cu flag and bpcc from
  * rx mlo link info sync event to pe session.
