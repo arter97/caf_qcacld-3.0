@@ -1078,7 +1078,7 @@ add_freq:
 static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len)
+			uint32_t *len, uint32_t weight_len)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -1095,6 +1095,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("Invalid context");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	/* check the channel avoidance list for beaconing entities */
+	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
+						 len, pcl_weight, weight_len);
 
 	if (policy_mgr_is_sap_mandatory_channel_set(psoc)) {
 		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
@@ -1175,15 +1179,26 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len)
+			uint32_t *len, uint32_t weight_len)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	bool srd_chan_enabled;
+
+	/* check the channel avoidance list for beaconing entities */
+	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
+						 len, pcl_weight, weight_len);
 
 	status = policy_mgr_modify_pcl_based_on_enabled_channels(
 			psoc, pcl_channels, pcl_weight, len);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get modified pcl for GO");
+		return status;
+	}
+
+	status = policy_mgr_modify_sap_pcl_based_on_dfs(
+			psoc, pcl_channels, pcl_weight, len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to get dfs modified pcl for GO");
 		return status;
 	}
 
@@ -1205,18 +1220,19 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 static QDF_STATUS policy_mgr_mode_specific_modification_on_pcl(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len, enum policy_mgr_con_mode mode)
+			uint32_t *len, uint32_t weight_len,
+			enum policy_mgr_con_mode mode)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	switch (mode) {
 	case PM_SAP_MODE:
 		status = policy_mgr_pcl_modification_for_sap(
-			psoc, pcl_channels, pcl_weight, len);
+			psoc, pcl_channels, pcl_weight, len, weight_len);
 		break;
 	case PM_P2P_GO_MODE:
 		status = policy_mgr_pcl_modification_for_p2p_go(
-			psoc, pcl_channels, pcl_weight, len);
+			psoc, pcl_channels, pcl_weight, len, weight_len);
 		break;
 	case PM_STA_MODE:
 	case PM_P2P_CLIENT_MODE:
@@ -1392,7 +1408,7 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("PCL before modification");
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 	policy_mgr_mode_specific_modification_on_pcl(
-		psoc, pcl_channels, pcl_weight, len, mode);
+		psoc, pcl_channels, pcl_weight, len, weight_len, mode);
 
 	status = policy_mgr_modify_pcl_based_on_dnbs(psoc, pcl_channels,
 						pcl_weight, len);
@@ -3079,7 +3095,8 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 			ch_weight_len);
 
 	status = policy_mgr_mode_specific_modification_on_pcl(
-			psoc, ch_freq_list, ch_weight_list, ch_cnt, mode);
+			psoc, ch_freq_list, ch_weight_list, ch_cnt,
+			ch_weight_len, mode);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get modified pcl for mode %d", mode);

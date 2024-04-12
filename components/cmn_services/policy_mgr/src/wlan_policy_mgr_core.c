@@ -2459,7 +2459,6 @@ get_sub_channels(struct wlan_objmgr_psoc *psoc,
  * @pcl_weights: pcl weight
  * @pcl_sz: pcl size
  * @index: pcl index
- * @skip_dfs_channel: to skip dfs channels or not
  * @skip_6gh_channel: to skip 6g channels or not
  * @chlist_5: 5g channel list
  * @chlist_len_5: 5g channel list length
@@ -2475,7 +2474,7 @@ static void
 add_sbs_chlist_to_pcl(struct wlan_objmgr_psoc *psoc,
 		      uint32_t *pcl_freqs, uint8_t *pcl_weights,
 		      uint32_t pcl_sz, uint32_t *index,
-		      bool skip_dfs_channel, bool skip_6gh_channel,
+		      bool skip_6gh_channel,
 		      const uint32_t *chlist_5, uint8_t chlist_len_5,
 		      const uint32_t *chlist_6, uint8_t chlist_len_6,
 		      enum policy_mgr_pcl_channel_order order)
@@ -2528,10 +2527,6 @@ add_sbs_chlist_to_pcl(struct wlan_objmgr_psoc *psoc,
 			if (scc_freq == chlist_5[i])
 				continue;
 
-			if (skip_dfs_channel &&
-			    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, chlist_5[i]))
-				continue;
-
 			pcl_freqs[*index] = chlist_5[i];
 			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
 			(*index)++;
@@ -2543,10 +2538,6 @@ add_sbs_chlist_to_pcl(struct wlan_objmgr_psoc *psoc,
 
 			/* SCC channel is already added in pcl freq*/
 			if (scc_freq == chlist_6[i])
-				continue;
-
-			if (skip_dfs_channel &&
-			    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, chlist_6[i]))
 				continue;
 
 			pcl_freqs[*index] = chlist_6[i];
@@ -2579,10 +2570,6 @@ add_sbs_chlist_to_pcl(struct wlan_objmgr_psoc *psoc,
 			if (scc_freq == chlist_5[i])
 				continue;
 
-			if (skip_dfs_channel &&
-			    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, chlist_5[i]))
-				continue;
-
 			pcl_freqs[*index] = chlist_5[i];
 			pcl_weights[*index] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
 			(*index)++;
@@ -2594,10 +2581,6 @@ add_sbs_chlist_to_pcl(struct wlan_objmgr_psoc *psoc,
 
 			/* SCC channel is already added in pcl freq*/
 			if (scc_freq == chlist_6[i])
-				continue;
-
-			if (skip_dfs_channel &&
-			    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, chlist_6[i]))
 				continue;
 
 			pcl_freqs[*index] = chlist_6[i];
@@ -2619,14 +2602,11 @@ add_chlist_to_pcl(struct wlan_objmgr_pdev *pdev,
 		  uint32_t *pcl_freqs, uint8_t *pcl_weights,
 		  uint32_t pcl_sz, uint32_t *index, uint32_t weight,
 		  const uint32_t *chlist, uint8_t chlist_len,
-		  bool skip_dfs_channel, bool skip_6gh_channel)
+		  bool skip_6gh_channel)
 {
 	uint32_t i;
 
 	for (i = 0; i < chlist_len && *index < pcl_sz; i++) {
-		if (skip_dfs_channel &&
-		    wlan_reg_is_dfs_for_freq(pdev, chlist[i]))
-			continue;
 		if (skip_6gh_channel &&
 		    WLAN_REG_IS_6GHZ_CHAN_FREQ(chlist[i]))
 			continue;
@@ -3127,7 +3107,6 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint32_t num_channels = 0;
 	uint32_t chan_index_24 = 0, chan_index_5 = 0, chan_index_6 = 0;
-	bool skip_dfs_channel = false;
 	uint32_t i = 0;
 	bool skip_6ghz_channel = false;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -3180,20 +3159,11 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
-	if ((mode == PM_SAP_MODE) || (mode == PM_P2P_GO_MODE))
-		policy_mgr_skip_dfs_ch(psoc,
-				       &skip_dfs_channel);
-
 	/* Let's divide the list in 2.4 & 5 Ghz lists */
 	for (i = 0; i < num_channels; i++) {
 		if (wlan_reg_is_24ghz_ch_freq(channel_list[i])) {
 			channel_list_24[chan_index_24++] = channel_list[i];
 		} else if (wlan_reg_is_5ghz_ch_freq(channel_list[i])) {
-			if ((true == skip_dfs_channel) &&
-			    wlan_reg_is_dfs_for_freq(pm_ctx->pdev,
-						     channel_list[i]))
-				continue;
-
 			channel_list_5[chan_index_5++] = channel_list[i];
 		} else if (wlan_reg_is_6ghz_chan_freq(channel_list[i])) {
 			/* Add to 5G list until 6G conc support is enabled */
@@ -3262,7 +3232,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	case PM_MCC_CH:
 		policy_mgr_get_connection_channels(psoc, mode,
 						   POLICY_MGR_PCL_ORDER_NONE,
-						   skip_dfs_channel,
+						   false,
 						   POLICY_MGR_PCL_GROUP_ID1_ID2,
 						   pcl_channels, pcl_weights,
 						   pcl_sz, len);
@@ -3272,7 +3242,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	case PM_MCC_CH_24G:
 		policy_mgr_get_connection_channels(psoc, mode,
 						   POLICY_MGR_PCL_ORDER_NONE,
-						   skip_dfs_channel,
+						   false,
 						   POLICY_MGR_PCL_GROUP_ID1_ID2,
 						   pcl_channels, pcl_weights,
 						   pcl_sz, len);
@@ -3285,7 +3255,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	case PM_MCC_CH_5G:
 		policy_mgr_get_connection_channels(psoc, mode,
 						   POLICY_MGR_PCL_ORDER_NONE,
-						   skip_dfs_channel,
+						   false,
 						   POLICY_MGR_PCL_GROUP_ID1_ID2,
 						   pcl_channels, pcl_weights,
 						   pcl_sz, len);
@@ -3303,7 +3273,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 					  channel_list_24, chan_index_24);
 		policy_mgr_get_connection_channels(psoc, mode,
 						   POLICY_MGR_PCL_ORDER_NONE,
-						   skip_dfs_channel,
+						   false,
 						   POLICY_MGR_PCL_GROUP_ID2_ID3,
 						   pcl_channels, pcl_weights,
 						   pcl_sz, len);
@@ -3318,7 +3288,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 					 channel_list_6, chan_index_6);
 		policy_mgr_get_connection_channels(psoc, mode,
 						   POLICY_MGR_PCL_ORDER_NONE,
-						   skip_dfs_channel,
+						   false,
 						   POLICY_MGR_PCL_GROUP_ID3_ID4,
 						   pcl_channels, pcl_weights,
 						   pcl_sz, len);
@@ -3328,7 +3298,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_get_connection_channels(
 					psoc, mode,
 					POLICY_MGR_PCL_ORDER_24G_THEN_5G,
-					skip_dfs_channel,
+					false,
 					POLICY_MGR_PCL_GROUP_ID1_ID2,
 					pcl_channels, pcl_weights, pcl_sz, len);
 		status = QDF_STATUS_SUCCESS;
@@ -3337,7 +3307,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_get_connection_channels(
 					psoc, mode,
 					POLICY_MGR_PCL_ORDER_5G_THEN_2G,
-					skip_dfs_channel,
+					false,
 					POLICY_MGR_PCL_GROUP_ID1_ID2,
 					pcl_channels, pcl_weights, pcl_sz, len);
 		status = QDF_STATUS_SUCCESS;
@@ -3346,7 +3316,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_get_connection_channels(
 					psoc, mode,
 					POLICY_MGR_PCL_ORDER_24G_THEN_5G,
-					skip_dfs_channel,
+					false,
 					POLICY_MGR_PCL_GROUP_ID1_ID2,
 					pcl_channels, pcl_weights, pcl_sz, len);
 		policy_mgr_add_24g_to_pcl(pcl_channels, pcl_weights, pcl_sz,
@@ -3358,7 +3328,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_get_connection_channels(
 					psoc, mode,
 					POLICY_MGR_PCL_ORDER_24G_THEN_5G,
-					skip_dfs_channel,
+					false,
 					POLICY_MGR_PCL_GROUP_ID1_ID2,
 					pcl_channels, pcl_weights, pcl_sz, len);
 		policy_mgr_add_5g_to_pcl(psoc, pcl_channels, pcl_weights,
@@ -3371,7 +3341,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	case PM_SCC_ON_5_CH_5G:
 		policy_mgr_get_connection_channels(psoc, mode,
 						   POLICY_MGR_PCL_ORDER_5G,
-						   skip_dfs_channel,
+						   false,
 						   POLICY_MGR_PCL_GROUP_ID1_ID2,
 						   pcl_channels, pcl_weights,
 						   pcl_sz, len);
@@ -3386,7 +3356,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_get_connection_channels(
 					psoc, mode,
 					POLICY_MGR_PCL_ORDER_5G_THEN_2G,
-					skip_dfs_channel,
+					false,
 					POLICY_MGR_PCL_GROUP_ID1_ID2,
 					pcl_channels, pcl_weights, pcl_sz, len);
 		policy_mgr_add_24g_to_pcl(pcl_channels, pcl_weights, pcl_sz,
@@ -3398,7 +3368,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_get_connection_channels(
 					psoc, mode,
 					POLICY_MGR_PCL_ORDER_5G_THEN_2G,
-					skip_dfs_channel,
+					false,
 					POLICY_MGR_PCL_GROUP_ID1_ID2,
 					pcl_channels, pcl_weights, pcl_sz, len);
 		policy_mgr_add_5g_to_pcl(psoc, pcl_channels, pcl_weights,
@@ -3411,7 +3381,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	case PM_SCC_ON_5_5G_24G:
 		policy_mgr_get_connection_channels(psoc, mode,
 						   POLICY_MGR_PCL_ORDER_5G,
-						   skip_dfs_channel,
+						   false,
 						   POLICY_MGR_PCL_GROUP_ID1_ID2,
 						   pcl_channels, pcl_weights,
 						   pcl_sz, len);
@@ -3428,7 +3398,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	case PM_SCC_ON_5_5G_SCC_ON_24G:
 		policy_mgr_get_connection_channels(psoc, mode,
 						   POLICY_MGR_PCL_ORDER_5G,
-						   skip_dfs_channel,
+						   false,
 						   POLICY_MGR_PCL_GROUP_ID1_ID2,
 						   pcl_channels, pcl_weights,
 						   pcl_sz, len);
@@ -3439,7 +3409,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 					 channel_list_6, chan_index_6);
 		policy_mgr_get_connection_channels(psoc, mode,
 						   POLICY_MGR_PCL_ORDER_2G,
-						   skip_dfs_channel,
+						   false,
 						   POLICY_MGR_PCL_GROUP_ID3_ID4,
 						   pcl_channels, pcl_weights,
 						   pcl_sz, len);
@@ -3457,17 +3427,17 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
-				  false, false);
+				  false);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_24G_SCC_CH_SBS_CH_5G:
@@ -3481,22 +3451,22 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
-				  false, false);
+				  false);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP4_PCL_CHANNELS,
 				  rest_freqs, rest_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_24G_SBS_CH_MCC_CH:
@@ -3510,17 +3480,17 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
-				  false, false);
+				  false);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SBS_CH:
@@ -3534,12 +3504,12 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SBS_CH_5G:
@@ -3553,17 +3523,17 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  rest_freqs, rest_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SBS_CH_24G_SCC_CH:
@@ -3577,17 +3547,17 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
-				  false, false);
+				  false);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SBS_CH_SCC_CH_24G:
@@ -3601,17 +3571,17 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
-				  false, false);
+				  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_CH_SBS_CH_24G:
@@ -3625,17 +3595,17 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
-				  false, false);
+				  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SBS_CH_SCC_CH_5G_24G:
@@ -3649,22 +3619,22 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  rest_freqs, rest_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP4_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
-				  false, false);
+				  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_CH_MCC_CH_SBS_CH_24G:
@@ -3678,22 +3648,22 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  scc_freqs, scc_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  rest_freqs, rest_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP4_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
-				  false, false);
+				  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SBS_CH_2G:
@@ -3707,18 +3677,18 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP1_PCL_CHANNELS,
 				  sbs_freqs, sbs_num,
-				  skip_dfs_channel, skip_6ghz_channel);
+				  skip_6ghz_channel);
 		add_chlist_to_pcl(pm_ctx->pdev,
 				  pcl_channels, pcl_weights, pcl_sz,
 				  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
 				  channel_list_24, chan_index_24,
-				  false, false);
+				  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G:
 		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
 				      pcl_weights, pcl_sz,
-				      len, skip_dfs_channel,
+				      len,
 				      skip_6ghz_channel,
 				      channel_list_5, chan_index_5,
 				      channel_list_6, chan_index_6,
@@ -3733,13 +3703,13 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 					  pcl_channels, pcl_weights, pcl_sz,
 					  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 					  channel_list_24, chan_index_24,
-					  false, false);
+					  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G:
 		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
 				      pcl_weights, pcl_sz,
-				      len, skip_dfs_channel,
+				      len,
 				      skip_6ghz_channel,
 				      channel_list_5, chan_index_5,
 				      channel_list_6, chan_index_6,
@@ -3754,7 +3724,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 					  pcl_channels, pcl_weights, pcl_sz,
 					  len, WEIGHT_OF_GROUP3_PCL_CHANNELS,
 					  channel_list_24, chan_index_24,
-					  false, false);
+					  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	default:
@@ -3766,12 +3736,6 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 			 device_mode_to_string(mode));
 	policy_mgr_debug("pcl len %d and weight list sz %d",
 			 *len, pcl_sz);
-
-	/* check the channel avoidance list for beaconing entities */
-	if ((mode == PM_SAP_MODE) || (mode == PM_P2P_GO_MODE))
-		policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
-							 len, pcl_weights,
-							 pcl_sz);
 
 	policy_mgr_set_weight_of_dfs_passive_channels_to_zero(psoc,
 			pcl_channels, len, pcl_weights, pcl_sz);
