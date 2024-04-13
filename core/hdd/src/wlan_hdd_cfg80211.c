@@ -2054,6 +2054,9 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_FW_PAGE_FAULT_REPORT,
 	},
+#ifdef WLAN_DP_FEATURE_STC
+	FEATURE_FLOW_STATS_EVENTS
+#endif
 };
 
 /**

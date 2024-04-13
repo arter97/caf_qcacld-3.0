@@ -2334,6 +2334,21 @@ ucfg_dp_register_ipa_wds_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
 }
 #endif /* IPA_WDS_EASYMESH_FEATURE */
 
+#ifdef WLAN_DP_FEATURE_STC
+static inline void
+ucfg_dp_register_stc_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
+			     struct wlan_dp_psoc_callbacks *cb_obj)
+{
+	dp_ctx->dp_ops.send_flow_stats_event = cb_obj->send_flow_stats_event;
+}
+#else
+static inline void
+ucfg_dp_register_stc_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
+			     struct wlan_dp_psoc_callbacks *cb_obj)
+{
+}
+#endif
+
 void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_dp_psoc_callbacks *cb_obj)
 {
@@ -2414,6 +2429,7 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	dp_ctx->dp_ops.link_monitoring_cb = cb_obj->link_monitoring_cb;
 	ucfg_dp_register_direct_link_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_ipa_wds_hdd_cbs(dp_ctx, cb_obj);
+	ucfg_dp_register_stc_hdd_cbs(dp_ctx, cb_obj);
 }
 
 void ucfg_dp_register_event_handler(struct wlan_objmgr_psoc *psoc,

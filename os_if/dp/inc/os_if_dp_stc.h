@@ -20,6 +20,7 @@
 #include "qdf_types.h"
 #include "qca_vendor.h"
 #include "wlan_cfg80211.h"
+#include "wlan_dp_public_struct.h"
 
 #ifdef WLAN_DP_FEATURE_STC
 extern const struct nla_policy
@@ -36,6 +37,12 @@ flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1];
 				QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX)		\
 	},
 
+#define FEATURE_FLOW_STATS_EVENTS					\
+	[QCA_NL80211_VENDOR_SUBCMD_FLOW_STATS_INDEX] = {		\
+		.vendor_id = QCA_NL80211_VENDOR_ID,			\
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_FLOW_STATS,		\
+	},
+
 /**
  * os_if_dp_flow_classify_result() - Handler to process flow classify result
  * @wiphy: wiphy handle
@@ -46,15 +53,29 @@ flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1];
  */
 QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 					 int data_len);
+
+/**
+ * osif_dp_register_stc_callbacks() - Set STC callbacks
+ * @cb_obj: callback object
+ *
+ * Return: None
+ */
+void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj);
 #else
 
 #define FEATURE_FLOW_CLASSIFY_COMMANDS
+#define FEATURE_FLOW_STATS_EVENTS
 
 static inline
 QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 					 int data_len)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
+{
 }
 #endif
 

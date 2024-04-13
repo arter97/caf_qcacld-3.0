@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,6 +32,7 @@
 #include <net/netevent.h>
 #include "wlan_osif_request_manager.h"
 #include <ol_defines.h>
+#include <os_if_dp_stc.h>
 
 #ifdef FEATURE_DIRECT_LINK
 #include <linux/remoteproc/qcom_rproc.h>
@@ -1383,6 +1384,7 @@ void os_if_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	cb_obj->osif_dp_process_mic_error = osif_dp_process_mic_error;
 	os_if_dp_register_txrx_callbacks(cb_obj);
 	osif_dp_register_direct_link_callbacks(cb_obj);
+	osif_dp_register_stc_callbacks(cb_obj);
 
 	ucfg_dp_register_hdd_callbacks(psoc, cb_obj);
 	os_if_dp_register_event_handler(psoc);

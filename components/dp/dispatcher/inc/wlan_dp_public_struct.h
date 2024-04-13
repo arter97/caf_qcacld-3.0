@@ -649,6 +649,90 @@ struct wlan_dp_stc_flow_classify_result {
 	uint8_t traffic_type;
 };
 
+#define DP_STC_TXRX_SAMPLES_MAX 5
+#define DP_TXRX_SAMPLES_WINDOW_MAX 2
+
+/*
+ * struct wlan_dp_stc_txrx_stats - TxRx stats
+ * @bytes: total number of bytes in a window
+ * @pkts: total number of pkts in a window
+ * @pkt_size_min: minimum packet size in a window
+ * @pkt_size_max: maximum packet size in a window
+ * @pkt_iat_min: minimum packet inter-arrival time in a window
+ * @pkt_iat_max: maximum packet inter-arrival time in a window
+ * @pkt_iat_sum: SUM of all the packet inter-arrival time in a window
+ */
+struct wlan_dp_stc_txrx_stats {
+	uint64_t bytes;
+	uint32_t pkts;
+	uint32_t pkt_size_min;
+	uint32_t pkt_size_max;
+	uint32_t pkt_iat_min;
+	uint32_t pkt_iat_max;
+	uint32_t pkt_iat_sum;
+};
+
+/*
+ * struct wlan_dp_stc_txrx_samples - TxRx samples
+ * @win_size: window size
+ * @tx: uplink/Tx samples
+ * @rx: downlink/Rx samples
+ */
+struct wlan_dp_stc_txrx_samples {
+	uint32_t win_size;
+	struct wlan_dp_stc_txrx_stats tx;
+	struct wlan_dp_stc_txrx_stats rx;
+};
+
+/*
+ * struct wlan_dp_stc_burst_stats - Burst stats
+ * @burst_duration_min: minimum burst duration in a window
+ * @burst_duration_max: maximum burst duration in a window
+ * @burst_duration_sum: SUM of all the burst duration in a window
+ * @burst_size_min: minimum burst size in a window
+ * @burst_size_max: maximum burst size in a window
+ * @burst_size_sum: SUM of all the burst size in a window
+ * @burst_count: Total number of bursts
+ */
+struct wlan_dp_stc_burst_stats {
+	uint32_t burst_duration_min;
+	uint32_t burst_duration_max;
+	uint32_t burst_duration_sum;
+	uint32_t burst_size_min;
+	uint32_t burst_size_max;
+	uint64_t burst_size_sum;
+	uint32_t burst_count;
+};
+
+/*
+ * struct wlan_dp_stc_burst_samples - Burst samples
+ * @txrx_samples: TxRx samples for the burst window
+ * @tx: Uplink/Tx burst samples
+ * @rx: downlink/Rx burst samples
+ */
+struct wlan_dp_stc_burst_samples {
+	struct wlan_dp_stc_txrx_samples txrx_samples;
+	struct wlan_dp_stc_burst_stats tx;
+	struct wlan_dp_stc_burst_stats rx;
+};
+
+#define WLAN_DP_TXRX_SAMPLES_READY BIT(0)
+#define WLAN_DP_BURST_SAMPLES_READY BIT(1)
+
+/*
+ * struct wlan_dp_stc_flow_samples - Flow samples
+ * @cookie: cookie/identifier
+ * @flow_tuple: tuple of the flow
+ * @txrx_samples: TxRx samples for this flow
+ * @burst_sample: Burst samples for this flow
+ */
+struct wlan_dp_stc_flow_samples {
+	uint32_t cookie;
+	struct flow_info flow_tuple;
+	struct wlan_dp_stc_txrx_samples txrx_samples[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
+	struct wlan_dp_stc_burst_samples burst_sample;
+};
+
 /**
  * struct wlan_dp_psoc_callbacks - struct containing callback
  * to non-converged driver
@@ -701,6 +785,7 @@ struct wlan_dp_stc_flow_classify_result {
  * @dp_register_lpass_ssr_notifier: Callback to register for lpass SSR notif
  * @dp_unregister_lpass_ssr_notifier: Callback to unregister for lpass SSR notif
  * @wlan_dp_ipa_wds_peer_cb: Callback to handle IPA WDS peer events
+ * @send_flow_stats_event: Callback to send flow stats vendor command
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -798,6 +883,11 @@ struct wlan_dp_psoc_callbacks {
 #ifdef IPA_WDS_EASYMESH_FEATURE
 	int (*wlan_dp_ipa_wds_peer_cb)(uint8_t vdev_id, uint16_t peer_id,
 				       uint8_t *wds_macaddr, bool map);
+#endif
+#ifdef WLAN_DP_FEATURE_STC
+	int (*send_flow_stats_event)(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_dp_stc_flow_samples *flow_samples,
+				     uint32_t flags);
 #endif
 };
 
