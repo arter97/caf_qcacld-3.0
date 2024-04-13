@@ -3494,8 +3494,10 @@ wlan_hdd_update_dbs_scan_and_fw_mode_config(void)
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	uint8_t dual_mac_feature = DISABLE_DBS_CXN_AND_SCAN;
 
-	if (!hdd_ctx)
+	if (!hdd_ctx) {
+		hdd_err("HDD context is null");
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	/*
 	 * ROME platform doesn't support any DBS related commands in FW,
@@ -3504,8 +3506,10 @@ wlan_hdd_update_dbs_scan_and_fw_mode_config(void)
 	 * for response. Check if FW supports DBS to eliminate ROME vs
 	 * NON-ROME platform.
 	 */
-	if (!policy_mgr_find_if_fw_supports_dbs(hdd_ctx->psoc))
+	if (!policy_mgr_find_if_fw_supports_dbs(hdd_ctx->psoc)) {
+		hdd_err("DBS is not supported by HW");
 		return QDF_STATUS_SUCCESS;
+	}
 
 	if (hdd_ctx->is_dual_mac_cfg_updated) {
 		hdd_debug("dual mac config has already been updated, skip");
