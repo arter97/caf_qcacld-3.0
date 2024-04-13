@@ -1143,6 +1143,7 @@ sap_validate_chan(struct sap_context *sap_context,
 	struct ch_params ch_params = {0};
 	bool is_go_scc_strict = false;
 	bool start_sap_on_provided_freq = false;
+	enum QDF_OPMODE opmode = QDF_SAP_MODE;
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
 	mac_ctx = MAC_CONTEXT(mac_handle);
@@ -1165,8 +1166,10 @@ sap_validate_chan(struct sap_context *sap_context,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (sap_context->vdev &&
-	    sap_context->vdev->vdev_mlme.vdev_opmode == QDF_P2P_GO_MODE) {
+	if (sap_context->vdev)
+		opmode = wlan_vdev_mlme_get_opmode(sap_context->vdev);
+
+	if (opmode == QDF_P2P_GO_MODE) {
 	       /*
 		* check whether go_force_scc is enabled or not.
 		* If it not enabled then don't any force scc on existing go and
@@ -1293,9 +1296,8 @@ validation_done:
 
 	if ((sap_context->acs_cfg->acs_mode ||
 	     policy_mgr_restrict_sap_on_unsafe_chan(mac_ctx->psoc)) &&
-	    !policy_mgr_is_sap_freq_allowed(mac_ctx->psoc,
-			wlan_vdev_mlme_get_opmode(sap_context->vdev),
-			sap_context->chan_freq)) {
+	    !policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, opmode,
+					    sap_context->chan_freq)) {
 		sap_warn("Abort SAP start due to unsafe channel");
 		return QDF_STATUS_E_ABORTED;
 	}
