@@ -1185,20 +1185,41 @@ enum policy_mgr_two_connection_mode {
  * STA on 2.4 GHZ
  * @PM_STA_STA_5_SAP_24_DBS: STA & STA connection on 5 GHZ SCC/MCC,
  * SAP on 2.4 GHZ
+ * @PM_NAN_24_SCC_MCC_PLUS_5_DBS: Generic index for NAN with other mode
+ *				  in SCC/MCC and another mode in DBS
+ * @PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS: NAN & SAP SCC in 2.4 GHz with NDI in 5 GHz
+ * @PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS: NAN & NDI SCC in 2.4 GHz with SAP in 5 GHz
+ * @PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS: NAN in 2.4 GHz with NDI & SAP in 5 GHz
+ * @PM_NAN_NDI_STA_DBS: Generic index for NAN & NDI with other mode in DBS
+ * @PM_NAN_DISC_STA_SCC_MCC_24_NDI_5_DBS: NAN & STA SCC/MCC in 2.4 GHz with NDI
+ *					  in 5 GHz
+ * @PM_NAN_DISC_NDI_STA_SCC_5_DBS: NAN in 2.4 GHz with NDI & STA SCC in 5 GHz
+ * @PM_NAN_DISC_NDI_STA_MCC_5_DBS: NAN in 2.4 GHz with NDI & STA MCC in 5 GHz
+ * @PM_NAN_DISC_NDI_24_STA_5_DBS: NAN & NDI in 2.4 GHz with STA in 5 GHz
+ * @PM_NAN_DISC_NDI_STA_24_SMM: NAN, NDI & STA in 2.4 GHz
+ * @PM_NAN_DISC_NDI_STA_MCC_24_DBS: NAN, NDI & STA in 2.4 GHz
+ * @PM_NAN_NDI_NDI_DBS: Generic index for NAN & NDI with other mode in DBS
+ * @PM_NAN_DISC_NDI_24_NDI_5_DBS: NAN & NDI in 2.4 GHz and another NDI in 5 GHz
+ * @PM_NAN_DISC_NDI_NDI_5_DBS: NAN in 2.4 GHz and both NDIs are in 5 GHz
+ * @PM_NAN_DISC_NDI_NDI_24_SMM: NAN and both NDIs in 2.4 GHz
+ * @PM_NAN_NDI_ML_STA_SCC_MCC_DBS: Generic index for NAN+NDI+ML-STA
+ * @PM_NAN_DISC_STA_24_STA_5_DBS: NAN & STA in 2.4 GHz and another STA in 5 GHz
+ * @PM_NAN_DISC_STA_STA_SCC_5_DBS: NAN in 2.4 GHz and both STAs are SCC in 5 GHz
+ * @PM_NAN_DISC_STA_STA_MCC_5_DBS: NAN in 2.4 GHz and both STAs are MCC in 5 GHz
+ * @PM_NAN_NDI_P2P_SCC_MCC_DBS: Generic index for NAN & NDI with P2P in DBS
+ * @PM_NAN_DISC_NDI_5_P2P_24_DBS: NAN & P2P are in 2.4 GHz and NDI is in 5 GHz
+ * @PM_NAN_DISC_NDI_24_P2P_5_DBS: NAN & NDI are in 2.4 GHz and P2P is in 5 GHz
+ * @PM_NAN_DISC_NDI_P2P_SCC_MCC_5_DBS: NAN in 2.4 GHz and NDI & P2P is in 5 GHz
+ * @PM_NAN_DISC_NDI_P2P_SCC_MCC_24_DBS: NAN, NDI and P2P are in 2.4 GHz
  * @PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS: NAN_DISC & SAP connection on 2.4 Ghz SCC,
  * NDI/NDP on 5 G
  * @PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS: NAN_DISC & NDI/NDP connection on 2.4 Ghz
  * SCC, SAP on 5 G
  * @PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS: SAP & NDI/NDP connection on 5 Ghz,
  * NAN_DISC on 24 Ghz
- * @PM_NAN_DISC_STA_24_NDI_5_DBS: STA and NAN Disc on 2.4Ghz and NDI on 5ghz DBS
  * @PM_NAN_DISC_NDI_24_STA_5_DBS: NDI and NAN Disc on 2.4Ghz and STA on 5ghz DBS
- * @PM_STA_NDI_5_NAN_DISC_24_DBS: STA, NDI on 5ghz and NAN Disc on 2.4Ghz DBS
- * @PM_STA_NDI_NAN_DISC_24_SMM: STA, NDI, NAN Disc all on 2.4ghz SMM
  * @PM_NAN_DISC_NDI_24_NDI_5_DBS: NDI and NAN Disc on 2.4Ghz and second NDI in
  * 5ghz DBS
- * @PM_NDI_NDI_5_NAN_DISC_24_DBS: Both NDI on 5ghz and NAN Disc on 2.4Ghz DBS
- * @PM_NDI_NDI_NAN_DISC_24_SMM: Both NDI, NAN Disc on 2.4ghz SMM
  * @PM_SAP_SAP_SCC_24_SAP_5_DBS: Both SAP on 2.4Ghz and another SAP on 5Ghz DBS
  * @PM_SAP_SAP_SCC_5_SAP_24_DBS: Both SAP on 5Ghz and another SAP on 2.4Ghz DBS
  * @PM_STA_STA_5_NAN_DISC_24_DBS: Both STA on 5Ghz and NAN Disc on 2.4Ghz DBS
@@ -1264,6 +1285,7 @@ enum policy_mgr_two_connection_mode {
  * @PM_MAX_THREE_CONNECTION_MODE: Maximum enumeration
  */
 enum policy_mgr_three_connection_mode {
+	/* STA + SAP + SAP */
 	PM_STA_SAP_SCC_24_SAP_5_DBS,
 	PM_STA_SAP_SCC_5_SAP_24_DBS,
 	PM_24_SCC_MCC_PLUS_5_DBS,
@@ -1271,16 +1293,46 @@ enum policy_mgr_three_connection_mode {
 	PM_5_SCC_MCC_PLUS_24_DBS,
 	PM_STA_SAP_5_STA_24_DBS = PM_5_SCC_MCC_PLUS_24_DBS,
 	PM_STA_STA_5_SAP_24_DBS = PM_5_SCC_MCC_PLUS_24_DBS,
+
+	/*
+	 * 3-home channels case can be allowed from host when NDP is one
+	 * of them as firmware takes care of it by internally disabling NDP to
+	 * avoid 3-home channel case
+	 */
+	PM_NAN_24_SCC_MCC_PLUS_5_DBS,
+	/* NAN + SAP */
 	PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS,
 	PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS,
 	PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS,
-	PM_NAN_DISC_STA_24_NDI_5_DBS,
-	PM_NAN_DISC_NDI_24_STA_5_DBS,
-	PM_STA_NDI_5_NAN_DISC_24_DBS,
-	PM_STA_NDI_NAN_DISC_24_SMM,
-	PM_NAN_DISC_NDI_24_NDI_5_DBS,
-	PM_NDI_NDI_5_NAN_DISC_24_DBS,
-	PM_NDI_NDI_NAN_DISC_24_SMM,
+
+	/* NAN + STA */
+	PM_NAN_NDI_STA_DBS,
+	PM_NAN_DISC_STA_SCC_MCC_24_NDI_5_DBS = PM_NAN_NDI_STA_DBS,
+	PM_NAN_DISC_NDI_STA_SCC_5_DBS = PM_NAN_NDI_STA_DBS,
+	PM_NAN_DISC_NDI_STA_MCC_5_DBS = PM_NAN_NDI_STA_DBS,
+	PM_NAN_DISC_NDI_24_STA_5_DBS = PM_NAN_NDI_STA_DBS,
+	PM_NAN_DISC_NDI_STA_24_SMM = PM_NAN_NDI_STA_DBS,
+	PM_NAN_DISC_NDI_STA_MCC_24_DBS = PM_NAN_NDI_STA_DBS,
+
+	/* NAN + 2 NDI */
+	PM_NAN_NDI_NDI_DBS,
+	PM_NAN_DISC_NDI_24_NDI_5_DBS = PM_NAN_NDI_NDI_DBS,
+	PM_NAN_DISC_NDI_NDI_5_DBS = PM_NAN_NDI_NDI_DBS,
+	PM_NAN_DISC_NDI_NDI_24_SMM = PM_NAN_NDI_NDI_DBS,
+
+	/* NAN + ML-STA */
+	PM_NAN_NDI_ML_STA_SCC_MCC_DBS,
+	PM_NAN_DISC_STA_24_STA_5_DBS = PM_NAN_NDI_ML_STA_SCC_MCC_DBS,
+	PM_NAN_DISC_STA_STA_SCC_5_DBS = PM_NAN_NDI_ML_STA_SCC_MCC_DBS,
+	PM_NAN_DISC_STA_STA_MCC_5_DBS = PM_NAN_NDI_ML_STA_SCC_MCC_DBS,
+
+	/* NAN + P2P */
+	PM_NAN_NDI_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_NDI_5_P2P_24_DBS = PM_NAN_NDI_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_NDI_24_P2P_5_DBS = PM_NAN_NDI_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_NDI_P2P_SCC_MCC_5_DBS = PM_NAN_NDI_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_NDI_P2P_SCC_MCC_24_DBS = PM_NAN_NDI_P2P_SCC_MCC_DBS,
+
 	PM_SAP_SAP_SCC_24_SAP_5_DBS,
 	PM_SAP_SAP_SCC_5_SAP_24_DBS,
 	PM_STA_STA_5_NAN_DISC_24_DBS,

@@ -3725,7 +3725,7 @@ enum policy_mgr_three_connection_mode
 	enum policy_mgr_three_connection_mode index =
 			PM_MAX_THREE_CONNECTION_MODE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint32_t count_sap = 0;
+	uint32_t count_sap = 0, count_p2p = 0;
 	uint32_t count_sta = 0;
 	uint32_t count_ndi = 0;
 	uint32_t count_nan_disc = 0;
@@ -3754,10 +3754,12 @@ enum policy_mgr_three_connection_mode
 	 */
 	count_sap += policy_mgr_mode_specific_connection_count(
 				psoc, PM_SAP_MODE, &list_sap[count_sap]);
-	count_sap += policy_mgr_mode_specific_connection_count(
+	count_p2p = policy_mgr_mode_specific_connection_count(
 				psoc, PM_P2P_GO_MODE, &list_sap[count_sap]);
-	count_sap += policy_mgr_mode_specific_connection_count(
-				psoc, PM_P2P_CLIENT_MODE, &list_sap[count_sap]);
+	count_p2p += policy_mgr_mode_specific_connection_count(
+				psoc, PM_P2P_CLIENT_MODE,
+				&list_sap[count_sap + count_p2p]);
+	count_sap += count_p2p;
 	count_sta = policy_mgr_mode_specific_connection_count(
 				psoc, PM_STA_MODE, list_sta);
 	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml_sta, ml_sta_idx,
@@ -3773,12 +3775,22 @@ enum policy_mgr_three_connection_mode
 			 num_ml_sta);
 
 	if (count_sap == 2 && num_ml_sta == 1) {
+		/* This covers the below combinations,
+		 * 1. SAP + SAP + single link ML-STA
+		 * 2. SAP + P2P GO/CLI + single link ML-STA
+		 * 3. P2P GO/CLI + P2P GO/CLI + single link ML-STA
+		 */
 		policy_mgr_get_index_for_ml_sta_sap_sap(
 				pm_ctx, &index,
 				freq_list[ml_sta_idx[0]],
 				pm_conc_connection_list[list_sap[0]].freq,
 				pm_conc_connection_list[list_sap[1]].freq);
 	} else if (count_sap == 2 && count_sta == 1 && !num_ml_sta) {
+		/* This covers the below combinations,
+		 * 1. SAP + SAP + non-ML STA
+		 * 2. SAP + P2P GO/CLI + non-ML STA
+		 * 3. P2P GO/CLI + P2P GO/CLI + non-ML STA
+		 */
 		policy_mgr_debug(
 			"channel: sap0: %d, sap1: %d, sta0: %d",
 			pm_conc_connection_list[list_sap[0]].freq,
@@ -3816,10 +3828,18 @@ enum policy_mgr_three_connection_mode
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
 	} else if (num_ml_sta == 2 && count_sap == 1) {
+		/* This covers the below combinations,
+		 * 1. ML-STA + SAP
+		 * 2. ML-STA + P2P GO/CLI
+		 */
 		sap_freq = pm_conc_connection_list[list_sap[0]].freq;
 		policy_mgr_get_index_for_ml_sta_sap(pm_ctx, &index, sap_freq,
 						    freq_list, ml_sta_idx);
 	} else if (count_sap == 1 && count_sta == 2 && !num_ml_sta) {
+		/* This covers the below combinations,
+		 * 1. SAP + non-ML STA + non-ML STA
+		 * 2. P2P GO/CLI + non-ML STA + non-ML STA
+		 */
 		policy_mgr_debug(
 			"channel: sap0: %d, sta0: %d, sta1: %d",
 			pm_conc_connection_list[list_sap[0]].freq,
@@ -3856,7 +3876,11 @@ enum policy_mgr_three_connection_mode
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
-	} else if (count_nan_disc == 1 && count_ndi == 1 && count_sap == 1) {
+	} else if (count_nan_disc == 1 && count_ndi == 1 &&
+		   count_sap == 1 && !count_p2p) {
+		/* This covers the below combinations,
+		 * 1. NAN + NDI + SAP
+		 */
 		/* Policy mgr only considers NAN Disc ch in 2.4GHz */
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
@@ -3876,13 +3900,44 @@ enum policy_mgr_three_connection_mode
 		} else {
 			index = PM_MAX_THREE_CONNECTION_MODE;
 		}
+	} else if (count_nan_disc == 1 && count_ndi == 1 && count_p2p == 1) {
+		/* This covers the below combinations,
+		 * 1. NAN + NDI + P2P GO/CLI
+		 */
+		/* Policy mgr only considers NAN Disc ch in 2.4GHz */
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_ndi[0]].freq)) {
+			index = PM_NAN_DISC_NDI_5_P2P_24_DBS;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+			   WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_ndi[0]].freq)) {
+			index = PM_NAN_DISC_NDI_24_P2P_5_DBS;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+			  WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_ndi[0]].freq)) {
+			index = PM_NAN_DISC_NDI_P2P_SCC_MCC_5_DBS;
+		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+			  WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_ndi[0]].freq)) {
+			index = PM_NAN_DISC_NDI_P2P_SCC_MCC_24_DBS;
+		} else {
+			index = PM_MAX_THREE_CONNECTION_MODE;
+		}
 	} else if (count_nan_disc == 1 && count_ndi == 1 && count_sta == 1) {
+		/* This covers the below combinations,
+		 * 1. NAN + NDI + STA/ML-STA with single link
+		 */
 		/* Policy mgr only considers NAN Disc ch in 2.4GHz */
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		    WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_ndi[0]].freq)) {
-			index = PM_NAN_DISC_STA_24_NDI_5_DBS;
+			index = PM_NAN_DISC_STA_SCC_MCC_24_NDI_5_DBS;
 		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 			   WLAN_REG_IS_24GHZ_CH_FREQ(
@@ -3892,16 +3947,19 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sta[0]].freq) &&
 			  WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_ndi[0]].freq)) {
-			index = PM_STA_NDI_5_NAN_DISC_24_DBS;
+			index = PM_NAN_DISC_NDI_STA_MCC_5_DBS;
 		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 			  WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_ndi[0]].freq)) {
-			index = PM_STA_NDI_NAN_DISC_24_SMM;
+			index = PM_NAN_DISC_NDI_STA_24_SMM;
 		}
 	} else if (count_nan_disc == 1 && count_sap == 1 && count_sta == 1) {
 		index = PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS;
 	} else if (count_nan_disc == 1 && count_ndi == 2) {
+		/* This covers the below combinations,
+		 * 1. NAN + NDI + NDI
+		 */
 		/* Policy mgr only considers NAN Disc ch in 2.4GHz */
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_ndi[0]].freq) &&
@@ -3917,14 +3975,17 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_ndi[0]].freq) &&
 			  WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_ndi[0]].freq)) {
-			index = PM_NDI_NDI_5_NAN_DISC_24_DBS;
+			index = PM_NAN_DISC_NDI_NDI_5_DBS;
 		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_ndi[0]].freq) &&
 			  WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_ndi[0]].freq)) {
-			index = PM_NDI_NDI_NAN_DISC_24_SMM;
+			index = PM_NAN_DISC_NDI_NDI_24_SMM;
 		}
 	} else if (count_sap == 3) {
+		/* This covers the below combinations,
+		 * 1. SAP + P2P GO/CLI + P2P GO/CLI
+		 */
 		if (policy_mgr_is_current_hwmode_sbs(psoc))
 			policy_mgr_get_index_for_3_given_freq_sbs(pm_ctx,
 								  &index,
