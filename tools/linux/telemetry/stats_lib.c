@@ -604,6 +604,10 @@ static int is_valid_cmd(struct stats_command *cmd)
 
 	switch (cmd->obj) {
 	case STATS_OBJ_AP:
+		if (cmd->type == STATS_TYPE_CTRL) {
+			STATS_ERR("Invalid request for AP stats.\n");
+			return -EINVAL;
+		}
 		if (sta_mac[0])
 			STATS_WARN("Ignore STA MAC for AP stats\n");
 		break;
