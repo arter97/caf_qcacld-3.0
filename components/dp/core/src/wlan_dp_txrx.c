@@ -1015,6 +1015,7 @@ static QDF_STATUS dp_gro_rx_bh_disable(struct wlan_dp_intf *dp_intf,
 	rx_aggregation = qdf_atomic_read(&dp_ctx->dp_agg_param.rx_aggregation);
 	gro_disallowed = qdf_atomic_read(&dp_intf->gro_disallowed);
 
+	wlan_dp_stc_check_n_track_rx_flow_features(dp_ctx, nbuf);
 	if (dp_get_current_throughput_level(dp_ctx) == PLD_BUS_WIDTH_IDLE ||
 	    !rx_aggregation || gro_disallowed) {
 		status = dp_ctx->dp_ops.dp_rx_napi_gro_flush(napi_to_use, nbuf,
@@ -1059,6 +1060,7 @@ static QDF_STATUS dp_gro_rx_bh_disable(struct wlan_dp_intf *dp_intf,
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	uint8_t low_tput_force_flush = 0;
 
+	wlan_dp_stc_check_n_track_rx_flow_features(dp_ctx, nbuf);
 	if (dp_get_current_throughput_level(dp_ctx) == PLD_BUS_WIDTH_IDLE) {
 		status = dp_ctx->dp_ops.dp_rx_napi_gro_flush(napi_to_use, nbuf,
 							&low_tput_force_flush);
@@ -1415,6 +1417,17 @@ QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 	return dp_rx_enqueue_pkt(cds_get_context(QDF_MODULE_ID_SOC), nbuf_list);
 }
 
+static inline QDF_STATUS wlan_dp_nbuf_push_pkt(struct wlan_dp_intf *dp_intf,
+					       qdf_nbuf_t nbuf,
+					       enum dp_nbuf_push_type type)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
+
+	wlan_dp_stc_check_n_track_rx_flow_features(dp_ctx, nbuf);
+
+	return dp_ctx->dp_ops.dp_nbuf_push_pkt(nbuf, type);
+}
+
 #ifdef CONFIG_HL_SUPPORT
 QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 				       qdf_nbuf_t nbuf)
@@ -1424,7 +1437,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 	dp_intf->dp_stats.tx_rx_stats.rx_non_aggregated++;
 	dp_ctx->no_rx_offload_pkt_cnt++;
 
-	return dp_ctx->dp_ops.dp_nbuf_push_pkt(nbuf, DP_NBUF_PUSH_NI);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, DP_NBUF_PUSH_NI);
 }
 #else
 
@@ -1461,7 +1474,6 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 				       qdf_nbuf_t nbuf)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
-	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
 	int status = QDF_STATUS_E_FAILURE;
 	bool nbuf_receive_offload_ok = false;
 	enum dp_nbuf_push_type push_type;
@@ -1536,7 +1548,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		push_type = DP_NBUF_PUSH_NAPI;
 	}
 
-	return dp_ops->dp_nbuf_push_pkt(nbuf, push_type);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, DP_NBUF_PUSH_NI);
 }
 
 #else /* WLAN_FEATURE_DYNAMIC_RX_AGGREGATION */
@@ -1545,7 +1557,6 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 				       qdf_nbuf_t nbuf)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
-	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
 	int status = QDF_STATUS_E_FAILURE;
 	bool nbuf_receive_offload_ok = false;
 	enum dp_nbuf_push_type push_type;
@@ -1591,7 +1602,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		push_type = DP_NBUF_PUSH_NAPI;
 	}
 
-	return dp_ops->dp_nbuf_push_pkt(nbuf, push_type);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, DP_NBUF_PUSH_NI);
 }
 #endif /* WLAN_FEATURE_DYNAMIC_RX_AGGREGATION */
 #endif
