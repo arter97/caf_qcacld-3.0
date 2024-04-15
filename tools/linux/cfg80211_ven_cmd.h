@@ -907,6 +907,7 @@ enum {
 	IEEE80211_PARAM_GTX_ENABLE = 828, /* User config to enable/disable green tx */
 	IEEE80211_PARAM_SHORT_GI20 = 829,
 	IEEE80211_PARAM_SHORT_GI40 = 830,
+	IEEE80211_PARAM_HWCTS2SELF_OFDMA = 831, /* User config to enable/disable HWCTS2SELF before DL OFDMA sequence.*/
 };
 
 enum {
@@ -2703,6 +2704,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_tpe_punc_chan_power", IEEE80211_PARAM_TPE_PUNC_PWR, GET_PARAM, 0},
 #endif
 	{"gtx_enable", IEEE80211_PARAM_GTX_ENABLE, SET_PARAM, 1},
+	{"hwcts2self_enable", IEEE80211_PARAM_HWCTS2SELF_OFDMA, SET_PARAM, 1},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
