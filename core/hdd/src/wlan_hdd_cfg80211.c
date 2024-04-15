@@ -29706,11 +29706,18 @@ wlan_hdd_cfg80211_get_channel_sap(struct wiphy *wiphy,
 	bool is_legacy_phymode = false;
 	uint32_t chan_freq;
 	struct wlan_channel *des_chan;
+	struct wlan_hdd_link_info *link_info;
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags))
+	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
+
+	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
 		return -EINVAL;
 
-	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	switch (ap_ctx->sap_config.SapHw_mode) {
 	case eCSR_DOT11_MODE_11n:
 	case eCSR_DOT11_MODE_11n_ONLY:
