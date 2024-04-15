@@ -933,42 +933,68 @@ uint32_t dscp_tid_map[WMI_HOST_DSCP_MAP_MAX] = {
 	7, 7, 7, 7, 7, 7, 7, 7,
 };
 
+static inline uint16_t
+dp_sawf_get_3_link_best_suitable_tid(struct dp_peer *peer,
+				     uint16_t tid1,
+				     uint16_t tid2)
+{
+	uint64_t tid1_weight = 0;
+	uint64_t tid2_weight = 0;
+
+	/* if no weights are feeded fall back to equal distribution */
+	if (!peer->tid_weight[tid1] || !peer->tid_weight[tid2]) {
+		tid1_weight = peer->flow_cnt[tid1];
+		tid2_weight = peer->flow_cnt[tid2];
+		goto tid_selection;
+	}
+
+	/* for the first two flows fall back to equal distribution */
+	if (!peer->flow_cnt[tid1] || !peer->flow_cnt[tid2]) {
+		tid1_weight = peer->flow_cnt[tid1];
+		tid2_weight = peer->flow_cnt[tid2];
+		goto tid_selection;
+	}
+
+	/* weight based distribution */
+	tid1_weight = peer->flow_cnt[tid1] * peer->tid_weight[tid2];
+	tid2_weight = peer->flow_cnt[tid2] * peer->tid_weight[tid1];
+
+tid_selection:
+	if (tid1_weight > tid2_weight)
+		return tid2;
+	else
+		return tid1;
+}
+
 static uint16_t dp_sawf_get_3_link_queue_id(struct dp_peer *peer, uint16_t tid)
 {
 	uint16_t queue_id = DP_SAWF_PEER_Q_INVALID;
 	uint8_t ac = 0;
 
 	ac = TID_TO_WME_AC(tid);
+	qdf_spin_lock_bh(&peer->flow_info_lock);
+
 	switch (ac) {
 	case WME_AC_BE:
-		if (peer->flow_cnt[0] > peer->flow_cnt[3])
-			queue_id = 3;
-		else
-			queue_id = 0;
+		queue_id = dp_sawf_get_3_link_best_suitable_tid(peer, 0, 3);
 		break;
 	case WME_AC_BK:
-		if (peer->flow_cnt[1] > peer->flow_cnt[2])
-			queue_id = 2;
-		else
-			queue_id = 1;
+		queue_id = dp_sawf_get_3_link_best_suitable_tid(peer, 1, 2);
 		break;
 	case WME_AC_VI:
-		if (peer->flow_cnt[4] > peer->flow_cnt[5])
-			queue_id = 5;
-		else
-			queue_id = 4;
+		queue_id = dp_sawf_get_3_link_best_suitable_tid(peer, 4, 5);
 		break;
 	case WME_AC_VO:
-		if (peer->flow_cnt[6] > peer->flow_cnt[7])
-			queue_id = 7;
-		else
-			queue_id = 6;
+		queue_id = dp_sawf_get_3_link_best_suitable_tid(peer, 6, 7);
 		break;
 	default:
 		break;
 	}
 	if (queue_id != DP_SAWF_PEER_Q_INVALID)
 		peer->flow_cnt[queue_id]++;
+
+	qdf_spin_unlock_bh(&peer->flow_info_lock);
+
 	return queue_id;
 }
 
@@ -1054,12 +1080,60 @@ dp_sawf_3_link_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 	}
 
 	queue_id = DP_SAWF_QUEUE_ID_GET(mark_metadata);
-	if (queue_id < CDP_DATA_TID_MAX && mld_peer->flow_cnt[queue_id])
-		mld_peer->flow_cnt[queue_id]--;
+	if (queue_id < CDP_DATA_TID_MAX) {
+		qdf_spin_lock_bh(&peer->flow_info_lock);
+		if (mld_peer->flow_cnt[queue_id])
+			mld_peer->flow_cnt[queue_id]--;
+
+		qdf_spin_unlock_bh(&peer->flow_info_lock);
+	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+dp_sawf_3_link_peer_set_tid_weight(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
+				   uint16_t peer_id, uint8_t tid_weight[])
+{
+	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_peer *peer, *mld_peer;
+	uint8_t i = 0;
+
+	dp_sawf_info("mac_addr: ", QDF_MAC_ADDR_FMT,
+		     QDF_MAC_ADDR_REF(mac_addr));
+
+	if (peer_id != HTT_INVALID_PEER)
+		peer = dp_peer_get_ref_by_id(dpsoc, peer_id, DP_MOD_ID_SAWF);
+	else
+		peer = dp_find_peer_by_destmac(dpsoc, mac_addr, DP_VDEV_ALL);
+
+	if (!peer)
+		return QDF_STATUS_E_FAILURE;
+
+	if (IS_MLO_DP_LINK_PEER(peer)) {
+		mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
+	} else if (IS_MLO_DP_MLD_PEER(peer)) {
+		mld_peer = peer;
+	} else {
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!dp_is_mlo_3_link_peer(peer)) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	for (i = 0; i < CDP_DATA_TID_MAX; i++) {
+		if (mld_peer->tid_weight[i] != tid_weight[i])
+			mld_peer->tid_weight[i] = tid_weight[i];
+	}
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif /* WLAN_FEATURE_11BE_MLO_3_LINK_SUPPORT */
 
 QDF_STATUS

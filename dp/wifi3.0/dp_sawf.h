@@ -500,6 +500,9 @@ uint16_t dp_sawf_get_peer_msduq(struct net_device *netdev, uint8_t *dest_mac,
 QDF_STATUS
 dp_sawf_3_link_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 			       uint16_t peer_id, uint32_t mark_metadata);
+QDF_STATUS
+dp_sawf_3_link_peer_set_tid_weight(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
+				   uint16_t peer_id, uint8_t tid_weight[]);
 #endif
 uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 			   uint32_t service_id);
