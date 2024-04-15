@@ -937,6 +937,7 @@ struct wlan_nan_rx_ops {
  * by Fw or not.
  * @mlo_sta_nan_ndi_allowed: MLO STA + NAN + NDI concurrency is supported
  * @nan_pairing_peer_create_cap: create NAN pairing peer in host when it is true
+ * @sta_sap_ndp_support: supports STA + SAP + NDP
  */
 struct nan_tgt_caps {
 	uint32_t nan_conc_control:1;
@@ -951,6 +952,7 @@ struct nan_tgt_caps {
 	uint32_t mlo_sta_nan_ndi_allowed:1;
 #endif
 	uint32_t nan_pairing_peer_create_cap:1;
+	uint32_t sta_sap_ndp_support:1;
 };
 
 #endif
