@@ -30260,9 +30260,15 @@ wlan_hdd_mlo_update_sa(struct hdd_adapter *adapter,
 	peer = wlan_objmgr_get_peer_by_mac(adapter->hdd_ctx->psoc,
 					   dest_addr, WLAN_OSIF_ID);
 	if (!peer) {
-		/* if dest_addr is mld address, should go here */
-		hdd_err("Peer not found with MAC " QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(dest));
+		/*
+		 * for mlo connection, it use mld address
+		 * in the EAPOL frame, so once we search
+		 * dest_addr in the above peer list, and
+		 * it will fail since mld peer not stored
+		 * in the list, then it will go here.
+		 */
+		hdd_debug("Peer not found with MAC " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(dest));
 		qdf_mem_copy(ehdr->h_source, src, ETH_ALEN);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return;
