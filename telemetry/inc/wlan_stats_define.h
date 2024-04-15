@@ -633,6 +633,8 @@ struct advance_data_tx_stats {
 	uint32_t failed_retry_count;
 	uint32_t retry_count;
 	uint32_t multiple_retry_count;
+	uint32_t mpdu_retries;
+	uint32_t total_mpdu_retries;
 	uint32_t release_src_not_tqm;
 	uint32_t inval_link_id;
 	uint32_t tx_ppdus;
