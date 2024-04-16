@@ -645,8 +645,9 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
-	if (QDF_P2P_CLIENT_MODE == adapter->device_mode ||
-	    QDF_P2P_DEVICE_MODE == adapter->device_mode) {
+	if ((QDF_P2P_CLIENT_MODE == adapter->device_mode ||
+	     QDF_P2P_DEVICE_MODE == adapter->device_mode) &&
+	    !ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc)) {
 		/* Disable NAN Discovery if enabled */
 		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 	}

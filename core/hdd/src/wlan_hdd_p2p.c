@@ -132,7 +132,8 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	}
 
 	/* Disable NAN Discovery if enabled */
-	ucfg_nan_disable_concurrency(hdd_ctx->psoc);
+	if (!ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc))
+		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 
 	status = wlan_cfg80211_roc(vdev, chan, duration, cookie);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);

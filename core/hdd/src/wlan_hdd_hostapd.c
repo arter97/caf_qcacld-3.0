@@ -8600,7 +8600,10 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	sap_cnt = policy_mgr_get_sap_mode_info(hdd_ctx->psoc, NULL,
 					       &vdev_id_list[sta_cnt]);
 
-	/* Disable NAN Disc before starting P2P GO or STA+SAP or SAP+SAP */
+	/*
+	 * Check if NAN Disc has to be disabled before starting
+	 * P2P-GO or STA+SAP or SAP+SAP
+	 */
 	if (adapter->device_mode == QDF_P2P_GO_MODE || sta_cnt ||
 	    (sap_cnt > (MAX_SAP_NUM_CONCURRENCY_WITH_NAN - 1))) {
 		hdd_debug("Invalid NAN concurrency. SAP: %d STA: %d P2P_GO: %d",
@@ -8609,18 +8612,28 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		for (i = 0; i < sta_cnt + sap_cnt; i++)
 			if (vdev_id_list[i] == link_info->vdev_id)
 				disable_nan = false;
+
+		if (adapter->device_mode == QDF_P2P_GO_MODE &&
+		    ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc))
+			disable_nan = false;
+
 		if (disable_nan)
 			ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 	}
 
-	/* NDI + SAP conditional supported */
-	hdd_sap_nan_check_and_disable_unsupported_ndi(hdd_ctx->psoc, true);
+	if (adapter->device_mode == QDF_SAP_MODE) {
+		/* NDI + SAP conditional supported */
+		hdd_sap_nan_check_and_disable_unsupported_ndi(hdd_ctx->psoc,
+							      true);
 
-	if (policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-						      PM_NAN_DISC_MODE, NULL) &&
-	    !policy_mgr_nan_sap_pre_enable_conc_check(hdd_ctx->psoc,
-						      PM_SAP_MODE, freq))
-		hdd_debug("NAN disabled due to concurrency constraints");
+		if (policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+							      PM_NAN_DISC_MODE,
+							      NULL) &&
+		    !policy_mgr_nan_sap_pre_enable_conc_check(hdd_ctx->psoc,
+							      PM_SAP_MODE,
+							      freq))
+			hdd_debug("NAN disabled due to concurrency constraints");
+	}
 
 	/* check if concurrency is allowed */
 	if (!policy_mgr_allow_concurrency(
