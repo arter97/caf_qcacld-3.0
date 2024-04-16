@@ -184,10 +184,17 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 	struct qdf_mac_addr connected_bssid;
 	uint8_t vdev_id;
 	struct wlan_objmgr_psoc *psoc;
+	uint8_t good_rssi_cfg;
+	struct psoc_mlme_obj *mlme_psoc_obj;
+	struct scoring_cfg *score_config;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	vdev_id = wlan_vdev_get_id(vdev);
 	psoc = wlan_pdev_get_psoc(pdev);
+
+	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
+	if (!mlme_psoc_obj)
+		return QDF_STATUS_E_INVAL;
 
 	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
 		if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc,
@@ -219,13 +226,17 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 	if (IS_ROAM_REASON_STA_KICKOUT(sync_ind->roam_reason)) {
 		struct reject_ap_info ap_info;
 
-		qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
-		ap_info.bssid = connected_bssid;
-		ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
-		ap_info.reject_reason = REASON_STA_KICKOUT;
-		ap_info.source = ADDED_BY_DRIVER;
-		wlan_update_mlo_reject_ap_info(pdev, vdev_id, &ap_info);
-		wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
+		score_config = &mlme_psoc_obj->psoc_cfg.score_config;
+		good_rssi_cfg = score_config->rssi_score.good_rssi_threshold;
+		if (good_rssi_cfg > sync_ind->rssi) {
+			qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
+			ap_info.bssid = connected_bssid;
+			ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
+			ap_info.reject_reason = REASON_STA_KICKOUT;
+			ap_info.source = ADDED_BY_DRIVER;
+			wlan_update_mlo_reject_ap_info(pdev, vdev_id, &ap_info);
+			wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
+		}
 	}
 
 	cm_update_scan_mlme_on_roam(vdev, &connected_bssid,
