@@ -6914,9 +6914,11 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t conn_index;
-	bool ret = false, mlo_sap_present = false;
+	bool ret = false;
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t vdev_id;
+	uint8_t mlo_sap_support_link_num;
+	uint8_t started_mlo_sap_vdev_num = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -6942,20 +6944,22 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 			return ret;
 		}
 
-		/* As only one ML SAP is allowed, break after one ML SAP
-		 * instance found in the policy manager list.
-		 */
-		if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-			mlo_sap_present = true;
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
-			break;
-		}
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+			started_mlo_sap_vdev_num++;
 
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	if (is_new_vdev_mlo && mlo_sap_present)
+	mlo_sap_support_link_num =
+		wlan_mlme_get_mlo_sap_support_link(psoc);
+
+	policy_mgr_debug("is_new_vdev_mlo %u started_mlo_sap_vdev_num %u, mlo_sap_support_link_num %u",
+			 is_new_vdev_mlo,
+			 started_mlo_sap_vdev_num,
+			 mlo_sap_support_link_num);
+	if (is_new_vdev_mlo &&
+	    started_mlo_sap_vdev_num >= mlo_sap_support_link_num)
 		ret = false;
 	else
 		ret = true;
