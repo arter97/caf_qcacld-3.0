@@ -439,6 +439,42 @@ os_if_spectral_streamfs_send_msg(struct wlan_objmgr_pdev *pdev,
 }
 
 /**
+ * os_if_spectral_streamfs_free_msg() - Clears streamfs local buffer
+ * spectral_buf_cb.free_sbuff API is called to free samp structure skb for
+ * mode with channel width 160 or 80p80, for streamfs only local buffer
+ * is cleared.
+ * @pdev : Pointer to pdev
+ * @smsg_type: Spectral message type
+ *
+ * Return: void
+ */
+static void
+os_if_spectral_streamfs_free_msg(struct wlan_objmgr_pdev *pdev,
+				 enum spectral_msg_type smsg_type)
+{
+	struct pdev_spectral *ps = NULL;
+	struct pdev_spectral_streamfs *pss = NULL;
+
+	if (smsg_type >= SPECTRAL_MSG_TYPE_MAX) {
+		spectral_err("Invalid Spectral message type %u", smsg_type);
+		return;
+	}
+
+	ps = wlan_objmgr_pdev_get_comp_private_obj(pdev,
+						   WLAN_UMAC_COMP_SPECTRAL);
+
+	if (!ps) {
+		spectral_err("PDEV SPECTRAL object is NULL!");
+		return;
+	}
+
+	pss = &ps->streamfs_obj;
+
+	/* Clear the local copy */
+	pss->streamfs_buf[smsg_type] = NULL;
+}
+
+/**
  * os_if_spectral_streamfs_init() - Initialize streamfs channel and associated
  * callbacks for spectral module for a given pdev
  * @pdev : Pointer to pdev
@@ -480,7 +516,7 @@ os_if_spectral_streamfs_init(struct wlan_objmgr_pdev *pdev)
 	spectral_buf_cb.get_sbuff = os_if_spectral_streamfs_alloc_buf;
 	spectral_buf_cb.send_bcast = NULL;
 	spectral_buf_cb.send_unicast = os_if_spectral_streamfs_send_msg;
-	spectral_buf_cb.free_sbuff = NULL;
+	spectral_buf_cb.free_sbuff = os_if_spectral_streamfs_free_msg;
 	spectral_buf_cb.convert_to_phy_ch_width =
 		wlan_spectral_get_phy_ch_width;
 	spectral_buf_cb.convert_to_nl_ch_width =
