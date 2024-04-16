@@ -173,6 +173,18 @@ struct dp_set_arp_stats_params {
 };
 
 /**
+ * struct dp_active_traffic_map_params - active traffic map
+ * @vdev_id: vdev_id for which traffic map is being sent
+ * @mac: mac address of the peer
+ * @active_traffic_map: Active traffic bitmap
+ */
+struct dp_active_traffic_map_params {
+	uint32_t vdev_id;
+	struct qdf_mac_addr mac;
+	uint32_t active_traffic_map;
+};
+
+/**
  * struct dp_get_arp_stats_params - get arp stats from firmware
  * @pkt_type: packet type(1 - ARP)
  * @vdev_id: session id
@@ -752,6 +764,7 @@ struct wlan_dp_psoc_callbacks {
  * @arp_request_ctx: ARP request context
  * @dp_lro_config_cmd: Callback to  send LRO config command
  * @dp_send_dhcp_ind: Callback to send DHCP indication
+ * @dp_send_active_traffic_map: Callback to send active traffic mapping
  */
 struct wlan_dp_psoc_sb_ops {
 	/*TODO to add target if TX ops*/
@@ -766,6 +779,8 @@ struct wlan_dp_psoc_sb_ops {
 					struct cdp_lro_hash_config *dp_lro_cmd);
 	QDF_STATUS (*dp_send_dhcp_ind)(uint16_t vdev_id,
 				       struct dp_dhcp_ind *dhcp_ind);
+	QDF_STATUS (*dp_send_active_traffic_map)(struct wlan_objmgr_psoc *psoc,
+						 struct dp_active_traffic_map_params *req_buf);
 };
 
 /**
