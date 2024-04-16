@@ -1738,6 +1738,11 @@ dlm_update_bssid_connect_params(struct wlan_objmgr_pdev *pdev,
 				   &next_node);
 		dlm_entry = qdf_container_of(cur_node, struct dlm_reject_ap,
 					     node);
+		if (!dlm_entry && next_node) {
+			cur_node = next_node;
+			next_node = NULL;
+			continue;
+		}
 
 		if (!qdf_mem_cmp(dlm_entry->bssid.bytes, bssid.bytes,
 				 QDF_MAC_ADDR_SIZE)) {
@@ -1752,7 +1757,7 @@ dlm_update_bssid_connect_params(struct wlan_objmgr_pdev *pdev,
 	}
 
 	/* This means that the BSSID was not added in the reject list of DLM */
-	if (!entry_found) {
+	if (!entry_found || !dlm_entry) {
 		qdf_mutex_release(&dlm_ctx->reject_ap_list_lock);
 		return;
 	}
