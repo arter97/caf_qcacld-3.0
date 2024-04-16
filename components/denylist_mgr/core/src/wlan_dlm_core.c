@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1388,6 +1388,11 @@ dlm_update_bssid_connect_params(struct wlan_objmgr_pdev *pdev,
 				   &next_node);
 		dlm_entry = qdf_container_of(cur_node, struct dlm_reject_ap,
 					     node);
+		if (!dlm_entry && next_node) {
+			cur_node = next_node;
+			next_node = NULL;
+			continue;
+		}
 
 		if (!qdf_mem_cmp(dlm_entry->bssid.bytes, bssid.bytes,
 				 QDF_MAC_ADDR_SIZE)) {
@@ -1402,7 +1407,7 @@ dlm_update_bssid_connect_params(struct wlan_objmgr_pdev *pdev,
 	}
 
 	/* This means that the BSSID was not added in the reject list of DLM */
-	if (!entry_found) {
+	if (!entry_found || !dlm_entry) {
 		qdf_mutex_release(&dlm_ctx->reject_ap_list_lock);
 		return;
 	}
