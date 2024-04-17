@@ -9596,7 +9596,7 @@ lim_rem_denylist_entry_with_lowest_delta(qdf_list_t *list)
 }
 
 void
-lim_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
+lim_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			     struct sir_rssi_disallow_lst *entry)
 {
 	struct reject_ap_info ap_info;
@@ -9610,6 +9610,7 @@ lim_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
 	ap_info.source = entry->source;
 	ap_info.rssi_reject_params.received_time = entry->received_time;
 	ap_info.rssi_reject_params.original_timeout = entry->original_timeout;
+	wlan_update_mlo_reject_ap_info(pdev, vdev_id, &ap_info);
 	/* Add this ap info to the rssi reject ap type in denylist manager */
 	wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
 }

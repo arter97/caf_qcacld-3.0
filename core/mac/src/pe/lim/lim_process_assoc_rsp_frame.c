@@ -1059,10 +1059,90 @@ static void lim_cache_emlsr_params(struct pe_session *session_entry,
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 }
+
+#ifdef FEATURE_DENYLIST_MGR
+/**
+ * lim_handle_assoc_failure_in_dlm() - Add candidate entry in deny list
+ * based on failure code send by AP
+ * @status_code: assoc status code
+ *
+ * Return: true/false
+ */
+static bool
+lim_handle_assoc_failure_in_dlm(uint16_t status_code)
+{
+	switch (status_code) {
+	case STATUS_ASSOC_DENIED_RATES:
+		return true;
+	case STATUS_DENIED_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOC:
+		return true;
+	case STATUS_DENIED_EHT_NOT_SUPPORTED:
+		return true;
+	case STATUS_DENIED_LINK_ON_WHICH_THE_ASSOC_FRAME_IS_TXED_NOT_ACCEPTED:
+		return true;
+	case STATUS_AP_UNABLE_TO_HANDLE_NEW_STA:
+		return true;
+	case STATUS_ASSOC_DENIED_UNSPEC:
+		return true;
+	}
+	return false;
+}
+
+/**
+ * lim_get_dlm_reject_reason() - Get dlm reject reason
+ * from ap assoc failure code
+ * @status_code: assoc status code
+ *
+ * Return: dlm reject reason
+ */
+static enum dlm_reject_ap_reason
+lim_get_dlm_reject_reason(uint16_t status_code)
+{
+	switch (status_code) {
+	case STATUS_ASSOC_DENIED_RATES:
+		return REASON_BASIC_RATES_MISMATCH;
+	case STATUS_DENIED_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOC:
+		return
+			REASON_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOCIATION;
+	case STATUS_DENIED_EHT_NOT_SUPPORTED:
+		return REASON_EHT_NOT_SUPPORTED;
+	case STATUS_DENIED_LINK_ON_WHICH_THE_ASSOC_FRAME_IS_TXED_NOT_ACCEPTED:
+		return REASON_TX_LINK_NOT_ACCEPTED;
+	case STATUS_AP_UNABLE_TO_HANDLE_NEW_STA:
+		return REASON_REASSOC_NO_MORE_STAS;
+	case STATUS_ASSOC_DENIED_UNSPEC:
+		return REASON_OTHER;
+	}
+	return REASON_UNKNOWN;
+}
+#else
+static inline bool
+lim_handle_assoc_failure_in_dlm(uint16_t status_code)
+{
+	return false;
+}
+
+static inline enum dlm_reject_ap_reason
+lim_get_dlm_reject_reason(uint16_t status_code)
+{
+	return REASON_UNKNOWN;
+}
+#endif /* FEATURE_DENYLIST_MGR */
 #else
 static inline void lim_cache_emlsr_params(struct pe_session *session_entry,
 					  tpSirAssocRsp assoc_rsp)
+{}
+
+static inline bool
+lim_handle_assoc_failure_in_dlm(uint16_t status_code)
 {
+	return false;
+}
+
+static inline enum dlm_reject_ap_reason
+lim_get_dlm_reject_reason(uint16_t status_code)
+{
+	return REASON_UNKNOWN;
 }
 #endif
 
@@ -1400,9 +1480,23 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		ap_info.source = ADDED_BY_DRIVER;
 		ap_info.original_timeout = ap_info.retry_delay;
 		ap_info.received_time = qdf_mc_timer_get_system_time();
-		lim_add_bssid_to_reject_list(mac_ctx->pdev, &ap_info);
-	}
+		lim_add_bssid_to_reject_list(mac_ctx->pdev,
+					     session_entry->vdev_id, &ap_info);
+	} else if (assoc_rsp->status_code != STATUS_SUCCESS &&
+		   lim_handle_assoc_failure_in_dlm(assoc_rsp->status_code)) {
+		struct reject_ap_info ap_info;
 
+		qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
+		qdf_mem_copy(ap_info.bssid.bytes, hdr->sa, QDF_MAC_ADDR_SIZE);
+		ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
+		ap_info.reject_reason =
+			lim_get_dlm_reject_reason(assoc_rsp->status_code);
+		ap_info.source = ADDED_BY_DRIVER;
+		wlan_update_mlo_reject_ap_info(mac_ctx->pdev,
+					       session_entry->vdev_id,
+					       &ap_info);
+		wlan_dlm_add_bssid_to_reject_list(mac_ctx->pdev, &ap_info);
+	}
 	status = lim_handle_pmfcomeback_timer(session_entry, assoc_rsp);
 	/* return if retry again timer is started and ignore this assoc resp */
 	if (QDF_IS_STATUS_SUCCESS(status)) {

@@ -2822,12 +2822,12 @@ cm_roam_event_handler(struct roam_offload_roam_event *roam_event)
 
 static void
 cm_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
+			    uint8_t vdev_id,
 			    struct sir_rssi_disallow_lst *entry)
 {
 	struct reject_ap_info ap_info;
 
 	qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
-
 	ap_info.bssid = entry->bssid;
 	ap_info.reject_ap_type = DRIVER_RSSI_REJECT_TYPE;
 	ap_info.rssi_reject_params.expected_rssi = entry->expected_rssi;
@@ -2836,6 +2836,7 @@ cm_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
 	ap_info.source = entry->source;
 	ap_info.rssi_reject_params.received_time = entry->received_time;
 	ap_info.rssi_reject_params.original_timeout = entry->original_timeout;
+	wlan_update_mlo_reject_ap_info(pdev, vdev_id, &ap_info);
 	/* Add this ap info to the rssi reject ap type in denylist manager */
 	wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
 }
@@ -2888,7 +2889,7 @@ cm_btm_denylist_event_handler(struct wlan_objmgr_psoc *psoc,
 		}
 
 		/* Add this bssid to the rssi reject ap type in denylist mgr */
-		cm_add_bssid_to_reject_list(pdev, &entry);
+		cm_add_bssid_to_reject_list(pdev, list->vdev_id, &entry);
 		denylist++;
 	}
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_CM_ID);

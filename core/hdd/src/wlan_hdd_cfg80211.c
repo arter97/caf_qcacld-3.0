@@ -5645,7 +5645,9 @@ static int hdd_set_denylist_bssid(struct hdd_context *hdd_ctx,
 				ap_info.reject_reason =
 						REASON_USERSPACE_AVOID_LIST;
 				ap_info.source = ADDED_BY_DRIVER;
-
+				wlan_update_mlo_reject_ap_info(
+							hdd_ctx->pdev,
+							vdev_id, &ap_info);
 				/* This BSSID is avoided and not denylisted */
 				ucfg_dlm_add_bssid_to_reject_list(hdd_ctx->pdev,
 								  &ap_info);
