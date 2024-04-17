@@ -898,11 +898,23 @@ int osif_twt_send_requestor_enable_cmd(struct wlan_objmgr_psoc *psoc,
 				       uint8_t pdev_id)
 {
 	struct twt_enable_param req = {0};
+	int ret = 0;
+	QDF_STATUS status;
 
 	req.pdev_id = pdev_id;
 	req.ext_conf_present = true;
 
-	return osif_twt_requestor_enable(psoc, &req);
+	status = ucfg_twt_set_requestor_enable_cmd_in_progress(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		if (status == QDF_STATUS_E_ALREADY)
+			return ret;
+		return qdf_status_to_os_return(status);
+	}
+
+	ret = osif_twt_requestor_enable(psoc, &req);
+	ucfg_twt_reset_requestor_enable_cmd_in_progress(psoc);
+
+	return ret;
 }
 
 int osif_twt_send_responder_enable_cmd(struct wlan_objmgr_psoc *psoc,
