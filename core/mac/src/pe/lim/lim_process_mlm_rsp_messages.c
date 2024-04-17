@@ -3172,6 +3172,7 @@ static void lim_process_switch_channel_join_req(
 	 * and wait for the probe response/ beacon to post JOIN CNF
 	 */
 	if (nontx_bss_id) {
+		pe_debug("Skip sending join probe for MBSS candidate");
 		session_entry->limMlmState = eLIM_MLM_JOINED_STATE;
 		join_cnf.sessionId = session_entry->peSessionId;
 		join_cnf.resultCode = eSIR_SME_SUCCESS;

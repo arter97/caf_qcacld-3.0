@@ -2862,7 +2862,8 @@ static void lim_set_mbssid_info(struct pe_session *pe_session)
 		mbssid_info =
 			&pe_session->pLimReAssocReq->bssDescription.mbssid_info;
 
-	mlme_set_mbssid_info(pe_session->vdev, mbssid_info);
+	mlme_set_mbssid_info(pe_session->vdev, mbssid_info,
+			     pe_session->curr_op_freq);
 }
 
 /**

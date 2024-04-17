@@ -5565,7 +5565,8 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 
 	if (rsp->connect_rsp.is_reassoc ||
 	    csr_is_link_switch_in_progress(vdev))
-		mlme_set_mbssid_info(vdev, &cur_node->entry->mbssid_info);
+		mlme_set_mbssid_info(vdev, &cur_node->entry->mbssid_info,
+				     bss_desc->chan_freq);
 
 	if (bcn_ies->Country.present)
 		qdf_mem_copy(country_code, bcn_ies->Country.country,
