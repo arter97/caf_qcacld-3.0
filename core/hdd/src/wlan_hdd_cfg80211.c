@@ -21979,20 +21979,22 @@ static char *wlan_hdd_iface_debug_string(uint32_t iface_type)
 static void wlan_hdd_dump_iface_combinations(uint32_t num,
 			const struct ieee80211_iface_combination *combination)
 {
-	int i, j;
+	int i, j, k;
 	char buf[IFACE_DUMP_SIZE] = {0};
 	uint8_t len = 0;
 
 	hdd_debug("max combinations %d", num);
 
 	for (i = 0; i < num; i++) {
-		for (j = 0; j < combination[i].max_interfaces; j++) {
-			if (combination[i].limits[j].types)
-				len += qdf_scnprintf(buf + len,
-						     IFACE_DUMP_SIZE - len,
-						     " + %s",
-					wlan_hdd_iface_debug_string(
-					combination[i].limits[j].types));
+		for (j = 0; j < combination[i].n_limits; j++) {
+			for (k = 0; k < combination[i].limits[j].max; k++) {
+				if (combination[i].limits[j].types)
+					len += qdf_scnprintf(buf + len,
+					       IFACE_DUMP_SIZE - len,
+					       k == 0 && j == 0 ? "%s" : "+%s",
+					       wlan_hdd_iface_debug_string(
+					       combination[i].limits[j].types));
+			}
 		}
 
 		hdd_nofl_debug("iface combination[%d]: %s", i, buf);
