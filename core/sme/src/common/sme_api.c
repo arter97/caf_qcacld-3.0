@@ -89,6 +89,7 @@
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_vdev_mgr_ucfg_api.h"
 #include "wlan_vdev_mlme_main.h"
+#include "wlan_tdls_api.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -4780,7 +4781,7 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 		      uint8_t vdev_id)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct wlan_mlme_nss_chains *dynamic_cfg;
 	struct wlan_objmgr_vdev *vdev =
 		       wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
@@ -4798,7 +4799,13 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 	if (ll_lt_sap_vdev_id != WLAN_INVALID_VDEV_ID) {
 		sme_info_rl("LL_LT_SAP vdev %d present, chainmask config not allowed",
 			    ll_lt_sap_vdev_id);
-		return QDF_STATUS_E_FAILURE;
+		goto release_ref;
+	}
+
+	if (QDF_STATUS_SUCCESS == wlan_is_tdls_session_present(vdev)) {
+		sme_debug("TDLS session exists");
+		status = QDF_STATUS_E_FAILURE;
+		goto release_ref;
 	}
 
 	status = sme_acquire_global_lock(&mac_ctx->sme);
