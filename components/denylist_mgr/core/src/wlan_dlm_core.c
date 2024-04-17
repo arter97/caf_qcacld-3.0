@@ -502,6 +502,12 @@ dlm_update_avoidlist_reject_reason(struct dlm_reject_ap *entry,
 	entry->nud_fail = false;
 	entry->sta_kickout = false;
 	entry->ho_fail = false;
+	entry->no_more_stas = false;
+	entry->basic_rates_mismatched = false;
+	entry->eht_not_supported = false;
+	entry->tx_link_denied = false;
+	entry->same_address_present_in_ap = false;
+	entry->other = false;
 
 	switch (reject_reason) {
 	case REASON_NUD_FAILURE:
@@ -513,10 +519,75 @@ dlm_update_avoidlist_reject_reason(struct dlm_reject_ap *entry,
 	case REASON_ROAM_HO_FAILURE:
 		entry->ho_fail = true;
 		break;
+	case REASON_REASSOC_NO_MORE_STAS:
+		entry->no_more_stas = true;
+		break;
+	case REASON_BASIC_RATES_MISMATCH:
+		entry->basic_rates_mismatched = true;
+		break;
+	case REASON_OTHER:
+		entry->other = true;
+		break;
+	case REASON_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOCIATION:
+		entry->same_address_present_in_ap = true;
+		break;
+	case REASON_EHT_NOT_SUPPORTED:
+		entry->eht_not_supported = true;
+		break;
+	case REASON_TX_LINK_NOT_ACCEPTED:
+		entry->tx_link_denied = true;
+		break;
+
 	default:
 		dlm_err("Invalid reason passed %d", reject_reason);
 	}
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static void dlm_update_reject_mlo_info(struct dlm_reject_ap *entry,
+				       struct reject_ap_info *ap_info)
+{
+	entry->dlm_reject_mlo_ap_info.tried_link_count =
+				ap_info->reject_mlo_ap_info.tried_link_count;
+	entry->dlm_reject_mlo_ap_info.link_action =
+				ap_info->reject_mlo_ap_info.link_action;
+	qdf_copy_macaddr(&entry->dlm_reject_mlo_ap_info.mld_addr,
+			 &ap_info->reject_mlo_ap_info.mld_addr);
+	qdf_mem_copy(&entry->dlm_reject_mlo_ap_info.tried_links,
+		     &ap_info->reject_mlo_ap_info.tried_links,
+		     entry->dlm_reject_mlo_ap_info.tried_link_count *
+		     sizeof(uint16_t));
+}
+
+static void
+dlm_update_reject_mlo_config(struct dlm_reject_ap *dlm_entry,
+			     struct reject_ap_config_params *reject_list)
+{
+	qdf_copy_macaddr(&reject_list->reject_mlo_ap_config_param.mld_addr,
+			 &dlm_entry->dlm_reject_mlo_ap_info.mld_addr);
+	reject_list->reject_mlo_ap_config_param.tried_link_count =
+			dlm_entry->dlm_reject_mlo_ap_info.tried_link_count;
+	qdf_mem_copy(&reject_list->reject_mlo_ap_config_param.tried_links,
+		     &dlm_entry->dlm_reject_mlo_ap_info.tried_links,
+		     reject_list->reject_mlo_ap_config_param.tried_link_count *
+		     sizeof(uint16_t));
+
+	dlm_debug("Added MLO AP" QDF_MAC_ADDR_FMT " to avoid list with tried link count %d",
+		  QDF_MAC_ADDR_REF(
+			reject_list->reject_mlo_ap_config_param.mld_addr.bytes),
+		  reject_list->reject_mlo_ap_config_param.tried_link_count);
+}
+#else
+static inline void
+dlm_update_reject_mlo_info(struct dlm_reject_ap *dlm_entry,
+			   struct reject_ap_info *ap_info)
+{}
+
+static inline void
+dlm_update_reject_mlo_config(struct dlm_reject_ap *dlm_entry,
+			     struct reject_ap_config_params *reject_list)
+{}
+#endif
 
 static void
 dlm_handle_avoid_list(struct dlm_reject_ap *entry,
@@ -537,6 +608,8 @@ dlm_handle_avoid_list(struct dlm_reject_ap *entry,
 	} else {
 		return;
 	}
+
+	dlm_update_reject_mlo_info(entry, ap_info);
 	entry->source = ap_info->source;
 	/* Update bssid info for new entry */
 	entry->bssid = ap_info->bssid;
@@ -1251,6 +1324,8 @@ static void dlm_fill_reject_list(qdf_list_t *reject_db_list,
 				  dlm_entry->rssi_reject_params.expected_rssi,
 				  *num_of_reject_bssid,
 				  dlm_entry->reject_ap_reason);
+			dlm_update_reject_mlo_config(dlm_entry,
+						     dlm_reject_list);
 		}
 		cur_node = next_node;
 		next_node = NULL;
