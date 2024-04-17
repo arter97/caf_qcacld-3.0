@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -103,6 +103,15 @@ wlan_tdls_notify_sta_connect(uint8_t vdev_id,
 			     bool tdls_chan_swit_prohibited,
 			     bool tdls_prohibited,
 			     struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_is_tdls_session_present() - Get TDLS session status
+ * @vdev: vdev pointer
+ *
+ * Return: QDF_STATUS_SUCCESS if success; other value if failed
+ */
+QDF_STATUS
+wlan_is_tdls_session_present(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_tdls_update_tx_pkt_cnt() - update tx pkt count
