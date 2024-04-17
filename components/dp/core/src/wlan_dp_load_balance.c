@@ -32,7 +32,34 @@
 #define LOAD_BALANCE_TIME_THRS 5000000000
 
 /**
+ * wlan_dp_lb_sort_ring_weightages() - function to sort the ring weightages
+ *	from high to low
+ * @e1: first element
+ * @e2: second element
+ *
+ * Return: -1, if element1 weight is greater than the element2 weight
+ *	1, if element1 weight is lesser than the element2 weight
+ *	0, if both weights are equal
+ */
+int wlan_dp_lb_sort_ring_weightages(const void *e1, const void *e2)
+{
+	struct wlan_dp_rx_ring_wtg *w1 = (struct wlan_dp_rx_ring_wtg *)e1;
+	struct wlan_dp_rx_ring_wtg *w2 = (struct wlan_dp_rx_ring_wtg *)e2;
+
+	if (w1->weight > w2->weight)
+		return -1;
+	else if (w1->weight < w2->weight)
+		return 1;
+	else
+		return 0;
+}
+
+/**
  * wlan_dp_lb_irq_balance_handler() - handler for irq balancing
+ * Sort the ring weightages from high to low since the cpu list is
+ * sorted from high to low based on the allowed load. Idea is to take
+ * highest load allowed cpu first and put ring weightages until the allowed
+ * weightage.
  * @dp_ctx: dp context
  * @cpu_load_avg: cpu load average in percentage for NR_CPUS
  * @num_cpus: Number of available CPUs
@@ -46,6 +73,43 @@ wlan_dp_lb_irq_balance_handler(struct wlan_dp_psoc_context *dp_ctx,
 			       uint32_t num_cpus,
 			       struct wlan_dp_rx_ring_wtg *weightages)
 {
+	int cpu, i = 0;
+	int grp_id;
+
+	/* sort ring weightages from high to low */
+	qdf_sort(weightages, MAX_REO_DEST_RINGS, sizeof(*weightages),
+		 wlan_dp_lb_sort_ring_weightages, NULL);
+
+	cpu = 0;
+
+	while (weightages[i].weight) {
+		dp_debug("Applying ring%d weight %d on cpu%d",
+			 weightages[i].ring_id, weightages[i].weight,
+			 cpu_load_avg[cpu].cpu_id);
+
+		grp_id = cdp_get_ext_grp_id_from_reo_num(dp_ctx->cdp_soc,
+							 weightages[i].ring_id);
+		if (grp_id < 0) {
+			dp_err("failed to get grp id");
+			continue;
+		}
+
+		hif_check_and_apply_irq_affinity(dp_ctx->hif_handle, grp_id,
+						 cpu_load_avg[cpu].cpu_id);
+
+		cpu_load_avg[cpu].allowed_wtg -= weightages[i++].weight;
+
+		if (i >= MAX_REO_DEST_RINGS)
+			break;
+
+		if ((cpu_load_avg[cpu].allowed_wtg + ALLOWED_BUFFER_WT) >=
+		    (int)weightages[i].weight)
+			continue;
+
+		cpu++;
+		if (cpu >= num_cpus)
+			cpu = 0;
+	}
 }
 
 /**

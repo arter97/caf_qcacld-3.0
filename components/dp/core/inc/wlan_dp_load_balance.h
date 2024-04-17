@@ -21,6 +21,8 @@
 
 struct wlan_dp_psoc_context;
 
+#define ALLOWED_BUFFER_WT 5
+
 /**
  * struct wlan_dp_rx_ring_wtg - per ring weightage
  * @weight: weightage of the ring in percentage
