@@ -54,7 +54,7 @@ dp_update_pdev_rx_protocol_tag(struct cdp_soc_t  *soc, uint8_t pdev_id,
 
 bool
 dp_rx_err_cce_drop(struct dp_soc *soc, struct dp_vdev *vdev,
-		   qdf_nbuf_t nbuf, uint8_t *rx_hdr_tlv);
+		    qdf_nbuf_t nbuf, uint8_t *rx_hdr_tlv, bool is_mld);
 #ifdef WLAN_SUPPORT_RX_TAG_STATISTICS
 /**
  * dp_dump_pdev_rx_protocol_tag_stats - dump the number of packets tagged for
