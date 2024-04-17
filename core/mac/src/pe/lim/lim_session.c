@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -829,7 +829,7 @@ static void lim_clear_mbssid_info(struct wlan_objmgr_vdev *vdev)
 {
 	struct scan_mbssid_info mbssid_info = {0};
 
-	mlme_set_mbssid_info(vdev, &mbssid_info);
+	mlme_set_mbssid_info(vdev, &mbssid_info, INVALID_CHANNEL_NUM);
 }
 
 /**
