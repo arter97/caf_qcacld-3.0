@@ -22,6 +22,30 @@
 struct wlan_dp_psoc_context;
 
 /**
+ * struct wlan_dp_rx_ring_wtg - per ring weightage
+ * @weight: weightage of the ring in percentage
+ * @ring_id: ring id
+ */
+struct wlan_dp_rx_ring_wtg {
+	uint32_t weight;
+	uint8_t ring_id;
+};
+
+/**
+ * struct cpu_load - structure holding cpu load in percentage
+ * @allowed_wtg: allowed wlan weight on this CPU
+ * @total_cpu_avg_load: total cpu average load in percentage
+ * @wlan_avg_load: wlan average load on the cpu in percentage
+ * @cpu_id: cpu id
+ */
+struct cpu_load {
+	int allowed_wtg;
+	uint8_t total_cpu_avg_load;
+	uint8_t wlan_avg_load;
+	uint8_t cpu_id;
+};
+
+/**
  * struct cpu_irq_load - structure holding cpu irq load
  * @irq_time_prev: previous CPU irq time in ns
  * @wlan_irq_time_prev: previous wlan irq time in ns
@@ -52,6 +76,8 @@ struct cpu_irq_load {
  * subset of preferred_cpu_mask
  * @load_balance_lock: lock to protect load balace from multiple contexts
  * @last_stats_avg_comp_time: time since previous stats average computed in ns
+ * @last_load_balanced_time: time since when the previous load balance is done
+ *	in nanoseconds
  */
 struct wlan_dp_lb_data {
 	struct cpu_irq_load cpu_load[NR_CPUS];
@@ -60,6 +86,7 @@ struct wlan_dp_lb_data {
 	qdf_cpu_mask curr_cpu_mask;
 	qdf_spinlock_t load_balance_lock;
 	uint64_t last_stats_avg_comp_time;
+	uint64_t last_load_balanced_time;
 };
 
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
