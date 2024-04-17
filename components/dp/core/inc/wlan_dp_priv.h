@@ -448,6 +448,12 @@ struct fisa_pkt_hist {
  * @pkt_hist: FISA aggreagtion packets history
  * @same_mld_vdev_mismatch: Packets flushed after vdev_mismatch on same MLD
  * @add_timestamp: FISA entry created timestamp
+ * @num_pkts: number of packets received on this flow
+ * @num_pkts_prev: number of packets received on this flow previously
+ * @avg_pkts_per_sec: average packets per second received on this flow
+ * @last_pkt_rcvd_tstamp: last packet received timestamp on this flow
+ * @last_avg_cal_tstamp: last average calculated timestamp for this flow
+ * @elig_for_balance: flow is eligible for flow balance or not
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -497,6 +503,14 @@ struct dp_fisa_rx_sw_ft {
 #endif
 	uint64_t same_mld_vdev_mismatch;
 	uint64_t add_timestamp;
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
+	uint64_t num_pkts;
+	uint64_t num_pkts_prev;
+	uint32_t avg_pkts_per_sec;
+	qdf_time_t last_pkt_rcvd_tstamp;
+	qdf_time_t last_avg_cal_tstamp;
+	bool elig_for_balance;
+#endif
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)

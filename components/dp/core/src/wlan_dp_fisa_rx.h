@@ -257,4 +257,14 @@ dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support)
 {
 }
 #endif
+
+#if defined(WLAN_SUPPORT_RX_FISA) && \
+	defined(WLAN_DP_FLOW_BALANCE_SUPPORT)
+void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx);
+#else
+static inline void
+dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+#endif
 #endif

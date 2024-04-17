@@ -18,6 +18,7 @@
 
 #include "hif.h"
 #include "wlan_dp_priv.h"
+#include "wlan_dp_fisa_rx.h"
 
 #define NUM_CPUS_FOR_LOAD_BALANCE 2
 
@@ -408,6 +409,7 @@ void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx)
 	if (time_delta_ns >= SAMPLING_AVERAGE_TIME_THRS) {
 		wlan_dp_lb_compute_cpu_load_average(dp_ctx);
 		cdp_calculate_per_ring_pkt_avg(dp_ctx->cdp_soc);
+		dp_fisa_calc_flow_stats_avg(dp_ctx);
 		lb_data->last_stats_avg_comp_time = curr_time_in_ns;
 	}
 

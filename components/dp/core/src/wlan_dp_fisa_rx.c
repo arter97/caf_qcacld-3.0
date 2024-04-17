@@ -135,6 +135,105 @@ void dp_fisa_record_pkt(struct dp_fisa_rx_sw_ft *fisa_flow, qdf_nbuf_t nbuf,
 
 #endif
 
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
+/* time in us */
+#define LONG_LIVED_FLOW_TIME_THRESH 1000000
+#define ACTIVE_FLOW_TIME_THRESH 100000
+
+static inline void
+dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow)
+{
+	fisa_flow->num_pkts++;
+	fisa_flow->last_pkt_rcvd_tstamp = qdf_get_log_timestamp();
+}
+
+/**
+ * dp_fisa_calc_flow_stats_avg - API called from dp_lb_compute_stats_average
+ * to calculate the flow stats average for every load balance sample
+ * time threshold(1sec). This average will get used in flow balance.
+ * Iterate through the software FST table and compute the average only for
+ * the long lived active flow.
+ * @dp_ctx: dp context
+ *
+ * Return: None
+ */
+void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct dp_rx_fst *rx_fst = dp_ctx->rx_fst;
+	struct dp_fisa_rx_sw_ft *sw_ft_base;
+	struct dp_fisa_rx_sw_ft *sw_ft_entry;
+	qdf_time_t cur_tstamp;
+	uint64_t time_us;
+	uint64_t flow_init_time_us;
+	uint64_t last_pkt_rcvd_time_us;
+	uint64_t pkts_per_sec;
+	uint64_t num_pkts;
+	int i;
+
+	if (!rx_fst)
+		return;
+
+	cur_tstamp = qdf_get_log_timestamp();
+
+	qdf_spin_lock_bh(&rx_fst->dp_rx_fst_lock);
+	sw_ft_base = (struct dp_fisa_rx_sw_ft *)rx_fst->base;
+
+	for (i = 0; i < rx_fst->max_entries; i++) {
+		sw_ft_entry = &sw_ft_base[i];
+
+		if (!sw_ft_entry->is_populated)
+			continue;
+
+		flow_init_time_us =
+			qdf_log_timestamp_to_usecs(cur_tstamp -
+						   sw_ft_entry->flow_init_ts);
+		last_pkt_rcvd_time_us =
+		qdf_log_timestamp_to_usecs(qdf_get_log_timestamp() -
+					   sw_ft_entry->last_pkt_rcvd_tstamp);
+
+		/* calculate avg only for the long lived and active flow */
+		if ((flow_init_time_us < LONG_LIVED_FLOW_TIME_THRESH) ||
+		    (last_pkt_rcvd_time_us > ACTIVE_FLOW_TIME_THRESH)) {
+			sw_ft_entry->elig_for_balance = false;
+			sw_ft_entry->num_pkts = sw_ft_entry->num_pkts_prev;
+			sw_ft_entry->last_avg_cal_tstamp = cur_tstamp;
+			continue;
+		}
+
+		sw_ft_entry->elig_for_balance = true;
+
+		if (!sw_ft_entry->num_pkts_prev) {
+			sw_ft_entry->num_pkts_prev = sw_ft_entry->num_pkts;
+			sw_ft_entry->last_avg_cal_tstamp = cur_tstamp;
+			continue;
+		} else {
+			num_pkts = sw_ft_entry->num_pkts -
+					 sw_ft_entry->num_pkts_prev;
+			sw_ft_entry->num_pkts_prev = sw_ft_entry->num_pkts;
+			time_us = cur_tstamp - sw_ft_entry->last_avg_cal_tstamp;
+			pkts_per_sec = (num_pkts * 1000000) /
+					qdf_log_timestamp_to_usecs(time_us);
+
+			if (!sw_ft_entry->avg_pkts_per_sec)
+				sw_ft_entry->avg_pkts_per_sec = pkts_per_sec;
+			else
+				sw_ft_entry->avg_pkts_per_sec =
+				((sw_ft_entry->avg_pkts_per_sec * 25) / 100) +
+				((pkts_per_sec * 75) / 100);
+
+			sw_ft_entry->last_avg_cal_tstamp = cur_tstamp;
+		}
+	}
+
+	qdf_spin_unlock_bh(&rx_fst->dp_rx_fst_lock);
+}
+#else
+static inline void
+dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow)
+{
+}
+#endif
+
 /**
  * wlan_dp_nbuf_skip_rx_pkt_tlv() - Function to skip the TLVs and
  *				    mac header from msdu
@@ -2132,6 +2231,9 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		/* Add new flow if the there is no ongoing flow */
 		fisa_flow = dp_rx_get_fisa_flow(dp_fisa_rx_hdl, vdev,
 						head_nbuf);
+
+		if (fisa_flow)
+			dp_fisa_update_flow_balance_stats(fisa_flow);
 
 		/* Do not FISA aggregate IPSec packets */
 		if (fisa_flow &&
