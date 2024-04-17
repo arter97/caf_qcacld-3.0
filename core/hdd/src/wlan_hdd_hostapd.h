@@ -341,27 +341,35 @@ int hdd_hostapd_stop(struct net_device *dev);
 int hdd_sap_context_init(struct hdd_context *hdd_ctx);
 void hdd_sap_context_destroy(struct hdd_context *hdd_ctx);
 #ifdef QCA_HT_2040_COEX
-QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
-				   uint8_t channel_type);
-
 /**
- * hdd_get_sap_ht2040_mode() - get ht2040 mode
- * @adapter: pointer to adapter
+ * hdd_set_sap_ht2040_mode() - set ht2040 mode
+ * @link_info: pointer to link_info
  * @channel_type: given channel type
  *
  * Return: QDF_STATUS_SUCCESS if successfully
  */
-QDF_STATUS hdd_get_sap_ht2040_mode(struct hdd_adapter *adapter,
+QDF_STATUS hdd_set_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
+				   uint8_t channel_type);
+
+/**
+ * hdd_get_sap_ht2040_mode() - get ht2040 mode
+ * @link_info: pointer to link_info
+ * @channel_type: given channel type
+ *
+ * Return: QDF_STATUS_SUCCESS if successfully
+ */
+QDF_STATUS hdd_get_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
 				   enum eSirMacHTChannelType *channel_type);
 #else
-static inline QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
-						 uint8_t channel_type)
+static inline QDF_STATUS
+hdd_set_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
+			uint8_t channel_type)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 static inline QDF_STATUS hdd_get_sap_ht2040_mode(
-				struct hdd_adapter *adapter,
+				struct wlan_hdd_link_info *link_info,
 				enum eSirMacHTChannelType *channel_type)
 {
 	return QDF_STATUS_E_FAILURE;

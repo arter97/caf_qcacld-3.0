@@ -742,10 +742,11 @@ static void hdd_wiphy_lock(struct wireless_dev *dev_ptr)
 #endif
 
 #ifdef QCA_HT_2040_COEX
-QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
+QDF_STATUS hdd_set_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
 				   uint8_t channel_type)
 {
 	QDF_STATUS qdf_ret_status = QDF_STATUS_E_FAILURE;
+	struct hdd_adapter *adapter = link_info->adapter;
 	mac_handle_t mac_handle;
 
 	hdd_debug("change HT20/40 mode");
@@ -757,7 +758,7 @@ QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
 			return QDF_STATUS_E_FAULT;
 		}
 		qdf_ret_status = sme_set_ht2040_mode(mac_handle,
-						     adapter->deflink->vdev_id,
+						     link_info->vdev_id,
 						     channel_type, true);
 		if (qdf_ret_status == QDF_STATUS_E_FAILURE) {
 			hdd_err("Failed to change HT20/40 mode");
@@ -767,13 +768,14 @@ QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS hdd_get_sap_ht2040_mode(struct hdd_adapter *adapter,
+QDF_STATUS hdd_get_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
 				   enum eSirMacHTChannelType *channel_type)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct hdd_adapter *adapter = link_info->adapter;
 	mac_handle_t mac_handle;
 
-	hdd_debug("get HT20/40 mode vdev_id %d", adapter->deflink->vdev_id);
+	hdd_debug("get HT20/40 mode vdev_id %d", link_info->vdev_id);
 
 	if (adapter->device_mode == QDF_SAP_MODE) {
 		mac_handle = adapter->hdd_ctx->mac_handle;
@@ -782,7 +784,7 @@ QDF_STATUS hdd_get_sap_ht2040_mode(struct hdd_adapter *adapter,
 			return status;
 		}
 		status = sme_get_ht2040_mode(mac_handle,
-					     adapter->deflink->vdev_id,
+					     link_info->vdev_id,
 					     channel_type);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("Failed to get HT20/40 mode");
