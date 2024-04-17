@@ -16277,7 +16277,8 @@ static int __wlan_hdd_cfg80211_get_link_properties(struct wiphy *wiphy,
 
 		sta_info = hdd_get_sta_info_by_mac(
 					&adapter->sta_info_list, peer_mac,
-					STA_INFO_CFG80211_GET_LINK_PROPERTIES);
+					STA_INFO_CFG80211_GET_LINK_PROPERTIES,
+					STA_INFO_MATCH_STA_MAC_ONLY);
 
 		if (!sta_info) {
 			hdd_err("No active peer with mac = " QDF_MAC_ADDR_FMT,
@@ -23973,7 +23974,8 @@ wlan_hdd_set_vlan_id(struct hdd_sta_info_obj *sta_info_list,
 	sta_info =
 	hdd_get_sta_info_by_mac(sta_info_list,
 				mac,
-				STA_INFO_SOFTAP_GET_STA_INFO);
+				STA_INFO_SOFTAP_GET_STA_INFO,
+				STA_INFO_MATCH_STA_OR_MLD_MAC);
 	if (!sta_info) {
 		hdd_err("Failed to find right station MAC: "
 			  QDF_MAC_ADDR_FMT,
@@ -23996,7 +23998,8 @@ wlan_hdd_set_vlan_config(struct hdd_adapter *adapter,
 
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   (uint8_t *)mac,
-					   STA_INFO_SOFTAP_GET_STA_INFO);
+					   STA_INFO_SOFTAP_GET_STA_INFO,
+					   STA_INFO_MATCH_STA_OR_MLD_MAC);
 
 	if (!sta_info) {
 		hdd_err("Failed to find right station MAC:"
@@ -26636,7 +26639,8 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 		sta_info = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
 						mac,
-						STA_INFO_CFG80211_DEL_STATION);
+						STA_INFO_CFG80211_DEL_STATION,
+						STA_INFO_MATCH_STA_OR_MLD_MAC);
 
 		if (!sta_info) {
 			hdd_debug("Skip DEL STA as this is not used::"

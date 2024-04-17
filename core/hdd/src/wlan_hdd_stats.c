@@ -6970,7 +6970,8 @@ wlan_hdd_get_mld_peer_stats(struct hdd_adapter *adapter,
 
 		stainfo = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 						  link_peer->link_addr.bytes,
-						  STA_INFO_WLAN_HDD_CFG80211_GET_STATION);
+						  STA_INFO_WLAN_HDD_CFG80211_GET_STATION,
+						  STA_INFO_MATCH_STA_MAC_ONLY);
 		if (!stainfo) {
 			hdd_debug("Peer " QDF_MAC_ADDR_FMT " not found",
 				  QDF_MAC_ADDR_REF(link_peer->link_addr.bytes));
@@ -8291,7 +8292,8 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 		if (qdf_status == QDF_STATUS_SUCCESS && get_peer_info_enable) {
 			stainfo = hdd_get_sta_info_by_mac(
 					&adapter->sta_info_list, mac,
-					STA_INFO_WLAN_HDD_CFG80211_GET_STATION);
+					STA_INFO_WLAN_HDD_CFG80211_GET_STATION,
+					STA_INFO_MATCH_STA_OR_MLD_MAC);
 			if (!stainfo) {
 				hdd_debug("Peer " QDF_MAC_ADDR_FMT " not found",
 					  QDF_MAC_ADDR_REF(mac));

@@ -1580,7 +1580,8 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 
 	stainfo = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					  event->staMac.bytes,
-					  STA_INFO_FILL_STATION_INFO);
+					  STA_INFO_FILL_STATION_INFO,
+					  STA_INFO_MATCH_STA_MAC_ONLY);
 
 	if (!stainfo) {
 		hdd_err("invalid stainfo");
@@ -1673,7 +1674,8 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 	cache_sta_info =
 		hdd_get_sta_info_by_mac(&adapter->cache_sta_info_list,
 					event->staMac.bytes,
-					STA_INFO_FILL_STATION_INFO);
+					STA_INFO_FILL_STATION_INFO,
+					STA_INFO_MATCH_STA_MAC_ONLY);
 
 	if (!cache_sta_info) {
 		cache_sta_info = qdf_mem_malloc(sizeof(*cache_sta_info));
@@ -3082,7 +3084,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		cache_stainfo = hdd_get_sta_info_by_mac(
 						&adapter->cache_sta_info_list,
 						disassoc_comp->staMac.bytes,
-						STA_INFO_HOSTAPD_SAP_EVENT_CB);
+						STA_INFO_HOSTAPD_SAP_EVENT_CB,
+						STA_INFO_MATCH_STA_MAC_ONLY);
 		if (cache_stainfo) {
 			/* Cache the disassoc info */
 			cache_stainfo->rssi = disassoc_comp->rssi;
@@ -3130,7 +3133,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		stainfo = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
 						disassoc_comp->staMac.bytes,
-						STA_INFO_HOSTAPD_SAP_EVENT_CB);
+						STA_INFO_HOSTAPD_SAP_EVENT_CB,
+						STA_INFO_MATCH_STA_MAC_ONLY);
 		if (!stainfo) {
 			hdd_err("Failed to find the right station");
 			return QDF_STATUS_E_INVAL;

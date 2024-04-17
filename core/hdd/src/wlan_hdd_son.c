@@ -2456,7 +2456,8 @@ static QDF_STATUS hdd_son_get_node_info_sap(struct wlan_objmgr_vdev *vdev,
 
 	adapter = link_info->adapter;
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list, mac_addr,
-					   STA_INFO_SON_GET_DATRATE_INFO);
+					   STA_INFO_SON_GET_DATRATE_INFO,
+					   STA_INFO_MATCH_STA_OR_MLD_MAC);
 	if (!sta_info) {
 		hdd_err("Sta info is null");
 		return QDF_STATUS_E_FAILURE;
@@ -2535,7 +2536,8 @@ static QDF_STATUS hdd_son_get_peer_capability(struct wlan_objmgr_vdev *vdev,
 	adapter = link_info->adapter;
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   peer->macaddr,
-					   STA_INFO_SOFTAP_GET_STA_INFO);
+					   STA_INFO_SOFTAP_GET_STA_INFO,
+					   STA_INFO_MATCH_STA_OR_MLD_MAC);
 	if (!sta_info) {
 		hdd_err("sta_info NULL");
 		return QDF_STATUS_E_FAILURE;
@@ -2590,7 +2592,8 @@ uint32_t hdd_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
 	adapter = link_info->adapter;
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   peer->macaddr,
-					   STA_INFO_SOFTAP_GET_STA_INFO);
+					   STA_INFO_SOFTAP_GET_STA_INFO,
+					   STA_INFO_MATCH_STA_OR_MLD_MAC);
 	if (!sta_info) {
 		hdd_err("sta_info NULL");
 		return ret;

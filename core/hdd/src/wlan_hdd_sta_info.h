@@ -66,6 +66,25 @@ enum dhcp_nego_status {
 	DHCP_NEGO_IN_PROGRESS
 };
 
+/**
+ * enum wlan_sta_info_mac_type - mac type for get sta info
+ * @STA_INFO_MAC_UNKNOWN: unknown mac type
+ * @STA_INFO_STA_MAC: peer mac of client. for mlo client, it is link_address.
+ * @STA_INFO_MLD_MAC: mld mac of mlo client
+ */
+typedef enum {
+	STA_INFO_MAC_UNKNOWN  = 0,
+	STA_INFO_STA_MAC      = BIT(0),
+	STA_INFO_MLD_MAC      = BIT(1)
+} wlan_sta_info_mac_type;
+
+#define STA_INFO_MATCH_STA_MAC_ONLY STA_INFO_STA_MAC
+#define STA_INFO_MATCH_MLD_MAC_ONLY STA_INFO_MLD_MAC
+#define STA_INFO_MATCH_STA_OR_MLD_MAC (STA_INFO_STA_MAC | STA_INFO_MLD_MAC)
+
+#define IS_MATCH_STA_MAC(value) (STA_INFO_STA_MAC & (value))
+#define IS_MATCH_MLD_MAC(value) (STA_INFO_MLD_MAC & (value))
+
 /*
  * Pending frame type of EAP_FAILURE, bit number used in "pending_eap_frm_type"
  * of sta_info.
@@ -554,6 +573,7 @@ struct hdd_station_info *hdd_get_sta_info_by_id(
  *                      the sta_info obj.
  * @mac_addr: The mac addr by which the sta_info has to be fetched.
  * @sta_info_dbgid: Debug ID of the caller API
+ * @match_mac_type: mac type to match, it can match sta_mac or mld_mac or both
  *
  * Return: Pointer to the hdd_station_info structure which contains the mac
  *         address passed
@@ -561,7 +581,8 @@ struct hdd_station_info *hdd_get_sta_info_by_id(
 struct hdd_station_info *hdd_get_sta_info_by_mac(
 				struct hdd_sta_info_obj *sta_info_container,
 				const uint8_t *mac_addr,
-				wlan_sta_info_dbgid sta_info_dbgid);
+				wlan_sta_info_dbgid sta_info_dbgid,
+				uint32_t match_mac_type);
 
 /**
  * hdd_clear_cached_sta_info() - Clear the cached sta info from the container

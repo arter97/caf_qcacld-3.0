@@ -1391,7 +1391,8 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 
 	stainfo = hdd_get_sta_info_by_mac(&adapter->cache_sta_info_list,
 					  mac_addr.bytes,
-					  STA_INFO_GET_CACHED_STATION_REMOTE);
+					  STA_INFO_GET_CACHED_STATION_REMOTE,
+					  STA_INFO_MATCH_STA_OR_MLD_MAC);
 
 	if (!stainfo) {
 		hdd_err("peer " QDF_MAC_ADDR_FMT " not found",
@@ -1664,7 +1665,8 @@ static int hdd_get_station_remote(struct wlan_hdd_link_info *link_info,
 			hdd_get_sta_info_by_mac(
 					&adapter->sta_info_list,
 					mac_addr.bytes,
-					STA_INFO_HDD_GET_STATION_REMOTE);
+					STA_INFO_HDD_GET_STATION_REMOTE,
+					STA_INFO_MATCH_STA_OR_MLD_MAC);
 
 	if (!stainfo) {
 		status = hdd_get_cached_station_remote(hdd_ctx, adapter,
@@ -2492,7 +2494,8 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
 	struct hdd_station_info *stainfo =
 				hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					       mac_addr.bytes,
-					       STA_INFO_HDD_GET_STATION_REMOTE);
+					       STA_INFO_HDD_GET_STATION_REMOTE,
+					       STA_INFO_MATCH_STA_OR_MLD_MAC);
 	int status;
 
 	/* For now, only connected STAs are supported */
