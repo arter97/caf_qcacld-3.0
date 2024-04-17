@@ -828,6 +828,7 @@ struct enhance_roam_info {
  * @is_user_std_set: true if user set the @wifi_std
  * @wifi_std: wifi standard version
  * @max_mcs_index: Max supported mcs index of vdev
+ * @mac_4_addr: flag of mac 4 address
  * @vdev_traffic_type: to set if vdev is LOW_LATENCY or HIGH_TPUT
  * @country_ie_for_all_band: take all band channel info in country ie
  * @mlme_ap: SAP related vdev private configurations
@@ -902,6 +903,7 @@ struct mlme_legacy_priv {
 	WMI_HOST_WIFI_STANDARD wifi_std;
 #ifdef WLAN_FEATURE_SON
 	uint8_t max_mcs_index;
+	bool mac_4_addr;
 #endif
 	uint8_t vdev_traffic_type;
 	bool country_ie_for_all_band;
