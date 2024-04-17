@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -59,8 +59,10 @@ static void osif_pre_cac_complete_cb(struct wlan_objmgr_psoc *psoc,
 	errno = osif_vdev_sync_trans_start_wait(osif_priv->wdev->netdev,
 						&vdev_sync);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_PRE_CAC_ID);
-	if (errno)
+	if (errno) {
+		osif_err("Failed to complete pre_cac_cb");
 		return;
+	}
 
 	osif_pre_cac_complete_legacy_cb(psoc, vdev_id, status);
 
