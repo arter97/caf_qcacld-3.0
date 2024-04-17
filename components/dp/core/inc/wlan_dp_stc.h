@@ -42,6 +42,14 @@
 			__field##_max = __val;				\
 	} while (0)
 
+#define DP_STC_UPDATE_WIN_MIN_MAX_STATS(__field, __val)			\
+	do {								\
+		if (__field##_min == 0 || __field##_min > __val)	\
+			__field##_min = __val;				\
+		if (__field##_max < __val)				\
+			__field##_max = __val;				\
+	} while (0)
+
 /* TODO - This macro needs to be same as the max peers in CMN DP */
 #define DP_STC_MAX_PEERS 64
 
@@ -87,18 +95,68 @@ enum wlan_dp_stc_burst_state {
 };
 
 #define DP_STC_SAMPLE_FLOWS_MAX 32
+#define DP_STC_LONG_WINDOW_MS 30000
+#define DP_STC_TIMER_THRESH_MS 600
+
+/**
+ * enum wlan_stc_sampling_state - Sampling state
+ * @WLAN_DP_SAMPLING_STATE_INIT: init state
+ * @WLAN_DP_SAMPLING_STATE_FLOW_ADDED: flow added for sampling
+ * @WLAN_DP_SAMPLING_STATE_SAMPLING_START: sampling started
+ * @WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS: sampling burst stats
+ * @WLAN_DP_SAMPLING_STATE_SAMPLING_DONE: sampling completed
+ * @WLAN_DP_SAMPLING_STATE_SAMPLES_SENT: samples sent
+ * @WLAN_DP_SAMPLING_STATE_CLASSIFIED: flow classified
+ */
+enum wlan_stc_sampling_state {
+	WLAN_DP_SAMPLING_STATE_INIT,
+	WLAN_DP_SAMPLING_STATE_FLOW_ADDED,
+	WLAN_DP_SAMPLING_STATE_SAMPLING_START,
+	WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS,
+	WLAN_DP_SAMPLING_STATE_SAMPLING_DONE,
+	WLAN_DP_SAMPLING_STATE_SAMPLES_SENT,
+	WLAN_DP_SAMPLING_STATE_CLASSIFIED,
+};
+
+/* bit-fields used for "flags" in struct wlan_dp_stc_sampling_table_entry */
+#define WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID BIT(0)
+#define WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID BIT(1)
+#define WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY BIT(2)
+#define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_READY BIT(3)
+
+#define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(0)
+#define WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_SENT BIT(1)
 
 /*
  * struct wlan_dp_stc_sampling_table_entry - Sampling table entry
  * @state: State of sampling for this flow
- * @flags: flags
- * @flow_tuple: flow tuple of this flow
- * @txrx_samples: TxRx samples
- * @burst_sample: Burst samples
+ * @flags: flags set by timer
+ * @flags1: flags set by periodic work
+ * @next_sample_idx: next sample index to fill min/max stats in per-packet path
+ * @next_win_idx: next window index to fill min/max stats in per-packet path
+ * @max_num_sample_attempts: max number of sampling_timer runs to collect
+ *			     txrx and burst state
+ * @tx_flow_id: tx flow ID
+ * @tx_flow_metadata: tx flow metadata
+ * @rx_flow_id: rx flow ID
+ * @rx_flow_metadata: rx flow metadata
+ * @tx_stats_ref: tx window stats reference
+ * @rx_stats_ref: rx window stats reference
+ * @flow_samples: flow samples
  */
 struct wlan_dp_stc_sampling_table_entry {
-	uint32_t state;
+	enum wlan_stc_sampling_state state;
 	uint32_t flags;
+	uint32_t flags1;
+	uint8_t next_sample_idx;
+	uint8_t next_win_idx;
+	uint8_t max_num_sample_attempts;
+	uint32_t tx_flow_id;
+	uint32_t tx_flow_metadata;
+	uint32_t rx_flow_id;
+	uint32_t rx_flow_metadata;
+	struct wlan_dp_stc_txrx_stats tx_stats_ref;
+	struct wlan_dp_stc_txrx_stats rx_stats_ref;
 	struct wlan_dp_stc_flow_samples flow_samples;
 };
 
@@ -113,23 +171,40 @@ struct wlan_dp_stc_sampling_table {
 /**
  * struct wlan_dp_stc_flow_table_entry - Flow table maintained in per pkt path
  * @prev_pkt_arrival_ts: previous packet arrival time
+ * @win_transition_complete: Window transition completion flag.
  * @metadata: flow metadata
  * @burst_state: burst state
  * @burst_start_time: burst start time
  * @burst_start_detect_bytes: current snapshot of total bytes during burst
  *			      start detection phase
  * @cur_burst_bytes: total bytes accumulated in current burst
+ * @idx: union for storing sample & window index
+ * @idx.sample_win_idx: sample and window index
+ * @idx.s.win_idx: window index
+ * @idx.s.sample_idx: sample index
  * @txrx_stats: txrx stats
+ * @txrx_min_max_stats: placeholder for stats which needs per window
+ *			min/max values
  * @burst_stats: burst stats
  */
 struct wlan_dp_stc_flow_table_entry {
 	uint64_t prev_pkt_arrival_ts;
+	uint8_t win_transition_complete;
 	uint32_t metadata;
 	enum wlan_dp_stc_burst_state burst_state;
 	uint64_t burst_start_time;
 	uint32_t burst_start_detect_bytes;
 	uint32_t cur_burst_bytes;
+	/* Can be atomic.! Decide based on the accuracy during test */
+	union {
+		uint32_t sample_win_idx;
+		struct {
+			uint32_t win_idx:16,
+				 sample_idx:16;
+		} s;
+	} idx;
 	struct wlan_dp_stc_txrx_stats txrx_stats;
+	struct wlan_dp_stc_txrx_min_max_stats txrx_min_max_stats[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
 	struct wlan_dp_stc_burst_stats burst_stats;
 };
 

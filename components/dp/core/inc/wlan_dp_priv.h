@@ -466,6 +466,7 @@ struct fisa_pkt_hist {
  * @last_pkt_rcvd_tstamp: last packet received timestamp on this flow
  * @last_avg_cal_tstamp: last average calculated timestamp for this flow
  * @elig_for_balance: flow is eligible for flow balance or not
+ * @track_flow_stats: flag to indicate if this flow is to be tracked
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -525,6 +526,7 @@ struct dp_fisa_rx_sw_ft {
 	qdf_time_t last_avg_cal_tstamp;
 	bool elig_for_balance;
 #endif
+	uint8_t track_flow_stats;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)

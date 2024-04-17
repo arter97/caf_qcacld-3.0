@@ -652,6 +652,20 @@ struct wlan_dp_stc_flow_classify_result {
 #define DP_STC_TXRX_SAMPLES_MAX 5
 #define DP_TXRX_SAMPLES_WINDOW_MAX 2
 
+/**
+ * struct wlan_dp_stc_txrx_min_max_stats - MIN/MAX stats
+ * @pkt_size_min: minimum packet size
+ * @pkt_size_max: maximum packet size
+ * @pkt_iat_min: minimum packet inter-arrival time
+ * @pkt_iat_max: maximum packet inter-arrival time
+ */
+struct wlan_dp_stc_txrx_min_max_stats {
+	uint32_t pkt_size_min;
+	uint32_t pkt_size_max;
+	uint32_t pkt_iat_min;
+	uint32_t pkt_iat_max;
+};
+
 /*
  * struct wlan_dp_stc_txrx_stats - TxRx stats
  * @bytes: total number of bytes in a window
