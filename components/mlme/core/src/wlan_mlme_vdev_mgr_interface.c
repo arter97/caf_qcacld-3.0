@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1349,10 +1349,13 @@ bool mlme_get_cac_required(struct wlan_objmgr_vdev *vdev)
 }
 
 QDF_STATUS mlme_set_mbssid_info(struct wlan_objmgr_vdev *vdev,
-				struct scan_mbssid_info *mbssid_info)
+				struct scan_mbssid_info *mbssid_info,
+				qdf_freq_t freq)
 {
 	struct vdev_mlme_obj *vdev_mlme;
 	struct vdev_mlme_mbss_11ax *mbss_11ax;
+	struct qdf_mac_addr bssid;
+	struct qdf_mac_addr bcast_addr = QDF_MAC_ADDR_BCAST_INIT;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!vdev_mlme) {
@@ -1367,6 +1370,33 @@ QDF_STATUS mlme_set_mbssid_info(struct wlan_objmgr_vdev *vdev,
 		     mbssid_info->trans_bssid, QDF_MAC_ADDR_SIZE);
 	qdf_mem_copy(mbss_11ax->non_trans_bssid,
 		     mbssid_info->non_trans_bssid, QDF_MAC_ADDR_SIZE);
+
+	qdf_mem_copy(&bssid.bytes, vdev_mlme->mgmt.generic.bssid,
+		     QDF_MAC_ADDR_SIZE);
+
+	/*
+	 * Consider the case of 5 GHz + non-tx 6 GHz MLO candidate.
+	 * The scan entry might be generated from a ML-probe, which doesn't have
+	 * the MBSSID info for the non-tx partner link. In this case, host has
+	 * to identify if this link is MBSS or not. This is essential to receive
+	 * traffic over this link.
+	 *
+	 * The below logic looks into the rnr db for the 6 GHz bssid and
+	 * determines if the bssid is non-tx profile from the bss parameter
+	 * saved by its neighbor. If this is a non-tx bssid, but trans_bssid
+	 * info is not available from the scan entry, then set transmitted bssid
+	 * to bcast address. Upon sending this bcast tx bssid to firmware, the
+	 * firmware would auto-detect the tx bssid from the upcoming beacons
+	 * and tunes the interface to proper bssid.
+	 *
+	 * Note: Always send bcast mac in trans_bssid if the host is unable
+	 * to determine if a given BSS is part of an MBSS.
+	 */
+	if (freq != INVALID_CHANNEL_NUM && !mbss_11ax->profile_idx &&
+	    qdf_is_macaddr_zero((struct qdf_mac_addr *)&mbss_11ax->trans_bssid) &&
+	    util_is_bssid_non_tx(wlan_vdev_get_psoc(vdev), &bssid, freq))
+		qdf_mem_copy(mbss_11ax->trans_bssid,
+			     bcast_addr.bytes, QDF_MAC_ADDR_SIZE);
 
 	return QDF_STATUS_SUCCESS;
 }

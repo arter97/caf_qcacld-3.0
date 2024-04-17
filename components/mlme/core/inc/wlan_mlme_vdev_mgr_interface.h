@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -316,12 +316,13 @@ mlme_set_cac_required(struct wlan_objmgr_vdev *vdev, bool val);
  * mlme_set_mbssid_info() - save mbssid info
  * @vdev: vdev pointer
  * @mbssid_info: mbssid info
+ * @freq: current operating frequency
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 mlme_set_mbssid_info(struct wlan_objmgr_vdev *vdev,
-		     struct scan_mbssid_info *mbssid_info);
+		     struct scan_mbssid_info *mbssid_info, qdf_freq_t freq);
 
 /**
  * mlme_get_mbssid_info() - get mbssid info
