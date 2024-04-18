@@ -2862,6 +2862,7 @@ struct wlan_mlme_iot {
  * @eml_cap: EML capability subfield present in ML IE common info
  * @dynamic_nss_chains_support : intersection of host and fw capability of
  *				 dynamic NSS chain support
+ * @reduce_pwr_scan_mode : reduce power scan mode enable/disable
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
@@ -2913,6 +2914,7 @@ struct wlan_mlme_cfg {
 	bool connection_roaming_ini_flag;
 	struct wlan_mlme_eml_cap eml_cap;
 	bool dynamic_nss_chains_support;
+	bool reduce_pwr_scan_mode;
 };
 
 /**

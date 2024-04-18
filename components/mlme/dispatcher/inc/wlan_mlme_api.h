@@ -5094,4 +5094,16 @@ QDF_STATUS wlan_mlme_set_disconnect_receive(struct wlan_objmgr_vdev *vdev,
  */
 
 bool wlan_mlme_get_is_disconnect_receive(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_get_reduce_pwr_scan_mode() - Get reduce power scan mode
+ * enabled or disabled
+ * @psoc: pointer to psoc object
+ * @scan_mode: pointer to hold value of scan mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_reduce_pwr_scan_mode(struct wlan_objmgr_psoc *psoc,
+				   bool *scan_mode);
 #endif /* _WLAN_MLME_API_H_ */
