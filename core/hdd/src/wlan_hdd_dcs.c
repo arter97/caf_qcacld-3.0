@@ -31,6 +31,7 @@
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_dcs_ucfg_api.h>
 #include "wlan_ll_sap_ucfg_api.h"
+#include "wlan_dlm_api.h"
 
 /* Time(in milliseconds) before which the AP doesn't expect a connection */
 #define HDD_DCS_AWGN_BSS_RETRY_DELAY (5 * 60 * 1000)

@@ -584,3 +584,23 @@ ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 #endif
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(FEATURE_DENYLIST_MGR)
+/**
+ * mlo_get_curr_link_combination: Get current tried link combination
+ * @vdev: vdev
+ *
+ * This API gets current tried mlo partner link combination.
+ *
+ * Return: curr link combination bit map
+ */
+uint8_t
+mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev);
+#else
+static inline uint8_t
+mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
+{
+	return 0;
+}
+#endif
+

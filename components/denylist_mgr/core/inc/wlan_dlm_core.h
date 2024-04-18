@@ -375,6 +375,20 @@ dlm_get_rssi_denylist_threshold(struct wlan_objmgr_pdev *pdev);
  */
 uint8_t
 dlm_get_max_allowed_11be_failure(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * dlm_update_mlo_reject_ap_info: Update MLO info of reqjected candidate
+ * @pdev: objmgr pdev
+ * @vdev_id: vdev id
+ * @ap_info: reject ap info
+ *
+ * This API updates the MLO info of rejected AP
+ */
+void
+dlm_update_mlo_reject_ap_info(struct wlan_objmgr_pdev *pdev,
+			      uint8_t vdev_id,
+			      struct reject_ap_info *ap_info);
+
 #endif
 
 /**

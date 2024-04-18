@@ -39,6 +39,7 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_psoc_mlme_api.h"
 #include <wlan_cp_stats_chipset_stats.h>
+#include "wlan_dlm_api.h"
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
 #define BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN 15

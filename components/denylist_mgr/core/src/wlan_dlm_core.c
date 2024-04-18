@@ -29,6 +29,7 @@
 #include "wlan_dlm_tgt_api.h"
 #include <wlan_cm_bss_score_param.h>
 #include "cfg_ucfg_api.h"
+#include "wlan_mlo_link_force.h"
 
 #define SECONDS_TO_MS(params)       ((params) * 1000)
 #define MINUTES_TO_MS(params)       (SECONDS_TO_MS(params) * 60)
@@ -1148,6 +1149,25 @@ void dlm_dump_denylist_bssid(struct wlan_objmgr_pdev *pdev)
 	qdf_mutex_release(&dlm_ctx->reject_ap_list_lock);
 }
 
+static enum dlm_reject_ap_reason
+dlm_get_reject_ap_reason(struct dlm_reject_ap *dlm_entry)
+{
+	if (dlm_entry->no_more_stas)
+		return REASON_REASSOC_NO_MORE_STAS;
+	else if (dlm_entry->basic_rates_mismatched)
+		return REASON_BASIC_RATES_MISMATCH;
+	else if (dlm_entry->eht_not_supported)
+		return REASON_EHT_NOT_SUPPORTED;
+	else if (dlm_entry->tx_link_denied)
+		return REASON_TX_LINK_NOT_ACCEPTED;
+	else if (dlm_entry->same_address_present_in_ap)
+		return REASON_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOCIATION;
+	else if (dlm_entry->other)
+		return REASON_OTHER;
+
+	return REASON_OTHER;
+}
+
 static void dlm_fill_reject_list(qdf_list_t *reject_db_list,
 				 struct reject_ap_config_params *reject_list,
 				 uint8_t *num_of_reject_bssid,
@@ -1195,6 +1215,8 @@ static void dlm_fill_reject_list(qdf_list_t *reject_db_list,
 						    dlm_reject_list);
 			dlm_reject_list->reject_ap_type = reject_ap_type;
 			dlm_reject_list->bssid = dlm_entry->bssid;
+			dlm_reject_list->reject_reason =
+					dlm_get_reject_ap_reason(dlm_entry);
 			(*num_of_reject_bssid)++;
 			dlm_debug("Adding BSSID " QDF_MAC_ADDR_FMT " of type %d retry delay %d expected RSSI %d, entries added = %d reject reason %d",
 				  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes),
@@ -1718,6 +1740,84 @@ uint8_t dlm_get_max_allowed_11be_failure(struct wlan_objmgr_pdev *pdev)
 
 	return cfg->max_11be_con_failure_allowed;
 }
+
+static uint8_t
+dlm_get_link_action(struct wlan_objmgr_vdev *vdev,
+		    enum dlm_reject_ap_reason reject_ap_reason)
+{
+	struct mlo_link_info link_info;
+	uint8_t i = 0;
+	uint8_t link_count = 0;
+
+	switch (reject_ap_reason) {
+	case REASON_NUD_FAILURE:
+	case REASON_STA_KICKOUT:
+		for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+			link_info = vdev->mlo_dev_ctx->link_ctx->links_info[i];
+
+			if (qdf_is_macaddr_zero(&link_info.ap_link_addr))
+				break;
+
+			link_count++;
+		}
+		if (link_count == THREE_LINK)
+			return WLAN_HOST_AVOID_3_LINK;
+		if (link_count == TWO_LINK)
+			return WLAN_HOST_AVOID_2_LINK;
+		if (link_count == SLO)
+			return WLAN_HOST_REJECT_11BE;
+		break;
+	case REASON_ASSOC_REJECT_POOR_RSSI:
+		return WLAN_HOST_AVOID_CANDIDATE_WITH_ASSOC_OR_PARTNER_LINK;
+	case REASON_EHT_NOT_SUPPORTED:
+		return WLAN_HOST_REJECT_11BE;
+	case REASON_REASSOC_NO_MORE_STAS:
+		return WLAN_HOST_AVOID_CANDIDATE_WITH_ASSOC_OR_PARTNER_LINK;
+	case REASON_BASIC_RATES_MISMATCH:
+		return WLAN_HOST_AVOID_ASSOC_LINK;
+	case REASON_OTHER:
+		return WLAN_HOST_AVOID_ASSOC_LINK;
+	case REASON_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOCIATION:
+		return WLAN_HOST_AVOID_ASSOC_LINK;
+	case REASON_TX_LINK_NOT_ACCEPTED:
+		return WLAN_HOST_AVOID_ASSOC_LINK;
+	default:
+		return WLAN_HOST_AVOID_ASSOC_LINK;
+	}
+
+	return WLAN_HOST_AVOID_ASSOC_LINK;
+}
+
+void
+dlm_update_mlo_reject_ap_info(struct wlan_objmgr_pdev *pdev,
+			      uint8_t vdev_id,
+			      struct reject_ap_info *ap_info)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr mld_addr = {0};
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+			WLAN_OBJMGR_ID);
+	if (!vdev) {
+		obj_mgr_debug("Unable to get first vdev of pdev");
+		return;
+	}
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OBJMGR_ID);
+		return;
+	}
+
+	wlan_vdev_get_bss_peer_mld_mac(vdev, &mld_addr);
+	qdf_copy_macaddr(&ap_info->reject_mlo_ap_info.mld_addr, &mld_addr);
+
+	ap_info->reject_mlo_ap_info.tried_links[ap_info->reject_mlo_ap_info.tried_link_count] =
+		mlo_get_curr_link_combination(vdev);
+	ap_info->reject_mlo_ap_info.link_action =
+		dlm_get_link_action(vdev, ap_info->reject_reason);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OBJMGR_ID);
+	ap_info->reject_mlo_ap_info.tried_link_count++;
+}
+
 #endif
 
 qdf_time_t dlm_get_connection_monitor_time(struct wlan_objmgr_pdev *pdev)

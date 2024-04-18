@@ -22,6 +22,7 @@
  */
 
 #include "osif_sync.h"
+#include "wlan_dlm_api.h"
 #include "wlan_hdd_main.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_dlm_ucfg_api.h"

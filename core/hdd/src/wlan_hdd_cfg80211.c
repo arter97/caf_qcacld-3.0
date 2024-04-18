@@ -219,6 +219,8 @@
 #ifdef WLAN_FEATURE_11BE_MLO_TTLM
 #include "wlan_t2lm_api.h"
 #endif
+#include "wlan_dlm_api.h"
+
 /*
  * A value of 100 (milliseconds) can be sent to FW.
  * FW would enable Tx beamforming based on this.

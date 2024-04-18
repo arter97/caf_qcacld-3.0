@@ -29,6 +29,7 @@
 
 #ifdef FEATURE_DENYLIST_MGR
 #include "wlan_dlm_core.h"
+#include "wlan_objmgr_vdev_obj.h"
 
 /**
  * wlan_dlm_add_bssid_to_reject_list() - Add BSSID to the specific reject list.
@@ -149,12 +150,37 @@ wlan_dlm_get_max_allowed_11be_failure(struct wlan_objmgr_pdev *pdev)
 {
 	return dlm_get_max_allowed_11be_failure(pdev);
 }
+
+/**
+ * wlan_update_mlo_reject_ap_info: Update MLO info of reqjected candidate
+ * @pdev: objmgr pdev
+ * @vdev_id: vdev id
+ * @ap_info: reject ap info
+ *
+ * This API updates the MLO info of rejected AP
+ */
+
+static inline void
+wlan_update_mlo_reject_ap_info(struct wlan_objmgr_pdev *pdev,
+			       uint8_t vdev_id,
+			       struct reject_ap_info *ap_info)
+{
+	return dlm_update_mlo_reject_ap_info(pdev, vdev_id, ap_info);
+}
+
 #else
 static inline uint8_t
 wlan_dlm_get_max_allowed_11be_failure(struct wlan_objmgr_pdev *pdev)
 {
 	return 0;
 }
+
+static inline void
+wlan_update_mlo_reject_ap_info(struct wlan_objmgr_pdev *pdev,
+			       uint8_t vdev_id,
+			       struct reject_ap_info *ap_info)
+{}
+
 #endif
 
 /**
@@ -220,5 +246,11 @@ wlan_dlm_get_connection_monitor_time(struct wlan_objmgr_pdev *pdev)
 {
 	return 0;
 }
+
+static inline void
+wlan_update_mlo_reject_ap_info(struct wlan_objmgr_pdev *pdev,
+			       uint8_t vdev_id,
+			       struct reject_ap_info *ap_info)
+{}
 #endif
 #endif

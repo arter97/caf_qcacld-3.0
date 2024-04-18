@@ -5504,3 +5504,27 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 			psoc, vdev_id,
 			ml_nlink_vendor_cmd_request_evt, &data);
 }
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(FEATURE_DENYLIST_MGR)
+uint8_t
+mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlo_link_info link_info;
+	uint8_t i = 0;
+	uint8_t curr_link_comb = 0;
+
+	/* Iterate from 1st index, because assoc link is at 0th index */
+	for (i = 1; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = vdev->mlo_dev_ctx->link_ctx->links_info[i];
+		if (qdf_is_macaddr_zero(&link_info.ap_link_addr))
+			break;
+
+		if (!link_info.is_link_active)
+			continue;
+
+		curr_link_comb |= 1 << i;
+	}
+	return curr_link_comb;
+}
+#endif
+
