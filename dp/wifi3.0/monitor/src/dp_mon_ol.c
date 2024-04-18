@@ -588,10 +588,12 @@ ol_ath_ucfg_set_peer_pkt_capture_mon_2_0(void *vscn,
 	else
 		action = LITE_MON_PEER_REMOVE;
 
-	ni = ieee80211_find_node(ic, peer_info->peer_mac, WLAN_MLME_SB_ID);
-	if (!ni && action == LITE_MON_PEER_ADD) {
-		qdf_info("Node doesn't exist");
-		return -EINVAL;
+	if (!peer_info->skip_node_check) {
+		ni = ieee80211_find_node(ic, peer_info->peer_mac, WLAN_MLME_SB_ID);
+		if (!ni && action == LITE_MON_PEER_ADD) {
+			qdf_info("Node doesn't exist");
+			return -EINVAL;
+		}
 	}
 
 	if (ni) {
@@ -610,7 +612,8 @@ ol_ath_ucfg_set_peer_pkt_capture_mon_2_0(void *vscn,
 	mon_config = qdf_mem_malloc(sizeof(struct lite_mon_config));
 	if (!mon_config) {
 		qdf_err("Memory allocation failed");
-		ieee80211_free_node(ni, WLAN_MLME_SB_ID);
+		if (ni)
+			ieee80211_free_node(ni, WLAN_MLME_SB_ID);
 		return A_NO_MEMORY;
 	}
 
@@ -640,7 +643,8 @@ ol_ath_ucfg_set_peer_pkt_capture_mon_2_0(void *vscn,
 
 	wlan_set_lite_monitor_peer_config(scn, mon_config);
 
-	ieee80211_free_node(ni, WLAN_MLME_SB_ID);
+	if (ni)
+		ieee80211_free_node(ni, WLAN_MLME_SB_ID);
 	qdf_mem_free(mon_config);
 	mon_config = NULL;
 

@@ -95,10 +95,12 @@ int wlan_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
 		dev = wdev->netdev;
 		scn =  ath_netdev_priv(dev);
 
-		if (ic->ic_cfg80211_radio_handler.ic_set_peer_pkt_capture_params)
+		if (ic->ic_cfg80211_radio_handler.ic_set_peer_pkt_capture_params) {
+			peer_info.skip_node_check = false;
 			return_val =
 				ic->ic_cfg80211_radio_handler.ic_set_peer_pkt_capture_params((void *)scn,
 											     &peer_info);
+		}
 	} else {
 			return_val = -EOPNOTSUPP;
 	}
