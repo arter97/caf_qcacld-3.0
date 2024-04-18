@@ -525,6 +525,10 @@
 #define FEATURE_RUNTIME_PM (1)
 #endif
 
+#ifdef CONFIG_FEATURE_EPM
+#define FEATURE_EPM (1)
+#endif
+
 #if defined(CONFIG_ICNSS) || defined(CONFIG_ICNSS_MODULE)
 #ifdef CONFIG_SNOC_FW_SIM
 #define CONFIG_PLD_SNOC_FW_SIM (1)

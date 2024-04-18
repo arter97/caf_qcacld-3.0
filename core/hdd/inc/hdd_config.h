@@ -166,7 +166,7 @@ enum hdd_dot11_mode {
  * cpu_cxpc_threshold - PM QOS threshold
  * @Min: 0
  * @Max: 2000000000
- * @Default: 100000
+ * @Default: 16000
  *
  * This ini is used to set PM QOS threshold value
  *
@@ -182,7 +182,7 @@ enum hdd_dot11_mode {
 			"cpu_cxpc_threshold", \
 			0, \
 			2000000000, \
-			100000, \
+			16000, \
 			CFG_VALUE_OR_DEFAULT, \
 			"PM QOS threshold")
 #define CFG_CPU_CXPC_THRESHOLD_ALL CFG(CFG_CPU_CXPC_THRESHOLD)
@@ -198,6 +198,63 @@ enum hdd_dot11_mode {
 #else
 #define CFG_INTERFACE_CHANGE_WAIT_DEFAULT	250
 #endif
+#endif
+
+#ifdef FEATURE_EPM
+/*
+ * <ini>
+ * epm_enable - enable epm functionality
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable epm functionality
+ *
+ * Related: None.
+ *
+ * Supported Feature: ALL
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+ #define CFG_EPM_ENABLE CFG_INI_BOOL( \
+			"epm_enable", \
+			0, \
+			"enable epm functionality")
+#define CFG_EPM_ENABLE_ALL CFG(CFG_EPM_ENABLE)
+#else
+#define CFG_EPM_ENABLE_ALL
+#endif
+
+#ifdef FEATURE_EPM
+/*
+ * <ini>
+ * epm_value - set epm value
+ * @Min: 0
+ * @Max: 2000000000
+ * @Default: 100000
+ *
+ * This ini is used to set epm value
+ *
+ * Related: None.
+ *
+ * Supported Feature: ALL
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+ #define CFG_EPM_VALUE CFG_INI_UINT( \
+			"epm_value", \
+			0, \
+			2000000000, \
+			100000, \
+			CFG_VALUE_OR_DEFAULT, \
+			"epm value")
+#define CFG_EPM_VALUE_ALL CFG(CFG_EPM_VALUE)
+#else
+#define CFG_EPM_VALUE_ALL
 #endif
 
 /*
@@ -1590,5 +1647,7 @@ enum host_log_level {
 	CFG(CFG_NO_SAP_NAN_CONCURRENCY) \
 	CFG(CFG_NO_P2P_CONCURRENCY) \
 	CFG(CFG_STA_P2P_NDP_CONCURRENCY) \
-	CFG(CFG_STA_SAP_P2P_CONCURRENCY)
+	CFG(CFG_STA_SAP_P2P_CONCURRENCY) \
+	CFG_EPM_ENABLE_ALL \
+	CFG_EPM_VALUE_ALL
 #endif

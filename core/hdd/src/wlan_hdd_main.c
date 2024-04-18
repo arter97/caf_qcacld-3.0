@@ -14971,6 +14971,23 @@ static void hdd_init_cpu_cxpc_threshold_cfg(struct hdd_config *config,
 }
 #endif
 
+#ifdef FEATURE_EPM
+static void hdd_init_epm_value_cfg(struct hdd_config *config,
+				   struct wlan_objmgr_psoc *psoc)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (wma_is_epm_supported_cfg(wma_handle) &&
+	    wma_is_epm_supported_fw(wma_handle))
+		config->cpu_cxpc_threshold = cfg_get(psoc, CFG_EPM_VALUE);
+}
+#else
+static void hdd_init_epm_value_cfg(struct hdd_config *config,
+				   struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 /**
  * hdd_cfg_params_init() - Initialize hdd params in hdd_config structure
  * @hdd_ctx: Pointer to HDD context
@@ -18188,6 +18205,8 @@ int hdd_wlan_startup(struct hdd_context *hdd_ctx)
 		hdd_err("Failed to start modules; errno:%d", errno);
 		goto free_iface_comb;
 	}
+
+	hdd_init_epm_value_cfg(hdd_ctx->config, hdd_ctx->psoc);
 
 	if (hdd_get_conparam() == QDF_GLOBAL_EPPING_MODE)
 		return 0;

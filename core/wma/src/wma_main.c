@@ -614,6 +614,48 @@ static void wma_set_smem_mailbox_feature(tp_wma_handle wma_handle,
 }
 #endif
 
+#ifdef FEATURE_EPM
+bool wma_is_epm_supported_cfg(WMA_HANDLE handle)
+{
+	bool is_feature_enabled_from_cfg;
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+
+	is_feature_enabled_from_cfg =
+		cfg_get(wma_handle->psoc, CFG_EPM_ENABLE);
+
+	wma_debug("EPM enable feature cfg value: %d",
+		  is_feature_enabled_from_cfg);
+
+	return is_feature_enabled_from_cfg;
+}
+
+bool wma_is_epm_supported_fw(WMA_HANDLE handle)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+	bool is_feature_enabled_from_fw;
+
+	is_feature_enabled_from_fw =
+		wmi_service_enabled(wma_handle->wmi_handle,
+				    wmi_service_epm);
+	wma_debug("EPM enable feature fw value: %d",
+		  is_feature_enabled_from_fw);
+
+	return is_feature_enabled_from_fw;
+}
+
+static void wma_set_epm_feature(tp_wma_handle wma_handle,
+				target_resource_config *tgt_cfg)
+{
+	tgt_cfg->is_epm_supported = true;
+}
+
+#else
+static void wma_set_epm_feature(tp_wma_handle wma_handle,
+				target_resource_config *tgt_cfg)
+{
+}
+#endif
+
 /**
  * wma_set_default_tgt_config() - set default tgt config
  * @wma_handle: wma handle
@@ -729,6 +771,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 
 	if (wma_is_smem_mailbox_supported(wma_handle))
 		wma_set_smem_mailbox_feature(wma_handle, tgt_cfg);
+	if (wma_is_epm_supported_cfg(wma_handle))
+		wma_set_epm_feature(wma_handle, tgt_cfg);
 }
 
 /**

@@ -438,6 +438,11 @@ config FEATURE_ML_MONITOR_MODE_SUPPORT
 	bool "Enable FEATURE_ML_MONITOR_MODE_SUPPORT"
 	default n
 
+config FEATURE_EPM
+	depends on BUS_AUTO_SUSPEND
+	bool "Enable EPM support"
+	default n
+
 config FEATURE_MSCS
 	bool "Enable FEATURE_MSCS"
 	default n
