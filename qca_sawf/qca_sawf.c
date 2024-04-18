@@ -102,7 +102,10 @@ static struct wlan_objmgr_vdev *qca_sawf_get_vdev(struct net_device *netdev,
 			return NULL;
 		}
 
-		osdev = osifp_peer_find_hash_find_osdev(mldev, mac_addr);
+		if (mldev->wdev.iftype == NL80211_IFTYPE_AP)
+			osdev = osifp_peer_find_hash_find_osdev(mldev, mac_addr);
+		else
+			osdev = osif_sta_mlo_find_osdev(mldev);
 		if (!osdev) {
 			qdf_err("Invalid link osdev");
 			return NULL;
