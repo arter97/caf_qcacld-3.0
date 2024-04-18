@@ -290,7 +290,8 @@ static void wma_update_num_peers_tids(t_wma_handle *wma_handle,
 static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,
 					     target_resource_config *tgt_cfg)
 {
-	tgt_cfg->peer_map_unmap_v2 = cfg_get(psoc, CFG_WDS_MODE) ? true : false;
+	tgt_cfg->peer_map_unmap_v2 =
+		wlan_mlme_get_wds_mode(psoc) ? true : false;
 }
 #else
 static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,
@@ -7072,6 +7073,7 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 		wlan_res_cfg->pktcapture_support = true;
 	else
 		wlan_res_cfg->pktcapture_support = false;
+	wlan_res_cfg->max_peer_ext_stats = WMA_SON_MAX_PEER_EXT_STATS;
 
 	if (wmi_service_enabled(wmi_handle,
 				wmi_service_sae_eapol_offload_support))

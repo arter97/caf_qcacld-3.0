@@ -689,6 +689,59 @@ static void lim_start_bss_update_ht_vht_caps(struct mac_context *mac_ctx,
 		 session->curr_op_freq, ht_caps.caps, vht_config.caps);
 }
 
+#ifdef WLAN_FEATURE_SON
+/**
+ * lim_save_max_mcs_idx() - save max mcs index to mlme component
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session: pointer to pe session
+ *
+ * Return: void
+ */
+static void
+lim_save_max_mcs_idx(struct mac_context *mac_ctx, struct pe_session *session)
+{
+	tDot11fIEVHTCaps vht_cap;
+	tDot11fIEhe_cap he_cap;
+	tDot11fIEHTCaps ht_cap;
+	u_int8_t session_max_mcs_idx = INVALID_MCS_NSS_INDEX;
+
+	if (IS_DOT11_MODE_HE(session->dot11mode)) {
+		qdf_mem_zero(&he_cap, sizeof(tDot11fIEhe_cap));
+		populate_dot11f_he_caps(mac_ctx, session, &he_cap);
+		session_max_mcs_idx = lim_get_he_max_mcs_idx(session->ch_width,
+							     &he_cap);
+	}
+	if (session_max_mcs_idx == INVALID_MCS_NSS_INDEX &&
+	    IS_DOT11_MODE_VHT(session->dot11mode)) {
+		qdf_mem_zero(&vht_cap, sizeof(tDot11fIEVHTCaps));
+		populate_dot11f_vht_caps(mac_ctx, session, &vht_cap);
+		session_max_mcs_idx = lim_get_vht_max_mcs_idx(&vht_cap);
+	}
+	if (session_max_mcs_idx == INVALID_MCS_NSS_INDEX &&
+	    IS_DOT11_MODE_HT(session->dot11mode)) {
+		qdf_mem_zero(&ht_cap, sizeof(tDot11fIEHTCaps));
+		populate_dot11f_ht_caps(mac_ctx, session, &ht_cap);
+		session_max_mcs_idx = lim_get_ht_max_mcs_idx(&ht_cap);
+	}
+	if (session_max_mcs_idx == INVALID_MCS_NSS_INDEX &&
+	    session->extRateSet.numRates)
+		session_max_mcs_idx =
+				lim_get_max_rate_idx(&session->extRateSet);
+
+	if (session_max_mcs_idx == INVALID_MCS_NSS_INDEX &&
+	    session->rateSet.numRates)
+		session_max_mcs_idx =
+				lim_get_max_rate_idx(&session->rateSet);
+
+	mlme_save_vdev_max_mcs_idx(session->vdev, session_max_mcs_idx);
+}
+#else
+static void
+lim_save_max_mcs_idx(struct mac_context *mac_ctx, struct pe_session *session)
+{
+}
+#endif
+
 /**
  * __lim_handle_sme_start_bss_request() - process SME_START_BSS_REQ message
  *@mac_ctx: Pointer to Global MAC structure
@@ -1076,7 +1129,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			mac_ctx->mlme_cfg->power.local_power_constraint = 0;
 
 		mlm_start_req->beacon_tx_rate = session->beacon_tx_rate;
-
+		lim_save_max_mcs_idx(mac_ctx, session);
 		session->limPrevSmeState = session->limSmeState;
 		session->limSmeState = eLIM_SME_WT_START_BSS_STATE;
 
@@ -1095,6 +1148,8 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		if (QDF_IS_STATUS_ERROR(qdf_status))
 			goto free;
 		qdf_mem_free(mlm_start_req);
+		lim_update_rrm_capability(mac_ctx);
+
 		return;
 	} else {
 
@@ -3082,6 +3137,21 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		session->maxTxPower = lim_get_max_tx_power(mac_ctx, mlme_obj);
 		session->def_max_tx_pwr = session->maxTxPower;
 	}
+
+	/*
+	 * for mdm platform which QCA_NL80211_VENDOR_SUBCMD_LL_STATS_GET
+	 * will not call from android framework every 3 seconds, and tx
+	 * power will never update. So we use iw dev get tx power need
+	 * set maxTxPower non-zero value, that firmware can calc a non-zero
+	 * tx power, and update to host driver.
+	 */
+	if (LIM_IS_STA_ROLE(session) && session->maxTxPower == 0) {
+		session->maxTxPower =
+			wlan_reg_get_channel_reg_power_for_freq(mac_ctx->pdev,
+							session->curr_op_freq);
+		pe_debug("session->maxTxPower %u", session->maxTxPower);
+	}
+
 	session->limRFBand = lim_get_rf_band(session->curr_op_freq);
 
 	/* Initialize 11h Enable Flag */
@@ -7922,6 +7992,29 @@ static void lim_change_channel(
 					      session_entry);
 }
 
+#ifdef WLAN_FEATURE_11AX
+static inline void
+lim_update_he_capable(struct pe_session *session, uint8_t dot11mode)
+{
+	session->he_capable = IS_DOT11_MODE_HE(dot11mode);
+}
+#else
+static inline void
+lim_update_he_capable(struct pe_session *session, uint8_t dot11mode)
+{}
+#endif
+#ifdef WLAN_FEATURE_11BE
+static inline void
+lim_update_eht_capable(struct pe_session *session, uint8_t dot11mode)
+{
+	session->eht_capable = IS_DOT11_MODE_EHT(dot11mode);
+}
+#else
+static inline void
+lim_update_eht_capable(struct pe_session *session, uint8_t dot11mode)
+{}
+#endif
+
 /**
  * lim_process_sme_channel_change_request() - process sme ch change req
  *
@@ -7981,10 +8074,20 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		session_entry->channelChangeReasonCode =
 			LIM_SWITCH_CHANNEL_MONITOR;
 
-	pe_nofl_debug("SAP CSA: %d ---> %d, ch_bw %d, nw_type %d, dot11mode %d",
+	pe_nofl_debug("SAP CSA: %d ---> %d, ch_bw %d, nw_type %d, dot11mode %d, old dot11mode %d",
 		      session_entry->curr_op_freq, target_freq,
 		      ch_change_req->ch_width, ch_change_req->nw_type,
-		      ch_change_req->dot11mode);
+		      ch_change_req->dot11mode, session_entry->dot11mode);
+
+	/* Update ht/vht/he/eht capability as per the new dot11mode */
+	if (ch_change_req->dot11mode != session_entry->dot11mode) {
+		session_entry->htCapability =
+			IS_DOT11_MODE_HT(ch_change_req->dot11mode);
+		session_entry->vhtCapability =
+			IS_DOT11_MODE_VHT(ch_change_req->dot11mode);
+		lim_update_he_capable(session_entry, ch_change_req->dot11mode);
+		lim_update_eht_capable(session_entry, ch_change_req->dot11mode);
+	}
 
 	if (IS_DOT11_MODE_HE(ch_change_req->dot11mode) &&
 		((QDF_MONITOR_MODE == session_entry->opmode) ||

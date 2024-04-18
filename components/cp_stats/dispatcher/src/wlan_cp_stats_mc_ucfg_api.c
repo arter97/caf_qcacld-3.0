@@ -353,7 +353,8 @@ QDF_STATUS wlan_cp_stats_vdev_cs_deinit(struct vdev_cp_stats *vdev_cs)
 
 QDF_STATUS wlan_cp_stats_pdev_cs_init(struct pdev_cp_stats *pdev_cs)
 {
-	pdev_cs->pdev_stats = qdf_mem_malloc(sizeof(struct pdev_mc_cp_stats));
+	pdev_cs->pdev_stats = qdf_mem_malloc(
+				MAX_MAC * sizeof(struct pdev_mc_cp_stats));
 	if (!pdev_cs->pdev_stats)
 		return QDF_STATUS_E_NOMEM;
 
@@ -809,8 +810,28 @@ QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev;
 	struct pdev_mc_cp_stats *pdev_mc_stats;
 	struct pdev_cp_stats *pdev_cp_stats_priv;
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t mac_id;
 
 	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cp_stats_err("pdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc = pdev->pdev_objmgr.wlan_psoc;
+	if (!psoc) {
+		cp_stats_err("psoc is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc,
+						vdev->vdev_objmgr.vdev_id);
+	if (mac_id >= MAX_MAC) {
+		cp_stats_err("invalid mac_id %d", mac_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
 	if (!pdev_cp_stats_priv) {
 		cp_stats_err("pdev cp stats object is null");
@@ -818,7 +839,7 @@ QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	}
 
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
-	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
+	pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[mac_id];
 	*dbm = pdev_mc_stats->max_pwr;
 	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
 

@@ -135,6 +135,7 @@
 #include "nan_public_structs.h"
 #include "nan_ucfg_api.h"
 #include "wlan_reg_ucfg_api.h"
+#include "wlan_afc_ucfg_api.h"
 #include "wlan_dfs_ucfg_api.h"
 #include "wlan_hdd_rx_monitor.h"
 #include "sme_power_save_api.h"
@@ -208,7 +209,8 @@
 #include "wlan_hdd_eht.h"
 #include <linux/bitfield.h>
 #include "wlan_hdd_mlo.h"
-#include "wlan_afc_ucfg_api.h"
+#include <wlan_hdd_son.h>
+#include <son_ucfg_api.h>
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -397,6 +399,7 @@ static const struct category_info cinfo[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_IFMGR] = {QDF_TRACE_LEVEL_ALL},
 	[QDF_MODULE_ID_GPIO] = {QDF_TRACE_LEVEL_ALL},
 	[QDF_MODULE_ID_MLO] = {QDF_TRACE_LEVEL_ALL},
+	[QDF_MODULE_ID_SON] = {QDF_TRACE_LEVEL_ALL},
 };
 
 struct notifier_block hdd_netdev_notifier;
@@ -405,6 +408,17 @@ struct sock *cesium_nl_srv_sock;
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 static void wlan_hdd_auto_shutdown_cb(void);
 #endif
+
+bool hdd_adapter_is_ap(struct hdd_adapter *adapter)
+{
+	if (!adapter) {
+		hdd_err("null adapter");
+		return false;
+	}
+
+	return adapter->device_mode == QDF_SAP_MODE ||
+		adapter->device_mode == QDF_P2P_GO_MODE;
+}
 
 QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
 				     uint8_t session_id,
@@ -4418,6 +4432,8 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		 */
 		hdd_nan_register_callbacks(hdd_ctx);
 
+		hdd_son_register_callbacks(hdd_ctx);
+
 		wlan_hdd_register_btc_chain_mode_handler(hdd_ctx->psoc);
 
 		status = cds_pre_enable();
@@ -5868,6 +5884,7 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 	ucfg_scan_vdev_set_disable(vdev, REASON_VDEV_DOWN);
 	wlan_hdd_scan_abort(adapter);
 	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, adapter->dev);
+	ucfg_son_disable_cbs(vdev);
 	/* Disable serialization for vdev before sending vdev delete */
 	wlan_ser_vdev_queue_disable(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
@@ -7554,7 +7571,7 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 		hdd_abort_ongoing_sta_connection(hdd_ctx);
 		/* Diassociate with all the peers before stop ap post */
 		if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
-			if (wlan_hdd_del_station(adapter))
+			if (wlan_hdd_del_station(adapter, NULL))
 				hdd_sap_indicate_disconnect_for_sta(adapter);
 		}
 		status = wlan_hdd_flush_pmksa_cache(adapter);
@@ -11455,23 +11472,18 @@ static inline void hdd_lte_coex_restart_sap(struct hdd_adapter *adapter,
 }
 #endif /* defined(FEATURE_WLAN_CH_AVOID) */
 
-QDF_STATUS
-wlan_hdd_get_adapter_by_vdev_id_from_objmgr(struct hdd_context *hdd_ctx,
-					    struct hdd_adapter **adapter,
-					    struct wlan_objmgr_vdev *vdev)
+struct hdd_adapter *
+wlan_hdd_get_adapter_from_objmgr(struct wlan_objmgr_vdev *vdev)
 {
-	*adapter = NULL;
-	if (!hdd_ctx)
-		return QDF_STATUS_E_INVAL;
-
 	if (!vdev) {
 		hdd_err("null vdev object");
-		return QDF_STATUS_E_INVAL;
+		return NULL;
 	}
 
-	*adapter = vdev->vdev_nif.osdev->legacy_osif_priv;
+	if (vdev->vdev_nif.osdev)
+		return vdev->vdev_nif.osdev->legacy_osif_priv;
 
-	return QDF_STATUS_SUCCESS;
+	return NULL;
 }
 
 /**
@@ -11493,7 +11505,6 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 	uint8_t vdev_id[WLAN_MAX_VDEVS];
 	struct ieee80211_mgmt *mgmt =
 		(struct ieee80211_mgmt *)frame_ind->frameBuf;
-	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_INDICATE_MGMT_FRAME;
 
@@ -11534,10 +11545,9 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 			if (!vdev)
 				continue;
 
-			status = wlan_hdd_get_adapter_by_vdev_id_from_objmgr(
-						hdd_ctx, &adapter, vdev);
+			adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
 
-			if (QDF_IS_STATUS_ERROR(status) || !adapter) {
+			if (!adapter) {
 				wlan_objmgr_vdev_release_ref(vdev,
 							     WLAN_OSIF_ID);
 				continue;
@@ -15651,12 +15661,6 @@ static inline bool hdd_adapter_is_sta(struct hdd_adapter *adapter)
 		adapter->device_mode == QDF_P2P_CLIENT_MODE;
 }
 
-static inline bool hdd_adapter_is_ap(struct hdd_adapter *adapter)
-{
-	return adapter->device_mode == QDF_SAP_MODE ||
-		adapter->device_mode == QDF_P2P_GO_MODE;
-}
-
 bool hdd_is_any_adapter_connected(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
@@ -15860,7 +15864,7 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
 
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
-		wlan_hdd_del_station(ap_adapter);
+		wlan_hdd_del_station(ap_adapter, NULL);
 		hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
 		hdd_debug("Now doing SAP STOPBSS");
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
@@ -18287,7 +18291,7 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
-		wlan_hdd_del_station(ap_adapter);
+		wlan_hdd_del_station(ap_adapter, NULL);
 		hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(sap_ctx)) {

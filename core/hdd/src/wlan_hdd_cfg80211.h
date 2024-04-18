@@ -440,7 +440,15 @@ void hdd_select_cbmode(struct hdd_adapter *adapter, qdf_freq_t oper_freq,
  * Return: true or false based on findings
  */
 bool wlan_hdd_is_ap_supports_immediate_power_save(uint8_t *ies, int length);
-int wlan_hdd_del_station(struct hdd_adapter *adapter);
+
+/**
+ * wlan_hdd_del_station() - delete station wrapper
+ * @adapter: pointer to the hdd adapter
+ * @mac: pointer to mac addr
+ *
+ * Return: Errno
+ */
+int wlan_hdd_del_station(struct hdd_adapter *adapter, const uint8_t *mac);
 
 #if defined(USE_CFG80211_DEL_STA_V2)
 int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
@@ -766,6 +774,26 @@ static inline void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
 {
 }
 #endif
+
+/**
+ * hdd_set_phy_mode() - set phy mode
+ * @adapter: Handle to hdd_adapter
+ * @vendor_phy_mode: phy mode to set
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_set_phy_mode(struct hdd_adapter *adapter,
+		     enum qca_wlan_vendor_phy_mode vendor_phy_mode);
+
+/**
+ * hdd_set_mac_chan_width() - set channel width
+ * @adapter: Handle to hdd_adapter
+ * @chwidth: given channel width
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_set_mac_chan_width(struct hdd_adapter *adapter,
+			   enum eSirMacHTChannelWidth chwidth);
 
 /**
  * hdd_is_legacy_connection() - Is adapter connection is legacy

@@ -3282,6 +3282,28 @@ QDF_STATUS sme_set_phy_mode(mac_handle_t mac_handle, eCsrPhyMode phyMode)
 	return QDF_STATUS_SUCCESS;
 }
 
+/*
+ * sme_get_11b_data_duration() -
+ * returns 11b data duration via channel freq.
+ *
+ * mac_handle - The handle returned by mac_open.
+ * chan_freq - channel frequency
+ *
+ * Return - 11b data duration on success else 0
+ */
+uint32_t sme_get_11b_data_duration(mac_handle_t mac_handle, uint32_t chan_freq)
+{
+	uint32_t rx_11b_data_duration = 0;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct lim_channel_status *chan_status =
+					csr_get_channel_status(mac, chan_freq);
+
+	if (chan_status)
+		rx_11b_data_duration = chan_status->rx_11b_mode_data_duration;
+
+	return rx_11b_data_duration;
+}
+
 QDF_STATUS sme_roam_ndi_stop(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -7696,6 +7718,38 @@ QDF_STATUS sme_set_ht2040_mode(mac_handle_t mac_handle, uint8_t sessionId,
 		sme_release_global_lock(&mac->sme);
 	}
 	return status;
+}
+
+QDF_STATUS sme_get_ht2040_mode(mac_handle_t mac_handle, uint8_t vdev_id,
+			       enum eSirMacHTChannelType *channel_type)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	if (!CSR_IS_SESSION_VALID(mac, vdev_id)) {
+		sme_err("Session not valid for session id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	session = CSR_GET_SESSION(mac, vdev_id);
+	sme_debug("Get HT operation beacon IE, channel_type=%d cur cbmode %d",
+		  *channel_type, session->bssParams.cbMode);
+
+	switch (session->bssParams.cbMode) {
+	case PHY_SINGLE_CHANNEL_CENTERED:
+		*channel_type = eHT_CHAN_HT20;
+		break;
+	case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+		*channel_type = eHT_CHAN_HT40MINUS;
+		break;
+	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+		*channel_type = eHT_CHAN_HT40PLUS;
+		break;
+	default:
+		sme_err("Error!!! Invalid HT20/40 mode !");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 #endif

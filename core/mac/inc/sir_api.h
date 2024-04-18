@@ -88,7 +88,7 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #endif
 
 /* FW response timeout values in milli seconds */
-#define SIR_PEER_ASSOC_TIMEOUT           (4000) /* 4 seconds */
+#define SIR_PEER_ASSOC_TIMEOUT           (10000) /* 10 seconds */
 
 #ifdef FEATURE_RUNTIME_PM
 /* Add extra PMO_RESUME_TIMEOUT for runtime PM resume timeout */
@@ -1065,10 +1065,13 @@ struct assoc_ind {
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
 	uint8_t max_mcs_idx;
+	uint8_t max_real_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 	/* Extended CSA capability of station */
 	uint8_t ecsa_capable;
+	uint32_t ext_cap;
+	uint8_t supported_band;
 	tDot11fIEHTCaps HTCaps;
 	tDot11fIEVHTCaps VHTCaps;
 	bool he_caps_present;
