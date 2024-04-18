@@ -3029,7 +3029,7 @@ static inline void wma_mgmt_pktdump_rx_handler(
  */
 static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 					  uint32_t desc_id, uint32_t status,
-					  uint32_t vdev_id)
+					  uint32_t vdev_id,  int32_t peer_rssi)
 {
 	struct wlan_objmgr_pdev *pdev;
 	qdf_nbuf_t buf = NULL;
@@ -3058,6 +3058,10 @@ static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 		mgmt_params.vdev_id = mgmt_txrx_get_vdev_id(pdev, desc_id);
 	else
 		mgmt_params.vdev_id = vdev_id;
+
+	vdev_id = mgmt_txrx_get_vdev_id(pdev, desc_id);
+	mgmt_params.vdev_id = vdev_id;
+	mgmt_params.peer_rssi = peer_rssi;
 
 	wma_mgmt_pktdump_tx_handler(wma_handle, buf, mgmt_params.vdev_id,
 				    status);
@@ -3133,7 +3137,8 @@ int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 		vdev_id = WMI_VDEV_ID_FROM_INFO_GET(cmpl_params->info);
 
 	wma_process_mgmt_tx_completion(wma_handle, cmpl_params->desc_id,
-				       cmpl_params->status, vdev_id);
+				       cmpl_params->status, vdev_id,
+				       cmpl_params->ack_rssi);
 
 	return 0;
 }
@@ -3208,7 +3213,7 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle, uint8_t *buf,
 
 		wma_process_mgmt_tx_completion(wma_handle,
 					       desc_ids[i], status[i],
-					       INVALID_VDEV_ID);
+					       INVALID_VDEV_ID, 0);
 	}
 	return 0;
 }

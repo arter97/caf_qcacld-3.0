@@ -63,6 +63,7 @@
 #include "wlan_t2lm_api.h"
 #include "wlan_connectivity_logging.h"
 #include "wlan_mlo_mgr_ap.h"
+#include "wlan_scan_api.h"
 
 /**
  *
@@ -2187,6 +2188,42 @@ lim_send_delts_req_action_frame(struct mac_context *mac,
 
 } /* End lim_send_delts_req_action_frame. */
 
+static void
+wlan_get_rssi_by_bssid(struct wlan_objmgr_pdev *pdev, uint8_t *mac,
+		       int32_t *rssi)
+{
+	struct scan_filter *scan_filter;
+	qdf_list_t *list = NULL;
+	struct scan_cache_node *first_node = NULL;
+
+	scan_filter = qdf_mem_malloc(sizeof(*scan_filter));
+	if (!scan_filter) {
+		pe_err("Unable to allocate memory");
+		return;
+	}
+
+	scan_filter->num_of_bssid = 1;
+	qdf_mem_copy(scan_filter->bssid_list[0].bytes,
+		     mac, sizeof(struct qdf_mac_addr));
+
+	scan_filter->ignore_auth_enc_type = true;
+	list = wlan_scan_get_result(pdev, scan_filter);
+	qdf_mem_free(scan_filter);
+
+	if (!list || (list && !qdf_list_size(list))) {
+		pe_debug("scan list empty");
+		goto exit;
+	}
+
+	qdf_list_peek_front(list, (qdf_list_node_t **)&first_node);
+	if (first_node && first_node->entry)
+		*rssi = first_node->entry->rssi_raw;
+
+exit:
+	if (list)
+		wlan_scan_purge_results(list);
+}
+
 #define SAE_AUTH_SEQ_NUM_OFFSET         2
 #define SAE_AUTH_STATUS_CODE_OFFSET     4
 #define SAE_AUTH_MESSAGE_TYPE_OFFSET    6
@@ -2216,6 +2253,12 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 	enum qdf_dp_tx_rx_status qdf_tx_complete;
 	uint8_t *frm_body;
 	uint16_t reason_code = 0;
+	int32_t rssi = 0;
+
+	if (!params) {
+		pe_err("MGMT param not present for the event: %d", tag);
+		return;
+	}
 
 	pe_session = pe_find_session_by_vdev_id(mac, params->vdev_id);
 	if (pe_session && pe_session->opmode == QDF_STA_MODE) {
@@ -2246,10 +2289,17 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 			if (algo == eSIR_AUTH_TYPE_SAE)
 				type = seq;
 
+			if (params->peer_rssi)
+				rssi = params->peer_rssi;
+			else
+				wlan_get_rssi_by_bssid(mac->pdev,
+						       &mac_hdr->i_addr3[0],
+						       &rssi);
+
 			wlan_connectivity_mgmt_event(
 					mac->psoc,
 					mac_hdr, params->vdev_id, status,
-					qdf_tx_complete, mac->lim.bss_rssi,
+					qdf_tx_complete, rssi,
 					algo, type, seq, 0, WLAN_AUTH_REQ);
 			lim_cp_stats_cstats_log_auth_evt(pe_session,
 							 CSTATS_DIR_TX, algo,
@@ -2263,7 +2313,7 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 		wlan_connectivity_mgmt_event(
 					mac->psoc,
 					mac_hdr, params->vdev_id, reason_code,
-					qdf_tx_complete, mac->lim.bss_rssi,
+					qdf_tx_complete, rssi,
 					0, 0, 0, 0, tag);
 	}
 }
@@ -4488,6 +4538,7 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 		lim_diag_mgmt_tx_event_report(mac, pMacHdr,
 					      pe_session,
 					      QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
+
 		wlan_connectivity_mgmt_event(mac->psoc,
 					     (struct wlan_frame_hdr *)pMacHdr,
 					     pe_session->vdev_id, nReason,
