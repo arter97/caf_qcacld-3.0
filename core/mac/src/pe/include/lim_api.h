@@ -119,6 +119,7 @@ lim_post_msg_to_process_deferred_queue(struct mac_context *mac)
 
 #define SET_LIM_PROCESS_DEFD_MESGS(mac, val) \
 	mac->lim.gLimProcessDefdMsgs = val; \
+	mac->lim.defer_caller = __func__; \
 	pe_debug("Defer LIM msg %d", val); \
 	lim_post_msg_to_process_deferred_queue(mac);
 
