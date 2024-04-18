@@ -16286,7 +16286,7 @@ static int __wlan_hdd_cfg80211_get_link_properties(struct wiphy *wiphy,
 			return -EINVAL;
 		}
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(sta_info->link_info);
 		nss = sta_info->nss;
 		freq = ap_ctx->operating_chan_freq;
 		rate_flags = sta_info->rate_flags;
