@@ -49,6 +49,7 @@
 #endif
 #include "cdp_txrx_ctrl.h"
 #include "wlan_dp_load_balance.h"
+#include "wlan_dp_flow_balance.h"
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -336,6 +337,13 @@ void ucfg_dp_set_hif_handle(struct wlan_objmgr_psoc *psoc,
 
 	dp_ctx->hif_handle = hif_handle;
 }
+
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
+void ucfg_dp_update_num_rx_rings(struct wlan_objmgr_psoc *psoc)
+{
+	wlan_dp_fb_update_num_rx_rings(psoc);
+}
+#endif
 
 QDF_STATUS ucfg_dp_init(void)
 {

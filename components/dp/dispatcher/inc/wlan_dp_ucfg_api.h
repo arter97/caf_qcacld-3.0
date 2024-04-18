@@ -123,6 +123,15 @@ void ucfg_dp_set_hif_handle(struct wlan_objmgr_psoc *psoc,
 			    struct hif_opaque_softc *hif_handle);
 void ucfg_dp_set_cmn_dp_handle(struct wlan_objmgr_psoc *psoc,
 			       ol_txrx_soc_handle soc);
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
+void ucfg_dp_update_num_rx_rings(struct wlan_objmgr_psoc *psoc);
+#else
+static inline void
+ucfg_dp_update_num_rx_rings(struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 /**
  * ucfg_dp_init() - DP module initialization API
  *

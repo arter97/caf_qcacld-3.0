@@ -80,6 +80,7 @@ struct cpu_irq_load {
  * @last_stats_avg_comp_time: time since previous stats average computed in ns
  * @last_load_balanced_time: time since when the previous load balance is done
  *	in nanoseconds
+ * @num_wlan_used_rx_rings: number of rx rings used by wlan
  */
 struct wlan_dp_lb_data {
 	struct cpu_irq_load cpu_load[NR_CPUS];
@@ -89,6 +90,7 @@ struct wlan_dp_lb_data {
 	qdf_spinlock_t load_balance_lock;
 	uint64_t last_stats_avg_comp_time;
 	uint64_t last_load_balanced_time;
+	uint8_t num_wlan_used_rx_rings;
 };
 
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT

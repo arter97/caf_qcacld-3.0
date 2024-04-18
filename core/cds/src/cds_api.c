@@ -910,6 +910,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 
 	wlan_psoc_set_dp_handle(psoc, gp_cds_context->dp_soc);
 	ucfg_dp_set_cmn_dp_handle(psoc, gp_cds_context->dp_soc);
+	ucfg_dp_update_num_rx_rings(psoc);
 	ucfg_pmo_psoc_update_dp_handle(psoc, gp_cds_context->dp_soc);
 	ucfg_ocb_update_dp_handle(psoc, gp_cds_context->dp_soc);
 

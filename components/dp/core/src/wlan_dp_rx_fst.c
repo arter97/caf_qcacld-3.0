@@ -30,6 +30,7 @@
 #include <wlan_dp_fisa_rx.h>
 #include <cdp_txrx_ctrl.h>
 #include "qdf_ssr_driver_dump.h"
+#include "wlan_dp_flow_balance.h"
 
 /* Timeout in milliseconds to wait for CMEM FST HTT response */
 #define DP_RX_FST_CMEM_RESP_TIMEOUT 2000
@@ -498,6 +499,9 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	qdf_atomic_init(&dp_ctx->skip_fisa_param.skip_fisa);
 	qdf_atomic_init(&fst->pm_suspended);
+
+	if (wlan_dp_fb_supported())
+		fst->add_tcp_flow_to_fst = true;
 
 	QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_ERROR,
 		  "Rx FST attach successful, #entries:%d\n",

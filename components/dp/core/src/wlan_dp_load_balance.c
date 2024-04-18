@@ -18,6 +18,7 @@
 
 #include "hif.h"
 #include "wlan_dp_priv.h"
+#include "wlan_dp_flow_balance.h"
 #include "wlan_dp_fisa_rx.h"
 
 #define NUM_CPUS_FOR_LOAD_BALANCE 2
@@ -162,6 +163,25 @@ wlan_dp_lb_update_cur_ring_wtgs(uint32_t *per_ring_pkt_avg,
 }
 
 /**
+ * wlan_dp_lb_check_eligible_for_flow_balance() - Check for flow balance is
+ *	eligible or not.
+ * @dp_ctx: dp context
+ * @total_avg_pkts: sum of per second packet average of all Rx rings.
+ *
+ * Return: true if flow balance is eligible, else return false.
+ */
+static inline bool
+wlan_dp_lb_check_eligible_for_flow_balance(struct wlan_dp_psoc_context *dp_ctx,
+					   uint32_t total_avg_pkts)
+{
+	if (wlan_dp_fb_supported() &&
+	    total_avg_pkts > FLOW_BALANCE_THRESH)
+		return true;
+
+	return false;
+}
+
+/**
  * wlan_dp_lb_handler() - handler for load balance
  * Calculates the per CPU allowed wlan tput weightage(throughput in percentage).
  * If flow balance support is enabled, get the per ring throughput weightage in
@@ -204,6 +224,7 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	struct cpu_load *cpu_load_avg;
 	uint32_t per_ring_pkt_avg[MAX_REO_DEST_RINGS];
 	qdf_cpu_mask *cpu_mask = &lb_data->curr_cpu_mask;
+	enum wlan_dp_fb_status status = FLOW_BALANCE_NOT_ELIGIBLE;
 	uint64_t start_time;
 	uint32_t num_cpus = 0;
 	uint32_t total_cpu_load = 0;
@@ -270,11 +291,18 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	cdp_get_per_ring_pkt_avg(dp_ctx->cdp_soc,
 				 per_ring_pkt_avg, &total_avg_pkts);
 
-	/* update the current ring weightages which are needed
-	 * for irq balance.
+	/* Check if flow balance is eligible or not, if eligible then do
+	 * flow balance else update the current ring weightages which are
+	 * needed for irq balance
 	 */
-	wlan_dp_lb_update_cur_ring_wtgs(per_ring_pkt_avg,
-					total_avg_pkts, &weightages[0]);
+	if (wlan_dp_lb_check_eligible_for_flow_balance(dp_ctx, total_avg_pkts))
+		status = wlan_dp_fb_handler(dp_ctx, per_ring_pkt_avg,
+					    total_avg_pkts, &cpu_load_avgs[0],
+					    num_cpus, &weightages[0]);
+
+	if (status != FLOW_BALANCE_SUCCESS)
+		wlan_dp_lb_update_cur_ring_wtgs(per_ring_pkt_avg,
+						total_avg_pkts,	&weightages[0]);
 
 	wlan_dp_lb_irq_balance_handler(dp_ctx, &cpu_load_avgs[0],
 				       num_cpus, &weightages[0]);

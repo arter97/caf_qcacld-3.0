@@ -30,6 +30,7 @@
 #include "wlan_fpm_table.h"
 #include "wlan_dp_fim.h"
 #endif
+#include <cdp_txrx_ipa.h>
 
 #define NUM_RX_QUEUES 5
 
@@ -1222,6 +1223,20 @@ static inline void
 wlan_dp_rx_aggr_dis_req(struct wlan_dp_intf *dp_intf,
 			enum ctrl_rx_aggr_client_id id, bool disable)
 {
+}
+#endif
+
+#ifdef IPA_OFFLOAD
+static inline bool
+wlan_dp_check_is_ring_ipa_rx(ol_txrx_soc_handle soc, uint8_t ring_id)
+{
+	return cdp_ipa_check_is_ring_ipa_rx(soc, ring_id);
+}
+#else
+static inline bool
+wlan_dp_check_is_ring_ipa_rx(ol_txrx_soc_handle soc, uint8_t ring_id)
+{
+	return false;
 }
 #endif
 #endif

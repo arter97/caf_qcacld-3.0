@@ -23,6 +23,7 @@
 #endif
 #include <qdf_status.h>
 #include <wlan_dp_priv.h>
+#include "wlan_dp_flow_balance.h"
 
 //#define FISA_DEBUG_ENABLE
 
@@ -282,5 +283,14 @@ static inline void
 dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 {
 }
+#endif
+
+#if defined(WLAN_SUPPORT_RX_FISA) && \
+	defined(WLAN_DP_FLOW_BALANCE_SUPPORT)
+void
+dp_fisa_flow_balance_build_flow_map_tbl(struct wlan_dp_psoc_context *dp_ctx,
+					struct wlan_dp_rx_ring_fm_tbl *map_tbl,
+					uint32_t *total_flow_avg_pkts,
+					uint32_t *total_num_flows);
 #endif
 #endif

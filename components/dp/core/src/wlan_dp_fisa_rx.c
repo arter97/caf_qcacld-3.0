@@ -227,6 +227,58 @@ void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 
 	qdf_spin_unlock_bh(&rx_fst->dp_rx_fst_lock);
 }
+
+/**
+ * dp_fisa_flow_balance_build_flow_map_tbl - Build per ring flow map table
+ * Iterate over the software fst table and build flow map table which tells
+ * the flows to ring mapping. Also store the flow detils in the flow map
+ * table which will be used in flow balancing.
+ * @dp_ctx: DP context
+ * @map_tbl: per ring flow map table of MAX_REO_DEST_RINGS
+ * @total_flow_avg_pkts: sum of all the flows average packets per second
+ * @total_num_flows: total number of flows eligible for balance
+ *
+ * Return: none
+ */
+void
+dp_fisa_flow_balance_build_flow_map_tbl(struct wlan_dp_psoc_context *dp_ctx,
+					struct wlan_dp_rx_ring_fm_tbl *map_tbl,
+					uint32_t *total_flow_avg_pkts,
+					uint32_t *total_num_flows)
+{
+	struct dp_rx_fst *rx_fst = dp_ctx->rx_fst;
+	struct dp_fisa_rx_sw_ft *sw_ft_base;
+	struct dp_fisa_rx_sw_ft *sw_ft_entry;
+	struct wlan_dp_rx_ring_fm_tbl *ring;
+	struct wlan_dp_flow *flow;
+	int i;
+
+	qdf_spin_lock_bh(&rx_fst->dp_rx_fst_lock);
+	sw_ft_base = (struct dp_fisa_rx_sw_ft *)rx_fst->base;
+
+	for (i = 0; i < rx_fst->max_entries; i++) {
+		sw_ft_entry = &sw_ft_base[i];
+		if (!sw_ft_entry->is_populated ||
+		    !sw_ft_entry->elig_for_balance)
+			continue;
+
+		if (sw_ft_entry->napi_id >= MAX_REO_DEST_RINGS)
+			continue;
+
+		ring = &map_tbl[sw_ft_entry->napi_id];
+		flow = &ring->flow_list[ring->num_flows];
+		flow->flow_id = sw_ft_entry->flow_id;
+		flow->avg_pkt_cnt = sw_ft_entry->avg_pkts_per_sec;
+		ring->total_avg_pkts += sw_ft_entry->avg_pkts_per_sec;
+		ring->ring_id = sw_ft_entry->napi_id;
+		ring->num_flows++;
+
+		*total_flow_avg_pkts += sw_ft_entry->avg_pkts_per_sec;
+		*total_num_flows += 1;
+	}
+
+	qdf_spin_unlock_bh(&rx_fst->dp_rx_fst_lock);
+}
 #else
 static inline void
 dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow)
