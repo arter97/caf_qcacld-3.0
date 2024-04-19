@@ -33,7 +33,6 @@
 #include <wlan_cp_stats_utils_api.h>
 #include "../../core/src/wlan_cp_stats_defs.h"
 #include "../../core/src/wlan_cp_stats_obj_mgr_handler.h"
-#include "son_api.h"
 #include "wlan_policy_mgr_api.h"
 
 static bool tgt_mc_cp_stats_is_last_event(struct stats_event *ev,
@@ -176,11 +175,6 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
 	pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[ev->mac_seq_num];
-	if (!is_station_stats &&
-	    pdev_mc_stats->max_pwr != ev->pdev_stats[pdev_id].max_pwr &&
-	    mac_id == ev->mac_seq_num)
-		wlan_son_deliver_tx_power(vdev,
-					  ev->pdev_stats[pdev_id].max_pwr);
 	if (mac_id == ev->mac_seq_num)
 		max_pwr = pdev_mc_stats->max_pwr =
 			ev->pdev_stats[pdev_id].max_pwr;
