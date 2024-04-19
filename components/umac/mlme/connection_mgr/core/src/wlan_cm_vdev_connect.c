@@ -1161,46 +1161,6 @@ set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
 }
 #endif
 
-static void
-cm_check_ml_missing_partner_entries(struct cm_connect_req *conn_req)
-{
-	uint8_t idx;
-	struct scan_cache_entry *entry, *partner_entry;
-	qdf_list_t *candidate_list = conn_req->candidate_list;
-	struct qdf_mac_addr *mld_addr;
-	struct partner_link_info *partner_info;
-
-	entry = conn_req->cur_candidate->entry;
-	mld_addr = util_scan_entry_mldaddr(entry);
-
-	/*
-	 * If the entry is not one of following, return gracefully:
-	 *   -AP is not ML type
-	 *   -AP is SLO
-	 */
-	if (!mld_addr || !entry->ml_info.num_links)
-		return;
-
-	for (idx = 0; idx < entry->ml_info.num_links; idx++) {
-		if (!entry->ml_info.link_info[idx].is_valid_link)
-			continue;
-
-		partner_info = &entry->ml_info.link_info[idx];
-		partner_entry = cm_get_entry(candidate_list,
-					     &partner_info->link_addr);
-		/*
-		 * If partner entry is not found in candidate list or if
-		 * the MLD address of the entry is not equal to current
-		 * candidate MLD address, treat it as entry not found.
-		 */
-		if (!partner_entry ||
-		    !qdf_is_macaddr_equal(mld_addr,
-					  &partner_entry->ml_info.mld_mac_addr)) {
-			partner_info->is_scan_entry_not_found = true;
-		}
-	}
-}
-
 QDF_STATUS
 cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 		       struct cm_connect_req *conn_req)
@@ -1264,7 +1224,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	mlme_debug("sta and ap intersect num of partner link: %d", j);
 
 	set_partner_info_for_2link_sap(scan_entry, partner_info);
-	cm_check_ml_missing_partner_entries(conn_req);
 
 	return QDF_STATUS_SUCCESS;
 }
