@@ -1283,6 +1283,7 @@ struct debug_peer_data_rx {
 struct debug_peer_data_link {
 	struct basic_peer_data_link b_link;
 	uint32_t last_ack_rssi;
+	uint32_t avg_ack_rssi;
 };
 
 struct debug_peer_data_rate {

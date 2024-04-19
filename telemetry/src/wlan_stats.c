@@ -4282,6 +4282,7 @@ static QDF_STATUS get_debug_peer_data_link(struct unified_stats *stats,
 	}
 	fill_basic_peer_data_link(&data->b_link, &peer_stats->rx);
 	data->last_ack_rssi = peer_stats->tx.last_ack_rssi;
+	data->avg_ack_rssi = CDP_SNR_OUT(peer_stats->tx.avg_ack_rssi);
 
 	stats->feat[INX_FEAT_LINK] = data;
 	stats->size[INX_FEAT_LINK] = sizeof(struct debug_peer_data_link);
