@@ -88,6 +88,7 @@ struct dp_lite_mon_config {
  * @lite_mon_tx_lock: lite mon tx config lock
  * @subtype_filtering: Flag to indicate if subtype filtering is needed
  * @sw_peer_filtering: Flag to indicate if sw peer filtering is needed
+ * @disable_hw_filter: Flag to indicate if hw filtering is disabled
  */
 struct dp_lite_mon_tx_config {
 	struct dp_lite_mon_config tx_config;
@@ -95,6 +96,7 @@ struct dp_lite_mon_tx_config {
 	qdf_spinlock_t lite_mon_tx_lock;
 	bool subtype_filtering;
 	bool sw_peer_filtering;
+	bool disable_hw_filter;
 };
 
 /**
