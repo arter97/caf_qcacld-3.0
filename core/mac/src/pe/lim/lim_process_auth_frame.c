@@ -1896,6 +1896,12 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
+
+	if (qdf_atomic_read(&pe_session->vdev->is_ap_suspend)) {
+		pe_err("SAP is suspended, reject peer auth");
+		return;
+	}
+
 	curr_seq_num = (mac_hdr->seqControl.seqNumHi << 4) |
 		(mac_hdr->seqControl.seqNumLo);
 

@@ -5106,4 +5106,25 @@ bool wlan_mlme_get_is_disconnect_receive(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS
 wlan_mlme_get_reduce_pwr_scan_mode(struct wlan_objmgr_psoc *psoc,
 				   bool *scan_mode);
+
+/**
+ * wlan_mlme_set_sap_suspend_resume() - set SAP suspend resume
+ * @psoc: pointer to psoc object
+ * @params : pointer to struct vdev_suspend_param
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS
+wlan_mlme_set_sap_suspend_resume(struct wlan_objmgr_psoc *psoc,
+				 struct vdev_suspend_param *params);
+
+/**
+ * wlan_mlme_is_sap_suspend_supported() - check SAP suspend support
+ * @vdev: vdev object
+ *
+ * Return: bool support present or not supported
+ */
+bool
+wlan_mlme_is_sap_suspend_supported(struct wlan_objmgr_vdev *vdev);
+
 #endif /* _WLAN_MLME_API_H_ */

@@ -8619,3 +8619,20 @@ wlan_mlme_get_reduce_pwr_scan_mode(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool wlan_mlme_is_sap_suspend_supported(struct wlan_objmgr_vdev *vdev)
+{
+	return tgt_sap_is_suspend_supported(vdev);
+}
+
+QDF_STATUS
+wlan_mlme_set_sap_suspend_resume(struct wlan_objmgr_psoc *psoc,
+				 struct vdev_suspend_param *params)
+{
+	struct vdev_suspend_params param = {0};
+
+	param.vdev_id = params->vdev_id;
+	param.suspend = params->suspend;
+	qdf_mem_copy(&param.mac_addr, &params->mac_addr,
+		     sizeof(QDF_MAC_ADDR_SIZE));
+	return tgt_sap_suspend_param_send(psoc, &param);
+}

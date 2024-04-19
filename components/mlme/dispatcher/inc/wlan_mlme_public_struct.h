@@ -1349,6 +1349,18 @@ struct wlan_user_mcc_quota {
 };
 
 /**
+ * struct vdev_suspend_param: Vdev suspend params
+ * @vdev_id: vdev id
+ * @suspend: suspend flag
+ * @mac_addr: MLD mac address when vdev is MLO
+ */
+struct vdev_suspend_param {
+	uint8_t vdev_id;
+	uint8_t suspend;
+	struct qdf_mac_addr mac_addr;
+};
+
+/**
  * enum wlan_mlme_hw_mode_config_type - HW mode config type replicated from
  *                                     wmi_hw_mode_config_type in FW header.
  *                                     similar as wmi_host_hw_mode_config_type.

@@ -128,6 +128,9 @@ extern const struct nla_policy setband_policy[QCA_WLAN_VENDOR_ATTR_MAX + 1];
 extern const struct nla_policy wlan_hdd_set_acs_dfs_config_policy[
 			QCA_WLAN_VENDOR_ATTR_ACS_DFS_MAX + 1];
 
+extern const struct nla_policy wlan_hdd_sap_suspend_policy[
+			QCA_WLAN_VENDOR_ATTR_AP_SUSPEND_MAX + 1];
+
 /* QCA_NL80211_VENDOR_SUBCMD_STA_CONNECT_ROAM_POLICY policy */
 extern const struct nla_policy wlan_hdd_set_sta_roam_config_policy[
 			QCA_WLAN_VENDOR_ATTR_STA_CONNECT_ROAM_POLICY_MAX + 1];

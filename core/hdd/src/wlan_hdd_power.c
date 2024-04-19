@@ -1857,6 +1857,8 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct wlan_hdd_link_info *link_info;
 	bool ignore_cac_updated = false;
+	struct vdev_suspend_param param = {0};
+	struct qdf_mac_addr *mld_addr;
 
 	hdd_enter();
 
@@ -1881,6 +1883,17 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 				  adapter->dev->name);
 			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
 			wlan_hdd_start_sap(link_info, true);
+			if (qdf_atomic_read(&link_info->vdev->is_ap_suspend)) {
+				mld_addr =
+				hdd_get_mld_mac_addr_from_vdev(link_info->vdev);
+				if (mld_addr)
+					qdf_mem_copy(&param.mac_addr, mld_addr,
+						     sizeof(QDF_MAC_ADDR_SIZE));
+				param.vdev_id = link_info->vdev_id;
+				param.suspend = 1;
+				ucfg_mlme_set_sap_suspend_resume(hdd_ctx->psoc,
+								 &param);
+			}
 		}
 next_adapter:
 		hdd_adapter_dev_put_debug(adapter,

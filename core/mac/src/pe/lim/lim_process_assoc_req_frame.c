@@ -2824,6 +2824,10 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 		pe_err("vdev is NULL");
 		return;
 	}
+	if (qdf_atomic_read(&vdev->is_ap_suspend)) {
+		pe_err("SAP is suspended, reject peer assoc");
+		return;
+	}
 
 	if (wlan_vdev_mlme_get_state(vdev) != WLAN_VDEV_S_UP ||
 	    wlan_vdev_mlme_get_substate(vdev) != WLAN_VDEV_SS_UP_ACTIVE) {

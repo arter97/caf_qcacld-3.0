@@ -5480,4 +5480,35 @@ ucfg_mlme_get_reduce_power_scan_mode(struct wlan_objmgr_psoc *psoc,
 {
 	return wlan_mlme_get_reduce_pwr_scan_mode(psoc, scan_mode);
 }
+
+/**
+ * ucfg_mlme_set_sap_suspend_resume() - set vdev suspend resume
+ * @psoc: pointer to psoc object
+ * @param : pointer to struct vdev_suspend_param
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_sap_suspend_resume(struct wlan_objmgr_psoc *psoc,
+				 struct vdev_suspend_param *param)
+{
+	return wlan_mlme_set_sap_suspend_resume(psoc, param);
+}
+
+/**
+ * ucfg_mlme_is_sap_suspend_supported() - check vdev suspend support
+ * @vdev: vdev object
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: bool support enabled or disabled
+ */
+static inline
+bool ucfg_mlme_is_sap_suspend_supported(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_mlme_is_sap_suspend_supported(vdev);
+}
+
 #endif /* _WLAN_MLME_UCFG_API_H_ */

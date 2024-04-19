@@ -5717,6 +5717,16 @@ int wlan_hdd_alloc_iface_combination_mem(struct hdd_context *hdd_ctx);
  */
 void wlan_hdd_free_iface_combination_mem(struct hdd_context *hdd_ctx);
 
+/**
+ * hdd_get_mld_mac_addr_from_vdev() - This API returns pointer to MLD
+ * mac address when vdev belongs to MLO SAP
+ * @vdev: pointer to VDEV object
+ *
+ * Return: pointer to MLD addr or NULL
+ */
+struct qdf_mac_addr *
+hdd_get_mld_mac_addr_from_vdev(struct wlan_objmgr_vdev *vdev);
+
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
 /**
  * hdd_get_link_info_by_link_id() - get wlan_hdd_link_info by link id

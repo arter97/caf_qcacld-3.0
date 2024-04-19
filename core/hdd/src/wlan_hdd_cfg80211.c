@@ -13946,6 +13946,167 @@ hdd_set_interdependent_configuration(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * __wlan_hdd_cfg80211_sap_suspend_allowed() - API to check suspend SAP can
+ * be allowed or not
+ *
+ * @link_info: MLD link info
+ * @vdev: Pointer to vdev objmgr
+ *
+ * Return: 0 for success, else error.
+ */
+
+static int
+__wlan_hdd_cfg80211_sap_suspend_allowed(struct wlan_hdd_link_info *link_info,
+					struct wlan_objmgr_vdev *vdev)
+{
+	struct hdd_hostapd_state *hapd_state;
+	struct hdd_ap_ctx *ap_ctx;
+
+	if (cds_is_driver_recovering()) {
+		hdd_err("SSR is ongoing");
+		return -EAGAIN;
+	}
+	hapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	if (hapd_state->bss_state != BSS_START) {
+		hdd_err("SAP not active");
+		return -EAGAIN;
+	}
+	if (qdf_atomic_read(&ap_ctx->ch_switch_in_progress)) {
+		hdd_err("channel switch progress");
+		return -EAGAIN;
+	}
+	if (wlan_vdev_is_dfs_cac_wait(vdev) == QDF_STATUS_SUCCESS) {
+		hdd_err("CAC in progress");
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+struct qdf_mac_addr *
+hdd_get_mld_mac_addr_from_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	if (wlan_vdev_mlme_is_mlo_ap(vdev))
+		return &vdev->mlo_dev_ctx->mld_addr;
+
+	return NULL;
+}
+#else
+struct qdf_mac_addr *
+hdd_get_mld_mac_addr_from_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return NULL;
+}
+#endif
+
+/**
+ * __wlan_hdd_cfg80211_sap_suspend_resume() - Wifi configuration
+ * vendor command
+ *
+ * @wiphy: wiphy device pointer
+ * @wdev: wireless device pointer
+ * @data: Vendor command data buffer
+ * @data_len: Buffer length
+ *
+ * Handles QCA_WLAN_VENDOR_ATTR_CONFIG_MAX.
+ *
+ * Return: Success or Error code.
+ */
+static int
+__wlan_hdd_cfg80211_sap_suspend_resume(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       const void *data, int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+	bool vdev_suspend_resume;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
+	struct vdev_suspend_param param = {0};
+	int8_t ret;
+	enum QDF_OPMODE dev_mode;
+	struct csr_del_sta_params peer_param = {
+		.peerMacAddr = QDF_MAC_ADDR_BCAST_INIT,
+		.reason_code = REASON_DEAUTH_NETWORK_LEAVING,
+		.subtype = SIR_MAC_MGMT_DEAUTH,
+	};
+	struct qdf_mac_addr *mld_addr;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+	dev_mode = hdd_get_device_mode(adapter->deflink->vdev_id);
+
+	if (dev_mode != QDF_SAP_MODE && dev_mode != QDF_P2P_GO_MODE) {
+		hdd_err("Command supported for SAP/GO mode");
+		return -EINVAL;
+	}
+	if (wlan_cfg80211_nla_parse(tb,
+				    QCA_WLAN_VENDOR_ATTR_AP_SUSPEND_MAX,
+				    data, data_len,
+				    wlan_hdd_sap_suspend_policy)) {
+		hdd_err("invalid attr");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_AP_SUSPEND_STATE]) {
+		hdd_err("Invalid attr pause resume mode");
+		return -EINVAL;
+	}
+	vdev_suspend_resume =
+		nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_AP_SUSPEND_STATE]);
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+	if (!ucfg_mlme_is_sap_suspend_supported(vdev)) {
+		hdd_err("Suspend feature not supported");
+		ret = -EOPNOTSUPP;
+		goto end;
+	}
+	if (qdf_atomic_read(&vdev->is_ap_suspend) == vdev_suspend_resume) {
+		hdd_err("SAP already in state: %d", vdev_suspend_resume);
+		ret = 0;
+		goto end;
+	}
+	ret = __wlan_hdd_cfg80211_sap_suspend_allowed(adapter->deflink, vdev);
+	if (ret)
+		goto end;
+
+	mld_addr = hdd_get_mld_mac_addr_from_vdev(vdev);
+	if (mld_addr)
+		qdf_mem_copy(&param.mac_addr, mld_addr,
+			     sizeof(QDF_MAC_ADDR_SIZE));
+	vdev_id = adapter->deflink->vdev_id;
+
+	param.vdev_id = vdev_id;
+	param.suspend = vdev_suspend_resume;
+	qdf_atomic_set(&vdev->is_ap_suspend, vdev_suspend_resume);
+	if (vdev_suspend_resume) {
+		ret = hdd_softap_deauth_all_sta(adapter, &peer_param);
+		if (ret) {
+			hdd_err("Deauth all STA failed");
+			goto reset;
+		}
+	}
+	ret = ucfg_mlme_set_sap_suspend_resume(hdd_ctx->psoc, &param);
+	if (ret) {
+		hdd_err("Suspend SAP failed");
+		goto reset;
+	}
+	goto end;
+reset:
+	qdf_atomic_set(&vdev->is_ap_suspend, !vdev_suspend_resume);
+end:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return ret;
+}
+
+/**
  * __wlan_hdd_cfg80211_wifi_configuration_set() - Wifi configuration
  * vendor command
  *
@@ -14130,6 +14291,41 @@ static int wlan_hdd_cfg80211_wifi_configuration_get(struct wiphy *wiphy,
 
 	errno = __wlan_hdd_cfg80211_wifi_configuration_get(wiphy, wdev,
 							   data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+/**
+ * wlan_hdd_cfg80211_set_sap_suspend_resume() - Wifi configuration
+ * vendor command to Set SAP in suspend state and avoid interface deletion
+ * Set SAP in suspend/resume after sending deauth to all connected peers
+ * when feature is supported
+ *
+ * @wiphy: wiphy device pointer
+ * @wdev: wireless device pointer
+ * @data: Vendor command data buffer
+ * @data_len: Buffer length
+ *
+ * Handles QCA_WLAN_VENDOR_ATTR_CONFIG_MAX.
+ *
+ * Return: EOK or other error codes.
+ */
+static int
+wlan_hdd_cfg80211_set_sap_suspend_resume(struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 const void *data, int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_sap_suspend_resume(wiphy, wdev, data,
+						       data_len);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
@@ -16896,6 +17092,11 @@ wlan_hdd_set_acs_dfs_config_policy[QCA_WLAN_VENDOR_ATTR_ACS_DFS_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_ACS_DFS_MODE] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_ACS_CHANNEL_HINT] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_ACS_FREQUENCY_HINT] = {.type = NLA_U32},
+};
+
+const struct nla_policy
+wlan_hdd_sap_suspend_policy[QCA_WLAN_VENDOR_ATTR_AP_SUSPEND_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_AP_SUSPEND_STATE] = {.type = NLA_U8},
 };
 
 /**
@@ -22035,6 +22236,16 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_TX_LATENCY_STATS_COMMANDS
 	FEATURE_REGULATORY_TPC_INFO_VENDOR_COMMANDS
 	FEATURE_FLOW_CLASSIFY_COMMANDS
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_AP_SUSPEND,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			WIPHY_VENDOR_CMD_NEED_NETDEV |
+			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_set_sap_suspend_resume,
+		vendor_command_policy(wlan_hdd_sap_suspend_policy,
+				      QCA_WLAN_VENDOR_ATTR_AP_SUSPEND_MAX)
+	}
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
