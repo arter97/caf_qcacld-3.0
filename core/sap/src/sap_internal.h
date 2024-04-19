@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -235,6 +235,7 @@ struct sap_context {
 	qdf_list_t ft_pending_assoc_ind_list;
 	qdf_event_t ft_pending_event;
 	uint32_t freq_before_ch_switch;
+	struct ch_params ch_params_before_ch_switch;
 #ifdef WLAN_FEATURE_P2P_P2P_STA
 /*
  *This param is used for GO+GO force scc logic where after
