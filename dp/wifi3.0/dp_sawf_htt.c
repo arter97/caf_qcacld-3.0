@@ -89,10 +89,9 @@ dp_htt_h2t_sawf_def_queues_map_req(struct htt_soc *soc,
 	struct dp_htt_htc_pkt *pkt;
 	QDF_STATUS status;
 
-	htt_msg = qdf_nbuf_alloc(
-			soc->osdev,
+	htt_msg = qdf_nbuf_alloc_no_recycler(
 			HTT_MSG_BUF_SIZE(HTT_SAWF_DEF_QUEUES_MAP_REQ_BYTES),
-			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
+			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4);
 
 	if (!htt_msg) {
 		dp_htt_err("Fail to allocate htt msg buffer");
@@ -165,10 +164,9 @@ dp_htt_sawf_msduq_recfg_req_send(struct htt_soc *soc,
 	QDF_STATUS status;
 
 	htt_size = sizeof(struct htt_h2t_sdwf_msduq_recfg_req);
-	htt_msg = qdf_nbuf_alloc(
-			soc->osdev,
+	htt_msg = qdf_nbuf_alloc_no_recycler(
 			HTT_MSG_BUF_SIZE(htt_size),
-			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
+			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4);
 
 	if (!htt_msg) {
 		dp_htt_err("Fail to allocate htt msg buffer");
@@ -448,10 +446,9 @@ dp_htt_h2t_sawf_def_queues_unmap_req(struct htt_soc *soc,
 	struct dp_htt_htc_pkt *pkt;
 	QDF_STATUS status;
 
-	htt_msg = qdf_nbuf_alloc(
-			soc->osdev,
+	htt_msg = qdf_nbuf_alloc_no_recycler(
 			HTT_MSG_BUF_SIZE(HTT_SAWF_DEF_QUEUES_UNMAP_REQ_BYTES),
-			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
+			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4);
 
 	if (!htt_msg) {
 		dp_htt_err("Fail to allocate htt msg buffer");
@@ -520,10 +517,9 @@ dp_htt_h2t_sawf_def_queues_map_report_req(struct htt_soc *soc,
 	struct dp_htt_htc_pkt *pkt;
 	QDF_STATUS status;
 
-	htt_msg = qdf_nbuf_alloc(
-			soc->osdev,
+	htt_msg = qdf_nbuf_alloc_no_recycler(
 			HTT_MSG_BUF_SIZE(HTT_SAWF_DEF_QUEUES_MAP_REPORT_REQ_BYTES),
-			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
+			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4);
 
 	if (!htt_msg) {
 		dp_htt_err("Fail to allocate htt msg buffer");
@@ -811,10 +807,9 @@ dp_sawf_htt_h2t_mpdu_stats_req(struct htt_soc *soc,
 
 	dp_sawf_info("stats_type %u enable %u", stats_type, enable);
 
-	htt_msg = qdf_nbuf_alloc(
-			soc->osdev,
+	htt_msg = qdf_nbuf_alloc_no_recycler(
 			HTT_MSG_BUF_SIZE(HTT_H2T_STREAMING_STATS_REQ_MSG_SZ),
-			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
+			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4);
 
 	if (!htt_msg) {
 		dp_sawf_err("Fail to allocate htt msg buffer");
