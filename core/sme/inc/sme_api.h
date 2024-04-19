@@ -1957,10 +1957,6 @@ QDF_STATUS sme_reset_tsfcb(mac_handle_t mac_handle);
 QDF_STATUS sme_set_tsf_gpio(mac_handle_t mac_handle, uint32_t pinvalue);
 #endif
 
-QDF_STATUS sme_update_mimo_power_save(mac_handle_t mac_handle,
-				      uint8_t is_ht_smps_enabled,
-				      uint8_t ht_smps_mode,
-				      bool send_smps_action);
 #ifdef WLAN_BCN_RECV_FEATURE
 /**
  * sme_handle_bcn_recv_start() - Enable fw to start sending
