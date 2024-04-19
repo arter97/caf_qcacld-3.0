@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1588,7 +1588,7 @@ static int hdd_get_connected_station_info(struct wlan_hdd_link_info *link_info,
 						       nl_buf_len);
 	if (!skb) {
 		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
-		goto fail;
+		return -ENOMEM;
 	}
 
 	hdd_info("stainfo");
@@ -2350,7 +2350,7 @@ static int hdd_get_connected_station_info_ex(struct hdd_context *hdd_ctx,
 						       nl_buf_len);
 	if (!skb) {
 		hdd_err_rl("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
-		goto fail;
+		return -ENOMEM;
 	}
 
 	if (qdf_is_macaddr_zero(&stainfo->mld_addr))
