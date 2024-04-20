@@ -263,6 +263,60 @@ static inline uint64_t dp_stc_get_timestamp(void)
 	return qdf_sched_clock();
 }
 
+static inline uint8_t wlan_dp_ip_proto_to_stc_proto(uint16_t ip_proto)
+{
+	switch (ip_proto) {
+	case IPPROTO_TCP:
+		return QCA_WLAN_VENDOR_FLOW_POLICY_PROTO_TCP;
+	case IPPROTO_UDP:
+		return QCA_WLAN_VENDOR_FLOW_POLICY_PROTO_UDP;
+	default:
+		break;
+	}
+
+	return -EINVAL;
+}
+
+/**
+ * wlan_dp_stc_populate_flow_tuple() - Populate the STC flow tuple using the
+ *				       flow tuple in active flow table
+ * @flow_tuple: STC flow tuple
+ * @flow_tuple_info: flow tuple info
+ *
+ * Return: None
+ */
+static inline void
+wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
+				struct cdp_rx_flow_tuple_info *flow_tuple_info)
+{
+	uint8_t is_ipv4_flow = 1;	//TODO - Get from fisa flow table entry
+	uint8_t is_ipv6_flow = 0;
+	uint8_t proto = flow_tuple_info->l4_protocol;
+
+	if (is_ipv4_flow) {
+		flow_tuple->src_ip.ipv4_addr = flow_tuple_info->src_ip_31_0;
+		flow_tuple->dst_ip.ipv4_addr = flow_tuple_info->dest_ip_31_0;
+	} else if (is_ipv6_flow) {
+		flow_tuple->src_ip.ipv6_addr[0] = flow_tuple_info->src_ip_31_0;
+		flow_tuple->src_ip.ipv6_addr[1] = flow_tuple_info->src_ip_63_32;
+		flow_tuple->src_ip.ipv6_addr[2] = flow_tuple_info->src_ip_95_64;
+		flow_tuple->src_ip.ipv6_addr[3] =
+						flow_tuple_info->src_ip_127_96;
+
+		flow_tuple->dst_ip.ipv6_addr[0] = flow_tuple_info->dest_ip_31_0;
+		flow_tuple->dst_ip.ipv6_addr[1] =
+						flow_tuple_info->dest_ip_63_32;
+		flow_tuple->dst_ip.ipv6_addr[2] =
+						flow_tuple_info->dest_ip_95_64;
+		flow_tuple->dst_ip.ipv6_addr[3] =
+						flow_tuple_info->dest_ip_127_96;
+	}
+	flow_tuple->src_port = flow_tuple_info->src_port;
+	flow_tuple->dst_port = flow_tuple_info->dest_port;
+	flow_tuple->proto = wlan_dp_ip_proto_to_stc_proto(proto);
+	flow_tuple->flags = 0;
+}
+
 /**
  * wlan_dp_stc_mark_ping_ts() - Mark the last ping timestamp in STC table
  * @dp_ctx: DP global psoc context
@@ -386,6 +440,12 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx);
  */
 QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx);
 #else
+static inline void
+wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
+				struct cdp_rx_flow_tuple_info *flow_tuple_info)
+{
+}
+
 static inline void
 wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 			 struct qdf_mac_addr *peer_mac_addr, uint16_t peer_id)

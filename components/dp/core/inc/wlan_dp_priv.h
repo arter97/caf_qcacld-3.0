@@ -436,6 +436,7 @@ struct fisa_pkt_hist {
  * @head_skb_ip_hdr_offset: IP header offset
  * @head_skb_l4_hdr_offset: L4 header offset
  * @rx_flow_tuple_info: RX tuple information
+ * @flow_tuple_hash: flow tuple hash
  * @napi_id: NAPI ID (REO ID) on which the flow is being received
  * @prev_napi_id: previous NAPI ID before flow migration
  * @is_mig: flag indicating whether flow is migrated or not
@@ -489,6 +490,7 @@ struct dp_fisa_rx_sw_ft {
 	uint32_t head_skb_ip_hdr_offset;
 	uint32_t head_skb_l4_hdr_offset;
 	struct cdp_rx_flow_tuple_info rx_flow_tuple_info;
+	uint64_t flow_tuple_hash;
 	uint8_t napi_id;
 	uint8_t prev_napi_id;
 	bool is_mig;

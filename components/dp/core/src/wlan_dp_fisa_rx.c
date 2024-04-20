@@ -22,6 +22,7 @@
 #include "dp_htt.h"
 #include "dp_internal.h"
 #include "hif.h"
+#include <wlan_dp_stc.h>
 
 static void dp_rx_fisa_flush_flow_wrap(struct dp_fisa_rx_sw_ft *sw_ft);
 
@@ -703,6 +704,26 @@ static bool is_same_flow(struct cdp_rx_flow_tuple_info *tuple1,
 		return true;
 }
 
+#ifdef WLAN_DP_FEATURE_STC
+static inline uint64_t
+wlan_dp_fisa_get_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
+			   struct cdp_rx_flow_tuple_info *flow_tuple_info)
+{
+	struct flow_info flow_tuple = {0};
+
+	wlan_dp_stc_populate_flow_tuple(&flow_tuple, flow_tuple_info);
+
+	return wlan_dp_get_flow_hash(dp_ctx, &flow_tuple);
+}
+#else
+static inline uint64_t
+wlan_dp_fisa_get_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
+			   struct cdp_rx_flow_tuple_info *flow_tuple_info)
+{
+	return 0;
+}
+#endif
+
 /**
  * dp_rx_fisa_add_ft_entry() - Add new flow to HW and SW FT if it is not added
  * @vdev: Handle DP vdev to save in SW flow table
@@ -788,7 +809,9 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 			qdf_mem_copy(&sw_ft_entry->rx_flow_tuple_info,
 				     &rx_flow_tuple_info,
 				     sizeof(struct cdp_rx_flow_tuple_info));
-
+			sw_ft_entry->flow_tuple_hash =
+				wlan_dp_fisa_get_flow_hash(fisa_hdl->dp_ctx,
+							   &sw_ft_entry->rx_flow_tuple_info);
 			sw_ft_entry->is_flow_tcp = proto_params.tcp_proto;
 			sw_ft_entry->is_flow_udp = proto_params.udp_proto;
 			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
