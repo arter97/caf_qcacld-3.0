@@ -1304,7 +1304,7 @@
 #define MAX_IPA_IFACE (CONFIG_NUM_IPA_IFACE)
 #else
 #ifndef NUM_IPA_IFACE
-#define NUM_IPA_IFACE (CONFIG_WLAN_MAX_VDEVS)
+#define NUM_IPA_IFACE (3)
 #endif
 #define MAX_IPA_IFACE (NUM_IPA_IFACE)
 #endif
