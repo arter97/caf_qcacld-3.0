@@ -2990,7 +2990,7 @@ static QDF_STATUS send_thermal_mitigation_param_cmd_non_tlv(wmi_unified_t wmi_ha
 	cmd->enable = param->enable;
 	cmd->dc = param->dc;
 	cmd->dc_per_event = param->dc_per_event;
-	for (i = 0; i < THERMAL_LEVELS; i++) {
+	for (i = 0; i < DEFAULT_THERMAL_LEVELS; i++) {
 		cmd->levelconf[i].tmplwm = param->levelconf[i].tmplwm;
 		cmd->levelconf[i].tmphwm = param->levelconf[i].tmphwm;
 		cmd->levelconf[i].dcoffpercent =
