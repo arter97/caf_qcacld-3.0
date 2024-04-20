@@ -4565,7 +4565,7 @@ QDF_STATUS wlan_mlme_set_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc,
 static inline uint8_t
 wlan_mlme_get_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc)
 {
-	return 0;
+	return 1;
 }
 
 static inline QDF_STATUS
