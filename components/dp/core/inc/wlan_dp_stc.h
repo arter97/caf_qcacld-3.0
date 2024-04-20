@@ -95,6 +95,10 @@ enum wlan_dp_stc_burst_state {
 };
 
 #define DP_STC_SAMPLE_FLOWS_MAX 32
+#define DP_STC_SAMPLE_BIDI_FLOW_MAX 16
+#define DP_STC_SAMPLE_RX_FLOW_MAX 8
+#define DP_STC_SAMPLE_TX_FLOW_MAX 8
+
 #define DP_STC_LONG_WINDOW_MS 30000
 #define DP_STC_TIMER_THRESH_MS 600
 
@@ -116,6 +120,38 @@ enum wlan_stc_sampling_state {
 	WLAN_DP_SAMPLING_STATE_SAMPLING_DONE,
 	WLAN_DP_SAMPLING_STATE_SAMPLES_SENT,
 	WLAN_DP_SAMPLING_STATE_CLASSIFIED,
+};
+
+/* Bit-fields used for "flags" in struct wlan_dp_stc_sampling_candidate */
+#define WLAN_DP_SAMPLING_CANDIDATE_VALID BIT(0)
+#define WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID BIT(1)
+#define WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID BIT(2)
+
+enum wlan_dp_flow_dir {
+	WLAN_DP_FLOW_DIR_INVALID,
+	WLAN_DP_FLOW_DIR_TX,
+	WLAN_DP_FLOW_DIR_RX,
+	WLAN_DP_FLOW_DIR_BIDI,
+};
+
+/**
+ * struct wlan_dp_stc_sampling_candidate - Sampling candidate
+ * @flags: flags
+ * @tx_flow_id: TX flow ID
+ * @tx_flow_metadata: TX flow metadata
+ * @rx_flow_id: RX flow ID
+ * @rx_flow_metadata: RX flow metadata
+ * @flow_tuple: flow tuple
+ * @dir: flow direction
+ */
+struct wlan_dp_stc_sampling_candidate {
+	uint32_t flags;
+	uint32_t tx_flow_id;
+	uint32_t tx_flow_metadata;
+	uint32_t rx_flow_id;
+	uint32_t rx_flow_metadata;
+	struct flow_info flow_tuple;
+	enum wlan_dp_flow_dir dir;
 };
 
 /* bit-fields used for "flags" in struct wlan_dp_stc_sampling_table_entry */
@@ -162,9 +198,17 @@ struct wlan_dp_stc_sampling_table_entry {
 
 /*
  * struct wlan_dp_stc_sampling_table - Sampling table
+ * @num_valid_entries: Number of valid flows added to sampling flow table
+ * @num_bidi_flows: number of Bi-Di flows added to sampling flow table
+ * @num_tx_only_flows: number of TX only flows added to sampling flow table
+ * @num_rx_only_flows: number of RX only flows added to sampling flow table
  * @entries: records added to sampling table
  */
 struct wlan_dp_stc_sampling_table {
+	qdf_atomic_t num_valid_entries;
+	qdf_atomic_t num_bidi_flows;
+	qdf_atomic_t num_tx_only_flows;
+	qdf_atomic_t num_rx_only_flows;
 	struct wlan_dp_stc_sampling_table_entry entries[DP_STC_SAMPLE_FLOWS_MAX];
 };
 
@@ -226,12 +270,27 @@ struct wlan_dp_stc_tx_flow_table {
 };
 
 /**
+ * enum wlan_dp_stc_timer_state - Sampling timer state
+ * @WLAN_DP_STC_TIMER_INIT: Init state
+ * @WLAN_DP_STC_TIMER_STOPPED: timer stopped state
+ * @WLAN_DP_STC_TIMER_STARTED: timer started state
+ * @WLAN_DP_STC_TIMER_RUNNING: timer running state
+ */
+enum wlan_dp_stc_timer_state {
+	WLAN_DP_STC_TIMER_INIT,
+	WLAN_DP_STC_TIMER_STOPPED,
+	WLAN_DP_STC_TIMER_STARTED,
+	WLAN_DP_STC_TIMER_RUNNING,
+};
+
+/**
  * struct wlan_dp_stc - Smart traffic classifier context
  * @dp_ctx: DP component global context
  * @flow_monitor_work: periodic work to process all the misc work for STC
  * @flow_monitor_interval: periodic flow monitor work interval
  * @periodic_work_state: States of the periodic flow monitor work
  * @flow_sampling_timer: timer to sample all the short-listed flows
+ * @sample_timer_state: sampling timer state
  * @peer_ping_info: Ping tracking per peer
  * @sampling_flow_table: Sampling flow table
  * @rx_flow_table: RX flow table
@@ -243,6 +302,7 @@ struct wlan_dp_stc {
 	uint32_t flow_monitor_interval;
 	enum wlan_dp_stc_periodic_work_state periodic_work_state;
 	qdf_timer_t flow_sampling_timer;
+	enum wlan_dp_stc_timer_state sample_timer_state;
 	struct wlan_dp_stc_peer_ping_info peer_ping_info[DP_STC_MAX_PEERS];
 	struct wlan_dp_stc_sampling_table sampling_flow_table;
 	struct wlan_dp_stc_rx_flow_table rx_flow_table;

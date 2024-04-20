@@ -468,6 +468,8 @@ struct fisa_pkt_hist {
  * @last_avg_cal_tstamp: last average calculated timestamp for this flow
  * @elig_for_balance: flow is eligible for flow balance or not
  * @track_flow_stats: flag to indicate if this flow is to be tracked
+ * @selected_to_sample: flag to indicate flow has been selected to sample
+ * @classified: flag to indicate flow has been classified
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -529,6 +531,8 @@ struct dp_fisa_rx_sw_ft {
 	bool elig_for_balance;
 #endif
 	uint8_t track_flow_stats;
+	uint8_t selected_to_sample;
+	uint8_t classified;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)

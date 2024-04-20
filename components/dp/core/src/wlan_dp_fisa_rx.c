@@ -804,7 +804,7 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 			sw_ft_entry->reo_dest_indication = reo_dest_indication;
 			sw_ft_entry->flow_id_toeplitz =
 						QDF_NBUF_CB_RX_FLOW_ID(nbuf);
-			sw_ft_entry->flow_init_ts = qdf_get_log_timestamp();
+			sw_ft_entry->flow_init_ts = qdf_sched_clock();
 
 			qdf_mem_copy(&sw_ft_entry->rx_flow_tuple_info,
 				     &rx_flow_tuple_info,
@@ -1090,7 +1090,7 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 				     rx_flow_tuple_info,
 				     sizeof(struct cdp_rx_flow_tuple_info));
 
-			sw_ft_entry->flow_init_ts = qdf_get_log_timestamp();
+			sw_ft_entry->flow_init_ts = qdf_sched_clock();
 			sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 			sw_ft_entry->is_flow_udp = elem->is_udp_flow;
 

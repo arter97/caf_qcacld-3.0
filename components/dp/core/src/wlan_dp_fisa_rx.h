@@ -187,6 +187,12 @@ void dp_rx_fst_detach(struct wlan_dp_psoc_context *dp_ctx);
  */
 void dp_resume_fse_cache_flush(struct wlan_dp_psoc_context *dp_ctx);
 
+static inline uint64_t
+wlan_dp_fisa_get_flow_tuple_hash(struct dp_fisa_rx_sw_ft *sw_ft_entry)
+{
+	return sw_ft_entry->flow_tuple_hash;
+}
+
 /**
  * dp_rx_fst_update_pm_suspend_status() - Update Suspend status in FISA
  * @dp_ctx: DP component context

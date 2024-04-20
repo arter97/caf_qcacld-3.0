@@ -22,6 +22,7 @@
   */
 
 #include "wlan_dp_stc.h"
+#include "wlan_dp_fisa_rx.h"
 
 #ifdef WLAN_DP_FEATURE_STC
 
@@ -178,11 +179,347 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline int
+wlan_dp_stc_get_valid_sampling_flow_count(struct wlan_dp_stc *dp_stc)
+{
+	return qdf_atomic_read(&dp_stc->sampling_flow_table.num_valid_entries);
+}
+
+static inline void
+wlan_dp_stc_get_avail_flow_quota(struct wlan_dp_stc *dp_stc, uint8_t *bidi,
+				 uint8_t *tx, uint8_t *rx)
+{
+	struct wlan_dp_stc_sampling_table *sampling_table;
+
+	sampling_table = &dp_stc->sampling_flow_table;
+
+	*bidi = DP_STC_SAMPLE_BIDI_FLOW_MAX -
+			qdf_atomic_read(&sampling_table->num_bidi_flows);
+	*tx = DP_STC_SAMPLE_TX_FLOW_MAX -
+			qdf_atomic_read(&sampling_table->num_tx_only_flows);
+	*rx = DP_STC_SAMPLE_RX_FLOW_MAX -
+			qdf_atomic_read(&sampling_table->num_rx_only_flows);
+}
+
+static inline void
+wlan_dp_stc_fill_rx_flow_candidate(struct wlan_dp_stc *dp_stc,
+				   struct wlan_dp_stc_sampling_candidate *candidate,
+				   uint16_t rx_flow_id,
+				   uint32_t rx_flow_metadata)
+{
+	candidate->rx_flow_id = rx_flow_id;
+	candidate->rx_flow_metadata = rx_flow_metadata;
+	candidate->flags |= WLAN_DP_SAMPLING_CANDIDATE_VALID;
+	candidate->flags |= WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID;
+}
+
+static inline void
+wlan_dp_stc_fill_bidi_flow_candidate(struct wlan_dp_stc *dp_stc,
+				     struct wlan_dp_stc_sampling_candidate *candidate,
+				     uint16_t tx_flow_id,
+				     uint32_t tx_flow_metadata,
+				     uint16_t rx_flow_id,
+				     uint32_t rx_flow_metadata)
+{
+	candidate->tx_flow_id = tx_flow_id;
+	candidate->tx_flow_metadata = tx_flow_metadata;
+	candidate->rx_flow_id = rx_flow_id;
+	candidate->rx_flow_metadata = rx_flow_metadata;
+	candidate->flags |= WLAN_DP_SAMPLING_CANDIDATE_VALID;
+	candidate->flags |= WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID;
+	candidate->flags |= WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID;
+}
+
+static inline void
+wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
+				       struct wlan_dp_stc_sampling_candidate *candidate,
+				       struct wlan_dp_stc_sampling_table_entry *sampling_flow)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_stc_sampling_table *sampling_table =
+					&dp_stc->sampling_flow_table;
+
+	sampling_flow->dir = candidate->dir;
+	switch (candidate->dir) {
+	case WLAN_DP_FLOW_DIR_TX:
+		qdf_atomic_inc(&sampling_table->num_tx_only_flows);
+		break;
+	case WLAN_DP_FLOW_DIR_RX:
+		qdf_atomic_inc(&sampling_table->num_rx_only_flows);
+		break;
+	case WLAN_DP_FLOW_DIR_BIDI:
+		qdf_atomic_inc(&sampling_table->num_bidi_flows);
+		break;
+	default:
+		break;
+	}
+
+	if (candidate->flags & WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID) {
+		sampling_flow->flags |= WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID;
+		sampling_flow->tx_flow_id = candidate->tx_flow_id;
+		sampling_flow->tx_flow_metadata = candidate->tx_flow_metadata;
+	}
+
+	if (candidate->flags & WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID) {
+		struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
+		struct dp_fisa_rx_sw_ft *sw_ft_entry;
+
+		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[candidate->rx_flow_id]);
+		sampling_flow->flags |= WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID;
+		sampling_flow->rx_flow_id = candidate->rx_flow_id;
+		sampling_flow->rx_flow_metadata = candidate->rx_flow_metadata;
+		wlan_dp_stc_populate_flow_tuple(&sampling_flow->flow_samples.flow_tuple,
+						&sw_ft_entry->rx_flow_tuple_info);
+		sampling_flow->tuple_hash = sw_ft_entry->flow_tuple_hash;
+	}
+
+	sampling_flow->state = WLAN_DP_SAMPLING_STATE_FLOW_ADDED;
+}
+
+static inline struct wlan_dp_stc_sampling_table_entry *
+wlan_dp_get_free_sampling_table_entry(struct wlan_dp_stc *dp_stc)
+{
+	int i;
+	struct wlan_dp_stc_sampling_table *table = &dp_stc->sampling_flow_table;
+
+	for (i = 0; i < DP_STC_SAMPLE_FLOWS_MAX; i++) {
+		if (table->entries[i].state == WLAN_DP_SAMPLING_STATE_INIT)
+			return &table->entries[i];
+	}
+
+	return NULL;
+}
+
+static inline bool
+wlan_dp_txrx_samples_ready(struct wlan_dp_stc_sampling_table_entry *flow)
+{
+	if (flow->flags & WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY)
+		return true;
+
+	return false;
+}
+
+static inline bool
+wlan_dp_txrx_samples_reported(struct wlan_dp_stc_sampling_table_entry *flow)
+{
+	if (flow->flags1 & WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT)
+		return true;
+
+	return false;
+}
+
+static inline bool
+wlan_dp_burst_samples_ready(struct wlan_dp_stc_sampling_table_entry *flow)
+{
+	if (flow->flags & WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_READY)
+		return true;
+
+	return false;
+}
+
+static inline bool
+wlan_dp_burst_samples_reported(struct wlan_dp_stc_sampling_table_entry *flow)
+{
+	if (flow->flags1 & WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_SENT)
+		return true;
+
+	return false;
+}
+
+static inline QDF_STATUS
+wlan_dp_stc_find_ul_flow(struct wlan_dp_stc *dp_stc, uint16_t rx_flow_id,
+			 uint64_t rx_flow_tuple_hash, uint16_t *tx_flow_id,
+			 uint64_t *tx_flow_metadata)
+{
+	return QDF_STATUS_E_INVAL;
+}
+
+static inline QDF_STATUS
+wlan_dp_send_txrx_sample(struct wlan_dp_stc *dp_stc,
+			 struct wlan_dp_stc_sampling_table_entry *flow)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
+
+	if (dp_ctx->dp_ops.send_flow_stats_event)
+		return dp_ctx->dp_ops.send_flow_stats_event(psoc,
+						&flow->flow_samples,
+						WLAN_DP_TXRX_SAMPLES_READY);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_dp_send_burst_sample(struct wlan_dp_stc *dp_stc,
+			  struct wlan_dp_stc_sampling_table_entry *flow)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
+
+	if (dp_ctx->dp_ops.send_flow_stats_event)
+		return dp_ctx->dp_ops.send_flow_stats_event(psoc,
+						&flow->flow_samples,
+						WLAN_DP_BURST_SAMPLES_READY);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#define FLOW_TRACK_ELIGIBLE_THRESH_US 10000000
+
 static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 {
+	struct wlan_dp_stc *dp_stc = (struct wlan_dp_stc *)arg;
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
+	struct wlan_dp_stc_sampling_candidate candidates[DP_STC_SAMPLE_FLOWS_MAX];
+	uint32_t candidate_idx = 0;
+	uint8_t bidi, tx, rx;
+	uint16_t rx_flow_id, tx_flow_id, flow_id;
+	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
+	uint64_t rx_flow_tuple_hash;
+	struct dp_fisa_rx_sw_ft *sw_ft_entry;
+	struct wlan_dp_stc_sampling_table_entry *sampling_flow;
+	uint64_t cur_ts = dp_stc_get_timestamp();
+	uint64_t tx_flow_metadata;
+	QDF_STATUS status;
+	int i;
+	bool start_timer = false, candidate_selected = false;
+
 	/*
 	 * 1) Monitor TX/RX flows
 	 * 2) Add long flow to Sampling flow table
+	 */
+
+	if (wlan_dp_stc_get_valid_sampling_flow_count(dp_stc) ==
+						DP_STC_SAMPLE_FLOWS_MAX)
+		goto other_checks;
+
+	wlan_dp_stc_get_avail_flow_quota(dp_stc, &bidi, &tx, &rx);
+
+	for (rx_flow_id = 0; rx_flow_id < fst->max_entries; rx_flow_id++) {
+		if (!rx && !bidi)
+			break;
+		/* loop through entire FISA table */
+		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[rx_flow_id]);
+		if (!sw_ft_entry->is_populated ||
+		    sw_ft_entry->selected_to_sample ||
+		    sw_ft_entry->classified)
+			continue;
+
+		if (cur_ts - sw_ft_entry->flow_init_ts <
+						FLOW_TRACK_ELIGIBLE_THRESH_US)
+			continue;
+
+		/* Temp place holder function */
+		rx_flow_tuple_hash =
+				wlan_dp_fisa_get_flow_tuple_hash(sw_ft_entry);
+		/*
+		 * This function should search and mark the flow id in
+		 * tx_flow for cross referencing
+		 */
+		status = wlan_dp_stc_find_ul_flow(dp_stc,
+						  rx_flow_id,
+						  rx_flow_tuple_hash,
+						  &tx_flow_id,
+						  &tx_flow_metadata);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			if (rx) {
+				/* This is a RX only flow. */
+				wlan_dp_stc_fill_rx_flow_candidate(dp_stc,
+						&candidates[candidate_idx],
+						rx_flow_id,
+						sw_ft_entry->metadata);
+				candidates[candidate_idx].dir = WLAN_DP_FLOW_DIR_RX;
+				candidate_idx++;
+				rx--;
+				candidate_selected = true;
+			}
+			continue;
+		}
+
+		if (bidi) {
+			wlan_dp_stc_fill_bidi_flow_candidate(dp_stc,
+					&candidates[candidate_idx],
+					tx_flow_id, tx_flow_metadata,
+					rx_flow_id, sw_ft_entry->metadata);
+			candidates[candidate_idx].dir = WLAN_DP_FLOW_DIR_BIDI;
+			candidate_idx++;
+			bidi--;
+			candidate_selected = true;
+			continue;
+		}
+	}
+
+	if (!candidate_selected)
+		goto other_checks;
+
+	for (i = 0; i < DP_STC_SAMPLE_FLOWS_MAX; i++) {
+		if (!(candidates[i].flags & WLAN_DP_SAMPLING_CANDIDATE_VALID))
+			continue;
+
+		/* Optimize this function to return array of pointers */
+		sampling_flow = wlan_dp_get_free_sampling_table_entry(dp_stc);
+		if (!sampling_flow) {
+			/*
+			 * Quota is present but entry is not free.
+			 * This cannot happen
+			 */
+			qdf_assert_always(0);
+			break;
+		}
+
+		/*
+		 * Set the indication in tx & rx flows,
+		 * for us to not shortlist them again.
+		 */
+		if (sampling_flow->flags |
+					WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
+			sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[candidates[i].rx_flow_id]);
+			sw_ft_entry->selected_to_sample = 1;
+		}
+
+		wlan_dp_move_candidate_to_sample_table(dp_stc, &candidates[i],
+						       sampling_flow);
+		start_timer = true;
+	}
+
+	if (start_timer &&
+	    dp_stc->sample_timer_state < WLAN_DP_STC_TIMER_STARTED) {
+		qdf_timer_mod(&dp_stc->flow_sampling_timer,
+			      DP_STC_TIMER_THRESH_MS);
+	}
+
+other_checks:
+	/* 3) Check if flow samples are ready to be sent to userspace */
+	for (flow_id = 0; flow_id < DP_STC_SAMPLE_FLOWS_MAX; flow_id++) {
+		sampling_flow = &dp_stc->sampling_flow_table.entries[flow_id];
+
+		if (wlan_dp_txrx_samples_ready(sampling_flow) &&
+		    !wlan_dp_txrx_samples_reported(sampling_flow)) {
+			/* TXRX sample is ready to be sent */
+			sampling_flow->flags1 |=
+				WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT;
+			wlan_dp_send_txrx_sample(dp_stc, sampling_flow);
+			/*
+			 * Set flag to indicate that the txrx samples
+			 * have been reported
+			 */
+		}
+
+		if (wlan_dp_burst_samples_ready(sampling_flow) &&
+		    !wlan_dp_burst_samples_reported(sampling_flow)) {
+			/* Burst samples are ready to be sent */
+			sampling_flow->flags1 |=
+				WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_SENT;
+			wlan_dp_send_burst_sample(dp_stc, sampling_flow);
+			/*
+			 * Set flag to indicate that the burst sample
+			 * has been reported
+			 */
+		}
+	}
+
+	/*
 	 * 3) Flow inactivity detection
 	 * 4) Ping inactivity detection
 	 */
