@@ -427,6 +427,7 @@ static bool __lim_process_sme_sys_ready_ind(struct mac_context *mac,
 	if (ANI_DRIVER_TYPE(mac) != QDF_DRIVER_TYPE_MFG) {
 		ready_req->pe_roam_synch_cb = pe_roam_synch_callback;
 		ready_req->pe_disconnect_cb = pe_disconnect_callback;
+		ready_req->pe_roam_set_ie_cb = pe_set_ie_for_roam_invoke;
 		pe_register_mgmt_rx_frm_callback(mac);
 		pe_register_callbacks_with_wma(mac, ready_req);
 		mac->lim.sme_msg_callback = ready_req->sme_msg_cb;
@@ -3135,10 +3136,9 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	cb_mode = wlan_get_cb_mode(mac_ctx, session->curr_op_freq, ie_struct,
 				   session);
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
-	    session->force_24ghz_in_ht20) {
+	    wlan_cm_get_force_20mhz_in_24ghz(session->vdev))
 		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
-		pe_debug("force_24ghz_in_ht20 is set so set cbmode to 0");
-	}
+
 	status = wlan_get_rate_set(mac_ctx, ie_struct, session);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Get rate failed vdev id %d", session->vdev_id);
@@ -4404,8 +4404,6 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	session->ssId.length = req->entry->ssid.length;
 	qdf_mem_copy(session->ssId.ssId, req->entry->ssid.ssid,
 		     session->ssId.length);
-
-	session->force_24ghz_in_ht20 = req->force_24ghz_in_ht20;
 
 	status = lim_fill_pe_session(mac_ctx, session, bss_desc);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -8197,7 +8195,7 @@ static void lim_set_pdev_ht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 		}
 		*ie_params->ie_ptr = WLAN_ELEMID_HTCAP_ANA;
 		*(ie_params->ie_ptr + 1) = ie_params->ie_len - 2;
-		lim_set_ht_caps(mac_ctx, NULL, ie_params->ie_ptr,
+		lim_set_ht_caps(mac_ctx, ie_params->ie_ptr,
 				ie_params->ie_len);
 
 		if (NSS_1x1_MODE == i) {
@@ -8267,8 +8265,7 @@ static void lim_set_pdev_vht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 		}
 		*ie_params->ie_ptr = WLAN_ELEMID_VHTCAP;
 		*(ie_params->ie_ptr + 1) = ie_params->ie_len - 2;
-		lim_set_vht_caps(mac_ctx, NULL, ie_params->ie_ptr,
-				ie_params->ie_len);
+		lim_set_vht_caps(mac_ctx, ie_params->ie_ptr, ie_params->ie_len);
 
 		if (NSS_1x1_MODE == i) {
 			p_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_VHTCAPS,
@@ -8328,8 +8325,8 @@ static void lim_process_set_vdev_ies_per_band(struct mac_context *mac_ctx,
 
 	pe_debug("rcvd set vdev ie per band req vdev_id = %d",
 		p_msg->vdev_id);
-	/* intentionally using NULL here so that self capability are sent */
-	if (lim_send_ies_per_band(mac_ctx, NULL, p_msg->vdev_id,
+
+	if (lim_send_ies_per_band(mac_ctx, p_msg->vdev_id,
 				  p_msg->dot11_mode, p_msg->device_mode) !=
 	    QDF_STATUS_SUCCESS)
 		pe_err("Unable to send HT/VHT Cap to FW");

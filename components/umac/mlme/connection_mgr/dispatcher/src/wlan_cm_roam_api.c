@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -134,6 +134,8 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	struct mlme_legacy_priv *mlme_priv;
 	struct wlan_channel *des_chan;
 	struct connect_chan_info *chan_info_orig;
+	enum phy_ch_width ch_width;
+	QDF_STATUS status;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
@@ -148,7 +150,19 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
 		return;
-	chan_info_orig->ch_width_orig = des_chan->ch_width;
+
+	/* If operating mode is STA / P2P-CLI then get the channel width
+	 * from phymode. This is due the reason where actual operating
+	 * channel width is configured as part of WMI_PEER_ASSOC_CMDID
+	 * which could be downgraded while the peer associated.
+	 * If there is a failure or operating mode is not STA / P2P-CLI
+	 * then get channel width from wlan_channel.
+	 */
+	status = wlan_mlme_get_sta_ch_width(vdev, &ch_width);
+	if (QDF_IS_STATUS_ERROR(status))
+		chan_info_orig->ch_width_orig = des_chan->ch_width;
+	else
+		chan_info_orig->ch_width_orig = ch_width;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq) &&
 	    des_chan->ch_width == CH_WIDTH_40MHZ) {
@@ -4032,6 +4046,62 @@ bool wlan_cm_is_self_mld_roam_supported(struct wlan_objmgr_psoc *psoc)
 
 	return wmi_service_enabled(wmi_handle,
 				   wmi_service_self_mld_roam_between_dbs_and_hbs);
+}
+
+void
+wlan_cm_set_force_20mhz_in_24ghz(struct wlan_objmgr_vdev *vdev,
+				 bool is_40mhz_cap)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct mlme_legacy_priv *mlme_priv;
+	uint16_t dot11_mode;
+	bool send_ie_to_fw = false;
+
+	if (!vdev)
+		return;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj || !mlme_obj->cfg.obss_ht40.is_override_ht20_40_24g)
+		return;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return;
+
+	/*
+	 * Force 20 MHz in 2.4 GHz only if "override_ht20_40_24g" ini
+	 * is set and userspace connect req doesn't have 40 MHz HT caps
+	 */
+	if (mlme_priv->connect_info.force_20mhz_in_24ghz != !is_40mhz_cap)
+		send_ie_to_fw = true;
+
+	mlme_priv->connect_info.force_20mhz_in_24ghz = !is_40mhz_cap;
+
+	if (cm_is_vdev_connected(vdev) && send_ie_to_fw) {
+		dot11_mode =
+			cm_csr_get_vdev_dot11_mode(wlan_vdev_get_id(vdev));
+		cm_send_ies_for_roam_invoke(vdev, dot11_mode);
+	}
+}
+
+bool
+wlan_cm_get_force_20mhz_in_24ghz(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev)
+		return true;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return true;
+
+	return mlme_priv->connect_info.force_20mhz_in_24ghz;
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD

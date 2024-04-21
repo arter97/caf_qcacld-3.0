@@ -1407,7 +1407,8 @@ void pe_register_callbacks_with_wma(struct mac_context *mac,
 	status = wma_register_roaming_callbacks(
 			ready_req->csr_roam_auth_event_handle_cb,
 			ready_req->pe_roam_synch_cb,
-			ready_req->pe_disconnect_cb);
+			ready_req->pe_disconnect_cb,
+			ready_req->pe_roam_set_ie_cb);
 	if (status != QDF_STATUS_SUCCESS)
 		pe_err("Registering roaming callbacks with WMA failed");
 }
@@ -3164,6 +3165,19 @@ roam_sync_fail:
 	pe_delete_session(mac_ctx, ft_session_ptr);
 	return status;
 }
+
+QDF_STATUS
+pe_set_ie_for_roam_invoke(struct mac_context *mac_ctx, uint8_t vdev_id,
+			  uint16_t dot11_mode, enum QDF_OPMODE opmode)
+{
+	QDF_STATUS status;
+
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	status = lim_send_ies_per_band(mac_ctx, vdev_id, dot11_mode, opmode);
+	return status;
+}
 #endif
 
 static bool lim_is_beacon_miss_scenario(struct mac_context *mac,
@@ -4052,10 +4066,11 @@ lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 					wlan_pdev_get_psoc(mac_ctx->pdev),
 					cache_entry);
 
+	util_scan_free_cache_entry(cache_entry);
+
 	if (!is_security_allowed) {
 		mlme_debug("current security is not valid for partner link link_addr:" QDF_MAC_ADDR_FMT,
 			   QDF_MAC_ADDR_REF(link_addr->bytes));
-		util_scan_free_cache_entry(cache_entry);
 		return QDF_STATUS_E_FAILURE;
 	}
 
