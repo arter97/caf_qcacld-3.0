@@ -2335,6 +2335,16 @@ static bool dp_fisa_disallowed_for_vdev(struct dp_soc *soc,
 	return true;
 }
 
+static inline void
+wlan_dp_fisa_nbuf_mark_flow_info(struct dp_fisa_rx_sw_ft *fisa_flow,
+				 qdf_nbuf_t nbuf)
+{
+	QDF_NBUF_CB_EXT_RX_FLOW_ID(nbuf) = fisa_flow->flow_id;
+	QDF_NBUF_CB_RX_FLOW_METADATA(nbuf) = fisa_flow->metadata;
+	if (fisa_flow->track_flow_stats)
+		QDF_NBUF_CB_RX_TRACK_FLOW(nbuf) = 1;
+}
+
 QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		      struct dp_vdev *vdev,
 		      qdf_nbuf_t nbuf_list)
@@ -2395,6 +2405,8 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		/* Add new flow if the there is no ongoing flow */
 		fisa_flow = dp_rx_get_fisa_flow(dp_fisa_rx_hdl, vdev,
 						head_nbuf);
+		if (fisa_flow)
+			wlan_dp_fisa_nbuf_mark_flow_info(fisa_flow, head_nbuf);
 
 		if (fisa_flow)
 			dp_fisa_update_flow_balance_stats(fisa_flow, dp_ctx);
