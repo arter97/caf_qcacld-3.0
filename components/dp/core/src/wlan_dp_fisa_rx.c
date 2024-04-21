@@ -1089,6 +1089,9 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			qdf_mem_copy(&sw_ft_entry->rx_flow_tuple_info,
 				     rx_flow_tuple_info,
 				     sizeof(struct cdp_rx_flow_tuple_info));
+			sw_ft_entry->flow_tuple_hash =
+				wlan_dp_fisa_get_flow_hash(fisa_hdl->dp_ctx,
+					&sw_ft_entry->rx_flow_tuple_info);
 
 			sw_ft_entry->flow_init_ts = qdf_sched_clock();
 			sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
@@ -1097,6 +1100,7 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
 
 			is_fst_updated = true;
+			wlan_dp_indicate_rx_flow_add(dp_ctx);
 			fisa_hdl->add_flow_count++;
 			break;
 		}

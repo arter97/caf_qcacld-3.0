@@ -410,6 +410,25 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 }
 
 /**
+ * wlan_dp_indicate_rx_flow_add() - Indication to STC when rx flow is added
+ * @dp_ctx: Global DP psoc context
+ *
+ * Return: None
+ */
+static inline void
+wlan_dp_indicate_rx_flow_add(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+
+	/* RCU or atomic variable?? */
+	if (dp_stc->periodic_work_state < WLAN_DP_STC_WORK_STARTED) {
+		qdf_periodic_work_start(&dp_stc->flow_monitor_work,
+					dp_stc->flow_monitor_interval);
+		dp_stc->periodic_work_state = WLAN_DP_STC_WORK_STARTED;
+	}
+}
+
+/**
  * wlan_dp_stc_track_flow_features() - Track flow features
  * @dp_stc: STC context
  * @nbuf: packet handle
@@ -503,6 +522,11 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx);
 static inline void
 wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 				struct cdp_rx_flow_tuple_info *flow_tuple_info)
+{
+}
+
+static inline void
+wlan_dp_indicate_rx_flow_add(struct wlan_dp_psoc_context *dp_ctx)
 {
 }
 
