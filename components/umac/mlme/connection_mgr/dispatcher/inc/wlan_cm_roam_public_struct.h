@@ -1074,6 +1074,7 @@ enum roam_scan_dwell_type {
 /**
  * enum eroam_frame_subtype - Enhanced roam frame subtypes.
  *
+ * @WLAN_ROAM_STATS_FRAME_SUBTYPE_INVALID: Invalid subtype
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_RESP: Authentication resp frame
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_RESP: Reassociation resp frame
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1: EAPOL-Key M1 frame
@@ -1086,6 +1087,7 @@ enum roam_scan_dwell_type {
  * @WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_REQ: Reassociation req frame
  */
 enum eroam_frame_subtype {
+	WLAN_ROAM_STATS_FRAME_SUBTYPE_INVALID = 0,
 	WLAN_ROAM_STATS_FRAME_SUBTYPE_AUTH_RESP = 1,
 	WLAN_ROAM_STATS_FRAME_SUBTYPE_REASSOC_RESP = 2,
 	WLAN_ROAM_STATS_FRAME_SUBTYPE_EAPOL_M1 = 3,
@@ -2562,6 +2564,8 @@ struct roam_frame_stats {
  * @vdev_id: vdev id
  * @num_tlv: Number of roam scans triggered
  * @num_roam_msg_info: Number of roam_msg_info present in event
+ * @enhance_roam_rt_event:  flag of whether we need send event for
+ * real time enhance roam stats info to user space
  * @trigger: Roam trigger related details
  * @scan: Roam scan event details
  * @result: Roam result related info
@@ -2576,6 +2580,7 @@ struct roam_stats_event {
 	uint8_t vdev_id;
 	uint8_t num_tlv;
 	uint8_t num_roam_msg_info;
+	bool enhance_roam_rt_event;
 	struct wmi_roam_trigger_info trigger[MAX_ROAM_SCAN_STATS_TLV];
 	struct wmi_roam_scan_data scan[MAX_ROAM_SCAN_STATS_TLV];
 	struct wmi_roam_result result[MAX_ROAM_SCAN_STATS_TLV];

@@ -4226,7 +4226,7 @@ wlan_cm_update_roam_frame_info(struct mlme_legacy_priv *mlme_priv,
 	for (i = 0; i < frame_data->num_frame; i++) {
 		if (!wlan_cm_get_valid_frame_type(&frame_data->frame_info[i]))
 			continue;
-		j++;
+
 		if (j >= WLAN_ROAM_MAX_FRAME_INFO)
 			break;
 		/*
@@ -4251,6 +4251,7 @@ wlan_cm_update_roam_frame_info(struct mlme_legacy_priv *mlme_priv,
 			   info->timestamp[j].timestamp,
 			   info->timestamp[j].status,
 			   QDF_MAC_ADDR_REF(info->timestamp[j].bssid.bytes));
+		j++;
 	}
 }
 
@@ -4378,6 +4379,10 @@ wlan_cm_update_roam_stats_info(struct wlan_objmgr_psoc *psoc,
 			wlan_cm_update_roam_bssid(mlme_priv,
 						  &stats_info->scan[index]);
 
+		stats_info->enhance_roam_rt_event = true;
+		mlme_cm_osif_roam_rt_stats(stats_info,
+					   mlme_priv->roam_write_index);
+
 		mlme_priv->roam_write_index += 1;
 		if (mlme_priv->roam_write_index == mlme_priv->roam_cache_num)
 			mlme_priv->roam_write_index = 0;
@@ -4464,6 +4469,28 @@ wlan_cm_roam_stats_info_get(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+wlan_cm_roam_info_get(struct wlan_objmgr_vdev *vdev,
+		      struct enhance_roam_info **roam_info,
+		      uint8_t idx)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (mlme_priv->roam_cache_num == 0) {
+		mlme_debug("Enhanced roam stats not supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+	*roam_info = &mlme_priv->roam_info[idx];
+	return QDF_STATUS_SUCCESS;
+}
+
 #else
 static void
 wlan_cm_update_roam_stats_info(struct wlan_objmgr_psoc *psoc,
