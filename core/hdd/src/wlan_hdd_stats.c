@@ -11663,7 +11663,7 @@ hdd_cstats_log_ndi_create_resp_evt(struct wlan_hdd_link_info *li,
 
 	priv_obj = nan_get_vdev_priv_obj(vdev);
 	if (!priv_obj) {
-		hdd_err("priv_obj is null")
+		hdd_err("priv_obj is null");
 		return;
 	}
 
