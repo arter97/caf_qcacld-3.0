@@ -7398,8 +7398,6 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 
 	he_config = &mlme_priv->he_config;
 	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
-		he_config->bfee_sts_lt_80 =
-			mac->he_cap_2g.bfee_sts_lt_80;
 		he_config->tx_he_mcs_map_lt_80 =
 			mac->he_cap_2g.tx_he_mcs_map_lt_80;
 		he_config->rx_he_mcs_map_lt_80 =
@@ -7409,14 +7407,11 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 				mac->he_cap_2g.max_ampdu_len_exp_ext);
 		he_config->ul_2x996_tone_ru_supp = 0;
 		he_config->num_sounding_gt_80 = 0;
-		he_config->bfee_sts_gt_80 = 0;
 		he_config->tb_ppdu_tx_stbc_gt_80mhz = 0;
 		he_config->rx_stbc_gt_80mhz = 0;
 		he_config->he_ppdu_20_in_160_80p80Mhz = 0;
 		he_config->he_ppdu_80_in_160_80p80Mhz = 0;
 	} else {
-		he_config->bfee_sts_lt_80 =
-			mac->he_cap_5g.bfee_sts_lt_80;
 		he_config->tx_he_mcs_map_lt_80 =
 			mac->he_cap_5g.tx_he_mcs_map_lt_80;
 		he_config->rx_he_mcs_map_lt_80 =
@@ -7429,8 +7424,6 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 				mac->he_cap_5g.max_ampdu_len_exp_ext);
 		if (he_config->chan_width_2 ||
 		    he_config->chan_width_3) {
-			he_config->bfee_sts_gt_80 =
-				mac->he_cap_5g.bfee_sts_gt_80;
 			he_config->num_sounding_gt_80 =
 				mac->he_cap_5g.num_sounding_gt_80;
 			he_config->he_ppdu_20_in_160_80p80Mhz =
@@ -7451,6 +7444,38 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 		he_config->codebook_su = mac->he_cap_5g.codebook_su;
 		he_config->codebook_mu = mac->he_cap_5g.codebook_mu;
 	}
+
+	pe_debug("he_config: 0x%x", mlme_priv->he_config);
+}
+
+static void
+lim_revise_req_he_bfee_per_band(struct mlme_legacy_priv *mlme_priv,
+				struct pe_session *session)
+{
+	struct mac_context *mac = session->mac_ctx;
+	tDot11fIEhe_cap *he_config;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(session->vdev);
+	if (!psoc) {
+		pe_err("Failed to get psoc");
+		return;
+	}
+
+	he_config = &mlme_priv->he_config;
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq)) {
+		he_config->bfee_sts_lt_80 =
+			mac->he_cap_2g.bfee_sts_lt_80;
+		he_config->bfee_sts_gt_80 = 0;
+	} else {
+		he_config->bfee_sts_lt_80 =
+			mac->he_cap_5g.bfee_sts_lt_80;
+		if (he_config->chan_width_2 ||
+		    he_config->chan_width_3) {
+			he_config->bfee_sts_gt_80 =
+				mac->he_cap_5g.bfee_sts_gt_80;
+		}
+	}
 }
 
 void lim_copy_bss_he_cap(struct pe_session *session)
@@ -7461,6 +7486,7 @@ void lim_copy_bss_he_cap(struct pe_session *session)
 	if (!mlme_priv)
 		return;
 	lim_revise_req_he_cap_per_band(mlme_priv, session);
+	lim_revise_req_he_bfee_per_band(mlme_priv, session);
 	lim_update_he_caps_mcs(session->mac_ctx, session);
 	qdf_mem_copy(&(session->he_config), &(mlme_priv->he_config),
 		     sizeof(session->he_config));
@@ -7474,7 +7500,9 @@ void lim_copy_join_req_he_cap(struct pe_session *session)
 	if (!mlme_priv)
 		return;
 	if (!session->mac_ctx->usr_cfg_tx_bfee_nsts)
-		lim_revise_req_he_cap_per_band(mlme_priv, session);
+		lim_revise_req_he_bfee_per_band(mlme_priv, session);
+
+	lim_revise_req_he_cap_per_band(mlme_priv, session);
 	qdf_mem_copy(&(session->he_config), &(mlme_priv->he_config),
 		     sizeof(session->he_config));
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq)) {
