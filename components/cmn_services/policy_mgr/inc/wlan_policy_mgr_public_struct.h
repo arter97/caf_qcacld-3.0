@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1014,6 +1014,8 @@ enum policy_mgr_three_connection_mode {
 	PM_NDI_NDI_NAN_DISC_24_SMM,
 	PM_SAP_SAP_SCC_24_SAP_5_DBS,
 	PM_SAP_SAP_SCC_5_SAP_24_DBS,
+	PM_SAP_SAP_SCC_5_STA_24_DBS,
+	PM_SAP_SAP_STA_SCC_5_DBS,
 	PM_STA_STA_5_NAN_DISC_24_DBS,
 	PM_NAN_DISC_24_STA_STA_5_DBS,
 	PM_STA_STA_24_NAN_DISC_24_SMM,

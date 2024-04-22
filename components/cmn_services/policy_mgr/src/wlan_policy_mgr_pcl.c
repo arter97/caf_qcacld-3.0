@@ -41,7 +41,7 @@
 #include "wlan_cm_roam_api.h"
 #include "wlan_scan_api.h"
 
-/**
+/*
  * first_connection_pcl_table - table which provides PCL for the
  * very first connection in the system
  */
@@ -70,6 +70,11 @@ policy_mgr_next_action_two_connection_table_type
 		*next_action_two_connection_table;
 policy_mgr_next_action_three_connection_table_type
 		*next_action_three_connection_table;
+#ifdef FEATURE_FOURTH_CONNECTION
+policy_mgr_next_action_four_connection_table_type
+		*next_action_four_connection_table;
+#endif
+
 policy_mgr_next_action_two_connection_table_type
 		*next_action_two_connection_2x2_2g_1x1_5g_table;
 policy_mgr_next_action_three_connection_table_type
@@ -594,17 +599,50 @@ void policy_mgr_update_with_safe_channel_list(struct wlan_objmgr_psoc *psoc,
 }
 
 static QDF_STATUS policy_mgr_modify_pcl_based_on_enabled_channels(
-					struct policy_mgr_psoc_priv_obj *pm_ctx,
+					struct wlan_objmgr_psoc *psoc,
 					uint32_t *pcl_list_org,
 					uint8_t *weight_list_org,
 					uint32_t *pcl_len_org)
 {
 	uint32_t i, pcl_len = 0;
+	bool allow_go_scc_on_dfs_chn = false;
+	bool dfs_master_capable = false;
+	uint8_t sta_sap_scc_on_dfs_chnl = 0;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("context is NULL");
+		return status;
+	}
+
+	status = ucfg_mlme_get_dfs_master_capability(psoc, &dfs_master_capable);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to get dfs master capable");
+		return status;
+	}
+
+	status = policy_mgr_get_sta_sap_scc_on_dfs_chnl(psoc,
+						&sta_sap_scc_on_dfs_chnl);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to get sta_sap_scc_on_dfs_chnl");
+		return status;
+	}
+
+	if (dfs_master_capable &&
+	    (sta_sap_scc_on_dfs_chnl == PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX &&
+	     pm_ctx->cfg.go_force_scc == GO_FORCE_SCC_STRICT)) {
+		allow_go_scc_on_dfs_chn = true;
+	}
 
 	for (i = 0; i < *pcl_len_org; i++) {
-		if (!wlan_reg_is_passive_or_disable_for_pwrmode(
+		if ((!wlan_reg_is_passive_or_disable_for_pwrmode(
 			pm_ctx->pdev, pcl_list_org[i],
-			REG_CURRENT_PWR_MODE)) {
+			REG_CURRENT_PWR_MODE)) ||
+		    (allow_go_scc_on_dfs_chn &&
+		     policy_mgr_is_sta_sap_scc(psoc, pcl_list_org[i]) &&
+		     wlan_reg_is_dfs_for_freq(pm_ctx->pdev, pcl_list_org[i]))) {
 			pcl_list_org[pcl_len] = pcl_list_org[i];
 			weight_list_org[pcl_len++] = weight_list_org[i];
 		}
@@ -1040,7 +1078,7 @@ add_freq:
 static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len)
+			uint32_t *len, uint32_t weight_len)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -1053,6 +1091,14 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	bool srd_chan_enabled;
 
 	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* check the channel avoidance list for beaconing entities */
+	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
+						 len, pcl_weight, weight_len);
 
 	if (policy_mgr_is_sap_mandatory_channel_set(psoc)) {
 		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
@@ -1133,22 +1179,26 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len)
+			uint32_t *len, uint32_t weight_len)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool srd_chan_enabled;
 
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("context is NULL");
+	/* check the channel avoidance list for beaconing entities */
+	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
+						 len, pcl_weight, weight_len);
+
+	status = policy_mgr_modify_pcl_based_on_enabled_channels(
+			psoc, pcl_channels, pcl_weight, len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("failed to get modified pcl for GO");
 		return status;
 	}
 
-	status = policy_mgr_modify_pcl_based_on_enabled_channels(
-			pm_ctx, pcl_channels, pcl_weight, len);
+	status = policy_mgr_modify_sap_pcl_based_on_dfs(
+			psoc, pcl_channels, pcl_weight, len);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_err("failed to get modified pcl for GO");
+		policy_mgr_err("failed to get dfs modified pcl for GO");
 		return status;
 	}
 
@@ -1170,18 +1220,19 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 static QDF_STATUS policy_mgr_mode_specific_modification_on_pcl(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t *pcl_channels, uint8_t *pcl_weight,
-			uint32_t *len, enum policy_mgr_con_mode mode)
+			uint32_t *len, uint32_t weight_len,
+			enum policy_mgr_con_mode mode)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	switch (mode) {
 	case PM_SAP_MODE:
 		status = policy_mgr_pcl_modification_for_sap(
-			psoc, pcl_channels, pcl_weight, len);
+			psoc, pcl_channels, pcl_weight, len, weight_len);
 		break;
 	case PM_P2P_GO_MODE:
 		status = policy_mgr_pcl_modification_for_p2p_go(
-			psoc, pcl_channels, pcl_weight, len);
+			psoc, pcl_channels, pcl_weight, len, weight_len);
 		break;
 	case PM_STA_MODE:
 	case PM_P2P_CLIENT_MODE:
@@ -1357,7 +1408,7 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("PCL before modification");
 	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 	policy_mgr_mode_specific_modification_on_pcl(
-		psoc, pcl_channels, pcl_weight, len, mode);
+		psoc, pcl_channels, pcl_weight, len, weight_len, mode);
 
 	status = policy_mgr_modify_pcl_based_on_dnbs(psoc, pcl_channels,
 						pcl_weight, len);
@@ -2773,6 +2824,20 @@ enum policy_mgr_three_connection_mode
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq)) {
 			index = PM_STA_SAP_SCC_5_SAP_24_DBS;
+		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq)) {
+			index = PM_SAP_SAP_SCC_5_STA_24_DBS;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq)) {
+			index = PM_SAP_SAP_STA_SCC_5_DBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -3030,7 +3095,8 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 			ch_weight_len);
 
 	status = policy_mgr_mode_specific_modification_on_pcl(
-			psoc, ch_freq_list, ch_weight_list, ch_cnt, mode);
+			psoc, ch_freq_list, ch_weight_list, ch_cnt,
+			ch_weight_len, mode);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get modified pcl for mode %d", mode);
@@ -3739,6 +3805,7 @@ bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_two_connection_mode third_index = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool ret = false;
+	bool force_scc = policy_mgr_is_force_scc(psoc);
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3746,9 +3813,9 @@ bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 			return false;
 	}
 
-	if (pm_conc_connection_list[0].freq != ch_freq ||
+	if (!force_scc && (pm_conc_connection_list[0].freq != ch_freq ||
 	    pm_conc_connection_list[0].freq !=
-				pm_conc_connection_list[1].freq) {
+				pm_conc_connection_list[1].freq)) {
 		policy_mgr_debug("No MCC support in 3vif in same mac: %d %d %d",
 				 pm_conc_connection_list[0].freq,
 				 pm_conc_connection_list[1].freq,

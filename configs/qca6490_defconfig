@@ -1,2 +1,4 @@
 CONFIG_CNSS_QCA6490 := y
 include $(WLAN_ROOT)/configs/default_defconfig
+
+CONFIG_FOURTH_CONNECTION_AUTO := y

@@ -839,6 +839,40 @@ policy_mgr_get_third_conn_action_table(
 	}
 }
 
+#ifdef FEATURE_FOURTH_CONNECTION
+static QDF_STATUS
+policy_mgr_get_fourth_conn_action_table(
+	struct wlan_objmgr_psoc *psoc,
+	enum policy_mgr_band band,
+	enum policy_mgr_conc_next_action *next_action)
+{
+	enum policy_mgr_three_connection_mode fourth_index = 0;
+	policy_mgr_next_action_four_connection_table_type *fourth_conn_table;
+
+	fourth_index = policy_mgr_get_fourth_connection_pcl_table_index(psoc);
+	if (PM_MAX_THREE_CONNECTION_MODE == fourth_index) {
+		policy_mgr_err(
+		"couldn't find index for 4th connection next action table");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	fourth_conn_table = next_action_four_connection_table;
+	*next_action = (*fourth_conn_table)[fourth_index][band];
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+policy_mgr_get_fourth_conn_action_table(
+	struct wlan_objmgr_psoc *psoc,
+	enum policy_mgr_band band,
+	enum policy_mgr_conc_next_action *next_action)
+{
+	policy_mgr_err("fourth connection not supported!");
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 static QDF_STATUS
 policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 			   uint32_t session_id,
@@ -916,6 +950,10 @@ policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 		third_conn_table = policy_mgr_get_third_conn_action_table(
 			psoc, session_id, ch_freq, reason);
 		*next_action = (*third_conn_table)[third_index][band];
+		break;
+	case 3:
+		if (policy_mgr_get_fourth_conn_action_table(psoc, band, next_action))
+			return QDF_STATUS_E_FAILURE;
 		break;
 	default:
 		policy_mgr_err("unexpected num_connections value %d",
