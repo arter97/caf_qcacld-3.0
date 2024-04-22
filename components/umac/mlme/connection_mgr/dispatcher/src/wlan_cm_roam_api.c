@@ -2842,6 +2842,27 @@ cm_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
 	wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+cm_btm_update_reject_ml_ap_info(struct sir_rssi_disallow_lst *entry,
+				struct roam_denylist_timeout *deny_list)
+{
+	qdf_copy_macaddr(&entry->reject_mlo_ap_info.mld_addr,
+			 &deny_list->reject_mlo_ap_info.mld_addr);
+	qdf_mem_copy(&entry->reject_mlo_ap_info.tried_links,
+		     &deny_list->reject_mlo_ap_info.tried_links,
+		     deny_list->reject_mlo_ap_info.tried_link_count *
+		     sizeof(uint32_t));
+	entry->reject_mlo_ap_info.tried_link_count =
+			deny_list->reject_mlo_ap_info.tried_link_count;
+}
+#else
+static inline void
+cm_btm_update_reject_ml_ap_info(struct sir_rssi_disallow_lst *entry,
+				struct roam_denylist_timeout *denylist)
+{}
+#endif
+
 QDF_STATUS
 cm_btm_denylist_event_handler(struct wlan_objmgr_psoc *psoc,
 			      struct roam_denylist_event *list)
@@ -2888,7 +2909,7 @@ cm_btm_denylist_event_handler(struct wlan_objmgr_psoc *psoc,
 			entry.retry_delay = denylist->timeout;
 			entry.expected_rssi = denylist->rssi;
 		}
-
+		cm_btm_update_reject_ml_ap_info(&entry, denylist);
 		/* Add this bssid to the rssi reject ap type in denylist mgr */
 		cm_add_bssid_to_reject_list(pdev, list->vdev_id, &entry);
 		denylist++;

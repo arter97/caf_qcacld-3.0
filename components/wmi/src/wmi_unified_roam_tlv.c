@@ -2870,10 +2870,38 @@ static enum dlm_reject_ap_reason wmi_get_reject_reason(uint32_t reason)
 		return REASON_REASSOC_RSSI_REJECT;
 	case WMI_BL_REASON_REASSOC_NO_MORE_STAS:
 		return REASON_REASSOC_NO_MORE_STAS;
+	case WMI_BL_REASON_BASIC_RATES_MIS_MATCH:
+		return REASON_BASIC_RATES_MISMATCH;
+	case WMI_BL_REASON_EHT_NOT_SUPPORTED:
+		return REASON_EHT_NOT_SUPPORTED;
+	case WMI_BL_REASON_EXISTING_MLD_ASSOCIATION:
+		return REASON_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOCIATION;
+	case WMI_BL_REASON_LINK_TRANSMITTED_NOT_ACCEPTED:
+		return REASON_TX_LINK_NOT_ACCEPTED;
+	case WMI_BL_REASON_DENIED_OTHER_REASON:
+		return REASON_OTHER;
 	default:
 		return REASON_UNKNOWN;
 	}
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static void roam_update_mlo_bl_info(struct roam_denylist_timeout *roam_denylist,
+				    wmi_roam_blacklist_with_timeout_tlv_param *src_list)
+{
+	qdf_mem_copy(&roam_denylist->reject_mlo_ap_info.tried_links,
+		     &src_list->ml_failed_links_combo_bitmap,
+		     src_list->ml_failed_link_combo_count * sizeof(uint32_t));
+	roam_denylist->reject_mlo_ap_info.tried_link_count = src_list->ml_failed_link_combo_count;
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_list->mld,
+				   roam_denylist->reject_mlo_ap_info.mld_addr.bytes);
+}
+#else
+static inline void
+roam_update_mlo_bl_info(struct roam_denylist_timeout *roam_denylist,
+			wmi_roam_blacklist_with_timeout_tlv_param *src_list)
+{}
+#endif
 
 static QDF_STATUS
 extract_btm_denylist_event(wmi_unified_t wmi_handle,
@@ -2937,6 +2965,7 @@ extract_btm_denylist_event(wmi_unified_t wmi_handle,
 		roam_denylist->reject_reason =
 				wmi_get_reject_reason(src_list->reason);
 		roam_denylist->source = src_list->source;
+		roam_update_mlo_bl_info(roam_denylist, src_list);
 		roam_denylist++;
 		src_list++;
 	}

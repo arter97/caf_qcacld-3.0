@@ -2441,6 +2441,7 @@ enum roam_reason {
  * @reject_reason: reason to add the BSSID to DLM
  * @original_timeout: original timeout sent by the AP
  * @source: Source of adding the BSSID to DLM
+ * @reject_mlo_ap_info: reject mlo ap info
  */
 struct roam_denylist_timeout {
 	struct qdf_mac_addr bssid;
@@ -2450,6 +2451,9 @@ struct roam_denylist_timeout {
 	enum dlm_reject_ap_reason reject_reason;
 	uint32_t original_timeout;
 	enum dlm_reject_ap_source source;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct reject_mlo_ap_info reject_mlo_ap_info;
+#endif
 };
 
 /**
