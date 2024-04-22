@@ -3269,6 +3269,11 @@ wlan_hdd_set_station_stats_request_pending(struct wlan_hdd_link_info *link_info,
 	if (!adapter->hdd_ctx->is_get_station_clubbed_in_ll_stats_req)
 		return QDF_STATUS_E_INVAL;
 
+	if (ucfg_mc_cp_stats_is_req_pending(psoc, TYPE_STATION_STATS)) {
+		hdd_debug("Station stats request pending");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
@@ -3407,8 +3412,12 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 
 	vdev_req_status = wlan_hdd_set_station_stats_request_pending(link_info,
 								     req);
-	if (QDF_IS_STATUS_ERROR(vdev_req_status))
+	if (QDF_IS_STATUS_ERROR(vdev_req_status)) {
 		hdd_nofl_debug("Requesting LL_STATS only");
+		req->is_unified_ll_stats = false;
+	} else {
+		req->is_unified_ll_stats = true;
+	}
 
 	/*
 	 * FW can send radio stats with multiple events and for the first event
@@ -3427,8 +3436,9 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 	request = osif_request_alloc(&params);
 	if (!request) {
 		hdd_err("Request Allocation Failure");
-		wlan_hdd_reset_station_stats_request_pending(hdd_ctx->psoc,
-							     adapter);
+		if (QDF_IS_STATUS_SUCCESS(vdev_req_status))
+			wlan_hdd_reset_station_stats_request_pending(
+					hdd_ctx->psoc, adapter);
 		return -ENOMEM;
 	}
 
@@ -3493,7 +3503,11 @@ static int wlan_hdd_send_ll_stats_req(struct wlan_hdd_link_info *link_info,
 
 exit:
 	qdf_atomic_set(&adapter->is_ll_stats_req_pending, 0);
-	wlan_hdd_reset_station_stats_request_pending(hdd_ctx->psoc, adapter);
+
+	if (QDF_IS_STATUS_SUCCESS(vdev_req_status))
+		wlan_hdd_reset_station_stats_request_pending(hdd_ctx->psoc,
+							     adapter);
+
 	hdd_exit();
 	osif_request_put(request);
 
@@ -9500,14 +9514,17 @@ int wlan_hdd_get_station_stats(struct wlan_hdd_link_info *link_info)
 	struct stats_event *stats;
 	struct wlan_objmgr_vdev *vdev;
 
-	if (!get_station_fw_request_needed) {
-		hdd_debug("return cached get_station stats");
-		return 0;
-	}
-
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
+
+	if (!get_station_fw_request_needed ||
+	    ucfg_mc_cp_stats_is_req_pending(wlan_vdev_get_psoc(vdev),
+					    TYPE_STATION_STATS)) {
+		hdd_debug("return cached get_station stats");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+		return 0;
+	}
 
 	stats = wlan_cfg80211_mc_cp_stats_get_station_stats(vdev, &ret);
 	if (ret || !stats) {

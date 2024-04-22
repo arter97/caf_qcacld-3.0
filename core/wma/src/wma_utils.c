@@ -2739,11 +2739,10 @@ QDF_STATUS wma_process_ll_stats_set_req(tp_wma_handle wma,
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 static QDF_STATUS
 wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
-			  struct ll_stats_get_params *cmd)
+			  struct ll_stats_get_params *cmd,
+			  bool is_unified_ll_stats)
 {
-	if (!(cfg_get(wma_handle->psoc, CFG_CLUB_LL_STA_AND_GET_STATION) &&
-	      wmi_service_enabled(wma_handle->wmi_handle,
-				  wmi_service_get_station_in_ll_stats_req) &&
+	if (!(is_unified_ll_stats &&
 	      wma_handle->interfaces[cmd->vdev_id].type == WMI_VDEV_TYPE_STA))
 		return wmi_unified_process_ll_stats_get_cmd(
 						wma_handle->wmi_handle, cmd);
@@ -2754,7 +2753,8 @@ wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
 #else
 static QDF_STATUS
 wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
-			  struct ll_stats_get_params *cmd)
+			  struct ll_stats_get_params *cmd,
+			  bool is_unified_ll_stats)
 {
 	return wmi_unified_process_ll_stats_get_cmd(wma_handle->wmi_handle,
 						    cmd);
@@ -2844,7 +2844,8 @@ QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 		}
 	}
 
-	ret = wma_send_ll_stats_get_cmd(wma, &cmd);
+	ret = wma_send_ll_stats_get_cmd(wma, &cmd,
+					getReq->is_unified_ll_stats);
 	if (ret) {
 		wma_err("Failed to send get link stats request");
 		return QDF_STATUS_E_FAILURE;

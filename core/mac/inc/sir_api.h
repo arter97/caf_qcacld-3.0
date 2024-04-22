@@ -2918,6 +2918,7 @@ typedef struct {
 	uint32_t paramIdMask;
 	bool is_mlo_req;
 	uint32_t mlo_vdev_id_bitmap;
+	bool is_unified_ll_stats;
 } tSirLLStatsGetReq, *tpSirLLStatsGetReq;
 
 typedef struct {
