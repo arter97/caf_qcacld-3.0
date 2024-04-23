@@ -5087,7 +5087,8 @@ void csr_clear_sae_single_pmk(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if (!(keymgmt & (1 << WLAN_CRYPTO_KEY_MGMT_SAE))) {
+	if (!(QDF_HAS_PARAM(keymgmt, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	      QDF_HAS_PARAM(keymgmt, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY))) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 		return;
 	}

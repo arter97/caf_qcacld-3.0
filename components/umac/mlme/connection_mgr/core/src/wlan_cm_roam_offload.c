@@ -5664,7 +5664,8 @@ cm_store_sae_single_pmk_to_global_cache(struct wlan_objmgr_psoc *psoc,
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
 				   IS_SINGLE_PMK, &src_cfg);
 	if (!src_cfg.bool_value ||
-	    !QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
+	    !(QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	      QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY)))
 		return;
 	/*
 	 * Mark the AP as single PMK capable in Crypto Table
