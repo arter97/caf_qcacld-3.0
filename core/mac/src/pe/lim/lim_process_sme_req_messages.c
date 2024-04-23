@@ -2884,7 +2884,8 @@ lim_update_sae_single_pmk_ap_cap(struct mac_context *mac,
 	akm = wlan_crypto_get_param(session->vdev,
 				    WLAN_CRYPTO_PARAM_KEY_MGMT);
 
-	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) &&
+	if ((QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	     QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY)) &&
 	    mac->mlme_cfg->lfr.sae_single_pmk_feature_enabled)
 		wlan_mlme_set_sae_single_pmk_bss_cap(mac->psoc,
 			session->vdev_id,
