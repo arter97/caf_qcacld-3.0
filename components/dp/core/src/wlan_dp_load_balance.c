@@ -20,6 +20,7 @@
 #include "wlan_dp_priv.h"
 #include "wlan_dp_flow_balance.h"
 #include "wlan_dp_fisa_rx.h"
+#include "wlan_dp_main.h"
 
 #define NUM_CPUS_FOR_LOAD_BALANCE 2
 
@@ -32,6 +33,9 @@
 
 /*time in ns to make the load balance */
 #define LOAD_BALANCE_TIME_THRS 5000000000
+
+#define DEFAULT_AFFINITY_THRESH 5
+#define LOAD_BALANCE_TPUT_THRESH_CNT 5
 
 /**
  * wlan_dp_lb_sort_ring_weightages() - function to sort the ring weightages
@@ -54,6 +58,46 @@ int wlan_dp_lb_sort_ring_weightages(const void *e1, const void *e2)
 		return 1;
 	else
 		return 0;
+}
+
+/**
+ * wlan_dp_lb_set_default_affinity() - function to set default affinity
+ * Affine the reo group interrupts to the given cpu mask in round robin
+ * fashion. Don't set any affinity for the rings used by IPA.
+ *
+ * example: given cpumask is 0x3 and reo3 and reo7 are used by IPA,
+ * reo0->cpu0, reo1->cpu1, reo2->cpu0, reo4->cpu1, reo5->cpu0, reo6->cpu1.
+ *
+ * @dp_ctx: dp context
+ * Return: none
+ */
+void wlan_dp_lb_set_default_affinity(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
+	qdf_cpu_mask *cpu_mask = &lb_data->curr_cpu_mask;
+	qdf_cpu_mask temp_mask;
+	int i, cpu;
+	int grp_id;
+
+	if (qdf_cpumask_empty(cpu_mask))
+		return;
+
+	qdf_cpumask_copy(&temp_mask, cpu_mask);
+
+	for (i = 0; i < MAX_REO_DEST_RINGS; i++) {
+		if (wlan_dp_check_is_ring_ipa_rx(dp_ctx->cdp_soc, i))
+			continue;
+
+		grp_id = cdp_get_ext_grp_id_from_reo_num(dp_ctx->cdp_soc, i);
+		cpu = qdf_cpumask_first(&temp_mask);
+		hif_check_and_apply_irq_affinity(dp_ctx->hif_handle,
+						 grp_id, cpu);
+		qdf_cpumask_clear_cpu(cpu, &temp_mask);
+		if (qdf_cpumask_empty(&temp_mask))
+			qdf_cpumask_copy(&temp_mask, cpu_mask);
+	}
+
+	lb_data->in_default_affinity = true;
 }
 
 /**
@@ -309,6 +353,7 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 
 	qdf_spin_unlock(&lb_data->load_balance_lock);
 	lb_data->last_load_balanced_time = qdf_sched_clock();
+	lb_data->in_default_affinity = false;
 
 	dp_info("Total time taken for load balance %lluns",
 		lb_data->last_load_balanced_time - start_time);
@@ -417,16 +462,31 @@ wlan_dp_lb_compute_cpu_load_average(struct wlan_dp_psoc_context *dp_ctx)
  * handler to compute the stats average for every sampling threshold time(1sec).
  *
  * @dp_ctx: dp context
+ * @tput_level: current throughput level
  *
  * Return: none
  */
-void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx)
+void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx,
+				      enum tput_level tput_level)
 {
-	struct wlan_dp_lb_data *lb_data;
+	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
 	uint64_t curr_time_in_ns = qdf_sched_clock();
 	uint64_t time_delta_ns;
+	static uint32_t tput_level_high_count;
+	static uint32_t tput_level_low_count;
 
-	lb_data = &dp_ctx->lb_data;
+	if (tput_level >= TPUT_LEVEL_HIGH) {
+		tput_level_high_count++;
+		tput_level_low_count = 0;
+	} else {
+		tput_level_low_count++;
+		tput_level_high_count = 0;
+	}
+
+	if ((tput_level_low_count > DEFAULT_AFFINITY_THRESH) &&
+	    !lb_data->in_default_affinity)
+		wlan_dp_lb_set_default_affinity(dp_ctx);
+
 	if (!lb_data->last_stats_avg_comp_time) {
 		lb_data->last_stats_avg_comp_time = curr_time_in_ns;
 		lb_data->last_load_balanced_time = curr_time_in_ns;
@@ -442,7 +502,8 @@ void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx)
 	}
 
 	time_delta_ns = curr_time_in_ns - lb_data->last_load_balanced_time;
-	if (time_delta_ns >= LOAD_BALANCE_TIME_THRS)
+	if ((time_delta_ns >= LOAD_BALANCE_TIME_THRS) &&
+	    (tput_level_high_count > LOAD_BALANCE_TPUT_THRESH_CNT))
 		wlan_dp_lb_handler(dp_ctx);
 }
 

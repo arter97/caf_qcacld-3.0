@@ -81,6 +81,7 @@ struct cpu_irq_load {
  * @last_load_balanced_time: time since when the previous load balance is done
  *	in nanoseconds
  * @num_wlan_used_rx_rings: number of rx rings used by wlan
+ * @in_default_affinity: currently default affinity is set for dp rx interrupts
  */
 struct wlan_dp_lb_data {
 	struct cpu_irq_load cpu_load[NR_CPUS];
@@ -91,6 +92,7 @@ struct wlan_dp_lb_data {
 	uint64_t last_stats_avg_comp_time;
 	uint64_t last_load_balanced_time;
 	uint8_t num_wlan_used_rx_rings;
+	bool in_default_affinity;
 };
 
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
@@ -114,10 +116,21 @@ void wlan_dp_load_balancer_deinit(struct wlan_objmgr_psoc *psoc);
  * wlan_dp_lb_compute_stats_average() - compute stats average
  * for load balance
  * @dp_ctx: dp context
+ * @cur_tput_level: current throughput level
  *
  * Return: none
  */
-void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx);
+void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx,
+				      enum tput_level cur_tput_level);
+
+/**
+ * wlan_dp_lb_set_default_affinity() - set default affinity for dp rx
+ * groups
+ * @dp_ctx: dp context
+ *
+ * Return: none
+ */
+void wlan_dp_lb_set_default_affinity(struct wlan_dp_psoc_context *dp_ctx);
 #else
 static inline void wlan_dp_load_balancer_init(struct wlan_objmgr_psoc *psoc)
 {
@@ -128,7 +141,13 @@ static inline void wlan_dp_load_balancer_deinit(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline void
-wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx)
+wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx,
+				 enum tput_level cur_tput_level)
+{
+}
+
+static inline void
+wlan_dp_lb_set_default_affinity(struct wlan_dp_psoc_context *dp_ctx)
 {
 }
 #endif

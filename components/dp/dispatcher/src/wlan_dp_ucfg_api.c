@@ -2965,6 +2965,18 @@ void ucfg_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
 	return wlan_dp_txrx_soc_detach(soc);
 }
 
+void ucfg_dp_txrx_set_default_affinity(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return;
+	}
+
+	wlan_dp_lb_set_default_affinity(dp_ctx);
+}
+
 QDF_STATUS ucfg_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
 	return wlan_dp_txrx_attach_target(soc, pdev_id);

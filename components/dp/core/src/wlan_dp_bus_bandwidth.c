@@ -1724,7 +1724,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	}
 
 	hif_affinity_mgr_set_affinity(hif_ctx);
-	wlan_dp_lb_compute_stats_average(dp_ctx);
+	wlan_dp_lb_compute_stats_average(dp_ctx, tput_level);
 
 }
 
