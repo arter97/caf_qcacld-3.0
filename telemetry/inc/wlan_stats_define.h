@@ -208,13 +208,13 @@ enum stats_type_e {
  * enum stats_info_attr: Defines the bitmap for the
  *                       telemetric info attribute
  * @STATS_INFO_AGGREGATE:   Indicate aggregation flag for driver
+ * @STATS_INFO_RESOLVE_STA: Indicate Host driver to resolve STA internaly
  * @STATS_INFO_ASYNC_REQ:   Indicate the request for non-blocking stats
- * @STATS_INFO_STATUS_FAIL: Indicate failure in processing req
  */
 enum stats_info_attr {
 	STATS_INFO_AGGREGATE = 1,
-	STATS_INFO_ASYNC_REQ = 2,
-	STATS_INFO_STATUS_FAIL = 4,
+	STATS_INFO_RESOLVE_STA = 2,
+	STATS_INFO_ASYNC_REQ = 4,
 };
 
 enum stats_if_wme_ac {

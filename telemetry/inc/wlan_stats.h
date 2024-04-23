@@ -99,6 +99,7 @@ enum stats_feat_index_e {
  * @intf_name: Interface name for which stats are requested
  * @async_req: Indicate the request for non-blocking stats
  * @link_id: Link id of a MLD object
+ * @resolve_sta: Indicate Host driver to find the vdev to which STA is connected
  */
 struct stats_config {
 	struct wiphy           *wiphy;
@@ -115,6 +116,7 @@ struct stats_config {
 	char                   intf_name[IFNAMSIZ];
 	bool                   async_req;
 	u_int8_t               link_id;
+	bool                   resolve_sta;
 };
 
 /**
