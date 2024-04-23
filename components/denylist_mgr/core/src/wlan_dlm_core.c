@@ -153,117 +153,10 @@ dlm_update_ap_info(struct dlm_reject_ap *dlm_entry, struct dlm_config *cfg,
 #define MAX_BL_TIME 255000
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/**
- * dlm_is_11_ax_allowed() - If avoided candidate is allowed to connect
- * as 11AX or not
- * @entry: scan entry
- * @reject_ap_list:   reject ap list
- *
- * This API checks if the avoided entry is added to avoid 11BE connection
- * only or all modes are not allowed. AP could set EHT not supported which
- * means that host should avoid 11BE connection only whether the enum is
- * set for assoc link or partner link.
- *
- * Return: true/false based on 11ax connection allowed or not
- */
-static bool dlm_is_11_ax_allowed(struct scan_cache_entry *entry,
-				 qdf_list_t *reject_ap_list)
-{
-	struct dlm_reject_ap *dlm_entry = NULL;
-	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
-	uint8_t i;
-
-	/*
-	 * Here entry is not MLO entry, so no need to check
-	 * further the added entry is not allowed as 11AX.
-	 */
-	if (!entry->ie_list.multi_link_bv)
-		return false;
-
-	/*
-	 * Don't try to connect even if the partner link
-	 * is not allowed to connect in 11BE. The AP can't
-	 * support 11BE bit 11AX can be supported.
-	 */
-	qdf_list_peek_front(reject_ap_list, &cur_node);
-	while (cur_node) {
-		qdf_list_peek_next(reject_ap_list, cur_node,
-				   &next_node);
-
-		dlm_entry = qdf_container_of(cur_node, struct dlm_reject_ap,
-					     node);
-		if (qdf_is_macaddr_equal(&dlm_entry->bssid, &entry->bssid)) {
-			if (dlm_entry->dlm_reject_mlo_ap_info.link_action ==
-			    WLAN_HOST_REJECT_11BE)
-				return true;
-		}
-		for (i = 0; i < entry->ml_info.num_links; i++) {
-			if (qdf_is_macaddr_equal(
-				&dlm_entry->bssid,
-				&entry->ml_info.link_info[i].link_addr)) {
-				if (dlm_entry->dlm_reject_mlo_ap_info.link_action ==
-				    WLAN_HOST_REJECT_11BE)
-					return true;
-			}
-		}
-		cur_node = next_node;
-		next_node = NULL;
-	}
-
-	/* There is no other link action where candidate can be present in avoid
-	 * list and can connect in different mode. So, add entry to avoid list
-	 * in case entry is present in avoid list.
-	 */
-	return false;
-}
 
 /**
- * dlm_is_partner_link_in_avoid_list() - If partner link of the current entry
- * needs to be avoided or not
- * @entry: scan entry
- * @reject_ap_list:   reject ap list
- *
- * This API checks if the partner link of the current entry is added as avoid
- * as partner link or not.
- *
- * Return: true/false based on partner link in avoid list or not.
- */
-static bool dlm_is_partner_link_in_avoid_list(struct scan_cache_entry *entry,
-					      qdf_list_t *reject_ap_list)
-{
-	struct dlm_reject_ap *dlm_entry = NULL;
-	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
-	uint8_t i;
-
-	if (!entry->ie_list.multi_link_bv)
-		return false;
-
-	qdf_list_peek_front(reject_ap_list, &cur_node);
-	while (cur_node) {
-		qdf_list_peek_next(reject_ap_list, cur_node,
-				   &next_node);
-
-		dlm_entry = qdf_container_of(cur_node, struct dlm_reject_ap,
-					     node);
-		for (i = 0; i < entry->ml_info.num_links; i++) {
-			if (qdf_is_macaddr_equal(
-					&dlm_entry->bssid,
-					&entry->ml_info.link_info[i].link_addr)) {
-				if (dlm_entry->dlm_reject_mlo_ap_info.link_action ==
-				    WLAN_HOST_AVOID_CANDIDATE_WITH_ASSOC_OR_PARTNER_LINK)
-					return true;
-			}
-		}
-		cur_node = next_node;
-		next_node = NULL;
-	}
-
-	return false;
-}
-
-/**
- * dlm_is_11be_trial_reach_max() - If 11BE connection trail for particular entry is
- * reached to max or not
+ * dlm_is_11be_trial_reach_max() - If 11BE connection trail for particular entry
+ * is reached to max or not
  * @pdev: pdev
  * @entry: scan entry
  * @reject_ap_list:   reject ap list
@@ -295,7 +188,7 @@ static bool dlm_is_11be_trial_reach_max(struct wlan_objmgr_pdev *pdev,
 				&dlm_entry->dlm_reject_mlo_ap_info.mld_addr,
 				&entry->ml_info.mld_mac_addr)) {
 			mlo_connection_trial +=
-				dlm_entry->dlm_reject_mlo_ap_info.tried_link_count;
+			dlm_entry->dlm_reject_mlo_ap_info.tried_link_count;
 			if (mlo_connection_trial >
 			    wlan_dlm_get_max_allowed_11be_failure(pdev))
 				return true;
@@ -306,24 +199,151 @@ static bool dlm_is_11be_trial_reach_max(struct wlan_objmgr_pdev *pdev,
 
 	return false;
 }
+
+/**
+ * dlm_is_11be_entry_allowed() - If avoided candidate is allowed to connect
+ * in 11be
+ * @pdev: obj mgr pdev
+ * @entry: scan entry
+ * @dlm_entry:   dlm_entry
+ * @reject_ap_list: reject ap list
+ *
+ * Return: true/false based on 11ax connection allowed or not
+ */
+static bool dlm_is_11be_entry_allowed(struct wlan_objmgr_pdev *pdev,
+				      struct scan_cache_entry *entry,
+				      struct dlm_reject_ap *dlm_entry,
+				      qdf_list_t *reject_ap_list)
+{
+	bool allowed = true;
+	int i;
+
+	/*
+	 * Here entry is not MLO entry, so no need to check
+	 * further.
+	 */
+	if (!entry->ie_list.multi_link_bv)
+		return allowed;
+
+	/* This is MLD level check */
+	if (dlm_entry->dlm_reject_mlo_ap_info.link_action ==
+	    WLAN_HOST_REJECT_11BE) {
+		dlm_debug(QDF_MAC_ADDR_FMT " with no of links %d, rejected as bssid " QDF_MAC_ADDR_FMT  " is not allowed for 11BE",
+			  QDF_MAC_ADDR_REF(entry->bssid.bytes),
+			  entry->ml_info.num_links,
+			  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes));
+		allowed = false;
+		goto exit;
+	}
+
+	/* This is LINK address level check */
+	for (i = 0; i < entry->ml_info.num_links; i++) {
+		if (qdf_is_macaddr_equal(&dlm_entry->bssid,
+		    &entry->ml_info.link_info[i].link_addr) &&
+		    dlm_entry->dlm_reject_mlo_ap_info.link_action ==
+		    WLAN_HOST_AVOID_CANDIDATE_WITH_ASSOC_OR_PARTNER_LINK) {
+			dlm_debug(QDF_MAC_ADDR_FMT " with no of links %d, rejected as partner link " QDF_MAC_ADDR_FMT  " is not allowed for 11BE",
+				  QDF_MAC_ADDR_REF(entry->bssid.bytes),
+				  entry->ml_info.num_links,
+				  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes));
+			allowed = false;
+			goto exit;
+		}
+	}
+
+	/* This is bssid level check */
+	if (qdf_is_macaddr_equal(&dlm_entry->bssid, &entry->bssid)) {
+		if (entry->ml_info.num_links == THREE_LINK &&
+		    dlm_entry->dlm_reject_mlo_ap_info.link_action ==
+		    WLAN_HOST_AVOID_3_LINK) {
+			dlm_debug(QDF_MAC_ADDR_FMT " with no of links %d, as 3 link not allowed ",
+				  QDF_MAC_ADDR_REF(entry->bssid.bytes),
+					entry->ml_info.num_links);
+			allowed = false;
+			goto exit;
+		}
+
+		if (entry->ml_info.num_links == TWO_LINK &&
+		    dlm_entry->dlm_reject_mlo_ap_info.link_action ==
+		    WLAN_HOST_AVOID_2_LINK) {
+			dlm_debug(QDF_MAC_ADDR_FMT " with no of links %d, as 2 link not allowed ",
+				  QDF_MAC_ADDR_REF(entry->bssid.bytes),
+				  entry->ml_info.num_links);
+			allowed = false;
+			goto exit;
+		}
+	}
+
+	if (dlm_is_11be_trial_reach_max(pdev, entry, reject_ap_list)) {
+		dlm_debug(QDF_MAC_ADDR_FMT " MAX trial reach for the MLD " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes),
+			  QDF_MAC_ADDR_REF(dlm_entry->dlm_reject_mlo_ap_info.mld_addr));
+		allowed = false;
+	}
+	/* There is no other link action where candidate can be present in avoid
+	 * list and can connect in different mode. So, add entry to avoid list
+	 * in case entry is present in avoid list.
+	 */
+exit:
+	if (!allowed)
+		dlm_entry->dlm_reject_mlo_ap_info.tried_link_count++;
+
+	return allowed;
+}
+
+static bool dlm_is_entry_11be(struct dlm_reject_ap *dlm_entry)
+{
+	if (!qdf_is_macaddr_zero(&dlm_entry->dlm_reject_mlo_ap_info.mld_addr))
+		return true;
+
+	return false;
+
+}
+
+static bool dlm_is_11be_action(struct dlm_reject_ap *dlm_entry)
+{
+	return dlm_entry->dlm_reject_mlo_ap_info.link_action ? true : false;
+}
+
+static bool dlm_is_mld_address_match(struct dlm_reject_ap *dlm_entry,
+				     struct scan_cache_entry *entry)
+{
+
+	if (!entry->ie_list.multi_link_bv)
+		return false;
+
+	dlm_debug("dlm entry mld " QDF_MAC_ADDR_FMT " entry mld" QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(dlm_entry->dlm_reject_mlo_ap_info.mld_addr.bytes),
+		  QDF_MAC_ADDR_REF(entry->ml_info.mld_mac_addr.bytes));
+
+	if (qdf_is_macaddr_equal(&dlm_entry->dlm_reject_mlo_ap_info.mld_addr,
+				 &entry->ml_info.mld_mac_addr))
+		return true;
+
+	return false;
+}
 #else
-static inline bool dlm_is_11_ax_allowed(struct scan_cache_entry *entry,
-					qdf_list_t *reject_ap_list)
+static inline bool dlm_is_11be_entry_allowed(struct wlan_objmgr_pdev *pdev,
+					     struct scan_cache_entry *entry,
+					     struct dlm_reject_ap *dlm_entry,
+					     qdf_list_t *reject_ap_list)
+{
+	return false;
+}
+
+static inline bool dlm_is_entry_11be(struct dlm_reject_ap *dlm_entry)
+{
+	return false;
+}
+
+static inline bool dlm_is_11be_action(struct dlm_reject_ap *dlm_entry)
 {
 	return false;
 }
 
 static inline bool
-dlm_is_partner_link_in_avoid_list(struct scan_cache_entry *entry,
-				  qdf_list_t *reject_ap_list)
-{
-	return false;
-}
-
-static inline bool
-dlm_is_11be_trial_reach_max(struct wlan_objmgr_pdev *pdev,
-			    struct scan_cache_entry *entry,
-			    qdf_list_t *reject_ap_list)
+dlm_is_mld_address_match(struct dlm_reject_ap *dlm_entry,
+			 struct scan_cache_entry *entry)
 {
 	return false;
 }
@@ -351,7 +371,8 @@ dlm_prune_old_entries_and_get_action(struct wlan_objmgr_pdev *pdev,
 		return CM_DLM_NO_ACTION;
 	}
 
-	if (DLM_IS_AP_IN_RSSI_REJECT_LIST(dlm_entry) &&
+	if (qdf_is_macaddr_equal(&dlm_entry->bssid, &entry->bssid) &&
+	    DLM_IS_AP_IN_RSSI_REJECT_LIST(dlm_entry) &&
 	    !dlm_entry->userspace_denylist && !dlm_entry->driver_denylist &&
 	    dlm_entry->rssi_reject_params.original_timeout > MAX_BL_TIME) {
 		dlm_info("Allow BSSID " QDF_MAC_ADDR_FMT " as the retry delay is greater than %u ms, expected RSSI = %d, current RSSI = %d, retry delay = %u ms original timeout %u time added %lu source %d reason %d",
@@ -371,9 +392,21 @@ dlm_prune_old_entries_and_get_action(struct wlan_objmgr_pdev *pdev,
 
 		return CM_DLM_NO_ACTION;
 	}
+
 	if (DLM_IS_AP_IN_DENYLIST(dlm_entry)) {
-		dlm_debug(QDF_MAC_ADDR_FMT " in denylist list, reject ap type %d removing from candidate list",
-			  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes),
+		if (DLM_IS_AP_DENYLISTED_BY_DRIVER(dlm_entry) &&
+		    dlm_is_entry_11be(dlm_entry) &&
+		    dlm_is_11be_action(dlm_entry)) {
+			if (!dlm_is_11be_entry_allowed(pdev, entry, dlm_entry,
+						       reject_ap_list))
+				return CM_DLM_REMOVE;
+			else
+				return CM_DLM_NO_ACTION;
+		}
+		if (!qdf_is_macaddr_equal(&dlm_entry->bssid, &entry->bssid))
+			return CM_DLM_NO_ACTION;
+		dlm_debug(QDF_MAC_ADDR_FMT " in deny list, reject ap type %d removing from candidate list",
+			  QDF_MAC_ADDR_REF(entry->bssid.bytes),
 			  dlm_entry->reject_ap_type);
 
 		if (DLM_IS_AP_DENYLISTED_BY_USERSPACE(dlm_entry) ||
@@ -383,24 +416,25 @@ dlm_prune_old_entries_and_get_action(struct wlan_objmgr_pdev *pdev,
 		return CM_DLM_REMOVE;
 	}
 
-	if (DLM_IS_AP_IN_AVOIDLIST(dlm_entry) &&
-	    !dlm_is_11_ax_allowed(entry, reject_ap_list)) {
-		dlm_debug(QDF_MAC_ADDR_FMT " in avoid list, deprioritize it",
-			  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes));
+	if (DLM_IS_AP_IN_AVOIDLIST(dlm_entry)) {
+		if (DLM_IS_AP_AVOIDED_BY_DRIVER(dlm_entry) &&
+		    dlm_is_entry_11be(dlm_entry) &&
+		    dlm_is_11be_action(dlm_entry)) {
+			if (!dlm_is_11be_entry_allowed(pdev, entry, dlm_entry,
+						       reject_ap_list))
+				return CM_DLM_AVOID;
+			else
+				return CM_DLM_NO_ACTION;
+		}
+		if (!qdf_is_macaddr_equal(&dlm_entry->bssid, &entry->bssid))
+			return CM_DLM_NO_ACTION;
+
+		dlm_debug(QDF_MAC_ADDR_FMT " in avoid list, reject ap type %d removing from candidate list",
+			  QDF_MAC_ADDR_REF(entry->bssid.bytes),
+			  dlm_entry->reject_ap_type);
 		return CM_DLM_AVOID;
 	}
 
-	if (dlm_is_partner_link_in_avoid_list(entry, reject_ap_list)) {
-		dlm_debug(QDF_MAC_ADDR_FMT " in avoid list, deprioritize it",
-			  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes));
-		return CM_DLM_AVOID;
-	}
-
-	if (dlm_is_11be_trial_reach_max(pdev, entry, reject_ap_list)) {
-		dlm_debug(QDF_MAC_ADDR_FMT " in avoid list, deprioritize it",
-			  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes));
-		return CM_DLM_AVOID;
-	}
 	return CM_DLM_NO_ACTION;
 }
 
@@ -428,7 +462,6 @@ dlm_action_on_bssid(struct wlan_objmgr_pdev *pdev,
 		dlm_err("failed to acquire reject_ap_list_lock");
 		return CM_DLM_NO_ACTION;
 	}
-
 	cfg = &dlm_psoc_obj->dlm_cfg;
 
 	qdf_list_peek_front(&dlm_ctx->reject_ap_list, &cur_node);
@@ -440,7 +473,8 @@ dlm_action_on_bssid(struct wlan_objmgr_pdev *pdev,
 		dlm_entry = qdf_container_of(cur_node, struct dlm_reject_ap,
 					     node);
 
-		if (qdf_is_macaddr_equal(&dlm_entry->bssid, &entry->bssid)) {
+		if (qdf_is_macaddr_equal(&dlm_entry->bssid, &entry->bssid) ||
+		    dlm_is_mld_address_match(dlm_entry, entry)) {
 			action = dlm_prune_old_entries_and_get_action(pdev,
 						dlm_entry, cfg, entry,
 						&dlm_ctx->reject_ap_list);
