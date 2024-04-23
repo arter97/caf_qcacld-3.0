@@ -98,6 +98,7 @@ enum stats_feat_index_e {
  * @peer_type: type of peer
  * @intf_name: Interface name for which stats are requested
  * @async_req: Indicate the request for non-blocking stats
+ * @link_id: Link id of a MLD object
  */
 struct stats_config {
 	struct wiphy           *wiphy;
@@ -113,6 +114,7 @@ struct stats_config {
 	enum stats_peer_type   peer_type;
 	char                   intf_name[IFNAMSIZ];
 	bool                   async_req;
+	u_int8_t               link_id;
 };
 
 /**
