@@ -359,6 +359,114 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 		lb_data->last_load_balanced_time - start_time);
 }
 
+static inline void
+wlan_dp_lb_get_update_cpu_mask(struct wlan_dp_lb_data *lb_data,
+			       int max_num_cpus,
+			       qdf_cpu_mask *audio_taken_cpus,
+			       qdf_cpu_mask *updated_cpu_mask)
+{
+	int num_cpus = 0;
+	int cpu;
+
+	qdf_cpumask_clear(updated_cpu_mask);
+	qdf_for_each_online_cpu(cpu) {
+		if (qdf_cpumask_test_cpu(cpu, audio_taken_cpus))
+			continue;
+
+		qdf_cpumask_set_cpu(cpu, updated_cpu_mask);
+		num_cpus++;
+
+		if (num_cpus == NUM_CPUS_FOR_LOAD_BALANCE)
+			break;
+	}
+}
+
+#ifdef WLAN_FEATURE_AFFINITY_MGR
+/* time in ns units */
+#define AFFINITY_TIME_THRESHOLD 5000000000
+
+/**
+ * wlan_dp_lb_check_for_cpu_mask_change - check whether preferred cpumask need
+ * to be changed due to audio affinity.
+ * If audio taken cpumask is empty then use default preferred cpumask
+ * for load balance.
+ * If audio taken cpumask is not empty then update the preferred cpumask
+ * which will not intersect with the audio taken cpumask.
+ *
+ * @dp_ctx: dp context
+ *
+ * Return: none
+ */
+static void
+wlan_dp_lb_check_for_cpu_mask_change(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_lb_data *lb_data;
+	qdf_cpu_mask audio_taken_cpus;
+	qdf_cpu_mask updated_cpu_mask;
+	uint64_t cur_time = qdf_sched_clock();
+
+	if (!hif_affinity_mgr_supported(dp_ctx->hif_handle))
+		return;
+
+	lb_data = &dp_ctx->lb_data;
+	/* Get audio taken cpus mask */
+	audio_taken_cpus = qdf_walt_get_cpus_taken();
+
+	if (qdf_cpumask_empty(&audio_taken_cpus)) {
+		if (!qdf_cpumask_empty(&lb_data->audio_taken_cpumask))
+			qdf_cpumask_clear(&lb_data->audio_taken_cpumask);
+
+		if (!qdf_cpumask_equal(&lb_data->preferred_cpu_mask,
+				       &lb_data->def_cpumask)) {
+			qdf_cpumask_copy(&lb_data->preferred_cpu_mask,
+					 &lb_data->def_cpumask);
+			goto load_balance;
+		}
+
+		return;
+	}
+
+	if (!qdf_cpumask_equal(&lb_data->audio_taken_cpumask,
+			       &audio_taken_cpus) &&
+	    ((cur_time - lb_data->cpu_mask_change_time) <
+	     AFFINITY_TIME_THRESHOLD)) {
+		wlan_dp_lb_get_update_cpu_mask(lb_data,
+					       NUM_CPUS_FOR_LOAD_BALANCE,
+					       &audio_taken_cpus,
+					       &updated_cpu_mask);
+		if (qdf_cpumask_empty(&updated_cpu_mask))
+			qdf_cpumask_copy(&lb_data->preferred_cpu_mask,
+					 &audio_taken_cpus);
+		else
+			qdf_cpumask_copy(&lb_data->preferred_cpu_mask,
+					 &updated_cpu_mask);
+
+		dp_debug("Audio taken cpus old:%*pbl new:%*pbl updated_cpumask:%pbl",
+			 qdf_cpumask_pr_args(&lb_data->audio_taken_cpumask),
+			 qdf_cpumask_pr_args(&audio_taken_cpus),
+			 qdf_cpumask_pr_args(&lb_data->preferred_cpu_mask));
+
+		qdf_cpumask_copy(&lb_data->audio_taken_cpumask,
+				 &audio_taken_cpus);
+		lb_data->cpu_mask_change_time = cur_time;
+		goto load_balance;
+	}
+
+	return;
+
+load_balance:
+	qdf_cpumask_copy(&lb_data->curr_cpu_mask,
+			 &lb_data->preferred_cpu_mask);
+	wlan_dp_lb_set_default_affinity(dp_ctx);
+	wlan_dp_lb_handler(dp_ctx);
+}
+#else
+static inline void
+wlan_dp_lb_check_for_cpu_mask_change(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+#endif
+
 /**
  * wlan_dp_lb_compute_cpu_load_average() - function called from
  * wlan_dp_lb_compute_stats_average() and it does the following,
@@ -489,6 +597,8 @@ void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx,
 	if ((tput_level_low_count > DEFAULT_AFFINITY_THRESH) &&
 	    !lb_data->in_default_affinity)
 		wlan_dp_lb_set_default_affinity(dp_ctx);
+
+	wlan_dp_lb_check_for_cpu_mask_change(dp_ctx);
 
 	if (!lb_data->last_stats_avg_comp_time) {
 		lb_data->last_stats_avg_comp_time = curr_time_in_ns;

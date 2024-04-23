@@ -75,6 +75,8 @@ struct cpu_irq_load {
  * changed if all the cups of current preferred mask goes offline or current
  * preferred mask intersect with the audio used cpumask.
  * @curr_cpu_mask: cpus which are available for load balance currently,
+ * @audio_taken_cpumask: cpu mask which is being used by audio
+ * @cpu_mask_change_time: time in ns at which cpu mask changed last time
  * subset of preferred_cpu_mask
  * @load_balance_lock: lock to protect load balace from multiple contexts
  * @last_stats_avg_comp_time: time since previous stats average computed in ns
@@ -88,6 +90,8 @@ struct wlan_dp_lb_data {
 	qdf_cpu_mask def_cpumask;
 	qdf_cpu_mask preferred_cpu_mask;
 	qdf_cpu_mask curr_cpu_mask;
+	qdf_cpu_mask audio_taken_cpumask;
+	uint64_t cpu_mask_change_time;
 	qdf_spinlock_t load_balance_lock;
 	uint64_t last_stats_avg_comp_time;
 	uint64_t last_load_balanced_time;
