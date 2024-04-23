@@ -692,7 +692,7 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 	uint8_t info = 0;
 	uint64_t request_id = 0;
 
-	if (cmd->recursive)
+	if (!cmd->recursive)
 		info |= STATS_INFO_AGGREGATE;
 	if (is_async_req()) {
 		info |= STATS_INFO_ASYNC_REQ;
