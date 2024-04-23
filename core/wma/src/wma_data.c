@@ -2694,7 +2694,8 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	mgmt_param.peer_rssi = peer_rssi;
 	if (iface && wlan_vdev_mlme_get_opmode(iface->vdev) == QDF_STA_MODE &&
 	    wlan_vdev_mlme_is_mlo_vdev(iface->vdev) &&
-	    wma_is_vdev_up(vdev_id) && frmType == TXRX_FRM_802_11_MGMT &&
+	    (wlan_vdev_mlme_is_active(iface->vdev) == QDF_STATUS_SUCCESS) &&
+	    frmType == TXRX_FRM_802_11_MGMT &&
 	    pFc->subType != SIR_MAC_MGMT_PROBE_REQ &&
 	    pFc->subType != SIR_MAC_MGMT_AUTH &&
 	    action != (ACTION_CATEGORY_PUBLIC << 8 | TDLS_DISCOVERY_RESPONSE) &&

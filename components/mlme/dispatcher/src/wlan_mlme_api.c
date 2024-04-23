@@ -1397,6 +1397,27 @@ void wlan_mlme_set_epcs_capability(struct wlan_objmgr_psoc *psoc, bool flag)
 	mlme_obj->cfg.sta.epcs_capability = flag;
 }
 
+bool wlan_mlme_get_eht_disable_punct_in_us_lpi(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.sta.eht_disable_punct_in_us_lpi;
+}
+
+void wlan_mlme_set_eht_disable_punct_in_us_lpi(struct wlan_objmgr_psoc *psoc, bool flag)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return;
+
+	mlme_debug("set mlme epcs capability to %d", flag);
+	mlme_obj->cfg.sta.eht_disable_punct_in_us_lpi = flag;
+}
+
 bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
@@ -8031,6 +8052,9 @@ wlan_mlme_get_bw_no_punct(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint8_t country[REG_ALPHA2_LEN + 1];
 
+	if (!wlan_mlme_get_eht_disable_punct_in_us_lpi(psoc))
+		return status;
+
 	wlan_reg_read_current_country(psoc, country);
 
 	if (!wlan_reg_is_6ghz_chan_freq(bss_chan->ch_freq) ||
@@ -8076,6 +8100,9 @@ wlan_mlme_update_bw_no_punct(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	enum phy_ch_width new_ch_width;
 	struct wlan_objmgr_pdev *pdev;
+
+	if (!wlan_mlme_get_eht_disable_punct_in_us_lpi(psoc))
+		return status;
 
 	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0,
 					  WLAN_MLME_NB_ID);

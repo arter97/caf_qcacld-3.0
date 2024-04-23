@@ -1818,6 +1818,7 @@ enum station_prefer_bw {
  * @mlo_prefer_percentage:          percentage to boost/reduce mlo scoring
  * @epcs_capability:                epcs capability enable or disable flag
  * @usr_disable_eht:                user disable the eht for STA
+ * @eht_disable_punct_in_us_lpi:    Disable eht puncture in us lpi mode
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1856,6 +1857,7 @@ struct wlan_mlme_sta_cfg {
 #ifdef WLAN_FEATURE_11BE
 	bool epcs_capability;
 	bool usr_disable_eht;
+	bool eht_disable_punct_in_us_lpi;
 #endif
 };
 

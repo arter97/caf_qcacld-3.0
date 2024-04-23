@@ -1320,6 +1320,25 @@ void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable);
 
 /**
+ * wlan_mlme_get_eht_disable_punct_in_us_lpi() - Get disable eht punct in us
+ * lpi mode flag.
+ * @psoc: psoc object
+ *
+ * Return: true if eht punct disabled in us lpi mode
+ */
+bool wlan_mlme_get_eht_disable_punct_in_us_lpi(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_eht_disable_punct_in_us_lpi() - Set disable eht punct in us
+ * lpi mode flag.
+ * @psoc: psoc object
+ * @flag: true if eht punct disabled in us lpi mode
+ *
+ * Return: void
+ */
+void wlan_mlme_set_eht_disable_punct_in_us_lpi(struct wlan_objmgr_psoc *psoc,
+					       bool flag);
+/**
  * wlan_mlme_update_bw_no_punct() - update connected VDEV
  * channel bandwidth without puncture bitmap for FCC requirement
  * @psoc: pointer to SOC object
@@ -1366,6 +1385,18 @@ bool wlan_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
 static inline
 void wlan_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable)
+{
+}
+
+static inline
+bool wlan_mlme_get_eht_disable_punct_in_us_lpi(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+void wlan_mlme_set_eht_disable_punct_in_us_lpi(struct wlan_objmgr_psoc *psoc,
+					       bool flag)
 {
 }
 
