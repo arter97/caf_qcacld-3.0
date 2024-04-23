@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved..
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved..
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,6 +38,24 @@ int hdd_sysfs_runtime_pm_create(struct kobject *driver_kobject);
 void
 hdd_sysfs_runtime_pm_destroy(struct kobject *driver_kobject);
 
+/**
+ * hdd_sysfs_create_rtpm_interface() - API to create
+ * rtpm sysfs file
+ * @wifi_kobject: sysfs wifi kobject
+ *
+ * Return: 0 for success and non zero error code for failure
+ */
+int hdd_sysfs_create_rtpm_interface(struct kobject *wifi_kobject);
+
+/**
+ * hdd_sysfs_destroy_rtpm_interface() - API to destroy
+ * rtpm sysfs file
+ * @wifi_kobject: sysfs wifi kobject
+ *
+ * Return: None
+ */
+void hdd_sysfs_destroy_rtpm_interface(struct kobject *wifi_kobject);
+
 #else
 
 static inline int
@@ -50,5 +68,16 @@ static inline void
 hdd_sysfs_runtime_pm_destroy(struct kobject *driver_kobject)
 {
 }
+
+static inline void
+hdd_sysfs_create_rtpm_interface(struct kobject *wifi_kobject)
+{
+}
+
+static inline void
+hdd_sysfs_destroy_rtpm_interface(struct kobject *wifi_kobject)
+{
+}
+
 #endif
 #endif

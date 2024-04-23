@@ -1189,7 +1189,8 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 	if (!hif_ctx)
 		return -EINVAL;
 
-	is_any_sta_connected = hdd_is_any_sta_connected(hdd_ctx);
+	is_any_sta_connected = hdd_is_any_sta_connected(hdd_ctx) ||
+					hdd_is_any_cli_connected(hdd_ctx);
 
 	hdd_debug("PM QOS update: runtime_pm_prevented %d Current value: %ld, is_any_sta_connected %d",
 		  hdd_ctx->runtime_pm_prevented, curr_val,
@@ -1221,7 +1222,8 @@ bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 	long long curr_val_us;
 	int max_cpu_num;
 
-	if (!hdd_is_any_sta_connected(hdd_ctx)) {
+	if (!hdd_is_any_sta_connected(hdd_ctx) &&
+	    !hdd_is_any_cli_connected(hdd_ctx)) {
 		hdd_debug("No active wifi connections. Ignore PM QOS vote");
 		return false;
 	}

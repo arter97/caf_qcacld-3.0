@@ -1157,13 +1157,19 @@ void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 static void hdd_send_obss_scan_req(struct hdd_context *hdd_ctx, bool val)
 {
 	QDF_STATUS status;
-	uint32_t sta_vdev_id = 0;
+	uint32_t vdev_id = 0;
 
-	status = hdd_get_first_connected_sta_vdev_id(hdd_ctx, &sta_vdev_id);
+	status = hdd_get_first_connected_sta_cli_vdev_id(hdd_ctx, &vdev_id,
+							 QDF_STA_MODE);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		status = hdd_get_first_connected_sta_cli_vdev_id(
+							hdd_ctx, &vdev_id,
+							QDF_P2P_CLIENT_MODE);
+	}
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_debug("reconfig OBSS scan param: %d", val);
-		sme_reconfig_obss_scan_param(hdd_ctx->mac_handle, sta_vdev_id,
+		sme_reconfig_obss_scan_param(hdd_ctx->mac_handle, vdev_id,
 					     val);
 	} else {
 		hdd_debug("Connected STA not found");

@@ -629,8 +629,9 @@ void hdd_abort_ongoing_sta_sae_connection(struct hdd_context *hdd_ctx)
 					     false);
 }
 
-QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
-					       uint32_t *vdev_id)
+QDF_STATUS hdd_get_first_connected_sta_cli_vdev_id(struct hdd_context *hdd_ctx,
+						   uint32_t *vdev_id,
+						   enum QDF_OPMODE device_mode)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ANY_STA_CONNECTED;
@@ -643,8 +644,7 @@ QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (adapter->device_mode == QDF_STA_MODE ||
-		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		if (adapter->device_mode == device_mode) {
 			hdd_adapter_for_each_active_link_info(adapter,
 							      link_info) {
 				if (!hdd_cm_is_vdev_connected(link_info))
@@ -668,7 +668,20 @@ bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx)
 	QDF_STATUS status;
 	uint32_t vdev_id;
 
-	status = hdd_get_first_connected_sta_vdev_id(hdd_ctx, &vdev_id);
+	status = hdd_get_first_connected_sta_cli_vdev_id(hdd_ctx, &vdev_id,
+							 QDF_STA_MODE);
+
+	return QDF_IS_STATUS_ERROR(status) ? false : true;
+}
+
+bool hdd_is_any_cli_connected(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	uint32_t vdev_id;
+
+	status = hdd_get_first_connected_sta_cli_vdev_id(hdd_ctx, &vdev_id,
+							 QDF_P2P_CLIENT_MODE);
+
 	return QDF_IS_STATUS_ERROR(status) ? false : true;
 }
 

@@ -303,15 +303,25 @@ void hdd_abort_ongoing_sta_sae_connection(struct hdd_context *hdd_ctx);
 bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_get_first_connected_sta_vdev_id() - check if any sta in connected state
- * and exteact the vdev id of connected STA.
+ * hdd_is_any_cli_connected() - check if any p2p client in connected state
+ * @hdd_ctx: hdd context
+ *
+ * Return: true if any connected p2p client
+ */
+bool hdd_is_any_cli_connected(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_get_first_connected_sta_cli_vdev_id() - check if any sta/cli in
+ * connected state and extract the vdev id of connected STA.
  * @hdd_ctx: hdd context
  * @vdev_id: pointer to vdev id
+ * @device_mode: STA or P2P CLI mode
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
-					       uint32_t *vdev_id);
+QDF_STATUS hdd_get_first_connected_sta_cli_vdev_id(struct hdd_context *hdd_ctx,
+						   uint32_t *vdev_id,
+						   enum QDF_OPMODE device_mode);
 
 /**
  * hdd_sme_roam_callback() - hdd sme roam callback

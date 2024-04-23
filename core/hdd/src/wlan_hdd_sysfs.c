@@ -743,6 +743,16 @@ void hdd_destroy_wifi_feature_interface_sysfs_file(void)
 	hdd_sysfs_destroy_wifi_feature_interface(wifi_kobject);
 }
 
+void hdd_create_rtpm_interface_sysfs_file(void)
+{
+	hdd_sysfs_create_rtpm_interface(wifi_kobject);
+}
+
+void hdd_destroy_rtpm_interface_sysfs_file(void)
+{
+	hdd_sysfs_destroy_rtpm_interface(wifi_kobject);
+}
+
 int hdd_sysfs_print(void *ctx, const char *fmt, ...)
 {
 	va_list args;

@@ -677,6 +677,7 @@ static void
 wlan_hdd_runtime_pm_wow_disconnect_handler(struct hdd_context *hdd_ctx)
 {
 	struct hif_opaque_softc *hif_ctx;
+	bool is_any_sta_connected = hdd_is_any_sta_connected(hdd_ctx);
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -689,7 +690,10 @@ wlan_hdd_runtime_pm_wow_disconnect_handler(struct hdd_context *hdd_ctx)
 		return;
 	}
 
-	if (hdd_is_any_sta_connected(hdd_ctx)) {
+	if (!is_any_sta_connected)
+		hif_rtpm_restore_autosuspend_delay();
+
+	if (is_any_sta_connected || hdd_is_any_cli_connected(hdd_ctx)) {
 		hdd_debug("active connections: runtime pm prevented: %d",
 			  hdd_ctx->runtime_pm_prevented);
 		return;
