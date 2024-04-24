@@ -1618,7 +1618,7 @@ int wlan_set_lite_monitor_peer_config(void *vscn,
 			goto fail;
 		}
 	} else {
-		dp_mon_err("failed to get vdev");
+		dp_mon_err("invalid interface %s", ifname);
 		retval = -EINVAL;
 		goto fail;
 	}
