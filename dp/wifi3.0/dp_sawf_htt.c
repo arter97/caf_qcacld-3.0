@@ -197,7 +197,8 @@ dp_htt_sawf_msduq_recfg_req_send(struct htt_soc *soc,
 	msg_word++;
 	*msg_word = 0;
 
-	HTT_H2T_SDWF_MSDUQ_RECFG_REQ_SVC_CLASS_ID_SET(*msg_word, msduq->svc_id);
+	HTT_H2T_SDWF_MSDUQ_RECFG_REQ_SVC_CLASS_ID_SET(*msg_word,
+						      msduq->svc_id - 1);
 	HTT_H2T_SDWF_MSDUQ_RECFG_REQ_DEACTIVATE_SET(*msg_word, q_ind);
 
 	req_cookie = DP_SAWF_MSDUQ_COOKIE_CREATE(q_id, q_ind);
@@ -250,6 +251,7 @@ dp_htt_sawf_msduq_recfg_req(struct htt_soc *soc, struct dp_sawf_msduq *msduq,
 #ifdef WLAN_FEATURE_11BE
 		struct dp_soc *dpsoc;
 		uint8_t cnt = 0;
+		bool htt_sent_for_soc[GLOBAL_SOC_SIZE] = {false};
 		struct dp_peer *link_peer, *mld_peer;
 		struct dp_mld_link_peers link_peers_info = {NULL};
 
@@ -278,6 +280,27 @@ dp_htt_sawf_msduq_recfg_req(struct htt_soc *soc, struct dp_sawf_msduq *msduq,
 				continue;
 
 			dpsoc = link_peer->vdev->pdev->soc;
+
+			/*
+			 * In case of split-phy chips when both radio vaps are
+			 * under same mld this loop will try to send HTT twice
+			 * on same SOC.
+			 * Locally storing the sent record to avoid such
+			 * back-to-back HTT send commands.
+			 */
+			if (htt_sent_for_soc[dp_get_chip_id(dpsoc)]) {
+				dp_sawf_debug("htt recfg_req for soc:%d "
+					      "svc_id:%d tgt_opaque_id: %d "
+					      "sent already. "
+					      "Hence dropping here !",
+					      dp_get_chip_id(dpsoc),
+					      msduq->svc_id,
+					      msduq->tgt_opaque_id);
+				continue;
+			}
+
+			htt_sent_for_soc[dp_get_chip_id(dpsoc)] = true;
+
 			dp_sawf_debug("htt recfg_req send for MLO soc:%d peer:%d",
 				      dp_get_chip_id(dpsoc), peer->peer_id);
 			status = dp_htt_sawf_msduq_recfg_req_send(dpsoc->htt_handle,
