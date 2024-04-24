@@ -278,7 +278,7 @@ static bool dlm_is_11be_entry_allowed(struct wlan_objmgr_pdev *pdev,
 	if (dlm_is_11be_trial_reach_max(pdev, entry, reject_ap_list)) {
 		dlm_debug(QDF_MAC_ADDR_FMT " MAX trial reach for the MLD " QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes),
-			  QDF_MAC_ADDR_REF(dlm_entry->dlm_reject_mlo_ap_info.mld_addr));
+			  QDF_MAC_ADDR_REF(dlm_entry->dlm_reject_mlo_ap_info.mld_addr.bytes));
 		allowed = false;
 	}
 	/* There is no other link action where candidate can be present in avoid
@@ -286,8 +286,6 @@ static bool dlm_is_11be_entry_allowed(struct wlan_objmgr_pdev *pdev,
 	 * in case entry is present in avoid list.
 	 */
 exit:
-	if (!allowed)
-		dlm_entry->dlm_reject_mlo_ap_info.tried_link_count++;
 
 	return allowed;
 }
