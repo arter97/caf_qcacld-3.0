@@ -1408,7 +1408,7 @@ QDF_STATUS wlan_hdd_send_t2lm_event(struct wlan_objmgr_vdev *vdev,
 	adapter = link_info->adapter;
 	data_len = hdd_get_t2lm_setup_event_len();
 	skb = wlan_cfg80211_vendor_event_alloc(adapter->hdd_ctx->wiphy,
-					       NULL,
+					       &adapter->wdev,
 					       data_len,
 					       index, GFP_KERNEL);
 	if (!skb) {

@@ -24,6 +24,7 @@
 #include "wlan_cm_api.h"
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_connectivity_logging.h"
+#include <wlan_mlo_link_force.h>
 
 #define T2LM_MIN_DIALOG_TOKEN         1
 #define T2LM_MAX_DIALOG_TOKEN         0xFF
@@ -81,6 +82,14 @@ bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
 	uint16_t ieee_link_mask = 0;
 	uint16_t provisioned_links = 0;
 	bool is_valid_link_mask = false;
+	struct ml_link_force_state curr_force_state = {0};
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		t2lm_err("PSOC is NULL");
+		return false;
+	}
 
 	ieee_link_mask = t2lm_get_connected_link_id(vdev);
 
@@ -115,6 +124,26 @@ bool t2lm_is_valid_t2lm_link_map(struct wlan_objmgr_vdev *vdev,
 				}
 			}
 		}
+	}
+
+	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
+	t2lm_debug("Current force state force_inactive_bitmap: %d force_active_bitmap: %d curr_dynamic_inactive_bitmap: %d curr_active_bitmap: %d curr_inactive_bitmap: %d",
+		   curr_force_state.force_inactive_bitmap,
+		   curr_force_state.force_active_bitmap,
+		   curr_force_state.curr_dynamic_inactive_bitmap,
+		   curr_force_state.curr_active_bitmap,
+		   curr_force_state.curr_inactive_bitmap);
+
+	if (!t2lm_req->t2lm_info[WLAN_T2LM_BIDI_DIRECTION].default_link_mapping &&
+	    t2lm_req->t2lm_info[WLAN_T2LM_BIDI_DIRECTION].ieee_link_map_tid[0] &&
+	    ((t2lm_req->t2lm_info[WLAN_T2LM_BIDI_DIRECTION].ieee_link_map_tid[0] &
+	      curr_force_state.force_inactive_bitmap) ==
+	    t2lm_req->t2lm_info[WLAN_T2LM_BIDI_DIRECTION].ieee_link_map_tid[0])) {
+		t2lm_err("TTLM req: 0x%x failed due to force_inactive link: 0x%x",
+			 t2lm_req->t2lm_info[WLAN_T2LM_BIDI_DIRECTION].ieee_link_map_tid[0],
+			 curr_force_state.force_inactive_bitmap);
+
+		return false;
 	}
 
 	return is_valid_link_mask;

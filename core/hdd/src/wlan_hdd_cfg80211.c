@@ -32098,7 +32098,7 @@ hdd_validate_ttlm_params(struct wlan_objmgr_vdev *vdev,
 
 			if (!(connected_link_id & BIT(i))) {
 				hdd_err("TTLM mapping link_id: %d is not connected", i);
-				return -EINVAL;
+				return -EAGAIN;
 			}
 		}
 	}
@@ -32254,7 +32254,7 @@ __wlan_hdd_cfg80211_set_ttlm_mapping(struct wiphy *wiphy,
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		hdd_err("failed due to non-ML connection");
-		ret = -EINVAL;
+		ret = -EOPNOTSUPP;
 		goto vdev_release;
 	}
 
@@ -32273,6 +32273,8 @@ __wlan_hdd_cfg80211_set_ttlm_mapping(struct wiphy *wiphy,
 	hdd_print_ttlm_params(&t2lm);
 
 	ret = hdd_mlo_set_ttlm_mapping(vdev, &t2lm);
+	if (ret)
+		ret = -EBUSY;
 
 vdev_release:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
