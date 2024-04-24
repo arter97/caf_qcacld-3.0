@@ -4394,12 +4394,13 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 	struct scan_filter *filter;
 	qdf_list_t *scan_list = NULL;
 	struct wlan_objmgr_pdev *pdev;
-	uint8_t idx;
+	uint8_t idx, num_partner_found = 0;
 	struct mlo_link_info *link_info;
 	struct scan_cache_entry *cur_entry;
 	struct scan_cache_node *link_node;
 	struct mlo_partner_info *partner_info;
-	struct qdf_mac_addr mld_addr = {0};
+	struct wlan_ssid *ssid;
+	struct qdf_mac_addr *bssid_list = NULL, mld_addr = {0};
 	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -4423,6 +4424,15 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 	}
 
 	partner_info = &session->lim_join_req->partner_info;
+
+	bssid_list = qdf_mem_malloc(partner_info->num_partner_links *
+				    sizeof(struct qdf_mac_addr));
+
+	if (!bssid_list) {
+		status = QDF_STATUS_E_NOMEM;
+		goto mem_free;
+	}
+
 	for (idx = 0; idx < partner_info->num_partner_links; idx++) {
 		link_info = &partner_info->partner_link_info[idx];
 		qdf_copy_macaddr(&filter->bssid_list[idx],
@@ -4434,20 +4444,38 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 		pe_debug("Filter BSSID: " QDF_MAC_ADDR_FMT ", freq: %d",
 			 QDF_MAC_ADDR_REF(filter->bssid_list[idx].bytes),
 			 filter->chan_freq_list[idx]);
+
+		qdf_copy_macaddr(&bssid_list[idx], &link_info->link_addr);
 	}
 
 	wlan_vdev_get_bss_peer_mld_mac(session->vdev, &mld_addr);
 	filter->match_mld_addr = true;
 	qdf_copy_macaddr(&filter->mld_addr, &mld_addr);
 
-	/* If no.of. scan entries fetched not equal to no.of partner links
-	 * then fail as common AKM is not determined.
-	 */
+	ssid = util_scan_entry_ssid(cur_entry);
+	if (!util_scan_is_null_ssid(ssid)) {
+		qdf_mem_copy(filter->ssid_list[0].ssid,
+			     ssid->ssid, ssid->length);
+		filter->ssid_list[0].length = ssid->length;
+
+		filter->num_of_ssid++;
+	}
+
 	scan_list = wlan_scan_get_result(pdev, filter);
-	qdf_mem_free(filter);
 	if (!scan_list) {
 		pe_debug("Empty scan list");
 		status = QDF_STATUS_E_NULL_VALUE;
+		goto mem_free;
+	}
+
+	/*
+	 * If no.of. scan entries fetched is less than no.of partner links
+	 * then fail as common AKM is not determined atleast one link.
+	 */
+	if (qdf_list_size(scan_list) < partner_info->num_partner_links) {
+		pe_debug("Can't find all the partner link entries, found %d",
+			 qdf_list_size(scan_list));
+		status = QDF_STATUS_E_INVAL;
 		goto mem_free;
 	}
 
@@ -4461,6 +4489,17 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 			 QDF_MAC_ADDR_REF(link_node->entry->bssid.bytes),
 			 link_node->entry->channel.chan_freq);
 
+		for (idx = 0; idx < partner_info->num_partner_links; idx++) {
+			if (num_partner_found == partner_info->num_partner_links)
+				break;
+
+			if (qdf_is_macaddr_equal(&bssid_list[idx],
+						 &link_node->entry->bssid)) {
+				qdf_zero_macaddr(&bssid_list[idx]);
+				num_partner_found++;
+			}
+		}
+
 		if (!wlan_scan_entries_contain_cmn_akm(cur_entry,
 						       link_node->entry)) {
 			status = QDF_STATUS_E_FAILURE;
@@ -4471,14 +4510,19 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 		next_node = NULL;
 	}
 
-	if (qdf_list_size(scan_list) != partner_info->num_partner_links) {
-		pe_err("Scan list (%d), actual partner links (%d)",
-		       qdf_list_size(scan_list),
-		       partner_info->num_partner_links);
+	/*
+	 * If no.of unique entries not equal to total partner links, then
+	 * AKM of atleast one partner link is not determined.
+	 */
+	if (num_partner_found != partner_info->num_partner_links) {
+		pe_err("Unique entries found (%d), actual partner links (%d)",
+		       num_partner_found, partner_info->num_partner_links);
 		status = QDF_STATUS_E_INVAL;
 	}
 
 mem_free:
+	qdf_mem_free(filter);
+	qdf_mem_free(bssid_list);
 	if (scan_list)
 		wlan_scan_purge_results(scan_list);
 	util_scan_free_cache_entry(cur_entry);
