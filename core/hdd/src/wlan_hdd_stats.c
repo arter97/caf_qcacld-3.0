@@ -7949,6 +7949,93 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
+static int
+wlan_hdd_calculate_get_sta_len(void)
+{
+	int nl_buf_len = NLMSG_HDRLEN;
+
+	/* NL80211_ATTR_MAC */
+	nl_buf_len += nla_total_size(QDF_MAC_ADDR_SIZE) +
+			/* STATION_INFO_RX_BYTES */
+			nla_total_size(sizeof(uint32_t)) +
+			/* STATION_INFO_TX_BYTES */
+			nla_total_size(sizeof(uint32_t)) +
+			/* NL80211_STA_INFO_SIGNAL */
+			nla_total_size(sizeof(int8_t));
+
+	return nl_buf_len;
+}
+
+#define GET_STATION_IDX QCA_NL80211_VENDOR_SUBCMD_ASYNC_GET_STATION_INDEX
+static QDF_STATUS
+wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
+				       const uint8_t *mac,
+				       struct station_info *sinfo)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct sk_buff *skb = NULL;
+	int nl_buf_len = 0;
+	struct nlattr *nla_attr, *nla_attr_1;
+	struct get_station_client_info *client_info;
+	uint8_t iter;
+	int flags = cds_get_gfp_flags();
+
+	hdd_debug("RSSI %d tx_bytes %u rx_bytes %u", sinfo->signal,
+		  sinfo->tx_bytes, sinfo->rx_bytes);
+	nl_buf_len = wlan_hdd_calculate_get_sta_len();
+	for (iter = 0; iter < GET_STA_MAX_HOST_CLIENT; iter++) {
+		client_info = &adapter->sta_client_info[iter];
+
+		if (!client_info->in_use)
+			continue;
+
+		skb = cfg80211_vendor_event_alloc_ucast(
+						hdd_ctx->wiphy, &adapter->wdev,
+						client_info->port_id,
+						nl_buf_len,
+						GET_STATION_IDX, flags);
+		if (!skb) {
+			hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
+			return -ENOMEM;
+		}
+
+		nla_attr = nla_nest_start(
+			skb,
+			QCA_WLAN_VENDOR_ATTR_ASYNC_GET_STATION_RESPONSE);
+		if (nla_put(skb, NL80211_ATTR_MAC, QDF_MAC_ADDR_SIZE, mac)) {
+			hdd_err("put mac addr failed");
+			goto fail;
+		}
+
+		nla_attr_1 = nla_nest_start(skb, NL80211_ATTR_STA_INFO);
+		if (nla_put_u32(skb, NL80211_STA_INFO_RX_BYTES,
+				sinfo->rx_bytes)) {
+			hdd_err("put rx_bytes failed");
+			goto fail;
+		}
+
+		if (nla_put_u32(skb, NL80211_STA_INFO_TX_BYTES,
+				sinfo->tx_bytes)) {
+			hdd_err("put tx_bytes failed");
+			goto fail;
+		}
+
+		if (nla_put_u8(skb, NL80211_STA_INFO_SIGNAL, sinfo->signal)) {
+			hdd_err("put rssi failed");
+			goto fail;
+		}
+
+		nla_nest_end(skb, nla_attr_1);
+		nla_nest_end(skb, nla_attr);
+		wlan_cfg80211_vendor_event(skb, flags);
+	}
+	return QDF_STATUS_SUCCESS;
+fail:
+	wlan_cfg80211_vendor_free_skb(skb);
+	return -EINVAL;
+}
+
 /**
  * wlan_hdd_get_sta_stats() - get aggregate STA stats
  * @link_info: Link info pointer of STA adapter to get stats for
@@ -7976,6 +8063,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 
 	if (link_info->vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
 		wlan_hdd_update_sinfo(sinfo, link_info);
+		wlan_hdd_fill_send_get_sta_ucast_stats(link_info, mac, sinfo);
 		hdd_debug_rl("Sending Cached stats for standby link");
 		return 0;
 	}
@@ -8030,6 +8118,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 		       QDF_MAC_ADDR_REF(link_mac));
 
 	wlan_hdd_copy_sinfo_to_link_info(link_info, sinfo);
+	wlan_hdd_fill_send_get_sta_ucast_stats(link_info, mac, sinfo);
 
 	hdd_exit();
 

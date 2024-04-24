@@ -2118,6 +2118,10 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	FEATURE_FLOW_STATS_EVENTS
 	FEATURE_FLOW_REPORT_EVENTS
 #endif
+	[QCA_NL80211_VENDOR_SUBCMD_ASYNC_GET_STATION_INDEX] = {
+		.vendor_id = QCA_NL80211_VENDOR_ID,
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_ASYNC_GET_STATION,
+	},
 };
 
 /**
@@ -22094,6 +22098,111 @@ static int wlan_hdd_cfg80211_tpc_backoff(struct wiphy *wiphy,
 	return errno;
 }
 
+#define GET_STATION_MAX QCA_WLAN_VENDOR_ATTR_ASYNC_GET_STATION_MAX
+#define GET_STATION_CONFIG QCA_WLAN_VENDOR_ATTR_ASYNC_GET_STATION_CONFIG
+
+const struct nla_policy wlan_hdd_async_get_station[GET_STATION_MAX + 1] = {
+	[GET_STATION_CONFIG] = {.type = NLA_U8}
+};
+
+static QDF_STATUS wlan_hdd_fill_port_id(struct hdd_adapter *adapter,
+					uint32_t port_id, uint8_t cfg_val)
+{
+	uint8_t iter;
+	struct get_station_client_info *client_info;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	for (iter = 0; iter < GET_STA_MAX_HOST_CLIENT; iter++) {
+		client_info = &adapter->sta_client_info[iter];
+		if (!cfg_val) {
+			if (client_info->port_id == port_id) {
+				client_info->in_use = false;
+				client_info->port_id = 0;
+				status = QDF_STATUS_SUCCESS;
+				break;
+			}
+		} else if (client_info->in_use) {
+			continue;
+		} else {
+			client_info->in_use = true;
+			client_info->port_id = port_id;
+			status = QDF_STATUS_SUCCESS;
+			break;
+		}
+	}
+
+	return status;
+}
+
+/**
+ * __wlan_hdd_cfg80211_async_get_station() - send get station unicast command
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int __wlan_hdd_cfg80211_async_get_station(struct wiphy *wiphy,
+						 struct wireless_dev *wdev,
+						 const void *data,
+						 int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct nlattr *tb[GET_STATION_MAX + 1];
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	int ret;
+	uint32_t port_id;
+	uint8_t cfg_val;
+
+	if (wlan_cfg80211_nla_parse(tb, GET_STATION_MAX, data, data_len,
+				    wlan_hdd_async_get_station)) {
+		hdd_err("nla_parse failed for QCA_WLAN_VENDOR_ATTR_ASYNC_GET_STATION_CONFIG data");
+		return -EINVAL;
+	}
+
+	cfg_val = nla_get_u8(tb[GET_STATION_CONFIG]);
+	status = hdd_get_netlink_sender_portid(hdd_ctx, &port_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error;
+	hdd_debug("cfg_val %d port_id %u", cfg_val, port_id);
+	status = wlan_hdd_fill_port_id(adapter, port_id, cfg_val);
+
+error:
+	ret = qdf_status_to_os_return(status);
+	return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_async_get_station() - send get station unicast command
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int wlan_hdd_cfg80211_async_get_station(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       const void *data,
+					       int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_async_get_station(wiphy, wdev,
+						      data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -22640,6 +22749,16 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 #if defined(WLAN_FEATURE_TELEMETRY) && defined(WLAN_DP_FEATURE_STC)
 	FEATURE_ASYNC_STATS_VENDOR_COMMANDS
 #endif
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_ASYNC_GET_STATION,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			 WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_async_get_station,
+		vendor_command_policy(wlan_hdd_async_get_station,
+				      GET_STATION_MAX)
+	},
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)

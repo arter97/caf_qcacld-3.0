@@ -540,6 +540,7 @@ typedef enum {
 	NET_DEV_HOLD_IS_ANY_STA_CONNECTED = 61,
 	NET_DEV_HOLD_GET_ADAPTER_BY_BSSID = 62,
 	NET_DEV_HOLD_ALLOW_NEW_INTF = 63,
+	NET_DEV_HOLD_GET_STA_CONNECTIONS = 64,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
@@ -1198,6 +1199,18 @@ struct wlan_hdd_tx_power {
 	uint32_t tx_pwr_cached_timestamp;
 };
 
+#define GET_STA_MAX_HOST_CLIENT 5
+/**
+ * struct get_station_client_info - To store get station command port id
+ * information
+ * @port_id: client id coming from upper layer
+ * @in_use: set true for a client when host receives vendor cmd for that client
+ */
+struct get_station_client_info {
+	uint32_t port_id;
+	bool in_use;
+};
+
 /**
  * struct hdd_adapter - hdd vdev/net_device context
  * @magic: Magic cookie for adapter sanity verification.  Note that this
@@ -1323,6 +1336,7 @@ struct wlan_hdd_tx_power {
  * @tx_latency_cfg: configuration for per-link transmit latency statistics
  * @link_state_cached_timestamp: link state cached timestamp
  * @keep_alive_interval: user configured STA keep alive interval
+ * @sta_client_info: To store get station user application port_id's
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1517,6 +1531,7 @@ struct hdd_adapter {
 	qdf_time_t link_state_cached_timestamp;
 #endif
 	uint16_t keep_alive_interval;
+	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -2102,6 +2117,8 @@ enum wlan_state_ctrl_str_id {
  * @hdd_hlp_data_lock: lock to avoid race condition in handling hlp data
  * @hdd_hlp_data_list: list to maintain hlp data packets
  * @hlp_processing_work: work to process hlp data pkt for association
+ * @get_sta_user_notif: Get station notifier callback to handle port_id on
+ *			userspace application close/abort
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2398,6 +2415,7 @@ struct hdd_context {
 	qdf_spinlock_t hdd_hlp_data_lock;
 	qdf_list_t hdd_hlp_data_list;
 	struct work_struct hlp_processing_work;
+	struct notifier_block get_sta_user_notif;
 };
 
 /**

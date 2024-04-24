@@ -482,6 +482,95 @@ static void wlan_hdd_auto_shutdown_cb(void);
 
 static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx);
 
+/**
+ * wlan_hdd_deinit_port_id_info()- Initialize/deinitialize
+ * the get station client info table
+ * @hdd_ctx: hdd context
+ *
+ * Return: none
+ */
+static void
+wlan_hdd_deinit_port_id_info(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_STA_CONNECTIONS;
+	uint8_t iter;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->device_mode == QDF_STA_MODE) {
+			for (iter = 0; iter < GET_STA_MAX_HOST_CLIENT; iter++) {
+				adapter->sta_client_info[iter].port_id = 0;
+				adapter->sta_client_info[iter].in_use = false;
+			}
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+}
+
+static int wlan_hdd_get_port_status_notify(struct notifier_block *nb,
+					   unsigned long state,
+					   void *_notify)
+{
+	struct hdd_context *hdd_ctx;
+	uint8_t iter;
+	struct get_station_client_info *client_info;
+	struct netlink_notify *notify = _notify;
+	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_STA_CONNECTIONS;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_debug("HDD CTX is NUll");
+		return NOTIFY_DONE;
+	}
+
+	if (state != NETLINK_URELEASE)
+		return NOTIFY_DONE;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->device_mode == QDF_STA_MODE) {
+			for (iter = 0; iter < GET_STA_MAX_HOST_CLIENT; iter++) {
+				client_info = &adapter->sta_client_info[iter];
+				if (notify->portid == client_info->port_id) {
+					hdd_debug("Remove port_id %u",
+						  notify->portid);
+					client_info->port_id = 0;
+					client_info->in_use = false;
+					hdd_adapter_dev_put_debug(adapter,
+								  dbgid);
+					return NOTIFY_DONE;
+				}
+			}
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	return NOTIFY_DONE;
+}
+
+static int hdd_register_get_port_status_notifier(struct hdd_context *hdd_ctx)
+{
+	int ret;
+
+	hdd_ctx->get_sta_user_notif.notifier_call =
+						wlan_hdd_get_port_status_notify;
+	ret = netlink_register_notifier(&hdd_ctx->get_sta_user_notif);
+	if (ret) {
+		hdd_err("Failed to register get sta user notifier: %d", ret);
+		goto out;
+	}
+	hdd_debug("Registered GET_STA user application notifier");
+out:
+	return ret;
+}
+
+static void hdd_unregister_get_port_status_notifier(struct hdd_context *hdd_ctx)
+{
+	netlink_unregister_notifier(&hdd_ctx->get_sta_user_notif);
+}
+
 bool hdd_adapter_is_ap(struct hdd_adapter *adapter)
 {
 	if (!adapter) {
@@ -5273,6 +5362,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			hdd_send_thermal_mitigation_val(hdd_ctx, thermal_state,
 							THERMAL_MONITOR_WPSS);
 	}
+	hdd_register_get_port_status_notifier(hdd_ctx);
 
 	hdd_exit();
 
@@ -7943,6 +8033,7 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_IS_ANY_STA_CONNECTED",
 		"NET_DEV_HOLD_GET_ADAPTER_BY_BSSID",
 		"NET_DEV_HOLD_ALLOW_NEW_INTF",
+		"NET_DEV_HOLD_GET_STA_CONNECTIONS",
 		"NET_DEV_HOLD_ID_MAX"};
 	int32_t num_dbg_strings = QDF_ARRAY_SIZE(strings);
 
@@ -17598,6 +17689,8 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	hdd_ctx->is_dual_mac_cfg_updated = false;
 	hdd_ctx->driver_status = DRIVER_MODULES_CLOSED;
 	hdd_ctx->is_fw_dbg_log_levels_configured = false;
+	wlan_hdd_deinit_port_id_info(hdd_ctx);
+	hdd_unregister_get_port_status_notifier(hdd_ctx);
 	hdd_debug("Wlan transitioned (now CLOSED)");
 
 done:
