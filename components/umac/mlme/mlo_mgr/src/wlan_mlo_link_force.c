@@ -2750,6 +2750,15 @@ ml_nlink_handle_legacy_sap_intf(struct wlan_objmgr_psoc *psoc,
 	uint8_t i = 0;
 	bool sap_2g_only = false;
 
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+
+	if (ml_num_link < 2)
+		return;
+
 	/* SAP MCC with MLO STA link is not preferred.
 	 * If SAP is 2Ghz only by ACS and two ML link are
 	 * 5/6 band, then force SCC may not happen. In such
@@ -2767,14 +2776,6 @@ ml_nlink_handle_legacy_sap_intf(struct wlan_objmgr_psoc *psoc,
 	 * 2G ML STA, no need force SCC link.
 	 */
 	if (!sap_2g_only)
-		return;
-
-	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
-			       QDF_ARRAY_SIZE(ml_linkid_lst),
-			       ml_link_info, ml_freq_lst, ml_vdev_lst,
-			       ml_linkid_lst, &ml_num_link,
-			       &ml_link_bitmap);
-	if (ml_num_link < 2)
 		return;
 
 	for (i = 0; i < ml_num_link; i++) {
