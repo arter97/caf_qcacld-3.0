@@ -734,19 +734,6 @@ static const struct ieee80211_iface_limit
 	},
 };
 
-/* P2P limit */
-static const struct ieee80211_iface_limit
-	wlan_hdd_p2p_iface_limit[] = {
-	{
-		.max = 1,
-		.types = BIT(NL80211_IFTYPE_P2P_CLIENT),
-	},
-	{
-		.max = 1,
-		.types = BIT(NL80211_IFTYPE_P2P_GO),
-	},
-};
-
 /* STA + P2P + P2P combination */
 static const struct ieee80211_iface_limit
 	wlan_hdd_sta_p2p_p2p_iface_limit[] = {
@@ -953,13 +940,7 @@ static struct ieee80211_iface_combination
 		.beacon_int_min_gcd = 1,
 #endif
 	},
-	/* P2P */
-	{
-		.limits = wlan_hdd_p2p_iface_limit,
-		.num_different_channels = 2,
-		.max_interfaces = 2,
-		.n_limits = ARRAY_SIZE(wlan_hdd_p2p_iface_limit),
-	},
+
 	/* STA + P2P + P2P */
 	{
 		.limits = wlan_hdd_sta_p2p_p2p_iface_limit,
@@ -24040,6 +24021,23 @@ static bool wlan_hdd_is_iface_sap_sap(uint8_t idx)
 }
 
 /**
+ * wlan_hdd_is_iface_p2p_p2p() - This API checks whether P2P + P2P present
+ * in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if P2P interface is present otherwise false
+ */
+static bool wlan_hdd_is_iface_p2p_p2p(uint8_t idx)
+{
+	if (wlan_hdd_iface_combination[idx].limits[0].max == 2 &&
+	    wlan_hdd_iface_combination[idx].limits[0].types ==
+	    (BIT(NL80211_IFTYPE_P2P_GO) | BIT(NL80211_IFTYPE_P2P_CLIENT)))
+		return true;
+
+	return false;
+}
+
+/**
  * wlan_hdd_is_sta_sap_concurrency_present() - This API checks whether STA and
  * SAP present in the interface combination
  * @idx: index for interface combination array
@@ -24381,7 +24379,8 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		if (!ucfg_policy_mgr_is_fw_supports_dbs(psoc) &&
 		    (wlan_hdd_iface_combination[i].max_interfaces > 2 ||
 		     wlan_hdd_is_iface_sta_sta(i) ||
-		     wlan_hdd_is_iface_sap_sap(i)))
+		     wlan_hdd_is_iface_sap_sap(i) ||
+		     wlan_hdd_is_iface_p2p_p2p(i)))
 			continue;
 
 		/* Filter for 1x1 DBS targets */
