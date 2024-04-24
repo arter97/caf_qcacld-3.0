@@ -9655,6 +9655,63 @@ static int hdd_config_tx_rx_nss(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
+static void hdd_update_vdev_nss_chains_config(struct wlan_hdd_link_info *link)
+{
+	struct hdd_adapter *adapter = link->adapter;
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev, *tmp_vdev;
+	struct wlan_mlme_nss_chains *user_cfg, *dynamic_cfg;
+
+	if (hdd_validate_adapter(adapter)) {
+		hdd_err("adapter is null. Unable to update vdev nss chains");
+		return;
+	}
+
+	tmp_vdev = hdd_objmgr_get_vdev_by_user(link, WLAN_OSIF_ID);
+	if (!tmp_vdev) {
+		hdd_err("Null vdev[%u]. Can't update nss chains",
+			link->vdev_id);
+		return;
+	}
+	/* Get the dynamic nss chain config for the active vdev
+	 * on which user configuration has been applied. This is
+	 * copied to all connected vdevs.
+	 */
+	user_cfg = mlme_get_dynamic_vdev_config(tmp_vdev);
+	if (!user_cfg) {
+		hdd_err("Unable to get user updated cfg for vdev[%u]",
+			link->vdev_id);
+		hdd_objmgr_put_vdev_by_user(tmp_vdev, WLAN_OSIF_ID);
+		return;
+	}
+	hdd_objmgr_put_vdev_by_user(tmp_vdev, WLAN_OSIF_ID);
+
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		if (link_info->vdev_id == link->vdev_id)
+			continue;
+		if (!hdd_is_vdev_in_conn_state(link_info))
+			continue;
+
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+		if (!vdev) {
+			hdd_err("Null vdev[%u]. Can't update nss chains",
+				link_info->vdev_id);
+			continue;
+		}
+		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
+		if (!dynamic_cfg) {
+			hdd_err("Unable to get dynamic cfg for vdev[%u]",
+				link_info->vdev_id);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+			continue;
+		}
+		*dynamic_cfg = *user_cfg;
+		hdd_nofl_debug("Updated nss chains config for vdev[%u]",
+			       link_info->vdev_id);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	}
+}
+
 static int hdd_set_tx_rx_nss_per_band(struct wlan_hdd_link_info *link_info,
 				      uint8_t tx_nss_2g, uint8_t rx_nss_2g,
 				      uint8_t tx_nss_5g, uint8_t rx_nss_5g)
@@ -9721,6 +9778,7 @@ static int hdd_set_tx_rx_nss_per_band(struct wlan_hdd_link_info *link_info,
 	if (QDF_IS_STATUS_ERROR(status))
 		return -EINVAL;
 
+	hdd_update_vdev_nss_chains_config(link_info);
 	return 0;
 }
 
@@ -9868,6 +9926,7 @@ hdd_set_dynamic_vdev_chains_per_band(struct wlan_hdd_link_info *link_info,
 	if (QDF_IS_STATUS_ERROR(status))
 		return -EINVAL;
 
+	hdd_update_vdev_nss_chains_config(link_info);
 	return 0;
 err:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
