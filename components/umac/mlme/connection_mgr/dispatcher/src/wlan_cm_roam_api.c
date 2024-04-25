@@ -2821,6 +2821,46 @@ cm_roam_event_handler(struct roam_offload_roam_event *roam_event)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+cm_btm_update_reject_ml_ap_info(struct sir_rssi_disallow_lst *entry,
+				struct roam_denylist_timeout *deny_list)
+{
+	qdf_copy_macaddr(&entry->reject_mlo_ap_info.mld_addr,
+			 &deny_list->reject_mlo_ap_info.mld_addr);
+	qdf_mem_copy(&entry->reject_mlo_ap_info.tried_links,
+		     &deny_list->reject_mlo_ap_info.tried_links,
+		     deny_list->reject_mlo_ap_info.tried_link_count *
+		     sizeof(uint32_t));
+	entry->reject_mlo_ap_info.tried_link_count =
+			deny_list->reject_mlo_ap_info.tried_link_count;
+}
+
+static void
+cm_upadte_ap_mlo_info_received_from_fw(struct reject_ap_info *ap_info,
+				       struct sir_rssi_disallow_lst *entry)
+{
+	qdf_copy_macaddr(&ap_info->reject_mlo_ap_info.mld_addr,
+			 &entry->reject_mlo_ap_info.mld_addr);
+	qdf_mem_copy(&ap_info->reject_mlo_ap_info.tried_links,
+		     &entry->reject_mlo_ap_info.tried_links,
+		     entry->reject_mlo_ap_info.tried_link_count *
+		     sizeof(uint32_t));
+	ap_info->reject_mlo_ap_info.tried_link_count =
+			entry->reject_mlo_ap_info.tried_link_count;
+}
+#else
+static inline void
+cm_btm_update_reject_ml_ap_info(struct sir_rssi_disallow_lst *entry,
+				struct roam_denylist_timeout *denylist)
+{}
+
+static inline void
+cm_upadte_ap_mlo_info_received_from_fw(struct reject_ap_info *ap_info,
+				       struct sir_rssi_disallow_lst *entry)
+{}
+#endif
+
 static void
 cm_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
 			    uint8_t vdev_id,
@@ -2837,31 +2877,11 @@ cm_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
 	ap_info.source = entry->source;
 	ap_info.rssi_reject_params.received_time = entry->received_time;
 	ap_info.rssi_reject_params.original_timeout = entry->original_timeout;
+	cm_upadte_ap_mlo_info_received_from_fw(&ap_info, entry);
 	wlan_update_mlo_reject_ap_info(pdev, vdev_id, &ap_info);
 	/* Add this ap info to the rssi reject ap type in denylist manager */
 	wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
 }
-
-#ifdef WLAN_FEATURE_11BE_MLO
-static void
-cm_btm_update_reject_ml_ap_info(struct sir_rssi_disallow_lst *entry,
-				struct roam_denylist_timeout *deny_list)
-{
-	qdf_copy_macaddr(&entry->reject_mlo_ap_info.mld_addr,
-			 &deny_list->reject_mlo_ap_info.mld_addr);
-	qdf_mem_copy(&entry->reject_mlo_ap_info.tried_links,
-		     &deny_list->reject_mlo_ap_info.tried_links,
-		     deny_list->reject_mlo_ap_info.tried_link_count *
-		     sizeof(uint32_t));
-	entry->reject_mlo_ap_info.tried_link_count =
-			deny_list->reject_mlo_ap_info.tried_link_count;
-}
-#else
-static inline void
-cm_btm_update_reject_ml_ap_info(struct sir_rssi_disallow_lst *entry,
-				struct roam_denylist_timeout *denylist)
-{}
-#endif
 
 QDF_STATUS
 cm_btm_denylist_event_handler(struct wlan_objmgr_psoc *psoc,

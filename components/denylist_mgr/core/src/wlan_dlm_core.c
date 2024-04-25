@@ -626,6 +626,21 @@ dlm_update_rssi_reject_reason(struct dlm_reject_ap *entry,
 	case REASON_REASSOC_NO_MORE_STAS:
 		entry->no_more_stas = true;
 		break;
+	case REASON_BASIC_RATES_MISMATCH:
+		entry->basic_rates_mismatched = true;
+		break;
+	case REASON_OTHER:
+		entry->other = true;
+		break;
+	case REASON_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOCIATION:
+		entry->same_address_present_in_ap = true;
+		break;
+	case REASON_EHT_NOT_SUPPORTED:
+		entry->eht_not_supported = true;
+		break;
+	case REASON_TX_LINK_NOT_ACCEPTED:
+		entry->tx_link_denied = true;
+		break;
 	default:
 		dlm_err("Invalid reason passed %d", reject_reason);
 	}
@@ -646,6 +661,7 @@ dlm_handle_rssi_reject_list(struct dlm_reject_ap *entry,
 		bssid_newly_added = true;
 	}
 
+	dlm_update_reject_mlo_info(entry, ap_info);
 	entry->ap_timestamp.rssi_reject_timestamp =
 					qdf_mc_timer_get_system_time();
 	entry->rssi_reject_params = ap_info->rssi_reject_params;
@@ -938,6 +954,16 @@ dlm_get_rssi_reject_reason(struct dlm_reject_ap *dlm_entry)
 		return REASON_REASSOC_NO_MORE_STAS;
 	else if (dlm_entry->reassoc_rssi_reject)
 		return REASON_REASSOC_RSSI_REJECT;
+	else if (dlm_entry->basic_rates_mismatched)
+		return REASON_BASIC_RATES_MISMATCH;
+	else if (dlm_entry->eht_not_supported)
+		return REASON_EHT_NOT_SUPPORTED;
+	else if (dlm_entry->tx_link_denied)
+		return REASON_TX_LINK_NOT_ACCEPTED;
+	else if (dlm_entry->same_address_present_in_ap)
+		return REASON_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOCIATION;
+	else if (dlm_entry->other)
+		return REASON_OTHER;
 
 	return REASON_UNKNOWN;
 }
@@ -1216,6 +1242,8 @@ static void dlm_fill_reject_list(qdf_list_t *reject_db_list,
 			dlm_reject_list->reject_reason =
 					dlm_get_reject_ap_reason(dlm_entry);
 			(*num_of_reject_bssid)++;
+			dlm_update_reject_mlo_config(dlm_entry,
+						     dlm_reject_list);
 			dlm_debug("Adding BSSID " QDF_MAC_ADDR_FMT " of type %d retry delay %d expected RSSI %d, entries added = %d reject reason %d",
 				  QDF_MAC_ADDR_REF(dlm_entry->bssid.bytes),
 				  reject_ap_type,
@@ -1750,6 +1778,10 @@ dlm_get_link_action(struct wlan_objmgr_vdev *vdev,
 	switch (reject_ap_reason) {
 	case REASON_NUD_FAILURE:
 	case REASON_STA_KICKOUT:
+		if (!vdev) {
+			dlm_err("invalid vdev");
+			return WLAN_HOST_AVOID_ASSOC_LINK;
+		}
 		for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
 			link_info = vdev->mlo_dev_ctx->link_ctx->links_info[i];
 
@@ -1791,29 +1823,43 @@ dlm_update_mlo_reject_ap_info(struct wlan_objmgr_pdev *pdev,
 			      uint8_t vdev_id,
 			      struct reject_ap_info *ap_info)
 {
-	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *vdev = NULL;
 	struct qdf_mac_addr mld_addr = {0};
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
-			WLAN_OBJMGR_ID);
-	if (!vdev) {
-		obj_mgr_debug("Unable to get first vdev of pdev");
-		return;
-	}
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_OBJMGR_ID);
-		return;
-	}
+	/*
+	 * Two cases are handled here:
+	 * a.) If Reject list is updated by host then mld address will be
+	 *     null and entry needs to be updated for current connection,
+	 *     so the mld address and can be derived from vdev.
+	 * b.) If the reject list is sent by FW. FW can send the blacklisted
+	 *     data in disconnected state. At that time vdev will not be ML
+	 *     vdev and mld address will be null. In that case mlo address
+	 *     will be populated from ap_info which is already updated at
+	 *     the time of FW even extraction
+	 */
+	if (qdf_is_macaddr_zero(&ap_info->reject_mlo_ap_info.mld_addr)) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+							    WLAN_OBJMGR_ID);
+		if (!vdev) {
+			dlm_err("Unable to get first vdev of pdev");
 
-	wlan_vdev_get_bss_peer_mld_mac(vdev, &mld_addr);
-	qdf_copy_macaddr(&ap_info->reject_mlo_ap_info.mld_addr, &mld_addr);
-
-	ap_info->reject_mlo_ap_info.tried_links[ap_info->reject_mlo_ap_info.tried_link_count] =
+			return;
+		}
+		if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+			dlm_debug("not mlo vdev");
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_OBJMGR_ID);
+			return;
+		}
+		wlan_vdev_get_bss_peer_mld_mac(vdev, &mld_addr);
+		qdf_copy_macaddr(&ap_info->reject_mlo_ap_info.mld_addr, &mld_addr);
+		ap_info->reject_mlo_ap_info.tried_links[ap_info->reject_mlo_ap_info.tried_link_count] =
 		mlo_get_curr_link_combination(vdev);
+		ap_info->reject_mlo_ap_info.tried_link_count++;
+	}
+
 	ap_info->reject_mlo_ap_info.link_action =
 		dlm_get_link_action(vdev, ap_info->reject_reason);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_OBJMGR_ID);
-	ap_info->reject_mlo_ap_info.tried_link_count++;
 }
 
 #endif
