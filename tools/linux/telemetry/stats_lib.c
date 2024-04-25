@@ -2377,7 +2377,7 @@ static int32_t build_child_sta_list(char *ifname,
 						  ifname, (char *)&buffer,
 						  sizeof(uint32_t));
 	if (msg < 0) {
-		STATS_ERR("Couldn't send NL command; %d\n", msg);
+		STATS_INFO("Couldn't send NL command on %s; %d\n", ifname, msg);
 		return -EIO;
 	}
 
@@ -2473,8 +2473,7 @@ static int32_t build_child_vap_list(struct interface_list *if_list,
 
 		fill_mld_interface(temp_obj);
 
-		if (build_child_sta_list(ifname, curr_obj))
-			return -EIO;
+		build_child_sta_list(ifname, curr_obj);
 	}
 
 	return 0;
@@ -2525,10 +2524,8 @@ static int32_t build_child_radio_list(struct interface_list *if_list,
 			curr_obj->next = temp_obj;
 		curr_obj = temp_obj;
 
-		if (build_child_vap_list(if_list, ifname,
-					 if_list->radio[rinx].hw_addr,
-					 curr_obj))
-			return -EIO;
+		build_child_vap_list(if_list, ifname,
+				     if_list->radio[rinx].hw_addr, curr_obj);
 	}
 
 	return 0;
@@ -2763,11 +2760,8 @@ static void *build_object_list(struct stats_command *cmd)
 			curr_obj->next = temp_obj;
 		curr_obj = temp_obj;
 
-		if (build_child_radio_list(&if_list, soc_if, if_count,
-					   curr_obj)) {
-			ret = -1;
-			break;
-		}
+		build_child_radio_list(&if_list, soc_if, if_count, curr_obj);
+
 		if_count = 0;
 		memset(soc_if, 0, (MAX_RADIO_NUM * sizeof(struct soc_ifnames)));
 	}
