@@ -792,7 +792,8 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 			sw_ft_entry->is_flow_tcp = proto_params.tcp_proto;
 			sw_ft_entry->is_flow_udp = proto_params.udp_proto;
 			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
-			if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf))
+			if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf) ||
+			    vdev->opmode == wlan_op_mode_ap)
 				sw_ft_entry->rx_flow_tuple_info.is_exception = true;
 
 			is_fst_updated = true;
@@ -2237,7 +2238,9 @@ static bool dp_is_nbuf_bypass_fisa(qdf_nbuf_t nbuf, struct dp_vdev *vdev,
 				   bool add_tcp_flow_to_fst)
 {
 	/* RX frame from non-regular path or DHCP packet */
-	if ((!add_tcp_flow_to_fst && QDF_NBUF_CB_RX_TCP_PROTO(nbuf)) ||
+	if ((!add_tcp_flow_to_fst &&
+	     (QDF_NBUF_CB_RX_TCP_PROTO(nbuf) ||
+	      vdev->opmode == wlan_op_mode_ap)) ||
 	    qdf_nbuf_is_exc_frame(nbuf) ||
 	    qdf_nbuf_is_ipv4_dhcp_pkt(nbuf) ||
 	    qdf_nbuf_is_da_mcbc(nbuf))

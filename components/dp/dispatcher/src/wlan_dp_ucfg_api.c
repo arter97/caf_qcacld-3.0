@@ -1419,6 +1419,13 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 		txrx_ops->rx.rx_flush = NULL;
 	}
 
+	if (wlan_dp_fb_enabled(dp_intf->dp_ctx) &&
+	    wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
+	    dp_intf->device_mode != QDF_MONITOR_MODE) {
+		dp_debug("FISA feature enabled");
+		dp_rx_register_fisa_ops(txrx_ops);
+	}
+
 	txrx_ops->get_tsf_time = wlan_dp_get_tsf_time;
 	txrx_ops->vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev_register(soc,
