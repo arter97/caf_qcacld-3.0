@@ -1143,12 +1143,6 @@ static QDF_STATUS hdd_set_nss_params(struct wlan_hdd_link_info *link_info,
 				      link_info->vdev_id)))
 		return QDF_STATUS_E_FAILURE;
 
-	/* Check TDLS status and update antenna mode */
-	if ((adapter->device_mode == QDF_STA_MODE ||
-	     adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
-	     policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc))
-		wlan_hdd_tdls_antenna_switch(link_info, rx_nss);
-
 	return QDF_STATUS_SUCCESS;
 }
 

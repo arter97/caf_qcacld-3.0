@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -847,6 +847,8 @@ QDF_STATUS policy_mgr_register_hdd_cb(struct wlan_objmgr_psoc *psoc,
 		hdd_cbacks->wlan_get_sap_acs_band;
 	pm_ctx->hdd_cbacks.wlan_check_cc_intf_cb =
 		hdd_cbacks->wlan_check_cc_intf_cb;
+	pm_ctx->hdd_cbacks.wlan_set_tx_rx_nss_cb =
+		hdd_cbacks->wlan_set_tx_rx_nss_cb;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -870,6 +872,7 @@ QDF_STATUS policy_mgr_deregister_hdd_cb(struct wlan_objmgr_psoc *psoc)
 	pm_ctx->hdd_cbacks.hdd_get_ap_6ghz_capable = NULL;
 	pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params = NULL;
 	pm_ctx->hdd_cbacks.wlan_get_sap_acs_band = NULL;
+	pm_ctx->hdd_cbacks.wlan_set_tx_rx_nss_cb = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }
