@@ -109,7 +109,7 @@ wlan_peer_update_avg_tx_rate_stats_user(
 	avg->tx[type].num_mpdu += user->mpdu_success;
 	avg->tx[type].num_retry += user->mpdu_failed;
 
-	if (user->ack_rssi_valid) {
+	if (!(user->is_mcast) && user->ack_rssi_valid) {
 		avg->tx[type].num_snr++;
 		avg->tx[type].sum_snr += user->usr_ack_rssi;
 	}
