@@ -323,7 +323,7 @@ wlan_is_tdls_session_present(struct wlan_objmgr_vdev *vdev)
 	if (mlo_is_mld_sta(vdev))
 		return wlan_mlo_is_tdls_session_present(vdev);
 
-	if (tdls_get_connected_peer_count_from_vdev > 0) {
+	if (tdls_get_connected_peer_count_from_vdev(vdev) > 0) {
 		tdls_debug("TDLS session is present");
 		return QDF_STATUS_SUCCESS;
 	}

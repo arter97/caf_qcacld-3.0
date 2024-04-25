@@ -931,6 +931,8 @@ QDF_STATUS policy_mgr_register_hdd_cb(struct wlan_objmgr_psoc *psoc,
 		hdd_cbacks->wlan_get_sap_acs_band;
 	pm_ctx->hdd_cbacks.wlan_check_cc_intf_cb =
 		hdd_cbacks->wlan_check_cc_intf_cb;
+	pm_ctx->hdd_cbacks.wlan_set_tx_rx_nss_cb =
+		hdd_cbacks->wlan_set_tx_rx_nss_cb;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -954,6 +956,7 @@ QDF_STATUS policy_mgr_deregister_hdd_cb(struct wlan_objmgr_psoc *psoc)
 	pm_ctx->hdd_cbacks.hdd_get_ap_6ghz_capable = NULL;
 	pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params = NULL;
 	pm_ctx->hdd_cbacks.wlan_get_sap_acs_band = NULL;
+	pm_ctx->hdd_cbacks.wlan_set_tx_rx_nss_cb = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }
