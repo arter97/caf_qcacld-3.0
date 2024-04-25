@@ -94,12 +94,14 @@ struct wlan_dp_spm_flow_info {
  * @origin_aft: Active flow table for originating traffic
  * @flow_rec_base: Flow records base address
  * @o_flow_rec_freelist: Flow records freelist
+ * @flow_list_lock: Flow list operation lock
  * @o_stats: Flow table stats for originating traffic
  */
 struct wlan_dp_spm_intf_context {
 	struct wlan_dp_spm_flow_info *origin_aft[WLAN_DP_SPM_FLOW_REC_TBL_MAX];
 	struct wlan_dp_spm_flow_info *flow_rec_base;
 	qdf_list_t o_flow_rec_freelist;
+	qdf_spinlock_t flow_list_lock;
 	struct wlan_dp_spm_flow_tbl_stats o_stats;
 };
 

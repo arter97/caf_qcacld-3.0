@@ -760,6 +760,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 	uint64_t curr_ts = qdf_sched_clock();
 	int i;
 
+	qdf_spinlock_acquire(&spm_intf->flow_list_lock);
 	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++, cursor++) {
 		cursor = spm_intf->origin_aft[i];
 		if (!cursor)
@@ -780,6 +781,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 			spm_intf->origin_aft[i] = NULL;
 		}
 	}
+	qdf_spinlock_release(&spm_intf->flow_list_lock);
 }
 #endif
 /* Flow Unique ID generator */
@@ -809,6 +811,7 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 
 	qdf_list_create(&spm_intf->o_flow_rec_freelist,
 			WLAN_DP_SPM_FLOW_REC_TBL_MAX);
+	qdf_spinlock_create(&spm_intf->flow_list_lock);
 
 	spm_intf->flow_rec_base = (struct wlan_dp_spm_flow_info *)
 			qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
@@ -859,6 +862,7 @@ void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 
 	wlan_dp_spm_flow_retire(spm_intf, true);
 
+	qdf_spinlock_destroy(&spm_intf->flow_list_lock);
 	qdf_mem_free(spm_intf->flow_rec_base);
 
 	qdf_mem_free(spm_intf);
@@ -884,14 +888,18 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 
 	spm_intf = dp_intf->spm_intf_ctx;
 
+	qdf_spinlock_acquire(&spm_intf->flow_list_lock);
 	qdf_list_remove_front(&spm_intf->o_flow_rec_freelist,
 			      (qdf_list_node_t **)&flow_rec);
 
 	if (!flow_rec) {
+		qdf_spinlock_release(&spm_intf->flow_list_lock);
 		dp_info_rl("records freelist size: %u, Active flow table full!",
 			   spm_intf->o_flow_rec_freelist.count);
 		return QDF_STATUS_E_EMPTY;
 	}
+	flow_rec->active_ts = qdf_sched_clock();
+	qdf_spinlock_release(&spm_intf->flow_list_lock);
 
 	/* Copy data to flow record */
 	flow_rec->guid = flow_guid_gen++;
@@ -901,7 +909,6 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	flow_rec->svc_metadata = WLAN_DP_SPM_INVALID_METADATA;
 	flow_rec->flags |= DP_SPM_FLOW_FLAG_IN_USE;
 	flow_rec->cookie = cookie_sk;
-	flow_rec->active_ts = qdf_sched_clock();
 
 	/* put the flow record in table and fill stats */
 	spm_intf->origin_aft[flow_rec->id] = flow_rec;
