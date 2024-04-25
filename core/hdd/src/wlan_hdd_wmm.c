@@ -2051,15 +2051,12 @@ void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 			  enum sme_qos_wmmuptype *user_pri,
 			  bool *is_critical)
 {
-	QDF_STATUS status;
 
 	hdd_wmm_classify_critical_pkt(skb, user_pri, is_critical);
 
 	if (false == *is_critical) {
-		status = ucfg_dp_fim_update_metadata((qdf_nbuf_t)skb,
-						     adapter->deflink->vdev);
-		if (status == QDF_STATUS_SUCCESS)
-			ucfg_dp_lapb_handle_app_ind((qdf_nbuf_t)skb);
+		ucfg_dp_fim_update_metadata((qdf_nbuf_t)skb,
+					    adapter->deflink->vdev);
 
 		if (!ucfg_dp_fpm_check_tid_override_tagged((qdf_nbuf_t)skb)) {
 			hdd_wmm_get_user_priority_from_ip_tos(adapter, skb,

@@ -1764,10 +1764,10 @@ ucfg_dp_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
  * @nbuf: skb
  * @vdev:vdev
  *
- * Return: QDF_STATUS_SUCCESS if skb marked with valid metadata
+ * Return: None
  */
-QDF_STATUS ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
-				       struct wlan_objmgr_vdev *vdev);
+void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
+				 struct wlan_objmgr_vdev *vdev);
 
 /*
  * ucfg_dp_fim_display_hash_table() - Display FIM node from hash table
@@ -1865,10 +1865,10 @@ uint8_t ucfg_fpm_policy_get(struct fpm_table *fpm, struct dp_policy *policy,
 			    uint8_t max_count);
 #else
 static inline
-QDF_STATUS ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
-				       struct wlan_objmgr_vdev *vdev)
+void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
+				 struct wlan_objmgr_vdev *vdev)
 {
-	return QDF_STATUS_E_NOSUPPORT;
+	return;
 }
 
 static inline
