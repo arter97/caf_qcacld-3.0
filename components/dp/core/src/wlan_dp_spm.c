@@ -185,7 +185,8 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 		if (clear_tbl) {
 			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
 					     &cursor->node);
-		} else if ((curr_ts - cursor->active_ts) > (5000 * 1000)) {
+		} else if ((curr_ts - cursor->active_ts) >
+				WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT) {
 			wlan_dp_spm_unmap_svc_to_flow(cursor->svc_id,
 						      &cursor->info);
 			qdf_mem_zero(cursor,
@@ -615,16 +616,19 @@ void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg)
 	/* TBD: Will be implemented when message interface is set for SAWFISH */
 }
 
-uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
+uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 				      uint16_t flow_id, uint64_t cookie)
 {
+	struct wlan_dp_spm_context *spm_ctx = dp_intf->spm_intf_ctx;
 	struct wlan_dp_spm_flow_info *flow;
 
 	flow = spm_intf->origin_aft[flow_id];
 
-	qdf_assert(flow);
+	/* Flow can be NULL when evicted or retired */
+	if (qdf_unlikely(!flow))
+		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
 
-	if (flow->cookie != cookie) {
+	if (qdf_unlikely(flow->cookie != cookie)) {
 		dp_info("Flow cookie %lu mismatch against table %lu", cookie,
 			flow->cookie);
 		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
@@ -764,6 +768,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 		if (clear_tbl) {
 			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
 					     &cursor->node);
+			spm_intf->origin_aft[i] = NULL;
 		} else if ((curr_ts - cursor->active_ts) > (5000 * 1000)) {
 			qdf_mem_zero(cursor,
 				     sizeof(struct wlan_dp_spm_flow_info));
@@ -772,6 +777,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 					     &cursor->node);
 			spm_intf->o_stats.active--;
 			spm_intf->o_stats.deleted++;
+			spm_intf->origin_aft[i] = NULL;
 		}
 	}
 }
@@ -904,7 +910,8 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	*flow_id = flow_rec->id;
 
 	/* Trigger flow retiring event at threshold */
-	if (spm_intf->o_flow_rec_freelist.count < 10) {
+	if (qdf_unlikely(spm_intf->o_flow_rec_freelist.count <
+				WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK)) {
 		if (!wlan_dp_spm_get_context())
 			wlan_dp_spm_flow_retire(dp_intf->spm_intf_ctx, false);
 		else

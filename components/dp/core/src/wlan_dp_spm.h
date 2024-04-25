@@ -14,6 +14,10 @@
 #define WLAN_DP_SPM_MAX_SERVICE_CLASS_SUPPORT 32
 #define WLAN_DP_SPM_INVALID_METADATA 0xFF
 
+/* Timeout in nano seconds */
+#define WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT (10 * 1000 * 1000 * 1000)
+#define WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK 10
+
 /**
  * enum wlan_dp_spm_event_type - SPM event type
  * @WLAN_DP_SPM_EVENT_ACTIVE_FLOW_ADD: Addition of a new active flow
@@ -231,13 +235,13 @@ void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg);
 
 /**
  * wlan_dp_spm_svc_get_metadata() - Get service metadata for flow:
- * @spm_intf: SPM interface
+ * @dp_intf: DP interface
  * @flow_id: Flow ID
  * @cookie: sock address or hash value depending on traffic
  *
  * Return: Service metadata for the flow
  */
-uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
+uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 				      uint16_t flow_id, uint64_t cookie);
 
 /**
@@ -301,7 +305,7 @@ void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg)
 }
 
 static inline
-uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
+uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 				      uint16_t flow_id, uint64_t cookie)
 {
 	return QDF_STATUS_SUCCESS;
