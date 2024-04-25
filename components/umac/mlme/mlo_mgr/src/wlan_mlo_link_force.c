@@ -787,6 +787,9 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	if (!policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL))
+		return;
+
 	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
 			       ml_link_info, ml_freq_lst, ml_vdev_lst,

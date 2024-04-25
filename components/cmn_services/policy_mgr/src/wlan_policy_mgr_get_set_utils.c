@@ -13538,7 +13538,8 @@ policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 	if (!mlo_dev_ctx)
 		return false;
 
-	if (!wlan_mlme_is_aux_emlsr_support(psoc))
+	if (!policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) ||
+	    !wlan_mlme_is_aux_emlsr_support(psoc))
 		return false;
 
 	emlsr_mode = mlo_dev_ctx->sta_ctx->emlsr_mode_req;
