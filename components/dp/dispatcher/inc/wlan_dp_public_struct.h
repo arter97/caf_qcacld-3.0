@@ -718,6 +718,7 @@ struct wlan_dp_stc_burst_samples {
 
 #define WLAN_DP_TXRX_SAMPLES_READY BIT(0)
 #define WLAN_DP_BURST_SAMPLES_READY BIT(1)
+#define WLAN_DP_FLOW_CLASSIFIED BIT(2)
 
 /*
  * struct wlan_dp_stc_flow_samples - Flow samples
@@ -786,6 +787,7 @@ struct wlan_dp_stc_flow_samples {
  * @dp_unregister_lpass_ssr_notifier: Callback to unregister for lpass SSR notif
  * @wlan_dp_ipa_wds_peer_cb: Callback to handle IPA WDS peer events
  * @send_flow_stats_event: Callback to send flow stats vendor command
+ * @send_flow_report_event: Callback to send flow report vendor command
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -888,6 +890,9 @@ struct wlan_dp_psoc_callbacks {
 	int (*send_flow_stats_event)(struct wlan_objmgr_psoc *psoc,
 				     struct wlan_dp_stc_flow_samples *flow_samples,
 				     uint32_t flags);
+	int (*send_flow_report_event)(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_dp_stc_flow_samples *flow_samples,
+				      uint32_t flags);
 #endif
 };
 

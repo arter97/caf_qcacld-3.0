@@ -752,6 +752,18 @@ os_if_dp_flow_stats_update_or_get_len(struct sk_buff *flow_sample_event,
 		goto fail;
 	len += ret;
 
+	if (flags & WLAN_DP_FLOW_CLASSIFIED) {
+		if (flow_sample_event &&
+		    nla_put_u8(flow_sample_event,
+			       QCA_WLAN_VENDOR_ATTR_FLOW_STATS_TRAFFIC_TYPE,
+			       0)) {
+			osif_err("STC: traffic type put failed");
+			goto fail;
+		} else {
+			len += nla_total_size(sizeof(u8));
+		}
+	}
+
 	if (flags & WLAN_DP_TXRX_SAMPLES_READY) {
 		ret = os_if_dp_fill_txrx_samples(flow_sample_event,
 						 flow_samples->txrx_samples);
@@ -775,15 +787,14 @@ fail:
 }
 
 static int
-os_if_dp_send_flow_stats_event(struct wlan_objmgr_psoc *psoc,
-			       struct wlan_dp_stc_flow_samples *flow_samples,
-			       uint32_t flags)
+os_if_dp_send_flow_stats(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_dp_stc_flow_samples *flow_samples,
+			 enum qca_nl80211_vendor_subcmds_index index,
+			 uint32_t flags)
 {
 	struct sk_buff *flow_sample_event;
 	struct wlan_objmgr_pdev *pdev;
 	struct pdev_osif_priv *os_priv;
-	enum qca_nl80211_vendor_subcmds_index index =
-				QCA_NL80211_VENDOR_SUBCMD_FLOW_STATS_INDEX;
 	uint32_t event_len;
 	int ret;
 
@@ -827,7 +838,31 @@ flow_sample_nla_fail:
 	return -EINVAL;
 }
 
+static int
+os_if_dp_send_flow_stats_event(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_dp_stc_flow_samples *flow_samples,
+			       uint32_t flags)
+{
+	enum qca_nl80211_vendor_subcmds_index index =
+				QCA_NL80211_VENDOR_SUBCMD_FLOW_STATS_INDEX;
+
+	return os_if_dp_send_flow_stats(psoc, flow_samples, index, flags);
+}
+
+static int
+os_if_dp_send_flow_report_event(struct wlan_objmgr_psoc *psoc,
+				struct wlan_dp_stc_flow_samples *flow_samples,
+				uint32_t flags)
+{
+	enum qca_nl80211_vendor_subcmds_index index =
+			QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_REPORT_INDEX;
+
+	flags |= WLAN_DP_FLOW_CLASSIFIED;
+	return os_if_dp_send_flow_stats(psoc, flow_samples, index, flags);
+}
+
 void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 {
 	cb_obj->send_flow_stats_event = os_if_dp_send_flow_stats_event;
+	cb_obj->send_flow_report_event = os_if_dp_send_flow_report_event;
 }

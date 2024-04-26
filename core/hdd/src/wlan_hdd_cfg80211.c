@@ -2058,6 +2058,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	},
 #ifdef WLAN_DP_FEATURE_STC
 	FEATURE_FLOW_STATS_EVENTS
+	FEATURE_FLOW_REPORT_EVENTS
 #endif
 };
 

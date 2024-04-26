@@ -43,6 +43,12 @@ flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1];
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_FLOW_STATS,		\
 	},
 
+#define FEATURE_FLOW_REPORT_EVENTS						\
+	[QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_REPORT_INDEX] = {		\
+		.vendor_id = QCA_NL80211_VENDOR_ID,				\
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_REPORT,	\
+	},
+
 /**
  * os_if_dp_flow_classify_result() - Handler to process flow classify result
  * @wiphy: wiphy handle
@@ -65,6 +71,7 @@ void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj);
 
 #define FEATURE_FLOW_CLASSIFY_COMMANDS
 #define FEATURE_FLOW_STATS_EVENTS
+#define FEATURE_FLOW_REPORT_EVENTS
 
 static inline
 QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,

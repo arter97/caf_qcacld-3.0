@@ -2347,6 +2347,7 @@ ucfg_dp_register_stc_hdd_cbs(struct wlan_dp_psoc_context *dp_ctx,
 			     struct wlan_dp_psoc_callbacks *cb_obj)
 {
 	dp_ctx->dp_ops.send_flow_stats_event = cb_obj->send_flow_stats_event;
+	dp_ctx->dp_ops.send_flow_report_event = cb_obj->send_flow_report_event;
 }
 #else
 static inline void
