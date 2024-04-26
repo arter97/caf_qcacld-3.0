@@ -1264,6 +1264,9 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	}
 
 	dp_link->cdp_vdev_registered = 1;
+	dp_link->cdp_vdev_deleted = 0;
+	dp_link->destroyed = 0;
+
 	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
@@ -1318,6 +1321,8 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	}
 
 	dp_link->cdp_vdev_registered = 1;
+	dp_link->cdp_vdev_deleted = 0;
+	dp_link->destroyed = 0;
 	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
@@ -1352,6 +1357,8 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	}
 
 	dp_link->cdp_vdev_registered = 1;
+	dp_link->cdp_vdev_deleted = 0;
+	dp_link->destroyed = 0;
 	dp_intf->txrx_ops = txrx_ops;
 
 	qdf_copy_macaddr(&dp_link->conn_info.peer_macaddr,
@@ -1384,6 +1391,8 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 			  &txrx_ops);
 
 	dp_link->cdp_vdev_registered = 1;
+	dp_link->cdp_vdev_deleted = 0;
+	dp_link->destroyed = 0;
 	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
@@ -1438,6 +1447,8 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 	}
 
 	dp_link->cdp_vdev_registered = 1;
+	dp_link->cdp_vdev_deleted = 0;
+	dp_link->destroyed = 0;
 	dp_intf->txrx_ops = *txrx_ops;
 	dp_link->sap_tx_block_mask &= ~DP_TX_FN_CLR;
 

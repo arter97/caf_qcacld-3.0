@@ -794,9 +794,9 @@ struct wlan_dp_link {
 	struct wlan_dp_conn_info conn_info;
 	uint32_t sap_tx_block_mask;
 	enum bss_intf_state bss_state;
-	uint8_t destroyed : 1,
-		cdp_vdev_registered : 1,
-		cdp_vdev_deleted : 1;
+	uint8_t destroyed;
+	uint8_t cdp_vdev_registered;
+	uint8_t	cdp_vdev_deleted;
 	TAILQ_ENTRY(wlan_dp_link) inactive_list_elem;
 };
 
