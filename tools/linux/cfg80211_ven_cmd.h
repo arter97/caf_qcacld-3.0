@@ -1328,6 +1328,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_ENABLE_IOT_MESH_FEATURE = 508,
 	OL_ATH_PARAM_ENABLE_IOT_MESH_METRIC_THRESHOLD = 509,
 	OL_ATH_PARAM_DUMP_TABLE = 510,
+	OL_ATH_PARAM_ENABLE_IOT_MESH_MCAST_DROP = 511,
 
 	/* Set tsf qtimer sync report period */
 	OL_ATH_PARAM_SET_TSF_QTIMER_PERIOD = 999,
@@ -3418,6 +3419,9 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_IOT_MESH_METRIC_THRESHOLD, SET_PARAM, 1},
 	{"dump_mesh_tbl",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DUMP_TABLE, GET_PARAM, 0},
+	{"iot_mesh_mcast_drop",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_IOT_MESH_MCAST_DROP,
+								SET_PARAM, 1},
 };
 #endif
 #endif

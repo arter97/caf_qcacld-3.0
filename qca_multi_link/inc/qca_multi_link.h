@@ -152,4 +152,8 @@ bool qca_multi_link_sta_rx(struct net_device *net_dev, qdf_nbuf_t nbuf);
 bool qca_multi_link_sta_tx(struct net_device *net_dev, qdf_nbuf_t nbuf);
 void qca_multi_link_set_dbdc_loop_detection_cb(qca_multi_link_set_loop_detection_fn_t qca_ml_cb,
 			void *ctx);
+#ifdef IOT_DRONE_MESH
+bool qca_multi_link_drone_mesh_mcast_drop(struct net_device *net_dev,
+							qdf_nbuf_t nbuf);
+#endif
 #endif
