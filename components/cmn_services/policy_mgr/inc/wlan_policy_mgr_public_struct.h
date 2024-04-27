@@ -457,9 +457,13 @@ enum policy_mgr_mac_use {
  *	channel on 2.4 Ghz & 2.4 Ghz channels
  * @PM_SCC_ON_5_SCC_ON_24_5G: SCC channel on 5 Ghz, SCC channel
  *	on 2.4 Ghz & 5 Ghz channels
+ * @PM_SCC_ON_5_SCC_ON_24_5G_24G: SCC channel on 5 Ghz, SCC channel
+ *	on 2.4 Ghz, 5 Ghz channels & 2 Ghz channels
  * @PM_SCC_ON_5_5G_24G: SCC channel on 5 Ghz, 5 Ghz channels & 2.4 Ghz channels
  * @PM_SCC_ON_5_5G_SCC_ON_24G: SCC channel on 5 Ghz, 5 Ghz channels &
  *	SCC channel on 2.4 Ghz
+ * @PM_SCC_ON_5_5G_SCC_ON_24_24G: SCC channel on 5 Ghz, 5 Ghz channels,
+ *	SCC channel on 2.4 Ghz & 2.4 Ghz channels
  * @PM_SCC_ON_24_SCC_ON_5_24G: SCC channel on 2.4 Ghz, SCC
  *	channel on 5 Ghz & 2.4 Ghz channels
  * @PM_SCC_ON_24_SCC_ON_5_5G: SCC channel on 2.4 Ghz, SCC
@@ -524,8 +528,10 @@ enum policy_mgr_pcl_type {
 	PM_SCC_ON_5_CH_5G,
 	PM_SCC_ON_5_SCC_ON_24_24G,
 	PM_SCC_ON_5_SCC_ON_24_5G,
+	PM_SCC_ON_5_SCC_ON_24_5G_24G,
 	PM_SCC_ON_5_5G_24G,
 	PM_SCC_ON_5_5G_SCC_ON_24G,
+	PM_SCC_ON_5_5G_SCC_ON_24_24G,
 	PM_SCC_ON_24_SCC_ON_5_24G,
 	PM_SCC_ON_24_SCC_ON_5_5G,
 	PM_SCC_ON_24_CH_24G,
