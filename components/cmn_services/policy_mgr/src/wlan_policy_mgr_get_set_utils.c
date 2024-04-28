@@ -5950,6 +5950,16 @@ bool policy_mgr_allow_sap_go_concurrency(struct wlan_objmgr_psoc *psoc,
 	return true;
 }
 
+#ifdef CONFIG_HL_SUPPORT
+/* Legacy chipset has no such service bit, but it can support dual AP on same
+ * channel, hence bypass the check
+ */
+bool policy_mgr_dual_beacon_on_single_mac_scc_capable(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+#else
 bool policy_mgr_dual_beacon_on_single_mac_scc_capable(
 		struct wlan_objmgr_psoc *psoc)
 {
@@ -5970,6 +5980,7 @@ bool policy_mgr_dual_beacon_on_single_mac_scc_capable(
 	policy_mgr_debug("Dual beaconing on same channel on single MAC is not supported");
 	return false;
 }
+#endif
 
 bool policy_mgr_dual_beacon_on_single_mac_mcc_capable(
 		struct wlan_objmgr_psoc *psoc)
