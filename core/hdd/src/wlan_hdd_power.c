@@ -1828,6 +1828,25 @@ static inline void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
 #endif
 
 /**
+ * hdd_restore_ignore_cac() - Restore ignore cac info on SSR
+ * @hdd_ctx:   hdd context
+ *
+ * Return:     None
+ */
+static void hdd_restore_ignore_cac(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	bool ignore_cac;
+
+	status = ucfg_mlme_get_dfs_ignore_cac(hdd_ctx->psoc, &ignore_cac);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("can't get ignore cac flag");
+
+	wlansap_set_dfs_ignore_cac(hdd_ctx->mac_handle, ignore_cac);
+	hdd_debug("ignore_cac=%d", ignore_cac);
+}
+
+/**
  * hdd_ssr_restart_sap() - restart sap on SSR
  * @hdd_ctx:   hdd context
  *
@@ -1837,6 +1856,7 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct wlan_hdd_link_info *link_info;
+	bool ignore_cac_updated = false;
 
 	hdd_enter();
 
@@ -1848,6 +1868,11 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
 				continue;
+
+			if (!ignore_cac_updated) {
+				hdd_restore_ignore_cac(hdd_ctx);
+				ignore_cac_updated = true;
+			}
 
 			hdd_debug("Restart prev SAP session(vdev %d), event_flags 0x%lx, link_flags 0x%lx(%s)",
 				  link_info->vdev_id,
