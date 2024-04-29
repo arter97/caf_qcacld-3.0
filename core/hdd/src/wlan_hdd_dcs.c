@@ -591,8 +591,8 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
  * Return: None
  */
 #ifdef WLAN_FEATURE_VDEV_DCS
-static void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
-			     uint32_t mac_id, uint8_t vdev_id)
+void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+		      uint32_t mac_id, uint8_t vdev_id)
 {
 	/* Send DCS command only for low latency sap*/
 	if (policy_mgr_is_vdev_ll_sap(psoc, vdev_id)) {
@@ -601,12 +601,6 @@ static void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 		else
 			ucfg_wlan_dcs_cmd(psoc, mac_id, true);
 	}
-}
-#else
-static void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
-			     uint32_t mac_id, uint8_t vdev_id)
-{
-	ucfg_wlan_dcs_cmd(psoc, mac_id, true);
 }
 #endif
 

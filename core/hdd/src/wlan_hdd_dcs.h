@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,6 +26,7 @@
 #define WLAN_HDD_DCS_H
 
 #include <wlan_hdd_main.h>
+#include "wlan_dcs_ucfg_api.h"
 
 #ifdef DCS_INTERFERENCE_DETECTION
 /**
@@ -74,6 +75,26 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter);
  * Return: None
  */
 void hdd_dcs_clear(struct hdd_adapter *adapter);
+
+#ifdef WLAN_FEATURE_VDEV_DCS
+/**
+ * hdd_send_dcs_cmd() - Send dcs command to firmware
+ * @psoc: pointer to psoc
+ * @mac_id: mac_id
+ * @vdev_id: vdev_id
+ *
+ * Return: None
+ */
+void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+		      uint32_t mac_id, uint8_t vdev_id);
+#else
+static inline
+void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+		      uint32_t mac_id, uint8_t vdev_id)
+{
+	ucfg_wlan_dcs_cmd(psoc, mac_id, true);
+}
+#endif
 #else
 static inline void hdd_dcs_register_cb(struct hdd_context *hdd_ctx)
 {
@@ -91,6 +112,12 @@ static inline void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
 }
 
 static inline void hdd_dcs_clear(struct hdd_adapter *adapter)
+{
+}
+
+static inline
+void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+		      uint32_t mac_id, uint8_t vdev_id)
 {
 }
 #endif
