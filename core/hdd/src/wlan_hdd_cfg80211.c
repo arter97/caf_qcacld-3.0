@@ -8592,6 +8592,14 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_2GHZ] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_2GHZ] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_2GHZ] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_5GHZ] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ] = {
+		.type = NLA_U8},
 };
 
 #define WLAN_MAX_LINK_ID 15
@@ -9793,6 +9801,132 @@ static int hdd_config_tx_rx_nss_per_band(struct wlan_hdd_link_info *link_info,
 
 	return hdd_set_tx_rx_nss_per_band(link_info, tx_nss_2g, rx_nss_2g,
 					  tx_nss_5g, rx_nss_5g);
+}
+
+static int
+hdd_set_dynamic_vdev_chains_per_band(struct wlan_hdd_link_info *link_info,
+				     uint8_t tx_chains_2g, uint8_t rx_chains_2g,
+				     uint8_t tx_chains_5g, uint8_t rx_chains_5g)
+{
+	struct wlan_mlme_nss_chains user_cfg, *dynamic_cfg;
+	mac_handle_t mac_handle;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("Invalid hdd_ctx");
+		return -EINVAL;
+	}
+
+	mac_handle = hdd_ctx->mac_handle;
+	if (!mac_handle) {
+		hdd_err("NULL MAC handle");
+		return -EINVAL;
+	}
+
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
+		hdd_err("Vdev_%d is not in connected state, rejecting command",
+			link_info->vdev_id);
+		return -EINVAL;
+	}
+
+	qdf_mem_zero(&user_cfg, sizeof(user_cfg));
+	user_cfg.num_rx_chains[NSS_CHAINS_BAND_2GHZ] = rx_chains_2g;
+	user_cfg.num_tx_chains[NSS_CHAINS_BAND_2GHZ] = tx_chains_2g;
+	user_cfg.num_rx_chains[NSS_CHAINS_BAND_5GHZ] = rx_chains_5g;
+	user_cfg.num_tx_chains[NSS_CHAINS_BAND_5GHZ] = tx_chains_5g;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	dynamic_cfg = ucfg_mlme_get_dynamic_vdev_config(vdev);
+	if (!dynamic_cfg) {
+		hdd_err("nss chain dynamic config NULL");
+		goto err;
+	}
+
+	if ((dynamic_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ] > rx_chains_2g) ||
+	    (dynamic_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ] > tx_chains_2g)) {
+		hdd_err("2G Chains less than nss, configure correct 2g nss first.");
+		goto err;
+	}
+
+	if ((dynamic_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ] > rx_chains_5g) ||
+	    (dynamic_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ] > tx_chains_5g)) {
+		hdd_err("5/6G Chains less than nss, configure correct 5/6g nss first.");
+		goto err;
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	status = sme_nss_chains_update(mac_handle, &user_cfg,
+				       link_info->vdev_id);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return -EINVAL;
+
+	return 0;
+err:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return -EINVAL;
+}
+
+static int hdd_config_vdev_chains_per_band(struct wlan_hdd_link_info *link_info,
+					   struct nlattr *tb[])
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	uint8_t tx_chains_2g, tx_chains_5g, rx_chains_2g, rx_chains_5g;
+	struct nlattr *tx_attr_2g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_2GHZ];
+	struct nlattr *tx_attr_5g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS_5GHZ];
+	struct nlattr *rx_attr_2g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_2GHZ];
+	struct nlattr *rx_attr_5g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ];
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("Invalid hdd_ctx");
+		return -EINVAL;
+	}
+
+	if (!tx_attr_2g && !rx_attr_2g && !tx_attr_5g && !rx_attr_5g)
+		return 0;
+
+	/* if one is present, both must be present */
+	if (!tx_attr_2g || !rx_attr_2g) {
+		hdd_err("Missing attribute for %s",
+			tx_attr_2g ? "RX_2G" : "TX_2G");
+		return -EINVAL;
+	}
+
+	/* if one is present, both must be present */
+	if (!tx_attr_5g || !rx_attr_5g) {
+		hdd_err("Missing attribute for %s",
+			tx_attr_5g ? "RX_5G" : "TX_5G");
+		return -EINVAL;
+	}
+
+	tx_chains_2g = nla_get_u8(tx_attr_2g);
+	rx_chains_2g = nla_get_u8(rx_attr_2g);
+	tx_chains_5g = nla_get_u8(tx_attr_5g);
+	rx_chains_5g = nla_get_u8(rx_attr_5g);
+
+	hdd_debug("2.4GHz Band: tx_chains %d rx_chains %d",
+		  tx_chains_2g, rx_chains_2g);
+	hdd_debug("5/6GHz Band: tx_chains %d rx_chains %d",
+		  tx_chains_5g, rx_chains_5g);
+
+	if (hdd_ctx->dynamic_nss_chains_support)
+		return hdd_set_dynamic_vdev_chains_per_band(link_info,
+							    tx_chains_2g,
+							    rx_chains_2g,
+							    tx_chains_5g,
+							    rx_chains_5g);
+	return 0;
 }
 
 #ifdef WLAN_FEATURE_SON
@@ -13647,6 +13781,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_peer_ampdu,
 	hdd_set_ul_mu_config,
 	hdd_config_tx_rx_nss_per_band,
+	hdd_config_vdev_chains_per_band,
 };
 
 /**
