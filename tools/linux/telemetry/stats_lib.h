@@ -450,6 +450,7 @@ struct debug_psoc_data {
  * @next: Next stats_obj
  * @parent: Parent stats_obj
  * @response_id: Response ID of non-blocking stats request
+ * @link_id: Link Id of MLD level object
  */
 struct stats_obj {
 	enum stats_level_e lvl;
@@ -465,6 +466,7 @@ struct stats_obj {
 	struct stats_obj *next;
 	struct stats_obj *parent;
 	uint32_t response_id;
+	uint8_t link_id;
 };
 
 /**
