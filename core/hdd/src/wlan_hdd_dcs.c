@@ -582,6 +582,34 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 }
 
+/**
+ * hdd_send_dcs_cmd() - Send DCS command
+ * @psoc: pointer to psoc object
+ * @mac_id: mac_id
+ * @vdev_id: vdev_id
+ *
+ * Return: None
+ */
+#ifdef WLAN_FEATURE_VDEV_DCS
+static void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+			     uint32_t mac_id, uint8_t vdev_id)
+{
+	/* Send DCS command only for low latency sap*/
+	if (policy_mgr_is_vdev_ll_sap(psoc, vdev_id)) {
+		if (ucfg_is_vdev_level_dcs_supported(psoc))
+			ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
+		else
+			ucfg_wlan_dcs_cmd(psoc, mac_id, true);
+	}
+}
+#else
+static void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+			     uint32_t mac_id, uint8_t vdev_id)
+{
+	ucfg_wlan_dcs_cmd(psoc, mac_id, true);
+}
+#endif
+
 void hdd_dcs_clear(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -610,7 +638,7 @@ void hdd_dcs_clear(struct hdd_adapter *adapter)
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (policy_mgr_get_sap_go_count_on_mac(psoc, list, mac_id) <= 1) {
 		ucfg_config_dcs_disable(psoc, mac_id, WLAN_HOST_DCS_WLANIM);
-		ucfg_wlan_dcs_cmd(psoc, mac_id, true);
+		hdd_send_dcs_cmd(psoc, mac_id, adapter->deflink->vdev_id);
 		if (wlansap_dcs_is_wlan_interference_mitigation_enabled(sap_ctx))
 			ucfg_dcs_clear(psoc, mac_id);
 	}
