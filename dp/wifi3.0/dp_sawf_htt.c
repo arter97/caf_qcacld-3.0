@@ -240,7 +240,7 @@ dp_htt_sawf_msduq_recfg_req(struct htt_soc *soc, struct dp_sawf_msduq *msduq,
 			    uint8_t q_id, HTT_MSDUQ_DEACTIVATE_E q_ind,
 			    struct dp_peer *peer)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	if (IS_DP_LEGACY_PEER(peer)) {
 		status = dp_htt_sawf_msduq_recfg_req_send(soc, msduq, q_id,
