@@ -1992,5 +1992,8 @@ ucfg_dp_rx_aggr_dis_req(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_dp_flow_classify_result(struct wlan_dp_stc_flow_classify_result *flow_classify_result);
+
+QDF_STATUS ucfg_dp_flow_stats_policy(enum qca_async_stats_type type,
+				     enum qca_async_stats_action);
 #endif /* WLAN_DP_FEATURE_STC */
 #endif /* _WLAN_DP_UCFG_API_H_ */

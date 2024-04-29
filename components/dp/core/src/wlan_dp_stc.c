@@ -916,6 +916,37 @@ static void wlan_dp_stc_flow_sampling_timer(void *arg)
 	return;
 }
 
+QDF_STATUS
+wlan_dp_stc_handle_flow_stats_policy(enum qca_async_stats_type type,
+				     enum qca_async_stats_action action)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+
+	switch (type) {
+	case QCA_ASYNC_STATS_TYPE_FLOW_STATS:
+		if (action == QCA_ASYNC_STATS_ACTION_START)
+			dp_stc->send_flow_stats = 1;
+		else if (action == QCA_ASYNC_STATS_ACTION_STOP)
+			dp_stc->send_flow_stats = 0;
+		else
+			return QDF_STATUS_E_INVAL;
+		break;
+	case QCA_ASYNC_STATS_TYPE_CLASSIFIED_FLOW_STATS:
+		if (action == QCA_ASYNC_STATS_ACTION_START)
+			dp_stc->send_classified_flow_stats = 1;
+		else if (action == QCA_ASYNC_STATS_ACTION_STOP)
+			dp_stc->send_classified_flow_stats = 0;
+		else
+			return QDF_STATUS_E_INVAL;
+		break;
+	default:
+		break;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline bool wlan_dp_is_flow_exact_match(struct flow_info *tuple1,
 					       struct flow_info *tuple2)
 {

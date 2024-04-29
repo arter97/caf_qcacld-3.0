@@ -23,3 +23,9 @@ QDF_STATUS ucfg_dp_flow_classify_result(
 	wlan_dp_stc_handle_flow_classify_result(flow_classify_result);
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS ucfg_dp_flow_stats_policy(enum qca_async_stats_type type,
+				     enum qca_async_stats_action action)
+{
+	return wlan_dp_stc_handle_flow_stats_policy(type, action);
+}

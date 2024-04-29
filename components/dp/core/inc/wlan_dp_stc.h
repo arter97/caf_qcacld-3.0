@@ -288,6 +288,9 @@ enum wlan_dp_stc_timer_state {
 /**
  * struct wlan_dp_stc - Smart traffic classifier context
  * @dp_ctx: DP component global context
+ * @send_flow_stats: Flag to indicate whether flow stats are to be reported
+ * @send_classified_flow_stats: Flag to indicate whether the classified
+ *				flow stats are to be reported
  * @flow_monitor_work: periodic work to process all the misc work for STC
  * @flow_monitor_interval: periodic flow monitor work interval
  * @periodic_work_state: States of the periodic flow monitor work
@@ -300,6 +303,8 @@ enum wlan_dp_stc_timer_state {
  */
 struct wlan_dp_stc {
 	struct wlan_dp_psoc_context *dp_ctx;
+	uint8_t send_flow_stats;
+	uint8_t send_classified_flow_stats;
 	struct qdf_periodic_work flow_monitor_work;
 	uint32_t flow_monitor_interval;
 	enum wlan_dp_stc_periodic_work_state periodic_work_state;
@@ -505,6 +510,9 @@ wlan_dp_stc_check_n_track_tx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 					       vdev_id, peer_id, metadata);
 }
 
+QDF_STATUS
+wlan_dp_stc_handle_flow_stats_policy(enum qca_async_stats_type type,
+				     enum qca_async_stats_action);
 /**
  * wlan_dp_stc_handle_flow_classify_result() - Handle flow classify result
  * @flow_classify_result:
