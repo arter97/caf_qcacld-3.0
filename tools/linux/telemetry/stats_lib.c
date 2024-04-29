@@ -2832,8 +2832,6 @@ static void *build_single_object(struct stats_command *cmd)
 		}
 	}
 
-	memset(ifname, '\0', sizeof(ifname));
-
 	switch (cmd->obj) {
 	case STATS_OBJ_AP:
 		get_first_active_soc_ifname(cmd, &if_list, ifname);
@@ -2863,8 +2861,10 @@ static void *build_single_object(struct stats_command *cmd)
 	}
 
 	temp_obj = alloc_object(cmd->obj, ifname);
-	if (!temp_obj)
+	if (!temp_obj) {
 		STATS_ERR("Failed to allocate object for OBJ %d!", cmd->obj);
+		goto error_handle;
+	}
 
 	if (temp_obj->obj_type == STATS_OBJ_VAP)
 		fill_mld_interface(temp_obj);
