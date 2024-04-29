@@ -1026,6 +1026,9 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	uint32_t congestion_timeout = 0, reason;
 	uint8_t peer_cap;
 	QDF_STATUS qdf_status;
+	struct wlan_channel *bss_chan;
+	uint8_t band;
+	bool is_24ghz_enabled;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -1052,6 +1055,27 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	ret = osif_twt_parse_add_dialog_attrs(tb2, &params);
 	if (ret)
 		return ret;
+
+	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
+	if (!bss_chan) {
+		osif_err("Unable to find bss chan");
+		return -EINVAL;
+	}
+
+	band = wlan_reg_freq_to_band((qdf_freq_t)bss_chan->ch_freq);
+	if (band == REG_BAND_UNKNOWN) {
+		osif_err("Invalid bss freq");
+		return -EINVAL;
+	}
+
+	ucfg_twt_cfg_get_24ghz_enabled(psoc, &is_24ghz_enabled);
+
+	if (!is_24ghz_enabled &&
+	    !wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    band == REG_BAND_2G) {
+		osif_err("TWT disabled for 2.4 GHz band");
+		return -EINVAL;
+	}
 
 	qdf_status = ucfg_twt_get_peer_capabilities(psoc, &params.peer_macaddr,
 						    &peer_cap);
