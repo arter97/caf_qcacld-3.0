@@ -700,10 +700,6 @@ dp_lite_mon_update_peers(struct dp_lite_mon_config *config,
 			      peer_list_elem) {
 			if (!qdf_mem_cmp(&peer->peer_mac.raw[0],
 					 peer_config->mac, QDF_MAC_ADDR_SIZE)) {
-				if (peer->vdev_id != peer_config->vdev_id) {
-					dp_mon_warn("Incorrect peer vdev");
-					return QDF_STATUS_E_FAILURE;
-				}
 				/* delete peer from lite mon peer list */
 				TAILQ_REMOVE(&config->peer_list,
 					     peer, peer_list_elem);
