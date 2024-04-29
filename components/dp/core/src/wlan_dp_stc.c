@@ -23,6 +23,7 @@
 
 #include "wlan_dp_stc.h"
 #include "wlan_dp_fisa_rx.h"
+#include "target_if.h"
 
 #ifdef WLAN_DP_FEATURE_STC
 
@@ -1034,10 +1035,39 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 	}
 }
 
+static bool
+wlan_dp_stc_is_traffic_conext_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		dp_err("Invalid WMI handle");
+		return false;
+	}
+
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_traffic_context_support);
+}
+
+static bool wlan_dp_stc_clients_available(struct wlan_dp_psoc_context *dp_ctx)
+{
+	if (wlan_dp_stc_is_traffic_conext_supported(dp_ctx->psoc))
+		return true;
+
+	return false;
+}
+
 QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wlan_dp_stc *dp_stc;
 	QDF_STATUS status;
+
+	if (!wlan_dp_stc_clients_available(dp_ctx)) {
+		dp_info("STC: No clients available, skip attach");
+		dp_ctx->dp_stc = NULL;
+		return QDF_STATUS_SUCCESS;
+	}
 
 	dp_info("STC: attach");
 	dp_stc = qdf_mem_malloc(sizeof(*dp_stc));
@@ -1088,10 +1118,16 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 
+	if (!dp_stc) {
+		dp_info("STC: module not initialized, skip detach");
+		return QDF_STATUS_SUCCESS;
+	}
+
 	dp_info("STC: detach");
 	qdf_timer_sync_cancel(&dp_stc->flow_sampling_timer);
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
 	qdf_mem_free(dp_ctx->dp_stc);
+	dp_ctx->dp_stc = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }
