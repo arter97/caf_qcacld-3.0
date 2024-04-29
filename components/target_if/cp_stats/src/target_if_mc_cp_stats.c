@@ -818,10 +818,12 @@ static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 
 	ev->last_event = stats_param.last_event;
 	ev->mac_seq_num = mac_seq;
+#ifndef CONFIG_HL_SUPPORT
 	if (IS_MSB_SET(ev->last_event) && IS_LSB_SET(ev->last_event))
 		mac_seq = 0;
 	else
 		mac_seq++;
+#endif
 
 	status = target_if_cp_stats_extract_pdev_stats(wmi_hdl, &stats_param,
 						       ev, data);
