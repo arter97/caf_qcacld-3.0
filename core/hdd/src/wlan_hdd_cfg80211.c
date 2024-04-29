@@ -31404,7 +31404,7 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
 	.get_link_tid_map_status = wlan_hdd_cfg80211_get_t2lm_mapping_status,
 #endif
-#ifdef WLAN_FEATURE_11BE_MLO_TTLM
+#if defined(WLAN_FEATURE_11BE_MLO_TTLM) && defined(WLAN_FEATURE_11BE_MLO)
 	.set_ttlm = wlan_hdd_cfg80211_set_ttlm_mapping,
 #endif
 };
