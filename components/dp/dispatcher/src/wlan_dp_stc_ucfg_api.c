@@ -20,6 +20,6 @@
 QDF_STATUS ucfg_dp_flow_classify_result(
 		struct wlan_dp_stc_flow_classify_result *flow_classify_result)
 {
-	/* TODO - Implement later */
+	wlan_dp_stc_handle_flow_classify_result(flow_classify_result);
 	return QDF_STATUS_SUCCESS;
 }

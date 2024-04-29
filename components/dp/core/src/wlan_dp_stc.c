@@ -916,6 +916,93 @@ static void wlan_dp_stc_flow_sampling_timer(void *arg)
 	return;
 }
 
+static inline bool wlan_dp_is_flow_exact_match(struct flow_info *tuple1,
+					       struct flow_info *tuple2)
+{
+	if ((tuple1->src_port ^ tuple2->src_port) ||
+	    (tuple1->dst_port ^ tuple2->dst_port) ||
+	    (tuple1->proto ^ tuple2->proto))
+		return false;
+
+	if ((tuple1->flags & DP_FLOW_TUPLE_FLAGS_IPV4) &&
+	    ((tuple1->src_ip.ipv4_addr ^ tuple2->src_ip.ipv4_addr) ||
+	     (tuple1->dst_ip.ipv4_addr ^ tuple2->dst_ip.ipv4_addr)))
+		return false;
+
+	if ((tuple1->flags & DP_FLOW_TUPLE_FLAGS_IPV6) &&
+	    ((tuple1->src_ip.ipv6_addr[0] ^ tuple2->src_ip.ipv6_addr[0]) ||
+	     (tuple1->src_ip.ipv6_addr[1] ^ tuple2->src_ip.ipv6_addr[1]) ||
+	     (tuple1->src_ip.ipv6_addr[2] ^ tuple2->src_ip.ipv6_addr[2]) ||
+	     (tuple1->src_ip.ipv6_addr[3] ^ tuple2->src_ip.ipv6_addr[3]) ||
+	     (tuple1->dst_ip.ipv6_addr[0] ^ tuple2->dst_ip.ipv6_addr[0]) ||
+	     (tuple1->dst_ip.ipv6_addr[1] ^ tuple2->dst_ip.ipv6_addr[1]) ||
+	     (tuple1->dst_ip.ipv6_addr[2] ^ tuple2->dst_ip.ipv6_addr[2]) ||
+	     (tuple1->dst_ip.ipv6_addr[3] ^ tuple2->dst_ip.ipv6_addr[3])))
+		return false;
+
+	return true;
+}
+
+void
+wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result *flow_classify_result)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc_sampling_table *sampling_table;
+	struct flow_info *flow_tuple = &flow_classify_result->flow_tuple;
+	struct wlan_dp_stc_sampling_table_entry *flow;
+	uint64_t hash;
+	int i;
+
+	hash = wlan_dp_get_flow_hash(dp_ctx, flow_tuple);
+	sampling_table = &dp_stc->sampling_flow_table;
+
+	for (i = 0; i < DP_STC_SAMPLE_FLOWS_MAX; i++) {
+		flow = &sampling_table->entries[i];
+		if (flow->state == WLAN_DP_SAMPLING_STATE_INIT)
+			continue;
+
+		/* Neither samples have been reported, so skip this flow */
+		if (!(wlan_dp_txrx_samples_reported(flow) ||
+		      wlan_dp_burst_samples_reported(flow)))
+			continue;
+
+		if (flow->tuple_hash != hash)
+			continue;
+
+		if (!wlan_dp_is_flow_exact_match(flow_tuple,
+						 &flow->flow_samples.flow_tuple))
+			continue;
+
+		/*
+		 * Flow is an exact match.
+		 * The classification result is for this flow only.
+		 */
+		/*
+		 * 1) Indicate to TX and RX flow
+		 * 2) Change state to classified,
+		 *	timer will remove it from table
+		 * The risk in changing state here is that, if the flow is
+		 * classified using txrx samples, then timer may change the
+		 * state to BURST_SAMPLING. This is write from 2 contexts.
+		 */
+		if (wlan_dp_burst_samples_reported(flow))
+			wlan_dp_stc_remove_sampling_table_entry(dp_stc, flow);
+		flow->state = WLAN_DP_SAMPLING_STATE_CLASSIFIED;
+		break;
+	}
+
+	/*
+	 * Currently there is no case of sampling table entry being removed
+	 * without the classification result. So assert if we are unable to
+	 * find the flow which has been classified.
+	 */
+	if (i == DP_STC_SAMPLE_FLOWS_MAX) {
+		dp_info("STC: Could not find the classified flow in table");
+		qdf_assert_always(0);
+	}
+}
+
 QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wlan_dp_stc *dp_stc;

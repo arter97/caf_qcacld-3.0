@@ -191,6 +191,8 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint32_t tx_flow_metadata;
 	uint32_t rx_flow_id;
 	uint32_t rx_flow_metadata;
+	uint64_t tuple_hash;
+	struct flow_info flow_tuple;
 	struct wlan_dp_stc_txrx_stats tx_stats_ref;
 	struct wlan_dp_stc_txrx_stats rx_stats_ref;
 	struct wlan_dp_stc_flow_samples flow_samples;
@@ -503,6 +505,14 @@ wlan_dp_stc_check_n_track_tx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 					       vdev_id, peer_id, metadata);
 }
 
+/**
+ * wlan_dp_stc_handle_flow_classify_result() - Handle flow classify result
+ * @flow_classify_result:
+ *
+ * Return: none
+ */
+void
+wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result *flow_classify_result);
 /**
  * wlan_dp_stc_attach() - STC attach
  * @dp_ctx: DP global psoc context
