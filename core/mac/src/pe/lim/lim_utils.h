@@ -3600,6 +3600,22 @@ void lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
  */
 void lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
 					   struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_csa_evt() : chipset stats for CSA event
+ *
+ * @pe_session: pointer to session object
+ * @dir: Direction of the event i.e TX/RX
+ * @target_freq: Target freq
+ * @target_ch_width: Target channel width
+ * @switch_mode: Switch mode
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_csa_evt(struct pe_session *pe_session,
+				     enum cstats_dir dir, uint16_t target_freq,
+				     uint8_t target_ch_width,
+				     uint8_t switch_mode);
 #else
 static inline void
 lim_cp_stats_cstats_log_assoc_resp_evt(struct pe_session *session_entry,
@@ -3673,6 +3689,13 @@ lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
 static inline void
 lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
 				      struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_csa_evt(struct pe_session *pe_session,
+				enum cstats_dir dir, uint16_t target_freq,
+				uint8_t target_ch_width, uint8_t switch_mode)
 {
 }
 #endif /* WLAN_CHIPSET_STATS */
