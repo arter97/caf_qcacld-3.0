@@ -3799,9 +3799,63 @@ mlme_cm_alloc_roam_stats_info(struct vdev_mlme_obj *vdev_mlme)
 	qdf_mutex_create(&vdev_mlme->ext_vdev_ptr->roam_rd_wr_lock);
 }
 
+#ifdef WLAN_CHIPSET_STATS
+static void
+cm_cp_stats_cstats_log_deauth_evt(struct wlan_objmgr_vdev *vdev,
+				  enum cstats_dir dir, uint16_t reason_code)
+{
+	struct cstats_deauth_mgmt_frm stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_MGMT_DEAUTH_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_deauth_mgmt_frm) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.reason = reason_code;
+	stat.direction = dir;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_deauth_mgmt_frm), &stat);
+}
+
+static void
+cm_cp_stats_cstats_log_disassoc_evt(struct wlan_objmgr_vdev *vdev,
+				    enum cstats_dir dir, uint16_t reason_code)
+{
+	struct cstats_disassoc_mgmt_frm stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_MGMT_DISASSOC_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_disassoc_mgmt_frm) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.reason = reason_code;
+	stat.direction = dir;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_disassoc_mgmt_frm), &stat);
+}
+#else
+static void
+cm_cp_stats_cstats_log_deauth_evt(struct wlan_objmgr_vdev *vdev,
+				  enum cstats_dir dir, uint16_t reason_code)
+{
+}
+
+static void
+cm_cp_stats_cstats_log_disassoc_evt(struct wlan_objmgr_vdev *vdev,
+				    enum cstats_dir dir, uint16_t reason_code)
+{
+}
+#endif /* WLAN_CHIPSET_STATS */
+
 /**
  * wlan_cm_update_roam_trigger_info() - API to update roam trigger info
- * @mlme_priv:    Pointer to vdev mlme legacy priv struct
+ * @vdev:    Pointer to vdev object
  * @data:  Data from target_if wmi event
  *
  * Get roam trigger info from target_if wmi event and save in vdev mlme ring
@@ -3811,12 +3865,13 @@ mlme_cm_alloc_roam_stats_info(struct vdev_mlme_obj *vdev_mlme)
  * Return: void
  */
 static void
-wlan_cm_update_roam_trigger_info(struct mlme_legacy_priv *mlme_priv,
+wlan_cm_update_roam_trigger_info(struct wlan_objmgr_vdev *vdev,
 				 struct wmi_roam_trigger_info *data)
 {
 	uint32_t trigger_reason;
 	uint32_t index;
 	struct enhance_roam_info *info;
+	struct mlme_legacy_priv *mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 
 	index = mlme_priv->roam_write_index;
 	info = &mlme_priv->roam_info[index];
@@ -3950,6 +4005,15 @@ wlan_cm_update_roam_trigger_info(struct mlme_legacy_priv *mlme_priv,
 		mlme_debug("roam disconnection: type:%u reason:%u",
 			   data->deauth_trig_data.type,
 			   data->deauth_trig_data.reason);
+		if (data->deauth_trig_data.type == 1) {
+			cm_cp_stats_cstats_log_deauth_evt(
+						vdev, CSTATS_DIR_RX,
+						data->deauth_trig_data.reason);
+		} else if (data->deauth_trig_data.type == 2) {
+			cm_cp_stats_cstats_log_disassoc_evt(
+						vdev, CSTATS_DIR_RX,
+						data->deauth_trig_data.reason);
+		}
 		break;
 	case ROAM_TRIGGER_REASON_STA_KICKOUT:
 		info->trigger.condition.roam_tx_failures.kickout_threshold =
@@ -4302,7 +4366,7 @@ wlan_cm_update_roam_stats_info(struct wlan_objmgr_psoc *psoc,
 
 	if (stats_info->trigger[index].present) {
 		wlan_cm_clear_current_roam_stats_info(mlme_priv);
-		wlan_cm_update_roam_trigger_info(mlme_priv,
+		wlan_cm_update_roam_trigger_info(vdev,
 						 &stats_info->trigger[index]);
 		if (stats_info->scan[index].present)
 			wlan_cm_update_roam_scan_info(vdev,
@@ -4520,7 +4584,6 @@ static void cm_cp_stats_cstats_roam_result(struct wlan_objmgr_vdev *vdev,
 
 	wlan_cstats_host_stats(sizeof(struct cstats_sta_roam_result), &stat);
 }
-
 #else
 static inline void
 cm_cp_stats_cstats_roam_scan_start(struct wlan_objmgr_vdev *vdev,
