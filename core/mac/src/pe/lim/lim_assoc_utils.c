@@ -3694,7 +3694,7 @@ lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
 			struct pe_session *session,
 			struct bss_description *bss_desc)
 {
-	struct action_oui_search_attr vendor_ap_search_attr;
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
 	uint16_t ie_len;
 
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);

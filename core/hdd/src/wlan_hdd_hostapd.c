@@ -1979,7 +1979,7 @@ hdd_hostapd_update_beacon_country_ie(struct hdd_adapter *adapter)
 	struct hdd_station_info *sta_info, *tmp = NULL;
 	struct hdd_context *hdd_ctx;
 	struct hdd_ap_ctx *ap_ctx;
-	struct action_oui_search_attr attr;
+	struct action_oui_search_attr attr = {0};
 	QDF_STATUS status;
 	bool found = false;
 
