@@ -12051,6 +12051,7 @@ void lim_cp_stats_cstats_log_disc_req_evt(tDot11fTDLSDisReq *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
 	stat.dt = frm->DialogToken.token;
@@ -12075,6 +12076,7 @@ void lim_cp_stats_cstats_log_disc_resp_evt(tDot11fTDLSDisRsp *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12108,6 +12110,7 @@ void lim_cp_stats_cstats_log_setup_req_evt(tDot11fTDLSSetupReq *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12142,6 +12145,7 @@ lim_cp_stats_cstats_log_setup_resp_evt(tDot11fTDLSSetupRsp *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12179,6 +12183,7 @@ lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12215,6 +12220,7 @@ lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
