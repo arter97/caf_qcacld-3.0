@@ -48,6 +48,7 @@
 #include "wlan_dp_lapb_flow.h"
 #endif
 #include "cdp_txrx_ctrl.h"
+#include "wlan_dp_load_balance.h"
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -682,6 +683,7 @@ QDF_STATUS ucfg_dp_psoc_open(struct wlan_objmgr_psoc *psoc)
 	dp_register_pmo_handler();
 	dp_trace_init(psoc);
 	dp_bus_bandwidth_init(psoc);
+	wlan_dp_load_balancer_init(psoc);
 	qdf_wake_lock_create(&dp_ctx->rx_wake_lock, "qcom_rx_wakelock");
 
 	return QDF_STATUS_SUCCESS;
@@ -699,6 +701,7 @@ QDF_STATUS ucfg_dp_psoc_close(struct wlan_objmgr_psoc *psoc)
 
 	dp_rtpm_tput_policy_deinit(psoc);
 	dp_unregister_pmo_handler();
+	wlan_dp_load_balancer_deinit(psoc);
 	dp_bus_bandwidth_deinit(psoc);
 	qdf_wake_lock_destroy(&dp_ctx->rx_wake_lock);
 
