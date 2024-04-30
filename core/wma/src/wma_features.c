@@ -281,7 +281,7 @@ void wma_get_rx_retry_cnt(struct mac_context *mac, uint8_t vdev_id,
 	}
 
 	mac->rx_retry_cnt = peer_stats->rx.rx_retries;
-	wma_debug("Rx retry count %d, Peer" QDF_MAC_ADDR_FMT, mac->rx_retry_cnt,
+	wma_debug("Rx retry count %d, Peer " QDF_MAC_ADDR_FMT, mac->rx_retry_cnt,
 		  QDF_MAC_ADDR_REF(mac_addr));
 
 exit:

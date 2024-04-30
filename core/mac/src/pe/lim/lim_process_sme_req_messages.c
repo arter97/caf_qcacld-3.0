@@ -9310,8 +9310,7 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 	bool bufConsumed = true;
 	uint32_t *msg_buf = pMsg->bodyptr;
 
-	pe_nofl_debug("LIM handle SME Msg %s(%d)",
-		      lim_msg_str(pMsg->type), pMsg->type);
+	pe_nofl_debug("Handle %s(0x%04X)", lim_msg_str(pMsg->type), pMsg->type);
 
 	/* If no insert NOA required then execute the code below */
 
@@ -9345,28 +9344,23 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		break;
 
 	case eWNI_SME_ASSOC_CNF:
-		pe_debug("Received ASSOC_CNF message");
 		__lim_process_sme_assoc_cnf_new(mac, pMsg->type,
 						msg_buf);
 		break;
 
 	case eWNI_SME_ADDTS_REQ:
-		pe_debug("Received ADDTS_REQ message");
 		__lim_process_sme_addts_req(mac, msg_buf);
 		break;
 
 	case eWNI_SME_MSCS_REQ:
-		pe_debug("Received MSCS_REQ message");
 		__lim_process_sme_mscs_req(mac, msg_buf);
 		break;
 
 	case eWNI_SME_DELTS_REQ:
-		pe_debug("Received DELTS_REQ message");
 		__lim_process_sme_delts_req(mac, msg_buf);
 		break;
 
 	case SIR_LIM_ADDTS_RSP_TIMEOUT:
-		pe_debug("Received SIR_LIM_ADDTS_RSP_TIMEOUT message");
 		lim_process_sme_addts_rsp_timeout(mac, pMsg->bodyval);
 		break;
 

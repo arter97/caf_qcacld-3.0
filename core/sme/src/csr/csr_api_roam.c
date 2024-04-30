@@ -2600,7 +2600,7 @@ static void csr_get_peer_stats(struct mac_context *mac, uint32_t session_id,
 	info.vdev_id = wlan_vdev_get_id(vdev);
 	info.pdev_id = wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev));
 	qdf_mem_copy(info.peer_mac_addr, &peer_mac, QDF_MAC_ADDR_SIZE);
-	sme_debug("peer_mac" QDF_MAC_ADDR_FMT,
+	sme_debug("vdev %d peer_mac " QDF_MAC_ADDR_FMT, session_id,
 		  QDF_MAC_ADDR_REF(peer_mac.bytes));
 	mlme_obj->disconnect_stats_param.vdev_id = info.vdev_id;
 	status = ucfg_mc_cp_stats_send_stats_request(vdev, TYPE_PEER_STATS,
@@ -3104,7 +3104,9 @@ csr_roam_send_disconnect_done_indication(struct mac_context *mac_ctx,
 	if (!roam_info)
 		return;
 
-	sme_debug("DISCONNECT_DONE_IND RC:%d", discon_ind->reason_code);
+	sme_debug("Vdev %d, peer " QDF_MAC_ADDR_FMT " reason %d",
+		  vdev_id, QDF_MAC_ADDR_REF(discon_ind->peer_mac),
+		  discon_ind->reason_code);
 
 	if (CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
 		roam_info->reasonCode = discon_ind->reason_code;
@@ -3917,10 +3919,11 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	enum csr_akm_type csr_akm_type;
 	enum QDF_OPMODE opmode;
 
-	sme_debug("Receive WNI_SME_ASSOC_IND from SME");
 	pAssocInd = (struct assoc_ind *) msg_ptr;
-	sme_debug("Receive WNI_SME_ASSOC_IND from SME vdev id %d",
-		  pAssocInd->sessionId);
+	csr_akm_type = csr_translate_akm_type(pAssocInd->akm_type);
+	sme_debug("Receive WNI_SME_ASSOC_IND from SME vdev id %d, peer " QDF_MAC_ADDR_FMT " akm %d",
+		  pAssocInd->sessionId,
+		  QDF_MAC_ADDR_REF(pAssocInd->peerMacAddr), csr_akm_type);
 	status = csr_roam_get_session_id_from_bssid(mac_ctx,
 				(struct qdf_mac_addr *) pAssocInd->bssId,
 				&sessionId);
@@ -3934,7 +3937,6 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		sme_err("session %d not found", sessionId);
 		return;
 	}
-	csr_akm_type = csr_translate_akm_type(pAssocInd->akm_type);
 
 	roam_info = qdf_mem_malloc(sizeof(*roam_info));
 	if (!roam_info)
@@ -3987,7 +3989,6 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		} else {
 			roam_info->fAuthRequired = true;
 		}
-		sme_debug("Receive AUTH_TYPE of %d", csr_akm_type);
 		if (csr_akm_type == eCSR_AUTH_TYPE_OWE) {
 			roam_info->owe_pending_assoc_ind = qdf_mem_malloc(
 							    sizeof(*pAssocInd));
@@ -4016,7 +4017,6 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 			roam_info->status_code = eSIR_SME_ASSOC_REFUSED;
 		}
 	}
-	sme_debug("csr_akm_type: %d", csr_akm_type);
 
 	if (csr_akm_type != eCSR_AUTH_TYPE_OWE &&
 	    csr_akm_type != eCSR_AUTH_TYPE_FT_RSN_PSK) {
@@ -4099,9 +4099,6 @@ csr_roam_chk_lnk_disassoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	 */
 	pDisassocInd = (struct disassoc_ind *)msg_ptr;
 	sessionId = pDisassocInd->vdev_id;
-	sme_debug("Disassoc Indication from MAC for vdev_id %d bssid " QDF_MAC_ADDR_FMT,
-		  pDisassocInd->vdev_id,
-		  QDF_MAC_ADDR_REF(pDisassocInd->bssid.bytes));
 
 	if (!CSR_IS_SESSION_VALID(mac_ctx, sessionId)) {
 		sme_err("vdev:%d Invalid session. BSSID: " QDF_MAC_ADDR_FMT,
@@ -4118,16 +4115,14 @@ csr_roam_chk_lnk_disassoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	    pDisassocInd->peer_macaddr))
 		return;
 
-	sme_nofl_info("disassoc from peer " QDF_MAC_ADDR_FMT
-		      "reason: %d status: %d vid %d",
-		      QDF_MAC_ADDR_REF(pDisassocInd->peer_macaddr.bytes),
-		      pDisassocInd->reasonCode,
-		      pDisassocInd->status_code, sessionId);
 	session = CSR_GET_SESSION(mac_ctx, sessionId);
 	if (!session) {
-		sme_err("session: %d not found", sessionId);
+		sme_err("vdev: %d not found", sessionId);
 		return;
 	}
+	sme_debug("Vdev %d, peer " QDF_MAC_ADDR_FMT " reason: %d status: %d",
+		  sessionId, QDF_MAC_ADDR_REF(pDisassocInd->peer_macaddr.bytes),
+		  pDisassocInd->reasonCode, pDisassocInd->status_code);
 	/* Update the disconnect stats */
 	session->disconnect_stats.disconnection_cnt++;
 	session->disconnect_stats.disassoc_by_peer++;
@@ -4144,9 +4139,6 @@ csr_roam_chk_lnk_deauth_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	struct deauth_ind *pDeauthInd;
 
 	pDeauthInd = (struct deauth_ind *)msg_ptr;
-	sme_debug("DEAUTH Indication from MAC for vdev_id %d bssid "QDF_MAC_ADDR_FMT,
-		  pDeauthInd->vdev_id,
-		  QDF_MAC_ADDR_REF(pDeauthInd->bssid.bytes));
 
 	sessionId = pDeauthInd->vdev_id;
 	if (!CSR_IS_SESSION_VALID(mac_ctx, sessionId)) {
@@ -4168,6 +4160,10 @@ csr_roam_chk_lnk_deauth_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		sme_err("session %d not found", sessionId);
 		return;
 	}
+	sme_debug("vdev %d bssid " QDF_MAC_ADDR_FMT " reason: %d status: %d",
+		  pDeauthInd->vdev_id,
+		  QDF_MAC_ADDR_REF(pDeauthInd->bssid.bytes),
+		  pDeauthInd->reasonCode, pDeauthInd->status_code);
 	/* Update the disconnect stats */
 	switch (pDeauthInd->reasonCode) {
 	case REASON_DISASSOC_DUE_TO_INACTIVITY:
@@ -4272,12 +4268,15 @@ csr_roam_chk_lnk_deauth_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	roam_info = qdf_mem_malloc(sizeof(*roam_info));
 	if (!roam_info)
 		return;
-	sme_debug("eWNI_SME_DEAUTH_RSP from SME");
+
 	sessionId = pDeauthRsp->sessionId;
 	if (!CSR_IS_SESSION_VALID(mac_ctx, sessionId)) {
 		qdf_mem_free(roam_info);
 		return;
 	}
+	sme_debug("Vdev %d, peer " QDF_MAC_ADDR_FMT " status code %d",
+		  sessionId, QDF_MAC_ADDR_REF(pDeauthRsp->peer_macaddr.bytes),
+		  pDeauthRsp->status_code);
 	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, sessionId);
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		qdf_copy_macaddr(&roam_info->peerMac,
@@ -4307,12 +4306,14 @@ csr_roam_chk_lnk_disassoc_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	roam_info = qdf_mem_malloc(sizeof(*roam_info));
 	if (!roam_info)
 		return;
-	sme_debug("eWNI_SME_DISASSOC_RSP from SME ");
 	sessionId = pDisassocRsp->sessionId;
 	if (!CSR_IS_SESSION_VALID(mac_ctx, sessionId)) {
 		qdf_mem_free(roam_info);
 		return;
 	}
+	sme_debug("Vdev %d, peer " QDF_MAC_ADDR_FMT " status code %d",
+		  sessionId, QDF_MAC_ADDR_REF(pDisassocRsp->peer_macaddr.bytes),
+		  pDisassocRsp->status_code);
 	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, sessionId);
 	if (opmode == QDF_SAP_MODE || opmode == QDF_P2P_GO_MODE) {
 		qdf_copy_macaddr(&roam_info->peerMac,
@@ -4551,8 +4552,8 @@ void csr_roam_process_wm_status_change_command(
 		sme_err("session %d not found", pCommand->vdev_id);
 		csr_roam_wm_status_change_complete(mac, pCommand->vdev_id);
 	}
-	sme_debug("session:%d, CmdType : %d",
-		pCommand->vdev_id, pCommand->u.wmStatusChangeCmd.Type);
+	sme_debug("vdev %d type %d", pCommand->vdev_id,
+		  pCommand->u.wmStatusChangeCmd.Type);
 
 	switch (pCommand->u.wmStatusChangeCmd.Type) {
 	case eCsrDisassociated:

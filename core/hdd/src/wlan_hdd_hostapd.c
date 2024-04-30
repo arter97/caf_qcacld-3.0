@@ -3133,8 +3133,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 					     &cache_stainfo, true,
 					     STA_INFO_HOSTAPD_SAP_EVENT_CB);
 		}
-		hdd_nofl_info("SAP disassociated " QDF_MAC_ADDR_FMT,
-			      QDF_MAC_ADDR_REF(wrqu.addr.sa_data));
+		hdd_nofl_info("SAP Peer " QDF_MAC_ADDR_FMT " disassociated %sreason %d status code %d",
+			      QDF_MAC_ADDR_REF(disassoc_comp->staMac.bytes),
+			      disassoc_comp->reason ==
+			      eSAP_USR_INITATED_DISASSOC ? "by user " : "",
+			      disassoc_comp->reason_code,
+			      disassoc_comp->status_code);
 		hdd_place_marker(adapter, "CLIENT DISASSOCIATED FROM SAP",
 				 wrqu.addr.sa_data);
 
@@ -3145,11 +3149,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_err("Station Deauth event Set failed");
 
-		if (sap_event->sapevt.sapStationDisassocCompleteEvent.reason ==
-		    eSAP_USR_INITATED_DISASSOC)
-			hdd_debug(" User initiated disassociation");
-		else
-			hdd_debug(" MAC initiated disassociation");
 		we_event = IWEVEXPIRED;
 
 		DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
@@ -3163,7 +3162,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 						STA_INFO_HOSTAPD_SAP_EVENT_CB,
 						STA_INFO_MATCH_STA_MAC_ONLY);
 		if (!stainfo) {
-			hdd_err("Failed to find the right station");
+			hdd_err("Failed to find STA info for " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(disassoc_comp->staMac.bytes));
 			return QDF_STATUS_E_INVAL;
 		}
 

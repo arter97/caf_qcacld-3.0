@@ -1113,7 +1113,7 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		wlansap_context_put(sap_ctx);
 		return QDF_STATUS_E_NOMEM;
 	}
-	sap_debug("CSR roam_status = %s(%d), roam_result = %s(%d)",
+	sap_debug("vdev %d status %s(%d) result %s(%d)", sap_ctx->vdev_id,
 		  get_e_roam_cmd_status_str(roam_status), roam_status,
 		  get_e_csr_roam_result_str(roam_result), roam_result);
 
@@ -1151,13 +1151,11 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 				     (void *) eSAP_STATUS_SUCCESS);
 		break;
 	case eCSR_ROAM_SEND_P2P_STOP_BSS:
-		sap_debug("Received stopbss");
 		sap_signal_hdd_event(sap_ctx, csr_roam_info,
 				     eSAP_MAC_TRIG_STOP_BSS_EVENT,
 				     (void *) eSAP_STATUS_SUCCESS);
 		break;
 	case eCSR_ROAM_CHANNEL_COMPLETE_IND:
-		sap_debug("Received new channel from app");
 		wlansap_update_vendor_acs_chan(mac_ctx, sap_ctx);
 		break;
 
@@ -1247,19 +1245,15 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		}
 		break;
 	case eCSR_ROAM_DFS_CHAN_SW_NOTIFY:
-		sap_debug("Received Chan Sw Update Notification");
 		break;
 	case eCSR_ROAM_SET_CHANNEL_RSP:
-		sap_debug("Received set channel response");
 		ucfg_if_mgr_deliver_event(sap_ctx->vdev,
 					  WLAN_IF_MGR_EV_AP_CSA_COMPLETE,
 					  NULL);
 		break;
 	case eCSR_ROAM_CAC_COMPLETE_IND:
-		sap_debug("Received cac complete indication");
 		break;
 	case eCSR_ROAM_EXT_CHG_CHNL_IND:
-		sap_debug("Received set channel Indication");
 		break;
 	case eCSR_ROAM_CHANNEL_INFO_EVENT_IND:
 		wlansap_process_chan_info_event(sap_ctx, csr_roam_info);
@@ -1296,7 +1290,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			qdf_ret_status = QDF_STATUS_E_FAILURE;
 		break;
-	case eCSR_ROAM_RESULT_DEAUTH_IND:
 	case eCSR_ROAM_RESULT_DISASSOC_IND:
 		/* Fill in the event structure */
 		qdf_status = sap_signal_hdd_event(sap_ctx, csr_roam_info,
@@ -1472,9 +1465,8 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 					NULL);
 		break;
 	default:
-		sap_err("CSR roam_result = %s (%d) not handled",
-			 get_e_csr_roam_result_str(roam_result),
-			 roam_result);
+		sap_err("result %s(%d) not handled",
+			get_e_csr_roam_result_str(roam_result), roam_result);
 		break;
 	}
 EXIT:

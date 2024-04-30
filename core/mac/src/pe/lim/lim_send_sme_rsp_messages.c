@@ -897,8 +897,9 @@ void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 	QDF_STATUS status;
 	enum QDF_OPMODE opmode;
 
-	pe_debug("Disassoc Ntf with trigger : %d reasonCode: %d",
-		disassocTrigger, reasonCode);
+	pe_debug("vdev %d: peer " QDF_MAC_ADDR_FMT " trigger %d reason %d",
+		 smesessionId, QDF_MAC_ADDR_REF(peerMacAddr), disassocTrigger,
+		 reasonCode);
 
 	switch (disassocTrigger) {
 	case eLIM_DUPLICATE_ENTRY:
@@ -906,9 +907,6 @@ void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 		 * Duplicate entry is removed at LIM.
 		 * Initiate new entry for other session
 		 */
-		pe_debug("Rcvd eLIM_DUPLICATE_ENTRY for " QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(peerMacAddr));
-
 		for (i = 0; i < mac->lim.maxBssId; i++) {
 			session = &mac->lim.gpSession[i];
 			if (session->valid &&
@@ -948,9 +946,6 @@ void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 			failure = true;
 			goto error;
 		}
-		pe_debug("send eWNI_SME_DISASSOC_RSP with retCode: %d for "
-			 QDF_MAC_ADDR_FMT,
-			 reasonCode, QDF_MAC_ADDR_REF(peerMacAddr));
 		pSirSmeDisassocRsp->messageType = eWNI_SME_DISASSOC_RSP;
 		pSirSmeDisassocRsp->length = sizeof(struct disassoc_rsp);
 		pSirSmeDisassocRsp->sessionId = smesessionId;
@@ -989,9 +984,6 @@ void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 			failure = true;
 			goto error;
 		}
-		pe_debug("send eWNI_SME_DISASSOC_IND with retCode: %d for "
-			 QDF_MAC_ADDR_FMT,
-			 reasonCode, QDF_MAC_ADDR_REF(peerMacAddr));
 		pSirSmeDisassocInd->messageType = eWNI_SME_DISASSOC_IND;
 		pSirSmeDisassocInd->length = sizeof(*pSirSmeDisassocInd);
 		pSirSmeDisassocInd->vdev_id = smesessionId;
