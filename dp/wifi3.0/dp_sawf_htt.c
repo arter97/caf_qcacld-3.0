@@ -213,6 +213,10 @@ dp_htt_sawf_msduq_recfg_req_send(struct htt_soc *soc,
 
 	pkt->soc_ctxt = NULL;
 
+	/* Clear no_resp_ind bit */
+	msduq->no_resp_ind = 0;
+	dp_sawf_debug("Reset no_resp_ind Flag");
+
 	SET_HTC_PACKET_INFO_TX(
 			&pkt->htc_pkt,
 			dp_htt_h2t_send_complete_free_netbuf,
@@ -236,9 +240,9 @@ dp_htt_sawf_msduq_recfg_req_send(struct htt_soc *soc,
 }
 
 QDF_STATUS
-dp_htt_sawf_msduq_recfg_req(struct htt_soc *soc, struct dp_sawf_msduq *msduq,
-			    uint8_t q_id, HTT_MSDUQ_DEACTIVATE_E q_ind,
-			    struct dp_peer *peer)
+dp_htt_sawf_msduq_recfg_req(struct htt_soc *soc, struct dp_peer *peer,
+			    struct dp_sawf_msduq *msduq, uint8_t q_id,
+			    HTT_MSDUQ_DEACTIVATE_E q_ind)
 {
 	QDF_STATUS status;
 
@@ -391,6 +395,11 @@ dp_htt_sawf_msduq_recfg_ind(struct htt_soc *soc, uint32_t *msg_word)
 		     req_cookie);
 
 	qdf_spin_lock_bh(&sawf_ctx->sawf_peer_lock);
+
+	/* Clear no_resp_ind bit */
+	msduq->no_resp_ind = 0;
+	dp_sawf_debug("Reset no_resp_ind Flag");
+
 	curr_q_state = msduq->q_state;
 
 	/*
