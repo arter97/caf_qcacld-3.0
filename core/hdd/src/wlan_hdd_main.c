@@ -9965,6 +9965,22 @@ static void hdd_stop_ocb_adapter(struct hdd_adapter *adapter)
 	hdd_vdev_destroy(link_info);
 }
 
+static void hdd_flush_scan_block_work(struct hdd_adapter *adapter)
+{
+	struct work_struct *work;
+	char *name = NULL;
+	name = adapter->dev->name;
+
+	work = &adapter->scan_block_work;
+	if (!work->func) {
+		hdd_err("iface: %s Scan block work has been already cleaned up",
+			!name ? "none" : name);
+		return;
+	}
+
+	cds_flush_work(work);
+}
+
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
@@ -9985,7 +10001,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		wlan_hdd_cfg80211_deregister_frames(adapter);
 
 	hdd_stop_tsf_sync(adapter);
-	cds_flush_work(&adapter->scan_block_work);
+	hdd_flush_scan_block_work(adapter);
 	wlan_hdd_cfg80211_scan_block(adapter);
 	hdd_debug("Disabling queues");
 	wlan_hdd_netif_queue_control(adapter,
