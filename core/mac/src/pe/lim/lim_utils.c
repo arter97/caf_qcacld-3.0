@@ -227,16 +227,8 @@ char *lim_msg_str(uint32_t msgType)
 	switch (msgType) {
 	case eWNI_SME_SYS_READY_IND:
 		return "eWNI_SME_SYS_READY_IND";
-	case eWNI_SME_JOIN_REQ:
-		return "eWNI_SME_JOIN_REQ";
-	case eWNI_SME_JOIN_RSP:
-		return "eWNI_SME_JOIN_RSP";
 	case eWNI_SME_SETCONTEXT_RSP:
 		return "eWNI_SME_SETCONTEXT_RSP";
-	case eWNI_SME_REASSOC_REQ:
-		return "eWNI_SME_REASSOC_REQ";
-	case eWNI_SME_REASSOC_RSP:
-		return "eWNI_SME_REASSOC_RSP";
 	case eWNI_SME_DISASSOC_REQ:
 		return "eWNI_SME_DISASSOC_REQ";
 	case eWNI_SME_DISASSOC_RSP:

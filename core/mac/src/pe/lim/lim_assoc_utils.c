@@ -600,7 +600,7 @@ lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
 				mlmStaContext.protStatusCode,
 				pe_session->peSessionId);
 
-			lim_send_sme_join_reassoc_rsp(mac, eWNI_SME_REASSOC_RSP,
+			lim_send_sme_join_reassoc_rsp(mac, true,
 						      mlmStaContext.resultCode,
 						      mlmStaContext.protStatusCode,
 						      pe_session, smesessionId);
@@ -619,7 +619,7 @@ lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
 				mlmStaContext.protStatusCode,
 				pe_session->peSessionId);
 
-			lim_send_sme_join_reassoc_rsp(mac, eWNI_SME_JOIN_RSP,
+			lim_send_sme_join_reassoc_rsp(mac, false,
 						      mlmStaContext.resultCode,
 						      mlmStaContext.protStatusCode,
 						      pe_session, smesessionId);

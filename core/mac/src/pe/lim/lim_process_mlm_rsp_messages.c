@@ -1331,7 +1331,7 @@ void lim_join_result_callback(struct mac_context *mac,
 	if (!session) {
 		return;
 	}
-	lim_send_sme_join_reassoc_rsp(mac, eWNI_SME_JOIN_RSP,
+	lim_send_sme_join_reassoc_rsp(mac, false,
 				      session->result_code,
 				      session->prot_status_code,
 				      session, vdev_id);
@@ -1435,7 +1435,7 @@ void lim_handle_sme_join_result(struct mac_context *mac_ctx,
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_START_SUCCESS,
 					      0, NULL);
-		return lim_send_sme_join_reassoc_rsp(mac_ctx, eWNI_SME_JOIN_RSP,
+		return lim_send_sme_join_reassoc_rsp(mac_ctx, false,
 						     result_code,
 						     prot_status_code, session,
 						     session->smeSessionId);

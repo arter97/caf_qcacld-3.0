@@ -659,25 +659,24 @@ lim_cm_get_fail_reason_from_result_code(tSirResultCodes result_code)
 static
 void lim_send_assoc_rsp_diag_event(struct mac_context *mac_ctx,
 				   struct pe_session *session_entry,
-				   uint16_t msg_type, uint16_t result_code)
+				   bool is_reassoc, uint16_t result_code)
 {
-	if (msg_type == eWNI_SME_REASSOC_RSP)
-		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_REASSOC_RSP_EVENT,
-				      session_entry, result_code, 0);
-	else
-		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_JOIN_RSP_EVENT,
-				      session_entry, result_code, 0);
+	uint16_t diag_evt_type = is_reassoc ?
+		WLAN_PE_DIAG_REASSOC_RSP_EVENT : WLAN_PE_DIAG_JOIN_RSP_EVENT;
+
+	lim_diag_event_report(mac_ctx, diag_evt_type, session_entry,
+			      result_code, 0);
 }
 #else
 static inline
 void lim_send_assoc_rsp_diag_event(struct mac_context *mac_ctx,
 				   struct pe_session *session_entry,
-				   uint16_t msg_type, uint16_t result_code)
+				   bool is_reassoc, uint16_t result_code)
 {}
 #endif
 
 void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
-				   uint16_t msg_type,
+				   bool is_reassoc,
 				   tSirResultCodes result_code,
 				   uint16_t prot_status_code,
 				   struct pe_session *session_entry,
@@ -686,11 +685,12 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 	QDF_STATUS connect_status;
 	enum wlan_cm_connect_fail_reason fail_reason = 0;
 
-	lim_send_assoc_rsp_diag_event(mac_ctx, session_entry, msg_type,
+	lim_send_assoc_rsp_diag_event(mac_ctx, session_entry, is_reassoc,
 				      result_code);
 
-	pe_debug("Sending message: %s with reasonCode: %s",
-		 lim_msg_str(msg_type), lim_result_code_str(result_code));
+	pe_debug("Sending %s resp, with %s (%d)",
+		 is_reassoc ? "Reassoc" : "Join",
+		 lim_result_code_str(result_code), result_code);
 
 	if (result_code == eSIR_SME_SUCCESS) {
 		connect_status = QDF_STATUS_SUCCESS;
@@ -702,9 +702,7 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 
 	return lim_cm_send_connect_rsp(mac_ctx, session_entry, NULL,
 				       fail_reason, connect_status,
-				       prot_status_code,
-				       msg_type == eWNI_SME_JOIN_RSP ?
-				       false : true);
+				       prot_status_code, is_reassoc);
 
 	/* add reassoc resp API */
 }

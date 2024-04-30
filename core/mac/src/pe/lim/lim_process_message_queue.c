@@ -1803,8 +1803,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_PDEV_SET_HT_VHT_IE:
 	case eWNI_SME_SET_VDEV_IES_PER_BAND:
 	case eWNI_SME_SYS_READY_IND:
-	case eWNI_SME_JOIN_REQ:
-	case eWNI_SME_REASSOC_REQ:
 	case eWNI_SME_START_BSS_REQ:
 	case eWNI_SME_STOP_BSS_REQ:
 	case eWNI_SME_SWITCH_CHL_IND:

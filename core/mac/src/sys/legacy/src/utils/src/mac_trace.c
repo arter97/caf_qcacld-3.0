@@ -162,7 +162,6 @@ uint8_t *mac_trace_get_lim_mlm_state(uint16_t mlm_state)
 	}
 }
 
-#ifdef TRACE_RECORD
 /**
  * mac_trace_get_sme_msg_string() - Get the msg
  * @sme_msg: message type in numeric form
@@ -175,11 +174,7 @@ uint8_t *mac_trace_get_sme_msg_string(uint16_t sme_msg)
 {
 	switch (sme_msg) {
 		CASE_RETURN_STRING(eWNI_SME_SYS_READY_IND);
-		CASE_RETURN_STRING(eWNI_SME_JOIN_REQ);
-		CASE_RETURN_STRING(eWNI_SME_JOIN_RSP);
 		CASE_RETURN_STRING(eWNI_SME_SETCONTEXT_RSP);
-		CASE_RETURN_STRING(eWNI_SME_REASSOC_REQ);
-		CASE_RETURN_STRING(eWNI_SME_REASSOC_RSP);
 		CASE_RETURN_STRING(eWNI_SME_DISASSOC_REQ);
 		CASE_RETURN_STRING(eWNI_SME_DISASSOC_RSP);
 		CASE_RETURN_STRING(eWNI_SME_DISASSOC_IND);
@@ -319,7 +314,6 @@ uint8_t *mac_trace_get_sme_msg_string(uint16_t sme_msg)
 		break;
 	}
 }
-#endif
 
 /**
  * mac_trace_get_wma_msg_string() - Get the msg

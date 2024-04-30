@@ -5453,7 +5453,7 @@ end:
 	 * Send Reassoc failure response to host
 	 * (note session_entry may be NULL, but that's OK)
 	 */
-	lim_send_sme_join_reassoc_rsp(mac_ctx, eWNI_SME_REASSOC_RSP,
+	lim_send_sme_join_reassoc_rsp(mac_ctx, true,
 				      ret_code, STATUS_UNSPECIFIED_FAILURE,
 				      session_entry, vdev_id);
 }
