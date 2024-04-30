@@ -6935,6 +6935,59 @@ cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
 {}
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * cm_is_bssid_present_on_any_assoc_link() - Check if bssid belongs to any
+ *                                           assoc link
+ * @vdev: VDEV pointer
+ * @bssid: bssid pointer
+ *
+ * Return: True if bssid belongs to any assoc else return false
+ */
+static bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
+						  struct qdf_mac_addr *bssid)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
+	struct mlo_link_info *links_info;
+	struct qdf_mac_addr connected_bssid;
+	int i;
+	QDF_STATUS status;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) ||
+	    !mlo_dev_ctx || !mlo_dev_ctx->link_ctx) {
+		status = wlan_vdev_get_bss_peer_mac(vdev, &connected_bssid);
+		if (QDF_IS_STATUS_ERROR(status))
+			return false;
+
+		return qdf_is_macaddr_equal(bssid, &connected_bssid);
+	}
+
+	links_info = mlo_dev_ctx->link_ctx->links_info;
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		if (links_info[i].link_id == WLAN_INVALID_LINK_ID)
+			continue;
+		if (qdf_is_macaddr_equal(bssid,
+					 &links_info[i].ap_link_addr))
+			return true;
+	}
+
+	return false;
+}
+#else
+static bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
+						  struct qdf_mac_addr *bssid)
+{
+	struct qdf_mac_addr connected_bssid;
+	QDF_STATUS status;
+
+	status = wlan_vdev_get_bss_peer_mac(vdev, &connected_bssid);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
+
+	return qdf_is_macaddr_equal(bssid, &connected_bssid);
+}
+#endif
+
 QDF_STATUS
 cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 {
@@ -6981,7 +7034,8 @@ cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 	wlan_mlme_get_self_bss_roam(psoc, &enable_self_bss_roam);
 	if ((!enable_self_bss_roam ||
 	     cm_roam_get_roam_score_algo(psoc) == VENDOR_ROAM_SCORE_ALGORITHM_1) &&
-	     qdf_is_macaddr_equal(&roam_req->req.bssid, &connected_bssid)) {
+	     cm_is_bssid_present_on_any_assoc_link(cm_ctx->vdev,
+						   &roam_req->req.bssid)) {
 		mlme_err(CM_PREFIX_FMT "self bss roam disabled. invoke_src:%d",
 			 CM_PREFIX_REF(vdev_id, cm_id),
 			 req->roam_req.req.source);
@@ -7015,6 +7069,7 @@ cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 				 &roam_req->req.bssid);
 		goto send_cmd;
 	}
+
 	if (qdf_is_macaddr_equal(&roam_req->req.bssid, &connected_bssid))
 		roam_invoke_req->is_same_bssid = true;
 
