@@ -1941,9 +1941,11 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	if ((config->dot11Mode == eHDD_DOT11_MODE_11ac ||
 	     config->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY) && !cfg->en_11ac)
 		config->dot11Mode = eHDD_DOT11_MODE_AUTO;
+
 	/* 11BE mode support */
-	if (!hdd_dot11Mode_support_11be(config->dot11Mode) &&
-	    cfg->en_11be) {
+	if (cfg->en_11be &&
+	    (!hdd_dot11Mode_support_11be(config->dot11Mode) ||
+	     !wlan_reg_phybitmap_support_11be(hdd_ctx->pdev))) {
 		hdd_debug("dot11Mode %d override target en_11be to false",
 			  config->dot11Mode);
 		cfg->en_11be = false;
@@ -2185,6 +2187,15 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 
 	if (ht_cap_info.short_gi_40_mhz && !cfg->ht_sgi_40)
 		ht_cap_info.short_gi_40_mhz = cfg->ht_sgi_40;
+
+	hdd_debug("gHtSMPS ini: %d, dynamic_smps fw cap: %d",
+		  ht_cap_info.mimo_power_save, cfg->dynamic_smps);
+	if (ht_cap_info.mimo_power_save == HDD_SMPS_MODE_DYNAMIC) {
+		if (cfg->dynamic_smps)
+			ht_cap_info.mimo_power_save = HDD_SMPS_MODE_DYNAMIC;
+		else
+			ht_cap_info.mimo_power_save = HDD_SMPS_MODE_DISABLED;
+	}
 
 	hdd_ctx->num_rf_chains = cfg->num_rf_chains;
 	hdd_ctx->ht_tx_stbc_supported = cfg->ht_tx_stbc;

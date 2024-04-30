@@ -388,6 +388,16 @@ int hdd_vendor_mode_to_phymode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 			       eCsrPhyMode *csr_phy_mode);
 
 /**
+ * hdd_phymode_to_vendor_mode() - Get vendor phy mode according to CSR phy mode.
+ * @csr_phy_mode: phy mode of eCsrPhyMode
+ * @vendor_phy_mode: vendor phy mode
+ *
+ * Return: 0 on success, negative error value on failure
+ */
+int hdd_phymode_to_vendor_mode(eCsrPhyMode csr_phy_mode,
+			       enum qca_wlan_vendor_phy_mode *vendor_phy_mode);
+
+/**
  * hdd_vendor_mode_to_band() - Get band_info according to vendor phy mode
  * @vendor_phy_mode: vendor phy mode
  * @supported_band: supported band bitmap

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_dfs_utils_api.h"
+#include "wlan_mlme_main.h"
 
 #ifdef WLAN_FEATURE_BEARER_SWITCH
 wlan_bs_req_id
@@ -205,7 +206,9 @@ qdf_freq_t wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
 	} else if (wlan_reg_is_passive_for_freq(pdev, chan_freq))  {
 		*csa_reason = CSA_REASON_CHAN_PASSIVE;
 		goto get_new_ll_lt_sap_freq;
-	} else if (!policy_mgr_is_sap_freq_allowed(psoc, chan_freq)) {
+	} else if (!policy_mgr_is_sap_freq_allowed(psoc,
+				wlan_get_opmode_from_vdev_id(pdev, vdev_id),
+				chan_freq)) {
 		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
 		goto get_new_ll_lt_sap_freq;
 	} else if (policy_mgr_is_ll_lt_sap_restart_required(psoc)) {

@@ -2384,7 +2384,7 @@ static void hdd_llstats_post_radio_stats(struct hdd_adapter *adapter,
 	if (!vendor_event) {
 		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		hdd_llstats_free_radio_stats(radiostat);
-		goto failure;
+		return;
 	}
 
 	if (nla_put_u32(vendor_event,
@@ -3325,16 +3325,19 @@ static QDF_STATUS wlan_hdd_stats_request_needed(struct hdd_adapter *adapter)
 		hdd_err("Invalid hdd config");
 		return QDF_STATUS_E_INVAL;
 	}
+
 	if (adapter->hdd_ctx->is_get_station_clubbed_in_ll_stats_req) {
 		uint32_t stats_cached_duration;
 
 		stats_cached_duration =
 				qdf_system_ticks_to_msecs(qdf_system_ticks()) -
 				adapter->sta_stats_cached_timestamp;
-		if (stats_cached_duration <=
-			adapter->hdd_ctx->config->sta_stats_cache_expiry_time)
+		if (qdf_atomic_read(&adapter->is_ll_stats_req_pending) ||
+		    (stats_cached_duration <=
+			adapter->hdd_ctx->config->sta_stats_cache_expiry_time))
 			return QDF_STATUS_E_ALREADY;
 	}
+
 	return QDF_STATUS_SUCCESS;
 }
 

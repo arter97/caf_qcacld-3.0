@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -709,8 +709,7 @@ QDF_STATUS tdls_process_evt(struct scheduler_msg *msg)
 	}
 	event = &notify->event;
 
-	tdls_debug("evt type: %s(%d)",
-		   tdls_get_event_type_str(event->message_type),
+	tdls_debug(" %s(%d)", tdls_get_event_type_str(event->message_type),
 		   event->message_type);
 
 	switch (event->message_type) {
@@ -1606,15 +1605,6 @@ tdls_update_discovery_tries(struct wlan_objmgr_vdev *vdev)
 
 	vdev_config->discovery_tries_n =
 			tdls_config->tdls_max_discovery_attempt;
-
-	/*
-	 * For MLO peer discovery will happen on 2 links and the best link
-	 * will be chosen based on score for TDLS. So factor that into the
-	 * number of discovery attempts to increase the discoverability
-	 * window for the peer.
-	 */
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
-		vdev_config->discovery_tries_n *= 2;
 }
 
 QDF_STATUS tdls_notify_sta_connect(struct tdls_sta_notify_params *notify)

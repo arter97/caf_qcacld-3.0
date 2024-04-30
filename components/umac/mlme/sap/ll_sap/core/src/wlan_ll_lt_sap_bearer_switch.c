@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -78,6 +78,13 @@ bool __ll_lt_sap_is_bs_req_valid(struct wlan_bearer_switch_request *bs_req,
 		ll_sap_nofl_err("BS_SM request is null (via %s)", func);
 		return false;
 	}
+
+	if (bs_req->vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
+		ll_sap_nofl_err("Invalid vdev id %d in BS_SM request",
+				bs_req->vdev_id);
+		return false;
+	}
+
 	return true;
 }
 

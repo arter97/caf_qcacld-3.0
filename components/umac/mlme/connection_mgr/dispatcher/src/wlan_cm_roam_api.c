@@ -2899,6 +2899,7 @@ cm_roam_scan_ch_list_event_handler(struct cm_roam_scan_ch_resp *data)
 /**
  * cm_roam_stats_get_trigger_detail_str - Return roam trigger string from the
  * enum roam_trigger_reason
+ * @neigh_rpt: Neighbor report/BTM request related data
  * @ptr: Pointer to the roam trigger info
  * @buf: Destination buffer to write the reason string
  * @is_full_scan: Is roam scan partial scan or all channels scan
@@ -2907,7 +2908,8 @@ cm_roam_scan_ch_list_event_handler(struct cm_roam_scan_ch_resp *data)
  * Return: None
  */
 static void
-cm_roam_stats_get_trigger_detail_str(struct wmi_roam_trigger_info *ptr,
+cm_roam_stats_get_trigger_detail_str(struct wmi_neighbor_report_data *neigh_rpt,
+				     struct wmi_roam_trigger_info *ptr,
 				     char *buf, bool is_full_scan,
 				     uint8_t vdev_id)
 {
@@ -2938,7 +2940,8 @@ cm_roam_stats_get_trigger_detail_str(struct wmi_roam_trigger_info *ptr,
 	case ROAM_TRIGGER_REASON_UNIT_TEST:
 		break;
 	case ROAM_TRIGGER_REASON_BTM:
-		cm_roam_btm_req_event(&ptr->btm_trig_data, ptr, vdev_id, false);
+		cm_roam_btm_req_event(neigh_rpt, &ptr->btm_trig_data, ptr,
+				      vdev_id, false);
 		buf_cons = qdf_snprint(
 				temp, buf_left,
 				"Req_mode: %d Disassoc_timer: %d",
@@ -3030,6 +3033,7 @@ cm_roam_stats_get_trigger_detail_str(struct wmi_roam_trigger_info *ptr,
 /**
  * cm_roam_stats_print_trigger_info  - Roam trigger related details
  * @psoc:  Pointer to PSOC object
+ * @neigh_rpt: Neighbor report/BTM request related data
  * @data:  Pointer to the roam trigger data
  * @scan_data: Roam scan data pointer
  * @vdev_id: Vdev ID
@@ -3042,6 +3046,7 @@ cm_roam_stats_get_trigger_detail_str(struct wmi_roam_trigger_info *ptr,
  */
 static void
 cm_roam_stats_print_trigger_info(struct wlan_objmgr_psoc *psoc,
+				 struct wmi_neighbor_report_data *neigh_rpt,
 				 struct wmi_roam_trigger_info *data,
 				 struct wmi_roam_scan_data *scan_data,
 				 uint8_t vdev_id, bool is_full_scan)
@@ -3054,7 +3059,8 @@ cm_roam_stats_print_trigger_info(struct wlan_objmgr_psoc *psoc,
 	if (!buf)
 		return;
 
-	cm_roam_stats_get_trigger_detail_str(data, buf, is_full_scan, vdev_id);
+	cm_roam_stats_get_trigger_detail_str(neigh_rpt, data, buf,
+					     is_full_scan, vdev_id);
 	mlme_get_converted_timestamp(data->timestamp, time);
 
 	/* Update roam trigger info to userspace */
@@ -3604,7 +3610,8 @@ cm_roam_handle_btm_stats(struct wlan_objmgr_psoc *psoc,
 	 */
 	if (stats_info->scan[i].present &&
 	    stats_info->scan[i].type == ROAM_STATS_SCAN_TYPE_NO_SCAN) {
-		cm_roam_btm_req_event(&stats_info->trigger[i].btm_trig_data,
+		cm_roam_btm_req_event(&stats_info->data_11kv[i],
+				      &stats_info->trigger[i].btm_trig_data,
 				      &stats_info->trigger[i],
 				      stats_info->vdev_id, false);
 		log_btm_frames_only = true;
@@ -3616,7 +3623,9 @@ cm_roam_handle_btm_stats(struct wlan_objmgr_psoc *psoc,
 				    stats_info->scan[i].type;
 
 		/* BTM request diag log event will be sent from inside below */
-		cm_roam_stats_print_trigger_info(psoc, &stats_info->trigger[i],
+		cm_roam_stats_print_trigger_info(psoc,
+						 &stats_info->data_11kv[i],
+						 &stats_info->trigger[i],
 						 &stats_info->scan[i],
 						 stats_info->vdev_id,
 						 is_full_scan);
@@ -4384,7 +4393,8 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 			}
 
 			cm_roam_stats_print_trigger_info(
-					psoc, &stats_info->trigger[i],
+					psoc, &stats_info->data_11kv[i],
+					&stats_info->trigger[i],
 					&stats_info->scan[i],
 					stats_info->vdev_id, is_full_scan);
 
@@ -4469,9 +4479,10 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 			    ROAM_TRIGGER_REASON_WTC_BTM)
 				is_wtc = true;
 
-			cm_roam_btm_req_event(&stats_info->trigger[0].btm_trig_data,
-					      &stats_info->trigger[0],
-					      stats_info->vdev_id, is_wtc);
+			cm_roam_btm_req_event(&stats_info->data_11kv[0],
+					&stats_info->trigger[0].btm_trig_data,
+					&stats_info->trigger[0],
+					stats_info->vdev_id, is_wtc);
 		}
 
 		if (stats_info->scan[0].present &&
@@ -5001,8 +5012,8 @@ wlan_cm_set_force_20mhz_in_24ghz(struct wlan_objmgr_vdev *vdev,
 		return;
 
 	/*
-	 * Force 20 MHz in 2.4 GHz only if "override_ht20_40_24g" ini
-	 * is set and userspace connect req doesn't have 40 MHz HT caps
+	 * Force the connection to 20 MHz in 2.4 GHz if the userspace
+	 * connect req doesn't support 40 MHz in HT caps.
 	 */
 	if (mlme_priv->connect_info.force_20mhz_in_24ghz != !is_40mhz_cap)
 		send_ie_to_fw = true;

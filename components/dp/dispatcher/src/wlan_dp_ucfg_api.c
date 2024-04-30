@@ -300,6 +300,11 @@ void ucfg_dp_set_cmn_dp_handle(struct wlan_objmgr_psoc *psoc,
 
 	dp_ctx = dp_psoc_get_priv(psoc);
 
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
 	dp_ctx->cdp_soc = soc;
 
 	soc_param.hal_soc_hdl = NULL;
@@ -319,6 +324,10 @@ void ucfg_dp_set_hif_handle(struct wlan_objmgr_psoc *psoc,
 	struct wlan_dp_psoc_context *dp_ctx;
 
 	dp_ctx = dp_psoc_get_priv(psoc);
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
 
 	dp_ctx->hif_handle = hif_handle;
 }
@@ -1057,6 +1066,10 @@ ucfg_dp_update_config(struct wlan_objmgr_psoc *psoc,
 	void *soc;
 
 	dp_ctx =  dp_psoc_get_priv(psoc);
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	dp_ctx->arp_connectivity_map = req->arp_connectivity_map;
 	soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -1097,7 +1110,13 @@ ucfg_dp_update_config(struct wlan_objmgr_psoc *psoc,
 uint64_t
 ucfg_dp_get_rx_softirq_yield_duration(struct wlan_objmgr_psoc *psoc)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return 0;
+	}
 
 	return dp_ctx->dp_cfg.rx_softirq_max_yield_duration_ns;
 }
@@ -1537,8 +1556,20 @@ void ucfg_dp_register_rx_mic_error_ind_handler(void *soc)
 bool
 ucfg_dp_is_roam_after_nud_enabled(struct wlan_objmgr_psoc *psoc)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_psoc_cfg *dp_cfg;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return false;
+	}
+
+	dp_cfg = &dp_ctx->dp_cfg;
+	if (!dp_cfg) {
+		dp_err("Unable to get DP config");
+		return false;
+	}
 
 	if (dp_cfg->enable_nud_tracking == DP_ROAM_AFTER_NUD_FAIL ||
 	    dp_cfg->enable_nud_tracking == DP_DISCONNECT_AFTER_ROAM_FAIL)
@@ -1550,8 +1581,20 @@ ucfg_dp_is_roam_after_nud_enabled(struct wlan_objmgr_psoc *psoc)
 bool
 ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
-	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_psoc_cfg *dp_cfg;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return false;
+	}
+
+	dp_cfg = &dp_ctx->dp_cfg;
+	if (!dp_cfg) {
+		dp_err("Unable to get DP config");
+		return false;
+	}
 
 	if (dp_cfg->enable_nud_tracking == DP_DISCONNECT_AFTER_ROAM_FAIL)
 		return true;

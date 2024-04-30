@@ -5690,7 +5690,11 @@ lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 		}
 
 		total_psd_power = existing_pwr_count + ext_psd_count;
-
+		if (total_psd_power > MAX_NUM_PWR_LEVEL) {
+			pe_debug("total powers greater than max %d",
+				 MAX_NUM_PWR_LEVEL);
+			return existing_pwr_count;
+		}
 		i = existing_pwr_count;
 		for (j = 0; j < ext_psd_count && i < total_psd_power; j++)
 		{
@@ -6327,11 +6331,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 			} else {
 				max_tx_power = QDF_MIN(reg_max,
 						       local_constraint);
-				if (!max_tx_power)
-					max_tx_power = reg_max;
 			}
 		} else {
-			max_tx_power = QDF_MIN(reg_max, local_constraint);
+			max_tx_power = reg_max - local_constraint;
 			if (!max_tx_power)
 				max_tx_power = reg_max;
 		}

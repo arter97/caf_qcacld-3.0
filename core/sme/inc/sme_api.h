@@ -1957,10 +1957,6 @@ QDF_STATUS sme_reset_tsfcb(mac_handle_t mac_handle);
 QDF_STATUS sme_set_tsf_gpio(mac_handle_t mac_handle, uint32_t pinvalue);
 #endif
 
-QDF_STATUS sme_update_mimo_power_save(mac_handle_t mac_handle,
-				      uint8_t is_ht_smps_enabled,
-				      uint8_t ht_smps_mode,
-				      bool send_smps_action);
 #ifdef WLAN_BCN_RECV_FEATURE
 /**
  * sme_handle_bcn_recv_start() - Enable fw to start sending
@@ -4672,22 +4668,10 @@ enum csr_cfgdot11mode sme_phy_mode_to_dot11mode(enum wlan_phymode phy_mode);
  * Return: Max EHT channel width supported by FW (eg. 80, 160, 320)
  */
 uint32_t sme_get_eht_ch_width(void);
-
-/**
- * sme_is_11be_capable() - Check if 11 be is supported or not
- *
- * Return: True if 11be is supported
- */
-bool sme_is_11be_capable(void);
 #else /* !WLAN_FEATURE_11BE */
 static inline uint32_t sme_get_eht_ch_width(void)
 {
 	return 0;
-}
-
-static inline bool sme_is_11be_capable(void)
-{
-	return false;
 }
 #endif /* WLAN_FEATURE_11BE */
 

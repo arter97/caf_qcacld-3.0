@@ -4958,7 +4958,8 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		is_up = QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev));
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
-	if (requested_state != WLAN_ROAM_DEINIT && !is_up) {
+	if ((requested_state != WLAN_ROAM_DEINIT &&
+	     requested_state != WLAN_ROAM_RSO_STOPPED) && !is_up) {
 		mlme_debug("ROAM: roam state(%d) change requested in non-connected state",
 			   requested_state);
 		goto end;
@@ -6954,7 +6955,7 @@ cm_roam_btm_query_event(struct wmi_neighbor_report_data *btm_data,
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
-			  (uint64_t)btm_data->timestamp, NULL);
+			  (uint64_t)btm_data->req_time, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_QUERY_EVENT;
 	wlan_diag_event.version = DIAG_BTM_VERSION_2;
@@ -7075,7 +7076,7 @@ cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
-			  (uint64_t)trigger_info->timestamp,
+			  (uint64_t)btm_data->timestamp,
 			  &btm_data->target_bssid);
 
 	wlan_diag_event.version = DIAG_BTM_VERSION_2;
@@ -7123,7 +7124,8 @@ cm_roam_btm_candidate_event(struct wmi_btm_req_candidate_info *btm_data,
 }
 
 QDF_STATUS
-cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
+cm_roam_btm_req_event(struct wmi_neighbor_report_data *neigh_rpt,
+		      struct wmi_roam_btm_trigger_data *btm_data,
 		      struct wmi_roam_trigger_info *trigger_info,
 		      uint8_t vdev_id, bool is_wtc)
 {
@@ -7144,9 +7146,13 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 	    btm_data->disassoc_timer)
 		return status;
 
-	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
-			  (uint64_t)btm_data->timestamp,
-			  NULL);
+	if (neigh_rpt->resp_time)
+		populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
+				  (uint64_t)neigh_rpt->resp_time, NULL);
+	else
+		populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
+				  (uint64_t)trigger_info->timestamp, NULL);
+
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_REQ_EVENT;
 	wlan_diag_event.version = DIAG_BTM_VERSION_2;
