@@ -16,9 +16,143 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "hif.h"
 #include "wlan_dp_priv.h"
 
 #define NUM_CPUS_FOR_LOAD_BALANCE 2
+
+/* weightage in percentage */
+#define OLDER_SAMPLE_WTG 25
+#define LATEST_SAMPLE_WTG (100 - OLDER_SAMPLE_WTG)
+
+/* time in ns to averge the data sample */
+#define SAMPLING_AVERAGE_TIME_THRS 1000000000
+
+/**
+ * wlan_dp_lb_compute_cpu_load_average() - function called from
+ * wlan_dp_lb_compute_stats_average() and it does the following,
+ * 1. Fetch the per CPU irq/softirq load(time in ns) from the kernel and
+ * calculate the total cpu irq load percentage of the current sample.
+ * 2. Fetch the per CPU wlan irq/softirq load and per cpu ksoftirqd load
+ * (time in ns) from the wlan driver and calculate the wlan irq load percentage
+ * of the current sample.
+ * 3. Calculate the total cpu irq load average and cpu wlan load average.
+ *
+ * @dp_ctx: dp context
+ *
+ * Return: none
+ */
+static void
+wlan_dp_lb_compute_cpu_load_average(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct kernel_cpustat kcpustat;
+	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
+	struct cpu_irq_load *cpu_load;
+	void *hif_ctx = dp_ctx->hif_handle;
+	uint64_t wlan_irq_time[NR_CPUS] = {0};
+	uint64_t wlan_ksoftirqd_time[NR_CPUS] = {0};
+	uint64_t curr_time_in_ns;
+	uint64_t total_irq_time, total_irq_time_cur;
+	uint64_t wlan_irq_time_cur;
+	uint64_t wlan_ksoftirqd_time_cur;
+	uint64_t total_cpu_load, wlan_load;
+	int cpu;
+
+	hif_get_wlan_rx_time_stats(hif_ctx, wlan_irq_time, wlan_ksoftirqd_time);
+
+	qdf_for_each_online_cpu(cpu) {
+		cpu_load = &lb_data->cpu_load[cpu];
+		kcpustat_cpu_fetch(&kcpustat, cpu);
+
+		curr_time_in_ns = qdf_sched_clock();
+		total_irq_time = kcpustat.cpustat[CPUTIME_SOFTIRQ];
+		total_irq_time += kcpustat.cpustat[CPUTIME_IRQ];
+
+		/* If the cpu goes offline and comes back online, the current
+		 * irq time will be lesser than the previous irq time. Similarly
+		 * when the wlan driver unloaded and loaded back, wlan irq time
+		 * will be lesser than the previous wlan irq time. Update the
+		 * current irq time in the previous irq time and return.
+		 */
+		if (!cpu_load->irq_time_prev ||
+		    (cpu_load->irq_time_prev > total_irq_time) ||
+		    (cpu_load->wlan_irq_time_prev > wlan_irq_time[cpu])) {
+			cpu_load->irq_time_prev = total_irq_time;
+			cpu_load->wlan_irq_time_prev = wlan_irq_time[cpu];
+			cpu_load->wlan_ksoftirqd_time_prev =
+						wlan_ksoftirqd_time[cpu];
+			cpu_load->last_avg_calc_time = curr_time_in_ns;
+			cpu_load->cpu_id = cpu;
+			continue;
+		}
+
+		total_irq_time_cur = total_irq_time - cpu_load->irq_time_prev;
+		wlan_irq_time_cur = wlan_irq_time[cpu] -
+					cpu_load->wlan_irq_time_prev;
+		wlan_ksoftirqd_time_cur = wlan_ksoftirqd_time[cpu] -
+					cpu_load->wlan_ksoftirqd_time_prev;
+
+		if (wlan_irq_time_cur > total_irq_time_cur) {
+			dp_debug("cpu_irq_time %llu wlan_irq_time %llu cpu %d",
+				 total_irq_time_cur, wlan_irq_time_cur, cpu);
+			continue;
+		}
+
+		total_cpu_load =
+			((total_irq_time_cur + wlan_ksoftirqd_time_cur) * 100) /
+			(curr_time_in_ns - cpu_load->last_avg_calc_time);
+		wlan_load =
+			((wlan_irq_time_cur + wlan_ksoftirqd_time_cur) * 100) /
+			(curr_time_in_ns - cpu_load->last_avg_calc_time);
+
+		if (!cpu_load->total_cpu_avg_load)
+			cpu_load->total_cpu_avg_load = total_cpu_load;
+		else
+			cpu_load->total_cpu_avg_load =
+			((cpu_load->total_cpu_avg_load * OLDER_SAMPLE_WTG) / 100) +
+			((total_cpu_load * LATEST_SAMPLE_WTG) / 100);
+
+		if (!cpu_load->wlan_avg_load)
+			cpu_load->wlan_avg_load = wlan_load;
+		else
+			cpu_load->wlan_avg_load =
+			((cpu_load->wlan_avg_load * OLDER_SAMPLE_WTG) / 100) +
+			((wlan_load * LATEST_SAMPLE_WTG) / 100);
+
+		cpu_load->irq_time_prev = total_irq_time;
+		cpu_load->wlan_irq_time_prev = wlan_irq_time[cpu];
+		cpu_load->wlan_ksoftirqd_time_prev = wlan_ksoftirqd_time[cpu];
+		cpu_load->last_avg_calc_time = curr_time_in_ns;
+	}
+}
+
+/**
+ * wlan_dp_lb_compute_stats_average() - Called from the bus bandwidth
+ * handler to compute the stats average for every sampling threshold time(1sec).
+ *
+ * @dp_ctx: dp context
+ *
+ * Return: none
+ */
+void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_lb_data *lb_data;
+	uint64_t curr_time_in_ns = qdf_sched_clock();
+	uint64_t time_delta_ns;
+
+	lb_data = &dp_ctx->lb_data;
+	if (!lb_data->last_stats_avg_comp_time) {
+		lb_data->last_stats_avg_comp_time = curr_time_in_ns;
+		return;
+	}
+
+	time_delta_ns = curr_time_in_ns - lb_data->last_stats_avg_comp_time;
+	if (time_delta_ns >= SAMPLING_AVERAGE_TIME_THRS) {
+		wlan_dp_lb_compute_cpu_load_average(dp_ctx);
+		cdp_calculate_per_ring_pkt_avg(dp_ctx->cdp_soc);
+		lb_data->last_stats_avg_comp_time = curr_time_in_ns;
+	}
+}
 
 /**
  * wlan_dp_load_balancer_deinit() - deinitialize load balancer module

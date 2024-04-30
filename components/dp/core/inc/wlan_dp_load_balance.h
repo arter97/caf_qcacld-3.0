@@ -51,6 +51,7 @@ struct cpu_irq_load {
  * @curr_cpu_mask: cpus which are available for load balance currently,
  * subset of preferred_cpu_mask
  * @load_balance_lock: lock to protect load balace from multiple contexts
+ * @last_stats_avg_comp_time: time since previous stats average computed in ns
  */
 struct wlan_dp_lb_data {
 	struct cpu_irq_load cpu_load[NR_CPUS];
@@ -58,6 +59,7 @@ struct wlan_dp_lb_data {
 	qdf_cpu_mask preferred_cpu_mask;
 	qdf_cpu_mask curr_cpu_mask;
 	qdf_spinlock_t load_balance_lock;
+	uint64_t last_stats_avg_comp_time;
 };
 
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
@@ -76,12 +78,26 @@ void wlan_dp_load_balancer_init(struct wlan_objmgr_psoc *psoc);
  * Return: None
  */
 void wlan_dp_load_balancer_deinit(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_dp_lb_compute_stats_average() - compute stats average
+ * for load balance
+ * @dp_ctx: dp context
+ *
+ * Return: none
+ */
+void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx);
 #else
 static inline void wlan_dp_load_balancer_init(struct wlan_objmgr_psoc *psoc)
 {
 }
 
 static inline void wlan_dp_load_balancer_deinit(struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static inline void
+wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx)
 {
 }
 #endif
