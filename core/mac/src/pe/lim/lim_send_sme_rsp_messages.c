@@ -2311,6 +2311,12 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 			session_entry->htSupportedChannelWidthSet = true;
 		}
 	}
+
+	lim_cp_stats_cstats_log_csa_evt(session_entry, CSTATS_DIR_RX,
+					lim_ch_switch->sw_target_freq,
+					lim_ch_switch->ch_width,
+					lim_ch_switch->switchMode);
+
 	pe_debug("new ch %d: freq %d width: %d freq0 %d freq1 %d ht width %d, current freq %d: bw %d",
 		 lim_ch_switch->primaryChannel, lim_ch_switch->sw_target_freq,
 		 lim_ch_switch->ch_width, lim_ch_switch->ch_center_freq_seg0,
