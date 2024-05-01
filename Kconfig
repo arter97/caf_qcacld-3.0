@@ -1720,6 +1720,11 @@ config WLAN_TX_LATENCY_STATS
 	depends on WLAN_TSF_AUTO_REPORT
 	default n
 
+config WLAN_FEATURE_UL_JITTER
+	bool "Enable WLAN_FEATURE_UL_JITTER"
+	depends on WLAN_TSF_UPLINK_DELAY
+	default n
+
 config WLAN_TWT_CONVERGED
 	bool "Enable WLAN_TWT_CONVERGED"
 	default n
