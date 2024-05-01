@@ -1314,10 +1314,15 @@ bool qca_multi_link_sta_rx(struct net_device *net_dev, qdf_nbuf_t nbuf, struct n
 	uint8_t is_eapol;
 	bool is_primary = false;
 	struct wiphy *sta_wiphy = NULL;
-	struct net_device *sta_dev = net_dev;
+	struct net_device *sta_dev = NULL;
 	qdf_ether_header_t *eh = (qdf_ether_header_t *) qdf_nbuf_data(nbuf);
 	bool drop_packet = false;
 	qca_multi_link_status_t status = QCA_MULTI_LINK_PKT_NONE;
+
+	if (!net_dev)
+		goto end;
+	else
+		sta_dev = net_dev;
 
 	if (!qca_multi_link_need_procesing()) {
 		goto end;
