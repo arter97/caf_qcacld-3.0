@@ -1044,6 +1044,11 @@ other_checks:
 		if (sampling_flow->state == WLAN_DP_SAMPLING_STATE_INIT)
 			continue;
 
+		if (sampling_flow->state ==
+					WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL)
+			wlan_dp_stc_remove_sampling_table_entry(dp_stc,
+								sampling_flow);
+
 		if (wlan_dp_txrx_samples_ready(sampling_flow) &&
 		    !wlan_dp_txrx_samples_reported(sampling_flow)) {
 			/* TXRX sample is ready to be sent */
@@ -1390,8 +1395,8 @@ sample:
 			flow = &dp_stc->tx_flow_table.entries[flow_id];
 			if (sampling_entry->tx_flow_metadata !=
 							flow->metadata) {
-				wlan_dp_stc_remove_sampling_table_entry(dp_stc,
-									sampling_entry);
+				sampling_entry->state =
+					WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL;
 				/* continue to next flow */
 				break;
 			}
@@ -1415,8 +1420,8 @@ sample:
 			flow = &dp_stc->rx_flow_table.entries[flow_id];
 			if (sampling_entry->rx_flow_metadata !=
 							flow->metadata) {
-				wlan_dp_stc_remove_sampling_table_entry(dp_stc,
-									sampling_entry);
+				sampling_entry->state =
+					WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL;
 				/* continue to next flow */
 				break;
 			}
@@ -1479,6 +1484,8 @@ sample:
 		 * so that code execution does not reach here
 		 */
 		break;
+	case WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL:
+		fallthrough;
 	case WLAN_DP_SAMPLING_STATE_SAMPLES_SENT:
 		fallthrough;
 	case WLAN_DP_SAMPLING_STATE_CLASSIFIED:
