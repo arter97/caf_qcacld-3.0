@@ -308,6 +308,23 @@ target_if_dp_lro_config_cmd(struct wlan_objmgr_psoc *psoc,
 	return wmi_unified_lro_config_cmd(wmi_handle, &wmi_lro_cmd);
 }
 
+#ifdef WLAN_DP_FEATURE_STC
+QDF_STATUS
+target_if_dp_send_opm_stats_cmd(struct wlan_objmgr_psoc *psoc,
+				uint8_t pdev_id)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		dp_err("wmi_handle is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return wmi_unified_send_opm_stats_cmd(wmi_handle, pdev_id);
+}
+#endif
+
 /**
  * target_if_dp_send_dhcp_ind() - process set arp stats request command to fw
  * @vdev_id: vdev id
@@ -389,6 +406,19 @@ target_if_dp_active_traffic_map(struct wlan_objmgr_psoc *psoc,
 	return wmi_unified_peer_active_traffic_map_send(wmi_handle, &cmd);
 }
 
+#ifdef WLAN_DP_FEATURE_STC
+static inline void
+dp_register_tx_ops_opm_stats(struct wlan_dp_psoc_sb_ops *sb_ops)
+{
+	sb_ops->dp_send_opm_stats_cmd = target_if_dp_send_opm_stats_cmd;
+}
+#else
+static inline void
+dp_register_tx_ops_opm_stats(struct wlan_dp_psoc_sb_ops *sb_ops)
+{
+}
+#endif
+
 void target_if_dp_register_tx_ops(struct wlan_dp_psoc_sb_ops *sb_ops)
 {
 	sb_ops->dp_arp_stats_register_event_handler =
@@ -403,6 +433,7 @@ void target_if_dp_register_tx_ops(struct wlan_dp_psoc_sb_ops *sb_ops)
 	sb_ops->dp_send_dhcp_ind =
 		target_if_dp_send_dhcp_ind;
 	sb_ops->dp_send_active_traffic_map = target_if_dp_active_traffic_map;
+	dp_register_tx_ops_opm_stats(sb_ops);
 }
 
 void target_if_dp_register_rx_ops(struct wlan_dp_psoc_nb_ops *nb_ops)

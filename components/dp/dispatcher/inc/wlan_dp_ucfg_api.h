@@ -1995,5 +1995,23 @@ QDF_STATUS ucfg_dp_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 
 QDF_STATUS ucfg_dp_flow_stats_policy(enum qca_async_stats_type type,
 				     enum qca_async_stats_action);
+QDF_STATUS
+ucfg_telemetry_start_opm_stats(struct wlan_objmgr_vdev *vdev,
+			       uint32_t periodicity);
+QDF_STATUS
+ucfg_telemetry_stop_opm_stats(struct wlan_objmgr_vdev *vdev);
+#else
+static inline QDF_STATUS
+ucfg_telemetry_start_opm_stats(struct wlan_objmgr_vdev *vdev,
+			       uint32_t periodicity)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_telemetry_stop_opm_stats(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_DP_FEATURE_STC */
 #endif /* _WLAN_DP_UCFG_API_H_ */

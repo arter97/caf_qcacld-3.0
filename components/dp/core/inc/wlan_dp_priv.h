@@ -680,6 +680,7 @@ struct dp_rx_fst {
  * @hlp_list: List of HLP peers for HLP response handling
  * @disable_rx_aggr: Disable Rx aggregation
  * @spm_intf_ctx: SPM interface context
+ * @opm_stats_work: OPM stats work
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -760,6 +761,9 @@ struct wlan_dp_intf {
 #endif
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_FEATURE_MLSTC)
 	struct wlan_dp_spm_intf_context *spm_intf_ctx;
+#endif
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
+	struct qdf_periodic_work opm_stats_work;
 #endif
 };
 
