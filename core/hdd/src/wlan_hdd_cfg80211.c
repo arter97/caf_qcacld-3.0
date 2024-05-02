@@ -221,6 +221,9 @@
 #endif
 #include "wlan_dlm_api.h"
 #include "os_if_dp_stc.h"
+#ifdef WLAN_FEATURE_TELEMETRY
+#include "os_if_telemetry.h"
+#endif
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -20875,6 +20878,95 @@ static int wlan_hdd_cfg80211_get_monitor_mode(struct wiphy *wiphy,
 }
 #endif
 
+#if defined(WLAN_FEATURE_TELEMETRY) && defined(WLAN_DP_FEATURE_STC)
+/**
+ * __wlan_hdd_cfg80211_telemetry_stats_service() - Stats service
+ * vendor command
+ * @wiphy: wiphy device pointer
+ * @wdev: wireless device pointer
+ * @data: Vendor command data buffer
+ * @data_len: Buffer length
+ *
+ * Return: 0 for Success and negative value for failure
+ */
+static int
+__wlan_hdd_cfg80211_telemetry_stats_service(struct wiphy *wiphy,
+					    struct wireless_dev *wdev,
+					    const void *data, int data_len)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx  = wiphy_priv(wiphy);
+	struct wlan_objmgr_vdev *vdev;
+	int errno;
+	QDF_STATUS status;
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
+		hdd_err_rl("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	errno = hdd_validate_adapter(adapter);
+	if (errno)
+		return errno;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	if (vdev->vdev_mlme.vdev_opmode != QDF_STA_MODE) {
+		hdd_err_rl("Stats service not supported in device mode: %d",
+			   vdev->vdev_mlme.vdev_opmode);
+		status = QDF_STATUS_E_INVAL;
+		goto end;
+	}
+
+	status = os_if_telemetry_stats_service(vdev, data, data_len);
+
+end:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+
+	return qdf_status_to_os_return(status);
+}
+
+/**
+ * wlan_hdd_cfg80211_telemetry_stats_service() - Start service
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int
+wlan_hdd_cfg80211_telemetry_stats_service(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  const void *data, int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	hdd_enter_dev(wdev->netdev);
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_telemetry_stats_service(wiphy, wdev,
+							    data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	hdd_exit();
+
+	return errno;
+}
+#endif
+
 #ifdef WLAN_SUPPORT_SERVICE_CLASS
 static inline
 int __wlan_hdd_cfg80211_service_class_cmd(struct wiphy *wiphy,
@@ -22388,6 +22480,9 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 		vendor_command_policy(wlan_hdd_sap_suspend_policy,
 				      QCA_WLAN_VENDOR_ATTR_AP_SUSPEND_MAX)
 	}
+#if defined(WLAN_FEATURE_TELEMETRY) && defined(WLAN_DP_FEATURE_STC)
+	FEATURE_ASYNC_STATS_VENDOR_COMMANDS
+#endif
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
