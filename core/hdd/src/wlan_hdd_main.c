@@ -17521,6 +17521,8 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 		return -EINVAL;
 
 	cds_set_driver_state_module_stop(true);
+	if (!is_recovery_stop)
+		ucfg_ipa_uc_shutdown_opt_dp_ctrl_cleanup(hdd_ctx->pdev);
 
 	debugfs_threads = hdd_return_debugfs_threads_count();
 
