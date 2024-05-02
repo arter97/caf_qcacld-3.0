@@ -969,6 +969,8 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 
 	status = ucfg_cm_set_roam_band_update(hdd_ctx->psoc,
 					      adapter->deflink->vdev_id);
+	ucfg_cm_set_roam_band_mask(hdd_ctx->psoc,
+				   adapter->deflink->vdev_id, band_bitmap);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to send RSO update to fw on set band");
 
