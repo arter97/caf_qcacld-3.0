@@ -152,6 +152,10 @@ config DEBUG_RX_RING_BUFFER
 	bool "Enable DEBUG_RX_RING_BUFFER"
 	default n
 
+config WLAN_DP_LOAD_BALANCE_SUPPORT
+	bool "Enable load balance support"
+	default n
+
 config DELIVERY_TO_STACK_STATUS_CHECK
 	bool "Enable DELIVERY_TO_STACK_STATUS_CHECK"
 	default n
