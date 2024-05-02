@@ -1416,6 +1416,10 @@ config WLAN_FEATURE_TWT
 	bool "Enable WLAN_FEATURE_TWT"
 	default n
 
+config WLAN_TELEMETRY
+	bool "Enable CONFIG_WLAN_TELEMETRY"
+	default n
+
 config WLAN_FEATURE_WMI_DIAG_OVER_CE7
 	bool "Enable WLAN_FEATURE_WMI_DIAG_OVER_CE7"
 	default n

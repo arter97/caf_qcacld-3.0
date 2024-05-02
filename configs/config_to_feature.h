@@ -3066,4 +3066,8 @@
 #ifdef CONFIG_QCA_WIFI_WCN7750
 #define QCA_WIFI_WCN7750 (1)
 #endif
+
+#ifdef CONFIG_WLAN_TELEMETRY
+#define WLAN_FEATURE_TELEMETRY (1)
+#endif
 #endif /* CONFIG_TO_FEATURE_H */

@@ -330,6 +330,7 @@ _fixed_ipaths = [
     "os_if/sync/src",
     "os_if/tdls/inc",
     "os_if/twt/inc",
+    "os_if/telemetry/inc",
     "uapi/linux",
 ]
 
@@ -1801,6 +1802,13 @@ _conditional_srcs = {
             "components/spatial_reuse/dispatcher/src/spatial_reuse_api.c",
             "components/spatial_reuse/dispatcher/src/spatial_reuse_ucfg_api.c",
             "cmn/target_if/spatial_reuse/src/target_if_spatial_reuse.c",
+        ],
+    },
+    "CONFIG_WLAN_TELEMETRY": {
+        True: [
+            "os_if/telemetry/src/os_if_telemetry.c",
+            "components/dp/core/src/wlan_dp_telemetry.c",
+            "components/dp/dispatcher/src/wlan_dp_telemetry_ucfg_api.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_TWT": {

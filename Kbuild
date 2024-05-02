@@ -2437,6 +2437,18 @@ endif
 
 $(call add-wlan-objs,wifi_pos,$(WIFI_POS_OBJS))
 
+###### Telemetry ########
+TELEMETRY_OSIF_SRC := os_if/telemetry/src
+
+TELEMETRY_INCS := -I$(WLAN_ROOT)/os_if/telemetry/inc
+
+ifeq ($(CONFIG_WLAN_TELEMETRY), y)
+TELEMETRY_OBJS := $(TELEMETRY_OSIF_SRC)/os_if_telemetry.o
+endif
+
+$(call add-wlan-objs,telemetry,$(TELEMETRY_OBJS))
+
+
 ###### TWT CONVERGED ########
 TWT_CONV_CMN_OSIF_SRC := $(WLAN_COMMON_ROOT)/os_if/linux/twt/src
 TWT_CONV_CMN_DISPATCHER_SRC := $(WLAN_COMMON_ROOT)/umac/twt/dispatcher/src
@@ -2619,6 +2631,12 @@ WLAN_DP_COMP_OBJS := $(DP_COMP_CORE_DIR)/wlan_dp_main.o \
 
 ifeq ($(CONFIG_WLAN_LRO), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_OS_IF_DIR)/os_if_dp_lro.o
+endif
+
+ifeq ($(CONFIG_WLAN_TELEMETRY), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_telemetry.o \
+		$(DP_COMP_UCFG_DIR)/wlan_dp_telemetry_api.o \
+		$(DP_COMP_UCFG_DIR)/wlan_dp_telemetry_ucfg_api.o
 endif
 
 ifeq ($(CONFIG_WLAN_NUD_TRACKING), y)
@@ -3278,6 +3296,8 @@ INCS +=		$(CP_MC_STATS_COMPONENT_INC)
 INCS +=		$(CP_STATS_CFG80211_OS_IF_INC)
 ################ TWT CONVERGED ################
 INCS +=		$(TWT_CONV_INCS)
+################ TELEMETR ################
+INCS +=		$(TELEMETRY_INCS)
 ################ Dynamic ACS ####################
 INCS +=		$(DCS_TGT_IF_INC)
 INCS +=		$(DCS_DISP_INC)
@@ -3542,6 +3562,7 @@ ccflags-$(CONFIG_DIRECT_BUF_RX_ENABLE) += -DDBR_MULTI_SRNG_ENABLE
 endif
 ccflags-$(CONFIG_WMI_CMD_STRINGS) += -DWMI_CMD_STRINGS
 ccflags-$(CONFIG_WLAN_FEATURE_TWT) += -DWLAN_SUPPORT_TWT
+ccflags-$(CONFIG_WLAN_TELEMETRY) += -DWLAN_FEATURE_TELEMETRY
 ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 ifeq ($(CONFIG_DP_USE_REDUCED_PEER_ID_FIELD_WIDTH), y)
 ccflags-y += -DDP_USE_REDUCED_PEER_ID_FIELD_WIDTH
