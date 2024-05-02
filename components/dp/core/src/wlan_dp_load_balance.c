@@ -218,7 +218,7 @@ static inline bool
 wlan_dp_lb_check_eligible_for_flow_balance(struct wlan_dp_psoc_context *dp_ctx,
 					   uint32_t total_avg_pkts)
 {
-	if (wlan_dp_fb_supported() &&
+	if (wlan_dp_fb_enabled(dp_ctx) &&
 	    total_avg_pkts > FLOW_BALANCE_THRESH)
 		return true;
 
@@ -475,6 +475,9 @@ void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx,
 	static uint32_t tput_level_high_count;
 	static uint32_t tput_level_low_count;
 
+	if (!dp_ctx->dp_cfg.is_load_balance_enabled)
+		return;
+
 	if (tput_level >= TPUT_LEVEL_HIGH) {
 		tput_level_high_count++;
 		tput_level_low_count = 0;
@@ -518,6 +521,9 @@ void wlan_dp_load_balancer_deinit(struct wlan_objmgr_psoc *psoc)
 	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
 
+	if (!dp_ctx->dp_cfg.is_load_balance_enabled)
+		return;
+
 	qdf_spinlock_destroy(&lb_data->load_balance_lock);
 }
 
@@ -558,6 +564,11 @@ void wlan_dp_load_balancer_init(struct wlan_objmgr_psoc *psoc)
 	unsigned int cpus;
 	int package_id;
 	int num_cpus = 0;
+
+	if (dp_ctx->dp_cfg.is_load_balance_enabled)
+		hif_set_load_balance_enabled_flag(dp_ctx->hif_handle);
+	else
+		return;
 
 	lb_data = &dp_ctx->lb_data;
 	qdf_spinlock_create(&lb_data->load_balance_lock);

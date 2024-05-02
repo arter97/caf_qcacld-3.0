@@ -95,9 +95,9 @@ wlan_dp_fb_handler(struct wlan_dp_psoc_context *dp_ctx,
 		   uint32_t num_cpus,
 		   struct wlan_dp_rx_ring_wtg *balanced_wtgs);
 
-static inline bool wlan_dp_fb_supported(void)
+static inline bool wlan_dp_fb_enabled(struct wlan_dp_psoc_context *dp_ctx)
 {
-	return true;
+	return dp_ctx->dp_cfg.is_flow_balance_enabled;
 }
 
 void wlan_dp_fb_update_num_rx_rings(struct wlan_objmgr_psoc *psoc);
@@ -113,7 +113,7 @@ wlan_dp_fb_handler(struct wlan_dp_psoc_context *dp_ctx,
 	return FLOW_BALANCE_NOT_ELIGIBLE;
 }
 
-static inline bool wlan_dp_fb_supported(void)
+static inline bool wlan_dp_fb_enabled(struct wlan_dp_psoc_context *dp_ctx)
 {
 	return false;
 }

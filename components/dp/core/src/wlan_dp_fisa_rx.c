@@ -141,8 +141,12 @@ void dp_fisa_record_pkt(struct dp_fisa_rx_sw_ft *fisa_flow, qdf_nbuf_t nbuf,
 #define ACTIVE_FLOW_TIME_THRESH 100000
 
 static inline void
-dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow)
+dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow,
+				  struct wlan_dp_psoc_context *dp_ctx)
 {
+	if (!wlan_dp_fb_enabled(dp_ctx))
+		return;
+
 	fisa_flow->num_pkts++;
 	fisa_flow->last_pkt_rcvd_tstamp = qdf_get_log_timestamp();
 }
@@ -170,7 +174,7 @@ void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 	uint64_t num_pkts;
 	int i;
 
-	if (!rx_fst)
+	if (!wlan_dp_fb_enabled(dp_ctx) || !rx_fst)
 		return;
 
 	cur_tstamp = qdf_get_log_timestamp();
@@ -332,7 +336,8 @@ void dp_fisa_update_fst_table(struct wlan_dp_psoc_context *dp_ctx,
 }
 #else
 static inline void
-dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow)
+dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow,
+				  struct wlan_dp_psoc_context *dp_ctx)
 {
 }
 #endif
@@ -2362,7 +2367,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 						head_nbuf);
 
 		if (fisa_flow)
-			dp_fisa_update_flow_balance_stats(fisa_flow);
+			dp_fisa_update_flow_balance_stats(fisa_flow, dp_ctx);
 
 		/* Do not FISA aggregate IPSec packets */
 		if (fisa_flow &&

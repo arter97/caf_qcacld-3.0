@@ -657,6 +657,48 @@ static void dp_ini_tcp_settings(struct wlan_dp_psoc_cfg *config,
 }
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
+#ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
+/**
+ * dp_ini_load_balance() - Initialize INIs concerned about load balance
+ * @config: pointer to dp config
+ * @psoc: pointer to psoc obj
+ *
+ * Return: none
+ */
+static void dp_ini_load_balance(struct wlan_dp_psoc_cfg *config,
+				struct wlan_objmgr_psoc *psoc)
+{
+	config->is_load_balance_enabled = cfg_get(psoc,
+						  CFG_DP_ENABLE_LOAD_BALANCE);
+}
+#else
+static void dp_ini_load_balance(struct wlan_dp_psoc_cfg *config,
+				struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
+/**
+ * dp_ini_flow_balance() - Initialize INIs concerned about flow balance
+ * @config: pointer to dp config
+ * @psoc: pointer to psoc obj
+ *
+ * Return: none
+ */
+static void dp_ini_flow_balance(struct wlan_dp_psoc_cfg *config,
+				struct wlan_objmgr_psoc *psoc)
+{
+	config->is_flow_balance_enabled = cfg_get(psoc,
+						  CFG_DP_ENABLE_FLOW_BALANCE);
+}
+#else
+static void dp_ini_flow_balance(struct wlan_dp_psoc_cfg *config,
+				struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 #ifdef CONFIG_DP_TRACE
 /**
  * dp_trace_cfg_update() - initialize DP Trace config
@@ -831,6 +873,8 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 		  + 1;
 	dp_ini_bus_bandwidth(config, psoc);
 	dp_ini_tcp_settings(config, psoc);
+	dp_ini_load_balance(config, psoc);
+	dp_ini_flow_balance(config, psoc);
 
 	dp_ini_tcp_del_ack_settings(config, psoc);
 

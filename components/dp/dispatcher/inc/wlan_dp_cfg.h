@@ -1360,6 +1360,58 @@
 #define CFG_DP_DIRECT_LINK
 #endif
 
+#ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
+/*
+ * <ini>
+ * dp_enable_load_balance - Control load balance feature support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable load balance datapath feature
+ *
+ * Supported Feature: All modes
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_ENABLE_LOAD_BALANCE \
+	CFG_INI_BOOL("dp_enable_load_balance", false, \
+		     "Enable/Disable load balance support")
+
+#define CFG_DP_LOAD_BALANCE \
+	CFG(CFG_DP_ENABLE_LOAD_BALANCE)
+#else
+#define CFG_DP_LOAD_BALANCE
+#endif
+
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
+/*
+ * <ini>
+ * dp_enable_flow_balance - Control flow balance feature support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable flow balance datapath feature
+ *
+ * Supported Feature: STA and SAP
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_ENABLE_FLOW_BALANCE \
+	CFG_INI_BOOL("dp_enable_flow_balance", false, \
+		     "Enable/Disable flow balance support")
+
+#define CFG_DP_FLOW_BALANCE \
+	CFG(CFG_DP_ENABLE_FLOW_BALANCE)
+#else
+#define CFG_DP_FLOW_BALANCE
+#endif
+
 /*
  * <ini>
  * dp_wlm_rx_aggr_control - WLM Rx aggregation Control
@@ -1406,6 +1458,8 @@
 	CFG_DP_CONFIG_DP_TRACE_ALL \
 	CFG_DP_HL_BUNDLE \
 	CFG_DP_FISA \
-	CFG_DP_DIRECT_LINK
+	CFG_DP_DIRECT_LINK \
+	CFG_DP_LOAD_BALANCE \
+	CFG_DP_FLOW_BALANCE
 
 #endif /* WLAN_DP_CFG_H__ */
