@@ -499,7 +499,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 				struct qdf_mac_addr mac_addr)
 {
 	int idx, i, ret = 0;
-	bool eht_capab, update_self_peer;
+	bool update_self_peer;
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_hdd_link_info *link_info;
@@ -518,8 +518,8 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 	 * For SAP mode, hdd_hostapd_set_mac_address() is the entry point for
 	 * MAC address update.
 	 */
-	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (!(eht_capab && hdd_adapter_is_ml_adapter(adapter))) {
+
+	if (!hdd_adapter_is_ml_adapter(adapter)) {
 		struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 		ret = hdd_dynamic_mac_address_set(adapter->deflink, mac_addr,

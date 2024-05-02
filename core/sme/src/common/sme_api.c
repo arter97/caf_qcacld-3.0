@@ -16863,7 +16863,6 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_peer *peer;
 	struct vdev_mlme_obj *vdev_mlme;
 	struct wlan_objmgr_psoc *psoc;
-	bool eht_enab = false;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 
@@ -16872,9 +16871,8 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 	if (req_status)
 		goto p2p_self_peer_create;
 
-	ucfg_psoc_mlme_get_11be_capab(psoc, &eht_enab);
 	if (vdev_opmode == QDF_STA_MODE && update_sta_self_peer) {
-		if (eht_enab && update_mld_addr) {
+		if (update_mld_addr) {
 			old_macaddr = wlan_vdev_mlme_get_mldaddr(vdev);
 			new_macaddr = mld_addr.bytes;
 		} else {
@@ -16903,7 +16901,7 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 	}
 
 	/* Update VDEV MAC address */
-	if (eht_enab && update_mld_addr) {
+	if (update_mld_addr) {
 		if (update_sta_self_peer || vdev_opmode == QDF_SAP_MODE) {
 			qdf_ret_status = wlan_mlo_mgr_update_mld_addr(
 					    (struct qdf_mac_addr *)
