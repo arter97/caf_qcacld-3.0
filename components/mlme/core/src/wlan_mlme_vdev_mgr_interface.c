@@ -1329,6 +1329,8 @@ QDF_STATUS mlme_set_mbssid_info(struct wlan_objmgr_vdev *vdev,
 	mbss_11ax->profile_num = mbssid_info->profile_count;
 	qdf_mem_copy(mbss_11ax->trans_bssid,
 		     mbssid_info->trans_bssid, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(mbss_11ax->non_trans_bssid,
+		     mbssid_info->non_trans_bssid, QDF_MAC_ADDR_SIZE);
 
 	return QDF_STATUS_SUCCESS;
 }
