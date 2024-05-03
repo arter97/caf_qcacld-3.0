@@ -1647,7 +1647,7 @@ bool wma_objmgr_peer_exist(tp_wma_handle wma,
 	return true;
 }
 
-#ifdef WLAN_FEATURE_PEER_TRANS_HIST
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 void wma_peer_tbl_trans_add_entry(struct wlan_objmgr_peer *peer, bool is_create,
 				  struct cdp_peer_setup_info *peer_info)
 {
