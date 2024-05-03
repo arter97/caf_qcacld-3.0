@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -39,6 +39,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "nan_ucfg_api.h"
 #include "wlan_mlme_main.h"
+#include "wlan_policy_mgr_i.h"
 
 static uint16_t tdls_get_connected_peer_count(struct tdls_soc_priv_obj *soc_obj)
 {
@@ -2377,6 +2378,8 @@ int tdls_process_set_responder(struct tdls_set_responder_req *set_req)
 {
 	struct tdls_peer *curr_peer;
 	struct tdls_vdev_priv_obj *tdls_vdev;
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status;
 
 	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(set_req->vdev);
 	if (!tdls_vdev) {
@@ -2390,6 +2393,20 @@ int tdls_process_set_responder(struct tdls_set_responder_req *set_req)
 	}
 
 	curr_peer->is_responder = set_req->responder;
+
+	psoc = wlan_vdev_get_psoc(tdls_vdev->vdev);
+	if (!psoc) {
+		tdls_err("psoc not found");
+		return -EINVAL;
+	}
+
+	status = policy_mgr_update_nss_req(psoc,
+					   wlan_vdev_get_id(tdls_vdev->vdev));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("Unable to process NSS request");
+		return -EINVAL;
+	}
+
 	return 0;
 }
 
