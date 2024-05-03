@@ -1377,7 +1377,6 @@ static QDF_STATUS nan_handle_enable_rsp(struct nan_event_params *nan_event)
 		goto fail;
 	}
 
-	nan_cstats_log_nan_enable_resp_evt(nan_event);
 fail:
 	psoc_nan_obj->nan_social_ch_2g_freq = 0;
 	psoc_nan_obj->nan_social_ch_5g_freq = 0;
@@ -1393,6 +1392,8 @@ fail:
 	ucfg_tdls_notify_connect_failure(psoc);
 
 done:
+	nan_cstats_log_nan_enable_resp_evt(nan_event);
+
 	nan_conc_callback = psoc_nan_obj->cb_obj.nan_concurrency_update;
 	if (nan_conc_callback)
 		nan_conc_callback();
