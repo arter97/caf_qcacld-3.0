@@ -51,7 +51,7 @@ static void usage(void)
 	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"--metadata: Enable metadata <0x1/0x2>");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
-			"--output: output vap to deliver <athX>");
+			"--output: output vap to deliver");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"--show_filter: Show the provided filter option");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
@@ -401,9 +401,9 @@ static void lite_mon_sanitize_count(uint8_t count)
 static void lite_mon_sanitize_interface_name(char *ifname)
 {
 	lite_mon_printf(LITE_MON_TRACE_DEBUG, "interface name %s", ifname);
-	if (strncmp(ifname, "ath", VAP_IFACE_PREFIX_LEN)) {
+	if (!strlen(ifname)) {
 		lite_mon_printf(LITE_MON_TRACE_ERROR,
-				"Vap name missing or wrong");
+				"Vap name missing");
 		exit(0);
 	}
 }
