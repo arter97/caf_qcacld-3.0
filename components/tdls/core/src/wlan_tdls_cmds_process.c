@@ -2401,8 +2401,7 @@ int tdls_process_set_responder(struct tdls_set_responder_req *set_req)
 	}
 
 	status = policy_mgr_update_nss_req(psoc,
-					   wlan_vdev_get_id(tdls_vdev->vdev),
-					   HW_MODE_SS_2x2, HW_MODE_SS_2x2);
+					   wlan_vdev_get_id(tdls_vdev->vdev));
 	if (QDF_IS_STATUS_ERROR(status)) {
 		tdls_err("Unable to process NSS request");
 		return -EINVAL;

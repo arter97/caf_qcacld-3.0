@@ -775,18 +775,54 @@ static void policy_mgr_get_hw_mode_params(
 }
 
 QDF_STATUS policy_mgr_update_nss_req(struct wlan_objmgr_psoc *psoc,
-				     uint8_t vdev_id, uint8_t tx_nss,
-				     uint8_t rx_nss)
+				     uint8_t vdev_id)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct target_psoc_info *tgt_hdl;
+	struct wlan_psoc_host_mac_phy_caps *tmp;
+	struct tgt_info *info;
+	struct policy_mgr_mac_ss_bw_info mac_ss_bw_info;
+	uint8_t i,  mac_found = 0;
+	uint32_t lmac_id;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		policy_mgr_err("tgt_hdl not found");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	info = &tgt_hdl->info;
+	lmac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
+	if (lmac_id == 0xFF) {
+		policy_mgr_err("mac_id not found");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++) {
+		tmp = &info->mac_phy_cap[i];
+
+		if (tmp->lmac_id  != lmac_id)
+			continue;
+
+		policy_mgr_get_hw_mode_params(tmp, &mac_ss_bw_info);
+		mac_found = 1;
+		break;
+	}
+
+	if (!mac_found) {
+		policy_mgr_err("mac_id : %d not found", lmac_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	return pm_ctx->hdd_cbacks.wlan_set_tx_rx_nss_cb(psoc, vdev_id,
-							tx_nss, rx_nss);
+							mac_ss_bw_info.mac_tx_stream,
+							mac_ss_bw_info.mac_rx_stream);
 }
 
 /**
