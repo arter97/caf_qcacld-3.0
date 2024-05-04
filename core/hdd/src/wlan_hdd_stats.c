@@ -524,8 +524,8 @@ hdd_get_link_info_by_bssid(struct hdd_context *hdd_ctx, const uint8_t *bssid)
 	return NULL;
 }
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 #define WLAN_INVALID_RSSI_VALUE -128
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * wlan_hdd_is_per_link_stats_supported - Check if FW supports per link stats
  * @hdd_ctx: Pointer to hdd context
@@ -7833,7 +7833,9 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	if (!ucfg_mlme_stats_is_link_speed_report_actual(hdd_ctx->psoc)) {
+	if (sinfo->signal == WLAN_INVALID_RSSI_VALUE) {
+		hdd_debug("don't fill tx rx rate for inactive link");
+	} else if (!ucfg_mlme_stats_is_link_speed_report_actual(hdd_ctx->psoc)) {
 		bool tx_rate_calc, rx_rate_calc;
 		uint8_t tx_nss_max, rx_nss_max;
 
