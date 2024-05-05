@@ -217,6 +217,22 @@ void ucfg_dp_update_intf_mac(struct wlan_objmgr_psoc *psoc,
 	wlan_dp_set_vdev_direct_link_cfg(psoc, dp_intf);
 }
 
+static inline uint8_t
+wlan_dp_get_dp_intf_id(struct wlan_dp_psoc_context *dp_ctx)
+{
+	uint8_t id = 0;
+
+	while (id < WLAN_DP_INTF_MAX) {
+		if (qdf_test_bit(id, dp_ctx->wlan_dp_intf_id_map)) {
+			id++;
+			continue;
+		}
+		break;
+	}
+
+	return id;
+}
+
 QDF_STATUS
 ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 		    struct qdf_mac_addr *intf_addr,
@@ -224,6 +240,7 @@ ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx;
+	uint8_t id;
 
 	dp_ctx =  dp_get_context();
 
@@ -243,6 +260,18 @@ ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 	qdf_copy_macaddr(&dp_intf->mac_addr, intf_addr);
 
 	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
+	id = wlan_dp_get_dp_intf_id(dp_ctx);
+	if (id == WLAN_DP_INTF_MAX) {
+		qdf_spin_unlock_bh(&dp_ctx->intf_list_lock);
+		dp_err("Max dp interface already created");
+		__qdf_mem_free(dp_intf);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_intf->id = id;
+	qdf_set_bit(id, dp_ctx->wlan_dp_intf_id_map);
+	dp_intf->guid = ++dp_ctx->intf_guid;
+	dp_ctx->dp_intf_list[id] = dp_intf;
 	qdf_list_insert_front(&dp_ctx->intf_list, &dp_intf->node);
 	qdf_spin_unlock_bh(&dp_ctx->intf_list_lock);
 
@@ -290,6 +319,8 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 
 	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
 	qdf_list_remove_node(&dp_ctx->intf_list, &dp_intf->node);
+	qdf_clear_bit(dp_intf->id, dp_ctx->wlan_dp_intf_id_map);
+	dp_ctx->dp_intf_list[dp_intf->id] = NULL;
 	qdf_spin_unlock_bh(&dp_ctx->intf_list_lock);
 	dp_softap_hlp_deinit(dp_intf);
 	__qdf_mem_free(dp_intf);

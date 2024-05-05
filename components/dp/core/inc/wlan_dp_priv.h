@@ -631,6 +631,8 @@ struct dp_rx_fst {
  * @device_mode: Device Mode
  * @intf_id: Interface ID
  * @node: list node for membership in the interface list
+ * @id: ID assigned to the dp interface
+ * @guid: unique identifier for the dp interface instance
  * @dev: netdev reference
  * @txrx_ops: Interface tx-rx ops
  * @dp_stats: Device TX/RX statistics
@@ -692,6 +694,8 @@ struct wlan_dp_intf {
 	enum QDF_OPMODE device_mode;
 
 	qdf_list_node_t node;
+	uint8_t id;
+	uint32_t guid;
 
 	qdf_netdev_t dev;
 	struct ol_txrx_ops txrx_ops;
@@ -832,6 +836,8 @@ struct dp_direct_link_context {
 };
 #endif
 
+#define WLAN_DP_INTF_MAX WLAN_MAX_VDEVS
+
 #ifdef WLAN_DP_FEATURE_STC
 struct wlan_dp_stc;
 #endif
@@ -847,6 +853,9 @@ struct wlan_dp_stc;
  * @hal_soc: HAL SoC handle
  * @intf_list_lock: DP interfaces list lock
  * @intf_list: DP interfaces list
+ * @dp_intf_list: array of dp_intf for fastpath access
+ * @intf_guid: global unique identifier counter for dp_intf
+ * @wlan_dp_intf_id_map: bitmap of the dp_intf ID (available/used)
  * @rps: rps
  * @dynamic_rps: dynamic rps
  * @enable_rxthread: Enable/Disable rx thread
@@ -922,6 +931,10 @@ struct wlan_dp_psoc_context {
 
 	qdf_spinlock_t intf_list_lock;
 	qdf_list_t intf_list;
+
+	struct wlan_dp_intf *dp_intf_list[WLAN_DP_INTF_MAX];
+	uint32_t intf_guid;
+	qdf_bitmap(wlan_dp_intf_id_map, WLAN_DP_INTF_MAX);
 
 	bool rps;
 	bool dynamic_rps;
