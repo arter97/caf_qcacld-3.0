@@ -5034,7 +5034,7 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 	}
 
 	if (cdp_peer_state_get(soc, params->smesessionId,
-			       params->bssId) == OL_TXRX_PEER_STATE_DISC) {
+			       params->bssId, true) == OL_TXRX_PEER_STATE_DISC) {
 		/*
 		 * This is the case for reassociation.
 		 * peer state update and peer_assoc is required since it
