@@ -299,6 +299,54 @@ dp_sawf_get_peer_msduq_info(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 	}
 	dp_sawf_nofl_err("------------------------------------");
 
+#ifdef SAWF_MSDUQ_DEBUG
+	dp_sawf_nofl_err("\n");
+	dp_sawf_nofl_err("SAWF HTT DE-ACTIVATE COUNTERS:");
+	dp_sawf_nofl_err("-------------------------------------");
+	dp_sawf_nofl_err("| Queue_id | recv_failure | timeout |");
+	dp_sawf_nofl_err("-------------------------------------");
+
+	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
+		msduq = &sawf_ctx->msduq[q_idx];
+		if (msduq->q_state == SAWF_MSDUQ_UNUSED)
+			continue;
+		dp_sawf_nofl_err("|     %d      |      %d      |      %d     |",
+				 q_idx + DP_SAWF_DEFAULT_Q_MAX,
+				 msduq->deactivate_stats.recv_failure,
+				 msduq->deactivate_stats.timeout);
+	}
+	dp_sawf_nofl_err("\n");
+	dp_sawf_nofl_err("SAWF HTT RE-ACTIVATE COUNTERS:");
+	dp_sawf_nofl_err("-------------------------------------");
+	dp_sawf_nofl_err("| Queue_id | recv_failure | timeout |");
+	dp_sawf_nofl_err("-------------------------------------");
+
+	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
+		msduq = &sawf_ctx->msduq[q_idx];
+		if (msduq->q_state == SAWF_MSDUQ_UNUSED)
+			continue;
+		dp_sawf_nofl_err("|    %d    |     %d      |      %d     |",
+				 q_idx + DP_SAWF_DEFAULT_Q_MAX,
+				 msduq->reactivate_stats.recv_failure,
+				 msduq->reactivate_stats.timeout);
+	}
+#endif
+	dp_sawf_nofl_err("\n");
+	dp_sawf_nofl_err("------------------------------------");
+	dp_sawf_nofl_err("| Queue_id | tgt_opaque_id | state |");
+	dp_sawf_nofl_err("------------------------------------");
+
+	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
+		msduq = &sawf_ctx->msduq[q_idx];
+		if (msduq->q_state == SAWF_MSDUQ_UNUSED)
+			continue;
+		dp_sawf_nofl_err("|    %d    |       %d      |      %s      |",
+				 q_idx + DP_SAWF_DEFAULT_Q_MAX,
+				 msduq->tgt_opaque_id,
+				 dp_sawf_msduq_state_to_string(
+				 msduq->q_state));
+	}
+
 	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
 		msduq = &sawf_ctx->msduq[q_idx];
 		if (msduq->q_state != SAWF_MSDUQ_IN_USE)
@@ -1340,6 +1388,7 @@ dp_sawf_peer_msduq_htt_resp_timeout(struct dp_soc *soc, struct dp_peer *peer,
 			dp_sawf_debug("Reset no_resp_ind Flag");
 			if (current_q_state == SAWF_MSDUQ_REACTIVATE_PENDING) {
 				dp_sawf_err("HTT Reactivate timeout");
+				DP_SAWF_MSDUQ_STATS_INC(reactivate_stats, timeout);
 				/*
 				 * Record MSDUQ with no response for Reactivate,
 				 * to notify NW Manager.
@@ -1350,6 +1399,7 @@ dp_sawf_peer_msduq_htt_resp_timeout(struct dp_soc *soc, struct dp_peer *peer,
 					*is_notify_needed = true;
 			} else {
 				dp_sawf_err("HTT Deactivate timeout");
+				DP_SAWF_MSDUQ_STATS_INC(deactivate_stats, timeout);
 				new_q_state = SAWF_MSDUQ_IN_USE;
 			}
 
