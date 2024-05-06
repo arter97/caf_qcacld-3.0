@@ -759,9 +759,9 @@ out:
 
 /**
  * populate_dot11f_ds_params() - To populate DS IE params
- * mac_ctx: Pointer to global mac context
- * dot11f_param: pointer to DS params IE
- * freq: freq
+ * @mac_ctx: Pointer to global mac context
+ * @dot11f_param: pointer to DS params IE
+ * @freq: freq
  *
  * This routine will populate DS param in management frame like
  * beacon, probe response, and etc.
@@ -2174,10 +2174,10 @@ populate_dot11f_supp_rates(struct mac_context *mac,
 /**
  * populate_dot11f_rates_tdls() - populate supported rates and
  *                                extended supported rates IE.
- * @p_mac global - header.
- * @p_supp_rates - pointer to supported rates IE
- * @p_ext_supp_rates - pointer to extended supported rates IE
- * @curr_oper_channel - current operating channel
+ * @p_mac: Pointer to global mac context
+ * @p_supp_rates: pointer to supported rates IE
+ * @p_ext_supp_rates: pointer to extended supported rates IE
+ * @curr_oper_channel: current operating channel
  *
  * This function populates the supported rates and extended supported
  * rates IE based in the STA capability. If the number of rates
@@ -7135,7 +7135,7 @@ populate_dot11f_chan_load_report(struct mac_context *mac,
 		dot11f->report.channel_load_report.bw_indication.ccfs1 = channel_load_report->bw_ind.center_freq_seg1;
 	}
 
-	pe_debug("regClass %d chan %d meas_time %d meas_dur %d, chan_load %d",
+	pe_debug("regClass %d chan %d meas_time %lu meas_dur %d, chan_load %d",
 		 dot11f->report.channel_load_report.op_class,
 		 dot11f->report.channel_load_report.channel,
 		 channel_load_report->rrm_scan_tsf,
@@ -7509,7 +7509,7 @@ void populate_dot11f_timeout_interval(struct mac_context *mac,
 
 /**
  * populate_dot11f_timing_advert_frame() - Populate the TA mgmt frame fields
- * @mac: the MAC context
+ * @mac_ctx: the MAC context
  * @frame: pointer to the TA frame
  *
  * Return: The SIR status.
@@ -7860,6 +7860,8 @@ populate_dot11f_he_bss_color_change(struct mac_context *mac_ctx,
  * lim_get_ext_ie_ptr_from_ext_id() - Find out ext ie
  * @ie: source ie address
  * @ie_len: source ie length
+ * @oui: oui buffer
+ * @oui_size: oui size
  *
  * This API is used to find out ext ie from ext id
  *
@@ -11426,6 +11428,7 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 /**
  * wlan_fill_single_pmk_ap_cap_from_scan_entry() - WAP3_SPMK VSIE from scan
  * entry
+ * @mac_ctx: pointer to mac_context
  * @bss_desc: BSS Descriptor
  * @scan_entry: scan entry
  *
