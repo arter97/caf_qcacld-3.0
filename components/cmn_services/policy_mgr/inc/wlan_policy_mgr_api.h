@@ -1389,6 +1389,14 @@ policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 bool
 policy_mgr_init_disallow_mode_bmap(struct mlo_link_set_active_req *req);
 
+/**
+ * policy_mgr_find_current_hw_mode() - Find the current hw mode
+ * @psoc: psoc pointer
+ *
+ * Return: policy mgr hw mode enum
+ */
+enum policy_mgr_curr_hw_mode
+policy_mgr_find_current_hw_mode(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
@@ -1403,6 +1411,12 @@ static inline bool
 policy_mgr_init_disallow_mode_bmap(struct mlo_link_set_active_req *req)
 {
 	return false;
+}
+
+static inline enum policy_mgr_curr_hw_mode
+policy_mgr_find_current_hw_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return POLICY_MGR_HW_MODE_INVALID;
 }
 
 static inline bool

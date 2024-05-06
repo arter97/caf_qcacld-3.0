@@ -1470,6 +1470,36 @@ enum set_hw_mode_status {
 	SET_HW_MODE_STATUS_ALREADY,
 };
 
+/**
+ * enum policy_mgr_curr_hw_mode: Policy mgr curr hw mode
+ * @POLICY_MGR_HW_MODE_SINGLE: Hw mode none
+ * @POLICY_MGR_HW_MODE_DBS: HW mode is DBS
+ * @POLICY_MGR_HW_MODE_SBS_PASSIVE: HW mode is SBS passive
+ * @POLICY_MGR_HW_MODE_SBS: HW mode is SBS
+ * @POLICY_MGR_HW_MODE_DBS_SBS: HW mode DBS SBS
+ * @POLICY_MGR_HW_MODE_DBS_OR_SBS: HW mode DBS or SBS
+ * @POLICY_MGR_HW_MODE_DBS_2G_5G: HW mode DBS 2G/5G
+ * @POLICY_MGR_HW_MODE_2G_PHYB: Hw mode 2G phyb
+ * @POLICY_MGR_HW_MODE_EMLSR: HW mode is EMLSR
+ * @POLICY_MGR_HW_MODE_AUX_EMLSR_SINGLE: Hw mode Aux EMLSR single
+ * @POLICY_MGR_HW_MODE_AUX_EMLSR_SPLIT: Hw mode Aux EMLSR split
+ * @POLICY_MGR_HW_MODE_INVALID: Invalid Hw mode
+ */
+enum policy_mgr_curr_hw_mode {
+	POLICY_MGR_HW_MODE_SINGLE = 0,
+	POLICY_MGR_HW_MODE_DBS = 1,
+	POLICY_MGR_HW_MODE_SBS_PASSIVE = 2,
+	POLICY_MGR_HW_MODE_SBS = 3,
+	POLICY_MGR_HW_MODE_DBS_SBS = 4,
+	POLICY_MGR_HW_MODE_DBS_OR_SBS = 5,
+	POLICY_MGR_HW_MODE_DBS_2G_5G = 6,
+	POLICY_MGR_HW_MODE_2G_PHYB = 7,
+	POLICY_MGR_HW_MODE_EMLSR = 8,
+	POLICY_MGR_HW_MODE_AUX_EMLSR_SINGLE = 9,
+	POLICY_MGR_HW_MODE_AUX_EMLSR_SPLIT = 10,
+	POLICY_MGR_HW_MODE_INVALID = 255
+};
+
 typedef void (*dual_mac_cb)(enum set_hw_mode_status status,
 		uint32_t scan_config,
 		uint32_t fw_mode_config);

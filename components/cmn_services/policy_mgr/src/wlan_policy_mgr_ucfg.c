@@ -499,4 +499,10 @@ ucfg_policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+
+enum policy_mgr_curr_hw_mode
+ucfg_policy_mgr_find_current_hw_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return policy_mgr_find_current_hw_mode(psoc);
+}
 #endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,6 +26,7 @@
 #include "osif_vdev_sync.h"
 #include "wlan_hdd_sysfs_connect_info.h"
 #include "qwlan_version.h"
+#include "wlan_policy_mgr_ucfg.h"
 
 /**
  * wlan_hdd_version_info() - Populate driver, FW and HW version
@@ -298,6 +299,39 @@ uint8_t *hdd_dot11_mode_str(uint32_t dot11mode)
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+static
+uint8_t *hdd_curr_hw_mode_str(uint8_t curr_hw_mode)
+{
+	switch (curr_hw_mode) {
+	case POLICY_MGR_HW_MODE_SINGLE:
+		return "HW MODE SINGLE";
+	case POLICY_MGR_HW_MODE_DBS:
+		return "HW MODE DBS";
+	case POLICY_MGR_HW_MODE_SBS_PASSIVE:
+		return "HW MODE SBS PASSIVE";
+	case POLICY_MGR_HW_MODE_SBS:
+		return "HW MODE SBS";
+	case POLICY_MGR_HW_MODE_DBS_SBS:
+		return "HW MODE DBS SBS";
+	case POLICY_MGR_HW_MODE_DBS_OR_SBS:
+		return "HW MODE DBS OR SBS";
+	case POLICY_MGR_HW_MODE_DBS_2G_5G:
+		return "HW MODE DBS 2g/5g";
+	case POLICY_MGR_HW_MODE_2G_PHYB:
+		return "HW MODE 2g phyB";
+	case POLICY_MGR_HW_MODE_EMLSR:
+		return "HW MODE EMLSR";
+	case POLICY_MGR_HW_MODE_AUX_EMLSR_SINGLE:
+		return "HW MODE EMLSR AUX SINGLE";
+	case POLICY_MGR_HW_MODE_AUX_EMLSR_SPLIT:
+		return "HW MODE EMLSR AUX SPLIT";
+	case POLICY_MGR_HW_MODE_INVALID:
+		return "HW MODE INVALID";
+	}
+
+	return "UNKNOWN";
+}
+
 /**
  * wlan_hdd_connect_info() - Populate connect info
  * @adapter: pointer to sta adapter for which connect info is required
@@ -317,6 +351,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	uint32_t tx_bit_rate, rx_bit_rate;
 	bool is_legacy = false;
 	bool is_standby = false;
+	uint8_t curr_hw_mode;
 
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		len = scnprintf(buf, buf_avail_len,
@@ -441,6 +476,14 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 				rx_bit_rate,
 				hdd_auth_type_str(conn_info->last_auth_type),
 				hdd_dot11_mode_str(conn_info->dot11mode));
+
+		if (len <= 0)
+			return length;
+
+		curr_hw_mode = ucfg_policy_mgr_find_current_hw_mode(wlan_vdev_get_psoc(link_info->vdev));
+		len = scnprintf(buf + length, buf_avail_len - length,
+				"current HW mode: %s\n",
+				hdd_curr_hw_mode_str(curr_hw_mode));
 
 		if (len <= 0)
 			return length;

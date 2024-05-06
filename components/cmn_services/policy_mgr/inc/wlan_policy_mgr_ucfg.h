@@ -561,6 +561,15 @@ QDF_STATUS
 ucfg_policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint8_t num_links);
+
+/**
+ * ucfg_policy_mgr_find_current_hw_mode() - Find current HW mode
+ * @psoc: objmgr psoc
+ *
+ * Return: policy mgr current HW mode.
+ */
+enum policy_mgr_curr_hw_mode
+ucfg_policy_mgr_find_current_hw_mode(struct wlan_objmgr_psoc *psoc);
 #else
 static inline QDF_STATUS
 ucfg_policy_mgr_pre_ap_start(struct wlan_objmgr_psoc *psoc,

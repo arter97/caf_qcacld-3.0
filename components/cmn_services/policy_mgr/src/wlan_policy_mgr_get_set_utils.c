@@ -13547,4 +13547,37 @@ policy_mgr_init_disallow_mode_bmap(struct mlo_link_set_active_req *req)
 
 	return true;
 }
+
+enum policy_mgr_curr_hw_mode
+policy_mgr_find_current_hw_mode(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	uint32_t old_hw_index = 0, new_hw_index = 0;
+	struct policy_mgr_hw_mode_params hw_mode;
+
+	status = policy_mgr_get_old_and_new_hw_index(psoc, &old_hw_index,
+						     &new_hw_index);
+	if (QDF_STATUS_SUCCESS != status) {
+		policy_mgr_err("Failed to get HW mode index");
+		goto end;
+	}
+
+	if (new_hw_index == POLICY_MGR_DEFAULT_HW_MODE_INDEX) {
+		policy_mgr_err("HW mode is not yet initialized");
+		goto end;
+	}
+
+	status = policy_mgr_get_hw_mode_from_idx(psoc, new_hw_index, &hw_mode);
+	if (QDF_STATUS_SUCCESS != status) {
+		policy_mgr_err("Failed to get HW mode index");
+		goto end;
+	}
+
+	policy_mgr_debug("Old hw_mode: %d New HW mode: %d", old_hw_index, new_hw_index);
+	if (new_hw_index >= POLICY_MGR_HW_MODE_SINGLE &&
+	    new_hw_index <= POLICY_MGR_HW_MODE_AUX_EMLSR_SPLIT)
+		return new_hw_index;
+end:
+	return POLICY_MGR_HW_MODE_INVALID;
+}
 #endif
