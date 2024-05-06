@@ -561,7 +561,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 
 		hdd_debug("detach vdev_id %d" QDF_MAC_ADDR_FMT,
 			  link_info->vdev_id,
-			  QDF_MAC_ADDR_REF(&old_mld->bytes));
+			  QDF_MAC_ADDR_REF(old_mld->bytes));
 		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[i++]);
 	}
 
@@ -586,7 +586,7 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 
 		hdd_debug("attach vdev_id %d" QDF_MAC_ADDR_FMT,
 			  link_info->vdev_id,
-			  QDF_MAC_ADDR_REF(&mac_addr.bytes));
+			  QDF_MAC_ADDR_REF(mac_addr.bytes));
 		qdf_copy_macaddr(&link_info->link_addr, &link_addrs[idx]);
 	}
 

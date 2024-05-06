@@ -8166,7 +8166,7 @@ policy_mgr_is_ml_links_in_mcc_allowed(struct wlan_objmgr_psoc *psoc,
 	if (*num_ml_sta < 2 || *num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS ||
 	    num_disabled_ml_sta) {
 		policy_mgr_debug("num_ml_sta invalid %d or link already disabled%d",
-				 num_ml_sta, num_disabled_ml_sta);
+				 *num_ml_sta, num_disabled_ml_sta);
 		return QDF_STATUS_E_FAILURE;
 	}
 

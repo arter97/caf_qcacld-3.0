@@ -80,7 +80,7 @@ policy_mgr_check_scc:
 	policy_mgr_check_scc_channel(psoc, new_sap_freq, sap_ch_freq, vdev_id,
 				     cc_switch_mode);
 	policy_mgr_debug("vdev_id %d old_freq %d new_freq %d", vdev_id,
-			 sap_ch_freq, new_sap_freq);
+			 sap_ch_freq, *new_sap_freq);
 }
 
 uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)

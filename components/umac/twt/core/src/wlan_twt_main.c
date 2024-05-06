@@ -1858,9 +1858,9 @@ wlan_twt_cfg_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	twt_debug("vdev:%d peer:" QDF_MAC_ADDR_FMT " dialog_id:%d wake_dur:%d wake_interval:%d",
+	twt_debug("vdev:%d peer:" QDF_MAC_ADDR_FMT " dialog_id:%u wake_dur:%u wake_interval:%u",
 		  vdev_id, QDF_MAC_ADDR_REF(peer_mac->bytes),
-		  *dialog_id, wake_dur, wake_interval);
+		  *dialog_id, *wake_dur, *wake_interval);
 
 	qdf_mutex_release(&peer_priv->twt_peer_lock);
 	wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);

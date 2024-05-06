@@ -325,7 +325,7 @@ ll_lt_sap_dump_stored_freq_list(struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj)
 			len += qdf_scnprintf(
 				freq_list + len,
 				LL_SAP_MAX_FREQ_LIST_INFO_LOG - len,
-				"%d[%u] ",
+				"%d[%lu] ",
 				ll_sap_psoc_obj->avoid_freq.freq_list[i].freq,
 				ll_sap_psoc_obj->avoid_freq.freq_list[i].timestamp);
 	}
@@ -968,7 +968,7 @@ QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp)
 	ll_sap_vdev_obj->target_tsf.twt_target_tsf = twt_target_tsf;
 	ll_sap_vdev_obj->target_tsf.non_twt_target_tsf = non_twt_target_tsf;
 
-	ll_sap_debug("vdev_id %d twt_target_tsf %ul and non_twt_target_tsf %ul",
+	ll_sap_debug("vdev_id %d twt_target_tsf %llu and non_twt_target_tsf %llu",
 		     rsp->twt_params.vdev_id,
 		     ll_sap_vdev_obj->target_tsf.twt_target_tsf,
 		     ll_sap_vdev_obj->target_tsf.non_twt_target_tsf);
