@@ -362,6 +362,38 @@ bool dp_tx_me_check_primary_peer_by_mac(struct dp_soc *soc, struct dp_vdev *vdev
 #endif
 
 /**
+ * dp_me_get_primary_peer() - Get primary peer for if @peer is MLD peer
+ * MCSD table store the MLD Peer mac address, Hence lookup always returns
+ * MLD peer for MLO client.
+ * @soc: Datapath soc handle
+ * @dp_peer: MLD peer object for which primary obj to be found.
+ *
+ * Return: Primary peer if found ; else dp_peer.
+ */
+#if defined(WLAN_FEATURE_11BE_MLO)
+static inline struct dp_peer *
+dp_me_get_primary_peer(struct dp_soc *soc, struct dp_peer *dp_peer)
+{
+	struct dp_peer *primary_dp_peer;
+	/* If this is MLD Peer find its primary peer and
+	 * unref MLD peer reference*/
+	if (dp_peer && IS_MLO_DP_MLD_PEER(dp_peer)) {
+		primary_dp_peer =
+			dp_get_primary_link_peer_by_id(soc, dp_peer->peer_id,
+						       DP_MOD_ID_MCAST2UCAST);
+		dp_peer_unref_delete(dp_peer, DP_MOD_ID_MCAST2UCAST);
+		return primary_dp_peer;
+	}
+	return dp_peer;
+}
+#else
+static inline struct dp_peer *
+dp_me_get_primary_peer(struct dp_soc *soc, struct dp_peer *dp_peer)
+{
+	return dp_peer;
+}
+#endif
+/**
  * dp_tx_me_send_dms_pkt: function to send dms packet
  * @soc: Datapath soc handle
  * @peer: Datapath peer handle
@@ -397,6 +429,17 @@ dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 	}
 }
 
+static inline void
+dp_tx_me_update_dms_stats(struct dp_vdev *vdev, bool is_igmp,
+			  uint8_t xmit_type, uint16_t num_pkt_sent)
+{
+	if (is_igmp) {
+		DP_STATS_INC(vdev, tx_i[xmit_type].igmp_mcast_en.igmp_ucast_converted,
+			     num_pkt_sent);
+	} else {
+		DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.ucast, num_pkt_sent);
+	}
+}
 /**
  * dp_tx_me_dms_pkt_handler: function to send dms packet
  * @soc: Datapath soc handle
@@ -404,6 +447,7 @@ dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
  * @tid : transmit TID
  * @is_igmp: flag to indicate igmp packet
  * @nbuf: Multicast nbuf
+* @dp_peer: dp peer object
  *
  * return: no of converted packets
  */
@@ -412,12 +456,13 @@ dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
 			 struct dp_vdev *vdev,
 			 uint8_t tid,
 			 bool is_igmp,
-			 qdf_nbuf_t nbuf)
+			 qdf_nbuf_t nbuf, struct dp_peer *dp_peer)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct cdp_tx_exception_metadata tx_exc_param = {0};
 	dp_vdev_dms_me_t dms_me;
 	uint8_t xmit_type = qdf_nbuf_get_vdev_xmit_type(nbuf);
+
 	tx_exc_param.sec_type = vdev->sec_type;
 	tx_exc_param.tx_encap_type = vdev->tx_encap_type;
 	tx_exc_param.peer_id = HTT_INVALID_PEER;
@@ -429,17 +474,18 @@ dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
 	dms_me.tx_exc_metadata = &tx_exc_param;
 	dms_me.num_pkt_sent = 0;
 
+	if (dp_peer) {
+		dp_tx_me_send_dms_pkt(soc, dp_peer, &dms_me);
+		dp_tx_me_update_dms_stats(vdev, is_igmp, xmit_type, 1);
+		return 1;
+	}
 	dp_vdev_iterate_peer(vdev, dp_tx_me_send_dms_pkt,
 			     &dms_me, DP_MOD_ID_MCAST2UCAST);
 
 	qdf_nbuf_free(nbuf);
 
-	if (is_igmp) {
-		DP_STATS_INC(vdev, tx_i[xmit_type].igmp_mcast_en.igmp_ucast_converted,
-			     dms_me.num_pkt_sent);
-	} else {
-		DP_STATS_INC(vdev, tx_i[xmit_type].mcast_en.ucast, dms_me.num_pkt_sent);
-	}
+	dp_tx_me_update_dms_stats(vdev, is_igmp, xmit_type,
+				  dms_me.num_pkt_sent);
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_MCAST2UCAST);
 
 	/* only bss peer is present, free the buffer*/
@@ -474,6 +520,8 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	qdf_ether_header_t *eh;
 	uint8_t *data;
 	uint16_t len;
+	uint16_t dms_pkt_retval = 0;
+	struct dp_peer *dp_peer = NULL;
 
 	/* reference to frame dst addr */
 	uint8_t *dstmac;
@@ -505,9 +553,9 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	if (!pdev)
 		goto free_return;
 
-	if (is_dms_pkt)
+	if (is_dms_pkt && (!dp_vdev_is_wds_ext_enabled(vdev)))
 		return dp_tx_me_dms_pkt_handler(soc_hdl, vdev, tid, is_igmp,
-						nbuf);
+						nbuf, dp_peer);
 
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 
@@ -550,6 +598,31 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		if (dp_tx_me_check_primary_peer_by_mac(soc, vdev, dstmac))
 			continue;
 
+		if (is_dms_pkt) {
+			dp_peer =
+				 dp_find_peer_by_macaddr(soc, dstmac,
+							 vdev->vdev_id,
+							 DP_MOD_ID_MCAST2UCAST);
+			dp_peer = dp_me_get_primary_peer(soc, dp_peer);
+			if (qdf_likely(dp_peer)) {
+				dms_pkt_retval +=
+					dp_tx_me_dms_pkt_handler(soc_hdl,
+								 vdev, tid, is_igmp,
+								 nbuf, dp_peer);
+				dp_peer_unref_delete(dp_peer,
+						     DP_MOD_ID_MCAST2UCAST);
+			}
+			/* return if all clients are processed */
+			if (new_mac_idx == new_mac_cnt - 1) {
+				dp_vdev_unref_delete(soc, vdev,
+						     DP_MOD_ID_MCAST2UCAST);
+				qdf_nbuf_free(nbuf);
+				if (dms_pkt_retval)
+					return dms_pkt_retval;
+				return 1;
+			}
+			continue;
+		}
 		/*
 		 * optimize to avoid malloc in per-packet path
 		 * For eg. seg_pool can be made part of vdev structure
