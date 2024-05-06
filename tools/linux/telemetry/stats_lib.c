@@ -693,9 +693,9 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 	uint64_t request_id = 0;
 
 	if (!cmd->recursive)
-		info |= STATS_INFO_AGGREGATE;
+		info |= STATS_INFO_AGGREGATE | STATS_INFO_RESOLVE_STA;
 	if (is_async_req()) {
-		info |= STATS_INFO_ASYNC_REQ;
+		info |= STATS_INFO_ASYNC_REQ | STATS_INFO_RESOLVE_STA;
 		request_id = generate_request_id(cmd->request_id);
 	}
 
@@ -2355,36 +2355,37 @@ static uint32_t get_mldev_mode(char *ifname)
 	return mldev_mode;
 }
 
-static int32_t build_child_sta_list(char *ifname,
-				    struct object_list *parent_obj)
+static uint32_t get_vap_opmode(char *ifname)
 {
-	struct cfg80211_data buffer;
-	uint32_t len = 0;
-	uint32_t opmode = 0;
-	uint8_t *buf = NULL;
+	struct cfg80211_data buffer = {0};
+	uint32_t opmode = IEEE80211_M_ANY;
+	uint16_t cmd = QCA_NL80211_VENDOR_SUBCMD_WIFI_PARAMS;
 	int32_t msg = 0;
-	uint16_t cmd = 0;
 
 	buffer.data = &opmode;
-	buffer.length = sizeof(uint32_t);
-	buffer.parse_data = 0;
-	buffer.callback = NULL;
-	buffer.parse_data = 0;
-	cmd = QCA_NL80211_VENDOR_SUBCMD_WIFI_PARAMS;
+	buffer.length = sizeof(opmode);
 	msg = wifi_cfg80211_send_getparam_command(&g_sock_ctx.cfg80211_ctxt,
 						  cmd,
 						  IEEE80211_PARAM_GET_OPMODE,
 						  ifname, (char *)&buffer,
 						  sizeof(uint32_t));
-	if (msg < 0) {
-		STATS_INFO("Couldn't send NL command on %s; %d\n", ifname, msg);
-		return -EIO;
-	}
+	if (msg < 0)
+		STATS_ERR("Couldn't send NL command on %s; %d\n", ifname, msg);
 
-	if (opmode != IEEE80211_M_HOSTAP)
+	return opmode;
+}
+
+static int32_t build_child_sta_list(char *ifname,
+				    struct object_list *parent_obj)
+{
+	struct cfg80211_data buffer = {0};
+	uint32_t len = 0;
+	uint8_t *buf = NULL;
+	uint16_t cmd = 0;
+
+	if (get_vap_opmode(ifname) != IEEE80211_M_HOSTAP)
 		return 0;
 
-	memset(&buffer, 0, sizeof(buffer));
 	len = sizeof(struct ieee80211req_sta_info) * EXPECTED_MAX_STAS_PERVAP;
 
 	buf = (uint8_t *)malloc(len);
@@ -2639,14 +2640,15 @@ static void get_first_active_vap_ifname(struct interface_list *if_list,
 
 	for (inx = 0; inx < if_list->v_count; inx++) {
 		ifname = if_list->vap[inx].name;
-		if (is_interface_active(ifname, STATS_OBJ_VAP)) {
+		if (is_interface_active(ifname, STATS_OBJ_VAP) &&
+		    (get_vap_opmode(ifname) == IEEE80211_M_HOSTAP)) {
 			strlcpy(v_ifname, ifname, IFNAME_LEN);
 			break;
 		}
 	}
 }
 
-static void *build_async_object(struct stats_command *cmd)
+static void *build_single_object(struct stats_command *cmd)
 {
 	struct object_list *temp_obj = NULL;
 	char ifname[IFNAME_LEN] = {'\0'};
@@ -3210,7 +3212,10 @@ static int32_t process_and_send_stats_request(struct stats_command *cmd)
 		return -EINVAL;
 	}
 
-	req_obj_list = build_object_list(cmd);
+	if (cmd->recursive)
+		req_obj_list = build_object_list(cmd);
+	else
+		req_obj_list = build_single_object(cmd);
 	if (!req_obj_list) {
 		STATS_ERR("Failed to build Object Hierarchy!\n");
 		return -EPERM;
@@ -4199,7 +4204,7 @@ int32_t libstats_async_send_stats_req(struct stats_command *cmd)
 		return -EINVAL;
 	}
 
-	req_obj_list = build_async_object(cmd);
+	req_obj_list = build_single_object(cmd);
 	if (!req_obj_list) {
 		STATS_ERR("Failed to build Object Hierarchy!\n");
 		return -EPERM;
