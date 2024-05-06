@@ -9174,7 +9174,7 @@ int wlan_hdd_get_sap_go_peer_linkspeed(struct wlan_hdd_link_info *link_info,
 	struct hdd_station_info *sta_info, *tmp = NULL;
 
 	value = value + command_len;
-	ret = sscanf(value, "%17s", &macaddr_string);
+	ret = sscanf(value, "%17s", macaddr_string);
 
 	if (ret != 1)
 		return -EINVAL;

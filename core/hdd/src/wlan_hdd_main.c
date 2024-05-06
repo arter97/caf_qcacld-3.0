@@ -17816,7 +17816,7 @@ static QDF_STATUS hdd_ssr_on_pagefault_cb(struct hdd_context *hdd_ctx)
 
 	if (!hdd_ctx->last_pagefault_ssr_time ||
 	    (curr_time - hdd_ctx->last_pagefault_ssr_time) >= ssr_threshold) {
-		hdd_info("curr_time %lu last_pagefault_ssr_time %lu ssr_frequency %d",
+		hdd_info("curr_time %lu last_pagefault_ssr_time %lu ssr_frequency %lu",
 			 curr_time, hdd_ctx->last_pagefault_ssr_time,
 			 ssr_threshold);
 		hdd_ctx->last_pagefault_ssr_time = curr_time;
