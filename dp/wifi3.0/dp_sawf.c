@@ -89,6 +89,16 @@
 #define SAWF_FLOW_DEPRIORITIZE 3
 #define DP_RETRY_COUNT 7
 
+void dp_soc_sawf_init(struct dp_soc *soc)
+{
+	qdf_spinlock_create(&soc->sawf_flow_sync_lock);
+}
+
+void dp_soc_sawf_deinit(struct dp_soc *soc)
+{
+	qdf_spinlock_destroy(&soc->sawf_flow_sync_lock);
+}
+
 uint16_t dp_sawf_msduq_peer_id_set(uint16_t peer_id, uint8_t msduq)
 {
 	uint16_t peer_msduq = 0;
@@ -703,6 +713,8 @@ dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 	bool match_found = false;
 	uint8_t q_idx;
 
+	qdf_spin_lock_bh(&dpsoc->sawf_flow_sync_lock);
+
 	dp_sawf_info("mac_addr: "QDF_MAC_ADDR_FMT" svc_id %u direction %u "
 		     "start_or_stop %u, flow_count %u",
 		     QDF_MAC_ADDR_REF(mac_addr), svc_id, direction,
@@ -713,8 +725,10 @@ dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 	else
 		peer = dp_find_peer_by_destmac(dpsoc, mac_addr, DP_VDEV_ALL);
 
-	if (!peer)
-		return QDF_STATUS_E_FAILURE;
+	if (!peer) {
+		dp_sawf_err("Peer is NULL");
+		goto fail;
+	}
 
 	if (IS_MLO_DP_LINK_PEER(peer))
 		mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
@@ -727,9 +741,8 @@ dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 		primary_link_peer = dp_get_primary_link_peer_by_id
 			(dpsoc, mld_peer->peer_id, DP_MOD_ID_SAWF);
 		if (!primary_link_peer) {
-			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 			dp_sawf_err("Invalid primary peer");
-			return QDF_STATUS_E_FAILURE;
+			goto fail;
 		}
 
 		/*
@@ -745,8 +758,6 @@ dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 		dp_sawf_err("sawf_ctx doesn't exist");
 		goto fail;
 	}
-
-	qdf_spin_lock_bh(&sawf_ctx->sawf_peer_lock);
 
 	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
 		msduq = &sawf_ctx->msduq[q_idx];
@@ -818,7 +829,7 @@ dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 			      qdf_atomic_read(&msduq->ref_count));
 	}
 
-	qdf_spin_unlock_bh(&sawf_ctx->sawf_peer_lock);
+	qdf_spin_unlock_bh(&dpsoc->sawf_flow_sync_lock);
 
 	if (peer_mac)
 		qdf_mem_copy(peer_mac, peer->mac_addr.raw, QDF_MAC_ADDR_SIZE);
@@ -828,6 +839,8 @@ dp_sawf_peer_flow_count(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
 fail:
 	if (peer)
 		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	qdf_spin_unlock_bh(&dpsoc->sawf_flow_sync_lock);
 	return QDF_STATUS_E_FAILURE;
 }
 
