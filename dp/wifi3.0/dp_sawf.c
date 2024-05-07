@@ -342,17 +342,19 @@ dp_sawf_get_peer_msduq_info(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 	}
 #endif
 	dp_sawf_nofl_err("\n");
-	dp_sawf_nofl_err("------------------------------------");
-	dp_sawf_nofl_err("| Queue_id | tgt_opaque_id | state |");
-	dp_sawf_nofl_err("------------------------------------");
+	dp_sawf_nofl_err("------------------------------------------------------------------");
+	dp_sawf_nofl_err("| Queue_id | tgt_opaque_id |  map_done  |  ref_count  |   state   |");
+	dp_sawf_nofl_err("-------------------------------------------------------------------");
 
 	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; q_idx++) {
 		msduq = &sawf_ctx->msduq[q_idx];
 		if (msduq->q_state == SAWF_MSDUQ_UNUSED)
 			continue;
-		dp_sawf_nofl_err("|    %d    |       %d      |      %s      |",
+		dp_sawf_nofl_err("|    %d    |       0x%x      |      %d      |     %d    |     %s    ",
 				 q_idx + DP_SAWF_DEFAULT_Q_MAX,
 				 msduq->tgt_opaque_id,
+				 msduq->map_done,
+				 qdf_atomic_read(&msduq->ref_count),
 				 dp_sawf_msduq_state_to_string(
 				 msduq->q_state));
 	}
@@ -723,6 +725,12 @@ dp_sawf_peer_msduq_reconfigure(struct dp_soc *dpsoc, struct dp_peer *peer,
 	uint8_t current_q_state, new_q_state;
 
 	current_q_state = msduq->q_state;
+
+	/* If tgt_opaque_id is not initialized HTT send needs to be stopped */
+	if (!msduq->map_done) {
+		dp_sawf_err("Uninitialized tgt_opaque_id");
+		return;
+	}
 
 	if (q_action == HTT_MSDUQ_DEACTIVATE) {
 		if (current_q_state == SAWF_MSDUQ_IN_USE) {

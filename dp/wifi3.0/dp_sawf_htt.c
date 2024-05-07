@@ -815,6 +815,7 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		msduq->remapped_tid = remapped_tid;
 		msduq->htt_msduq = host_tid_queue;
 		msduq->tgt_opaque_id = tgt_opaque_id;
+		msduq->map_done = 1;
 		telemetry_sawf_update_msduq_info(peer->sawf->telemetry_ctx,
 						 msduq_index,
 						 remapped_tid, host_tid_queue,

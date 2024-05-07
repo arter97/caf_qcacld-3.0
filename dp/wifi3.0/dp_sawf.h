@@ -496,7 +496,8 @@ struct dp_sawf_msduq {
 	uint8_t q_state;
 	uint8_t is_deactivation_needed:1,
 		no_resp_ind:1,
-		reserved:6;
+		map_done:1,
+		reserved:5;
 #ifdef SAWF_MSDUQ_DEBUG
 	struct msduq_htt_stats deactivate_stats;
 	struct msduq_htt_stats reactivate_stats;
