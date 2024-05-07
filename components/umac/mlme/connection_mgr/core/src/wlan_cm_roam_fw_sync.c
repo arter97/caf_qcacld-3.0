@@ -792,7 +792,9 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 
 	if (roaming_info->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OWE) ||
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY)) {
 		struct wlan_crypto_pmksa *pmkid_cache, *pmksa;
 
@@ -911,6 +913,8 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 					     roaming_info->pmk,
 					     roaming_info->pmk_len);
 				pmkid_cache->pmk_len = roaming_info->pmk_len;
+			} else {
+				mlme_debug("PMK not received from fw");
 			}
 
 			wlan_cm_set_psk_pmk(pdev, vdev_id,
