@@ -620,6 +620,104 @@ void wlan_dp_lb_compute_stats_average(struct wlan_dp_psoc_context *dp_ctx,
 		wlan_dp_lb_handler(dp_ctx);
 }
 
+static void
+wlan_dp_lb_update_cpu_mask(void *context, uint32_t cpu, bool cpu_up)
+{
+	struct wlan_dp_psoc_context *dp_ctx = context;
+	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
+	qdf_cpu_mask *preferred_mask = &lb_data->preferred_cpu_mask;
+	qdf_cpu_mask *cur_cpu_mask = &lb_data->curr_cpu_mask;
+	qdf_cpu_mask updated_cpu_mask;
+
+	/* might moved out of default cpumask previously due to all cpus in
+	 * default cpumask went offline, move back to default cpumask if any of
+	 * the cpu of default cpumask comes online.
+	 */
+	if (!qdf_cpumask_test_cpu(cpu, preferred_mask)) {
+		if (qdf_cpumask_test_cpu(cpu, &lb_data->def_cpumask) &&
+		    lb_data->preferred_mask_change_by_cpuhp) {
+			qdf_cpumask_copy(preferred_mask, &lb_data->def_cpumask);
+			qdf_cpumask_clear(cur_cpu_mask);
+			qdf_cpumask_set_cpu(cpu, cur_cpu_mask);
+			lb_data->preferred_mask_change_by_cpuhp = false;
+			goto load_balance;
+		}
+
+		return;
+	}
+
+	if (cpu_up) {
+		qdf_cpumask_set_cpu(cpu, cur_cpu_mask);
+	} else {
+		qdf_cpumask_clear_cpu(cpu, cur_cpu_mask);
+		if (qdf_cpumask_empty(cur_cpu_mask)) {
+			wlan_dp_lb_get_update_cpu_mask(lb_data,
+						       NUM_CPUS_FOR_LOAD_BALANCE,
+						       &lb_data->audio_taken_cpumask,
+						       &updated_cpu_mask);
+
+			if (qdf_cpumask_intersects(preferred_mask,
+						   &lb_data->def_cpumask) &&
+			    !qdf_cpumask_intersects(&updated_cpu_mask,
+						    &lb_data->def_cpumask))
+				lb_data->preferred_mask_change_by_cpuhp = true;
+
+			qdf_cpumask_copy(preferred_mask, &updated_cpu_mask);
+			qdf_cpumask_copy(cur_cpu_mask, preferred_mask);
+		}
+	}
+
+load_balance:
+	wlan_dp_lb_set_default_affinity(dp_ctx);
+	wlan_dp_lb_handler(dp_ctx);
+}
+
+static void
+wlan_dp_lb_cpu_hotplug_notify(void *context, uint32_t cpu, bool cpu_up)
+{
+	struct qdf_op_sync *op_sync;
+
+	if (qdf_op_protect(&op_sync))
+		return;
+
+	wlan_dp_lb_update_cpu_mask(context, cpu, cpu_up);
+	qdf_op_unprotect(op_sync);
+}
+
+static void wlan_dp_lb_cpu_online_cb(void *context, uint32_t cpu)
+{
+	wlan_dp_lb_cpu_hotplug_notify(context, cpu, true);
+}
+
+static void wlan_dp_lb_cpu_before_offline_cb(void *context, uint32_t cpu)
+{
+	wlan_dp_lb_cpu_hotplug_notify(context, cpu, false);
+}
+
+/**
+ * wlan_dp_lb_cpuhp_register() - register cpu hotplug notifier callback
+ * @dp_ctx: dp context
+ *
+ * Return: none
+ */
+static void wlan_dp_lb_cpuhp_register(struct wlan_dp_psoc_context *dp_ctx)
+{
+	qdf_cpuhp_register(&dp_ctx->cpuhp_event_handle, dp_ctx,
+			   wlan_dp_lb_cpu_online_cb,
+			   wlan_dp_lb_cpu_before_offline_cb);
+}
+
+/**
+ * wlan_dp_lb_cpuhp_unregister() - unregister cpu hotplug notifier cb
+ * @dp_ctx: dp context
+ *
+ * Return: none
+ */
+static void wlan_dp_lb_cpuhp_unregister(struct wlan_dp_psoc_context *dp_ctx)
+{
+	qdf_cpuhp_unregister(&dp_ctx->cpuhp_event_handle);
+}
+
 /**
  * wlan_dp_load_balancer_deinit() - deinitialize load balancer module
  * @psoc: psoc handle
@@ -634,6 +732,7 @@ void wlan_dp_load_balancer_deinit(struct wlan_objmgr_psoc *psoc)
 	if (!dp_ctx->dp_cfg.is_load_balance_enabled)
 		return;
 
+	wlan_dp_lb_cpuhp_unregister(dp_ctx);
 	qdf_spinlock_destroy(&lb_data->load_balance_lock);
 }
 
@@ -697,6 +796,8 @@ void wlan_dp_load_balancer_init(struct wlan_objmgr_psoc *psoc)
 			 &lb_data->def_cpumask);
 	qdf_cpumask_copy(&lb_data->curr_cpu_mask,
 			 &lb_data->def_cpumask);
+
+	wlan_dp_lb_cpuhp_register(dp_ctx);
 
 	dp_info("default cpus for load balance: %*pbl",
 		qdf_cpumask_pr_args(&lb_data->def_cpumask));

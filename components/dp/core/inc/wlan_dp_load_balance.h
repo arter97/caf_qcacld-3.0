@@ -84,6 +84,7 @@ struct cpu_irq_load {
  *	in nanoseconds
  * @num_wlan_used_rx_rings: number of rx rings used by wlan
  * @in_default_affinity: currently default affinity is set for dp rx interrupts
+ * @preferred_mask_change_by_cpuhp: preferred cpumask change due to cpu hotplug
  */
 struct wlan_dp_lb_data {
 	struct cpu_irq_load cpu_load[NR_CPUS];
@@ -97,6 +98,7 @@ struct wlan_dp_lb_data {
 	uint64_t last_load_balanced_time;
 	uint8_t num_wlan_used_rx_rings;
 	bool in_default_affinity;
+	bool preferred_mask_change_by_cpuhp;
 };
 
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
