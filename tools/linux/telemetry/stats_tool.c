@@ -551,6 +551,24 @@ const char *stats_if_sw_enq_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 };
 #endif
 
+const char *pdev_stats_if_sw_enq_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0  to 1  ms", "1  to 2  ms",
+	"2  to 3  ms", "3  to 4  ms",
+	"4  to 5  ms", "5  to 6  ms",
+	"6  to 7  ms", "7  to 8  ms",
+	"8  to 9  ms", "9  to 10 ms",
+	"10 to 11 ms", "11 to 12 ms", "12+      ms"
+};
+
+const char *pdev_stats_if_fw_to_hw_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0   to 2   ms", "2   to 5   ms",
+	"4   to 6   ms", "6   to 8   ms",
+	"8   to 10  ms", "10  to 20  ms",
+	"20  to 30  ms", "30  to 40  ms",
+	"40  to 50  ms", "50  to 100 ms",
+	"100 to 250 ms", "250 to 500 ms", "500+       ms"
+};
+
 const char *stats_if_intfrm_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 	"0  to 5  ms", "6  to 10 ms",
 	"11 to 15 ms", "16 to 20 ms",
@@ -2038,7 +2056,7 @@ void print_advance_radio_data_vow(struct advance_pdev_data_vow *vow)
 			count = total_tx->swq_delay.delay_bucket[idx];
 			if (count)
 				STATS_PRINT("\t\t%s:  Packets = %ju\n",
-					    stats_if_sw_enq_delay_bucket[idx],
+					    pdev_stats_if_sw_enq_delay_bucket[idx],
 					    count);
 		}
 		STATS_32(stdout, "Min", total_tx->swq_delay.min_delay);
@@ -2050,7 +2068,7 @@ void print_advance_radio_data_vow(struct advance_pdev_data_vow *vow)
 			count = total_tx->hwtx_delay.delay_bucket[idx];
 			if (count)
 				STATS_PRINT("\t\t%s:  Packets = %ju\n",
-					    stats_if_fw_to_hw_delay_bucket[idx],
+					    pdev_stats_if_fw_to_hw_delay_bucket[idx],
 					    count);
 		}
 		STATS_32(stdout, "Min", total_tx->hwtx_delay.min_delay);
