@@ -11811,21 +11811,25 @@ void populate_dot11f_mlo_rnr(struct mac_context *mac_ctx,
 	for (link = 0; link < vdev_count; link++) {
 		if (!wlan_vdev_list[link])
 			continue;
-		if (wlan_vdev_list[link] == session->vdev) {
-			lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
-			continue;
-		}
-		if (!wlan_vdev_mlme_is_mlo_ap(wlan_vdev_list[link])) {
-			lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
-			continue;
-		}
+		if (wlan_vdev_list[link] == session->vdev)
+			goto release_ref;
+
+		if (!wlan_vdev_mlme_is_mlo_ap(wlan_vdev_list[link]))
+			goto release_ref;
+
 		link_session = pe_find_session_by_vdev_id(
 			mac_ctx, wlan_vdev_get_id(wlan_vdev_list[link]));
 		if (!link_session) {
 			pe_debug("vdev id %d pe session is not created",
 				 wlan_vdev_get_id(wlan_vdev_list[link]));
-			lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
-			continue;
+			goto release_ref;
+		}
+
+		if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
+					     link_session->curr_op_freq) &&
+		    mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
+			pe_debug("skip rnrie populate if cac running");
+			goto release_ref;
 		}
 
 		for (i = 0; i < MAX_NUM_RNR_ENTRY; i++) {
@@ -11861,6 +11865,7 @@ void populate_dot11f_mlo_rnr(struct mac_context *mac_ctx,
 			num++;
 			rnr_populated = false;
 		}
+release_ref:
 		lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
 	}
 	*num_rnr = num;
