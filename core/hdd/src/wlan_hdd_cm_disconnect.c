@@ -280,7 +280,9 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 
 	ucfg_dp_nud_reset_tracking(vdev);
 	hdd_reset_limit_off_chan(adapter);
-	hdd_reset_sta_keep_alive_interval(link_info, hdd_ctx);
+
+	if (!is_link_switch)
+		hdd_reset_sta_keep_alive_interval(link_info, hdd_ctx);
 
 	hdd_cm_print_bss_info(sta_ctx);
 }
