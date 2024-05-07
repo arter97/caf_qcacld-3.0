@@ -1795,15 +1795,14 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		link_info->vdev_id, QDF_TRACE_DEFAULT_PDEV_ID,
 		QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_ASSOC));
 
-	if (is_roam) {
+	if (is_roam)
 		ucfg_dp_nud_indicate_roam(vdev);
-
-		if (adapter->keep_alive_interval)
-			hdd_vdev_send_sta_keep_alive_interval(link_info,
-						hdd_ctx,
-						adapter->keep_alive_interval);
-	}
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
+
+	if (adapter->keep_alive_interval &&
+	    (is_roam ||	wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)))
+		hdd_vdev_send_sta_keep_alive_interval(link_info, hdd_ctx,
+						adapter->keep_alive_interval);
 }
 
 static void
