@@ -47,6 +47,9 @@
 #ifdef WLAN_SUPPORT_LAPB
 #include "wlan_dp_lapb_flow.h"
 #endif
+#ifdef WLAN_SUPPORT_RX_FISA
+#include <wlan_dp_fisa_rx.h>
+#endif
 #include "cdp_txrx_ctrl.h"
 #include "wlan_dp_load_balance.h"
 #include "wlan_dp_flow_balance.h"
@@ -2666,7 +2669,9 @@ void ucfg_dp_runtime_disable_rx_thread(struct wlan_objmgr_vdev *vdev,
 				       bool value)
 {
 	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_psoc_context *dp_ctx;
 
 	if (!dp_link) {
 		dp_err("Unable to get DP link");
@@ -2674,8 +2679,85 @@ void ucfg_dp_runtime_disable_rx_thread(struct wlan_objmgr_vdev *vdev,
 	}
 
 	dp_intf = dp_link->dp_intf;
-	dp_intf->runtime_disable_rx_thread = value;
+	if (qdf_unlikely(!dp_intf))
+		return;
+
+	dp_ctx = dp_intf->dp_ctx;
+	if (qdf_unlikely(!dp_ctx))
+		return;
+
+	qdf_atomic_inc(&dp_intf->num_active_task);
+
+	if (dp_intf->runtime_disable_rx_thread != value) {
+		dp_intf->runtime_disable_rx_thread = value;
+		if (dp_ctx->enable_dp_rx_threads)
+			dp_txrx_flush_pkts_by_vdev_id(soc, dp_link->link_id);
+	}
+
+	qdf_atomic_dec(&dp_intf->num_active_task);
 }
+
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+static void dp_flush_fisa_entries_by_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
+	struct wlan_dp_psoc_context *dp_ctx;
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	if (qdf_unlikely(!soc))
+		return;
+
+	dp_ctx = dp_intf->dp_ctx;
+	if (qdf_unlikely(!dp_ctx))
+		return;
+
+	qdf_atomic_inc(&dp_intf->num_active_task);
+
+	/* do fisa flush for this vdev */
+	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_ctx->dp_cfg))
+		wlan_dp_rx_fisa_flush_by_vdev_id((struct dp_soc *)soc,
+						 dp_link->link_id);
+
+	qdf_atomic_dec(&dp_intf->num_active_task);
+}
+
+void ucfg_dp_fisa_route_to_latency_sensitive_reo(struct wlan_objmgr_vdev *vdev,
+						 bool value)
+{
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	if (!dp_link) {
+		dp_err("Unable to get DP link");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf))
+		return;
+
+	dp_ctx = dp_intf->dp_ctx;
+	if (qdf_unlikely(!dp_ctx))
+		return;
+
+	if (dp_intf->route_to_latency_sensitive_reo != value) {
+		if (!dp_is_fisa_in_cmem(dp_ctx)) {
+			dp_err("lsr feature not supported");
+			return;
+		}
+
+		dp_intf->route_to_latency_sensitive_reo = value;
+		dp_flush_fisa_entries_by_vdev(vdev);
+	}
+}
+#else
+void ucfg_dp_fisa_route_to_latency_sensitive_reo(struct wlan_objmgr_vdev *vdev,
+						 bool value)
+{
+}
+#endif
 
 bool ucfg_dp_get_napi_enabled(struct wlan_objmgr_psoc *psoc)
 {

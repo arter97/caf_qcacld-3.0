@@ -1893,6 +1893,10 @@ config WLAN_SUPPORT_LAPB
 	bool "enable CONFIG_WLAN_SUPPORT_LAPB"
 	default n
 
+config WLAN_FEATURE_LATENCY_SENSITIVE_REO
+	bool "enable WLAN_FEATURE_LATENCY_SENSITIVE_REO"
+	default n
+
 config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"
 	default \"wlan\"

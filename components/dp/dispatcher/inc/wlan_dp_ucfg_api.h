@@ -1185,6 +1185,17 @@ void ucfg_dp_runtime_disable_rx_thread(struct wlan_objmgr_vdev *vdev,
 				       bool value);
 
 /**
+ * ucfg_dp_fisa_route_to_latency_sensitive_reo() - Enable route to latency
+ *						   sensitive reo
+ * @vdev: vdev handle
+ * @value : value to be set (true/false)
+ *
+ * Return: None
+ */
+void ucfg_dp_fisa_route_to_latency_sensitive_reo(struct wlan_objmgr_vdev *vdev,
+						 bool value);
+
+/**
  * ucfg_dp_get_napi_enabled() - Get NAPI enabled/disabled info
  * @psoc: psoc handle mapped to DP context
  *

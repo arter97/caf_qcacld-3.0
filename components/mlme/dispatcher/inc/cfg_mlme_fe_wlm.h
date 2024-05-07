@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,15 +27,16 @@
 /*
  * Flag definition of 32-bit host latency flags
  *
- * |31  18|  17  |  16    |15        8|7    1|     0     |
- * +------+------+--------+-----------+------+-----------+
- * | RSVD | HBB  | PM-QOS |  RSVD     | RSVD | RX Thread |
- * +------+------+--------+-----------+------+-----------+
- * |       common         |  TX Path  |    RX Path       |
+ * |31  18|  17  |  16    |15        8|7    2|       1      |     0     |
+ * +------+------+--------+-----------+------+--------------+-----------+
+ * | RSVD | HBB  | PM-QOS |  RSVD     | RSVD | Route to LSR | RX Thread |
+ * +------+------+--------+-----------+------+--------------+-----------+
+ * |       common         |  TX Path  |            RX Path              |
  *
  * bit 0-7: Rx path related optimization
  * bit 0: disable rx_thread for vdev
- * bit 1-7: Reserved
+ * bit 1: Route vdev traffic to latency sensitive reo
+ * bit 2-7: Reserved
  * bit 8-15: Tx path related optimization
  * bit 8-15: Reserved
  * bit 16-31: common changes
@@ -44,6 +45,7 @@
  */
 
 #define WLM_HOST_RX_THREAD_FLAG         (1 << 0)
+#define WLM_HOST_ROUTE_TO_LSR_FLAG      (1 << 1)
 #define WLM_HOST_PM_QOS_FLAG            (1 << 16)
 #define WLM_HOST_HBB_FLAG               (1 << 17)
 
@@ -163,15 +165,16 @@
  * bit 11: Disable sys sleep if setting
  * bit 12-31: Reserve for future usage
  *
- * |63  50|  49  |  48    |47        40|39   33|    32     |
- * +------+------+--------+------------+-------+-----------+
- * | RSVD | HBB  | PM-QOS |  RSVD      | RSVD  | RX Thread |
- * +------+------+--------+------------+-------+-----------+
- * |       common         |  TX Path   |     RX Path       |
+ * |63  50|  49  |  48    |47        40|39  34|      33      |    32     |
+ * +------+------+--------+------------+------+--------------+-----------+
+ * | RSVD | HBB  | PM-QOS |  RSVD      | RSVD | Route to LSR | RX Thread |
+ * +------+------+--------+------------+------+--------------+-----------+
+ * |       common         |  TX Path   |             RX Path             |
  *
  * bit 39-32: Rx path related optimization
  * bit 32: disable rx_thread for vdev
- * bit 33-39: Reserved
+ * bit 33: Route vdev traffic to latency sensitive reo
+ * bit 34-39: Reserved
  * bit 40-47: Tx path related optimization
  * bit 40-47: Reserved
  * bit 48-63: common changes
@@ -223,15 +226,16 @@
  * bit 11: Disable sys sleep if setting
  * bit 12-31: Reserve for future usage
  *
- * |63  50|  49  |  48    |47        40|39   33|    32     |
- * +------+------+--------+------------+-------+-----------+
- * | RSVD | HBB  | PM-QOS |  RSVD      | RSVD  | RX Thread |
- * +------+------+--------+------------+-------+-----------+
- * |       common         |  TX Path   |     RX Path       |
+ * |63  50|  49  |  48    |47        40|39  34|      33      |    32     |
+ * +------+------+--------+------------+------+--------------+-----------+
+ * | RSVD | HBB  | PM-QOS |  RSVD      | RSVD | Route to LSR | RX Thread |
+ * +------+------+--------+------------+------+--------------+-----------+
+ * |       common         |  TX Path   |             RX Path             |
  *
  * bit 39-32: Rx path related optimization
  * bit 32: disable rx_thread for vdev
- * bit 33-39: Reserved
+ * bit 33: Route vdev traffic to latency sensitive reo
+ * bit 34-39: Reserved
  * bit 40-47: Tx path related optimization
  * bit 40-47: Reserved
  * bit 48-63: common changes
@@ -283,15 +287,16 @@
  * bit 11: Disable sys sleep if setting
  * bit 12-31: Reserve for future usage
  *
- * |63  50|  49  |  48    |47        40|39   33|    32     |
- * +------+------+--------+------------+-------+-----------+
- * | RSVD | HBB  | PM-QOS |  RSVD      | RSVD  | RX Thread |
- * +------+------+--------+------------+-------+-----------+
- * |       common         |  TX Path   |     RX Path       |
+ * |63  50|  49  |  48    |47        40|39  34|      33      |    32     |
+ * +------+------+--------+------------+------+--------------+-----------+
+ * | RSVD | HBB  | PM-QOS |  RSVD      | RSVD | Route to LSR | RX Thread |
+ * +------+------+--------+------------+------+--------------+-----------+
+ * |       common         |  TX Path   |             RX Path             |
  *
  * bit 39-32: Rx path related optimization
  * bit 32: disable rx_thread for vdev
- * bit 33-39: Reserved
+ * bit 33: Route vdev traffic to latency sensitive reo
+ * bit 34-39: Reserved
  * bit 40-47: Tx path related optimization
  * bit 40-47: Reserved
  * bit 48-63: common changes
@@ -344,15 +349,16 @@
  * bit 24: Disable MLMR mode
  * bit 25-31: Reserved for future use
  *
- * |63  50|  49  |  48    |47        40|39   33|    32     |
- * +------+------+--------+------------+-------+-----------+
- * | RSVD | HBB  | PM-QOS |  RSVD      | RSVD  | RX Thread |
- * +------+------+--------+------------+-------+-----------+
- * |       common         |  TX Path   |     RX Path       |
+ * |63  50|  49  |  48    |47        40|39  34|      33      |    32     |
+ * +------+------+--------+------------+------+--------------+-----------+
+ * | RSVD | HBB  | PM-QOS |  RSVD      | RSVD | Route to LSR | RX Thread |
+ * +------+------+--------+------------+------+--------------+-----------+
+ * |       common         |  TX Path   |             RX Path             |
  *
  * bit 39-32: Rx path related optimization
  * bit 32: disable rx_thread for vdev
- * bit 33-39: Reserved
+ * bit 33: Route vdev traffic to latency sensitive reo
+ * bit 34-39: Reserved
  * bit 40-47: Tx path related optimization
  * bit 40-47: Reserved
  * bit 48-63: common changes

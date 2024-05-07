@@ -1384,12 +1384,25 @@ dp_rx_thread_gro_flush_ind_cbk(void *link_ctx, int rx_ctx_id)
 				   rx_ctx_id, gro_flush_code);
 }
 
+#if defined(WLAN_SUPPORT_RX_FISA)
+static inline bool wlan_dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
+{
+	return dp_rx_is_ring_latency_sensitive_reo(ring_id);
+}
+#else
+static inline bool wlan_dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
+{
+	return false;
+}
+#endif
+
 QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 					qdf_nbuf_t nbuf_list)
 {
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 	uint8_t link_id;
+	uint8_t ring_id;
 	qdf_nbuf_t head_ptr;
 
 	if (qdf_unlikely(!link_ctx || !nbuf_list)) {
@@ -1401,9 +1414,11 @@ QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 	if (!is_dp_link_valid(dp_link))
 		return QDF_STATUS_E_FAILURE;
 
+	ring_id = QDF_NBUF_CB_RX_CTX_ID(nbuf_list);
 	dp_intf = dp_link->dp_intf;
-	if (dp_intf->runtime_disable_rx_thread &&
-	    dp_intf->txrx_ops.rx.rx_stack)
+	if ((dp_intf->runtime_disable_rx_thread ||
+	     wlan_dp_rx_is_ring_latency_sensitive_reo(ring_id)) &&
+	     dp_intf->txrx_ops.rx.rx_stack)
 		return dp_intf->txrx_ops.rx.rx_stack(dp_link, nbuf_list);
 
 	link_id = dp_link->link_id;

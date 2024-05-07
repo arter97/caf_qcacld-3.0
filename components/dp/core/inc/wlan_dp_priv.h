@@ -677,6 +677,8 @@ struct dp_rx_fst {
  *		     particular rx_context
  * @fisa_force_flushed: Flag to indicate FISA flow has been flushed for a
  *			particular rx_context
+ * @route_to_latency_sensitive_reo: Enable rx routing to
+ *				    latency sensitive reo2sw ring
  * @runtime_disable_rx_thread: Runtime Rx thread flag
  * @rx_stack: function pointer Rx packet handover
  * @tx_fn: function pointer to send Tx packet
@@ -750,6 +752,9 @@ struct wlan_dp_intf {
 	 */
 	uint8_t fisa_disallowed[MAX_REO_DEST_RINGS];
 	uint8_t fisa_force_flushed[MAX_REO_DEST_RINGS];
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+	bool route_to_latency_sensitive_reo;
+#endif
 #endif
 
 	bool runtime_disable_rx_thread;
