@@ -1059,7 +1059,7 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!wlan_dp_is_local_pkt_capture_enabled(psoc) &&
+	if (!wlan_dp_is_local_pkt_capture_active(psoc) &&
 	    policy_mgr_is_sta_mon_concurrency(psoc))
 		return QDF_STATUS_E_NOSUPPORT;
 
