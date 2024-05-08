@@ -1688,6 +1688,11 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_load_balance.c",
         ],
     },
+    "CONFIG_WLAN_DP_FLOW_BALANCE_SUPPORT": {
+        True: [
+            "components/dp/core/src/wlan_dp_flow_balance.c",
+        ],
+    },
     "CONFIG_WLAN_FEATURE_DSRC": {
         True: [
             "components/ocb/core/src/wlan_ocb_main.c",

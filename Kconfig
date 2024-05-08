@@ -156,6 +156,11 @@ config WLAN_DP_LOAD_BALANCE_SUPPORT
 	bool "Enable load balance support"
 	default n
 
+config WLAN_DP_FLOW_BALANCE_SUPPORT
+	depends on WLAN_DP_LOAD_BALANCE_SUPPORT
+	bool "Enable flow balance support"
+	default n
+
 config DELIVERY_TO_STACK_STATUS_CHECK
 	bool "Enable DELIVERY_TO_STACK_STATUS_CHECK"
 	default n
