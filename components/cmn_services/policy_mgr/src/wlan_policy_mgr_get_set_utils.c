@@ -48,6 +48,7 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_connectivity_logging.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_nan_api_i.h"
 
 /* invalid channel id. */
 #define INVALID_CHANNEL_ID 0
@@ -2421,6 +2422,7 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_freq_range *freq_range;
 	bool emlsr_links_with_aux = false;
 	uint8_t mac_id;
+	uint8_t sta = 0, p2p = 0, nan = 0, ndi = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2493,6 +2495,49 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 		 * in this hw mode.
 		 */
 		if (i == MAX_MAC) {
+			policy_mgr_rl_debug("new freq %d mode %s is allowed in hw mode %s",
+					    ch_freq,
+					    device_mode_to_string(mode),
+					    policy_mgr_hw_mode_to_str(j));
+			return true;
+		}
+
+		sta = 0, p2p = 0, nan = 0, ndi = 0;
+		for (i = 0; i < MAX_MAC; i++) {
+			if (!wlan_nan_is_sta_p2p_ndp_supported(psoc))
+				break;
+			/* Get the freq list which are in the MAC
+			 * supported freq range.
+			 */
+			policy_mgr_get_mac_freq_list(
+				freq_range,
+				i,
+				mac_freq_list, mac_mode_list, &mac_freq_num,
+				conn[0].freq, conn[0].mode,
+				conn[1].freq, conn[1].mode,
+				conn[2].freq, conn[2].mode,
+				ch_freq, mode);
+
+			for (i = 0; i < mac_freq_num; i++) {
+				if (mac_mode_list[i] == PM_STA_MODE)
+					sta++;
+				else if (mac_mode_list[i] ==
+							QDF_P2P_CLIENT_MODE ||
+					 mac_mode_list[i] == QDF_P2P_GO_MODE)
+					p2p++;
+				else if (mac_mode_list[i] == QDF_NAN_DISC_MODE)
+					nan++;
+				else if (mac_mode_list[i] == QDF_NDI_MODE)
+					ndi++;
+			}
+
+			policy_mgr_debug("sta %d ap %d nan %d ndi %d",
+					 sta, p2p, nan, ndi);
+		}
+
+		if (wlan_nan_is_sta_p2p_ndp_supported(psoc) &&
+		    ((sta == 2 && nan == 1 && p2p == 1) ||
+		     (sta == 1 && nan == 1 && ndi == 1 && p2p == 1))) {
 			policy_mgr_rl_debug("new freq %d mode %s is allowed in hw mode %s",
 					    ch_freq,
 					    device_mode_to_string(mode),
