@@ -22259,7 +22259,7 @@ int
 wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 			   struct hdd_adapter **adapter,
 			   const char *name, bool rtnl_held,
-			   unsigned char name_assign_type)
+			   unsigned char name_assign_type, bool is_rx_mon)
 {
 	struct hdd_adapter *sta_adapter;
 	struct hdd_adapter *mon_adapter;
@@ -22283,8 +22283,7 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	if (!ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc) &&
-	    ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc)) {
+	if (is_rx_mon) {
 		num_open_session = policy_mgr_mode_specific_connection_count(
 						hdd_ctx->psoc,
 						PM_STA_MODE,
