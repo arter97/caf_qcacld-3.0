@@ -58,6 +58,7 @@
 #include "wlan_epcs_api.h"
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_public_structs.h"
+#include "wlan_p2p_api.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
@@ -2333,10 +2334,8 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 	tpSirMacMgmtHdr mac_hdr = WMA_GET_RX_MAC_HEADER(pBd);
 	uint32_t frame_len = WMA_GET_RX_PAYLOAD_LEN(pBd);
 	uint8_t *pBody = WMA_GET_RX_MPDU_DATA(pBd);
-	uint8_t dpp_oui[] = { 0x50, 0x6F, 0x9A, 0x1A };
 	tpSirMacActionFrameHdr action_hdr = (tpSirMacActionFrameHdr) pBody;
 	tpSirMacVendorSpecificPublicActionFrameHdr vendor_specific;
-
 
 	pe_debug("Received an action frame category: %d action_id: %d",
 		 action_hdr->category, (action_hdr->category ==
@@ -2364,13 +2363,18 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 				return;
 			}
 
-			/* Check if it is a DPP public action frame */
-			if (qdf_mem_cmp(vendor_specific->Oui, dpp_oui, 4)) {
-				pe_debug("public action frame (Vendor specific) OUI: %x %x %x %x",
-					 vendor_specific->Oui[0],
-					 vendor_specific->Oui[1],
-					 vendor_specific->Oui[2],
-					 vendor_specific->Oui[3]);
+			pe_debug("public action frame (Vendor specific) OUI: %x %x %x %x",
+				 vendor_specific->Oui[0],
+				 vendor_specific->Oui[1],
+				 vendor_specific->Oui[2],
+				 vendor_specific->Oui[3]);
+
+			/* Drop P2P frames as they are handled by P2P module */
+			if (wlan_p2p_is_action_frame_of_p2p_type(
+						(uint8_t *)mac_hdr,
+						WMA_GET_RX_MPDU_LEN(pBd))) {
+				pe_debug("Drop P2P public action frame as already handled in p2p module");
+				return;
 			}
 		}
 
