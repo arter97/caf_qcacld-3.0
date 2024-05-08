@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -357,11 +357,16 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 #define RX_DIRECT_LINK_CE_BUF_NUM   30
 
 static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
-	/* 4 TX DESC pools */
+	/* Max 3 DESC pools required in Single MAC solution
+	 * 4 TX DESC pools
+	 */
 	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
 	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
 	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+#if !defined(QCA_WIFI_WCN7750) && !defined(QCA_WIFI_QCA6750) && \
+    !defined(QCA_WIFI_WCN6450)
 	{QDF_DP_TX_DESC_TYPE, TX_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+#endif
 
 	/* 4 Tx EXT DESC NON Cacheable pools */
 	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
@@ -370,8 +375,11 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	 NON_CACHEABLE, { 0 } },
 	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
+#if !defined(QCA_WIFI_WCN7750) && !defined(QCA_WIFI_QCA6750) && \
+    !defined(QCA_WIFI_WCN6450)
 	{QDF_DP_TX_EXT_DESC_TYPE, HAL_TX_EXT_DESC_WITH_META_DATA, 0, 0,
 	 NON_CACHEABLE, { 0 } },
+#endif
 
 	/* 4 Tx EXT DESC Link Cacheable pools */
 	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
@@ -380,14 +388,20 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	 0, CACHEABLE, { 0 } },
 	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
 	 0, CACHEABLE, { 0 } },
+#if !defined(QCA_WIFI_WCN7750) && !defined(QCA_WIFI_QCA6750) && \
+    !defined(QCA_WIFI_WCN6450)
 	{QDF_DP_TX_EXT_DESC_LINK_TYPE, sizeof(struct dp_tx_ext_desc_elem_s), 0,
 	 0, CACHEABLE, { 0 } },
+#endif
 
 	/* 4 TX TSO DESC pools */
 	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
 	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
 	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+#if !defined(QCA_WIFI_WCN7750) && !defined(QCA_WIFI_QCA6750) && \
+    !defined(QCA_WIFI_WCN6450)
 	{QDF_DP_TX_TSO_DESC_TYPE, TX_TSO_DESC_SIZE, 0, 0, CACHEABLE, { 0 } },
+#endif
 
 	/* 4 TX TSO NUM SEG DESC pools */
 	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
@@ -396,8 +410,11 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	 CACHEABLE, { 0 } },
 	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
+#if !defined(QCA_WIFI_WCN7750) && !defined(QCA_WIFI_QCA6750) && \
+    !defined(QCA_WIFI_WCN6450)
 	{QDF_DP_TX_TSO_NUM_SEG_TYPE, TX_TSO_NUM_SEG_DESC_SIZE, 0, 0,
 	 CACHEABLE, { 0 } },
+#endif
 
 	/* DP RX DESCs BUF pools */
 	{QDF_DP_RX_DESC_BUF_TYPE, sizeof(union dp_rx_desc_list_elem_t),
