@@ -2535,6 +2535,8 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	bool big_data_stats_req = false;
 	bool big_data_fw_support = false;
 	int ret;
+	struct hdd_station_info *stainfo = NULL;
+	struct qdf_mac_addr *peer_mac_addr;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
@@ -2547,10 +2549,22 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 
 	wlan_hdd_get_peer_rx_rate_stats(link_info);
 
+	if (hdd_cm_is_vdev_connected(link_info)) {
+		peer_mac_addr = &link_info->session.station.conn_info.bssid;
+		stainfo = qdf_mem_malloc(sizeof(*stainfo));
+		if (stainfo) {
+			qdf_mem_copy(&stainfo->sta_mac, peer_mac_addr,
+				     QDF_MAC_ADDR_SIZE);
+
+			if (hdd_get_peer_stats(adapter, stainfo))
+				hdd_err_rl("hdd_get_peer_stats fail");
+		}
+	}
+
 	if (big_data_stats_req) {
 		if (wlan_hdd_get_big_data_station_stats(link_info)) {
 			hdd_err_rl("wlan_hdd_get_big_data_station_stats fail");
-			return -EINVAL;
+			goto free_sta_info;
 		}
 		nl_buf_len = hdd_get_big_data_stats_len(link_info);
 	}
@@ -2559,9 +2573,11 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	connect_fail_rsn_len = hdd_get_connect_fail_reason_code_len(adapter);
 	nl_buf_len += connect_fail_rsn_len;
 	nl_buf_len += hdd_get_uplink_delay_len(adapter);
+	if (stainfo)
+		nl_buf_len += hdd_add_peer_stats_get_len(stainfo);
 	if (!nl_buf_len) {
 		hdd_err_rl("Failed to get bcn pmf stats");
-		return -EINVAL;
+		goto free_sta_info;
 	}
 
 	nl_buf_len += NLMSG_HDRLEN;
@@ -2569,27 +2585,24 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 						       nl_buf_len);
 	if (!skb) {
 		hdd_err_rl("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
-		return -ENOMEM;
+		goto free_sta_info;
 	}
 
 	if (hdd_add_pmf_bcn_protect_stats(skb, link_info)) {
 		hdd_err_rl("hdd_add_pmf_bcn_protect_stats fail");
-		wlan_cfg80211_vendor_free_skb(skb);
-		return -EINVAL;
+		goto error;
 	}
 
 	if (connect_fail_rsn_len) {
 		if (hdd_add_connect_fail_reason_code(skb, adapter)) {
 			hdd_err_rl("hdd_add_connect_fail_reason_code fail");
-			wlan_cfg80211_vendor_free_skb(skb);
-			return -ENOMEM;
+			goto error;
 		}
 	}
 
 	if (big_data_stats_req) {
 		if (hdd_big_data_pack_resp_nlmsg(skb, link_info)) {
-			wlan_cfg80211_vendor_free_skb(skb);
-			return -EINVAL;
+			goto error;
 		}
 	}
 
@@ -2601,8 +2614,12 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 
 	if (QDF_IS_STATUS_ERROR(hdd_add_uplink_delay(adapter, skb))) {
 		hdd_err_rl("hdd_add_uplink_delay fail");
-		wlan_cfg80211_vendor_free_skb(skb);
-		return -EINVAL;
+		goto error;
+	}
+
+	if (stainfo && QDF_IS_STATUS_ERROR(hdd_add_peer_stats(skb, stainfo))) {
+		hdd_err_rl("hdd_add_peer_stats fail");
+		goto error;
 	}
 
 	if (QDF_IS_STATUS_ERROR(hdd_add_uplink_jitter(adapter, skb))) {
@@ -2613,7 +2630,18 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 
 	ret = wlan_cfg80211_vendor_cmd_reply(skb);
 	hdd_reset_roam_params(hdd_ctx->psoc, link_info->vdev_id);
+	if (stainfo)
+		qdf_mem_free(stainfo);
+
 	return ret;
+
+error:
+	wlan_cfg80211_vendor_free_skb(skb);
+
+free_sta_info:
+	if (stainfo)
+		qdf_mem_free(stainfo);
+	return -EINVAL;
 }
 
 /**
