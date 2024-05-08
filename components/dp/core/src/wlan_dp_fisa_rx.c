@@ -316,6 +316,10 @@ void dp_fisa_update_fst_table(struct wlan_dp_psoc_context *dp_ctx,
 		sw_ft_entry->prev_napi_id = sw_ft_entry->napi_id;
 		sw_ft_entry->napi_id = flow_details->napi_id;
 
+		dp_info("moving flow %d from napi_id%d to napi_id%d",
+			sw_ft_entry->flow_id, sw_ft_entry->prev_napi_id,
+			sw_ft_entry->napi_id);
+
 		/* Handle the case of hash based routing enabled/disabled */
 		if (flow_details->napi_id > 3)
 			sw_ft_entry->reo_dest_indication =

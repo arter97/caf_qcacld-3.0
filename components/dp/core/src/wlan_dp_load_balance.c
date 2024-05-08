@@ -92,6 +92,7 @@ void wlan_dp_lb_set_default_affinity(struct wlan_dp_psoc_context *dp_ctx)
 		cpu = qdf_cpumask_first(&temp_mask);
 		hif_check_and_apply_irq_affinity(dp_ctx->hif_handle,
 						 grp_id, cpu);
+		lb_data->reo_cpu_map[i] = cpu;
 		qdf_cpumask_clear_cpu(cpu, &temp_mask);
 		if (qdf_cpumask_empty(&temp_mask))
 			qdf_cpumask_copy(&temp_mask, cpu_mask);
@@ -119,6 +120,7 @@ wlan_dp_lb_irq_balance_handler(struct wlan_dp_psoc_context *dp_ctx,
 			       uint32_t num_cpus,
 			       struct wlan_dp_rx_ring_wtg *weightages)
 {
+	struct wlan_dp_lb_data *lb_data = &dp_ctx->lb_data;
 	int cpu, i = 0;
 	int grp_id;
 
@@ -129,9 +131,9 @@ wlan_dp_lb_irq_balance_handler(struct wlan_dp_psoc_context *dp_ctx,
 	cpu = 0;
 
 	while (weightages[i].weight) {
-		dp_debug("Applying ring%d weight %d on cpu%d",
-			 weightages[i].ring_id, weightages[i].weight,
-			 cpu_load_avg[cpu].cpu_id);
+		dp_info("Applying ring%d weight %d on cpu%d",
+			weightages[i].ring_id, weightages[i].weight,
+			cpu_load_avg[cpu].cpu_id);
 
 		grp_id = cdp_get_ext_grp_id_from_reo_num(dp_ctx->cdp_soc,
 							 weightages[i].ring_id);
@@ -142,6 +144,9 @@ wlan_dp_lb_irq_balance_handler(struct wlan_dp_psoc_context *dp_ctx,
 
 		hif_check_and_apply_irq_affinity(dp_ctx->hif_handle, grp_id,
 						 cpu_load_avg[cpu].cpu_id);
+
+		lb_data->reo_cpu_map[weightages[i].ring_id] =
+						cpu_load_avg[cpu].cpu_id;
 
 		cpu_load_avg[cpu].allowed_wtg -= weightages[i++].weight;
 
@@ -225,6 +230,54 @@ wlan_dp_lb_check_eligible_for_flow_balance(struct wlan_dp_psoc_context *dp_ctx,
 	return false;
 }
 
+/* units in percentage */
+#define ALLOWED_BUFFER_LOAD 10
+static inline uint32_t
+wlan_dp_gb_get_curr_wlan_wtg(struct wlan_dp_lb_data *lb_data,
+			     struct wlan_dp_rx_ring_wtg *wtgs,
+			     uint8_t cpu_id)
+{
+	uint32_t curr_weightage = 0;
+	int i;
+
+	for (i = 0; i < MAX_REO_DEST_RINGS; i++) {
+		if (lb_data->reo_cpu_map[i] == cpu_id)
+			curr_weightage += wtgs[i].weight;
+	}
+
+	return curr_weightage;
+}
+
+static bool
+wlan_dp_is_load_balance_needed(struct wlan_dp_lb_data *lb_data,
+			       struct wlan_dp_rx_ring_wtg *wtgs,
+			       struct cpu_load *cpu_load_avg,
+			       uint32_t num_cpus)
+{
+	struct cpu_load *load;
+	uint32_t curr_wtg;
+	int i;
+
+	for (i = 0; i < num_cpus; i++) {
+		load = &cpu_load_avg[i];
+
+		curr_wtg = wlan_dp_gb_get_curr_wlan_wtg(lb_data,
+							wtgs, load->cpu_id);
+
+		dp_info("CPU%d CWW:%d AWW:%d", load->cpu_id,
+			curr_wtg, load->allowed_wtg);
+
+		/* check whether the current wlan weightage is +-10% of the
+		 * allowed weightage. If not, load balance is needed.
+		 */
+		if (!((load->allowed_wtg - ALLOWED_BUFFER_LOAD <= curr_wtg) &&
+		      (load->allowed_wtg + ALLOWED_BUFFER_LOAD >= curr_wtg)))
+			return true;
+	}
+
+	return false;
+}
+
 /**
  * wlan_dp_lb_handler() - handler for load balance
  * Calculates the per CPU allowed wlan tput weightage(throughput in percentage).
@@ -276,7 +329,8 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	uint32_t total_avg_pkts = 0;
 	int cpu;
 	uint8_t targeted_load_per_cpu;
-	uint8_t non_wlan_avg_load;
+	uint8_t non_wlan_avg_load = 0;
+	bool do_load_balance = true;
 
 	dp_info("cpu mask for load balance %*pbl ",
 		qdf_cpumask_pr_args(cpu_mask));
@@ -313,19 +367,21 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	/*calculate and update per cpu allowed wlan tput weightage */
 	for (cpu = 0; cpu < num_cpus; cpu++) {
 		cpu_load_avg = &cpu_load_avgs[cpu];
-		non_wlan_avg_load = cpu_load_avg->total_cpu_avg_load -
-					cpu_load_avg->wlan_avg_load;
+		if (cpu_load_avg->total_cpu_avg_load >
+		    cpu_load_avg->wlan_avg_load)
+			non_wlan_avg_load = cpu_load_avg->total_cpu_avg_load -
+						cpu_load_avg->wlan_avg_load;
+
 		if (non_wlan_avg_load >= targeted_load_per_cpu)
 			cpu_load_avg->allowed_wtg = 0;
 		else
 			cpu_load_avg->allowed_wtg =
 			((targeted_load_per_cpu - non_wlan_avg_load) * 100) /
 			total_wlan_load;
-		dp_debug("cpu_id %d total_irq_load %d wlan_irq_load %d allowed_tpu_wtg %d",
-			 cpu_load_avg->cpu_id,
-			 cpu_load_avg->total_cpu_avg_load,
-			 cpu_load_avg->wlan_avg_load,
-			 cpu_load_avg->allowed_wtg);
+		dp_info("cpu %d TL %d WL %d AW %d", cpu_load_avg->cpu_id,
+			cpu_load_avg->total_cpu_avg_load,
+			cpu_load_avg->wlan_avg_load,
+			cpu_load_avg->allowed_wtg);
 	}
 
 	/* sort cpus based on allowed tput weightages from high to low */
@@ -344,12 +400,20 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 					    total_avg_pkts, &cpu_load_avgs[0],
 					    num_cpus, &weightages[0]);
 
-	if (status != FLOW_BALANCE_SUCCESS)
+	if (status != FLOW_BALANCE_SUCCESS) {
 		wlan_dp_lb_update_cur_ring_wtgs(per_ring_pkt_avg,
 						total_avg_pkts,	&weightages[0]);
+		do_load_balance = wlan_dp_is_load_balance_needed(lb_data,
+								 &weightages[0],
+								 &cpu_load_avgs[0],
+								 num_cpus);
+	}
 
-	wlan_dp_lb_irq_balance_handler(dp_ctx, &cpu_load_avgs[0],
-				       num_cpus, &weightages[0]);
+	if (!do_load_balance)
+		dp_info("load balance is not needed");
+	else
+		wlan_dp_lb_irq_balance_handler(dp_ctx, &cpu_load_avgs[0],
+					       num_cpus, &weightages[0]);
 
 	qdf_spin_unlock(&lb_data->load_balance_lock);
 	lb_data->last_load_balanced_time = qdf_sched_clock();

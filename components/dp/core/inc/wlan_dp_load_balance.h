@@ -19,6 +19,8 @@
 #ifndef _WLAN_DP_LOAD_BALACE_H_
 #define _WLAN_DP_LOAD_BALACE_H_
 
+#include "wlan_init_cfg.h"
+
 struct wlan_dp_psoc_context;
 
 #define ALLOWED_BUFFER_WT 5
@@ -85,6 +87,7 @@ struct cpu_irq_load {
  * @num_wlan_used_rx_rings: number of rx rings used by wlan
  * @in_default_affinity: currently default affinity is set for dp rx interrupts
  * @preferred_mask_change_by_cpuhp: preferred cpumask change due to cpu hotplug
+ * @reo_cpu_map: REO to CPU mapping
  */
 struct wlan_dp_lb_data {
 	struct cpu_irq_load cpu_load[NR_CPUS];
@@ -99,6 +102,7 @@ struct wlan_dp_lb_data {
 	uint8_t num_wlan_used_rx_rings;
 	bool in_default_affinity;
 	bool preferred_mask_change_by_cpuhp;
+	uint8_t reo_cpu_map[8];
 };
 
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
