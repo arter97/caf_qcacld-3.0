@@ -480,6 +480,21 @@ QDF_STATUS
 dp_sawf_get_peer_msduq_svc_params(struct cdp_soc_t *soc, uint8_t *mac,
 				  void *data);
 
+#ifdef SAWF_ADMISSION_CONTROL
+/**
+ * dp_sawf_get_peer_admctrl_stats - Get Peer SAWF AdmCtrl Stats
+ * @soc: soc handle
+ * @mac: mac address
+ * @data: data to be filled
+ * @peer_type: Peer type
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_sawf_get_peer_admctrl_stats(struct cdp_soc_t *soc, uint8_t *mac,
+			       void *data, enum cdp_peer_type peer_type);
+#endif
+
 #ifdef SAWF_MSDUQ_DEBUG
 struct msduq_htt_stats {
 	uint16_t recv_failure;

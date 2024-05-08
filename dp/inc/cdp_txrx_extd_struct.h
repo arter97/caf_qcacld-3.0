@@ -303,5 +303,27 @@ struct sawf_msduq_svc_params {
 	uint32_t delay_bound;
 	uint32_t mark_metadata;
 };
+
+/*
+ * struct sawf_admctrl_msduq_stats - SAWF AdmCtrl MSDUQ Stats
+ * @tx_success_pkt: MSDUQ Tx success pkt count
+ */
+struct sawf_admctrl_msduq_stats {
+	uint64_t tx_success_pkt;
+};
+
+/*
+ * struct sawf_admctrl_peer_stats - SAWF AdmCtrl Peer Stats
+ * @tx_success_pkt: Tx success pkt count
+ * @avg_tx_rate: Average Tx rate
+ * @tx_airtime_consumption: Tx airtime consumption on per AC basis
+ * @msduq_stats: SAWF AdmCtrl MSDUQ Stats
+ */
+struct sawf_admctrl_peer_stats {
+	uint64_t tx_success_pkt;
+	uint64_t avg_tx_rate;
+	uint16_t tx_airtime_consumption[WME_AC_MAX];
+	struct sawf_admctrl_msduq_stats msduq_stats[DP_SAWF_MAX_TIDS * DP_SAWF_MAX_QUEUES];
+};
 #endif /* CONFIG_SAWF */
 #endif /* _CDP_TXRX_EXTD_STRUCT_H_ */

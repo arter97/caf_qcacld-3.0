@@ -3290,6 +3290,150 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef SAWF_ADMISSION_CONTROL
+QDF_STATUS
+dp_sawf_get_peer_admctrl_stats(struct cdp_soc_t *soc, uint8_t *mac, void *data,
+			       enum cdp_peer_type peer_type)
+{
+	uint8_t tid, q_idx;
+	uint8_t stats_cfg;
+	struct dp_soc *dp_soc;
+	struct sawf_tx_stats *sawf_stats;
+	uint64_t tx_success_pkt = 0;
+	struct dp_txrx_peer *txrx_peer;
+	struct dp_peer_sawf *sawf_ctx;
+	uint16_t host_q_id, host_q_idx;
+	cdp_peer_stats_param_t buf = {0};
+	struct dp_peer_sawf_stats *stats_ctx;
+	struct sawf_admctrl_peer_stats *admctrl_stats;
+	struct sawf_admctrl_msduq_stats *msduq_stats;
+	struct cdp_peer_info peer_info = {0};
+	uint8_t stats_arr_size, inx, link_id, ac;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct dp_peer_per_pkt_stats *per_pkt_stats;
+	struct cdp_peer_telemetry_stats telemetry_stats = {0};
+	struct dp_peer *peer = NULL, *primary_link_peer = NULL;
+
+	admctrl_stats = (struct sawf_admctrl_peer_stats *)data;
+	if (!admctrl_stats) {
+		dp_sawf_err("Invalid data to fill");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dp_soc = cdp_soc_t_to_dp_soc(soc);
+	if (!dp_soc) {
+		dp_sawf_err("Invalid soc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	stats_cfg = wlan_cfg_get_sawf_stats_config(dp_soc->wlan_cfg_ctx);
+	if (!stats_cfg) {
+		dp_sawf_debug("sawf stats is disabled");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, DP_VDEV_ALL, mac, false,
+				 peer_type);
+
+	peer = dp_peer_hash_find_wrapper(dp_soc, &peer_info, DP_MOD_ID_SAWF);
+	if (!peer) {
+		dp_sawf_err("Invalid peer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer) {
+		dp_sawf_err("txrx peer is NULL");
+		goto done;
+	}
+
+	if (!IS_MLO_DP_LINK_PEER(peer)) {
+		stats_arr_size = txrx_peer->stats_arr_size;
+		for (inx = 0; inx < stats_arr_size; inx++) {
+			per_pkt_stats = &txrx_peer->stats[inx].per_pkt_stats;
+			tx_success_pkt += per_pkt_stats->tx.tx_success.num;
+		}
+	} else {
+		link_id = dp_get_peer_hw_link_id(dp_soc, peer->vdev->pdev);
+		per_pkt_stats =
+			&txrx_peer->stats[link_id].per_pkt_stats;
+		tx_success_pkt = per_pkt_stats->tx.tx_success.num;
+	}
+
+	/* Fill Tx Success Pkt Count */
+	admctrl_stats->tx_success_pkt = tx_success_pkt;
+
+	/* Only Tx_Success Pkt count is required for MLD MAC, return */
+	if (peer_type == CDP_MLD_PEER_TYPE) {
+		status = QDF_STATUS_SUCCESS;
+		goto done;
+	}
+
+	/* Fetch and update Tx airtime consumption stats */
+	dp_get_peer_telemetry_stats(soc, mac, &telemetry_stats);
+	for (ac = 0; ac < WME_AC_MAX; ac++)
+		admctrl_stats->tx_airtime_consumption[ac] = telemetry_stats.tx_airtime_consumption[ac];
+
+	/* Fetch and update Tx average rate */
+	dp_txrx_get_peer_extd_stats_param(peer, cdp_peer_tx_avg_rate, &buf);
+	admctrl_stats->avg_tx_rate = buf.tx_rate_avg;
+
+	/* Fetch and update SAWF MSDUQ Stats */
+	stats_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
+	if (!stats_ctx) {
+		dp_sawf_err("stats ctx doesn't exist");
+		goto done;
+	}
+
+	primary_link_peer = dp_get_primary_link_peer_by_id(dp_soc,
+							   txrx_peer->peer_id,
+							   DP_MOD_ID_SAWF);
+	if (!primary_link_peer) {
+		dp_sawf_err("No primary link peer found");
+		goto done;
+	}
+
+	sawf_ctx = dp_peer_sawf_ctx_get(primary_link_peer);
+	if (!sawf_ctx) {
+		dp_sawf_err("sawf_ctx doesn't exist");
+		goto done;
+	}
+
+	msduq_stats = admctrl_stats->msduq_stats;
+
+	for (tid = 0; tid < DP_SAWF_MAX_TIDS; tid++) {
+		for (q_idx = 0; q_idx < DP_SAWF_MAX_QUEUES; q_idx++) {
+			host_q_id = dp_sawf_get_host_msduq_id(sawf_ctx,
+							      tid,
+							      q_idx);
+			if (host_q_id == DP_SAWF_PEER_Q_INVALID ||
+			    host_q_id < DP_SAWF_DEFAULT_Q_MAX) {
+				msduq_stats++;
+				continue;
+			}
+			host_q_idx = host_q_id - DP_SAWF_DEFAULT_Q_MAX;
+			if (host_q_idx > DP_SAWF_Q_MAX - 1) {
+				msduq_stats++;
+				continue;
+			}
+
+			sawf_stats = &stats_ctx->stats.tx_stats[host_q_idx];
+			msduq_stats->tx_success_pkt = sawf_stats->tx_success.num;
+			msduq_stats++;
+		}
+	}
+
+	status = QDF_STATUS_SUCCESS;
+done:
+	if (primary_link_peer)
+		dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_SAWF);
+	if (peer)
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	return status;
+}
+#endif
+
 QDF_STATUS
 dp_sawf_get_tx_stats(void *arg, uint64_t *in_bytes, uint64_t *in_cnt,
 		     uint64_t *tx_bytes, uint64_t *tx_cnt,
