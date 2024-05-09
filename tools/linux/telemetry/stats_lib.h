@@ -487,6 +487,7 @@ struct reply_buffer {
  * @recursive: Stats recursiveness
  * @mld_link:  Stats for mld link
  * @serviceid: Stats serviceid
+ * @link_id: Link Id of MLD level object
  * @feat_flag: Stats requested for combination of Features
  * @request_id:Request ID of non blocking stats request from application
  * @sta_mac:   Station MAC address if Stats requested for STA object
@@ -501,6 +502,7 @@ struct stats_command {
 	bool recursive;
 	bool mld_link;
 	uint8_t serviceid;
+	uint8_t link_id;
 	char if_name[IFNAME_LEN];
 	u_int64_t feat_flag;
 	uint32_t request_id;
