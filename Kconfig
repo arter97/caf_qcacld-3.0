@@ -293,6 +293,10 @@ config DP_WAR_INVALID_FIRST_MSDU_FLAG
 	bool "Enable DP_WAR_INVALID_FIRST_MSDU_FLAG"
 	default n
 
+config TX_NSS_STATS_SUPPORT
+	bool "Enable TX_NSS_STATS_SUPPORT"
+	default n
+
 config DSC_DEBUG
 	bool "Enable DSC_DEBUG"
 	default n
