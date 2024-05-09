@@ -5030,6 +5030,10 @@ ccflags-$(CONFIG_WLAN_FEATURE_COAP) += -DWLAN_FEATURE_COAP
 # SSR driver dump config
 ccflags-$(CONFIG_CNSS2_SSR_DRIVER_DUMP) += -DWLAN_FEATURE_SSR_DRIVER_DUMP
 
+# SMEM_MAILBOX config
+ccflags-$(CONFIG_FEATURE_SMEM_MAILBOX) += -DFEATURE_SMEM_MAILBOX
+ccflags-$(CONFIG_FEATURE_SMEM_MAILBOX) += -DCONFIG_FEATURE_SMEM_MAILBOX
+
 # Currently, for versions of gcc which support it, the kernel Makefile
 # is disabling the maybe-uninitialized warning.  Re-enable it for the
 # WLAN driver.  Note that we must use ccflags-y here so that it
