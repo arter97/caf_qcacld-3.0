@@ -2358,6 +2358,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 #endif
 free:
 	qdf_mem_free(csa_params);
+	session_entry->cal_tpc_post_csa = true;
 	return;
 send_event:
 	if (send_status)

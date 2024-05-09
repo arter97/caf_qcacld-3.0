@@ -731,8 +731,10 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 			ap_constraint_change = true;
 		}
 
-		if (ap_constraint_change || (tpe_change && !skip_tpe)) {
+		if (ap_constraint_change || (tpe_change && !skip_tpe) ||
+		    session->cal_tpc_post_csa) {
 			lim_calculate_tpc(mac_ctx, session);
+			session->cal_tpc_post_csa = false;
 
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac_ctx->psoc,
