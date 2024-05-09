@@ -1536,11 +1536,13 @@ void
 dp_sawf_msduq_timer_handler(void *arg)
 {
 	struct dp_soc *dpsoc = (struct dp_soc *)arg;
+	int sawf_reclaim_timer =
+		wlan_cfg_get_sawf_msduq_reclaim_timer_val(dpsoc->wlan_cfg_ctx);
 
 	dp_soc_iterate_peer(dpsoc, dp_sawf_peer_msduq_timeout, NULL,
 			    DP_MOD_ID_SAWF);
 
-	qdf_timer_mod(&dpsoc->sawf_msduq_timer, DP_SAWF_MSDUQ_TIMER_MS);
+	qdf_timer_mod(&dpsoc->sawf_msduq_timer, sawf_reclaim_timer);
 }
 
 void dp_soc_sawf_msduq_timer_init(struct dp_soc *soc)
@@ -1751,12 +1753,16 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	}
 
 	if (wlan_cfg_get_sawf_msduq_reclaim_config(soc->wlan_cfg_ctx)) {
+		int sawf_reclaim_timer =
+			wlan_cfg_get_sawf_msduq_reclaim_timer_val(
+							soc->wlan_cfg_ctx);
+
 		if (!soc->sawf_msduq_timer_enabled) {
 			soc->sawf_msduq_timer_enabled = true;
 			dp_sawf_info("SAWF MDSUQ timer is started for soc:%d",
 				     soc_id);
 			qdf_timer_start(&soc->sawf_msduq_timer,
-					DP_SAWF_MSDUQ_TIMER_MS);
+					sawf_reclaim_timer);
 		}
 	}
 

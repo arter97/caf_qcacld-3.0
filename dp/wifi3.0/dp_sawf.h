@@ -120,7 +120,6 @@
 #define DP_SAWF_MAX_DYNAMIC_AST 2
 
 #define DP_SAWF_DELAY_BOUND_MS_MULTIPLER 1000
-#define DP_SAWF_MSDUQ_TIMER_MS 20000
 
 /**
  * msduq_state - status of MSDUQ
