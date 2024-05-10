@@ -746,4 +746,8 @@ void dp_soc_sawf_msduq_timer_init(struct dp_soc *soc);
  * Return: void
  */
 void dp_soc_sawf_msduq_timer_deinit(struct dp_soc *soc);
+
+void dp_soc_sawf_init(struct dp_soc *soc);
+
+void dp_soc_sawf_deinit(struct dp_soc *soc);
 #endif /* DP_SAWF_H*/
