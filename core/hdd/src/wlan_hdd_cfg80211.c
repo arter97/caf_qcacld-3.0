@@ -4579,6 +4579,7 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct wlan_hdd_link_info *link_info,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct sap_config *sap_cfg;
 	struct sk_buff *vendor_event;
+	struct wlan_objmgr_vdev *vdev;
 	int ret_val;
 	uint16_t ch_width;
 	uint8_t pri_channel;
@@ -4709,17 +4710,29 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
-	if (wlan_vdev_mlme_is_mlo_ap(link_info->vdev)) {
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Null vdev[%u]. QCA_WLAN_VENDOR_ATTR_ACS_LINK_ID put fail",
+			link_info->vdev_id);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		return;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_ap(vdev)) {
 		ret_val = nla_put_u8(vendor_event,
 				     QCA_WLAN_VENDOR_ATTR_ACS_LINK_ID,
-				     wlan_vdev_get_link_id(link_info->vdev));
+				     wlan_vdev_get_link_id(vdev));
 
 		if (ret_val) {
 			hdd_err("QCA_WLAN_VENDOR_ATTR_ACS_LINK_ID put fail");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 			wlan_cfg80211_vendor_free_skb(vendor_event);
 			return;
 		}
 	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
 	hdd_debug("ACS result for %s: vdev_id: %d PRI_CH_FREQ: %d SEC_CH_FREQ: %d VHT_SEG0: %d VHT_SEG1: %d ACS_BW: %d punc support: %d punc bitmap: %d",
 		  adapter->dev->name, link_info->vdev_id,
 		  sap_cfg->acs_cfg.pri_ch_freq,
