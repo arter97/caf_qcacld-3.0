@@ -5782,4 +5782,14 @@ hdd_nb_get_link_id_from_params(void *params, enum hdd_nb_params_id id)
 QDF_STATUS
 hdd_update_sub20_chan_width(struct wlan_hdd_link_info *link_info,
 			    enum cfg_sub_20_channel_width sub_20_ch_width);
+
+/**
+ * hdd_allow_new_intf() - Allow new intf created or not
+ * @hdd_ctx: hdd context
+ * @mode: qdf opmode of new interface
+ *
+ * Return: true if allowed, otherwise false
+ */
+bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
+                        enum QDF_OPMODE mode);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

@@ -660,15 +660,8 @@ int hdd_set_p2p_ps(struct net_device *dev, void *msgData)
 	return wlan_hdd_set_power_save(adapter, &noa);
 }
 
-/**
- * hdd_allow_new_intf() - Allow new intf created or not
- * @hdd_ctx: hdd context
- * @mode: qdf opmode of new interface
- *
- * Return: true if allowed, otherwise false
- */
-static bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
-			       enum QDF_OPMODE mode)
+bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
+			enum QDF_OPMODE mode)
 {
 	struct hdd_adapter *adapter = NULL;
 	struct hdd_adapter *next_adapter = NULL;
