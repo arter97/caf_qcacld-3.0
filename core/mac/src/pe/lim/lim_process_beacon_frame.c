@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -189,6 +189,12 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			csa_param.channel = csa_ie->newchannel;
 			csa_param.csa_chan_freq = wlan_reg_legacy_chan_to_freq(
 						pdev, csa_ie->newchannel);
+			if (!csa_param.csa_chan_freq) {
+				pe_nofl_rl_debug("invalid freq from csa ie newchannel %d link %d",
+						 csa_ie->newchannel,
+						 link_id);
+				return;
+			}
 			csa_param.switch_mode = csa_ie->switchmode;
 			csa_param.ies_present_flag |= MLME_CSA_IE_PRESENT;
 			mlo_sta_handle_csa_standby_link(mlo_ctx, link_id,
@@ -210,6 +216,12 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 				csa_param.csa_chan_freq =
 					wlan_reg_legacy_chan_to_freq(
 						pdev, xcsa_ie->newchannel);
+			if (!csa_param.csa_chan_freq) {
+				pe_nofl_rl_debug("invalid freq from xcsa ie newchannel %d link %d",
+						 xcsa_ie->newchannel,
+						 link_id);
+				return;
+			}
 			csa_param.ies_present_flag |= MLME_XCSA_IE_PRESENT;
 			mlo_sta_handle_csa_standby_link(mlo_ctx, link_id,
 							&csa_param, vdev);
