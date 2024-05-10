@@ -2998,13 +2998,15 @@ static struct object_list *find_head_object(struct stats_command *cmd,
 					temp_obj->is_mld_processed = true;
 					break;
 				}
-			} else if (temp_obj->child) {
+			} else {
 				if (temp_obj->obj_type == STATS_OBJ_AP)
 					ap_obj = temp_obj;
 				else
 					radio_obj = temp_obj;
-				temp_obj = temp_obj->child;
-				continue;
+				if (temp_obj->child) {
+					temp_obj = temp_obj->child;
+					continue;
+				}
 			}
 next_object:
 			if (temp_obj->next)
@@ -3032,15 +3034,17 @@ next_object:
 					temp_obj->take_mld_addr = true;
 					break;
 				}
-			} else if (temp_obj->child) {
+			} else {
 				if (temp_obj->obj_type == STATS_OBJ_AP)
 					ap_obj = temp_obj;
 				else if (temp_obj->obj_type == STATS_OBJ_RADIO)
 					radio_obj = temp_obj;
 				else
 					vap_obj = temp_obj;
-				temp_obj = temp_obj->child;
-				continue;
+				if (temp_obj->child) {
+					temp_obj = temp_obj->child;
+					continue;
+				}
 			}
 			if (temp_obj->next)
 				temp_obj = temp_obj->next;
