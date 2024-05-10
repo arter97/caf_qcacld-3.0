@@ -15,7 +15,7 @@
  */
 
 #ifndef _DP_SAWF_H__
-#define _DP_SAWF_H_
+#define _DP_SAWF_H__
 
 #include <linux/in6.h>
 
