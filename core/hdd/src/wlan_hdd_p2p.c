@@ -66,24 +66,67 @@
 void
 wlan_hdd_cleanup_remain_on_channel_ctx(struct wlan_hdd_link_info *link_info)
 {
-	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *vdev, *sta_vdev = NULL;
+	uint8_t sta_vdev_id = WLAN_INVALID_VDEV_ID;
+	struct wlan_objmgr_psoc *psoc = NULL;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_P2P_ID);
 	if (!vdev)
 		return;
 
-	ucfg_p2p_cleanup_roc_by_vdev(vdev);
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		goto done;
+
+	if (ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
+		sta_vdev_id = ucfg_p2p_psoc_priv_get_sta_vdev_id(psoc);
+		sta_vdev = wlan_hdd_get_sta_vdev_for_p2p_dev(psoc, sta_vdev_id,
+							     WLAN_OSIF_P2P_ID);
+		if (!sta_vdev) {
+			hdd_debug("Invalid sta_vdev %d for p2p device operation",
+				  sta_vdev_id);
+			goto done;
+		}
+		ucfg_p2p_cleanup_roc_by_vdev(sta_vdev);
+		hdd_objmgr_put_vdev_by_user(sta_vdev, WLAN_OSIF_P2P_ID);
+	} else {
+		ucfg_p2p_cleanup_roc_by_vdev(vdev);
+	}
+
+done:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
 }
 
 void wlan_hdd_cleanup_actionframe(struct wlan_hdd_link_info *link_info)
 {
-	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *vdev, *sta_vdev;
+	uint8_t sta_vdev_id = WLAN_INVALID_VDEV_ID;
+	struct wlan_objmgr_psoc *psoc = NULL;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_P2P_ID);
 	if (!vdev)
 		return;
-	ucfg_p2p_cleanup_tx_by_vdev(vdev);
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		goto done;
+
+	if (ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
+		sta_vdev_id = ucfg_p2p_psoc_priv_get_sta_vdev_id(psoc);
+		sta_vdev = wlan_hdd_get_sta_vdev_for_p2p_dev(psoc, sta_vdev_id,
+							     WLAN_OSIF_P2P_ID);
+		if (!sta_vdev) {
+			hdd_debug("Invalid sta_vdev %d for p2p device operation",
+				  sta_vdev_id);
+			goto done;
+		}
+		ucfg_p2p_cleanup_tx_by_vdev(sta_vdev);
+		hdd_objmgr_put_vdev_by_user(sta_vdev, WLAN_OSIF_P2P_ID);
+	} else {
+		ucfg_p2p_cleanup_tx_by_vdev(vdev);
+	}
+
+done:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
 }
 

@@ -25414,11 +25414,15 @@ static int hdd_change_adapter_mode(struct hdd_adapter *adapter,
 
 	hdd_enter();
 
-	hdd_stop_adapter(hdd_ctx, adapter);
-	hdd_deinit_adapter(hdd_ctx, adapter, true);
-	adapter->device_mode = new_mode;
+	if (adapter->device_mode != QDF_P2P_DEVICE_MODE ||
+	    !ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+						hdd_ctx->psoc)) {
+		hdd_stop_adapter(hdd_ctx, adapter);
+		hdd_deinit_adapter(hdd_ctx, adapter, true);
+	}
 	memset(&adapter->deflink->session, 0,
 	       sizeof(adapter->deflink->session));
+	adapter->device_mode = new_mode;
 	hdd_set_station_ops(netdev);
 
 	hdd_exit();
