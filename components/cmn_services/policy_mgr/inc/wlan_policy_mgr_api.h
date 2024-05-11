@@ -5956,4 +5956,29 @@ bool policy_mgr_mon_sbs_mac0_freq(struct wlan_objmgr_psoc *psoc,
  */
 bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * policy_mgr_modify_pcl_for_p2p_ndp_concurrency() - Modify PCL for P2P+NDP
+ * @psoc: psoc pointer
+ * @pcl: Original PCL
+ * @num_pcl: Number of entries in @pcl
+ *
+ * Modify the PCL as per below table,
+ *  ---------------------------------------------------------------------------
+ *  | STA connection  |      P2P channel preference                           |
+ *  |--------------------------------------------------------------------------
+ *  |Not connected    | 5G 149 > rest of 5G > 2G 6 > rest of 2G               |
+ *  |Channel 6.       | 5G 149 > rest of 5G > 2G 6 > rest of 2G               |
+ *  |2GHz non-6 ch    | 5G 149 > rest of 5G > STA channel > 2G 6 > rest of 2G |
+ *  |Channel 149.     | 5G 149 > rest of 5G > 2G 6 > rest of 2G               |
+ *  |5GHz non-149 ch  | AP channel > 5G 149 > rest of 5G > 2G 6 > rest of 2G  |
+ *  |DFS Ch.          | 5G 149 > rest of 5G > 2G 6 > rest of 2G               |
+ *  |6 GHz AP         | 5G 149 > rest of 5G > 2G 6 > rest of 2G               |
+ *  ---------------------------------------------------------------------------
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
+					      struct weighed_pcl *pcl,
+					      uint32_t *num_pcl);
 #endif /* __WLAN_POLICY_MGR_API_H */

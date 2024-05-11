@@ -44,6 +44,7 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_ll_sap_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_nan_api_i.h"
 
 /*
  * first_connection_pcl_table - table which provides PCL for the
@@ -4207,6 +4208,284 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 	policy_mgr_dump_channel_list(*ch_cnt, ch_freq_list, ch_weight_list);
 
 	return status;
+}
+
+static inline void
+policy_mgr_append_freq_to_pcl(struct weighed_pcl *pcl, uint32_t *count,
+			      qdf_freq_t freq, uint32_t weight, uint32_t flag)
+{
+	struct weighed_pcl *entry = &pcl[*count];
+
+	entry->freq = freq;
+	entry->weight = weight;
+	entry->flag = flag;
+
+	*count = *count + 1;
+}
+
+static void
+policy_mgr_append_5g_nan_social_ch(struct wlan_objmgr_psoc *psoc,
+				   struct weighed_pcl *org_pcl,
+				   uint32_t *count,
+				   struct weighed_pcl *new_pcl,
+				   uint32_t *new_count,
+				   uint32_t weight)
+{
+	uint32_t i = 0;
+	struct weighed_pcl *entry;
+
+	for (i = 0; i < *count; i++) {
+		entry = &org_pcl[i];
+		if (entry->freq == wlan_nan_get_disc_5g_ch_freq(psoc)) {
+			policy_mgr_append_freq_to_pcl(new_pcl, new_count,
+						      entry->freq, weight,
+						      entry->flag);
+			break;
+		}
+	}
+}
+
+static void
+policy_mgr_append_5g_non_nan_social_ch(struct wlan_objmgr_psoc *psoc,
+				       struct weighed_pcl *org_pcl,
+				       uint32_t *count,
+				       struct weighed_pcl *new_pcl,
+				       uint32_t *new_count,
+				       uint32_t weight)
+{
+	uint32_t i = 0;
+	struct weighed_pcl *entry;
+
+	for (i = 0; i < *count; i++) {
+		entry = &org_pcl[i];
+		if ((wlan_reg_is_5ghz_ch_freq(entry->freq) ||
+		     wlan_reg_is_6ghz_chan_freq(entry->freq)) &&
+		    entry->freq != wlan_nan_get_disc_5g_ch_freq(psoc))
+			policy_mgr_append_freq_to_pcl(new_pcl, new_count,
+						      entry->freq, weight,
+						      entry->flag);
+	}
+}
+
+static void
+policy_mgr_append_2g_nan_social_ch(struct wlan_objmgr_psoc *psoc,
+				   struct weighed_pcl *org_pcl, uint32_t *count,
+				   struct weighed_pcl *new_pcl,
+				   uint32_t *new_count,	uint32_t weight)
+{
+	uint32_t i = 0;
+	struct weighed_pcl *entry;
+
+	for (i = 0; i < *count; i++) {
+		entry = &org_pcl[i];
+		if (entry->freq == wlan_nan_get_24ghz_social_ch_freq(psoc)) {
+			policy_mgr_append_freq_to_pcl(new_pcl, new_count,
+						      entry->freq, weight,
+						      entry->flag);
+			break;
+		}
+	}
+}
+
+static void
+policy_mgr_append_2g_non_nan_social_ch(struct wlan_objmgr_psoc *psoc,
+				       struct weighed_pcl *org_pcl,
+				       uint32_t *count,
+				       struct weighed_pcl *new_pcl,
+				       uint32_t *new_count, uint32_t weight)
+{
+	uint32_t i = 0;
+	struct weighed_pcl *entry;
+
+	for (i = 0; i < *count; i++) {
+		entry = &org_pcl[i];
+		if (wlan_reg_is_24ghz_ch_freq(entry->freq) &&
+		    entry->freq != wlan_nan_get_24ghz_social_ch_freq(psoc))
+			policy_mgr_append_freq_to_pcl(new_pcl, new_count,
+						      entry->freq, weight,
+						      entry->flag);
+	}
+}
+
+static void
+policy_mgr_append_sta_freq_to_pcl(struct weighed_pcl *org_pcl, uint32_t *count,
+				  struct weighed_pcl *new_pcl,
+				  uint32_t *new_count, uint32_t sta_freq,
+				  uint32_t weight)
+{
+	uint32_t i = 0;
+	struct weighed_pcl *entry;
+
+	for (i = 0; i < *count; i++) {
+		entry = &org_pcl[i];
+		if (entry->freq == sta_freq) {
+			policy_mgr_append_freq_to_pcl(new_pcl, new_count,
+						      entry->freq, weight,
+						      entry->flag);
+			break;
+		}
+	}
+}
+
+static void
+policy_mger_remove_duplicate_freq_with_weight(struct weighed_pcl *pcl,
+					      uint32_t *count,
+					      uint32_t sta_freq,
+					      uint32_t weight)
+{
+	uint32_t i = 0;
+	struct weighed_pcl *entry;
+
+	for (i = 0; i < *count; i++) {
+		entry = &pcl[i];
+		if (entry->freq == sta_freq &&
+		    entry->weight == weight)
+			break;
+	}
+
+	if (i < *count) {
+		while (i < *count - 1) {
+			pcl[i] = pcl[i + 1];
+			i++;
+		}
+		*count = i;
+	}
+}
+
+QDF_STATUS
+policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
+					      struct weighed_pcl *pcl,
+					      uint32_t *num_pcl)
+{
+	uint32_t i;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0}, sta_freq;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t num_ml = 0, num_non_ml = 0;
+	uint8_t ml_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t non_ml_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct weighed_pcl new_pcl[NUM_CHANNELS] = {0};
+	uint32_t new_num_pcl = 0;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml, ml_idx,
+					       &num_non_ml, non_ml_idx,
+					       freq_list, vdev_id_list);
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	/*
+	 * No need to modify the PCL for below as NDP is not supported
+	 * with these concurrencies,
+	 * 1. Non ML-STA + Non-ML STA
+	 * 2. Non ML-STA + ML STA
+	 */
+	if (num_non_ml > 1 ||
+	    (num_non_ml && num_ml))
+		return QDF_STATUS_SUCCESS;
+
+	/* Non ML-STA */
+	sta_freq = freq_list[0];
+
+	/* Check if there is an ML-STA and get 5GHz link channel */
+	for (i = 0; i < num_ml; i++)
+		if (!wlan_reg_is_24ghz_ch_freq(freq_list[i]))
+			sta_freq = freq_list[i];
+
+	if (!sta_freq ||
+	    sta_freq == wlan_nan_get_24ghz_social_ch_freq(psoc) ||
+	    sta_freq == wlan_nan_get_disc_5g_ch_freq(psoc) ||
+	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, sta_freq) ||
+	    wlan_reg_is_6ghz_chan_freq(sta_freq)) {
+		/* Add ch-149 */
+		policy_mgr_append_5g_nan_social_ch(psoc, pcl,
+					num_pcl, new_pcl, &new_num_pcl,
+					WEIGHT_OF_GROUP1_PCL_CHANNELS);
+		/* Add rest of the 5 GHz channels */
+		policy_mgr_append_5g_non_nan_social_ch(psoc, pcl,
+						num_pcl, new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP2_PCL_CHANNELS);
+		/* Add ch-6 */
+		policy_mgr_append_2g_nan_social_ch(psoc, pcl, num_pcl,
+						new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP3_PCL_CHANNELS);
+		/* Add rest of the 2 GHz channels */
+		policy_mgr_append_2g_non_nan_social_ch(psoc, pcl, num_pcl,
+						new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP4_PCL_CHANNELS);
+	} else if (wlan_reg_is_24ghz_ch_freq(sta_freq) &&
+		   sta_freq != wlan_nan_get_24ghz_social_ch_freq(psoc)) {
+		/* Add ch-149 */
+		policy_mgr_append_5g_nan_social_ch(psoc, pcl,
+						num_pcl, new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP1_PCL_CHANNELS);
+		/* Add rest of the 5 GHz channels */
+		policy_mgr_append_5g_non_nan_social_ch(psoc, pcl,
+						num_pcl, new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP2_PCL_CHANNELS);
+		/* Add STA channel */
+		policy_mgr_append_sta_freq_to_pcl(pcl, num_pcl, new_pcl,
+						&new_num_pcl, sta_freq,
+						WEIGHT_OF_GROUP3_PCL_CHANNELS);
+		/* Add ch-6 */
+		policy_mgr_append_2g_nan_social_ch(psoc, pcl, num_pcl,
+						new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP4_PCL_CHANNELS);
+		/* Add rest of the 2 GHz channels */
+		policy_mgr_append_2g_non_nan_social_ch(psoc, pcl, num_pcl,
+						new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP5_PCL_CHANNELS);
+		/*
+		 * STA channel is added already and above API also adds
+		 * it again. Remove it to avoid duplicate entry
+		 */
+		policy_mger_remove_duplicate_freq_with_weight(new_pcl,
+						&new_num_pcl, sta_freq,
+						WEIGHT_OF_GROUP5_PCL_CHANNELS);
+	} else if (wlan_reg_is_5ghz_ch_freq(sta_freq) &&
+		   sta_freq != wlan_nan_get_disc_5g_ch_freq(psoc)) {
+		/* Add STA channel */
+		policy_mgr_append_sta_freq_to_pcl(pcl, num_pcl, new_pcl,
+						&new_num_pcl, sta_freq,
+						WEIGHT_OF_GROUP1_PCL_CHANNELS);
+		/* Add ch-149 */
+		policy_mgr_append_5g_nan_social_ch(psoc, pcl,
+						num_pcl, new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP2_PCL_CHANNELS);
+		/* Add rest of the 5 GHz channels */
+		policy_mgr_append_5g_non_nan_social_ch(psoc, pcl,
+						num_pcl, new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP3_PCL_CHANNELS);
+		/*
+		 * STA channel is added already and above API also adds
+		 * it again. Remove it to avoid duplicate entry
+		 */
+		policy_mger_remove_duplicate_freq_with_weight(new_pcl,
+						&new_num_pcl, sta_freq,
+						WEIGHT_OF_GROUP3_PCL_CHANNELS);
+		/* Add ch-6 */
+		policy_mgr_append_2g_nan_social_ch(psoc, pcl, num_pcl,
+						new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP4_PCL_CHANNELS);
+		/* Add rest of the 2 GHz channels */
+		policy_mgr_append_2g_non_nan_social_ch(psoc, pcl, num_pcl,
+						new_pcl, &new_num_pcl,
+						WEIGHT_OF_GROUP5_PCL_CHANNELS);
+	}
+
+	if (*num_pcl != new_num_pcl)
+		policy_mgr_debug("No.of channels are different in original(%d) and modified PCL(%d)",
+				 *num_pcl, new_num_pcl);
+
+	*num_pcl = new_num_pcl;
+	for (i = 0; i < new_num_pcl; i++)
+		pcl[i] = new_pcl[i];
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS policy_mgr_get_valid_chans(struct wlan_objmgr_psoc *psoc,

@@ -16631,18 +16631,6 @@ static int wlan_hdd_cfg80211_set_ns_offload(struct wiphy *wiphy,
 }
 #endif /* WLAN_NS_OFFLOAD */
 
-/**
- * struct weighed_pcl: Preferred channel info
- * @freq: Channel frequency
- * @weight: Weightage of the channel
- * @flag: Validity of the channel in p2p negotiation
- */
-struct weighed_pcl {
-		u32 freq;
-		u32 weight;
-		u32 flag;
-};
-
 const struct nla_policy get_preferred_freq_list_policy[
 		QCA_WLAN_VENDOR_ATTR_GET_PREFERRED_FREQ_LIST_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_GET_PREFERRED_FREQ_LIST_IFACE_TYPE] = {
@@ -16717,6 +16705,57 @@ static uint32_t wlan_hdd_populate_weigh_pcl(
 	return chan_idx;
 }
 
+/** wlan_hdd_modify_pcl_for_p2p_ndp_concurrency() - get preferred frequency list
+ * @hdd_ctx: pointer to hdd context
+ * @pcl: Calculated PCL as per concurrency policies
+ * @num_pcl: Number of entries in @pcl
+ *
+ * Return: success or failure code
+ */
+static QDF_STATUS
+wlan_hdd_modify_pcl_for_p2p_ndp_concurrency(struct hdd_context *hdd_ctx,
+					    struct weighed_pcl *pcl,
+					    uint32_t *num_pcl)
+{
+	return policy_mgr_modify_pcl_for_p2p_ndp_concurrency(hdd_ctx->psoc,
+							     pcl, num_pcl);
+}
+
+#define HDD_MAX_PCL_INFO_LOG 192
+
+/**
+ * hdd_pcl_info_dump() - Dump PCL info
+ * @pcl: weighted PCL buffer
+ * @count: number of channels present in @pcl buffer
+ *
+ * Return: void
+ */
+static void
+hdd_pcl_info_dump(struct weighed_pcl *pcl, uint32_t count)
+{
+	uint32_t i;
+	uint8_t info[HDD_MAX_PCL_INFO_LOG];
+	int len = 0;
+	int ret;
+	struct weighed_pcl *chan;
+
+	hdd_debug("PCL freqs: %d (freq MHz[weight]:flag):", count);
+	for (i = 0; i < count; i++) {
+		chan = &pcl[i];
+		ret = scnprintf(info + len, sizeof(info) - len, "%d[%d]:0x%x ",
+				chan->freq, chan->weight, chan->flag);
+		if (ret <= 0)
+			break;
+		len += ret;
+		if (len >= (sizeof(info) - 20)) {
+			hdd_nofl_debug("%s", info);
+			len = 0;
+		}
+	}
+	if (len > 0)
+		hdd_nofl_debug("%s", info);
+}
+
 /** __wlan_hdd_cfg80211_get_preferred_freq_list() - get preferred frequency list
  * @wiphy: Pointer to wireless phy
  * @wdev: Pointer to wireless device
@@ -16788,6 +16827,7 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 	if (!chan_weights)
 		return -ENOMEM;
 
+	/* Get PCL as per concurrency policy */
 	status = policy_mgr_get_pcl(
 			hdd_ctx->psoc, intf_mode, chan_weights->pcl_list,
 			&chan_weights->pcl_len, chan_weights->weight_list,
@@ -16798,6 +16838,7 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 		qdf_mem_free(chan_weights);
 		return -EINVAL;
 	}
+
 	/*
 	 * save the pcl in freq_list_legacy to be sent up with
 	 * QCA_WLAN_VENDOR_ATTR_GET_PREFERRED_FREQ_LIST.
@@ -16822,6 +16863,12 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 	pcl_len = wlan_hdd_populate_weigh_pcl(hdd_ctx->psoc, chan_weights,
 					      w_pcl, intf_mode);
 	qdf_mem_free(chan_weights);
+
+	/* Modify the PCL as per mode preference */
+	if (ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc) &&
+	    (intf_mode == PM_P2P_CLIENT_MODE || intf_mode == PM_P2P_GO_MODE))
+		wlan_hdd_modify_pcl_for_p2p_ndp_concurrency(hdd_ctx,
+							    w_pcl, &pcl_len);
 
 	for (i = 0; i < pcl_len; i++)
 		freq_list[i] = w_pcl[i].freq;
@@ -16886,6 +16933,7 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 		nla_nest_end(reply_skb, channel);
 	}
 	nla_nest_end(reply_skb, nla_attr);
+	hdd_pcl_info_dump(w_pcl, pcl_len);
 	qdf_mem_free(w_pcl);
 
 	return wlan_cfg80211_vendor_cmd_reply(reply_skb);
