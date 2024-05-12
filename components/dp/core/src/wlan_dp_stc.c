@@ -579,6 +579,7 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_stc_flow_table_entry *flow;
 	struct wlan_dp_stc_burst_samples *burst_sample;
+	uint32_t burst_dur, burst_size;
 
 	burst_sample = &sampling_entry->flow_samples.burst_sample;
 	if (!(sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID))
@@ -589,6 +590,24 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 		     sizeof(burst_sample->txrx_samples.tx));
 	qdf_mem_copy(&burst_sample->tx, &flow->burst_stats,
 		     sizeof(burst_sample->tx));
+	if (flow->burst_state == BURST_DETECTION_BURST_START) {
+		struct wlan_dp_stc_burst_stats *burst_stats;
+
+		burst_stats = &burst_sample->tx;
+
+		/*
+		 * Burst ended at the last packet, so calculate
+		 * burst duration using the last pkt timestamp
+		 */
+		burst_dur = flow->prev_pkt_arrival_ts -
+					flow->burst_start_time;
+		burst_size = flow->cur_burst_bytes;
+
+		DP_STC_UPDATE_MIN_MAX_SUM_STATS(burst_stats->burst_duration,
+						burst_dur);
+		DP_STC_UPDATE_MIN_MAX_SUM_STATS(burst_stats->burst_size,
+						burst_size);
+	}
 
 save_rx_flow_samples:
 	if (!(sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID))
@@ -601,7 +620,23 @@ save_rx_flow_samples:
 	qdf_mem_copy(&burst_sample->rx, &flow->burst_stats,
 		     sizeof(burst_sample->rx));
 	if (flow->burst_state == BURST_DETECTION_BURST_START) {
-		/* The current burst has not yet completed */
+		struct wlan_dp_stc_burst_stats *burst_stats;
+
+		burst_stats = &burst_sample->rx;
+
+		/*
+		 * Burst ended at the last packet, so calculate
+		 * burst duration using the last pkt timestamp
+		 */
+		burst_dur = flow->prev_pkt_arrival_ts -
+					flow->burst_start_time;
+		burst_size = flow->cur_burst_bytes;
+
+		DP_STC_UPDATE_MIN_MAX_SUM_STATS(burst_stats->burst_duration,
+						burst_dur);
+		DP_STC_UPDATE_MIN_MAX_SUM_STATS(burst_stats->burst_size,
+						burst_size);
+
 	}
 }
 
