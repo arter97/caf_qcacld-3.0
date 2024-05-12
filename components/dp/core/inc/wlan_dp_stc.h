@@ -57,6 +57,10 @@
 #define BURST_START_BYTES_THRESHOLD 3000
 #define BURST_END_TIME_THRESHOLD_NS 300000000
 
+#define WLAN_DP_STC_TX_FLOW_ID_INTF_ID_SHIFT 6
+#define WLAN_DP_STC_TX_FLOW_ID_INTF_ID_MASK 0x3
+#define WLAN_DP_STC_TX_FLOW_ID_MASK 0x3f
+
 /**
  * struct wlan_dp_stc_peer_ping_info - Active ping information table with
  *				       per peer records

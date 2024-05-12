@@ -328,11 +328,58 @@ wlan_dp_burst_samples_reported(struct wlan_dp_stc_sampling_table_entry *flow)
 	return false;
 }
 
+static inline struct wlan_dp_intf *
+wlan_dp_stc_find_candidate_intf(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_intf *dp_intf = NULL;
+	uint8_t id = 0;
+
+	/* TODO - Handle STA + STA case */
+	while (id < WLAN_DP_INTF_MAX) {
+		dp_intf = dp_ctx->dp_intf_list[id];
+		if (dp_intf && dp_intf->device_mode == QDF_STA_MODE)
+			return dp_intf;
+	}
+
+	return dp_intf;
+}
+
+#define FLOW_TRACK_ELIGIBLE_THRESH_NS 10000000000
+
 static inline QDF_STATUS
 wlan_dp_stc_find_ul_flow(struct wlan_dp_stc *dp_stc, uint16_t rx_flow_id,
 			 uint64_t rx_flow_tuple_hash, uint16_t *tx_flow_id,
 			 uint64_t *tx_flow_metadata)
 {
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_intf *dp_intf;
+	uint8_t flow_id;
+
+	dp_intf = wlan_dp_stc_find_candidate_intf(dp_ctx);
+	if (!dp_intf || !dp_intf->spm_intf_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	for (flow_id = 0; flow_id < WLAN_DP_SPM_FLOW_REC_TBL_MAX; flow_id++) {
+		struct wlan_dp_spm_flow_info *flow;
+
+		flow = &dp_intf->spm_intf_ctx->flow_rec_base[flow_id];
+		if (!flow->is_populated ||
+		    flow->selected_to_sample ||
+		    flow->classified)
+			continue;
+
+		if (flow->flow_tuple_hash != rx_flow_tuple_hash)
+			continue;
+
+		dp_info("STC: Found Bi-Di flow tx %d (dp_intf %d mdata 0x%x) rx %d",
+			flow_id, dp_intf->id, flow->guid, rx_flow_id);
+		*tx_flow_id = (dp_intf->id <<
+					WLAN_DP_STC_TX_FLOW_ID_INTF_ID_SHIFT) |
+			      flow_id;
+		*tx_flow_metadata = flow->guid;
+		return QDF_STATUS_SUCCESS;
+	}
+
 	return QDF_STATUS_E_INVAL;
 }
 
@@ -365,8 +412,6 @@ wlan_dp_send_burst_sample(struct wlan_dp_stc *dp_stc,
 
 	return QDF_STATUS_SUCCESS;
 }
-
-#define FLOW_TRACK_ELIGIBLE_THRESH_US 10000000
 
 static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 {
@@ -409,7 +454,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 			continue;
 
 		if (cur_ts - sw_ft_entry->flow_init_ts <
-						FLOW_TRACK_ELIGIBLE_THRESH_US)
+						FLOW_TRACK_ELIGIBLE_THRESH_NS)
 			continue;
 
 		/* Temp place holder function */
@@ -472,18 +517,38 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 			break;
 		}
 
+		wlan_dp_move_candidate_to_sample_table(dp_stc, &candidates[i],
+						       sampling_flow);
 		/*
 		 * Set the indication in tx & rx flows,
 		 * for us to not shortlist them again.
 		 */
-		if (sampling_flow->flags |
+		if (sampling_flow->flags &
+					WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
+			struct wlan_dp_spm_flow_info *flow;
+			struct wlan_dp_intf *dp_intf;
+			uint8_t intf_id;
+			uint8_t tx_flow_id = sampling_flow->tx_flow_id;
+			/*
+			 * TODO - How to find dp_intf ?
+			 * dp_intf array needs to be maintained, using intf_id
+			 * as the array index.
+			 */
+			intf_id = (tx_flow_id >>
+					WLAN_DP_STC_TX_FLOW_ID_INTF_ID_SHIFT) &
+					WLAN_DP_STC_TX_FLOW_ID_INTF_ID_MASK;
+			dp_intf = dp_ctx->dp_intf_list[intf_id];
+			flow = &dp_intf->spm_intf_ctx->flow_rec_base[tx_flow_id];
+			/* NULL check is needed for spm_intf_ctx */
+			flow->selected_to_sample = 1;
+		}
+
+		if (sampling_flow->flags &
 					WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 			sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[candidates[i].rx_flow_id]);
 			sw_ft_entry->selected_to_sample = 1;
 		}
 
-		wlan_dp_move_candidate_to_sample_table(dp_stc, &candidates[i],
-						       sampling_flow);
 		start_timer = true;
 	}
 
@@ -537,7 +602,27 @@ wlan_dp_stc_trigger_sampling(struct wlan_dp_stc *dp_stc, uint16_t flow_id,
 
 	switch (dir) {
 	case QDF_TX:
+	{
+		struct wlan_dp_spm_flow_info *flow;
+		struct wlan_dp_intf *dp_intf;
+		uint8_t intf_id;
+		uint16_t tx_flow_id;
+
+		/*
+		 * TODO - How to find dp_intf ?
+		 * dp_intf array needs to be maintained, using intf_id
+		 * as the array index.
+		 */
+		intf_id = (flow_id >> WLAN_DP_STC_TX_FLOW_ID_INTF_ID_SHIFT) &
+				 WLAN_DP_STC_TX_FLOW_ID_INTF_ID_MASK;
+		dp_intf = dp_ctx->dp_intf_list[intf_id];
+		tx_flow_id = flow_id & WLAN_DP_STC_TX_FLOW_ID_MASK;
+		flow = &dp_intf->spm_intf_ctx->flow_rec_base[tx_flow_id];
+		/* NULL check is needed for spm_intf_ctx */
+		flow->track_flow_stats = track;
+
 		break;
+	}
 	case QDF_RX:
 	{
 		struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
