@@ -1278,6 +1278,7 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
 		txrx_ops.rx.rx_flush = NULL;
+		txrx_ops.rx.rx_gro_flush = dp_rx_gro_flush_cbk;
 	}
 
 	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
@@ -1334,6 +1335,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
 		txrx_ops.rx.rx_flush = NULL;
+		txrx_ops.rx.rx_gro_flush = dp_rx_gro_flush_cbk;
 	}
 
 	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
@@ -1462,6 +1464,7 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 		txrx_ops->rx.rx = dp_softap_rx_packet_cbk;
 		txrx_ops->rx.rx_stack = NULL;
 		txrx_ops->rx.rx_flush = NULL;
+		txrx_ops->rx.rx_gro_flush = dp_rx_gro_flush_cbk;
 	}
 
 	if (wlan_dp_fb_enabled(dp_intf->dp_ctx) &&
@@ -2686,12 +2689,16 @@ void ucfg_dp_runtime_disable_rx_thread(struct wlan_objmgr_vdev *vdev,
 	if (qdf_unlikely(!dp_ctx))
 		return;
 
+	if (!dp_ctx->enable_dp_rx_threads) {
+		dp_info("rx_thread is not enabled");
+		return;
+	}
+
 	qdf_atomic_inc(&dp_intf->num_active_task);
 
 	if (dp_intf->runtime_disable_rx_thread != value) {
 		dp_intf->runtime_disable_rx_thread = value;
-		if (dp_ctx->enable_dp_rx_threads)
-			dp_txrx_flush_pkts_by_vdev_id(soc, dp_link->link_id);
+		dp_txrx_flush_pkts_by_vdev_id(soc, dp_link->link_id);
 	}
 
 	qdf_atomic_dec(&dp_intf->num_active_task);

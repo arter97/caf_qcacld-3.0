@@ -44,6 +44,11 @@
 #include <qdf_trace.h>
 #include <qdf_net_stats.h>
 #include <wlan_dp_stc.h>
+#if (defined(CONFIG_LITHIUM) || \
+		defined(CONFIG_BERYLLIUM) || \
+		defined(CONFIG_RHINE))
+#include <hif_napi.h>
+#endif
 
 uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *link_ctx)
 {
@@ -1154,28 +1159,48 @@ int dp_is_lro_enabled(struct wlan_dp_psoc_context *dp_ctx)
 }
 #endif /* FEATURE_LRO */
 
+#if (defined(CONFIG_LITHIUM) || \
+		defined(CONFIG_BERYLLIUM) || \
+		defined(CONFIG_RHINE))
+static inline qdf_napi_struct *dp_gro_rx_get_napi_from_id(uint8_t ring_id)
+{
+	struct hif_opaque_softc *hif = cds_get_context(QDF_MODULE_ID_HIF);
+	int grp_id;
+
+	grp_id = wlan_cfg_get_intr_idx_from_rx_ring_id(ring_id);
+	if (qdf_unlikely(grp_id == -EINVAL))
+		return NULL;
+
+	return hif_get_dp_rx_napi(hif, grp_id);
+}
+#else
+static inline qdf_napi_struct *dp_gro_rx_get_napi_from_id(uint8_t ring_id)
+{
+	return NULL;
+}
+#endif
+
 /**
- * dp_gro_rx_thread() - Handle Rx processing via GRO for DP thread
+ * dp_gro_rx() - Handle Rx processing via GRO
  * @dp_intf: pointer to DP interface
  * @nbuf: pointer to n/w buff
  *
  * Return: QDF_STATUS_SUCCESS if processed via GRO or non zero return code
  */
-static
-QDF_STATUS dp_gro_rx_thread(struct wlan_dp_intf *dp_intf,
-			    qdf_nbuf_t nbuf)
+static QDF_STATUS dp_gro_rx(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 {
 	qdf_napi_struct *napi_to_use = NULL;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	uint8_t ring_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
-	if (!dp_intf->dp_ctx->enable_dp_rx_threads) {
-		dp_err_rl("gro not supported without DP RX thread!");
-		return status;
+	if (dp_intf->dp_ctx->enable_dp_rx_threads &&
+	    !dp_intf->runtime_disable_rx_thread) {
+		napi_to_use =
+			(qdf_napi_struct *)dp_rx_get_napi_context(soc, ring_id);
+	} else {
+		napi_to_use = dp_gro_rx_get_napi_from_id(ring_id);
 	}
-
-	napi_to_use =
-		(qdf_napi_struct *)dp_rx_get_napi_context(cds_get_context(QDF_MODULE_ID_SOC),
-				       QDF_NBUF_CB_RX_CTX_ID(nbuf));
 
 	if (!napi_to_use) {
 		dp_err_rl("no napi to use for GRO!");
@@ -1245,7 +1270,7 @@ static void dp_register_rx_ol_cb(struct wlan_dp_psoc_context *dp_ctx,
 		qdf_atomic_set(&dp_ctx->dp_agg_param.rx_aggregation, 1);
 		if (wifi3_0_target) {
 		/* no flush registration needed, it happens in DP thread */
-			dp_ctx->receive_offload_cb = dp_gro_rx_thread;
+			dp_ctx->receive_offload_cb = dp_gro_rx;
 		} else {
 			/*ihelium based targets */
 			if (dp_ctx->enable_rxthread)
@@ -1342,6 +1367,11 @@ void dp_disable_rx_ol_for_low_tput(struct wlan_dp_psoc_context *dp_ctx,
 				   bool disable)
 {
 }
+
+static inline qdf_napi_struct *dp_gro_rx_get_napi_from_id(uint8_t ring_id)
+{
+	return NULL;
+}
 #endif /* RECEIVE_OFFLOAD */
 
 #ifdef WLAN_FEATURE_TSF_PLUS_SOCK_TS
@@ -1358,6 +1388,35 @@ static inline void dp_tsf_timestamp_rx(struct wlan_dp_psoc_context *dp_ctx,
 }
 #endif
 
+static inline QDF_STATUS dp_rx_gro_flush(struct wlan_dp_intf *dp_intf,
+					 uint8_t rx_ctx_id)
+{
+	qdf_napi_struct *napi;
+
+	napi = dp_gro_rx_get_napi_from_id(rx_ctx_id);
+	if (qdf_unlikely(!napi))
+		return QDF_STATUS_E_FAILURE;
+	local_bh_disable();
+	napi_gro_flush(napi, false);
+	local_bh_enable();
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+dp_rx_gro_flush_cbk(void *link_ctx, int rx_ctx_id)
+{
+	struct wlan_dp_link *dp_link = link_ctx;
+
+	if (qdf_unlikely((!dp_link) || (!dp_link->dp_intf) ||
+			 (!dp_link->dp_intf->dp_ctx))) {
+		dp_err("Null params being passed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return dp_rx_gro_flush(dp_link->dp_intf, rx_ctx_id);
+}
+
 QDF_STATUS
 dp_rx_thread_gro_flush_ind_cbk(void *link_ctx, int rx_ctx_id)
 {
@@ -1373,7 +1432,7 @@ dp_rx_thread_gro_flush_ind_cbk(void *link_ctx, int rx_ctx_id)
 
 	dp_intf = dp_link->dp_intf;
 	if (dp_intf->runtime_disable_rx_thread)
-		return QDF_STATUS_SUCCESS;
+		return dp_rx_gro_flush(dp_intf, rx_ctx_id);
 
 	if (dp_is_low_tput_gro_enable(dp_intf->dp_ctx)) {
 		dp_intf->dp_stats.tx_rx_stats.rx_gro_flush_skip++;
@@ -1517,8 +1576,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 
 	if (nbuf_receive_offload_ok && dp_ctx->receive_offload_cb &&
 	    !dp_ctx->dp_agg_param.gro_force_flush[rx_ctx_id] &&
-	    !dp_intf->gro_flushed[rx_ctx_id] &&
-	    !dp_intf->runtime_disable_rx_thread) {
+	    !dp_intf->gro_flushed[rx_ctx_id]) {
 		status = dp_ctx->receive_offload_cb(dp_intf, nbuf);
 
 		if (QDF_IS_STATUS_SUCCESS(status)) {
