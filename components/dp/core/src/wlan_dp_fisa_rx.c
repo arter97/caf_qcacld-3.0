@@ -241,7 +241,8 @@ void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 	for (i = 0; i < rx_fst->max_entries; i++) {
 		sw_ft_entry = &sw_ft_base[i];
 
-		if (!sw_ft_entry->is_populated)
+		if (!sw_ft_entry->is_populated ||
+		    dp_rx_is_ring_latency_sensitive_reo(sw_ft_entry->napi_id))
 			continue;
 
 		flow_init_time_us =
