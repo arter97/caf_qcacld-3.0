@@ -15,7 +15,7 @@
 #define WLAN_DP_SPM_INVALID_METADATA 0xFF
 
 /* Timeout in nano seconds */
-#define WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT (10 * 1000 * 1000 * 1000)
+#define WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT 10000000000
 #define WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK 10
 
 /**
@@ -344,7 +344,7 @@ QDF_STATUS wlan_dp_spm_policy_update(struct dp_policy *policy)
 }
 #endif
 
-#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_FEATURE_MLSTC)
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 /**
  * wlan_dp_spm_intf_ctx_init(): Initialize per interface SPM context
  * @dp_intf: DP interface

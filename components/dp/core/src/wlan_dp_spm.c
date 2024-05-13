@@ -5,7 +5,7 @@
 
 #include <dp_types.h>
 #include <dp_internal.h>
-#include "wlan_dp_spm.h"
+#include <wlan_dp_spm.h>
 #include "dp_htt.h"
 
 #define DP_SPM_FLOW_FLAG_IN_USE         BIT(0)
@@ -777,7 +777,8 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
 					     &cursor->node);
 			spm_intf->origin_aft[i] = NULL;
-		} else if ((curr_ts - cursor->active_ts) > (5000 * 1000)) {
+		} else if ((curr_ts - cursor->active_ts) >
+				WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT) {
 			qdf_mem_zero(cursor,
 				     sizeof(struct wlan_dp_spm_flow_info));
 			cursor->id = i;

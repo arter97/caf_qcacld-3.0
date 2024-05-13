@@ -773,7 +773,7 @@ struct wlan_dp_intf {
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
 	bool disable_rx_aggr[CTRL_RX_AGGR_ID_MAX];
 #endif
-#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_FEATURE_MLSTC)
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_intf_context *spm_intf_ctx;
 #endif
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
@@ -1045,7 +1045,7 @@ struct wlan_dp_psoc_context {
 #ifdef WLAN_DP_FEATURE_STC
 	struct wlan_dp_stc *dp_stc;
 #endif
-#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_FEATURE_MLSTC)
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_context *spm_ctx;
 #endif
 };
