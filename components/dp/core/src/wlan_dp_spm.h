@@ -67,6 +67,7 @@ struct wlan_dp_spm_flow_tbl_stats {
  * struct wlan_dp_spm_flow_info - Record of flow which will be tracked
  * @node: List node
  * @id: Flow ID
+ * @is_populated: Is flow valid
  * @info: Flow details
  * @guid: Global unique identifier
  * @peer_id: Peer ID
@@ -75,10 +76,15 @@ struct wlan_dp_spm_flow_tbl_stats {
  * @cookie: sock address or skb hash
  * @flags: flow flags
  * @active_ts: last active timestamp
+ * @c_flow_id: STC classification table ID
+ * @track_flow_stats: is stats tracking enabled for flow
+ * @reserved: unused
+ * @flow_tuple_hash: flow_tuple_hash to identify bi-directional flow
  */
 struct wlan_dp_spm_flow_info {
 	qdf_list_node_t node;
 	uint16_t id;
+	bool is_populated;
 	struct flow_info info;
 	uint64_t guid;
 	uint16_t peer_id;
@@ -87,6 +93,12 @@ struct wlan_dp_spm_flow_info {
 	uint64_t cookie;
 	uint32_t flags;
 	uint64_t active_ts;
+#ifdef WLAN_DP_FEATURE_STC
+	uint8_t c_flow_id;
+	uint32_t track_flow_stats:1,
+		 reserved:31;
+	uint64_t flow_tuple_hash;
+#endif
 };
 
 /**

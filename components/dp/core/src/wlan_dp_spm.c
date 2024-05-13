@@ -635,6 +635,13 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 	}
 
 	flow->active_ts = qdf_sched_clock();
+
+	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, skb,
+						   flow->track_flow_stats,
+						   flow->id,
+						   dp_intf->def_link->link_id,
+						   flow->peer_id, flow->guid);
+
 	return flow->svc_metadata;
 }
 
@@ -785,7 +792,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 }
 #endif
 /* Flow Unique ID generator */
-static uint64_t flow_guid_gen;
+static uint32_t flow_guid_gen;
 
 QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 {
@@ -873,6 +880,52 @@ void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 	dp_info("SPM interface deinitialized!");
 }
 
+#ifdef WLAN_DP_FEATURE_STC
+void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
+				     struct wlan_dp_spm_flow_info *flow_rec)
+{
+	struct wlan_dp_stc_flow_tuple stc_flow_tuple = {0};
+	struct flow_info *flow_info = &flow_rec->info;
+
+	/* Switching direction to match Rx flow hash for bi-di flows*/
+	if (flow_info->proto == htons(ETH_P_IP)) {
+		stc_flow_tuple.src_ip.ipv4_addr = flow_info->dst_ip.ipv4_addr;
+		stc_flow_tuple.dst_ip.ipv4_addr = flow_info->src_ip.ipv4_addr;
+	} else if (flow_info->proto == htons(ETH_P_IPV6)) {
+		stc_flow_tuple.src_ip.ipv6_addr[0] =
+						flow_info->dst_ip.ipv6_addr[0];
+		stc_flow_tuple.src_ip.ipv6_addr[1] =
+						flow_info->dst_ip.ipv6_addr[1];
+		stc_flow_tuple.src_ip.ipv6_addr[2] =
+						flow_info->dst_ip.ipv6_addr[2];
+		stc_flow_tuple.src_ip.ipv6_addr[3] =
+						flow_info->dst_ip.ipv6_addr[3];
+
+		stc_flow_tuple.dst_ip.ipv6_addr[0] =
+						flow_info->src_ip.ipv6_addr[0];
+		stc_flow_tuple.dst_ip.ipv6_addr[1] =
+						flow_info->src_ip.ipv6_addr[1];
+		stc_flow_tuple.dst_ip.ipv6_addr[2] =
+						flow_info->src_ip.ipv6_addr[2];
+		stc_flow_tuple.dst_ip.ipv6_addr[3] =
+						flow_info->src_ip.ipv6_addr[3];
+	}
+
+	stc_flow_tuple.src_port = flow_info->dst_port;
+	stc_flow_tuple.dst_port = flow_info->src_port;
+	stc_flow_tuple.proto = flow_info->proto;
+	stc_flow_tuple.flags = 0;
+
+	flow_rec->flow_tuple_hash = wlan_dp_get_flow_hash(dp_ctx,
+							  &stc_flow_tuple);
+}
+#else
+void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
+				     struct wlan_dp_spm_flow_info *flow_rec);
+{
+}
+#endif
+
 QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 					  uint16_t *flow_id,
 					  struct flow_info *flow_info,
@@ -915,6 +968,7 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	spm_intf->o_stats.active++;
 
 	*flow_id = flow_rec->id;
+	flow_rec->is_populated = 1;
 
 	/* Trigger flow retiring event at threshold */
 	if (qdf_unlikely(spm_intf->o_flow_rec_freelist.count <
