@@ -114,8 +114,6 @@ struct dp_dhcp_stats {
 #define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC)
 #endif
 
-#define NUM_TX_QUEUES_MASK 0x1F
-
 #ifndef NUM_CPUS
 #ifdef QCA_CONFIG_SMP
 #define NUM_CPUS NR_CPUS

@@ -111,6 +111,15 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf,
 				  qdf_nbuf_t nbuf);
 
 /**
+ * wlan_dp_sawfish_update_metadata() - Update metadata for received skb flow.
+ * @dp_intf: dp context of interface
+ * @nbuf: Pointer to struct sk_buff
+ *
+ * Return: QDF_STATUS enumeration
+ */
+int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
+				    qdf_nbuf_t nbuf);
+/**
  * dp_fim_display_hash_table() - Display fim nodes from hash table
  * @dp_intf: dp context of interface
  *

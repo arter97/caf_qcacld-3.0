@@ -1758,17 +1758,8 @@ ucfg_dp_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
 }
 #endif
 
-#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
-/*
- * ucfg_dp_fim_update_metadata() - Update skb with metadata
- * @nbuf: skb
- * @vdev:vdev
- *
- * Return: None
- */
-void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
-				 struct wlan_objmgr_vdev *vdev);
 
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 /*
  * ucfg_dp_fim_display_hash_table() - Display FIM node from hash table
  * @vdev: vdev
@@ -1864,13 +1855,6 @@ QDF_STATUS ucfg_fpm_policy_rem(struct fpm_table *fpm, uint64_t cookie);
 uint8_t ucfg_fpm_policy_get(struct fpm_table *fpm, struct dp_policy *policy,
 			    uint8_t max_count);
 #else
-static inline
-void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
-				 struct wlan_objmgr_vdev *vdev)
-{
-	return;
-}
-
 static inline
 void ucfg_dp_fim_display_hash_table(struct wlan_objmgr_vdev *vdev)
 {
@@ -2014,4 +1998,23 @@ ucfg_telemetry_stop_opm_stats(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_DP_FEATURE_STC */
+
+#if defined(WLAN_SUPPORT_FLOW_PRIORTIZATION) || defined(WLAN_FEATURE_SAWFISH) \
+						|| defined(WLAN_DP_FEATURE_STC)
+/*
+ * ucfg_dp_fim_update_metadata() - Update skb with metadata
+ * @nbuf: skb
+ * @vdev:vdev
+ *
+ * Return: None
+ */
+void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
+				 struct wlan_objmgr_vdev *vdev);
+#else
+static inline void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
+					       struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
+
 #endif /* _WLAN_DP_UCFG_API_H_ */

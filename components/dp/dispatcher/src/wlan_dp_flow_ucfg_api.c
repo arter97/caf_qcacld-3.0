@@ -15,25 +15,27 @@
  */
 
 #include "wlan_dp_priv.h"
-#include "wlan_dp_ucfg_api.h"
 #include "wlan_dp_fim.h"
+#include "wlan_dp_ucfg_api.h"
 
-#ifdef WLAN_FEATURE_SAWFISH
-static QDF_STATUS ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
-					       qdf_nbuf_t nbuf)
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
+static inline void ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
+						qdf_nbuf_t nbuf)
 {
-	return wlan_dp_sawfish_update_metadata(dp_intf, nbuf);
+	wlan_dp_sawfish_update_metadata(dp_intf, nbuf);
+
+	return;
 }
 #else
-static QDF_STATUS ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
-					       qdf_nbuf_t nbuf)
+static inline void ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
+						qdf_nbuf_t nbuf)
 {
 }
 #endif
 
 #ifdef CONFIG_WLAN_SUPPORT_LAPB
-static void ucfg_dp_update_lapb_metadata(struct wlan_dp_intf *dp_intf,
-					 qdf_nbuf_t nbuf)
+static inline void ucfg_dp_update_lapb_metadata(struct wlan_dp_intf *dp_intf,
+						qdf_nbuf_t nbuf)
 {
 	QDF_STATUS status;
 
@@ -42,12 +44,21 @@ static void ucfg_dp_update_lapb_metadata(struct wlan_dp_intf *dp_intf,
 		ucfg_dp_lapb_handle_app_ind(nbuf);
 }
 #else
-static void ucfg_dp_update_lapb_metadata(struct wlan_dp_intf *dp_intf,
-					 qdf_nbuf_t nbuf)
+static inline void ucfg_dp_update_lapb_metadata(struct wlan_dp_intf *dp_intf,
+						qdf_nbuf_t nbuf)
 {
 }
 #endif
 
+#if defined(WLAN_SUPPORT_FLOW_PRIORTIZATION) || defined(WLAN_FEATURE_SAWFISH) \
+						|| defined(WLAN_DP_FEATURE_STC)
+/*
+ * ucfg_dp_fim_update_metadata() - Update skb with metadata
+ * @nbuf: skb
+ * @vdev:vdev
+ *
+ * Return: None
+ */
 void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;
@@ -68,10 +79,12 @@ void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 		return;
 	}
 
-	ucfg_dp_update_lapb_metadata(dp_intf, nbuf);
 	ucfg_dp_update_sawf_metadata(dp_intf, nbuf);
+	ucfg_dp_update_lapb_metadata(dp_intf, nbuf);
 }
+#endif
 
+#ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 void ucfg_dp_fim_display_hash_table(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;
@@ -221,3 +234,4 @@ void ucfg_dp_fpm_display_policy(struct wlan_objmgr_vdev *vdev)
 
 	dp_fpm_display_policy(dp_intf);
 }
+#endif

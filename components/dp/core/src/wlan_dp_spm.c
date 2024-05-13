@@ -7,6 +7,8 @@
 #include <dp_internal.h>
 #include <wlan_dp_spm.h>
 #include "dp_htt.h"
+#include "wlan_dp_fim.h"
+#include "wlan_dp_stc.h"
 
 #define DP_SPM_FLOW_FLAG_IN_USE         BIT(0)
 #define DP_SPM_FLOW_FLAG_SVC_METADATA   BIT(1)
@@ -277,7 +279,6 @@ void wlan_dp_spm_svc_map(struct wlan_dp_spm_svc_class *svc_class)
  */
 void wlan_dp_spm_svc_delete(struct wlan_dp_spm_svc_class *svc_class)
 {
-	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
 	struct wlan_dp_spm_policy_info *policy;
 
@@ -617,13 +618,13 @@ void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg)
 }
 
 uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
-				      uint16_t flow_id, uint64_t cookie)
+				      qdf_nbuf_t skb, uint16_t flow_id,
+				      uint64_t cookie)
 {
 	struct wlan_dp_spm_context *spm_ctx = dp_intf->spm_intf_ctx;
 	struct wlan_dp_spm_flow_info *flow;
 
 	flow = spm_intf->origin_aft[flow_id];
-
 	/* Flow can be NULL when evicted or retired */
 	if (qdf_unlikely(!flow))
 		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
@@ -631,10 +632,11 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 	if (qdf_unlikely(flow->cookie != cookie)) {
 		dp_info("Flow cookie %lu mismatch against table %lu", cookie,
 			flow->cookie);
-		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	flow->active_ts = qdf_sched_clock();
+	skb->mark = flow->svc_metadata;
 
 	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, skb,
 						   flow->track_flow_stats,
@@ -642,7 +644,7 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 						   dp_intf->def_link->link_id,
 						   flow->peer_id, flow->guid);
 
-	return flow->svc_metadata;
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS wlan_dp_spm_policy_add(struct dp_policy *policy)
@@ -791,7 +793,37 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 	}
 	qdf_spinlock_release(&spm_intf->flow_list_lock);
 }
+
+uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
+				      qdf_nbuf_t nbuf, uint16_t flow_id,
+				      uint64_t cookie)
+{
+	struct wlan_dp_spm_intf_context *spm_intf = dp_intf->spm_intf_ctx;
+	struct wlan_dp_spm_flow_info *flow;
+
+	flow = spm_intf->origin_aft[flow_id];
+	/* Flow can be NULL when evicted or retired */
+	if (qdf_unlikely(!flow))
+		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
+
+	if (qdf_unlikely(flow->cookie != cookie)) {
+		dp_info("Flow cookie %lu mismatch against table %lu", cookie,
+			flow->cookie);
+		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
+	}
+
+	flow->active_ts = qdf_sched_clock();
+
+	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, nbuf,
+						   flow->track_flow_stats,
+						   flow->id,
+						   dp_intf->def_link->link_id,
+						   flow->peer_id, flow->guid);
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
+
 /* Flow Unique ID generator */
 static uint32_t flow_guid_gen;
 
@@ -882,45 +914,51 @@ void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 }
 
 #ifdef WLAN_DP_FEATURE_STC
+static inline
 void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
 				     struct wlan_dp_spm_flow_info *flow_rec)
 {
-	struct wlan_dp_stc_flow_tuple stc_flow_tuple = {0};
+	struct flow_info flow_info_reverse = {0};
 	struct flow_info *flow_info = &flow_rec->info;
 
 	/* Switching direction to match Rx flow hash for bi-di flows*/
-	if (flow_info->proto == htons(ETH_P_IP)) {
-		stc_flow_tuple.src_ip.ipv4_addr = flow_info->dst_ip.ipv4_addr;
-		stc_flow_tuple.dst_ip.ipv4_addr = flow_info->src_ip.ipv4_addr;
-	} else if (flow_info->proto == htons(ETH_P_IPV6)) {
-		stc_flow_tuple.src_ip.ipv6_addr[0] =
+	if (flow_info->flags & FLOW_INFO_PRESENT_IPV4_SRC_IP) {
+		flow_info_reverse.src_ip.ipv4_addr =
+						flow_info->dst_ip.ipv4_addr;
+		flow_info_reverse.dst_ip.ipv4_addr =
+						flow_info->src_ip.ipv4_addr;
+		flow_rec->is_ipv4 = true;
+	} else if (flow_info->flags & FLOW_INFO_PRESENT_IPV6_SRC_IP) {
+		flow_info_reverse.src_ip.ipv6_addr[0] =
 						flow_info->dst_ip.ipv6_addr[0];
-		stc_flow_tuple.src_ip.ipv6_addr[1] =
+		flow_info_reverse.src_ip.ipv6_addr[1] =
 						flow_info->dst_ip.ipv6_addr[1];
-		stc_flow_tuple.src_ip.ipv6_addr[2] =
+		flow_info_reverse.src_ip.ipv6_addr[2] =
 						flow_info->dst_ip.ipv6_addr[2];
-		stc_flow_tuple.src_ip.ipv6_addr[3] =
+		flow_info_reverse.src_ip.ipv6_addr[3] =
 						flow_info->dst_ip.ipv6_addr[3];
 
-		stc_flow_tuple.dst_ip.ipv6_addr[0] =
+		flow_info_reverse.dst_ip.ipv6_addr[0] =
 						flow_info->src_ip.ipv6_addr[0];
-		stc_flow_tuple.dst_ip.ipv6_addr[1] =
+		flow_info_reverse.dst_ip.ipv6_addr[1] =
 						flow_info->src_ip.ipv6_addr[1];
-		stc_flow_tuple.dst_ip.ipv6_addr[2] =
+		flow_info_reverse.dst_ip.ipv6_addr[2] =
 						flow_info->src_ip.ipv6_addr[2];
-		stc_flow_tuple.dst_ip.ipv6_addr[3] =
+		flow_info_reverse.dst_ip.ipv6_addr[3] =
 						flow_info->src_ip.ipv6_addr[3];
 	}
 
-	stc_flow_tuple.src_port = flow_info->dst_port;
-	stc_flow_tuple.dst_port = flow_info->src_port;
-	stc_flow_tuple.proto = flow_info->proto;
-	stc_flow_tuple.flags = 0;
+	flow_info_reverse.src_port = flow_info->dst_port;
+	flow_info_reverse.dst_port = flow_info->src_port;
+	flow_info_reverse.proto =
+				wlan_dp_ip_proto_to_stc_proto(flow_info->proto);
+	flow_info_reverse.flags = 0;
 
 	flow_rec->flow_tuple_hash = wlan_dp_get_flow_hash(dp_ctx,
-							  &stc_flow_tuple);
+							  &flow_info_reverse);
 }
 #else
+static inline
 void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
 				     struct wlan_dp_spm_flow_info *flow_rec);
 {
@@ -934,6 +972,7 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 {
 	struct wlan_dp_spm_intf_context *spm_intf;
 	struct wlan_dp_spm_flow_info *flow_rec = NULL;
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 
 	if (!dp_intf->spm_intf_ctx) {
 		dp_info("Feature not supported");
@@ -945,24 +984,29 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	qdf_spinlock_acquire(&spm_intf->flow_list_lock);
 	qdf_list_remove_front(&spm_intf->o_flow_rec_freelist,
 			      (qdf_list_node_t **)&flow_rec);
+	qdf_spinlock_release(&spm_intf->flow_list_lock);
 
 	if (!flow_rec) {
 		qdf_spinlock_release(&spm_intf->flow_list_lock);
+		*flow_id = WLAN_DP_SPM_INVALID_FLOW_ID;
 		dp_info_rl("records freelist size: %u, Active flow table full!",
 			   spm_intf->o_flow_rec_freelist.count);
 		return QDF_STATUS_E_EMPTY;
 	}
-	flow_rec->active_ts = qdf_sched_clock();
-	qdf_spinlock_release(&spm_intf->flow_list_lock);
 
 	/* Copy data to flow record */
+	flow_rec->flow_add_ts = qdf_sched_clock();
 	flow_rec->guid = flow_guid_gen++;
 	flow_rec->peer_id = peer_id;
+	flow_rec->vdev_id = dp_intf->def_link->link_id;
 	qdf_mem_copy(&flow_rec->info, flow_info, sizeof(struct flow_info));
 	flow_rec->svc_id = WLAN_DP_SPM_INVALID_METADATA;
 	flow_rec->svc_metadata = WLAN_DP_SPM_INVALID_METADATA;
 	flow_rec->flags |= DP_SPM_FLOW_FLAG_IN_USE;
 	flow_rec->cookie = cookie_sk;
+
+	wlan_dp_spm_update_tx_flow_hash(dp_ctx, flow_rec);
+	wlan_dp_indicate_rx_flow_add(dp_ctx);
 
 	/* put the flow record in table and fill stats */
 	spm_intf->origin_aft[flow_rec->id] = flow_rec;
