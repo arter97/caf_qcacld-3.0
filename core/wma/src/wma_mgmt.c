@@ -2111,6 +2111,8 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 
 	params.prb_rsp_template_len = probe_rsp_info->probeRespTemplateLen;
 	params.prb_rsp_template_frm = probe_rsp_info->probeRespTemplate;
+	params.go_ignore_non_p2p_probe_req =
+		probe_rsp_info->go_ignore_non_p2p_probe_req;
 
 	return wmi_unified_probe_rsp_tmpl_send_cmd(wma->wmi_handle, vdev_id,
 						   &params);
