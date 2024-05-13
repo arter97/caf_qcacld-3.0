@@ -21,13 +21,7 @@
 #include <qdf_nbuf.h>
 #include <wlan_hdd_ether.h>
 
-#define SAWFISH_FLOW_ID_MAGIC_MASK 0xF100
-#define SAWFISH_FLOW_ID_MAGIC 0xA100
-/* 5 bits for NUM_TX_QUEUES, 6 bits flow_id, shift is 11 */
-#define SAWFISH_FLOW_ID_MAGIC_SHFT 11
-#define SAWFISH_FLOW_ID_MASK 0x07E0
-#define SAWFISH_FLOW_ID_SHFT 5
-#define SAWFISH_FLOW_ID_MAX (SAWFISH_FLOW_ID_MASK >> SAWFISH_FLOW_ID_SHFT)
+#define SAWFISH_FLOW_ID_MAX 0x3F
 #define SAWFISH_INVALID_FLOW_ID 0xFFFF
 #define SPM_INVALID_SVC 0xFFFF
 
@@ -99,10 +93,8 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 	struct sock *sk = NULL;
 	struct flow_info flow = {0};
 	qdf_flow_keys_t keys;
-	uint16_t svc_metadata = 0;
-	uint16_t flow_id;
 	uint16_t peer_id;
-	uint16_t sk_tx_q_mapping;
+	uint16_t sk_tx_flow_id;
 	int status = QDF_STATUS_E_INVAL;
 	union generic_ethhdr *eth_hdr;
 	uint8_t *pkt;
@@ -113,13 +105,10 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	sk_tx_q_mapping = sk->sk_tx_queue_mapping;
+	sk_tx_flow_id = sk->sk_txtime_unused;
 
-	if (qdf_likely((sk_tx_q_mapping & SAWFISH_FLOW_ID_MAGIC_MASK) ==
-						SAWFISH_FLOW_ID_MAGIC)) {
-		flow_id = (sk_tx_q_mapping & SAWFISH_FLOW_ID_MASK) >>
-			  SAWFISH_FLOW_ID_SHFT;
-	} else {
+	/* sk_tx_flow_id != 0 means flow_id valid */
+	if (qdf_unlikely(!sk_tx_flow_id)) {
 		wlan_dp_parse_skb_flow_info(skb, &flow, &keys);
 		if (qdf_unlikely(!flow.flags ||
 				 flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT)) {
@@ -131,39 +120,29 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 		peer_id = cdp_get_peer_id(dp_intf->dp_ctx->cdp_soc,
 					  CDP_VDEV_ALL, eth_hdr->eth_II.h_dest);
 
-		status = wlan_dp_spm_get_flow_id_origin(dp_intf, &flow_id,
+		status = wlan_dp_spm_get_flow_id_origin(dp_intf, &sk_tx_flow_id,
 							&flow, (uint64_t)sk,
 							peer_id);
 		/* Check status */
-		if (qdf_unlikely(flow_id > SAWFISH_FLOW_ID_MAX)) {
-			skb->mark = SPM_INVALID_SVC;
+		if (qdf_unlikely(sk_tx_flow_id > SAWFISH_FLOW_ID_MAX)) {
+			/* skb->mark with svc_metadata, lapb_metadata */
 			return QDF_STATUS_E_INVAL;
 		}
-
-		sk->sk_tx_queue_mapping &= ~(SAWFISH_FLOW_ID_MASK);
-		sk->sk_tx_queue_mapping |= (flow_id << SAWFISH_FLOW_ID_SHFT);
-		/* add magic */
-		sk->sk_tx_queue_mapping &= ~(SAWFISH_FLOW_ID_MAGIC_MASK);
-		sk->sk_tx_queue_mapping |= (SAWFISH_FLOW_ID_MAGIC <<
-						SAWFISH_FLOW_ID_MAGIC_SHFT);
+		sk->sk_txtime_unused = sk_tx_flow_id;
 	}
 
-	svc_metadata = wlan_dp_spm_svc_get_metadata(dp_intf, flow_id,
-						    (uint64_t)sk);
-	if (qdf_unlikely(svc_metadata == SPM_INVALID_SVC)) {
+	status = wlan_dp_spm_svc_get_metadata(dp_intf, skb, sk_tx_flow_id,
+					      (uint64_t)sk);
+	if (qdf_unlikely(status != QDF_STATUS_SUCCESS)) {
 		/*
 		 * Flow is possibly evicted, so mark for invalid flow.
 		 * Subsequent packets of flow will have new flow allocated.
 		 */
-		sk->sk_tx_queue_mapping &= ~(SAWFISH_FLOW_ID_MASK);
-		sk->sk_tx_queue_mapping &= ~(SAWFISH_FLOW_ID_MAGIC_MASK);
-
-		skb->mark = SPM_INVALID_SVC;
+		sk->sk_txtime_unused = 0;
 
 		return QDF_STATUS_E_INVAL;
 	}
 
-	skb->mark = svc_metadata;
 
 	return QDF_STATUS_SUCCESS;
 }

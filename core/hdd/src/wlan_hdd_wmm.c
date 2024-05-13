@@ -2097,7 +2097,6 @@ uint16_t hdd_get_tx_queue_for_ac(struct hdd_adapter *adapter,
 				 struct sk_buff *skb, uint16_t ac)
 {
 	struct sock *sk = skb->sk;
-	uint16_t ac_tx_queue_index;
 	int new_index;
 	int cpu = qdf_get_smp_processor_id();
 	struct hdd_tx_rx_stats *stats =
@@ -2123,9 +2122,8 @@ uint16_t hdd_get_tx_queue_for_ac(struct hdd_adapter *adapter,
 							 TX_QUEUES_PER_AC));
 	}
 
-	ac_tx_queue_index = sk->sk_tx_queue_mapping & NUM_TX_QUEUES_MASK;
-	if (ac_tx_queue_index != NO_QUEUE_MAPPING &&
-	    ac_tx_queue_index < NUM_TX_QUEUES) {
+	if (sk->sk_tx_queue_mapping != NO_QUEUE_MAPPING &&
+	    sk->sk_tx_queue_mapping < NUM_TX_QUEUES) {
 		++stats->per_cpu[cpu].qselect_sk_tx_map;
 		return sk->sk_tx_queue_mapping;
 	}
