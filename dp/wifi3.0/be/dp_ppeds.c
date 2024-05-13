@@ -1170,6 +1170,9 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 					goto failed;
 				}
 				qdf_atomic_inc(&be_soc->borrow_count);
+			} else {
+				TX_DESC_LOCK_UNLOCK(&pool->lock);
+				goto failed;
 			}
 		} else {
 			tx_desc->flags = 0;
