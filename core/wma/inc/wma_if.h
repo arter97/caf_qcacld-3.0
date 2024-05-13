@@ -528,12 +528,14 @@ typedef struct {
  * @probeRespTemplate: probe response template
  * @probeRespTemplateLen: probe response template length
  * @ucProxyProbeReqValidIEBmap: valid IE bitmap
+ * @go_ignore_non_p2p_probe_req: go ignore non-p2p probe req
  */
 typedef struct sSendProbeRespParams {
 	tSirMacAddr bssId;
 	uint8_t probeRespTemplate[SIR_MAX_PROBE_RESP_SIZE];
 	uint32_t probeRespTemplateLen;
 	uint32_t ucProxyProbeReqValidIEBmap[8];
+	bool go_ignore_non_p2p_probe_req;
 } tSendProbeRespParams, *tpSendProbeRespParams;
 
 /**
