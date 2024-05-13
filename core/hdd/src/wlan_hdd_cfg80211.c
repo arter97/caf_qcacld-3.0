@@ -8750,6 +8750,11 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_REDUCED_POWER_SCAN_MODE] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_CONSECUTIVE_TX_NO_ACK_DURATION] = {
+		.type = NLA_U16 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_CONSECUTIVE_TX_NO_ACK_THRESHOLD] = {
+		.type = NLA_U16 },
+
 };
 
 
@@ -10229,6 +10234,70 @@ static int hdd_config_ani(struct wlan_hdd_link_info *link_info,
 			hdd_err("Failed to set ani level, errno %d", errno);
 			return errno;
 		}
+	}
+
+	return 0;
+}
+
+#define TX_NO_ACK_DURATION_MAX 10000
+#define TX_NO_ACK_DURATION_MIN 10
+#define TX_NO_ACK_THRESHOLD_MIN 10
+#define MAX_PDEV_DATA_STALL_PARAMS 2
+static int
+hdd_config_data_stall_param(struct wlan_hdd_link_info *link_info,
+			    struct nlattr *tb[])
+{
+	QDF_STATUS status;
+	uint16_t tx_no_ack_duration, tx_no_ack_threshold;
+	struct nlattr *tx_no_ack_duration_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CONSECUTIVE_TX_NO_ACK_DURATION];
+	struct nlattr *tx_no_ack_threshold_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CONSECUTIVE_TX_NO_ACK_THRESHOLD];
+	struct dev_set_param setparam[MAX_PDEV_DATA_STALL_PARAMS] = {};
+	uint8_t index = 0;
+
+	if (!tx_no_ack_duration_attr || !tx_no_ack_threshold_attr)
+		return 0;
+
+	tx_no_ack_duration = nla_get_u16(tx_no_ack_duration_attr);
+	tx_no_ack_threshold = nla_get_u16(tx_no_ack_threshold_attr);
+
+	hdd_debug("tx_no_ack_duration %d, tx_no_ack_threshold %d",
+		  tx_no_ack_duration, tx_no_ack_threshold);
+
+	if ((tx_no_ack_duration > TX_NO_ACK_DURATION_MAX ||
+	     (tx_no_ack_duration < TX_NO_ACK_DURATION_MIN &&
+	      tx_no_ack_duration)) ||
+	    (tx_no_ack_threshold < TX_NO_ACK_THRESHOLD_MIN &&
+	     tx_no_ack_threshold)) {
+		hdd_debug("param invalid");
+		return -EINVAL;
+	}
+
+	status = mlme_check_index_setparam(setparam,
+					   wmi_pdev_param_dstall_consecutive_tx_no_ack_interval,
+					   tx_no_ack_duration, index++,
+					   MAX_PDEV_DATA_STALL_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed at wmi_pdev_param_dstall_consecutive_tx_no_ack_interval");
+		return -EINVAL;
+	}
+
+	status = mlme_check_index_setparam(setparam,
+					   wmi_pdev_param_dstall_consecutive_tx_no_ack_threshold,
+					   tx_no_ack_threshold,
+					   index++, MAX_PDEV_DATA_STALL_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed at wmi_pdev_param_dstall_consecutive_tx_no_ack_threshold");
+		return -EINVAL;
+	}
+
+	status = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						     WMI_PDEV_ID_SOC, setparam,
+						     index);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to send tx no ack duration and threshold");
+		return -EINVAL;
 	}
 
 	return 0;
@@ -14179,6 +14248,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_set_ul_mu_config,
 	hdd_config_tx_rx_nss_per_band,
 	hdd_config_vdev_chains_per_band,
+	hdd_config_data_stall_param,
 };
 
 /**
