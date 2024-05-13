@@ -662,8 +662,8 @@ struct wlan_dp_stc_flow_classify_result {
 struct wlan_dp_stc_txrx_min_max_stats {
 	uint32_t pkt_size_min;
 	uint32_t pkt_size_max;
-	uint32_t pkt_iat_min;
-	uint32_t pkt_iat_max;
+	uint64_t pkt_iat_min;
+	uint64_t pkt_iat_max;
 };
 
 /*
@@ -681,9 +681,9 @@ struct wlan_dp_stc_txrx_stats {
 	uint32_t pkts;
 	uint32_t pkt_size_min;
 	uint32_t pkt_size_max;
-	uint32_t pkt_iat_min;
-	uint32_t pkt_iat_max;
-	uint32_t pkt_iat_sum;
+	uint64_t pkt_iat_min;
+	uint64_t pkt_iat_max;
+	uint64_t pkt_iat_sum;
 };
 
 /*
@@ -709,9 +709,9 @@ struct wlan_dp_stc_txrx_samples {
  * @burst_count: Total number of bursts
  */
 struct wlan_dp_stc_burst_stats {
-	uint32_t burst_duration_min;
-	uint32_t burst_duration_max;
-	uint32_t burst_duration_sum;
+	uint64_t burst_duration_min;
+	uint64_t burst_duration_max;
+	uint64_t burst_duration_sum;
 	uint32_t burst_size_min;
 	uint32_t burst_size_max;
 	uint64_t burst_size_sum;

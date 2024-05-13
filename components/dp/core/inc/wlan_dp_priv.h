@@ -527,8 +527,8 @@ struct dp_fisa_rx_sw_ft {
 #endif
 	uint64_t same_mld_vdev_mismatch;
 	uint64_t add_timestamp;
-#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
 	uint64_t num_pkts;
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
 	uint64_t num_pkts_prev;
 	uint32_t avg_pkts_per_sec;
 	qdf_time_t last_pkt_rcvd_tstamp;

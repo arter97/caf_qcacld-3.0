@@ -34,12 +34,10 @@ QDF_STATUS
 wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 				struct wlan_dp_stc_flow_table_entry *flow_entry,
 				uint8_t vdev_id, uint16_t peer_id,
-				uint32_t metadata)
+				uint16_t pkt_len, uint32_t metadata)
 {
-	/* TODO - Fix the below API for getting pkt length */
-	uint32_t pkt_len = qdf_nbuf_len(nbuf);
-	uint64_t pkt_iat = 0;
 	uint64_t curr_pkt_ts = dp_stc_get_timestamp();
+	uint64_t pkt_iat = 0;
 	uint16_t s, w;
 
 	if (flow_entry->metadata != metadata) {
@@ -54,7 +52,6 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 		DP_STC_UPDATE_MIN_MAX_SUM_STATS(flow_entry->txrx_stats.pkt_iat,
 						pkt_iat);
 	}
-	flow_entry->prev_pkt_arrival_ts = curr_pkt_ts;
 
 	flow_entry->txrx_stats.bytes += pkt_len;
 	flow_entry->txrx_stats.pkts++;
@@ -91,6 +88,7 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 	}
 	/* TxRx Stats - End */
 
+check_burst:
 	/* Burst stats - START */
 	switch (flow_entry->burst_state) {
 	case BURST_DETECTION_INIT:
@@ -100,8 +98,7 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 		 */
 		flow_entry->burst_start_time = curr_pkt_ts;
 		flow_entry->burst_state = BURST_DETECTION_START;
-		flow_entry->burst_start_detect_bytes = pkt_len;
-		break;
+		fallthrough;
 	case BURST_DETECTION_START:
 	{
 		uint32_t time_delta = curr_pkt_ts -
@@ -120,6 +117,9 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 			   bytes < BURST_START_BYTES_THRESHOLD) {
 			/* Burst start failed, move to new burst detection */
 			flow_entry->burst_state = BURST_DETECTION_INIT;
+			flow_entry->burst_start_detect_bytes = 0;
+			flow_entry->cur_burst_bytes = 0;
+			goto check_burst;
 		} else if (time_delta < BURST_START_TIME_THRESHOLD_NS &&
 			   (bytes + pkt_len) > BURST_START_BYTES_THRESHOLD) {
 			/* Valid burst start */
@@ -163,10 +163,11 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 			DP_STC_UPDATE_MIN_MAX_SUM_STATS(burst_stats->burst_size,
 							burst_size);
 			flow_entry->burst_start_time = curr_pkt_ts;
-			flow_entry->burst_state = BURST_DETECTION_START;
-			flow_entry->burst_start_detect_bytes = pkt_len;
+			flow_entry->burst_state = BURST_DETECTION_INIT;
+			flow_entry->burst_start_detect_bytes = 0;
 			flow_entry->cur_burst_bytes = 0;
-			break;
+			pkt_iat = 0;
+			goto check_burst;
 		}
 
 		flow_entry->cur_burst_bytes += pkt_len;
@@ -176,6 +177,7 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 		break;
 	}
 	/* Burst stats - END */
+	flow_entry->prev_pkt_arrival_ts = curr_pkt_ts;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -240,6 +242,7 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 	struct wlan_dp_stc_sampling_table *sampling_table =
 					&dp_stc->sampling_flow_table;
 
+	qdf_atomic_inc(&dp_stc->sampling_flow_table.num_valid_entries);
 	sampling_flow->dir = candidate->dir;
 	switch (candidate->dir) {
 	case WLAN_DP_FLOW_DIR_TX:
@@ -344,7 +347,7 @@ wlan_dp_stc_find_candidate_intf(struct wlan_dp_psoc_context *dp_ctx)
 	return dp_intf;
 }
 
-#define FLOW_TRACK_ELIGIBLE_THRESH_NS 10000000000
+#define FLOW_TRACK_ELIGIBLE_THRESH_NS 3000000000
 
 static inline QDF_STATUS
 wlan_dp_stc_find_ul_flow(struct wlan_dp_stc *dp_stc, uint16_t rx_flow_id,
@@ -413,6 +416,62 @@ wlan_dp_send_burst_sample(struct wlan_dp_stc *dp_stc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline QDF_STATUS
+wlan_dp_stc_remove_sampling_table_entry(struct wlan_dp_stc *dp_stc,
+					struct wlan_dp_stc_sampling_table_entry *sampling_entry)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_stc_sampling_table *sampling_table =
+					&dp_stc->sampling_flow_table;
+	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
+	struct dp_fisa_rx_sw_ft *sw_ft_entry;
+
+	if (sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
+		struct wlan_dp_spm_flow_info *flow;
+		struct wlan_dp_intf *dp_intf;
+		uint8_t intf_id;
+		uint8_t tx_flow_id = sampling_entry->tx_flow_id;
+
+		intf_id = (tx_flow_id >> WLAN_DP_STC_TX_FLOW_ID_INTF_ID_SHIFT) &
+					WLAN_DP_STC_TX_FLOW_ID_INTF_ID_MASK;
+		dp_intf = dp_ctx->dp_intf_list[intf_id];
+		tx_flow_id = tx_flow_id & WLAN_DP_STC_TX_FLOW_ID_MASK;
+		flow = &dp_intf->spm_intf_ctx->flow_rec_base[tx_flow_id];
+		/* NULL check is needed for spm_intf_ctx */
+		if (flow->guid == sampling_entry->tx_flow_metadata)
+			flow->track_flow_stats = 0;
+	}
+
+	if (sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
+		uint16_t flow_id = sampling_entry->rx_flow_id;
+
+		sw_ft_entry =
+			&(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[flow_id]);
+		if (sampling_entry->rx_flow_metadata == sw_ft_entry->metadata)
+			sw_ft_entry->track_flow_stats = 0;
+	}
+
+	switch (sampling_entry->dir) {
+	case WLAN_DP_FLOW_DIR_TX:
+		qdf_atomic_dec(&sampling_table->num_tx_only_flows);
+		break;
+	case WLAN_DP_FLOW_DIR_RX:
+		qdf_atomic_dec(&sampling_table->num_rx_only_flows);
+		break;
+	case WLAN_DP_FLOW_DIR_BIDI:
+		qdf_atomic_dec(&sampling_table->num_bidi_flows);
+		break;
+	default:
+		break;
+	}
+
+	qdf_atomic_dec(&dp_stc->sampling_flow_table.num_valid_entries);
+	qdf_mem_zero(sampling_entry, sizeof(*sampling_entry));
+	sampling_entry->state = WLAN_DP_SAMPLING_STATE_INIT;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 {
 	struct wlan_dp_stc *dp_stc = (struct wlan_dp_stc *)arg;
@@ -444,6 +503,8 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 	wlan_dp_stc_get_avail_flow_quota(dp_stc, &bidi, &tx, &rx);
 
 	for (rx_flow_id = 0; rx_flow_id < fst->max_entries; rx_flow_id++) {
+		uint64_t pkt_rate;
+
 		if (!rx && !bidi)
 			break;
 		/* loop through entire FISA table */
@@ -455,6 +516,11 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 
 		if (cur_ts - sw_ft_entry->flow_init_ts <
 						FLOW_TRACK_ELIGIBLE_THRESH_NS)
+			continue;
+
+		pkt_rate = (sw_ft_entry->num_pkts * 1000000000) /
+				(cur_ts - sw_ft_entry->flow_init_ts);
+		if (pkt_rate < 15)
 			continue;
 
 		/* Temp place holder function */
@@ -538,6 +604,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 					WLAN_DP_STC_TX_FLOW_ID_INTF_ID_SHIFT) &
 					WLAN_DP_STC_TX_FLOW_ID_INTF_ID_MASK;
 			dp_intf = dp_ctx->dp_intf_list[intf_id];
+			tx_flow_id = tx_flow_id & WLAN_DP_STC_TX_FLOW_ID_MASK;
 			flow = &dp_intf->spm_intf_ctx->flow_rec_base[tx_flow_id];
 			/* NULL check is needed for spm_intf_ctx */
 			flow->selected_to_sample = 1;
@@ -563,6 +630,9 @@ other_checks:
 	for (flow_id = 0; flow_id < DP_STC_SAMPLE_FLOWS_MAX; flow_id++) {
 		sampling_flow = &dp_stc->sampling_flow_table.entries[flow_id];
 
+		if (sampling_flow->state == WLAN_DP_SAMPLING_STATE_INIT)
+			continue;
+
 		if (wlan_dp_txrx_samples_ready(sampling_flow) &&
 		    !wlan_dp_txrx_samples_reported(sampling_flow)) {
 			/* TXRX sample is ready to be sent */
@@ -581,10 +651,19 @@ other_checks:
 			sampling_flow->flags1 |=
 				WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_SENT;
 			wlan_dp_send_burst_sample(dp_stc, sampling_flow);
+			sampling_flow->burst_stats_report_ts = cur_ts;
 			/*
 			 * Set flag to indicate that the burst sample
 			 * has been reported
 			 */
+		}
+
+		if (wlan_dp_burst_samples_reported(sampling_flow) &&
+		    sampling_flow->burst_stats_report_ts &&
+		    cur_ts - sampling_flow->burst_stats_report_ts >
+						FLOW_CLASSIFY_WAIT_TIME_NS) {
+			wlan_dp_stc_remove_sampling_table_entry(dp_stc,
+								sampling_flow);
 		}
 	}
 
@@ -726,48 +805,6 @@ save_rx_flow_samples:
 						burst_size);
 
 	}
-}
-
-static inline QDF_STATUS
-wlan_dp_stc_remove_sampling_table_entry(struct wlan_dp_stc *dp_stc,
-					struct wlan_dp_stc_sampling_table_entry *sampling_entry)
-{
-	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
-	struct wlan_dp_stc_sampling_table *sampling_table =
-					&dp_stc->sampling_flow_table;
-	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
-	struct dp_fisa_rx_sw_ft *sw_ft_entry;
-
-	sampling_entry->state = WLAN_DP_SAMPLING_STATE_INIT;
-
-	if (sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
-		/* TODO - Add code for clearing TX AFT */
-	}
-
-	if (sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
-		uint16_t flow_id = sampling_entry->rx_flow_id;
-
-		sw_ft_entry =
-			&(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[flow_id]);
-		if (sampling_entry->rx_flow_metadata == sw_ft_entry->metadata)
-			sw_ft_entry->track_flow_stats = 0;
-	}
-
-	switch (sampling_entry->dir) {
-	case WLAN_DP_FLOW_DIR_TX:
-		qdf_atomic_dec(&sampling_table->num_tx_only_flows);
-		break;
-	case WLAN_DP_FLOW_DIR_RX:
-		qdf_atomic_dec(&sampling_table->num_rx_only_flows);
-		break;
-	case WLAN_DP_FLOW_DIR_BIDI:
-		qdf_atomic_dec(&sampling_table->num_bidi_flows);
-		break;
-	default:
-		break;
-	}
-
-	return QDF_STATUS_SUCCESS;
 }
 
 static inline void
@@ -1036,6 +1073,8 @@ static void wlan_dp_stc_flow_sampling_timer(void *arg)
 	if (sampling_pending)
 		qdf_timer_mod(&dp_stc->flow_sampling_timer,
 			      DP_STC_TIMER_THRESH_MS);
+	else
+		dp_stc->sample_timer_state = WLAN_DP_STC_TIMER_STOPPED;
 
 	return;
 }

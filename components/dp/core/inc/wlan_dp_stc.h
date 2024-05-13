@@ -24,6 +24,7 @@
 #define __WLAN_DP_STC_H__
 
 #include "wlan_dp_main.h"
+#include "wlan_dp_spm.h"
 
 #define DP_STC_UPDATE_MIN_MAX_STATS(__field, __val)			\
 	do {								\
@@ -54,8 +55,9 @@
 #define DP_STC_MAX_PEERS 64
 
 #define BURST_START_TIME_THRESHOLD_NS 10000000
-#define BURST_START_BYTES_THRESHOLD 3000
-#define BURST_END_TIME_THRESHOLD_NS 300000000
+#define BURST_START_BYTES_THRESHOLD 5000
+#define BURST_END_TIME_THRESHOLD_NS 1500000000
+#define FLOW_CLASSIFY_WAIT_TIME_NS 10000000000
 
 #define WLAN_DP_STC_TX_FLOW_ID_INTF_ID_SHIFT 6
 #define WLAN_DP_STC_TX_FLOW_ID_INTF_ID_MASK 0x3
@@ -172,6 +174,7 @@ struct wlan_dp_stc_sampling_candidate {
 /*
  * struct wlan_dp_stc_sampling_table_entry - Sampling table entry
  * @state: State of sampling for this flow
+ * @dir: direction of flow
  * @flags: flags set by timer
  * @flags1: flags set by periodic work
  * @next_sample_idx: next sample index to fill min/max stats in per-packet path
@@ -188,6 +191,8 @@ struct wlan_dp_stc_sampling_candidate {
  */
 struct wlan_dp_stc_sampling_table_entry {
 	enum wlan_stc_sampling_state state;
+	enum wlan_dp_flow_dir dir;
+	uint64_t burst_stats_report_ts;
 	uint32_t flags;
 	uint32_t flags1;
 	uint8_t next_sample_idx;
@@ -405,6 +410,9 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	bool send_fw_indication = false;
 
+	if (peer_id == 0xFFFF)
+		return;
+
 	if (!qdf_is_macaddr_equal(&dp_stc->peer_ping_info[peer_id].mac_addr,
 				  peer_mac_addr)) {
 		qdf_copy_macaddr(&dp_stc->peer_ping_info[peer_id].mac_addr,
@@ -448,6 +456,7 @@ wlan_dp_indicate_rx_flow_add(struct wlan_dp_psoc_context *dp_ctx)
  * @flow_entry: flow entry (to which the current pkt belongs)
  * @vdev_id: ID of vdev to which the packet belongs
  * @peer_id: ID of peer to which the packet belongs
+ * @pkt_len: length of the packet (excluding ethernet header)
  * @metadata: RX flow metadata
  *
  * Return: QDF_STATUS
@@ -456,7 +465,7 @@ QDF_STATUS
 wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 				struct wlan_dp_stc_flow_table_entry *flow_entry,
 				uint8_t vdev_id, uint16_t peer_id,
-				uint32_t metadata);
+				uint16_t pkt_len, uint32_t metadata);
 
 static inline QDF_STATUS
 wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
@@ -468,6 +477,7 @@ wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 	uint16_t peer_id;
 	uint16_t flow_id;
 	uint32_t metadata;
+	uint16_t pkt_len;
 
 	if (qdf_likely(!QDF_NBUF_CB_RX_TRACK_FLOW(nbuf)))
 		return QDF_STATUS_SUCCESS;
@@ -477,11 +487,13 @@ wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 	peer_id = QDF_NBUF_CB_RX_PEER_ID(nbuf);
 	flow_id = QDF_NBUF_CB_EXT_RX_FLOW_ID(nbuf);
 	metadata = QDF_NBUF_CB_RX_FLOW_METADATA(nbuf);
+	pkt_len = qdf_nbuf_len(nbuf);
 
 	flow_entry = &dp_stc->rx_flow_table.entries[flow_id];
 
 	return wlan_dp_stc_track_flow_features(dp_stc, nbuf, flow_entry,
-					       vdev_id, peer_id, metadata);
+					       vdev_id, peer_id, pkt_len,
+					       metadata);
 }
 
 /**
@@ -506,14 +518,17 @@ wlan_dp_stc_check_n_track_tx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_flow_table_entry *flow_entry;
+	uint16_t pkt_len;
 
 	if (qdf_likely(!flow_track_enabled))
 		return QDF_STATUS_SUCCESS;
 
 	flow_entry = &dp_stc->tx_flow_table.entries[flow_id];
+	pkt_len = qdf_nbuf_len(nbuf) - sizeof(qdf_ether_header_t);
 
 	return wlan_dp_stc_track_flow_features(dp_stc, nbuf, flow_entry,
-					       vdev_id, peer_id, metadata);
+					       vdev_id, peer_id, pkt_len,
+					       metadata);
 }
 
 QDF_STATUS

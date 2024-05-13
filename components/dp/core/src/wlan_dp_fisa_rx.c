@@ -991,6 +991,9 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	sw_ft_entry->reo_dest_indication = elem->reo_dest_indication;
 	qdf_mem_copy(&sw_ft_entry->rx_flow_tuple_info, &elem->flow_tuple_info,
 		     sizeof(struct cdp_rx_flow_tuple_info));
+	sw_ft_entry->flow_tuple_hash =
+		wlan_dp_fisa_get_flow_hash(fisa_hdl->dp_ctx,
+					   &sw_ft_entry->rx_flow_tuple_info);
 
 	sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 	sw_ft_entry->is_flow_udp = elem->is_udp_flow;
@@ -998,6 +1001,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 
 	fisa_hdl->add_flow_count++;
 	fisa_hdl->del_flow_count++;
+	wlan_dp_indicate_rx_flow_add(fisa_hdl->dp_ctx);
 
 	dp_rx_fisa_release_ft_lock(fisa_hdl, reo_id);
 }
@@ -2246,7 +2250,7 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 		dp_rx_fisa_aggr_tcp(fisa_hdl, fisa_flow, nbuf);
 	}
 
-	fisa_flow->last_accessed_ts = qdf_get_log_timestamp();
+	fisa_flow->last_accessed_ts = qdf_sched_clock();
 
 	return FISA_AGGR_DONE;
 
@@ -2345,6 +2349,7 @@ static inline void
 wlan_dp_fisa_nbuf_mark_flow_info(struct dp_fisa_rx_sw_ft *fisa_flow,
 				 qdf_nbuf_t nbuf)
 {
+	fisa_flow->num_pkts++;
 	QDF_NBUF_CB_EXT_RX_FLOW_ID(nbuf) = fisa_flow->flow_id;
 	QDF_NBUF_CB_RX_FLOW_METADATA(nbuf) = fisa_flow->metadata;
 	if (fisa_flow->track_flow_stats)

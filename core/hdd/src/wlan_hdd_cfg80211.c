@@ -22506,7 +22506,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 		.doit = wlan_hdd_cfg80211_set_sap_suspend_resume,
 		vendor_command_policy(wlan_hdd_sap_suspend_policy,
 				      QCA_WLAN_VENDOR_ATTR_AP_SUSPEND_MAX)
-	}
+	},
 #if defined(WLAN_FEATURE_TELEMETRY) && defined(WLAN_DP_FEATURE_STC)
 	FEATURE_ASYNC_STATS_VENDOR_COMMANDS
 #endif
