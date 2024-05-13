@@ -2752,9 +2752,31 @@ void ucfg_dp_fisa_route_to_latency_sensitive_reo(struct wlan_objmgr_vdev *vdev,
 		dp_flush_fisa_entries_by_vdev(vdev);
 	}
 }
+
+void ucfg_dp_runtime_disable_rx_fisa_aggr(struct wlan_objmgr_vdev *vdev,
+					  bool value)
+{
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
+
+	if (!dp_link) {
+		dp_err("Unable to get DP link");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+
+	if (dp_intf->runtime_disable_rx_fisa_aggr != value)
+		dp_intf->runtime_disable_rx_fisa_aggr = value;
+}
 #else
 void ucfg_dp_fisa_route_to_latency_sensitive_reo(struct wlan_objmgr_vdev *vdev,
 						 bool value)
+{
+}
+
+void ucfg_dp_runtime_disable_rx_fisa_aggr(struct wlan_objmgr_vdev *vdev,
+					  bool value)
 {
 }
 #endif

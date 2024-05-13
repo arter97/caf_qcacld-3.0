@@ -11034,6 +11034,11 @@ static void hdd_set_wlm_host_latency_level(struct hdd_context *hdd_ctx,
 	else
 		ucfg_dp_fisa_route_to_latency_sensitive_reo(vdev, false);
 
+	if (latency_host_flags & WLM_HOST_RX_FISA_FLAG)
+		ucfg_dp_runtime_disable_rx_fisa_aggr(vdev, true);
+	else
+		ucfg_dp_runtime_disable_rx_fisa_aggr(vdev, false);
+
 	if (adapter->latency_level)
 		ucfg_dp_rx_aggr_dis_req(vdev, CTRL_RX_AGGR_ID_WLM, true);
 	else

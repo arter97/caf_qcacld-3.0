@@ -679,6 +679,8 @@ struct dp_rx_fst {
  *			particular rx_context
  * @route_to_latency_sensitive_reo: Enable rx routing to
  *				    latency sensitive reo2sw ring
+ * @runtime_disable_rx_fisa_aggr: Runtime disable FISA aggregation but allows
+ *				  flow entry addition to FSE
  * @runtime_disable_rx_thread: Runtime Rx thread flag
  * @rx_stack: function pointer Rx packet handover
  * @tx_fn: function pointer to send Tx packet
@@ -755,6 +757,7 @@ struct wlan_dp_intf {
 #ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
 	bool route_to_latency_sensitive_reo;
 #endif
+	bool runtime_disable_rx_fisa_aggr;
 #endif
 
 	bool runtime_disable_rx_thread;
