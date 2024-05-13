@@ -253,6 +253,12 @@ wlan_tdls_notify_sta_connect(uint8_t vdev_id,
 			     bool tdls_prohibited,
 			     struct wlan_objmgr_vdev *vdev) {}
 
+static inline QDF_STATUS
+wlan_is_tdls_session_present(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_INVAL;
+}
+
 static inline void
 wlan_tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 			    struct qdf_mac_addr *mac_addr)
