@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -89,6 +90,7 @@
 #include "qdf_types.h"
 #include <linux/cpuidle.h>
 #include <wlan_cp_stats_mc_ucfg_api.h>
+#include "son_api.h"
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
 #define HDD_SSR_BRING_UP_TIME 3000000
@@ -3029,18 +3031,19 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 
 	HDD_IS_RATE_LIMIT_REQ(is_rate_limited,
 			      hdd_ctx->config->nb_commands_interval);
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED ||
 	    is_rate_limited) {
-		hdd_debug("Modules not enabled/rate limited, use cached stats");
 		/* Send cached data to upperlayer*/
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
-		if (!vdev) {
-			hdd_err("vdev is NULL");
-			return -EINVAL;
-		}
 		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
-		return 0;
+		hdd_debug("Modules not enabled/rate limited, cached tx power = %d",
+			  *dbm);
+		goto deliver_son;
 	}
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
@@ -3050,6 +3053,10 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	wlan_hdd_get_tx_power(adapter, dbm);
 	hdd_debug("power: %d", *dbm);
 
+deliver_son:
+	if (adapter->device_mode != QDF_STA_MODE)
+		wlan_son_deliver_tx_power(vdev, *dbm);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	return 0;
 }
 

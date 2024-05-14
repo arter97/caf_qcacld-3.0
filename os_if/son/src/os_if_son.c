@@ -35,6 +35,7 @@
 #include <wlan_reg_services_api.h>
 #include <wlan_scan_ucfg_api.h>
 #include <wlan_dcs_ucfg_api.h>
+#include <wlan_nlink_common.h>
 
 static struct son_callbacks g_son_os_if_cb;
 static struct wlan_os_if_son_ops g_son_os_if_txrx_ops;
@@ -1840,3 +1841,52 @@ int os_if_son_del_ast(struct wlan_objmgr_vdev *vdev,
 }
 
 qdf_export_symbol(os_if_son_del_ast);
+
+QDF_STATUS
+os_if_son_send_status_nlink_msg(uint32_t event_id,
+				enum osif_son_status_evt_type event_type,
+				char *module_name)
+{
+	struct osif_son_status_evt event = {0};
+	int flags = GFP_KERNEL;
+	struct sk_buff *skb;
+	struct nlmsghdr *nlhdr;
+
+	if (in_interrupt() || irqs_disabled() || in_atomic())
+		flags = GFP_ATOMIC;
+
+	skb = nlmsg_new(NLMSG_SPACE(WLAN_NL_MAX_PAYLOAD), flags);
+	if (!skb) {
+		osif_err("null skb");
+		return QDF_STATUS_E_NOMEM;
+	}
+	event.id = event_id;
+	event.event_type = event_type;
+
+	nlhdr = nlmsg_put(skb, 0, 0, RTM_NEWLINK, sizeof(struct ifinfomsg), 0);
+	if (!nlhdr) {
+		osif_err("null nlhdr");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	if (nla_put_string(skb, IFLA_IFNAME, module_name))
+		goto nla_put_failed;
+
+	if (nla_put(skb, IFLA_WIRELESS, sizeof(struct osif_son_status_evt),
+		    &event))
+		goto nla_put_failed;
+
+	nlmsg_end(skb, nlhdr);
+	rtnl_notify(skb, &init_net, 0, RTNLGRP_NOTIFY, NULL, GFP_KERNEL);
+	osif_debug("send status nl msg done, id %x, type %x",
+		   event.id, event.event_type);
+
+	return QDF_STATUS_SUCCESS;
+
+nla_put_failed:
+	osif_err("nla put failed");
+	kfree_skb(skb);
+	return QDF_STATUS_E_NOMEM;
+}
+
+qdf_export_symbol(os_if_son_send_status_nlink_msg);

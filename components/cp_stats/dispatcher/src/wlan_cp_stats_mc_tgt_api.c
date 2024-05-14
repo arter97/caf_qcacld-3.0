@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,7 +33,6 @@
 #include <wlan_cp_stats_utils_api.h>
 #include "../../core/src/wlan_cp_stats_defs.h"
 #include "../../core/src/wlan_cp_stats_obj_mgr_handler.h"
-#include "son_api.h"
 #include "wlan_policy_mgr_api.h"
 
 static bool tgt_mc_cp_stats_is_last_event(struct stats_event *ev,
@@ -130,6 +129,11 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	if (!ev->pdev_stats)
 		return;
 
+	if (ev->mac_seq_num >= MAX_MAC) {
+		cp_stats_err("invalid mac seq num");
+		return;
+	}
+
 	if (is_station_stats)
 		status = ucfg_mc_cp_stats_get_pending_req(psoc,
 					TYPE_STATION_STATS, &last_req);
@@ -170,11 +174,7 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, last_req.vdev_id);
 
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
-	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
-	if (!is_station_stats &&
-	    pdev_mc_stats->max_pwr != ev->pdev_stats[pdev_id].max_pwr)
-		wlan_son_deliver_tx_power(vdev,
-					  ev->pdev_stats[pdev_id].max_pwr);
+	pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[ev->mac_seq_num];
 	if (mac_id == ev->mac_seq_num)
 		max_pwr = pdev_mc_stats->max_pwr =
 			ev->pdev_stats[pdev_id].max_pwr;
