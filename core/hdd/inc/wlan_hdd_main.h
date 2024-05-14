@@ -5552,4 +5552,13 @@ hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
 }
 #endif
 
+/**
+ * hdd_allow_new_intf() - Allow new intf created or not
+ * @hdd_ctx: hdd context
+ * @mode: qdf opmode of new interface
+ *
+ * Return: true if allowed, otherwise false
+ */
+bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
+			enum QDF_OPMODE mode);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
