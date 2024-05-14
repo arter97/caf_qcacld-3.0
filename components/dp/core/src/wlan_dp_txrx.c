@@ -1760,7 +1760,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 	bool is_arp_req;
 	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
 	bool is_eapol, send_over_nl;
-	bool is_dhcp;
+	bool is_dhcp, is_ip_mcast;
 	struct dp_tx_rx_stats *stats;
 	QDF_STATUS status;
 	uint8_t pkt_type;
@@ -1787,6 +1787,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 		is_arp_req = false;
 		is_eapol = false;
 		is_dhcp = false;
+		is_ip_mcast = false;
 		send_over_nl = false;
 
 		if (qdf_nbuf_is_ipv4_arp_pkt(nbuf)) {
@@ -1826,6 +1827,9 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 						dhcp_ack_count;
 				is_dhcp = true;
 			}
+		} else if (qdf_nbuf_data_is_ipv4_mcast_pkt(nbuf->data) ||
+			   qdf_nbuf_data_is_ipv6_mcast_pkt(nbuf->data)) {
+			is_ip_mcast = true;
 		}
 
 		if (qdf_nbuf_is_icmp_pkt(nbuf))
@@ -1906,7 +1910,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 		/* hold configurable wakelock for unicast traffic */
 		if (!dp_is_current_high_throughput(dp_ctx) &&
 		    dp_ctx->dp_cfg.rx_wakelock_timeout &&
-		    dp_link->conn_info.is_authenticated)
+		    dp_link->conn_info.is_authenticated && !is_ip_mcast)
 			wake_lock = dp_is_rx_wake_lock_needed(nbuf, is_arp_req);
 
 		if (wake_lock) {
