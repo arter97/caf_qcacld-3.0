@@ -896,7 +896,8 @@ int hdd_reg_set_country(struct hdd_context *hdd_ctx, char *country_code)
 		qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
 	}
 
-	hdd_reg_wait_for_country_change(hdd_ctx);
+	if (!cds_is_driver_loading())
+		hdd_reg_wait_for_country_change(hdd_ctx);
 
 	return qdf_status_to_os_return(status);
 }
