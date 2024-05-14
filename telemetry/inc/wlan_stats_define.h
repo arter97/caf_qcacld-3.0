@@ -161,21 +161,25 @@ enum stats_level_e {
 /**
  * enum stats_object_e: Defines the Stats specific to object
  * @STATS_OBJ_STA:   Stats for station/peer associated to AP
- * @STATS_OBJ_LINK:  Stats for a link of an MLD
  * @STATS_OBJ_VAP:   Stats for VAP
  * @STATS_OBJ_MLD:   Stats for MLD group
  * @STATS_OBJ_RADIO: Stats for particular Radio
  * @STATS_OBJ_AP:    Stats for SoC
+ * @STATS_OBJ_LINK:  Stats for a link of an MLD
+ * @STATS_OBJ_LAST:  End of enum elements
  * @STATS_OBJ_MAX:   Max supported objects
  */
 enum stats_object_e {
 	STATS_OBJ_STA,
-	STATS_OBJ_LINK,
 	STATS_OBJ_VAP,
 	STATS_OBJ_MLD,
 	STATS_OBJ_RADIO,
 	STATS_OBJ_AP,
-	STATS_OBJ_MAX = STATS_OBJ_AP,
+	STATS_OBJ_LINK,
+
+	/* New element must be above this */
+	STATS_OBJ_LAST,
+	STATS_OBJ_MAX = STATS_OBJ_LAST - 1,
 };
 
 /**
