@@ -1761,8 +1761,7 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 {
 #define PEER_ALL_TID_BITMASK 0xffffffff
 	uint32_t peer_tid_bitmap = PEER_ALL_TID_BITMASK;
-	uint8_t *peer_addr = mac_addr;
-	uint8_t peer_mac[QDF_MAC_ADDR_SIZE] = {0};
+	uint8_t peer_addr[QDF_MAC_ADDR_SIZE] = {0};
 	struct peer_flush_params param = {0};
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
@@ -1778,6 +1777,8 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 		QDF_BUG(0);
 		return QDF_STATUS_E_INVAL;
 	}
+
+	qdf_mem_copy(peer_addr, mac_addr, QDF_MAC_ADDR_SIZE);
 
 	iface = &wma->interfaces[vdev_id];
 	if (!iface->peer_count) {
@@ -1826,7 +1827,7 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 	param.vdev_id = vdev_id;
 	if (!wmi_service_enabled(wma->wmi_handle,
 				 wmi_service_peer_delete_no_peer_flush_tids_cmd))
-		wmi_unified_peer_flush_tids_send(wma->wmi_handle, mac_addr,
+		wmi_unified_peer_flush_tids_send(wma->wmi_handle, peer_addr,
 						 &param);
 
 	/* peer->ref_cnt is not visible in WMA */
@@ -1850,8 +1851,6 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 peer_detach:
 	wma_debug("vdevid %d is detaching with peer_addr "QDF_MAC_ADDR_FMT" peer_count %d",
 		vdev_id, QDF_MAC_ADDR_REF(peer_addr), iface->peer_count);
-	/* Copy peer mac to find and delete objmgr peer */
-	qdf_mem_copy(peer_mac, peer_addr, QDF_MAC_ADDR_SIZE);
 	if (no_fw_peer_delete &&
 	    is_cdp_peer_detach_force_delete_supported(soc)) {
 		if (!peer_unmap_conf_support_enabled) {
@@ -1877,8 +1876,8 @@ peer_detach:
 	}
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
-	wlan_release_peer_key_wakelock(wma->pdev, peer_mac);
-	wma_remove_objmgr_peer(wma, iface->vdev, peer_mac);
+	wlan_release_peer_key_wakelock(wma->pdev, peer_addr);
+	wma_remove_objmgr_peer(wma, iface->vdev, peer_addr);
 
 	iface->peer_count--;
 #undef PEER_ALL_TID_BITMASK
