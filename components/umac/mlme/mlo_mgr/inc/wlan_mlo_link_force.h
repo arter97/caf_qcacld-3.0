@@ -47,6 +47,9 @@
  * @ml_nlink_vendor_cmd_request_evt: vendor command request
  * @ml_nlink_post_set_link_evt: re-schedule event to update link state
  * @ml_nlink_emlsr_timeout_evt: emlsr opportunistic timeout
+ * @ml_nlink_nan_pre_enable_evt: nan pre enable
+ * @ml_nlink_nan_post_enable_evt: nan post enable
+ * @ml_nlink_nan_post_disable_evt: nan post disable
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
@@ -70,6 +73,9 @@ enum ml_nlink_change_event_type {
 	ml_nlink_vendor_cmd_request_evt,
 	ml_nlink_post_set_link_evt,
 	ml_nlink_emlsr_timeout_evt,
+	ml_nlink_nan_pre_enable_evt,
+	ml_nlink_nan_post_enable_evt,
+	ml_nlink_nan_post_disable_evt,
 };
 
 enum ml_emlsr_disable_request {

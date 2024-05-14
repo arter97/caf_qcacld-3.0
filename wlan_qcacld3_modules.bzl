@@ -506,6 +506,7 @@ _fixed_srcs = [
     "cmn/wmi/src/wmi_unified_vdev_api.c",
     "cmn/wmi/src/wmi_unified_vdev_tlv.c",
     "components/cmn_services/interface_mgr/src/wlan_if_mgr_roam.c",
+    "components/cmn_services/interface_mgr/src/wlan_if_mgr_nan.c",
     "components/cmn_services/interface_mgr/src/wlan_if_mgr_sap.c",
     "components/cmn_services/interface_mgr/src/wlan_if_mgr_sta.c",
     "components/cmn_services/policy_mgr/src/wlan_policy_mgr_action.c",

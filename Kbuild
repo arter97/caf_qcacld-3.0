@@ -1354,7 +1354,8 @@ UMAC_INTERFACE_MGR_OBJS := $(UMAC_INTERFACE_MGR_CMN_DIR)/src/wlan_if_mgr_main.o 
 			  $(UMAC_INTERFACE_MGR_CMN_DIR)/src/wlan_if_mgr_core.o \
 			  $(UMAC_INTERFACE_MGR_COMP_DIR)/src/wlan_if_mgr_sta.o \
 			  $(UMAC_INTERFACE_MGR_COMP_DIR)/src/wlan_if_mgr_sap.o \
-			  $(UMAC_INTERFACE_MGR_COMP_DIR)/src/wlan_if_mgr_roam.o
+			  $(UMAC_INTERFACE_MGR_COMP_DIR)/src/wlan_if_mgr_roam.o \
+			  $(UMAC_INTERFACE_MGR_COMP_DIR)/src/wlan_if_mgr_nan.o
 
 $(call add-wlan-objs,umac_ifmgr,$(UMAC_INTERFACE_MGR_OBJS))
 
