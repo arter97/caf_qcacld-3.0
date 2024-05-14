@@ -525,6 +525,9 @@ static int __hdd_hostapd_open(struct net_device *dev)
 		return ret;
 	}
 
+	if (!hdd_allow_new_intf(hdd_ctx, adapter->device_mode))
+		return -EOPNOTSUPP;
+
 	ret = hdd_start_adapter(adapter, true);
 	if (ret) {
 		hdd_err("Error Initializing the AP mode: %d", ret);
