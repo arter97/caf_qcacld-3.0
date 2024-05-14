@@ -1534,25 +1534,25 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 		sap_context->dfs_ch_disable = true;
 #endif
 	}
+
+	if (sap_context->freq_list) {
+		qdf_mem_free(sap_context->freq_list);
+		sap_context->freq_list = NULL;
+		sap_context->num_of_channel = 0;
+	}
+
+	sap_get_freq_list(sap_context, &freq_list, &num_of_channels);
+	if (!num_of_channels || !freq_list) {
+		sap_err("No freq sutiable for SAP in current list, SAP failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 	sap_debug("skip_acs_status = %d",
 		  sap_context->acs_cfg->skip_scan_status);
 	if (sap_context->acs_cfg->skip_scan_status !=
 					eSAP_SKIP_ACS_SCAN) {
 #endif
-
-		if (sap_context->freq_list) {
-			qdf_mem_free(sap_context->freq_list);
-			sap_context->freq_list = NULL;
-			sap_context->num_of_channel = 0;
-		}
-
-		sap_get_freq_list(sap_context, &freq_list, &num_of_channels);
-		if (!num_of_channels || !freq_list) {
-			sap_err("No freq sutiable for SAP in current list, SAP failed");
-			return QDF_STATUS_E_FAILURE;
-		}
-
 		req = qdf_mem_malloc(sizeof(*req));
 		if (!req) {
 			qdf_mem_free(freq_list);
@@ -1645,8 +1645,9 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 		}
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
-	} else {
-		sap_context->acs_cfg->skip_scan_status = eSAP_SKIP_ACS_SCAN;
+	} else { /* skip_scan_status == eSAP_SKIP_ACS_SCAN */
+		sap_context->freq_list = freq_list;
+		sap_context->num_of_channel = num_of_channels;
 	}
 
 	if (sap_context->acs_cfg->skip_scan_status == eSAP_SKIP_ACS_SCAN) {
