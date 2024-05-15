@@ -3424,8 +3424,8 @@ IE he_op (EID_EXTN_ID_ELEMENT) OUI (0x24)
             { // control
                 ch_width: 2;
                 dup_bcon: 1;
-                reg_info: 3;
-                reserved: 2;
+                reg_info: 4;
+                reserved: 1;
             }
             center_freq_seg0, 1;
             center_freq_seg1, 1;
