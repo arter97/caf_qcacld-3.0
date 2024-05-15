@@ -828,6 +828,7 @@ struct enhance_roam_info {
  * @mac_id: vdev mac_id
  * @ap_nss: AP advertised NSS
  * @is_disconnect_received: Is disconnect received on this vdev
+ * @keep_alive_period: KEEPALIVE period in seconds
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -903,6 +904,7 @@ struct mlme_legacy_priv {
 	uint32_t mac_id;
 	uint8_t ap_nss;
 	bool is_disconnect_received;
+	uint16_t keep_alive_period;
 };
 
 /**

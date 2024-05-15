@@ -5493,4 +5493,16 @@ bool ucfg_mlme_is_sap_suspend_supported(struct wlan_objmgr_vdev *vdev)
 	return wlan_mlme_is_sap_suspend_supported(vdev);
 }
 
+/**
+ * ucfg_mlme_get_keepalive_period() - Get keep alive period
+ * @vdev: VDEV object
+ *
+ * Return: Keep alive period.
+ */
+static inline
+uint16_t ucfg_mlme_get_keepalive_period(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_mlme_get_keepalive_period(vdev);
+}
+
 #endif /* _WLAN_MLME_UCFG_API_H_ */
