@@ -4656,6 +4656,7 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	enum roam_offload_state cur_state = mlme_get_roam_state(psoc, vdev_id);
+	QDF_STATUS status;
 
 	switch (cur_state) {
 	case WLAN_ROAM_RSO_ENABLED:
@@ -4684,11 +4685,23 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 					    WLAN_ROAM_SYNCH_IN_PROG);
 			break;
 		}
+
+		mlme_debug("ROAM: ROAM_SYNCH received in state: %d", cur_state);
 		/*
-		 * transition to WLAN_ROAM_SYNCH_IN_PROG not allowed otherwise
-		 * if we're already RSO stopped, fall through to return failure
-		 */
-		fallthrough;
+		* If ROAM SYNC come to host in below scenario:
+		* 1. HOST sends RSO stop command with scan mode 4, in order
+		*    to process supplicant disabled roaming request
+		* 2. FW already queued the roam sync event before RSO STOP
+		*    command receive from host
+		* In this case host should send RSO STOP with scan mode = 0
+		* to allow FW to move into RSO STOP state
+		*/
+		status = cm_roam_stop_req(psoc, vdev_id, REASON_ROAM_ABORT,
+					  NULL, false);
+		if (QDF_IS_STATUS_ERROR(status))
+			mlme_err("ROAM: Unable to process RSO STOP req");
+
+		return QDF_STATUS_E_FAILURE;
 	case WLAN_ROAM_INIT:
 	case WLAN_ROAM_DEINIT:
 	case WLAN_ROAM_SYNCH_IN_PROG:
