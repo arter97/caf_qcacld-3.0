@@ -827,7 +827,7 @@ struct enhance_roam_info {
  *				operation on bss color collision detection
  * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  * @disconnect_runtime_lock: runtime lock to complete disconnection
- * @best_6g_power_type: best 6g power type
+ * @keep_alive_period: KEEPALIVE period in seconds
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -900,6 +900,7 @@ struct mlme_legacy_priv {
 	qdf_runtime_lock_t bss_color_change_runtime_lock;
 	qdf_runtime_lock_t disconnect_runtime_lock;
 	enum reg_6g_ap_type best_6g_power_type;
+	uint16_t keep_alive_period;
 };
 
 /**
