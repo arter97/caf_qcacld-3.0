@@ -348,6 +348,12 @@ uint32_t qca_sawf_get_mark_metadata(struct qca_sawf_metadata_param *params)
 		mark_metadata = DP_SAWF_META_DATA_INVALID;
 	}
 
+	sawf_debug("dev %s mac_addr " QDF_MAC_ADDR_FMT " svc_id %u rule_id %u rule_type %u -> metadata 0x%x",
+		   params->netdev->name,
+		   QDF_MAC_ADDR_REF(params->peer_mac),
+		   params->service_id,
+		   params->rule_id, params->sawf_rule_type, mark_metadata);
+
 	return mark_metadata;
 }
 
