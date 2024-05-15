@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -119,6 +119,16 @@ bool cfg_nan_is_roam_config_disabled(struct wlan_objmgr_psoc *psoc);
  * disabled or not
  */
 bool cfg_nan_is_eht_cap_enable(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * cfg_nan_get_support_sta_sap_ndp()- get value of config support
+ * STA + SAP + NDP
+ * @psoc: pointer to psoc object
+ *
+ * Return: Boolean flag indicating whether STA + SAP + NDP is supported
+ * or not
+ */
+bool cfg_nan_get_support_sta_sap_ndp(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 bool cfg_nan_is_roam_config_disabled(struct wlan_objmgr_psoc *psoc)
@@ -176,6 +186,12 @@ static inline bool cfg_nan_get_support_mp0_discovery(
 
 
 static inline bool cfg_nan_is_eht_cap_enable(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+bool cfg_nan_get_support_sta_sap_ndp(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

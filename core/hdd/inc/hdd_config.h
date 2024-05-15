@@ -1441,6 +1441,32 @@ enum host_log_level {
 		"g_no_sta_nan_concurrency", \
 		0, \
 		"This ini is used to disable STA-NAN concurrency")
+
+/*
+ * <ini>
+ * g_sap_sta_ndp_concurrency - Enable/disable SAP-STA-NDP concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will not allow SAP-STA-NDP Concurrency to be included in the
+ * iface combinations.
+ *
+ * 0: disable SAP-STA-NDP concurrency
+ * 1: enable SAP-STA-NDP concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAP_STA_NDP_CONCURRENCY CFG_INI_BOOL( \
+		"g_sap_sta_ndp_concurrency", \
+		0, \
+		"This ini is used to enable/disable SAP-STA-NDP concurrency")
+
 /*
  * <ini>
  * g_no_sta_sap_concurrency - disable STA-SAP concurrency
@@ -1534,6 +1560,7 @@ enum host_log_level {
 	CFG(CFG_ENABLE_SMEM_MAILBOX) \
 	CFG(CFG_NO_STA_SAP_CONCURRENCY) \
 	CFG(CFG_NO_STA_NAN_CONCURRENCY) \
+	CFG(CFG_SAP_STA_NDP_CONCURRENCY) \
 	CFG(CFG_NO_SAP_NAN_CONCURRENCY) \
 	CFG(CFG_NO_P2P_CONCURRENCY) \
 	CFG(CFG_STA_SAP_P2P_CONCURRENCY)

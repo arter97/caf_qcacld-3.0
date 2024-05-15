@@ -104,6 +104,7 @@ enum nan_disc_state {
  *                      wmi_vdev_param_enable_disable_nan_config_features
  * @disable_6g_nan: Disable NAN in 6GHz frequency band
  * @enable_nan_eht_cap: Enable(1)/Disable(0) NAN EHT capability
+ * @support_sta_sap_ndp: support STA + SAP + NDP
  */
 struct nan_cfg_params {
 	bool enable;
@@ -118,6 +119,7 @@ struct nan_cfg_params {
 	uint32_t nan_feature_config;
 	bool disable_6g_nan;
 	bool enable_nan_eht_cap;
+	bool support_sta_sap_ndp;
 };
 
 /**

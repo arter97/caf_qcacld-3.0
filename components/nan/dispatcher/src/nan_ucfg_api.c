@@ -67,6 +67,9 @@ static void nan_cfg_init(struct wlan_objmgr_psoc *psoc,
 	nan_obj->cfg_param.disable_6g_nan = cfg_get(psoc, CFG_DISABLE_6G_NAN);
 	nan_obj->cfg_param.enable_nan_eht_cap =
 					cfg_get(psoc, CFG_NAN_ENABLE_EHT_CAP);
+	nan_obj->cfg_param.support_sta_sap_ndp = cfg_get(
+						psoc,
+						CFG_SAP_STA_NDP_CONCURRENCY);
 }
 
 /**
@@ -1286,6 +1289,19 @@ bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return psoc_nan_obj->nan_caps.ndi_txbf_supported;
+}
+
+bool ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return false;
+	}
+
+	return psoc_nan_obj->nan_caps.sta_sap_ndp_support;
 }
 
 static inline bool
