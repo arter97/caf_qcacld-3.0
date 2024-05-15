@@ -169,4 +169,27 @@ void wlan_dp_send_ipa_wds_peer_disconnect(struct cdp_ctrl_objmgr_psoc *cpsoc,
 					  uint8_t vdev_id);
 #endif /* IPA_WDS_EASYMESH_FEATURE */
 
+#ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
+/**
+ * wlan_dp_notify_vdev_mac_id_migration() - Notify DP about vdev migration
+ *
+ * @vdev: objmgr vdev reference
+ * @old_mac_id: old mac id vdev present
+ * @new_mac_id: new migrating mac id
+ *
+ * This API notifies DP about vdev migration across MAC's
+ *
+ * Return: none
+ */
+void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
+					  uint32_t old_mac_id,
+					  uint32_t new_mac_id);
+#else
+static inline
+void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
+					  uint32_t old_mac_id,
+					  uint32_t new_mac_id)
+{
+}
+#endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */
 #endif

@@ -165,3 +165,15 @@ void wlan_dp_send_ipa_wds_peer_disconnect(struct cdp_ctrl_objmgr_psoc *cpsoc,
 						       false);
 }
 #endif /* IPA_WDS_EASYMESH_FEATURE */
+
+#ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
+void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
+					  uint32_t old_mac_id,
+					  uint32_t new_mac_id)
+{
+	/*
+	 * TODO Pass this info to DP resource mgr
+	 * Take action for vdev to mac_id migration
+	 */
+}
+#endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */

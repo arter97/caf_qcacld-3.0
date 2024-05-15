@@ -39,6 +39,7 @@
 #include "wlan_vdev_mgr_utils_api.h"
 #include <wmi_unified_priv.h>
 #include <target_if.h>
+#include "wlan_dp_api.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -5718,6 +5719,7 @@ void wlan_mlme_set_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *vdev_mlme_priv;
+	uint8_t old_mac_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_LEGACY_MAC_ID);
@@ -5730,7 +5732,10 @@ void wlan_mlme_set_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
 		goto rel_ref;
 	}
 
+	old_mac_id = vdev_mlme_priv->mac_id;
 	vdev_mlme_priv->mac_id = mac_id;
+
+	wlan_dp_notify_vdev_mac_id_migration(vdev, old_mac_id, mac_id);
 rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
