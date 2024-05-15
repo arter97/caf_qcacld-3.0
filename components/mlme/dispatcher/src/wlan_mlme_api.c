@@ -8632,7 +8632,6 @@ wlan_mlme_set_sap_suspend_resume(struct wlan_objmgr_psoc *psoc,
 
 	param.vdev_id = params->vdev_id;
 	param.suspend = params->suspend;
-	qdf_mem_copy(&param.mac_addr, &params->mac_addr,
-		     sizeof(QDF_MAC_ADDR_SIZE));
+	qdf_mem_copy(&param.mac_addr, &params->mac_addr, QDF_MAC_ADDR_SIZE);
 	return tgt_sap_suspend_param_send(psoc, &param);
 }

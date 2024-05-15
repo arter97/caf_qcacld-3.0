@@ -14208,8 +14208,7 @@ __wlan_hdd_cfg80211_sap_suspend_resume(struct wiphy *wiphy,
 
 	mld_addr = hdd_get_mld_mac_addr_from_vdev(vdev);
 	if (mld_addr)
-		qdf_mem_copy(&param.mac_addr, mld_addr,
-			     sizeof(QDF_MAC_ADDR_SIZE));
+		qdf_mem_copy(&param.mac_addr, mld_addr, QDF_MAC_ADDR_SIZE);
 	vdev_id = adapter->deflink->vdev_id;
 
 	param.vdev_id = vdev_id;
