@@ -2095,6 +2095,7 @@ enum wlan_state_ctrl_str_id {
  * @is_wifi3_0_target:
  * @dump_in_progress: Stores value of dump in progress
  * @max_chipset_log_size_enable: ini flag to enable/disable max_chipset_log_size
+ * @max_chipset_log_size: Stores max chipset log size value
  * @dual_sta_policy: Concurrent STA policy configuration
  * @is_therm_stats_in_progress:
  * @is_vdev_macaddr_dynamic_update_supported:
@@ -2378,6 +2379,7 @@ struct hdd_context {
 	bool is_wifi3_0_target;
 	bool dump_in_progress;
 	bool max_chipset_log_size_enable;
+	uint16_t max_chipset_log_size;
 	struct hdd_dual_sta_policy dual_sta_policy;
 #ifdef THERMAL_STATS_SUPPORT
 	bool is_therm_stats_in_progress;
