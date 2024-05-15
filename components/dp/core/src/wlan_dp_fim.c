@@ -80,6 +80,18 @@ static void dp_fim_parse_skb_flow_info(struct sk_buff *skb,
 		flow->proto = flow_info.proto;
 		flow->flags |= FLOW_INFO_IPV4_PARSE_SUCCESS;
 
+	} else if (qdf_nbuf_sock_is_ipv6_pkt(skb)) {
+		if (qdf_nbuf_get_ipv6_flow_info(skb, &flow_info))
+			return;
+
+		flow->src_port = flow_info.src_port;
+		flow->dst_port = flow_info.dst_port;
+		qdf_mem_copy(&flow->src_ip.ipv6_addr, &flow_info.src_ip.ipv6_addr,
+			     sizeof(flow_info.src_ip.ipv6_addr));
+		qdf_mem_copy(&flow->dst_ip.ipv6_addr, &flow_info.dst_ip.ipv6_addr,
+			     sizeof(flow_info.dst_ip.ipv6_addr));
+		flow->proto = flow_info.proto;
+		flow->flags |= FLOW_INFO_IPV6_PARSE_SUCCESS;
 	}
 }
 
@@ -267,7 +279,8 @@ void dp_fim_hash_table_delete_node(struct fim_vdev_ctx *fim_ctx,
 static inline bool dp_fim_is_proto_supported(struct sk_buff *skb)
 {
 	if (skb->sk &&
-	    qdf_nbuf_sock_is_ipv4_pkt(skb) &&
+	    (qdf_nbuf_sock_is_ipv4_pkt(skb) ||
+	    qdf_nbuf_sock_is_ipv6_pkt(skb)) &&
 	    (qdf_nbuf_sock_is_udp_pkt(skb) ||
 	     qdf_nbuf_sock_is_tcp_pkt(skb)))
 		return true;
