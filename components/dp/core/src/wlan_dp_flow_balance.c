@@ -295,7 +295,7 @@ wlan_dp_fb_do_flow_balance(struct wlan_dp_psoc_context *dp_ctx,
 	 */
 	for (i = 0; i < num_rings; i++) {
 get_next_ring:
-		if (ring_idx > MAX_REO_DEST_RINGS)
+		if (ring_idx >= MAX_REO_DEST_RINGS)
 			break;
 
 		ring = &map_tbl[ring_idx];
@@ -560,6 +560,7 @@ void wlan_dp_fb_update_num_rx_rings(struct wlan_objmgr_psoc *psoc)
 	cdp_config_param_type soc_param;
 	QDF_STATUS status;
 	int i;
+	uint8_t num_rx_rings = 0;
 
 	status = cdp_txrx_get_psoc_param(dp_ctx->cdp_soc,
 					 CDP_CFG_REO_RINGS_MAPPING, &soc_param);
@@ -571,9 +572,10 @@ void wlan_dp_fb_update_num_rx_rings(struct wlan_objmgr_psoc *psoc)
 	for (i = 0; i < MAX_REO_DEST_RINGS; i++) {
 		if ((BIT(i) & soc_param.cdp_reo_rings_mapping) &&
 		    !wlan_dp_check_is_ring_ipa_rx(dp_ctx->cdp_soc, i))
-			lb_data->num_wlan_used_rx_rings++;
+			num_rx_rings++;
 	}
 
+	lb_data->num_wlan_used_rx_rings = num_rx_rings;
 	dp_info("fb: num_host_used_rx_rings %d",
 		lb_data->num_wlan_used_rx_rings);
 }
