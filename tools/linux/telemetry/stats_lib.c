@@ -2487,6 +2487,55 @@ static void fill_mld_interface(struct object_list *obj)
 	}
 }
 
+static int get_mld_link_id(char *ifname, char *link_name)
+{
+	char path[100] = {'\0'};
+	ssize_t bufsize = sizeof(path);
+	FILE *fp;
+	char link_id_str[10] = {'\0'};
+
+	if ((strlcpy(path, ifname, bufsize) >= bufsize) ||
+	    (strlcat(path, "/", bufsize) >= bufsize) ||
+	    (strlcat(path, link_name, bufsize) >= bufsize) ||
+	    (strlcat(path, "/link_id_", bufsize) >= bufsize) ||
+	    (strlcat(path, link_name, bufsize) >= bufsize)) {
+		STATS_ERR("Error creating pathname %s\n", path);
+		return MLO_INVALID_LINK_ID;
+	}
+
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return MLO_INVALID_LINK_ID;
+
+	fgets(link_id_str, IFNAMSIZ, fp);
+	fclose(fp);
+
+	return atoi(link_id_str);
+}
+
+static void get_mld_link_parent(char *ifname, char *link_name, char *parent)
+{
+	char path[100] = {'\0'};
+	ssize_t bufsize = sizeof(path);
+	FILE *fp;
+
+	if ((strlcpy(path, ifname, bufsize) >= bufsize) ||
+	    (strlcat(path, "/", bufsize) >= bufsize) ||
+	    (strlcat(path, link_name, bufsize) >= bufsize) ||
+	    (strlcat(path, "/parent_", bufsize) >= bufsize) ||
+	    (strlcat(path, link_name, bufsize) >= bufsize)) {
+		STATS_ERR("Error creating pathname %s\n", path);
+		return;
+	}
+
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return;
+
+	fgets(parent, IFNAMSIZ, fp);
+	fclose(fp);
+}
+
 static int find_link_vaps(struct interface_list *if_list, uint8_t inx,
 			  char *rifname, struct object_list *parent_obj,
 			  struct object_list **curr_obj)
@@ -2498,7 +2547,7 @@ static int find_link_vaps(struct interface_list *if_list, uint8_t inx,
 	char temp_name[IFNAME_LEN] = {'\0'};
 	char parent[IFNAME_LEN] = {'\0'};
 	struct object_list *temp_obj = NULL;
-	uint8_t link_id = 0xFF;
+	uint8_t link_id = MLO_INVALID_LINK_ID;
 	int ret = 0;
 
 	ifname = if_list->mld[inx].name;
@@ -2533,21 +2582,9 @@ static int find_link_vaps(struct interface_list *if_list, uint8_t inx,
 		}
 
 		if (libstats_is_ifname_valid(temp_name, STATS_OBJ_LINK)) {
-			/* Current assumption is that link number directly
-			 * corresponds to wifi. Eg link0->wifi0, link1->wifi1
-			 * once a parent object is introduced inside each link,
-			 * this logic will be changed.
-			 */
-			if (!strncmp(temp_name, "link0", IFNAME_LEN)) {
-				strlcpy(parent, "wifi0", IFNAME_LEN);
-				link_id = 0;
-			} else if (!strncmp(temp_name, "link1", IFNAME_LEN)) {
-				strlcpy(parent, "wifi1", IFNAME_LEN);
-				link_id = 1;
-			} else if (!strncmp(temp_name, "link2", IFNAME_LEN)) {
-				strlcpy(parent, "wifi2", IFNAME_LEN);
-				link_id = 2;
-			}
+
+			link_id = get_mld_link_id(path, temp_name);
+			get_mld_link_parent(path, temp_name, parent);
 
 			if (!strncmp(parent, rifname, IFNAME_LEN)) {
 				temp_obj = alloc_object(STATS_OBJ_VAP, ifname);
