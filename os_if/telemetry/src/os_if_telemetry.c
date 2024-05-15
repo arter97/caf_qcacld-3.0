@@ -92,6 +92,8 @@ QDF_STATUS os_if_telemetry_stats_service(struct wlan_objmgr_vdev *vdev,
 
 	switch (spt) {
 	case QCA_ASYNC_STATS_TYPE_FLOW_STATS:
+	case QCA_ASYNC_STATS_TYPE_CLASSIFIED_FLOW_STATS:
+		ucfg_dp_flow_stats_policy(spt, action);
 		break;
 
 	case QCA_ASYNC_STATS_TYPE_POWERSAVE:
