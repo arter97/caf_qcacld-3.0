@@ -2155,7 +2155,7 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 				   struct hdd_adapter *adapter)
 {
 	struct hdd_ap_ctx *ap_ctx;
-	uint8_t sta_cnt, sap_cnt;
+	uint8_t sap_cnt;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	struct sap_context *sap_ctx;
 	bool ch_valid;
@@ -2193,10 +2193,6 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 	 * today. But this needs to be re-visited when we start
 	 * supporting this combo.
 	 */
-	sta_cnt = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-							    PM_STA_MODE,
-							    NULL);
-	if (!sta_cnt)
 		qdf_status =
 		policy_mgr_nan_sap_post_enable_conc_check(hdd_ctx->psoc);
 	if (qdf_status == QDF_STATUS_E_PENDING) {
