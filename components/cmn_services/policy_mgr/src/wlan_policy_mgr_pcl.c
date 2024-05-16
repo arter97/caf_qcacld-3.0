@@ -1781,10 +1781,15 @@ static enum policy_mgr_pcl_type policy_mgr_get_pcl_5_port(
 		return PM_MAX_PCL_TYPE;
 	}
 
-	if (mode != PM_SAP_MODE && mode != PM_NDI_MODE) {
-		policy_mgr_err("Can't start 5th port if not SAP, NDI");
+	if (mode != PM_SAP_MODE &&
+	    mode != PM_NDI_MODE &&
+	    mode != PM_P2P_GO_MODE &&
+	    mode != PM_P2P_CLIENT_MODE) {
+		policy_mgr_err("Can't start 5th port if not SAP/NDI/P2P");
 		return PM_MAX_PCL_TYPE;
 	}
+	if (mode == PM_P2P_CLIENT_MODE)
+		mode = PM_STA_MODE;
 
 	fifth_index =
 		policy_mgr_get_fifth_connection_pcl_table_index(psoc);
@@ -3343,6 +3348,38 @@ policy_mgr_get_index_for_ml_sta_sap_dbs(
 		*index = PM_STA_SAP_5_STA_24_DBS;
 }
 
+#ifdef FEATURE_FIFTH_CONNECTION
+static void policy_mgr_get_index_for_ml_sta_p2p_nan_dbs(
+	struct policy_mgr_psoc_priv_obj *pm_ctx,
+	enum policy_mgr_four_connection_mode *index, qdf_freq_t p2p_freq,
+	qdf_freq_t *ml_freq, uint8_t *ml_sta_idx)
+{
+	/*
+	 * Both the links of an ML-STA can't be on 2GHz for now. So, below case
+	 * represents that both are 5GHz links
+	 */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq[ml_sta_idx[0]]) ==
+	    WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq[ml_sta_idx[1]])) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(p2p_freq))
+			*index = PM_NAN_DISC_STA_STA_5_MCC_P2P_24_DBS;
+		else
+			*index = PM_NAN_DISC_STA_STA_P2P_5_SCC_MCC_DBS;
+	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(p2p_freq)) {
+		if (ml_freq[ml_sta_idx[0]] == p2p_freq ||
+		    ml_freq[ml_sta_idx[1]] == p2p_freq)
+			*index = PM_NAN_DISC_STA_P2P_24_SCC_STA_5_DBS;
+		else
+			*index = PM_NAN_DISC_STA_P2P_24_MCC_STA_5_DBS;
+	} else {
+		if (ml_freq[ml_sta_idx[0]] == p2p_freq ||
+		    ml_freq[ml_sta_idx[1]] == p2p_freq)
+			*index = PM_NAN_DISC_STA_24_STA_P2P_SCC_5_DBS;
+		else
+			*index = PM_NAN_DISC_STA_24_STA_P2P_MCC_5_DBS;
+	}
+}
+#endif
+
 /**
  * policy_mgr_get_index_for_ml_sta_sap_hwmode_sbs() - Find the index for next
  * connection for ML STA + SAP, in case current HW mode is SBS but ML STA is
@@ -3717,6 +3754,12 @@ policy_mgr_get_index_for_ml_sta_sap_sap(
 			enum policy_mgr_three_connection_mode *index,
 			qdf_freq_t ml_sta_freq, qdf_freq_t sap_freq_1,
 			qdf_freq_t sap_freq_2) {}
+
+static inline void policy_mgr_get_index_for_ml_sta_p2p_nan_dbs(
+	struct policy_mgr_psoc_priv_obj *pm_ctx,
+	enum policy_mgr_four_connection_mode *index, qdf_freq_t p2p_freq,
+	qdf_freq_t *ml_freq, uint8_t *ml_sta_idx)
+{}
 #endif /* WLAN_FEATURE_11BE_MLO */
 
 enum policy_mgr_three_connection_mode
@@ -4028,6 +4071,7 @@ enum policy_mgr_four_connection_mode
 	uint32_t count_sap = 0;
 	uint32_t count_ndi = 0;
 	uint32_t count_nan_disc = 0;
+	uint8_t count_p2p;
 	uint8_t num_ml_sta = 0, num_non_ml_sta = 0;
 	uint32_t list_sap[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint32_t list_ndi[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
@@ -4035,6 +4079,7 @@ enum policy_mgr_four_connection_mode
 	uint8_t ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint8_t non_ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t p2p_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -4056,14 +4101,25 @@ enum policy_mgr_four_connection_mode
 					psoc, PM_NDI_MODE, list_ndi);
 	count_nan_disc = policy_mgr_mode_specific_connection_count(
 					psoc, PM_NAN_DISC_MODE, list_nan_disc);
+	count_p2p = policy_mgr_get_mode_specific_conn_info(psoc, p2p_freq_list,
+							   NULL,
+							   PM_P2P_CLIENT_MODE);
+	count_p2p += policy_mgr_get_mode_specific_conn_info(psoc,
+					&p2p_freq_list[count_p2p], NULL,
+					PM_P2P_GO_MODE);
 
-	policy_mgr_debug("sap:%d ndi:%d nan disc:%d ml_sta:%d",
+	policy_mgr_debug("sap:%d ndi:%d nan disc:%d ml_sta:%d p2p: %d",
 			 count_sap, count_ndi, count_nan_disc,
 			 num_ml_sta);
 	if (num_ml_sta == 2 && count_sap == 1 && count_nan_disc == 1)
 		index = PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS;
 	else if (num_ml_sta == 2 && count_nan_disc == 1 && count_ndi == 1)
 		index = PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS;
+	else if (num_ml_sta == 2 && count_p2p == 1 && count_nan_disc == 1)
+		policy_mgr_get_index_for_ml_sta_p2p_nan_dbs(pm_ctx, &index,
+							    p2p_freq_list[0],
+							    freq_list,
+							    ml_sta_idx);
 	else
 		index =  PM_MAX_FOUR_CONNECTION_MODE;
 

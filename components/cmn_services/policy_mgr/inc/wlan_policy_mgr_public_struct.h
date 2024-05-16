@@ -1387,12 +1387,23 @@ enum policy_mgr_three_connection_mode {
 };
 #endif
 
-#ifdef FEATURE_FIFTH_CONNECTION
 /**
  * enum policy_mgr_four_connection_mode - Combination of first four
  * connection type, concurrency state, band used.
  * @PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS: NAN on 2GHz, both STA SCC
  * or MCC on 2GHz/5GHz and SAP SCC on 2GHz
+ * @PM_NAN_ML_STA_P2P_SCC_MCC_DBS: Generic PCL index for NAN+ML-STA+P2P
+ * @PM_NAN_ML_STA_P2P_SCC_MCC_DBS: Generic PCL index for NAN+ML-STA+P2P
+ * @PM_NAN_DISC_STA_24_STA_P2P_SCC_5_DBS: NAN & STA on 2GHz and STA & P2P SCC
+ *					  on 5GHz
+ * @PM_NAN_DISC_STA_24_STA_P2P_MCC_5_DBS: NAN & STA on 2GHz and STA & P2P MCC
+ *					  on 5GHz
+ * @PM_NAN_DISC_STA_P2P_24_SCC_STA_5_DBS: NAN, STA & P2P SCC on 2GHz and STA
+ *					  on 5GHz
+ * @PM_NAN_DISC_STA_P2P_24_MCC_STA_5_DBS: NAN, STA & P2P MCC on 2GHz and STA
+ *					  on 5GHz
+ * @PM_NAN_DISC_STA_STA_5_MCC_P2P_24_DBS: NAN & P2P on 2GHz and ML-STA on 5 GHz
+ * @PM_NAN_DISC_STA_STA_P2P_5_SCC_MCC_DBS: NAN on 2GHz and ML-STA & P2P on 5GHz
  * @PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS : NAN on 2GHz, NDI on 2GHz/5GHz
  * and both STA SCC or MCC on 2GHz/5GHz,
  * @PM_MAX_FOUR_CONNECTION_MODE: Maximum enumeration
@@ -1400,11 +1411,20 @@ enum policy_mgr_three_connection_mode {
 enum policy_mgr_four_connection_mode {
 	/* NAN disc + ML-STA + SAP */
 	PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS,
+
+	/* NAN disc + ML-STA + P2P */
+	PM_NAN_ML_STA_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_STA_24_STA_P2P_SCC_5_DBS = PM_NAN_ML_STA_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_STA_24_STA_P2P_MCC_5_DBS = PM_NAN_ML_STA_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_STA_P2P_24_SCC_STA_5_DBS = PM_NAN_ML_STA_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_STA_P2P_24_MCC_STA_5_DBS = PM_NAN_ML_STA_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_STA_STA_5_MCC_P2P_24_DBS = PM_NAN_ML_STA_P2P_SCC_MCC_DBS,
+	PM_NAN_DISC_STA_STA_P2P_5_SCC_MCC_DBS = PM_NAN_ML_STA_P2P_SCC_MCC_DBS,
+
 	/* NAN disc + NDI + ML-STA */
 	PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS,
 	PM_MAX_FOUR_CONNECTION_MODE,
 };
-#endif
 
 /**
  * enum policy_mgr_conc_next_action - actions to be taken on old
