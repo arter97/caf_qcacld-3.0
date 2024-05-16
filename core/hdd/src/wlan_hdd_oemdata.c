@@ -1523,7 +1523,8 @@ void hdd_oem_event_smem_cb(const struct oem_data *oem_event_data)
 	if (link_info)
 		wdev = &link_info->adapter->wdev;
 
-	pld_oem_event_smem_write(qdf_dev->dev, 1, (const __u8 *)oem_event_data,
+	pld_oem_event_smem_write(qdf_dev->dev, 1,
+				 (const __u8 *)oem_event_data->data,
 				 oem_event_data->data_len);
 	hdd_exit();
 }
