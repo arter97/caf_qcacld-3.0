@@ -862,6 +862,25 @@ static const struct ieee80211_iface_limit
 
 #if defined(WLAN_FEATURE_NAN) && \
 	   (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
+/* STA + STA + SAP + NAN */
+static const struct ieee80211_iface_limit
+	wlan_hdd_sta_sta_sap_nan_iface_limit[] = {
+	{
+		/* STA */
+		.max = 2,
+		.types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+		/* SAP */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_AP)
+	},
+	{
+		/* NAN */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_NAN),
+	},
+};
 /* STA + NAN disc combination */
 static const struct ieee80211_iface_limit
 	wlan_hdd_sta_nan_iface_limit[] = {
@@ -993,6 +1012,14 @@ static struct ieee80211_iface_combination
 	},
 #if defined(WLAN_FEATURE_NAN) && \
 	   (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
+	/* STA + STA + SAP + NAN*/
+	{
+		.limits = wlan_hdd_sta_sta_sap_nan_iface_limit,
+		.num_different_channels = 3,
+		.max_interfaces = 4,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_sta_sap_nan_iface_limit),
+		.beacon_int_infra_match = true,
+	},
 	/* NAN + STA */
 	{
 		.limits = wlan_hdd_sta_nan_iface_limit,
@@ -23700,6 +23727,37 @@ static bool wlan_hdd_is_sta_sap_concurrency_present(uint8_t idx)
 }
 
 /**
+ * wlan_hdd_is_sap_sta_nan_concurrency_present() - This API checks whether SAP,
+ * STA and NDP present in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if SAP, STA and NAN interface is present otherwise false
+ */
+static bool wlan_hdd_is_sap_sta_nan_concurrency_present(uint8_t idx)
+{
+	int j = 0;
+	bool nan_present = false;
+	bool sap_present = false;
+	bool sta_present = false;
+
+	if (wlan_hdd_iface_combination[idx].max_interfaces != 4)
+		return false;
+	for (j = 0; j < wlan_hdd_iface_combination[idx].n_limits; j++) {
+		if (wlan_hdd_iface_combination[idx].limits[j].types ==
+		    BIT(NL80211_IFTYPE_NAN))
+			nan_present = true;
+		else if (wlan_hdd_iface_combination[idx].limits[j].types ==
+			 BIT(NL80211_IFTYPE_AP))
+			sap_present = true;
+		else if (wlan_hdd_iface_combination[idx].limits[j].types ==
+			 BIT(NL80211_IFTYPE_STATION))
+			sta_present = true;
+	}
+
+	return (nan_present && sap_present && sta_present);
+}
+
+/**
  * wlan_hdd_is_sta_nan_concurrency_present() - This API checks whether STA and
  * NAN present in the interface combination
  * @idx: index for interface combination array
@@ -23711,6 +23769,9 @@ static bool wlan_hdd_is_sta_nan_concurrency_present(uint8_t idx)
 	int j = 0;
 	bool nan_present = false;
 	bool sta_present = false;
+
+	if (wlan_hdd_iface_combination[idx].max_interfaces != 2)
+		return false;
 
 	for (j = 0; j < wlan_hdd_iface_combination[idx].n_limits; j++) {
 		if (wlan_hdd_iface_combination[idx].limits[j].types ==
@@ -23736,6 +23797,9 @@ static bool wlan_hdd_is_sap_nan_concurrency_present(uint8_t idx)
 	int j = 0;
 	bool nan_present = false;
 	bool sap_present = false;
+
+	if (wlan_hdd_iface_combination[idx].max_interfaces != 2)
+		return false;
 
 	for (j = 0; j < wlan_hdd_iface_combination[idx].n_limits; j++) {
 		if (wlan_hdd_iface_combination[idx].limits[j].types ==
@@ -23872,6 +23936,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
 	bool no_p2p_concurrency, no_sap_nan_concurrency, no_sta_sap_concurrency;
 	bool no_sta_nan_concurrency, sta_sap_p2p_concurrency;
+	bool sap_sta_nan_concurrency;
 	uint8_t num;
 	QDF_STATUS status;
 
@@ -23891,6 +23956,8 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	no_sap_nan_concurrency = cfg_get(psoc, CFG_NO_SAP_NAN_CONCURRENCY);
 	no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
 	sta_sap_p2p_concurrency = cfg_get(psoc, CFG_STA_SAP_P2P_CONCURRENCY);
+	sap_sta_nan_concurrency = cfg_get(psoc,
+					  CFG_SAP_STA_NDP_CONCURRENCY);
 
 	num = ARRAY_SIZE(wlan_hdd_iface_combination);
 
@@ -23917,15 +23984,29 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 							i))
 			continue;
 
-		/* remove STA NAN concurrency */
-		if (no_sta_nan_concurrency &&
-		    wlan_hdd_is_sta_nan_concurrency_present(i))
+		/* remove SAP STA NAN concurrency */
+		if (!sap_sta_nan_concurrency &&
+		    wlan_hdd_is_sap_sta_nan_concurrency_present(i))
 			continue;
 
-		/* remove SAP NAN concurrency */
-		if (no_sap_nan_concurrency &&
-		    wlan_hdd_is_sap_nan_concurrency_present(i))
-			continue;
+		if (sap_sta_nan_concurrency) {
+			/* remove STA NAN concurrency */
+			if (wlan_hdd_is_sta_nan_concurrency_present(i))
+				continue;
+			/* remove SAP NAN concurrency */
+			if (wlan_hdd_is_sap_nan_concurrency_present(i))
+				continue;
+		} else {
+			/* remove STA NAN concurrency */
+			if (no_sta_nan_concurrency &&
+			    wlan_hdd_is_sta_nan_concurrency_present(i))
+				continue;
+
+			 /* remove SAP NAN concurrency */
+			if (no_sap_nan_concurrency &&
+			    wlan_hdd_is_sap_nan_concurrency_present(i))
+				continue;
+		}
 
 		/* remove STA SAP concurrency */
 		if (no_sta_sap_concurrency &&
