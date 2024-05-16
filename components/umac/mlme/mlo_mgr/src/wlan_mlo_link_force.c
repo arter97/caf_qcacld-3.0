@@ -42,6 +42,8 @@
 /* Compute disallowed mode bitmap 2 links at a time */
 #define MAX_DISALLOW_MODE_LINK_NUM     2
 
+#define NAN_2G_CHANNEL                  2437
+
 static
 void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 			    struct wlan_objmgr_vdev *vdev,
@@ -2748,7 +2750,8 @@ ml_nlink_handle_legacy_sap_intf(struct wlan_objmgr_psoc *psoc,
 	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t i = 0;
-	bool sap_2g_only = false;
+	bool sap_2g_only = false, is_nan_present = false;
+	uint32_t list_nan_disc[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 
 	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
@@ -2771,6 +2774,24 @@ ml_nlink_handle_legacy_sap_intf(struct wlan_objmgr_psoc *psoc,
 			  sap_vdev_id, sap_freq);
 		sap_2g_only = true;
 	}
+
+	is_nan_present = policy_mgr_mode_specific_connection_count(
+					psoc, PM_NAN_DISC_MODE, list_nan_disc);
+
+	/*
+	 * Force inctive 2GHz link if SAP + ML-sta is causing MCC
+	 */
+
+	for (i = 0; i < ml_num_link; i++) {
+		/*
+		 * check if NAN is present and causing mcc with SAP
+		 */
+		if (wlan_reg_is_24ghz_ch_freq(ml_freq_lst[i]) &&
+		    ml_freq_lst[i] != NAN_2G_CHANNEL &&
+		    is_nan_present)
+			force_cmd->force_inactive_bitmap |= 1 << ml_linkid_lst[i];
+	}
+
 	/*
 	 * If SAP is on 5G or 6G, SAP can always force SCC to 5G/6G ML STA or
 	 * 2G ML STA, no need force SCC link.
@@ -2924,6 +2945,40 @@ ml_nlink_handle_legacy_p2p_intf(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
+static void ml_nlink_handle_legacy_nan_intf(struct wlan_objmgr_psoc *psoc,
+					    struct ml_link_force_state *force_cmd,
+					    struct wlan_objmgr_vdev *vdev)
+{
+	uint32_t list_nan_disc[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t is_nan_present = 0;
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t i = 0;
+
+	is_nan_present = policy_mgr_mode_specific_connection_count(
+					psoc, PM_NAN_DISC_MODE, list_nan_disc);
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	/* no need to in active in case of one link */
+	if (ml_num_link < 2)
+		return;
+	/* check only for 2GHz ml link
+	 * inactive if it is leading to mcc
+	 */
+	for (i = 0; i < ml_num_link; i++) {
+		if (wlan_reg_is_24ghz_ch_freq(ml_freq_lst[i]) &&
+		    ml_freq_lst[i] != NAN_2G_CHANNEL && is_nan_present)
+			force_cmd->force_inactive_bitmap |= 1 << ml_linkid_lst[i];
+	}
+}
+
 static void
 ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
@@ -2990,6 +3045,7 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 		disallow_mcc = true;
 		break;
 	case PM_SAP_MODE:
+		ml_nlink_handle_legacy_nan_intf(psoc, force_cmd, vdev);
 		break;
 	default:
 		/* unexpected legacy connection mode */
@@ -3570,6 +3626,8 @@ ml_nlink_handle_legacy_intf(struct wlan_objmgr_psoc *psoc,
 			ml_nlink_handle_legacy_p2p_intf(
 				psoc, vdev, force_cmd, vdev_lst[0],
 				freq_lst[0]);
+			break;
+		case PM_NAN_DISC_MODE:
 			break;
 		default:
 			/* unexpected legacy connection count */
@@ -4865,7 +4923,8 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	if (!(op_mode == QDF_SAP_MODE ||
 	      op_mode == QDF_P2P_GO_MODE ||
 	      op_mode == QDF_STA_MODE ||
-	      op_mode == QDF_P2P_CLIENT_MODE)) {
+	      op_mode == QDF_P2P_CLIENT_MODE ||
+	      op_mode == QDF_NAN_DISC_MODE)) {
 		mlo_debug("op_mode: %d", op_mode);
 		goto end;
 	}
@@ -4997,7 +5056,8 @@ ml_nlink_undo_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	if (!(op_mode == QDF_SAP_MODE ||
 	      op_mode == QDF_P2P_GO_MODE ||
 	      op_mode == QDF_STA_MODE ||
-	      op_mode == QDF_P2P_CLIENT_MODE)) {
+	      op_mode == QDF_P2P_CLIENT_MODE ||
+	      op_mode == QDF_NAN_DISC_MODE)) {
 		mlo_debug("op_mode: %d", op_mode);
 		goto end;
 	}
@@ -5414,6 +5474,135 @@ end:
 	return status;
 }
 
+/**
+ * ml_nlink_nan_pre_enable_handler() - Disable eMLSR in case of nan pre-enable
+ * @psoc: psoc object
+ * @vdev:vdev object
+ * @evt: event type
+ * @data: event data
+ *
+ * Return: success
+ */
+static QDF_STATUS
+ml_nlink_nan_pre_enable_handler(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				enum ml_nlink_change_event_type evt,
+				struct ml_nlink_change_event *data)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *ml_vdev = NULL;
+	uint32_t old_emlsr_disable_req;
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint8_t ml_vdev_lst[WLAN_MAX_ML_BSS_LINKS];
+	qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS];
+	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t i;
+	uint32_t link_5g_num = 0;
+
+	if (!policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) ||
+	    !wlan_mlme_is_aux_emlsr_support(psoc))
+		return QDF_STATUS_SUCCESS;
+
+	ml_vdev = ml_nlink_get_affect_ml_sta(psoc);
+	if (!ml_vdev)
+		goto end;
+
+	ml_nlink_get_link_info(psoc, ml_vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	if (ml_num_link < 2)
+		goto end;
+
+	for (i = 0; i < ml_num_link; i++) {
+		if (ml_vdev_lst[i] == WLAN_INVALID_VDEV_ID)
+			continue;
+		if (policy_mgr_vdev_is_force_inactive(psoc, ml_vdev_lst[i]))
+			continue;
+		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i]))
+			link_5g_num++;
+	}
+	/* 5G link num < 2, emlsr is not available, no need to disallow it */
+	if (link_5g_num < 2)
+		goto end;
+
+	old_emlsr_disable_req =
+	ml_nlink_get_emlsr_mode_disable_req(psoc, ml_vdev);
+	if (old_emlsr_disable_req) {
+		mlo_debug("emlsr is disabled already");
+		goto end;
+	}
+
+	/* eMLSR disable by disallow_bitmap update */
+	old_emlsr_disable_req =
+	ml_nlink_set_emlsr_mode_disable_req(
+		psoc, ml_vdev, ML_EMLSR_DISALLOW_BY_NAN_DISC);
+	if (old_emlsr_disable_req) {
+		mlo_debug("emlsr is disabled already");
+		goto end;
+	}
+
+	status = ml_nlink_update_non_force_disallow_bitmap(
+				psoc, ml_vdev, evt, data,
+				MLO_LINK_FORCE_REASON_CONNECT,
+				link_ctrl_f_sync_set_link);
+	if (status == QDF_STATUS_E_PENDING)
+		status = QDF_STATUS_SUCCESS;
+
+end:
+	if (ml_vdev)
+		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
+
+	return status;
+}
+
+/**
+ * ml_nlink_nan_post_disable_handler() - Re-evaluate eMLSR in case of
+ * nan pre-enable
+ * @psoc: psoc object
+ * @vdev:vdev object
+ * @evt: event type
+ * @data: event data
+ *
+ * Return: success
+ */
+
+static QDF_STATUS
+ml_nlink_nan_post_disable_handler(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  enum ml_nlink_change_event_type evt,
+				  struct ml_nlink_change_event *data)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *ml_vdev = NULL;
+	uint32_t old_emlsr_disable_req;
+
+	if (!policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) ||
+	    !wlan_mlme_is_aux_emlsr_support(psoc))
+		return QDF_STATUS_SUCCESS;
+	     ml_vdev = ml_nlink_get_affect_ml_sta(psoc);
+	if (!ml_vdev)
+		goto end;
+
+	old_emlsr_disable_req =
+	ml_nlink_clr_emlsr_mode_disable_req(
+			psoc, ml_vdev,
+			ML_EMLSR_DISALLOW_BY_NAN_DISC);
+
+	if (old_emlsr_disable_req & ML_EMLSR_DISALLOW_BY_NAN_DISC)
+		ml_nlink_set_emlsr_mode_disable_req(
+					psoc, ml_vdev,
+					ML_EMLSR_DISALLOW_BY_OPP_TIMER);
+end:
+	if (ml_vdev)
+		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
+
+	return status;
+}
+
 static QDF_STATUS ml_nlink_emlsr_opportunistic_timer_handler(
 		struct wlan_objmgr_psoc *psoc,
 		struct wlan_objmgr_vdev *vdev,
@@ -5513,6 +5702,9 @@ static void ml_nlink_check_stop_start_emlsr_timer(
 	case ml_nlink_ap_csa_start_evt:
 	case ml_nlink_ap_csa_end_evt:
 	case ml_nlink_ap_start_failed_evt:
+	case ml_nlink_nan_pre_enable_evt:
+	case ml_nlink_nan_post_enable_evt:
+	case ml_nlink_nan_post_disable_evt:
 		break;
 	default:
 		return;
@@ -5691,6 +5883,27 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 	case ml_nlink_vendor_cmd_request_evt:
 		status = ml_nlink_vendor_cmd_handler(
 			psoc, vdev, evt, data);
+		break;
+	case ml_nlink_nan_pre_enable_evt:
+		mlo_debug("NAN Pre-enable");
+		status = ml_nlink_nan_pre_enable_handler(
+			psoc, vdev, evt, data);
+		break;
+	case ml_nlink_nan_post_enable_evt:
+		status = ml_nlink_state_change_handler(
+			psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
+			evt, data);
+		mlo_debug("NAN Post-enable");
+		break;
+	case ml_nlink_nan_post_disable_evt:
+		/* reset NAN eMLSR disallowed bit */
+		status = ml_nlink_nan_post_disable_handler(
+			psoc, vdev, evt, data);
+		/* re-evaluate inactive link */
+		status = ml_nlink_state_change_handler(
+			psoc, vdev, MLO_LINK_FORCE_REASON_DISCONNECT,
+			evt, data);
+		mlo_debug("NAN Post-disable");
 		break;
 	default:
 		break;

@@ -86,11 +86,13 @@ enum ml_emlsr_disable_request {
 	ML_EMLSR_DOWNGRADE_BY_STA_START = 1 << 4,
 	ML_EMLSR_DISALLOW_BY_OPP_TIMER = 1 << 5,
 	ML_EMLSR_DOWNGRADE_BY_OPP_TIMER = 1 << 6,
+	ML_EMLSR_DISALLOW_BY_NAN_DISC = 1 << 7,
 };
 
 #define ML_EMLSR_DISALLOW_MASK_ALL (ML_EMLSR_DISALLOW_BY_CONCURENCY | \
 				    ML_EMLSR_DISALLOW_BY_AP_CSA | \
-				    ML_EMLSR_DISALLOW_BY_OPP_TIMER)
+				    ML_EMLSR_DISALLOW_BY_OPP_TIMER | \
+				    ML_EMLSR_DISALLOW_BY_NAN_DISC)
 
 #define ML_EMLSR_DOWNGRADE_MASK_ALL (ML_EMLSR_DOWNGRADE_BY_AP_CSA | \
 				     ML_EMLSR_DOWNGRADE_BY_AP_START | \
@@ -216,6 +218,9 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_vendor_cmd_request_evt);
 	CASE_RETURN_STRING(ml_nlink_post_set_link_evt);
 	CASE_RETURN_STRING(ml_nlink_emlsr_timeout_evt);
+	CASE_RETURN_STRING(ml_nlink_nan_pre_enable_evt);
+	CASE_RETURN_STRING(ml_nlink_nan_post_enable_evt);
+	CASE_RETURN_STRING(ml_nlink_nan_post_disable_evt);
 	default:
 		return "Unknown";
 	}
