@@ -58,10 +58,14 @@
 
 #define MAX_MAC 2
 
+#ifdef FEATURE_FIFTH_CONNECTION
+#define MAX_NUMBER_OF_CONC_CONNECTIONS 5
+#else
 #ifdef FEATURE_FOURTH_CONNECTION
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 4
 #else
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 3
+#endif
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -1197,6 +1201,8 @@ enum policy_mgr_two_connection_mode {
  * and second STA on 5Ghz SMM
  * @PM_NAN_DISC_24_STA_24_STA_5_DBS: NAN Disc on 2.4Ghz and first STA on 2.4Ghz
  * and second STA on 5Ghz DBS
+ * @PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS: NAN Disc on 2.4Ghz and and STA,
+ * SAP SCC MCC on DBS
  * @PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS: ANY 2 link on 5 GHZ high mac
  * and one link on 5 GHZ low doing SBS
  * @PM_STA_24_SAP_5_HIGH_MCC_STA_5_LOW_SBS : First STA on 2.4 GHZ & SAP on high
@@ -1269,6 +1275,7 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_24_STA_5_STA_24_DBS,
 	PM_NAN_DISC_24_STA_24_STA_5_SMM,
 	PM_NAN_DISC_24_STA_24_STA_5_DBS,
+	PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS,
 	PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_24_SAP_5_HIGH_MCC_STA_5_LOW_SBS =
 		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
@@ -1303,6 +1310,25 @@ enum policy_mgr_three_connection_mode {
 	PM_24_5_PLUS_5_LOW_OR_HIGH_SHARE_SBS,
 
 	PM_MAX_THREE_CONNECTION_MODE,
+};
+#endif
+
+#ifdef FEATURE_FIFTH_CONNECTION
+/**
+ * enum policy_mgr_four_connection_mode - Combination of first four
+ * connection type, concurrency state, band used.
+ * @PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS: NAN on 2GHz, both STA SCC
+ * or MCC on 2GHz/5GHz and SAP SCC on 2GHz
+ * @PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS : NAN on 2GHz, NDI on 2GHz/5GHz
+ * and both STA SCC or MCC on 2GHz/5GHz,
+ * @PM_MAX_FOUR_CONNECTION_MODE: Maximum enumeration
+ */
+enum policy_mgr_four_connection_mode {
+	/* NAN disc + ML-STA + SAP */
+	PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS,
+	/* NAN disc + NDI + ML-STA */
+	PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS,
+	PM_MAX_FOUR_CONNECTION_MODE,
 };
 #endif
 

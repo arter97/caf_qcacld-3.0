@@ -564,6 +564,10 @@ config FIX_TXDMA_LIMITATION
 	bool "Enable FIX_TXDMA_LIMITATION"
 	default n
 
+config FIFTH_CONNECTION
+	bool "Enable FIFTH_CONNECTION"
+	default n
+
 config FOURTH_CONNECTION
 	bool "Enable FOURTH_CONNECTION"
 	default n
