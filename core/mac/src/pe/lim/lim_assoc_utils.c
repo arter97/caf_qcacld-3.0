@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,6 +60,9 @@
 #include <cdp_txrx_cfg.h>
 #include <cdp_txrx_cmn.h>
 #include <lim_mlo.h>
+#include "sir_mac_prot_def.h"
+#include "wlan_action_oui_public_struct.h"
+#include "wlan_action_oui_main.h"
 
 /**
  * lim_cmp_ssid() - utility function to compare SSIDs
@@ -319,9 +322,15 @@ QDF_STATUS lim_del_peer_info(struct mac_context *mac,
 	uint16_t i;
 	uint32_t  bitmap = 1 << CDP_PEER_DELETE_NO_SPECIAL;
 	bool peer_unmap_conf_support_enabled;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_psoc *psoc;
 
 	peer_unmap_conf_support_enabled =
 				cdp_cfg_get_peer_unmap_conf_support(soc);
+
+	psoc = wlan_vdev_get_psoc(pe_session->vdev);
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
 
 	for (i = 0; i < pe_session->dph.dphHashTable.size; i++) {
 		tpDphHashNode sta_ds;
@@ -330,6 +339,13 @@ QDF_STATUS lim_del_peer_info(struct mac_context *mac,
 					    &pe_session->dph.dphHashTable);
 		if (!sta_ds)
 			continue;
+
+		peer = wlan_objmgr_get_peer_by_mac(psoc, sta_ds->staAddr,
+						   WLAN_LEGACY_MAC_ID);
+		if (peer) {
+			wma_peer_tbl_trans_add_entry(peer, false, NULL);
+			wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+		}
 
 		cdp_peer_teardown(soc, pe_session->vdev_id, sta_ds->staAddr);
 		if (peer_unmap_conf_support_enabled)
@@ -2213,11 +2229,6 @@ static void lim_add_tdls_sta_6ghz_he_cap(struct mac_context *mac_ctx,
 #endif /* FEATURE_WLAN_TDLS */
 
 #ifdef WLAN_FEATURE_11BE
-static bool lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
-{
-	return add_sta_params->eht_capable;
-}
-
 static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 						  tpSirAssocRsp assoc_rsp)
 {
@@ -2229,11 +2240,6 @@ static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 	return false;
 }
 #else
-static bool lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
-{
-	return false;
-}
-
 static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 						  tpSirAssocRsp assoc_rsp)
 {
@@ -3668,6 +3674,38 @@ void lim_sta_add_bss_update_ht_parameter(uint32_t bss_chan_freq,
 		add_bss->ch_width = CH_WIDTH_20MHZ;
 }
 
+/**
+ * lim_limit_bw_for_iot_ap() - limit sta vdev band width for iot ap
+ *@mac_ctx: mac context
+ *@session: pe session
+ *@bss_desc: bss descriptor
+ *
+ * When connect IoT AP, limit sta vdev band width
+ *
+ * Return: None
+ */
+static void
+lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
+			struct pe_session *session,
+			struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr;
+	uint16_t ie_len;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+
+	if (wlan_action_oui_search(mac_ctx->psoc,
+				   &vendor_ap_search_attr,
+				   ACTION_OUI_LIMIT_BW)) {
+		pe_debug("Limit vdev %d bw to 40M for IoT AP",
+			 session->vdev_id);
+		wma_set_vdev_bw(session->vdev_id, eHT_CHANNEL_WIDTH_40MHZ);
+	}
+}
+
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp,
 				   tpSchBeaconStruct pBeaconStruct,
 				   struct bss_description *bssDescription,
@@ -4118,6 +4156,8 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		       retCode);
 	}
 	qdf_mem_free(pAddBssParams);
+
+	lim_limit_bw_for_iot_ap(mac, pe_session, bssDescription);
 
 returnFailure:
 	/* Clean-up will be done by the caller... */

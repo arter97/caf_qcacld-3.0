@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4052,6 +4052,7 @@ policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
 /**
  * policy_mgr_is_sap_freq_allowed - Check if the channel is allowed for sap
  * @psoc: PSOC object information
+ * @opmode: Current op_mode, helps to check whether it's P2P_GO/SAP
  * @sap_freq: channel frequency to be checked
  *
  * Check the factors as below to decide whether the channel is allowed or not:
@@ -4062,6 +4063,7 @@ policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
  * Return: true for allowed, else false
  */
 bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
+				    enum QDF_OPMODE opmode,
 				    uint32_t sap_freq);
 
 /**
@@ -4827,7 +4829,7 @@ bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/*
+/**
  * policy_mgr_is_ml_sta_links_in_mcc() - Check ML links are in MCC or not
  * @psoc: psoc ctx
  * @ml_freq_lst: ML STA freq list
@@ -4846,6 +4848,21 @@ policy_mgr_is_ml_sta_links_in_mcc(struct wlan_objmgr_psoc *psoc,
 				  uint8_t *ml_linkid_lst,
 				  uint8_t num_ml_sta,
 				  uint32_t *affected_linkid_bitmap);
+
+/**
+ * policy_mgr_is_ml_links_in_mcc_allowed() - Check ML links are in MCC or not
+ * @psoc: psoc ctx
+ * @vdev: Pointer to vdev object
+ * @ml_sta_vdev_lst: ML STA vdev id list
+ * @num_ml_sta: Number of total ML STA links
+ *
+ * Return: QDF_STATUS_SUCCESS if ML link in MCC is allowed
+ */
+QDF_STATUS
+policy_mgr_is_ml_links_in_mcc_allowed(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev,
+				      uint8_t *ml_sta_vdev_lst,
+				      uint8_t *num_ml_sta);
 
 /**
  * policy_mgr_is_vdev_high_tput_or_low_latency() - Check vdev has

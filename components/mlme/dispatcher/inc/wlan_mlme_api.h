@@ -355,11 +355,29 @@ wlan_mlme_get_wlm_multi_client_ll_caps(struct wlan_objmgr_psoc *psoc)
  *
  * Return: coex_unsafe_chan_nb_user_prefer
  */
-bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
+uint32_t wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
+		struct wlan_objmgr_psoc *psoc);
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_p2p_go(
+		struct wlan_objmgr_psoc *psoc);
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(
 		struct wlan_objmgr_psoc *psoc);
 #else
 static inline
-bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
+uint32_t wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_p2p_go(
 		struct wlan_objmgr_psoc *psoc)
 {
 	return false;
@@ -4956,4 +4974,15 @@ wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS
 wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
 				    uint8_t csa_status);
+
+/**
+ * wlan_mlme_is_hs_20_btm_offload_disabled() - Get BTM offload is enable/disable
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_is_hs_20_btm_offload_disabled(struct wlan_objmgr_psoc *psoc,
+					bool *val);
 #endif /* _WLAN_MLME_API_H_ */

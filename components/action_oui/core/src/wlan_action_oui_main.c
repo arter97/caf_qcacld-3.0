@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -208,6 +208,9 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 		      ACTION_OUI_MAX_STR_LEN);
 	qdf_str_lcopy(psoc_priv->action_oui_str[ACTION_OUI_DISABLE_BFORMEE],
 		      cfg_get(psoc, CFG_ACTION_OUI_DISABLE_BFORMEE),
+			      ACTION_OUI_MAX_STR_LEN);
+	qdf_str_lcopy(psoc_priv->action_oui_str[ACTION_OUI_LIMIT_BW],
+		      cfg_get(psoc, CFG_ACTION_OUI_LIMIT_BW),
 			      ACTION_OUI_MAX_STR_LEN);
 }
 

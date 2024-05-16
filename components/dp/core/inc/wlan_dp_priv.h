@@ -434,6 +434,7 @@ struct fisa_pkt_hist {
  * @last_accessed_ts: Timestamp when the flow was last accessed
  * @pkt_hist: FISA aggreagtion packets history
  * @same_mld_vdev_mismatch: Packets flushed after vdev_mismatch on same MLD
+ * @add_timestamp: FISA entry created timestamp
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -482,6 +483,7 @@ struct dp_fisa_rx_sw_ft {
 	struct fisa_pkt_hist pkt_hist;
 #endif
 	uint64_t same_mld_vdev_mismatch;
+	uint64_t add_timestamp;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)
@@ -692,9 +694,12 @@ struct wlan_dp_intf {
 	qdf_list_t dp_link_list;
 };
 
+#define WLAN_DP_LINK_MAGIC 0x5F44505F4C494E4B	/* "_DP_LINK" in ASCII */
+
 /**
  * struct wlan_dp_link - DP link (corresponds to objmgr vdev)
  * @node: list node for membership in the DP links list
+ * @magic: magic number to identify validity of dp_link
  * @link_id: ID for this DP link (Same as vdev_id)
  * @mac_addr: mac address of this link
  * @dp_intf: Parent DP interface for this DP link
@@ -709,6 +714,7 @@ struct wlan_dp_intf {
  */
 struct wlan_dp_link {
 	qdf_list_node_t node;
+	uint64_t magic;
 	uint8_t link_id;
 	struct qdf_mac_addr mac_addr;
 	struct wlan_dp_intf *dp_intf;

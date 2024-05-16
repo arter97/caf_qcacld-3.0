@@ -1656,6 +1656,8 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_STA;
 	struct wlan_hdd_link_info *link_info;
+	enum qca_wlan_vendor_phy_mode vendor_phy_mode =
+						QCA_WLAN_VENDOR_PHY_MODE_AUTO;
 
 	pdev = hdd_ctx->pdev;
 
@@ -1692,8 +1694,11 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 					hdd_country_change_bw_check(link_info,
 								    oper_freq);
 
-				if (!hdd_is_vdev_in_conn_state(link_info))
+				if (!hdd_is_vdev_in_conn_state(link_info)) {
+					hdd_set_vdev_phy_mode(adapter,
+							      vendor_phy_mode);
 					continue;
+				}
 
 				if (phy_changed || freq_changed ||
 				    width_changed) {
@@ -1704,6 +1709,8 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 							link_info,
 							REASON_UNSPEC_FAILURE,
 							false);
+					hdd_set_vdev_phy_mode(adapter,
+							      vendor_phy_mode);
 					sta_ctx->reg_phymode = csr_phy_mode;
 				} else {
 					hdd_debug("Remain on current channel but update tx power");
@@ -1954,7 +1961,8 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 	wiphy = pdev_priv->wiphy;
 	hdd_ctx = wiphy_priv(wiphy);
 
-	nb_flag = ucfg_mlme_get_coex_unsafe_chan_nb_user_prefer(hdd_ctx->psoc);
+	nb_flag = ucfg_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(
+								hdd_ctx->psoc);
 	reg_flag = ucfg_mlme_get_coex_unsafe_chan_reg_disable(hdd_ctx->psoc);
 
 	if (avoid_freq_ind && nb_flag && reg_flag)

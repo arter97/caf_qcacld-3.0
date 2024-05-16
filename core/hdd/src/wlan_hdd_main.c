@@ -250,6 +250,7 @@
 #include "cdp_txrx_mon.h"
 #include "os_if_ll_sap.h"
 #include "wlan_p2p_ucfg_api.h"
+#include "wlan_crypto_obj_mgr_i.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -1940,9 +1941,11 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	if ((config->dot11Mode == eHDD_DOT11_MODE_11ac ||
 	     config->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY) && !cfg->en_11ac)
 		config->dot11Mode = eHDD_DOT11_MODE_AUTO;
+
 	/* 11BE mode support */
-	if (!hdd_dot11Mode_support_11be(config->dot11Mode) &&
-	    cfg->en_11be) {
+	if (cfg->en_11be &&
+	    (!hdd_dot11Mode_support_11be(config->dot11Mode) ||
+	     !wlan_reg_phybitmap_support_11be(hdd_ctx->pdev))) {
 		hdd_debug("dot11Mode %d override target en_11be to false",
 			  config->dot11Mode);
 		cfg->en_11be = false;
@@ -2184,6 +2187,15 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 
 	if (ht_cap_info.short_gi_40_mhz && !cfg->ht_sgi_40)
 		ht_cap_info.short_gi_40_mhz = cfg->ht_sgi_40;
+
+	hdd_debug("gHtSMPS ini: %d, dynamic_smps fw cap: %d",
+		  ht_cap_info.mimo_power_save, cfg->dynamic_smps);
+	if (ht_cap_info.mimo_power_save == HDD_SMPS_MODE_DYNAMIC) {
+		if (cfg->dynamic_smps)
+			ht_cap_info.mimo_power_save = HDD_SMPS_MODE_DYNAMIC;
+		else
+			ht_cap_info.mimo_power_save = HDD_SMPS_MODE_DISABLED;
+	}
 
 	hdd_ctx->num_rf_chains = cfg->num_rf_chains;
 	hdd_ctx->ht_tx_stbc_supported = cfg->ht_tx_stbc;
@@ -9719,6 +9731,7 @@ static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	uint8_t link_id;
 
 	mode = adapter->device_mode;
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
@@ -9790,6 +9803,13 @@ static void hdd_stop_sap_go_adapter(struct hdd_adapter *adapter)
 		clear_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
 		qdf_mem_free(ap_ctx->beacon);
 		ap_ctx->beacon = NULL;
+
+		if (vdev) {
+			link_id = wlan_vdev_get_link_id(vdev);
+			ucfg_crypto_free_key_by_link_id(hdd_ctx->psoc,
+							&link_info->link_addr,
+							link_id);
+		}
 	}
 	/* Clear all the cached sta info */
 	hdd_clear_cached_sta_info(adapter);
@@ -14168,6 +14188,9 @@ static int __hdd_psoc_idle_restart(struct hdd_context *hdd_ctx)
 
 	ret = hdd_wlan_start_modules(hdd_ctx, false);
 
+	if (!qdf_is_fw_down())
+		cds_set_recovery_in_progress(false);
+
 	hdd_soc_idle_restart_unlock();
 
 	return ret;
@@ -17760,37 +17783,75 @@ QDF_STATUS hdd_md_bl_evt_cb(void *ctx, struct sir_md_bl_evt *event)
 }
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
-/**
- * hdd_ssr_on_pagefault_cb - Callback to trigger SSR because
- * of host wake up by firmware with reason pagefault
- *
- * Return: None
- */
-static void hdd_ssr_on_pagefault_cb(void)
+static QDF_STATUS hdd_ssr_on_pagefault_cb(struct hdd_context *hdd_ctx)
 {
 	uint32_t ssr_frequency_on_pagefault;
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	qdf_time_t curr_time;
+	qdf_time_t curr_time, ssr_threshold;
 
 	hdd_enter();
 
 	if (!hdd_ctx)
-		return;
+		return QDF_STATUS_E_NULL_VALUE;
 
 	ssr_frequency_on_pagefault =
 		ucfg_pmo_get_ssr_frequency_on_pagefault(hdd_ctx->psoc);
 
-	curr_time = qdf_get_time_of_the_day_ms();
+	curr_time = qdf_get_system_uptime();
+	ssr_threshold = qdf_system_msecs_to_ticks(ssr_frequency_on_pagefault);
 
 	if (!hdd_ctx->last_pagefault_ssr_time ||
-	    (curr_time - hdd_ctx->last_pagefault_ssr_time) >=
-					ssr_frequency_on_pagefault) {
+	    (curr_time - hdd_ctx->last_pagefault_ssr_time) >= ssr_threshold) {
 		hdd_info("curr_time %lu last_pagefault_ssr_time %lu ssr_frequency %d",
 			 curr_time, hdd_ctx->last_pagefault_ssr_time,
-			 ssr_frequency_on_pagefault);
+			 ssr_threshold);
 		hdd_ctx->last_pagefault_ssr_time = curr_time;
 		cds_trigger_recovery(QDF_HOST_WAKEUP_REASON_PAGEFAULT);
+
+		return QDF_STATUS_SUCCESS;
 	}
+
+	return QDF_STATUS_E_AGAIN;
+}
+
+#define FW_PAGE_FAULT_IDX QCA_NL80211_VENDOR_SUBCMD_FW_PAGE_FAULT_REPORT_INDEX
+static QDF_STATUS hdd_send_pagefault_report_to_user(struct hdd_context *hdd_ctx,
+						    void *buf, uint32_t buf_len)
+{
+	struct sk_buff *event_buf;
+	int flags = cds_get_gfp_flags();
+	uint8_t *ev_data = buf;
+	uint16_t event_len = NLMSG_HDRLEN + buf_len;
+
+	event_buf = wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
+						     event_len,
+						     FW_PAGE_FAULT_IDX, flags);
+	if (!event_buf) {
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	if (nla_put(event_buf, QCA_WLAN_VENDOR_ATTR_FW_PAGE_FAULT_REPORT_DATA,
+		    buf_len, ev_data)) {
+		hdd_debug("Failed to fill pagefault blob data");
+		wlan_cfg80211_vendor_free_skb(event_buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_cfg80211_vendor_event(event_buf, flags);
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS hdd_pagefault_action_cb(void *buf, uint32_t buf_len)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	if (wlan_pmo_enable_ssr_on_page_fault(hdd_ctx->psoc))
+		return hdd_ssr_on_pagefault_cb(hdd_ctx);
+
+	return hdd_send_pagefault_report_to_user(hdd_ctx, buf, buf_len);
 }
 
 /**
@@ -17901,7 +17962,7 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 	sme_async_oem_event_init(mac_handle,
 				 hdd_oem_event_async_cb);
 
-	sme_register_ssr_on_pagefault_cb(mac_handle, hdd_ssr_on_pagefault_cb);
+	sme_register_pagefault_cb(mac_handle, hdd_pagefault_action_cb);
 
 	hdd_exit();
 
@@ -18463,6 +18524,65 @@ wlan_hdd_mlo_sap_reinit(struct wlan_hdd_link_info *link_info)
 }
 #endif
 
+void wlan_hdd_set_sap_beacon_protection(struct hdd_context *hdd_ctx,
+					struct wlan_hdd_link_info *link_info,
+					struct hdd_beacon_data *beacon)
+{
+	const uint8_t *ie = NULL;
+	struct s_ext_cap *p_ext_cap;
+	struct wlan_objmgr_vdev *vdev;
+	bool target_bigtk_support = false;
+	uint8_t vdev_id;
+	uint8_t ie_len;
+
+	if (!beacon) {
+		hdd_err("beacon is null");
+		return;
+	}
+
+	ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_EXTCAP, beacon->tail,
+				      beacon->tail_len);
+	if (!ie) {
+		hdd_err("IE is null");
+		return;
+	}
+
+	if (ie[1] > DOT11F_IE_EXTCAP_MAX_LEN ||
+	    ie[1] < DOT11F_IE_EXTCAP_MIN_LEN) {
+		hdd_err("Invalid IEs eid: %d elem_len: %d", ie[0], ie[1]);
+		return;
+	}
+
+	p_ext_cap = qdf_mem_malloc(sizeof(*p_ext_cap));
+	if (!p_ext_cap)
+		return;
+
+	ie_len = (ie[1] > sizeof(*p_ext_cap)) ? sizeof(*p_ext_cap) : ie[1];
+
+	qdf_mem_copy(p_ext_cap, &ie[2], ie_len);
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		goto end;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	hdd_debug("vdev %d beacon protection %d", vdev_id,
+		  p_ext_cap->beacon_protection_enable);
+
+	ucfg_mlme_get_bigtk_support(hdd_ctx->psoc, &target_bigtk_support);
+
+	if (target_bigtk_support && p_ext_cap->beacon_protection_enable)
+		mlme_set_bigtk_support(vdev, true);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+
+end:
+	qdf_mem_free(p_ext_cap);
+}
+
 void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 {
 	struct hdd_ap_ctx *ap_ctx;
@@ -18506,6 +18626,8 @@ void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 				       ap_adapter->dev);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		goto end;
+
+	wlan_hdd_set_sap_beacon_protection(hdd_ctx, link_info, ap_ctx->beacon);
 
 	hdd_debug("Waiting for SAP to start");
 	qdf_status = qdf_wait_single_event(&hostapd_state->qdf_event,
@@ -19623,6 +19745,9 @@ void hdd_component_psoc_close(struct wlan_objmgr_psoc *psoc)
 	ucfg_fwol_psoc_close(psoc);
 	ucfg_dlm_psoc_close(psoc);
 	ucfg_mlme_psoc_close(psoc);
+
+	if (!cds_is_driver_recovering())
+		ucfg_crypto_flush_entries(psoc);
 }
 
 void hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)

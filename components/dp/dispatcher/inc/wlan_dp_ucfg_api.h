@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -74,6 +74,17 @@ ucfg_dp_is_disconect_after_roam_fail(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS ucfg_dp_update_link_mac_addr(struct wlan_objmgr_vdev *vdev,
 					struct qdf_mac_addr *new_mac_addr,
 					bool is_link_switch);
+
+/**
+ * ucfg_dp_update_def_link() - update DP interface default link
+ * @psoc: psoc handle
+ * @intf_mac: interface MAC address
+ * @vdev: objmgr vdev handle to set the def_link in dp_intf
+ *
+ */
+void ucfg_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
+			     struct qdf_mac_addr *intf_mac,
+			     struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_dp_update_intf_mac() - update DP interface MAC address
@@ -1633,4 +1644,12 @@ ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS ucfg_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 				  struct cdp_vdev_stats *buf);
 
+/*
+ * ucfg_dp_set_mon_conf_flags(): Set monitor configuration flags
+ * @psoc: psoc handle
+ * @flags: monitor configuration flags
+ *
+ * Return: None
+ */
+void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags);
 #endif /* _WLAN_DP_UCFG_API_H_ */

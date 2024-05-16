@@ -79,6 +79,7 @@ QDF_STATUS dp_allocate_ctx(void)
 	}
 
 	qdf_spinlock_create(&dp_ctx->intf_list_lock);
+	qdf_spinlock_create(&dp_ctx->dp_link_del_lock);
 	qdf_list_create(&dp_ctx->intf_list, 0);
 	TAILQ_INIT(&dp_ctx->inactive_dp_link_list);
 
@@ -227,6 +228,11 @@ bool is_dp_link_valid(struct wlan_dp_link *dp_link)
 
 	if (!dp_link) {
 		dp_err("link is NULL");
+		return false;
+	}
+
+	if (dp_link->magic != WLAN_DP_LINK_MAGIC) {
+		dp_err("dp_link %pK bad magic %llx", dp_link, dp_link->magic);
 		return false;
 	}
 
@@ -1195,6 +1201,7 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	}
 
 	/* Update Parent interface details */
+	dp_link->magic = WLAN_DP_LINK_MAGIC;
 	dp_link->dp_intf = dp_intf;
 	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
 	qdf_list_insert_front(&dp_intf->dp_link_list, &dp_link->node);
@@ -1252,14 +1259,26 @@ static void dp_link_handle_cdp_vdev_delete(struct wlan_dp_psoc_context *dp_ctx,
 {
 	qdf_spin_lock_bh(&dp_ctx->dp_link_del_lock);
 
+	dp_info("CDP vdev registered %d, vdev deleted %d",
+		dp_link->cdp_vdev_registered,
+		dp_link->cdp_vdev_deleted);
+
 	if (!dp_link->cdp_vdev_registered || dp_link->cdp_vdev_deleted) {
 		/* CDP vdev is not created/registered or already deleted */
+		dp_info("Free dp_link %pK id %d (" QDF_MAC_ADDR_FMT ")",
+			dp_link, dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
+		dp_link->magic = 0;
 		qdf_mem_free(dp_link);
 	} else {
 		/*
 		 * Add it to inactive dp_link list, and it will be freed when
 		 * the CDP vdev gets deleted
 		 */
+		dp_info("Add to inactive list dp_link %pK id %d ("
+			QDF_MAC_ADDR_FMT ")",
+			dp_link, dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		TAILQ_INSERT_TAIL(&dp_ctx->inactive_dp_link_list, dp_link,
 				  inactive_list_elem);
 		dp_link->destroyed = 1;
@@ -2011,12 +2030,11 @@ void wlan_dp_link_cdp_vdev_delete_notification(void *context)
 	struct wlan_dp_psoc_context *dp_ctx = NULL;
 	uint8_t found = 0;
 
-	/* TODO - What will happen if cdp vdev was never created ? */
-
 	/* dp_link will not be freed before this point. */
 	if (!dp_link)
 		return;
 
+	dp_info("dp_link %pK id %d", dp_link, dp_link->link_id);
 	dp_intf = dp_link->dp_intf;
 	dp_ctx = dp_intf->dp_ctx;
 
@@ -2041,9 +2059,17 @@ void wlan_dp_link_cdp_vdev_delete_notification(void *context)
 		else
 			qdf_assert_always(0);
 
+		dp_info("Free dp_link %pK id %d (" QDF_MAC_ADDR_FMT ")",
+			dp_link, dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
+		dp_link->magic = 0;
 		qdf_mem_free(dp_link);
 	} else {
 		/* dp_link not yet destroyed */
+		dp_info("CDP vdev delete for dp_link %pK id %d ("
+			QDF_MAC_ADDR_FMT ")",
+			dp_link, dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
 		dp_link->cdp_vdev_deleted = 1;
 	}
 
@@ -2770,3 +2796,50 @@ void wlan_dp_pdev_cfg_sync_profile(struct cdp_soc_t *cdp_soc, uint8_t pdev_id)
 	dp_err("pdev based config item not found in profile table");
 }
 #endif
+
+void __wlan_dp_update_def_link(struct wlan_objmgr_psoc *psoc,
+			       struct qdf_mac_addr *intf_mac,
+			       struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct qdf_mac_addr zero_addr = QDF_MAC_ADDR_ZERO_INIT;
+
+	dp_ctx =  dp_psoc_get_priv(psoc);
+
+	dp_intf = dp_get_intf_by_macaddr(dp_ctx, intf_mac);
+	if (!dp_intf) {
+		dp_err("DP interface not found addr:" QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(intf_mac->bytes));
+		QDF_BUG(0);
+		return;
+	}
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (dp_link && dp_link->dp_intf == dp_intf) {
+		dp_info("change dp_intf %pK(" QDF_MAC_ADDR_FMT
+			") def_link %d(" QDF_MAC_ADDR_FMT ") -> %d("
+			 QDF_MAC_ADDR_FMT ")",
+			dp_intf, QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes),
+			dp_intf->def_link->link_id,
+			QDF_MAC_ADDR_REF(dp_intf->def_link->mac_addr.bytes),
+			dp_link->link_id,
+			QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes));
+		dp_intf->def_link = dp_link;
+		return;
+	}
+
+	dp_info("Update failed dp_intf %pK(" QDF_MAC_ADDR_FMT ") from %pK("
+		QDF_MAC_ADDR_FMT ") to %pK(" QDF_MAC_ADDR_FMT ") (intf %pK("
+		QDF_MAC_ADDR_FMT ") id %d) ",
+		dp_intf, QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes),
+		dp_intf->def_link,
+		QDF_MAC_ADDR_REF(dp_intf->def_link->mac_addr.bytes),
+		dp_link, dp_link ? QDF_MAC_ADDR_REF(dp_link->mac_addr.bytes) :
+					QDF_MAC_ADDR_REF(zero_addr.bytes),
+		dp_link ? dp_link->dp_intf : NULL,
+		dp_link ? QDF_MAC_ADDR_REF(dp_link->dp_intf->mac_addr.bytes) :
+				QDF_MAC_ADDR_REF(zero_addr.bytes),
+		dp_link ? dp_link->link_id : WLAN_INVALID_LINK_ID);
+}

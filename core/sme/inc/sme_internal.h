@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -507,7 +507,7 @@ struct sme_context {
 			(const struct oem_data *oem_event_data);
 #endif
 
-	void (*ssr_on_pagefault_cb)(void);
+	QDF_STATUS (*pagefault_action_cb)(void *buf, uint32_t data);
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 	void (*latency_level_event_handler_cb)

@@ -1508,11 +1508,15 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 		weight_config->beamforming_cap_weightage;
 
 	/*
-	 * Don’t consider pcl weightage for STA connection,
-	 * if primary interface is configured.
+	 * Don’t consider pcl weightage if:
+	 * a) primary interface is configured (or)
+	 * b) HW is non-DBS
 	 */
-	if (policy_mgr_is_pcl_weightage_required(psoc))
+	if (policy_mgr_is_pcl_weightage_required(psoc) &&
+	    policy_mgr_is_hw_dbs_capable(psoc))
 		req_score_params->pcl_weightage = weight_config->pcl_weightage;
+	else
+		req_score_params->pcl_weightage = 0;
 
 	req_score_params->oce_wan_weightage = weight_config->oce_wan_weightage;
 	req_score_params->oce_ap_tx_pwr_weightage =
@@ -2981,10 +2985,10 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct wlan_mlme_btm *btm_cfg;
-	bool is_hs_20_ap;
+	bool is_hs_20_ap, is_hs_20_btm_offload_disabled;
 	struct cm_roam_values_copy temp;
-	uint8_t vdev_id;
-	bool abridge_flag;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	bool abridge_flag, is_disable_btm, assoc_btm_cap;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -2992,26 +2996,31 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 
 	btm_cfg = &mlme_obj->cfg.btm;
 	*btm_offload_config = btm_cfg->btm_offload_config;
-
 	/* Return if INI is disabled */
 	if (!(*btm_offload_config))
 		return;
 
-	if (!wlan_cm_get_assoc_btm_cap(vdev)) {
-		mlme_debug("BTM not supported, disable BTM offload");
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id, IS_DISABLE_BTM, &temp);
+	is_disable_btm = temp.bool_value;
+	assoc_btm_cap = wlan_cm_get_assoc_btm_cap(psoc, vdev_id);
+	if (!assoc_btm_cap || is_disable_btm) {
+		mlme_debug("disable btm offload vdev:%d btm_cap: %d is_btm: %d",
+			   vdev_id, assoc_btm_cap, is_disable_btm);
 		*btm_offload_config = 0;
 		return;
 	}
 
-	vdev_id = wlan_vdev_get_id(vdev);
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id, HS_20_AP, &temp);
 	is_hs_20_ap = temp.bool_value;
+	wlan_mlme_is_hs_20_btm_offload_disabled(psoc,
+						&is_hs_20_btm_offload_disabled);
 
 	/*
 	 * For RSO Stop/Passpoint R2 cert test case 5.11(when STA is connected
 	 * to Hotspot-2.0 AP), disable BTM offload to firmware
 	 */
-	if (command == ROAM_SCAN_OFFLOAD_STOP || is_hs_20_ap) {
+	if (command == ROAM_SCAN_OFFLOAD_STOP ||
+	    (is_hs_20_ap && is_hs_20_btm_offload_disabled)) {
 		mlme_debug("RSO cmd: %d is_hs_20_ap:%d", command,
 			   is_hs_20_ap);
 		*btm_offload_config = 0;
@@ -4949,7 +4958,8 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		is_up = QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev));
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
-	if (requested_state != WLAN_ROAM_DEINIT && !is_up) {
+	if ((requested_state != WLAN_ROAM_DEINIT &&
+	     requested_state != WLAN_ROAM_RSO_STOPPED) && !is_up) {
 		mlme_debug("ROAM: roam state(%d) change requested in non-connected state",
 			   requested_state);
 		goto end;
@@ -5507,6 +5517,41 @@ bool cm_lookup_pmkid_using_bssid(struct wlan_objmgr_psoc *psoc,
 	return true;
 }
 
+/**
+ * cm_roam_clear_is_disable_btm_flag - API to clear is_disable_btm flag
+ * @pdev: pdev pointer
+ * @vdev_id: dvev ID
+ *
+ * Return: None
+ */
+static void cm_roam_clear_is_disable_btm_flag(struct wlan_objmgr_pdev *pdev,
+					      uint8_t vdev_id)
+{
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL for vdev %d", vdev_id);
+		return;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		mlme_debug("vdev: %d rso_cfg is NULL", vdev_id);
+		goto release_ref;
+	}
+
+	if (rso_cfg->is_disable_btm) {
+		mlme_debug("vdev: %d clear is_disable_btm flag", vdev_id);
+		rso_cfg->is_disable_btm = false;
+	}
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+}
+
 void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 				    uint8_t vdev_id)
 {
@@ -5522,6 +5567,8 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return;
+
+	cm_roam_clear_is_disable_btm_flag(pdev, vdev_id);
 
 	if (mlme_obj->cfg.lfr.roam_scan_offload_enabled) {
 		/*
@@ -6485,6 +6532,33 @@ cm_populate_roam_success_mlo_param(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+/**
+ * cm_roam_cancel_event() - Send roam cancelled diag event
+ * @vdev_id: Vdev id
+ * @reason: Roam failure reason code
+ * @fw_timestamp: Firmware timestamp
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+cm_roam_cancel_event(uint8_t vdev_id, enum wlan_roam_failure_reason_code reason,
+		     uint64_t fw_timestamp)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_roam_result);
+
+	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
+
+	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id, fw_timestamp,
+			  NULL);
+
+	wlan_diag_event.version = DIAG_ROAM_RESULT_VERSION;
+	wlan_diag_event.roam_fail_reason = reason;
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_ROAM_CANCEL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_trigger_info *trigger,
 			       struct wmi_roam_result *res,
@@ -6493,6 +6567,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t i;
 	struct qdf_mac_addr bssid = {0};
+	enum wlan_roam_failure_reason_code roam_cancel_reason;
 	bool roam_abort = (res->fail_reason == ROAM_FAIL_REASON_SYNC ||
 			   res->fail_reason == ROAM_FAIL_REASON_DISCONNECT ||
 			   res->fail_reason == ROAM_FAIL_REASON_HOST ||
@@ -6502,9 +6577,30 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 				ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO);
 	bool is_full_scan = (scan_data->present &&
 			scan_data->type == WLAN_ROAM_SCAN_TYPE_FULL_SCAN);
+	bool is_roam_cancel =
+		(res->fail_reason == ROAM_FAIL_REASON_SCAN_CANCEL);
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
 				 struct wlan_diag_roam_result);
+
+	if (is_roam_cancel) {
+		if (res->roam_abort_reason ==
+		    WMI_ROAM_SCAN_CANCEL_IDLE_SCREEN_ON) {
+			roam_cancel_reason = ROAM_FAIL_REASON_SCREEN_ACTIVITY;
+		} else if (res->roam_abort_reason ==
+			 WMI_ROAM_SCAN_CANCEL_OTHER_PRIORITY_ROAM_SCAN) {
+			roam_cancel_reason =
+				ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN;
+		} else {
+			mlme_debug("vdev:%d Unsupported abort reason:%d",
+				   vdev_id, res->roam_abort_reason);
+			return;
+		}
+
+		cm_roam_cancel_event(vdev_id, roam_cancel_reason,
+				     res->timestamp);
+		return;
+	}
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
@@ -6579,7 +6675,6 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 				       trigger->trigger_reason,
 				       wlan_diag_event.is_roam_successful,
 				       is_full_scan, res->fail_reason);
-
 }
 
 #endif
@@ -6860,7 +6955,7 @@ cm_roam_btm_query_event(struct wmi_neighbor_report_data *btm_data,
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
-			  (uint64_t)btm_data->timestamp, NULL);
+			  (uint64_t)btm_data->req_time, NULL);
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_QUERY_EVENT;
 	wlan_diag_event.version = DIAG_BTM_VERSION_2;
@@ -6981,7 +7076,7 @@ cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
 	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
 
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
-			  (uint64_t)trigger_info->timestamp,
+			  (uint64_t)btm_data->timestamp,
 			  &btm_data->target_bssid);
 
 	wlan_diag_event.version = DIAG_BTM_VERSION_2;
@@ -7029,7 +7124,8 @@ cm_roam_btm_candidate_event(struct wmi_btm_req_candidate_info *btm_data,
 }
 
 QDF_STATUS
-cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
+cm_roam_btm_req_event(struct wmi_neighbor_report_data *neigh_rpt,
+		      struct wmi_roam_btm_trigger_data *btm_data,
 		      struct wmi_roam_trigger_info *trigger_info,
 		      uint8_t vdev_id, bool is_wtc)
 {
@@ -7050,9 +7146,13 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 	    btm_data->disassoc_timer)
 		return status;
 
-	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
-			  (uint64_t)btm_data->timestamp,
-			  NULL);
+	if (neigh_rpt->resp_time)
+		populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
+				  (uint64_t)neigh_rpt->resp_time, NULL);
+	else
+		populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
+				  (uint64_t)trigger_info->timestamp, NULL);
+
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BTM_REQ_EVENT;
 	wlan_diag_event.version = DIAG_BTM_VERSION_2;

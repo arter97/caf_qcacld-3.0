@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1863,6 +1863,47 @@ QDF_STATUS hdd_get_rx_nss(struct wlan_hdd_link_info *link_info, uint8_t *rx_nss)
 	return status;
 }
 
+int hdd_phymode_to_vendor_mode(eCsrPhyMode csr_phy_mode,
+			       enum qca_wlan_vendor_phy_mode *vendor_phy_mode)
+{
+	switch (csr_phy_mode) {
+	case eCSR_DOT11_MODE_AUTO:
+	case eCSR_DOT11_MODE_11be:
+	case eCSR_DOT11_MODE_11be_ONLY:
+		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_AUTO;
+		break;
+	case eCSR_DOT11_MODE_11a:
+		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_11A;
+		break;
+	case eCSR_DOT11_MODE_11b:
+	case eCSR_DOT11_MODE_11b_ONLY:
+		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_11B;
+		break;
+	case eCSR_DOT11_MODE_11g:
+	case eCSR_DOT11_MODE_11g_ONLY:
+		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_11G;
+		break;
+	case eCSR_DOT11_MODE_11n:
+	case eCSR_DOT11_MODE_11n_ONLY:
+		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_11AGN;
+		break;
+	case eCSR_DOT11_MODE_11ac:
+	case eCSR_DOT11_MODE_11ac_ONLY:
+		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT160;
+		break;
+	case eCSR_DOT11_MODE_11ax:
+	case eCSR_DOT11_MODE_11ax_ONLY:
+		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_11AX_HE160;
+		break;
+	case eCSR_DOT11_MODE_abg:
+	default:
+		hdd_err("Not supported mode %d", csr_phy_mode);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 int hdd_vendor_mode_to_phymode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 			       eCsrPhyMode *csr_phy_mode)
 {
@@ -2027,6 +2068,7 @@ int hdd_phymode_to_dot11_mode(eCsrPhyMode phymode,
 {
 	switch (phymode) {
 	case eCSR_DOT11_MODE_AUTO:
+	case eCSR_DOT11_MODE_11be:
 		*dot11_mode = eHDD_DOT11_MODE_AUTO;
 		break;
 	case eCSR_DOT11_MODE_11a:

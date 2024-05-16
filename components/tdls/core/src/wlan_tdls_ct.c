@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -165,7 +165,7 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 			peer = qdf_container_of(p_node, struct tdls_peer,
 						node);
 
-			tdls_debug("Peer: " QDF_MAC_ADDR_FMT "link status %d, vdev id %d",
+			tdls_debug("Peer: " QDF_MAC_ADDR_FMT " link status %d, vdev id %d",
 				   QDF_MAC_ADDR_REF(peer->peer_mac.bytes),
 				   peer->link_status, wlan_vdev_get_id(vdev));
 
@@ -474,8 +474,8 @@ void tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
 	return;
 }
 
-void tdls_implicit_send_discovery_request(
-				struct tdls_vdev_priv_obj *tdls_vdev_obj)
+void
+tdls_implicit_send_discovery_request(struct tdls_vdev_priv_obj *tdls_vdev_obj)
 {
 	struct tdls_peer *curr_peer;
 	struct tdls_peer *temp_peer;
@@ -574,12 +574,16 @@ int tdls_recv_discovery_resp(struct tdls_vdev_priv_obj *tdls_vdev,
 			qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
 	}
 
-	tdls_debug("Discovery(%u) Response from " QDF_MAC_ADDR_FMT
-		   " link_status %d", tdls_vdev->discovery_sent_cnt,
+	tdls_debug("[TDLS] vdev:%d action:%d (%s) sent_count:%u from peer " QDF_MAC_ADDR_FMT
+		   " link_status %d", wlan_vdev_get_id(tdls_vdev->vdev),
+		   TDLS_DISCOVERY_RESPONSE,
+		   "TDLS_DISCOVERY_RESPONSE",
+		   tdls_vdev->discovery_sent_cnt,
 		   QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
 		   curr_peer->link_status);
 
-	/* Since peer link status bases on vdev and stream goes through
+	/*
+	 * Since peer link status bases on vdev and stream goes through
 	 * vdev0 (assoc link) at start, rx/tx pkt count on vdev0, but
 	 * it choices vdev1 as tdls link, the peer status does not change on
 	 * vdev1 though it has been changed for vdev0 per the rx/tx pkt count.
@@ -665,10 +669,11 @@ void tdls_indicate_teardown(struct tdls_vdev_priv_obj *tdls_vdev,
 		return;
 	}
 
-	tdls_set_peer_link_status(curr_peer,
-				  TDLS_LINK_TEARING,
+	tdls_set_peer_link_status(curr_peer, TDLS_LINK_TEARING,
 				  TDLS_LINK_UNSPECIFIED);
-	tdls_notice("Teardown reason %d", reason);
+	tdls_notice("vdev:%d Teardown reason %d peer:" QDF_MAC_ADDR_FMT,
+		    wlan_vdev_get_id(tdls_vdev->vdev), reason,
+		    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 
 	if (tdls_soc->tdls_dp_vdev_update)
 		tdls_soc->tdls_dp_vdev_update(
@@ -900,9 +905,10 @@ static void tdls_ct_process_connected_link(
  *
  * Return: None
  */
-static void tdls_ct_process_cap_supported(struct tdls_peer *curr_peer,
-					struct tdls_vdev_priv_obj *tdls_vdev,
-					struct tdls_soc_priv_obj *tdls_soc_obj)
+static void
+tdls_ct_process_cap_supported(struct tdls_peer *curr_peer,
+			      struct tdls_vdev_priv_obj *tdls_vdev,
+			      struct tdls_soc_priv_obj *tdls_soc_obj)
 {
 	if (curr_peer->rx_pkt || curr_peer->tx_pkt)
 		tdls_debug(QDF_MAC_ADDR_FMT "link_status %d tdls_support %d tx %d rx %d rssi %d vdev %d",
@@ -914,10 +920,11 @@ static void tdls_ct_process_cap_supported(struct tdls_peer *curr_peer,
 	switch (curr_peer->link_status) {
 	case TDLS_LINK_IDLE:
 	case TDLS_LINK_DISCOVERING:
-		if (TDLS_IS_EXTERNAL_CONTROL_ENABLED(
-			tdls_soc_obj->tdls_configs.tdls_feature_flags) &&
-			(!curr_peer->is_forced_peer))
+		if (!curr_peer->is_forced_peer &&
+		    TDLS_IS_EXTERNAL_CONTROL_ENABLED(
+			tdls_soc_obj->tdls_configs.tdls_feature_flags))
 			break;
+
 		tdls_ct_process_idle_and_discovery(curr_peer, tdls_vdev,
 						   tdls_soc_obj);
 		break;
@@ -950,7 +957,7 @@ static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 		return;
 
 	if (curr_peer->rx_pkt || curr_peer->tx_pkt)
-		tdls_debug(QDF_MAC_ADDR_FMT "link_status %d tdls_support %d tx %d rx %d vdev %d",
+		tdls_debug(QDF_MAC_ADDR_FMT " link_status %d tdls_support %d tx %d rx %d vdev %d",
 			   QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
 			   curr_peer->link_status, curr_peer->tdls_support,
 			   curr_peer->tx_pkt, curr_peer->rx_pkt,
@@ -970,7 +977,10 @@ static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 		if (curr_peer->is_forced_peer ||
 		    curr_peer->discovery_attempt <
 		    tdls_vdev->threshold_config.discovery_tries_n) {
-			tdls_debug("TDLS UNKNOWN discover ");
+			tdls_debug("TDLS UNKNOWN discover num_attempts:%d num_left:%d forced_peer:%d",
+				   curr_peer->discovery_attempt,
+				   tdls_vdev->threshold_config.discovery_tries_n,
+				   curr_peer->is_forced_peer);
 			tdls_vdev->curr_candidate = curr_peer;
 			tdls_implicit_send_discovery_request(tdls_vdev);
 
@@ -1026,8 +1036,8 @@ static void tdls_ct_process_handler(struct wlan_objmgr_vdev *vdev)
 	struct tdls_vdev_priv_obj *tdls_vdev_obj;
 	struct tdls_soc_priv_obj *tdls_soc_obj;
 
-	if (QDF_STATUS_SUCCESS != tdls_get_vdev_objects(vdev, &tdls_vdev_obj,
-						   &tdls_soc_obj))
+	status = tdls_get_vdev_objects(vdev, &tdls_vdev_obj, &tdls_soc_obj);
+	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
 	/* If any concurrency is detected */
@@ -1561,13 +1571,14 @@ void tdls_disable_offchan_and_teardown_links(
 		tdls_indicate_teardown(tdls_vdev, curr_peer,
 				       TDLS_TEARDOWN_PEER_UNSPEC_REASON);
 
+		tdls_decrement_peer_count(vdev, tdls_soc);
+
 		/*
 		 * Del Sta happened already as part of tdls_delete_all_tdls_peers
 		 * Hence clear tdls vdev data structure.
 		 */
 		tdls_reset_peer(tdls_vdev, curr_peer->peer_mac.bytes);
 
-		tdls_decrement_peer_count(vdev, tdls_soc);
 		tdls_soc->tdls_conn_info[staidx].valid_entry = false;
 		tdls_soc->tdls_conn_info[staidx].session_id = 255;
 		tdls_soc->tdls_conn_info[staidx].index =

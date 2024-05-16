@@ -4058,8 +4058,10 @@ QDF_STATUS sme_neighbor_report_request(
 	return status;
 }
 
-void sme_register_ssr_on_pagefault_cb(mac_handle_t mac_handle,
-				      void (*hdd_ssr_on_pagefault_cb)(void))
+void
+sme_register_pagefault_cb(mac_handle_t mac_handle,
+			  QDF_STATUS (*hdd_pagefault_action_cb)(void *buf,
+								uint32_t data))
 {
 	QDF_STATUS status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -4068,7 +4070,7 @@ void sme_register_ssr_on_pagefault_cb(mac_handle_t mac_handle,
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		mac->sme.ssr_on_pagefault_cb = hdd_ssr_on_pagefault_cb;
+		mac->sme.pagefault_action_cb = hdd_pagefault_action_cb;
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -4084,7 +4086,7 @@ void sme_deregister_ssr_on_pagefault_cb(mac_handle_t mac_handle)
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		mac->sme.ssr_on_pagefault_cb = NULL;
+		mac->sme.pagefault_action_cb = NULL;
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -12277,37 +12279,6 @@ QDF_STATUS sme_ht40_stop_obss_scan(mac_handle_t mac_handle, uint32_t vdev_id)
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * sme_update_mimo_power_save() - Update MIMO power save
- * configuration
- * @mac_handle: The handle returned by macOpen
- * @is_ht_smps_enabled: enable/disable ht smps
- * @ht_smps_mode: smps mode disabled/static/dynamic
- * @send_smps_action: flag to send smps force mode command
- * to FW
- *
- * Return: QDF_STATUS if SME update mimo power save
- * configuration success else failure status
- */
-QDF_STATUS sme_update_mimo_power_save(mac_handle_t mac_handle,
-				      uint8_t is_ht_smps_enabled,
-				      uint8_t ht_smps_mode,
-				      bool send_smps_action)
-{
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-
-	sme_debug("SMPS enable: %d mode: %d send action: %d",
-		is_ht_smps_enabled, ht_smps_mode,
-		send_smps_action);
-	mac_ctx->mlme_cfg->ht_caps.enable_smps =
-		is_ht_smps_enabled;
-	mac_ctx->mlme_cfg->ht_caps.smps = ht_smps_mode;
-	mac_ctx->roam.configParam.send_smps_action =
-		send_smps_action;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #ifdef WLAN_BCN_RECV_FEATURE
 QDF_STATUS sme_handle_bcn_recv_start(mac_handle_t mac_handle,
 				     uint32_t vdev_id, uint32_t nth_value,
@@ -16750,14 +16721,6 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
 }
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
-
-#ifdef WLAN_FEATURE_11BE
-bool sme_is_11be_capable(void)
-{
-	return sme_is_feature_supported_by_fw(DOT11BE);
-}
-#endif
-
 QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 				 struct qdf_mac_addr mld_addr,
 				 struct wlan_objmgr_vdev *vdev)
@@ -16817,6 +16780,7 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_peer *peer;
 	struct vdev_mlme_obj *vdev_mlme;
 	struct wlan_objmgr_psoc *psoc;
+	bool eht_enab = false;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 
@@ -16825,8 +16789,9 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 	if (req_status)
 		goto p2p_self_peer_create;
 
+	ucfg_psoc_mlme_get_11be_capab(psoc, &eht_enab);
 	if (vdev_opmode == QDF_STA_MODE && update_sta_self_peer) {
-		if (sme_is_11be_capable() && update_mld_addr) {
+		if (eht_enab && update_mld_addr) {
 			old_macaddr = wlan_vdev_mlme_get_mldaddr(vdev);
 			new_macaddr = mld_addr.bytes;
 		} else {
@@ -16855,7 +16820,7 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_vdev *vdev,
 	}
 
 	/* Update VDEV MAC address */
-	if (sme_is_11be_capable() && update_mld_addr) {
+	if (eht_enab && update_mld_addr) {
 		if (update_sta_self_peer || vdev_opmode == QDF_SAP_MODE) {
 			qdf_ret_status = wlan_mlo_mgr_update_mld_addr(
 					    (struct qdf_mac_addr *)

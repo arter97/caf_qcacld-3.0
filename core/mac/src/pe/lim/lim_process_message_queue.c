@@ -1047,10 +1047,34 @@ static bool
 lim_is_ignore_btm_frame(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			tSirMacFrameCtl fc, uint8_t *body, uint16_t frm_len)
 {
-	bool is_sta_roam_disabled_by_p2p, is_mbo_wo_pmf;
+	bool is_sta_roam_disabled_by_p2p, is_mbo_wo_pmf, is_disable_btm;
 	uint8_t action_id, category, token = 0;
 	tpSirMacActionFrameHdr action_hdr;
 	enum wlan_diag_btm_block_reason reason;
+	struct cm_roam_values_copy temp;
+
+	/*
+	 * Drop BTM frame, if BTM roam disabled by userspace via vendor
+	 * command QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT
+	 */
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id, IS_DISABLE_BTM, &temp);
+	is_disable_btm = temp.bool_value;
+	if (is_disable_btm) {
+		pe_debug("Drop BTM frame. vdev:%d BTM roam disabled by user",
+			 vdev_id);
+		return true;
+	}
+
+	/*
+	 * When DUT associated to BTM disabled AP and receives BTM req frame
+	 * from connected AP then instead of forwarding the BTM req frame to
+	 * supplicant, host should drop it
+	 */
+	if (!wlan_cm_get_assoc_btm_cap(psoc, vdev_id)) {
+		pe_debug("Drop BTM frame. vdev:%d BTM not supported by AP",
+			 vdev_id);
+		return true;
+	}
 
 	/*
 	 * Drop BTM frame received on STA interface if concurrent
@@ -1391,10 +1415,8 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 	}
 
 	/* Check if frame is registered by HDD */
-	if (lim_check_mgmt_registered_frames(mac, pRxPacketInfo, pe_session)) {
-		pe_debug("Received frame is passed to SME");
+	if (lim_check_mgmt_registered_frames(mac, pRxPacketInfo, pe_session))
 		goto end;
-	}
 
 	if (fc.protVer != SIR_MAC_PROTOCOL_VERSION) {   /* Received Frame with non-zero Protocol Version */
 		pe_err("Unexpected frame with protVersion %d received",

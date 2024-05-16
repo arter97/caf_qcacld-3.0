@@ -1542,9 +1542,6 @@ void hdd_disable_mc_addr_filtering(struct hdd_adapter *adapter,
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
-	if (!hdd_cm_is_vdev_associated(adapter->deflink))
-		return;
-
 	status = ucfg_pmo_disable_mc_addr_filtering_in_fwr(
 						hdd_ctx->psoc,
 						adapter->deflink->vdev_id,
@@ -1568,9 +1565,6 @@ void hdd_disable_and_flush_mc_addr_list(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	QDF_STATUS status;
 
-	if (!hdd_cm_is_vdev_associated(adapter->deflink))
-		goto flush_mc_list;
-
 	/* disable mc list first because the mc list is cached in PMO */
 	status = ucfg_pmo_disable_mc_addr_filtering_in_fwr(
 						hdd_ctx->psoc,
@@ -1579,12 +1573,10 @@ void hdd_disable_and_flush_mc_addr_list(struct hdd_adapter *adapter,
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_debug("failed to disable mc list; status:%d", status);
 
-flush_mc_list:
 	status = ucfg_pmo_flush_mc_addr_list(hdd_ctx->psoc,
 					     adapter->deflink->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_debug("failed to flush mc list; status:%d", status);
-
 }
 
 /**
@@ -1880,6 +1872,14 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return QDF_STATUS_E_FAILURE;
+
+	if (ucfg_ipa_is_enabled()) {
+		ucfg_ipa_uc_force_pipe_shutdown(hdd_ctx->pdev);
+
+		if (pld_is_fw_rejuvenate(hdd_ctx->parent_dev) ||
+		    pld_is_pdr(hdd_ctx->parent_dev))
+			ucfg_ipa_fw_rejuvenate_send_msg(hdd_ctx->pdev);
+	}
 
 	hdd_set_connection_in_progress(false);
 

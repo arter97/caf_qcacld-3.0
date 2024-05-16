@@ -1589,10 +1589,16 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 
 	sta_ds = dph_lookup_hash_entry(mac_ctx, mac_hdr->sa, &aid,
 				       &session->dph.dphHashTable);
-	if (sta_ds && lim_is_session_he_capable(session))
+	if (sta_ds &&
+	    (lim_is_session_he_capable(session) ||
+	     sta_ds->staType == STA_ENTRY_TDLS_PEER))
 		he_cap = lim_is_sta_he_capable(sta_ds);
-	if (sta_ds && lim_is_session_eht_capable(session))
+
+	if (sta_ds &&
+	    (lim_is_session_eht_capable(session) ||
+	     sta_ds->staType == STA_ENTRY_TDLS_PEER))
 		eht_cap = lim_is_sta_eht_capable(sta_ds);
+
 	if (sta_ds && sta_ds->staType == STA_ENTRY_NDI_PEER)
 		he_cap = lim_is_session_he_capable(session);
 
@@ -2294,8 +2300,10 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 
 
 	pe_debug("Received an action frame category: %d action_id: %d",
-		 action_hdr->category, action_hdr->category ==
-		 ACTION_CATEGORY_PUBLIC ? action_hdr->actionID : 255);
+		 action_hdr->category, (action_hdr->category ==
+		 ACTION_CATEGORY_PUBLIC || action_hdr->category ==
+		 ACTION_CATEGORY_PROTECTED_DUAL_OF_PUBLIC_ACTION) ?
+		 action_hdr->actionID : 255);
 
 	if (frame_len < sizeof(*action_hdr)) {
 		pe_debug("frame_len %d less than action frame header len",
@@ -2305,6 +2313,7 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 
 	switch (action_hdr->category) {
 	case ACTION_CATEGORY_PUBLIC:
+	case ACTION_CATEGORY_PROTECTED_DUAL_OF_PUBLIC_ACTION:
 		if (action_hdr->actionID == PUB_ACTION_VENDOR_SPECIFIC) {
 			vendor_specific =
 				(tpSirMacVendorSpecificPublicActionFrameHdr)

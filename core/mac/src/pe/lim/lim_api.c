@@ -89,6 +89,7 @@
 #include "wlan_tdls_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_cm_api.h"
+#include "wlan_mlme_api.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -2879,9 +2880,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		pe_err("LFR3:roam_sync_ind_ptr is NULL");
 		return status;
 	}
-	session_ptr = pe_find_session_by_vdev_id(mac_ctx,
-				vdev_id);
-
+	session_ptr = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session_ptr) {
 		pe_err("LFR3:Unable to find session");
 		return status;
@@ -3153,6 +3152,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	}
 
 	pe_delete_session(mac_ctx, session_ptr);
+
 	return QDF_STATUS_SUCCESS;
 
 roam_sync_fail:
@@ -3800,6 +3800,20 @@ lim_mlo_roam_delete_link_peer(struct pe_session *pe_session,
 }
 #endif
 
+void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
+				enum phy_ch_width ch_width)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return;
+	}
+
+	mlme_priv->connect_info.assoc_chan_info.omn_ie_ch_width = ch_width;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool
 lim_match_link_info(uint8_t req_link_id,
@@ -3909,7 +3923,7 @@ lim_validate_probe_rsp_link_info(struct pe_session *session_entry,
 		if (!lim_match_link_info(ml_partner_info.partner_link_info[i].link_id,
 					 &ml_partner_info.partner_link_info[i].link_addr,
 					 &partner_info)) {
-			pe_err("Prb req link info does not match prb resp link info");
+			pe_err("Atleast one Per-STA profile is missing in the ML-probe response");
 			return QDF_STATUS_E_PROTO;
 		}
 	}
@@ -3944,60 +3958,15 @@ lim_clear_ml_partner_info(struct pe_session *session_entry)
 }
 
 static QDF_STATUS
-lim_compare_scan_entry_partner_info_with_join_req(struct mlo_partner_info
-						  *partner_info,
-						  struct partner_link_info
-						  *partner_link)
-{
-	int i;
-	int j;
-	struct mlo_link_info *partner_link_info;
-	struct partner_link_info *scan_info;
-	int num_matching_links = 0;
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-
-	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		partner_link_info = &partner_info->partner_link_info[i];
-		for (j = 0; j < MLD_MAX_LINKS - 1; j++) {
-			scan_info = &partner_link[j];
-			if (!scan_info)
-				continue;
-			/*
-			 * do not compare if both have freq as zero
-			 */
-			if (scan_info->freq == 0)
-				continue;
-
-			if (scan_info->freq == partner_link_info->chan_freq) {
-				qdf_mem_cmp(partner_link_info->link_addr.bytes,
-					    scan_info->link_addr.bytes,
-					    QDF_MAC_ADDR_SIZE);
-				num_matching_links += 1;
-			}
-		}
-	}
-
-	if (partner_info->num_partner_links == num_matching_links) {
-		pe_debug("num of matching partner links %d",
-			 num_matching_links);
-		status = QDF_STATUS_SUCCESS;
-	}
-
-	return status;
-}
-
-static QDF_STATUS
 lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 					    struct mac_context *mac_ctx)
 {
 	struct join_req *lim_join_req;
 	struct wlan_objmgr_pdev *pdev;
-	struct partner_link_info *partner_link = NULL;
-	struct qdf_mac_addr qdf_bssid;
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mlo_partner_info *partner_info;
-	uint16_t join_req_freq = 0;
-	struct scan_cache_entry *cache_entry;
+	struct mlo_link_info *link_info;
+	struct scan_cache_entry *partner_entry;
+	uint8_t i;
 
 	if (!session_entry) {
 		pe_err("session entry is NULL");
@@ -4021,47 +3990,23 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	partner_link = qdf_mem_malloc(sizeof(struct partner_link_info) *
-			(MLD_MAX_LINKS - 1));
-
-	if (!partner_link)
-		return QDF_STATUS_E_FAILURE;
-
-	qdf_mem_copy(&qdf_bssid,
-		     &(lim_join_req->bssDescription.bssId),
-		     QDF_MAC_ADDR_SIZE);
-
-	join_req_freq = lim_join_req->bssDescription.chan_freq;
-
-	cache_entry = wlan_scan_get_scan_entry_by_mac_freq(pdev,
-							   &qdf_bssid,
-							   join_req_freq);
-
-	if (!cache_entry) {
-		pe_err("failed to get partner link info by mac addr");
-		status = QDF_STATUS_E_FAILURE;
-		goto free_mem;
-	}
-
-	qdf_mem_copy(partner_link, cache_entry->ml_info.link_info,
-		     sizeof(struct partner_link_info) * (MLD_MAX_LINKS - 1));
-
-	util_scan_free_cache_entry(cache_entry);
-
 	partner_info = &lim_join_req->partner_info;
-
-	status = lim_compare_scan_entry_partner_info_with_join_req(
-			partner_info, partner_link);
-
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		pe_err("failed to match num of partner links in scan entry");
-		status = QDF_STATUS_E_FAILURE;
-		goto free_mem;
+	for (i = 0; i < partner_info->num_partner_links; i++) {
+		link_info = &partner_info->partner_link_info[i];
+		partner_entry =
+			wlan_scan_get_entry_by_bssid(pdev,
+						     &link_info->link_addr);
+		if (!partner_entry) {
+			pe_err("Scan entry is not found for partner link %d "
+			       QDF_MAC_ADDR_FMT,
+			       link_info->link_id,
+			       QDF_MAC_ADDR_REF(link_info->link_addr.bytes));
+			return QDF_STATUS_E_FAILURE;
+		}
+		util_scan_free_cache_entry(partner_entry);
 	}
 
-free_mem:
-	qdf_mem_free(partner_link);
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
@@ -4106,6 +4051,16 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	channel.ch_phymode = cache_entry->phy_mode;
 	channel.ch_cfreq1 = cache_entry->channel.cfreq0;
 	channel.ch_cfreq2 = cache_entry->channel.cfreq1;
+	channel.ch_width =
+		wlan_mlme_get_ch_width_from_phymode(cache_entry->phy_mode);
+
+	/*
+	 * Supplicant needs non zero center_freq1 in case of 20 MHz connection
+	 * also as a response of get_channel request. In case of 20 MHz channel
+	 * width central frequency is same as channel frequency
+	 */
+	if (channel.ch_width == CH_WIDTH_20MHZ)
+		channel.ch_cfreq1 = channel.ch_freq;
 
 	util_scan_free_cache_entry(cache_entry);
 

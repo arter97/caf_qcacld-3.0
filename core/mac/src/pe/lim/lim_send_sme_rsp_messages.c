@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -59,6 +59,7 @@
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include <wlan_mlo_mgr_sta.h>
 #include <spatial_reuse_api.h>
+#include <wlan_mlo_mgr_cmn.h>
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -1829,12 +1830,13 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	} else if (cnx_count > 2) {
 		is_allowed =
 		policy_mgr_allow_concurrency_csa(
-			mac_ctx->psoc, csa_freq,
+			mac_ctx->psoc,
 			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
 							     mode,
 							     session_entry->vdev_id),
-			session_entry->vdev_id,
-			policy_mgr_get_bw(new_ch_width), false,
+			csa_freq,
+			policy_mgr_get_bw(new_ch_width),
+			session_entry->vdev_id, false,
 			CSA_REASON_UNKNOWN);
 	}
 
@@ -1916,12 +1918,25 @@ static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
 				 uint8_t link_id,
 				 struct csa_offload_params *csa_params)
 {
+	struct wlan_objmgr_pdev *pdev;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 
-	mlo_mgr_update_csa_link_info(vdev->mlo_dev_ctx,
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		pe_err("pdev is null");
+		return;
+	}
+
+	mlo_mgr_update_csa_link_info(pdev, vdev->mlo_dev_ctx,
 				     csa_params, link_id);
 	pe_debug("vdev_id: %d link id %d mlo csa sta param updated ",
 		 vdev_id, link_id);
+}
+
+static bool
+lim_mlo_is_csa_allow(struct wlan_objmgr_vdev *vdev, uint16_t csa_freq)
+{
+	return wlan_mlo_is_csa_allow(vdev, csa_freq);
 }
 
 #else
@@ -1952,6 +1967,11 @@ static void update_csa_link_info(struct wlan_objmgr_vdev *vdev,
 {
 }
 
+static bool
+lim_mlo_is_csa_allow(struct wlan_objmgr_vdev *vdev, uint16_t csa_freq)
+{
+	return true;
+}
 #endif
 
 /**
@@ -1978,7 +1998,8 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 }
 
 void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
-			      struct csa_offload_params *csa_params)
+			      struct csa_offload_params *csa_params,
+			      bool send_status)
 {
 	struct pe_session *session_entry;
 	struct mlme_legacy_priv *mlme_priv;
@@ -2004,19 +2025,19 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	if (!session_entry) {
 		pe_err("Session does not exists for "QDF_MAC_ADDR_FMT,
 		       QDF_MAC_ADDR_REF(csa_params->bssid.bytes));
-		goto err;
+		goto free;
 	}
 	sta_ds = dph_lookup_hash_entry(mac_ctx, session_entry->bssId, &aid,
 		&session_entry->dph.dphHashTable);
 
 	if (!sta_ds) {
 		pe_err("sta_ds does not exist");
-		goto err;
+		goto send_event;
 	}
 
 	if (!LIM_IS_STA_ROLE(session_entry)) {
 		pe_debug("Invalid role to handle CSA");
-		goto err;
+		goto send_event;
 	}
 
 	lim_ch_switch = &session_entry->gLimChannelSwitch;
@@ -2035,7 +2056,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (!lim_sta_follow_csa(session_entry, csa_params,
 				lim_ch_switch, ch_params))
-		goto err;
+		goto send_event;
 	else
 		qdf_mem_zero(&ch_params, sizeof(struct ch_params));
 
@@ -2043,7 +2064,13 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 					session_entry->curr_op_freq,
 					csa_params)) {
 		pe_debug("Channel switch is not allowed");
-		goto err;
+		goto send_event;
+	}
+
+	if (!lim_mlo_is_csa_allow(session_entry->vdev,
+				  csa_params->csa_chan_freq)) {
+		pe_debug("Channel switch for MLO vdev is not allowed");
+		goto send_event;
 	}
 	/*
 	 * on receiving channel switch announcement from AP, delete all
@@ -2293,7 +2320,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (!lim_sta_follow_csa(session_entry, csa_params,
 				lim_ch_switch, ch_params))
-		goto err;
+		goto send_event;
 
 	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
 		link_id = wlan_vdev_get_link_id(session_entry->vdev);
@@ -2323,7 +2350,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 
 	if (mlo_is_any_link_disconnecting(session_entry->vdev)) {
 		pe_info_rl("Ignore CSA, vdev is in not in conncted state");
-		goto err;
+		goto send_event;
 	}
 
 	lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
@@ -2335,8 +2362,12 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 			WLAN_PE_DIAG_SWITCH_CHL_IND_EVENT, session_entry,
 			QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
 #endif
-
-err:
+free:
+	qdf_mem_free(csa_params);
+	return;
+send_event:
+	if (send_status)
+		wlan_mlme_send_csa_event_status_ind(session_entry->vdev, 0);
 	qdf_mem_free(csa_params);
 }
 
@@ -2368,7 +2399,7 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 		qdf_mem_free(csa_params);
 		return;
 	}
-	lim_handle_sta_csa_param(mac_ctx, csa_params);
+	lim_handle_sta_csa_param(mac_ctx, csa_params, true);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -2392,7 +2423,7 @@ void lim_handle_mlo_sta_csa_param(struct wlan_objmgr_vdev *vdev,
 
 	qdf_mem_copy(tmp_csa_params, csa_params, sizeof(*tmp_csa_params));
 
-	lim_handle_sta_csa_param(mac, tmp_csa_params);
+	lim_handle_sta_csa_param(mac, tmp_csa_params, false);
 }
 #endif
 

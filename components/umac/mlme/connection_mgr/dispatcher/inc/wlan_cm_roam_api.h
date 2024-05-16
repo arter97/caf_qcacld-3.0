@@ -888,6 +888,17 @@ QDF_STATUS wlan_cm_set_roam_band_bitmask(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id,
 					 uint32_t roam_band_bitmask);
 
+/**
+ * wlan_cm_set_btm_config() - Set btm roaming disable flag for vdev
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @is_disable_btm: to check whether btm roaming is disabled or not
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, bool is_disable_btm);
+
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 /**
  * struct roam_link_speed_cfg - link speed state config
@@ -1506,6 +1517,13 @@ wlan_cm_set_roam_band_bitmask(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
+static inline QDF_STATUS wlan_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						bool is_disable_btm)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline
 uint32_t wlan_cm_get_roam_scan_scheme_bitmap(struct wlan_objmgr_psoc *psoc,
 					     uint8_t vdev_id)
@@ -1948,8 +1966,8 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
 
 /**
  * cm_roam_update_vdev() - Update the STA and BSS
+ * @vdev: Pointer to the vdev object
  * @sync_ind: Information needed for roam sync propagation
- * @vdev_id: vdev id
  *
  * This function will perform all the vdev related operations with
  * respect to the self sta and the peer after roaming and completes
@@ -1957,8 +1975,8 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
  *
  * Return: None
  */
-void cm_roam_update_vdev(struct roam_offload_synch_ind *sync_ind,
-			 uint8_t vdev_id);
+void cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
+			 struct roam_offload_synch_ind *sync_ind);
 
 /**
  * cm_roam_pe_sync_callback() - Callback registered at pe, gets invoked when
@@ -2104,12 +2122,12 @@ wlan_cm_set_assoc_btm_cap(struct wlan_objmgr_vdev *vdev, bool val);
 
 /**
  * wlan_cm_get_assoc_btm_cap() - Get the assoc BTM capability
- * @vdev: pointer to vdev
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id
  *
  * Return: BTM cap
  */
-bool
-wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_vdev *vdev);
+bool wlan_cm_get_assoc_btm_cap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 
 /**
  * wlan_cm_is_self_mld_roam_supported() - Is self mld roam supported

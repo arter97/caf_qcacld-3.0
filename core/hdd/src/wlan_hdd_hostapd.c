@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -364,18 +364,21 @@ hdd_hostapd_deinit_sap_session(struct wlan_hdd_link_info *link_info)
  * Called when, 1. bss stopped, 2. channel switch
  *
  * @adapter: pointer to hdd adapter
- * @chan_freq: current channel frequency
+ * @chan_freq: channel frequency
+ * @ch_params: channel params
  *
  * Return: None
  */
 static void hdd_hostapd_channel_allow_suspend(struct hdd_adapter *adapter,
-					      uint32_t chan_freq)
+					      uint32_t chan_freq,
+					      struct ch_params *ch_params)
 {
 
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_hostapd_state *hostapd_state =
 		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 	struct sap_context *sap_ctx;
+	bool is_dfs;
 
 	hdd_debug("bss_state: %d, chan_freq: %d, dfs_ref_cnt: %d",
 		  hostapd_state->bss_state, chan_freq,
@@ -391,9 +394,10 @@ static void hdd_hostapd_channel_allow_suspend(struct hdd_adapter *adapter,
 		return;
 	}
 
-	if (!sap_chan_bond_dfs_sub_chan(sap_ctx,
-					chan_freq,
-					PHY_CHANNEL_BONDING_STATE_MAX))
+	is_dfs = wlan_mlme_check_chan_param_has_dfs(hdd_ctx->pdev,
+						    ch_params,
+						    chan_freq);
+	if (!is_dfs)
 		return;
 
 	/* Release wakelock when no more DFS channels are used */
@@ -411,17 +415,20 @@ static void hdd_hostapd_channel_allow_suspend(struct hdd_adapter *adapter,
  * Called when, 1. bss started, 2. channel switch
  *
  * @adapter: pointer to hdd adapter
- * @chan_freq: current channel frequency
+ * @chan_freq: channel frequency
+ * @ch_params: channel params
  *
  * Return - None
  */
 static void hdd_hostapd_channel_prevent_suspend(struct hdd_adapter *adapter,
-						uint32_t chan_freq)
+						uint32_t chan_freq,
+						struct ch_params *ch_params)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_hostapd_state *hostapd_state =
 		WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 	struct sap_context *sap_ctx;
+	bool is_dfs;
 
 	hdd_debug("bss_state: %d, chan_freq: %d, dfs_ref_cnt: %d",
 		  hostapd_state->bss_state, chan_freq,
@@ -437,9 +444,10 @@ static void hdd_hostapd_channel_prevent_suspend(struct hdd_adapter *adapter,
 		return;
 	}
 
-	if (!sap_chan_bond_dfs_sub_chan(sap_ctx,
-					chan_freq,
-					PHY_CHANNEL_BONDING_STATE_MAX))
+	is_dfs = wlan_mlme_check_chan_param_has_dfs(hdd_ctx->pdev,
+						    &sap_ctx->ch_params,
+						    chan_freq);
+	if (!is_dfs)
 		return;
 
 	/* Acquire wakelock if we have at least one DFS channel in use */
@@ -1788,11 +1796,13 @@ static void hdd_hostapd_set_sap_key(struct hdd_adapter *adapter)
 	struct wlan_crypto_key *crypto_key;
 	uint8_t key_index;
 
-	for (key_index = 0; key_index < WLAN_CRYPTO_MAXKEYIDX; ++key_index) {
+	for (key_index = 0; key_index < WLAN_CRYPTO_TOTAL_KEYIDX; ++key_index) {
 		crypto_key = wlan_crypto_get_key(adapter->deflink->vdev,
 						 key_index);
 		if (!crypto_key)
 			continue;
+
+		hdd_debug("key idx %d", key_index);
 		ucfg_crypto_set_key_req(adapter->deflink->vdev, crypto_key,
 					WLAN_CRYPTO_KEY_TYPE_GROUP);
 		wma_update_set_key(adapter->deflink->vdev_id, false, key_index,
@@ -2351,7 +2361,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		wlan_hdd_auto_shutdown_enable(hdd_ctx, true);
 #endif
 		hdd_hostapd_channel_prevent_suspend(adapter,
-			ap_ctx->operating_chan_freq);
+			ap_ctx->operating_chan_freq,
+			&sap_config->ch_params);
 
 		hostapd_state->bss_state = BSS_START;
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
@@ -2426,7 +2437,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		       status ? "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
 
 		hdd_hostapd_channel_allow_suspend(adapter,
-						  ap_ctx->operating_chan_freq);
+						  ap_ctx->operating_chan_freq,
+						  &ap_ctx->sap_context->ch_params);
 
 		/* Invalidate the channel info. */
 		ap_ctx->operating_chan_freq = 0;
@@ -3015,10 +3027,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		if (hostapd_state->bss_state != BSS_STOP) {
 			/* Allow suspend for old channel */
 			hdd_hostapd_channel_allow_suspend(adapter,
-				ap_ctx->sap_context->freq_before_ch_switch);
+				ap_ctx->sap_context->freq_before_ch_switch,
+				&ap_ctx->sap_context->ch_params_before_ch_switch);
 			/* Prevent suspend for new channel */
 			hdd_hostapd_channel_prevent_suspend(adapter,
-				sap_event->sapevt.sap_ch_selected.pri_ch_freq);
+				sap_event->sapevt.sap_ch_selected.pri_ch_freq,
+				&ap_ctx->sap_context->ch_params);
 		}
 		/* SME/PE is already updated for new operation
 		 * channel. So update HDD layer also here. This
@@ -6406,7 +6420,6 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	bool bval = false;
 	bool enable_dfs_scan = true;
 	bool deliver_start_evt = true;
-	struct s_ext_cap p_ext_cap = {0};
 	enum reg_phymode reg_phy_mode, updated_phy_mode;
 	struct sap_context *sap_ctx;
 	struct wlan_objmgr_vdev *vdev;
@@ -6541,29 +6554,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 
 	ucfg_policy_mgr_get_mcc_scc_switch(hdd_ctx->psoc, &mcc_to_scc_switch);
 
-	ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_EXTCAP, beacon->tail,
-				      beacon->tail_len);
-	if (ie && (ie[0] != DOT11F_EID_EXTCAP ||
-		   ie[1] > DOT11F_IE_EXTCAP_MAX_LEN)) {
-		hdd_err("Invalid IEs eid: %d elem_len: %d", ie[0], ie[1]);
-		ret = -EINVAL;
-		goto error;
-	}
-
-	if (ie) {
-		bool target_bigtk_support = false;
-
-		memcpy(&p_ext_cap, &ie[2], (ie[1] > sizeof(p_ext_cap)) ?
-		       sizeof(p_ext_cap) : ie[1]);
-
-		hdd_debug("beacon protection %d",
-			  p_ext_cap.beacon_protection_enable);
-
-		ucfg_mlme_get_bigtk_support(hdd_ctx->psoc,
-					    &target_bigtk_support);
-		if (target_bigtk_support && p_ext_cap.beacon_protection_enable)
-			mlme_set_bigtk_support(vdev, true);
-	}
+	wlan_hdd_set_sap_beacon_protection(hdd_ctx, link_info, beacon);
 
 	/* Overwrite second AP's channel with first only when:
 	 * 1. If operating mode is single mac
@@ -7226,6 +7217,16 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		hdd_err("stop ap is given on device modes other than SAP/GO. Hence return");
 		goto exit;
 	}
+
+	/*
+	 * Reset sap mandatory channel list.If band is changed then
+	 * frequencies of new selected band can be removed in pcl
+	 * modification based on sap mandatory channel list.
+	 */
+	status = policy_mgr_reset_sap_mandatory_channels(hdd_ctx->psoc);
+	/* Don't go to exit in case of failure. Clean up & stop BSS */
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("failed to reset mandatory channels");
 
 	/*
 	 * For STA+SAP/GO concurrency support from GUI, In case if

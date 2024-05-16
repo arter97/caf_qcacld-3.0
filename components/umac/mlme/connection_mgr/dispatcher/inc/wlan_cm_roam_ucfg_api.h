@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -41,6 +41,18 @@ QDF_STATUS
 ucfg_user_space_enable_disable_rso(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id,
 				   const bool is_fast_roam_enabled);
+
+/**
+ * ucfg_clear_user_disabled_roaming() - clear user/wpa_supplicant
+ * disabled_roaming flag in driver
+ * @psoc: Pointer to pdev
+ * @vdev_id: vdev id
+ *
+ * Return: void
+ */
+void
+ucfg_clear_user_disabled_roaming(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
 
 /**
  * ucfg_is_rso_enabled() - Check if rso is enabled
@@ -181,6 +193,21 @@ ucfg_cm_set_roam_band_mask(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	return wlan_cm_set_roam_band_bitmask(psoc, vdev_id, roam_band_mask);
 }
 
+/**
+ * ucfg_cm_set_btm_config() - Inline ucfg api to set btm roaming disable flag
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ * @is_disable_btm: btm config flag that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS ucfg_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						bool is_disable_btm)
+{
+	return wlan_cm_set_btm_config(psoc, vdev_id, is_disable_btm);
+}
+
 static inline QDF_STATUS
 ucfg_cm_set_roam_band_update(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
@@ -219,6 +246,13 @@ ucfg_cm_update_roam_scan_scheme_bitmap(struct wlan_objmgr_psoc *psoc,
 static inline QDF_STATUS
 ucfg_cm_set_roam_band_mask(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   uint32_t roam_band_mask)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS ucfg_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						bool is_disable_btm)
 {
 	return QDF_STATUS_SUCCESS;
 }

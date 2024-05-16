@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -421,6 +421,10 @@ enum roam_fail_params {
  * found after final BMISS.
  * @ROAM_FAIL_REASON_CURR_AP_STILL_OK: Background scan was abort, but
  * current network condition is fine.
+ * @ROAM_FAIL_REASON_SCAN_CANCEL: Roam fail reason, scan cancelled
+ * @ROAM_FAIL_REASON_SCREEN_ACTIVITY: Roam fail reason screen activity happened
+ * @ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN: Roam fail due to other priority
+ * roam scan started.
  * @ROAM_FAIL_REASON_UNKNOWN: Default reason
  */
 enum wlan_roam_failure_reason_code {
@@ -461,6 +465,9 @@ enum wlan_roam_failure_reason_code {
 	ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT,
 	ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT,
 	ROAM_FAIL_REASON_CURR_AP_STILL_OK,
+	ROAM_FAIL_REASON_SCAN_CANCEL,
+	ROAM_FAIL_REASON_SCREEN_ACTIVITY,
+	ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN,
 	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 
@@ -593,6 +600,7 @@ struct sae_roam_auth_map {
  * @tried_candidate_freq_list: freq list on which connection tried
  * @rso_rsn_caps: rsn caps with global user MFP which can be used for
  *                cross-AKM roaming
+ * @is_disable_btm: btm roaming disabled or not from userspace
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -647,6 +655,7 @@ struct rso_config {
 	bool is_forced_roaming;
 	struct wlan_chan_list tried_candidate_freq_list;
 	uint16_t rso_rsn_caps;
+	bool is_disable_btm;
 };
 
 /**
@@ -761,6 +770,7 @@ struct rso_config_params {
  * @ROAM_BAND: Allowed band for roaming in FW
  * @HI_RSSI_SCAN_RSSI_DELTA:
  * @ROAM_RSSI_DIFF_6GHZ: roam rssi diff for 6 GHz AP
+ * @IS_DISABLE_BTM: disable btm roaming
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -792,6 +802,7 @@ enum roam_cfg_param {
 	ROAM_BAND,
 	HI_RSSI_SCAN_RSSI_DELTA,
 	ROAM_RSSI_DIFF_6GHZ,
+	IS_DISABLE_BTM,
 };
 
 /**

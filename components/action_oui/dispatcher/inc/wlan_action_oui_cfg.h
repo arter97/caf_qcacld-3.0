@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -780,21 +780,7 @@
  * Info Mask : 21 - 0010 0001 Check for OUI and Band
  * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
  *
- * OUI 3 : 8CFDF0
- * OUI data Len : 05
- * OUI Data : 0101020100
- * OUI data Mask: F8 - 11111000
- * Info Mask : 21 - 0010 0001 Check for OUI and Band
- * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
- *
- * OUI 4 : 8CFDF0
- * OUI data Len : 05
- * OUI Data : 0109020300
- * OUI data Mask: F8 - 11111000
- * Info Mask : 21 - 0010 0001 Check for OUI and Band
- * Capabilities: C0 - 1100 0000 Band == 2 GHz || Band == 5 GHz
- *
- * g_action_oui_enable_cts_2_self=000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0 8CFDF0 05 0101020100 F8 21 C0 8CFDF0 05 0109020300 F8 21 C0
+ * g_action_oui_enable_cts_2_self=000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0
  *
  * Refer to gEnableActionOUI for more detail about the format.
  *
@@ -810,7 +796,7 @@
 	"g_action_oui_enable_cts_2_self", \
 	0, \
 	ACTION_OUI_MAX_STR_LEN, \
-	"000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0 8CFDF0 05 0101020100 F8 21 C0 8CFDF0 05 0109020300 F8 21 C0", \
+	"000C43 04 07000000 F0 21 C0 000C43 04 03000000 F0 21 C0", \
 	"Used to enable CTS2SELF frame for specified APs")
 
 /*
@@ -874,6 +860,34 @@
 	"8CFDF0 13 040000494c510302097201cb17000009110000 FFFFE0 01", \
 	"To restrict matching OUI APs to two link connection at max")
 
+/*
+ * <ini>
+ * CFG_ACTION_OUI_LIMIT_BW - Used to limit BW for specified AP
+ *
+ * Example OUIs: (All values in Hex)
+ * OUI 1: 00904c
+ *       OUI data Len: 04
+ *       OUI Data : 0201009C
+ *       OUI data Mask: F0 - 11110000
+ *       Info Mask : 01 - only OUI present in Info mask
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_LIMIT_BW CFG_INI_STRING( \
+	"gActionOUILimitBW", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"", \
+	"Limit BW for specified AP")
+
 #define CFG_ACTION_OUI \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1) \
@@ -895,5 +909,6 @@
 	CFG(CFG_ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN) \
 	CFG(CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ) \
 	CFG(CFG_ACTION_OUI_DISABLE_BFORMEE) \
+	CFG(CFG_ACTION_OUI_LIMIT_BW) \
 	CFG(CFG_ENABLE_ACTION_OUI)
 #endif
