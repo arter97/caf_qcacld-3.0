@@ -1013,6 +1013,12 @@ static int hdd_get_station_info(struct wlan_hdd_link_info *link_info)
 		return -EINVAL;
 	}
 
+	if (hdd_is_roaming_in_progress(hdd_ctx) &&
+	    hdd_is_connection_in_progress(NULL, NULL)) {
+		hdd_err("Connection in progress, command is not supported");
+		return -EINVAL;
+	}
+
 	nl_buf_len = hdd_calculate_station_info_ie_size(hdd_sta_ctx);
 	if (!nl_buf_len) {
 		hdd_err("BSS ie size calculation failed");
