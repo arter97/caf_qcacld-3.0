@@ -523,6 +523,19 @@ wlan_dp_stc_handle_flow_stats_policy(enum qca_async_stats_type type,
  */
 void
 wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result *flow_classify_result);
+
+/**
+ * wlan_dp_stc_peer_event_notify() - Handle the peer map/unmap events
+ * @soc: CDP soc
+ * @event: Peer event
+ * @peer_id: Peer ID
+ * @vdev_id: VDEV ID
+ * @peer_mac_addr: mac address of the Peer
+ */
+QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
+					 enum cdp_peer_event event,
+					 uint16_t peer_id, uint8_t vdev_id,
+					 uint8_t *peer_mac_addr);
 /**
  * wlan_dp_stc_attach() - STC attach
  * @dp_ctx: DP global psoc context

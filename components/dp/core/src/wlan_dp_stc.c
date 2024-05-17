@@ -1073,6 +1073,55 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 	}
 }
 
+QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
+					 enum cdp_peer_event event,
+					 uint16_t peer_id, uint8_t vdev_id,
+					 uint8_t *peer_mac_addr)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+
+	if (peer_id >= DP_STC_MAX_PEERS)
+		return QDF_STATUS_E_INVAL;
+
+	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
+
+	switch (event) {
+	case CDP_PEER_EVENT_MAP:
+		if (active_traffic_map->valid) {
+			dp_info("STC: Peer map notify for active peer");
+			qdf_assert_always(0);
+			return QDF_STATUS_E_BUSY;
+		}
+
+		active_traffic_map->vdev_id = vdev_id;
+		active_traffic_map->peer_id = peer_id;
+		qdf_mem_copy(active_traffic_map->mac_addr.bytes,
+			     peer_mac_addr, QDF_MAC_ADDR_SIZE);
+		active_traffic_map->valid = 1;
+		break;
+	case CDP_PEER_EVENT_UNMAP:
+		if (!active_traffic_map->valid) {
+			dp_info("STC: Peer unmap notify for inactive peer");
+			qdf_assert_always(0);
+			return QDF_STATUS_E_BUSY;
+		}
+
+		if (qdf_mem_cmp(active_traffic_map->mac_addr.bytes,
+				peer_mac_addr, QDF_MAC_ADDR_SIZE) != 0) {
+			dp_err("STC: peer unmap notify: mac addr mismatch");
+			return QDF_STATUS_E_INVAL;
+		}
+		active_traffic_map->valid = 0;
+		break;
+	default:
+		break;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static bool
 wlan_dp_stc_is_traffic_conext_supported(struct wlan_objmgr_psoc *psoc)
 {

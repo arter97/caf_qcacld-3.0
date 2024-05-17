@@ -124,6 +124,18 @@ cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
 				     reason_code, cdp_reason_code);
 }
 
+/**
+ * wlan_dp_stc_peer_event_notify() - Handle the peer map/unmap events
+ * @soc: CDP soc
+ * @event: Peer event
+ * @peer_id: Peer ID
+ * @vdev_id: VDEV ID
+ * @peer_mac_addr: mac address of the Peer
+ */
+QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
+					 enum cdp_peer_event event,
+					 uint16_t peer_id, uint8_t vdev_id,
+					 uint8_t *peer_mac_addr);
 static struct ol_if_ops dp_ol_if_ops = {
 	.peer_set_default_routing = target_if_peer_set_default_routing,
 	.peer_rx_reorder_queue_setup = target_if_peer_rx_reorder_queue_setup,
@@ -153,6 +165,9 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.peer_map_event = wlan_dp_send_ipa_wds_peer_map_event,
 	.peer_unmap_event = wlan_dp_send_ipa_wds_peer_unmap_event,
 	.peer_send_wds_disconnect = wlan_dp_send_ipa_wds_peer_disconnect,
+#endif
+#ifdef WLAN_DP_FEATURE_STC
+	.dp_peer_event_notify = wlan_dp_stc_peer_event_notify,
 #endif
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
