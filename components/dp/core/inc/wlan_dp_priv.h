@@ -445,6 +445,7 @@ struct fisa_pkt_hist {
  * @prev_napi_id: previous NAPI ID before flow migration
  * @is_mig: flag indicating whether flow is migrated or not
  * @vdev: VDEV handle corresponding to the FLOW
+ * @vdev_id: DP vdev id
  * @dp_intf: DP interface handle corresponding to the flow
  * @bytes_aggregated: Number of bytes currently aggregated
  * @flush_count: Number of Flow flushes done
@@ -502,6 +503,7 @@ struct dp_fisa_rx_sw_ft {
 	uint8_t prev_napi_id;
 	bool is_mig;
 	struct dp_vdev *vdev;
+	uint8_t vdev_id;
 	struct wlan_dp_intf *dp_intf;
 	uint64_t bytes_aggregated;
 	uint32_t flush_count;

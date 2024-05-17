@@ -672,6 +672,7 @@ static void dp_rx_fisa_update_sw_ft_entry(struct dp_fisa_rx_sw_ft *sw_ft_entry,
 {
 	sw_ft_entry->flow_hash = flow_hash;
 	sw_ft_entry->flow_id = flow_id;
+	sw_ft_entry->vdev_id = vdev->vdev_id;
 	sw_ft_entry->vdev = vdev;
 	sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 	sw_ft_entry->dp_ctx = dp_ctx;
@@ -828,6 +829,7 @@ dp_rx_fisa_add_ft_entry(struct dp_vdev *vdev,
 		if (is_same_flow(&sw_ft_entry->rx_flow_tuple_info,
 				 &rx_flow_tuple_info)) {
 			sw_ft_entry->vdev = vdev;
+			sw_ft_entry->vdev_id = vdev->vdev_id;
 			sw_ft_entry->dp_intf =
 					dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 			dp_fisa_debug("It is same flow fse entry idx %d",
@@ -1381,6 +1383,7 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 
 	if (!fisa_hdl->flow_deletion_supported) {
 		sw_ft_entry->vdev = vdev;
+		sw_ft_entry->vdev_id = vdev->vdev_id;
 		sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 		return sw_ft_entry;
 	}
@@ -1395,6 +1398,7 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 		return NULL;
 
 	sw_ft_entry->vdev = vdev;
+	sw_ft_entry->vdev_id = vdev->vdev_id;
 	sw_ft_entry->dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
 	return sw_ft_entry;
 }
@@ -1729,6 +1733,7 @@ dp_fisa_rx_get_flow_flush_vdev_ref(ol_txrx_soc_handle cdp_soc,
 				   struct dp_fisa_rx_sw_ft *fisa_flow)
 {
 	struct dp_vdev *fisa_flow_head_skb_vdev;
+	struct dp_vdev *fisa_flow_vdev;
 	uint8_t vdev_id;
 
 	vdev_id = QDF_NBUF_CB_RX_VDEV_ID(fisa_flow->head_skb);
@@ -1743,21 +1748,30 @@ get_new_vdev_ref:
 	}
 
 	if (qdf_unlikely(fisa_flow_head_skb_vdev != fisa_flow->vdev)) {
+		if (qdf_unlikely(fisa_flow_head_skb_vdev->vdev_id ==
+				 fisa_flow->vdev_id))
+			goto fisa_flow_vdev_fail;
+
+		fisa_flow_vdev = dp_vdev_get_ref_by_id(
+						cdp_soc_t_to_dp_soc(cdp_soc),
+						fisa_flow->vdev_id,
+						DP_MOD_ID_RX);
+		if (qdf_unlikely(!fisa_flow_vdev))
+			goto fisa_flow_vdev_fail;
+
+		if (qdf_unlikely(fisa_flow_vdev != fisa_flow->vdev))
+			goto fisa_flow_vdev_mismatch;
+
 		/*
 		 * vdev_id may mismatch in case of MLO link switch.
 		 * Check if the vdevs belong to same MLD,
 		 * if yes, then submit the flow else drop the packets.
 		 */
 		if (qdf_unlikely(qdf_mem_cmp(
-				fisa_flow->vdev->mld_mac_addr.raw,
+				fisa_flow_vdev->mld_mac_addr.raw,
 				fisa_flow_head_skb_vdev->mld_mac_addr.raw,
 				QDF_MAC_ADDR_SIZE) != 0)) {
-			qdf_nbuf_free(fisa_flow->head_skb);
-			dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
-					     fisa_flow_head_skb_vdev,
-					     DP_MOD_ID_RX);
-			fisa_flow_head_skb_vdev = NULL;
-			goto out;
+			goto fisa_flow_vdev_mismatch;
 		} else {
 			fisa_flow->same_mld_vdev_mismatch++;
 			/* Continue with aggregation */
@@ -1766,15 +1780,32 @@ get_new_vdev_ref:
 			dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
 					     fisa_flow_head_skb_vdev,
 					     DP_MOD_ID_RX);
+
 			/*
 			 * Update vdev_id and let it loop to find this
 			 * vdev by ref.
 			 */
-			vdev_id = fisa_flow->vdev->vdev_id;
+			vdev_id = fisa_flow_vdev->vdev_id;
+			dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+					     fisa_flow_vdev,
+					     DP_MOD_ID_RX);
 			goto get_new_vdev_ref;
 		}
+	} else {
+		goto out;
 	}
 
+fisa_flow_vdev_mismatch:
+	dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+			     fisa_flow_vdev,
+			     DP_MOD_ID_RX);
+
+fisa_flow_vdev_fail:
+	qdf_nbuf_free(fisa_flow->head_skb);
+	dp_vdev_unref_delete(cdp_soc_t_to_dp_soc(cdp_soc),
+			     fisa_flow_head_skb_vdev,
+			     DP_MOD_ID_RX);
+	fisa_flow_head_skb_vdev = NULL;
 out:
 	return fisa_flow_head_skb_vdev;
 }
