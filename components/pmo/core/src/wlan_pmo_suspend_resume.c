@@ -1690,13 +1690,13 @@ void pmo_core_psoc_handle_initial_wake_up(void *cb_ctx)
 		return;
 	}
 
-	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
+	psoc_ctx = pmo_psoc_get_priv(psoc);
+	hif_ctx = psoc_ctx->hif_hdl;
 	if (!hif_ctx)
 		pmo_err("hif ctx is null, request resume not called");
 	else if(hif_pm_get_wake_irq_type(hif_ctx) == HIF_PM_CE_WAKE)
 		hif_rtpm_check_and_request_resume(true);
 
-	psoc_ctx = pmo_psoc_get_priv(psoc);
 	pmo_core_update_wow_initial_wake_up(psoc_ctx, 1);
 }
 
