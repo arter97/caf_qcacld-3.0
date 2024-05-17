@@ -1517,6 +1517,32 @@ enum host_log_level {
 		0, \
 		"This ini is used to enable STA-SAP-P2P concurrency")
 
+/*
+ * <ini>
+ * g_sta_p2p_ndp_concurrency - STA + P2P + NAN + NDP concurrency support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini allows P2P + STA + NAN + NDP Concurrency. Concurrency
+ * to be included in the iface combinations when this ini is set and
+ * firmware also advertises corresponding capability
+ *
+ * 1: Enable P2P-NAN concurrency
+ * 0: Disable P2P-NAN concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STA_P2P_NDP_CONCURRENCY CFG_INI_BOOL( \
+		"g_sta_p2p_ndp_concurrency", \
+		1, \
+		"This ini is used to enable STA+P2P+NDP concurrency")
+
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
@@ -1563,5 +1589,6 @@ enum host_log_level {
 	CFG(CFG_SAP_STA_NDP_CONCURRENCY) \
 	CFG(CFG_NO_SAP_NAN_CONCURRENCY) \
 	CFG(CFG_NO_P2P_CONCURRENCY) \
+	CFG(CFG_STA_P2P_NDP_CONCURRENCY) \
 	CFG(CFG_STA_SAP_P2P_CONCURRENCY)
 #endif

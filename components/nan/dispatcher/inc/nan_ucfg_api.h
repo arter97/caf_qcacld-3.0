@@ -453,6 +453,14 @@ bool ucfg_nan_is_sta_nan_ndi_4_port_allowed(struct wlan_objmgr_psoc *psoc);
 bool ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_nan_is_sta_p2p_ndp_supported()- Get support for STA + P2P + NDP
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if STA + P2P + NDP supported
+ */
+bool ucfg_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_nan_is_beamforming_supported- Get support for beamforing
  * @psoc: pointer to psoc object
  *
@@ -648,6 +656,12 @@ bool ucfg_nan_is_sta_nan_ndi_4_port_allowed(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+ucfg_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

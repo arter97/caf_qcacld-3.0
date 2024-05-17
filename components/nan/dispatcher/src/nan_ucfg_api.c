@@ -70,6 +70,9 @@ static void nan_cfg_init(struct wlan_objmgr_psoc *psoc,
 	nan_obj->cfg_param.support_sta_sap_ndp = cfg_get(
 						psoc,
 						CFG_SAP_STA_NDP_CONCURRENCY);
+	nan_obj->cfg_param.support_sta_sap_ndp =
+				cfg_get(psoc, CFG_STA_P2P_NDP_CONCURRENCY);
+
 }
 
 /**
@@ -1302,6 +1305,12 @@ bool ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return psoc_nan_obj->nan_caps.sta_sap_ndp_support;
+}
+
+inline bool
+ucfg_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_nan_is_sta_p2p_ndp_supp_by_fw(psoc);
 }
 
 static inline bool

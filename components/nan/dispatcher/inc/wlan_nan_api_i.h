@@ -129,6 +129,14 @@ wlan_ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  * Return: True if STA + P2P +NDP is supported
  */
 bool wlan_nan_is_sta_p2p_ndp_supp_by_fw(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_nan_is_sta_p2p_ndp_supported() - Check if STA+P2P+NDP conc is supported
+ * @psoc: pointer to PSOC object
+ *
+ * Return: True if STA + P2P +NDP is supported
+ */
+bool wlan_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 enum nan_datapath_state wlan_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev)

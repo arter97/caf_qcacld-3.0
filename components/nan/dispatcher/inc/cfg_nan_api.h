@@ -129,6 +129,16 @@ bool cfg_nan_is_eht_cap_enable(struct wlan_objmgr_psoc *psoc);
  * or not
  */
 bool cfg_nan_get_support_sta_sap_ndp(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * cfg_nan_get_support_sta_p2p_ndp()- get value of config support
+ * STA + P2P + NDP
+ * @psoc: pointer to psoc object
+ *
+ * Return: Boolean flag indicating whether STA + P2P + NDP is supported
+ * or not
+ */
+bool cfg_nan_get_support_sta_p2p_ndp(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 bool cfg_nan_is_roam_config_disabled(struct wlan_objmgr_psoc *psoc)
@@ -192,6 +202,12 @@ static inline bool cfg_nan_is_eht_cap_enable(struct wlan_objmgr_psoc *psoc)
 
 static inline
 bool cfg_nan_get_support_sta_sap_ndp(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+bool cfg_nan_get_support_sta_p2p_ndp(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

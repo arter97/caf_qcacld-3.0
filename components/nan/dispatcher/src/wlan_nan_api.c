@@ -117,3 +117,9 @@ bool wlan_nan_is_sta_p2p_ndp_supp_by_fw(struct wlan_objmgr_psoc *psoc)
 
 	return psoc_nan_obj->nan_caps.sta_p2p_ndp_conc;
 }
+
+bool wlan_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return (wlan_nan_is_sta_p2p_ndp_supp_by_fw(psoc) &&
+		cfg_nan_get_support_sta_p2p_ndp(psoc));
+}
