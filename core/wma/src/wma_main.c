@@ -6250,6 +6250,10 @@ static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
 	if (wmi_service_enabled(wma_handle->wmi_handle,
 				wmi_service_sta_sap_ndp_concurrency_support))
 		tgt_cfg->nan_caps.sta_sap_ndp_support = 1;
+
+	if (wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_sta_p2p_ndp_conc))
+		tgt_cfg->nan_caps.sta_p2p_ndp_conc = 1;
 }
 #else
 static void wma_update_nan_target_caps(tp_wma_handle wma_handle,

@@ -104,3 +104,16 @@ QDF_STATUS wlan_ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
 {
 	return ndi_add_pasn_peer_to_nan(psoc, vdev_id, peer_mac);
 }
+
+bool wlan_nan_is_sta_p2p_ndp_supp_by_fw(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return false;
+	}
+
+	return psoc_nan_obj->nan_caps.sta_p2p_ndp_conc;
+}

@@ -121,6 +121,14 @@ QDF_STATUS wlan_nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			      struct qdf_mac_addr *peer_mac);
+
+/**
+ * wlan_nan_is_sta_p2p_ndp_supp_by_fw() - Check if STA+P2P+NDP conc is supported
+ * @psoc: pointer to PSOC object
+ *
+ * Return: True if STA + P2P +NDP is supported
+ */
+bool wlan_nan_is_sta_p2p_ndp_supp_by_fw(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 enum nan_datapath_state wlan_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev)
@@ -180,6 +188,12 @@ wlan_ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			      struct qdf_mac_addr *peer_mac)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool
+wlan_nan_is_sta_p2p_ndp_supp_by_fw(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif /*WLAN_FEATURE_NAN */
 #endif /*_WLAN_NAN_API_I_H_ */
