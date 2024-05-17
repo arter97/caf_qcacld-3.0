@@ -88,6 +88,10 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 			if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
 			    wlan_is_mlo_sta_nan_ndi_allowed(psoc))
 				disable_nan = false;
+			else if (op_mode == QDF_STA_MODE && sap_cnt == 1 &&
+				 ucfg_nan_is_sta_sap_ndp_supported(psoc) &&
+				 !wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+				disable_nan = false;
 		}
 		if (op_mode == QDF_P2P_CLIENT_MODE &&
 		    ucfg_nan_is_sta_p2p_ndp_supported(psoc))

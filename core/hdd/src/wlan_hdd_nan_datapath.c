@@ -198,7 +198,9 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			switch (adapter->device_mode) {
 			case QDF_SAP_MODE:
-				if (test_bit(SOFTAP_BSS_STARTED,
+				if (!wlan_nan_is_sta_sap_nan_allowed(
+							hdd_ctx->psoc) &&
+				    test_bit(SOFTAP_BSS_STARTED,
 					     &link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);

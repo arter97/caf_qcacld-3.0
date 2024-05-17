@@ -2286,10 +2286,11 @@ policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct policy_mgr_conc_connection_info *sap_info = NULL;
-	uint8_t i, sta_cnt;
+	uint8_t i, sta_cnt = 0;
 	qdf_freq_t nan_freq_2g, nan_freq_5g, freq_2g;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t list_sta[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t list_sta[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint8_t num_ml_sta = 0, num_non_ml_sta = 0;
 	uint8_t ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint8_t non_ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
@@ -2312,8 +2313,9 @@ policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	sta_cnt = policy_mgr_mode_specific_connection_count(
-				psoc, PM_STA_MODE, list_sta);
+	sta_cnt = policy_mgr_get_mode_specific_conn_info(
+				psoc, &list_sta[sta_cnt],
+				&vdev_id[sta_cnt], PM_STA_MODE);
 
 	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml_sta, ml_sta_idx,
 					       &num_non_ml_sta, non_ml_sta_idx,
@@ -2381,13 +2383,13 @@ policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 		 */
 	} else if (wlan_nan_is_sta_sap_nan_allowed(psoc)) {
 		freq_2g = nan_freq_2g;
-
-		if (sta_cnt && !num_ml_sta) {
+		if (sta_cnt && num_ml_sta < 2) {
 			for (i = 0; i < sta_cnt; i++) {
 				if (WLAN_REG_IS_24GHZ_CH_FREQ(list_sta[i]))
 					freq_2g = list_sta[i];
 			}
 		}
+
 		status = policy_mgr_change_sap_channel_with_csa(
 						psoc, sap_info->vdev_id,
 						freq_2g,
@@ -2415,6 +2417,7 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 	uint8_t band_mask = 0;
 	uint8_t chn_idx, num_chan;
 	struct regulatory_channel *channel_list;
+	uint8_t sap_5g_movement = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2430,15 +2433,23 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 			break;
 		}
 	}
-	if (sap_freq == 0 || policy_mgr_is_safe_channel(psoc, sap_freq))
+
+	if (sap_freq == 0)
+		return;
+	sap_freq = policy_mgr_get_nondfs_preferred_channel(psoc, PM_SAP_MODE,
+							   false,
+							   sap_info->vdev_id);
+	if (!WLAN_REG_IS_24GHZ_CH_FREQ(sap_freq) &&
+	    wlan_nan_is_sta_sap_nan_allowed(psoc))
+		sap_5g_movement = true;
+
+	if ((sap_freq == 0 || policy_mgr_is_safe_channel(psoc, sap_freq)) &&
+	    !sap_5g_movement)
 		return;
 
 	user_config_freq = policy_mgr_get_user_config_sap_freq(
 						psoc, sap_info->vdev_id);
 
-	sap_freq = policy_mgr_get_nondfs_preferred_channel(psoc, PM_SAP_MODE,
-							   false,
-							   sap_info->vdev_id);
 	policy_mgr_debug("User/ACS orig Freq: %d New SAP Freq: %d",
 			 user_config_freq, sap_freq);
 

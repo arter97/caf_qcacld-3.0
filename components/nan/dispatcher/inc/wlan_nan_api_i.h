@@ -203,5 +203,11 @@ wlan_nan_is_sta_p2p_ndp_supp_by_fw(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
+
+static inline bool
+wlan_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif /*WLAN_FEATURE_NAN */
 #endif /*_WLAN_NAN_API_I_H_ */

@@ -2418,11 +2418,10 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	qdf_freq_t ml_sta_link0_freq = 0;
 	qdf_freq_t ml_sta_link1_freq = 0;
-	uint8_t i, j;
+	uint8_t i, j, nan = 0, sap = 0, sta = 0, ndi = 0, p2p;
 	struct policy_mgr_freq_range *freq_range;
 	bool emlsr_links_with_aux = false;
 	uint8_t mac_id;
-	uint8_t sta = 0, p2p = 0, nan = 0, ndi = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2502,9 +2501,10 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 			return true;
 		}
 
-		sta = 0, p2p = 0, nan = 0, ndi = 0;
+		sta = 0, p2p = 0, nan = 0, ndi = 0, sap = 0;
 		for (i = 0; i < MAX_MAC; i++) {
-			if (!wlan_nan_is_sta_p2p_ndp_supported(psoc))
+			if (!wlan_nan_is_sta_p2p_ndp_supported(psoc) &&
+			    !wlan_nan_is_sta_sap_nan_allowed(psoc))
 				break;
 			/* Get the freq list which are in the MAC
 			 * supported freq range.
@@ -2522,17 +2522,16 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 				if (mac_mode_list[i] == PM_STA_MODE)
 					sta++;
 				else if (mac_mode_list[i] ==
-							QDF_P2P_CLIENT_MODE ||
-					 mac_mode_list[i] == QDF_P2P_GO_MODE)
+							PM_P2P_CLIENT_MODE ||
+					 mac_mode_list[i] == PM_P2P_GO_MODE)
 					p2p++;
-				else if (mac_mode_list[i] == QDF_NAN_DISC_MODE)
+				else if (mac_mode_list[i] == PM_NAN_DISC_MODE)
 					nan++;
-				else if (mac_mode_list[i] == QDF_NDI_MODE)
+				else if (mac_mode_list[i] == PM_NDI_MODE)
 					ndi++;
+				else if (mac_mode_list[i] == PM_SAP_MODE)
+					sap++;
 			}
-
-			policy_mgr_debug("sta %d ap %d nan %d ndi %d",
-					 sta, p2p, nan, ndi);
 		}
 
 		if (wlan_nan_is_sta_p2p_ndp_supported(psoc) &&
@@ -2544,7 +2543,18 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 					    policy_mgr_hw_mode_to_str(j));
 			return true;
 		}
+
+		if (((sta == 2 && nan == 1 && sap == 1) ||
+		     (sta == 1 && nan == 1 && ndi == 1 && sap == 1)) &&
+		    wlan_nan_is_sta_sap_nan_allowed(psoc)) {
+			policy_mgr_debug("new freq %d mode %s is allowed in hw mode %s",
+					 ch_freq,
+					 device_mode_to_string(mode),
+					 policy_mgr_hw_mode_to_str(j));
+			return true;
+		}
 	}
+
 	policy_mgr_debug("the 4th new freq %d mode %s is not allowed in any hw mode",
 			 ch_freq, device_mode_to_string(mode));
 
@@ -5867,8 +5877,11 @@ bool policy_mgr_max_concurrent_connections_reached(
 	if (pm_ctx) {
 		for (i = 0; i < QDF_MAX_NO_OF_MODE; i++)
 			j += pm_ctx->no_of_active_sessions[i];
-		return j >
-			(pm_ctx->cfg.max_conc_cxns - 1);
+		if (!wlan_nan_is_sta_sap_nan_allowed(psoc) &&
+		    !wlan_nan_is_sta_p2p_ndp_supported(psoc))
+			return j > (pm_ctx->cfg.max_conc_cxns - 1);
+		else
+			return j > pm_ctx->cfg.max_conc_cxns;
 	}
 
 	return false;
@@ -5937,7 +5950,8 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 {
 	uint32_t i;
 	struct policy_mgr_psoc_priv_obj *pm_ctx = NULL;
-	uint8_t sap_cnt, go_cnt, ll_lt_sap_vdev_id;
+	uint8_t sap_cnt, go_cnt, ll_lt_sap_vdev_id, nan_cnt = 0;
+	uint8_t count_sta;
 
 	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
 
@@ -5955,7 +5969,21 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 
 	go_cnt = policy_mgr_mode_specific_connection_count(psoc,
 							   PM_P2P_GO_MODE, NULL);
-	if (sap_cnt || go_cnt) {
+
+	if (wlan_nan_is_sta_sap_nan_allowed(psoc) ||
+	    wlan_nan_is_sta_p2p_ndp_supported(psoc)) {
+		nan_cnt = policy_mgr_mode_specific_connection_count(
+				psoc,
+				PM_NAN_DISC_MODE, NULL);
+		count_sta = policy_mgr_mode_specific_connection_count(
+				psoc, PM_STA_MODE, NULL);
+		go_cnt += policy_mgr_mode_specific_connection_count(psoc,
+							PM_P2P_CLIENT_MODE,
+							NULL);
+
+	}
+
+	if (sap_cnt || go_cnt || nan_cnt || count_sta) {
 		pm_ctx = policy_mgr_get_context(psoc);
 		if (!pm_ctx) {
 			policy_mgr_err("context is NULL");
@@ -5972,6 +6000,12 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 				"Couldn't start 4th port for bad cfg of dual mac");
 			return false;
 		}
+
+		if ((mode == PM_NAN_DISC_MODE || mode == PM_NDI_MODE) &&
+		    (wlan_nan_is_sta_sap_nan_allowed(psoc) ||
+		     wlan_nan_is_sta_p2p_ndp_supported(psoc)))
+			return true;
+
 		for (i = 0; i < pcl.pcl_len; i++)
 			if (ch_freq == pcl.pcl_list[i])
 				return true;
@@ -10147,6 +10181,7 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	struct policy_mgr_pcl_list pcl;
 	bool allowed;
+	uint8_t i = 0;
 
 	qdf_mem_zero(&pcl, sizeof(pcl));
 	status = policy_mgr_get_pcl(psoc, mode, pcl.pcl_list, &pcl.pcl_len,
@@ -10167,6 +10202,18 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 				mode,
 				ch_freq,
 				pcl);
+	/* Fifth connection concurrency check*/
+	if (allowed && policy_mgr_get_connection_count(psoc) == 4 &&
+	    (wlan_nan_is_sta_sap_nan_allowed(psoc) ||
+	     wlan_nan_is_sta_p2p_ndp_supported(psoc))) {
+		if (mode == QDF_NDI_MODE) {
+			return true;
+		} else if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE) {
+			for (i = 0; i < pcl.pcl_len; i++)
+				if (ch_freq == pcl.pcl_list[i])
+					return true;
+		}
+	}
 	return allowed;
 }
 

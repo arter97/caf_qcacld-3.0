@@ -1304,7 +1304,8 @@ bool ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
 		return false;
 	}
 
-	return psoc_nan_obj->nan_caps.sta_sap_ndp_support;
+	return psoc_nan_obj->cfg_param.support_sta_sap_ndp &&
+		       psoc_nan_obj->nan_caps.sta_sap_ndp_support;
 }
 
 inline bool

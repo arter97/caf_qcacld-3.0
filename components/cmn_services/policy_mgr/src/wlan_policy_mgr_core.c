@@ -41,6 +41,8 @@
 #endif
 #include "wlan_cm_ucfg_api.h"
 #include "target_if.h"
+#include "wlan_nan_api.h"
+#include "wlan_nan_api_i.h"
 
 #define POLICY_MGR_MAX_CON_STRING_LEN   230
 #define LOWER_END_FREQ_5GHZ 4900
@@ -4285,6 +4287,11 @@ bool policy_mgr_allow_new_home_channel(
 		policy_mgr_err("Invalid Context");
 		return false;
 	}
+
+	if ((wlan_nan_is_sta_sap_nan_allowed(psoc) ||
+	     wlan_nan_is_sta_p2p_ndp_supported(psoc)) &&
+	    (mode == PM_NAN_DISC_MODE || mode == PM_NDI_MODE))
+		return true;
 
 	force_switch_without_dis =
 		policy_mgr_get_mcc_to_scc_switch_mode(psoc) ==
