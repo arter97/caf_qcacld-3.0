@@ -5398,6 +5398,12 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
  */
 struct wlan_hdd_link_info *
 hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id);
+#else
+static inline struct wlan_hdd_link_info *
+hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id)
+{
+	return NULL;
+}
 #endif
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
