@@ -470,6 +470,7 @@ struct fisa_pkt_hist {
  * @track_flow_stats: flag to indicate if this flow is to be tracked
  * @selected_to_sample: flag to indicate flow has been selected to sample
  * @classified: flag to indicate flow has been classified
+ * @peer_id: Peer ID
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -533,6 +534,7 @@ struct dp_fisa_rx_sw_ft {
 	uint8_t track_flow_stats;
 	uint8_t selected_to_sample;
 	uint8_t classified;
+	uint16_t peer_id;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)

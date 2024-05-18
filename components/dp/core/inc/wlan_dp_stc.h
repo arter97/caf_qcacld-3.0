@@ -136,6 +136,7 @@ enum wlan_dp_flow_dir {
 
 /**
  * struct wlan_dp_stc_sampling_candidate - Sampling candidate
+ * @peer_id: Peer ID
  * @flags: flags
  * @tx_flow_id: TX flow ID
  * @tx_flow_metadata: TX flow metadata
@@ -145,6 +146,7 @@ enum wlan_dp_flow_dir {
  * @dir: flow direction
  */
 struct wlan_dp_stc_sampling_candidate {
+	uint16_t peer_id;
 	uint32_t flags;
 	uint32_t tx_flow_id;
 	uint32_t tx_flow_metadata;

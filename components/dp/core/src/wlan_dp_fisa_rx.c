@@ -1096,6 +1096,7 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			sw_ft_entry->flow_init_ts = qdf_sched_clock();
 			sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 			sw_ft_entry->is_flow_udp = elem->is_udp_flow;
+			sw_ft_entry->peer_id = elem->peer_id;
 
 			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
 
@@ -1319,6 +1320,7 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	elem->reo_dest_indication = reo_dest_indication;
 	elem->vdev = vdev;
 	elem->vdev_id = vdev->vdev_id;
+	elem->peer_id = QDF_NBUF_CB_RX_PEER_ID(nbuf);
 
 	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
 	qdf_list_insert_back(&fisa_hdl->fst_update_list, &elem->node);

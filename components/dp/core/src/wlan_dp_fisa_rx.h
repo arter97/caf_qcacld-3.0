@@ -75,6 +75,7 @@ struct dp_fisa_rx_fst_update_elem {
 	qdf_list_node_t node;
 	struct cdp_rx_flow_tuple_info flow_tuple_info;
 	struct dp_vdev *vdev;
+	uint16_t peer_id;
 	uint8_t vdev_id;
 	uint32_t flow_idx;
 	uint32_t reo_dest_indication;

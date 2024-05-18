@@ -255,6 +255,7 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 		break;
 	}
 
+	sampling_flow->peer_id = candidate->peer_id;
 	if (candidate->flags & WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID) {
 		sampling_flow->flags |= WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID;
 		sampling_flow->tx_flow_id = candidate->tx_flow_id;
@@ -430,6 +431,8 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 						&candidates[candidate_idx],
 						rx_flow_id,
 						sw_ft_entry->metadata);
+				candidates[candidate_idx].peer_id =
+							sw_ft_entry->peer_id;
 				candidates[candidate_idx].dir = WLAN_DP_FLOW_DIR_RX;
 				candidate_idx++;
 				rx--;
