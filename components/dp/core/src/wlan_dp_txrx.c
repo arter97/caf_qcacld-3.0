@@ -696,8 +696,9 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 		goto drop_pkt_and_release_nbuf;
 	}
 
-	wlan_dp_stc_mark_ping_ts(dp_ctx, &mac_addr_tx_allowed,
-				 peer_info.peer_id);
+	if (pkt_type == QDF_NBUF_CB_PACKET_TYPE_ICMP)
+		wlan_dp_stc_mark_ping_ts(dp_ctx,
+					 peer_info.peer_id);
 	/* check whether need to linearize nbuf, like non-linear udp data */
 	if (dp_nbuf_nontso_linearize(nbuf) != QDF_STATUS_SUCCESS) {
 		dp_err_rl(" nbuf %pK linearize failed. drop the pkt", nbuf);
@@ -1745,6 +1746,9 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 			}
 		}
 
+		if (qdf_nbuf_is_icmp_pkt(nbuf))
+			wlan_dp_stc_mark_ping_ts(dp_ctx,
+						 QDF_NBUF_CB_RX_PEER_ID(nbuf));
 		wlan_dp_pkt_add_timestamp(dp_intf, QDF_PKT_RX_DRIVER_EXIT,
 					  nbuf);
 

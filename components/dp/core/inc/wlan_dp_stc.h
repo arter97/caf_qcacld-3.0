@@ -545,14 +545,13 @@ wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 /**
  * wlan_dp_stc_mark_ping_ts() - Mark the last ping timestamp in STC table
  * @dp_ctx: DP global psoc context
- * @peer_mac_addr: peer mac address
  * @peer_id: peer id
  *
  * Return: void
  */
 static inline void
 wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
-			 struct qdf_mac_addr *peer_mac_addr, uint16_t peer_id)
+			 uint16_t peer_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
@@ -565,17 +564,11 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 	if (!active_traffic_map->valid)
 		return;
 
-	if (!qdf_is_macaddr_equal(&active_traffic_map->mac_addr,
-				  peer_mac_addr)) {
-		qdf_copy_macaddr(&active_traffic_map->mac_addr,
-				 peer_mac_addr);
-		send_fw_indication = true;
-	}
-
 	if (active_traffic_map->last_ping_ts == 0)
 		send_fw_indication = true;
 
 	active_traffic_map->last_ping_ts = dp_stc_get_timestamp();
+	qdf_atomic_set(&active_traffic_map->active_ping, 1);
 
 	if (send_fw_indication)
 		qdf_atomic_set(&active_traffic_map->send_fw_ind, 1);
@@ -757,7 +750,7 @@ wlan_dp_indicate_rx_flow_add(struct wlan_dp_psoc_context *dp_ctx)
 
 static inline void
 wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
-			 struct qdf_mac_addr *peer_mac_addr, uint16_t peer_id)
+			 uint16_t peer_id)
 {
 }
 

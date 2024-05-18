@@ -522,10 +522,9 @@ wlan_dp_get_tx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
 #define WLAN_DP_STC_PING_INACTIVE_TIMEOUT_NS 10000000000
 static inline void
 wlan_dp_stc_check_ping_activity(struct wlan_dp_stc *dp_stc,
-				struct wlan_dp_stc_classified_flow_entry *c_entry)
+				uint16_t peer_id)
 {
 	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
-	uint16_t peer_id = c_entry->peer_id;
 	uint64_t cur_ts = dp_stc_get_timestamp();
 
 	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
@@ -535,6 +534,7 @@ wlan_dp_stc_check_ping_activity(struct wlan_dp_stc *dp_stc,
 	if ((qdf_atomic_read(&active_traffic_map->active_ping) == 1) &&
 	    (cur_ts - active_traffic_map->last_ping_ts >
 				WLAN_DP_STC_PING_INACTIVE_TIMEOUT_NS)) {
+		active_traffic_map->last_ping_ts = 0;
 		qdf_atomic_set(&active_traffic_map->active_ping, 0);
 		qdf_atomic_set(&active_traffic_map->send_fw_ind, 1);
 	}
@@ -678,13 +678,12 @@ wlan_dp_stc_process_add_classified_flow(struct wlan_dp_stc *dp_stc,
 
 static inline QDF_STATUS
 wlan_dp_stc_send_active_traffic_map_ind(struct wlan_dp_stc *dp_stc,
-					struct wlan_dp_stc_classified_flow_entry *c_entry)
+					uint16_t peer_id)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
 	struct wlan_dp_psoc_sb_ops *sb_ops = &dp_ctx->sb_ops;
 	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
 	struct dp_active_traffic_map_params req_buf;
-	uint16_t peer_id = c_entry->peer_id;
 	uint32_t wmi_active_traffic_map = 0;
 	QDF_STATUS status;
 
@@ -694,6 +693,8 @@ wlan_dp_stc_send_active_traffic_map_ind(struct wlan_dp_stc *dp_stc,
 
 	if (qdf_atomic_read(&active_traffic_map->send_fw_ind) == 0)
 		return QDF_STATUS_SUCCESS;
+
+	qdf_atomic_set(&active_traffic_map->send_fw_ind, 0);
 
 	if (qdf_atomic_read(&active_traffic_map->num_streaming))
 		wmi_active_traffic_map |=
@@ -712,7 +713,7 @@ wlan_dp_stc_send_active_traffic_map_ind(struct wlan_dp_stc *dp_stc,
 		wmi_active_traffic_map |=
 				WMI_PEER_ACTIVE_TRAFFIC_TYPE_VIDEO_CONF_M;
 
-	req_buf.vdev_id = c_entry->vdev_id;
+	req_buf.vdev_id = active_traffic_map->vdev_id;
 	qdf_mem_copy(&req_buf.mac.bytes,
 		     active_traffic_map->mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
@@ -757,16 +758,6 @@ wlan_dp_stc_process_classified_flow(struct wlan_dp_stc *dp_stc,
 	default:
 		break;
 	}
-
-	/*
-	 * 1) Check ping inactivity
-	 */
-	wlan_dp_stc_check_ping_activity(dp_stc, c_entry);
-
-	/*
-	 * 1) Send wmi command to FW if required
-	 */
-	wlan_dp_stc_send_active_traffic_map_ind(dp_stc, c_entry);
 }
 
 /*
@@ -872,6 +863,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 	uint64_t tx_flow_metadata;
 	QDF_STATUS status;
 	int i;
+	uint16_t peer_id;
 	bool start_timer = false, candidate_selected = false;
 
 	/*
@@ -1064,7 +1056,7 @@ other_checks:
 	}
 
 	if (!qdf_atomic_read(&c_table->num_valid_entries))
-		return;
+		goto skip_classified_table_check;
 
 	for (flow_id = 0; flow_id < DP_STC_CLASSIFIED_TABLE_FLOW_MAX;
 								flow_id++) {
@@ -1081,6 +1073,19 @@ other_checks:
 		c_entry = &c_table->entries[flow_id];
 
 		wlan_dp_stc_process_classified_flow(dp_stc, c_entry);
+	}
+
+skip_classified_table_check:
+	for (peer_id = 0; peer_id < DP_STC_MAX_PEERS; peer_id++) {
+		/*
+		 * 1) Check ping inactivity
+		 */
+		wlan_dp_stc_check_ping_activity(dp_stc, peer_id);
+
+		/*
+		 * 2) Send wmi command to FW if required
+		 */
+		wlan_dp_stc_send_active_traffic_map_ind(dp_stc, peer_id);
 	}
 }
 
