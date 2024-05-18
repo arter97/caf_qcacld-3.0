@@ -1431,6 +1431,32 @@
 	CFG_INI_BOOL("dp_wlm_rx_aggr_control", false, \
 		     "Enable/Disable WLM Rx aggregation Control")
 
+#ifdef WLAN_DP_FEATURE_STC
+/*
+ * <ini>
+ * dp_stc_enable - Control STC feature enablement
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable DP STC
+ *
+ * Supported Feature: STA (pre 802.11BE)
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_STC_ENABLE \
+	CFG_INI_BOOL("dp_stc_enable", false, \
+		     "Enable/Disable DP Smart Traffic Classifier")
+
+#define CFG_DP_STC \
+	CFG(CFG_DP_STC_ENABLE)
+#else
+#define CFG_DP_STC
+#endif
+
 #define CFG_DP_ALL \
 	CFG(CFG_DP_RX_THREAD_CPU_MASK) \
 	CFG(CFG_DP_RX_THREAD_UL_CPU_MASK) \
@@ -1460,6 +1486,7 @@
 	CFG_DP_FISA \
 	CFG_DP_DIRECT_LINK \
 	CFG_DP_LOAD_BALANCE \
-	CFG_DP_FLOW_BALANCE
+	CFG_DP_FLOW_BALANCE \
+	CFG_DP_STC
 
 #endif /* WLAN_DP_CFG_H__ */

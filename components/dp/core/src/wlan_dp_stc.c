@@ -1145,10 +1145,21 @@ static bool wlan_dp_stc_clients_available(struct wlan_dp_psoc_context *dp_ctx)
 	return false;
 }
 
+void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
+			  struct wlan_objmgr_psoc *psoc)
+{
+	config->stc_enable = cfg_get(psoc, CFG_DP_STC_ENABLE);
+}
+
 QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wlan_dp_stc *dp_stc;
 	QDF_STATUS status;
+
+	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
+		dp_info("STC: feature not enabled via cfg");
+		return QDF_STATUS_SUCCESS;
+	}
 
 	if (!wlan_dp_stc_clients_available(dp_ctx)) {
 		dp_info("STC: No clients available, skip attach");

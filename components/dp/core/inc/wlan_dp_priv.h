@@ -143,6 +143,7 @@ struct dp_rtpm_tput_policy_context {
  * @wlm_rx_aggr_control: Control Rx aggregation based on WLM state
  * @is_load_balance_enabled: indicates whether load balance is enabled or not
  * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
+ * @stc_enable: indicates whether STC feature is enabled or not
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -223,6 +224,9 @@ struct wlan_dp_psoc_cfg {
 #endif
 #ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
 	bool is_flow_balance_enabled;
+#endif
+#ifdef WLAN_DP_FEATURE_STC
+	bool stc_enable;
 #endif
 };
 

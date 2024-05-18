@@ -536,6 +536,28 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 					 enum cdp_peer_event event,
 					 uint16_t peer_id, uint8_t vdev_id,
 					 uint8_t *peer_mac_addr);
+
+/**
+ * wlan_dp_stc_cfg_init() - CFG init for STC
+ * @config: SoC CFG config
+ * @psoc: Objmgr PSoC handle
+ *
+ * Return: None
+ */
+void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
+			  struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_dp_cfg_is_stc_enabled() - Helper function to check if STC is enabled
+ * @dp_cfg: SoC CFG config
+ *
+ * Return: true if STC is enabled, false if STC is disabled.
+ */
+static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->stc_enable;
+}
+
 /**
  * wlan_dp_stc_attach() - STC attach
  * @dp_ctx: DP global psoc context
@@ -584,6 +606,16 @@ wlan_dp_stc_check_n_track_tx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 					   uint16_t peer_id, uint32_t metadata)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
+					struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
 }
 
 static inline

@@ -919,6 +919,7 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_trace_cfg_update(config, psoc);
 	dp_fisa_cfg_init(config, psoc);
 	dp_direct_link_cfg_init(config, psoc);
+	wlan_dp_stc_cfg_init(config, psoc);
 }
 
 /**
@@ -2475,19 +2476,16 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
 
 	/* FISA Attach */
 	qdf_status = wlan_dp_rx_fisa_attach(dp_ctx);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		/* return success to let init process go */
-		if (qdf_status == QDF_STATUS_E_NOSUPPORT)
-			return QDF_STATUS_SUCCESS;
-
+	if (qdf_status == QDF_STATUS_E_NOSUPPORT)
+		qdf_status = QDF_STATUS_SUCCESS;
+	if (QDF_IS_STATUS_ERROR(qdf_status))
 		goto fisa_attach_fail;
-	}
 
 	qdf_status = wlan_dp_stc_attach(dp_ctx);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		dp_err("Failed to attach STC: %d", qdf_status);
+	if (qdf_status == QDF_STATUS_E_NOSUPPORT)
+		qdf_status = QDF_STATUS_SUCCESS;
+	if (QDF_IS_STATUS_ERROR(qdf_status))
 		goto stc_attach_fail;
-	}
 
 	return qdf_status;
 
