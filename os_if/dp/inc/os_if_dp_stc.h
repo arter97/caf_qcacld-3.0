@@ -23,6 +23,8 @@
 #include "wlan_dp_public_struct.h"
 
 #ifdef WLAN_DP_FEATURE_STC
+typedef struct wlan_dp_stc_txrx_samples (*txrx_samples_t)[DP_TXRX_SAMPLES_WINDOW_MAX];
+
 extern const struct nla_policy
 flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1];
 

@@ -160,68 +160,319 @@ static inline bool is_flow_tuple_ipv6(struct flow_info *flow_tuple)
 	return false;
 }
 
-static inline void os_if_dp_print_tuple(struct sk_buff *flow_sample_event,
-					struct flow_info *flow_tuple)
+#define BUF_LEN_MAX 1024
+static inline void os_if_dp_print_tuple(struct flow_info *flow_tuple)
 {
-	if (!flow_sample_event)
-		return;
+	uint8_t buf[BUF_LEN_MAX];
+	uint16_t buf_len = BUF_LEN_MAX, len = 0;
 
-	osif_err("STC: Flow tuple:");
+	len = scnprintf(buf, buf_len,
+			"Flow tuple: ");
 	if (is_flow_tuple_ipv4(flow_tuple)) {
-		osif_err("STC: ipv4 src addr 0x%x",
-			 flow_tuple->src_ip.ipv4_addr);
-		osif_err("STC: ipv4 dst addr 0x%x",
-			 flow_tuple->dst_ip.ipv4_addr);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x", flow_tuple->src_ip.ipv4_addr);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x", flow_tuple->dst_ip.ipv4_addr);
 	} else if (is_flow_tuple_ipv6(flow_tuple)) {
-		osif_err("STC: ipv6 src addr 0x%x 0x%x 0x%x 0x%x",
-			 flow_tuple->src_ip.ipv6_addr[0],
-			 flow_tuple->src_ip.ipv6_addr[1],
-			 flow_tuple->src_ip.ipv6_addr[2],
-			 flow_tuple->src_ip.ipv6_addr[3]);
-		osif_err("STC: ipv6 dst addr 0x%x 0x%x 0x%x 0x%x",
-			 flow_tuple->dst_ip.ipv6_addr[0],
-			 flow_tuple->dst_ip.ipv6_addr[1],
-			 flow_tuple->dst_ip.ipv6_addr[2],
-			 flow_tuple->dst_ip.ipv6_addr[3]);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x-0x%x-0x%x-0x%x",
+				 flow_tuple->src_ip.ipv6_addr[0],
+				 flow_tuple->src_ip.ipv6_addr[1],
+				 flow_tuple->src_ip.ipv6_addr[2],
+				 flow_tuple->src_ip.ipv6_addr[3]);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x-0x%x-0x%x-0x%x",
+				 flow_tuple->dst_ip.ipv6_addr[0],
+				 flow_tuple->dst_ip.ipv6_addr[1],
+				 flow_tuple->dst_ip.ipv6_addr[2],
+				 flow_tuple->dst_ip.ipv6_addr[3]);
 	}
 
-	osif_err("STC: src port %d", flow_tuple->src_port);
-	osif_err("STC: dst port %d", flow_tuple->dst_port);
-	osif_err("STC: proto %d", flow_tuple->proto);
+	len += scnprintf(buf + len, buf_len - len,
+			 " %u", flow_tuple->src_port);
+	len += scnprintf(buf + len, buf_len - len,
+			 " %u", flow_tuple->dst_port);
+	len += scnprintf(buf + len, buf_len - len, " %u", flow_tuple->proto);
+
+	osif_nofl_debug("STC: %s", buf);
 }
 
-static inline void
-os_if_dp_print_txrx_stats(struct sk_buff *flow_sample_event,
-			  struct wlan_dp_stc_txrx_stats *txrx_stats)
+static void
+os_if_dp_print_flow_txrx_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 {
-	if (!flow_sample_event)
-		return;
+	uint8_t buf[BUF_LEN_MAX];
+	uint16_t buf_len = BUF_LEN_MAX, len = 0;
+	txrx_samples_t txrx_samples = flow_samples->txrx_samples;
+	int i, j;
 
-	osif_err("STC: TXRX Stats:");
-	osif_err("STC: bytes %lld", txrx_stats->bytes);
-	osif_err("STC: pkts %d", txrx_stats->pkts);
-	osif_err("STC: pkt_size_min %d", txrx_stats->pkt_size_min);
-	osif_err("STC: pkt_size_max %d", txrx_stats->pkt_size_max);
-	osif_err("STC: pkt_iat_min %lld", txrx_stats->pkt_iat_min);
-	osif_err("STC: pkt_iat_max %lld", txrx_stats->pkt_iat_max);
-	osif_err("STC: pkt_iat_sum %lld", txrx_stats->pkt_iat_sum);
+	len = scnprintf(buf, buf_len,
+			"Flow TxRx Stats:");
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s %32s %32s %32s %32s %32s",
+			 "",
+			 "Sample1          ",
+			 "Sample2          ",
+			 "Sample3          ",
+			 "Sample4          ",
+			 "Sample5          ");
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s %15s %15s %15s %15s %15s %15s %15s %15s %15s %15s",
+			 "", "WIN1     ", "WIN2     ",
+			 "WIN1     ", "WIN2     ",
+			 "WIN1     ", "WIN2     ",
+			 "WIN1     ", "WIN2     ",
+			 "WIN1     ", "WIN2     ");
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* UL bytes */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "UL bytes: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15llu", txrx_samples[i][j].tx.bytes);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* UL pkts */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "UL pkts: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15u", txrx_samples[i][j].tx.pkts);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* UL pkt_size_min */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "UL pkt_size_min: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15u",
+					txrx_samples[i][j].tx.pkt_size_min);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* UL pkt_size_max */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "UL pkt_size_max: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15u",
+					txrx_samples[i][j].tx.pkt_size_max);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* UL pkt_iat_min */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "UL pkt_iat_min: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15llu",
+					txrx_samples[i][j].tx.pkt_iat_min);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* UL pkt_iat_max */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "UL pkt_iat_max: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15llu",
+					txrx_samples[i][j].tx.pkt_iat_max);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* UL pkt_iat_sum */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "UL pkt_iat_sum: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15llu",
+					txrx_samples[i][j].tx.pkt_iat_sum);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* DL bytes */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "DL bytes: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15llu", txrx_samples[i][j].rx.bytes);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* DL pkts */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "DL pkts: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15u", txrx_samples[i][j].rx.pkts);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* DL pkt_size_min */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "DL pkt_size_min: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15u",
+					txrx_samples[i][j].rx.pkt_size_min);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* DL pkt_size_max */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "DL pkt_size_max: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15u",
+					txrx_samples[i][j].rx.pkt_size_max);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* DL pkt_iat_min */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "DL pkt_iat_min: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15llu",
+					txrx_samples[i][j].rx.pkt_iat_min);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* DL pkt_iat_max */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "DL pkt_iat_max: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15llu",
+					txrx_samples[i][j].rx.pkt_iat_max);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
+	len = 0;
+
+	/* DL pkt_iat_sum */
+	len += scnprintf(buf + len, buf_len - len,
+			 "%20s", "DL pkt_iat_sum: ");
+	for (i = 0; i < DP_STC_TXRX_SAMPLES_MAX; i++) {
+		for (j = 0; j < DP_TXRX_SAMPLES_WINDOW_MAX; j++) {
+			len += scnprintf(buf + len, buf_len - len,
+					" %15llu",
+					txrx_samples[i][j].rx.pkt_iat_sum);
+		}
+	}
+	osif_nofl_debug("STC: %s", buf);
 }
 
-static inline void
-os_if_dp_print_burst_stats(struct sk_buff *flow_sample_event,
-			   struct wlan_dp_stc_burst_stats *burst_stats)
+static void
+os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 {
-	if (!flow_sample_event)
-		return;
+	struct wlan_dp_stc_burst_samples *burst_sample;
+	struct wlan_dp_stc_txrx_samples *txrx_samples;
 
-	osif_err("STC: Burst Stats:");
-	osif_err("STC: burst_duration_min %d", burst_stats->burst_duration_min);
-	osif_err("STC: burst_duration_max %d", burst_stats->burst_duration_max);
-	osif_err("STC: burst_duration_sum %d", burst_stats->burst_duration_sum);
-	osif_err("STC: burst_size_min %d", burst_stats->burst_size_min);
-	osif_err("STC: burst_size_max %d", burst_stats->burst_size_max);
-	osif_err("STC: burst_size_sum%d", burst_stats->burst_size_sum);
-	osif_err("STC: burst_count %d", burst_stats->burst_count);
+	burst_sample = &flow_samples->burst_sample;
+	txrx_samples = &burst_sample->txrx_samples;
+
+	osif_nofl_debug("STC: Burst TxRx Stats:");
+	osif_nofl_debug("STC: %20s %15s %15s", "", "UL", "DL");
+
+	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
+			"bytes: ", txrx_samples->tx.bytes,
+			txrx_samples->rx.bytes);
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+			"pkts: ", txrx_samples->tx.pkts,
+			txrx_samples->rx.pkts);
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+			"pkt_size_min: ", txrx_samples->tx.pkt_size_min,
+			txrx_samples->rx.pkt_size_min);
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+			"pkt_size_max: ", txrx_samples->tx.pkt_size_max,
+			txrx_samples->rx.pkt_size_max);
+	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
+			"pkt_iat_min: ", txrx_samples->tx.pkt_iat_min,
+			txrx_samples->rx.pkt_iat_min);
+	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
+			"pkt_iat_max: ", txrx_samples->tx.pkt_iat_max,
+			txrx_samples->rx.pkt_iat_max);
+	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
+			"pkt_iat_sum: ", txrx_samples->tx.pkt_iat_sum,
+			txrx_samples->rx.pkt_iat_sum);
+
+	osif_nofl_debug("STC: Burst Stats: ");
+	osif_nofl_debug("STC: %20s %15s %15s", "", "UL", "DL");
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+			"burst_duration_min: ",
+			burst_sample->tx.burst_duration_min,
+			burst_sample->rx.burst_duration_min);
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+			"burst_duration_max: ",
+			burst_sample->tx.burst_duration_max,
+			burst_sample->rx.burst_duration_max);
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+			"burst_duration_sum: ",
+			burst_sample->tx.burst_duration_sum,
+			burst_sample->rx.burst_duration_sum);
+	osif_nofl_debug("STC: %20s %15u\t\t\t15%d",
+			"burst_size_min: ",
+			burst_sample->tx.burst_size_min,
+			burst_sample->rx.burst_size_min);
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+			"burst_size_max: ",
+			burst_sample->tx.burst_size_max,
+			burst_sample->rx.burst_size_max);
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+			"burst_size_sum: ",
+			burst_sample->tx.burst_size_sum,
+			burst_sample->rx.burst_size_sum);
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+			"burst_count: ",
+			burst_sample->tx.burst_count,
+			burst_sample->rx.burst_count);
 }
 
 #define nla_nest_end_checked(skb, start) do {		\
@@ -237,7 +488,6 @@ os_if_dp_fill_flow_tuple(struct sk_buff *flow_sample_event,
 	int len = 0;
 	uint32_t attr_id;
 
-	os_if_dp_print_tuple(flow_sample_event, flow_tuple);
 	if (flow_sample_event) {
 		attr_id = QCA_WLAN_VENDOR_ATTR_FLOW_STATS_FLOW_TUPLE;
 		nla_attr = nla_nest_start(flow_sample_event, attr_id);
@@ -332,8 +582,6 @@ fail:
 	return -EINVAL;
 }
 
-typedef struct wlan_dp_stc_txrx_samples (*txrx_samples_t)[DP_TXRX_SAMPLES_WINDOW_MAX];
-
 static inline int
 os_if_dp_fill_txrx_stats(struct sk_buff *flow_sample_event,
 			 struct wlan_dp_stc_txrx_stats *txrx_stats)
@@ -341,7 +589,6 @@ os_if_dp_fill_txrx_stats(struct sk_buff *flow_sample_event,
 	int len = 0;
 	uint32_t attr_id;
 
-	os_if_dp_print_txrx_stats(flow_sample_event, txrx_stats);
 	attr_id = QCA_WLAN_VENDOR_ATTR_TXRX_STATS_NUM_BYTES;
 	if (flow_sample_event &&
 	    wlan_cfg80211_nla_put_u64(flow_sample_event, attr_id,
@@ -423,7 +670,6 @@ os_if_dp_fill_txrx_one_win_samples(struct sk_buff *flow_sample_event,
 	int ret, len = 0;
 	uint32_t attr_id;
 
-	osif_err("STC: win size %d", win_sample->win_size);
 	attr_id = QCA_WLAN_VENDOR_ATTR_TXRX_SAMPLES_WINDOWS_WINDOW_SIZE;
 	if (flow_sample_event &&
 	    nla_put_u32(flow_sample_event, attr_id, win_sample->win_size)) {
@@ -573,7 +819,6 @@ os_if_dp_fill_burst_stats(struct sk_buff *flow_sample_event,
 	int len = 0;
 	uint32_t attr_id;
 
-	os_if_dp_print_burst_stats(flow_sample_event, burst_stats);
 	if (flow_sample_event &&
 	    nla_put_u32(flow_sample_event,
 			QCA_WLAN_VENDOR_ATTR_BURST_STATS_BURST_DURATION_MIN,
@@ -838,6 +1083,19 @@ flow_sample_nla_fail:
 	return -EINVAL;
 }
 
+static void
+os_if_dp_print_flow_stats(struct wlan_dp_stc_flow_samples *flow_samples,
+			  uint32_t flags)
+{
+	os_if_dp_print_tuple(&flow_samples->flow_tuple);
+
+	if (flags & WLAN_DP_TXRX_SAMPLES_READY)
+		os_if_dp_print_flow_txrx_stats(flow_samples);
+
+	if (flags & WLAN_DP_BURST_SAMPLES_READY)
+		os_if_dp_print_flow_burst_stats(flow_samples);
+}
+
 static int
 os_if_dp_send_flow_stats_event(struct wlan_objmgr_psoc *psoc,
 			       struct wlan_dp_stc_flow_samples *flow_samples,
@@ -846,6 +1104,7 @@ os_if_dp_send_flow_stats_event(struct wlan_objmgr_psoc *psoc,
 	enum qca_nl80211_vendor_subcmds_index index =
 				QCA_NL80211_VENDOR_SUBCMD_FLOW_STATS_INDEX;
 
+	os_if_dp_print_flow_stats(flow_samples, flags);
 	return os_if_dp_send_flow_stats(psoc, flow_samples, index, flags);
 }
 
