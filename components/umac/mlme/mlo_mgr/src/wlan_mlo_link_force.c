@@ -4321,7 +4321,8 @@ ml_nlink_update_force_active_inactive(struct wlan_objmgr_psoc *psoc,
 				      struct ml_link_force_state *curr,
 				      struct ml_link_force_state *new,
 				      enum mlo_link_force_reason reason,
-				      uint32_t link_control_flags)
+				      uint32_t link_control_flags,
+				      enum ml_nlink_change_event_type evt)
 {
 	uint16_t no_force_links;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -4357,6 +4358,11 @@ ml_nlink_update_force_active_inactive(struct wlan_objmgr_psoc *psoc,
 			status = QDF_STATUS_E_NOSUPPORT;
 		}
 	}
+
+	if (evt == ml_nlink_vendor_cmd_request_evt &&
+	    status == QDF_STATUS_SUCCESS)
+		update = true;
+
 	if (!update)
 		goto end;
 
@@ -4576,7 +4582,8 @@ ml_nlink_update_force_command_target(struct wlan_objmgr_psoc *psoc,
 					      curr,
 					      new,
 					      reason,
-					      link_control_flags);
+					      link_control_flags,
+					      evt);
 	if (status == QDF_STATUS_E_PENDING ||
 	    (status != QDF_STATUS_SUCCESS && status != QDF_STATUS_E_NOSUPPORT))
 		goto end;
