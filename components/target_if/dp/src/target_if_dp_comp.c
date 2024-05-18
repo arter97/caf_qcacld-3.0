@@ -379,6 +379,7 @@ target_if_dp_active_traffic_map(struct wlan_objmgr_psoc *psoc,
 	struct wmi_unified *wmi_handle;
 	struct wlan_objmgr_peer *peer;
 	struct peer_active_traffic_map_params cmd = {0};
+	QDF_STATUS status;
 
 	if (!psoc || !req_buf) {
 		target_if_err("Invalid params");
@@ -403,7 +404,12 @@ target_if_dp_active_traffic_map(struct wlan_objmgr_psoc *psoc,
 		     QDF_MAC_ADDR_SIZE);
 	cmd.active_traffic_map = req_buf->active_traffic_map;
 
-	return wmi_unified_peer_active_traffic_map_send(wmi_handle, &cmd);
+	status = wmi_unified_peer_active_traffic_map_send(wmi_handle, &cmd);
+
+	if (peer)
+		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
+
+	return status;
 }
 
 #ifdef WLAN_DP_FEATURE_STC
