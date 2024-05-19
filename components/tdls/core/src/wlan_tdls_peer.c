@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -759,6 +759,7 @@ static void tdls_prevent_suspend(struct tdls_soc_priv_obj *tdls_soc)
 			      WIFI_POWER_EVENT_WAKELOCK_TDLS);
 	qdf_runtime_pm_prevent_suspend(&tdls_soc->runtime_lock);
 	tdls_soc->is_prevent_suspend = true;
+	tdls_debug("Acquire WIFI_POWER_EVENT_WAKELOCK_TDLS");
 }
 
 /**
@@ -778,6 +779,7 @@ static void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc)
 			      WIFI_POWER_EVENT_WAKELOCK_TDLS);
 	qdf_runtime_pm_allow_suspend(&tdls_soc->runtime_lock);
 	tdls_soc->is_prevent_suspend = false;
+	tdls_debug("Release WIFI_POWER_EVENT_WAKELOCK_TDLS");
 }
 
 /**
@@ -865,6 +867,21 @@ void tdls_set_link_status(struct tdls_vdev_priv_obj *vdev_obj,
 	}
 }
 
+static inline char *
+tdls_link_status_str(enum tdls_link_state link_status)
+{
+	switch (link_status) {
+	CASE_RETURN_STRING(TDLS_LINK_IDLE);
+	CASE_RETURN_STRING(TDLS_LINK_DISCOVERING);
+	CASE_RETURN_STRING(TDLS_LINK_DISCOVERED);
+	CASE_RETURN_STRING(TDLS_LINK_CONNECTING);
+	CASE_RETURN_STRING(TDLS_LINK_CONNECTED);
+	CASE_RETURN_STRING(TDLS_LINK_TEARING);
+	default:
+		return "UNKNOWN";
+	}
+}
+
 void tdls_set_peer_link_status(struct tdls_peer *peer,
 			       enum tdls_link_state link_status,
 			       enum tdls_link_state_reason link_reason)
@@ -878,12 +895,14 @@ void tdls_set_peer_link_status(struct tdls_peer *peer,
 	enum tdls_link_state old_status;
 
 	vdev_obj = peer->vdev_priv;
-	tdls_debug("vdev %d state %d reason %d peer:" QDF_MAC_ADDR_FMT,
-		   wlan_vdev_get_id(vdev_obj->vdev), link_status, link_reason,
-		   QDF_MAC_ADDR_REF(peer->peer_mac.bytes));
 
 	old_status = peer->link_status;
 	peer->link_status = link_status;
+	tdls_debug("vdev:%d new state: %s old state:%s reason %d peer:" QDF_MAC_ADDR_FMT,
+		   wlan_vdev_get_id(vdev_obj->vdev),
+		   tdls_link_status_str(link_status),
+		   tdls_link_status_str(old_status), link_reason,
+		   QDF_MAC_ADDR_REF(peer->peer_mac.bytes));
 	tdls_update_pmo_status(vdev_obj, old_status, link_status);
 
 	if (link_status >= TDLS_LINK_DISCOVERED)

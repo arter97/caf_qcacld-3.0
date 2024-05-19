@@ -223,7 +223,7 @@ bool wlan_mlme_get_wlm_multi_client_ll_caps(struct wlan_objmgr_psoc *psoc)
 #endif
 
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
-bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
+uint32_t wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
 		struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -233,7 +233,22 @@ bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
 		mlme_legacy_err("Failed to get MLME Obj");
 		return cfg_default(CFG_COEX_UNSAFE_CHAN_NB_USER_PREFER);
 	}
+
 	return mlme_obj->cfg.reg.coex_unsafe_chan_nb_user_prefer;
+}
+
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return !!(wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(psoc) &
+					IGNORE_FW_COEX_INFO_ON_SAP_MODE);
+}
+
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_p2p_go(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return !!(wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(psoc) &
+					IGNORE_FW_COEX_INFO_ON_P2P_GO_MODE);
 }
 #endif
 
@@ -972,6 +987,12 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	 * is set/enabled.
 	 */
 	value = QDF_MIN(he_cap->flex_twt_sched, (twt_req || twt_resp));
+	/*
+	 * mlme obj will have intersected flex_twt_sched value
+	 * taken from ini value, FW capability and twt req/resp
+	 */
+	value = QDF_MIN(value,
+			mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched);
 	mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched = value;
 
 	mlme_obj->cfg.he_caps.dot11_he_cap.ba_32bit_bitmap =
@@ -1112,7 +1133,15 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 		mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_lt_80 = 0;
 		mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_gt_80 = 0;
 	}
-	mlme_obj->cfg.he_caps.dot11_he_cap.ul_mu = he_cap->ul_mu;
+
+	if (!mlme_obj->cfg.he_caps.enable_ul_mimo) {
+		mlme_debug("UL MIMO feature is disabled via ini, fw caps :%d",
+			   he_cap->ul_mu);
+		mlme_obj->cfg.he_caps.dot11_he_cap.ul_mu = 0;
+	} else {
+		mlme_obj->cfg.he_caps.dot11_he_cap.ul_mu = he_cap->ul_mu;
+	}
+
 	mlme_obj->cfg.he_caps.dot11_he_cap.su_feedback_tone16 =
 					he_cap->su_feedback_tone16;
 	mlme_obj->cfg.he_caps.dot11_he_cap.mu_feedback_tone16 =

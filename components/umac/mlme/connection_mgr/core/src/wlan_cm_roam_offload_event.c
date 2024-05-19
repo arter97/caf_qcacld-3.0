@@ -624,7 +624,8 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 		goto err;
 	}
 
-	cm_roam_update_vdev(sync_ind, vdev_id);
+	cm_roam_update_vdev(vdev, sync_ind);
+
 	/*
 	 * update phy_mode in wma to avoid mismatch in phymode between host and
 	 * firmware. The phymode stored in peer->peer_mlme.phymode is

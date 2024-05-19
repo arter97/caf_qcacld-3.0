@@ -6004,30 +6004,7 @@ static bool hdd_is_supported_chain_mask_1x1(struct hdd_context *hdd_ctx)
 
 QDF_STATUS hdd_update_smps_antenna_mode(struct hdd_context *hdd_ctx, int mode)
 {
-	QDF_STATUS status;
-	uint8_t smps_mode;
-	uint8_t smps_enable;
-	mac_handle_t mac_handle;
-
-	/* Update SME SMPS config */
-	if (HDD_ANTENNA_MODE_1X1 == mode) {
-		smps_enable = true;
-		smps_mode = HDD_SMPS_MODE_STATIC;
-	} else {
-		smps_enable = false;
-		smps_mode = HDD_SMPS_MODE_DISABLED;
-	}
-
-	hdd_debug("Update SME SMPS enable: %d mode: %d",
-		 smps_enable, smps_mode);
-	mac_handle = hdd_ctx->mac_handle;
-	status = sme_update_mimo_power_save(mac_handle, smps_enable,
-					    smps_mode, false);
-	if (QDF_STATUS_SUCCESS != status) {
-		hdd_err("Update SMPS config failed enable: %d mode: %d status: %d",
-			smps_enable, smps_mode, status);
-		return QDF_STATUS_E_FAILURE;
-	}
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 
 	hdd_ctx->current_antenna_mode = mode;
 	/*

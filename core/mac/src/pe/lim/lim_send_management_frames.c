@@ -201,7 +201,6 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t channel;
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool is_band_2g;
-	uint16_t ie_buf_size;
 	uint16_t mlo_ie_len = 0;
 
 	if (additional_ielen)
@@ -399,6 +398,20 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_btm_extended_caps(mac_ctx, pesession,
 						  &pr->ExtCap);
 
+	if (lim_is_session_eht_capable(pesession)) {
+		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + MIN_IE_LEN);
+		if (!eht_cap_ie) {
+			pe_err("malloc failed for eht_cap_ie");
+			qdf_status = QDF_STATUS_E_NOMEM;
+			goto mem_free;
+		}
+		is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(pesession->curr_op_freq);
+		lim_ieee80211_pack_ehtcap(eht_cap_ie, pr->eht_cap, pr->he_cap,
+					  is_band_2g);
+		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
+		pr->eht_cap.present = false;
+	}
+
 	/* That's it-- now we pack it.  First, how much space are we going to */
 	status = dot11f_get_packed_probe_request_size(mac_ctx, pr, &payload);
 	if (DOT11F_FAILED(status)) {
@@ -411,15 +424,16 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 			status);
 	}
 
-	bytes = payload + sizeof(tSirMacMgmtHdr) + addn_ielen + mlo_ie_len;
+	bytes = payload + sizeof(tSirMacMgmtHdr) + addn_ielen + mlo_ie_len +
+		eht_cap_ie_len;
 
 	/* Ok-- try to allocate some memory: */
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				      (void **)&packet);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pe_err("Failed to allocate %d bytes for a Probe Request", bytes);
-		qdf_mem_free(pr);
-		return QDF_STATUS_E_NOMEM;
+		qdf_status = QDF_STATUS_E_NOMEM;
+		goto mem_free;
 	}
 	/* Paranoia: */
 	qdf_mem_zero(frame, bytes);
@@ -435,46 +449,17 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (DOT11F_FAILED(status)) {
 		pe_err("Failed to pack a Probe Request (0x%08x)", status);
 		cds_packet_free((void *)packet);
-		return QDF_STATUS_E_FAILURE;    /* allocated! */
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto mem_free;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("There were warnings while packing a Probe Request (0x%08x)", status);
 	}
 
-	/* Strip EHT capabilities IE */
-	if (lim_is_session_eht_capable(pesession)) {
-		ie_buf_size = payload;
-
-		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
-		if (!eht_cap_ie) {
-			pe_err("malloc failed for eht_cap_ie");
-			goto skip_eht_ie_update;
-		}
-
-		qdf_status = lim_strip_eht_cap_ie(mac_ctx, frame +
-						  sizeof(tSirMacMgmtHdr),
-						  &ie_buf_size, eht_cap_ie);
-		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			pe_err("Failed to strip EHT cap IE");
-			qdf_mem_free(eht_cap_ie);
-			goto skip_eht_ie_update;
-		}
-
-		is_band_2g =
-			WLAN_REG_IS_24GHZ_CH_FREQ(pesession->curr_op_freq);
-
-		lim_ieee80211_pack_ehtcap(eht_cap_ie, pr->eht_cap, pr->he_cap,
-					  is_band_2g);
-		eht_cap_ie_len = eht_cap_ie[1] + 2;
-
-		/* Copy the EHT IE to the end of the frame */
-		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) +
-			     ie_buf_size,
+	if (eht_cap_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     eht_cap_ie, eht_cap_ie_len);
-		qdf_mem_free(eht_cap_ie);
-		payload = ie_buf_size +  eht_cap_ie_len;
+		payload += eht_cap_ie_len;
 	}
-skip_eht_ie_update:
-	qdf_mem_free(pr);
 
 	/* Append any AddIE if present. */
 	if (addn_ielen) {
@@ -522,10 +507,17 @@ skip_eht_ie_update:
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pe_err("could not send Probe Request frame!");
 		/* Pkt will be freed up by the callback */
-		return QDF_STATUS_E_FAILURE;
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto mem_free;
 	}
 
-	return QDF_STATUS_SUCCESS;
+	qdf_status = QDF_STATUS_SUCCESS;
+
+mem_free:
+	qdf_mem_free(eht_cap_ie);
+	qdf_mem_free(pr);
+
+	return qdf_status;
 } /* End lim_send_probe_req_mgmt_frame. */
 
 static QDF_STATUS lim_get_addn_ie_for_probe_resp(struct mac_context *mac,
@@ -1526,7 +1518,6 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *eht_op_ie = NULL, eht_op_ie_len = 0;
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool is_band_2g;
-	uint16_t ie_buf_size;
 	uint16_t mlo_ie_len = 0;
 	struct element_info ie;
 
@@ -1791,6 +1782,44 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 							       sta, &frm);
 	}
 
+	if (sta && lim_is_sta_eht_capable(sta) &&
+	    lim_is_session_eht_capable(pe_session)) {
+		eht_op_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + MIN_IE_LEN);
+		if (!eht_op_ie) {
+			pe_err("malloc failed for eht_op_ie");
+			goto error;
+		}
+
+		lim_ieee80211_pack_ehtop(eht_op_ie, frm.eht_op,
+					 frm.VHTOperation,
+					 frm.he_op,
+					 frm.HTInfo);
+		eht_op_ie_len = eht_op_ie[TAG_LEN_POS] + MIN_IE_LEN;
+
+		/* Set eht op to false as frame contents are present in
+		 * eht_op_ie buffer
+		 */
+		frm.eht_op.present = false;
+
+		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + MIN_IE_LEN);
+		if (!eht_cap_ie) {
+			pe_err("malloc failed for eht_cap_ie");
+			goto error;
+		}
+
+		is_band_2g =
+			WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq);
+		lim_ieee80211_pack_ehtcap(eht_cap_ie, frm.eht_cap, frm.he_cap,
+					  is_band_2g);
+
+		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
+
+		/* Set eht cap to false as frame contents are present in
+		 * eht_cap_ie buffer
+		 */
+		frm.eht_cap.present = false;
+	}
+
 	/* Allocate a buffer for this frame: */
 	status = dot11f_get_packed_assoc_response_size(mac_ctx, &frm, &payload);
 	if (DOT11F_FAILED(status)) {
@@ -1802,12 +1831,14 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			status);
 	}
 
-	bytes += sizeof(tSirMacMgmtHdr) + payload + mlo_ie_len;
+	bytes += sizeof(tSirMacMgmtHdr) + payload + mlo_ie_len + eht_op_ie_len +
+		eht_cap_ie_len;
 
 	if (sta) {
 		bytes += sta->mlmStaContext.owe_ie_len;
 		bytes += sta->mlmStaContext.ft_ie_len;
 	}
+
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				      (void **)&packet);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -1840,78 +1871,16 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			status);
 	}
 
-	/* Strip EHT operation and EHT capabilities IEs */
-	if (lim_is_session_eht_capable(pe_session)) {
-		ie_buf_size = payload - WLAN_ASSOC_RSP_IES_OFFSET;
-		eht_op_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
-		if (!eht_op_ie) {
-			pe_err("malloc failed for eht_op_ie");
-			cds_packet_free((void *)packet);
-			goto error;
-		}
-
-		qdf_status = lim_strip_eht_op_ie(mac_ctx, frame +
-						 sizeof(tSirMacMgmtHdr) +
-						 WLAN_ASSOC_RSP_IES_OFFSET,
-						 &ie_buf_size, eht_op_ie);
-		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			pe_err("Failed to strip EHT op IE");
-			qdf_mem_free(eht_cap_ie);
-			cds_packet_free((void *)packet);
-			cds_packet_free((void *)packet);
-		}
-
-		lim_ieee80211_pack_ehtop(eht_op_ie, frm.eht_op,
-					 frm.VHTOperation,
-					 frm.he_op,
-					 frm.HTInfo);
-		eht_op_ie_len = eht_op_ie[1] + 2;
-
-		/* Copy the EHT operation IE to the end of the frame */
-		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) +
-			     WLAN_ASSOC_RSP_IES_OFFSET + ie_buf_size,
+	if (eht_op_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     eht_op_ie, eht_op_ie_len);
-		qdf_mem_free(eht_op_ie);
-		bytes = bytes - payload;
-		payload = ie_buf_size + WLAN_ASSOC_RSP_IES_OFFSET +
-			  eht_op_ie_len;
-		bytes = bytes + payload;
+		payload += eht_op_ie_len;
+	}
 
-		ie_buf_size = payload - WLAN_ASSOC_RSP_IES_OFFSET;
-		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
-		if (!eht_cap_ie) {
-			pe_err("malloc failed for eht_cap_ie");
-			cds_packet_free((void *)packet);
-			goto error;
-		}
-
-		qdf_status = lim_strip_eht_cap_ie(mac_ctx, frame +
-						  sizeof(tSirMacMgmtHdr) +
-						  WLAN_ASSOC_RSP_IES_OFFSET,
-						  &ie_buf_size, eht_cap_ie);
-		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			pe_err("Failed to strip EHT cap IE");
-			qdf_mem_free(eht_cap_ie);
-			cds_packet_free((void *)packet);
-			goto error;
-		}
-
-		is_band_2g =
-			WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq);
-		lim_ieee80211_pack_ehtcap(eht_cap_ie, frm.eht_cap, frm.he_cap,
-					  is_band_2g);
-
-		eht_cap_ie_len = eht_cap_ie[1] + 2;
-
-		/* Copy the EHT capability IE to the end of the frame */
-		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) +
-			     WLAN_ASSOC_RSP_IES_OFFSET + ie_buf_size,
+	if (eht_cap_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     eht_cap_ie, eht_cap_ie_len);
-		qdf_mem_free(eht_cap_ie);
-		bytes = bytes - payload;
-		payload = ie_buf_size + WLAN_ASSOC_RSP_IES_OFFSET +
-			  eht_cap_ie_len;
-		bytes = bytes + payload;
+		payload += eht_cap_ie_len;
 	}
 
 	if (addn_ie_len && addn_ie_len <= WNI_CFG_ASSOC_RSP_ADDNIE_DATA_LEN) {
@@ -1951,6 +1920,13 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		      frm.HTCaps.present, frm.VHTCaps.present,
 		      frm.vendor_vht_ie.present, frm.he_cap.present,
 		      frm.eht_cap.present);
+
+	lim_cp_stats_cstats_log_assoc_resp_evt(pe_session, CSTATS_DIR_TX,
+					       status_code, aid, mac_hdr->bssId,
+					       mac_hdr->da, frm.HTCaps.present,
+					       frm.VHTCaps.present,
+					       frm.he_cap.present,
+					       frm.eht_cap.present, false);
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -1998,6 +1974,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	lim_util_count_sta_add(mac_ctx, sta, pe_session);
 
 error:
+	qdf_mem_free(eht_cap_ie);
+	qdf_mem_free(eht_op_ie);
 	qdf_mem_free(add_ie);
 }
 
@@ -2203,6 +2181,9 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 					mac_hdr, params->vdev_id, status,
 					qdf_tx_complete, mac->lim.bss_rssi,
 					algo, type, seq, 0, WLAN_AUTH_REQ);
+			lim_cp_stats_cstats_log_auth_evt(pe_session,
+							 CSTATS_DIR_TX, algo,
+							 seq, status);
 			return;
 		}
 
@@ -2395,7 +2376,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	bool bss_mfp_capable, frag_ie_present = false;
 	int8_t peer_rssi = 0;
 	bool is_band_2g;
-	uint16_t ie_buf_size;
 	uint16_t mlo_ie_len, fils_hlp_ie_len = 0;
 	uint8_t *fils_hlp_ie = NULL;
 	struct cm_roam_values_copy mdie_cfg = {0};
@@ -2914,6 +2894,27 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		}
 	}
 
+	/* Strip EHT capabilities IE */
+	if (lim_is_session_eht_capable(pe_session)) {
+		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + MIN_IE_LEN);
+		if (!eht_cap_ie) {
+			pe_err("malloc failed for eht_cap_ie");
+			goto end;
+		}
+
+		is_band_2g =
+			WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq);
+
+		lim_ieee80211_pack_ehtcap(eht_cap_ie, frm->eht_cap, frm->he_cap,
+					  is_band_2g);
+		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
+
+		/* Mark EHT capability as false as this the data is already
+		 * present in eht_cap_ie buffer pointer
+		 */
+		frm->eht_cap.present = false;
+	}
+
 	status = dot11f_get_packed_assoc_request_size(mac_ctx, frm, &payload);
 	if (DOT11F_FAILED(status)) {
 		pe_err("Association Request packet size failure(0x%08x)",
@@ -2927,7 +2928,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
 		rsnx_ie_len + mbo_ie_len + adaptive_11r_ie_len +
-		mscs_ext_ie_len + vendor_ie_len + mlo_ie_len + fils_hlp_ie_len;
+		mscs_ext_ie_len + vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
+		eht_cap_ie_len;
 
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
@@ -2974,42 +2976,10 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		payload = payload + fils_hlp_ie_len;
 	}
 
-	/* Strip EHT capabilities IE */
-	if (lim_is_session_eht_capable(pe_session)) {
-		ie_buf_size = payload - WLAN_ASSOC_REQ_IES_OFFSET;
-
-		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
-		if (!eht_cap_ie) {
-			pe_err("malloc failed for eht_cap_ie");
-			cds_packet_free((void *)packet);
-			goto end;
-		}
-
-		qdf_status = lim_strip_eht_cap_ie(mac_ctx, frame +
-						  sizeof(tSirMacMgmtHdr) +
-						  WLAN_ASSOC_REQ_IES_OFFSET,
-						  &ie_buf_size, eht_cap_ie);
-		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			pe_err("Failed to strip EHT cap IE");
-			qdf_mem_free(eht_cap_ie);
-			cds_packet_free((void *)packet);
-			goto end;
-		}
-
-		is_band_2g =
-			WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq);
-
-		lim_ieee80211_pack_ehtcap(eht_cap_ie, frm->eht_cap, frm->he_cap,
-					  is_band_2g);
-		eht_cap_ie_len = eht_cap_ie[1] + 2;
-
-		/* Copy the EHT IE to the end of the frame */
-		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) +
-			     WLAN_ASSOC_REQ_IES_OFFSET + ie_buf_size,
+	if (eht_cap_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     eht_cap_ie, eht_cap_ie_len);
-		qdf_mem_free(eht_cap_ie);
-		payload = ie_buf_size + WLAN_ASSOC_REQ_IES_OFFSET +
-			  eht_cap_ie_len;
+		payload += eht_cap_ie_len;
 	}
 
 	if (rsnx_ie && rsnx_ie_len) {
@@ -3101,6 +3071,16 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		     pe_session->vdev_id, QDF_MAC_ADDR_REF(pe_session->bssId),
 		     mac_ctx->mgmtSeqNum);
 
+	lim_cp_stats_cstats_log_assoc_req_evt(pe_session, CSTATS_DIR_TX,
+					      pe_session->bssId,
+					      mac_hdr->sa,
+					      frm->SSID.num_ssid,
+					      frm->SSID.ssid,
+					      frm->HTCaps.present,
+					      frm->VHTCaps.present,
+					      frm->he_cap.present,
+					      frm->eht_cap.present, false);
+
 	min_rid = lim_get_min_session_txrate(pe_session, NULL);
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_ASSOC_START_EVENT,
 			      pe_session, QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
@@ -3129,6 +3109,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 end:
+	qdf_mem_free(eht_cap_ie);
 	qdf_mem_free(fils_hlp_ie);
 	qdf_mem_free(rsnx_ie);
 	qdf_mem_free(vendor_ies);
@@ -4399,6 +4380,9 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 					     mac->lim.bss_rssi, 0, 0, 0, 0,
 					     WLAN_DISASSOC_TX);
 
+		lim_cp_stats_cstats_log_disassoc_evt(pe_session, CSTATS_DIR_TX,
+						     nReason);
+
 		/* Queue Disassociation frame in high priority WQ */
 		qdf_status = wma_tx_frame(mac, pPacket, (uint16_t) nBytes,
 					TXRX_FRM_802_11_MGMT,
@@ -4661,6 +4645,9 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 					     QDF_TX_RX_STATUS_OK,
 					     mac->lim.bss_rssi, 0, 0, 0, 0,
 					     WLAN_DEAUTH_TX);
+
+		lim_cp_stats_cstats_log_deauth_evt(pe_session, CSTATS_DIR_TX,
+						   nReason);
 
 		/* Queue Disassociation frame in high priority WQ */
 		qdf_status =

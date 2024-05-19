@@ -1341,7 +1341,7 @@ static int __wlan_hdd_cfg80211_get_tdls_capabilities(struct wiphy *wiphy,
 						       NLMSG_HDRLEN);
 	if (!skb) {
 		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
-		goto fail;
+		return -EINVAL;
 	}
 
 	if ((cfg_tdls_get_support_enable(hdd_ctx->psoc, &tdls_support) ==
@@ -9072,7 +9072,9 @@ int hdd_set_vdev_phy_mode(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
-	eCsrPhyMode phymode;
+	eCsrPhyMode csr_req_phymode, csr_max_phymode;
+	enum reg_phymode reg_req_phymode, reg_max_phymode;
+	enum qca_wlan_vendor_phy_mode max_vendor_phy_mode;
 	WMI_HOST_WIFI_STANDARD std;
 	enum hdd_dot11_mode dot11_mode;
 	uint8_t supported_band;
@@ -9082,24 +9084,41 @@ int hdd_set_vdev_phy_mode(struct hdd_adapter *adapter,
 		hdd_err("Station is connected, command is not supported");
 		return -EINVAL;
 	}
+	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &csr_req_phymode);
+	if (ret < 0)
+		return ret;
 
-	adapter->user_phy_mode = vendor_phy_mode;
+	reg_req_phymode = csr_convert_to_reg_phy_mode(csr_req_phymode, 0);
+	reg_max_phymode = wlan_reg_get_max_phymode(hdd_ctx->pdev,
+						   reg_req_phymode, 0);
+	if (reg_req_phymode != reg_max_phymode) {
+		hdd_debug("reg_max_phymode %d, req_req_phymode %d",
+			  reg_max_phymode, reg_req_phymode);
+		csr_max_phymode =
+			csr_convert_from_reg_phy_mode(reg_max_phymode);
+		ret = hdd_phymode_to_vendor_mode(csr_max_phymode,
+						 &max_vendor_phy_mode);
+		if (ret)
+			return ret;
+	} else {
+		csr_max_phymode = csr_req_phymode;
+		max_vendor_phy_mode = vendor_phy_mode;
+	}
 
-	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &phymode);
+	adapter->user_phy_mode = max_vendor_phy_mode;
+
+	ret = hdd_phymode_to_dot11_mode(csr_max_phymode, &dot11_mode);
 	if (ret)
 		return ret;
 
-	ret = hdd_phymode_to_dot11_mode(phymode, &dot11_mode);
-	if (ret)
-		return ret;
-
-	ret = hdd_vendor_mode_to_band(vendor_phy_mode, &supported_band,
+	ret = hdd_vendor_mode_to_band(max_vendor_phy_mode, &supported_band,
 				      wlan_reg_is_6ghz_supported(psoc));
 	if (ret)
 		return ret;
 
 	std = hdd_get_wifi_standard(hdd_ctx, dot11_mode, supported_band);
-	hdd_debug("wifi_standard %d, vendor_phy_mode %d", std, vendor_phy_mode);
+	hdd_debug("wifi_standard %d, vendor_phy_mode %d",
+		  std, max_vendor_phy_mode);
 
 	ret = sme_cli_set_command(link_info->vdev_id,
 				  wmi_vdev_param_wifi_standard_version,
@@ -9119,31 +9138,68 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
-	eCsrPhyMode phymode;
+	eCsrPhyMode csr_req_phymode, csr_max_phymode;
+	enum reg_phymode reg_req_phymode, reg_max_phymode;
+	enum qca_wlan_vendor_phy_mode max_vendor_phy_mode = vendor_phy_mode;
 	uint8_t supported_band;
 	uint32_t bonding_mode;
 	int ret = 0;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER_BY_VDEV;
+	struct hdd_adapter *curr_adapter, *next_adapter;
 
 	if (!psoc) {
 		hdd_err("psoc is NULL");
 		return -EINVAL;
 	}
 
-	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &phymode);
+	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &csr_req_phymode);
 	if (ret < 0)
 		return ret;
 
-	ret = hdd_vendor_mode_to_band(vendor_phy_mode, &supported_band,
+	reg_req_phymode = csr_convert_to_reg_phy_mode(csr_req_phymode, 0);
+	reg_max_phymode = wlan_reg_get_max_phymode(hdd_ctx->pdev,
+						   reg_req_phymode, 0);
+
+	if (reg_req_phymode != reg_max_phymode) {
+		hdd_debug("reg_max_phymode %d, req_req_phymode %d",
+			  reg_max_phymode, reg_req_phymode);
+		csr_max_phymode =
+			csr_convert_from_reg_phy_mode(reg_max_phymode);
+		ret = hdd_phymode_to_vendor_mode(csr_max_phymode,
+						 &max_vendor_phy_mode);
+		if (ret)
+			return ret;
+	} else {
+		csr_max_phymode = csr_req_phymode;
+		max_vendor_phy_mode = vendor_phy_mode;
+	}
+
+	ret = hdd_vendor_mode_to_band(max_vendor_phy_mode, &supported_band,
 				      wlan_reg_is_6ghz_supported(psoc));
 	if (ret < 0)
 		return ret;
 
-	ret = hdd_vendor_mode_to_bonding_mode(vendor_phy_mode, &bonding_mode);
+	ret = hdd_vendor_mode_to_bonding_mode(max_vendor_phy_mode,
+					      &bonding_mode);
 	if (ret < 0)
 		return ret;
 
-	return hdd_update_phymode(adapter, phymode, supported_band,
-				  bonding_mode);
+	ret = hdd_update_phymode(adapter, csr_max_phymode, supported_band,
+				 bonding_mode);
+	if (ret)
+		return ret;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, curr_adapter, next_adapter,
+					   dbgid) {
+		if (curr_adapter->device_mode == QDF_STA_MODE &&
+		    !hdd_cm_is_vdev_connected(curr_adapter->deflink)) {
+			hdd_set_vdev_phy_mode(curr_adapter,
+					      max_vendor_phy_mode);
+		}
+		hdd_adapter_dev_put_debug(curr_adapter, dbgid);
+	}
+
+	return 0;
 }
 
 /**
@@ -11645,21 +11701,98 @@ static int hdd_set_wfc_state(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * hdd_parse_ul_mu_mlo_config() - Parse UL MU command arguments for ML case
+ * @link_info: Link info pointer in HDD adapter
+ * @tb: array of pointer to struct nlattr
+ * @mlo_ulmu_cfg: array of struct mlo_ulmu_config
+ *
+ * Return: num of links on success, negative on failure
+ */
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+static int hdd_parse_ul_mu_mlo_config(struct wlan_hdd_link_info *link_info,
+				      struct nlattr *tb[],
+				      struct mlo_ulmu_config mlo_ulmu_cfg[])
+{
+	struct nlattr *curr_attr = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS];
+	uint8_t num_links = 0, link_id, ulmu;
+	int rem;
+	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
+	struct nlattr *ulmu_attr = NULL, *mlo_link_id = NULL;
+	struct wlan_hdd_link_info *link;
+
+	nla_for_each_nested(curr_attr,
+			    tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS], rem) {
+		if (num_links > WLAN_MAX_LINK_ID) {
+			hdd_debug("invalid link_id:%u", link_id);
+			return -EINVAL;
+		}
+		if (wlan_cfg80211_nla_parse(tb2,
+					    QCA_WLAN_VENDOR_ATTR_CONFIG_MAX,
+					    nla_data(curr_attr),
+					    nla_len(curr_attr),
+					    wlan_hdd_wifi_config_policy)) {
+			hdd_err_rl("nla_parse failed");
+			return -EINVAL;
+		}
+
+		ulmu_attr = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG];
+		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
+
+		if (!ulmu_attr || !mlo_link_id)
+			return 0;
+
+		ulmu = nla_get_u8(ulmu_attr);
+		if (ulmu != QCA_UL_MU_SUSPEND && ulmu != QCA_UL_MU_ENABLE) {
+			hdd_err("Invalid ulmu value: %d", ulmu);
+			return -EINVAL;
+		}
+		link_id = nla_get_u8(mlo_link_id);
+		if (link_id > WLAN_MAX_LINK_ID) {
+			hdd_err("invalid link_id:%u", link_id);
+			return -EINVAL;
+		}
+		mlo_ulmu_cfg[num_links].ulmu = ulmu;
+		link = hdd_get_link_info_by_ieee_link_id(link_info->adapter,
+							 link_id);
+		if (!link) {
+			hdd_err("Invalid link ID: %d", link_id);
+			return -EINVAL;
+		}
+		mlo_ulmu_cfg[num_links].vdev_id = link->vdev_id;
+		num_links++;
+	}
+	return num_links;
+}
+#else
+static int hdd_parse_ul_mu_mlo_config(struct wlan_hdd_link_info *link_info,
+				      struct nlattr *tb[],
+				      struct mlo_ulmu_config mlo_ulmu_cfg[])
+{
+	return 0;
+}
+#endif
+
+/**
  * hdd_set_ul_mu_config() - Configure UL MU i.e suspend/enable
  * @link_info: Link info pointer in HDD adapter
- * @attr: pointer to nla attr
+ * @tb: array of pointer to struct nlattr
  *
  * Return: 0 on success, negative on failure
  */
 
 static int hdd_set_ul_mu_config(struct wlan_hdd_link_info *link_info,
-				const struct nlattr *attr)
+				struct nlattr *tb[])
 {
 	uint8_t ulmu;
 	uint8_t ulmu_disable;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	int errno;
 	QDF_STATUS qdf_status;
+	struct mlo_ulmu_config mlo_ulmu_cfg[WLAN_MAX_LINK_ID + 1] = {0};
+	struct nlattr *curr_attr = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS];
+	struct nlattr *ulmu_attr = NULL;
+	uint8_t i;
+	int8_t num_links = 0;
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno) {
@@ -11667,28 +11800,47 @@ static int hdd_set_ul_mu_config(struct wlan_hdd_link_info *link_info,
 		return errno;
 	}
 
-	ulmu = nla_get_u8(attr);
+	if (!curr_attr)
+		goto skip_mlo_ulmu;
+
+	num_links = hdd_parse_ul_mu_mlo_config(link_info, tb, mlo_ulmu_cfg);
+	if (num_links > 0)
+		goto set_ulmu;
+	else
+		return num_links;
+
+skip_mlo_ulmu:
+
+	ulmu_attr = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG];
+	if (!ulmu_attr)
+		return 0;
+
+	ulmu = nla_get_u8(ulmu_attr);
 	if (ulmu != QCA_UL_MU_SUSPEND && ulmu != QCA_UL_MU_ENABLE) {
 		hdd_err("Invalid ulmu value, ulmu : %d", ulmu);
 		return -EINVAL;
 	}
 
+	mlo_ulmu_cfg[0].ulmu = ulmu;
+	mlo_ulmu_cfg[0].vdev_id = link_info->vdev_id;
 	hdd_debug("UL MU value : %d", ulmu);
+	num_links = 1;
 
-	if (ulmu == QCA_UL_MU_SUSPEND)
-		ulmu_disable = 1;
-	else
-		ulmu_disable = 0;
-
-	qdf_status = ucfg_mlme_set_ul_mu_config(hdd_ctx->psoc,
-						link_info->vdev_id,
-						ulmu_disable);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		errno = -EINVAL;
-		hdd_err("Failed to set UL MU, errno : %d", errno);
+set_ulmu:
+	for (i = 0; i < num_links; i++) {
+		if (mlo_ulmu_cfg[i].ulmu == QCA_UL_MU_SUSPEND)
+			ulmu_disable = 1;
+		else
+			ulmu_disable = 0;
+		qdf_status = ucfg_mlme_set_ul_mu_config(hdd_ctx->psoc,
+							mlo_ulmu_cfg[i].vdev_id,
+							ulmu_disable);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			hdd_err("Failed to set MLO UL MU");
+			return -EINVAL;
+		}
 	}
-
-	return errno;
+	return 0;
 }
 
 /**
@@ -12422,8 +12574,6 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_link_force_active},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EMLSR_MODE_SWITCH,
 	 hdd_set_emlsr_mode},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_UL_MU_CONFIG,
-	 hdd_set_ul_mu_config},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_AP_ALLOWED_FREQ_LIST,
 	 hdd_set_master_channel_list},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_TTLM_NEGOTIATION_SUPPORT,
@@ -13364,6 +13514,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_power,
 	hdd_set_channel_width,
 	hdd_config_peer_ampdu,
+	hdd_set_ul_mu_config,
 };
 
 /**
@@ -15120,6 +15271,9 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 			hdd_err("Failed to trigger bug report");
 			return -EINVAL;
 		}
+
+		wlan_set_chipset_stats_bit();
+
 		status = wlan_logging_wait_for_flush_log_completion();
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("wait for flush log timed out");

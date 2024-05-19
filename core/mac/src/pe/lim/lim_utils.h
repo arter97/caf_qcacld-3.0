@@ -39,6 +39,7 @@
 #include "include/wlan_vdev_mlme.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_qct_sys.h"
+#include <wlan_cp_stats_chipset_stats.h>
 
 #define LIM_QOS_AP_SUPPORTS_UAPSD         0x80
 
@@ -3401,4 +3402,237 @@ uint32_t lim_cmp_ssid(tSirMacSSid *ssid, struct pe_session *pe_session);
 void
 lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
 				       bool is_sap_starting);
+
+#ifdef WLAN_CHIPSET_STATS
+/**
+ * lim_cp_stats_cstats_log_assoc_resp_evt() - Log chipset stats for assoc resp
+ *
+ * @session_entry: pointer to session object
+ * @dir: Direction
+ * @status_code: assoc/reassoc status
+ * @aid: association identifier
+ * @bssid: bssid
+ * @da: destination address
+ * @is_ht: is HT
+ * @is_vht: is VHT
+ * @is_he: is HE
+ * @is_eht: is EHT
+ * @is_reassoc: is reassoc frame
+ *
+ * Return : void
+ */
+void lim_cp_stats_cstats_log_assoc_resp_evt(struct pe_session *session_entry,
+					    enum cstats_dir dir,
+					    uint16_t status_code, uint16_t aid,
+					    uint8_t *bssid, uint8_t *da,
+					    bool is_ht, bool is_vht, bool is_he,
+					    bool is_eht, bool is_reassoc);
+
+/**
+ * lim_cp_stats_cstats_log_auth_evt() - Log chipset stats for auth frames
+ *
+ * @pe_session: pointer to session object
+ * @dir: direction
+ * @algo: auth algorithm
+ * @seq: auth sequence
+ * @status: Status
+ *
+ * Return : void
+ */
+void lim_cp_stats_cstats_log_auth_evt(struct pe_session *pe_session,
+				      enum cstats_dir dir, uint16_t algo,
+				      uint16_t seq, uint16_t status);
+
+/**
+ * lim_cp_stats_cstats_log_deauth_evt() - Log chipset stats for deauth frames
+ *
+ * @pe_session: pointer to session object
+ * @dir: direction
+ * @reasonCode: reason code
+ *
+ * Return : void
+ */
+void lim_cp_stats_cstats_log_deauth_evt(struct pe_session *pe_session,
+					enum cstats_dir dir,
+					uint16_t reasonCode);
+
+/**
+ * lim_cp_stats_cstats_log_disassoc_evt() - Log chipset stats for disassoc frm
+ *
+ * @pe_session: pointer to session object
+ * @dir: direction
+ * @reasonCode: reason code
+ *
+ * Return : void
+ */
+void lim_cp_stats_cstats_log_disassoc_evt(struct pe_session *pe_session,
+					  enum cstats_dir dir,
+					  uint16_t reasonCode);
+
+/**
+ * lim_cp_stats_cstats_log_assoc_req_evt() - Log chipset stats for assoc req frm
+ *
+ * @pe_session: pointer to session object
+ * @dir: Direction
+ * @bssid: bssid
+ * @sa: source addr
+ * @ssid_len: ssid length
+ * @ssid: ssid
+ * @is_ht: is HT
+ * @is_vht: is VHT
+ * @is_he: is HE
+ * @is_eht: is EHT
+ * @is_reassoc: is reassociation request
+ *
+ * Return : void
+ */
+void lim_cp_stats_cstats_log_assoc_req_evt(struct pe_session *pe_session,
+					   enum cstats_dir dir, uint8_t *bssid,
+					   uint8_t *sa, uint8_t ssid_len,
+					   uint8_t *ssid, bool is_ht,
+					   bool is_vht, bool is_he,
+					   bool is_eht, bool is_reassoc);
+
+/**
+ * lim_cp_stats_cstats_log_disc_req_evt() : chipset stats for TDLS disc req
+ *
+ * @frm: pointer to tDot11fTDLSDisReq
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_disc_req_evt(tDot11fTDLSDisReq *frm,
+					  struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_disc_resp_evt() : chipset stats for TDLS disc resp
+ *
+ * @frm: pointer to tDot11fTDLSDisRsp
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_disc_resp_evt(tDot11fTDLSDisRsp *frm,
+					   struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_setup_req_evt() : chipset stats for TDLS setup req
+ *
+ * @frm: pointer to tDot11fTDLSSetupReq
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_setup_req_evt(tDot11fTDLSSetupReq *frm,
+					   struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_setup_resp_evt() : chipset stats for TDLS setup resp
+ *
+ * @frm: pointer to tDot11fTDLSSetupRsp
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_setup_resp_evt(tDot11fTDLSSetupRsp *frm,
+					    struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_setup_confirm_evt() : chipset stats for TDLS setup
+ * confirm
+ *
+ * @frm: pointer to tDot11fTDLSSetupCnf
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
+					       struct pe_session *pe_session);
+
+/**
+ * lim_cp_stats_cstats_log_tear_down_evt() : chipset stats for TDLS teardown
+ *
+ * @frm: pointer to tDot11fTDLSSetupCnf
+ * @pe_session: pointer to session object
+ *
+ * Return: void
+ */
+void lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
+					   struct pe_session *pe_session);
+#else
+static inline void
+lim_cp_stats_cstats_log_assoc_resp_evt(struct pe_session *session_entry,
+				       enum cstats_dir dir,
+				       uint16_t status_code, uint16_t aid,
+				       uint8_t *bssid, uint8_t *da,
+				       bool is_ht, bool is_vht, bool is_he,
+				       bool is_eht, bool is_reassoc)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_auth_evt(struct pe_session *pe_session,
+				 enum cstats_dir dir, uint16_t algo,
+				 uint16_t seq, uint16_t status)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_deauth_evt(struct pe_session *pe_session,
+				   enum cstats_dir dir, uint16_t reasonCode)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_disassoc_evt(struct pe_session *pe_session,
+				     enum cstats_dir dir, uint16_t reasonCode)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_assoc_req_evt(struct pe_session *pe_session,
+				      enum cstats_dir dir, uint8_t *bssid,
+				      uint8_t *sa, uint8_t ssid_len,
+				      uint8_t *ssid, bool is_ht,
+				      bool is_vht, bool is_he,
+				      bool is_eht, bool is_reassoc)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_disc_req_evt(tDot11fTDLSDisReq *frm,
+				     struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_disc_resp_evt(tDot11fTDLSDisRsp *frm,
+				      struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_setup_req_evt(tDot11fTDLSSetupReq *frm,
+				      struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_setup_resp_evt(tDot11fTDLSSetupRsp *frm,
+				       struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
+					  struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
+				      struct pe_session *pe_session)
+{
+}
+#endif /* WLAN_CHIPSET_STATS */
 #endif /* __LIM_UTILS_H */

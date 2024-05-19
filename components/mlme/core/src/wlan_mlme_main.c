@@ -1712,6 +1712,7 @@ static void mlme_init_ht_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_SHORT_GI_20MHZ);
 	u1.ht_cap_info.short_gi_40_mhz =
 				cfg_get(psoc, CFG_SHORT_GI_40MHZ);
+	u1.ht_cap_info.mimo_power_save = cfg_get(psoc, CFG_HT_SMPS_MODE);
 	ht_caps->ht_cap_info = u1.ht_cap_info;
 
 	/* HT Capapabilties - AMPDU Params */
@@ -2034,7 +2035,7 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	 */
 	he_caps->dot11_he_cap.broadcast_twt = 0;
 
-	is_twt_enabled = wlan_twt_cfg_is_twt_enabled(psoc);
+	is_twt_enabled = cfg_get(psoc, CFG_ENABLE_TWT);
 
 	if (is_twt_enabled)
 		he_caps->dot11_he_cap.flex_twt_sched =
