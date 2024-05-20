@@ -318,7 +318,7 @@ struct wlan_dp_stc_peer_traffic_map {
 struct wlan_dp_stc_classified_flow_entry {
 	uint8_t flow_active;
 	enum qca_traffic_type traffic_type;
-	uint8_t tx_flow_id;
+	uint16_t tx_flow_id;
 	uint8_t rx_flow_id;
 	uint32_t prev_tx_pkts;
 	uint32_t prev_rx_pkts;
@@ -351,6 +351,7 @@ struct wlan_dp_stc_classified_flow_table {
  * @rx_flow_table: RX flow table
  * @tx_flow_table: TX flow table
  * @classified_flow_table: Flow table of all the classified flows
+ * @candidates: Sampling candidate selection table
  */
 struct wlan_dp_stc {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -366,6 +367,7 @@ struct wlan_dp_stc {
 	struct wlan_dp_stc_rx_flow_table rx_flow_table;
 	struct wlan_dp_stc_tx_flow_table tx_flow_table;
 	struct wlan_dp_stc_classified_flow_table classified_flow_table;
+	struct wlan_dp_stc_sampling_candidate candidates[DP_STC_SAMPLE_FLOWS_MAX];
 };
 
 /* Function Declaration - START */
@@ -467,7 +469,7 @@ static inline void
 wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc_peer_traffic_map *active_traffic_map,
 			     enum qca_traffic_type traffic_type)
 {
-	uint32_t val = 1;
+	uint32_t val = 0;
 
 	switch (traffic_type) {
 	case QCA_TRAFFIC_TYPE_STREAMING:
@@ -586,7 +588,7 @@ wlan_dp_indicate_rx_flow_add(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 
 	/* RCU or atomic variable?? */
-	if (dp_stc->periodic_work_state < WLAN_DP_STC_WORK_STARTED) {
+	if (dp_stc && dp_stc->periodic_work_state < WLAN_DP_STC_WORK_STARTED) {
 		qdf_periodic_work_start(&dp_stc->flow_monitor_work,
 					dp_stc->flow_monitor_interval);
 		dp_stc->periodic_work_state = WLAN_DP_STC_WORK_STARTED;

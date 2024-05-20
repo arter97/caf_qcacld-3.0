@@ -160,11 +160,17 @@ static inline bool is_flow_tuple_ipv6(struct flow_info *flow_tuple)
 	return false;
 }
 
-#define BUF_LEN_MAX 1024
+#define BUF_LEN_MAX 256
 static inline void os_if_dp_print_tuple(struct flow_info *flow_tuple)
 {
-	uint8_t buf[BUF_LEN_MAX];
+	uint8_t *buf;
 	uint16_t buf_len = BUF_LEN_MAX, len = 0;
+
+	buf = qdf_mem_malloc(BUF_LEN_MAX);
+	if (!buf) {
+		osif_debug("log buffer allocation failed");
+		return;
+	}
 
 	len = scnprintf(buf, buf_len,
 			"Flow tuple: ");
@@ -195,15 +201,22 @@ static inline void os_if_dp_print_tuple(struct flow_info *flow_tuple)
 	len += scnprintf(buf + len, buf_len - len, " %u", flow_tuple->proto);
 
 	osif_nofl_debug("STC: %s", buf);
+	qdf_mem_free(buf);
 }
 
 static void
 os_if_dp_print_flow_txrx_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 {
-	uint8_t buf[BUF_LEN_MAX];
+	uint8_t *buf;
 	uint16_t buf_len = BUF_LEN_MAX, len = 0;
 	txrx_samples_t txrx_samples = flow_samples->txrx_samples;
 	int i, j;
+
+	buf = qdf_mem_malloc(BUF_LEN_MAX);
+	if (!buf) {
+		osif_debug("log buffer allocation failed");
+		return;
+	}
 
 	len = scnprintf(buf, buf_len,
 			"Flow TxRx Stats:");
@@ -407,6 +420,7 @@ os_if_dp_print_flow_txrx_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 		}
 	}
 	osif_nofl_debug("STC: %s", buf);
+	qdf_mem_free(buf);
 }
 
 static void
