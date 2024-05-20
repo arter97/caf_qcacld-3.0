@@ -9024,7 +9024,8 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 
 	if (!active_link_bitmap) {
 		goto done;
-	} else if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+	} else if (policy_mgr_is_emlsr_sta_concurrency_present(psoc) &&
+		   !wlan_mlme_is_aux_emlsr_support(psoc)) {
 		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
 		goto done;
 	}
@@ -9180,7 +9181,8 @@ policy_mgr_update_mlo_links_based_on_linkid_nlink(
 		policy_mgr_err("vdev is not mlo vdev");
 		goto release_vdev_ref;
 	}
-	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc) &&
+	    !wlan_mlme_is_aux_emlsr_support(psoc)) {
 		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
 		goto release_vdev_ref;
 	}
@@ -9551,7 +9553,8 @@ policy_mgr_update_active_mlo_num_nlink(struct wlan_objmgr_psoc *psoc,
 	uint32_t link_bitmap = 0;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
-	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc) &&
+	    !wlan_mlme_is_aux_emlsr_support(psoc)) {
 		policy_mgr_debug("Concurrency exists, cannot enter EMLSR mode");
 		return QDF_STATUS_E_FAILURE;
 	}

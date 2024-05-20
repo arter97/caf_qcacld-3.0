@@ -594,6 +594,45 @@ get_disallow_mlo_mode_table(struct wlan_objmgr_psoc *psoc)
 }
 
 static uint32_t
+override_mlmr_disallow_mode(struct wlan_objmgr_psoc *psoc,
+			    struct wlan_objmgr_vdev *vdev,
+			    uint8_t ml_num_link,
+			    qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS],
+			    uint32_t disallow_mode_bitmap)
+{
+	uint8_t num_5g_links = 0;
+	uint8_t i;
+
+	if (vdev->mlo_dev_ctx->sta_ctx->emlsr_mode_req !=
+	    WLAN_EMLSR_MODE_ENTER)
+		return disallow_mode_bitmap;
+
+	/* If user vendor command force enter eMLSR, e.g. emlsr_mode_req is
+	 * WLAN_EMLSR_MODE_ENTER, try to append MLMR to disallow
+	 * bitmap
+	 */
+	if ((disallow_mode_bitmap & MLMR_5GL_5GH) ||
+	    (disallow_mode_bitmap & MLMR_5GH_5GH) ||
+	    (disallow_mode_bitmap & MLMR_5GL_5GL)) {
+		return disallow_mode_bitmap;
+	}
+
+	for (i = 0; i < ml_num_link; i++) {
+		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i]))
+			num_5g_links++;
+	}
+	if (num_5g_links < 2)
+		return disallow_mode_bitmap;
+
+	disallow_mode_bitmap |= MLMR_5GL_5GH;
+	mlo_debug("disallow_mode_bitmap 0x%x emlsr_mode_req 0x%x",
+		  disallow_mode_bitmap,
+		  vdev->mlo_dev_ctx->sta_ctx->emlsr_mode_req);
+
+	return disallow_mode_bitmap;
+}
+
+static uint32_t
 override_emlsr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 			     struct wlan_objmgr_vdev *vdev,
 			     uint8_t ml_num_link,
@@ -726,6 +765,9 @@ no_legacy_intf:
 	override_emlsr_disallow_mode(psoc, vdev, ml_num_link,
 				     ml_freq_lst, disallow_mode_bitmap,
 				     conc_emlsr_allow);
+	disallow_mode_bitmap =
+	override_mlmr_disallow_mode(psoc, vdev, ml_num_link,
+				    ml_freq_lst, disallow_mode_bitmap);
 
 	num_of_modes = extract_disallow_mode(disallow_mode_bitmap,
 					     disallow_mode);
@@ -5929,7 +5971,8 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 {
 	struct ml_nlink_change_event data;
 
-	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc) &&
+	    !wlan_mlme_is_aux_emlsr_support(psoc)) {
 		mlo_debug("eMLSR concurrency not allow to set link");
 		return QDF_STATUS_E_INVAL;
 	}
