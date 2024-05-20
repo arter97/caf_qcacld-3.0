@@ -270,12 +270,7 @@ static bool csr_is_conn_state(struct mac_context *mac_ctx, uint32_t session_id,
 	return mac_ctx->roam.roamSession[session_id].connectState == state;
 }
 
-bool csr_is_conn_state_connected(struct mac_context *mac, uint32_t sessionId)
-{
-	return cm_is_vdevid_connected(mac->pdev, sessionId) ||
-	       csr_is_conn_state_connected_wds(mac, sessionId);
-}
-
+static inline
 bool csr_is_conn_state_connected_wds(struct mac_context *mac_ctx,
 				     uint32_t session_id)
 {
@@ -283,26 +278,10 @@ bool csr_is_conn_state_connected_wds(struct mac_context *mac_ctx,
 				 eCSR_ASSOC_STATE_TYPE_WDS_CONNECTED);
 }
 
-bool csr_is_conn_state_connected_infra_ap(struct mac_context *mac_ctx,
-					  uint32_t session_id)
+bool csr_is_conn_state_connected(struct mac_context *mac, uint32_t sessionId)
 {
-	return csr_is_conn_state(mac_ctx, session_id,
-				 eCSR_ASSOC_STATE_TYPE_INFRA_CONNECTED) ||
-		csr_is_conn_state(mac_ctx, session_id,
-				  eCSR_ASSOC_STATE_TYPE_INFRA_DISCONNECTED);
-}
-
-bool csr_is_conn_state_disconnected_wds(struct mac_context *mac_ctx,
-					uint32_t session_id)
-{
-	return csr_is_conn_state(mac_ctx, session_id,
-				 eCSR_ASSOC_STATE_TYPE_WDS_DISCONNECTED);
-}
-
-bool csr_is_conn_state_wds(struct mac_context *mac, uint32_t sessionId)
-{
-	return csr_is_conn_state_connected_wds(mac, sessionId) ||
-	       csr_is_conn_state_disconnected_wds(mac, sessionId);
+	return cm_is_vdevid_connected(mac->pdev, sessionId) ||
+	       csr_is_conn_state_connected_wds(mac, sessionId);
 }
 
 uint16_t cm_csr_get_vdev_dot11_mode(uint8_t vdev_id)
@@ -803,24 +782,6 @@ bool csr_is_all_session_disconnected(struct mac_context *mac)
 	}
 
 	return fRc;
-}
-
-bool csr_is_infra_ap_started(struct mac_context *mac)
-{
-	uint32_t sessionId;
-	bool fRc = false;
-
-	for (sessionId = 0; sessionId < WLAN_MAX_VDEVS; sessionId++) {
-		if (CSR_IS_SESSION_VALID(mac, sessionId) &&
-				(csr_is_conn_state_connected_infra_ap(mac,
-					sessionId))) {
-			fRc = true;
-			break;
-		}
-	}
-
-	return fRc;
-
 }
 
 bool csr_is_conn_state_disconnected(struct mac_context *mac, uint8_t vdev_id)
