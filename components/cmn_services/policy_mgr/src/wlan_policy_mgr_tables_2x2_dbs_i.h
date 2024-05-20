@@ -1930,6 +1930,11 @@ fourth_connection_pcl_dbs_table
 	[PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS] = {
 	[PM_SAP_MODE] = { PM_5G, PM_5G, PM_5G } },
 	[PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS] = {
+	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } },
+
+	[PM_SAP_SAP_SCC_5_STA_24_DBS] = {
+	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } },
+	[PM_SAP_SAP_STA_SCC_5_DBS] = {
 	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } }
 };
 #else
@@ -1958,7 +1963,14 @@ fourth_connection_pcl_dbs_table
 	[PM_NDI_NDI_5_NAN_DISC_24_DBS] = {
 	[PM_STA_MODE] = { PM_5G, PM_5G, PM_5G } },
 	[PM_NDI_NDI_NAN_DISC_24_SMM] = {
-	[PM_STA_MODE] = { PM_5G, PM_5G, PM_5G } }
+	[PM_STA_MODE] = { PM_5G, PM_5G, PM_5G } },
+	[PM_SAP_SAP_SCC_5_SAP_24_DBS] = {
+	[PM_STA_MODE] = { PM_24G, PM_24G, PM_24G } },
+	[PM_SAP_SAP_SCC_5_STA_24_DBS] = {
+	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } },
+	[PM_SAP_SAP_STA_SCC_5_DBS] = {
+	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } }
+
 };
 #endif
 #endif

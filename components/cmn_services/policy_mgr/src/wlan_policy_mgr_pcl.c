@@ -2219,6 +2219,13 @@ enum policy_mgr_three_connection_mode
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq)) {
 			index = PM_STA_SAP_SCC_5_SAP_24_DBS;
+		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq)) {
+			index = PM_SAP_SAP_SCC_5_STA_24_DBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -2324,6 +2331,32 @@ enum policy_mgr_three_connection_mode
 			  WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_ndi[0]].freq)) {
 			index = PM_NDI_NDI_NAN_DISC_24_SMM;
+		}
+	} else if (count_sap == 3) {
+		if (WLAN_REG_IS_SAME_BAND_FREQS(
+			pm_conc_connection_list[list_sap[0]].freq,
+			pm_conc_connection_list[list_sap[1]].freq)) {
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(
+				pm_conc_connection_list[list_sap[2]].freq))
+				index = PM_SAP_SAP_SCC_5_SAP_24_DBS;
+			else
+				index = PM_SAP_SAP_SCC_24_SAP_5_DBS;
+		} else if (WLAN_REG_IS_SAME_BAND_FREQS(
+			pm_conc_connection_list[list_sap[0]].freq,
+			pm_conc_connection_list[list_sap[2]].freq)) {
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(
+				pm_conc_connection_list[list_sap[1]].freq))
+				index = PM_SAP_SAP_SCC_5_SAP_24_DBS;
+			else
+				index = PM_SAP_SAP_SCC_24_SAP_5_DBS;
+		} else if (WLAN_REG_IS_SAME_BAND_FREQS(
+			pm_conc_connection_list[list_sap[1]].freq,
+			pm_conc_connection_list[list_sap[2]].freq)) {
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(
+				pm_conc_connection_list[list_sap[0]].freq))
+				index = PM_SAP_SAP_SCC_5_SAP_24_DBS;
+			else
+				index = PM_SAP_SAP_SCC_24_SAP_5_DBS;
 		}
 	}
 
