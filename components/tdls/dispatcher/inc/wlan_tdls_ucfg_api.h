@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -323,28 +323,6 @@ QDF_STATUS ucfg_tdls_set_operating_mode(
 			struct tdls_set_mode_params *set_mode_params);
 
 /**
- * ucfg_tdls_update_rx_pkt_cnt() - update rx pkt count
- * @vdev: tdls vdev object
- * @mac_addr: peer mac address
- * @dest_mac_addr: dest mac address
- *
- * Return: None
- */
-void ucfg_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
-				 struct qdf_mac_addr *mac_addr,
-				 struct qdf_mac_addr *dest_mac_addr);
-
-/**
- * ucfg_tdls_update_tx_pkt_cnt() - update tx pkt count
- * @vdev: tdls vdev object
- * @mac_addr: peer mac address
- *
- * Return: None
- */
-void ucfg_tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
-				 struct qdf_mac_addr *mac_addr);
-
-/**
  * ucfg_tdls_antenna_switch() - tdls antenna switch
  * @vdev: tdls vdev object
  * @mode: antenna mode
@@ -535,19 +513,6 @@ static inline
 QDF_STATUS ucfg_tdls_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-void ucfg_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
-				 struct qdf_mac_addr *mac_addr,
-				 struct qdf_mac_addr *dest_mac_addr)
-{
-}
-
-static inline
-void ucfg_tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
-				 struct qdf_mac_addr *mac_addr)
-{
 }
 
 static inline
