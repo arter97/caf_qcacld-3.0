@@ -2069,17 +2069,21 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 				WMI_GET_BITS(src_data->frame_info,
 					     WLAN_FRAME_INFO_AUTH_ALG_OFFSET,
 					     4);
+		/*
+		 * src_data->status_code is treated as tx status under
+		 * following condition:
+		 * 1. if the frame is an authentication frame and req_resp bit
+		 * is set to '0'
+		 * 2. If the Frame is Association Request frame
+		 * 3. If the Frame is Re-Association Request Frame
+		 */
 
-		if (!dst_buf->is_rsp) {
+		if ((!dst_buf->is_rsp &&
+		     dst_buf->subtype == MGMT_SUBTYPE_AUTH) ||
+		    dst_buf->subtype == MGMT_SUBTYPE_ASSOC_REQ ||
+		    dst_buf->subtype == MGMT_SUBTYPE_REASSOC_REQ) {
 			dst_buf->tx_status = wmi_get_converted_tx_status(
 							src_data->status_code);
-			/* wmi_roam_frame_info->status_code sent from the fw
-			 * denotes the tx_status of the transmitted frames.
-			 * To Do: Need a separate field for status code or
-			 * use existing field of wmi_roam_frame_info tlv
-			 * to send the tx status of transmitted frame from the
-			 * FW.
-			 */
 			dst_buf->status_code = 0;
 		}
 
