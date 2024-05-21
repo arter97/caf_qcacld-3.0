@@ -365,11 +365,12 @@ QDF_STATUS dp_tx_add_to_comp_queue_1_0(struct dp_soc *soc,
  * dp_config_enh_tx_capture_1_0()- API to enable/disable enhanced tx capture
  * @pdev_handle: DP_PDEV handle
  * @val: user provided value
+ * @mac_id: LMAC id, dummy field not used in legacy capture
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-dp_config_enh_tx_capture_1_0(struct dp_pdev *pdev_handle, uint8_t val);
+dp_config_enh_tx_capture_1_0(struct dp_pdev *pdev, uint8_t val, uint8_t mac_id);
 
 /*
  * dp_deliver_mgmt_frm: Process

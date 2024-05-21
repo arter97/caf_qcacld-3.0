@@ -2576,11 +2576,12 @@ dp_enh_tx_cap_mode_change(struct dp_pdev *pdev, uint8_t user_mode)
  * dp_config_enh_tx_capture_1_0()- API to enable/disable enhanced tx capture
  * @pdev_handle: DP_PDEV handle
  * @val: user provided value
+ * @mac_id: LMAC id, dummy field not used in legacy capture
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-dp_config_enh_tx_capture_1_0(struct dp_pdev *pdev, uint8_t val)
+dp_config_enh_tx_capture_1_0(struct dp_pdev *pdev, uint8_t val, uint8_t mac_id)
 {
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
