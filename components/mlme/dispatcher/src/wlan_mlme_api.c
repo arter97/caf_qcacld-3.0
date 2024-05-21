@@ -7494,6 +7494,22 @@ wlan_mlme_get_sta_nan_host_conc_support(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
+ * wlan_mlme_get_sta_sap_nan_host_conc_support() - This API checks if STA, SAP
+ * and NAN concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if STA and NAN concurrency is allowed otherwise false
+ */
+static bool
+wlan_mlme_get_sta_sap_nan_host_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	bool sta_sap_nan_concurrency = cfg_get(psoc,
+					       CFG_SAP_STA_NDP_CONCURRENCY);
+
+	return sta_sap_nan_concurrency;
+}
+
+/**
  * wlan_mlme_get_sta_sap_p2p_host_conc_support() - This API checks if
  * STA-SAP-P2P concurrency is allowed or not
  * @psoc: psoc context
@@ -7666,6 +7682,9 @@ wlan_mlme_set_iface_combinations(struct wlan_objmgr_psoc *psoc,
 	if (wlan_mlme_get_sta_p2p_p2p_tdls_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_P2P_P2P_TDLS_SUPPORT;
+	if (wlan_mlme_get_sta_sap_nan_host_conc_support(psoc))
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_SAP_NAN_SUPPORT;
 	mlme_debug("iface combinations = %x",
 		   mlme_feature_set->iface_combinations);
 }
