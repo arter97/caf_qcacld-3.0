@@ -6693,6 +6693,10 @@ cm_roam_cancel_event(uint8_t vdev_id, enum wlan_roam_failure_reason_code reason,
 	return QDF_STATUS_SUCCESS;
 }
 
+#define ROAM_STATUS_SUCCESS 0
+#define ROAM_STATUS_FAILURE 1
+#define ROAM_STATUS_NO_ROAM 2
+
 void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_trigger_info *trigger,
 			       struct wmi_roam_result *res,
@@ -6749,9 +6753,9 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	 * 2. FW sends res->status == 1 if FW triggered roaming but failed due
 	 *    to the reason other than below reasons
 	 *
-	 * Print NO_ROAM for below reasons where either candidate AP is not
-	 * found or we roamed to current AP itself irrespective of the
-	 * res->status value:
+	 * Print NO_ROAM if res->status == 2 for below reasons where
+	 * either candidate AP is not found or we roamed to current
+	 * AP itself irrespective of the res->status value:
 	 * ROAM_FAIL_REASON_NO_AP_FOUND
 	 * ROAM_FAIL_REASON_NO_CAND_AP_FOUND
 	 * ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT
@@ -6760,7 +6764,8 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	 */
 	wlan_diag_event.is_roam_successful = true;
 
-	if (res->fail_reason == ROAM_FAIL_REASON_NO_AP_FOUND ||
+	if (res->status == ROAM_STATUS_NO_ROAM ||
+	    res->fail_reason == ROAM_FAIL_REASON_NO_AP_FOUND ||
 	    res->fail_reason == ROAM_FAIL_REASON_NO_CAND_AP_FOUND ||
 	    res->fail_reason == ROAM_FAIL_REASON_CURR_AP_STILL_OK ||
 	    res->fail_reason ==
