@@ -6222,10 +6222,10 @@ hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info
 }
 
 struct wlan_hdd_link_info *
-hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id)
+hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
+				  int32_t link_id, bool is_cache)
 {
 	struct wlan_hdd_link_info *link_info;
-	struct hdd_station_ctx *sta_ctx;
 
 	if (!adapter || link_id == WLAN_INVALID_LINK_ID) {
 		hdd_err("NULL adapter or invalid link ID");
@@ -6233,8 +6233,7 @@ hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id)
 	}
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-		if (sta_ctx->conn_info.ieee_link_id == link_id)
+		if (hdd_cm_get_ieee_link_id(link_info, is_cache) == link_id)
 			return link_info;
 	}
 
@@ -6278,7 +6277,8 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 
 	adapter = cur_link_info->adapter;
 	new_link_info = hdd_get_link_info_by_ieee_link_id(adapter,
-							  ieee_new_link_id);
+							  ieee_new_link_id,
+							  false);
 	if (!new_link_info) {
 		hdd_err("Link id %d not found", ieee_new_link_id);
 		goto release_ref;
@@ -15576,7 +15576,7 @@ void hdd_adapter_reset_station_ctx(struct hdd_adapter *adapter)
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 		qdf_mem_zero(&sta_ctx->conn_info.bssid, QDF_MAC_ADDR_SIZE);
 
-		hdd_cm_clear_ieee_link_id(link_info);
+		hdd_cm_clear_ieee_link_id(link_info, false);
 		sta_ctx->user_cfg_chn_width = CH_WIDTH_INVALID;
 	}
 }
@@ -18615,6 +18615,8 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 
 	sme_register_pagefault_cb(mac_handle, hdd_pagefault_action_cb);
 
+	sme_register_set_disconnect_cb(mac_handle,
+				       hdd_set_disconnect_link_id_cb);
 	hdd_exit();
 
 	return ret;
@@ -18641,6 +18643,8 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
+
+	sme_deregister_disconnect_cb(mac_handle);
 
 	sme_deregister_ssr_on_pagefault_cb(mac_handle);
 
@@ -22799,6 +22803,37 @@ hdd_update_sub20_chan_width(struct wlan_hdd_link_info *link_info,
 	hdd_ctx->config->sub_20_ch_width = sub_20_ch_width;
 out:
 	return status;
+}
+
+void hdd_set_disconnect_link_id_cb(uint8_t vdev_id)
+{
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_station_ctx *hdd_sta_ctx;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("HDD CTX is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Link info is NULL for vdev_id %d", vdev_id);
+		return;
+	}
+
+	adapter = link_info->adapter;
+	if (adapter->device_mode != QDF_STA_MODE)
+		return;
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	adapter->disconnect_link_id = hdd_cm_get_ieee_link_id(link_info, true);
+	if (adapter->disconnect_link_id != WLAN_INVALID_LINK_ID) {
+		hdd_debug("disconnect received on link_id %u vdev_id %d",
+			  adapter->disconnect_link_id, vdev_id);
+	}
 }
 
 /* Register the module init/exit functions */

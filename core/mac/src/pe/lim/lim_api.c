@@ -2536,7 +2536,6 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 	struct wlan_frame_hdr *mac_hdr;
 	struct qdf_mac_addr discon_bssid;
 	uint8_t session_id;
-	struct wlan_objmgr_vdev *vdev;
 
 	if (!deauth_disassoc_frame ||
 	    deauth_disassoc_frame_len <
@@ -2553,16 +2552,6 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 					   discon_bssid.bytes, &session_id);
 	if (!session)
 		goto end;
-
-	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
-							 session->self_mac_addr,
-							 WLAN_LEGACY_MAC_ID);
-	if (!vdev) {
-		pe_err("VDEV is NULL");
-		goto end;
-	}
-	wlan_mlme_set_disconnect_receive(vdev, true);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 	if (!lim_is_sb_disconnect_allowed(session))
 		return QDF_STATUS_SUCCESS;
@@ -2602,6 +2591,10 @@ end:
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
+
+	if (mac->sme.set_disconnect_link_id_cb)
+		mac->sme.set_disconnect_link_id_cb(session->vdev_id);
+
 	lim_tear_down_link_with_ap(mac, session->peSessionId,
 				   reason_code,
 				   eLIM_PEER_ENTITY_DEAUTH);

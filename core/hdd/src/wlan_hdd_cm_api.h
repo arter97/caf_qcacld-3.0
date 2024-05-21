@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -402,35 +402,52 @@ QDF_STATUS hdd_cm_save_connected_links_info(struct qdf_mac_addr *self_mac,
 					    int32_t link_id);
 
 /**
- * hdd_cm_set_ieee_link_id() - Set IEEE link ID in station context conn info.
+ * hdd_cm_set_ieee_link_id() - Set IEEE link ID in station context
  * @link_info: Link info pointer in HDD adapter
  * @link_id: IEEE link ID
+ * @is_cache: Is to set link_id in cache_conn_info
  *
- * Sets IEEE link ID in connection info of @link_info's station context.
+ * Sets IEEE link ID in @link_info's station context.
  *
  * Return: void
  */
 void
-hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id);
+hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id,
+			bool is_cache);
 
 /**
  * hdd_cm_clear_ieee_link_id() - Clear IEEE link ID in station context
- * conn info.
  * @link_info: Link info pointer in HDD adapter
+ * @is_cache: Is to clear link_id in cache_conn_info
  *
- * Clear IEEE link ID in connection info of @link_info's station context.
+ * Clear IEEE link ID in @link_info's station context.
  *
  * Return: void
  */
-void hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info);
+void
+hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache);
+
+/**
+ * hdd_cm_get_ieee_link_id() - Get IEEE link ID from station context
+ * @link_info: Link info pointer in HDD adapter
+ * @is_cache: Is to get link_id from cache_conn_info
+ *
+ * Get IEEE link ID in @link_info's station context.
+ *
+ * Return: ieee_link_id
+ */
+int32_t
+hdd_cm_get_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache);
+
 #else
 static inline void
-hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id)
+hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id,
+			bool is_cache)
 {
 }
 
 static inline void
-hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info)
+hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
 {
 }
 
@@ -440,6 +457,12 @@ QDF_STATUS hdd_cm_save_connected_links_info(struct qdf_mac_addr *self_mac,
 					    int32_t link_id)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline int32_t
+hdd_cm_get_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
+{
+	return WLAN_INVALID_LINK_ID;
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* __WLAN_HDD_CM_API_H */

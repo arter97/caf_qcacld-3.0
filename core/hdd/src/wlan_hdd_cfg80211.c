@@ -7341,7 +7341,7 @@ hdd_set_ratemask_for_mlo(uint8_t link_id, struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	link_info = hdd_get_link_info_by_ieee_link_id(adapter, link_id);
+	link_info = hdd_get_link_info_by_ieee_link_id(adapter, link_id, false);
 	if (!link_info) {
 		hdd_err("Incorrect link info");
 		return -EINVAL;
@@ -12148,7 +12148,7 @@ static int hdd_parse_ul_mu_mlo_config(struct wlan_hdd_link_info *link_info,
 		}
 		mlo_ulmu_cfg[num_links].ulmu = ulmu;
 		link = hdd_get_link_info_by_ieee_link_id(link_info->adapter,
-							 link_id);
+							 link_id, false);
 		if (!link) {
 			hdd_err("Invalid link ID: %d", link_id);
 			return -EINVAL;

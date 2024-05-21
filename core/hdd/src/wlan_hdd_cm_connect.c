@@ -350,30 +350,53 @@ QDF_STATUS hdd_cm_save_connected_links_info(struct qdf_mac_addr *self_mac,
 	}
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	hdd_cm_set_ieee_link_id(link_info, link_id);
+	hdd_cm_set_ieee_link_id(link_info, link_id, false);
+	hdd_cm_set_ieee_link_id(link_info, link_id, true);
 	qdf_copy_macaddr(&sta_ctx->conn_info.bssid, bssid);
 	return QDF_STATUS_SUCCESS;
 }
 
 void
-hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id)
+hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id,
+			bool is_cache)
 {
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
 	hdd_debug("old_link_id:%d new_link_id:%d",
+		  is_cache ? sta_ctx->cache_conn_info.ieee_link_id :
 		  sta_ctx->conn_info.ieee_link_id, link_id);
-	sta_ctx->conn_info.ieee_link_id = link_id;
+	if (is_cache)
+		sta_ctx->cache_conn_info.ieee_link_id = link_id;
+	else
+		sta_ctx->conn_info.ieee_link_id = link_id;
 }
 
 void
-hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info)
+hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
 {
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	hdd_debug("clear link id:%d", sta_ctx->conn_info.ieee_link_id);
-	sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
+	hdd_debug("clear link id:%d",
+		  is_cache ? sta_ctx->conn_info.ieee_link_id :
+		  sta_ctx->conn_info.ieee_link_id);
+	if (is_cache)
+		sta_ctx->cache_conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
+	else
+		sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
+}
+
+int32_t
+hdd_cm_get_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
+{
+	struct hdd_station_ctx *sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	if (is_cache)
+		return sta_ctx->cache_conn_info.ieee_link_id;
+	else
+		return sta_ctx->conn_info.ieee_link_id;
 }
 #endif
 
@@ -1542,7 +1565,7 @@ hdd_cm_mlme_send_standby_link_chn_width(struct hdd_adapter *adapter,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	link_info = hdd_get_link_info_by_ieee_link_id(adapter, link_id);
+	link_info = hdd_get_link_info_by_ieee_link_id(adapter, link_id, false);
 	if (!link_info) {
 		hdd_err("Link info not found by linkid:%u", link_id);
 		return QDF_STATUS_E_INVAL;
@@ -1804,18 +1827,9 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 						adapter->keep_alive_interval);
 }
 
-static void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
+static inline void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
 {
-	struct wlan_hdd_link_info *link_info = NULL;
-	uint8_t i;
-
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_info = &adapter->link_info[i];
-		if (link_info && link_info->vdev) {
-			wlan_mlme_set_disconnect_receive(
-						link_info->vdev, false);
-		}
-	}
+	adapter->disconnect_link_id = WLAN_INVALID_LINK_ID;
 }
 
 static void

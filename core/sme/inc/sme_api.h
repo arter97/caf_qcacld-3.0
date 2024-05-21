@@ -4897,5 +4897,26 @@ QDF_STATUS sme_send_channel_change_req(mac_handle_t mac_handle,
 QDF_STATUS sme_update_beacon_country_ie(mac_handle_t mac_handle,
 					uint8_t vdev_id,
 					bool country_ie_for_all_band);
+/**
+ * sme_register_set_disconnect_cb() - function to register cb to set
+ * disconnect link_id
+ * @mac_handle: Opaque handle to the global MAC context
+ * @hdd_set_disconnect_link_id_cb: callback to be registered
+ *
+ * Return: None
+ */
+
+void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
+				    void (*set_disconnect_link_id_cb)
+				    (uint8_t vdev_id));
+
+/**
+ * sme_deregister_disconnect_cb() - function to deregister cb to
+ * disconnect link_id
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: None
+ */
+void sme_deregister_disconnect_cb(mac_handle_t mac_handle);
 
 #endif /* #if !defined( __SME_API_H ) */

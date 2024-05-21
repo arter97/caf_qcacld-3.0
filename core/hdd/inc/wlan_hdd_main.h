@@ -1337,6 +1337,8 @@ struct get_station_client_info {
  * @link_state_cached_timestamp: link state cached timestamp
  * @keep_alive_interval: user configured STA keep alive interval
  * @sta_client_info: To store get station user application port_id's
+ * @disconnect_link_id: cache disconnect link_id, for legacy link_id will
+ *			be @WLAN_INVALID_LINK_ID
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1532,6 +1534,7 @@ struct hdd_adapter {
 #endif
 	uint16_t keep_alive_interval;
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
+	int32_t disconnect_link_id;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -5569,6 +5572,7 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
  * IEEE link ID.
  * @adapter: HDD adapter
  * @link_id: IEEE link ID to search for.
+ * @is_cache: Set this flag to get the link_id from cache_conn_info
  *
  * Search the station ctx connection info for matching link ID in @adapter and
  * return the link info pointer on match. The IEEE link ID is updated in station
@@ -5577,10 +5581,12 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
  * Return: link info pointer
  */
 struct wlan_hdd_link_info *
-hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id);
+hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
+				  int32_t link_id, bool is_cache);
 #else
 static inline struct wlan_hdd_link_info *
-hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id)
+hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
+				  int32_t link_id, bool is_cache)
 {
 	return NULL;
 }
@@ -5838,4 +5844,13 @@ hdd_update_sub20_chan_width(struct wlan_hdd_link_info *link_info,
  */
 bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
                         enum QDF_OPMODE mode);
+
+/**
+ *hdd_set_disconnect_link_id_cb() - set STA disconnected link_id
+ *@vdev_id: vdev_id
+ *
+ * Return: None
+ */
+void
+hdd_set_disconnect_link_id_cb(uint8_t vdev_id);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

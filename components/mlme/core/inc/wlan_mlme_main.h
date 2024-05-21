@@ -840,7 +840,6 @@ struct enhance_roam_info {
  * @best_6g_power_type: best 6g power type
  * @mac_id: vdev mac_id
  * @ap_nss: AP advertised NSS
- * @is_disconnect_received: Is disconnect received on this vdev
  * @keep_alive_period: KEEPALIVE period in seconds
  */
 struct mlme_legacy_priv {
@@ -917,7 +916,6 @@ struct mlme_legacy_priv {
 	enum reg_6g_ap_type best_6g_power_type;
 	uint32_t mac_id;
 	uint8_t ap_nss;
-	bool is_disconnect_received;
 	uint16_t keep_alive_period;
 };
 

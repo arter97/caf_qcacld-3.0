@@ -5051,25 +5051,6 @@ wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_mlme_is_hs_20_btm_offload_disabled(struct wlan_objmgr_psoc *psoc,
 					bool *val);
-/**
- * wlan_mlme_set_disconnect_receive() - set disconnect receive on vdev
- * @vdev: vdev obj
- * @set_disconnect_receive: set disconnect receive
- *
- * Return: QDF Status
- */
-QDF_STATUS wlan_mlme_set_disconnect_receive(struct wlan_objmgr_vdev *vdev,
-					    bool set_disconnect_receive);
-
-/**
- * wlan_mlme_get_is_disconnect_receive() - Get disconnect received or not
- * on vdev
- * @vdev: VDEV object
- *
- * API to get the disconnect received on vdev
- *
- * Return: true/false
- */
 
 bool wlan_mlme_get_is_disconnect_receive(struct wlan_objmgr_vdev *vdev);
 
