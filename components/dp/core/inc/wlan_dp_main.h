@@ -1241,8 +1241,8 @@ wlan_dp_check_is_ring_ipa_rx(ol_txrx_soc_handle soc, uint8_t ring_id)
 #endif
 
 /* The below two key combined is ASCII "WLAN_DP_GET_HASH" */
-#define WLAN_DP_SIPHASH_KEY_0 0x574C414E5F44505F
-#define WLAN_DP_SIPHASH_KEY_1 0x4745545F48415348
+#define WLAN_DP_HASH_KEY_0 0x574C414E5F44505F
+#define WLAN_DP_HASH_KEY_1 0x4745545F48415348
 
 /**
  * wlan_dp_get_flow_hash() - Generate flow tuple hash
@@ -1255,11 +1255,19 @@ static inline uint64_t
 wlan_dp_get_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
 		      struct flow_info *flow_tuple)
 {
-	qdf_siphash_aligned_key_t flow_secret;
+	uint64_t *data = (uint64_t *)flow_tuple;
+	uint64_t a, b, c, d, e;
+	uint64_t flow_secret[2];
 
-	flow_secret.key[0] = WLAN_DP_SIPHASH_KEY_0;
-	flow_secret.key[1] = WLAN_DP_SIPHASH_KEY_1;
-	return qdf_siphash(flow_tuple, offsetofend(typeof(*flow_tuple), flags),
-			   &flow_secret);
+	flow_secret[0] = WLAN_DP_HASH_KEY_0;
+	flow_secret[1] = WLAN_DP_HASH_KEY_1;
+
+	a = data[0] ^ flow_secret[0];
+	b = data[1] ^ flow_secret[1];
+	c = data[2] ^ flow_secret[0];
+	d = data[3] ^ flow_secret[1];
+	e = data[4] ^ flow_secret[0];
+
+	return ((a ^ b) ^ (c ^ d) ^ e);
 }
 #endif

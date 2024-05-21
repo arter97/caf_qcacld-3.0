@@ -613,19 +613,16 @@ union wlan_tp_data {
 
 /*
  * struct flow_info - Structure used for defining flow
- * @proto: Flow proto
- * @src_port: Source port
- * @dst_port: Destination port
- * @flags: Flags indicating available attributes of a flow
  * @src_ip: Source IP (IPv4/IPv6)
  * @dst_ip: Destination IP (IPv4/IPv6)
+ * @src_port: Source port
+ * @dst_port: Destination port
+ * @proto: Flow proto
+ * @reserved: Padding
+ * @flags: Flags indicating available attributes of a flow
  * @flow_label: Flow label if IPv6 is used for src_ip/dst_ip
  */
 struct flow_info {
-	uint8_t proto;
-	uint16_t src_port;
-	uint16_t dst_port;
-	uint32_t flags;
 	union {
 		uint32_t ipv4_addr;             /* IPV4 address */
 		uint32_t ipv6_addr[4];          /* IPV6 address */
@@ -634,6 +631,11 @@ struct flow_info {
 		uint32_t ipv4_addr;             /* IPV4 address */
 		uint32_t ipv6_addr[4];          /* IPV6 address */
 	} dst_ip;
+	uint16_t src_port;
+	uint16_t dst_port;
+	uint8_t proto;
+	uint8_t reserved[3];
+	uint32_t flags;
 	uint32_t flow_label;
 };
 
