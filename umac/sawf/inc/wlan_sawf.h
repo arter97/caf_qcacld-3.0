@@ -345,6 +345,14 @@ QDF_STATUS wlan_sawf_deinit(void);
  */
 struct sawf_ctx *wlan_get_sawf_ctx(void);
 
+/* wlan_clear_sawf_ctx() - Clear service aware wifi context
+ *
+ * Clear Service Aware Wifi Context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_clear_sawf_ctx(void);
+
 /* wlan_service_id_valid() - Validate the service ID
  *
  * Validate the service ID

@@ -79,6 +79,35 @@ QDF_STATUS wlan_sawf_deinit(void)
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS wlan_clear_sawf_ctx(void)
+{
+	struct wlan_sawf_svc_class_params *sawf_params;
+	uint8_t svc_idx, svc_id;
+
+	if (!g_wlan_sawf_ctx) {
+		sawf_err("SAWF global context is already freed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_spin_lock_bh(&g_wlan_sawf_ctx->lock);
+	for (svc_idx = 0; svc_idx < SAWF_SVC_CLASS_MAX; svc_idx++) {
+		sawf_params = &g_wlan_sawf_ctx->svc_classes[svc_idx];
+		svc_id = sawf_params->svc_id;
+		if (svc_id == 0)
+			continue;
+
+		telemetry_sawf_set_svclass_cfg(false, svc_id, 0, 0, 0, 0, 0, 0,
+					       0);
+		qdf_mem_zero(sawf_params,
+			     sizeof(struct wlan_sawf_svc_class_params));
+	}
+	qdf_spin_unlock_bh(&g_wlan_sawf_ctx->lock);
+	sawf_debug("SAWF global context is cleared");
+
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(wlan_clear_sawf_ctx);
+
 struct sawf_ctx *wlan_get_sawf_ctx(void)
 {
 	return g_wlan_sawf_ctx;
