@@ -1600,6 +1600,33 @@ enum host_log_level {
 		1, \
 		"This ini is used to enable STA+P2P+NDP concurrency")
 
+#ifdef WLAN_CHIPSET_LOG_MAX_SIZE
+/*
+ * <ini>
+ * max_chipset_log_size_enable - Flag to enable max_chipset_log_size sysfs node
+ *
+ * @Min: 0
+ * @Max: 1
+ * Default: 0
+ *
+ * This INI is used to enable / disable max_chipset_log_size sysfs node.
+ * config are as follows:
+ * 0 - Disable max_chipset_log_size sysfs node
+ * 1 - Enable max_chipset_log_size sysfs node
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_MAX_CHIPSET_LOG_SIZE_ENABLE CFG_INI_BOOL( \
+	"max_chipset_log_size_enable", \
+	false, \
+	"This ini is used to enable/disable max_chipset_log_size sysfs node")
+#define CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL CFG(CFG_MAX_CHIPSET_LOG_SIZE_ENABLE)
+#else
+#define CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL
+#endif
+
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
@@ -1649,5 +1676,6 @@ enum host_log_level {
 	CFG(CFG_STA_P2P_NDP_CONCURRENCY) \
 	CFG(CFG_STA_SAP_P2P_CONCURRENCY) \
 	CFG_EPM_ENABLE_ALL \
-	CFG_EPM_VALUE_ALL
+	CFG_EPM_VALUE_ALL \
+	CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL
 #endif
