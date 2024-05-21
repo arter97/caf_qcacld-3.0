@@ -2970,6 +2970,7 @@ void print_debug_sta_data_link(struct debug_peer_data_link *link)
 {
 	print_basic_sta_data_link(&link->b_link);
 	STATS_32(stdout, "Last ack rssi", link->last_ack_rssi);
+	STATS_32(stdout, "Average ack rssi", link->avg_ack_rssi);
 }
 
 void print_debug_sta_data_rate(struct debug_peer_data_rate *rate)
