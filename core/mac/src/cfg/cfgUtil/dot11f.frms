@@ -4032,7 +4032,7 @@ IE mlo_ie (EID_EXTN_ID_ELEMENT) OUI (0x6B)
 
 IE t2lm_ie (EID_EXTN_ID_ELEMENT) OUI (0x6D)
 {
-    data[3..255];
+    data[2..255];
 }
 
 /////////////////////////////////////////////////////////////////////////////
