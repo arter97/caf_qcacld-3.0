@@ -24,9 +24,6 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_mlme_api.h"
 
-/* Fix max concurrent conn to 4 for NAN */
-#define MAX_CONC_CXNS 4
-
 #ifdef WLAN_FEATURE_SR
 /**
  * policy_mgr_init_same_mac_conc_sr_status() - Function initializes default
@@ -88,10 +85,6 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 		cfg->max_conc_cxns = cfg_get(psoc, CFG_MAX_CONC_CXNS);
 		policy_mgr_err("max_conc_cxns %d non-nan", cfg->max_conc_cxns);
 	}
-
-	if (cfg->max_conc_cxns > MAX_CONC_CXNS)
-		cfg->max_conc_cxns = MAX_CONC_CXNS;
-	policy_mgr_debug("max_conc_cxns %d ", cfg->max_conc_cxns);
 
 	cfg->max_conc_cxns = QDF_MIN(cfg->max_conc_cxns,
 				     MAX_NUMBER_OF_CONC_CONNECTIONS);

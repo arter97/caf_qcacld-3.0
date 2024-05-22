@@ -129,6 +129,9 @@
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
 
+/* Fix max concurrent conn to 4 for NAN */
+#define MAX_CONC_CXNS 4
+
 static uint32_t g_fw_wlan_feat_caps;
 /**
  * wma_get_fw_wlan_feat_caps() - get fw feature capability
@@ -694,7 +697,9 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	tgt_cfg->is_go_connected_d3wow_enabled =
 		ucfg_pmo_get_go_mode_bus_suspend(wma_handle->psoc);
 	tgt_cfg->num_max_active_vdevs =
-		policy_mgr_get_max_conc_cxns(wma_handle->psoc);
+		policy_mgr_get_max_conc_cxns(wma_handle->psoc) > MAX_CONC_CXNS
+		? MAX_CONC_CXNS : policy_mgr_get_max_conc_cxns(
+		wma_handle->psoc);
 	tgt_cfg->num_max_mlo_link_per_ml_bss =
 		wlan_mlme_get_sta_mlo_conn_max_num(wma_handle->psoc);
 	cfg_nan_get_max_ndi(wma_handle->psoc,

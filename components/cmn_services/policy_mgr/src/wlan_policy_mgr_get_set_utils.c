@@ -5874,11 +5874,7 @@ bool policy_mgr_max_concurrent_connections_reached(
 	if (pm_ctx) {
 		for (i = 0; i < QDF_MAX_NO_OF_MODE; i++)
 			j += pm_ctx->no_of_active_sessions[i];
-		if (!wlan_nan_is_sta_sap_nan_allowed(psoc) &&
-		    !wlan_nan_is_sta_p2p_ndp_supported(psoc))
-			return j > (pm_ctx->cfg.max_conc_cxns - 1);
-		else
-			return j > pm_ctx->cfg.max_conc_cxns;
+		return j > (pm_ctx->cfg.max_conc_cxns - 1);
 	}
 
 	return false;
