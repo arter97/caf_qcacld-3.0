@@ -7531,6 +7531,22 @@ wlan_mlme_get_sta_sap_p2p_host_conc_support(struct wlan_objmgr_psoc *psoc)
 	return true;
 }
 
+/**
+ * wlan_mlme_get_sta_p2p_ndp_host_conc_support() - This API checks if STA, P2P
+ * and NDP concurrency is allowed or not
+ * @psoc: psoc context
+ *
+ * Return: true if STA, P2P and NDP concurrency is allowed otherwise false
+ */
+static bool
+wlan_mlme_get_sta_p2p_ndp_host_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	bool sta_p2p_ndp_concurrency = cfg_get(psoc,
+					       CFG_STA_P2P_NDP_CONCURRENCY);
+
+	return sta_p2p_ndp_concurrency;
+}
+
 #if defined(FEATURE_WLAN_TDLS)
 /**
  * wlan_mlme_get_sta_tdls_host_conc_support() - This API checks if STA-TDLS
@@ -7685,6 +7701,9 @@ wlan_mlme_set_iface_combinations(struct wlan_objmgr_psoc *psoc,
 	if (wlan_mlme_get_sta_sap_nan_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_SAP_NAN_SUPPORT;
+	if (wlan_mlme_get_sta_p2p_ndp_host_conc_support(psoc))
+		mlme_feature_set->iface_combinations |=
+					MLME_IFACE_STA_P2P_NAN_SUPPORT;
 	mlme_debug("iface combinations = %x",
 		   mlme_feature_set->iface_combinations);
 }
