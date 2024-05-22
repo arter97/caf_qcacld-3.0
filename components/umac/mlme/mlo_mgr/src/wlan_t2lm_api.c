@@ -982,6 +982,8 @@ wlan_update_t2lm_mapping(struct wlan_objmgr_vdev *vdev,
 		if (!t2lm_ctx->established_t2lm.t2lm.default_link_mapping) {
 			wlan_t2lm_init_default_mapping(t2lm_ctx);
 			t2lm_debug("initialize to default T2LM mapping");
+			wlan_mlo_dev_t2lm_notify_link_update(vdev,
+					&t2lm_ctx->established_t2lm.t2lm);
 		}
 		return QDF_STATUS_SUCCESS;
 	}
