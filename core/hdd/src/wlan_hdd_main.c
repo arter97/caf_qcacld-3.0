@@ -7261,6 +7261,7 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_GET_ADAPTER_BY_BSSID",
 		"NET_DEV_HOLD_SHUTDOWN_OPEN_INTERFACE",
 		"NET_DEV_HOLD_REOPEN_SUSPEND_INTERFACE",
+		"NET_DEV_HOLD_IS_INTERFACE_NEED_REOPEN",
 		"NET_DEV_HOLD_ID_MAX"};
 	int32_t num_dbg_strings = QDF_ARRAY_SIZE(strings);
 
@@ -10326,14 +10327,39 @@ hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx,
 	return pld_idle_shutdown(hdd_ctx->parent_dev, hdd_psoc_idle_shutdown);
 }
 
+static bool hdd_is_interface_need_reopen(struct hdd_context *hdd_ctx,
+					 unsigned long event)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_INTERFACE_NEED_REOPEN;
+
+	if (!hdd_shutdown_wlan_is_applicable(hdd_ctx, event)) {
+		hdd_debug("WLAN mode is not applicable during resume");
+		return false;
+	}
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->is_opened_before_suspend) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			if (next_adapter)
+				hdd_adapter_dev_put_debug(next_adapter, dbgid);
+			return true;
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	return false;
+}
+
 static QDF_STATUS
 hdd_reopen_wlan_in_post_suspend(struct hdd_context *hdd_ctx,
 				unsigned long event)
 {
 	int ret = 0;
 
-	if (!hdd_shutdown_wlan_is_applicable(hdd_ctx, event)) {
-		hdd_debug("needn't shutdown in suspend");
+	if (!hdd_is_interface_need_reopen(hdd_ctx, event)) {
+		hdd_debug("needn't reopen in resume");
 		return 0;
 	}
 
