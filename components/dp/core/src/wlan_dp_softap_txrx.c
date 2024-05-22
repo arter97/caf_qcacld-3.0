@@ -116,6 +116,7 @@ static void dp_softap_inspect_tx_eap_pkt(struct wlan_dp_link *dp_link,
 	uint8_t *data;
 	uint8_t auth_type, eap_code;
 	struct wlan_objmgr_peer *peer;
+	struct wlan_dp_peer_priv_context *priv_ctx;
 	struct wlan_dp_sta_info *sta_info;
 
 	if (qdf_likely(QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) !=
@@ -153,11 +154,12 @@ static void dp_softap_inspect_tx_eap_pkt(struct wlan_dp_link *dp_link,
 		dp_err("Peer object not found");
 		return;
 	}
-	sta_info = dp_get_peer_priv_obj(peer);
-	if (!sta_info) {
+	priv_ctx = dp_get_peer_priv_obj(peer);
+	if (!priv_ctx) {
 		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
 		return;
 	}
+	sta_info = &priv_ctx->sta_info;
 
 	if (tx_comp) {
 		dp_info("eap_failure frm tx done" QDF_MAC_ADDR_FMT,
@@ -180,7 +182,7 @@ void dp_softap_check_wait_for_tx_eap_pkt(struct wlan_dp_intf *dp_intf,
 					 struct qdf_mac_addr *mac_addr)
 {
 	struct wlan_objmgr_peer *peer;
-	struct wlan_dp_sta_info *sta_info;
+	struct wlan_dp_peer_priv_context *priv_ctx;
 	QDF_STATUS qdf_status;
 
 	if (dp_intf->device_mode != QDF_P2P_GO_MODE)
@@ -194,9 +196,9 @@ void dp_softap_check_wait_for_tx_eap_pkt(struct wlan_dp_intf *dp_intf,
 		return;
 	}
 
-	sta_info = dp_get_peer_priv_obj(peer);
+	priv_ctx = dp_get_peer_priv_obj(peer);
 	if (qdf_atomic_test_bit(DP_PENDING_TYPE_EAP_FAILURE,
-				&sta_info->pending_eap_frm_type)) {
+				&priv_ctx->sta_info.pending_eap_frm_type)) {
 		dp_info("eap_failure frm pending" QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(mac_addr->bytes));
 		qdf_status = qdf_wait_for_event_completion(
@@ -296,6 +298,7 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
 	struct wlan_objmgr_peer *peer;
+	struct wlan_dp_peer_priv_context *priv_ctx;
 	struct wlan_dp_sta_info *sta_info;
 	int errno = 0;
 	struct qdf_mac_addr *src_mac;
@@ -331,12 +334,13 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		sta_info = dp_get_peer_priv_obj(peer);
-		if (!sta_info) {
-			dp_err("Station not found");
+		priv_ctx = dp_get_peer_priv_obj(peer);
+		if (!priv_ctx) {
+			dp_err("Peer priv ctx not found");
 			wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
 			return QDF_STATUS_E_INVAL;
 		}
+		sta_info = &priv_ctx->sta_info;
 
 		dp_info("ENTER: type=%d, phase=%d, nego_status=%d",
 			subtype,

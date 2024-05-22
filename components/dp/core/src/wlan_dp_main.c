@@ -1278,23 +1278,27 @@ dp_intf_get_next_deflink_candidate(struct wlan_dp_intf *dp_intf,
 QDF_STATUS
 dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 {
+	struct wlan_dp_peer_priv_context *priv_ctx;
 	struct wlan_dp_sta_info *sta_info;
 	QDF_STATUS status;
 
-	sta_info = qdf_mem_malloc(sizeof(*sta_info));
-	if (!sta_info)
+	priv_ctx = qdf_mem_malloc(sizeof(*priv_ctx));
+	if (!priv_ctx) {
+		dp_err("Failed to allocated DP peer priv ctx");
 		return QDF_STATUS_E_NOMEM;
+	}
 
 	status = wlan_objmgr_peer_component_obj_attach(peer, WLAN_COMP_DP,
-						       sta_info,
+						       priv_ctx,
 						       QDF_STATUS_SUCCESS);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("DP peer ("QDF_MAC_ADDR_FMT") attach failed",
 			QDF_MAC_ADDR_REF(peer->macaddr));
-		qdf_mem_free(sta_info);
+		qdf_mem_free(priv_ctx);
 		return status;
 	}
 
+	sta_info = &priv_ctx->sta_info;
 	qdf_mem_copy(sta_info->sta_mac.bytes, peer->macaddr,
 		     QDF_MAC_ADDR_SIZE);
 	sta_info->pending_eap_frm_type = 0;
@@ -1310,22 +1314,25 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 QDF_STATUS
 dp_peer_obj_destroy_notification(struct wlan_objmgr_peer *peer, void *arg)
 {
-	struct wlan_dp_sta_info *sta_info;
+	struct wlan_dp_peer_priv_context *priv_ctx;
 	QDF_STATUS status;
 
-	sta_info = dp_get_peer_priv_obj(peer);
-	if (!sta_info) {
+	priv_ctx = dp_get_peer_priv_obj(peer);
+	if (!priv_ctx) {
 		dp_err("DP_peer_obj is NULL");
 		return QDF_STATUS_E_FAULT;
 	}
 
 	status = wlan_objmgr_peer_component_obj_detach(peer, WLAN_COMP_DP,
-						       sta_info);
+						       priv_ctx);
 	if (QDF_IS_STATUS_ERROR(status))
 		dp_err("DP peer ("QDF_MAC_ADDR_FMT") detach failed",
 			QDF_MAC_ADDR_REF(peer->macaddr));
 
-	qdf_mem_free(sta_info);
+	if (priv_ctx->vote_node)
+		wlan_dp_resource_mgr_vote_node_free(priv_ctx->vote_node);
+
+	qdf_mem_free(priv_ctx);
 
 	return status;
 }

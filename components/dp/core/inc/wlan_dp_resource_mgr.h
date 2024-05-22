@@ -105,6 +105,11 @@ static inline
 void wlan_dp_resource_mgr_detach(struct wlan_dp_psoc_context *dp_ctx)
 {
 }
+
+static inline void
+wlan_dp_resource_mgr_vote_node_free(struct wlan_dp_resource_vote_node *node)
+{
+}
 #endif /*WLAN_DP_DYNAMIC_RESOURCE_MGMT*/
 
 #endif /*_WLAN_DP_RESOURCE_MGR_H_*/

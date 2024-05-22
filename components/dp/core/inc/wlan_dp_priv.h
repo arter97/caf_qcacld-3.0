@@ -40,6 +40,7 @@
 #include "htc_api.h"
 #include "wlan_dp_wfds.h"
 #include "wlan_dp_load_balance.h"
+#include "wlan_dp_resource_mgr.h"
 
 #ifndef NUM_TX_RX_HISTOGRAM
 #define NUM_TX_RX_HISTOGRAM 128
@@ -1050,6 +1051,16 @@ struct wlan_dp_psoc_context {
 	struct wlan_dp_spm_context *spm_ctx;
 	struct wlan_dp_spm_flow_info *gl_flow_recs;
 #endif
+};
+
+/**
+ * struct wlan_dp_peer_priv_context - DP peer priv context
+ * @sta_info: STA info per peer
+ * @vote_node: Resource vote node context
+ */
+struct wlan_dp_peer_priv_context {
+	struct wlan_dp_sta_info sta_info;
+	struct wlan_dp_resource_vote_node *vote_node;
 };
 
 #ifdef WLAN_DP_PROFILE_SUPPORT

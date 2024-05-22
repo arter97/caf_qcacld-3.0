@@ -877,6 +877,7 @@ void ucfg_dp_update_dhcp_state_on_disassoc(struct wlan_objmgr_vdev *vdev,
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 	struct wlan_objmgr_peer *peer;
+	struct wlan_dp_peer_priv_context *priv_ctx;
 	struct wlan_dp_sta_info *stainfo;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -895,11 +896,12 @@ void ucfg_dp_update_dhcp_state_on_disassoc(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	stainfo = dp_get_peer_priv_obj(peer);
-	if (!stainfo) {
+	priv_ctx = dp_get_peer_priv_obj(peer);
+	if (!priv_ctx) {
 		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
 		return;
 	}
+	stainfo = &priv_ctx->sta_info;
 
 	/* Send DHCP STOP indication to FW */
 	stainfo->dhcp_phase = DHCP_PHASE_ACK;
