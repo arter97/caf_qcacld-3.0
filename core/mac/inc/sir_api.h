@@ -1192,6 +1192,7 @@ struct disassoc_ind {
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
+	struct qdf_mac_addr peer_mld_addr;
 	uint16_t staId;
 	uint32_t reasonCode;
 	bool from_ap;
@@ -1263,6 +1264,7 @@ struct deauth_ind {
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;      /* AP BSSID */
 	struct qdf_mac_addr peer_macaddr;
+	struct qdf_mac_addr peer_mld_addr;
 
 	uint16_t staId;
 	uint32_t reasonCode;

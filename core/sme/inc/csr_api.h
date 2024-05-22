@@ -35,6 +35,9 @@
 
 #define CSR_INVALID_SCANRESULT_HANDLE       (NULL)
 
+/* Length to print MAC 12 char + 5 ":" + 2 space + mld string */
+#define MAC_ADDR_DUMP_LEN 26
+
 enum csr_akm_type {
 	/* never used */
 	eCSR_AUTH_TYPE_NONE,
@@ -693,6 +696,7 @@ typedef struct tagCsrEseBeaconReq {
 
 struct csr_del_sta_params {
 	struct qdf_mac_addr peerMacAddr;
+	struct qdf_mac_addr peer_mld_addr;
 	uint16_t reason_code;
 	uint8_t subtype;
 };
