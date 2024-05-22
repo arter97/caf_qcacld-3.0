@@ -3244,8 +3244,8 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 		return -EINVAL;
 	}
 
-	/* Async stats don't need to fetch MLD mode */
-	if (!is_async_req())
+	/* MLD mode is not required for non-recursive requests */
+	if (!user_cmd->recursive)
 		mldev_mode = get_mldev_mode(obj_list->ifname,
 					    obj_list->link_id);
 	/**
