@@ -929,6 +929,7 @@ struct wlan_dp_stc;
  * @cpuhp_event_handle: event handle for cpu hotplug
  * @dp_stc: STC context
  * @spm_ctx: Servicy policy manager context
+ * @gl_flow_recs: Global Tx flow table for all dp_interfaces
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1047,6 +1048,7 @@ struct wlan_dp_psoc_context {
 #endif
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_context *spm_ctx;
+	struct wlan_dp_spm_flow_info *gl_flow_recs;
 #endif
 };
 

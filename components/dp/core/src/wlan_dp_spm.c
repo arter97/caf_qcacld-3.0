@@ -830,6 +830,7 @@ static uint32_t flow_guid_gen;
 QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 {
 	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	struct wlan_dp_spm_intf_context *spm_intf;
 	struct wlan_dp_spm_flow_info *flow_rec;
 	int i;
@@ -853,16 +854,18 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 			WLAN_DP_SPM_FLOW_REC_TBL_MAX);
 	qdf_spinlock_create(&spm_intf->flow_list_lock);
 
-	spm_intf->flow_rec_base = (struct wlan_dp_spm_flow_info *)
-			qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
-				       WLAN_DP_SPM_FLOW_REC_TBL_MAX);
+	if (!dp_ctx->gl_flow_recs)
+		goto fail_flow_rec_freelist;
+
+	spm_intf->flow_rec_base =
+	     &dp_ctx->gl_flow_recs[dp_intf->id * WLAN_DP_SPM_FLOW_REC_TBL_MAX];
 	if (!spm_intf->flow_rec_base) {
 		dp_err("Unable to allocate origin freelist");
 		goto fail_flow_rec_freelist;
 	}
 
 	flow_rec = spm_intf->flow_rec_base;
-	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++) {
+	for (i = 1; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++) {
 		qdf_mem_zero(flow_rec, sizeof(struct wlan_dp_spm_flow_info));
 		flow_rec->id = i;
 		qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
@@ -903,7 +906,8 @@ void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 	wlan_dp_spm_flow_retire(spm_intf, true);
 
 	qdf_spinlock_destroy(&spm_intf->flow_list_lock);
-	qdf_mem_free(spm_intf->flow_rec_base);
+	qdf_mem_zero(spm_intf->flow_rec_base, WLAN_DP_SPM_FLOW_REC_TBL_MAX *
+					sizeof(struct wlan_dp_spm_flow_info));
 
 	qdf_mem_free(spm_intf);
 	dp_intf->spm_intf_ctx = NULL;
@@ -962,6 +966,22 @@ static inline
 void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
 				     struct wlan_dp_spm_flow_info *flow_rec);
 {
+}
+#endif
+
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
+void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
+{
+	dp_ctx->gl_flow_recs =
+		qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
+			       WLAN_DP_SPM_FLOW_REC_TBL_MAX * WLAN_DP_INTF_MAX);
+	if (!dp_ctx->gl_flow_recs)
+		dp_err("Failed to SPM Tx flow table");
+}
+
+void wlan_dp_spm_flow_table_detach(struct wlan_dp_psoc_context *dp_ctx)
+{
+	qdf_mem_free(dp_ctx->gl_flow_recs);
 }
 #endif
 

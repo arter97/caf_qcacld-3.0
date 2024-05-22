@@ -86,6 +86,7 @@ QDF_STATUS dp_allocate_ctx(void)
 	qdf_spinlock_create(&dp_ctx->dp_link_del_lock);
 	qdf_list_create(&dp_ctx->intf_list, 0);
 	TAILQ_INIT(&dp_ctx->inactive_dp_link_list);
+	wlan_dp_spm_flow_table_attach(dp_ctx);
 
 	dp_attach_ctx(dp_ctx);
 
@@ -98,6 +99,7 @@ void dp_free_ctx(void)
 
 	dp_ctx =  dp_get_context();
 
+	wlan_dp_spm_flow_table_detach(dp_ctx);
 	qdf_spinlock_destroy(&dp_ctx->dp_link_del_lock);
 	qdf_spinlock_destroy(&dp_ctx->intf_list_lock);
 	qdf_list_destroy(&dp_ctx->intf_list);

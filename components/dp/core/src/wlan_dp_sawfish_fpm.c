@@ -99,6 +99,9 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 	union generic_ethhdr *eth_hdr;
 	uint8_t *pkt;
 
+	if (!dp_intf->spm_intf_ctx)
+		return QDF_STATUS_E_NOSUPPORT;
+
 	sk = skb->sk;
 	if (qdf_unlikely(!sk)) {
 		skb->mark = SPM_INVALID_SVC;
