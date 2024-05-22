@@ -176,4 +176,15 @@ void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
 	 * Take action for vdev to mac_id migration
 	 */
 }
+
+void
+wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
+				struct nan_datapath_channel_info *ch_info,
+				uint32_t num_channels)
+{
+	/*
+	 * TODO Pass this info to DP resource mgr
+	 * Take action for NAN session update
+	 */
+}
 #endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */

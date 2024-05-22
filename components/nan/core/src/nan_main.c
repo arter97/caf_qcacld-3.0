@@ -38,6 +38,7 @@
 #include "qdf_platform.h"
 #include "wlan_osif_request_manager.h"
 #include "wlan_p2p_api.h"
+#include "wlan_dp_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_if_mgr_public_struct.h"
 #include "wlan_if_mgr_api.h"
@@ -1005,8 +1006,12 @@ static QDF_STATUS nan_handle_confirm(struct nan_datapath_confirm_event *confirm)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (peer)
+	if (peer) {
+		if (confirm->rsp_code == NAN_DATAPATH_RESPONSE_ACCEPT)
+			wlan_dp_notify_ndp_channel_info(peer, &confirm->ch[0],
+							confirm->num_channels);
 		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
+	}
 
 	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
 	if (!psoc_nan_obj) {
@@ -1514,6 +1519,7 @@ static QDF_STATUS nan_handle_schedule_update(
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct wlan_objmgr_peer *peer;
 
 	psoc = wlan_vdev_get_psoc(ind->vdev);
 	if (!psoc) {
@@ -1525,6 +1531,14 @@ static QDF_STATUS nan_handle_schedule_update(
 	if (!psoc_nan_obj) {
 		nan_err("psoc_nan_obj is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, ind->peer_addr.bytes,
+					   WLAN_NAN_ID);
+	if (peer) {
+		wlan_dp_notify_ndp_channel_info(peer, &ind->ch[0],
+						ind->num_channels);
+		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
 	}
 
 	ndi_update_ndp_session(ind->vdev, &ind->peer_addr, &ind->ch[0]);

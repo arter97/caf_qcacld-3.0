@@ -184,6 +184,24 @@ void wlan_dp_send_ipa_wds_peer_disconnect(struct cdp_ctrl_objmgr_psoc *cpsoc,
 void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
 					  uint32_t old_mac_id,
 					  uint32_t new_mac_id);
+
+#ifdef WLAN_FEATURE_NAN
+/**
+ * wlan_dp_notify_ndp_channel_info() - Notify DP about NDP peer channel info
+ *
+ * @peer: objmgr peer reference
+ * @ch_info: NDP channel info
+ * @num_channels: Number of channels info
+ *
+ * This API notifies DP about vdev migration across MAC's
+ *
+ * Return: none
+ */
+void
+wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
+				struct nan_datapath_channel_info *ch_info,
+				uint32_t num_channels);
+#endif
 #else
 static inline
 void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
@@ -191,5 +209,14 @@ void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
 					  uint32_t new_mac_id)
 {
 }
+
+#ifdef WLAN_FEATURE_NAN
+static inline void
+wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
+				struct nan_datapath_channel_info *ch_info,
+				uint32_t num_channels)
+{
+}
+#endif
 #endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */
 #endif

@@ -342,12 +342,14 @@ struct peer_nan_datapath_map {
 
 /**
  * struct nan_datapath_channel_info - ndp channel and channel bandwidth
+ * @phymode: Channel phymode(wmi_channel_phymode) of the npd connection
  * @freq: channel freq in mhz of the ndp connection
  * @ch_width: channel width (wmi_channel_width) of the ndp connection
  * @nss: nss used for ndp connection
  * @mac_id: MAC ID associated with the NDP channel
  */
 struct nan_datapath_channel_info {
+	uint32_t phymode;
 	uint32_t freq;
 	uint32_t ch_width;
 	uint32_t nss;
