@@ -3694,12 +3694,58 @@ bool policy_mgr_is_scc_with_this_vdev_id(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
+/*
+ * policy_mgr_get_sta_p2p_conn_info() - Get STA+P2P connection info
+ * @pm_ctx: pm_ctx ctx
+ * @info: Buffer to carry the final connection info
+ *
+ * STA/P2P-CLI/P2P-GO can do MCC with NAN/NDI and firmware takes care of
+ * managing the MCC. Host driver doesn't have to consider NAN/NDI channels or
+ * take any decision based on NAN/NDI channels.
+ * But SAP and NAN MCC has a restriction as both are beaconing entities and SAP
+ * can't go off-channel for much time. So, consider NAN/NDI channels also for
+ * MCC checks to take any decision on SAP.
+ * This API is to decide whether to include(for SAP) or exclude(for STA/P2P)
+ * NAN/NDI and fill the buffer.
+ *
+ * Return: Number of connections that are in MCC
+ */
+static uint32_t
+policy_mgr_get_sta_p2p_conn_info(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				 struct policy_mgr_conc_connection_info *info)
+{
+	uint32_t num_connections = 0, i;
+	bool sap_present;
+
+	sap_present = !!policy_mgr_mode_specific_connection_count(pm_ctx->psoc,
+								  PM_SAP_MODE,
+								  NULL);
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (!pm_conc_connection_list[i].in_use)
+			continue;
+
+		if (!sap_present &&
+		    ((pm_conc_connection_list[i].mode == PM_NAN_DISC_MODE ||
+		      pm_conc_connection_list[i].mode == PM_NDI_MODE) &&
+		     wlan_nan_is_sta_p2p_ndp_supported(pm_ctx->psoc)))
+			continue;
+
+		info[num_connections++] = pm_conc_connection_list[i];
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return num_connections;
+}
+
 bool policy_mgr_is_mcc_with_this_vdev_id(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id, uint8_t *mcc_vdev_id)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint32_t i, ch_freq;
+	uint32_t i, ch_freq, num_connections = 0;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct policy_mgr_conc_connection_info info[
+			MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 
 	if (mcc_vdev_id)
 		*mcc_vdev_id = WLAN_INVALID_VDEV_ID;
@@ -3718,26 +3764,22 @@ bool policy_mgr_is_mcc_with_this_vdev_id(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/* Compare given vdev_id freq against other vdev_id's */
-	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		if (pm_conc_connection_list[i].vdev_id == vdev_id)
+	num_connections = policy_mgr_get_sta_p2p_conn_info(pm_ctx, info);
+
+	for (i = 0; i < num_connections; i++) {
+		if (info[i].vdev_id == vdev_id)
 			continue;
 
-		if (!pm_conc_connection_list[i].in_use)
-			continue;
-
-		if (pm_conc_connection_list[i].freq != ch_freq &&
+		if (info[i].freq != ch_freq &&
 		    policy_mgr_are_2_freq_on_same_mac(psoc,
-						      pm_conc_connection_list[i].freq,
+						      info[i].freq,
 						      ch_freq)) {
 			if (mcc_vdev_id)
-				*mcc_vdev_id = pm_conc_connection_list[i].vdev_id;
+				*mcc_vdev_id = info[i].vdev_id;
 
-			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 			return true;
 		}
 	}
-	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	return false;
 }
@@ -3766,6 +3808,8 @@ bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc)
 	uint32_t num_connections = 0;
 	bool is_scc = false;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_conc_connection_info info[
+			MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3773,18 +3817,15 @@ bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc)
 		return is_scc;
 	}
 
-	num_connections = policy_mgr_get_connection_count(psoc);
+	num_connections = policy_mgr_get_sta_p2p_conn_info(pm_ctx, info);
 
-	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	switch (num_connections) {
 	case 1:
 		break;
 	case 2:
-		if (pm_conc_connection_list[0].freq ==
-		    pm_conc_connection_list[1].freq &&
-		    policy_mgr_are_2_freq_on_same_mac(psoc,
-			pm_conc_connection_list[0].freq,
-			pm_conc_connection_list[1].freq))
+		if (info[0].freq == info[1].freq &&
+		    policy_mgr_are_2_freq_on_same_mac(psoc, info[0].freq,
+						      info[1].freq))
 			is_scc = true;
 		break;
 	case 3:
@@ -3796,17 +3837,12 @@ bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc)
 		 */
 		if ((policy_mgr_is_current_hwmode_dbs(psoc) ||
 		     policy_mgr_is_current_hwmode_sbs(psoc)) &&
-		    (pm_conc_connection_list[0].freq ==
-		     pm_conc_connection_list[1].freq ||
-		     pm_conc_connection_list[0].freq ==
-		     pm_conc_connection_list[2].freq ||
-		     pm_conc_connection_list[1].freq ==
-		     pm_conc_connection_list[2].freq))
+		    (info[0].freq == info[1].freq ||
+		     info[0].freq == info[2].freq ||
+		     info[1].freq == info[2].freq))
 			is_scc = true;
-		else if ((pm_conc_connection_list[0].freq ==
-			  pm_conc_connection_list[1].freq) &&
-			 (pm_conc_connection_list[0].freq ==
-			  pm_conc_connection_list[2].freq))
+		else if ((info[0].freq == info[1].freq) &&
+			 (info[0].freq == info[2].freq))
 			is_scc = true;
 
 		break;
@@ -3815,7 +3851,6 @@ bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc)
 				 num_connections);
 		break;
 	}
-	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	return is_scc;
 }
@@ -10374,46 +10409,42 @@ bool policy_mgr_will_freq_lead_to_mcc(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_is_two_connection_mcc() - Check if MCC scenario
  * when there are two connections
  * @psoc: PSOC object information
+ * @info: Connection info to be considered for MCC check
  *
  * If if MCC scenario when there are two connections
  *
  * Return: true or false
  */
-static bool policy_mgr_is_two_connection_mcc(struct wlan_objmgr_psoc *psoc)
+static bool
+policy_mgr_is_two_connection_mcc(struct wlan_objmgr_psoc *psoc,
+				 struct policy_mgr_conc_connection_info *info)
 {
-	return ((pm_conc_connection_list[0].freq !=
-		 pm_conc_connection_list[1].freq) &&
-		(policy_mgr_are_2_freq_on_same_mac(psoc,
-			pm_conc_connection_list[0].freq,
-			pm_conc_connection_list[1].freq)) &&
-		(pm_conc_connection_list[0].freq <=
-		 WLAN_REG_MAX_24GHZ_CHAN_FREQ) &&
-		(pm_conc_connection_list[1].freq <=
-		 WLAN_REG_MAX_24GHZ_CHAN_FREQ)) ? true : false;
+	return ((info[0].freq != info[1].freq) &&
+		(policy_mgr_are_2_freq_on_same_mac(psoc, info[0].freq,
+						   info[1].freq)) &&
+		(info[0].freq <= WLAN_REG_MAX_24GHZ_CHAN_FREQ) &&
+		(info[1].freq <= WLAN_REG_MAX_24GHZ_CHAN_FREQ)) ? true : false;
 }
 
 /**
  * policy_mgr_is_three_connection_mcc() - Check if MCC scenario
  * when there are three connections
  *
+ * @info: Connection info to be considered for MCC check
+ *
  * If if MCC scenario when there are three connections
  *
  * Return: true or false
  */
-static bool policy_mgr_is_three_connection_mcc(void)
+static bool
+policy_mgr_is_three_connection_mcc(struct policy_mgr_conc_connection_info *info)
 {
-	return (((pm_conc_connection_list[0].freq !=
-		  pm_conc_connection_list[1].freq) ||
-		 (pm_conc_connection_list[0].freq !=
-		  pm_conc_connection_list[2].freq) ||
-		 (pm_conc_connection_list[1].freq !=
-		  pm_conc_connection_list[2].freq)) &&
-		(pm_conc_connection_list[0].freq <=
-		 WLAN_REG_MAX_24GHZ_CHAN_FREQ) &&
-		(pm_conc_connection_list[1].freq <=
-		 WLAN_REG_MAX_24GHZ_CHAN_FREQ) &&
-		(pm_conc_connection_list[2].freq <=
-		 WLAN_REG_MAX_24GHZ_CHAN_FREQ)) ? true : false;
+	return (((info[0].freq != info[1].freq) ||
+		 (info[0].freq != info[2].freq) ||
+		 (info[1].freq != info[2].freq)) &&
+		(info[0].freq <= WLAN_REG_MAX_24GHZ_CHAN_FREQ) &&
+		(info[1].freq <= WLAN_REG_MAX_24GHZ_CHAN_FREQ) &&
+		(info[2].freq <= WLAN_REG_MAX_24GHZ_CHAN_FREQ)) ? true : false;
 }
 
 uint32_t policy_mgr_get_conc_vdev_on_same_mac(struct wlan_objmgr_psoc *psoc,
@@ -10449,18 +10480,27 @@ bool policy_mgr_is_mcc_in_24G(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t num_connections = 0;
 	bool is_24G_mcc = false;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_conc_connection_info info[
+			MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 
-	num_connections = policy_mgr_get_connection_count(psoc);
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	num_connections = policy_mgr_get_sta_p2p_conn_info(pm_ctx, info);
 
 	switch (num_connections) {
 	case 1:
 		break;
 	case 2:
-		if (policy_mgr_is_two_connection_mcc(psoc))
+		if (policy_mgr_is_two_connection_mcc(psoc, info))
 			is_24G_mcc = true;
 		break;
 	case 3:
-		if (policy_mgr_is_three_connection_mcc())
+		if (policy_mgr_is_three_connection_mcc(info))
 			is_24G_mcc = true;
 		break;
 	default:
