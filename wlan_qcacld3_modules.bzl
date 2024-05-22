@@ -241,6 +241,8 @@ _fixed_ipaths = [
     "components/fw_offload/dispatcher/inc",
     "components/interop_issues_ap/core/inc",
     "components/interop_issues_ap/dispatcher/inc",
+    "components/mgmt_rx_srng/core/inc",
+    "components/mgmt_rx_srng/dispatcher/inc",
     "components/mlme/core/inc",
     "components/mlme/core/src",
     "components/mlme/dispatcher/inc",
