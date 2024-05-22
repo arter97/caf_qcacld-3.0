@@ -312,6 +312,41 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
 	}
 }
 
+bool dp_peer_check_dms_capable(struct cdp_soc_t *soc_hdl,
+			       uint8_t vdev_id,
+			       struct dp_peer *peer)
+{
+	struct dp_txrx_peer *txrx_peer = dp_get_txrx_peer(peer);
+
+	if (!txrx_peer)
+		return false;
+
+	return txrx_peer->is_dms;
+}
+
+bool dp_peer_check_dms_capable_by_mac(struct cdp_soc_t *soc_hdl,
+				      uint8_t vdev_id,
+				      uint8_t *mac_addr)
+{
+	struct dp_peer *peer = NULL;
+	struct cdp_peer_info peer_info = { 0 };
+	bool is_capable = false;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, mac_addr, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper(soc, &peer_info, DP_MOD_ID_CDP);
+
+	if (!peer)
+		return false;
+
+	is_capable = dp_peer_check_dms_capable(soc_hdl, vdev_id, peer);
+	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+
+	return is_capable;
+}
+
 #if defined(QCA_SUPPORT_WDS_EXTENDED) || defined(WLAN_FEATURE_11BE_MLO)
 /**
  * dp_tx_me_check_primary_peer_by_mac() - Check primary peer using mac address
@@ -412,6 +447,10 @@ dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 		return;
 
 	if (dp_peer_check_wds_ext_peer(peer))
+		return;
+
+	if (!dp_peer_check_dms_capable(dms_me->soc_hdl, dms_me->vdev->vdev_id,
+	    peer))
 		return;
 
 	dms_me->tx_exc_metadata->peer_id = peer->peer_id;
@@ -582,6 +621,7 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	paddr_data = qdf_nbuf_mapped_paddr_get(nbuf) + QDF_MAC_ADDR_SIZE;
 
 	for (new_mac_idx = 0; new_mac_idx < new_mac_cnt; new_mac_idx++) {
+		bool is_peer_dms = 0;
 		dstmac = newmac[new_mac_idx];
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 				"added mac addr (%pM)", dstmac);
@@ -598,7 +638,22 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		if (dp_tx_me_check_primary_peer_by_mac(soc, vdev, dstmac))
 			continue;
 
-		if (is_dms_pkt) {
+		/*
+		 * dp_peer_check_dms_capable_by_mac returns:
+		 * 1. true, if peer = dms_capable
+		 * 2. false in all other cases.
+		 */
+		is_peer_dms = dp_peer_check_dms_capable_by_mac(soc_hdl, vdev_id, dstmac);
+
+		/*
+		 * Lets consider following cases
+		 * 1. ME6 = 1, is_peer_dms = 0
+		 *    Below condition does not get satisfied and ME5 packet is sent.
+		 * 2. ME6 = 1, is_peer_dms = 1
+		 *    Amsdu subframe is sent.
+		 */
+		if (is_dms_pkt && is_peer_dms) {
+
 			dp_peer =
 				 dp_find_peer_by_macaddr(soc, dstmac,
 							 vdev->vdev_id,
