@@ -13,6 +13,7 @@
 #include "hal_rx.h"
 #include <init_deinit_lmac.h>
 #include "target_if_mgmt_rx_srng.h"
+#include "dp_internal.h"
 
 bool wlan_mgmt_rx_srng_cfg_enable(struct wlan_objmgr_psoc *psoc)
 {
@@ -111,6 +112,29 @@ wlan_mgmt_rx_srng_attach_buffers(struct mgmt_rx_srng_pdev_priv *pdev_priv)
 			(pdev_priv->write_idx + 1) % MGMT_RX_SRNG_ENTRIES;
 	}
 	hal_srng_access_end(pdev_priv->hal_soc, srng);
+
+	return status;
+}
+
+static QDF_STATUS
+wlan_mgmt_rx_srng_htt_setup_send(struct wlan_objmgr_pdev *pdev)
+{
+	struct cdp_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct mgmt_rx_srng_pdev_priv *pdev_priv;
+	struct mgmt_srng_cfg *mgmt_ring_cfg;
+	QDF_STATUS status;
+
+	pdev_priv = wlan_objmgr_pdev_get_comp_private_obj(
+					pdev, WLAN_UMAC_COMP_MGMT_RX_SRNG);
+	if (!pdev_priv) {
+		mgmt_rx_srng_err("pdev priv is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+	mgmt_ring_cfg = &pdev_priv->mgmt_rx_srng_cfg;
+	status = dp_send_htt_mgmt_rx_buf_refil_srng_setup(soc,
+							  mgmt_ring_cfg->srng);
+	if (QDF_IS_STATUS_ERROR(status))
+		mgmt_rx_srng_err("mgmt srng htt setup failed");
 
 	return status;
 }
@@ -271,8 +295,14 @@ QDF_STATUS wlan_mgmt_rx_srng_pdev_create_notification(
 
 	tgt_mgmt_rx_srng_send_reap_threshold(psoc, thres);
 
+	status = wlan_mgmt_rx_srng_htt_setup_send(pdev);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto unregister_ev_handlers;
+
 	return status;
 
+unregister_ev_handlers:
+	tgt_mgmt_rx_srng_unregister_ev_handler(psoc);
 free_srng_buffers:
 	wlan_mgmt_rx_srng_free_buffers(pdev_priv);
 free_mgmt_rx_srng:
