@@ -9,6 +9,10 @@
  */
 
 #include <wlan_mgmt_rx_srng_main.h>
+#include "hal_api.h"
+#include "hal_rx.h"
+#include <init_deinit_lmac.h>
+#include "target_if_mgmt_rx_srng.h"
 
 bool wlan_mgmt_rx_srng_cfg_enable(struct wlan_objmgr_psoc *psoc)
 {
@@ -24,32 +28,273 @@ bool wlan_mgmt_rx_srng_cfg_enable(struct wlan_objmgr_psoc *psoc)
 	return psoc_priv->mgmt_rx_srng_is_enable;
 }
 
+static QDF_STATUS
+wlan_mgmt_rx_srng_alloc_buf(struct mgmt_rx_srng_pdev_priv *pdev_priv,
+			    uint32_t id, qdf_dma_addr_t *paddr)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mgmt_rx_srng_desc *rx_desc;
+	qdf_nbuf_t nbuf;
+	int write_idx;
+
+	nbuf = qdf_nbuf_alloc(pdev_priv->osdev, MGMT_RX_BUF_SIZE, 0, 4, false);
+	if (!nbuf) {
+		mgmt_rx_srng_err("Nbuf alloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	status = qdf_nbuf_map_single(pdev_priv->osdev, nbuf,
+				     QDF_DMA_FROM_DEVICE);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_nbuf_free(nbuf);
+		mgmt_rx_srng_err("Nbuf map failure for id %d", id);
+		return QDF_STATUS_E_FAILURE;
+	}
+	*paddr = qdf_nbuf_get_frag_paddr(nbuf, 0);
+	qdf_mem_dma_sync_single_for_device(pdev_priv->osdev, *paddr,
+					   MGMT_RX_BUF_SIZE, DMA_FROM_DEVICE);
+
+	write_idx = pdev_priv->write_idx;
+	rx_desc = &pdev_priv->rx_desc[write_idx];
+
+	rx_desc->nbuf = nbuf;
+	rx_desc->pa = *paddr;
+	rx_desc->cookie = id;
+	rx_desc->in_use = true;
+
+	return status;
+}
+
+static
+void wlan_mgmt_rx_srng_free_buffers(struct mgmt_rx_srng_pdev_priv *pdev_priv)
+{
+	int i;
+
+	for (i = 0; i < MGMT_RX_SRNG_ENTRIES; i++) {
+		if (pdev_priv->rx_desc[i].in_use) {
+			qdf_nbuf_unmap_single(
+				pdev_priv->osdev, pdev_priv->rx_desc[i].nbuf,
+				QDF_DMA_FROM_DEVICE);
+			qdf_nbuf_free(pdev_priv->rx_desc[i].nbuf);
+		}
+	}
+}
+
+static QDF_STATUS
+wlan_mgmt_rx_srng_attach_buffers(struct mgmt_rx_srng_pdev_priv *pdev_priv)
+{
+	void *srng = pdev_priv->mgmt_rx_srng_cfg.srng;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	qdf_dma_addr_t paddr;
+	int i;
+	void *ring_entry;
+
+	hal_srng_access_start(pdev_priv->hal_soc, srng);
+	for (i = 0; i < MGMT_RX_SRNG_ENTRIES - 1; i++) {
+		status = wlan_mgmt_rx_srng_alloc_buf(pdev_priv, i, &paddr);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hal_srng_access_end(pdev_priv->hal_soc, srng);
+			wlan_mgmt_rx_srng_free_buffers(pdev_priv);
+			return status;
+		}
+
+		ring_entry = hal_srng_src_get_next(pdev_priv->hal_soc, srng);
+		if (!ring_entry) {
+			mgmt_rx_srng_err("Failure to get mgmt refill entry");
+			QDF_BUG(0);
+		}
+
+		hal_rxdma_buff_addr_info_set(
+			pdev_priv->hal_soc, ring_entry, paddr,
+			pdev_priv->rx_desc[pdev_priv->write_idx].cookie, 0);
+		pdev_priv->write_idx =
+			(pdev_priv->write_idx + 1) % MGMT_RX_SRNG_ENTRIES;
+	}
+	hal_srng_access_end(pdev_priv->hal_soc, srng);
+
+	return status;
+}
+
+static QDF_STATUS
+wlan_mgmt_rx_srng_setup(struct mgmt_rx_srng_pdev_priv *pdev_priv)
+{
+	uint32_t entry_size = hal_srng_get_entrysize(pdev_priv->hal_soc,
+						     RXDMA_BUF);
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t ring_alloc_size;
+	struct hal_srng_params ring_params = {0};
+	struct mgmt_srng_cfg *mgmt_ring_cfg = &pdev_priv->mgmt_rx_srng_cfg;
+	void *srng, *mem;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!pdev_priv->osdev) {
+		psoc = wlan_pdev_get_psoc(pdev_priv->pdev);
+		if (!psoc) {
+			mgmt_rx_srng_err("psoc obj is NULL");
+			return QDF_STATUS_E_FAILURE;
+		}
+		pdev_priv->osdev = wlan_psoc_get_qdf_dev(psoc);
+		if (!pdev_priv->osdev) {
+			mgmt_rx_srng_err("no osdev");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
+	pdev_priv->rx_desc = (struct mgmt_rx_srng_desc *)qdf_mem_malloc(
+		sizeof(struct mgmt_rx_srng_desc) * MGMT_RX_SRNG_ENTRIES);
+	if (!pdev_priv->rx_desc) {
+		mgmt_rx_srng_err("Failure to alloc rx desc for mgmt rx srng");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	ring_alloc_size = (MGMT_RX_SRNG_ENTRIES * entry_size);
+
+	mem = qdf_aligned_mem_alloc_consistent(
+					pdev_priv->osdev, &ring_alloc_size,
+					&mgmt_ring_cfg->base_vaddr_unaligned,
+					&mgmt_ring_cfg->base_paddr_unaligned,
+					&mgmt_ring_cfg->base_paddr_aligned, 32);
+
+	if (!mem) {
+		mgmt_rx_srng_err("Failed to alloc mem for mgmt rx srng");
+		qdf_mem_free(pdev_priv->rx_desc);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_set(mgmt_ring_cfg->base_vaddr_unaligned, 0, ring_alloc_size);
+
+	mgmt_ring_cfg->ring_alloc_size = ring_alloc_size;
+	mgmt_ring_cfg->base_vaddr_aligned = mem;
+	ring_params.ring_base_vaddr = mgmt_ring_cfg->base_vaddr_aligned;
+	ring_params.ring_base_paddr =
+		(qdf_dma_addr_t)mgmt_ring_cfg->base_paddr_aligned;
+	ring_params.num_entries = MGMT_RX_SRNG_ENTRIES;
+
+	srng = hal_srng_setup(pdev_priv->hal_soc, RXDMA_BUF,
+			      MGMT_RX_BUF_REFILL_RING_IDX,
+			      0, &ring_params, 0);
+	if (!srng) {
+		mgmt_rx_srng_err("mgmt rx srng setup failed");
+		qdf_mem_free_consistent(pdev_priv->osdev,
+					pdev_priv->osdev->dev,
+					ring_alloc_size,
+					mgmt_ring_cfg->base_vaddr_unaligned,
+			(qdf_dma_addr_t)mgmt_ring_cfg->base_paddr_unaligned, 0);
+		qdf_mem_free(pdev_priv->rx_desc);
+		return QDF_STATUS_E_FAILURE;
+	}
+	mgmt_ring_cfg->srng = srng;
+
+	pdev_priv->read_idx = 0;
+	pdev_priv->write_idx = 0;
+
+	return status;
+}
+
+static void wlan_mgmt_rx_srng_free(struct mgmt_rx_srng_pdev_priv *pdev_priv)
+{
+	struct mgmt_srng_cfg *mgmt_ring_cfg;
+
+	mgmt_ring_cfg = &pdev_priv->mgmt_rx_srng_cfg;
+
+	qdf_mem_free_consistent(pdev_priv->osdev,
+				pdev_priv->osdev->dev,
+				mgmt_ring_cfg->ring_alloc_size,
+				mgmt_ring_cfg->base_vaddr_unaligned,
+			(qdf_dma_addr_t)mgmt_ring_cfg->base_paddr_unaligned, 0);
+
+	qdf_mem_free(pdev_priv->rx_desc);
+}
+
 QDF_STATUS wlan_mgmt_rx_srng_pdev_create_notification(
 				struct wlan_objmgr_pdev *pdev, void *arg)
 {
+	struct hif_opaque_softc *hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	struct mgmt_rx_srng_pdev_priv *pdev_priv;
-	QDF_STATUS status;
+	struct mgmt_rx_srng_psoc_priv *psoc_priv;
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	int thres;
+
+	if (!hif_ctx) {
+		mgmt_rx_srng_err("invalid hif context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		mgmt_rx_srng_err("psoc is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	psoc_priv = wlan_objmgr_psoc_get_comp_private_obj(
+					psoc, WLAN_UMAC_COMP_MGMT_RX_SRNG);
+	if (!psoc_priv) {
+		mgmt_rx_srng_err("psoc priv is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Setup ring only if feature enabled in both host and target */
+	if (!psoc_priv->mgmt_rx_srng_is_enable)
+		return status;
 
 	pdev_priv = qdf_mem_malloc(sizeof(*pdev_priv));
-	if (!pdev_priv)
+	if (!pdev_priv) {
+		mgmt_rx_srng_err("Failure to alloc mgmt rx srng pdev priv");
 		return QDF_STATUS_E_NOMEM;
+	}
 
 	status = wlan_objmgr_pdev_component_obj_attach(
 					pdev, WLAN_UMAC_COMP_MGMT_RX_SRNG,
 					pdev_priv, QDF_STATUS_SUCCESS);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_srng_err("Failed to attach mgmt rx srng priv to pdev");
+		qdf_mem_free(pdev_priv);
+		psoc_priv->mgmt_rx_srng_is_enable = false;
 		return status;
 	}
 	pdev_priv->pdev = pdev;
+	thres = cfg_get(psoc, CFG_MGMT_RX_SRNG_REAP_EVENT_THRESHOLD);
+	pdev_priv->hal_soc = hif_get_hal_handle(hif_ctx);
+
+	status = wlan_mgmt_rx_srng_setup(pdev_priv);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto free_pdev_priv;
+
+	status = wlan_mgmt_rx_srng_attach_buffers(pdev_priv);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto free_mgmt_rx_srng;
+
+	status = tgt_mgmt_rx_srng_register_ev_handler(psoc);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto free_srng_buffers;
+
+	tgt_mgmt_rx_srng_send_reap_threshold(psoc, thres);
+
 	return status;
+
+free_srng_buffers:
+	wlan_mgmt_rx_srng_free_buffers(pdev_priv);
+free_mgmt_rx_srng:
+	wlan_mgmt_rx_srng_free(pdev_priv);
+free_pdev_priv:
+	status = wlan_objmgr_pdev_component_obj_detach(
+					pdev, WLAN_UMAC_COMP_MGMT_RX_SRNG,
+					pdev_priv);
+	if (QDF_IS_STATUS_ERROR(status))
+		mgmt_rx_srng_err("Failed to detach mgmt rx srng pdev_priv");
+
+	qdf_mem_free(pdev_priv);
+	psoc_priv->mgmt_rx_srng_is_enable = false;
+	return QDF_STATUS_E_FAILURE;
 }
 
 QDF_STATUS wlan_mgmt_rx_srng_pdev_destroy_notification(
 				struct wlan_objmgr_pdev *pdev, void *arg)
 {
 	struct mgmt_rx_srng_pdev_priv *pdev_priv;
-	struct mgmt_srng_cfg *mgmt_ring_cfg;
+	struct mgmt_rx_srng_psoc_priv *psoc_priv;
+	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status;
 
 	pdev_priv = wlan_objmgr_pdev_get_comp_private_obj(
@@ -58,6 +303,26 @@ QDF_STATUS wlan_mgmt_rx_srng_pdev_destroy_notification(
 		mgmt_rx_srng_err("pdev priv is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		mgmt_rx_srng_err("psoc is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	psoc_priv = wlan_objmgr_psoc_get_comp_private_obj(
+					psoc, WLAN_UMAC_COMP_MGMT_RX_SRNG);
+	if (!psoc_priv) {
+		mgmt_rx_srng_err("psoc priv is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!psoc_priv->mgmt_rx_srng_is_enable)
+		return QDF_STATUS_SUCCESS;
+
+	tgt_mgmt_rx_srng_unregister_ev_handler(psoc);
+	wlan_mgmt_rx_srng_free_buffers(pdev_priv);
+	wlan_mgmt_rx_srng_free(pdev_priv);
 
 	status = wlan_objmgr_pdev_component_obj_detach(
 					pdev, WLAN_UMAC_COMP_MGMT_RX_SRNG,
@@ -91,6 +356,8 @@ QDF_STATUS wlan_mgmt_rx_srng_psoc_create_notification(
 	psoc_priv->psoc = psoc;
 	psoc_priv->mgmt_rx_srng_is_enable =
 				cfg_get(psoc, CFG_FEATURE_MGMT_RX_SRNG_ENABLE);
+	target_if_mgmt_rx_srng_register_rx_ops(&psoc_priv->rx_ops);
+	target_if_mgmt_rx_srng_register_tx_ops(&psoc_priv->tx_ops);
 
 	return status;
 

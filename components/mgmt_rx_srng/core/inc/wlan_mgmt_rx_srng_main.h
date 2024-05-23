@@ -21,6 +21,7 @@
 #include "wlan_objmgr_cmn.h"
 #include "wlan_objmgr_global_obj.h"
 #include "wlan_mgmt_rx_srng_priv.h"
+#include <wlan_mgmt_rx_srng_tgt_api.h>
 
 #define mgmt_rx_srng_fatal(params...) \
 	QDF_TRACE_FATAL(QDF_MODULE_ID_MGMT_RX_SRNG, params)
