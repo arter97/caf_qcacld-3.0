@@ -17,7 +17,7 @@
 
 /* Timeout in nano seconds */
 #define WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT 10000000000
-#define WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK 10
+#define WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK 5
 
 /**
  * enum wlan_dp_spm_event_type - SPM event type
@@ -104,10 +104,9 @@ struct wlan_dp_spm_flow_info {
 	uint64_t active_ts;
 #ifdef WLAN_DP_FEATURE_STC
 	uint8_t c_flow_id;
-	uint32_t track_flow_stats:1,
-		 selected_to_sample:1,
-		 classified:1,
-		 reserved:29;
+	uint8_t track_flow_stats;
+	uint8_t selected_to_sample;
+	uint8_t classified;
 	uint64_t flow_tuple_hash;
 #endif
 };

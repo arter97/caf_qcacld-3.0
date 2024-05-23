@@ -765,6 +765,7 @@ void wlan_dp_spm_event_post(enum wlan_dp_spm_event_type type, void *data)
 static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 				    bool clear_tbl)
 {
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_spm_flow_info *cursor;
 	uint64_t curr_ts = qdf_sched_clock();
 	int i;
@@ -776,11 +777,19 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 			continue;
 
 		if (clear_tbl) {
+			wlan_dp_stc_tx_flow_retire_ind(dp_ctx,
+						       cursor->classified,
+						       cursor->c_flow_id);
+			qdf_mem_zero(cursor,
+				     sizeof(struct wlan_dp_spm_flow_info));
 			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
 					     &cursor->node);
 			spm_intf->origin_aft[i] = NULL;
 		} else if ((curr_ts - cursor->active_ts) >
 				WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT) {
+			wlan_dp_stc_tx_flow_retire_ind(dp_ctx,
+						       cursor->classified,
+						       cursor->c_flow_id);
 			qdf_mem_zero(cursor,
 				     sizeof(struct wlan_dp_spm_flow_info));
 			cursor->id = i;

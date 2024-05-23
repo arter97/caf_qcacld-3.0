@@ -506,12 +506,16 @@ enum wlan_dp_stc_classfied_flow_state {
 
 static inline void
 wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
+			       uint8_t classified,
 			       uint8_t c_flow_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_classified_flow_table *c_table =
 						&dp_stc->classified_flow_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
+
+	if (!classified)
+		return;
 
 	c_entry = &c_table->entries[c_flow_id];
 	if (qdf_atomic_read(&c_entry->state) ==
@@ -526,12 +530,16 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 
 static inline void
 wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
+			       uint8_t classified,
 			       uint8_t c_flow_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_classified_flow_table *c_table =
 						&dp_stc->classified_flow_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
+
+	if (!classified)
+		return;
 
 	c_entry = &c_table->entries[c_flow_id];
 	if (qdf_atomic_read(&c_entry->state) ==
@@ -747,6 +755,20 @@ wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 
 static inline void
 wlan_dp_indicate_rx_flow_add(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
+static inline void
+wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
+			       uint8_t classified,
+			       uint8_t c_flow_id)
+{
+}
+
+static inline void
+wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
+			       uint8_t classified,
+			       uint8_t c_flow_id)
 {
 }
 

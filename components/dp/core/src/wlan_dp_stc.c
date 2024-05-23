@@ -527,14 +527,59 @@ wlan_dp_stc_check_ping_activity(struct wlan_dp_stc *dp_stc,
 #define FLOW_RESUME_TIME_THRESH_NS 500000000
 
 static inline void
+wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
+				  struct wlan_dp_stc_classified_flow_entry *c_entry)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_spm_flow_info *tx_flow;
+	struct dp_fisa_rx_sw_ft *rx_flow;
+
+	if (qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_DEL_FLAGS_TX_DEL,
+				&c_entry->del_flags) &&
+	    qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_RX_FLOW_VALID,
+				&c_entry->flags)) {
+		/* TX flow retired, mark corresponding rx flow as inactive */
+		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, c_entry->rx_flow_id);
+		rx_flow->classified = 0;
+		/*
+		 * Classified flow entry is cleared at the end,
+		 * so no need to clear the del_flags
+		 */
+	}
+
+	if (qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_DEL_FLAGS_RX_DEL,
+				&c_entry->del_flags) &&
+	    qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_TX_FLOW_VALID,
+				&c_entry->flags)) {
+		/* RX flow retired, mark corresponding tx flow as inactive */
+		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, c_entry->tx_flow_id);
+		tx_flow->classified = 0;
+		/*
+		 * Classified flow entry is cleared at the end,
+		 * so no need to clear the del_flags
+		 */
+	}
+
+	active_traffic_map = &dp_stc->peer_traffic_map[c_entry->peer_id];
+	if (active_traffic_map->valid)
+		wlan_dp_stc_dec_traffic_type(active_traffic_map,
+					     c_entry->traffic_type);
+
+	qdf_mem_zero(c_entry, sizeof(*c_entry));
+	qdf_atomic_set(&c_entry->state, WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT);
+}
+
+static inline void
 wlan_dp_stc_check_and_retire_flow(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
 	if (qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_DEL_FLAGS_TX_DEL,
 				&c_entry->del_flags) ||
-	    qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_DEL_FLAGS_TX_DEL,
+	    qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_DEL_FLAGS_RX_DEL,
 				&c_entry->del_flags)) {
 		/* trigger a detach of this c_entry */
+		wlan_dp_stc_purge_classified_flow(dp_stc, c_entry);
 	}
 }
 
@@ -750,6 +795,16 @@ wlan_dp_stc_process_classified_flow(struct wlan_dp_stc *dp_stc,
 	}
 }
 
+static inline bool
+wlan_dp_stc_is_traffic_type_known(enum qca_traffic_type traffic_type)
+{
+	if (traffic_type == QCA_TRAFFIC_TYPE_UNKNOWN ||
+	    traffic_type == QCA_TRAFFIC_TYPE_INVALID)
+		return false;
+
+	return true;
+}
+
 /*
  * This function should just mark something in the sampling entry.
  * The periodic work can take care of moving this entry to classified table
@@ -790,8 +845,10 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 		rx_flow->classified = 1;
 	}
 
-	if (flow->traffic_type == QCA_TRAFFIC_TYPE_UNKNOWN)
+	if (!wlan_dp_stc_is_traffic_type_known(flow->traffic_type)) {
+		wlan_dp_stc_remove_sampling_table_entry(dp_stc, flow);
 		return;
+	}
 
 	/* Move to classified flow table if its not unknown traffic type */
 	for (c_id = 0; c_id < DP_STC_CLASSIFIED_TABLE_FLOW_MAX; c_id++) {
@@ -1020,15 +1077,13 @@ other_checks:
 								sampling_flow);
 		}
 
-		if (sampling_flow->state == WLAN_DP_SAMPLING_STATE_CLASSIFIED &&
-		    !(sampling_flow->flags1 &
-				WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT)) {
-			wlan_dp_send_flow_report(dp_stc, sampling_flow);
-			sampling_flow->flags1 |=
-				WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT;
-			/* TODO - This should be moved outside this if condition
-			 * Adding a flow to classified table also can fail.
-			 */
+		if (sampling_flow->state == WLAN_DP_SAMPLING_STATE_CLASSIFIED) {
+			if (sampling_flow->flags1 &
+				WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT) {
+				wlan_dp_send_flow_report(dp_stc, sampling_flow);
+				sampling_flow->flags1 |=
+				       WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT;
+			}
 			wlan_dp_stc_move_to_classified_table(dp_stc,
 							     sampling_flow);
 		}
@@ -1568,8 +1623,7 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * 1) txrx stats reported and flow classified as valid type
 		 * 2) burst stats reported and flow classification attempted
 		 */
-		if (flow_classify_result->traffic_type !=
-						QCA_TRAFFIC_TYPE_UNKNOWN ||
+		if (wlan_dp_stc_is_traffic_type_known(flow->traffic_type) ||
 		    wlan_dp_burst_samples_reported(flow))
 			flow->state = WLAN_DP_SAMPLING_STATE_CLASSIFIED;
 

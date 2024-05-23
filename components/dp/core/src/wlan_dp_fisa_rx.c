@@ -961,6 +961,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 		       struct dp_fisa_rx_fst_update_elem *elem,
 		       uint32_t hashed_flow_idx)
 {
+	struct wlan_dp_psoc_context *dp_ctx = fisa_hdl->dp_ctx;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
 	struct fisa_pkt_hist pkt_hist;
 	u8 reo_id;
@@ -975,6 +976,8 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	dp_rx_fisa_flush_flow_wrap(sw_ft_entry);
 
 	dp_rx_fisa_save_pkt_hist(sw_ft_entry, &pkt_hist);
+	wlan_dp_stc_rx_flow_retire_ind(dp_ctx, sw_ft_entry->classified,
+				       sw_ft_entry->c_flow_id);
 	/* Clear the sw_ft_entry */
 	qdf_mem_zero(sw_ft_entry, sizeof(*sw_ft_entry));
 	dp_rx_fisa_restore_pkt_hist(sw_ft_entry, &pkt_hist);
@@ -1000,6 +1003,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 	sw_ft_entry->is_flow_udp = elem->is_udp_flow;
 	sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
+	sw_ft_entry->flow_init_ts = qdf_sched_clock();
 
 	fisa_hdl->add_flow_count++;
 	fisa_hdl->del_flow_count++;
