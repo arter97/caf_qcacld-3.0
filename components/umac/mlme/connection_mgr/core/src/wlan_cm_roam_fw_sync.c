@@ -113,12 +113,12 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	    cm_is_peer_preset_on_other_sta(psoc, vdev, vdev_id, event)) {
 		mlme_err("vdev %d Roam sync not handled in connecting/disconnecting state",
 			 vdev_id);
-		status = wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
-						   vdev_id,
-						   WLAN_ROAM_RSO_STOPPED,
-						   REASON_ROAM_SYNCH_FAILED);
+		wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+					  vdev_id,
+					  WLAN_ROAM_RSO_STOPPED,
+					  REASON_ROAM_SYNCH_FAILED);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
-		return status;
+		return QDF_STATUS_E_INVAL;
 	}
 	mlo_sta_stop_reconfig_timer(vdev);
 	wlan_clear_mlo_sta_link_removed_flag(vdev);
@@ -1163,6 +1163,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				     mlme_get_tdls_chan_switch_prohibited(vdev),
 				     mlme_get_tdls_prohibited(vdev), vdev);
 
+	wlan_cm_update_scan_mlme_info(vdev, connect_rsp);
 	cm_update_associated_ch_info(vdev, true);
 
 	status = cm_sm_deliver_event_sync(cm_ctx, WLAN_CM_SM_EV_ROAM_DONE,
@@ -1181,6 +1182,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp);
+
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
 

@@ -345,7 +345,10 @@ next_link:
 
 	for (i = 0; i < num_of_links; i++) {
 		tpc_attr = nla_nest_start(reply_skb, i);
-
+		if (!tpc_attr) {
+			hdd_err("tpc_attr null, %d", i);
+			continue;
+		}
 		if (nla_put(reply_skb, QCA_WLAN_VENDOR_ATTR_TPC_BSSID,
 			    QDF_MAC_ADDR_SIZE, &link_bssid[i])) {
 			hdd_err("failed to put mac_addr");
@@ -402,6 +405,10 @@ next_link:
 		}
 		for (j = 0; j < reg_tpc_info[i].num_pwr_levels; j++) {
 			tpc_level = nla_nest_start(reply_skb, j);
+			if (!tpc_level) {
+				hdd_err("tpc_level null. level %d", j);
+				continue;
+			}
 			chan_power_info = &reg_tpc_info[i].chan_power_info[j];
 
 			attr_id = QCA_WLAN_VENDOR_ATTR_TPC_PWR_LEVEL_FREQUENCY;

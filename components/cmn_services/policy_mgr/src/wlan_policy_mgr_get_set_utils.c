@@ -752,6 +752,21 @@ static void policy_mgr_get_hw_mode_params(
 	}
 }
 
+QDF_STATUS policy_mgr_update_nss_req(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, uint8_t tx_nss,
+				     uint8_t rx_nss)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_FAILURE;
+	}
+	return pm_ctx->hdd_cbacks.wlan_set_tx_rx_nss_cb(psoc, vdev_id,
+							tx_nss, rx_nss);
+}
+
 /**
  * policy_mgr_set_hw_mode_params() - sets TX-RX stream,
  * bandwidth and DBS in hw_mode_list
@@ -11289,6 +11304,25 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 		policy_mgr_err("SAP not allowed on DFS channel if no dfs master capability!!");
 		return false;
 	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("Invalid vdev");
+		return false;
+	}
+	/* Allow the current CSA to continue if it's already started. This is
+	 * possible when SAP CSA started to move to STA channel but STA got
+	 * disconnected.
+	 */
+	if (!wlan_vdev_mlme_is_init_state(vdev) &&
+	    !wlan_vdev_is_up_active_state(vdev)) {
+		policy_mgr_debug("SAP is not yet UP: vdev %d", vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return true;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	/*
 	 * Check if any of the concurrent STA/ML-STA link/P2P client are in

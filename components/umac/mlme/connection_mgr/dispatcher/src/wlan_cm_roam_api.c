@@ -37,6 +37,7 @@
 #include "wlan_connectivity_logging.h"
 #include "target_if.h"
 #include "wlan_mlo_mgr_roam.h"
+#include <wlan_cp_stats_chipset_stats.h>
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
 #define BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN 15
@@ -260,15 +261,19 @@ QDF_STATUS wlan_cm_disable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	QDF_STATUS status;
+	uint8_t disable_reason = REASON_DRIVER_DISABLED;
 
 	if (reason == REASON_DRIVER_DISABLED && requestor)
 		mlme_set_operations_bitmap(psoc, vdev_id, requestor, false);
+
+	if (reason == REASON_VDEV_RESTART_FROM_HOST)
+		disable_reason = REASON_VDEV_RESTART_FROM_HOST;
 
 	mlme_debug("ROAM_CONFIG: vdev[%d] Disable roaming - requestor:%s",
 		   vdev_id, cm_roam_get_requestor_string(requestor));
 
 	status = cm_roam_state_change(pdev, vdev_id, WLAN_ROAM_RSO_STOPPED,
-				      REASON_DRIVER_DISABLED, NULL, false);
+				      disable_reason, NULL, false);
 
 	return status;
 }
@@ -279,15 +284,19 @@ QDF_STATUS wlan_cm_enable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	QDF_STATUS status;
+	uint8_t enable_reason = REASON_DRIVER_ENABLED;
 
 	if (reason == REASON_DRIVER_ENABLED && requestor)
 		mlme_set_operations_bitmap(psoc, vdev_id, requestor, true);
+
+	if (reason == REASON_VDEV_RESTART_FROM_HOST)
+		enable_reason = REASON_VDEV_RESTART_FROM_HOST;
 
 	mlme_debug("ROAM_CONFIG: vdev[%d] Enable roaming - requestor:%s",
 		   vdev_id, cm_roam_get_requestor_string(requestor));
 
 	status = cm_roam_state_change(pdev, vdev_id, WLAN_ROAM_RSO_ENABLED,
-				      REASON_DRIVER_ENABLED, NULL, false);
+				      enable_reason, NULL, false);
 
 	return status;
 }
@@ -4359,6 +4368,140 @@ wlan_cm_update_roam_stats_info(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_CHIPSET_STATS
+static void
+cm_cp_stats_cstats_roam_scan_cancel(struct cstats_sta_roam_scan_cancel *stat,
+				    struct wmi_roam_trigger_abort_reason *abort)
+{
+	stat->reason_code = abort->abort_reason_code;
+	stat->data_rssi = abort->data_rssi;
+	stat->data_rssi_threshold = abort->data_rssi_threshold;
+	stat->rx_linkspeed_status = abort->rx_linkspeed_status;
+}
+
+static void
+cm_cp_stats_cstats_roam_scan_start(struct wlan_objmgr_vdev *vdev,
+				   struct wmi_roam_trigger_info *event,
+				   bool is_full_scan)
+{
+	struct cstats_sta_roam_scan_start stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_STA_ROAM_SCAN_START_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_sta_roam_scan_start) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.trigger_reason = event->trigger_reason;
+	stat.trigger_sub_reason = event->trigger_sub_reason;
+	stat.rssi = event->current_rssi;
+	stat.timestamp = event->timestamp;
+	stat.is_full_scan = is_full_scan;
+	cm_cp_stats_cstats_roam_scan_cancel(&stat.abort_roam,
+					    &event->abort_reason);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_sta_roam_scan_start),
+			       &stat);
+}
+
+static void
+cm_cp_stats_cstats_roam_scan_ap(struct cstats_sta_roam_scan_ap *stat,
+				struct wmi_roam_candidate_info *ap,
+				uint8_t num_ap)
+{
+	uint8_t i;
+
+	if (num_ap > MAX_ROAM_CANDIDATE_AP)
+		num_ap = MAX_ROAM_CANDIDATE_AP;
+
+	for (i = 0; i < num_ap; i++) {
+		CSTATS_MAC_COPY(stat->bssid, ap->bssid.bytes);
+		stat[i].total_score = ap->total_score;
+		stat[i].rssi = ap->rssi;
+		stat[i].etp = ap->etp;
+		stat[i].freq = ap->freq;
+		stat[i].cu_load = ap->cu_load;
+		stat[i].is_mlo = ap->is_mlo;
+		stat[i].type = ap->type;
+	}
+}
+
+static void cm_cp_stats_cstats_roam_scan_done(struct wlan_objmgr_vdev *vdev,
+					      struct wmi_roam_scan_data *event,
+					      bool is_full_scan)
+{
+	struct cstats_sta_roam_scan_done stat = {0};
+	uint8_t i;
+
+	if (event->num_ap >= MAX_ROAM_CANDIDATE_AP &&
+	    event->num_chan > MAX_ROAM_SCAN_CHAN)
+		return;
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_STA_ROAM_SCAN_DONE_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_sta_roam_scan_done) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.cand_ap_count = event->num_ap;
+	stat.num_scanned_freq = event->num_chan;
+	stat.timestamp = event->scan_complete_timestamp;
+
+	for (i = 0; i < event->num_chan; i++)
+		stat.scanned_freq[i] = event->chan_freq[i];
+
+	stat.is_full_scan = is_full_scan;
+	cm_cp_stats_cstats_roam_scan_ap(stat.ap, event->ap, stat.cand_ap_count);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_sta_roam_scan_done), &stat);
+}
+
+static void cm_cp_stats_cstats_roam_result(struct wlan_objmgr_vdev *vdev,
+					   struct wmi_roam_result *event)
+{
+	struct cstats_sta_roam_result stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_STA_ROAM_RESULT_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_sta_roam_result) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id  = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.timestamp = event->timestamp;
+	stat.status = event->status;
+	stat.fail_reason = event->fail_reason;
+	stat.roam_cancel_reason = event->roam_abort_reason;
+	CSTATS_MAC_COPY(stat.bssid, event->fail_bssid.bytes);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_sta_roam_result), &stat);
+}
+
+#else
+static inline void
+cm_cp_stats_cstats_roam_scan_start(struct wlan_objmgr_vdev *vdev,
+				   struct wmi_roam_trigger_info *event,
+				   bool is_full_scan)
+{
+}
+
+static inline void
+cm_cp_stats_cstats_roam_scan_done(struct wlan_objmgr_vdev *vdev,
+				  struct wmi_roam_scan_data *event,
+				  bool is_full_scan)
+{
+}
+
+static inline void
+cm_cp_stats_cstats_roam_result(struct wlan_objmgr_vdev *vdev,
+			       struct wmi_roam_result *event)
+{
+}
+#endif /* WLAN_CHIPSET_STATS */
+
 QDF_STATUS
 cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 			    struct roam_stats_event *stats_info)
@@ -4384,6 +4527,9 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 				stats_info->scan[i].present &&
 				stats_info->scan[i].type;
 
+			cm_cp_stats_cstats_roam_scan_start
+				(vdev, &stats_info->trigger[i], is_full_scan);
+
 			if (stats_info->trigger[i].trigger_reason ==
 			    ROAM_TRIGGER_REASON_BTM) {
 				cm_roam_handle_btm_stats(psoc, stats_info, i,
@@ -4398,20 +4544,26 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 					&stats_info->scan[i],
 					stats_info->vdev_id, is_full_scan);
 
-			if (stats_info->scan[i].present)
+			if (stats_info->scan[i].present) {
 				cm_roam_stats_print_scan_info(
 					psoc, &stats_info->scan[i],
 					stats_info->vdev_id,
 					stats_info->trigger[i].trigger_reason,
 					stats_info->trigger[i].timestamp);
+				cm_cp_stats_cstats_roam_scan_done
+				     (vdev, &stats_info->scan[i], is_full_scan);
+			}
 		}
 
-		if (stats_info->result[i].present)
+		if (stats_info->result[i].present) {
 			cm_roam_stats_print_roam_result(psoc,
 							&stats_info->trigger[i],
 							&stats_info->result[i],
 							&stats_info->scan[i],
 							stats_info->vdev_id);
+			cm_cp_stats_cstats_roam_result
+					       (vdev, &stats_info->result[i]);
+		}
 
 		if (stats_info->frame_stats[i].num_frame)
 			cm_roam_print_frame_info(psoc,

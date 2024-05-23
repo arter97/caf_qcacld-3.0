@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -833,6 +833,9 @@ static int __os_if_nan_process_ndp_initiator_req(struct wlan_objmgr_psoc *psoc,
 	}
 
 	req.vdev = nan_vdev;
+
+	os_if_cstats_log_ndp_initiator_req_evt(&req);
+
 	status = ucfg_nan_req_processor(nan_vdev, &req, NDP_INITIATOR_REQ);
 	ret = qdf_status_to_os_return(status);
 initiator_req_failed:
@@ -1023,6 +1026,8 @@ static int __os_if_nan_process_ndp_responder_req(struct wlan_objmgr_psoc *psoc,
 		goto responder_req_failed;
 	}
 
+	os_if_cstats_log_ndp_responder_req_evt(nan_vdev, &req);
+
 	osif_debug("vdev_id: %d, transaction_id: %d, ndp_rsp %d, ndp_instance_id: %d, ndp_app_info_len: %d, csid: %d",
 		   wlan_vdev_get_id(nan_vdev), req.transaction_id, req.ndp_rsp,
 		   req.ndp_instance_id, req.ndp_info.ndp_app_info_len,
@@ -1110,6 +1115,9 @@ static int __os_if_nan_process_ndp_end_req(struct wlan_objmgr_psoc *psoc,
 	}
 
 	req.vdev = nan_vdev;
+
+	os_if_cstats_log_ndp_end_req_evt(nan_vdev, &req);
+
 	status = ucfg_nan_req_processor(nan_vdev, &req, NDP_END_REQ);
 	ret = qdf_status_to_os_return(status);
 	if (ret)
@@ -1309,6 +1317,8 @@ static void os_if_ndp_initiator_rsp_handler(struct wlan_objmgr_vdev *vdev,
 			rsp->reason))
 		goto ndp_initiator_rsp_nla_failed;
 
+	os_if_cstats_log_ndp_initiator_resp_evt(vdev, rsp);
+
 	osif_debug("NDP Initiator rsp sent, tid:%d, instance id:%d, status:%d, reason: %d",
 		   rsp->transaction_id, rsp->ndp_instance_id, rsp->status,
 		   rsp->reason);
@@ -1390,6 +1400,8 @@ static void os_if_ndp_responder_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	   QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE,
 	   rsp->reason))
 		goto ndp_responder_rsp_nla_failed;
+
+	os_if_cstats_log_ndp_responder_resp_evt(vdev, rsp);
 
 	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	return;
@@ -1599,6 +1611,8 @@ static void os_if_ndp_indication_handler(struct wlan_objmgr_vdev *vdev,
 			goto ndp_indication_nla_failed;
 	}
 
+	os_if_cstats_log_ndp_indication_evt(vdev, event);
+
 	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 	return;
 ndp_indication_nla_failed:
@@ -1807,6 +1821,9 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 			goto ndp_confirm_nla_failed;
 
 	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+
+	os_if_cstats_log_ndp_confirm_evt(vdev, ndp_confirm);
+
 	osif_debug("NDP confim sent, ndp instance id: %d, peer addr: "QDF_MAC_ADDR_FMT" rsp_code: %d, reason_code: %d",
 		   ndp_confirm->ndp_instance_id,
 		   QDF_MAC_ADDR_REF(ndp_confirm->peer_ndi_mac_addr.bytes),
@@ -1888,6 +1905,8 @@ static void os_if_ndp_end_rsp_handler(struct wlan_objmgr_vdev *vdev,
 	if (nla_put_u16(vendor_event, QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID,
 			rsp->transaction_id))
 		goto ndp_end_rsp_nla_failed;
+
+	os_if_cstats_log_ndp_end_rsp_evt(vdev, rsp);
 
 	osif_debug("NDP End rsp sent, transaction id: %u, status: %u, reason: %u",
 		   rsp->transaction_id, rsp->status, rsp->reason);
@@ -2005,6 +2024,8 @@ static void os_if_new_peer_ind_handler(struct wlan_objmgr_vdev *vdev,
 		osif_err("failed to get callbacks");
 		return;
 	}
+
+	os_if_cstats_log_ndp_new_peer_evt(vdev, peer_ind);
 
 	osif_debug("vdev_id: %d, peer_mac: "QDF_MAC_ADDR_FMT,
 		   vdev_id, QDF_MAC_ADDR_REF(peer_ind->peer_mac_addr.bytes));
@@ -2253,6 +2274,8 @@ static void os_if_ndp_iface_delete_rsp_handler(struct wlan_objmgr_psoc *psoc,
 	else
 		osif_debug("NDI BSS stop failed with reason %d",
 			   ndi_rsp->reason);
+
+	os_if_cstats_log_ndi_delete_resp_evt(vdev, ndi_rsp);
 
 	ucfg_nan_set_ndi_delete_rsp_reason(vdev, ndi_rsp->reason);
 	ucfg_nan_set_ndi_delete_rsp_status(vdev, ndi_rsp->status);
@@ -2896,9 +2919,294 @@ int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	case QCA_WLAN_NAN_EXT_SUBCMD_TYPE_ENABLE_REQ:
 		return os_if_process_nan_enable_req(pdev, tb, vdev_id);
 	case QCA_WLAN_NAN_EXT_SUBCMD_TYPE_DISABLE_REQ:
+		os_if_cstats_log_disable_nan_disc_evt(pdev, vdev_id);
 		return os_if_process_nan_disable_req(psoc, tb);
 	default:
 		osif_err("Unrecognized NAN subcmd type(%d)", nan_subcmd);
 		return -EINVAL;
 	}
 }
+
+#ifdef WLAN_CHIPSET_STATS
+void
+os_if_cstats_log_ndp_initiator_req_evt(struct nan_datapath_initiator_req *req)
+{
+	struct cstats_nan_ndp_initiator_req stat = {0};
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = req->vdev;
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDP_INITIATOR_REQ_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndp_initiator_req) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.transaction_id = req->transaction_id;
+	stat.channel = req->channel;
+	stat.channel_cfg = req->channel_cfg;
+	stat.service_instance_id = req->service_instance_id;
+	CSTATS_MAC_COPY(stat.self_ndi_mac_addr, req->self_ndi_mac_addr.bytes);
+	CSTATS_MAC_COPY(stat.peer_discovery_mac_addr,
+			req->peer_discovery_mac_addr.bytes);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndp_initiator_req),
+			       &stat);
+}
+
+void
+os_if_cstats_log_ndp_responder_req_evt(struct wlan_objmgr_vdev *vdev,
+				       struct nan_datapath_responder_req *req)
+{
+	struct cstats_nan_ndp_responder_req stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDP_RESPONDER_REQ_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndp_responder_req) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.transaction_id = req->transaction_id;
+	stat.ndp_instance_id = req->ndp_instance_id;
+	stat.ndp_rsp = req->ndp_rsp;
+	stat.ncs_sk_type = req->ncs_sk_type;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndp_responder_req),
+			       &stat);
+}
+
+void os_if_cstats_log_ndp_end_req_evt(struct wlan_objmgr_vdev *vdev,
+				      struct nan_datapath_end_req *rq)
+{
+	struct cstats_nan_ndp_end_req stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDP_END_REQ_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndp_end_req) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.transaction_id = rq->transaction_id;
+	stat.num_ndp_instances = rq->num_ndp_instances;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndp_end_req), &stat);
+}
+
+void
+os_if_cstats_log_ndp_initiator_resp_evt(struct wlan_objmgr_vdev *vdev,
+					struct nan_datapath_initiator_rsp *rsp)
+{
+	struct cstats_nan_ndp_initiator_resp stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDP_INITIATOR_RSP_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndp_initiator_resp) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.status = rsp->status;
+	stat.reason = rsp->reason;
+	stat.transaction_id = rsp->transaction_id;
+	stat.service_instance_id = rsp->ndp_instance_id;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndp_initiator_resp),
+			       &stat);
+}
+
+void
+os_if_cstats_log_ndp_responder_resp_evt(struct wlan_objmgr_vdev *vdev,
+					struct nan_datapath_responder_rsp *rsp)
+{
+	struct cstats_nan_ndp_responder_resp stat = {0};
+
+	stat.cmn.hdr.evt_id =
+		WLAN_CHIPSET_STATS_NAN_NDP_RESPONDER_RESP_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_tdls_disc_req) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.status = rsp->status;
+	stat.reason = rsp->reason;
+	stat.transaction_id = rsp->transaction_id;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndp_responder_resp),
+			       &stat);
+}
+
+void
+os_if_cstats_log_ndp_indication_evt(struct wlan_objmgr_vdev *vdev,
+				    struct nan_datapath_indication_event *evt)
+{
+	struct cstats_nan_ndp_ind stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDP_INDICATION_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndp_ind) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.ndp_instance_id = evt->ndp_instance_id;
+	stat.service_instance_id = evt->service_instance_id;
+	CSTATS_MAC_COPY(stat.peer_mac, evt->peer_mac_addr.bytes);
+	CSTATS_MAC_COPY(stat.peer_discovery_mac_addr,
+			evt->peer_discovery_mac_addr.bytes);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndp_ind), &stat);
+}
+
+void
+os_if_cstats_log_ndp_confirm_evt(struct wlan_objmgr_vdev *vdev,
+				 struct nan_datapath_confirm_event *nc)
+{
+	struct cstats_nan_ndp_confirm_ind stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDP_CONFIRM_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndp_confirm_ind) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.instance_id = nc->ndp_instance_id;
+	stat.rsp_code = nc->rsp_code;
+	stat.reason_code = nc->reason_code;
+	CSTATS_MAC_COPY(stat.peer_addr, nc->peer_ndi_mac_addr.bytes);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndp_confirm_ind),
+			       &stat);
+}
+
+void
+os_if_cstats_log_ndp_end_rsp_evt(struct wlan_objmgr_vdev *vdev,
+				 struct nan_datapath_end_rsp_event *rsp)
+{
+	struct cstats_nan_ndp_end_resp stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDP_END_RESP_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndp_end_resp) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.status = rsp->status;
+	stat.reason = rsp->reason;
+	stat.transaction_id = rsp->transaction_id;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndp_end_resp), &stat);
+}
+
+void
+os_if_cstats_log_ndp_new_peer_evt(struct wlan_objmgr_vdev *vdev,
+				  struct nan_datapath_peer_ind *peer_ind)
+{
+	struct cstats_nan_ndp_new_peer_ind stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDP_NEW_PEER_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndp_new_peer_ind) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.sta_id = peer_ind->sta_id;
+	CSTATS_MAC_COPY(stat.peer_mac, peer_ind->peer_mac_addr.bytes);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndp_new_peer_ind),
+			       &stat);
+}
+
+void
+os_if_cstats_log_ndi_delete_resp_evt(struct wlan_objmgr_vdev *vdev,
+				     struct nan_datapath_inf_delete_rsp *rsp)
+{
+	struct cstats_nan_ndi_delete_resp stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_NAN_NDI_DELETE_RESP_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_ndi_delete_resp) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.status = rsp->status;
+	stat.reason = rsp->reason;
+	stat.transaction_id = ucfg_nan_get_ndp_delete_transaction_id(vdev);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_ndi_delete_resp),
+			       &stat);
+}
+
+void os_if_cstats_log_nan_disc_enable_req_evt(uint8_t vdev_id,
+					      struct nan_enable_req *nan_req)
+{
+	struct cstats_nan_disc_enable stat = {0};
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(nan_req->pdev,
+						    vdev_id, WLAN_NAN_ID);
+	if (!vdev) {
+		osif_err("vdev is null");
+		return;
+	}
+
+	stat.cmn.hdr.evt_id =
+		WLAN_CHIPSET_STATS_NAN_DISCOVERY_ENABLE_REQ_EVENT_ID;
+	stat.cmn.hdr.length =
+			sizeof(struct cstats_nan_disc_enable) -
+			sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+	stat.social_chan_2g_freq = nan_req->social_chan_2g_freq;
+	stat.social_chan_5g_freq = nan_req->social_chan_5g_freq;
+	stat.rtt_cap = nan_req->params.rtt_cap;
+	stat.disable_6g_nan = nan_req->params.disable_6g_nan;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_disc_enable), &stat);
+}
+
+void
+os_if_cstats_log_disable_nan_disc_evt(struct wlan_objmgr_pdev *pdev,
+				      uint8_t vdev_id)
+{
+	struct cstats_nan_disc_disable_req stat = {0};
+	struct wlan_objmgr_vdev *vdev = NULL;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id, WLAN_NAN_ID);
+	if (!vdev) {
+		osif_err("vdev is null");
+		return;
+	}
+
+	stat.cmn.hdr.evt_id =
+		WLAN_CHIPSET_STATS_NAN_DISCOVERY_DISABLE_REQ_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_nan_disc_disable_req) -
+			  sizeof(struct cstats_hdr);
+	stat.cmn.opmode = wlan_vdev_mlme_get_opmode(vdev);
+	stat.cmn.vdev_id = wlan_vdev_get_id(vdev);
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.disable_2g_discovery = 1;
+	stat.disable_5g_discovery = 1;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+	wlan_cstats_host_stats(sizeof(struct cstats_nan_disc_disable_req),
+			       &stat);
+}
+#endif /* WLAN_CHIPSET_STATS */
+
