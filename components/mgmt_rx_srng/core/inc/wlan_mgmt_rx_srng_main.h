@@ -50,6 +50,8 @@ QDF_STATUS wlan_mgmt_rx_srng_pdev_destroy_notification(
 				struct wlan_objmgr_pdev *pdev, void *arg);
 
 bool wlan_mgmt_rx_srng_cfg_enable(struct wlan_objmgr_psoc *psoc);
+void wlan_mgmt_rx_srng_reap_buf(struct wlan_objmgr_pdev *pdev,
+				struct mgmt_srng_reap_event_params *param);
 #endif /* end of _WLAN_MGMT_RX_SRNG_MAIN_H_*/
 
 #endif

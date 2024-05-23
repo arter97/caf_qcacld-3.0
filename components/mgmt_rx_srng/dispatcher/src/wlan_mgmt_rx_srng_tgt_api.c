@@ -70,4 +70,5 @@ void
 tgt_wlan_mgmt_rx_srng_reap_event(struct wlan_objmgr_pdev *pdev,
 				 struct mgmt_srng_reap_event_params *params)
 {
+	wlan_mgmt_rx_srng_reap_buf(pdev, params);
 }

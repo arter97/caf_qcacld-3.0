@@ -14,6 +14,7 @@
 #include <init_deinit_lmac.h>
 #include "target_if_mgmt_rx_srng.h"
 #include "dp_internal.h"
+#include "wmi_unified_api.h"
 
 bool wlan_mgmt_rx_srng_cfg_enable(struct wlan_objmgr_psoc *psoc)
 {
@@ -64,6 +65,115 @@ wlan_mgmt_rx_srng_alloc_buf(struct mgmt_rx_srng_pdev_priv *pdev_priv,
 	rx_desc->in_use = true;
 
 	return status;
+}
+
+void wlan_mgmt_rx_srng_reap_buf(struct wlan_objmgr_pdev *pdev,
+				struct mgmt_srng_reap_event_params *param)
+{
+	struct mgmt_rx_srng_pdev_priv *pdev_priv;
+	struct hal_buf_info buf_info;
+	struct mgmt_rx_srng_hdr *hdr;
+	struct wmi_unified *wmi_handle;
+	void *srng;
+	qdf_dma_addr_t paddr;
+	QDF_STATUS status;
+	uint16_t len;
+	int num_buf_recv = 0;
+	qdf_nbuf_t nbuf_head = NULL, nbuf_tail = NULL, nbuf, next;
+
+	void *ring_entry;
+
+	pdev_priv = wlan_objmgr_pdev_get_comp_private_obj(
+					pdev, WLAN_UMAC_COMP_MGMT_RX_SRNG);
+	if (!pdev_priv) {
+		mgmt_rx_srng_err("psoc priv is NULL");
+		return;
+	}
+
+	wmi_handle = lmac_get_pdev_wmi_handle(pdev);
+	if (!wmi_handle) {
+		mgmt_rx_srng_err("WMI handle is null in mgmt rx srng");
+		return;
+	}
+
+	srng = pdev_priv->mgmt_rx_srng_cfg.srng;
+	num_buf_recv = hal_srng_src_num_avail(pdev_priv->hal_soc, srng, true);
+
+	hal_srng_access_start(pdev_priv->hal_soc, srng);
+	while (num_buf_recv-- > 0) {
+		qdf_mem_zero(&buf_info, sizeof(buf_info));
+		ring_entry = hal_srng_src_get_next(pdev_priv->hal_soc, srng);
+		if (!ring_entry) {
+			mgmt_rx_srng_err("MGMT RX sring entry NULL");
+			continue;
+		}
+
+		hal_rx_buf_cookie_rbm_get(pdev_priv->hal_soc,
+					  (uint32_t *)ring_entry, &buf_info);
+		status = wlan_mgmt_rx_srng_alloc_buf(pdev_priv,
+						     buf_info.sw_cookie,
+						     &paddr);
+
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			hal_rxdma_buff_addr_info_set(
+				pdev_priv->hal_soc, ring_entry, paddr,
+				pdev_priv->rx_desc[pdev_priv->write_idx].cookie,
+				0);
+
+			pdev_priv->write_idx =
+			(pdev_priv->write_idx + 1) % MGMT_RX_SRNG_ENTRIES;
+		} else {
+			mgmt_rx_srng_err("Low mem: MGMT_SRNG buf alloc fail");
+			break;
+		}
+
+		if (pdev_priv->rx_desc[pdev_priv->read_idx].in_use) {
+			nbuf = pdev_priv->rx_desc[pdev_priv->read_idx].nbuf;
+			pdev_priv->rx_desc[pdev_priv->read_idx].in_use = false;
+			qdf_nbuf_unmap_single(pdev_priv->osdev, nbuf,
+					      QDF_DMA_FROM_DEVICE);
+			pdev_priv->read_idx =
+			(pdev_priv->read_idx + 1) % MGMT_RX_SRNG_ENTRIES;
+		} else {
+			mgmt_rx_srng_err("Received invalid cookie buffer");
+			qdf_assert_always(0);
+		}
+
+		if (!nbuf_head) {
+			nbuf_head = nbuf;
+			QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(nbuf_head) = 1;
+		} else {
+			qdf_nbuf_set_next(nbuf_tail, nbuf);
+			QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(nbuf_head)++;
+		}
+		nbuf_tail = nbuf;
+		qdf_nbuf_set_next(nbuf_tail, NULL);
+	}
+	hal_srng_access_end(pdev_priv->hal_soc, srng);
+
+	//Processing of reaped buffers by sending them to WMI layer
+	nbuf = nbuf_head;
+
+	while (nbuf) {
+		next = nbuf->next;
+		hdr = (struct mgmt_rx_srng_hdr *)qdf_nbuf_data(nbuf);
+		len = hdr->buff_len;
+
+		/* FW adds the header to the buffer copied in the mgmt SRNG.
+		 * This header provides host with info about the length of the
+		 * buffer, use same to set the pkt len and remove the header.
+		 */
+		qdf_nbuf_set_pktlen(nbuf, len);
+		if (qdf_nbuf_pull_head(nbuf, sizeof(*hdr)) == NULL) {
+			mgmt_rx_srng_err("Pkt len insuffficient");
+			qdf_nbuf_free(nbuf);
+			nbuf = next;
+			continue;
+		}
+
+		wmi_rx_buf_srng(wmi_handle, nbuf);
+		nbuf = next;
+	}
 }
 
 static

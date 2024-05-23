@@ -29,6 +29,15 @@
 #define MGMT_RX_BUF_REFILL_RING_IDX 2
 #endif
 
+/** struct mgmt_rx_srng_hdr - header info for mgmt frame
+ * @buff_len: buffer len
+ * @reserved: Reserved
+ */
+struct mgmt_rx_srng_hdr {
+	A_UINT16 buff_len;
+	A_UINT16 reserved;
+};
+
 /**
  * struct mgmt_rx_srng_psoc_priv - mgmt rx srng component psoc priv obj
  * @psoc: pointer to psoc object
