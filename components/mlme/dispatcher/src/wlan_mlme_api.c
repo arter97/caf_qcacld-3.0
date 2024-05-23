@@ -1411,13 +1411,23 @@ bool wlan_mlme_get_epcs_capability(struct wlan_objmgr_psoc *psoc)
 void wlan_mlme_set_epcs_capability(struct wlan_objmgr_psoc *psoc, bool flag)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 
-	if (!mlme_obj)
+	if (!mlme_obj || !mac_ctx)
 		return;
 
 	mlme_debug("set mlme epcs capability from %d to %d",
 		   mlme_obj->cfg.sta.epcs_capability, flag);
 	mlme_obj->cfg.sta.epcs_capability = flag;
+	if (flag) {
+		mlme_obj->cfg.eht_caps.dot11_eht_cap.epcs_pri_access = 1;
+		mac_ctx->eht_cap_2g.epcs_pri_access = 1;
+		mac_ctx->eht_cap_5g.epcs_pri_access = 1;
+	} else {
+		mlme_obj->cfg.eht_caps.dot11_eht_cap.epcs_pri_access = 0;
+		mac_ctx->eht_cap_2g.epcs_pri_access = 0;
+		mac_ctx->eht_cap_5g.epcs_pri_access = 0;
+	}
 }
 
 bool wlan_mlme_get_eht_disable_punct_in_us_lpi(struct wlan_objmgr_psoc *psoc)
