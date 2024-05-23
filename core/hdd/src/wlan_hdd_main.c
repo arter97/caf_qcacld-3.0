@@ -253,6 +253,7 @@
 #include "wlan_crypto_obj_mgr_i.h"
 #include "wlan_p2p_ucfg_api.h"
 #include "wifi_pos_api.h"
+#include "wlan_mgmt_rx_srng_ucfg_api.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -20492,10 +20493,16 @@ static QDF_STATUS hdd_component_init(void)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto ll_sap_deinit;
 
+	status = ucfg_mgmt_rx_srng_init();
+	if (QDF_IS_STATUS_ERROR(status))
+		goto mlo_mgr_register_osif_deinit;
+
 	hdd_register_cstats_ops();
 
 	return QDF_STATUS_SUCCESS;
 
+mlo_mgr_register_osif_deinit:
+	hdd_mlo_mgr_unregister_osif_ops();
 ll_sap_deinit:
 	ucfg_ll_sap_deinit();
 qmi_deinit:
@@ -20550,6 +20557,7 @@ mlme_global_deinit:
 static void hdd_component_deinit(void)
 {
 	/* deinitialize non-converged components */
+	ucfg_mgmt_rx_srng_deinit();
 	hdd_mlo_mgr_unregister_osif_ops();
 	ucfg_ll_sap_deinit();
 	ucfg_qmi_deinit();
