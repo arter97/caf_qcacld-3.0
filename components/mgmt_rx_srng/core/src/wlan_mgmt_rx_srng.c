@@ -10,6 +10,20 @@
 
 #include <wlan_mgmt_rx_srng_main.h>
 
+bool wlan_mgmt_rx_srng_cfg_enable(struct wlan_objmgr_psoc *psoc)
+{
+	struct mgmt_rx_srng_psoc_priv *psoc_priv;
+
+	psoc_priv = wlan_objmgr_psoc_get_comp_private_obj(
+					psoc, WLAN_UMAC_COMP_MGMT_RX_SRNG);
+	if (!psoc_priv) {
+		mgmt_rx_srng_err("psoc priv is NULL");
+		return false;
+	}
+
+	return psoc_priv->mgmt_rx_srng_is_enable;
+}
+
 QDF_STATUS wlan_mgmt_rx_srng_pdev_create_notification(
 				struct wlan_objmgr_pdev *pdev, void *arg)
 {
@@ -75,6 +89,8 @@ QDF_STATUS wlan_mgmt_rx_srng_psoc_create_notification(
 		goto free_psoc_priv;
 	}
 	psoc_priv->psoc = psoc;
+	psoc_priv->mgmt_rx_srng_is_enable =
+				cfg_get(psoc, CFG_FEATURE_MGMT_RX_SRNG_ENABLE);
 
 	return status;
 

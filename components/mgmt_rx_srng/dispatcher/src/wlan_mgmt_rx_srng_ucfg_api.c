@@ -107,3 +107,8 @@ void ucfg_mgmt_rx_srng_deinit(void)
 		mgmt_rx_srng_err("Failed to unregister psoc create handler");
 }
 
+bool ucfg_wlan_mgmt_rx_srng_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mgmt_rx_srng_cfg_enable(psoc);
+}
+

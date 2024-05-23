@@ -48,6 +48,7 @@ QDF_STATUS wlan_mgmt_rx_srng_pdev_create_notification(
 QDF_STATUS wlan_mgmt_rx_srng_pdev_destroy_notification(
 				struct wlan_objmgr_pdev *pdev, void *arg);
 
+bool wlan_mgmt_rx_srng_cfg_enable(struct wlan_objmgr_psoc *psoc);
 #endif /* end of _WLAN_MGMT_RX_SRNG_MAIN_H_*/
 
 #endif

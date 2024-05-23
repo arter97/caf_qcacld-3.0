@@ -17,6 +17,7 @@
 #ifdef FEATURE_MGMT_RX_OVER_SRNG
 QDF_STATUS ucfg_mgmt_rx_srng_init(void);
 void ucfg_mgmt_rx_srng_deinit(void);
+bool ucfg_wlan_mgmt_rx_srng_enabled(struct wlan_objmgr_psoc *psoc);
 #else
 static inline QDF_STATUS ucfg_mgmt_rx_srng_init(void)
 {
@@ -27,6 +28,10 @@ static inline void ucfg_mgmt_rx_srng_deinit(void)
 {
 }
 
+static inline bool ucfg_wlan_mgmt_rx_srng_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif
 
 #endif
