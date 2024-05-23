@@ -1130,8 +1130,12 @@ static uint16_t dp_sawf_get_3_link_queue_id(struct dp_peer *peer, uint16_t tid)
 	default:
 		break;
 	}
-	if (queue_id != DP_SAWF_PEER_Q_INVALID)
-		peer->flow_cnt[queue_id]++;
+	if (queue_id != DP_SAWF_PEER_Q_INVALID) {
+		if (queue_id < CDP_DATA_TID_MAX)
+			peer->flow_cnt[queue_id]++;
+		else
+			queue_id = DP_SAWF_PEER_Q_INVALID;
+	}
 
 	qdf_spin_unlock_bh(&peer->flow_info_lock);
 
