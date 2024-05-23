@@ -14689,7 +14689,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 						hdd_ctx->pdev,
 						link_info->vdev_id);
 
-		sme_set_per_link_ba_mode(mac_handle, set_val);
+		sme_config_ba_mode_all_vdevs(mac_handle, set_val);
 
 		if (!cfg_val) {
 			ret_val = wma_cli_set_command(
@@ -14771,7 +14771,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			/* Configure ADDBA req buffer size to 64 */
 			set_val = HDD_BA_MODE_64;
 
-		sme_set_per_link_ba_mode(mac_handle, set_val);
+		sme_config_ba_mode_all_vdevs(mac_handle, set_val);
 
 		ret_val = wma_cli_set_command(link_info->vdev_id,
 					      GEN_VDEV_PARAM_AMPDU,
