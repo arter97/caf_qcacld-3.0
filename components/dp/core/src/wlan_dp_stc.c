@@ -1650,6 +1650,9 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
 
+	if (!dp_stc)
+		return QDF_STATUS_E_NOSUPPORT;
+
 	if (peer_id >= DP_STC_MAX_PEERS)
 		return QDF_STATUS_E_INVAL;
 

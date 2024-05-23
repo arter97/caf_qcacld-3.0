@@ -510,13 +510,16 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t c_flow_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
-	struct wlan_dp_stc_classified_flow_table *c_table =
-						&dp_stc->classified_flow_table;
+	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
+
+	if (!dp_stc)
+		return;
 
 	if (!classified)
 		return;
 
+	c_table = &dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
@@ -534,13 +537,16 @@ wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t c_flow_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
-	struct wlan_dp_stc_classified_flow_table *c_table =
-						&dp_stc->classified_flow_table;
+	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
+
+	if (!dp_stc)
+		return;
 
 	if (!classified)
 		return;
 
+	c_table = &dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
@@ -566,6 +572,9 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
 	bool send_fw_indication = false;
+
+	if (!dp_stc)
+		return;
 
 	if (peer_id == 0xFFFF)
 		return;
