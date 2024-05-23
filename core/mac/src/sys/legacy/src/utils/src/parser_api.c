@@ -13574,7 +13574,10 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 						WLAN_EXTN_ELEMID_HE_6G_CAP;
 		}
 		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps,
-						 pe_session);
+						 NULL);
+		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
+			eht_caps.support_320mhz_6ghz = 0;
+
 		if ((eht_caps.present && frm->eht_cap.present &&
 		     qdf_mem_cmp(&eht_caps, &frm->eht_cap, sizeof(eht_caps))) ||
 		     (eht_caps.present && !frm->eht_cap.present) ||
