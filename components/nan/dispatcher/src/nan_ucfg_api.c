@@ -1489,7 +1489,7 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 		status = ucfg_nan_pasn_peer_delete_all(psoc);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			nan_err("Unable to delete all NAN Peer : %u", status);
-			return status;
+			goto end;
 		}
 	}
 
@@ -1500,6 +1500,7 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 	else
 		nan_debug("Unable to send NAN Disable request: %u", status);
 
+end:
 	qdf_mem_free(nan_req);
 	return status;
 }
