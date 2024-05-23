@@ -64,6 +64,7 @@
 #include <wlan_cmn_ieee80211.h>
 #include <target_if.h>
 #include "wlan_ll_sap_api.h"
+#include "wlan_nan_api.h"
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -990,6 +991,14 @@ selected_default_freq:
 	default_freq = wlan_ll_lt_sap_override_freq(mac_ctx->psoc,
 						    sap_ctx->vdev_id,
 						    default_freq);
+	if (policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
+						      PM_NAN_DISC_MODE,
+						      NULL) &&
+	    wlan_nan_is_sta_sap_nan_allowed(mac_ctx->psoc)) {
+		default_freq = wlan_nan_sap_override_freq(mac_ctx->psoc,
+							  sap_ctx->vdev_id,
+							  default_freq);
+	}
 
 	return default_freq;
 }
@@ -1183,7 +1192,16 @@ sap_validate_chan(struct sap_context *sap_context,
 							sap_context->chan_freq);
 		return QDF_STATUS_SUCCESS;
 	}
-
+	if (wlan_nan_is_sta_sap_nan_allowed(mac_ctx->psoc) &&
+	    policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
+						      PM_NAN_DISC_MODE,
+						      NULL)) {
+		sap_context->chan_freq = wlan_nan_sap_override_freq(
+						mac_ctx->psoc,
+						sap_context->vdev_id,
+						sap_context->chan_freq);
+		return QDF_STATUS_SUCCESS;
+	}
 	if (sap_context->vdev)
 		opmode = wlan_vdev_mlme_get_opmode(sap_context->vdev);
 

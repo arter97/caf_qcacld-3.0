@@ -123,6 +123,7 @@
 #include <wlan_psoc_mlme_ucfg_api.h>
 #include "wlan_ll_sap_api.h"
 #include "wlan_ll_sap_ucfg_api.h"
+#include "wlan_nan_api.h"
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -7051,6 +7052,17 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	config->chan_freq = wlan_ll_lt_sap_override_freq(hdd_ctx->psoc,
 							 link_info->vdev_id,
 							 config->chan_freq);
+
+	/* Override SAP freq to 2GHz channel 6 if NAN interface is present */
+	if (wlan_nan_is_sta_sap_nan_allowed(hdd_ctx->psoc) &&
+	    policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+						      PM_NAN_DISC_MODE,
+						      NULL)) {
+		config->chan_freq = wlan_nan_sap_override_freq(
+					hdd_ctx->psoc,
+					link_info->vdev_id,
+					config->chan_freq);
+	}
 	if (!config->chan_freq) {
 		hdd_err("vdev %d invalid ch_freq: %d", link_info->vdev_id,
 			config->chan_freq);
