@@ -29245,6 +29245,24 @@ wlan_hdd_cfg80211_get_channel_sap(struct wiphy *wiphy,
 	return 0;
 }
 
+static qdf_freq_t hdd_get_sec_2ghz_freq(qdf_freq_t freq,
+					enum phy_ch_width ch_width,
+					qdf_freq_t freq_seg_1)
+{
+	/*
+	 * In case of 2.4 GHz + 40 MHz, use the secondary channel
+	 * to determine the exact ccfs1
+	 */
+	if (wlan_reg_is_24ghz_ch_freq(freq) && ch_width == CH_WIDTH_40MHZ) {
+		if (freq < freq_seg_1)
+			return freq + HT40_SEC_OFFSET;
+		else
+			return freq - HT40_SEC_OFFSET;
+	}
+
+	return 0;
+}
+
 static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 						struct wlan_objmgr_vdev *vdev,
 						int link_id,
@@ -29256,6 +29274,7 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	enum wlan_phymode peer_phymode;
 	uint8_t vdev_id;
 	struct wlan_channel *des_chan;
+	qdf_freq_t sec_2g_freq = 0;
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
@@ -29279,10 +29298,22 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	chan_info->ch_width =
 			wlan_mlme_get_ch_width_from_phymode(peer_phymode);
 	ch_params.ch_width = chan_info->ch_width;
+
+	sec_2g_freq = hdd_get_sec_2ghz_freq(chan_info->ch_freq,
+					    chan_info->ch_width,
+					    chan_info->ch_cfreq1);
+
 	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
-						chan_info->ch_freq, 0,
+						chan_info->ch_freq, sec_2g_freq,
 						&ch_params,
 						REG_CURRENT_PWR_MODE);
+
+	if (chan_info->ch_cfreq1 != ch_params.mhz_freq_seg0 ||
+	    chan_info->ch_cfreq2 != ch_params.mhz_freq_seg1)
+		hdd_debug("Old ccfs1 %d ccfs2 %d - New ccfs1 %d ccfs2 %d",
+			  chan_info->ch_cfreq1, chan_info->ch_cfreq2,
+			  ch_params.mhz_freq_seg0, ch_params.mhz_freq_seg1);
+
 	chan_info->ch_cfreq1 = ch_params.mhz_freq_seg0;
 	chan_info->ch_cfreq2 = ch_params.mhz_freq_seg1;
 
@@ -29339,6 +29370,7 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 	struct wlan_channel chan_info;
 	int ret = 0;
 	struct ch_params ch_params = {0};
+	qdf_freq_t sec_2g_freq = 0;
 
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("vdev not associated");
@@ -29359,8 +29391,13 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 
 		ch_params.ch_width = chan_info.ch_width;
 		ch_params.center_freq_seg1 = chan_info.ch_cfreq2;
+		sec_2g_freq = hdd_get_sec_2ghz_freq(chan_info.ch_freq,
+						    chan_info.ch_width,
+						    chan_info.ch_cfreq1);
+
 		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
-							chan_info.ch_freq, 0,
+							chan_info.ch_freq,
+							sec_2g_freq,
 							&ch_params,
 							REG_CURRENT_PWR_MODE);
 		chan_info.ch_cfreq1 = ch_params.mhz_freq_seg0;
