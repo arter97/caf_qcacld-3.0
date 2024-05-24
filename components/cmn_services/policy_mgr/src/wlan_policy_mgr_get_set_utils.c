@@ -4027,6 +4027,90 @@ bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc)
 	return true;
 }
 
+bool policy_mgr_is_sap_override_dfs_required(struct wlan_objmgr_pdev *pdev,
+					     uint32_t chan_freq,
+					     enum phy_ch_width ch_width,
+					     qdf_freq_t acs_start_freq,
+					     qdf_freq_t acs_end_freq,
+					     uint32_t *con_vdev_id,
+					     uint32_t *con_ch_freq)
+{
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status;
+	bool cac_in_progress, on_non_2ghz;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return false;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	if (!con_vdev_id || !con_ch_freq) {
+		policy_mgr_err("Invalid NULL pointer");
+		return false;
+	}
+
+	*con_vdev_id = policy_mgr_get_dfs_beaconing_session_id(psoc);
+
+	/* No DFS beaconing session exist, no override */
+	if (*con_vdev_id == WLAN_UMAC_VDEV_ID_MAX)
+		return false;
+
+	status = policy_mgr_get_chan_by_session_id(psoc,
+						   *con_vdev_id,
+						   con_ch_freq);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Fail to get channel by vdev id %d",
+			       *con_vdev_id);
+		return false;
+	}
+
+	cac_in_progress = pm_ctx->hdd_cbacks.hdd_is_cac_in_progress &&
+			  pm_ctx->hdd_cbacks.hdd_is_cac_in_progress();
+
+	on_non_2ghz = chan_freq ? !WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq) :
+		      !WLAN_REG_IS_24GHZ_CH_FREQ(acs_start_freq);
+	/*
+	 * If CAC in progress HW mode cannot change in target,
+	 * override if MCC in current HW mode.
+	 */
+	if (cac_in_progress) {
+		if (!policy_mgr_is_current_hwmode_dbs(psoc)) {
+			policy_mgr_debug("CAC in progress, current SMM mode");
+			return true;
+		}
+
+		if (policy_mgr_is_current_hwmode_dbs(psoc) && on_non_2ghz) {
+			policy_mgr_debug("CAC in progress, current DBS mode");
+			return true;
+		}
+
+		/* If doing CAC in SBS mode, same check as below */
+	}
+
+	/* SMM capable */
+	if (!policy_mgr_is_hw_dbs_capable(psoc) &&
+	    !policy_mgr_is_hw_sbs_capable(psoc))
+		return true;
+
+	/* DBS capable */
+	if (!policy_mgr_is_hw_sbs_capable(psoc)) {
+		if (on_non_2ghz) {
+			policy_mgr_debug("DBS capable, new SAP on non 2ghz");
+			return true;
+		}
+		return false;
+	}
+
+	/* TODO: SBS capable */
+	return false;
+}
+
 QDF_STATUS policy_mgr_get_nss_for_vdev(struct wlan_objmgr_psoc *psoc,
 				enum policy_mgr_con_mode mode,
 				uint8_t *nss_2g, uint8_t *nss_5g)

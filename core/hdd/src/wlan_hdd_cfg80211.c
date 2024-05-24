@@ -1846,31 +1846,32 @@ int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter)
 	struct hdd_adapter *con_sap_adapter;
 	struct sap_config *sap_config, *con_sap_config;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	uint32_t con_ch_freq;
+	uint32_t con_vdev_id, con_ch_freq;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd context is NULL");
 		return 0;
 	}
 
-	/*
-	 * Check if AP+AP case, once primary AP chooses a DFS
-	 * channel secondary AP should always follow primary APs channel
-	 */
-	if (!policy_mgr_concurrent_beaconing_sessions_running(
-		hdd_ctx->psoc))
+	sap_config = &adapter->session.ap.sap_config;
+
+	if (!policy_mgr_is_sap_override_dfs_required(hdd_ctx->pdev,
+						     sap_config->chan_freq,
+						     sap_config->ch_width_orig,
+						     sap_config->acs_cfg.start_ch_freq,
+						     sap_config->acs_cfg.end_ch_freq,
+						     &con_vdev_id,
+						     &con_ch_freq))
 		return 0;
 
-	con_sap_adapter = hdd_get_con_sap_adapter(adapter, true);
+	if (con_vdev_id >= WLAN_UMAC_VDEV_ID_MAX)
+		return 0;
+
+	con_sap_adapter = hdd_get_adapter_by_vdev(hdd_ctx, con_vdev_id);
 	if (!con_sap_adapter)
 		return 0;
 
-	sap_config = &adapter->session.ap.sap_config;
 	con_sap_config = &con_sap_adapter->session.ap.sap_config;
-	con_ch_freq = con_sap_adapter->session.ap.operating_chan_freq;
-
-	if (!wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, con_ch_freq))
-		return 0;
 
 	hdd_debug("Only SCC AP-AP DFS Permitted (ch_freq=%d, con_ch_freq=%d)",
 		  sap_config->chan_freq, con_ch_freq);
