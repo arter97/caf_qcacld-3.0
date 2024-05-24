@@ -4110,7 +4110,7 @@ enum policy_mgr_four_connection_mode
 
 	policy_mgr_debug("sap:%d ndi:%d nan disc:%d ml_sta:%d p2p: %d",
 			 count_sap, count_ndi, count_nan_disc,
-			 num_ml_sta);
+			 num_ml_sta, count_p2p);
 	if (num_ml_sta == 2 && count_sap == 1 && count_nan_disc == 1)
 		index = PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS;
 	else if (num_ml_sta == 2 && count_nan_disc == 1 && count_ndi == 1)
