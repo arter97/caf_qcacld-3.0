@@ -4112,8 +4112,6 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				&low_5_band_scc_present);
 		status = QDF_STATUS_SUCCESS;
 		break;
-		status = QDF_STATUS_SUCCESS;
-		break;
 	case PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW:
 		add_sbs_chlist_to_pcl(
 				psoc,  pcl_channels, pcl_weights, pcl_sz, len,

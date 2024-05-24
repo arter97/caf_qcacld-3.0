@@ -109,11 +109,6 @@ tdls_find_all_peer(struct tdls_soc_priv_obj *soc_obj, const uint8_t *macaddr)
 	struct tdls_search_peer_param tdls_search_param;
 	struct wlan_objmgr_psoc *psoc;
 
-	if (!soc_obj) {
-		tdls_err("tdls soc object is NULL");
-		return NULL;
-	}
-
 	psoc = soc_obj->soc;
 	if (!psoc) {
 		tdls_err("psoc is NULL");
