@@ -32620,7 +32620,7 @@ hdd_validate_ttlm_params(struct wlan_objmgr_vdev *vdev,
 
 			if (!(connected_link_id & BIT(i))) {
 				hdd_err("TTLM mapping link_id: %d is not connected", i);
-				return -EAGAIN;
+				return -ENOTCONN;
 			}
 		}
 	}
@@ -32628,7 +32628,7 @@ hdd_validate_ttlm_params(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
-static int
+static void
 hdd_fill_ttlm_params(struct cfg80211_ttlm_params *params,
 		     struct wlan_t2lm_info *t2lm)
 {
@@ -32641,8 +32641,6 @@ hdd_fill_ttlm_params(struct cfg80211_ttlm_params *params,
 		for (i = 0; i < T2LM_MAX_NUM_TIDS; i++)
 			t2lm->ieee_link_map_tid[i] = params->dlink[i];
 	}
-
-	return 0;
 }
 
 static void hdd_print_ttlm_params(struct wlan_t2lm_info *t2lm)
@@ -32765,12 +32763,12 @@ __wlan_hdd_cfg80211_set_ttlm_mapping(struct wiphy *wiphy,
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("Vdev is null return");
-		return -EINVAL;
+		return -ENOTCONN;
 	}
 
 	if (!wlan_cm_is_vdev_connected(vdev)) {
 		hdd_debug("Not associated!, vdev %d", wlan_vdev_get_id(vdev));
-		ret = -EAGAIN;
+		ret = -ENOTCONN;
 		goto vdev_release;
 	}
 
@@ -32786,11 +32784,7 @@ __wlan_hdd_cfg80211_set_ttlm_mapping(struct wiphy *wiphy,
 		goto vdev_release;
 	}
 
-	ret = hdd_fill_ttlm_params(params, &t2lm);
-	if (ret) {
-		hdd_err("Failed to fill TTLM params");
-		goto vdev_release;
-	}
+	hdd_fill_ttlm_params(params, &t2lm);
 
 	hdd_print_ttlm_params(&t2lm);
 
