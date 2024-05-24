@@ -3383,6 +3383,7 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	tSirMacRateSet *opr_rates = &sap_ctx->sap_bss_cfg.operationalRateSet;
 	tSirMacRateSet *ext_rates = &sap_ctx->sap_bss_cfg.extendedRateSet;
 	uint8_t h2e;
+	uint32_t con_ch_freq, con_vdev_id;
 
 	/*
 	 * check if channel is in DFS_NOL or if the channel
@@ -3406,32 +3407,24 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	 * ACS check if AP1 ACS resulting channel is DFS and if yes
 	 * override AP2 ACS scan result with AP1 DFS channel
 	 */
-	if (policy_mgr_concurrent_beaconing_sessions_running(mac_ctx->psoc)) {
-		uint32_t con_ch_freq;
-		uint16_t con_ch;
-
-		con_ch_freq = sme_get_beaconing_concurrent_operation_channel(
-				mac_handle, sap_ctx->sessionId);
-		con_ch = wlan_reg_freq_to_chan(mac_ctx->pdev, con_ch_freq);
-		/* Overwrite second AP's channel with first only when:
-		 * 1. If operating mode is single mac
-		 * 2. or if 2nd AP is coming up on 5G band channel
-		 */
-		if ((!policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) ||
-		     WLAN_REG_IS_5GHZ_CH_FREQ(sap_ctx->chan_freq)) &&
-		     con_ch &&
-		     wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
-					      con_ch_freq)) {
-			sap_ctx->chan_freq = con_ch_freq;
-			if (sap_phymode_is_eht(sap_ctx->phyMode))
-				wlan_reg_set_create_punc_bitmap(
-					&sap_ctx->ch_params, true);
-			wlan_reg_set_channel_params_for_pwrmode(
-						    mac_ctx->pdev,
-						    con_ch_freq, 0,
-						    &sap_ctx->ch_params,
-						    REG_CURRENT_PWR_MODE);
-		}
+	if (policy_mgr_is_sap_override_dfs_required(mac_ctx->pdev,
+						    sap_ctx->chan_freq,
+						    sap_ctx->ch_width_orig,
+						    0, 0,
+						    sap_phymode_is_eht(
+						    sap_ctx->phyMode),
+						    &con_vdev_id,
+						    &con_ch_freq)) {
+		sap_ctx->chan_freq = con_ch_freq;
+		if (sap_phymode_is_eht(sap_ctx->phyMode))
+			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
+							true);
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+							con_ch_freq, 0,
+							&sap_ctx->ch_params,
+							REG_CURRENT_PWR_MODE);
+		sap_debug("override to DFS channel %d vdev id %d",
+			  con_ch_freq, con_vdev_id);
 	}
 
 	sap_validate_chanmode_and_chwidth(mac_ctx, sap_ctx);

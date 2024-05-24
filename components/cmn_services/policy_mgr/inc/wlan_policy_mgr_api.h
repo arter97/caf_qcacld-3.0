@@ -4366,6 +4366,30 @@ void policy_mgr_set_weight_of_disabled_inactive_channels_to_zero(
  */
 bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 					   uint8_t vdev_id, qdf_freq_t ch_freq);
+
+/**
+ * policy_mgr_is_sap_override_dfs_required() - Check if need override SAP
+ * channel with existing DFS SAP channel
+ * @pdev: pointer of pdev
+ * @chan_freq: SAP home channel frequency to check
+ * @ch_width: SAP channel bandwidth to check
+ * @acs_start_freq: New SAP ACS start frequency
+ * @acs_end_freq: New SAP ACS end frequency
+ * @puncture_enable: SAP enable puncture flag
+ * @con_vdev_id: retrieve existing DFS SAP vdev id
+ * @con_ch_freq: retrieve existing DFS SAP channel frequency
+ *
+ * Return: true if SAP need override by existing DFS SAP, otherwise false
+ */
+bool policy_mgr_is_sap_override_dfs_required(struct wlan_objmgr_pdev *pdev,
+					     uint32_t chan_freq,
+					     enum phy_ch_width ch_width,
+					     qdf_freq_t acs_start_freq,
+					     qdf_freq_t acs_end_freq,
+					     bool puncture_enable,
+					     uint32_t *con_vdev_id,
+					     uint32_t *con_ch_freq);
+
 /**
  * policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan() - check if sta+sap scc
  * allowed on dfs chan

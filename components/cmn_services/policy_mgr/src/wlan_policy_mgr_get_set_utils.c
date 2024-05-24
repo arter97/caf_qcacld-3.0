@@ -11823,6 +11823,124 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	return true;
 }
 
+bool policy_mgr_is_sap_override_dfs_required(struct wlan_objmgr_pdev *pdev,
+					     uint32_t chan_freq,
+					     enum phy_ch_width ch_width,
+					     qdf_freq_t acs_start_freq,
+					     qdf_freq_t acs_end_freq,
+					     bool puncture_enable,
+					     uint32_t *con_vdev_id,
+					     uint32_t *con_ch_freq)
+{
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status;
+	bool sap_on_dfs = false, cac_in_progress, on_non_2ghz;
+	struct ch_params chan_params = {0};
+	qdf_freq_t cut_off_freq;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return false;
+
+	if (!con_vdev_id || !con_ch_freq) {
+		policy_mgr_err("Invalid NULL pointer");
+		return false;
+	}
+
+	*con_vdev_id = policy_mgr_get_dfs_beaconing_session_id(psoc);
+
+	/* No DFS beaconing session exist, no override */
+	if (*con_vdev_id == WLAN_UMAC_VDEV_ID_MAX)
+		return false;
+
+	status = policy_mgr_get_chan_by_session_id(psoc,
+						   *con_vdev_id,
+						   con_ch_freq);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Fail to get channel by vdev id %d",
+			       *con_vdev_id);
+		return false;
+	}
+
+	cac_in_progress =
+		wlan_util_is_vdev_in_cac_wait(pdev, WLAN_POLICY_MGR_ID);
+
+	on_non_2ghz = chan_freq ? !WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq) :
+		      !WLAN_REG_IS_24GHZ_CH_FREQ(acs_start_freq);
+
+	/*
+	 * If CAC in progress HW mode cannot change in target,
+	 * override if MCC in current HW mode.
+	 */
+	if (cac_in_progress) {
+		if (!policy_mgr_is_current_hwmode_dbs(psoc) &&
+		    !policy_mgr_is_current_hwmode_sbs(psoc)) {
+			policy_mgr_debug("CAC in progress, current SMM mode");
+			return true;
+		}
+
+		if (policy_mgr_is_current_hwmode_dbs(psoc) && on_non_2ghz) {
+			policy_mgr_debug("CAC in progress, current DBS mode");
+			return true;
+		}
+
+		/* If doing CAC in SBS mode, same check as below */
+	}
+
+	/* SMM capable */
+	if (!policy_mgr_is_hw_dbs_capable(psoc) &&
+	    !policy_mgr_is_hw_sbs_capable(psoc))
+		return true;
+
+	/* DBS capable */
+	if (!policy_mgr_is_hw_sbs_capable(psoc)) {
+		if (on_non_2ghz) {
+			policy_mgr_debug("DBS capable, new SAP on non 2ghz");
+			return true;
+		}
+		return false;
+	}
+
+	/* SBS capable */
+	cut_off_freq = policy_mgr_get_sbs_cut_off_freq(psoc);
+	/*
+	 * If call when ACS with SBS capable, don't override
+	 * if may select channel on another mac
+	 */
+	if (!chan_freq && acs_start_freq && acs_end_freq) {
+		if (on_non_2ghz && ((*con_ch_freq > cut_off_freq &&
+		    acs_start_freq > cut_off_freq) ||
+		    (*con_ch_freq < cut_off_freq &&
+		    acs_end_freq < cut_off_freq))) {
+			policy_mgr_debug("con DFS freq %d acs start %d end %d",
+					 *con_ch_freq,
+					 acs_start_freq,
+					 acs_end_freq);
+			return true;
+		}
+		return false;
+	}
+
+	chan_params.ch_width = ch_width;
+	if (puncture_enable)
+		wlan_reg_set_create_punc_bitmap(&chan_params, true);
+
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
+	    wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+	    pdev, chan_freq, &chan_params, REG_CURRENT_PWR_MODE) ==
+	    CHANNEL_STATE_DFS)
+		sap_on_dfs = true;
+
+	/* Allowed if new SAP on different mac and not on DFS */
+	if (!policy_mgr_2_freq_always_on_same_mac(psoc,
+						  chan_freq,
+						  *con_ch_freq) &&
+	    !sap_on_dfs)
+		return false;
+
+	return true;
+}
+
 bool
 policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 						 uint8_t vdev_id,
