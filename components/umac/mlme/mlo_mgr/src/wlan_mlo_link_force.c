@@ -27,6 +27,7 @@
 #include "wlan_mlme_main.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include "target_if.h"
+#include "wlan_nan_api.h"
 
 /* Exclude AP removed link */
 #define NLINK_EXCLUDE_REMOVED_LINK      0x01
@@ -569,6 +570,14 @@ get_disallow_mlo_mode_table(struct wlan_objmgr_psoc *psoc)
 	disallow_mlo_mode_table_type *disallow_mlo_mode_table;
 
 	rd_type = policy_mgr_get_rd_type(psoc);
+
+	/* select DBS rd if NAN interface is present */
+	if (wlan_nan_is_sta_sap_nan_allowed(psoc) &&
+	    policy_mgr_mode_specific_connection_count(psoc,
+						      PM_NAN_DISC_MODE,
+						      NULL))
+		rd_type = pm_rd_dbs;
+
 	switch (rd_type) {
 	case pm_rd_dbs:
 		disallow_mlo_mode_table =
