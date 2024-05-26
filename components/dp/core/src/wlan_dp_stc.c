@@ -1720,8 +1720,10 @@ wlan_dp_stc_is_traffic_conext_supported(struct wlan_objmgr_psoc *psoc)
 
 static bool wlan_dp_stc_clients_available(struct wlan_dp_psoc_context *dp_ctx)
 {
-	if (wlan_dp_stc_is_traffic_conext_supported(dp_ctx->psoc))
+	if (wlan_dp_stc_is_traffic_conext_supported(dp_ctx->psoc)) {
+		dp_info("STC: TCAM client available");
 		return true;
+	}
 
 	return false;
 }
@@ -1804,6 +1806,7 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 
 	dp_info("STC: detach");
 	qdf_timer_sync_cancel(&dp_stc->flow_sampling_timer);
+	qdf_periodic_work_stop_sync(&dp_stc->flow_monitor_work);
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
 	qdf_mem_free(dp_ctx->dp_stc);
 	dp_ctx->dp_stc = NULL;

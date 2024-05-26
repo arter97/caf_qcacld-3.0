@@ -1573,7 +1573,7 @@ dp_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_dp_psoc_context *dp_ctx;
-	QDF_STATUS status;
+	QDF_STATUS status, err_status;
 
 	dp_info("DP PDEV OBJ create notification");
 	psoc = wlan_pdev_get_psoc(pdev);
@@ -1581,11 +1581,13 @@ dp_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 		obj_mgr_err("psoc is NULL in pdev");
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	dp_ctx =  dp_psoc_get_priv(psoc);
 	if (!dp_ctx) {
 		dp_err("Failed to get dp_ctx from psoc");
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	status = wlan_objmgr_pdev_component_obj_attach(pdev,
 						       WLAN_COMP_DP,
 						       (void *)dp_ctx,
@@ -1596,6 +1598,32 @@ dp_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 	}
 
 	dp_ctx->pdev = pdev;
+
+	/* STC attach is being done here, after FISA considering the
+	 * below two reasons:
+	 * 1) STC is dependent on FW capability as one of its clients for
+	 * initialization, which is not populated during cds_dp_open. Hence the
+	 * STC attach is being done during objmgr pdev create.
+	 * 2) FISA will not start before pdev create, so its safe to attach
+	 * STC after FISA, though there is a dependency on FISA.
+	 */
+	status = wlan_dp_stc_attach(dp_ctx);
+	if (status == QDF_STATUS_E_NOSUPPORT)
+		status = QDF_STATUS_SUCCESS;
+	if (QDF_IS_STATUS_ERROR(status))
+		goto stc_attach_fail;
+
+	return status;
+
+stc_attach_fail:
+	err_status = wlan_objmgr_pdev_component_obj_detach(pdev, WLAN_COMP_DP,
+							   dp_ctx);
+	if (QDF_IS_STATUS_ERROR(err_status)) {
+		dp_err("Failed to detach dp_ctx from pdev");
+		return err_status;
+	}
+
+	dp_ctx->pdev = NULL;
 	return status;
 }
 
@@ -1618,6 +1646,13 @@ dp_pdev_obj_destroy_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 		dp_err("Failed to get dp_ctx from pdev");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	/*
+	 * wlan_dp_stc_detach(dp_ctx);
+	 *
+	 * STC detach has been done earlier in cds_dp_close, since STC is
+	 * dependent on FISA, and hence should be closed before FISA.
+	 */
 	status = wlan_objmgr_pdev_component_obj_detach(pdev,
 						       WLAN_COMP_DP,
 						       dp_ctx);
@@ -1625,6 +1660,7 @@ dp_pdev_obj_destroy_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 		dp_err("Failed to detach dp_ctx from pdev");
 		return status;
 	}
+
 	if (!dp_ctx->pdev)
 		dp_err("DP Pdev is NULL");
 
@@ -2490,16 +2526,7 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		goto fisa_attach_fail;
 
-	qdf_status = wlan_dp_stc_attach(dp_ctx);
-	if (qdf_status == QDF_STATUS_E_NOSUPPORT)
-		qdf_status = QDF_STATUS_SUCCESS;
-	if (QDF_IS_STATUS_ERROR(qdf_status))
-		goto stc_attach_fail;
-
 	return qdf_status;
-
-stc_attach_fail:
-	wlan_dp_rx_fisa_detach(dp_ctx);
 
 fisa_attach_fail:
 	wlan_dp_txrx_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC),
@@ -2514,6 +2541,10 @@ QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	struct wlan_dp_psoc_context *dp_ctx;
 
 	dp_ctx =  dp_get_context();
+	/*
+	 * STC detach must be done before FISA detach, since STC uses the
+	 * FISA table.
+	 */
 	wlan_dp_stc_detach(dp_ctx);
 	wlan_dp_rx_fisa_detach(dp_ctx);
 	return cdp_pdev_detach(soc, pdev_id, force);
