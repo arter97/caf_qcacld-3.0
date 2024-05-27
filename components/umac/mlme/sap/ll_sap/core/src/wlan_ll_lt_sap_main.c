@@ -335,10 +335,9 @@ ll_lt_sap_dump_stored_freq_list(struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj)
 	qdf_mem_free(freq_list);
 }
 
-static void
-ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
-					qdf_freq_t freq,
-					enum ll_sap_csa_source csa_src)
+void ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
+					     qdf_freq_t freq,
+					     enum ll_sap_csa_source csa_src)
 {
 	struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj;
 
