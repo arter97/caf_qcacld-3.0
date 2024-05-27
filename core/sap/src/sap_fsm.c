@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1189,7 +1189,8 @@ validation_done:
 	     !target_psoc_get_sap_coex_fixed_chan_cap(
 			wlan_psoc_get_tgt_if_handle(mac_ctx->psoc))) &&
 	    !policy_mgr_is_sap_freq_allowed(mac_ctx->psoc,
-					    sap_context->chan_freq)) {
+			wlan_vdev_mlme_get_opmode(sap_context->vdev),
+			sap_context->chan_freq)) {
 		sap_warn("Abort SAP start due to unsafe channel");
 		return QDF_STATUS_E_ABORTED;
 	}
@@ -3624,7 +3625,9 @@ static void sap_fsm_validate_and_change_channel(struct mac_context *mac_ctx,
 	if (((!sap_ctx->acs_cfg || !sap_ctx->acs_cfg->acs_mode) &&
 	     target_psoc_get_sap_coex_fixed_chan_cap(
 				wlan_psoc_get_tgt_if_handle(mac_ctx->psoc))) ||
-	    (policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, sap_ctx->chan_freq) &&
+	    (policy_mgr_is_sap_freq_allowed(mac_ctx->psoc,
+				wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
+				sap_ctx->chan_freq) &&
 	     !wlan_reg_is_disable_for_pwrmode(mac_ctx->pdev, sap_ctx->chan_freq,
 					      REG_CURRENT_PWR_MODE)))
 		return;

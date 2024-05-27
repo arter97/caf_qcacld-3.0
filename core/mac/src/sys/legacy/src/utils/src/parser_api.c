@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2921,6 +2921,11 @@ sir_convert_probe_frame2_t2lm_struct(tDot11fProbeResponse *pr,
 		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   &ie[0], pr->t2lm_ie[i].num_data + 3);
 
+		if (ie[TAG_LEN_POS] + 2 > DOT11F_IE_T2LM_IE_MAX_LEN + 3) {
+			pe_debug("Invalid T2LM IE length");
+			return QDF_STATUS_E_PROTO;
+		}
+
 		status = wlan_mlo_parse_t2lm_info(&ie[0], &t2lm);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_debug("Parse T2LM IE fail");
@@ -3866,6 +3871,12 @@ sir_convert_assoc_resp_frame2_t2lm_struct(struct mac_context *mac,
 			     ar->t2lm_ie[i].num_data);
 		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   &ie[0], ar->t2lm_ie[i].num_data + 3);
+
+		if (ie[TAG_LEN_POS] + 2 > DOT11F_IE_T2LM_IE_MAX_LEN + 3) {
+			pe_debug("Invalid T2LM IE length");
+			return QDF_STATUS_E_PROTO;
+		}
+
 		status = wlan_mlo_parse_t2lm_info(&ie[0], &t2lm);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_debug("Parse T2LM IE fail");
@@ -5189,6 +5200,12 @@ sir_convert_beacon_frame2_t2lm_struct(tDot11fBeacon *bcn_frm,
 			     bcn_frm->t2lm_ie[i].num_data);
 		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   &ie[0], bcn_frm->t2lm_ie[i].num_data + 3);
+
+		if (ie[TAG_LEN_POS] + 2 > DOT11F_IE_T2LM_IE_MAX_LEN + 3) {
+			pe_debug("Invalid T2LM IE length");
+			return QDF_STATUS_E_PROTO;
+		}
+
 		status = wlan_mlo_parse_t2lm_info(&ie[0], &t2lm);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_debug("Parse T2LM IE fail");
@@ -11602,7 +11619,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	uint16_t presence_bitmap = 0;
 	bool is_2g;
 	uint32_t value = 0;
-	uint8_t *ppet;
+	uint8_t *ppet, cb_mode;
 	uint8_t *eht_cap_ie = NULL;
 	bool sta_prof_he_ie = false;
 
@@ -11906,19 +11923,16 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		}
 
 		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)) {
+			cb_mode = lim_get_cb_mode_for_freq(mac_ctx, pe_session,
+							   chan_freq);
 			populate_dot11f_ht_caps(mac_ctx, NULL, &ht_caps);
-			ht_caps.supportedChannelWidthSet = 0;
-			ht_caps.shortGI40MHz = 0;
-		}
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
-		    mac_ctx->roam.configParam.channelBondingMode5GHz) {
-			ht_caps.supportedChannelWidthSet = 1;
-			ht_caps.shortGI40MHz = 1;
-		}
-		if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq) &&
-		    mac_ctx->roam.configParam.channelBondingMode24GHz) {
-			ht_caps.supportedChannelWidthSet = 1;
-			ht_caps.shortGI40MHz = 1;
+			if (!cb_mode) {
+				ht_caps.supportedChannelWidthSet = 0;
+				ht_caps.shortGI40MHz = 0;
+			} else {
+				ht_caps.supportedChannelWidthSet = 1;
+				ht_caps.shortGI40MHz = 1;
+			}
 		}
 
 		if ((ht_caps.present && frm->HTCaps.present &&
