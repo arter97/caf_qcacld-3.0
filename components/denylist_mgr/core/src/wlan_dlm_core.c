@@ -1906,6 +1906,13 @@ dlm_update_mlo_reject_ap_info(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct qdf_mac_addr mld_addr = {0};
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_OBJMGR_ID);
+	if (!vdev) {
+		dlm_err("Unable to get vdev with vdev id %d", vdev_id);
+		return;
+	}
+
 	/*
 	 * Two cases are handled here:
 	 * a.) If Reject list is updated by host then mld address will be
@@ -1918,13 +1925,6 @@ dlm_update_mlo_reject_ap_info(struct wlan_objmgr_pdev *pdev,
 	 *     the time of FW even extraction
 	 */
 	if (qdf_is_macaddr_zero(&ap_info->reject_mlo_ap_info.mld_addr)) {
-		vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
-							    WLAN_OBJMGR_ID);
-		if (!vdev) {
-			dlm_err("Unable to get first vdev of pdev");
-
-			return;
-		}
 		if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 			dlm_debug("not mlo vdev");
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_OBJMGR_ID);
