@@ -1235,7 +1235,6 @@ lim_send_sme_mgmt_tx_completion(struct mac_context *mac,
 
 	mgmt_tx_completion_ind->tx_complete_status = txCompleteStatus;
 
-	msg.type = eWNI_SME_MGMT_FRM_TX_COMPLETION_IND;
 	msg.bodyptr = mgmt_tx_completion_ind;
 	msg.bodyval = 0;
 

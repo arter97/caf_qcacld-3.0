@@ -3839,8 +3839,6 @@ static QDF_STATUS lim_send_sme_tdls_add_sta_rsp(struct mac_context *mac,
 	struct tdls_add_sta_rsp *add_sta_rsp;
 	QDF_STATUS ret;
 
-	msg.type = eWNI_SME_TDLS_ADD_STA_RSP;
-
 	add_sta_rsp = qdf_mem_malloc(sizeof(*add_sta_rsp));
 	if (!add_sta_rsp)
 		return QDF_STATUS_E_NOMEM;
@@ -3916,7 +3914,6 @@ add_sta_error:
 /**
  * lim_send_tdls_comp_mgmt_rsp() - Send Response to upper layers
  * @mac_ctx:          Pointer to Global MAC structure
- * @msg_type:         Indicates message type
  * @result_code:       Indicates the result of previously issued
  *                    eWNI_SME_msg_type_REQ message
  * @vdev_id: vdev id
@@ -3930,15 +3927,15 @@ add_sta_error:
  */
 
 static void
-lim_send_tdls_comp_mgmt_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
-	 tSirResultCodes result_code, uint8_t vdev_id)
+lim_send_tdls_comp_mgmt_rsp(struct mac_context *mac_ctx,
+			    tSirResultCodes result_code, uint8_t vdev_id)
 {
 	struct scheduler_msg msg = {0};
 	struct tdls_send_mgmt_rsp *sme_rsp;
 	QDF_STATUS status;
 
-	pe_debug("vdev:%d Sending message %s with reasonCode %s", vdev_id,
-		 lim_msg_str(msg_type), lim_result_code_str(result_code));
+	pe_debug("vdev:%d TDLS_SEND_MGMT_RSP reasonCode %s", vdev_id,
+		 lim_result_code_str(result_code));
 
 	sme_rsp = qdf_mem_malloc(sizeof(*sme_rsp));
 	if (!sme_rsp)
@@ -3948,14 +3945,13 @@ lim_send_tdls_comp_mgmt_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 	sme_rsp->vdev_id = vdev_id;
 	sme_rsp->psoc = mac_ctx->psoc;
 
-	msg.type = msg_type;
 	msg.bodyptr = sme_rsp;
 	msg.callback = tgt_tdls_send_mgmt_rsp;
 	status = scheduler_post_message(QDF_MODULE_ID_PE,
 					QDF_MODULE_ID_TDLS,
 					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("post msg fail, %d", status);
+		pe_err("vdev_id %d post msg fail, %d", vdev_id, status);
 		qdf_mem_free(sme_rsp);
 	}
 }
@@ -3969,7 +3965,6 @@ QDF_STATUS lim_process_sme_tdls_mgmt_send_req(struct mac_context *mac_ctx,
 	uint16_t ie_len;
 	tSirResultCodes result_code = eSIR_SME_INVALID_PARAMETERS;
 
-	pe_debug("Send Mgmt Received");
 	session_entry = pe_find_session_by_bssid(mac_ctx,
 						 send_req->bssid.bytes,
 						 &session_id);
@@ -4082,8 +4077,7 @@ QDF_STATUS lim_process_sme_tdls_mgmt_send_req(struct mac_context *mac_ctx,
 	}
 
 lim_tdls_send_mgmt_error:
-	lim_send_tdls_comp_mgmt_rsp(mac_ctx, eWNI_SME_TDLS_SEND_MGMT_RSP,
-				    result_code, send_req->session_id);
+	lim_send_tdls_comp_mgmt_rsp(mac_ctx, result_code, send_req->session_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4099,8 +4093,6 @@ static QDF_STATUS lim_send_sme_tdls_del_sta_rsp(struct mac_context *mac,
 	struct scheduler_msg msg = { 0 };
 	struct tdls_del_sta_rsp *del_sta_rsp;
 	QDF_STATUS ret;
-
-	msg.type = eWNI_SME_TDLS_DEL_STA_RSP;
 
 	del_sta_rsp = qdf_mem_malloc(sizeof(*del_sta_rsp));
 	if (!del_sta_rsp)

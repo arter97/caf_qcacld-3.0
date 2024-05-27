@@ -544,8 +544,6 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 		    (lim_msg->type != WMA_SET_STA_BCASTKEY_RSP) &&
 		    (lim_msg->type != WMA_AGGR_QOS_RSP) &&
 		    (lim_msg->type != WMA_SET_MIMOPS_RSP) &&
-		    (lim_msg->type != WMA_SWITCH_CHANNEL_RSP) &&
-		    (lim_msg->type != WMA_P2P_NOA_ATTR_IND) &&
 		    (lim_msg->type != WMA_ADD_TS_RSP) &&
 		    /*
 		     * LIM won't process any defer queue commands if gLimAddtsSent is
@@ -1713,8 +1711,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		 * and when crash happens we loose critical trace logs
 		 * if these are also logged
 		 */
-		if (msg->type != SIR_BB_XPORT_MGMT_MSG &&
-		    msg->type != WMA_RX_SCAN_EVENT)
+		if (msg->type != SIR_BB_XPORT_MGMT_MSG)
 			MTRACE(mac_trace_msg_rx(mac_ctx, NO_SESSION,
 				LIM_TRACE_MAKE_RXMSG(msg->type,
 				LIM_MSG_PROCESSED)));
@@ -1786,7 +1783,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_TDLS_SEND_MGMT_REQ:
 	case eWNI_SME_TDLS_ADD_STA_REQ:
 	case eWNI_SME_TDLS_DEL_STA_REQ:
-	case eWNI_SME_TDLS_LINK_ESTABLISH_REQ:
 #endif
 	case eWNI_SME_SET_HW_MODE_REQ:
 	case eWNI_SME_SET_DUAL_MAC_CFG_REQ:
