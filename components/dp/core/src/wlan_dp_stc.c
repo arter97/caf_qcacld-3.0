@@ -296,6 +296,7 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 	}
 
 	sampling_flow->state = WLAN_DP_SAMPLING_STATE_FLOW_ADDED;
+	candidate->flags = 0;
 }
 
 static inline struct wlan_dp_stc_sampling_table_entry *
@@ -1022,8 +1023,9 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 
 		if (sampling_flow->flags &
 					WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
-			rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx,
-							  candidates[i].rx_flow_id);
+			uint8_t rx_flow_id = sampling_flow->rx_flow_id;
+
+			rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
 			rx_flow->selected_to_sample = 1;
 		}
 
@@ -1644,7 +1646,6 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 	 */
 	if (i == DP_STC_SAMPLE_FLOWS_MAX) {
 		dp_info("STC: Could not find the classified flow in table");
-		qdf_assert_always(0);
 	}
 }
 
