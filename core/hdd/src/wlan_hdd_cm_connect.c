@@ -1617,7 +1617,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	mac_handle_t mac_handle;
 	bool is_auth_required = true;
 	bool is_roam_offload = false;
-	bool is_roam = rsp->is_reassoc;
+	bool is_roam = rsp->is_reassoc, is_vdev_repurpose;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint8_t uapsd_mask = 0;
 	uint32_t time_buffer_size;
@@ -1692,7 +1692,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 	hdd_cm_handle_assoc_event(vdev, rsp->bssid.bytes);
 
-	if (ucfg_cm_is_link_switch_connect_resp(rsp)) {
+	is_vdev_repurpose = ucfg_cm_is_link_switch_connect_resp(rsp);
+	if (is_vdev_repurpose) {
 		if (hdd_cm_mlme_send_standby_link_chn_width(adapter, vdev))
 			hdd_debug("send standby link chn width fail");
 	}
@@ -1710,7 +1711,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			wlan_hdd_set_mas(adapter, hdd_ctx->miracast_value);
 	}
 
-	if (!is_roam) {
+	if (!is_roam && !is_vdev_repurpose) {
 		/* Initialize the Linkup event completion variable */
 		INIT_COMPLETION(adapter->linkup_event_var);
 
@@ -1779,8 +1780,19 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 					     &rsp->bssid, is_auth_required);
 	}
 
-	hdd_debug("Enabling queues");
-	hdd_cm_netif_queue_enable(adapter);
+	if (!is_vdev_repurpose) {
+		hdd_debug("Enabling queues");
+		hdd_cm_netif_queue_enable(adapter);
+
+		if (adapter->device_mode == QDF_STA_MODE)
+			cdp_reset_rx_hw_ext_stats(soc);
+
+		wlan_hdd_auto_shutdown_enable(hdd_ctx, false);
+		if (adapter->keep_alive_interval)
+			hdd_vdev_send_sta_keep_alive_interval(link_info,
+							      hdd_ctx,
+						adapter->keep_alive_interval);
+	}
 
 	/* send peer status indication to oem app */
 	if (vdev_mlme) {
@@ -1809,10 +1821,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				  alt_pipe);
 	}
 
-	if (adapter->device_mode == QDF_STA_MODE)
-		cdp_reset_rx_hw_ext_stats(soc);
-
-	wlan_hdd_auto_shutdown_enable(hdd_ctx, false);
 
 	DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
 		link_info->vdev_id, QDF_TRACE_DEFAULT_PDEV_ID,
@@ -1821,10 +1829,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	if (is_roam)
 		ucfg_dp_nud_indicate_roam(vdev);
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
-
-	if (adapter->keep_alive_interval)
-		hdd_vdev_send_sta_keep_alive_interval(link_info, hdd_ctx,
-						adapter->keep_alive_interval);
 }
 
 static inline void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
