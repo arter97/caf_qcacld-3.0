@@ -612,19 +612,26 @@ override_mlmr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 	uint8_t num_5g_links = 0;
 	uint8_t i;
 
-	if (vdev->mlo_dev_ctx->sta_ctx->emlsr_mode_req !=
-	    WLAN_EMLSR_MODE_ENTER)
-		return disallow_mode_bitmap;
-
 	/* If user vendor command force enter eMLSR, e.g. emlsr_mode_req is
 	 * WLAN_EMLSR_MODE_ENTER, try to append MLMR to disallow
 	 * bitmap
 	 */
+	if (vdev->mlo_dev_ctx->sta_ctx->emlsr_mode_req !=
+	    WLAN_EMLSR_MODE_ENTER)
+		return disallow_mode_bitmap;
+
+	/* If EMLSR is disallowed by concurrency, no need to append MLMR
+	 * disallow bitmap
+	 */
+	if ((disallow_mode_bitmap & EMLSR_5GL_5GH) ||
+	    (disallow_mode_bitmap & EMLSR_5GH_5GH) ||
+	    (disallow_mode_bitmap & EMLSR_5GL_5GL))
+		return disallow_mode_bitmap;
+
 	if ((disallow_mode_bitmap & MLMR_5GL_5GH) ||
 	    (disallow_mode_bitmap & MLMR_5GH_5GH) ||
-	    (disallow_mode_bitmap & MLMR_5GL_5GL)) {
+	    (disallow_mode_bitmap & MLMR_5GL_5GL))
 		return disallow_mode_bitmap;
-	}
 
 	for (i = 0; i < ml_num_link; i++) {
 		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i]))
@@ -634,7 +641,7 @@ override_mlmr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 		return disallow_mode_bitmap;
 
 	disallow_mode_bitmap |= MLMR_5GL_5GH;
-	mlo_debug("disallow_mode_bitmap 0x%x emlsr_mode_req 0x%x",
+	mlo_debug("disallow_mode_bitmap 0x%x user emlsr_mode_req 0x%x",
 		  disallow_mode_bitmap,
 		  vdev->mlo_dev_ctx->sta_ctx->emlsr_mode_req);
 
