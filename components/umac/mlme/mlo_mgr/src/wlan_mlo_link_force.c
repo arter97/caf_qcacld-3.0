@@ -705,7 +705,8 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	enum home_channel_map_id legacy_hc_id;
 	disallow_mlo_mode_table_type *disallow_tbl;
 	uint8_t legacy_num;
-	qdf_freq_t legacy_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	/* For NAN interface additional 5GHz connection is required  */
+	qdf_freq_t legacy_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
 	uint8_t legacy_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t allow_mcc;
@@ -717,6 +718,16 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 					psoc, legacy_vdev_lst,
 					legacy_freq_lst, mode_lst,
 					QDF_ARRAY_SIZE(legacy_vdev_lst));
+
+	if (wlan_nan_is_sta_sap_nan_allowed(psoc) &&
+	    wlan_nan_get_disc_5g_ch_freq(psoc) &&
+	    policy_mgr_mode_specific_connection_count(psoc,
+						      PM_NAN_DISC_MODE,
+						      NULL)) {
+		legacy_freq_lst[legacy_num] =
+			wlan_nan_get_disc_5g_ch_freq(psoc);
+		legacy_num++;
+	}
 	if (!legacy_num)
 		goto no_legacy_intf;
 
@@ -3214,7 +3225,7 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 			 * available ml links after force inactive the bitmap.
 			 */
 			if (ml_link_bitmap & ~force_inactive_link_bitmap)
-				force_cmd->force_inactive_bitmap =
+				force_cmd->force_inactive_bitmap |=
 					force_inactive_link_bitmap;
 			else
 				mlo_debug("unexpected no left links: avail 0x%x inact 0x%x",
@@ -3229,7 +3240,7 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 
 			if (force_cmd->force_inactive_num > 1) {
 				force_cmd->force_inactive_num--;
-				force_cmd->force_inactive_num_bitmap =
+				force_cmd->force_inactive_num_bitmap |=
 						force_inactive_num_bitmap;
 			} else {
 				force_cmd->force_inactive_num = 0;
