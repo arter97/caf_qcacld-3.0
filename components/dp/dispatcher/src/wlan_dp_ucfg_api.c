@@ -1467,7 +1467,8 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 		txrx_ops->rx.rx_gro_flush = dp_rx_gro_flush_cbk;
 	}
 
-	if (wlan_dp_fb_enabled(dp_intf->dp_ctx) &&
+	if ((wlan_dp_fb_enabled(dp_intf->dp_ctx) ||
+	     wlan_dp_rx_is_latency_sensitive_reo_enabled()) &&
 	    wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
 	    dp_intf->device_mode != QDF_MONITOR_MODE) {
 		dp_debug("FISA feature enabled");

@@ -377,20 +377,6 @@ static void dp_rx_sw_ft_hist_deinit(struct dp_fisa_rx_sw_ft *sw_ft,
 }
 #endif
 
-#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
-static inline
-bool dp_rx_is_latency_sensitive_reo_enabled(void)
-{
-	return true;
-}
-#else
-static inline
-bool dp_rx_is_latency_sensitive_reo_enabled(void)
-{
-	return false;
-}
-#endif
-
 QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
@@ -515,7 +501,7 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	qdf_atomic_init(&fst->pm_suspended);
 
 	if (wlan_dp_fb_enabled(dp_ctx) ||
-	    dp_rx_is_latency_sensitive_reo_enabled())
+	    wlan_dp_rx_is_latency_sensitive_reo_enabled())
 		fst->add_tcp_flow_to_fst = true;
 
 	QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_ERROR,
