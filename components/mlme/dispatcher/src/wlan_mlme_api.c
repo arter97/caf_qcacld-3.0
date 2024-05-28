@@ -4030,6 +4030,24 @@ wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 QDF_STATUS
+wlan_mlme_get_sap_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	bool emlsr_cap;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	emlsr_cap = wma_get_mlo_sap_emlsr(get_wmi_unified_hdl_from_psoc(psoc));
+	*value = emlsr_cap & mlme_obj->cfg.gen.enable_sap_emlsr_mode;
+	mlme_legacy_debug("emlsr %d from fw cap, ini %d return %d", emlsr_cap,
+			  mlme_obj->cfg.gen.enable_sap_emlsr_mode, *value);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_set_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;

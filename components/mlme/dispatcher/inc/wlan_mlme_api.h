@@ -2914,6 +2914,17 @@ QDF_STATUS
 wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
 
 /**
+ * wlan_mlme_get_sap_emlsr_mode_enabled() - Get the sap eMLSR mode flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_sap_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc,
+				     bool *value);
+
+/**
  * wlan_mlme_set_emlsr_mode_enabled() - Set the eMLSR mode flag
  * @psoc: psoc context
  * @value: Enable/Disable value.
@@ -3027,6 +3038,13 @@ wlan_mlme_set_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode value)
 
 static inline QDF_STATUS
 wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	*value = false;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_mlme_get_sap_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 {
 	*value = false;
 	return QDF_STATUS_SUCCESS;
