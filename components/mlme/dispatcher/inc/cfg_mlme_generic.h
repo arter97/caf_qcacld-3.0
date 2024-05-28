@@ -434,8 +434,30 @@ enum wlan_epcs_frame {
 		0, \
 		"eMLSR mode enable flag")
 #define CFG_EMLSR_MODE_ENABLED	CFG(CFG_EMLSR_MODE_ENABLE)
+
+/*
+ * sap_emlsr_mode_enable - Enable sap eMLSR mode support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This cfg is used to enable sap eMLSR mode
+ * If 0 - MLMR mode
+ * If 1 - eMLSR mode (Default mode)
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ */
+#define CFG_SAP_EMLSR_MODE_ENABLE CFG_INI_BOOL( \
+		"sap_emlsr_mode_enable", \
+		1, \
+		"SAP eMLSR mode enable flag")
+#define CFG_SAP_EMLSR_MODE_ENABLED	CFG(CFG_SAP_EMLSR_MODE_ENABLE)
+
 #else
 #define CFG_EMLSR_MODE_ENABLED
+#define CFG_SAP_EMLSR_MODE_ENABLED
 #endif
 
 /*
@@ -1340,6 +1362,7 @@ enum wlan_epcs_frame {
 	CFG(CFG_MGMT_FRAME_HW_TX_RETRY_COUNT) \
 	CFG_6GHZ_STD_CONN_POLICY \
 	CFG_EMLSR_MODE_ENABLED \
+	CFG_SAP_EMLSR_MODE_ENABLED \
 	CFG_SR_ENABLE_MODES_ALL \
 	CFG_T2LM_NEGOTIATION_SUPPORTED \
 	CFG_DIS_VLP_STA_CONN_TO_SP_AP \
