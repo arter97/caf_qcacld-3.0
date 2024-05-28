@@ -1303,6 +1303,7 @@ static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_mlme_generic *gen)
 {
 	gen->enable_emlsr_mode = cfg_default(CFG_EMLSR_MODE_ENABLE);
+	gen->enable_sap_emlsr_mode = cfg_get(psoc, CFG_SAP_EMLSR_MODE_ENABLE);
 }
 
 /**
