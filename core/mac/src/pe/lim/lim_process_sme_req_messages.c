@@ -4752,7 +4752,9 @@ static void lim_prepare_and_send_disassoc(struct mac_context *mac_ctx,
 		     QDF_MAC_ADDR_SIZE);
 	disassoc_req.peer_macaddr = disassoc_req.bssid;
 	disassoc_req.reasonCode = req->req.reason_code;
-	if (req->req.reason_code == REASON_FW_TRIGGERED_ROAM_FAILURE) {
+	if (req->req.source == CM_INTERNAL_DISCONNECT) {
+		disassoc_req.reasonCode = REASON_HOST_TRIGGERED_SILENT_DEAUTH;
+	} else if (req->req.reason_code == REASON_FW_TRIGGERED_ROAM_FAILURE) {
 		disassoc_req.process_ho_fail = true;
 		disassoc_req.doNotSendOverTheAir = 1;
 	} else if (wlan_cm_is_vdev_roam_reassoc_state(pe_session->vdev)) {
@@ -6241,6 +6243,10 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 
 	pe_session->smeSessionId = smesessionId;
 	pe_session->process_ho_fail = smeDisassocReq.process_ho_fail;
+
+	if (pe_session->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE &&
+	    smeDisassocReq.reasonCode == REASON_HOST_TRIGGERED_SILENT_DEAUTH)
+		lim_ft_cleanup_pre_auth_info(mac, pe_session);
 
 	switch (GET_LIM_SYSTEM_ROLE(pe_session)) {
 	case eLIM_STA_ROLE:
@@ -8930,7 +8936,6 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		break;
 
 	case eWNI_SME_ASSOC_CNF:
-		if (pMsg->type == eWNI_SME_ASSOC_CNF)
 			pe_debug("Received ASSOC_CNF message");
 			__lim_process_sme_assoc_cnf_new(mac, pMsg->type,
 							msg_buf);
