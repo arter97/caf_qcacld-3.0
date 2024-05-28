@@ -2647,6 +2647,11 @@ void dp_peer_tid_delay_avg(struct cdp_delay_tx_stats *tx_delay,
 	uint64_t hw_avg_sum = 0;
 	uint64_t nw_avg_sum = 0;
 	uint32_t cur_win, idx;
+	uint32_t max_pkt_per_window_size;
+	uint32_t max_window_size;
+
+	max_pkt_per_window_size = tx_delay->max_pkt_per_window_size;
+	max_window_size = tx_delay->max_window_size;
 
 	cur_win = tx_delay->curr_win_idx;
 	tx_delay->sw_delay_win_avg[cur_win] += (uint64_t)sw_delay;
@@ -2654,23 +2659,23 @@ void dp_peer_tid_delay_avg(struct cdp_delay_tx_stats *tx_delay,
 	tx_delay->nw_delay_win_avg[cur_win] += (uint64_t)nw_delay;
 	tx_delay->cur_win_num_pkts++;
 
-	if (!(tx_delay->cur_win_num_pkts % CDP_MAX_PKT_PER_WIN)) {
+	if (!(tx_delay->cur_win_num_pkts % max_pkt_per_window_size)) {
 		/* Update the average of the completed window */
 		tx_delay->sw_delay_win_avg[cur_win] = qdf_do_div(
 					tx_delay->sw_delay_win_avg[cur_win],
-					CDP_MAX_PKT_PER_WIN);
+					max_pkt_per_window_size);
 		tx_delay->hw_delay_win_avg[cur_win] = qdf_do_div(
 				tx_delay->hw_delay_win_avg[cur_win],
-				CDP_MAX_PKT_PER_WIN);
+				max_pkt_per_window_size);
 		tx_delay->nw_delay_win_avg[cur_win] = qdf_do_div(
 				tx_delay->nw_delay_win_avg[cur_win],
-				CDP_MAX_PKT_PER_WIN);
+				max_pkt_per_window_size);
 		tx_delay->curr_win_idx++;
 		tx_delay->cur_win_num_pkts = 0;
 
 		/* Compute the moving average from all windows */
-		if (tx_delay->curr_win_idx == CDP_MAX_WIN_MOV_AVG) {
-			for (idx = 0; idx < CDP_MAX_WIN_MOV_AVG; idx++) {
+		if (tx_delay->curr_win_idx == max_window_size) {
+			for (idx = 0; idx < max_window_size; idx++) {
 				sw_avg_sum += tx_delay->sw_delay_win_avg[idx];
 				hw_avg_sum += tx_delay->hw_delay_win_avg[idx];
 				nw_avg_sum += tx_delay->nw_delay_win_avg[idx];
@@ -2679,11 +2684,11 @@ void dp_peer_tid_delay_avg(struct cdp_delay_tx_stats *tx_delay,
 				tx_delay->nw_delay_win_avg[idx] = 0;
 			}
 			tx_delay->swdelay_avg = qdf_do_div(sw_avg_sum,
-							   CDP_MAX_WIN_MOV_AVG);
+							   max_window_size);
 			tx_delay->hwdelay_avg = qdf_do_div(hw_avg_sum,
-							   CDP_MAX_WIN_MOV_AVG);
+							   max_window_size);
 			tx_delay->nwdelay_avg = qdf_do_div(nw_avg_sum,
-							   CDP_MAX_WIN_MOV_AVG);
+							   max_window_size);
 			tx_delay->curr_win_idx = 0;
 		}
 	}
