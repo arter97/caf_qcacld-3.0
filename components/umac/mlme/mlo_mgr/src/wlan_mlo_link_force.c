@@ -360,7 +360,7 @@ ml_nlink_set_dynamic_inactive_links(struct wlan_objmgr_psoc *psoc,
 	mlo_dev_lock_release(mlo_dev_ctx);
 }
 
-static void
+void
 ml_nlink_update_force_link_request(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_vdev *vdev,
 				   struct set_link_req *req,
@@ -425,6 +425,7 @@ void ml_nlink_init_concurrency_link_request(
 		mlo_err("mlo_ctx or sta_ctx null");
 		return;
 	}
+
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	force_state = &mlo_dev_ctx->sta_ctx->link_force_ctx.force_state;
 	req =
@@ -439,7 +440,7 @@ void ml_nlink_init_concurrency_link_request(
 	mlo_dev_lock_release(mlo_dev_ctx);
 }
 
-void
+static void
 ml_nlink_get_force_link_request(struct wlan_objmgr_psoc *psoc,
 				struct wlan_objmgr_vdev *vdev,
 				struct set_link_req *req,
@@ -798,6 +799,33 @@ static void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 	*ml_link_bitmap = link_bitmap;
 }
 
+static uint32_t
+ml_nlink_get_available_link_bitmap(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	return ml_link_bitmap;
+}
+
+/**
+ * convert_link_bitmap_to_link_ids() - Convert link bitmap to link ids
+ * @link_bitmap: PSOC object information
+ * @link_id_sz: link_ids array size
+ * @link_ids: link id array
+ *
+ * Return: num of link id in link_ids array converted from link bitmap
+ */
 uint32_t
 convert_link_bitmap_to_link_ids(uint32_t link_bitmap,
 				uint8_t link_id_sz,
@@ -839,6 +867,162 @@ ml_nlink_convert_link_bitmap_to_ids(uint32_t link_bitmap,
 {
 	return convert_link_bitmap_to_link_ids(link_bitmap, link_id_sz,
 					       link_ids);
+}
+
+uint32_t
+ml_nlink_convert_vdev_ids_to_link_bitmap(
+	struct wlan_objmgr_psoc *psoc,
+	uint8_t *mlo_vdev_lst,
+	uint8_t num_ml_vdev)
+{
+	struct wlan_objmgr_vdev *tmp_vdev;
+	uint8_t i, link_id;
+	uint32_t link_bitmap = 0;
+
+	for (i = 0; i < num_ml_vdev; i++) {
+		tmp_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+				psoc, mlo_vdev_lst[i],
+				WLAN_POLICY_MGR_ID);
+		if (!tmp_vdev) {
+			policy_mgr_err("vdev not found for vdev_id %d ",
+				       mlo_vdev_lst[i]);
+			continue;
+		}
+		link_id = wlan_vdev_get_link_id(tmp_vdev);
+		if (link_id == WLAN_INVALID_LINK_ID)
+			policy_mgr_err("vdev %d has invalid link id %d",
+				       mlo_vdev_lst[i], link_id);
+		else
+			link_bitmap |= 1 << link_id;
+		wlan_objmgr_vdev_release_ref(tmp_vdev,
+					     WLAN_POLICY_MGR_ID);
+	}
+
+	return link_bitmap;
+}
+
+/**
+ * ml_nlink_sta_inactivity_allowed_with_quiet() - Check force inactive allowed
+ * for links in bitmap
+ * @psoc: PSOC object information
+ * @vdev: vdev object
+ * @force_inactive_bitmap: force inactive link bimap
+ *
+ * If left links (exclude removed link and QUITE link) are zero, the force
+ * inactive bitmap is not allowed.
+ *
+ * Return: true if allow to force inactive links in force_inactive_bitmap
+ */
+static bool ml_nlink_sta_inactivity_allowed_with_quiet(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				uint16_t force_inactive_bitmap)
+{
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+
+	ml_nlink_get_link_info(psoc, vdev, (NLINK_EXCLUDE_REMOVED_LINK |
+					    NLINK_EXCLUDE_QUIET_LINK |
+					    NLINK_EXCLUDE_STANDBY_LINK),
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	ml_link_bitmap &= ~force_inactive_bitmap;
+	if (!ml_link_bitmap) {
+		mlo_debug("not allow - no active link after force inactive 0x%x",
+			  force_inactive_bitmap);
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * ml_nlink_allow_conc() - Check force inactive allowed for links in bitmap
+ * @psoc: PSOC object information
+ * @vdev: vdev object
+ * @no_forced_bitmap: no force link bitmap
+ * @force_inactive_bitmap: force inactive link bimap
+ *
+ * Check the no force bitmap and force inactive bitmap are allowed to send
+ * to firmware
+ *
+ * Return: true if allow to "no force" and force inactive links.
+ */
+static bool
+ml_nlink_allow_conc(struct wlan_objmgr_psoc *psoc,
+		    struct wlan_objmgr_vdev *vdev,
+		    uint16_t no_forced_bitmap,
+		    uint16_t force_inactive_bitmap)
+{
+	uint8_t vdev_id_num = 0;
+	uint8_t vdev_ids[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t vdev_id_bitmap_sz;
+	uint32_t vdev_id_bitmap[MLO_VDEV_BITMAP_SZ];
+	uint32_t i;
+	union conc_ext_flag conc_ext_flags;
+	struct wlan_objmgr_vdev *ml_vdev;
+	bool allow = true;
+	qdf_freq_t freq = 0;
+	struct wlan_channel *bss_chan;
+
+	if (!ml_nlink_sta_inactivity_allowed_with_quiet(
+			psoc, vdev, force_inactive_bitmap))
+		return false;
+
+	ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
+		psoc, vdev, no_forced_bitmap, NULL, &vdev_id_bitmap_sz,
+		vdev_id_bitmap,	&vdev_id_num, vdev_ids);
+
+	for (i = 0; i < vdev_id_num; i++) {
+		ml_vdev =
+		wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						     vdev_ids[i],
+						     WLAN_MLO_MGR_ID);
+		if (!ml_vdev) {
+			mlo_err("invalid vdev id %d ", vdev_ids[i]);
+			continue;
+		}
+
+		/* If link is active, no need to check allow conc */
+		if (!policy_mgr_vdev_is_force_inactive(psoc, vdev_ids[i])) {
+			wlan_objmgr_vdev_release_ref(ml_vdev,
+						     WLAN_MLO_MGR_ID);
+			continue;
+		}
+
+		conc_ext_flags.value =
+		policy_mgr_get_conc_ext_flags(ml_vdev, true);
+
+		bss_chan = wlan_vdev_mlme_get_bss_chan(ml_vdev);
+		if (bss_chan)
+			freq = bss_chan->ch_freq;
+
+		if (!policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
+						       freq,
+						       HW_MODE_20_MHZ,
+						       conc_ext_flags.value,
+						       NULL)) {
+			wlan_objmgr_vdev_release_ref(ml_vdev,
+						     WLAN_MLO_MGR_ID);
+			break;
+		}
+
+		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
+	}
+
+	if (i < vdev_id_num) {
+		mlo_err("not allow - vdev %d freq %d active due to conc",
+			vdev_ids[i], freq);
+		allow = false;
+	}
+
+	return allow;
 }
 
 /**
@@ -1644,128 +1828,431 @@ ml_nlink_handle_dynamic_inactive(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
-/**
- * ml_nlink_sta_inactivity_allowed_with_quiet() - Check force inactive allowed
- * for links in bitmap
- * @psoc: PSOC object information
- * @vdev: vdev object
- * @force_inactive_bitmap: force inactive link bimap
- *
- * If left links (exclude removed link and QUITE link) are zero, the force
- * inactive bitmap is not allowed.
- *
- * Return: true if allow to force inactive links in force_inactive_bitmap
- */
-static bool ml_nlink_sta_inactivity_allowed_with_quiet(
-				struct wlan_objmgr_psoc *psoc,
-				struct wlan_objmgr_vdev *vdev,
-				uint16_t force_inactive_bitmap)
+static bool
+ml_nlink_check_allow_link_req(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_objmgr_vdev *vdev,
+			      struct ml_link_force_state *curr,
+			      struct set_link_req *new)
 {
-	uint8_t ml_num_link = 0;
-	uint32_t ml_link_bitmap = 0;
-	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint16_t no_force_links;
 
-	ml_nlink_get_link_info(psoc, vdev, (NLINK_EXCLUDE_REMOVED_LINK |
-					    NLINK_EXCLUDE_QUIET_LINK |
-					    NLINK_EXCLUDE_STANDBY_LINK),
-			       QDF_ARRAY_SIZE(ml_linkid_lst),
-			       ml_link_info, ml_freq_lst, ml_vdev_lst,
-			       ml_linkid_lst, &ml_num_link,
-			       &ml_link_bitmap);
-	ml_link_bitmap &= ~force_inactive_bitmap;
-	if (!ml_link_bitmap) {
-		mlo_debug("not allow - no active link after force inactive 0x%x",
-			  force_inactive_bitmap);
-		return false;
+	if (!new->force_inactive_bitmap &&
+	    !new->force_inactive_num &&
+	    !new->force_active_bitmap &&
+	    !new->force_active_num &&
+	    (curr->force_inactive_bitmap ||
+	     curr->force_inactive_num ||
+	     curr->force_active_bitmap ||
+	     curr->force_active_num)) {
+		/* If link is force inactive already, but new command will
+		 * mark it non-force, need to check conc allow or not.
+		 */
+		no_force_links = curr->force_inactive_bitmap;
+		/* Check non forced links allowed by conc */
+		if (!ml_nlink_allow_conc(psoc, vdev, no_force_links, 0))
+			return false;
+	}
+
+	if (new->force_inactive_bitmap != curr->force_inactive_bitmap) {
+		/* If link is force inactive already, but new command will
+		 * mark it non-force, need to check conc allow or not.
+		 */
+		no_force_links = curr->force_inactive_bitmap &
+				 new->force_inactive_bitmap;
+		no_force_links ^= curr->force_inactive_bitmap;
+
+		/* Check non forced links allowed by conc */
+		if (!ml_nlink_allow_conc(psoc, vdev, no_force_links,
+					 new->force_inactive_bitmap))
+			return false;
+	}
+
+	if (new->force_active_bitmap != curr->force_active_bitmap) {
+		/* Check forced active links allowed by conc */
+		if (!ml_nlink_allow_conc(psoc, vdev, new->force_active_bitmap,
+					 new->force_inactive_bitmap))
+			return false;
 	}
 
 	return true;
 }
 
-/**
- * ml_nlink_allow_conc() - Check force inactive allowed for links in bitmap
- * @psoc: PSOC object information
- * @vdev: vdev object
- * @no_forced_bitmap: no force link bitmap
- * @force_inactive_bitmap: force inactive link bimap
- *
- * Check the no force bitmap and force inactive bitmap are allowed to send
- * to firmware
- *
- * Return: true if allow to "no force" and force inactive links.
- */
 static bool
-ml_nlink_allow_conc(struct wlan_objmgr_psoc *psoc,
-		    struct wlan_objmgr_vdev *vdev,
-		    uint16_t no_forced_bitmap,
-		    uint16_t force_inactive_bitmap)
-{
-	uint8_t vdev_id_num = 0;
-	uint8_t vdev_ids[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint32_t vdev_id_bitmap_sz;
-	uint32_t vdev_id_bitmap[MLO_VDEV_BITMAP_SZ];
-	uint32_t i;
-	union conc_ext_flag conc_ext_flags;
-	struct wlan_objmgr_vdev *ml_vdev;
-	bool allow = true;
-	qdf_freq_t freq = 0;
-	struct wlan_channel *bss_chan;
+ml_nlink_validate_request(struct wlan_objmgr_psoc *psoc,
+			  struct wlan_objmgr_vdev *vdev,
+			  struct set_link_req *combined,
+			  enum set_link_source source,
+			  struct set_link_req *request,
+			  struct set_link_req *combined_new)
 
-	if (!ml_nlink_sta_inactivity_allowed_with_quiet(
-			psoc, vdev, force_inactive_bitmap))
+{
+	uint32_t available_links;
+	uint32_t link_bitmap, link_num;
+	struct set_link_req tmp;
+	struct ml_link_force_state curr;
+
+	if (!request->force_active_bitmap &&
+	    !request->force_inactive_bitmap &&
+	    !request->force_active_num &&
+	    !request->force_active_num_bitmap &&
+	    !request->force_inactive_num &&
+	    !request->force_inactive_num_bitmap) {
+		qdf_mem_copy(combined_new, combined, sizeof(*combined));
+		return true;
+	}
+
+	available_links = ml_nlink_get_available_link_bitmap(psoc, vdev);
+
+	/* validate request conflict with itself,
+	 * For an external request, we support either force
+	 * bitmap(USER mode) or force num(MIX mode) but not
+	 * support both at same time.
+	 */
+	if (request->force_active_bitmap &
+	    request->force_inactive_bitmap) {
+		mlo_debug("req source %d not supported: force_active_bitmap 0x%x inact 0x%x conflict",
+			  source, request->force_active_bitmap,
+			  request->force_inactive_bitmap);
+		return false;
+	}
+	if (request->force_active_bitmap &&
+	    (request->force_active_num ||
+	     request->force_active_num_bitmap ||
+	     request->force_inactive_num ||
+	     request->force_inactive_num_bitmap)) {
+		mlo_debug("req source %d not supported: force_active_bitmap 0x%x conflict with force num",
+			  source, request->force_active_bitmap);
+		return false;
+	}
+	if (request->force_inactive_bitmap &&
+	    (request->force_active_num ||
+	     request->force_active_num_bitmap ||
+	     request->force_inactive_num ||
+	     request->force_inactive_num_bitmap)) {
+		mlo_debug("req source %d not supported: force_inactive_bitmap 0x%x conflict with force num",
+			  source, request->force_inactive_bitmap);
+		return false;
+	}
+	if ((request->force_active_num &&
+	     !request->force_active_num_bitmap) ||
+	    (!request->force_active_num &&
+	    request->force_active_num_bitmap)) {
+		mlo_debug("req source %d not supported: force act num bitmap 0",
+			  source);
+		return false;
+	}
+	if ((request->force_inactive_num &&
+	     !request->force_inactive_num_bitmap) ||
+	    (!request->force_inactive_num &&
+	     request->force_inactive_num_bitmap)) {
+		mlo_debug("req source %d not supported: force inact num bitmap 0",
+			  source);
+		return false;
+	}
+	if (request->force_inactive_num &&
+	    request->force_active_num) {
+		mlo_debug("req source %d not supported: force inact num %d mix with act num %d in req",
+			  source, request->force_inactive_num,
+			  request->force_active_num);
+		return false;
+	}
+
+	/* validate force active bitmap */
+	if (request->force_active_bitmap) {
+		if (request->force_active_bitmap &
+		    combined->force_inactive_bitmap) {
+			mlo_debug("req source %d not supported: act bitmap 0x%x conflict with high priority inact bitmap 0x%x",
+				  source, request->force_active_bitmap,
+				  combined->force_inactive_bitmap);
+			return false;
+		}
+
+		link_bitmap = ~request->force_active_bitmap &
+			combined->force_inactive_num_bitmap;
+		if (combined->force_inactive_num_bitmap) {
+			if (!link_bitmap) {
+				mlo_debug("req source %d not supported: act bitmap 0x%x conflict with high priority forc inact num",
+					  source,
+					  request->force_active_bitmap);
+				return false;
+			}
+			link_num =
+			convert_link_bitmap_to_link_ids(link_bitmap,
+							0, NULL);
+			if (link_num < combined->force_inactive_num) {
+				mlo_debug("req source %d not supported: act bitmap 0x%x, can't force inact num for high priority",
+					  source,
+					  request->force_active_bitmap);
+				return false;
+			}
+		}
+	}
+
+	/* validate force inactive bitmap */
+	if (request->force_inactive_bitmap) {
+		if (request->force_inactive_bitmap &
+		    combined->force_active_bitmap) {
+			mlo_debug("req source %d not supported: inact bitmap 0x%x conflict with high priority act bitmap 0x%x",
+				  source, request->force_inactive_bitmap,
+				  combined->force_active_bitmap);
+			return false;
+		}
+		/* if no available link after force inactive links,
+		 * reject it.
+		 */
+		if (!(available_links &
+		      ~(request->force_inactive_bitmap |
+			combined->force_inactive_bitmap))) {
+			mlo_debug("req source %d not supported: no available link after force inact bitmap 0x%x",
+				  source, request->force_inactive_bitmap);
+			return false;
+		}
+		link_bitmap = ~request->force_inactive_bitmap &
+			combined->force_active_num_bitmap;
+		if (combined->force_active_num_bitmap) {
+			if (!link_bitmap) {
+				mlo_debug("req source %d not supported: can't force act number bitmap 0x%x for high priority",
+					  source,
+					  combined->force_active_num_bitmap);
+				return false;
+			}
+			link_num =
+			convert_link_bitmap_to_link_ids(link_bitmap,
+							0, NULL);
+			if (link_num < combined->force_active_num) {
+				mlo_debug("req source %d not supported: no available link to force act num",
+					  source);
+				return false;
+			}
+		}
+	}
+
+	/* validate force active num */
+	if (request->force_active_num_bitmap) {
+		if (!request->force_active_num) {
+			mlo_debug("req source %d not supported: req force act num 0",
+				  source);
+			return false;
+		}
+		link_bitmap = request->force_active_num_bitmap &
+			~combined->force_inactive_bitmap;
+		if (combined->force_inactive_bitmap) {
+			if (!link_bitmap) {
+				mlo_debug("req source %d not supported: no available link to force act num bitmap 0x%x",
+					  source,
+					  request->force_active_num_bitmap);
+				return false;
+			}
+			link_num =
+			convert_link_bitmap_to_link_ids(link_bitmap,
+							0, NULL);
+			if (link_num < request->force_active_num) {
+				mlo_debug("req source %d not supported: no available link to force act num %d",
+					  source, request->force_active_num);
+				return false;
+			}
+		}
+		/* Too much combinations: But in real world
+		 * vendor command may send MIX mode with force
+		 * active num 1 or 2.
+		 * In DBS rd, internal force command is:
+		 *  force inactive num 1 with 5G+6G bitmap.
+		 * Then if receive Mix mode force active num 1, we can accept.
+		 * Then if receive Mix mode force active num 2:
+		 *   Bitmap 2G+5G or 2G+6G, we accept.
+		 *   Bitmap 5G+6G, we reject.
+		 */
+		if (request->force_active_num > 2) {
+			mlo_debug("req source %d not supported: force_active_num %d > 2",
+				  source, request->force_active_num);
+			return false;
+		}
+		if (request->force_active_num > 1 &&
+		    combined->force_inactive_num) {
+			link_bitmap = ~request->force_active_num_bitmap &
+				combined->force_inactive_num_bitmap;
+			if (!link_bitmap) {
+				mlo_debug("req source %d not supported: force act num %d conflict with inact num %d",
+					  source, request->force_active_num,
+					  combined->force_inactive_num);
+				return false;
+			}
+			link_num =
+			convert_link_bitmap_to_link_ids(link_bitmap,
+							0, NULL);
+			if (link_num < combined->force_inactive_num) {
+				mlo_debug("req source %d not supported: no available link to force inact",
+					  source);
+				return false;
+			}
+		}
+	}
+
+	/* validate force inactive num. */
+	if (request->force_inactive_num_bitmap) {
+		if (!request->force_inactive_num) {
+			mlo_debug("req source %d not supported: req force inact num 0",
+				  source);
+			return false;
+		}
+		link_bitmap = ~combined->force_active_bitmap &
+			request->force_inactive_num_bitmap;
+		if (combined->force_active_bitmap) {
+			if (!link_bitmap) {
+				mlo_debug("req source %d not supported: no available link to force inact num",
+					  source);
+				return false;
+			}
+			link_num =
+			convert_link_bitmap_to_link_ids(link_bitmap,
+							0, NULL);
+			if (link_num < request->force_inactive_num) {
+				mlo_debug("req source %d not supported: no available link to force inact num bitmap 0x%x",
+					  source,
+					  request->force_inactive_num_bitmap);
+				return false;
+			}
+		}
+		if (request->force_inactive_num > 2) {
+			mlo_debug("req source %d not supported: force_inactive_num %d",
+				  source, request->force_inactive_num);
+			return false;
+		}
+	}
+
+	/* force num can't be combined, the request can be honored
+	 * only if there is no force num in higher priority request.
+	 */
+	if (combined->force_active_num &&
+	    request->force_active_num) {
+		mlo_debug("req source %d not supported: high priority force active num present",
+			  source);
+		return false;
+	}
+	if (combined->force_inactive_num &&
+	    request->force_inactive_num) {
+		mlo_debug("req source %d not supported: high priority force inactive num present",
+			  source);
+		return false;
+	}
+
+	qdf_mem_copy(&tmp, combined, sizeof(tmp));
+	tmp.force_active_bitmap |= request->force_active_bitmap;
+	tmp.force_inactive_bitmap |=
+			request->force_inactive_bitmap;
+	if (!tmp.force_active_num) {
+		tmp.force_active_num = request->force_active_num;
+		tmp.force_active_num_bitmap =
+			request->force_active_num_bitmap;
+	}
+	if (!tmp.force_inactive_num) {
+		tmp.force_inactive_num = request->force_inactive_num;
+		tmp.force_inactive_num_bitmap =
+			request->force_inactive_num_bitmap;
+	}
+
+	ml_nlink_get_curr_force_state(psoc, vdev, &curr);
+
+	/* If concurrency not allowed after apply external request,
+	 * reject the external request.
+	 */
+	if (!ml_nlink_check_allow_link_req(psoc, vdev, &curr, &tmp)) {
+		mlo_debug("req source %d not supported by conc check",
+			  source);
+		return false;
+	}
+
+	qdf_mem_copy(combined_new, &tmp, sizeof(tmp));
+
+	mlo_debug("source %d act 0x%x inact 0x%x %d 0x%x %d 0x%x",
+		  source, request->force_active_bitmap,
+		  request->force_inactive_bitmap,
+		  request->force_active_num,
+		  request->force_active_num_bitmap,
+		  request->force_inactive_num,
+		  request->force_inactive_num_bitmap);
+
+	return true;
+}
+
+static bool
+ml_nlink_validate_link_request(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_vdev *vdev,
+			       enum set_link_source source,
+			       struct set_link_req *link_request)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct set_link_req request, combined, combined_new;
+	uint8_t i;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
+		mlo_err("mlo_ctx or sta_ctx null");
+		return false;
+	}
+	if (source <= 0 || source >= SET_LINK_SOURCE_MAX) {
+		mlo_err("invalid src %d", source);
+		return false;
+	}
+	qdf_mem_zero(&combined, sizeof(combined));
+	ml_nlink_get_force_link_request(psoc, vdev, &combined, 0);
+	for (i = 1; i < source; i++) {
+		qdf_mem_zero(&request, sizeof(request));
+		ml_nlink_get_force_link_request(psoc, vdev, &request,
+						i);
+
+		if (!ml_nlink_validate_request(psoc, vdev, &combined,
+					       i, &request, &combined_new))
+			continue;
+
+		qdf_mem_copy(&combined, &combined_new, sizeof(combined_new));
+	}
+
+	if (!ml_nlink_validate_request(psoc, vdev, &combined,
+				       source, link_request, &combined_new))
 		return false;
 
-	ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
-		psoc, vdev, no_forced_bitmap, NULL, &vdev_id_bitmap_sz,
-		vdev_id_bitmap,	&vdev_id_num, vdev_ids);
+	return true;
+}
 
-	for (i = 0; i < vdev_id_num; i++) {
-		ml_vdev =
-		wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-						     vdev_ids[i],
-						     WLAN_MLO_MGR_ID);
-		if (!ml_vdev) {
-			mlo_err("invalid vdev id %d ", vdev_ids[i]);
-			continue;
-		}
+static void
+ml_nlink_handle_all_link_request(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_objmgr_vdev *vdev,
+				 struct ml_link_force_state *new)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct set_link_req request, combined, combined_new;
+	uint8_t i;
 
-		/* If link is active, no need to check allow conc */
-		if (!policy_mgr_vdev_is_force_inactive(psoc, vdev_ids[i])) {
-			wlan_objmgr_vdev_release_ref(ml_vdev,
-						     WLAN_MLO_MGR_ID);
-			continue;
-		}
-
-		conc_ext_flags.value =
-		policy_mgr_get_conc_ext_flags(ml_vdev, true);
-
-		bss_chan = wlan_vdev_mlme_get_bss_chan(ml_vdev);
-		if (bss_chan)
-			freq = bss_chan->ch_freq;
-
-		if (!policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
-						       freq,
-						       HW_MODE_20_MHZ,
-						       conc_ext_flags.value,
-						       NULL)) {
-			wlan_objmgr_vdev_release_ref(ml_vdev,
-						     WLAN_MLO_MGR_ID);
-			break;
-		}
-
-		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
+		mlo_err("mlo_ctx or sta_ctx null");
+		return;
 	}
 
-	if (i < vdev_id_num) {
-		mlo_err("not allow - vdev %d freq %d active due to conc",
-			vdev_ids[i], freq);
-		allow = false;
+	qdf_mem_zero(&combined, sizeof(combined));
+	ml_nlink_get_force_link_request(psoc, vdev, &combined, 0);
+	for (i = 1; i < SET_LINK_SOURCE_MAX; i++) {
+		qdf_mem_zero(&request, sizeof(request));
+		ml_nlink_get_force_link_request(psoc, vdev, &request, i);
+
+		if (!ml_nlink_validate_request(psoc, vdev, &combined,
+					       i, &request, &combined_new))
+			continue;
+
+		qdf_mem_copy(&combined, &combined_new, sizeof(combined_new));
 	}
 
-	return allow;
+	new->force_active_bitmap = combined.force_active_bitmap;
+	new->force_inactive_bitmap = combined.force_inactive_bitmap;
+	new->force_active_num = combined.force_active_num;
+	new->force_active_num_bitmap =
+		combined.force_active_num_bitmap;
+	new->force_inactive_num = combined.force_inactive_num;
+	new->force_inactive_num_bitmap =
+		combined.force_inactive_num_bitmap;
+
+	ml_nlink_dump_force_state(new, "");
 }
 
 static QDF_STATUS
@@ -1773,7 +2260,9 @@ ml_nlink_update_no_force_for_all(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_objmgr_vdev *vdev,
 				 struct ml_link_force_state *curr,
 				 struct ml_link_force_state *new,
-				 enum mlo_link_force_reason reason)
+				 enum mlo_link_force_reason reason,
+				 uint32_t link_control_flags)
+
 {
 	uint16_t no_force_links;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -1804,7 +2293,7 @@ ml_nlink_update_no_force_for_all(struct wlan_objmgr_psoc *psoc,
 						psoc, wlan_vdev_get_id(vdev),
 						reason,
 						MLO_LINK_FORCE_MODE_NO_FORCE,
-						0, 0, 0, 0);
+						0, 0, 0, link_control_flags);
 	}
 
 end:
@@ -1812,14 +2301,18 @@ end:
 }
 
 static QDF_STATUS
-ml_nlink_update_force_inactive(struct wlan_objmgr_psoc *psoc,
-			       struct wlan_objmgr_vdev *vdev,
-			       struct ml_link_force_state *curr,
-			       struct ml_link_force_state *new,
-			       enum mlo_link_force_reason reason)
+ml_nlink_update_force_active_inactive(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev,
+				      struct ml_link_force_state *curr,
+				      struct ml_link_force_state *new,
+				      enum mlo_link_force_reason reason,
+				      uint32_t link_control_flags)
 {
 	uint16_t no_force_links;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	bool update = false;
+	uint16_t new_force_inactive_bitmap = curr->force_inactive_bitmap;
+	uint16_t new_force_active_bitmap = curr->force_active_bitmap;
 
 	if (new->force_inactive_bitmap != curr->force_inactive_bitmap) {
 		/* If link is force inactive already, but new command will
@@ -1830,20 +2323,37 @@ ml_nlink_update_force_inactive(struct wlan_objmgr_psoc *psoc,
 		no_force_links ^= curr->force_inactive_bitmap;
 
 		/* Check non forced links allowed by conc */
-		if (!ml_nlink_allow_conc(psoc, vdev, no_force_links,
+		if (ml_nlink_allow_conc(psoc, vdev, no_force_links,
 					 new->force_inactive_bitmap)) {
+			update = true;
+			new_force_inactive_bitmap = new->force_inactive_bitmap;
+		} else {
 			status = QDF_STATUS_E_NOSUPPORT;
-			goto end;
 		}
-		status = policy_mgr_mlo_sta_set_nlink(
-				psoc, wlan_vdev_get_id(vdev), reason,
-				MLO_LINK_FORCE_MODE_INACTIVE,
-				0,
-				new->force_inactive_bitmap,
-				0,
-				link_ctrl_f_overwrite_inactive_bitmap |
-				link_ctrl_f_post_re_evaluate);
 	}
+
+	if (new->force_active_bitmap != curr->force_active_bitmap) {
+		/* Check forced active links allowed by conc */
+		if (ml_nlink_allow_conc(psoc, vdev, new->force_active_bitmap,
+					 new->force_inactive_bitmap)) {
+			update = true;
+			new_force_active_bitmap = new->force_active_bitmap;
+		} else {
+			status = QDF_STATUS_E_NOSUPPORT;
+		}
+	}
+	if (!update)
+		goto end;
+
+	status = policy_mgr_mlo_sta_set_nlink(
+			psoc, wlan_vdev_get_id(vdev), reason,
+			MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
+			0,
+			new_force_active_bitmap,
+			new_force_inactive_bitmap,
+			link_control_flags |
+			link_ctrl_f_overwrite_active_bitmap |
+			link_ctrl_f_overwrite_inactive_bitmap);
 
 end:
 	return status;
@@ -1854,7 +2364,8 @@ ml_nlink_update_force_inactive_num(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_vdev *vdev,
 				   struct ml_link_force_state *curr,
 				   struct ml_link_force_state *new,
-				   enum mlo_link_force_reason reason)
+				   enum mlo_link_force_reason reason,
+				   uint32_t link_control_flags)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -1868,6 +2379,7 @@ ml_nlink_update_force_inactive_num(struct wlan_objmgr_psoc *psoc,
 					new->force_inactive_num,
 					new->force_inactive_num_bitmap,
 					0,
+					link_control_flags |
 					link_ctrl_f_dynamic_force_link_num |
 					link_ctrl_f_post_re_evaluate);
 	}
@@ -1876,23 +2388,31 @@ ml_nlink_update_force_inactive_num(struct wlan_objmgr_psoc *psoc,
 }
 
 static QDF_STATUS
-ml_nlink_update_force_active(struct wlan_objmgr_psoc *psoc,
-			     struct wlan_objmgr_vdev *vdev,
-			     struct ml_link_force_state *curr,
-			     struct ml_link_force_state *new,
-			     enum mlo_link_force_reason reason)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static QDF_STATUS
 ml_nlink_update_force_active_num(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_objmgr_vdev *vdev,
 				 struct ml_link_force_state *curr,
 				 struct ml_link_force_state *new,
-				 enum mlo_link_force_reason reason)
+				 enum mlo_link_force_reason reason,
+				 uint32_t link_control_flags)
 {
-	return QDF_STATUS_SUCCESS;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (new->force_active_num !=
+			curr->force_active_num ||
+	    new->force_active_num_bitmap !=
+			curr->force_active_num_bitmap) {
+		status = policy_mgr_mlo_sta_set_nlink(
+					psoc, wlan_vdev_get_id(vdev), reason,
+					MLO_LINK_FORCE_MODE_ACTIVE_NUM,
+					new->force_active_num,
+					new->force_active_num_bitmap,
+					0,
+					link_control_flags |
+					link_ctrl_f_dynamic_force_link_num |
+					link_ctrl_f_post_re_evaluate);
+	}
+
+	return status;
 }
 
 static bool
@@ -1916,6 +2436,12 @@ ml_nlink_all_links_ready_for_state_change(struct wlan_objmgr_psoc *psoc,
 			  wlan_vdev_get_id(vdev));
 		return false;
 	}
+	if (policy_mgr_is_set_link_in_progress(psoc)) {
+		mlo_debug("mlo vdev %d not ready due to set link in progress",
+			  wlan_vdev_get_id(vdev));
+		return false;
+	}
+
 	/* For initial connecting to 2 or 3 links ML ap, assoc link and
 	 * non assoc link connected one by one, avoid changing link state
 	 * before link vdev connect completion, to check connected link count.
@@ -1934,6 +2460,131 @@ ml_nlink_all_links_ready_for_state_change(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return true;
+}
+
+static QDF_STATUS
+ml_nlink_update_force_command_target(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev,
+				     enum mlo_link_force_reason reason,
+				     enum ml_nlink_change_event_type evt,
+				     struct ml_nlink_change_event *data,
+				     struct ml_link_force_state *curr,
+				     struct ml_link_force_state *new)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t link_control_flags = 0;
+
+	if (evt == ml_nlink_post_set_link_evt && data)
+		SET_POST_RE_EVALUATE_LOOPS(link_control_flags,
+					   data->evt.post_set_link.post_re_evaluate_loops);
+
+	status = ml_nlink_update_no_force_for_all(psoc, vdev,
+						  curr,
+						  new,
+						  reason,
+						  link_control_flags);
+	if (status == QDF_STATUS_E_PENDING || status != QDF_STATUS_SUCCESS)
+		goto end;
+
+	status =
+	ml_nlink_update_force_active_inactive(psoc, vdev,
+					      curr,
+					      new,
+					      reason,
+					      link_control_flags);
+	if (status == QDF_STATUS_E_PENDING ||
+	    (status != QDF_STATUS_SUCCESS && status != QDF_STATUS_E_NOSUPPORT))
+		goto end;
+
+	status = ml_nlink_update_force_inactive_num(psoc, vdev,
+						    curr,
+						    new,
+						    reason,
+						    link_control_flags);
+
+	if (status == QDF_STATUS_E_PENDING || status != QDF_STATUS_SUCCESS)
+		goto end;
+
+	status = ml_nlink_update_force_active_num(psoc, vdev,
+						  curr,
+						  new,
+						  reason,
+						  link_control_flags);
+end:
+	return status;
+}
+
+/**
+ * ml_nlink_state_change_emlsr_no_conc() - Handle eMLSR STA link force
+ * with vendor command request (HW no EMSR conc supported)
+ * @psoc: PSOC object information
+ * @reason: reason code of trigger force mode change.
+ * @evt: event type
+ * @data: event data
+ *
+ * This API will handle vendor command set link request for standalone
+ * eMLSR STA for HMT. The target doesn't support concurrency in eMLSR
+ * mode.
+ * Since we don't support eMLSR STA+Legacy Interfaces, the eMLSR sta
+ * has been changed to MLSR by wlan_handle_emlsr_sta_concurrency if any
+ * concurrent interface up. So this API will do no-op for any vendor
+ * command request if eMLSR concurrency present.
+ *
+ * Return: QDF_STATUS_SUCCESS if no new command updated to target.
+ *	   QDF_STATUS_E_PENDING if new command is sent to target.
+ *	   otherwise QDF_STATUS error code
+ */
+static QDF_STATUS
+ml_nlink_state_change_emlsr_no_conc(struct wlan_objmgr_psoc *psoc,
+				    enum mlo_link_force_reason reason,
+				    enum ml_nlink_change_event_type evt,
+				    struct ml_nlink_change_event *data)
+{
+	struct ml_link_force_state force_state = {0};
+	struct ml_link_force_state curr_force_state = {0};
+	struct wlan_objmgr_vdev *vdev = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	switch (evt) {
+	case ml_nlink_vendor_cmd_request_evt:
+	case ml_nlink_post_set_link_evt:
+		break;
+	default:
+		mlo_debug("Don't disable eMLSR links");
+		return QDF_STATUS_SUCCESS;
+	}
+	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+		mlo_debug("eMLSR concurrency not allow to set link");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = ml_nlink_get_affect_ml_sta(psoc);
+	if (!vdev)
+		goto end;
+	if (!ml_nlink_all_links_ready_for_state_change(psoc, vdev, evt))
+		goto end;
+
+	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
+
+	ml_nlink_handle_all_link_request(psoc, vdev, &force_state);
+
+	status =
+	ml_nlink_update_force_command_target(psoc, vdev, reason, evt,
+					     data, &curr_force_state,
+					     &force_state);
+end:
+	if (vdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
+
+		if (status == QDF_STATUS_SUCCESS)
+			mlo_debug("exit no force state change");
+		else if (status == QDF_STATUS_E_PENDING)
+			mlo_debug("exit pending force state change");
+		else
+			mlo_err("exit err %d state change", status);
+	}
+
+	return status;
 }
 
 /**
@@ -1972,11 +2623,14 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 	/*
 	 * eMLSR is allowed in MCC mode also. So, don't disable any links
 	 * if current connection happens in eMLSR mode.
-	 * eMLSR is handled by wlan_handle_emlsr_sta_concurrency
+	 * eMLSR concurrency is handled by wlan_handle_emlsr_sta_concurrency
+	 * ml_nlink_state_change_emlsr will only handle the vendor
+	 * command set link request, any other event will be ignored.
 	 */
 	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL)) {
-		mlo_debug("Don't disable eMLSR links");
-		goto end;
+		status = ml_nlink_state_change_emlsr_no_conc(
+						psoc, reason, evt, data);
+		return status;
 	}
 
 	vdev = ml_nlink_get_affect_ml_sta(psoc);
@@ -2009,43 +2663,12 @@ static QDF_STATUS ml_nlink_state_change(struct wlan_objmgr_psoc *psoc,
 	ml_nlink_update_concurrency_link_request(psoc, vdev,
 						 &force_state,
 						 reason);
+	ml_nlink_handle_all_link_request(psoc, vdev, &force_state);
 
-	status = ml_nlink_update_no_force_for_all(psoc, vdev,
-						  &curr_force_state,
-						  &force_state,
-						  reason);
-	if (status == QDF_STATUS_E_PENDING || status != QDF_STATUS_SUCCESS)
-		goto end;
-
-	status = ml_nlink_update_force_inactive(psoc, vdev,
-						&curr_force_state,
-						&force_state,
-						reason);
-	if (status == QDF_STATUS_E_PENDING ||
-	    (status != QDF_STATUS_SUCCESS && status != QDF_STATUS_E_NOSUPPORT))
-		goto end;
-
-	status = ml_nlink_update_force_inactive_num(psoc, vdev,
-						    &curr_force_state,
-						    &force_state,
-						    reason);
-	if (status == QDF_STATUS_E_PENDING || status != QDF_STATUS_SUCCESS)
-		goto end;
-
-	/* At present, only force inactive/inactive num mode have been used
-	 * to avoid MCC, force active/active num APIs are no-op for now.
-	 */
-	status = ml_nlink_update_force_active(psoc, vdev,
-					      &curr_force_state,
-					      &force_state,
-					      reason);
-	if (status == QDF_STATUS_E_PENDING || status != QDF_STATUS_SUCCESS)
-		goto end;
-
-	status = ml_nlink_update_force_active_num(psoc, vdev,
-						  &curr_force_state,
-						  &force_state,
-						  reason);
+	status =
+	ml_nlink_update_force_command_target(psoc, vdev, reason, evt,
+					     data, &curr_force_state,
+					     &force_state);
 end:
 	if (vdev) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
@@ -2202,6 +2825,7 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 		  data->evt.vendor.link_num,
 		  data->evt.vendor.link_bitmap,
 		  data->evt.vendor.link_bitmap2);
+
 	switch (data->evt.vendor.link_ctrl_mode) {
 	case LINK_CONTROL_MODE_DEFAULT:
 		ml_nlink_clr_force_link_request(psoc, vdev,
@@ -2212,6 +2836,12 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 		req.reason = data->evt.vendor.reason;
 		req.force_active_bitmap = data->evt.vendor.link_bitmap;
 		req.force_inactive_bitmap = data->evt.vendor.link_bitmap2;
+		if (!ml_nlink_validate_link_request(psoc, vdev,
+						    SET_LINK_FROM_VENDOR_CMD,
+						    &req)) {
+			mlo_debug("not supported");
+			return QDF_STATUS_E_INVAL;
+		}
 		ml_nlink_update_force_link_request(psoc, vdev, &req,
 						   SET_LINK_FROM_VENDOR_CMD);
 		break;
@@ -2220,12 +2850,28 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 		req.reason = data->evt.vendor.reason;
 		req.force_active_num = data->evt.vendor.link_num;
 		req.force_active_num_bitmap = data->evt.vendor.link_bitmap;
+		if (!ml_nlink_validate_link_request(psoc, vdev,
+						    SET_LINK_FROM_VENDOR_CMD,
+						    &req)) {
+			mlo_debug("not supported");
+			return QDF_STATUS_E_INVAL;
+		}
 		ml_nlink_update_force_link_request(psoc, vdev, &req,
 						   SET_LINK_FROM_VENDOR_CMD);
 		break;
 	default:
 		status = QDF_STATUS_E_INVAL;
+		return status;
 	}
+
+	status = ml_nlink_state_change(psoc, MLO_LINK_FORCE_REASON_CONNECT,
+				       evt, data);
+
+	if (status == QDF_STATUS_E_PENDING)
+		status = QDF_STATUS_SUCCESS;
+	else if (status != QDF_STATUS_SUCCESS)
+		ml_nlink_clr_force_link_request(psoc, vdev,
+						SET_LINK_FROM_VENDOR_CMD);
 
 	return status;
 }
@@ -2389,6 +3035,7 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			evt, data);
 		break;
 	case ml_nlink_connection_updated_evt:
+	case ml_nlink_post_set_link_evt:
 		if (mode == QDF_STA_MODE &&
 		    (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) ||
 		     MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))) {
@@ -2417,7 +3064,7 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
-void
+QDF_STATUS
 ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id,
 				 enum link_control_modes link_control_mode,
@@ -2429,6 +3076,11 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 {
 	struct ml_nlink_change_event data;
 
+	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+		mlo_debug("eMLSR concurrency not allow to set link");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	qdf_mem_zero(&data, sizeof(data));
 	data.evt.vendor.link_ctrl_mode = link_control_mode;
 	data.evt.vendor.mode = mode;
@@ -2437,7 +3089,7 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 	data.evt.vendor.link_bitmap = link_bitmap;
 	data.evt.vendor.link_bitmap2 = link_bitmap2;
 
-	ml_nlink_conn_change_notify(
+	return ml_nlink_conn_change_notify(
 			psoc, vdev_id,
 			ml_nlink_vendor_cmd_request_evt, &data);
 }

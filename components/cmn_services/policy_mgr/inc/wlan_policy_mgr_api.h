@@ -5180,12 +5180,28 @@ policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id);
 
 /**
+ * policy_mgr_clear_ml_links_settings_in_fw_nlink() - Process
+ * QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE in default mode
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev_id
+ *
+ * This API is used if nlink service is enabled.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_clear_ml_links_settings_in_fw_nlink(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id);
+
+/**
  * policy_mgr_activate_mlo_links_nlink() - Force active ML links based on user
  * requested link mac address with link bitmap
  * @psoc: objmgr psoc
  * @session_id: session id
  * @num_links: number of links to be forced active
  * @active_link_addr: link mac address of links to be forced active
+ *
+ * This API is used if nlink service is enabled.
  *
  * Return: void
  */
@@ -5226,6 +5242,28 @@ policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 					    uint32_t *config_state_list);
 
 /**
+ * policy_mgr_update_mlo_links_based_on_linkid_nlink() -
+ * Force active ML links based
+ * on user requested coming via QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev id
+ * @num_links: number of links to be forced active
+ * @link_id_list: link id(s) list coming from user space
+ * @config_state_list: config state list coming from user space
+ *
+ * This API is used if nlink service is enabled.
+ *
+ * Return: success if the command gets processed successfully
+ */
+QDF_STATUS
+policy_mgr_update_mlo_links_based_on_linkid_nlink(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					uint8_t num_links,
+					uint8_t *link_id_list,
+					uint32_t *config_state_list);
+
+/**
  * policy_mgr_update_active_mlo_num_links() - Force active ML links based
  * on user requested coming via LINK_STATE_MIXED_MODE_ACTIVE_NUM_LINKS
  * @psoc: objmgr psoc
@@ -5237,6 +5275,22 @@ policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 						  uint8_t vdev_id,
 						  uint8_t num_links);
+/**
+ * policy_mgr_update_active_mlo_num_nlink() - Force active ML links based
+ * on user requested coming via LINK_STATE_MIXED_MODE_ACTIVE_NUM_LINKS
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev id
+ * @force_active_cnt: number of links to be forced active
+ *
+ * This API is used if nlink service is enabled.
+ *
+ * Return: success if the command gets processed successfully
+ */
+QDF_STATUS
+policy_mgr_update_active_mlo_num_nlink(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id,
+				       uint8_t force_active_cnt);
+
 #else
 static inline bool
 policy_mgr_vdev_is_force_inactive(struct wlan_objmgr_psoc *psoc,
