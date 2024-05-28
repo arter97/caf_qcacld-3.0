@@ -607,11 +607,43 @@ static uint32_t
 override_mlmr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 			    struct wlan_objmgr_vdev *vdev,
 			    uint8_t ml_num_link,
-			    qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS],
-			    uint32_t disallow_mode_bitmap)
+			    qdf_freq_t ml_freq_lst[MAX_DISALLOW_MODE_LINK_NUM],
+			    uint8_t ml_linkid_lst[MAX_DISALLOW_MODE_LINK_NUM],
+			    uint32_t disallow_mode_bitmap,
+			    uint32_t force_active_bitmap)
 {
-	uint8_t num_5g_links = 0;
+	uint8_t num_5g_links = 0, force_active_5g_num = 0;
 	uint8_t i;
+
+	for (i = 0; i < ml_num_link; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i]))
+			continue;
+		if (force_active_bitmap & (1 << ml_linkid_lst[i]))
+			force_active_5g_num++;
+	}
+
+	/* If force active the two 5G links is requested (by vendor
+	 * command.e.g), and new disallow mode is EMLSR and MLMR, this
+	 * is confliction. This happens when SAP CSA from 2G to 5G to
+	 * disallow EMLSR while the vendor command has force enter EMLSR
+	 * by disallow MLMR for ML STA 5GL+5GH. If this confliction
+	 * happens, to release MLMR to continue CSA.
+	 */
+	if (((disallow_mode_bitmap & EMLSR_5GL_5GH) ||
+	     (disallow_mode_bitmap & EMLSR_5GH_5GH) ||
+	     (disallow_mode_bitmap & EMLSR_5GL_5GL)) &&
+	    ((disallow_mode_bitmap & MLMR_5GL_5GH) ||
+	     (disallow_mode_bitmap & MLMR_5GH_5GH) ||
+	     (disallow_mode_bitmap & MLMR_5GL_5GL))) {
+		if (force_active_5g_num > 1) {
+			mlo_debug("disallow bitmap 0x%x conflict with force active bitmap 0x%x, allow MLMR",
+				  disallow_mode_bitmap, force_active_bitmap);
+			disallow_mode_bitmap &=
+				~(MLMR_5GL_5GH | MLMR_5GH_5GH | MLMR_5GL_5GL);
+
+			return disallow_mode_bitmap;
+		}
+	}
 
 	/* If user vendor command force enter eMLSR, e.g. emlsr_mode_req is
 	 * WLAN_EMLSR_MODE_ENTER, try to append MLMR to disallow
@@ -653,7 +685,7 @@ static uint32_t
 override_emlsr_disallow_mode(struct wlan_objmgr_psoc *psoc,
 			     struct wlan_objmgr_vdev *vdev,
 			     uint8_t ml_num_link,
-			     qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS],
+			     qdf_freq_t ml_freq_lst[MAX_DISALLOW_MODE_LINK_NUM],
 			     uint32_t disallow_mode_bitmap,
 			     bool *conc_emlsr_allow)
 {
@@ -702,7 +734,8 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			bool *conc_emlsr_allow,
 			uint8_t ml_num_link,
 			qdf_freq_t ml_freq_lst[MAX_DISALLOW_MODE_LINK_NUM],
-			uint8_t ml_linkid_lst[MAX_DISALLOW_MODE_LINK_NUM])
+			uint8_t ml_linkid_lst[MAX_DISALLOW_MODE_LINK_NUM],
+			uint32_t force_active_bitmap)
 {
 	struct disallow_mlo_modes mlo_modes;
 	uint8_t num_of_modes = 0;
@@ -799,7 +832,9 @@ no_legacy_intf:
 				     conc_emlsr_allow);
 	disallow_mode_bitmap =
 	override_mlmr_disallow_mode(psoc, vdev, ml_num_link,
-				    ml_freq_lst, disallow_mode_bitmap);
+				    ml_freq_lst, ml_linkid_lst,
+				    disallow_mode_bitmap,
+				    force_active_bitmap);
 
 	num_of_modes = extract_disallow_mode(disallow_mode_bitmap,
 					     disallow_mode);
@@ -831,7 +866,8 @@ static void
 ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			       struct wlan_objmgr_vdev *vdev,
 			       bool initial_connected,
-			       bool *disallow_changed)
+			       bool *disallow_changed,
+			       uint32_t force_active_bitmap)
 {
 	enum mlo_disallowed_mode mlo_disallow_mode[MAX_DISALLOW_MODE];
 	enum mlo_disallowed_mode tmp_mlo_disallow_mode[MAX_DISALLOW_MODE];
@@ -887,7 +923,8 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 					tmp_disallow_link_bitmap,
 					&conc_emlsr_allow,
 					MAX_DISALLOW_MODE_LINK_NUM,
-					dual_freq_lst, dual_linkid_lst);
+					dual_freq_lst, dual_linkid_lst,
+					force_active_bitmap);
 
 			/* Combine the 3 disallowed mode bitmaps into one for 3-link */
 			for (k = 0; k < tmp_num_of_modes; k++) {
@@ -1017,15 +1054,24 @@ ml_nlink_populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_link_force_context *link_force_ctx;
+	uint32_t force_active_bitmap;
+	struct ml_link_force_state curr_force_state = {0};
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
 	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
 		mlo_err("mlo_ctx or sta_ctx null");
 		return;
 	}
+	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
+	force_active_bitmap = curr_force_state.force_active_bitmap;
+
+	if (req->param.force_mode == MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE ||
+	    req->param.force_mode == MLO_LINK_FORCE_MODE_ACTIVE)
+		force_active_bitmap = req->param.force_cmd.ieee_link_id_bitmap;
 
 	if (!(link_control_flags & link_ctrl_f_dont_update_disallow_bitmap))
-		ml_nlink_update_disallow_modes(psoc, vdev, false, NULL);
+		ml_nlink_update_disallow_modes(psoc, vdev, false, NULL,
+					       force_active_bitmap);
 
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	link_force_ctx = &mlo_dev_ctx->sta_ctx->link_force_ctx;
@@ -1071,7 +1117,62 @@ ml_nlink_init_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	 */
 	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) &&
 	    wlan_mlme_is_aux_emlsr_support(psoc))
-		ml_nlink_update_disallow_modes(psoc, vdev, true, NULL);
+		ml_nlink_update_disallow_modes(psoc, vdev, true, NULL, 0);
+}
+
+static bool
+ml_nlink_is_support_emlsr_with_freq(
+		struct wlan_objmgr_psoc *psoc,
+		qdf_freq_t ml_freq_lst[MAX_DISALLOW_MODE_LINK_NUM],
+		qdf_freq_t legacy_intf_freq)
+{
+	enum home_channel_map_id ml_hc_id;
+	enum home_channel_map_id legacy_hc_id;
+	disallow_mlo_mode_table_type *disallow_tbl;
+	struct disallow_mlo_modes mlo_modes;
+	uint32_t disallow_mode_bitmap;
+
+	ml_hc_id = get_hc_id(psoc, MAX_DISALLOW_MODE_LINK_NUM, ml_freq_lst);
+	if (ml_hc_id >= HC_MAX_MAP_ID) {
+		mlo_debug("invalid ml_hc_id, %d", ml_hc_id);
+		return false;
+	}
+
+	if (ml_hc_id != HC_5GL_5GH &&
+	    ml_hc_id != HC_5GH_5GH &&
+	    ml_hc_id != HC_5GL_5GL) {
+		mlo_debug("ml %s no emlsr support", hc_id_to_string(ml_hc_id));
+		return false;
+	}
+
+	legacy_hc_id = get_hc_id(psoc, 1, &legacy_intf_freq);
+	if (legacy_hc_id >= HC_LEGACY_MAX) {
+		mlo_debug("invalid legacy_hc_id %d", legacy_hc_id);
+		return false;
+	}
+
+	disallow_tbl = get_disallow_mlo_mode_table(psoc);
+	if (!disallow_tbl) {
+		mlo_debug("invalid disallow_tbl rd %d",
+			  policy_mgr_get_rd_type(psoc));
+		return false;
+	}
+
+	mlo_modes = (*disallow_tbl)[ml_hc_id][legacy_hc_id];
+	disallow_mode_bitmap = mlo_modes.allow_mcc;
+			;
+	mlo_debug("ml %s legacy %s rd %d disallow_mode_bitmap 0x%x",
+		  hc_id_to_string(ml_hc_id),
+		  hc_id_to_string(legacy_hc_id),
+		  policy_mgr_get_rd_type(psoc),
+		  disallow_mode_bitmap);
+
+	if (disallow_mode_bitmap & EMLSR_5GL_5GH ||
+	    disallow_mode_bitmap & EMLSR_5GH_5GH ||
+	    disallow_mode_bitmap & EMLSR_5GL_5GL)
+		return false;
+
+	return true;
 }
 
 void
@@ -4489,9 +4590,15 @@ ml_nlink_update_non_force_disallow_bitmap(
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool disallow_mode_changed = false;
+	uint32_t force_active_bitmap;
+	struct ml_link_force_state curr_force_state = {0};
+
+	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
+	force_active_bitmap = curr_force_state.force_active_bitmap;
 
 	ml_nlink_update_disallow_modes(psoc, vdev, false,
-				       &disallow_mode_changed);
+				       &disallow_mode_changed,
+				       force_active_bitmap);
 	link_control_flags |= link_ctrl_f_dont_update_disallow_bitmap;
 
 	/* In middle of transition, no need schedule force scc workqueue */
@@ -5398,6 +5505,7 @@ ml_nlink_ap_csa_start_handler(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS];
 	uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS];
 	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
+	qdf_freq_t ml_5g_freq_lst[WLAN_MAX_ML_BSS_LINKS];
 	uint8_t i, force_inactive_num = 0;
 	uint32_t force_inactive_num_bitmap = 0;
 	bool csa_to_scc = false;
@@ -5442,6 +5550,7 @@ ml_nlink_ap_csa_start_handler(struct wlan_objmgr_psoc *psoc,
 					csa_to_scc = true;
 			}
 			link_5g_bitmap |= 1 << ml_linkid_lst[i];
+			ml_5g_freq_lst[link_5g_num] = ml_freq_lst[i];
 			link_5g_num++;
 		}
 	}
@@ -5483,6 +5592,14 @@ ml_nlink_ap_csa_start_handler(struct wlan_objmgr_psoc *psoc,
 		mlo_debug("emlsr is disabled already");
 		goto end;
 	}
+
+	if (ml_nlink_is_support_emlsr_with_freq(psoc, ml_5g_freq_lst,
+						tgt_ch_freq)) {
+		mlo_debug("emlsr is allowed after CSA to %d, no need to disable",
+			  tgt_ch_freq);
+		goto end;
+	}
+
 	if (!data->evt.csa_start.wait_set_link) {
 		status = QDF_STATUS_E_PENDING;
 		goto end;
