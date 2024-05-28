@@ -5278,6 +5278,8 @@ sir_parse_beacon_ie(struct mac_context *mac,
 	if (pBies->RSN.present) {
 		pBeaconStruct->rsnPresent = 1;
 		convert_rsn(mac, &pBeaconStruct->rsn, &pBies->RSN);
+	} else {
+		pe_debug("RSN IE is not present");
 	}
 
 	if (pBies->WPA.present) {
