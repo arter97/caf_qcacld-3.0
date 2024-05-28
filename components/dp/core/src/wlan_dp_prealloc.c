@@ -433,8 +433,22 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	{QDF_DP_HW_LINK_DESC_TYPE, HW_LINK_DESC_SIZE, NUM_HW_LINK_DESCS, 0,
 	 NON_CACHEABLE, { 0 } },
 #ifdef CONFIG_BERYLLIUM
-	{QDF_DP_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
-	 ((DP_TX_RX_DESC_MAX_NUM * sizeof(uint64_t)) / qdf_page_size),
+	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
+	 0, NON_CACHEABLE, { 0 } },
+	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
+	 0, NON_CACHEABLE, { 0 } },
+	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
+	 0, NON_CACHEABLE, { 0 } },
+#if !defined(QCA_WIFI_WCN7750)
+	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
+	 0, NON_CACHEABLE, { 0 } },
+#endif
+	{QDF_DP_RX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX * sizeof(uint64_t)) / qdf_page_size),
 	 0, NON_CACHEABLE, { 0 } },
 #endif
 #ifdef FEATURE_DIRECT_LINK
@@ -756,6 +770,14 @@ dp_update_num_elements_by_desc_type(struct wlan_dp_prealloc_cfg *cfg,
 		return;
 	case QDF_DP_RX_DESC_BUF_TYPE:
 		*num_elements = cfg->num_rx_sw_desc * WLAN_CFG_RX_SW_DESC_WEIGHT_SIZE;
+		return;
+	case QDF_DP_TX_HW_CC_SPT_PAGE_TYPE:
+		*num_elements = (cfg->num_tx_desc * sizeof(uint64_t)) /
+			qdf_page_size;
+		return;
+	case QDF_DP_RX_HW_CC_SPT_PAGE_TYPE:
+		*num_elements = (cfg->num_rx_sw_desc * sizeof(uint64_t)) /
+			qdf_page_size;
 		return;
 	default:
 		return;
