@@ -2748,5 +2748,25 @@ QDF_STATUS wma_p2p_self_peer_remove(struct wlan_objmgr_vdev *vdev);
  * Return: QDF_STATUS_SUCCESS for success or error code.
  */
 QDF_STATUS wma_send_reduce_pwr_scan_mode(uint32_t pdev_id, uint32_t param_val);
+
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/**
+ * wma_get_mlo_sap_emlsr() - Get sap emlsr flag
+ * @wmi_handle: wmi handler
+ *
+ * The API will return if fw support emlsr or not for mlo sap mode.
+ *
+ * Return: true if support emlsr otherwise false.
+ */
+bool
+wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle);
+#else
+static inline bool
+wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle)
+{
+	return false;
+}
+#endif
+
 #endif
 

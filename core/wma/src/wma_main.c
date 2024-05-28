@@ -10586,3 +10586,12 @@ QDF_STATUS wma_send_ani_level_request(tp_wma_handle wma_handle,
 					      num_freqs);
 }
 #endif
+
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+bool
+wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle)
+{
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_mlo_sap_emlsr_support);
+}
+#endif
