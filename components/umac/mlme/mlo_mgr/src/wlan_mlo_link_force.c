@@ -3240,7 +3240,7 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 
 			if (force_cmd->force_inactive_num > 1) {
 				force_cmd->force_inactive_num--;
-				force_cmd->force_inactive_num_bitmap |=
+				force_cmd->force_inactive_num_bitmap =
 						force_inactive_num_bitmap;
 			} else {
 				force_cmd->force_inactive_num = 0;
