@@ -1244,8 +1244,10 @@ enum policy_mgr_two_connection_mode {
  * and second STA on 5Ghz SMM
  * @PM_NAN_DISC_24_STA_24_STA_5_DBS: NAN Disc on 2.4Ghz and first STA on 2.4Ghz
  * and second STA on 5Ghz DBS
- * @PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS: NAN Disc on 2.4Ghz and and STA,
+ * @PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS: NAN Disc on 2.4Ghz and STA,
  * SAP SCC MCC on DBS
+ * @PM_NAN_DISC_24_STA_STA_SCC_MCC_DBS: NAN Disc on 2.4Ghz and STA,
+ * STA SCC MCC on DBS
  * @PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS: ANY 2 link on 5 GHZ high mac
  * and one link on 5 GHZ low doing SBS
  * @PM_STA_24_SAP_5_HIGH_MCC_STA_5_LOW_SBS : First STA on 2.4 GHZ & SAP on high
@@ -1350,6 +1352,7 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_24_STA_24_STA_5_SMM,
 	PM_NAN_DISC_24_STA_24_STA_5_DBS,
 	PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS,
+	PM_NAN_DISC_24_STA_STA_SCC_MCC_DBS,
 	PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_24_SAP_5_HIGH_MCC_STA_5_LOW_SBS =
 		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,

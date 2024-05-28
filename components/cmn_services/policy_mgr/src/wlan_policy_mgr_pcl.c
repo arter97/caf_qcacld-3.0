@@ -3879,6 +3879,9 @@ enum policy_mgr_three_connection_mode
 		sap_freq = pm_conc_connection_list[list_sap[0]].freq;
 		policy_mgr_get_index_for_ml_sta_sap(pm_ctx, &index, sap_freq,
 						    freq_list, ml_sta_idx);
+	} else if (num_ml_sta == 2 && count_nan_disc == 1) {
+		/* ML STA + SAP */
+		index = PM_NAN_DISC_24_STA_STA_SCC_MCC_DBS;
 	} else if (count_sap == 1 && count_sta == 2 && !num_ml_sta) {
 		/* This covers the below combinations,
 		 * 1. SAP + non-ML STA + non-ML STA
