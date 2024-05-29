@@ -24,6 +24,12 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_mlme_api.h"
 
+/*
+ * Max allowed active vdevs are 4 as per firmware. MAX_CONC_CXNS should be
+ * same as this.
+ */
+#define MAX_CONC_CXNS 4
+
 #ifdef WLAN_FEATURE_SR
 /**
  * policy_mgr_init_same_mac_conc_sr_status() - Function initializes default
@@ -87,7 +93,9 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 	}
 
 	cfg->max_conc_cxns = QDF_MIN(cfg->max_conc_cxns,
-				     MAX_NUMBER_OF_CONC_CONNECTIONS);
+				     QDF_MIN(MAX_NUMBER_OF_CONC_CONNECTIONS,
+					     MAX_CONC_CXNS));
+
 	cfg->conc_rule1 = cfg_get(psoc, CFG_ENABLE_CONC_RULE1);
 	cfg->conc_rule2 = cfg_get(psoc, CFG_ENABLE_CONC_RULE2);
 	cfg->pcl_band_priority = cfg_get(psoc, CFG_PCL_BAND_PRIORITY);

@@ -5944,7 +5944,8 @@ bool policy_mgr_max_concurrent_connections_reached(
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (pm_ctx) {
 		for (i = 0; i < QDF_MAX_NO_OF_MODE; i++)
-			j += pm_ctx->no_of_active_sessions[i];
+			if (i != QDF_NAN_DISC_MODE)
+				j += pm_ctx->no_of_active_sessions[i];
 		return j > (pm_ctx->cfg.max_conc_cxns - 1);
 	}
 

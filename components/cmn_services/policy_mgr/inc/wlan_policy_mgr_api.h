@@ -2524,18 +2524,22 @@ bool policy_mgr_concurrent_open_sessions_running(
 	struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_max_concurrent_connections_reached() - Check if
- * max conccurrency is reached
+ * policy_mgr_max_concurrent_connections_reached() - Check if max allowed
+ * concurrent connections are reached
  * @psoc: PSOC object information
- * Checks for presence of concurrency where more than one connection exists
  *
- * Return: True if the max concurrency is reached, False otherwise
+ * This API is to check if max allowed concurrencies are reached. This is to
+ * make sure that no more than wmi_resource_config->num_max_active_vdevs
+ * active vdevs are consumed by the concurrent connections.
+ * Don't consider NAN discovery vdev for this check as it doesn't need an
+ * active vdev in firmware.
  *
  * Example:
  *    STA + STA (wlan0 and wlan1 are connected) - returns true
  *    STA + STA (wlan0 connected and wlan1 disconnected) - returns false
  *    DUT with P2P-GO + P2P-CLIENT connection) - returns true
  *
+ * Return: true - if all active vdevs are consumed
  */
 bool policy_mgr_max_concurrent_connections_reached(
 		struct wlan_objmgr_psoc *psoc);
