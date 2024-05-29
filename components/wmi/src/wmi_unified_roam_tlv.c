@@ -938,6 +938,7 @@ static void
 wmi_extract_pdev_hw_mode_trans_ind(
 	wmi_pdev_hw_mode_transition_event_fixed_param *fixed_param,
 	wmi_pdev_set_hw_mode_response_vdev_mac_entry *vdev_mac_entry,
+	uint32_t num_mac_freq, wmi_pdev_band_to_mac *mac_freq,
 	struct cm_hw_mode_trans_ind *hw_mode_trans_ind)
 {
 	uint32_t i;
@@ -952,10 +953,11 @@ wmi_extract_pdev_hw_mode_trans_ind(
 	hw_mode_trans_ind->new_hw_mode_index = fixed_param->new_hw_mode_index;
 	hw_mode_trans_ind->num_vdev_mac_entries =
 					fixed_param->num_vdev_mac_entries;
-	wmi_debug("old_hw_mode_index:%d new_hw_mode_index:%d entries=%d",
+	wmi_debug("old_hw_mode_index:%d new_hw_mode_index:%d entries=%d num_mac_freq %d",
 		  fixed_param->old_hw_mode_index,
 		  fixed_param->new_hw_mode_index,
-		  fixed_param->num_vdev_mac_entries);
+		  fixed_param->num_vdev_mac_entries,
+		  num_mac_freq);
 
 	if (!vdev_mac_entry) {
 		wmi_err("Invalid vdev_mac_entry");
@@ -985,6 +987,29 @@ wmi_extract_pdev_hw_mode_trans_ind(
 		hw_mode_trans_ind->vdev_mac_map[i].mac_id = mac_id;
 
 		wmi_debug("vdev_id:%d mac_id:%d", vdev_id, mac_id);
+	}
+
+	if (!mac_freq) {
+		wmi_debug("mac_freq Null");
+		return;
+	}
+
+	wmi_debug("num mac freq %d", num_mac_freq);
+	if (num_mac_freq > MAX_FREQ_RANGE_NUM)
+		num_mac_freq = MAX_FREQ_RANGE_NUM;
+
+	hw_mode_trans_ind->num_freq_map = num_mac_freq;
+	for (i = 0; i < num_mac_freq; i++) {
+		hw_mode_trans_ind->mac_freq_map[i].mac_id =
+				WMI_PDEV_TO_MAC_MAP(mac_freq[i].pdev_id);
+		hw_mode_trans_ind->mac_freq_map[i].start_freq =
+							mac_freq[i].start_freq;
+		hw_mode_trans_ind->mac_freq_map[i].end_freq =
+							mac_freq[i].end_freq;
+		wmi_debug("mac id %d freq %d %d",
+			  hw_mode_trans_ind->mac_freq_map[i].mac_id,
+			  hw_mode_trans_ind->mac_freq_map[i].start_freq,
+			  hw_mode_trans_ind->mac_freq_map[i].end_freq);
 	}
 }
 
@@ -1075,6 +1100,7 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 		wmi_extract_pdev_hw_mode_trans_ind(
 		    param_buf->hw_mode_transition_fixed_param,
 		    param_buf->wmi_pdev_set_hw_mode_response_vdev_mac_mapping,
+		    0, NULL,
 		    hw_mode_trans_ind);
 		roam_event->hw_mode_trans_ind = hw_mode_trans_ind;
 	}
@@ -2460,6 +2486,8 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		wmi_extract_pdev_hw_mode_trans_ind(
 		    param_buf->hw_mode_transition_fixed_param,
 		    param_buf->wmi_pdev_set_hw_mode_response_vdev_mac_mapping,
+		    param_buf->num_mac_freq_mapping,
+		    param_buf->mac_freq_mapping,
 		    &roam_sync_ind->hw_mode_trans_ind);
 		roam_sync_ind->hw_mode_trans_present = true;
 	} else {
