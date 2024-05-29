@@ -478,6 +478,33 @@ bool sap_operating_on_dfs(struct mac_context *mac_ctx,
 	return false;
 }
 
+bool sap_plus_sap_cac_skip(struct mac_context *mac,
+			   struct sap_context *sap_ctx,
+			   qdf_freq_t chan_freq)
+{
+	uint8_t intf;
+
+	for (intf = 0; intf < SAP_MAX_NUM_SESSION; intf++) {
+		struct sap_context *sap_context =
+			mac->sap.sapCtxList[intf].sap_context;
+
+		if (!sap_context || sap_context == sap_ctx)
+			continue;
+		if (mac->sap.sapCtxList[intf].sapPersona != QDF_SAP_MODE &&
+		    mac->sap.sapCtxList[intf].sapPersona != QDF_P2P_GO_MODE)
+			continue;
+		if (sap_context->isCacEndNotified &&
+		    sap_context->chan_freq == chan_freq &&
+		    sap_operating_on_dfs(mac, sap_context)) {
+			sap_debug("SAP vid %d CAC can skip due to CAC completed on other SAP vid %d",
+				  sap_ctx->sessionId, sap_context->sessionId);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /**
  * is_wlansap_cac_required_for_chan() - Is cac required for given channel
  * @mac_ctx: mac ctx
@@ -498,6 +525,7 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t sta_cnt, i;
+	eSapDfsCACState_t cac_state = eSAP_DFS_DO_NOT_SKIP_CAC;
 
 	if (ch_params->ch_width == CH_WIDTH_160MHZ) {
 		wlan_reg_set_create_punc_bitmap(ch_params, true);
@@ -529,16 +557,17 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 	}
 	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
 		is_ch_dfs = false;
-
+	if (is_ch_dfs && sap_plus_sap_cac_skip(mac_ctx, sap_ctx, chan_freq))
+		cac_state = eSAP_DFS_SKIP_CAC;
 	sap_debug("vdev id %d chan %d is_ch_dfs %d pre_cac_complete %d ignore_cac %d cac_state %d",
 		  sap_ctx->sessionId, chan_freq, is_ch_dfs,
 		  wlan_pre_cac_complete_get(sap_ctx->vdev),
 		  mac_ctx->sap.SapDfsInfo.ignore_cac,
-		  mac_ctx->sap.SapDfsInfo.cac_state);
+		  cac_state);
 
 	if (!is_ch_dfs || wlan_pre_cac_complete_get(sap_ctx->vdev) ||
 	    mac_ctx->sap.SapDfsInfo.ignore_cac ||
-	    mac_ctx->sap.SapDfsInfo.cac_state == eSAP_DFS_SKIP_CAC)
+	    cac_state == eSAP_DFS_SKIP_CAC)
 		cac_required = false;
 	else
 		cac_required = true;
@@ -1529,7 +1558,6 @@ sap_find_valid_concurrent_session(mac_handle_t mac_handle)
 QDF_STATUS sap_clear_global_dfs_param(mac_handle_t mac_handle,
 				      struct sap_context *sap_ctx)
 {
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct sap_context *con_sap_ctx;
 
 	con_sap_ctx = sap_find_valid_concurrent_session(mac_handle);
@@ -1544,7 +1572,6 @@ QDF_STATUS sap_clear_global_dfs_param(mac_handle_t mac_handle,
 	 * as per design CAC timer should be destroyed after stop
 	 */
 	wlansap_cleanup_cac_timer(sap_ctx);
-	mac_ctx->sap.SapDfsInfo.cac_state = eSAP_DFS_DO_NOT_SKIP_CAC;
 	sap_cac_reset_notify(mac_handle);
 
 	return QDF_STATUS_SUCCESS;
@@ -2959,15 +2986,7 @@ QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 			}
 		}
 	}
-	/*
-	 * All APs are done with CAC timer, all APs should start beaconing.
-	 * Lets assume AP1 and AP2 started beaconing on DFS channel, Now lets
-	 * say AP1 goes down and comes back on same DFS channel. In this case
-	 * AP1 shouldn't start CAC timer and start beacon immediately because
-	 * AP2 is already beaconing on this channel. This case will be handled
-	 * by checking against eSAP_DFS_SKIP_CAC while starting the timer.
-	 */
-	mac->sap.SapDfsInfo.cac_state = eSAP_DFS_SKIP_CAC;
+
 	return qdf_status;
 }
 #endif
@@ -3675,6 +3694,7 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 	uint32_t sap_chan_freq;
 	uint32_t ch_cfreq1 = 0;
 	enum reg_wifi_band band;
+	eSapDfsCACState_t cac_state = eSAP_DFS_DO_NOT_SKIP_CAC;
 
 	if (msg == eSAP_MAC_START_BSS_SUCCESS) {
 		/*
@@ -3762,9 +3782,11 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 			  sap_ctx->chan_freq, is_dfs);
 		if (is_dfs) {
 			sap_dfs_info = &mac_ctx->sap.SapDfsInfo;
+			if (sap_plus_sap_cac_skip(mac_ctx, sap_ctx,
+						  sap_chan_freq))
+				cac_state = eSAP_DFS_SKIP_CAC;
 			if ((false == sap_dfs_info->ignore_cac) &&
-			    (eSAP_DFS_DO_NOT_SKIP_CAC ==
-			    sap_dfs_info->cac_state) &&
+			    (cac_state == eSAP_DFS_DO_NOT_SKIP_CAC) &&
 			    !wlan_pre_cac_complete_get(sap_ctx->vdev) &&
 			    policy_mgr_get_dfs_master_dynamic_enabled(
 					mac_ctx->psoc,
