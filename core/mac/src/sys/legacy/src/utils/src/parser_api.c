@@ -3412,7 +3412,8 @@ sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pframe,
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			util_get_bvmlie_persta_partner_info(ml_ie,
 							ml_ie_total_len,
-							&p_assoc_req->mlo_info);
+							&p_assoc_req->mlo_info,
+							WLAN_FC0_STYPE_INVALID);
 			util_get_bvmlie_mldmacaddr(ml_ie, ml_ie_total_len,
 						   &mld_mac_addr);
 			qdf_mem_copy(p_assoc_req->mld_mac, mld_mac_addr.bytes,
@@ -4015,7 +4016,8 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 
 	ml_ie_info = &p_assoc_rsp->mlo_ie.mlo_ie;
 	util_get_bvmlie_persta_partner_info(ml_ie, ml_ie_total_len,
-					    &partner_info);
+					    &partner_info,
+					    WLAN_FC0_STYPE_ASSOC_RESP);
 
 	sir_copy_assoc_rsp_partner_info_to_session(session_entry,
 						   &partner_info);
@@ -4539,7 +4541,8 @@ sir_convert_reassoc_req_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			util_get_bvmlie_persta_partner_info(ml_ie,
 							ml_ie_total_len,
-							&p_assoc_req->mlo_info);
+							&p_assoc_req->mlo_info,
+							WLAN_FC0_STYPE_INVALID);
 
 			util_get_bvmlie_mldmacaddr(ml_ie, ml_ie_total_len,
 						   &mld_mac_addr);
@@ -5542,7 +5545,8 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 			status = util_get_bvmlie_persta_partner_info(
 								ml_ie,
 								ml_ie_total_len,
-								&partner_info);
+								&partner_info,
+								WLAN_FC0_STYPE_INVALID);
 			if (QDF_IS_STATUS_ERROR(status))
 				return status;
 			bcn_struct->mlo_ie.mlo_ie.num_sta_profile =
