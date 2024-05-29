@@ -415,6 +415,7 @@ struct fisa_pkt_hist {
  * @rx_flow_tuple_info: RX tuple information
  * @napi_id: NAPI ID (REO ID) on which the flow is being received
  * @vdev: VDEV handle corresponding to the FLOW
+ * @vdev_id: DP vdev id
  * @dp_intf: DP interface handle corresponding to the flow
  * @bytes_aggregated: Number of bytes currently aggregated
  * @flush_count: Number of Flow flushes done
@@ -459,6 +460,7 @@ struct dp_fisa_rx_sw_ft {
 	struct cdp_rx_flow_tuple_info rx_flow_tuple_info;
 	uint8_t napi_id;
 	struct dp_vdev *vdev;
+	uint8_t vdev_id;
 	struct wlan_dp_intf *dp_intf;
 	uint64_t bytes_aggregated;
 	uint32_t flush_count;
