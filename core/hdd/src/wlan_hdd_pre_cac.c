@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -267,10 +267,22 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	hdd_debug("channel: %d", chan_freq);
+	cac_ch_width = wlansap_get_max_bw_by_phymode(hdd_ap_ctx->sap_context);
+	if (cac_ch_width > DEFAULT_PRE_CAC_BANDWIDTH)
+		cac_ch_width = DEFAULT_PRE_CAC_BANDWIDTH;
+	if (chan_freq) {
+		qdf_mem_zero(&chandef, sizeof(struct cfg80211_chan_def));
+		if (wlan_set_def_pre_cac_chan(hdd_ctx, chan_freq, &chandef,
+					      &channel_type, &cac_ch_width)) {
+			hdd_err("failed to set pre_cac channel %d", chan_freq);
+			return -EINVAL;
+		}
+	}
+	hdd_debug("channel: %d bw: %d", chan_freq, cac_ch_width);
 
 	ret = ucfg_pre_cac_validate_and_get_freq(hdd_ctx->pdev, chan_freq,
-						 &pre_cac_chan_freq);
+						 &pre_cac_chan_freq,
+						 cac_ch_width);
 	if (ret != 0) {
 		hdd_err("can't validate pre-cac channel");
 		goto release_intf_addr_and_return_failure;
