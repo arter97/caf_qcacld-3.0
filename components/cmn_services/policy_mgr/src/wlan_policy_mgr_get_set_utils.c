@@ -11367,6 +11367,10 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							 vdev_id_list,
 							 PM_STA_MODE);
+
+	if (sta_cnt >= MAX_NUMBER_OF_CONC_CONNECTIONS)
+		return false;
+
 	gc_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							&vdev_id_list[sta_cnt],
 							PM_P2P_CLIENT_MODE);
