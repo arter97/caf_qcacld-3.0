@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,6 +34,9 @@
 #include "wlan_mlme_main.h"
 
 #define CSR_INVALID_SCANRESULT_HANDLE       (NULL)
+
+/* Length to print MAC 12 char + 5 ":" + 2 space + mld string */
+#define MAC_ADDR_DUMP_LEN 26
 
 enum csr_akm_type {
 	/* never used */
@@ -748,6 +751,7 @@ typedef struct tagCsrEseBeaconReq {
 
 struct csr_del_sta_params {
 	struct qdf_mac_addr peerMacAddr;
+	struct qdf_mac_addr peer_mld_addr;
 	uint16_t reason_code;
 	uint8_t subtype;
 };

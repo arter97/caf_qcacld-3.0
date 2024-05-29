@@ -564,28 +564,50 @@ static void sme_dump_peer_disconnect_timeout_info(tSmeCmd *sme_cmd)
 {
 	struct wmstatus_changecmd *wms_cmd;
 	struct qdf_mac_addr peer_macaddr = QDF_MAC_ADDR_ZERO_INIT;
+	struct qdf_mac_addr peer_mld_addr = QDF_MAC_ADDR_ZERO_INIT;
+	char mld_log_str[MAC_ADDR_DUMP_LEN] = {0};
 
 	if (sme_cmd->command == eSmeCommandRoam &&
 	    (sme_cmd->u.roamCmd.roamReason == eCsrForcedDisassocSta ||
 	    sme_cmd->u.roamCmd.roamReason == eCsrForcedDeauthSta)) {
 		qdf_mem_copy(peer_macaddr.bytes, sme_cmd->u.roamCmd.peerMac,
 			     QDF_MAC_ADDR_SIZE);
+		if (!qdf_is_macaddr_zero(&sme_cmd->u.roamCmd.peer_mld_addr))
+			qdf_copy_macaddr(&peer_mld_addr,
+					 &sme_cmd->u.roamCmd.peer_mld_addr);
 	} else if (sme_cmd->command == eSmeCommandWmStatusChange) {
 		wms_cmd = &sme_cmd->u.wmStatusChangeCmd;
-		if (wms_cmd->Type == eCsrDisassociated)
+		if (wms_cmd->Type == eCsrDisassociated) {
 			qdf_copy_macaddr(
 				&peer_macaddr,
 				&wms_cmd->u.DisassocIndMsg.peer_macaddr);
-		else if (wms_cmd->Type == eCsrDeauthenticated)
+			if (!qdf_is_macaddr_zero(
+				&wms_cmd->u.DisassocIndMsg.peer_mld_addr))
+				qdf_copy_macaddr(
+					&peer_mld_addr,
+					&wms_cmd->u.DisassocIndMsg.peer_mld_addr);
+		} else if (wms_cmd->Type == eCsrDeauthenticated) {
 			qdf_copy_macaddr(
 				&peer_macaddr,
 				&wms_cmd->u.DeauthIndMsg.peer_macaddr);
+			if (!qdf_is_macaddr_zero(
+				&wms_cmd->u.DeauthIndMsg.peer_mld_addr))
+				qdf_copy_macaddr(
+					&peer_mld_addr,
+					&wms_cmd->u.DeauthIndMsg.peer_mld_addr);
+		}
 	}
 
+	if (!qdf_is_macaddr_zero(&peer_mld_addr))
+		qdf_scnprintf(mld_log_str, MAC_ADDR_DUMP_LEN,
+			      " mld: " QDF_MAC_ADDR_FMT,
+			      QDF_MAC_ADDR_REF(peer_mld_addr.bytes));
+
 	if (!qdf_is_macaddr_zero(&peer_macaddr))
-		sme_err("vdev %d cmd %d timeout for peer " QDF_MAC_ADDR_FMT,
+		sme_err("vdev %d cmd %d timeout for peer " QDF_MAC_ADDR_FMT "%s",
 			sme_cmd->vdev_id, sme_cmd->command,
-			QDF_MAC_ADDR_REF(peer_macaddr.bytes));
+			QDF_MAC_ADDR_REF(peer_macaddr.bytes), mld_log_str);
+
 }
 
 QDF_STATUS sme_ser_cmd_callback(struct wlan_serialization_command *cmd,
