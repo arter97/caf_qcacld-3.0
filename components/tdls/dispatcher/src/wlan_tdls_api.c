@@ -33,6 +33,21 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_sta.h"
 
+void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
+				      struct tdls_callbacks *cbs)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							WLAN_UMAC_COMP_TDLS);
+	if (!soc_obj) {
+		tdls_err("Failed to get tdls psoc component");
+		return;
+	}
+
+	soc_obj->tdls_cb.delete_all_tdls_peers = cbs->delete_all_tdls_peers;
+}
+
 static QDF_STATUS tdls_teardown_flush_cb(struct scheduler_msg *msg)
 {
 	struct tdls_link_teardown *tdls_teardown = msg->bodyptr;
@@ -592,4 +607,24 @@ bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
 		return true;
 
 	return false;
+}
+
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct tdls_soc_priv_obj *soc_obj;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							WLAN_UMAC_COMP_TDLS);
+	if (!soc_obj) {
+		tdls_err("Failed to get tdls psoc component");
+		return;
+	}
+
+	if (soc_obj->tdls_cb.delete_all_tdls_peers)
+		soc_obj->tdls_cb.delete_all_tdls_peers(vdev);
 }

@@ -154,6 +154,7 @@ static bool wlan_hdd_is_tdls_allowed(struct hdd_context *hdd_ctx,
 				     struct wlan_objmgr_vdev *vdev)
 {
 	bool tdls_support;
+	struct wlan_hdd_link_info *link_info;
 
 	if ((cfg_tdls_get_support_enable(hdd_ctx->psoc, &tdls_support) ==
 		QDF_STATUS_SUCCESS) && !tdls_support) {
@@ -179,6 +180,13 @@ static bool wlan_hdd_is_tdls_allowed(struct hdd_context *hdd_ctx,
 
 	if (ucfg_mlme_get_tdls_prohibited(vdev)) {
 		hdd_debug("TDLS is prohobited by AP");
+		return false;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
+	if (wlan_hdd_is_link_switch_in_progress(link_info)) {
+		hdd_debug("vdev:%d Link switch in progress",
+			  wlan_vdev_get_id(vdev));
 		return false;
 	}
 
