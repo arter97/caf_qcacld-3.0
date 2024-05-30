@@ -669,9 +669,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		if (bcn->he_op.oper_info_6g_present) {
 			session->ap_defined_power_type_6g =
 					bcn->he_op.oper_info_6g.info.reg_info;
-			if (session->ap_defined_power_type_6g < REG_INDOOR_AP ||
-			    session->ap_defined_power_type_6g >
-			    REG_MAX_SUPP_AP_TYPE) {
+			if (lim_is_ap_power_type_6g_invalid(session)) {
 				session->ap_defined_power_type_6g =
 						REG_CURRENT_MAX_AP_TYPE;
 				pe_debug("AP power type is invalid, defaulting to MAX_AP_TYPE");

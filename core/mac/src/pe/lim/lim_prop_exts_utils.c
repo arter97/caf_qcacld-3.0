@@ -128,8 +128,7 @@ static void lim_extract_he_op(struct pe_session *session,
 		session->he_op.oper_info_6g.info.center_freq_seg1;
 	session->ap_defined_power_type_6g =
 		session->he_op.oper_info_6g.info.reg_info;
-	if (session->ap_defined_power_type_6g < REG_INDOOR_AP ||
-	    session->ap_defined_power_type_6g > REG_MAX_SUPP_AP_TYPE) {
+	if (lim_is_ap_power_type_6g_invalid(session)) {
 		session->ap_defined_power_type_6g = REG_CURRENT_MAX_AP_TYPE;
 		pe_debug("AP power type invalid, defaulting to MAX_AP_TYPE");
 	}

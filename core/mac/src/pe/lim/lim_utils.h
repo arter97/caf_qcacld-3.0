@@ -3065,12 +3065,18 @@ static inline void lim_ap_check_6g_compatible_peer(
  * @LOCAL_EIRP_PSD: Local PSD power interpretation
  * @REGULATORY_CLIENT_EIRP: Regulatory power interpretation
  * @REGULATORY_CLIENT_EIRP_PSD: Regulatory PSD power interpretation
+ * @ADDITIONAL_REGULATORY_CLIENT_EIRP: Additional Regulatory power
+ * interpretation
+ * @ADDITIONAL_REGULATORY_CLIENT_EIRP_PSD: Additional Regulatory PSD power
+ * interpretation
  */
 enum max_tx_power_interpretation {
 	LOCAL_EIRP = 0,
 	LOCAL_EIRP_PSD,
 	REGULATORY_CLIENT_EIRP,
 	REGULATORY_CLIENT_EIRP_PSD,
+	ADDITIONAL_REGULATORY_CLIENT_EIRP,
+	ADDITIONAL_REGULATORY_CLIENT_EIRP_PSD,
 };
 
 /**
@@ -3102,6 +3108,15 @@ void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
 				    struct pe_session *session,
 				    struct bss_description *bss_desc,
 				    bool *has_tpe_updated);
+
+/**
+ * lim_is_ap_power_type_6g_invalid() - Check if the AP power type for 6 GHz
+ * channel is invalid
+ * @session: pe session
+ *
+ * Return: true if invalid else false
+ */
+bool lim_is_ap_power_type_6g_invalid(struct pe_session *session);
 
 /**
  * lim_send_conc_params_update() - Function to check and update params based on
