@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -142,6 +142,14 @@ struct tdls_set_state_info {
 };
 
 /**
+ * struct tdls_callbacks - vdev id state info
+ * @delete_all_tdls_peers: Callback to lim to delete TDLS peers
+ */
+struct tdls_callbacks {
+	QDF_STATUS (*delete_all_tdls_peers) (struct wlan_objmgr_vdev *vdev);
+};
+
+/**
  * struct tdls_soc_priv_obj - tdls soc private context
  * @soc: objmgr psoc
  * @tdls_current_mode: current tdls mode
@@ -198,6 +206,7 @@ struct tdls_set_state_info {
  * @timer_cnt: used for mlo tdls to monitor discovery response
  * @fw_tdls_wideband_capability: bool for tdls wideband fw capability
  * @is_user_tdls_enable: bool to check whether TDLS enable through userspace
+ * @tdls_cb: TDLS callbacks to other modules
  */
 struct tdls_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -258,6 +267,7 @@ struct tdls_soc_priv_obj {
 	qdf_atomic_t timer_cnt;
 	bool fw_tdls_wideband_capability;
 	bool is_user_tdls_enable;
+	struct tdls_callbacks tdls_cb;
 };
 
 /**

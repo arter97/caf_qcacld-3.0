@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -215,6 +215,9 @@ QDF_STATUS if_mgr_disconnect_start(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 
 	qdf_runtime_pm_prevent_suspend(&mlme_priv->disconnect_runtime_lock);
+
+	if (mlo_mgr_is_link_switch_in_progress(vdev))
+		wlan_tdls_delete_all_peers(vdev);
 
 	return QDF_STATUS_SUCCESS;
 }
