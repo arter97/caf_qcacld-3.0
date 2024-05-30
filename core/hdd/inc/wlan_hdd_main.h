@@ -5570,6 +5570,23 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 				     int32_t ieee_new_link_id, uint8_t vdev_id);
 
 /**
+ * hdd_roam_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV
+ * mac addr update due to roaming.
+ * @vdev: vdev pointer
+ * @old_self_mac: Current self link mac of VDEV
+ * @new_self_mac: New self link mac of VDEV
+ *
+ * Check if both @old_self_mac and @new_self_mac are part of adapter
+ * corresponding to @vdev_id. Then take necessary actions to support
+ * MAC update and update DP to change link MAC address to new link's address.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
+					 struct qdf_mac_addr *old_self_mac,
+					 struct qdf_mac_addr *new_self_mac);
+
+/**
  * hdd_get_link_info_by_ieee_link_id() - Find link info pointer matching with
  * IEEE link ID.
  * @adapter: HDD adapter
@@ -5585,12 +5602,23 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 struct wlan_hdd_link_info *
 hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
 				  int32_t link_id, bool is_cache);
+
+QDF_STATUS
+hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
+					struct wlan_hdd_link_info *new_link_info);
 #else
 static inline struct wlan_hdd_link_info *
 hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
 				  int32_t link_id, bool is_cache)
 {
 	return NULL;
+}
+
+static inline QDF_STATUS
+hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
+					struct wlan_hdd_link_info *new_link_info)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
