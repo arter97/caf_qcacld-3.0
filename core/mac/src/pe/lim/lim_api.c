@@ -564,6 +564,20 @@ static inline void lim_nan_register_callbacks(struct mac_context *mac_ctx)
 }
 #endif
 
+#ifdef FEATURE_WLAN_TDLS
+static void lim_register_tdls_callbacks(struct mac_context *mac_ctx)
+{
+	struct tdls_callbacks tdls_cb = {0};
+
+	tdls_cb.delete_all_tdls_peers = lim_delete_all_tdls_peers;
+
+	wlan_tdls_register_lim_callbacks(mac_ctx->psoc, &tdls_cb);
+}
+#else
+static inline void lim_register_tdls_callbacks(struct mac_context *mac_ctx)
+{}
+#endif
+
 void lim_stop_pmfcomeback_timer(struct pe_session *session)
 {
 	if (session->opmode != QDF_STA_MODE)
@@ -860,6 +874,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	lim_register_debug_callback();
 	lim_nan_register_callbacks(mac);
 	p2p_register_callbacks(mac);
+	lim_register_tdls_callbacks(mac);
 	lim_register_scan_mbssid_callback(mac);
 	lim_register_sap_bcn_callback(mac);
 	wlan_reg_register_ctry_change_callback(
