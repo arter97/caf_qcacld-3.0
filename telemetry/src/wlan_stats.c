@@ -4600,7 +4600,7 @@ static QDF_STATUS get_debug_peer_ctrl_tx(struct unified_stats *stats,
 	ctrl->cs_tx_dropblock = cp_stats->cs_tx_dropblock;
 	ctrl->cs_is_tx_nobuf = cp_stats->cs_is_tx_nobuf;
 	ctrl->rts_success = peer_stats->tx.rts_success;
-	ctrl->rts_success = peer_stats->tx.rts_failure;
+	ctrl->rts_failure = peer_stats->tx.rts_failure;
 	ctrl->bar_cnt = peer_stats->tx.bar_cnt;
 	ctrl->ndpa_cnt = peer_stats->tx.ndpa_cnt;
 
