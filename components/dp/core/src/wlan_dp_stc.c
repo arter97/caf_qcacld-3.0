@@ -524,7 +524,7 @@ wlan_dp_stc_check_ping_activity(struct wlan_dp_stc *dp_stc,
 	}
 }
 
-#define FLOW_INACTIVE_TIME_THRESH_NS 10000000000
+#define FLOW_INACTIVE_TIME_THRESH_NS 20000000000
 #define FLOW_RESUME_TIME_THRESH_NS 500000000
 
 static inline void
@@ -563,7 +563,7 @@ wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 	}
 
 	active_traffic_map = &dp_stc->peer_traffic_map[c_entry->peer_id];
-	if (active_traffic_map->valid)
+	if (active_traffic_map->valid && c_entry->flow_active)
 		wlan_dp_stc_dec_traffic_type(active_traffic_map,
 					     c_entry->traffic_type);
 
@@ -980,6 +980,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 					&candidates[candidate_idx],
 					tx_flow_id, tx_flow_metadata,
 					rx_flow_id, rx_flow->metadata);
+			candidates[candidate_idx].peer_id = rx_flow->peer_id;
 			candidates[candidate_idx].dir = WLAN_DP_FLOW_DIR_BIDI;
 			candidate_idx++;
 			bidi--;

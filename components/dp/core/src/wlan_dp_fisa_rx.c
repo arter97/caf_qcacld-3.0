@@ -1058,6 +1058,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 
 	sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 	sw_ft_entry->is_flow_udp = elem->is_udp_flow;
+	sw_ft_entry->peer_id = elem->peer_id;
 	sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
 	sw_ft_entry->flow_init_ts = qdf_sched_clock();
 
