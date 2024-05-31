@@ -1536,10 +1536,17 @@ struct debug_pdev_data_raw {
 	uint32_t num_frags_overflow_err;
 };
 
+struct stats_if_tso_packet_info {
+	uint8_t num_seg;
+	size_t tso_packet_len;
+	uint32_t tso_seg_idx;
+};
+
 struct debug_pdev_data_tso {
 	struct pkt_info dropped_host;
 	struct pkt_info tso_no_mem_dropped;
 	uint32_t dropped_target;
+	struct stats_if_tso_packet_info pkt_info[STATS_IF_TSO_PACKETS_MAX];
 };
 
 struct debug_pdev_data_cfr {
