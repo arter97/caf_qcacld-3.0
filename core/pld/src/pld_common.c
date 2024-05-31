@@ -863,6 +863,7 @@ int pld_request_bus_bandwidth(struct device *dev, int bandwidth)
 	case PLD_BUS_TYPE_SNOC:
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_request_bus_bandwidth(dev, bandwidth);
 		break;
 	case PLD_BUS_TYPE_SDIO:
 		/* To do Add call cns API */
