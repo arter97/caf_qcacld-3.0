@@ -1631,9 +1631,7 @@ dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
 	filter_category = ppdu_info->rx_user_status[user].filter_category;
 	switch (filter_category) {
 	case DP_MPDU_FILTER_CATEGORY_FP:
-		if (config->rx_config.fp_enabled &&
-		    (!config->rx_config.peer_count ||
-		     !config->rx_config.fpmo_enabled)) {
+		if (config->rx_config.fp_enabled) {
 			if (config->fp_type_subtype_filter_all)
 				return QDF_STATUS_SUCCESS;
 			else
@@ -1648,9 +1646,7 @@ dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
 			return QDF_STATUS_SUCCESS;
 		break;
 	case DP_MPDU_FILTER_CATEGORY_MO:
-		if (config->rx_config.mo_enabled &&
-		    (!config->rx_config.peer_count ||
-		     !config->rx_config.md_enabled))
+		if (config->rx_config.mo_enabled)
 			return QDF_STATUS_SUCCESS;
 		break;
 	case DP_MPDU_FILTER_CATEGORY_FP_MO:
