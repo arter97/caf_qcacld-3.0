@@ -1309,7 +1309,7 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id))
-		tgt_dfs_radar_enable(wma->pdev, 0, 0, true);
+		policy_mgr_update_dfs_master_dynamic_enabled(psoc, true);
 
 	iface = &wma->interfaces[rsp->vdev_id];
 	if (!iface->vdev) {
