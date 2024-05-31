@@ -17536,8 +17536,6 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 		return -EINVAL;
 
 	cds_set_driver_state_module_stop(true);
-	if (!is_recovery_stop)
-		ucfg_ipa_uc_shutdown_opt_dp_ctrl_cleanup(hdd_ctx->pdev);
 
 	debugfs_threads = hdd_return_debugfs_threads_count();
 
@@ -17569,6 +17567,9 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 		goto done;
 	case DRIVER_MODULES_ENABLED:
 		hdd_debug("Wlan transitioning (CLOSED <- ENABLED)");
+		if (!is_recovery_stop)
+			ucfg_ipa_uc_shutdown_opt_dp_ctrl_cleanup(hdd_ctx->pdev);
+
 		hdd_son_send_module_status_event(HDD_WLAN_STATUS_EVT_DOWN);
 		if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
 			hdd_disable_power_management(hdd_ctx);
