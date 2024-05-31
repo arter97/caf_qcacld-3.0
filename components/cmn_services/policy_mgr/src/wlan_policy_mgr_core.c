@@ -1598,17 +1598,18 @@ static uint32_t policy_mgr_dump_current_concurrency_5_connection(
 
 	mode = pm_conc_connection_list[4].mode;
 	qdf_scnprintf(buf, sizeof(buf), "(vdev %d)",
-		      pm_conc_connection_list[3].vdev_id);
+		      pm_conc_connection_list[4].vdev_id);
 
 	switch (mode) {
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
 					pm_ctx->psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+", length);
-		count += strlcat(cc_mode,
-				 ml_sta_prefix(
-				 pm_ctx->psoc, pm_conc_connection_list[3].vdev_id),
-				 length);
+		count += strlcat(
+			cc_mode,
+			ml_sta_prefix(
+			pm_ctx->psoc, pm_conc_connection_list[4].vdev_id),
+			length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
@@ -4277,6 +4278,8 @@ bool policy_mgr_allow_new_home_channel(
 	uint32_t ext_flags)
 {
 	bool status = true;
+	uint8_t conn_index, count = 0;
+	bool nan_present;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool on_same_mac = false, force_switch_without_dis = false;
 
@@ -4296,6 +4299,33 @@ bool policy_mgr_allow_new_home_channel(
 		QDF_MCC_TO_SCC_SWITCH_FORCE_PREFERRED_WITHOUT_DISCONNECTION;
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	/* Allow 3rd home channel on same mac if NAN interface is present */
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (pm_conc_connection_list[conn_index].in_use &&
+		    pm_conc_connection_list[conn_index].mode !=
+		    PM_NAN_DISC_MODE &&
+		    pm_conc_connection_list[conn_index].mode != PM_NDI_MODE) {
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			    pm_conc_connection_list[conn_index].freq))
+				count++;
+		}
+	}
+
+	nan_present = policy_mgr_mode_specific_connection_count(
+					psoc,
+					PM_NAN_DISC_MODE,
+					NULL);
+
+	if (count <= 2 && nan_present &&
+	    WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq) &&
+	    (wlan_nan_is_sta_sap_nan_allowed(psoc) ||
+	    wlan_nan_is_sta_p2p_ndp_supported(psoc))) {
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+		return true;
+	}
+
 	if (num_connections == 3) {
 		status = policy_mgr_allow_4th_new_freq(psoc,
 						       ch_freq, mode,

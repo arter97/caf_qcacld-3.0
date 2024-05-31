@@ -2390,17 +2390,18 @@ policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 					freq_2g = list_sta[i];
 			}
 		}
-
-		status = policy_mgr_change_sap_channel_with_csa(
+		if (sap_info->freq != freq_2g) {
+			status = policy_mgr_change_sap_channel_with_csa(
 						psoc, sap_info->vdev_id,
 						freq_2g,
 						CH_WIDTH_40MHZ,
 						true);
 
-		policy_mgr_debug("Force SCC for SAP Ch freq: %d",
-				 freq_2g);
-		if (status == QDF_STATUS_SUCCESS)
-			status = QDF_STATUS_E_PENDING;
+			policy_mgr_debug("Force SCC for SAP Ch freq: %d",
+					 freq_2g);
+			if (status == QDF_STATUS_SUCCESS)
+				status = QDF_STATUS_E_PENDING;
+		}
 	}
 end:
 	pm_ctx->sta_ap_intf_check_work_info->nan_force_scc_in_progress = false;
