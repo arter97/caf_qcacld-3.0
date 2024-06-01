@@ -839,11 +839,13 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 	if (flow->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, flow->tx_flow_id);
 		tx_flow->classified = 1;
+		tx_flow->selected_to_sample = 0;
 	}
 
 	if (flow->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, flow->rx_flow_id);
 		rx_flow->classified = 1;
+		rx_flow->selected_to_sample = 0;
 	}
 
 	if (!wlan_dp_stc_is_traffic_type_known(flow->traffic_type)) {
