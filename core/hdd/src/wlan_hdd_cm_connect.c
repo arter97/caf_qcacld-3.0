@@ -364,7 +364,8 @@ hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id,
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	hdd_debug("old_link_id:%d new_link_id:%d",
+	hdd_debug("%s: old_link_id:%d new_link_id:%d",
+		  is_cache ? "cache_conn_info" : "conn_info",
 		  is_cache ? sta_ctx->cache_conn_info.ieee_link_id :
 		  sta_ctx->conn_info.ieee_link_id, link_id);
 	if (is_cache)
@@ -379,8 +380,9 @@ hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	hdd_debug("clear link id:%d",
-		  is_cache ? sta_ctx->conn_info.ieee_link_id :
+	hdd_debug("%s: clear link id:%d",
+		  is_cache ? "cache_conn_info" : "conn_info",
+		  is_cache ? sta_ctx->cache_conn_info.ieee_link_id :
 		  sta_ctx->conn_info.ieee_link_id);
 	if (is_cache)
 		sta_ctx->cache_conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
