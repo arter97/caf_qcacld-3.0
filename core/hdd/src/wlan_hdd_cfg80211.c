@@ -12284,7 +12284,7 @@ hdd_set_coex_traffic_shaping_mode(struct wlan_hdd_link_info *link_info,
 	return ret;
 }
 
-#define STA_KEEPALIVE_INTERVAL_MAX 60
+#define STA_KEEPALIVE_INTERVAL_MAX 255
 #define STA_KEEPALIVE_INTERVAL_MIN 5
 
 int hdd_vdev_send_sta_keep_alive_interval(
