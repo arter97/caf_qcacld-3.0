@@ -1434,14 +1434,11 @@ qdf_export_symbol(qca_multi_link_set_dbdc_loop_detection_cb);
 bool qca_multi_link_drone_mesh_mcast_drop(struct net_device *net_dev,
 							qdf_nbuf_t nbuf)
 {
-	uint8_t is_mcast;
-	qdf_ether_header_t *eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
-
-	is_mcast = IEEE80211_IS_MULTICAST(eh->ether_dhost);
-	if (is_mcast)
-		return 1;
+	if (qdf_nbuf_data_is_ipv6_mcast_pkt(qdf_nbuf_data(nbuf)) ||
+	    qdf_nbuf_data_is_ipv4_mcast_pkt(qdf_nbuf_data(nbuf)))
+		return true;
 	else
-		return 0;
+		return false;
 }
 
 qdf_export_symbol(qca_multi_link_drone_mesh_mcast_drop);
