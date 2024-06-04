@@ -2441,7 +2441,9 @@ fourth_connection_pcl_dbs_sbs_table
 			  PM_SCC_ON_5_SCC_ON_24_5G_24G},
 	[PM_P2P_GO_MODE] = { PM_SCC_ON_5_5G_SCC_ON_24_24G,
 			     PM_SCC_ON_5_5G_SCC_ON_24_24G,
-			     PM_SCC_ON_5_SCC_ON_24_5G_24G} },
+			     PM_SCC_ON_5_SCC_ON_24_5G_24G},
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
 	[PM_NAN_DISC_24_STA_STA_SCC_MCC_DBS] = {
 	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
 	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
@@ -2457,7 +2459,9 @@ fourth_connection_pcl_dbs_sbs_table
 			  PM_SCC_ON_5_SCC_ON_24_5G_24G},
 	[PM_P2P_GO_MODE] = { PM_SCC_ON_5_5G_SCC_ON_24_24G,
 			     PM_SCC_ON_5_5G_SCC_ON_24_24G,
-			     PM_SCC_ON_5_SCC_ON_24_5G_24G} },
+			     PM_SCC_ON_5_SCC_ON_24_5G_24G},
+	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
+			  PM_SCC_ON_5_5G_24G } },
 
 	/* NAN + P2P */
 	[PM_NAN_NDI_P2P_SCC_MCC_DBS] = {
