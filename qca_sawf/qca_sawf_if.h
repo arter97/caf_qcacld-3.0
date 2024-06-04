@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _DP_SAWF_H__
-#define _DP_SAWF_H_
+#ifndef __DP_SAWF_H__
+#define __DP_SAWF_H__
 
 /* qca_sawf_metadata_param
  *
