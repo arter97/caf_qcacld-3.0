@@ -1912,6 +1912,10 @@ static void hdd_handle_country_change_work_error(struct hdd_context *hdd_ctx,
 		qdf_sched_work(0, &hdd_ctx->country_change_work);
 	} else {
 		hdd_err("can not handle country change %d", errno);
+		qdf_event_set_all(&hdd_ctx->regulatory_update_event);
+		qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
+		hdd_ctx->is_regulatory_update_in_progress = false;
+		qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
 	}
 }
 
