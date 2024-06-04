@@ -27,6 +27,7 @@
 #include <wlan_scan_utils_api.h>
 #include "wlan_dlm_tgt_api.h"
 #include <wlan_cm_bss_score_param.h>
+#include <wlan_dlm_public_struct.h>
 
 #define SECONDS_TO_MS(params)       ((params) * 1000)
 #define MINUTES_TO_MS(params)       (SECONDS_TO_MS(params) * 60)
@@ -197,8 +198,15 @@ dlm_prune_old_entries_and_get_action(struct dlm_reject_ap *dlm_entry,
 			  dlm_entry->reject_ap_type);
 
 		if (DLM_IS_AP_DENYLISTED_BY_USERSPACE(dlm_entry) ||
-		    DLM_IS_AP_IN_RSSI_REJECT_LIST(dlm_entry))
-			return CM_DLM_FORCE_REMOVE;
+		    DLM_IS_AP_IN_RSSI_REJECT_LIST(dlm_entry)) {
+			if (dlm_entry->reject_ap_reason == REASON_UNKNOWN ||
+			    dlm_entry->reject_ap_reason == REASON_NUD_FAILURE ||
+			    dlm_entry->reject_ap_reason == REASON_STA_KICKOUT ||
+			    dlm_entry->reject_ap_reason == REASON_ROAM_HO_FAILURE)
+				return CM_DLM_REMOVE;
+			else
+				return CM_DLM_FORCE_REMOVE;
+		}
 
 		return CM_DLM_REMOVE;
 	}
