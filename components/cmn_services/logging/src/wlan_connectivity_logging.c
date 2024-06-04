@@ -1034,6 +1034,8 @@ wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
 	/* for candidate not found case*/
 	if (con_req) {
 		req = *con_req;
+		qdf_mem_zero(&req.scan_ie, sizeof(struct element_info));
+		qdf_mem_zero(&req.assoc_ie, sizeof(struct element_info));
 	} else {
 		status = wlan_cm_get_active_connect_req_param(vdev, &req);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -1073,6 +1075,16 @@ wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.grp_cipher = req.crypto.user_grp_cipher;
 	wlan_diag_event.akm = req.crypto.user_akm_suite;
 	wlan_diag_event.auth_algo = req.crypto.user_auth_type;
+
+	if (req.scan_ie.len) {
+		qdf_mem_free(req.scan_ie.ptr);
+		qdf_mem_zero(&req.scan_ie, sizeof(struct element_info));
+	}
+
+	if (req.assoc_ie.len) {
+		qdf_mem_free(req.assoc_ie.ptr);
+		qdf_mem_zero(&req.assoc_ie, sizeof(struct element_info));
+	}
 
 	wlan_diag_event.bt_coex =
 		wlan_mlme_get_bt_profile_con(wlan_vdev_get_psoc(vdev));
