@@ -1008,14 +1008,13 @@ static int hdd_get_station_info(struct wlan_hdd_link_info *link_info)
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	if (hdd_cm_is_vdev_connected(link_info)) {
-		hdd_err("Station is connected, command is not supported");
+	if (!wlan_cm_is_vdev_disconnected(link_info->vdev)) {
+		hdd_debug("Station is not in disconnect state, command is not supported");
 		return -EINVAL;
 	}
 
-	if (hdd_is_roaming_in_progress(hdd_ctx) &&
-	    hdd_is_connection_in_progress(NULL, NULL)) {
-		hdd_err("Connection in progress, command is not supported");
+	if (qdf_is_macaddr_zero(&hdd_sta_ctx->cache_conn_info.bssid)) {
+		hdd_err("Connection never happened");
 		return -EINVAL;
 	}
 
