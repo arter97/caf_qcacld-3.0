@@ -29,6 +29,10 @@ _target_chipset_map = {
     "x1e80100": [
         "kiwi-v2",
     ],
+    "canoe": [
+        "peach-v2",
+        "kiwi-v2",
+    ],
 }
 
 _chipset_hw_map = {
