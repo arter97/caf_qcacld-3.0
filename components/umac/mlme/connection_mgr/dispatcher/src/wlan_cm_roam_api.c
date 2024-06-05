@@ -3332,7 +3332,8 @@ static void cm_roam_stats_process_roam_msg_info(struct wlan_objmgr_psoc *psoc,
 	char time[TIME_STRING_LEN];
 	static const char msg_id1_str[] = "Roam RSSI TH Reset";
 
-	if (data->msg_id == WMI_ROAM_MSG_RSSI_RECOVERED) {
+	if (data->msg_id == WMI_ROAM_MSG_RSSI_RECOVERED ||
+	    data->msg_id == WMI_ROAM_MSG_CONNECTED_IN_POOR_RSSI) {
 		mlme_get_converted_timestamp(data->timestamp, time);
 		mlme_nofl_info("%s [ROAM MSG INFO]: VDEV[%d] %s, Current rssi: %d dbm, next_rssi_threshold: %d dbm",
 			       time, vdev_id, msg_id1_str, data->msg_param1,
