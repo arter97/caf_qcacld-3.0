@@ -4772,21 +4772,13 @@ fail:
 	return status;
 }
 
-QDF_STATUS cm_process_join_req(struct scheduler_msg *msg)
+QDF_STATUS cm_process_join_req(struct cm_vdev_join_req *join_req)
 {
-	struct cm_vdev_join_req *req;
 	QDF_STATUS status;
 
-	if (!msg || !msg->bodyptr) {
-		pe_err("msg or msg->bodyptr is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	req = msg->bodyptr;
-
-	status = lim_cm_handle_join_req(req);
+	status = lim_cm_handle_join_req(join_req);
 	if (status != QDF_STATUS_E_PENDING)
-		cm_free_join_req(req);
+		cm_free_join_req(join_req);
 
 	return status;
 }

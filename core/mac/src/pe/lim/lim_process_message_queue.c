@@ -2150,9 +2150,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case CM_BSS_PEER_CREATE_REQ:
 		cm_process_peer_create(msg);
 		break;
-	case CM_CONNECT_REQ:
-		cm_process_join_req(msg);
-		break;
 	case CM_REASSOC_REQ:
 		cm_process_reassoc_req(msg);
 		break;
