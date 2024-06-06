@@ -5554,6 +5554,23 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+/**
+ * hdd_link_rej_mac_addr_update() - API to update OSIF/HDD on VDEV
+ * mac addr update due to link rejection.
+ * @ieee_rej_link_id: Rejected IEEE link ID
+ * @ieee_acc_link_id: Accepted IEEE link ID
+ * @vdev_id: VDEV undergoing link rejection.
+ *
+ * Check if both @ieee_rej_link_id and @ieee_acc_link_id are part of adapter
+ * corresponding to @vdev_id. Then take necessary actions to support link reject
+ * MAC update and reset hdd adapter link info for rejected link.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_link_rej_mac_addr_update(uint8_t ieee_rej_link_id,
+			     uint8_t ieee_acc_link_id,
+			     uint8_t vdev_id);
 
 /**
  * hdd_link_switch_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV

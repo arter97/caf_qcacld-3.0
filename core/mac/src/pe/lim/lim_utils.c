@@ -9387,6 +9387,9 @@ void lim_extract_ml_info(struct pe_session *session,
 		if (!link_info)
 			continue;
 
+		if (ml_partner_info->partner_link_info[i].link_status_code)
+			continue;
+
 		ml_link->partner_info[partner_idx].vdev_id = link_info->vdev_id;
 		ml_link->partner_info[partner_idx].link_id = link_info->link_id;
 

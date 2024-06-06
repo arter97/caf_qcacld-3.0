@@ -61,6 +61,7 @@
 #include <spatial_reuse_api.h>
 #include <wlan_mlo_mgr_cmn.h>
 #include "wlan_mlme_public_struct.h"
+#include <wlan_mlo_mgr_link_switch.h>
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -446,6 +447,10 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 		lim_send_smps_intolerent(mac_ctx, pe_session, bcn_len, bcn_ptr);
 		lim_cm_fill_rsp_from_stads(mac_ctx, pe_session, rsp);
 		rsp->uapsd_mask = pe_session->gUapsdPerAcBitmask;
+
+		mlo_mgr_update_link_status_code(pe_session->vdev,
+						wlan_vdev_get_link_id(pe_session->vdev),
+						STATUS_SUCCESS);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -530,6 +535,12 @@ static void lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
 		qdf_copy_macaddr(
 			&rsp_partner_info->partner_link_info[i].link_addr,
 			&partner_info->partner_link_info[i].link_addr);
+		rsp_partner_info->partner_link_info[i].link_status_code =
+			partner_info->partner_link_info[i].link_status_code;
+
+		mlo_mgr_update_link_status_code(pe_session->vdev,
+			partner_info->partner_link_info[i].link_id,
+			partner_info->partner_link_info[i].link_status_code);
 
 		wlan_get_chan_by_bssid_from_rnr(
 			pe_session->vdev,

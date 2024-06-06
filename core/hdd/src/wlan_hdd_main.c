@@ -6376,7 +6376,129 @@ QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 			status);
 
 	hdd_adapter_update_mlo_mgr_mac_addr(cur_link_info->adapter);
+	return status;
+}
 
+/**
+ * hdd_adapter_update_rejected_links_info() - Update rejected links info
+ * @rej_link_info: Rejected partner link hdd information
+ * @acc_link_info: Accepted partner link hdd information
+ *
+ * This function will update the rejected and accepted
+ * link information in hdd adapter ctx.
+ *
+ * Return: 0 for success, non zero for failure
+ */
+static QDF_STATUS
+hdd_adapter_update_rejected_links_info(struct wlan_hdd_link_info *rej_link_info,
+				       struct wlan_hdd_link_info *acc_link_info)
+{
+	int rej_link_idx, acc_link_idx;
+	struct hdd_adapter *adapter = acc_link_info->adapter;
+	uint8_t cur_old_pos, cur_new_pos;
+	struct vdev_osif_priv *vdev_priv;
+	unsigned long link_flags;
+	struct wlan_objmgr_vdev *vdev;
+
+	rej_link_idx = hdd_adapter_get_index_of_link_info(rej_link_info);
+
+	/* Update the new position of current and new link info
+	 * in the link info array.
+	 */
+	rej_link_idx = hdd_adapter_get_index_of_link_info(rej_link_info);
+	acc_link_idx = hdd_adapter_get_index_of_link_info(acc_link_info);
+
+	cur_old_pos = adapter->curr_link_info_map[rej_link_idx];
+	cur_new_pos = adapter->curr_link_info_map[acc_link_idx];
+
+	adapter->curr_link_info_map[acc_link_idx] = cur_old_pos;
+	adapter->curr_link_info_map[rej_link_idx] = cur_new_pos;
+
+	qdf_atomic_clear_bit(rej_link_idx, &adapter->active_links);
+	qdf_spin_lock_bh(&rej_link_info->vdev_lock);
+
+	vdev = rej_link_info->vdev;
+	rej_link_info->vdev = acc_link_info->vdev;
+	rej_link_info->vdev_id = acc_link_info->vdev_id;
+	qdf_spin_unlock_bh(&rej_link_info->vdev_lock);
+
+	qdf_spin_lock_bh(&acc_link_info->vdev_lock);
+	acc_link_info->vdev = vdev;
+	acc_link_info->vdev_id = wlan_vdev_get_id(vdev);
+	qdf_spin_unlock_bh(&acc_link_info->vdev_lock);
+	qdf_atomic_set_bit(acc_link_idx, &adapter->active_links);
+
+	/* Move the link flags between current and new link info */
+	link_flags = acc_link_info->link_flags;
+	acc_link_info->link_flags = rej_link_info->link_flags;
+	rej_link_info->link_flags = link_flags;
+
+	/* Update VDEV-OSIF priv pointer to new link info */
+	vdev_priv = wlan_vdev_get_ospriv(acc_link_info->vdev);
+	vdev_priv->legacy_osif_priv = acc_link_info;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+hdd_link_rej_mac_addr_update(uint8_t ieee_rej_link_id,
+			     uint8_t ieee_acc_link_id,
+			     uint8_t vdev_id)
+{
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *rej_link_info, *acc_link_info;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("HDD ctx NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rej_link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!rej_link_info) {
+		hdd_err("VDEV %d not found", vdev_id);
+		return status;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(rej_link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Invalid VDEV %d", vdev_id);
+		return status;
+	}
+
+	adapter = rej_link_info->adapter;
+	acc_link_info = hdd_get_link_info_by_ieee_link_id(adapter,
+							  ieee_acc_link_id,
+							  false);
+	if (!acc_link_info) {
+		hdd_err("VDEV %d not found for new link", vdev_id);
+		goto release_ref;
+	}
+
+	if (rej_link_info == rej_link_info->adapter->deflink ||
+	    acc_link_info == acc_link_info->adapter->deflink) {
+		hdd_err("deflink switched");
+		cds_trigger_recovery(QDF_VDEV_LINK_MISMATCH);
+		goto release_ref;
+	}
+
+	status = hdd_adapter_update_rejected_links_info(rej_link_info,
+							acc_link_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to update adapter link info");
+		goto release_ref;
+	}
+
+	hdd_adapter_update_mlo_mgr_mac_addr(adapter);
+	sme_vdev_set_data_tx_callback(vdev);
+	ucfg_pmo_del_wow_pattern(vdev);
+	ucfg_pmo_register_wow_default_patterns(vdev);
+
+release_ref:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return status;
 }
 #endif

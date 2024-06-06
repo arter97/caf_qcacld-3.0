@@ -258,6 +258,7 @@ static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_update_bss_info = hdd_cm_save_connected_links_info,
 	.mlo_mgr_osif_update_mac_addr = hdd_link_switch_vdev_mac_addr_update,
 	.mlo_roam_osif_update_mac_addr = hdd_roam_vdev_mac_addr_update,
+	.mlo_mgr_osif_link_rej_update_mac_addr = hdd_link_rej_mac_addr_update,
 	.mlo_mgr_osif_link_switch_notification =
 					hdd_adapter_link_switch_notification,
 };
