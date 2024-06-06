@@ -85,9 +85,6 @@ config CHECKSUM_OFFLOAD
 	bool "Enable CHECKSUM_OFFLOAD"
 	default n
 
-config CHIP_VERSION
-	int "Enable CHIP_VERSION"
-
 config CNSS_GENL_MODULE
 	bool "Enable CNSS_GENL_MODULE"
 	default n
@@ -244,18 +241,6 @@ config DP_PKT_ADD_TIMESTAMP
 config DP_PKT_STATS_PER_LMAC
 	bool "Enable DP_PKT_STATS_PER_LMAC"
 	default n
-
-config DP_RX_BUFFER_POOL_ALLOC_THRES
-	int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
-
-config DP_RX_BUFFER_POOL_SIZE
-	int "Enable DP_RX_BUFFER_POOL_SIZE"
-
-config DP_RX_REFILL_BUFF_POOL_SIZE
-	int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
-
-config DP_RX_REFILL_THRD_THRESHOLD
-	int "Enable DP_RX_REFILL_THRD_THRESHOLD"
 
 config DP_RX_DROP_RAW_FRM
 	bool "Enable DP_RX_DROP_RAW_FRM"
@@ -726,6 +711,7 @@ config ENABLE_MAX_LOGS_PER_SEC
 
 config MAX_LOGS_PER_SEC
 	int "Enable MAX_LOGS_PER_SEC"
+	default 0
 
 config MCC_TO_SCC_SWITCH
 	bool "Enable MCC to SCC Switch Logic"
@@ -913,6 +899,7 @@ config QCOM_VOWIFI_11R
 
 config QDF_NBUF_HISTORY_SIZE
 	int "Enable QDF_NBUF_HISTORY_SIZE"
+	default 0
 
 config QDF_TEST
 	bool "Enable QDF_TEST"
@@ -1000,6 +987,7 @@ config ENABLE_SCHED_HISTORY_SIZE
 
 config SCHED_HISTORY_SIZE
 	int "Enable SCHED_HISTORY_SIZE"
+	default 0
 
 config SERIALIZE_QUEUE_SETUP
 	bool "Enable SERIALIZE_QUEUE_SETUP"
@@ -1790,9 +1778,6 @@ config WLAN_TXRX_STATS
 	bool "Enable WLAN_TXRX_STATS"
 	default n
 
-config WLAN_UMAC_MLO_MAX_DEV
-	int "Enable WLAN_UMAC_MLO_MAX_DEV"
-
 config WLAN_VENDOR_HANDOFF_CONTROL
 	bool "Enable WLAN_VENDOR_HANDOFF_CONTROL"
 	default n
@@ -1951,6 +1936,7 @@ config DP_TX_PACKET_INSPECT_FOR_ILP
 
 config NUM_SOC_PERF_CLUSTER
 	int "enable NUM_SOC_PERF_CLUSTER"
+	default 0
 
 config WLAN_OPEN_SOURCE
 	bool "enable WLAN_OPEN_SOURCE"
@@ -2035,9 +2021,6 @@ config 4_BYTES_TLV_TAG
 config QCA_WIFI_EMULATION
 	bool "enable CONFIG_QCA_WIFI_EMULATION"
 	default n
-
-config QDF_TIMER_MULTIPLIER_FRAC
-	int "set QDF_TIMER_MULTIPLIER_FRAC"
 
 config QDF_TIMER_MULTIPLIER_FRAC_ENABLE
 	bool "enable QDF_TIMER_MULTIPLIER_FRAC_ENABLE"
@@ -2188,23 +2171,59 @@ config IPA_OPT_WIFI_DP_CTRL
 	depends on IPA_OPT_WIFI_DP
 	default n
 
-menu "Optional Configs"
+config DP_RX_MSDU_DONE_FAIL_HISTORY
+        bool "Enable DP_RX_MSDU_DONE_FAIL_HISTORY"
+        default n
+
+config DP_RX_PEEK_MSDU_DONE_WAR
+        bool "Enable DP_RX_PEEK_MSDU_DONE_WAR"
+        default n
+
+config WLAN_AUX_SUPPORT
+        bool "Enable WLAN_AUX_SUPPORT"
+        default n
+
+config WLAN_MCC_MIN_CHANNEL_QUOTA
+        int "Enable WLAN_MCC_MIN_CHANNEL_QUOTA"
+        default 20
 
 if CNSS_KIWI_V2
 config CFG_BMISS_OFFLOAD_MAX_VDEV
 	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
+	default 0
 
 config CFG_MAX_STA_VDEVS
 	int "Enable CFG_MAX_STA_VDEVS"
+	default 0
 
 config ROME_IF
 	string "Enable ROME_IF"
 	default pci
-endif
 
-config WLAN_MCC_MIN_CHANNEL_QUOTA
-	int "Enable WLAN_MCC_MIN_CHANNEL_QUOTA"
-	default 20
+config CHIP_VERSION
+        int "Enable CHIP_VERSION"
+	default 0
+
+config DP_RX_BUFFER_POOL_ALLOC_THRES
+        int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
+        default 0
+
+config DP_RX_BUFFER_POOL_SIZE
+        int "Enable DP_RX_BUFFER_POOL_SIZE"
+        default 0
+
+config DP_RX_REFILL_BUFF_POOL_SIZE
+        int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+        default 0
+
+config DP_RX_REFILL_THRD_THRESHOLD
+        int "Enable DP_RX_REFILL_THRD_THRESHOLD"
+        default 0
+
+config WLAN_UMAC_MLO_MAX_DEV
+        int "Enable WLAN_UMAC_MLO_MAX_DEV"
+        default 0
+endif
 
 if CNSS_QCA6750
 config ROME_IF
@@ -2213,6 +2232,23 @@ config ROME_IF
 
 config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
         int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
+	default 0
+
+config DP_RX_BUFFER_POOL_ALLOC_THRES
+        int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
+        default 0
+
+config DP_RX_BUFFER_POOL_SIZE
+        int "Enable DP_RX_BUFFER_POOL_SIZE"
+        default 0
+
+config DP_RX_REFILL_BUFF_POOL_SIZE
+        int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+        default 0
+
+config DP_RX_REFILL_THRD_THRESHOLD
+        int "Enable DP_RX_REFILL_THRD_THRESHOLD"
+        default 0
 endif
 
 if CNSS_WCN7750
@@ -2222,25 +2258,40 @@ config ROME_IF
 
 config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
         int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
+	default 0
 
 config CFG_BMISS_OFFLOAD_MAX_VDEV
         int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
+	default 0
 
 config CFG_MAX_STA_VDEVS
         int "Enable CFG_MAX_STA_VDEVS"
+	default 0
+
+config DP_RX_BUFFER_POOL_ALLOC_THRES
+        int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
+        default 0
+
+config DP_RX_BUFFER_POOL_SIZE
+        int "Enable DP_RX_BUFFER_POOL_SIZE"
+        default 0
+
+config DP_RX_REFILL_BUFF_POOL_SIZE
+        int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+        default 0
+
+config DP_RX_REFILL_THRD_THRESHOLD
+        int "Enable DP_RX_REFILL_THRD_THRESHOLD"
+        default 0
+
+config WLAN_UMAC_MLO_MAX_DEV
+        int "Enable WLAN_UMAC_MLO_MAX_DEV"
+        default 0
 endif
 
-config DP_RX_MSDU_DONE_FAIL_HISTORY
-	bool "Enable DP_RX_MSDU_DONE_FAIL_HISTORY"
-	default n
-
-config DP_RX_PEEK_MSDU_DONE_WAR
-	bool "Enable DP_RX_PEEK_MSDU_DONE_WAR"
-	default n
-
-config WLAN_AUX_SUPPORT
-	bool "Enable WLAN_AUX_SUPPORT"
-	default n
-endmenu
-
+if QCA6490_HEADERS_DEF
+config CHIP_VERSION
+        int "Enable CHIP_VERSION"
+        default 0
+endif
 endif # QCA_CLD_WLAN
