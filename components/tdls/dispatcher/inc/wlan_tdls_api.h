@@ -24,6 +24,7 @@
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
+#include "wlan_tdls_main.h"
 
 #ifdef FEATURE_WLAN_TDLS
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -152,6 +153,17 @@ void wlan_tdls_notify_start_bss_failure(struct wlan_objmgr_psoc *psoc);
  */
 void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc,
 				struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_tdls_find_peer() - find TDLS peer in TDLS vdev object
+ * @vdev_obj: TDLS vdev object
+ * @macaddr: MAC address of peer
+ *
+ * Return: If peer is found, then it returns pointer to tdls_peer;
+ *         otherwise, it returns NULL.
+ */
+struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
+				      const uint8_t *macaddr);
 
 #ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
 /**
