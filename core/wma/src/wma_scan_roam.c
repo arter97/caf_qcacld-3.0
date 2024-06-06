@@ -2695,13 +2695,6 @@ static void wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
 	qdf_mem_free(roam_synch_data);
 }
 
-void wma_handle_roam_sync_timeout(tp_wma_handle wma_handle,
-				  struct roam_sync_timeout_timer_info *info)
-{
-	wma_invalid_roam_reason_handler(wma_handle, info->vdev_id,
-					CM_ROAM_NOTIF_ROAM_ABORT);
-}
-
 void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
 				    uint32_t reason)
 {

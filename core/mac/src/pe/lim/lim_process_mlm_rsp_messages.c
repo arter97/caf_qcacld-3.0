@@ -1665,13 +1665,6 @@ void lim_process_mlm_del_bss_rsp(struct mac_context *mac,
 		return;
 	}
 	lim_process_sta_mlm_del_bss_rsp(mac, vdev_stop_rsp, pe_session);
-
-	if (pe_session->limRmfEnabled) {
-		if (QDF_STATUS_SUCCESS !=
-		    lim_send_exclude_unencrypt_ind(mac, true, pe_session)) {
-			pe_err("Could not send down Exclude Unencrypted Indication!");
-		}
-	}
 }
 
 void lim_process_sta_mlm_del_bss_rsp(struct mac_context *mac,
@@ -2493,14 +2486,6 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 			/* Called while processing assoc response */
 			lim_process_sta_mlm_add_bss_rsp(mac_ctx, add_bss_rsp,
 							session_entry);
-		}
-	}
-
-	if (session_entry->limRmfEnabled) {
-		if (QDF_STATUS_SUCCESS !=
-			lim_send_exclude_unencrypt_ind(mac_ctx, false,
-				session_entry)) {
-			pe_err("Failed to send Exclude Unencrypted Ind");
 		}
 	}
 err:

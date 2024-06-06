@@ -6650,7 +6650,7 @@ QDF_STATUS csr_invoke_neighbor_report_request(
 
 	sme_debug("Sending SIR_HAL_INVOKE_NEIGHBOR_REPORT");
 
-	msg.type = SIR_HAL_INVOKE_NEIGHBOR_REPORT;
+	msg.type = WMA_INVOKE_NEIGHBOR_REPORT;
 	msg.reserved = 0;
 	msg.bodyptr = invoke_params;
 

@@ -1915,14 +1915,6 @@ struct roam_init_params {
 	uint8_t enable;
 };
 
-/**
- * struct roam_sync_timeout_timer_info - Info related to roam sync timer
- * @vdev_id: Vdev id for which host waiting roam sync ind from fw
- */
-struct roam_sync_timeout_timer_info {
-	uint8_t vdev_id;
-};
-
 struct roam_offload_scan_rsp {
 	uint8_t sessionId;
 	uint32_t reason;
@@ -2069,11 +2061,6 @@ enum set_antenna_mode_status {
 struct sir_antenna_mode_resp {
 	enum set_antenna_mode_status status;
 };
-
-typedef struct sSirWlanExcludeUnencryptParam {
-	bool excludeUnencrypt;
-	struct qdf_mac_addr bssid;
-} tSirWlanExcludeUnencryptParam, *tpSirWlanExcludeUnencryptParam;
 
 typedef enum {
 	P2P_SCAN_TYPE_SEARCH = 1,       /* P2P Search */
@@ -2404,34 +2391,6 @@ struct tx_power_limit {
 	/* Thermal limits for 2g and 5g */
 	uint32_t txPower2g;
 	uint32_t txPower5g;
-};
-
-enum bad_peer_thresh_levels {
-	WLAN_WMA_IEEE80211_B_LEVEL = 0,
-	WLAN_WMA_IEEE80211_AG_LEVEL,
-	WLAN_WMA_IEEE80211_N_LEVEL,
-	WLAN_WMA_IEEE80211_AC_LEVEL,
-	WLAN_WMA_IEEE80211_AX_LEVEL,
-	WLAN_WMA_IEEE80211_MAX_LEVEL,
-};
-
-#define NUM_OF_RATE_THRESH_MAX    (4)
-struct t_bad_peer_info {
-	uint32_t cond;
-	uint32_t delta;
-	uint32_t percentage;
-	uint32_t thresh[NUM_OF_RATE_THRESH_MAX];
-	uint32_t txlimit;
-};
-
-struct t_bad_peer_txtcl_config {
-	/* Array of thermal levels */
-	struct t_bad_peer_info threshold[WLAN_WMA_IEEE80211_MAX_LEVEL];
-	uint32_t enable;
-	uint32_t period;
-	uint32_t txq_limit;
-	uint32_t tgt_backoff;
-	uint32_t tgt_report_prd;
 };
 
 /* notify MODEM power state to FW */
@@ -4329,28 +4288,6 @@ struct sme_update_access_policy_vendor_ie {
 struct sme_tx_fail_cnt_threshold {
 	uint8_t session_id;
 	uint32_t tx_fail_cnt_threshold;
-};
-
-/**
- * struct sme_short_retry_limit - transmission retry limit for short frames.
- * @session_id: Session id
- * @short_retry_limit: transmission retry limit for short frame.
- *
- */
-struct sme_short_retry_limit {
-	uint8_t session_id;
-	uint32_t short_retry_limit;
-};
-
-/**
- * struct sme_long_retry_limit - transmission retry limit for long frames
- * @session_id: Session id
- * @short_retry_limit: transmission retry limit for long frames.
- *
- */
-struct sme_long_retry_limit {
-	uint8_t session_id;
-	uint32_t long_retry_limit;
 };
 
 /**

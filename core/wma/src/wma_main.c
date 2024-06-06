@@ -8319,89 +8319,6 @@ static QDF_STATUS wma_update_tx_fail_cnt_th(tp_wma_handle wma,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wma_update_short_retry_limit() - Set retry limit for short frames
- * @wma: WMA handle
- * @short_retry_limit_th: retry limir count for Short frames.
- *
- * This function is used to configure the transmission retry limit at which
- * short frames needs to be retry.
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS wma_update_short_retry_limit(tp_wma_handle wma,
-		struct sme_short_retry_limit *short_retry_limit_th)
-{
-	uint8_t vdev_id;
-	uint32_t short_retry_limit;
-	int ret;
-	struct wmi_unified *wmi_handle;
-
-	if (wma_validate_handle(wma))
-		return QDF_STATUS_E_INVAL;
-
-	wmi_handle = wma->wmi_handle;
-	if (wmi_validate_handle(wmi_handle))
-		return QDF_STATUS_E_INVAL;
-
-	vdev_id = short_retry_limit_th->session_id;
-	short_retry_limit = short_retry_limit_th->short_retry_limit;
-	wma_debug("Set short retry limit threshold  vdevId %d count %d",
-		vdev_id, short_retry_limit);
-
-	ret = wma_vdev_set_param(wmi_handle, vdev_id,
-				 wmi_vdev_param_non_agg_sw_retry_th,
-				 short_retry_limit);
-
-	if (ret) {
-		wma_err("Failed to send short limit threshold command");
-		return QDF_STATUS_E_FAILURE;
-	}
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * wma_update_long_retry_limit() - Set retry limit for long frames
- * @wma: WMA handle
- * @long_retry_limit_th: retry limir count for long frames
- *
- * This function is used to configure the transmission retry limit at which
- * long frames needs to be retry
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS wma_update_long_retry_limit(tp_wma_handle wma,
-		struct sme_long_retry_limit  *long_retry_limit_th)
-{
-	uint8_t vdev_id;
-	uint32_t long_retry_limit;
-	int ret;
-	struct wmi_unified *wmi_handle;
-
-	if (wma_validate_handle(wma))
-		return QDF_STATUS_E_INVAL;
-
-	wmi_handle = wma->wmi_handle;
-	if (wmi_validate_handle(wmi_handle))
-		return QDF_STATUS_E_INVAL;
-
-	vdev_id = long_retry_limit_th->session_id;
-	long_retry_limit = long_retry_limit_th->long_retry_limit;
-	wma_debug("Set TX pkt fail count threshold  vdevId %d count %d",
-		vdev_id, long_retry_limit);
-
-	ret  = wma_vdev_set_param(wmi_handle, vdev_id,
-			wmi_vdev_param_agg_sw_retry_th,
-			long_retry_limit);
-
-	if (ret) {
-		wma_err("Failed to send long limit threshold command");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #define MAX_VDEV_AP_ALIVE_PARAMS 4
 /* params being sent:
  * wmi_vdev_param_ap_keepalive_min_idle_inactive_time_secs
@@ -9546,10 +9463,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		qdf_mem_free(msg->bodyptr);
 		break;
 
-	case WMA_ROAM_SYNC_TIMEOUT:
-		wma_handle_roam_sync_timeout(wma_handle, msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
 	case WMA_RATE_UPDATE_IND:
 		wma_process_rate_update_indicate(wma_handle,
 				(tSirRateUpdateInd *) msg->bodyptr);
@@ -9606,14 +9519,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 	case WMA_SET_THERMAL_LEVEL:
 		wma_process_set_thermal_level(wma_handle, msg->bodyval);
 		break;
-#ifdef CONFIG_HL_SUPPORT
-	case WMA_INIT_BAD_PEER_TX_CTL_INFO_CMD:
-		wma_process_init_bad_peer_tx_ctl_info(
-			wma_handle,
-			(struct t_bad_peer_txtcl_config *)msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-			break;
-#endif
 	case WMA_SET_MIMOPS_REQ:
 		wma_process_set_mimops_req(wma_handle,
 					   (tSetMIMOPS *) msg->bodyptr);
@@ -9870,15 +9775,7 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		wma_update_tx_fail_cnt_th(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-	case SIR_HAL_LONG_RETRY_LIMIT_CNT:
-		wma_update_long_retry_limit(wma_handle, msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case SIR_HAL_SHORT_RETRY_LIMIT_CNT:
-		wma_update_short_retry_limit(wma_handle, msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case SIR_HAL_POWER_DEBUG_STATS_REQ:
+	case WMA_POWER_DEBUG_STATS_REQ:
 		wma_process_power_debug_stats_req(wma_handle);
 		break;
 	case WMA_BEACON_DEBUG_STATS_REQ:

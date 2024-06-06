@@ -10469,7 +10469,7 @@ QDF_STATUS lim_ap_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 	if (!wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev))
 		lim_configure_fd_for_existing_6ghz_sap(session, true);
 
-	msg.type = SIR_HAL_SEND_AP_VDEV_UP;
+	msg.type = WMA_SEND_AP_VDEV_UP;
 	msg.bodyval = session->smeSessionId;
 
 	status = scheduler_post_message(QDF_MODULE_ID_PE, QDF_MODULE_ID_WMA,

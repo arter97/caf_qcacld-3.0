@@ -1972,15 +1972,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 			msg->bodyptr = NULL;
 		}
 		break;
-	case SIR_LIM_ADDR2_MISS_IND:
-		pe_err(
-			FL("Addr2 mismatch interrupt received %X"), msg->type);
-		/* message from HAL indicating addr2 mismatch interrupt occurred
-		 * msg->bodyptr contains only pointer to 48-bit addr2 field
-		 */
-		qdf_mem_free((void *)(msg->bodyptr));
-		msg->bodyptr = NULL;
-		break;
 	case WMA_AGGR_QOS_RSP:
 		lim_process_ft_aggr_qos_rsp(mac_ctx, msg);
 		break;
