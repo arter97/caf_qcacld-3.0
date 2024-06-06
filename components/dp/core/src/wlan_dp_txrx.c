@@ -955,9 +955,14 @@ void dp_rx_monitor_callback(ol_osif_vdev_handle context,
  */
 static bool dp_is_rx_wake_lock_needed(qdf_nbuf_t nbuf)
 {
-	if ((!qdf_nbuf_pkt_type_is_mcast(nbuf) &&
-	     !qdf_nbuf_pkt_type_is_bcast(nbuf)) ||
-	    qdf_nbuf_is_arp_local(nbuf))
+	/*
+	 * Non local ARP packets are being received as unicast packets as well,
+	 * Do not take wake lock for such packets.
+	 */
+	if (qdf_unlikely(qdf_nbuf_is_arp_local(nbuf)))
+		return true;
+	else if (qdf_likely(!qdf_nbuf_pkt_type_is_mcast(nbuf) &&
+			    !qdf_nbuf_pkt_type_is_bcast(nbuf)))
 		return true;
 
 	return false;
