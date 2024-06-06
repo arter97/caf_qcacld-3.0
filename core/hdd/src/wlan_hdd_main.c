@@ -9130,28 +9130,24 @@ wlan_hdd_set_ml_cap_for_sap_intf(struct hdd_adapter_create_param *create_params,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
 	defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
-void hdd_adapter_disable_all_links(struct hdd_adapter *adapter)
+void
+hdd_adapter_disable_all_links(struct hdd_adapter *adapter, bool clear_macaddr)
 {
 	uint8_t idx_pos;
 	struct wlan_hdd_link_info *link_info;
 
-	/* For multi link sap, active_links is used to restore
-	 * sap in SSR, and clear link info for rmmod. so
-	 * not clear it.
-	 */
-	if (adapter->device_mode == QDF_SAP_MODE)
+	if (adapter->device_mode != QDF_STA_MODE)
 		return;
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
-		qdf_zero_macaddr(&link_info->link_addr);
+		if (clear_macaddr)
+			qdf_zero_macaddr(&link_info->link_addr);
 		idx_pos = hdd_adapter_get_index_of_link_info(link_info);
 		adapter->curr_link_info_map[idx_pos] = idx_pos;
 	}
+
 	adapter->deflink = &adapter->link_info[WLAN_HDD_DEFLINK_IDX];
-	if (adapter->device_mode == QDF_STA_MODE)
-		adapter->active_links = (1 << adapter->num_links_on_create) - 1;
-	else
-		adapter->active_links = 0x1;
+	adapter->active_links = (1 << adapter->num_links_on_create) - 1;
 }
 #endif
 
@@ -10251,7 +10247,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	/* Disable all links (expect default index) in adapter.
 	 * Set link address to NULL
 	 */
-	hdd_adapter_disable_all_links(adapter);
+	hdd_adapter_disable_all_links(adapter, true);
 
 	/* This function should be invoked at the end of this api*/
 	hdd_dump_func_call_map();

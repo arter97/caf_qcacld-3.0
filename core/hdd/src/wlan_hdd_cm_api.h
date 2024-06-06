@@ -81,6 +81,23 @@ QDF_STATUS hdd_cm_netif_queue_control(struct wlan_objmgr_vdev *vdev,
 				      enum netif_action_type action,
 				      enum netif_reason_type reason);
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+/**
+ * hdd_cm_connect_active_notify() - Callback to HDD on  connection request
+ * becomes active.
+ * @vdev_id: VDEV ID on which connection became active.
+ *
+ * The callback to make sure connection related fields are properly set
+ * from HDD.
+ *
+ * Returns: void
+ */
+void hdd_cm_connect_active_notify(uint8_t vdev_id);
+#else
+static inline void hdd_cm_connect_active_notify(uint8_t vdev_id)
+{
+}
+#endif
 QDF_STATUS hdd_cm_connect_complete(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_cm_connect_resp *rsp,
 				   enum osif_cb_type type);

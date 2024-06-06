@@ -2967,15 +2967,18 @@ wlan_hdd_get_link_info_from_objmgr(struct wlan_objmgr_vdev *vdev);
 /**
  * hdd_adapter_disable_all_links() - Reset the links on stop adapter.
  * @adapter: HDD adapter
+ * @clear_macaddr: Clears mac address if set to true
  *
  * Resets the MAC address in each link info and resets the link info
  * mapping in adapter array.
  *
  * Return: void
  */
-void hdd_adapter_disable_all_links(struct hdd_adapter *adapter);
+void
+hdd_adapter_disable_all_links(struct hdd_adapter *adapter, bool clear_macaddr);
 #else
-static inline void hdd_adapter_disable_all_links(struct hdd_adapter *adapter)
+static inline void
+hdd_adapter_disable_all_links(struct hdd_adapter *adapter, bool clear_macaddr)
 {
 }
 #endif

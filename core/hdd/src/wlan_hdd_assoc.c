@@ -2917,6 +2917,7 @@ void hdd_roam_profile_init(struct wlan_hdd_link_info *link_info)
 }
 
 struct osif_cm_ops osif_ops = {
+	.connect_active_notify_cb = hdd_cm_connect_active_notify,
 	.connect_complete_cb = hdd_cm_connect_complete,
 	.disconnect_complete_cb = hdd_cm_disconnect_complete,
 	.netif_queue_control_cb = hdd_cm_netif_queue_control,
