@@ -28,6 +28,7 @@
 #include "wlan_mlo_mgr_link_switch.h"
 #include "target_if.h"
 #include "wlan_nan_api.h"
+#include "wlan_nan_api_i.h"
 
 /* Exclude AP removed link */
 #define NLINK_EXCLUDE_REMOVED_LINK      0x01
@@ -726,14 +727,18 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 					legacy_freq_lst, mode_lst,
 					QDF_ARRAY_SIZE(legacy_vdev_lst));
 
-	if (wlan_nan_is_sta_sap_nan_allowed(psoc) &&
-	    wlan_nan_get_disc_5g_ch_freq(psoc) &&
+	if ((wlan_nan_is_sta_sap_nan_allowed(psoc) ||
+	     wlan_nan_is_sta_p2p_ndp_supported(psoc)) &&
 	    policy_mgr_mode_specific_connection_count(psoc,
 						      PM_NAN_DISC_MODE,
 						      NULL)) {
-		legacy_freq_lst[legacy_num] =
-			wlan_nan_get_disc_5g_ch_freq(psoc);
-		legacy_num++;
+		if (wlan_nan_get_disc_5g_ch_freq(psoc))
+			legacy_freq_lst[legacy_num++] =
+				wlan_nan_get_disc_5g_ch_freq(psoc);
+
+		if (wlan_nan_get_disc_24g_ch_freq(psoc))
+			legacy_freq_lst[legacy_num++] =
+				wlan_nan_get_disc_24g_ch_freq(psoc);
 	}
 	if (!legacy_num)
 		goto no_legacy_intf;

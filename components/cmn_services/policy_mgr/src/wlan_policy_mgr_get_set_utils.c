@@ -6346,9 +6346,7 @@ policy_mgr_get_legacy_conn_info(struct wlan_objmgr_psoc *psoc,
 		    pm_conc_connection_list[conn_index].mode !=
 							PM_P2P_CLIENT_MODE &&
 		    pm_conc_connection_list[conn_index].mode !=
-							PM_P2P_GO_MODE &&
-		    pm_conc_connection_list[conn_index].mode !=
-							PM_NAN_DISC_MODE) {
+							PM_P2P_GO_MODE) {
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 			continue;
 		}
@@ -6374,9 +6372,6 @@ policy_mgr_get_legacy_conn_info(struct wlan_objmgr_psoc *psoc,
 		else if (pm_conc_connection_list[conn_index].mode ==
 							PM_SAP_MODE)
 			has_priority[j] = PRIORITY_SAP;
-		else if (pm_conc_connection_list[conn_index].mode ==
-							PM_NAN_DISC_MODE)
-			has_priority[j] = PRIORITY_OTHER;
 		else
 			has_priority[j] = PRIORITY_OTHER;
 
