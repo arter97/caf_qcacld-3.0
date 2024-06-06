@@ -4283,7 +4283,7 @@ policy_mgr_append_freq_to_pcl(struct weighed_pcl *pcl, uint32_t *count,
 }
 
 static void
-policy_mgr_append_5g_nan_social_ch(struct wlan_objmgr_psoc *psoc,
+policy_mgr_append_5g_nan_social_ch(struct wlan_objmgr_pdev *pdev,
 				   struct weighed_pcl *org_pcl,
 				   uint32_t *count,
 				   struct weighed_pcl *new_pcl,
@@ -4295,7 +4295,7 @@ policy_mgr_append_5g_nan_social_ch(struct wlan_objmgr_psoc *psoc,
 
 	for (i = 0; i < *count; i++) {
 		entry = &org_pcl[i];
-		if (entry->freq == wlan_nan_get_disc_5g_ch_freq(psoc)) {
+		if (entry->freq == wlan_nan_get_5ghz_social_ch_freq(pdev)) {
 			policy_mgr_append_freq_to_pcl(new_pcl, new_count,
 						      entry->freq, weight,
 						      entry->flag);
@@ -4305,7 +4305,7 @@ policy_mgr_append_5g_nan_social_ch(struct wlan_objmgr_psoc *psoc,
 }
 
 static void
-policy_mgr_append_5g_non_nan_social_ch(struct wlan_objmgr_psoc *psoc,
+policy_mgr_append_5g_non_nan_social_ch(struct wlan_objmgr_pdev *pdev,
 				       struct weighed_pcl *org_pcl,
 				       uint32_t *count,
 				       struct weighed_pcl *new_pcl,
@@ -4319,7 +4319,7 @@ policy_mgr_append_5g_non_nan_social_ch(struct wlan_objmgr_psoc *psoc,
 		entry = &org_pcl[i];
 		if ((wlan_reg_is_5ghz_ch_freq(entry->freq) ||
 		     wlan_reg_is_6ghz_chan_freq(entry->freq)) &&
-		    entry->freq != wlan_nan_get_disc_5g_ch_freq(psoc))
+		    entry->freq != wlan_nan_get_5ghz_social_ch_freq(pdev))
 			policy_mgr_append_freq_to_pcl(new_pcl, new_count,
 						      entry->freq, weight,
 						      entry->flag);
@@ -4327,7 +4327,7 @@ policy_mgr_append_5g_non_nan_social_ch(struct wlan_objmgr_psoc *psoc,
 }
 
 static void
-policy_mgr_append_2g_nan_social_ch(struct wlan_objmgr_psoc *psoc,
+policy_mgr_append_2g_nan_social_ch(struct wlan_objmgr_pdev *pdev,
 				   struct weighed_pcl *org_pcl, uint32_t *count,
 				   struct weighed_pcl *new_pcl,
 				   uint32_t *new_count,	uint32_t weight)
@@ -4337,7 +4337,7 @@ policy_mgr_append_2g_nan_social_ch(struct wlan_objmgr_psoc *psoc,
 
 	for (i = 0; i < *count; i++) {
 		entry = &org_pcl[i];
-		if (entry->freq == wlan_nan_get_24ghz_social_ch_freq(psoc)) {
+		if (entry->freq == wlan_nan_get_24ghz_social_ch_freq(pdev)) {
 			policy_mgr_append_freq_to_pcl(new_pcl, new_count,
 						      entry->freq, weight,
 						      entry->flag);
@@ -4347,7 +4347,7 @@ policy_mgr_append_2g_nan_social_ch(struct wlan_objmgr_psoc *psoc,
 }
 
 static void
-policy_mgr_append_2g_non_nan_social_ch(struct wlan_objmgr_psoc *psoc,
+policy_mgr_append_2g_non_nan_social_ch(struct wlan_objmgr_pdev *pdev,
 				       struct weighed_pcl *org_pcl,
 				       uint32_t *count,
 				       struct weighed_pcl *new_pcl,
@@ -4359,7 +4359,7 @@ policy_mgr_append_2g_non_nan_social_ch(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < *count; i++) {
 		entry = &org_pcl[i];
 		if (wlan_reg_is_24ghz_ch_freq(entry->freq) &&
-		    entry->freq != wlan_nan_get_24ghz_social_ch_freq(psoc))
+		    entry->freq != wlan_nan_get_24ghz_social_ch_freq(pdev))
 			policy_mgr_append_freq_to_pcl(new_pcl, new_count,
 						      entry->freq, weight,
 						      entry->flag);
@@ -4456,34 +4456,35 @@ policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
 			sta_freq = freq_list[i];
 
 	if (!sta_freq ||
-	    sta_freq == wlan_nan_get_24ghz_social_ch_freq(psoc) ||
-	    sta_freq == wlan_nan_get_disc_5g_ch_freq(psoc) ||
+	    sta_freq == wlan_nan_get_24ghz_social_ch_freq(pm_ctx->pdev) ||
+	    sta_freq == wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev) ||
 	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, sta_freq) ||
 	    wlan_reg_is_6ghz_chan_freq(sta_freq)) {
 		/* Add ch-149 */
-		policy_mgr_append_5g_nan_social_ch(psoc, pcl,
+		policy_mgr_append_5g_nan_social_ch(pm_ctx->pdev, pcl,
 					num_pcl, new_pcl, &new_num_pcl,
 					WEIGHT_OF_GROUP1_PCL_CHANNELS);
 		/* Add rest of the 5 GHz channels */
-		policy_mgr_append_5g_non_nan_social_ch(psoc, pcl,
+		policy_mgr_append_5g_non_nan_social_ch(pm_ctx->pdev, pcl,
 						num_pcl, new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP2_PCL_CHANNELS);
 		/* Add ch-6 */
-		policy_mgr_append_2g_nan_social_ch(psoc, pcl, num_pcl,
+		policy_mgr_append_2g_nan_social_ch(pm_ctx->pdev, pcl, num_pcl,
 						new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP3_PCL_CHANNELS);
 		/* Add rest of the 2 GHz channels */
-		policy_mgr_append_2g_non_nan_social_ch(psoc, pcl, num_pcl,
-						new_pcl, &new_num_pcl,
+		policy_mgr_append_2g_non_nan_social_ch(pm_ctx->pdev, pcl,
+						num_pcl, new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP4_PCL_CHANNELS);
 	} else if (wlan_reg_is_24ghz_ch_freq(sta_freq) &&
-		   sta_freq != wlan_nan_get_24ghz_social_ch_freq(psoc)) {
+		   sta_freq !=
+			wlan_nan_get_24ghz_social_ch_freq(pm_ctx->pdev)) {
 		/* Add ch-149 */
-		policy_mgr_append_5g_nan_social_ch(psoc, pcl,
+		policy_mgr_append_5g_nan_social_ch(pm_ctx->pdev, pcl,
 						num_pcl, new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP1_PCL_CHANNELS);
 		/* Add rest of the 5 GHz channels */
-		policy_mgr_append_5g_non_nan_social_ch(psoc, pcl,
+		policy_mgr_append_5g_non_nan_social_ch(pm_ctx->pdev, pcl,
 						num_pcl, new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP2_PCL_CHANNELS);
 		/* Add STA channel */
@@ -4491,12 +4492,12 @@ policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
 						&new_num_pcl, sta_freq,
 						WEIGHT_OF_GROUP3_PCL_CHANNELS);
 		/* Add ch-6 */
-		policy_mgr_append_2g_nan_social_ch(psoc, pcl, num_pcl,
+		policy_mgr_append_2g_nan_social_ch(pm_ctx->pdev, pcl, num_pcl,
 						new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP4_PCL_CHANNELS);
 		/* Add rest of the 2 GHz channels */
-		policy_mgr_append_2g_non_nan_social_ch(psoc, pcl, num_pcl,
-						new_pcl, &new_num_pcl,
+		policy_mgr_append_2g_non_nan_social_ch(pm_ctx->pdev, pcl,
+						num_pcl, new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP5_PCL_CHANNELS);
 		/*
 		 * STA channel is added already and above API also adds
@@ -4506,17 +4507,17 @@ policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
 						&new_num_pcl, sta_freq,
 						WEIGHT_OF_GROUP5_PCL_CHANNELS);
 	} else if (wlan_reg_is_5ghz_ch_freq(sta_freq) &&
-		   sta_freq != wlan_nan_get_disc_5g_ch_freq(psoc)) {
+		   sta_freq != wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev)) {
 		/* Add STA channel */
 		policy_mgr_append_sta_freq_to_pcl(pcl, num_pcl, new_pcl,
 						&new_num_pcl, sta_freq,
 						WEIGHT_OF_GROUP1_PCL_CHANNELS);
 		/* Add ch-149 */
-		policy_mgr_append_5g_nan_social_ch(psoc, pcl,
+		policy_mgr_append_5g_nan_social_ch(pm_ctx->pdev, pcl,
 						num_pcl, new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP2_PCL_CHANNELS);
 		/* Add rest of the 5 GHz channels */
-		policy_mgr_append_5g_non_nan_social_ch(psoc, pcl,
+		policy_mgr_append_5g_non_nan_social_ch(pm_ctx->pdev, pcl,
 						num_pcl, new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP3_PCL_CHANNELS);
 		/*
@@ -4527,12 +4528,12 @@ policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
 						&new_num_pcl, sta_freq,
 						WEIGHT_OF_GROUP3_PCL_CHANNELS);
 		/* Add ch-6 */
-		policy_mgr_append_2g_nan_social_ch(psoc, pcl, num_pcl,
+		policy_mgr_append_2g_nan_social_ch(pm_ctx->pdev, pcl, num_pcl,
 						new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP4_PCL_CHANNELS);
 		/* Add rest of the 2 GHz channels */
-		policy_mgr_append_2g_non_nan_social_ch(psoc, pcl, num_pcl,
-						new_pcl, &new_num_pcl,
+		policy_mgr_append_2g_non_nan_social_ch(pm_ctx->pdev, pcl,
+						num_pcl, new_pcl, &new_num_pcl,
 						WEIGHT_OF_GROUP5_PCL_CHANNELS);
 	}
 

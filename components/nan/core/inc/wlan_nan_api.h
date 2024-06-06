@@ -188,6 +188,14 @@ wlan_nan_get_connection_info(struct wlan_objmgr_psoc *psoc,
 			     struct policy_mgr_vdev_entry_info *conn_info);
 
 /**
+ * wlan_nan_get_disc_24g_ch_freq: Get NAN Disc 2.4GHz channel frequency
+ * @psoc: pointer to psoc object
+ *
+ * Return: NAN Disc 2.4GHz channel frequency
+ */
+qdf_freq_t wlan_nan_get_disc_24g_ch_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_nan_get_disc_5g_ch_freq: Get NAN Disc 5G channel frequency
  * @psoc: pointer to psoc object
  *
@@ -287,6 +295,12 @@ wlan_nan_get_connection_info(struct wlan_objmgr_psoc *psoc,
 			     struct policy_mgr_vdev_entry_info *conn_info)
 {
 	return QDF_STATUS_E_FAILURE;
+}
+
+static inline qdf_freq_t
+wlan_nan_get_disc_24g_ch_freq(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
 }
 
 static inline uint32_t

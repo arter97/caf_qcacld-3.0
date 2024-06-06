@@ -55,6 +55,11 @@ struct wlan_objmgr_vdev;
 
 #define NAN_PASN_PEER_CREATE 0x0c
 #define NAN_PASN_PEER_DELETE 0x0d
+
+#define NAN_5GHZ_SOCIAL_CH_149_FREQ 5745
+#define NAN_5GHZ_SOCIAL_CH_44_FREQ 5220
+#define NAN_2GHZ_SOCIAL_CH_FREQ 2437
+
 /**
  * enum nan_discovery_msg_type - NAN msg type
  * @NAN_GENERIC_REQ: Type for all the NAN requests other than enable/disable

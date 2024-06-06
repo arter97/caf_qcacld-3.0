@@ -140,14 +140,26 @@ bool wlan_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_nan_get_24ghz_social_ch_freq(): Get NAN 2.4 GHz social channel
- * @psoc: pointer to PSOC object
+ * @pdev: PDEV object
  *
  * API fetches 2.4 GHz NAN social channel from nan_psoc_priv_obj
  *
  * Return: NAN social channel frequency
  */
 qdf_freq_t
-wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_psoc *psoc);
+wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_nan_get_5ghz_social_ch_freq(): Get NAN 5GHz social channel
+ * @pdev: PDEV object
+ *
+ * This API returns 5745(channel-149) if it's valid as per regulatory rules
+ * and returns 5220(channel-44) otherwise.
+ *
+ * Return: NAN social channel frequency
+ */
+qdf_freq_t
+wlan_nan_get_5ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev);
 #else
 static inline
 enum nan_datapath_state wlan_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev)
@@ -222,7 +234,13 @@ wlan_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline qdf_freq_t
-wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_psoc *psoc)
+wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
+{
+	return 0;
+}
+
+static inline qdf_freq_t
+wlan_nan_get_5ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
 {
 	return 0;
 }
