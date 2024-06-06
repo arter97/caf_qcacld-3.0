@@ -13505,7 +13505,7 @@ bool policy_mgr_allow_non_force_link_bitmap(
 						       NULL)) {
 			allow = false;
 			policy_mgr_debug("not allow - standby link 0x%x freq %d active due to conc",
-					 standby_link_bitmap, freq);
+					 standby_link_bitmap, standby_freq);
 			goto restore_conn;
 		}
 	}
