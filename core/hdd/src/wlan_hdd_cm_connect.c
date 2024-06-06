@@ -23,6 +23,7 @@
  */
 
 #include "wlan_hdd_main.h"
+#include <wlan_hdd_mlo.h>
 #include "wlan_hdd_cm_api.h"
 #include "wlan_hdd_trace.h"
 #include "wlan_hdd_object_manager.h"
@@ -1867,6 +1868,28 @@ static void hdd_cm_connect_success(struct wlan_objmgr_vdev *vdev,
 		hdd_cm_connect_success_post_user_update(vdev, rsp);
 	}
 }
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+void hdd_cm_connect_active_notify(uint8_t vdev_id)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Link info not found for vdev %d", vdev_id);
+		return;
+	}
+
+	if (hdd_adapter_restore_link_vdev_map(link_info->adapter, true))
+		hdd_adapter_update_mlo_mgr_mac_addr(link_info->adapter);
+}
+#endif
 
 QDF_STATUS hdd_cm_connect_complete(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_cm_connect_resp *rsp,
