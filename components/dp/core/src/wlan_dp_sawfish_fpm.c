@@ -20,10 +20,10 @@
 #include <wlan_dp_fim.h>
 #include <qdf_nbuf.h>
 #include <wlan_hdd_ether.h>
+#include <wlan_dp_metadata.h>
 
 #define SAWFISH_FLOW_ID_MAX 0x3F
 #define SAWFISH_INVALID_FLOW_ID 0xFFFF
-#define SPM_INVALID_SVC 0xFFFF
 
 /**
  * wlan_dp_parse_skb_flow_info() - Parse flow info from skb
@@ -92,7 +92,7 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 
 	sk = skb->sk;
 	if (qdf_unlikely(!sk)) {
-		skb->mark = SPM_INVALID_SVC;
+		skb->mark = FLOW_INVALID_METADATA;
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -103,7 +103,7 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 		wlan_dp_parse_skb_flow_info(skb, &flow);
 		if (qdf_unlikely(!flow.flags ||
 				 flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT)) {
-			skb->mark = SPM_INVALID_SVC;
+			skb->mark = FLOW_INVALID_METADATA;
 			return QDF_STATUS_E_INVAL;
 		}
 		pkt = skb->data;

@@ -318,7 +318,7 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 		return QDF_STATUS_E_INVAL;
 
 	if (!fim_ctx->fim_enable) {
-		skb->mark = FIM_INVALID_METADATA;
+		skb->mark = FLOW_INVALID_METADATA;
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -329,7 +329,7 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 		dp_fim_parse_skb_flow_info(skb, &flow);
 		if (!flow.flags || flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT) {
 			DP_STATS_INC(fim_ctx, pkt_not_support, 1);
-			skb->mark = FIM_INVALID_METADATA;
+			skb->mark = FLOW_INVALID_METADATA;
 			return QDF_STATUS_E_INVAL;
 		}
 
@@ -338,7 +338,7 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 		DP_STATS_INC(fim_ctx, sk_valid, 1);
 		if (!dp_fim_is_proto_supported(skb)) {
 			DP_STATS_INC(fim_ctx, pkt_not_support, 1);
-			skb->mark = FIM_INVALID_METADATA;
+			skb->mark = FLOW_INVALID_METADATA;
 			return QDF_STATUS_E_INVAL;
 		}
 		hash = sk->sk_txhash;
@@ -365,7 +365,7 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 		status = fpm_policy_flow_match(dp_intf, skb, &metadata, &flow,
 					       &policy_id);
 		if (status == FLOW_MATCH_DO_NOT_FOUND) {
-			metadata = FIM_INVALID_METADATA;
+			metadata = FLOW_INVALID_METADATA;
 			policy_id = FIM_INVALID_POLICY_ID;
 		}
 

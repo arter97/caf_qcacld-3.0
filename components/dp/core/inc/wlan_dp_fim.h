@@ -20,9 +20,9 @@
 #include "qdf_notifier.h"
 #include "wlan_dp_priv.h"
 #include "wlan_fpm_table.h"
+#include "wlan_dp_metadata.h"
 
 #define FIM_HASH_SIZE		256
-#define FIM_INVALID_METADATA    0x0F000000
 #define FIM_INVALID_POLICY_ID   0xDEADBEEF
 #define FIM_SOCK_FLAG_BIT	BIT(0)
 #define FIM_EXPIRY_TIMEOUT_MS	(120 * 1000)
