@@ -4341,13 +4341,13 @@ cm_roam_switch_to_init(struct wlan_objmgr_pdev *pdev,
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_NB_ID);
 	if (!vdev) {
-		mlme_err("CM_RSO: vdev is null");
+		mlme_err("CM_RSO: vdev:%d is null", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (cm_is_vdev_disconnecting(vdev) ||
-	    cm_is_vdev_disconnected(vdev)) {
-		mlme_debug("CM_RSO: RSO Init received in disconnected state");
+	if (!cm_is_vdev_connected(vdev)) {
+		mlme_debug("CM_RSO: vdev:%d RSO Init received in non-connected state",
+			   vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -5626,7 +5626,8 @@ cm_store_sae_single_pmk_to_global_cache(struct wlan_objmgr_psoc *psoc,
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
 				   IS_SINGLE_PMK, &src_cfg);
 	if (!src_cfg.bool_value ||
-	    !QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
+	    !(QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	      QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY)))
 		return;
 	/*
 	 * Mark the AP as single PMK capable in Crypto Table

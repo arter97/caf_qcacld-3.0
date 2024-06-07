@@ -7132,7 +7132,7 @@ void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
 static bool
 lim_is_vendor_htc_he_ap(struct bss_description *bss_desc)
 {
-	struct action_oui_search_attr vendor_ap_search_attr;
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
 	uint16_t ie_len;
 
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);

@@ -188,7 +188,10 @@ hdd_reset_sta_keep_alive_interval(struct wlan_hdd_link_info *link_info,
 		return;
 	}
 
-	wlan_hdd_save_sta_keep_alive_interval(link_info->adapter, 0);
+	if (!wlan_vdev_mlme_get_is_mlo_link(hdd_ctx->psoc,
+					    link_info->vdev_id))
+		wlan_hdd_save_sta_keep_alive_interval(link_info->adapter, 0);
+
 	ucfg_mlme_get_sta_keep_alive_period(hdd_ctx->psoc,
 					    &keep_alive_interval);
 	hdd_vdev_send_sta_keep_alive_interval(link_info, hdd_ctx,
@@ -280,7 +283,9 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 
 	ucfg_dp_nud_reset_tracking(vdev);
 	hdd_reset_limit_off_chan(adapter);
-	hdd_reset_sta_keep_alive_interval(link_info, hdd_ctx);
+
+	if (!is_link_switch)
+		hdd_reset_sta_keep_alive_interval(link_info, hdd_ctx);
 
 	hdd_cm_print_bss_info(sta_ctx);
 }

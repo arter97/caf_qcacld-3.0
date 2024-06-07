@@ -5093,6 +5093,7 @@ bool wlan_hdd_is_session_type_monitor(uint8_t session_type);
  * @name: name of the interface
  * @rtnl_held: True if RTNL lock is held
  * @name_assign_type: the name of assign type of the netdev
+ * @is_rx_mon: if monitor mode is getting enabled
  *
  * Return: 0 - on success
  *         err code - on failure
@@ -5100,7 +5101,8 @@ bool wlan_hdd_is_session_type_monitor(uint8_t session_type);
 int wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 			       struct hdd_adapter **adapter,
 			       const char *name, bool rtnl_held,
-			       unsigned char name_assign_type);
+			       unsigned char name_assign_type,
+			       bool is_rx_mon);
 
 #ifdef CONFIG_WLAN_DEBUG_CRASH_INJECT
 /**
@@ -5552,4 +5554,13 @@ hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
 }
 #endif
 
+/**
+ * hdd_allow_new_intf() - Allow new intf created or not
+ * @hdd_ctx: hdd context
+ * @mode: qdf opmode of new interface
+ *
+ * Return: true if allowed, otherwise false
+ */
+bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
+			enum QDF_OPMODE mode);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

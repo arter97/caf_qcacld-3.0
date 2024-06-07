@@ -8384,7 +8384,7 @@ void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
 	vendor_event = wlan_cfg80211_vendor_event_alloc(
 			hdd_ctx->wiphy, &link_info->adapter->wdev, len,
 			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
-			GFP_KERNEL);
+			qdf_mem_malloc_flags());
 
 	if (!vendor_event) {
 		hdd_err("wlan_cfg80211_vendor_event_alloc failed vdev id %d, data len %d",
@@ -8409,7 +8409,7 @@ void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
 			hdd_err_rl("nlhdr is null");
 	}
 
-	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
 }
 #endif
 
@@ -11800,6 +11800,67 @@ void wlan_hdd_save_sta_keep_alive_interval(struct hdd_adapter *adapter,
 	adapter->keep_alive_interval = keep_alive_interval;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * hdd_ml_vdev_set_sta_keep_alive_interval() - Set STA KEEPALIVE interval for
+ *                                             all connected ml vdev
+ * @vdev: Pointer to vdev
+ * @hdd_ctx: Pointer to hdd context
+ * @keep_alive_interval: KEEPALIVE interval
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_ml_vdev_set_sta_keep_alive_interval(
+						struct wlan_objmgr_vdev *vdev,
+						struct hdd_context *hdd_ctx,
+						uint16_t keep_alive_interval)
+{
+	struct wlan_objmgr_vdev *ml_vdev;
+	uint8_t ml_vdev_id;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_hdd_link_info *link_info;
+	int status, i;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx) {
+		hdd_err("MLO dev context null");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS ; i++) {
+		ml_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!ml_vdev)
+			continue;
+
+		ml_vdev_id = ml_vdev->vdev_objmgr.vdev_id;
+		link_info = hdd_get_link_info_by_vdev(hdd_ctx, ml_vdev_id);
+		if (!link_info)
+			continue;
+
+		if (!hdd_is_vdev_in_conn_state(link_info)) {
+			hdd_debug("Vdev (id %d) not in connected/started state",
+				  link_info->vdev_id);
+			continue;
+		}
+
+		status = hdd_vdev_send_sta_keep_alive_interval(link_info,
+							hdd_ctx,
+							keep_alive_interval);
+		if (status)
+			return status;
+	}
+
+	return 0;
+}
+#else
+static inline int hdd_ml_vdev_set_sta_keep_alive_interval(
+						struct wlan_objmgr_vdev *vdev,
+						struct hdd_context *hdd_ctx,
+						uint16_t keep_alive_interval)
+{
+	return -EINVAL;
+}
+#endif
 /**
  * hdd_vdev_set_sta_keep_alive_interval() - Set sta keep alive interval
  * @link_info: Link info pointer.
@@ -11815,6 +11876,7 @@ static int hdd_vdev_set_sta_keep_alive_interval(
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	enum QDF_OPMODE device_mode = link_info->adapter->device_mode;
 	uint16_t keep_alive_interval;
+	struct wlan_objmgr_vdev *vdev = link_info->vdev;
 
 	keep_alive_interval = nla_get_u16(attr);
 	if (keep_alive_interval > STA_KEEPALIVE_INTERVAL_MAX ||
@@ -11824,24 +11886,28 @@ static int hdd_vdev_set_sta_keep_alive_interval(
 		return -EINVAL;
 	}
 
-	hdd_debug("sta keep alive interval = %u", keep_alive_interval);
-
 	if (device_mode != QDF_STA_MODE) {
 		hdd_debug("This command is not supported for %s device mode",
 			  device_mode_to_string(device_mode));
 		return -EINVAL;
 	}
 
-	if (!hdd_is_vdev_in_conn_state(link_info)) {
-		hdd_debug("Vdev (id %d) not in connected/started state, cannot accept command",
-			  link_info->vdev_id);
-		return -EINVAL;
-	}
-
+	hdd_debug("sta keep alive interval = %u", keep_alive_interval);
 	wlan_hdd_save_sta_keep_alive_interval(adapter, keep_alive_interval);
 
-	return hdd_vdev_send_sta_keep_alive_interval(link_info, hdd_ctx,
-						     keep_alive_interval);
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
+		hdd_debug("Vdev (id %d) not in connected/started state, configure KEEPALIVE interval after connection",
+			  link_info->vdev_id);
+		return 0;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return hdd_vdev_send_sta_keep_alive_interval(link_info,
+							hdd_ctx,
+							keep_alive_interval);
+
+	return hdd_ml_vdev_set_sta_keep_alive_interval(vdev, hdd_ctx,
+						       keep_alive_interval);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -13256,6 +13322,58 @@ static int hdd_get_optimized_power_config(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * hdd_get_sta_keepalive_interval() - Get keep alive interval
+ * @link_info: Link info pointer in HDD adapter
+ * @skb: sk buffer to hold nl80211 attributes
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success; error number otherwise
+ */
+static int hdd_get_sta_keepalive_interval(struct wlan_hdd_link_info *link_info,
+					  struct sk_buff *skb,
+					  const struct nlattr *attr)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	enum QDF_OPMODE device_mode = adapter->device_mode;
+	uint32_t keep_alive_interval;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (device_mode != QDF_STA_MODE) {
+		hdd_debug("This command is not supported for %s device mode",
+			  device_mode_to_string(device_mode));
+		return -EINVAL;
+	}
+
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
+		if (adapter->keep_alive_interval)
+			keep_alive_interval = adapter->keep_alive_interval;
+		else
+			ucfg_mlme_get_sta_keep_alive_period(
+							hdd_ctx->psoc,
+							&keep_alive_interval);
+	} else {
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
+		if (!vdev) {
+			hdd_err("vdev is NULL");
+			return -EINVAL;
+		}
+
+		keep_alive_interval = ucfg_mlme_get_keepalive_period(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
+	}
+
+	hdd_debug("STA KEEPALIVE interval = %d", keep_alive_interval);
+	if (nla_put_u16(skb, QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL,
+			keep_alive_interval)) {
+		hdd_err("nla_put failure");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * typedef config_getter_fn - get configuration handler
  * @link_info: Link info pointer in HDD adapter
  * @skb: sk buffer to hold nl80211 attributes
@@ -13342,6 +13460,9 @@ static const struct config_getters config_getters[] = {
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS,
 	 WLAN_MAX_ML_BSS_LINKS * sizeof(uint8_t) * 2,
 	 hdd_get_mlo_max_band_info},
+	 {QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL,
+	  sizeof(uint16_t),
+	  hdd_get_sta_keepalive_interval},
 };
 
 /**
@@ -29350,7 +29471,8 @@ static int __wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					       struct net_device *dev,
 					       const u8 *buf, size_t len,
 					       const u8 *src, const u8 *dest,
-						__be16 proto, bool unencrypted)
+						__be16 proto, bool unencrypted,
+						int link_id)
 {
 	qdf_nbuf_t nbuf;
 	struct ethhdr *ehdr;
@@ -29392,7 +29514,8 @@ static int _wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					      struct net_device *dev,
 					      const u8 *buf, size_t len,
 					      const u8 *src, const u8 *dest,
-					      __be16 proto, bool unencrypted)
+					      __be16 proto, bool unencrypted,
+					      int link_id)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -29402,14 +29525,15 @@ static int _wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 		return errno;
 
 	errno = __wlan_hdd_cfg80211_tx_control_port(wiphy, dev, buf, len, src,
-						    dest, proto, unencrypted);
+						    dest, proto, unencrypted,
+						    link_id);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0) || \
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41) || \
 	defined(CFG80211_TX_CONTROL_PORT_LINK_SUPPORT))
 static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					     struct net_device *dev,
@@ -29418,28 +29542,54 @@ static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					     const u8 *dest, const __be16 proto,
 					     bool unencrypted, int link_id,
 					     u64 *cookie)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	return _wlan_hdd_cfg80211_tx_control_port(wiphy, dev, buf, len,
+						  adapter->mac_addr.bytes,
+						  dest, proto, unencrypted,
+						  link_id);
+}
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0))
 static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					     struct net_device *dev,
 					     const u8 *buf, size_t len,
 					     const u8 *dest, __be16 proto,
 					     bool unencrypted, u64 *cookie)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	return _wlan_hdd_cfg80211_tx_control_port(wiphy, dev, buf, len,
+						  adapter->mac_addr.bytes,
+						  dest, proto, unencrypted, -1);
+}
 #else
 static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 					     struct net_device *dev,
 					     const u8 *buf, size_t len,
 					     const u8 *dest, __be16 proto,
 					     bool unencrypted)
-#endif
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
 	return _wlan_hdd_cfg80211_tx_control_port(wiphy, dev, buf, len,
 						  adapter->mac_addr.bytes,
-						  dest, proto, unencrypted);
+						  dest, proto, unencrypted, -1);
 }
+#endif
 
 #if defined(CFG80211_CTRL_FRAME_SRC_ADDR_TA_ADDR)
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
+bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
+				       u8 *ta_addr,
+				       struct sk_buff *skb,
+				       bool unencrypted)
+{
+	return cfg80211_rx_control_port(dev, skb, unencrypted, -1);
+}
+
+#else
 bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 				       u8 *ta_addr,
 				       struct sk_buff *skb,
@@ -29447,6 +29597,8 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 {
 	return cfg80211_rx_control_port(dev, ta_addr, skb, unencrypted);
 }
+#endif
+
 #else
 bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 				       u8 *ta_addr,

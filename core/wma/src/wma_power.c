@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1723,6 +1723,8 @@ QDF_STATUS wma_enable_disable_imps(uint32_t pdev_id, uint32_t param_val)
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("Unable to enable/disable:(%d) IMPS",
 			param_val);
+
+	wma->in_imps = !!param_val;
 
 	return status;
 }

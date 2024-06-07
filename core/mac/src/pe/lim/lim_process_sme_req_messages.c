@@ -1792,7 +1792,7 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 					     struct pe_session *session,
 					     tDot11fBeaconIEs *ie_struct)
 {
-	struct action_oui_search_attr vendor_ap_search_attr;
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
 	uint16_t ie_len;
 	bool follow_ap_edca;
 	struct bss_description *bss_desc =
@@ -2884,7 +2884,8 @@ lim_update_sae_single_pmk_ap_cap(struct mac_context *mac,
 	akm = wlan_crypto_get_param(session->vdev,
 				    WLAN_CRYPTO_PARAM_KEY_MGMT);
 
-	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) &&
+	if ((QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	     QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY)) &&
 	    mac->mlme_cfg->lfr.sae_single_pmk_feature_enabled)
 		wlan_mlme_set_sae_single_pmk_bss_cap(mac->psoc,
 			session->vdev_id,
@@ -3155,7 +3156,7 @@ bool lim_enable_cts_to_self_for_exempted_iot_ap(
 				       uint8_t *ie_ptr,
 				       uint16_t ie_len)
 {
-	struct action_oui_search_attr vendor_ap_search_attr;
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
 
 	vendor_ap_search_attr.ie_data = ie_ptr;
 	vendor_ap_search_attr.ie_length = ie_len;
@@ -3186,7 +3187,7 @@ lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
 			       struct pe_session *session,
 			       struct bss_description *bss_desc)
 {
-	struct action_oui_search_attr vendor_ap_search_attr;
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
 	uint16_t ie_len;
 
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
