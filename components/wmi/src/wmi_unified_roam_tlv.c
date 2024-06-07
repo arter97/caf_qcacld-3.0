@@ -3169,7 +3169,7 @@ extract_roam_stats_event_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	else
 		num_trigger_reason = 0;
 
-	rem_len = len - sizeof(*fixed_param);
+	rem_len = WMI_SVC_MSG_MAX_SIZE - sizeof(*fixed_param);
 	if (rem_len < num_trigger_reason * sizeof(wmi_roam_trigger_reason)) {
 		wmi_err_rl("Invalid roam trigger data");
 		return QDF_STATUS_E_INVAL;
