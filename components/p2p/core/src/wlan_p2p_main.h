@@ -243,6 +243,7 @@ struct p2p_param {
  * @param:            p2p parameters to be used
  * @connection_status:Global P2P connection status
  * @mcc_quota_ev_os_if_cb:  callback to OS IF to indicate mcc quota event
+ * @mgmt_frm_registration_update: mgmt frame registration update
  */
 struct p2p_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -264,6 +265,7 @@ struct p2p_soc_priv_obj {
 #ifdef WLAN_FEATURE_MCC_QUOTA
 	mcc_quota_event_callback mcc_quota_ev_os_if_cb;
 #endif
+	uint32_t mgmt_frm_registration_update;
 };
 
 /**
@@ -628,4 +630,24 @@ QDF_STATUS
 p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_vdev *vdev);
 #endif /* WLAN_FEATURE_P2P_P2P_STA */
+
+/**
+ * p2p_set_mgmt_frm_registration_update() - Set mgmt registration update
+ * @psoc: pointer to psoc object
+ * @mgmt_frm_registration_update: mgmt frame registration update value
+ *
+ * Return: None
+ */
+void
+p2p_set_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc,
+				     uint32_t mgmt_frm_registration_update);
+
+/**
+ * p2p_get_mgmt_frm_registration_update() - Get mgmt registration update
+ * @psoc: pointer to psoc object
+ *
+ * Return: uint32_t
+ */
+uint32_t
+p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_P2P_MAIN_H_ */

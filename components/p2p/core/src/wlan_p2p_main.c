@@ -1570,3 +1570,42 @@ QDF_STATUS p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+void
+p2p_set_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc,
+				     uint32_t mgmt_frm_registration_update)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							    WLAN_UMAC_COMP_P2P);
+
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc context is NULL");
+		return;
+	}
+
+	p2p_soc_obj->mgmt_frm_registration_update =
+				mgmt_frm_registration_update;
+	p2p_debug("set mgmt regis update value %u",
+		  p2p_soc_obj->mgmt_frm_registration_update);
+}
+
+uint32_t
+p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							    WLAN_UMAC_COMP_P2P);
+
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc context is NULL");
+		return 0;
+	}
+
+	p2p_debug("get mgmt regis update value %u",
+		  p2p_soc_obj->mgmt_frm_registration_update);
+
+	return p2p_soc_obj->mgmt_frm_registration_update;
+}

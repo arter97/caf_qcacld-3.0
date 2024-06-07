@@ -224,6 +224,7 @@
 #ifdef WLAN_FEATURE_TELEMETRY
 #include "os_if_telemetry.h"
 #endif
+#include "wlan_p2p_ucfg_api.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -32912,6 +32913,59 @@ QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 1))
+static void __wlan_hdd_cfg80211_update_mgmt_frame_registrations(
+						struct wiphy *wiphy,
+						struct wireless_dev *wdev,
+						struct mgmt_frame_regs *upd)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct hdd_context *hdd_ctx;
+
+	if (!adapter) {
+		hdd_err("Invalid adapter");
+		return;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("HDD context is null");
+		return;
+	}
+
+	if (adapter->device_mode == QDF_P2P_DEVICE_MODE)
+		ucfg_p2p_set_mgmt_frm_registration_update(
+						hdd_ctx->psoc,
+						upd->interface_stypes);
+}
+
+/**
+ * wlan_hdd_cfg80211_update_mgmt_frame_registrations() - Handler to update
+ * the management frame registration
+ * @wiphy: pointer to wiphy
+ * @wdev: pointer to wdev
+ * @upd: pointer to mgmt_frame_regs
+ *
+ * Return: None
+ */
+static void wlan_hdd_cfg80211_update_mgmt_frame_registrations(
+						struct wiphy *wiphy,
+						struct wireless_dev *wdev,
+						struct mgmt_frame_regs *upd)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return;
+
+	__wlan_hdd_cfg80211_update_mgmt_frame_registrations(wiphy, wdev, upd);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+}
+#endif
+
 static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	.add_virtual_intf = wlan_hdd_add_virtual_intf,
 	.del_virtual_intf = wlan_hdd_del_virtual_intf,
@@ -33018,5 +33072,9 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO_TTLM) && defined(WLAN_FEATURE_11BE_MLO)
 	.set_ttlm = wlan_hdd_cfg80211_set_ttlm_mapping,
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 1))
+	.update_mgmt_frame_registrations =
+			wlan_hdd_cfg80211_update_mgmt_frame_registrations,
 #endif
 };
