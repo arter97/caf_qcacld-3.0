@@ -2511,8 +2511,18 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 	qdf_mem_copy(sap_config->self_macaddr.bytes,
 		link_mac_addr->bytes, sizeof(struct qdf_mac_addr));
 
+	/* ACS is about to start, so set acs in progress flag */
+	qdf_atomic_set(&ap_ctx->acs_in_progress, 1);
+
 	qdf_status = wlansap_acs_chselect(sap_ctx, acs_event_callback,
 					  sap_config);
+
+	/*
+         * If ACS scan is skipped then ACS request would be completed by now,
+	 * so reset acs in progress flag
+	 */
+	if (sap_config->acs_cfg.skip_acs_scan)
+		qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("ACS channel select failed");
@@ -2520,12 +2530,6 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 	}
 	if (sap_is_auto_channel_select(sap_ctx))
 		sap_config->acs_cfg.acs_mode = true;
-
-	/* If ACS scan is skipped then ACS request would be completed by now,
-	 * so no need to set acs in progress
-	 */
-	if (!sap_config->acs_cfg.skip_acs_scan)
-		qdf_atomic_set(&ap_ctx->acs_in_progress, 1);
 
 	return 0;
 }
