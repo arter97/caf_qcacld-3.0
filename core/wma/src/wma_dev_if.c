@@ -737,7 +737,7 @@ QDF_STATUS wma_vdev_detach(struct del_vdev_params *pdel_vdev_req_param)
 	iface = &wma_handle->interfaces[vdev_id];
 	if (!iface->vdev) {
 		wma_err("vdev %d is NULL", vdev_id);
-		return status;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	status = wma_check_for_deferred_peer_delete(wma_handle,
