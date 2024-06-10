@@ -2110,7 +2110,8 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		if ((!dst_buf->is_rsp &&
 		     dst_buf->subtype == MGMT_SUBTYPE_AUTH) ||
 		    dst_buf->subtype == MGMT_SUBTYPE_ASSOC_REQ ||
-		    dst_buf->subtype == MGMT_SUBTYPE_REASSOC_REQ) {
+		    dst_buf->subtype == MGMT_SUBTYPE_REASSOC_REQ ||
+		    dst_buf->type == ROAM_FRAME_INFO_FRAME_TYPE_EXT) {
 			dst_buf->tx_status = wmi_get_converted_tx_status(
 							src_data->status_code);
 			dst_buf->status_code = 0;
