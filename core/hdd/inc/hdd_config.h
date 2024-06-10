@@ -1600,6 +1600,30 @@ enum host_log_level {
 		1, \
 		"This ini is used to enable STA+P2P+NDP concurrency")
 
+#ifdef WLAN_FEATURE_UL_JITTER
+/*
+ * <ini>
+ * ul_jitter_log - Control UL jitter test logging
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to Control UL jitter test logging
+ *
+ * Supported Feature: WLAN_FEATURE_UL_JITTER
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_UL_JITTER_LOG \
+	CFG_INI_BOOL("ul_jitter_log", 0, \
+		     "Enable/Disable UL Jitter Logging")
+#define CFG_UL_JITTER_LOG_ALL CFG(CFG_UL_JITTER_LOG)
+#else
+#define CFG_UL_JITTER_LOG_ALL
+#endif
+
 #ifdef WLAN_CHIPSET_LOG_MAX_SIZE
 /*
  * <ini>
@@ -1675,6 +1699,7 @@ enum host_log_level {
 	CFG(CFG_NO_P2P_CONCURRENCY) \
 	CFG(CFG_STA_P2P_NDP_CONCURRENCY) \
 	CFG(CFG_STA_SAP_P2P_CONCURRENCY) \
+	CFG_UL_JITTER_LOG_ALL \
 	CFG_EPM_ENABLE_ALL \
 	CFG_EPM_VALUE_ALL \
 	CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL

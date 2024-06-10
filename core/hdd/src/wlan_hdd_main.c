@@ -14936,6 +14936,19 @@ static void hdd_init_vc_mode_cfg_bitmap(struct hdd_config *config,
 }
 #endif
 
+#ifdef WLAN_FEATURE_UL_JITTER
+static void hdd_cfg_ul_jitter_log(struct hdd_config *config,
+				  struct wlan_objmgr_psoc *psoc)
+{
+	config->ul_jitter_log = cfg_get(psoc, CFG_UL_JITTER_LOG);
+}
+#else
+static void hdd_cfg_ul_jitter_log(struct hdd_config *config,
+				  struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 #ifdef DHCP_SERVER_OFFLOAD
 static void
 hdd_init_dhcp_server_ip(struct hdd_context *hdd_ctx)
@@ -15121,6 +15134,7 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 	config->nb_commands_interval =
 				cfg_get(psoc, CFG_NB_COMMANDS_RATE_LIMIT);
 
+	hdd_cfg_ul_jitter_log(config, psoc);
 	hdd_init_vc_mode_cfg_bitmap(config, psoc);
 	hdd_init_runtime_pm(config, psoc);
 	hdd_init_wlan_auto_shutdown(config, psoc);
