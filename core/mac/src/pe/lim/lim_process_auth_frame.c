@@ -1000,26 +1000,6 @@ static void lim_process_ft_auth_frame(struct mac_context *mac_ctx,
 	}
 }
 
-static uint8_t
-lim_get_pasn_peer_vdev_id(struct mac_context *mac, uint8_t *bssid)
-{
-	struct wlan_objmgr_peer *peer;
-	uint8_t vdev_id;
-
-	peer = wlan_objmgr_get_peer_by_mac(mac->psoc, bssid,
-					   WLAN_MGMT_RX_ID);
-	if (!peer) {
-		pe_err("PASN peer doesn't exist for bssid: " QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(bssid));
-		return WLAN_UMAC_VDEV_ID_MAX;
-	}
-
-	vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
-	wlan_objmgr_peer_release_ref(peer, WLAN_MGMT_RX_ID);
-
-	return vdev_id;
-}
-
 /**
  * lim_process_pasn_auth_frame()- Process PASN authentication frame
  * @mac_ctx: MAC context
@@ -2351,6 +2331,35 @@ static void lim_process_ft_sae_auth_frame(struct mac_context *mac,
 #endif
 
 /**
+ * lim_get_vdev_id_from_macaddr() - This API will get VDEV Id from PDEV and MAC
+ * address
+ * @pdev: pointer to PDEV object
+ * @mac_addr: VDEV MAC address
+ *
+ * Return: VDEV ID
+ */
+static uint8_t
+lim_get_vdev_id_from_macaddr(struct wlan_objmgr_pdev *pdev, uint8_t *mac_addr)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(pdev, mac_addr,
+							 WLAN_MGMT_RX_ID);
+
+	if (!vdev) {
+		pe_err("vdev is null for macaddr " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(mac_addr));
+		return WLAN_UMAC_VDEV_ID_MAX;
+	}
+
+	vdev_id =  wlan_vdev_get_id(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MGMT_RX_ID);
+
+	return vdev_id;
+}
+
+/**
  *
  * Pass the received Auth frame. This is possibly the pre-auth from the
  * neighbor AP, in the same mobility domain.
@@ -2408,7 +2417,8 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 	}
 
 	if (auth_alg == eSIR_AUTH_TYPE_PASN) {
-		vdev_id = lim_get_pasn_peer_vdev_id(mac, mac_hdr->bssId);
+		vdev_id = lim_get_vdev_id_from_macaddr(mac->pdev, mac_hdr->da);
+
 		if (vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
 			/*
 			 * This can be NAN auth mgmt frame and for NAN, PASN
