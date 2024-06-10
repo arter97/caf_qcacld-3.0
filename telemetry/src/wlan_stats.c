@@ -4600,7 +4600,7 @@ static QDF_STATUS get_debug_peer_ctrl_tx(struct unified_stats *stats,
 	ctrl->cs_tx_dropblock = cp_stats->cs_tx_dropblock;
 	ctrl->cs_is_tx_nobuf = cp_stats->cs_is_tx_nobuf;
 	ctrl->rts_success = peer_stats->tx.rts_success;
-	ctrl->rts_success = peer_stats->tx.rts_failure;
+	ctrl->rts_failure = peer_stats->tx.rts_failure;
 	ctrl->bar_cnt = peer_stats->tx.bar_cnt;
 	ctrl->ndpa_cnt = peer_stats->tx.ndpa_cnt;
 
@@ -5397,7 +5397,28 @@ static QDF_STATUS get_debug_pdev_data_raw(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
-#if FEATURE_TSO_STATS
+#ifdef FEATURE_TSO_STATS
+static void fill_debug_pdev_data_tso_info(struct debug_pdev_data_tso *data,
+					  struct cdp_tso_stats *tso)
+{
+	uint8_t inx;
+
+	for (inx = 0; inx < STATS_IF_TSO_PACKETS_MAX; inx++) {
+		data->pkt_info[inx].num_seg
+			= tso->tso_info.tso_packet_info[inx].num_seg;
+		data->pkt_info[inx].tso_packet_len
+			= tso->tso_info.tso_packet_info[inx].tso_packet_len;
+		data->pkt_info[inx].tso_seg_idx
+			= tso->tso_info.tso_packet_info[inx].tso_seg_idx;
+	}
+}
+#else
+static void fill_debug_pdev_data_tso_info(struct debug_pdev_data_tso *data,
+					  struct cdp_tso_stats *tso)
+{
+}
+#endif /* FEATURE_TSO_STATS */
+
 static QDF_STATUS get_debug_pdev_data_tso(struct unified_stats *stats,
 					  struct cdp_pdev_stats *pdev_stats)
 {
@@ -5419,26 +5440,13 @@ static QDF_STATUS get_debug_pdev_data_tso(struct unified_stats *stats,
 	data->tso_no_mem_dropped.num = tso->tso_no_mem_dropped.num;
 	data->tso_no_mem_dropped.bytes = tso->tso_no_mem_dropped.bytes;
 	data->dropped_target = tso->dropped_target;
-	for (inx = 0; inx < STATS_IF_TSO_PACKETS_MAX; inx++) {
-		data->tso_info.tso_packet_info[inx].num_seg
-			= tso->tso_info.tso_packet_info[inx].num_seg;
-		data->tso_info.tso_packet_info[inx].tso_packet_len
-			= tso->tso_info.tso_packet_info[inx].tso_packet_len;
-		data->tso_info.tso_packet_info[inx].tso_seg_idx
-			= tso->tso_info.tso_packet_info[inx].tso_seg_idx;
-	}
+	fill_debug_pdev_data_tso_info(data, tso);
+
 	stats->feat[INX_FEAT_TSO] = data;
 	stats->size[INX_FEAT_TSO] = sizeof(struct debug_pdev_data_tso);
 
 	return QDF_STATUS_SUCCESS;
 }
-#else
-static QDF_STATUS get_debug_pdev_data_tso(struct unified_stats *stats,
-					  struct cdp_pdev_stats *pdev_stats)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 static QDF_STATUS get_debug_pdev_data_cfr(struct unified_stats *stats,

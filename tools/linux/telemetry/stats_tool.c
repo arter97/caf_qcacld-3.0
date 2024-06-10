@@ -3476,6 +3476,24 @@ void print_debug_radio_data_raw(struct debug_pdev_data_raw *raw)
 		 raw->num_frags_overflow_err);
 }
 
+#ifdef FEATURE_TSO_STATS
+void print_debug_tso_info(struct debug_pdev_data_tso *tso)
+{
+	uint8_t id;
+
+	for (id = 0; id < CDP_MAX_TSO_PACKETS; id++) {
+		/* TSO LEVEL 1 - PACKET INFO */
+		STATS_PRINT("Packet_Id:[%u]: Packet Length %zu | No. of segments: %u\n",
+			    id, tso->pkt_info[id].tso_packet_len,
+			    tso->pkt_info[id].num_seg);
+	}
+}
+#else
+void print_debug_tso_info(struct debug_pdev_data_tso *tso)
+{
+}
+#endif /* FEATURE_TSO_STATS */
+
 void print_debug_radio_data_tso(struct debug_pdev_data_tso *tso)
 {
 	STATS_64(stdout, "Packets dropped by host", tso->dropped_host.num);
@@ -3485,6 +3503,7 @@ void print_debug_radio_data_tso(struct debug_pdev_data_tso *tso)
 	STATS_64(stdout, "Bytes dropped due to no memory",
 		 tso->tso_no_mem_dropped.bytes);
 	STATS_32(stdout, "Packets dropped by target", tso->dropped_target);
+	print_debug_tso_info(tso);
 }
 
 static const char *capture_status_to_str(enum stats_if_chan_capture_status type)

@@ -1545,6 +1545,7 @@ enum _ol_ath_param_t {
 #ifdef QCA_PROCESS_UPLINK_CSA
 	OL_ATH_PARAM_PROCESS_UPLINK_CSA = 553,
 #endif
+	OL_ATH_PARAM_CBS_TOTAL_DWELL_TIME = 554,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -4058,6 +4059,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_process_uplink_csa_en",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PROCESS_UPLINK_CSA, GET_PARAM, 0},
 #endif
+	{"cbs_total_dwell_time",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CBS_TOTAL_DWELL_TIME, SET_PARAM, 1},
+	{"g_cbs_total_dwell_time",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CBS_TOTAL_DWELL_TIME, GET_PARAM, 0},
 };
 #endif
 

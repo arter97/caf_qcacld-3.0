@@ -972,11 +972,17 @@ uint32_t dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 	QDF_STATUS status;
 	uint32_t work_done = 0;
 	struct dp_mon_pdev *mon_pdev;
-	struct dp_mon_mac *mon_mac = dp_get_mon_mac(pdev, mac_id);
+	struct dp_mon_mac *mon_mac;
 
 	if (!pdev) {
 		dp_rx_mon_dest_err("pdev is null for mac_id = %d",
 				   mac_id);
+		return work_done;
+	}
+
+	mon_mac = dp_get_mon_mac(pdev, mac_id);
+	if (!mon_mac) {
+		dp_rx_mon_dest_err("mon_mac is null for mac_id = %d", mac_id);
 		return work_done;
 	}
 

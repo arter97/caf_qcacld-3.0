@@ -3827,6 +3827,8 @@ static void free_debug_sta(struct stats_obj *sta)
 				free(data->rate);
 			if (data->txcap)
 				free(data->txcap);
+			if (data->deter)
+				free(data->deter);
 		}
 		break;
 	case STATS_TYPE_CTRL:
@@ -3923,6 +3925,10 @@ static void free_debug_radio(struct stats_obj *radio)
 				free(data->txcap);
 			if (data->monitor)
 				free(data->monitor);
+			if (data->deter)
+				free(data->deter);
+			if (data->wmm)
+				free(data->wmm);
 		}
 		break;
 	case STATS_TYPE_CTRL:

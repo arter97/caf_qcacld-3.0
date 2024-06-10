@@ -241,7 +241,7 @@ dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 #endif
 
 bool dp_rx_err_cce_drop(struct dp_soc *soc, struct dp_vdev *vdev,
-			qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
+			 qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr, bool is_mld)
 {
 	uint16_t cce_metadata = RX_PROTOCOL_TAG_START_OFFSET;
 	qdf_ether_header_t *eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
@@ -263,7 +263,7 @@ bool dp_rx_err_cce_drop(struct dp_soc *soc, struct dp_vdev *vdev,
 	 * can leak from here and reach bridge. This code will come into picture
 	 * if first packet received is eapol and tidq is not yet setup.
 	 */
-	if (!dp_rx_err_match_dhost(eh, vdev))
+	if (!dp_rx_err_match_dhost(eh, vdev, is_mld))
 		return true;
 
 	return false;
