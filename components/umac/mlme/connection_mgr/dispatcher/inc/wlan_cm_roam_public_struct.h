@@ -609,6 +609,7 @@ struct sae_roam_auth_map {
  * @rso_rsn_caps: rsn caps with global user MFP which can be used for
  *                cross-AKM roaming
  * @is_disable_btm: btm roaming disabled or not from userspace
+ * @is_aggressive_roaming_mode: Aggressive roaming is set or not
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -664,6 +665,7 @@ struct rso_config {
 	struct wlan_chan_list tried_candidate_freq_list;
 	uint16_t rso_rsn_caps;
 	bool is_disable_btm;
+	bool is_aggressive_roaming_mode;
 };
 
 /**
@@ -780,6 +782,7 @@ struct rso_config_params {
  * @HI_RSSI_SCAN_RSSI_DELTA:
  * @ROAM_RSSI_DIFF_6GHZ: roam rssi diff for 6 GHz AP
  * @IS_DISABLE_BTM: disable btm roaming
+ * @IS_ROAM_AGGRESSIVE : Aggressive Roaming mode
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -813,6 +816,7 @@ enum roam_cfg_param {
 	HI_RSSI_SCAN_RSSI_DELTA,
 	ROAM_RSSI_DIFF_6GHZ,
 	IS_DISABLE_BTM,
+	IS_ROAM_AGGRESSIVE,
 };
 
 /**

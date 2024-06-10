@@ -4570,6 +4570,18 @@ QDF_STATUS sme_set_roam_config_enable(mac_handle_t mac_handle,
 				      uint8_t roam_control_enable);
 
 /**
+ * sme_set_aggressive_roaming() - Set Aggressive roaming in SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @is_aggressive_roam_mode: True if roaming mode is set to aggressive
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_aggressive_roaming(mac_handle_t mac_handle,
+				      uint8_t vdev_id,
+				      bool is_aggressive_roam_mode);
+
+/**
  * sme_send_vendor_btm_params - Send vendor btm params to FW
  * @hdd_ctx: HDD context
  * @vdev_id: vdev id

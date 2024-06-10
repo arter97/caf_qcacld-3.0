@@ -16627,6 +16627,19 @@ QDF_STATUS sme_set_roam_config_enable(mac_handle_t mac_handle,
 					  &src_config);
 }
 
+QDF_STATUS sme_set_aggressive_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
+				      bool is_aggressive_roam_mode)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.bool_value = is_aggressive_roam_mode;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  IS_ROAM_AGGRESSIVE,
+					  &src_config);
+}
+
 QDF_STATUS sme_get_roam_config_status(mac_handle_t mac_handle,
 				      uint8_t vdev_id,
 				      uint8_t *config_status)

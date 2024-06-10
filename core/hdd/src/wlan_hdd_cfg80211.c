@@ -19613,13 +19613,6 @@ static int wlan_hdd_cfg80211_set_fast_roaming(struct hdd_context *hdd_ctx,
 	bool roaming_enabled;
 	int ret;
 
-	if (sme_roaming_in_progress(hdd_ctx->mac_handle,
-				    adapter->deflink->vdev_id)) {
-		hdd_err_rl("Roaming in progress for vdev %d",
-			   adapter->deflink->vdev_id);
-		return -EAGAIN;
-	}
-
 	/*
 	 * Get current roaming state and decide whether to wait for RSO_STOP
 	 * response or not.
@@ -19659,6 +19652,21 @@ static int wlan_hdd_cfg80211_set_fast_roaming(struct hdd_context *hdd_ctx,
 			return -EBUSY;
 		}
 	}
+
+	return ret;
+}
+
+static int
+wlan_hdd_cfg80211_set_aggressive_roaming(struct hdd_context *hdd_ctx,
+					 struct hdd_adapter *adapter)
+{
+	int ret = 0;
+	QDF_STATUS qdf_status = 0;
+
+	qdf_status = sme_set_aggressive_roaming(hdd_ctx->mac_handle,
+						adapter->deflink->vdev_id,
+						true);
+	ret = qdf_status_to_os_return(qdf_status);
 
 	return ret;
 }
@@ -19719,11 +19727,22 @@ static int __wlan_hdd_cfg80211_set_roam_policy(struct wiphy *wiphy,
 	roam_policy = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_ROAMING_POLICY]);
 	hdd_debug("ROAM_CONFIG: roam_policy %d", roam_policy);
 
+	if (sme_roaming_in_progress(hdd_ctx->mac_handle,
+				    adapter->deflink->vdev_id)) {
+		hdd_err_rl("Roaming in progress for vdev %d",
+			   adapter->deflink->vdev_id);
+		return -EAGAIN;
+	}
+
 	switch (roam_policy) {
 	case QCA_ROAMING_NOT_ALLOWED:
 	case QCA_ROAMING_ALLOWED_WITHIN_ESS:
 		ret = wlan_hdd_cfg80211_set_fast_roaming(hdd_ctx, adapter,
 							 roam_policy);
+		break;
+	case QCA_ROAMING_MODE_AGGRESSIVE:
+		ret = wlan_hdd_cfg80211_set_aggressive_roaming(hdd_ctx,
+							       adapter);
 		break;
 	default:
 		ret = -EINVAL;

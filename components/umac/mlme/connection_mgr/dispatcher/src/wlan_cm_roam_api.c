@@ -1370,6 +1370,9 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			cm_roam_update_cfg(psoc, vdev_id,
 					   REASON_ROAM_CONTROL_CONFIG_ENABLED);
 		break;
+	case IS_ROAM_AGGRESSIVE:
+		rso_cfg->is_aggressive_roaming_mode = src_config->bool_value;
+		break;
 	case ROAM_PREFERRED_CHAN:
 		/*
 		 * In RSO update command, the specific channel list is
