@@ -650,4 +650,15 @@ p2p_set_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc,
  */
 uint32_t
 p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_parse_assoc_ie_for_device_info() - This function finds P2P interface
+ * address from assocaition IE
+ * @assoc_ie: Association request IE
+ * @assoc_ie_len: Association IE length
+ *
+ * Return: pointer to P2P address
+ */
+const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
+						  uint32_t assoc_ie_len);
 #endif /* _WLAN_P2P_MAIN_H_ */

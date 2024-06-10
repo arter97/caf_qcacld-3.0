@@ -29,13 +29,15 @@
 #define P2P_MAX_NOA_DESC 4
 
 #define HEADER_LEN_P2P_IE  6
-#define OUI_SIZE_P2P       4
 
 #define P2P_1X1_WAR_OUI   "\x00\x50\xf2\x04"
 #define P2P_1X1_OUI_LEN    4
 
 #define MAX_CONFIG_METHODS_LEN   2
 #define DEVICE_CATEGORY_MAX_LEN  1
+
+#define P2P_OUI                  "\x50\x6f\x9a\x09"
+#define P2P_OUI_SIZE             4
 
 /**
  * struct p2p_ps_params - P2P powersave related params

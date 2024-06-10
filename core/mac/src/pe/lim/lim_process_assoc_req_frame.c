@@ -2194,13 +2194,57 @@ static bool lim_is_pmkid_found_for_peer(struct mac_context *mac_ctx,
 	return false;
 }
 
+/**
+ * lim_find_p2p_address_from_assoc_req() - This function finds P2P interface
+ * address from assocaition request
+ * @assoc_req: Assocaition request
+ *
+ * This API find P2P address by parsing P2P IE from assocaition request.
+ * Return: pointer to P2P address
+ */
+static uint8_t *lim_find_p2p_address_from_assoc_req(tpSirAssocReq assoc_req)
+{
+	uint32_t length;
+	const uint8_t *ies;
+	uint8_t *p2p_addr;
+
+	length = assoc_req->assocReqFrameLength - WLAN_ASSOC_REQ_IES_OFFSET;
+	ies = assoc_req->assocReqFrame + WLAN_ASSOC_REQ_IES_OFFSET;
+
+	p2p_addr = (uint8_t *)wlan_p2p_parse_assoc_ie_for_device_info(ies,
+								      length);
+
+	return p2p_addr;
+}
+
+/**
+ * lim_is_sae_peer_allowed() - This function check PMKID for valid peer
+ * @mac_ctx: MAC context
+ * session: Pointer to PE session
+ * @assoc_req: Assocaition request
+ * @rsn_ie: RSN IE
+ * @sa: Source address from association request
+ * @mac_status_code: MAC status code
+ *
+ * Return: true if valid peer is found otherwise false
+ */
 static bool lim_is_sae_peer_allowed(struct mac_context *mac_ctx,
 				    struct pe_session *session,
+				    tpSirAssocReq assoc_req,
 				    tDot11fIERSN *rsn_ie, tSirMacAddr sa,
 				    enum wlan_status_code *mac_status_code)
 {
 	bool is_allowed = false;
 	uint8_t *peer_mac_addr = sa;
+
+	if (session->opmode == QDF_P2P_GO_MODE) {
+		peer_mac_addr = lim_find_p2p_address_from_assoc_req(assoc_req);
+		if (!peer_mac_addr) {
+			pe_err("p2p_device info not foundi for vdev %d",
+			       session->vdev_id);
+			return false;
+		}
+	}
 
 	/* Allow the peer with valid PMKID */
 	if (!rsn_ie->pmkid_count) {
@@ -2237,7 +2281,8 @@ static bool lim_validate_pmkid_for_sae(struct mac_context *mac_ctx,
 
 	if (lim_is_sae_akm_present(&rsn_ie) &&
 	    !assoc_req->is_sae_authenticated &&
-	    !lim_is_sae_peer_allowed(mac_ctx, session, &rsn_ie, sa, &code))
+	    !lim_is_sae_peer_allowed(mac_ctx, session, assoc_req, &rsn_ie, sa,
+				     &code))
 		goto reject_assoc;
 
 	return true;
