@@ -91,4 +91,61 @@ wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
+
+#ifdef IPA_WDS_EASYMESH_FEATURE
+/**
+ * wlan_dp_send_ipa_wds_peer_map_event() - Notify IPA upon wds peer map event
+ * @cpsoc: pointer to psoc object
+ * @peer_id: peer id of direct connected peer
+ * @hw_peer_id: hw peer id of direct peer
+ * @vdev_id: vdev id
+ * @wds_mac_addr: mac address of wds peer
+ * @peer_type: WDS peer ast entry type
+ * @tx_ast_hashidx: AST hash index
+ *
+ * This API notifies IPA driver with [peer_id, wds_mac_addr] upon wds peer
+ * map event from target.
+ *
+ * Return: 0 for success, otherwise error codes
+ */
+int wlan_dp_send_ipa_wds_peer_map_event(struct cdp_ctrl_objmgr_psoc *cpsoc,
+					uint16_t peer_id, uint16_t hw_peer_id,
+					uint8_t vdev_id, uint8_t *wds_mac_addr,
+					enum cdp_txrx_ast_entry_type peer_type,
+					uint32_t tx_ast_hashidx);
+
+/**
+ * wlan_dp_send_ipa_wds_peer_unmap_event() - Notify IPA upon wds peer unmap
+ *					     event
+ * @cpsoc: pointer to psoc object
+ * @peer_id: peer id of direct connected peer
+ * @vdev_id: vdev id
+ * @wds_mac_addr: mac address of wds peer
+ *
+ * This API notifies IPA driver with [peer_id, wds_mac_addr] upon wds peer
+ * unmap event from target.
+ *
+ * Return: 0 for success, otherwise error codes
+ */
+int wlan_dp_send_ipa_wds_peer_unmap_event(struct cdp_ctrl_objmgr_psoc *cpsoc,
+					  uint16_t peer_id, uint8_t vdev_id,
+					  uint8_t *wds_mac_addr);
+
+/**
+ * wlan_dp_send_ipa_wds_peer_disconnect() - Notify IPA of disconnecting wds
+ *					    peer
+ * @cpsoc: pointer to psoc object
+ * @wds_mac_addr: mac address of wds peer
+ * @vdev_id: vdev id
+ *
+ * This API notifies IPA driver with wds_mac_addr when direct connected peer
+ * disconnects.
+ *
+ * Return: none
+ */
+void wlan_dp_send_ipa_wds_peer_disconnect(struct cdp_ctrl_objmgr_psoc *cpsoc,
+					  uint8_t *wds_mac_addr,
+					  uint8_t vdev_id);
+#endif /* IPA_WDS_EASYMESH_FEATURE */
+
 #endif

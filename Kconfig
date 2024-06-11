@@ -620,6 +620,10 @@ config ICMP_DISABLE_PS
 	bool "Enable ICMP packet disable powersave feature"
 	default n
 
+config QCACLD_FEATURE_SON
+	bool "Enable easymesh for QCACLD"
+	default n
+
 config IPA_OFFLOAD
 	bool "Enable IPA_OFFLOAD"
 	default n
@@ -630,6 +634,17 @@ config IPA_OPT_WIFI_DP
 
 config IPA_SET_RESET_TX_DB_PA
 	bool "Enable IPA_SET_RESET_TX_DB_PA"
+	default n
+
+config FEATURE_WDS
+	bool "Enable WDS feature"
+	depends on QCACLD_FEATURE_SON
+	default n
+
+config IPA_WDS_EASYMESH
+	bool "Enable IPA WDS EASYMESH"
+	depends on IPA_OFFLOAD
+	depends on FEATURE_WDS
 	default n
 
 config KIWI_HEADERS_DEF

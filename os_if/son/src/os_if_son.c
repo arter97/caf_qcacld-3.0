@@ -1834,3 +1834,19 @@ int os_if_son_get_sta_stats(struct wlan_objmgr_vdev *vdev, uint8_t *mac_addr,
 	return 0;
 }
 qdf_export_symbol(os_if_son_get_sta_stats);
+
+int os_if_son_del_ast(struct wlan_objmgr_vdev *vdev,
+		      struct qdf_mac_addr *wds_macaddr,
+		      struct qdf_mac_addr *peer_macaddr)
+{
+	if (!vdev || !wds_macaddr || !peer_macaddr) {
+		osif_err("invalid param");
+		return -EINVAL;
+	}
+
+	wlan_son_del_ast(vdev, wds_macaddr, peer_macaddr);
+
+	return 0;
+}
+
+qdf_export_symbol(os_if_son_del_ast);
