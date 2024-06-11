@@ -3393,6 +3393,40 @@ sir_convert_assoc_req_frame2_eht_struct(tDot11fAssocRequest *ar,
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
+
+/**
+ * mlo_parse_peer_eml_cap: Parse eml capability info
+ * @p_assoc_req: assoc req buffer pointer
+ * @eml_cap: eml capablility info
+ *
+ * Return: None
+ */
+static void
+mlo_parse_peer_eml_cap(tpSirAssocReq p_assoc_req, uint16_t eml_cap)
+{
+	p_assoc_req->eml_info.emlsr_supp =
+		QDF_GET_BITS(eml_cap,
+			     WLAN_ML_BV_CINFO_EMLCAP_EMLSRSUPPORT_IDX,
+			     WLAN_ML_BV_CINFO_EMLCAP_EMLSRSUPPORT_BITS);
+	p_assoc_req->eml_info.emlsr_pad_delay =
+		QDF_GET_BITS(eml_cap,
+			     WLAN_ML_BV_CINFO_EMLCAP_EMLSR_PADDINGDELAY_IDX,
+			     WLAN_ML_BV_CINFO_EMLCAP_EMLSR_PADDINGDELAY_BITS);
+	p_assoc_req->eml_info.emlsr_trans_delay =
+		QDF_GET_BITS(eml_cap,
+			     WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_IDX,
+			     WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_BITS);
+	p_assoc_req->eml_info.trans_timeout =
+		QDF_GET_BITS(eml_cap,
+			     WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_IDX,
+			     WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_BITS);
+	pe_debug("emlsr support %d padding_delay %d trans_delay %d trans_timeout %d",
+		 p_assoc_req->eml_info.emlsr_supp,
+		 p_assoc_req->eml_info.emlsr_pad_delay,
+		 p_assoc_req->eml_info.emlsr_trans_delay,
+		 p_assoc_req->eml_info.trans_timeout);
+}
+
 static QDF_STATUS
 sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pframe,
 					uint32_t nframe,
@@ -3403,6 +3437,8 @@ sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pframe,
 	qdf_size_t ml_ie_total_len;
 	struct qdf_mac_addr mld_mac_addr;
 	uint32_t status;
+	bool eml_cap_found = false;
+	uint16_t eml_cap;
 
 	if (ar->mlo_ie.present) {
 		status = util_find_mlie(pframe + WLAN_ASSOC_REQ_IES_OFFSET,
@@ -3414,6 +3450,12 @@ sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pframe,
 							ml_ie_total_len,
 							&p_assoc_req->mlo_info,
 							WLAN_FC0_STYPE_INVALID);
+
+			util_get_bvmlie_eml_cap(ml_ie, ml_ie_total_len,
+						&eml_cap_found, &eml_cap);
+			if (eml_cap_found)
+				mlo_parse_peer_eml_cap(p_assoc_req, eml_cap);
+
 			util_get_bvmlie_mldmacaddr(ml_ie, ml_ie_total_len,
 						   &mld_mac_addr);
 			qdf_mem_copy(p_assoc_req->mld_mac, mld_mac_addr.bytes,
@@ -4533,6 +4575,8 @@ sir_convert_reassoc_req_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 	qdf_size_t ml_ie_total_len;
 	struct qdf_mac_addr mld_mac_addr;
 	uint32_t status = QDF_STATUS_SUCCESS;
+	bool eml_cap_found = false;
+	uint16_t eml_cap;
 
 	if (ar->mlo_ie.present) {
 		status = util_find_mlie(pframe + WLAN_REASSOC_REQ_IES_OFFSET,
@@ -4543,6 +4587,11 @@ sir_convert_reassoc_req_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 							ml_ie_total_len,
 							&p_assoc_req->mlo_info,
 							WLAN_FC0_STYPE_INVALID);
+
+			util_get_bvmlie_eml_cap(ml_ie, ml_ie_total_len,
+						&eml_cap_found, &eml_cap);
+			if (eml_cap_found)
+				mlo_parse_peer_eml_cap(p_assoc_req, eml_cap);
 
 			util_get_bvmlie_mldmacaddr(ml_ie, ml_ie_total_len,
 						   &mld_mac_addr);

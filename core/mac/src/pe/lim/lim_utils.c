@@ -8247,6 +8247,7 @@ void lim_update_sta_mlo_info(struct pe_session *session,
 		pe_debug("mld mac " QDF_MAC_ADDR_FMT " assoc peer %d",
 			 QDF_MAC_ADDR_REF(add_sta_params->mld_mac_addr),
 			 add_sta_params->is_assoc_peer);
+		add_sta_params->eml_info = sta_ds->eml_info;
 		return;
 	}
 
