@@ -2454,7 +2454,7 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	qdf_freq_t ml_sta_link0_freq = 0;
 	qdf_freq_t ml_sta_link1_freq = 0;
-	uint8_t i, j, nan = 0, sap = 0, sta = 0, ndi = 0, p2p;
+	uint8_t i, j, k, nan = 0, sap = 0, sta = 0, ndi = 0, p2p;
 	struct policy_mgr_freq_range *freq_range;
 	bool emlsr_links_with_aux = false;
 	uint8_t mac_id;
@@ -2554,18 +2554,18 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 				conn[2].freq, conn[2].mode,
 				ch_freq, mode);
 
-			for (i = 0; i < mac_freq_num; i++) {
-				if (mac_mode_list[i] == PM_STA_MODE)
+			for (k = 0; k < mac_freq_num; k++) {
+				if (mac_mode_list[k] == PM_STA_MODE)
 					sta++;
-				else if (mac_mode_list[i] ==
+				else if (mac_mode_list[k] ==
 							PM_P2P_CLIENT_MODE ||
-					 mac_mode_list[i] == PM_P2P_GO_MODE)
+					 mac_mode_list[k] == PM_P2P_GO_MODE)
 					p2p++;
-				else if (mac_mode_list[i] == PM_NAN_DISC_MODE)
+				else if (mac_mode_list[k] == PM_NAN_DISC_MODE)
 					nan++;
-				else if (mac_mode_list[i] == PM_NDI_MODE)
+				else if (mac_mode_list[k] == PM_NDI_MODE)
 					ndi++;
-				else if (mac_mode_list[i] == PM_SAP_MODE)
+				else if (mac_mode_list[k] == PM_SAP_MODE)
 					sap++;
 			}
 		}
