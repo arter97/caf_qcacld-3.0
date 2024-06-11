@@ -2028,6 +2028,12 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 		goto send_event;
 	}
 
+	if (session_entry->ch_switch_in_progress) {
+		pe_debug("ch switch inprogress, ignore CSA vdev %d",
+			 session_entry->vdev_id);
+		goto send_event;
+	}
+
 	lim_ch_switch = &session_entry->gLimChannelSwitch;
 	ch_params.ch_width = csa_params->new_ch_width;
 

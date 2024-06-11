@@ -186,7 +186,8 @@ struct hdd_station_info *hdd_get_sta_info_by_id(
 struct hdd_station_info *hdd_get_sta_info_by_mac(
 				struct hdd_sta_info_obj *sta_info_container,
 				const uint8_t *mac_addr,
-				wlan_sta_info_dbgid sta_info_dbgid)
+				wlan_sta_info_dbgid sta_info_dbgid,
+				uint32_t match_mac_type)
 {
 	struct hdd_station_info *sta_info = NULL;
 
@@ -195,14 +196,18 @@ struct hdd_station_info *hdd_get_sta_info_by_mac(
 		hdd_err("Parameter(s) null");
 		return NULL;
 	}
-
+	hdd_debug("match_mac_type %d sta_info_dbgid %d " QDF_MAC_ADDR_FMT,
+		  match_mac_type, sta_info_dbgid,
+		  QDF_MAC_ADDR_REF(mac_addr));
 	qdf_spin_lock_bh(&sta_info_container->sta_obj_lock);
 
 	qdf_list_for_each(&sta_info_container->sta_obj, sta_info, sta_node) {
-		if (qdf_is_macaddr_equal(&sta_info->sta_mac,
-					 (struct qdf_mac_addr *)mac_addr) ||
+		if ((IS_MATCH_STA_MAC(match_mac_type) &&
+		     qdf_is_macaddr_equal(&sta_info->sta_mac,
+					  (struct qdf_mac_addr *)mac_addr)) ||
+		    (IS_MATCH_MLD_MAC(match_mac_type) &&
 		    qdf_is_macaddr_equal(&sta_info->mld_addr,
-					 (struct qdf_mac_addr *)mac_addr)) {
+					 (struct qdf_mac_addr *)mac_addr))) {
 			hdd_take_sta_info_ref(sta_info_container,
 					      sta_info, false, sta_info_dbgid);
 			qdf_spin_unlock_bh(&sta_info_container->sta_obj_lock);

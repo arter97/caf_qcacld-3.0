@@ -529,6 +529,19 @@ ml_nlink_get_standby_link_bitmap(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_objmgr_vdev *vdev);
 
 /**
+ * ml_nlink_get_standby_link_freq() - Get standby link chan freq
+ * @psoc: psoc
+ * @vdev: vdev object
+ * @standby_link_bmap: standby link id bitmap
+ *
+ * Return: standby link chan freq
+ */
+qdf_freq_t
+ml_nlink_get_standby_link_freq(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_vdev *vdev,
+			       uint32_t standby_link_bmap);
+
+/**
  * ml_nlink_convert_vdev_ids_to_link_bitmap() - convert vdev id list
  * to link id bitmap
  * @psoc: psoc
@@ -584,3 +597,23 @@ ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 #endif
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(FEATURE_DENYLIST_MGR)
+/**
+ * mlo_get_curr_link_combination: Get current tried link combination
+ * @vdev: vdev
+ *
+ * This API gets current tried mlo partner link combination.
+ *
+ * Return: curr link combination bit map
+ */
+uint8_t
+mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev);
+#else
+static inline uint8_t
+mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
+{
+	return 0;
+}
+#endif
+

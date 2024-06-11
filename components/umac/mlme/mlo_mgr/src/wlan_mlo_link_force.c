@@ -39,6 +39,9 @@
 /* Dump link information */
 #define NLINK_DUMP_LINK                 0x10
 
+/* Compute disallowed mode bitmap 2 links at a time */
+#define MAX_DISALLOW_MODE_LINK_NUM     2
+
 static
 void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 			    struct wlan_objmgr_vdev *vdev,
@@ -69,8 +72,13 @@ enum home_channel_map_id {
 	HC_2G_5GH,
 	HC_2G_2G,
 	HC_LEGACY_MAX,
-	/* todo: add all 3 link ml STA HC MAP */
-	HC_5GL_5GH_2G = HC_LEGACY_MAX,
+	HC_2G_5GL_5GH = HC_LEGACY_MAX,
+	HC_2G_5GL_5GL,
+	HC_2G_5GH_5GH,
+	HC_5GL_5GL_5GH,
+	HC_5GL_5GH_5GH,
+	HC_5GL_5GL_5GL,
+	HC_5GH_5GH_5GH,
 	HC_MAX_MAP_ID,
 };
 
@@ -87,6 +95,13 @@ static inline const char *hc_id_to_string(uint32_t idx)
 	CASE_RETURN_STRING(HC_2G_5GL);
 	CASE_RETURN_STRING(HC_2G_5GH);
 	CASE_RETURN_STRING(HC_2G_2G);
+	CASE_RETURN_STRING(HC_2G_5GL_5GH);
+	CASE_RETURN_STRING(HC_2G_5GL_5GL);
+	CASE_RETURN_STRING(HC_2G_5GH_5GH);
+	CASE_RETURN_STRING(HC_5GL_5GL_5GH);
+	CASE_RETURN_STRING(HC_5GL_5GH_5GH);
+	CASE_RETURN_STRING(HC_5GL_5GL_5GL);
+	CASE_RETURN_STRING(HC_5GH_5GH_5GH);
 	default:
 		return "Unknown";
 	}
@@ -184,7 +199,7 @@ disallow_mlo_mode_table_sbs_low_share = {
 			[HC_2G_5GL] = {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_2G_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
 					MLMR_5GH_5GH | EMLSR_5GH_5GH},
-			[HC_2G_2G] = {MLMR_5GL_5GH, MLMR_5GL_5GH} },
+			[HC_2G_2G] = {MLMR_5GH_5GH, MLMR_5GH_5GH} },
 	[HC_5GL_5GL] = {[HC_NONE] =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_2G]  =    {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_5GL] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
@@ -210,26 +225,64 @@ disallow_mlo_mode_table_sbs_upper_share = {
 	[HC_2G_5GL] = {[HC_NONE]  =   {0, 0},
 			[HC_2G]   =   {0, 0},
 			[HC_5GL]  =   {0, 0},
-			[HC_5GH]  =   {0, MLMR_2G_5GL} },
+			[HC_5GH]  =   {0, MLMR_2G_5GL},
+			[HC_5GL_5GH] = {0, 0},
+			[HC_5GH_5GH] = {MLMR_2G_5GL, MLMR_2G_5GL},
+			[HC_5GL_5GL] = {0, 0},
+			[HC_2G_5GL] = {0, 0},
+			[HC_2G_5GH] = {0, 0},
+			[HC_2G_2G] = {0, 0} },
 	[HC_2G_5GH] = {[HC_NONE]  =   {0, 0},
 			[HC_2G]   =   {0, 0},
 			[HC_5GL]  =   {0, MLMR_2G_5GH},
-			[HC_5GH]  =   {0, 0} },
+			[HC_5GH]  =   {0, 0},
+			[HC_5GL_5GH] = {0, 0},
+			[HC_5GH_5GH] = {0, 0},
+			[HC_5GL_5GL] = {MLMR_2G_5GH, MLMR_2G_5GH},
+			[HC_2G_5GL] = {0, 0},
+			[HC_2G_5GH] = {0, 0},
+			[HC_2G_2G] = {0, 0} },
 	[HC_5GL_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]   =   {0, MLMR_5GL_5GH},
 			[HC_5GL]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
-			[HC_5GH]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH} },
+			[HC_5GH]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GL_5GH] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GH_5GH] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GL_5GL] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_2G_5GL] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_2G_5GH] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_2G_2G] = {MLMR_5GL_5GH, MLMR_5GL_5GH} },
 	[HC_5GH_5GH] = {[HC_NONE] =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_2G]   =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_5GL]  =   {MLMR_5GH_5GH | EMLSR_5GH_5GH,
 						MLMR_5GH_5GH | EMLSR_5GH_5GH},
 			[HC_5GH]  =   {MLMR_5GH_5GH | EMLSR_5GH_5GH,
-						MLMR_5GH_5GH | EMLSR_5GH_5GH} },
+						MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GL_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GH_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GL_5GL] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_2G_5GL] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_2G_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_2G_2G] = {MLMR_5GH_5GH, MLMR_5GH_5GH} },
 	[HC_5GL_5GL] = {[HC_NONE] =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_2G]   =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_5GL]  =   {MLMR_5GL_5GL | EMLSR_5GL_5GL,
 						MLMR_5GL_5GL | EMLSR_5GL_5GL},
-			[HC_5GH]  =   {MLMR_5GL_5GL, MLMR_5GL_5GL} },
+			[HC_5GH]  =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_5GL_5GH] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GH_5GH] = {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_5GL_5GL] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_5GL] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_5GH] = {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_2G_2G] = {MLMR_5GL_5GL, MLMR_5GL_5GL} },
 };
 
 static disallow_mlo_mode_table_type
@@ -238,25 +291,61 @@ disallow_mlo_mode_table_sbs_switchable = {
 	[HC_2G_5GL] = {[HC_NONE]  =   {0, 0},
 			[HC_2G]   =   {0, 0},
 			[HC_5GL]  =   {0, 0},
-			[HC_5GH]  =   {0, MLMR_2G_5GL} },
+			[HC_5GH]  =   {0, MLMR_2G_5GL},
+			[HC_5GL_5GH] = {0, 0},
+			[HC_5GH_5GH] = {MLMR_2G_5GL, MLMR_2G_5GL},
+			[HC_5GL_5GL] = {0, 0},
+			[HC_2G_5GL] = {0, 0},
+			[HC_2G_5GH] = {0, 0},
+			[HC_2G_2G] = {0, 0} },
 	[HC_2G_5GH] = {[HC_NONE]  =   {0, 0},
 			[HC_2G]   =   {0, 0},
 			[HC_5GL]  =   {0, MLMR_2G_5GH},
-			[HC_5GH]  =   {0, 0} },
+			[HC_5GH]  =   {0, 0},
+			[HC_5GL_5GH] = {0, 0},
+			[HC_5GH_5GH] = {0, 0},
+			[HC_5GL_5GL] = {MLMR_2G_5GH, MLMR_2G_5GH},
+			[HC_2G_5GL] = {0, 0},
+			[HC_2G_5GH] = {0, 0},
+			[HC_2G_2G] = {0, 0} },
 	[HC_5GL_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]   =   {0, MLMR_5GL_5GH},
 			[HC_5GL]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
-			[HC_5GH]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH} },
+			[HC_5GH]  =   {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GL_5GH] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GH_5GH] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_5GL_5GL] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_2G_5GL] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_2G_5GH] = {EMLSR_5GL_5GH, EMLSR_5GL_5GH},
+			[HC_2G_2G] = {MLMR_5GL_5GH, MLMR_5GL_5GH} },
 	[HC_5GH_5GH] = {[HC_NONE] =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_2G]   =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_5GL]  =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_5GH]  =   {MLMR_5GH_5GH | EMLSR_5GH_5GH,
-						MLMR_5GH_5GH | EMLSR_5GH_5GH} },
+						MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GL_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GH_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GL_5GL] = {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_2G_5GL] = {MLMR_5GH_5GH, MLMR_5GH_5GH},
+			[HC_2G_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_2G_2G] = {MLMR_5GH_5GH, MLMR_5GH_5GH} },
 	[HC_5GL_5GL] = {[HC_NONE] =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_2G]   =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_5GL]  =   {MLMR_5GL_5GL | EMLSR_5GL_5GL,
 						MLMR_5GL_5GL | EMLSR_5GL_5GL},
-			[HC_5GH]  =   {MLMR_5GL_5GL, MLMR_5GL_5GL} },
+			[HC_5GH]  =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_5GL_5GH] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GH_5GH] = {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_5GL_5GL] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_5GL] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_5GH] = {MLMR_5GL_5GL, MLMR_5GL_5GL},
+			[HC_2G_2G] = {MLMR_5GL_5GL, MLMR_5GL_5GL} },
 };
 
 static disallow_mlo_mode_table_type
@@ -265,29 +354,74 @@ disallow_mlo_mode_table_dbs = {
 	[HC_2G_5GL] = {[HC_NONE] =    {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {0, 0},
-			[HC_5GH] =    {0, MLMR_2G_5GL} },
+			[HC_5GH] =    {0, MLMR_2G_5GL},
+			[HC_5GL_5GH] = {0, 0},
+			[HC_5GH_5GH] = {MLMR_2G_5GL, MLMR_2G_5GL},
+			[HC_5GL_5GL] = {0, 0},
+			[HC_2G_5GL] = {0, 0},
+			[HC_2G_5GH] = {0, 0},
+			[HC_2G_2G] = {0, 0} },
 	[HC_2G_5GH] = {[HC_NONE] =    {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {0, MLMR_2G_5GH},
-			[HC_5GH] =    {0, 0} },
+			[HC_5GH] =    {0, 0},
+			[HC_5GL_5GH] = {0, 0},
+			[HC_5GH_5GH] = {0, 0},
+			[HC_5GL_5GL] = {MLMR_2G_5GH, MLMR_2G_5GH},
+			[HC_2G_5GL] = {0, 0},
+			[HC_2G_5GH] = {0, 0},
+			[HC_2G_2G] = {0, 0} },
 	[HC_5GL_5GH] = {[HC_NONE] =   {MLMR_5GL_5GH, MLMR_5GL_5GH},
 			[HC_2G]  =    {MLMR_5GL_5GH, MLMR_5GL_5GH},
 			[HC_5GL] =    {MLMR_5GL_5GH | EMLSR_5GL_5GH,
 						MLMR_5GL_5GH | EMLSR_5GL_5GH},
 			[HC_5GH] =    {MLMR_5GL_5GH | EMLSR_5GL_5GH,
-						MLMR_5GL_5GH | EMLSR_5GL_5GH} },
+						MLMR_5GL_5GH | EMLSR_5GL_5GH},
+			[HC_5GL_5GH] = {MLMR_5GL_5GH | EMLSR_5GL_5GH,
+						MLMR_5GL_5GH | EMLSR_5GL_5GH},
+			[HC_5GH_5GH] = {MLMR_5GL_5GH | EMLSR_5GL_5GH,
+						MLMR_5GL_5GH | EMLSR_5GL_5GH},
+			[HC_5GL_5GL] = {MLMR_5GL_5GH | EMLSR_5GL_5GH,
+						MLMR_5GL_5GH | EMLSR_5GL_5GH},
+			[HC_2G_5GL] = {MLMR_5GL_5GH | EMLSR_5GL_5GH,
+						MLMR_5GL_5GH | EMLSR_5GL_5GH},
+			[HC_2G_5GH] = {MLMR_5GL_5GH | EMLSR_5GL_5GH,
+						MLMR_5GL_5GH | EMLSR_5GL_5GH},
+			[HC_2G_2G] = {MLMR_5GL_5GH, MLMR_5GL_5GH} },
 	[HC_5GH_5GH] = {[HC_NONE] =   {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_2G]  =    {MLMR_5GH_5GH, MLMR_5GH_5GH},
 			[HC_5GL] =    {MLMR_5GH_5GH | EMLSR_5GH_5GH,
 						MLMR_5GH_5GH | EMLSR_5GH_5GH},
 			[HC_5GH] =    {MLMR_5GH_5GH | EMLSR_5GH_5GH,
-						MLMR_5GH_5GH | EMLSR_5GH_5GH} },
+						MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GL_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GH_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_5GL_5GL] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_2G_5GL] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_2G_5GH] = {MLMR_5GH_5GH | EMLSR_5GH_5GH,
+					MLMR_5GH_5GH | EMLSR_5GH_5GH},
+			[HC_2G_2G] = {MLMR_5GH_5GH, MLMR_5GH_5GH} },
 	[HC_5GL_5GL] = {[HC_NONE] =   {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_2G]  =    {MLMR_5GL_5GL, MLMR_5GL_5GL},
 			[HC_5GL] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
 						MLMR_5GL_5GL | EMLSR_5GL_5GL},
 			[HC_5GH] =    {MLMR_5GL_5GL | EMLSR_5GL_5GL,
-						MLMR_5GL_5GL | EMLSR_5GL_5GL} },
+						MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GL_5GH] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GH_5GH] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_5GL_5GL] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_5GL] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_5GH] = {MLMR_5GL_5GL | EMLSR_5GL_5GL,
+					MLMR_5GL_5GL | EMLSR_5GL_5GL},
+			[HC_2G_2G] = {MLMR_5GL_5GL, MLMR_5GL_5GL} },
 };
 
 #define HC_MAP_DATA(_HC_2G_, _HC_5GL_, _HC_5GH_) \
@@ -308,7 +442,13 @@ static const uint32_t home_channel_maps[HC_MAX_MAP_ID] = {
 	HC_MAP(HC_2G_5GL,  1, 1, 0),
 	HC_MAP(HC_2G_5GH,  1, 0, 1),
 	HC_MAP(HC_2G_2G,  2, 0, 0),
-	HC_MAP(HC_5GL_5GH_2G,  1, 1, 1),
+	HC_MAP(HC_2G_5GL_5GH,  1, 1, 1),
+	HC_MAP(HC_2G_5GL_5GL,  1, 2, 0),
+	HC_MAP(HC_2G_5GH_5GH,  1, 0, 2),
+	HC_MAP(HC_5GL_5GL_5GH,  0, 2, 1),
+	HC_MAP(HC_5GL_5GH_5GH,  0, 1, 2),
+	HC_MAP(HC_5GL_5GL_5GL,  0, 3, 0),
+	HC_MAP(HC_5GH_5GH_5GH,  0, 0, 3),
 };
 
 static enum home_channel_map_id
@@ -503,7 +643,10 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			bool initial_connected,
 			enum mlo_disallowed_mode
 			mlo_disallow_mode[MAX_DISALLOW_MODE],
-			uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE])
+			uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE],
+			uint8_t ml_num_link,
+			qdf_freq_t ml_freq_lst[MAX_DISALLOW_MODE_LINK_NUM],
+			uint8_t ml_linkid_lst[MAX_DISALLOW_MODE_LINK_NUM])
 {
 	struct disallow_mlo_modes mlo_modes;
 	uint8_t num_of_modes = 0;
@@ -513,25 +656,11 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	enum home_channel_map_id ml_hc_id;
 	enum home_channel_map_id legacy_hc_id;
 	disallow_mlo_mode_table_type *disallow_tbl;
-	uint8_t ml_num_link = 0;
-	uint32_t ml_link_bitmap = 0;
-	qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS];
-	uint8_t ml_vdev_lst[WLAN_MAX_ML_BSS_LINKS];
-	uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS];
-	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
 	uint8_t legacy_num;
 	qdf_freq_t legacy_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t legacy_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t allow_mcc;
-
-	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
-			       QDF_ARRAY_SIZE(ml_linkid_lst),
-			       ml_link_info, ml_freq_lst, ml_vdev_lst,
-			       ml_linkid_lst, &ml_num_link,
-			       &ml_link_bitmap);
-	if (ml_num_link < 2)
-		goto end;
 
 	if (initial_connected)
 		goto no_legacy_intf;
@@ -635,8 +764,10 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 			       bool *disallow_changed)
 {
 	enum mlo_disallowed_mode mlo_disallow_mode[MAX_DISALLOW_MODE];
+	enum mlo_disallowed_mode tmp_mlo_disallow_mode[MAX_DISALLOW_MODE];
 	uint32_t disallow_link_bitmap[MAX_DISALLOW_MODE];
-	uint8_t num_of_modes, i, j, k;
+	uint32_t tmp_disallow_link_bitmap[MAX_DISALLOW_MODE];
+	uint8_t num_of_modes = 0, tmp_num_of_modes, i, j, k;
 	struct ml_link_disallow_mode_bitmap *ml_link_disallow;
 	uint8_t link_ids[MAX_MLO_LINK_ID];
 	uint8_t num_ids;
@@ -646,6 +777,14 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_link_force_context *link_force_ctx;
 	bool disallow_mode_changed = false;
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t dual_freq_lst[MAX_DISALLOW_MODE_LINK_NUM];
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t dual_linkid_lst[MAX_DISALLOW_MODE_LINK_NUM];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
 
 	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
 	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
@@ -653,10 +792,43 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	num_of_modes = populate_disallow_modes(psoc, vdev,
-					       initial_connected,
-					       mlo_disallow_mode,
-					       disallow_link_bitmap);
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	if (ml_num_link < 2)
+		return;
+
+	for (i = 0; i < ml_num_link; i++) {
+		for (j = i + 1; j < ml_num_link; j++) {
+			dual_freq_lst[0] = ml_freq_lst[i];
+			dual_freq_lst[1] = ml_freq_lst[j];
+			dual_linkid_lst[0] = ml_linkid_lst[i];
+			dual_linkid_lst[1] = ml_linkid_lst[j];
+			tmp_num_of_modes =
+				populate_disallow_modes(
+					psoc, vdev, initial_connected,
+					tmp_mlo_disallow_mode,
+					tmp_disallow_link_bitmap,
+					MAX_DISALLOW_MODE_LINK_NUM,
+					dual_freq_lst, dual_linkid_lst);
+
+			/* Combine the 3 disallowed mode bitmaps into one for 3-link */
+			for (k = 0; k < tmp_num_of_modes; k++) {
+				if (num_of_modes < MAX_DISALLOW_MODE) {
+					disallow_link_bitmap[num_of_modes] =
+						tmp_disallow_link_bitmap[k];
+					mlo_disallow_mode[num_of_modes] =
+						tmp_mlo_disallow_mode[k];
+					num_of_modes++;
+				} else {
+					mlo_err("max disallowed modes exceeded limits");
+					break;
+				}
+			}
+		}
+	}
 
 	/* Combine the MLO_DISALLOWED_MODE_NO_MLMR and
 	 * MLO_DISALLOWED_MODE_NO_EMLSR to MLO_DISALLOWED_MODE_NO_MLMR_EMLSR
@@ -855,7 +1027,6 @@ ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
 	mlo_dev_lock_acquire(mlo_dev_ctx);
 	sta_ctx = mlo_dev_ctx->sta_ctx;
 	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		/*todo: add standby link */
 		if (!mlo_dev_ctx->wlan_vdev_list[i])
 			continue;
 		vdev_id = wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]);
@@ -1527,10 +1698,10 @@ ml_nlink_get_standby_link_bitmap(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t ml_num_link = 0;
 	uint32_t standby_link_bitmap = 0;
-	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_vdev_lst[WLAN_MAX_ML_BSS_LINKS];
+	qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS];
+	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
 
 	ml_nlink_get_standby_link_info(psoc, vdev, NLINK_DUMP_LINK,
 				       QDF_ARRAY_SIZE(ml_linkid_lst),
@@ -1539,6 +1710,35 @@ ml_nlink_get_standby_link_bitmap(struct wlan_objmgr_psoc *psoc,
 				       &standby_link_bitmap);
 
 	return standby_link_bitmap;
+}
+
+qdf_freq_t
+ml_nlink_get_standby_link_freq(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_vdev *vdev,
+			       uint32_t standby_link_bmap)
+{
+	uint8_t ml_num_link = 0;
+	uint32_t standby_link_bitmap = 0;
+	uint8_t ml_vdev_lst[WLAN_MAX_ML_BSS_LINKS];
+	qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS];
+	uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS];
+	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
+	qdf_freq_t freq = 0;
+	uint8_t i;
+
+	ml_nlink_get_standby_link_info(psoc, vdev, 0,
+				       QDF_ARRAY_SIZE(ml_linkid_lst),
+				       ml_link_info, ml_freq_lst, ml_vdev_lst,
+				       ml_linkid_lst, &ml_num_link,
+				       &standby_link_bitmap);
+	for (i = 0; i < ml_num_link; i++) {
+		if (standby_link_bmap & (1 << ml_linkid_lst[i])) {
+			freq = ml_freq_lst[i];
+			break;
+		}
+	}
+
+	return freq;
 }
 
 /**
@@ -1863,6 +2063,34 @@ sap_force_inactive_table_lowshare_rd = {
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {0, 0},
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_2G_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {0, 0} },
+	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
+			[HC_5GH] =    {0, HC_5GL_5GL} },
+	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
+			[HC_5GH] =    {0, 0} },
+	[HC_5GL_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_5GL_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL},
+			[HC_5GH] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL} },
+	[HC_5GH_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH} },
 };
 
 static force_inactive_table_type
@@ -1880,6 +2108,34 @@ sap_force_inactive_table_dbs_rd = {
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {HC_5GH_5GH, HC_5GH_5GH},
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_2G_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GH, HC_5GL_5GH},
+			[HC_5GH] =    {HC_5GL_5GH, HC_5GL_5GH} },
+	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
+			[HC_5GH] =    {0, HC_5GL_5GL} },
+	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, HC_5GH_5GH},
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GH, HC_5GL_5GL_5GH},
+			[HC_5GH] =    {HC_5GL_5GL_5GH, HC_5GL_5GL_5GH} },
+	[HC_5GL_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GH_5GH, HC_5GL_5GH_5GH},
+			[HC_5GH] =    {HC_5GL_5GH_5GH, HC_5GL_5GH_5GH} },
+	[HC_5GL_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL},
+			[HC_5GH] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL} },
+	[HC_5GH_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH},
+			[HC_5GH] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH} },
 };
 
 static force_inactive_table_type
@@ -1905,6 +2161,34 @@ sta_p2p_force_inactive_table_lowshare_rd = {
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {0, 0},
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_2G_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL, HC_2G_5GH},
+			[HC_5GH] =    {HC_5GH, HC_2G_5GL} },
+	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL_5GL, 0},
+			[HC_5GH] =    {0, HC_2G_5GL_5GL} },
+	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_2G, 0},
+			[HC_5GH] =    {HC_5GH_5GH, 0} },
+	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL, 0},
+			[HC_5GH] =    {HC_5GH, HC_5GL_5GL} },
+	[HC_5GL_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL, 0},
+			[HC_5GH] =    {HC_5GH_5GH, 0} },
+	[HC_5GL_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL},
+			[HC_5GH] =    {0, HC_5GL_5GL_5GL} },
+	[HC_5GH_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, 0},
+			[HC_5GH] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH} },
 };
 
 static force_inactive_table_type
@@ -1925,11 +2209,39 @@ sta_p2p_force_inactive_table_dbs_rd = {
 	[HC_5GL_5GL] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
-			[HC_5GH] =    {HC_5GL_5GL, HC_5GL_5GL} },
+			[HC_5GH] =    {0, HC_5GL_5GL} },
 	[HC_5GH_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {0, 0},
-			[HC_5GL] =    {HC_5GH_5GH, HC_5GH_5GH},
+			[HC_5GL] =    {0, HC_5GH_5GH},
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
+	[HC_2G_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL_5GH, 0},
+			[HC_5GH] =    {HC_5GL_5GH, 0} },
+	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GL_5GL, 0},
+			[HC_5GH] =    {HC_5GL_5GL, 0} },
+	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {HC_2G, 0},
+			[HC_5GL] =    {HC_5GH_5GH, 0},
+			[HC_5GH] =    {HC_5GH_5GH, 0} },
+	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GH, HC_5GL_5GL_5GH},
+			[HC_5GH] =    {HC_5GL_5GL_5GH, HC_5GL_5GL_5GH} },
+	[HC_5GL_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GH_5GH, HC_5GL_5GH_5GH},
+			[HC_5GH] =    {HC_5GL_5GH_5GH, HC_5GL_5GH_5GH} },
+	[HC_5GL_5GL_5GL] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL},
+			[HC_5GH] =    {0, HC_5GL_5GL_5GL} },
+	[HC_5GH_5GH_5GH] = {[HC_NONE] =   {0, 0},
+			[HC_2G]  =    {0, 0},
+			[HC_5GL] =    {0, HC_5GH_5GH_5GH},
+			[HC_5GH] =    {HC_5GH_5GH_5GH, HC_5GH_5GH_5GH} },
 };
 
 static force_inactive_table_type *sap_tbl[] = {
@@ -2014,6 +2326,27 @@ static void hc_id_2_link_bitmap(
 		break;
 	case HC_2G_5GH:
 		*link_bitmap = link_map[HC_2G] | link_map[HC_5GH];
+		break;
+	case HC_2G_5GL_5GH:
+		*link_bitmap = link_map[HC_2G] | link_map[HC_5GL] | link_map[HC_5GH];
+		break;
+	case HC_2G_5GL_5GL:
+		*link_bitmap = link_map[HC_2G] | link_map[HC_5GL];
+		break;
+	case HC_2G_5GH_5GH:
+		*link_bitmap = link_map[HC_2G] | link_map[HC_5GH];
+		break;
+	case HC_5GL_5GL_5GH:
+		*link_bitmap = link_map[HC_5GL] | link_map[HC_5GH];
+		break;
+	case HC_5GL_5GH_5GH:
+		*link_bitmap = link_map[HC_5GL] | link_map[HC_5GH];
+		break;
+	case HC_5GL_5GL_5GL:
+		*link_bitmap = link_map[HC_5GL];
+		break;
+	case HC_5GH_5GH_5GH:
+		*link_bitmap = link_map[HC_5GH];
 		break;
 	default:
 		return;
@@ -2296,7 +2629,6 @@ ml_nlink_handle_legacy_sta_intf(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	for (i = 0; i < ml_num_link; i++) {
-		/*todo add removed link to force_inactive_link_bitmap*/
 		if (ml_freq_lst[i] == non_ml_sta_freq) {
 			scc_link_bitmap = 1 << ml_linkid_lst[i];
 		} else if (policy_mgr_2_freq_always_on_same_mac(
@@ -2583,145 +2915,11 @@ ml_nlink_handle_legacy_p2p_intf(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
-/**
- * ml_nlink_handle_3_port_specific_scenario() - Check some specific corner
- * case that can't be handled general logic in
- * ml_nlink_handle_legacy_intf_3_ports.
- * @psoc: PSOC object information
- * @legacy_intf_freq1: legacy interface 1 channel frequency
- * @legacy_intf_freq2: legacy interface 2 channel frequency
- * @ml_num_link: number of ML STA links
- * @ml_freq_lst: ML STA link channel frequency list
- * @ml_linkid_lst: ML STA link ids
- *
- * Return: link force inactive bitmap
- */
-static uint32_t
-ml_nlink_handle_3_port_specific_scenario(struct wlan_objmgr_psoc *psoc,
-					 qdf_freq_t legacy_intf_freq1,
-					 qdf_freq_t legacy_intf_freq2,
-					 uint8_t ml_num_link,
-					 qdf_freq_t *ml_freq_lst,
-					 uint8_t *ml_linkid_lst)
-{
-	uint32_t force_inactive_link_bitmap = 0;
-
-	if (ml_num_link < 2)
-		return 0;
-
-	/* special case handling:
-	 * LL P2P on 2.4G, ML STA 5G+6G, SAP on 6G, then
-	 * inactive 5G link.
-	 * LL P2P on 2.4G, ML STA 5G+6G, SAP on 5G, then
-	 * inactive 6G link.
-	 */
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(legacy_intf_freq1) &&
-	    !WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[0]) &&
-	    policy_mgr_are_sbs_chan(psoc, ml_freq_lst[0], ml_freq_lst[1]) &&
-	    policy_mgr_2_freq_always_on_same_mac(psoc, ml_freq_lst[0],
-						 legacy_intf_freq2))
-		force_inactive_link_bitmap |= 1 << ml_linkid_lst[1];
-	else if (WLAN_REG_IS_24GHZ_CH_FREQ(legacy_intf_freq1) &&
-		 !WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[1]) &&
-		 policy_mgr_are_sbs_chan(psoc, ml_freq_lst[0],
-					 ml_freq_lst[1]) &&
-		 policy_mgr_2_freq_always_on_same_mac(psoc, ml_freq_lst[1],
-						      legacy_intf_freq2))
-		force_inactive_link_bitmap |= 1 << ml_linkid_lst[0];
-
-	if (force_inactive_link_bitmap)
-		mlo_debug("force inactive 0x%x", force_inactive_link_bitmap);
-
-	return force_inactive_link_bitmap;
-}
-
-/**
- * ml_nlink_handle_legacy_intf_3_ports() - Check force inactive needed
- * with 2 legacy interfaces
- * @psoc: PSOC object information
- * @vdev: vdev object
- * @force_cmd: force command to be returned
- * @legacy_intf_freq1: legacy interface frequency
- * @legacy_intf_freq2: legacy interface frequency
- *
- * If legacy interface 1 (which channel frequency legacy_intf_freq1) is
- * mcc with any link based on current hw mode, then force inactive the link.
- * And if standby link is mcc with legacy interface, then disable standby
- * link as well.
- * In 3 Port case, at present only legacy interface 1(which channel frequency
- * legacy_intf_freq1) MCC avoidance requirement can be met. The assignment of
- * legacy_intf_freq1 and legacy_intf_freq2 is based on priority of Port type,
- * check policy_mgr_get_legacy_conn_info for detail.
- * Cornor cases will be handled in ml_nlink_handle_3_port_specific_scenario.
- *
- * Return: void
- */
 static void
 ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    struct ml_link_force_state *force_cmd,
-				    qdf_freq_t legacy_intf_freq1,
-				    qdf_freq_t legacy_intf_freq2)
-{
-	uint8_t ml_num_link = 0;
-	uint32_t ml_link_bitmap = 0;
-	uint32_t force_inactive_link_bitmap = 0;
-	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t i = 0;
-	uint32_t scc_link_bitmap = 0;
-
-	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
-			       QDF_ARRAY_SIZE(ml_linkid_lst),
-			       ml_link_info, ml_freq_lst, ml_vdev_lst,
-			       ml_linkid_lst, &ml_num_link,
-			       &ml_link_bitmap);
-	if (ml_num_link < 2)
-		return;
-
-	for (i = 0; i < ml_num_link; i++) {
-		if (ml_vdev_lst[i] == WLAN_INVALID_VDEV_ID) {
-			/*standby link will be handled later. */
-			continue;
-		}
-		if (ml_freq_lst[i] == legacy_intf_freq1) {
-			scc_link_bitmap = 1 << ml_linkid_lst[i];
-			if (ml_freq_lst[i] == legacy_intf_freq2) {
-				mlo_debug("3 vdev scc no-op");
-				return;
-			}
-		} else if (policy_mgr_are_2_freq_on_same_mac(
-				psoc, ml_freq_lst[i], legacy_intf_freq1)) {
-			force_inactive_link_bitmap |= 1 << ml_linkid_lst[i];
-		} else if (i == 1) {
-			force_inactive_link_bitmap |=
-			ml_nlink_handle_3_port_specific_scenario(
-							psoc,
-							legacy_intf_freq1,
-							legacy_intf_freq2,
-							ml_num_link,
-							ml_freq_lst,
-							ml_linkid_lst);
-		}
-	}
-	/* usually it can't happen in 3 Port */
-	if (!force_inactive_link_bitmap && !scc_link_bitmap) {
-		mlo_debug("legacy vdev freq %d standalone on dedicated mac",
-			  legacy_intf_freq1);
-		return;
-	}
-
-	if (force_inactive_link_bitmap)
-		force_cmd->force_inactive_bitmap = force_inactive_link_bitmap;
-}
-
-static void
-ml_nlink_handle_legacy_intf_3_ports_emlsr(
-				    struct wlan_objmgr_psoc *psoc,
-				    struct wlan_objmgr_vdev *vdev,
-				    struct ml_link_force_state *force_cmd,
+				    bool emlsr_conn_with_aux,
 				    uint8_t num_legacy_vdev,
 				    uint8_t *vdev_lst,
 				    qdf_freq_t *freq_lst,
@@ -2754,6 +2952,7 @@ ml_nlink_handle_legacy_intf_3_ports_emlsr(
 	enum home_channel_map_id force_inact_hc_id;
 	enum home_channel_map_id force_inact_hc_id2;
 	enum pm_rd_type rd_type = policy_mgr_get_rd_type(psoc);
+	bool legacy_2_intf_mcc_scc;
 
 	if (num_legacy_vdev < 2)
 		return;
@@ -2763,8 +2962,7 @@ ml_nlink_handle_legacy_intf_3_ports_emlsr(
 	legacy_pm_mode = mode_lst[0];
 	legacy_vdev_id = vdev_lst[0];
 
-	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK |
-				NLINK_EXCLUDE_STANDBY_LINK,
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
 			       ml_link_info, ml_freq_lst, ml_vdev_lst,
 			       ml_linkid_lst, &ml_num_link,
@@ -2792,13 +2990,14 @@ ml_nlink_handle_legacy_intf_3_ports_emlsr(
 	}
 
 	for (i = 0; i < ml_num_link; i++) {
-		if (ml_vdev_lst[i] == WLAN_INVALID_VDEV_ID) {
-			/*standby link will be handled later. */
-			continue;
-		}
 		if (ml_freq_lst[i] == legacy_intf_freq1 ||
 		    ml_freq_lst[i] == legacy_intf_freq2) {
 			scc_link_bitmap |= 1 << ml_linkid_lst[i];
+		} else if (policy_mgr_2_freq_always_on_same_mac(
+			   psoc, ml_freq_lst[i], legacy_intf_freq1) ||
+			   policy_mgr_2_freq_always_on_same_mac(
+			   psoc, ml_freq_lst[i], legacy_intf_freq2)){
+			force_inactive_link_bitmap |= 1 << ml_linkid_lst[i];
 		}
 		if (policy_mgr_vdev_is_force_inactive(psoc, ml_vdev_lst[i]))
 			vdev_inactive_links |= 1 << ml_linkid_lst[i];
@@ -2810,48 +3009,69 @@ ml_nlink_handle_legacy_intf_3_ports_emlsr(
 		return;
 	}
 
-	/* 1. Handle the 2 legacy intf are SCC or MCC firstly.
-	 * If the legacy intf  home channel are always in same suband (SCC
-	 * or MCC), such as 2G + 2G, 5GL + 5GL, or 5GH + 5GH,
-	 * the force inactive action is similar to one home channel
-	 * case in same subband.
-	 */
-	if (policy_mgr_2_freq_always_on_same_mac(
-			psoc, legacy_intf_freq1, legacy_intf_freq2)) {
-		non_ml_hc_id = get_hc_id(psoc, 1, freq_lst);
-		if (non_ml_hc_id >= HC_BAND_MAX) {
-			mlo_debug("invalid non_ml_hc_id %d", non_ml_hc_id);
-			return;
+	/* 1. Handle the 2 legacy intf are SCC or MCC firstly. */
+	legacy_2_intf_mcc_scc = policy_mgr_2_freq_always_on_same_mac(
+			psoc, legacy_intf_freq1, legacy_intf_freq2);
+	if (legacy_2_intf_mcc_scc) {
+		if (emlsr_conn_with_aux) {
+			/* If the legacy intf home channel are always in same
+			 * suband (SCC or MCC), such as 2G + 2G, 5GL + 5GL, or
+			 * 5GH + 5GH, for EMLSR ML STA case the force inactive
+			 * action is similar to one home channel case in same
+			 * subband.
+			 */
+			non_ml_hc_id = get_hc_id(psoc, 1, freq_lst);
+			if (non_ml_hc_id >= HC_BAND_MAX) {
+				mlo_debug("invalid non_ml_hc_id %d",
+					  non_ml_hc_id);
+				return;
+			}
+
+			force_inactive_tlb =
+				get_force_inactive_table(psoc, PM_STA_MODE);
+			if (!force_inactive_tlb) {
+				mlo_debug("unable to get force inactive tbl");
+				return;
+			}
+			force_modes =
+			(*force_inactive_tlb)[ml_link_hc_id][non_ml_hc_id];
+
+			force_inactive_hc_id =
+					force_modes.force_inactive_hc_id;
+			force_inactive_num_hc_id =
+					force_modes.force_inactive_num_hc_id;
+			force_inactive_link_bitmap = 0;
+			hc_id_2_link_bitmap(psoc, ml_num_link, ml_freq_lst,
+					    ml_linkid_lst,
+					    force_inactive_hc_id,
+					    &force_inactive_link_bitmap);
+			hc_id_2_link_bitmap(psoc, ml_num_link, ml_freq_lst,
+					    ml_linkid_lst,
+					    force_inactive_num_hc_id,
+					    &force_inactive_num_bitmap);
+
+			mlo_debug("ml %s legacy %s mode %s %s inact %s inact num %s rd %d",
+				  hc_id_to_string(ml_link_hc_id),
+				  hc_id_to_string(non_ml_hc_id),
+				  device_mode_to_string(mode_lst[0]),
+				  device_mode_to_string(mode_lst[1]),
+				  hc_id_to_string(force_inactive_hc_id),
+				  hc_id_to_string(force_inactive_num_hc_id),
+				  policy_mgr_get_rd_type(psoc));
+		} else {
+			/* force_inactive_link_bitmap contains all ML links
+			 * in same subband (includes SCC links).
+			 * force_inactive_num_bitmap will contain all other
+			 * band's ML links. For non EMLSR case, the links in
+			 * force_inactive_num_bitmap have to be forced to
+			 * MLSR by force inactive num command.
+			 * for example, ML STA 5GL_5GH + SAP 2G + GO 2G: force
+			 * inactive num 1 for ML STA 5GL+5GH.
+			 */
+			force_inactive_link_bitmap |= scc_link_bitmap;
+			force_inactive_num_bitmap =
+				ml_link_bitmap & ~force_inactive_link_bitmap;
 		}
-
-		force_inactive_tlb =
-			get_force_inactive_table(psoc, PM_STA_MODE);
-		if (!force_inactive_tlb) {
-			mlo_debug("unable to get force inactive tbl");
-			return;
-		}
-		force_modes =
-		(*force_inactive_tlb)[ml_link_hc_id][non_ml_hc_id];
-
-		force_inactive_hc_id = force_modes.force_inactive_hc_id;
-		force_inactive_num_hc_id =
-				force_modes.force_inactive_num_hc_id;
-
-		hc_id_2_link_bitmap(psoc, ml_num_link, ml_freq_lst,
-				    ml_linkid_lst, force_inactive_hc_id,
-				    &force_inactive_link_bitmap);
-		hc_id_2_link_bitmap(psoc, ml_num_link, ml_freq_lst,
-				    ml_linkid_lst, force_inactive_num_hc_id,
-				    &force_inactive_num_bitmap);
-
-		mlo_debug("ml %s legacy %s mode %s %s inact %s inact num %s rd %d",
-			  hc_id_to_string(ml_link_hc_id),
-			  hc_id_to_string(non_ml_hc_id),
-			  device_mode_to_string(mode_lst[0]),
-			  device_mode_to_string(mode_lst[1]),
-			  hc_id_to_string(force_inactive_hc_id),
-			  hc_id_to_string(force_inactive_num_hc_id),
-			  policy_mgr_get_rd_type(psoc));
 		mlo_debug("scc link 0x%x force inact 0x%x force inact num 0x%x",
 			  scc_link_bitmap, force_inactive_link_bitmap,
 			  force_inactive_num_bitmap);
@@ -2880,7 +3100,12 @@ ml_nlink_handle_legacy_intf_3_ports_emlsr(
 			if (ml_link_bitmap & ~force_inactive_link_bitmap)
 				force_cmd->force_inactive_bitmap =
 					force_inactive_link_bitmap;
+			else
+				mlo_debug("unexpected no left links: avail 0x%x inact 0x%x",
+					  ml_link_bitmap,
+					  force_inactive_link_bitmap);
 		}
+
 		if (force_inactive_num_bitmap) {
 			force_cmd->force_inactive_num =
 				convert_link_bitmap_to_link_ids(
@@ -2911,7 +3136,8 @@ ml_nlink_handle_legacy_intf_3_ports_emlsr(
 	 * MCC, ML STA will not support EMLSR.
 	 * All MCC ML STA links have to be forced to MLSR.
 	 */
-	ml_nlink_handle_mcc_links(psoc, vdev, force_cmd);
+	if (emlsr_conn_with_aux)
+		ml_nlink_handle_mcc_links(psoc, vdev, force_cmd);
 
 	/* 2 legacy intf are DBS or SBS channels,
 	 * Basic rule is :
@@ -3099,15 +3325,12 @@ ml_nlink_handle_legacy_intf_3_ports_emlsr(
 			    force_inact_hc_id2,
 			    &force_inactive_link_bitmap2);
 
+	/* SAP on 5GH and ML STA on 6G, force inactive 6G to avoid MCC */
 	for (i = 0; i < num_legacy_vdev; i++) {
 		if (mode_lst[i] != PM_SAP_MODE ||
 		    !WLAN_REG_IS_5GHZ_CH_FREQ(freq_lst[i]))
 			continue;
 		for (j = 0; j < ml_num_link; j++) {
-			if (ml_vdev_lst[j] == WLAN_INVALID_VDEV_ID) {
-				/*standby link will be handled later. */
-				continue;
-			}
 			if (WLAN_REG_IS_6GHZ_CHAN_FREQ(ml_freq_lst[j]) &&
 			    policy_mgr_2_freq_always_on_same_mac(
 					psoc, ml_freq_lst[j], freq_lst[i])) {
@@ -3140,13 +3363,13 @@ ml_nlink_handle_legacy_intf_3_ports_emlsr(
 		force_cmd->force_inactive_bitmap |=
 			force_inactive_link_bitmap;
 
-	if (ml_link_bitmap & ~force_inactive_link_bitmap &
+	if (ml_link_bitmap & ~force_cmd->force_inactive_bitmap &
 	    ~force_inactive_link_bitmap2)
 		force_cmd->force_inactive_bitmap |=
 			force_inactive_link_bitmap2;
 
-	if (ml_link_bitmap & ~force_inactive_link_bitmap &
-	    ~force_inactive_link_bitmap2 & ~force_inactive_link_bitmap3)
+	if (ml_link_bitmap & ~force_cmd->force_inactive_bitmap &
+	    ~force_inactive_link_bitmap3)
 		force_cmd->force_inactive_bitmap |=
 			force_inactive_link_bitmap3;
 
@@ -3194,22 +3417,29 @@ ml_nlink_handle_standby_link_3_ports(
 			       &ml_link_bitmap);
 	if (ml_num_link < 2)
 		return;
+
+	if (policy_mgr_2_freq_always_on_same_mac(
+				psoc, freq_lst[0], freq_lst[1]))
+		return;
+
 	for (i = 0; i < ml_num_link; i++) {
 		if (ml_vdev_lst[i] != WLAN_INVALID_VDEV_ID)
 			continue;
-		/* standby link will be forced inactive if mcc with
-		 * legacy interface
-		 */
+
 		for (j = 0; j < num_legacy_vdev; j++) {
-			if (ml_freq_lst[i] != freq_lst[j] &&
-			    policy_mgr_are_2_freq_on_same_mac(
-					psoc, ml_freq_lst[i], freq_lst[j]))
-				force_inactive_link_bitmap |=
-						1 << ml_linkid_lst[i];
+			if (ml_freq_lst[i] == freq_lst[j])
+				break;
 		}
+		/* standby link will be force inactive if not SCC with
+		 * any legacy interface, for example SAP 2G, GO 5GL, standby
+		 * link on 5GH
+		 */
+		if (j == num_legacy_vdev)
+			force_inactive_link_bitmap |= 1 << ml_linkid_lst[i];
 	}
 
-	if (force_inactive_link_bitmap)
+	if (ml_link_bitmap & ~force_cmd->force_inactive_bitmap &
+	    ~force_inactive_link_bitmap)
 		force_cmd->force_inactive_bitmap |= force_inactive_link_bitmap;
 }
 
@@ -3240,7 +3470,6 @@ ml_nlink_handle_legacy_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	/* handle 2 port case with 2 ml sta links.
-	 * todo: 2 port case with 3 ml sta links
 	 */
 	if (num_legacy_vdev == 1) {
 		switch (mode_lst[0]) {
@@ -3269,8 +3498,8 @@ ml_nlink_handle_legacy_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 	case PM_P2P_GO_MODE:
 	case PM_STA_MODE:
 	case PM_SAP_MODE:
-		ml_nlink_handle_legacy_intf_3_ports_emlsr(
-			psoc, vdev, force_cmd, num_legacy_vdev,
+		ml_nlink_handle_legacy_intf_3_ports(
+			psoc, vdev, force_cmd, true, num_legacy_vdev,
 			vdev_lst, freq_lst, mode_lst);
 		break;
 	default:
@@ -3373,32 +3602,25 @@ ml_nlink_handle_legacy_intf(struct wlan_objmgr_psoc *psoc,
 	 * 6G: ML Link + Port2	       | 2G: ML Link | 5GL: Port3
 	 *	=> disable 2G link
 	 * general rule:
-	 * If Port3 is mcc with any link based on current hw mode, then
-	 * force inactive the link.
-	 * And if standby link is mcc with Port3, then disable standby
-	 * link as well.
+	 * If any link is always mcc with Port3, then force inactive the link.
+	 * And if standby link is MCC with any Legacy Ports, then disable
+	 * standby link as well.
 	 */
 	switch (mode_lst[0]) {
 	case PM_P2P_CLIENT_MODE:
 	case PM_P2P_GO_MODE:
-		if (!policy_mgr_is_vdev_high_tput_or_low_latency(
-					psoc, vdev_lst[0]))
-			break;
-		fallthrough;
 	case PM_STA_MODE:
-		ml_nlink_handle_legacy_intf_3_ports(
-			psoc, vdev, force_cmd, freq_lst[0], freq_lst[1]);
-		break;
 	case PM_SAP_MODE:
-		/* if 2g only sap present, force inactive num to fw. */
-		ml_nlink_handle_legacy_sap_intf(
-			psoc, vdev, force_cmd, vdev_lst[0], freq_lst[0]);
+		ml_nlink_handle_legacy_intf_3_ports(
+			psoc, vdev, force_cmd, false, num_legacy_vdev,
+			vdev_lst, freq_lst, mode_lst);
 		break;
 	default:
 		/* unexpected legacy connection count */
 		mlo_debug("unexpected legacy intf mode %d", mode_lst[0]);
 		return;
 	}
+
 	ml_nlink_handle_standby_link_3_ports(psoc, vdev, force_cmd,
 					     num_legacy_vdev,
 					     vdev_lst,
@@ -4631,7 +4853,6 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_SUCCESS;
 
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	/* todo: add sta/gc support */
 	if (!(op_mode == QDF_SAP_MODE ||
 	      op_mode == QDF_P2P_GO_MODE ||
 	      op_mode == QDF_STA_MODE ||
@@ -4656,10 +4877,15 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 		tgt_ch_freq = data->evt.csa_start.tgt_ch_freq;
 
 	for (i = 0; i < ml_num_link; i++) {
-		if (ml_vdev_lst[i] == WLAN_INVALID_VDEV_ID)
+		/* force inactive num = 2 amongst all links for 3-link ML STA */
+		force_inactive_num_bitmap |= 1 << ml_linkid_lst[i];
+		force_inactive_num++;
+
+		if ((ml_num_link > 2) || (ml_vdev_lst[i] ==
+		    WLAN_INVALID_VDEV_ID) ||
+		    policy_mgr_vdev_is_force_inactive(psoc, ml_vdev_lst[i]))
 			continue;
-		if (policy_mgr_vdev_is_force_inactive(psoc, ml_vdev_lst[i]))
-			continue;
+
 		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i])) {
 			/* ML STA 5GH+5GH, if SAP CSA to SCC channel of ML STA,
 			 * downgrade EMLSR to MLSR by force inactive the other
@@ -4674,9 +4900,6 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 					force_inactive_bitmap |=
 					1 << ml_linkid_lst[i];
 			}
-
-			force_inactive_num_bitmap |= 1 << ml_linkid_lst[i];
-			force_inactive_num++;
 		}
 	}
 	/* small optimization, if 5G links num is less then 2, eMLSR is
@@ -4762,7 +4985,6 @@ ml_nlink_undo_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_SUCCESS;
 
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-	/* todo: add sta/gc support */
 	if (!(op_mode == QDF_SAP_MODE ||
 	      op_mode == QDF_P2P_GO_MODE ||
 	      op_mode == QDF_STA_MODE ||
@@ -5409,8 +5631,8 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		break;
 	case ml_nlink_connect_pre_start_evt:
 	case ml_nlink_ap_start_evt:
-		status = ml_nlink_emlsr_downgrade_handler(
-			psoc, vdev, evt, data);
+		status = ml_nlink_emlsr_downgrade_handler(psoc, vdev, evt,
+							  data);
 		break;
 	case ml_nlink_connect_failed_evt:
 	case ml_nlink_ap_start_failed_evt:
@@ -5502,3 +5724,27 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 			psoc, vdev_id,
 			ml_nlink_vendor_cmd_request_evt, &data);
 }
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(FEATURE_DENYLIST_MGR)
+uint8_t
+mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlo_link_info link_info;
+	uint8_t i = 0;
+	uint8_t curr_link_comb = 0;
+
+	/* Iterate from 1st index, because assoc link is at 0th index */
+	for (i = 1; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = vdev->mlo_dev_ctx->link_ctx->links_info[i];
+		if (qdf_is_macaddr_zero(&link_info.ap_link_addr))
+			break;
+
+		if (!link_info.is_link_active)
+			continue;
+
+		curr_link_comb |= 1 << i;
+	}
+	return curr_link_comb;
+}
+#endif
+

@@ -1133,6 +1133,7 @@ bool lim_get_vdev_rmf_capable(struct mac_context *mac,
 /**
  * lim_add_bssid_to_reject_list:- Add rssi reject Ap info to denylist mgr.
  * @pdev: pdev
+ * @vdev_id: vdev_id
  * @entry: info of the BSSID to be put in rssi reject list.
  *
  * This API will add the passed ap info to the rssi reject list.
@@ -1140,6 +1141,7 @@ bool lim_get_vdev_rmf_capable(struct mac_context *mac,
  */
 void
 lim_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
+			     uint8_t vdev_id,
 			     struct sir_rssi_disallow_lst *entry);
 
 /**

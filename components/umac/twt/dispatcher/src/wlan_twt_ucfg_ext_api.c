@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -248,3 +248,14 @@ bool ucfg_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc)
 	return wlan_twt_get_pmo_allowed(psoc);
 }
 
+QDF_STATUS
+ucfg_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_twt_set_requestor_enable_cmd_in_progress(psoc);
+}
+
+void
+ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_twt_reset_requestor_enable_cmd_in_progress(psoc);
+}

@@ -7840,21 +7840,23 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 	wlan_twt_get_bcast_responder_cfg(mac->psoc, &bcast_responder);
 
 	he_cap->broadcast_twt = 0;
-	if (session->opmode == QDF_STA_MODE) {
+	switch (session->opmode) {
+	case QDF_STA_MODE:
+	case QDF_P2P_CLIENT_MODE:
 		wlan_twt_get_requestor_cfg(mac->psoc, &twt_requestor);
 		he_cap->twt_request =
 			twt_requestor && twt_get_requestor_flag(mac);
-	}
-	if (session->opmode == QDF_SAP_MODE) {
+		he_cap->broadcast_twt = bcast_requestor;
+		break;
+	case QDF_SAP_MODE:
+	case QDF_P2P_GO_MODE:
 		wlan_twt_get_responder_cfg(mac->psoc, &twt_responder);
 		he_cap->twt_responder =
 			twt_responder && twt_get_responder_flag(mac);
-	}
-
-	if (session->opmode == QDF_STA_MODE) {
-		he_cap->broadcast_twt = bcast_requestor;
-	} else if (session->opmode == QDF_SAP_MODE) {
 		he_cap->broadcast_twt = bcast_responder;
+		break;
+	default:
+		break;
 	}
 }
 #else
@@ -13183,13 +13185,6 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 			wlan_mlme_get_t2lm_negotiation_supported(mac_ctx->psoc);
 		mlo_ie->mld_capab_and_op_info.str_freq_separation = 0;
 		mlo_ie->mld_capab_and_op_info.aar_support = 0;
-	}
-
-	if (partner_info->num_partner_links == 2 &&
-	    wlan_mlme_is_aux_emlsr_support(psoc)) {
-		wlan_vdev_mlme_cap_clear(pe_session->vdev,
-					 WLAN_VDEV_C_EMLSR_CAP);
-		pe_debug("EMLSR is not supported for 3-link association until FW support is added");
 	}
 
 	/* Check if STA supports EMLSR and vendor command prefers EMLSR mode */

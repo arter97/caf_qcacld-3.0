@@ -1730,7 +1730,8 @@ err:
 
 	if (!key_present && mlo_mgr_is_link_switch_in_progress(vdev)) {
 		mlme_err("No key found for link_id %d", link_id);
-		QDF_BUG(0);
+		mlo_disconnect(vdev, CM_OSIF_DISCONNECT,
+			       REASON_KEY_FAIL_TO_INSTALL, NULL);
 	}
 	mlo_defer_set_keys(vdev, link_id, false);
 }

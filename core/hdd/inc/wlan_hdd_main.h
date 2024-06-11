@@ -1322,6 +1322,7 @@ struct wlan_hdd_tx_power {
  * @tx_power: Structure to hold connection tx Power info
  * @tx_latency_cfg: configuration for per-link transmit latency statistics
  * @link_state_cached_timestamp: link state cached timestamp
+ * @keep_alive_interval: user configured STA keep alive interval
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1515,6 +1516,7 @@ struct hdd_adapter {
 #ifdef WLAN_FEATURE_11BE_MLO
 	qdf_time_t link_state_cached_timestamp;
 #endif
+	uint16_t keep_alive_interval;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)

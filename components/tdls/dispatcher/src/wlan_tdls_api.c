@@ -31,6 +31,7 @@
 #include <wlan_objmgr_cmn.h>
 #include "wlan_tdls_cfg_api.h"
 #include "wlan_policy_mgr_api.h"
+#include "wlan_mlo_mgr_sta.h"
 
 static QDF_STATUS tdls_teardown_flush_cb(struct scheduler_msg *msg)
 {
@@ -285,6 +286,50 @@ static inline void
 wlan_tdls_handle_sap_start(struct wlan_objmgr_psoc *psoc)
 {}
 #endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static QDF_STATUS
+wlan_mlo_is_tdls_session_present(struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t i;
+	struct wlan_mlo_dev_context *ml_dev = vdev->mlo_dev_ctx;
+
+	if (!ml_dev) {
+		tdls_err("MLO dev ctx is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	for (i = 0; i < ml_dev->wlan_vdev_count; i++) {
+		vdev = ml_dev->wlan_vdev_list[i];
+		if (tdls_get_connected_peer_count_from_vdev(vdev) > 0) {
+			tdls_debug("TDLS session is present");
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	return QDF_STATUS_E_INVAL;
+}
+#else
+static QDF_STATUS
+wlan_mlo_is_tdls_session_present(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_INVAL;
+}
+#endif
+
+QDF_STATUS
+wlan_is_tdls_session_present(struct wlan_objmgr_vdev *vdev)
+{
+	if (mlo_is_mld_sta(vdev))
+		return wlan_mlo_is_tdls_session_present(vdev);
+
+	if (tdls_get_connected_peer_count_from_vdev > 0) {
+		tdls_debug("TDLS session is present");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return QDF_STATUS_E_INVAL;
+}
 
 void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc,
 				struct wlan_objmgr_vdev *vdev)

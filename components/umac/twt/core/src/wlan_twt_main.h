@@ -350,6 +350,27 @@ wlan_twt_cfg_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 bool
 wlan_is_twt_session_present_for_given_peer(struct wlan_objmgr_psoc *psoc,
 					   uint8_t *peer_macaddr);
+
+/**
+ * wlan_twt_set_requestor_enable_cmd_in_progress - Check and set TWT requestor
+ * enable command in progress
+ * @psoc: Pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_twt_reset_requestor_enable_cmd_in_progress - Reset TWT requestor
+ * enable command in progress
+ * @psoc: Pointer to psoc object
+ *
+ * Return: None
+ */
+void
+wlan_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
+
 #else
 
 static inline bool
@@ -543,5 +564,16 @@ wlan_is_twt_session_present_for_given_peer(struct wlan_objmgr_psoc *psoc,
 					   uint8_t *peer_macaddr)
 {
 	return 0;
+}
+
+static inline QDF_STATUS
+wlan_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+wlan_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
+{
 }
 #endif

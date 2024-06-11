@@ -28,6 +28,9 @@
 #include <wlan_serialization_api.h>
 #include "wlan_twt_main.h"
 
+#define TWT_COMMAND_PENDING_FLAG_SET	1
+#define TWT_COMMAND_PENDING_FLAG_RESET	0
+
 /**
  * wlan_twt_add_session()  - Add TWT session entry in the TWT context
  * @psoc: Pointer to global psoc object
@@ -2408,4 +2411,41 @@ wlan_is_twt_session_present_for_given_peer(struct wlan_objmgr_psoc *psoc,
 end:
 	wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
 	return status;
+}
+
+QDF_STATUS
+wlan_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	struct twt_psoc_priv_obj *twt_psoc =
+		wlan_objmgr_psoc_get_comp_private_obj(psoc, WLAN_UMAC_COMP_TWT);
+
+	if (!twt_psoc) {
+		twt_err("null twt psoc priv obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (qdf_atomic_read(&twt_psoc->twt_requestor_enable_pending)) {
+		twt_nofl_debug("Previous TWT requestor enable is in progress");
+		return QDF_STATUS_E_ALREADY;
+	}
+
+	qdf_atomic_set(&twt_psoc->twt_requestor_enable_pending,
+		       TWT_COMMAND_PENDING_FLAG_SET);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void
+wlan_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	struct twt_psoc_priv_obj *twt_psoc =
+		wlan_objmgr_psoc_get_comp_private_obj(psoc, WLAN_UMAC_COMP_TWT);
+
+	if (!twt_psoc) {
+		twt_err("null twt psoc priv obj");
+		return;
+	}
+
+	qdf_atomic_set(&twt_psoc->twt_requestor_enable_pending,
+		       TWT_COMMAND_PENDING_FLAG_RESET);
 }

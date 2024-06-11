@@ -299,6 +299,8 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 	struct wlan_dp_sta_info *sta_info;
 	int errno = 0;
 	struct qdf_mac_addr *src_mac;
+	struct cdp_peer_output_param peer_info = {0};
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	if (((dp_intf->device_mode == QDF_SAP_MODE) ||
 	     (dp_intf->device_mode == QDF_P2P_GO_MODE)) &&
@@ -314,7 +316,18 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 						   src_mac->bytes,
 						   WLAN_DP_ID);
 		if (!peer) {
-			dp_err("Peer object not found");
+			cdp_peer_get_info_by_peer_addr(soc, src_mac->bytes, 0,
+						       &peer_info);
+
+			if (peer_info.state != OL_TXRX_PEER_STATE_INVALID &&
+			    peer_info.mld_peer) {
+				dp_debug("mld peer " QDF_MAC_ADDR_FMT
+					 " no dhcp inspect",
+					 QDF_MAC_ADDR_REF(src_mac->bytes));
+				return QDF_STATUS_E_INVAL;
+			}
+			dp_err("Peer " QDF_MAC_ADDR_FMT " object not found",
+			       QDF_MAC_ADDR_REF(src_mac->bytes));
 			return QDF_STATUS_E_INVAL;
 		}
 

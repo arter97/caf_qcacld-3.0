@@ -50,6 +50,7 @@
 #include "wlan_mlo_link_force.h"
 #include <wlan_psoc_mlme_api.h>
 #include <wma.h>
+#include "wlan_objmgr_vdev_obj.h"
 
 /*
  * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
@@ -223,6 +224,7 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 		ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
 		ap_info.reject_reason = REASON_STA_KICKOUT;
 		ap_info.source = ADDED_BY_DRIVER;
+		wlan_update_mlo_reject_ap_info(pdev, vdev_id, &ap_info);
 		wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
 	}
 
@@ -1622,6 +1624,7 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 		ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
 		ap_info.reject_reason = REASON_ROAM_HO_FAILURE;
 		ap_info.source = ADDED_BY_DRIVER;
+		wlan_update_mlo_reject_ap_info(pdev, ind->vdev_id, &ap_info);
 		wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
 	}
 

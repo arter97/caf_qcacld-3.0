@@ -219,6 +219,8 @@
 #ifdef WLAN_FEATURE_11BE_MLO_TTLM
 #include "wlan_t2lm_api.h"
 #endif
+#include "wlan_dlm_api.h"
+
 /*
  * A value of 100 (milliseconds) can be sent to FW.
  * FW would enable Tx beamforming based on this.
@@ -5645,7 +5647,9 @@ static int hdd_set_denylist_bssid(struct hdd_context *hdd_ctx,
 				ap_info.reject_reason =
 						REASON_USERSPACE_AVOID_LIST;
 				ap_info.source = ADDED_BY_DRIVER;
-
+				wlan_update_mlo_reject_ap_info(
+							hdd_ctx->pdev,
+							vdev_id, &ap_info);
 				/* This BSSID is avoided and not denylisted */
 				ucfg_dlm_add_bssid_to_reject_list(hdd_ctx->pdev,
 								  &ap_info);
@@ -8582,6 +8586,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL] = {
+		.type = NLA_U16},
 };
 
 #define WLAN_MAX_LINK_ID 15
@@ -11774,6 +11780,81 @@ hdd_set_coex_traffic_shaping_mode(struct wlan_hdd_link_info *link_info,
 	return ret;
 }
 
+#define STA_KEEPALIVE_INTERVAL_MAX 60
+#define STA_KEEPALIVE_INTERVAL_MIN 5
+
+int hdd_vdev_send_sta_keep_alive_interval(
+				struct wlan_hdd_link_info *link_info,
+				struct hdd_context *hdd_ctx,
+				uint16_t keep_alive_interval)
+{
+	struct keep_alive_req request;
+
+	qdf_mem_zero(&request, sizeof(request));
+
+	request.timePeriod = keep_alive_interval;
+	request.packetType = WLAN_KEEP_ALIVE_NULL_PKT;
+
+	if (QDF_STATUS_SUCCESS !=
+	    sme_set_keep_alive(hdd_ctx->mac_handle, link_info->vdev_id,
+			       &request)) {
+		hdd_err("Failure to execute Keep Alive");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+void wlan_hdd_save_sta_keep_alive_interval(struct hdd_adapter *adapter,
+					   uint16_t keep_alive_interval)
+{
+	adapter->keep_alive_interval = keep_alive_interval;
+}
+
+/**
+ * hdd_vdev_set_sta_keep_alive_interval() - Set sta keep alive interval
+ * @link_info: Link info pointer.
+ * @attr: NL attribute pointer.
+ *
+ * Return: 0 on success, negative on failure.
+ */
+static int hdd_vdev_set_sta_keep_alive_interval(
+				struct wlan_hdd_link_info *link_info,
+				const struct nlattr *attr)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	enum QDF_OPMODE device_mode = link_info->adapter->device_mode;
+	uint16_t keep_alive_interval;
+
+	keep_alive_interval = nla_get_u16(attr);
+	if (keep_alive_interval > STA_KEEPALIVE_INTERVAL_MAX ||
+	    keep_alive_interval < STA_KEEPALIVE_INTERVAL_MIN) {
+		hdd_err("Sta keep alive period: %d is out of range",
+			keep_alive_interval);
+		return -EINVAL;
+	}
+
+	hdd_debug("sta keep alive interval = %u", keep_alive_interval);
+
+	if (device_mode != QDF_STA_MODE) {
+		hdd_debug("This command is not supported for %s device mode",
+			  device_mode_to_string(device_mode));
+		return -EINVAL;
+	}
+
+	if (!hdd_is_vdev_in_conn_state(link_info)) {
+		hdd_debug("Vdev (id %d) not in connected/started state, cannot accept command",
+			  link_info->vdev_id);
+		return -EINVAL;
+	}
+
+	wlan_hdd_save_sta_keep_alive_interval(adapter, keep_alive_interval);
+
+	return hdd_vdev_send_sta_keep_alive_interval(link_info, hdd_ctx,
+						     keep_alive_interval);
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 static int hdd_test_config_emlsr_mode(struct hdd_context *hdd_ctx,
 				      bool cfg_val)
@@ -12478,6 +12559,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_coex_traffic_shaping_mode},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_BTM_SUPPORT,
 	 hdd_set_btm_support_config},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL,
+	 hdd_vdev_set_sta_keep_alive_interval},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -16273,7 +16356,8 @@ static int __wlan_hdd_cfg80211_get_link_properties(struct wiphy *wiphy,
 
 		sta_info = hdd_get_sta_info_by_mac(
 					&adapter->sta_info_list, peer_mac,
-					STA_INFO_CFG80211_GET_LINK_PROPERTIES);
+					STA_INFO_CFG80211_GET_LINK_PROPERTIES,
+					STA_INFO_MATCH_STA_MAC_ONLY);
 
 		if (!sta_info) {
 			hdd_err("No active peer with mac = " QDF_MAC_ADDR_FMT,
@@ -16281,7 +16365,7 @@ static int __wlan_hdd_cfg80211_get_link_properties(struct wiphy *wiphy,
 			return -EINVAL;
 		}
 
-		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(sta_info->link_info);
 		nss = sta_info->nss;
 		freq = ap_ctx->operating_chan_freq;
 		rate_flags = sta_info->rate_flags;
@@ -23969,7 +24053,8 @@ wlan_hdd_set_vlan_id(struct hdd_sta_info_obj *sta_info_list,
 	sta_info =
 	hdd_get_sta_info_by_mac(sta_info_list,
 				mac,
-				STA_INFO_SOFTAP_GET_STA_INFO);
+				STA_INFO_SOFTAP_GET_STA_INFO,
+				STA_INFO_MATCH_STA_OR_MLD_MAC);
 	if (!sta_info) {
 		hdd_err("Failed to find right station MAC: "
 			  QDF_MAC_ADDR_FMT,
@@ -23992,7 +24077,8 @@ wlan_hdd_set_vlan_config(struct hdd_adapter *adapter,
 
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   (uint8_t *)mac,
-					   STA_INFO_SOFTAP_GET_STA_INFO);
+					   STA_INFO_SOFTAP_GET_STA_INFO,
+					   STA_INFO_MATCH_STA_OR_MLD_MAC);
 
 	if (!sta_info) {
 		hdd_err("Failed to find right station MAC:"
@@ -26632,7 +26718,8 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 		sta_info = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
 						mac,
-						STA_INFO_CFG80211_DEL_STATION);
+						STA_INFO_CFG80211_DEL_STATION,
+						STA_INFO_MATCH_STA_OR_MLD_MAC);
 
 		if (!sta_info) {
 			hdd_debug("Skip DEL STA as this is not used::"

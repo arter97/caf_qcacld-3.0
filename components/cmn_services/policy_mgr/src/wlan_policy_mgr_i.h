@@ -1064,6 +1064,16 @@ void policy_mgr_reg_chan_change_callback(struct wlan_objmgr_psoc *psoc,
 		void *arg);
 
 /**
+ * policy_mgr_update_nss_req() - wrapper API to update nss
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS_SUCCESS
+ */
+QDF_STATUS policy_mgr_update_nss_req(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id);
+
+/**
  * policy_mgr_nss_update() - update nss for AP vdev
  * @psoc: PSOC object information
  * @new_nss: new NSS value

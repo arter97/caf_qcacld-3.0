@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -322,6 +322,27 @@ QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val);
  * Return: QDF_STATUS_SUCCESS
  */
 bool ucfg_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_twt_set_requestor_enable_cmd_in_progress() - Set TWT requestor enable
+ * command is in progress
+ * @psoc: Pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_twt_reset_requestor_enable_cmd_in_progress() - Reset TWT requestor enable
+ * command is in progress
+ * @psoc: Pointer to psoc object
+ *
+ * Return: None
+ */
+void
+ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
+
 #else
 static inline
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -448,5 +469,15 @@ bool ucfg_twt_get_pmo_allowed(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
+static inline QDF_STATUS
+ucfg_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+}
 #endif
 #endif

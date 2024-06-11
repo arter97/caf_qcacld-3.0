@@ -31,6 +31,7 @@
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_dcs_ucfg_api.h>
 #include "wlan_ll_sap_ucfg_api.h"
+#include "wlan_dlm_api.h"
 
 /* Time(in milliseconds) before which the AP doesn't expect a connection */
 #define HDD_DCS_AWGN_BSS_RETRY_DELAY (5 * 60 * 1000)
@@ -38,12 +39,14 @@
 /**
  * hdd_dcs_add_bssid_to_reject_list() - add bssid to reject list
  * @pdev: pdev ptr
+ * @vdev_id: vdev id
  * @bssid: bssid to be added
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
 hdd_dcs_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
+				 uint8_t vdev_id,
 				 struct qdf_mac_addr *bssid)
 {
 	struct reject_ap_info ap_info;
@@ -56,6 +59,7 @@ hdd_dcs_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
 	ap_info.reject_ap_type = DRIVER_RSSI_REJECT_TYPE;
 	ap_info.reject_reason = REASON_STA_KICKOUT;
 	ap_info.source = ADDED_BY_DRIVER;
+	wlan_update_mlo_reject_ap_info(pdev, vdev_id, &ap_info);
 	return ucfg_dlm_add_bssid_to_reject_list(pdev, &ap_info);
 }
 
@@ -101,8 +105,9 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 			pdev = wlan_vdev_get_pdev(vdev);
 			if (!pdev)
 				return QDF_STATUS_E_INVAL;
-
-			hdd_dcs_add_bssid_to_reject_list(pdev, bssid);
+			hdd_dcs_add_bssid_to_reject_list(
+						pdev,
+						link_info->vdev_id, bssid);
 			wlan_hdd_cm_issue_disconnect(link_info,
 						     REASON_UNSPEC_FAILURE,
 						     true);

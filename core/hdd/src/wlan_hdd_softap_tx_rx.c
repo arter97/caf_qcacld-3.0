@@ -166,7 +166,8 @@ void hdd_ipa_update_rx_mcbc_stats(struct hdd_adapter *adapter,
 	hdd_sta_info = hdd_get_sta_info_by_mac(
 				&adapter->sta_info_list,
 				src_mac->bytes,
-				STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK);
+				STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK,
+				STA_INFO_MATCH_STA_OR_MLD_MAC);
 	if (!hdd_sta_info)
 		return;
 
@@ -421,7 +422,8 @@ QDF_STATUS hdd_softap_init_tx_rx_sta(struct wlan_hdd_link_info *link_info,
 
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   sta_mac->bytes,
-					   STA_INFO_SOFTAP_INIT_TX_RX_STA);
+					   STA_INFO_SOFTAP_INIT_TX_RX_STA,
+					   STA_INFO_MATCH_STA_MAC_ONLY);
 
 	if (sta_info) {
 		hdd_err("Reinit of in use station " QDF_MAC_ADDR_FMT,
@@ -574,7 +576,8 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 	qdf_status = hdd_softap_init_tx_rx_sta(link_info, sta_mac);
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   sta_mac->bytes,
-					   STA_INFO_SOFTAP_REGISTER_STA);
+					   STA_INFO_SOFTAP_REGISTER_STA,
+					   STA_INFO_MATCH_STA_MAC_ONLY);
 
 	if (!sta_info) {
 		hdd_debug("STA not found");
@@ -772,7 +775,8 @@ hdd_softap_change_per_sta_state(struct wlan_hdd_link_info *link_info,
 
 	sta_info = hdd_get_sta_info_by_mac(&link_info->adapter->sta_info_list,
 					   sta_mac->bytes,
-					   STA_INFO_SOFTAP_CHANGE_STA_STATE);
+					   STA_INFO_SOFTAP_CHANGE_STA_STATE,
+					   STA_INFO_MATCH_STA_MAC_ONLY);
 
 	if (!sta_info) {
 		hdd_debug("Failed to find right station MAC: " QDF_MAC_ADDR_FMT,

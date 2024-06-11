@@ -1436,7 +1436,7 @@ wlan_son_del_ast(struct wlan_objmgr_vdev *vdev,
 	ol_txrx_soc_handle soc;
 	bool ast_entry_found;
 	struct cdp_ast_entry_info wds_ast_entry = {0};
-	struct cdp_ast_entry_info peer_ast_entry = {0};
+	uint16_t peer_id;
 
 	soc = wlan_psoc_get_dp_handle(wlan_vdev_get_psoc(vdev));
 	if (!soc) {
@@ -1459,20 +1459,18 @@ wlan_son_del_ast(struct wlan_objmgr_vdev *vdev,
 	son_debug("wds ast type %d, peer_id %d",
 		  wds_ast_entry.type, wds_ast_entry.peer_id);
 
-	ast_entry_found = cdp_peer_get_ast_info_by_soc(
-				soc, peer_macaddr->bytes,
-				&peer_ast_entry);
-
-	if (!ast_entry_found) {
-		son_err("peer ast_entry not found");
+	peer_id = cdp_get_peer_id(soc, CDP_VDEV_ALL, peer_macaddr->bytes);
+	if (peer_id == HTT_INVALID_PEER) {
+		son_err("peer " QDF_MAC_ADDR_FMT " not found",
+			QDF_MAC_ADDR_REF(peer_macaddr->bytes));
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	son_debug("peer ast type %d, peer_id %d",
-		  peer_ast_entry.type, peer_ast_entry.peer_id);
+	son_debug("peer " QDF_MAC_ADDR_FMT " found peer_id %u",
+		  QDF_MAC_ADDR_REF(peer_macaddr->bytes), peer_id);
 
 	if ((wds_ast_entry.type == CDP_TXRX_AST_TYPE_WDS) &&
-	    (wds_ast_entry.peer_id == peer_ast_entry.peer_id))
+	    (wds_ast_entry.peer_id == peer_id))
 		return cdp_peer_ast_delete_by_soc(soc, wds_macaddr->bytes,
 						  NULL, NULL);
 	return QDF_STATUS_E_FAILURE;

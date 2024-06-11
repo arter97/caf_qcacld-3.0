@@ -1795,8 +1795,14 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		link_info->vdev_id, QDF_TRACE_DEFAULT_PDEV_ID,
 		QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_ASSOC));
 
-	if (is_roam)
+	if (is_roam) {
 		ucfg_dp_nud_indicate_roam(vdev);
+
+		if (adapter->keep_alive_interval)
+			hdd_vdev_send_sta_keep_alive_interval(link_info,
+						hdd_ctx,
+						adapter->keep_alive_interval);
+	}
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
 }
 
@@ -1843,10 +1849,13 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	adapter = link_info->adapter;
 	hdd_cm_clear_pmf_stats(adapter);
 
-	if (adapter->device_mode == QDF_STA_MODE) {
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
 		/* Inform FTM TIME SYNC about the connection with AP */
-		hdd_ftm_time_sync_sta_state_notify(adapter,
+		if (adapter->device_mode == QDF_STA_MODE)
+			hdd_ftm_time_sync_sta_state_notify(adapter,
 						   FTM_TIME_SYNC_STA_CONNECTED);
+
 		ucfg_mlme_init_twt_context(hdd_ctx->psoc,
 					   &rsp->bssid,
 					   TWT_ALL_SESSIONS_DIALOG_ID);

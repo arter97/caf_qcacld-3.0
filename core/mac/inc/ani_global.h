@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -392,6 +392,8 @@ struct lim_context {
 	/* from HAL. e.g when LIM issues ADD_STA req it will clear this flag and when it will receive */
 	/* the response the flag will be set. */
 	uint8_t gLimProcessDefdMsgs;
+	/* record last caller of updating gLimProcessDefdMsgs for debug */
+	const char *defer_caller;
 
 	/* UAPSD flag used on AP */
 	uint8_t gUapsdEnable;

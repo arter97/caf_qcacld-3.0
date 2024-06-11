@@ -898,11 +898,23 @@ int osif_twt_send_requestor_enable_cmd(struct wlan_objmgr_psoc *psoc,
 				       uint8_t pdev_id)
 {
 	struct twt_enable_param req = {0};
+	int ret = 0;
+	QDF_STATUS status;
 
 	req.pdev_id = pdev_id;
 	req.ext_conf_present = true;
 
-	return osif_twt_requestor_enable(psoc, &req);
+	status = ucfg_twt_set_requestor_enable_cmd_in_progress(psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		if (status == QDF_STATUS_E_ALREADY)
+			return ret;
+		return qdf_status_to_os_return(status);
+	}
+
+	ret = osif_twt_requestor_enable(psoc, &req);
+	ucfg_twt_reset_requestor_enable_cmd_in_progress(psoc);
+
+	return ret;
 }
 
 int osif_twt_send_responder_enable_cmd(struct wlan_objmgr_psoc *psoc,
@@ -1267,13 +1279,18 @@ osif_twt_concurrency_update_on_scc(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_vdev *vdev = object;
 	struct twt_conc_context *twt_arg = arg;
 	QDF_STATUS status;
-	uint8_t mac_id = policy_mgr_mode_get_macid_by_vdev_id(
-						pdev->pdev_objmgr.wlan_psoc,
-						wlan_vdev_get_id(vdev));
+	uint8_t mac_id;
 	uint32_t reason;
+	uint8_t vdev_id;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	mac_id = policy_mgr_mode_get_macid_by_vdev_id(twt_arg->psoc, vdev_id);
 
 	if (vdev->vdev_mlme.vdev_opmode == QDF_SAP_MODE &&
 	    vdev->vdev_mlme.mlme_state == WLAN_VDEV_S_UP) {
+		if (policy_mgr_is_vdev_ll_lt_sap(twt_arg->psoc, vdev_id))
+			return;
+
 		osif_debug("Concurrency exist on SAP vdev");
 		reason = HOST_TWT_DISABLE_REASON_CONCURRENCY_SCC;
 		status = osif_twt_send_responder_disable_cmd(twt_arg->psoc,
