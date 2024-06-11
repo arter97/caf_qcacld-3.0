@@ -1055,6 +1055,12 @@ void lim_mlo_save_mlo_info(tpDphHashNode sta_ds,
 	qdf_mem_copy(&sta_ds->mlo_info, mlo_info, sizeof(sta_ds->mlo_info));
 }
 
+void lim_mlo_save_eml_info(tpDphHashNode sta_ds,
+			   struct wlan_mlo_eml_cap *eml_info)
+{
+	sta_ds->eml_info = *eml_info;
+}
+
 QDF_STATUS lim_fill_complete_mlo_ie(struct pe_session *session,
 				    uint16_t total_len, uint8_t *target)
 {
