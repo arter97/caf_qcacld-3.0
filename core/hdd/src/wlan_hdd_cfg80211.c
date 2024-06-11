@@ -24209,35 +24209,6 @@ static bool wlan_hdd_is_sta_p2p_concurrency_present(
 }
 
 /**
- * wlan_hdd_is_p2p_concurrency_present() - This API checks whether P2P
- * concurrency is present in the interface combination
- * @sta_sap_p2p_concurrency: flag to check STA-SAP-P2P concurrency
- * @idx: index for interface combination array
- *
- * This API will allow the P2P concurrencies with following exception:
- * a) STA-P2P
- * b) STA-SAP-P2P when g_sta_sap_p2p INI is enabled
- *
- * Return: true if P2P allowed otherwise false
- */
-static bool wlan_hdd_is_p2p_concurrency_present(bool sta_sap_p2p_concurrency,
-						uint8_t idx)
-{
-	if (wlan_hdd_is_sta_p2p_concurrency_present(wlan_hdd_iface_combination,
-						    idx))
-		return false;
-
-	if (!wlan_hdd_is_p2p_iface_present(idx))
-		return false;
-
-	if (sta_sap_p2p_concurrency &&
-	    wlan_hdd_is_sta_sap_concurrency_present(idx))
-		return false;
-
-	return true;
-}
-
-/**
  * wlan_hdd_is_p2p_nan_sta_conc_present() - This API checks whether P2P
  * NAN and STA present in the interface combination
  * @idx: index for interface combination array
@@ -24263,6 +24234,42 @@ static bool wlan_hdd_is_p2p_nan_sta_conc_present(uint8_t idx)
 	}
 
 	return (nan_present && p2p_present && sta_present);
+}
+
+/**
+ * wlan_hdd_is_p2p_concurrency_present() - This API checks whether P2P
+ * concurrency is present in the interface combination
+ * @sta_sap_p2p_concurrency: flag to check STA-SAP-P2P concurrency
+ * @sta_p2p_ndp_concurrency: flag to check STA-P2P-NDP concurrency
+ * @idx: index for interface combination array
+ *
+ * This API will allow the P2P concurrencies with following exception:
+ * a) STA-P2P
+ * b) STA-SAP-P2P when g_sta_sap_p2p INI is enabled
+ * b) STA-P2P-NDP when g_sta_p2p_ndp_concurrency INI is enabled
+ *
+ * Return: true if P2P allowed otherwise false
+ */
+static bool wlan_hdd_is_p2p_concurrency_present(bool sta_sap_p2p_concurrency,
+						bool sta_p2p_ndp_concurrency,
+						uint8_t idx)
+{
+	if (wlan_hdd_is_sta_p2p_concurrency_present(wlan_hdd_iface_combination,
+						    idx))
+		return false;
+
+	if (!wlan_hdd_is_p2p_iface_present(idx))
+		return false;
+
+	if (sta_sap_p2p_concurrency &&
+	    wlan_hdd_is_sta_sap_concurrency_present(idx))
+		return false;
+
+	if (sta_p2p_ndp_concurrency &&
+	    wlan_hdd_is_p2p_nan_sta_conc_present(idx))
+		return false;
+
+	return true;
 }
 
 int wlan_hdd_alloc_iface_combination_mem(struct hdd_context *hdd_ctx)
@@ -24348,7 +24355,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	bool dbs_one_by_one, dbs_two_by_two;
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
 	bool no_p2p_concurrency, no_sap_nan_concurrency, no_sta_sap_concurrency;
-	bool no_sta_nan_concurrency, sta_sap_p2p_concurrency;
+	bool no_sta_nan_concurrency, sta_sap_p2p_concurrency, sta_p2p_ndp_conc;
 	bool sap_sta_nan_concurrency;
 	uint8_t num;
 	QDF_STATUS status;
@@ -24371,6 +24378,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	sta_sap_p2p_concurrency = cfg_get(psoc, CFG_STA_SAP_P2P_CONCURRENCY);
 	sap_sta_nan_concurrency = cfg_get(psoc,
 					  CFG_SAP_STA_NDP_CONCURRENCY);
+	sta_p2p_ndp_conc = ucfg_nan_is_sta_p2p_ndp_supported(psoc);
 
 	num = ARRAY_SIZE(wlan_hdd_iface_combination);
 
@@ -24392,9 +24400,11 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		 * remove P2P concurrencies with following exception:
 		 * a) STA-P2P
 		 * b) STA-SAP-P2P when g_sta_sap_p2p INI is enabled
+		 * c) STA-P2P-NAN when g_sta_p2p_ndp_concurrency INI is enabled
 		 */
 		if (no_p2p_concurrency &&
 		    wlan_hdd_is_p2p_concurrency_present(sta_sap_p2p_concurrency,
+							sta_p2p_ndp_conc,
 							i))
 			continue;
 
@@ -24425,15 +24435,11 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		}
 
 		/*
-		 * Don't add STA + P2P + NAN to the final list in below cases,
-		 * 1. STA + NAN concurrency is not supported
-		 * 2. P2P concurrency is not supported
-		 * 3. STA + P2P + NDP concurrency is not supported
+		 * Don't add STA + P2P + NAN to the final list when
+		 * STA + P2P + NDP concurrency is not supported
 		 */
-		if ((no_sta_nan_concurrency ||
-		     no_p2p_concurrency ||
-		     !ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc)) &&
-		     wlan_hdd_is_p2p_nan_sta_conc_present(i))
+		if (!ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc) &&
+		    wlan_hdd_is_p2p_nan_sta_conc_present(i))
 			continue;
 
 		/* STA + P2P + NAN concurrency is present */
