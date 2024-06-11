@@ -1343,6 +1343,9 @@ wlan_rptr_same_ssid_check(struct wlan_objmgr_vdev *vdev,
 				      &iterate_msg, WLAN_MLME_NB_ID);
 	if (s_ssid_msg.ssid_match) {
 		wlan_rptr_global_set_s_ssid();
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+		g_priv->rssi_based_bssid = 1;
+#endif
 		RPTR_LOGI("RPTR Enable same_ssid_support ssid:%s g_caps:%x",
 			  ssid, g_priv->global_feature_caps);
 	}
