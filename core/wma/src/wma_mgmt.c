@@ -94,6 +94,7 @@
 
 #if defined(WLAN_FEATURE_11BE_MLO)
 #include <wmi_unified_11be_api.h>
+#include "wlan_mlo_mgr_peer.h"
 #endif
 
 /* Max debug string size for WMM in bytes */
@@ -1188,6 +1189,76 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 			     QDF_MAC_ADDR_SIZE);
 	}
 }
+
+/**
+ * wma_populate_peer_eml_cap() - Set EML caps to the peer assoc request
+ * @wma: wma handle
+ * @peer: assoc peer data structure
+ * @params: Add sta params
+ *
+ * Return: None
+ */
+static void
+wma_populate_peer_eml_cap(tp_wma_handle wma,
+			  struct peer_assoc_params *peer,
+			  tpAddStaParams params)
+{
+	struct peer_assoc_mlo_params *mlo_params;
+	struct wlan_mlo_eml_cap *eml_info;
+	bool emlsr = false;
+	struct wlan_objmgr_peer *obj_peer = NULL;
+	struct wlan_mlo_dev_context *mld_dev;
+	struct wlan_mlo_peer_context *ml_peer = NULL;
+	bool assoc_peer = false;
+
+	wlan_mlme_get_sap_emlsr_mode_enabled(wma->psoc, &emlsr);
+
+	/* if mlo sap not support emlsr client, then skip update */
+	if (!emlsr)
+		return;
+
+	obj_peer = wlan_objmgr_get_peer_by_mac(wma->psoc,
+					       peer->peer_mac,
+					       WLAN_LEGACY_WMA_ID);
+	if (!obj_peer)
+		return;
+	/* eml info is from assoc req frame if it is assoc peer */
+	assoc_peer = wlan_peer_mlme_is_assoc_peer(obj_peer);
+	wlan_objmgr_peer_release_ref(obj_peer, WLAN_LEGACY_WMA_ID);
+
+	if (assoc_peer) {
+		eml_info = &params->eml_info;
+	} else {
+		ml_peer = wlan_mlo_get_mlpeer_by_peer_mladdr(
+				(struct qdf_mac_addr *)&peer->mlo_params.mld_mac,
+				&mld_dev);
+		if (!mld_dev || !ml_peer) {
+			wma_err("MLD context  or ML peer is NULL");
+			return;
+		}
+		/*
+		 * could not get eml capability info from
+		 * add_sta_param if it is not assoc link
+		 */
+		eml_info = &ml_peer->mlpeer_emlcap;
+	}
+	mlo_params = &peer->mlo_params;
+	if (!mlo_params || !eml_info) {
+		wma_err("mlo parameter or eml info is null");
+		return;
+	}
+	mlo_params->emlsr_support = eml_info->emlsr_supp;
+	mlo_params->emlsr_pad_delay_us = eml_info->emlsr_pad_delay;
+	mlo_params->emlsr_trans_delay_us = eml_info->emlsr_trans_delay;
+	mlo_params->trans_timeout_us = eml_info->trans_timeout;
+	wma_debug("is assoc %d emlsr supp %d pad delay %d trans delay %d tran timeout %d",
+		  assoc_peer,
+		  mlo_params->emlsr_support,
+		  mlo_params->emlsr_pad_delay_us,
+		  mlo_params->emlsr_trans_delay_us,
+		  mlo_params->trans_timeout_us);
+}
+
 #else
 static void wma_populate_peer_puncture(struct peer_assoc_params *peer,
 				       struct wlan_channel *des_chan)
@@ -1198,6 +1269,14 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 				      tpAddStaParams params)
 {
 }
+
+static void
+wma_populate_peer_eml_cap(tp_wma_handle wma,
+			  struct peer_assoc_params *peer,
+			  tpAddStaParams params)
+{
+}
+
 #endif
 
 void wma_objmgr_set_peer_mlme_nss(tp_wma_handle wma, uint8_t *mac_addr,
@@ -1794,6 +1873,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	wma_populate_peer_eht_cap(cmd, params);
 	wma_populate_peer_puncture(cmd, des_chan);
 	wma_populate_peer_mlo_cap(cmd, params);
+	wma_populate_peer_eml_cap(wma, cmd, params);
+
 	if (!wma_is_vdev_in_ap_mode(wma, params->smesessionId))
 		intr->nss = cmd->peer_nss;
 	wma_objmgr_set_peer_mlme_nss(wma, cmd->peer_mac, cmd->peer_nss);
