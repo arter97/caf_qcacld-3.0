@@ -2632,31 +2632,16 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	}
 
 	if (pFc->type == WLAN_FC0_TYPE_MGMT) {
-		if ((mac->mlme_cfg->gen.debug_packet_log &
+		if (((mac->mlme_cfg->gen.debug_packet_log &
 		    DEBUG_PKTLOG_TYPE_MGMT) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_REQ) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_RSP) &&
-		    (pFc->subType != SIR_MAC_MGMT_ACTION)) {
-			wma_debug("TX MGMT - Type %hu, SubType %hu seq_num[%d]",
-				  pFc->type, pFc->subType,
-				  ((mHdr->seqControl.seqNumHi << 4) |
-				  mHdr->seqControl.seqNumLo));
-			qdf_trace_hex_dump(QDF_MODULE_ID_WMA,
-					   QDF_TRACE_LEVEL_DEBUG, pData,
-					   frmLen);
-		} else if ((mac->mlme_cfg->gen.debug_packet_log &
-			   DEBUG_PKTLOG_TYPE_ACTION) &&
-			   (pFc->subType == SIR_MAC_MGMT_ACTION)) {
-			wma_debug("TX MGMT - Type %hu, SubType %hu seq_num[%d]",
-				  pFc->type, pFc->subType,
-				 ((mHdr->seqControl.seqNumHi << 4) |
-				 mHdr->seqControl.seqNumLo));
-			qdf_trace_hex_dump(QDF_MODULE_ID_WMA,
-					   QDF_TRACE_LEVEL_DEBUG, pData,
-					   frmLen);
-		}
+		    (pFc->subType != SIR_MAC_MGMT_ACTION)) ||
+		    ((mac->mlme_cfg->gen.debug_packet_log &
+		      DEBUG_PKTLOG_TYPE_ACTION) &&
+		     (pFc->subType == SIR_MAC_MGMT_ACTION)))
+			mgmt_txrx_frame_hex_dump(pData, frmLen, true);
 	}
-
 	if (wlan_reg_is_5ghz_ch_freq(wma_handle->interfaces[vdev_id].ch_freq))
 		is_5g = true;
 

@@ -1345,16 +1345,10 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 		    (fc.subType != SIR_MAC_MGMT_PROBE_REQ) &&
 		    (fc.subType != SIR_MAC_MGMT_PROBE_RSP) &&
 		    (fc.subType != SIR_MAC_MGMT_BEACON) &&
-		    (fc.subType != SIR_MAC_MGMT_ACTION)) {
-			pe_debug("RX MGMT - Type %hu, SubType %hu, seq num[%d]",
-				 fc.type, fc.subType,
-				 ((pHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET) |
-				 pHdr->seqControl.seqNumLo));
-			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
-					   QDF_TRACE_LEVEL_DEBUG, pHdr,
-					   WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo)
-					   + SIR_MAC_HDR_LEN_3A);
-		}
+		    (fc.subType != SIR_MAC_MGMT_ACTION))
+			mgmt_txrx_frame_hex_dump((uint8_t *)pHdr,
+					 WMA_GET_RX_MPDU_LEN(pRxPacketInfo),
+					 false);
 	}
 
 #ifdef FEATURE_WLAN_EXTSCAN
