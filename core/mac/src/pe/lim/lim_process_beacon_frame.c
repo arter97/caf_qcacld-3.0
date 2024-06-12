@@ -609,7 +609,9 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			qdf_mem_copy(session->beacon,
 				WMA_GET_RX_MAC_HEADER(rx_pkt_info),
 				session->bcnLen);
-
+		mgmt_txrx_frame_hex_dump((uint8_t *)mac_hdr,
+					 WMA_GET_RX_MPDU_LEN(rx_pkt_info),
+					 false);
 		lim_check_and_announce_join_success(mac_ctx, bcn_ptr,
 				mac_hdr, session);
 	}
