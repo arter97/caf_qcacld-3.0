@@ -81,7 +81,7 @@ QDF_STATUS csr_scan_close(struct mac_context *mac);
 void csr_free_scan_result_entry(struct mac_context *mac, struct tag_csrscan_result
 				*pResult);
 
-QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t sessionId,
+QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t vdev_id,
 				  struct csr_roam_info *roam_info,
 				  eRoamCmdStatus u1, eCsrRoamResult u2);
 void csr_roam_complete(struct mac_context *mac, uint8_t session_id);
