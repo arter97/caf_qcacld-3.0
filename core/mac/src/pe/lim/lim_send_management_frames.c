@@ -483,8 +483,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		      vdev_id, mac_ctx->mgmtSeqNum,
 		      QDF_MAC_ADDR_REF(bssid),
 		      (int)sizeof(tSirMacMgmtHdr) + payload);
-	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, frame,
-			   sizeof(tSirMacMgmtHdr) + payload);
+	mgmt_txrx_frame_hex_dump(frame, sizeof(tSirMacMgmtHdr) + payload, true);
 
 	/* If this probe request is sent during P2P Search State, then we need
 	 * to send it at OFDM rate.
@@ -6680,10 +6679,9 @@ lim_send_epcs_action_req_frame(struct wlan_objmgr_vdev *vdev,
 	frm.Action.action = args->action;
 	frm.DialogToken.token = args->arg1;
 
-	pe_debug("Sending a EPCS negotiation Request from " QDF_MAC_ADDR_FMT " to " QDF_MAC_ADDR_FMT,
-		 QDF_MAC_ADDR_REF(session->self_mac_addr),
+	pe_debug("Sending a EPCS negotiation Request token %d from " QDF_MAC_ADDR_FMT " to " QDF_MAC_ADDR_FMT,
+		 frm.DialogToken.token, QDF_MAC_ADDR_REF(session->self_mac_addr),
 		 QDF_MAC_ADDR_REF(peer_mac));
-	pe_debug("Dialog token %d", frm.DialogToken.token);
 
 	status = dot11f_get_packed_epcs_neg_reqSize(mac_ctx, &frm,
 						    &payload_size);
@@ -6728,10 +6726,6 @@ lim_send_epcs_action_req_frame(struct wlan_objmgr_vdev *vdev,
 		pe_warn("There were warnings while packing EPCS req (0x%08x)",
 			status);
 	}
-
-	pe_debug("Dump EPCS TX req action frame");
-	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, frame_ptr,
-			   num_bytes);
 
 	if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq) ||
 	    session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -6839,10 +6833,6 @@ lim_send_epcs_action_teardown_frame(struct wlan_objmgr_vdev *vdev,
 		pe_warn("There were warnings while packing EPCS tear down(0x%08x)",
 			status);
 	}
-
-	pe_debug("Dump EPCS TX tear down action frame");
-	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, frame_ptr,
-			   num_bytes);
 
 	if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq) ||
 	    session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -7171,11 +7161,6 @@ lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
 	}
 
 	frm.t2lm_ie[0].num_data = ie_buf->elem_len - 1;
-
-	pe_debug("Dump T2LM IE buff len %d", ie_buf->elem_len);
-	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, ie_buf,
-			   ie_buf->elem_len +  sizeof(struct ie_header));
-
 	qdf_mem_copy(&frm.t2lm_ie[0].data, ie_buf->data,
 		     frm.t2lm_ie[0].num_data);
 
@@ -7187,10 +7172,9 @@ lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
 	frm.num_t2lm_ie = 1;
 	frm.t2lm_ie[0].present = 1;
 
-	pe_debug("Sending a T2LM negotiation Request from " QDF_MAC_ADDR_FMT " to " QDF_MAC_ADDR_FMT,
-		 QDF_MAC_ADDR_REF(session->self_mac_addr),
+	pe_debug("Sending a T2LM negotiation Request token %d from " QDF_MAC_ADDR_FMT " to " QDF_MAC_ADDR_FMT,
+		 frm.DialogToken.token, QDF_MAC_ADDR_REF(session->self_mac_addr),
 		 QDF_MAC_ADDR_REF(peer_mac));
-	pe_debug("Dialog token %d", frm.DialogToken.token);
 
 	status = dot11f_get_packed_t2lm_neg_reqSize(mac_ctx, &frm,
 						    &payload_size);
@@ -7236,10 +7220,6 @@ lim_send_t2lm_action_req_frame(struct wlan_objmgr_vdev *vdev,
 		pe_warn("There were warnings while packing T2LM req (0x%08x)",
 			status);
 	}
-
-	pe_debug("Dump T2LM TX req action frame");
-	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, frame_ptr,
-			   num_bytes);
 
 	if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq) ||
 	    session->opmode == QDF_P2P_CLIENT_MODE ||

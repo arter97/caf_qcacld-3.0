@@ -4530,11 +4530,9 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 
 	pe_join_req = session->lim_join_req;
 	bss_desc = &session->lim_join_req->bssDescription;
-	pe_debug("Beacon/probe frame received:");
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   util_scan_entry_frame_ptr(req->entry),
-			   util_scan_entry_frame_len(req->entry));
-
+	mgmt_txrx_frame_hex_dump(util_scan_entry_frame_ptr(req->entry),
+				 util_scan_entry_frame_len(req->entry),
+				 false);
 	status = wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc,
 						    req->entry);
 	if (QDF_IS_STATUS_ERROR(status)) {
