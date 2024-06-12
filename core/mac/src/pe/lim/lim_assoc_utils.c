@@ -3571,26 +3571,36 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
  * lim_update_vht_oper_assoc_resp : Update VHT Operations in assoc response.
  * @mac_ctx Pointer to Global MAC structure
  * @pAddBssParams: parameters required for add bss params.
- * @vht_caps: VHT CAP IE to update.
- * @vht_oper: VHT Operations to update.
- * @ht_info: HT Info IE to update.
+ * @assoc_rsp: assoc response from AP.
  * @pe_session : session entry.
  *
  * Return : void
  */
 static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
-		struct bss_params *pAddBssParams,
-		tDot11fIEVHTCaps *vht_caps, tDot11fIEVHTOperation *vht_oper,
-		tDot11fIEHTInfo *ht_info, struct pe_session *pe_session)
+					   struct bss_params *pAddBssParams,
+					   tpSirAssocRsp assoc_rsp,
+					   struct pe_session *pe_session)
 {
-	uint8_t ch_width;
+	tDot11fIEVHTOperation *vht_oper = NULL;
+	tDot11fIEVHTCaps *vht_caps = NULL;
+	enum phy_ch_width ch_width;
 
 	ch_width = pAddBssParams->ch_width;
+
+	if (assoc_rsp->VHTCaps.present) {
+		vht_caps = &assoc_rsp->VHTCaps;
+		vht_oper = &assoc_rsp->VHTOperation;
+	} else if (assoc_rsp->vendor_vht_ie.VHTCaps.present) {
+		vht_caps = &assoc_rsp->vendor_vht_ie.VHTCaps;
+		vht_oper = &assoc_rsp->vendor_vht_ie.VHTOperation;
+	}
 
 	if (vht_oper->chanWidth == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ &&
 	    pe_session->ch_width)
 		ch_width =
-			lim_get_vht_ch_width(vht_caps, vht_oper, ht_info) + 1;
+			lim_get_vht_ch_width(vht_caps, vht_oper,
+					     &assoc_rsp->HTInfo,
+					     &assoc_rsp->oper_mode_ntf);
 
 	if (ch_width > pe_session->ch_width)
 		ch_width = pe_session->ch_width;
@@ -3811,8 +3821,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	if (pAddBssParams->vhtCapable) {
 		if (vht_oper)
 			lim_update_vht_oper_assoc_resp(mac, pAddBssParams,
-						       vht_caps, vht_oper,
-						       &pAssocRsp->HTInfo,
+						       pAssocRsp,
 						       pe_session);
 		if (vht_caps)
 			lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,

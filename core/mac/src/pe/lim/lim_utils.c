@@ -11293,6 +11293,20 @@ void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 }
 
 
+uint8_t lim_convert_phy_width_to_vht_width(enum phy_ch_width ch_width)
+{
+	if (ch_width == CH_WIDTH_80P80MHZ)
+		return WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
+	if (ch_width >= CH_WIDTH_160MHZ)
+		return WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+	if (ch_width == CH_WIDTH_80MHZ)
+		return WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	if (ch_width == CH_WIDTH_40MHZ || ch_width == CH_WIDTH_20MHZ)
+		return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+
+	return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+}
+
 bool lim_update_channel_width(struct mac_context *mac_ctx,
 			      tpDphHashNode sta_ptr,
 			      struct pe_session *session,
@@ -11337,22 +11351,9 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 		 QDF_MAC_ADDR_REF(sta_ptr->staAddr), oper_mode,
 		 ch_width, fw_vht_ch_wd);
 
-	if (ch_width >= CH_WIDTH_160MHZ) {
-		sta_ptr->vhtSupportedChannelWidthSet =
-				WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
-		ch_width = CH_WIDTH_160MHZ;
-	} else if (ch_width == CH_WIDTH_80MHZ) {
-		sta_ptr->vhtSupportedChannelWidthSet =
-				WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-	} else if (ch_width == CH_WIDTH_40MHZ) {
-		sta_ptr->vhtSupportedChannelWidthSet =
-				WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-	} else if (ch_width == CH_WIDTH_20MHZ) {
-		sta_ptr->vhtSupportedChannelWidthSet =
-				WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-	} else {
-		return false;
-	}
+	sta_ptr->vhtSupportedChannelWidthSet =
+			lim_convert_phy_width_to_vht_width(ch_width);
+
 	if (ch_width >= CH_WIDTH_40MHZ)
 		sta_ptr->htSupportedChannelWidthSet = CH_WIDTH_40MHZ;
 	else
@@ -11363,41 +11364,70 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 					    sta_ptr->staAddr);
 }
 
-uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
-			     tDot11fIEVHTOperation *vht_op,
-			     tDot11fIEHTInfo *ht_info)
+enum phy_ch_width
+lim_get_omn_channel_width(tDot11fIEOperatingMode *omn_ie)
+{
+	if (omn_ie->chanWidth < WNI_OMI_CH_WIDTH_80MHZ)
+		return omn_ie->chanWidth;
+	if (omn_ie->chanWidth == WNI_OMI_CH_WIDTH_80MHZ) {
+		if (!omn_ie->vht_160_80p80_supp)
+			return CH_WIDTH_80MHZ;
+		return CH_WIDTH_160MHZ;
+	}
+
+	return CH_WIDTH_INVALID;
+}
+
+enum phy_ch_width lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
+				       tDot11fIEVHTOperation *vht_op,
+				       tDot11fIEHTInfo *ht_info,
+				       tDot11fIEOperatingMode *omn_ie)
 {
 	uint8_t ccfs0, ccfs1, offset;
-	uint8_t ch_width;
+	enum phy_ch_width vht_ch_width, omn_ch_width;
 
 	ccfs0 = vht_op->chan_center_freq_seg0;
 	ccfs1 = vht_op->chan_center_freq_seg1;
-	ch_width = vht_op->chanWidth;
-
-	if (ch_width > WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ) {
-		pe_err("Invalid ch width in vht operation IE %d", ch_width);
-		return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-	}
 
 	if (vht_cap->vht_extended_nss_bw_cap &&
 	    vht_cap->extended_nss_bw_supp && ht_info && ht_info->present)
 		ccfs1 = ht_info->chan_center_freq_seg2;
 
-	/* According to new VHTOP IE definition, vht ch_width will
-	 * be 1 for 80MHz, 160MHz and 80+80MHz.
-	 *
-	 * To get the correct operation ch_width, find center
-	 * frequency difference.
-	 */
-	if (ch_width == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ && ccfs1) {
-		offset = abs(ccfs0 - ccfs1);
-
-		if (offset == 8)
-			ch_width =  WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
-		else if (offset > 16)
-			ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
+	/* Process the VHT OP and retrieve the max channel width */
+	switch (vht_op->chanWidth) {
+	case WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ:
+		if (ht_info && ht_info->present &&
+		    ht_info->recommendedTxWidthSet)
+			vht_ch_width = CH_WIDTH_40MHZ;
+		else
+			vht_ch_width = CH_WIDTH_20MHZ;
+		break;
+	case WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ:
+		vht_ch_width = CH_WIDTH_80MHZ;
+		if (ccfs1) {
+			offset = abs(ccfs0 - ccfs1);
+			if (offset == 8)
+				vht_ch_width = CH_WIDTH_160MHZ;
+			else if (offset > 16)
+				vht_ch_width = CH_WIDTH_80P80MHZ;
+		}
+		break;
+	default:
+		pe_err("Invalid ch width in vht operation IE %d",
+		       vht_op->chanWidth);
+		return CH_WIDTH_20MHZ;
 	}
-	return ch_width;
+
+	/*
+	 * Process the OMN IE and reduce the max channel width to
+	 * the operating channel width
+	 */
+	if (!(omn_ie && omn_ie->present))
+		return vht_ch_width;
+
+	omn_ch_width = lim_get_omn_channel_width(omn_ie);
+
+	return QDF_MIN(omn_ch_width, vht_ch_width);
 }
 
 bool
@@ -11724,28 +11754,6 @@ next:
 	}
 
 	return NULL;
-}
-
-enum phy_ch_width
-lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40)
-{
-	switch (ch_width) {
-	case WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ:
-		return CH_WIDTH_80P80MHZ;
-	case WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ:
-		return CH_WIDTH_160MHZ;
-	case WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ:
-		return CH_WIDTH_80MHZ;
-	case WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ:
-		if (is_40)
-			return CH_WIDTH_40MHZ;
-		else
-			return CH_WIDTH_20MHZ;
-	default:
-		pe_debug("Unknown VHT ch width %d", ch_width);
-			break;
-	}
-	return CH_WIDTH_20MHZ;
 }
 
 void

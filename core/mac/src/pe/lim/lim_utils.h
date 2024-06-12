@@ -3220,6 +3220,15 @@ uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset);
 void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		    uint8_t rx_nss, struct pe_session *session);
 
+/*
+ * lim_convert_phy_width_to_vht_width() - Function to convert the
+ * enum phy_ch_width to the vht channel width definition.
+ * @ch_width: phy ch width
+ *
+ * Return: VHT channel width
+ */
+uint8_t lim_convert_phy_width_to_vht_width(enum phy_ch_width ch_width);
+
 /**
  * lim_update_channel_width() - Function to update channel width
  * @mac_ctx: pointer to Global Mac structure
@@ -3245,12 +3254,24 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
  * @vht_cap: Pointer to VHT Caps IE.
  * @vht_op: Pointer to VHT Operation IE.
  * @ht_info: Pointer to HT Info IE.
+ * @opmode_ie: Pointer to Operating mode IE
  *
- * Return: VHT channel width
+ * Return: phy channel width
  */
-uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
-			     tDot11fIEVHTOperation *vht_op,
-			     tDot11fIEHTInfo *ht_info);
+enum phy_ch_width lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
+				       tDot11fIEVHTOperation *vht_op,
+				       tDot11fIEHTInfo *ht_info,
+				       tDot11fIEOperatingMode *omn_ie);
+
+/*
+ * lim_get_omn_channel_width() - Function to get the OMN channel width
+ * from the OMN IE fields
+ * @omn_ie: OMN IE
+ *
+ * Return: phy channel width
+ */
+enum phy_ch_width
+lim_get_omn_channel_width(tDot11fIEOperatingMode *omn_ie);
 
 /*
  * lim_set_tpc_power() - Function to compute and send TPC power level to the
@@ -3392,18 +3413,6 @@ lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
 				enum QDF_OPMODE opmode,
 				qdf_freq_t start_freq,
 				qdf_freq_t end_freq);
-
-/**
- * lim_convert_vht_chwidth_to_phy_chwidth() - Convert VHT operation
- * ch width into phy ch width
- *
- * @ch_width: VHT op channel width
- * @is_40: is 40 MHz
- *
- * Return: phy chwidth
- */
-enum phy_ch_width
-lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40);
 
 /**
  * lim_update_cu_flag() - Update cu flag in capability information

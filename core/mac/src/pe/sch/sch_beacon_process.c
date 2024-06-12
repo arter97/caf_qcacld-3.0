@@ -476,20 +476,18 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	if (bcn->OperatingMode.present) {
 		lim_update_nss(mac_ctx, sta_ds, bcn->OperatingMode.rxNSS,
 			       session);
-		ch_width = bcn->OperatingMode.chanWidth;
-		pe_debug("OMN IE present in bcn/probe rsp, omn_ie_ch_width: %d",
-			 ch_width);
+		ch_width = lim_get_omn_channel_width(&bcn->OperatingMode);
+		pe_debug("OMN IE present in bcn/probe rsp, ie width: %d ch_width: %d",
+			 bcn->OperatingMode.chanWidth, ch_width);
 		lim_update_omn_ie_ch_width(session->vdev, ch_width);
 
-	} else {
-		bcn_vht_chwidth = lim_get_vht_ch_width(vht_caps, vht_op,
-						       &bcn->HTInfo);
-		ch_width =
-			lim_convert_vht_chwidth_to_phy_chwidth(bcn_vht_chwidth,
-							       is_40);
 	}
 
-	lim_update_channel_width(mac_ctx, sta_ds, session, ch_width, &ch_bw);
+	bcn_vht_chwidth = lim_get_vht_ch_width(vht_caps, vht_op,
+					       &bcn->HTInfo,
+					       &bcn->OperatingMode);
+	lim_update_channel_width(mac_ctx, sta_ds, session,
+				 bcn_vht_chwidth, &ch_bw);
 }
 
 #ifdef WLAN_FEATURE_SR
