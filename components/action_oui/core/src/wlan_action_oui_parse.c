@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -760,12 +760,12 @@ QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
 	extension_list = &oui_priv->extension_list;
 	qdf_mutex_acquire(&oui_priv->extension_lock);
 
-	if (psoc_priv->max_extensions -
-	    (psoc_priv->total_extensions - psoc_priv->host_only_extensions) < 0) {
-		action_oui_err("total_extensions: %d exceeds max_extensions: %d, do not update",
-			       psoc_priv->max_extensions,
+	if ((psoc_priv->total_extensions - psoc_priv->host_only_extensions) >
+	    psoc_priv->max_extensions) {
+		action_oui_err("total configured extensions: %d exceeds max_extensions: %d, do not update",
 			       (psoc_priv->total_extensions -
-				psoc_priv->host_only_extensions));
+				psoc_priv->host_only_extensions),
+			       psoc_priv->max_extensions);
 		qdf_mutex_release(&oui_priv->extension_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
