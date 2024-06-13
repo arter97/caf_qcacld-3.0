@@ -1521,7 +1521,7 @@ enum host_log_level {
  */
 #define CFG_SAP_STA_NDP_CONCURRENCY CFG_INI_BOOL( \
 		"g_sap_sta_ndp_concurrency", \
-		0, \
+		1, \
 		"This ini is used to enable/disable SAP-STA-NDP concurrency")
 
 /*
