@@ -664,6 +664,84 @@ wlan_mlme_get_external_acs_policy(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+wlan_mlme_get_acs_linear_bss_status(struct wlan_objmgr_psoc *psoc,
+				    bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.acs.lin_bss_score_en;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_acs_linear_rssi_status(struct wlan_objmgr_psoc *psoc,
+				     bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.acs.lin_rssi_score_en;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_acs_wifi_non_wifi_load_status(struct wlan_objmgr_psoc *psoc,
+					    bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.acs.load_score_en;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_acs_same_chan_weight_rand_status(struct wlan_objmgr_psoc *psoc,
+					       bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.acs.same_weight_chan_rand_en;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_acs_early_terminate_status(struct wlan_objmgr_psoc *psoc,
+					 bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.acs.termi_on_1st_clean_chan_en;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_acs_rssi_threshold_score(struct wlan_objmgr_psoc *psoc,
+				       int16_t *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.acs.rssi_score_thrs;
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_mlme_get_tx_chainmask_cck(struct wlan_objmgr_psoc *psoc,
 					  bool *value)
 {

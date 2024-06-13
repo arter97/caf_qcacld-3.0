@@ -2550,6 +2550,8 @@ end:
 static void mlme_init_acs_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_acs *acs)
 {
+	uint32_t acs_config_features;
+
 	acs->is_acs_with_more_param =
 		cfg_get(psoc, CFG_ACS_WITH_MORE_PARAM);
 	acs->auto_channel_select_weight =
@@ -2565,6 +2567,19 @@ static void mlme_init_acs_cfg(struct wlan_objmgr_psoc *psoc,
 	acs->np_chan_weightage = cfg_get(psoc, CFG_ACS_NP_CHAN_WEIGHT);
 	acs->acs_prefer_6ghz_psc = cfg_default(CFG_ACS_PREFER_6GHZ_PSC);
 	mlme_acs_parse_weight_list(psoc, acs);
+
+	acs_config_features = cfg_get(psoc, CFG_ACS_CONFIG_FEATURE_BITMAP);
+	acs->lin_bss_score_en =
+		acs_config_features & ACS_CONFIG_LINEAR_BSS_SCORE_ENABLE;
+	acs->lin_rssi_score_en =
+		acs_config_features & ACS_CONFIG_LINEAR_RSSI_SCORE_ENABLE;
+	acs->load_score_en =
+		acs_config_features & ACS_CONFIG_WIFI_NONWIFI_LOADING_ENABLE;
+	acs->same_weight_chan_rand_en =
+		acs_config_features & ACS_CONFIG_SAME_WC_CHAN_RAND_ENABLE;
+	acs->termi_on_1st_clean_chan_en =
+		acs_config_features & ACS_CONFIG_TERMI_ON_1ST_CLN_CHAN_ENABLE;
+	acs->rssi_score_thrs = cfg_get(psoc, CFG_ACS_RSSI_SCORE_THR);
 }
 
 static void

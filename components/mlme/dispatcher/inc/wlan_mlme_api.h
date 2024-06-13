@@ -614,6 +614,78 @@ QDF_STATUS wlan_mlme_get_vendor_acs_support(struct wlan_objmgr_psoc *psoc,
 					    bool *value);
 
 /**
+ * wlan_mlme_get_acs_linear_bss_status() - Get acs linear bss status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS wlan_mlme_get_acs_linear_bss_status(struct wlan_objmgr_psoc *psoc,
+					       bool *value);
+
+/**
+ * wlan_mlme_get_acs_linear_rssi_status() - Get acs linear rssi status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS wlan_mlme_get_acs_linear_rssi_status(struct wlan_objmgr_psoc *psoc,
+						bool *value);
+
+/**
+ * wlan_mlme_get_acs_wifi_non_wifi_load_status() - Get acs wifi, non-wifi
+ *						   load status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS
+wlan_mlme_get_acs_wifi_non_wifi_load_status(struct wlan_objmgr_psoc *psoc,
+					    bool *value);
+
+/**
+ * wlan_mlme_get_acs_same_chan_weight_rand_status() - Get acs same weight
+ *						channel randomization status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS
+wlan_mlme_get_acs_same_chan_weight_rand_status(struct wlan_objmgr_psoc *psoc,
+					       bool *value);
+
+/**
+ * wlan_mlme_get_acs_early_terminate_status() - Get early terminate acs status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS
+wlan_mlme_get_acs_early_terminate_status(struct wlan_objmgr_psoc *psoc,
+					 bool *value);
+
+/**
+ * wlan_mlme_get_acs_rssi_threshold_score() - Get acs rssi threshold
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS
+wlan_mlme_get_acs_rssi_threshold_score(struct wlan_objmgr_psoc *psoc,
+				       int16_t *value);
+
+/**
  * wlan_mlme_get_acs_support_for_dfs_ltecoex() - Get the flag for
  *						 acs support for dfs ltecoex
  * @psoc: pointer to psoc object
