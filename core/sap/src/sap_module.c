@@ -554,6 +554,9 @@ wlansap_set_scan_acs_channel_params(struct sap_config *config,
 	struct mac_context *mac;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint32_t auto_channel_select_weight;
+	bool is_linear_bss_count;
+	bool is_linear_rssi;
+	int16_t linear_rssi_threshold;
 
 	if (!config) {
 		sap_err("Invalid config passed ");
@@ -591,6 +594,29 @@ wlansap_set_scan_acs_channel_params(struct sap_config *config,
 	psap_ctx->sec_ch_freq = config->sec_ch_freq;
 	qdf_mem_copy(psap_ctx->self_mac_addr,
 		config->self_macaddr.bytes, QDF_MAC_ADDR_SIZE);
+
+	/* Updating ACS Configuration */
+	status = ucfg_mlme_get_acs_linear_bss_status(mac->psoc,
+						     &is_linear_bss_count);
+
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		sap_err("get_acs_linear_bss_status failed");
+
+	status = ucfg_mlme_get_acs_linear_rssi_status(mac->psoc,
+						      &is_linear_rssi);
+
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		sap_err("get_acs_linear_rssi_status failed");
+
+	status = ucfg_mlme_get_acs_rssi_threshold_score(mac->psoc,
+							&linear_rssi_threshold);
+
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		sap_err("get_acs_rssi_threshold_score failed");
+
+	psap_ctx->acs_cfg->is_linear_bss_count = is_linear_bss_count;
+	psap_ctx->acs_cfg->is_linear_rssi = is_linear_rssi;
+	psap_ctx->acs_cfg->linear_rssi_threshold = linear_rssi_threshold;
 
 	return status;
 }

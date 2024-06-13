@@ -522,6 +522,9 @@ struct sap_acs_cfg {
 	bool       skip_acs_scan;
 	uint32_t   last_scan_ageout_time;
 	struct master_acs master_acs_cfg;
+	bool	   is_linear_bss_count;
+	bool	   is_linear_rssi;
+	int16_t	   linear_rssi_threshold;
 };
 
 /*

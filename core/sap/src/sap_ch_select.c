@@ -62,6 +62,8 @@
    --------------------------------------------------------------------------*/
 #define SAP_DEBUG
 
+#define BSS_COUNT_COMPENSATION 2
+
 #define IS_RSSI_VALID(extRssi, rssi) \
 	( \
 		((extRssi < rssi) ? true : false) \
@@ -629,6 +631,7 @@ uint32_t sapweight_rssi_count(struct sap_context *sap_ctx, int8_t rssi,
 	int32_t rssiWeight = 0;
 	int32_t countWeight = 0;
 	uint32_t rssicountWeight = 0;
+	uint32_t auto_chnl_select_weight = sap_ctx->auto_channel_select_weight;
 	uint8_t softap_rssi_weight_cfg, softap_count_weight_cfg;
 	uint8_t softap_rssi_weight_local, softap_count_weight_local;
 
@@ -659,10 +662,21 @@ uint32_t sapweight_rssi_count(struct sap_context *sap_ctx, int8_t rssi,
 		rssiWeight = 0;
 
 	/* Weight from data count */
-	countWeight = ACS_WEIGHT_COMPUTE(sap_ctx->auto_channel_select_weight,
-					 softap_count_weight_cfg,
-					 count - SOFTAP_MIN_COUNT,
-					 SOFTAP_MAX_COUNT - SOFTAP_MIN_COUNT);
+	if (!sap_ctx->acs_cfg->is_linear_bss_count) {
+		countWeight = ACS_WEIGHT_COMPUTE(auto_chnl_select_weight,
+						 softap_count_weight_cfg,
+						 count - SOFTAP_MIN_COUNT,
+						 SOFTAP_MAX_COUNT);
+	} else {
+		/* Bss Count Weight Linearisation */
+		countWeight = count;
+	}
+
+	if (sap_ctx->acs_cfg->is_linear_rssi &&
+	    rssi > (int8_t)sap_ctx->acs_cfg->linear_rssi_threshold) {
+		/* RSSI is stronger than threshold, Double the BSS count */
+		countWeight = count * BSS_COUNT_COMPENSATION;
+	}
 
 	if (countWeight > softap_count_weight_local)
 		countWeight = softap_count_weight_local;
@@ -1642,12 +1656,13 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 	chan_free_cfg = ACS_WEIGHT_SOFTAP_CHANNEL_FREE_CFG(weight_config);
 	txpwr_range_cfg = ACS_WEIGHT_SOFTAP_TX_POWER_RANGE_CFG(weight_config);
 	txpwr_tput_cfg = ACS_WEIGHT_SOFTAP_TX_POWER_THROUGHPUT_CFG(weight_config);
-	sap_nofl_debug("Channel weight 0x%x, nf local %d, chan free local %d, txpwr range %d tput %d",
+	sap_nofl_debug("Channel weight 0x%x, nf local %d, chan free local %d, txpwr range %d tput %d linear_rssi_thresh %d",
 			sap_ctx->auto_channel_select_weight,
 			ACS_WEIGHT_CFG_TO_LOCAL(weight_config, nf_cfg),
 			ACS_WEIGHT_CFG_TO_LOCAL(weight_config, chan_free_cfg),
 			ACS_WEIGHT_CFG_TO_LOCAL(weight_config, txpwr_range_cfg),
-			ACS_WEIGHT_CFG_TO_LOCAL(weight_config, txpwr_tput_cfg));
+			ACS_WEIGHT_CFG_TO_LOCAL(weight_config, txpwr_tput_cfg),
+			sap_ctx->acs_cfg->linear_rssi_threshold);
 	sap_nofl_debug("ACS freq weight info: freq[weight{normalized_weight,rssi_bss_weight,chan_status_weight(nf,cc,txpwr range,txpwt tput), power_weight}][rssi][bss]:");
 	/* reset len and freq count */
 	len = 0;
@@ -1661,7 +1676,9 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 		 */
 
 		rssi = (int8_t)ch_info->rssi_agr;
-		if (ch_in_pcl(sap_ctx, ch_info->chan_freq))
+		if (ch_in_pcl(sap_ctx, ch_info->chan_freq) &&
+		    sap_ctx->acs_cfg->is_linear_rssi &&
+		    rssi > (int8_t)sap_ctx->acs_cfg->linear_rssi_threshold)
 			rssi -= PCL_RSSI_DISCOUNT;
 
 		if (rssi < SOFTAP_MIN_RSSI)
