@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5379,7 +5380,17 @@ static int hdd_send_coex_config_params(struct hdd_context *hdd_ctx,
 		hdd_err("Failed to send coex BT interference level");
 		goto err;
 	}
+#ifdef FEATURE_COEX_TPUT_SHAPING_CONFIG
+	coex_cfg_params.config_type = WMI_COEX_CONFIG_ENABLE_TPUT_SHAPING;
+	coex_cfg_params.config_arg1 = config->coex_tput_shaping_enable;
 
+	status = sme_send_coex_config_cmd(&coex_cfg_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send coex Tput Shaping value %d",
+			coex_cfg_params.config_arg1);
+		goto err;
+	}
+#endif
 	if (wlan_hdd_mpta_helper_enable(config))
 		goto err;
 
