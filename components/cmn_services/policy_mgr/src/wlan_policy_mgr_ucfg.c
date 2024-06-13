@@ -25,10 +25,14 @@
 #include "wlan_mlme_api.h"
 
 /*
- * Max allowed active vdevs are 4 as per firmware. MAX_CONC_CXNS should be
+ * Max allowed active vdevs as per firmware. MAX_CONC_CXNS should be
  * same as this.
  */
+#ifdef WLAN_FEATURE_SON
+#define MAX_CONC_CXNS    MAX_NUMBER_OF_CONC_CONNECTIONS
+#else
 #define MAX_CONC_CXNS 4
+#endif
 
 #ifdef WLAN_FEATURE_SR
 /**

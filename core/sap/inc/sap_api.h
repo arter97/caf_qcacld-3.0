@@ -62,7 +62,7 @@ extern "C" {
 #ifndef QDF_MAX_NO_OF_SAP_MODE
 #define       QDF_MAX_NO_OF_SAP_MODE       2    /* max # of SAP */
 #endif
-#define       SAP_MAX_NUM_SESSION          5
+#define       SAP_MAX_NUM_SESSION          WLAN_MAX_VDEVS
 #define       SAP_MAX_OBSS_STA_CNT         1    /* max # of OBSS STA */
 #define       SAP_ACS_WEIGHT_MAX           (26664)
 /* ACS will mark non ACS channels(filtered by PCL) or channels not in

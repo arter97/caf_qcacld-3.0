@@ -821,7 +821,7 @@ struct dhcp_server {
 #define CFG_NUM_VDEV_ENABLE CFG_INI_UINT( \
 		"gNumVdevs", \
 		1, \
-		5, \
+		WLAN_MAX_VDEVS, \
 		CFG_TGT_NUM_VDEV, \
 		CFG_VALUE_OR_DEFAULT, \
 		"Number of VDEVs")
