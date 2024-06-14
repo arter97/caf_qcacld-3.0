@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _DP_FSE_H__
+#ifndef _DP_FSE_H_
 #define _DP_FSE_H_
 
 /**

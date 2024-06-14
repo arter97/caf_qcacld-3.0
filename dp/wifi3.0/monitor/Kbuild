@@ -248,6 +248,7 @@ CFLAGS_REMOVE_dp_lite_mon.o := $(PERF_PWR_OFFLOAD_HW_LI_INC) $(MONITOR_1_0_INC)
 endif
 endif
 ################ QCA_GCC7_0_SUPPORT - END ####################
+EXTRA_CFLAGS+= -Wno-int-to-pointer-cast
 
 ifeq ($(CONFIG_LITHIUM), 1)
 EXTRA_CFLAGS += $(PERF_PWR_OFFLOAD_HW_LI_INC) $(MONITOR_1_0_INC)

@@ -2197,6 +2197,12 @@ dfs_compute_agile_and_curchan_width(struct wlan_dfs *dfs,
 				    enum phy_ch_width *agile_ch_width,
 				    enum phy_ch_width *cur_ch_width)
 {
+	if (dfs->dfs_curchan->dfs_ch_flags & WLAN_CHAN_HALF ||
+	    dfs->dfs_curchan->dfs_ch_flags & WLAN_CHAN_QUARTER) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			"aDFS during 5/10MHz operation not supported");
+		return;
+	}
 	/*
 	 * Agile detector's band of operation depends on current pdev.
 	 * Find the current channel's width and apply the translate rules
@@ -2208,6 +2214,11 @@ dfs_compute_agile_and_curchan_width(struct wlan_dfs *dfs,
 	dfs_find_curchwidth_and_center_chan_for_freq(dfs, cur_ch_width,
 						     NULL, NULL);
 
+	if (*cur_ch_width == CH_WIDTH_5MHZ || *cur_ch_width == CH_WIDTH_10MHZ) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			"aDFS during 5/10MHz operation not supported");
+		return;
+	}
 	/* Check if the FW supports agile DFS when the pdev is operating on
 	 * 160 or 80P80MHz bandwidth. This information is stored in the flag
 	 * "dfs_fw_adfs_support_160" when the current chainmask is configured.
