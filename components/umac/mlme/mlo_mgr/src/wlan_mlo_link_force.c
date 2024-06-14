@@ -573,7 +573,8 @@ get_disallow_mlo_mode_table(struct wlan_objmgr_psoc *psoc)
 	rd_type = policy_mgr_get_rd_type(psoc);
 
 	/* select DBS rd if NAN interface is present */
-	if (wlan_nan_is_sta_sap_nan_allowed(psoc) &&
+	if ((wlan_nan_is_sta_sap_nan_allowed(psoc) ||
+	     wlan_nan_is_sta_p2p_ndp_supported(psoc)) &&
 	    policy_mgr_mode_specific_connection_count(psoc,
 						      PM_NAN_DISC_MODE,
 						      NULL))

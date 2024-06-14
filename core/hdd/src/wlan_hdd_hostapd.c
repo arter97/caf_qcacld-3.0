@@ -6896,7 +6896,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	enum reg_phymode reg_phy_mode, updated_phy_mode;
 	struct sap_context *sap_ctx;
 	struct wlan_objmgr_vdev *vdev;
-	uint32_t user_config_freq = 0;
+	uint32_t user_config_freq = 0, new_freq;
 	struct hdd_ap_ctx *ap_ctx;
 	enum policy_mgr_con_mode pm_con_mode;
 	struct qdf_mac_addr *link_mac;
@@ -7054,14 +7054,17 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 							 config->chan_freq);
 
 	/* Override SAP freq to 2GHz channel 6 if NAN interface is present */
-	if (wlan_nan_is_sta_sap_nan_allowed(hdd_ctx->psoc) &&
+	if (adapter->device_mode == QDF_SAP_MODE &&
+	    wlan_nan_is_sta_sap_nan_allowed(hdd_ctx->psoc) &&
 	    policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
 						      PM_NAN_DISC_MODE,
 						      NULL)) {
-		config->chan_freq = wlan_nan_sap_override_freq(
-					hdd_ctx->psoc,
-					link_info->vdev_id,
-					config->chan_freq);
+		new_freq = wlan_nan_sap_override_freq(hdd_ctx->psoc,
+						      link_info->vdev_id,
+						      config->chan_freq);
+		hdd_debug("vdev %d, update SAP freq from %d to %d due to NAN",
+			  link_info->vdev_id, config->chan_freq, new_freq);
+		config->chan_freq = new_freq;
 	}
 	if (!config->chan_freq) {
 		hdd_err("vdev %d invalid ch_freq: %d", link_info->vdev_id,

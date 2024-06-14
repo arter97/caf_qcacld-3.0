@@ -6045,7 +6045,6 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 		go_cnt += policy_mgr_mode_specific_connection_count(psoc,
 							PM_P2P_CLIENT_MODE,
 							NULL);
-
 	}
 
 	if (sap_cnt || go_cnt || nan_cnt || count_sta) {
