@@ -964,6 +964,11 @@ int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 	}
 	strlcpy(info->fw_build_id, cnss_info.fw_build_id,
 		sizeof(info->fw_build_id));
+#ifdef PCIE_SWITCH_SUPPORT
+	info->pcie_switch_attached = cnss_info.pcie_switch_attached;
+#else
+	info->pcie_switch_attached = 0;
+#endif
 
 	return 0;
 }
