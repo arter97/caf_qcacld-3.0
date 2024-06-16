@@ -789,6 +789,7 @@ _conditional_srcs = {
         True: [
             "cmn/target_if/dcs/src/target_if_dcs.c",
             "cmn/umac/dcs/core/src/wlan_dcs.c",
+	    "cmn/umac/dcs/dispatcher/src/wlan_dcs_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_init_deinit_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_tgt_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_ucfg_api.c",

@@ -2539,7 +2539,8 @@ DCS_OBJS := $(DCS_TGT_IF_SRC)/target_if_dcs.o \
 	$(DCS_CORE_SRC)/wlan_dcs.o \
 	$(DCS_DISP_SRC)/wlan_dcs_init_deinit_api.o \
 	$(DCS_DISP_SRC)/wlan_dcs_ucfg_api.o \
-	$(DCS_DISP_SRC)/wlan_dcs_tgt_api.o
+	$(DCS_DISP_SRC)/wlan_dcs_tgt_api.o \
+	$(DCS_DISP_SRC)/wlan_dcs_api.o
 endif
 
 $(call add-wlan-objs,dcs,$(DCS_OBJS))
