@@ -525,6 +525,7 @@ struct sap_acs_cfg {
 	bool	   is_linear_bss_count;
 	bool	   is_linear_rssi;
 	int16_t	   linear_rssi_threshold;
+	bool	   is_same_weight_rand_enabled;
 };
 
 /*

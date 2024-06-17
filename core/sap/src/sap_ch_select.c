@@ -1810,33 +1810,69 @@ void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params)
 
    SIDE EFFECTS
    ============================================================================*/
-static void sap_sort_chl_weight(struct sap_sel_ch_info *ch_info_params)
+static void sap_sort_chl_weight(struct sap_sel_ch_info *ch_info_params,
+				struct sap_context *sap_ctx)
 {
 	struct sap_ch_info temp;
 
 	struct sap_ch_info *ch_info = NULL;
-	uint32_t i = 0, j = 0, min_weight_index = 0;
+	uint32_t i = 0, j = 0, k = 0, min_weight_index = 0;
+	uint32_t rand_idx = 0;
+	uint32_t pos = 0;
+	uint32_t delta = 0;
+	unsigned long current_time;
 
 	ch_info = ch_info_params->ch_info;
-	for (i = 0; i < ch_info_params->num_ch; i++) {
-		min_weight_index = i;
-		for (j = i + 1; j < ch_info_params->num_ch; j++) {
-			if (ch_info[j].weight <
-			    ch_info[min_weight_index].weight) {
-				min_weight_index = j;
-			} else if (ch_info[j].weight ==
-				   ch_info[min_weight_index].weight) {
-				if (ch_info[j].bss_count <
-				    ch_info[min_weight_index].bss_count)
-					min_weight_index = j;
+	if (sap_ctx->acs_cfg->is_same_weight_rand_enabled) {
+		sap_debug("ACS Ext: Same Channel Randomization Enabled");
+		/* Randomziation */
+		for (i = 0; i < ch_info_params->num_ch; i++) {
+			min_weight_index = i;
+			for (j = i;
+			     (ch_info[j].weight == ch_info[j + 1].weight) &&
+			     (ch_info[j].bss_count == ch_info[j + 1].bss_count);
+			     j++)
+				;
+			if (min_weight_index != j) {
+				delta = j - min_weight_index;
+				for (k = 0; k < delta ; k++) {
+					current_time = qdf_ktime_get_real_ns();
+					rand_idx = current_time % (delta + 1);
+					pos = min_weight_index + rand_idx;
+					qdf_mem_copy(&temp,
+						     &ch_info[min_weight_index],
+						     sizeof(*ch_info));
+					qdf_mem_copy(&ch_info[min_weight_index],
+						     &ch_info[pos],
+						     sizeof(*ch_info));
+					qdf_mem_copy(&ch_info[pos], &temp,
+						     sizeof(*ch_info));
+				}
 			}
 		}
-		if (min_weight_index != i) {
-			qdf_mem_copy(&temp, &ch_info[min_weight_index],
-				     sizeof(*ch_info));
-			qdf_mem_copy(&ch_info[min_weight_index], &ch_info[i],
-				     sizeof(*ch_info));
-			qdf_mem_copy(&ch_info[i], &temp, sizeof(*ch_info));
+
+	} else {
+		for (i = 0; i < ch_info_params->num_ch; i++) {
+			min_weight_index = i;
+			for (j = i + 1; j < ch_info_params->num_ch; j++) {
+				if (ch_info[j].weight <
+				    ch_info[min_weight_index].weight) {
+					min_weight_index = j;
+				} else if (ch_info[j].weight ==
+					   ch_info[min_weight_index].weight) {
+					if (ch_info[j].bss_count <
+					    ch_info[min_weight_index].bss_count)
+						min_weight_index = j;
+				}
+			}
+			if (min_weight_index != i) {
+				qdf_mem_copy(&temp, &ch_info[min_weight_index],
+					     sizeof(*ch_info));
+				qdf_mem_copy(&ch_info[min_weight_index],
+					     &ch_info[i], sizeof(*ch_info));
+				qdf_mem_copy(&ch_info[i], &temp,
+					     sizeof(*ch_info));
+			}
 		}
 	}
 }
@@ -2038,7 +2074,7 @@ sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	sap_sort_chl_weight(ch_info_params);
+	sap_sort_chl_weight(ch_info_params, sap_ctx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2243,7 +2279,7 @@ sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	sap_sort_chl_weight(ch_info_params);
+	sap_sort_chl_weight(ch_info_params, sap_ctx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2512,7 +2548,7 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	sap_sort_chl_weight(ch_info_params);
+	sap_sort_chl_weight(ch_info_params, sap_ctx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2743,7 +2779,7 @@ static void sap_sort_chl_weight_ht40_24_g(
 		sap_nofl_debug("ACS 40 Mhz freq score: %s", info);
 	qdf_mem_free(info);
 
-	sap_sort_chl_weight(ch_info_params);
+	sap_sort_chl_weight(ch_info_params, sap_ctx);
 }
 
 /**
@@ -2893,7 +2929,7 @@ sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	sap_sort_chl_weight(ch_info_params);
+	sap_sort_chl_weight(ch_info_params, sap_ctx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2978,7 +3014,7 @@ next_bw:
 	case CH_WIDTH_20MHZ:
 	default:
 		/* Sorting the channels as per weights as 20MHz channels */
-		sap_sort_chl_weight(ch_info_params);
+		sap_sort_chl_weight(ch_info_params, sap_ctx);
 		status = QDF_STATUS_SUCCESS;
 	}
 
