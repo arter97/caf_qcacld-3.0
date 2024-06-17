@@ -2837,6 +2837,8 @@ static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
 	}
 
 	wlan_hdd_set_powersave(sta_adapter->deflink, true, 0);
+
+	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, false);
 }
 
 static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
@@ -2857,6 +2859,8 @@ static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 		return;
 	}
 	wlan_hdd_set_powersave(sta_adapter->deflink, false, 0);
+
+	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, true);
 }
 #else
 static inline void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
@@ -14514,6 +14518,7 @@ static int hdd_context_init(struct hdd_context *hdd_ctx)
 	qdf_wake_lock_create(&hdd_ctx->monitor_mode_wakelock,
 			     "monitor_mode_wakelock");
 	hdd_lp_create_work(hdd_ctx);
+	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, false);
 
 	return 0;
 

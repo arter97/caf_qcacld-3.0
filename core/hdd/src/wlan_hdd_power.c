@@ -3010,6 +3010,11 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 	if (0 != status)
 		return status;
 
+	if (wlan_hdd_is_lpc_powersave_disabled(hdd_ctx)) {
+		hdd_debug("LPC has disabled power save");
+		return -EINVAL;
+	}
+
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver Module not enabled return success");
 		return 0;
