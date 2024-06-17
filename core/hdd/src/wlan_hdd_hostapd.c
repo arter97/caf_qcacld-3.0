@@ -525,6 +525,9 @@ static int __hdd_hostapd_open(struct net_device *dev)
 		return ret;
 	}
 
+	if (!hdd_allow_new_intf(hdd_ctx, adapter->device_mode))
+		return -EOPNOTSUPP;
+
 	ret = hdd_start_adapter(adapter, true);
 	if (ret) {
 		hdd_err("Error Initializing the AP mode: %d", ret);
@@ -1897,7 +1900,7 @@ hdd_hostapd_update_beacon_country_ie(struct hdd_adapter *adapter)
 	struct hdd_station_info *sta_info, *tmp = NULL;
 	struct hdd_context *hdd_ctx;
 	struct hdd_ap_ctx *ap_ctx;
-	struct action_oui_search_attr attr;
+	struct action_oui_search_attr attr = {0};
 	QDF_STATUS status;
 	bool found = false;
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -467,4 +467,50 @@ QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 					    bool *one_by_one_dbs,
 					    bool *two_by_two_dbs);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * ucfg_policy_mgr_clear_ml_links_settings_in_fw() - Process
+ * QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE in default mode
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev_id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id);
+
+/**
+ * ucfg_policy_mgr_update_mlo_links_based_on_linkid() - Force active
+ * ML links based on user requested coming via
+ * QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev id
+ * @num_links: number of links to be forced active
+ * @link_id_list: link id(s) list coming from user space
+ * @config_state_list: config state list coming from user space
+ *
+ * Return: success if the command gets processed successfully
+ */
+QDF_STATUS
+ucfg_policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
+						 uint8_t vdev_id,
+						 uint8_t num_links,
+						 uint8_t *link_id_list,
+						 uint32_t *config_state_list);
+
+/**
+ * ucfg_policy_mgr_update_active_mlo_num_links() - Force active ML links based
+ * on user requested coming via LINK_STATE_MIXED_MODE_ACTIVE_NUM_LINKS
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev id
+ * @num_links: number of links to be forced active
+ *
+ * Return: success if the command gets processed successfully
+ */
+QDF_STATUS
+ucfg_policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    uint8_t num_links);
+#endif
 #endif //__WLAN_POLICY_MGR_UCFG

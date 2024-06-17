@@ -1203,6 +1203,8 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 	/* Update Parent interface details */
 	dp_link->magic = WLAN_DP_LINK_MAGIC;
+	dp_link->destroyed = 0;
+	dp_link->cdp_vdev_deleted = 0;
 	dp_link->dp_intf = dp_intf;
 	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
 	qdf_list_insert_front(&dp_intf->dp_link_list, &dp_link->node);
@@ -2034,8 +2036,10 @@ void wlan_dp_link_cdp_vdev_delete_notification(void *context)
 	uint8_t found = 0;
 
 	/* dp_link will not be freed before this point. */
-	if (!dp_link)
+	if (!dp_link) {
+		dp_info("dp_link is null");
 		return;
+	}
 
 	dp_info("dp_link %pK id %d", dp_link, dp_link->link_id);
 	dp_intf = dp_link->dp_intf;

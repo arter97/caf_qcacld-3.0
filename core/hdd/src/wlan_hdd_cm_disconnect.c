@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -165,6 +165,39 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 	hdd_place_marker(adapter, "DISCONNECTED", NULL);
 }
 
+/**
+ * hdd_reset_sta_keep_alive_interval() - Reset STA keep alive interval
+ * @link_info: Link info pointer.
+ * @hdd_ctx: HDD context pointer.
+ *
+ * Return: None.
+ */
+static void
+hdd_reset_sta_keep_alive_interval(struct wlan_hdd_link_info *link_info,
+				  struct hdd_context *hdd_ctx)
+{
+	enum QDF_OPMODE device_mode = link_info->adapter->device_mode;
+	uint32_t keep_alive_interval;
+
+	if (!link_info->adapter->keep_alive_interval)
+		return;
+
+	if (device_mode != QDF_STA_MODE) {
+		hdd_debug("Not supported for device mode %s = ",
+			  device_mode_to_string(device_mode));
+		return;
+	}
+
+	if (!wlan_vdev_mlme_get_is_mlo_link(hdd_ctx->psoc,
+					    link_info->vdev_id))
+		wlan_hdd_save_sta_keep_alive_interval(link_info->adapter, 0);
+
+	ucfg_mlme_get_sta_keep_alive_period(hdd_ctx->psoc,
+					    &keep_alive_interval);
+	hdd_vdev_send_sta_keep_alive_interval(link_info, hdd_ctx,
+					      keep_alive_interval);
+}
+
 void
 __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_info,
 					     struct wlan_objmgr_vdev *vdev,
@@ -250,6 +283,9 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 
 	ucfg_dp_nud_reset_tracking(vdev);
 	hdd_reset_limit_off_chan(adapter);
+
+	if (!is_link_switch)
+		hdd_reset_sta_keep_alive_interval(link_info, hdd_ctx);
 
 	hdd_cm_print_bss_info(sta_ctx);
 }

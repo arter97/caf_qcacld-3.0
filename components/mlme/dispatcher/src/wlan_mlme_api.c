@@ -1417,13 +1417,23 @@ bool wlan_mlme_get_epcs_capability(struct wlan_objmgr_psoc *psoc)
 void wlan_mlme_set_epcs_capability(struct wlan_objmgr_psoc *psoc, bool flag)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 
-	if (!mlme_obj)
+	if (!mlme_obj || !mac_ctx)
 		return;
 
 	mlme_debug("set mlme epcs capability from %d to %d",
 		   mlme_obj->cfg.sta.epcs_capability, flag);
 	mlme_obj->cfg.sta.epcs_capability = flag;
+	if (flag) {
+		mlme_obj->cfg.eht_caps.dot11_eht_cap.epcs_pri_access = 1;
+		mac_ctx->eht_cap_2g.epcs_pri_access = 1;
+		mac_ctx->eht_cap_5g.epcs_pri_access = 1;
+	} else {
+		mlme_obj->cfg.eht_caps.dot11_eht_cap.epcs_pri_access = 0;
+		mac_ctx->eht_cap_2g.epcs_pri_access = 0;
+		mac_ctx->eht_cap_5g.epcs_pri_access = 0;
+	}
 }
 
 bool wlan_mlme_get_eht_disable_punct_in_us_lpi(struct wlan_objmgr_psoc *psoc)
@@ -5271,7 +5281,8 @@ void wlan_mlme_update_sae_single_pmk(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	if (keymgmt & (1 << WLAN_CRYPTO_KEY_MGMT_SAE))
+	if (QDF_HAS_PARAM(keymgmt, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	    QDF_HAS_PARAM(keymgmt, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY))
 		is_sae_connection = true;
 
 	mlme_legacy_debug("SAE_SPMK: single_pmk_ap:%d, is_sae_connection:%d, pmk_len:%d",
@@ -8401,3 +8412,29 @@ wlan_mlme_is_hs_20_btm_offload_disabled(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+void wlan_mlme_set_keepalive_period(struct wlan_objmgr_vdev *vdev,
+				    uint16_t keep_alive_period)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return;
+	}
+
+	mlme_priv->keep_alive_period = keep_alive_period;
+}
+
+uint16_t wlan_mlme_get_keepalive_period(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return 0;
+	}
+
+	return mlme_priv->keep_alive_period;
+}

@@ -100,6 +100,18 @@ enum wmm_user_mode {
 
 };
 
+/**
+ * struct peer_mac_addresses -Peer MAC address info
+ * @mac: Provided peer MAC address
+ * @peer_mac: Peer MAC address
+ * @peer_mld: Peer MLD address
+ */
+struct peer_mac_addresses {
+	struct qdf_mac_addr mac;
+	struct qdf_mac_addr peer_mac;
+	struct qdf_mac_addr peer_mld;
+};
+
 struct pwr_channel_info {
 	uint32_t first_freq;
 	uint8_t num_chan;
@@ -827,7 +839,7 @@ struct enhance_roam_info {
  *				operation on bss color collision detection
  * @bss_color_change_runtime_lock: runtime lock to complete bss color change
  * @disconnect_runtime_lock: runtime lock to complete disconnection
- * @best_6g_power_type: best 6g power type
+ * @keep_alive_period: KEEPALIVE period in seconds
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -900,6 +912,7 @@ struct mlme_legacy_priv {
 	qdf_runtime_lock_t bss_color_change_runtime_lock;
 	qdf_runtime_lock_t disconnect_runtime_lock;
 	enum reg_6g_ap_type best_6g_power_type;
+	uint16_t keep_alive_period;
 };
 
 /**
@@ -2006,4 +2019,18 @@ uint8_t wlan_mlme_get_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS wlan_mlme_set_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev,
 					   uint8_t psd_power);
+
+/**
+ * wlan_find_peer_and_get_mac_and_mld_addr() - This API find peer from the peer
+ * list and cache peer MAC and MLD address in the peer_mac_info.
+ * @psoc: PSOC object
+ * @peer_mac_info: Peer MAC address info
+ *
+ * Return: None
+ */
+QDF_STATUS
+wlan_find_peer_and_get_mac_and_mld_addr(
+				struct wlan_objmgr_psoc *psoc,
+				struct peer_mac_addresses *peer_mac_info);
+
 #endif

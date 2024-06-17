@@ -3490,7 +3490,8 @@ static void cm_fill_stop_reason(struct wlan_roam_stop_config *stop_req,
 {
 	if (reason == REASON_ROAM_SYNCH_FAILED)
 		stop_req->reason = REASON_ROAM_SYNCH_FAILED;
-	else if (reason == REASON_DRIVER_DISABLED)
+	else if (reason == REASON_DRIVER_DISABLED ||
+		 reason == REASON_VDEV_RESTART_FROM_HOST)
 		stop_req->reason = REASON_ROAM_STOP_ALL;
 	else if (reason == REASON_SUPPLICANT_DISABLED_ROAMING)
 		stop_req->reason = REASON_SUPPLICANT_DISABLED_ROAMING;
@@ -4340,13 +4341,13 @@ cm_roam_switch_to_init(struct wlan_objmgr_pdev *pdev,
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_NB_ID);
 	if (!vdev) {
-		mlme_err("CM_RSO: vdev is null");
+		mlme_err("CM_RSO: vdev:%d is null", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (cm_is_vdev_disconnecting(vdev) ||
-	    cm_is_vdev_disconnected(vdev)) {
-		mlme_debug("CM_RSO: RSO Init received in disconnected state");
+	if (!cm_is_vdev_connected(vdev)) {
+		mlme_debug("CM_RSO: vdev:%d RSO Init received in non-connected state",
+			   vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -4894,6 +4895,21 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 				   requested_state, *vdev_id);
 			*is_rso_skip = true;
 		}
+	}
+
+	/*
+	 * Send RSO STOP before triggering a vdev restart on an MLO vdev
+	 * Send RSO START after CSA is completed on an MLO vdev
+	 */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    mlo_check_if_all_vdev_up(vdev) &&
+	    reason == REASON_VDEV_RESTART_FROM_HOST) {
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+
+		*is_rso_skip = false;
+		*vdev_id = wlan_vdev_get_id(assoc_vdev);
+		mlme_debug("MLO_CSA: Send RSO on assoc vdev %d", *vdev_id);
+		goto end;
 	}
 
 	if (!wlan_vdev_mlme_get_is_mlo_link(wlan_pdev_get_psoc(pdev),
@@ -5609,7 +5625,8 @@ cm_store_sae_single_pmk_to_global_cache(struct wlan_objmgr_psoc *psoc,
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
 				   IS_SINGLE_PMK, &src_cfg);
 	if (!src_cfg.bool_value ||
-	    !QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
+	    !(QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	      QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY)))
 		return;
 	/*
 	 * Mark the AP as single PMK capable in Crypto Table

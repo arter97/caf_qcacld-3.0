@@ -50,6 +50,7 @@
 #include "wlan_reg_ucfg_api.h"
 #include "qdf_func_tracker.h"
 #include "wlan_cm_roam_ucfg_api.h"
+#include "wlan_tdls_api.h"
 
 #if defined(LINUX_QCMBR)
 #define SIOCIOCTLTX99 (SIOCDEVPRIVATE+13)
@@ -6062,6 +6063,13 @@ int hdd_set_antenna_mode(struct wlan_hdd_link_info *link_info, int mode)
 		.priv_size = 0,
 		.timeout_ms = SME_POLICY_MGR_CMD_TIMEOUT,
 	};
+
+	if (QDF_STATUS_SUCCESS ==
+	    wlan_is_tdls_session_present(link_info->vdev)) {
+		hdd_debug("TDLS session exists");
+		ret = -EINVAL;
+		goto exit;
+	}
 
 	switch (mode) {
 	case HDD_ANTENNA_MODE_1X1:

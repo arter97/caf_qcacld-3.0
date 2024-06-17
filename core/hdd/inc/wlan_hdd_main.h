@@ -1296,6 +1296,7 @@ struct wlan_hdd_tx_power {
  * @tx_power: Structure to hold connection tx Power info
  * @tx_latency_cfg: configuration for per-link transmit latency statistics
  * @link_state_cached_timestamp: link state cached timestamp
+ * @keep_alive_interval: user configured STA keep alive interval
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1493,6 +1494,7 @@ struct hdd_adapter {
 #ifdef WLAN_FEATURE_11BE_MLO
 	qdf_time_t link_state_cached_timestamp;
 #endif
+	uint16_t keep_alive_interval;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -5101,6 +5103,7 @@ bool wlan_hdd_is_session_type_monitor(uint8_t session_type);
  * @name: name of the interface
  * @rtnl_held: True if RTNL lock is held
  * @name_assign_type: the name of assign type of the netdev
+ * @is_rx_mon: if monitor mode is getting enabled
  *
  * Return: 0 - on success
  *         err code - on failure
@@ -5108,7 +5111,8 @@ bool wlan_hdd_is_session_type_monitor(uint8_t session_type);
 int wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 			       struct hdd_adapter **adapter,
 			       const char *name, bool rtnl_held,
-			       unsigned char name_assign_type);
+			       unsigned char name_assign_type,
+			       bool is_rx_mon);
 
 #ifdef CONFIG_WLAN_DEBUG_CRASH_INJECT
 /**
@@ -5396,6 +5400,12 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
  */
 struct wlan_hdd_link_info *
 hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id);
+#else
+static inline struct wlan_hdd_link_info *
+hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id)
+{
+	return NULL;
+}
 #endif
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
@@ -5560,4 +5570,13 @@ hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
 }
 #endif
 
+/**
+ * hdd_allow_new_intf() - Allow new intf created or not
+ * @hdd_ctx: hdd context
+ * @mode: qdf opmode of new interface
+ *
+ * Return: true if allowed, otherwise false
+ */
+bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
+			enum QDF_OPMODE mode);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

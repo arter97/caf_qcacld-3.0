@@ -1647,7 +1647,7 @@ bool wma_objmgr_peer_exist(tp_wma_handle wma,
 	return true;
 }
 
-#ifdef WLAN_FEATURE_PEER_TRANS_HIST
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 void wma_peer_tbl_trans_add_entry(struct wlan_objmgr_peer *peer, bool is_create,
 				  struct cdp_peer_setup_info *peer_info)
 {
@@ -5348,7 +5348,7 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 				  WMA_VHT_PPS_DELIM_CRC_FAIL, 1);
 	if (wmi_service_enabled(wma->wmi_handle,
 				wmi_service_listen_interval_offload_support)) {
-		struct wlan_objmgr_vdev *vdev;
+		struct wlan_objmgr_vdev *vdev = NULL;
 		uint32_t moddtim;
 		bool is_connection_roaming_cfg_set = 0;
 
@@ -5386,10 +5386,16 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			wma_debug("failed to send wmi_vdev_param_dyndtim_cnt");
 			goto out;
 		}
+
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
 							params->smesessionId,
 							WLAN_LEGACY_WMA_ID);
-		if (!vdev || !ucfg_pmo_get_moddtim_user_enable(vdev)) {
+		if (!vdev) {
+			wma_debug("Invalid vdev");
+			goto out;
+		}
+
+		if (!ucfg_pmo_get_moddtim_user_enable(vdev)) {
 			moddtim = wma->staModDtim;
 			status = mlme_check_index_setparam(
 						setparam,
@@ -5398,15 +5404,9 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 						MAX_VDEV_STA_REQ_PARAMS);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				wma_debug("failed to send wmi_vdev_param_moddtim_cnt");
-				if (vdev)
-					wlan_objmgr_vdev_release_ref(vdev,
-							WLAN_LEGACY_WMA_ID);
-				goto out;
+				goto rel_ref;
 			}
-			if (vdev)
-				wlan_objmgr_vdev_release_ref(vdev,
-							    WLAN_LEGACY_WMA_ID);
-		} else if (vdev && ucfg_pmo_get_moddtim_user_enable(vdev) &&
+		} else if (ucfg_pmo_get_moddtim_user_enable(vdev) &&
 			   !ucfg_pmo_get_moddtim_user_active(vdev)) {
 			moddtim = ucfg_pmo_get_moddtim_user(vdev);
 			status = mlme_check_index_setparam(
@@ -5416,19 +5416,18 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 						MAX_VDEV_STA_REQ_PARAMS);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				wma_debug("failed to send wmi_vdev_param_moddtim_cnt");
-				wlan_objmgr_vdev_release_ref(vdev,
-							WLAN_LEGACY_WMA_ID);
-				goto out;
+				goto rel_ref;
 			}
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 		}
 		status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
 							params->smesessionId,
 							setparam, index);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			wma_err("failed to send DTIM vdev setparams");
-			goto out;
 		}
+rel_ref:
+		if (vdev)
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 
 	} else {
 		wma_debug("listen interval offload is not set");

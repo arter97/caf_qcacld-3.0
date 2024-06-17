@@ -367,6 +367,30 @@ QDF_STATUS
 policy_mgr_get_dfs_sta_sap_go_scc_movement(struct wlan_objmgr_psoc *psoc,
 					   bool *move_sap_go_first);
 
+ /**
+  * policy_mgr_nss_update_cb() - callback from SME confirming nss
+  * update
+  * @psoc: psoc handle
+  * @tx_status: tx completion status for updated beacon with new
+  *              nss value
+  * @vdev_id: vdev id for the specific connection
+  * @next_action: next action to happen at policy mgr after
+  *              beacon update
+  * @reason: Reason for nss update
+  * @original_vdev_id: original request hwmode change vdev id
+  * @request_id: request ID
+  *
+  * This function is the callback registered with SME at nss
+  * update request time
+  *
+  * Return: None
+  */
+
+void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
+			      uint8_t tx_status, uint8_t vdev_id,
+			      uint8_t next_action,
+			      enum policy_mgr_conn_update_reason reason,
+			      uint32_t original_vdev_id, uint32_t request_id);
 /*
  * policy_mgr_get_connected_vdev_band_mask() - to get the connected vdev band
  * mask
@@ -2197,6 +2221,7 @@ struct policy_mgr_sme_cbacks {
  *  based on target channel frequency and concurrent connections.
  * @wlan_get_sap_acs_band: get acs band from sap config
  * @wlan_check_cc_intf_cb: get interference frequency of input SAP/GO interface
+ * @wlan_set_tx_rx_nss_cb: set NSS dynamically for STA
  */
 struct policy_mgr_hdd_cbacks {
 	QDF_STATUS (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
@@ -2228,6 +2253,9 @@ struct policy_mgr_hdd_cbacks {
 	QDF_STATUS (*wlan_check_cc_intf_cb)(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint32_t *ch_freq);
+	QDF_STATUS (*wlan_set_tx_rx_nss_cb)(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id, uint8_t tx_nss,
+					    uint8_t rx_nss);
 };
 
 /**
@@ -5152,12 +5180,28 @@ policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id);
 
 /**
+ * policy_mgr_clear_ml_links_settings_in_fw_nlink() - Process
+ * QCA_WLAN_VENDOR_ATTR_LINK_STATE_CONTROL_MODE in default mode
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev_id
+ *
+ * This API is used if nlink service is enabled.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_clear_ml_links_settings_in_fw_nlink(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id);
+
+/**
  * policy_mgr_activate_mlo_links_nlink() - Force active ML links based on user
  * requested link mac address with link bitmap
  * @psoc: objmgr psoc
  * @session_id: session id
  * @num_links: number of links to be forced active
  * @active_link_addr: link mac address of links to be forced active
+ *
+ * This API is used if nlink service is enabled.
  *
  * Return: void
  */
@@ -5198,6 +5242,28 @@ policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 					    uint32_t *config_state_list);
 
 /**
+ * policy_mgr_update_mlo_links_based_on_linkid_nlink() -
+ * Force active ML links based
+ * on user requested coming via QCA_NL80211_VENDOR_SUBCMD_MLO_LINK_STATE
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev id
+ * @num_links: number of links to be forced active
+ * @link_id_list: link id(s) list coming from user space
+ * @config_state_list: config state list coming from user space
+ *
+ * This API is used if nlink service is enabled.
+ *
+ * Return: success if the command gets processed successfully
+ */
+QDF_STATUS
+policy_mgr_update_mlo_links_based_on_linkid_nlink(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					uint8_t num_links,
+					uint8_t *link_id_list,
+					uint32_t *config_state_list);
+
+/**
  * policy_mgr_update_active_mlo_num_links() - Force active ML links based
  * on user requested coming via LINK_STATE_MIXED_MODE_ACTIVE_NUM_LINKS
  * @psoc: objmgr psoc
@@ -5209,6 +5275,22 @@ policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
 						  uint8_t vdev_id,
 						  uint8_t num_links);
+/**
+ * policy_mgr_update_active_mlo_num_nlink() - Force active ML links based
+ * on user requested coming via LINK_STATE_MIXED_MODE_ACTIVE_NUM_LINKS
+ * @psoc: objmgr psoc
+ * @vdev_id: vdev id
+ * @force_active_cnt: number of links to be forced active
+ *
+ * This API is used if nlink service is enabled.
+ *
+ * Return: success if the command gets processed successfully
+ */
+QDF_STATUS
+policy_mgr_update_active_mlo_num_nlink(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id,
+				       uint8_t force_active_cnt);
+
 #else
 static inline bool
 policy_mgr_vdev_is_force_inactive(struct wlan_objmgr_psoc *psoc,

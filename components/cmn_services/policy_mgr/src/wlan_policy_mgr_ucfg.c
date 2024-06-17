@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -21,6 +21,7 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_nan_api.h"
+#include "wlan_mlo_link_force.h"
 
 #ifdef WLAN_FEATURE_SR
 /**
@@ -379,3 +380,70 @@ QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 	return policy_mgr_get_dbs_hw_modes(psoc, one_by_one_dbs,
 					   two_by_two_dbs);
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS
+ucfg_policy_mgr_clear_ml_links_settings_in_fw(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id)
+{
+	QDF_STATUS status;
+
+	if (ml_is_nlink_service_supported(psoc))
+		status =
+		policy_mgr_clear_ml_links_settings_in_fw_nlink(
+							psoc,
+							vdev_id);
+	else
+		status =
+		policy_mgr_clear_ml_links_settings_in_fw(psoc,
+							 vdev_id);
+
+	return status;
+}
+
+QDF_STATUS
+ucfg_policy_mgr_update_active_mlo_num_links(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    uint8_t force_active_cnt)
+{
+	QDF_STATUS status;
+
+	if (ml_is_nlink_service_supported(psoc))
+		status =
+		policy_mgr_update_active_mlo_num_nlink(psoc,
+						       vdev_id,
+						       force_active_cnt);
+	else
+		status =
+		policy_mgr_update_active_mlo_num_links(psoc,
+						       vdev_id,
+						       force_active_cnt);
+	return status;
+}
+
+QDF_STATUS
+ucfg_policy_mgr_update_mlo_links_based_on_linkid(struct wlan_objmgr_psoc *psoc,
+						 uint8_t vdev_id,
+						 uint8_t num_links,
+						 uint8_t *link_id_list,
+						 uint32_t *config_state_list)
+{
+	QDF_STATUS status;
+
+	if (ml_is_nlink_service_supported(psoc))
+		status =
+		policy_mgr_update_mlo_links_based_on_linkid_nlink(
+						psoc,
+						vdev_id, num_links,
+						link_id_list,
+						config_state_list);
+	else
+		status = policy_mgr_update_mlo_links_based_on_linkid(
+						psoc,
+						vdev_id, num_links,
+						link_id_list,
+						config_state_list);
+
+	return status;
+}
+#endif

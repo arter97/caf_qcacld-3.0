@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -284,7 +284,8 @@ void pre_cac_get_vdev_id(struct wlan_objmgr_psoc *psoc,
 
 int pre_cac_validate_and_get_freq(struct wlan_objmgr_pdev *pdev,
 				  uint32_t chan_freq,
-				  uint32_t *pre_cac_chan_freq)
+				  uint32_t *pre_cac_chan_freq,
+				  enum phy_ch_width cac_ch_width)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	uint32_t len = CFG_VALID_CHANNEL_LIST_LEN;
@@ -293,6 +294,8 @@ int pre_cac_validate_and_get_freq(struct wlan_objmgr_pdev *pdev,
 	uint32_t weight_len = 0;
 	QDF_STATUS status;
 	uint32_t i;
+	bool is_ch_dfs = false;
+	struct ch_params ch_params;
 
 	pre_cac_stop(psoc);
 
@@ -320,12 +323,32 @@ int pre_cac_validate_and_get_freq(struct wlan_objmgr_pdev *pdev,
 							 freq_list, &len,
 							 pcl_weights,
 							 weight_len);
+try_next_bw:
 		for (i = 0; i < len; i++) {
-			if (wlan_reg_is_dfs_for_freq(pdev,
-						     freq_list[i])) {
+			is_ch_dfs = false;
+			qdf_mem_zero(&ch_params, sizeof(ch_params));
+			ch_params.ch_width = cac_ch_width;
+			wlan_reg_set_create_punc_bitmap(&ch_params, true);
+			if (wlan_reg_is_5ghz_ch_freq(freq_list[i]) &&
+			    wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+					pdev, freq_list[i], &ch_params,
+				REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS)
+				is_ch_dfs = true;
+
+			if (is_ch_dfs) {
 				*pre_cac_chan_freq = freq_list[i];
 				break;
 			}
+		}
+
+		if (*pre_cac_chan_freq == 0 &&
+		    cac_ch_width != CH_WIDTH_20MHZ &&
+		    wlan_get_next_lower_bandwidth(cac_ch_width)
+						!= CH_WIDTH_INVALID) {
+			cac_ch_width =
+				wlan_get_next_lower_bandwidth(cac_ch_width);
+			pre_cac_debug("try next bw %d", cac_ch_width);
+			goto try_next_bw;
 		}
 
 		if (*pre_cac_chan_freq == 0) {
@@ -333,20 +356,31 @@ int pre_cac_validate_and_get_freq(struct wlan_objmgr_pdev *pdev,
 			return -EINVAL;
 		}
 	} else {
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = cac_ch_width;
+		wlan_reg_set_create_punc_bitmap(&ch_params, true);
+		if (wlan_reg_is_5ghz_ch_freq(chan_freq) &&
+		    wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+				pdev, chan_freq, &ch_params,
+				REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS)
+			is_ch_dfs = true;
+
 		/* Only when driver selects a channel, check is done for
 		 * unnsafe and NOL channels. When user provides a fixed channel
 		 * the user is expected to take care of this.
 		 */
 		if (!wlan_mlme_is_channel_valid(psoc, chan_freq) ||
-		    !wlan_reg_is_dfs_for_freq(pdev, chan_freq)) {
-			pre_cac_err("Invalid channel for pre cac:%d",
-				    chan_freq);
+		    !is_ch_dfs) {
+			pre_cac_err("Invalid channel for pre cac:%d dfs %d",
+				    chan_freq, is_ch_dfs);
 			return -EINVAL;
 		}
 		*pre_cac_chan_freq = chan_freq;
 	}
 
-	pre_cac_debug("selected pre cac channel:%d", *pre_cac_chan_freq);
+	pre_cac_debug("selected pre cac channel:%d bw %d", *pre_cac_chan_freq,
+		      cac_ch_width);
+
 	return 0;
 }
 
