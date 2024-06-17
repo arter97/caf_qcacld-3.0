@@ -2609,7 +2609,7 @@ static int find_link_vaps(struct interface_list *if_list, uint8_t inx,
 				if (build_child_sta_list(ifname, link_id,
 							 *curr_obj))
 					ret = -EIO;
-					break;
+				break;
 			}
 		}
 	}
