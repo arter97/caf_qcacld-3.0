@@ -1453,9 +1453,13 @@ int __wlan_hdd_validate_context(struct hdd_context *hdd_ctx, const char *func)
 		return -EAGAIN;
 	}
 
-	if (cds_is_load_or_unload_in_progress()) {
-		hdd_debug("Load/unload in progress (via %s); state:0x%x",
-			  func, cds_get_driver_state());
+	if (cds_is_driver_unloading()) {
+		hdd_err("Driver unload is in progress (via %s)", func);
+		return -ENODEV;
+	}
+
+	if (cds_is_driver_loading()) {
+		hdd_err("Driver load is in progress (via %s)", func);
 		return -EAGAIN;
 	}
 
