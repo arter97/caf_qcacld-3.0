@@ -21,6 +21,7 @@ _target_chipset_map = {
     ],
     "volcano": [
         "qca6750",
+	"peach-v2",
     ],
     "parrot": [
         "qca6750",
