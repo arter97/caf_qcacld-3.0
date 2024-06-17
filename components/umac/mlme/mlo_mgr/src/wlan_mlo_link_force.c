@@ -2179,8 +2179,7 @@ static bool ml_nlink_sta_inactivity_allowed_with_quiet(
 	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
 
 	ml_nlink_get_link_info(psoc, vdev, (NLINK_EXCLUDE_REMOVED_LINK |
-					    NLINK_EXCLUDE_QUIET_LINK |
-					    NLINK_EXCLUDE_STANDBY_LINK),
+					    NLINK_EXCLUDE_QUIET_LINK),
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
 			       ml_link_info, ml_freq_lst, ml_vdev_lst,
 			       ml_linkid_lst, &ml_num_link,
