@@ -268,6 +268,33 @@
 
 /*
  * <ini>
+ * Aggressive_RoamScan_StepRSSI - Aggressive Roam scan step RSSI
+ * @Min: 0
+ * @Max: 20
+ * @Default: 5
+ *
+ * This INI is the drop in RSSI value that will trigger a precautionary
+ * scan by firmware. Max value is chosen in such a way that this type
+ * of scan can be disabled by user in aggressive mode.
+ *
+ * Related: Roaming
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: Internal
+ *
+ * <\ini>
+ */
+#define CFG_ROAM_AGGRESSIVE_SCAN_STEP_RSSI CFG_INI_UINT( \
+			"Aggressive_RoamScan_StepRSSI", \
+			0, \
+			20, \
+			5, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Aggressive Roam scan step RSSI")
+
+/*
+ * <ini>
  * enable_scoring_for_roam - enable/disable scoring logic in FW for candidate
  *
  * <ini>
@@ -475,6 +502,7 @@
 	CFG(CFG_2G_TO_5G_ROAM_MIN_RSSI) \
 	CFG(CFG_ROAM_TRIGGER_SCORE_DELTA) \
 	CFG(CFG_AGGRESSIVE_ROAM_SCORE_DELTA) \
-	CFG(CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA)
+	CFG(CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA) \
+	CFG(CFG_ROAM_AGGRESSIVE_SCAN_STEP_RSSI)
 
 #endif /* __CFG_MLME_ROAM_SCORING_H */

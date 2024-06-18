@@ -884,6 +884,24 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 	case ROAM_CONFIG_ENABLE:
 		dst_config->bool_value = rso_cfg->roam_control_enable;
 		break;
+	case IS_ROAM_AGGRESSIVE:
+		dst_config->bool_value = rso_cfg->is_aggressive_roaming_mode;
+		break;
+	case ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA:
+		dst_config->uint_value =
+			mlme_obj->cfg.roam_scoring.aggre_min_roam_score_delta;
+		break;
+	case ROAM_AGGRESSIVE_SCORE_DELTA:
+		dst_config->uint_value =
+			mlme_obj->cfg.roam_scoring.roam_aggre_score_delta;
+		break;
+	case ROAM_AGGRESSIVE_SCAN_STEP_RSSI:
+		dst_config->int_value =
+				mlme_obj->cfg.lfr.roam_aggre_scan_step_rssi;
+		break;
+	case ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD:
+		dst_config->uint_value = mlme_obj->cfg.lfr.roam_aggre_threshold;
+		break;
 	default:
 		mlme_err("Invalid roam config requested:%d", roam_cfg_type);
 		status = QDF_STATUS_E_FAILURE;
@@ -1375,6 +1393,21 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		break;
 	case IS_ROAM_AGGRESSIVE:
 		rso_cfg->is_aggressive_roaming_mode = src_config->bool_value;
+		break;
+	case ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA:
+		mlme_obj->cfg.roam_scoring.aggre_min_roam_score_delta =
+							src_config->uint_value;
+		break;
+	case ROAM_AGGRESSIVE_SCORE_DELTA:
+		mlme_obj->cfg.roam_scoring.roam_aggre_score_delta =
+							src_config->uint_value;
+		break;
+	case ROAM_AGGRESSIVE_SCAN_STEP_RSSI:
+		mlme_obj->cfg.lfr.roam_aggre_scan_step_rssi =
+							src_config->int_value;
+		break;
+	case ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD:
+		mlme_obj->cfg.lfr.roam_aggre_threshold = src_config->uint_value;
 		break;
 	case ROAM_PREFERRED_CHAN:
 		/*

@@ -2125,6 +2125,8 @@ struct fw_scan_channels {
  * roam invoke fail on nud.
  * @hs20_btm_offload_disable: indicate whether btm offload is enable/disable
  * for Hotspot 2.0
+ * @roam_aggre_scan_step_rssi: Roam scan step RSSI in aggressive mode
+ * @roam_aggre_threshold: Roam threshold in aggressive mode
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2254,6 +2256,8 @@ struct wlan_mlme_lfr_cfg {
 	uint8_t roam_full_scan_6ghz_on_disc;
 	bool disconnect_on_nud_roam_invoke_fail;
 	bool hs20_btm_offload_disable;
+	uint32_t roam_aggre_scan_step_rssi;
+	uint32_t roam_aggre_threshold;
 };
 
 /**
@@ -2466,6 +2470,10 @@ struct wlan_mlme_rssi_cfg_score  {
  * @apsd_enabled: Enable automatic power save delivery
  * @min_roam_score_delta: Minimum difference between connected AP's and
  *			candidate AP's roam score to start roaming.
+ * @aggre_min_roam_score_delta: Minimum difference between connected AP's and
+ *			candidate AP's roam score to start roaming in Aggressive
+ *			roaming mode.
+ * @roam_aggre_score_delta: percentage delta in roam score in Aggressive mode
  */
 struct wlan_mlme_roam_scoring_cfg {
 	bool enable_scoring_for_roam;
@@ -2473,6 +2481,8 @@ struct wlan_mlme_roam_scoring_cfg {
 	uint32_t roam_score_delta;
 	bool apsd_enabled;
 	uint32_t min_roam_score_delta;
+	uint32_t aggre_min_roam_score_delta;
+	uint32_t roam_aggre_score_delta;
 };
 
 /* struct wlan_mlme_threshold - Threshold related config items
