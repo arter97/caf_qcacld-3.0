@@ -562,7 +562,7 @@ bool osif_dp_cfg80211_rx_control_port(qdf_netdev_t dev, u8 *ta_addr,
 				      qdf_nbuf_t nbuf, bool unencrypted)
 {
 	return cfg80211_rx_control_port((struct net_device *)dev,
-					ta_addr, (struct sk_buff *)nbuf,
+					(struct sk_buff *)nbuf,
 					unencrypted);
 }
 #endif

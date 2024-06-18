@@ -1037,7 +1037,8 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	    hdd_ctx->target_type == TARGET_TYPE_MANGO ||
 	    hdd_ctx->target_type == TARGET_TYPE_PEACH ||
 	    hdd_ctx->target_type == TARGET_TYPE_WCN6450 ||
-	    hdd_ctx->target_type == TARGET_TYPE_WCN7750) {
+	    hdd_ctx->target_type == TARGET_TYPE_WCN7750 ||
+	    hdd_ctx->target_type == TARGET_TYPE_QCC2072) {
 		qdf_status = cdp_pdev_init(cds_get_context(QDF_MODULE_ID_SOC),
 					   gp_cds_context->htc_ctx,
 					   gp_cds_context->qdf_ctx, 0);
