@@ -1307,6 +1307,7 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   struct cm_roam_values_copy *src_config)
 {
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct rso_config *rso_cfg;
 	struct rso_cfg_params *dst_cfg;
@@ -1322,6 +1323,12 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (!vdev) {
 		mlme_err("vdev object is NULL");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return QDF_STATUS_E_INVAL;
 	}
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
@@ -1393,6 +1400,13 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		break;
 	case IS_ROAM_AGGRESSIVE:
 		rso_cfg->is_aggressive_roaming_mode = src_config->bool_value;
+		if (rso_cfg->roam_control_enable)
+			break;
+		if (mlme_obj->cfg.lfr.roam_scan_offload_enabled &&
+		    cm_is_vdevid_active(pdev, vdev_id) &&
+		    rso_cfg->is_aggressive_roaming_mode)
+			cm_roam_update_cfg(psoc, vdev_id,
+					   REASON_AGGRESSIVE_ROAM_ENABLED);
 		break;
 	case ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA:
 		mlme_obj->cfg.roam_scoring.aggre_min_roam_score_delta =

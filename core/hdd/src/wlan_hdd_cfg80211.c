@@ -19656,6 +19656,13 @@ static int wlan_hdd_cfg80211_set_fast_roaming(struct hdd_context *hdd_ctx,
 	bool roaming_enabled;
 	int ret;
 
+	qdf_status =
+		sme_set_aggressive_roaming(hdd_ctx->mac_handle,
+					   adapter->deflink->vdev_id, false);
+
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status_to_os_return(qdf_status);
+
 	/*
 	 * Get current roaming state and decide whether to wait for RSO_STOP
 	 * response or not.

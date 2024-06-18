@@ -2257,7 +2257,7 @@ struct wlan_mlme_lfr_cfg {
 	bool disconnect_on_nud_roam_invoke_fail;
 	bool hs20_btm_offload_disable;
 	uint32_t roam_aggre_scan_step_rssi;
-	uint32_t roam_aggre_threshold;
+	uint8_t roam_aggre_threshold;
 };
 
 /**

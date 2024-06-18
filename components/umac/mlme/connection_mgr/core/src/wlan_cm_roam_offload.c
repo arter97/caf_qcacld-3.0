@@ -124,11 +124,36 @@ cm_roam_fill_rssi_change_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				struct wlan_roam_rssi_change_params *params)
 {
 	struct cm_roam_values_copy temp;
+	struct wlan_objmgr_vdev *vdev;
+	struct rso_config *rso_cfg;
+	enum roam_cfg_param reason;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		mlme_err("rso_cfg is NULL");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	params->vdev_id = vdev_id;
+
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable)
+		reason = ROAM_AGGRESSIVE_SCAN_STEP_RSSI;
+	else
+		reason = RSSI_CHANGE_THRESHOLD;
+
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
-				   RSSI_CHANGE_THRESHOLD, &temp);
+				   reason, &temp);
 	params->rssi_change_thresh = temp.int_value;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
 				   BEACON_RSSI_WEIGHT, &temp);
@@ -1197,7 +1222,11 @@ cm_roam_scan_offload_rssi_thresh(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	lfr_cfg = &mlme_obj->cfg.lfr;
 
-	if (rso_config->alert_rssi_threshold) {
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable) {
+		params->rssi_thresh =
+			(int8_t)lfr_cfg->roam_aggre_threshold * (-1);
+	} else if (rso_config->alert_rssi_threshold) {
 		params->rssi_thresh = rso_config->alert_rssi_threshold;
 	} else {
 		mlme_debug("lookup_threshold:%d",
@@ -1562,8 +1591,6 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 	req_score_params->vendor_roam_score_algorithm =
 			score_config->vendor_roam_score_algorithm;
 
-	req_score_params->roam_score_delta =
-				roam_score_params->roam_score_delta;
 	req_score_params->roam_trigger_bitmap =
 				roam_score_params->roam_trigger_bitmap;
 
@@ -1575,8 +1602,19 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_copy(&req_score_params->oce_wan_scoring,
 		     &score_config->oce_wan_scoring,
 		     sizeof(struct per_slot_score));
-	req_score_params->cand_min_roam_score_delta =
+
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable) {
+		req_score_params->roam_score_delta =
+				roam_score_params->roam_aggre_score_delta;
+		req_score_params->cand_min_roam_score_delta =
+				roam_score_params->aggre_min_roam_score_delta;
+	} else {
+		req_score_params->roam_score_delta =
+				roam_score_params->roam_score_delta;
+		req_score_params->cand_min_roam_score_delta =
 					roam_score_params->min_roam_score_delta;
+	}
 }
 
 static uint32_t cm_crpto_cipher_wmi_cipher(int32_t cipherset)
@@ -5714,6 +5752,11 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 	}
 
 	cm_roam_control_restore_default_config(pdev, vdev_id);
+
+	/* Reset to non-aggressive mode */
+	src_config.bool_value = 0;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id, IS_ROAM_AGGRESSIVE,
+				   &src_config);
 }
 
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
@@ -5979,6 +6022,10 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	src_cfg.uint_value = mlme_obj->cfg.lfr.roam_rescan_rssi_diff;
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
 				   RSSI_CHANGE_THRESHOLD, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.lfr.roam_aggre_scan_step_rssi;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_AGGRESSIVE_SCAN_STEP_RSSI, &src_cfg);
 
 	src_cfg.uint_value = mlme_obj->cfg.lfr.roam_scan_hi_rssi_delay;
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
