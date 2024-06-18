@@ -10765,7 +10765,6 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 	}
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
-		adapter->monitor_mode_vdev_up_in_progress = true;
 		mon_ctx = WLAN_HDD_GET_MONITOR_CTX_PTR(link_info);
 
 		if (!mon_ctx->freq) {
@@ -10773,13 +10772,11 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 				hdd_debug("Del vdev %d", link_info->vdev_id);
 				wlan_hdd_delete_mon_link(adapter, link_info);
 			}
-			adapter->monitor_mode_vdev_up_in_progress = false;
 			return 0;
 		} else if (wlan_hdd_validate_vdev_id(link_info->vdev_id)) {
 			hdd_debug("Create mon vdev");
 			ret = hdd_vdev_create(link_info);
 			if (ret) {
-				adapter->monitor_mode_vdev_up_in_progress = false;
 				return ret;
 			}
 
@@ -10791,7 +10788,6 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 				hdd_debug("vdev %u freq %d bw %d already set",
 					  link_info->vdev_id, des_chan->ch_freq,
 					  des_chan->ch_width);
-				adapter->monitor_mode_vdev_up_in_progress = false;
 				continue;
 			}
 		}
@@ -10802,7 +10798,6 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 		if (ret) {
 			hdd_err("Invalid CH %d and BW %d combo",
 				mon_ctx->freq, mon_ctx->freq);
-			adapter->monitor_mode_vdev_up_in_progress = false;
 			return ret;
 		}
 
@@ -10812,7 +10807,6 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 		if (wlan_hdd_change_hw_mode_for_given_chnl(adapter, mon_ctx->freq,
 							   POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN)) {
 			hdd_err("Failed to change hw mode");
-			adapter->monitor_mode_vdev_up_in_progress = false;
 			return -EINVAL;
 		}
 
@@ -10820,9 +10814,10 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 		  qdf_event_reset(&adapter->qdf_monitor_mode_vdev_up_event);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err_rl("failed to reinit monitor vdev up event");
-			adapter->monitor_mode_vdev_up_in_progress = false;
 			return qdf_status_to_os_return(status);
 		}
+
+		adapter->monitor_mode_vdev_up_in_progress = true;
 
 		qdf_mem_zero(&ch_params, sizeof(struct ch_params));
 
