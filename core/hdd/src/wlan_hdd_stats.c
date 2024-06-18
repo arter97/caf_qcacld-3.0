@@ -9555,8 +9555,8 @@ void wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info)
 	status = wlan_hdd_get_per_peer_stats(link_info, peer_stats);
 	if (qdf_unlikely(QDF_IS_STATUS_ERROR(status)) ||
 	    qdf_unlikely(peer_stats->rx.last_rx_rate == 0)) {
-		hdd_debug("Driver failed to get rx rates, rx mcs=%d, status=%d",
-			  hdd_stats->class_a_stat.rx_mcs_index, status);
+		hdd_debug_rl("Failed to get rx rates, rx mcs=%d, status=%d",
+			     hdd_stats->class_a_stat.rx_mcs_index, status);
 		hdd_stats->class_a_stat.rx_preamble = INVALID_PREAMBLE;
 		if (hdd_stats->class_a_stat.rx_mcs_index == INVALID_MCS_IDX) {
 			hdd_stats->class_a_stat.rx_rate =
