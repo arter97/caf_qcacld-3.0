@@ -4437,6 +4437,8 @@ void wma_remove_bss_peer_on_failure(tp_wma_handle wma, uint8_t vdev_id)
 		return;
 	}
 
+	wma_delete_peer_mlo(wma->psoc, bss_peer.bytes);
+
 	wma_remove_peer(wma, bss_peer.bytes, vdev_id, false);
 }
 
