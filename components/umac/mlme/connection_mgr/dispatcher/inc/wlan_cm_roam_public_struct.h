@@ -2649,6 +2649,7 @@ struct roam_pmkid_req_event {
  * @send_roam_mlo_config: send MLO config to FW
  * @send_roam_scan_offload_rssi_params: Set the RSSI parameters for roam
  * offload scan
+ * @send_roam_idle_trigger: Send roam idle params to FW
  */
 struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_vdev_set_pcl_cmd)(struct wlan_objmgr_vdev *vdev,
@@ -2707,6 +2708,9 @@ struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_roam_mlo_config)(struct wlan_objmgr_vdev *vdev,
 					   struct wlan_roam_mlo_config *req);
 #endif
+	QDF_STATUS (*send_roam_idle_trigger)(wmi_unified_t wmi_handle,
+					     uint8_t command,
+					     struct wlan_roam_idle_params *req);
 };
 
 /**

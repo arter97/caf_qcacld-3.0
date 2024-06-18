@@ -866,7 +866,7 @@ target_if_cm_roam_disconnect_params(wmi_unified_t wmi_handle, uint8_t command,
  *
  * Return: void
  */
-static void
+static QDF_STATUS
 target_if_cm_roam_idle_params(wmi_unified_t wmi_handle, uint8_t command,
 			      struct wlan_roam_idle_params *req)
 {
@@ -894,6 +894,8 @@ target_if_cm_roam_idle_params(wmi_unified_t wmi_handle, uint8_t command,
 	status = wmi_unified_send_idle_roam_params(wmi_handle, req);
 	if (QDF_IS_STATUS_ERROR(status))
 		target_if_err("failed to send idle roam parameters");
+
+	return status;
 }
 #else
 static void
@@ -922,10 +924,11 @@ target_if_cm_roam_disconnect_params(wmi_unified_t wmi_handle, uint8_t command,
 {
 }
 
-static void
+static QDF_STATUS
 target_if_cm_roam_idle_params(wmi_unified_t wmi_handle, uint8_t command,
 			      struct wlan_roam_idle_params *req)
 {
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 
@@ -2305,6 +2308,7 @@ target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 	tx_ops->send_roam_triggers = target_if_cm_roam_triggers;
 	tx_ops->send_roam_disable_config =
 					target_if_cm_roam_send_disable_config;
+	tx_ops->send_roam_idle_trigger =  target_if_cm_roam_idle_params;
 	target_if_cm_roam_register_mlo_req_ops(tx_ops);
 }
 
