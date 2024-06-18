@@ -472,7 +472,7 @@ int wlan_hdd_qmi_put_suspend(void)
  *
  * Return: True if MLO connection, else False
  */
-static bool wlan_hdd_is_mlo_connection(struct wlan_hdd_link_info *link_info)
+bool wlan_hdd_is_mlo_connection(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool ret = false;

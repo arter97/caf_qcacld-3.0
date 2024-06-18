@@ -3033,7 +3033,7 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 	flush_work(&adapter->ipv4_notifier_work);
 	hdd_adapter_flush_ipv6_notifier_work(adapter);
 
-	if (hdd_adapter_is_ml_adapter(adapter)) {
+	if (wlan_hdd_is_mlo_connection(adapter->deflink)) {
 		status = wlan_hdd_set_mlo_ps(adapter, allow_power_save,
 					     timeout, -1);
 		goto exit;
