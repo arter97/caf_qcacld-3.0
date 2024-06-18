@@ -17129,6 +17129,28 @@ static inline void hdd_cal_fail_send_event(uint8_t cal_type, uint8_t reason)
 }
 #endif
 
+#ifdef IPA_WDI3_VLAN_SUPPORT
+/**
+ * hdd_dp_send_pdev_pkt_routing_vlan() - Initialize pdev pkt routing config to
+ *					 Target
+ * @hdd_ctx: hdd context pointer
+ *
+ * Return: None
+ */
+static void hdd_dp_send_pdev_pkt_routing_vlan(struct hdd_context *hdd_ctx)
+{
+	uint32_t mac_id;
+
+	for (mac_id = 0; mac_id < MAX_MAC; mac_id++)
+		ucfg_dp_send_pdev_pkt_routing_vlan(hdd_ctx->psoc, mac_id);
+}
+#else /* !IPA_WDI3_VLAN_SUPPORT */
+static inline void
+hdd_dp_send_pdev_pkt_routing_vlan(struct hdd_context *hdd_ctx)
+{
+}
+#endif /* IPA_WDI3_VLAN_SUPPORT */
+
 /**
  * hdd_features_init() - Init features
  * @hdd_ctx:	HDD context
@@ -17267,6 +17289,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	hdd_thermal_stats_cmd_init(hdd_ctx);
 	sme_set_cal_failure_event_cb(hdd_ctx->mac_handle,
 				     hdd_cal_fail_send_event);
+	hdd_dp_send_pdev_pkt_routing_vlan(hdd_ctx);
 
 	hdd_exit();
 	return 0;
