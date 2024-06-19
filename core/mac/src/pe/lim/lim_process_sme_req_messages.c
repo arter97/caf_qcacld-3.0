@@ -4601,6 +4601,10 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 				   req->assoc_ie.ptr, req->assoc_ie.len);
 
 	assoc_ie_len = req->assoc_ie.len;
+	/* update assoc ie to cm */
+	cm_update_session_assoc_ie(mac_ctx->psoc, session->vdev_id,
+				   &req->assoc_ie);
+
 	status = lim_fill_crypto_params(mac_ctx, session, req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Error in handling RSNXE");
@@ -4629,9 +4633,6 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 
 	qdf_mem_copy(pe_join_req->addIEAssoc.addIEdata,
 		     req->assoc_ie.ptr, req->assoc_ie.len);
-	/* update assoc ie to cm */
-	cm_update_session_assoc_ie(mac_ctx->psoc, session->vdev_id,
-				   &req->assoc_ie);
 	pe_join_req->addIEAssoc.length = req->assoc_ie.len;
 	qdf_mem_copy(pe_join_req->addIEScan.addIEdata,
 		     req->scan_ie.ptr, req->scan_ie.len);
@@ -5168,6 +5169,9 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	if (req->assoc_ie.len)
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   req->assoc_ie.ptr, req->assoc_ie.len);
+	/* update assoc ie to cm */
+	cm_update_session_assoc_ie(mac_ctx->psoc, vdev_id, &req->assoc_ie);
+
 	if (lim_is_rsn_profile(session_entry))
 		lim_fill_rsn_ie(mac_ctx, session_entry, req);
 	else if (lim_is_wpa_profile(session_entry))
@@ -5195,8 +5199,7 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	qdf_mem_copy(reassoc_req->addIEAssoc.addIEdata,
 		     req->assoc_ie.ptr, req->assoc_ie.len);
 	reassoc_req->addIEAssoc.length = req->assoc_ie.len;
-	/* update assoc ie to cm */
-	cm_update_session_assoc_ie(mac_ctx->psoc, vdev_id, &req->assoc_ie);
+
 	ucast_cipher = wlan_crypto_get_param(session_entry->vdev,
 					     WLAN_CRYPTO_PARAM_UCAST_CIPHER);
 	auth_mode = wlan_crypto_get_param(session_entry->vdev,
