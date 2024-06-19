@@ -791,9 +791,13 @@ static uint32_t sap_weight_channel_free(struct sap_context *sap_ctx,
 	if (!channel_stat || channel_stat->channel_freq == 0)
 		return softap_channel_free_weight_local;
 
-	rx_clear_count = channel_stat->rx_clear_count -
+	if (sap_ctx->acs_cfg->is_wifi_non_wifi_load_score_enabled) {
+		rx_clear_count = channel_stat->rx_clear_count;
+	} else {
+		rx_clear_count = channel_stat->rx_clear_count -
 			channel_stat->tx_frame_count -
 			channel_stat->bss_rx_cycle_count;
+	}
 	cycle_count = channel_stat->cycle_count;
 
 	/* LSH 4, otherwise it is always 0. */
