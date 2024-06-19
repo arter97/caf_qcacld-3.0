@@ -2648,34 +2648,8 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		reassoc_req_len = synch_event->reassoc_req_len;
 		reassoc_rsp_len = synch_event->reassoc_rsp_len;
 
-		if (synch_event->bcn_probe_rsp_len > WMI_SVC_MSG_MAX_SIZE) {
-			status = QDF_STATUS_E_FAILURE;
-			goto abort_roam;
-		}
-		if (synch_event->reassoc_rsp_len >
-			(WMI_SVC_MSG_MAX_SIZE - synch_event->bcn_probe_rsp_len)) {
-			status = QDF_STATUS_E_FAILURE;
-			goto abort_roam;
-		}
-		if (synch_event->reassoc_req_len >
-			WMI_SVC_MSG_MAX_SIZE - (synch_event->bcn_probe_rsp_len +
-			synch_event->reassoc_rsp_len)) {
-			status = QDF_STATUS_E_FAILURE;
-			goto abort_roam;
-		}
 		roam_synch_data_len = bcn_probe_rsp_len +
 			reassoc_rsp_len + reassoc_req_len;
-
-		/*
-		 * Below is the check for the entire size of the message
-		 * received from the firmware.
-		 */
-		if (roam_synch_data_len > WMI_SVC_MSG_MAX_SIZE -
-			(sizeof(*synch_event) + sizeof(wmi_channel) +
-			 sizeof(wmi_key_material) + sizeof(uint32_t))) {
-			status = QDF_STATUS_E_FAILURE;
-			goto abort_roam;
-		}
 		roam_synch_data_len += sizeof(struct roam_offload_synch_ind);
 	}
 
