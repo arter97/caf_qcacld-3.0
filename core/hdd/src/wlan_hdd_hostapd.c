@@ -3854,6 +3854,25 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 		return -EBUSY;
 	}
 
+	/*
+	 * Trigger acs followed by csa if csa reason is non dcs and current
+	 * vdev is ll sap.
+	 *
+	 */
+	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+					 wlan_vdev_get_id(sap_ctx->vdev)) &&
+	    sap_ctx->csa_reason != CSA_REASON_DCS &&
+	    sap_ctx->csa_reason != CSA_REASON_USER_INITIATED) {
+		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
+					    CSA_REASON_LL_LT_SAP_EVENT);
+		hdd_dcs_trigger_csa_for_ll_lt_sap(
+				hdd_ctx->psoc,
+				hdd_ctx,
+				wlan_vdev_get_id(sap_ctx->vdev),
+				LL_SAP_CSA_CONCURENCY);
+		return ret;
+	}
+
 	if (wlan_reg_is_6ghz_chan_freq(target_chan_freq) &&
 	    !wlan_reg_is_6ghz_band_set(hdd_ctx->pdev)) {
 		hdd_err("6 GHz band disabled");

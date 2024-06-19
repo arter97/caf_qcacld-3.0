@@ -2410,6 +2410,60 @@ static void hdd_update_acs_channel_list(struct sap_config *sap_config,
 	sap_config->acs_cfg.ch_list_count = temp_count;
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP
+static QDF_STATUS update_ll_lt_sap_channel_list(
+				struct wlan_objmgr_psoc *psoc,
+				struct sap_config *sap_config,
+				struct sap_context *sap_ctx)
+{
+	struct connection_info conn_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t count;
+	struct policy_mgr_pcl_list *pcl;
+	QDF_STATUS status;
+	int acs_list_count = sap_config->acs_cfg.ch_list_count;
+
+	if (!sap_config->acs_cfg.master_freq_list)
+		return QDF_STATUS_E_FAILURE;
+
+	/* get the master channel list */
+	qdf_mem_copy(sap_config->acs_cfg.freq_list,
+		     sap_config->acs_cfg.master_freq_list,
+		     sizeof(qdf_freq_t) *
+		     sap_config->acs_cfg.master_ch_list_count);
+
+	sap_config->acs_cfg.ch_list_count =
+			sap_config->acs_cfg.master_ch_list_count;
+
+	pcl = qdf_mem_malloc(sizeof(*pcl));
+	if (!pcl)
+		return QDF_STATUS_E_NOMEM;
+	status = policy_mgr_get_pcl_ch_list_for_ll_sap(psoc, pcl,
+						       sap_ctx->vdev_id,
+						       conn_info,
+						       &count);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto end;
+
+	wlan_hdd_trim_acs_channel_list(pcl->pcl_list, pcl->pcl_len,
+				       sap_config->acs_cfg.freq_list,
+				       &sap_config->acs_cfg.ch_list_count);
+
+	if (acs_list_count != sap_config->acs_cfg.ch_list_count)
+		sap_dump_acs_channel(&sap_config->acs_cfg);
+end:
+	qdf_mem_free(pcl);
+
+	return status;
+}
+#else
+static inline QDF_STATUS
+update_ll_lt_sap_channel_list(struct wlan_objmgr_psoc *psoc,
+			      struct sap_config *sap_config,
+			      struct sap_context *sap_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 /**
  * wlan_hdd_cfg80211_start_acs : Start ACS Procedure for SAP
  * @link_info: Link info pointer in SAP HDD adapter
@@ -2495,6 +2549,13 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 			}
 		}
 	}
+
+	if (sap_ctx->fsm_state == SAP_STARTED &&
+	    policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+					 wlan_vdev_get_id(sap_ctx->vdev)))
+		update_ll_lt_sap_channel_list(hdd_ctx->psoc,
+					      sap_config, sap_ctx);
+
 	status = wlan_hdd_config_acs(hdd_ctx, adapter);
 	if (status) {
 		hdd_err("ACS config failed");

@@ -538,3 +538,12 @@ void wlan_ll_lt_store_to_avoid_list_and_flush_old(
 {
 	ll_lt_store_to_avoid_list_and_flush_old(psoc, freq, csa_src);
 }
+
+qdf_freq_t
+wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, qdf_freq_t curr_freq,
+				   enum ll_sap_csa_source csa_src)
+{
+	return ll_lt_sap_get_valid_freq(psoc, vdev_id, curr_freq, csa_src);
+}
+

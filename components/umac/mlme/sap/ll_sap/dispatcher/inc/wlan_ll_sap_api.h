@@ -287,6 +287,21 @@ void wlan_ll_lt_store_to_avoid_list_and_flush_old(
 					qdf_freq_t freq,
 					enum ll_sap_csa_source csa_src);
 
+/**
+ * wlan_ll_sap_get_valid_freq_for_csa() - API to get valid frequency for
+ * LL_LT_SAP
+ * @psoc: Pointer to psoc object
+ * @vdev_id: Vdev Id of ll_lt_sap
+ * @curr_freq: current frequency
+ * @csa_src: LL_SAP csa source
+ *
+ * Return: QDF_STATUS
+ */
+
+qdf_freq_t
+wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, qdf_freq_t curr_freq,
+				   enum ll_sap_csa_source csa_src);
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
@@ -433,6 +448,14 @@ static inline void
 wlan_ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
 					     qdf_freq_t freq,
 					     enum ll_sap_csa_source csa_src);
+
+static inline qdf_freq_t
+wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, qdf_freq_t curr_freq,
+				   enum ll_sap_csa_source csa_src)
+{
+	return 0;
+}
 
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 #endif /* _WLAN_LL_LT_SAP_API_H_ */

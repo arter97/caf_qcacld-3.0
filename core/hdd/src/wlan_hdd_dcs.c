@@ -312,9 +312,6 @@ hdd_dcs_continue_csa_for_ll_lt_sap_post_bearer_switch(
 						uint8_t vdev_id)
 {
 	struct wlan_hdd_link_info *link_info;
-	qdf_freq_t curr_freq;
-
-	curr_freq = policy_mgr_get_ll_lt_sap_freq(hdd_ctx->psoc);
 
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx,
 					      vdev_id);
@@ -324,8 +321,6 @@ hdd_dcs_continue_csa_for_ll_lt_sap_post_bearer_switch(
 		return;
 	}
 
-	wlan_ll_lt_store_to_avoid_list_and_flush_old(hdd_ctx->psoc, curr_freq,
-						     LL_SAP_CSA_DCS);
 	wlan_hdd_cfg80211_start_acs(link_info);
 }
 
@@ -362,6 +357,7 @@ hdd_ll_lt_sap_acs_start_bearer_switch_requester_cb(
  * @psoc: Psoc pointer
  * @hdd_ctx: hdd context
  * @vdev_id: vdev id of the requester
+ * @src: ll sap csa source
  * This function switches bearer to ble on acs start
  *
  * Return: QDF_STATUS
@@ -369,7 +365,8 @@ hdd_ll_lt_sap_acs_start_bearer_switch_requester_cb(
 static QDF_STATUS
 hdd_switch_bearer_to_ble_on_ll_lt_sap_acs_start(struct wlan_objmgr_psoc *psoc,
 						struct hdd_context *hdd_ctx,
-						uint8_t vdev_id)
+						uint8_t vdev_id,
+						enum ll_sap_csa_source src)
 {
 	struct wlan_bearer_switch_request bs_request = {0};
 	QDF_STATUS status = QDF_STATUS_E_ALREADY;
@@ -381,6 +378,8 @@ hdd_switch_bearer_to_ble_on_ll_lt_sap_acs_start(struct wlan_objmgr_psoc *psoc,
 		hdd_debug("ll_lt_sap is not resent");
 		return status;
 	}
+
+	wlan_ll_lt_store_to_avoid_list_and_flush_old(psoc, ll_lt_sap_freq, src);
 
 	bs_request.vdev_id = vdev_id;
 	bs_request.request_id = wlan_ll_lt_sap_bearer_switch_get_id(psoc);
@@ -407,27 +406,20 @@ hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
 static inline QDF_STATUS
 hdd_switch_bearer_to_ble_on_ll_lt_sap_acs_start(struct wlan_objmgr_psoc *psoc,
 						struct hdd_context *hdd_ctx,
-						uint8_t vdev_id)
+						uint8_t vdev_id,
+						enum ll_sap_csa_source src)
 {
 	return QDF_STATUS_E_ALREADY;
 }
 #endif /* WLAN_FEATURE_LL_LT_SAP */
 
-/**
- * hdd_dcs_trigger_csa_for_ll_lt_sap() - Trigger CSA for ll_sap
- * once dcs threshold reaches
- * @psoc: psoc object
- * @hdd_ctx: hdd_ctx
- * @vdev_id: vdev_id
- *
- * Return: None
- */
-static void
+void
 hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
 				  struct hdd_context *hdd_ctx,
-				  uint8_t vdev_id)
+				  uint8_t vdev_id, enum ll_sap_csa_source src)
 {
-	hdd_switch_bearer_to_ble_on_ll_lt_sap_acs_start(psoc, hdd_ctx, vdev_id);
+	hdd_switch_bearer_to_ble_on_ll_lt_sap_acs_start(psoc, hdd_ctx,
+							vdev_id, src);
 }
 
 /**
@@ -461,8 +453,8 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, struct dcs_param *param,
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, param->vdev_id))
 		return hdd_dcs_trigger_csa_for_ll_lt_sap(psoc, hdd_ctx,
-							 param->vdev_id);
-
+							 param->vdev_id,
+							 LL_SAP_CSA_DCS);
 	if (policy_mgr_is_force_scc(psoc) &&
 	    policy_mgr_is_sta_gc_active_on_mac(psoc, param->mac_id)) {
 		ucfg_config_dcs_event_data(psoc, param->mac_id, true);

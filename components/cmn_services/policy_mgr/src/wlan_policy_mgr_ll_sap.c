@@ -285,7 +285,7 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 							sap_info.vdev_id,
 							sap_info.freq,
 							is_ll_lt_sap_enabled);
-		csa_reason = CSA_REASON_CONCURRENT_LL_LT_SAP_EVENT;
+		csa_reason = CSA_REASON_LL_LT_SAP_EVENT;
 	} else {
 		restart_freq = wlan_get_ll_lt_sap_restart_freq(pm_ctx->pdev,
 							       sap_info.freq,

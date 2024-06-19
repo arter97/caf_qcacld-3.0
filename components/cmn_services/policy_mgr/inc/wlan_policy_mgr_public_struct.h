@@ -102,7 +102,7 @@ typedef int (*send_mode_change_event_cb)(void);
  * @CSA_REASON_GO_BSS_STARTED: P2P go started
  * @CSA_REASON_SAP_ACS: 2.4 GHz preferred SAP ACS starting
  * @CSA_REASON_SAP_FIX_CH_CONC_WITH_GO: SAP fix channel start
- * @CSA_REASON_CONCURRENT_LL_LT_SAP_EVENT: LL_LT_SAP concurrency
+ * @CSA_REASON_LL_LT_SAP_EVENT: LL_LT_SAP csa event
  *  and move GO to other band
  */
 enum sap_csa_reason_code {
@@ -122,7 +122,7 @@ enum sap_csa_reason_code {
 	CSA_REASON_GO_BSS_STARTED,
 	CSA_REASON_SAP_ACS,
 	CSA_REASON_SAP_FIX_CH_CONC_WITH_GO,
-	CSA_REASON_CONCURRENT_LL_LT_SAP_EVENT
+	CSA_REASON_LL_LT_SAP_EVENT
 };
 
 /*

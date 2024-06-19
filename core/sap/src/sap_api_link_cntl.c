@@ -55,9 +55,9 @@
 #include "wlan_pre_cac_api.h"
 #include <wlan_cfg80211_scan.h>
 #include <wlan_hdd_hostapd.h>
-
-/* IF MGR API header file */
 #include "wlan_if_mgr_ucfg_api.h"
+#include "wlan_ll_sap_api.h"
+
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -437,9 +437,18 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 	}
 	sap_debug("ACS scan completed");
 
-	oper_channel = wlansap_calculate_chan_from_scan_result(mac_handle,
-							       sap_ctx, scanid);
-
+	if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, sap_ctx->vdev_id) &&
+	    sap_ctx->fsm_state == SAP_STARTED)
+		oper_channel = wlan_ll_sap_get_valid_freq_for_csa(
+							mac_ctx->psoc,
+							sap_ctx->vdev_id,
+							sap_ctx->chan_freq,
+							LL_SAP_CSA_CONCURENCY);
+	else
+		oper_channel =
+			wlansap_calculate_chan_from_scan_result(
+							mac_handle,
+							sap_ctx, scanid);
 	if (oper_channel == SAP_CHANNEL_NOT_SELECTED) {
 		sap_info("No suitable channel, so select default channel");
 		oper_channel = sap_select_default_oper_chan(mac_ctx, sap_ctx);
