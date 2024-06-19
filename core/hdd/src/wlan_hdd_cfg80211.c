@@ -11769,7 +11769,7 @@ hdd_set_coex_traffic_shaping_mode(struct wlan_hdd_link_info *link_info,
 	return ret;
 }
 
-#define STA_KEEPALIVE_INTERVAL_MAX 60
+#define STA_KEEPALIVE_INTERVAL_MAX 255
 #define STA_KEEPALIVE_INTERVAL_MIN 5
 
 int hdd_vdev_send_sta_keep_alive_interval(
@@ -29003,6 +29003,24 @@ wlan_hdd_cfg80211_get_channel_sap(struct wiphy *wiphy,
 	return 0;
 }
 
+static qdf_freq_t hdd_get_sec_2ghz_freq(qdf_freq_t freq,
+					enum phy_ch_width ch_width,
+					qdf_freq_t freq_seg_1)
+{
+	/*
+	 * In case of 2.4 GHz + 40 MHz, use the secondary channel
+	 * to determine the exact ccfs1
+	 */
+	if (wlan_reg_is_24ghz_ch_freq(freq) && ch_width == CH_WIDTH_40MHZ) {
+		if (freq < freq_seg_1)
+			return freq + HT40_SEC_OFFSET;
+		else
+			return freq - HT40_SEC_OFFSET;
+	}
+
+	return 0;
+}
+
 static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 						struct wlan_objmgr_vdev *vdev,
 						int link_id,
@@ -29014,6 +29032,7 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	enum wlan_phymode peer_phymode;
 	uint8_t vdev_id;
 	struct wlan_channel *des_chan;
+	qdf_freq_t sec_2g_freq = 0;
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
@@ -29037,18 +29056,65 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	chan_info->ch_width =
 			wlan_mlme_get_ch_width_from_phymode(peer_phymode);
 	ch_params.ch_width = chan_info->ch_width;
+
+	sec_2g_freq = hdd_get_sec_2ghz_freq(chan_info->ch_freq,
+					    chan_info->ch_width,
+					    chan_info->ch_cfreq1);
+
 	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
-						chan_info->ch_freq, 0,
+						chan_info->ch_freq, sec_2g_freq,
 						&ch_params,
 						REG_CURRENT_PWR_MODE);
+
+	if (chan_info->ch_cfreq1 != ch_params.mhz_freq_seg0 ||
+	    chan_info->ch_cfreq2 != ch_params.mhz_freq_seg1)
+		hdd_debug("Old ccfs1 %d ccfs2 %d - New ccfs1 %d ccfs2 %d",
+			  chan_info->ch_cfreq1, chan_info->ch_cfreq2,
+			  ch_params.mhz_freq_seg0, ch_params.mhz_freq_seg1);
+
 	chan_info->ch_cfreq1 = ch_params.mhz_freq_seg0;
 	chan_info->ch_cfreq2 = ch_params.mhz_freq_seg1;
 
-	hdd_debug("vdev: %d, freq: %d, freq1: %d, freq2: %d, ch_width: %d",
+	hdd_debug("vdev: %d, freq: %d, freq1: %d, freq2: %d, ch_width: %d, max_ch_width:%d",
 		  vdev_id, chan_info->ch_freq, chan_info->ch_cfreq1,
-		  chan_info->ch_cfreq2, chan_info->ch_width);
+		  chan_info->ch_cfreq2, chan_info->ch_width,
+		  ch_params.ch_width);
+
 	return 0;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static int
+wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
+				    struct wlan_channel *chan_info)
+{
+	struct wlan_objmgr_vdev *vdev;
+	int ret;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		hdd_debug("not a mlo vdev");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EINVAL;
+	}
+
+	ret = mlo_mgr_get_per_link_chan_info(vdev, link_id, chan_info);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return ret;
+}
+#else
+static inline int
+wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
+				    struct wlan_channel *chan_info)
+{
+	return -EINVAL;
+}
+#endif
 
 static int
 wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
@@ -29057,11 +29123,12 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 				  struct hdd_adapter *adapter, int link_id)
 {
 	struct hdd_station_ctx *sta_ctx = NULL;
-	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *link_vdev;
 	bool is_legacy_phymode = false;
 	struct wlan_channel chan_info;
 	int ret = 0;
 	struct ch_params ch_params = {0};
+	qdf_freq_t sec_2g_freq = 0;
 
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_debug("vdev not associated");
@@ -29072,31 +29139,44 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 	if (sta_ctx->conn_info.dot11mode < eCSR_CFG_DOT11_MODE_11N)
 		is_legacy_phymode = true;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
-	if (!vdev) {
-		hdd_debug("vdev null");
-		return -EINVAL;
-	}
-
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		ret = mlo_mgr_get_per_link_chan_info(vdev, link_id, &chan_info);
-		if (ret != 0)
-			goto release;
+	link_vdev = wlan_key_get_link_vdev(adapter, WLAN_OSIF_ID, link_id);
+	if (!link_vdev) {
+		/* request is for standby link */
+		ret =  wlan_hdd_get_standby_link_chan_info(adapter, link_id,
+							   &chan_info);
+		if (ret)
+			return ret;
 
 		ch_params.ch_width = chan_info.ch_width;
 		ch_params.center_freq_seg1 = chan_info.ch_cfreq2;
+		sec_2g_freq = hdd_get_sec_2ghz_freq(chan_info.ch_freq,
+						    chan_info.ch_width,
+						    chan_info.ch_cfreq1);
+
 		wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
-							chan_info.ch_freq, 0,
+							chan_info.ch_freq,
+							sec_2g_freq,
 							&ch_params,
 							REG_CURRENT_PWR_MODE);
 		chan_info.ch_cfreq1 = ch_params.mhz_freq_seg0;
 		chan_info.ch_cfreq2 = ch_params.mhz_freq_seg1;
+		hdd_debug("max allowed ch_width:%d, ap ch_width: %d",
+			  ch_params.ch_width, chan_info.ch_width);
+		/*
+		 * To take care scenarios when AP channel width and max
+		 * supported ch_width for connection in STA may different.
+		 * For example, a case where AP advertise beacon/probe response
+		 * in 320 MHz and STA (configured with country code = KR)
+		 * supports max ch_width 160 MHz.
+		 */
+		if (ch_params.ch_width < chan_info.ch_width)
+			chan_info.ch_width = ch_params.ch_width;
 	} else {
-		ret = wlan_hdd_cfg80211_get_vdev_chan_info(hdd_ctx, vdev,
-							   link_id,
-							   &chan_info);
-		if (ret != 0)
-			goto release;
+		ret = wlan_hdd_cfg80211_get_vdev_chan_info(hdd_ctx, link_vdev,
+							   link_id, &chan_info);
+		wlan_key_put_link_vdev(link_vdev, WLAN_OSIF_ID);
+		if (ret)
+			return ret;
 	}
 
 	chandef->chan = ieee80211_get_channel(wiphy, chan_info.ch_freq);
@@ -29112,8 +29192,6 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 		  chan_info.ch_freq, chandef->width, chandef->center_freq1,
 		  chandef->center_freq2);
 
-release:
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return ret;
 }
 

@@ -12023,6 +12023,7 @@ void lim_cp_stats_cstats_log_disc_req_evt(tDot11fTDLSDisReq *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
 	stat.dt = frm->DialogToken.token;
@@ -12047,6 +12048,7 @@ void lim_cp_stats_cstats_log_disc_resp_evt(tDot11fTDLSDisRsp *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12080,6 +12082,7 @@ void lim_cp_stats_cstats_log_setup_req_evt(tDot11fTDLSSetupReq *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12114,6 +12117,7 @@ lim_cp_stats_cstats_log_setup_resp_evt(tDot11fTDLSSetupRsp *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12151,6 +12155,7 @@ lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12187,6 +12192,7 @@ lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12199,5 +12205,30 @@ lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
 	CSTATS_MAC_COPY(stat.resp_sta_addr, frm->LinkIdentifier.RespStaAddr);
 
 	wlan_cstats_host_stats(sizeof(struct cstats_tdls_tear_down), &stat);
+}
+
+void lim_cp_stats_cstats_log_csa_evt(struct pe_session *pe_session,
+				     enum cstats_dir dir, uint16_t target_freq,
+				     uint8_t target_ch_width,
+				     uint8_t switch_mode)
+{
+	struct cstats_csa_evt stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_CSA_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_csa_evt) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = pe_session->opmode;
+	stat.cmn.vdev_id = pe_session->vdev_id;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.direction = dir;
+	stat.target_freq = target_freq;
+	stat.target_ch_width = target_ch_width;
+	stat.current_freq = pe_session->curr_op_freq;
+	stat.current_ch_width = pe_session->ch_width;
+	stat.switch_mode = switch_mode;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_csa_evt), &stat);
 }
 #endif /* WLAN_CHIPSET_STATS */
