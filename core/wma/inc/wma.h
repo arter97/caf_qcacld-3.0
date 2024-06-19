@@ -1716,7 +1716,7 @@ QDF_STATUS wma_peer_unmap_conf_cb(uint8_t vdev_id,
 bool wma_objmgr_peer_exist(tp_wma_handle wma,
 			   uint8_t *peer_addr, uint8_t *peer_vdev_id);
 
-#ifdef WLAN_FEATURE_PEER_TRANS_HIST
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /**
  * wma_peer_tbl_trans_add_entry() - Add peer transition to peer history
  * @peer: Object manager peer pointer

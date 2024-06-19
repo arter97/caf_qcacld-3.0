@@ -85,10 +85,6 @@ config WLAN_TX_FLOW_CONTROL_V2
 	bool "Enable tx flow control version:2"
 	default n
 
-config WLAN_FEATURE_PEER_TRANS_HIST
-	bool "Enable Peer transition history"
-	default n
-
 config WLAN_LRO
 	bool "Enable Large Receive Offload"
 	depends on HELIUMPLUS
