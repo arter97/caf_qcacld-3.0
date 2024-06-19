@@ -1190,8 +1190,35 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 	}
 }
 
+#define MIN_TIMEOUT_VAL 0
+#define MAX_TIMEOUT_VAL 11
+
+#define TIMEOUT_TO_US 6
+
+/*
+ * wma_convert_trans_timeout_us() - API to convert
+ * emlsr transition timeout to microseconds. Refer Table 9-401h
+ * of IEEE802.11be specification
+ * @timeout: EMLSR transition timeout
+ *
+ * Return: Timeout value in microseconds
+ */
+static inline uint32_t
+wma_convert_trans_timeout_us(uint16_t timeout)
+{
+	uint32_t us = 0;
+
+	if (timeout > MIN_TIMEOUT_VAL && timeout < MAX_TIMEOUT_VAL) {
+		/* timeout = 1 is for 128us*/
+		us = (1 << (timeout + TIMEOUT_TO_US));
+	}
+
+	return us;
+}
+
 /**
- * wma_populate_peer_eml_cap() - Set EML caps to the peer assoc request
+ * wma_populate_peer_mlo_common_info_sap() - Set common info caps to
+ * the peer assoc request for mlo sap mode
  * @wma: wma handle
  * @peer: assoc peer data structure
  * @params: Add sta params
@@ -1199,9 +1226,9 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
  * Return: None
  */
 static void
-wma_populate_peer_eml_cap(tp_wma_handle wma,
-			  struct peer_assoc_params *peer,
-			  tpAddStaParams params)
+wma_populate_peer_mlo_common_info_sap(tp_wma_handle wma,
+				      struct peer_assoc_params *peer,
+				      tpAddStaParams params)
 {
 	struct peer_assoc_mlo_params *mlo_params;
 	struct wlan_mlo_eml_cap *eml_info;
@@ -1259,6 +1286,78 @@ wma_populate_peer_eml_cap(tp_wma_handle wma,
 		  mlo_params->trans_timeout_us);
 }
 
+/**
+ * wma_populate_peer_mlo_common_info_sta() - Set common info caps to
+ * the peer assoc request for mlo sta mode
+ * @wma: wma handle
+ * @vdev: vdev object
+ * @params: Add sta params
+ * @req: peer assoc request parameters
+ *
+ * Return: None
+ */
+static void
+wma_populate_peer_mlo_common_info_sta(tp_wma_handle wma,
+				      struct wlan_objmgr_vdev *vdev,
+				      tpAddStaParams params,
+				      struct peer_assoc_params *req)
+{
+	uint8_t pdev_id;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_psoc *psoc = wma->psoc;
+	uint16_t link_id_bitmap;
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma->pdev);
+	peer = wlan_objmgr_get_peer(psoc, pdev_id, req->peer_mac,
+				    WLAN_LEGACY_WMA_ID);
+
+	if (!peer) {
+		wma_err("peer not valid");
+		return;
+	}
+
+	if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
+							true) ||
+	    policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+		req->mlo_params.mlo_force_link_inactive = 1;
+		link_id_bitmap = 1 << params->link_id;
+		ml_nlink_set_curr_force_inactive_state(
+				psoc, vdev, link_id_bitmap, LINK_ADD);
+		ml_nlink_init_concurrency_link_request(psoc, vdev);
+	}
+	wma_debug("assoc_link %d" QDF_MAC_ADDR_FMT ", force inactive %d link id %d",
+		  req->mlo_params.mlo_assoc_link,
+		  QDF_MAC_ADDR_REF(peer->mldaddr),
+		  req->mlo_params.mlo_force_link_inactive,
+		  params->link_id);
+
+	req->mlo_params.emlsr_support = params->emlsr_support;
+	if (req->mlo_params.emlsr_support) {
+		req->mlo_params.trans_timeout_us =
+		wma_convert_trans_timeout_us(params->emlsr_trans_timeout);
+	}
+
+	req->mlo_params.msd_cap_support = params->msd_caps_present;
+	req->mlo_params.medium_sync_duration =
+			params->msd_caps.med_sync_duration;
+	req->mlo_params.medium_sync_ofdm_ed_thresh =
+			params->msd_caps.med_sync_ofdm_ed_thresh;
+	req->mlo_params.medium_sync_max_txop_num =
+			params->msd_caps.med_sync_max_txop_num;
+	req->mlo_params.link_switch_in_progress =
+		wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
+	/*
+	 * Set max simultaneous links = 1 for MLSR, 2 for MLMR. The +1
+	 * is added as per the agreement with FW for backward
+	 * compatibility purposes. Our internal structures still
+	 * conform to the values as per spec i.e. 0 = MLSR, 1 = MLMR.
+	 */
+	req->mlo_params.max_num_simultaneous_links =
+		wlan_mlme_get_sta_mlo_simultaneous_links(psoc) + 1;
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+}
+
 #else
 static void wma_populate_peer_puncture(struct peer_assoc_params *peer,
 				       struct wlan_channel *des_chan)
@@ -1269,14 +1368,6 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 				      tpAddStaParams params)
 {
 }
-
-static void
-wma_populate_peer_eml_cap(tp_wma_handle wma,
-			  struct peer_assoc_params *peer,
-			  tpAddStaParams params)
-{
-}
-
 #endif
 
 void wma_objmgr_set_peer_mlme_nss(tp_wma_handle wma, uint8_t *mac_addr,
@@ -1379,32 +1470,6 @@ static void wma_objmgr_set_peer_mlme_type(tp_wma_handle wma,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 
-#define MIN_TIMEOUT_VAL 0
-#define MAX_TIMEOUT_VAL 11
-
-#define TIMEOUT_TO_US 6
-
-/*
- * wma_convert_trans_timeout_us() - API to convert
- * emlsr transition timeout to microseconds. Refer Table 9-401h
- * of IEEE802.11be specification
- * @timeout: EMLSR transition timeout
- *
- * Return: Timeout value in microseconds
- */
-static inline uint32_t
-wma_convert_trans_timeout_us(uint16_t timeout)
-{
-	uint32_t us = 0;
-
-	if (timeout > MIN_TIMEOUT_VAL && timeout < MAX_TIMEOUT_VAL) {
-		/* timeout = 1 is for 128us*/
-		us = (1 << (timeout + TIMEOUT_TO_US));
-	}
-
-	return us;
-}
-
 /**
  * wma_set_mlo_capability() - set MLO caps to the peer assoc request
  * @wma: wma handle
@@ -1422,7 +1487,6 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 	uint8_t pdev_id;
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_psoc *psoc = wma->psoc;
-	uint16_t link_id_bitmap;
 
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma->pdev);
 	peer = wlan_objmgr_get_peer(psoc, pdev_id, req->peer_mac,
@@ -1433,55 +1497,27 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 		return;
 	}
 
-	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)peer->mldaddr)) {
-		req->mlo_params.mlo_enabled = true;
-		req->mlo_params.mlo_assoc_link =
-					wlan_peer_mlme_is_assoc_peer(peer);
-		WLAN_ADDR_COPY(req->mlo_params.mld_mac, peer->mldaddr);
-		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
-								true) ||
-		    policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
-			req->mlo_params.mlo_force_link_inactive = 1;
-			link_id_bitmap = 1 << params->link_id;
-			ml_nlink_set_curr_force_inactive_state(
-					psoc, vdev, link_id_bitmap, LINK_ADD);
-			ml_nlink_init_concurrency_link_request(psoc, vdev);
-		}
-		wma_debug("assoc_link %d" QDF_MAC_ADDR_FMT ", force inactive %d link id %d",
-			  req->mlo_params.mlo_assoc_link,
-			  QDF_MAC_ADDR_REF(peer->mldaddr),
-			  req->mlo_params.mlo_force_link_inactive,
-			  params->link_id);
-
-		req->mlo_params.emlsr_support = params->emlsr_support;
-		req->mlo_params.ieee_link_id = params->link_id;
-		if (req->mlo_params.emlsr_support) {
-			req->mlo_params.trans_timeout_us =
-			wma_convert_trans_timeout_us(params->emlsr_trans_timeout);
-		}
-		req->mlo_params.msd_cap_support = params->msd_caps_present;
-		req->mlo_params.medium_sync_duration =
-				params->msd_caps.med_sync_duration;
-		req->mlo_params.medium_sync_ofdm_ed_thresh =
-				params->msd_caps.med_sync_ofdm_ed_thresh;
-		req->mlo_params.medium_sync_max_txop_num =
-				params->msd_caps.med_sync_max_txop_num;
-		req->mlo_params.link_switch_in_progress =
-			wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
-		/*
-		 * Set max simultaneous links = 1 for MLSR, 2 for MLMR. The +1
-		 * is added as per the agreement with FW for backward
-		 * compatibility purposes. Our internal structures still
-		 * conform to the values as per spec i.e. 0 = MLSR, 1 = MLMR.
-		 */
-		req->mlo_params.max_num_simultaneous_links =
-			wlan_mlme_get_sta_mlo_simultaneous_links(psoc) + 1;
-	} else {
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)peer->mldaddr)) {
 		wma_debug("Peer MLO context is NULL");
 		req->mlo_params.mlo_enabled = false;
 		req->mlo_params.emlsr_support = false;
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+		return;
 	}
+	/* set common info for mlo sta/sap */
+	req->mlo_params.mlo_enabled = true;
+	req->mlo_params.mlo_assoc_link =
+				wlan_peer_mlme_is_assoc_peer(peer);
+	WLAN_ADDR_COPY(req->mlo_params.mld_mac, peer->mldaddr);
+	req->mlo_params.ieee_link_id = params->link_id;
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+
+	/* update eml for mlo sap/sta separately */
+	if (wma_is_vdev_in_ap_mode(wma, params->smesessionId))
+		wma_populate_peer_mlo_common_info_sap(wma, req, params);
+	else
+		wma_populate_peer_mlo_common_info_sta(wma, vdev, params, req);
+
 }
 
 static void wma_set_mlo_assoc_vdev(struct wlan_objmgr_vdev *vdev,
@@ -1873,7 +1909,6 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	wma_populate_peer_eht_cap(cmd, params);
 	wma_populate_peer_puncture(cmd, des_chan);
 	wma_populate_peer_mlo_cap(cmd, params);
-	wma_populate_peer_eml_cap(wma, cmd, params);
 
 	if (!wma_is_vdev_in_ap_mode(wma, params->smesessionId))
 		intr->nss = cmd->peer_nss;
