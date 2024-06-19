@@ -29,53 +29,42 @@
  * wlan_dp_parse_skb_flow_info() - Parse flow info from skb
  * @skb: network buffer
  * @flow: pointer to flow tuple info
- * @keys: keys to dissect flow
  *
  * Return: none
  */
 static void wlan_dp_parse_skb_flow_info(struct sk_buff *skb,
-					struct flow_info *flow,
-					qdf_flow_keys_t *keys)
+					struct flow_info *flow)
 {
-	qdf_nbuf_flow_dissect_flow_keys(skb, keys);
+	struct qdf_flow_info flow_info;
 
-	if (qdf_unlikely(qdf_flow_is_first_frag(keys))) {
-		if (skb->protocol == htons(ETH_P_IP)) {
-			qdf_nbuf_flow_get_ports(skb, keys);
-		} else {
+	if (qdf_nbuf_sock_is_ipv4_pkt(skb)) {
+		if (!qdf_nbuf_is_ipv4_first_fragment(skb)) {
 			flow->flags |= FLOW_INFO_PRESENT_IP_FRAGMENT;
 			return;
 		}
-	} else if (qdf_flow_is_frag(keys)) {
-		flow->flags |= FLOW_INFO_PRESENT_IP_FRAGMENT;
-		return;
-	}
 
-	flow->src_port = qdf_ntohs(qdf_flow_parse_src_port(keys));
-	flow->flags |= FLOW_INFO_PRESENT_SRC_PORT;
+		if (qdf_nbuf_get_ipv4_flow_info(skb, &flow_info))
+			return;
 
-	flow->dst_port = qdf_ntohs(qdf_flow_parse_dst_port(keys));
-	flow->flags |= FLOW_INFO_PRESENT_DST_PORT;
+		flow->src_port = flow_info.src_port;
+		flow->dst_port = flow_info.dst_port;
+		flow->src_ip.ipv4_addr = flow_info.src_ip.ipv4_addr;
+		flow->dst_ip.ipv4_addr = flow_info.dst_ip.ipv4_addr;
+		flow->proto = flow_info.proto;
+		flow->flags |= FLOW_INFO_IPV4_PARSE_SUCCESS;
 
-	flow->proto = qdf_flow_get_proto(keys);
-	flow->flags |= FLOW_INFO_PRESENT_PROTO;
+	} else if (qdf_nbuf_sock_is_ipv6_pkt(skb)) {
+		if (qdf_nbuf_get_ipv6_flow_info(skb, &flow_info))
+			return;
 
-	if (skb->protocol == qdf_ntohs(QDF_NBUF_TRAC_IPV4_ETH_TYPE)) {
-		flow->src_ip.ipv4_addr =
-				qdf_ntohl(qdf_flow_get_ipv4_src_addr(keys));
-		flow->flags |= FLOW_INFO_PRESENT_IPV4_SRC_IP;
-
-		flow->dst_ip.ipv4_addr =
-				qdf_ntohl(qdf_flow_get_ipv4_dst_addr(keys));
-		flow->flags |= FLOW_INFO_PRESENT_IPV4_DST_IP;
-	} else if (skb->protocol == qdf_ntohs(QDF_NBUF_TRAC_IPV6_ETH_TYPE)) {
-		qdf_flow_get_ipv6_src_addr(keys, &flow->src_ip.ipv6_addr);
-		flow->flags |= FLOW_INFO_PRESENT_IPV6_SRC_IP;
-
-		qdf_flow_get_ipv6_dst_addr(keys, &flow->dst_ip.ipv6_addr);
-		flow->flags |= FLOW_INFO_PRESENT_IPV4_DST_IP;
-
-		flow->flow_label = qdf_flow_get_flow_label(keys);
+		flow->src_port = flow_info.src_port;
+		flow->dst_port = flow_info.dst_port;
+		qdf_mem_copy(&flow->src_ip.ipv6_addr, &flow_info.src_ip.ipv6_addr,
+			     sizeof(flow_info.src_ip.ipv6_addr));
+		qdf_mem_copy(&flow->dst_ip.ipv6_addr, &flow_info.dst_ip.ipv6_addr,
+			     sizeof(flow_info.dst_ip.ipv6_addr));
+		flow->proto = flow_info.proto;
+		flow->flags |= FLOW_INFO_IPV6_PARSE_SUCCESS;
 	}
 }
 
@@ -92,7 +81,6 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 {
 	struct sock *sk = NULL;
 	struct flow_info flow = {0};
-	qdf_flow_keys_t keys;
 	uint16_t peer_id;
 	uint16_t sk_tx_flow_id;
 	int status = QDF_STATUS_E_INVAL;
@@ -112,7 +100,7 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 
 	/* sk_tx_flow_id != 0 means flow_id valid */
 	if (qdf_unlikely(!sk_tx_flow_id)) {
-		wlan_dp_parse_skb_flow_info(skb, &flow, &keys);
+		wlan_dp_parse_skb_flow_info(skb, &flow);
 		if (qdf_unlikely(!flow.flags ||
 				 flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT)) {
 			skb->mark = SPM_INVALID_SVC;
