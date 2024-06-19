@@ -1205,11 +1205,13 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
 	hdd_sysfs_sta_bitrates_create(adapter);
+	hdd_sysfs_ipa_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_ipa_destroy(adapter);
 	hdd_sysfs_sta_bitrates_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
