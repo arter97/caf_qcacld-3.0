@@ -275,6 +275,7 @@ _fixed_ipaths = [
     "components/target_if/dp/inc",
     "components/target_if/fw_offload/inc",
     "components/target_if/interop_issues_ap/inc",
+    "components/target_if/mgmt_rx_srng/inc",
     "components/target_if/nan/inc",
     "components/target_if/p2p/inc",
     "components/target_if/pkt_capture/inc",

@@ -1739,7 +1739,8 @@ $(call add-wlan-objs,pkt_capture,$(PKT_CAPTURE_OBJS))
 
 MGMT_RX_SRNG_DIR := components/mgmt_rx_srng
 MGMT_RX_SRNG_INC := -I$(WLAN_ROOT)/$(MGMT_RX_SRNG_DIR)/core/inc \
-		    -I$(WLAN_ROOT)/$(MGMT_RX_SRNG_DIR)/dispatcher/inc
+		    -I$(WLAN_ROOT)/$(MGMT_RX_SRNG_DIR)/dispatcher/inc \
+		    -I$(WLAN_ROOT)/components/target_if/mgmt_rx_srng/inc
 
 ########## FTM TIME SYNC ##########
 
