@@ -8458,7 +8458,9 @@ policy_mgr_handle_ml_sta_links_on_vdev_up_csa(struct wlan_objmgr_psoc *psoc,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 }
 
-#define SET_LINK_TIMEOUT 6000
+/* Add extra buff if any connection is disconnecting */
+#define SET_LINK_TIMEOUT ((STOP_RESPONSE_TIMER) + 6000)
+
 QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
