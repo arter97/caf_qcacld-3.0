@@ -378,6 +378,9 @@ void wlan_rptr_core_reset_global_flags(void)
 			OS_MEMZERO(&ss_info->denied_client_list[i][0],
 				   QDF_MAC_ADDR_SIZE);
 		}
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+		g_priv->rssi_based_bssid = 1;
+#endif
 #endif
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 	}
@@ -536,6 +539,71 @@ wlan_rptr_get_rootap_bssid(void *arg, wlan_scan_entry_t se)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+
+void wlan_rptr_set_rssi_based_bssid(struct wlan_objmgr_pdev *pdev,bool rssi_based_bssid)
+{
+	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+
+	qdf_print("Setting the rssi based bssid selection : %d Earlier: %d\n",rssi_based_bssid, g_priv->rssi_based_bssid);
+
+	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
+	g_priv->rssi_based_bssid =  rssi_based_bssid;
+	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
+}
+
+void wlan_rptr_reset_custom_chan_list(struct wlan_objmgr_pdev *pdev)
+{
+	struct chan_list *custom_chan_list = NULL;
+	uint8_t ssid_srch_fail;
+	struct wlan_rptr_pdev_priv *pdev_priv;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+
+	ssid_srch_fail = pdev_priv->num_desired_ssid_search_fail_cnt;
+	/* Reset the custom chan list in case the fail count reach threshold */
+	if (ssid_srch_fail > MAX_NUM_DESIRED_SSID_SEARCH_THRESHOLD) {
+		custom_chan_list = qdf_mem_malloc(sizeof(struct chan_list));
+		if(custom_chan_list){
+			/* Reset the custom chan list */
+			qdf_mem_zero(custom_chan_list, sizeof(struct chan_list));
+			ucfg_scan_set_custom_scan_chan_list(pdev, custom_chan_list);
+			qdf_print("Clear custom chan num:%d fail:%d",custom_chan_list->num_chan,pdev_priv->num_desired_ssid_search_fail_cnt);
+			qdf_mem_free(custom_chan_list);
+		}
+	}
+}
+
+static QDF_STATUS
+wlan_rptr_get_rssi_based_bssid(void *arg, wlan_scan_entry_t se)
+{
+	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)arg;
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct ieee80211_ie_extender *extender_ie;
+	int8_t rssi,*bssid;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv)
+		return QDF_STATUS_SUCCESS;
+
+	bssid = util_scan_entry_bssid(se);
+	rssi = util_scan_entry_rssi(se);
+
+	if (wlan_rptr_dessired_ssid_found(vdev, se) && (rssi >= pdev_priv->max_rssi)) {
+		extender_ie = (struct ieee80211_ie_extender *) util_scan_entry_extenderie(se);
+		if (extender_ie) {
+			/* Skip if the scan entry RE is not having the Root AP access */
+			if((extender_ie->extender_info & ROOTAP_ACCESS_MASK) != ROOTAP_ACCESS_MASK)
+				return QDF_STATUS_SUCCESS;
+		}
+		pdev_priv->max_rssi = rssi;
+		OS_MEMCPY(pdev_priv->preferred_bssid, bssid, QDF_MAC_ADDR_SIZE);
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS
 wlan_rptr_process_scan_entries(void *arg, wlan_scan_entry_t se)
 {
@@ -662,6 +730,16 @@ wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 			pdev_priv = wlan_rptr_get_pdev_priv(pdev);
 			OS_MEMSET(pdev_priv->preferred_bssid, 0,
 				  QDF_MAC_ADDR_SIZE);
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+			/* Select the best bssid based on the rssi */
+			if(g_priv->rssi_based_bssid){
+				if(!g_priv->num_stavaps_up) {
+					ucfg_scan_db_iterate(pdev, wlan_rptr_get_rssi_based_bssid, (void *)vdev);
+					/* Resetting the max rssi value */
+					pdev_priv->max_rssi = MESH_SUPPORT_RSSI_LOW;
+				}
+			}/* Root AP gets preference if rssi based bssid feature is disable */
+#endif
 			ucfg_scan_db_iterate(pdev, wlan_rptr_get_rootap_bssid,
 					     (void *)vdev);
 			if (!IS_NULL_ADDR(pdev_priv->preferred_bssid)) {
@@ -714,6 +792,19 @@ wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 					}
 				}
 			}
+#ifdef CONFIG_DRONE_MESH_SUPPORT
+			/*
+			 * Increment the counter for every consecutive fail attempt to find the
+			 * desired SSID and Reset if we are able to find our desired SSID, this
+			 * will be done for every scan.
+			 */
+			if(IS_NULL_ADDR(pdev_priv->preferred_bssid)){
+				(pdev_priv->num_desired_ssid_search_fail_cnt)++;
+			} else {
+				pdev_priv->num_desired_ssid_search_fail_cnt = 0;
+			}
+#endif
+
 		}
 	}
 }
