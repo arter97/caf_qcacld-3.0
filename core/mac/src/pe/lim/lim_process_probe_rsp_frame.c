@@ -215,8 +215,7 @@ void lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
 				 tpSirProbeRespBeacon probe_rsp)
 {
 	if (!(session_entry->lim_join_req &&
-	      session_entry->lim_join_req->is_ml_probe_req_sent &&
-	      probe_rsp->mlo_ie.mlo_ie_present))
+	      session_entry->lim_join_req->is_ml_probe_req_sent))
 		return;
 
 	lim_update_mlo_mgr_info(mac_ctx, session_entry->vdev, mac_addr,
