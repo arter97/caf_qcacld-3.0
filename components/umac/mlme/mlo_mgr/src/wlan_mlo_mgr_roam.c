@@ -1358,6 +1358,7 @@ mlo_roam_prepare_and_send_link_connect_req(struct wlan_objmgr_vdev *assoc_vdev,
 
 	qdf_mem_copy(sta_ctx->copied_conn_req, &req,
 		     sizeof(struct wlan_cm_connect_req));
+	sta_ctx->copied_conn_req->chan_freq = 0;
 	mlo_allocate_and_copy_ies(sta_ctx->copied_conn_req, &req);
 	copied_conn_req_lock_release(sta_ctx);
 
