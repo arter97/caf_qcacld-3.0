@@ -824,7 +824,7 @@ config QCA_WIFI_FTM
 config QCA_WIFI_FTM_NL80211
 	bool "Enable QCA_WIFI_FTM_NL80211"
 	depends on NL80211_TESTMODE
-	default n
+	default y
 
 config QCA_WIFI_KIWI
 	bool "Enable QCA_WIFI_KIWI"
