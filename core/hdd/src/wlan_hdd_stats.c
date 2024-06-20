@@ -5804,10 +5804,10 @@ wlan_hdd_fill_per_link_summary_stats(tCsrSummaryStatsInfo *stats,
 	orig_fail_cnt = info->tx_failed;
 	info->tx_retries = peer_stats->tx.retries_mpdu;
 	info->tx_failed += peer_stats->tx.mpdu_success_with_retries;
-	hdd_debug("for peer: " QDF_MAC_ADDR_FMT "tx retries adjust from %d to %d",
-		  QDF_MAC_ADDR_REF(peer_mac), orig_cnt, info->tx_retries);
-	hdd_debug("for peer: " QDF_MAC_ADDR_FMT "tx failed adjust from %d to %d",
-		  QDF_MAC_ADDR_REF(peer_mac), orig_fail_cnt, info->tx_failed);
+	hdd_debug_rl("for peer: " QDF_MAC_ADDR_FMT "tx retries adjust from %d to %d",
+		     QDF_MAC_ADDR_REF(peer_mac), orig_cnt, info->tx_retries);
+	hdd_debug_rl("for peer: " QDF_MAC_ADDR_FMT "tx failed adjust from %d to %d",
+		     QDF_MAC_ADDR_REF(peer_mac), orig_fail_cnt, info->tx_failed);
 exit:
 	qdf_mem_free(peer_stats);
 }
@@ -5845,10 +5845,10 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
 		orig_fail_cnt = info->tx_failed;
 		info->tx_retries = dp_stats.tx_retries_mpdu;
 		info->tx_failed += dp_stats.tx_mpdu_success_with_retries;
-		hdd_debug("vdev %d tx retries adjust from %d to %d",
-			  vdev_id, orig_cnt, info->tx_retries);
-		hdd_debug("tx failed adjust from %d to %d",
-			  orig_fail_cnt, info->tx_failed);
+		hdd_debug_rl("vdev %d tx retries adjust from %d to %d",
+			     vdev_id, orig_cnt, info->tx_retries);
+		hdd_debug_rl("tx failed adjust from %d to %d",
+			     orig_fail_cnt, info->tx_failed);
 	}
 
 	info->filled |= HDD_INFO_TX_PACKETS |
