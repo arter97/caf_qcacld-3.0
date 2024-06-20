@@ -1766,7 +1766,6 @@ static void lim_process_periodic_join_probe_req_timer(struct mac_context *mac_ct
 	struct pe_session *session;
 	tSirMacSSid ssid;
 	tSirMacAddr bssid;
-	tSirMacAddr bcast_mac = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 	session = pe_find_session_by_session_id(mac_ctx,
 	      mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer.sessionId);
@@ -1785,16 +1784,6 @@ static void lim_process_periodic_join_probe_req_timer(struct mac_context *mac_ct
 		ssid.length = session->ssId.length;
 		sir_copy_mac_addr(bssid,
 				  session->pLimMlmJoinReq->bssDescription.bssId);
-
-		/*
-		 * Some APs broadcasting hidden SSID doesn't respond to unicast
-		 * probe requests, however those APs respond to broadcast probe
-		 * requests. Therefore for hidden ssid connections, after 3
-		 * unicast probe requests, try the pending probes with broadcast
-		 * mac.
-		 */
-		if (session->ssidHidden && session->join_probe_cnt > 2)
-			sir_copy_mac_addr(bssid, bcast_mac);
 
 		lim_send_probe_req_mgmt_frame(mac_ctx, &ssid, bssid,
 					      session->curr_op_freq,
