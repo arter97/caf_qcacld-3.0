@@ -60,6 +60,7 @@
 #include <wlan_mlo_mgr_sta.h>
 #include <spatial_reuse_api.h>
 #include <wlan_mlo_mgr_cmn.h>
+#include "wlan_mlme_public_struct.h"
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -1974,6 +1975,75 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 	return true;
 }
 
+/**
+ * lim_get_max_channel_width_from_dot11mode()- This API will get maximum
+ * channel width allowed for given dot11mode.
+ * @dot11mode: dot11 mode
+ *
+ * Return: channel width
+ */
+static enum phy_ch_width
+lim_get_max_channel_width_from_dot11mode(enum mlme_dot11_mode dot11mode)
+{
+	switch (dot11mode) {
+	case MLME_DOT11_MODE_ABG:
+	case MLME_DOT11_MODE_11A:
+	case MLME_DOT11_MODE_11B:
+	case MLME_DOT11_MODE_11G:
+	case MLME_DOT11_MODE_11G_ONLY:
+		return CH_WIDTH_20MHZ;
+	case MLME_DOT11_MODE_11N:
+	case MLME_DOT11_MODE_11N_ONLY:
+		return CH_WIDTH_40MHZ;
+	case MLME_DOT11_MODE_11AC:
+	case MLME_DOT11_MODE_11AC_ONLY:
+	case MLME_DOT11_MODE_11AX:
+	case MLME_DOT11_MODE_11AX_ONLY:
+		return CH_WIDTH_160MHZ;
+	case MLME_DOT11_MODE_11BE:
+	case MLME_DOT11_MODE_11BE_ONLY:
+	case MLME_DOT11_MODE_ALL:
+		return CH_WIDTH_320MHZ;
+	default:
+		pe_err("Invalid dot11mode %d", dot11mode);
+		break;
+	}
+
+	return CH_WIDTH_INVALID;
+}
+
+/**
+ * lim_csa_update_channel_width_for_dot11mode()- This API will get maximum
+ * channel width allowed for given dot11mode and update CSA channel width.
+ * @session_entry: Session pointer
+ * @csa_params: Pointer to CSA params
+ *
+ * Return: None
+ */
+static void lim_csa_update_channel_width_for_dot11mode(
+					struct pe_session *session_entry,
+					struct csa_offload_params *csa_params)
+{
+	enum phy_ch_width max_ch_width;
+
+	max_ch_width = lim_get_max_channel_width_from_dot11mode(
+						session_entry->dot11mode);
+
+	/* If AP wants to set in 80 + 80 BW, do not change to 160 MHz */
+	if (csa_params->new_ch_width == CH_WIDTH_80P80MHZ &&
+	    max_ch_width == CH_WIDTH_160MHZ)
+		return;
+
+	if (csa_params->new_ch_width != CH_WIDTH_5MHZ &&
+	    csa_params->new_ch_width != CH_WIDTH_10MHZ &&
+	    csa_params->new_ch_width > max_ch_width) {
+		pe_debug("Downgrade bw from %d to max supported bw %d for dot11mode %d ",
+			 csa_params->new_ch_width, max_ch_width,
+			 session_entry->dot11mode);
+		csa_params->new_ch_width = max_ch_width;
+	}
+}
+
 void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 			      struct csa_offload_params *csa_params,
 			      bool send_status)
@@ -2024,6 +2094,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	}
 
 	lim_ch_switch = &session_entry->gLimChannelSwitch;
+
+	lim_csa_update_channel_width_for_dot11mode(session_entry, csa_params);
 	ch_params.ch_width = csa_params->new_ch_width;
 
 	if (IS_DOT11_MODE_EHT(session_entry->dot11mode))
