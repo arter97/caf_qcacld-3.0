@@ -670,18 +670,20 @@ static QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
 			     QDF_MAC_ADDR_SIZE);
 		break;
 	case QDF_STA_MODE:
-		if (!wlan_cm_is_vdev_roaming(vdev)) {
-			status = wlan_vdev_get_bss_peer_mld_mac(vdev,
-								&peer_mld_addr);
-			if (QDF_IS_STATUS_ERROR(status))
-				return status;
-		} else {
+		if (wlan_cm_is_vdev_active(vdev)) {
+			/* Roaming Pre-auth frame */
 			peer_roaming_mld_addr =
 				wlan_cm_roaming_get_peer_mld_addr(vdev);
 			if (!peer_roaming_mld_addr)
 				return QDF_STATUS_E_FAILURE;
 
 			peer_mld_addr = *peer_roaming_mld_addr;
+		} else {
+			/* Initial connection */
+			status = wlan_vdev_get_bss_peer_mld_mac(vdev,
+								&peer_mld_addr);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
 		}
 
 		qdf_mem_copy(mac_hdr->sa, peer_mld_addr.bytes,

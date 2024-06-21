@@ -5680,29 +5680,29 @@ void wlan_cm_store_mlo_roam_peer_address(struct wlan_objmgr_pdev *pdev,
 	if (!wlan_vdev_get_mlo_external_sae_auth_conversion(vdev))
 		goto rel_ref;
 
-	if (!wlan_cm_is_vdev_roaming(vdev))
+	if (!wlan_cm_is_vdev_active(vdev))
 		goto rel_ref;
 
 	rso_config = wlan_cm_get_rso_config(vdev);
 	if (!rso_config)
 		goto rel_ref;
 
+	wlan_cm_reset_mlo_roam_peer_address(rso_config);
+
+	/* ta have zero value for non-ML AP */
 	if (qdf_is_macaddr_zero(&auth_event->ta)) {
-		/* ta have zero value for non-ML AP */
 		rso_config->sae_roam_auth.is_mlo_ap = false;
-		wlan_cm_reset_mlo_roam_peer_address(rso_config);
 		goto rel_ref;
 	}
 
 	status = scm_get_mld_addr_by_link_addr(pdev, &auth_event->ap_bssid,
 					       &mld_addr);
 
-	rso_config->sae_roam_auth.is_mlo_ap = true;
 
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wlan_cm_reset_mlo_roam_peer_address(rso_config);
+	if (QDF_IS_STATUS_ERROR(status))
 		goto rel_ref;
-	}
+
+	rso_config->sae_roam_auth.is_mlo_ap = true;
 
 	qdf_mem_copy(rso_config->sae_roam_auth.peer_mldaddr.bytes,
 		     mld_addr.bytes, QDF_MAC_ADDR_SIZE);
