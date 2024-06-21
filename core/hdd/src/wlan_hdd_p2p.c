@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -965,7 +965,7 @@ struct wireless_dev *wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * hdd_deinit_mlo_interfaces() - De-initialize link adapters
  * @hdd_ctx: Pointer to hdd context
