@@ -2226,7 +2226,7 @@ _conditional_srcs = {
             "components/dp/dispatcher/src/wlan_dp_stc_ucfg_api.c",
             "os_if/dp/src/os_if_dp_stc.c",
 	    "components/dp/core/src/wlan_dp_spm.c",
-	    "components/dp/core/src/wlan_dp_sawfish_fpm.c",
+	    "components/dp/core/src/wlan_dp_fpm.c",
 	    "components/dp/dispatcher/src/wlan_dp_flow_ucfg_api.c",
 	    "core/hdd/src/wlan_hdd_sysfs_dp_stc.c",
         ],

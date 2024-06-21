@@ -53,49 +53,6 @@ static void dp_fim_hash_table_init(struct fim_hash_table *ht, uint32_t len)
 }
 
 /**
- * dp_fim_parse_skb_flow_info() - Parse flow info from skb
- * @skb: network buffer
- * @flow: pointer to flow tuple info
- *
- * Return: none
- */
-static void dp_fim_parse_skb_flow_info(struct sk_buff *skb,
-				       struct flow_info *flow)
-{
-	struct qdf_flow_info flow_info;
-
-	if (qdf_nbuf_sock_is_ipv4_pkt(skb)) {
-		if (!qdf_nbuf_is_ipv4_first_fragment(skb)) {
-			flow->flags |= FLOW_INFO_PRESENT_IP_FRAGMENT;
-			return;
-		}
-
-		if (qdf_nbuf_get_ipv4_flow_info(skb, &flow_info))
-			return;
-
-		flow->src_port = flow_info.src_port;
-		flow->dst_port = flow_info.dst_port;
-		flow->src_ip.ipv4_addr = flow_info.src_ip.ipv4_addr;
-		flow->dst_ip.ipv4_addr = flow_info.dst_ip.ipv4_addr;
-		flow->proto = flow_info.proto;
-		flow->flags |= FLOW_INFO_IPV4_PARSE_SUCCESS;
-
-	} else if (qdf_nbuf_sock_is_ipv6_pkt(skb)) {
-		if (qdf_nbuf_get_ipv6_flow_info(skb, &flow_info))
-			return;
-
-		flow->src_port = flow_info.src_port;
-		flow->dst_port = flow_info.dst_port;
-		qdf_mem_copy(&flow->src_ip.ipv6_addr, &flow_info.src_ip.ipv6_addr,
-			     sizeof(flow_info.src_ip.ipv6_addr));
-		qdf_mem_copy(&flow->dst_ip.ipv6_addr, &flow_info.dst_ip.ipv6_addr,
-			     sizeof(flow_info.dst_ip.ipv6_addr));
-		flow->proto = flow_info.proto;
-		flow->flags |= FLOW_INFO_IPV6_PARSE_SUCCESS;
-	}
-}
-
-/**
  * dp_fim_flow_exact_match() - Check if two flows are matching.
  * @fi: pointer to 1st flow tuple info
  * @flow: pointer to 2nd flow tuple info to match with 1st
