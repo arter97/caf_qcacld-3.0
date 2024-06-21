@@ -217,6 +217,7 @@ typedef struct sDphHashNode {
 	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
 	struct mlo_partner_info mlo_info;
 	struct wlan_mlo_eml_cap eml_info;
+	struct wlan_mlo_mld_cap mld_info;
 #endif
 } tDphHashNode, *tpDphHashNode;
 
