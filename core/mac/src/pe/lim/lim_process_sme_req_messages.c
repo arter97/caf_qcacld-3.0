@@ -5698,12 +5698,16 @@ lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 	uint8_t i, j;
 	uint8_t eirp_pwr = 0, psd_pwr = 0;
 	uint8_t ext_psd_count = 0;
+	struct chan_power_info *chan_psd_power_info = NULL;
+	struct chan_power_info *chan_eirp_power_info = NULL;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!vdev_mlme)
 		return 0;
 
 	ch_params.ch_width = CH_WIDTH_320MHZ;
+	ch_params.mhz_freq_seg1 = wlan_reg_compute_6g_center_freq_from_cfi(
+						session->ch_center_freq_seg1);
 	curr_op_freq = session->curr_op_freq;
 	if (is_psd) {
 		if (tpe->max_tx_pwr_interpret == LOCAL_EIRP_PSD)
@@ -5764,6 +5768,12 @@ lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 
 			vdev_mlme->reg_tpc_obj.frequency[i] = curr_freq;
 			vdev_mlme->reg_tpc_obj.tpe[i] = psd_pwr;
+
+			chan_psd_power_info =
+				&vdev_mlme->reg_tpc_obj.chan_psd_power_info[i];
+			chan_psd_power_info->tx_power = psd_pwr;
+			chan_psd_power_info->chan_cfreq = curr_freq;
+
 			curr_freq += 20;
 			i++;
 		}
@@ -5786,6 +5796,12 @@ lim_update_ext_tpe_power(struct mac_context *mac, struct pe_session *session,
 
 		vdev_mlme->reg_tpc_obj.frequency[i] = ch_params.mhz_freq_seg0;
 		vdev_mlme->reg_tpc_obj.tpe[i] = eirp_pwr;
+
+		chan_eirp_power_info =
+			&vdev_mlme->reg_tpc_obj.chan_eirp_power_info[i];
+		chan_eirp_power_info->chan_cfreq = ch_params.mhz_freq_seg0;
+		chan_eirp_power_info->tx_power = eirp_pwr;
+
 		ext_power_updated = 1;
 	}
 	return ext_power_updated;
@@ -5831,8 +5847,8 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	uint8_t psd_index = 0, non_psd_index = 0;
 	uint8_t addn_non_psd_index = 0, addn_psd_index = 0;
 	uint8_t bw_num;
-	uint16_t bw_val, ch_width = 0;
-	qdf_freq_t curr_op_freq, curr_freq = 0;
+	uint16_t bw_val;
+	qdf_freq_t curr_op_freq, curr_freq = 0, cen320_freq = 0;
 	enum reg_6g_client_type client_mobility_type;
 	enum reg_6g_ap_type ap_power_type_6g = REG_INDOOR_AP;
 	uint16_t reg_max = 0, psd_power = 0;
@@ -5856,6 +5872,8 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	enum phy_ch_width ch_width_non_ext;
 	uint8_t expect_num;
 	bool use_sp_tpe = false, non_psd_channel = false;
+	struct chan_power_info *chan_psd_power_info = NULL;
+	struct chan_power_info *chan_eirp_power_info = NULL;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!vdev_mlme)
@@ -5873,66 +5891,55 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 
 	for (i = 0; i < num_tpe_ies; i++) {
 		single_tpe = tpe_ies[i];
-		if (single_tpe.present &&
-		    (single_tpe.max_tx_pwr_category == client_mobility_type)) {
-			if (single_tpe.max_tx_pwr_interpret == LOCAL_EIRP ||
-			    single_tpe.max_tx_pwr_interpret == LOCAL_EIRP_PSD)
-				local_tpe_count++;
-			else if (single_tpe.max_tx_pwr_interpret ==
-				 REGULATORY_CLIENT_EIRP ||
-				 single_tpe.max_tx_pwr_interpret ==
-				 REGULATORY_CLIENT_EIRP_PSD ||
-				 single_tpe.max_tx_pwr_interpret ==
-				 ADDITIONAL_REGULATORY_CLIENT_EIRP ||
-				 single_tpe.max_tx_pwr_interpret ==
-				 ADDITIONAL_REGULATORY_CLIENT_EIRP_PSD)
-				reg_tpe_count++;
+		if (!single_tpe.present ||
+		    single_tpe.max_tx_pwr_category != client_mobility_type)
+			continue;
+
+		if (single_tpe.max_tx_pwr_interpret == LOCAL_EIRP) {
+			non_psd_index = i;
+			non_psd_set = true;
+			local_eirp_idx = non_psd_index;
+			local_eirp_set = non_psd_set;
+			local_tpe_count++;
+		} else if (single_tpe.max_tx_pwr_interpret ==
+			   LOCAL_EIRP_PSD) {
+			psd_index = i;
+			psd_set = true;
+			local_psd_idx = psd_index;
+			local_psd_set = psd_set;
+			local_tpe_count++;
+		} else if (single_tpe.max_tx_pwr_interpret ==
+			   REGULATORY_CLIENT_EIRP) {
+			non_psd_index = i;
+			non_psd_set = true;
+			reg_eirp_idx = non_psd_index;
+			reg_eirp_set = non_psd_set;
+			reg_tpe_count++;
+		} else if (single_tpe.max_tx_pwr_interpret ==
+			   REGULATORY_CLIENT_EIRP_PSD) {
+			psd_index = i;
+			psd_set = true;
+			reg_psd_idx = psd_index;
+			reg_psd_set = psd_set;
+			reg_tpe_count++;
+		} else if (single_tpe.max_tx_pwr_interpret ==
+			   ADDITIONAL_REGULATORY_CLIENT_EIRP) {
+			addn_non_psd_index = i;
+			non_psd_set = true;
+			reg_tpe_count++;
+		} else if (single_tpe.max_tx_pwr_interpret ==
+			   ADDITIONAL_REGULATORY_CLIENT_EIRP_PSD) {
+			addn_psd_index = i;
+			psd_set = true;
+			reg_tpe_count++;
 		}
 	}
 
 	if (!reg_tpe_count && !local_tpe_count)
 		return;
-	else if (reg_tpe_count && local_tpe_count)
-		both_tpe_present = true;
 
-	for (i = 0; i < num_tpe_ies; i++) {
-		single_tpe = tpe_ies[i];
-		if (single_tpe.present &&
-		    (single_tpe.max_tx_pwr_category == client_mobility_type)) {
-			if (single_tpe.max_tx_pwr_interpret == LOCAL_EIRP) {
-				non_psd_index = i;
-				non_psd_set = true;
-				local_eirp_idx = non_psd_index;
-				local_eirp_set = non_psd_set;
-			} else if (single_tpe.max_tx_pwr_interpret ==
-				   LOCAL_EIRP_PSD) {
-				psd_index = i;
-				psd_set = true;
-				local_psd_idx = psd_index;
-				local_psd_set = psd_set;
-			} else if (single_tpe.max_tx_pwr_interpret ==
-				   REGULATORY_CLIENT_EIRP) {
-				non_psd_index = i;
-				non_psd_set = true;
-				reg_eirp_idx = non_psd_index;
-				reg_eirp_set = non_psd_set;
-			} else if (single_tpe.max_tx_pwr_interpret ==
-				   REGULATORY_CLIENT_EIRP_PSD) {
-				psd_index = i;
-				psd_set = true;
-				reg_psd_idx = psd_index;
-				reg_psd_set = psd_set;
-			} else if (single_tpe.max_tx_pwr_interpret ==
-				   ADDITIONAL_REGULATORY_CLIENT_EIRP) {
-				addn_non_psd_index = i;
-				non_psd_set = true;
-			} else if (single_tpe.max_tx_pwr_interpret ==
-				   ADDITIONAL_REGULATORY_CLIENT_EIRP_PSD) {
-				addn_psd_index = i;
-				psd_set = true;
-			}
-		}
-	}
+	if (reg_tpe_count && local_tpe_count)
+		both_tpe_present = true;
 
 	curr_op_freq = session->curr_op_freq;
 	bw_val = wlan_reg_get_bw_value(session->ch_width);
@@ -5962,9 +5969,16 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	else if (addn_non_psd_index && !non_psd_channel)
 		non_psd_set = false;
 
-	pe_debug("Use SP TPE IE: %d", use_sp_tpe);
+	puncture_bit_map = lim_get_punc_chan_bit_map(session);
 
-	if (non_psd_set && !psd_set) {
+	pe_debug("psd_set: %d, non_psd_set: %d, reg_count: %d, local_count: %d, use_sp_tpe: %d, freq: %d, seg0: %d, seg1: %d, bw_val: %d, puncture_bit_map: %d, Local: eirp: %d psd: %d, Regulatory: eirp: %d psd %d",
+		 psd_set, non_psd_set, reg_tpe_count, local_tpe_count,
+		 use_sp_tpe, session->curr_op_freq,
+		 session->ch_center_freq_seg0, session->ch_center_freq_seg1,
+		 bw_val, puncture_bit_map, local_eirp_set, local_psd_set,
+		 reg_eirp_set, reg_psd_set);
+
+	if (non_psd_set) {
 		if (use_sp_tpe)
 			single_tpe = tpe_ies[addn_non_psd_index];
 		else
@@ -5991,6 +6005,8 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		}
 		vdev_mlme->reg_tpc_obj.num_pwr_levels =
 					single_tpe.max_tx_pwr_count + 1;
+		vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels =
+				single_tpe.max_tx_pwr_count + 1;
 
 		ch_params.ch_width = CH_WIDTH_20MHZ;
 		/*
@@ -6011,7 +6027,12 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 				*has_tpe_updated = true;
 			vdev_mlme->reg_tpc_obj.frequency[i] =
 							ch_params.mhz_freq_seg0;
+			chan_eirp_power_info =
+				&vdev_mlme->reg_tpc_obj.chan_eirp_power_info[i];
+			chan_eirp_power_info->chan_cfreq =
+						ch_params.mhz_freq_seg0;
 			vdev_mlme->reg_tpc_obj.tpe[i] = single_tpe.tx_power[i];
+			chan_eirp_power_info->tx_power = single_tpe.tx_power[i];
 			if (ch_params.ch_width != CH_WIDTH_INVALID)
 				ch_params.ch_width =
 					get_next_higher_bw[ch_params.ch_width];
@@ -6025,9 +6046,10 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 						0, NULL, false);
 			vdev_mlme->reg_tpc_obj.num_pwr_levels +=
 							ext_power_updated;
+			vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels +=
+							ext_power_updated;
 		}
 	}
-	puncture_bit_map = lim_get_punc_chan_bit_map(session);
 
 	if (psd_set && puncture_bit_map) {
 		if (use_sp_tpe)
@@ -6050,14 +6072,20 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		num_octets = QDF_MIN(num_octets, expect_num);
 
 		vdev_mlme->reg_tpc_obj.num_pwr_levels = num_octets;
+		vdev_mlme->reg_tpc_obj.num_psd_pwr_levels = num_octets;
+
+		cen320_freq = wlan_reg_compute_6g_center_freq_from_cfi(
+						session->ch_center_freq_seg1);
 
 		bonded_freq = wlan_reg_get_bonded_chan_entry(
-					curr_op_freq, session->ch_width, 0);
+					curr_op_freq, session->ch_width,
+					cen320_freq);
 
 		ch_width_non_ext = single_tpe.max_tx_pwr_count - 1;
 
 		bonded_freq_non_ext = wlan_reg_get_bonded_chan_entry(
-					curr_op_freq, ch_width_non_ext, 0);
+					curr_op_freq, ch_width_non_ext,
+					cen320_freq);
 		if (!bonded_freq_non_ext) {
 			pe_debug("tx pwr count don't match with any chan pair");
 			puncture_bit_map = 0;
@@ -6072,17 +6100,26 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 			    vdev_mlme->reg_tpc_obj.frequency[i] != curr_freq)
 				*has_tpe_updated = true;
 			vdev_mlme->reg_tpc_obj.frequency[i] = curr_freq;
+			chan_psd_power_info =
+				&vdev_mlme->reg_tpc_obj.chan_psd_power_info[i];
+			chan_psd_power_info->chan_cfreq = curr_freq;
 			curr_freq += 20;
 			vdev_mlme->reg_tpc_obj.tpe[i] = single_tpe.tx_power[i];
+			chan_psd_power_info->tx_power = single_tpe.tx_power[i];
 		}
 
 		curr_freq = bonded_freq->start_freq;
-		ext_power_updated = lim_update_ext_tpe_power(
-					mac, session, &single_tpe, curr_freq,
-					has_tpe_updated, num_octets,
-					bonded_freq_non_ext, true);
+		ext_power_updated =
+				lim_update_ext_tpe_power(mac, session,
+							 &single_tpe,
+							 curr_freq,
+							 has_tpe_updated,
+							 num_octets,
+							 bonded_freq_non_ext,
+							 true);
 
 		vdev_mlme->reg_tpc_obj.num_pwr_levels = ext_power_updated;
+		vdev_mlme->reg_tpc_obj.num_psd_pwr_levels = ext_power_updated;
 	}
 
 non_punctured_psd_update:
@@ -6108,6 +6145,10 @@ non_punctured_psd_update:
 		vdev_mlme->reg_tpc_obj.num_pwr_levels = num_octets;
 
 		ch_params.ch_width = session->ch_width;
+		ch_params.mhz_freq_seg1 =
+			wlan_reg_compute_6g_center_freq_from_cfi(
+						session->ch_center_freq_seg1);
+
 		wlan_reg_set_channel_params_for_pwrmode(mac->pdev, curr_op_freq,
 							0, &ch_params,
 							REG_CURRENT_PWR_MODE);
@@ -6118,34 +6159,58 @@ non_punctured_psd_update:
 			curr_freq = ch_params.mhz_freq_seg0 - bw_val / 2 + 10;
 
 		if (!num_octets) {
-			if (!he_op->oper_info_6g_present)
-				ch_width = session->ch_width;
-			else
-				ch_width = he_op->oper_info_6g.info.ch_width;
+			/*
+			 * If the PSD power values of all the sub-20 MHz
+			 * channels in the operating channel is the same,
+			 * then a single PSD value shall be indicated in the
+			 * beacon and value of ext_count is zero, as per
+			 * specification.
+			 */
 			num_octets = lim_get_num_pwr_levels(true,
 							    session->ch_width);
 			vdev_mlme->reg_tpc_obj.num_pwr_levels = num_octets;
+			vdev_mlme->reg_tpc_obj.num_psd_pwr_levels = num_octets;
+
 			for (i = 0; i < num_octets; i++) {
 				if (vdev_mlme->reg_tpc_obj.tpe[i] !=
 				    single_tpe.tx_power[0] ||
 				    vdev_mlme->reg_tpc_obj.frequency[i] !=
 				    curr_freq)
 					*has_tpe_updated = true;
+
+				chan_psd_power_info =
+				&vdev_mlme->reg_tpc_obj.chan_psd_power_info[i];
+
 				vdev_mlme->reg_tpc_obj.frequency[i] = curr_freq;
+				chan_psd_power_info->chan_cfreq = curr_freq;
 				curr_freq += 20;
+				/* fill same tx power for each 20MHz */
 				vdev_mlme->reg_tpc_obj.tpe[i] =
+							single_tpe.tx_power[0];
+				chan_psd_power_info->tx_power =
 							single_tpe.tx_power[0];
 			}
 		} else {
+			/*
+			 * tx power is not same for each 20MHz, so AP should
+			 * send valid value of ext_count
+			 */
 			for (i = 0; i < num_octets; i++) {
 				if (vdev_mlme->reg_tpc_obj.tpe[i] !=
 				    single_tpe.tx_power[i] ||
 				    vdev_mlme->reg_tpc_obj.frequency[i] !=
 				    curr_freq)
 					*has_tpe_updated = true;
+
+				chan_psd_power_info =
+				&vdev_mlme->reg_tpc_obj.chan_psd_power_info[i];
+				chan_psd_power_info->chan_cfreq = curr_freq;
 				vdev_mlme->reg_tpc_obj.frequency[i] = curr_freq;
+
 				curr_freq += 20;
 				vdev_mlme->reg_tpc_obj.tpe[i] =
+							single_tpe.tx_power[i];
+				chan_psd_power_info->tx_power =
 							single_tpe.tx_power[i];
 			}
 		}
@@ -6156,6 +6221,7 @@ non_punctured_psd_update:
 			vdev_mlme->reg_tpc_obj.num_pwr_levels =
 							ext_power_updated;
 	}
+
 
 	if (non_psd_set) {
 		if (use_sp_tpe)
@@ -6180,9 +6246,6 @@ non_punctured_psd_update:
 	}
 
 	if (both_tpe_present) {
-		pe_debug("Local: eirp: %d psd: %d, Regulatory: eirp: %d psd %d",
-			 local_eirp_set, local_psd_set, reg_eirp_set,
-			 reg_psd_set);
 		if (local_eirp_set && reg_eirp_set) {
 			local_tpe = tpe_ies[local_eirp_idx];
 			reg_tpe = tpe_ies[reg_eirp_idx];
@@ -6202,6 +6265,20 @@ non_punctured_psd_update:
 			vdev_mlme->reg_tpc_obj.tpe[i] =
 						QDF_MIN(local_tpe.tx_power[i],
 							reg_tpe.tx_power[i]);
+			if (non_psd_set) {
+				chan_eirp_power_info =
+				&vdev_mlme->reg_tpc_obj.chan_eirp_power_info[i];
+				chan_eirp_power_info->tx_power =
+					vdev_mlme->reg_tpc_obj.tpe[i];
+			}
+
+			if (psd_set) {
+				chan_psd_power_info =
+				&vdev_mlme->reg_tpc_obj.chan_psd_power_info[i];
+				chan_psd_power_info->tx_power =
+					vdev_mlme->reg_tpc_obj.tpe[i];
+			}
+
 			pe_debug("TPE: Local: %d, Reg: %d, power updated: %d",
 				 local_tpe.tx_power[i], reg_tpe.tx_power[i],
 				 *has_tpe_updated);
@@ -6372,6 +6449,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 	bw_val = wlan_reg_get_bw_value(session->ch_width);
 
 	ch_params.ch_width = session->ch_width;
+	ch_params.mhz_freq_seg1 = wlan_reg_compute_6g_center_freq_from_cfi(
+						session->ch_center_freq_seg1);
+
 	/* start frequency calculation */
 	wlan_reg_set_channel_params_for_pwrmode(mac->pdev, oper_freq, 0,
 						&ch_params,
@@ -6549,6 +6629,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 	mlme_obj->reg_tpc_obj.eirp_power = reg_max;
 	mlme_obj->reg_tpc_obj.power_type_6g = ap_power_type_6g;
 	mlme_obj->reg_tpc_obj.is_psd_power = is_psd_power;
+
+	if (session->best_6g_power_type == REG_INDOOR_SP_AP)
+		mlme_obj->reg_tpc_obj.is_power_type_client_sp = true;
 
 	if (LIM_IS_AP_ROLE(session) && is_psd_power)
 		wlan_mlme_set_sap_psd_for_20mhz(session->vdev,
