@@ -64,6 +64,8 @@ static char *p2p_get_cmd_type_str(enum p2p_cmd_type cmd_type)
 		return "P2P cleanup tx";
 	case P2P_SET_RANDOM_MAC:
 		return "P2P set random mac";
+	case P2P_GROUP_CHAN_SWITCH_CMD:
+		return "P2P group channel switch";
 	default:
 		return "Invalid P2P command";
 	}
@@ -92,6 +94,8 @@ static char *p2p_get_event_type_str(enum p2p_event_type event_type)
 		return "P2P noa event";
 	case P2P_EVENT_ADD_MAC_RSP:
 		return "P2P add mac filter resp event";
+	case P2P_EVENT_AP_ASSIST_DFS_GROUP_BMISS_IND:
+		return "P2P AP assisted DFS Group bmiss event";
 	default:
 		return "Invalid P2P event";
 	}
@@ -920,6 +924,24 @@ QDF_STATUS p2p_psoc_stop(struct wlan_objmgr_psoc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+p2p_process_chan_switch_req(struct p2p_chan_switch_req_params *req)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = req->p2p_soc_obj;
+	if (!p2p_soc_obj)
+		return QDF_STATUS_E_INVAL;
+
+	if (p2p_soc_obj->p2p_cb.p2p_group_chan_switch_req) {
+		p2p_soc_obj->p2p_cb.p2p_group_chan_switch_req(req->vdev_id,
+							      req->channel,
+							      req->op_class);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS p2p_process_cmd(struct scheduler_msg *msg)
 {
 	QDF_STATUS status;
@@ -970,7 +992,10 @@ QDF_STATUS p2p_process_cmd(struct scheduler_msg *msg)
 		status = p2p_process_set_rand_mac(msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-
+	case P2P_GROUP_CHAN_SWITCH_CMD:
+		status = p2p_process_chan_switch_req(msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
 	default:
 		p2p_err("drop unexpected message received %d",
 			msg->type);
@@ -979,6 +1004,22 @@ QDF_STATUS p2p_process_cmd(struct scheduler_msg *msg)
 	}
 
 	return status;
+}
+
+static QDF_STATUS p2p_process_ap_assist_dfs_group_bmiss(void *ev_data)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+	struct p2p_ap_assist_dfs_group_bmiss *params =
+				(struct p2p_ap_assist_dfs_group_bmiss *)ev_data;
+
+	p2p_soc_obj = params->p2p_soc_obj;
+	if (!p2p_soc_obj)
+		return QDF_STATUS_E_INVAL;
+
+	if (p2p_soc_obj->p2p_cb.ap_assist_dfs_group_bmiss_notify)
+		p2p_soc_obj->p2p_cb.ap_assist_dfs_group_bmiss_notify(params->vdev_id);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS p2p_process_evt(struct scheduler_msg *msg)
@@ -1018,6 +1059,9 @@ QDF_STATUS p2p_process_evt(struct scheduler_msg *msg)
 		status = p2p_process_set_rand_mac_rsp(
 				(struct p2p_mac_filter_rsp *)
 				msg->bodyptr);
+		break;
+	case P2P_EVENT_AP_ASSIST_DFS_GROUP_BMISS_IND:
+		status = p2p_process_ap_assist_dfs_group_bmiss(msg->bodyptr);
 		break;
 	default:
 		p2p_err("Drop unexpected message received %d",
@@ -1070,6 +1114,9 @@ QDF_STATUS p2p_event_flush_callback(struct scheduler_msg *msg)
 
 	p2p_debug("flush event, type:%d", msg->type);
 	switch (msg->type) {
+	case P2P_EVENT_AP_ASSIST_DFS_GROUP_BMISS_IND:
+		qdf_mem_free(msg->bodyptr);
+		break;
 	case P2P_EVENT_NOA:
 		noa_event = (struct p2p_noa_event *)msg->bodyptr;
 		qdf_mem_free(noa_event->noa_info);

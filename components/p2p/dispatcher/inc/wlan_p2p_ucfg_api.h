@@ -329,6 +329,22 @@ QDF_STATUS ucfg_p2p_lo_stop(struct wlan_objmgr_psoc *soc,
 #endif
 
 /**
+ * ucfg_p2p_send_chan_switch_req() - OSIF wrapper API to send channel switch
+ * request params to P2P module
+ * @psoc: PSOC object manager
+ * @vdev_id: VDEV ID of p2p entity for channel switch request
+ * @channel: Channel number of requested channel
+ * @opclass: Operating class of request channel
+ *
+ * Posts command to P2P module for channel switch request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_p2p_send_chan_switch_req(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t channel,
+					 uint8_t opclass);
+
+/**
  * p2p_peer_authorized() - Process peer authorized event
  * @vdev: vdev structure to which peer is associated
  * @mac_addr: peer mac address
