@@ -23455,9 +23455,10 @@ wlan_hdd_update_akm_suite_info(struct wiphy *wiphy)
 	return QDF_STATUS_SUCCESS;
 }
 #else
-static void
+static QDF_STATUS
 wlan_hdd_update_akm_suite_info(struct wiphy *wiphy)
 {
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -23702,6 +23703,8 @@ mem_fail_5g:
 	return -ENOMEM;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)) || \
+	defined(CFG80211_IFTYPE_AKM_SUITES_SUPPORT)
 static inline
 void hdd_reset_akm_suites(struct hdd_context *hdd_ctx)
 {
@@ -23711,6 +23714,12 @@ void hdd_reset_akm_suites(struct hdd_context *hdd_ctx)
 	qdf_mem_free(hdd_ctx->ap_akms);
 	hdd_ctx->ap_akms = NULL;
 }
+#else
+static inline
+void hdd_reset_akm_suites(struct hdd_context *hdd_ctx)
+{
+}
+#endif
 
 /**
  * wlan_hdd_cfg80211_deinit() - Deinit cfg80211
@@ -32182,7 +32191,7 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 				       struct sk_buff *skb,
 				       bool unencrypted)
 {
-	return cfg80211_rx_control_port(dev, ta_addr, skb, unencrypted);
+	return cfg80211_rx_control_port(dev, skb, unencrypted);
 }
 #endif
 
