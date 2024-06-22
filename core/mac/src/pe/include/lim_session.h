@@ -380,6 +380,28 @@ struct wlan_mlo_ie_info {
 #define MAX_NUM_RNR_ENTRY 2
 
 /**
+ * struct dfs_p2p_group_info - Data struct to hold DFS operating P2P group info
+ * @is_assisted_p2p_group: Is AP assisted DFS group
+ * @chan_usage_req_resp_inprog: Is channel usage exchange in progress
+ * @is_ap_bcn_monitor_active: Is FW monitoring assisted AP beacons
+ * @reserved: Reserved
+ * @ap_bssid: BSSID of assisted AP
+ * @non_tx_bssid: Non-TxBSSID of assisted AP
+ * @chan_usage_req: Channel usage request info
+ * @chan_usage_resp: Channel usage response info
+ */
+struct dfs_p2p_group_info {
+	uint16_t         is_assisted_p2p_group:1,
+			 chan_usage_req_resp_inprog:1,
+			 is_ap_bcn_monitor_active:1,
+			 reserved:13;
+	struct qdf_mac_addr ap_bssid;
+	struct qdf_mac_addr non_tx_bssid;
+	tDot11fchannel_usage_req chan_usage_req;
+	tDot11fchannel_usage_resp chan_usage_resp;
+};
+
+/**
  * struct pe_session - per-vdev PE context
  * @available: true if the entry is available, false if it is in use
  * @cm_id:
@@ -689,6 +711,7 @@ struct wlan_mlo_ie_info {
  * on 2.4 GHz
  * @join_probe_cnt: join probe request count
  * @cal_tpc_post_csa: Recalculate tx power power csa
+ * @dfs_p2p_info: DFS P2P group operation info.
  */
 struct pe_session {
 	uint8_t available;
@@ -1020,6 +1043,8 @@ struct pe_session {
 	bool is_unexpected_peer_error;
 	uint8_t join_probe_cnt;
 	bool cal_tpc_post_csa;
+
+	struct dfs_p2p_group_info dfs_p2p_info;
 };
 
 /*-------------------------------------------------------------------------
