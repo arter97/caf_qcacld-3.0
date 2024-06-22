@@ -5361,6 +5361,7 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t conn_6ghz_flag = 0;
+	qdf_freq_t cur_freq;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -5450,6 +5451,14 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE)
 		ml_nlink_conn_change_notify(
 			psoc, session_id, ml_nlink_ap_started_evt, NULL);
+
+	cur_freq = wlan_get_operation_chan_freq_vdev_id(pm_ctx->pdev,
+							session_id);
+	if (mode == QDF_STA_MODE &&
+	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, cur_freq) &&
+	    pm_ctx->conc_cbacks.ap_assist_dfs_group_notify) {
+		pm_ctx->conc_cbacks.ap_assist_dfs_group_notify(true);
+	}
 }
 
 /**
@@ -5637,6 +5646,12 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 	if (wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev) &&
 	    (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE))
 		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
+
+	if (mode == QDF_STA_MODE &&
+	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, cur_freq) &&
+	    pm_ctx->conc_cbacks.ap_assist_dfs_group_notify) {
+		pm_ctx->conc_cbacks.ap_assist_dfs_group_notify(false);
+	}
 
 	return qdf_status;
 }

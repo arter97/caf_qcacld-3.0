@@ -2298,10 +2298,15 @@ struct policy_mgr_hdd_cbacks {
  *                          concurrency.such as EDCA params and RTS threshold.
  *                          If updated, it will also send the updated parameters
  *                          to FW.
+ * @ap_assist_dfs_group_notify: Notify on change in STA interface entry in
+ * policy manager either due to addition or removal from connection table to
+ * re-evaluate the status of P2P Group which are assisted by concurrent DFS
+ * infra connection
  */
 
 struct policy_mgr_conc_cbacks {
 	void (*connection_info_update)(void);
+	void (*ap_assist_dfs_group_notify)(bool is_incr_session);
 };
 
 /**
