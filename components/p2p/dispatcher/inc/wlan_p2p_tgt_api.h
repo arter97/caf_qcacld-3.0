@@ -89,6 +89,26 @@ static inline QDF_STATUS tgt_p2p_unregister_lo_ev_handler(
 #endif
 
 /**
+ * tgt_p2p_register_ap_assist_bmiss_ev_handler() - Register AP assist DFS group
+ * bmiss event handler
+ * @psoc: PSOC object manager
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+tgt_p2p_register_ap_assist_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * tgt_p2p_unregister_ap_assist_bmiss_ev_handler() - Unregister AP assist DFS
+ * group bmiss event handler
+ * @psoc: PSOC object manager
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+tgt_p2p_unregister_ap_assist_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc);
+
+/**
  * tgt_p2p_register_macaddr_rx_filter_evt_handler() - register add mac rx
  *    filter status event
  * @psoc: soc object

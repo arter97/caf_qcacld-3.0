@@ -851,6 +851,7 @@ QDF_STATUS p2p_psoc_start(struct wlan_objmgr_psoc *soc,
 	tgt_p2p_register_noa_ev_handler(soc);
 	tgt_p2p_register_macaddr_rx_filter_evt_handler(soc, true);
 	tgt_p2p_register_mcc_quota_ev_handler(soc, true);
+	tgt_p2p_register_ap_assist_bmiss_ev_handler(soc);
 	/* register scan request id */
 	p2p_soc_obj->scan_req_id = wlan_scan_register_requester(
 		soc, P2P_MODULE_NAME, tgt_p2p_scan_event_cb,
@@ -899,6 +900,7 @@ QDF_STATUS p2p_psoc_stop(struct wlan_objmgr_psoc *soc)
 	/* unrgister scan request id*/
 	wlan_scan_unregister_requester(soc, p2p_soc_obj->scan_req_id);
 
+	tgt_p2p_unregister_ap_assist_bmiss_ev_handler(soc);
 	tgt_p2p_register_mcc_quota_ev_handler(soc, false);
 	/* unregister p2p lo stop and noa event */
 	tgt_p2p_register_macaddr_rx_filter_evt_handler(soc, false);

@@ -45,6 +45,40 @@ wlan_psoc_get_p2p_tx_ops(struct wlan_objmgr_psoc *psoc)
 	return &(psoc->soc_cb.tx_ops->p2p);
 }
 
+QDF_STATUS
+tgt_p2p_unregister_ap_assist_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_p2p_tx_ops *p2p_ops;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	p2p_ops = wlan_psoc_get_p2p_tx_ops(psoc);
+	if (p2p_ops && p2p_ops->unreg_ap_assist_bmiss_ev_handler) {
+		status = p2p_ops->unreg_ap_assist_bmiss_ev_handler(psoc);
+		if (QDF_IS_STATUS_ERROR(status))
+			p2p_debug("unreg ap assist bmiss event status %d",
+				  status);
+	}
+
+	return status;
+}
+
+QDF_STATUS
+tgt_p2p_register_ap_assist_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_p2p_tx_ops *p2p_ops;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	p2p_ops = wlan_psoc_get_p2p_tx_ops(psoc);
+	if (p2p_ops && p2p_ops->reg_ap_assist_bmiss_ev_handler) {
+		status = p2p_ops->reg_ap_assist_bmiss_ev_handler(psoc);
+		if (QDF_IS_STATUS_ERROR(status))
+			p2p_debug("reg ap assist bmiss event status %d",
+				  status);
+	}
+
+	return status;
+}
+
 #ifdef FEATURE_P2P_LISTEN_OFFLOAD
 QDF_STATUS tgt_p2p_register_lo_ev_handler(
 	struct wlan_objmgr_psoc *psoc)
