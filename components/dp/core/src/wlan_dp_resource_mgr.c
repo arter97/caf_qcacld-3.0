@@ -106,6 +106,151 @@ wlan_dp_resource_mgr_phymode_to_tput(enum wlan_phymode phymode)
 	}
 }
 
+static void
+wlan_dp_resource_mgr_post_upscale_resource_req(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
+{
+	ol_txrx_soc_handle cdp_soc = rsrc_ctx->dp_ctx->cdp_soc;
+	struct dp_rx_refill_thread *refill_thread;
+	struct dp_txrx_handle *dp_ext_hdl;
+
+	dp_rsrc_mgr_debug("Posting Upscale resource");
+	dp_ext_hdl = cdp_soc_get_dp_txrx_handle(cdp_soc);
+
+	refill_thread = &dp_ext_hdl->refill_thread;
+
+	/*Clear any previous resource downscale event*/
+	qdf_atomic_clear_bit(RX_RESOURCE_DOWNSCALE_EVENT,
+			     &refill_thread->event_flag);
+	qdf_set_bit(RX_RESOURCE_UPSCALE_EVENT,
+		    &refill_thread->event_flag);
+	qdf_set_bit(RX_REFILL_POST_EVENT, &refill_thread->event_flag);
+	qdf_wake_up_interruptible(&refill_thread->wait_q);
+}
+
+static void
+wlan_dp_resource_mgr_post_downscale_resource_req(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
+{
+	ol_txrx_soc_handle cdp_soc = rsrc_ctx->dp_ctx->cdp_soc;
+	struct dp_rx_refill_thread *refill_thread;
+	struct dp_txrx_handle *dp_ext_hdl;
+
+	dp_rsrc_mgr_debug("Posting Downscale resource");
+	dp_ext_hdl = cdp_soc_get_dp_txrx_handle(cdp_soc);
+
+	refill_thread = &dp_ext_hdl->refill_thread;
+
+	/*clear any previous resource upscale event*/
+	qdf_atomic_clear_bit(RX_RESOURCE_UPSCALE_EVENT,
+			     &refill_thread->event_flag);
+	qdf_set_bit(RX_RESOURCE_DOWNSCALE_EVENT,
+		    &refill_thread->event_flag);
+	qdf_set_bit(RX_REFILL_POST_EVENT, &refill_thread->event_flag);
+	qdf_wake_up_interruptible(&refill_thread->wait_q);
+}
+
+void wlan_dp_resource_mgr_downscale_resources(void)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_resource_mgr_ctx *rsrc_ctx = dp_ctx->rsrc_mgr_ctx;
+	struct cdp_soc_t *cdp_soc = dp_ctx->cdp_soc;
+	enum wlan_dp_resource_level rsrc_level;
+	uint64_t cur_req_rx_buff_descs;
+	uint64_t req_rx_buff_descs;
+	uint64_t in_use_rx_buff_descs;
+	QDF_STATUS status;
+
+	dp_rsrc_mgr_debug("Downscale resource called");
+	status = cdp_get_num_buff_descs_info(cdp_soc,
+					     &cur_req_rx_buff_descs,
+					     &in_use_rx_buff_descs, 0);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch DP rx desc info");
+		return;
+	}
+
+	rsrc_level = rsrc_ctx->cur_resource_level;
+	req_rx_buff_descs = rsrc_ctx->cur_rsrc_map[rsrc_level].num_rx_buffers;
+	dp_rsrc_mgr_debug("rsrc_level:%u cur:%u in_use:%u req:%u", rsrc_level,
+			  rsrc_level, cur_req_rx_buff_descs,
+			  in_use_rx_buff_descs, req_rx_buff_descs);
+
+	if (cur_req_rx_buff_descs != req_rx_buff_descs) {
+		dp_info("cur_rx_buf:%u req_rx_buf:%u",
+			cur_req_rx_buff_descs, req_rx_buff_descs);
+		status = cdp_set_req_buff_descs(cdp_soc, req_rx_buff_descs, 0);
+		if (QDF_IS_STATUS_ERROR(status))
+			dp_err("Unable to set req DP rx desc");
+	}
+}
+
+void wlan_dp_resource_mgr_upscale_resources(
+				struct dp_rx_refill_thread *refill_thread)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_resource_mgr_ctx *rsrc_ctx = dp_ctx->rsrc_mgr_ctx;
+	struct cdp_soc_t *cdp_soc = dp_ctx->cdp_soc;
+	enum wlan_dp_resource_level rsrc_level;
+	uint64_t cur_req_rx_buff_descs;
+	uint64_t req_rx_buff_descs;
+	uint64_t in_use_rx_buff_descs;
+	uint64_t additional_rx_buffers = 0, batch_count = 0;
+	uint32_t num_alloc_buff;
+	QDF_STATUS status;
+
+	dp_rsrc_mgr_debug("Upscale resource called");
+	status = cdp_get_num_buff_descs_info(cdp_soc,
+					     &cur_req_rx_buff_descs,
+					     &in_use_rx_buff_descs, 0);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch DP rx desc info");
+		return;
+	}
+
+	rsrc_level = rsrc_ctx->cur_resource_level;
+	req_rx_buff_descs = rsrc_ctx->cur_rsrc_map[rsrc_level].num_rx_buffers;
+
+	if (cur_req_rx_buff_descs != req_rx_buff_descs) {
+		dp_info("cur_rx_buf:%u req_rx_buf:%u",
+			cur_req_rx_buff_descs, req_rx_buff_descs);
+
+		cdp_set_req_buff_descs(cdp_soc, req_rx_buff_descs, 0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			dp_err("Unable to set REQ DP rx desc");
+			return;
+		}
+		if (req_rx_buff_descs > cur_req_rx_buff_descs &&
+		    req_rx_buff_descs > in_use_rx_buff_descs)
+			additional_rx_buffers = (req_rx_buff_descs -
+				in_use_rx_buff_descs);
+	}
+
+	dp_rsrc_mgr_debug("cur:%u req:%u in_use:%u additional_req:%u",
+			  cur_req_rx_buff_descs, req_rx_buff_descs,
+			  in_use_rx_buff_descs, additional_rx_buffers);
+	batch_count = RX_RESOURCE_ALLOC_BATCH_COUNT;
+	while (additional_rx_buffers) {
+		if (additional_rx_buffers < RX_RESOURCE_ALLOC_BATCH_COUNT)
+			batch_count = additional_rx_buffers;
+		num_alloc_buff = cdp_buffers_replenish_on_demand(cdp_soc,
+							 batch_count, 0);
+		if (!num_alloc_buff) {
+			dp_err("failed to allocate rx buffers, count:%u",
+			       batch_count);
+			break;
+		}
+		if (qdf_atomic_test_and_clear_bit(
+					RX_RESOURCE_DOWNSCALE_EVENT,
+					&refill_thread->event_flag)) {
+			dp_info("DOWNSCALE request posted, stopping uspcale");
+			wlan_dp_resource_mgr_downscale_resources();
+			break;
+		}
+		additional_rx_buffers -= num_alloc_buff;
+	}
+}
+
 static uint32_t
 wlan_dp_resource_mgr_get_mac_id(struct wlan_objmgr_vdev *vdev)
 {

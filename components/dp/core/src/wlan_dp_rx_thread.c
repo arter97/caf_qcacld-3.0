@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,7 @@
 #include "wlan_dp_main.h"
 #include "wlan_dp_public_struct.h"
 #include "wlan_dp_ucfg_api.h"
+#include "wlan_dp_resource_mgr.h"
 #include "qdf_nbuf.h"
 #include "qdf_threads.h"
 #include "qdf_net_if.h"
@@ -711,6 +712,18 @@ static int dp_rx_refill_thread_sub_loop(struct dp_rx_refill_thread *rx_thread,
 			dp_debug("shutting down (%s) pid %d",
 				 qdf_get_current_comm(), qdf_get_current_pid());
 			*shutdown = true;
+			break;
+		}
+
+		if (qdf_atomic_test_and_clear_bit(RX_RESOURCE_UPSCALE_EVENT,
+						  &rx_thread->event_flag)) {
+			wlan_dp_resource_mgr_upscale_resources(rx_thread);
+			break;
+		}
+
+		if (qdf_atomic_test_and_clear_bit(RX_RESOURCE_DOWNSCALE_EVENT,
+						  &rx_thread->event_flag)) {
+			wlan_dp_resource_mgr_downscale_resources();
 			break;
 		}
 
