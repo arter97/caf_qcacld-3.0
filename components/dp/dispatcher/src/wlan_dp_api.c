@@ -171,10 +171,14 @@ void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
 					  uint32_t old_mac_id,
 					  uint32_t new_mac_id)
 {
-	/*
-	 * TODO Pass this info to DP resource mgr
-	 * Take action for vdev to mac_id migration
-	 */
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx || !dp_ctx->rsrc_mgr_ctx)
+		return;
+
+	wlan_dp_resource_mgr_notify_vdev_mac_id_migration(dp_ctx->rsrc_mgr_ctx,
+							  vdev, old_mac_id,
+							  new_mac_id);
 }
 
 void

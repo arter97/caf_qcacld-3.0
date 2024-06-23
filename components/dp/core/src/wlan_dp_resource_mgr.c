@@ -1056,6 +1056,59 @@ wlan_dp_resource_mgr_vote_node_free(struct wlan_objmgr_peer *peer)
 								rsrc_ctx, peer);
 }
 
+void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				struct wlan_objmgr_vdev *vdev,
+				uint32_t old_mac_id,
+				uint32_t new_mac_id)
+{
+	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
+	struct wlan_dp_resource_vote_node *vote_node;
+	struct wlan_dp_peer_priv_context *priv_ctx;
+	struct wlan_objmgr_peer *peer;
+	bool list_update = false;
+
+	dp_rsrc_mgr_debug("vdev migration came for opmode:%u", opmode);
+	/*ML-STA connections are mac_n_list no handling required*/
+	if (((opmode == QDF_STA_MODE) &&
+	    wlan_vdev_mlme_is_mlo_vdev(vdev)) ||
+			(opmode == QDF_NDI_MODE))
+		return;
+
+	wlan_objmgr_for_each_vdev_peer(vdev, peer) {
+		wlan_objmgr_peer_get_ref(peer, WLAN_DP_ID);
+		/*If vote node is present then no active connection*/
+		priv_ctx = dp_get_peer_priv_obj(peer);
+		if (priv_ctx->vote_node) {
+			dp_rsrc_mgr_debug("vote_node found for vdev_id:%u migration",
+					  wlan_vdev_get_id(vdev));
+			vote_node = priv_ctx->vote_node;
+			if (vote_node->mac_id != old_mac_id) {
+				dp_err("old macid is not matching to vote macid old:%u new:%u vote_mac:%u",
+				       old_mac_id, new_mac_id, vote_node->mac_id);
+			}
+
+			/*
+			 * Removing from mac list based on old mac_id.
+			 * Adding to mac list based on new mac_id.
+			 */
+			qdf_list_remove_node(&rsrc_ctx->mac_list[vote_node->mac_id],
+					     &vote_node->node);
+			vote_node->mac_id = new_mac_id;
+			wlan_dp_resource_mgr_list_insert_vote_node(
+					&rsrc_ctx->mac_list[vote_node->mac_id],
+					vote_node, opmode);
+			if (!list_update)
+				list_update = true;
+		}
+
+		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
+	}
+
+	if (list_update)
+		wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
+}
+
 static void
 wlan_dp_resource_mgr_list_attach(struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
 {
