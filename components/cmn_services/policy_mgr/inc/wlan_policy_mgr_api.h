@@ -379,10 +379,23 @@ policy_mgr_get_dfs_sta_sap_go_scc_movement(struct wlan_objmgr_psoc *psoc,
 uint32_t policy_mgr_get_connected_vdev_band_mask(struct wlan_objmgr_vdev *vdev);
 
 /**
- * policy_mgr_get_dfs_master_dynamic_enabled() - support dfs master or not
- * on AP interface when STA+SAP(GO) concurrency
+ * policy_mgr_get_dfs_master_dynamic_enabled() - query current
+ * dfs master support when STA+SAP(GO) concurrency
  * @psoc: pointer to psoc
  * @vdev_id: sap vdev id
+ *
+ * Return: true if dfs master functionality should be enabled.
+ */
+bool
+policy_mgr_get_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id);
+
+/**
+ * policy_mgr_update_dfs_master_dynamic_enabled() - update dfs master support
+ * or not on AP interface when STA+SAP(GO) concurrency
+ * @psoc: pointer to psoc
+ * @always_update_target: force update the setting to target
+ * @des_chan: New SAP(GO) channel to be started
  *
  * This API is used to check AP dfs master functionality enabled or not when
  * STA+SAP(GO) concurrency.
@@ -401,8 +414,9 @@ uint32_t policy_mgr_get_connected_vdev_band_mask(struct wlan_objmgr_vdev *vdev);
  * Return: true if dfs master functionality should be enabled.
  */
 bool
-policy_mgr_get_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
-					  uint8_t vdev_id);
+policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
+					     bool always_update_target,
+					     struct wlan_channel *des_chan);
 
 /**
  * policy_mgr_get_can_skip_radar_event - Can skip DFS Radar event or not
