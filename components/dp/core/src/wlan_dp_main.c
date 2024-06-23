@@ -1323,14 +1323,13 @@ dp_peer_obj_destroy_notification(struct wlan_objmgr_peer *peer, void *arg)
 		return QDF_STATUS_E_FAULT;
 	}
 
+	wlan_dp_resource_mgr_vote_node_free(peer);
+
 	status = wlan_objmgr_peer_component_obj_detach(peer, WLAN_COMP_DP,
 						       priv_ctx);
 	if (QDF_IS_STATUS_ERROR(status))
 		dp_err("DP peer ("QDF_MAC_ADDR_FMT") detach failed",
 			QDF_MAC_ADDR_REF(peer->macaddr));
-
-	if (priv_ctx->vote_node)
-		wlan_dp_resource_mgr_vote_node_free(priv_ctx->vote_node);
 
 	qdf_mem_free(priv_ctx);
 
@@ -2441,6 +2440,8 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 	wlan_dp_rx_fisa_cmem_attach(dp_ctx);
 	wlan_dp_svc_init(dp_ctx);
 
+	wlan_dp_resource_mgr_attach(dp_ctx);
+
 	return dp_soc;
 
 err_soc_detach:
@@ -2464,6 +2465,7 @@ void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 
+	wlan_dp_resource_mgr_detach(dp_ctx);
 	cdp_soc_deinit(soc);
 	wlan_dp_check_inactive_dp_links(dp_ctx);
 	cdp_soc_detach(soc);
@@ -2525,6 +2527,8 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
 		qdf_status = QDF_STATUS_SUCCESS;
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		goto fisa_attach_fail;
+
+	wlan_dp_resource_mgr_set_req_resources(dp_ctx->rsrc_mgr_ctx);
 
 	return qdf_status;
 

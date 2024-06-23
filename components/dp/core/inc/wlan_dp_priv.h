@@ -939,6 +939,7 @@ struct wlan_dp_stc;
  * @dp_stc: STC context
  * @spm_ctx: Servicy policy manager context
  * @gl_flow_recs: Global Tx flow table for all dp_interfaces
+ * @rsrc_mgr_ctx: DP resource manager context reference
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1059,6 +1060,7 @@ struct wlan_dp_psoc_context {
 	struct wlan_dp_spm_context *spm_ctx;
 	struct wlan_dp_spm_flow_info *gl_flow_recs;
 #endif
+	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
 };
 
 /**
