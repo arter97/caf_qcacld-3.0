@@ -182,9 +182,13 @@ wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
 				struct nan_datapath_channel_info *ch_info,
 				uint32_t num_channels)
 {
-	/*
-	 * TODO Pass this info to DP resource mgr
-	 * Take action for NAN session update
-	 */
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx || !dp_ctx->rsrc_mgr_ctx)
+		return;
+
+	wlan_dp_resource_mgr_notify_ndp_channel_info(dp_ctx->rsrc_mgr_ctx,
+						     peer, ch_info,
+						     num_channels);
 }
 #endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */

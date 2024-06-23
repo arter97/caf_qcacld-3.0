@@ -125,6 +125,131 @@ wlan_dp_resource_mgr_get_mac_id(struct wlan_objmgr_vdev *vdev)
 }
 
 static void
+wlan_dp_resource_mgr_find_nan_max_phymodes(
+		struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+		struct wlan_dp_resource_vote_node **nan_max_vote_node)
+{
+	qdf_list_t *nan_list = &rsrc_ctx->nan_list;
+	struct wlan_dp_resource_vote_node *first_max_node = NULL;
+	struct wlan_dp_resource_vote_node *second_max_node = NULL;
+	struct wlan_dp_resource_vote_node *first_max_mac0_node = NULL;
+	struct wlan_dp_resource_vote_node *second_max_mac0_node = NULL;
+	struct wlan_dp_resource_vote_node *vote_node_cur;
+	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
+	bool ndi_dbs_support;
+	QDF_STATUS status;
+
+	dp_rsrc_mgr_debug("NAN find MAX phymodes called");
+	/*NO active peers for NAN*/
+	if (qdf_list_empty(nan_list))
+		return;
+
+	/*
+	 * NAN single peer can have operating slots in both MACs,
+	 * but at a time same peer can operate on single MAC.
+	 * Multiple peers can operate simultaneously on both MACs.
+	 * So pick max two phymodes of different peers and able to
+	 * support simultaneous operation on different peers.
+	 */
+	ndi_dbs_support = ucfg_is_ndi_dbs_supported(rsrc_ctx->dp_ctx->psoc);
+	status = qdf_list_peek_front(nan_list, &cur_node);
+	while (QDF_IS_STATUS_SUCCESS(status)) {
+		vote_node_cur = qdf_container_of(cur_node,
+				struct wlan_dp_resource_vote_node, node);
+
+		if (!first_max_node) {
+			first_max_mac0_node = vote_node_cur;
+			if (!ndi_dbs_support) {
+				first_max_mac0_node->tput =
+					first_max_mac0_node->tput0;
+				first_max_mac0_node->phymode =
+					first_max_mac0_node->phymode0;
+				nan_max_vote_node[0] = first_max_mac0_node;
+				dp_rsrc_mgr_debug("Single MAC NAN phymode");
+				return;
+			}
+			first_max_node = vote_node_cur;
+			goto get_next_node;
+		}
+		if (!second_max_node) {
+			second_max_node = vote_node_cur;
+			second_max_mac0_node = vote_node_cur;
+			if (first_max_node->tput1 < second_max_node->tput1) {
+				second_max_node = first_max_node;
+				first_max_node = vote_node_cur;
+			}
+			goto get_next_node;
+		}
+
+		if (vote_node_cur->tput1 > first_max_node->tput1) {
+			second_max_node = first_max_node;
+			first_max_node = vote_node_cur;
+		} else if (vote_node_cur->tput1 > second_max_node->tput1) {
+			second_max_node = vote_node_cur;
+		}
+
+get_next_node:
+		status = qdf_list_peek_next(nan_list, cur_node, &next_node);
+		cur_node = next_node;
+		next_node = NULL;
+	}
+
+	if (!second_max_node) {
+		/*Single NAN peer case in DBS*/
+		if (first_max_node->tput1 > first_max_node->tput0) {
+			first_max_node->tput = first_max_node->tput1;
+			first_max_node->phymode =
+				first_max_node->phymode1;
+			nan_max_vote_node[1] = first_max_node;
+		} else {
+			first_max_node->tput = first_max_node->tput0;
+			first_max_node->phymode =
+				first_max_node->phymode0;
+			nan_max_vote_node[0] = first_max_node;
+		}
+		dp_rsrc_mgr_debug("Single NAN peer present in DBS case");
+		return;
+	}
+
+	if (first_max_mac0_node == first_max_node) {
+		dp_rsrc_mgr_debug("NAN Same peer have both MACs vote");
+		/*
+		 * MAC-0 max phymode tput and MAC-1 max phymode tput are of
+		 * same peer, ideally same peer cannot have simultaneous rx on both macs.
+		 * so involve other peer in max phymode tput selection
+		 */
+		if ((first_max_node->tput0 + second_max_node->tput1) >
+		    (first_max_node->tput1 + second_max_mac0_node->tput0)) {
+			first_max_node->tput = first_max_node->tput0;
+			first_max_node->phymode = first_max_node->phymode0;
+			second_max_node->tput = second_max_node->tput1;
+			second_max_node->phymode = second_max_node->phymode1;
+			nan_max_vote_node[0] = first_max_node;
+			nan_max_vote_node[1] = second_max_node;
+		} else {
+			first_max_node->tput = first_max_node->tput1;
+			first_max_node->phymode = first_max_node->phymode1;
+			second_max_mac0_node->tput =
+				second_max_mac0_node->tput0;
+			second_max_mac0_node->phymode =
+				second_max_mac0_node->phymode0;
+			nan_max_vote_node[0] = second_max_mac0_node;
+			nan_max_vote_node[1] = first_max_node;
+		}
+		return;
+	}
+
+	dp_rsrc_mgr_debug("NAN multi peer MACs votes selected");
+	first_max_mac0_node->tput = first_max_mac0_node->tput0;
+	first_max_mac0_node->phymode = first_max_mac0_node->phymode0;
+	first_max_node->tput = second_max_node->tput1;
+	first_max_node->phymode = second_max_node->phymode1;
+
+	nan_max_vote_node[0] = first_max_mac0_node;
+	nan_max_vote_node[1] = second_max_node;
+}
+
+static void
 wlan_dp_resource_mgr_find_max_mac_n_phymodes(
 			struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 			struct wlan_dp_resource_vote_node **max_mac_n_phymodes)
@@ -371,6 +496,87 @@ wlan_dp_resource_mgr_add_vote_node(struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 			  vote_node->phymode);
 
 	return vote_node;
+}
+
+void
+wlan_dp_resource_mgr_notify_ndp_channel_info(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				struct wlan_objmgr_peer *peer,
+				struct nan_datapath_channel_info *ch_info,
+				uint32_t num_channels)
+{
+	struct wlan_dp_peer_priv_context *priv_ctx;
+	struct wlan_dp_resource_vote_node *vote_node;
+	enum QDF_OPMODE opmode = QDF_NDI_MODE;
+	enum wlan_phymode mac0_phymode = 0, mac1_phymode = 0;
+	uint64_t mac0_tput = 0, mac1_tput = 0;
+	enum wlan_phymode host_phymode;
+	int i;
+
+	dp_rsrc_mgr_debug("NDP notify channel info called");
+	for (i = 0; i < num_channels; i++) {
+		host_phymode = wma_fw_to_host_phymode(ch_info->phymode);
+		if (!ch_info->mac_id &&
+		    (wlan_dp_resource_mgr_phymode_to_tput(host_phymode) >
+		     mac0_tput)) {
+			mac0_phymode = host_phymode;
+			mac0_tput =
+			wlan_dp_resource_mgr_phymode_to_tput(mac0_phymode);
+		} else if (ch_info->mac_id &&
+			   (wlan_dp_resource_mgr_phymode_to_tput(host_phymode) >
+			    mac1_tput)) {
+			mac1_phymode = host_phymode;
+			mac1_tput = wlan_dp_resource_mgr_phymode_to_tput(mac1_phymode);
+		}
+		ch_info++;
+	}
+
+	priv_ctx = dp_get_peer_priv_obj(peer);
+	if (priv_ctx->vote_node) {
+		vote_node = priv_ctx->vote_node;
+		if (vote_node->phymode0 == mac0_phymode &&
+		    vote_node->phymode1 == mac1_phymode) {
+			dp_info("NDP Max phymode did not change");
+			return;
+		}
+
+		vote_node->phymode0 = mac0_phymode;
+		vote_node->tput0 = mac0_tput;
+		vote_node->phymode1 = mac1_phymode;
+		vote_node->tput1 = mac1_tput;
+
+		/*
+		 * Removing from the sorted list, since phymode changed.
+		 * Adding to list in based on new phymode throughput value.
+		 */
+		qdf_list_remove_node(&rsrc_ctx->nan_list,
+				     &vote_node->node);
+		wlan_dp_resource_mgr_list_insert_vote_node(
+			&rsrc_ctx->nan_list, vote_node, opmode);
+		dp_rsrc_mgr_debug("NDP resource vote node re-insert phymode0:%u phymode1:%u list_len:%u",
+				  vote_node->phymode0, vote_node->phymode1,
+				  qdf_list_size(&rsrc_ctx->nan_list));
+		goto select_max_phymodes;
+	}
+
+	vote_node = qdf_mem_malloc(sizeof(*vote_node));
+	if (!vote_node) {
+		dp_err("Failed to allocate memory for resource vote node");
+		return;
+	}
+	priv_ctx->vote_node = vote_node;
+	vote_node->phymode0 = mac0_phymode;
+	vote_node->tput0 = mac0_tput;
+	vote_node->phymode1 = mac1_phymode;
+	vote_node->tput1 = mac1_tput;
+	wlan_dp_resource_mgr_list_insert_vote_node(&rsrc_ctx->nan_list,
+						   vote_node, opmode);
+	dp_rsrc_mgr_debug("NDP new node phymode0:%u tput0:%u phymode1:%u tput1:%u list_len:%u",
+			  vote_node->phymode0, vote_node->tput0,
+			  vote_node->phymode1, vote_node->tput1,
+			  qdf_list_size(&rsrc_ctx->nan_list));
+select_max_phymodes:
+	wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
 }
 
 static struct wlan_dp_resource_vote_node*
