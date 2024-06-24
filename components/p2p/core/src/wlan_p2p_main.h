@@ -730,4 +730,41 @@ const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
 QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 			       struct p2p_usd_attr_params *param);
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+/**
+ * p2p_extract_ap_assist_dfs_params() - Extract P2P2 IE for assisted AP
+ * operation info
+ * @vdev: VDEV object manager pointer
+ * @ie: Buffer pointer to IE
+ * @ie_len: Length of bytes pointer by @ie
+ * @is_connected: If set to %true, only connected AP info is extracted from
+ * WLAN AP info attr in P2P2 IE
+ * @freq: Frequency to filter from the available APs in WLAN AP info attr in
+ * P2P@ IE
+ * @is_self: If set to %true, the extracted info is saved in VDEV priv
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					    const uint8_t *ie, uint16_t ie_len,
+					    bool is_connected, qdf_freq_t freq,
+					    bool is_self);
+
+/**
+ * p2p_get_ap_assist_dfs_params() - Get the parameters of attributes in P2P2 IE
+ * @vdev: VDEV object manager pointer of P2P entity
+ * @is_dfs_owner: Pointer to get DFS owner capability in extended cap of P2P2 IE
+ * @is_valid_ap_assist: Is assisted AP params valid
+ * @ap_bssid: Pointer to get AP BSSID of assisted AP in DFS oper extracted from
+ * wlan ap info attribute
+ * @opclass: Operating class of the AP pointed in @ap_bssid
+ * @chan: Channel number of the AP pointed in @ap_bssid
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					bool *is_dfs_owner,
+					bool *is_valid_ap_assist,
+					struct qdf_mac_addr *ap_bssid,
+					uint8_t *opclass, uint8_t *chan);
 #endif /* _WLAN_P2P_MAIN_H_ */

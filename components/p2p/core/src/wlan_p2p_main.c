@@ -1219,6 +1219,308 @@ const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
 	return NULL;
 }
 
+static void
+p2p_parse_p2p2_ext_cap_attr(const uint8_t *p2p2_ie, uint16_t rem_len,
+			    struct p2p_ap_assist_dfs_group_info *dfs_info)
+{
+	uint8_t min_attr_len = 3;
+	const uint8_t *attr_data;
+	uint16_t attr_len;
+
+	attr_len = LE_READ_2(&p2p2_ie[1]);
+	if (!attr_len)
+		return;
+
+	dfs_info->extn_cap_attr_found = true;
+
+	attr_data = p2p2_ie + min_attr_len;
+	dfs_info->is_dfs_owner = QDF_GET_BITS(attr_data[0], 6, 1);
+	dfs_info->is_client_csa = QDF_GET_BITS(attr_data[0], 7, 1);
+}
+
+static void
+p2p_parse_p2p2_wlan_ap_info_attr(const uint8_t *p2p2_ie, uint16_t rem_len,
+				 bool only_connected,
+				 struct p2p_ap_assist_dfs_group_info *dfs_info)
+{
+	uint8_t per_ap_len = 12, min_attr_len = 3;
+	uint16_t attr_len;
+	const uint8_t *attr_data;
+	uint8_t i, num_ap_infos, list_idx;
+
+	attr_len = LE_READ_2(&p2p2_ie[1]);
+	if (!attr_len)
+		return;
+
+	num_ap_infos = QDF_MIN(attr_len / per_ap_len,
+			       WLAN_P2P_MAX_WLAN_AP_INFO);
+
+	if (!num_ap_infos || (num_ap_infos * per_ap_len) > rem_len)
+		return;
+
+	dfs_info->wlan_ap_info_attr_found = true;
+
+	attr_data =  p2p2_ie + min_attr_len;
+
+	/*
+	 * If @only_connected is %true then WLAN APs with connected bit set
+	 * are only filtered, if not all the APs info is saved within the
+	 * size of @num_ap_infos. This only extracts the contents of the
+	 * attribute.
+	 */
+	list_idx = 0;
+	for (i = 0; i < num_ap_infos; i++) {
+		if (!QDF_GET_BITS(attr_data[0], 0, 1) && only_connected) {
+			attr_data += per_ap_len;
+			continue;
+		}
+
+		dfs_info->ap_info[list_idx].is_connected =
+					QDF_GET_BITS(attr_data[0], 0, 1);
+
+		attr_data++;
+		qdf_copy_macaddr(&dfs_info->ap_info[list_idx].ap_bssid,
+				 (struct qdf_mac_addr *)attr_data);
+		attr_data += ETH_ALEN;
+		attr_data += REG_ALPHA2_LEN + 1;
+		dfs_info->ap_info[list_idx].op_class = *attr_data;
+		attr_data++;
+
+		dfs_info->ap_info[list_idx].chan = *attr_data;
+		list_idx++;
+		break;
+	}
+
+	dfs_info->num_ap_info = list_idx;
+}
+
+static uint8_t
+p2p_validate_ap_assist_params(struct wlan_objmgr_pdev *pdev,
+			      struct p2p_ap_assist_dfs_group_info *dfs_info,
+			      qdf_freq_t req_freq)
+{
+	qdf_freq_t freq;
+	uint8_t idx, valid_idx, valid_cnt;
+	struct p2p_ap_assist_dfs_ap_info *ap_info;
+
+	if (!pdev)
+		return 0;
+
+	if (!dfs_info->extn_cap_attr_found ||
+	    !dfs_info->wlan_ap_info_attr_found || !dfs_info->num_ap_info)
+		return 0;
+
+	if (dfs_info->is_dfs_owner || !wlan_reg_is_dfs_for_freq(pdev, req_freq))
+		goto clear_ap_info;
+
+	/*
+	 * Filter out APs info which are in the same DFS frequency and has
+	 * valid BSSID from the extracted list.
+	 */
+	for (idx = 0, valid_cnt = 0; idx < dfs_info->num_ap_info; idx++) {
+		ap_info = &dfs_info->ap_info[idx];
+		if (wlan_reg_is_6ghz_op_class(pdev, ap_info->op_class))
+			continue;
+
+		freq = wlan_reg_legacy_chan_to_freq(pdev, ap_info->chan);
+		if (freq != req_freq)
+			continue;
+
+		if (qdf_is_macaddr_zero(&ap_info->ap_bssid) ||
+		    qdf_is_macaddr_broadcast(&ap_info->ap_bssid) ||
+		    QDF_NET_IS_MAC_MULTICAST(&ap_info->ap_bssid.bytes[0]))
+			continue;
+
+		ap_info->is_valid = true;
+		valid_cnt++;
+	}
+
+	if (!valid_cnt)
+		goto clear_ap_info;
+
+	for (idx = 0, valid_idx = 0; idx < dfs_info->num_ap_info; idx++) {
+		if (!dfs_info->ap_info[idx].is_valid)
+			continue;
+
+		if (valid_idx != idx) {
+			qdf_mem_copy(&dfs_info->ap_info[valid_idx],
+				     &dfs_info->ap_info[idx], sizeof(*ap_info));
+		}
+		valid_idx++;
+	}
+
+	qdf_mem_zero(&dfs_info->ap_info[valid_idx],
+		     sizeof(*ap_info) * (dfs_info->num_ap_info - valid_cnt));
+
+	dfs_info->num_ap_info = valid_cnt;
+	dfs_info->is_valid_ap_assist = true;
+
+	return valid_cnt;
+
+clear_ap_info:
+	qdf_mem_zero(&dfs_info->ap_info[0],
+		     sizeof(*ap_info) * dfs_info->num_ap_info);
+
+	return 0;
+}
+
+static QDF_STATUS
+p2p_parse_p2p2_ie(const uint8_t *ie, uint16_t ie_len, bool is_connected,
+		  struct p2p_ap_assist_dfs_group_info *dfs_info)
+{
+	const uint8_t *vendor_ie, *p2p2_ie;
+	uint16_t attr, rem_len, attr_len;
+	uint8_t min_attr_len = 3;
+
+	if (!dfs_info)
+		return QDF_STATUS_E_INVAL;
+
+	qdf_mem_zero(dfs_info, sizeof(*dfs_info));
+
+	vendor_ie = p2p_get_p2p2_ie_ptr(ie, ie_len);
+	if (!vendor_ie)
+		return QDF_STATUS_SUCCESS;
+
+	rem_len = vendor_ie[TAG_LEN_POS];
+	if (rem_len < (MIN_IE_LEN + P2P2_OUI_SIZE)) {
+		p2p_err("Invalid IE len %d", rem_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	p2p2_ie = vendor_ie + HEADER_LEN_P2P_IE;
+	rem_len -= P2P2_OUI_SIZE;
+
+	while (rem_len >= min_attr_len) {
+		attr = p2p2_ie[0];
+		attr_len = LE_READ_2(&p2p2_ie[1]);
+
+		if (!attr_len)
+			goto next_attr;
+
+		switch (attr) {
+		case P2P_ATTR_EXT_CAPABILITY:
+			p2p_parse_p2p2_ext_cap_attr(p2p2_ie, rem_len, dfs_info);
+			break;
+		case P2P_ATTR_WLAN_AP_INFO:
+			p2p_parse_p2p2_wlan_ap_info_attr(p2p2_ie, rem_len,
+							 is_connected,
+							 dfs_info);
+			break;
+		default:
+			break;
+		}
+next_attr:
+		p2p2_ie += (min_attr_len + attr_len);
+		rem_len -= (min_attr_len + attr_len);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+p2p_validate_peer_ap_assist_dfs_params(struct p2p_vdev_priv_obj *p2p_vdev_obj,
+				       struct p2p_ap_assist_dfs_group_info *peer_dfs_info)
+{
+	uint8_t idx;
+	struct p2p_ap_assist_dfs_ap_info *self_ap_info, *peer_ap_info;
+
+	if (!peer_dfs_info->is_valid_ap_assist)
+		return QDF_STATUS_E_FAILURE;
+
+	self_ap_info = &p2p_vdev_obj->ap_assist_dfs.ap_info[0];
+	for (idx = 0; idx < peer_dfs_info->num_ap_info; idx++) {
+		peer_ap_info = &peer_dfs_info->ap_info[idx];
+		if (peer_dfs_info->ap_info[idx].is_connected ||
+		    qdf_is_macaddr_equal(&peer_ap_info->ap_bssid,
+					 &self_ap_info->ap_bssid)) {
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					    const uint8_t *ie, uint16_t ie_len,
+					    bool is_connected, qdf_freq_t freq,
+					    bool is_self)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_pdev *pdev;
+	struct p2p_vdev_priv_obj *p2p_vdev_obj;
+	struct p2p_ap_assist_dfs_group_info *dfs_info, peer_info;
+
+	p2p_vdev_obj =
+		wlan_objmgr_vdev_get_comp_private_obj(vdev, WLAN_UMAC_COMP_P2P);
+	if (!p2p_vdev_obj)
+		return QDF_STATUS_E_INVAL;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	/*
+	 * If @is_self is %true then the extracted P2P2 IE info is saved in the
+	 * p2p_vdev_obj of that VDEV. For GO this will be needed to save the
+	 * AP details of the connected BSS and for CLI it needs to get the
+	 * AP details of the GO's STA BSS to later configure to FW the
+	 * BSSID to monitor.
+	 *
+	 * If @is_self is %false then the extracted P2P2 IE is of the peer
+	 * entity (assoc req coming to GO from CLI) and GO need to validate
+	 * that CLI's STA is either connected to AP in same frequency or it
+	 * connected to same AP or can either listen beacon from GO's STA
+	 * BSS AP.
+	 */
+	if (is_self) {
+		dfs_info = &p2p_vdev_obj->ap_assist_dfs;
+		is_connected = true;
+		status = p2p_parse_p2p2_ie(ie, ie_len, is_connected, dfs_info);
+		p2p_validate_ap_assist_params(pdev, dfs_info, freq);
+	} else {
+		dfs_info = &peer_info;
+		status = p2p_parse_p2p2_ie(ie, ie_len, is_connected, dfs_info);
+		p2p_validate_ap_assist_params(pdev, dfs_info, freq);
+		status = p2p_validate_peer_ap_assist_dfs_params(p2p_vdev_obj,
+								&peer_info);
+	}
+
+	return status;
+}
+
+QDF_STATUS p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					bool *is_dfs_owner,
+					bool *is_valid_ap_assist,
+					struct qdf_mac_addr *ap_bssid,
+					uint8_t *opclass, uint8_t *chan)
+{
+	struct p2p_vdev_priv_obj *p2p_vdev_obj;
+	struct p2p_ap_assist_dfs_group_info *dfs_info;
+
+	p2p_vdev_obj =
+		wlan_objmgr_vdev_get_comp_private_obj(vdev, WLAN_UMAC_COMP_P2P);
+	if (!p2p_vdev_obj)
+		return QDF_STATUS_E_INVAL;
+
+	dfs_info = &p2p_vdev_obj->ap_assist_dfs;
+	if (is_dfs_owner)
+		*is_dfs_owner = dfs_info->is_dfs_owner;
+
+	if (is_valid_ap_assist)
+		*is_valid_ap_assist = dfs_info->is_valid_ap_assist;
+
+	if (ap_bssid)
+		qdf_copy_macaddr(ap_bssid, &dfs_info->ap_info[0].ap_bssid);
+
+	if (opclass)
+		*opclass = dfs_info->ap_info[0].op_class;
+
+	if (chan)
+		*chan = dfs_info->ap_info[0].chan;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 bool p2p_check_oui_and_force_1x1(uint8_t *assoc_ie, uint32_t assoc_ie_len)
 {
 	const uint8_t *pos;
