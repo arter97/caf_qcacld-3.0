@@ -835,6 +835,7 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 				       qdf_freq_t chan_freq, uint32_t ccfs1,
 				       enum phy_ch_width chan_bw)
 {
+	int ret = 0;
 	struct ch_params ch_params = {0};
 	struct hdd_context *hdd_ctx;
 
@@ -890,7 +891,42 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 		}
 	}
 
-	return 0;
+	if (adapter->device_mode == QDF_P2P_GO_MODE &&
+	    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, chan_freq)) {
+		bool is_go_dfs_owner = false, is_valid_ap_assist = false;
+		struct wlan_objmgr_vdev *vdev;
+		qdf_freq_t vdev_freq = 0, ap_freq = 0;
+		uint8_t opclass = 0, ap_chan = 0;
+
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_ID);
+		if (!vdev)
+			return -EINVAL;
+
+		vdev_freq = wlan_get_operation_chan_freq(vdev);
+		ucfg_p2p_get_ap_assist_dfs_params(vdev, &is_go_dfs_owner,
+						  &is_valid_ap_assist,
+						  NULL, &opclass, &ap_chan);
+		if (!wlan_reg_is_6ghz_op_class(hdd_ctx->pdev, opclass))
+			ap_freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
+							       ap_chan);
+
+		/* If it is not valid AP assist, it means it has started on
+		 * different channel which is not DFS.
+		 */
+		if (is_go_dfs_owner || !is_valid_ap_assist)
+			goto vdev_ref;
+
+		if (ap_freq != vdev_freq || ap_freq != chan_freq) {
+			hdd_debug("Assist AP freq %d, vdev freq %d, new_freq %d",
+				  ap_freq, vdev_freq, chan_freq);
+			ret = -EINVAL;
+		}
+vdev_ref:
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	}
+
+	return ret;
 }
 
 uint32_t hdd_get_link_info_home_channel(struct wlan_hdd_link_info *link_info)
