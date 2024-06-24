@@ -1652,6 +1652,15 @@ void lim_process_sae_auth_timeout(struct mac_context *mac_ctx);
 void lim_process_rrm_sta_stats_rsp_timeout(struct mac_context *mac_ctx);
 
 /**
+ * lim_process_channel_vacate_timeout() - Process timeout of channel vacate
+ * timer.
+ * @mac_ctx: Pointer to global MAC struct
+ *
+ * Return: None
+ */
+void lim_process_channel_vacate_timeout(struct mac_context *mac_ctx);
+
+/**
  * lim_send_frame() - API to send frame
  * @mac_ctx Pointer to Global MAC structure
  * @vdev_id: vdev id

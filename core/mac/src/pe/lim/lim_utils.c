@@ -662,6 +662,8 @@ void lim_cleanup_mlm(struct mac_context *mac_ctx)
 		tx_timer_delete(&lim_timer->sae_auth_timer);
 		tx_timer_delete(&lim_timer->rrm_sta_stats_resp_timer);
 
+		tx_timer_delete(&lim_timer->channel_vacate_timer);
+
 		mac_ctx->lim.gLimTimersCreated = 0;
 	}
 } /*** end lim_cleanup_mlm() ***/
