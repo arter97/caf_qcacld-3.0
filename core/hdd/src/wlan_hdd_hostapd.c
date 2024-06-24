@@ -7896,6 +7896,65 @@ int hdd_destroy_acs_timer(struct hdd_adapter *adapter)
 	return 0;
 }
 
+static QDF_STATUS
+hdd_check_ap_assist_dfs_group_start_req(struct wlan_hdd_link_info *link_info,
+					const uint8_t *ie, uint16_t ie_len,
+					qdf_freq_t freq)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	bool is_dfs_master = 0, is_fw_cap = false;
+	bool is_valid_ap_assist = false, is_go_dfs_owner = false;
+	struct qdf_mac_addr ap_bssid;
+
+	vdev =  hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		status = QDF_STATUS_E_INVAL;
+		goto vdev_ref;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	ucfg_mlme_get_dfs_master_capability(psoc, &is_dfs_master);
+	if (is_dfs_master) {
+		hdd_debug_rl("Driver is DFS Master Cap so ignore checks");
+		status = QDF_STATUS_SUCCESS;
+		goto vdev_ref;
+	}
+
+	is_fw_cap = ucfg_p2p_fw_support_ap_assist_dfs_group(psoc);
+
+	status = ucfg_p2p_extract_ap_assist_dfs_params(vdev, ie, ie_len,
+						       true, freq, true);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Error parsing P2P2 IE");
+		goto vdev_ref;
+	}
+
+	status = ucfg_p2p_get_ap_assist_dfs_params(vdev, &is_go_dfs_owner,
+						   &is_valid_ap_assist,
+						   &ap_bssid, NULL, NULL);
+
+	if (is_go_dfs_owner || !is_valid_ap_assist || !is_fw_cap) {
+		hdd_debug("error GO DFS owner %d, FW CAP %d",
+			  is_go_dfs_owner, is_fw_cap);
+		status = QDF_STATUS_E_FAILURE;
+		goto vdev_ref;
+	}
+
+	status = ucfg_p2p_check_ap_assist_dfs_group_go(vdev);
+
+vdev_ref:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return status;
+}
+
 /**
  * __wlan_hdd_cfg80211_stop_ap() - stop soft ap
  * @wiphy: Pointer to wiphy structure
@@ -8956,6 +9015,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			p2p_link_info = p2p_adapter->deflink;
 			wlan_hdd_cleanup_remain_on_channel_ctx(p2p_link_info);
 		}
+
+		if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, freq)) {
+			status = hdd_check_ap_assist_dfs_group_start_req(link_info,
+									 params->beacon.tail,
+									 params->beacon.tail_len,
+									 freq);
+			if (QDF_IS_STATUS_ERROR(status))
+				return -EINVAL;
+		}
 	}
 
 	if ((adapter->device_mode == QDF_SAP_MODE)
@@ -9141,9 +9209,9 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
 	struct hdd_beacon_data *old, *new;
-	int status;
+	int status, link_id;
 	struct wlan_hdd_link_info *link_info;
-	int link_id;
+	struct sap_config *config;
 
 	hdd_enter();
 
@@ -9198,6 +9266,24 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 
 	link_info->session.ap.beacon = new;
 	hdd_debug("update beacon for P2P GO/SAP");
+
+	/* Re-check if assisted AP params got changed or not, not doing
+	 * validation, might need to check with framework implementation
+	 */
+	config = &(WLAN_HDD_GET_AP_CTX_PTR(link_info))->sap_config;
+	if (adapter->device_mode == QDF_P2P_GO_MODE && new->tail_len) {
+		status = ucfg_p2p_extract_ap_assist_dfs_params(link_info->vdev,
+							       new->tail,
+							       new->tail_len,
+							       true,
+							       config->chan_freq,
+							       true);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_debug("Failed parsing P2P2 IE");
+			return -EINVAL;
+		}
+	}
+
 	status = wlan_hdd_cfg80211_start_bss(link_info, params,
 					     NULL, 0, 0, false);
 
