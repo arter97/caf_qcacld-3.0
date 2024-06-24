@@ -7418,7 +7418,6 @@ lim_send_ttlm_action_rsp_frame(uint8_t token,
 {
 	struct mac_context *mac_ctx;
 	struct pe_session *session;
-	struct wlan_mlo_peer_context *ml_peer;
 	uint8_t vdev_id = 0;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *vdev;
@@ -7435,13 +7434,7 @@ lim_send_ttlm_action_rsp_frame(uint8_t token,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	ml_peer = peer->mlo_peer_ctx;
-	if (!ml_peer) {
-		status = QDF_STATUS_E_FAILURE;
-		goto peer_release;
-	}
-
-	vdev = mlo_get_first_vdev_by_ml_peer(ml_peer);
+	vdev = wlan_peer_get_vdev(peer);
 	if (!vdev) {
 		status = QDF_STATUS_E_FAILURE;
 		goto peer_release;
@@ -7451,7 +7444,7 @@ lim_send_ttlm_action_rsp_frame(uint8_t token,
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session) {
 		pe_err("session not found for given vdev_id %d", vdev_id);
-		goto vdev_release;
+		goto peer_release;
 	}
 
 	if (lim_send_t2lm_action_rsp_frame(mac_ctx, peer_mac, session, token,
@@ -7462,8 +7455,6 @@ lim_send_ttlm_action_rsp_frame(uint8_t token,
 		wlan_connectivity_t2lm_status_event(vdev);
 	}
 
-vdev_release:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLO_MGR_ID);
 peer_release:
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 
