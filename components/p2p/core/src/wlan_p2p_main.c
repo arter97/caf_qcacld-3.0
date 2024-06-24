@@ -38,6 +38,7 @@
 #include "cfg_p2p.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_mlme_api.h"
+#include <target_if.h>
 
 /**
  * p2p_get_cmd_type_str() - parse cmd to string
@@ -1986,3 +1987,216 @@ QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 	return tgt_p2p_send_usd_params(psoc, param);
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
+{
+	wmi_unified_t wmi_handle;
+	struct target_psoc_info *tgt_if_handle;
+
+	tgt_if_handle = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_if_handle)
+		return false;
+
+	wmi_handle = target_psoc_get_wmi_hdl(tgt_if_handle);
+	if (!wmi_handle)
+		return false;
+
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_ap_assisted_dfs_chan_p2p_session);
+}
+
+QDF_STATUS p2p_validate_ap_assist_dfs_group(struct wlan_objmgr_vdev *vdev)
+{
+	switch (wlan_vdev_mlme_get_opmode(vdev)) {
+	case QDF_P2P_GO_MODE:
+		return p2p_check_ap_assist_dfs_group_go_with_csa(vdev);
+	case QDF_P2P_CLIENT_MODE:
+		return p2p_check_ap_assist_dfs_group_cli(vdev);
+	default:
+		break;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+p2p_check_ap_assist_dfs_group_go_with_csa(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	struct policy_mgr_pcl_list pcl = {0};
+	enum policy_mgr_con_mode con_mode;
+	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+
+	status = p2p_check_ap_assist_dfs_group_go(vdev);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		return status;
+
+	con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, QDF_P2P_GO_MODE,
+							WLAN_INVALID_VDEV_ID);
+	status = policy_mgr_get_pcl_for_vdev_id(psoc, con_mode, pcl.pcl_list,
+						&pcl.pcl_len, pcl.weight_list,
+						QDF_ARRAY_SIZE(pcl.weight_list),
+						wlan_vdev_get_id(vdev));
+
+	return policy_mgr_change_sap_channel_with_csa(psoc,
+						      wlan_vdev_get_id(vdev),
+						      pcl.pcl_list[0],
+						      CH_WIDTH_MAX, true);
+}
+
+QDF_STATUS p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	struct qdf_mac_addr ap_bssid;
+	qdf_freq_t cur_freq, conc_vdev_freq;
+	struct wlan_objmgr_vdev *conc_vdev;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+	struct wlan_objmgr_psoc *psoc;
+	bool is_dfs_owner = false, is_valid_ap_assist = false;
+	uint8_t chan = 0;
+
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	p2p_get_ap_assist_dfs_params(vdev, &is_dfs_owner, &is_valid_ap_assist,
+				     &ap_bssid, NULL, &chan);
+
+	if (is_dfs_owner)
+		return QDF_STATUS_SUCCESS;
+
+	if (!is_valid_ap_assist)
+		return QDF_STATUS_E_INVAL;
+
+	if (wlan_vdev_mlme_is_init_state(vdev) == QDF_STATUS_SUCCESS) {
+		/* Ignore opclass check as the valid ap assist flag is true */
+		cur_freq = wlan_reg_legacy_chan_to_freq(pdev, chan);
+	} else {
+		cur_freq = wlan_get_operation_chan_freq(vdev);
+		if (!wlan_reg_is_dfs_for_freq(pdev, cur_freq))
+			return QDF_STATUS_SUCCESS;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	peer = wlan_objmgr_get_peer_by_mac(psoc, &ap_bssid.bytes[0],
+					   WLAN_P2P_ID);
+	if (!peer) {
+		p2p_debug("No entity with MAC " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(&ap_bssid.bytes[0]));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_SELF) {
+		p2p_debug("Invalid peer type");
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+
+	conc_vdev = wlan_peer_get_vdev(peer);
+	if (wlan_vdev_mlme_get_opmode(conc_vdev) != QDF_STA_MODE) {
+		p2p_debug("Conc VDEV is not STA");
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+
+	conc_vdev_freq = wlan_get_operation_chan_freq(conc_vdev);
+	if (conc_vdev_freq != cur_freq) {
+		p2p_debug("Conc VDEV freq %d, GO freq %d",
+			  conc_vdev_freq, cur_freq);
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+
+	status = QDF_STATUS_SUCCESS;
+
+exit:
+	wlan_objmgr_peer_release_ref(peer, WLAN_P2P_ID);
+
+	return status;
+}
+
+QDF_STATUS p2p_check_ap_assist_dfs_group_cli(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	bool conc_scc_sta_present = false;
+	bool is_dfs_owner = false, is_valid_ap_assist = false;
+	struct p2p_ap_assist_dfs_group_params params;
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *sta_vdev;
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+	struct wlan_lmac_if_p2p_tx_ops *ops;
+	qdf_freq_t cur_freq = 0;
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t idx, vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	cur_freq = wlan_get_operation_chan_freq(vdev);
+	if (!wlan_reg_is_dfs_for_freq(pdev, cur_freq)) {
+		/* Force set no active FW monitoring as channel is not DFS */
+		conc_scc_sta_present = true;
+		status = QDF_STATUS_SUCCESS;
+		goto update_lim;
+	}
+
+	p2p_get_ap_assist_dfs_params(vdev, &is_dfs_owner, &is_valid_ap_assist,
+				     &params.bssid, NULL, NULL);
+
+	if (is_dfs_owner)
+		return QDF_STATUS_SUCCESS;
+
+	if (!is_valid_ap_assist)
+		return QDF_STATUS_E_INVAL;
+
+	ops = &psoc->soc_cb.tx_ops->p2p;
+	if (!ops->send_ap_assist_dfs_group_params)
+		return QDF_STATUS_E_INVAL;
+
+	policy_mgr_get_mode_specific_conn_info(psoc, freq_list, vdev_id_list,
+					       PM_STA_MODE);
+
+	for (idx = 0; idx < MAX_NUMBER_OF_CONC_CONNECTIONS; idx++) {
+		if (!freq_list[idx])
+			break;
+
+		if (freq_list[idx] != cur_freq)
+			continue;
+
+		sta_vdev =
+			wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							     vdev_id_list[idx],
+							     WLAN_P2P_ID);
+		if (!sta_vdev)
+			continue;
+
+		if (wlan_vdev_is_up_active_state(sta_vdev) !=
+		    QDF_STATUS_SUCCESS) {
+			wlan_objmgr_vdev_release_ref(sta_vdev, WLAN_P2P_ID);
+			continue;
+		}
+
+		wlan_objmgr_vdev_release_ref(sta_vdev, WLAN_P2P_ID);
+		conc_scc_sta_present = true;
+		qdf_zero_macaddr(&params.bssid);
+		break;
+	}
+
+	params.vdev_id = wlan_vdev_get_id(vdev);
+	qdf_zero_macaddr(&params.non_tx_bssid);
+	status = ops->send_ap_assist_dfs_group_params(psoc, &params);
+	if (QDF_IS_STATUS_ERROR(status))
+		p2p_debug("Failed to send assisted AP params %d", status);
+
+update_lim:
+	p2p_soc_obj =
+		wlan_objmgr_psoc_get_comp_private_obj(psoc, WLAN_UMAC_COMP_P2P);
+	if (p2p_soc_obj->p2p_cb.ap_assist_dfs_group_fw_monitor_update)
+		p2p_soc_obj->p2p_cb.ap_assist_dfs_group_fw_monitor_update(wlan_vdev_get_id(vdev),
+									  !conc_scc_sta_present);
+
+	return status;
+}

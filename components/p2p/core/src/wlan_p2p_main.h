@@ -767,4 +767,65 @@ QDF_STATUS p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 					bool *is_valid_ap_assist,
 					struct qdf_mac_addr *ap_bssid,
 					uint8_t *opclass, uint8_t *chan);
+
+/**
+ * p2p_fw_support_ap_assist_dfs_group() - API to return the FW capability of
+ * AP assisted DFS P2P group
+ * @psoc: PSOC object manager
+ *
+ * This API checks the FW capability attribute to support for AP assisted
+ * DFS P2P group operation
+ *
+ * Return: bool
+ */
+bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_check_ap_assist_dfs_group_cli() - API to check the status of P2P CLI
+ * for operation in DFS channel under assisted AP mode
+ * @vdev: VDEV object manager pointer of P2P_CLI entity
+ *
+ * Checks the conditions for P2P CLI to operate in DFS channel in AP assisted
+ * mode and sends command to FW to either monitor the assisted or not.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_check_ap_assist_dfs_group_cli(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * p2p_check_ap_assist_dfs_group_go() - API to check the status of P2P GO
+ * for operation in DFS channel under assisted AP mode
+ * @vdev: VDEV object manager pointer of P2P_GO entity
+ *
+ * Checks the requirements for P2P GO to operate in DFS channel in AP assisted
+ * mode.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * p2p_check_ap_assist_dfs_group_go_with_csa() - API to check the status of
+ * P2P GO for operation in DFS channel
+ * @vdev: VDEV object manager pointer of P2P_GO entity
+ *
+ * Checks the requirements for P2P GO to operate in DFS channel in AP assisted
+ * mode and triggers CSA incase any condition fails.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+p2p_check_ap_assist_dfs_group_go_with_csa(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * p2p_validate_ap_assist_dfs_group() - Validate the params of extracted
+ * assisted AP params from P2P2 IE
+ * @vdev: VDEV object manager pointer of P2P device
+ *
+ * Validates the info parsed from the P2P2 IE related to DFS operation under
+ * assisted AP mode.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_validate_ap_assist_dfs_group(struct wlan_objmgr_vdev *vdev);
 #endif /* _WLAN_P2P_MAIN_H_ */
