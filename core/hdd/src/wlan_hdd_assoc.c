@@ -188,6 +188,7 @@ static const int beacon_filter_table[] = {
 	WLAN_ELEMID_VHTOP,
 	WLAN_ELEMID_QUIET_CHANNEL,
 	WLAN_ELEMID_TWT,
+	WLAN_ELEMID_VHT_TX_PWR_ENVLP,
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
 	/*
 	 * EID: 221 vendor IE is being used temporarily by 11AX
