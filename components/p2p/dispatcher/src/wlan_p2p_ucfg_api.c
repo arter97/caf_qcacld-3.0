@@ -749,3 +749,37 @@ QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 	return p2p_send_usd_params(psoc, param);
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+bool ucfg_p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_fw_support_ap_assist_dfs_group(psoc);
+}
+
+QDF_STATUS
+ucfg_p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+				      const uint8_t *ie, uint16_t ie_len,
+				      bool is_connected, qdf_freq_t freq,
+				      bool is_self)
+{
+	if (!ie || !ie_len)
+		return QDF_STATUS_SUCCESS;
+
+	return p2p_extract_ap_assist_dfs_params(vdev, ie, ie_len, is_connected,
+						freq, is_self);
+}
+
+QDF_STATUS ucfg_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					     bool *is_dfs_owner,
+					     bool *is_valid_ap_assist,
+					     struct qdf_mac_addr *ap_bssid,
+					     uint8_t *opclass, uint8_t *chan)
+{
+	return p2p_get_ap_assist_dfs_params(vdev, is_dfs_owner,
+					    is_valid_ap_assist, ap_bssid,
+					    opclass, chan);
+}
+
+QDF_STATUS ucfg_p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev)
+{
+	return p2p_check_ap_assist_dfs_group_go(vdev);
+}
