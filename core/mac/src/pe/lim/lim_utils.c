@@ -1878,7 +1878,8 @@ __lim_process_channel_switch_timeout(struct pe_session *pe_session)
 	 * Else, just don't bother to switch. Indicate HDD to look for a
 	 * better AP to associate
 	 */
-	if (!lim_is_channel_valid_for_channel_switch(mac, channel_freq)) {
+	if (!lim_is_channel_valid_for_channel_switch(mac, pe_session,
+						     channel_freq)) {
 		/* We need to restore pre-channelSwitch state on the STA */
 		if (lim_restore_pre_channel_switch_state(mac, pe_session) !=
 		    QDF_STATUS_SUCCESS) {
@@ -4268,9 +4269,12 @@ lim_get_b_dfrom_rx_packet(struct mac_context *mac, void *body, uint32_t **pRxPac
 } /*** end lim_get_b_dfrom_rx_packet() ***/
 
 bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
+					     struct pe_session *session,
 					     uint32_t channel_freq)
 {
 	bool ok = false;
+	TX_TIMER *channel_vacate_timer =
+		&mac->lim.lim_timers.channel_vacate_timer;
 
 	if (policy_mgr_is_chan_ok_for_dnbs(mac->psoc, channel_freq,
 					   &ok)) {
@@ -4283,12 +4287,34 @@ bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
 		return false;
 	}
 
-	if (wlan_reg_is_freq_enabled(mac->pdev, channel_freq,
-				     REG_CURRENT_PWR_MODE))
-		return true;
-
 	/* channel does not belong to list of valid channels */
-	return false;
+	if (!wlan_reg_is_freq_enabled(mac->pdev, channel_freq,
+				      REG_CURRENT_PWR_MODE)) {
+		return false;
+	}
+
+	/*
+	 * Do not allow CSA to different DFS channel when the CLI is already
+	 * operating in DFS channel under assisted AP mode and the timer for
+	 * channel vacate is running.
+	 *
+	 * If moving to non-DFS channel, then stop the timer.
+	 */
+	if (session->opmode == QDF_P2P_CLIENT_MODE &&
+	    session->dfs_p2p_info.is_assisted_p2p_group) {
+		if (tx_timer_running(channel_vacate_timer) &&
+		    channel_vacate_timer->sessionId == session->peSessionId) {
+			if (wlan_reg_is_dfs_for_freq(mac->pdev, channel_freq)) {
+				pe_debug("Channel change to DFS for assisted AP P2P group");
+				return false;
+			}
+
+			pe_debug("Stop channel vacate timer");
+			tx_timer_deactivate(channel_vacate_timer);
+		}
+	}
+
+	return true;
 }
 
 /**
