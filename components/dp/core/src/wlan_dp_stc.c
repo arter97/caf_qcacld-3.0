@@ -467,7 +467,7 @@ wlan_dp_stc_remove_sampling_table_entry(struct wlan_dp_stc *dp_stc,
 
 	if (sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 		struct wlan_dp_spm_flow_info *tx_flow;
-		uint8_t tx_flow_id = sampling_entry->tx_flow_id;
+		uint16_t tx_flow_id = sampling_entry->tx_flow_id;
 
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, tx_flow_id);
 		if (tx_flow->guid == sampling_entry->tx_flow_metadata)
@@ -1018,7 +1018,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		if (sampling_flow->flags &
 					WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 			struct wlan_dp_spm_flow_info *tx_flow;
-			uint8_t tx_flow_id = sampling_flow->tx_flow_id;
+			uint16_t tx_flow_id = sampling_flow->tx_flow_id;
 
 			tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, tx_flow_id);
 			tx_flow->selected_to_sample = 1;
@@ -1026,7 +1026,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 
 		if (sampling_flow->flags &
 					WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
-			uint8_t rx_flow_id = sampling_flow->rx_flow_id;
+			uint16_t rx_flow_id = sampling_flow->rx_flow_id;
 
 			rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
 			rx_flow->selected_to_sample = 1;

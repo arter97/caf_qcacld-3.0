@@ -147,8 +147,8 @@ enum wlan_dp_flow_dir {
  * @peer_id: Peer ID
  * @flags: flags
  * @tx_flow_id: TX flow ID
- * @tx_flow_metadata: TX flow metadata
  * @rx_flow_id: RX flow ID
+ * @tx_flow_metadata: TX flow metadata
  * @rx_flow_metadata: RX flow metadata
  * @flow_tuple: flow tuple
  * @dir: flow direction
@@ -156,9 +156,9 @@ enum wlan_dp_flow_dir {
 struct wlan_dp_stc_sampling_candidate {
 	uint16_t peer_id;
 	uint32_t flags;
-	uint32_t tx_flow_id;
+	uint16_t tx_flow_id;
+	uint16_t rx_flow_id;
 	uint32_t tx_flow_metadata;
-	uint32_t rx_flow_id;
 	uint32_t rx_flow_metadata;
 	struct flow_info flow_tuple;
 	enum wlan_dp_flow_dir dir;
@@ -178,6 +178,7 @@ struct wlan_dp_stc_sampling_candidate {
  * struct wlan_dp_stc_sampling_table_entry - Sampling table entry
  * @state: State of sampling for this flow
  * @dir: direction of flow
+ * @burst_stats_report_ts: Burst stats reported timestamp
  * @flags: flags set by timer
  * @flags1: flags set by periodic work
  * @next_sample_idx: next sample index to fill min/max stats in per-packet path
@@ -185,9 +186,11 @@ struct wlan_dp_stc_sampling_candidate {
  * @max_num_sample_attempts: max number of sampling_timer runs to collect
  *			     txrx and burst state
  * @tx_flow_id: tx flow ID
- * @tx_flow_metadata: tx flow metadata
  * @rx_flow_id: rx flow ID
+ * @tx_flow_metadata: tx flow metadata
  * @rx_flow_metadata: rx flow metadata
+ * @tuple_hash: Flow tuple hash
+ * @flow_tuple: Flow tuple info
  * @tx_stats_ref: tx window stats reference
  * @rx_stats_ref: rx window stats reference
  * @flow_samples: flow samples
@@ -203,9 +206,9 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint8_t max_num_sample_attempts;
 	uint8_t traffic_type;
 	uint16_t peer_id;
-	uint32_t tx_flow_id;
+	uint16_t tx_flow_id;
+	uint16_t rx_flow_id;
 	uint32_t tx_flow_metadata;
-	uint32_t rx_flow_id;
 	uint32_t rx_flow_metadata;
 	uint64_t tuple_hash;
 	struct flow_info flow_tuple;
@@ -270,7 +273,7 @@ struct wlan_dp_stc_flow_table_entry {
 	struct wlan_dp_stc_burst_stats burst_stats;
 };
 
-#define DP_STC_FLOW_TABLE_ENTRIES_MAX 256
+#define DP_STC_FLOW_TABLE_ENTRIES_MAX 384
 /**
  * struct wlan_dp_stc_rx_flow_table - RX flow table
  * @entries: RX flow table records
@@ -319,15 +322,15 @@ struct wlan_dp_stc_peer_traffic_map {
 #define DP_STC_CLASSIFIED_TABLE_FLOW_MAX 256
 struct wlan_dp_stc_classified_flow_entry {
 	uint8_t flow_active;
-	enum qca_traffic_type traffic_type;
+	uint8_t vdev_id;
 	uint16_t tx_flow_id;
-	uint8_t rx_flow_id;
+	uint16_t rx_flow_id;
+	uint16_t peer_id;
 	uint32_t prev_tx_pkts;
 	uint32_t prev_rx_pkts;
-	uint8_t vdev_id;
-	uint16_t peer_id;
 	unsigned long flags;
 	unsigned long del_flags;
+	enum qca_traffic_type traffic_type;
 	qdf_atomic_t state;
 };
 
