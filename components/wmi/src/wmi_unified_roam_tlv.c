@@ -2387,6 +2387,7 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint8_t kck_len;
 	uint8_t kek_len;
+	struct roam_scan_candidate_frame roam_candidate = {0};
 
 	synch_event = param_buf->fixed_param;
 	roam_sync_ind->roamed_vdev_id = synch_event->vdev_id;
@@ -2437,6 +2438,16 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		wmi_fill_data_synch_frame_event(rso_cfg, roam_sync_ind);
 	} else {
 		wmi_fill_data_synch_event(roam_sync_ind, param_buf);
+
+		roam_candidate.vdev_id = roam_sync_ind->roamed_vdev_id;
+		roam_candidate.frame_length =
+				roam_sync_ind->beacon_probe_resp_length;
+		roam_candidate.frame = (uint8_t *)roam_sync_ind +
+				       roam_sync_ind->beacon_probe_resp_offset;
+		roam_candidate.rssi = roam_sync_ind->rssi;
+		roam_candidate.roam_offload_candidate_frm = false;
+		wlan_cm_add_all_link_probe_rsp_to_scan_db(wlan_vdev_get_psoc(vdev),
+							  &roam_candidate);
 	}
 	chan = param_buf->chan;
 	if (chan) {
