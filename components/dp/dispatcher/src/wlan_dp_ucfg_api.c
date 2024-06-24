@@ -3266,3 +3266,15 @@ ucfg_dp_rx_aggr_dis_req(struct wlan_objmgr_vdev *vdev,
 
 	wlan_dp_rx_aggr_dis_req(dp_link->dp_intf, id, disable);
 }
+
+bool ucfg_dp_ipa_ctrl_debug_supported(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t is_ipa_ctrl_debug_supported =
+		cfg_get(psoc, CFG_DP_IPA_DEBUG_ENABLE);
+
+	if (is_ipa_ctrl_debug_supported ==
+		       IPA_DEBUG_OPT_DP_CTRL)
+		return true;
+
+	return false;
+}

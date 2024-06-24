@@ -1702,6 +1702,24 @@ ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 				enum cdp_peer_type peer_type,
 				uint8_t num_link);
 
+/**
+ * ucfg_dp_ipa_ctrl_debug_supported() - get ini for opt_dp_ctrl debugging
+ * in IPA module
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if ctrl debugging enabled from ini false otherwise
+ */
+bool ucfg_dp_ipa_ctrl_debug_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * enum wlan_ipa_debug_value - ipa debug code
+ * @IPA_DEBUG_OPT_DP_CTRL: debug opt_dp_ctrl feature
+ *
+ */
+enum wlan_ipa_debug_value {
+	IPA_DEBUG_OPT_DP_CTRL = 1
+};
+
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 /**
  * ucfg_dp_is_local_pkt_capture_enabled() - Get local packet capture config

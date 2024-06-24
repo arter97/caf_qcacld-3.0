@@ -1484,6 +1484,28 @@
 #define CFG_DP_DYNAMIC_RESOURCE_MGMT
 #endif
 
+/*
+ * <ini>
+ * dp_ipa_debug_enable - support IPA debugging
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * This ini is used to enable ipa debugging
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_IPA_DEBUG_ENABLE \
+	CFG_INI_UINT("dp_ipa_debug_enable", \
+		     0, \
+		     16, \
+		     0, \
+		     CFG_VALUE_OR_DEFAULT, "IPA debug support")
+
 #define CFG_DP_ALL \
 	CFG(CFG_DP_RX_THREAD_CPU_MASK) \
 	CFG(CFG_DP_RX_THREAD_UL_CPU_MASK) \
@@ -1515,6 +1537,7 @@
 	CFG_DP_LOAD_BALANCE \
 	CFG_DP_FLOW_BALANCE \
 	CFG_DP_STC \
-	CFG_DP_DYNAMIC_RESOURCE_MGMT
+	CFG_DP_DYNAMIC_RESOURCE_MGMT \
+	CFG(CFG_DP_IPA_DEBUG_ENABLE)
 
 #endif /* WLAN_DP_CFG_H__ */
