@@ -594,8 +594,7 @@ wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx,
 void wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
 				     bool is_virtual_iface)
 {
-	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
-		wlan_hdd_lpc_del_monitor_interface(hdd_ctx, is_virtual_iface);
+	wlan_hdd_lpc_del_monitor_interface(hdd_ctx, is_virtual_iface);
 }
 
 bool hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
