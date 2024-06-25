@@ -4854,7 +4854,8 @@ QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 			 */
 			if (extracted_ie) {
 				ie_len = elem_len + size_of_len_field + 1;
-				if (ie_len <= eid_max_len - extracted_ie_len) {
+				if (ie_len <= (eid_max_len + size_of_len_field +
+					       1 - extracted_ie_len)) {
 					qdf_mem_copy(
 					extracted_ie + extracted_ie_len,
 					&ptr[0], ie_len);
