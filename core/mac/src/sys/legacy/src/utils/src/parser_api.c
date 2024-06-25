@@ -3772,6 +3772,11 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 		pAssocReq->addIEPresent = 1;
 		convert_p2p_opaque(mac, &pAssocReq->addIE, &ar->P2PIEOpaque);
 	}
+
+	if (ar->P2P2IEOpaque.present) {
+		pAssocReq->addIEPresent = 1;
+		convert_p2p2_opaque(mac, &pAssocReq->addIE, &ar->P2P2IEOpaque);
+	}
 #ifdef WLAN_FEATURE_WFD
 	if (ar->WFDIEOpaque.present) {
 		pAssocReq->addIEPresent = 1;
@@ -4951,6 +4956,11 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 	if (ar->P2PIEOpaque.present) {
 		pAssocReq->addIEPresent = 1;
 		convert_p2p_opaque(mac, &pAssocReq->addIE, &ar->P2PIEOpaque);
+	}
+
+	if (ar->P2P2IEOpaque.present) {
+		pAssocReq->addIEPresent = 1;
+		convert_p2p2_opaque(mac, &pAssocReq->addIE, &ar->P2P2IEOpaque);
 	}
 #ifdef WLAN_FEATURE_WFD
 	if (ar->WFDIEOpaque.present) {
