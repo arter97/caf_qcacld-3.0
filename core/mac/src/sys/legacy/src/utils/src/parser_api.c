@@ -1785,6 +1785,13 @@ populate_dot11f_ext_cap(struct mac_context *mac,
 		p_ext_cap->beacon_protection_enable = pe_session ?
 			mlme_get_bigtk_support(pe_session->vdev) : false;
 	}
+	if (pe_session &&
+	    (pe_session->opmode == QDF_P2P_GO_MODE ||
+	     pe_session->opmode == QDF_P2P_CLIENT_MODE)) {
+		p_ext_cap->chan_usage = true;
+		p_ext_cap->cap_notif_support = true;
+	}
+
 	if (pe_session)
 		populate_dot11f_twt_extended_caps(mac, pe_session, pDot11f);
 
@@ -12538,13 +12545,15 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 	p_ext_cap = (struct s_ext_cap *)dot11f->bytes;
 	dot11f->present = 1;
 
-	if (pe_session->opmode == QDF_STA_MODE) {
+	if (pe_session->opmode == QDF_STA_MODE ||
+	    pe_session->opmode == QDF_P2P_CLIENT_MODE) {
 		wlan_twt_get_requestor_cfg(mac_ctx->psoc, &twt_requestor);
 		p_ext_cap->twt_requestor_support =
 			twt_requestor && twt_get_requestor_flag(mac_ctx);
 	}
 
-	if (pe_session->opmode == QDF_SAP_MODE) {
+	if (pe_session->opmode == QDF_SAP_MODE ||
+	    pe_session->opmode == QDF_P2P_GO_MODE) {
 		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_responder);
 		p_ext_cap->twt_responder_support =
 			twt_responder && twt_get_responder_flag(mac_ctx);

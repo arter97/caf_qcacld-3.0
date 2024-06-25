@@ -660,6 +660,8 @@ struct s_ext_cap {
 	uint8_t dmg_loc_supp_aps:1;
 	uint8_t i2r_lmr_feedback_policy:1;
 	uint8_t reserved13:6;
+	/* Octet 14 */
+	uint8_t cap_notif_support: 1;
 };
 
 void swap_bit_field16(uint16_t in, uint16_t *out);
