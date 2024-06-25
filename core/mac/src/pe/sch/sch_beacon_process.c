@@ -802,12 +802,16 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		lim_send_beacon_params(mac_ctx, &beaconParams, session);
 	}
 
-	if ((session->opmode == QDF_P2P_CLIENT_MODE) &&
-	    session->send_p2p_conf_frame) {
-		lim_p2p_oper_chan_change_confirm_action_frame(mac_ctx,
-							      session->bssId,
-							      session);
-		session->send_p2p_conf_frame = false;
+	if (session->opmode == QDF_P2P_CLIENT_MODE) {
+		if (session->send_p2p_conf_frame) {
+			lim_p2p_oper_chan_change_confirm_action_frame(mac_ctx,
+								      session->bssId,
+								      session);
+			session->send_p2p_conf_frame = false;
+		}
+
+		if (session->send_notify_cap)
+			lim_send_channel_usage_req_notif_cap_action_frame(session->vdev_id);
 	}
 
 	lim_process_beacon_eht(mac_ctx, session, bcn);

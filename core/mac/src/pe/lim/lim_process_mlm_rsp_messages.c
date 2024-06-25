@@ -3425,6 +3425,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		if (pe_session->opmode == QDF_P2P_CLIENT_MODE) {
 			pe_debug("Send p2p operating channel change conf action frame once first beacon is received on new channel");
 			pe_session->send_p2p_conf_frame = true;
+			pe_session->send_notify_cap = true;
 		}
 
 		if (ucfg_pkt_capture_get_pktcap_mode(mac->psoc))

@@ -666,6 +666,7 @@ struct dfs_p2p_group_info {
  * @enable_bcast_probe_rsp:
  * @ht_client_cnt:
  * @ch_switch_in_progress:
+ * @send_notify_cap: Send notify capability pending
  * @he_with_wep_tkip:
  * @fils_info:
  * @prev_auth_seq_num: Sequence number of previously received auth frame to
@@ -991,6 +992,7 @@ struct pe_session {
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
 	bool ch_switch_in_progress;
+	bool send_notify_cap;
 	bool he_with_wep_tkip;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct pe_fils_session *fils_info;
