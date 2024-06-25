@@ -1216,6 +1216,68 @@ wma_convert_trans_timeout_us(uint16_t timeout)
 	return us;
 }
 
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_0 0
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_1 (1U << 5)
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_2 (1U << 6)
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_3 (1U << 7)
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_4 (1U << 8)
+
+/**
+ * wma_convert_emlsr_pad_delay() - API to convert eMLSR Padding delay in us
+ * @emlsr_pad_delay: eMLSR Padding delay value advertised in Basic ML IE
+ *
+ * Return: uint16_t
+ */
+static uint16_t
+wma_convert_emlsr_pad_delay(uint8_t emlsr_pad_delay)
+{
+	uint16_t us = 0;
+	uint16_t delay_us[WLAN_ML_BV_CINFO_EMLCAP_EMLSRDELAY_INVALIDSTART] = {
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_0,
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_1,
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_2,
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_3,
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRPADDELAY_4};
+
+	if (emlsr_pad_delay >=
+	    WLAN_ML_BV_CINFO_EMLCAP_EMLSRDELAY_INVALIDSTART)
+		return us;
+
+	return delay_us[emlsr_pad_delay];
+}
+
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_0 0
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_1 (1U << 4)
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_2 (1U << 5)
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_3 (1U << 6)
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_4 (1U << 7)
+#define WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_5 (1U << 8)
+
+/**
+ * wma_convert_emlsr_tran_delay() - API to convert eMLSR Transition delay in us
+ * @emlsr_trans_delay: eMLSR Transition delay value advertised in Basic ML IE
+ *
+ * Return: uint16_t
+ */
+static uint16_t
+wma_convert_emlsr_tran_delay(uint8_t emlsr_trans_delay)
+{
+	uint16_t us = 0;
+	uint16_t delay_us[WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_INVALIDSTART] = {
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_0,
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_1,
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_2,
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_3,
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_4,
+			  WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_5};
+
+	if (emlsr_trans_delay >=
+	    WLAN_ML_BV_CINFO_EMLCAP_EMLSRTRANSDELAY_INVALIDSTART)
+		return us;
+
+	return delay_us[emlsr_trans_delay];
+}
+
 /**
  * wma_populate_peer_mlo_common_info_sap() - Set common info caps to
  * the peer assoc request for mlo sap mode
@@ -1275,9 +1337,9 @@ wma_populate_peer_mlo_common_info_sap(tp_wma_handle wma,
 		return;
 	}
 	mlo_params->emlsr_support = eml_info->emlsr_supp;
-	mlo_params->emlsr_pad_delay_us = eml_info->emlsr_pad_delay;
-	mlo_params->emlsr_trans_delay_us = eml_info->emlsr_trans_delay;
-	mlo_params->trans_timeout_us = eml_info->trans_timeout;
+	mlo_params->emlsr_pad_delay_us = wma_convert_emlsr_pad_delay(eml_info->emlsr_pad_delay);
+	mlo_params->emlsr_trans_delay_us = wma_convert_emlsr_tran_delay(eml_info->emlsr_trans_delay);
+	mlo_params->trans_timeout_us = wma_convert_trans_timeout_us(eml_info->trans_timeout);
 	wma_debug("is assoc %d emlsr supp %d pad delay %d trans delay %d tran timeout %d",
 		  assoc_peer,
 		  mlo_params->emlsr_support,
