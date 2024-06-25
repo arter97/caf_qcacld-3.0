@@ -2128,6 +2128,8 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 			       pe_session->limMlmState));
 		pe_session->limSystemRole = eLIM_AP_ROLE;
 
+		lim_fill_dfs_p2p_group_params(pe_session);
+
 		sch_edca_profile_update(mac, pe_session, NULL);
 		/* For dual AP case, delete pre auth node if any */
 		lim_delete_pre_auth_list(mac);
@@ -3386,6 +3388,9 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	} else {
 		pe_session->nwType = eSIR_11A_NW_TYPE;
 	}
+
+	lim_fill_dfs_p2p_group_params(pe_session);
+
 	pe_debug("new network type for peer: %d", pe_session->nwType);
 	switch (channelChangeReasonCode) {
 	case LIM_SWITCH_CHANNEL_REASSOC:

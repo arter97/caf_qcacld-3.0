@@ -177,6 +177,15 @@ void pe_stop(struct mac_context *mac);
 bool is_mgmt_protected(uint32_t vdev_id, const uint8_t *peer_mac_addr);
 
 /**
+ * lim_fill_dfs_p2p_group_params() - Fill the params of P2P group operating
+ * in DFS channel.
+ * @pe_session: Session
+ *
+ * Return: void
+ */
+void lim_fill_dfs_p2p_group_params(struct pe_session *pe_session);
+
+/**
  * lim_stop_pmfcomeback_timer() - stop pmf comeback timer
  * @session: Pointer to PE session
  *

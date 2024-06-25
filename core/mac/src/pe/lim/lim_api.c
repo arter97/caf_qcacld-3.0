@@ -712,6 +712,34 @@ bool is_mgmt_protected(uint32_t vdev_id,
 	return protected;
 }
 
+void lim_fill_dfs_p2p_group_params(struct pe_session *pe_session)
+{
+	bool is_dfs_owner, is_valid_ap_assist;
+	struct qdf_mac_addr ap_bssid;
+	struct dfs_p2p_group_info *dfs_p2p_info;
+
+	if (pe_session->opmode != QDF_P2P_CLIENT_MODE &&
+	    pe_session->opmode != QDF_P2P_GO_MODE)
+		return;
+
+	dfs_p2p_info = &pe_session->dfs_p2p_info;
+	qdf_mem_zero(dfs_p2p_info, sizeof(*dfs_p2p_info));
+	if (!wlan_reg_is_dfs_for_freq(wlan_vdev_get_pdev(pe_session->vdev),
+				      pe_session->curr_op_freq)) {
+		return;
+	}
+
+	wlan_p2p_get_ap_assist_dfs_params(pe_session->vdev, &is_dfs_owner,
+					  &is_valid_ap_assist, &ap_bssid,
+					  NULL, NULL);
+
+	if (is_dfs_owner || !is_valid_ap_assist)
+		return;
+
+	dfs_p2p_info->is_assisted_p2p_group = !is_dfs_owner;
+	qdf_copy_macaddr(&dfs_p2p_info->ap_bssid, &ap_bssid);
+}
+
 static void p2p_register_callbacks(struct mac_context *mac_ctx)
 {
 	struct p2p_protocol_callbacks p2p_cb = {0};
