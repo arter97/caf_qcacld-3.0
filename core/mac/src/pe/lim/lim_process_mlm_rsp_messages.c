@@ -262,7 +262,13 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 			if (!wlan_reg_is_dfs_for_freq(mac->pdev, chan_freq))
 				send_bcon_ind = true;
 		}
-		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq))
+
+		/* If currently in AP assisted P2P DFS operation then
+		 * don't move to CAC wait state as radar is assisted by
+		 * concurrent STA interface.
+		 */
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) ||
+		    pe_session->dfs_p2p_info.is_assisted_p2p_group)
 			send_bcon_ind = true;
 
 		if (send_bcon_ind) {
