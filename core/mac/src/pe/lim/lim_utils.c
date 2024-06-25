@@ -10221,6 +10221,12 @@ QDF_STATUS lim_sta_mlme_vdev_restart_send(struct vdev_mlme_obj *vdev_mlme,
 		return QDF_STATUS_E_INVAL;
 	}
 	if (mlme_is_chan_switch_in_progress(vdev_mlme->vdev)) {
+		/* If STA interface is moving to different channel, check if
+		 * need to reevaluate the operation of P2P group in DFS channel.
+		 */
+		if (wlan_vdev_mlme_get_opmode(vdev_mlme->vdev) == QDF_STA_MODE)
+			lim_check_ap_assist_dfs_p2p_group(false);
+
 		switch (session->channelChangeReasonCode) {
 		case LIM_SWITCH_CHANNEL_OPERATION:
 			status = __lim_process_channel_switch_timeout(session);

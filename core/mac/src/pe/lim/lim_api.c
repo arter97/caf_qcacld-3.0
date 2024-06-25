@@ -90,6 +90,7 @@
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_cm_api.h"
 #include "wlan_mlme_api.h"
+#include <wlan_p2p_api.h>
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -842,12 +843,41 @@ lim_unregister_scan_mbssid_callback(struct mac_context *mac_ctx)
 	return status;
 }
 
+void lim_check_ap_assist_dfs_p2p_group(bool is_incr_session)
+{
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	struct pe_session *session;
+	struct wlan_objmgr_pdev *pdev;
+	uint8_t idx;
+
+	if (!mac)
+		return;
+
+	pdev = mac->pdev;
+	for (idx = 0; idx < mac->lim.maxBssId; idx++) {
+		if (!mac->lim.gpSession[idx].valid ||
+		    (mac->lim.gpSession[idx].opmode != QDF_P2P_GO_MODE &&
+		     mac->lim.gpSession[idx].opmode != QDF_P2P_CLIENT_MODE))
+			continue;
+
+		session = &mac->lim.gpSession[idx];
+		if (!wlan_reg_is_dfs_for_freq(pdev, session->curr_op_freq) ||
+		    !session->dfs_p2p_info.is_assisted_p2p_group)
+			continue;
+
+		if (!is_incr_session || session->opmode == QDF_P2P_CLIENT_MODE)
+			wlan_p2p_validate_ap_assist_dfs_group(session->vdev);
+	}
+}
+
 static void lim_register_policy_mgr_callback(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_conc_cbacks conc_cbacks;
 
 	qdf_mem_zero(&conc_cbacks, sizeof(conc_cbacks));
 	conc_cbacks.connection_info_update = lim_send_conc_params_update;
+	conc_cbacks.ap_assist_dfs_group_notify =
+					lim_check_ap_assist_dfs_p2p_group;
 
 	if (QDF_STATUS_SUCCESS != policy_mgr_register_conc_cb(psoc,
 							      &conc_cbacks)) {
@@ -977,8 +1007,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	wlan_reg_register_is_chan_connected_callback(mac->psoc,
 					lim_get_connected_chan_for_mode);
 
-	if (mac->mlme_cfg->edca_params.enable_edca_params)
-		lim_register_policy_mgr_callback(mac->psoc);
+	lim_register_policy_mgr_callback(mac->psoc);
 
 	if (!QDF_IS_STATUS_SUCCESS(
 	    cds_shutdown_notifier_register(pe_shutdown_notifier_cb, mac))) {
