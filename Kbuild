@@ -3489,6 +3489,11 @@ CONFIG_WLAN_FEATURE_MULTI_LINK_SAP := y
 endif
 endif
 
+found = $(shell if grep -qF "IEEE80211_CHANCTX_CHANGE_PUNCTURING" $(srctree)/include/net/mac80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_RU_PUNC_CHANDEF
+endif
+
 ifeq ($(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP), y)
 CONFIG_WLAN_DP_MLO_DEV_CTX := y
 CONFIG_QCA_DP_TX_FW_METADATA_V2 := y

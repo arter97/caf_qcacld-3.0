@@ -2294,6 +2294,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 		"file": "include/uapi/linux/nl80211.h",
 		"flag": "WLAN_FEATURE_11BE_MLO_TTLM",
 	},
+	{
+		"pattern": "IEEE80211_CHANCTX_CHANGE_PUNCTURING",
+		"file": "include/net/mac80211.h",
+		"flag": "CFG80211_RU_PUNC_CHANDEF",
+	},
     ]
 
     cmd = 'touch "$@"\n'
