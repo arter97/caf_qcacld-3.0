@@ -2865,6 +2865,20 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 		force_1x1 = wlan_p2p_check_oui_and_force_1x1(
 				frm_body + LIM_ASSOC_REQ_IE_OFFSET,
 				frame_len - LIM_ASSOC_REQ_IE_OFFSET);
+
+		if (session->dfs_p2p_info.is_assisted_p2p_group) {
+			if (!assoc_req->addIEPresent)
+				goto error;
+
+			status = wlan_p2p_extract_ap_assist_dfs_params(session->vdev,
+								       assoc_req->addIE.addIEdata,
+								       assoc_req->addIE.length,
+								       false,
+								       session->curr_op_freq,
+								       false);
+			if (QDF_IS_STATUS_ERROR(status))
+				goto error;
+		}
 	}
 
 	/* Send assoc indication to SME */
