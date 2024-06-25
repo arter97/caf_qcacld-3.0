@@ -61,6 +61,31 @@ void hdd_ipa_set_tx_flow_info(void);
  */
 void hdd_ipa_set_mcc_mode(bool mcc_mode);
 
+#ifdef FEATURE_WDS
+/**
+ * hdd_ipa_peer_map_unmap_event() - Handle peer map and unmap event
+ * @vdev_id: vdev id of SAP vdev with wds enabled
+ * @peer_id: peer id of repeater STA connected to SAP
+ * @wds_macaddr: mac address of wds peer
+ * @map: true for map event, false for unmap event
+ *
+ * This routine handles wds peer map and unmap event from datapath layer
+ * and then notify IPA with WLAN_IPA_CLIENT_CONNECT_EX for map event and
+ * WLAN_IPA_CLIENT_DISCONNECT for unmap event respectively.
+ *
+ * Return: 0 for success and other error codes
+ */
+int hdd_ipa_peer_map_unmap_event(uint8_t vdev_id, uint16_t peer_id,
+				 uint8_t *wds_macaddr, bool map);
+#else /* !FEATURE_WDS */
+static inline int
+hdd_ipa_peer_map_unmap_event(uint8_t vdev_id, uint16_t peer_id,
+			     uint8_t *wds_macaddr, bool map)
+{
+	return 0;
+}
+#endif /* FEATURE_WDS*/
+
 #else
 static inline
 void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t skb, qdf_netdev_t dev)
@@ -73,6 +98,13 @@ static inline void hdd_ipa_set_tx_flow_info(void)
 
 static inline void hdd_ipa_set_mcc_mode(bool mcc_mode)
 {
+}
+
+static inline int
+hdd_ipa_peer_map_unmap_event(uint8_t vdev_id, uint16_t peer_id,
+			     uint8_t *wds_macaddr, bool map)
+{
+	return 0;
 }
 
 #endif

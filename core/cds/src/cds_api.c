@@ -83,6 +83,7 @@
 #include <qdf_notifier.h>
 #include <qwlan_version.h>
 #include <qdf_trace.h>
+#include "wlan_hdd_ipa.h"
 
 /* Preprocessor Definitions and Constants */
 
@@ -116,7 +117,43 @@ cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
 				     reason_code, cdp_reason_code);
 }
 
-static struct ol_if_ops  dp_ol_if_ops = {
+#if defined(IPA_WDS_EASYMESH_FEATURE)
+static int cds_peer_map_event(struct cdp_ctrl_objmgr_psoc *psoc,
+			      uint16_t peer_id, uint16_t hw_peer_id,
+			      uint8_t vdev_id, uint8_t *peer_mac_addr,
+			      enum cdp_txrx_ast_entry_type peer_type,
+			      uint32_t tx_ast_hashidx)
+{
+	if (peer_type != CDP_TXRX_AST_TYPE_WDS)
+		return 0;
+
+	/* With CDP_TXRX_AST_TYPE_WDS, it can be inferred that WDS AST
+	 * learning is enabled on the vdev.
+	 */
+	return hdd_ipa_peer_map_unmap_event(vdev_id, peer_id, peer_mac_addr,
+					    true);
+}
+
+static int cds_peer_unmap_event(struct cdp_ctrl_objmgr_psoc *psoc,
+				uint16_t peer_id, uint8_t vdev_id,
+				uint8_t *mac_addr)
+{
+	return hdd_ipa_peer_map_unmap_event(vdev_id, peer_id, mac_addr, false);
+}
+
+#if defined(FEATURE_AST)
+static void cds_peer_send_wds_disconnect(struct cdp_ctrl_objmgr_psoc *psoc,
+					 uint8_t *mac_addr, uint8_t vdev_id)
+{
+	/* IPA component does not care about peer_id in the disconnect case.
+	 * Hence put a dummy 0 here for peer_id.
+	 */
+	hdd_ipa_peer_map_unmap_event(vdev_id, 0, mac_addr, false);
+}
+#endif
+#endif
+
+static struct ol_if_ops dp_ol_if_ops = {
 	.peer_set_default_routing = target_if_peer_set_default_routing,
 	.peer_rx_reorder_queue_setup = target_if_peer_rx_reorder_queue_setup,
 	.peer_rx_reorder_queue_remove = target_if_peer_rx_reorder_queue_remove,
@@ -135,10 +172,17 @@ static struct ol_if_ops  dp_ol_if_ops = {
 	.dp_get_multi_pages = dp_prealloc_get_multi_pages,
 	.dp_put_multi_pages = dp_prealloc_put_multi_pages
 #endif
-    /* TODO: Add any other control path calls required to OL_IF/WMA layer */
+#if defined(IPA_WDS_EASYMESH_FEATURE)
+	.peer_map_event = cds_peer_map_event,
+	.peer_unmap_event = cds_peer_unmap_event,
+#if defined(FEATURE_AST)
+	.peer_send_wds_disconnect = cds_peer_send_wds_disconnect,
+#endif
+#endif
+	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
-#else
-static struct ol_if_ops  dp_ol_if_ops;
+#else /* !QCA_WIFI_QCA8074 */
+static struct ol_if_ops dp_ol_if_ops;
 #endif
 
 static void cds_trigger_recovery_work(void *param);

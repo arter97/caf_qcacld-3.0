@@ -534,3 +534,175 @@ void hdd_ipa_set_mcc_mode(bool mcc_mode)
 
 	ucfg_ipa_set_mcc_mode(hdd_ctx->pdev, mcc_mode);
 }
+
+#ifdef FEATURE_WDS
+/**
+ * struct hdd_ipa_wds_evt - IPA WDS event
+ * @pdev:    pointer to pdev
+ * @net_dev:  pointer to net device
+ * @event:    ipa event
+ * @vdev_id:  vdev id
+ * @mac_addr: pointer to mac addr
+ */
+struct hdd_ipa_wds_evt {
+	struct wlan_objmgr_pdev *pdev;
+	qdf_netdev_t net_dev;
+	enum wlan_ipa_wlan_event event;
+	uint16_t vdev_id;
+	struct qdf_mac_addr mac_addr;
+};
+
+static QDF_STATUS hdd_process_ipa_wds_event(struct scheduler_msg *msg)
+{
+	struct hdd_ipa_wds_evt *ipa_wds_evt;
+	QDF_STATUS status;
+
+	if (!(msg->bodyptr)) {
+		hdd_err("Invalid message body");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ipa_wds_evt = (struct hdd_ipa_wds_evt *)msg->bodyptr;
+	hdd_debug("process wds evt %d, vdev %d", ipa_wds_evt->event,
+		  ipa_wds_evt->vdev_id);
+	status = ucfg_ipa_wlan_evt(ipa_wds_evt->pdev,
+				   ipa_wds_evt->net_dev,
+				   QDF_SAP_MODE,
+				   ipa_wds_evt->vdev_id,
+				   ipa_wds_evt->event,
+				   ipa_wds_evt->mac_addr.bytes, false);
+	qdf_mem_free(msg->bodyptr);
+
+	return status;
+}
+
+static QDF_STATUS hdd_flush_ipa_wds_event(struct scheduler_msg *msg)
+{
+	if (!msg || !(msg->bodyptr)) {
+		hdd_err("invalid msg");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	hdd_debug("flush msg");
+	qdf_mem_free(msg->bodyptr);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS hdd_ipa_send_wds_msg(struct wlan_objmgr_pdev *pdev,
+				 qdf_netdev_t net_dev,
+				 enum wlan_ipa_wlan_event event,
+				 uint16_t vdev_id,
+				 const uint8_t *mac_addr)
+{
+	struct scheduler_msg msg = {0};
+	struct hdd_ipa_wds_evt *ipa_wds_evt;
+	QDF_STATUS status;
+
+	ipa_wds_evt = qdf_mem_malloc(sizeof(*ipa_wds_evt));
+	if (!ipa_wds_evt)
+		return QDF_STATUS_E_NOMEM;
+
+	hdd_debug("queue event %d, vdev id %d", event, vdev_id);
+	ipa_wds_evt->pdev = pdev;
+	ipa_wds_evt->net_dev = net_dev;
+	ipa_wds_evt->event = event;
+	ipa_wds_evt->vdev_id = vdev_id;
+	qdf_mem_copy(ipa_wds_evt->mac_addr.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
+	msg.bodyptr = ipa_wds_evt;
+	msg.callback = hdd_process_ipa_wds_event;
+	msg.flush_callback = hdd_flush_ipa_wds_event;
+	status = scheduler_post_message(QDF_MODULE_ID_HDD,
+					QDF_MODULE_ID_IPA,
+					QDF_MODULE_ID_OS_IF,
+					&msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(ipa_wds_evt);
+		hdd_err("post msg fail:%d", status);
+	}
+
+	return status;
+}
+
+static QDF_STATUS hdd_ipa_map_wds_peer(struct hdd_context *hdd_ctx,
+				       struct hdd_adapter *adapter, uint16_t peer_id,
+				       uint8_t *wds_macaddr)
+{
+	return hdd_ipa_send_wds_msg(hdd_ctx->pdev, adapter->dev,
+				    WLAN_IPA_CLIENT_CONNECT_EX, adapter->vdev_id,
+				    wds_macaddr);
+}
+
+static QDF_STATUS hdd_ipa_unmap_wds_peer(struct hdd_context *hdd_ctx,
+					 struct hdd_adapter *adapter,
+					 uint8_t *wds_macaddr)
+{
+	struct hdd_station_info *sta_info;
+
+	/* Ensure wds_macaddr is indeed a wds node.
+	 * 1. Check against self mac address.
+	 * 2. Check against sta_info_list.
+	 */
+	if (hdd_get_adapter_by_macaddr(hdd_ctx, wds_macaddr)) {
+		hdd_debug("MAC: "QDF_MAC_ADDR_FMT" is self mac",
+			  QDF_MAC_ADDR_REF(wds_macaddr));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list, wds_macaddr,
+					   STA_INFO_SOFTAP_GET_STA_INFO);
+	if (sta_info) {
+		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info,
+				     true, STA_INFO_SOFTAP_GET_STA_INFO);
+		hdd_debug("MAC: "QDF_MAC_ADDR_FMT "is a connected STA",
+			  QDF_MAC_ADDR_REF(wds_macaddr));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return hdd_ipa_send_wds_msg(hdd_ctx->pdev, adapter->dev,
+				    WLAN_IPA_CLIENT_DISCONNECT, adapter->vdev_id,
+				    wds_macaddr);
+}
+
+int hdd_ipa_peer_map_unmap_event(uint8_t vdev_id, uint16_t peer_id,
+				 uint8_t *wds_macaddr, bool map)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+	QDF_STATUS status;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		status = QDF_STATUS_E_INVAL;
+		goto err_ret;
+	}
+
+	hdd_debug("vdev %d %s for peer_id %d mac "QDF_MAC_ADDR_FMT,
+		  vdev_id, map ? "map" : "unmap", peer_id,
+		  QDF_MAC_ADDR_REF(wds_macaddr));
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+	if (qdf_unlikely(!adapter)) {
+		hdd_debug("Adapter is NULL for vdev %d", vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto err_ret;
+	}
+
+	/* WDS AST learning is only for SAP vdev with wds mode enabled */
+	if (!(adapter->device_mode == QDF_SAP_MODE &&
+	      ucfg_mlme_get_wds_mode(hdd_ctx->psoc))) {
+		hdd_debug("Invalid config for vdev %d", vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto err_ret;
+	}
+
+	if (map)
+		status = hdd_ipa_map_wds_peer(hdd_ctx, adapter, peer_id,
+					      wds_macaddr);
+	else
+		status = hdd_ipa_unmap_wds_peer(hdd_ctx, adapter, wds_macaddr);
+
+err_ret:
+	return qdf_status_to_os_return(status);
+}
+#endif /* FEATURE_WDS */
