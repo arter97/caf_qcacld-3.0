@@ -741,11 +741,82 @@ void lim_fill_dfs_p2p_group_params(struct pe_session *pe_session)
 	qdf_copy_macaddr(&dfs_p2p_info->ap_bssid, &ap_bssid);
 }
 
+static void lim_process_p2p_group_chan_switch_req(uint8_t vdev_id,
+						  uint8_t chan,
+						  uint8_t op_class)
+{
+	struct pe_session *session;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac_ctx)
+		return;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("Session not found for vdev_id: %d", vdev_id);
+		return;
+	}
+
+	if (session->opmode != QDF_P2P_CLIENT_MODE)
+		return;
+
+	lim_send_channel_usage_req_action_frame(mac_ctx, session,
+						chan, op_class);
+}
+
+static void lim_process_ap_assist_dfs_group_p2p_bmiss_notify(uint8_t vdev_id)
+{
+	struct pe_session *session;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac_ctx)
+		return;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("Session not found for vdev_id: %d", vdev_id);
+		return;
+	}
+
+	if (session->opmode != QDF_P2P_CLIENT_MODE ||
+	    !session->dfs_p2p_info.is_ap_bcn_monitor_active)
+		return;
+
+	lim_send_channel_usage_req_action_frame(mac_ctx, session, 0, 0);
+}
+
+static void
+lim_process_ap_assist_dfs_group_p2p_fw_monitor_update(uint8_t vdev_id, bool val)
+{
+	struct pe_session *session;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac_ctx)
+		return;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("Session not found for vdev_id: %d", vdev_id);
+		return;
+	}
+
+	if (session->opmode != QDF_P2P_CLIENT_MODE)
+		return;
+
+	session->dfs_p2p_info.is_ap_bcn_monitor_active = val;
+}
+
 static void p2p_register_callbacks(struct mac_context *mac_ctx)
 {
 	struct p2p_protocol_callbacks p2p_cb = {0};
 
 	p2p_cb.is_mgmt_protected = is_mgmt_protected;
+	p2p_cb.ap_assist_dfs_group_bmiss_notify =
+			lim_process_ap_assist_dfs_group_p2p_bmiss_notify;
+	p2p_cb.p2p_group_chan_switch_req =
+			lim_process_p2p_group_chan_switch_req;
+	p2p_cb.ap_assist_dfs_group_fw_monitor_update =
+			lim_process_ap_assist_dfs_group_p2p_fw_monitor_update;
 	ucfg_p2p_register_callbacks(mac_ctx->psoc, &p2p_cb);
 }
 
