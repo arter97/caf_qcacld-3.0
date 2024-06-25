@@ -2509,6 +2509,75 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 					       sap_info->bw), true);
 }
 
+QDF_STATUS
+policy_mgr_sta_post_disconnect_conc_check(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_conc_connection_info *sap_info = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t i;
+	uint32_t nan_freq_2g;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid pm context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (policy_mgr_is_sap_mode(pm_conc_connection_list[i].mode) &&
+		    pm_conc_connection_list[i].in_use) {
+			sap_info = &pm_conc_connection_list[i];
+			break;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	if (!sap_info)
+		goto end;
+
+	if (sap_info->freq == 0)
+		goto end;
+
+	nan_freq_2g = policy_mgr_mode_specific_get_channel(psoc,
+							   PM_NAN_DISC_MODE);
+	if (sap_info->freq == nan_freq_2g) {
+		policy_mgr_debug("NAN and SAP already in SCC");
+		goto end;
+	}
+
+	if (nan_freq_2g == 0)
+		goto end;
+
+	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
+	    pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress()) {
+		policy_mgr_debug("channel switch is already in progress");
+		return status;
+	}
+
+	if (pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason &&
+	    wlan_nan_is_sta_sap_nan_allowed(psoc)) {
+		pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason(
+				psoc,
+				sap_info->vdev_id,
+				CSA_REASON_CONCURRENT_NAN_EVENT);
+
+		status = policy_mgr_change_sap_channel_with_csa(
+				psoc, sap_info->vdev_id,
+				nan_freq_2g,
+				CH_WIDTH_40MHZ,
+				true);
+		policy_mgr_debug("Force SCC for SAP Ch freq: %d",
+				 nan_freq_2g);
+		if (status == QDF_STATUS_SUCCESS)
+			status = QDF_STATUS_E_PENDING;
+	}
+end:
+	pm_ctx->sta_ap_intf_check_work_info->nan_force_scc_in_progress = false;
+	return status;
+}
+
 void policy_mgr_check_sap_restart(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id)
 {

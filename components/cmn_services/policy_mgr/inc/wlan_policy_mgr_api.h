@@ -3714,6 +3714,15 @@ QDF_STATUS policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 		bool *one_by_one_dbs, bool *two_by_two_dbs);
 
 /**
+ * policy_mgr_sta_post_disconnect_conc_check() - Evaluate conc post disconnect
+ * @psoc: Pointer to soc
+ *
+ * Return: Negative value on error
+ */
+QDF_STATUS
+policy_mgr_sta_post_disconnect_conc_check(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_check_sap_restart() - Restart SAP when band/channel change
  * @psoc: Pointer to soc
  * @vdev_id: Vdev id
