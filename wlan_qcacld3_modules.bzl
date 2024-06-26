@@ -2231,6 +2231,12 @@ _conditional_srcs = {
 	    "core/hdd/src/wlan_hdd_sysfs_dp_stc.c",
         ],
     },
+    "CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE": {
+        True: [
+            "cmn/dp/wifi3.0/dp_rx_buffer_pool.c",
+	    "cmn/qdf/linux/src/qdf_page_pool.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
