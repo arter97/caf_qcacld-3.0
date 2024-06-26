@@ -3948,7 +3948,8 @@ lim_match_link_info(uint8_t req_link_id,
 
 QDF_STATUS
 lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
-		  uint32_t len, qdf_freq_t freq, int32_t rssi)
+		  uint32_t len, qdf_freq_t freq, int32_t rssi,
+		  uint8_t snr, uint32_t tsf_delta)
 {
 	qdf_nbuf_t buf;
 	struct wlan_objmgr_pdev *pdev;
@@ -3980,6 +3981,8 @@ lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
 	rx_param.pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 	rx_param.chan_freq = freq;
 	rx_param.rssi = rssi;
+	rx_param.snr = snr;
+	rx_param.tsf_delta = tsf_delta;
 
 	/* Set all per chain rssi as invalid */
 	for (i = 0; i < WLAN_MGMT_TXRX_HOST_MAX_ANTENNA; i++)
@@ -4658,7 +4661,7 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 			status = lim_add_bcn_probe(session_entry->vdev,
 						   link_probe_rsp.ptr,
 						   link_probe_rsp.len,
-						   chan_freq, rssi);
+						   chan_freq, rssi, 0, 0);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				pe_err("failed to add bcn probe %d", status);
 				status =
