@@ -2030,11 +2030,23 @@ int hdd_init_regulatory_update_event(struct hdd_context *hdd_ctx)
 		hdd_err("Failed to create regulatory update event");
 		goto failure;
 	}
+
 	status = qdf_mutex_create(&hdd_ctx->regulatory_status_lock);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to create regulatory status mutex");
 		goto failure;
 	}
+
+	status = qdf_create_work(0, &hdd_ctx->country_change_work,
+				 hdd_country_change_work_handle, hdd_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to create country change work.");
+		goto failure;
+	}
+
+	ucfg_reg_register_chan_change_callback(hdd_ctx->psoc,
+					       hdd_regulatory_dyn_cbk, NULL);
+	qdf_mem_zero(hdd_ctx->reg.alpha2, REG_ALPHA2_LEN + 1);
 	hdd_ctx->is_regulatory_update_in_progress = false;
 
 failure:
@@ -2051,12 +2063,6 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	if (!cur_chan_list) {
 		return -ENOMEM;
 	}
-
-	qdf_create_work(0, &hdd_ctx->country_change_work,
-			hdd_country_change_work_handle, hdd_ctx);
-	ucfg_reg_register_chan_change_callback(hdd_ctx->psoc,
-					       hdd_regulatory_dyn_cbk,
-					       NULL);
 
 	ret = hdd_update_country_code(hdd_ctx);
 	if (ret) {
@@ -2086,7 +2092,6 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_2GHZ);
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_5GHZ);
 	fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
-	qdf_mem_zero(hdd_ctx->reg.alpha2, REG_ALPHA2_LEN + 1);
 
 	qdf_mem_free(cur_chan_list);
 	return 0;
@@ -2124,13 +2129,13 @@ void hdd_deinit_regulatory_update_event(struct hdd_context *hdd_ctx)
 	status = qdf_event_destroy(&hdd_ctx->regulatory_update_event);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to destroy regulatory update event");
+
 	status = qdf_mutex_destroy(&hdd_ctx->regulatory_status_lock);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to destroy regulatory status mutex");
-}
 
-void hdd_regulatory_deinit(struct hdd_context *hdd_ctx)
-{
+	ucfg_reg_unregister_chan_change_callback(hdd_ctx->psoc,
+						 hdd_regulatory_dyn_cbk);
 	qdf_flush_work(&hdd_ctx->country_change_work);
 	qdf_destroy_work(0, &hdd_ctx->country_change_work);
 }
