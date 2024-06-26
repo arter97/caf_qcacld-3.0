@@ -4775,11 +4775,12 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 			WMITLV_SET_HDR(buf, WMITLV_TAG_ARRAY_STRUC, 0);
 			buf += WMI_TLV_HDR_SIZE;
 
-			wmi_debug("RSO_CFG: vdev[%d] 11r TLV psk_msk_len = %d psk_msk_ext:%d md:0x%x",
+			wmi_debug("RSO_CFG: vdev[%d] 11r TLV psk_msk_len = %d psk_msk_ext:%d md:0x%x ft_over_ds_enable:%d",
 				  roam_req->vdev_id,
 				  roam_offload_11r->psk_msk_len,
 				  roam_offload_11r->psk_msk_ext_len,
-				  roam_offload_11r->mdid);
+				  roam_offload_11r->mdid,
+				  roam_offload_11r->ft_over_ds_enable);
 			if (roam_offload_11r->psk_msk_len)
 				QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI,
 						   QDF_TRACE_LEVEL_DEBUG,

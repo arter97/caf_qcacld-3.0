@@ -9506,6 +9506,7 @@ static int hdd_set_ft_over_ds(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
+	hdd_debug("Enable FT over DS: %d", ft_over_ds_enable);
 	status = ucfg_mlme_set_ft_over_ds(hdd_ctx->psoc, ft_over_ds_enable);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("set ft_over_ds failed");
