@@ -1160,7 +1160,6 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 
 	/* Assoc link info */
 	mlo_params->vdev_id = ml_info->vdev_id;
-	mlo_params->ieee_link_id = ml_info->link_id;
 	qdf_mem_copy(&mlo_params->chan, &ml_info->channel_info,
 		     sizeof(struct wlan_channel));
 	qdf_mem_copy(&mlo_params->bssid, &ml_info->link_addr,
@@ -1549,6 +1548,7 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 	uint8_t pdev_id;
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_psoc *psoc = wma->psoc;
+	uint8_t link_id;
 
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma->pdev);
 	peer = wlan_objmgr_get_peer(psoc, pdev_id, req->peer_mac,
@@ -1571,14 +1571,18 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 	req->mlo_params.mlo_assoc_link =
 				wlan_peer_mlme_is_assoc_peer(peer);
 	WLAN_ADDR_COPY(req->mlo_params.mld_mac, peer->mldaddr);
-	req->mlo_params.ieee_link_id = params->link_id;
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
 
 	/* update eml for mlo sap/sta separately */
-	if (wma_is_vdev_in_ap_mode(wma, params->smesessionId))
+	if (wma_is_vdev_in_ap_mode(wma, params->smesessionId)) {
+		/* update the link id that MLO sta assoc */
+		link_id = wlan_vdev_get_link_id(vdev);
+		req->mlo_params.ieee_link_id = link_id;
 		wma_populate_peer_mlo_common_info_sap(wma, req, params);
-	else
+	} else {
+		req->mlo_params.ieee_link_id = params->link_id;
 		wma_populate_peer_mlo_common_info_sta(wma, vdev, params, req);
+	}
 
 }
 
