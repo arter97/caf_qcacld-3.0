@@ -7610,13 +7610,12 @@ hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 	if (fine_time_meas_cap & wmi_fw_rtt_respr)
 		responder_bits |= BIT(RESPONDER_RTT_11MC_SUPPORTED);
 
-	responder_bits |=
-		(rsta_11az_support &
-		 BIT(RESPONDER_RTT_11AZ_NTB_RANGING_SUPPORTED));
+	if (rsta_11az_support & CFG_RESPONDER_11AZ_NTB_SUPPORT)
+		responder_bits |= RESPONDER_RTT_11AZ_NTB_RANGING_SUPPORTED;
 
-	responder_bits |=
-		(rsta_11az_support &
-		 BIT(RESPONDER_RTT_11AZ_NTB_RANGING_SUPPORTED));
+	if (rsta_11az_support & CFG_RESPONDER_11AZ_TB_SUPPORT)
+		responder_bits |=
+			RESPONDER_RTT_11AZ_TB_RANGING_SUPPORTED;
 
 	status = mlme_check_index_setparam(
 			vdevsetparam,
