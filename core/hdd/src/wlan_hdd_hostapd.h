@@ -710,4 +710,22 @@ static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
 {}
 #endif
 
+/**
+ * hdd_ssr_restart_sap_cac_link() - Whether postpone sap link or not for SSR
+ * @adapter: adapter structure
+ * @link_info: link info structure
+ *
+ * This API use to check if the DFS sap link need to be postponed start or not
+ * in the SSR case if there is another partner link.
+ * And it can cover below cases:
+ * 1. If there is only one created/remaining DFS sap link not started, do not postpone.
+ * 2. If there is another 6GHz sap link not started, postpone the DFS sap link.
+ * 3. If there is another non-6GHz sap link not started, do not postpone.
+ *
+ * Return: True if need postpone otherwise false.
+ */
+bool
+hdd_ssr_restart_sap_cac_link(struct hdd_adapter *adapter,
+			     struct wlan_hdd_link_info *link_info);
+
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */
