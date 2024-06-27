@@ -2583,7 +2583,8 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
          * If ACS scan is skipped then ACS request would be completed by now,
 	 * so reset acs in progress flag
 	 */
-	if (sap_config->acs_cfg.skip_acs_scan)
+	if (sap_config->acs_cfg.skip_acs_scan ||
+	    QDF_IS_STATUS_ERROR(qdf_status))
 		qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {

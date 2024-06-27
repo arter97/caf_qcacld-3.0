@@ -1633,6 +1633,8 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 			qdf_ret_status = QDF_STATUS_SUCCESS;
 			goto release_vdev_ref;
 		}
+		/* reset skip acs scan */
+		sap_context->acs_cfg->skip_acs_scan = false;
 
 		sap_context->acs_req_timestamp = qdf_get_time_of_the_day_ms();
 
