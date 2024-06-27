@@ -558,3 +558,13 @@ struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
 {
 	return tdls_find_peer(vdev_obj, macaddr);
 }
+
+QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc))
+		status = wlan_tdls_teardown_links(psoc);
+
+	return status;
+}
