@@ -1531,6 +1531,9 @@ wlan_dp_stc_handle_flow_stats_policy(enum qca_async_stats_type type,
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 
+	if (!dp_stc)
+		return QDF_STATUS_E_NOSUPPORT;
+
 	dp_info("STC: type %d action %d", type, action);
 	switch (type) {
 	case QCA_ASYNC_STATS_TYPE_FLOW_STATS:
