@@ -4756,6 +4756,8 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 							 &rem_tlv);
 				if (!stats_info->trigger[i].common_roam)
 					continue;
+				wlan_cm_update_roam_stats_info(psoc, stats_info, i);
+				continue;
 			}
 
 			cm_roam_stats_print_trigger_info(
