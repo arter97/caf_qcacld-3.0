@@ -485,6 +485,19 @@ void dp_wds_replace_peer_mac(void *soc, struct wlan_dp_link *dp_link,
 }
 #endif /* FEATURE_WDS*/
 
+/**
+ * dp_softap_is_mlo_dev() - Check if dp link is mlo capable
+ * @dp_link: DP link context
+ *
+ * Return: true if mlo capable otherwise false.
+ */
+static inline bool
+dp_softap_is_mlo_dev(struct wlan_dp_link *dp_link)
+{
+	return wlan_vdev_mlme_feat_ext2_cap_get(dp_link->vdev,
+						WLAN_VDEV_FEXT2_MLO);
+}
+
 static QDF_STATUS
 dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 			      qdf_nbuf_t nbuf,
@@ -495,6 +508,9 @@ dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 	enum ol_txrx_peer_state peer_state;
 	void *soc;
 	struct cdp_peer_output_param peer_info = {0};
+	struct wlan_dp_link *dp_link_first = NULL;
+	struct wlan_dp_link *dp_link_next = NULL;
+	bool mlo_dev = false;
 
 	dest_mac_addr = (struct qdf_mac_addr *)(qdf_nbuf_data(nbuf) +
 						QDF_NBUF_DEST_MAC_OFFSET);
@@ -530,6 +546,27 @@ dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 		    qdf_ntohs(qdf_nbuf_get_protocol(nbuf)) != ETHERTYPE_WAI) {
 			dp_debug_rl("NON-EAPOL/WAPI pkt in non-Auth state");
 			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
+	if (qdf_ntohs(qdf_nbuf_get_protocol(nbuf)) == ETHERTYPE_PAE) {
+		/*
+		 * update the sa for legacy link peer that
+		 * is not aware of mld address.
+		 */
+		mlo_dev = dp_softap_is_mlo_dev(dp_link);
+		if (!peer_info.mld_peer && mlo_dev) {
+			dp_for_each_link_held_safe(dp_link->dp_intf,
+						   dp_link_first,
+						   dp_link_next) {
+				if (dp_link_first->link_id == *link_id) {
+					qdf_mem_copy(qdf_nbuf_data(nbuf) +
+						     QDF_NBUF_SRC_MAC_OFFSET,
+						     &dp_link_first->mac_addr.bytes[0],
+						     QDF_MAC_ADDR_SIZE);
+					break;
+				}
+			}
 		}
 	}
 	return QDF_STATUS_SUCCESS;
@@ -714,12 +751,7 @@ dp_softap_is_exception_path(struct wlan_dp_link *dp_link,
 			    qdf_nbuf_t nbuf,
 			    struct cdp_tx_exception_metadata *param)
 {
-	bool is_mlo_vdev;
-
-	is_mlo_vdev = wlan_vdev_mlme_feat_ext2_cap_get(dp_link->vdev,
-						       WLAN_VDEV_FEXT2_MLO);
-
-	if (is_mlo_vdev) {
+	if (dp_softap_is_mlo_dev(dp_link)) {
 		/* mlo sap broadcast/multicast case */
 		if (QDF_NBUF_CB_GET_IS_BCAST(nbuf) ||
 		    QDF_NBUF_CB_GET_IS_MCAST(nbuf)) {
