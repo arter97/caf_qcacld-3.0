@@ -671,8 +671,6 @@ wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx,
 
 	hdd_debug("lpc: Delete monitor interface");
 
-	wlan_hdd_release_intf_addr(hdd_ctx, adapter->mac_addr.bytes);
-	qdf_zero_macaddr(&adapter->mac_addr);
 	hdd_stop_adapter(hdd_ctx, adapter);
 	hdd_deinit_adapter(hdd_ctx, adapter, true);
 	adapter->is_virtual_iface = is_virtual_iface;
@@ -699,6 +697,7 @@ static void hdd_lpc_work_handler(void *arg)
 	struct hdd_adapter *adapter;
 	struct osif_vdev_sync *vdev_sync;
 	int errno;
+	struct qdf_mac_addr adapter_mac;
 
 	if (!hdd_ctx)
 		return;
@@ -709,6 +708,7 @@ static void hdd_lpc_work_handler(void *arg)
 		return;
 	}
 
+	qdf_copy_macaddr(&adapter_mac, &adapter->mac_addr);
 	errno = osif_vdev_sync_trans_start_wait(adapter->dev, &vdev_sync);
 	if (errno)
 		return;
@@ -717,6 +717,12 @@ static void hdd_lpc_work_handler(void *arg)
 	osif_vdev_sync_wait_for_ops(vdev_sync);
 
 	hdd_close_adapter(hdd_ctx, adapter, true);
+	/*
+	 * Release mac addr to pool after current monitor
+	 * interface's dp_intf is freed, in case other interface
+	 * acquire same mac addr and free dp_intf here.
+	 */
+	wlan_hdd_release_intf_addr(hdd_ctx, adapter_mac.bytes);
 	hdd_ctx->lpc_info.lpc_wk_scheduled = false;
 
 	osif_vdev_sync_trans_stop(vdev_sync);
