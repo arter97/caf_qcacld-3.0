@@ -6828,6 +6828,9 @@ wlan_hdd_update_rnrie(struct hdd_beacon_data *beacon,
 }
 #endif
 
+#define RSNXE_URNM_MFPR_BYTES 2
+#define RSNXE_URNM_X20_BIT 0x5
+#define RSNXE_URNM_BIT 0x80
 static void
 hdd_softap_update_pasn_vdev_params(struct hdd_context *hdd_ctx,
 				   uint8_t vdev_id,
@@ -6835,8 +6838,10 @@ hdd_softap_update_pasn_vdev_params(struct hdd_context *hdd_ctx,
 				   bool mfp_capable, bool mfp_required)
 {
 	uint32_t pasn_vdev_param = 0;
-	const uint8_t *rsnx_ie, *rsnxe_cap;
-	uint8_t cap_len;
+	const uint8_t *rsnx_ie, *rsnxe_cap, *ie;
+	struct s_ext_cap *ext_caps;
+	uint8_t ie_len;
+	uint8_t rsnxe_len;
 
 	if (mfp_capable)
 		pasn_vdev_param |= WLAN_CRYPTO_MFPC;
@@ -6849,9 +6854,55 @@ hdd_softap_update_pasn_vdev_params(struct hdd_context *hdd_ctx,
 	if (!rsnx_ie)
 		return;
 
-	rsnxe_cap = wlan_crypto_parse_rsnxe_ie(rsnx_ie, &cap_len);
-	if (rsnxe_cap && *rsnxe_cap & WLAN_CRYPTO_RSNX_CAP_URNM_MFPR)
+	rsnxe_len = rsnx_ie[SIR_MAC_IE_LEN_OFFSET];
+	if (!rsnxe_len ||
+	    rsnxe_len < RSNXE_URNM_MFPR_BYTES) {
+		hdd_debug("vdev:%d RSNXE len:%d less than expected", vdev_id,
+			  rsnxe_len);
+		return;
+	}
+
+	/*
+	 * RSNXE Format:
+	 *  1  |  1
+	 * EID | Length |
+	 *
+	 * Byte 1
+	 * [Protected TWT, SAE H2E, Reserved, protected
+	 * WUR frame, reserved] |
+	 *
+	 * Byte 2[Secure LTF, Secure RTT, URNM-MFPR-X20,
+	 * ...., URNM_MFPR]
+	 */
+	rsnxe_cap = (rsnx_ie + SIR_MAC_IE_TYPE_LEN_SIZE +
+		     RSNXE_URNM_MFPR_BYTES - 1);
+
+	/* RSNXE Byte 2 & Bit 3 */
+	if (*rsnxe_cap & RSNXE_URNM_X20_BIT)
+		pasn_vdev_param |= WLAN_CRYPTO_URNM_MFPR_X20;
+
+	/* RSNXE Byte 2 & Bit 15 */
+	if (*rsnxe_cap & RSNXE_URNM_BIT)
 		pasn_vdev_param |= WLAN_CRYPTO_URNM_MFPR;
+
+	hdd_debug("vdev_id:%d RSNXE Cap: 0x%x", vdev_id, *rsnxe_cap);
+
+	ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_EXTCAP, beacon->tail,
+				      beacon->tail_len);
+	if (ie) {
+		ext_caps = qdf_mem_malloc(sizeof(*ext_caps));
+		if (!ext_caps)
+			return;
+
+		ie_len = (ie[1] > sizeof(*ext_caps)) ? sizeof(*ext_caps) : ie[1];
+		qdf_mem_copy(ext_caps, &ie[2], ie_len);
+		if (ext_caps->i2r_lmr_feedback_policy)
+			pasn_vdev_param |= WLAN_CRYPTO_I2R_LMR_FB;
+
+		qdf_mem_free(ext_caps);
+	}
+
+	hdd_debug("pasn_vdev_param:0x%x", pasn_vdev_param);
 
 	wlan_crypto_vdev_set_param(hdd_ctx->psoc, vdev_id,
 				   wmi_vdev_param_11az_security_config,
