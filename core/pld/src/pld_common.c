@@ -2916,3 +2916,35 @@ int pld_oem_event_smem_write(struct device *dev, int flags, const __u8 *data,
 	return cnss_utils_smem_mailbox_write(dev, flags, data, len);
 }
 #endif
+
+#ifdef CONFIG_DT_CPU_MASK_DP_INTR
+void pld_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
+					    unsigned int *cpumask)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		pld_pcie_get_cpumask_for_wlan_rx_interrupts(dev, cpumask);
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		pld_ipci_get_cpumask_for_wlan_rx_interrupts(dev, cpumask);
+		break;
+	default:
+		break;
+	}
+}
+
+void pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
+						 unsigned int *cpumask)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(dev, cpumask);
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		pld_ipci_get_cpumask_for_wlan_tx_comp_interrupts(dev, cpumask);
+		break;
+	default:
+		break;
+	}
+}
+#endif
