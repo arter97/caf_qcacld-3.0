@@ -2114,7 +2114,7 @@ lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
 	if (ie_struct->he_cap.present)
 		bss_dot11_mode = MLME_DOT11_MODE_11AX;
 
-	if (ie_struct->eht_cap.present && ie_struct->mlo_ie.present &&
+	if (ie_struct->eht_cap.present &&
 	    lim_get_bss_11be_mode_allowed(mac_ctx, bss_desc, ie_struct))
 		bss_dot11_mode = MLME_DOT11_MODE_11BE;
 

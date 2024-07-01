@@ -2314,8 +2314,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 					roam_synch_ind->is_link_beacon :
 					roam_synch_ind->is_beacon);
 	bss_desc_ptr->rssi = roam_synch_ind->rssi;
-	/* Copy Timestamp */
-	bss_desc_ptr->scansystimensec = qdf_get_monotonic_boottime_ns();
 
 	if (is_multi_link_roam(roam_synch_ind)) {
 		bss_desc_ptr->chan_freq =
@@ -2342,7 +2340,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 					       WLAN_FC0_TYPE_MGMT,
 					       parsed_frm_ptr);
 
-	bss_desc_ptr->sinr = 0;
 	bss_desc_ptr->beaconInterval = parsed_frm_ptr->beaconInterval;
 	bss_desc_ptr->timeStamp[0]   = parsed_frm_ptr->timeStamp[0];
 	bss_desc_ptr->timeStamp[1]   = parsed_frm_ptr->timeStamp[1];
@@ -2353,12 +2350,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		     (uint8_t *)&bssid.bytes,
 		     sizeof(tSirMacAddr));
 
-	qdf_mem_copy((uint8_t *)&bss_desc_ptr->seq_ctrl,
-		     (uint8_t *)&mac_hdr->seqControl,
-		     sizeof(tSirMacSeqCtl));
-
-	bss_desc_ptr->received_time =
-		      (uint64_t)qdf_mc_timer_get_system_time();
 	if (parsed_frm_ptr->mdiePresent) {
 		bss_desc_ptr->mdiePresent = parsed_frm_ptr->mdiePresent;
 		qdf_mem_copy((uint8_t *)bss_desc_ptr->mdie,

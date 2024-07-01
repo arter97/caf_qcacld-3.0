@@ -12797,23 +12797,6 @@ uint32_t wlan_get_11h_power_constraint(struct mac_context *mac_ctx,
 	return local_power_constraint;
 }
 
-#ifdef FEATURE_WLAN_ESE
-static void wlan_fill_qbss_load_param(tDot11fBeaconIEs *bcn_ies,
-				      struct bss_description *bss_desc)
-{
-	if (!bcn_ies->QBSSLoad.present)
-		return;
-
-	bss_desc->QBSSLoad_present = true;
-	bss_desc->QBSSLoad_avail = bcn_ies->QBSSLoad.avail;
-}
-#else
-static void wlan_fill_qbss_load_param(tDot11fBeaconIEs *bcn_ies,
-				      struct bss_description *bss_desc)
-{
-}
-#endif
-
 #ifdef WLAN_FEATURE_FILS_SK
 static void wlan_update_bss_with_fils_data(struct mac_context *mac_ctx,
 					  struct scan_cache_entry *scan_entry,
@@ -12903,7 +12886,6 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 
 	qdf_mem_copy(bss_desc->bssId, scan_entry->bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
-	bss_desc->scansystimensec = scan_entry->boottime_ns;
 	qdf_mem_copy(bss_desc->timeStamp,
 		scan_entry->tsf_info.data, 8);
 
@@ -12923,8 +12905,6 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 
 	/* channel frequency what peer sent in beacon/probersp. */
 	bss_desc->chan_freq = scan_entry->channel.chan_freq;
-	bss_desc->received_time =
-		scan_entry->scan_entry_time;
 	bss_desc->startTSF[0] =
 		mac_ctx->rrm.rrmPEContext.startTSF[0];
 	bss_desc->startTSF[1] =
@@ -12933,9 +12913,9 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 		scan_entry->rrm_parent_tsf;
 	bss_desc->fProbeRsp = (scan_entry->frm_subtype ==
 			  MGMT_SUBTYPE_PROBE_RESP);
-	bss_desc->seq_ctrl = hdr->seqControl;
-	bss_desc->tsf_delta = scan_entry->tsf_delta;
 	bss_desc->adaptive_11r_ap = scan_entry->adaptive_11r_ap;
+	bss_desc->is_ml_ap  =
+			util_scan_entry_bv_ml_ie(scan_entry) ? true : false;
 
 	bss_desc->mbo_oce_enabled_ap =
 			util_scan_entry_mbo_oce(scan_entry) ? true : false;
@@ -12963,7 +12943,6 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 			(bcn_ies->MobilityDomain.resourceReqCap << 1));
 	}
 
-	wlan_fill_qbss_load_param(bcn_ies, bss_desc);
 	wlan_update_bss_with_fils_data(mac_ctx, scan_entry, bss_desc);
 
 	qdf_mem_free(bcn_ies);

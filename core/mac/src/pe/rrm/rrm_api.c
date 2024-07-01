@@ -1759,7 +1759,7 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 					beacon_xmit_ind->duration;
 				beacon_report->phyType = bss_desc->nwType;
 				beacon_report->bcnProbeRsp = 1;
-				beacon_report->rsni = bss_desc->sinr;
+				beacon_report->rsni = 0;
 
 				rrm_calculate_and_fill_rcpi(&beacon_report->rcpi,
 							    bss_desc->rssi);
