@@ -1700,7 +1700,8 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 	if (SAP_INIT != sap_ctx->fsm_state)
 		return;
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(roam_info->chan_info_freq))
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(roam_info->chan_info_freq) &&
+	    !sap_ctx->acs_cfg->is_early_terminate_enabled)
 		return;
 
 	state = wlan_reg_get_channel_state_for_pwrmode(
@@ -1740,7 +1741,8 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 		return;
 
 	/* Do not select first empty channel for LL_LT_SAP */
-	if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc, sap_ctx->vdev_id))
+	if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc, sap_ctx->vdev_id) &&
+	    !sap_ctx->acs_cfg->is_early_terminate_enabled)
 		return;
 
 	filter = qdf_mem_malloc(sizeof(*filter));

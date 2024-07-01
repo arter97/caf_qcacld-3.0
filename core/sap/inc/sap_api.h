@@ -527,6 +527,7 @@ struct sap_acs_cfg {
 	int16_t	   linear_rssi_threshold;
 	bool	   is_same_weight_rand_enabled;
 	bool	   is_wifi_non_wifi_load_score_enabled;
+	bool	   is_early_terminate_enabled;
 };
 
 /*

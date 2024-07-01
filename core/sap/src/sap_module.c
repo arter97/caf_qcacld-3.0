@@ -559,6 +559,7 @@ wlansap_set_scan_acs_channel_params(struct sap_config *config,
 	bool is_rand;
 	bool is_chan_load;
 	int16_t linear_rssi_threshold;
+	bool early_terminate_en;
 
 	if (!config) {
 		sap_err("Invalid config passed ");
@@ -628,11 +629,17 @@ wlansap_set_scan_acs_channel_params(struct sap_config *config,
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		sap_err("get_acs_wifi_non_wifi_load_status failed");
 
+	status = ucfg_mlme_get_acs_early_terminate_status(mac->psoc,
+							  &early_terminate_en);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		sap_err("get_acs_early_terminate_status failed");
+
 	psap_ctx->acs_cfg->is_linear_bss_count = is_linear_bss_count;
 	psap_ctx->acs_cfg->is_linear_rssi = is_linear_rssi;
 	psap_ctx->acs_cfg->linear_rssi_threshold = linear_rssi_threshold;
 	psap_ctx->acs_cfg->is_same_weight_rand_enabled = is_rand;
 	psap_ctx->acs_cfg->is_wifi_non_wifi_load_score_enabled = is_chan_load;
+	psap_ctx->acs_cfg->is_early_terminate_enabled = early_terminate_en;
 
 	return status;
 }
