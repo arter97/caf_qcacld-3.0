@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -214,6 +214,7 @@ static uint8_t wma_get_number_of_peers_supported(tp_wma_handle wma)
 /**
  * wma_get_number_of_tids_supported - API to query for number of tids supported
  * @no_of_peers_supported: Number of peer supported
+ * @num_vdevs: Number of vdevs
  *
  * Return: Max number of tids supported
  */
@@ -3456,7 +3457,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 				WMA_RX_SERIALIZER_CTX);
 
 	wma_handle->ito_repeat_count = cds_cfg->ito_repeat_count;
-	wma_handle->bandcapability = cds_cfg->bandcapability;
 
 	/* Register PWR_SAVE_FAIL event only in case of recovery(1) */
 	if (ucfg_pmo_get_auto_power_fail_mode(wma_handle->psoc) ==
@@ -5298,6 +5298,13 @@ wma_update_sar_version(struct wlan_psoc_host_service_ext_param *param,
 	cfg->sar_version = param ? param->sar_version : SAR_VERSION_1;
 }
 
+static void
+wma_update_sar_flag(struct wlan_psoc_host_service_ext2_param *param,
+		    struct wma_tgt_cfg *cfg)
+{
+	cfg->sar_flag = param ? param->sar_flag : SAR_SET_CTL_GROUPING_DISABLE;
+}
+
 /**
  * wma_update_hdd_band_cap() - update band cap which hdd understands
  * @supported_band: supported band which has been given by FW
@@ -5603,6 +5610,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	void *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	target_resource_config *wlan_res_cfg;
 	struct wlan_psoc_host_service_ext_param *service_ext_param;
+	struct wlan_psoc_host_service_ext2_param *service_ext2_param;
 	struct target_psoc_info *tgt_hdl;
 	struct wmi_unified *wmi_handle;
 	uint8_t i;
@@ -5624,6 +5632,8 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 
 	service_ext_param =
 			target_psoc_get_service_ext_param(tgt_hdl);
+	service_ext2_param =
+			target_psoc_get_service_ext2_param(tgt_hdl);
 	wmi_handle = get_wmi_unified_hdl_from_psoc(wma_handle->psoc);
 	if (wmi_validate_handle(wmi_handle))
 		return -EINVAL;
@@ -5681,6 +5691,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	wma_update_hdd_band_cap(target_if_get_phy_capability(tgt_hdl),
 				&tgt_cfg, wma_handle->psoc);
 	wma_update_sar_version(service_ext_param, &tgt_cfg);
+	wma_update_sar_flag(service_ext2_param, &tgt_cfg);
 	tgt_cfg.fine_time_measurement_cap =
 		target_if_get_wmi_fw_sub_feat_caps(tgt_hdl);
 	tgt_cfg.wmi_max_len = wmi_get_max_msg_len(wma_handle->wmi_handle)
@@ -7733,7 +7744,7 @@ release_ref:
 
 /**
  * wma_get_arp_req_stats() - process get arp stats request command to fw
- * @wma_handle: WMA handle
+ * @handle: WMA handle
  * @req_buf: get srp stats request buffer
  *
  * Return: None
@@ -9132,9 +9143,16 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 	uint32_t i;
 	QDF_STATUS status;
 	bool is_channel_allowed;
+	uint32_t band_bitmap;
 
 	if (wma_validate_handle(wma_handle))
 		return QDF_STATUS_E_NULL_VALUE;
+
+	status = ucfg_reg_get_band(wma_handle->pdev, &band_bitmap);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		wma_err("failed to get band");
+		return status;
+	}
 
 	/*
 	 * if vdev_id is WLAN_UMAC_VDEV_ID_MAX, then roaming is enabled on
@@ -9147,7 +9165,7 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 
 
 	wma_debug("RSO_CFG: BandCapability:%d, band_mask:%d",
-		  wma_handle->bandcapability, msg->band_mask);
+		  band_bitmap, msg->band_mask);
 	for (i = 0; i < wma_handle->saved_chan.num_channels; i++) {
 		msg->chan_weights.saved_chan_list[i] =
 					wma_handle->saved_chan.ch_freq_list[i];
@@ -9186,8 +9204,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 5G/6G band if only 2G band configured
 		 * as supported roam band mask
 		 */
-		if (((wma_handle->bandcapability == BAND_2G) ||
-		    (msg->band_mask == BIT(REG_BAND_2G))) &&
+		if ((band_bitmap == BIT(REG_BAND_2G) ||
+		     msg->band_mask == BIT(REG_BAND_2G)) &&
 		    !WLAN_REG_IS_24GHZ_CH_FREQ(
 		    msg->chan_weights.saved_chan_list[i])) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -9199,8 +9217,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 2G/6G band if only 5G band configured
 		 * as supported roam band mask
 		 */
-		if (((wma_handle->bandcapability == BAND_5G) ||
-		    (msg->band_mask == BIT(REG_BAND_5G))) &&
+		if ((band_bitmap == BIT(REG_BAND_5G) ||
+		     msg->band_mask == BIT(REG_BAND_5G)) &&
 		    !WLAN_REG_IS_5GHZ_CH_FREQ(
 		    msg->chan_weights.saved_chan_list[i])) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -9212,7 +9230,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 2G/5G band if only 6G band configured
 		 * as supported roam band mask
 		 */
-		if (msg->band_mask == BIT(REG_BAND_6G) &&
+		if ((band_bitmap == BIT(REG_BAND_6G) ||
+		     msg->band_mask == BIT(REG_BAND_6G)) &&
 		    !WLAN_REG_IS_6GHZ_CHAN_FREQ(
 		    msg->chan_weights.saved_chan_list[i])) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -9224,7 +9243,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 6G band if only 2G + 5G band configured
 		 * as supported roam band mask.
 		 */
-		if (msg->band_mask == (BIT(REG_BAND_2G) | BIT(REG_BAND_5G)) &&
+		if ((band_bitmap == (BIT(REG_BAND_2G) | BIT(REG_BAND_5G)) ||
+		     msg->band_mask == (BIT(REG_BAND_2G) | BIT(REG_BAND_5G))) &&
 		    (WLAN_REG_IS_6GHZ_CHAN_FREQ(
 		    msg->chan_weights.saved_chan_list[i]))) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -9236,7 +9256,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 2G band if only 5G + 6G band configured
 		 * as supported roam band mask.
 		 */
-		if (msg->band_mask == (BIT(REG_BAND_5G) | BIT(REG_BAND_6G)) &&
+		if ((band_bitmap == (BIT(REG_BAND_5G) | BIT(REG_BAND_6G)) ||
+		     msg->band_mask == (BIT(REG_BAND_5G) | BIT(REG_BAND_6G))) &&
 		    (WLAN_REG_IS_24GHZ_CH_FREQ(
 		    msg->chan_weights.saved_chan_list[i]))) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -9248,7 +9269,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 5G band if only 2G + 6G band configured
 		 * as supported roam band mask.
 		 */
-		if (msg->band_mask == (BIT(REG_BAND_2G) | BIT(REG_BAND_6G)) &&
+		if ((band_bitmap == (BIT(REG_BAND_2G) | BIT(REG_BAND_6G)) ||
+		     msg->band_mask == (BIT(REG_BAND_2G) | BIT(REG_BAND_6G))) &&
 		    (WLAN_REG_IS_5GHZ_CH_FREQ(
 		    msg->chan_weights.saved_chan_list[i]))) {
 			msg->chan_weights.weighed_valid_list[i] =
