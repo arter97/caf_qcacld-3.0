@@ -168,12 +168,12 @@ static void pm_init_trace_set_link_mem(void)
 	if (!g_trace_set_link_cmd)
 		g_trace_set_link_cmd = qdf_mem_malloc(
 			MAX_TRACE_NUM_OF_SET_LINK *
-			sizeof(struct mlo_link_set_active_param));
+			sizeof(struct trace_set_link_cmd));
 	qdf_atomic_init(&g_trace_set_link_cmd_index);
 	if (!g_trace_set_link_evt)
 		g_trace_set_link_evt = qdf_mem_malloc(
 			MAX_TRACE_NUM_OF_SET_LINK *
-			sizeof(struct mlo_link_set_active_resp));
+			sizeof(struct trace_set_link_evt));
 	qdf_atomic_init(&g_trace_set_link_evt_index);
 }
 
