@@ -804,41 +804,32 @@ struct bss_description {
 	/* offset of the ieFields from bssId. */
 	uint16_t length;
 	tSirMacAddr bssId;
-	unsigned long scansystimensec;
 	uint32_t timeStamp[2];
 	uint16_t beaconInterval;
 	uint16_t capabilityInfo;
 	tSirNwType nwType;      /* Indicates 11a/b/g */
 	int8_t rssi;
 	int8_t rssi_raw;
-	int8_t sinr;
 	/* channel frequency what peer sent in beacon/probersp. */
 	uint32_t chan_freq;
 	/* Based on system time, not a relative time. */
-	uint64_t received_time;
 	uint32_t parentTSF;
 	uint32_t startTSF[2];
 	uint8_t mdiePresent;
 	/* MDIE for 11r, picked from the beacons */
 	uint8_t mdie[SIR_MDIE_SIZE];
-#ifdef FEATURE_WLAN_ESE
-	uint16_t QBSSLoad_present;
-	uint16_t QBSSLoad_avail;
-#endif
 	/* whether it is from a probe rsp */
 	uint8_t fProbeRsp;
-	tSirMacSeqCtl seq_ctrl;
-	uint32_t tsf_delta;
 	struct scan_mbssid_info mbssid_info;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct fils_ind_elements fils_info_element;
 #endif
-	uint32_t assoc_disallowed;
 	uint32_t adaptive_11r_ap;
 	uint32_t mbo_oce_enabled_ap;
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	uint32_t is_single_pmk;
 #endif
+	uint32_t is_ml_ap;
 	/* Please keep the structure 4 bytes aligned above the ieFields */
 	QDF_FLEX_ARRAY(uint32_t, ieFields);
 };
