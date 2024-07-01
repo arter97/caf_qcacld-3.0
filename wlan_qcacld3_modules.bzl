@@ -2193,6 +2193,11 @@ _conditional_srcs = {
             "os_if/mlme/sap/ll_sap/src/os_if_ll_sap.c",
         ],
     },
+    "CONFIG_WLAN_DP_DYNAMIC_RESOURCE_MGMT": {
+        True: [
+            "components/dp/core/src/wlan_dp_resource_mgr.c",
+        ],
+    },
     "CONFIG_WLAN_SUPPORT_FLOW_PRIORTIZATION": {
         True: [
             "components/dp/core/src/wlan_dp_fpm.c",
