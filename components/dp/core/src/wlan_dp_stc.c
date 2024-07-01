@@ -1088,8 +1088,8 @@ other_checks:
 		}
 
 		if (sampling_flow->state == WLAN_DP_SAMPLING_STATE_CLASSIFIED) {
-			if (sampling_flow->flags1 &
-				WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT) {
+			if (!(sampling_flow->flags1 &
+				WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT)) {
 				wlan_dp_send_flow_report(dp_stc, sampling_flow);
 				sampling_flow->flags1 |=
 				       WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT;
