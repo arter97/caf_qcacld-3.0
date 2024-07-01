@@ -1509,6 +1509,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	static enum tput_level prev_tput_level = TPUT_LEVEL_NONE;
 	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
 	hdd_cb_handle ctx = dp_ops->callback_ctx;
+	uint32_t cpumask = 0;
 
 	if (!soc)
 		return;
@@ -1574,14 +1575,18 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	if (dp_ctx->cur_vote_level != next_vote_level) {
 		/* Set affinity for tx completion grp interrupts */
 		if (tput_level >= TPUT_LEVEL_VERY_HIGH &&
-		    prev_tput_level < TPUT_LEVEL_VERY_HIGH)
-			hif_set_grp_intr_affinity(hif_ctx,
-				cdp_get_tx_rings_grp_bitmap(soc), true);
-		else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
-			 prev_tput_level >= TPUT_LEVEL_VERY_HIGH)
+		    prev_tput_level < TPUT_LEVEL_VERY_HIGH) {
+			pld_get_cpumask_for_wlan_tx_comp_interrupts(dp_ctx->qdf_dev->dev,
+								    &cpumask);
 			hif_set_grp_intr_affinity(hif_ctx,
 				cdp_get_tx_rings_grp_bitmap(soc),
-				false);
+				cpumask, true);
+		} else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
+			 prev_tput_level >= TPUT_LEVEL_VERY_HIGH) {
+			hif_set_grp_intr_affinity(hif_ctx,
+				cdp_get_tx_rings_grp_bitmap(soc),
+				cpumask, false);
+		}
 
 		prev_tput_level = tput_level;
 		dp_ctx->cur_vote_level = next_vote_level;
