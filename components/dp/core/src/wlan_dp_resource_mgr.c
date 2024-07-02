@@ -14,6 +14,7 @@
 #include <wma.h>
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_ctrl.h>
+#include "cfg_ucfg_api.h"
 
 static uint64_t
 wlan_dp_resource_mgr_phymode_to_tput(enum wlan_phymode phymode)
@@ -161,6 +162,9 @@ void wlan_dp_resource_mgr_downscale_resources(void)
 	uint64_t in_use_rx_buff_descs;
 	QDF_STATUS status;
 
+	if (!rsrc_ctx)
+		return;
+
 	dp_rsrc_mgr_debug("Downscale resource called");
 	status = cdp_get_num_buff_descs_info(cdp_soc,
 					     &cur_req_rx_buff_descs,
@@ -198,6 +202,9 @@ void wlan_dp_resource_mgr_upscale_resources(
 	uint64_t additional_rx_buffers = 0, batch_count = 0;
 	uint32_t num_alloc_buff;
 	QDF_STATUS status;
+
+	if (!rsrc_ctx)
+		return;
 
 	dp_rsrc_mgr_debug("Upscale resource called");
 	status = cdp_get_num_buff_descs_info(cdp_soc,
@@ -658,6 +665,9 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 	enum wlan_phymode host_phymode;
 	int i;
 
+	if (!rsrc_ctx)
+		return;
+
 	dp_rsrc_mgr_debug("NDP notify channel info called");
 	for (i = 0; i < num_channels; i++) {
 		host_phymode = wma_fw_to_host_phymode(ch_info->phymode);
@@ -1018,6 +1028,9 @@ wlan_dp_resource_mgr_vote_node_free(struct wlan_objmgr_peer *peer)
 	struct  wlan_objmgr_vdev *vdev;
 	enum QDF_OPMODE opmode;
 
+	if (!rsrc_ctx)
+		return;
+
 	vdev = wlan_peer_get_vdev(peer);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 
@@ -1067,6 +1080,9 @@ void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
 	struct wlan_dp_peer_priv_context *priv_ctx;
 	struct wlan_objmgr_peer *peer;
 	bool list_update = false;
+
+	if (!rsrc_ctx)
+		return;
 
 	dp_rsrc_mgr_debug("vdev migration came for opmode:%u", opmode);
 	/*ML-STA connections are mac_n_list no handling required*/
@@ -1140,7 +1156,7 @@ wlan_dp_resource_mgr_set_req_resources(
 	QDF_STATUS status;
 
 	if (!rsrc_ctx) {
-		dp_err("DP resource mgr context not present");
+		dp_info("DP resource mgr context not present");
 		return;
 	}
 
@@ -1163,6 +1179,11 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 	cdp_config_param_type val = {0};
 	QDF_STATUS status;
 	int i;
+
+	if (!cfg_get(dp_ctx->psoc, CFG_DP_DYNAMIC_RESOURCE_MGMT_ENABLE)) {
+		dp_info("DP dynamic resourec mgmt cfg disabled");
+		return;
+	}
 
 	rsrc_ctx = qdf_mem_malloc(sizeof(*rsrc_ctx));
 	if (!rsrc_ctx) {
