@@ -2540,6 +2540,8 @@ static bool dp_runtime_fisa_aggr_disabled_for_vdev(struct dp_vdev *vdev,
 		return false;
 	}
 
+	dp_rx_fisa_release_ft_lock(dp_intf->dp_ctx->rx_fst, rx_ctx_id);
+
 	if (qdf_unlikely(!dp_intf->fisa_force_flushed[rx_ctx_id])) {
 		dp_rx_fisa_flush_by_intf_ctx_id(dp_intf, rx_ctx_id);
 		dp_intf->fisa_force_flushed[rx_ctx_id] = 1;
@@ -2623,7 +2625,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		}
 
 		if (dp_runtime_fisa_aggr_disabled_for_vdev(vdev, rx_ctx_id)) {
-			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
+			/* fst lock released when true returned */
 			goto pull_nbuf;
 		}
 
