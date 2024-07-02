@@ -1465,7 +1465,8 @@ static inline void hdd_set_dfs_pri_multiplier(struct hdd_context *hdd_ctx,
 }
 #endif
 
-void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx)
+void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
+				    bool send_sync_event)
 {
 	struct ieee80211_regdomain *regd;
 	struct ieee80211_reg_rule *regd_rules;
@@ -1528,7 +1529,12 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx)
 			  regd_rules[i].flags);
 	}
 
-	regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);
+	if (send_sync_event && hdd_hold_rtnl_lock()) {
+		regulatory_set_wiphy_regd_sync(hdd_ctx->wiphy, regd);
+		hdd_release_rtnl_lock();
+	} else {
+		regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);
+	}
 
 	hdd_debug("regd sync event sent with reg rules info");
 	qdf_mem_free(regd);
@@ -2005,7 +2011,7 @@ sync_chanlist:
 #if defined CFG80211_USER_HINT_CELL_BASE_SELF_MANAGED || \
 	    (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0))
 	if (wiphy->registered)
-		hdd_send_wiphy_regd_sync_event(hdd_ctx);
+		hdd_send_wiphy_regd_sync_event(hdd_ctx, false);
 #endif
 
 	hdd_config_tdls_with_band_switch(hdd_ctx);

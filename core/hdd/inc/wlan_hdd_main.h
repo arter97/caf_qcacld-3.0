@@ -5948,4 +5948,34 @@ wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info)
  * Return: True if MLO connection, else False
  */
 bool wlan_hdd_is_mlo_connection(struct wlan_hdd_link_info *link_info);
+
+#if defined(CONFIG_HDD_INIT_WITH_RTNL_LOCK)
+/**
+ * hdd_hold_rtnl_lock - Hold RTNL lock
+ *
+ * Hold RTNL lock
+ *
+ * Return: True if held and false otherwise
+ */
+static inline bool hdd_hold_rtnl_lock(void)
+{
+	rtnl_lock();
+	return true;
+}
+
+/**
+ * hdd_release_rtnl_lock - Release RTNL lock
+ *
+ * Release RTNL lock
+ *
+ * Return: None
+ */
+static inline void hdd_release_rtnl_lock(void)
+{
+	rtnl_unlock();
+}
+#else
+static inline bool hdd_hold_rtnl_lock(void) { return false; }
+static inline void hdd_release_rtnl_lock(void) { }
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

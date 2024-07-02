@@ -12253,7 +12253,7 @@ static int hdd_wiphy_init(struct hdd_context *hdd_ctx)
 	 */
 #if defined CFG80211_USER_HINT_CELL_BASE_SELF_MANAGED ||	\
 		(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0))
-	hdd_send_wiphy_regd_sync_event(hdd_ctx);
+	hdd_send_wiphy_regd_sync_event(hdd_ctx, true);
 #endif
 
 	pld_increment_driver_load_cnt(hdd_ctx->parent_dev);
@@ -16055,36 +16055,6 @@ static int hdd_init_thermal_info(struct hdd_context *hdd_ctx)
 
 }
 
-#if defined(CONFIG_HDD_INIT_WITH_RTNL_LOCK)
-/**
- * hdd_hold_rtnl_lock - Hold RTNL lock
- *
- * Hold RTNL lock
- *
- * Return: True if held and false otherwise
- */
-static inline bool hdd_hold_rtnl_lock(void)
-{
-	rtnl_lock();
-	return true;
-}
-
-/**
- * hdd_release_rtnl_lock - Release RTNL lock
- *
- * Release RTNL lock
- *
- * Return: None
- */
-static inline void hdd_release_rtnl_lock(void)
-{
-	rtnl_unlock();
-}
-#else
-static inline bool hdd_hold_rtnl_lock(void) { return false; }
-static inline void hdd_release_rtnl_lock(void) { }
-#endif
-
 #if !defined(REMOVE_PKT_LOG)
 
 /* MAX iwpriv command support */
@@ -19640,7 +19610,7 @@ static void hdd_inform_wifi_on(void)
 	if (ret)
 		return;
 	if (hdd_ctx->wiphy->registered)
-		hdd_send_wiphy_regd_sync_event(hdd_ctx);
+		hdd_send_wiphy_regd_sync_event(hdd_ctx, false);
 
 	osif_psoc_sync_op_stop(psoc_sync);
 }
