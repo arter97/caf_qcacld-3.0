@@ -1298,24 +1298,26 @@ wma_populate_peer_mlo_common_info_sap(tp_wma_handle wma,
 	struct wlan_mlo_dev_context *mld_dev;
 	struct wlan_mlo_peer_context *ml_peer = NULL;
 	bool assoc_peer = false;
+	struct wlan_mlo_mld_cap *mld_info;
 
-	wlan_mlme_get_sap_emlsr_mode_enabled(wma->psoc, &emlsr);
-
-	/* if mlo sap not support emlsr client, then skip update */
-	if (!emlsr)
+	mlo_params = &peer->mlo_params;
+	if (!mlo_params) {
+		wma_err("mlo parameter is null");
 		return;
+	}
 
 	obj_peer = wlan_objmgr_get_peer_by_mac(wma->psoc,
 					       peer->peer_mac,
 					       WLAN_LEGACY_WMA_ID);
 	if (!obj_peer)
 		return;
-	/* eml info is from assoc req frame if it is assoc peer */
+	/* eml/mld info is from assoc req frame if it is assoc peer */
 	assoc_peer = wlan_peer_mlme_is_assoc_peer(obj_peer);
 	wlan_objmgr_peer_release_ref(obj_peer, WLAN_LEGACY_WMA_ID);
 
 	if (assoc_peer) {
 		eml_info = &params->eml_info;
+		mld_info = &params->mld_info;
 	} else {
 		ml_peer = wlan_mlo_get_mlpeer_by_peer_mladdr(
 				(struct qdf_mac_addr *)&peer->mlo_params.mld_mac,
@@ -1329,22 +1331,32 @@ wma_populate_peer_mlo_common_info_sap(tp_wma_handle wma,
 		 * add_sta_param if it is not assoc link
 		 */
 		eml_info = &ml_peer->mlpeer_emlcap;
+		mld_info = &ml_peer->mlpeer_mldcap;
 	}
-	mlo_params = &peer->mlo_params;
-	if (!mlo_params || !eml_info) {
-		wma_err("mlo parameter or eml info is null");
+
+	/*
+	 * Set max simultaneous links = 1 for MLSR, 2 for MLMR. The +1
+	 * is added as per the agreement with FW for backward
+	 * compatibility purposes. Our internal structures still
+	 * conform to the values as per spec i.e. 0 = MLSR, 1 = MLMR.
+	 */
+	mlo_params->max_num_simultaneous_links = mld_info->max_simult_link + 1;
+
+	wlan_mlme_get_sap_emlsr_mode_enabled(wma->psoc, &emlsr);
+	if (!emlsr)
 		return;
-	}
+
 	mlo_params->emlsr_support = eml_info->emlsr_supp;
 	mlo_params->emlsr_pad_delay_us = wma_convert_emlsr_pad_delay(eml_info->emlsr_pad_delay);
 	mlo_params->emlsr_trans_delay_us = wma_convert_emlsr_tran_delay(eml_info->emlsr_trans_delay);
 	mlo_params->trans_timeout_us = wma_convert_trans_timeout_us(eml_info->trans_timeout);
-	wma_debug("is assoc %d emlsr supp %d pad delay %d trans delay %d tran timeout %d",
+	wma_debug("is assoc %d emlsr supp %d pad delay %d trans delay %d tran timeout %d link num %d",
 		  assoc_peer,
 		  mlo_params->emlsr_support,
 		  mlo_params->emlsr_pad_delay_us,
 		  mlo_params->emlsr_trans_delay_us,
-		  mlo_params->trans_timeout_us);
+		  mlo_params->trans_timeout_us,
+		  mlo_params->max_num_simultaneous_links);
 }
 
 /**
