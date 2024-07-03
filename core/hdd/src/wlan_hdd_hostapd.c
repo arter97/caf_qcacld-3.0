@@ -4355,20 +4355,11 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		ch_params.ch_width = CH_WIDTH_MAX;
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
-		/*
-		 * Adding this feature flag temporarily, will remove this once
-		 * feature flag is enabled.
-		 */
-#ifdef WLAN_FEATURE_LL_LT_SAP
 		intf_ch_freq =
 			wlan_get_ll_lt_sap_restart_freq(hdd_ctx->pdev,
 							sap_context->chan_freq,
 							sap_context->vdev_id,
 							&csa_reason);
-#else
-		intf_ch_freq = wlansap_get_chan_band_restrict(sap_context,
-							      &csa_reason);
-#endif
 		if (!intf_ch_freq) {
 			schedule_work(&link_info->sap_stop_bss_work);
 			wlansap_context_put(sap_context);

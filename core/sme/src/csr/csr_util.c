@@ -39,6 +39,7 @@
 #include <wlan_mlo_mgr_public_structs.h>
 #include "wlan_objmgr_vdev_obj.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_ll_sap_api.h"
 
 #define CASE_RETURN_STR(n) {\
 	case (n): return (# n);\
@@ -511,6 +512,7 @@ static eCSR_BW_Val csr_get_half_bw(enum phy_ch_width ch_width)
  * @intf_hbw: concurrent SAP/GO half bw
  * @intf_cfreq: concurrent SAP/GO channel frequency
  * @op_mode: opmode
+ * @cc_switch_mode: channel switch mode
  *
  * This routine is called to check if one SAP/GO channel is overlapping with
  * other SAP/GO channel
@@ -574,23 +576,23 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	enum phy_ch_width ch_width;
 	enum channel_state state;
 	qdf_freq_t new_sap_freq = 0;
-	bool is_ll_lt_sap_present = false;
+	qdf_freq_t ll_lt_sap_freq = 0;
+	bool force_mcc_required = false;
+	enum sap_csa_reason_code csa_reason;
 
 	if (mac_ctx->roam.configParam.cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
 		return 0;
 
-	policy_mgr_ll_lt_sap_get_valid_freq(
-				mac_ctx->psoc, mac_ctx->pdev,
-				vdev_id, sap_ch_freq,
-				mac_ctx->roam.configParam.cc_switch_mode,
-				&new_sap_freq,
-				&is_ll_lt_sap_present);
-	/*
-	 * If ll_lt_sap is present, then it has already updated the frequency
-	 * according to current concurrency, so, return from here
-	 */
-	if (is_ll_lt_sap_present) {
+	if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id)) {
+		new_sap_freq = wlan_get_ll_lt_sap_restart_freq(mac_ctx->pdev,
+								sap_ch_freq,
+								vdev_id,
+								&csa_reason);
+		/*
+		 * If ll_lt_sap is present, then it has already updated the freq
+		 * according to current concurrency, so, return from here
+		 */
 		if (new_sap_freq == sap_ch_freq)
 			return 0;
 
@@ -598,6 +600,16 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			  new_sap_freq, vdev_id);
 		return new_sap_freq;
 	}
+
+	ll_lt_sap_freq = policy_mgr_get_ll_lt_sap_freq(mac_ctx->psoc);
+	op_mode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
+
+	/* check if force MCC is required for LL LT SAP */
+	if (ll_lt_sap_freq && ((sap_ch_freq == ll_lt_sap_freq) ||
+	    (op_mode == QDF_SAP_MODE &&
+	     policy_mgr_are_2_freq_on_same_mac(mac_ctx->psoc, sap_ch_freq,
+					       ll_lt_sap_freq))))
+		force_mcc_required = true;
 
 	if (sap_ch_freq != 0) {
 		sap_cfreq = sap_ch_freq;
@@ -620,7 +632,9 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	for (i = 0; i < WLAN_MAX_VDEVS; i++) {
 		if (!CSR_IS_SESSION_VALID(mac_ctx, i))
 			continue;
-
+		/* Skip LL SAP freq for SCC */
+		if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, i))
+			continue;
 		session = CSR_GET_SESSION(mac_ctx, i);
 		op_mode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, i);
 		if ((op_mode == QDF_STA_MODE ||
@@ -701,8 +715,9 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			((intf_lfreq > sap_lfreq && intf_lfreq < sap_hfreq) ||
 			(intf_hfreq > sap_lfreq && intf_hfreq < sap_hfreq))))
 			intf_ch_freq = 0;
-	} else if (intf_ch_freq && sap_ch_freq != intf_ch_freq &&
-		   (policy_mgr_is_force_scc(mac_ctx->psoc))) {
+	} else if (((intf_ch_freq && sap_ch_freq != intf_ch_freq) ||
+		    force_mcc_required) &&
+		    policy_mgr_is_force_scc(mac_ctx->psoc)) {
 		policy_mgr_check_scc_channel(mac_ctx->psoc, &intf_ch_freq,
 					     sap_ch_freq, vdev_id,
 					     cc_switch_mode);
