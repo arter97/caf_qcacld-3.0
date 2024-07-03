@@ -221,6 +221,7 @@ struct peer_ml_info {
  * @link_id: per link id
  * @emlsr_trans_timeout: EMLSR transition timeout value
  * @eml_info: EMLSR capability info for sta peer under mlo sap mode
+ * @mld_info: mld and operation capability info for sta peer under mlo sap mode
  *
  * This structure contains parameter required for
  * add sta request of upper layer.
@@ -316,6 +317,7 @@ typedef struct {
 	uint8_t link_id;
 	uint16_t emlsr_trans_timeout;
 	struct wlan_mlo_eml_cap eml_info;
+	struct wlan_mlo_mld_cap mld_info;
 	struct ml_partner_link_info ml_partner_info[MLD_MAX_LINKS - 1];
 	struct peer_ml_info ml_info;
 #endif
