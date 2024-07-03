@@ -3207,24 +3207,22 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 	mcc_to_scc_switch =
 		policy_mgr_get_mcc_to_scc_switch_mode(pm_ctx->psoc);
 
-	policy_mgr_debug("Concurrent open sessions running: %d",
-			 policy_mgr_concurrent_open_sessions_running(pm_ctx->psoc));
-
-	if (!policy_mgr_is_sap_go_existed(pm_ctx->psoc))
+	if (!policy_mgr_is_sap_go_existed(pm_ctx->psoc)) {
+		policy_mgr_debug("No beaconing interface present");
 		goto end;
+	}
 
 	cc_count = policy_mgr_get_sap_mode_info(pm_ctx->psoc,
 						&op_ch_freq_list[cc_count],
 						&vdev_id[cc_count]);
 
-	policy_mgr_debug("Number of concurrent SAP: %d", cc_count);
 	if (cc_count < MAX_NUMBER_OF_CONC_CONNECTIONS)
 		cc_count = cc_count +
 				policy_mgr_get_mode_specific_conn_info(
 					pm_ctx->psoc, &op_ch_freq_list[cc_count],
 					&vdev_id[cc_count], PM_P2P_GO_MODE);
-	policy_mgr_debug("Number of beaconing entities (SAP + GO):%d",
-							cc_count);
+	policy_mgr_debug("No. of beaconing interface (SAP + LL LT SAP + GO):%d",
+			 cc_count);
 	if (!cc_count) {
 		policy_mgr_err("Could not retrieve SAP/GO operating channel&vdevid");
 		goto end;
@@ -3671,12 +3669,12 @@ sap_restart:
 			return;
 		}
 
-		policy_mgr_debug("Checking for Concurrent Change interference");
-
 		if (policy_mgr_mode_specific_connection_count(
 					psoc, PM_P2P_GO_MODE, NULL))
 			timeout_ms = MAX_NOA_TIME;
 
+		policy_mgr_debug("Queue check interface work with timeout %d",
+				 timeout_ms);
 		if (!qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
 					    timeout_ms)) {
 			policy_mgr_debug("change interface request already queued");

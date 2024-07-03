@@ -425,7 +425,7 @@ wlan_mlme_get_ap_policy(struct wlan_objmgr_vdev *vdev)
 		return HOST_CONCURRENT_AP_POLICY_UNSPECIFIED;
 	}
 
-	mlme_debug("Get ap_cfg_policy to :%d", mlme_priv->mlme_ap.ap_policy);
+	mlme_rl_debug("AP policy %d", mlme_priv->mlme_ap.ap_policy);
 
 	return mlme_priv->mlme_ap.ap_policy;
 }

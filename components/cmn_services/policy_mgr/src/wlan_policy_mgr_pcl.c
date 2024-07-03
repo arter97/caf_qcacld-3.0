@@ -1034,10 +1034,8 @@ policy_mgr_modify_pcl_based_on_indoor(struct wlan_objmgr_psoc *psoc,
 	     policy_mgr_is_special_mode_active_5g(psoc, PM_STA_MODE)))
 		include_indoor_channel = true;
 
-	if (include_indoor_channel) {
-		policy_mgr_debug("Indoor channels allowed. PCL not modified for indoor channels");
+	if (include_indoor_channel)
 		return QDF_STATUS_SUCCESS;
-	}
 
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (wlan_reg_is_freq_indoor_in_secondary_list(pm_ctx->pdev,
@@ -1685,7 +1683,6 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	policy_mgr_debug("Modified PCL: 6Ghz %d avoid_list %d skip scc %d",
 			 modified_pcl_6_ghz, avoid_list_modified_pcl,
 			 skip_scc_modified_pcl);
-	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 
 	return QDF_STATUS_SUCCESS;
 }

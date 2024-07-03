@@ -85,9 +85,9 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
 		uint8_t ll_lt_sap_vdev_id =
 				wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
 
-		policymgr_nofl_debug("%s ll_lt_sap vdev %d with freq %d is in scc with vdev %d",
-				     func, ll_lt_sap_vdev_id, ll_lt_sap_freq,
-				     scc_vdev_id);
+		policy_mgr_rl_nofl_debug("%s ll_lt_sap vdev %d with freq %d is in scc with vdev %d",
+					 func, ll_lt_sap_vdev_id,
+					 ll_lt_sap_freq, scc_vdev_id);
 		return true;
 	}
 

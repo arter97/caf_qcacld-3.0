@@ -124,6 +124,7 @@
 #include "wlan_ll_sap_api.h"
 #include "wlan_ll_sap_ucfg_api.h"
 #include "wlan_nan_api.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -4230,7 +4231,7 @@ QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
 					    target_chan_freq,
 					    target_bw, forced, false);
 	if (ret && ret != -EBUSY) {
-		hdd_err("channel switch failed");
+		hdd_err("Vdev %d channel switch failed", link_info->vdev_id);
 		hdd_stop_sap_set_tx_power(psoc, link_info);
 	}
 
@@ -4302,8 +4303,8 @@ void wlan_hdd_set_sap_csa_reason(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (sap_ctx)
 		sap_ctx->csa_reason = reason;
-	hdd_nofl_debug("set csa reason %d %s vdev %d",
-		       reason, sap_get_csa_reason_str(reason), vdev_id);
+	hdd_nofl_debug("vdev %d CSA reason %d %s",
+			vdev_id, reason, sap_get_csa_reason_str(reason));
 }
 
 QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
@@ -4362,7 +4363,6 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		hdd_err("sap_context is invalid");
 		return QDF_STATUS_E_FAILURE;
 	}
-	wlan_hdd_set_sap_csa_reason(psoc, vdev_id, csa_reason);
 
 	policy_mgr_get_original_bw_for_sap_restart(psoc, &use_sap_original_bw);
 	if (use_sap_original_bw)
@@ -4371,22 +4371,19 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		ch_params.ch_width = CH_WIDTH_MAX;
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
-		intf_ch_freq =
-			wlan_get_ll_lt_sap_restart_freq(hdd_ctx->pdev,
-							sap_context->chan_freq,
-							sap_context->vdev_id,
-							&csa_reason);
-		if (!intf_ch_freq) {
-			schedule_work(&link_info->sap_stop_bss_work);
+		if (!policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
 			wlansap_context_put(sap_context);
-			hdd_debug("vdev %d stop ll_lt_sap, no channel found for csa",
-				  vdev_id);
+			hdd_debug("vdev %d freq %d, LL LT SAP dont need Channel change",
+				  vdev_id, sap_context->chan_freq);
 			return QDF_STATUS_E_FAILURE;
 		}
+		sap_context->csa_reason = CSA_REASON_LL_LT_SAP_EVENT;
+		goto force_restart_chan;
 	} else {
 		intf_ch_freq = wlansap_get_chan_band_restrict(sap_context,
 							      &csa_reason);
 	}
+
 	if (intf_ch_freq && intf_ch_freq != sap_context->chan_freq)
 		goto sap_restart;
 
@@ -4441,9 +4438,6 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	 * Need to take care of 3 port cases with 2 STA iface in future.
 	 */
 	intf_ch_freq = wlansap_check_cc_intf(sap_context);
-	hdd_debug("sap_vdev %d intf_ch: %d, orig freq: %d",
-		  vdev_id, intf_ch_freq, sap_ch_freq);
-
 	temp_ch_freq = intf_ch_freq ? intf_ch_freq : sap_ch_freq;
 	wlansap_get_csa_chanwidth_from_phymode(sap_context, temp_ch_freq,
 					       &ch_params);
@@ -4455,43 +4449,42 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		    &ch_params))) {
 			schedule_work(&link_info->sap_stop_bss_work);
 			wlansap_context_put(sap_context);
-			hdd_debug("can't move sap to chan(freq): %u, stopping SAP",
-				  intf_ch_freq);
+			hdd_debug("vdev %d can't move sap to chan(freq): %u, stopping SAP",
+				  vdev_id, intf_ch_freq);
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
 
 sap_restart:
 	if (!intf_ch_freq) {
-		hdd_debug("Unable to find safe channel, Hence stop the SAP or Set Tx power");
-		sap_context->csa_reason = csa_reason;
+		hdd_debug("vdev %d Unable to find safe channel, Hence stop the SAP or Set Tx power",
+			  vdev_id);
+		wlan_hdd_set_sap_csa_reason(psoc, vdev_id, csa_reason);
 		hdd_stop_sap_set_tx_power(psoc, link_info);
 		wlansap_context_put(sap_context);
 		return QDF_STATUS_E_FAILURE;
-	} else {
-		sap_context->csa_reason = csa_reason;
 	}
+	wlan_hdd_set_sap_csa_reason(psoc, vdev_id, csa_reason);
+
 	if (ch_params.ch_width == CH_WIDTH_MAX)
 		wlansap_get_csa_chanwidth_from_phymode(
 					sap_context, intf_ch_freq,
 					&ch_params);
 
-	hdd_debug("mhz_freq_seg0: %d, ch_width: %d",
-		  ch_params.mhz_freq_seg0, ch_params.ch_width);
 	if (sap_context->csa_reason == CSA_REASON_UNSAFE_CHANNEL &&
 	    (!policy_mgr_check_bw_with_unsafe_chan_freq(hdd_ctx->psoc,
 							ch_params.mhz_freq_seg0,
 							ch_params.ch_width))) {
-		hdd_debug("SAP bw shrink to 20M for unsafe");
+		hdd_debug("SAP bw shrink to 20M for unsafe from %d", ch_params.ch_width);
 		ch_params.ch_width = CH_WIDTH_20MHZ;
 	}
 
-	hdd_debug("SAP restart orig chan freq: %d, new freq: %d bw %d",
-		  hdd_ap_ctx->sap_config.chan_freq, intf_ch_freq,
-		  ch_params.ch_width);
+	hdd_debug("SAP CSA vdev %d, Freq: %d -> %d bw %d freq0 %d",
+		  vdev_id, hdd_ap_ctx->sap_config.chan_freq, intf_ch_freq,
+		  ch_params.ch_width, ch_params.mhz_freq_seg0);
 	hdd_ap_ctx->bss_stop_reason = BSS_STOP_DUE_TO_MCC_SCC_SWITCH;
 	*ch_freq = intf_ch_freq;
-	hdd_debug("SAP channel change with CSA/ECSA");
+force_restart_chan:
 	status = hdd_sap_restart_chan_switch_cb(psoc, vdev_id, *ch_freq,
 						ch_params.ch_width, false);
 	wlansap_context_put(sap_context);

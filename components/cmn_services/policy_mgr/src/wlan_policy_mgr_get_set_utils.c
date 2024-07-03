@@ -13251,8 +13251,8 @@ static qdf_freq_t _policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc,
 		if (!is_ll_sap_present)
 			continue;
 
-		policy_mgr_debug("LL SAP %d present with vdev_id %d and freq %d",
-				 ap_type, vdev_id, freq);
+		policy_mgr_rl_debug("LL SAP %d present with vdev_id %d and freq %d",
+				    ap_type, vdev_id, freq);
 
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 		return freq;
