@@ -7121,6 +7121,16 @@ policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 	if (notify_reason > MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_POST_SER)
 		return QDF_STATUS_SUCCESS;
 
+	/*
+	 * CSA on the SAP/GO would have been allowed based on the
+	 * current concurrency combination. Starting a link switch
+	 * during an active CSA, could lead to unexpected behavior.
+	 */
+	if (policy_mgr_is_chan_switch_in_progress(psoc)) {
+		policy_mgr_debug("CSA is in progress for SAP/GO, reject the link switch");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");

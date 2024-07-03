@@ -3762,12 +3762,13 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
+bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ANY_STA_CONNECTING;
 	struct wlan_hdd_link_info *link_info;
+	bool is_connecting = false, is_switching_link = false;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -3782,10 +3783,19 @@ bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-			if (!hdd_cm_is_connecting(link_info))
+
+			is_connecting = hdd_cm_is_connecting(link_info);
+			if (!is_connecting &&
+			    wlan_hdd_is_link_switch_in_progress(link_info))
+				is_switching_link = true;
+
+			if (!is_connecting && !is_switching_link)
 				continue;
 
-			hdd_debug("vdev_id %d: connecting", link_info->vdev_id);
+			hdd_debug("vdev_id %d: connecting %d switching link %d",
+				  link_info->vdev_id, is_connecting,
+				  is_switching_link);
+
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			if (next_adapter)
 				hdd_adapter_dev_put_debug(next_adapter, dbgid);
@@ -3848,9 +3858,15 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	 * If sta connection is in progress do not allow SAP channel change from
 	 * user space as it may change the HW mode requirement, for which sta is
 	 * trying to connect.
+	 *
+	 * Allowing the concurrency in the middle of a link switch could
+	 * lead to undefined behavior.
+	 * Eg: The concurrency could be safe when link switch vdev is torn down
+	 * during link switch. However, when the link comes up, the combination
+	 * could be undesired.
 	 */
-	if (hdd_is_any_sta_connecting(hdd_ctx)) {
-		hdd_err("STA connection is in progress");
+	if (hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx)) {
+		hdd_err("Do not allow CSA, STA connect/link switch is in progress");
 		return -EBUSY;
 	}
 

@@ -500,12 +500,13 @@ enum qca_wlan_802_11_mode hdd_convert_dot11mode_from_phymode(int phymode);
 void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
 
 /**
- * hdd_is_any_sta_connecting() - check if any sta is connecting
+ * hdd_is_sta_connect_or_link_switch_in_prog() - check if any sta is connecting
+ * or in the middle of a link switch
  * @hdd_ctx: hdd context
  *
- * Return: true if any sta is connecting
+ * Return: true if any sta is connecting/in link switch
  */
-bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
+bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx);
 
 /**
  * wlan_hdd_configure_twt_responder() - configure twt responder in sap_config
