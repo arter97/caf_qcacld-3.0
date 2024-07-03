@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,6 +42,7 @@
  * @is_twt_enabled_in_11n: Enable TWT support in 11n mode
  * @rtwt_requestor_enabled: Restricted TWT requestor enable or disable
  * @rtwt_responder_enabled: Restricted TWT responder enable or disable
+ * @twt_responder_type: TWT responder type
  */
 struct twt_mc_cfg_params {
 	bool enable_twt;
@@ -57,6 +58,7 @@ struct twt_mc_cfg_params {
 	bool is_twt_enabled_in_11n;
 	bool rtwt_requestor_enabled;
 	bool rtwt_responder_enabled;
+	uint8_t twt_responder_type;
 };
 
 #endif /* __WLAN_TWT_EXT_DEFS_H__ */

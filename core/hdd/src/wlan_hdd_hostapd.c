@@ -8281,6 +8281,8 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 {
 	bool twt_res_svc_cap, enable_twt, twt_res_cfg;
 	uint32_t reason;
+	uint8_t twt_res_type_cfg;
+	bool is_ll_sap = false;
 
 	enable_twt = ucfg_twt_cfg_is_twt_enabled(hdd_ctx->psoc);
 	ucfg_twt_get_responder(hdd_ctx->psoc, &twt_res_svc_cap);
@@ -8289,11 +8291,45 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 		hdd_debug("TWT responder already disable, skip");
 		return;
 	}
+
+	ucfg_twt_cfg_get_responder_type(hdd_ctx->psoc, &twt_res_type_cfg);
+
+	if (ucfg_policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id))
+		is_ll_sap = true;
+
+	switch (twt_res_type_cfg) {
+	case TWT_RESPONDER_TYPE_ALL_DISABLE:
+		twt_responder = 0;
+		break;
+	case TWT_RESPONDER_TYPE_LL_LT_SAP:
+		if (!is_ll_sap) {
+			hdd_debug("TWT responder not supported for vdev %d",
+				  vdev_id);
+			twt_responder = 0;
+		}
+		break;
+	case TWT_RESPONDER_TYPE_SAP:
+		if (is_ll_sap) {
+			hdd_debug("TWT responder not supported for vdev %d",
+				  vdev_id);
+			twt_responder = 0;
+		}
+		break;
+	case (TWT_RESPONDER_TYPE_LL_LT_SAP | TWT_RESPONDER_TYPE_SAP):
+		break;
+	default:
+		hdd_err("TWT responder type %d is invalid", twt_res_type_cfg);
+		twt_responder = 0;
+		break;
+	}
+
 	ucfg_twt_cfg_set_responder(hdd_ctx->psoc,
 				   QDF_MIN(twt_res_svc_cap,
 					   (enable_twt &&
 					    twt_responder)));
-	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
+	hdd_debug("cfg80211 TWT responder:%d for type %d", twt_responder,
+		  twt_res_type_cfg);
+
 	if (enable_twt && twt_responder) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {

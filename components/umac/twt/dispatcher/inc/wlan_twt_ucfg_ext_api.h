@@ -343,6 +343,15 @@ ucfg_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
 void
 ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * ucfg_twt_cfg_get_responder_type() - get TWT responder type
+ * @psoc: Pointer to global PSOC object
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS_SUCCESS
+ */
+QDF_STATUS
+ucfg_twt_cfg_get_responder_type(struct wlan_objmgr_psoc *psoc, uint8_t *val);
 #else
 static inline
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -478,6 +487,12 @@ ucfg_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 static inline void
 ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 {
+}
+
+static inline QDF_STATUS
+ucfg_twt_cfg_get_responder_type(struct wlan_objmgr_psoc *psoc, uint8_t *val)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 #endif

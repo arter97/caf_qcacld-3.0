@@ -50,6 +50,7 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 	twt_cfg->enable_twt = cfg_get(psoc, CFG_ENABLE_TWT);
 	twt_cfg->twt_requestor = cfg_get(psoc, CFG_TWT_REQUESTOR);
 	twt_cfg->twt_responder = cfg_get(psoc, CFG_TWT_RESPONDER);
+	twt_cfg->twt_responder_type = cfg_get(psoc, CFG_TWT_RESPONDER_TYPE);
 	twt_cfg->twt_congestion_timeout =
 				cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
 	twt_cfg->bcast_requestor_enabled = CFG_TWT_GET_BCAST_REQ(bcast_conf);
@@ -62,8 +63,8 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 	twt_cfg->rtwt_requestor_enabled = CFG_GET_RTWT_REQ(rtwt_conf);
 	twt_cfg->rtwt_responder_enabled = CFG_GET_RTWT_RES(rtwt_conf);
 
-	twt_debug("req: %d resp: %d", twt_cfg->twt_requestor,
-		  twt_cfg->twt_responder);
+	twt_debug("req: %d resp: %d resp_type %d", twt_cfg->twt_requestor,
+		  twt_cfg->twt_responder, twt_cfg->twt_responder_type);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -152,6 +153,22 @@ wlan_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
 	}
 
 	*val = twt_psoc_obj->cfg_params.twt_requestor;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_get_responder_type(struct wlan_objmgr_psoc *psoc, uint8_t *val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj) {
+		*val = cfg_default(CFG_TWT_RESPONDER_TYPE);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = twt_psoc_obj->cfg_params.twt_responder_type;
 
 	return QDF_STATUS_SUCCESS;
 }

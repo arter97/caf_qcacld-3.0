@@ -69,6 +69,32 @@
 
 /*
  * <ini>
+ * twt_responder_type - TWT responder type
+ * @Min: 0
+ * @Max: 0xFF
+ * @Default: 4
+ *
+ * Zero value represent TWT responder is disabled for all types.
+ * Set below bits to enable TWT responder:
+ * BIT(1) -> supported for SAP
+ * BIT(2) -> supported for LL SAP
+ *
+ * Related: NA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_TWT_RESPONDER_TYPE CFG_INI_UINT( \
+		"twt_responder_type", \
+		0, \
+		0xFF, \
+		0x4, \
+		CFG_VALUE_OR_DEFAULT, \
+		"TWT responder type")
+
+/*
+ * <ini>
  * enable_twt - Enable Target Wake Time support.
  * @Min: 0
  * @Max: 1
@@ -293,7 +319,8 @@
 	CFG(CFG_ENABLE_TWT_24GHZ) \
 	CFG(CFG_DISABLE_TWT_INFO_FRAME) \
 	CFG(CFG_TWT_ENABLE_IN_11N) \
-	CFG(CFG_RTWT_REQ_RESP)
+	CFG(CFG_RTWT_REQ_RESP) \
+	CFG(CFG_TWT_RESPONDER_TYPE)
 #elif !defined(WLAN_SUPPORT_TWT) && !defined(WLAN_TWT_CONV_SUPPORTED)
 #define CFG_TWT_ALL
 #endif

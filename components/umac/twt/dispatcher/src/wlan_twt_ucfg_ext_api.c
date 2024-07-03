@@ -48,6 +48,12 @@ ucfg_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
+ucfg_twt_cfg_get_responder_type(struct wlan_objmgr_psoc *psoc, uint8_t *val)
+{
+	return wlan_twt_cfg_get_responder_type(psoc, val);
+}
+
+QDF_STATUS
 ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
 {
 	return wlan_twt_cfg_set_responder(psoc, val);

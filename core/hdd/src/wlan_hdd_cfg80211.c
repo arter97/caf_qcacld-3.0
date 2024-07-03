@@ -225,6 +225,7 @@
 #include "os_if_telemetry.h"
 #endif
 #include "wlan_p2p_ucfg_api.h"
+#include "wlan_twt_ucfg_ext_api.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -5247,6 +5248,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	int ret_val;
 	uint8_t max_assoc_cnt = 0;
 	uint8_t max_str_link_count = 0;
+	uint8_t twt_res_type;
 
 	uint8_t feature_flags[(NUM_QCA_WLAN_VENDOR_FEATURES + 7) / 8] = {0};
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
@@ -5310,9 +5312,11 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 
 	hdd_get_twt_requestor(hdd_ctx->psoc, &twt_req);
 	hdd_get_twt_responder(hdd_ctx->psoc, &twt_res);
-	hdd_debug("twt_req:%d twt_res:%d", twt_req, twt_res);
+	ucfg_twt_cfg_get_responder_type(hdd_ctx->psoc, &twt_res_type);
+	hdd_debug("twt_req:%d twt_res:%d for type:%d ", twt_req, twt_res,
+		  twt_res_type);
 
-	if (twt_req || twt_res) {
+	if (twt_req || (twt_res && twt_res_type)) {
 		wlan_hdd_cfg80211_set_feature(feature_flags,
 					      QCA_WLAN_VENDOR_FEATURE_TWT);
 

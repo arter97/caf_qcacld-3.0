@@ -469,6 +469,17 @@ QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 					    bool *one_by_one_dbs,
 					    bool *two_by_two_dbs);
 
+/**
+ * ucfg_policy_mgr_is_vdev_ll_lt_sap() - This API is a wrapper for the function
+ * "policy_mgr_is_vdev_ll_lt_sap"
+ *
+ * @psoc: PSOC object
+ * @vdev_id: VDEV id
+ *
+ * Return: true if it's present otherwise false
+ */
+bool ucfg_policy_mgr_is_vdev_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
+				       uint32_t vdev_id);
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * ucfg_policy_mgr_pre_ap_start() - handle ap start request

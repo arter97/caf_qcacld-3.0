@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -62,6 +62,16 @@ QDF_STATUS wlan_twt_cfg_update(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS
 wlan_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
+
+/**
+ * wlan_twt_cfg_get_responder_type() - get TWT responder type
+ * @psoc: Pointer to global PSOC
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_responder_type(struct wlan_objmgr_psoc *psoc, uint8_t *val);
 
 /**
  * wlan_twt_cfg_get_responder() - get cfg responder
@@ -260,6 +270,12 @@ static inline QDF_STATUS wlan_twt_cfg_update(struct wlan_objmgr_psoc *psoc)
 
 static inline QDF_STATUS
 wlan_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_get_responder_type(struct wlan_objmgr_psoc *psoc, uint8_t *val)
 {
 	return QDF_STATUS_SUCCESS;
 }

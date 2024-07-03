@@ -106,6 +106,18 @@ enum twt_status {
 };
 
 /**
+ * enum twt_responder_type : TWT responder type
+ * @TWT_RESPONDER_TYPE_ALL_DISABLE: TWT responder disable for all types
+ * @TWT_RESPONDER_TYPE_SAP: only SAP supported
+ * @TWT_RESPONDER_TYPE_LL_LT_SAP: only LL SAP supported
+ */
+enum twt_responder_type {
+	TWT_RESPONDER_TYPE_ALL_DISABLE = 0x0,
+	TWT_RESPONDER_TYPE_SAP = BIT(1),
+	TWT_RESPONDER_TYPE_LL_LT_SAP = BIT(2),
+};
+
+/**
  * struct twt_conc_arg: TWT concurrency args
  * @hdd_ctx: pointer to hdd context
  */
