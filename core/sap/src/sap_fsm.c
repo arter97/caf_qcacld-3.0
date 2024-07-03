@@ -1663,7 +1663,6 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 			qdf_ret_status = QDF_STATUS_E_FAILURE;
 			goto release_vdev_ref;
 		} else {
-			wlansap_dump_acs_ch_freq(sap_context);
 			host_log_acs_scan_start(scan_id, vdev_id);
 		}
 
@@ -1680,9 +1679,6 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 				eCSR_SCAN_SUCCESS);
 	}
 #endif
-
-	wlansap_dump_acs_ch_freq(sap_context);
-
 	qdf_ret_status = QDF_STATUS_SUCCESS;
 
 release_vdev_ref:

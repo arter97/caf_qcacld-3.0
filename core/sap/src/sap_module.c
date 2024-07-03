@@ -4289,19 +4289,6 @@ qdf_freq_t wlansap_dcs_get_freq(struct sap_context *sap_context)
 	return sap_context->dcs_ch_freq;
 }
 
-void wlansap_dump_acs_ch_freq(struct sap_context *sap_context)
-{
-	if (!sap_context) {
-		sap_err("Invalid sap_debug");
-		return;
-	}
-
-	if (sap_context->fsm_state == SAP_STARTED)
-		sap_info("DCS freq %d", sap_context->dcs_ch_freq);
-	else
-		sap_info("ACS freq %d", sap_context->chan_freq);
-}
-
 void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
 			     qdf_freq_t ch_freq)
 {
@@ -4312,23 +4299,13 @@ void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
 
 	if (sap_context->fsm_state == SAP_STARTED) {
 		sap_context->dcs_ch_freq = ch_freq;
-		sap_debug("Configuring DCS freq %d", sap_context->dcs_ch_freq);
+		sap_debug("Selecting DCS freq %d", sap_context->dcs_ch_freq);
 	} else {
 		sap_context->chan_freq = ch_freq;
-		sap_debug("configuring ACS freq %d", sap_context->chan_freq);
+		sap_debug("Selecting ACS freq %d", sap_context->chan_freq);
 	}
 }
 #else
-void wlansap_dump_acs_ch_freq(struct sap_context *sap_context)
-{
-	if (!sap_context) {
-		sap_err("Invalid sap_debug");
-		return;
-	}
-
-	sap_info("ACS dump ch_freq=%d", sap_context->chan_freq);
-}
-
 void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
 			     qdf_freq_t ch_freq)
 {
@@ -4338,7 +4315,7 @@ void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
 	}
 
 	sap_context->chan_freq = ch_freq;
-	sap_debug("Configuring freq %d", sap_context->chan_freq);
+	sap_debug("Selecting ACS freq %d", sap_context->chan_freq);
 }
 #endif
 

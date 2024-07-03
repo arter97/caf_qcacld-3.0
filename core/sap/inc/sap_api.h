@@ -1803,16 +1803,6 @@ bool wlansap_filter_vendor_unsafe_ch_freq(
 	struct sap_context *sap_context, struct sap_config *sap_config);
 
 /**
- * wlansap_dump_acs_ch_freq() - print acs channel frequency
- * @sap_context: sap context
- *
- * This function is used to print acs channel frequecny
- *
- * Return: None
- */
-void wlansap_dump_acs_ch_freq(struct sap_context *sap_context);
-
-/**
  * wlansap_set_acs_ch_freq() - set acs channel frequency
  * @sap_context: sap context
  * @ch_freq: ch_freq to be set

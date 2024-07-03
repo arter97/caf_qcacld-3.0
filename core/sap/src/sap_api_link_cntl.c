@@ -459,8 +459,6 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 	sap_config_acs_result(mac_handle, sap_ctx,
 			      sap_ctx->acs_cfg->ht_sec_ch_freq);
 
-	wlansap_dump_acs_ch_freq(sap_ctx);
-
 	sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
 	sap_ctx->sap_status = eSAP_STATUS_SUCCESS;
 close_session:
@@ -1790,9 +1788,6 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 	sap_ctx->acs_cfg->pri_ch_freq = roam_info->chan_info_freq;
 	sap_config_acs_result(MAC_HANDLE(mac), sap_ctx,
 			      sap_ctx->acs_cfg->ht_sec_ch_freq);
-
-	wlansap_dump_acs_ch_freq(sap_ctx);
-
 	sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
 	sap_ctx->sap_status = eSAP_STATUS_SUCCESS;
 

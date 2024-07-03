@@ -3007,6 +3007,47 @@ sap_acs_next_lower_bandwidth(enum phy_ch_width ch_width)
 	return wlan_reg_get_next_lower_bandwidth(ch_width);
 }
 
+/*
+ * Consider 4 char for Freq, 6 for weight, 1 for space and 1 for EOS.
+ */
+#define SAP_SORTED_CHANNEL_INFO_LOG_LEN 12
+
+static void sap_dump_sorted_list(struct sap_sel_ch_info *ch_info)
+{
+	uint32_t i;
+	struct sap_ch_info *chan_info = ch_info->ch_info;
+	uint8_t *info;
+	uint32_t len = 0;
+
+	info = qdf_mem_malloc(SAP_MAX_CHANNEL_INFO_LOG);
+	if (!info)
+		return;
+
+	sap_nofl_debug("ACS sorted freq list: freq[weight]:");
+	for (i = 0; i < ch_info->num_ch; i++) {
+		if (chan_info->valid &&
+		    chan_info->weight < SAP_ACS_WEIGHT_ADJUSTABLE) {
+			len += qdf_scnprintf(info + len,
+					     SAP_MAX_CHANNEL_INFO_LOG - len,
+					     "%d[%d] ",
+					     chan_info->chan_freq,
+					     chan_info->weight);
+			if (len >=
+			    (SAP_MAX_CHANNEL_INFO_LOG -
+			     SAP_SORTED_CHANNEL_INFO_LOG_LEN)) {
+				sap_nofl_debug("%s", info);
+				len = 0;
+			}
+		}
+		chan_info++;
+	}
+
+	if (len)
+		sap_nofl_debug("%s", info);
+
+	qdf_mem_free(info);
+}
+
 QDF_STATUS
 sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
 		      qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
@@ -3049,6 +3090,7 @@ sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
 	/* Sort the ch lst as per the computed weights, lesser weight first. */
 	sap_sort_chl_weight_all(mac_ctx, sap_ctx, ch_info, op_band,
 				reg_domain, &cur_bw);
+	sap_dump_sorted_list(ch_info);
 	sap_ctx->acs_cfg->ch_width = cur_bw;
 
 	if (domain)
