@@ -1091,7 +1091,7 @@ QDF_STATUS dp_softap_rx_packet_cbk(void *link_ctx, qdf_nbuf_t rx_buf)
 					      0, QDF_RX));
 
 		if (dp_rx_pkt_tracepoints_enabled())
-			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0);
+			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0, 0);
 
 		qdf_nbuf_set_protocol_eth_tye_trans(nbuf);
 
