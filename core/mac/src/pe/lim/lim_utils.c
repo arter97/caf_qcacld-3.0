@@ -11173,6 +11173,9 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 	if (LIM_IS_AP_ROLE(session)) {
 		/* Update he ops for puncture */
 		wlan_reg_set_create_punc_bitmap(&ch_params, false);
+		wlan_reg_set_non_eht_ch_params(&ch_params, true);
+		wlan_reg_set_input_punc_bitmap(&ch_params,
+					       lim_get_punc_chan_bit_map(session));
 		wlan_reg_set_channel_params_for_pwrmode(mac->pdev,
 							session->curr_op_freq,
 							sec_chan_freq,
