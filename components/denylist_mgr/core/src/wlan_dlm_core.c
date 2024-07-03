@@ -1932,12 +1932,13 @@ dlm_update_mlo_reject_ap_info(struct wlan_objmgr_pdev *pdev,
 	 *     will be populated from ap_info which is already updated at
 	 *     the time of FW even extraction
 	 */
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		dlm_debug("not mlo vdev");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OBJMGR_ID);
+		return;
+	}
+
 	if (qdf_is_macaddr_zero(&ap_info->reject_mlo_ap_info.mld_addr)) {
-		if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-			dlm_debug("not mlo vdev");
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_OBJMGR_ID);
-			return;
-		}
 		wlan_vdev_get_bss_peer_mld_mac(vdev, &mld_addr);
 		qdf_copy_macaddr(&ap_info->reject_mlo_ap_info.mld_addr, &mld_addr);
 		ap_info->reject_mlo_ap_info.tried_links[ap_info->reject_mlo_ap_info.tried_link_count] =
