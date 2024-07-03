@@ -865,10 +865,11 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
-		if (chan_bw >= CH_WIDTH_80MHZ) {
+		if (chan_bw != CH_WIDTH_MAX && chan_bw >= CH_WIDTH_80MHZ) {
 			hdd_err("BW %d not possible in 2.4GHz band", chan_bw);
 			return -EINVAL;
 		}
+
 		if ((chan_bw != CH_WIDTH_20MHZ) &&
 		    (chan_freq == wlan_reg_ch_to_freq(CHAN_ENUM_2484)) &&
 		    (chan_bw != CH_WIDTH_MAX) &&
