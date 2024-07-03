@@ -38,6 +38,9 @@
 #include "mon_destination_ring.h"
 #include "dp_mon_2.0.h"
 #endif
+#ifdef WLAN_DP_FEATURE_STC
+#include "wlan_dp_stc.h"
+#endif
 
 #ifdef DP_MEM_PRE_ALLOC
 
@@ -274,6 +277,17 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 #endif
 #ifdef WLAN_PKT_CAPTURE_TX_2_0
 	{DP_MON_TX_DESC_POOL_TYPE, 0, false, false, NULL},
+#endif
+#ifdef WLAN_DP_FEATURE_STC
+	{DP_STC_CONTEXT_TYPE, sizeof(struct wlan_dp_stc), false,  true, NULL},
+	{DP_STC_SAMPLING_TABLE_TYPE, sizeof(struct wlan_dp_stc_sampling_table),
+	 false,  true, NULL},
+	{DP_STC_RX_FLOW_TABLE_TYPE, sizeof(struct wlan_dp_stc_rx_flow_table),
+	 false,  true, NULL},
+	{DP_STC_TX_FLOW_TABLE_TYPE, sizeof(struct wlan_dp_stc_tx_flow_table),
+	 false,  true, NULL},
+	{DP_STC_CLASSIFIED_FLOW_TABLE_TYPE,
+	 sizeof(struct wlan_dp_stc_classified_flow_table), false,  true, NULL},
 #endif
 };
 

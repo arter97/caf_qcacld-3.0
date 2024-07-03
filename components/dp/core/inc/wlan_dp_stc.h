@@ -368,10 +368,10 @@ struct wlan_dp_stc {
 	qdf_timer_t flow_sampling_timer;
 	enum wlan_dp_stc_timer_state sample_timer_state;
 	struct wlan_dp_stc_peer_traffic_map peer_traffic_map[DP_STC_MAX_PEERS];
-	struct wlan_dp_stc_sampling_table sampling_flow_table;
-	struct wlan_dp_stc_rx_flow_table rx_flow_table;
-	struct wlan_dp_stc_tx_flow_table tx_flow_table;
-	struct wlan_dp_stc_classified_flow_table classified_flow_table;
+	struct wlan_dp_stc_sampling_table *sampling_flow_table;
+	struct wlan_dp_stc_rx_flow_table *rx_flow_table;
+	struct wlan_dp_stc_tx_flow_table *tx_flow_table;
+	struct wlan_dp_stc_classified_flow_table *classified_flow_table;
 	struct wlan_dp_stc_sampling_candidate candidates[DP_STC_SAMPLE_FLOWS_MAX];
 };
 
@@ -524,7 +524,7 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 	if (!classified)
 		return;
 
-	c_table = &dp_stc->classified_flow_table;
+	c_table = dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
@@ -551,7 +551,7 @@ wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 	if (!classified)
 		return;
 
-	c_table = &dp_stc->classified_flow_table;
+	c_table = dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
@@ -657,7 +657,7 @@ wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 	metadata = QDF_NBUF_CB_RX_FLOW_METADATA(nbuf);
 	pkt_len = qdf_nbuf_len(nbuf);
 
-	flow_entry = &dp_stc->rx_flow_table.entries[flow_id];
+	flow_entry = &dp_stc->rx_flow_table->entries[flow_id];
 
 	return wlan_dp_stc_track_flow_features(dp_stc, nbuf, flow_entry,
 					       vdev_id, peer_id, pkt_len,
@@ -691,7 +691,7 @@ wlan_dp_stc_check_n_track_tx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 	if (qdf_likely(!flow_track_enabled))
 		return QDF_STATUS_SUCCESS;
 
-	flow_entry = &dp_stc->tx_flow_table.entries[flow_id];
+	flow_entry = &dp_stc->tx_flow_table->entries[flow_id];
 	pkt_len = qdf_nbuf_len(nbuf) - sizeof(qdf_ether_header_t);
 
 	return wlan_dp_stc_track_flow_features(dp_stc, nbuf, flow_entry,

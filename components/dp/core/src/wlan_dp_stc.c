@@ -24,6 +24,8 @@
 #include "wlan_dp_stc.h"
 #include "wlan_dp_fisa_rx.h"
 #include "target_if.h"
+#include "dp_internal.h"
+#include "wlan_dp_prealloc.h"
 
 #ifdef WLAN_DP_FEATURE_STC
 
@@ -185,7 +187,7 @@ check_burst:
 static inline int
 wlan_dp_stc_get_valid_sampling_flow_count(struct wlan_dp_stc *dp_stc)
 {
-	return qdf_atomic_read(&dp_stc->sampling_flow_table.num_valid_entries);
+	return qdf_atomic_read(&dp_stc->sampling_flow_table->num_valid_entries);
 }
 
 static inline void
@@ -194,7 +196,7 @@ wlan_dp_stc_get_avail_flow_quota(struct wlan_dp_stc *dp_stc, uint8_t *bidi,
 {
 	struct wlan_dp_stc_sampling_table *sampling_table;
 
-	sampling_table = &dp_stc->sampling_flow_table;
+	sampling_table = dp_stc->sampling_flow_table;
 
 	*bidi = DP_STC_SAMPLE_BIDI_FLOW_MAX -
 			qdf_atomic_read(&sampling_table->num_bidi_flows);
@@ -257,9 +259,9 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
 	struct wlan_dp_stc_sampling_table *sampling_table =
-					&dp_stc->sampling_flow_table;
+					dp_stc->sampling_flow_table;
 
-	qdf_atomic_inc(&dp_stc->sampling_flow_table.num_valid_entries);
+	qdf_atomic_inc(&dp_stc->sampling_flow_table->num_valid_entries);
 	sampling_flow->dir = candidate->dir;
 	switch (candidate->dir) {
 	case WLAN_DP_FLOW_DIR_TX:
@@ -303,7 +305,7 @@ static inline struct wlan_dp_stc_sampling_table_entry *
 wlan_dp_get_free_sampling_table_entry(struct wlan_dp_stc *dp_stc)
 {
 	int i;
-	struct wlan_dp_stc_sampling_table *table = &dp_stc->sampling_flow_table;
+	struct wlan_dp_stc_sampling_table *table = dp_stc->sampling_flow_table;
 
 	for (i = 0; i < DP_STC_SAMPLE_FLOWS_MAX; i++) {
 		if (table->entries[i].state == WLAN_DP_SAMPLING_STATE_INIT)
@@ -463,7 +465,7 @@ wlan_dp_stc_remove_sampling_table_entry(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
 	struct wlan_dp_stc_sampling_table *sampling_table =
-					&dp_stc->sampling_flow_table;
+					dp_stc->sampling_flow_table;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 
 	if (sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
@@ -497,7 +499,7 @@ wlan_dp_stc_remove_sampling_table_entry(struct wlan_dp_stc *dp_stc,
 		break;
 	}
 
-	qdf_atomic_dec(&dp_stc->sampling_flow_table.num_valid_entries);
+	qdf_atomic_dec(&dp_stc->sampling_flow_table->num_valid_entries);
 	qdf_mem_zero(sampling_entry, sizeof(*sampling_entry));
 	sampling_entry->state = WLAN_DP_SAMPLING_STATE_INIT;
 
@@ -817,7 +819,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
 	struct wlan_dp_stc_classified_flow_table *c_table =
-						&dp_stc->classified_flow_table;
+						dp_stc->classified_flow_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
@@ -909,7 +911,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 							dp_stc->candidates;
 	struct wlan_dp_stc_sampling_table_entry *sampling_flow;
 	struct wlan_dp_stc_classified_flow_table *c_table =
-						&dp_stc->classified_flow_table;
+						dp_stc->classified_flow_table;
 	uint64_t cur_ts = dp_stc_get_timestamp();
 	uint64_t tx_flow_metadata;
 	QDF_STATUS status;
@@ -1045,7 +1047,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 other_checks:
 	/* 3) Check if flow samples are ready to be sent to userspace */
 	for (flow_id = 0; flow_id < DP_STC_SAMPLE_FLOWS_MAX; flow_id++) {
-		sampling_flow = &dp_stc->sampling_flow_table.entries[flow_id];
+		sampling_flow = &dp_stc->sampling_flow_table->entries[flow_id];
 
 		if (sampling_flow->state == WLAN_DP_SAMPLING_STATE_INIT)
 			continue;
@@ -1197,7 +1199,7 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 	if (!(sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID))
 		goto save_rx_flow_samples;
 
-	flow = &dp_stc->tx_flow_table.entries[sampling_entry->tx_flow_id];
+	flow = &dp_stc->tx_flow_table->entries[sampling_entry->tx_flow_id];
 	qdf_mem_copy(&burst_sample->txrx_samples.tx, &flow->txrx_stats,
 		     sizeof(burst_sample->txrx_samples.tx));
 	qdf_mem_copy(&burst_sample->tx, &flow->burst_stats,
@@ -1225,7 +1227,7 @@ save_rx_flow_samples:
 	if (!(sampling_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID))
 		return;
 
-	flow = &dp_stc->rx_flow_table.entries[sampling_entry->rx_flow_id];
+	flow = &dp_stc->rx_flow_table->entries[sampling_entry->rx_flow_id];
 	qdf_mem_copy(&burst_sample->txrx_samples.rx, &flow->txrx_stats,
 		     sizeof(burst_sample->txrx_samples.rx));
 	burst_sample->txrx_samples.win_size = DP_STC_LONG_WINDOW_MS;
@@ -1304,7 +1306,7 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 					WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 			flow_id = sampling_entry->tx_flow_id;
 			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1, QDF_TX);
-			flow = &dp_stc->tx_flow_table.entries[flow_id];
+			flow = &dp_stc->tx_flow_table->entries[flow_id];
 #ifdef METADATA_CHECK_NEEDED_DURING_ADD
 			if (sampling_entry->tx_flow_metadata !=
 							flow->guid) {
@@ -1336,7 +1338,7 @@ sample:
 					WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 			flow_id = sampling_entry->rx_flow_id;
 			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1, QDF_RX);
-			flow = &dp_stc->rx_flow_table.entries[flow_id];
+			flow = &dp_stc->rx_flow_table->entries[flow_id];
 #ifdef METADATA_CHECK_NEEDED_DURING_ADD
 			if (sampling_entry->rx_flow_metadata !=
 							flow->metadata) {
@@ -1398,7 +1400,7 @@ sample:
 		if (sampling_entry->flags &
 					WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 			flow_id = sampling_entry->tx_flow_id;
-			flow = &dp_stc->tx_flow_table.entries[flow_id];
+			flow = &dp_stc->tx_flow_table->entries[flow_id];
 			if (sampling_entry->tx_flow_metadata !=
 							flow->metadata) {
 				sampling_entry->state =
@@ -1423,7 +1425,7 @@ sample:
 		if (sampling_entry->flags &
 					WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 			flow_id = sampling_entry->rx_flow_id;
-			flow = &dp_stc->rx_flow_table.entries[flow_id];
+			flow = &dp_stc->rx_flow_table->entries[flow_id];
 			if (sampling_entry->rx_flow_metadata !=
 							flow->metadata) {
 				sampling_entry->state =
@@ -1511,7 +1513,7 @@ static void wlan_dp_stc_flow_sampling_timer(void *arg)
 	int i;
 
 	for (i = 0; i < DP_STC_SAMPLE_FLOWS_MAX; i++) {
-		sampling_entry = &dp_stc->sampling_flow_table.entries[i];
+		sampling_entry = &dp_stc->sampling_flow_table->entries[i];
 		sampling_pending |= wlan_dp_stc_sample_flow(dp_stc,
 							    sampling_entry);
 	}
@@ -1599,7 +1601,7 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 	int i;
 
 	hash = wlan_dp_get_flow_hash(dp_ctx, flow_tuple);
-	sampling_table = &dp_stc->sampling_flow_table;
+	sampling_table = dp_stc->sampling_flow_table;
 
 	for (i = 0; i < DP_STC_SAMPLE_FLOWS_MAX; i++) {
 		flow = &sampling_table->entries[i];
@@ -1743,7 +1745,12 @@ void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
 
 QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 	struct wlan_dp_stc *dp_stc;
+	struct wlan_dp_stc_sampling_table *s_table;
+	struct wlan_dp_stc_rx_flow_table *rx_flow_table;
+	struct wlan_dp_stc_tx_flow_table *tx_flow_table;
+	struct wlan_dp_stc_classified_flow_table *c_table;
 	QDF_STATUS status;
 
 	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
@@ -1758,11 +1765,48 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 	}
 
 	dp_info("STC: attach");
-	dp_stc = qdf_mem_malloc(sizeof(*dp_stc));
+	dp_stc = dp_context_alloc_mem(soc, DP_STC_CONTEXT_TYPE,
+				      sizeof(*dp_stc));
 	if (!dp_stc) {
 		dp_err("STC context alloc failed");
 		return QDF_STATUS_E_NOMEM;
 	}
+
+	s_table = dp_context_alloc_mem(soc, DP_STC_SAMPLING_TABLE_TYPE,
+				       sizeof(*s_table));
+	if (!s_table) {
+		dp_err("STC sampling flow table alloc failed");
+		status = QDF_STATUS_E_NOMEM;
+		goto sampling_table_alloc_fail;
+	}
+	dp_stc->sampling_flow_table = s_table;
+
+	rx_flow_table = dp_context_alloc_mem(soc, DP_STC_RX_FLOW_TABLE_TYPE,
+					     sizeof(*rx_flow_table));
+	if (!rx_flow_table) {
+		dp_err("STC RX flow table alloc failed");
+		status = QDF_STATUS_E_NOMEM;
+		goto rx_flow_table_alloc_fail;
+	}
+	dp_stc->rx_flow_table = rx_flow_table;
+
+	tx_flow_table = dp_context_alloc_mem(soc, DP_STC_TX_FLOW_TABLE_TYPE,
+					     sizeof(*tx_flow_table));
+	if (!tx_flow_table) {
+		dp_err("STC TX flow table alloc failed");
+		status = QDF_STATUS_E_NOMEM;
+		goto tx_flow_table_alloc_fail;
+	}
+	dp_stc->tx_flow_table = tx_flow_table;
+
+	c_table = dp_context_alloc_mem(soc, DP_STC_CLASSIFIED_FLOW_TABLE_TYPE,
+				       sizeof(*c_table));
+	if (!c_table) {
+		dp_err("STC classified flow table alloc failed");
+		status = QDF_STATUS_E_NOMEM;
+		goto classified_table_alloc_fail;
+	}
+	dp_stc->classified_flow_table = c_table;
 
 	dp_ctx->dp_stc = dp_stc;
 	dp_stc->dp_ctx = dp_ctx;
@@ -1797,7 +1841,16 @@ timer_init_fail:
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
 
 periodic_work_creation_fail:
-	qdf_mem_free(dp_stc);
+	dp_context_free_mem(soc, DP_STC_CLASSIFIED_FLOW_TABLE_TYPE, c_table);
+classified_table_alloc_fail:
+	dp_context_free_mem(soc, DP_STC_TX_FLOW_TABLE_TYPE, tx_flow_table);
+tx_flow_table_alloc_fail:
+	dp_context_free_mem(soc, DP_STC_RX_FLOW_TABLE_TYPE, rx_flow_table);
+rx_flow_table_alloc_fail:
+	dp_context_free_mem(soc, DP_STC_SAMPLING_TABLE_TYPE, s_table);
+sampling_table_alloc_fail:
+	dp_context_free_mem(soc, DP_STC_CONTEXT_TYPE, dp_stc);
+	dp_ctx->dp_stc = NULL;
 
 	return status;
 }
@@ -1805,6 +1858,7 @@ periodic_work_creation_fail:
 QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct dp_soc *soc = (struct dp_soc *)dp_ctx->cdp_soc;
 
 	if (!dp_stc) {
 		dp_info("STC: module not initialized, skip detach");
@@ -1815,7 +1869,16 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 	qdf_timer_sync_cancel(&dp_stc->flow_sampling_timer);
 	qdf_periodic_work_stop_sync(&dp_stc->flow_monitor_work);
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
-	qdf_mem_free(dp_ctx->dp_stc);
+	dp_context_free_mem(soc, DP_STC_CLASSIFIED_FLOW_TABLE_TYPE,
+			    dp_stc->classified_flow_table);
+	dp_context_free_mem(soc, DP_STC_TX_FLOW_TABLE_TYPE,
+			    dp_stc->tx_flow_table);
+	dp_context_free_mem(soc, DP_STC_RX_FLOW_TABLE_TYPE,
+			    dp_stc->rx_flow_table);
+	dp_context_free_mem(soc, DP_STC_SAMPLING_TABLE_TYPE,
+			    dp_stc->sampling_flow_table);
+	dp_context_free_mem(soc, DP_STC_CONTEXT_TYPE, dp_stc);
+
 	dp_ctx->dp_stc = NULL;
 
 	return QDF_STATUS_SUCCESS;
