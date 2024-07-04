@@ -716,7 +716,7 @@ static void hdd_lpc_work_handler(void *arg)
 	osif_vdev_sync_unregister(adapter->dev);
 	osif_vdev_sync_wait_for_ops(vdev_sync);
 
-	hdd_close_adapter(hdd_ctx, adapter, true);
+	hdd_close_adapter(hdd_ctx, adapter, false);
 	/*
 	 * Release mac addr to pool after current monitor
 	 * interface's dp_intf is freed, in case other interface
