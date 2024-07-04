@@ -425,8 +425,9 @@ wlan_dp_send_flow_report(struct wlan_dp_stc *dp_stc,
 	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
 	uint32_t flags = 0;
 
-	dp_err("STC: Send NL msg flow report: %d", dp_stc->send_flow_stats);
-	if (!dp_stc->send_flow_stats)
+	dp_err("STC: Send NL msg flow report: %d",
+	       dp_stc->send_classified_flow_stats);
+	if (!dp_stc->send_classified_flow_stats)
 		return QDF_STATUS_SUCCESS;
 
 	if (wlan_dp_txrx_samples_ready(flow))
