@@ -1736,9 +1736,7 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 		 */
 
 		rssi = (int8_t)ch_info->rssi_agr;
-		if (ch_in_pcl(sap_ctx, ch_info->chan_freq) &&
-		    sap_ctx->acs_cfg->is_linear_rssi &&
-		    rssi > (int8_t)sap_ctx->acs_cfg->linear_rssi_threshold)
+		if (ch_in_pcl(sap_ctx, ch_info->chan_freq))
 			rssi -= PCL_RSSI_DISCOUNT;
 
 		if (rssi < SOFTAP_MIN_RSSI)
