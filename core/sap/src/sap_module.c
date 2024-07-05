@@ -3533,6 +3533,7 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 	uint32_t first_valid_dfs_5g_freq = 0;
 	uint32_t first_valid_non_dfs_5g_freq = 0;
 	uint32_t first_valid_6g_freq = 0;
+	uint32_t first_valid_6g_psc_freq = 0;
 	uint8_t vdev_id;
 
 	if (!sap_ctx) {
@@ -3601,18 +3602,21 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx,
 					first_valid_dfs_5g_freq = pcl_freqs[i];
 				}
 			}
-			if (!first_valid_6g_freq &&
-			    wlan_reg_is_6ghz_chan_freq(pcl_freqs[i])) {
-				first_valid_6g_freq = pcl_freqs[i];
-				if (pref_band == REG_BAND_6G)
-					break;
+			if (wlan_reg_is_6ghz_chan_freq(pcl_freqs[i])) {
+				if (!first_valid_6g_freq)
+					first_valid_6g_freq = pcl_freqs[i];
+				if (wlan_reg_is_6ghz_psc_chan_freq(pcl_freqs[i]) &&
+				    !first_valid_6g_psc_freq)
+					first_valid_6g_psc_freq = pcl_freqs[i];
 			}
 		}
 
 		selected_freq = pcl_freqs[0];
 
 		if (pref_band == REG_BAND_6G) {
-			if (first_valid_6g_freq)
+			if (first_valid_6g_psc_freq)
+				selected_freq = first_valid_6g_psc_freq;
+			else if (first_valid_6g_freq)
 				selected_freq = first_valid_6g_freq;
 			else if (first_valid_non_dfs_5g_freq)
 				selected_freq = first_valid_non_dfs_5g_freq;
