@@ -1572,7 +1572,7 @@ dp_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_dp_psoc_context *dp_ctx;
-	QDF_STATUS status, err_status;
+	QDF_STATUS status;
 
 	dp_info("DP PDEV OBJ create notification");
 	psoc = wlan_pdev_get_psoc(pdev);
@@ -1606,23 +1606,8 @@ dp_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 	 * 2) FISA will not start before pdev create, so its safe to attach
 	 * STC after FISA, though there is a dependency on FISA.
 	 */
-	status = wlan_dp_stc_attach(dp_ctx);
-	if (status == QDF_STATUS_E_NOSUPPORT)
-		status = QDF_STATUS_SUCCESS;
-	if (QDF_IS_STATUS_ERROR(status))
-		goto stc_attach_fail;
+	wlan_dp_stc_attach(dp_ctx);
 
-	return status;
-
-stc_attach_fail:
-	err_status = wlan_objmgr_pdev_component_obj_detach(pdev, WLAN_COMP_DP,
-							   dp_ctx);
-	if (QDF_IS_STATUS_ERROR(err_status)) {
-		dp_err("Failed to detach dp_ctx from pdev");
-		return err_status;
-	}
-
-	dp_ctx->pdev = NULL;
 	return status;
 }
 
