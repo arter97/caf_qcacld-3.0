@@ -5355,13 +5355,15 @@ static void wma_send_bss_color_change_enable(tp_wma_handle wma,
 }
 #endif
 
-#define MAX_VDEV_STA_REQ_PARAMS 5
+#define MAX_VDEV_STA_REQ_PARAMS 7
 /* params being sent:
  * 1.wmi_vdev_param_max_li_of_moddtim
  * 2.wmi_vdev_param_max_li_of_moddtim_ms
  * 3.wmi_vdev_param_dyndtim_cnt
  * 4.wmi_vdev_param_moddtim_cnt
  * 5.wmi_vdev_param_moddtim_cnt
+ * 6.wmi_vdev_param_telesdtim_cnt
+ * 7.wmi_vdev_param_min_teles_dtim_lvl
  */
 
 /**
