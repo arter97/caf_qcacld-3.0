@@ -4194,7 +4194,6 @@ void wma_remove_req(tp_wma_handle wma, uint8_t vdev_id,
  * @shortSlotTimeSupported: short slot time
  * @llbCoexist: llbCoexist
  * @maxTxPower: max tx power
- * @bss_max_idle_period: BSS max idle period
  *
  * Return: QDF_STATUS
  */
@@ -4202,14 +4201,14 @@ static QDF_STATUS
 wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 			tSirMacBeaconInterval beaconInterval,
 			uint8_t dtimPeriod, uint8_t shortSlotTimeSupported,
-			uint8_t llbCoexist, int8_t maxTxPower,
-			uint16_t bss_max_idle_period)
+			uint8_t llbCoexist, int8_t maxTxPower)
 {
 	uint32_t slot_time;
 	struct wma_txrx_node *intr = wma->interfaces;
 	struct dev_set_param setparam[MAX_VDEV_SET_BSS_PARAMS];
 	uint8_t index = 0;
 	enum ieee80211_protmode prot_mode;
+	uint32_t keep_alive_period;
 	QDF_STATUS ret;
 
 	ret = QDF_STATUS_E_FAILURE;
@@ -4287,11 +4286,12 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 		goto error;
 	}
 	mlme_set_max_reg_power(intr[vdev_id].vdev, maxTxPower);
-	if (bss_max_idle_period)
-		wma_set_sta_keep_alive(
+	wlan_mlme_get_sta_keep_alive_period(wma->psoc,
+					    &keep_alive_period);
+	wma_set_sta_keep_alive(
 				wma, vdev_id,
 				SIR_KEEP_ALIVE_NULL_PKT,
-				bss_max_idle_period,
+				keep_alive_period,
 				NULL, NULL, NULL);
 error:
 	return ret;
@@ -4446,7 +4446,7 @@ QDF_STATUS wma_post_vdev_start_setup(uint8_t vdev_id)
 				    mlme_obj->proto.generic.dtim_period,
 				    mlme_obj->proto.generic.slot_time,
 				    mlme_obj->proto.generic.protection_mode,
-				    bss_power, 0)) {
+				    bss_power)) {
 		wma_err("Failed to set wma_vdev_set_bss_params");
 	}
 
@@ -4763,8 +4763,7 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 				    add_bss->dtimPeriod,
 				    add_bss->shortSlotTimeSupported,
 				    add_bss->llbCoexist,
-				    add_bss->maxTxPower,
-				    add_bss->bss_max_idle_period)) {
+				    add_bss->maxTxPower)) {
 		wma_err("Failed to set bss params");
 	}
 
@@ -5510,8 +5509,7 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 	if (wma_vdev_set_bss_params(wma, params->smesessionId,
 				    iface->beaconInterval, iface->dtimPeriod,
 				    iface->shortSlotTimeSupported,
-				    iface->llbCoexist, maxTxPower,
-				    iface->bss_max_idle_period)) {
+				    iface->llbCoexist, maxTxPower)) {
 		wma_err("Failed to bss params");
 	}
 
