@@ -4997,7 +4997,11 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 	    mlo_check_if_all_vdev_up(vdev) &&
 	    reason == REASON_VDEV_RESTART_FROM_HOST) {
 		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
-
+		if (!assoc_vdev) {
+			mlme_err("Assoc vdev is NULL");
+			status = QDF_STATUS_E_FAILURE;
+			goto end;
+		}
 		*is_rso_skip = false;
 		*vdev_id = wlan_vdev_get_id(assoc_vdev);
 		mlme_debug("MLO_CSA: Send RSO on assoc vdev %d", *vdev_id);
