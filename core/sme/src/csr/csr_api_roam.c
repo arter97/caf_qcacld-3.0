@@ -5020,6 +5020,8 @@ QDF_STATUS csr_roam_set_psk_pmk(struct mac_context *mac,
 	    !csr_pmk_match_mlo_address(vdev, pmksa)) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 		sme_debug("Set pmksa received for non-connected bss");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_MLME, QDF_TRACE_LEVEL_DEBUG,
+				   pmksa->pmk, WLAN_MAX_PMK_DUMP_BYTES);
 		return QDF_STATUS_E_INVAL;
 	}
 
