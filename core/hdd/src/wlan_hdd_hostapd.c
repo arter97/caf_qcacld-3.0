@@ -4211,6 +4211,16 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
+static bool hdd_is_link_info_valid(struct wlan_hdd_link_info *link_info)
+{
+	if (!link_info) {
+		hdd_err("Invalid link_info");
+		return false;
+	}
+
+	return true;
+}
+
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
 					struct wlan_hdd_link_info *link_info,
@@ -4222,15 +4232,16 @@ QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
 
 	hdd_enter();
 
-	if (!link_info) {
-		hdd_err("Invalid link_info");
+	if (!hdd_is_link_info_valid(link_info))
 		return QDF_STATUS_E_INVAL;
-	}
 
 	ret = hdd_softap_set_channel_change(link_info,
 					    target_chan_freq,
 					    target_bw, forced, false);
 	if (ret && ret != -EBUSY) {
+		if (!hdd_is_link_info_valid(link_info))
+			return QDF_STATUS_E_INVAL;
+
 		hdd_err("Vdev %d channel switch failed", link_info->vdev_id);
 		hdd_stop_sap_set_tx_power(psoc, link_info);
 	}
