@@ -5444,8 +5444,18 @@ wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
+	uint8_t i = 0;
 
-	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
+	for (i = 0; i < 20; i++) {
+		hdd_debug("get_features %d", i);
+		errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
+		if (errno == -EAGAIN) {
+			qdf_sleep(100);
+			continue;
+		} else {
+			break;
+		}
+	}
 	if (errno)
 		return errno;
 
