@@ -119,6 +119,7 @@ struct wlan_dp_resource_vote_node {
  * @nan_list: NAN connections vote node list
  * @mac_count: total number of MACs supported
  * @max_phymode_nodes: max phymodes selected across system
+ * @rsrc_mgr_lock: lock to protect operations from parallel contexts
  */
 struct wlan_dp_resource_mgr_ctx {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -131,6 +132,7 @@ struct wlan_dp_resource_mgr_ctx {
 	qdf_list_t nan_list;
 	uint32_t mac_count;
 	struct wlan_dp_resource_vote_node *max_phymode_nodes[MAX_MAC_RESOURCES];
+	qdf_spinlock_t rsrc_mgr_lock;
 };
 
 #ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
