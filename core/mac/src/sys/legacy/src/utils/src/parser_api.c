@@ -222,7 +222,7 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 {
 	uint8_t ch_offset;
 	uint32_t sw_target_freq;
-	uint8_t primary_channel;
+	uint8_t primary_channel, ccfs1, band_mask;
 	enum phy_ch_width ch_width;
 	uint16_t punct_bitmap;
 	struct ch_params ch_params = {0};
@@ -231,7 +231,12 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 	primary_channel = session_entry->gLimChannelSwitch.primaryChannel;
 	punct_bitmap = lim_get_chan_switch_puncture(session_entry);
 	if (punct_bitmap != NO_SCHANS_PUNC) {
+		band_mask = BIT(wlan_reg_freq_to_band(sw_target_freq));
 		ch_params.ch_width = session_entry->gLimChannelSwitch.ch_width;
+		ccfs1 = session_entry->gLimWiderBWChannelSwitch.newCenterChanFreq1;
+		ch_params.mhz_freq_seg1 = wlan_reg_chan_band_to_freq(mac_ptr->pdev,
+								     ccfs1,
+								     band_mask);
 		wlan_reg_set_non_eht_ch_params(&ch_params, true);
 		wlan_reg_set_input_punc_bitmap(&ch_params, punct_bitmap);
 		wlan_reg_set_channel_params_for_pwrmode(mac_ptr->pdev,
@@ -589,7 +594,7 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 {
 	uint16_t num_tpe, punct_bitmap;
 	qdf_freq_t target_freq;
-	uint8_t ccfs0, ccfs1;
+	uint8_t ccfs0, ccfs1, band_mask;
 	enum phy_ch_width ch_width;
 	struct ch_params ch_params = {0};
 	/*
@@ -617,7 +622,12 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	target_freq = pe_session->gLimChannelSwitch.sw_target_freq;
 	punct_bitmap = lim_get_chan_switch_puncture(pe_session);
 	if (punct_bitmap != NO_SCHANS_PUNC) {
+		band_mask = BIT(wlan_reg_freq_to_band(target_freq));
 		ch_params.ch_width = pe_session->gLimChannelSwitch.ch_width;
+		ccfs1 = pe_session->gLimWiderBWChannelSwitch.newCenterChanFreq1;
+		ch_params.mhz_freq_seg1 = wlan_reg_chan_band_to_freq(mac->pdev,
+								     ccfs1,
+								     band_mask);
 		wlan_reg_set_non_eht_ch_params(&ch_params, true);
 		wlan_reg_set_input_punc_bitmap(&ch_params, punct_bitmap);
 
@@ -10329,8 +10339,10 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
 	 * 2) If the target channel width is more than 160MHz.
 	 */
 	if (punct_bitmap == NO_SCHANS_PUNC &&
-	    wlan_reg_get_bw_value(ch_switch->ch_width) > BW_160)
+	    wlan_reg_get_bw_value(ch_switch->ch_width) <= BW_160_MHZ) {
+		bw_ind->present = false;
 		return QDF_STATUS_SUCCESS;
+	}
 
 	bw_ind->present = true;
 	bw_ind->channel_width =	wlan_mlme_convert_phy_ch_width_to_eht_op_bw(

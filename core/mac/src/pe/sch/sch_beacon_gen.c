@@ -688,7 +688,6 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	uint8_t *addn_ie = NULL;
 	tDot11fIEExtCap extracted_extcap;
 	bool extcap_present = true, addnie_present = false;
-	bool is_6ghz_chsw;
 	uint8_t *eht_op_ie = NULL, eht_op_ie_len = 0;
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool is_band_2g;
@@ -793,29 +792,25 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	}
 	session->schBeaconOffsetBegin = offset + (uint16_t) n_bytes;
 	/* Initialize the 'new' fields at the end of the beacon */
-	is_6ghz_chsw =
-		WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq) ||
-		WLAN_REG_IS_6GHZ_CHAN_FREQ
-			(session->gLimChannelSwitch.sw_target_freq);
 	if (session->limSystemRole == eLIM_AP_ROLE &&
 	    (session->dfsIncludeChanSwIe == true ||
 	     session->bw_update_include_ch_sw_ie == true)) {
 		if (!CHAN_HOP_ALL_BANDS_ENABLE ||
-		    session->lim_non_ecsa_cap_num == 0 || is_6ghz_chsw) {
+		    session->lim_non_ecsa_cap_num == 0) {
 			tDot11fIEext_chan_switch_ann *ext_csa =
 						&bcn_2->ext_chan_switch_ann;
 			populate_dot_11_f_ext_chann_switch_ann(mac_ctx,
 							       ext_csa,
 							       session);
 			if (lim_is_session_eht_capable(session)) {
-				bcn_2->ChannelSwitchWrapper.present = 1;
 				populate_dot11f_bw_ind_element(mac_ctx,
-						session,
-				&bcn_2->ChannelSwitchWrapper.bw_ind_element);
+							       session,
+							       &bcn_2->ChannelSwitchWrapper.bw_ind_element);
+				if (bcn_2->ChannelSwitchWrapper.bw_ind_element.present)
+					bcn_2->ChannelSwitchWrapper.present = true;
 			}
 		}
-		if (session->lim_non_ecsa_cap_num &&
-		    !is_6ghz_chsw)
+		if (session->lim_non_ecsa_cap_num)
 			populate_channel_switch_ann(mac_ctx, bcn_2, session);
 
 	}
@@ -834,7 +829,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		/* Need to insert channel switch announcement here */
 		if ((LIM_IS_AP_ROLE(session) ||
 		     LIM_IS_P2P_DEVICE_GO(session)) &&
-		    session->dfsIncludeChanSwIe && !is_6ghz_chsw) {
+		    session->dfsIncludeChanSwIe) {
 			populate_channel_switch_ann(mac_ctx, bcn_2, session);
 		}
 	}
