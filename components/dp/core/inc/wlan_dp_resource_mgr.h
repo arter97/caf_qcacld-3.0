@@ -112,6 +112,7 @@ struct wlan_dp_resource_vote_node {
  * @dp_ctx: DP context reference
  * @cur_rsrc_map: Current DP resource map
  * @cur_resource_level: current resource level for active connections
+ * @monitor_vdev_vote: Monitor vdev present
  * @cur_max_tput: Current MAX throughput
  * @mac_n_list: MAC-n list for connections mac_id not fixed
  * @mac_list: MAC based vote nodes list
@@ -123,6 +124,7 @@ struct wlan_dp_resource_mgr_ctx {
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_resource_map cur_rsrc_map[RESOURCE_LVL_MAX];
 	enum wlan_dp_resource_level cur_resource_level;
+	bool monitor_vdev_vote;
 	uint64_t cur_max_tput;
 	qdf_list_t mac_n_list;
 	qdf_list_t mac_list[MAX_MAC_RESOURCES];
@@ -320,6 +322,31 @@ void
 wlan_dp_resource_mgr_set_req_resources(
 				struct wlan_dp_resource_mgr_ctx *rsrc_ctx);
 
+/**
+ * wlan_dp_resource_mgr_notify_vdev_creation: notify vdev creation to
+ * DP resource manager
+ * @rsrc_ctx: DP resource context reference
+ * @vdev: vdev objmgr reference
+ *
+ * Return: None
+ */
+void
+wlan_dp_resource_mgr_notify_vdev_creation(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_dp_resource_mgr_notify_vdev_deletion: notify vdev deletion to
+ * DP resource manager
+ * @rsrc_ctx: DP resource context reference
+ * @vdev: vdev objmgr reference
+ *
+ * Return: None
+ */
+void
+wlan_dp_resource_mgr_notify_vdev_deletion(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				struct wlan_objmgr_vdev *vdev);
 #else
 
 static inline
@@ -351,6 +378,20 @@ wlan_dp_resource_mgr_downscale_resources(void)
 static inline void
 wlan_dp_resource_mgr_set_req_resources(
 				struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
+{
+}
+
+static inline void
+wlan_dp_resource_mgr_notify_vdev_creation(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline void
+wlan_dp_resource_mgr_notify_vdev_deletion(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif /*WLAN_DP_DYNAMIC_RESOURCE_MGMT*/

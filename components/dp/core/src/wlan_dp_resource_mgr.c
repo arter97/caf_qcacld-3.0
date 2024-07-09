@@ -481,6 +481,10 @@ wlan_dp_resource_mgr_select_resource_level(
 	int i;
 
 	dp_rsrc_mgr_debug("Select resource level called");
+	if (rsrc_ctx->monitor_vdev_vote)
+		total_tput =
+			rsrc_ctx->cur_rsrc_map[RESOURCE_LVL_MAX - 1].max_tput;
+
 	for (i = 0; i < rsrc_ctx->mac_count; i++) {
 		vote_node = rsrc_ctx->max_phymode_nodes[i];
 		if (vote_node)
@@ -1145,6 +1149,40 @@ wlan_dp_resource_mgr_list_detach(struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
 	qdf_list_destroy(&rsrc_ctx->nan_list);
 	for (i = 0; i < MAX_MAC_RESOURCES; i++)
 		qdf_list_destroy(&rsrc_ctx->mac_list[i]);
+}
+
+void
+wlan_dp_resource_mgr_notify_vdev_creation(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				struct wlan_objmgr_vdev *vdev)
+{
+	if (!rsrc_ctx) {
+		dp_info("DP resource mgr context not present");
+		return;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_MONITOR_MODE)
+		return;
+
+	rsrc_ctx->monitor_vdev_vote = true;
+	wlan_dp_resource_mgr_select_resource_level(rsrc_ctx);
+}
+
+void
+wlan_dp_resource_mgr_notify_vdev_deletion(
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				struct wlan_objmgr_vdev *vdev)
+{
+	if (!rsrc_ctx) {
+		dp_info("DP resource mgr context not present");
+		return;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_MONITOR_MODE)
+		return;
+
+	rsrc_ctx->monitor_vdev_vote = false;
+	wlan_dp_resource_mgr_select_resource_level(rsrc_ctx);
 }
 
 void

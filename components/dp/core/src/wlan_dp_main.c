@@ -1408,6 +1408,8 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		return status;
 	}
 
+	wlan_dp_resource_mgr_notify_vdev_creation(dp_ctx->rsrc_mgr_ctx, vdev);
+
 	dp_intf->device_mode = wlan_vdev_mlme_get_opmode(vdev);
 
 	if (dp_intf->device_mode == QDF_SAP_MODE ||
@@ -1496,6 +1498,8 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 	dp_intf = dp_link->dp_intf;
 	dp_ctx = dp_intf->dp_ctx;
+
+	wlan_dp_resource_mgr_notify_vdev_deletion(dp_ctx->rsrc_mgr_ctx, vdev);
 
 	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
 	qdf_list_remove_node(&dp_intf->dp_link_list, &dp_link->node);
