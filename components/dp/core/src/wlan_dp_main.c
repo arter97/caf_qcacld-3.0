@@ -2246,7 +2246,6 @@ void wlan_dp_link_cdp_vdev_delete_notification(void *context)
 {
 	struct wlan_dp_link *dp_link = (struct wlan_dp_link *)context;
 	struct wlan_dp_link *tmp_dp_link;
-	struct wlan_dp_intf *dp_intf = NULL;
 	struct wlan_dp_psoc_context *dp_ctx = NULL;
 	uint8_t found = 0;
 
@@ -2257,8 +2256,7 @@ void wlan_dp_link_cdp_vdev_delete_notification(void *context)
 	}
 
 	dp_info("dp_link %pK id %d", dp_link, dp_link->link_id);
-	dp_intf = dp_link->dp_intf;
-	dp_ctx = dp_intf->dp_ctx;
+	dp_ctx = dp_get_context();
 
 	qdf_spin_lock_bh(&dp_ctx->dp_link_del_lock);
 
