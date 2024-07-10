@@ -8408,7 +8408,7 @@ static void lim_populate_eht_160_mcs_set(struct mac_context *mac_ctx,
 			fw_5g_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11);
 	rates->bw_160_rx_max_nss_for_mcs_10_and_11 =
 		QDF_MIN(peer_eht_caps->bw_160_rx_max_nss_for_mcs_10_and_11,
-			fw_5g_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11);
+			fw_5g_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11);
 	rates->bw_160_tx_max_nss_for_mcs_0_to_9 =
 		QDF_MIN(peer_eht_caps->bw_160_tx_max_nss_for_mcs_0_to_9,
 			fw_5g_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9);
@@ -8493,6 +8493,8 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 		pe_debug("session not eht capable");
 		return QDF_STATUS_SUCCESS;
 	}
+
+	pe_debug("bw is %d", ch_width);
 
 	switch (ch_width) {
 	case CH_WIDTH_320MHZ:
