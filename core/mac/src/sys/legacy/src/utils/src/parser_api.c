@@ -10001,6 +10001,110 @@ QDF_STATUS lim_strip_and_decode_eht_op(uint8_t *ie, uint16_t ie_len,
 	return QDF_STATUS_SUCCESS;
 }
 
+static enum phy_ch_width lim_get_ht_chan_width(tDot11fIEHTInfo *dot11f_ht_info)
+{
+	if (!dot11f_ht_info->present)
+		return CH_WIDTH_INVALID;
+
+	if (dot11f_ht_info->recommendedTxWidthSet)
+		return CH_WIDTH_40MHZ;
+
+	return CH_WIDTH_20MHZ;
+}
+
+static enum phy_ch_width
+lim_get_vht_chan_width(tDot11fIEVHTOperation *dot11f_vht_op,
+		       tDot11fIEHTInfo *dot11f_ht_info)
+{
+	if (!dot11f_vht_op->present)
+		return lim_get_ht_chan_width(dot11f_ht_info);
+
+	if (lim_get_ht_chan_width(dot11f_ht_info) == CH_WIDTH_20MHZ)
+		return CH_WIDTH_20MHZ;
+
+	switch (dot11f_vht_op->chanWidth) {
+	case 0:
+		return CH_WIDTH_40MHZ;
+	case 1:
+		if (!dot11f_vht_op->chan_center_freq_seg1) {
+			return CH_WIDTH_80MHZ;
+		} else if ((dot11f_vht_op->chan_center_freq_seg1 -
+			    dot11f_vht_op->chan_center_freq_seg0) == 8) {
+			return CH_WIDTH_160MHZ;
+		} else if ((dot11f_vht_op->chan_center_freq_seg1 -
+			    dot11f_vht_op->chan_center_freq_seg0) > 16) {
+			return CH_WIDTH_80P80MHZ;
+		} else {
+			return CH_WIDTH_INVALID;
+		}
+	case 2:
+		return CH_WIDTH_160MHZ;
+	case 3:
+		if (dot11f_vht_op->chan_center_freq_seg1 &&
+		    (dot11f_vht_op->chan_center_freq_seg1 -
+		     dot11f_vht_op->chan_center_freq_seg0) > 16) {
+			return CH_WIDTH_80P80MHZ;
+		} else {
+			return CH_WIDTH_INVALID;
+		}
+	default:
+		return CH_WIDTH_INVALID;
+	}
+}
+
+static enum phy_ch_width
+lim_get_he_chan_width(tDot11fIEhe_op *dot11f_he_op,
+		      tDot11fIEVHTOperation *dot11f_vht_op,
+		      tDot11fIEHTInfo *dot11f_ht_info)
+{
+	if (!dot11f_he_op->present)
+		return CH_WIDTH_INVALID;
+
+	if (!dot11f_he_op->oper_info_6g_present)
+		return lim_get_vht_chan_width(dot11f_vht_op, dot11f_ht_info);
+
+	switch (dot11f_he_op->oper_info_6g.info.ch_width) {
+	case 0:
+		return CH_WIDTH_20MHZ;
+	case 1:
+		return CH_WIDTH_40MHZ;
+	case 2:
+		return CH_WIDTH_80MHZ;
+	case 3:
+		if (dot11f_he_op->oper_info_6g.info.center_freq_seg1 &&
+		    (dot11f_he_op->oper_info_6g.info.center_freq_seg1 -
+		     dot11f_he_op->oper_info_6g.info.center_freq_seg0) == 8) {
+			return CH_WIDTH_160MHZ;
+		} else if (dot11f_he_op->oper_info_6g.info.center_freq_seg1 &&
+			   (dot11f_he_op->oper_info_6g.info.center_freq_seg1 -
+			    dot11f_he_op->oper_info_6g.info.center_freq_seg0) > 16) {
+			return CH_WIDTH_80P80MHZ;
+		} else {
+			return CH_WIDTH_INVALID;
+		}
+	default:
+		return CH_WIDTH_INVALID;
+	}
+}
+
+static enum phy_ch_width lim_get_eht_chan_width(tDot11fIEeht_op *dot11f_eht_op)
+{
+	switch (dot11f_eht_op->channel_width) {
+	case 0:
+		return CH_WIDTH_20MHZ;
+	case 1:
+		return CH_WIDTH_40MHZ;
+	case 2:
+		return CH_WIDTH_80MHZ;
+	case 3:
+		return CH_WIDTH_160MHZ;
+	case 4:
+		return CH_WIDTH_320MHZ;
+	default:
+		return CH_WIDTH_INVALID;
+	}
+}
+
 void lim_ieee80211_pack_ehtop(uint8_t *ie, tDot11fIEeht_op dot11f_eht_op,
 			      tDot11fIEVHTOperation dot11f_vht_op,
 			      tDot11fIEhe_op dot11f_he_op,
@@ -10011,7 +10115,6 @@ void lim_ieee80211_pack_ehtop(uint8_t *ie, tDot11fIEeht_op dot11f_eht_op,
 	uint32_t i;
 	uint32_t eht_op_info_len = 0;
 	uint32_t ehtoplen;
-	bool diff_chan_width = false;
 
 	if (!ie) {
 		pe_err("ie is null");
@@ -10024,20 +10127,9 @@ void lim_ieee80211_pack_ehtop(uint8_t *ie, tDot11fIEeht_op dot11f_eht_op,
 
 	qdf_mem_copy(&ehtop->elem_id_extn, EHT_OP_OUI_TYPE, EHT_OP_OUI_SIZE);
 
-	if (dot11f_he_op.present && dot11f_he_op.oper_info_6g_present &&
-	    (dot11f_he_op.oper_info_6g.info.ch_width !=
-	     dot11f_eht_op.channel_width)) {
-		diff_chan_width = true;
-	} else if (dot11f_vht_op.present &&
-		   (dot11f_vht_op.chanWidth != dot11f_eht_op.channel_width)) {
-		diff_chan_width = true;
-	} else if (dot11f_ht_info.present &&
-		   (dot11f_ht_info.recommendedTxWidthSet !=
-		    dot11f_eht_op.channel_width)) {
-		diff_chan_width = true;
-	}
-
-	if (diff_chan_width) {
+	if (lim_get_eht_chan_width(&dot11f_eht_op) !=
+	    lim_get_he_chan_width(&dot11f_he_op,
+				  &dot11f_vht_op, &dot11f_ht_info)) {
 		val = dot11f_eht_op.eht_op_information_present;
 		EHTOP_PARAMS_INFOP_SET_TO_IE(ehtop->ehtop_param, val);
 	}
