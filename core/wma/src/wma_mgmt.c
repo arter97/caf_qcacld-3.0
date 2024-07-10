@@ -3339,7 +3339,7 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle, uint8_t *buf,
 void wma_process_update_opmode(tp_wma_handle wma_handle,
 			       tUpdateVHTOpMode *update_vht_opmode)
 {
-	wmi_host_channel_width ch_width;
+	wmi_host_channel_width ch_width, wmi_opmode_chwidth;
 	uint8_t pdev_id;
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_psoc *psoc = wma_handle->psoc;
@@ -3372,18 +3372,21 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 
 	ch_width = wmi_get_ch_width_from_phy_mode(wma_handle->wmi_handle,
 						  fw_phymode);
-	wma_debug("ch_width: %d, fw phymode: %d peer_phymode: %d, op_mode: %d",
-		  ch_width, fw_phymode, peer_phymode,
-		  update_vht_opmode->opMode);
+	wmi_opmode_chwidth =
+		target_if_phy_ch_width_to_wmi_chan_width(update_vht_opmode->chwidth);
 
-	if (ch_width < update_vht_opmode->opMode) {
+	wma_debug("ch_width: %d, fw phymode: %d peer_phymode: %d, op_mode chwidth: %d, wmi opmode chwidth %d",
+		  ch_width, fw_phymode, peer_phymode,
+		  update_vht_opmode->chwidth, wmi_opmode_chwidth);
+
+	if (ch_width < wmi_opmode_chwidth) {
 		wma_err("Invalid peer bw update %d, self bw %d",
-			update_vht_opmode->opMode, ch_width);
+			update_vht_opmode->chwidth, ch_width);
 		return;
 	}
 
 	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
-			   WMI_HOST_PEER_CHWIDTH, update_vht_opmode->opMode,
+			   WMI_HOST_PEER_CHWIDTH, wmi_opmode_chwidth,
 			   update_vht_opmode->smesessionId);
 
 	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,

@@ -8475,6 +8475,7 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 	tUpdateVHTOpMode *pHtOpMode = NULL;
 	uint16_t staId = 0;
 	tpDphHashNode sta = NULL;
+	tSirMacHTChannelWidth opmode_chwidth;
 
 	pe_debug("received Set HT 20/40 mode message");
 	if (!msg_buf) {
@@ -8538,10 +8539,14 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 			pHtOpMode = qdf_mem_malloc(sizeof(tUpdateVHTOpMode));
 			if (!pHtOpMode)
 				return;
-			pHtOpMode->opMode =
+			opmode_chwidth =
 				(pe_session->htSecondaryChannelOffset ==
 				 PHY_SINGLE_CHANNEL_CENTERED) ?
 				eHT_CHANNEL_WIDTH_20MHZ : eHT_CHANNEL_WIDTH_40MHZ;
+			pHtOpMode->chwidth =
+				opmode_chwidth == eHT_CHANNEL_WIDTH_20MHZ ?
+				CH_WIDTH_20MHZ : CH_WIDTH_40MHZ;
+
 			qdf_mem_copy(pHtOpMode->peer_mac, &sta->staAddr,
 				     sizeof(tSirMacAddr));
 			pHtOpMode->smesessionId = pe_session->smeSessionId;
@@ -8558,8 +8563,8 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 				qdf_mem_free(pHtOpMode);
 				return;
 			}
-			pe_debug("Notified FW about OP mode: %d",
-				pHtOpMode->opMode);
+			pe_debug("Notified FW about OP mode chwidth: %d",
+				 pHtOpMode->chwidth);
 
 		} else
 			pe_debug("station does not support HT40");
@@ -9297,7 +9302,7 @@ lim_update_new_ch_width_to_fw(struct mac_context *mac_ctx,
 		if (!psta || !psta->added)
 			continue;
 
-		params.opMode = lim_calculate_peer_ch_width(session,
+		params.chwidth = lim_calculate_peer_ch_width(session,
 					psta->staAddr, ch_bandwidth);
 		params.smesessionId = session->smeSessionId;
 		qdf_mem_copy(params.peer_mac, psta->staAddr,

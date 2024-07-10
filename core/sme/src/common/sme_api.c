@@ -7701,12 +7701,12 @@ QDF_STATUS sme_notify_ht2040_mode(mac_handle_t mac_handle,
 
 	switch (channel_type) {
 	case eHT_CHAN_HT20:
-		pHtOpMode->opMode = eHT_CHANNEL_WIDTH_20MHZ;
+		pHtOpMode->chwidth = CH_WIDTH_20MHZ;
 		break;
 
 	case eHT_CHAN_HT40MINUS:
 	case eHT_CHAN_HT40PLUS:
-		pHtOpMode->opMode = eHT_CHANNEL_WIDTH_40MHZ;
+		pHtOpMode->chwidth = CH_WIDTH_40MHZ;
 		break;
 
 	default:
@@ -7731,7 +7731,7 @@ QDF_STATUS sme_notify_ht2040_mode(mac_handle_t mac_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	sme_debug("vdev %d OP mode: %d", sessionId, pHtOpMode->opMode);
+	sme_debug("vdev %d OP mode chwidth: %d", sessionId, pHtOpMode->chwidth);
 
 	return QDF_STATUS_SUCCESS;
 }

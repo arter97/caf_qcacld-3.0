@@ -591,13 +591,13 @@ typedef struct {
 
 /**
  * struct tUpdateVHTOpMode - VHT operating mode
- * @opMode: VHT operating mode
+ * @chwidth: Channel width of opmode change
  * @staId: station id
  * @smesessionId: SME session id
  * @peer_mac: peer mac address
  */
 typedef struct {
-	uint16_t opMode;
+	enum phy_ch_width chwidth;
 	uint16_t smesessionId;
 	tSirMacAddr peer_mac;
 } tUpdateVHTOpMode, *tpUpdateVHTOpMode;

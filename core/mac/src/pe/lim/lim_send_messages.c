@@ -308,8 +308,8 @@ QDF_STATUS lim_send_mode_update(struct mac_context *mac,
 	msgQ.reserved = 0;
 	msgQ.bodyptr = pVhtOpMode;
 	msgQ.bodyval = 0;
-	pe_debug("Sending WMA_UPDATE_OP_MODE, op_mode %d",
-			pVhtOpMode->opMode);
+	pe_debug("Sending WMA_UPDATE_OP_MODE, op_mode chwidth %d",
+			pVhtOpMode->chwidth);
 	if (!pe_session)
 		MTRACE(mac_trace_msg_tx(mac, NO_SESSION, msgQ.type));
 	else

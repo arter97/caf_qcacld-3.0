@@ -4938,7 +4938,7 @@ bool lim_check_vht_op_mode_change(struct mac_context *mac,
 	if (update_allow) {
 		tUpdateVHTOpMode tempParam;
 
-		tempParam.opMode = chanWidth;
+		tempParam.chwidth = chanWidth;
 		tempParam.smesessionId = pe_session->smeSessionId;
 		qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
 
