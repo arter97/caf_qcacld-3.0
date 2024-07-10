@@ -347,6 +347,7 @@ struct wlan_dp_stc_classified_flow_table {
  *				flow stats are to be reported
  * @flow_monitor_work: periodic work to process all the misc work for STC
  * @flow_monitor_interval: periodic flow monitor work interval
+ * @logmask: mask indicating which logs are enabled
  * @periodic_work_state: States of the periodic flow monitor work
  * @flow_sampling_timer: timer to sample all the short-listed flows
  * @sample_timer_state: sampling timer state
@@ -364,6 +365,7 @@ struct wlan_dp_stc {
 	uint8_t send_classified_flow_stats;
 	struct qdf_periodic_work flow_monitor_work;
 	uint32_t flow_monitor_interval;
+	uint32_t logmask;
 	enum wlan_dp_stc_periodic_work_state periodic_work_state;
 	qdf_timer_t flow_sampling_timer;
 	enum wlan_dp_stc_timer_state sample_timer_state;
@@ -746,6 +748,24 @@ static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 }
 
 /**
+ * wlan_dp_stc_get_logmask() - Get STC log mask
+ * @dp_ctx: DP global psoc context
+ *
+ * Return: logmask configured in STC
+ */
+uint32_t wlan_dp_stc_get_logmask(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_stc_update_logmask() - Set STC log mask
+ * @dp_ctx: DP global psoc context
+ * @mask: new log mask to be set
+ *
+ * Return: None
+ */
+void wlan_dp_stc_update_logmask(struct wlan_dp_psoc_context *dp_ctx,
+				uint32_t mask);
+
+/**
  * wlan_dp_stc_attach() - STC attach
  * @dp_ctx: DP global psoc context
  *
@@ -817,6 +837,18 @@ static inline void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
 static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 {
 	return false;
+}
+
+static inline
+uint32_t wlan_dp_stc_get_logmask(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return 0;
+}
+
+static inline
+void wlan_dp_stc_update_logmask(struct wlan_dp_psoc_context *dp_ctx,
+				uint32_t mask)
+{
 }
 
 static inline

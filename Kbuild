@@ -2658,6 +2658,7 @@ WLAN_DP_COMP_OBJS += $(DP_COMP_OS_IF_DIR)/os_if_dp_stc.o
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_spm.o
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_sawfish_fpm.o
 WLAN_DP_COMP_OBJS += $(DP_COMP_UCFG_DIR)/wlan_dp_flow_ucfg_api.o
+WLAN_DP_COMP_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dp_stc.o
 endif
 
 ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))

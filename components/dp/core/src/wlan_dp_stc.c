@@ -35,6 +35,10 @@
 #define FLOW_RESUME_TIME_THRESH_NS 500000000
 #define FLOW_SHORTLIST_PKT_RATE_PER_SEC_THRESH 15
 
+/* Macros used by STC logmask */
+#define WLAN_DP_STC_LOGMASK_FLOW_STATS BIT(0)
+#define WLAN_DP_STC_LOGMASK_CLASSIFIED_FLOW_STATS BIT(1)
+
 QDF_STATUS
 wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 				struct wlan_dp_stc_flow_table_entry *flow_entry,
@@ -395,11 +399,14 @@ wlan_dp_send_txrx_sample(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
 	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
+	uint32_t flags = WLAN_DP_TXRX_SAMPLES_READY;
+
+	if (dp_stc->logmask & WLAN_DP_STC_LOGMASK_FLOW_STATS)
+		flags |= WLAN_DP_LOG_ENABLE;
 
 	if (dp_ctx->dp_ops.send_flow_stats_event)
 		return dp_ctx->dp_ops.send_flow_stats_event(psoc,
-						&s_entry->flow_samples,
-						WLAN_DP_TXRX_SAMPLES_READY);
+						&s_entry->flow_samples, flags);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -422,6 +429,9 @@ wlan_dp_send_flow_report(struct wlan_dp_stc *dp_stc,
 	if (wlan_dp_burst_samples_ready(s_entry))
 		flags |= WLAN_DP_BURST_SAMPLES_READY;
 
+	if (dp_stc->logmask & WLAN_DP_STC_LOGMASK_CLASSIFIED_FLOW_STATS)
+		flags |= WLAN_DP_LOG_ENABLE;
+
 	if (dp_ctx->dp_ops.send_flow_report_event)
 		return dp_ctx->dp_ops.send_flow_report_event(psoc,
 						&s_entry->flow_samples, flags);
@@ -435,11 +445,14 @@ wlan_dp_send_burst_sample(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
 	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
+	uint32_t flags = WLAN_DP_BURST_SAMPLES_READY;
+
+	if (dp_stc->logmask & WLAN_DP_STC_LOGMASK_FLOW_STATS)
+		flags |= WLAN_DP_LOG_ENABLE;
 
 	if (dp_ctx->dp_ops.send_flow_stats_event)
 		return dp_ctx->dp_ops.send_flow_stats_event(psoc,
-						&s_entry->flow_samples,
-						WLAN_DP_BURST_SAMPLES_READY);
+						&s_entry->flow_samples, flags);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1673,6 +1686,31 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t wlan_dp_stc_get_logmask(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+
+	if (!dp_stc) {
+		dp_info("STC: module not initialized");
+		return 0;
+	}
+
+	return dp_stc->logmask;
+}
+
+void wlan_dp_stc_update_logmask(struct wlan_dp_psoc_context *dp_ctx,
+				uint32_t mask)
+{
+	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+
+	if (!dp_stc) {
+		dp_info("STC: module not initialized");
+		return;
+	}
+
+	dp_stc->logmask = mask;
 }
 
 static bool
