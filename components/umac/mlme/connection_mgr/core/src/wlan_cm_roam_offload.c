@@ -7512,6 +7512,7 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t i;
 	uint16_t diag_event;
+	bool is_mlo = false;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
 
@@ -7565,16 +7566,29 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 						 !frame_data->is_rsp);
 		diag_event = EVENT_WLAN_MGMT;
 
-		status = wlan_populate_roam_mld_log_param(vdev,
-							  &wlan_diag_event,
-							  wlan_diag_event.subtype);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mlme_err("vdev: %d Unable to populate MLO parameter",
-				 wlan_vdev_get_id(vdev));
-			return status;
+		wlan_diag_event.supported_links = frame_data->band;
+
+		/*
+		 * Frame_data->band will be '0' for legacy connection and
+		 * And will be band bit map for MLO connection where band bitmap
+		 * as follows:
+		 * BIT 0: 2 GHz link
+		 * BIT 1: 5 GHz link
+		 * BIT 2: 6 GHz link
+		 */
+		if (frame_data->band) {
+			is_mlo = true;
+			status =
+			wlan_populate_roam_mld_log_param(vdev,
+							 &wlan_diag_event,
+							 wlan_diag_event.subtype);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				mlme_err("vdev: %d Unable to populate MLO parameter",
+					 wlan_vdev_get_id(vdev));
+				return status;
+			}
 		}
 
-		wlan_diag_event.supported_links = frame_data->band;
 	}
 
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
@@ -7588,7 +7602,7 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
 	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_REASSOC_RESP_EVENT ||
 	    wlan_diag_event.subtype == WLAN_CONN_DIAG_ASSOC_RESP_EVENT) {
-		wlan_connectivity_mlo_setup_event(vdev);
+		wlan_connectivity_mlo_setup_event(vdev, is_mlo);
 
 		/*
 		 * Send STA info event when roaming is successful
