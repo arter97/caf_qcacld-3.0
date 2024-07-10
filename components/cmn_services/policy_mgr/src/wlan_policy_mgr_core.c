@@ -4816,7 +4816,7 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 		*intf_ch_freq = 0;
 		break;
 	default:
-		if (num_connections > 3) {
+		if (num_connections > (MAX_NUMBER_OF_CONC_CONNECTIONS - 1)) {
 			policy_mgr_debug("invalid num_connections: %d",
 					 num_connections);
 			break;

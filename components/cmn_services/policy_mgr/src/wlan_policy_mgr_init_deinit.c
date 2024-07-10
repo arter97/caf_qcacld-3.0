@@ -1022,6 +1022,8 @@ QDF_STATUS policy_mgr_register_hdd_cb(struct wlan_objmgr_psoc *psoc,
 		hdd_cbacks->wlan_check_cc_intf_cb;
 	pm_ctx->hdd_cbacks.wlan_set_tx_rx_nss_cb =
 		hdd_cbacks->wlan_set_tx_rx_nss_cb;
+	pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason =
+		hdd_cbacks->wlan_hdd_set_sap_csa_reason;
 
 	return QDF_STATUS_SUCCESS;
 }

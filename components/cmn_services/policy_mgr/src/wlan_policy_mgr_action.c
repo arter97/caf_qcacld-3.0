@@ -2419,7 +2419,8 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 	uint8_t band_mask = 0;
 	uint8_t chn_idx, num_chan;
 	struct regulatory_channel *channel_list;
-	uint8_t sap_5g_movement = false;
+	qdf_freq_t intf_ch_freq = 0;
+	uint8_t mcc_to_scc_switch;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2438,29 +2439,37 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 
 	if (sap_freq == 0)
 		return;
-	sap_freq = policy_mgr_get_nondfs_preferred_channel(psoc, PM_SAP_MODE,
-							   false,
-							   sap_info->vdev_id);
-	if (!WLAN_REG_IS_24GHZ_CH_FREQ(sap_freq) &&
-	    wlan_nan_is_sta_sap_nan_allowed(psoc))
-		sap_5g_movement = true;
-
-	if ((sap_freq == 0 || policy_mgr_is_safe_channel(psoc, sap_freq)) &&
-	    !sap_5g_movement)
-		return;
 
 	user_config_freq = policy_mgr_get_user_config_sap_freq(
 						psoc, sap_info->vdev_id);
+	policy_mgr_debug("user_config_freq %d", user_config_freq);
 
-	policy_mgr_debug("User/ACS orig Freq: %d New SAP Freq: %d",
+	if (user_config_freq == sap_freq &&
+	    policy_mgr_is_safe_channel(psoc, sap_freq))
+		return;
+
+	policy_mgr_get_mcc_scc_switch(pm_ctx->psoc, &mcc_to_scc_switch);
+
+	policy_mgr_check_scc_channel(pm_ctx->psoc, &intf_ch_freq,
+				     user_config_freq,
+				     sap_info->vdev_id, mcc_to_scc_switch);
+
+	if (intf_ch_freq && intf_ch_freq != user_config_freq)
+		user_config_freq = intf_ch_freq;
+
+	policy_mgr_debug("intf_ch_freq: %d",
 			 user_config_freq, sap_freq);
 
 	if (wlan_reg_is_enable_in_secondary_list_for_freq(pm_ctx->pdev,
 							  user_config_freq) &&
 	    policy_mgr_is_safe_channel(psoc, user_config_freq)) {
-		policy_mgr_debug("Give preference to user config freq");
+		policy_mgr_debug("restart freq %d", user_config_freq);
 		sap_freq = user_config_freq;
 	} else {
+		sap_freq = policy_mgr_get_nondfs_preferred_channel(
+					psoc, PM_SAP_MODE,
+					false,
+					sap_info->vdev_id);
 		channel_list = qdf_mem_malloc(
 					sizeof(struct regulatory_channel) *
 					       NUM_CHANNELS);
