@@ -112,8 +112,14 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 
 	/* timer_cnt is reset when link switch happens */
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
-	    qdf_atomic_read(&tdls_soc->timer_cnt) == 0)
+	    qdf_atomic_read(&tdls_soc->timer_cnt) == 0) {
+		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
+		if (tdls_vdev) {
+			qdf_mem_free(tdls_vdev->rx_mgmt);
+			tdls_vdev->rx_mgmt = NULL;
+		}
 		return;
+	}
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 	    qdf_atomic_dec_and_test(&tdls_soc->timer_cnt)) {
@@ -121,17 +127,25 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 		select_vdev = tdls_process_mlo_choice_tdls_vdev(vdev);
 		tdls_link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
 		if (select_vdev) {
-			tdls_vdev =
-			      wlan_objmgr_vdev_get_comp_private_obj(select_vdev,
-							   WLAN_UMAC_COMP_TDLS);
-			rx_mgmt = tdls_vdev->rx_mgmt;
+			tdls_vdev = wlan_vdev_get_tdls_vdev_obj(select_vdev);
+			if (!tdls_vdev)
+				return;
+
 			if (tdls_link_vdev && tdls_link_vdev != select_vdev) {
 				tdls_debug("tdls link created on vdev %d",
 					   wlan_vdev_get_id(tdls_link_vdev));
 				goto exit;
 			}
 
+			if (!tdls_vdev->rx_mgmt) {
+				tdls_debug("vdev %d doesn't have discovery response cached",
+					   wlan_vdev_get_id(tdls_link_vdev));
+				return;
+			}
+
+			rx_mgmt = tdls_vdev->rx_mgmt;
 			mac = &rx_mgmt->buf[TDLS_80211_PEER_ADDR_OFFSET];
+
 			tdls_notice("[TDLS] vdev:%d TDLS Discovery Response, " QDF_MAC_ADDR_FMT " RSSI[%d]<---OTA",
 				    wlan_vdev_get_id(tdls_vdev->vdev),
 				    QDF_MAC_ADDR_REF(mac), rx_mgmt->rx_rssi);

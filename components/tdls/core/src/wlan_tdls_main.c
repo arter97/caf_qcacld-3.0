@@ -211,6 +211,8 @@ static QDF_STATUS tdls_vdev_init(struct tdls_vdev_priv_obj *vdev_obj)
 	qdf_mc_timer_init(&vdev_obj->peer_discovery_timer, QDF_TIMER_TYPE_SW,
 			  tdls_discovery_timeout_peer_cb, vdev_obj->vdev);
 
+	vdev_obj->rx_mgmt = NULL;
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -221,6 +223,9 @@ static void tdls_vdev_deinit(struct tdls_vdev_priv_obj *vdev_obj)
 
 	qdf_mc_timer_destroy(&vdev_obj->peer_update_timer);
 	qdf_mc_timer_destroy(&vdev_obj->peer_discovery_timer);
+
+	qdf_mem_free(vdev_obj->rx_mgmt);
+	vdev_obj->rx_mgmt = NULL;
 
 	tdls_peer_idle_timers_destroy(vdev_obj);
 	tdls_free_peer_list(vdev_obj);
@@ -1083,6 +1088,9 @@ void tdls_set_ct_mode(struct wlan_objmgr_psoc *psoc,
 	}
 
 	qdf_atomic_set(&tdls_soc_obj->timer_cnt, 0);
+	qdf_mem_free(tdls_vdev_obj->rx_mgmt);
+	tdls_vdev_obj->rx_mgmt = NULL;
+
 	tdls_feature_flags = tdls_soc_obj->tdls_configs.tdls_feature_flags;
 	if (TDLS_SUPPORT_DISABLED == tdls_soc_obj->tdls_current_mode ||
 	    TDLS_SUPPORT_SUSPENDED == tdls_soc_obj->tdls_current_mode ||
