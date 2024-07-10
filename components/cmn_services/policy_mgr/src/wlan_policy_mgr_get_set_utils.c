@@ -13828,3 +13828,48 @@ end:
 	return POLICY_MGR_HW_MODE_INVALID;
 }
 #endif
+
+bool
+policy_mgr_allow_concurrency_sta_csa(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id,
+				     enum QDF_OPMODE mode,
+				     qdf_freq_t csa_freq,
+				     enum phy_ch_width new_ch_width)
+{
+	bool is_allowed = true;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_conc_connection_info
+			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	uint8_t num_del = 0;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	policy_mgr_store_and_del_conn_info_by_vdev_id(
+			psoc,
+			vdev_id,
+			info, &num_del);
+
+	is_allowed =
+	policy_mgr_is_concurrency_allowed(psoc,
+		policy_mgr_qdf_opmode_to_pm_con_mode(psoc,
+						     mode,
+						     vdev_id),
+		csa_freq,
+		policy_mgr_get_bw(new_ch_width),
+		0,
+		NULL);
+
+	/* Restore the connection info */
+	if (num_del > 0)
+		policy_mgr_restore_deleted_conn_info(psoc,
+						     info,
+						     num_del);
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	return is_allowed;
+}
+

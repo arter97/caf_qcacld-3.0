@@ -4935,6 +4935,26 @@ QDF_STATUS policy_mgr_get_radio_combinations(struct wlan_objmgr_psoc *psoc,
 bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
 
+/**
+ * policy_mgr_allow_concurrency_sta_csa() - Check if concurrency
+ * is allowed for sta and csa
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id
+ * @mode: new connection mode
+ * @csa_freq: csa frequency requested
+ * @new_ch_width: new ch width
+ *
+ * Check if CSA is allowed with current concurrency combination
+ *
+ * Return: True/False
+ */
+bool
+policy_mgr_allow_concurrency_sta_csa(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id,
+				     enum QDF_OPMODE mode,
+				     qdf_freq_t csa_freq,
+				     enum phy_ch_width new_ch_width);
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * policy_mgr_restart_emlsr_opportunistic_timer() - restart

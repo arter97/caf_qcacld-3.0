@@ -62,6 +62,7 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include "wlan_mlme_public_struct.h"
 #include <wlan_mlo_mgr_link_switch.h>
+#include "wlan_policy_mgr_i.h"
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -1818,16 +1819,11 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	    !policy_mgr_is_interband_mcc_supported(mac_ctx->psoc)) {
 		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, csa_freq);
 	} else if (cnx_count > 2) {
-		is_allowed =
-		policy_mgr_allow_concurrency_csa(
-			mac_ctx->psoc,
-			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
-							     mode,
-							     session_entry->vdev_id),
-			csa_freq,
-			policy_mgr_get_bw(new_ch_width),
-			session_entry->vdev_id, false,
-			CSA_REASON_UNKNOWN);
+		is_allowed = policy_mgr_allow_concurrency_sta_csa(mac_ctx->psoc,
+								  wlan_vdev_get_id(session_entry->vdev),
+								  mode,
+								  csa_freq,
+								  new_ch_width);
 	}
 
 	return is_allowed;
