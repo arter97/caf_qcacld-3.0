@@ -1595,34 +1595,39 @@ bool sap_is_prev_n_freqs_free(bool *clean_channel_array, uint32_t curr_index,
 /**
  * is_freq_allowed_for_sap(): is frequency allowed to start SAP
  * @pdev: object manager pdev
- * @clean_channel_array: array of chan enum containing that chan free or not
+ * @sap_ctx: SAP Context
  * @freq: Scanned frequency
- * @ch_width: phy channel width
- * @vdev: object manager vdev
  *
  * Return: true if frequency is allowed based on BW else false.
  */
 static
 bool is_freq_allowed_for_sap(struct wlan_objmgr_pdev *pdev,
-			     bool *clean_channel_array,
-			     qdf_freq_t freq, enum phy_ch_width ch_width,
-			     struct wlan_objmgr_vdev *vdev) {
+			     struct sap_context *sap_ctx,
+			     qdf_freq_t freq)
+{
 	uint16_t min_bw = 0;
 	uint16_t max_bw = 0;
 	uint16_t curr_bw;
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status;
+	bool *clean_channel_array = sap_ctx->clean_channel_array;
+	enum phy_ch_width ch_width = sap_ctx->acs_cfg->ch_width;
+	struct wlan_objmgr_vdev *vdev = sap_ctx->vdev;
 	const struct bonded_channel_freq *range = NULL;
 	uint32_t curr_index = wlan_reg_get_chan_enum_for_freq(freq);
+
 	if (curr_index >= INVALID_CHANNEL)
 		return false;
+
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
 		sap_err("invalid psoc");
 		return false;
 	}
-	if (wlan_mlme_get_ap_policy(vdev) ==
-	    HOST_CONCURRENT_AP_POLICY_UNSPECIFIED) {
+
+	if ((wlan_mlme_get_ap_policy(vdev) ==
+	    HOST_CONCURRENT_AP_POLICY_UNSPECIFIED) &&
+	    !sap_ctx->acs_cfg->is_early_terminate_enabled) {
 		sap_debug("low latency sap is not present");
 		return false;
 	}
@@ -1769,11 +1774,8 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 	if (sap_ctx->acs_cfg->ch_width > CH_WIDTH_20MHZ) {
 		sap_mark_freq_as_clean(sap_ctx->clean_channel_array,
 				       roam_info->chan_info_freq);
-		if (!is_freq_allowed_for_sap(mac->pdev,
-					     sap_ctx->clean_channel_array,
-					     roam_info->chan_info_freq,
-					     sap_ctx->acs_cfg->ch_width,
-					     sap_ctx->vdev)) {
+		if (!is_freq_allowed_for_sap(mac->pdev, sap_ctx,
+					     roam_info->chan_info_freq)) {
 			goto exit;
 		}
 	}

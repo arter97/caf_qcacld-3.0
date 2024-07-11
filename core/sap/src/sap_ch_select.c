@@ -1873,6 +1873,29 @@ static void sap_sort_chl_weight(struct mac_context *mac_ctx,
 
 	sap_update_vlp_deprority_chan(mac_ctx, ch_info_params);
 	ch_info = ch_info_params->ch_info;
+	for (i = 0; i < ch_info_params->num_ch; i++) {
+		min_weight_index = i;
+		for (j = i + 1; j < ch_info_params->num_ch; j++) {
+			if (ch_info[j].weight <
+					ch_info[min_weight_index].weight) {
+				min_weight_index = j;
+			} else if (ch_info[j].weight ==
+					ch_info[min_weight_index].weight) {
+				if (ch_info[j].bss_count <
+					ch_info[min_weight_index].bss_count)
+					min_weight_index = j;
+			}
+		}
+		if (min_weight_index != i) {
+			qdf_mem_copy(&temp, &ch_info[min_weight_index],
+				     sizeof(*ch_info));
+			qdf_mem_copy(&ch_info[min_weight_index],
+				     &ch_info[i], sizeof(*ch_info));
+			qdf_mem_copy(&ch_info[i], &temp,
+				     sizeof(*ch_info));
+		}
+	}
+
 	if (sap_ctx->acs_cfg->is_same_weight_rand_enabled) {
 		sap_debug("ACS Ext: Same Channel Randomization Enabled");
 		/* Randomziation */
@@ -1901,29 +1924,6 @@ static void sap_sort_chl_weight(struct mac_context *mac_ctx,
 			}
 		}
 
-	} else {
-		for (i = 0; i < ch_info_params->num_ch; i++) {
-			min_weight_index = i;
-			for (j = i + 1; j < ch_info_params->num_ch; j++) {
-				if (ch_info[j].weight <
-				    ch_info[min_weight_index].weight) {
-					min_weight_index = j;
-				} else if (ch_info[j].weight ==
-					   ch_info[min_weight_index].weight) {
-					if (ch_info[j].bss_count <
-					    ch_info[min_weight_index].bss_count)
-						min_weight_index = j;
-				}
-			}
-			if (min_weight_index != i) {
-				qdf_mem_copy(&temp, &ch_info[min_weight_index],
-					     sizeof(*ch_info));
-				qdf_mem_copy(&ch_info[min_weight_index],
-					     &ch_info[i], sizeof(*ch_info));
-				qdf_mem_copy(&ch_info[i], &temp,
-					     sizeof(*ch_info));
-			}
-		}
 	}
 }
 
