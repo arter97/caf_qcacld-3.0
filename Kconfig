@@ -1870,6 +1870,7 @@ config DP_TX_PACKET_INSPECT_FOR_ILP
 
 config NUM_SOC_PERF_CLUSTER
 	int "enable NUM_SOC_PERF_CLUSTER"
+	default 0
 
 config WLAN_OPEN_SOURCE
 	bool "enable WLAN_OPEN_SOURCE"
@@ -2054,10 +2055,11 @@ config CNSS_QCA6750
 	bool "Enable CNSS_QCA6750"
 	default n
 
-menu "Optional Configs"
+config CNSS_ADRASTEA
+        bool "Enable CNSS_ADRASTEA"
+        default n
 
 if CNSS_KIWI_V2
-
 config CFG_BMISS_OFFLOAD_MAX_VDEV
 	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
 
@@ -2067,7 +2069,6 @@ config CFG_MAX_STA_VDEVS
 config ROME_IF
 	string "Enable ROME_IF"
 	default pci
-
 endif
 
 config WLAN_MCC_MIN_CHANNEL_QUOTA
@@ -2075,14 +2076,18 @@ config WLAN_MCC_MIN_CHANNEL_QUOTA
 	default 20
 
 if CNSS_QCA6750
-
 config ROME_IF
 	string "Enable ROME_IF"
 	default ipci
 
 config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
         int "Enable CONFIG_DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
+endif
 
+if CNSS_ADRASTEA
+config ROME_IF
+	string "Enable ROME_IF"
+	default snoc
 endif
 
 config DP_RX_MSDU_DONE_FAIL_HISTORY
@@ -2093,5 +2098,71 @@ config DP_RX_PEEK_MSDU_DONE_WAR
 	bool "Enable DP_RX_PEEK_MSDU_DONE_WAR"
 	default n
 
-endmenu
+config QCACLD_FEATURE_METERING
+	bool "Enable QCACLD_FEATURE_METERING"
+	default n
+
+config WIFI_3_0_ADRASTEA
+	bool "Enable WIFI_3_0_ADRASTEA"
+	default n
+
+config ADRASTEA_RRI_ON_DDR
+	bool "Enable ADRASTEA_RRI_ON_DDR"
+	default n
+
+config ATH_PROCFS_DIAG_SUPPORT
+	bool "Enable ATH_PROCFS_DIAG_SUPPORT"
+	default n
+
+config ADRASTEA_SHADOW_REGISTERS
+	bool "Enable ADRASTEA_SHADOW_REGISTERS"
+	default n
+
+config FEATURE_ENABLE_CE_DP_IRQ_AFFINE
+	bool "Enable FEATURE_ENABLE_CE_DP_IRQ_AFFINE"
+	default n
+
+config HIF_SNOC
+	bool "Enable HIF_SNOC"
+	default n
+
+config PKTLOG_LEGACY
+	bool "Enable PKTLOG_LEGACY"
+	default n
+
+config WLAN_SEND_DSCP_UP_MAP_TO_FW
+	bool "Enable WLAN_SEND_DSCP_UP_MAP_TO_FW"
+	default n
+
+config ENABLE_DEBUG_ADDRESS_MARKING
+	bool "Enable ENABLE_DEBUG_ADDRESS_MARKING"
+	default n
+
+config CHANNEL_HOPPING_ALL_BANDS
+	bool "Enable CHANNEL_HOPPING_ALL_BANDS"
+	default n
+
+config PKT_LOG
+	bool "Enable PKT_LOG"
+	default ni
+
+config WLAN_DUMP_IN_PROGRESS
+	bool "Enable WLAN_DUMP_IN_PROGRESS"
+	default n
+
+config WLAN_TX_FLOW_CONTROL_V2_HL
+	bool "Enable WLAN_TX_FLOW_CONTROL_V2_HL"
+	default n
+
+config LL_DP_SUPPORT_LEGACY
+	bool "Enable LL_DP_SUPPORT_LEGACY"
+	default n
+
+config WLAN_FASTPATH_LEGACY
+	bool "Enable WLAN_FASTPATH_LEGACY"
+	default n
+
+config QCA_SUPPORT_TX_THROTTLE_LEGACY
+	bool "Enable QCA_SUPPORT_TX_THROTTLE_LEGACY"
+	default n
 endif # QCA_CLD_WLAN
