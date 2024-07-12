@@ -940,6 +940,7 @@ struct wlan_dp_stc;
  * @spm_ctx: Servicy policy manager context
  * @gl_flow_recs: Global Tx flow table for all dp_interfaces
  * @rsrc_mgr_ctx: DP resource manager context reference
+ * @monitor_flag: Monitor interface flags configured when add Mon interface
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1061,6 +1062,7 @@ struct wlan_dp_psoc_context {
 	struct wlan_dp_spm_flow_info *gl_flow_recs;
 #endif
 	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
+	uint32_t monitor_flag;
 };
 
 /**

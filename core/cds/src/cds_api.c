@@ -928,6 +928,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	ucfg_dp_update_num_rx_rings(psoc);
 	ucfg_pmo_psoc_update_dp_handle(psoc, gp_cds_context->dp_soc);
 	ucfg_ocb_update_dp_handle(psoc, gp_cds_context->dp_soc);
+	ucfg_dp_recover_mon_conf_flags(psoc);
 
 	cds_set_ac_specs_params(cds_cfg);
 	cds_cfg_update_ac_specs_params((struct txrx_pdev_cfg_param_t *)
