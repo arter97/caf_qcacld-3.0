@@ -444,7 +444,7 @@ void lim_objmgr_update_emlsr_caps(struct wlan_objmgr_psoc *psoc,
 		if (wlan_cm_is_vdev_active(vdev) ||
 		    wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
 			pe_debug("no change required for link vdev");
-			return;
+			goto rel_ref;
 		}
 
 		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
@@ -462,6 +462,7 @@ void lim_objmgr_update_emlsr_caps(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
+rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 #endif
