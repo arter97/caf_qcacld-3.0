@@ -91,7 +91,7 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 		return QDF_STATUS_E_NOSUPPORT;
 
 	sk = skb->sk;
-	if (qdf_unlikely(!sk)) {
+	if (qdf_unlikely(!qdf_nbuf_sock_is_valid_fullsock(skb))) {
 		skb->mark = FLOW_INVALID_METADATA;
 		return QDF_STATUS_E_INVAL;
 	}
