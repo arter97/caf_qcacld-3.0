@@ -431,6 +431,8 @@ enum roam_fail_params {
  * roam scan started.
  * @ROAM_FAIL_REASON_REASSOC_TO_SAME_AP: Host internal reason code. Reassoc
  * command rejected due to reassociation request received for same AP.
+ * @ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED: Roaming is not triggered as part
+ * of the first roam scan as additional scan is required to scan all MLD links
  * @ROAM_FAIL_REASON_UNKNOWN: Default reason
  */
 enum wlan_roam_failure_reason_code {
@@ -475,6 +477,7 @@ enum wlan_roam_failure_reason_code {
 	ROAM_FAIL_REASON_SCREEN_ACTIVITY,
 	ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN,
 	ROAM_FAIL_REASON_REASSOC_TO_SAME_AP,
+	ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED,
 	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 
