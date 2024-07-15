@@ -6694,15 +6694,22 @@ static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 {
 	struct sap_config *sap_config;
+	struct wlan_objmgr_vdev *vdev;
 
-	if (!wlan_vdev_mlme_is_mlo_ap(link_info->vdev))
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
 		return;
+
+	if (!wlan_vdev_mlme_is_mlo_ap(vdev))
+		goto err;
 
 	sap_config = &link_info->session.ap.sap_config;
 	sap_config->mlo_sap = false;
 	sap_config->link_id = 0;
 	sap_config->num_link = 0;
-	mlo_ap_vdev_detach(link_info->vdev);
+	mlo_ap_vdev_detach(vdev);
+err:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
 /**
