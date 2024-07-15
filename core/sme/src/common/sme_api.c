@@ -10859,15 +10859,15 @@ void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		sme_debug("No session for id %d", vdev_id);
 		return;
 	}
-	sme_debug("Config EHT caps for BW %d", chwidth);
-	mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.support_320mhz_6ghz = 0;
 
 	if (chwidth < eHT_CHANNEL_WIDTH_320MHZ) {
-		sme_debug("EHT caps config not required for bw: %d", chwidth);
-		return;
+		sme_debug("Reset 320M support as chan width is %d", chwidth);
+		mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.support_320mhz_6ghz = 0;
+	} else {
+		sme_debug("Config EHT caps");
+		mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.support_320mhz_6ghz = 1;
 	}
 
-	mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.support_320mhz_6ghz = 1;
 	qdf_mem_copy(&mac_ctx->eht_cap_5g,
 		     &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap,
 		     sizeof(tDot11fIEeht_cap));

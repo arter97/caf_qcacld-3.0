@@ -9910,6 +9910,8 @@ populate_dot11f_revise_eht_caps(struct pe_session *session,
 		eht_cap->bfee_ss_320mhz = 0;
 	}
 
+	pe_debug("320 MHz support %d", eht_cap->support_320mhz_6ghz);
+
 	if (wlan_epcs_get_config(session->vdev))
 		eht_cap->epcs_pri_access = 1;
 	else
