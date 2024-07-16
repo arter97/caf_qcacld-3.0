@@ -54,47 +54,6 @@
 #include "wlan_dp_load_balance.h"
 #include "wlan_dp_flow_balance.h"
 
-#ifdef FEATURE_DIRECT_LINK
-/**
- * wlan_dp_set_vdev_direct_link_cfg() - Set direct link config in DP vdev
- * @psoc: objmgr psoc handle
- * @dp_intf: pointer to DP component interface handle
- *
- * Return: direct link configuration
- */
-static inline
-QDF_STATUS wlan_dp_set_vdev_direct_link_cfg(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_dp_intf *dp_intf)
-{
-	struct wlan_dp_link *dp_link, *dp_link_next;
-	cdp_config_param_type vdev_param = {0};
-	QDF_STATUS status;
-
-	if (dp_intf->device_mode != QDF_SAP_MODE ||
-	    !dp_intf->dp_ctx->dp_direct_link_ctx)
-		return QDF_STATUS_SUCCESS;
-
-	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
-		vdev_param.cdp_vdev_tx_to_fw =
-					dp_intf->direct_link_config.config_set;
-		status = cdp_txrx_set_vdev_param(wlan_psoc_get_dp_handle(psoc),
-						 dp_link->link_id,
-						 CDP_VDEV_TX_TO_FW, vdev_param);
-		if (QDF_IS_STATUS_ERROR(status))
-			break;
-	}
-
-	return status;
-}
-#else
-static inline
-QDF_STATUS wlan_dp_set_vdev_direct_link_cfg(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_dp_intf *dp_intf)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline
 QDF_STATUS wlan_dp_update_vdev_mac_addr(struct wlan_dp_psoc_context *dp_ctx,
@@ -216,8 +175,6 @@ void ucfg_dp_update_intf_mac(struct wlan_objmgr_psoc *psoc,
 		dp_link ? dp_link->link_id : 255);
 	if (dp_link && dp_link->dp_intf == dp_intf)
 		dp_intf->def_link = dp_link;
-
-	wlan_dp_set_vdev_direct_link_cfg(psoc, dp_intf);
 }
 
 static inline uint8_t
