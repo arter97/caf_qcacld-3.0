@@ -2076,7 +2076,7 @@ lim_roam_gen_mbssid_beacon(struct mac_context *mac,
 
 	if (roam_ind->is_beacon) {
 		offset = SIR_MAC_HDR_LEN_3A + SIR_MAC_B_PR_SSID_OFFSET;
-		length = nontx_bcn_prbrsp_len - SIR_MAC_HDR_LEN_3A;
+		length = nontx_bcn_prbrsp_len - offset;
 		if (sir_parse_beacon_ie(mac, parsed_frm,
 					&nontx_bcn_prbrsp[offset],
 					length) != QDF_STATUS_SUCCESS ||
@@ -2178,7 +2178,8 @@ lim_roam_gen_beacon_descr(struct mac_context *mac,
 			if (sir_parse_beacon_ie(mac, parsed_frm,
 				&bcn_prb_ptr[SIR_MAC_HDR_LEN_3A +
 				SIR_MAC_B_PR_SSID_OFFSET],
-				bcn_prb_len - SIR_MAC_HDR_LEN_3A) !=
+				bcn_prb_len - SIR_MAC_HDR_LEN_3A -
+				SIR_MAC_B_PR_SSID_OFFSET) !=
 						QDF_STATUS_SUCCESS ||
 			    !parsed_frm->ssidPresent) {
 				pe_err("Parse error Beacon, length: %d",
