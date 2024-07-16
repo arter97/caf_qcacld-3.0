@@ -359,8 +359,9 @@ static void wlansap_ft_deinit(struct sap_context *sap_ctx)
 }
 
 QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
-			 enum QDF_OPMODE mode,
-			 uint8_t *addr, uint32_t session_id, bool reinit)
+			enum QDF_OPMODE mode,
+			uint8_t *addr, uint32_t session_id,
+			bool cac_offload, bool reinit)
 {
 	QDF_STATUS status;
 	struct mac_context *mac;
@@ -380,6 +381,8 @@ QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
 		sap_err("Invalid MAC context");
 		return QDF_STATUS_E_INVAL;
 	}
+
+	sap_ctx->dfs_cac_offload = cac_offload;
 
 	status = sap_set_session_param(MAC_HANDLE(mac), sap_ctx, session_id);
 	if (QDF_STATUS_SUCCESS != status) {
@@ -884,7 +887,6 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	sap_ctx->enableOverLapCh = config->enOverLapCh;
 	sap_ctx->acs_cfg = &config->acs_cfg;
 	sap_ctx->sec_ch_freq = config->sec_ch_freq;
-	sap_ctx->dfs_cac_offload = config->dfs_cac_offload;
 	sap_ctx->isCacStartNotified = false;
 	sap_ctx->isCacEndNotified = false;
 	sap_ctx->is_chan_change_inprogress = false;
@@ -3065,24 +3067,15 @@ void wlansap_cleanup_cac_timer(struct sap_context *sap_ctx)
 		return;
 	}
 
-	if (mac->sap.SapDfsInfo.vdev_id != sap_ctx->vdev_id) {
-		sap_err("sapdfs, force cleanup vdev mismatch sap vdev id %d mac_ctx vdev id %d",
-			sap_ctx->vdev_id, mac->sap.SapDfsInfo.vdev_id);
-		return;
-	}
-
 	if (mac->sap.SapDfsInfo.is_dfs_cac_timer_running) {
 		mac->sap.SapDfsInfo.is_dfs_cac_timer_running = 0;
-		mac->sap.SapDfsInfo.vdev_id = WLAN_INVALID_VDEV_ID;
-
 		if (!sap_ctx->dfs_cac_offload) {
 			qdf_mc_timer_stop(
 				&mac->sap.SapDfsInfo.sap_dfs_cac_timer);
 			qdf_mc_timer_destroy(
 				&mac->sap.SapDfsInfo.sap_dfs_cac_timer);
-			sap_debug("sapdfs, force cleanup running dfs cac timer vdev id %d",
-				  sap_ctx->vdev_id);
 		}
+		sap_err("sapdfs, force cleanup running dfs cac timer");
 	}
 }
 

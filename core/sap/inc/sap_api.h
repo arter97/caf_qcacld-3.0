@@ -591,7 +591,6 @@ struct sap_config {
 	enum sap_acs_dfs_mode acs_dfs_mode;
 	struct hdd_channel_info *channel_info;
 	uint32_t channel_info_count;
-	bool dfs_cac_offload;
 #ifdef WLAN_SUPPORT_TWT
 	bool cfg80211_twt_responder;
 #endif
@@ -688,7 +687,6 @@ typedef struct sSapDfsInfo {
 	uint8_t sap_ch_switch_beacon_cnt;
 	uint8_t sap_ch_switch_mode;
 	uint16_t reduced_beacon_interval;
-	uint8_t vdev_id;
 } tSapDfsInfo;
 
 /* MAX number of CAC channels to be recorded */
@@ -815,6 +813,7 @@ QDF_STATUS sap_destroy_ctx(struct sap_context *sap_ctx);
  * @mode: Device mode
  * @addr: MAC address of the SAP
  * @session_id: Pointer to the session id
+ * @cac_offload: if CAC is offloaded
  * @reinit: if called as part of reinit
  *
  * sap_create_ctx() allocates the sap context which is uninitialized.
@@ -826,8 +825,9 @@ QDF_STATUS sap_destroy_ctx(struct sap_context *sap_ctx);
  *         QDF_STATUS_SUCCESS: Success
  */
 QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
-			 enum QDF_OPMODE mode,
-			 uint8_t *addr, uint32_t session_id, bool reinit);
+			enum QDF_OPMODE mode,
+			uint8_t *addr, uint32_t session_id,
+			bool cac_offload, bool reinit);
 
 /**
  * sap_deinit_ctx() - De-initialize the sap context

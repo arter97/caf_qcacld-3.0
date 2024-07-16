@@ -784,7 +784,6 @@ wlansap_roam_process_dfs_radar_found(struct mac_context *mac_ctx,
 			sap_err("sapdfs: sap_radar_found_status is false");
 			return;
 		}
-
 		sap_debug("sapdfs:Posting event eSAP_DFS_CHANNEL_CAC_RADAR_FOUND");
 		/*
 		 * If Radar is found, while in DFS CAC WAIT State then post stop
@@ -798,7 +797,6 @@ wlansap_roam_process_dfs_radar_found(struct mac_context *mac_ctx,
 					sap.SapDfsInfo.sap_dfs_cac_timer);
 		}
 		mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running = false;
-		mac_ctx->sap.SapDfsInfo.vdev_id = WLAN_INVALID_VDEV_ID;
 
 		/*
 		 * User space is already indicated the CAC start and if
@@ -1083,9 +1081,8 @@ static void wlan_sap_pre_cac_radar_ind(struct sap_context *sap_ctx,
 		qdf_mc_timer_stop(dfs_timer);
 		qdf_mc_timer_destroy(dfs_timer);
 	}
-	mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running = false;
-	mac_ctx->sap.SapDfsInfo.vdev_id = WLAN_INVALID_VDEV_ID;
 
+	mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running = false;
 	wlan_pre_cac_handle_radar_ind(sap_ctx->vdev);
 }
 #else

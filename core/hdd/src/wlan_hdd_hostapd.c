@@ -322,8 +322,10 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 	}
 
 	status = sap_init_ctx(sap_ctx, adapter->device_mode,
-			       link_mac->bytes,
-			       link_info->vdev_id, reinit);
+			      link_mac->bytes,
+			      link_info->vdev_id,
+			      hdd_ctx->dfs_cac_offload,
+			      reinit);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wlansap_start failed!! status: %d", status);
 		link_info->session.ap.sap_context = NULL;
@@ -7047,7 +7049,6 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	mgmt_frame = (struct ieee80211_mgmt *)beacon->head;
 
 	config->beacon_int = mgmt_frame->u.beacon.beacon_int;
-	config->dfs_cac_offload = hdd_ctx->dfs_cac_offload;
 	config->dtim_period = beacon->dtim_period;
 
 	if (config->acs_cfg.acs_mode == true) {
