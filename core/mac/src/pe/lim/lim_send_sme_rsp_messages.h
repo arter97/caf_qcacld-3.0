@@ -134,6 +134,7 @@ QDF_STATUS lim_prepare_disconnect_done_ind(struct mac_context *mac_ctx,
  * lim_send_sme_disassoc_ntf() - Send disassoc notification to upper layer
  * @mac: Global MAC context
  * @peerMacAddr: The peer MAC addr to which disassociate was initiated
+ * @peerMldAddr: Peer MLD mac
  * @reasonCode: The reason for Disassociation
  * @disassocTrigger: The trigger for Disassociation
  * @aid: The STAID. This parameter is present only on AP
@@ -148,6 +149,7 @@ QDF_STATUS lim_prepare_disconnect_done_ind(struct mac_context *mac_ctx,
  */
 void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 			       tSirMacAddr peerMacAddr,
+			       tSirMacAddr peerMldAddr,
 			       tSirResultCodes reasonCode,
 			       uint16_t disassocTrigger,
 			       uint16_t aid,
