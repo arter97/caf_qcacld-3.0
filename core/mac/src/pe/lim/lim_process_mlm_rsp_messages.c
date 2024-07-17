@@ -2927,6 +2927,8 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 
 	assoc_rsp.len = 0;
 	mlo_get_assoc_rsp(session_entry->vdev, &assoc_rsp);
+	if (!assoc_rsp.len)
+		return QDF_STATUS_E_INVAL;
 
 	if (!session_entry->ml_partner_info.num_partner_links) {
 		pe_debug("MLO_ROAM: vdev:%d num_partner_links is 0",
@@ -2941,9 +2943,6 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 	pe_err("vdev:%d sta_link_addr" QDF_MAC_ADDR_FMT,
 	       session_entry->vdev_id,
 	       QDF_MAC_ADDR_REF(&sta_link_addr.bytes[0]));
-
-	if (!assoc_rsp.len)
-		return QDF_STATUS_SUCCESS;
 
 	mlm_join_cnf.resultCode = eSIR_SME_SUCCESS;
 	mlm_join_cnf.protStatusCode = STATUS_SUCCESS;
