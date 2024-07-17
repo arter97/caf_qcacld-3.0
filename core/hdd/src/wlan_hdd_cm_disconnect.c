@@ -123,6 +123,59 @@ static void hdd_cm_print_bss_info(struct hdd_station_ctx *hdd_sta_ctx)
 		       conn_info->hs20vendor_ie.release_num : 0);
 }
 
+#ifdef IPA_HANDLE_MLO_DEF_LINK_REG
+/**
+ * hdd_handle_ipa_sta_mlo_disconn() - Handle STA MLO disconnection for IPA
+ * @link_info: Link info pointer in HDD adapter
+ * @sta_ctx: pointer to struct hdd_station_ctx
+ * @mac_addr: pointer to AP mld addr if MLO deflink. Otherwise pointer to
+ *	      AP BSSID.
+ *
+ * This function handles STA MLO connection and only deflink information
+ * is registered to IPA component for STA_DISCONNECT event.
+ *
+ * Return: true to notify IPA component of the STA_DISCONNECT event.
+ *	   false to not notify IPA component.
+ */
+static bool hdd_handle_ipa_sta_mlo_disconn(struct wlan_hdd_link_info *link_info,
+					   struct hdd_station_ctx *sta_ctx,
+					   uint8_t **mac_addr)
+{
+	struct qdf_mac_addr mac = {0};
+
+	if (wlan_vdev_mlme_is_mlo_vdev(link_info->vdev)) {
+		if (WLAN_HDD_IS_DEFLINK(link_info)) {
+			qdf_mem_copy(&mac, &sta_ctx->conn_info.mld_addr,
+				     QDF_MAC_ADDR_SIZE);
+			*mac_addr = sta_ctx->conn_info.mld_addr.bytes;
+		} else {
+			return false;
+		}
+	} else {
+		qdf_mem_copy(&mac, &sta_ctx->conn_info.bssid,
+			     QDF_MAC_ADDR_SIZE);
+		*mac_addr = sta_ctx->conn_info.bssid.bytes;
+	}
+
+	return QDF_IS_STATUS_SUCCESS(wlan_hdd_validate_mac_address(&mac));
+}
+#else /* !IPA_HANDLE_MLO_DEF_LINK_REG */
+static bool hdd_handle_ipa_sta_mlo_disconn(struct wlan_hdd_link_info *link_info,
+					   struct hdd_station_ctx *sta_ctx,
+					   uint8_t **mac_addr)
+{
+	QDF_STATUS status;
+
+	status = wlan_hdd_validate_mac_address(&sta_ctx->conn_info.bssid);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
+
+	*mac_addr = sta_ctx->conn_info.bssid.bytes;
+
+	return true;
+}
+#endif /* IPA_HANDLE_MLO_DEF_LINK_REG */
+
 void
 __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info)
 {
@@ -131,19 +184,20 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 	struct hdd_station_ctx *sta_ctx;
 	uint32_t time_buffer_size;
 	struct wlan_objmgr_vdev *vdev;
+	uint8_t *mac_addr;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	hdd_stop_tsf_sync(adapter);
 	time_buffer_size = sizeof(sta_ctx->conn_info.connect_time);
 	qdf_mem_zero(sta_ctx->conn_info.connect_time, time_buffer_size);
+
 	if (ucfg_ipa_is_enabled() &&
-	    QDF_IS_STATUS_SUCCESS(wlan_hdd_validate_mac_address(
-				  &sta_ctx->conn_info.bssid)))
+	    hdd_handle_ipa_sta_mlo_disconn(link_info, sta_ctx, &mac_addr))
 		ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
 				  link_info->vdev_id,
 				  WLAN_IPA_STA_DISCONNECT,
-				  sta_ctx->conn_info.bssid.bytes,
+				  mac_addr,
 				  false);
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
