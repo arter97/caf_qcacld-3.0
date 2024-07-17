@@ -1261,7 +1261,7 @@ tdls_update_peer_off_channel_list(struct wlan_objmgr_pdev *pdev,
 		if ((!freq || freq == peer_freq) &&
 		    (!wlan_reg_is_24ghz_ch_freq(peer_freq) ||
 		     (wlan_reg_is_6ghz_chan_freq(peer_freq) &&
-		      tdls_is_6g_freq_allowed(vdev, peer_freq)))) {
+		      tdls_is_6g_freq_allowed(pdev, peer_freq)))) {
 			off_channels[params->num_off_channels] =
 					peer_info->peer_cap.peer_chan[i];
 			tdls_debug("allowd_chan:%d idx:%d",

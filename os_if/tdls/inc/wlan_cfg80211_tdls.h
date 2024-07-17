@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -179,11 +179,11 @@ bool wlan_cfg80211_tdls_is_fw_wideband_capable(struct wlan_objmgr_vdev *vdev);
 /**
  * wlan_cfg80211_tdls_is_fw_6ghz_capable() - Check whether fw supports 6 GHz
  *                                           band TDLS
- * @vdev:     Pointer to vdev
+ * @pdev:     Pointer to pdev
  *
  * Return: true if fw supports 6 GHz TDLS connection
  */
-bool wlan_cfg80211_tdls_is_fw_6ghz_capable(struct wlan_objmgr_vdev *vdev);
+bool wlan_cfg80211_tdls_is_fw_6ghz_capable(struct wlan_objmgr_pdev *pdev);
 #endif
 
 /**
