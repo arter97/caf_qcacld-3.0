@@ -249,10 +249,6 @@
 #include "os_if_dp_local_pkt_capture.h"
 #include "cdp_txrx_mon.h"
 
-#ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
-#include <linux/netpoll.h>
-#endif
-
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
 #endif
@@ -7265,6 +7261,7 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_GET_ADAPTER_BY_BSSID",
 		"NET_DEV_HOLD_SHUTDOWN_OPEN_INTERFACE",
 		"NET_DEV_HOLD_REOPEN_SUSPEND_INTERFACE",
+		"NET_DEV_HOLD_IS_INTERFACE_NEED_REOPEN",
 		"NET_DEV_HOLD_ID_MAX"};
 	int32_t num_dbg_strings = QDF_ARRAY_SIZE(strings);
 
@@ -10217,6 +10214,26 @@ out:
 }
 
 #ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+static bool
+hdd_shutdown_wlan_is_applicable(struct hdd_context *hdd_ctx, unsigned long evt)
+{
+	enum pmo_suspend_mode mode;
+
+	if (evt == PM_HIBERNATION_PREPARE)
+		return true;
+
+	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
+	hdd_debug("suspend mode is %d", mode);
+
+	if (mode == PMO_SUSPEND_SHUTDOWN)
+		return true;
+
+	if (mode == PMO_SUSPEND_WOW && !hdd_is_any_interface_open(hdd_ctx))
+		return true;
+
+	return false;
+}
+
 static int hdd_shutdown_open_interface(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
@@ -10276,32 +10293,21 @@ static int hdd_reopen_suspended_interface(struct hdd_context *hdd_ctx)
 }
 
 static QDF_STATUS
-hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
+hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx,
+				     unsigned long event)
 {
 #define SHUTDOWN_IN_SUSPEND_RETRY 30
 
 	int count = 0;
-	enum pmo_suspend_mode mode;
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver Modules not Enabled ");
 		return 0;
 	}
 
-	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
-	hdd_debug("suspend mode is %d", mode);
-
-	if (mode == PMO_SUSPEND_NONE || mode == PMO_SUSPEND_LEGENCY) {
+	if (!hdd_shutdown_wlan_is_applicable(hdd_ctx, event)) {
 		hdd_debug("needn't shutdown in suspend");
 		return 0;
-	}
-
-	if (!hdd_is_any_interface_open(hdd_ctx)) {
-		return pld_idle_shutdown(hdd_ctx->parent_dev,
-					 hdd_psoc_idle_shutdown);
-	} else {
-		if (mode == PMO_SUSPEND_WOW)
-			return 0;
 	}
 
 	if(hdd_shutdown_open_interface(hdd_ctx))
@@ -10321,24 +10327,50 @@ hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 	return pld_idle_shutdown(hdd_ctx->parent_dev, hdd_psoc_idle_shutdown);
 }
 
+static bool hdd_is_interface_need_reopen(struct hdd_context *hdd_ctx,
+					 unsigned long event)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_INTERFACE_NEED_REOPEN;
+
+	if (!hdd_shutdown_wlan_is_applicable(hdd_ctx, event)) {
+		hdd_debug("WLAN mode is not applicable during resume");
+		return false;
+	}
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->is_opened_before_suspend) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			if (next_adapter)
+				hdd_adapter_dev_put_debug(next_adapter, dbgid);
+			return true;
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	return false;
+}
+
 static QDF_STATUS
-hdd_reopen_wlan_in_post_suspend(struct hdd_context *hdd_ctx)
+hdd_reopen_wlan_in_post_suspend(struct hdd_context *hdd_ctx,
+				unsigned long event)
 {
 	int ret = 0;
 
-	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) != PMO_SUSPEND_SHUTDOWN) {
-		hdd_debug("shutdown in suspend not supported");
+	if (!hdd_is_interface_need_reopen(hdd_ctx, event)) {
+		hdd_debug("needn't reopen in resume");
 		return 0;
 	}
 
 	ret = pld_idle_restart(hdd_ctx->parent_dev, hdd_psoc_idle_restart);
-	if(ret){
+	if (ret) {
 		hdd_err("wlan idle restart fail, ret:%d", ret);
 		return ret;
 	}
 
 	ret = hdd_reopen_suspended_interface(hdd_ctx);
-	if(ret){
+	if (ret) {
 		hdd_err("adapters can't get rtnl lock, aborting reopen");
 		return ret;
 	}
@@ -10360,12 +10392,12 @@ static int hdd_pm_notify(struct notifier_block *b,
 	switch (event) {
 	case PM_SUSPEND_PREPARE:
 	case PM_HIBERNATION_PREPARE:
-		if (0 != hdd_shutdown_wlan_in_suspend_prepare(hdd_ctx))
+		if (0 != hdd_shutdown_wlan_in_suspend_prepare(hdd_ctx, event))
 			return NOTIFY_STOP;
 		break;
 	case PM_POST_SUSPEND:
 	case PM_POST_HIBERNATION:
-		if (0 != hdd_reopen_wlan_in_post_suspend(hdd_ctx))
+		if (0 != hdd_reopen_wlan_in_post_suspend(hdd_ctx, event))
 			return NOTIFY_STOP;
 		break;
 	}
