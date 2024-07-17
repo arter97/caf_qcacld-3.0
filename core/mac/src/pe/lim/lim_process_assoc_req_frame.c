@@ -147,6 +147,7 @@ static void lim_convert_supported_channels(struct mac_context *mac_ctx,
  */
 static QDF_STATUS lim_check_sta_in_pe_entries(struct mac_context *mac_ctx,
 					      tSirMacAddr sa,
+					      tSirMacAddr mld_mac,
 					       uint16_t sessionid,
 					       bool *dup_entry)
 {
@@ -160,9 +161,9 @@ static QDF_STATUS lim_check_sta_in_pe_entries(struct mac_context *mac_ctx,
 		session = &mac_ctx->lim.gpSession[i];
 		if (session->valid &&
 		    (session->opmode == QDF_SAP_MODE)) {
-			sta_ds = dph_lookup_hash_entry(
-					mac_ctx, sa,
-					&assoc_id, &session->dph.dphHashTable);
+			sta_ds = lim_get_sta_ds(
+					mac_ctx, sa, mld_mac,
+					&assoc_id, session);
 			if (sta_ds
 				&& (!sta_ds->rmfEnabled ||
 				    (sessionid != session->peSessionId))
@@ -181,10 +182,9 @@ static QDF_STATUS lim_check_sta_in_pe_entries(struct mac_context *mac_ctx,
 					return QDF_STATUS_E_AGAIN;
 				}
 				sta_ds->sta_deletion_in_progress = true;
-				pe_err("Sending Disassoc and Deleting existing STA entry:"
-				       QDF_MAC_ADDR_FMT,
-				       QDF_MAC_ADDR_REF(
-						session->self_mac_addr));
+				pe_debug("Vdev %d Delete STA " QDF_MAC_ADDR_FMT,
+					 session->vdev_id,
+					 QDF_MAC_ADDR_REF(sa));
 				lim_send_disassoc_mgmt_frame(mac_ctx,
 					REASON_UNSPEC_FAILURE,
 					(uint8_t *)sa, session, false);
@@ -257,19 +257,21 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 	QDF_STATUS qdf_status;
 	enum wlan_status_code wlan_status;
 	struct qdf_mac_addr *mld_mac;
+	uint32_t offset = WLAN_ASSOC_REQ_IES_OFFSET;
 
-	if (sub_type == LIM_ASSOC)
+	if (sub_type == LIM_ASSOC) {
 		wlan_status = sir_convert_assoc_req_frame2_struct(mac_ctx, frm_body,
 							     frame_len,
 							     assoc_req);
-	else
+	} else {
 		wlan_status = sir_convert_reassoc_req_frame2_struct(mac_ctx,
 						frm_body, frame_len, assoc_req);
-
+		offset = WLAN_REASSOC_REQ_IES_OFFSET;
+	}
 	if (wlan_status == STATUS_SUCCESS) {
 		qdf_status = lim_strip_and_decode_eht_cap(
-					frm_body + WLAN_ASSOC_REQ_IES_OFFSET,
-					frame_len - WLAN_ASSOC_REQ_IES_OFFSET,
+					frm_body + offset,
+					frame_len - offset,
 					&assoc_req->eht_cap,
 					assoc_req->he_cap,
 					session->curr_op_freq);
@@ -289,7 +291,6 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 			qdf_mem_zero(&assoc_req->mlo_info,
 				     sizeof(assoc_req->mlo_info));
 		}
-
 		return true;
 	}
 
@@ -2554,7 +2555,12 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 	lim_get_phy_mode(mac_ctx, &phy_mode, session);
 	limGetQosMode(session, &qos_mode);
 
-	status = lim_check_sta_in_pe_entries(mac_ctx, sa,
+	if (!lim_chk_assoc_req_parse_error(mac_ctx, sa, session,
+					   assoc_req, sub_type,
+					   frm_body, frame_len))
+		goto error;
+
+	status = lim_check_sta_in_pe_entries(mac_ctx, sa, assoc_req->mld_mac,
 					     session->peSessionId,
 					     &dup_entry);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -2596,10 +2602,6 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 		}
 	}
 
-	if (!lim_chk_assoc_req_parse_error(mac_ctx, sa, session,
-					   assoc_req, sub_type,
-					   frm_body, frame_len))
-		goto error;
 
 	if (!lim_chk_capab(mac_ctx, sa, session, assoc_req,
 			   sub_type, &local_cap))
