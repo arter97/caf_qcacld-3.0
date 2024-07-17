@@ -11760,7 +11760,11 @@ int sme_update_he_full_ul_mumimo(mac_handle_t mac_handle, uint8_t session_id,
 		sme_err("No session for id %d", session_id);
 		return -EINVAL;
 	}
+
+	sme_info("UL MU mimo: %d", cfg_val);
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.ul_mu = cfg_val;
+	mac_ctx->he_cap_2g.ul_mu = cfg_val;
+	mac_ctx->he_cap_5g.ul_mu = cfg_val;
 
 	csr_update_session_he_cap(mac_ctx, session);
 
