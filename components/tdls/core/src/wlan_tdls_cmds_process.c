@@ -112,10 +112,11 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 	struct vdev_mlme_obj *mlme_obj;
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	qdf_freq_t freq = wlan_get_operation_chan_freq(vdev);
 
-	if (!psoc) {
-		tdls_err("psoc is NULL");
+	if (!psoc || !pdev) {
+		tdls_err("psoc or pdev is NULL");
 		return;
 	}
 
@@ -123,8 +124,10 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 	 * Check whether the frequency is 6ghz and tdls connection on 6ghz freq
 	 * is allowed.
 	 */
-	if (!tdls_is_6g_freq_allowed(vdev, freq))
+	if (!tdls_is_6g_freq_allowed(pdev, freq)) {
+		tdls_err("VLP not supported or non-psc freq %d", freq);
 		return;
+	}
 
 	/*
 	 * Since, 8 TDLS peers can be connected. If connected peer already

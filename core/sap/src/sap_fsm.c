@@ -3328,7 +3328,6 @@ wlansap_is_power_change_required(struct mac_context *mac_ctx,
 	struct wlan_objmgr_vdev *sta_vdev;
 	uint8_t sta_vdev_id;
 	enum hw_mode_bandwidth ch_wd;
-	uint8_t country[CDS_COUNTRY_CODE_LEN + 1];
 	enum channel_state state;
 	uint32_t ap_pwr_type_6g = 0;
 	bool indoor_ch_support = false;
@@ -3357,12 +3356,6 @@ wlansap_is_power_change_required(struct mac_context *mac_ctx,
 
 	if (ap_pwr_type_6g == REG_INDOOR_AP && indoor_ch_support) {
 		sap_debug("STA is connected to Indoor AP and indoor concurrency is supported");
-		return false;
-	}
-
-	wlan_reg_read_current_country(mac_ctx->psoc, country);
-	if (!wlan_reg_ctry_support_vlp(country)) {
-		sap_debug("Device country doesn't support VLP");
 		return false;
 	}
 
