@@ -6723,6 +6723,7 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 	struct pe_session *pe_session = NULL;
 	uint8_t sessionId;
 	uint8_t smesessionId;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -6897,6 +6898,7 @@ sendDisassoc:
 	if (pe_session)
 		lim_send_sme_disassoc_ntf(mac,
 					  smeDisassocReq.peer_macaddr.bytes,
+					  (uint8_t *)mld_addr.bytes,
 					  retCode,
 					  disassocTrigger,
 					  1, smesessionId,
@@ -6904,6 +6906,7 @@ sendDisassoc:
 	else
 		lim_send_sme_disassoc_ntf(mac,
 					  smeDisassocReq.peer_macaddr.bytes,
+					  (uint8_t *)mld_addr.bytes,
 					  retCode, disassocTrigger, 1,
 					  smesessionId, NULL);
 
@@ -7601,6 +7604,7 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 	struct pe_session *session_entry = NULL;
 	uint8_t session_id;
 	tpSirAssocReq assoc_req;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	if (!msg_buf) {
 		pe_err("msg_buf is NULL");
@@ -7638,7 +7642,10 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 		 * send a DISASSOC_IND message to WSM to make sure
 		 * the state in WSM and LIM is the same
 		 */
-		lim_send_sme_disassoc_ntf(mac_ctx, assoc_cnf.peer_macaddr.bytes,
+		lim_send_sme_disassoc_ntf(
+				mac_ctx,
+				assoc_cnf.peer_macaddr.bytes,
+				(uint8_t *)mld_addr.bytes,
 				eSIR_SME_STA_NOT_ASSOCIATED,
 				eLIM_PEER_ENTITY_DISASSOC, assoc_cnf.aid,
 				session_entry->smeSessionId,
@@ -9153,6 +9160,7 @@ static void lim_process_sme_disassoc_req(struct mac_context *mac_ctx,
 	struct disassoc_req disassoc_req;
 	struct pe_session *session;
 	uint8_t session_id;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	qdf_mem_copy(&disassoc_req, msg->bodyptr, sizeof(struct disassoc_req));
 
@@ -9164,6 +9172,7 @@ static void lim_process_sme_disassoc_req(struct mac_context *mac_ctx,
 		       QDF_MAC_ADDR_REF(disassoc_req.bssid.bytes));
 		lim_send_sme_disassoc_ntf(mac_ctx,
 					  disassoc_req.peer_macaddr.bytes,
+					  mld_addr.bytes,
 					  eSIR_SME_INVALID_PARAMETERS,
 					  eLIM_HOST_DISASSOC, 1,
 					  disassoc_req.sessionId, NULL);
