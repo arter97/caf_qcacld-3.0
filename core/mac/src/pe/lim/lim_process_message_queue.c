@@ -1501,16 +1501,17 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 			break;
 
 		case SIR_MAC_MGMT_ACTION:
+			pe_debug("RX MGMT - Type %hu, SubType %hu, seq num[%d]",
+				 fc.type, fc.subType,
+				 ((pHdr->seqControl.seqNumHi <<
+				   HIGH_SEQ_NUM_OFFSET) |
+				  pHdr->seqControl.seqNumLo));
 			if (!pe_session)
 				lim_process_action_frame_no_session(mac,
 								    pRxPacketInfo);
 			else {
 				if (mac->mlme_cfg->gen.debug_packet_log &
 				    DEBUG_PKTLOG_TYPE_ACTION) {
-					pe_debug("RX MGMT - Type %hu, SubType %hu, seq num[%d]",
-						 fc.type, fc.subType,
-						 ((pHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET) |
-						 pHdr->seqControl.seqNumLo));
 					QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
 							   QDF_TRACE_LEVEL_DEBUG,
 							   pHdr,

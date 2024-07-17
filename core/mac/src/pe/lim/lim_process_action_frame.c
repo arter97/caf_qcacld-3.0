@@ -1176,7 +1176,8 @@ __lim_process_radio_measure_request(struct mac_context *mac, uint8_t *pRxPacketI
 		 pHdr->fc.type, pHdr->fc.subType, curr_seq_num);
 
 	rrm_process_radio_measurement_request(mac, pe_session->bssId, frm,
-					      pe_session);
+					      pe_session, pHdr, frameLen,
+					      pRxPacketInfo);
 err:
 	qdf_mem_free(frm);
 }
@@ -1991,7 +1992,8 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		break;
 
 	case ACTION_CATEGORY_RRM:
-
+		pe_debug("RRM Action category: %d action: %d",
+			 action_hdr->category, action_hdr->actionID);
 		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
 		    LIM_IS_AP_ROLE(session) &&
 		    action_hdr->actionID == RRM_RADIO_MEASURE_RPT) {
