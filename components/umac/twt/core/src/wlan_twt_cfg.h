@@ -64,16 +64,6 @@ QDF_STATUS
 wlan_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
- * wlan_twt_cfg_get_responder_type() - get TWT responder type
- * @psoc: Pointer to global PSOC
- * @val: pointer to output variable
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_twt_cfg_get_responder_type(struct wlan_objmgr_psoc *psoc, uint8_t *val);
-
-/**
  * wlan_twt_cfg_get_responder() - get cfg responder
  * @psoc: Pointer to global psoc
  * @val: pointer to output variable
@@ -270,12 +260,6 @@ static inline QDF_STATUS wlan_twt_cfg_update(struct wlan_objmgr_psoc *psoc)
 
 static inline QDF_STATUS
 wlan_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wlan_twt_cfg_get_responder_type(struct wlan_objmgr_psoc *psoc, uint8_t *val)
 {
 	return QDF_STATUS_SUCCESS;
 }
