@@ -1855,6 +1855,32 @@ static void hdd_restore_ignore_cac(struct hdd_context *hdd_ctx)
 }
 
 /**
+ * hdd_apctx_set_ap_suspend() - set AP in suspend mode as per ap ctx
+ * @hdd_ctx:   hdd context
+ * @link_info: Link info
+ *
+ * Return: nothing
+ */
+static void hdd_apctx_set_ap_suspend(struct hdd_context *hdd_ctx,
+				     struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	struct qdf_mac_addr *mld_addr;
+	struct vdev_suspend_param param = {0};
+
+	if (ap_ctx && qdf_atomic_read(&ap_ctx->is_ap_suspend)) {
+		mld_addr = hdd_get_mld_mac_addr_from_vdev(link_info->vdev);
+		if (mld_addr)
+			qdf_mem_copy(&param.mac_addr, mld_addr,
+				     sizeof(QDF_MAC_ADDR_SIZE));
+		param.vdev_id = link_info->vdev_id;
+		param.suspend = 1;
+		ucfg_mlme_set_sap_suspend_resume(hdd_ctx->psoc, &param);
+		qdf_atomic_set(&link_info->vdev->is_ap_suspend, 1);
+	}
+}
+
+/**
  * hdd_ssr_restart_sap() - restart sap on SSR
  * @hdd_ctx:   hdd context
  *
@@ -1865,8 +1891,6 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct wlan_hdd_link_info *link_info;
 	bool ignore_cac_updated = false;
-	struct vdev_suspend_param param = {0};
-	struct qdf_mac_addr *mld_addr;
 
 	hdd_enter();
 
@@ -1891,17 +1915,7 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 				  adapter->dev->name);
 			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
 			wlan_hdd_start_sap(link_info, true);
-			if (qdf_atomic_read(&link_info->vdev->is_ap_suspend)) {
-				mld_addr =
-				hdd_get_mld_mac_addr_from_vdev(link_info->vdev);
-				if (mld_addr)
-					qdf_mem_copy(&param.mac_addr, mld_addr,
-						     sizeof(QDF_MAC_ADDR_SIZE));
-				param.vdev_id = link_info->vdev_id;
-				param.suspend = 1;
-				ucfg_mlme_set_sap_suspend_resume(hdd_ctx->psoc,
-								 &param);
-			}
+			hdd_apctx_set_ap_suspend(hdd_ctx, link_info);
 		}
 next_adapter:
 		hdd_adapter_dev_put_debug(adapter,

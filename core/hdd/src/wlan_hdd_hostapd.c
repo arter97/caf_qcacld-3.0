@@ -4888,6 +4888,7 @@ QDF_STATUS hdd_init_ap_mode(struct wlan_hdd_link_info *link_info,
 		wlansap_dcs_set_vdev_starting(sap_ctx, false);
 		qdf_mem_zero(&link_info->session.ap.sap_config.acs_cfg,
 			     sizeof(struct sap_acs_cfg));
+		qdf_atomic_init(&link_info->session.ap.is_ap_suspend);
 	}
 
 	INIT_WORK(&link_info->sap_stop_bss_work,
@@ -4926,6 +4927,7 @@ void hdd_deinit_ap_mode(struct wlan_hdd_link_info *link_info)
 		wlan_hdd_set_roaming_state(link_info,
 					   RSO_SAP_CHANNEL_CHANGE, true);
 	}
+	qdf_atomic_set(&ap_ctx->is_ap_suspend, 0);
 
 	if (hdd_hostapd_deinit_sap_session(link_info))
 		hdd_err("Failed:hdd_hostapd_deinit_sap_session");

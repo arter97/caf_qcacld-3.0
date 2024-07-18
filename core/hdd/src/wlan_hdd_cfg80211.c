@@ -14480,6 +14480,7 @@ __wlan_hdd_cfg80211_sap_suspend_resume(struct wiphy *wiphy,
 		.subtype = SIR_MAC_MGMT_DEAUTH,
 	};
 	struct qdf_mac_addr *mld_addr;
+	struct hdd_ap_ctx *ap_ctx;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
@@ -14543,6 +14544,12 @@ __wlan_hdd_cfg80211_sap_suspend_resume(struct wiphy *wiphy,
 		hdd_err("Suspend SAP failed");
 		goto reset;
 	}
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	if (!ap_ctx) {
+		hdd_err("ap_ctx is null, suspend state not cached for SSR");
+		goto end;
+	}
+	qdf_atomic_set(&ap_ctx->is_ap_suspend, vdev_suspend_resume);
 	goto end;
 reset:
 	qdf_atomic_set(&vdev->is_ap_suspend, !vdev_suspend_resume);

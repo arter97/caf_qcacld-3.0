@@ -881,6 +881,7 @@ struct hdd_fw_txrx_stats {
  * @country_ie_updated: country ie is updated or not by hdd hostapd
  * @during_auth_offload: auth mgmt frame is offloading to hostapd
  * @reg_punc_bitmap: puncturing bitmap
+ * @is_ap_suspend: SAP suspend state
  */
 struct hdd_ap_ctx {
 	struct hdd_hostapd_state hostapd_state;
@@ -906,6 +907,7 @@ struct hdd_ap_ctx {
 #ifdef WLAN_FEATURE_11BE
 	uint16_t reg_punc_bitmap;
 #endif
+	qdf_atomic_t is_ap_suspend;
 };
 
 /**
