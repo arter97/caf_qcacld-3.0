@@ -212,7 +212,8 @@ void tdls_decrement_peer_count(struct wlan_objmgr_vdev *vdev,
 	if (soc_obj->connected_peer_count)
 		soc_obj->connected_peer_count--;
 
-	tdls_debug("Connected peer count %d", soc_obj->connected_peer_count);
+	tdls_debug("vdev %d connected peer count %d",
+		   wlan_vdev_get_id(vdev), soc_obj->connected_peer_count);
 
 	/* Need to update osif params when last peer gets disconnected */
 	if (!soc_obj->connected_peer_count &&
@@ -2336,8 +2337,8 @@ QDF_STATUS tdls_process_should_teardown(struct wlan_objmgr_vdev *vdev,
 	soc_obj = wlan_vdev_get_tdls_soc_obj(vdev);
 	vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
 
-	tdls_debug("TDLS %s: " QDF_MAC_ADDR_FMT "reason %d",
-		   tdls_evt_to_str(type),
+	tdls_debug("vdev %d TDLS %s: " QDF_MAC_ADDR_FMT "reason %d",
+		   wlan_vdev_get_id(vdev), tdls_evt_to_str(type),
 		   QDF_MAC_ADDR_REF(evt->peermac.bytes), evt->peer_reason);
 
 	if (!soc_obj || !vdev_obj) {
@@ -2354,8 +2355,10 @@ QDF_STATUS tdls_process_should_teardown(struct wlan_objmgr_vdev *vdev,
 
 	reason = evt->peer_reason;
 	if (TDLS_LINK_CONNECTED == curr_peer->link_status) {
-		tdls_err("%s reason: %d for" QDF_MAC_ADDR_FMT,
+		tdls_err("vdev %d %s reason: %d link_state %d for"
+			 QDF_MAC_ADDR_FMT, wlan_vdev_get_id(vdev),
 			 tdls_evt_to_str(type), evt->peer_reason,
+			 curr_peer->link_status,
 			 QDF_MAC_ADDR_REF(evt->peermac.bytes));
 		if (reason == TDLS_TEARDOWN_RSSI ||
 		    reason == TDLS_DISCONNECTED_PEER_DELETE ||
@@ -2481,6 +2484,7 @@ static int tdls_teardown_links(struct tdls_soc_priv_obj *soc_obj, uint32_t mode)
 	uint8_t staidx;
 	struct tdls_peer *curr_peer;
 	struct tdls_conn_info *conn_rec;
+	QDF_STATUS status;
 	int ret = 0;
 
 	conn_rec = soc_obj->tdls_conn_info;
@@ -2500,8 +2504,11 @@ static int tdls_teardown_links(struct tdls_soc_priv_obj *soc_obj, uint32_t mode)
 		tdls_debug("Indicate TDLS teardown peer bssid "
 			   QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(
 			   curr_peer->peer_mac.bytes));
-		tdls_indicate_teardown(curr_peer->vdev_priv, curr_peer,
-				       TDLS_TEARDOWN_PEER_UNSPEC_REASON);
+		status = tdls_indicate_teardown(curr_peer->vdev_priv,
+						curr_peer,
+						TDLS_TEARDOWN_PEER_UNSPEC_REASON);
+		if (QDF_IS_STATUS_ERROR(status))
+			return -EAGAIN;
 
 		soc_obj->tdls_teardown_peers_cnt++;
 	}
