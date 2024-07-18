@@ -63,8 +63,8 @@ struct tdls_peer *tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
 		status = qdf_list_peek_next(head, p_node, &p_node);
 	}
 
-	tdls_debug("no tdls peer " QDF_MAC_ADDR_FMT,
-		   QDF_MAC_ADDR_REF(macaddr));
+	tdls_debug("vdev %d no tdls peer " QDF_MAC_ADDR_FMT,
+		   wlan_vdev_get_id(vdev_obj->vdev), QDF_MAC_ADDR_REF(macaddr));
 	return NULL;
 }
 

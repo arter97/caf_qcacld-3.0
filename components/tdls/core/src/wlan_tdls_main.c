@@ -514,13 +514,21 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 		if (!curr_peer)
 			continue;
 
-		tdls_notice("indicate TDLS teardown "QDF_MAC_ADDR_FMT,
+		tdls_notice("vdev %d indicate TDLS teardown " QDF_MAC_ADDR_FMT,
+			    wlan_vdev_get_id(tdls_vdev->vdev),
 			    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 
 		/* Indicate teardown to supplicant */
-		tdls_indicate_teardown(tdls_vdev,
-				       curr_peer,
-				       TDLS_TEARDOWN_PEER_UNSPEC_REASON);
+		status = tdls_indicate_teardown(
+					tdls_vdev, curr_peer,
+					TDLS_TEARDOWN_PEER_UNSPEC_REASON);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			tdls_err("vdev %d teardown indication failed for peer "
+				 QDF_MAC_ADDR_FMT,
+				 wlan_vdev_get_id(tdls_vdev->vdev),
+				 QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
+			continue;
+		}
 
 		tdls_reset_peer(tdls_vdev, curr_peer->peer_mac.bytes);
 
@@ -1543,12 +1551,9 @@ void tdls_process_enable_disable_for_ml_vdev(struct wlan_objmgr_vdev *vdev,
 					     bool is_enable)
 {
 	struct wlan_mlo_dev_context *ml_dev_ctx;
+	struct wlan_objmgr_vdev *vdev_iter;
 	QDF_STATUS status;
 	uint8_t i;
-	struct wlan_objmgr_vdev *vdev_iter;
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
-		return;
 
 	ml_dev_ctx = vdev->mlo_dev_ctx;
 	if (!ml_dev_ctx)
