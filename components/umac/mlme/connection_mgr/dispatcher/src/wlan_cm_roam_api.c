@@ -562,6 +562,9 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 							   vdev_id_list,
 							   PM_STA_MODE);
 
+	if (policy_mgr_is_mlo_sta_present(psoc))
+		sta_count += policy_mgr_get_disabled_ml_links_count(psoc);
+
 	/* No need to fill freq list, if no other STA is in connected state */
 	if (!sta_count)
 		return;
