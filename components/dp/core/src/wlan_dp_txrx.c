@@ -1631,7 +1631,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		push_type = DP_NBUF_PUSH_NAPI;
 	}
 
-	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, DP_NBUF_PUSH_NI);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, push_type);
 }
 
 #else /* WLAN_FEATURE_DYNAMIC_RX_AGGREGATION */
@@ -1688,7 +1688,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		push_type = DP_NBUF_PUSH_NAPI;
 	}
 
-	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, DP_NBUF_PUSH_NI);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, push_type);
 }
 #endif /* WLAN_FEATURE_DYNAMIC_RX_AGGREGATION */
 #endif
