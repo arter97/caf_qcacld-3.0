@@ -10524,10 +10524,6 @@ lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 	if (!pSirSmeSwitchChInd)
 		return;
 
-	/* Remove the existing puncturing if any */
-	if (LIM_IS_AP_ROLE(session))
-		lim_remove_puncture(mac_ctx, session);
-
 	pSirSmeSwitchChInd->messageType = eWNI_SME_CH_SWITCH_STARTED_NOTIFY;
 	pSirSmeSwitchChInd->length = sizeof(*pSirSmeSwitchChInd);
 	pSirSmeSwitchChInd->sessionId = session->vdev_id;
@@ -10647,6 +10643,10 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	target_ch_freq = dfs_csa_ie_req->target_chan_freq;
 	/* Channel switch announcement needs to be included in beacon */
 	session_entry->dfsIncludeChanSwIe = true;
+
+	/* Remove the existing puncturing if any */
+	if (LIM_IS_AP_ROLE(session_entry))
+		lim_remove_puncture(mac_ctx, session_entry);
 
 	wlan_reg_set_create_punc_bitmap(&dfs_csa_ie_req->ch_params, false);
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
