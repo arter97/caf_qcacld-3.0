@@ -492,6 +492,11 @@ void pmo_set_sta_wow_bitmask(struct pmo_psoc_cfg *pmo_cfg, uint32_t *bitmask, ui
 		pmo_set_wow_event_bitmap(WOW_DCS_INTERFERENCE_DET,
 					 wow_bitmap_size,
 					 bitmask);
+
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_PF_EVENT))
+		pmo_set_wow_event_bitmap(WOW_PF_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
 }
 
 void pmo_set_sap_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)
