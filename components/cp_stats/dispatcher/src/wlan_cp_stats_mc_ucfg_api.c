@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1374,7 +1374,6 @@ void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
 	uint8_t total_channel;
 	uint8_t i;
 	bool found = false;
-	uint32_t mac_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_CP_STATS_ID);
@@ -1388,13 +1387,6 @@ void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
-	if (mac_id >= MAX_MAC) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
-		cp_stats_err("invalid mac_id %d", mac_id);
-		return;
-	}
-
 	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
 	if (!pdev_cp_stats_priv) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
@@ -1402,7 +1394,11 @@ void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[mac_id];
+	/**
+	 * Store cp stats in mac0 always as vdev will not be up when
+	 * driver receives cp stats of each channel during ACS.
+	 */
+	pdev_mc_stats = &pdev_cp_stats_priv->pdev_stats[0];
 	channel_stats = &pdev_mc_stats->chan_stats;
 	channel_status_list = channel_stats->channel_status_list;
 	total_channel = channel_stats->total_channel;
