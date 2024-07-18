@@ -2651,22 +2651,57 @@ lim_add_sta(struct mac_context *mac_ctx,
 			add_sta_params->stbc_capable = 0;
 	}
 
-	if (session_entry->opmode == QDF_SAP_MODE ||
-	    session_entry->opmode == QDF_P2P_GO_MODE) {
-		if (session_entry->parsedAssocReq) {
-			uint16_t aid = sta_ds->assocId;
-			/* Get a copy of the already parsed Assoc Request */
-			assoc_req =
-			(tpSirAssocReq) session_entry->parsedAssocReq[aid];
+	if ((session_entry->opmode == QDF_SAP_MODE ||
+	     session_entry->opmode == QDF_P2P_GO_MODE) &&
+	     session_entry->parsedAssocReq) {
+		struct wlan_crypto_params *peer_crypto_params;
+		QDF_STATUS status;
+		uint32_t length;
+		const uint8_t *ies;
+		uint16_t aid = sta_ds->assocId;
 
-			if (assoc_req) {
-				add_sta_params->wpa_rsn = assoc_req->rsnPresent;
-				add_sta_params->wpa_rsn |=
-					(assoc_req->wpaPresent << 1);
-			}
+		/* Get a copy of the already parsed Assoc Request */
+		assoc_req = (tpSirAssocReq) session_entry->parsedAssocReq[aid];
+		if (!assoc_req)
+			goto next_action;
+
+		add_sta_params->wpa_rsn = assoc_req->rsnPresent;
+		add_sta_params->wpa_rsn |= assoc_req->wpaPresent << 1;
+
+		if (!assoc_req->rsnPresent) {
+			pe_debug("RSN is not present");
+			goto next_action;
 		}
+
+		if (assoc_req->assocReqFrameLength < WLAN_ASSOC_REQ_IES_OFFSET)
+			goto next_action;
+
+		ies = assoc_req->assocReqFrame + WLAN_ASSOC_REQ_IES_OFFSET;
+		length = assoc_req->assocReqFrameLength -
+						WLAN_ASSOC_REQ_IES_OFFSET;
+		peer_crypto_params =
+				qdf_mem_malloc(sizeof(*peer_crypto_params));
+		if (!peer_crypto_params)
+			goto next_action;
+
+		status = wlan_get_crypto_params_from_rsn_ie(peer_crypto_params,
+							    ies, length);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("vdev:%d Failed to extract crypto_params",
+			       session_entry->vdev_id);
+			qdf_mem_free(peer_crypto_params);
+			goto next_action;
+		}
+
+		add_sta_params->sec_info.key_mgmt =
+					peer_crypto_params->key_mgmt;
+		pe_debug("Peer key_mgmt:0x%x",
+			 add_sta_params->sec_info.key_mgmt);
+
+		qdf_mem_free(peer_crypto_params);
 	}
 
+next_action:
 	lim_update_he_stbc_capable(add_sta_params);
 	lim_update_he_mcs_12_13(add_sta_params, sta_ds);
 

@@ -321,6 +321,7 @@ typedef struct {
 	struct ml_partner_link_info ml_partner_info[MLD_MAX_LINKS - 1];
 	struct peer_ml_info ml_info;
 #endif
+	struct security_info sec_info;
 } tAddStaParams, *tpAddStaParams;
 
 /**
