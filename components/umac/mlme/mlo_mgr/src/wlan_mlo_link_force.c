@@ -752,6 +752,13 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	uint8_t legacy_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t allow_mcc;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	if (initial_connected)
 		goto no_legacy_intf;
@@ -766,9 +773,9 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 	    policy_mgr_mode_specific_connection_count(psoc,
 						      PM_NAN_DISC_MODE,
 						      NULL)) {
-		if (wlan_nan_get_disc_5g_ch_freq(psoc))
+		if (wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev))
 			legacy_freq_lst[legacy_num++] =
-				wlan_nan_get_disc_5g_ch_freq(psoc);
+				wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
 
 		if (wlan_nan_get_disc_24g_ch_freq(psoc))
 			legacy_freq_lst[legacy_num++] =

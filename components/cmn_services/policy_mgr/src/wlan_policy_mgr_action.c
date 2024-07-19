@@ -1857,6 +1857,13 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 				    uint32_t sap_freq)
 {
 	uint32_t nan_2g_freq, nan_5g_freq;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	/*
 	 * Ignore safe channel validation when the mode is P2P_GO and user
@@ -1879,7 +1886,7 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 
 	nan_2g_freq =
 		policy_mgr_mode_specific_get_channel(psoc, PM_NAN_DISC_MODE);
-	nan_5g_freq = wlan_nan_get_disc_5g_ch_freq(psoc);
+	nan_5g_freq = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
 
 	if ((WLAN_REG_IS_SAME_BAND_FREQS(nan_2g_freq, sap_freq) ||
 	     WLAN_REG_IS_SAME_BAND_FREQS(nan_5g_freq, sap_freq)) &&
@@ -2143,7 +2150,7 @@ bool policy_mgr_nan_sap_scc_on_unsafe_ch_chk(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_debug("No NAN+SAP SCC");
 		return false;
 	}
-	nan_5g_freq = wlan_nan_get_disc_5g_ch_freq(psoc);
+	nan_5g_freq = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
 
 	policy_mgr_debug("Freq SAP: %d NAN: %d %d", sap_freq,
 			 nan_2g_freq, nan_5g_freq);
@@ -2245,7 +2252,7 @@ policy_mgr_nan_sap_pre_enable_conc_check(struct wlan_objmgr_psoc *psoc,
 		nan_2g_freq =
 			policy_mgr_mode_specific_get_channel(pm_ctx->psoc,
 							     PM_NAN_DISC_MODE);
-		nan_5g_freq = wlan_nan_get_disc_5g_ch_freq(pm_ctx->psoc);
+		nan_5g_freq = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
 		policy_mgr_debug("SAP CH: %d NAN Ch: %d %d", ch_freq,
 				 nan_2g_freq, nan_5g_freq);
 		if (ucfg_is_nan_conc_control_supported(pm_ctx->psoc) &&
@@ -2330,7 +2337,7 @@ policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 
 	nan_freq_2g = policy_mgr_mode_specific_get_channel(psoc,
 							   PM_NAN_DISC_MODE);
-	nan_freq_5g = wlan_nan_get_disc_5g_ch_freq(psoc);
+	nan_freq_5g = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
 
 	if (sap_info->freq == nan_freq_2g && !sta_cnt)	{
 		policy_mgr_debug("NAN and SAP already in SCC");
@@ -3460,7 +3467,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 
 	nan_2g_freq =
 		policy_mgr_mode_specific_get_channel(psoc, PM_NAN_DISC_MODE);
-	nan_5g_freq = wlan_nan_get_disc_5g_ch_freq(psoc);
+	nan_5g_freq = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
 
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
