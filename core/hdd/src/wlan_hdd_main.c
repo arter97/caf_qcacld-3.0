@@ -10207,7 +10207,9 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 		hdd_stop_and_close_pre_cac_adapter(hdd_ctx, vdev);
 	}
 	wlansap_cleanup_cac_timer(sap_ctx);
-	cds_flush_work(&link_info->sap_stop_bss_work);
+
+	if (link_info->sap_stop_bss_work.func)
+		cds_flush_work(&link_info->sap_stop_bss_work);
 
 	if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
 		hdd_info("ACS in progress, wait for complete");
