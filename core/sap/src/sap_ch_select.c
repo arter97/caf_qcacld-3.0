@@ -1892,7 +1892,7 @@ static void sap_sort_chl_weight(struct mac_context *mac_ctx,
 		/* Randomziation */
 		for (i = 0; i < ch_info_params->num_ch; i++) {
 			min_weight_index = i;
-			for (j = i;
+			for (j = i; ((j + 1) < ch_info_params->num_ch) &&
 			     (ch_info[j].weight == ch_info[j + 1].weight) &&
 			     (ch_info[j].bss_count == ch_info[j + 1].bss_count);
 			     j++)
