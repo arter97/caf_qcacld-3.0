@@ -4490,8 +4490,7 @@ policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
 	if (!sta_freq ||
 	    sta_freq == wlan_nan_get_24ghz_social_ch_freq(pm_ctx->pdev) ||
 	    sta_freq == wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev) ||
-	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, sta_freq) ||
-	    wlan_reg_is_6ghz_chan_freq(sta_freq)) {
+	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, sta_freq)) {
 		/* Add ch-149 */
 		policy_mgr_append_5g_nan_social_ch(pm_ctx->pdev, pcl,
 					num_pcl, new_pcl, &new_num_pcl,
@@ -4538,8 +4537,8 @@ policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
 		policy_mger_remove_duplicate_freq_with_weight(new_pcl,
 						&new_num_pcl, sta_freq,
 						WEIGHT_OF_GROUP5_PCL_CHANNELS);
-	} else if (wlan_reg_is_5ghz_ch_freq(sta_freq) &&
-		   sta_freq != wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev)) {
+	} else if (wlan_reg_is_5ghz_ch_freq(sta_freq) ||
+		   wlan_reg_is_6ghz_chan_freq(sta_freq)) {
 		/* Add STA channel */
 		policy_mgr_append_sta_freq_to_pcl(pcl, num_pcl, new_pcl,
 						&new_num_pcl, sta_freq,

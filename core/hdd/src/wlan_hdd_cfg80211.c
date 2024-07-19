@@ -17157,6 +17157,7 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 
 	/* Modify the PCL as per mode preference */
 	if (ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc) &&
+	    ucfg_nan_get_prefer_nan_chan_for_p2p(hdd_ctx->psoc) &&
 	    (intf_mode == PM_P2P_CLIENT_MODE || intf_mode == PM_P2P_GO_MODE))
 		wlan_hdd_modify_pcl_for_p2p_ndp_concurrency(hdd_ctx,
 							    w_pcl, &pcl_len);
