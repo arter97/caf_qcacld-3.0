@@ -4169,7 +4169,15 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 
 	restriction_mask = wlan_hdd_get_sap_restriction_mask(hdd_ctx);
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+	if (!sap_ctx) {
+		hdd_err("Invalid sap_ctx");
+		return;
+	}
 	sap_config = &link_info->session.ap.sap_config;
+	if (!sap_config) {
+		hdd_err("Invalid sap_config");
+		return;
+	}
 	chan_freq = sap_ctx->chan_freq;
 	unsafe_ch_list = &psoc_priv_obj->unsafe_chan_list;
 
@@ -4213,10 +4221,17 @@ void hdd_stop_sap_set_tx_power(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
-static bool hdd_is_link_info_valid(struct wlan_hdd_link_info *link_info)
+static bool hdd_is_valid_sap_mode(struct wlan_hdd_link_info *link_info)
 {
-	if (!link_info) {
-		hdd_err("Invalid link_info");
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	 if (hdd_validate_adapter(link_info->adapter))
+		return false;
+
+	if ((adapter->device_mode != QDF_P2P_GO_MODE &&
+	    adapter->device_mode != QDF_SAP_MODE)) {
+		hdd_err("Device mode: %d, is not SAP or P2P_GO",
+			adapter->device_mode);
 		return false;
 	}
 
@@ -4234,17 +4249,20 @@ QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
 
 	hdd_enter();
 
-	if (!hdd_is_link_info_valid(link_info))
+	if (!link_info) {
+		hdd_err("Invalid link_info");
 		return QDF_STATUS_E_INVAL;
+	}
 
 	ret = hdd_softap_set_channel_change(link_info,
 					    target_chan_freq,
 					    target_bw, forced, false);
 	if (ret && ret != -EBUSY) {
-		if (!hdd_is_link_info_valid(link_info))
+		hdd_err("Vdev %d channel switch failed", link_info->vdev_id);
+
+		if (!hdd_is_valid_sap_mode(link_info))
 			return QDF_STATUS_E_INVAL;
 
-		hdd_err("Vdev %d channel switch failed", link_info->vdev_id);
 		hdd_stop_sap_set_tx_power(psoc, link_info);
 	}
 
