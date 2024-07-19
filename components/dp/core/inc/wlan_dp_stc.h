@@ -652,6 +652,10 @@ wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 	if (qdf_likely(!QDF_NBUF_CB_RX_TRACK_FLOW(nbuf)))
 		return QDF_STATUS_SUCCESS;
 
+	/* Do not update flow feature stats for TCP pure acks */
+	if (qdf_unlikely(QDF_NBUF_CB_RX_TCP_PURE_ACK(nbuf)))
+		return QDF_STATUS_SUCCESS;
+
 	dp_stc = dp_ctx->dp_stc;
 	vdev_id = QDF_NBUF_CB_RX_VDEV_ID(nbuf);
 	peer_id = QDF_NBUF_CB_RX_PEER_ID(nbuf);
@@ -691,6 +695,11 @@ wlan_dp_stc_check_n_track_tx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 	uint16_t pkt_len;
 
 	if (qdf_likely(!flow_track_enabled))
+		return QDF_STATUS_SUCCESS;
+
+	/* Do not update flow feature stats for TCP pure acks */
+	if (qdf_unlikely(QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) ==
+					QDF_NBUF_CB_PACKET_TYPE_TCP_ACK))
 		return QDF_STATUS_SUCCESS;
 
 	flow_entry = &dp_stc->tx_flow_table->entries[flow_id];
