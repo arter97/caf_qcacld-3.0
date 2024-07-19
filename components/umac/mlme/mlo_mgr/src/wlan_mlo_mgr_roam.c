@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -278,6 +278,25 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+uint8_t mlo_mgr_num_roam_links(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_cm_connect_resp *reassoc_rsp;
+
+	if (!vdev->mlo_dev_ctx)
+		return 1;
+
+	if (!vdev->mlo_dev_ctx->sta_ctx)
+		return 0;
+
+	reassoc_rsp = vdev->mlo_dev_ctx->sta_ctx->copied_reassoc_rsp;
+	if (!reassoc_rsp || !reassoc_rsp->roaming_info)
+		return 0;
+
+	return reassoc_rsp->roaming_info->num_setup_links;
+}
+#endif
+
 QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 			       void *event, uint32_t event_data_len)
 {
@@ -1154,6 +1173,7 @@ mlo_roam_prepare_and_send_link_connect_req(struct wlan_objmgr_vdev *assoc_vdev,
 
 	req.ssid.length = ssid.length;
 	qdf_mem_copy(&req.ssid.ssid, &ssid.ssid, ssid.length);
+	qdf_copy_macaddr(&req.mld_addr, &rsp->mld_addr);
 
 	req.ml_parnter_info = rsp->ml_parnter_info;
 

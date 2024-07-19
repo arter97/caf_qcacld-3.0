@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -592,7 +592,6 @@ typedef struct sSapDfsInfo {
 	 */
 	uint32_t target_chan_freq;
 	uint8_t ignore_cac;
-	eSapDfsCACState_t cac_state;
 	uint32_t user_provided_target_chan_freq;
 
 	/*
@@ -1145,14 +1144,16 @@ QDF_STATUS wlansap_set_dfs_ignore_cac(mac_handle_t mac_handle,
 /**
  * wlansap_get_dfs_cac_state() - Get cac_state value
  * @mac_handle: Opaque handle to the global MAC context
+ * @sap_context: sap adapter context
  * @cac_state: Location to store cac_state value
  *
- * This API is used to Get the value of ignore_cac value
+ * This API is used to Get the value of current cac state
  *
  * Return: The QDF_STATUS code associated with performing the operation
  */
 QDF_STATUS wlansap_get_dfs_cac_state(mac_handle_t mac_handle,
-				     eSapDfsCACState_t *cac_state);
+				     struct sap_context *sap_context,
+				     bool *cac_state);
 
 /**
  * wlansap_get_csa_chanwidth_from_phymode() - function to populate

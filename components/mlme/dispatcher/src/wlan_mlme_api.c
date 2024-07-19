@@ -220,7 +220,7 @@ bool wlan_mlme_get_wlm_multi_client_ll_caps(struct wlan_objmgr_psoc *psoc)
 #endif
 
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
-bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
+uint32_t wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
 		struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -230,7 +230,22 @@ bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
 		mlme_legacy_err("Failed to get MLME Obj");
 		return cfg_default(CFG_COEX_UNSAFE_CHAN_NB_USER_PREFER);
 	}
+
 	return mlme_obj->cfg.reg.coex_unsafe_chan_nb_user_prefer;
+}
+
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return !!(wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(psoc) &
+					IGNORE_FW_COEX_INFO_ON_SAP_MODE);
+}
+
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_p2p_go(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return !!(wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(psoc) &
+					IGNORE_FW_COEX_INFO_ON_P2P_GO_MODE);
 }
 #endif
 
@@ -6974,4 +6989,11 @@ uint8_t *wlan_mlme_get_src_addr_from_frame(struct element_info *frame)
 	hdr = (struct wlan_frame_hdr *)frame->ptr;
 
 	return hdr->i_addr2;
+}
+
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
+				    uint8_t csa_status)
+{
+	return wlan_mlme_send_csa_event_status_ind_cmd(vdev, csa_status);
 }

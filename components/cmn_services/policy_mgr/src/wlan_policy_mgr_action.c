@@ -1583,7 +1583,8 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 	for (j = 0; j < pm_ctx->unsafe_channel_count; j++) {
 		if ((ch_freq == pm_ctx->unsafe_channel_list[j]) &&
 		    (qdf_test_bit(QDF_SAP_MODE, &restriction_mask) ||
-		     !wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(psoc))) {
+		     !wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(
+								     psoc))) {
 			is_safe = false;
 			policy_mgr_warn("Freq %d is not safe, restriction mask %lu", ch_freq, restriction_mask);
 			break;
@@ -1622,11 +1623,18 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 #endif
 
 bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
+				    enum QDF_OPMODE opmode,
 				    uint32_t sap_freq)
 {
 	uint32_t nan_2g_freq, nan_5g_freq;
 
-	if (policy_mgr_is_safe_channel(psoc, sap_freq))
+	/*
+	 * Ignore safe channel validation when the mode is P2P_GO and user
+	 * configures the corresponding bit in ini coex_unsafe_chan_nb_user_prefer.
+	 */
+	if ((opmode == QDF_P2P_GO_MODE &&
+	     wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_p2p_go(psoc)) ||
+	    policy_mgr_is_safe_channel(psoc, sap_freq))
 		return true;
 
 	/*
