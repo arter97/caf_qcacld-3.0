@@ -4529,7 +4529,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		 * use the API which is hw mode agnostic.
 		 */
 		if (dbs_ml_sta_present)
-			same_mac = policy_mgr_2_freq_same_mac_in_dbs(pm_ctx,
+			same_mac = policy_mgr_2_freq_same_mac_in_dbs(psoc,
 								sap_ch_freq,
 								pcl_freq);
 		else if (sbs_ml_sta_present)

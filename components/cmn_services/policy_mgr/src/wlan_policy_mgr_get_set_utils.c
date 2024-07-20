@@ -2001,13 +2001,20 @@ enum pm_rd_type policy_mgr_get_rd_type(struct wlan_objmgr_psoc *psoc)
 }
 
 bool
-policy_mgr_2_freq_same_mac_in_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+policy_mgr_2_freq_same_mac_in_dbs(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t freq_1, qdf_freq_t freq_2)
 {
 	struct policy_mgr_freq_range *freq_range;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
 
 	/* Return true if non DBS capable HW */
-	if (!policy_mgr_is_hw_dbs_capable(pm_ctx->psoc))
+	if (!policy_mgr_is_hw_dbs_capable(psoc))
 		return true;
 
 	freq_range = pm_ctx->hw_mode.freq_range_caps[MODE_DBS];
@@ -2082,7 +2089,7 @@ bool policy_mgr_2_freq_always_on_same_mac(struct wlan_objmgr_psoc *psoc,
 		return false;
 
 	is_dbs_mode_same_mac =
-		policy_mgr_2_freq_same_mac_in_dbs(pm_ctx, freq_1, freq_2);
+		policy_mgr_2_freq_same_mac_in_dbs(psoc, freq_1, freq_2);
 
 	/* if DBS mode leading to same mac, check for SBS mode */
 	if (is_dbs_mode_same_mac)

@@ -1228,7 +1228,7 @@ static bool policy_mgr_channel_mcc_with_non_sap(struct wlan_objmgr_psoc *psoc,
 			conc_freq = pm_conc_connection_list[i].freq;
 			if (conc_freq != chan_freq &&
 			    ((check_only_dbs &&
-			      policy_mgr_2_freq_same_mac_in_dbs(pm_ctx,
+			      policy_mgr_2_freq_same_mac_in_dbs(psoc,
 								chan_freq,
 								conc_freq)) ||
 			     policy_mgr_2_freq_always_on_same_mac(psoc,
