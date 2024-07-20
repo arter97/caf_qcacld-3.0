@@ -1551,6 +1551,31 @@ enum host_log_level {
 
 /*
  * <ini>
+ * g_sap_sap_sta_concurrency  - enable SAP-SAP-STA concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will not allow SAP-SAP-STA concurrency to be included in the
+ * iface combinations.
+ *
+ * 0: disable SAP-SAP-STA concurrency
+ * 1: enable SAP-SAP-STA concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAP_SAP_STA_CONCURRENCY CFG_INI_BOOL( \
+		"g_sap_sap_sta_concurrency", \
+		0, \
+		"This ini is used to enable SAP-SAP-STA concurrency")
+
+/*
+ * <ini>
  * g_sta_sap_p2p_concurrency - enable STA-SAP-P2P concurrency
  * @Min: 0
  * @Max: 1
@@ -1722,6 +1747,7 @@ enum host_log_level {
 	CFG(CFG_STA_P2P_NDP_CONCURRENCY) \
 	CFG(CFG_PREFER_NAN_CHAN_FOR_P2P) \
 	CFG(CFG_STA_SAP_P2P_CONCURRENCY) \
+	CFG(CFG_SAP_SAP_STA_CONCURRENCY) \
 	CFG_UL_JITTER_LOG_ALL \
 	CFG_EPM_ENABLE_ALL \
 	CFG_EPM_VALUE_ALL \
