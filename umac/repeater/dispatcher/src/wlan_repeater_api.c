@@ -1139,9 +1139,16 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 #endif
 
 	val.cdp_vdev_param_da_war = 0;
-	cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id, CDP_ENABLE_DA_WAR,
-			val);
 
+#ifdef IOT_DRONE_MESH
+	if (!wlan_pdev_nif_feat_ext_cap_get(pdev, WLAN_PDEV_FEXT_IOT_DRONE_MESH_EN)) {
+#endif
+		cdp_txrx_set_vdev_param(soc_txrx_handle,
+					vdev_id,
+					CDP_ENABLE_DA_WAR, val);
+#ifdef IOT_DRONE_MESH
+	}
+#endif
 	ext_cb->max_pri_stavap_process_up(vdev);
 
 	if (qca_multi_link_get_num_sta() > 1) {
@@ -1236,8 +1243,15 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	if (g_priv->num_stavaps_up == 0) {
 		val.cdp_vdev_param_da_war = 1;
-		cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id, CDP_ENABLE_DA_WAR,
-				val);
+#ifdef IOT_DRONE_MESH
+		if (!wlan_pdev_nif_feat_ext_cap_get(pdev, WLAN_PDEV_FEXT_IOT_DRONE_MESH_EN)) {
+#endif
+			cdp_txrx_set_vdev_param(soc_txrx_handle,
+						vdev_id,
+						CDP_ENABLE_DA_WAR, val);
+#ifdef IOT_DRONE_MESH
+		}
+#endif
 	}
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
