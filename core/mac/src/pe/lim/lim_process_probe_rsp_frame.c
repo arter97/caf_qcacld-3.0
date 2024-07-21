@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -343,9 +343,6 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 	if (!lim_validate_probe_rsp_mld_addr(session_entry, probe_rsp))
 		goto mem_free;
 
-	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, body,
-			   frame_len);
-
 	lim_update_mlo_mgr_prb_info(mac_ctx, session_entry,
 				    (struct qdf_mac_addr *)header->bssId,
 				    probe_rsp);
@@ -394,7 +391,10 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 					     (rx_Packet_info),
 				     session_entry->bcnLen);
 		}
-			/* STA in WT_JOIN_BEACON_STATE */
+		/* STA in WT_JOIN_BEACON_STATE */
+		mgmt_txrx_frame_hex_dump((uint8_t *)header,
+					 WMA_GET_RX_MPDU_LEN(rx_Packet_info),
+					 false);
 		lim_check_and_announce_join_success(mac_ctx, probe_rsp,
 						header,
 						session_entry);

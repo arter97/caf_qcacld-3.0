@@ -356,6 +356,22 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 /**
+ * hdd_adapter_restore_link_vdev_map() - Change the VDEV to link info mapping
+ * in adapter.
+ * @adapter: HDD adapter pointer
+ * @same_vdev_mac_map: Maintain VDEV to MAC address mapping during the restore.
+ *
+ * This API restores the VDEV to HDD link info mapping to its initial order
+ * which could have got remapped in the process of link switch. If
+ * @same_vdev_mac_map is set to %true then the MAC address to VDEV mapping is
+ * preserved.
+ *
+ * Returns: %true if any mapping changes or %false otherwise.
+ */
+bool hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter,
+				       bool same_vdev_mac_map);
+
+/**
  * hdd_mlo_mgr_register_osif_ops() - Register OSIF ops with global MLO manager
  * for callback to notify.
  *
@@ -376,6 +392,13 @@ QDF_STATUS hdd_mlo_mgr_register_osif_ops(void);
  */
 QDF_STATUS hdd_mlo_mgr_unregister_osif_ops(void);
 #else
+static inline bool
+hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter,
+				  bool same_vdev_mac_map)
+{
+	return false;
+}
+
 static inline QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
 {
 	return QDF_STATUS_SUCCESS;

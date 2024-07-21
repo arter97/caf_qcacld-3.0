@@ -6718,6 +6718,7 @@ policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
 	uint8_t num_del = 0;
 	struct ml_nlink_change_event data;
+	uint16_t dyn_inact_bmap = 0, force_inact_bmap = 0;
 
 	if (notify_reason > MLO_LINK_SWITCH_NOTIFY_REASON_PRE_START_POST_SER)
 		return QDF_STATUS_SUCCESS;
@@ -6749,7 +6750,11 @@ policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 		psoc, vdev_id, info, &num_del);
 	conc_ext_flags.value =
 	policy_mgr_get_conc_ext_flags(vdev, true);
-	if (!policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
+	ml_nlink_get_dynamic_inactive_links(psoc, vdev, &dyn_inact_bmap,
+					    &force_inact_bmap);
+
+	if (!(dyn_inact_bmap & BIT(new_ieee_link_id)) &&
+	    !policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
 					       new_primary_freq,
 					       HW_MODE_20_MHZ,
 					       conc_ext_flags.value,
@@ -7789,7 +7794,7 @@ policy_mgr_is_ml_links_in_mcc_allowed(struct wlan_objmgr_psoc *psoc,
 	if (*num_ml_sta < 2 || *num_ml_sta > MAX_NUMBER_OF_CONC_CONNECTIONS ||
 	    num_disabled_ml_sta) {
 		policy_mgr_debug("num_ml_sta invalid %d or link already disabled%d",
-				 num_ml_sta, num_disabled_ml_sta);
+				 *num_ml_sta, num_disabled_ml_sta);
 		return QDF_STATUS_E_FAILURE;
 	}
 

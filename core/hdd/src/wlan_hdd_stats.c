@@ -729,13 +729,24 @@ static void
 wlan_hdd_get_mlo_links_count(struct hdd_adapter *adapter, uint32_t *count)
 {
 	struct wlan_hdd_link_info *link_info;
-	struct hdd_station_ctx *sta_ctx;
+	struct hdd_station_ctx *sta_ctx = NULL;
 	u32 num_links = 0;
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-		if (sta_ctx->conn_info.ieee_link_id != WLAN_INVALID_LINK_ID)
-			num_links++;
+		if (link_info->adapter->device_mode == QDF_P2P_CLIENT_MODE ||
+		    link_info->adapter->device_mode == QDF_STA_MODE) {
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+			if (sta_ctx->conn_info.ieee_link_id !=
+			    WLAN_INVALID_LINK_ID) {
+				num_links++;
+			}
+		} else if (link_info->adapter->device_mode == QDF_SAP_MODE ||
+			   link_info->adapter->device_mode == QDF_P2P_GO_MODE) {
+			if (test_bit(SOFTAP_BSS_STARTED,
+				     &link_info->link_flags)) {
+				num_links++;
+			}
+		}
 	}
 
 	*count = num_links;
@@ -956,23 +967,34 @@ wlan_hdd_put_mlo_link_iface_info(struct wlan_hdd_mlo_iface_stats_info *info,
  * @link_info: Link info pointerin adapter
  * @info: Pointer to wlan_hdd_mlo_iface_stats_info struct
  *
- * Return: True on success, False on failure
+ * Return: void
  */
 static void
 wlan_hdd_get_connected_link_info(struct wlan_hdd_link_info *link_info,
 				 struct wlan_hdd_mlo_iface_stats_info *info)
 {
-	struct hdd_station_ctx *sta_ctx;
+	struct hdd_station_ctx *sta_ctx = NULL;
+	struct hdd_ap_ctx *ap_ctx = NULL;
+
+	info->link_id = WLAN_INVALID_LINK_ID;
 
 	if (!link_info) {
 		hdd_err("Invalid link_info");
-		info->link_id = WLAN_INVALID_LINK_ID;
 		return;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	info->link_id = sta_ctx->conn_info.ieee_link_id;
-	info->freq = sta_ctx->conn_info.chan_freq;
+	if (link_info->adapter->device_mode == QDF_P2P_CLIENT_MODE ||
+	    link_info->adapter->device_mode == QDF_STA_MODE) {
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		info->link_id = sta_ctx->conn_info.ieee_link_id;
+		info->freq = sta_ctx->conn_info.chan_freq;
+	} else if ((link_info->adapter->device_mode == QDF_SAP_MODE ||
+		    link_info->adapter->device_mode == QDF_P2P_GO_MODE) &&
+		   test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+		info->link_id = ap_ctx->sap_config.link_id;
+		info->freq = ap_ctx->sap_config.chan_freq;
+	}
 }
 #endif
 
@@ -1070,21 +1092,30 @@ static bool put_wifi_wmm_ac_stat(wmi_wmm_ac_stats *stats,
  * put_wifi_interface_info() - put wifi interface info
  * @stats: Pointer to stats context
  * @vendor_event: Pointer to vendor event
+ * @link_info: Pointer to link_info
  *
  * Return: bool
  */
 static bool put_wifi_interface_info(struct wifi_interface_info *stats,
-				    struct sk_buff *vendor_event)
+				    struct sk_buff *vendor_event,
+				    struct wlan_hdd_link_info *link_info)
 {
+	if (link_info->adapter->device_mode == QDF_P2P_CLIENT_MODE ||
+	    link_info->adapter->device_mode == QDF_STA_MODE) {
+		if (nla_put_u32(vendor_event,
+				QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_STATE,
+				stats->state)) {
+			hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
+			return false;
+		}
+	}
+
 	if (nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_MODE,
 			stats->mode) ||
 	    nla_put(vendor_event,
 		    QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_MAC_ADDR,
 		    QDF_MAC_ADDR_SIZE, stats->macAddr.bytes) ||
-	    nla_put_u32(vendor_event,
-			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_STATE,
-			stats->state) ||
 	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_ROAMING,
 			stats->roaming) ||
@@ -1118,11 +1149,13 @@ static bool put_wifi_interface_info(struct wifi_interface_info *stats,
  * @if_stat: Pointer to interface stats context
  * @num_peers: Number of peers
  * @vendor_event: Pointer to vendor event
+ * @link_info: Pointer to link_info
  *
  * Return: bool
  */
 static bool put_wifi_iface_stats(struct wifi_interface_stats *if_stat,
-				 u32 num_peers, struct sk_buff *vendor_event)
+				 u32 num_peers, struct sk_buff *vendor_event,
+				 struct wlan_hdd_link_info *link_info)
 {
 	int i = 0;
 	struct nlattr *wmm_info;
@@ -1130,7 +1163,7 @@ static bool put_wifi_iface_stats(struct wifi_interface_stats *if_stat,
 	u64 average_tsf_offset;
 	wmi_iface_link_stats *link_stats = &if_stat->link_stats;
 
-	if (!put_wifi_interface_info(&if_stat->info, vendor_event)) {
+	if (!put_wifi_interface_info(&if_stat->info, vendor_event, link_info)) {
 		hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
 		return false;
 
@@ -1856,7 +1889,8 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("mlo_iface_stats: failed to get bss peer_mld_mac");
 
-	if (!put_wifi_iface_stats(&cumulative_if_stat, num_links, skb)) {
+	if (!put_wifi_iface_stats(&cumulative_if_stat, num_links, skb,
+				  ml_adapter->deflink)) {
 		hdd_err("put_wifi_iface_stats fail");
 		goto err;
 	}
@@ -1886,7 +1920,7 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 			goto err;
 
 		if (!put_wifi_iface_stats(&link_if_stat[i],
-					  per_link_peers, skb)) {
+					  per_link_peers, skb, link_info)) {
 			hdd_err("put_wifi_iface_stats failed for link[%u]", i);
 			goto err;
 		}
@@ -1921,6 +1955,7 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 	struct sk_buff *skb;
 	struct wlan_hdd_link_info *link_info;
 	struct qdf_mac_addr *netdev_addr;
+	int8_t rssi_data;
 
 	if (!wlan_hdd_is_mlo_connection(adapter->deflink))
 		return;
@@ -1944,11 +1979,25 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
 		wlan_hdd_get_connected_link_info(link_info, &info);
+
 		if (info.link_id == WLAN_INVALID_LINK_ID)
 			continue;
 
-		if ((link_info->rssi != 0) && (rssi <= link_info->rssi)) {
-			rssi = link_info->rssi;
+		rssi_data = link_info->ll_iface_stats.link_stats.rssi_data;
+
+		if ((link_info->adapter->device_mode == QDF_P2P_GO_MODE ||
+		     link_info->adapter->device_mode == QDF_SAP_MODE) &&
+		    rssi <= rssi_data) {
+			rssi = rssi_data;
+			update_stats = true;
+			if (!hdd_get_interface_info(link_info,
+						    &cumulative_if_stat.info)) {
+				hdd_err("failed to get iface info for link %u",
+					info.link_id);
+				goto err;
+			}
+		} else if (rssi_data != 0 && (rssi <= rssi_data)) {
+			rssi = rssi_data;
 			update_stats = true;
 			if (!hdd_get_interface_info(link_info,
 						    &cumulative_if_stat.info)) {
@@ -1978,7 +2027,8 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("mlo_iface_stats: failed to get bss peer_mld_mac");
 
-	if (!put_wifi_iface_stats(&cumulative_if_stat, num_links, skb)) {
+	if (!put_wifi_iface_stats(&cumulative_if_stat, num_links, skb,
+				  adapter->deflink)) {
 		hdd_err("put_wifi_iface_stats fail");
 		goto err;
 	}
@@ -1993,6 +2043,7 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
 		wlan_hdd_get_connected_link_info(link_info, &info);
+
 		if (info.link_id == WLAN_INVALID_LINK_ID)
 			continue;
 
@@ -2008,7 +2059,8 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 		if (!wlan_hdd_put_mlo_link_iface_info(&info, skb))
 			goto err;
 
-		if (!put_wifi_iface_stats(stats, per_link_peers, skb)) {
+		if (!put_wifi_iface_stats(stats, per_link_peers, skb,
+					  link_info)) {
 			hdd_err("put iface stats failed for link[%u]", info.link_id);
 			goto err;
 		}
@@ -2215,7 +2267,7 @@ hdd_link_layer_process_iface_stats(struct wlan_hdd_link_info *link_info,
 		return;
 	}
 
-	if (!put_wifi_iface_stats(if_stat, num_peers, skb)) {
+	if (!put_wifi_iface_stats(if_stat, num_peers, skb, link_info)) {
 		hdd_err("put_wifi_iface_stats fail");
 		wlan_cfg80211_vendor_free_skb(skb);
 		return;
@@ -5576,31 +5628,17 @@ roam_rt_stats_fill_cand_info(struct sk_buff *vendor_event, uint8_t idx,
 	nla_nest_end(vendor_event, nl_array);
 }
 
-void
-wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
-				       uint8_t idx)
+static void
+wlan_hdd_cfg80211_typical_roam_events_callback(struct wlan_hdd_link_info *link_info,
+					       struct roam_stats_event *roam_stats,
+					       uint8_t idx)
 {
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	int status;
 	uint32_t data_size, roam_event_type = 0;
 	struct sk_buff *vendor_event;
-	struct wlan_hdd_link_info *link_info;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	status = wlan_hdd_validate_context(hdd_ctx);
-	if (status) {
+	if (wlan_hdd_validate_context(hdd_ctx)) {
 		hdd_err("Invalid hdd_ctx");
-		return;
-	}
-
-	if (!roam_stats) {
-		hdd_err("msg received here is null");
-		return;
-	}
-
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, roam_stats->vdev_id);
-	if (!link_info) {
-		hdd_err("vdev_id %d does not exist with host",
-			roam_stats->vdev_id);
 		return;
 	}
 
@@ -9136,7 +9174,7 @@ int wlan_hdd_get_sap_go_peer_linkspeed(struct wlan_hdd_link_info *link_info,
 	struct hdd_station_info *sta_info, *tmp = NULL;
 
 	value = value + command_len;
-	ret = sscanf(value, "%17s", &macaddr_string);
+	ret = sscanf(value, "%17s", macaddr_string);
 
 	if (ret != 1)
 		return -EINVAL;
@@ -9639,6 +9677,8 @@ void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx)
 	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FRAME_STATUS
 #define ROAM_STATS_FRAME_TIMESTAMP \
 	QCA_WLAN_VENDOR_ATTR_ROAM_STATS_FRAME_TIMESTAMP
+#define ROAM_STATS_EVENT_INDEX \
+	QCA_NL80211_VENDOR_SUBCMD_ROAM_STATS_INDEX
 
 static enum qca_roam_reason
 hdd_convert_roam_trigger_reason(enum roam_trigger_reason reason)
@@ -9921,8 +9961,9 @@ hdd_convert_roam_failures_reason(enum wlan_roam_failure_reason_code fail)
  *
  * Return: required length of an individual record of roaming stats
  */
-static uint32_t hdd_get_roam_stats_individual_record_len(struct enhance_roam_info *roam_info,
-							 uint32_t index)
+static uint32_t
+hdd_get_roam_stats_individual_record_len(struct enhance_roam_info *roam_info,
+					 uint32_t index)
 {
 	struct enhance_roam_info *info;
 	enum qca_roam_reason vendor_trigger_reason;
@@ -10452,6 +10493,9 @@ static int hdd_nla_put_roam_stats_info(struct sk_buff *skb,
 	}
 
 	for (i = 0; i < WLAN_ROAM_MAX_FRAME_INFO; i++) {
+		if (info->timestamp[i].frame_type ==
+				WLAN_ROAM_STATS_FRAME_SUBTYPE_INVALID)
+			break;
 		roam_frame = nla_nest_start(skb, i);
 		if (!roam_frame) {
 			hdd_err("nla_nest_start fail");
@@ -10687,6 +10731,100 @@ int wlan_hdd_cfg80211_get_roam_stats(struct wiphy *wiphy,
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
+}
+#endif
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifdef WLAN_FEATURE_ROAM_INFO_STATS
+static void
+wlan_hdd_cfg80211_enhance_roam_events_callback(struct wlan_hdd_link_info *link_info,
+					       struct roam_stats_event *roam_stats,
+					       uint8_t idx)
+{
+	int status;
+	uint32_t data_size = 0;
+	struct sk_buff *vendor_event;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct enhance_roam_info *roam_info = NULL;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	status = wlan_hdd_validate_context(hdd_ctx);
+	if (status) {
+		hdd_err("Invalid hdd_ctx");
+		return;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
+	if (!vdev)
+		return;
+	ucfg_cm_roam_info_get(vdev, &roam_info, idx);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+
+	/* QCA_WLAN_VENDOR_ATTR_ROAM_STATS_INFO */
+	data_size += nla_total_size(0);
+	/* nest attribute */
+	data_size += nla_total_size(0);
+
+	data_size += hdd_get_roam_stats_individual_record_len(roam_info, idx);
+
+	data_size += NLMSG_HDRLEN;
+
+	vendor_event =
+		wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
+						 &link_info->adapter->wdev,
+						 data_size,
+						 ROAM_STATS_EVENT_INDEX,
+						 GFP_KERNEL);
+
+	if (hdd_nla_put_roam_stats_info(vendor_event, roam_info, 0)) {
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		hdd_err("nla put failure");
+		return;
+	}
+
+	roam_stats->enhance_roam_rt_event = false;
+
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+}
+#else
+static void
+wlan_hdd_cfg80211_enhance_roam_events_callback(struct wlan_hdd_link_info *link_info,
+					       struct roam_stats_event *roam_stats,
+					       uint8_t idx)
+{
+}
+#endif
+void
+wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
+				       uint8_t idx)
+{
+	int status;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	status = wlan_hdd_validate_context(hdd_ctx);
+	if (status) {
+		hdd_err("Invalid hdd_ctx");
+		return;
+	}
+
+	if (!roam_stats) {
+		hdd_err("msg received here is null");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, roam_stats->vdev_id);
+	if (!link_info) {
+		hdd_err("vdev_id %d does not exist with host",
+			roam_stats->vdev_id);
+		return;
+	}
+	if (roam_stats->enhance_roam_rt_event)
+		wlan_hdd_cfg80211_enhance_roam_events_callback(link_info,
+							       roam_stats, idx);
+	else
+		wlan_hdd_cfg80211_typical_roam_events_callback(link_info,
+							       roam_stats, idx);
 }
 #endif
 

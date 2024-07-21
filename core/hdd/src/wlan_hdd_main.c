@@ -594,8 +594,7 @@ wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx,
 void wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
 				     bool is_virtual_iface)
 {
-	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
-		wlan_hdd_lpc_del_monitor_interface(hdd_ctx, is_virtual_iface);
+	wlan_hdd_lpc_del_monitor_interface(hdd_ctx, is_virtual_iface);
 }
 
 bool hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
@@ -8856,21 +8855,21 @@ wlan_hdd_set_ml_cap_for_sap_intf(struct hdd_adapter_create_param *create_params,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
 	defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
-void hdd_adapter_disable_all_links(struct hdd_adapter *adapter)
+void
+hdd_adapter_disable_all_links(struct hdd_adapter *adapter, bool clear_macaddr)
 {
 	uint8_t idx_pos;
 	struct wlan_hdd_link_info *link_info;
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
-		qdf_zero_macaddr(&link_info->link_addr);
+		if (clear_macaddr)
+			qdf_zero_macaddr(&link_info->link_addr);
 		idx_pos = hdd_adapter_get_index_of_link_info(link_info);
 		adapter->curr_link_info_map[idx_pos] = idx_pos;
 	}
+
 	adapter->deflink = &adapter->link_info[WLAN_HDD_DEFLINK_IDX];
-	if (adapter->device_mode == QDF_STA_MODE)
-		adapter->active_links = (1 << adapter->num_links_on_create) - 1;
-	else
-		adapter->active_links = 0x1;
+	adapter->active_links = (1 << adapter->num_links_on_create) - 1;
 }
 #endif
 
@@ -9920,7 +9919,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	/* Disable all links (expect default index) in adapter.
 	 * Set link address to NULL
 	 */
-	hdd_adapter_disable_all_links(adapter);
+	hdd_adapter_disable_all_links(adapter, true);
 
 	/* This function should be invoked at the end of this api*/
 	hdd_dump_func_call_map();
@@ -17817,7 +17816,7 @@ static QDF_STATUS hdd_ssr_on_pagefault_cb(struct hdd_context *hdd_ctx)
 
 	if (!hdd_ctx->last_pagefault_ssr_time ||
 	    (curr_time - hdd_ctx->last_pagefault_ssr_time) >= ssr_threshold) {
-		hdd_info("curr_time %lu last_pagefault_ssr_time %lu ssr_frequency %d",
+		hdd_info("curr_time %lu last_pagefault_ssr_time %lu ssr_frequency %lu",
 			 curr_time, hdd_ctx->last_pagefault_ssr_time,
 			 ssr_threshold);
 		hdd_ctx->last_pagefault_ssr_time = curr_time;

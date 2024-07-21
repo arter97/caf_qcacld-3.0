@@ -1856,12 +1856,8 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 	hdr = (tpSirMacMgmtHdr)((uint8_t *)roam_synch +
 		roam_synch->reassoc_req_offset);
 	if (hdr->fc.type == SIR_MAC_MGMT_FRAME &&
-	    hdr->fc.subType == SIR_MAC_MGMT_ASSOC_REQ) {
+	    hdr->fc.subType == SIR_MAC_MGMT_ASSOC_REQ)
 		ies_offset = WLAN_ASSOC_REQ_IES_OFFSET;
-		pe_debug("roam assoc req frm");
-	} else {
-		pe_debug("roam reassoc req frm");
-	}
 
 	if (roam_synch->reassoc_req_length <
 	    (sizeof(tSirMacMgmtHdr) + ies_offset)) {
@@ -1869,10 +1865,6 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 		       roam_synch->reassoc_req_length);
 		return;
 	}
-	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   (uint8_t *)roam_synch +
-				roam_synch->reassoc_req_offset,
-			   roam_synch->reassoc_req_length);
 
 	ft_session->limRmfEnabled = false;
 
@@ -2227,10 +2219,7 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 			roam_synch_ind->is_beacon,
 		 QDF_MAC_ADDR_REF(bssid.bytes),
 		 QDF_MAC_ADDR_REF(mac_hdr->bssId));
-
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   bcn_proberesp_ptr,
-			   bcn_proberesp_len);
+	mgmt_txrx_frame_hex_dump(bcn_proberesp_ptr, bcn_proberesp_len, false);
 
 	status = lim_roam_gen_beacon_descr(mac, bcn_proberesp_ptr,
 					   bcn_proberesp_len, is_mlo_link,
@@ -3043,7 +3032,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 	reassoc_resp = (uint8_t *)roam_sync_ind_ptr +
 			roam_sync_ind_ptr->reassoc_resp_offset;
-
+	mgmt_txrx_frame_hex_dump(reassoc_resp,
+				 roam_sync_ind_ptr->reassoc_resp_length, false);
 	if (wlan_vdev_mlme_get_is_mlo_link(mac_ctx->psoc, vdev_id)) {
 		status = lim_gen_link_specific_assoc_rsp(mac_ctx,
 						ft_session_ptr,
@@ -3710,23 +3700,22 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
-void lim_roam_mlo_create_peer(struct mac_context *mac,
-			      struct roam_offload_synch_ind *sync_ind,
-			      uint8_t vdev_id,
-			      uint8_t *peer_mac)
+QDF_STATUS lim_roam_mlo_create_peer(struct mac_context *mac,
+				    struct roam_offload_synch_ind *sync_ind,
+				    uint8_t vdev_id, uint8_t *peer_mac)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_peer *link_peer = NULL;
 	uint8_t link_id;
 	struct mlo_partner_info partner_info;
 	struct qdf_mac_addr link_addr;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc,
 						    vdev_id,
 						    WLAN_LEGACY_MAC_ID);
 	if (!vdev)
-		return;
+		return QDF_STATUS_E_INVAL;
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		goto end;
@@ -3750,19 +3739,21 @@ void lim_roam_mlo_create_peer(struct mac_context *mac,
 	/* Get the bss peer obj */
 	link_peer = wlan_objmgr_get_peer_by_mac(mac->psoc, peer_mac,
 						WLAN_LEGACY_MAC_ID);
-	if (!link_peer)
+	if (!link_peer) {
+		status = QDF_STATUS_E_INVAL;
 		goto end;
+	}
 
-	status = wlan_mlo_peer_create(vdev, link_peer,
-				      &partner_info, NULL, 0);
-
+	status = wlan_mlo_peer_create(vdev, link_peer, &partner_info, NULL, 0);
 	if (QDF_IS_STATUS_ERROR(status))
-		pe_err("Peer creation failed");
+		pe_err("MLO peer creation failed");
 
 	wlan_objmgr_peer_release_ref(link_peer, WLAN_LEGACY_MAC_ID);
 
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	return status;
 }
 
 void

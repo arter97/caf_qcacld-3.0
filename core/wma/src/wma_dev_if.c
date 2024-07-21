@@ -473,6 +473,10 @@ wma_release_vdev_ref(struct wma_txrx_node *iface)
 	struct wlan_objmgr_vdev *vdev;
 
 	vdev = iface->vdev;
+	if (!vdev) {
+		wma_debug("vdev context is NULL");
+		return;
+	}
 	wma_debug("vdev state: %d", vdev->obj_state);
 	if (vdev->obj_state != WLAN_OBJ_STATE_LOGICALLY_DELETED) {
 		wma_debug("no vdev delete");
