@@ -1176,6 +1176,9 @@ bool p2p_check_oui_and_force_1x1(uint8_t *assoc_ie, uint32_t assoc_ie_len)
 
 	pos = p2p_parse_assoc_ie_for_device_info(assoc_ie, assoc_ie_len);
 
+	if (!pos)
+		return false;
+
 	/*
 	 * the P2P Device info is of format:
 	 * attr_id - 1 byte
