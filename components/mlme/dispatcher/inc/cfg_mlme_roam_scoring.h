@@ -398,18 +398,56 @@
 
 /*
  * <ini>
- * idle_roam_score_delta/RoamIdle_Delta - Roam score delta value in
- * percentage for idle roam.
+ * roam_trigger_score_delta - Percentage increment in roam score value
+ * expected from a roaming candidate AP.
+ *
  * @Min: 0
  * @Max: 100
- * @Default: 0
+ * @Default: N/A
  *
- * This ini is used to configure the minimum change in roam score
- * value of the AP to consider it as candidate for
- * roaming when roam trigger is due to idle state of sta.
- * This value will be sent to firmware over the WMI_ROAM_AP_PROFILE wmi
- * command in the roam_score_delta_param_list tlv.
- * Related: None
+ * This INI parameter provides the percentage increment value over the roam
+ * score for candidate APs. It allows them to be preferred over the current
+ * AP for roaming triggers.
+ *
+ * Roam score delta in %.
+ * Consider AP as roam candidate only if AP score is at least
+ * roam_score_delta % better than connected AP score.
+ * Ex: roam_score_delta = 20, and connected AP score is 4000,
+ * then consider candidate AP only if its score is at least
+ * 4800 (= 4000 * 120%)
+ *
+ * The input string format looks like this:
+ * roam_trigger_score_delta="<TRIGGER1>,<score_delta1>,<TRIGGER2>,
+ * <score_delta2>..."
+ *
+ * For example:
+ * roam_trigger_score_delta=10,0,14,0,9,5
+ * The above input string means:
+ * - For BTM and IDLE trigger, no score delta required.
+ * - For host invoke roaming, the candidate AP score should be 5%
+ *   higher than the current AP.
+ * - For other roaming triggers, the candidate AP score should be
+ *   [Ini roam_score_delta]% higher than the current AP.
+ *
+ * TRIGGER values correspond to the following enum roam_trigger_reason:
+ * ROAM_TRIGGER_REASON_PER        - 1
+ * ROAM_TRIGGER_REASON_BMISS      - 2
+ * ROAM_TRIGGER_REASON_LOW_RSSI   - 3
+ * ROAM_TRIGGER_REASON_HIGH_RSSI  - 4
+ * ROAM_TRIGGER_REASON_PERIODIC   - 5
+ * ROAM_TRIGGER_REASON_MAWC       - 6
+ * ROAM_TRIGGER_REASON_DENSE      - 7
+ * ROAM_TRIGGER_REASON_BACKGROUND - 8
+ * ROAM_TRIGGER_REASON_FORCED     - 9
+ * ROAM_TRIGGER_REASON_BTM        - 10
+ * ROAM_TRIGGER_REASON_UNIT_TEST  - 11
+ * ROAM_TRIGGER_REASON_BSS_LOAD   - 12
+ * ROAM_TRIGGER_REASON_DISASSOC   - 13
+ * ROAM_TRIGGER_REASON_IDLE_ROAM  - 14
+ *
+ * score_delta: [0 - 100]
+ *
+ * Related: roam_score_delta
  *
  * Supported Feature: Roaming
  *
@@ -417,43 +455,13 @@
  *
  * </ini>
  */
-#define CFG_IDLE_ROAM_SCORE_DELTA CFG_INI_UINT( \
-		"idle_roam_score_delta RoamIdle_Delta", \
-		RoamIdle_Delta_min, \
-		RoamIdle_Delta_max, \
-		RoamIdle_Delta_default, \
-		CFG_VALUE_OR_DEFAULT, \
-		"Roam score delta for Idle roam trigger")
-
-/*
- * <ini>
- * btm_roam_score_delta/RoamBTM_Delta - Roam score delta value in percentage for
- * BTM triggered roaming.
- * @Min: 0
- * @Max: 100
- * @Default: 0
- *
- * This ini is used to configure the minimum change in roam score
- * value of the AP to consider it as candidate when the sta is disconnected
- * from the current AP due to BTM kickout.
- * This value will be sent to firmware over the WMI_ROAM_AP_PROFILE wmi
- * command in the roam_score_delta_param_list tlv.
- *
- * Related: None
- *
- * Supported Feature: Roaming
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_BTM_ROAM_SCORE_DELTA CFG_INI_UINT( \
-	"btm_roam_score_delta RoamBTM_Delta", \
-	RoamBTM_Delta_min, \
-	RoamBTM_Delta_max, \
-	RoamBTM_Delta_default, \
-	CFG_VALUE_OR_DEFAULT, \
-	"Roam score delta for BTM roam trigger")
+#define ROAM_TRIGGER_SCORE_DELTA_STRING_MAX_LEN (ROAM_TRIGGER_REASON_MAX * 7)
+#define CFG_ROAM_TRIGGER_SCORE_DELTA CFG_INI_STRING( \
+	"roam_trigger_score_delta", \
+	0, \
+	ROAM_TRIGGER_SCORE_DELTA_STRING_MAX_LEN, \
+	"10,0,14,0", \
+	"candidate AP's percentage roam score delta")
 
 #define CFG_ROAM_SCORING_ALL \
 	CFG(CFG_ROAM_SCORE_DELTA_TRIGGER_BITMAP) \
@@ -465,8 +473,7 @@
 	CFG(CFG_DISCONNECT_ROAM_TRIGGER_MIN_RSSI) \
 	CFG(CFG_BMISS_ROAM_MIN_RSSI) \
 	CFG(CFG_2G_TO_5G_ROAM_MIN_RSSI) \
-	CFG(CFG_IDLE_ROAM_SCORE_DELTA) \
-	CFG(CFG_BTM_ROAM_SCORE_DELTA) \
+	CFG(CFG_ROAM_TRIGGER_SCORE_DELTA) \
 	CFG(CFG_AGGRESSIVE_ROAM_SCORE_DELTA) \
 	CFG(CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA)
 

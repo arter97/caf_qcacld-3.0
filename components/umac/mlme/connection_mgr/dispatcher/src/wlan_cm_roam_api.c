@@ -738,15 +738,15 @@ wlan_cm_roam_get_score_delta_params(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_roam_triggers *params)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	uint8_t i;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return;
 
-	params->score_delta_param[IDLE_ROAM_TRIGGER] =
-			mlme_obj->cfg.trig_score_delta[IDLE_ROAM_TRIGGER];
-	params->score_delta_param[BTM_ROAM_TRIGGER] =
-			mlme_obj->cfg.trig_score_delta[BTM_ROAM_TRIGGER];
+	for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++)
+		params->score_delta_param[i] =
+			mlme_obj->cfg.trig_score_delta[i];
 }
 
 void

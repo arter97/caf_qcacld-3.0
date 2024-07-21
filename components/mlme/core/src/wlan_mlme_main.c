@@ -3667,22 +3667,56 @@ static void mlme_init_btm_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_MIN_BTM_CANDIDATE_SCORE);
 }
 
+/**
+ * mlme_init_roam_score_delta - Set score delta for each INI config
+ * @psoc: psoc
+ * @mlme_cfg: mlme_cfg
+ *
+ * Set score delta for each roam trigger based on INI config.
+ *
+ * Return: None
+ */
+static void mlme_init_roam_score_delta(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_mlme_cfg *mlme_cfg)
+{
+	uint8_t trig_score_delta[ROAM_TRIGGER_REASON_MAX * 2];
+	qdf_size_t trig_score_delta_num = 0;
+	enum roam_trigger_reason roam_trig;
+	uint8_t score_delta;
+	uint32_t i;
+	struct roam_trigger_score_delta *score_delta_param;
+
+	for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++) {
+		score_delta_param =
+				&mlme_cfg->trig_score_delta[i];
+		score_delta_param->roam_score_delta = ROAM_MAX_CFG_VALUE;
+	}
+
+	qdf_uint8_array_parse(cfg_get(psoc,
+				      CFG_ROAM_TRIGGER_SCORE_DELTA),
+			      trig_score_delta,
+			      ROAM_TRIGGER_REASON_MAX * 2,
+			      &trig_score_delta_num);
+
+	for (i = 0; i + 1 < trig_score_delta_num; i += 2) {
+		roam_trig = trig_score_delta[i];
+		score_delta = trig_score_delta[i + 1];
+		if (roam_trig < ROAM_TRIGGER_REASON_MAX && roam_trig > 0) {
+			score_delta_param =
+				&mlme_cfg->trig_score_delta[roam_trig];
+			score_delta_param->roam_score_delta = score_delta;
+			score_delta_param->trigger_reason = roam_trig;
+		}
+	}
+}
+
 static void
 mlme_init_roam_score_config(struct wlan_objmgr_psoc *psoc,
 			    struct wlan_mlme_cfg *mlme_cfg)
 {
-	struct roam_trigger_score_delta *score_delta_param;
 	struct roam_trigger_min_rssi *min_rssi_param;
 
-	score_delta_param = &mlme_cfg->trig_score_delta[IDLE_ROAM_TRIGGER];
-	score_delta_param->roam_score_delta =
-			cfg_get(psoc, CFG_IDLE_ROAM_SCORE_DELTA);
-	score_delta_param->trigger_reason = ROAM_TRIGGER_REASON_IDLE;
-
-	score_delta_param = &mlme_cfg->trig_score_delta[BTM_ROAM_TRIGGER];
-	score_delta_param->roam_score_delta =
-			cfg_get(psoc, CFG_BTM_ROAM_SCORE_DELTA);
-	score_delta_param->trigger_reason = ROAM_TRIGGER_REASON_BTM;
+	mlme_init_roam_score_delta(psoc, mlme_cfg);
 
 	min_rssi_param = &mlme_cfg->trig_min_rssi[DEAUTH_MIN_RSSI];
 	min_rssi_param->min_rssi =

@@ -1802,6 +1802,7 @@ cm_roam_scan_offload_ap_profile(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	struct ap_profile *profile = &params->profile;
+	uint8_t i;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -1839,10 +1840,9 @@ cm_roam_scan_offload_ap_profile(struct wlan_objmgr_psoc *psoc,
 	params->min_rssi_params[MIN_RSSI_2G_TO_5G_ROAM] =
 			mlme_obj->cfg.trig_min_rssi[MIN_RSSI_2G_TO_5G_ROAM];
 
-	params->score_delta_param[IDLE_ROAM_TRIGGER] =
-			mlme_obj->cfg.trig_score_delta[IDLE_ROAM_TRIGGER];
-	params->score_delta_param[BTM_ROAM_TRIGGER] =
-			mlme_obj->cfg.trig_score_delta[BTM_ROAM_TRIGGER];
+	for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++)
+		params->score_delta_param[i] =
+			mlme_obj->cfg.trig_score_delta[i];
 }
 
 static bool
