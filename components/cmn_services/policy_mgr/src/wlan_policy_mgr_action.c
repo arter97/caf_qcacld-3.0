@@ -2442,7 +2442,8 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 
 	user_config_freq = policy_mgr_get_user_config_sap_freq(
 						psoc, sap_info->vdev_id);
-	policy_mgr_debug("user_config_freq %d", user_config_freq);
+	policy_mgr_debug("user_config_freq %d sap_freq %d",
+			 user_config_freq, sap_freq);
 
 	if (user_config_freq == sap_freq &&
 	    policy_mgr_is_safe_channel(psoc, sap_freq))
@@ -2457,8 +2458,8 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 	if (intf_ch_freq && intf_ch_freq != user_config_freq)
 		user_config_freq = intf_ch_freq;
 
-	policy_mgr_debug("intf_ch_freq: %d",
-			 user_config_freq, sap_freq);
+	policy_mgr_debug("user_config_freq %d intf_ch_freq: %d",
+			 user_config_freq, intf_ch_freq);
 
 	if (wlan_reg_is_enable_in_secondary_list_for_freq(pm_ctx->pdev,
 							  user_config_freq) &&
