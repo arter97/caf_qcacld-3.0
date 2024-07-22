@@ -20648,7 +20648,13 @@ hdd_send_usable_channel(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	skb_len += NLMSG_HDRLEN;
+	/**
+	 * As each nesting occupies NLMSG_HDRLEN size in the skb, add
+	 * NLMSG_HDRLEN worth space for each nesting.
+	 */
+	skb_len += NLMSG_HDRLEN * (count + 1);
+
+
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, skb_len);
 	if (!skb) {
 		hdd_info("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
