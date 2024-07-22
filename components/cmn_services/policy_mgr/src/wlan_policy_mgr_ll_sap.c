@@ -141,9 +141,23 @@ policy_mgr_ll_lt_sap_get_restart_freq_for_concurent_sap(
 		if (user_config_freq == curr_freq)
 			return user_config_freq;
 
-		policy_mgr_check_scc_channel(pm_ctx->psoc, &intf_ch_freq,
-					     user_config_freq,
-					     vdev_id, mcc_to_scc_switch);
+		if (mode == PM_SAP_MODE ||
+		    (mode == PM_P2P_GO_MODE &&
+		     policy_mgr_go_scc_enforced(pm_ctx->psoc))) {
+			policy_mgr_check_scc_channel(pm_ctx->psoc,
+						     &intf_ch_freq,
+						     user_config_freq,
+						     vdev_id,
+						     mcc_to_scc_switch);
+		} else if (mode == PM_P2P_GO_MODE &&
+			  !policy_mgr_allow_concurrency(pm_ctx->psoc, mode,
+							 user_config_freq,
+							 HW_MODE_20_MHZ, 0,
+							 vdev_id)) {
+			policy_mgr_debug("vdev %d User freq %d not allowed, keep current freq %d",
+					 vdev_id, user_config_freq, curr_freq);
+			return curr_freq;
+		}
 		if (intf_ch_freq && (intf_ch_freq != user_config_freq))
 			user_config_freq = intf_ch_freq;
 		return user_config_freq;
