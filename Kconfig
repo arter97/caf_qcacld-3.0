@@ -2153,6 +2153,10 @@ config FEATURE_DIRECT_LINK
 	bool "enable FEATURE_DIRECT_LINK"
 	default n
 
+config DP_FTM_MODE_SKIP_WBM_RING_INIT
+	bool "Skip WBM ring init in FTM mode"
+	default n
+
 config WLAN_FEATURE_EMLSR
 	bool "Enable EMLSR feature"
 	default n
