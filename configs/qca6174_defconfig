@@ -745,3 +745,8 @@ CONFIG_WLAN_SYSFS_MEM_STATS := y
 
 #Enable thermal throttle
 CONFIG_FW_THERMAL_THROTTLE := y
+
+ifeq ($(CONFIG_ROME_IF),pci)
+	CONFIG_FEATURE_SINGLE_MSI := n
+endif
+
