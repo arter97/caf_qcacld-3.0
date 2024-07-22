@@ -948,7 +948,7 @@ static void ol_tx_update_connectivity_stats(struct ol_tx_desc_t *tx_desc,
 	stats_rx = tx_desc->vdev->stats_rx;
 	ol_tx_flow_pool_unlock(tx_desc);
 
-	pkt_type_bitmap = wlan_dp_intf_get_pkt_type_bitmap_value(tx_desc->vdev);
+	pkt_type_bitmap = wlan_dp_intf_get_pkt_type_bitmap_value(osif_dev);
 
 	if (pkt_type_bitmap) {
 		if (status != htt_tx_status_download_fail)
