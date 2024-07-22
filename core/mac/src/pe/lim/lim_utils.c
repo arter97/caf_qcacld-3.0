@@ -12023,6 +12023,7 @@ void lim_cp_stats_cstats_log_disc_req_evt(tDot11fTDLSDisReq *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
 	stat.dt = frm->DialogToken.token;
@@ -12047,6 +12048,7 @@ void lim_cp_stats_cstats_log_disc_resp_evt(tDot11fTDLSDisRsp *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12080,6 +12082,7 @@ void lim_cp_stats_cstats_log_setup_req_evt(tDot11fTDLSSetupReq *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12114,6 +12117,7 @@ lim_cp_stats_cstats_log_setup_resp_evt(tDot11fTDLSSetupRsp *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12151,6 +12155,7 @@ lim_cp_stats_cstats_log_setup_confirm_evt(tDot11fTDLSSetupCnf *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12187,6 +12192,7 @@ lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
 	stat.cmn.opmode = pe_session->opmode;
 	stat.cmn.vdev_id = pe_session->vdev_id;
 	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.act_category = frm->Category.category;
 	stat.act = frm->Action.action;
@@ -12200,4 +12206,166 @@ lim_cp_stats_cstats_log_tear_down_evt(tDot11fTDLSTeardown *frm,
 
 	wlan_cstats_host_stats(sizeof(struct cstats_tdls_tear_down), &stat);
 }
+
+void lim_cp_stats_cstats_log_csa_evt(struct pe_session *pe_session,
+				     enum cstats_dir dir, uint16_t target_freq,
+				     uint8_t target_ch_width,
+				     uint8_t switch_mode)
+{
+	struct cstats_csa_evt stat = {0};
+
+	stat.cmn.hdr.evt_id = WLAN_CHIPSET_STATS_CSA_EVENT_ID;
+	stat.cmn.hdr.length = sizeof(struct cstats_csa_evt) -
+			      sizeof(struct cstats_hdr);
+	stat.cmn.opmode = pe_session->opmode;
+	stat.cmn.vdev_id = pe_session->vdev_id;
+	stat.cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	stat.cmn.time_tick = qdf_get_log_timestamp();
+
+	stat.direction = dir;
+	stat.target_freq = target_freq;
+	stat.target_ch_width = target_ch_width;
+	stat.current_freq = pe_session->curr_op_freq;
+	stat.current_ch_width = pe_session->ch_width;
+	stat.switch_mode = switch_mode;
+
+	wlan_cstats_host_stats(sizeof(struct cstats_csa_evt), &stat);
+}
 #endif /* WLAN_CHIPSET_STATS */
+
+uint16_t lim_get_tpe_ie_length(enum phy_ch_width chan_width,
+			       tDot11fIEtransmit_power_env *tpe_ie,
+			       uint16_t num_tpe)
+{
+	uint16_t total_ie_len = 0;
+	uint16_t idx = 0;
+
+	for (idx = 0; idx < num_tpe; idx++) {
+		if (!tpe_ie[idx].present)
+			return total_ie_len;
+
+		/* +2 for including element id and length */
+		total_ie_len += 2;
+		/* +1 for including tx power info */
+		total_ie_len += 1;
+		total_ie_len += tpe_ie[idx].num_tx_power;
+
+		if (!(chan_width == CH_WIDTH_320MHZ &&
+		      tpe_ie[idx].max_tx_pwr_interpret))
+			continue;
+
+		if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP ||
+		    tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP) {
+			/* Maximum Transmit Power For 320 MHz */
+			total_ie_len += 1;
+		} else if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP_PSD ||
+			   tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP_PSD) {
+			/* Extension Transmit PSD Information */
+			total_ie_len += 1;
+			/* Maximum Transmit PSD power */
+			total_ie_len += MAX_TX_PSD_POWER;
+		}
+	}
+
+	return total_ie_len;
+}
+
+QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
+				    uint16_t tpe_ie_len,
+				    tDot11fIEtransmit_power_env *tpe_ptr,
+				    uint16_t num_tpe, uint8_t *target)
+{
+	uint8_t *ie_len = NULL;
+	uint32_t consumed = 0;
+	uint32_t total_consumed = 0;
+	uint8_t tx_pwr_info = 0U;
+	uint8_t local_psd = 0U;
+	uint8_t reg_psd = 0U;
+	uint8_t *on_entry_target = target;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint16_t idx = 0;
+
+	for (idx = 0; idx < num_tpe; idx++) {
+		if (!tpe_ptr[idx].present)
+			return QDF_STATUS_E_INVAL;
+
+		consumed = 0;
+		*target = WLAN_ELEMID_VHT_TX_PWR_ENVLP;
+		++target;
+		++consumed;
+
+		ie_len = target;
+		++target;
+		++consumed;
+
+		tx_pwr_info = 0U;
+		tx_pwr_info |= (tpe_ptr[idx].max_tx_pwr_count << 0);
+		tx_pwr_info |= (tpe_ptr[idx].max_tx_pwr_interpret << 3);
+		tx_pwr_info |= (tpe_ptr[idx].max_tx_pwr_category << 6);
+		*target = tx_pwr_info;
+		++consumed;
+		++target;
+
+		qdf_mem_copy(target, &tpe_ptr[idx].tx_power, tpe_ptr[idx].num_tx_power);
+		consumed += tpe_ptr[idx].num_tx_power;
+		target += tpe_ptr[idx].num_tx_power;
+
+		if (!(chan_width == CH_WIDTH_320MHZ &&
+		      tpe_ptr[idx].max_tx_pwr_interpret))
+			goto end;
+
+		switch (tpe_ptr[idx].max_tx_pwr_interpret) {
+		case LOCAL_EIRP:
+			/* Maximum Local EIRP Transmit Power For 320 MHz */
+			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320;
+			target += 1;
+			consumed += 1;
+			break;
+		case LOCAL_EIRP_PSD:
+			local_psd = 0U;
+			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.ext_count << 0);
+			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.reserved << 4);
+			/* Extension Transmit Local PSD Information */
+			*target = local_psd;
+			target += 1;
+			consumed += 1;
+			/* Maximum Transmit Local PSD power */
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power, MAX_TX_PSD_POWER);
+			target += MAX_TX_PSD_POWER;
+			consumed += MAX_TX_PSD_POWER;
+			break;
+		case REGULATORY_CLIENT_EIRP:
+			/* Maximum Regulatory EIRP Transmit Power For 320 MHz */
+			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320;
+			target += 1;
+			consumed += 1;
+			break;
+		case REGULATORY_CLIENT_EIRP_PSD:
+			reg_psd = 0U;
+			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count << 0);
+			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.reserved << 4);
+			/* Extension Transmit Regulatory PSD Information */
+			*target = reg_psd;
+			consumed += 1;
+			target += 1;
+			/* Maximum Transmit Regulatory PSD power */
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power, MAX_TX_PSD_POWER);
+			target += MAX_TX_PSD_POWER;
+			consumed += MAX_TX_PSD_POWER;
+			break;
+		}
+end:
+		if (ie_len && consumed >= 2) {
+			total_consumed += consumed;
+			/* -2 for element id and length */
+			*ie_len = consumed - 2;
+		}
+	}
+
+	pe_debug("pack tpe ie %d bytes, expected to copy %d bytes",
+		 total_consumed, tpe_ie_len);
+	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   on_entry_target, total_consumed);
+
+	return status;
+}

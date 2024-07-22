@@ -1343,6 +1343,22 @@ QDF_STATUS
 wlan_cm_roam_stats_info_get(struct wlan_objmgr_vdev *vdev,
 			    struct enhance_roam_info **roam_info,
 			    uint32_t  *roam_num);
+
+/**
+ * wlan_cm_roam_info_get() - get vdev roam info
+ *
+ * @vdev: pointer to vdev
+ * @roam_info: pointer to buffer to copy roam stats info
+ * @idx: index of roam stats cache buffer
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+wlan_cm_roam_info_get(struct wlan_objmgr_vdev *vdev,
+		      struct enhance_roam_info **roam_info,
+		      uint8_t idx);
+
 #else
 static inline
 void mlme_cm_alloc_roam_stats_info(struct vdev_mlme_obj *vdev_mlme)

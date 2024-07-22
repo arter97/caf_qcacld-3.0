@@ -7217,6 +7217,11 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	if (ret)
 		goto exit;
 
+	if (hdd_ctx->is_wiphy_suspended) {
+		hdd_debug("wiphy is suspended");
+		return -EINVAL;
+	}
+
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		goto exit;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -571,6 +571,9 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	uint16_t mlo_ie_len = 0;
 	uint16_t tim_size;
 	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
+	uint16_t tpe_ie_len = 0;
+	tDot11fIEtransmit_power_env *transmit_power_env = NULL;
+	uint16_t num_transmit_power_env = 0;
 
 	tim_size = sch_get_tim_size(HAL_NUM_STA);
 
@@ -743,21 +746,26 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		/*
 		populate_dot11f_vht_ext_bss_load( mac_ctx, &bcn2.VHTExtBssLoad);
 		*/
-		populate_dot11f_tx_power_env(mac_ctx,
-					     &bcn_2->transmit_power_env[0],
-					     session->ch_width,
-					     session->curr_op_freq,
-					     &bcn_2->num_transmit_power_env,
-					     false);
 	}
 
-	if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
+	if (session->vhtCapability ||
+	    wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
+		transmit_power_env = qdf_mem_malloc(
+					WLAN_MAX_NUM_TPE_IE *
+					sizeof(tDot11fIEtransmit_power_env));
+		if (!transmit_power_env) {
+			status = QDF_STATUS_E_NOMEM;
+			goto free_and_exit;
+		}
 		populate_dot11f_tx_power_env(mac_ctx,
-					     &bcn_2->transmit_power_env[0],
+					     transmit_power_env,
 					     session->ch_width,
 					     session->curr_op_freq,
-					     &bcn_2->num_transmit_power_env,
+					     &num_transmit_power_env,
 					     false);
+		tpe_ie_len = lim_get_tpe_ie_length(session->ch_width,
+						   transmit_power_env,
+						   num_transmit_power_env);
 	}
 
 	if (lim_is_session_he_capable(session)) {
@@ -883,10 +891,8 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		addn_ielen = session->add_ie_params.probeRespBCNDataLen;
 		addn_ie = qdf_mem_malloc(addn_ielen);
 		if (!addn_ie) {
-			qdf_mem_free(bcn_1);
-			qdf_mem_free(bcn_2);
-			qdf_mem_free(wsc_prb_res);
-			return QDF_STATUS_E_NOMEM;
+			status = QDF_STATUS_E_NOMEM;
+			goto free_and_exit;
 		}
 		qdf_mem_copy(addn_ie,
 			session->add_ie_params.probeRespBCNData_buff,
@@ -998,6 +1004,19 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		n_bytes = ie_buf_size + eht_cap_ie_len;
 	}
 
+	if (tpe_ie_len) {
+		status = lim_fill_complete_tpe_ie(
+					session->ch_width, tpe_ie_len,
+					transmit_power_env,
+					num_transmit_power_env,
+					session->pSchBeaconFrameEnd + n_bytes);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("assemble tpe ie error");
+			tpe_ie_len = 0;
+		}
+		n_bytes += tpe_ie_len;
+	}
+
 	if (mlo_ie_len) {
 		status = lim_fill_complete_mlo_ie(session, mlo_ie_len,
 					 session->pSchBeaconFrameEnd + n_bytes);
@@ -1088,6 +1107,8 @@ free_and_exit:
 	qdf_mem_free(bcn_2);
 	qdf_mem_free(wsc_prb_res);
 	qdf_mem_free(addn_ie);
+	qdf_mem_free(transmit_power_env);
+
 	return status;
 }
 

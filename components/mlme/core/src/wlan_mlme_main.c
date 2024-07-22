@@ -2587,6 +2587,8 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_SAME_LINK_MLD_ADDR);
 	sta->mlo_5gl_5gh_mlsr =
 		cfg_get(psoc, CFG_MLO_MLO_5GL_5GH_MLSR);
+	sta->epcs_capability =
+		cfg_get(psoc, CFG_MLO_EPCS_SUPPORT_ENABLE);
 
 	mlme_debug("mlo_support_link_num: %d, mlo_support_link_band: 0x%x",
 		   sta->mlo_support_link_num, sta->mlo_support_link_band);
@@ -2804,7 +2806,8 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_MAX_LI_MODULATED_DTIM_MS);
 
 	mlme_init_sta_mlo_cfg(psoc, sta);
-	wlan_mlme_set_epcs_capability(psoc, false);
+	wlan_mlme_set_epcs_capability(psoc,
+				      wlan_mlme_get_epcs_capability(psoc));
 	wlan_mlme_set_usr_disable_sta_eht(psoc, false);
 	wlan_mlme_set_eht_disable_punct_in_us_lpi(psoc,
 						  cfg_default(CFG_EHT_DISABLE_PUNCT_IN_US_LPI));
