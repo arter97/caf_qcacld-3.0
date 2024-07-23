@@ -7548,17 +7548,10 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 		for (i = 0; i < scan_data->num_ap; i++) {
 			if (i >= MAX_ROAM_CANDIDATE_AP)
 				break;
-			if (scan_data->ap[i].type == WLAN_ROAM_SCAN_ROAMED_AP) {
-				wlan_diag_event.rssi =
-						(-1) * scan_data->ap[i].rssi;
 
-				qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
-					     scan_data->ap[i].bssid.bytes,
-					     QDF_MAC_ADDR_SIZE);
-				break;
-			} else if (!memcmp(wlan_diag_event.diag_cmn.bssid,
-					scan_data->ap[i].bssid.bytes,
-					QDF_MAC_ADDR_SIZE)) {
+			if (!qdf_mem_cmp(wlan_diag_event.diag_cmn.bssid,
+					 scan_data->ap[i].bssid.bytes,
+					 QDF_MAC_ADDR_SIZE)) {
 				wlan_diag_event.rssi =
 						(-1) * scan_data->ap[i].rssi;
 				break;
