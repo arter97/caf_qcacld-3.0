@@ -1698,6 +1698,11 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 				 * continue to next statement
 				 */
 			case QDF_STA_MODE:
+				hdd_debug("Update vdev %d CAP IE", link_info->vdev_id);
+				sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+							  link_info->vdev_id,
+							  QDF_STA_MODE);
+
 				sta_ctx =
 					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 				new_phy_mode = wlan_reg_get_max_phymode(pdev,
@@ -1736,9 +1741,6 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 							    pdev,
 							    link_info->vdev_id);
 				}
-				sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
-							  link_info->vdev_id,
-							  QDF_STA_MODE);
 				break;
 			default:
 				break;

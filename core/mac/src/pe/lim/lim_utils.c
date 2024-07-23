@@ -8965,18 +8965,26 @@ void lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
 }
 
 static void
-lim_revise_eht_caps(struct mac_context *mac, tDot11fIEeht_cap *eht_cap)
+lim_revise_eht_caps_per_band(struct mac_context *mac, enum cds_band_type band,
+			     tDot11fIEeht_cap *eht_cap)
 {
 	uint32_t country_max_allowed_bw;
+
+	if (band == CDS_BAND_2GHZ)
+		return;
 
 	country_max_allowed_bw = wlan_reg_get_country_max_allowed_bw(mac->pdev);
 	if (!country_max_allowed_bw) {
 		pe_debug("Failed to get country_max_allowed_bw");
 		return;
+	} else {
+		pe_debug("max_allowed_bw %d", country_max_allowed_bw);
 	}
 
 	if (country_max_allowed_bw < BW_320_MHZ)
 		eht_cap->support_320mhz_6ghz = 0;
+	else if (country_max_allowed_bw == BW_320_MHZ)
+		eht_cap->support_320mhz_6ghz = 1;
 }
 
 void lim_set_eht_caps(struct mac_context *mac,
@@ -8998,7 +9006,7 @@ void lim_set_eht_caps(struct mac_context *mac,
 		is_band_2g = true;
 
 	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
-	lim_revise_eht_caps(mac, &dot11_cap);
+	lim_revise_eht_caps_per_band(mac, band, &dot11_cap);
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
 					NULL);
 	lim_log_eht_cap(mac, &dot11_cap);
