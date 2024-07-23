@@ -5148,11 +5148,8 @@ int wlan_hdd_set_channel(struct wlan_hdd_link_info *link_info,
 			return -EINVAL;
 		}
 
-		if (chandef->center_freq2)
-			channel_seg2 = ieee80211_frequency_to_channel(
-				chandef->center_freq2);
-		else
-			hdd_err("Invalid center_freq2");
+		channel_seg2 =
+			ieee80211_frequency_to_channel(chandef->center_freq2);
 	}
 
 	num_ch = CFG_VALID_CHANNEL_LIST_LEN;
@@ -5167,9 +5164,15 @@ int wlan_hdd_set_channel(struct wlan_hdd_link_info *link_info,
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_config = &ap_ctx->sap_config;
 	sap_config->chan_freq = chandef->chan->center_freq;
-	sap_config->ch_params.center_freq_seg1 = channel_seg2;
-	sap_config->ch_params.center_freq_seg0 =
+
+	if (NL80211_CHAN_WIDTH_80P80 == chandef->width) {
+		sap_config->ch_params.center_freq_seg1 = channel_seg2;
+		sap_config->ch_params.center_freq_seg0 =
 			ieee80211_frequency_to_channel(chandef->center_freq1);
+	} else {
+		sap_config->ch_params.mhz_freq_seg1 = chandef->center_freq1;
+		sap_config->ch_params.center_freq_seg0 = 0;
+	}
 
 	if (QDF_SAP_MODE == adapter->device_mode) {
 		/* set channel to what hostapd configured */
