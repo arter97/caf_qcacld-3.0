@@ -534,6 +534,9 @@ void dp_bbm_context_deinit(struct wlan_objmgr_psoc *psoc)
 #endif /* FEATURE_BUS_BANDWIDTH_MGR */
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 #ifdef FEATURE_RUNTIME_PM
+
+#define DP_RTPM_POLICY_HIGH_TPUT_THRESH TPUT_LEVEL_MEDIUM
+
 void dp_rtpm_tput_policy_init(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -547,14 +550,11 @@ void dp_rtpm_tput_policy_init(struct wlan_objmgr_psoc *psoc)
 
 	ctx = &dp_ctx->rtpm_tput_policy_ctx;
 	qdf_runtime_lock_init(&ctx->rtpm_lock);
-	ctx->curr_state = DP_RTPM_TPUT_POLICY_STATE_REQUIRED;
-	qdf_atomic_init(&ctx->high_tput_vote);
 }
 
 void dp_rtpm_tput_policy_deinit(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_context *dp_ctx;
-	struct dp_rtpm_tput_policy_context *ctx;
 
 	dp_ctx = dp_psoc_get_priv(psoc);
 	if (!dp_ctx) {
@@ -562,46 +562,12 @@ void dp_rtpm_tput_policy_deinit(struct wlan_objmgr_psoc *psoc)
 		return;
 	}
 
-	ctx = &dp_ctx->rtpm_tput_policy_ctx;
-	ctx->curr_state = DP_RTPM_TPUT_POLICY_STATE_INVALID;
-	qdf_runtime_lock_deinit(&ctx->rtpm_lock);
+	qdf_runtime_lock_deinit(&dp_ctx->rtpm_tput_policy_ctx.rtpm_lock);
 }
-
-/**
- * dp_rtpm_tput_policy_prevent() - prevent a runtime bus suspend
- * @dp_ctx: DP handle
- *
- * return: None
- */
-static void dp_rtpm_tput_policy_prevent(struct wlan_dp_psoc_context *dp_ctx)
-{
-	struct dp_rtpm_tput_policy_context *ctx;
-
-	ctx = &dp_ctx->rtpm_tput_policy_ctx;
-	qdf_runtime_pm_prevent_suspend(&ctx->rtpm_lock);
-}
-
-/**
- * dp_rtpm_tput_policy_allow() - allow a runtime bus suspend
- * @dp_ctx: DP handle
- *
- * return: None
- */
-static void dp_rtpm_tput_policy_allow(struct wlan_dp_psoc_context *dp_ctx)
-{
-	struct dp_rtpm_tput_policy_context *ctx;
-
-	ctx = &dp_ctx->rtpm_tput_policy_ctx;
-	qdf_runtime_pm_allow_suspend(&ctx->rtpm_lock);
-}
-
-#define DP_RTPM_POLICY_HIGH_TPUT_THRESH TPUT_LEVEL_MEDIUM
 
 void dp_rtpm_tput_policy_apply(struct wlan_dp_psoc_context *dp_ctx,
 			       enum tput_level tput_level)
 {
-	int vote;
-	enum dp_rtpm_tput_policy_state temp_state;
 	struct dp_rtpm_tput_policy_context *ctx;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
@@ -610,39 +576,23 @@ void dp_rtpm_tput_policy_apply(struct wlan_dp_psoc_context *dp_ctx,
 
 	ctx = &dp_ctx->rtpm_tput_policy_ctx;
 
-	if (tput_level >= DP_RTPM_POLICY_HIGH_TPUT_THRESH)
-		temp_state = DP_RTPM_TPUT_POLICY_STATE_NOT_REQUIRED;
-	else
-		temp_state = DP_RTPM_TPUT_POLICY_STATE_REQUIRED;
-
-	if (ctx->curr_state == temp_state)
-		return;
-
-	if (temp_state == DP_RTPM_TPUT_POLICY_STATE_REQUIRED) {
-		cdp_set_rtpm_tput_policy_requirement(soc, false);
-		qdf_atomic_dec(&ctx->high_tput_vote);
-		dp_rtpm_tput_policy_allow(dp_ctx);
-	} else {
+	if (tput_level >= DP_RTPM_POLICY_HIGH_TPUT_THRESH &&
+	    !qdf_atomic_test_and_set_bit(0, &ctx->high_tput_vote)) {
 		cdp_set_rtpm_tput_policy_requirement(soc, true);
-		qdf_atomic_inc(&ctx->high_tput_vote);
-		dp_rtpm_tput_policy_prevent(dp_ctx);
-	}
-
-	ctx->curr_state = temp_state;
-	vote = qdf_atomic_read(&ctx->high_tput_vote);
-
-	if (vote < 0 || vote > 1) {
-		dp_alert_rl("Incorrect vote!");
-		QDF_BUG(0);
+		qdf_runtime_pm_prevent_suspend(&ctx->rtpm_lock);
+	} else if (tput_level < DP_RTPM_POLICY_HIGH_TPUT_THRESH &&
+		   qdf_atomic_test_and_clear_bit(0, &ctx->high_tput_vote)) {
+		cdp_set_rtpm_tput_policy_requirement(soc, false);
+		qdf_runtime_pm_allow_suspend(&ctx->rtpm_lock);
 	}
 }
 
-int dp_rtpm_tput_policy_get_vote(struct wlan_dp_psoc_context *dp_ctx)
+unsigned long dp_rtpm_tput_policy_get_vote(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct dp_rtpm_tput_policy_context *ctx;
 
 	ctx = &dp_ctx->rtpm_tput_policy_ctx;
-	return qdf_atomic_read(&ctx->high_tput_vote);
+	return ctx->high_tput_vote;
 }
 #endif /* FEATURE_RUNTIME_PM */
 
@@ -1685,7 +1635,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	}
 
 	if (vote_level_change || tx_level_change || rx_level_change) {
-		dp_info("tx:%llu[%llu(off)+%llu(no-off)] rx:%llu[%llu(off)+%llu(no-off)] next_level(vote %u rx %u tx %u rtpm %d) pm_qos(rx:%u,%*pb tx:%u,%*pb on_low_tput:%u)",
+		dp_info("tx:%llu[%llu(off)+%llu(no-off)] rx:%llu[%llu(off)+%llu(no-off)] next_level(vote %u rx %u tx %u rtpm %u) pm_qos(rx:%u,%*pb tx:%u,%*pb on_low_tput:%u)",
 			tx_packets,
 			dp_ctx->prev_tx_offload_pkts,
 			dp_ctx->prev_no_tx_offload_pkts,
