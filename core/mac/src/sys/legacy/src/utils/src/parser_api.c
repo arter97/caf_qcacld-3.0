@@ -3123,6 +3123,11 @@ QDF_STATUS sir_convert_probe_frame2_struct(struct mac_context *mac,
 				   pFrame, nFrame);
 		qdf_mem_free(pr);
 		return QDF_STATUS_E_FAILURE;
+	} else if (DOT11F_WARNED(status)) {
+		pe_debug_rl("Warned to parse a Probe Response (0x%08x, %d bytes) ch %d %d",
+			    status, nFrame,
+			    pr->DSParams.curr_channel,
+			    pr->HTInfo.primaryChannel);
 	}
 	/* & "transliterate" from a 'tDot11fProbeResponse' to a 'tSirProbeRespBeacon'... */
 

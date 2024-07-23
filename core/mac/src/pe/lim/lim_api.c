@@ -4140,22 +4140,6 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	if (!cache_entry)
 		return QDF_STATUS_E_FAILURE;
 
-	/**
-	 * Reject all the partner link if any partner link  doesn’t pass the
-	 * security check and proceed connection with single link.
-	 */
-	is_security_allowed =
-		wlan_cm_is_eht_allowed_for_current_security(
-					wlan_pdev_get_psoc(mac_ctx->pdev),
-					cache_entry, true);
-
-	if (!is_security_allowed) {
-		mlme_debug("current security is not valid for partner link link_addr:" QDF_MAC_ADDR_FMT,
-			   QDF_MAC_ADDR_REF(link_addr->bytes));
-		util_scan_free_cache_entry(cache_entry);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	channel.ch_freq = cache_entry->channel.chan_freq;
 	channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);
 	channel.ch_phymode = cache_entry->phy_mode;
@@ -4172,10 +4156,25 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	if (channel.ch_width == CH_WIDTH_20MHZ)
 		channel.ch_cfreq1 = channel.ch_freq;
 
-	util_scan_free_cache_entry(cache_entry);
-
 	mlo_mgr_update_ap_channel_info(vdev, link_id, (uint8_t *)link_addr,
 				       channel);
+
+	/**
+	 * Reject all the partner link if any partner link  doesn’t pass the
+	 * security check and proceed connection with single link.
+	 */
+	is_security_allowed =
+		wlan_cm_is_eht_allowed_for_current_security(
+					wlan_pdev_get_psoc(mac_ctx->pdev),
+					cache_entry, true);
+
+	if (!is_security_allowed) {
+		mlme_debug("current security is not valid for partner link link_addr:" QDF_MAC_ADDR_FMT,
+			   QDF_MAC_ADDR_REF(link_addr->bytes));
+		util_scan_free_cache_entry(cache_entry);
+		return QDF_STATUS_E_FAILURE;
+	}
+	util_scan_free_cache_entry(cache_entry);
 
 	return QDF_STATUS_SUCCESS;
 }
