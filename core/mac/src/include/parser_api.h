@@ -1963,12 +1963,14 @@ dot11f_parse_assoc_rsp_mlo_partner_info(struct pe_session *pe_session,
  * @mac_ctx: MAC context
  * @session: reporting session
  * @dot11f: pointer to tDot11fIEreduced_neighbor_report to fill
+ * @num_rnr: number of rnr ie's included
  *
  * Return: none
  */
 void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 			    struct pe_session *session,
-			    tDot11fIEreduced_neighbor_report *dot11f);
+			    tDot11fIEreduced_neighbor_report *dot11f,
+			    uint16_t *num_rnr);
 
 /**
  * populate_dot11f_rnr_tbtt_info() - populate rnr for the tbtt_len specified

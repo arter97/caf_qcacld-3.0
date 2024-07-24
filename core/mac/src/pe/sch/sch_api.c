@@ -558,6 +558,34 @@ memfree:
 	return status;
 }
 
+/**
+ * lim_get_concurrent_ap_vdevid() - loop every vdev to get 2g/5g
+ * and return valid vdev id
+ * @psoc: pointer to psoc
+ * @pe_session: pe session
+ *
+ * Return: uint8_t
+ */
+static uint8_t
+lim_get_concurrent_ap_vdevid(struct mac_context *mac_ctx,
+			     struct pe_session *pe_session)
+{
+	uint8_t i;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_num;
+
+	vdev_num = policy_mgr_get_sap_mode_info(mac_ctx->psoc, freq_list,
+						vdev_id_list);
+	for (i = 0; i < vdev_num; i++) {
+		if (wlan_reg_is_24ghz_ch_freq(freq_list[i]) ||
+		    wlan_reg_is_5ghz_ch_freq(freq_list[i])) {
+			return vdev_id_list[i];
+		}
+	}
+	return INVALID_VDEV_ID;
+}
+
 QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 			       uint16_t size, struct pe_session *pe_session,
 			       enum sir_bcn_update_reason reason)
@@ -565,6 +593,8 @@ QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 	struct scheduler_msg msgQ = {0};
 	tpSendbeaconParams beaconParams = NULL;
 	QDF_STATUS retCode;
+	uint8_t vdev_id = INVALID_VDEV_ID;
+	bool is_curr_ap_6g = false;
 
 	if (LIM_IS_AP_ROLE(pe_session) &&
 	   (mac->sch.beacon_changed)) {
@@ -574,11 +604,21 @@ QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 		if (QDF_STATUS_SUCCESS != retCode)
 			pe_err("FAILED to send probe response template with retCode %d",
 				retCode);
-		/*Fils Discovery Template */
-		retCode = lim_send_fils_discovery_template(mac, pe_session);
-		if (QDF_STATUS_SUCCESS != retCode)
-			pe_err("FAILED to send fils discovery template retCode %d",
-			       retCode);
+		/* FILS discovery IE should only be included
+		 * if standalone AP operating on 6ghz
+		 * check if another AP is operating on 2/5ghz
+		 * then do not include FILS IE
+		 */
+		vdev_id = lim_get_concurrent_ap_vdevid(mac, pe_session);
+		is_curr_ap_6g = wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq);
+		if (vdev_id == INVALID_VDEV_ID && is_curr_ap_6g) {
+			/*Fils Discovery Template */
+			retCode = lim_send_fils_discovery_template(mac,
+								   pe_session);
+			if (retCode != QDF_STATUS_SUCCESS)
+				pe_err("FAILED to send fils discovery template retCode %d",
+				       retCode);
+		}
 	}
 
 	beaconParams = qdf_mem_malloc(sizeof(tSendbeaconParams));

@@ -973,7 +973,8 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			 *     MLO SAP + 6G legacy SAP
 			 */
 			populate_dot11f_6g_rnr(mac_ctx, session,
-					       &bcn_2->reduced_neighbor_report[0]);
+					       &bcn_2->reduced_neighbor_report[0],
+					       &bcn_2->num_reduced_neighbor_report);
 		}
 		/*
 		 * Can be efficiently updated whenever new IE added  in Probe
@@ -982,6 +983,10 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		lim_update_probe_rsp_template_ie_bitmap_beacon2(mac_ctx, bcn_2,
 					&session->DefProbeRspIeBitmap[0],
 					&session->probeRespFrame);
+
+		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+				   &bcn_2->reduced_neighbor_report[0],
+				   sizeof(tDot11fIEreduced_neighbor_report));
 
 		/* update probe response WPS IE instead of beacon WPS IE */
 		if (session->wps_state != SAP_WPS_DISABLED) {
@@ -1548,6 +1553,7 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(struct mac_context *mac,
 		qdf_mem_copy(&prb_rsp->reduced_neighbor_report[i],
 			     &beacon2->reduced_neighbor_report[i],
 			     sizeof(beacon2->reduced_neighbor_report[i]));
+
 	}
 	prb_rsp->num_reduced_neighbor_report = num_rnr;
 

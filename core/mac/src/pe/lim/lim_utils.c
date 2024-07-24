@@ -10512,33 +10512,32 @@ QDF_STATUS lim_ap_mlme_vdev_rnr_notify(struct pe_session *session)
 		pe_err("session is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
+
 	if (!mlme_is_notify_co_located_ap_update_rnr(session->vdev))
 		return status;
 	mlme_set_notify_co_located_ap_update_rnr(session->vdev, false);
-	// Only 6G SAP need to notify co-located SAP to add RNR
-	if (!wlan_reg_is_6ghz_chan_freq(session->curr_op_freq))
-		return status;
 	pe_debug("vdev id %d non mlo 6G AP notify co-located AP to update RNR",
 		 wlan_vdev_get_id(session->vdev));
 	vdev_num = policy_mgr_get_sap_mode_info(mac_ctx->psoc, freq_list,
 						vdev_id_list);
+
 	for (i = 0; i < vdev_num; i++) {
 		if (vdev_id_list[i] == session->vdev_id)
 			continue;
-		if (wlan_reg_is_6ghz_chan_freq(freq_list[i]))
-			continue;
+
 		co_session = pe_find_session_by_vdev_id(mac_ctx,
 							vdev_id_list[i]);
-		if (!co_session)
+		if (!co_session ||
+		    !wlan_reg_is_6ghz_chan_freq(co_session->curr_op_freq))
 			continue;
 
-		status = sch_set_fixed_beacon_fields(mac_ctx, co_session);
+		status = sch_set_fixed_beacon_fields(mac_ctx, session);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("Unable to update 6g co located RNR in beacon");
 			return status;
 		}
 
-		status = lim_send_beacon_ind(mac_ctx, co_session,
+		status = lim_send_beacon_ind(mac_ctx, session,
 					     REASON_RNR_UPDATE);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("Unable to send beacon indication");

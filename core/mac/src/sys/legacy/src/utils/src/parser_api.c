@@ -14046,7 +14046,8 @@ static void lim_is_6g_vdev(struct wlan_objmgr_psoc *psoc, void *obj, void *args)
 
 void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 			    struct pe_session *session,
-			    tDot11fIEreduced_neighbor_report *dot11f)
+			    tDot11fIEreduced_neighbor_report *dot11f,
+			    uint16_t *num_rnr)
 {
 	struct pe_session *co_session;
 	struct wlan_objmgr_psoc *psoc;
@@ -14087,6 +14088,12 @@ void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 		 wlan_vdev_get_id(session->vdev),
 		 wlan_vdev_get_id(co_session->vdev),
 		 dot11f->op_class, dot11f->channel_num);
+
+	pe_debug("AK: tbtt_len %d ",
+		 dot11f->tbtt_info_len);
+
+	*num_rnr = 1;
+
 }
 
 QDF_STATUS populate_dot11f_bcn_prot_extcaps(struct mac_context *mac_ctx,
