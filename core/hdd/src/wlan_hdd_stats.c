@@ -1241,32 +1241,33 @@ bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 	     (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 	     (QDF_P2P_DEVICE_MODE == adapter->device_mode))) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-		if (hdd_cm_is_disconnected(link_info))
-			info->state = WIFI_DISCONNECTED;
 
-		if (hdd_cm_is_connecting(link_info)) {
+		if (QDF_STA_MODE == adapter->device_mode &&
+		    link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
+			info->state = WIFI_ASSOCIATED;
+		} else if (hdd_cm_is_disconnected(link_info)) {
+			info->state = WIFI_DISCONNECTED;
+		} else if (hdd_cm_is_connecting(link_info)) {
 			hdd_debug("Session ID %d, Connection is in progress",
 				  link_info->vdev_id);
 			info->state = WIFI_ASSOCIATING;
+		} else if (hdd_cm_is_vdev_associated(link_info)) {
+			if (!sta_ctx->conn_info.is_authenticated) {
+				hdd_err("client " QDF_MAC_ADDR_FMT " is in the middle of WPS/EAPOL exchange.",
+					QDF_MAC_ADDR_REF(mac->bytes));
+				info->state = WIFI_AUTHENTICATING;
+			} else {
+				info->state = WIFI_ASSOCIATED;
+			}
 		}
-		if (hdd_cm_is_vdev_associated(link_info) &&
-		    !sta_ctx->conn_info.is_authenticated) {
-			hdd_err("client " QDF_MAC_ADDR_FMT
-				" is in the middle of WPS/EAPOL exchange.",
-				QDF_MAC_ADDR_REF(mac->bytes));
-			info->state = WIFI_AUTHENTICATING;
-		}
-		if (hdd_cm_is_vdev_associated(link_info) ||
-		    link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
-			info->state = WIFI_ASSOCIATED;
+
+		if (info->state == WIFI_ASSOCIATED) {
 			qdf_copy_macaddr(&info->bssid,
 					 &sta_ctx->conn_info.bssid);
 			qdf_mem_copy(info->ssid,
 				     sta_ctx->conn_info.ssid.SSID.ssId,
 				     sta_ctx->conn_info.ssid.SSID.length);
-			/*
-			 * NULL Terminate the string
-			 */
+			/* NULL Terminate the string */
 			info->ssid[sta_ctx->conn_info.ssid.SSID.length] = 0;
 		}
 	}

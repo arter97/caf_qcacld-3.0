@@ -15526,7 +15526,8 @@ hdd_adapter_get_link_mac_addr(struct wlan_hdd_link_info *link_info)
 	adapter = link_info->adapter;
 	if (!hdd_adapter_is_ml_adapter(adapter) ||
 	    qdf_is_macaddr_zero(&link_info->link_addr) ||
-	    !wlan_vdev_mlme_is_mlo_vdev(link_info->vdev))
+	    (link_info->vdev_id != WLAN_INVALID_VDEV_ID &&
+	     !wlan_vdev_mlme_is_mlo_vdev(link_info->vdev)))
 		return &adapter->mac_addr;
 
 	return &link_info->link_addr;
