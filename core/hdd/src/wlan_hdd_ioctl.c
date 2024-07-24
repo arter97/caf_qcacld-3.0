@@ -2900,7 +2900,7 @@ static int drv_cmd_get_roam_trigger(struct wlan_hdd_link_info *link_info,
 				    struct hdd_priv_data *priv_data)
 {
 	int ret = 0;
-	uint8_t lookup_threshold;
+	uint8_t next_rssi_threshold;
 	int rssi;
 	char extra[32];
 	uint8_t len = 0;
@@ -2909,18 +2909,18 @@ static int drv_cmd_get_roam_trigger(struct wlan_hdd_link_info *link_info,
 	status = ucfg_cm_get_neighbor_lookup_rssi_threshold(
 						hdd_ctx->psoc,
 						link_info->vdev_id,
-						&lookup_threshold);
+						&next_rssi_threshold);
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_GETROAMTRIGGER_IOCTL,
-		   link_info->vdev_id, lookup_threshold);
+		   link_info->vdev_id, next_rssi_threshold);
 
-	hdd_debug("vdev_id: %u, lookup_threshold: %u",
-		  link_info->vdev_id, lookup_threshold);
+	hdd_debug("vdev_id: %u, NEXT_RSSI_THRESHOLD: %u",
+		  link_info->vdev_id, next_rssi_threshold);
 
-	rssi = (-1) * lookup_threshold;
+	rssi = (-1) * next_rssi_threshold;
 
 	len = scnprintf(extra, sizeof(extra), "%s %d", command, rssi);
 	len = QDF_MIN(priv_data->total_len, len + 1);

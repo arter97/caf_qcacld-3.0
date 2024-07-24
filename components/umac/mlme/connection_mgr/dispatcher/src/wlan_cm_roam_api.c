@@ -778,11 +778,16 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 	struct rso_config *rso_cfg;
 	struct rso_cfg_params *src_cfg;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct rso_config_params *rso_config;
+	struct wlan_mlme_lfr_cfg *lfr_cfg;
 
 	qdf_mem_zero(dst_config, sizeof(*dst_config));
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
+
+	rso_config = &mlme_obj->cfg.lfr.rso_user_config;
+	lfr_cfg = &mlme_obj->cfg.lfr;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_NB_ID);
@@ -835,7 +840,20 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 		dst_config->uint_value = src_cfg->neighbor_lookup_threshold;
 		break;
 	case NEXT_RSSI_THRESHOLD:
-		dst_config->uint_value = src_cfg->next_rssi_threshold;
+		mlme_debug("is_agg: %d, control_enable: %d, alert_rssi_th: %d",
+			   roam_cfg_type, rso_cfg->roam_control_enable,
+			   rso_config->alert_rssi_threshold);
+
+		if (rso_cfg->is_aggressive_roaming_mode &&
+		    !rso_cfg->roam_control_enable) {
+			dst_config->uint_value = lfr_cfg->roam_aggre_threshold;
+		} else if (rso_config->alert_rssi_threshold) {
+			dst_config->uint_value =
+					rso_config->alert_rssi_threshold;
+		} else {
+			dst_config->uint_value =
+				src_cfg->neighbor_lookup_threshold;
+		}
 		break;
 	case SCAN_N_PROBE:
 		dst_config->uint_value = src_cfg->roam_scan_n_probes;
