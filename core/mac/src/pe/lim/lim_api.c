@@ -4240,11 +4240,11 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mlo_link_info *link_info = NULL;
 	struct mlo_partner_info *partner_info;
-	uint8_t chan;
-	uint8_t op_class;
-	uint16_t chan_freq, gen_frame_len;
-	uint8_t idx;
-	uint8_t req_link_id;
+	uint8_t chan, op_class, idx, req_link_id;
+	uint16_t gen_frame_len, probe_rsp_ie_len;
+	qdf_freq_t chan_freq;
+	struct wlan_country_ie *cc_ie;
+	uint8_t *cc, *probe_rsp_ie_ptr;
 
 	if (!session_entry)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -4309,6 +4309,17 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 		qdf_mem_copy(&sta_link_addr, session_entry->self_mac_addr,
 			     QDF_MAC_ADDR_SIZE);
 
+		probe_rsp_ie_ptr = probe_rsp + WLAN_PROBE_RESP_IES_OFFSET;
+		probe_rsp_ie_len = probe_rsp_len - WLAN_PROBE_RESP_IES_OFFSET;
+		cc_ie = (struct wlan_country_ie *)
+				wlan_get_ie_ptr_from_eid(WLAN_ELEMID_COUNTRY,
+							 probe_rsp_ie_ptr,
+							 probe_rsp_ie_len);
+		if (cc_ie && cc_ie->len)
+			cc = cc_ie->cc;
+		else
+			cc = NULL;
+
 		for (idx = 0; idx < partner_info->num_partner_links; idx++) {
 			req_link_id =
 				partner_info->partner_link_info[idx].link_id;
@@ -4356,9 +4367,12 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 				status = QDF_STATUS_E_FAILURE;
 				goto end;
 			}
+
 			chan_freq =
-				wlan_reg_chan_opclass_to_freq(chan, op_class,
-							      true);
+				wlan_reg_chan_opclass_to_freq_prefer_global(mac_ctx->pdev,
+									    cc,
+									    chan,
+									    op_class);
 
 			status = lim_add_bcn_probe(session_entry->vdev,
 						   link_probe_rsp.ptr,
