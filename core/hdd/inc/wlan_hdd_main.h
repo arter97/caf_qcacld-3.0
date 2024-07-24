@@ -3755,6 +3755,15 @@ QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
 				    enum phy_ch_width ch_width,
 				    bool forced);
 
+/**
+ * hdd_is_chan_switch_in_progress() - Check if any adapter has channel switch
+ * in progress
+ *
+ * Return: true, if any adapter has channel switch in
+ * progress else false
+ */
+bool hdd_is_chan_switch_in_progress(void);
+
 #if defined(FEATURE_WLAN_CH_AVOID)
 QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
 

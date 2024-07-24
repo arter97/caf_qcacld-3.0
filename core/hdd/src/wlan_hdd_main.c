@@ -4129,14 +4129,7 @@ static enum policy_mgr_con_mode wlan_hdd_get_mode_for_non_connected_vdev(
 	return mode;
 }
 
-/**
- * hdd_is_chan_switch_in_progress() - Check if any adapter has channel switch in
- * progress
- *
- * Return: true, if any adapter has channel switch in
- * progress else false
- */
-static bool hdd_is_chan_switch_in_progress(void)
+bool hdd_is_chan_switch_in_progress(void)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);

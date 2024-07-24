@@ -959,6 +959,15 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 		return 0;
 	}
 
+	if (hdd_is_chan_switch_in_progress()) {
+		hdd_debug("channel switch is in progress");
+		status = policy_mgr_wait_chan_switch_complete_evt(hdd_ctx->psoc);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_err("qdf wait for csa event failed");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
 	hdd_ctx->curr_band = wlan_reg_band_bitmap_to_band_info(band_bitmap);
 
 	if (QDF_IS_STATUS_ERROR(ucfg_reg_set_band(hdd_ctx->pdev,
