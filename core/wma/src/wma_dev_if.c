@@ -6032,7 +6032,8 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 			wmi_debug("sap d3 wow");
 			wma_sap_d3_wow_client_connect(wma);
 		}
-		wma_sap_prevent_runtime_pm(wma);
+		if (!policy_mgr_is_vdev_ll_lt_sap(wma->psoc, vdev_id))
+			wma_sap_prevent_runtime_pm(wma);
 
 		return;
 	}
