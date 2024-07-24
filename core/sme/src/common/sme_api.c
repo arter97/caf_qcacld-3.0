@@ -11238,11 +11238,20 @@ int sme_update_he_capabilities(mac_handle_t mac_handle, uint8_t session_id,
 			cfg_he_cap->rx_ctrl_frame = 0;
 		break;
 	case QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_PUNCTURED_PREAMBLE_RX:
-		if (cfg_val)
+		if (cfg_val) {
+			he_cap_orig->rx_pream_puncturing =
+				cfg_get(mac_ctx->psoc, CFG_HE_RX_PREAM_PUNC);
 			cfg_he_cap->rx_pream_puncturing =
 				he_cap_orig->rx_pream_puncturing;
-		else
+			mac_ctx->he_cap_2g.rx_pream_puncturing =
+				he_cap_orig->rx_pream_puncturing;
+			mac_ctx->he_cap_5g.rx_pream_puncturing =
+				he_cap_orig->rx_pream_puncturing;
+		} else {
 			cfg_he_cap->rx_pream_puncturing = 0;
+			mac_ctx->he_cap_2g.rx_pream_puncturing = 0;
+			mac_ctx->he_cap_5g.rx_pream_puncturing = 0;
+		}
 		break;
 	default:
 		sme_debug("default: Unhandled cfg %d", cfg_id);
