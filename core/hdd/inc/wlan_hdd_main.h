@@ -1341,6 +1341,8 @@ struct get_station_client_info {
  * @sta_client_info: To store get station user application port_id's
  * @disconnect_link_id: cache disconnect link_id, for legacy link_id will
  *			be @WLAN_INVALID_LINK_ID
+ * @wlm_ll_conn_flag: Indicates if low lateny connection flag set
+ *		      based on wlm mode
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1537,6 +1539,7 @@ struct hdd_adapter {
 	uint16_t keep_alive_interval;
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
 	int32_t disconnect_link_id;
+	bool wlm_ll_conn_flag;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)

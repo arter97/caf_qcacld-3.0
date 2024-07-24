@@ -11179,6 +11179,22 @@ static void hdd_set_wlm_host_latency_level(struct hdd_context *hdd_ctx,
 	else
 		ucfg_dp_runtime_disable_rx_fisa_aggr(vdev, false);
 
+	if (latency_host_flags & WLM_HOST_TX_DISABLE_SWLM) {
+		if (!adapter->wlm_ll_conn_flag) {
+			cdp_vdev_inform_ll_conn(soc_hdl,
+						adapter->deflink->vdev_id,
+						CDP_VDEV_LL_CONN_ADD);
+			adapter->wlm_ll_conn_flag = 1;
+		}
+	} else {
+		if (adapter->wlm_ll_conn_flag) {
+			cdp_vdev_inform_ll_conn(soc_hdl,
+						adapter->deflink->vdev_id,
+						CDP_VDEV_LL_CONN_DEL);
+			adapter->wlm_ll_conn_flag = 0;
+		}
+	}
+
 	if (adapter->latency_level)
 		ucfg_dp_rx_aggr_dis_req(vdev, CTRL_RX_AGGR_ID_WLM, true);
 	else
