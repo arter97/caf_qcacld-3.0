@@ -3192,8 +3192,11 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 	}
 
 	if (work_info->nan_force_scc_in_progress) {
-		policy_mgr_nan_sap_post_enable_conc_check(pm_ctx->psoc);
-		goto end;
+		status =
+			policy_mgr_nan_sap_post_enable_conc_check(pm_ctx->psoc);
+
+		if (status == QDF_STATUS_E_PENDING)
+			goto end;
 	}
 	/*
 	 * Check if force scc is required for GO + GO case. vdev id will be
