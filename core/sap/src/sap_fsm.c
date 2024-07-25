@@ -2600,9 +2600,6 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 		bss_complete->status = (eSapStatus) context;
 		bss_complete->staId = sap_ctx->sap_sta_id;
 
-		sap_debug("(eSAP_START_BSS_EVENT): staId = %d",
-			  bss_complete->staId);
-
 		bss_complete->operating_chan_freq = sap_ctx->chan_freq;
 		bss_complete->ch_width = sap_ctx->ch_params.ch_width;
 		if (QDF_IS_STATUS_SUCCESS(bss_complete->status)) {

@@ -2784,7 +2784,8 @@ lim_handle_bss_color_change_ie(struct mac_context *mac_ctx,
 	if (LIM_IS_AP_ROLE(session) &&
 	    session->he_op.bss_col_disabled &&
 	    session->he_bss_color_change.new_color) {
-		pe_debug("countdown: %d, new_color: %d",
+		pe_debug("Vdev %d countdown: %d, new_color: %d",
+			 session->vdev_id,
 			 session->he_bss_color_change.countdown,
 			 session->he_bss_color_change.new_color);
 		if (session->he_bss_color_change.countdown > 0) {
@@ -2852,8 +2853,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		wlan_vdev_mlme_set_sap_go_move_before_sta(vdev, false);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 	}
-	pe_debug("role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
-		 GET_LIM_SYSTEM_ROLE(session),
+	pe_debug("Vdev %d role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
+		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
 		 session->dfsIncludeChanSwIe,
 		 session->gLimOperatingMode.present,
 		 session->gLimChannelSwitch.switchCount,

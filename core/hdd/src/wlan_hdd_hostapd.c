@@ -564,7 +564,7 @@ static int __hdd_hostapd_open(struct net_device *dev)
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 
 	/* Enable all Tx queues */
-	hdd_debug("Enabling queues");
+	hdd_debug("vdev %d Enabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter,
 				   WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
 				   WLAN_CONTROL_PATH);
@@ -623,7 +623,7 @@ int hdd_hostapd_stop_no_trans(struct net_device *dev)
 	hdd_deinit_adapter(hdd_ctx, adapter, true);
 	clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 	/* Stop all tx queues */
-	hdd_debug("Disabling queues");
+	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -2502,12 +2502,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 
 	switch (event_id) {
 	case eSAP_START_BSS_EVENT:
-		hdd_debug("BSS status = %s, channel = %u, bc sta Id = %d",
-		       sap_event->sapevt.sapStartBssCompleteEvent.
-		       status ? "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS",
-		       sap_event->sapevt.sapStartBssCompleteEvent.
-		       operating_chan_freq,
-		       sap_event->sapevt.sapStartBssCompleteEvent.staId);
 		ap_ctx->operating_chan_freq =
 			sap_event->sapevt.sapStartBssCompleteEvent
 			.operating_chan_freq;
@@ -2520,8 +2514,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		sap_config->ch_params.ch_width =
 			sap_event->sapevt.sapStartBssCompleteEvent.ch_width;
 
-		hdd_nofl_info("AP started vid %d freq %d BW %d",
+		hdd_nofl_info("AP %s vid %d freq %d BW %d",
 			      link_info->vdev_id,
+			      sap_event->sapevt.sapStartBssCompleteEvent.status ?
+			      "failed" : "started",
 			      ap_ctx->operating_chan_freq,
 			      sap_config->ch_params.ch_width);
 
@@ -2566,12 +2562,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		}
 
-		hdd_debug("The value of dfs_cac_block_tx[%d] for ApCtx[%pK]:%d",
-				ap_ctx->dfs_cac_block_tx, ap_ctx,
-				link_info->vdev_id);
+		hdd_debug("vdev %d dfs_cac_block_tx %d",
+			  link_info->vdev_id, ap_ctx->dfs_cac_block_tx);
 
 		if (hostapd_state->qdf_status) {
-			hdd_err("startbss event failed!!");
 			/*
 			 * Make sure to set the event before proceeding
 			 * for error handling otherwise caller thread will
@@ -2714,9 +2708,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		break;          /* Event will be sent after Switch-Case stmt */
 
 	case eSAP_STOP_BSS_EVENT:
-		hdd_debug("BSS stop status = %s",
-		       sap_event->sapevt.sapStopBssCompleteEvent.
-		       status ? "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
 		hdd_cp_stats_cstats_sap_go_stop_event(link_info, sap_event);
 
 		hdd_hostapd_channel_allow_suspend(adapter,
@@ -2743,9 +2734,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 				hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 			}
 		}
-		hdd_nofl_info("Ap stopped vid %d reason=%d",
+		hdd_nofl_info("Ap stopped vid %d reason=%d status %d",
 			      link_info->vdev_id,
-			      ap_ctx->bss_stop_reason);
+			      ap_ctx->bss_stop_reason,
+			      sap_event->sapevt.sapStopBssCompleteEvent.status);
 		qdf_status =
 			policy_mgr_get_mac_id_by_session_id(
 						    hdd_ctx->psoc,
@@ -2881,7 +2873,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		 * is done for now just print
 		 */
 		key_complete = &sap_event->sapevt.sapStationSetKeyCompleteEvent;
-		hdd_debug("SET Key: configured status = %s",
+		hdd_debug("Vdev %d SET Key: configured status = %s",
+			  link_info->vdev_id,
 			  key_complete->status ?
 			  "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
 
@@ -2902,7 +2895,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		memcpy(msg.src_addr.sa_data,
 		       &sap_event->sapevt.sapStationMICFailureEvent.
 		       staMac, QDF_MAC_ADDR_SIZE);
-		hdd_debug("MIC MAC " QDF_MAC_ADDR_FMT,
+		hdd_debug("Vdev %d MIC MAC " QDF_MAC_ADDR_FMT,
+			  link_info->vdev_id,
 			  QDF_MAC_ADDR_REF(msg.src_addr.sa_data));
 		if (sap_event->sapevt.sapStationMICFailureEvent.
 		    multicast == true)
@@ -2952,7 +2946,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		wrqu.addr.sa_family = ARPHRD_ETHER;
 		memcpy(wrqu.addr.sa_data,
 		       &event->staMac, QDF_MAC_ADDR_SIZE);
-		hdd_info("associated " QDF_MAC_ADDR_FMT,
+		hdd_info("Vdev %d, STA " QDF_MAC_ADDR_FMT " associated",
+			 link_info->vdev_id,
 			 QDF_MAC_ADDR_REF(wrqu.addr.sa_data));
 		hdd_place_marker(adapter, "CLIENT ASSOCIATED",
 				 wrqu.addr.sa_data);
@@ -3133,7 +3128,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 					     &cache_stainfo, true,
 					     STA_INFO_HOSTAPD_SAP_EVENT_CB);
 		}
-		hdd_nofl_info("SAP Peer " QDF_MAC_ADDR_FMT " disassociated %sreason %d status code %d",
+		hdd_nofl_info("SAP(%d) Peer " QDF_MAC_ADDR_FMT " disassociated %sreason %d status code %d",
+			      link_info->vdev_id,
 			      QDF_MAC_ADDR_REF(disassoc_comp->staMac.bytes),
 			      disassoc_comp->reason ==
 			      eSAP_USR_INITATED_DISASSOC ? "by user " : "",
@@ -3312,7 +3308,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		wrqu.data.pointer = maxAssocExceededEvent;
 		wrqu.data.length = strlen(maxAssocExceededEvent);
 		we_custom_event_generic = (uint8_t *) maxAssocExceededEvent;
-		hdd_debug("%s", maxAssocExceededEvent);
+		hdd_debug("vdev %d %s", link_info->vdev_id,
+			  maxAssocExceededEvent);
 		break;
 	case eSAP_STA_ASSOC_IND:
 		if (sap_event->sapevt.sapAssocIndication.owe_ie) {
@@ -3414,10 +3411,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch_freq;
 		ap_ctx->sap_config.acs_cfg.ch_width =
 			sap_event->sapevt.sap_ch_selected.ch_width;
-		hdd_nofl_info("ACS Completed vid %d freq %d BW %d",
+		hdd_nofl_info("Vdev %d ACS Completed freq %d BW %d flag %x ACS in progress %d",
 			      link_info->vdev_id,
 			      ap_ctx->sap_config.acs_cfg.pri_ch_freq,
-			      ap_ctx->sap_config.acs_cfg.ch_width);
+			      ap_ctx->sap_config.acs_cfg.ch_width,
+			      link_info->link_flags,
+			      ap_ctx->acs_in_progress);
 
 		if (qdf_atomic_read(&ap_ctx->acs_in_progress) &&
 		    test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
@@ -3453,7 +3452,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		return QDF_STATUS_SUCCESS;
 
 	case eSAP_STOP_BSS_DUE_TO_NO_CHNL:
-		hdd_debug("Stop sap session[%d]",
+		hdd_debug("eSAP_STOP_BSS_DUE_TO_NO_CHNL Stop sap vdev %d",
 			  link_info->vdev_id);
 		schedule_work(&link_info->sap_stop_bss_work);
 		return QDF_STATUS_SUCCESS;
@@ -3534,10 +3533,6 @@ stopbss:
 		char *stopBssEvent = "STOP-BSS.response";       /* 17 */
 		int event_len = strlen(stopBssEvent);
 
-		hdd_debug("BSS stop status = %s",
-		       sap_event->sapevt.sapStopBssCompleteEvent.status ?
-		       "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
-
 		/* Change the BSS state now since, as we are shutting
 		 * things down, we don't want interfaces to become
 		 * re-enabled
@@ -3558,7 +3553,8 @@ stopbss:
 		/* Stop the pkts from n/w stack as we are going to free all of
 		 * the TX WMM queues for all STAID's
 		 */
-		hdd_debug("Disabling queues");
+		hdd_debug("vdev %d Disabling queues",
+			  adapter->deflink->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -7205,7 +7201,8 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		if (QDF_IS_STATUS_ERROR(
 		    sme_update_channel_list(mac_handle))) {
 			hdd_update_indoor_channel(hdd_ctx, false);
-			hdd_err("Can't start BSS: update channel list failed");
+			hdd_err("vdev %d Can't start BSS: update channel list failed",
+				link_info->vdev_id);
 			ret = -EINVAL;
 			goto free;
 		}
@@ -7625,8 +7622,9 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 						    config->chan_freq);
 	config->SapHw_mode = csr_convert_from_reg_phy_mode(updated_phy_mode);
 	if (config->sap_orig_hw_mode != config->SapHw_mode)
-		hdd_info("orig phymode %d new phymode %d",
-			 config->sap_orig_hw_mode, config->SapHw_mode);
+		hdd_info("Vdev %d orig phymode %d new phymode %d",
+			 link_info->vdev_id, config->sap_orig_hw_mode,
+			 config->SapHw_mode);
 	qdf_mem_zero(sme_config, sizeof(*sme_config));
 	sme_get_config_param(mac_handle, sme_config);
 	/* Override hostapd.conf wmm_enabled only for 11n and 11AC configs (IOT)
@@ -7684,7 +7682,8 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		goto error;
 	}
 
-	hdd_nofl_debug("SAP mac:" QDF_MAC_ADDR_FMT " SSID: " QDF_SSID_FMT " BCNINTV:%d Freq:%d freq_seg0:%d freq_seg1:%d ch_width:%d HW mode:%d privacy:%d akm:%d acs_mode:%d acs_dfs_mode %d dtim period:%d MFPC %d, MFPR %d",
+	hdd_nofl_debug("Vdev %d SAP mac:" QDF_MAC_ADDR_FMT " SSID: " QDF_SSID_FMT " BCNINTV:%d Freq:%d freq_seg0:%d freq_seg1:%d ch_width:%d HW mode:%d privacy:%d akm:%d acs_mode:%d acs_dfs_mode %d dtim period:%d MFPC %d, MFPR %d",
+		       link_info->vdev_id,
 		       QDF_MAC_ADDR_REF(adapter->mac_addr.bytes),
 		       QDF_SSID_REF(config->SSIDinfo.ssid.length,
 				    config->SSIDinfo.ssid.ssId),
@@ -7712,7 +7711,8 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		wlansap_reset_sap_config_add_ie(config, eUPDATE_IE_ALL);
 		/* Bss already started. just return. */
 		/* TODO Probably it should update some beacon params. */
-		hdd_debug("Bss Already started...Ignore the request");
+		hdd_debug("Vdev %d Bss Already started...Ignore the request",
+			  link_info->vdev_id);
 		hdd_exit();
 		ret = 0;
 		goto free;
@@ -7743,7 +7743,8 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	if (!hdd_set_connection_in_progress(true)) {
 		mutex_unlock(&hdd_ctx->sap_lock);
 
-		hdd_err("Can't start BSS: set connection in progress failed");
+		hdd_err("Vdev %d Can't start BSS: set connection in progress failed",
+			link_info->vdev_id);
 		ret = -EINVAL;
 		goto error;
 	}
@@ -7770,7 +7771,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		mutex_unlock(&hdd_ctx->sap_lock);
 
 		hdd_set_connection_in_progress(false);
-		hdd_err("SAP Start Bss fail");
+		hdd_err("SAP (%d) Start Bss fail", link_info->vdev_id);
 		ret = -EINVAL;
 		goto error;
 	}
@@ -7784,10 +7785,11 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	    QDF_IS_STATUS_ERROR(hostapd_state->qdf_status)) {
 		mutex_unlock(&hdd_ctx->sap_lock);
 		if (QDF_IS_STATUS_ERROR(qdf_status))
-			hdd_err("Wait for start BSS failed status %d",
-				qdf_status);
+			hdd_err("vdev %d, Wait for start BSS failed status %d",
+				link_info->vdev_id, qdf_status);
 		else
-			hdd_err("Start BSS failed status %d",
+			hdd_err("Vdev %d Start BSS failed status %d",
+				link_info->vdev_id,
 				hostapd_state->qdf_status);
 		hdd_set_connection_in_progress(false);
 		sme_get_command_q_status(mac_handle);
@@ -8007,7 +8009,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	ap_ctx->sap_config.acs_cfg.acs_mode = false;
 	hdd_dcs_clear(adapter);
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
-	hdd_debug("Disabling queues");
+	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);

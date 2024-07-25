@@ -1320,10 +1320,8 @@ void p2p_peer_authorized(struct wlan_objmgr_vdev *vdev, uint8_t *mac_addr)
 	}
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev));
 	peer = wlan_objmgr_get_peer(psoc, pdev_id,  mac_addr, WLAN_P2P_ID);
-	if (!peer) {
-		p2p_debug("peer info not found");
+	if (!peer)
 		return;
-	}
 	status = process_peer_for_noa(vdev, psoc, peer);
 	wlan_objmgr_peer_release_ref(peer, WLAN_P2P_ID);
 

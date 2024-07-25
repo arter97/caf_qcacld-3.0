@@ -1745,7 +1745,8 @@ static int hdd_pause_ns(struct hdd_context *hdd_ctx)
 		}
 
 		/* stop all TX queues before suspend */
-		hdd_debug("Disabling queues for dev mode %s",
+		hdd_debug("vdev %d Disabling queues for dev mode %s",
+			  adapter->deflink->vdev_id,
 			  qdf_opmode_str(adapter->device_mode));
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_STOP_ALL_NETIF_QUEUE,

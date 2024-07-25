@@ -1058,7 +1058,7 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 	 * netdev queues as it will lead to data stall/NUD failure.
 	 */
 	if (!(rsp->cm_id & CM_ID_LSWITCH_BIT)) {
-		hdd_debug("Disabling queues");
+		hdd_debug("vdev %d Disabling queues", link_info->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					     WLAN_CONTROL_PATH);

@@ -8488,12 +8488,11 @@ QDF_STATUS sme_ch_avoid_update_req(mac_handle_t mac_handle)
 						    QDF_MODULE_ID_WMA,
 						    &message);
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			sme_err("Post Ch Avoid Update MSG fail");
+			sme_err("Post WMA_CH_AVOID_UPDATE_REQ fail");
 			qdf_mem_free(cauReq);
 			sme_release_global_lock(&mac->sme);
 			return QDF_STATUS_E_FAILURE;
 		}
-		sme_debug("Posted Ch Avoid Update MSG");
 		sme_release_global_lock(&mac->sme);
 	}
 

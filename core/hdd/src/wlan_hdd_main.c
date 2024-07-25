@@ -5583,15 +5583,15 @@ static int __hdd_open(struct net_device *dev)
 	if (!test_bit(SME_SESSION_OPENED, &link_info->link_flags)) {
 		ret = hdd_start_adapter(adapter, true);
 		if (ret) {
-			hdd_err("Failed to start adapter :%d",
-				adapter->device_mode);
+			hdd_err("Vdev %d Failed to start adapter :%d",
+				link_info->vdev_id, adapter->device_mode);
 			return ret;
 		}
 	}
 
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 	if (hdd_cm_is_vdev_associated(link_info)) {
-		hdd_debug("Enabling Tx Queues");
+		hdd_debug("vdev %d Enabling queues", link_info->vdev_id);
 		/* Enable TX queues only when we are connected */
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_START_ALL_NETIF_QUEUE,
@@ -5600,7 +5600,7 @@ static int __hdd_open(struct net_device *dev)
 
 	/* Enable carrier and transmit queues for NDI */
 	if (WLAN_HDD_IS_NDI(adapter)) {
-		hdd_debug("Enabling Tx Queues");
+		hdd_debug("vdev %d Enabling queues", link_info->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 			WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
 			WLAN_CONTROL_PATH);
@@ -5679,9 +5679,9 @@ int hdd_stop_no_trans(struct net_device *dev)
 	 * Disable TX on the interface, after this hard_start_xmit() will not
 	 * be called on that interface
 	 */
-	hdd_debug("Disabling queues, adapter device mode: %s(%d)",
+	hdd_debug("vdev %d Disabling queues, adapter device mode: %s(%d)",
+		  adapter->deflink->vdev_id,
 		  qdf_opmode_str(adapter->device_mode), adapter->device_mode);
-
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -9474,7 +9474,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 			if (QDF_STATUS_SUCCESS != status)
 				goto err_destroy_dp_intf;
 			/* Stop the Interface TX queue. */
-			hdd_debug("Disabling queues");
+			hdd_debug("vdev %d Disabling queues",
+				  adapter->deflink->vdev_id);
 			wlan_hdd_netif_queue_control(adapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -9508,7 +9509,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		if (QDF_STATUS_SUCCESS != status)
 			goto err_destroy_dp_intf;
 
-		hdd_debug("Disabling queues");
+		hdd_debug("vdev %d Disabling queues",
+			  adapter->deflink->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -9557,7 +9559,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 			goto err_destroy_dp_intf;
 
 		/* Stop the Interface TX queue. */
-		hdd_debug("Disabling queues");
+		hdd_debug("vdev %d Disabling queues",
+			  adapter->deflink->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -10360,7 +10363,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	hdd_stop_tsf_sync(adapter);
 	hdd_flush_scan_block_work(adapter);
 	wlan_hdd_cfg80211_scan_block(adapter);
-	hdd_debug("Disabling queues");
+	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -18888,12 +18891,15 @@ QDF_STATUS hdd_softap_sta_deauth(struct wlan_hdd_link_info *link_info,
 					       &is_sap_bcast_deauth_enabled);
 
 	hdd_enter();
-
-	hdd_debug("sap_bcast_deauth_enabled %d", is_sap_bcast_deauth_enabled);
 	/* Ignore request to deauth bcmc station */
-	if (!is_sap_bcast_deauth_enabled)
-		if (param->peerMacAddr.bytes[0] & 0x1)
+	if (!is_sap_bcast_deauth_enabled) {
+		if (param->peerMacAddr.bytes[0] & 0x1) {
+			hdd_debug("Vdev %d sap_bcast_deauth_enabled %d, Ignore request to deauth bc/mc station ",
+				  link_info->vdev_id,
+				  is_sap_bcast_deauth_enabled);
 			return qdf_status;
+		}
+	}
 
 	qdf_status =
 		wlansap_deauth_sta(WLAN_HDD_GET_SAP_CTX_PTR(link_info),
