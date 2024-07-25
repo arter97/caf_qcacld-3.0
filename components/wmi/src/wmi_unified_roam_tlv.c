@@ -3837,7 +3837,7 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 	struct wlan_crypto_keys *all_keys;
 	struct wlan_crypto_key *dst_key, *pairwise;
 	struct wlan_crypto_key *key_alloc_buf[WMI_NUM_KEYS_ALLOCATED];
-	bool flush_keybuf;
+	bool flush_keybuf = true;
 	uint8_t total_num_tlv,  j = 0, k = 0;
 	uint8_t count = 0, total_links = 0, dst_key_count = 0;
 	uint8_t igtk_idx = 0, bigtk_idx = 0;
@@ -3868,7 +3868,6 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 	for (k = 0; k < WMI_NUM_KEYS_ALLOCATED; k++) {
 		key_alloc_buf[k] = qdf_mem_malloc(sizeof(*dst_key));
 		if (!key_alloc_buf[k]) {
-			flush_keybuf = true;
 			status = QDF_STATUS_E_NOMEM;
 			goto free_entries;
 		}
@@ -3929,7 +3928,6 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 		if (!is_valid_keyix(ml_keys->key_ix)) {
 			wmi_err_rl("invalid key index:%d", ml_keys->key_ix);
 			status = QDF_STATUS_E_INVAL;
-			flush_keybuf = true;
 			goto free_entries;
 		}
 
@@ -3941,7 +3939,6 @@ extract_roam_synch_key_event_tlv(wmi_unified_t wmi_handle,
 				wmi_err_rl("Received key_len as 0 for tlv:%d",
 					   count);
 				status = QDF_STATUS_E_INVAL;
-				flush_keybuf = true;
 				goto free_entries;
 			}
 
