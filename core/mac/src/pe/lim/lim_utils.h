@@ -3111,7 +3111,7 @@ static inline void lim_ap_check_6g_compatible_peer(
 {}
 #endif
 
-#define MAX_TX_PSD_POWER 15
+#define EXT_TX_PSD_POWER 8
 
 /**
  * enum max_tx_power_interpretation
