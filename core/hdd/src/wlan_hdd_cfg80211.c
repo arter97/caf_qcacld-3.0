@@ -12569,6 +12569,12 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		mlo_bd_info = nla_nest_start(skb, CONFIG_MLO_LINKS);
+		if (!mlo_bd_info) {
+			hdd_err("nla_nest_start error");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+			return -EINVAL;
+		}
+
 		for (link_id = 0; link_id < WLAN_MAX_LINK_ID; link_id++) {
 			link_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
 							    WLAN_OSIF_ID);
