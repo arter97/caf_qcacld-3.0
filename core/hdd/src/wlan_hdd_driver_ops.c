@@ -1167,6 +1167,10 @@ int wlan_hdd_pld_get_bus_pm_state(struct device *dev,
 {
 	struct hdd_context *hdd_ctx;
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx)
+		return PLD_BUS_RESUME;
+
 	hdd_err("wow bus pm state %s\n",
 		(hdd_ctx->bus_pm_state == PLD_BUS_SUSPEND) ? "SUSPEND" : "RESUME");
 	return hdd_ctx->bus_pm_state;
