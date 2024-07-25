@@ -5770,6 +5770,8 @@ QDF_STATUS policy_mgr_decr_connection_count(struct wlan_objmgr_psoc *psoc,
 			pm_conc_connection_list[next_conn_index].in_use;
 		pm_conc_connection_list[conn_index].ch_flagext =
 			pm_conc_connection_list[next_conn_index].ch_flagext;
+		pm_conc_connection_list[conn_index].conn_6ghz_flag =
+			pm_conc_connection_list[next_conn_index].conn_6ghz_flag;
 		conn_index++;
 		next_conn_index++;
 	}
