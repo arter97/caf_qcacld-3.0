@@ -10674,6 +10674,8 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
 	int i = 0;
 	bool emlsr_cap;
+	struct wlan_mlo_eml_cap eml_cap = {0};
+	bool emlsr;
 
 	if (!mac_ctx || !session || !frm)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -10713,21 +10715,28 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 
 	/* Check if HW supports eMLSR mode */
 	emlsr_cap = policy_mgr_is_hw_emlsr_capable(mac_ctx->psoc);
+	/* Check if wmi service bitmap set or not to indicate wlan fw support */
+	wlan_mlme_get_sap_emlsr_mode_enabled(mac_ctx->psoc, &emlsr);
 
-	if (emlsr_cap) {
-		/*
-		 * wlan_mlme_get_eml_params not applicable for sap.
-		 * will be override while new wmi service bit is ready
-		 * to indicate mlo sap support emlsr wlan client.
-		 * Now give the default zero firstly.
-		 */
+	if (emlsr_cap && emlsr) {
 		mlo_ie->eml_capab_present = 1;
 		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EMLCAP_P;
 		common_info_len += WLAN_ML_BV_CINFO_EMLCAP_SIZE;
 		mlo_ie->eml_capabilities_info.emlmr_support = 0;
-		mlo_ie->eml_capabilities_info.transition_timeout = 0;
+		mlo_ie->eml_capabilities_info.emlsr_support = emlsr;
+
+		/* AP-MLD should advertise emlsr_padding_delay as 0 */
 		mlo_ie->eml_capabilities_info.emlsr_padding_delay = 0;
+		/* AP-MLD should advertise emlsr_transition_delay as 0 */
 		mlo_ie->eml_capabilities_info.emlsr_transition_delay = 0;
+
+		/* trans_timeout shared by MLO STA/SAP */
+		wlan_mlme_get_eml_params(mac_ctx->psoc, &eml_cap);
+		/*
+		 * Indicates the timeout value for EML Operating Mode
+		 * Notification frame exchange
+		 */
+		mlo_ie->eml_capabilities_info.transition_timeout = eml_cap.trans_timeout;
 	}
 
 	mlo_ie->mld_capab_and_op_present = 1;
@@ -11449,6 +11458,8 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 	bool sta_pro_present;
 	QDF_STATUS status;
 	bool emlsr_cap;
+	struct wlan_mlo_eml_cap eml_cap = {0};
+	bool emlsr;
 
 	if (!mac_ctx || !session)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -11486,18 +11497,29 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 	common_info_length += WLAN_ML_BSSPARAMCHNGCNT_SIZE;
 	/* Check if HW supports eMLSR mode */
 	emlsr_cap = policy_mgr_is_hw_emlsr_capable(mac_ctx->psoc);
+	/* Check if wmi service bitmap set or not to indicate fw support */
+	wlan_mlme_get_sap_emlsr_mode_enabled(mac_ctx->psoc, &emlsr);
 
-
-	if (emlsr_cap) {
-		/* wlan_mlme_get_eml_params not applicable for sap */
+	if (emlsr_cap && emlsr) {
 		mlo_ie->eml_capab_present = 1;
 		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EMLCAP_P;
 		tmp_offset += 2;
 		common_info_length += WLAN_ML_BV_CINFO_EMLCAP_SIZE;
 		mlo_ie->eml_capabilities_info.emlmr_support = 0;
-		mlo_ie->eml_capabilities_info.transition_timeout = 0;
+		mlo_ie->eml_capabilities_info.emlsr_support = emlsr;
+
+		/* AP-MLD should advertise emlsr_padding_delay as 0 */
 		mlo_ie->eml_capabilities_info.emlsr_padding_delay = 0;
+		/* AP-MLD should advertise emlsr_transition_delay as 0 */
 		mlo_ie->eml_capabilities_info.emlsr_transition_delay = 0;
+
+		/* trans_timeout shared by MLO STA/SAP */
+		wlan_mlme_get_eml_params(mac_ctx->psoc, &eml_cap);
+		/*
+		 * Indicates the timeout value for EML Operating Mode
+		 * Notification frame exchange
+		 */
+		mlo_ie->eml_capabilities_info.transition_timeout = eml_cap.trans_timeout;
 	}
 
 	mlo_ie->mld_capab_and_op_present = 1;
