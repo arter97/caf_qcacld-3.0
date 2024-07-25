@@ -397,6 +397,7 @@ typedef struct sSirAssocReq {
 	tDot11fIEeht_cap eht_cap;
 	bool is_sae_authenticated;
 	struct mlo_partner_info mlo_info;
+	struct wlan_mlo_eml_cap eml_info;
 	uint8_t mld_mac[QDF_MAC_ADDR_SIZE];
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 	tDot11fIEfils_session fils_session;
