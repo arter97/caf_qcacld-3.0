@@ -3600,10 +3600,10 @@ wma_wow_wakeup_pagefault_notify(tp_wma_handle wma, void *ev, uint32_t ev_len)
 		return;
 	}
 
-	cur_time = qdf_get_system_uptime();
+	cur_time = (qdf_time_t)qdf_get_monotonic_boottime();
 	pf_wakeup_intv =
 		wlan_pmo_get_interval_for_pagefault_wakeup_counts(psoc);
-	cutoff_time = cur_time - qdf_system_msecs_to_ticks(pf_wakeup_intv);
+	cutoff_time = cur_time - (qdf_time_t)WMA_MSEC_TO_USEC(pf_wakeup_intv);
 
 	status = wma_wow_pagefault_parse_event(psoc, ev, ev_len, &pf_sym_list);
 	if (QDF_IS_STATUS_ERROR(status)) {
