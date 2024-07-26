@@ -4020,6 +4020,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_ON_5G_LOW:
+	case PM_SCC_ON_5G_LOW_CH_24G:
 		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
 				      pcl_weights, pcl_sz,
 				      len,
@@ -4029,9 +4030,17 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				      POLICY_MGR_PCL_ORDER_SCC_5G_LOW,
 				      &high_5_band_scc_present,
 				      &low_5_band_scc_present);
+
+		if (pcl == PM_SCC_ON_5G_LOW_CH_24G)
+			add_chlist_to_pcl(pm_ctx->pdev,
+					  pcl_channels, pcl_weights, pcl_sz,
+					  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+					  channel_list_24, chan_index_24,
+					  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_ON_5G_HIGH:
+	case PM_SCC_ON_5G_HIGH_CH_24G:
 		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
 				      pcl_weights, pcl_sz,
 				      len,
@@ -4041,6 +4050,13 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				      POLICY_MGR_PCL_ORDER_SCC_5G_HIGH,
 				      &high_5_band_scc_present,
 				      &low_5_band_scc_present);
+
+		if (pcl == PM_SCC_ON_5G_HIGH_CH_24G)
+			add_chlist_to_pcl(pm_ctx->pdev,
+					  pcl_channels, pcl_weights, pcl_sz,
+					  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+					  channel_list_24, chan_index_24,
+					  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SBS_CH_MCC_CH_SCC_ON_24_24G:

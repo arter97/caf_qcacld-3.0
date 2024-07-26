@@ -510,6 +510,10 @@ enum policy_mgr_mac_use {
  * followed by MCC channels on 5G high frequencies
  * @PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW: SCC channels on 5G high frequencies
  * followed by MCC channels on 5G low frequencies
+ * @PM_SCC_ON_5G_LOW_CH_24G: SCC channels on 5G low frequencies followed by
+ * 2.4 GHz channels.
+ * @PM_SCC_ON_5G_HIGH_CH_24G: SCC channels on 5G high frequencies followed by
+ * 2.4 GHz channels.
  *
  * @PM_MAX_PCL_TYPE: Max place holder
  *
@@ -568,6 +572,8 @@ enum policy_mgr_pcl_type {
 	PM_MCC_CH_SCC_ON_24G,
 	PM_SCC_ON_5G_LOW_MCC_ON_5G_HIGH,
 	PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW,
+	PM_SCC_ON_5G_LOW_CH_24G,
+	PM_SCC_ON_5G_HIGH_CH_24G,
 
 	PM_MAX_PCL_TYPE
 };

@@ -2168,10 +2168,10 @@ policy_mgr_check_and_get_third_connection_pcl_table_index_for_mcc(
 {
 	enum policy_mgr_two_connection_mode index = PM_MAX_TWO_CONNECTION_MODE;
 
-	if (policy_mgr_are_2_freq_on_same_mac(psoc,
-					      pm_conc_connection_list[0].freq,
-					      pm_conc_connection_list[1].freq)
-					     ) {
+	if (policy_mgr_2_freq_always_on_same_mac(
+					psoc,
+					pm_conc_connection_list[0].freq,
+					pm_conc_connection_list[1].freq)) {
 		if ((WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
 		    (WLAN_REG_IS_24GHZ_CH_FREQ(
@@ -2223,10 +2223,10 @@ policy_mgr_check_and_get_third_connection_pcl_table_index_for_dbs(
 {
 	enum policy_mgr_two_connection_mode index = PM_MAX_TWO_CONNECTION_MODE;
 
-	if (!policy_mgr_are_2_freq_on_same_mac(psoc,
-					       pm_conc_connection_list[0].freq,
-					       pm_conc_connection_list[1].freq)
-					      ) {
+	if (!policy_mgr_2_freq_always_on_same_mac(
+					psoc,
+					pm_conc_connection_list[0].freq,
+					pm_conc_connection_list[1].freq)) {
 		/* SBS */
 		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
@@ -2822,7 +2822,7 @@ policy_mgr_get_third_connection_pcl_table_index_sta_ll_lt_sap(
 	 * LL_LT_SAP can not be in SCC so there will not be any scc index.
 	 * With LL_LT_SAP, MCC is possible only on 5 GHz
 	 */
-	if (policy_mgr_are_2_freq_on_same_mac(
+	if (policy_mgr_2_freq_always_on_same_mac(
 					psoc,
 					pm_conc_connection_list[0].freq,
 					pm_conc_connection_list[1].freq)) {
@@ -2914,7 +2914,7 @@ policy_mgr_get_third_connection_pcl_table_index_go_ll_lt_sap(
 	 * LL_LT_SAP can not be in SCC so there will not be any scc index.
 	 * With LL_LT_SAP, MCC is possible only on 5 GHz
 	 */
-	if (policy_mgr_are_2_freq_on_same_mac(
+	if (policy_mgr_2_freq_always_on_same_mac(
 					psoc,
 					pm_conc_connection_list[0].freq,
 					pm_conc_connection_list[1].freq)) {
@@ -2968,7 +2968,7 @@ policy_mgr_get_third_connection_pcl_table_index_cli_ll_lt_sap(
 	 * LL_LT_SAP can not be in SCC so there will not be any scc index.
 	 * With LL_LT_SAP, MCC is possible only on 5 GHz
 	 */
-	if (policy_mgr_are_2_freq_on_same_mac(
+	if (policy_mgr_2_freq_always_on_same_mac(
 					psoc,
 					pm_conc_connection_list[0].freq,
 					pm_conc_connection_list[1].freq)) {
