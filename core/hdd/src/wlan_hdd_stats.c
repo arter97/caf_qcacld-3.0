@@ -3510,22 +3510,22 @@ int wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
 	tSirLLStatsGetReq get_req;
 	struct hdd_adapter *adapter = link_info->adapter;
 
-	hdd_enter_dev(adapter->dev);
-
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
-		hdd_warn("Command not allowed in FTM mode");
+		hdd_warn_rl("Command not allowed in FTM mode");
 		return -EPERM;
 	}
 
 	if (hdd_cm_is_vdev_roaming(link_info)) {
-		hdd_debug("Roaming in progress, cannot process the request");
+		hdd_info_rl("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
 
 	if (!adapter->is_link_layer_stats_set) {
-		hdd_info("LL_STATs not set");
+		hdd_info_rl("LL_STATs not set");
 		return -EINVAL;
 	}
+
+	hdd_enter_dev(adapter->dev);
 
 	get_req.reqId = req_id;
 	get_req.paramIdMask = req_mask;
