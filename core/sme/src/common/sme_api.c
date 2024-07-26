@@ -15335,6 +15335,31 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed to set scan mode for 6 GHz, %d", status);
 }
+
+void sme_config_ba_mode_all_vdevs(mac_handle_t mac_handle, uint8_t val)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	enum QDF_OPMODE op_mode;
+	uint8_t vdev_id;
+	int ret_val = 0;
+
+	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
+		op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
+		if (op_mode == QDF_STA_MODE) {
+			ret_val = wma_cli_set_command(
+						vdev_id,
+						wmi_vdev_param_set_ba_mode,
+						val, VDEV_CMD);
+
+		if (QDF_IS_STATUS_ERROR(ret_val))
+			sme_err("BA mode set failed for vdev: %d, ret %d",
+				vdev_id, ret_val);
+		else
+			sme_debug("vdev: %d ba mode: %d param id %d",
+				  vdev_id, val, wmi_vdev_param_set_ba_mode);
+		}
+	}
+}
 #endif
 
 #ifdef WLAN_FEATURE_11BE
@@ -15485,31 +15510,6 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	ucfg_mlme_set_bss_color_collision_det_sta(mac_ctx->psoc, false);
 }
 
-void sme_set_per_link_ba_mode(mac_handle_t mac_handle, uint8_t val)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	enum QDF_OPMODE op_mode;
-	uint8_t vdev_id;
-	int ret_val = 0;
-
-	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
-		op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
-		if (op_mode == QDF_STA_MODE) {
-			ret_val = wma_cli_set_command(
-						vdev_id,
-						wmi_vdev_param_set_ba_mode,
-						val, VDEV_CMD);
-
-		if (QDF_IS_STATUS_ERROR(ret_val))
-			sme_err("BA mode set failed for vdev: %d, ret %d",
-				vdev_id, ret_val);
-		else
-			sme_debug("vdev: %d ba mode: %d param id %d",
-				  vdev_id, val, wmi_vdev_param_set_ba_mode);
-		}
-	}
-}
-
 static inline
 void sme_set_mcs_15_tx_rx_disable(uint8_t vdev_id)
 {
@@ -15562,7 +15562,7 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 							       &val);
 	if (QDF_IS_STATUS_SUCCESS(status))
 		ucfg_mlme_set_bss_color_collision_det_sta(mac_ctx->psoc, val);
-	sme_set_per_link_ba_mode(mac_handle, ba_mode_auto);
+	sme_config_ba_mode_all_vdevs(mac_handle, ba_mode_auto);
 	sme_set_mcs_15_tx_rx_disable(vdev_id);
 	wlan_mlme_set_btm_abridge_flag(mac_ctx->psoc, false);
 	wlan_mlme_set_eht_mld_id(mac_ctx->psoc, 0);
