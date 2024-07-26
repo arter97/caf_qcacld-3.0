@@ -13123,6 +13123,7 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_con_mode con_mode;
 	union conc_ext_flag conc_ext_flags;
 	uint32_t cc_count, i, j, ap_index;
+	bool found = false;
 	uint32_t op_freq[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 	QDF_STATUS status;
@@ -13183,7 +13184,20 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 			ap_index = j;
 			break;
 		}
+		if (policy_mgr_get_connection_count(psoc) >= 3 && !found) {
+			if (ch_freq == pcl.pcl_list[i])
+				found = true;
+		}
 	}
+
+	/* For fourth connect check, if SAP setup freq not found in
+	 * pcl.pcl_list, set ap_index 0 avoid return true, then
+	 * SAP can start on ap_index's home channel instead of
+	 * start failure.
+	 */
+	if (policy_mgr_get_connection_count(psoc) >= 3 && !found)
+		ap_index = 0;
+
 	/* If same band MCC SAP/GO not present, return true,
 	 * no AP to AP channel override
 	 */
