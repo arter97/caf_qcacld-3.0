@@ -2534,7 +2534,7 @@ void wlan_hdd_ft_set_key_delay(struct wlan_objmgr_vdev *vdev)
 
 	if (ucfg_cm_ft_key_ready_for_install(vdev))
 		errno =
-		wlan_cfg80211_crypto_add_key(vdev,
+		wlan_cfg80211_crypto_add_key(vdev, NULL,
 					     WLAN_CRYPTO_KEY_TYPE_UNICAST,
 					     0, false);
 	if (errno)

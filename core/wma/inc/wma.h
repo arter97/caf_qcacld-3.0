@@ -2457,12 +2457,13 @@ void wma_set_peer_ucast_cipher(uint8_t *mac_addr, int32_t cipher,
  * @session_id: vdev session identifier
  * @pairwise: denotes if it is pairwise or group key
  * @key_index: Key Index
+ * @peer_mac: MAC address of crypto key entity
  * @cipher_type: cipher type being used for the encryption/decryption
  *
  * Return: None
  */
 void wma_update_set_key(uint8_t session_id, bool pairwise,
-			uint8_t key_index,
+			uint8_t key_index, const uint8_t *peer_mac,
 			enum wlan_crypto_cipher_type cipher_type);
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
