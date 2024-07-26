@@ -2222,9 +2222,14 @@ err_soc_detach:
 
 void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
 {
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
 	cdp_soc_deinit(soc);
 	cdp_soc_detach(soc);
 	wlan_dp_svc_deinit(dp_get_context());
+
+	if (dp_ctx)
+		dp_ctx->cdp_soc = NULL;
 }
 
 QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
