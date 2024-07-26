@@ -186,7 +186,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *frame;
 	void *packet;
 	QDF_STATUS qdf_status;
-	struct pe_session *pesession;
+	struct pe_session *pesession = NULL;
 	uint8_t sessionid;
 	const uint8_t *p2pie = NULL;
 	uint8_t txflag = 0;
@@ -247,7 +247,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * Therefore for hidden ssid connections, after 3 unicast probe
 	 * requests, try the pending probes with broadcast mac.
 	 */
-	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(pesession->curr_op_freq) &&
+	if (pesession && !WLAN_REG_IS_6GHZ_CHAN_FREQ(pesession->curr_op_freq) &&
 	    pesession->join_probe_cnt > 2)
 		sir_copy_mac_addr(bssid, bcast_mac);
 
