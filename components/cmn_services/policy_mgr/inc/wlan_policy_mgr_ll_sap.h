@@ -22,6 +22,20 @@
 
 #include "wlan_objmgr_psoc_obj.h"
 
+/**
+ * enum ll_lt_sap_event - event of LL SAP
+ * @LL_LT_SAP_EVENT_STARTING: LL_LT_SAP is starting
+ * @LL_LT_SAP_EVENT_STARTED: LL_LT_SAP has started.
+ * @LL_LT_SAP_EVENT_STOPPED: LL_LT_SAP has stopped.
+ * @LL_LT_SAP_EVENT_MAX: LL_LT_SAP max event
+ */
+enum ll_lt_sap_event {
+	LL_LT_SAP_EVENT_STARTING = 1,
+	LL_LT_SAP_EVENT_STARTED,
+	LL_LT_SAP_EVENT_STOPPED,
+	LL_LT_SAP_EVENT_MAX,
+};
+
 #ifdef WLAN_FEATURE_LL_LT_SAP
 /**
  * wlan_policy_mgr_get_ll_lt_sap_vdev_id() - Get ll_lt_sap vdev id
@@ -53,8 +67,7 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_ll_lt_sap_restart_concurrent_sap() - Check and restart
  * concurrent SAP or ll_lt_sap
  * @psoc: PSOC object
- * @is_ll_lt_sap_enabling: Indicates if ll_lt_sap is getting enabled or
- * getting disabled
+ * @event: Indicates if ll_lt_sap is getting enabled or getting disabled
  *
  * This API checks and restarts concurrent SAP or ll_lt_sap when ll_lt_sap comes
  * up or goes down.
@@ -71,7 +84,7 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
  * Return: None
  */
 void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
-						 bool is_ll_lt_sap_enabling);
+						 enum ll_lt_sap_event event);
 #else
 
 static inline bool
@@ -88,7 +101,7 @@ uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
 
 static inline void
 policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
-					    bool is_ll_lt_sap_enabling)
+					    enum ll_lt_sap_event event)
 {
 }
 #endif

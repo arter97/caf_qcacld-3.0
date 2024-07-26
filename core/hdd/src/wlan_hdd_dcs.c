@@ -581,17 +581,25 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 	struct wlan_hdd_link_info *link_info;
 	uint32_t dcs_ch = wlan_reg_freq_to_chan(hdd_ctx->pdev, dcs_ch_freq);
 
-	hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(hdd_ctx->psoc,
-							    vdev_id);
+	/* For LL SAP switch only for LL SAP, not for all vdev on same MAC */
+	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id)) {
+		hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
+								hdd_ctx->psoc,
+								vdev_id);
+		count = 1;
+		list[0] = vdev_id;
+	} else {
+		status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
+							     vdev_id,
+							     &mac_id);
 
-	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc, vdev_id,
-						     &mac_id);
-
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("get mac id failed");
-		return QDF_STATUS_E_INVAL;
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("get mac id failed");
+				return QDF_STATUS_E_INVAL;
+		}
+		count = policy_mgr_get_sap_go_count_on_mac(hdd_ctx->psoc, list,
+							   mac_id);
 	}
-	count = policy_mgr_get_sap_go_count_on_mac(hdd_ctx->psoc, list, mac_id);
 
 	/*
 	 * Dcs can only be enabled after all vdev finish csa.
@@ -613,6 +621,7 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 		else
 			wlansap_dcs_set_vdev_starting(sap_ctx, false);
 	}
+
 	for (conn_idx = 0; conn_idx < count; conn_idx++) {
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx, list[conn_idx]);
 		if (!link_info) {

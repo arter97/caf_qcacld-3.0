@@ -4173,8 +4173,9 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id)) {
 		is_ll_lt_sap = true;
-		policy_mgr_ll_lt_sap_restart_concurrent_sap(hdd_ctx->psoc,
-							    true);
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(
+							hdd_ctx->psoc,
+							LL_LT_SAP_EVENT_STARTING);
 	}
 
 	if (is_ll_lt_sap || sap_force_11n_for_11ac)
