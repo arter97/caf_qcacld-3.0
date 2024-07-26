@@ -6681,12 +6681,16 @@ static bool check_disable_channels(struct hdd_context *hdd_ctx,
 	    !hdd_ctx->original_channels->channel_info)
 		return false;
 
+	qdf_mutex_acquire(&hdd_ctx->cache_channel_lock);
 	num_channels = hdd_ctx->original_channels->num_channels;
 	for (i = 0; i < num_channels; i++) {
 		if (operating_freq ==
-		    hdd_ctx->original_channels->channel_info[i].freq)
+		    hdd_ctx->original_channels->channel_info[i].freq) {
+			qdf_mutex_release(&hdd_ctx->cache_channel_lock);
 			return true;
+		}
 	}
+	qdf_mutex_release(&hdd_ctx->cache_channel_lock);
 
 	return false;
 }
