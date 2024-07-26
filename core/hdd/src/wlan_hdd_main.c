@@ -6407,7 +6407,7 @@ hdd_set_derived_multicast_list(struct wlan_objmgr_psoc *psoc,
 			       struct pmo_mc_addr_list_params *mc_list_request,
 			       int *mc_count)
 {
-	int i = 0, j = 0, list_count = *mc_count;
+	uint8_t i = 0, j = 0, list_count = *mc_count;
 	struct qdf_mac_addr *peer_mc_addr_list = NULL;
 	uint8_t  driver_mc_cnt = 0;
 	uint32_t max_ndp_sessions = 0;
@@ -6423,7 +6423,8 @@ hdd_set_derived_multicast_list(struct wlan_objmgr_psoc *psoc,
 						 &peer_mc_addr_list[j]))
 				break;
 		}
-		if (i == list_count) {
+		if (i == list_count &&
+		    (list_count + driver_mc_cnt < PMO_MAX_MC_ADDR_LIST)) {
 			qdf_mem_copy(
 			   &(mc_list_request->mc_addr[list_count +
 						driver_mc_cnt].bytes),
