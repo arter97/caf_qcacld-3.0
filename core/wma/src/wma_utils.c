@@ -4499,7 +4499,7 @@ QDF_STATUS wma_remove_bss_peer_before_join(
 		del_req = wma_fill_hold_req(wma, vdev_id,
 					    WMA_DELETE_STA_REQ,
 					    WMA_DELETE_STA_CONNECT_RSP,
-					    cm_join_req,
+					    mac_addr, cm_join_req,
 					    WMA_DELETE_STA_TIMEOUT);
 		if (!del_req) {
 			wma_err("Failed to allocate request. vdev_id %d",

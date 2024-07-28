@@ -1535,8 +1535,8 @@ QDF_STATUS wma_send_pdev_set_antenna_mode(tp_wma_handle wma_handle,
 
 struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 				    uint8_t vdev_id, uint32_t msg_type,
-				    uint8_t type, void *params,
-				    uint32_t timeout);
+				    uint8_t type, uint8_t *mac_addr,
+				    void *params, uint32_t timeout);
 
 int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 				   uint32_t len);
