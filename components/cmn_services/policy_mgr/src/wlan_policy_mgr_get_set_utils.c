@@ -11845,6 +11845,11 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	 * moved to right channel.
 	 */
 	for (idx = 0; idx < sta_cnt + gc_cnt; idx++) {
+		if (idx >= MAX_NUMBER_OF_CONC_CONNECTIONS) {
+			policy_mgr_err("idx:%u is out of bounds", idx);
+			return false;
+		}
+
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
 							    vdev_id_list[idx],
 							    WLAN_POLICY_MGR_ID);

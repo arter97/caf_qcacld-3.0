@@ -11786,6 +11786,10 @@ lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
 
 	vdev_num = policy_mgr_get_sap_mode_info(session->mac_ctx->psoc,
 						freq_list, vdev_id_list);
+	if (vdev_num >= MAX_NUMBER_OF_CONC_CONNECTIONS) {
+		pe_err("vdev_num:%u is out of bounds", vdev_num);
+		return;
+	}
 
 	for (i = 0; i < vdev_num; i++) {
 		if (vdev_id_list[i] ==  session->vdev_id)
