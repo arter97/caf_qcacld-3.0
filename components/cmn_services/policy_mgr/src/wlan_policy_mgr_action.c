@@ -3228,6 +3228,73 @@ policy_mgr_proc_deferred_csa(struct wlan_objmgr_psoc *psoc, bool *handled)
 }
 #endif
 
+/*
+ * policy_mgr_switch_sap_vdev_table_sequence() - select SAP 5 GHz as vdev[0]
+ *
+ * @pm_ctx: Policy manager private data
+ * @vdev_id: vdev_id table
+ * @cc_count: number of valid sap mode in use
+ *
+ * For MLO STA and 5G AP + 6G AP psc chn.
+ * MLO STA connect 5 GHz AP and 6 GHz non-psc channel AP,
+ * we prefer switch 5 GHz AP to STA 5G channel for scc first,
+ * then switch 6G AP if needed. So, exchange vdev[0] and do sap restart first.
+ *
+ * Return: void
+ */
+static void
+policy_mgr_switch_sap_vdev_table_sequence(struct policy_mgr_psoc_priv_obj *pm_ctx,
+					  uint8_t *vdev_id, uint32_t cc_count)
+{
+	uint8_t i;
+	qdf_freq_t sta_5g_freq = 0, sap_5g_freq = 0;
+	qdf_freq_t sta_6g_freq = 0, sap_6g_freq = 0;
+	uint8_t sap_5g_vdev_id = 0;
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (pm_conc_connection_list[i].mode == PM_SAP_MODE &&
+		    pm_conc_connection_list[i].in_use) {
+			if (WLAN_REG_IS_5GHZ_CH_FREQ(pm_conc_connection_list[i].freq)) {
+				sap_5g_freq = pm_conc_connection_list[i].freq;
+				sap_5g_vdev_id = pm_conc_connection_list[i].vdev_id;
+			} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pm_conc_connection_list[i].freq)) {
+				sap_6g_freq = pm_conc_connection_list[i].freq;
+			}
+		} else if (pm_conc_connection_list[i].mode == PM_STA_MODE &&
+			   pm_conc_connection_list[i].in_use) {
+			if (WLAN_REG_IS_5GHZ_CH_FREQ(pm_conc_connection_list[i].freq))
+				sta_5g_freq = pm_conc_connection_list[i].freq;
+			else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pm_conc_connection_list[i].freq))
+				sta_6g_freq = pm_conc_connection_list[i].freq;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	if (sta_5g_freq && sap_5g_freq && sta_5g_freq != sap_5g_freq &&
+	    sta_6g_freq && sap_6g_freq && sta_6g_freq != sap_6g_freq &&
+	    !wlan_reg_is_6ghz_psc_chan_freq(sta_6g_freq)) {
+		policy_mgr_debug("5g sta:%d, sap:%d, 6g: sta:%d, sap:%d vdev_id:%d",
+				 sta_5g_freq, sap_5g_freq,
+				 sta_6g_freq, sap_6g_freq, sap_5g_vdev_id);
+		policy_mgr_debug("before exchange vdev restart table");
+		for (i = 0; i < cc_count; i++)
+			policy_mgr_debug("vdev_id:%d", vdev_id[i]);
+
+		for (i = 0; i < cc_count; i++) {
+			if (vdev_id[i] == sap_5g_vdev_id) {
+				vdev_id[i] = vdev_id[0];
+				vdev_id[0] = sap_5g_vdev_id;
+				break;
+			}
+		}
+
+		policy_mgr_debug("after exchange vdev restart table");
+		for (i = 0; i < cc_count; i++)
+			policy_mgr_debug("vdev_id:%d", vdev_id[i]);
+	}
+}
+
 static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 				struct policy_mgr_psoc_priv_obj *pm_ctx)
 {
@@ -3355,6 +3422,15 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 		policy_mgr_err("SAP restart get channel callback in NULL");
 		goto end;
 	}
+
+	/* For MLO STA 5 GHz + 6 GHz(no-psc chn) and  SAP 5+6 GHz(psc chn),
+	 * prefer switch 5 GHz SAP first, select it as vdev[0] to restart
+	 * first.
+	 */
+	policy_mgr_switch_sap_vdev_table_sequence(pm_ctx,
+						  &vdev_id[0],
+						  cc_count);
+
 	if (cc_count <= MAX_NUMBER_OF_CONC_CONNECTIONS)
 		for (i = 0; i < cc_count; i++) {
 			status = pm_ctx->hdd_cbacks.
