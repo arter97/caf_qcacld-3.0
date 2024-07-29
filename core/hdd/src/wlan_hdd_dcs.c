@@ -325,7 +325,10 @@ hdd_dcs_continue_csa_for_ll_lt_sap_post_bearer_switch(
 		return;
 	}
 
-	wlan_hdd_cfg80211_start_acs(link_info);
+	if (wlan_hdd_cfg80211_start_acs(link_info))
+		hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
+								hdd_ctx->psoc,
+								vdev_id);
 }
 
 /**
