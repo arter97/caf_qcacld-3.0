@@ -2039,6 +2039,25 @@ QDF_STATUS p2p_ready_to_tx_frame(struct p2p_soc_priv_obj *p2p_soc_obj,
 	return status;
 }
 
+QDF_STATUS
+p2p_cancel_tx_frame_by_roc(struct p2p_soc_priv_obj *p2p_soc_obj,
+			   uint64_t cookie)
+{
+	struct tx_action_context *cur_tx_ctx;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	cur_tx_ctx = p2p_find_tx_ctx_by_roc(p2p_soc_obj, cookie);
+
+	while (cur_tx_ctx) {
+		p2p_debug("tx_ctx:%pK", cur_tx_ctx);
+		p2p_send_tx_conf(cur_tx_ctx, false);
+		p2p_remove_tx_context(cur_tx_ctx);
+		cur_tx_ctx = p2p_find_tx_ctx_by_roc(p2p_soc_obj, cookie);
+	}
+
+	return status;
+}
+
 QDF_STATUS p2p_cleanup_tx_sync(
 	struct p2p_soc_priv_obj *p2p_soc_obj,
 	struct wlan_objmgr_vdev *vdev)
