@@ -315,8 +315,8 @@ policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	qdf_freq_t sta_5g_freqs[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	qdf_freq_t ap_5g_freqs[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint16_t ap_ch_flagext[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ap_5g_freqs[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
+	uint16_t ap_ch_flagext[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 	uint32_t num_5g_sta = 0, num_5g_ap = 0;
 	bool sta_on_5g = false;
 	bool sta_on_2g = false;
