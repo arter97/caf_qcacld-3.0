@@ -3197,7 +3197,7 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 	QDF_STATUS status;
 	uint8_t *data;
 	uint8_t *addba_rsp_ptr;
-	uint32_t data_len;
+	uint32_t data_len, offset;
 	struct wmi_mgmt_params *mgmt_params = (struct wmi_mgmt_params *)params;
 
 	if (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
@@ -3211,28 +3211,70 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 	}
 
 	data = qdf_nbuf_data(buf);
-
 	if (!data) {
 		pe_err("Addba response frame is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	mac_hdr = (tSirMacMgmtHdr *)data;
+	if (mac_hdr->fc.wep) {
+		uint8_t mic_len, hdr_len, pdev_id, vdev_id;
+		struct wlan_objmgr_vdev *vdev;
+		struct vdev_mlme_obj *vdev_mlme;
+
+		vdev_id = mgmt_params->vdev_id;
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+					vdev_id, WLAN_LEGACY_MAC_ID);
+		if (!vdev) {
+			pe_err("vdev is NULL");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+		if (!vdev_mlme) {
+			pe_err("Failed to get vdev mlme obj!");
+			wlan_objmgr_vdev_release_ref(vdev,
+						     WLAN_LEGACY_MAC_ID);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_NDI) {
+			hdr_len = IEEE80211_CCMP_HEADERLEN;
+			mic_len = IEEE80211_CCMP_MICLEN;
+		} else {
+			pdev_id = wlan_objmgr_pdev_get_pdev_id(
+							mac_ctx->pdev);
+			status = mlme_get_peer_mic_len(mac_ctx->psoc,
+					       pdev_id, mac_hdr->da,
+					       &mic_len, &hdr_len);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				pe_err("Fail to get mic info");
+				wlan_objmgr_vdev_release_ref(vdev,
+							WLAN_LEGACY_MAC_ID);
+				return QDF_STATUS_E_FAILURE;
+			}
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		offset = sizeof(*mac_hdr) + hdr_len;
+	} else {
+		offset = sizeof(*mac_hdr);
+	}
+
 	data_len = (uint32_t)qdf_nbuf_get_data_len(buf);
-	if (data_len < (sizeof(*mac_hdr) + sizeof(rsp))) {
+	if (data_len < (offset + sizeof(rsp))) {
 		pe_err("Invalid data len %d", data_len);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	addba_rsp_ptr = lim_get_addba_rsp_ptr(
-				data + sizeof(*mac_hdr),
-				data_len - sizeof(*mac_hdr));
+	addba_rsp_ptr = lim_get_addba_rsp_ptr(data + offset,
+					      data_len - offset);
 	if (!addba_rsp_ptr) {
 		pe_debug("null addba_rsp_ptr");
 		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   (void *)data, data_len);
-		addba_rsp_ptr = (uint8_t *)data + sizeof(*mac_hdr);
+		addba_rsp_ptr = (uint8_t *)data + offset;
 	}
-	mac_hdr = (tSirMacMgmtHdr *)data;
+
 	rsp_len = sizeof(rsp);
 	status = dot11f_unpack_addba_rsp(mac_ctx, addba_rsp_ptr,
 					 rsp_len, &rsp, false);
