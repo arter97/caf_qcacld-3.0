@@ -866,6 +866,7 @@ enum {
 	IEEE80211_PARAM_ASSOC_REJECT = 818,
 #endif
 	IEEE80211_PARAM_LIST_REG_CHAN = 819,
+	IEEE80211_PARAM_PURE_11AX_ENABLE = 820,
 };
 
 enum {
@@ -1484,6 +1485,7 @@ enum _ol_ath_param_t {
         OL_ATH_PARAM_RC_UPPER_CAP_DL_DIR = 540,
         OL_ATH_PARAM_RC_UPPER_CAP_UL_DIR = 541,
 #endif
+	OL_ATH_PARAM_PRE_11AX_PACKET_REMOVAL = 542,
 	OL_ATH_PARAM_DUMP_ALL_NODES = 543,
 	OL_ATH_PARAM_EDGE_NODE_ADV = 544,
 	OL_ATH_PARAM_ENABLE_IOT_MESH_FEATURE = 545,
@@ -2610,6 +2612,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, SET_PARAM, 2},
 	{"g_assoc_reject", IEEE80211_PARAM_ASSOC_REJECT, GET_PARAM, 0},
 #endif
+	{"pure_11ax", IEEE80211_PARAM_PURE_11AX_ENABLE, SET_PARAM, 1},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
@@ -3918,6 +3921,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_EML, GET_PARAM, 0},
 
 #endif
+	{"pre_11ax_packet_removal",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PRE_11AX_PACKET_REMOVAL, SET_PARAM, 1},
 	{"set_as_edge_node",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EDGE_NODE_ADV,
 							SET_PARAM, 1},
