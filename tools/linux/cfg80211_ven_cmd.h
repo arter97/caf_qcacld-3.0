@@ -3947,6 +3947,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"iot_mesh_mcast_drop",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_IOT_MESH_MCAST_DROP,
 							SET_PARAM, 1},
+	{"set_mgmtretrylimit",
+		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_RADIO_MGMT_RETRY_LIMIT, SET_PARAM, 1}
 };
 #endif
 
