@@ -6380,6 +6380,9 @@ cm_get_diag_roam_sub_reason(enum roam_trigger_sub_reason sub_reason)
 	case ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU:
 		return DIAG_ROAM_SUB_REASON_INACTIVITY_TIMER_CU;
 
+	case ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN:
+		return DIAG_ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN;
+
 	default:
 		break;
 	}
@@ -7435,9 +7438,11 @@ cm_roam_btm_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 	 * is received only once on the device. Restricting the
 	 * BTM req and BTM candidate event to be logged only for partial scan
 	 */
-	if (trigger_info->present &&
-	    trigger_info->scan_type == ROAM_STATS_SCAN_TYPE_FULL &&
-	    btm_data->disassoc_timer)
+	if ((trigger_info->present &&
+	     trigger_info->scan_type == ROAM_STATS_SCAN_TYPE_FULL &&
+	    btm_data->disassoc_timer) ||
+	    trigger_info->trigger_sub_reason ==
+	    ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN)
 		return status;
 
 	if (neigh_rpt->resp_time)

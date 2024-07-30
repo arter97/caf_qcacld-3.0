@@ -200,6 +200,8 @@
  * @ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU: Roam scan triggered due to
  * first periodic timer exiry when full scan count is 0 and roam scan trigger
  * is CU load
+ * @ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN: Additional partial roam scan
+ * triggered during MLO usecase.
  */
 enum roam_trigger_sub_reason {
 	ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER = 1,
@@ -211,6 +213,7 @@ enum roam_trigger_sub_reason {
 	ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY,
 	ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY_CU,
 	ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU,
+	ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN,
 };
 
 /**

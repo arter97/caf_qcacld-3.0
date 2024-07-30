@@ -5639,6 +5639,8 @@ char *mlme_get_sub_reason_str(enum roam_trigger_sub_reason sub_reason)
 		return "LOW RSSI PERIODIC TIMER2";
 	case ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU:
 		return "CU INACTIVITY TIMER";
+	case ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN:
+		return "MLD Additional partial Scan";
 	default:
 		return "NONE";
 	}
