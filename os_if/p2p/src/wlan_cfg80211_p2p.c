@@ -571,6 +571,79 @@ int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
 }
 
 #ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * osif_p2p_op_type_convert_qca_enum_to_p2p_enum() - this API convert
+ * QCA_WLAN_VENDOR_USD_OP_TYPE_XX to P2P_USD_OP_TYPE_XX
+ * @qca_op_type: QCA WLAN vendor attribute USD OP type
+ * @p2p_op_type: pointer to P2P USD OP type
+ *
+ * Return: 0 in case of success else error value
+ */
+static int
+osif_p2p_op_type_convert_qca_enum_to_p2p_enum(
+			enum qca_wlan_vendor_attr_an_usd_op_type qca_op_type,
+			enum p2p_usd_op_type *p2p_op_type)
+{
+	switch (qca_op_type) {
+	case QCA_WLAN_VENDOR_USD_OP_TYPE_FLUSH:
+		*p2p_op_type = P2P_USD_OP_TYPE_FLUSH;
+		break;
+	case QCA_WLAN_VENDOR_USD_OP_TYPE_PUBLISH:
+		*p2p_op_type = P2P_USD_OP_TYPE_PUBLISH;
+		break;
+	case QCA_WLAN_VENDOR_USD_OP_TYPE_SUBSCRIBE:
+		*p2p_op_type = P2P_USD_OP_TYPE_SUBSCRIBE;
+		break;
+	case QCA_WLAN_VENDOR_USD_OP_TYPE_UPDATE_PUBLISH:
+		*p2p_op_type = P2P_USD_OP_TYPE_UPDATE_PUBLISH;
+		break;
+	case QCA_WLAN_VENDOR_USD_OP_TYPE_CANCEL_PUBLISH:
+		*p2p_op_type = P2P_USD_OP_TYPE_CANCEL_PUBLISH;
+		break;
+	case QCA_WLAN_VENDOR_USD_OP_TYPE_CANCEL_SUBSCRIBE:
+		*p2p_op_type = P2P_USD_OP_TYPE_CANCEL_SUBSCRIBE;
+		break;
+	default:
+		osif_err("invalid OP type %d", qca_op_type);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * osif_p2p_service_protocol_type_convert_qca_enum_to_p2p_enum() - this API
+ * converts QCA_WLAN_VENDOR_USD_SERVICE_PROTOCOL_TYPE_XX to
+ * P2P_USD_SERVICE_PROTOCOL_TYPE_XX
+ *
+ * @qca_type: QCA WLAN vendor attribute USD service protocol type
+ * @p2p_type: pointer to P2P USD service protocol type
+ *
+ * Return: 0 in case of success else error value
+ */
+static int
+osif_p2p_service_protocol_type_convert_qca_enum_to_p2p_enum(
+		enum qca_wlan_vendor_attr_usd_service_protocol_type qca_type,
+		enum p2p_usd_service_protocol_type *p2p_type)
+{
+	switch (qca_type) {
+	case QCA_WLAN_VENDOR_USD_SERVICE_PROTOCOL_TYPE_BONJOUR:
+		*p2p_type = P2P_USD_SERVICE_PROTOCOL_TYPE_BONJOUR;
+		break;
+	case QCA_WLAN_VENDOR_USD_SERVICE_PROTOCOL_TYPE_GENERIC:
+		*p2p_type = P2P_USD_SERVICE_PROTOCOL_TYPE_GENERIC;
+		break;
+	case QCA_WLAN_VENDOR_USD_SERVICE_PROTOCOL_TYPE_CSA_MATTER:
+		*p2p_type = P2P_USD_SERVICE_PROTOCOL_TYPE_CSA_MATTER;
+		break;
+	default:
+		osif_err("invalid service protocol type %d", qca_type);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			     const void *data, int data_len)
 {
@@ -580,6 +653,8 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	QDF_STATUS status;
 	uint8_t freq_config;
 	int ret = -EINVAL;
+	enum qca_wlan_vendor_attr_an_usd_op_type qca_op_type;
+	enum qca_wlan_vendor_attr_usd_service_protocol_type qca_service_type;
 
 	/* Parse and fetch USD params*/
 	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_USD_MAX,
@@ -599,10 +674,14 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	qdf_mem_zero(usd_param, sizeof(*usd_param));
 
-	usd_param->op_type =
-			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_USD_OP_TYPE]);
+	qca_op_type = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_USD_OP_TYPE]);
+	ret = osif_p2p_op_type_convert_qca_enum_to_p2p_enum(
+							qca_op_type,
+							&usd_param->op_type);
+	if (ret)
+		goto mem_free;
 
-	if (usd_param->op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_FLUSH)
+	if (qca_op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_FLUSH)
 		goto end;
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_USD_INSTANCE_ID]) {
@@ -619,8 +698,7 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (tb[QCA_WLAN_VENDOR_ATTR_USD_SSI]) {
 		usd_param->ssi.len = nla_len(tb[QCA_WLAN_VENDOR_ATTR_USD_SSI]);
 
-		usd_param->ssi.data = qdf_mem_malloc(
-						sizeof(*usd_param->ssi.data));
+		usd_param->ssi.data = qdf_mem_malloc(usd_param->ssi.len);
 		if (!usd_param->ssi.data)
 			goto mem_free;
 
@@ -637,8 +715,8 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	 * no need to parse other attributes for the OP type other than
 	 * Publish and Subscribe
 	 */
-	if (usd_param->op_type != QCA_WLAN_VENDOR_USD_OP_TYPE_PUBLISH &&
-	    usd_param->op_type != QCA_WLAN_VENDOR_USD_OP_TYPE_SUBSCRIBE)
+	if (qca_op_type != QCA_WLAN_VENDOR_USD_OP_TYPE_PUBLISH &&
+	    qca_op_type != QCA_WLAN_VENDOR_USD_OP_TYPE_SUBSCRIBE)
 		goto end;
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_USD_SRC_ADDR]) {
@@ -659,8 +737,7 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			nla_len(tb[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_ID]);
 
 	usd_param->service_info.service_id =
-			qdf_mem_malloc(
-				sizeof(*usd_param->service_info.service_id));
+				qdf_mem_malloc(usd_param->service_info.len);
 	if (!usd_param->service_info.service_id)
 		goto mem_free;
 
@@ -678,8 +755,11 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto mem_free;
 	}
 
-	usd_param->service_info.protocol_type =
-	nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_PROTOCOL_TYPE]);
+	qca_service_type =
+		nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_PROTOCOL_TYPE]);
+	ret = osif_p2p_service_protocol_type_convert_qca_enum_to_p2p_enum(
+					qca_service_type,
+					&usd_param->service_info.protocol_type);
 
 	osif_debug("service protocol type %d",
 		   usd_param->service_info.protocol_type);
@@ -713,8 +793,7 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 						nla_len(tb2[freq_config]);
 
 		usd_param->freq_config.freq_list.freq =
-			qdf_mem_malloc(
-				sizeof(*usd_param->freq_config.freq_list.freq));
+			qdf_mem_malloc(usd_param->service_info.len);
 		if (!usd_param->freq_config.freq_list.freq)
 			goto mem_free;
 
@@ -736,7 +815,7 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	usd_param->frame.len =
 		nla_len(tb[QCA_WLAN_VENDOR_ATTR_USD_ELEMENT_CONTAINER]);
 
-	usd_param->frame.data = qdf_mem_malloc(sizeof(*usd_param->frame.data));
+	usd_param->frame.data = qdf_mem_malloc(usd_param->frame.len);
 	if (!usd_param->frame.data)
 		goto mem_free;
 
