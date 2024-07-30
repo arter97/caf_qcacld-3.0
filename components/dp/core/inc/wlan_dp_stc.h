@@ -304,7 +304,23 @@ enum wlan_dp_stc_timer_state {
 	WLAN_DP_STC_TIMER_RUNNING,
 };
 
-struct wlan_dp_stc_peer_traffic_map {
+/**
+ * struct wlan_dp_stc_peer_traffic_context - peer traffic context
+ * @mac_addr: peer mac address
+ * @valid: context valid flag
+ * @vdev_id: vdev_id for the peer
+ * @peer_id: peer_id assigned to this peer
+ * @last_ping_ts: Last seen ping pkt timestamp
+ * @num_streaming: Number of streaming flows on this peer
+ * @num_gaming: Number of gaming flows on this peer
+ * @num_voice_call: Number of voice call flows on this peer
+ * @num_video_call: Number of video call flows on this peer
+ * @active_bk_traffic: Flag to indicate if background traffic is
+ *		       active on this peer
+ * @active_ping: Flag to indicate if ping is active on this peer
+ * @send_fw_ind: Flag to mark if traffic_map indication is to be sent to FW
+ */
+struct wlan_dp_stc_peer_traffic_context {
 	struct qdf_mac_addr mac_addr;
 	uint8_t valid;
 	uint8_t vdev_id;
@@ -320,6 +336,20 @@ struct wlan_dp_stc_peer_traffic_map {
 };
 
 #define DP_STC_CLASSIFIED_TABLE_FLOW_MAX 256
+/**
+ * struct wlan_dp_stc_classified_flow_entry - Classified flow entry
+ * @flow_active: flag to indicate if the flow is active
+ * @vdev_id: vdev_id on which the flow is active
+ * @tx_flow_id: TX flow table index
+ * @rx_flow_id: RX flow table index
+ * @peer_id: ID of the peer on which the flow is running
+ * @prev_tx_pkts: Last snapshot for TX pkts count
+ * @prev_rx_pkts: Last snapshot for RX pkts count
+ * @flags: flags bitmap
+ * @del_flags: delete flags bitmap
+ * @traffic_type: Traffic type identified
+ * @state: STATE
+ */
 struct wlan_dp_stc_classified_flow_entry {
 	uint8_t flow_active;
 	uint8_t vdev_id;
@@ -334,6 +364,11 @@ struct wlan_dp_stc_classified_flow_entry {
 	qdf_atomic_t state;
 };
 
+/**
+ * struct wlan_dp_stc_classified_flow_table - Classified flow table
+ * @num_valid_entries: Number of valid entries
+ * @entries: classified flow table entries
+ */
 struct wlan_dp_stc_classified_flow_table {
 	qdf_atomic_t num_valid_entries;
 	struct wlan_dp_stc_classified_flow_entry entries[DP_STC_CLASSIFIED_TABLE_FLOW_MAX];
@@ -351,7 +386,7 @@ struct wlan_dp_stc_classified_flow_table {
  * @periodic_work_state: States of the periodic flow monitor work
  * @flow_sampling_timer: timer to sample all the short-listed flows
  * @sample_timer_state: sampling timer state
- * @peer_traffic_map: per peer active traffic map
+ * @peer_tc: per peer active traffic context
  * @peer_ping_info: Ping tracking per peer
  * @sampling_flow_table: Sampling flow table
  * @rx_flow_table: RX flow table
@@ -369,7 +404,7 @@ struct wlan_dp_stc {
 	enum wlan_dp_stc_periodic_work_state periodic_work_state;
 	qdf_timer_t flow_sampling_timer;
 	enum wlan_dp_stc_timer_state sample_timer_state;
-	struct wlan_dp_stc_peer_traffic_map peer_traffic_map[DP_STC_MAX_PEERS];
+	struct wlan_dp_stc_peer_traffic_context peer_tc[DP_STC_MAX_PEERS];
 	struct wlan_dp_stc_sampling_table *sampling_flow_table;
 	struct wlan_dp_stc_rx_flow_table *rx_flow_table;
 	struct wlan_dp_stc_tx_flow_table *tx_flow_table;
@@ -446,57 +481,57 @@ wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 }
 
 static inline void
-wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc_peer_traffic_map *active_traffic_map,
+wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc_peer_traffic_context *peer_tc,
 			     enum qca_traffic_type traffic_type)
 {
 	uint32_t val = 0;
 
 	switch (traffic_type) {
 	case QCA_TRAFFIC_TYPE_STREAMING:
-		val = qdf_atomic_inc_return(&active_traffic_map->num_streaming);
+		val = qdf_atomic_inc_return(&peer_tc->num_streaming);
 		break;
 	case QCA_TRAFFIC_TYPE_GAMING:
-		val = qdf_atomic_inc_return(&active_traffic_map->num_gaming);
+		val = qdf_atomic_inc_return(&peer_tc->num_gaming);
 		break;
 	case QCA_TRAFFIC_TYPE_VOICE_CALL:
-		val = qdf_atomic_inc_return(&active_traffic_map->num_voice_call);
+		val = qdf_atomic_inc_return(&peer_tc->num_voice_call);
 		break;
 	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
-		val = qdf_atomic_inc_return(&active_traffic_map->num_video_call);
+		val = qdf_atomic_inc_return(&peer_tc->num_video_call);
 		break;
 	default:
 		break;
 	}
 
 	if (val == 1)
-		qdf_atomic_set(&active_traffic_map->send_fw_ind, 1);
+		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 }
 
 static inline void
-wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc_peer_traffic_map *active_traffic_map,
+wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc_peer_traffic_context *peer_tc,
 			     enum qca_traffic_type traffic_type)
 {
 	uint32_t val = 0;
 
 	switch (traffic_type) {
 	case QCA_TRAFFIC_TYPE_STREAMING:
-		val = qdf_atomic_dec_and_test(&active_traffic_map->num_streaming);
+		val = qdf_atomic_dec_and_test(&peer_tc->num_streaming);
 		break;
 	case QCA_TRAFFIC_TYPE_GAMING:
-		val = qdf_atomic_dec_and_test(&active_traffic_map->num_gaming);
+		val = qdf_atomic_dec_and_test(&peer_tc->num_gaming);
 		break;
 	case QCA_TRAFFIC_TYPE_VOICE_CALL:
-		val = qdf_atomic_dec_and_test(&active_traffic_map->num_voice_call);
+		val = qdf_atomic_dec_and_test(&peer_tc->num_voice_call);
 		break;
 	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
-		val = qdf_atomic_dec_and_test(&active_traffic_map->num_video_call);
+		val = qdf_atomic_dec_and_test(&peer_tc->num_video_call);
 		break;
 	default:
 		break;
 	}
 
 	if (val)
-		qdf_atomic_set(&active_traffic_map->send_fw_ind, 1);
+		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 }
 
 enum wlan_dp_stc_classfied_flow_state {
@@ -577,7 +612,7 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 			 uint16_t peer_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	bool send_fw_indication = false;
 
 	if (!dp_stc)
@@ -586,18 +621,18 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 	if (peer_id == 0xFFFF)
 		return;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[peer_id];
+	if (!peer_tc->valid)
 		return;
 
-	if (active_traffic_map->last_ping_ts == 0)
+	if (peer_tc->last_ping_ts == 0)
 		send_fw_indication = true;
 
-	active_traffic_map->last_ping_ts = dp_stc_get_timestamp();
-	qdf_atomic_set(&active_traffic_map->active_ping, 1);
+	peer_tc->last_ping_ts = dp_stc_get_timestamp();
+	qdf_atomic_set(&peer_tc->active_ping, 1);
 
 	if (send_fw_indication)
-		qdf_atomic_set(&active_traffic_map->send_fw_ind, 1);
+		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 }
 
 /**
