@@ -23623,6 +23623,24 @@ static inline void wlan_hdd_set_ext_feature_punct(struct wiphy *wiphy)
 }
 #endif
 
+#ifdef WLAN_EXT_FEATURE_AP_PMKSA_CACHING
+/**
+ * wlan_hdd_set_ap_pmksa_caching_feature_flag() - set feature flag for
+ * AP PMKSA caching to the kernel.
+ * @wiphy: wiphy
+ *
+ * Return: void
+ */
+static void wlan_hdd_set_ap_pmksa_caching_feature_flag(struct wiphy *wiphy)
+{
+	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_AP_PMKSA_CACHING);
+}
+#else
+static void wlan_hdd_set_ap_pmksa_caching_feature_flag(struct wiphy *wiphy)
+{
+}
+#endif
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -23759,6 +23777,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_BEACON_RATE_HT);
 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_BEACON_RATE_VHT);
 #endif
+	wlan_hdd_set_ap_pmksa_caching_feature_flag(wiphy);
 
 	hdd_add_channel_switch_support(&wiphy->flags);
 	wiphy->max_num_csa_counters = WLAN_HDD_MAX_NUM_CSA_COUNTERS;
