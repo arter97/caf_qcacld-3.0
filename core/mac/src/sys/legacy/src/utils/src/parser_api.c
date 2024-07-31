@@ -602,6 +602,13 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	ccfs0 = pe_session->gLimChannelSwitch.legacy_ccfs0;
 	ccfs1 = pe_session->gLimChannelSwitch.legacy_ccfs1;
 
+	/* Usage of value equal to 2 for 160 is deprecated, the differentiation
+	 * comes between 80 MHz and 160 MHz by presence of CCFS1 incase of
+	 * 160 MHz which is set to zero incase of 80 MHz.
+	 */
+	if (ch_width == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+
 	pDot11f->WiderBWChanSwitchAnn.newChanWidth = ch_width;
 	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq0 = ccfs0;
 	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq1 = ccfs1;
