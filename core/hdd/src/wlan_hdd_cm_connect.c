@@ -828,7 +828,7 @@ def_chan:
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->deflink->vdev_id,
 				    CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
 
-	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq,
+	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq, 0,
 					    ch_bw, NO_SCHANS_PUNC, false, true);
 	if (ret) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");

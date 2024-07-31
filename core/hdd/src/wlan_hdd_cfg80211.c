@@ -30094,15 +30094,17 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 
 	ch_width = hdd_map_nl_chan_width(csa_params->chandef.width);
 	csa_punct_bitmap = wlan_hdd_cfg80211_get_csa_punct_bitmap(csa_params);
-	hdd_debug("Freq %d width %d ch_width %d punct_bitmap 0x%x",
+	hdd_debug("Freq %d width %d CCFS1 %d, CCFS2 %d, ch_width %d punct_bitmap 0x%x",
 		  csa_params->chandef.chan->center_freq,
-		  csa_params->chandef.width, ch_width, csa_punct_bitmap);
+		  csa_params->chandef.width, csa_params->chandef.center_freq1,
+		  csa_params->chandef.center_freq2, ch_width, csa_punct_bitmap);
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
 
 	ret =
 	hdd_softap_set_channel_change(link_info,
 				      csa_params->chandef.chan->center_freq,
+				      csa_params->chandef.center_freq1,
 				      ch_width, csa_punct_bitmap, false, true);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d",

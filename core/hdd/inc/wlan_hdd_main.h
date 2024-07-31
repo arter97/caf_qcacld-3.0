@@ -2611,6 +2611,7 @@ hdd_adapter_ops_record_event(struct hdd_context *hdd_ctx,
  * hdd_validate_channel_and_bandwidth() - Validate the channel-bandwidth combo
  * @adapter: HDD adapter
  * @chan_freq: Channel frequency
+ * @ccfs1: Value of CCFS1 in MHz
  * @chan_bw: Bandwidth
  *
  * Checks if the given bandwidth is valid for the given channel number.
@@ -2618,7 +2619,7 @@ hdd_adapter_ops_record_event(struct hdd_context *hdd_ctx,
  * Return: 0 for success, non-zero for failure
  */
 int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
-				       qdf_freq_t chan_freq,
+				       qdf_freq_t chan_freq, uint32_t ccfs1,
 				       enum phy_ch_width chan_bw);
 
 /**

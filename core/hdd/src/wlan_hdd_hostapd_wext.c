@@ -427,7 +427,7 @@ static __iw_softap_setparam(struct net_device *dev,
 								set_value);
 
 			ret = hdd_softap_set_channel_change(link_info,
-							    set_value,
+							    set_value, 0,
 							    CH_WIDTH_MAX,
 							    NO_SCHANS_PUNC,
 							    false, true);

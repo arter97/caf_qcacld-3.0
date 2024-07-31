@@ -65,6 +65,7 @@ void *hdd_filter_ft_info(const uint8_t *frame,
  *
  * @link_info: pointer to hdd link info.
  * @target_chan_freq: target channel frequency.
+ * @ccfs1:  Value of CCFS1 in MHz
  * @target_bw: Target bandwidth to move.
  * If no bandwidth is specified, the value is CH_WIDTH_MAX
  * @punct_bitmap: Puncturing bitmap of CSA, follows same convention as
@@ -75,7 +76,7 @@ void *hdd_filter_ft_info(const uint8_t *frame,
  * Return: 0 for success, non zero for failure
  */
 int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
-				  int target_chan_freq,
+				  int target_chan_freq, uint32_t ccfs1,
 				  enum phy_ch_width target_bw,
 				  uint32_t punct_bitmap,
 				  bool forced,

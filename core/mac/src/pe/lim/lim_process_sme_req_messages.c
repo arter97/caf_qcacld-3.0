@@ -10729,7 +10729,8 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	uint8_t session_id;
 	tLimWiderBWChannelSwitchInfo *wider_bw_ch_switch;
 	QDF_STATUS status;
-	enum phy_ch_width ch_width;
+	enum phy_ch_width ch_width, non_eht_ch_width;
+	qdf_freq_t ccfs1_mhz;
 	uint32_t target_ch_freq;
 	uint16_t punct_bitmap;
 	bool is_vdev_ll_lt_sap = false;
@@ -10768,25 +10769,73 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	if (LIM_IS_AP_ROLE(session_entry))
 		lim_remove_puncture(mac_ctx, session_entry);
 
-	wlan_reg_set_create_punc_bitmap(&dfs_csa_ie_req->ch_params, false);
+	punct_bitmap =
+		wlan_reg_get_input_punc_bitmap(&dfs_csa_ie_req->ch_params);
+	ch_width = dfs_csa_ie_req->ch_params.ch_width;
+	ccfs1_mhz = dfs_csa_ie_req->ch_params.mhz_freq_seg1;
+
+	/* Get the non - EHT chan params */
+	wlan_reg_set_non_eht_ch_params(&dfs_csa_ie_req->ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 						dfs_csa_ie_req->target_chan_freq,
-						0,
-						&dfs_csa_ie_req->ch_params,
+						0, &dfs_csa_ie_req->ch_params,
 						REG_CURRENT_PWR_MODE);
 
-	ch_width = dfs_csa_ie_req->ch_params.ch_width;
-	if (ch_width >= CH_WIDTH_160MHZ &&
+	non_eht_ch_width = dfs_csa_ie_req->ch_params.ch_width;
+	if (non_eht_ch_width >= CH_WIDTH_160MHZ &&
 	    wma_get_vht_ch_width() < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
-		ch_width = CH_WIDTH_80MHZ;
+		non_eht_ch_width = CH_WIDTH_80MHZ;
 	}
-	session_entry->gLimChannelSwitch.ch_width = ch_width;
-	session_entry->gLimChannelSwitch.sec_ch_offset =
-				 dfs_csa_ie_req->ch_params.sec_ch_offset;
-	session_entry->gLimChannelSwitch.ch_center_freq_seg0 =
+
+	session_entry->gLimChannelSwitch.legacy_sec_ch_offset =
+				dfs_csa_ie_req->ch_params.sec_ch_offset;
+	session_entry->gLimChannelSwitch.legacy_ccfs0 =
 				dfs_csa_ie_req->ch_params.center_freq_seg0;
-	session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
+	session_entry->gLimChannelSwitch.legacy_ccfs1 =
 				dfs_csa_ie_req->ch_params.center_freq_seg1;
+	session_entry->gLimChannelSwitch.legacy_ch_width = non_eht_ch_width;
+
+	pe_debug("legacy BW %d CCFS0 %d, CCFS1 %d",
+		 non_eht_ch_width, dfs_csa_ie_req->ch_params.center_freq_seg0,
+		 dfs_csa_ie_req->ch_params.center_freq_seg1);
+
+	if (punct_bitmap || ch_width > CH_WIDTH_160MHZ) {
+		qdf_mem_zero(&dfs_csa_ie_req->ch_params,
+			     sizeof(dfs_csa_ie_req->ch_params));
+
+		/* Get the EHT chan params */
+		dfs_csa_ie_req->ch_params.ch_width = ch_width;
+		dfs_csa_ie_req->ch_params.mhz_freq_seg1 = ccfs1_mhz;
+
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+							dfs_csa_ie_req->target_chan_freq,
+							0,
+							&dfs_csa_ie_req->ch_params,
+							REG_CURRENT_PWR_MODE);
+
+		session_entry->gLimChannelSwitch.ch_width =
+				dfs_csa_ie_req->ch_params.ch_width;
+		session_entry->gLimChannelSwitch.sec_ch_offset =
+				 dfs_csa_ie_req->ch_params.sec_ch_offset;
+		session_entry->gLimChannelSwitch.ch_center_freq_seg0 =
+				dfs_csa_ie_req->ch_params.center_freq_seg0;
+		session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
+				dfs_csa_ie_req->ch_params.center_freq_seg1;
+
+		pe_debug("EHT BW %d CCFS0 %d, CCFS1 %d",
+			 dfs_csa_ie_req->ch_params.ch_width,
+			 dfs_csa_ie_req->ch_params.center_freq_seg0,
+			 dfs_csa_ie_req->ch_params.center_freq_seg1);
+	} else {
+		session_entry->gLimChannelSwitch.ch_width =
+			session_entry->gLimChannelSwitch.legacy_ch_width;
+		session_entry->gLimChannelSwitch.sec_ch_offset =
+			session_entry->gLimChannelSwitch.legacy_sec_ch_offset;
+		session_entry->gLimChannelSwitch.ch_center_freq_seg0 =
+			session_entry->gLimChannelSwitch.legacy_ccfs0;
+		session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
+			session_entry->gLimChannelSwitch.legacy_ccfs1;
+	}
 
 	is_vdev_ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(
 						mac_ctx->psoc,
@@ -10813,7 +10862,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 
 	/* Now encode the Wider Ch BW element depending on the ch width */
 	wider_bw_ch_switch = &session_entry->gLimWiderBWChannelSwitch;
-	switch (ch_width) {
+	switch (session_entry->gLimChannelSwitch.legacy_ch_width) {
 	case CH_WIDTH_20MHZ:
 		/*
 		 * Wide channel BW sublement in channel wrapper element is not
@@ -10835,7 +10884,6 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 			WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 		break;
 	case CH_WIDTH_160MHZ:
-	case CH_WIDTH_320MHZ:
 		session_entry->dfsIncludeChanWrapperIe = true;
 		wider_bw_ch_switch->newChanWidth =
 			WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
@@ -10852,7 +10900,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 		 * frequency segment 1.
 		 */
 		wider_bw_ch_switch->newCenterChanFreq1 =
-			dfs_csa_ie_req->ch_params.center_freq_seg1;
+			session_entry->gLimChannelSwitch.legacy_ccfs1;
 		break;
 	default:
 		session_entry->dfsIncludeChanWrapperIe = false;
@@ -10868,18 +10916,12 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	 * Channel Switch Wrapper IE is mandatory as it needs to have
 	 * Bandwidth Indication subelement in this IE
 	 */
-	punct_bitmap =
-		wlan_reg_get_input_punc_bitmap(&dfs_csa_ie_req->ch_params);
-	if (punct_bitmap != NO_SCHANS_PUNC) {
+	if (punct_bitmap || ch_width > CH_WIDTH_160MHZ)
 		session_entry->dfsIncludeChanWrapperIe = true;
-		lim_set_chan_switch_puncture(session_entry, punct_bitmap);
-	} else {
-		lim_set_chan_switch_puncture(session_entry, NO_SCHANS_PUNC);
-	}
 
 	/* Fetch the center channel based on the channel width */
 	wider_bw_ch_switch->newCenterChanFreq0 =
-		dfs_csa_ie_req->ch_params.center_freq_seg0;
+			session_entry->gLimChannelSwitch.legacy_ccfs0;
 skip_vht:
 
 	/* Take a wakelock for CSA for 5 seconds and release in vdev start */
