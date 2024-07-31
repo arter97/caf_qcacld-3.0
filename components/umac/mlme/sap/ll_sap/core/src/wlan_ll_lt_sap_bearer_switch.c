@@ -422,6 +422,40 @@ ll_lt_sap_cache_bs_request(struct bearer_switch_info *bs_ctx,
 					 bs_req->request_id));
 }
 
+static void ll_lt_sap_reorder_bs_req(struct bearer_switch_info *bs_ctx)
+{
+	uint8_t i, j;
+
+	for (i = 0; i < MAX_BEARER_SWITCH_REQUESTERS; i++) {
+		if (!bs_ctx->requests[i].requester_cb)
+			continue;
+
+		for (j = 0; j < i; j++) {
+			if (bs_ctx->requests[j].requester_cb)
+				continue;
+
+			bs_ctx->requests[j].requester_cb =
+				bs_ctx->requests[i].requester_cb;
+			bs_ctx->requests[j].arg =
+					bs_ctx->requests[i].arg;
+			bs_ctx->requests[j].arg_value =
+					bs_ctx->requests[i].arg_value;
+			bs_ctx->requests[j].req_type =
+					bs_ctx->requests[i].req_type;
+			bs_ctx->requests[j].vdev_id =
+					bs_ctx->requests[i].vdev_id;
+			bs_ctx->requests[j].request_id =
+					bs_ctx->requests[i].request_id;
+			bs_ctx->requests[j].source =
+					bs_ctx->requests[i].source;
+
+			bs_ctx->requests[i].requester_cb = NULL;
+			bs_ctx->requests[i].arg = NULL;
+			bs_ctx->requests[i].arg_value = 0;
+		}
+	}
+}
+
 /**
  * ll_lt_sap_flush_bs_wlan_req() - API to flush bearer switch
  * requests to wlan bearer from cached requests
@@ -447,6 +481,8 @@ ll_lt_sap_flush_bs_wlan_req(struct bearer_switch_info *bs_ctx)
 		bs_ctx->requests[i].arg = NULL;
 		bs_ctx->requests[i].arg_value = 0;
 	}
+
+	ll_lt_sap_reorder_bs_req(bs_ctx);
 }
 
 /*
@@ -502,6 +538,7 @@ ll_lt_sap_invoke_bs_requester_cbks(struct bearer_switch_info *bs_ctx,
 		bs_ctx->requests[i].arg = NULL;
 		bs_ctx->requests[i].arg_value = 0;
 	}
+	ll_lt_sap_reorder_bs_req(bs_ctx);
 }
 
 /*
