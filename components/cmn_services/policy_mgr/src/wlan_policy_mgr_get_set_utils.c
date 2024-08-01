@@ -2441,6 +2441,32 @@ policy_mgr_ml_sta_active_freq(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+static bool policy_mgr_if_max_one_home_channel_used(
+				qdf_freq_t freq_list[3],
+				qdf_freq_t freq4)
+{
+	qdf_freq_t freq[4] = {freq_list[0], freq_list[1], freq_list[2], freq4};
+	uint8_t i, j, freq_sets = 0;
+	uint8_t match_freq[4] = {0};
+
+	for (i = 0; i < QDF_ARRAY_SIZE(freq); i++) {
+		for (j = i + 1; j < QDF_ARRAY_SIZE(freq); j++) {
+			if (freq[i] == freq[j] && freq[i] != 0 &&
+			    freq[j] != 0) {
+				match_freq[i]++;
+				freq[i] = 0;
+				freq[j] = 0;
+			}
+		}
+	}
+
+	for (i = 0;   i < QDF_ARRAY_SIZE(freq); i++) {
+		if (match_freq[i] == 1)
+			freq_sets++;
+	}
+	return freq_sets >= 1;
+}
+
 bool
 policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 			      qdf_freq_t ch_freq,
@@ -2459,6 +2485,7 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 	bool emlsr_links_with_aux = false;
 	uint8_t mac_id;
 	bool force_scc = policy_mgr_is_3vifs_mcc_to_scc_enabled(psoc);
+	qdf_freq_t freq[3] = {0};
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2572,27 +2599,42 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
 			}
 		}
 
+		for (i = 0; i < QDF_ARRAY_SIZE(freq); i++) {
+			if (conn[0].mode != PM_NDI_MODE)
+				freq[i] = conn[i].freq;
+		}
+
+		/* check two valid scc channel */
+		if (!policy_mgr_if_max_one_home_channel_used(
+					freq,
+					ch_freq)) {
+			goto end;
+		}
+
 		if (wlan_nan_is_sta_p2p_ndp_supported(psoc) &&
 		    ((sta == 2 && nan == 1 && p2p == 1) ||
 		     (sta == 1 && nan == 1 && ndi == 1 && p2p == 1))) {
-			policy_mgr_rl_debug("new freq %d mode %s is allowed in hw mode %s",
+			policy_mgr_rl_debug("new freq %d mode %s is allowed in hw mode %s sta %d nan %d p2p %d ndi %d",
 					    ch_freq,
 					    device_mode_to_string(mode),
-					    policy_mgr_hw_mode_to_str(j));
+					    policy_mgr_hw_mode_to_str(j),
+					    sta, nan, p2p, ndi);
 			return true;
 		}
 
 		if (((sta == 2 && nan == 1 && sap == 1) ||
 		     (sta == 1 && nan == 1 && ndi == 1 && sap == 1)) &&
 		    wlan_nan_is_sta_sap_nan_allowed(psoc)) {
-			policy_mgr_debug("new freq %d mode %s is allowed in hw mode %s",
+			policy_mgr_debug("new freq %d mode %s is allowed in hw mode %s sta %d nan %d sap %d ndi %d",
 					 ch_freq,
 					 device_mode_to_string(mode),
-					 policy_mgr_hw_mode_to_str(j));
+					 policy_mgr_hw_mode_to_str(j),
+					 sta, nan, sap, ndi);
 			return true;
 		}
 	}
 
+end:
 	policy_mgr_debug("the 4th new freq %d mode %s is not allowed in any hw mode",
 			 ch_freq, device_mode_to_string(mode));
 

@@ -4913,6 +4913,9 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 	mcc_to_scc_switch =
 		policy_mgr_get_mcc_to_scc_switch_mode(psoc);
 
+	if (wlan_nan_is_disc_active(psoc))
+		return QDF_STATUS_SUCCESS;
+
 	sta_count = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
 							      NULL);
 

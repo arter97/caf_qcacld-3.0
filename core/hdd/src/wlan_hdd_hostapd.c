@@ -8850,9 +8850,6 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	 */
 	if (adapter->device_mode == QDF_P2P_GO_MODE || sta_cnt ||
 	    (sap_cnt > (MAX_SAP_NUM_CONCURRENCY_WITH_NAN - 1))) {
-		hdd_debug("Invalid NAN concurrency. SAP: %d STA: %d P2P_GO: %d",
-			  sap_cnt, sta_cnt,
-			  (adapter->device_mode == QDF_P2P_GO_MODE));
 		for (i = 0; i < sta_cnt + sap_cnt; i++)
 			if (vdev_id_list[i] == link_info->vdev_id)
 				disable_nan = false;
@@ -8863,8 +8860,12 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		     ucfg_nan_is_sta_sap_ndp_supported(hdd_ctx->psoc)))
 			disable_nan = false;
 
-		if (disable_nan)
+		if (disable_nan) {
+			hdd_debug("Invalid NAN concurrency. SAP: %d STA: %d P2P_GO: %d",
+				  sap_cnt, sta_cnt,
+				  (adapter->device_mode == QDF_P2P_GO_MODE));
 			ucfg_nan_disable_concurrency(hdd_ctx->psoc);
+		}
 	}
 
 	if (adapter->device_mode == QDF_SAP_MODE &&

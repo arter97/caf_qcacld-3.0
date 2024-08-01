@@ -4741,6 +4741,9 @@ policy_mgr_handle_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	uint8_t sta_count, go_count;
 
+	if (wlan_nan_is_disc_active(psoc))
+		return QDF_STATUS_SUCCESS;
+
 	go_count = policy_mgr_mode_specific_connection_count(psoc,
 							     PM_P2P_GO_MODE,
 							     NULL);
