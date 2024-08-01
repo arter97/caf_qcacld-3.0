@@ -639,6 +639,7 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 
 	flow->active_ts = qdf_sched_clock();
 	skb->mark = flow->svc_metadata;
+	flow->num_pkts++;
 
 	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, skb,
 						   flow->track_flow_stats,
