@@ -1412,7 +1412,7 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	struct tdls_config_params *threshold_params;
 	uint32_t tdls_feature_flags;
 	QDF_STATUS status;
-	bool tdls_mlo;
+	enum tdls_feature_mode current_mode = TDLS_SUPPORT_DISABLED;
 
 	tdls_feature_flags = tdls_soc_obj->tdls_configs.tdls_feature_flags;
 	if (!TDLS_IS_ENABLED(tdls_feature_flags)) {
@@ -1420,29 +1420,31 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 		return;
 	}
 
-	tdls_mlo = wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc);
-
 	/* If AP or caller indicated TDLS Prohibited then disable tdls mode */
 	if (sta_connect_event) {
 		if (tdls_prohibited) {
-			tdls_soc_obj->tdls_current_mode =
-					TDLS_SUPPORT_DISABLED;
+			current_mode = TDLS_SUPPORT_DISABLED;
 		} else {
 			if (!TDLS_IS_IMPLICIT_TRIG_ENABLED(tdls_feature_flags))
-				tdls_soc_obj->tdls_current_mode =
-					TDLS_SUPPORT_EXP_TRIG_ONLY;
+				current_mode = TDLS_SUPPORT_EXP_TRIG_ONLY;
 			else if (TDLS_IS_EXTERNAL_CONTROL_ENABLED(
 				tdls_feature_flags))
-				tdls_soc_obj->tdls_current_mode =
-					TDLS_SUPPORT_EXT_CONTROL;
+				current_mode = TDLS_SUPPORT_EXT_CONTROL;
 			else
-				tdls_soc_obj->tdls_current_mode =
-					TDLS_SUPPORT_IMP_MODE;
+				current_mode = TDLS_SUPPORT_IMP_MODE;
 		}
 	} else {
-		tdls_soc_obj->tdls_current_mode =
-				TDLS_SUPPORT_DISABLED;
+		current_mode = TDLS_SUPPORT_DISABLED;
 	}
+
+	if (!wlan_cm_is_vdev_connected(tdls_vdev_obj->vdev) &&
+	    sta_connect_event && current_mode != TDLS_SUPPORT_DISABLED) {
+		tdls_debug("Vdev:%d is not connected. Don't enable TDLS",
+			   wlan_vdev_get_id(tdls_vdev_obj->vdev));
+		return;
+	}
+
+	tdls_soc_obj->tdls_current_mode = current_mode;
 
 	tdls_info_to_fw = qdf_mem_malloc(sizeof(struct tdls_info));
 	if (!tdls_info_to_fw)
