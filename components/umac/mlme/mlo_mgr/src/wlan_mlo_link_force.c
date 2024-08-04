@@ -813,6 +813,12 @@ populate_disallow_modes(struct wlan_objmgr_psoc *psoc,
 		break;
 	}
 
+	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
+		disallow_mode_bitmap = EMLSR_5GL_5GH | EMLSR_5GH_5GH |
+				       EMLSR_5GL_5GL;
+		goto no_legacy_intf;
+	}
+
 	ml_hc_id = get_hc_id(psoc, ml_num_link, ml_freq_lst);
 	if (ml_hc_id >= HC_MAX_MAP_ID) {
 		mlo_debug("invalid ml_hc_id, %d", ml_hc_id);
