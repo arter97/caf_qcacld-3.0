@@ -1161,6 +1161,33 @@ QDF_STATUS tdls_set_extctrl_param(struct tdls_peer *peer, qdf_freq_t ch_freq,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
+					  uint8_t *macaddr)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+	struct tdls_vdev_priv_obj *vdev_obj;
+	struct tdls_peer *curr_peer;
+	QDF_STATUS status;
+
+	status = tdls_get_vdev_objects(vdev, &vdev_obj, &soc_obj);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("Error getting TDLS priv objects");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	curr_peer = tdls_find_peer(vdev_obj, macaddr);
+	if (!curr_peer) {
+		tdls_err("tdls peer not found for mac:");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	curr_peer->sta_kickout_count++;
+	tdls_debug("vdev:%d TDLS peer: " QDF_MAC_ADDR_FMT,
+		   wlan_vdev_get_id(vdev), QDF_MAC_ADDR_REF(macaddr));
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS tdls_reset_peer(struct tdls_vdev_priv_obj *vdev_obj,
 			   const uint8_t *macaddr)
 {

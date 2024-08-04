@@ -633,3 +633,9 @@ void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
 	if (soc_obj->tdls_cb.delete_all_tdls_peers)
 		soc_obj->tdls_cb.delete_all_tdls_peers(vdev);
 }
+
+QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
+					       uint8_t *macaddr)
+{
+	return tdls_update_peer_kickout_count(vdev, macaddr);
+}

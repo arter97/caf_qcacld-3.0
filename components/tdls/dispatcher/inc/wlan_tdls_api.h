@@ -264,8 +264,18 @@ bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev);
-#else
 
+/*
+ * wlan_tdls_update_peer_kickout_count() - Update the TDLS peer sta kickout
+ * count
+ * @vdev: Pointer to vdev private object
+ * @macaddr: Peer mac address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
+					       uint8_t *macaddr);
+#else
 static inline
 void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
 				      struct tdls_callbacks *cbs)
@@ -372,5 +382,12 @@ bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
 static inline
 void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
 {}
+
+static inline
+QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
+					       uint8_t *macaddr)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 #endif

@@ -1774,6 +1774,18 @@ QDF_STATUS tdls_process_del_peer_rsp(struct tdls_del_sta_rsp *rsp)
 				tdls_decrement_peer_count(vdev, soc_obj);
 		}
 		tdls_reset_peer(vdev_obj, macaddr);
+		/*
+		 * Avoid TDLS with peer if STA kickout threshold is reached.
+		 * Some IOT devices establish TDLS but immediately teardown.
+		 * To avoid that set the tdls_support as not supported for that
+		 * peer
+		 */
+		if (curr_peer->sta_kickout_count >=
+				WLAN_TDLS_STA_KICKOUT_THRESHOLD) {
+			curr_peer->tdls_support = TDLS_CAP_NOT_SUPPORTED;
+			tdls_debug("Sta Kickout Threshold reached, set cap to unsupported");
+		}
+
 		conn_rec[sta_idx].valid_entry = false;
 		conn_rec[sta_idx].session_id = 0xff;
 		conn_rec[sta_idx].index = INVALID_TDLS_PEER_INDEX;

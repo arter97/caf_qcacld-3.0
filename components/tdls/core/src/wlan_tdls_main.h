@@ -349,6 +349,8 @@ struct tdls_peer_mlme_info {
  * @peer_idle_timer: time to check idle traffic in tdls peers
  * @is_peer_idle_timer_initialised: Flag to check idle timer init
  * @spatial_streams: Number of TX/RX spatial streams for TDLS
+ * @sta_kickout_count: Number of times STA kickout event received for this
+ * peer
  * @reason: reason
  * @state_change_notification: state change notification
  * @qos: QOS capability of TDLS link
@@ -382,6 +384,7 @@ struct tdls_peer {
 	qdf_mc_timer_t peer_idle_timer;
 	bool is_peer_idle_timer_initialised;
 	uint8_t spatial_streams;
+	uint8_t sta_kickout_count;
 	enum tdls_link_state_reason reason;
 	tdls_state_change_callback state_change_notification;
 	uint8_t qos;
