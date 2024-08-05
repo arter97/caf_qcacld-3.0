@@ -3832,7 +3832,6 @@ uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
 	return cb_mode;
 }
 
-static
 uint8_t lim_get_sta_cb_mode_for_24ghz(struct mac_context *mac,
 				      uint8_t vdev_id)
 {

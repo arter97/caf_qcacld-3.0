@@ -8047,10 +8047,17 @@ populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 				tDot11fIEhe_cap *he_cap,
 				struct pe_session *session)
 {
-	if (is_2g)
+	if (is_2g) {
 		qdf_mem_copy(he_cap, &mac_ctx->he_cap_2g, sizeof(*he_cap));
-	else
+		if (session) {
+			he_cap->chan_width_0 =
+			lim_get_sta_cb_mode_for_24ghz(mac_ctx,
+						      session->vdev_id);
+		}
+	}
+	else {
 		qdf_mem_copy(he_cap, &mac_ctx->he_cap_5g, sizeof(*he_cap));
+	}
 
 	if (session)
 		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);

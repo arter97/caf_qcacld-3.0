@@ -478,6 +478,16 @@ uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
 				 qdf_freq_t chan_freq);
 
 /**
+ * lim_get_sta_cb_mode_for_24ghz() - Get cb mode for 2GHz
+ * @mac: pointer to Global MAC structure
+ * @vdev_id: vdev id
+ *
+ * Return: cb mode allowed for the freq
+ */
+uint8_t lim_get_sta_cb_mode_for_24ghz(struct mac_context *mac,
+				      uint8_t vdev_id);
+
+/**
  * lim_update_sta_run_time_ht_switch_chnl_params() - Process change in HT
  * bandwidth
  * @mac: pointer to Global MAC structure

@@ -15599,7 +15599,9 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		     &mac_ctx->eht_cap_5g_orig,
 		     sizeof(tDot11fIEeht_cap));
 	mac_ctx->usr_eht_testbed_cfg = false;
-	mac_ctx->roam.configParam.channelBondingMode24GHz = 1;
+	wlan_mlme_get_24_chan_bonding_mode(
+			mac_ctx->psoc,
+			&mac_ctx->roam.configParam.channelBondingMode24GHz);
 	wlan_mlme_set_sta_mlo_conn_band_bmp(mac_ctx->psoc, 0x77);
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 2);
 	status = ucfg_mlme_get_bss_color_collision_det_support(mac_ctx->psoc,
