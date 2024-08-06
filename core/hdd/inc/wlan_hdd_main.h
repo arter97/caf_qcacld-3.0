@@ -1340,10 +1340,10 @@ struct get_station_client_info {
  * @link_state_cached_timestamp: link state cached timestamp
  * @keep_alive_interval: user configured STA keep alive interval
  * @sta_client_info: To store get station user application port_id's
- * @disconnect_link_id: cache disconnect link_id, for legacy link_id will
- *			be @WLAN_INVALID_LINK_ID
  * @wlm_ll_conn_flag: Indicates if low lateny connection flag set
  *		      based on wlm mode
+ * @discon_link_info: link_info pointer on which post disconnect stats to be
+ *                    fetched
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1540,8 +1540,8 @@ struct hdd_adapter {
 #endif
 	uint16_t keep_alive_interval;
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
-	int32_t disconnect_link_id;
 	bool wlm_ll_conn_flag;
+	struct wlan_hdd_link_info *discon_link_info;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -5950,13 +5950,13 @@ bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
                         enum QDF_OPMODE mode);
 
 /**
- *hdd_set_disconnect_link_id_cb() - set STA disconnected link_id
+ *hdd_set_disconnect_link_info_cb() - set STA disconnected link info
  *@vdev_id: vdev_id
  *
  * Return: None
  */
 void
-hdd_set_disconnect_link_id_cb(uint8_t vdev_id);
+hdd_set_disconnect_link_info_cb(uint8_t vdev_id);
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /*

@@ -18891,7 +18891,7 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 	sme_register_pagefault_cb(mac_handle, hdd_pagefault_action_cb);
 
 	sme_register_set_disconnect_cb(mac_handle,
-				       hdd_set_disconnect_link_id_cb);
+				       hdd_set_disconnect_link_info_cb);
 	hdd_exit();
 
 	return ret;
@@ -23090,11 +23090,10 @@ out:
 	return status;
 }
 
-void hdd_set_disconnect_link_id_cb(uint8_t vdev_id)
+void hdd_set_disconnect_link_info_cb(uint8_t vdev_id)
 {
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
-	struct hdd_station_ctx *hdd_sta_ctx;
 	struct hdd_context *hdd_ctx;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
@@ -23113,12 +23112,17 @@ void hdd_set_disconnect_link_id_cb(uint8_t vdev_id)
 	if (adapter->device_mode != QDF_STA_MODE)
 		return;
 
-	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	adapter->disconnect_link_id = hdd_cm_get_ieee_link_id(link_info, true);
-	if (adapter->disconnect_link_id != WLAN_INVALID_LINK_ID) {
-		hdd_debug("disconnect received on link_id %u vdev_id %d",
-			  adapter->disconnect_link_id, vdev_id);
-	}
+	/*
+	 * Disconnect link_info to be update with the disconnect link
+	 * sent successfully OTA. If any case disconnect not sent OTA
+	 * will force update with the active link_info.
+	 */
+	if (adapter->discon_link_info ||
+	    wlan_vdev_mlme_is_mlo_link_vdev(link_info->vdev))
+		return;
+
+	adapter->discon_link_info = link_info;
+	hdd_debug("vdev_id %d", link_info->vdev_id);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE

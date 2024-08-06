@@ -485,6 +485,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 */
 	adapter->last_disconnect_reason =
 			osif_cm_mac_to_qca_reason(rsp->req.req.reason_code);
+	hdd_set_disconnect_link_info_cb(link_info->vdev_id);
 
 	return QDF_STATUS_SUCCESS;
 }

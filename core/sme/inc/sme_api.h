@@ -4929,13 +4929,13 @@ QDF_STATUS sme_update_beacon_country_ie(mac_handle_t mac_handle,
  * sme_register_set_disconnect_cb() - function to register cb to set
  * disconnect link_id
  * @mac_handle: Opaque handle to the global MAC context
- * @hdd_set_disconnect_link_id_cb: callback to be registered
+ * @hdd_set_disconnect_link_info_cb: callback to be registered
  *
  * Return: None
  */
 
 void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
-				    void (*set_disconnect_link_id_cb)
+				    void (*set_disconnect_link_info_cb)
 				    (uint8_t vdev_id));
 
 /**

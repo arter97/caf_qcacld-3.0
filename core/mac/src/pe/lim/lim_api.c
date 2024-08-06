@@ -2723,8 +2723,8 @@ end:
 		}
 	}
 
-	if (mac->sme.set_disconnect_link_id_cb)
-		mac->sme.set_disconnect_link_id_cb(session->vdev_id);
+	if (mac->sme.set_disconnect_link_info_cb)
+		mac->sme.set_disconnect_link_info_cb(session->vdev_id);
 
 	lim_tear_down_link_with_ap(mac, session->peSessionId,
 				   reason_code,

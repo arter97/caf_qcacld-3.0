@@ -1695,27 +1695,10 @@ static int hdd_get_station_remote(struct wlan_hdd_link_info *link_info,
  *
  * Return: link_info pointer on success, otherwise NULL
  */
-static struct wlan_hdd_link_info
+static inline struct wlan_hdd_link_info
 *hdd_get_link_info_disconnect_receive(struct hdd_adapter *adapter)
 {
-	struct wlan_hdd_link_info *link_info;
-
-	if (adapter->disconnect_link_id == WLAN_INVALID_LINK_ID) {
-		hdd_debug("Legacy connection stats");
-		return adapter->deflink;
-	}
-
-	link_info = hdd_get_link_info_by_ieee_link_id(
-						adapter,
-						adapter->disconnect_link_id,
-						true);
-	if (!link_info) {
-		hdd_debug("Populate stats on Assoc vdev, link_id %d",
-			  adapter->disconnect_link_id);
-		return adapter->deflink;
-	}
-
-	return link_info;
+	return adapter->discon_link_info;
 }
 
 /**
@@ -1766,6 +1749,11 @@ __hdd_cfg80211_get_station_cmd(struct wiphy *wiphy,
 	/* Parse and fetch Command Type*/
 	if (tb[STATION_INFO]) {
 		link_info = hdd_get_link_info_disconnect_receive(adapter);
+		if (!link_info) {
+			hdd_debug("link_info NULL");
+			status = -EINVAL;
+			goto out;
+		}
 		status = hdd_get_station_info(link_info);
 	} else if (tb[STATION_ASSOC_FAIL_REASON]) {
 		status = hdd_get_station_assoc_fail(adapter->deflink);
