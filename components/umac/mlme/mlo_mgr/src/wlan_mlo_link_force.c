@@ -3523,11 +3523,15 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 				force_inact_hc_id2 = HC_2G;
 			else if (non_ml_hc_id == HC_2G_5GL)
 				force_inact_hc_id2 = HC_5GH;
-			else if (non_ml_hc_id == HC_2G_5GH)
-				force_inact_hc_id2 = HC_5GL;
-			else
+			else if (non_ml_hc_id == HC_2G_5GH) {
+				if (ml_link_hc_id == HC_2G_5GL)
+					mlo_debug("Skip nlink force for STA(2G+5GL)+SAP(2G+5GH)");
+				else
+					force_inact_hc_id2 = HC_5GL;
+			} else {
 				mlo_debug("SAP+SAP, unexpected non_ml_hc_id %d",
 					  non_ml_hc_id);
+			}
 		} else if (disallow_mcc) {
 			force_inact_hc_id =
 				get_hc_id(psoc, 1, freq_lst);
