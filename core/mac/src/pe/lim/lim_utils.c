@@ -10639,7 +10639,8 @@ QDF_STATUS lim_ap_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 
 	lim_remove_puncture(mac_ctx, session);
 
-	if (!wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev)) {
+	if (!LIM_IS_NDI_ROLE(session) &&
+	    !wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev)) {
 		mlme_set_notify_co_located_ap_update_rnr(vdev_mlme->vdev, true);
 		lim_ap_mlme_vdev_rnr_notify(session);
 		lim_configure_fd_for_existing_6ghz_sap(session, false);
