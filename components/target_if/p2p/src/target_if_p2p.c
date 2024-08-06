@@ -293,6 +293,21 @@ target_if_p2p_unreg_assist_dfs_group_bmiss_evt_handler(struct wlan_objmgr_psoc *
 	return status;
 }
 
+static QDF_STATUS
+target_if_p2p_send_ap_assist_dfs_group_params(struct wlan_objmgr_psoc *psoc,
+					      struct p2p_ap_assist_dfs_group_params *params)
+{
+	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
+
+	if (!wmi_handle) {
+		target_if_err("Invalid wmi handle");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wmi_unified_p2p_send_ap_assist_dfs_group_params(wmi_handle,
+							       params);
+}
+
 static inline void
 target_if_p2p_register_ap_assist_dfs_tx_ops(struct wlan_lmac_if_p2p_tx_ops *p2p_tx_ops)
 {
@@ -300,6 +315,8 @@ target_if_p2p_register_ap_assist_dfs_tx_ops(struct wlan_lmac_if_p2p_tx_ops *p2p_
 			target_if_p2p_reg_assist_dfs_group_bmiss_evt_handler;
 	p2p_tx_ops->unreg_ap_assist_bmiss_ev_handler =
 			target_if_p2p_unreg_assist_dfs_group_bmiss_evt_handler;
+	p2p_tx_ops->send_ap_assist_dfs_group_params =
+			target_if_p2p_send_ap_assist_dfs_group_params;
 }
 
 /**
