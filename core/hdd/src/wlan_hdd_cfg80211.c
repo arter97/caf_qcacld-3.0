@@ -24680,8 +24680,8 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	uint8_t i, j = 0;
 	bool dbs_one_by_one, dbs_two_by_two;
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
-	bool no_p2p_concurrency, no_sap_nan_concurrency, no_sta_sap_concurrency;
-	bool no_sta_nan_concurrency, sta_sap_p2p_concurrency, sta_p2p_ndp_conc;
+	bool no_p2p_concurrency;
+	bool sta_sap_p2p_concurrency, sta_p2p_ndp_conc;
 	bool sap_sta_nan_concurrency, sap_sap_sta_concurrency;
 	uint8_t num;
 	QDF_STATUS status;
@@ -24698,9 +24698,6 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	}
 
 	no_p2p_concurrency = cfg_get(psoc, CFG_NO_P2P_CONCURRENCY);
-	no_sta_nan_concurrency = cfg_get(psoc, CFG_NO_STA_NAN_CONCURRENCY);
-	no_sap_nan_concurrency = cfg_get(psoc, CFG_NO_SAP_NAN_CONCURRENCY);
-	no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
 	sta_sap_p2p_concurrency = cfg_get(psoc, CFG_STA_SAP_P2P_CONCURRENCY);
 	sap_sap_sta_concurrency = cfg_get(psoc, CFG_SAP_SAP_STA_CONCURRENCY);
 	sap_sta_nan_concurrency = cfg_get(psoc,
@@ -24751,17 +24748,6 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 			/* remove SAP NAN concurrency */
 			if (wlan_hdd_is_sap_nan_concurrency_present(i))
 				continue;
-		} else {
-			/* remove STA NAN concurrency */
-			if (no_sta_nan_concurrency &&
-			    wlan_hdd_is_sta_nan_concurrency_present(
-					wlan_hdd_iface_combination, i))
-				continue;
-
-			 /* remove SAP NAN concurrency */
-			if (no_sap_nan_concurrency &&
-			    wlan_hdd_is_sap_nan_concurrency_present(i))
-				continue;
 		}
 
 		/*
@@ -24781,11 +24767,6 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 			j -= wlan_hdd_remove_sta_p2p_conc(hdd_ctx->combination,
 							  j);
 		}
-
-		/* remove STA SAP concurrency */
-		if (no_sta_sap_concurrency &&
-		    wlan_hdd_is_sta_sap_concurrency_present(i))
-			continue;
 
 		hdd_ctx->combination[j] = wlan_hdd_iface_combination[i];
 
