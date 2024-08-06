@@ -3419,6 +3419,37 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 
 	}
 
+	if (subType == SIR_MAC_MGMT_AUTH ||
+	    subType == SIR_MAC_MGMT_ASSOC_REQ ||
+	    subType == SIR_MAC_MGMT_REASSOC_REQ) {
+		struct wlan_objmgr_vdev *roam_vdev;
+		uint8_t vdev_id;
+
+		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
+		vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+								 pHdr->da,
+								 WLAN_LEGACY_MAC_ID);
+		if (!vdev)
+			return eMGMT_DROP_NO_DROP;
+
+		if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+			return eMGMT_DROP_NO_DROP;
+		}
+
+		vdev_id = wlan_vdev_get_id(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+		roam_vdev = wlan_objmgr_pdev_get_roam_vdev(mac->pdev,
+							   WLAN_LEGACY_MAC_ID);
+		if (roam_vdev) {
+			pe_debug("vdev %d roaming in progress, reject client connect to SAP vdev %d",
+				 wlan_vdev_get_id(roam_vdev), vdev_id);
+			wlan_objmgr_vdev_release_ref(roam_vdev, WLAN_LEGACY_MAC_ID);
+			return eMGMT_DROP_CONNECT_DURING_ROAMING;
+		}
+	}
+
 	return eMGMT_DROP_NO_DROP;
 }
 
