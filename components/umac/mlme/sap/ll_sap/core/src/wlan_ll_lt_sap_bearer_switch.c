@@ -705,7 +705,7 @@ ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state(
 				struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool is_bs_req_cached = false;
 
 	if (ll_lt_sap_find_bs_req_by_id(bs_ctx, bs_req->request_id))
