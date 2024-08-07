@@ -918,7 +918,7 @@ QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp)
 	uint64_t non_twt_target_tsf = 0;
 
 	if (!rsp) {
-		ll_sap_err("vdev %d rsp is null", rsp->twt_params.vdev_id);
+		ll_sap_err("rsp is null");
 		return QDF_STATUS_E_FAILURE;
 	}
 
