@@ -6060,7 +6060,7 @@ static bool policy_mgr_is_concurrency_allowed_4_port(
 	uint32_t i;
 	struct policy_mgr_psoc_priv_obj *pm_ctx = NULL;
 	uint8_t sap_cnt, go_cnt, ll_lt_sap_vdev_id, nan_cnt = 0;
-	uint8_t count_sta;
+	uint8_t count_sta = 0;
 
 	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
 
