@@ -2235,6 +2235,14 @@ _conditional_srcs = {
 	    "core/hdd/src/wlan_hdd_sysfs_dp_stc.c",
         ],
     },
+    "CONFIG_FEATURE_MGMT_RX_OVER_SRNG": {
+        True: [
+            "components/mgmt_rx_srng/core/src/wlan_mgmt_rx_srng.c",
+            "components/mgmt_rx_srng/dispatcher/src/wlan_mgmt_rx_srng_ucfg_api.c",
+	    "components/target_if/mgmt_rx_srng/src/target_if_mgmt_rx_srng.c",
+	    "components/mgmt_rx_srng/dispatcher/src/wlan_mgmt_rx_srng_tgt_api.c",
+        ],
+    },
     "CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE": {
         True: [
             "cmn/dp/wifi3.0/dp_rx_buffer_pool.c",

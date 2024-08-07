@@ -2210,6 +2210,10 @@ config WLAN_DP_FEATURE_STC
 	bool "Enable WLAN_DP_FEATURE_STC"
 	default n
 
+config FEATURE_MGMT_RX_OVER_SRNG
+	bool "enable FEATURE_MGMT_RX_OVER_SRNG"
+	default n
+
 config DP_FEATURE_RX_BUFFER_RECYCLE
 	bool "Enable CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE"
 	default n
