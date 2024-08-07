@@ -4278,7 +4278,7 @@ static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
 	qdf_freq_t chan_freq = 0;
 	struct wlan_objmgr_pdev *pdev;
 
-	qdf_mem_copy(&assoc_link_addr, session_entry->self_mac_addr,
+	qdf_mem_copy(&assoc_link_addr, session_entry->bssId,
 		     QDF_MAC_ADDR_SIZE);
 
 	rnr_end = rnr + rnr[TAG_LEN_POS] + MIN_IE_LEN;
