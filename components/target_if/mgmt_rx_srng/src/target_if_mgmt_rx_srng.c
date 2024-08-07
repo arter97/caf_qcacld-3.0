@@ -51,7 +51,7 @@ static int target_if_mgmt_srng_reap_event_handler(void *handle, uint8_t *buf,
 	return 0;
 }
 
-QDF_STATUS target_if_mgmt_rx_srng_send_reap_event_threshold(
+static QDF_STATUS target_if_mgmt_rx_srng_send_reap_event_threshold(
 		struct wlan_objmgr_psoc *psoc, uint32_t val)
 
 {
@@ -148,4 +148,36 @@ target_if_mgmt_rx_srng_register_tx_ops(struct wlan_mgmt_rx_srng_tx_ops *tx_ops)
 
 	tx_ops->mgmt_rx_srng_send_threshold =
 			target_if_mgmt_rx_srng_send_reap_event_threshold;
+}
+
+void target_if_mgmt_rx_srng_update_support(struct wlan_objmgr_psoc *psoc,
+					   wmi_unified_t wmi_handle)
+{
+	struct mgmt_rx_srng_psoc_priv *psoc_priv;
+	struct target_psoc_info *tgt_hdl;
+	bool cfg_enable;
+
+	psoc_priv = wlan_objmgr_psoc_get_comp_private_obj(
+					psoc, WLAN_UMAC_COMP_MGMT_RX_SRNG);
+	if (!psoc_priv) {
+		target_if_err("mgmt rx srng psoc priv is NULL");
+		return;
+	}
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		target_if_err("target_psoc_info is null in mgmt_rx_srng");
+		return;
+	}
+	cfg_enable = psoc_priv->mgmt_rx_srng_is_enable;
+
+	if (wmi_service_enabled(wmi_handle, wmi_service_mgmt_rx_srng_support) &&
+	    cfg_enable) {
+		psoc_priv->mgmt_rx_srng_is_enable = true;
+		tgt_hdl->info.wlan_res_cfg.mgmt_rx_srng_support = true;
+		target_if_debug("mgmt_rx_srng_support is enabled");
+	} else {
+		psoc_priv->mgmt_rx_srng_is_enable = false;
+		target_if_debug("mgmt_rx_srng_support is not enabled");
+	}
 }
