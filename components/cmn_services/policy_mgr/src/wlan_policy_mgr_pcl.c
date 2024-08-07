@@ -1178,9 +1178,29 @@ static bool policy_mgr_channel_mcc_with_non_sap(struct wlan_objmgr_psoc *psoc,
 						qdf_freq_t chan_freq)
 {
 	uint32_t i, connection_of_2ghz = 0;
-	qdf_freq_t conc_freq;
+	qdf_freq_t conc_freq, nan_2g_freq;
 	bool is_mcc = false, check_only_dbs = false;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t sta_cnt = 0;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+
+	nan_2g_freq =
+		policy_mgr_mode_specific_get_channel(psoc, PM_NAN_DISC_MODE);
+
+	sta_cnt =
+		policy_mgr_get_mode_specific_conn_info(
+						psoc, &freq_list[sta_cnt],
+						vdev_id_list,
+						PM_STA_MODE);
+	/* In case of ML STA + NAN concurrency consider NAN social,
+	 * As SCC channel. SAP will move to NAN social channel.
+	 * In case of legacy STA, SAP will move to legacy STA channel.
+	 */
+	for (i = 0; i < sta_cnt; i++)
+		if (policy_mgr_is_ml_vdev_id(psoc, vdev_id_list[i]) &&
+		    wlan_nan_is_disc_active(psoc) && chan_freq == nan_2g_freq)
+			return false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
