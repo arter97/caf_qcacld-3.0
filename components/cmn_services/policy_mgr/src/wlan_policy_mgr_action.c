@@ -458,7 +458,12 @@ policy_mgr_get_connection_table_entry_info(struct wlan_objmgr_pdev *pdev,
 	struct vdev_mlme_obj *vdev_mlme;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
-						    WLAN_POLICY_MGR_ID);
+			WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev is NULL");
+		return status;
+	}
+
 	chan = wlan_vdev_get_active_channel(vdev);
 	if (!chan)
 		goto rel_ref;
