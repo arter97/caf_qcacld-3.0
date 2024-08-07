@@ -7995,6 +7995,12 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		  qdf_opmode_str(adapter->device_mode), adapter->device_mode);
 
 	if (adapter->device_mode == QDF_SAP_MODE) {
+		if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+						 link_info->vdev_id)) {
+			wlan_ll_sap_switch_bearer_on_stop_ap(
+							hdd_ctx->psoc,
+							link_info->vdev_id);
+		}
 		wlan_hdd_del_station(adapter, NULL);
 		mac_handle = hdd_ctx->mac_handle;
 		status = wlan_hdd_flush_pmksa_cache(link_info);

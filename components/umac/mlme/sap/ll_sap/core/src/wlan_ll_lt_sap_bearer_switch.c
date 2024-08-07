@@ -610,6 +610,8 @@ ll_lt_sap_find_bs_req_by_id(struct bearer_switch_info *bs_ctx,
  * ll_lt_sap_send_bs_req_to_userspace() - Send bearer switch request to user
  * space
  * @vdev: ll_lt sap vdev
+ * @req_type: Type of the request
+ * @source: Source of the request
  *
  * API to send bearer switch request to userspace
  *
@@ -617,14 +619,40 @@ ll_lt_sap_find_bs_req_by_id(struct bearer_switch_info *bs_ctx,
  */
 static void
 ll_lt_sap_send_bs_req_to_userspace(struct wlan_objmgr_vdev *vdev,
-				   enum bearer_switch_req_type req_type)
+				   enum bearer_switch_req_type req_type,
+				   enum bearer_switch_req_source source)
 {
 	struct ll_sap_ops *osif_cbk;
 
 	osif_cbk = ll_sap_get_osif_cbk();
 	if (osif_cbk && osif_cbk->ll_sap_send_audio_transport_switch_req_cb)
 		osif_cbk->ll_sap_send_audio_transport_switch_req_cb(vdev,
-								    req_type);
+								    req_type,
+								    source);
+}
+
+/**
+ * ll_lt_sap_handle_bs_request_on_stop_ap() - API to handle bearer switch
+ * in stop ap case
+ * @bs_ctx: Bearer switch context
+ * @bs_req: Bearer switch request
+ *
+ * If LL_LT_SAP is stopping, no need to start the timer, no need to cache the
+ * request, no need to invoke the cbk as well Just move state machine to
+ * non-wlan state.
+ *
+ * Return: None
+ */
+static void
+ll_lt_sap_handle_bs_request_on_stop_ap(
+				struct bearer_switch_info *bs_ctx,
+				struct wlan_bearer_switch_request *bs_req)
+{
+	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type,
+					   bs_req->source);
+	bs_sm_transition_to(bs_ctx, BEARER_NON_WLAN);
+
+	return;
 }
 
 /**
@@ -662,7 +690,8 @@ ll_lt_sap_continue_bs_to_wlan(void *user_data)
 		return;
 	}
 
-	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
+	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type,
+					   bs_req->source);
 
 	/*
 	 * Switch back to wlan is sent here, hence set the non wlan requested
@@ -802,6 +831,14 @@ ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_state(
 {
 	QDF_STATUS status;
 
+	/* If bearer is non-wlan and LL_LT_SAP is getting stopped,
+	 * then just return
+	 */
+	if (bs_req->source == BEARER_SWITCH_REQ_STOP_AP) {
+		ll_sap_debug("Bearer is already non-wlan");
+		return;
+	}
+
 	ll_lt_sap_bs_increament_ref_count(bs_ctx, bs_req);
 
 	ll_lt_sap_stop_bs_wlan_req_timer(bs_ctx, bs_req->request_id);
@@ -817,7 +854,8 @@ ll_lt_sap_handle_bs_to_non_wlan_in_non_wlan_state(
 
 	ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
 
-	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
+	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type,
+					   bs_req->source);
 
 	bs_ctx->sm.is_non_wlan_requested = true;
 
@@ -1113,6 +1151,9 @@ ll_lt_sap_handle_bs_to_non_wlan_in_wlan_state(
 		return;
 	}
 
+	if (bs_req->source == BEARER_SWITCH_REQ_STOP_AP)
+		return ll_lt_sap_handle_bs_request_on_stop_ap(bs_ctx, bs_req);
+
 	/*
 	 * If bearer switch request is already cached and this function is
 	 * invoked after that, then don't increment the ref count and don't
@@ -1130,7 +1171,8 @@ ll_lt_sap_handle_bs_to_non_wlan_in_wlan_state(
 		ll_lt_sap_cache_bs_request(bs_ctx, bs_req);
 	}
 
-	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type);
+	ll_lt_sap_send_bs_req_to_userspace(bs_ctx->vdev, bs_req->req_type,
+					   bs_req->source);
 
 	bs_ctx->sm.is_non_wlan_requested = true;
 

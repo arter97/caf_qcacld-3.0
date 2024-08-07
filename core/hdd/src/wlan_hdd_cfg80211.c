@@ -226,6 +226,7 @@
 #endif
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_cfg80211_p2p.h"
+#include "wlan_ll_sap_api.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -28403,6 +28404,13 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 		goto fn_end;
 
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac)) {
+		if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+						 adapter->deflink->vdev_id)) {
+			wlan_ll_sap_switch_bearer_on_stop_ap(
+						hdd_ctx->psoc,
+						adapter->deflink->vdev_id);
+		}
+
 		if (!QDF_IS_STATUS_SUCCESS(hdd_softap_deauth_all_sta(adapter,
 								     param)))
 			goto fn_end;
