@@ -31843,6 +31843,8 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	hdd_debug("get channel for link id: %d, device mode: %d", link_id,
 		  adapter->device_mode);
 
+	hdd_reg_wait_for_country_change(hdd_ctx);
+
 	switch (adapter->device_mode) {
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
