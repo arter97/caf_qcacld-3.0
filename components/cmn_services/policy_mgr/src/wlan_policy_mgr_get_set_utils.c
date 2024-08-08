@@ -9305,7 +9305,7 @@ policy_mgr_is_link_active_allowed(struct wlan_objmgr_psoc *psoc,
 		ch_freq = chan_info->ch_freq;
 		if (wlan_reg_freq_to_band((qdf_freq_t)ch_freq) ==
 		    REG_BAND_2G) {
-			policy_mgr_err("vdev:  Invalid link activation for link: %d at freq: %d in  HW mode: %d",
+			policy_mgr_err("vdev: %d Invalid link activation for link: %d at freq: %d in  HW mode: %d",
 				       link_info->vdev_id, link_info->link_id,
 				       ch_freq,
 				       POLICY_MGR_HW_MODE_AUX_EMLSR_SINGLE);
