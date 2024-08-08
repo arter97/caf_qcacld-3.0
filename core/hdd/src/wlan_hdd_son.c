@@ -33,6 +33,7 @@
 #include <wlan_hdd_object_manager.h>
 #include <wlan_hdd_stats.h>
 #include "wlan_cfg80211_mc_cp_stats.h"
+#include "wlan_dp_ucfg_api.h"
 
 static const struct son_chan_width {
 	enum ieee80211_cwm_width son_chwidth;
@@ -2644,6 +2645,19 @@ static int hdd_son_get_sta_stats(struct wlan_objmgr_vdev *vdev,
 	return ret;
 }
 
+/**
+ * hdd_son_set_def_tidmap_prty() - set default tidmap priority
+ * @vdev: vdev
+ * @pri: tidmap priority
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int hdd_son_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
+				       uint32_t pri)
+{
+	return ucfg_dp_set_def_tidmap_prty(vdev, pri);
+}
+
 void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 {
 	struct son_callbacks cb_obj = {0};
@@ -2683,6 +2697,7 @@ void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.os_if_get_peer_capability = hdd_son_get_peer_capability;
 	cb_obj.os_if_get_peer_max_mcs_idx = hdd_son_get_peer_max_mcs_idx;
 	cb_obj.os_if_get_sta_stats = hdd_son_get_sta_stats;
+	cb_obj.os_if_set_def_tidmap_prty = hdd_son_set_def_tidmap_prty;
 
 	os_if_son_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 
