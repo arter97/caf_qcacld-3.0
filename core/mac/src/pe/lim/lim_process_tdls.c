@@ -4210,8 +4210,6 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 	struct pe_session *pe_session;
 	uint8_t session_id;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	tSirMacAddr peer;
-	struct tdls_peer *curr_peer;
 	struct tdls_vdev_priv_obj *vdev_obj;
 
 	pe_debug("TDLS Delete STA Request Received");
@@ -4259,20 +4257,6 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 		pe_err("Del Sta received in invalid LIMsme state: %d",
 		       pe_session->limSmeState);
 		goto lim_tdls_del_sta_error;
-	}
-
-	curr_peer = wlan_tdls_find_peer(vdev_obj, del_sta_req->peermac.bytes);
-	if (!curr_peer) {
-		pe_err("tdls peer is null");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (curr_peer->link_status ==  TDLS_LINK_CONNECTED &&
-	    curr_peer->valid_entry) {
-		qdf_mem_copy(peer, del_sta_req->peermac.bytes,
-			     sizeof(tSirMacAddr));
-		lim_send_deauth_mgmt_frame(mac, REASON_DEAUTH_NETWORK_LEAVING,
-					   peer, pe_session, false);
 	}
 
 	status = lim_tdls_del_sta(mac, del_sta_req->peermac,
