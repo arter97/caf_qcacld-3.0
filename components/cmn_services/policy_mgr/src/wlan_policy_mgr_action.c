@@ -2586,8 +2586,7 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 
 	policy_mgr_change_sap_channel_with_csa(psoc, vdev_id,
 					       sap_freq,
-					       policy_mgr_get_ch_width(
-					       sap_info->bw), true);
+					       CH_WIDTH_MAX, true);
 vdev_release:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 }
