@@ -1053,14 +1053,13 @@ err_ret:
 
 } /* End lim_send_probe_rsp_mgmt_frame. */
 
-static uint8_t wnm_chan_usage_dialog_token;
 #define MIN_WNM_CHAN_USAGE_TOKEN (1)
-static inline uint8_t lim_get_wnm_chan_usage_dialog_token(void)
+static uint8_t lim_get_wnm_action_dialog_token(struct pe_session *session)
 {
-	++wnm_chan_usage_dialog_token;
+	if (!session->wnm_action_dialog_token)
+		session->wnm_action_dialog_token = MIN_WNM_CHAN_USAGE_TOKEN;
 
-	return wnm_chan_usage_dialog_token ? wnm_chan_usage_dialog_token :
-		MIN_WNM_CHAN_USAGE_TOKEN;
+	return session->wnm_action_dialog_token++;
 }
 
 static QDF_STATUS
@@ -1094,7 +1093,7 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 {
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	struct pe_session *session;
-	uint8_t code[ REG_ALPHA2_LEN + 1];
+	uint8_t code[REG_ALPHA2_LEN + 1];
 	QDF_STATUS qdf_status;
 	struct wlan_objmgr_psoc *psoc;
 	qdf_freq_t freq;
@@ -1112,7 +1111,7 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session || session->opmode != QDF_P2P_CLIENT_MODE ||
-	    !session->send_notify_cap)
+	    !session->post_csa_notify_cap)
 		return;
 
 	psoc = wlan_vdev_get_psoc(session->vdev);
@@ -1121,10 +1120,10 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 
 	frm.Category.category = ACTION_CATEGORY_WNM;
 	frm.Action.action = WNM_CHAN_USAGE_REQ;
-	frm.DialogToken.token = lim_get_wnm_chan_usage_dialog_token();
+	frm.DialogToken.token = lim_get_wnm_action_dialog_token(session);
 
 	frm.channel_usage.present = true;
-	frm.channel_usage.usage_mode = 5;
+	frm.channel_usage.usage_mode = CHAN_USAGE_CAPABILITY_NOTIFY;
 
 	wlan_reg_read_current_country(psoc, code);
 	freq = session->curr_op_freq;
@@ -1160,7 +1159,8 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 	status = dot11f_get_packed_channel_usage_reqSize(mac_ctx, &frm,
 							 &payload);
 	if (DOT11F_FAILED(status)) {
-		pe_err("Failed to calculate the packed size(0x%08x).", status);
+		pe_debug("Failed to calculate the packed size(0x%08x).",
+			 status);
 		return;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Warnings in calculating the packed size(0x%08x).",
@@ -1191,8 +1191,9 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 					       frame_ptr + sizeof(*mac_hdr),
 					       num_bytes, &payload);
 	if (DOT11F_FAILED(status)) {
-		pe_err("Failed to pack frame(0x%08x).", status);
+		pe_debug("Failed to pack frame(0x%08x).", status);
 		/* Free the allocated cds packet */
+		cds_packet_free((void *)pkt_ptr);
 		return;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Warnings in packing frame0x%08x).", status);
@@ -1200,8 +1201,7 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 
 	tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   frame_ptr, num_bytes);
+	mgmt_txrx_frame_hex_dump(frame_ptr, num_bytes, true);
 
 	qdf_status = wma_tx_frame(mac, pkt_ptr, (uint16_t)num_bytes,
 				  TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
@@ -1215,7 +1215,7 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 		cds_packet_free((void *)pkt_ptr);
 	}
 
-	session->send_notify_cap = false;
+	session->post_csa_notify_cap = false;
 }
 
 void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
@@ -1255,10 +1255,10 @@ void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 	qdf_mem_zero(frm, sizeof(*frm));
 	frm->Category.category = ACTION_CATEGORY_WNM;
 	frm->Action.action = WNM_CHAN_USAGE_REQ;
-	frm->DialogToken.token = lim_get_wnm_chan_usage_dialog_token();
+	frm->DialogToken.token = lim_get_wnm_action_dialog_token(session);
 
 	frm->channel_usage.present = true;
-	frm->channel_usage.usage_mode = 4;
+	frm->channel_usage.usage_mode = CHAN_USAGE_AIDABLE_BSS_CSA_REQ;
 
 	qdf_status =
 		policy_mgr_get_pcl_for_vdev_id(psoc, PM_P2P_CLIENT_MODE,
@@ -1320,7 +1320,7 @@ pack_frame:
 	status = dot11f_get_packed_channel_usage_reqSize(mac_ctx, frm,
 							 &payload);
 	if (DOT11F_FAILED(status)) {
-		pe_err("Failed to calculate the packed size(0x%08x)", status);
+		pe_debug("Failed to calculate the packed size(0x%08x)", status);
 		return;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Warnings in calculating the packed size(0x%08x)",
@@ -1351,8 +1351,9 @@ pack_frame:
 					       frame_ptr + sizeof(*mac_hdr),
 					       num_bytes, &payload);
 	if (DOT11F_FAILED(status)) {
-		pe_err("Failed to pack frame(0x%08x)", status);
+		pe_debug("Failed to pack frame(0x%08x)", status);
 		/* Free the allocated cds packet */
+		cds_packet_free((void *)pkt_ptr);
 		return;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Warnings in packing frame0x%08x)", status);
@@ -1365,8 +1366,7 @@ pack_frame:
 	 */
 	tx_timer_deactivate(&mac_ctx->lim.lim_timers.channel_vacate_timer);
 
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   frame_ptr, num_bytes);
+	mgmt_txrx_frame_hex_dump(frame_ptr, num_bytes, true);
 
 	qdf_status = wma_tx_frameWithTxComplete(mac_ctx, pkt_ptr,
 						(uint16_t)num_bytes,
@@ -1466,7 +1466,7 @@ pack_frame:
 	status = dot11f_get_packed_channel_usage_respSize(mac_ctx, frm,
 							  &payload);
 	if (DOT11F_FAILED(status)) {
-		pe_err("Failed to calculate the packed size(0x%08x)", status);
+		pe_debug("Failed to calculate the packed size(0x%08x)", status);
 		return;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Warnings in calculating the packed size(0x%08x)",
@@ -1497,8 +1497,9 @@ pack_frame:
 						frame_ptr + sizeof(*mac_hdr),
 						num_bytes, &payload);
 	if (DOT11F_FAILED(status)) {
-		pe_err("Failed to pack frame(0x%08x)", status);
+		pe_debug("Failed to pack frame(0x%08x)", status);
 		/* Free the allocated cds packet */
+		cds_packet_free((void *)pkt_ptr);
 		return;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Warnings in packing frame0x%08x)", status);

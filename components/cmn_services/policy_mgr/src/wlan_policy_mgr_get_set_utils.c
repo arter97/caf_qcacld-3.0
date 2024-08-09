@@ -5456,9 +5456,8 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 							session_id);
 	if (mode == QDF_STA_MODE &&
 	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, cur_freq) &&
-	    pm_ctx->conc_cbacks.ap_assist_dfs_group_notify) {
+	    pm_ctx->conc_cbacks.ap_assist_dfs_group_notify)
 		pm_ctx->conc_cbacks.ap_assist_dfs_group_notify(true);
-	}
 }
 
 /**
@@ -5649,9 +5648,8 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 
 	if (mode == QDF_STA_MODE &&
 	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, cur_freq) &&
-	    pm_ctx->conc_cbacks.ap_assist_dfs_group_notify) {
+	    pm_ctx->conc_cbacks.ap_assist_dfs_group_notify)
 		pm_ctx->conc_cbacks.ap_assist_dfs_group_notify(false);
-	}
 
 	return qdf_status;
 }

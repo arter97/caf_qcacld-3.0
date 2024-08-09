@@ -480,11 +480,6 @@ tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
 	struct p2p_soc_priv_obj *p2p_soc_obj;
 	struct p2p_ap_assist_dfs_group_bmiss *ev_data;
 
-	if (!psoc) {
-		p2p_err("psoc context passed is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
 	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							    WLAN_UMAC_COMP_P2P);
 	if (!p2p_soc_obj) {
@@ -506,7 +501,6 @@ tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
 
 	status = scheduler_post_message(QDF_MODULE_ID_P2P, QDF_MODULE_ID_P2P,
 					QDF_MODULE_ID_TARGET_IF, &msg);
-
 	if (QDF_IS_STATUS_ERROR(status)) {
 		p2p_nofl_debug("p2p failed to post msg (%d), status (%d)",
 			       P2P_EVENT_AP_ASSIST_DFS_GROUP_BMISS_IND, status);

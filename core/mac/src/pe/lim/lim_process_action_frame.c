@@ -928,8 +928,8 @@ __lim_process_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 	status = dot11f_unpack_channel_usage_req(mac_ctx, body_ptr, frame_len,
 						 frm, false);
 	if (DOT11F_FAILED(status)) {
-		pe_err("Error parsing channel usage req action frame (0x%08x, %d bytes):",
-		       status, frame_len);
+		pe_debug("Error parsing channel usage req action frame (0x%08x, %d bytes):",
+			 status, frame_len);
 		return;
 	} else if (DOT11F_WARNED(status)) {
 		pe_debug("There were warnings while unpacking channel usage req action frame  (0x%08x, %d bytes):",
@@ -983,8 +983,8 @@ __lim_process_channel_usage_resp_action_frame(struct mac_context *mac_ctx,
 	status = dot11f_unpack_channel_usage_resp(mac_ctx, body_ptr,
 						  trunc_frame_len, frm, false);
 	if (DOT11F_FAILED(status)) {
-		pe_err("Error parsing channel usage resp action frame (0x%08x, %d bytes):",
-		       status, frame_len);
+		pe_debug("Error parsing channel usage resp action frame (0x%08x, %d bytes):",
+			 status, frame_len);
 		return;
 	} else if (DOT11F_WARNED(status)) {
 		pe_debug("There were warnings while unpacking channel usage resp action frame  (0x%08x, %d bytes):",

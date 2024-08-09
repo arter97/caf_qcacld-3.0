@@ -810,7 +810,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 			session->send_p2p_conf_frame = false;
 		}
 
-		if (session->send_notify_cap)
+		if (session->post_csa_notify_cap)
 			lim_send_channel_usage_req_notif_cap_action_frame(session->vdev_id);
 	}
 

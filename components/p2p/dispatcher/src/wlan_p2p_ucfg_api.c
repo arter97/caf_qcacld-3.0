@@ -547,11 +547,6 @@ QDF_STATUS ucfg_p2p_send_chan_switch_req(struct wlan_objmgr_psoc *psoc,
 	struct p2p_soc_priv_obj *p2p_soc_obj;
 	struct p2p_chan_switch_req_params *ch_switch_params;
 
-	if (!psoc) {
-		p2p_err("psoc context passed is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
 	if (vdev_id >= WLAN_INVALID_VDEV_ID) {
 		p2p_err("Invalid VDEV");
 		return QDF_STATUS_E_INVAL;

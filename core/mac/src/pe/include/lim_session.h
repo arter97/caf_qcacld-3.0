@@ -391,10 +391,10 @@ struct wlan_mlo_ie_info {
  * @chan_usage_resp: Channel usage response info
  */
 struct dfs_p2p_group_info {
-	uint16_t         is_assisted_p2p_group:1,
-			 chan_usage_req_resp_inprog:1,
-			 is_ap_bcn_monitor_active:1,
-			 reserved:13;
+	uint8_t is_assisted_p2p_group:1,
+		chan_usage_req_resp_inprog:1,
+		is_ap_bcn_monitor_active:1,
+		reserved:5;
 	struct qdf_mac_addr ap_bssid;
 	struct qdf_mac_addr non_tx_bssid;
 	tDot11fchannel_usage_req chan_usage_req;
@@ -666,7 +666,7 @@ struct dfs_p2p_group_info {
  * @enable_bcast_probe_rsp:
  * @ht_client_cnt:
  * @ch_switch_in_progress:
- * @send_notify_cap: Send notify capability pending
+ * @post_csa_notify_cap: Send notify capability pending post CSA
  * @he_with_wep_tkip:
  * @fils_info:
  * @prev_auth_seq_num: Sequence number of previously received auth frame to
@@ -712,6 +712,7 @@ struct dfs_p2p_group_info {
  * on 2.4 GHz
  * @join_probe_cnt: join probe request count
  * @cal_tpc_post_csa: Recalculate tx power power csa
+ * @wnm_action_dialog_token: Dialog token for WNM action frames.
  * @dfs_p2p_info: DFS P2P group operation info.
  */
 struct pe_session {
@@ -992,7 +993,7 @@ struct pe_session {
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
 	bool ch_switch_in_progress;
-	bool send_notify_cap;
+	bool post_csa_notify_cap;
 	bool he_with_wep_tkip;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct pe_fils_session *fils_info;
@@ -1046,6 +1047,7 @@ struct pe_session {
 	uint8_t join_probe_cnt;
 	bool cal_tpc_post_csa;
 
+	uint8_t wnm_action_dialog_token;
 	struct dfs_p2p_group_info dfs_p2p_info;
 };
 

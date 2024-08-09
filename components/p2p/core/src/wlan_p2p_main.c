@@ -934,11 +934,10 @@ p2p_process_chan_switch_req(struct p2p_chan_switch_req_params *req)
 	if (!p2p_soc_obj)
 		return QDF_STATUS_E_INVAL;
 
-	if (p2p_soc_obj->p2p_cb.p2p_group_chan_switch_req) {
+	if (p2p_soc_obj->p2p_cb.p2p_group_chan_switch_req)
 		p2p_soc_obj->p2p_cb.p2p_group_chan_switch_req(req->vdev_id,
 							      req->channel,
 							      req->op_class);
-	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1010,8 +1009,7 @@ QDF_STATUS p2p_process_cmd(struct scheduler_msg *msg)
 static QDF_STATUS p2p_process_ap_assist_dfs_group_bmiss(void *ev_data)
 {
 	struct p2p_soc_priv_obj *p2p_soc_obj;
-	struct p2p_ap_assist_dfs_group_bmiss *params =
-				(struct p2p_ap_assist_dfs_group_bmiss *)ev_data;
+	struct p2p_ap_assist_dfs_group_bmiss *params = ev_data;
 
 	p2p_soc_obj = params->p2p_soc_obj;
 	if (!p2p_soc_obj)

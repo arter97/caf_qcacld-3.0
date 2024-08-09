@@ -370,8 +370,7 @@ struct p2p_ap_assist_dfs_ap_info {
 
 /**
  * struct p2p_ap_assist_dfs_group_info - Extracted info from P2P2 IE related
- * to DFS
- * owner capability and AP assisted params
+ * to DFS owner capability and AP assisted params
  * @is_dfs_owner: Is DFS owner
  * @is_client_csa: Can client send CSA request
  * @extn_cap_attr_found: Is extended cap attr found
