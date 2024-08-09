@@ -3642,8 +3642,12 @@ void lim_mon_deinit_session(struct mac_context *mac_ptr,
 
 	session = pe_find_session_by_vdev_id(mac_ptr, msg->vdev_id);
 
-	if (session && session->bssType == eSIR_MONITOR_MODE)
+	if (session && session->bssType == eSIR_MONITOR_MODE) {
+		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
+					      WLAN_VDEV_SM_EV_DOWN,
+					      0, NULL);
 		pe_delete_session(mac_ptr, session);
+	}
 }
 
 /**

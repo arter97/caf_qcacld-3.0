@@ -10193,7 +10193,20 @@ wlan_hdd_delete_mon_link(struct hdd_adapter *adapter,
 	status = hdd_monitor_mode_vdev_status(adapter);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("stop failed montior mode");
+
+	status = qdf_event_reset(&adapter->qdf_monitor_mode_vdev_stop_event);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("failed to reinit vdev stop event");
+
 	sme_delete_mon_session(hdd_ctx->mac_handle, link_info->vdev_id);
+
+	/* block until vdev stop success*/
+	status =
+		qdf_wait_for_event_completion(&adapter->qdf_monitor_mode_vdev_stop_event,
+					      WLAN_MONITOR_MODE_VDEV_STOP_EVT);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("monitor vdev stop event time out vdev id: %d status %d",
+			   adapter->deflink->vdev_id, status);
 
 	if (vdev)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
@@ -22728,7 +22741,7 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 
-void hdd_sme_monitor_mode_callback(uint8_t vdev_id)
+void hdd_sme_monitor_mode_callback(uint8_t vdev_id, bool is_up)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
@@ -22749,11 +22762,16 @@ void hdd_sme_monitor_mode_callback(uint8_t vdev_id)
 		hdd_err_rl("Invalid magic");
 		return;
 	}
-
-	qdf_event_set(&adapter->qdf_monitor_mode_vdev_up_event);
-
-	hdd_debug("monitor mode vdev up completed");
-	adapter->monitor_mode_vdev_up_in_progress = false;
+	if (is_up) {
+		qdf_event_set(&adapter->qdf_monitor_mode_vdev_up_event);
+		hdd_debug("monitor mode vdev up completed for vdev %d",
+			  vdev_id);
+		adapter->monitor_mode_vdev_up_in_progress = false;
+	} else {
+		qdf_event_set(&adapter->qdf_monitor_mode_vdev_stop_event);
+		hdd_debug("monitor mode vdev stop completed for vdev %d",
+			  vdev_id);
+	}
 }
 
 QDF_STATUS hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
@@ -22764,6 +22782,8 @@ QDF_STATUS hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
 	if (session_type == QDF_MONITOR_MODE) {
 		qdf_status = qdf_event_create(
 				&adapter->qdf_monitor_mode_vdev_up_event);
+		qdf_status = qdf_event_create(
+				&adapter->qdf_monitor_mode_vdev_stop_event);
 	}
 	return qdf_status;
 }

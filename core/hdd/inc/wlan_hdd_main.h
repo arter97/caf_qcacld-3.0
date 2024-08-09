@@ -329,7 +329,7 @@ enum hdd_nb_cmd_id {
 
 /* Maximum time(ms) to wait for monitor mode vdev up event completion*/
 #define WLAN_MONITOR_MODE_VDEV_UP_EVT      SME_CMD_VDEV_START_BSS_TIMEOUT
-
+#define WLAN_MONITOR_MODE_VDEV_STOP_EVT    SME_CMD_STOP_VDEV_TIMEOUT
 /* Mac Address string length */
 #define MAC_ADDRESS_STR_LEN 18  /* Including null terminator */
 /* Max and min IEs length in bytes */
@@ -1242,6 +1242,7 @@ struct get_station_client_info {
  * @is_ll_stats_req_pending: atomic variable to check active stats req
  * @sta_stats_cached_timestamp: last updated stats timestamp
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
+ * @qdf_monitor_mode_vdev_stop_event: QDF event for monitor mode vdev stop rsp
  * @disconnect_comp_var: completion variable for disconnect callback
  * @linkup_event_var: completion variable for Linkup Event
  * @is_link_up_service_needed: Track whether the linkup handling is needed
@@ -1384,6 +1385,7 @@ struct hdd_adapter {
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 	qdf_event_t qdf_monitor_mode_vdev_up_event;
+	qdf_event_t qdf_monitor_mode_vdev_stop_event;
 #endif
 
 	/* TODO: move these to sta ctx. These may not be used in AP */
@@ -5339,14 +5341,14 @@ int hdd_crash_inject(struct hdd_adapter *adapter, uint32_t v1, uint32_t v2)
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 
-void hdd_sme_monitor_mode_callback(uint8_t vdev_id);
+void hdd_sme_monitor_mode_callback(uint8_t vdev_id, bool is_up);
 
 QDF_STATUS hdd_monitor_mode_vdev_status(struct hdd_adapter *adapter);
 
 QDF_STATUS hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
 					     uint8_t session_type);
 #else
-static inline void hdd_sme_monitor_mode_callback(uint8_t vdev_id) {}
+static inline void hdd_sme_monitor_mode_callback(uint8_t vdev_id, bool is_up) {}
 
 static inline QDF_STATUS
 hdd_monitor_mode_vdev_status(struct hdd_adapter *adapter)
