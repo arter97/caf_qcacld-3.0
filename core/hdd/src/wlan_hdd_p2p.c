@@ -1565,7 +1565,7 @@ static uint32_t set_first_connection_operating_channel(
 	oper_chan_freq = hdd_get_operating_chan_freq(hdd_ctx, dev_mode);
 	if (!oper_chan_freq) {
 		hdd_err(" First adapter operating channel is invalid");
-		return -EINVAL;
+		return set_value;
 	}
 	operating_channel = wlan_reg_freq_to_chan(hdd_ctx->pdev,
 						  oper_chan_freq);
@@ -1605,9 +1605,9 @@ static uint32_t set_second_connection_operating_channel(
 						  policy_mgr_get_mcc_operating_channel(
 						  hdd_ctx->psoc, vdev_id));
 
-	if (operating_channel == 0) {
+	if (!operating_channel) {
 		hdd_err("Second adapter operating channel is invalid");
-		return -EINVAL;
+		return set_value;
 	}
 
 	hdd_info("Second connection channel No.:%d and quota:%dms",

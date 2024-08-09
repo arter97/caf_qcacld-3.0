@@ -7767,17 +7767,17 @@ QDF_STATUS sme_set_ht2040_mode(mac_handle_t mac_handle, uint8_t sessionId,
 
 	switch (channel_type) {
 	case eHT_CHAN_HT20:
-		if (!session->cb_mode)
+		if (session->cb_mode == PHY_SINGLE_CHANNEL_CENTERED)
 			return QDF_STATUS_SUCCESS;
 		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
 		break;
 	case eHT_CHAN_HT40MINUS:
-		if (session->cb_mode)
+		if (session->cb_mode != PHY_SINGLE_CHANNEL_CENTERED)
 			return QDF_STATUS_SUCCESS;
 		cb_mode = PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
 		break;
 	case eHT_CHAN_HT40PLUS:
-		if (session->cb_mode)
+		if (session->cb_mode != PHY_SINGLE_CHANNEL_CENTERED)
 			return QDF_STATUS_SUCCESS;
 		cb_mode = PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
 		break;
