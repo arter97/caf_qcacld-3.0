@@ -2482,9 +2482,8 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 	uint32_t sap_freq = 0, i;
 	QDF_STATUS status;
 	uint32_t user_config_freq;
-	uint8_t band_mask = 0;
-	uint8_t chn_idx, num_chan, vdev_id;
-	struct regulatory_channel *channel_list;
+	uint8_t vdev_id;
+	struct regulatory_channel;
 	qdf_freq_t intf_ch_freq = 0;
 	uint8_t mcc_to_scc_switch;
 	struct wlan_objmgr_vdev *vdev;
@@ -2536,43 +2535,12 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 
 	policy_mgr_debug("user_config_freq %d intf_ch_freq: %d",
 			 user_config_freq, intf_ch_freq);
-
-	if (wlan_reg_is_enable_in_secondary_list_for_freq(pm_ctx->pdev,
-							  user_config_freq) &&
-	    policy_mgr_is_safe_channel(psoc, user_config_freq)) {
-		policy_mgr_debug("restart freq %d", user_config_freq);
-		sap_freq = user_config_freq;
-	} else {
-		sap_freq = policy_mgr_get_nondfs_preferred_channel(
-					psoc, PM_SAP_MODE,
-					false,
-					vdev_id);
-		channel_list = qdf_mem_malloc(
-					sizeof(struct regulatory_channel) *
-					       NUM_CHANNELS);
-		if (!channel_list)
-			goto vdev_release;
-
-		band_mask |= BIT(wlan_reg_freq_to_band(user_config_freq));
-		num_chan = wlan_reg_get_band_channel_list_for_pwrmode(
-						pm_ctx->pdev,
-						band_mask,
-						channel_list,
-						REG_CURRENT_PWR_MODE, false);
-		for (chn_idx = 0; chn_idx < num_chan; chn_idx++) {
-			if (wlan_reg_is_enable_in_secondary_list_for_freq(
-					pm_ctx->pdev,
-					channel_list[chn_idx].center_freq) &&
-			    policy_mgr_is_safe_channel(
-					psoc,
-					channel_list[chn_idx].center_freq)) {
-				policy_mgr_debug("Prefer user config band freq %d",
-						 channel_list[chn_idx].center_freq);
-				sap_freq = channel_list[chn_idx].center_freq;
-			}
-		}
-		qdf_mem_free(channel_list);
-	}
+	/* if user configured frequency is not valid
+	 * frequency, remain on the same frequency and do not restart the SAP
+	 */
+	if (!policy_mgr_is_safe_channel(pm_ctx->psoc, user_config_freq))
+		goto vdev_release;
+	sap_freq = user_config_freq;
 
 	if (pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress &&
 	    pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress()) {
