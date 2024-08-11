@@ -8000,6 +8000,7 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 
 		nla_nest_end(skb, nla_attr_1);
 		nla_nest_end(skb, nla_attr);
+		hdd_debug("PortId: %u", client_info->port_id);
 		wlan_cfg80211_vendor_event(skb, flags);
 	}
 	return QDF_STATUS_SUCCESS;
