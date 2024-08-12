@@ -2999,7 +2999,8 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
-lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
+lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
+					       struct pe_session *session)
 {
 	struct mlo_partner_info *partner_info;
 	struct mlo_link_info *partner_link_info;
@@ -3034,7 +3035,11 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
 	mlo_mgr_update_ap_link_info(session->vdev,
 				    wlan_vdev_get_link_id(session->vdev),
 				    session->bssId, channel);
-
+	lim_update_mlo_mgr_info(mac_ctx,
+				session->vdev,
+				(struct qdf_mac_addr *)session->bssId,
+				wlan_vdev_get_link_id(session->vdev),
+				channel.ch_freq);
 	/* Populating Partner link band Info */
 	partner_info = &session->lim_join_req->partner_info;
 	for (i = 0; i < partner_info->num_partner_links; i++) {
@@ -3047,11 +3052,17 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
 					    partner_link_info->link_id,
 					    partner_link_info->link_addr.bytes,
 					    channel);
+		lim_update_mlo_mgr_info(mac_ctx,
+					session->vdev,
+					&partner_link_info->link_addr,
+					partner_link_info->link_id,
+					channel.ch_freq);
 	}
 }
 #else
 static void
-lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
+lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
+					       struct pe_session *session)
 {}
 #endif
 
@@ -3168,7 +3179,8 @@ static void lim_process_switch_channel_join_req(
 		join_cnf.resultCode = eSIR_SME_SUCCESS;
 		join_cnf.protStatusCode = STATUS_SUCCESS;
 
-		lim_update_mlo_mgr_ap_link_info_mbssid_connect(session_entry);
+		lim_update_mlo_mgr_ap_link_info_mbssid_connect(mac_ctx,
+							       session_entry);
 
 		lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
 				     (uint32_t *)&join_cnf);
