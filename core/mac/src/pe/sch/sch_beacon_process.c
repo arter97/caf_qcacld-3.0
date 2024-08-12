@@ -466,8 +466,7 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		vht_op = &bcn->vendor_vht_ie.VHTOperation;
 	}
 	if (!session->vhtCapability ||
-	    !(bcn->OperatingMode.present ||
-	      (vht_op && vht_op->present && vht_caps)))
+	    !(vht_op && vht_op->present && vht_caps))
 		return;
 
 	is_40 = bcn->HTInfo.present ?
