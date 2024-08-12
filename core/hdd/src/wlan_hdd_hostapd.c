@@ -7014,9 +7014,6 @@ hdd_ssr_restart_sap_cac_link(struct hdd_adapter *adapter,
 	uint8_t created_sap;
 	uint8_t started_sap;
 
-	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
-		return false;
-
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_err("null sap_ctx");

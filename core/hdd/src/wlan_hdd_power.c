@@ -1906,6 +1906,10 @@ restart_post_cac_links:
 			if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
 				continue;
 
+			if (test_bit(SOFTAP_BSS_STARTED,
+				     &link_info->link_flags))
+				continue;
+
 			if (!ignore_cac_updated) {
 				hdd_restore_ignore_cac(hdd_ctx);
 				ignore_cac_updated = true;
