@@ -3217,24 +3217,31 @@ hdd_set_tsf_ul_delay_report(struct hdd_adapter *adapter, bool ena)
 #ifdef WLAN_FEATURE_UL_JITTER
 #define TX_RX_NSS_VENDOR_SIZE 3
 #define SS_COUNT_JITTER 2
+#define TX_NSS_CNT_IDX 0
+#define RX_NSS_CNT_IDX 1
+
 QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 			    struct sk_buff *skb)
 {
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	int **nss_stats;
+	int **nss_stats, **aggr_nss_stats;
 	struct nlattr *nss_nest, *nss;
 	int nestid;
 	struct hdd_context *hdd_ctx;
 	bool log_enabled = false;
+	struct wlan_hdd_link_info *link_info;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	log_enabled = ul_jitter_log_enabled(hdd_ctx);
-	if (log_enabled)
-		hdd_info("Received hdd_get_txrx_nss");
 	nss_stats = qdf_mem_malloc(SS_COUNT_JITTER * sizeof(int *));
 	if (!nss_stats) {
-		hdd_err_rl("failed to allocate nss array");
+		hdd_err_rl("failed to allocate nss_stats");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	aggr_nss_stats = qdf_mem_malloc(SS_COUNT_JITTER * sizeof(int *));
+	if (!aggr_nss_stats) {
+		hdd_err_rl("failed to allocate aggr_nss_stats");
+		qdf_mem_free(nss_stats);
 		return QDF_STATUS_E_NOMEM;
 	}
 
@@ -3242,17 +3249,41 @@ QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 		nss_stats[i] = qdf_mem_malloc(TX_RX_NSS_VENDOR_SIZE *
 					      sizeof(int));
 		if (!nss_stats[i]) {
-			hdd_err_rl("failed to allocate nss array");
+			hdd_err_rl("failed to allocate nss_stats column");
 			status = QDF_STATUS_E_NOMEM;
-			goto free_mem1;
+			goto free_mem;
+		}
+		aggr_nss_stats[i] = qdf_mem_malloc(TX_RX_NSS_VENDOR_SIZE *
+						   sizeof(int));
+		if (!aggr_nss_stats[i]) {
+			hdd_err_rl("failed to allocate aggr_nss_stats column");
+			status = QDF_STATUS_E_NOMEM;
+			goto free_mem;
 		}
 	}
 
-	status = cdp_get_txrx_nss(soc, adapter->deflink->vdev_id, nss_stats);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err_rl("Get txrx nss failed");
-		status = QDF_STATUS_E_FAILURE;
-		goto free_mem2;
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	log_enabled = ul_jitter_log_enabled(hdd_ctx);
+	if (log_enabled)
+		hdd_info("Received Tx Rx NSS request");
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (!hdd_cm_is_vdev_associated(link_info))
+			continue;
+
+		status = cdp_get_txrx_nss(soc, link_info->vdev_id, nss_stats);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err_rl("Get stats failed, vdev_id: %d status: %d",
+				   link_info->vdev_id, status);
+			status = QDF_STATUS_E_FAILURE;
+			goto free_mem;
+		}
+		for (int i = 0; i < SS_COUNT_JITTER; i++) {
+			aggr_nss_stats[i][TX_NSS_CNT_IDX] +=
+				nss_stats[i][TX_NSS_CNT_IDX];
+			aggr_nss_stats[i][RX_NSS_CNT_IDX] +=
+				nss_stats[i][RX_NSS_CNT_IDX];
+		}
 	}
 
 	nestid = QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_NSS_PKT_COUNT;
@@ -3261,7 +3292,7 @@ QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 		hdd_err("nla_nest_start failed");
 		wlan_cfg80211_vendor_free_skb(skb);
 		status = QDF_STATUS_E_FAILURE;
-		goto free_mem2;
+		goto free_mem;
 	}
 
 	for (int i = 0; i < SS_COUNT_JITTER; i++) {
@@ -3270,31 +3301,41 @@ QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 			hdd_err("nla_nest_start failed");
 			wlan_cfg80211_vendor_free_skb(skb);
 			status = QDF_STATUS_E_FAILURE;
-			goto free_mem2;
+			goto free_mem;
 		}
 		nla_put_u8(skb,
 			   QCA_WLAN_VENDOR_ATTR_NSS_PKT_NSS_VALUE,
-			   nss_stats[i][0]);
+			   i + 1);
 		wlan_cfg80211_nla_put_u64(skb,
 			    QCA_WLAN_VENDOR_ATTR_NSS_PKT_TX_PACKET_COUNT,
-			    (u64)nss_stats[i][1]);
+			    (u64)aggr_nss_stats[i][TX_NSS_CNT_IDX]);
 		wlan_cfg80211_nla_put_u64(skb,
 			    QCA_WLAN_VENDOR_ATTR_NSS_PKT_RX_PACKET_COUNT,
-			    (u64)nss_stats[i][2]);
+			    (u64)aggr_nss_stats[i][RX_NSS_CNT_IDX]);
 		if (log_enabled)
 			hdd_info("nss val %d tx_pkt %d rx_pkt %d",
-				 nss_stats[i][0], (u64)nss_stats[i][1],
-				 (u64)nss_stats[i][2]);
+				 i + 1, (u64)aggr_nss_stats[i][TX_NSS_CNT_IDX],
+				 (u64)aggr_nss_stats[i][RX_NSS_CNT_IDX]);
 		nla_nest_end(skb, nss);
 	}
 
 	nla_nest_end(skb, nss_nest);
-free_mem2:
 
-	for (int i = 0; i < SS_COUNT_JITTER; i++)
+free_mem:
+	for (int i = 0; i < SS_COUNT_JITTER; i++) {
+		if (!nss_stats[i])
+			break;
+
 		qdf_mem_free(nss_stats[i]);
-free_mem1:
+
+		if (!aggr_nss_stats[i])
+			continue;
+
+		qdf_mem_free(aggr_nss_stats[i]);
+	}
+
 	qdf_mem_free(nss_stats);
+	qdf_mem_free(aggr_nss_stats);
 
 	return status;
 }
