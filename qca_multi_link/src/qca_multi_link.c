@@ -1665,3 +1665,22 @@ void qca_multi_link_set_dbdc_loop_detection_cb(
 }
 
 qdf_export_symbol(qca_multi_link_set_dbdc_loop_detection_cb);
+
+#ifdef IOT_DRONE_MESH
+/**
+ * qca_multi_link_drone_mesh_mcast_drop - Mcast handling is not present
+ * as of now in IoT drone mesh, hence drop both the Tx/Rx mcast pkt to
+ * avoid loop in the network
+ **/
+bool qca_multi_link_drone_mesh_mcast_drop(struct net_device *net_dev,
+					  qdf_nbuf_t nbuf)
+{
+	if (qdf_nbuf_data_is_ipv6_mcast_pkt(qdf_nbuf_data(nbuf)) ||
+	    qdf_nbuf_data_is_ipv4_mcast_pkt(qdf_nbuf_data(nbuf)))
+		return true;
+	else
+		return false;
+}
+
+qdf_export_symbol(qca_multi_link_drone_mesh_mcast_drop);
+#endif

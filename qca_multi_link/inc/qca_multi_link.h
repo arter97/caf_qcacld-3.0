@@ -172,4 +172,8 @@ void qca_multi_link_set_dbdc_loop_detection_cb(qca_multi_link_set_loop_detection
 					       void *ctx);
 bool qca_multi_link_is_primary_radio(struct wiphy *dev_wiphy);
 struct net_device *qca_multi_link_get_station_vap(struct wiphy *wiphy);
+#ifdef IOT_DRONE_MESH
+bool qca_multi_link_drone_mesh_mcast_drop(struct net_device *net_dev,
+					  qdf_nbuf_t nbuf);
+#endif
 #endif
