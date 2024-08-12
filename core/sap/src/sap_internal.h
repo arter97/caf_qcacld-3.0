@@ -568,6 +568,15 @@ void
 sap_build_start_bss_config(struct start_bss_config *sap_bss_cfg,
 			   struct sap_config *config);
 
+/**
+ * sap_is_ch_non_overlap() - returns true if non-overlapping channel
+ * @sap_ctx: Sap context
+ * @ch: channel number
+ *
+ * Returns: true if non-overlapping (1, 6, 11) channel, false otherwise
+ */
+bool sap_is_ch_non_overlap(struct sap_context *sap_ctx, uint16_t ch);
+
 #ifdef QCA_DFS_BW_PUNCTURE
 /**
  * sap_is_chan_change_needed_for_radar() - Check if SAP channel change needed

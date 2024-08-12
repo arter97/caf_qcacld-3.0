@@ -3105,7 +3105,7 @@ next_bw:
  *
  * Returns: true if non-overlapping (1, 6, 11) channel, false otherwise
  */
-static bool sap_is_ch_non_overlap(struct sap_context *sap_ctx, uint16_t ch)
+bool sap_is_ch_non_overlap(struct sap_context *sap_ctx, uint16_t ch)
 {
 	if (sap_ctx->enableOverLapCh)
 		return true;

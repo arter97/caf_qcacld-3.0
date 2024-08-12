@@ -1704,6 +1704,7 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 	struct scan_filter *filter;
 	qdf_list_t *list = NULL;
 	enum channel_state state;
+	uint32_t ch_freq = roam_info->chan_info_freq;
 
 	mac = sap_get_mac_context();
 	if (!mac) {
@@ -1722,8 +1723,10 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 		return;
 	}
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(roam_info->chan_info_freq) &&
-	    !sap_ctx->acs_cfg->is_early_terminate_enabled)
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq) &&
+	    (!sap_ctx->acs_cfg->is_early_terminate_enabled ||
+	     !sap_is_ch_non_overlap(sap_ctx,
+				    wlan_reg_freq_to_chan(mac->pdev, ch_freq))))
 		return;
 
 	state = wlan_reg_get_channel_state_for_pwrmode(
