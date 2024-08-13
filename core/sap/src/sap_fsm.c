@@ -2870,6 +2870,7 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 				    mac_handle_t mac_handle)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
+	uint32_t con_ch_freq, con_vdev_id;
 
 	/*
 	 * check if channel is in DFS_NOL or if the channel
@@ -2887,28 +2888,18 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	 * ACS check if AP1 ACS resulting channel is DFS and if yes
 	 * override AP2 ACS scan result with AP1 DFS channel
 	 */
-	if (policy_mgr_concurrent_beaconing_sessions_running(mac_ctx->psoc)) {
-		uint32_t con_ch_freq;
-		uint16_t con_ch;
-
-		con_ch_freq = sme_get_beaconing_concurrent_operation_channel(
-				mac_handle, sap_ctx->sessionId);
-		con_ch = wlan_reg_freq_to_chan(mac_ctx->pdev, con_ch_freq);
-		/* Overwrite second AP's channel with first only when:
-		 * 1. If operating mode is single mac
-		 * 2. or if 2nd AP is coming up on 5G band channel
-		 */
-		if ((!policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) ||
-		     WLAN_REG_IS_5GHZ_CH_FREQ(sap_ctx->chan_freq)) &&
-		     con_ch &&
-		     wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
-					      con_ch_freq)) {
-			sap_ctx->chan_freq = con_ch_freq;
-			wlan_reg_set_channel_params_for_freq(
-						    mac_ctx->pdev,
-						    con_ch_freq, 0,
-						    &sap_ctx->ch_params);
-		}
+	if (policy_mgr_is_sap_override_dfs_required(mac_ctx->pdev,
+						    sap_ctx->chan_freq,
+						    sap_ctx->ch_width_orig,
+						    0, 0,
+						    &con_vdev_id,
+						    &con_ch_freq)) {
+		sap_ctx->chan_freq = con_ch_freq;
+		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+						     con_ch_freq, 0,
+						     &sap_ctx->ch_params);
+		sap_debug("override to DFS channel %d vdev id %d",
+			  con_ch_freq, con_vdev_id);
 	}
 
 	sap_validate_chanmode_and_chwidth(mac_ctx, sap_ctx);
