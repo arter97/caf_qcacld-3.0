@@ -1505,8 +1505,12 @@ void ppdu_desc_dbg_queue_deinit(struct tx_cap_debug_log_info *ptr_log_info)
 static void dp_tx_capture_work_q_timer_handler(void *arg)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)arg;
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_pdev *mon_pdev;
 
+	if (!pdev || !pdev->monitor_pdev)
+		return;
+
+	mon_pdev = pdev->monitor_pdev;
 	qdf_queue_work(0, mon_pdev->tx_capture.ppdu_stats_workqueue,
 		       &mon_pdev->tx_capture.ppdu_stats_work);
 	qdf_timer_mod(&mon_pdev->tx_capture.work_q_timer,
