@@ -357,6 +357,7 @@ _fixed_srcs = [
     "cmn/dp/wifi3.0/dp_arch_ops.c",
     "cmn/dp/wifi3.0/dp_htt.c",
     "cmn/dp/wifi3.0/dp_main.c",
+    "cmn/dp/wifi3.0/dp_hist.c",
     "cmn/dp/wifi3.0/dp_peer.c",
     "cmn/dp/wifi3.0/dp_rx.c",
     "cmn/dp/wifi3.0/dp_rx_defrag.c",
