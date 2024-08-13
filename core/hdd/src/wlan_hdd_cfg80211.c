@@ -26139,22 +26139,33 @@ static int wlan_hdd_add_key_sap(struct wlan_hdd_link_info *link_info,
 				enum wlan_crypto_cipher_type cipher)
 {
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc = NULL;
 	int errno = 0;
 	struct hdd_hostapd_state *hostapd_state =
 		WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
+	QDF_STATUS status;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("psoc is NULL");
+		return -EINVAL;
+	}
+
 	/* Do not send install key when sap restart is in progress. If there is
 	 * critical channel request handling going on, fw will stop that request
 	 * and will not send restart response
 	 */
-	if (wlan_vdev_is_restart_progress(vdev) == QDF_STATUS_SUCCESS) {
-		hdd_err("vdev: %d restart in progress", wlan_vdev_get_id(vdev));
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		return -EINVAL;
+	if (policy_mgr_is_chan_switch_in_progress(psoc)) {
+		status = policy_mgr_wait_chan_switch_complete_evt(psoc);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_err("Vdev %d wait for csa event failed!!",
+				link_info->vdev_id);
+			return qdf_status_to_os_return(status);
+		}
 	}
 
 	if (hostapd_state->bss_state == BSS_START) {
