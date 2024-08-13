@@ -5959,6 +5959,13 @@ bool policy_mgr_dual_beacon_on_single_mac_scc_capable(
 {
 	return true;
 }
+
+bool policy_mgr_dual_beacon_on_single_mac_mcc_capable(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+
 #else
 bool policy_mgr_dual_beacon_on_single_mac_scc_capable(
 		struct wlan_objmgr_psoc *psoc)
@@ -5980,7 +5987,6 @@ bool policy_mgr_dual_beacon_on_single_mac_scc_capable(
 	policy_mgr_debug("Dual beaconing on same channel on single MAC is not supported");
 	return false;
 }
-#endif
 
 bool policy_mgr_dual_beacon_on_single_mac_mcc_capable(
 		struct wlan_objmgr_psoc *psoc)
@@ -6002,6 +6008,7 @@ bool policy_mgr_dual_beacon_on_single_mac_mcc_capable(
 	policy_mgr_debug("Dual beaconing on different channel on single MAC is not supported");
 	return false;
 }
+#endif
 
 bool policy_mgr_sta_sap_scc_on_lte_coex_chan(
 	struct wlan_objmgr_psoc *psoc)
