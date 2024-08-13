@@ -19696,7 +19696,8 @@ static int wlan_hdd_cfg80211_set_fast_roaming(struct hdd_context *hdd_ctx,
 
 static int
 wlan_hdd_cfg80211_set_aggressive_roaming(struct hdd_context *hdd_ctx,
-					 struct hdd_adapter *adapter)
+					 struct hdd_adapter *adapter,
+					 uint32_t is_fast_roam_enabled)
 {
 	int ret = 0;
 	QDF_STATUS qdf_status = 0;
@@ -19704,6 +19705,18 @@ wlan_hdd_cfg80211_set_aggressive_roaming(struct hdd_context *hdd_ctx,
 	qdf_status = sme_set_aggressive_roaming(hdd_ctx->mac_handle,
 						adapter->deflink->vdev_id,
 						true);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status_to_os_return(qdf_status);
+
+	/* Update roaming */
+	qdf_status =
+		ucfg_user_space_enable_disable_rso(hdd_ctx->pdev,
+						   adapter->deflink->vdev_id,
+						   is_fast_roam_enabled);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		hdd_err("ROAM_CONFIG: sme_config_fast_roaming failed with status=%d",
+				qdf_status);
+
 	ret = qdf_status_to_os_return(qdf_status);
 
 	return ret;
@@ -19780,7 +19793,8 @@ static int __wlan_hdd_cfg80211_set_roam_policy(struct wiphy *wiphy,
 		break;
 	case QCA_ROAMING_MODE_AGGRESSIVE:
 		ret = wlan_hdd_cfg80211_set_aggressive_roaming(hdd_ctx,
-							       adapter);
+							       adapter,
+							       roam_policy);
 		break;
 	default:
 		ret = -EINVAL;
