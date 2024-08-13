@@ -4411,6 +4411,14 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	} else {
 		intf_ch_freq = wlansap_get_chan_band_restrict(sap_context,
 							      &csa_reason);
+		if (!intf_ch_freq &&
+		    (csa_reason == CSA_REASON_CHAN_DISABLED ||
+		     csa_reason == CSA_REASON_BAND_RESTRICTED)) {
+			schedule_work(&link_info->sap_stop_bss_work);
+			wlansap_context_put(sap_context);
+			hdd_err("Stop SAP as no valid channel found");
+			return QDF_STATUS_E_FAILURE;
+		}
 	}
 
 	if (intf_ch_freq && intf_ch_freq != sap_context->chan_freq)
