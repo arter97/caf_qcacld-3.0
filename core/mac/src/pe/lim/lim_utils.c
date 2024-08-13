@@ -12089,8 +12089,13 @@ void lim_cp_stats_cstats_log_assoc_req_evt(struct pe_session *pe_session,
 	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.freq = pe_session->curr_op_freq;
-	stat.ssid_len = ssid_len;
-	qdf_mem_copy(stat.ssid, ssid, ssid_len);
+
+	if (ssid_len > WLAN_SSID_MAX_LEN)
+		stat.ssid_len = WLAN_SSID_MAX_LEN;
+	else
+		stat.ssid_len = ssid_len;
+
+	qdf_mem_copy(stat.ssid, ssid, stat.ssid_len);
 
 	stat.direction = dir;
 	CSTATS_MAC_COPY(stat.bssid, bssid);
