@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5757,95 +5757,6 @@ end:
 }
 
 /**
- * is_dot11mode_support_ht_cap() - Check dot11mode supports HT capability
- * @dot11mode: dot11mode
- *
- * This function checks whether dot11mode support HT capability or not
- *
- * Return: True, if supports. False otherwise
- */
-static bool is_dot11mode_support_ht_cap(enum csr_cfgdot11mode dot11mode)
-{
-	if ((dot11mode == eCSR_CFG_DOT11_MODE_AUTO) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11N) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AC) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11N_ONLY) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AC_ONLY) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY)) {
-		return true;
-	}
-
-	return false;
-}
-
-/**
- * is_dot11mode_support_vht_cap() - Check dot11mode supports VHT capability
- * @dot11mode: dot11mode
- *
- * This function checks whether dot11mode support VHT capability or not
- *
- * Return: True, if supports. False otherwise
- */
-static bool is_dot11mode_support_vht_cap(enum csr_cfgdot11mode dot11mode)
-{
-	if ((dot11mode == eCSR_CFG_DOT11_MODE_AUTO) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AC) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AC_ONLY) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY)) {
-		return true;
-	}
-
-	return false;
-}
-
-/**
- * is_dot11mode_support_he_cap() - Check dot11mode supports HE capability
- * @dot11mode: dot11mode
- *
- * This function checks whether dot11mode support HE capability or not
- *
- * Return: True, if supports. False otherwise
- */
-static bool is_dot11mode_support_he_cap(enum csr_cfgdot11mode dot11mode)
-{
-	if ((dot11mode == eCSR_CFG_DOT11_MODE_AUTO) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY)) {
-		return true;
-	}
-
-	return false;
-}
-
-#ifdef WLAN_FEATURE_11BE
-/**
- * is_dot11mode_support_eht_cap() - Check dot11mode supports EHT capability
- * @dot11mode: dot11mode
- *
- * This function checks whether dot11mode support EHT capability or not
- *
- * Return: True, if supports. False otherwise
- */
-static bool is_dot11mode_support_eht_cap(enum csr_cfgdot11mode dot11mode)
-{
-	if ((dot11mode == eCSR_CFG_DOT11_MODE_AUTO) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11BE) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11BE_ONLY)) {
-		return true;
-	}
-
-	return false;
-}
-#else
-static bool is_dot11mode_support_eht_cap(enum csr_cfgdot11mode dot11mode)
-{
-	return false;
-}
-#endif
-
-/**
  * lim_send_ht_caps_ie() - gets HT capability and send to firmware via wma
  * @mac_ctx: global mac context
  * @session: pe session. This can be NULL. In that case self cap will be sent
@@ -5999,7 +5910,7 @@ static QDF_STATUS lim_send_vht_caps_ie(struct mac_context *mac_ctx,
 
 QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 				 struct pe_session *session, uint8_t vdev_id,
-				 enum csr_cfgdot11mode dot11_mode,
+				 enum mlme_dot11_mode dot11_mode,
 				 enum QDF_OPMODE device_mode)
 {
 	QDF_STATUS status_ht = QDF_STATUS_SUCCESS;
@@ -6011,15 +5922,15 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 	 * it is causing weird padding errors. Instead use Sir Mac VHT struct
 	 * to send IE to wma.
 	 */
-	if (is_dot11mode_support_ht_cap(dot11_mode))
+	if (IS_DOT11_MODE_HT(dot11_mode))
 		status_ht = lim_send_ht_caps_ie(mac_ctx, session,
 						device_mode, vdev_id);
 
-	if (is_dot11mode_support_vht_cap(dot11_mode))
+	if (IS_DOT11_MODE_VHT(dot11_mode))
 		status_vht = lim_send_vht_caps_ie(mac_ctx, session,
 						  device_mode, vdev_id);
 
-	if (is_dot11mode_support_he_cap(dot11_mode)) {
+	if (IS_DOT11_MODE_HE(dot11_mode)) {
 		status_he = lim_send_he_caps_ie(mac_ctx, session,
 						device_mode, vdev_id);
 
@@ -6029,7 +5940,7 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 								vdev_id);
 	}
 
-	if (is_dot11mode_support_eht_cap(dot11_mode)) {
+	if (IS_DOT11_MODE_EHT(dot11_mode)) {
 		status_he = lim_send_eht_caps_ie(mac_ctx, session,
 						 device_mode, vdev_id);
 	}
@@ -10253,7 +10164,7 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session)
 	    session->opmode == QDF_P2P_GO_MODE)
 		mlme_obj->reg_tpc_obj.num_pwr_levels = 0;
 
-	lim_calculate_tpc(mac_ctx, session, 0, false);
+	lim_calculate_tpc(mac_ctx, session);
 
 	tx_ops->set_tpc_power(mac_ctx->psoc, session->vdev_id,
 			      &mlme_obj->reg_tpc_obj);
@@ -10390,7 +10301,7 @@ lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
 
 	wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_power_type_6g);
 
-	if (sta_session->ap_power_type_6g == REG_INDOOR_AP &&
+	if (sta_session->best_6g_power_type == REG_INDOOR_AP &&
 	    !wlan_reg_is_freq_indoor(mac_ctx->pdev,
 				     sap_session->curr_op_freq) &&
 	    ap_power_type_6g == REG_VERY_LOW_POWER_AP) {

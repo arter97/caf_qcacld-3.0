@@ -9,20 +9,41 @@ _target_chipset_map = {
 	"monaco":[
 		"wlan",
 	],
+	"pitti":[
+		"adrastea",
+	],
+	"pitti_32go":[
+                "adrastea",
+        ],
+	"parrot":[
+                "qca6750",
+                "adrastea",
+        ],
 }
 
 _chipset_hw_map = {
-	"wlan"   : "ADRESTEA"
+	"wlan"   : "ADRASTEA",
+	"adrastea" : "ADRASTEA",
+	"qca6750": "MOSELLE",
 }
 
 _chipset_header_map = {
 	"wlan" : [
     ],
+	"adrastea" : [
+    ],
+    "qca6750" : [
+        "api/hw/qca6750/v1",
+        "cmn/hal/wifi3.0/qca6750",
+    ],
 }
 
 _hw_header_map = {
-	"ADRESTEA" : [
+	"ADRASTEA" : [
 	],
+	"MOSELLE" : [
+        "cmn/hal/wifi3.0/li",
+    ],
 }
 
 _fixed_includes = [
@@ -148,6 +169,9 @@ _fixed_ipaths = [
 	"cmn/qal/inc",
 	"cmn/qal/linux/src",
 	"cmn/dp/wifi3.0",
+	"cmn/dp/wifi3.0/monitor",
+	"cmn/dp/wifi3.0/monitor/1.0",
+        "cmn/dp/wifi3.0/monitor/2.0",
 	"cmn/dp/inc",
 	"cmn/dp/cmn_dp_api",
 	"cmn/ftm/dispatcher/inc",
@@ -233,6 +257,7 @@ _fixed_ipaths = [
 	"cmn/umac/mlme/psoc_mgr/dispatcher/inc",
 	"cmn/hif/src",
 	"cmn/hif/src/pcie",
+	"cmn/hif/src/ipcie",
 	"cmn/hif/src/ce",
 	"cmn/hif/inc",
 	"cmn/wlan_cfg",
@@ -263,6 +288,7 @@ _fixed_ipaths = [
 	"core/mac/src/pe/lim",
 	"cmn/os_if/linux/ftm/inc",
 	"components/ipa/core/inc",
+	"components/target_if/ipa/inc",
 	"cmn/os_if/linux/crypto/inc",
 	"cmn/utils/fwlog",
 	"cmn/os_if/linux/gpio/inc",
@@ -274,7 +300,6 @@ _fixed_ipaths = [
 	"cmn/os_if/linux/cp_stats/inc",
 	"cmn/hif/src/snoc",
 	"cmn/hal/wifi3.0",
-	"cmn/umac/dfs/dispatcher/inc"
 ]
 
 # paths where include files are private in src folders
@@ -453,25 +478,6 @@ _fixed_srcs = [
 	"os_if/nan/src/os_if_nan.c",
 	"os_if/p2p/src/wlan_cfg80211_p2p.c",
 	"os_if/interop_issues_ap/src/wlan_cfg80211_interop_issues_ap.c",
-	"core/dp/htt/htt.c",
-	"core/dp/htt/htt_h2t.c",
-	"core/dp/htt/htt_t2h.c",
-	"core/dp/htt/htt_rx.c",
-	"core/dp/htt/htt_fw_stats.c",
-	"core/dp/htt/htt_tx.c",
-	"core/dp/txrx/ol_rx_pn.c",
-	"core/dp/txrx/ol_rx_reorder.c",
-	"core/dp/txrx/ol_cfg.c",
-	"core/dp/txrx/ol_txrx_encap.c",
-	"core/dp/txrx/ol_txrx.c",
-	"core/dp/txrx/ol_txrx_peer_find.c",
-	"core/dp/txrx/ol_tx.c",
-	"core/dp/txrx/ol_tx_send.c",
-	"core/dp/txrx/ol_tx_desc.c",
-	"core/dp/txrx/ol_rx.c",
-	"core/dp/txrx/ol_rx_fwd.c",
-	"core/dp/txrx/ol_rx_reorder_timeout.c",
-	"core/dp/txrx/ol_rx_defrag.c",
 	"core/sme/src/nan/nan_datapath_api.c",
 	"core/mac/src/pe/nan/nan_datapath.c",
 	"core/wma/src/wma_power.c",
@@ -484,7 +490,6 @@ _fixed_srcs = [
 	"core/wma/src/wma_data.c",
 	"core/wma/src/wma_dev_if.c",
 	"core/wma/src/wma_main.c",
-	"core/pld/src/pld_snoc.c",
 	"core/pld/src/pld_common.c",
 	"components/cmn_services/policy_mgr/src/wlan_policy_mgr_action.c",
 	"components/cmn_services/policy_mgr/src/wlan_policy_mgr_init_deinit.c",
@@ -606,10 +611,8 @@ _fixed_srcs = [
 	"cmn/hif/src/ath_procfs.c",
 	"cmn/hif/src/ce/ce_tasklet.c",
 	"cmn/hif/src/ce/ce_service.c",
-	"cmn/hif/src/ce/ce_service_legacy.c",
 	"cmn/hif/src/ce/ce_diag.c",
 	"cmn/hif/src/ce/ce_main.c",
-	"cmn/hif/src/snoc/if_snoc.c",
 	"cmn/hif/src/hif_main.c",
 	"cmn/hif/src/hif_exec.c",
 	"cmn/hif/src/hif_main_legacy.c",
@@ -619,8 +622,6 @@ _fixed_srcs = [
 	"cmn/global_lmac_if/src/wlan_global_lmac_if.c",
 	"cmn/scheduler/src/scheduler_api.c",
 	"cmn/scheduler/src/scheduler_core.c",
-	"core/dp/txrx/ol_tx_throttle.c",
-	"cmn/hif/src/dispatcher/multibus_snoc.c"
 ]
 
 _conditional_srcs = {
@@ -727,6 +728,13 @@ _conditional_srcs = {
             "cmn/qdf/linux/src/qdf_pkt_add_timestamp.c",
         ],
     },
+	"CONFIG_DP_SWLM": {
+        True: [
+            # TODO: need separate cfg for sysfs
+            "core/hdd/src/wlan_hdd_sysfs_swlm.c",
+            "core/dp/txrx3.0/dp_swlm.c",
+        ],
+    },
    "CONFIG_DSC_TEST": {
         True: [
             "components/dsc/test/wlan_dsc_test.c",
@@ -812,7 +820,6 @@ _conditional_srcs = {
     "CONFIG_FEATURE_MONITOR_MODE_SUPPORT": {
         True: [
             "core/hdd/src/wlan_hdd_rx_monitor.c",
-			"core/dp/htt/htt_monitor_rx.c",
         ],
     },
   "CONFIG_FEATURE_MOTION_DETECTION": {
@@ -897,6 +904,7 @@ _conditional_srcs = {
     "CONFIG_HIF_IPCI": {
         True: [
             "cmn/hif/src/dispatcher/multibus_ipci.c",
+	    "cmn/hif/src/ipcie/if_ipci.c",
         ],
     },
     "CONFIG_HIF_PCI": {
@@ -906,11 +914,11 @@ _conditional_srcs = {
             "core/pld/src/pld_pcie.c",
         ],
     },
-"CONFIG_HIF_SDIO": {
-    True: [
-        "cmn/hif/src/dispatcher/multibus_sdio.c",
-    ],
-},
+   "CONFIG_HIF_SDIO": {
+        True: [
+            "cmn/hif/src/dispatcher/multibus_sdio.c",
+        ],
+    },
     "CONFIG_HIF_SNOC": {
         True: [
             "cmn/hif/src/dispatcher/multibus_snoc.c",
@@ -920,15 +928,6 @@ _conditional_srcs = {
         True: [
             "cmn/hif/src/dispatcher/multibus_usb.c",
             "core/pld/src/pld_usb.c",
-        ],
-    },
-    "CONFIG_HL_DP_SUPPORT": {
-        True: [
-            "core/dp/txrx/ol_tx_classify.c",
-            "core/dp/txrx/ol_tx_hl.c",
-            "core/dp/txrx/ol_tx_queue.c",
-            "core/dp/txrx/ol_tx_sched.c",
-			"core/dp/htt/htt_rx_hl.c",
         ],
     },
     "CONFIG_HOST_11D_SCAN": {
@@ -943,6 +942,14 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_ipa.c",
             # TODO: need a separate flag for sysfs
             "core/hdd/src/wlan_hdd_sysfs_ipa.c",
+            "components/ipa/dispatcher/src/wlan_ipa_ucfg_api.c",
+            "components/ipa/dispatcher/src/wlan_ipa_obj_mgmt_api.c",
+            "components/ipa/dispatcher/src/wlan_ipa_tgt_api.c",
+            "components/ipa/core/src/wlan_ipa_main.c",
+            "components/ipa/core/src/wlan_ipa_core.c",
+            "components/ipa/core/src/wlan_ipa_stats.c",
+            "components/ipa/core/src/wlan_ipa_rm.c",
+            "components/target_if/ipa/src/target_if_ipa.c",
         ],
     },
     "CONFIG_IPCIE_FW_SIM": {
@@ -971,11 +978,19 @@ _conditional_srcs = {
           # TODO: how to handle Kbuild logic
           #ifneq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))
           #ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))
-          "cmn/dp/cmn_dp_api/dp_ratetable.c",
           "cmn/dp/wifi3.0/li/dp_li.c",
           "cmn/dp/wifi3.0/li/dp_li_rx.c",
           "cmn/dp/wifi3.0/li/dp_li_tx.c",
           "cmn/dp/wifi3.0/dp_reo.c",
+          "cmn/dp/wifi3.0/dp_tx.c",
+	  "cmn/dp/wifi3.0/dp_stats.c",
+	  "cmn/dp/wifi3.0/dp_main.c",
+	  "cmn/dp/wifi3.0/dp_arch_ops.c",
+	  "cmn/dp/wifi3.0/dp_tx_desc.c",
+	  "cmn/dp/wifi3.0/dp_rx.c",
+	  "cmn/dp/wifi3.0/dp_htt.c",
+	  "cmn/dp/wifi3.0/dp_peer.c",
+	  "cmn/dp/wifi3.0/dp_rx_desc.c",
           "cmn/dp/wifi3.0/dp_rx_err.c",
           "cmn/hal/wifi3.0/hal_reo.c",
           "cmn/hal/wifi3.0/hal_srng.c",
@@ -983,12 +998,43 @@ _conditional_srcs = {
           "cmn/hal/wifi3.0/li/hal_li_reo.c",
           "cmn/hif/src/ce/ce_service_srng.c",
           "cmn/wlan_cfg/wlan_cfg.c",
+	  "core/dp/txrx3.0/dp_txrx.c",
+	  "cmn/target_if/dp/src/target_if_dp.c",
+	  "cmn/dp/wifi3.0/dp_rx_defrag.c",
+	  "cmn/dp/wifi3.0/dp_tx_flow_control.c",
       ],
-  },
-    "CONFIG_LL_DP_SUPPORT": {
+	  False: [
+          "core/dp/txrx/ol_rx_pn.c",
+	  "core/dp/txrx/ol_rx_reorder.c",
+	  "core/dp/txrx/ol_rx_reorder_timeout.c",
+	  "core/dp/txrx/ol_rx_fwd.c",
+	  "core/dp/txrx/ol_rx.c",
+	  "core/dp/txrx/ol_cfg.c",
+	  "core/dp/txrx/ol_txrx_encap.c",
+	  "core/dp/txrx/ol_txrx.c",
+	  "core/dp/txrx/ol_txrx_peer_find.c",
+	  "core/dp/txrx/ol_tx.c",
+	  "core/dp/txrx/ol_tx_send.c",
+	  "core/dp/txrx/ol_tx_desc.c",
+	  "core/dp/txrx/ol_rx_defrag.c",
+	  "core/dp/htt/htt.c",
+	  "core/dp/htt/htt_h2t.c",
+	  "core/dp/htt/htt_t2h.c",
+	  "core/dp/htt/htt_rx.c",
+	  "core/dp/htt/htt_fw_stats.c",
+	  "core/dp/htt/htt_tx.c",
+	  "cmn/hif/src/ce/ce_service_legacy.c",
+	  "core/dp/txrx/ol_tx_ll.c",
+	  "core/dp/htt/htt_rx_ll.c",
+	  "core/dp/txrx/ol_tx_throttle.c",
+	  "core/dp/htt/htt_monitor_rx.c",
+	  "core/dp/txrx/ol_txrx_flow_control.c",
+	],
+    },
+    "CONFIG_QCA6750_HEADERS_DEF": {
         True: [
-            "core/dp/txrx/ol_tx_ll.c",
-			"core/dp/htt/htt_rx_ll.c",
+            "cmn/hal/wifi3.0/qca6750/hal_6750.c",
+            "cmn/hif/src/qca6750def.c",
         ],
     },
     "CONFIG_OCB_UT_FRAMEWORK": {
@@ -1021,6 +1067,18 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_pktlog.c",
         ],
     },
+	"CONFIG_WLAN_FEATURE_DP_RX_THREADS": {
+        True: [
+            "core/dp/txrx3.0/dp_rx_thread.c",
+        ],
+    },
+	"CONFIG_RX_FISA": {
+        True: [
+            "core/dp/txrx3.0/dp_fisa_rx.c",
+            "core/dp/txrx3.0/dp_rx_fst.c",
+	    "cmn/hal/wifi3.0/hal_rx_flow.c",
+        ],
+    },
     "CONFIG_PLD_IPCI_ICNSS_FLAG": {
         True: [
             "core/pld/src/pld_ipci.c",
@@ -1029,6 +1087,7 @@ _conditional_srcs = {
    "CONFIG_PLD_SNOC_ICNSS_FLAG": {
         True: [
             "core/pld/src/pld_snoc.c",
+	    "cmn/hif/src/snoc/if_snoc.c",
         ],
     },
     "CONFIG_POWER_MANAGEMENT_OFFLOAD": {
@@ -1165,11 +1224,6 @@ _conditional_srcs = {
             "components/umac/mlme/connection_mgr/core/src/wlan_cm_roam_offload_event.c",
         ],
     },
-    "LEGACY_CONFIG_QCA_SUPPORT_TX_THROTTLE": {
-        False: [
-            "core/dp/txrx/ol_tx_throttle.c",
-        ],
-    },
     "CONFIG_QCA_WIFI_FTM": {
         True: [
             "cmn/ftm/core/src/wlan_ftm_svc.c",
@@ -1254,12 +1308,12 @@ _conditional_srcs = {
     "CONFIG_WIFI_MONITOR_SUPPORT": {
         True: [
             "cmn/dp/wifi3.0/monitor/1.0/dp_mon_1.0.c",
-            "cmn/dp/wifi3.0/monitor/1.0/dp_mon_filter_1.0.c",
-            "cmn/dp/wifi3.0/monitor/1.0/dp_rx_mon_dest_1.0.c",
-            "cmn/dp/wifi3.0/monitor/1.0/dp_rx_mon_status_1.0.c",
-            "cmn/dp/wifi3.0/monitor/dp_mon.c",
-            "cmn/dp/wifi3.0/monitor/dp_mon_filter.c",
-            "cmn/dp/wifi3.0/monitor/dp_rx_mon.c",
+	    "cmn/dp/wifi3.0/monitor/1.0/dp_mon_filter_1.0.c",
+	    "cmn/dp/wifi3.0/monitor/1.0/dp_rx_mon_dest_1.0.c",
+	    "cmn/dp/wifi3.0/monitor/1.0/dp_rx_mon_status_1.0.c",
+	    "cmn/dp/wifi3.0/monitor/dp_mon.c",
+	    "cmn/dp/wifi3.0/monitor/dp_mon_filter.c",
+	    "cmn/dp/wifi3.0/monitor/dp_rx_mon.c",
         ],
     },
     "CONFIG_WIFI_MONITOR_SUPPORT_Y_WLAN_TX_MON_2_0": {
@@ -1395,15 +1449,7 @@ _conditional_srcs = {
     True: [
         "core/dp/txrx/ol_tx_ll_fastpath.c",
     ],
-    False: [
-        "core/dp/txrx/ol_tx_ll_legacy.c",
-    ],
     },
-	"CONFIG_WLAN_TX_FLOW_CONTROL_V2": {
-		True: [
-			"core/dp/txrx/ol_txrx_flow_control.c",
-		],
-	},
     "CONFIG_WLAN_FEATURE_11AX": {
         True: [
             "core/hdd/src/wlan_hdd_he.c",
@@ -1979,10 +2025,21 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         ],
         cmd = "cat $(SRCS) > $@",
     )
+    native.genrule(
+        name = "configs/{}_defconfig_generate_perf".format(tvc),
+        outs = ["configs/{}_defconfig.generated_perf".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    out = "{}.ko".format(chipset.replace("-", "_"))
+    if chipset == "wlan":
+        out = "{}.ko".format(chipset.replace("-", "_"))
+    else:
+        out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
@@ -2014,12 +2071,33 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
             "//msm-kernel:all_headers",
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+            "//vendor/qcom/opensource/dataipa:include_headers",
+            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ],
     )
 
+def define_dist(target, variant, chipsets):
+    tv = "{}_{}".format(target, variant)
+    dataList = []
+    for c in chipsets:
+        tvc = "{}_{}_{}".format(target, variant, c)
+        name = "{}_qca_cld_{}".format(tv, c)
+        dataList.append(":{}".format(name))
+        copy_to_dist_dir(
+            name = "{}_modules_dist".format(tvc),
+            data =  [":{}".format(name)],
+            dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+            flat = True,
+            wipe_dist_dir = False,
+            allow_duplicate_filenames = False,
+            mode_overrides = {"**/*": "644"},
+            log = "info",
+        )
+    if target == "blair" or target == "monaco":
+        return
     copy_to_dist_dir(
-        name = "{}_modules_dist".format(tvc),
-        data = [":{}".format(name)],
+        name = "{}_all_modules_dist".format(tv),
+        data = dataList,
         dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         flat = True,
         wipe_dist_dir = False,
@@ -2034,3 +2112,4 @@ def define_modules():
         if chipsets:
             for c in chipsets:
                 _define_module_for_target_variant_chipset(t, v, c)
+            define_dist(t, v, chipsets)

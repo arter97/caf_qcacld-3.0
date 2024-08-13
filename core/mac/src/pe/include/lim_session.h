@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2021-2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -205,6 +205,7 @@ struct mlo_link_ie_info {
  * @prev_auth_seq_num: Sequence number of previously received auth frame to
  * detect duplicate frames.
  * @prev_auth_mac_addr: mac_addr of the sta correspond to @prev_auth_seq_num
+ * @cal_tpc_post_csa: Recalculate tx power power csa
  */
 struct pe_session {
 	/* To check session table is in use or free */
@@ -645,11 +646,8 @@ struct pe_session {
 	uint16_t prot_status_code;
 	tSirResultCodes result_code;
 	uint32_t dfs_regdomain;
-	/* AP power type */
-	uint8_t ap_power_type;
-	bool same_ctry_code;  /* If AP Country IE has same country code as */
-	/* STA programmed country */
-	uint8_t ap_power_type_6g;  /* AP power type for 6G (LPI, SP, or VLP) */
+	uint8_t ap_defined_power_type_6g;
+	uint8_t best_6g_power_type;
 	bool sta_follows_sap_power;
 #ifdef WLAN_FEATURE_11BE
 	bool eht_capable;
@@ -661,6 +659,7 @@ struct pe_session {
 #endif
 #endif /* WLAN_FEATURE_11BE */
 	uint8_t user_edca_set;
+	bool cal_tpc_post_csa;
 };
 
 /*-------------------------------------------------------------------------
