@@ -308,7 +308,6 @@ static inline void hdd_wlan_ssr_shutdown_event(void) { }
 static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
 {
 	hdd_enter();
-	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
 
 	cds_shutdown_notifier_call();
 	cds_shutdown_notifier_purge();
