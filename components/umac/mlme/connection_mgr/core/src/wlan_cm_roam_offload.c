@@ -6023,7 +6023,7 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
 				   RSSI_CHANGE_THRESHOLD, &src_cfg);
 
-	src_cfg.uint_value = mlme_obj->cfg.lfr.roam_aggre_scan_step_rssi;
+	src_cfg.int_value = mlme_obj->cfg.lfr.roam_aggre_scan_step_rssi;
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
 				   ROAM_AGGRESSIVE_SCAN_STEP_RSSI, &src_cfg);
 
