@@ -7975,12 +7975,22 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 		nla_attr = nla_nest_start(
 			skb,
 			QCA_WLAN_VENDOR_ATTR_ASYNC_GET_STATION_RESPONSE);
+		if (!nla_attr) {
+			hdd_err("nla_nest_start fail");
+			goto fail;
+		}
+
 		if (nla_put(skb, NL80211_ATTR_MAC, QDF_MAC_ADDR_SIZE, mac)) {
 			hdd_err("put mac addr failed");
 			goto fail;
 		}
 
 		nla_attr_1 = nla_nest_start(skb, NL80211_ATTR_STA_INFO);
+		if (!nla_attr_1) {
+			hdd_err("nla_nest_start fail");
+			goto fail;
+		}
+
 		if (nla_put_u32(skb, NL80211_STA_INFO_RX_BYTES,
 				sinfo->rx_bytes)) {
 			hdd_err("put rx_bytes failed");

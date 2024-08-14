@@ -291,7 +291,7 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 {
 	struct sap_context *sap_ctx;
 	struct hdd_adapter *adapter = link_info->adapter;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx;
 	struct qdf_mac_addr *link_mac;
 	QDF_STATUS status;
 
@@ -300,8 +300,13 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 		return NULL;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is null");
+		return NULL;
+	}
 
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_err("can't allocate the sap_ctx");
 		return NULL;

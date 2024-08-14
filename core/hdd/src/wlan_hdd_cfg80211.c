@@ -2246,6 +2246,11 @@ int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter)
 		return 0;
 
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, con_vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev");
+		return -EINVAL;
+	}
+
 	con_sap_adapter = link_info->adapter;
 	if (!con_sap_adapter)
 		return 0;
@@ -26418,7 +26423,7 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 	QDF_STATUS status;
 	struct wlan_objmgr_peer *peer;
 	struct hdd_context *hdd_ctx;
-	struct qdf_mac_addr mac_address;
+	struct qdf_mac_addr mac_address = {0};
 	int32_t cipher_cap, ucast_cipher = 0;
 	int errno = 0;
 	enum wlan_crypto_cipher_type cipher;
@@ -29298,7 +29303,7 @@ __wlan_hdd_cfg80211_update_owe_info(struct wiphy *wiphy,
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	int errno;
 	struct sap_context *sap_ctx;
 	struct wlan_hdd_link_info *link_info = NULL;

@@ -10835,7 +10835,7 @@ int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
 	struct ch_params ch_params;
 	enum phy_ch_width max_fw_bw;
 	enum phy_ch_width ch_width;
-	int ret;
+	int ret = -EINVAL;
 	uint8_t index = 0;
 
 	if ((hdd_get_conparam() != QDF_GLOBAL_MONITOR_MODE) &&
@@ -10954,7 +10954,7 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_monitor_ctx *mon_ctx;
 	struct wlan_hdd_link_info *link_info;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct channel_change_req *req;
 	struct wlan_channel *des_chan;
 	struct ch_params ch_params;
