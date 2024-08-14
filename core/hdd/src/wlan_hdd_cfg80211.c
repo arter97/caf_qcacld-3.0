@@ -13004,8 +13004,10 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 		nla_nest_end(skb, mlo_bd);
 		i++;
 
-		if (link_vdev)
+		if (link_vdev) {
 			hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
+			link_vdev = NULL;
+		}
 	}
 	nla_nest_end(skb, mlo_bd_info);
 end:
