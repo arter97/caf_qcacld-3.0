@@ -1294,7 +1294,7 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 	const struct wlan_mlme_ratemask *ratemask_cfg;
 	struct config_ratemask_params rparams = {0};
 	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	uint32_t mac_id;
+	uint32_t mac_id = MAX_MAC;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma)
@@ -1372,9 +1372,15 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id)) {
-		wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
-		wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
-							    mac_id, rsp);
+		if (mac_id < MAX_MAC) {
+			wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
+			wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
+								    mac_id,
+								    rsp);
+		} else {
+			wma_err("Invalid mac_id: %u", mac_id);
+			return QDF_STATUS_E_INVAL;
+		}
 	}
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE

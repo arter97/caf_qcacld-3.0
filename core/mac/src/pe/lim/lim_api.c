@@ -4045,6 +4045,8 @@ lim_update_cuflag_bpcc_each_link(struct mlo_mgmt_ml_info *cu_params)
 	struct mac_context *mac;
 
 	mac = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac)
+		return;
 
 	for (i = 0; i < mac->lim.maxBssId; i++) {
 		struct pe_session *session_entry = &mac->lim.gpSession[i];

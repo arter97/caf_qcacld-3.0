@@ -2258,7 +2258,7 @@ populate_dot11f_supp_channels(struct mac_context *mac,
 {
 	uint8_t i, j = 0;
 	uint8_t *p;
-	struct supported_channels supportedChannels;
+	struct supported_channels supportedChannels = {0};
 	uint8_t channel, opclass, base_opclass;
 	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
