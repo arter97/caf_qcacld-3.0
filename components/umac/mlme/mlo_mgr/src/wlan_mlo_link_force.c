@@ -3752,11 +3752,28 @@ ml_nlink_handle_legacy_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	enum policy_mgr_con_mode mode_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t num_legacy_vdev;
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 
 	num_legacy_vdev = policy_mgr_get_legacy_conn_info(
 					psoc, vdev_lst,
 					freq_lst, mode_lst,
 					QDF_ARRAY_SIZE(vdev_lst));
+	if (wlan_nan_is_disc_active(psoc)) {
+		if (num_legacy_vdev < MAX_LEGACY_CONCURRENCT_MODES &&
+		    wlan_nan_get_5ghz_social_ch_freq(pdev)) {
+			freq_lst[num_legacy_vdev] =
+				wlan_nan_get_5ghz_social_ch_freq(pdev);
+			mode_lst[num_legacy_vdev++] = PM_NAN_DISC_MODE;
+		}
+
+		if (num_legacy_vdev < MAX_LEGACY_CONCURRENCT_MODES &&
+		    wlan_nan_get_24ghz_social_ch_freq(pdev)) {
+			freq_lst[num_legacy_vdev] =
+				wlan_nan_get_24ghz_social_ch_freq(pdev);
+			mode_lst[num_legacy_vdev++] = PM_NAN_DISC_MODE;
+		}
+	}
+
 	if (!num_legacy_vdev)
 		return;
 
@@ -3789,6 +3806,7 @@ ml_nlink_handle_legacy_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 	case PM_P2P_GO_MODE:
 	case PM_STA_MODE:
 	case PM_SAP_MODE:
+	case PM_NAN_DISC_MODE:
 		ml_nlink_handle_legacy_intf_3_ports(
 			psoc, vdev, force_cmd, true, num_legacy_vdev,
 			vdev_lst, freq_lst, mode_lst);
@@ -4669,13 +4687,17 @@ ml_nlink_update_non_force_disallow_bitmap(
 				       force_active_bitmap);
 	link_control_flags |= link_ctrl_f_dont_update_disallow_bitmap;
 
+	if (evt == ml_nlink_nan_pre_enable_evt)
+		link_control_flags |= link_ctrl_f_sync_set_link;
+
 	/* In middle of transition, no need schedule force scc workqueue */
 	if (evt == ml_nlink_ap_start_evt ||
 	    evt == ml_nlink_ap_csa_start_evt ||
 	    evt == ml_nlink_ap_start_failed_evt ||
 	    evt == ml_nlink_ap_csa_end_evt ||
 	    evt == ml_nlink_connect_pre_start_evt ||
-	    evt == ml_nlink_connect_failed_evt)
+	    evt == ml_nlink_connect_failed_evt ||
+	    evt == ml_nlink_nan_pre_enable_evt)
 		link_control_flags |= link_ctrl_f_dont_reschedule_workqueue;
 
 	/* Send "no force update" to clear any MLMR EMLSR restriction
@@ -4774,7 +4796,8 @@ ml_nlink_update_force_command_target(struct wlan_objmgr_psoc *psoc,
 	    evt == ml_nlink_ap_start_failed_evt ||
 	    evt == ml_nlink_ap_csa_end_evt ||
 	    evt == ml_nlink_connect_pre_start_evt ||
-	    evt == ml_nlink_connect_failed_evt)
+	    evt == ml_nlink_connect_failed_evt ||
+	    evt == ml_nlink_nan_pre_enable_evt)
 		link_control_flags |= link_ctrl_f_dont_reschedule_workqueue;
 
 	status = ml_nlink_update_no_force_for_all(psoc, vdev,
@@ -5761,15 +5784,6 @@ ml_nlink_nan_pre_enable_handler(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *ml_vdev = NULL;
-	uint32_t old_emlsr_disable_req;
-	uint8_t ml_num_link = 0;
-	uint32_t ml_link_bitmap = 0;
-	uint8_t ml_vdev_lst[WLAN_MAX_ML_BSS_LINKS];
-	qdf_freq_t ml_freq_lst[WLAN_MAX_ML_BSS_LINKS];
-	uint8_t ml_linkid_lst[WLAN_MAX_ML_BSS_LINKS];
-	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
-	uint8_t i;
-	uint32_t link_5g_num = 0;
 
 	if (!policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) ||
 	    !wlan_mlme_is_aux_emlsr_support(psoc))
@@ -5779,49 +5793,12 @@ ml_nlink_nan_pre_enable_handler(struct wlan_objmgr_psoc *psoc,
 	if (!ml_vdev)
 		goto end;
 
-	ml_nlink_get_link_info(psoc, ml_vdev, NLINK_EXCLUDE_REMOVED_LINK,
-			       QDF_ARRAY_SIZE(ml_linkid_lst),
-			       ml_link_info, ml_freq_lst, ml_vdev_lst,
-			       ml_linkid_lst, &ml_num_link,
-			       &ml_link_bitmap);
-	if (ml_num_link < 2)
-		goto end;
+	/* Check if any set link is already in progress and thus wait */
+	policy_mgr_wait_for_set_link_update(psoc);
 
-	for (i = 0; i < ml_num_link; i++) {
-		if (ml_vdev_lst[i] == WLAN_INVALID_VDEV_ID)
-			continue;
-		if (policy_mgr_vdev_is_force_inactive(psoc, ml_vdev_lst[i]))
-			continue;
-		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i]))
-			link_5g_num++;
-	}
-	/* 5G link num < 2, emlsr is not available, no need to disallow it */
-	if (link_5g_num < 2)
-		goto end;
-
-	old_emlsr_disable_req =
-	ml_nlink_get_emlsr_mode_disable_req(psoc, ml_vdev);
-	if (old_emlsr_disable_req) {
-		mlo_debug("emlsr is disabled already");
-		goto end;
-	}
-
-	/* eMLSR disable by disallow_bitmap update */
-	old_emlsr_disable_req =
+	/* eMLSR disable by nan start */
 	ml_nlink_set_emlsr_mode_disable_req(psoc, ml_vdev,
-					    ML_EMLSR_DISALLOW_BY_NAN_DISC |
-					    ML_EMLSR_DISALLOW_BY_CONCURENCY);
-	if (old_emlsr_disable_req) {
-		mlo_debug("emlsr is disabled already");
-		goto end;
-	}
-
-	status = ml_nlink_update_non_force_disallow_bitmap(
-				psoc, ml_vdev, evt, data,
-				MLO_LINK_FORCE_REASON_CONNECT,
-				link_ctrl_f_sync_set_link);
-	if (status == QDF_STATUS_E_PENDING)
-		status = QDF_STATUS_SUCCESS;
+					    ML_EMLSR_DISALLOW_BY_NAN_DISC);
 
 end:
 	if (ml_vdev)
@@ -5861,13 +5838,7 @@ ml_nlink_nan_post_disable_handler(struct wlan_objmgr_psoc *psoc,
 	old_emlsr_disable_req =
 	ml_nlink_clr_emlsr_mode_disable_req(
 			psoc, ml_vdev,
-			ML_EMLSR_DISALLOW_BY_NAN_DISC |
-			ML_EMLSR_DISALLOW_BY_CONCURENCY);
-
-	if (old_emlsr_disable_req & ML_EMLSR_DISALLOW_BY_NAN_DISC)
-		ml_nlink_set_emlsr_mode_disable_req(
-					psoc, ml_vdev,
-					ML_EMLSR_DISALLOW_BY_OPP_TIMER);
+			ML_EMLSR_DISALLOW_BY_NAN_DISC);
 end:
 	if (ml_vdev)
 		wlan_objmgr_vdev_release_ref(ml_vdev, WLAN_MLO_MGR_ID);
@@ -5903,7 +5874,8 @@ static QDF_STATUS ml_nlink_emlsr_opportunistic_timer_handler(
 	if (disable_req &
 	    ~(ML_EMLSR_DISALLOW_BY_OPP_TIMER |
 	      ML_EMLSR_DOWNGRADE_BY_OPP_TIMER |
-	      ML_EMLSR_DISALLOW_BY_CONCURENCY)) {
+	      ML_EMLSR_DISALLOW_BY_CONCURENCY |
+	      ML_EMLSR_DISALLOW_BY_NAN_DISC)) {
 		mlo_debug("emlsr disabled by req 0x%x", disable_req);
 		goto end;
 	}
