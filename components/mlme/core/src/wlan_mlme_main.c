@@ -3084,6 +3084,7 @@ mlme_init_bss_load_trigger_params(struct wlan_objmgr_psoc *psoc,
 	bss_load_trig->enabled =
 		cfg_get(psoc, CFG_ENABLE_BSS_LOAD_TRIGGERED_ROAM);
 	bss_load_trig->threshold = cfg_get(psoc, CFG_BSS_LOAD_THRESHOLD);
+	bss_load_trig->bss_load_alpha = cfg_get(psoc, CFG_BSS_LOAD_ALPHA);
 
 	ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
 	if (val)
