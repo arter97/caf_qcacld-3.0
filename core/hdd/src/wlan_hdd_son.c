@@ -282,6 +282,7 @@ static int hdd_son_set_chan_ext_offset(
 	QDF_STATUS status;
 	int retval = -EINVAL;
 	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -290,7 +291,7 @@ static int hdd_son_set_chan_ext_offset(
 
 	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info) {
-		hdd_err("null adapter");
+		hdd_err("null link_info");
 		return retval;
 	}
 
@@ -301,7 +302,7 @@ static int hdd_son_set_chan_ext_offset(
 
 	retval = 0;
 	chan_type = hdd_son_chan_ext_offset_to_chan_type(son_chan_ext_offset);
-	status = hdd_set_sap_ht2040_mode(link_info->adapter, chan_type);
+	status = hdd_set_sap_ht2040_mode(link_info, chan_type);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Cannot set SAP HT20/40 mode!");
 		retval = -EINVAL;

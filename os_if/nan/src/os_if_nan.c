@@ -2871,10 +2871,12 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
 		   nan_req->social_chan_2g_freq, nan_req->social_chan_5g_freq);
 	status = ucfg_nan_discovery_req(nan_req, NAN_ENABLE_REQ);
 
-	if (QDF_IS_STATUS_SUCCESS(status))
+	if (QDF_IS_STATUS_SUCCESS(status)) {
 		osif_debug("Successfully sent NAN Enable request");
-	else
+		os_if_cstats_log_nan_disc_enable_req_evt(vdev_id, nan_req);
+	} else {
 		osif_err("Unable to send NAN Enable request");
+	}
 
 	qdf_mem_free(nan_req);
 	return qdf_status_to_os_return(status);

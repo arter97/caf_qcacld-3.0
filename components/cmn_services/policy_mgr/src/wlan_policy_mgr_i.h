@@ -201,6 +201,8 @@
 
 #define policy_mgr_rl_debug(params...) \
 	QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policy_mgr_rl_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_RL_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
 
 #define PM_CONC_CONNECTION_LIST_VALID_INDEX(index) \
 		((MAX_NUMBER_OF_CONC_CONNECTIONS > index) && \
@@ -238,6 +240,13 @@ extern policy_mgr_next_action_three_connection_table_type
 extern const enum policy_mgr_pcl_type
 	fourth_connection_pcl_dbs_sbs_table
 	[PM_MAX_THREE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
+	[PM_MAX_CONC_PRIORITY_MODE];
+#endif
+
+#ifdef FEATURE_FIFTH_CONNECTION
+extern const enum policy_mgr_pcl_type
+	fifth_connection_pcl_dbs_sbs_table
+	[PM_MAX_FOUR_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
 	[PM_MAX_CONC_PRIORITY_MODE];
 #endif
 

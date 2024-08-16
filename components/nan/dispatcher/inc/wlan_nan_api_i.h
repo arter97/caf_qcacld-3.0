@@ -121,6 +121,33 @@ QDF_STATUS wlan_nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			      struct qdf_mac_addr *peer_mac);
+
+/**
+ * wlan_nan_is_sta_p2p_ndp_supp_by_fw() - Check if STA+P2P+NDP conc is supported
+ * @psoc: pointer to PSOC object
+ *
+ * Return: True if STA + P2P +NDP is supported
+ */
+bool wlan_nan_is_sta_p2p_ndp_supp_by_fw(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_nan_is_sta_p2p_ndp_supported() - Check if STA+P2P+NDP conc is supported
+ * @psoc: pointer to PSOC object
+ *
+ * Return: True if STA + P2P +NDP is supported
+ */
+bool wlan_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_nan_get_24ghz_social_ch_freq(): Get NAN 2.4 GHz social channel
+ * @pdev: PDEV object
+ *
+ * API fetches 2.4 GHz NAN social channel from nan_psoc_priv_obj
+ *
+ * Return: NAN social channel frequency
+ */
+qdf_freq_t
+wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev);
 #else
 static inline
 enum nan_datapath_state wlan_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev)
@@ -181,5 +208,24 @@ wlan_ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline bool
+wlan_nan_is_sta_p2p_ndp_supp_by_fw(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+wlan_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline qdf_freq_t
+wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
+{
+	return 0;
+}
+
 #endif /*WLAN_FEATURE_NAN */
 #endif /*_WLAN_NAN_API_I_H_ */

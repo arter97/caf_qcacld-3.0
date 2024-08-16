@@ -124,6 +124,18 @@ cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
 				     reason_code, cdp_reason_code);
 }
 
+/**
+ * wlan_dp_stc_peer_event_notify() - Handle the peer map/unmap events
+ * @soc: CDP soc
+ * @event: Peer event
+ * @peer_id: Peer ID
+ * @vdev_id: VDEV ID
+ * @peer_mac_addr: mac address of the Peer
+ */
+QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
+					 enum cdp_peer_event event,
+					 uint16_t peer_id, uint8_t vdev_id,
+					 uint8_t *peer_mac_addr);
 static struct ol_if_ops dp_ol_if_ops = {
 	.peer_set_default_routing = target_if_peer_set_default_routing,
 	.peer_rx_reorder_queue_setup = target_if_peer_rx_reorder_queue_setup,
@@ -153,6 +165,9 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.peer_map_event = wlan_dp_send_ipa_wds_peer_map_event,
 	.peer_unmap_event = wlan_dp_send_ipa_wds_peer_unmap_event,
 	.peer_send_wds_disconnect = wlan_dp_send_ipa_wds_peer_disconnect,
+#endif
+#ifdef WLAN_DP_FEATURE_STC
+	.dp_peer_event_notify = wlan_dp_stc_peer_event_notify,
 #endif
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
@@ -910,8 +925,10 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 
 	wlan_psoc_set_dp_handle(psoc, gp_cds_context->dp_soc);
 	ucfg_dp_set_cmn_dp_handle(psoc, gp_cds_context->dp_soc);
+	ucfg_dp_update_num_rx_rings(psoc);
 	ucfg_pmo_psoc_update_dp_handle(psoc, gp_cds_context->dp_soc);
 	ucfg_ocb_update_dp_handle(psoc, gp_cds_context->dp_soc);
+	ucfg_dp_recover_mon_conf_flags(psoc);
 
 	cds_set_ac_specs_params(cds_cfg);
 	cds_cfg_update_ac_specs_params((struct txrx_pdev_cfg_param_t *)
@@ -1021,7 +1038,8 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	    hdd_ctx->target_type == TARGET_TYPE_MANGO ||
 	    hdd_ctx->target_type == TARGET_TYPE_PEACH ||
 	    hdd_ctx->target_type == TARGET_TYPE_WCN6450 ||
-	    hdd_ctx->target_type == TARGET_TYPE_WCN7750) {
+	    hdd_ctx->target_type == TARGET_TYPE_WCN7750 ||
+	    hdd_ctx->target_type == TARGET_TYPE_QCC2072) {
 		qdf_status = cdp_pdev_init(cds_get_context(QDF_MODULE_ID_SOC),
 					   gp_cds_context->htc_ctx,
 					   gp_cds_context->qdf_ctx, 0);
@@ -1038,6 +1056,8 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 		cds_alert("Failed to attach interrupts");
 		goto pdev_deinit;
 	}
+
+	ucfg_dp_txrx_set_default_affinity(psoc);
 
 	dp_config.enable_rx_threads =
 		(cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE) ?
@@ -2809,15 +2829,16 @@ QDF_STATUS cds_set_sub_20_support(bool enable)
 
 /**
  * cds_set_sub_20_channel_width() - API to set sub 20 MHz ch width
- * @value: pending sub 20 MHz ch width to set
+ * @sub_20_ch_width: pending sub 20 MHz ch width to set
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cds_set_sub_20_channel_width(uint32_t value)
+QDF_STATUS
+cds_set_sub_20_channel_width(enum cfg_sub_20_channel_width sub_20_ch_width)
 {
 	struct cds_context *p_cds_context;
 
-	if (value > WLAN_SUB_20_CH_WIDTH_10)
+	if (sub_20_ch_width > WLAN_SUB_20_CH_WIDTH_10)
 		return QDF_STATUS_E_INVAL;
 
 	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
@@ -2827,7 +2848,10 @@ QDF_STATUS cds_set_sub_20_channel_width(uint32_t value)
 	if (!p_cds_context->cds_cfg->sub_20_support)
 		return QDF_STATUS_E_NOSUPPORT;
 
-	p_cds_context->cds_cfg->sub_20_channel_width = value;
+	if (sub_20_ch_width == p_cds_context->cds_cfg->sub_20_channel_width)
+		return QDF_STATUS_E_ALREADY;
+
+	p_cds_context->cds_cfg->sub_20_channel_width = sub_20_ch_width;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -3103,3 +3127,14 @@ int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
 	return 0;
 }
 #endif
+
+bool cds_is_pm_fw_debug_enable(void)
+{
+	struct cds_context *cds_ctx = cds_get_global_context();
+
+	if (cds_ctx && cds_ctx->cds_cfg &&
+	    cds_ctx->cds_cfg->is_pm_fw_debug_enable)
+		return true;
+
+	return false;
+}

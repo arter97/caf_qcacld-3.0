@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -46,6 +46,7 @@
 #include "lim_session.h"
 #include "wma.h"
 #include "wlan_utility.h"
+#include "wlan_mlo_mgr_sta.h"
 
 #ifdef FEATURE_WLAN_ESE
 /**
@@ -128,8 +129,7 @@ static void lim_extract_he_op(struct pe_session *session,
 		session->he_op.oper_info_6g.info.center_freq_seg1;
 	session->ap_defined_power_type_6g =
 		session->he_op.oper_info_6g.info.reg_info;
-	if (session->ap_defined_power_type_6g < REG_INDOOR_AP ||
-	    session->ap_defined_power_type_6g > REG_MAX_SUPP_AP_TYPE) {
+	if (lim_is_ap_power_type_6g_invalid(session)) {
 		session->ap_defined_power_type_6g = REG_CURRENT_MAX_AP_TYPE;
 		pe_debug("AP power type invalid, defaulting to MAX_AP_TYPE");
 	}
@@ -339,8 +339,8 @@ void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
-static void lim_extract_eht_op(struct pe_session *session,
-			       tSirProbeRespBeacon *beacon_struct)
+void lim_extract_eht_op(struct pe_session *session,
+			tSirProbeRespBeacon *beacon_struct)
 {
 	uint32_t max_eht_bw;
 
@@ -405,11 +405,6 @@ void lim_update_eht_bw_cap_mcs(struct pe_session *session,
 			session->eht_config.num_sounding_dim_320mhz = 0;
 	}
 }
-#else
-static void lim_extract_eht_op(struct pe_session *session,
-			       tSirProbeRespBeacon *beacon_struct)
-{
-}
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -418,6 +413,7 @@ void lim_objmgr_update_emlsr_caps(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool ap_emlsr_cap = false;
+	struct wlan_objmgr_vdev *assoc_vdev;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_LEGACY_MAC_ID);
@@ -445,9 +441,28 @@ void lim_objmgr_update_emlsr_caps(struct wlan_objmgr_psoc *psoc,
 			pe_debug("EML caps present in assoc rsp");
 		}
 	} else {
-		pe_debug("no change required for link vdev");
+		if (wlan_cm_is_vdev_active(vdev) ||
+		    wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+			pe_debug("no change required for link vdev");
+			goto rel_ref;
+		}
+
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+		if (assoc_vdev) {
+			if (!wlan_vdev_mlme_cap_get(
+					assoc_vdev, WLAN_VDEV_C_EMLSR_CAP)) {
+				wlan_vdev_obj_lock(vdev);
+				wlan_vdev_mlme_cap_clear(
+						vdev, WLAN_VDEV_C_EMLSR_CAP);
+				wlan_vdev_obj_unlock(vdev);
+				pe_debug("Cleared link vdev EML caps.");
+			} else {
+				pe_debug("no change required for link vdev");
+			}
+		}
 	}
 
+rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 #endif
@@ -598,6 +613,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	uint8_t channel = 0;
 	uint8_t sta_prefer_80mhz_over_160mhz;
 	struct mlme_vht_capabilities_info *mlme_vht_cap;
+	QDF_STATUS status;
 
 	beacon_struct = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
 	if (!beacon_struct)
@@ -608,8 +624,9 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	sta_prefer_80mhz_over_160mhz =
 		session->mac_ctx->mlme_cfg->sta.sta_prefer_80mhz_over_160mhz;
 
-	if (sir_parse_beacon_ie(mac_ctx, beacon_struct, p_ie,
-		(uint32_t) ie_len) != QDF_STATUS_SUCCESS) {
+	status = sir_parse_beacon_ie(mac_ctx, beacon_struct, p_ie,
+				     (uint32_t)ie_len);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("sir_parse_beacon_ie failed to parse beacon");
 		qdf_mem_free(beacon_struct);
 		return;
@@ -620,9 +637,10 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	    beacon_struct->wmeEdcaPresent ||
 	    beacon_struct->HTCaps.present)
 		LIM_BSS_CAPS_SET(WME, *qos_cap);
-	if (LIM_BSS_CAPS_GET(WME, *qos_cap)
-			&& beacon_struct->wsmCapablePresent)
+
+	if (LIM_BSS_CAPS_GET(WME, *qos_cap) && beacon_struct->wsmCapablePresent)
 		LIM_BSS_CAPS_SET(WSM, *qos_cap);
+
 	if (beacon_struct->HTCaps.present)
 		mac_ctx->lim.htCapabilityPresentInBeacon = 1;
 	else
@@ -630,10 +648,10 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 
 	vht_op = &beacon_struct->VHTOperation;
 	vht_caps = &beacon_struct->VHTCaps;
-	if (IS_BSS_VHT_CAPABLE(beacon_struct->VHTCaps) &&
-			vht_op->present &&
-			session->vhtCapability) {
+	if (IS_BSS_VHT_CAPABLE(beacon_struct->VHTCaps) && vht_op->present &&
+	    session->vhtCapability) {
 		session->vhtCapabilityPresentInBeacon = 1;
+
 		if (((beacon_struct->Vendor1IEPresent &&
 		      beacon_struct->vendor_vht_ie.present &&
 		      beacon_struct->Vendor3IEPresent)) &&
@@ -647,7 +665,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	}
 
 	if (session->vhtCapabilityPresentInBeacon == 1 &&
-			!session->htSupportedChannelWidthSet) {
+	    !session->htSupportedChannelWidthSet) {
 		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_txbf_20mhz)
 			session->vht_config.su_beam_formee = 0;
 
@@ -658,8 +676,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 					mac_ctx, session,
 					beacon_struct->chan_freq);
 
-	} else if (session->vhtCapabilityPresentInBeacon &&
-			vht_op->chanWidth) {
+	} else if (session->vhtCapabilityPresentInBeacon && vht_op->chanWidth) {
 		/* If VHT is supported min 80 MHz support is must */
 		ap_bcon_ch_width = vht_op->chanWidth;
 		if (vht_caps->vht_extended_nss_bw_cap) {
@@ -707,8 +724,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 				vht_ch_wd =
 					WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
 			else
-				vht_ch_wd =
-					WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+				vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
 		}
 		/*
 		 * If the supported channel width is greater than 80MHz and
@@ -774,12 +790,11 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 		session->ap_ch_width = session->ch_width;
 	}
 
-	if (session->vhtCapability &&
-		session->vhtCapabilityPresentInBeacon &&
-		beacon_struct->ext_cap.present) {
+	if (session->vhtCapability && session->vhtCapabilityPresentInBeacon &&
+	    beacon_struct->ext_cap.present) {
 		ext_cap = (struct s_ext_cap *)beacon_struct->ext_cap.bytes;
 		session->gLimOperatingMode.present =
-			ext_cap->oper_mode_notification;
+					ext_cap->oper_mode_notification;
 		if (ext_cap->oper_mode_notification) {
 			uint8_t self_nss = 0;
 
@@ -798,13 +813,12 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 			 *  WFA CERT test scenario.
 			 */
 			if (ext_cap->beacon_protection_enable &&
-			    (session->opmode == QDF_STA_MODE) &&
-			    (!session->nss_forced_1x1) &&
+			    session->opmode == QDF_STA_MODE &&
+			    !session->nss_forced_1x1 &&
 			     lim_get_nss_supported_by_ap(
 					&beacon_struct->VHTCaps,
 					&beacon_struct->HTCaps,
-					&beacon_struct->he_cap) ==
-						 NSS_1x1_MODE)
+					&beacon_struct->he_cap) == NSS_1x1_MODE)
 				session->gLimOperatingMode.rxNSS = self_nss - 1;
 			else
 				session->gLimOperatingMode.rxNSS =
@@ -813,6 +827,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 			pe_err("AP does not support op_mode rx");
 		}
 	}
+
 	lim_check_is_he_mcs_valid(session, beacon_struct);
 	lim_check_peer_ldpc_and_update(session, beacon_struct);
 	lim_extract_he_op(session, beacon_struct);

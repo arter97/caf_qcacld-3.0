@@ -555,7 +555,8 @@ bool cds_is_5_mhz_enabled(void);
 bool cds_is_10_mhz_enabled(void);
 bool cds_is_sub_20_mhz_enabled(void);
 QDF_STATUS cds_set_sub_20_support(bool enable);
-QDF_STATUS cds_set_sub_20_channel_width(uint32_t value);
+QDF_STATUS
+cds_set_sub_20_channel_width(enum cfg_sub_20_channel_width sub_20_ch_width);
 
 bool cds_is_self_recovery_enabled(void);
 bool cds_is_fw_down(void);
@@ -667,5 +668,12 @@ static inline bool cds_is_driver_transitioning(void)
 		__CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_RECOVERING) ||
 		__CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_BAD);
 }
+
+/**
+ * cds_is_pm_fw_debug_enable() - This API provides PMO FW debug enable check.
+ *
+ * Return: true if PMO FW debug is enable and otherwise  false
+ */
+bool cds_is_pm_fw_debug_enable(void);
 
 #endif /* if !defined __CDS_API_H */

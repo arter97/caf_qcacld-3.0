@@ -801,7 +801,7 @@ static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
 				    struct validate_bss_data *candidate_info)
 {
 	struct scan_cache_entry *scan_entry = candidate_info->scan_entry;
-	struct action_oui_search_attr attr;
+	struct action_oui_search_attr attr = {0};
 	int8_t i, allowed_partner_links = 0;
 	uint8_t mlo_support_link_num;
 

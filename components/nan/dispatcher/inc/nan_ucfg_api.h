@@ -445,6 +445,22 @@ bool ucfg_nan_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc);
 bool ucfg_nan_is_sta_nan_ndi_4_port_allowed(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_nan_is_sta_sap_ndp_supported()- Get support for STA + SAP + NDI
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if STA + SAP + NDP supported
+ */
+bool ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_nan_is_sta_p2p_ndp_supported()- Get support for STA + P2P + NDP
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if STA + P2P + NDP supported
+ */
+bool ucfg_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_nan_is_beamforming_supported- Get support for beamforing
  * @psoc: pointer to psoc object
  *
@@ -570,6 +586,16 @@ ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS ucfg_nan_send_delete_pasn_peer(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id,
 					  struct qdf_mac_addr *peer_mac_addr);
+
+/**
+ * ucfg_nan_get_prefer_nan_chan_for_p2p() - get value of prefer NAN social
+ * channels for P2P
+ * @psoc: pointer to psoc object
+ *
+ * Return: Boolean flag indicating whether NAN social channels can be preferred
+ * for P2P or not
+ */
+bool ucfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc);
 #else /* WLAN_FEATURE_NAN */
 
 static inline
@@ -635,6 +661,17 @@ bool ucfg_nan_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc)
 
 static inline
 bool ucfg_nan_is_sta_nan_ndi_4_port_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+ucfg_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -726,6 +763,12 @@ ucfg_nan_send_delete_pasn_peer(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			       struct qdf_mac_addr *peer_mac_addr)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool
+ucfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif /* WLAN_FEATURE_NAN */
 #endif /* _NAN_UCFG_API_H_ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -308,6 +308,23 @@ target_if_dp_lro_config_cmd(struct wlan_objmgr_psoc *psoc,
 	return wmi_unified_lro_config_cmd(wmi_handle, &wmi_lro_cmd);
 }
 
+#ifdef WLAN_DP_FEATURE_STC
+static QDF_STATUS
+target_if_dp_send_opm_stats_cmd(struct wlan_objmgr_psoc *psoc,
+				uint8_t pdev_id)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		dp_err("wmi_handle is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return wmi_unified_send_opm_stats_cmd(wmi_handle, pdev_id);
+}
+#endif
+
 /**
  * target_if_dp_send_dhcp_ind() - process set arp stats request command to fw
  * @vdev_id: vdev id
@@ -355,6 +372,59 @@ target_if_dp_send_dhcp_ind(uint16_t vdev_id,
 	return status;
 }
 
+static QDF_STATUS
+target_if_dp_active_traffic_map(struct wlan_objmgr_psoc *psoc,
+				struct dp_active_traffic_map_params *req_buf)
+{
+	struct wmi_unified *wmi_handle;
+	struct wlan_objmgr_peer *peer;
+	struct peer_active_traffic_map_params cmd = {0};
+	QDF_STATUS status;
+
+	if (!psoc || !req_buf) {
+		target_if_err("Invalid params");
+		return -EINVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid wmi handle");
+		return -EINVAL;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, req_buf->mac.bytes,
+					   WLAN_DP_ID);
+	if (!peer) {
+		target_if_err("Peer not found in the list");
+		return -EINVAL;
+	}
+
+	cmd.vdev_id = req_buf->vdev_id;
+	qdf_mem_copy(cmd.peer_macaddr.bytes, req_buf->mac.bytes,
+		     QDF_MAC_ADDR_SIZE);
+	cmd.active_traffic_map = req_buf->active_traffic_map;
+
+	status = wmi_unified_peer_active_traffic_map_send(wmi_handle, &cmd);
+
+	if (peer)
+		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
+
+	return status;
+}
+
+#ifdef WLAN_DP_FEATURE_STC
+static inline void
+dp_register_tx_ops_opm_stats(struct wlan_dp_psoc_sb_ops *sb_ops)
+{
+	sb_ops->dp_send_opm_stats_cmd = target_if_dp_send_opm_stats_cmd;
+}
+#else
+static inline void
+dp_register_tx_ops_opm_stats(struct wlan_dp_psoc_sb_ops *sb_ops)
+{
+}
+#endif
+
 void target_if_dp_register_tx_ops(struct wlan_dp_psoc_sb_ops *sb_ops)
 {
 	sb_ops->dp_arp_stats_register_event_handler =
@@ -368,6 +438,8 @@ void target_if_dp_register_tx_ops(struct wlan_dp_psoc_sb_ops *sb_ops)
 	sb_ops->dp_lro_config_cmd = target_if_dp_lro_config_cmd;
 	sb_ops->dp_send_dhcp_ind =
 		target_if_dp_send_dhcp_ind;
+	sb_ops->dp_send_active_traffic_map = target_if_dp_active_traffic_map;
+	dp_register_tx_ops_opm_stats(sb_ops);
 }
 
 void target_if_dp_register_rx_ops(struct wlan_dp_psoc_nb_ops *nb_ops)

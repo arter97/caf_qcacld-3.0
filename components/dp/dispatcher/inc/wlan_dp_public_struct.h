@@ -173,6 +173,18 @@ struct dp_set_arp_stats_params {
 };
 
 /**
+ * struct dp_active_traffic_map_params - active traffic map
+ * @vdev_id: vdev_id for which traffic map is being sent
+ * @mac: mac address of the peer
+ * @active_traffic_map: Active traffic bitmap
+ */
+struct dp_active_traffic_map_params {
+	uint32_t vdev_id;
+	struct qdf_mac_addr mac;
+	uint32_t active_traffic_map;
+};
+
+/**
  * struct dp_get_arp_stats_params - get arp stats from firmware
  * @pkt_type: packet type(1 - ARP)
  * @vdev_id: session id
@@ -588,6 +600,157 @@ union wlan_tp_data {
 	struct wlan_rx_tp_data rx_tp_data;
 };
 
+/*
+ * Flow tuple related flags
+ */
+#define DP_FLOW_TUPLE_FLAGS_IPV4	BIT(0)
+#define DP_FLOW_TUPLE_FLAGS_IPV6	BIT(1)
+#define DP_FLOW_TUPLE_FLAGS_SRC_IP	BIT(2)
+#define DP_FLOW_TUPLE_FLAGS_DST_IP	BIT(3)
+#define DP_FLOW_TUPLE_FLAGS_SRC_PORT	BIT(4)
+#define DP_FLOW_TUPLE_FLAGS_DST_PORT	BIT(5)
+#define DP_FLOW_TUPLE_FLAGS_PROTO	BIT(6)
+
+/*
+ * struct flow_info - Structure used for defining flow
+ * @src_ip: Source IP (IPv4/IPv6)
+ * @dst_ip: Destination IP (IPv4/IPv6)
+ * @src_port: Source port
+ * @dst_port: Destination port
+ * @proto: Flow proto
+ * @reserved: Padding
+ * @flags: Flags indicating available attributes of a flow
+ * @flow_label: Flow label if IPv6 is used for src_ip/dst_ip
+ */
+struct flow_info {
+	union {
+		uint32_t ipv4_addr;             /* IPV4 address */
+		uint32_t ipv6_addr[4];          /* IPV6 address */
+	} src_ip;
+	union {
+		uint32_t ipv4_addr;             /* IPV4 address */
+		uint32_t ipv6_addr[4];          /* IPV6 address */
+	} dst_ip;
+	uint16_t src_port;
+	uint16_t dst_port;
+	uint8_t proto;
+	uint8_t reserved[3];
+	uint32_t flags;
+	uint32_t flow_label;
+};
+
+/*
+ * struct wlan_dp_stc_flow_classify_result - Flow classification result
+ * @flow_tuple: tuple of the flow which is classified
+ * @cookie: cookie/identifier
+ * @traffic_type: traffic type classified
+ */
+struct wlan_dp_stc_flow_classify_result {
+	struct flow_info flow_tuple;
+	uint32_t cookie;
+	uint8_t traffic_type;
+};
+
+#define DP_STC_TXRX_SAMPLES_MAX 5
+#define DP_TXRX_SAMPLES_WINDOW_MAX 2
+
+/**
+ * struct wlan_dp_stc_txrx_min_max_stats - MIN/MAX stats
+ * @pkt_size_min: minimum packet size
+ * @pkt_size_max: maximum packet size
+ * @pkt_iat_min: minimum packet inter-arrival time
+ * @pkt_iat_max: maximum packet inter-arrival time
+ */
+struct wlan_dp_stc_txrx_min_max_stats {
+	uint32_t pkt_size_min;
+	uint32_t pkt_size_max;
+	uint64_t pkt_iat_min;
+	uint64_t pkt_iat_max;
+};
+
+/*
+ * struct wlan_dp_stc_txrx_stats - TxRx stats
+ * @bytes: total number of bytes in a window
+ * @pkts: total number of pkts in a window
+ * @pkt_size_min: minimum packet size in a window
+ * @pkt_size_max: maximum packet size in a window
+ * @pkt_iat_min: minimum packet inter-arrival time in a window
+ * @pkt_iat_max: maximum packet inter-arrival time in a window
+ * @pkt_iat_sum: SUM of all the packet inter-arrival time in a window
+ */
+struct wlan_dp_stc_txrx_stats {
+	uint64_t bytes;
+	uint32_t pkts;
+	uint32_t pkt_size_min;
+	uint32_t pkt_size_max;
+	uint64_t pkt_iat_min;
+	uint64_t pkt_iat_max;
+	uint64_t pkt_iat_sum;
+};
+
+/*
+ * struct wlan_dp_stc_txrx_samples - TxRx samples
+ * @win_size: window size
+ * @tx: uplink/Tx samples
+ * @rx: downlink/Rx samples
+ */
+struct wlan_dp_stc_txrx_samples {
+	uint32_t win_size;
+	struct wlan_dp_stc_txrx_stats tx;
+	struct wlan_dp_stc_txrx_stats rx;
+};
+
+/*
+ * struct wlan_dp_stc_burst_stats - Burst stats
+ * @burst_duration_min: minimum burst duration in a window
+ * @burst_duration_max: maximum burst duration in a window
+ * @burst_duration_sum: SUM of all the burst duration in a window
+ * @burst_size_min: minimum burst size in a window
+ * @burst_size_max: maximum burst size in a window
+ * @burst_size_sum: SUM of all the burst size in a window
+ * @burst_count: Total number of bursts
+ */
+struct wlan_dp_stc_burst_stats {
+	uint64_t burst_duration_min;
+	uint64_t burst_duration_max;
+	uint64_t burst_duration_sum;
+	uint32_t burst_size_min;
+	uint32_t burst_size_max;
+	uint64_t burst_size_sum;
+	uint32_t burst_count;
+};
+
+/*
+ * struct wlan_dp_stc_burst_samples - Burst samples
+ * @txrx_samples: TxRx samples for the burst window
+ * @tx: Uplink/Tx burst samples
+ * @rx: downlink/Rx burst samples
+ */
+struct wlan_dp_stc_burst_samples {
+	struct wlan_dp_stc_txrx_samples txrx_samples;
+	struct wlan_dp_stc_burst_stats tx;
+	struct wlan_dp_stc_burst_stats rx;
+};
+
+#define WLAN_DP_TXRX_SAMPLES_READY BIT(0)
+#define WLAN_DP_BURST_SAMPLES_READY BIT(1)
+#define WLAN_DP_FLOW_CLASSIFIED BIT(2)
+#define WLAN_DP_LOG_ENABLE BIT(3)
+
+/*
+ * struct wlan_dp_stc_flow_samples - Flow samples
+ * @cookie: cookie/identifier
+ * @flow_tuple: tuple of the flow
+ * @txrx_samples: TxRx samples for this flow
+ * @burst_sample: Burst samples for this flow
+ */
+struct wlan_dp_stc_flow_samples {
+	uint32_t cookie;
+	struct flow_info flow_tuple;
+	struct wlan_dp_stc_txrx_samples txrx_samples[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
+	struct wlan_dp_stc_burst_samples burst_sample;
+};
+
 /**
  * struct wlan_dp_psoc_callbacks - struct containing callback
  * to non-converged driver
@@ -640,6 +803,8 @@ union wlan_tp_data {
  * @dp_register_lpass_ssr_notifier: Callback to register for lpass SSR notif
  * @dp_unregister_lpass_ssr_notifier: Callback to unregister for lpass SSR notif
  * @wlan_dp_ipa_wds_peer_cb: Callback to handle IPA WDS peer events
+ * @send_flow_stats_event: Callback to send flow stats vendor command
+ * @send_flow_report_event: Callback to send flow report vendor command
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -652,10 +817,10 @@ struct wlan_dp_psoc_callbacks {
 	void (*dp_get_tsf_time)(qdf_netdev_t netdev, uint64_t input_time,
 				uint64_t *tsf_time);
 	void (*dp_tsf_timestamp_rx)(hdd_cb_handle ctx, qdf_nbuf_t nbuf);
-#ifdef WLAN_FEATURE_FILS_SK_SAP
+
 	void (*dp_fils_hlp_rx)(uint8_t intf_id, hdd_cb_handle ctx,
 			       qdf_nbuf_t nbuf);
-#endif
+
 	QDF_STATUS (*dp_nbuf_push_pkt)(qdf_nbuf_t nbuf,
 				       enum dp_nbuf_push_type type);
 
@@ -738,6 +903,14 @@ struct wlan_dp_psoc_callbacks {
 	int (*wlan_dp_ipa_wds_peer_cb)(uint8_t vdev_id, uint16_t peer_id,
 				       uint8_t *wds_macaddr, bool map);
 #endif
+#ifdef WLAN_DP_FEATURE_STC
+	int (*send_flow_stats_event)(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_dp_stc_flow_samples *flow_samples,
+				     uint32_t flags);
+	int (*send_flow_report_event)(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_dp_stc_flow_samples *flow_samples,
+				      uint32_t flags);
+#endif
 };
 
 /**
@@ -752,6 +925,8 @@ struct wlan_dp_psoc_callbacks {
  * @arp_request_ctx: ARP request context
  * @dp_lro_config_cmd: Callback to  send LRO config command
  * @dp_send_dhcp_ind: Callback to send DHCP indication
+ * @dp_send_active_traffic_map: Callback to send active traffic mapping
+ * @dp_send_opm_stats_cmd: Callback to send OPM stats command
  */
 struct wlan_dp_psoc_sb_ops {
 	/*TODO to add target if TX ops*/
@@ -766,6 +941,12 @@ struct wlan_dp_psoc_sb_ops {
 					struct cdp_lro_hash_config *dp_lro_cmd);
 	QDF_STATUS (*dp_send_dhcp_ind)(uint16_t vdev_id,
 				       struct dp_dhcp_ind *dhcp_ind);
+	QDF_STATUS (*dp_send_active_traffic_map)(struct wlan_objmgr_psoc *psoc,
+						 struct dp_active_traffic_map_params *req_buf);
+#ifdef WLAN_DP_FEATURE_STC
+	QDF_STATUS (*dp_send_opm_stats_cmd)(struct wlan_objmgr_psoc *psoc,
+					    uint8_t pdev_id);
+#endif
 };
 
 /**
@@ -845,48 +1026,11 @@ struct dp_svc_data {
 #define MAX_TID 8
 
 /*
- * Flow tuple related flags
- */
-#define DP_FLOW_TUPLE_FLAGS_IPV4	BIT(0)
-#define DP_FLOW_TUPLE_FLAGS_IPV6	BIT(1)
-#define DP_FLOW_TUPLE_FLAGS_SRC_IP	BIT(2)
-#define DP_FLOW_TUPLE_FLAGS_DST_IP	BIT(3)
-#define DP_FLOW_TUPLE_FLAGS_SRC_PORT	BIT(4)
-#define DP_FLOW_TUPLE_FLAGS_DST_PORT	BIT(5)
-#define DP_FLOW_TUPLE_FLAGS_PROTO	BIT(6)
-
-/*
  * Flow policy related flags
  */
 #define DP_POLICY_TO_TID_MAP	BIT(0)
 #define DP_POLICY_TO_SVC_MAP	BIT(1)
 #define DP_POLICY_UPDATE_PRIO	BIT(2)
-
-/*
- * struct flow_info - Structure used for defining flow
- * @proto: Flow proto
- * @src_port: Source port
- * @dst_port: Destination port
- * @flags: Flags indicating available attributes of a flow
- * @src_ip: Source IP (IPv4/IPv6)
- * @dst_ip: Destination IP (IPv4/IPv6)
- * @flow_label: Flow label if IPv6 is used for src_ip/dst_ip
- */
-struct flow_info {
-	uint8_t proto;
-	uint16_t src_port;
-	uint16_t dst_port;
-	uint32_t flags;
-	union {
-		uint32_t ipv4_addr;             /* IPV4 address */
-		uint32_t ipv6_addr[4];          /* IPV6 address */
-	} src_ip;
-	union {
-		uint32_t ipv4_addr;             /* IPV4 address */
-		uint32_t ipv6_addr[4];          /* IPV6 address */
-	} dst_ip;
-	uint32_t flow_label;
-};
 
 /* struct dp_policy - Structure used for defining flow policy.
  * @node: dp_policy node used in constructing hlist.

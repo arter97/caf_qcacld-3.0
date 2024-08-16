@@ -90,7 +90,7 @@ static int populate_oem_data_cap(struct hdd_adapter *adapter,
 	if (!chan_freq_list)
 		return -ENOMEM;
 
-	strlcpy(data_cap->oem_target_signature, OEM_TARGET_SIGNATURE,
+	strscpy(data_cap->oem_target_signature, OEM_TARGET_SIGNATURE,
 		OEM_TARGET_SIGNATURE_LEN);
 	data_cap->oem_target_type = hdd_ctx->target_type;
 	data_cap->oem_fw_version = hdd_ctx->target_fw_version;
@@ -1523,7 +1523,8 @@ void hdd_oem_event_smem_cb(const struct oem_data *oem_event_data)
 	if (link_info)
 		wdev = &link_info->adapter->wdev;
 
-	pld_oem_event_smem_write(qdf_dev->dev, 1, (const __u8 *)oem_event_data,
+	pld_oem_event_smem_write(qdf_dev->dev, 1,
+				 (const __u8 *)oem_event_data->data,
 				 oem_event_data->data_len);
 	hdd_exit();
 }

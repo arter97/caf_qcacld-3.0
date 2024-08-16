@@ -38,7 +38,11 @@
 #include "qdf_platform.h"
 #include "wlan_osif_request_manager.h"
 #include "wlan_p2p_api.h"
+#include "wlan_dp_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
+#include "wlan_if_mgr_public_struct.h"
+#include "wlan_if_mgr_api.h"
+#include "wlan_mlme_api.h"
 
 bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc)
 {
@@ -1002,8 +1006,12 @@ static QDF_STATUS nan_handle_confirm(struct nan_datapath_confirm_event *confirm)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (peer)
+	if (peer) {
+		if (confirm->rsp_code == NAN_DATAPATH_RESPONSE_ACCEPT)
+			wlan_dp_notify_ndp_channel_info(peer, &confirm->ch[0],
+							confirm->num_channels);
 		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
+	}
 
 	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
 	if (!psoc_nan_obj) {
@@ -1336,12 +1344,29 @@ static QDF_STATUS nan_handle_enable_rsp(struct nan_event_params *nan_event)
 	void (*call_back)(void *cookie);
 	uint8_t vdev_id;
 	void (*nan_conc_callback)(void);
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wlan_objmgr_vdev *vdev = NULL;
 
 	psoc = nan_event->psoc;
 	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
 	if (!psoc_nan_obj) {
 		nan_err("psoc_nan_obj is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_NAN_ID);
+	if (!pdev) {
+		nan_err("null pdev");
+		status = QDF_STATUS_E_INVAL;
+		goto fail;
+	}
+
+	vdev = wlan_objmgr_pdev_get_first_vdev(pdev, WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("No vdev is up yet, unable to proceed!");
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
+		status = QDF_STATUS_E_INVAL;
+		goto fail;
 	}
 
 	if (nan_event->is_nan_enable_success) {
@@ -1354,12 +1379,18 @@ static QDF_STATUS nan_handle_enable_rsp(struct nan_event_params *nan_event)
 				vdev_id = NAN_PSEUDO_VDEV_ID;
 			} else if (vdev_id >= WLAN_MAX_VDEVS) {
 				nan_err("Invalid NAN vdev_id: %u", vdev_id);
+				wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
+				wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 				goto fail;
 			}
 			nan_debug("NAN vdev_id: %u", vdev_id);
 			policy_mgr_incr_active_session(psoc, QDF_NAN_DISC_MODE,
 						       vdev_id);
 			policy_mgr_process_force_scc_for_nan(psoc);
+
+			if_mgr_deliver_event(vdev,
+					     WLAN_IF_MGR_EV_NAN_POST_ENABLE,
+					     NULL);
 
 		} else {
 			/*
@@ -1370,14 +1401,17 @@ static QDF_STATUS nan_handle_enable_rsp(struct nan_event_params *nan_event)
 			psoc_nan_obj->nan_social_ch_5g_freq = 0;
 			policy_mgr_check_n_start_opportunistic_timer(psoc);
 		}
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 		goto done;
 	} else {
 		nan_info("NAN enable has failed");
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 		/* NAN Enable has failed, restore changes */
 		goto fail;
 	}
 
-	nan_cstats_log_nan_enable_resp_evt(nan_event);
 fail:
 	psoc_nan_obj->nan_social_ch_2g_freq = 0;
 	psoc_nan_obj->nan_social_ch_5g_freq = 0;
@@ -1393,6 +1427,8 @@ fail:
 	ucfg_tdls_notify_connect_failure(psoc);
 
 done:
+	nan_cstats_log_nan_enable_resp_evt(nan_event);
+
 	nan_conc_callback = psoc_nan_obj->cb_obj.nan_concurrency_update;
 	if (nan_conc_callback)
 		nan_conc_callback();
@@ -1409,6 +1445,8 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 	QDF_STATUS status;
 	uint8_t vdev_id;
 	void (*nan_conc_callback)(void);
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
 
 	if (!psoc) {
 		nan_err("psoc is NULL");
@@ -1418,6 +1456,19 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
 	if (!psoc_nan_obj) {
 		nan_err("psoc_nan_obj is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_NAN_ID);
+	if (!pdev) {
+		nan_err("null pdev");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev = wlan_objmgr_pdev_get_first_vdev(pdev, WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("No vdev is up yet, unable to proceed!");
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
@@ -1437,9 +1488,18 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 		nan_handle_emlsr_concurrency(psoc, false);
 		policy_mgr_nan_sap_post_disable_conc_check(psoc);
 		nan_cstats_log_nan_disable_resp_evt(vdev_id, psoc);
+
+		if_mgr_deliver_event(vdev,
+				     WLAN_IF_MGR_EV_NAN_POST_DISABLE,
+				     NULL);
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
 	} else {
 		/* Should not happen, NAN state can always be disabled */
 		nan_err("Cannot set NAN state to disabled!");
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 		return QDF_STATUS_E_FAILURE;
 	}
 	nan_conc_callback = psoc_nan_obj->cb_obj.nan_concurrency_update;
@@ -1459,6 +1519,7 @@ static QDF_STATUS nan_handle_schedule_update(
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct wlan_objmgr_peer *peer;
 
 	psoc = wlan_vdev_get_psoc(ind->vdev);
 	if (!psoc) {
@@ -1470,6 +1531,14 @@ static QDF_STATUS nan_handle_schedule_update(
 	if (!psoc_nan_obj) {
 		nan_err("psoc_nan_obj is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, ind->peer_addr.bytes,
+					   WLAN_NAN_ID);
+	if (peer) {
+		wlan_dp_notify_ndp_channel_info(peer, &ind->ch[0],
+						ind->num_channels);
+		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
 	}
 
 	ndi_update_ndp_session(ind->vdev, &ind->peer_addr, &ind->ch[0]);
@@ -1677,6 +1746,13 @@ pre_enable_failure:
 void nan_handle_emlsr_concurrency(struct wlan_objmgr_psoc *psoc,
 				  bool nan_enable)
 {
+	/*
+	 * For ganges EMLSR disallowed is set via change notify.
+	 */
+	if (policy_mgr_is_mlo_in_mode_emlsr(psoc, NULL, NULL) &&
+	    wlan_mlme_is_aux_emlsr_support(psoc))
+		return;
+
 	if (nan_enable) {
 		/*
 		 * Check if any set link is already progress,
@@ -1723,6 +1799,7 @@ QDF_STATUS nan_discovery_pre_enable(struct wlan_objmgr_pdev *pdev,
 {
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+	struct wlan_objmgr_vdev *vdev = NULL;
 
 	if (!psoc) {
 		nan_err("psoc is null");
@@ -1766,9 +1843,20 @@ QDF_STATUS nan_discovery_pre_enable(struct wlan_objmgr_pdev *pdev,
 
 	/* Try to teardown TDLS links, but do not wait */
 	status = ucfg_tdls_teardown_links(psoc);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		nan_err("Failed to teardown TDLS links");
+	} else {
+		vdev = wlan_objmgr_pdev_get_first_vdev(pdev, WLAN_NAN_ID);
+		if (!vdev) {
+			nan_err("No vdev is up yet, unable to proceed!");
+			status = QDF_STATUS_E_INVAL;
+			goto pre_enable_failure;
+		}
 
+		if_mgr_deliver_event(vdev, WLAN_IF_MGR_EV_NAN_PRE_ENABLE, NULL);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	}
 pre_enable_failure:
 	if (QDF_IS_STATUS_ERROR(status))
 		nan_set_discovery_state(psoc, NAN_DISC_DISABLED);
@@ -1948,6 +2036,22 @@ wlan_nan_get_connection_info(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+qdf_freq_t wlan_nan_get_disc_24g_ch_freq(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return 0;
+	}
+
+	if (nan_get_discovery_state(psoc) != NAN_DISC_ENABLED)
+		return 0;
+
+	return psoc_nan_obj->nan_social_ch_2g_freq;
+}
+
 uint32_t wlan_nan_get_disc_5g_ch_freq(struct wlan_objmgr_psoc *psoc)
 {
 	struct nan_psoc_priv_obj *psoc_nan_obj;
@@ -1962,6 +2066,26 @@ uint32_t wlan_nan_get_disc_5g_ch_freq(struct wlan_objmgr_psoc *psoc)
 		return 0;
 
 	return psoc_nan_obj->nan_social_ch_5g_freq;
+}
+
+qdf_freq_t wlan_nan_get_5ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
+{
+	qdf_freq_t freq = 0;
+
+	freq = wlan_nan_get_disc_5g_ch_freq(wlan_pdev_get_psoc(pdev));
+
+	if (freq)
+		goto done;
+
+	if (wlan_reg_is_freq_enabled(pdev, NAN_5GHZ_SOCIAL_CH_149_FREQ,
+				     REG_CURRENT_PWR_MODE))
+		freq = NAN_5GHZ_SOCIAL_CH_149_FREQ;
+	else if (wlan_reg_is_freq_enabled(pdev, NAN_5GHZ_SOCIAL_CH_44_FREQ,
+					  REG_CURRENT_PWR_MODE))
+		freq = NAN_5GHZ_SOCIAL_CH_44_FREQ;
+
+done:
+	return freq;
 }
 
 bool wlan_nan_get_sap_conc_support(struct wlan_objmgr_psoc *psoc)

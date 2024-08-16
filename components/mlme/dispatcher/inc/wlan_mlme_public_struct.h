@@ -1349,6 +1349,18 @@ struct wlan_user_mcc_quota {
 };
 
 /**
+ * struct vdev_suspend_param: Vdev suspend params
+ * @vdev_id: vdev id
+ * @suspend: suspend flag
+ * @mac_addr: MLD mac address when vdev is MLO
+ */
+struct vdev_suspend_param {
+	uint8_t vdev_id;
+	uint8_t suspend;
+	struct qdf_mac_addr mac_addr;
+};
+
+/**
  * enum wlan_mlme_hw_mode_config_type - HW mode config type replicated from
  *                                     wmi_hw_mode_config_type in FW header.
  *                                     similar as wmi_host_hw_mode_config_type.
@@ -1478,11 +1490,11 @@ struct wlan_mlme_aux_dev_caps {
  * @tx_retry_multiplier: TX xretry extension parameter
  * @mgmt_hw_tx_retry_count: MGMT HW tx retry count for frames
  * @std_6ghz_conn_policy: 6GHz standard connection policy
- * @disable_vlp_sta_conn_to_sp_ap: Disable VLP STA connection to SP AP
  * @eht_mode: EHT mode of operation
  * @t2lm_negotiation_support: T2LM negotiation supported enum value
  * @enable_emlsr_mode: 11BE eMLSR mode support
  * @mld_id: MLD ID of requested BSS within ML probe request frame
+ * @enable_sap_emlsr_mode: 11BE eMLSR mode support for sap
  * @oem_eht_mlo_crypto_bitmap: Bitmap of APs allowed by OEMs to connect
  * in EHT/MLO.
  * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
@@ -1541,13 +1553,13 @@ struct wlan_mlme_generic {
 	uint8_t mgmt_hw_tx_retry_count[CFG_FRAME_TYPE_MAX];
 #ifdef CONFIG_BAND_6GHZ
 	bool std_6ghz_conn_policy;
-	bool disable_vlp_sta_conn_to_sp_ap;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	enum wlan_eht_mode eht_mode;
 	bool enable_emlsr_mode;
 	enum t2lm_negotiation_support t2lm_negotiation_support;
 	uint8_t mld_id;
+	bool enable_sap_emlsr_mode;
 #endif
 #ifdef WLAN_FEATURE_11BE
 	uint32_t oem_eht_mlo_crypto_bitmap;
@@ -1621,6 +1633,12 @@ struct acs_weight_range {
  * by ACS
  * @acs_prefer_6ghz_psc: Select 6 GHz PSC channel as priority
  * @np_chan_weightage: Weightage to be given to non preferred channels.
+ * @lin_bss_score_en: Linear BSS score enable
+ * @lin_rssi_score_en: Linear RSSI score enable
+ * @load_score_en: Wi-Fi + Non Wi-Fi loading score enable
+ * @same_weight_chan_rand_en: Enable randomization of same weight channels
+ * @termi_on_1st_clean_chan_en: Early terminate ACS scan on 1st clean channel
+ * @rssi_score_thrs: RSSI score threshold defined
  */
 struct wlan_mlme_acs {
 	bool is_acs_with_more_param;
@@ -1635,6 +1653,12 @@ struct wlan_mlme_acs {
 	bool force_sap_start;
 	bool acs_prefer_6ghz_psc;
 	uint32_t np_chan_weightage;
+	bool lin_bss_score_en;
+	bool lin_rssi_score_en;
+	bool load_score_en;
+	bool same_weight_chan_rand_en;
+	bool termi_on_1st_clean_chan_en;
+	int16_t rssi_score_thrs;
 };
 
 /**
@@ -2862,6 +2886,7 @@ struct wlan_mlme_iot {
  * @eml_cap: EML capability subfield present in ML IE common info
  * @dynamic_nss_chains_support : intersection of host and fw capability of
  *				 dynamic NSS chain support
+ * @reduce_pwr_scan_mode : reduce power scan mode enable/disable
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
@@ -2913,6 +2938,7 @@ struct wlan_mlme_cfg {
 	bool connection_roaming_ini_flag;
 	struct wlan_mlme_eml_cap eml_cap;
 	bool dynamic_nss_chains_support;
+	bool reduce_pwr_scan_mode;
 };
 
 /**

@@ -24,7 +24,7 @@
 #ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 #include "wlan_fpm_table.h"
 #endif
-
+#include <cdp_txrx_ctrl.h>
 
 void wlan_dp_update_peer_map_unmap_version(uint8_t *version)
 {
@@ -57,11 +57,23 @@ void wlan_dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support)
 }
 
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
-bool wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+bool wlan_dp_is_local_pkt_capture_active(struct wlan_objmgr_psoc *psoc)
 {
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	union cdp_config_param_t param;
+	QDF_STATUS status;
 
-	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+	status = cdp_txrx_get_psoc_param(soc, CDP_MONITOR_FLAG, &param);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch monitor flags.");
+		return false;
+	}
+
+	if (cdp_cfg_get(soc, cfg_dp_local_pkt_capture) &&
+	    !(QDF_MONITOR_FLAG_OTHER_BSS & param.cdp_monitor_flag))
+		return true;
+
+	return false;
 }
 #endif
 
@@ -153,3 +165,34 @@ void wlan_dp_send_ipa_wds_peer_disconnect(struct cdp_ctrl_objmgr_psoc *cpsoc,
 						       false);
 }
 #endif /* IPA_WDS_EASYMESH_FEATURE */
+
+#ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
+void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
+					  uint32_t old_mac_id,
+					  uint32_t new_mac_id)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx || !dp_ctx->rsrc_mgr_ctx)
+		return;
+
+	wlan_dp_resource_mgr_notify_vdev_mac_id_migration(dp_ctx->rsrc_mgr_ctx,
+							  vdev, old_mac_id,
+							  new_mac_id);
+}
+
+void
+wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
+				struct nan_datapath_channel_info *ch_info,
+				uint32_t num_channels)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx || !dp_ctx->rsrc_mgr_ctx)
+		return;
+
+	wlan_dp_resource_mgr_notify_ndp_channel_info(dp_ctx->rsrc_mgr_ctx,
+						     peer, ch_info,
+						     num_channels);
+}
+#endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */

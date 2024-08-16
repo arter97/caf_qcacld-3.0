@@ -553,6 +553,16 @@ QDF_STATUS wlan_mlme_get_sub_20_chan_width(struct wlan_objmgr_psoc *psoc,
 					   uint8_t *sub_20_chan_width);
 
 /**
+ * wlan_mlme_set_sub_20_chan_width() - Set the sub 20 chan width config
+ * @psoc: pointer to psoc object
+ * @sub_20_chan_width: sub 20 chan width to be set
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_sub_20_chan_width(struct wlan_objmgr_psoc *psoc,
+					   uint8_t sub_20_chan_width);
+
+/**
  * wlan_mlme_get_fw_timeout_crash() - Get the fw timeout crash config
  * @psoc: pointer to psoc object
  * @fw_timeout_crash: Pointer to the variable from caller
@@ -602,6 +612,78 @@ QDF_STATUS wlan_mlme_get_auto_channel_weight(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS wlan_mlme_get_vendor_acs_support(struct wlan_objmgr_psoc *psoc,
 					    bool *value);
+
+/**
+ * wlan_mlme_get_acs_linear_bss_status() - Get acs linear bss status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS wlan_mlme_get_acs_linear_bss_status(struct wlan_objmgr_psoc *psoc,
+					       bool *value);
+
+/**
+ * wlan_mlme_get_acs_linear_rssi_status() - Get acs linear rssi status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS wlan_mlme_get_acs_linear_rssi_status(struct wlan_objmgr_psoc *psoc,
+						bool *value);
+
+/**
+ * wlan_mlme_get_acs_wifi_non_wifi_load_status() - Get acs wifi, non-wifi
+ *						   load status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS
+wlan_mlme_get_acs_wifi_non_wifi_load_status(struct wlan_objmgr_psoc *psoc,
+					    bool *value);
+
+/**
+ * wlan_mlme_get_acs_same_chan_weight_rand_status() - Get acs same weight
+ *						channel randomization status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS
+wlan_mlme_get_acs_same_chan_weight_rand_status(struct wlan_objmgr_psoc *psoc,
+					       bool *value);
+
+/**
+ * wlan_mlme_get_acs_early_terminate_status() - Get early terminate acs status
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS
+wlan_mlme_get_acs_early_terminate_status(struct wlan_objmgr_psoc *psoc,
+					 bool *value);
+
+/**
+ * wlan_mlme_get_acs_rssi_threshold_score() - Get acs rssi threshold
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+
+QDF_STATUS
+wlan_mlme_get_acs_rssi_threshold_score(struct wlan_objmgr_psoc *psoc,
+				       int16_t *value);
 
 /**
  * wlan_mlme_get_acs_support_for_dfs_ltecoex() - Get the flag for
@@ -2831,19 +2913,6 @@ wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 #ifdef CONFIG_BAND_6GHZ
 /**
- * wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled() - Get the disable vlp
- *                                                       STA conn to SP AP flag
- * @psoc: psoc context
- * @value: Enable/Disable value ptr.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
-						struct wlan_objmgr_psoc *psoc,
-						bool *value);
-
-/**
  * wlan_mlme_is_standard_6ghz_conn_policy_enabled() - Get the 6 GHz standard
  *                                                    connection policy flag
  * @psoc: psoc context
@@ -2867,15 +2936,6 @@ QDF_STATUS
 wlan_mlme_is_relaxed_lpi_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					     bool *value);
 #else
-static inline QDF_STATUS
-wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
-						struct wlan_objmgr_psoc *psoc,
-						bool *value)
-{
-	*value = false;
-	return QDF_STATUS_SUCCESS;
-}
-
 static inline QDF_STATUS
 wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool *value)
@@ -2924,6 +2984,17 @@ wlan_mlme_set_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode value);
  */
 QDF_STATUS
 wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
+
+/**
+ * wlan_mlme_get_sap_emlsr_mode_enabled() - Get the sap eMLSR mode flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_sap_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc,
+				     bool *value);
 
 /**
  * wlan_mlme_set_emlsr_mode_enabled() - Set the eMLSR mode flag
@@ -3039,6 +3110,13 @@ wlan_mlme_set_eht_mode(struct wlan_objmgr_psoc *psoc, enum wlan_eht_mode value)
 
 static inline QDF_STATUS
 wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	*value = false;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_mlme_get_sap_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 {
 	*value = false;
 	return QDF_STATUS_SUCCESS;
@@ -5063,25 +5141,79 @@ wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_mlme_is_hs_20_btm_offload_disabled(struct wlan_objmgr_psoc *psoc,
 					bool *val);
-/**
- * wlan_mlme_set_disconnect_receive() - set disconnect receive on vdev
- * @vdev: vdev obj
- * @set_disconnect_receive: set disconnect receive
- *
- * Return: QDF Status
- */
-QDF_STATUS wlan_mlme_set_disconnect_receive(struct wlan_objmgr_vdev *vdev,
-					    bool set_disconnect_receive);
-
-/**
- * wlan_mlme_get_is_disconnect_receive() - Get disconnect received or not
- * on vdev
- * @vdev: VDEV object
- *
- * API to get the disconnect received on vdev
- *
- * Return: true/false
- */
 
 bool wlan_mlme_get_is_disconnect_receive(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_get_reduce_pwr_scan_mode() - Get reduce power scan mode
+ * enabled or disabled
+ * @psoc: pointer to psoc object
+ * @scan_mode: pointer to hold value of scan mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_reduce_pwr_scan_mode(struct wlan_objmgr_psoc *psoc,
+				   bool *scan_mode);
+
+/**
+ * wlan_mlme_set_sap_suspend_resume() - set SAP suspend resume
+ * @psoc: pointer to psoc object
+ * @params : pointer to struct vdev_suspend_param
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS
+wlan_mlme_set_sap_suspend_resume(struct wlan_objmgr_psoc *psoc,
+				 struct vdev_suspend_param *params);
+
+/**
+ * wlan_mlme_is_sap_suspend_supported() - check SAP suspend support
+ * @vdev: vdev object
+ *
+ * Return: bool support present or not supported
+ */
+bool
+wlan_mlme_is_sap_suspend_supported(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_set_keepalive_period() - Save keep alive period
+ * @vdev: VDEV object
+ * @keep_alive_period: Keep alive period
+ *
+ * Return: None
+ */
+void wlan_mlme_set_keepalive_period(struct wlan_objmgr_vdev *vdev,
+				    uint16_t keep_alive_period);
+
+/**
+ * wlan_mlme_get_keepalive_period() - Get keep alive period
+ * @vdev: VDEV object
+ *
+ * Return: Keep alive period.
+ */
+uint16_t wlan_mlme_get_keepalive_period(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_reset_sta_keepalive_period() - Reset keep alive period to default
+ * cfg whether it is set by userspace or via assoc rsp
+ * @psoc: pointer to psoc object
+ * @vdev: VDEV object
+ *
+ * Return: None
+ */
+void wlan_mlme_reset_sta_keepalive_period(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_get_sta_keep_alive_period() - get keep alive period
+ * @psoc: pointer to psoc object
+ * @keep_alive_period: keep alive period
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_sta_keep_alive_period(struct wlan_objmgr_psoc *psoc,
+				    uint32_t *keep_alive_period);
+
 #endif /* _WLAN_MLME_API_H_ */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -64,6 +64,16 @@ QDF_STATUS wlan_p2p_cleanup_roc_by_vdev(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_p2p_status_connect(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * wlan_p2p_is_action_frame_of_p2p_type() - Given action frame is p2p type or
+ * not
+ * @data_buf: data buffer address
+ * @length: buffer length
+ *
+ * Return: bool
+ */
+bool wlan_p2p_is_action_frame_of_p2p_type(uint8_t *data_buf, uint32_t length);
+
+/**
  * wlan_p2p_abort_scan() - Abort on going scan on p2p interfaces
  * @pdev: pdev object
  *
@@ -98,4 +108,16 @@ wlan_p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * wlan_p2p_parse_assoc_ie_for_device_info() - wrapper API for
+ * "p2p_parse_assoc_ie_for_device_info"
+ *
+ * @assoc_ie: Association request IE
+ * @assoc_ie_len: Association IE length
+ *
+ * Return: pointer to P2P address
+ */
+const uint8_t *wlan_p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
+						       uint32_t assoc_ie_len);
 #endif

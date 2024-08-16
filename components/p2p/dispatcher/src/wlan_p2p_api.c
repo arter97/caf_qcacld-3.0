@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,6 +28,7 @@
 #include "../../core/src/wlan_p2p_roc.h"
 #include <cds_utils.h>
 #include "wlan_scan_api.h"
+#include "../../core/src/wlan_p2p_off_chan_tx.h"
 
 bool wlan_p2p_check_oui_and_force_1x1(uint8_t *assoc_ie, uint32_t assoc_ie_len)
 {
@@ -74,6 +75,13 @@ QDF_STATUS wlan_p2p_status_connect(struct wlan_objmgr_vdev *vdev)
 	}
 
 	return p2p_status_connect(vdev);
+}
+
+bool
+wlan_p2p_is_action_frame_of_p2p_type(uint8_t *data_buf,
+				     uint32_t length)
+{
+	return p2p_is_action_frame_of_p2p_type(data_buf, length);
 }
 
 #ifdef WLAN_FEATURE_P2P_P2P_STA
@@ -136,4 +144,13 @@ QDF_STATUS wlan_p2p_abort_scan(struct wlan_objmgr_pdev *pdev)
 						 WLAN_VDEV_OP,
 						 wlan_p2p_abort_vdev_scan,
 						 NULL, 0, WLAN_P2P_ID);
+}
+
+const uint8_t *wlan_p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
+						       uint32_t assoc_ie_len)
+{
+	if (!assoc_ie || !assoc_ie_len)
+		return NULL;
+
+	return wlan_p2p_parse_assoc_ie_for_device_info(assoc_ie, assoc_ie_len);
 }

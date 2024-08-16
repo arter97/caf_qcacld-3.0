@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2014, 2016, 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -56,6 +56,24 @@ lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 			  uint16_t ie_len, uint8_t *qos_cap, uint8_t *uapsd,
 			  int8_t *local_constraint, struct pe_session *session,
 			  bool *is_pwr_constraint);
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * lim_extract_eht_op() - Extract EHT operation IE into session
+ * @session: Pointer to pe_session
+ * @beacon_struct: Pointer to extracted beacon/probe response of the
+ * AP
+ *
+ * Return: None
+ */
+void lim_extract_eht_op(struct pe_session *session,
+			tSirProbeRespBeacon *beacon_struct);
+#else
+static inline void
+lim_extract_eht_op(struct pe_session *session,
+		   tSirProbeRespBeacon *beacon_struct)
+{}
+#endif
 
 ePhyChanBondState lim_get_htcb_state(ePhyChanBondState aniCBMode);
 

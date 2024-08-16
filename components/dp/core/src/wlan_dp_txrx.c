@@ -43,6 +43,12 @@
 #include "wlan_tdls_api.h"
 #include <qdf_trace.h>
 #include <qdf_net_stats.h>
+#include <wlan_dp_stc.h>
+#if (defined(CONFIG_LITHIUM) || \
+		defined(CONFIG_BERYLLIUM) || \
+		defined(CONFIG_RHINE))
+#include <hif_napi.h>
+#endif
 
 uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *link_ctx)
 {
@@ -118,12 +124,15 @@ void dp_event_eapol_log(qdf_nbuf_t nbuf, enum qdf_proto_dir dir)
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
 static int dp_intf_is_tx_allowed(qdf_nbuf_t nbuf,
-				 uint8_t intf_id, void *soc,
-				 uint8_t *peer_mac)
+				 uint8_t link_id, void *soc,
+				 uint8_t *peer_mac,
+				 struct cdp_peer_output_param *peer_info)
 {
 	enum ol_txrx_peer_state peer_state;
 
-	peer_state = cdp_peer_state_get(soc, intf_id, peer_mac, false);
+	cdp_peer_get_info_by_peer_addr(soc, peer_mac, link_id,
+				       peer_info);
+	peer_state = peer_info->state;
 	if (qdf_likely(OL_TXRX_PEER_STATE_AUTH == peer_state))
 		return true;
 	if (OL_TXRX_PEER_STATE_CONN == peer_state &&
@@ -584,6 +593,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 	uint8_t pkt_type;
 	struct qdf_mac_addr mac_addr_tx_allowed = QDF_MAC_ADDR_ZERO_INIT;
 	int cpu = qdf_get_smp_processor_id();
+	struct cdp_peer_output_param peer_info = {0};
 
 	stats = &dp_intf->dp_stats.tx_rx_stats;
 	++stats->per_cpu[cpu].tx_called;
@@ -684,12 +694,16 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 			     QDF_TX));
 
 	if (!dp_intf_is_tx_allowed(nbuf, dp_link->link_id, soc,
-				   mac_addr_tx_allowed.bytes)) {
+				   mac_addr_tx_allowed.bytes,
+				   &peer_info)) {
 		dp_info("Tx not allowed for sta:" QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(mac_addr_tx_allowed.bytes));
 		goto drop_pkt_and_release_nbuf;
 	}
 
+	if (pkt_type == QDF_NBUF_CB_PACKET_TYPE_ICMP)
+		wlan_dp_stc_mark_ping_ts(dp_ctx,
+					 peer_info.peer_id);
 	/* check whether need to linearize nbuf, like non-linear udp data */
 	if (dp_nbuf_nontso_linearize(nbuf) != QDF_STATUS_SUCCESS) {
 		dp_err_rl(" nbuf %pK linearize failed. drop the pkt", nbuf);
@@ -932,22 +946,39 @@ void dp_rx_monitor_callback(ol_osif_vdev_handle context,
 /**
  * dp_is_rx_wake_lock_needed() - check if wake lock is needed
  * @nbuf: pointer to sk_buff
+ * @is_arp_req: ARP request packet
  *
  * RX wake lock is needed for:
- * 1) Unicast data packet OR
- * 2) Local ARP data packet
+ * 1) Local ARP data packet
+ * 2) Unicast data packet
  *
  * Return: true if wake lock is needed or false otherwise.
  */
-static bool dp_is_rx_wake_lock_needed(qdf_nbuf_t nbuf)
+static bool dp_is_rx_wake_lock_needed(qdf_nbuf_t nbuf, bool is_arp_req)
 {
-	if ((!qdf_nbuf_pkt_type_is_mcast(nbuf) &&
-	     !qdf_nbuf_pkt_type_is_bcast(nbuf)) ||
-	    qdf_nbuf_is_arp_local(nbuf))
+	/* Take wake lock for local ARP request packet */
+	if (qdf_unlikely(is_arp_req)) {
+		if (qdf_nbuf_is_arp_local(nbuf))
+			return true;
+	} else if (qdf_likely(!qdf_nbuf_pkt_type_is_mcast(nbuf) &&
+			      !qdf_nbuf_pkt_type_is_bcast(nbuf))) {
 		return true;
+	}
 
 	return false;
 }
+
+#if defined(WLAN_SUPPORT_RX_FISA)
+static inline bool wlan_dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
+{
+	return dp_rx_is_ring_latency_sensitive_reo(ring_id);
+}
+#else
+static inline bool wlan_dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
+{
+	return false;
+}
+#endif
 
 #ifdef RECEIVE_OFFLOAD
 /**
@@ -1007,6 +1038,7 @@ static QDF_STATUS dp_gro_rx_bh_disable(struct wlan_dp_intf *dp_intf,
 	rx_aggregation = qdf_atomic_read(&dp_ctx->dp_agg_param.rx_aggregation);
 	gro_disallowed = qdf_atomic_read(&dp_intf->gro_disallowed);
 
+	wlan_dp_stc_check_n_track_rx_flow_features(dp_ctx, nbuf);
 	if (dp_get_current_throughput_level(dp_ctx) == PLD_BUS_WIDTH_IDLE ||
 	    !rx_aggregation || gro_disallowed) {
 		status = dp_ctx->dp_ops.dp_rx_napi_gro_flush(napi_to_use, nbuf,
@@ -1051,6 +1083,7 @@ static QDF_STATUS dp_gro_rx_bh_disable(struct wlan_dp_intf *dp_intf,
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	uint8_t low_tput_force_flush = 0;
 
+	wlan_dp_stc_check_n_track_rx_flow_features(dp_ctx, nbuf);
 	if (dp_get_current_throughput_level(dp_ctx) == PLD_BUS_WIDTH_IDLE) {
 		status = dp_ctx->dp_ops.dp_rx_napi_gro_flush(napi_to_use, nbuf,
 							&low_tput_force_flush);
@@ -1143,28 +1176,49 @@ int dp_is_lro_enabled(struct wlan_dp_psoc_context *dp_ctx)
 }
 #endif /* FEATURE_LRO */
 
+#if (defined(CONFIG_LITHIUM) || \
+		defined(CONFIG_BERYLLIUM) || \
+		defined(CONFIG_RHINE))
+static inline qdf_napi_struct *dp_gro_rx_get_napi_from_id(uint8_t ring_id)
+{
+	struct hif_opaque_softc *hif = cds_get_context(QDF_MODULE_ID_HIF);
+	int grp_id;
+
+	grp_id = wlan_cfg_get_intr_idx_from_rx_ring_id(ring_id);
+	if (qdf_unlikely(grp_id == -EINVAL))
+		return NULL;
+
+	return hif_get_dp_rx_napi(hif, grp_id);
+}
+#else
+static inline qdf_napi_struct *dp_gro_rx_get_napi_from_id(uint8_t ring_id)
+{
+	return NULL;
+}
+#endif
+
 /**
- * dp_gro_rx_thread() - Handle Rx processing via GRO for DP thread
+ * dp_gro_rx() - Handle Rx processing via GRO
  * @dp_intf: pointer to DP interface
  * @nbuf: pointer to n/w buff
  *
  * Return: QDF_STATUS_SUCCESS if processed via GRO or non zero return code
  */
-static
-QDF_STATUS dp_gro_rx_thread(struct wlan_dp_intf *dp_intf,
-			    qdf_nbuf_t nbuf)
+static QDF_STATUS dp_gro_rx(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 {
 	qdf_napi_struct *napi_to_use = NULL;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	uint8_t ring_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
-	if (!dp_intf->dp_ctx->enable_dp_rx_threads) {
-		dp_err_rl("gro not supported without DP RX thread!");
-		return status;
+	if (dp_intf->dp_ctx->enable_dp_rx_threads &&
+	    !dp_intf->runtime_disable_rx_thread &&
+	    !wlan_dp_rx_is_ring_latency_sensitive_reo(ring_id)) {
+		napi_to_use =
+			(qdf_napi_struct *)dp_rx_get_napi_context(soc, ring_id);
+	} else {
+		napi_to_use = dp_gro_rx_get_napi_from_id(ring_id);
 	}
-
-	napi_to_use =
-		(qdf_napi_struct *)dp_rx_get_napi_context(cds_get_context(QDF_MODULE_ID_SOC),
-				       QDF_NBUF_CB_RX_CTX_ID(nbuf));
 
 	if (!napi_to_use) {
 		dp_err_rl("no napi to use for GRO!");
@@ -1234,7 +1288,7 @@ static void dp_register_rx_ol_cb(struct wlan_dp_psoc_context *dp_ctx,
 		qdf_atomic_set(&dp_ctx->dp_agg_param.rx_aggregation, 1);
 		if (wifi3_0_target) {
 		/* no flush registration needed, it happens in DP thread */
-			dp_ctx->receive_offload_cb = dp_gro_rx_thread;
+			dp_ctx->receive_offload_cb = dp_gro_rx;
 		} else {
 			/*ihelium based targets */
 			if (dp_ctx->enable_rxthread)
@@ -1331,6 +1385,11 @@ void dp_disable_rx_ol_for_low_tput(struct wlan_dp_psoc_context *dp_ctx,
 				   bool disable)
 {
 }
+
+static inline qdf_napi_struct *dp_gro_rx_get_napi_from_id(uint8_t ring_id)
+{
+	return NULL;
+}
 #endif /* RECEIVE_OFFLOAD */
 
 #ifdef WLAN_FEATURE_TSF_PLUS_SOCK_TS
@@ -1347,6 +1406,35 @@ static inline void dp_tsf_timestamp_rx(struct wlan_dp_psoc_context *dp_ctx,
 }
 #endif
 
+static inline QDF_STATUS dp_rx_gro_flush(struct wlan_dp_intf *dp_intf,
+					 uint8_t rx_ctx_id)
+{
+	qdf_napi_struct *napi;
+
+	napi = dp_gro_rx_get_napi_from_id(rx_ctx_id);
+	if (qdf_unlikely(!napi))
+		return QDF_STATUS_E_FAILURE;
+	local_bh_disable();
+	napi_gro_flush(napi, false);
+	local_bh_enable();
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+dp_rx_gro_flush_cbk(void *link_ctx, int rx_ctx_id)
+{
+	struct wlan_dp_link *dp_link = link_ctx;
+
+	if (qdf_unlikely((!dp_link) || (!dp_link->dp_intf) ||
+			 (!dp_link->dp_intf->dp_ctx))) {
+		dp_err("Null params being passed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return dp_rx_gro_flush(dp_link->dp_intf, rx_ctx_id);
+}
+
 QDF_STATUS
 dp_rx_thread_gro_flush_ind_cbk(void *link_ctx, int rx_ctx_id)
 {
@@ -1361,8 +1449,9 @@ dp_rx_thread_gro_flush_ind_cbk(void *link_ctx, int rx_ctx_id)
 	}
 
 	dp_intf = dp_link->dp_intf;
-	if (dp_intf->runtime_disable_rx_thread)
-		return QDF_STATUS_SUCCESS;
+	if (dp_intf->runtime_disable_rx_thread ||
+	    wlan_dp_rx_is_ring_latency_sensitive_reo(rx_ctx_id))
+		return dp_rx_gro_flush(dp_intf, rx_ctx_id);
 
 	if (dp_is_low_tput_gro_enable(dp_intf->dp_ctx)) {
 		dp_intf->dp_stats.tx_rx_stats.rx_gro_flush_skip++;
@@ -1379,6 +1468,7 @@ QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 	uint8_t link_id;
+	uint8_t ring_id;
 	qdf_nbuf_t head_ptr;
 
 	if (qdf_unlikely(!link_ctx || !nbuf_list)) {
@@ -1390,9 +1480,11 @@ QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 	if (!is_dp_link_valid(dp_link))
 		return QDF_STATUS_E_FAILURE;
 
+	ring_id = QDF_NBUF_CB_RX_CTX_ID(nbuf_list);
 	dp_intf = dp_link->dp_intf;
-	if (dp_intf->runtime_disable_rx_thread &&
-	    dp_intf->txrx_ops.rx.rx_stack)
+	if ((dp_intf->runtime_disable_rx_thread ||
+	     wlan_dp_rx_is_ring_latency_sensitive_reo(ring_id)) &&
+	     dp_intf->txrx_ops.rx.rx_stack)
 		return dp_intf->txrx_ops.rx.rx_stack(dp_link, nbuf_list);
 
 	link_id = dp_link->link_id;
@@ -1407,6 +1499,17 @@ QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 	return dp_rx_enqueue_pkt(cds_get_context(QDF_MODULE_ID_SOC), nbuf_list);
 }
 
+static inline QDF_STATUS wlan_dp_nbuf_push_pkt(struct wlan_dp_intf *dp_intf,
+					       qdf_nbuf_t nbuf,
+					       enum dp_nbuf_push_type type)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
+
+	wlan_dp_stc_check_n_track_rx_flow_features(dp_ctx, nbuf);
+
+	return dp_ctx->dp_ops.dp_nbuf_push_pkt(nbuf, type);
+}
+
 #ifdef CONFIG_HL_SUPPORT
 QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 				       qdf_nbuf_t nbuf)
@@ -1416,7 +1519,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 	dp_intf->dp_stats.tx_rx_stats.rx_non_aggregated++;
 	dp_ctx->no_rx_offload_pkt_cnt++;
 
-	return dp_ctx->dp_ops.dp_nbuf_push_pkt(nbuf, DP_NBUF_PUSH_NI);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, DP_NBUF_PUSH_NI);
 }
 #else
 
@@ -1453,7 +1556,6 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 				       qdf_nbuf_t nbuf)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
-	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
 	int status = QDF_STATUS_E_FAILURE;
 	bool nbuf_receive_offload_ok = false;
 	enum dp_nbuf_push_type push_type;
@@ -1481,8 +1583,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 
 	if (nbuf_receive_offload_ok && dp_ctx->receive_offload_cb &&
 	    !dp_ctx->dp_agg_param.gro_force_flush[rx_ctx_id] &&
-	    !dp_intf->gro_flushed[rx_ctx_id] &&
-	    !dp_intf->runtime_disable_rx_thread) {
+	    !dp_intf->gro_flushed[rx_ctx_id]) {
 		status = dp_ctx->receive_offload_cb(dp_intf, nbuf);
 
 		if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -1513,7 +1614,9 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 
 	if (qdf_likely((dp_ctx->enable_dp_rx_threads ||
 			dp_ctx->enable_rxthread) &&
-		       !dp_intf->runtime_disable_rx_thread)) {
+		       (!in_softirq() ||
+			(!wlan_dp_rx_is_ring_latency_sensitive_reo(rx_ctx_id) &&
+			 !dp_intf->runtime_disable_rx_thread)))) {
 		push_type = DP_NBUF_PUSH_BH_DISABLE;
 	} else if (qdf_unlikely(QDF_NBUF_CB_RX_PEER_CACHED_FRM(nbuf))) {
 		/*
@@ -1528,7 +1631,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		push_type = DP_NBUF_PUSH_NAPI;
 	}
 
-	return dp_ops->dp_nbuf_push_pkt(nbuf, push_type);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, push_type);
 }
 
 #else /* WLAN_FEATURE_DYNAMIC_RX_AGGREGATION */
@@ -1537,10 +1640,10 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 				       qdf_nbuf_t nbuf)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
-	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
 	int status = QDF_STATUS_E_FAILURE;
 	bool nbuf_receive_offload_ok = false;
 	enum dp_nbuf_push_type push_type;
+	uint8_t rx_ctx_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
 
 	if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf) &&
 	    !QDF_NBUF_CB_RX_PEER_CACHED_FRM(nbuf))
@@ -1568,7 +1671,9 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 
 	if (qdf_likely((dp_ctx->enable_dp_rx_threads ||
 			dp_ctx->enable_rxthread) &&
-		       !dp_intf->runtime_disable_rx_thread)) {
+		       (!in_softirq() ||
+			(!wlan_dp_rx_is_ring_latency_sensitive_reo(rx_ctx_id) &&
+			 !dp_intf->runtime_disable_rx_thread)))) {
 		push_type = DP_NBUF_PUSH_BH_DISABLE;
 	} else if (qdf_unlikely(QDF_NBUF_CB_RX_PEER_CACHED_FRM(nbuf))) {
 		/*
@@ -1583,7 +1688,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		push_type = DP_NBUF_PUSH_NAPI;
 	}
 
-	return dp_ops->dp_nbuf_push_pkt(nbuf, push_type);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, push_type);
 }
 #endif /* WLAN_FEATURE_DYNAMIC_RX_AGGREGATION */
 #endif
@@ -1659,9 +1764,10 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 	struct qdf_mac_addr *mac_addr, *dest_mac_addr;
 	bool wake_lock = false;
 	bool track_arp = false;
+	bool is_arp_req;
 	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
 	bool is_eapol, send_over_nl;
-	bool is_dhcp;
+	bool is_dhcp, is_ip_mcast;
 	struct dp_tx_rx_stats *stats;
 	QDF_STATUS status;
 	uint8_t pkt_type;
@@ -1685,8 +1791,10 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 		nbuf = next;
 		next = qdf_nbuf_next(nbuf);
 		qdf_nbuf_set_next(nbuf, NULL);
+		is_arp_req = false;
 		is_eapol = false;
 		is_dhcp = false;
+		is_ip_mcast = false;
 		send_over_nl = false;
 
 		if (qdf_nbuf_is_ipv4_arp_pkt(nbuf)) {
@@ -1697,6 +1805,8 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 					rx_arp_rsp_count;
 				dp_debug("ARP packet received");
 				track_arp = true;
+			} else if (qdf_nbuf_data_is_arp_req(nbuf)) {
+				is_arp_req = true;
 			}
 		} else if (qdf_nbuf_is_ipv4_eapol_pkt(nbuf)) {
 			subtype = qdf_nbuf_get_eapol_subtype(nbuf);
@@ -1724,8 +1834,14 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 						dhcp_ack_count;
 				is_dhcp = true;
 			}
+		} else if (qdf_nbuf_data_is_ipv4_mcast_pkt(nbuf->data) ||
+			   qdf_nbuf_data_is_ipv6_mcast_pkt(nbuf->data)) {
+			is_ip_mcast = true;
 		}
 
+		if (qdf_nbuf_is_icmp_pkt(nbuf))
+			wlan_dp_stc_mark_ping_ts(dp_ctx,
+						 QDF_NBUF_CB_RX_PEER_ID(nbuf));
 		wlan_dp_pkt_add_timestamp(dp_intf, QDF_PKT_RX_DRIVER_EXIT,
 					  nbuf);
 
@@ -1775,7 +1891,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 		}
 
 		if (dp_rx_pkt_tracepoints_enabled())
-			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0);
+			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0, 0);
 
 		qdf_nbuf_set_dev(nbuf, dp_intf->dev);
 		qdf_nbuf_set_protocol_eth_tye_trans(nbuf);
@@ -1801,8 +1917,8 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 		/* hold configurable wakelock for unicast traffic */
 		if (!dp_is_current_high_throughput(dp_ctx) &&
 		    dp_ctx->dp_cfg.rx_wakelock_timeout &&
-		    dp_link->conn_info.is_authenticated)
-			wake_lock = dp_is_rx_wake_lock_needed(nbuf);
+		    dp_link->conn_info.is_authenticated && !is_ip_mcast)
+			wake_lock = dp_is_rx_wake_lock_needed(nbuf, is_arp_req);
 
 		if (wake_lock) {
 			cds_host_diag_log_work(&dp_ctx->rx_wake_lock,

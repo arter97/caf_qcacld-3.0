@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -161,4 +161,40 @@ bool cfg_nan_is_eht_cap_enable(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return nan_obj->cfg_param.enable_nan_eht_cap;
+}
+
+bool cfg_nan_get_support_sta_sap_ndp(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = cfg_nan_get_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return cfg_default(CFG_SAP_STA_NDP_CONCURRENCY);
+	}
+
+	return nan_obj->cfg_param.support_sta_sap_ndp;
+}
+
+bool cfg_nan_get_support_sta_p2p_ndp(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = cfg_nan_get_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return cfg_default(CFG_STA_P2P_NDP_CONCURRENCY);
+	}
+
+	return nan_obj->cfg_param.support_sta_p2p_ndp;
+}
+
+bool cfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = cfg_nan_get_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return cfg_default(CFG_STA_SAP_P2P_CONCURRENCY);
+	}
+
+	return nan_obj->cfg_param.prefer_nan_chan_for_p2p;
 }

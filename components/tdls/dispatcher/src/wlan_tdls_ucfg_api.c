@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1062,20 +1062,6 @@ QDF_STATUS ucfg_tdls_set_operating_mode(
 	tdls_debug("Exit ");
 
 	return QDF_STATUS_SUCCESS;
-}
-
-void ucfg_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
-				 struct qdf_mac_addr *mac_addr,
-				 struct qdf_mac_addr *dest_mac_addr)
-{
-	tdls_update_rx_pkt_cnt(vdev, mac_addr, dest_mac_addr);
-
-}
-
-void ucfg_tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
-				 struct qdf_mac_addr *mac_addr)
-{
-	tdls_update_tx_pkt_cnt(vdev, mac_addr);
 }
 
 QDF_STATUS ucfg_tdls_antenna_switch(struct wlan_objmgr_vdev *vdev,

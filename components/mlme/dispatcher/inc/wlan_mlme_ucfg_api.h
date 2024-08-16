@@ -576,6 +576,20 @@ QDF_STATUS ucfg_mlme_get_sub_20_chan_width(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_set_sub_20_chan_width() - Set the sub 20 chan width config
+ * @psoc: pointer to psoc object
+ * @sub_20_chan_width: sub 20 chan width to be set
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_set_sub_20_chan_width(struct wlan_objmgr_psoc *psoc,
+					   uint8_t sub_20_chan_width)
+{
+	return wlan_mlme_set_sub_20_chan_width(psoc, sub_20_chan_width);
+}
+
+/**
  * ucfg_mlme_get_fw_timeout_crash() - Get the fw timeout crash config
  * @psoc: pointer to psoc object
  * @fw_timeout_crash: Pointer to the variable from caller
@@ -668,6 +682,109 @@ ucfg_mlme_get_external_acs_policy(struct wlan_objmgr_psoc *psoc,
 				  bool *value)
 {
 	return wlan_mlme_get_external_acs_policy(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_linear_bss_status() - Get linear bss acs status flag
+ *
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_linear_bss_status(struct wlan_objmgr_psoc *psoc,
+				    bool *value)
+{
+	return wlan_mlme_get_acs_linear_bss_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_linear_rssi_status() - Get linear rssi acs status flag
+ *
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_linear_rssi_status(struct wlan_objmgr_psoc *psoc,
+				     bool *value)
+{
+	return wlan_mlme_get_acs_linear_rssi_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_wifi_non_wifi_load_status() - Get Wi-Fi, Non Wi-Fi
+ *						    acs load status flag
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_wifi_non_wifi_load_status(struct wlan_objmgr_psoc *psoc,
+					    bool *value)
+{
+	return wlan_mlme_get_acs_wifi_non_wifi_load_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_same_chan_weight_rand_status() - Get acs same weight
+ *						      channels randomization
+ *						      status flag
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_same_chan_weight_rand_status(struct wlan_objmgr_psoc *psoc,
+					       bool *value)
+{
+	return wlan_mlme_get_acs_same_chan_weight_rand_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_early_terminate_status() - Get acs scan early terminate
+ *						status flag
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_early_terminate_status(struct wlan_objmgr_psoc *psoc,
+					 bool *value)
+{
+	return wlan_mlme_get_acs_early_terminate_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_rssi_threshold_score() - Get acs rssi threshold
+ *
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_rssi_threshold_score(struct wlan_objmgr_psoc *psoc,
+				       int16_t *value)
+{
+	return wlan_mlme_get_acs_rssi_threshold_score(psoc, value);
 }
 
 /**
@@ -3080,24 +3197,6 @@ ucfg_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 }
 
 /**
- * ucfg_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled() - Get disable vlp sta
- *                                                        conn to sp ap flag
- * @psoc: pointer to psoc object
- * @value: pointer to hold the value of flag
- *
- * Inline UCFG API to be used by HDD/OSIF callers
- *
- * Return: QDF Status
- */
-static inline QDF_STATUS
-ucfg_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
-						struct wlan_objmgr_psoc *psoc,
-						bool *value)
-{
-	return wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(psoc, value);
-}
-
-/**
  * ucfg_mlme_is_standard_6ghz_conn_policy_enabled() - Get 6ghz standard
  *                                                    connection policy flag
  * @psoc: pointer to psoc object
@@ -5451,4 +5550,62 @@ ucfg_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 {
 	return wlan_mlme_assemble_rate_code(preamble, nss, rate);
 }
+
+/**
+ * ucfg_mlme_get_reduce_power_scan_mode() - Get reduce power scan mode
+ * enabled or disabled
+ * @psoc: pointer to psoc object
+ * @scan_mode: pointer to hold value of scan mode
+ *
+ * Return: Success if able to get scan mode of failure
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_reduce_power_scan_mode(struct wlan_objmgr_psoc *psoc,
+				     bool *scan_mode)
+{
+	return wlan_mlme_get_reduce_pwr_scan_mode(psoc, scan_mode);
+}
+
+/**
+ * ucfg_mlme_set_sap_suspend_resume() - set vdev suspend resume
+ * @psoc: pointer to psoc object
+ * @param : pointer to struct vdev_suspend_param
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_sap_suspend_resume(struct wlan_objmgr_psoc *psoc,
+				 struct vdev_suspend_param *param)
+{
+	return wlan_mlme_set_sap_suspend_resume(psoc, param);
+}
+
+/**
+ * ucfg_mlme_is_sap_suspend_supported() - check vdev suspend support
+ * @vdev: vdev object
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: bool support enabled or disabled
+ */
+static inline
+bool ucfg_mlme_is_sap_suspend_supported(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_mlme_is_sap_suspend_supported(vdev);
+}
+
+/**
+ * ucfg_mlme_get_keepalive_period() - Get keep alive period
+ * @vdev: VDEV object
+ *
+ * Return: Keep alive period.
+ */
+static inline
+uint16_t ucfg_mlme_get_keepalive_period(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_mlme_get_keepalive_period(vdev);
+}
+
 #endif /* _WLAN_MLME_UCFG_API_H_ */

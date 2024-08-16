@@ -3,6 +3,10 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
+    "anorak": [
+	"qca6490",
+	"kiwi-v2",
+    ],
     "niobe": [
 	"kiwi-v2",
     ],
@@ -19,6 +23,10 @@ _target_chipset_map = {
     ],
     "volcano": [
         "qca6750",
+	"peach-v2",
+    ],
+    "x1e80100": [
+        "kiwi-v2",
     ],
 }
 
@@ -28,6 +36,7 @@ _chipset_hw_map = {
     "peach-v2": "BERYLLIUM",
     "qca6750": "MOSELLE",
     "wcn7750": "BERYLLIUM",
+    "qca6490": "LITHIUM",
 }
 
 _chipset_header_map = {
@@ -51,6 +60,10 @@ _chipset_header_map = {
         "api/hw/wcn7750/v1",
         "cmn/hal/wifi3.0/wcn7750",
     ],
+    "qca6490": [
+        "api/hw/qca6490/v1",
+        "cmn/hal/wifi3.0/qca6490",
+    ],
 }
 
 _hw_header_map = {
@@ -59,7 +72,10 @@ _hw_header_map = {
     ],
     "MOSELLE" : [
         "cmn/hal/wifi3.0/li",
-	],
+    ],
+    "LITHIUM": [
+        "cmn/hal/wifi3.0/li",
+    ],
 }
 
 _fixed_includes = [
@@ -327,6 +343,7 @@ _fixed_ipaths = [
     "os_if/sync/src",
     "os_if/tdls/inc",
     "os_if/twt/inc",
+    "os_if/telemetry/inc",
     "uapi/linux",
 ]
 
@@ -506,6 +523,7 @@ _fixed_srcs = [
     "cmn/wmi/src/wmi_unified_vdev_api.c",
     "cmn/wmi/src/wmi_unified_vdev_tlv.c",
     "components/cmn_services/interface_mgr/src/wlan_if_mgr_roam.c",
+    "components/cmn_services/interface_mgr/src/wlan_if_mgr_nan.c",
     "components/cmn_services/interface_mgr/src/wlan_if_mgr_sap.c",
     "components/cmn_services/interface_mgr/src/wlan_if_mgr_sta.c",
     "components/cmn_services/policy_mgr/src/wlan_policy_mgr_action.c",
@@ -720,6 +738,12 @@ _conditional_srcs = {
             "cmn/hal/wifi3.0/peach/hal_peach.c",
         ],
     },
+    "CONFIG_QCA6490_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qca6490/hal_6490.c",
+            "cmn/hif/src/qca6490def.c",
+        ],
+    },
     "CONFIG_QCA6750_HEADERS_DEF": {
         True: [
             "cmn/hal/wifi3.0/qca6750/hal_6750.c",
@@ -766,6 +790,7 @@ _conditional_srcs = {
         True: [
             "cmn/target_if/dcs/src/target_if_dcs.c",
             "cmn/umac/dcs/core/src/wlan_dcs.c",
+	    "cmn/umac/dcs/dispatcher/src/wlan_dcs_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_init_deinit_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_tgt_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_ucfg_api.c",
@@ -1683,6 +1708,16 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_rx_thread.c",
         ],
     },
+    "CONFIG_WLAN_DP_LOAD_BALANCE_SUPPORT": {
+        True: [
+            "components/dp/core/src/wlan_dp_load_balance.c",
+        ],
+    },
+    "CONFIG_WLAN_DP_FLOW_BALANCE_SUPPORT": {
+        True: [
+            "components/dp/core/src/wlan_dp_flow_balance.c",
+        ],
+    },
     "CONFIG_WLAN_FEATURE_DSRC": {
         True: [
             "components/ocb/core/src/wlan_ocb_main.c",
@@ -1787,6 +1822,13 @@ _conditional_srcs = {
             "components/spatial_reuse/dispatcher/src/spatial_reuse_api.c",
             "components/spatial_reuse/dispatcher/src/spatial_reuse_ucfg_api.c",
             "cmn/target_if/spatial_reuse/src/target_if_spatial_reuse.c",
+        ],
+    },
+    "CONFIG_WLAN_TELEMETRY": {
+        True: [
+            "os_if/telemetry/src/os_if_telemetry.c",
+            "components/dp/core/src/wlan_dp_telemetry.c",
+            "components/dp/dispatcher/src/wlan_dp_telemetry_ucfg_api.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_TWT": {
@@ -2153,6 +2195,11 @@ _conditional_srcs = {
             "os_if/mlme/sap/ll_sap/src/os_if_ll_sap.c",
         ],
     },
+    "CONFIG_WLAN_DP_DYNAMIC_RESOURCE_MGMT": {
+        True: [
+            "components/dp/core/src/wlan_dp_resource_mgr.c",
+        ],
+    },
     "CONFIG_WLAN_SUPPORT_FLOW_PRIORTIZATION": {
         True: [
             "components/dp/core/src/wlan_dp_fpm.c",
@@ -2171,6 +2218,23 @@ _conditional_srcs = {
     "CONFIG_WLAN_SUPPORT_LAPB": {
         True: [
             "components/dp/core/src/wlan_dp_lapb_flow.c",
+        ],
+    },
+    "CONFIG_WLAN_DP_FEATURE_STC": {
+        True: [
+            "components/dp/core/src/wlan_dp_stc.c",
+            "components/dp/dispatcher/src/wlan_dp_stc_ucfg_api.c",
+            "os_if/dp/src/os_if_dp_stc.c",
+	    "components/dp/core/src/wlan_dp_spm.c",
+	    "components/dp/core/src/wlan_dp_fpm.c",
+	    "components/dp/dispatcher/src/wlan_dp_flow_ucfg_api.c",
+	    "core/hdd/src/wlan_hdd_sysfs_dp_stc.c",
+        ],
+    },
+    "CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE": {
+        True: [
+            "cmn/dp/wifi3.0/dp_rx_buffer_pool.c",
+	    "cmn/qdf/linux/src/qdf_page_pool.c",
         ],
     },
 }
@@ -2308,6 +2372,10 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
             "//msm-kernel:all_headers",
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+        ]
+
+    if target != "x1e80100" and target != "anorak":
+        deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ]

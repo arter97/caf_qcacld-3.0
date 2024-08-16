@@ -188,7 +188,10 @@ hdd_reset_sta_keep_alive_interval(struct wlan_hdd_link_info *link_info,
 		return;
 	}
 
-	wlan_hdd_save_sta_keep_alive_interval(link_info->adapter, 0);
+	if (!wlan_vdev_mlme_get_is_mlo_link(hdd_ctx->psoc,
+					    link_info->vdev_id))
+		wlan_hdd_save_sta_keep_alive_interval(link_info->adapter, 0);
+
 	ucfg_mlme_get_sta_keep_alive_period(hdd_ctx->psoc,
 					    &keep_alive_interval);
 	hdd_vdev_send_sta_keep_alive_interval(link_info, hdd_ctx,
@@ -280,7 +283,9 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 
 	ucfg_dp_nud_reset_tracking(vdev);
 	hdd_reset_limit_off_chan(adapter);
-	hdd_reset_sta_keep_alive_interval(link_info, hdd_ctx);
+
+	if (!is_link_switch)
+		hdd_reset_sta_keep_alive_interval(link_info, hdd_ctx);
 
 	hdd_cm_print_bss_info(sta_ctx);
 }
@@ -600,8 +605,12 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	if (des_chan->ch_width != assoc_ch_width)
 		wlan_hdd_re_enable_320mhz_6g_conection(hdd_ctx, assoc_ch_width);
 
-	wlan_mlme_get_channel_bonding_5ghz(hdd_ctx->psoc, &cb_mode);
-	if (cb_mode == 0 && !wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq))
+	if (wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq))
+		ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc, &cb_mode);
+	else
+		ucfg_mlme_get_channel_bonding_5ghz(hdd_ctx->psoc, &cb_mode);
+
+	if (cb_mode == 0)
 		max_bw = cb_mode;
 	else
 		max_bw = get_max_bw();
@@ -672,6 +681,7 @@ static void
 wlan_hdd_runtime_pm_wow_disconnect_handler(struct hdd_context *hdd_ctx)
 {
 	struct hif_opaque_softc *hif_ctx;
+	bool is_any_sta_connected = hdd_is_any_sta_connected(hdd_ctx);
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -684,7 +694,10 @@ wlan_hdd_runtime_pm_wow_disconnect_handler(struct hdd_context *hdd_ctx)
 		return;
 	}
 
-	if (hdd_is_any_sta_connected(hdd_ctx)) {
+	if (!is_any_sta_connected)
+		hif_rtpm_restore_autosuspend_delay();
+
+	if (is_any_sta_connected || hdd_is_any_cli_connected(hdd_ctx)) {
 		hdd_debug("active connections: runtime pm prevented: %d",
 			  hdd_ctx->runtime_pm_prevented);
 		return;

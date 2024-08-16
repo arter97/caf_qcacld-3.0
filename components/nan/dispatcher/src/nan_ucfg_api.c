@@ -67,6 +67,13 @@ static void nan_cfg_init(struct wlan_objmgr_psoc *psoc,
 	nan_obj->cfg_param.disable_6g_nan = cfg_get(psoc, CFG_DISABLE_6G_NAN);
 	nan_obj->cfg_param.enable_nan_eht_cap =
 					cfg_get(psoc, CFG_NAN_ENABLE_EHT_CAP);
+	nan_obj->cfg_param.support_sta_sap_ndp = cfg_get(
+						psoc,
+						CFG_SAP_STA_NDP_CONCURRENCY);
+	nan_obj->cfg_param.support_sta_p2p_ndp =
+				cfg_get(psoc, CFG_STA_P2P_NDP_CONCURRENCY);
+	nan_obj->cfg_param.prefer_nan_chan_for_p2p =
+				cfg_get(psoc, CFG_PREFER_NAN_CHAN_FOR_P2P);
 }
 
 /**
@@ -1288,6 +1295,26 @@ bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 	return psoc_nan_obj->nan_caps.ndi_txbf_supported;
 }
 
+bool ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return false;
+	}
+
+	return psoc_nan_obj->cfg_param.support_sta_sap_ndp &&
+		       psoc_nan_obj->nan_caps.sta_sap_ndp_support;
+}
+
+inline bool
+ucfg_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_nan_is_sta_p2p_ndp_supported(psoc);
+}
+
 static inline bool
 ucfg_is_nan_enabled(struct nan_psoc_priv_obj *psoc_nan_obj)
 {
@@ -1463,7 +1490,7 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 		status = ucfg_nan_pasn_peer_delete_all(psoc);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			nan_err("Unable to delete all NAN Peer : %u", status);
-			return status;
+			goto end;
 		}
 	}
 
@@ -1474,6 +1501,7 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 	else
 		nan_debug("Unable to send NAN Disable request: %u", status);
 
+end:
 	qdf_mem_free(nan_req);
 	return status;
 }
@@ -1770,4 +1798,9 @@ end:
 		osif_request_put(request);
 
 	return status;
+}
+
+bool ucfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc)
+{
+	return cfg_nan_get_prefer_nan_chan_for_p2p(psoc);
 }

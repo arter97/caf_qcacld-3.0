@@ -688,6 +688,7 @@ struct wlan_mlo_ie_info {
  * @is_unexpected_peer_error: true if unexpected peer error
  * on 2.4 GHz
  * @join_probe_cnt: join probe request count
+ * @cal_tpc_post_csa: Recalculate tx power power csa
  */
 struct pe_session {
 	uint8_t available;
@@ -1018,6 +1019,7 @@ struct pe_session {
 	bool is_oui_auth_assoc_6mbps_2ghz_enable;
 	bool is_unexpected_peer_error;
 	uint8_t join_probe_cnt;
+	bool cal_tpc_post_csa;
 };
 
 /*-------------------------------------------------------------------------

@@ -629,8 +629,9 @@ void hdd_abort_ongoing_sta_sae_connection(struct hdd_context *hdd_ctx)
 					     false);
 }
 
-QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
-					       uint32_t *vdev_id)
+QDF_STATUS hdd_get_first_connected_sta_cli_vdev_id(struct hdd_context *hdd_ctx,
+						   uint32_t *vdev_id,
+						   enum QDF_OPMODE device_mode)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ANY_STA_CONNECTED;
@@ -643,8 +644,7 @@ QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (adapter->device_mode == QDF_STA_MODE ||
-		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		if (adapter->device_mode == device_mode) {
 			hdd_adapter_for_each_active_link_info(adapter,
 							      link_info) {
 				if (!hdd_cm_is_vdev_connected(link_info))
@@ -668,7 +668,20 @@ bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx)
 	QDF_STATUS status;
 	uint32_t vdev_id;
 
-	status = hdd_get_first_connected_sta_vdev_id(hdd_ctx, &vdev_id);
+	status = hdd_get_first_connected_sta_cli_vdev_id(hdd_ctx, &vdev_id,
+							 QDF_STA_MODE);
+
+	return QDF_IS_STATUS_ERROR(status) ? false : true;
+}
+
+bool hdd_is_any_cli_connected(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	uint32_t vdev_id;
+
+	status = hdd_get_first_connected_sta_cli_vdev_id(hdd_ctx, &vdev_id,
+							 QDF_P2P_CLIENT_MODE);
+
 	return QDF_IS_STATUS_ERROR(status) ? false : true;
 }
 
@@ -2490,10 +2503,6 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 	struct hdd_station_ctx *sta_ctx = NULL;
 	struct hdd_context *hdd_ctx;
 
-	hdd_debug("CSR Callback: status=%s (%d) result= %s (%d)",
-		  get_e_roam_cmd_status_str(roam_status), roam_status,
-		  get_e_csr_roam_result_str(roam_result), roam_result);
-
 	/* Sanity check */
 	if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
 		hdd_err("Invalid adapter or adapter has invalid magic");
@@ -2503,6 +2512,10 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
+	hdd_debug("vdev %d status %s(%d) result %s(%d)", link_info->vdev_id,
+		  get_e_roam_cmd_status_str(roam_status), roam_status,
+		  get_e_csr_roam_result_str(roam_result), roam_result);
+
 	MTRACE(qdf_trace(QDF_MODULE_ID_HDD, TRACE_CODE_HDD_RX_SME_MSG,
 				 link_info->vdev_id, roam_status));
 
@@ -2510,17 +2523,11 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 	case eCSR_ROAM_MIC_ERROR_IND:
 		hdd_roam_mic_error_indication_handler(link_info, roam_info);
 		break;
-
 	case eCSR_ROAM_SET_KEY_COMPLETE:
-	{
 		qdf_ret_status =
 			hdd_roam_set_key_complete_handler(link_info, roam_info,
 							  roam_status,
 							  roam_result);
-		if (eCSR_ROAM_RESULT_AUTHENTICATED == roam_result)
-			hdd_debug("set key complete, session: %d",
-				  link_info->vdev_id);
-	}
 		break;
 	case eCSR_ROAM_UNPROT_MGMT_FRAME_IND:
 		if (roam_info)
@@ -2538,16 +2545,11 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 					    roam_info->tsm_ie.msmt_interval);
 		break;
 	case eCSR_ROAM_ESE_ADJ_AP_REPORT_IND:
-	{
 		hdd_indicate_ese_adj_ap_rep_ind(adapter, roam_info);
 		break;
-	}
-
 	case eCSR_ROAM_ESE_BCN_REPORT_IND:
-	{
 		hdd_indicate_ese_bcn_report_ind(adapter, roam_info);
 		break;
-	}
 #endif /* FEATURE_WLAN_ESE */
 	case eCSR_ROAM_STA_CHANNEL_SWITCH:
 		hdd_roam_channel_switch_handler(link_info, roam_info);
@@ -2915,6 +2917,7 @@ void hdd_roam_profile_init(struct wlan_hdd_link_info *link_info)
 }
 
 struct osif_cm_ops osif_ops = {
+	.connect_active_notify_cb = hdd_cm_connect_active_notify,
 	.connect_complete_cb = hdd_cm_connect_complete,
 	.disconnect_complete_cb = hdd_cm_disconnect_complete,
 	.netif_queue_control_cb = hdd_cm_netif_queue_control,

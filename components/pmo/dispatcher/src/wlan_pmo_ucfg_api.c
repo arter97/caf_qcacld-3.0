@@ -739,6 +739,9 @@ ucfg_pmo_get_runtime_pm_delay(struct wlan_objmgr_psoc *psoc)
 {
 	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
 
+	if (!pmo_psoc_ctx)
+		return 0;
+
 	return pmo_psoc_ctx->psoc_cfg.runtime_pm_delay;
 }
 #endif /* FEATURE_RUNTIME_PM */
@@ -1137,4 +1140,9 @@ QDF_STATUS ucfg_pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
 					 struct qdf_mac_addr *bridgeaddr)
 {
 	return pmo_get_vdev_bridge_addr(vdev, bridgeaddr);
+}
+
+bool ucfg_pmo_is_fw_debug_enable(struct wlan_objmgr_psoc *psoc)
+{
+	return cfg_get(psoc, CFG_PMO_FW_DEBUG_ENABLE);
 }

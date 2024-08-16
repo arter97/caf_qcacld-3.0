@@ -24,6 +24,7 @@
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
+#include "wlan_tdls_main.h"
 
 #ifdef FEATURE_WLAN_TDLS
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -153,6 +154,17 @@ void wlan_tdls_notify_start_bss_failure(struct wlan_objmgr_psoc *psoc);
 void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc,
 				struct wlan_objmgr_vdev *vdev);
 
+/**
+ * wlan_tdls_find_peer() - find TDLS peer in TDLS vdev object
+ * @vdev_obj: TDLS vdev object
+ * @macaddr: MAC address of peer
+ *
+ * Return: If peer is found, then it returns pointer to tdls_peer;
+ *         otherwise, it returns NULL.
+ */
+struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
+				      const uint8_t *macaddr);
+
 #ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
 /**
  * wlan_tdls_notify_channel_switch_complete() - Notify TDLS module about the
@@ -215,6 +227,15 @@ void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint8_t *peer_addr);
+
+/**
+ * wlan_tdls_teardown_links_for_non_dbs() - notify TDLS module to teardown
+ * TDLS links for non-DBS target
+ * @psoc: psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc);
 #else
 
 #ifdef FEATURE_SET
@@ -252,6 +273,12 @@ wlan_tdls_notify_sta_connect(uint8_t vdev_id,
 			     bool tdls_chan_swit_prohibited,
 			     bool tdls_prohibited,
 			     struct wlan_objmgr_vdev *vdev) {}
+
+static inline QDF_STATUS
+wlan_is_tdls_session_present(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_INVAL;
+}
 
 static inline void
 wlan_tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
@@ -295,5 +322,11 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint8_t *peer_addr)
 {}
+
+static inline
+QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 #endif

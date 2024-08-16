@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2018, 2020 The Linux Foundation. All rights reserved.
-* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+* Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -99,6 +99,20 @@ void hdd_create_wifi_feature_interface_sysfs_file(void);
 void hdd_destroy_wifi_feature_interface_sysfs_file(void);
 
 /**
+ * hdd_create_rtpm_interface_sysfs_file - Create rtpm interface sysfs file
+ *
+ * Return: none
+ */
+void hdd_create_rtpm_interface_sysfs_file(void);
+
+/**
+ * hdd_destroy_rtpm_interface_sysfs_file - Destroy rtpm interface sysfs file
+ *
+ * Return: none
+ */
+void hdd_destroy_rtpm_interface_sysfs_file(void);
+
+/**
  * hdd_sysfs_create_wifi_root_obj() - create wifi root kobj
  *
  * Return: none
@@ -159,6 +173,14 @@ static inline void hdd_create_wifi_feature_interface_sysfs_file(void)
 }
 
 static inline void hdd_destroy_wifi_feature_interface_sysfs_file(void)
+{
+}
+
+static inline void hdd_create_rtpm_interface_sysfs_file(void)
+{
+}
+
+static inline void hdd_destroy_rtpm_interface_sysfs_file(void)
 {
 }
 

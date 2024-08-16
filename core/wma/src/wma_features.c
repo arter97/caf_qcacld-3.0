@@ -281,7 +281,7 @@ void wma_get_rx_retry_cnt(struct mac_context *mac, uint8_t vdev_id,
 	}
 
 	mac->rx_retry_cnt = peer_stats->rx.rx_retries;
-	wma_debug("Rx retry count %d, Peer" QDF_MAC_ADDR_FMT, mac->rx_retry_cnt,
+	wma_debug("Rx retry count %d, Peer " QDF_MAC_ADDR_FMT, mac->rx_retry_cnt,
 		  QDF_MAC_ADDR_REF(mac_addr));
 
 exit:
@@ -5854,7 +5854,7 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	tp_wma_handle wma = (tp_wma_handle)handle;
 	WMI_CHAN_INFO_EVENTID_param_tlvs *param_buf;
 	wmi_chan_info_event_fixed_param *event;
-	struct scan_chan_info buf;
+	struct scan_chan_info buf = {0};
 	struct mac_context *mac = NULL;
 	struct channel_status *channel_status;
 	bool snr_monitor_enabled;

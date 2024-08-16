@@ -2739,11 +2739,10 @@ QDF_STATUS wma_process_ll_stats_set_req(tp_wma_handle wma,
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 static QDF_STATUS
 wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
-			  struct ll_stats_get_params *cmd)
+			  struct ll_stats_get_params *cmd,
+			  bool is_unified_ll_stats)
 {
-	if (!(cfg_get(wma_handle->psoc, CFG_CLUB_LL_STA_AND_GET_STATION) &&
-	      wmi_service_enabled(wma_handle->wmi_handle,
-				  wmi_service_get_station_in_ll_stats_req) &&
+	if (!(is_unified_ll_stats &&
 	      wma_handle->interfaces[cmd->vdev_id].type == WMI_VDEV_TYPE_STA))
 		return wmi_unified_process_ll_stats_get_cmd(
 						wma_handle->wmi_handle, cmd);
@@ -2754,7 +2753,8 @@ wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
 #else
 static QDF_STATUS
 wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
-			  struct ll_stats_get_params *cmd)
+			  struct ll_stats_get_params *cmd,
+			  bool is_unified_ll_stats)
 {
 	return wmi_unified_process_ll_stats_get_cmd(wma_handle->wmi_handle,
 						    cmd);
@@ -2844,7 +2844,8 @@ QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 		}
 	}
 
-	ret = wma_send_ll_stats_get_cmd(wma, &cmd);
+	ret = wma_send_ll_stats_get_cmd(wma, &cmd,
+					getReq->is_unified_ll_stats);
 	if (ret) {
 		wma_err("Failed to send get link stats request");
 		return QDF_STATUS_E_FAILURE;
@@ -4068,12 +4069,14 @@ QDF_STATUS wma_send_vdev_stop_to_fw(t_wma_handle *wma, uint8_t vdev_id)
 		return status;
 	}
 
+	wlan_mlme_reset_sta_keepalive_period(wma->psoc, iface->vdev);
+	iface->bss_max_idle_period = 0;
+
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(iface->vdev);
 	if (!vdev_mlme) {
 		wma_err("Failed to get vdev mlme obj for vdev id %d", vdev_id);
 		return status;
 	}
-
 	/*
 	 * Reset the dynamic nss chains config to the ini values, as when the
 	 * vdev gets its started again, this would be a fresh connection,
@@ -4435,6 +4438,8 @@ void wma_remove_bss_peer_on_failure(tp_wma_handle wma, uint8_t vdev_id)
 			QDF_MAC_ADDR_REF(bss_peer.bytes));
 		return;
 	}
+
+	wma_delete_peer_mlo(wma->psoc, bss_peer.bytes);
 
 	wma_remove_peer(wma, bss_peer.bytes, vdev_id, false);
 }
@@ -5250,3 +5255,22 @@ vht_ch_width:
 	return wma_get_vht_ch_width();
 }
 #endif
+
+QDF_STATUS wma_send_reduce_pwr_scan_mode(uint32_t pdev_id, uint32_t param_val)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct pdev_params pparam = {0};
+	QDF_STATUS status;
+
+	if (!wma)
+		return QDF_STATUS_E_FAILURE;
+
+	pparam.param_id = WMI_PDEV_PARAM_SCAN_MODE;
+	pparam.param_value = param_val;
+	status = wmi_unified_pdev_param_send(wma->wmi_handle,
+					     &pparam, pdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Unable to send reduce power scan mode");
+
+	return status;
+}

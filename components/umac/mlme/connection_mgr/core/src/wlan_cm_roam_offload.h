@@ -603,15 +603,17 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 
 /**
  * cm_roam_btm_req_event  - Send BTM request related logging event
- * @vdev_id: Vdev id
+ * @neigh_rpt: Neighbor report/BTM request related data
  * @btm_data: BTM trigger related data
  * @trigger_info: Roam trigger related info
+ * @vdev_id: vdev id
  * @is_wtc: Is WTC or BTM response
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
+cm_roam_btm_req_event(struct wmi_neighbor_report_data *neigh_rpt,
+		      struct wmi_roam_btm_trigger_data *btm_data,
 		      struct wmi_roam_trigger_info *trigger_info,
 		      uint8_t vdev_id, bool is_wtc);
 
@@ -696,7 +698,8 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 }
 
 static inline QDF_STATUS
-cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
+cm_roam_btm_req_event(struct wmi_neighbor_report_data *neigh_rpt,
+		      struct wmi_roam_btm_trigger_data *btm_data,
 		      struct wmi_roam_trigger_info *trigger_info,
 		      uint8_t vdev_id, bool is_wtc)
 {
@@ -754,4 +757,20 @@ cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
  * Return: True if connected AP is MBO capable without PMF
  */
 bool cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * cm_fill_rso_channel_list() - Fill roam frequencies in chan_info
+ * @psoc: PSOC pointer
+ * @vdev: vdev pointer
+ * @rso_cfg: roam config
+ * @chan_info: roam scan channel list
+ * @reason: Channel update reason
+ *
+ * Return: None
+ */
+void cm_fill_rso_channel_list(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_objmgr_vdev *vdev,
+			      struct rso_config *rso_cfg,
+			      struct wlan_roam_scan_channel_list *chan_info,
+			      uint8_t reason);
 #endif /* _WLAN_CM_ROAM_OFFLOAD_H_ */

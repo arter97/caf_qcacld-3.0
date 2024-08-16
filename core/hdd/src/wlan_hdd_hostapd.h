@@ -341,27 +341,35 @@ int hdd_hostapd_stop(struct net_device *dev);
 int hdd_sap_context_init(struct hdd_context *hdd_ctx);
 void hdd_sap_context_destroy(struct hdd_context *hdd_ctx);
 #ifdef QCA_HT_2040_COEX
-QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
-				   uint8_t channel_type);
-
 /**
- * hdd_get_sap_ht2040_mode() - get ht2040 mode
- * @adapter: pointer to adapter
+ * hdd_set_sap_ht2040_mode() - set ht2040 mode
+ * @link_info: pointer to link_info
  * @channel_type: given channel type
  *
  * Return: QDF_STATUS_SUCCESS if successfully
  */
-QDF_STATUS hdd_get_sap_ht2040_mode(struct hdd_adapter *adapter,
+QDF_STATUS hdd_set_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
+				   uint8_t channel_type);
+
+/**
+ * hdd_get_sap_ht2040_mode() - get ht2040 mode
+ * @link_info: pointer to link_info
+ * @channel_type: given channel type
+ *
+ * Return: QDF_STATUS_SUCCESS if successfully
+ */
+QDF_STATUS hdd_get_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
 				   enum eSirMacHTChannelType *channel_type);
 #else
-static inline QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
-						 uint8_t channel_type)
+static inline QDF_STATUS
+hdd_set_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
+			uint8_t channel_type)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 static inline QDF_STATUS hdd_get_sap_ht2040_mode(
-				struct hdd_adapter *adapter,
+				struct wlan_hdd_link_info *link_info,
 				enum eSirMacHTChannelType *channel_type)
 {
 	return QDF_STATUS_E_FAILURE;
@@ -387,11 +395,15 @@ int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 int wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			       struct net_device *dev,
 			       struct cfg80211_ap_settings *params);
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
+int wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
+				    struct net_device *dev,
+				    struct cfg80211_ap_update *params);
+#else
 int wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 				    struct net_device *dev,
 				    struct cfg80211_beacon_data *params);
-
+#endif
 /**
  * hdd_is_peer_associated - is peer connected to softap
  * @adapter: pointer to softap adapter
@@ -488,12 +500,13 @@ enum qca_wlan_802_11_mode hdd_convert_dot11mode_from_phymode(int phymode);
 void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
 
 /**
- * hdd_is_any_sta_connecting() - check if any sta is connecting
+ * hdd_is_sta_connect_or_link_switch_in_prog() - check if any sta is connecting
+ * or in the middle of a link switch
  * @hdd_ctx: hdd context
  *
- * Return: true if any sta is connecting
+ * Return: true if any sta is connecting/in link switch
  */
-bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
+bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx);
 
 /**
  * wlan_hdd_configure_twt_responder() - configure twt responder in sap_config
@@ -660,4 +673,41 @@ hdd_cp_stats_cstats_log_sap_go_dfs_event(struct wlan_hdd_link_info *li,
 {
 }
 #endif /* WLAN_CHIPSET_STATS */
+
+#ifdef WLAN_FEATURE_FILS_SK_SAP
+void hdd_hlp_work_queue(struct work_struct *work);
+void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx, qdf_nbuf_t netbuf);
+static inline void hdd_fils_hlp_init(struct hdd_context *hdd_ctx)
+{
+	qdf_spinlock_create(&hdd_ctx->hdd_hlp_data_lock);
+	qdf_list_create(&hdd_ctx->hdd_hlp_data_list, 0);
+}
+
+static inline void hdd_fils_hlp_deinit(struct hdd_context *hdd_ctx)
+{
+	qdf_list_destroy(&hdd_ctx->hdd_hlp_data_list);
+	qdf_spinlock_destroy(&hdd_ctx->hdd_hlp_data_lock);
+}
+
+static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
+{
+	hdd_debug("HLP Processing WorkQueue Initialised");
+	INIT_WORK(&hdd_ctx->hlp_processing_work,
+		  hdd_hlp_work_queue);
+}
+#else
+static inline void hdd_fils_hlp_init(struct hdd_context *hdd_ctx)
+{}
+
+static inline void hdd_fils_hlp_deinit(struct hdd_context *hdd_ctx)
+{}
+
+static inline void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx,
+				   qdf_nbuf_t netbuf)
+{}
+
+static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
+{}
+#endif
+
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */

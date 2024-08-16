@@ -10,9 +10,14 @@
 #include <qdf_nbuf.h>
 #include "wlan_dp_main.h"
 
-#define WLAN_DP_SPM_FLOW_REC_TBL_MAX 256
+#define WLAN_DP_SPM_FLOW_REC_TBL_MAX 64
+#define WLAN_DP_SPM_INVALID_FLOW_ID 0xFF
 #define WLAN_DP_SPM_MAX_SERVICE_CLASS_SUPPORT 32
 #define WLAN_DP_SPM_INVALID_METADATA 0xFF
+
+/* Timeout in nano seconds */
+#define WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT 10000000000
+#define WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK 5
 
 /**
  * enum wlan_dp_spm_event_type - SPM event type
@@ -63,26 +68,47 @@ struct wlan_dp_spm_flow_tbl_stats {
  * struct wlan_dp_spm_flow_info - Record of flow which will be tracked
  * @node: List node
  * @id: Flow ID
+ * @is_populated: Is flow valid
  * @info: Flow details
+ * @is_ipv4: Is flow IPV4
  * @guid: Global unique identifier
  * @peer_id: Peer ID
+ * @vdev_id: Vdev ID
  * @svc_id: Service ID
  * @svc_metadata: Service metadata
  * @cookie: sock address or skb hash
  * @flags: flow flags
+ * @flow_add_ts: Flow add timestamp
  * @active_ts: last active timestamp
+ * @c_flow_id: STC classification table ID
+ * @track_flow_stats: is stats tracking enabled for flow
+ * @selected_to_sample: Selected for classification stats collection
+ * @classified: Classification done
+ * @reserved: unused
+ * @flow_tuple_hash: flow_tuple_hash to identify bi-directional flow
  */
 struct wlan_dp_spm_flow_info {
 	qdf_list_node_t node;
 	uint16_t id;
+	bool is_populated;
 	struct flow_info info;
+	bool is_ipv4;
 	uint64_t guid;
 	uint16_t peer_id;
+	uint8_t vdev_id;
 	uint16_t svc_id;
 	uint8_t svc_metadata;
 	uint64_t cookie;
 	uint32_t flags;
+	uint64_t flow_add_ts;
 	uint64_t active_ts;
+#ifdef WLAN_DP_FEATURE_STC
+	uint8_t c_flow_id;
+	uint8_t track_flow_stats;
+	uint8_t selected_to_sample;
+	uint8_t classified;
+	uint64_t flow_tuple_hash;
+#endif
 };
 
 /**
@@ -90,12 +116,14 @@ struct wlan_dp_spm_flow_info {
  * @origin_aft: Active flow table for originating traffic
  * @flow_rec_base: Flow records base address
  * @o_flow_rec_freelist: Flow records freelist
+ * @flow_list_lock: Flow list operation lock
  * @o_stats: Flow table stats for originating traffic
  */
 struct wlan_dp_spm_intf_context {
 	struct wlan_dp_spm_flow_info *origin_aft[WLAN_DP_SPM_FLOW_REC_TBL_MAX];
 	struct wlan_dp_spm_flow_info *flow_rec_base;
 	qdf_list_t o_flow_rec_freelist;
+	qdf_spinlock_t flow_list_lock;
 	struct wlan_dp_spm_flow_tbl_stats o_stats;
 };
 
@@ -172,6 +200,19 @@ struct wlan_dp_spm_context {
 	uint32_t policy_cnt;
 };
 
+/**
+ * wlan_dp_spm_svc_get_metadata() - Get service metadata for flow:
+ * @dp_intf: DP interface
+ * @nbuf: Nbuf Packet
+ * @flow_id: Flow ID
+ * @cookie: sock address or hash value depending on traffic
+ *
+ * Return: Service metadata for the flow
+ */
+uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
+				      qdf_nbuf_t nbuf, uint16_t flow_id,
+				      uint64_t cookie);
+
 #ifdef WLAN_FEATURE_SAWFISH
 /**
  * wlan_dp_spm_ctx_init() - Initialize SPM context
@@ -228,17 +269,6 @@ uint8_t wlan_dp_spm_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
  * Return: None
  */
 void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg);
-
-/**
- * wlan_dp_spm_svc_get_metadata() - Get service metadata for flow:
- * @spm_intf: SPM interface
- * @flow_id: Flow ID
- * @cookie: sock address or hash value depending on traffic
- *
- * Return: Service metadata for the flow
- */
-uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
-				      uint16_t flow_id, uint64_t cookie);
 
 /**
  * wlan_dp_spm_policy_add(): Add policy to a service
@@ -301,13 +331,6 @@ void wlan_dp_spm_svc_set_queue_info(uint32_t *msg_word, qdf_nbuf_t htt_t2h_msg)
 }
 
 static inline
-uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_spm_intf_context *spm_intf,
-				      uint16_t flow_id, uint64_t cookie)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
 QDF_STATUS wlan_dp_spm_policy_add(struct dp_policy *policy)
 {
 	return QDF_STATUS_SUCCESS;
@@ -326,7 +349,23 @@ QDF_STATUS wlan_dp_spm_policy_update(struct dp_policy *policy)
 }
 #endif
 
-#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_FEATURE_MLSTC)
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
+/**
+ * wlan_dp_spm_flow_table_attach() - SPM flow table attach
+ * @dp_ctx: Global DP component context
+ *
+ * Return: None
+ */
+void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_spm_flow_table_detach() - SPM flow table detach
+ * @dp_ctx: Global DP component context
+ *
+ * Return: None
+ */
+void wlan_dp_spm_flow_table_detach(struct wlan_dp_psoc_context *dp_ctx);
+
 /**
  * wlan_dp_spm_intf_ctx_init(): Initialize per interface SPM context
  * @dp_intf: DP interface
@@ -369,6 +408,16 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
 				 uint16_t flow_id, uint64_t flow_guid);
 #else
+static inline void
+wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
+static inline void
+wlan_dp_spm_flow_table_detach(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
 static inline
 QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 {

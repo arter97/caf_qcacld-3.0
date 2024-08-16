@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -56,6 +56,7 @@ static void wlan_p2p_rx_callback(void *user_data,
 	struct vdev_osif_priv *osif_priv;
 	struct wireless_dev *wdev;
 	enum QDF_OPMODE opmode;
+	uint32_t mgmt_frm_registration_update = 0;
 
 	psoc = user_data;
 	if (!psoc) {
@@ -68,6 +69,16 @@ static void wlan_p2p_rx_callback(void *user_data,
 	if (!vdev) {
 		osif_err("vdev is null");
 		return;
+	}
+
+	if (rx_frame->frm_type == MGMT_PROBE_REQ) {
+		mgmt_frm_registration_update =
+			ucfg_p2p_get_mgmt_frm_registration_update(psoc);
+		if (!(mgmt_frm_registration_update & BIT(MGMT_SUBTYPE_PROBE_REQ >> 4))) {
+			osif_debug("Drop mgmt frame_type %d, kernel registration is not open",
+				   rx_frame->frm_type);
+			goto fail;
+		}
 	}
 
 	assoc_vdev = vdev;

@@ -30,6 +30,7 @@
 #include "wlan_fpm_table.h"
 #include "wlan_dp_fim.h"
 #endif
+#include <cdp_txrx_ipa.h>
 
 #define NUM_RX_QUEUES 5
 
@@ -1224,4 +1225,49 @@ wlan_dp_rx_aggr_dis_req(struct wlan_dp_intf *dp_intf,
 {
 }
 #endif
+
+#ifdef IPA_OFFLOAD
+static inline bool
+wlan_dp_check_is_ring_ipa_rx(ol_txrx_soc_handle soc, uint8_t ring_id)
+{
+	return cdp_ipa_check_is_ring_ipa_rx(soc, ring_id);
+}
+#else
+static inline bool
+wlan_dp_check_is_ring_ipa_rx(ol_txrx_soc_handle soc, uint8_t ring_id)
+{
+	return false;
+}
+#endif
+
+/* The below two key combined is ASCII "WLAN_DP_GET_HASH" */
+#define WLAN_DP_HASH_KEY_0 0x574C414E5F44505F
+#define WLAN_DP_HASH_KEY_1 0x4745545F48415348
+
+/**
+ * wlan_dp_get_flow_hash() - Generate flow tuple hash
+ * @dp_ctx: DP global psoc context
+ * @flow_tuple: flow tuple
+ *
+ * Return: tuple hash
+ */
+static inline uint64_t
+wlan_dp_get_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
+		      struct flow_info *flow_tuple)
+{
+	uint64_t *data = (uint64_t *)flow_tuple;
+	uint64_t a, b, c, d, e;
+	uint64_t flow_secret[2];
+
+	flow_secret[0] = WLAN_DP_HASH_KEY_0;
+	flow_secret[1] = WLAN_DP_HASH_KEY_1;
+
+	a = data[0] ^ flow_secret[0];
+	b = data[1] ^ flow_secret[1];
+	c = data[2] ^ flow_secret[0];
+	d = data[3] ^ flow_secret[1];
+	e = data[4] ^ flow_secret[0];
+
+	return ((a ^ b) ^ (c ^ d) ^ e);
+}
 #endif

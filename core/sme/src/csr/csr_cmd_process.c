@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -41,13 +42,16 @@ QDF_STATUS csr_msg_processor(struct mac_context *mac_ctx, void *msg_buf)
 	tSirSmeRsp *sme_rsp = (tSirSmeRsp *) msg_buf;
 	uint8_t vdev_id = sme_rsp->vdev_id;
 	enum csr_roam_state cur_state;
+	enum csr_roam_substate sub_state;
 
 	cur_state = sme_get_current_roam_state(MAC_HANDLE(mac_ctx), vdev_id);
-	sme_debug("msg %d[0x%04X] recvd in curstate %s & substate %s id(%d)",
-		sme_rsp->messageType, sme_rsp->messageType,
-		mac_trace_getcsr_roam_state(cur_state),
-		mac_trace_getcsr_roam_sub_state(
-			mac_ctx->roam.curSubState[vdev_id]), vdev_id);
+	sub_state =
+		sme_get_current_roam_sub_state(MAC_HANDLE(mac_ctx), vdev_id);
+	sme_debug("msg %s[0x%04X] in %s[%s] vdev %d",
+		  mac_trace_get_sme_msg_string(sme_rsp->messageType),
+		  sme_rsp->messageType,
+		  mac_trace_getcsr_roam_state(cur_state),
+		  mac_trace_getcsr_roam_sub_state(sub_state), vdev_id);
 
 	/* Process the message based on the state of the roaming states... */
 	switch (cur_state) {
@@ -59,17 +63,12 @@ QDF_STATUS csr_msg_processor(struct mac_context *mac_ctx, void *msg_buf)
 		/* are we in roaming states */
 		csr_roaming_state_msg_processor(mac_ctx, msg_buf);
 		break;
-
 	default:
-
-		if (sme_rsp->messageType ==
-		    eWNI_SME_UPPER_LAYER_ASSOC_CNF) {
+		if (sme_rsp->messageType == eWNI_SME_UPPER_LAYER_ASSOC_CNF) {
 			tSirSmeAssocIndToUpperLayerCnf *upper_layer_assoc_cnf =
 				(tSirSmeAssocIndToUpperLayerCnf *)msg_buf;
-			if (upper_layer_assoc_cnf->ies) {
+			if (upper_layer_assoc_cnf->ies)
 				qdf_mem_free(upper_layer_assoc_cnf->ies);
-				sme_debug("free ies");
-			}
 			break;
 		}
 
@@ -80,19 +79,19 @@ QDF_STATUS csr_msg_processor(struct mac_context *mac_ctx, void *msg_buf)
 		 * due to failure or finding the condition meets both
 		 * SAP and infra requirement.
 		 */
-		if (eWNI_SME_SETCONTEXT_RSP == sme_rsp->messageType ||
-		    eWNI_SME_DISCONNECT_DONE_IND ==
-		    sme_rsp->messageType) {
-			sme_warn("handling msg 0x%X CSR state is %d",
-				sme_rsp->messageType, cur_state);
-			csr_roam_check_for_link_status_change(mac_ctx,
-					sme_rsp);
-		} else {
-			sme_err("Message 0x%04X is not handled by CSR state is %d session Id %d",
-				sme_rsp->messageType, cur_state,
+		if (sme_rsp->messageType == eWNI_SME_SETCONTEXT_RSP ||
+		    sme_rsp->messageType == eWNI_SME_DISCONNECT_DONE_IND)
+			csr_roam_check_for_link_status_change(mac_ctx, sme_rsp);
+		else
+			sme_err("msg %s[0x%04X] not handled in %s[%s] for vdev %d",
+				mac_trace_get_sme_msg_string(sme_rsp->messageType),
+				sme_rsp->messageType,
+				mac_trace_getcsr_roam_state(cur_state),
+				mac_trace_getcsr_roam_sub_state(sub_state),
 				vdev_id);
-		}
+
 		break;
-	} /* switch */
+	}
+
 	return status;
 }

@@ -323,7 +323,7 @@ wlan_is_tdls_session_present(struct wlan_objmgr_vdev *vdev)
 	if (mlo_is_mld_sta(vdev))
 		return wlan_mlo_is_tdls_session_present(vdev);
 
-	if (tdls_get_connected_peer_count_from_vdev > 0) {
+	if (tdls_get_connected_peer_count_from_vdev(vdev) > 0) {
 		tdls_debug("TDLS session is present");
 		return QDF_STATUS_SUCCESS;
 	}
@@ -551,4 +551,20 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 		   QDF_MAC_ADDR_REF(peer_addr), peer->discovery_attempt);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+}
+
+struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
+				      const uint8_t *macaddr)
+{
+	return tdls_find_peer(vdev_obj, macaddr);
+}
+
+QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc))
+		status = wlan_tdls_teardown_links(psoc);
+
+	return status;
 }

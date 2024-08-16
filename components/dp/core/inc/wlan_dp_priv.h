@@ -39,6 +39,8 @@
 #include <qdf_types.h>
 #include "htc_api.h"
 #include "wlan_dp_wfds.h"
+#include "wlan_dp_load_balance.h"
+#include "wlan_dp_resource_mgr.h"
 
 #ifndef NUM_TX_RX_HISTOGRAM
 #define NUM_TX_RX_HISTOGRAM 128
@@ -48,30 +50,13 @@
 
 #if defined(WLAN_FEATURE_DP_BUS_BANDWIDTH) && defined(FEATURE_RUNTIME_PM)
 /**
- * enum dp_rtpm_tput_policy_state - states to track runtime_pm tput policy
- * @DP_RTPM_TPUT_POLICY_STATE_INVALID: invalid state
- * @DP_RTPM_TPUT_POLICY_STATE_REQUIRED: state indicating runtime_pm is required
- * @DP_RTPM_TPUT_POLICY_STATE_NOT_REQUIRED: state indicating runtime_pm is NOT
- * required
- */
-enum dp_rtpm_tput_policy_state {
-	DP_RTPM_TPUT_POLICY_STATE_INVALID,
-	DP_RTPM_TPUT_POLICY_STATE_REQUIRED,
-	DP_RTPM_TPUT_POLICY_STATE_NOT_REQUIRED
-};
-
-/**
  * struct dp_rtpm_tput_policy_context - RTPM throughput policy context
- * @curr_state: current state of throughput policy (RTPM require or not)
- * @wake_lock: wakelock for QDF wake_lock acquire/release APIs
  * @rtpm_lock: lock use for QDF rutime PM prevent/allow APIs
  * @high_tput_vote: atomic variable to keep track of voting
  */
 struct dp_rtpm_tput_policy_context {
-	enum dp_rtpm_tput_policy_state curr_state;
-	qdf_wake_lock_t wake_lock;
 	qdf_runtime_lock_t rtpm_lock;
-	qdf_atomic_t high_tput_vote;
+	unsigned long high_tput_vote;
 };
 #endif
 
@@ -140,6 +125,9 @@ struct dp_rtpm_tput_policy_context {
  * @is_rx_fisa_lru_del_enabled: flag to enable/disable FST entry delete
  * @is_direct_link_enabled: indicates whether direct link is enabled or not
  * @wlm_rx_aggr_control: Control Rx aggregation based on WLM state
+ * @is_load_balance_enabled: indicates whether load balance is enabled or not
+ * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
+ * @stc_enable: indicates whether STC feature is enabled or not
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -215,6 +203,15 @@ struct wlan_dp_psoc_cfg {
 	bool is_direct_link_enabled;
 #endif
 	bool wlm_rx_aggr_control;
+#ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
+	bool is_load_balance_enabled;
+#endif
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
+	bool is_flow_balance_enabled;
+#endif
+#ifdef WLAN_DP_FEATURE_STC
+	bool stc_enable;
+#endif
 };
 
 /**
@@ -356,11 +353,13 @@ struct fils_peer_hlp_node {
  * @allow_fse_metdata_mismatch: packet allowed since it belongs to same flow,
  *			only fse_metadata is not same.
  * @allow_non_aggr: packet allowed due to any other reason.
+ * @allow_mig_mismatch: packet allowed due to migrated flow
  */
 struct dp_fisa_reo_mismatch_stats {
 	uint32_t allow_cce_match;
 	uint32_t allow_fse_metdata_mismatch;
 	uint32_t allow_non_aggr;
+	uint32_t allow_mig_mismatch;
 };
 
 /**
@@ -425,8 +424,12 @@ struct fisa_pkt_hist {
  * @head_skb_ip_hdr_offset: IP header offset
  * @head_skb_l4_hdr_offset: L4 header offset
  * @rx_flow_tuple_info: RX tuple information
+ * @flow_tuple_hash: flow tuple hash
  * @napi_id: NAPI ID (REO ID) on which the flow is being received
+ * @prev_napi_id: previous NAPI ID before flow migration
+ * @is_mig: flag indicating whether flow is migrated or not
  * @vdev: VDEV handle corresponding to the FLOW
+ * @vdev_id: DP vdev id
  * @dp_intf: DP interface handle corresponding to the flow
  * @bytes_aggregated: Number of bytes currently aggregated
  * @flush_count: Number of Flow flushes done
@@ -447,6 +450,17 @@ struct fisa_pkt_hist {
  * @pkt_hist: FISA aggreagtion packets history
  * @same_mld_vdev_mismatch: Packets flushed after vdev_mismatch on same MLD
  * @add_timestamp: FISA entry created timestamp
+ * @num_pkts: number of packets received on this flow
+ * @num_pkts_prev: number of packets received on this flow previously
+ * @avg_pkts_per_sec: average packets per second received on this flow
+ * @last_pkt_rcvd_time: last packet received time on this flow in ns
+ * @last_avg_cal_time: last average calculated time for this flow in ns
+ * @elig_for_balance: flow is eligible for flow balance or not
+ * @track_flow_stats: flag to indicate if this flow is to be tracked
+ * @selected_to_sample: flag to indicate flow has been selected to sample
+ * @classified: flag to indicate flow has been classified
+ * @peer_id: Peer ID
+ * @c_flow_id: STC classified flow table ID
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -469,8 +483,12 @@ struct dp_fisa_rx_sw_ft {
 	uint32_t head_skb_ip_hdr_offset;
 	uint32_t head_skb_l4_hdr_offset;
 	struct cdp_rx_flow_tuple_info rx_flow_tuple_info;
+	uint64_t flow_tuple_hash;
 	uint8_t napi_id;
+	uint8_t prev_napi_id;
+	bool is_mig;
 	struct dp_vdev *vdev;
+	uint8_t vdev_id;
 	struct wlan_dp_intf *dp_intf;
 	uint64_t bytes_aggregated;
 	uint32_t flush_count;
@@ -496,6 +514,19 @@ struct dp_fisa_rx_sw_ft {
 #endif
 	uint64_t same_mld_vdev_mismatch;
 	uint64_t add_timestamp;
+	uint64_t num_pkts;
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
+	uint64_t num_pkts_prev;
+	uint32_t avg_pkts_per_sec;
+	qdf_time_t last_pkt_rcvd_time;
+	qdf_time_t last_avg_cal_time;
+	bool elig_for_balance;
+#endif
+	uint8_t track_flow_stats;
+	uint8_t selected_to_sample;
+	uint8_t classified;
+	uint16_t peer_id;
+	uint16_t c_flow_id;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)
@@ -546,6 +577,7 @@ struct fse_cache_flush_history {
  * @rx_hash_enabled: Flag to indicate if Hash based routing supported
  * @rx_toeplitz_hash_key: hash key
  * @rx_pkt_tlv_size: RX packet TLV size
+ * @add_tcp_flow_to_fst: Add tcp flow to the FST table
  */
 struct dp_rx_fst {
 	uint8_t *base;
@@ -582,6 +614,7 @@ struct dp_rx_fst {
 	bool rx_hash_enabled;
 	uint8_t *rx_toeplitz_hash_key;
 	uint16_t rx_pkt_tlv_size;
+	bool add_tcp_flow_to_fst;
 };
 
 /**
@@ -592,6 +625,8 @@ struct dp_rx_fst {
  * @device_mode: Device Mode
  * @intf_id: Interface ID
  * @node: list node for membership in the interface list
+ * @id: ID assigned to the dp interface
+ * @guid: unique identifier for the dp interface instance
  * @dev: netdev reference
  * @txrx_ops: Interface tx-rx ops
  * @dp_stats: Device TX/RX statistics
@@ -625,6 +660,10 @@ struct dp_rx_fst {
  *		     particular rx_context
  * @fisa_force_flushed: Flag to indicate FISA flow has been flushed for a
  *			particular rx_context
+ * @route_to_latency_sensitive_reo: Enable rx routing to
+ *				    latency sensitive reo2sw ring
+ * @runtime_disable_rx_fisa_aggr: Runtime disable FISA aggregation but allows
+ *				  flow entry addition to FSE
  * @runtime_disable_rx_thread: Runtime Rx thread flag
  * @rx_stack: function pointer Rx packet handover
  * @tx_fn: function pointer to send Tx packet
@@ -640,6 +679,8 @@ struct dp_rx_fst {
  * @hlp_list_lock: Lock to protect hlp link_list operation
  * @hlp_list: List of HLP peers for HLP response handling
  * @disable_rx_aggr: Disable Rx aggregation
+ * @spm_intf_ctx: SPM interface context
+ * @opm_stats_work: OPM stats work
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -651,6 +692,8 @@ struct wlan_dp_intf {
 	enum QDF_OPMODE device_mode;
 
 	qdf_list_node_t node;
+	uint8_t id;
+	uint32_t guid;
 
 	qdf_netdev_t dev;
 	struct ol_txrx_ops txrx_ops;
@@ -694,6 +737,10 @@ struct wlan_dp_intf {
 	 */
 	uint8_t fisa_disallowed[MAX_REO_DEST_RINGS];
 	uint8_t fisa_force_flushed[MAX_REO_DEST_RINGS];
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+	bool route_to_latency_sensitive_reo;
+#endif
+	bool runtime_disable_rx_fisa_aggr;
 #endif
 
 	bool runtime_disable_rx_thread;
@@ -717,6 +764,12 @@ struct wlan_dp_intf {
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
 	bool disable_rx_aggr[CTRL_RX_AGGR_ID_MAX];
+#endif
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
+	struct wlan_dp_spm_intf_context *spm_intf_ctx;
+#endif
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
+	struct qdf_periodic_work opm_stats_work;
 #endif
 };
 
@@ -751,9 +804,9 @@ struct wlan_dp_link {
 	struct wlan_dp_conn_info conn_info;
 	uint32_t sap_tx_block_mask;
 	enum bss_intf_state bss_state;
-	uint8_t destroyed : 1,
-		cdp_vdev_registered : 1,
-		cdp_vdev_deleted : 1;
+	uint8_t destroyed;
+	uint8_t cdp_vdev_registered;
+	uint8_t	cdp_vdev_deleted;
 	TAILQ_ENTRY(wlan_dp_link) inactive_list_elem;
 };
 
@@ -785,6 +838,12 @@ struct dp_direct_link_context {
 };
 #endif
 
+#define WLAN_DP_INTF_MAX WLAN_MAX_VDEVS
+
+#ifdef WLAN_DP_FEATURE_STC
+struct wlan_dp_stc;
+#endif
+
 /**
  * struct wlan_dp_psoc_context - psoc related data required for DP
  * @psoc: object manager psoc context
@@ -796,6 +855,9 @@ struct dp_direct_link_context {
  * @hal_soc: HAL SoC handle
  * @intf_list_lock: DP interfaces list lock
  * @intf_list: DP interfaces list
+ * @dp_intf_list: array of dp_intf for fastpath access
+ * @intf_guid: global unique identifier counter for dp_intf
+ * @wlan_dp_intf_id_map: bitmap of the dp_intf ID (available/used)
  * @rps: rps
  * @dynamic_rps: dynamic rps
  * @enable_rxthread: Enable/Disable rx thread
@@ -855,6 +917,13 @@ struct dp_direct_link_context {
  * @inactive_dp_link_list: inactive DP links list
  * @dp_link_del_lock: DP link delete operation lock
  * @svc_ctx: service class context
+ * @lb_data: wlan load balance data structure
+ * @cpuhp_event_handle: event handle for cpu hotplug
+ * @dp_stc: STC context
+ * @spm_ctx: Servicy policy manager context
+ * @gl_flow_recs: Global Tx flow table for all dp_interfaces
+ * @rsrc_mgr_ctx: DP resource manager context reference
+ * @monitor_flag: Monitor interface flags configured when add Mon interface
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -867,6 +936,10 @@ struct wlan_dp_psoc_context {
 
 	qdf_spinlock_t intf_list_lock;
 	qdf_list_t intf_list;
+
+	struct wlan_dp_intf *dp_intf_list[WLAN_DP_INTF_MAX];
+	uint32_t intf_guid;
+	qdf_bitmap(wlan_dp_intf_id_map, WLAN_DP_INTF_MAX);
 
 	bool rps;
 	bool dynamic_rps;
@@ -960,6 +1033,29 @@ struct wlan_dp_psoc_context {
 #ifdef WLAN_SUPPORT_SERVICE_CLASS
 	struct dp_svc_ctx *svc_ctx;
 #endif
+#ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
+	struct wlan_dp_lb_data lb_data;
+	struct qdf_cpuhp_handler *cpuhp_event_handle;
+#endif
+#ifdef WLAN_DP_FEATURE_STC
+	struct wlan_dp_stc *dp_stc;
+#endif
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
+	struct wlan_dp_spm_context *spm_ctx;
+	struct wlan_dp_spm_flow_info *gl_flow_recs;
+#endif
+	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
+	uint32_t monitor_flag;
+};
+
+/**
+ * struct wlan_dp_peer_priv_context - DP peer priv context
+ * @sta_info: STA info per peer
+ * @vote_node: Resource vote node context
+ */
+struct wlan_dp_peer_priv_context {
+	struct wlan_dp_sta_info sta_info;
+	struct wlan_dp_resource_vote_node *vote_node;
 };
 
 #ifdef WLAN_DP_PROFILE_SUPPORT

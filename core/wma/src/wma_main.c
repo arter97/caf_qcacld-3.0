@@ -221,7 +221,7 @@ static uint8_t wma_get_number_of_peers_supported(tp_wma_handle wma)
 /**
  * wma_get_number_of_tids_supported - API to query for number of tids supported
  * @no_of_peers_supported: Number of peer supported
- * @no_vdevs: Number of vdevs
+ * @num_vdevs: Number of vdevs
  *
  * Return: Max number of tids supported
  */
@@ -611,6 +611,48 @@ static void wma_set_smem_mailbox_feature(tp_wma_handle wma_handle,
 }
 #endif
 
+#ifdef FEATURE_EPM
+bool wma_is_epm_supported_cfg(WMA_HANDLE handle)
+{
+	bool is_feature_enabled_from_cfg;
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+
+	is_feature_enabled_from_cfg =
+		cfg_get(wma_handle->psoc, CFG_EPM_ENABLE);
+
+	wma_debug("EPM enable feature cfg value: %d",
+		  is_feature_enabled_from_cfg);
+
+	return is_feature_enabled_from_cfg;
+}
+
+bool wma_is_epm_supported_fw(WMA_HANDLE handle)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+	bool is_feature_enabled_from_fw;
+
+	is_feature_enabled_from_fw =
+		wmi_service_enabled(wma_handle->wmi_handle,
+				    wmi_service_epm);
+	wma_debug("EPM enable feature fw value: %d",
+		  is_feature_enabled_from_fw);
+
+	return is_feature_enabled_from_fw;
+}
+
+static void wma_set_epm_feature(tp_wma_handle wma_handle,
+				target_resource_config *tgt_cfg)
+{
+	tgt_cfg->is_epm_supported = true;
+}
+
+#else
+static void wma_set_epm_feature(tp_wma_handle wma_handle,
+				target_resource_config *tgt_cfg)
+{
+}
+#endif
+
 /**
  * wma_set_default_tgt_config() - set default tgt config
  * @wma_handle: wma handle
@@ -724,6 +766,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 
 	if (wma_is_smem_mailbox_supported(wma_handle))
 		wma_set_smem_mailbox_feature(wma_handle, tgt_cfg);
+	if (wma_is_epm_supported_cfg(wma_handle))
+		wma_set_epm_feature(wma_handle, tgt_cfg);
 }
 
 /**
@@ -4009,7 +4053,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 				WMA_RX_SERIALIZER_CTX);
 
 	wma_handle->ito_repeat_count = cds_cfg->ito_repeat_count;
-	wma_handle->bandcapability = cds_cfg->bandcapability;
 
 	/* Register PWR_SAVE_FAIL event only in case of recovery(1) */
 	if (ucfg_pmo_get_auto_power_fail_mode(wma_handle->psoc) ==
@@ -6247,6 +6290,15 @@ static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
 	if (wmi_service_enabled(wma_handle->wmi_handle,
 				wmi_service_nan_pairing_peer_create))
 		tgt_cfg->nan_caps.nan_pairing_peer_create_cap = 1;
+
+	if (wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_sta_sap_ndp_concurrency_support))
+		tgt_cfg->nan_caps.sta_sap_ndp_support = 1;
+
+	if (wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_sta_p2p_ndp_conc))
+		tgt_cfg->nan_caps.sta_p2p_ndp_conc = 1;
+	wma_debug("NAN caps: 0x%x", tgt_cfg->nan_caps.caps);
 }
 #else
 static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
@@ -8170,7 +8222,8 @@ static void wma_set_wifi_start_packet_stats(void *wma_handle,
 		ATH_PKTLOG_TEXT | ATH_PKTLOG_SW_EVENT;
 #elif defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
       defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_KIWI) || \
-      defined(QCA_WIFI_WCN6450) || defined(QCA_WIFI_WCN7750)
+      defined(QCA_WIFI_WCN6450) || defined(QCA_WIFI_WCN7750) || \
+      defined(QCA_WIFI_QCC2072)
 	log_state = ATH_PKTLOG_RCFIND | ATH_PKTLOG_RCUPDATE |
 		    ATH_PKTLOG_TX | ATH_PKTLOG_LITE_T2H |
 		    ATH_PKTLOG_SW_EVENT | ATH_PKTLOG_RX;
@@ -8261,89 +8314,6 @@ static QDF_STATUS wma_update_tx_fail_cnt_th(tp_wma_handle wma,
 
 	if (ret) {
 		wma_err("Failed to send TX pkt fail count threshold command");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * wma_update_short_retry_limit() - Set retry limit for short frames
- * @wma: WMA handle
- * @short_retry_limit_th: retry limir count for Short frames.
- *
- * This function is used to configure the transmission retry limit at which
- * short frames needs to be retry.
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS wma_update_short_retry_limit(tp_wma_handle wma,
-		struct sme_short_retry_limit *short_retry_limit_th)
-{
-	uint8_t vdev_id;
-	uint32_t short_retry_limit;
-	int ret;
-	struct wmi_unified *wmi_handle;
-
-	if (wma_validate_handle(wma))
-		return QDF_STATUS_E_INVAL;
-
-	wmi_handle = wma->wmi_handle;
-	if (wmi_validate_handle(wmi_handle))
-		return QDF_STATUS_E_INVAL;
-
-	vdev_id = short_retry_limit_th->session_id;
-	short_retry_limit = short_retry_limit_th->short_retry_limit;
-	wma_debug("Set short retry limit threshold  vdevId %d count %d",
-		vdev_id, short_retry_limit);
-
-	ret = wma_vdev_set_param(wmi_handle, vdev_id,
-				 wmi_vdev_param_non_agg_sw_retry_th,
-				 short_retry_limit);
-
-	if (ret) {
-		wma_err("Failed to send short limit threshold command");
-		return QDF_STATUS_E_FAILURE;
-	}
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * wma_update_long_retry_limit() - Set retry limit for long frames
- * @wma: WMA handle
- * @long_retry_limit_th: retry limir count for long frames
- *
- * This function is used to configure the transmission retry limit at which
- * long frames needs to be retry
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS wma_update_long_retry_limit(tp_wma_handle wma,
-		struct sme_long_retry_limit  *long_retry_limit_th)
-{
-	uint8_t vdev_id;
-	uint32_t long_retry_limit;
-	int ret;
-	struct wmi_unified *wmi_handle;
-
-	if (wma_validate_handle(wma))
-		return QDF_STATUS_E_INVAL;
-
-	wmi_handle = wma->wmi_handle;
-	if (wmi_validate_handle(wmi_handle))
-		return QDF_STATUS_E_INVAL;
-
-	vdev_id = long_retry_limit_th->session_id;
-	long_retry_limit = long_retry_limit_th->long_retry_limit;
-	wma_debug("Set TX pkt fail count threshold  vdevId %d count %d",
-		vdev_id, long_retry_limit);
-
-	ret  = wma_vdev_set_param(wmi_handle, vdev_id,
-			wmi_vdev_param_agg_sw_retry_th,
-			long_retry_limit);
-
-	if (ret) {
-		wma_err("Failed to send long limit threshold command");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -8655,7 +8625,7 @@ release_ref:
 
 /**
  * wma_get_arp_req_stats() - process get arp stats request command to fw
- * @wma_handle: WMA handle
+ * @handle: WMA handle
  * @req_buf: get srp stats request buffer
  *
  * Return: None
@@ -9342,7 +9312,7 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		goto end;
 	}
 
-	wma_nofl_debug("Handle msg %s(0x%x)",
+	wma_nofl_debug("Handle %s(0x%x)",
 		       mac_trace_get_wma_msg_string(msg->type), msg->type);
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
@@ -9356,7 +9326,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 	switch (msg->type) {
 #ifdef FEATURE_WLAN_ESE
 	case WMA_TSM_STATS_REQ:
-		wma_debug("McThread: WMA_TSM_STATS_REQ");
 		wma_process_tsm_stats_req(wma_handle, (void *)msg->bodyptr);
 		break;
 #endif /* FEATURE_WLAN_ESE */
@@ -9495,10 +9464,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		qdf_mem_free(msg->bodyptr);
 		break;
 
-	case WMA_ROAM_SYNC_TIMEOUT:
-		wma_handle_roam_sync_timeout(wma_handle, msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
 	case WMA_RATE_UPDATE_IND:
 		wma_process_rate_update_indicate(wma_handle,
 				(tSirRateUpdateInd *) msg->bodyptr);
@@ -9555,14 +9520,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 	case WMA_SET_THERMAL_LEVEL:
 		wma_process_set_thermal_level(wma_handle, msg->bodyval);
 		break;
-#ifdef CONFIG_HL_SUPPORT
-	case WMA_INIT_BAD_PEER_TX_CTL_INFO_CMD:
-		wma_process_init_bad_peer_tx_ctl_info(
-			wma_handle,
-			(struct t_bad_peer_txtcl_config *)msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-			break;
-#endif
 	case WMA_SET_MIMOPS_REQ:
 		wma_process_set_mimops_req(wma_handle,
 					   (tSetMIMOPS *) msg->bodyptr);
@@ -9819,15 +9776,7 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		wma_update_tx_fail_cnt_th(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-	case SIR_HAL_LONG_RETRY_LIMIT_CNT:
-		wma_update_long_retry_limit(wma_handle, msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case SIR_HAL_SHORT_RETRY_LIMIT_CNT:
-		wma_update_short_retry_limit(wma_handle, msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case SIR_HAL_POWER_DEBUG_STATS_REQ:
+	case WMA_POWER_DEBUG_STATS_REQ:
 		wma_process_power_debug_stats_req(wma_handle);
 		break;
 	case WMA_BEACON_DEBUG_STATS_REQ:
@@ -10055,9 +10004,16 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 	uint32_t i;
 	QDF_STATUS status;
 	bool is_channel_allowed;
+	uint32_t band_bitmap;
 
 	if (wma_validate_handle(wma_handle))
 		return QDF_STATUS_E_NULL_VALUE;
+
+	status = ucfg_reg_get_band(wma_handle->pdev, &band_bitmap);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		wma_err("failed to get band");
+		return status;
+	}
 
 	/*
 	 * if vdev_id is WLAN_UMAC_VDEV_ID_MAX, then roaming is enabled on
@@ -10070,7 +10026,7 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 
 
 	wma_debug("RSO_CFG: BandCapability:%d, band_mask:%d",
-		  wma_handle->bandcapability, msg->band_mask);
+		  band_bitmap, msg->band_mask);
 	for (i = 0; i < wma_handle->saved_chan.num_channels; i++) {
 		msg->chan_weights.saved_chan_list[i] =
 					wma_handle->saved_chan.ch_freq_list[i];
@@ -10109,8 +10065,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 5G/6G band if only 2G band configured
 		 * as supported roam band mask
 		 */
-		if (((wma_handle->bandcapability == BAND_2G) ||
-		    (msg->band_mask == BIT(REG_BAND_2G))) &&
+		if ((band_bitmap == BIT(REG_BAND_2G) ||
+		     msg->band_mask == BIT(REG_BAND_2G)) &&
 		    !WLAN_REG_IS_24GHZ_CH_FREQ(
 		    msg->chan_weights.saved_chan_list[i])) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -10122,8 +10078,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 2G/6G band if only 5G band configured
 		 * as supported roam band mask
 		 */
-		if (((wma_handle->bandcapability == BAND_5G) ||
-		    (msg->band_mask == BIT(REG_BAND_5G))) &&
+		if ((band_bitmap == BIT(REG_BAND_5G) ||
+		     msg->band_mask == BIT(REG_BAND_5G)) &&
 		    !WLAN_REG_IS_5GHZ_CH_FREQ(
 		    msg->chan_weights.saved_chan_list[i])) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -10135,7 +10091,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 2G/5G band if only 6G band configured
 		 * as supported roam band mask
 		 */
-		if (msg->band_mask == BIT(REG_BAND_6G) &&
+		if ((band_bitmap == BIT(REG_BAND_6G) ||
+		     msg->band_mask == BIT(REG_BAND_6G)) &&
 		    !WLAN_REG_IS_6GHZ_CHAN_FREQ(
 		    msg->chan_weights.saved_chan_list[i])) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -10147,7 +10104,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 6G band if only 2G + 5G band configured
 		 * as supported roam band mask.
 		 */
-		if (msg->band_mask == (BIT(REG_BAND_2G) | BIT(REG_BAND_5G)) &&
+		if ((band_bitmap == (BIT(REG_BAND_2G) | BIT(REG_BAND_5G)) ||
+		     msg->band_mask == (BIT(REG_BAND_2G) | BIT(REG_BAND_5G))) &&
 		    (WLAN_REG_IS_6GHZ_CHAN_FREQ(
 		    msg->chan_weights.saved_chan_list[i]))) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -10159,7 +10117,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 2G band if only 5G + 6G band configured
 		 * as supported roam band mask.
 		 */
-		if (msg->band_mask == (BIT(REG_BAND_5G) | BIT(REG_BAND_6G)) &&
+		if ((band_bitmap == (BIT(REG_BAND_5G) | BIT(REG_BAND_6G)) ||
+		     msg->band_mask == (BIT(REG_BAND_5G) | BIT(REG_BAND_6G))) &&
 		    (WLAN_REG_IS_24GHZ_CH_FREQ(
 		    msg->chan_weights.saved_chan_list[i]))) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -10171,7 +10130,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		 * Dont allow roaming on 5G band if only 2G + 6G band configured
 		 * as supported roam band mask.
 		 */
-		if (msg->band_mask == (BIT(REG_BAND_2G) | BIT(REG_BAND_6G)) &&
+		if ((band_bitmap == (BIT(REG_BAND_2G) | BIT(REG_BAND_6G)) ||
+		     msg->band_mask == (BIT(REG_BAND_2G) | BIT(REG_BAND_6G))) &&
 		    (WLAN_REG_IS_5GHZ_CH_FREQ(
 		    msg->chan_weights.saved_chan_list[i]))) {
 			msg->chan_weights.weighed_valid_list[i] =
@@ -10518,5 +10478,14 @@ QDF_STATUS wma_send_ani_level_request(tp_wma_handle wma_handle,
 {
 	return wmi_unified_ani_level_cmd_send(wma_handle->wmi_handle, freqs,
 					      num_freqs);
+}
+#endif
+
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+bool
+wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle)
+{
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_mlo_sap_emlsr_support);
 }
 #endif

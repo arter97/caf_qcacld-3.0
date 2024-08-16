@@ -316,12 +316,13 @@ mlme_set_cac_required(struct wlan_objmgr_vdev *vdev, bool val);
  * mlme_set_mbssid_info() - save mbssid info
  * @vdev: vdev pointer
  * @mbssid_info: mbssid info
+ * @freq: current operating frequency
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 mlme_set_mbssid_info(struct wlan_objmgr_vdev *vdev,
-		     struct scan_mbssid_info *mbssid_info);
+		     struct scan_mbssid_info *mbssid_info, qdf_freq_t freq);
 
 /**
  * mlme_get_mbssid_info() - get mbssid info

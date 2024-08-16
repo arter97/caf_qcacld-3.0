@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,8 @@
 #include <osif_vdev_sync.h>
 #include "wlan_osif_priv.h"
 #include "wlan_lmac_if_def.h"
+#include <wlan_dcs_ucfg_api.h>
+#include "wlan_hdd_dcs.h"
 
 /**
  * hdd_green_ap_check_enable() - to check whether to enable green ap or not
@@ -199,6 +201,28 @@ wlan_hdd_sap_low_pwr_mode[QCA_WLAN_VENDOR_ATTR_DOZED_AP_MAX + 1] = {
 };
 
 /**
+ * wlan_hdd_enable_disable_dcs_cmd() - Enable/disable dcs based on low power
+ * mode configuration
+ * @psoc: pointer to psoc object
+ * @mac_id: mac_id
+ * @vdev_id: vdev_id
+ * @lp_flags: low power mode flags
+ *
+ * Return: None
+ */
+static void wlan_hdd_enable_disable_dcs_cmd(struct wlan_objmgr_psoc *psoc,
+					    uint32_t mac_id, uint8_t vdev_id,
+					    uint8_t lp_flags)
+{
+	if (lp_flags == QCA_WLAN_DOZED_AP_ENABLE)
+		ucfg_config_dcs_disable(psoc, mac_id, WLAN_HOST_DCS_WLANIM);
+	else
+		ucfg_config_dcs_enable(psoc, mac_id, WLAN_HOST_DCS_WLANIM);
+
+	hdd_send_dcs_cmd(psoc, mac_id, vdev_id);
+}
+
+/**
  * __wlan_hdd_enter_sap_low_pwr_mode() - Green AP low latency power
  * save mode
  * vendor command
@@ -222,6 +246,7 @@ __wlan_hdd_enter_sap_low_pwr_mode(struct wiphy *wiphy,
 	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_DOZED_AP_MAX + 1];
 	struct sk_buff *skb;
+	uint8_t vdev_id;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -258,6 +283,12 @@ __wlan_hdd_enter_sap_low_pwr_mode(struct wiphy *wiphy,
 	}
 
 	hdd_debug("Cookie id received : %llu", cookie_id);
+
+	vdev_id = wlan_vdev_get_id(adapter->deflink->vdev);
+	wlan_hdd_enable_disable_dcs_cmd(
+				hdd_ctx->psoc,
+				wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev),
+				vdev_id, lp_flags);
 
 	len = NLMSG_HDRLEN;
 	/*QCA_WLAN_VENDOR_ATTR_DOZED_AP_COOKIE*/

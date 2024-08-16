@@ -46,6 +46,9 @@
 #endif
 #include <cdp_txrx_ctrl.h>
 #include "wlan_dp_svc.h"
+#include "wlan_dp_stc.h"
+#include "wlan_dp_spm.h"
+#include "wlan_dp_telemetry_priv.h"
 
 #ifdef WLAN_DP_PROFILE_SUPPORT
 /* Memory profile table based on supported caps */
@@ -83,6 +86,8 @@ QDF_STATUS dp_allocate_ctx(void)
 	qdf_spinlock_create(&dp_ctx->dp_link_del_lock);
 	qdf_list_create(&dp_ctx->intf_list, 0);
 	TAILQ_INIT(&dp_ctx->inactive_dp_link_list);
+	wlan_dp_spm_flow_table_attach(dp_ctx);
+	dp_ctx->monitor_flag = 0;
 
 	dp_attach_ctx(dp_ctx);
 
@@ -95,6 +100,7 @@ void dp_free_ctx(void)
 
 	dp_ctx =  dp_get_context();
 
+	wlan_dp_spm_flow_table_detach(dp_ctx);
 	qdf_spinlock_destroy(&dp_ctx->dp_link_del_lock);
 	qdf_spinlock_destroy(&dp_ctx->intf_list_lock);
 	qdf_list_destroy(&dp_ctx->intf_list);
@@ -657,6 +663,48 @@ static void dp_ini_tcp_settings(struct wlan_dp_psoc_cfg *config,
 }
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
+#ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
+/**
+ * dp_ini_load_balance() - Initialize INIs concerned about load balance
+ * @config: pointer to dp config
+ * @psoc: pointer to psoc obj
+ *
+ * Return: none
+ */
+static void dp_ini_load_balance(struct wlan_dp_psoc_cfg *config,
+				struct wlan_objmgr_psoc *psoc)
+{
+	config->is_load_balance_enabled = cfg_get(psoc,
+						  CFG_DP_ENABLE_LOAD_BALANCE);
+}
+#else
+static void dp_ini_load_balance(struct wlan_dp_psoc_cfg *config,
+				struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
+#ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
+/**
+ * dp_ini_flow_balance() - Initialize INIs concerned about flow balance
+ * @config: pointer to dp config
+ * @psoc: pointer to psoc obj
+ *
+ * Return: none
+ */
+static void dp_ini_flow_balance(struct wlan_dp_psoc_cfg *config,
+				struct wlan_objmgr_psoc *psoc)
+{
+	config->is_flow_balance_enabled = cfg_get(psoc,
+						  CFG_DP_ENABLE_FLOW_BALANCE);
+}
+#else
+static void dp_ini_flow_balance(struct wlan_dp_psoc_cfg *config,
+				struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 #ifdef CONFIG_DP_TRACE
 /**
  * dp_trace_cfg_update() - initialize DP Trace config
@@ -831,6 +879,8 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 		  + 1;
 	dp_ini_bus_bandwidth(config, psoc);
 	dp_ini_tcp_settings(config, psoc);
+	dp_ini_load_balance(config, psoc);
+	dp_ini_flow_balance(config, psoc);
 
 	dp_ini_tcp_del_ack_settings(config, psoc);
 
@@ -872,6 +922,7 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_trace_cfg_update(config, psoc);
 	dp_fisa_cfg_init(config, psoc);
 	dp_direct_link_cfg_init(config, psoc);
+	wlan_dp_stc_cfg_init(config, psoc);
 }
 
 /**
@@ -1228,23 +1279,27 @@ dp_intf_get_next_deflink_candidate(struct wlan_dp_intf *dp_intf,
 QDF_STATUS
 dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 {
+	struct wlan_dp_peer_priv_context *priv_ctx;
 	struct wlan_dp_sta_info *sta_info;
 	QDF_STATUS status;
 
-	sta_info = qdf_mem_malloc(sizeof(*sta_info));
-	if (!sta_info)
+	priv_ctx = qdf_mem_malloc(sizeof(*priv_ctx));
+	if (!priv_ctx) {
+		dp_err("Failed to allocated DP peer priv ctx");
 		return QDF_STATUS_E_NOMEM;
+	}
 
 	status = wlan_objmgr_peer_component_obj_attach(peer, WLAN_COMP_DP,
-						       sta_info,
+						       priv_ctx,
 						       QDF_STATUS_SUCCESS);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("DP peer ("QDF_MAC_ADDR_FMT") attach failed",
 			QDF_MAC_ADDR_REF(peer->macaddr));
-		qdf_mem_free(sta_info);
+		qdf_mem_free(priv_ctx);
 		return status;
 	}
 
+	sta_info = &priv_ctx->sta_info;
 	qdf_mem_copy(sta_info->sta_mac.bytes, peer->macaddr,
 		     QDF_MAC_ADDR_SIZE);
 	sta_info->pending_eap_frm_type = 0;
@@ -1260,22 +1315,24 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 QDF_STATUS
 dp_peer_obj_destroy_notification(struct wlan_objmgr_peer *peer, void *arg)
 {
-	struct wlan_dp_sta_info *sta_info;
+	struct wlan_dp_peer_priv_context *priv_ctx;
 	QDF_STATUS status;
 
-	sta_info = dp_get_peer_priv_obj(peer);
-	if (!sta_info) {
+	priv_ctx = dp_get_peer_priv_obj(peer);
+	if (!priv_ctx) {
 		dp_err("DP_peer_obj is NULL");
 		return QDF_STATUS_E_FAULT;
 	}
 
+	wlan_dp_resource_mgr_vote_node_free(peer);
+
 	status = wlan_objmgr_peer_component_obj_detach(peer, WLAN_COMP_DP,
-						       sta_info);
+						       priv_ctx);
 	if (QDF_IS_STATUS_ERROR(status))
 		dp_err("DP peer ("QDF_MAC_ADDR_FMT") detach failed",
 			QDF_MAC_ADDR_REF(peer->macaddr));
 
-	qdf_mem_free(sta_info);
+	qdf_mem_free(priv_ctx);
 
 	return status;
 }
@@ -1327,6 +1384,8 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 
 	/* Update Parent interface details */
 	dp_link->magic = WLAN_DP_LINK_MAGIC;
+	dp_link->destroyed = 0;
+	dp_link->cdp_vdev_deleted = 0;
 	dp_link->dp_intf = dp_intf;
 	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
 	qdf_list_insert_front(&dp_intf->dp_link_list, &dp_link->node);
@@ -1350,6 +1409,8 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		return status;
 	}
 
+	wlan_dp_resource_mgr_notify_vdev_creation(dp_ctx->rsrc_mgr_ctx, vdev);
+
 	dp_intf->device_mode = wlan_vdev_mlme_get_opmode(vdev);
 
 	if (dp_intf->device_mode == QDF_SAP_MODE ||
@@ -1366,6 +1427,8 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		dp_nud_ignore_tracking(dp_intf, false);
 		dp_mic_enable_work(dp_intf);
 		dp_flow_priortization_init(dp_intf);
+		wlan_dp_spm_intf_ctx_init(dp_intf);
+		dp_telemetry_init(dp_intf);
 
 		if (dp_intf->device_mode == QDF_SAP_MODE ||
 		    dp_intf->device_mode == QDF_P2P_GO_MODE) {
@@ -1437,6 +1500,8 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	dp_intf = dp_link->dp_intf;
 	dp_ctx = dp_intf->dp_ctx;
 
+	wlan_dp_resource_mgr_notify_vdev_deletion(dp_ctx->rsrc_mgr_ctx, vdev);
+
 	qdf_spin_lock_bh(&dp_intf->dp_link_list_lock);
 	qdf_list_remove_node(&dp_intf->dp_link_list, &dp_link->node);
 	dp_intf->num_links--;
@@ -1450,7 +1515,9 @@ dp_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 		 * Interface level operations are stopped when last
 		 * link is deleted
 		 */
+		wlan_dp_spm_intf_ctx_deinit(dp_intf);
 		dp_flow_priortization_deinit(dp_intf);
+		dp_telemetry_deinit(dp_intf);
 		dp_nud_ignore_tracking(dp_intf, true);
 		dp_nud_reset_tracking(dp_intf);
 		dp_nud_flush_work(dp_intf);
@@ -1518,11 +1585,13 @@ dp_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 		obj_mgr_err("psoc is NULL in pdev");
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	dp_ctx =  dp_psoc_get_priv(psoc);
 	if (!dp_ctx) {
 		dp_err("Failed to get dp_ctx from psoc");
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	status = wlan_objmgr_pdev_component_obj_attach(pdev,
 						       WLAN_COMP_DP,
 						       (void *)dp_ctx,
@@ -1533,6 +1602,17 @@ dp_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 	}
 
 	dp_ctx->pdev = pdev;
+
+	/* STC attach is being done here, after FISA considering the
+	 * below two reasons:
+	 * 1) STC is dependent on FW capability as one of its clients for
+	 * initialization, which is not populated during cds_dp_open. Hence the
+	 * STC attach is being done during objmgr pdev create.
+	 * 2) FISA will not start before pdev create, so its safe to attach
+	 * STC after FISA, though there is a dependency on FISA.
+	 */
+	wlan_dp_stc_attach(dp_ctx);
+
 	return status;
 }
 
@@ -1555,6 +1635,13 @@ dp_pdev_obj_destroy_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 		dp_err("Failed to get dp_ctx from pdev");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	/*
+	 * wlan_dp_stc_detach(dp_ctx);
+	 *
+	 * STC detach has been done earlier in cds_dp_close, since STC is
+	 * dependent on FISA, and hence should be closed before FISA.
+	 */
 	status = wlan_objmgr_pdev_component_obj_detach(pdev,
 						       WLAN_COMP_DP,
 						       dp_ctx);
@@ -1562,6 +1649,7 @@ dp_pdev_obj_destroy_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 		dp_err("Failed to detach dp_ctx from pdev");
 		return status;
 	}
+
 	if (!dp_ctx->pdev)
 		dp_err("DP Pdev is NULL");
 
@@ -1755,7 +1843,7 @@ void dp_send_rps_ind(struct wlan_dp_intf *dp_intf)
 			i, rps_data.cpu_map_list[i]);
 	}
 
-	strlcpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
+	strscpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
 		sizeof(rps_data.ifname));
 	dp_ctx->dp_ops.dp_send_svc_nlink_msg(cds_get_radio_index(),
 					     WLAN_SVC_RPS_ENABLE_IND,
@@ -1803,7 +1891,7 @@ void dp_send_rps_disable_ind(struct wlan_dp_intf *dp_intf)
 
 	qdf_mem_zero(&rps_data.cpu_map_list, sizeof(rps_data.cpu_map_list));
 
-	strlcpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
+	strscpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
 		sizeof(rps_data.ifname));
 	dp_intf->dp_ctx->dp_ops.dp_send_svc_nlink_msg(cds_get_radio_index(),
 				    WLAN_SVC_RPS_ENABLE_IND,
@@ -2159,17 +2247,17 @@ void wlan_dp_link_cdp_vdev_delete_notification(void *context)
 {
 	struct wlan_dp_link *dp_link = (struct wlan_dp_link *)context;
 	struct wlan_dp_link *tmp_dp_link;
-	struct wlan_dp_intf *dp_intf = NULL;
 	struct wlan_dp_psoc_context *dp_ctx = NULL;
 	uint8_t found = 0;
 
 	/* dp_link will not be freed before this point. */
-	if (!dp_link)
+	if (!dp_link) {
+		dp_info("dp_link is null");
 		return;
+	}
 
 	dp_info("dp_link %pK id %d", dp_link, dp_link->link_id);
-	dp_intf = dp_link->dp_intf;
-	dp_ctx = dp_intf->dp_ctx;
+	dp_ctx = dp_get_context();
 
 	qdf_spin_lock_bh(&dp_ctx->dp_link_del_lock);
 
@@ -2305,7 +2393,8 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 	} else if (params->target_type == TARGET_TYPE_KIWI ||
 		   params->target_type == TARGET_TYPE_MANGO ||
 		   params->target_type == TARGET_TYPE_PEACH ||
-		   params->target_type == TARGET_TYPE_WCN7750) {
+		   params->target_type == TARGET_TYPE_WCN7750 ||
+		   params->target_type == TARGET_TYPE_QCC2072) {
 		dp_soc = cdp_soc_attach(BERYLLIUM_DP, hif_context,
 					params->target_psoc,
 					htc_ctx, qdf_ctx,
@@ -2340,6 +2429,8 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 	wlan_dp_rx_fisa_cmem_attach(dp_ctx);
 	wlan_dp_svc_init(dp_ctx);
 
+	wlan_dp_resource_mgr_attach(dp_ctx);
+
 	return dp_soc;
 
 err_soc_detach:
@@ -2363,10 +2454,12 @@ void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 
+	wlan_dp_resource_mgr_detach(dp_ctx);
 	cdp_soc_deinit(soc);
 	wlan_dp_check_inactive_dp_links(dp_ctx);
 	cdp_soc_detach(soc);
 	wlan_dp_svc_deinit(dp_ctx);
+	dp_ctx->cdp_soc = NULL;
 }
 
 QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)
@@ -2420,15 +2513,18 @@ QDF_STATUS wlan_dp_txrx_pdev_attach(ol_txrx_soc_handle soc)
 
 	/* FISA Attach */
 	qdf_status = wlan_dp_rx_fisa_attach(dp_ctx);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		/* return success to let init process go */
-		if (qdf_status == QDF_STATUS_E_NOSUPPORT)
-			return QDF_STATUS_SUCCESS;
+	if (qdf_status == QDF_STATUS_E_NOSUPPORT)
+		qdf_status = QDF_STATUS_SUCCESS;
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		goto fisa_attach_fail;
 
-		wlan_dp_txrx_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC),
-					 OL_TXRX_PDEV_ID, false);
-		return qdf_status;
-	}
+	wlan_dp_resource_mgr_set_req_resources(dp_ctx->rsrc_mgr_ctx);
+
+	return qdf_status;
+
+fisa_attach_fail:
+	wlan_dp_txrx_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC),
+				 OL_TXRX_PDEV_ID, false);
 
 	return qdf_status;
 }
@@ -2439,6 +2535,11 @@ QDF_STATUS wlan_dp_txrx_pdev_detach(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	struct wlan_dp_psoc_context *dp_ctx;
 
 	dp_ctx =  dp_get_context();
+	/*
+	 * STC detach must be done before FISA detach, since STC uses the
+	 * FISA table.
+	 */
+	wlan_dp_stc_detach(dp_ctx);
 	wlan_dp_rx_fisa_detach(dp_ctx);
 	return cdp_pdev_detach(soc, pdev_id, force);
 }

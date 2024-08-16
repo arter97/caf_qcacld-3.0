@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,14 +28,19 @@
 
 #define P2P_MAX_NOA_DESC 4
 
+#define P2P_MC_ADDR      "\x51\x6F\x9A\x02"
+#define P2P_MC_ADDR_SIZE 4
+
 #define HEADER_LEN_P2P_IE  6
-#define OUI_SIZE_P2P       4
 
 #define P2P_1X1_WAR_OUI   "\x00\x50\xf2\x04"
 #define P2P_1X1_OUI_LEN    4
 
 #define MAX_CONFIG_METHODS_LEN   2
 #define DEVICE_CATEGORY_MAX_LEN  1
+
+#define P2P_OUI                  "\x50\x6f\x9a\x09"
+#define P2P_OUI_SIZE             4
 
 /**
  * struct p2p_ps_params - P2P powersave related params

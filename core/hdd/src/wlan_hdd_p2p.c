@@ -132,7 +132,8 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	}
 
 	/* Disable NAN Discovery if enabled */
-	ucfg_nan_disable_concurrency(hdd_ctx->psoc);
+	if (!ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc))
+		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 
 	status = wlan_cfg80211_roc(vdev, chan, duration, cookie);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
@@ -660,15 +661,8 @@ int hdd_set_p2p_ps(struct net_device *dev, void *msgData)
 	return wlan_hdd_set_power_save(adapter, &noa);
 }
 
-/**
- * hdd_allow_new_intf() - Allow new intf created or not
- * @hdd_ctx: hdd context
- * @mode: qdf opmode of new interface
- *
- * Return: true if allowed, otherwise false
- */
-static bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
-			       enum QDF_OPMODE mode)
+bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
+			enum QDF_OPMODE mode)
 {
 	struct hdd_adapter *adapter = NULL;
 	struct hdd_adapter *next_adapter = NULL;
@@ -797,6 +791,8 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 
 	adapter = NULL;
 	if (type == NL80211_IFTYPE_MONITOR) {
+		bool is_rx_mon = QDF_MONITOR_FLAG_OTHER_BSS & *flags;
+
 		/*
 		 * if QDF_MONITOR_FLAG_OTHER_BSS bit is set in monitor flags
 		 * driver will assume current mode as STA + Monitor Mode.
@@ -805,14 +801,15 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 		 * reject the request.
 		 **/
 		if ((ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc) &&
-		     !(QDF_MONITOR_FLAG_OTHER_BSS & *flags)) ||
+		     !is_rx_mon) ||
 		    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) &&
-		     (QDF_MONITOR_FLAG_OTHER_BSS & *flags)) ||
+		     is_rx_mon) ||
 		    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
 						PACKET_CAPTURE_MODE_DISABLE) {
 			ret = wlan_hdd_add_monitor_check(hdd_ctx,
 							 &adapter, name, true,
-							 name_assign_type);
+							 name_assign_type,
+							 is_rx_mon);
 			if (ret)
 				return ERR_PTR(-EINVAL);
 
@@ -1278,16 +1275,29 @@ __hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 	}
 
 	/* Get adapter from Destination mac address of the frame */
+	dest_addr = &pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET];
 	if (type == WLAN_FC0_TYPE_MGMT &&
 	    sub_type != SIR_MAC_MGMT_PROBE_REQ && !is_pasn_auth_frame &&
-	    !qdf_is_macaddr_broadcast(
-	     (struct qdf_mac_addr *)&pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET])) {
-		dest_addr = &pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET];
+	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)dest_addr)) {
 		adapter = hdd_get_adapter_by_macaddr(hdd_ctx, dest_addr);
 		if (!adapter)
 			adapter = hdd_get_adapter_by_rand_macaddr(hdd_ctx,
 								  dest_addr);
 		if (!adapter) {
+			/* check if it is P2P MC address */
+			if (!qdf_mem_cmp(dest_addr,
+					 P2P_MC_ADDR, P2P_MC_ADDR_SIZE)) {
+				adapter = hdd_get_adapter(hdd_ctx,
+							  QDF_P2P_DEVICE_MODE);
+				if (!adapter) {
+					hdd_err("P2P adapter is null for frame %d len %d rx freq %d",
+						frame_type, frm_len, rx_freq);
+					return;
+				}
+
+				goto check_adapter;
+			}
+
 			/*
 			 * Under assumption that we don't receive any action
 			 * frame with BCST as destination,
