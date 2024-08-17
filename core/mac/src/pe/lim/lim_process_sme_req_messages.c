@@ -5887,29 +5887,6 @@ static uint8_t lim_get_num_tpe_octets(uint8_t max_transmit_power_count)
 	return 1 << (max_transmit_power_count - 1);
 }
 
-static enum reg_6g_ap_type
-lim_get_ap_power_type_for_tpc_calc(struct mac_context *mac,
-				   struct pe_session *session)
-{
-	bool rf_test_mode = false;
-	bool safe_mode_enable = false;
-	enum reg_6g_ap_type ap_power_type_6g;
-
-	ap_power_type_6g = session->best_6g_power_type;
-	wlan_mlme_get_safe_mode_enable(mac->psoc,
-				       &safe_mode_enable);
-	wlan_mlme_is_rf_test_mode_enabled(mac->psoc,
-					  &rf_test_mode);
-	/*
-	 * set LPI power if safe mode is enabled OR RF test
-	 * mode is enabled.
-	 */
-	if (rf_test_mode || safe_mode_enable)
-		ap_power_type_6g = REG_INDOOR_AP;
-
-	return ap_power_type_6g;
-}
-
 void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		      tDot11fIEtransmit_power_env *tpe_ies, uint8_t num_tpe_ies,
 		      tDot11fIEhe_op *he_op, bool *has_tpe_updated)
@@ -6017,8 +5994,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	bw_val = wlan_reg_get_bw_value(session->ch_width);
 
 	if (wlan_reg_is_6ghz_chan_freq(curr_op_freq)) {
-		ap_power_type_6g =
-			lim_get_ap_power_type_for_tpc_calc(mac, session);
+		ap_power_type_6g = session->best_6g_power_type;
 		if (psd_set) {
 			wlan_reg_get_client_power_for_connecting_ap(
 				mac->pdev, ap_power_type_6g,
@@ -6541,8 +6517,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 		is_6ghz_freq = true;
 		/* Power mode calculation for 6 GHz STA*/
 		if (LIM_IS_STA_ROLE(session))
-			ap_power_type_6g =
-			lim_get_ap_power_type_for_tpc_calc(mac, session);
+			ap_power_type_6g = session->best_6g_power_type;
 	}
 
 	if (mlme_obj->reg_tpc_obj.num_pwr_levels) {
