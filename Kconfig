@@ -2165,4 +2165,12 @@ config WLAN_FASTPATH_LEGACY
 config QCA_SUPPORT_TX_THROTTLE_LEGACY
 	bool "Enable QCA_SUPPORT_TX_THROTTLE_LEGACY"
 	default n
+
+config PLD_SNOC_ICNSS_FLAG
+	bool "Enable PLD_SNOC_ICNSS_FLAG"
+	default n
+
+config ICNSS2_HELIUM
+	bool "Enable ICNSS2_HELIUM"
+	default n
 endif # QCA_CLD_WLAN
