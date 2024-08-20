@@ -552,3 +552,35 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
 }
+
+static
+struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
+				      const uint8_t *macaddr)
+{
+	return tdls_find_peer(vdev_obj, macaddr);
+}
+
+bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mac_addr)
+{
+	struct tdls_vdev_priv_obj *vdev_obj;
+	struct tdls_peer *curr_peer;
+
+	vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
+	if (!vdev_obj) {
+		tdls_err("vdev_obj: %pK is null", vdev_obj);
+		return false;
+	}
+
+	curr_peer = wlan_tdls_find_peer(vdev_obj, mac_addr->bytes);
+	if (!curr_peer) {
+		tdls_err("tdls peer is null");
+		return false;
+	}
+
+	if (curr_peer->valid_entry &&
+	    curr_peer->link_status ==  TDLS_LINK_CONNECTED)
+		return true;
+
+	return false;
+}

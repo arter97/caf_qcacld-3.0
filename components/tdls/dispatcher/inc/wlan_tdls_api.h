@@ -215,6 +215,16 @@ void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint8_t *peer_addr);
+/**
+ * wlan_tdls_is_addba_request_allowed() - API to check if Add Block ack request
+ * is allowed for TDLS peer in current state.
+ * @vdev: Vdev object pointer
+ * @mac_addr: Mac address of the peer
+ *
+ * Return: True if ADDBA frame can be allowed
+ */
+bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mac_addr);
 #else
 
 #ifdef FEATURE_SET
@@ -295,5 +305,12 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint8_t *peer_addr)
 {}
+
+static inline
+bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mac_addr)
+{
+	return false;
+}
 #endif
 #endif
