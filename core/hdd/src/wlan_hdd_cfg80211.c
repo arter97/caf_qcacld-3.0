@@ -4391,6 +4391,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 						     adapter->device_mode,
 						     adapter->deflink->vdev_id);
 
+	ucfg_policy_mgr_acs_start(hdd_ctx->psoc, link_info->vdev_id);
 	/* consult policy manager to get PCL */
 	qdf_status = policy_mgr_get_pcl(hdd_ctx->psoc, pm_mode,
 					sap_config->acs_cfg.pcl_chan_freq,
@@ -4399,6 +4400,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					pcl_channels_weight_list,
 					NUM_CHANNELS,
 					link_info->vdev_id);
+
+	ucfg_policy_mgr_acs_completed(hdd_ctx->psoc, link_info->vdev_id);
 
 	sap_config->acs_cfg.band = hw_mode;
 
