@@ -2982,7 +2982,6 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 		lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
 				     (uint32_t *)&assoc_cnf);
 
-		session_entry->limMlmState = eLIM_MLM_IDLE_STATE;
 		qdf_mem_free(link_assoc_rsp.ptr);
 
 		return status;
