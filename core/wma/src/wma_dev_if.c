@@ -1354,12 +1354,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 			  rsp->vdev_id, rsp->cfgd_tx_streams,
 			  rsp->cfgd_rx_streams, rsp->chain_mask, mac_id);
 
-		if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id))
-			policy_mgr_update_dfs_master_dynamic_enabled(
-					psoc,
-					true,
-					iface->vdev->vdev_mlme.des_chan);
-
 		/* Fill bss_chan after vdev start */
 		qdf_mem_copy(iface->vdev->vdev_mlme.bss_chan,
 			     iface->vdev->vdev_mlme.des_chan,
