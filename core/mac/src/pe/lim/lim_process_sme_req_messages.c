@@ -4194,8 +4194,17 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 		     (uint16_t *)&req->assoc_ie.len, WLAN_ELEMID_RSNXE,
 		     ONE_BYTE, NULL, 0, rsnxe, WLAN_MAX_IE_LEN);
 
-	if (!rsnxe[0])
+	if (!rsnxe[SIR_MAC_IE_TYPE_OFFSET] || !rsnxe[SIR_MAC_IE_LEN_OFFSET])
 		goto end;
+
+	/*
+	 * Do not rebuild the RSNXE with length 1, if none of the caps are set
+	 * in the first octet. It leads to the creation of an empty RSNXE.
+	 */
+	if (!(rsnxe[2] & 0xF0)) {
+		pe_debug("None of the caps are set in 1st octet, strip RSNXE");
+		goto end;
+	}
 
 	switch (ap_rsnxe_len) {
 	case 0:
