@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,9 +49,6 @@ static ssize_t __hdd_sysfs_ipaucstate_store(struct net_device *net_dev,
 		return -EINVAL;
 
 	if (!ucfg_ipa_is_enabled())
-		return -EINVAL;
-
-	if (adapter->device_mode != QDF_SAP_MODE)
 		return -EINVAL;
 
 	ret = hdd_sysfs_validate_and_copy_buf(cmd, sizeof(cmd),

@@ -829,6 +829,9 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 	case NEIGHBOUR_LOOKUP_THRESHOLD:
 		dst_config->uint_value = src_cfg->neighbor_lookup_threshold;
 		break;
+	case NEXT_RSSI_THRESHOLD:
+		dst_config->uint_value = src_cfg->next_rssi_threshold;
+		break;
 	case SCAN_N_PROBE:
 		dst_config->uint_value = src_cfg->roam_scan_n_probes;
 		break;
@@ -1285,6 +1288,7 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct rso_config *rso_cfg;
 	struct rso_cfg_params *dst_cfg;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_roam_scan_channel_list chan_info = {0};
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -1378,9 +1382,30 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 					src_config->chan_info.num_chan, true);
 		if (QDF_IS_STATUS_ERROR(status))
 			break;
-		if (mlme_obj->cfg.lfr.roam_scan_offload_enabled)
-			cm_roam_update_cfg(psoc, vdev_id,
-					   REASON_CHANNEL_LIST_CHANGED);
+		if (!mlme_obj->cfg.lfr.roam_scan_offload_enabled)
+			break;
+
+		chan_info.vdev_id = vdev_id;
+		chan_info.chan_count = dst_cfg->pref_chan_info.num_chan;
+		qdf_mem_copy(chan_info.chan_freq_list,
+			     dst_cfg->pref_chan_info.freq_list,
+			     chan_info.chan_count * sizeof(uint32_t));
+		chan_info.chan_cache_type = CHANNEL_LIST_DYNAMIC;
+
+		status = cm_roam_acquire_lock(vdev);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
+		if (!MLME_IS_ROAM_STATE_RSO_ENABLED(psoc, vdev_id)) {
+			mlme_debug("PREF_CHAN received while ROAM RSO not started");
+			cm_roam_release_lock(vdev);
+			status = QDF_STATUS_E_INVAL;
+			break;
+		}
+		cm_fill_rso_channel_list(psoc, vdev, rso_cfg,
+					 &chan_info,
+					 REASON_CHANNEL_LIST_CHANGED);
+		wlan_cm_tgt_send_roam_freqs(psoc, vdev_id, &chan_info);
+		cm_roam_release_lock(vdev);
 		break;
 	case ROAM_SPECIFIC_CHAN:
 		status = cm_update_roam_scan_channel_list(psoc, vdev, rso_cfg,
@@ -1390,9 +1415,30 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 					false);
 		if (QDF_IS_STATUS_ERROR(status))
 			break;
-		if (mlme_obj->cfg.lfr.roam_scan_offload_enabled)
-			cm_roam_update_cfg(psoc, vdev_id,
-					   REASON_CHANNEL_LIST_CHANGED);
+		if (!mlme_obj->cfg.lfr.roam_scan_offload_enabled)
+			break;
+
+		chan_info.vdev_id = vdev_id;
+		chan_info.chan_count = dst_cfg->specific_chan_info.num_chan;
+		qdf_mem_copy(chan_info.chan_freq_list,
+			     dst_cfg->specific_chan_info.freq_list,
+			     chan_info.chan_count * sizeof(uint32_t));
+		chan_info.chan_cache_type = CHANNEL_LIST_DYNAMIC;
+
+		status = cm_roam_acquire_lock(vdev);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
+		if (!MLME_IS_ROAM_STATE_RSO_ENABLED(psoc, vdev_id)) {
+			mlme_debug("SPECIFIC_CHAN received while ROAM RSO not started");
+			cm_roam_release_lock(vdev);
+			status = QDF_STATUS_E_INVAL;
+			break;
+		}
+		cm_fill_rso_channel_list(psoc, vdev, rso_cfg,
+					 &chan_info,
+					 REASON_CHANNEL_LIST_CHANGED);
+		wlan_cm_tgt_send_roam_freqs(psoc, vdev_id, &chan_info);
+		cm_roam_release_lock(vdev);
 		break;
 	case ROAM_RSSI_DIFF:
 		dst_cfg->roam_rssi_diff = src_config->uint_value;
@@ -1405,6 +1451,9 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		break;
 	case NEIGHBOUR_LOOKUP_THRESHOLD:
 		dst_cfg->neighbor_lookup_threshold = src_config->uint_value;
+		fallthrough;
+	case NEXT_RSSI_THRESHOLD:
+		dst_cfg->next_rssi_threshold = src_config->uint_value;
 		break;
 	case SCAN_N_PROBE:
 		dst_cfg->roam_scan_n_probes = src_config->uint_value;
@@ -1565,6 +1614,8 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 	cfg_params->min_chan_scan_time =
 		mlme_obj->cfg.lfr.neighbor_scan_min_chan_time;
 	cfg_params->neighbor_lookup_threshold =
+		mlme_obj->cfg.lfr.neighbor_lookup_rssi_threshold;
+	cfg_params->next_rssi_threshold =
 		mlme_obj->cfg.lfr.neighbor_lookup_rssi_threshold;
 	cfg_params->rssi_thresh_offset_5g =
 		mlme_obj->cfg.lfr.rssi_threshold_offset_5g;
@@ -3131,7 +3182,36 @@ cm_roam_stats_print_roam_initial_info(struct roam_initial_data *data,
 }
 
 /**
- * cm_roam_stats_print_roam_msg_info - Roaming related message details
+ * cm_roam_update_next_rssi_threshold()  - Update neighbor_lookup_threshold
+ * @psoc: Pointer to psoc object
+ * @next_rssi_threshold: value of next rssi threshold coming from FW
+ * @vdev_id: vdev id
+ *
+ * Host updates the configured RSSI threshold from INI
+ * "gNeighborLookupThreshold RoamRSSI_Trigger" over the
+ * GETROAMTRIGGER command. But this RSSI threshold is reduced by
+ * firmware in steps for reasons like candidate not found during
+ * roam scan. So, the expectation is to print the next RSSI
+ * threshold at which the roam scan will be triggered. This value
+ * is received from firmware via the WMI_ROAM_SCAN_STATS_EVENTID.
+ *
+ * Return: None
+ */
+static void
+cm_roam_update_next_rssi_threshold(struct wlan_objmgr_psoc *psoc,
+				   uint32_t next_rssi_threshold,
+				   uint8_t vdev_id)
+{
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = next_rssi_threshold;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id, NEXT_RSSI_THRESHOLD,
+				   &src_config);
+}
+
+/**
+ * cm_roam_stats_process_roam_msg_info - Roaming related message details
+ * @psoc: Pointer to psoc object
  * @data:    Pointer to the btm rsp data
  * @vdev_id: vdev id
  *
@@ -3139,8 +3219,9 @@ cm_roam_stats_print_roam_initial_info(struct roam_initial_data *data,
  *
  * Return: None
  */
-static void cm_roam_stats_print_roam_msg_info(struct roam_msg_info *data,
-					      uint8_t vdev_id)
+static void cm_roam_stats_process_roam_msg_info(struct wlan_objmgr_psoc *psoc,
+						struct roam_msg_info *data,
+						uint8_t vdev_id)
 {
 	char time[TIME_STRING_LEN];
 	static const char msg_id1_str[] = "Roam RSSI TH Reset";
@@ -3150,6 +3231,8 @@ static void cm_roam_stats_print_roam_msg_info(struct roam_msg_info *data,
 		mlme_nofl_info("%s [ROAM MSG INFO]: VDEV[%d] %s, Current rssi: %d dbm, next_rssi_threshold: %d dbm",
 			       time, vdev_id, msg_id1_str, data->msg_param1,
 			       data->msg_param2);
+		cm_roam_update_next_rssi_threshold(psoc, data->msg_param2,
+						   vdev_id);
 	}
 }
 
@@ -3688,9 +3771,9 @@ log_btm_frames_only:
 	if (stats_info->roam_msg_info && stats_info->roam_msg_info[i].present &&
 	    i < stats_info->num_roam_msg_info) {
 		*rem_tlv_len = *rem_tlv_len + 1;
-		cm_roam_stats_print_roam_msg_info(
-						  &stats_info->roam_msg_info[i],
-						  stats_info->vdev_id);
+		cm_roam_stats_process_roam_msg_info(psoc,
+						&stats_info->roam_msg_info[i],
+						stats_info->vdev_id);
 	}
 
 	cm_report_roam_rt_stats(psoc, stats_info->vdev_id,
@@ -4600,6 +4683,8 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 	bool is_wtc = false;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *vdev;
+	uint32_t trigger;
+	struct wmi_roam_scan_data *scan = NULL;
 
 	if (!stats_info)
 		return QDF_STATUS_E_FAILURE;
@@ -4640,8 +4725,18 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 					stats_info->vdev_id,
 					stats_info->trigger[i].trigger_reason,
 					stats_info->trigger[i].timestamp);
+
 				cm_cp_stats_cstats_roam_scan_done
 				     (vdev, &stats_info->scan[i], is_full_scan);
+
+				trigger = stats_info->trigger[i].trigger_reason;
+				scan = &stats_info->scan[i];
+				if (trigger == ROAM_TRIGGER_REASON_LOW_RSSI ||
+				    trigger == ROAM_TRIGGER_REASON_PERIODIC) {
+					cm_roam_update_next_rssi_threshold(
+						psoc, scan->next_rssi_threshold,
+						stats_info->vdev_id);
+				}
 			}
 		}
 
@@ -4689,9 +4784,9 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 		    i < stats_info->num_roam_msg_info &&
 		    stats_info->roam_msg_info[i].present) {
 			rem_tlv++;
-			cm_roam_stats_print_roam_msg_info(
-						  &stats_info->roam_msg_info[i],
-						  stats_info->vdev_id);
+			cm_roam_stats_process_roam_msg_info(psoc,
+						&stats_info->roam_msg_info[i],
+						stats_info->vdev_id);
 		}
 
 		cm_report_roam_rt_stats(psoc, stats_info->vdev_id,
@@ -4757,7 +4852,7 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 	    stats_info->num_roam_msg_info - rem_tlv) {
 		for (i = 0; i < (stats_info->num_roam_msg_info-rem_tlv); i++) {
 			if (stats_info->roam_msg_info[rem_tlv + i].present)
-				cm_roam_stats_print_roam_msg_info(
+				cm_roam_stats_process_roam_msg_info(psoc,
 					&stats_info->roam_msg_info[rem_tlv + i],
 					stats_info->vdev_id);
 		}

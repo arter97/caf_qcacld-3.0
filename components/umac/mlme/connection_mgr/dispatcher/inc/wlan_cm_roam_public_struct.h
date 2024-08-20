@@ -293,6 +293,7 @@ struct rso_chan_info {
  * @neighbor_scan_min_period:
  * @specific_chan_info:
  * @neighbor_lookup_threshold:
+ * @next_rssi_threshold: Next roam can trigger rssi threshold
  * @rssi_thresh_offset_5g:
  * @min_chan_scan_time:
  * @max_chan_scan_time:
@@ -323,6 +324,7 @@ struct rso_cfg_params {
 	uint32_t neighbor_scan_min_period;
 	struct rso_chan_info specific_chan_info;
 	uint8_t neighbor_lookup_threshold;
+	uint8_t next_rssi_threshold;
 	int8_t rssi_thresh_offset_5g;
 	uint32_t min_chan_scan_time;
 	uint32_t max_chan_scan_time;
@@ -756,6 +758,7 @@ struct rso_config_params {
  * @ROAM_SPECIFIC_CHAN: specific channel list
  * @ROAM_RSSI_DIFF: rssi diff
  * @NEIGHBOUR_LOOKUP_THRESHOLD: lookup threshold
+ * @NEXT_RSSI_THRESHOLD: Next roam can trigger rssi threshold
  * @SCAN_N_PROBE: scan n probe
  * @SCAN_HOME_AWAY: scan and away
  * @NEIGHBOUR_SCAN_REFRESH_PERIOD: scan refresh
@@ -788,6 +791,7 @@ enum roam_cfg_param {
 	ROAM_SPECIFIC_CHAN,
 	ROAM_RSSI_DIFF,
 	NEIGHBOUR_LOOKUP_THRESHOLD,
+	NEXT_RSSI_THRESHOLD,
 	SCAN_N_PROBE,
 	SCAN_HOME_AWAY,
 	NEIGHBOUR_SCAN_REFRESH_PERIOD,
@@ -2640,6 +2644,7 @@ struct roam_pmkid_req_event {
  * @send_roam_mlo_config: send MLO config to FW
  * @send_roam_scan_offload_rssi_params: Set the RSSI parameters for roam
  * offload scan
+ * @send_roam_frequencies: send roam frequencies to FW
  */
 struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_vdev_set_pcl_cmd)(struct wlan_objmgr_vdev *vdev,
@@ -2698,6 +2703,9 @@ struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_roam_mlo_config)(struct wlan_objmgr_vdev *vdev,
 					   struct wlan_roam_mlo_config *req);
 #endif
+	QDF_STATUS (*send_roam_frequencies)(
+			struct wlan_objmgr_vdev *vdev,
+			struct wlan_roam_scan_channel_list *rso_ch_info);
 };
 
 /**

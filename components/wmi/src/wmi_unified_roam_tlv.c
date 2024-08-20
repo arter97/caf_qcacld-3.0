@@ -2069,17 +2069,21 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 				WMI_GET_BITS(src_data->frame_info,
 					     WLAN_FRAME_INFO_AUTH_ALG_OFFSET,
 					     4);
+		/*
+		 * src_data->status_code is treated as tx status under
+		 * following condition:
+		 * 1. if the frame is an authentication frame and req_resp bit
+		 * is set to '0'
+		 * 2. If the Frame is Association Request frame
+		 * 3. If the Frame is Re-Association Request Frame
+		 */
 
-		if (!dst_buf->is_rsp) {
+		if ((!dst_buf->is_rsp &&
+		     dst_buf->subtype == MGMT_SUBTYPE_AUTH) ||
+		    dst_buf->subtype == MGMT_SUBTYPE_ASSOC_REQ ||
+		    dst_buf->subtype == MGMT_SUBTYPE_REASSOC_REQ) {
 			dst_buf->tx_status = wmi_get_converted_tx_status(
 							src_data->status_code);
-			/* wmi_roam_frame_info->status_code sent from the fw
-			 * denotes the tx_status of the transmitted frames.
-			 * To Do: Need a separate field for status code or
-			 * use existing field of wmi_roam_frame_info tlv
-			 * to send the tx status of transmitted frame from the
-			 * FW.
-			 */
 			dst_buf->status_code = 0;
 		}
 
@@ -2353,6 +2357,7 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint8_t kck_len;
 	uint8_t kek_len;
+	struct roam_scan_candidate_frame roam_candidate = {0};
 
 	synch_event = param_buf->fixed_param;
 	roam_sync_ind->roamed_vdev_id = synch_event->vdev_id;
@@ -2403,6 +2408,16 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		wmi_fill_data_synch_frame_event(rso_cfg, roam_sync_ind);
 	} else {
 		wmi_fill_data_synch_event(roam_sync_ind, param_buf);
+
+		roam_candidate.vdev_id = roam_sync_ind->roamed_vdev_id;
+		roam_candidate.frame_length =
+				roam_sync_ind->beacon_probe_resp_length;
+		roam_candidate.frame = (uint8_t *)roam_sync_ind +
+				       roam_sync_ind->beacon_probe_resp_offset;
+		roam_candidate.rssi = roam_sync_ind->rssi;
+		roam_candidate.roam_offload_candidate_frm = false;
+		wlan_cm_add_all_link_probe_rsp_to_scan_db(wlan_vdev_get_psoc(vdev),
+							  &roam_candidate);
 	}
 	chan = param_buf->chan;
 	if (chan) {
@@ -2648,34 +2663,8 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		reassoc_req_len = synch_event->reassoc_req_len;
 		reassoc_rsp_len = synch_event->reassoc_rsp_len;
 
-		if (synch_event->bcn_probe_rsp_len > WMI_SVC_MSG_MAX_SIZE) {
-			status = QDF_STATUS_E_FAILURE;
-			goto abort_roam;
-		}
-		if (synch_event->reassoc_rsp_len >
-			(WMI_SVC_MSG_MAX_SIZE - synch_event->bcn_probe_rsp_len)) {
-			status = QDF_STATUS_E_FAILURE;
-			goto abort_roam;
-		}
-		if (synch_event->reassoc_req_len >
-			WMI_SVC_MSG_MAX_SIZE - (synch_event->bcn_probe_rsp_len +
-			synch_event->reassoc_rsp_len)) {
-			status = QDF_STATUS_E_FAILURE;
-			goto abort_roam;
-		}
 		roam_synch_data_len = bcn_probe_rsp_len +
 			reassoc_rsp_len + reassoc_req_len;
-
-		/*
-		 * Below is the check for the entire size of the message
-		 * received from the firmware.
-		 */
-		if (roam_synch_data_len > WMI_SVC_MSG_MAX_SIZE -
-			(sizeof(*synch_event) + sizeof(wmi_channel) +
-			 sizeof(wmi_key_material) + sizeof(uint32_t))) {
-			status = QDF_STATUS_E_FAILURE;
-			goto abort_roam;
-		}
 		roam_synch_data_len += sizeof(struct roam_offload_synch_ind);
 	}
 
