@@ -2517,6 +2517,12 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 		sap_config->chan_freq = AUTO_CHANNEL_SELECT;
 	ucfg_policy_mgr_get_mcc_scc_switch(hdd_ctx->psoc,
 					   &mcc_to_scc_switch);
+
+	if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
+		hdd_info("ACS is already in progress vdev %d",
+			 wlan_vdev_get_id(sap_ctx->vdev));
+		return 0;
+	}
 	/*
 	 * No DFS SCC is allowed in Auto use case. Hence not
 	 * calling DFS override
@@ -2595,7 +2601,7 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 					  sap_config);
 
 	/*
-         * If ACS scan is skipped then ACS request would be completed by now,
+	 * If ACS scan is skipped then ACS request would be completed by now,
 	 * so reset acs in progress flag
 	 */
 	if (sap_config->acs_cfg.skip_acs_scan ||
@@ -4212,7 +4218,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 			link_info->vdev_id);
 		return -EINVAL;
 	} else {
-		qdf_atomic_set(&ap_ctx->acs_in_progress, 1);
 		qdf_event_reset(&link_info->acs_complete_event);
 	}
 
