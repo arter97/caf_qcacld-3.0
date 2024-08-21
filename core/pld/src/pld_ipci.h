@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -166,6 +166,14 @@ pld_ipci_qmi_send(struct device *dev, int type, void *cmd,
 		  int (*cb)(void *ctx, void *event, int event_len))
 {
 	return 0;
+}
+
+static inline int
+pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
+			  int (*cb)(void *ctx, uint16_t type,
+				    void *event, int event_len))
+{
+	return -EINVAL;
 }
 
 static inline int pld_ipci_thermal_register(struct device *dev,
@@ -391,6 +399,24 @@ pld_ipci_qmi_send(struct device *dev, int type, void *cmd,
 {
 	return icnss_qmi_send(dev, type, cmd, cmd_len, cb_ctx, cb);
 }
+
+#ifdef WLAN_CHIPSET_STATS
+static inline int
+pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
+			  int (*cb)(void *ctx, uint16_t type,
+				    void *event, int event_len))
+{
+	return icnss_register_driver_async_data_cb(dev, cb_ctx, cb);
+}
+#else
+static inline int
+pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
+			  int (*cb)(void *ctx, uint16_t type,
+				    void *event, int event_len))
+{
+	return 0;
+}
+#endif
 
 static inline int pld_ipci_thermal_register(struct device *dev,
 					    unsigned long max_state,
