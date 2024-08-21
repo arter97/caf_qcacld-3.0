@@ -2001,6 +2001,8 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 	case WOW_REASON_XGAP:
 		return "XGAP";
 #endif
+	case WOW_REASON_PF_BLOCKING_LAST_TIME:
+		return "PF_BLOCKING_LAST_TIME";
 	default:
 		return "unknown";
 	}
