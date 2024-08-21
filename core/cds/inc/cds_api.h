@@ -70,7 +70,6 @@
  * @CDS_DRIVER_STATE_MODULE_STOP: Module stop in progress or done.
  * @CDS_DRIVER_STATE_ASSERTING_TARGET: Driver assert target in progress.
  * @CDS_DRIVER_STATE_SYS_REBOOTING: System reboot in progress.
- * @CDS_DRIVER_STATE_HTC_READY_TIMEOUT: Htc ready event wait timeout.
  */
 enum cds_driver_state {
 	CDS_DRIVER_STATE_UNINITIALIZED          = 0,
@@ -83,7 +82,6 @@ enum cds_driver_state {
 	CDS_DRIVER_STATE_MODULE_STOP            = BIT(6),
 	CDS_DRIVER_STATE_ASSERTING_TARGET       = BIT(7),
 	CDS_DRIVER_STATE_SYS_REBOOTING          = BIT(8),
-	CDS_DRIVER_STATE_HTC_READY_TIMEOUT      = BIT(9),
 };
 
 /**
@@ -166,19 +164,6 @@ static inline bool cds_is_load_or_unload_in_progress(void)
 
 	return __CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_LOADING) ||
 		__CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_UNLOADING);
-}
-
-/**
- * cds_is_htc_ready_timeout_state() - is driver in htc ready timeout
- *
- * Return: true if driver is in htc ready timeout state and false otherwise.
- */
-static inline bool cds_is_htc_ready_timeout_state(void)
-{
-	enum cds_driver_state state = cds_get_driver_state();
-
-	return __CDS_IS_DRIVER_STATE(
-			state, CDS_DRIVER_STATE_HTC_READY_TIMEOUT);
 }
 
 /**

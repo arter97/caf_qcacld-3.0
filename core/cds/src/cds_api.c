@@ -855,13 +855,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	status = htc_wait_target(HTCHandle);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_alert("Failed to complete BMI phase. status: %d", status);
-		if (status == QDF_STATUS_HTC_READY_TIMEOUT) {
-			cds_alert("Trigger SSR for HTC wait timeout");
-			cds_set_driver_state(CDS_DRIVER_STATE_HTC_READY_TIMEOUT);
-			cds_trigger_recovery(QDF_REASON_UNSPECIFIED);
-		} else {
-			QDF_BUG(status == QDF_STATUS_E_NOMEM || cds_is_fw_down());
-		}
+		QDF_BUG(status == QDF_STATUS_E_NOMEM || cds_is_fw_down());
 
 		goto err_wma_close;
 	}
@@ -2035,12 +2029,8 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 
 	cds_set_recovery_in_progress(true);
 	cds_set_assert_target_in_progress(true);
-	if (pld_force_collect_target_dump(qdf->dev) ||
-	    cds_is_htc_ready_timeout_state()) {
+	if (pld_force_collect_target_dump(qdf->dev))
 		cds_force_assert_target(qdf);
-		cds_clear_driver_state(
-				CDS_DRIVER_STATE_HTC_READY_TIMEOUT);
-	}
 	cds_set_assert_target_in_progress(false);
 
 	/* Do not wait for firmware down block wmi transactions */
