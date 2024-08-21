@@ -2607,8 +2607,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 
 	if (QDF_IS_STATUS_ERROR(hdd_get_txrx_nss(adapter, skb))) {
 		hdd_err_rl("hdd_get txrx nss fail");
-		wlan_cfg80211_vendor_free_skb(skb);
-		return -EINVAL;
+		goto error;
 	}
 
 	if (QDF_IS_STATUS_ERROR(hdd_add_uplink_delay(adapter, skb))) {
@@ -2623,8 +2622,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 
 	if (QDF_IS_STATUS_ERROR(hdd_add_uplink_jitter(adapter, skb))) {
 		hdd_err_rl("hdd_add_uplink_jitter fail");
-		wlan_cfg80211_vendor_free_skb(skb);
-		return -EINVAL;
+		goto error;
 	}
 
 	ret = wlan_cfg80211_vendor_cmd_reply(skb);
@@ -2638,8 +2636,10 @@ error:
 	wlan_cfg80211_vendor_free_skb(skb);
 
 free_sta_info:
-	if (stainfo)
+	if (stainfo) {
+		hdd_free_tx_rx_pkts_per_mcs(stainfo);
 		qdf_mem_free(stainfo);
+	}
 	return -EINVAL;
 }
 
