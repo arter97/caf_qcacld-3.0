@@ -4498,17 +4498,23 @@ void policy_mgr_move_vdev_from_connection_to_disabled_tbl(
 static bool
 policy_mgr_vdev_disabled_by_link_force(struct wlan_objmgr_psoc *psoc,
 				       struct wlan_objmgr_vdev *vdev,
-				       bool peer_assoc)
+				       bool peer_assoc,
+				       bool *is_dynamic_inactive)
 {
 	uint16_t dynamic_inactive = 0, forced_inactive = 0;
 	uint16_t link_id;
 
-	if (ml_is_nlink_service_supported(psoc) &&
-	    !peer_assoc) {
-		ml_nlink_get_dynamic_inactive_links(psoc, vdev,
-						    &dynamic_inactive,
-						    &forced_inactive);
-		link_id = wlan_vdev_get_link_id(vdev);
+	if (!ml_is_nlink_service_supported(psoc))
+		return false;
+
+	ml_nlink_get_dynamic_inactive_links(psoc, vdev,
+					    &dynamic_inactive,
+					    &forced_inactive);
+	link_id = wlan_vdev_get_link_id(vdev);
+	if (is_dynamic_inactive && (dynamic_inactive & (1 << link_id)))
+		*is_dynamic_inactive = true;
+
+	if (!peer_assoc) {
 		if ((forced_inactive | dynamic_inactive) &
 		    (1 << link_id)) {
 			policy_mgr_debug("vdev %d linkid %d is forced inactived 0x%0x dyn 0x%x",
@@ -4528,6 +4534,7 @@ policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
 					    bool peer_assoc)
 {
 	union conc_ext_flag conc_ext_flags;
+	bool is_dynamic_inactive = false;
 
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 		return false;
@@ -4539,8 +4546,12 @@ policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
 
 	/* Check vdev is disabled by link force command */
 	if (policy_mgr_vdev_disabled_by_link_force(psoc, vdev,
-						   peer_assoc))
+						   peer_assoc,
+						   &is_dynamic_inactive))
 		return true;
+
+	if (peer_assoc && is_dynamic_inactive)
+		return false;
 
 	conc_ext_flags.value = policy_mgr_get_conc_ext_flags(vdev, false);
 	/*
@@ -8268,6 +8279,7 @@ policy_mgr_is_ml_sta_links_in_mcc(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t i, j;
 	uint32_t link_id_bitmap;
+	bool mcc_present = false;
 
 	for (i = 0; i < num_ml_sta; i++) {
 		link_id_bitmap = 0;
@@ -8285,21 +8297,22 @@ policy_mgr_is_ml_sta_links_in_mcc(struct wlan_objmgr_psoc *psoc,
 							 ml_freq_lst[j]);
 				if (ml_linkid_lst) {
 					link_id_bitmap |= 1 << ml_linkid_lst[j];
-					policy_mgr_debug("link %d and %d are in MCC with freq %d and freq %d",
+					policy_mgr_debug("link %d and %d are in MCC with freq %d and freq %d bitmap 0x%x",
 							 ml_linkid_lst[i],
 							 ml_linkid_lst[j],
 							 ml_freq_lst[i],
-							 ml_freq_lst[j]);
+							 ml_freq_lst[j],
+							 link_id_bitmap);
 					if (affected_linkid_bitmap)
-						*affected_linkid_bitmap =
+						*affected_linkid_bitmap |=
 							link_id_bitmap;
 				}
-				return true;
+				mcc_present = true;
 			}
 		}
 	}
 
-	return false;
+	return mcc_present;
 }
 
 QDF_STATUS
@@ -13748,7 +13761,9 @@ bool policy_mgr_allow_non_force_link_bitmap(
 	uint8_t vdev_id_num2 = 0;
 	uint8_t vdev_ids2[WLAN_MLO_MAX_VDEVS];
 	uint32_t standby_link_bitmap;
+	uint8_t wlan_link_id;
 	qdf_freq_t standby_freq = 0;
+	uint16_t dynamic_inactive = 0, forced_inactive = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -13779,6 +13794,9 @@ bool policy_mgr_allow_non_force_link_bitmap(
 			vdev_id_bitmap, &vdev_id_num2, vdev_ids2);
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	ml_nlink_get_dynamic_inactive_links(psoc, vdev,
+					    &dynamic_inactive,
+					    &forced_inactive);
 	/* remove the force inactive link's vdev from connection
 	 * table.
 	 */
@@ -13793,7 +13811,7 @@ bool policy_mgr_allow_non_force_link_bitmap(
 	}
 
 	/* Check standby link allowed to be active (no forced) */
-	if (standby_freq) {
+	if (standby_freq && !(standby_link_bitmap & dynamic_inactive)) {
 		conc_ext_flags.value = 0;
 		conc_ext_flags.mlo = true;
 		conc_ext_flags.mlo_link_assoc_connected = true;
@@ -13827,7 +13845,22 @@ bool policy_mgr_allow_non_force_link_bitmap(
 						     WLAN_MLO_MGR_ID);
 			continue;
 		}
-
+		wlan_link_id = wlan_vdev_get_link_id(ml_vdev);
+		if (wlan_link_id == WLAN_INVALID_LINK_ID) {
+			policy_mgr_err("invalid link id %d vdev id %d ",
+				       wlan_link_id, vdev_ids[i]);
+			wlan_objmgr_vdev_release_ref(ml_vdev,
+						     WLAN_MLO_MGR_ID);
+			continue;
+		}
+		if (dynamic_inactive & (1 << wlan_link_id)) {
+			policy_mgr_debug("link id %d vdev id %d is in dynamic_inactive 0x%x",
+					 wlan_link_id, vdev_ids[i],
+					 dynamic_inactive);
+			wlan_objmgr_vdev_release_ref(ml_vdev,
+						     WLAN_MLO_MGR_ID);
+			continue;
+		}
 		conc_ext_flags.value =
 		policy_mgr_get_conc_ext_flags(ml_vdev, true);
 

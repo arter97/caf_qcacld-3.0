@@ -66,6 +66,11 @@ ml_nlink_set_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    enum ml_emlsr_disable_request req_source);
 
+static void
+ml_nlink_handle_mcc_links(struct wlan_objmgr_psoc *psoc,
+			  struct wlan_objmgr_vdev *vdev,
+			  struct ml_link_force_state *force_cmd);
+
 enum home_channel_map_id {
 	HC_NONE,
 	HC_2G,
@@ -2365,20 +2370,20 @@ sta_p2p_force_inactive_table_lowshare_rd = {
 			[HC_5GH] =    {HC_5GH, HC_2G_5GL} },
 	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {HC_2G, 0},
-			[HC_5GL] =    {HC_5GL_5GL, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
 			[HC_5GH] =    {0, HC_2G_5GL_5GL} },
 	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {HC_2G, 0},
 			[HC_5GL] =    {HC_2G, 0},
-			[HC_5GH] =    {HC_5GH_5GH, 0} },
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
 	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {0, 0},
-			[HC_5GL] =    {HC_5GL_5GL, 0},
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
 			[HC_5GH] =    {HC_5GH, HC_5GL_5GL} },
 	[HC_5GL_5GH_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {HC_5GL, 0},
-			[HC_5GH] =    {HC_5GH_5GH, 0} },
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
 	[HC_5GL_5GL_5GL] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {HC_5GL_5GL_5GL, HC_5GL_5GL_5GL},
@@ -2414,16 +2419,16 @@ sta_p2p_force_inactive_table_dbs_rd = {
 			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
 	[HC_2G_5GL_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {HC_2G, 0},
-			[HC_5GL] =    {HC_5GL_5GH, 0},
-			[HC_5GH] =    {HC_5GL_5GH, 0} },
+			[HC_5GL] =    {HC_5GL_5GH, HC_5GL_5GH},
+			[HC_5GH] =    {HC_5GL_5GH, HC_5GL_5GH} },
 	[HC_2G_5GL_5GL] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {HC_2G, 0},
-			[HC_5GL] =    {HC_5GL_5GL, 0},
-			[HC_5GH] =    {HC_5GL_5GL, 0} },
+			[HC_5GL] =    {HC_5GL_5GL, HC_5GL_5GL},
+			[HC_5GH] =    {HC_5GL_5GL, HC_5GL_5GL} },
 	[HC_2G_5GH_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {HC_2G, 0},
-			[HC_5GL] =    {HC_5GH_5GH, 0},
-			[HC_5GH] =    {HC_5GH_5GH, 0} },
+			[HC_5GL] =    {HC_5GH_5GH, HC_5GH_5GH},
+			[HC_5GH] =    {HC_5GH_5GH, HC_5GH_5GH} },
 	[HC_5GL_5GL_5GH] = {[HC_NONE] =   {0, 0},
 			[HC_2G]  =    {0, 0},
 			[HC_5GL] =    {HC_5GL_5GL_5GH, HC_5GL_5GL_5GH},
@@ -2577,6 +2582,46 @@ ml_nlink_handle_removal_links(struct wlan_objmgr_psoc *psoc,
 }
 
 static void
+ml_nlink_handle_mcc_link_emlsr_with_freq(
+				  struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  qdf_freq_t *ml_freq_lst,
+				  uint8_t *ml_vdev_lst,
+				  uint8_t *ml_linkid_lst,
+				  uint8_t ml_num_link,
+				  qdf_freq_t legacy_freq,
+				  struct ml_link_force_state *force_cmd)
+{
+	qdf_freq_t ml_mcc_freq_lst[MAX_DISALLOW_MODE_LINK_NUM];
+	uint32_t ml_mcc_linkid_bitmap = 0;
+	uint8_t mcc_num = 0;
+	uint8_t i;
+
+	if (!policy_mgr_is_ml_sta_links_in_mcc(psoc, ml_freq_lst,
+					       ml_vdev_lst,
+					       ml_linkid_lst,
+					       ml_num_link,
+					       &ml_mcc_linkid_bitmap))
+		return;
+
+	qdf_mem_zero(ml_mcc_freq_lst, sizeof(ml_mcc_freq_lst));
+	for (i = 0; i < ml_num_link; i++) {
+		if (ml_mcc_linkid_bitmap & (1 << ml_linkid_lst[i]))
+			ml_mcc_freq_lst[mcc_num++] = ml_freq_lst[i];
+
+		if (mcc_num >= QDF_ARRAY_SIZE(ml_mcc_freq_lst))
+			break;
+	}
+
+	if (ml_nlink_is_support_emlsr_with_freq(
+			psoc, ml_mcc_freq_lst,
+			legacy_freq))
+		return;
+
+	ml_nlink_handle_mcc_links(psoc, vdev, force_cmd);
+}
+
+static void
 ml_nlink_handle_comm_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 				struct wlan_objmgr_vdev *vdev,
 				struct ml_link_force_state *force_cmd,
@@ -2627,13 +2672,13 @@ ml_nlink_handle_comm_intf_emlsr(struct wlan_objmgr_psoc *psoc,
 			  pm_mode);
 		return;
 	}
-	if (!force_link_required &&
-	    policy_mgr_is_ml_sta_links_in_mcc(psoc, ml_freq_lst,
-					      ml_vdev_lst,
-					      ml_linkid_lst,
-					      ml_num_link,
-					      NULL))
-		force_link_required = true;
+
+	if (!force_link_required)
+		ml_nlink_handle_mcc_link_emlsr_with_freq(
+			psoc, vdev, ml_freq_lst,
+			ml_vdev_lst, ml_linkid_lst,
+			ml_num_link, legacy_freq, force_cmd);
+
 	if (!force_link_required)
 		return;
 
