@@ -14448,16 +14448,13 @@ void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 	}
 	populate_dot11f_rnr_tbtt_info(mac_ctx, session, co_session, dot11f,
 				      CURRENT_RNR_TBTT_INFO_LEN);
-	pe_debug("vdev id %d populate RNR IE with 6G vdev id %d op class %d chan num %d",
+	pe_debug("vdev id %d populate RNR IE with 6G vdev id %d op class %d chan num %d tbtt_len %d",
 		 wlan_vdev_get_id(session->vdev),
 		 wlan_vdev_get_id(co_session->vdev),
-		 dot11f->op_class, dot11f->channel_num);
-
-	pe_debug("AK: tbtt_len %d ",
+		 dot11f->op_class, dot11f->channel_num,
 		 dot11f->tbtt_info_len);
 
 	*num_rnr = 1;
-
 }
 
 QDF_STATUS populate_dot11f_bcn_prot_extcaps(struct mac_context *mac_ctx,
