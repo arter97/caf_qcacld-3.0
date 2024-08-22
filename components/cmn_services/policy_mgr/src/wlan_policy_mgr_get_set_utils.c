@@ -11605,6 +11605,7 @@ bool policy_mgr_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	enum conn_6ghz_flag conn_6ghz_flag = 0;
 	bool is_6g_allowed = false;
+	uint32_t conn_6ghz_capable = CONN_6GHZ_CAPABLE;
 
 	if (conn_flag)
 		*conn_flag = 0;
@@ -11639,10 +11640,14 @@ bool policy_mgr_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc,
 					psoc, vdev_id) |
 					CONN_6GHZ_FLAG_NO_LEGACY_CLIENT;
 
-	if ((conn_6ghz_flag & CONN_6GHZ_CAPABLE) == CONN_6GHZ_CAPABLE)
+	if (wlan_reg_is_afc_power_event_received(pm_ctx->pdev))
+		conn_6ghz_capable &= ~CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED;
+
+	if ((conn_6ghz_flag & conn_6ghz_capable) == conn_6ghz_capable)
 		is_6g_allowed = true;
-	policy_mgr_debug("vdev %d conn_6ghz_flag %x 6ghz %s", vdev_id,
-			 conn_6ghz_flag, is_6g_allowed ? "allowed" : "deny");
+	policy_mgr_debug("vdev %d conn_6ghz_flag %x 6ghz capable %x 6ghz %s",
+			 vdev_id, conn_6ghz_flag, conn_6ghz_capable,
+			 is_6g_allowed ? "allowed" : "deny");
 	if (conn_flag)
 		*conn_flag = conn_6ghz_flag;
 

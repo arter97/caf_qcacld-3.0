@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,6 +36,12 @@
 #define TGT_MAC_ID_24G 0
 #define TGT_MAC_ID_5G 0
 #endif
+
+/* FW update to host tx power 63 is FW init value.
+ * Host should convert it to zero which will reply to
+ * user space when use iw dev get tx power.
+ */
+#define TARGET_MAX_TX_POWER    63
 
 /**
  * target_if_mc_cp_get_mac_id(): API to get mac id
