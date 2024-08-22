@@ -1474,7 +1474,8 @@ static inline void hdd_set_dfs_pri_multiplier(struct hdd_context *hdd_ctx,
 }
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)) || \
+	defined(CFG80211_WIPHY_REGD_NO_RTNL_SUPPORT)
 static int
 hdd_regulatory_set_wiphy_regd_sync(struct wiphy *wiphy,
 				   struct ieee80211_regdomain *regd)
