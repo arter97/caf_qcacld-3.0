@@ -3138,6 +3138,7 @@ enum ll_ap_type {
  * @weight_copy: copy of the original weight
  * @valid: Is this a valid center frequency for regulatory domain
  * @weight_calc_done: Weight calculation done for this channel
+ * @num_bonded_pairs: number of valid bonded pairs
  */
 struct sap_ch_info {
 	uint32_t chan_freq;
@@ -3147,6 +3148,7 @@ struct sap_ch_info {
 	uint32_t weight_copy;
 	bool valid;
 	bool weight_calc_done;
+	uint8_t num_bonded_pairs;
 };
 
 /**
