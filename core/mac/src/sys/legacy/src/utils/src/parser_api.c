@@ -11061,6 +11061,7 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 	bool emlsr_cap;
 	struct wlan_mlo_eml_cap eml_cap = {0};
 	bool emlsr;
+	uint16_t tmp_count;
 
 	if (!mac_ctx || !session || !frm)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -11128,9 +11129,32 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 	presence_bitmap |= WLAN_ML_BV_CTRL_PBM_MLDCAPANDOP_P;
 
 	lim_get_mlo_vdev_list(session, &vdev_count, wlan_vdev_list);
+	tmp_count = vdev_count;
 	for (i = 0; i < vdev_count; i++) {
 		if (!wlan_vdev_list[i])
 			continue;
+		if (wlan_vdev_list[i] == session->vdev)
+			goto release_ref;
+
+		if (!wlan_vdev_mlme_is_mlo_ap(wlan_vdev_list[i]))
+			goto release_ref;
+
+		link_session = pe_find_session_by_vdev_id(mac_ctx,
+							  wlan_vdev_get_id(wlan_vdev_list[i]));
+		if (!link_session) {
+			pe_debug("vdev id %d pe session is not created",
+				 wlan_vdev_get_id(wlan_vdev_list[i]));
+			goto release_ref;
+		}
+
+		if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
+					     link_session->curr_op_freq) &&
+			mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
+			pe_debug("link not active if cac running");
+			tmp_count--;
+			goto release_ref;
+		}
+release_ref:
 		lim_mlo_release_vdev_ref(wlan_vdev_list[i]);
 	}
 
@@ -11141,7 +11165,7 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 	 * or reception of frames minus 1.
 	 */
 	mlo_ie->mld_capab_and_op_info.max_simultaneous_link_num =
-							vdev_count - 1;
+							tmp_count - 1;
 	common_info_len += WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 
 	mlo_ie->mld_id_present = 0;
@@ -11845,6 +11869,7 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 	bool emlsr_cap;
 	struct wlan_mlo_eml_cap eml_cap = {0};
 	bool emlsr;
+	uint16_t tmp_count = 0;
 
 	if (!mac_ctx || !session)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -11910,6 +11935,31 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 	mlo_ie->mld_capab_and_op_present = 1;
 	presence_bitmap |= WLAN_ML_BV_CTRL_PBM_MLDCAPANDOP_P;
 	lim_get_mlo_vdev_list(session, &vdev_count, wlan_vdev_list);
+	tmp_count = vdev_count;
+	for (link = 0; link < vdev_count; link++) {
+		if (!wlan_vdev_list[link])
+			continue;
+		if (wlan_vdev_list[link] == session->vdev)
+			continue;
+
+		if (!wlan_vdev_mlme_is_mlo_ap(wlan_vdev_list[link]))
+			continue;
+
+		link_session = pe_find_session_by_vdev_id(mac_ctx,
+							  wlan_vdev_get_id(wlan_vdev_list[link]));
+		if (!link_session) {
+			pe_debug("vdev id %d pe session is not created",
+				 wlan_vdev_get_id(wlan_vdev_list[link]));
+			continue;
+		}
+		if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
+					     link_session->curr_op_freq) &&
+		    mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
+			pe_debug("link not active if cac running");
+			tmp_count--;
+		}
+	}
+
 	/* max number of simultaneous links */
 
 	/*
@@ -11918,7 +11968,7 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 	 * or reception of frames minus 1.
 	 */
 	mlo_ie->mld_capab_and_op_info.max_simultaneous_link_num =
-							vdev_count - 1;
+							tmp_count - 1;
 	tmp_offset += 2; /* mld capabilities and operations */
 	common_info_length += WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 
