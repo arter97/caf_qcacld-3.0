@@ -7090,16 +7090,16 @@ next:
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
+	if (mlo_sta_present && conc_ext_flags.mlo_link_assoc_connected) {
+		policy_mgr_rl_debug("Allow secondary MLO link");
+		return true;
+	}
+
 	/* Reject if multiple STA connections are not allowed */
 	if (sta_cnt &&
 	    !policy_mgr_allow_multiple_sta_connections(psoc)) {
 		policy_mgr_rl_debug("Disallow Multiple STA connections");
 		return false;
-	}
-
-	if (mlo_sta_present && conc_ext_flags.mlo_link_assoc_connected) {
-		policy_mgr_rl_debug("Allow secondary MLO link");
-		return true;
 	}
 
 	if (conc_ext_flags.mlo && mlo_sta_present) {
