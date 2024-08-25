@@ -68,8 +68,12 @@
 
 #define tdls_notice(params...) \
 	QDF_TRACE_INFO(QDF_MODULE_ID_TDLS, params)
+#define tdls_notice_rl(params...) \
+	QDF_TRACE_INFO_RL(QDF_MODULE_ID_TDLS, params)
 #define tdls_warn(params...) \
 	QDF_TRACE_WARN(QDF_MODULE_ID_TDLS, params)
+#define tdls_warn_rl(params...) \
+	QDF_TRACE_WARN_RL(QDF_MODULE_ID_TDLS, params)
 #define tdls_err(params...) \
 	QDF_TRACE_ERROR(QDF_MODULE_ID_TDLS, params)
 #define tdls_alert(params...) \

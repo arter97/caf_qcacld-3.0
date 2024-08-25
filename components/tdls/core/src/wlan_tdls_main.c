@@ -2212,13 +2212,14 @@ QDF_STATUS tdls_scan_callback(struct tdls_soc_priv_obj *tdls_soc)
 
 	if (tdls_is_progress(tdls_vdev, NULL, 0)) {
 		if (tdls_soc->scan_reject_count++ >= TDLS_SCAN_REJECT_MAX) {
-			tdls_notice("Allow this scan req. as already max no of scan's are rejected");
+			tdls_notice_rl("Allow scan during tdls, as scan reject count %d reached threshold",
+					tdls_soc->scan_reject_count);
 			tdls_soc->scan_reject_count = 0;
 			status = QDF_STATUS_SUCCESS;
 
 		} else {
-			tdls_warn("tdls in progress. scan rejected %d",
-				  tdls_soc->scan_reject_count);
+			tdls_warn_rl("tdls in progress. scan rejected %d",
+				     tdls_soc->scan_reject_count);
 			status = QDF_STATUS_E_BUSY;
 		}
 	}
@@ -2229,7 +2230,7 @@ QDF_STATUS tdls_scan_callback(struct tdls_soc_priv_obj *tdls_soc)
 
 	feature = tdls_soc->tdls_configs.tdls_feature_flags;
 	if (TDLS_IS_SCAN_ENABLED(feature)) {
-		tdls_debug("TDLS Scan enabled, keep tdls link and allow scan, connected tdls peers: %d",
+		tdls_debug("TDLS Scan enabled so allow scan, tdls peers cnt %d",
 			   tdls_peer_count);
 		goto disable_tdls;
 	}
