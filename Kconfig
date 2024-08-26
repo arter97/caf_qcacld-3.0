@@ -673,6 +673,10 @@ config LEAK_DETECTION
 	bool "Enable LEAK_DETECTION"
 	default n
 
+config DP_PEER_UNMAP_TRACK
+	bool "Enable PEER_UNMAP_TRACK"
+	default n
+
 config LFR_SUBNET_DETECTION
 	bool "Enable LFR Subnet Change Detection"
 	default n
