@@ -8505,6 +8505,29 @@ QDF_STATUS sme_ch_avoid_update_req(mac_handle_t mac_handle)
 }
 #endif
 
+QDF_STATUS sme_set_p2p_go_bcn_int(mac_handle_t mac_handle, uint8_t vdev_id,
+				  uint16_t bcn_int)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	enum QDF_OPMODE op_mode;
+	QDF_STATUS status;
+
+	op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
+	if (op_mode != QDF_P2P_GO_MODE) {
+		sme_err("Invalid opmode %d for GO bcn int update", op_mode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->roam.roamSession[vdev_id].update_bcn_int = true;
+		mac->roam.roamSession[vdev_id].bcn_int = bcn_int;
+		status = csr_send_chng_mcc_beacon_interval(mac, vdev_id);
+		sme_release_global_lock(&mac->sme);
+	}
+	return status;
+}
+
 /**
  * sme_set_miracast() - Function to set miracast value to UMAC
  * @mac_handle:                Handle returned by macOpen

@@ -8835,6 +8835,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U16 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_FOLLOW_AP_PREFERENCE_FOR_CNDS_SELECT] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_P2P_GO_BEACON_INTERVAL] = {
+		.type = NLA_U16},
 
 };
 
@@ -12872,6 +12874,33 @@ static int hdd_reset_btm_abridge_flag(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
+/**
+ * hdd_set_p2p_go_bcn_int() - Set P2P GO beacon interval
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_set_p2p_go_bcn_int(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
+{
+	uint16_t bcn_int;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	QDF_STATUS status;
+
+	bcn_int = nla_get_u16(attr);
+
+	hdd_debug("configure P2P GO beacon interval %d", bcn_int);
+	status = sme_set_p2p_go_bcn_int(hdd_ctx->mac_handle,
+			       link_info->vdev_id, bcn_int);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to configure GO beacon interval");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * hdd_set_eht_emlsr_capability() - Set EMLSR capability for EHT STA
@@ -13391,6 +13420,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_reduce_power_scan_mode},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_FOLLOW_AP_PREFERENCE_FOR_CNDS_SELECT,
 	 hdd_reset_btm_abridge_flag},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_P2P_GO_BEACON_INTERVAL,
+	 hdd_set_p2p_go_bcn_int},
 };
 
 #ifdef WLAN_FEATURE_ELNA

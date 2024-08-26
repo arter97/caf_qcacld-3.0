@@ -310,8 +310,8 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 	/* Read beacon interval session Entry */
 	bi = session->beaconParams.beaconInterval;
 	if (bi != bcn->beaconInterval) {
-		pe_debug("Beacon interval changed from %d to %d",
-		       bcn->beaconInterval, bi);
+		pe_debug("Beacon interval changed from %d to %d", bi,
+			bcn->beaconInterval);
 
 		bi = bcn->beaconInterval;
 		session->beaconParams.beaconInterval = (uint16_t) bi;

@@ -4876,6 +4876,16 @@ QDF_STATUS sme_start_bss(mac_handle_t mac_handle, uint8_t vdev_id,
 			 struct start_bss_config *bss_config);
 
 /**
+ * sme_set_p2p_go_bcn_int() - Sets the P2P GO beacon interval
+ * @mac_handle: mac hancle
+ * @vdev_id: vdev id
+ * @bcn_int: beacon interval value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_p2p_go_bcn_int(mac_handle_t mac_handle, uint8_t vdev_id,
+				  uint16_t bcn_int);
+/**
  * sme_sap_ser_callback() - callback from serialization module
  * @cmd: serialization command
  * @reason: reason why serialization module has given this callback
