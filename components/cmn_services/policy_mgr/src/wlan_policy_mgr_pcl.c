@@ -1828,10 +1828,12 @@ static inline enum policy_mgr_pcl_type policy_mgr_get_pcl_4_port(
 static enum policy_mgr_pcl_type policy_mgr_get_pcl_5_port(
 				struct wlan_objmgr_psoc *psoc,
 				enum policy_mgr_con_mode mode,
-				enum policy_mgr_conc_priority_mode pref)
+				enum policy_mgr_conc_priority_mode pref,
+				uint8_t vdev_id)
 {
 	enum policy_mgr_four_connection_mode fifth_index = 0;
 	enum policy_mgr_pcl_type pcl;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
 		policy_mgr_err("Can't find index for 5th port pcl table for non dbs capable");
@@ -1841,10 +1843,29 @@ static enum policy_mgr_pcl_type policy_mgr_get_pcl_5_port(
 	if (mode != PM_SAP_MODE &&
 	    mode != PM_NDI_MODE &&
 	    mode != PM_P2P_GO_MODE &&
-	    mode != PM_P2P_CLIENT_MODE) {
-		policy_mgr_err("Can't start 5th port if not SAP/NDI/P2P");
+	    mode != PM_P2P_CLIENT_MODE &&
+	    mode != PM_STA_MODE) {
+		policy_mgr_err("Can't start 5th port if not SAP/NDI/P2P/STA");
 		return PM_MAX_PCL_TYPE;
 	}
+	/* Allow only ML-non assoc link connection as 5th-port */
+	if (mode == PM_STA_MODE) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+							    WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("vdev %d is not present", vdev_id);
+			return PM_MAX_PCL_TYPE;
+		}
+
+		if (!policy_mgr_is_mlo_sta_present(psoc) ||
+		    !wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+			policy_mgr_err("Can't start 5th port for non ML STA");
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			return PM_MAX_PCL_TYPE;
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	}
+
 	if (mode == PM_P2P_CLIENT_MODE)
 		mode = PM_STA_MODE;
 
@@ -1867,7 +1888,8 @@ static enum policy_mgr_pcl_type policy_mgr_get_pcl_5_port(
 static inline enum policy_mgr_pcl_type policy_mgr_get_pcl_5_port(
 				struct wlan_objmgr_psoc *psoc,
 				enum policy_mgr_con_mode mode,
-				enum policy_mgr_conc_priority_mode pref)
+				enum policy_mgr_conc_priority_mode pref,
+				uint8_t vdev_id)
 {
 	return PM_MAX_PCL_TYPE;
 }
@@ -1972,7 +1994,8 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 		pcl = policy_mgr_get_pcl_4_port(psoc, mode, conc_system_pref);
 		break;
 	case 4:
-		pcl = policy_mgr_get_pcl_5_port(psoc, mode, conc_system_pref);
+		pcl = policy_mgr_get_pcl_5_port(psoc, mode, conc_system_pref,
+						vdev_id);
 		break;
 	default:
 		policy_mgr_err("unexpected num_connections value %d",
@@ -4197,7 +4220,9 @@ enum policy_mgr_four_connection_mode
 			 num_ml_sta, count_p2p);
 	if (num_ml_sta == 2 && count_sap == 1 && count_nan_disc == 1)
 		index = PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS;
-	else if (num_ml_sta == 2 && count_nan_disc == 1 && count_ndi == 1)
+	else if ((num_ml_sta == 2 && count_nan_disc == 1 && count_ndi == 1) ||
+		 (num_ml_sta == 1 && count_p2p == 1 &&
+		  count_nan_disc == 1 && count_ndi == 1))
 		index = PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS;
 	else if (num_ml_sta == 2 && count_p2p == 1 && count_nan_disc == 1)
 		policy_mgr_get_index_for_ml_sta_p2p_nan_dbs(pm_ctx, &index,
