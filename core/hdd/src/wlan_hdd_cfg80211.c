@@ -21143,6 +21143,40 @@ static int wlan_hdd_cfg80211_get_usable_channel(struct wiphy *wiphy,
 
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 /**
+ * hdd_lpc_find_num_non_mon_active_adapters() - Find number of non-monitor
+ * active adapters
+ *
+ * This function iterates over the list of adapters and counts any
+ * non-monitor mode adapter which is UP
+ *
+ * Return: number of active adapters
+ */
+static int hdd_lpc_find_num_non_mon_active_adapters(void)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter = NULL;
+	struct hdd_adapter *next_adapter = NULL;
+	int num_active_adapter = 0;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return -EINVAL;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   NET_DEV_HOLD_LOCAL_PKT_CAPTURE) {
+		if (hdd_is_interface_up(adapter) &&
+			adapter->device_mode != QDF_MONITOR_MODE) {
+			num_active_adapter++;
+		}
+
+		hdd_adapter_dev_put_debug(adapter,
+					  NET_DEV_HOLD_LOCAL_PKT_CAPTURE);
+	}
+
+	return num_active_adapter;
+}
+
+/**
  * os_if_monitor_mode_configure() - Wifi monitor mode configuration
  * vendor command
  * @adapter: hdd adapter
@@ -21156,13 +21190,26 @@ QDF_STATUS os_if_monitor_mode_configure(struct hdd_adapter *adapter,
 					const void *data, int data_len)
 {
 	struct wlan_objmgr_vdev *vdev;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	int num_active_adapter;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
 	if (!vdev)
 		return QDF_STATUS_E_INVAL;
 
-	status = os_if_dp_set_lpc_configure(vdev, data, data_len);
+	num_active_adapter = hdd_lpc_find_num_non_mon_active_adapters();
+
+	/* Currently Local Packet capture is only supported on STA
+	 * interface and if any 2 port concurrency exists, return failure
+	 */
+	if (num_active_adapter == 1) {
+		status = os_if_dp_set_lpc_configure(vdev, data, data_len);
+	} else {
+		status = QDF_STATUS_E_NOSUPPORT;
+		hdd_debug("lpc: conc: more than 1 interface is UP: %d",
+			  num_active_adapter);
+	}
+
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	return status;
 }
