@@ -2888,7 +2888,7 @@ static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
 		return;
 	}
 
-	wlan_hdd_set_powersave(sta_adapter->deflink, true, 0);
+	wlan_hdd_lpc_set_bmps(sta_adapter, true, 0);
 
 	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, false);
 }
@@ -2910,7 +2910,8 @@ static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 		hdd_err("STA adapter does not exist");
 		return;
 	}
-	wlan_hdd_set_powersave(sta_adapter->deflink, false, 0);
+
+	wlan_hdd_lpc_set_bmps(sta_adapter, false, 0);
 
 	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, true);
 }
