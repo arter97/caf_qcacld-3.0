@@ -2892,24 +2892,24 @@ QDF_STATUS
 wlan_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 /**
- * wlan_mlme_is_rf_test_mode_enabled() - Get the rf test mode flag
+ * wlan_mlme_get_rf_test_mode() - Get the rf test mode
  * @psoc: psoc context
- * @value: Enable/Disable value ptr.
+ * @value: RF test mode value ptr.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
+wlan_mlme_get_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t *value);
 
 /**
- * wlan_mlme_set_rf_test_mode_enabled() - Set the rf test mode flag
+ * wlan_mlme_set_rf_test_mode() - Set the rf test mode
  * @psoc: psoc context
- * @value: Enable/Disable value.
+ * @value: RF test mode value.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
+wlan_mlme_set_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t value);
 
 #ifdef CONFIG_BAND_6GHZ
 /**

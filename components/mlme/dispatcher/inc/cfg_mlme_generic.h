@@ -328,10 +328,10 @@ enum wlan_epcs_frame {
 /*
  * rf_test_mode_enabled - Enable rf test mode support
  * @Min: 0
- * @Max: 1
+ * @Max: 4
  * @Default: 0
  *
- * This cfg is used to set rf test mode support flag
+ * This cfg is used to set rf test mode support
  * by default 6 G Hz security check will be enabled
  * with rf test mode as disabled.
  *
@@ -339,9 +339,12 @@ enum wlan_epcs_frame {
  *
  * Supported Feature: STA
  */
-#define CFG_RF_TEST_MODE_SUPP_ENABLED CFG_BOOL( \
+#define CFG_RF_TEST_MODE_SUPP_ENABLED CFG_UINT( \
 		"rf_test_mode_enabled", \
 		0, \
+		4, \
+		0, \
+		CFG_VALUE_OR_DEFAULT, \
 		"rf test mode Enable Flag")
 
 #ifdef CONFIG_BAND_6GHZ

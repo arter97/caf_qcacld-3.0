@@ -6379,8 +6379,8 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 	QDF_STATUS status_6G = QDF_STATUS_SUCCESS;
 	int8_t input_value;
 	int err;
-	uint32_t band_bitmap = 0, curr_band_bitmap;
-	bool rf_test_mode, fcc_constraint, dis_6g_keep_sta_cli_conn;
+	uint32_t band_bitmap = 0, curr_band_bitmap, rf_test_mode;
+	bool fcc_constraint, dis_6g_keep_sta_cli_conn;
 	bool modify_band = false;
 
 	/*
@@ -6427,8 +6427,7 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	status = ucfg_mlme_is_rf_test_mode_enabled(hdd_ctx->psoc,
-						   &rf_test_mode);
+	status = ucfg_mlme_get_rf_test_mode(hdd_ctx->psoc, &rf_test_mode);
 	if (!QDF_IS_STATUS_SUCCESS(status_6G)) {
 		hdd_err("Get rf test mode failed");
 		return qdf_status_to_os_return(status);

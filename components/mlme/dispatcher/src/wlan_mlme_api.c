@@ -4017,7 +4017,7 @@ wlan_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 }
 
 QDF_STATUS
-wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+wlan_mlme_get_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t *value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -4033,7 +4033,7 @@ wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 QDF_STATUS
-wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
+wlan_mlme_set_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 

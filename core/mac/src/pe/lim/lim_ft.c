@@ -535,6 +535,7 @@ static QDF_STATUS lim_fill_session_power_info(
 	struct vdev_mlme_obj *mlme_obj;
 	enum reg_6g_ap_type power_type_6g;
 	QDF_STATUS status;
+	uint32_t rf_test_mode;
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
 	if (!mlme_obj) {
@@ -551,11 +552,17 @@ static QDF_STATUS lim_fill_session_power_info(
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs = !is_pwr_constraint;
 
 	if (wlan_reg_is_6ghz_chan_freq(pbssDescription->chan_freq)) {
+		status = wlan_mlme_get_rf_test_mode(mac->psoc, &rf_test_mode);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Get rf test mode failed");
+			return status;
+		}
+
 		status = wlan_reg_get_best_6g_power_type(
 				mac->psoc, mac->pdev,
 				&power_type_6g,
 				ft_session->ap_defined_power_type_6g,
-				pbssDescription->chan_freq);
+				pbssDescription->chan_freq, rf_test_mode);
 		if (QDF_IS_STATUS_ERROR(status))
 			return status;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved..
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,14 +19,14 @@
 #include <wlan_hdd_sysfs.h>
 #include <wlan_hdd_sysfs_rf_test_mode.h>
 
-#define RF_TEST_MODE_ENABLE 1
+#define RF_TEST_MODE_ENABLE 4
 
 static ssize_t __hdd_sysfs_rf_test_mode_show(struct hdd_context *hdd_ctx,
 					     struct kobj_attribute *attr,
 					     char *buf)
 {
 	int ret = 0;
-	bool value;
+	uint32_t value;
 
 	if (!hdd_ctx || !hdd_ctx->psoc) {
 		hdd_err_rl("invalid input");
@@ -34,8 +34,7 @@ static ssize_t __hdd_sysfs_rf_test_mode_show(struct hdd_context *hdd_ctx,
 	}
 
 	ret = scnprintf(buf, PAGE_SIZE, "0x%x",
-			ucfg_mlme_is_rf_test_mode_enabled(hdd_ctx->psoc,
-							  &value));
+			ucfg_mlme_get_rf_test_mode(hdd_ctx->psoc, &value));
 
 	return ret;
 }
@@ -98,13 +97,13 @@ __hdd_sysfs_rf_test_mode_store(struct hdd_context *hdd_ctx,
 	hdd_debug("rf_test_mode: 0x%x", value);
 
 	/*
-	 * To enable rf_test_mode if value set is greater than one
-	 * adjust this value as one by default
+	 * To enable rf_test_mode if value set is greater than four
+	 * adjust this value as four by default
 	 */
 	if (value > RF_TEST_MODE_ENABLE)
 		value = RF_TEST_MODE_ENABLE;
 
-	ucfg_mlme_set_rf_test_mode_enabled(hdd_ctx->psoc, value);
+	ucfg_mlme_set_rf_test_mode(hdd_ctx->psoc, value);
 
 	return count;
 }

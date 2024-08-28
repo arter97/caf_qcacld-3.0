@@ -3314,6 +3314,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	struct cm_roam_values_copy temp;
 	uint32_t neighbor_lookup_threshold;
 	uint32_t hi_rssi_scan_rssi_delta;
+	uint32_t rf_test_mode;
 
 	/*
 	 * Update the capability here itself as this is used in
@@ -3569,11 +3570,20 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	if (wlan_reg_is_6ghz_chan_freq(bss_desc->chan_freq)) {
 		if (!ie_struct->Country.present)
 			pe_debug("Channel is 6G but country IE not present");
+
+		status = wlan_mlme_get_rf_test_mode(mac_ctx->psoc,
+						    &rf_test_mode);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Get rf test mode failed");
+			status = QDF_STATUS_E_NOSUPPORT;
+			goto send;
+		}
+
 		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev,
 				&power_type_6g,
 				session->ap_defined_power_type_6g,
-				bss_desc->chan_freq);
+				bss_desc->chan_freq, rf_test_mode);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			status = QDF_STATUS_E_NOSUPPORT;
 			goto send;

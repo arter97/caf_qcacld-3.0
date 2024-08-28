@@ -3167,7 +3167,7 @@ ucfg_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 }
 
 /**
- * ucfg_mlme_is_rf_test_mode_enabled() - Get rf test mode flag
+ * ucfg_mlme_get_rf_test_mode() - Get rf test mode
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3176,13 +3176,13 @@ ucfg_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value)
  * Return: QDF Status
  */
 static inline QDF_STATUS
-ucfg_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+ucfg_mlme_get_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t *value)
 {
-	return wlan_mlme_is_rf_test_mode_enabled(psoc, value);
+	return wlan_mlme_get_rf_test_mode(psoc, value);
 }
 
 /**
- * ucfg_mlme_set_rf_test_mode_enabled() - Set rf test mode flag
+ * ucfg_mlme_set_rf_test_mode() - Set rf test mode
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller
  *
@@ -3191,9 +3191,9 @@ ucfg_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
  * Return: QDF Status
  */
 static inline QDF_STATUS
-ucfg_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
+ucfg_mlme_set_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t value)
 {
-	return wlan_mlme_set_rf_test_mode_enabled(psoc, value);
+	return wlan_mlme_set_rf_test_mode(psoc, value);
 }
 
 /**
