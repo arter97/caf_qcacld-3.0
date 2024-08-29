@@ -818,8 +818,8 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, c_entry->tx_flow_id);
 		flow_active_ts = tx_flow->active_ts;
 		cur_ts = dp_stc_get_timestamp();
-		if (cur_ts - flow_active_ts > FLOW_INACTIVE_TIME_THRESH_NS)
-			goto flow_inactive;
+		if (cur_ts - flow_active_ts < FLOW_INACTIVE_TIME_THRESH_NS)
+			return;
 	}
 
 	if (rx_flow_valid) {
@@ -828,13 +828,10 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, c_entry->rx_flow_id);
 		flow_active_ts = rx_flow->last_accessed_ts;
 		cur_ts = dp_stc_get_timestamp();
-		if (cur_ts - flow_active_ts > FLOW_INACTIVE_TIME_THRESH_NS)
-			goto flow_inactive;
+		if (cur_ts - flow_active_ts < FLOW_INACTIVE_TIME_THRESH_NS)
+			return;
 	}
 
-	return;
-
-flow_inactive:
 	/*
 	 * Set inactive flag for the flow, but then how will it be added back
 	 * when the same flow starts again ?
