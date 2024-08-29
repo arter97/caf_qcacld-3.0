@@ -741,28 +741,6 @@ static int hdd_hostapd_change_mtu(struct net_device *net_dev, int new_mtu)
 	return errno;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
-static void hdd_wiphy_lock(struct wireless_dev *dev_ptr)
-{
-	mutex_lock(&dev_ptr->mtx);
-}
-
-static void hdd_wiphy_unlock(struct wireless_dev *dev_ptr)
-{
-	mutex_unlock(&dev_ptr->mtx);
-}
-#else
-static void hdd_wiphy_lock(struct wireless_dev *dev_ptr)
-{
-	mutex_lock(&dev_ptr->wiphy->mtx);
-}
-
-static void hdd_wiphy_unlock(struct wireless_dev *dev_ptr)
-{
-	mutex_unlock(&dev_ptr->wiphy->mtx);
-}
-#endif
-
 #ifdef QCA_HT_2040_COEX
 QDF_STATUS hdd_set_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
 				   uint8_t channel_type)
@@ -1157,7 +1135,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 		dev = assoc_adapter->dev;
 	}
 
-	hdd_wiphy_lock(dev->ieee80211_ptr);
+	hdd_wiphy_lock(NULL, dev->ieee80211_ptr);
 	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS) {
 		hdd_debug("Vdev %d mode %d not UP", vdev_id,
 			  adapter->device_mode);
@@ -1194,7 +1172,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id, puncture_bitmap);
 exit:
-	hdd_wiphy_unlock(dev->ieee80211_ptr);
+	hdd_wiphy_unlock(NULL, dev->ieee80211_ptr);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
@@ -2304,7 +2282,7 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 	dev = adapter->dev;
 	vdev_id = wlan_vdev_get_id(vdev);
 
-	hdd_wiphy_lock(dev->ieee80211_ptr);
+	hdd_wiphy_lock(NULL, dev->ieee80211_ptr);
 	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS &&
 	    wlan_vdev_is_restart_progress(vdev) != QDF_STATUS_SUCCESS) {
 		hdd_debug("Vdev %d mode %d not UP", vdev_id,
@@ -2335,7 +2313,7 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 					       input_punc_bitmap);
 
 exit:
-	hdd_wiphy_unlock(dev->ieee80211_ptr);
+	hdd_wiphy_unlock(NULL, dev->ieee80211_ptr);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
