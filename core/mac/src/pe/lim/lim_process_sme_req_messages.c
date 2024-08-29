@@ -3235,6 +3235,58 @@ lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
 	}
 }
 
+#ifdef WLAN_FEATURE_11AX
+static
+void lim_disable_he_dynamic_smps(struct pe_session *session)
+{
+	pe_debug("Disable HE D-SMPS");
+	session->he_config.he_dynamic_smps = 0;
+}
+#else
+static inline
+void lim_disable_he_dynamic_smps(struct pe_session *session)
+{}
+#endif
+
+/**
+ * lim_disable_dsmps_for_iot_ap() - disable dynamic SMPS for IOT AP
+ *@mac_ctx: mac context
+ *@session: pe session
+ *@bss_desc: bss descriptor
+ *
+ * When connecting to specific IOT AP, disable STA HT and HE dynamic SMPS
+ * capabilities.
+ *
+ * Return: None
+ */
+static void
+lim_disable_dsmps_for_iot_ap(struct mac_context *mac_ctx,
+			     struct pe_session *session,
+			     struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
+	uint16_t ie_len;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+
+	if (wlan_action_oui_search(mac_ctx->psoc,
+				   &vendor_ap_search_attr,
+				   ACTION_OUI_DISABLE_DYNAMIC_SMPS)) {
+		mac_ctx->mlme_cfg->ht_caps.enable_smps = 0;
+		/*
+		 * For HT D-SMPS type,
+		 * 0 - Static, 1 - Dynamic, 2 - Reserved/Invalid, 3 - Disabled
+		 */
+		mac_ctx->mlme_cfg->ht_caps.smps = 3;
+		mac_ctx->mlme_cfg->ht_caps.ht_cap_info.mimo_power_save = 3;
+		lim_disable_he_dynamic_smps(session);
+		pe_debug("Disable HT and HE D-SMPS for this IOT AP");
+	}
+}
+
 QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		    struct bss_description *bss_desc,
@@ -3509,6 +3561,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		&local_power_constraint, session, &is_pwr_constraint);
 
 	lim_disable_bformee_for_iot_ap(mac_ctx, session, bss_desc);
+
+	lim_disable_dsmps_for_iot_ap(mac_ctx, session, bss_desc);
 
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs =
 						!is_pwr_constraint;
