@@ -2121,7 +2121,7 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_2GHZ);
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_5GHZ);
 	fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
-	qdf_mem_zero(hdd_ctx->reg.alpha2, REG_ALPHA2_LEN + 1);
+	ucfg_reg_get_current_country(hdd_ctx->psoc, hdd_ctx->reg.alpha2);
 
 	qdf_mem_free(cur_chan_list);
 	return 0;
