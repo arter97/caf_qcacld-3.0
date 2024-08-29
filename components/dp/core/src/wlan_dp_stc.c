@@ -1017,6 +1017,57 @@ wlan_dp_stc_is_traffic_type_known(enum qca_traffic_type traffic_type)
 	return true;
 }
 
+#define BUF_LEN_MAX 256
+static inline bool is_flow_tuple_ipv4(struct flow_info *flow_tuple)
+{
+	if (qdf_likely((flow_tuple->flags | DP_FLOW_TUPLE_FLAGS_IPV4)))
+		return true;
+
+	return false;
+}
+
+static inline bool is_flow_tuple_ipv6(struct flow_info *flow_tuple)
+{
+	if (qdf_likely((flow_tuple->flags | DP_FLOW_TUPLE_FLAGS_IPV6)))
+		return true;
+
+	return false;
+}
+
+static inline uint8_t *dp_print_tuple_to_str(struct flow_info *flow_tuple,
+					     uint8_t *buf, uint16_t buf_len)
+{
+	uint16_t len = 0;
+
+	if (is_flow_tuple_ipv4(flow_tuple)) {
+		len += scnprintf(buf + len, buf_len - len,
+				 "0x%x", flow_tuple->src_ip.ipv4_addr);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x", flow_tuple->dst_ip.ipv4_addr);
+	} else if (is_flow_tuple_ipv6(flow_tuple)) {
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x-0x%x-0x%x-0x%x",
+				 flow_tuple->src_ip.ipv6_addr[0],
+				 flow_tuple->src_ip.ipv6_addr[1],
+				 flow_tuple->src_ip.ipv6_addr[2],
+				 flow_tuple->src_ip.ipv6_addr[3]);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x-0x%x-0x%x-0x%x",
+				 flow_tuple->dst_ip.ipv6_addr[0],
+				 flow_tuple->dst_ip.ipv6_addr[1],
+				 flow_tuple->dst_ip.ipv6_addr[2],
+				 flow_tuple->dst_ip.ipv6_addr[3]);
+	}
+
+	len += scnprintf(buf + len, buf_len - len,
+			 " %u", flow_tuple->src_port);
+	len += scnprintf(buf + len, buf_len - len,
+			 " %u", flow_tuple->dst_port);
+	len += scnprintf(buf + len, buf_len - len, " %u", flow_tuple->proto);
+
+	return buf;
+}
+
 /*
  * This function should just mark something in the sampling entry.
  * The periodic work can take care of moving this entry to classified table
@@ -1032,6 +1083,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint16_t c_id;
+	uint8_t buf[BUF_LEN_MAX];
 
 	/*
 	 * 1) Move sampling flow to classified flow table
@@ -1073,7 +1125,9 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 		if (state > WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
 			continue;
 
-		dp_info("STC: Move flow to classified flow %d for peer %d",
+		dp_info("STC: Move flow (%s) to classified flow %d for peer %d",
+			dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
+					      buf, BUF_LEN_MAX),
 			c_id, s_entry->peer_id);
 		/* Got a free entry */
 		qdf_atomic_set(&c_entry->state,
@@ -1170,7 +1224,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 						  &tx_flow_id,
 						  &tx_flow_metadata);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			if (rx) {
+			if (rx && rx_flow->is_flow_udp) {
 				/* This is a RX only flow. */
 				wlan_dp_stc_fill_rx_flow_candidate(dp_stc,
 						&candidates[candidate_idx],
@@ -1796,6 +1850,7 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 	struct wlan_dp_stc_sampling_table_entry *s_entry;
 	uint64_t hash;
 	int i;
+	uint8_t buf[BUF_LEN_MAX];
 
 	hash = wlan_dp_get_flow_hash(dp_ctx, flow_tuple);
 	s_table = dp_stc->sampling_flow_table;
@@ -1822,8 +1877,9 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * The classification result is for this flow only.
 		 */
 		s_entry->traffic_type = flow_classify_result->traffic_type;
-		dp_info("STC: sampling flow %d result %d burst_reported %d",
-			i, flow_classify_result->traffic_type,
+		dp_info("STC: sampling flow %d tuple (%s) result %d burst_reported %d",
+			i, dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
+			flow_classify_result->traffic_type,
 			wlan_dp_burst_samples_reported(s_entry));
 		/*
 		 * 1) Indicate to TX and RX flow
