@@ -2767,6 +2767,12 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 		else
 			qdf_tx_complete = QDF_TX_RX_STATUS_NO_ACK;
 
+		if (params->peer_rssi)
+			rssi = params->peer_rssi;
+		else
+			wlan_get_rssi_by_bssid(mac->pdev, &mac_hdr->i_addr3[0],
+					       &rssi);
+
 		if (tag == WLAN_AUTH_REQ) {
 			uint16_t algo = 0, type = 0, seq = 0, status = 0;
 
@@ -2780,13 +2786,6 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 
 			if (algo == eSIR_AUTH_TYPE_SAE)
 				type = seq;
-
-			if (params->peer_rssi)
-				rssi = params->peer_rssi;
-			else
-				wlan_get_rssi_by_bssid(mac->pdev,
-						       &mac_hdr->i_addr3[0],
-						       &rssi);
 
 			wlan_connectivity_mgmt_event(
 					mac->psoc,
