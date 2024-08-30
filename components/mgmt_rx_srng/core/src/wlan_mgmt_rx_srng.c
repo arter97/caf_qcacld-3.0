@@ -437,13 +437,6 @@ QDF_STATUS wlan_mgmt_rx_srng_pdev_destroy_notification(
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status;
 
-	pdev_priv = wlan_objmgr_pdev_get_comp_private_obj(
-					pdev, WLAN_UMAC_COMP_MGMT_RX_SRNG);
-	if (!pdev_priv) {
-		mgmt_rx_srng_err("pdev priv is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
 		mgmt_rx_srng_err("psoc is NULL");
@@ -459,6 +452,13 @@ QDF_STATUS wlan_mgmt_rx_srng_pdev_destroy_notification(
 
 	if (!psoc_priv->mgmt_rx_srng_is_enable)
 		return QDF_STATUS_SUCCESS;
+
+	pdev_priv = wlan_objmgr_pdev_get_comp_private_obj(
+					pdev, WLAN_UMAC_COMP_MGMT_RX_SRNG);
+	if (!pdev_priv) {
+		mgmt_rx_srng_err("pdev priv is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	tgt_mgmt_rx_srng_unregister_ev_handler(psoc);
 	wlan_mgmt_rx_srng_free_buffers(pdev_priv);
