@@ -25454,8 +25454,12 @@ static QDF_STATUS hdd_adapter_reset_ml_cap(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 
 	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (!eht_capab)
+	if (!eht_capab) {
+		hdd_adapter_clear_sl_ml_adapter(adapter);
+		adapter->active_links = 0x1;
+		hdd_debug("clear links for non 11be");
 		return QDF_STATUS_SUCCESS;
+	}
 
 	/* if interface is change from STA to SAP,
 	 * then enable is_ml_adapter as default
