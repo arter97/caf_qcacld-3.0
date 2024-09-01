@@ -1109,6 +1109,11 @@ void wma_vdev_set_listen_interval(uint8_t vdev_id, uint8_t val)
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	QDF_STATUS status;
 
+	if (!wma) {
+		wma_err("wma handle is null");
+		return;
+	}
+
 	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
 				    wmi_vdev_param_listen_interval, val);
 	if (QDF_IS_STATUS_ERROR(status))
