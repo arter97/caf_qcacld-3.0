@@ -10083,16 +10083,16 @@ hdd_disable_nan_active_disc(struct hdd_adapter *adapter)
 }
 
 static void
-hdd_monitor_mode_release_wakelock(struct wlan_hdd_link_info *link_info)
+hdd_monitor_mode_release_wakelock(struct hdd_adapter *adapter)
 {
-	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
 	    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
 	     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
 		hdd_info("Release wakelock for STA + monitor mode!");
-		os_if_dp_local_pkt_capture_stop(link_info->vdev);
+		os_if_dp_local_pkt_capture_stop(hdd_ctx->psoc,
+						adapter->device_mode);
 		qdf_runtime_pm_allow_suspend(
 				&hdd_ctx->runtime_context.monitor_mode);
 		hdd_lpc_enable_powersave(hdd_ctx);
@@ -10217,7 +10217,6 @@ wlan_hdd_delete_mon_link(struct hdd_adapter *adapter,
 		hdd_reset_monitor_interface(sta_adapter);
 	}
 
-	hdd_monitor_mode_release_wakelock(link_info);
 	wlan_hdd_scan_abort(link_info);
 
 	status = hdd_monitor_mode_vdev_status(adapter);
@@ -10242,6 +10241,8 @@ wlan_hdd_delete_mon_link(struct hdd_adapter *adapter,
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
 
 	hdd_vdev_destroy(link_info);
+	hdd_monitor_mode_release_wakelock(link_info->adapter);
+
 	return 0;
 }
 
