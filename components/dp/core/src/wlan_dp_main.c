@@ -2459,6 +2459,7 @@ void wlan_dp_txrx_soc_detach(ol_txrx_soc_handle soc)
 	wlan_dp_check_inactive_dp_links(dp_ctx);
 	cdp_soc_detach(soc);
 	wlan_dp_svc_deinit(dp_ctx);
+	dp_ctx->cdp_soc = NULL;
 }
 
 QDF_STATUS wlan_dp_txrx_attach_target(ol_txrx_soc_handle soc, uint8_t pdev_id)

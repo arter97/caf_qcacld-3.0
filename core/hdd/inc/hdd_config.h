@@ -1551,6 +1551,31 @@ enum host_log_level {
 
 /*
  * <ini>
+ * g_sap_sap_sta_concurrency  - enable SAP-SAP-STA concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will not allow SAP-SAP-STA concurrency to be included in the
+ * iface combinations.
+ *
+ * 0: disable SAP-SAP-STA concurrency
+ * 1: enable SAP-SAP-STA concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAP_SAP_STA_CONCURRENCY CFG_INI_BOOL( \
+		"g_sap_sap_sta_concurrency", \
+		0, \
+		"This ini is used to enable SAP-SAP-STA concurrency")
+
+/*
+ * <ini>
  * g_sta_sap_p2p_concurrency - enable STA-SAP-P2P concurrency
  * @Min: 0
  * @Max: 1
@@ -1579,7 +1604,7 @@ enum host_log_level {
  * g_sta_p2p_ndp_concurrency - STA + P2P + NAN + NDP concurrency support
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini allows P2P + STA + NAN + NDP Concurrency. Concurrency
  * to be included in the iface combinations when this ini is set and
@@ -1599,6 +1624,28 @@ enum host_log_level {
 		"g_sta_p2p_ndp_concurrency", \
 		1, \
 		"This ini is used to enable STA+P2P+NDP concurrency")
+
+/*
+ * <ini>
+ * g_prefer_nan_chan_for_p2p - Prefer NAN channels for P2P group formation
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini allows to prefer NAN social channels (149 and 6) for the
+ * P2P group formation. Rest of the channels to get next weightage. This helps
+ * to avoid MCC in case of NAN + P2P concurrency.
+ *
+ * Supported Feature: NAN + P2P
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_PREFER_NAN_CHAN_FOR_P2P CFG_INI_BOOL( \
+		"g_prefer_nan_chan_for_p2p", \
+		0, \
+		"This ini is used to prefer NAN social channels for P2P")
 
 #ifdef WLAN_FEATURE_UL_JITTER
 /*
@@ -1698,7 +1745,9 @@ enum host_log_level {
 	CFG(CFG_NO_SAP_NAN_CONCURRENCY) \
 	CFG(CFG_NO_P2P_CONCURRENCY) \
 	CFG(CFG_STA_P2P_NDP_CONCURRENCY) \
+	CFG(CFG_PREFER_NAN_CHAN_FOR_P2P) \
 	CFG(CFG_STA_SAP_P2P_CONCURRENCY) \
+	CFG(CFG_SAP_SAP_STA_CONCURRENCY) \
 	CFG_UL_JITTER_LOG_ALL \
 	CFG_EPM_ENABLE_ALL \
 	CFG_EPM_VALUE_ALL \

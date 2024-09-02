@@ -204,6 +204,18 @@ qdf_freq_t wlan_nan_get_disc_24g_ch_freq(struct wlan_objmgr_psoc *psoc);
 uint32_t wlan_nan_get_disc_5g_ch_freq(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_nan_get_5ghz_social_ch_freq(): Get NAN 5GHz social channel
+ * @pdev: PDEV object
+ *
+ * This API returns 5745(channel-149) if it's valid as per regulatory rules
+ * and returns 5220(channel-44) otherwise.
+ *
+ * Return: NAN social channel frequency
+ */
+qdf_freq_t
+wlan_nan_get_5ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev);
+
+/**
  * wlan_nan_get_sap_conc_support: Get NAN+SAP conc support
  * @psoc: pointer to psoc object
  *
@@ -305,6 +317,12 @@ wlan_nan_get_disc_24g_ch_freq(struct wlan_objmgr_psoc *psoc)
 
 static inline uint32_t
 wlan_nan_get_disc_5g_ch_freq(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline
+qdf_freq_t wlan_nan_get_5ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
 {
 	return 0;
 }

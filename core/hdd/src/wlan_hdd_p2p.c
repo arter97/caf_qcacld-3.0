@@ -1739,3 +1739,70 @@ void wlan_hdd_set_mcc_latency(struct hdd_adapter *adapter, int set_value)
 		hdd_info("MCC is not active. Exit w/o setting latency");
 	}
 }
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * __wlan_hdd_cfg80211_p2p_send_usd_cmd() - Function to send USD vendor command
+ * to the lower layers.
+ * @wiphy: wiphy pointer
+ * @wdev: Wireless device
+ * @data: pointer to data
+ * @data_len: data length
+ *
+ * Return: 0 on success, negative errno if error
+ */
+static int __wlan_hdd_cfg80211_p2p_send_usd_cmd(struct wiphy *wiphy,
+						struct wireless_dev *wdev,
+						const void *data,
+						int data_len)
+{
+	struct hdd_adapter *adapter;
+	struct net_device *dev = wdev->netdev;
+	struct hdd_context *hdd_ctx;
+	int ret;
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
+	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_err("Command not allowed in FTM/Monitor mode");
+		return -EPERM;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	ret = hdd_validate_adapter(adapter);
+	if (ret)
+		return ret;
+
+	hdd_ctx = adapter->hdd_ctx;
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (!hdd_ctx->psoc) {
+		hdd_err("psoc is null");
+		return -EINVAL;
+	}
+
+	return osif_p2p_send_usd_params(hdd_ctx->psoc,
+					adapter->deflink->vdev_id,
+					data, data_len);
+}
+
+int wlan_hdd_cfg80211_p2p_send_usd_cmd(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       const void *data, int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_p2p_send_usd_cmd(wiphy, wdev, data,
+						     data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

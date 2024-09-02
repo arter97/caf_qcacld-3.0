@@ -235,6 +235,10 @@ extern policy_mgr_next_action_two_connection_table_type
 		*next_action_two_connection_table;
 extern policy_mgr_next_action_three_connection_table_type
 		*next_action_three_connection_table;
+#ifdef FEATURE_FOURTH_CONNECTION
+extern policy_mgr_next_action_four_connection_table_type
+		*next_action_four_connection_table;
+#endif
 
 #ifdef FEATURE_FOURTH_CONNECTION
 extern const enum policy_mgr_pcl_type

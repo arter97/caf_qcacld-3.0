@@ -600,13 +600,34 @@ static void
 wlan_mlo_peer_initialize_eml_info(struct wlan_objmgr_peer *link_peer,
 				  struct wlan_mlo_eml_cap *eml_info)
 {
-	if (wlan_vdev_mlme_get_opmode(wlan_peer_get_vdev(link_peer)) != QDF_SAP_MODE)
+	if (!wlan_vdev_mlme_is_ap(wlan_peer_get_vdev(link_peer)))
 		return;
 
 	if (wlan_peer_mlme_is_assoc_peer(link_peer) &&
 	    eml_info && link_peer->mlo_peer_ctx)
 		qdf_mem_copy(&link_peer->mlo_peer_ctx->mlpeer_emlcap,
 			     eml_info,
+			     sizeof(struct wlan_mlo_eml_cap));
+}
+
+/**
+ * wlan_mlo_peer_initialize_mld_info () - Set mld info for ml peer context
+ * @link_peer: pointer to link peer
+ * @mld_info: mld capability and operation info
+ *
+ * Return: None
+ */
+static void
+wlan_mlo_peer_initialize_mld_info(struct wlan_objmgr_peer *link_peer,
+				  struct wlan_mlo_mld_cap *mld_info)
+{
+	if (!wlan_vdev_mlme_is_ap(wlan_peer_get_vdev(link_peer)))
+		return;
+
+	if (wlan_peer_mlme_is_assoc_peer(link_peer) &&
+	    mld_info && link_peer->mlo_peer_ctx)
+		qdf_mem_copy(&link_peer->mlo_peer_ctx->mlpeer_mldcap,
+			     mld_info,
 			     sizeof(struct wlan_mlo_eml_cap));
 }
 
@@ -622,6 +643,13 @@ wlan_mlo_peer_initialize_eml_info(struct wlan_objmgr_peer *link_peer,
 				  struct wlan_mlo_eml_cap *eml_info)
 {
 }
+
+static void
+wlan_mlo_peer_initialize_mld_info(struct wlan_objmgr_peer *link_peer,
+				  struct wlan_mlo_mld_cap *mld_info)
+{
+}
+
 #endif
 
 QDF_STATUS lim_mlo_proc_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
@@ -837,6 +865,9 @@ void lim_ap_mlo_sta_peer_ind(struct mac_context *mac,
 				/* update eml info for mld peer */
 				wlan_mlo_peer_initialize_eml_info(peer,
 								  &sta->eml_info);
+
+				wlan_mlo_peer_initialize_mld_info(peer,
+								  &sta->mld_info);
 			} else {
 				pe_err("invalid partner link number %d",
 				       assoc_req->mlo_info.num_partner_links);

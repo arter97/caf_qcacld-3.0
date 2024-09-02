@@ -959,6 +959,15 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 		return 0;
 	}
 
+	if (hdd_is_chan_switch_in_progress()) {
+		hdd_debug("channel switch is in progress");
+		status = policy_mgr_wait_chan_switch_complete_evt(hdd_ctx->psoc);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_err("qdf wait for csa event failed");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
 	hdd_ctx->curr_band = wlan_reg_band_bitmap_to_band_info(band_bitmap);
 
 	if (QDF_IS_STATUS_ERROR(ucfg_reg_set_band(hdd_ctx->pdev,
@@ -1465,7 +1474,24 @@ static inline void hdd_set_dfs_pri_multiplier(struct hdd_context *hdd_ctx,
 }
 #endif
 
-void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+static int
+hdd_regulatory_set_wiphy_regd_sync(struct wiphy *wiphy,
+				   struct ieee80211_regdomain *regd)
+{
+	return regulatory_set_wiphy_regd_sync(wiphy, regd);
+}
+#else
+static int
+hdd_regulatory_set_wiphy_regd_sync(struct wiphy *wiphy,
+				   struct ieee80211_regdomain *regd)
+{
+	return regulatory_set_wiphy_regd_sync_rtnl(wiphy, regd);
+}
+#endif
+
+void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
+				    bool send_sync_event)
 {
 	struct ieee80211_regdomain *regd;
 	struct ieee80211_reg_rule *regd_rules;
@@ -1528,7 +1554,12 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx)
 			  regd_rules[i].flags);
 	}
 
-	regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);
+	if (send_sync_event && hdd_hold_rtnl_lock()) {
+		hdd_regulatory_set_wiphy_regd_sync(hdd_ctx->wiphy, regd);
+		hdd_release_rtnl_lock();
+	} else {
+		regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);
+	}
 
 	hdd_debug("regd sync event sent with reg rules info");
 	qdf_mem_free(regd);
@@ -1683,6 +1714,11 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 				 * continue to next statement
 				 */
 			case QDF_STA_MODE:
+				hdd_debug("Update vdev %d CAP IE", link_info->vdev_id);
+				sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+							  link_info->vdev_id,
+							  QDF_STA_MODE);
+
 				sta_ctx =
 					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 				new_phy_mode = wlan_reg_get_max_phymode(pdev,
@@ -1721,9 +1757,6 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 							    pdev,
 							    link_info->vdev_id);
 				}
-				sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
-							  link_info->vdev_id,
-							  QDF_STA_MODE);
 				break;
 			default:
 				break;
@@ -2005,7 +2038,7 @@ sync_chanlist:
 #if defined CFG80211_USER_HINT_CELL_BASE_SELF_MANAGED || \
 	    (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0))
 	if (wiphy->registered)
-		hdd_send_wiphy_regd_sync_event(hdd_ctx);
+		hdd_send_wiphy_regd_sync_event(hdd_ctx, false);
 #endif
 
 	hdd_config_tdls_with_band_switch(hdd_ctx);

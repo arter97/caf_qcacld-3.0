@@ -300,6 +300,7 @@ typedef struct sLimMlmDisassocReq {
 
 typedef struct sLimMlmDisassocCnf {
 	tSirMacAddr peerMacAddr;
+	tSirMacAddr peerMldAddr;
 	tSirResultCodes resultCode;
 	uint16_t disassocTrigger;
 	uint16_t aid;
@@ -1375,12 +1376,35 @@ void lim_send_sme_disassoc_deauth_ntf(struct mac_context *mac_ctx,
 				QDF_STATUS status, uint32_t *ctx);
 
 #ifdef FEATURE_WLAN_TDLS
-QDF_STATUS lim_process_sme_del_all_tdls_peers(struct mac_context *p_mac,
-						 uint32_t *msg_buf);
+/**
+ * lim_process_sme_del_all_tdls_peers(): process delete tdls peers
+ * @mac: pointer to mac context
+ * @msg_buf: message buffer
+ *
+ * This function processes request to delete tdls peers
+ *
+ * Return: Success: QDF_STATUS_SUCCESS Failure: Error value
+ */
+QDF_STATUS
+lim_process_sme_del_all_tdls_peers(struct mac_context *mac, uint32_t *msg_buf);
+
+/**
+ * lim_delete_all_tdls_peers() - Delete all TDLS peers
+ * @vdev: Pointer to vdev object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_delete_all_tdls_peers(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 QDF_STATUS lim_process_sme_del_all_tdls_peers(struct mac_context *p_mac,
 						 uint32_t *msg_buf)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS lim_delete_all_tdls_peers(struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_SUCCESS;
 }

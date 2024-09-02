@@ -189,7 +189,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *frame;
 	void *packet;
 	QDF_STATUS qdf_status;
-	struct pe_session *pesession;
+	struct pe_session *pesession = NULL;
 	uint8_t sessionid;
 	const uint8_t *p2pie = NULL;
 	uint8_t txflag = 0;
@@ -250,7 +250,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * Therefore for hidden ssid connections, after 3 unicast probe
 	 * requests, try the pending probes with broadcast mac.
 	 */
-	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(pesession->curr_op_freq) &&
+	if (pesession && !WLAN_REG_IS_6GHZ_CHAN_FREQ(pesession->curr_op_freq) &&
 	    pesession->join_probe_cnt > 2)
 		sir_copy_mac_addr(bssid, bcast_mac);
 
@@ -3332,7 +3332,8 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 	data = qdf_nbuf_data(buf);
 	if (!data) {
 		pe_err("Addba response frame is NULL");
-		return QDF_STATUS_E_FAILURE;
+		status = QDF_STATUS_E_FAILURE;
+		goto error;
 	}
 
 	mac_hdr = (tSirMacMgmtHdr *)data;
@@ -3346,7 +3347,8 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 					vdev_id, WLAN_LEGACY_MAC_ID);
 		if (!vdev) {
 			pe_err("vdev is NULL");
-			return QDF_STATUS_E_FAILURE;
+			status = QDF_STATUS_E_FAILURE;
+			goto error;
 		}
 
 		vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
@@ -3354,7 +3356,8 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 			pe_err("Failed to get vdev mlme obj!");
 			wlan_objmgr_vdev_release_ref(vdev,
 						     WLAN_LEGACY_MAC_ID);
-			return QDF_STATUS_E_FAILURE;
+			status = QDF_STATUS_E_FAILURE;
+			goto error;
 		}
 
 		if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_NDI) {
@@ -3370,7 +3373,8 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 				pe_err("Fail to get mic info");
 				wlan_objmgr_vdev_release_ref(vdev,
 							WLAN_LEGACY_MAC_ID);
-				return QDF_STATUS_E_FAILURE;
+				status = QDF_STATUS_E_FAILURE;
+				goto error;
 			}
 		}
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
@@ -3382,7 +3386,8 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 	data_len = (uint32_t)qdf_nbuf_get_data_len(buf);
 	if (data_len < (offset + sizeof(rsp))) {
 		pe_err("Invalid data len %d", data_len);
-		return QDF_STATUS_E_FAILURE;
+		status = QDF_STATUS_E_FAILURE;
+		goto error;
 	}
 
 	addba_rsp_ptr = lim_get_addba_rsp_ptr(data + offset,
@@ -3401,6 +3406,7 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 	if (DOT11F_FAILED(status)) {
 		pe_err("Failed to unpack and parse (0x%08x, %d bytes)",
 			status, rsp_len);
+		status = QDF_STATUS_SUCCESS;
 		goto error;
 	}
 
@@ -3410,7 +3416,7 @@ error:
 	if (buf)
 		qdf_nbuf_free(buf);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 #define SAE_AUTH_ALGO_LEN 2

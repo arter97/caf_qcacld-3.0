@@ -1437,7 +1437,7 @@
  * dp_stc_enable - Control STC feature enablement
  * @Min: 0
  * @Max: 1
- * @Default: 1
+ * @Default: 0
  *
  * This ini is used to enable DP STC
  *

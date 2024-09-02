@@ -1176,6 +1176,9 @@ bool p2p_check_oui_and_force_1x1(uint8_t *assoc_ie, uint32_t assoc_ie_len)
 
 	pos = p2p_parse_assoc_ie_for_device_info(assoc_ie, assoc_ie_len);
 
+	if (!pos)
+		return false;
+
 	/*
 	 * the P2P Device info is of format:
 	 * attr_id - 1 byte
@@ -1317,10 +1320,8 @@ void p2p_peer_authorized(struct wlan_objmgr_vdev *vdev, uint8_t *mac_addr)
 	}
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev));
 	peer = wlan_objmgr_get_peer(psoc, pdev_id,  mac_addr, WLAN_P2P_ID);
-	if (!peer) {
-		p2p_debug("peer info not found");
+	if (!peer)
 		return;
-	}
 	status = process_peer_for_noa(vdev, psoc, peer);
 	wlan_objmgr_peer_release_ref(peer, WLAN_P2P_ID);
 
@@ -1626,3 +1627,11 @@ p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc)
 
 	return p2p_soc_obj->mgmt_frm_registration_update;
 }
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+			       struct p2p_usd_attr_params *param)
+{
+	return tgt_p2p_send_usd_params(psoc, param);
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

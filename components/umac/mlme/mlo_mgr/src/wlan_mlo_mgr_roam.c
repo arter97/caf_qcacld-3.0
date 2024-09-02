@@ -953,7 +953,8 @@ mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 
 		if ((qdf_test_bit(i, sta_ctx->wlan_connected_links) ||
 		     qdf_test_bit(i, sta_ctx->wlan_connect_req_links)) &&
-		    !QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(mlo_dev_ctx->wlan_vdev_list[i]))) {
+		    (!QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(mlo_dev_ctx->wlan_vdev_list[i])) ||
+		    wlan_cm_is_vdev_disconnecting(mlo_dev_ctx->wlan_vdev_list[i]))) {
 			mlo_debug("Vdev id %d is not in up state",
 				  wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]));
 			return false;
@@ -1053,7 +1054,8 @@ mlo_get_link_mac_addr_from_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 
 QDF_STATUS
 mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
-			  struct wlan_cm_connect_resp *reassoc_rsp)
+			  struct wlan_cm_connect_resp *reassoc_rsp,
+			  uint32_t auth_status)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_mlo_sta *sta_ctx;
@@ -1073,23 +1075,35 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 	if (!sta_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
-	sta_ctx->copied_reassoc_rsp = NULL;
-
-	/* Store reassoc rsp only if roamed to 2 link AP */
-	if (reassoc_rsp->ml_parnter_info.num_partner_links < 2)
-		return QDF_STATUS_E_INVAL;
-
-	/* Free assoc rsp, so that reassoc rsp can be used during
-	 * reassociation.
-	 */
 	if (sta_ctx->assoc_rsp.ptr) {
 		qdf_mem_free(sta_ctx->assoc_rsp.ptr);
 		sta_ctx->assoc_rsp.ptr = NULL;
 		sta_ctx->assoc_rsp.len = 0;
 	}
 
+	sta_ctx->assoc_rsp.ptr = qdf_mem_malloc(
+			reassoc_rsp->connect_ies.assoc_rsp.len);
+	if (!sta_ctx->assoc_rsp.ptr)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(sta_ctx->assoc_rsp.ptr,
+		     reassoc_rsp->connect_ies.assoc_rsp.ptr,
+		     reassoc_rsp->connect_ies.assoc_rsp.len);
+	sta_ctx->assoc_rsp.len = reassoc_rsp->connect_ies.assoc_rsp.len;
+	mlo_debug("save assoc_rsp frame for vdev: %d len: %d",
+		  wlan_vdev_get_id(vdev), sta_ctx->assoc_rsp.len);
+
+	wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
+	sta_ctx->copied_reassoc_rsp = NULL;
+
 	sta_ctx->ml_partner_info = reassoc_rsp->ml_parnter_info;
+
+	if (auth_status != ROAM_AUTH_STATUS_CONNECTED)
+		return QDF_STATUS_SUCCESS;
+
+	/* Store reassoc rsp only if roamed to 2 link AP */
+	if (reassoc_rsp->ml_parnter_info.num_partner_links < 2)
+		return QDF_STATUS_SUCCESS;
 
 	sta_ctx->copied_reassoc_rsp = qdf_mem_malloc(
 			sizeof(struct wlan_cm_connect_resp));

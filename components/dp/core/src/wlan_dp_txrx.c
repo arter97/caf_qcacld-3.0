@@ -968,6 +968,18 @@ static bool dp_is_rx_wake_lock_needed(qdf_nbuf_t nbuf, bool is_arp_req)
 	return false;
 }
 
+#if defined(WLAN_SUPPORT_RX_FISA)
+static inline bool wlan_dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
+{
+	return dp_rx_is_ring_latency_sensitive_reo(ring_id);
+}
+#else
+static inline bool wlan_dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
+{
+	return false;
+}
+#endif
+
 #ifdef RECEIVE_OFFLOAD
 /**
  * dp_resolve_rx_ol_mode() - Resolve Rx offload method, LRO or GRO
@@ -1200,7 +1212,8 @@ static QDF_STATUS dp_gro_rx(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	if (dp_intf->dp_ctx->enable_dp_rx_threads &&
-	    !dp_intf->runtime_disable_rx_thread) {
+	    !dp_intf->runtime_disable_rx_thread &&
+	    !wlan_dp_rx_is_ring_latency_sensitive_reo(ring_id)) {
 		napi_to_use =
 			(qdf_napi_struct *)dp_rx_get_napi_context(soc, ring_id);
 	} else {
@@ -1436,7 +1449,8 @@ dp_rx_thread_gro_flush_ind_cbk(void *link_ctx, int rx_ctx_id)
 	}
 
 	dp_intf = dp_link->dp_intf;
-	if (dp_intf->runtime_disable_rx_thread)
+	if (dp_intf->runtime_disable_rx_thread ||
+	    wlan_dp_rx_is_ring_latency_sensitive_reo(rx_ctx_id))
 		return dp_rx_gro_flush(dp_intf, rx_ctx_id);
 
 	if (dp_is_low_tput_gro_enable(dp_intf->dp_ctx)) {
@@ -1447,18 +1461,6 @@ dp_rx_thread_gro_flush_ind_cbk(void *link_ctx, int rx_ctx_id)
 	return dp_rx_gro_flush_ind(cds_get_context(QDF_MODULE_ID_SOC),
 				   rx_ctx_id, gro_flush_code);
 }
-
-#if defined(WLAN_SUPPORT_RX_FISA)
-static inline bool wlan_dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
-{
-	return dp_rx_is_ring_latency_sensitive_reo(ring_id);
-}
-#else
-static inline bool wlan_dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
-{
-	return false;
-}
-#endif
 
 QDF_STATUS dp_rx_pkt_thread_enqueue_cbk(void *link_ctx,
 					qdf_nbuf_t nbuf_list)
@@ -1612,8 +1614,9 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 
 	if (qdf_likely((dp_ctx->enable_dp_rx_threads ||
 			dp_ctx->enable_rxthread) &&
-		       (!dp_intf->runtime_disable_rx_thread ||
-			!in_softirq()))) {
+		       (!in_softirq() ||
+			(!wlan_dp_rx_is_ring_latency_sensitive_reo(rx_ctx_id) &&
+			 !dp_intf->runtime_disable_rx_thread)))) {
 		push_type = DP_NBUF_PUSH_BH_DISABLE;
 	} else if (qdf_unlikely(QDF_NBUF_CB_RX_PEER_CACHED_FRM(nbuf))) {
 		/*
@@ -1628,7 +1631,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		push_type = DP_NBUF_PUSH_NAPI;
 	}
 
-	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, DP_NBUF_PUSH_NI);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, push_type);
 }
 
 #else /* WLAN_FEATURE_DYNAMIC_RX_AGGREGATION */
@@ -1640,6 +1643,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 	int status = QDF_STATUS_E_FAILURE;
 	bool nbuf_receive_offload_ok = false;
 	enum dp_nbuf_push_type push_type;
+	uint8_t rx_ctx_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
 
 	if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf) &&
 	    !QDF_NBUF_CB_RX_PEER_CACHED_FRM(nbuf))
@@ -1667,8 +1671,9 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 
 	if (qdf_likely((dp_ctx->enable_dp_rx_threads ||
 			dp_ctx->enable_rxthread) &&
-		       (!dp_intf->runtime_disable_rx_thread ||
-			!in_softirq()))) {
+		       (!in_softirq() ||
+			(!wlan_dp_rx_is_ring_latency_sensitive_reo(rx_ctx_id) &&
+			 !dp_intf->runtime_disable_rx_thread)))) {
 		push_type = DP_NBUF_PUSH_BH_DISABLE;
 	} else if (qdf_unlikely(QDF_NBUF_CB_RX_PEER_CACHED_FRM(nbuf))) {
 		/*
@@ -1683,7 +1688,7 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		push_type = DP_NBUF_PUSH_NAPI;
 	}
 
-	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, DP_NBUF_PUSH_NI);
+	return wlan_dp_nbuf_push_pkt(dp_intf, nbuf, push_type);
 }
 #endif /* WLAN_FEATURE_DYNAMIC_RX_AGGREGATION */
 #endif
@@ -1886,7 +1891,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_link_context,
 		}
 
 		if (dp_rx_pkt_tracepoints_enabled())
-			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0);
+			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0, 0);
 
 		qdf_nbuf_set_dev(nbuf, dp_intf->dev);
 		qdf_nbuf_set_protocol_eth_tye_trans(nbuf);

@@ -665,6 +665,25 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 	return cac_required;
 }
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+bool
+is_sap_cac_required_for_chan(struct sap_context *sap_ctx)
+{
+	struct mac_context *mac;
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return false;
+	}
+
+	return is_wlansap_cac_required_for_chan(mac,
+					 sap_ctx,
+					 sap_ctx->chan_freq,
+					 &sap_ctx->ch_params);
+}
+#endif
+
 void sap_get_cac_dur_dfs_region(struct sap_context *sap_ctx,
 				uint32_t *cac_duration_ms,
 				uint32_t *dfs_region,
@@ -2580,9 +2599,6 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 
 		bss_complete->status = (eSapStatus) context;
 		bss_complete->staId = sap_ctx->sap_sta_id;
-
-		sap_debug("(eSAP_START_BSS_EVENT): staId = %d",
-			  bss_complete->staId);
 
 		bss_complete->operating_chan_freq = sap_ctx->chan_freq;
 		bss_complete->ch_width = sap_ctx->ch_params.ch_width;

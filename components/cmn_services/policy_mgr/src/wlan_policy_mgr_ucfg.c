@@ -397,6 +397,12 @@ QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 					   two_by_two_dbs);
 }
 
+QDF_STATUS
+ucfg_policy_mgr_wait_chan_switch_complete_evt(struct wlan_objmgr_psoc *psoc)
+{
+	return policy_mgr_wait_chan_switch_complete_evt(psoc);
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 QDF_STATUS
 ucfg_policy_mgr_pre_ap_start(struct wlan_objmgr_psoc *psoc,
@@ -519,10 +525,3 @@ ucfg_policy_mgr_find_current_hw_mode(struct wlan_objmgr_psoc *psoc)
 	return policy_mgr_find_current_hw_mode(psoc);
 }
 #endif
-
-bool
-ucfg_policy_mgr_is_vdev_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
-				  uint32_t vdev_id)
-{
-	return policy_mgr_is_vdev_ll_sap(psoc, vdev_id);
-}

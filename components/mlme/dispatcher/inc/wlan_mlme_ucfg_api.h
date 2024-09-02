@@ -5226,6 +5226,15 @@ bool ucfg_mlme_get_coex_unsafe_chan_reg_disable(
 #endif
 
 /**
+ * ucfg_mlme_is_chan_switch_in_progress() - check if CSA is currently
+ * in progress.
+ * @vdev: pointer to pdev object
+ *
+ * Return: True if the CSA is currently in progress
+ */
+bool ucfg_mlme_is_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev);
+
+/**
  * ucfg_set_ratemask_params() - Set ratemask config
  * @vdev:   pointer to vdev object
  * @num_ratemask: number of ratemask params

@@ -998,7 +998,9 @@ QDF_STATUS wlansap_deauth_sta(struct sap_context *sap_ctx,
  */
 QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 					       uint32_t target_chan_freq,
+					       uint32_t ccfs1,
 					       enum phy_ch_width target_bw,
+					       uint32_t punct_bitmap,
 					       bool strict);
 
 
@@ -1489,6 +1491,17 @@ QDF_STATUS wlansap_set_invalid_session(struct sap_context *sap_ctx);
  * Return: QDF_STATUS
  */
 QDF_STATUS wlansap_release_vdev_ref(struct sap_context *sap_ctx);
+
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/*
+ * is_sap_cac_required_for_chan() - Check whether need do cac for specific sap
+ * @sap_ctx: pointer to the SAP context
+ *
+ * Return: true if need cac otherwise false.
+ */
+bool
+is_sap_cac_required_for_chan(struct sap_context *sap_ctx);
+#endif
 
 /**
  * sap_get_cac_dur_dfs_region() - get cac duration and dfs region.

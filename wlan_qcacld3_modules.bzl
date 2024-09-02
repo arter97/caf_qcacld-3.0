@@ -23,6 +23,7 @@ _target_chipset_map = {
     ],
     "volcano": [
         "qca6750",
+	"peach-v2",
     ],
     "x1e80100": [
         "kiwi-v2",
@@ -2225,9 +2226,15 @@ _conditional_srcs = {
             "components/dp/dispatcher/src/wlan_dp_stc_ucfg_api.c",
             "os_if/dp/src/os_if_dp_stc.c",
 	    "components/dp/core/src/wlan_dp_spm.c",
-	    "components/dp/core/src/wlan_dp_sawfish_fpm.c",
+	    "components/dp/core/src/wlan_dp_fpm.c",
 	    "components/dp/dispatcher/src/wlan_dp_flow_ucfg_api.c",
 	    "core/hdd/src/wlan_hdd_sysfs_dp_stc.c",
+        ],
+    },
+    "CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE": {
+        True: [
+            "cmn/dp/wifi3.0/dp_rx_buffer_pool.c",
+	    "cmn/qdf/linux/src/qdf_page_pool.c",
         ],
     },
 }
@@ -2286,6 +2293,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 		"pattern": "NL80211_CMD_SET_TID_TO_LINK_MAPPING",
 		"file": "include/uapi/linux/nl80211.h",
 		"flag": "WLAN_FEATURE_11BE_MLO_TTLM",
+	},
+	{
+		"pattern": "IEEE80211_CHANCTX_CHANGE_PUNCTURING",
+		"file": "include/net/mac80211.h",
+		"flag": "CFG80211_RU_PUNC_CHANDEF",
 	},
     ]
 

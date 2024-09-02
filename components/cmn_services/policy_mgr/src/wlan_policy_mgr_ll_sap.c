@@ -100,7 +100,7 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
  * @pm_ctx: Policy manager context
  * @vdev_id: Vdev id of the SAP for which restart freq is required
  * @curr_freq: Current frequency of the SAP for which restart freq is required
- * @is_ll_lt_sap_enabling: Indicates if ll_lt_sap is getting enabled or disabled
+ * @event: Indicates if ll_lt_sap is getting enabled or disabled
  * @mode: Vdev mode
  *
  * This API returns user configured frequency if ll_lt_sap is going down and
@@ -114,7 +114,7 @@ policy_mgr_ll_lt_sap_get_restart_freq_for_concurent_sap(
 					struct policy_mgr_psoc_priv_obj *pm_ctx,
 					uint8_t vdev_id,
 					qdf_freq_t curr_freq,
-					bool is_ll_lt_sap_enabling,
+					enum ll_lt_sap_event event,
 					enum policy_mgr_con_mode mode)
 {
 	qdf_freq_t user_config_freq;
@@ -129,11 +129,11 @@ policy_mgr_ll_lt_sap_get_restart_freq_for_concurent_sap(
 	policy_mgr_get_mcc_scc_switch(pm_ctx->psoc, &mcc_to_scc_switch);
 
 	/*
-	 * If ll_lt_sap is getting disabled, return user configured frequency
+	 * If ll_lt_sap is stopped, return user configured frequency
 	 * for concurrent SAP restart, if user configured frequency is not valid
 	 * frequency, remain on the same frequency and do not restart the SAP
 	 */
-	if (!is_ll_lt_sap_enabling) {
+	if (event == LL_LT_SAP_EVENT_STOPPED) {
 		user_config_freq = policy_mgr_get_user_config_sap_freq(
 								pm_ctx->psoc,
 								vdev_id);
@@ -141,9 +141,23 @@ policy_mgr_ll_lt_sap_get_restart_freq_for_concurent_sap(
 		if (user_config_freq == curr_freq)
 			return user_config_freq;
 
-		policy_mgr_check_scc_channel(pm_ctx->psoc, &intf_ch_freq,
-					     user_config_freq,
-					     vdev_id, mcc_to_scc_switch);
+		if (mode == PM_SAP_MODE ||
+		    (mode == PM_P2P_GO_MODE &&
+		     policy_mgr_go_scc_enforced(pm_ctx->psoc))) {
+			policy_mgr_check_scc_channel(pm_ctx->psoc,
+						     &intf_ch_freq,
+						     user_config_freq,
+						     vdev_id,
+						     mcc_to_scc_switch);
+		} else if (mode == PM_P2P_GO_MODE &&
+			  !policy_mgr_allow_concurrency(pm_ctx->psoc, mode,
+							 user_config_freq,
+							 HW_MODE_20_MHZ, 0,
+							 vdev_id)) {
+			policy_mgr_debug("vdev %d User freq %d not allowed, keep current freq %d",
+					 vdev_id, user_config_freq, curr_freq);
+			return curr_freq;
+		}
 		if (intf_ch_freq && (intf_ch_freq != user_config_freq))
 			user_config_freq = intf_ch_freq;
 		return user_config_freq;
@@ -214,7 +228,7 @@ ret_freq:
  * required for concurrent SAP/GO
  * @pm_ctx: Policy manager context
  * @sap_info: SAP info
- * @is_ll_lt_sap_enabling: Indicates if ll_lt_sap is getting enabled or disabled
+ * @event: Indicates if ll_lt_sap is getting enabled or disabled
  *
  * Return: void
  */
@@ -222,7 +236,7 @@ static void
 policy_mgr_ll_lt_sap_check_for_restart_sap_go(
 			struct policy_mgr_psoc_priv_obj *pm_ctx,
 			struct policy_mgr_conc_connection_info *sap_info,
-			bool is_ll_lt_sap_enabling)
+			enum ll_lt_sap_event event)
 {
 	qdf_freq_t restart_freq;
 	struct ch_params ch_params = {0};
@@ -237,20 +251,27 @@ policy_mgr_ll_lt_sap_check_for_restart_sap_go(
 	if (sap_info->mode == PM_SAP_MODE || sap_info->mode == PM_P2P_GO_MODE) {
 		/*
 		 * No need to change channel for dynamic SBS
-		 * OR SAP/GO is on 2.4 Ghz channel, when XPAN is starting
-		 * OR XPAN has stopped and SAP/GO is on 5Ghz.
+		 * OR SAP/GO is on 2.4 Ghz channel, when LL_LT_SAP is
+		 * starting/started,
+		 * OR LL_LT_SAP has stopped and SAP/GO is on 5Ghz.
 		 */
 		if ((policy_mgr_is_dynamic_sbs_enabled(pm_ctx->psoc) ||
-		    (is_ll_lt_sap_enabling &&
-		    wlan_reg_is_24ghz_ch_freq(sap_info->freq)) ||
-		    (!is_ll_lt_sap_enabling &&
-		    !wlan_reg_is_24ghz_ch_freq(sap_info->freq))))
+		    ((event == LL_LT_SAP_EVENT_STARTING ||
+		     event == LL_LT_SAP_EVENT_STARTED) &&
+		     wlan_reg_is_24ghz_ch_freq(sap_info->freq))) ||
+		    (event == LL_LT_SAP_EVENT_STOPPED &&
+		     !wlan_reg_is_24ghz_ch_freq(sap_info->freq)))
 			return;
 
-		/* If GO is alone on the mac, no switch required */
-		if (is_ll_lt_sap_enabling && sap_info->mode == PM_P2P_GO_MODE &&
+		/*
+		 * If GO is alone on the 5 Ghz mac and LL_LT_SAP is starting OR
+		 * LL_LT_SAP is already up, no switch required.
+		 */
+		if (sap_info->mode == PM_P2P_GO_MODE &&
+		    (event == LL_LT_SAP_EVENT_STARTED ||
+		     (event == LL_LT_SAP_EVENT_STARTING &&
 		    !policy_mgr_any_other_vdev_on_same_mac_as_freq(pm_ctx->psoc,
-				sap_info->freq, sap_info->vdev_id))
+				sap_info->freq, sap_info->vdev_id))))
 			return;
 
 		restart_freq =
@@ -258,7 +279,7 @@ policy_mgr_ll_lt_sap_check_for_restart_sap_go(
 							pm_ctx,
 							sap_info->vdev_id,
 							sap_info->freq,
-							is_ll_lt_sap_enabling,
+							event,
 							sap_info->mode);
 	} else {
 		restart_freq = wlan_get_ll_lt_sap_restart_freq(pm_ctx->pdev,
@@ -285,9 +306,9 @@ policy_mgr_ll_lt_sap_check_for_restart_sap_go(
 	wlan_reg_set_channel_params_for_pwrmode(pm_ctx->pdev, restart_freq,
 						0, &ch_params,
 						REG_CURRENT_PWR_MODE);
-	policy_mgr_debug("vdev %d mode %d, %d -> %d, width %d",
-			 sap_info->vdev_id, sap_info->mode, sap_info->freq,
-			 restart_freq, ch_params.ch_width);
+	policy_mgr_debug("vdev %d event %d mode %d, %d -> %d, width %d",
+			 sap_info->vdev_id, event, sap_info->mode,
+			 sap_info->freq, restart_freq, ch_params.ch_width);
 
 	if (pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason)
 		pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason(pm_ctx->psoc,
@@ -309,7 +330,7 @@ policy_mgr_ll_lt_sap_check_for_restart_sap_go(
 }
 
 void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
-						 bool is_ll_lt_sap_enabling)
+						 enum ll_lt_sap_event event)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct policy_mgr_conc_connection_info sap_info[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
@@ -332,6 +353,6 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 		    sap_info[i].mode == PM_LL_LT_SAP_MODE ||
 		    sap_info[i].mode == PM_P2P_GO_MODE)
 			policy_mgr_ll_lt_sap_check_for_restart_sap_go(pm_ctx,
-					&sap_info[i], is_ll_lt_sap_enabling);
+					&sap_info[i], event);
 	}
 }

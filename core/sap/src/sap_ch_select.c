@@ -1514,7 +1514,6 @@ void sap_update_vlp_deprority_chan(struct mac_context *mac_ctx,
 	uint32_t j;
 	uint32_t temp;
 	struct sap_ch_info *ch_info = ch_info_params->ch_info;
-	uint32_t max_weight = 0;
 	uint8_t country[REG_ALPHA2_LEN + 1];
 	qdf_freq_t vlp_cutoff_freq;
 
@@ -1528,21 +1527,13 @@ void sap_update_vlp_deprority_chan(struct mac_context *mac_ctx,
 
 	vlp_cutoff_freq = wlan_reg_get_thresh_priority_freq(mac_ctx->pdev);
 
-	for (j = 0; j < ch_info_params->num_ch; j++) {
-		if (wlan_reg_is_6ghz_chan_freq(ch_info[j].chan_freq) &&
-		    max_weight < ch_info[j].weight)
-			max_weight = ch_info[j].weight;
-	}
-
-	sap_debug("max_weight %u country %.2s vlp_cut_off freq %u", max_weight,
-		  country, vlp_cutoff_freq);
+	sap_debug("country %.2s vlp_cut_off freq %u", country, vlp_cutoff_freq);
 
 	for (j = 0; j < ch_info_params->num_ch; j++) {
 		if (wlan_reg_is_vlp_depriority_freq(mac_ctx->pdev,
 						    ch_info[j].chan_freq)) {
 			temp = ch_info[j].weight;
-			ch_info[j].weight = (max_weight * 10 / 100) +
-					    max_weight;
+			ch_info[j].weight = (temp * 10 / 100) + temp;
 			ch_info[j].weight_calc_done = true;
 			sap_debug("freq %d org_weight %u updated weightage %u",
 				  ch_info[j].chan_freq, temp,
@@ -1901,7 +1892,7 @@ static void sap_sort_chl_weight(struct mac_context *mac_ctx,
 		/* Randomziation */
 		for (i = 0; i < ch_info_params->num_ch; i++) {
 			min_weight_index = i;
-			for (j = i;
+			for (j = i; ((j + 1) < ch_info_params->num_ch) &&
 			     (ch_info[j].weight == ch_info[j + 1].weight) &&
 			     (ch_info[j].bss_count == ch_info[j + 1].bss_count);
 			     j++)

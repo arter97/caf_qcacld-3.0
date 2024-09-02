@@ -5216,4 +5216,13 @@ QDF_STATUS
 wlan_mlme_get_sta_keep_alive_period(struct wlan_objmgr_psoc *psoc,
 				    uint32_t *keep_alive_period);
 
+/**
+ * wlan_mlme_get_24_chan_bonding_mode() - reset 24 GHz chan bonding
+ * @psoc: pointer to psoc object
+ * @chan_bonding: chan bonding
+ *
+ * Return: None
+ */
+void wlan_mlme_get_24_chan_bonding_mode(struct wlan_objmgr_psoc *psoc,
+					int *chan_bonding);
 #endif /* _WLAN_MLME_API_H_ */

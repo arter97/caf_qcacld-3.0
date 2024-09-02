@@ -518,4 +518,16 @@ ucfg_p2p_set_mgmt_frm_registration_update(
  */
 uint32_t
 ucfg_p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc);
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * ucfg_p2p_send_usd_params() - Sent USD parameters to target
+ * @psoc: pointer to PSOC object
+ * @param: pointer to USD attributes parameters structure
+ *
+ * Return: QDF status
+ */
+QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+				    struct p2p_usd_attr_params *param);
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* _WLAN_P2P_UCFG_API_H_ */

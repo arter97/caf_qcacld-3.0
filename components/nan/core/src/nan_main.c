@@ -2068,6 +2068,26 @@ uint32_t wlan_nan_get_disc_5g_ch_freq(struct wlan_objmgr_psoc *psoc)
 	return psoc_nan_obj->nan_social_ch_5g_freq;
 }
 
+qdf_freq_t wlan_nan_get_5ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
+{
+	qdf_freq_t freq = 0;
+
+	freq = wlan_nan_get_disc_5g_ch_freq(wlan_pdev_get_psoc(pdev));
+
+	if (freq)
+		goto done;
+
+	if (wlan_reg_is_freq_enabled(pdev, NAN_5GHZ_SOCIAL_CH_149_FREQ,
+				     REG_CURRENT_PWR_MODE))
+		freq = NAN_5GHZ_SOCIAL_CH_149_FREQ;
+	else if (wlan_reg_is_freq_enabled(pdev, NAN_5GHZ_SOCIAL_CH_44_FREQ,
+					  REG_CURRENT_PWR_MODE))
+		freq = NAN_5GHZ_SOCIAL_CH_44_FREQ;
+
+done:
+	return freq;
+}
+
 bool wlan_nan_get_sap_conc_support(struct wlan_objmgr_psoc *psoc)
 {
 	struct nan_psoc_priv_obj *psoc_nan_obj;

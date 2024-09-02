@@ -988,6 +988,7 @@ void lim_process_mlm_disassoc_cnf(struct mac_context *mac_ctx,
 	tSirResultCodes result_code;
 	tLimMlmDisassocCnf *disassoc_cnf;
 	struct pe_session *session_entry;
+	struct qdf_mac_addr mld_mac = QDF_MAC_ADDR_ZERO_INIT;
 
 	disassoc_cnf = (tLimMlmDisassocCnf *) msg;
 
@@ -1040,13 +1041,16 @@ void lim_process_mlm_disassoc_cnf(struct mac_context *mac_ctx,
 				session_entry->peSessionId,
 				session_entry->limSmeState));
 			lim_send_sme_disassoc_ntf(mac_ctx,
-				disassoc_cnf->peerMacAddr, result_code,
+				disassoc_cnf->peerMacAddr,
+				(uint8_t *)mld_mac.bytes, result_code,
 				disassoc_cnf->disassocTrigger,
 				disassoc_cnf->aid, session_entry->smeSessionId,
 				session_entry);
 		}
 	} else if (LIM_IS_AP_ROLE(session_entry)) {
-		lim_send_sme_disassoc_ntf(mac_ctx, disassoc_cnf->peerMacAddr,
+		lim_send_sme_disassoc_ntf(
+			mac_ctx, disassoc_cnf->peerMacAddr,
+			disassoc_cnf->peerMldAddr,
 			result_code, disassoc_cnf->disassocTrigger,
 			disassoc_cnf->aid, session_entry->smeSessionId,
 			session_entry);
@@ -1189,6 +1193,7 @@ void lim_process_mlm_purge_sta_ind(struct mac_context *mac, uint32_t *msg_buf)
 	tSirResultCodes resultCode;
 	tpLimMlmPurgeStaInd pMlmPurgeStaInd;
 	struct pe_session *pe_session;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -1240,6 +1245,7 @@ void lim_process_mlm_purge_sta_ind(struct mac_context *mac, uint32_t *msg_buf)
 		} else
 			lim_send_sme_disassoc_ntf(mac,
 						  pMlmPurgeStaInd->peerMacAddr,
+						  (uint8_t *)mld_addr.bytes,
 						  resultCode,
 						  pMlmPurgeStaInd->purgeTrigger,
 						  pMlmPurgeStaInd->aid,
@@ -2122,7 +2128,7 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 			       pe_session->limMlmState));
 		pe_session->limSystemRole = eLIM_AP_ROLE;
 
-		sch_edca_profile_update(mac, pe_session);
+		sch_edca_profile_update(mac, pe_session, NULL);
 		/* For dual AP case, delete pre auth node if any */
 		lim_delete_pre_auth_list(mac);
 		/* Check the SAP security configuration.If configured to
@@ -2913,6 +2919,8 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 
 	assoc_rsp.len = 0;
 	mlo_get_assoc_rsp(session_entry->vdev, &assoc_rsp);
+	if (!assoc_rsp.len)
+		return QDF_STATUS_E_INVAL;
 
 	if (!session_entry->ml_partner_info.num_partner_links) {
 		pe_debug("MLO_ROAM: vdev:%d num_partner_links is 0",
@@ -2927,9 +2935,6 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 	pe_err("vdev:%d sta_link_addr" QDF_MAC_ADDR_FMT,
 	       session_entry->vdev_id,
 	       QDF_MAC_ADDR_REF(&sta_link_addr.bytes[0]));
-
-	if (!assoc_rsp.len)
-		return QDF_STATUS_SUCCESS;
 
 	mlm_join_cnf.resultCode = eSIR_SME_SUCCESS;
 	mlm_join_cnf.protStatusCode = STATUS_SUCCESS;
@@ -2994,7 +2999,8 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
-lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
+lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
+					       struct pe_session *session)
 {
 	struct mlo_partner_info *partner_info;
 	struct mlo_link_info *partner_link_info;
@@ -3029,7 +3035,11 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
 	mlo_mgr_update_ap_link_info(session->vdev,
 				    wlan_vdev_get_link_id(session->vdev),
 				    session->bssId, channel);
-
+	lim_update_mlo_mgr_info(mac_ctx,
+				session->vdev,
+				(struct qdf_mac_addr *)session->bssId,
+				wlan_vdev_get_link_id(session->vdev),
+				channel.ch_freq);
 	/* Populating Partner link band Info */
 	partner_info = &session->lim_join_req->partner_info;
 	for (i = 0; i < partner_info->num_partner_links; i++) {
@@ -3042,11 +3052,17 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
 					    partner_link_info->link_id,
 					    partner_link_info->link_addr.bytes,
 					    channel);
+		lim_update_mlo_mgr_info(mac_ctx,
+					session->vdev,
+					&partner_link_info->link_addr,
+					partner_link_info->link_id,
+					channel.ch_freq);
 	}
 }
 #else
 static void
-lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct pe_session *session)
+lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
+					       struct pe_session *session)
 {}
 #endif
 
@@ -3163,7 +3179,8 @@ static void lim_process_switch_channel_join_req(
 		join_cnf.resultCode = eSIR_SME_SUCCESS;
 		join_cnf.protStatusCode = STATUS_SUCCESS;
 
-		lim_update_mlo_mgr_ap_link_info_mbssid_connect(session_entry);
+		lim_update_mlo_mgr_ap_link_info_mbssid_connect(mac_ctx,
+							       session_entry);
 
 		lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
 				     (uint32_t *)&join_cnf);

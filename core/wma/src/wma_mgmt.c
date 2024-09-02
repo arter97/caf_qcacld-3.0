@@ -1995,15 +1995,28 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	/* Till conversion is not done in WMI we need to fill fw phy mode */
 	cmd->peer_phymode = wmi_host_to_fw_phymode(phymode);
 
-	keymgmt = wlan_crypto_get_param(intr->vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	/*
+	 * For STA/P2P CLI mode get the Vdev AKM.
+	 * For SAP mode, since the associating client can choose one
+	 * of the multiple AKM advertised by the SAP, fetch the AKM value
+	 * from the parsed assoc req frame received.
+	 */
+	if (!wma_is_vdev_in_ap_mode(wma, params->smesessionId) ||
+	    !params->sec_info.key_mgmt)
+		keymgmt = wlan_crypto_get_param(intr->vdev,
+						WLAN_CRYPTO_PARAM_KEY_MGMT);
+	else
+		keymgmt = params->sec_info.key_mgmt;
+
 	authmode = wlan_crypto_get_param(intr->vdev,
 					 WLAN_CRYPTO_PARAM_AUTH_MODE);
 	uccipher = wlan_crypto_get_param(intr->vdev,
 					 WLAN_CRYPTO_PARAM_UCAST_CIPHER);
 
-	cmd->akm = cm_crypto_authmode_to_wmi_authmode(authmode,
-						      keymgmt,
+	cmd->akm = cm_crypto_authmode_to_wmi_authmode(authmode, keymgmt,
 						      uccipher);
+	wma_debug("vdev:%d AKM: 0x%x auth_mode:0x%x uc_cipher:0x%x",
+		  params->smesessionId, cmd->akm, authmode, uccipher);
 
 	status = wmi_unified_peer_assoc_send(wma->wmi_handle,
 					 cmd);

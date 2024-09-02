@@ -1993,7 +1993,7 @@ lim_util_count_sta_add(struct mac_context *mac,
 		return;
 
 	/* get here only if this is the first ANI peer in the BSS */
-	sch_edca_profile_update(mac, pe_session);
+	sch_edca_profile_update(mac, pe_session, NULL);
 }
 
 void
@@ -2029,7 +2029,7 @@ lim_util_count_sta_del(struct mac_context *mac,
 		return;
 
 	/* get here only if this is the last ANI peer in the BSS */
-	sch_edca_profile_update(mac, pe_session);
+	sch_edca_profile_update(mac, pe_session, NULL);
 }
 
 /**
@@ -3832,7 +3832,6 @@ uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
 	return cb_mode;
 }
 
-static
 uint8_t lim_get_sta_cb_mode_for_24ghz(struct mac_context *mac,
 				      uint8_t vdev_id)
 {
@@ -5469,7 +5468,7 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 			lim_send_edca_params(mac,
 					     sap_session->gLimEdcaParamsActive,
 					     sap_session->vdev_id, false);
-			sch_qos_update_broadcast(mac, sap_session);
+			sch_qos_update_broadcast(mac, sap_session, NULL);
 
 	/*
 	 * In case of mcc, where cb can come from scc to mcc switch where we
@@ -8248,6 +8247,7 @@ void lim_update_sta_mlo_info(struct pe_session *session,
 			 QDF_MAC_ADDR_REF(add_sta_params->mld_mac_addr),
 			 add_sta_params->is_assoc_peer);
 		add_sta_params->eml_info = sta_ds->eml_info;
+		add_sta_params->mld_info = sta_ds->mld_info;
 		return;
 	}
 
@@ -8964,18 +8964,26 @@ void lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
 }
 
 static void
-lim_revise_eht_caps(struct mac_context *mac, tDot11fIEeht_cap *eht_cap)
+lim_revise_eht_caps_per_band(struct mac_context *mac, enum cds_band_type band,
+			     tDot11fIEeht_cap *eht_cap)
 {
 	uint32_t country_max_allowed_bw;
+
+	if (band == CDS_BAND_2GHZ)
+		return;
 
 	country_max_allowed_bw = wlan_reg_get_country_max_allowed_bw(mac->pdev);
 	if (!country_max_allowed_bw) {
 		pe_debug("Failed to get country_max_allowed_bw");
 		return;
+	} else {
+		pe_debug("max_allowed_bw %d", country_max_allowed_bw);
 	}
 
 	if (country_max_allowed_bw < BW_320_MHZ)
 		eht_cap->support_320mhz_6ghz = 0;
+	else if (country_max_allowed_bw == BW_320_MHZ)
+		eht_cap->support_320mhz_6ghz = 1;
 }
 
 void lim_set_eht_caps(struct mac_context *mac,
@@ -8997,7 +9005,7 @@ void lim_set_eht_caps(struct mac_context *mac,
 		is_band_2g = true;
 
 	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
-	lim_revise_eht_caps(mac, &dot11_cap);
+	lim_revise_eht_caps_per_band(mac, band, &dot11_cap);
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
 					NULL);
 	lim_log_eht_cap(mac, &dot11_cap);
@@ -9384,6 +9392,9 @@ void lim_extract_ml_info(struct pe_session *session,
 					session->vdev->mlo_dev_ctx,
 					link_id);
 		if (!link_info)
+			continue;
+
+		if (ml_partner_info->partner_link_info[i].link_status_code)
 			continue;
 
 		ml_link->partner_info[partner_idx].vdev_id = link_info->vdev_id;
@@ -10500,33 +10511,32 @@ QDF_STATUS lim_ap_mlme_vdev_rnr_notify(struct pe_session *session)
 		pe_err("session is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
+
 	if (!mlme_is_notify_co_located_ap_update_rnr(session->vdev))
 		return status;
 	mlme_set_notify_co_located_ap_update_rnr(session->vdev, false);
-	// Only 6G SAP need to notify co-located SAP to add RNR
-	if (!wlan_reg_is_6ghz_chan_freq(session->curr_op_freq))
-		return status;
 	pe_debug("vdev id %d non mlo 6G AP notify co-located AP to update RNR",
 		 wlan_vdev_get_id(session->vdev));
 	vdev_num = policy_mgr_get_sap_mode_info(mac_ctx->psoc, freq_list,
 						vdev_id_list);
+
 	for (i = 0; i < vdev_num; i++) {
 		if (vdev_id_list[i] == session->vdev_id)
 			continue;
-		if (wlan_reg_is_6ghz_chan_freq(freq_list[i]))
-			continue;
+
 		co_session = pe_find_session_by_vdev_id(mac_ctx,
 							vdev_id_list[i]);
-		if (!co_session)
+		if (!co_session ||
+		    !wlan_reg_is_6ghz_chan_freq(co_session->curr_op_freq))
 			continue;
 
-		status = sch_set_fixed_beacon_fields(mac_ctx, co_session);
+		status = sch_set_fixed_beacon_fields(mac_ctx, session);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("Unable to update 6g co located RNR in beacon");
 			return status;
 		}
 
-		status = lim_send_beacon_ind(mac_ctx, co_session,
+		status = lim_send_beacon_ind(mac_ctx, session,
 					     REASON_RNR_UPDATE);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("Unable to send beacon indication");
@@ -10572,8 +10582,11 @@ void lim_apply_puncture(struct mac_context *mac,
 {
 	uint16_t puncture_bitmap;
 
-	puncture_bitmap =
-		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+	if (mlme_is_chan_switch_in_progress(session->vdev))
+		puncture_bitmap = session->gLimChannelSwitch.puncture_bitmap;
+	else
+		puncture_bitmap =
+			*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
 
 	if (puncture_bitmap) {
 		pe_debug("Apply puncture to reg: bitmap 0x%x, freq: %d, bw %d, mhz_freq_seg1: %d",
@@ -10589,7 +10602,6 @@ void lim_apply_puncture(struct mac_context *mac,
 	}
 }
 
-static
 void lim_remove_puncture(struct mac_context *mac,
 			 struct pe_session *session)
 {
@@ -10611,11 +10623,6 @@ void lim_apply_puncture(struct mac_context *mac,
 {
 }
 
-static inline
-void lim_remove_puncture(struct mac_context *mac,
-			 struct pe_session *session)
-{
-}
 #endif
 
 QDF_STATUS lim_ap_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
@@ -10632,7 +10639,8 @@ QDF_STATUS lim_ap_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 
 	lim_remove_puncture(mac_ctx, session);
 
-	if (!wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev)) {
+	if (!LIM_IS_NDI_ROLE(session) &&
+	    !wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev)) {
 		mlme_set_notify_co_located_ap_update_rnr(vdev_mlme->vdev, true);
 		lim_ap_mlme_vdev_rnr_notify(session);
 		lim_configure_fd_for_existing_6ghz_sap(session, false);
@@ -11046,6 +11054,8 @@ static void lim_update_ap_puncture(struct pe_session *session,
 		session->eht_op.disabled_sub_chan_bitmap_present = true;
 		pe_debug("vdev %d, puncture %d", session->vdev_id,
 			 ch_params->reg_punc_bitmap);
+	} else if (session->eht_op.disabled_sub_chan_bitmap_present) {
+		session->eht_op.disabled_sub_chan_bitmap_present = false;
 	}
 }
 
@@ -11108,8 +11118,8 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 		if (ch_params.mhz_freq_seg0 ==  session->curr_op_freq - 10)
 			sec_chan_freq = session->curr_op_freq - 20;
 	}
-	if (LIM_IS_AP_ROLE(session) &&
-	    !mlme_is_chan_switch_in_progress(mlme_obj->vdev))
+
+	if (LIM_IS_AP_ROLE(session))
 		lim_apply_puncture(mac, session, ch_params.mhz_freq_seg1);
 
 	if (LIM_IS_STA_ROLE(session))
@@ -11164,6 +11174,9 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 	if (LIM_IS_AP_ROLE(session)) {
 		/* Update he ops for puncture */
 		wlan_reg_set_create_punc_bitmap(&ch_params, false);
+		wlan_reg_set_non_eht_ch_params(&ch_params, true);
+		wlan_reg_set_input_punc_bitmap(&ch_params,
+					       lim_get_punc_chan_bit_map(session));
 		wlan_reg_set_channel_params_for_pwrmode(mac->pdev,
 							session->curr_op_freq,
 							sec_chan_freq,
@@ -11759,6 +11772,23 @@ next:
 	return NULL;
 }
 
+uint8_t lim_convert_phy_chwidth_to_vht_chwidth(enum phy_ch_width ch_width)
+{
+	switch (ch_width) {
+	case CH_WIDTH_80P80MHZ:
+		return WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
+	case CH_WIDTH_320MHZ:
+	case CH_WIDTH_160MHZ:
+		return WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+	case CH_WIDTH_80MHZ:
+		return WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	case CH_WIDTH_40MHZ:
+	case CH_WIDTH_20MHZ:
+	default:
+		return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+	}
+}
+
 void
 lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
 				       bool is_sap_starting)
@@ -11775,6 +11805,10 @@ lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
 
 	vdev_num = policy_mgr_get_sap_mode_info(session->mac_ctx->psoc,
 						freq_list, vdev_id_list);
+	if (vdev_num >= MAX_NUMBER_OF_CONC_CONNECTIONS) {
+		pe_err("vdev_num:%u is out of bounds", vdev_num);
+		return;
+	}
 
 	for (i = 0; i < vdev_num; i++) {
 		if (vdev_id_list[i] ==  session->vdev_id)
@@ -12296,7 +12330,7 @@ uint16_t lim_get_tpe_ie_length(enum phy_ch_width chan_width,
 			/* Extension Transmit PSD Information */
 			total_ie_len += 1;
 			/* Maximum Transmit PSD power */
-			total_ie_len += MAX_TX_PSD_POWER;
+			total_ie_len += EXT_TX_PSD_POWER;
 		}
 	}
 
@@ -12363,9 +12397,9 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 			target += 1;
 			consumed += 1;
 			/* Maximum Transmit Local PSD power */
-			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power, MAX_TX_PSD_POWER);
-			target += MAX_TX_PSD_POWER;
-			consumed += MAX_TX_PSD_POWER;
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power, EXT_TX_PSD_POWER);
+			target += EXT_TX_PSD_POWER;
+			consumed += EXT_TX_PSD_POWER;
 			break;
 		case REGULATORY_CLIENT_EIRP:
 			/* Maximum Regulatory EIRP Transmit Power For 320 MHz */
@@ -12382,9 +12416,9 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 			consumed += 1;
 			target += 1;
 			/* Maximum Transmit Regulatory PSD power */
-			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power, MAX_TX_PSD_POWER);
-			target += MAX_TX_PSD_POWER;
-			consumed += MAX_TX_PSD_POWER;
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power, EXT_TX_PSD_POWER);
+			target += EXT_TX_PSD_POWER;
+			consumed += EXT_TX_PSD_POWER;
 			break;
 		}
 end:

@@ -91,7 +91,8 @@ static void if_mgr_enable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 
 	if (curr_vdev_id != vdev_id &&
 	    vdev->vdev_mlme.mlme_state == WLAN_VDEV_S_UP) {
-		ifmgr_debug("Enable roaming for vdev_id %d", vdev_id);
+		ifmgr_debug("Enable roaming for vdev_id %d, requestor %d",
+			    vdev_id, roam_arg->requestor);
 		wlan_cm_enable_rso(pdev, vdev_id,
 				   roam_arg->requestor,
 				   REASON_DRIVER_ENABLED);

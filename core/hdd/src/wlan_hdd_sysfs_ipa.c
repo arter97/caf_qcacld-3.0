@@ -27,6 +27,8 @@
 #define MAX_OPT_DP_CTRL_FLT_ADD_CMD_SIZE 250
 #define MAX_OPT_DP_CTRL_FLT_DEL_CMD_SIZE 50
 #define IPV6ARRAY 4
+#define IPV6ARRAY_U8 16
+#define IPV6ARRAY_U16 8
 
 static ssize_t __hdd_sysfs_ipaucstate_store(struct net_device *net_dev,
 					    const char __user *buf,
@@ -134,6 +136,50 @@ static uint32_t convert_ip(char *sptr)
 	return ip;
 }
 
+static int parse_ipv6(char *str_ptr, uint32_t *ipv6_addr)
+{
+	uint8_t temp_addr[IPV6ARRAY_U8];
+	uint8_t *curr_ptr = temp_addr;
+	int value = 0;
+	int digits = 0;
+	uint16_t digit_value;
+	int i;
+
+	for (i = 0; i < IPV6ARRAY; i++)
+		ipv6_addr[i] = 0;
+
+	for (i = 0; i < IPV6ARRAY_U16; i++) {
+		if (*str_ptr == ':')
+			str_ptr++;
+
+		value = 0;
+		digits = 0;
+		while (*str_ptr && *str_ptr != ':' && digits < 4) {
+			if (kstrtou16(str_ptr, 16, &digit_value) &&
+			    digit_value < 0)
+				return -EINVAL;
+
+			value = (value << 4) | digit_value;
+			digits++;
+			str_ptr++;
+		}
+
+		*curr_ptr++ = (value >> 8) & 0xff;
+		*curr_ptr++ = value & 0xff;
+	}
+
+	/* Convert the uint8_t array to uint32_t array */
+	for (i = 0; i < IPV6ARRAY; ++i) {
+		ipv6_addr[i] = (temp_addr[i * 4] << 24) |
+				(temp_addr[i * 4 + 1] << 16) |
+				(temp_addr[i * 4 + 2] << 8) |
+				temp_addr[i * 4 + 3];
+		ipa_debug("opt_dp_ctrl, ipv6_array[%d] %d", i, ipv6_addr[i]);
+	}
+
+	return 0;
+}
+
 static ssize_t __hdd_sysfs_ipaoptdpctrl_store(struct hdd_context *hdd_ctx,
 					      struct kobj_attribute *attr,
 					      const char __user *buf,
@@ -144,8 +190,9 @@ static ssize_t __hdd_sysfs_ipaoptdpctrl_store(struct hdd_context *hdd_ctx,
 	char *sptr, *token;
 	struct ipa_wdi_opt_dpath_flt_add_cb_params ipa_flt_add_params;
 	uint16_t sport, dport;
-	uint32_t sipv4, dipv4, sipv6, dipv6;
-	int i = 0, j = 0;
+	uint32_t sipv4, dipv4;
+	char *sipv6, *dipv6;
+	int i = 0;
 
 	hdd_enter();
 
@@ -196,26 +243,23 @@ static ssize_t __hdd_sysfs_ipaoptdpctrl_store(struct hdd_context *hdd_ctx,
 			ipa_flt_add_params.flt_info[i].ipv4_addr.ipv4_daddr =
 								dipv4;
 		} else {
-			for (j = 0; j < IPV6ARRAY; j++) {
-				token = strsep(&sptr, " ");
-				if (!token)
-					return -EINVAL;
+			token = strsep(&sptr, " ");
+			if (!token)
+				return -EINVAL;
 
-				if (kstrtou32(token, 0, &sipv6))
-					return -EINVAL;
+			sipv6 = token;
+			parse_ipv6(sipv6,
+				   ipa_flt_add_params.flt_info[i].ipv6_addr.
+				   ipv6_saddr);
 
-				ipa_flt_add_params.flt_info[i].ipv6_addr.
-					ipv6_saddr[j] = sipv6;
-				token = strsep(&sptr, " ");
-				if (!token)
-					return -EINVAL;
+			token = strsep(&sptr, " ");
+			if (!token)
+				return -EINVAL;
 
-				if (kstrtou32(token, 0, &dipv6))
-					return -EINVAL;
-
-				ipa_flt_add_params.flt_info[i].ipv6_addr.
-					ipv6_daddr[j] = dipv6;
-			}
+			dipv6 = token;
+			parse_ipv6(dipv6,
+				   ipa_flt_add_params.flt_info[i].ipv6_addr.
+				   ipv6_daddr);
 		}
 
 		/* Get sport */

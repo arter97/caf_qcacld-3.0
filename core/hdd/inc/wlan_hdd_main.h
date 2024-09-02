@@ -881,6 +881,7 @@ struct hdd_fw_txrx_stats {
  * @country_ie_updated: country ie is updated or not by hdd hostapd
  * @during_auth_offload: auth mgmt frame is offloading to hostapd
  * @reg_punc_bitmap: puncturing bitmap
+ * @is_ap_suspend: SAP suspend state
  */
 struct hdd_ap_ctx {
 	struct hdd_hostapd_state hostapd_state;
@@ -906,6 +907,7 @@ struct hdd_ap_ctx {
 #ifdef WLAN_FEATURE_11BE
 	uint16_t reg_punc_bitmap;
 #endif
+	qdf_atomic_t is_ap_suspend;
 };
 
 /**
@@ -1339,6 +1341,8 @@ struct get_station_client_info {
  * @sta_client_info: To store get station user application port_id's
  * @disconnect_link_id: cache disconnect link_id, for legacy link_id will
  *			be @WLAN_INVALID_LINK_ID
+ * @wlm_ll_conn_flag: Indicates if low lateny connection flag set
+ *		      based on wlm mode
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1535,6 +1539,7 @@ struct hdd_adapter {
 	uint16_t keep_alive_interval;
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
 	int32_t disconnect_link_id;
+	bool wlm_ll_conn_flag;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -2606,6 +2611,7 @@ hdd_adapter_ops_record_event(struct hdd_context *hdd_ctx,
  * hdd_validate_channel_and_bandwidth() - Validate the channel-bandwidth combo
  * @adapter: HDD adapter
  * @chan_freq: Channel frequency
+ * @ccfs1: Value of CCFS1 in MHz
  * @chan_bw: Bandwidth
  *
  * Checks if the given bandwidth is valid for the given channel number.
@@ -2613,7 +2619,7 @@ hdd_adapter_ops_record_event(struct hdd_context *hdd_ctx,
  * Return: 0 for success, non-zero for failure
  */
 int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
-				       qdf_freq_t chan_freq,
+				       qdf_freq_t chan_freq, uint32_t ccfs1,
 				       enum phy_ch_width chan_bw);
 
 /**
@@ -3754,6 +3760,15 @@ QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
 				    qdf_freq_t chan_freq,
 				    enum phy_ch_width ch_width,
 				    bool forced);
+
+/**
+ * hdd_is_chan_switch_in_progress() - Check if any adapter has channel switch
+ * in progress
+ *
+ * Return: true, if any adapter has channel switch in
+ * progress else false
+ */
+bool hdd_is_chan_switch_in_progress(void);
 
 #if defined(FEATURE_WLAN_CH_AVOID)
 QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
@@ -5554,6 +5569,23 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+/**
+ * hdd_link_rej_mac_addr_update() - API to update OSIF/HDD on VDEV
+ * mac addr update due to link rejection.
+ * @ieee_rej_link_id: Rejected IEEE link ID
+ * @ieee_acc_link_id: Accepted IEEE link ID
+ * @vdev_id: VDEV undergoing link rejection.
+ *
+ * Check if both @ieee_rej_link_id and @ieee_acc_link_id are part of adapter
+ * corresponding to @vdev_id. Then take necessary actions to support link reject
+ * MAC update and reset hdd adapter link info for rejected link.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_link_rej_mac_addr_update(uint8_t ieee_rej_link_id,
+			     uint8_t ieee_acc_link_id,
+			     uint8_t vdev_id);
 
 /**
  * hdd_link_switch_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV
@@ -5948,4 +5980,34 @@ wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info)
  * Return: True if MLO connection, else False
  */
 bool wlan_hdd_is_mlo_connection(struct wlan_hdd_link_info *link_info);
+
+#if defined(CONFIG_HDD_INIT_WITH_RTNL_LOCK)
+/**
+ * hdd_hold_rtnl_lock - Hold RTNL lock
+ *
+ * Hold RTNL lock
+ *
+ * Return: True if held and false otherwise
+ */
+static inline bool hdd_hold_rtnl_lock(void)
+{
+	rtnl_lock();
+	return true;
+}
+
+/**
+ * hdd_release_rtnl_lock - Release RTNL lock
+ *
+ * Release RTNL lock
+ *
+ * Return: None
+ */
+static inline void hdd_release_rtnl_lock(void)
+{
+	rtnl_unlock();
+}
+#else
+static inline bool hdd_hold_rtnl_lock(void) { return false; }
+static inline void hdd_release_rtnl_lock(void) { }
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

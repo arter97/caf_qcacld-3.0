@@ -2153,6 +2153,10 @@ config FEATURE_DIRECT_LINK
 	bool "enable FEATURE_DIRECT_LINK"
 	default n
 
+config DP_FTM_MODE_SKIP_WBM_RING_INIT
+	bool "Skip WBM ring init in FTM mode"
+	default n
+
 config WLAN_FEATURE_EMLSR
 	bool "Enable EMLSR feature"
 	default n
@@ -2204,6 +2208,14 @@ config WLAN_MCC_MIN_CHANNEL_QUOTA
 
 config WLAN_DP_FEATURE_STC
 	bool "Enable WLAN_DP_FEATURE_STC"
+	default n
+
+config DP_FEATURE_RX_BUFFER_RECYCLE
+	bool "Enable CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE"
+	default n
+
+config FEATURE_WLAN_SUPPORT_USD
+	bool "enable FEATURE_WLAN_SUPPORT_USD"
 	default n
 
 if CNSS_KIWI_V2

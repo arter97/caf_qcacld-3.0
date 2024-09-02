@@ -1271,13 +1271,21 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto error;
 	}
 
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+		status =
+		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp,
+					  roam_synch_data->auth_status);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_err(CM_PREFIX_FMT " fail to copy reassoc resp status %d",
+				 CM_PREFIX_REF(vdev_id, cm_id), status);
+			goto error;
+		}
+	}
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
-
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
-		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp);
 
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);

@@ -61,6 +61,7 @@
 #include "wlan_p2p_api.h"
 #include "wlan_ll_sap_api.h"
 #include "wlan_dcs_api.h"
+#include "wlan_tdls_api.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
@@ -1176,7 +1177,8 @@ __lim_process_radio_measure_request(struct mac_context *mac, uint8_t *pRxPacketI
 		 pHdr->fc.type, pHdr->fc.subType, curr_seq_num);
 
 	rrm_process_radio_measurement_request(mac, pe_session->bssId, frm,
-					      pe_session);
+					      pe_session, pHdr, frameLen,
+					      pRxPacketInfo);
 err:
 	qdf_mem_free(frm);
 }
@@ -1603,7 +1605,8 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	struct wlan_mlme_qos *qos_aggr;
 
 	if (mlo_is_any_link_disconnecting(session->vdev)) {
-		pe_err("Ignore ADDBA, vdev is in not in conncted state");
+		pe_err("Ignore ADDBA, vdev:%d is in not in conncted state",
+		       wlan_vdev_get_id(session->vdev));
 		return;
 	}
 
@@ -1620,7 +1623,6 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	/* Unpack ADDBA request frame */
 	status = dot11f_unpack_addba_req(mac_ctx, body_ptr, frame_len,
 					 addba_req, false);
-
 	if (DOT11F_FAILED(status)) {
 		pe_err("Failed to unpack and parse (0x%08x, %d bytes)",
 			status, frame_len);
@@ -1632,6 +1634,21 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 
 	sta_ds = dph_lookup_hash_entry(mac_ctx, mac_hdr->sa, &aid,
 				       &session->dph.dphHashTable);
+	/*
+	 * TDLS peer addba request for some TID could be received before
+	 * TDLS_CHANGE_STA is received from userspace in some scenario
+	 * for example when the DUT sends TDLS setup response directly
+	 * to an already discovered peer and peer sends the addba request
+	 * immediately for TID 0.
+	 */
+	if (sta_ds && sta_ds->staType == STA_ENTRY_TDLS_PEER &&
+	    !wlan_tdls_is_addba_request_allowed(session->vdev,
+						(struct qdf_mac_addr *)sta_ds->staAddr)) {
+		pe_err("vdev:%d Dropping TDLS peer addba req received before change_sta",
+		       wlan_vdev_get_id(session->vdev));
+		goto error;
+	}
+
 	if (sta_ds &&
 	    (lim_is_session_he_capable(session) ||
 	     sta_ds->staType == STA_ENTRY_TDLS_PEER))
@@ -1991,7 +2008,8 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		break;
 
 	case ACTION_CATEGORY_RRM:
-
+		pe_debug("RRM Action category: %d action: %d",
+			 action_hdr->category, action_hdr->actionID);
 		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
 		    LIM_IS_AP_ROLE(session) &&
 		    action_hdr->actionID == RRM_RADIO_MEASURE_RPT) {

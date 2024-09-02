@@ -61,6 +61,8 @@
 #include <spatial_reuse_api.h>
 #include <wlan_mlo_mgr_cmn.h>
 #include "wlan_mlme_public_struct.h"
+#include <wlan_mlo_mgr_link_switch.h>
+#include "wlan_policy_mgr_i.h"
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -446,6 +448,10 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 		lim_send_smps_intolerent(mac_ctx, pe_session, bcn_len, bcn_ptr);
 		lim_cm_fill_rsp_from_stads(mac_ctx, pe_session, rsp);
 		rsp->uapsd_mask = pe_session->gUapsdPerAcBitmask;
+
+		mlo_mgr_update_link_status_code(pe_session->vdev,
+						wlan_vdev_get_link_id(pe_session->vdev),
+						STATUS_SUCCESS);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -530,6 +536,12 @@ static void lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
 		qdf_copy_macaddr(
 			&rsp_partner_info->partner_link_info[i].link_addr,
 			&partner_info->partner_link_info[i].link_addr);
+		rsp_partner_info->partner_link_info[i].link_status_code =
+			partner_info->partner_link_info[i].link_status_code;
+
+		mlo_mgr_update_link_status_code(pe_session->vdev,
+			partner_info->partner_link_info[i].link_id,
+			partner_info->partner_link_info[i].link_status_code);
 
 		wlan_get_chan_by_bssid_from_rnr(
 			pe_session->vdev,
@@ -880,6 +892,7 @@ void lim_send_sme_disassoc_deauth_ntf(struct mac_context *mac,
 
 void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 			       tSirMacAddr peerMacAddr,
+			       tSirMacAddr peerMldAddr,
 			       tSirResultCodes reasonCode,
 			       uint16_t disassocTrigger,
 			       uint16_t aid,
@@ -911,9 +924,9 @@ void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 			if (session->valid &&
 			    (session->opmode == QDF_SAP_MODE)) {
 				/* Find the sta ds entry in another session */
-				sta_ds = dph_lookup_hash_entry(mac,
-						peerMacAddr, &assoc_id,
-						&session->dph.dphHashTable);
+				sta_ds = lim_get_sta_ds(mac, peerMacAddr,
+							peerMldAddr, &assoc_id,
+							session);
 				if (sta_ds)
 					break;
 			}
@@ -1806,16 +1819,11 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	    !policy_mgr_is_interband_mcc_supported(mac_ctx->psoc)) {
 		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, csa_freq);
 	} else if (cnx_count > 2) {
-		is_allowed =
-		policy_mgr_allow_concurrency_csa(
-			mac_ctx->psoc,
-			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
-							     mode,
-							     session_entry->vdev_id),
-			csa_freq,
-			policy_mgr_get_bw(new_ch_width),
-			session_entry->vdev_id, false,
-			CSA_REASON_UNKNOWN);
+		is_allowed = policy_mgr_allow_concurrency_sta_csa(mac_ctx->psoc,
+								  wlan_vdev_get_id(session_entry->vdev),
+								  mode,
+								  csa_freq,
+								  new_ch_width);
 	}
 
 	return is_allowed;
@@ -2776,7 +2784,8 @@ lim_handle_bss_color_change_ie(struct mac_context *mac_ctx,
 	if (LIM_IS_AP_ROLE(session) &&
 	    session->he_op.bss_col_disabled &&
 	    session->he_bss_color_change.new_color) {
-		pe_debug("countdown: %d, new_color: %d",
+		pe_debug("Vdev %d countdown: %d, new_color: %d",
+			 session->vdev_id,
 			 session->he_bss_color_change.countdown,
 			 session->he_bss_color_change.new_color);
 		if (session->he_bss_color_change.countdown > 0) {
@@ -2844,8 +2853,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		wlan_vdev_mlme_set_sap_go_move_before_sta(vdev, false);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 	}
-	pe_debug("role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
-		 GET_LIM_SYSTEM_ROLE(session),
+	pe_debug("Vdev %d role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
+		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
 		 session->dfsIncludeChanSwIe,
 		 session->gLimOperatingMode.present,
 		 session->gLimChannelSwitch.switchCount,

@@ -1816,6 +1816,14 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
+	if (wlan_vdev_is_restart_progress(pe_session->vdev) ==
+			QDF_STATUS_SUCCESS) {
+		pe_debug("vdev %d is restarting, drop auth frame sa:"QDF_MAC_ADDR_FMT,
+			 pe_session->vdev_id,
+			 QDF_MAC_ADDR_REF(mac_hdr->sa));
+		return;
+	}
+
 	curr_seq_num = (mac_hdr->seqControl.seqNumHi << 4) |
 		(mac_hdr->seqControl.seqNumLo);
 
@@ -2343,14 +2351,32 @@ lim_get_vdev_id_from_macaddr(struct wlan_objmgr_pdev *pdev, uint8_t *mac_addr)
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t vdev_id;
+	struct wlan_mlo_dev_context *ml_dev_ctx;
 
 	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(pdev, mac_addr,
 							 WLAN_MGMT_RX_ID);
 
 	if (!vdev) {
-		pe_err("vdev is null for macaddr " QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(mac_addr));
-		return WLAN_UMAC_VDEV_ID_MAX;
+		/*
+		 * VDEV can be null for MLD address. So, get first VDEV from
+		 * ML DEV CTX.
+		 */
+		ml_dev_ctx = wlan_mlo_get_mld_ctx_by_mldaddr(
+					(struct qdf_mac_addr *)mac_addr);
+		if (!ml_dev_ctx) {
+			pe_err("ML dev ctx is null for macaddr " QDF_MAC_ADDR_FMT,
+			       QDF_MAC_ADDR_REF(mac_addr));
+			return WLAN_UMAC_VDEV_ID_MAX;
+		}
+
+		vdev = ml_dev_ctx->wlan_vdev_list[0];
+		if (!vdev) {
+			pe_err("vdev is null for macaddr " QDF_MAC_ADDR_FMT,
+			       QDF_MAC_ADDR_REF(mac_addr));
+			return WLAN_UMAC_VDEV_ID_MAX;
+		}
+
+		wlan_objmgr_vdev_get_ref(vdev, WLAN_MGMT_RX_ID);
 	}
 
 	vdev_id =  wlan_vdev_get_id(vdev);

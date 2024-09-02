@@ -10194,7 +10194,7 @@ QDF_STATUS wma_send_pdev_set_hw_mode_cmd(tp_wma_handle wma_handle,
 	}
 	timeout_msg = wma_fill_hold_req(wma_handle, 0,
 			SIR_HAL_PDEV_SET_HW_MODE,
-			WMA_PDEV_SET_HW_MODE_RESP, NULL,
+			WMA_PDEV_SET_HW_MODE_RESP, NULL, NULL,
 			WMA_VDEV_HW_MODE_REQUEST_TIMEOUT - 1);
 	if (!timeout_msg) {
 		wma_err("Failed to allocate request for SIR_HAL_PDEV_SET_HW_MODE");
@@ -10242,7 +10242,7 @@ QDF_STATUS wma_send_pdev_set_dual_mac_config(tp_wma_handle wma_handle,
 
 	req_msg = wma_fill_hold_req(wma_handle, 0,
 				    SIR_HAL_PDEV_DUAL_MAC_CFG_REQ,
-				    WMA_PDEV_MAC_CFG_RESP, NULL,
+				    WMA_PDEV_MAC_CFG_RESP, NULL, NULL,
 				    WMA_VDEV_DUAL_MAC_CFG_TIMEOUT);
 	if (!req_msg) {
 		wma_err("Failed to allocate request for SIR_HAL_PDEV_DUAL_MAC_CFG_REQ");

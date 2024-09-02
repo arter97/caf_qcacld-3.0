@@ -1241,32 +1241,33 @@ bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 	     (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 	     (QDF_P2P_DEVICE_MODE == adapter->device_mode))) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-		if (hdd_cm_is_disconnected(link_info))
-			info->state = WIFI_DISCONNECTED;
 
-		if (hdd_cm_is_connecting(link_info)) {
+		if (QDF_STA_MODE == adapter->device_mode &&
+		    link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
+			info->state = WIFI_ASSOCIATED;
+		} else if (hdd_cm_is_disconnected(link_info)) {
+			info->state = WIFI_DISCONNECTED;
+		} else if (hdd_cm_is_connecting(link_info)) {
 			hdd_debug("Session ID %d, Connection is in progress",
 				  link_info->vdev_id);
 			info->state = WIFI_ASSOCIATING;
+		} else if (hdd_cm_is_vdev_associated(link_info)) {
+			if (!sta_ctx->conn_info.is_authenticated) {
+				hdd_err("client " QDF_MAC_ADDR_FMT " is in the middle of WPS/EAPOL exchange.",
+					QDF_MAC_ADDR_REF(mac->bytes));
+				info->state = WIFI_AUTHENTICATING;
+			} else {
+				info->state = WIFI_ASSOCIATED;
+			}
 		}
-		if (hdd_cm_is_vdev_associated(link_info) &&
-		    !sta_ctx->conn_info.is_authenticated) {
-			hdd_err("client " QDF_MAC_ADDR_FMT
-				" is in the middle of WPS/EAPOL exchange.",
-				QDF_MAC_ADDR_REF(mac->bytes));
-			info->state = WIFI_AUTHENTICATING;
-		}
-		if (hdd_cm_is_vdev_associated(link_info) ||
-		    link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
-			info->state = WIFI_ASSOCIATED;
+
+		if (info->state == WIFI_ASSOCIATED) {
 			qdf_copy_macaddr(&info->bssid,
 					 &sta_ctx->conn_info.bssid);
 			qdf_mem_copy(info->ssid,
 				     sta_ctx->conn_info.ssid.SSID.ssId,
 				     sta_ctx->conn_info.ssid.SSID.length);
-			/*
-			 * NULL Terminate the string
-			 */
+			/* NULL Terminate the string */
 			info->ssid[sta_ctx->conn_info.ssid.SSID.length] = 0;
 		}
 	}
@@ -3510,22 +3511,22 @@ int wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
 	tSirLLStatsGetReq get_req;
 	struct hdd_adapter *adapter = link_info->adapter;
 
-	hdd_enter_dev(adapter->dev);
-
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
-		hdd_warn("Command not allowed in FTM mode");
+		hdd_warn_rl("Command not allowed in FTM mode");
 		return -EPERM;
 	}
 
 	if (hdd_cm_is_vdev_roaming(link_info)) {
-		hdd_debug("Roaming in progress, cannot process the request");
+		hdd_info_rl("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
 
 	if (!adapter->is_link_layer_stats_set) {
-		hdd_info("LL_STATs not set");
+		hdd_info_rl("LL_STATs not set");
 		return -EINVAL;
 	}
+
+	hdd_enter_dev(adapter->dev);
 
 	get_req.reqId = req_id;
 	get_req.paramIdMask = req_mask;
@@ -7721,6 +7722,7 @@ wlan_hdd_update_mlo_peer_stats(struct wlan_hdd_link_info *link_info,
 
 	sinfo->tx_bytes = peer_stats->tx.tx_success.bytes;
 	sinfo->rx_bytes = peer_stats->rx.rcvd.bytes;
+	sinfo->tx_packets = peer_stats->tx.tx_success.num;
 	sinfo->rx_packets = peer_stats->rx.rcvd.num;
 
 	hdd_nofl_debug("Updated sinfo with per peer stats");
@@ -7881,6 +7883,7 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	ucfg_dp_get_net_dev_stats(vdev, &stats);
 	sinfo->tx_bytes = stats.tx_bytes;
 	sinfo->rx_bytes = stats.rx_bytes;
+	sinfo->tx_packets = stats.tx_packets;
 	sinfo->rx_packets = stats.rx_packets;
 	wlan_hdd_update_mlo_peer_stats(link_info, sinfo);
 

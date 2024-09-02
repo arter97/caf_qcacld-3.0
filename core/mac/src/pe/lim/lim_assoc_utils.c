@@ -493,6 +493,7 @@ lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
  * lim_send_del_sta_cnf() - Send Del sta confirmation
  * @mac: Pointer to Global MAC structure
  * @sta_dsaddr: sta ds address
+ * @sta_mld_addr: sta mld address
  * @staDsAssocId: sta ds association id
  * @mlmStaContext: MLM station context
  * @status_code: Status code
@@ -504,6 +505,7 @@ lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
  */
 void
 lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
+		     struct qdf_mac_addr sta_mld_addr,
 		     uint16_t staDsAssocId,
 		     struct lim_sta_context mlmStaContext,
 		     tSirResultCodes status_code, struct pe_session *pe_session)
@@ -634,6 +636,9 @@ lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
 
 		qdf_mem_copy((uint8_t *) &mlmDisassocCnf.peerMacAddr,
 			     (uint8_t *) sta_dsaddr.bytes, QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy((uint8_t *)&mlmDisassocCnf.peerMldAddr,
+			     (uint8_t *)sta_mld_addr.bytes, QDF_MAC_ADDR_SIZE);
+
 		mlmDisassocCnf.resultCode = status_code;
 		mlmDisassocCnf.disassocTrigger = eLIM_DUPLICATE_ENTRY;
 		/* Update PE session Id */
@@ -2646,22 +2651,57 @@ lim_add_sta(struct mac_context *mac_ctx,
 			add_sta_params->stbc_capable = 0;
 	}
 
-	if (session_entry->opmode == QDF_SAP_MODE ||
-	    session_entry->opmode == QDF_P2P_GO_MODE) {
-		if (session_entry->parsedAssocReq) {
-			uint16_t aid = sta_ds->assocId;
-			/* Get a copy of the already parsed Assoc Request */
-			assoc_req =
-			(tpSirAssocReq) session_entry->parsedAssocReq[aid];
+	if ((session_entry->opmode == QDF_SAP_MODE ||
+	     session_entry->opmode == QDF_P2P_GO_MODE) &&
+	     session_entry->parsedAssocReq) {
+		struct wlan_crypto_params *peer_crypto_params;
+		QDF_STATUS status;
+		uint32_t length;
+		const uint8_t *ies;
+		uint16_t aid = sta_ds->assocId;
 
-			if (assoc_req) {
-				add_sta_params->wpa_rsn = assoc_req->rsnPresent;
-				add_sta_params->wpa_rsn |=
-					(assoc_req->wpaPresent << 1);
-			}
+		/* Get a copy of the already parsed Assoc Request */
+		assoc_req = (tpSirAssocReq) session_entry->parsedAssocReq[aid];
+		if (!assoc_req)
+			goto next_action;
+
+		add_sta_params->wpa_rsn = assoc_req->rsnPresent;
+		add_sta_params->wpa_rsn |= assoc_req->wpaPresent << 1;
+
+		if (!assoc_req->rsnPresent) {
+			pe_debug("RSN is not present");
+			goto next_action;
 		}
+
+		if (assoc_req->assocReqFrameLength < WLAN_ASSOC_REQ_IES_OFFSET)
+			goto next_action;
+
+		ies = assoc_req->assocReqFrame + WLAN_ASSOC_REQ_IES_OFFSET;
+		length = assoc_req->assocReqFrameLength -
+						WLAN_ASSOC_REQ_IES_OFFSET;
+		peer_crypto_params =
+				qdf_mem_malloc(sizeof(*peer_crypto_params));
+		if (!peer_crypto_params)
+			goto next_action;
+
+		status = wlan_get_crypto_params_from_rsn_ie(peer_crypto_params,
+							    ies, length);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("vdev:%d Failed to extract crypto_params",
+			       session_entry->vdev_id);
+			qdf_mem_free(peer_crypto_params);
+			goto next_action;
+		}
+
+		add_sta_params->sec_info.key_mgmt =
+					peer_crypto_params->key_mgmt;
+		pe_debug("Peer key_mgmt:0x%x",
+			 add_sta_params->sec_info.key_mgmt);
+
+		qdf_mem_free(peer_crypto_params);
 	}
 
+next_action:
 	lim_update_he_stbc_capable(add_sta_params);
 	lim_update_he_mcs_12_13(add_sta_params, sta_ds);
 
@@ -4523,6 +4563,20 @@ void lim_prepare_and_send_del_all_sta_cnf(struct mac_context *mac,
 			    (uint32_t *)&mlm_deauth);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void lim_copy_mld_mac_addr(uint8_t *sta_mld_addr,
+				  tpDphHashNode sta)
+{
+	qdf_mem_copy(sta_mld_addr, sta->mld_addr, QDF_MAC_ADDR_SIZE);
+}
+#else
+static inline
+void lim_copy_mld_mac_addr(uint8_t *sta_mld_addr,
+			   tpDphHashNode sta)
+{
+}
+#endif
+
 /**
  * lim_prepare_and_send_del_sta_cnf() - prepares and send del sta cnf
  *
@@ -4543,6 +4597,7 @@ lim_prepare_and_send_del_sta_cnf(struct mac_context *mac, tpDphHashNode sta,
 {
 	uint16_t staDsAssocId = 0;
 	struct qdf_mac_addr sta_dsaddr;
+	struct qdf_mac_addr sta_mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 	struct lim_sta_context mlmStaContext;
 	bool mlo_conn = false;
 
@@ -4554,6 +4609,7 @@ lim_prepare_and_send_del_sta_cnf(struct mac_context *mac, tpDphHashNode sta,
 	staDsAssocId = sta->assocId;
 	qdf_mem_copy((uint8_t *) sta_dsaddr.bytes,
 		     sta->staAddr, QDF_MAC_ADDR_SIZE);
+	lim_copy_mld_mac_addr(sta_mld_addr.bytes, sta);
 
 	mlmStaContext = sta->mlmStaContext;
 
@@ -4576,7 +4632,8 @@ lim_prepare_and_send_del_sta_cnf(struct mac_context *mac, tpDphHashNode sta,
 				 pe_session->limMlmState));
 	}
 
-	lim_send_del_sta_cnf(mac, sta_dsaddr, staDsAssocId, mlmStaContext,
+	lim_send_del_sta_cnf(mac, sta_dsaddr, sta_mld_addr, staDsAssocId,
+			     mlmStaContext,
 			     status_code, pe_session);
 }
 
@@ -4806,4 +4863,66 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 	ie.len = deauth_disassoc_frame_len - ie_offset;
 
 	mlme_set_peer_disconnect_ies(session->vdev, &ie);
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static void lim_get_sta_mld_log(tpDphHashNode sta_ds, tSirMacAddr mld_mac,
+				char *mld_log_str)
+{
+	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)mld_mac))
+		qdf_scnprintf(mld_log_str, MAC_ADDR_DUMP_LEN,
+			      " SA mld: " QDF_MAC_ADDR_FMT,
+			      QDF_MAC_ADDR_REF(mld_mac));
+
+	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)
+	    sta_ds->mld_addr))
+		qdf_scnprintf(mld_log_str, MAC_ADDR_DUMP_LEN,
+			      " STA DS mld: " QDF_MAC_ADDR_FMT,
+			      QDF_MAC_ADDR_REF(sta_ds->mld_addr));
+}
+#else
+static inline
+void lim_get_sta_mld_log(tpDphHashNode sta_ds, tSirMacAddr mld_mac,
+			 char *mld_log_str)
+{
+}
+#endif
+
+tpDphHashNode lim_get_sta_ds(struct mac_context *mac_ctx,
+			     tSirMacAddr sa, tSirMacAddr mld_mac,
+			     uint16_t *assoc_id,
+			     struct pe_session *session)
+{
+	tpDphHashNode sta_ds = NULL;
+	char mld_log_str[52] = {0};
+
+	/* Check if STA present with SA address */
+	sta_ds = dph_lookup_hash_entry(
+				mac_ctx, sa,
+				assoc_id,
+				&session->dph.dphHashTable);
+	/* Check if STA present with MLD address,
+	 * this can happen if SAP is non ML,
+	 * so the MLD address will be used as address for connected STA
+	 */
+	if (!sta_ds && !qdf_is_macaddr_zero((struct qdf_mac_addr *)mld_mac))
+		sta_ds = dph_lookup_hash_entry(
+				mac_ctx, mld_mac,
+				assoc_id,
+				&session->dph.dphHashTable);
+	/* Check if STA present with same MLD address as current SA,
+	 * this can happen if SAP is ML, so the MLD address will be
+	 * used as SA address for connected STA
+	 */
+	if (!sta_ds && wlan_vdev_mlme_is_mlo_vdev(session->vdev))
+		sta_ds = dph_lookup_hash_entry_by_mld_addr(
+				mac_ctx, sa,
+				assoc_id,
+				&session->dph.dphHashTable);
+	if (sta_ds) {
+		lim_get_sta_mld_log(sta_ds, mld_mac, mld_log_str);
+		pe_debug("Vdev %d STA found for " QDF_MAC_ADDR_FMT "%s",
+			 session->vdev_id, QDF_MAC_ADDR_REF(sa), mld_log_str);
+	}
+	return sta_ds;
 }

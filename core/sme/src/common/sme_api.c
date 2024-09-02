@@ -8125,7 +8125,7 @@ int sme_set_no_ack_policy(mac_handle_t mac_handle, uint8_t session_id,
 	}
 	sme_debug("no ack is set to %d for ac %d", set_val, ac);
 	qdf_mem_zero(&msg, sizeof(msg));
-	msg.type = eWNI_SME_UPDATE_EDCA_PROFILE;
+	msg.type = eWNI_SME_UPDATE_EDCA_ACTIVE_PROFILE;
 	msg.reserved = 0;
 	msg.bodyval = session_id;
 	status = scheduler_post_message(QDF_MODULE_ID_SME,
@@ -8488,12 +8488,11 @@ QDF_STATUS sme_ch_avoid_update_req(mac_handle_t mac_handle)
 						    QDF_MODULE_ID_WMA,
 						    &message);
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			sme_err("Post Ch Avoid Update MSG fail");
+			sme_err("Post WMA_CH_AVOID_UPDATE_REQ fail");
 			qdf_mem_free(cauReq);
 			sme_release_global_lock(&mac->sme);
 			return QDF_STATUS_E_FAILURE;
 		}
-		sme_debug("Posted Ch Avoid Update MSG");
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -10859,15 +10858,15 @@ void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		sme_debug("No session for id %d", vdev_id);
 		return;
 	}
-	sme_debug("Config EHT caps for BW %d", chwidth);
-	mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.support_320mhz_6ghz = 0;
 
 	if (chwidth < eHT_CHANNEL_WIDTH_320MHZ) {
-		sme_debug("EHT caps config not required for bw: %d", chwidth);
-		return;
+		sme_debug("Reset 320M support as chan width is %d", chwidth);
+		mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.support_320mhz_6ghz = 0;
+	} else {
+		sme_debug("Config EHT caps");
+		mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.support_320mhz_6ghz = 1;
 	}
 
-	mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.support_320mhz_6ghz = 1;
 	qdf_mem_copy(&mac_ctx->eht_cap_5g,
 		     &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap,
 		     sizeof(tDot11fIEeht_cap));
@@ -11238,11 +11237,20 @@ int sme_update_he_capabilities(mac_handle_t mac_handle, uint8_t session_id,
 			cfg_he_cap->rx_ctrl_frame = 0;
 		break;
 	case QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_PUNCTURED_PREAMBLE_RX:
-		if (cfg_val)
+		if (cfg_val) {
+			he_cap_orig->rx_pream_puncturing =
+				cfg_get(mac_ctx->psoc, CFG_HE_RX_PREAM_PUNC);
 			cfg_he_cap->rx_pream_puncturing =
 				he_cap_orig->rx_pream_puncturing;
-		else
+			mac_ctx->he_cap_2g.rx_pream_puncturing =
+				he_cap_orig->rx_pream_puncturing;
+			mac_ctx->he_cap_5g.rx_pream_puncturing =
+				he_cap_orig->rx_pream_puncturing;
+		} else {
 			cfg_he_cap->rx_pream_puncturing = 0;
+			mac_ctx->he_cap_2g.rx_pream_puncturing = 0;
+			mac_ctx->he_cap_5g.rx_pream_puncturing = 0;
+		}
 		break;
 	default:
 		sme_debug("default: Unhandled cfg %d", cfg_id);
@@ -15590,7 +15598,9 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		     &mac_ctx->eht_cap_5g_orig,
 		     sizeof(tDot11fIEeht_cap));
 	mac_ctx->usr_eht_testbed_cfg = false;
-	mac_ctx->roam.configParam.channelBondingMode24GHz = 1;
+	wlan_mlme_get_24_chan_bonding_mode(
+			mac_ctx->psoc,
+			&mac_ctx->roam.configParam.channelBondingMode24GHz);
 	wlan_mlme_set_sta_mlo_conn_band_bmp(mac_ctx->psoc, 0x77);
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 2);
 	status = ucfg_mlme_get_bss_color_collision_det_support(mac_ctx->psoc,
@@ -16638,6 +16648,19 @@ QDF_STATUS sme_set_aggressive_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
 	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
 					  IS_ROAM_AGGRESSIVE,
 					  &src_config);
+}
+
+QDF_STATUS sme_get_aggressive_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
+				      bool *is_aggressive_roam_mode)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy temp;
+
+	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id, IS_ROAM_AGGRESSIVE,
+				   &temp);
+	*is_aggressive_roam_mode = temp.bool_value;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS sme_get_roam_config_status(mac_handle_t mac_handle,

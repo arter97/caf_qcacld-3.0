@@ -541,6 +541,20 @@ static inline void lim_nan_register_callbacks(struct mac_context *mac_ctx)
 }
 #endif
 
+#ifdef FEATURE_WLAN_TDLS
+static void lim_register_tdls_callbacks(struct mac_context *mac_ctx)
+{
+	struct tdls_callbacks tdls_cb = {0};
+
+	tdls_cb.delete_all_tdls_peers = lim_delete_all_tdls_peers;
+
+	wlan_tdls_register_lim_callbacks(mac_ctx->psoc, &tdls_cb);
+}
+#else
+static inline void lim_register_tdls_callbacks(struct mac_context *mac_ctx)
+{}
+#endif
+
 #ifdef WLAN_FEATURE_LL_LT_SAP
 QDF_STATUS lim_ll_sap_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {
@@ -925,6 +939,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	lim_register_debug_callback();
 	lim_nan_register_callbacks(mac);
 	p2p_register_callbacks(mac);
+	lim_register_tdls_callbacks(mac);
 	lim_register_scan_mbssid_callback(mac);
 	lim_register_sap_bcn_callback(mac);
 	wlan_reg_register_ctry_change_callback(
@@ -3404,6 +3419,37 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 
 	}
 
+	if (subType == SIR_MAC_MGMT_AUTH ||
+	    subType == SIR_MAC_MGMT_ASSOC_REQ ||
+	    subType == SIR_MAC_MGMT_REASSOC_REQ) {
+		struct wlan_objmgr_vdev *roam_vdev;
+		uint8_t vdev_id;
+
+		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
+		vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+								 pHdr->da,
+								 WLAN_LEGACY_MAC_ID);
+		if (!vdev)
+			return eMGMT_DROP_NO_DROP;
+
+		if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+			return eMGMT_DROP_NO_DROP;
+		}
+
+		vdev_id = wlan_vdev_get_id(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+		roam_vdev = wlan_objmgr_pdev_get_roam_vdev(mac->pdev,
+							   WLAN_LEGACY_MAC_ID);
+		if (roam_vdev) {
+			pe_debug("vdev %d roaming in progress, reject client connect to SAP vdev %d",
+				 wlan_vdev_get_id(roam_vdev), vdev_id);
+			wlan_objmgr_vdev_release_ref(roam_vdev, WLAN_LEGACY_MAC_ID);
+			return eMGMT_DROP_CONNECT_DURING_ROAMING;
+		}
+	}
+
 	return eMGMT_DROP_NO_DROP;
 }
 
@@ -4140,22 +4186,6 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	if (!cache_entry)
 		return QDF_STATUS_E_FAILURE;
 
-	/**
-	 * Reject all the partner link if any partner link  doesn’t pass the
-	 * security check and proceed connection with single link.
-	 */
-	is_security_allowed =
-		wlan_cm_is_eht_allowed_for_current_security(
-					wlan_pdev_get_psoc(mac_ctx->pdev),
-					cache_entry, true);
-
-	if (!is_security_allowed) {
-		mlme_debug("current security is not valid for partner link link_addr:" QDF_MAC_ADDR_FMT,
-			   QDF_MAC_ADDR_REF(link_addr->bytes));
-		util_scan_free_cache_entry(cache_entry);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	channel.ch_freq = cache_entry->channel.chan_freq;
 	channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);
 	channel.ch_phymode = cache_entry->phy_mode;
@@ -4172,10 +4202,25 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	if (channel.ch_width == CH_WIDTH_20MHZ)
 		channel.ch_cfreq1 = channel.ch_freq;
 
-	util_scan_free_cache_entry(cache_entry);
-
 	mlo_mgr_update_ap_channel_info(vdev, link_id, (uint8_t *)link_addr,
 				       channel);
+
+	/**
+	 * Reject all the partner link if any partner link  doesn’t pass the
+	 * security check and proceed connection with single link.
+	 */
+	is_security_allowed =
+		wlan_cm_is_eht_allowed_for_current_security(
+					wlan_pdev_get_psoc(mac_ctx->pdev),
+					cache_entry, true);
+
+	if (!is_security_allowed) {
+		mlme_debug("current security is not valid for partner link link_addr:" QDF_MAC_ADDR_FMT,
+			   QDF_MAC_ADDR_REF(link_addr->bytes));
+		util_scan_free_cache_entry(cache_entry);
+		return QDF_STATUS_E_FAILURE;
+	}
+	util_scan_free_cache_entry(cache_entry);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4264,7 +4309,7 @@ static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
 	qdf_freq_t chan_freq = 0;
 	struct wlan_objmgr_pdev *pdev;
 
-	qdf_mem_copy(&assoc_link_addr, session_entry->self_mac_addr,
+	qdf_mem_copy(&assoc_link_addr, session_entry->bssId,
 		     QDF_MAC_ADDR_SIZE);
 
 	rnr_end = rnr + rnr[TAG_LEN_POS] + MIN_IE_LEN;

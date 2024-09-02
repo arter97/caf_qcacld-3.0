@@ -66,10 +66,12 @@ void hdd_reset_global_reg_params(void);
 /**
  * hdd_send_wiphy_regd_sync_event() - sends the regulatory sync event
  * @hdd_ctx: HDD context
+ * @send_sync_event: Send regd sync event bool flag
  *
  * Return: None
  */
-void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx);
+void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
+				    bool send_sync_event);
 
 /**
  * hdd_reg_wait_for_country_change() - Wait for country change event

@@ -2945,6 +2945,9 @@ static void lim_update_sae_config(struct mac_context *mac,
 {
 	struct wlan_crypto_pmksa *pmksa;
 	struct qdf_mac_addr bssid;
+	struct bss_description *bss_desc;
+	struct action_oui_search_attr ap_attr = {0};
+	bool is_vendor_ap = false;
 
 	qdf_mem_copy(bssid.bytes, session->bssId,
 		     QDF_MAC_ADDR_SIZE);
@@ -2954,6 +2957,16 @@ static void lim_update_sae_config(struct mac_context *mac,
 
 	pmksa = wlan_crypto_get_pmksa(session->vdev, &bssid);
 	if (!pmksa)
+		return;
+
+	bss_desc = &session->lim_join_req->bssDescription;
+	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	ap_attr.ie_length =
+		wlan_get_ielen_from_bss_description(bss_desc);
+	is_vendor_ap = wlan_action_oui_search(mac->psoc,
+					      &ap_attr,
+					      ACTION_OUI_RESTRICT_MAX_MLO_LINKS);
+	if (is_vendor_ap)
 		return;
 
 	session->sae_pmk_cached = true;
@@ -4240,11 +4253,23 @@ end:
 }
 
 void
-lim_update_connect_rsn_ie(struct pe_session *session,
+lim_update_connect_rsn_ie(struct mac_context *mac,
+			  struct pe_session *session,
 			  uint8_t *rsn_ie_buf, struct wlan_crypto_pmksa *pmksa)
 {
 	uint8_t *rsn_ie_end;
 	uint16_t rsn_ie_len = 0;
+	struct bss_description *bss_desc =
+					&session->lim_join_req->bssDescription;
+	struct action_oui_search_attr ap_attr = {0};
+
+	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	ap_attr.ie_length =
+		wlan_get_ielen_from_bss_description(bss_desc);
+	if (wlan_action_oui_search(mac->psoc,
+				   &ap_attr,
+				   ACTION_OUI_RESTRICT_MAX_MLO_LINKS))
+		pmksa = NULL;
 
 	rsn_ie_end = wlan_crypto_build_rsnie_with_pmksa(session->vdev,
 							rsn_ie_buf, pmksa);
@@ -4318,7 +4343,7 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	if (pmksa_peer)
 		pe_debug("PMKSA found");
 
-	lim_update_connect_rsn_ie(session, rsn_ie, pmksa_peer);
+	lim_update_connect_rsn_ie(mac_ctx, session, rsn_ie, pmksa_peer);
 	qdf_mem_free(rsn_ie);
 
 	/*
@@ -6723,6 +6748,7 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 	struct pe_session *pe_session = NULL;
 	uint8_t sessionId;
 	uint8_t smesessionId;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -6897,6 +6923,7 @@ sendDisassoc:
 	if (pe_session)
 		lim_send_sme_disassoc_ntf(mac,
 					  smeDisassocReq.peer_macaddr.bytes,
+					  (uint8_t *)mld_addr.bytes,
 					  retCode,
 					  disassocTrigger,
 					  1, smesessionId,
@@ -6904,6 +6931,7 @@ sendDisassoc:
 	else
 		lim_send_sme_disassoc_ntf(mac,
 					  smeDisassocReq.peer_macaddr.bytes,
+					  (uint8_t *)mld_addr.bytes,
 					  retCode, disassocTrigger, 1,
 					  smesessionId, NULL);
 
@@ -7601,6 +7629,7 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 	struct pe_session *session_entry = NULL;
 	uint8_t session_id;
 	tpSirAssocReq assoc_req;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	if (!msg_buf) {
 		pe_err("msg_buf is NULL");
@@ -7638,7 +7667,10 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 		 * send a DISASSOC_IND message to WSM to make sure
 		 * the state in WSM and LIM is the same
 		 */
-		lim_send_sme_disassoc_ntf(mac_ctx, assoc_cnf.peer_macaddr.bytes,
+		lim_send_sme_disassoc_ntf(
+				mac_ctx,
+				assoc_cnf.peer_macaddr.bytes,
+				(uint8_t *)mld_addr.bytes,
 				eSIR_SME_STA_NOT_ASSOCIATED,
 				eLIM_PEER_ENTITY_DISASSOC, assoc_cnf.aid,
 				session_entry->smeSessionId,
@@ -8129,8 +8161,9 @@ static void lim_process_sme_set_addba_accept(struct mac_context *mac_ctx,
 		mac_ctx->reject_addba_req = 0;
 }
 
-static void lim_process_sme_update_edca_params(struct mac_context *mac_ctx,
-					       uint32_t vdev_id)
+static void
+lim_process_sme_update_active_edca_params(struct mac_context *mac_ctx,
+					  uint32_t vdev_id)
 {
 	struct pe_session *pe_session;
 	tpDphHashNode sta_ds_ptr;
@@ -8248,6 +8281,111 @@ lim_process_sme_cfg_action_frm_in_tb_ppdu(struct mac_context *mac_ctx,
 	}
 
 	lim_send_action_frm_tb_ppdu_cfg(mac_ctx, msg->vdev_id, msg->cfg);
+}
+
+#define EDCA_GET_CW_WMM_TO_INI(_ptr, _val)		\
+	do {						\
+		*(_ptr) = ((BIT(_val) - 1) >> 8) & 0xFF;\
+		*(_ptr + 1) = (BIT(_val) - 1) & 0xFF;	\
+	} while (0)
+
+static void lim_parse_and_update_wmm_params(struct mac_context *mac_ctx,
+					    struct pe_session *pe_session,
+					    const uint8_t *ie, uint16_t ie_len)
+{
+	tDot11fIEWMMParams wmm_params;
+	uint32_t *ac_params;
+	uint32_t params[QCA_WLAN_AC_ALL][CFG_EDCA_DATA_LEN];
+	QDF_STATUS status;
+
+	status = wlan_parse_wmm_params(ie, ie_len, &wmm_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Error parsing IE for WMM params %d", ie_len);
+		return;
+	}
+
+	/* Fill Best effort AC params */
+	ac_params = &params[QCA_WLAN_AC_BE][0];
+	ac_params[CFG_EDCA_PROFILE_ACM_IDX] = wmm_params.acbe_acm;
+	ac_params[CFG_EDCA_PROFILE_AIFSN_IDX] = wmm_params.acbe_aifsn;
+	ac_params[CFG_EDCA_PROFILE_TXOPA_IDX] = wmm_params.acbe_txoplimit;
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+			       wmm_params.acbe_acwmin);
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMAXA_IDX,
+			       wmm_params.acbe_acwmax);
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMINB_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMING_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	/* Fill Background AC params */
+	ac_params = &params[QCA_WLAN_AC_BK][0];
+	ac_params[CFG_EDCA_PROFILE_ACM_IDX] = wmm_params.acbk_acm;
+	ac_params[CFG_EDCA_PROFILE_AIFSN_IDX] = wmm_params.acbk_aifsn;
+	ac_params[CFG_EDCA_PROFILE_TXOPA_IDX] = wmm_params.acbk_txoplimit;
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+			       wmm_params.acbk_acwmin);
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMAXA_IDX,
+			       wmm_params.acbk_acwmax);
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMINB_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMING_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	/* Fill Video AC params */
+	ac_params = &params[QCA_WLAN_AC_VI][0];
+	ac_params[CFG_EDCA_PROFILE_ACM_IDX] = wmm_params.acvi_acm;
+	ac_params[CFG_EDCA_PROFILE_AIFSN_IDX] = wmm_params.acvi_aifsn;
+	ac_params[CFG_EDCA_PROFILE_TXOPA_IDX] = wmm_params.acvi_txoplimit;
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+			       wmm_params.acvi_acwmin);
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMAXA_IDX,
+			       wmm_params.acvi_acwmax);
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMINB_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMING_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	/* Fill Voice AC params */
+	ac_params = &params[QCA_WLAN_AC_VO][0];
+	ac_params[CFG_EDCA_PROFILE_ACM_IDX] = wmm_params.acvo_acm;
+	ac_params[CFG_EDCA_PROFILE_AIFSN_IDX] = wmm_params.acvo_aifsn;
+	ac_params[CFG_EDCA_PROFILE_TXOPA_IDX] = wmm_params.acvo_txoplimit;
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+			       wmm_params.acvo_acwmin);
+	EDCA_GET_CW_WMM_TO_INI(ac_params + CFG_EDCA_PROFILE_CWMAXA_IDX,
+			       wmm_params.acvo_acwmax);
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMINB_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	qdf_mem_copy(ac_params + CFG_EDCA_PROFILE_CWMING_IDX,
+		     ac_params + CFG_EDCA_PROFILE_CWMINA_IDX,
+		     (CFG_EDCA_PROFILE_TXOPA_IDX - CFG_EDCA_PROFILE_AIFSN_IDX) *
+		     sizeof(uint32_t));
+
+	pe_session->user_edca_set = true;
+	sch_edca_profile_update(mac_ctx, pe_session, params);
 }
 
 static void
@@ -9153,6 +9291,7 @@ static void lim_process_sme_disassoc_req(struct mac_context *mac_ctx,
 	struct disassoc_req disassoc_req;
 	struct pe_session *session;
 	uint8_t session_id;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	qdf_mem_copy(&disassoc_req, msg->bodyptr, sizeof(struct disassoc_req));
 
@@ -9164,6 +9303,7 @@ static void lim_process_sme_disassoc_req(struct mac_context *mac_ctx,
 		       QDF_MAC_ADDR_REF(disassoc_req.bssid.bytes));
 		lim_send_sme_disassoc_ntf(mac_ctx,
 					  disassoc_req.peer_macaddr.bytes,
+					  mld_addr.bytes,
 					  eSIR_SME_INVALID_PARAMETERS,
 					  eLIM_HOST_DISASSOC, 1,
 					  disassoc_req.sessionId, NULL);
@@ -9588,8 +9728,8 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		lim_process_sme_set_addba_accept(mac,
 					(struct sme_addba_accept *)msg_buf);
 		break;
-	case eWNI_SME_UPDATE_EDCA_PROFILE:
-		lim_process_sme_update_edca_params(mac, pMsg->bodyval);
+	case eWNI_SME_UPDATE_EDCA_ACTIVE_PROFILE:
+		lim_process_sme_update_active_edca_params(mac, pMsg->bodyval);
 		break;
 	case WNI_SME_UPDATE_MU_EDCA_PARAMS:
 		lim_process_sme_update_mu_edca_params(mac, pMsg->bodyval);
@@ -10275,6 +10415,14 @@ static void lim_process_update_add_ies(struct mac_context *mac_ctx,
 				lim_handle_param_update(mac_ctx,
 						update_add_ies->updateType);
 			break;
+		case eUPDATE_IE_EDCA_PARAMS:
+			/*
+			 * If size is zero, then set user set edca to false
+			 * so the default params will be taken.
+			 */
+			session_entry->user_edca_set = false;
+			sch_edca_profile_update(mac_ctx, session_entry, NULL);
+			break;
 		default:
 			break;
 		}
@@ -10338,6 +10486,12 @@ static void lim_process_update_add_ies(struct mac_context *mac_ctx,
 		if (update_ie->notify)
 			lim_handle_param_update(mac_ctx,
 					update_add_ies->updateType);
+		break;
+	case eUPDATE_IE_EDCA_PARAMS:
+		lim_parse_and_update_wmm_params(mac_ctx,
+						session_entry,
+						update_ie->pAdditionIEBuffer,
+						update_ie->ieBufferlength);
 		break;
 	default:
 		pe_err("unhandled buffer type %d", update_add_ies->updateType);
@@ -10600,8 +10754,10 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	uint8_t session_id;
 	tLimWiderBWChannelSwitchInfo *wider_bw_ch_switch;
 	QDF_STATUS status;
-	enum phy_ch_width ch_width;
+	enum phy_ch_width ch_width, non_eht_ch_width;
+	qdf_freq_t ccfs1_mhz;
 	uint32_t target_ch_freq;
+	uint16_t punct_bitmap;
 	bool is_vdev_ll_lt_sap = false;
 
 	if (!msg_buf) {
@@ -10634,21 +10790,77 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	/* Channel switch announcement needs to be included in beacon */
 	session_entry->dfsIncludeChanSwIe = true;
 
-	wlan_reg_set_create_punc_bitmap(&dfs_csa_ie_req->ch_params, false);
+	/* Remove the existing puncturing if any */
+	if (LIM_IS_AP_ROLE(session_entry))
+		lim_remove_puncture(mac_ctx, session_entry);
+
+	punct_bitmap =
+		wlan_reg_get_input_punc_bitmap(&dfs_csa_ie_req->ch_params);
+	ch_width = dfs_csa_ie_req->ch_params.ch_width;
+	ccfs1_mhz = dfs_csa_ie_req->ch_params.mhz_freq_seg1;
+
+	/* Get the non - EHT chan params */
+	wlan_reg_set_non_eht_ch_params(&dfs_csa_ie_req->ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 						dfs_csa_ie_req->target_chan_freq,
-						0,
-						&dfs_csa_ie_req->ch_params,
+						0, &dfs_csa_ie_req->ch_params,
 						REG_CURRENT_PWR_MODE);
 
-	ch_width = dfs_csa_ie_req->ch_params.ch_width;
-	if (ch_width >= CH_WIDTH_160MHZ &&
+	non_eht_ch_width = dfs_csa_ie_req->ch_params.ch_width;
+	if (non_eht_ch_width >= CH_WIDTH_160MHZ &&
 	    wma_get_vht_ch_width() < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
-		ch_width = CH_WIDTH_80MHZ;
+		non_eht_ch_width = CH_WIDTH_80MHZ;
 	}
-	session_entry->gLimChannelSwitch.ch_width = ch_width;
-	session_entry->gLimChannelSwitch.sec_ch_offset =
+
+	session_entry->gLimChannelSwitch.legacy_sec_ch_offset =
+				dfs_csa_ie_req->ch_params.sec_ch_offset;
+	session_entry->gLimChannelSwitch.legacy_ccfs0 =
+				dfs_csa_ie_req->ch_params.center_freq_seg0;
+	session_entry->gLimChannelSwitch.legacy_ccfs1 =
+				dfs_csa_ie_req->ch_params.center_freq_seg1;
+	session_entry->gLimChannelSwitch.legacy_ch_width = non_eht_ch_width;
+
+	pe_debug("legacy BW %d CCFS0 %d, CCFS1 %d",
+		 non_eht_ch_width, dfs_csa_ie_req->ch_params.center_freq_seg0,
+		 dfs_csa_ie_req->ch_params.center_freq_seg1);
+
+	if (punct_bitmap || ch_width > CH_WIDTH_160MHZ) {
+		qdf_mem_zero(&dfs_csa_ie_req->ch_params,
+			     sizeof(dfs_csa_ie_req->ch_params));
+
+		/* Get the EHT chan params */
+		dfs_csa_ie_req->ch_params.ch_width = ch_width;
+		dfs_csa_ie_req->ch_params.mhz_freq_seg1 = ccfs1_mhz;
+
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+							dfs_csa_ie_req->target_chan_freq,
+							0,
+							&dfs_csa_ie_req->ch_params,
+							REG_CURRENT_PWR_MODE);
+
+		session_entry->gLimChannelSwitch.ch_width =
+				dfs_csa_ie_req->ch_params.ch_width;
+		session_entry->gLimChannelSwitch.sec_ch_offset =
 				 dfs_csa_ie_req->ch_params.sec_ch_offset;
+		session_entry->gLimChannelSwitch.ch_center_freq_seg0 =
+				dfs_csa_ie_req->ch_params.center_freq_seg0;
+		session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
+				dfs_csa_ie_req->ch_params.center_freq_seg1;
+
+		pe_debug("EHT BW %d CCFS0 %d, CCFS1 %d",
+			 dfs_csa_ie_req->ch_params.ch_width,
+			 dfs_csa_ie_req->ch_params.center_freq_seg0,
+			 dfs_csa_ie_req->ch_params.center_freq_seg1);
+	} else {
+		session_entry->gLimChannelSwitch.ch_width =
+			session_entry->gLimChannelSwitch.legacy_ch_width;
+		session_entry->gLimChannelSwitch.sec_ch_offset =
+			session_entry->gLimChannelSwitch.legacy_sec_ch_offset;
+		session_entry->gLimChannelSwitch.ch_center_freq_seg0 =
+			session_entry->gLimChannelSwitch.legacy_ccfs0;
+		session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
+			session_entry->gLimChannelSwitch.legacy_ccfs1;
+	}
 
 	is_vdev_ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(
 						mac_ctx->psoc,
@@ -10675,7 +10887,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 
 	/* Now encode the Wider Ch BW element depending on the ch width */
 	wider_bw_ch_switch = &session_entry->gLimWiderBWChannelSwitch;
-	switch (ch_width) {
+	switch (session_entry->gLimChannelSwitch.legacy_ch_width) {
 	case CH_WIDTH_20MHZ:
 		/*
 		 * Wide channel BW sublement in channel wrapper element is not
@@ -10713,7 +10925,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 		 * frequency segment 1.
 		 */
 		wider_bw_ch_switch->newCenterChanFreq1 =
-			dfs_csa_ie_req->ch_params.center_freq_seg1;
+			session_entry->gLimChannelSwitch.legacy_ccfs1;
 		break;
 	default:
 		session_entry->dfsIncludeChanWrapperIe = false;
@@ -10724,9 +10936,17 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 		pe_err("Invalid Channel Width");
 		break;
 	}
+
+	/* If puncturing pattern is present then Beacon should contain
+	 * Channel Switch Wrapper IE is mandatory as it needs to have
+	 * Bandwidth Indication subelement in this IE
+	 */
+	if (punct_bitmap || ch_width > CH_WIDTH_160MHZ)
+		session_entry->dfsIncludeChanWrapperIe = true;
+
 	/* Fetch the center channel based on the channel width */
 	wider_bw_ch_switch->newCenterChanFreq0 =
-		dfs_csa_ie_req->ch_params.center_freq_seg0;
+			session_entry->gLimChannelSwitch.legacy_ccfs0;
 skip_vht:
 
 	/* Take a wakelock for CSA for 5 seconds and release in vdev start */

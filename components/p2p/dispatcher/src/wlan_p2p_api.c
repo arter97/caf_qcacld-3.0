@@ -152,5 +152,5 @@ const uint8_t *wlan_p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
 	if (!assoc_ie || !assoc_ie_len)
 		return NULL;
 
-	return wlan_p2p_parse_assoc_ie_for_device_info(assoc_ie, assoc_ie_len);
+	return p2p_parse_assoc_ie_for_device_info(assoc_ie, assoc_ie_len);
 }

@@ -1216,6 +1216,16 @@ wlan_cm_get_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
 			       struct qdf_mac_addr *bssid);
 
 /**
+ * wlan_cm_clear_roam_offload_bssid() - Clear the roam offload bssid of the sae
+ * roam candidate
+ * @vdev: pointer to vdevs
+ *
+ * Return: None
+ */
+void
+wlan_cm_clear_roam_offload_bssid(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_cm_set_roam_offload_ssid() - Set the roam offload candidate ssid
  *
  * @vdev: pointer to vdev
@@ -1667,6 +1677,11 @@ wlan_cm_set_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
 static inline void
 wlan_cm_get_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
 			       struct qdf_mac_addr *bssid)
+{
+}
+
+static inline void
+wlan_cm_clear_roam_offload_bssid(struct wlan_objmgr_vdev *vdev)
 {
 }
 

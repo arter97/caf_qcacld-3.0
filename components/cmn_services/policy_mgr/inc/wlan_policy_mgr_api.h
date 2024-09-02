@@ -57,6 +57,12 @@ typedef const enum policy_mgr_conc_next_action
 	policy_mgr_next_action_three_connection_table_type
 	[PM_MAX_TWO_CONNECTION_MODE][POLICY_MGR_MAX_BAND];
 
+#ifdef FEATURE_FOURTH_CONNECTION
+typedef const enum policy_mgr_conc_next_action
+	policy_mgr_next_action_four_connection_table_type
+	[PM_MAX_THREE_CONNECTION_MODE][POLICY_MGR_MAX_BAND];
+#endif
+
 #define PM_FW_MODE_STA_STA_BIT_POS       0
 #define PM_FW_MODE_STA_P2P_BIT_POS       1
 
@@ -4935,6 +4941,26 @@ QDF_STATUS policy_mgr_get_radio_combinations(struct wlan_objmgr_psoc *psoc,
 bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
 
+/**
+ * policy_mgr_allow_concurrency_sta_csa() - Check if concurrency
+ * is allowed for sta and csa
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id
+ * @mode: new connection mode
+ * @csa_freq: csa frequency requested
+ * @new_ch_width: new ch width
+ *
+ * Check if CSA is allowed with current concurrency combination
+ *
+ * Return: True/False
+ */
+bool
+policy_mgr_allow_concurrency_sta_csa(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id,
+				     enum QDF_OPMODE mode,
+				     qdf_freq_t csa_freq,
+				     enum phy_ch_width new_ch_width);
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * policy_mgr_restart_emlsr_opportunistic_timer() - restart
@@ -6035,4 +6061,21 @@ QDF_STATUS policy_mgr_modify_pcl_for_vlp_channels(struct wlan_objmgr_psoc *psoc,
 						  struct wlan_objmgr_pdev *pdev,
 						  struct weighed_pcl *pcl,
 						  uint32_t num_pcl);
+
+#ifdef AUTO_PLATFORM
+/**
+ * policy_mgr_is_3vifs_mcc_to_scc_enabled() - Check if 3vifs mcc to scc is
+ * enabled.
+ * @psoc: psoc pointer
+ *
+ * Return: true/false.
+ */
+bool policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
 #endif /* __WLAN_POLICY_MGR_API_H */

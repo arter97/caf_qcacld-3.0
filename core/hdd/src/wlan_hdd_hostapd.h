@@ -65,19 +65,22 @@ void *hdd_filter_ft_info(const uint8_t *frame,
  *
  * @link_info: pointer to hdd link info.
  * @target_chan_freq: target channel frequency.
+ * @ccfs1:  Value of CCFS1 in MHz
  * @target_bw: Target bandwidth to move.
  * If no bandwidth is specified, the value is CH_WIDTH_MAX
+ * @punct_bitmap: Puncturing bitmap of CSA, follows same convention as
+ * Disabled Subchannel Bitmap in 802.11be EHT-OP IE
  * @forced: Force to switch channel, ignore SCC/MCC check
  * @allow_blocking: the calling thread allows be blocked
  *
  * Return: 0 for success, non zero for failure
  */
 int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
-				  int target_chan_freq,
+				  int target_chan_freq, uint32_t ccfs1,
 				  enum phy_ch_width target_bw,
+				  uint32_t punct_bitmap,
 				  bool forced,
 				  bool allow_blocking);
-
 /**
  * hdd_stop_sap_set_tx_power() - Function to set tx power
  * for unsafe channel if restriction bit mask is set else stop the SAP.
@@ -709,5 +712,23 @@ static inline void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx,
 static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
 {}
 #endif
+
+/**
+ * hdd_ssr_restart_sap_cac_link() - Whether postpone sap link or not for SSR
+ * @adapter: adapter structure
+ * @link_info: link info structure
+ *
+ * This API use to check if the DFS sap link need to be postponed start or not
+ * in the SSR case if there is another partner link.
+ * And it can cover below cases:
+ * 1. If there is only one created/remaining DFS sap link not started, do not postpone.
+ * 2. If there is another 6GHz sap link not started, postpone the DFS sap link.
+ * 3. If there is another non-6GHz sap link not started, do not postpone.
+ *
+ * Return: True if need postpone otherwise false.
+ */
+bool
+hdd_ssr_restart_sap_cac_link(struct hdd_adapter *adapter,
+			     struct wlan_hdd_link_info *link_info);
 
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */
