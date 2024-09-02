@@ -1938,6 +1938,13 @@ static QDF_STATUS mon_mlme_vdev_stop_resp(struct vdev_mlme_obj *vdev_mlme,
 	return wma_mon_mlme_vdev_stop_resp(vdev_mlme);
 }
 
+static void mon_mlme_vdev_down(struct vdev_mlme_obj *vdev_mlme)
+{
+	mlme_legacy_debug("vdev id = %d",
+			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	wma_mon_mlme_vdev_stop_resp(vdev_mlme);
+}
+
 /**
  * vdevmgr_vdev_delete_rsp_handle() - callback to handle vdev delete response
  * @psoc: psoc object
@@ -2492,6 +2499,7 @@ static struct vdev_mlme_ops mon_mlme_ops = {
 	.mlme_vdev_down_send = mon_mlme_vdev_down_send,
 	.mlme_vdev_ext_stop_rsp = mon_mlme_vdev_stop_resp,
 	.mlme_vdev_ext_start_rsp = vdevmgr_vdev_start_rsp_handle,
+	.mlme_vdev_init_down = mon_mlme_vdev_down,
 };
 
 static struct mlme_ext_ops ext_ops = {

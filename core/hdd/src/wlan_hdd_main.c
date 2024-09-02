@@ -10172,8 +10172,11 @@ wlan_hdd_delete_mon_link(struct hdd_adapter *adapter,
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info,
 					   WLAN_INIT_DEINIT_ID);
+	if (!vdev)
+		return 0;
+
 	if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
-	    vdev && ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+	    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
 	    PACKET_CAPTURE_MODE_DISABLE) {
 		struct hdd_adapter *sta_adapter;
 
