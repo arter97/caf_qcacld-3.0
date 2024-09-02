@@ -9321,24 +9321,40 @@ done:
 
 static QDF_STATUS
 policy_mgr_is_link_active_allowed(struct wlan_objmgr_psoc *psoc,
-				  struct mlo_link_info *link_info,
-				  uint8_t num_links)
+				  struct wlan_objmgr_vdev *vdev,
+				  uint32_t active_link_bitmap,
+				  uint8_t num_links_to_active)
 {
-	uint16_t ch_freq;
+	uint16_t ch_freq, iter;
 	struct wlan_channel *chan_info;
+	struct mlo_link_info *link_info;
 
-	if (num_links > 1 &&
-	    !policy_mgr_is_hw_dbs_capable(psoc)) {
+	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
+		if (link_info->link_id == WLAN_INVALID_LINK_ID) {
+			link_info++;
+			continue;
+		}
+
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr)) {
+			link_info++;
+			continue;
+		}
+
 		chan_info = link_info->link_chan_info;
 		ch_freq = chan_info->ch_freq;
-		if (wlan_reg_freq_to_band((qdf_freq_t)ch_freq) ==
-		    REG_BAND_2G) {
-			policy_mgr_err("vdev: %d Invalid link activation for link: %d at freq: %d in  HW mode: %d",
+
+		if (qdf_test_bit(link_info->link_id,
+		    (unsigned long *)&active_link_bitmap) &&
+		    (wlan_reg_freq_to_band((qdf_freq_t)ch_freq) ==
+		     REG_BAND_2G)) {
+			policy_mgr_err("vdev: %d Invalid link activation for link: %d at freq: %d",
 				       link_info->vdev_id, link_info->link_id,
-				       ch_freq,
-				       POLICY_MGR_HW_MODE_AUX_EMLSR_SINGLE);
+				       ch_freq);
 			return QDF_STATUS_E_FAILURE;
 		}
+
+		link_info++;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -9355,7 +9371,7 @@ policy_mgr_update_mlo_links_based_on_linkid_nlink(
 	uint8_t *link_mac_addr;
 	struct wlan_objmgr_vdev *vdev;
 	struct mlo_link_info *link_info;
-	uint8_t iter, link;
+	uint8_t iter, link, num_links_to_active = 0, num_links_to_inactive = 0;
 	uint32_t active_link_bitmap = 0;
 	uint32_t inactive_link_bitmap = 0;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -9382,7 +9398,6 @@ policy_mgr_update_mlo_links_based_on_linkid_nlink(
 		goto release_vdev_ref;
 	}
 
-	policy_mgr_debug("Num active links: %d", num_links);
 	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
 		if (link_info->link_id == WLAN_INVALID_LINK_ID) {
@@ -9404,29 +9419,34 @@ policy_mgr_update_mlo_links_based_on_linkid_nlink(
 			if (link_id_list[link] != link_info->link_id)
 				continue;
 			if (config_state_list[link]) {
-				if (policy_mgr_is_link_active_allowed(
-								psoc,
-								link_info,
-								num_links) !=
-				    QDF_STATUS_SUCCESS)
-					goto release_vdev_ref;
-
 				active_link_bitmap |= 1 << link_info->link_id;
 				policy_mgr_debug("link id:%d matched to active",
 						 link_info->link_id);
-
+				num_links_to_active++;
 			} else {
 				inactive_link_bitmap |= 1 << link_info->link_id;
 				policy_mgr_debug("link id:%d matched to inactive",
 						 link_info->link_id);
+				num_links_to_inactive++;
 			}
 		}
 
 		link_info++;
 	}
 
+	policy_mgr_debug("active_bitmap: %d, num_active: %d, inactive_bitmap: %d, num_inactive: %d",
+			 active_link_bitmap, num_links_to_active,
+			 inactive_link_bitmap, num_links_to_inactive);
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc) && num_links_to_active > 1 &&
+	    policy_mgr_is_link_active_allowed(psoc, vdev,
+				active_link_bitmap,
+				num_links_to_active) != QDF_STATUS_SUCCESS)
+		goto release_vdev_ref;
+
 	policy_mgr_debug("active link bitmap: %d, inactive link bitmap: %d",
 			 active_link_bitmap, inactive_link_bitmap);
+
 	if (active_link_bitmap && inactive_link_bitmap)
 		status = ml_nlink_vendor_command_set_link(
 				psoc, vdev_id,
