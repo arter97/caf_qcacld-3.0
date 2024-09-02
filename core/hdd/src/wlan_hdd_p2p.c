@@ -1782,6 +1782,8 @@ static int __wlan_hdd_cfg80211_p2p_send_usd_cmd(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+	hdd_ctx->usd_adapter = adapter;
+
 	return osif_p2p_send_usd_params(hdd_ctx->psoc,
 					adapter->deflink->vdev_id,
 					data, data_len);

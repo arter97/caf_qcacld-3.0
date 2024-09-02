@@ -9716,6 +9716,28 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 	ucfg_dp_destroy_intf(hdd_ctx->psoc, &adapter_mac);
 }
 
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * hdd_clear_usd_adapter() - set USD adapter to NULL, so that USD frames
+ * can not be forwarded on USD adapter.
+ * @hdd_ctx: pointer to HDD context
+ * @adapter: adapter context
+ *
+ * Returns: void
+ */
+static void hdd_clear_usd_adapter(struct hdd_context *hdd_ctx,
+				  struct hdd_adapter *adapter)
+{
+	if (hdd_ctx->usd_adapter == adapter)
+		hdd_ctx->usd_adapter = NULL;
+}
+#else
+static inline void hdd_clear_usd_adapter(struct hdd_context *hdd_ctx,
+					 struct hdd_adapter *adapter)
+{
+}
+#endif
+
 void hdd_close_adapter(struct hdd_context *hdd_ctx,
 		       struct hdd_adapter *adapter,
 		       bool rtnl_held)
@@ -9727,6 +9749,7 @@ void hdd_close_adapter(struct hdd_context *hdd_ctx,
 	ucfg_dp_bus_bw_compute_timer_stop(hdd_ctx->psoc);
 
 	hdd_check_for_net_dev_ref_leak(adapter);
+	hdd_clear_usd_adapter(hdd_ctx, adapter);
 	hdd_remove_adapter(hdd_ctx, adapter);
 	__hdd_close_adapter(hdd_ctx, adapter, rtnl_held);
 

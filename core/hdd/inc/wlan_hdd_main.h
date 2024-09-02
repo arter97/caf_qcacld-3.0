@@ -2133,6 +2133,7 @@ enum wlan_state_ctrl_str_id {
  * @hlp_processing_work: work to process hlp data pkt for association
  * @get_sta_user_notif: Get station notifier callback to handle port_id on
  *			userspace application close/abort
+ * @usd_adapter: adapter on which USD frames to be forwarded to userspace
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2433,6 +2434,9 @@ struct hdd_context {
 	qdf_list_t hdd_hlp_data_list;
 	struct work_struct hlp_processing_work;
 	struct notifier_block get_sta_user_notif;
+#ifdef FEATURE_WLAN_SUPPORT_USD
+	struct hdd_adapter *usd_adapter;
+#endif
 };
 
 /**
