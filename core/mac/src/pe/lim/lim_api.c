@@ -2876,10 +2876,8 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 	num_partner_links = ml_partner_info->num_partner_links;
 	for (idx = 0; idx < num_partner_links; idx++) {
 		link_vdev_id = ml_partner_info->partner_link_info[idx].vdev_id;
-		if (link_vdev_id == WLAN_INVALID_VDEV_ID)
-			continue;
-
-		if (link_vdev_id != session_entry->vdev_id)
+		if (link_vdev_id == WLAN_INVALID_VDEV_ID ||
+		    link_vdev_id != session_entry->vdev_id)
 			continue;
 
 		link_id = ml_partner_info->partner_link_info[idx].link_id;
@@ -2895,9 +2893,12 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 			goto end;
 		}
 
+		mgmt_txrx_frame_hex_dump(link_reassoc_rsp.ptr,
+					 link_reassoc_rsp.len, false);
+
 		lim_process_assoc_rsp_frame(mac_ctx, link_reassoc_rsp.ptr,
-					    link_reassoc_rsp.len - WLAN_MAC_HDR_LEN_3A,
-					    LIM_REASSOC, session_entry);
+					    link_reassoc_rsp.len, LIM_REASSOC,
+					    session_entry);
 	}
 end:
 	qdf_mem_free(link_reassoc_rsp.ptr);
@@ -3260,7 +3261,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		}
 	} else {
 		lim_process_assoc_rsp_frame(mac_ctx, reassoc_resp,
-					    roam_sync_ind_ptr->reassoc_resp_length - SIR_MAC_HDR_LEN_3A,
+					    roam_sync_ind_ptr->reassoc_resp_length,
 					    LIM_REASSOC, ft_session_ptr);
 		if (ft_session_ptr->is_unexpected_peer_error) {
 			status = QDF_STATUS_E_FAILURE;

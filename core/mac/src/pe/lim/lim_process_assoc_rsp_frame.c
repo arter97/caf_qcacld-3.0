@@ -1339,12 +1339,16 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		qdf_mem_free(beacon);
 		return;
 	}
+
 	/* Get pointer to Re/Association Response frame body */
 	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry) ||
-	    wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev))
+	    wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
 		body =  rx_pkt_info + SIR_MAC_HDR_LEN_3A;
-	else
+		frame_body_len -= SIR_MAC_HDR_LEN_3A;
+	} else {
 		body = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+	}
+
 	/* parse Re/Association Response frame. */
 	if (sir_convert_assoc_resp_frame2_struct(mac_ctx, session_entry, body,
 		frame_body_len, assoc_rsp) == QDF_STATUS_E_FAILURE) {
@@ -1441,7 +1445,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			 * Store the Assoc response. This is sent
 			 * to csr/hdd in join cnf response.
 			 */
-			qdf_mem_copy(session_entry->assocRsp, body, frame_body_len);
+			qdf_mem_copy(session_entry->assocRsp, body,
+				     frame_body_len);
 			session_entry->assocRspLen = frame_body_len;
 		}
 	}
