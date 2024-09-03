@@ -3697,6 +3697,8 @@ static void mlme_init_roam_score_delta(struct wlan_objmgr_psoc *psoc,
 	uint8_t score_delta;
 	uint32_t i;
 	struct roam_trigger_score_delta *score_delta_param;
+	struct psoc_mlme_obj *mlme_psoc_obj;
+	struct scoring_cfg *score_config;
 
 	for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++) {
 		score_delta_param =
@@ -3720,6 +3722,25 @@ static void mlme_init_roam_score_delta(struct wlan_objmgr_psoc *psoc,
 			score_delta_param->trigger_reason = roam_trig;
 		}
 	}
+
+	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
+	if (!mlme_psoc_obj)
+		return;
+	score_config = &mlme_psoc_obj->psoc_cfg.score_config;
+	if (!score_config->vendor_roam_score_algorithm)
+		return;
+
+	score_delta_param =
+		&mlme_cfg->trig_score_delta[ROAM_TRIGGER_REASON_IDLE];
+	score_delta_param->roam_score_delta =
+			cfg_get(psoc, CFG_IDLE_ROAM_SCORE_DELTA);
+	score_delta_param->trigger_reason = ROAM_TRIGGER_REASON_IDLE;
+
+	score_delta_param =
+		&mlme_cfg->trig_score_delta[ROAM_TRIGGER_REASON_BTM];
+	score_delta_param->roam_score_delta =
+			cfg_get(psoc, CFG_BTM_ROAM_SCORE_DELTA);
+	score_delta_param->trigger_reason = ROAM_TRIGGER_REASON_BTM;
 }
 
 static void
