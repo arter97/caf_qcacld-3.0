@@ -12909,6 +12909,14 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
+	/*
+	 * SAP restart not required if NAN is active
+	 * and SAP is already present on NAN social channel.
+	 */
+	if (wlan_nan_is_disc_active(psoc) &&
+	    freq == wlan_nan_get_disc_24g_ch_freq(psoc))
+		return false;
+
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	connection = pm_conc_connection_list;
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
