@@ -3227,7 +3227,7 @@ QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	int **nss_stats, **aggr_nss_stats;
 	struct nlattr *nss_nest, *nss;
-	int nestid;
+	int nestid, i;
 	struct hdd_context *hdd_ctx;
 	bool log_enabled = false;
 	struct wlan_hdd_link_info *link_info;
@@ -3245,7 +3245,7 @@ QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	for (int i = 0; i < SS_COUNT_JITTER; i++) {
+	for (i = 0; i < SS_COUNT_JITTER; i++) {
 		nss_stats[i] = qdf_mem_malloc(TX_RX_NSS_VENDOR_SIZE *
 					      sizeof(int));
 		if (!nss_stats[i]) {
@@ -3278,7 +3278,7 @@ QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 			status = QDF_STATUS_E_FAILURE;
 			goto free_mem;
 		}
-		for (int i = 0; i < SS_COUNT_JITTER; i++) {
+		for (i = 0; i < SS_COUNT_JITTER; i++) {
 			aggr_nss_stats[i][TX_NSS_CNT_IDX] +=
 				nss_stats[i][TX_NSS_CNT_IDX];
 			aggr_nss_stats[i][RX_NSS_CNT_IDX] +=
@@ -3295,7 +3295,7 @@ QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 		goto free_mem;
 	}
 
-	for (int i = 0; i < SS_COUNT_JITTER; i++) {
+	for (i = 0; i < SS_COUNT_JITTER; i++) {
 		nss = nla_nest_start(skb, i + 1);
 		if (!nss) {
 			hdd_err("nla_nest_start failed");
@@ -3322,7 +3322,7 @@ QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 	nla_nest_end(skb, nss_nest);
 
 free_mem:
-	for (int i = 0; i < SS_COUNT_JITTER; i++) {
+	for (i = 0; i < SS_COUNT_JITTER; i++) {
 		if (!nss_stats[i])
 			break;
 

@@ -1724,8 +1724,9 @@ err:
 }
 
 #ifdef WLAN_CHIPSET_STATS
-void cm_cp_stats_cstats_log_connect_event(struct wlan_objmgr_vdev *vdev,
-					  struct wlan_cm_connect_resp *rsp)
+static void
+cm_cp_stats_cstats_log_connect_event(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_cm_connect_resp *rsp)
 {
 	struct vdev_mlme_obj *vdev_mlme;
 	struct wlan_channel *des_chan;
