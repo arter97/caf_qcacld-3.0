@@ -1283,6 +1283,8 @@ validation_done:
 	 */
 
 	if ((sap_context->acs_cfg->acs_mode ||
+	     !target_psoc_get_sap_coex_fixed_chan_cap(
+		 wlan_psoc_get_tgt_if_handle(mac_ctx->psoc)) ||
 	     policy_mgr_restrict_sap_on_unsafe_chan(mac_ctx->psoc)) &&
 	    !policy_mgr_is_sap_freq_allowed(mac_ctx->psoc,
 					    sap_context->chan_freq)) {
