@@ -138,8 +138,8 @@
  * Aggressive_RoamCommon_Delta  - Percentage increment in roam
  * score value that is expected from a roaming candidate AP.
  * @Min: 0
- * @Max: 100
- * @Default: 0
+ * @Max: 30
+ * @Default: 10
  *
  * This ini is used to provide the percentage increment value over roam
  * score for the candidate APs so that they can be preferred over current
