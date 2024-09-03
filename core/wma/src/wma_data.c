@@ -757,6 +757,7 @@ static void wma_cp_stats_set_rate_flag(tp_wma_handle wma, uint8_t vdev_id)
 	status = wma_get_vdev_rate_flag(iface->vdev, &rate_flag);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err("vdev not found for id: %d", vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 		return;
 	}
 	ucfg_mc_cp_stats_set_rate_flags(vdev, rate_flag);
