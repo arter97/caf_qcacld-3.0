@@ -3903,6 +3903,40 @@ void hdd_cache_sta_vdev_id_in_p2p_psoc_priv(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * hdd_use_sta_vdev_for_p2p_device_operations()
+ * @hdd_ctx: pointer to hdd_ctx
+ * @device_mode: device mode
+ *
+ * This API is to check whether p2p device can use sta vdev or not even when
+ * vdev exhaust has not happened.
+ * One usecase of this API is to avoid creating interface for P2P-device
+ * when this returns true.
+ *
+ * Return: True/False
+ */
+static bool
+hdd_use_sta_vdev_for_p2p_device_operations(struct hdd_context *hdd_ctx,
+					   enum QDF_OPMODE device_mode)
+{
+	struct hdd_adapter *sta_adapter;
+
+	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!(sta_adapter && hdd_is_interface_up(sta_adapter))) {
+		hdd_err("sta interface is not up, do not use sta vdev for p2p device");
+		return false;
+	}
+
+	if (device_mode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_is_sta_vdev_for_p2p_device_supported(hdd_ctx->psoc)) {
+		ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(hdd_ctx->psoc,
+							     true);
+		return true;
+	}
+
+	return false;
+}
+
+/**
  * hdd_start_adapter() - Wrapper function for device specific adapter
  * @adapter: pointer to HDD adapter
  * @rtnl_held: true if rtnl lock is taken, otherwise false
@@ -3934,6 +3968,13 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 			goto err_start_adapter;
 		fallthrough;
 	case QDF_P2P_DEVICE_MODE:
+		if (device_mode == QDF_P2P_DEVICE_MODE &&
+		    hdd_use_sta_vdev_for_p2p_device_operations(adapter->hdd_ctx,
+							adapter->device_mode)) {
+			hdd_debug("Do not create new vdev, use STA vdev for P2P device mode");
+			break;
+		}
+		fallthrough;
 	case QDF_OCB_MODE:
 	case QDF_NAN_DISC_MODE:
 		ret = hdd_start_station_adapter(adapter);
@@ -3983,6 +4024,7 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 		hdd_cache_sta_vdev_id_in_p2p_psoc_priv(adapter->hdd_ctx->psoc,
 						       sta_adapter);
 		hdd_cache_p2p_macaddr_in_vdev(sta_adapter, &adapter->mac_addr);
+		adapter->deflink->vdev_id = sta_adapter->deflink->vdev_id;
 	}
 exit_with_success:
 	hdd_create_adapter_sysfs_files(adapter);
@@ -7667,6 +7709,38 @@ void hdd_reset_vdev_info(struct wlan_hdd_link_info *link_info)
 	qdf_spin_unlock_bh(&link_info->vdev_lock);
 }
 
+/**
+ * hdd_create_p2p_device_vdev_during_sta_vdev_destroy()
+ * @hdd_ctx: pointer to hdd_ctx
+ * @vdev: pointer to vdev
+ *
+ * Create vdev for P2P-device during STA vdev destroy if P2P-device is using
+ * STA vdev
+ *
+ * Return: None
+ */
+static void
+hdd_create_p2p_device_vdev_during_sta_vdev_destroy(
+					struct hdd_context *hdd_ctx,
+					struct wlan_objmgr_vdev *vdev)
+{
+	struct hdd_adapter *p2p_adapter;
+
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+							hdd_ctx->psoc)) {
+		/* create p2p device vdev if sta vdev gets deleted */
+		p2p_adapter = hdd_get_adapter(hdd_ctx, QDF_P2P_DEVICE_MODE);
+		if (!p2p_adapter) {
+			hdd_err("failed to get p2p device adapter");
+			return;
+		}
+		ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(hdd_ctx->psoc,
+							     false);
+		hdd_vdev_create(p2p_adapter->deflink);
+	}
+}
+
 int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 {
 	int ret;
@@ -7717,6 +7791,7 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	ret = hdd_vdev_destroy_event_wait(hdd_ctx, vdev);
 
 	ucfg_reg_11d_vdev_delete_update(psoc, op_mode, vdev_id);
+	hdd_create_p2p_device_vdev_during_sta_vdev_destroy(hdd_ctx, vdev);
 
 	qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.vdev_destroy);
 	return ret;
@@ -10520,14 +10595,9 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 	struct hdd_adapter *sta_adapter;
 
-	if (adapter->device_mode == QDF_STA_MODE)
-		status = hdd_stop_link_adapter(hdd_ctx, adapter);
-
-	status = hdd_stop_adapter_ext(hdd_ctx, adapter);
-
-	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
-	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
-							hdd_ctx->psoc)) {
+	if ((adapter->device_mode == QDF_STA_MODE ||
+	     adapter->device_mode == QDF_P2P_DEVICE_MODE) &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(hdd_ctx->psoc)) {
 		ucfg_p2p_psoc_priv_set_sta_vdev_id(hdd_ctx->psoc,
 						   WLAN_INVALID_VDEV_ID);
 
@@ -10537,6 +10607,16 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 					sta_adapter->deflink->vdev,
 					NULL);
 	}
+
+	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(hdd_ctx->psoc))
+		ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(hdd_ctx->psoc,
+							     false);
+
+	if (adapter->device_mode == QDF_STA_MODE)
+		status = hdd_stop_link_adapter(hdd_ctx, adapter);
+
+	status = hdd_stop_adapter_ext(hdd_ctx, adapter);
 
 	return status;
 }
@@ -11192,8 +11272,8 @@ static void hdd_delete_sta(struct hdd_adapter *adapter)
 
 QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 {
-	struct hdd_adapter *adapter, *next_adapter = NULL;
-	bool value;
+	struct hdd_adapter *adapter, *next_adapter = NULL, *sta_adapter = NULL;
+	bool value, handled = false;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_START_ALL_ADAPTERS;
 	int ret;
 
@@ -11214,9 +11294,15 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 		hdd_wmm_dscp_initial_state(adapter);
 
 		switch (adapter->device_mode) {
+		case QDF_P2P_DEVICE_MODE:
+			if (ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+						hdd_ctx->psoc)) {
+				hdd_info_rl("Do not create new vdev, use STA vdev for P2P device mode");
+				break;
+			}
+		fallthrough;
 		case QDF_STA_MODE:
 		case QDF_P2P_CLIENT_MODE:
-		case QDF_P2P_DEVICE_MODE:
 		case QDF_NAN_DISC_MODE:
 
 			ret = hdd_start_station_adapter(adapter);
@@ -11325,6 +11411,51 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
+
+	next_adapter = NULL;
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, sta_adapter, next_adapter,
+					   dbgid) {
+		if (!hdd_is_interface_up(sta_adapter)) {
+			hdd_adapter_dev_put_debug(sta_adapter, dbgid);
+			continue;
+		}
+
+		if (sta_adapter->device_mode == QDF_STA_MODE) {
+			if (next_adapter)
+				hdd_adapter_dev_put_debug(next_adapter, dbgid);
+			break;
+		}
+		hdd_adapter_dev_put_debug(sta_adapter, dbgid);
+	}
+	next_adapter = NULL;
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (!hdd_is_interface_up(adapter)) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+
+		if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
+		    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+							hdd_ctx->psoc)) {
+			hdd_cache_sta_vdev_id_in_p2p_psoc_priv(hdd_ctx->psoc,
+							       sta_adapter);
+			hdd_cache_p2p_macaddr_in_vdev(sta_adapter,
+						      &adapter->mac_addr);
+			adapter->deflink->vdev_id =
+					sta_adapter->deflink->vdev_id;
+			handled = true;
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+		if (handled) {
+			if (next_adapter)
+				hdd_adapter_dev_put_debug(next_adapter, dbgid);
+			break;
+		}
+	}
+
+	if (sta_adapter)
+		hdd_adapter_dev_put_debug(sta_adapter, dbgid);
 
 	hdd_exit();
 
@@ -22614,7 +22745,7 @@ wlan_hdd_get_link_info_from_vdev(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	 */
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
 	if (!link_info) {
-		hdd_err("Get adapter by vdev id failed");
+		hdd_err("vdev %d Get adapter by vdev id failed", vdev_id);
 		return NULL;
 	}
 
