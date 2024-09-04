@@ -743,6 +743,11 @@ QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 {
 	return p2p_send_usd_params(psoc, param);
 }
+
+bool ucfg_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_is_fw_support_usd(psoc);
+}
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
 bool ucfg_p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)

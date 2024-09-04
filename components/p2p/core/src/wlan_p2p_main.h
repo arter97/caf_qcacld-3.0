@@ -728,6 +728,14 @@ const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
  */
 QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 			       struct p2p_usd_attr_params *param);
+/**
+ * p2p_is_fw_support_usd() - wrapper API for API
+ * tgt_p2p_is_fw_support_usd()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if USD is supported by FW else false
+ */
+bool p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
 /**

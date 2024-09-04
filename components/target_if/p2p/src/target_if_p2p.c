@@ -618,4 +618,16 @@ QDF_STATUS target_if_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 
 	return wmi_unified_send_p2p_usd_req_cmd(wmi_handle, param);
 }
+
+bool target_if_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
+{
+	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
+
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return wmi_service_enabled(wmi_handle, wmi_service_usd_support);
+}
 #endif /* FEATURE_WLAN_SUPPORT_USD */

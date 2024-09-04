@@ -240,6 +240,15 @@ tgt_p2p_add_mac_addr_status_event_cb(
  */
 QDF_STATUS tgt_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 				   struct p2p_usd_attr_params *param);
+
+/**
+ * tgt_p2p_is_fw_support_usd() - wrapper API for function
+ * target_if_p2p_is_fw_support_usd()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if USD is supported by FW else false
+ */
+bool tgt_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
 /**
