@@ -3227,11 +3227,10 @@ lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
 
 	if (wlan_action_oui_search(mac_ctx->psoc,
 				   &vendor_ap_search_attr,
-				   ACTION_OUI_DISABLE_BFORMEE) &&
-	    session->nss == 2 && CH_WIDTH_160MHZ == session->ch_width) {
+				   ACTION_OUI_DISABLE_BFORMEE)) {
 		session->vht_config.su_beam_formee = 0;
 		session->vht_config.mu_beam_formee = 0;
-		pe_debug("IoT ap with BW 160 MHz NSS 2, disable Beamformee");
+		pe_debug("Disable Beamformee for IoT AP");
 	}
 }
 

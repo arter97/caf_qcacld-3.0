@@ -707,10 +707,11 @@
  * capability for specified AP with some conditions
  *
  * Example OUIs: (All values in Hex)
- * OUI 1: 000c43
- *       OUI data Len: 04
- *       OUI Data : 03000000
- *       OUI data Mask: F0 - 11110000
+ * gActionOUIDisableBFORMEE=00E04C 03 020160 E0 01
+ *       OUI: 00E04C
+ *       OUI data Len: 03
+ *       OUI Data : 020160
+ *       OUI data Mask: E0 - 11100000
  *       Info Mask : 01 - only OUI present in Info mask
  *
  * Refer to gEnableActionOUI for more detail about the format.
