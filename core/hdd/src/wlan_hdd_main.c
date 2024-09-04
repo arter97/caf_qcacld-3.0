@@ -8205,13 +8205,83 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 #endif
+/**
+ * hdd_use_sta_vdev_for_p2p_dev_upon_vdev_exhaust() - API to check
+ * whether to use sta vdev for p2p device mode when new interface tries to
+ * comes up and there is no vdev available to create
+ * @hdd_ctx: pointer to hdd_ctx
+ *
+ * Return: True/False
+ */
+static bool
+hdd_use_sta_vdev_for_p2p_dev_upon_vdev_exhaust(struct hdd_context *hdd_ctx)
+{
+	struct wlan_hdd_link_info *link_info = NULL;
+	qdf_list_t *vdev_list;
+	struct wlan_objmgr_vdev *vdev = NULL, *sta_vdev = NULL;
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	struct wlan_objmgr_pdev *pdev = hdd_ctx->pdev;
+	struct hdd_adapter *sta_adapter;
+
+	/**
+	 * Whenever new interface tries to comes up, check whether
+	 * whenther max vdev support has been reached or not.
+	 * If yes, then check if any p2p device mode vdev is present
+	 * or not. It it's present then set a flag to redirect all p2p
+	 * device operation into sta vdev and destroy the p2p device vdev
+	 * to accommodate new interface
+	 */
+	if ((wlan_pdev_get_vdev_count(pdev) < hdd_ctx->max_intf_count) ||
+	    !ucfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(psoc))
+		return false;
+
+	wlan_pdev_obj_lock(pdev);
+	vdev_list = &pdev->pdev_objmgr.wlan_vdev_list;
+	vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
+	while (vdev) {
+		if (!sta_vdev &&
+		    wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)
+			sta_vdev = vdev;
+
+		if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_DEVICE_MODE)
+			link_info = wlan_hdd_get_link_info_from_vdev(psoc,
+						wlan_vdev_get_id(vdev));
+
+		vdev = wlan_vdev_get_next_vdev_of_pdev(vdev_list, vdev);
+	}
+	wlan_pdev_obj_unlock(hdd_ctx->pdev);
+
+	/* destroy p2p device vdev if it's present */
+	if (link_info) {
+		sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+		if (sta_adapter && hdd_is_interface_up(sta_adapter)) {
+			ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(psoc,
+								     true);
+			hdd_cache_sta_vdev_id_in_p2p_psoc_priv(hdd_ctx->psoc,
+							       sta_adapter);
+			hdd_cache_p2p_macaddr_in_vdev(sta_adapter,
+					&link_info->adapter->mac_addr);
+		} else {
+			return false;
+		}
+		hdd_vdev_destroy(link_info);
+
+		qdf_spin_lock_bh(&link_info->vdev_lock);
+		link_info->vdev_id = sta_adapter->deflink->vdev_id;
+		link_info->vdev = sta_vdev;
+		qdf_spin_unlock_bh(&link_info->vdev_lock);
+		return true;
+	}
+
+	return false;
+}
 
 int hdd_vdev_create(struct wlan_hdd_link_info *link_info)
 {
 	QDF_STATUS status;
 	int errno = 0;
 	struct hdd_adapter *adapter = link_info->adapter;
-	struct hdd_context *hdd_ctx;
+	struct hdd_context *hdd_ctx = NULL;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_vdev_create_params vdev_params = {0};
 
@@ -8219,6 +8289,9 @@ int hdd_vdev_create(struct wlan_hdd_link_info *link_info)
 
 	/* do vdev create via objmgr */
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (hdd_use_sta_vdev_for_p2p_dev_upon_vdev_exhaust(hdd_ctx))
+		hdd_debug("max vdev create limit reached, use sta vdev for p2p device operation");
 
 	errno = hdd_populate_vdev_create_params(link_info, &vdev_params);
 	if (errno)
