@@ -1749,7 +1749,7 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_intf_context,
 		}
 
 		if (dp_rx_pkt_tracepoints_enabled())
-			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0);
+			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0, 0);
 
 		qdf_nbuf_set_dev(nbuf, dp_intf->dev);
 		qdf_nbuf_set_protocol_eth_tye_trans(nbuf);
