@@ -165,6 +165,9 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 	lim_diag_event_report(mac, WLAN_PE_DIAG_DEAUTH_FRAME_EVENT,
 		pe_session, 0, reasonCode);
 
+	lim_cp_stats_cstats_log_deauth_evt(pe_session, CSTATS_DIR_RX,
+					   reasonCode);
+
 	if (lim_check_disassoc_deauth_ack_pending(mac, (uint8_t *) pHdr->sa)) {
 		pe_debug("Ignore the Deauth received, while waiting for ack of "
 			"disassoc/deauth");

@@ -642,15 +642,8 @@ int hdd_set_p2p_ps(struct net_device *dev, void *msgData)
 	return wlan_hdd_set_power_save(adapter, &noa);
 }
 
-/**
- * hdd_allow_new_intf() - Allow new intf created or not
- * @hdd_ctx: hdd context
- * @mode: qdf opmode of new interface
- *
- * Return: true if allowed, otherwise false
- */
-static bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
-			       enum QDF_OPMODE mode)
+bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
+			enum QDF_OPMODE mode)
 {
 	struct hdd_adapter *adapter = NULL;
 	struct hdd_adapter *next_adapter = NULL;
@@ -779,6 +772,8 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 
 	adapter = NULL;
 	if (type == NL80211_IFTYPE_MONITOR) {
+		bool is_rx_mon = QDF_MONITOR_FLAG_OTHER_BSS & *flags;
+
 		/*
 		 * if QDF_MONITOR_FLAG_OTHER_BSS bit is set in monitor flags
 		 * driver will assume current mode as STA + Monitor Mode.
@@ -787,14 +782,15 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 		 * reject the request.
 		 **/
 		if ((ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc) &&
-		     !(QDF_MONITOR_FLAG_OTHER_BSS & *flags)) ||
+		     !is_rx_mon) ||
 		    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) &&
-		     (QDF_MONITOR_FLAG_OTHER_BSS & *flags)) ||
+		     is_rx_mon) ||
 		    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
 						PACKET_CAPTURE_MODE_DISABLE) {
 			ret = wlan_hdd_add_monitor_check(hdd_ctx,
 							 &adapter, name, true,
-							 name_assign_type);
+							 name_assign_type,
+							 is_rx_mon);
 			if (ret)
 				return ERR_PTR(-EINVAL);
 

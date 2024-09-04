@@ -190,6 +190,11 @@ sap_is_chan_change_needed(struct sap_context *sap_ctx)
 	QDF_STATUS status;
 	struct mac_context *mac_ctx;
 
+	if (!sap_phymode_is_eht(sap_ctx->phyMode)) {
+		sap_debug("phy mode: 0x%x", sap_ctx->phyMode);
+		return true;
+	}
+
 	mac_ctx = sap_get_mac_context();
 	if (!mac_ctx) {
 		sap_err("Invalid MAC context");

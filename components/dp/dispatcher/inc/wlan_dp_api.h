@@ -76,17 +76,16 @@ void wlan_dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support);
 
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 /**
- * wlan_dp_is_local_pkt_capture_enabled() - Get local packet capture config
+ * wlan_dp_is_local_pkt_capture_active() - Get local packet capture config
  * @psoc: pointer to psoc object
  *
- * Return: true if local packet capture is enabled from ini
- *         false otherwise
+ * Return: true if local packet capture is active, false otherwise
  */
 bool
-wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc);
+wlan_dp_is_local_pkt_capture_active(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
-wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+wlan_dp_is_local_pkt_capture_active(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

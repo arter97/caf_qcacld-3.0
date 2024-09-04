@@ -21,6 +21,7 @@
 #include "wlan_dp_main.h"
 #include "wlan_dp_api.h"
 #include <wlan_dp_fisa_rx.h>
+#include <cdp_txrx_ctrl.h>
 
 void wlan_dp_update_peer_map_unmap_version(uint8_t *version)
 {
@@ -53,11 +54,23 @@ void wlan_dp_set_fisa_dynamic_aggr_size_support(bool dynamic_aggr_size_support)
 }
 
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
-bool wlan_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+bool wlan_dp_is_local_pkt_capture_active(struct wlan_objmgr_psoc *psoc)
 {
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	union cdp_config_param_t param;
+	QDF_STATUS status;
 
-	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+	status = cdp_txrx_get_psoc_param(soc, CDP_MONITOR_FLAG, &param);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch monitor flags.");
+		return false;
+	}
+
+	if (cdp_cfg_get(soc, cfg_dp_local_pkt_capture) &&
+	    !(QDF_MONITOR_FLAG_OTHER_BSS & param.cdp_monitor_flag))
+		return true;
+
+	return false;
 }
 #endif
 

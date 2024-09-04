@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1031,6 +1031,19 @@ void policy_mgr_reg_chan_change_callback(struct wlan_objmgr_psoc *psoc,
 		struct regulatory_channel *chan_list,
 		struct avoid_freq_ind_data *avoid_freq_ind,
 		void *arg);
+
+/**
+ * policy_mgr_update_nss_req() - wrapper API to update nss
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ * @tx_nss: Tx nss to set
+ * @rx_nss: Rx nss to set
+ *
+ * Return: QDF_STATUS_SUCCESS
+ */
+QDF_STATUS policy_mgr_update_nss_req(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, uint8_t tx_nss,
+				     uint8_t rx_nss);
 
 /**
  * policy_mgr_nss_update() - update nss for AP vdev

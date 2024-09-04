@@ -78,8 +78,7 @@ cm_is_peer_preset_on_other_sta(struct wlan_objmgr_psoc *psoc,
 	sync_ind = (struct roam_offload_synch_ind *)event;
 
 	if (wma_objmgr_peer_exist(wma, sync_ind->bssid.bytes, &peer_vdev_id)) {
-		if ((!wlan_vdev_mlme_is_mlo_vdev(vdev) &&
-		     vdev_id != peer_vdev_id) ||
+		if (vdev_id != peer_vdev_id &&
 		    !mlo_check_is_given_vdevs_on_same_mld(psoc, vdev_id,
 							  peer_vdev_id)) {
 			wma_debug("Peer " QDF_MAC_ADDR_FMT
@@ -113,12 +112,12 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	    cm_is_peer_preset_on_other_sta(psoc, vdev, vdev_id, event)) {
 		mlme_err("vdev %d Roam sync not handled in connecting/disconnecting state",
 			 vdev_id);
-		status = wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
-						   vdev_id,
-						   WLAN_ROAM_RSO_STOPPED,
-						   REASON_ROAM_SYNCH_FAILED);
+		wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+					  vdev_id,
+					  WLAN_ROAM_RSO_STOPPED,
+					  REASON_ROAM_SYNCH_FAILED);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
-		return status;
+		return QDF_STATUS_E_INVAL;
 	}
 	mlo_sta_stop_reconfig_timer(vdev);
 	wlan_clear_mlo_sta_link_removed_flag(vdev);
@@ -184,10 +183,17 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 	struct qdf_mac_addr connected_bssid;
 	uint8_t vdev_id;
 	struct wlan_objmgr_psoc *psoc;
+	uint8_t good_rssi_cfg;
+	struct psoc_mlme_obj *mlme_psoc_obj;
+	struct scoring_cfg *score_config;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	vdev_id = wlan_vdev_get_id(vdev);
 	psoc = wlan_pdev_get_psoc(pdev);
+
+	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
+	if (!mlme_psoc_obj)
+		return QDF_STATUS_E_INVAL;
 
 	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
 		if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc,
@@ -219,12 +225,16 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 	if (IS_ROAM_REASON_STA_KICKOUT(sync_ind->roam_reason)) {
 		struct reject_ap_info ap_info;
 
-		qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
-		ap_info.bssid = connected_bssid;
-		ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
-		ap_info.reject_reason = REASON_STA_KICKOUT;
-		ap_info.source = ADDED_BY_DRIVER;
-		wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
+		score_config = &mlme_psoc_obj->psoc_cfg.score_config;
+		good_rssi_cfg = score_config->rssi_score.good_rssi_threshold;
+		if (good_rssi_cfg > sync_ind->rssi) {
+			qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
+			ap_info.bssid = connected_bssid;
+			ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
+			ap_info.reject_reason = REASON_STA_KICKOUT;
+			ap_info.source = ADDED_BY_DRIVER;
+			wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
+		}
 	}
 
 	cm_update_scan_mlme_on_roam(vdev, &connected_bssid,
@@ -780,7 +790,9 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 
 	if (roaming_info->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OWE) ||
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY)) {
 		struct wlan_crypto_pmksa *pmkid_cache, *pmksa;
 
@@ -899,6 +911,8 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 					     roaming_info->pmk,
 					     roaming_info->pmk_len);
 				pmkid_cache->pmk_len = roaming_info->pmk_len;
+			} else {
+				mlme_debug("PMK not received from fw");
 			}
 
 			wlan_cm_set_psk_pmk(pdev, vdev_id,
@@ -1163,6 +1177,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				     mlme_get_tdls_chan_switch_prohibited(vdev),
 				     mlme_get_tdls_prohibited(vdev), vdev);
 
+	wlan_cm_update_scan_mlme_info(vdev, connect_rsp);
 	cm_update_associated_ch_info(vdev, true);
 
 	status = cm_sm_deliver_event_sync(cm_ctx, WLAN_CM_SM_EV_ROAM_DONE,
@@ -1181,6 +1196,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp);
+
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
 

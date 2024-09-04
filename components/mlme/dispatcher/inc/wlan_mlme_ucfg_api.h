@@ -5436,4 +5436,16 @@ ucfg_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 {
 	return wlan_mlme_assemble_rate_code(preamble, nss, rate);
 }
+
+/**
+ * ucfg_mlme_get_keepalive_period() - Get keep alive period
+ * @vdev: VDEV object
+ *
+ * Return: Keep alive period.
+ */
+static inline
+uint16_t ucfg_mlme_get_keepalive_period(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_mlme_get_keepalive_period(vdev);
+}
 #endif /* _WLAN_MLME_UCFG_API_H_ */

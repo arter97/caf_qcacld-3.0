@@ -2863,6 +2863,22 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 	lim_proc_assoc_req_frm_cmn(mac_ctx, sub_type, session, hdr->sa,
 				   assoc_req, 0);
 
+	if (sub_type == LIM_ASSOC) {
+		lim_cp_stats_cstats_log_assoc_req_evt
+			(session, CSTATS_DIR_RX, hdr->bssId, hdr->sa,
+			 assoc_req->ssId.length, assoc_req->ssId.ssId,
+			 assoc_req->HTCaps.present, assoc_req->VHTCaps.present,
+			 assoc_req->he_cap.present, assoc_req->eht_cap.present,
+			 false);
+	} else if (sub_type == LIM_REASSOC) {
+		lim_cp_stats_cstats_log_assoc_req_evt
+			(session, CSTATS_DIR_RX, hdr->bssId, hdr->sa,
+			 assoc_req->ssId.length, assoc_req->ssId.ssId,
+			 assoc_req->HTCaps.present, assoc_req->VHTCaps.present,
+			 assoc_req->he_cap.present, assoc_req->eht_cap.present,
+			 true);
+	}
+
 	return;
 error:
 	if (assoc_req) {

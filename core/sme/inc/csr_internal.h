@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -118,6 +118,7 @@ struct csr_channel {
 struct roam_cmd {
 	enum csr_roam_reason roamReason;
 	tSirMacAddr peerMac;
+	struct qdf_mac_addr peer_mld_addr;
 	enum wlan_reason_code reason;
 };
 

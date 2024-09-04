@@ -802,6 +802,8 @@ static QDF_STATUS lim_send_tdls_dis_req_frame(struct mac_context *mac,
 		nPayload += mlo_ie_len;
 	}
 
+	lim_cp_stats_cstats_log_disc_req_evt(tdls_dis_req, pe_session);
+
 	qdf_mem_free(tdls_dis_req);
 
 #ifndef NO_PAD_TDLS_MIN_8023_SIZE
@@ -1837,6 +1839,8 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 		nPayload += mlo_ie_len;
 	}
 
+	lim_cp_stats_cstats_log_disc_resp_evt(tdls_dis_rsp, pe_session);
+
 	qdf_mem_free(tdls_dis_rsp);
 
 	if (0 != addIeLen) {
@@ -2250,6 +2254,8 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 			status);
 	}
 
+	lim_cp_stats_cstats_log_setup_req_evt(tdls_setup_req, pe_session);
+
 	qdf_mem_free(tdls_setup_req);
 
 	/* Copy the additional IE. */
@@ -2470,6 +2476,8 @@ QDF_STATUS lim_send_tdls_teardown_frame(struct mac_context *mac,
 		pe_warn("There were warnings while packing TDLS Teardown frame (0x%08x)",
 			status);
 	}
+
+	lim_cp_stats_cstats_log_tear_down_evt(teardown, pe_session);
 
 	qdf_mem_free(teardown);
 
@@ -2779,6 +2787,8 @@ lim_send_tdls_setup_rsp_frame(struct mac_context *mac,
 			status);
 	}
 
+	lim_cp_stats_cstats_log_setup_resp_evt(setup_rsp, pe_session);
+
 	qdf_mem_free(setup_rsp);
 
 	/* Copy the additional IE. */
@@ -3021,6 +3031,8 @@ QDF_STATUS lim_send_tdls_link_setup_cnf_frame(struct mac_context *mac,
 		pe_warn("There were warnings while packing TDLS Discovery Request (0x%08x)",
 			status);
 	}
+
+	lim_cp_stats_cstats_log_setup_confirm_evt(setup_cnf, pe_session);
 
 	qdf_mem_free(setup_cnf);
 

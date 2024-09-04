@@ -92,7 +92,7 @@
 # define RoamScan_AwayTime_default 0
 # define RoamRSSI_Trigger_min -100
 # define RoamRSSI_Trigger_max -50
-# define RoamRSSI_Trigger_default -78
+# define RoamRSSI_Trigger_default -76
 # define RoamCU_Trigger_min 0
 # define RoamCU_Trigger_max 100
 # define RoamCU_Trigger_default 70
@@ -1560,9 +1560,9 @@
  * <ini>
  * gNeighborLookupThreshold/RoamRSSI_Trigger - Set neighbor lookup rssi
  * threshold
- * @Min: 50
- * @Max: 100
- * @Default: 78
+ * @Min: -100
+ * @Max: -50
+ * @Default: -76
  *
  * This is used to control the RSSI threshold for neighbor lookup.
  *

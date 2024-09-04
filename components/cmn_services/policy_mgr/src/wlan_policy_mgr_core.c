@@ -4633,30 +4633,12 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 }
 
-/**
- * policy_mgr_nss_update_cb() - callback from SME confirming nss
- * update
- * @psoc: psoc handle
- * @tx_status: tx completion status for updated beacon with new
- *		nss value
- * @vdev_id: vdev id for the specific connection
- * @next_action: next action to happen at policy mgr after
- *		beacon update
- * @reason: Reason for nss update
- * @original_vdev_id: original request hwmode change vdev id
- * @request_id: request ID
- *
- * This function is the callback registered with SME at nss
- * update request time
- *
- * Return: None
- */
-static void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
-		uint8_t tx_status,
-		uint8_t vdev_id,
-		uint8_t next_action,
-		enum policy_mgr_conn_update_reason reason,
-		uint32_t original_vdev_id, uint32_t request_id)
+void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
+			      uint8_t tx_status,
+			      uint8_t vdev_id,
+			      uint8_t next_action,
+			      enum policy_mgr_conn_update_reason reason,
+			      uint32_t original_vdev_id, uint32_t request_id)
 {
 	uint32_t conn_index = 0;
 	QDF_STATUS ret;

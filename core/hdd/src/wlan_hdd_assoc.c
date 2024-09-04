@@ -2388,7 +2388,7 @@ hdd_roam_channel_switch_handler(struct wlan_hdd_link_info *link_info,
 	/* Enable Roaming on STA interface which was disabled before CSA */
 	if (adapter->device_mode == QDF_STA_MODE)
 		sme_start_roaming(mac_handle, link_info->vdev_id,
-				  REASON_DRIVER_ENABLED,
+				  REASON_VDEV_RESTART_FROM_HOST,
 				  RSO_CHANNEL_SWITCH);
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);

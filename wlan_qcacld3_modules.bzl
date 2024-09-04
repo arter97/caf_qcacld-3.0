@@ -727,6 +727,11 @@ _conditional_srcs = {
             "os_if/cp_stats/src/wlan_cfg80211_mc_cp_stats.c",
         ],
     },
+    "CONFIG_WLAN_CHIPSET_STATS": {
+        True: [
+            "cmn/umac/cp_stats/core/src/wlan_cp_stats_chipset_stats.c",
+        ],
+    },
     "CONFIG_QCA_TARGET_IF_MLME": {
 	True: [
 	    "components/target_if/mlme/src/target_if_mlme.c",

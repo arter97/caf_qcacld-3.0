@@ -3231,6 +3231,11 @@ static QDF_STATUS wma_wow_pagefault_action_cb(void *buf)
 {
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
+	if (!mac) {
+		wma_err("NULL mac ptr");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	return mac->sme.pagefault_action_cb(buf, WLAN_WMA_PF_APPS_NOTIFY_BUF_LEN);
 }
 
@@ -5828,7 +5833,7 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	tp_wma_handle wma = (tp_wma_handle)handle;
 	WMI_CHAN_INFO_EVENTID_param_tlvs *param_buf;
 	wmi_chan_info_event_fixed_param *event;
-	struct scan_chan_info buf;
+	struct scan_chan_info buf = {0};
 	struct mac_context *mac = NULL;
 	struct channel_status *channel_status;
 	bool snr_monitor_enabled;
