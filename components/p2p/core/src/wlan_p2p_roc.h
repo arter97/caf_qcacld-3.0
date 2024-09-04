@@ -90,6 +90,9 @@ enum roc_state {
  * @id:          identifier of roc
  * @tx_mgmt_mac_addr: TX Mgmt mac address
  * @opmode: Interface type
+ * @flag:       Indicate scan type. BIT[0] indicate whether
+ *              scan type is for p2p or not when sta vdev gets
+ *              use during p2p device mode operation
  */
 struct p2p_roc_context {
 	qdf_list_node_t node;
@@ -106,6 +109,7 @@ struct p2p_roc_context {
 	int32_t id;
 	struct qdf_mac_addr tx_mgmt_mac_addr;
 	enum QDF_OPMODE opmode;
+	uint32_t flag;
 };
 
 /**

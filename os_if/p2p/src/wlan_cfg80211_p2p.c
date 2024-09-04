@@ -358,6 +358,7 @@ static inline void wlan_p2p_init_lo_event(struct p2p_start_param *start_param,
 {
 }
 #endif /* FEATURE_P2P_LISTEN_OFFLOAD */
+
 /**
  * wlan_p2p_event_callback() - Callback for P2P event
  * @user_data: pointer to soc object
@@ -377,6 +378,7 @@ static void wlan_p2p_event_callback(void *user_data,
 	struct wireless_dev *wdev;
 	struct wlan_objmgr_pdev *pdev;
 	struct wireless_dev p2p_wdev = {0};
+	uint8_t flag;
 
 	osif_debug("user data:%pK, vdev id:%d, event type:%d opmode:%d",
 		   user_data, p2p_event->vdev_id, p2p_event->roc_event,
@@ -395,7 +397,12 @@ static void wlan_p2p_event_callback(void *user_data,
 		return;
 	}
 
-	if (p2p_event->opmode == QDF_P2P_DEVICE_MODE &&
+	/**
+	 * Get scan event flag sent by firmware. And then check
+	 * whether the scan is p2p scan using sta vdev or not.
+	 */
+	flag = (p2p_event->flag & P2P_SCAN_IN_STA_VDEV_FLAG);
+	if (p2p_event->opmode == QDF_P2P_DEVICE_MODE && flag &&
 	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
 		osif_vdev_mgr_get_p2p_wdev(&p2p_wdev);
 		wdev = &p2p_wdev;
@@ -425,6 +432,9 @@ static void wlan_p2p_event_callback(void *user_data,
 		osif_err("channel conversion failed");
 		goto fail;
 	}
+
+	osif_debug("Indicate frame over nl80211, idx:%d and interface:%s",
+		   wdev->netdev->ifindex, wdev->netdev->name);
 
 	if (p2p_event->roc_event == ROC_EVENT_READY_ON_CHAN) {
 		cfg80211_ready_on_channel(wdev,

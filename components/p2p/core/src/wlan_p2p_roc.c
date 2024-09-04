@@ -146,6 +146,7 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 				     QDF_MAC_ADDR_SIZE);
 		}
 		req->scan_req.scan_random.randomize = true;
+		req->scan_req.scan_ctrl_flags_ext |= SCAN_FLAG_EXT_P2P_SCAN;
 	}
 
 	if (req->scan_req.dwell_time_passive < P2P_MAX_ROC_DURATION) {
@@ -318,9 +319,10 @@ static QDF_STATUS p2p_send_roc_event(
 	p2p_evt.chan_freq = roc_ctx->chan_freq;
 	p2p_evt.duration = roc_ctx->duration;
 	p2p_evt.opmode = roc_ctx->opmode;
+	p2p_evt.flag = roc_ctx->flag;
 
-	p2p_debug("roc_event: %d, cookie:%llx", p2p_evt.roc_event,
-		  p2p_evt.cookie);
+	p2p_debug("roc_event: %d, cookie:%llx flag:%d", p2p_evt.roc_event,
+		  p2p_evt.cookie, p2p_evt.flag);
 
 	start_param->event_cb(start_param->event_cb_data, &p2p_evt);
 
@@ -996,7 +998,8 @@ void p2p_scan_event_cb(struct wlan_objmgr_vdev *vdev,
 	struct p2p_soc_priv_obj *p2p_soc_obj;
 	struct p2p_roc_context *curr_roc_ctx;
 
-	p2p_debug("soc:%pK, scan event:%d", arg, event->type);
+	p2p_debug("soc:%pK, scan event:%d flag:%d", arg, event->type,
+		  event->flag);
 
 	p2p_soc_obj = (struct p2p_soc_priv_obj *)arg;
 	if (!p2p_soc_obj) {
@@ -1008,6 +1011,22 @@ void p2p_scan_event_cb(struct wlan_objmgr_vdev *vdev,
 	if (!curr_roc_ctx) {
 		p2p_err("Failed to find valid P2P roc context");
 		return;
+	}
+
+	/**
+	 * When cancel roc cmd comes, driver will trigger stop scan internally
+	 * and sends the scan event to upper layer. By this time, firmware will
+	 * not send this event to driver. So, to redirect the event to p2p
+	 * interface, set the flag manually whenever stop scan gets trigger
+	 * by driver as part of cancel roc cmd.
+	 */
+	if (!(event->flag & P2P_SCAN_IN_STA_VDEV_FLAG) &&
+	    curr_roc_ctx->opmode == QDF_P2P_DEVICE_MODE) {
+		curr_roc_ctx->flag = 0;
+		curr_roc_ctx->flag = P2P_SCAN_IN_STA_VDEV_FLAG |
+					curr_roc_ctx->flag;
+	} else {
+		curr_roc_ctx->flag = event->flag;
 	}
 
 	qdf_mtrace(QDF_MODULE_ID_SCAN, QDF_MODULE_ID_P2P, event->type,
