@@ -515,6 +515,17 @@ ucfg_cm_roam_send_vendor_handoff_param_req(struct wlan_objmgr_psoc *psoc,
 					   void *vendor_handoff_context);
 
 /**
+ * ucfg_cm_roam_reset_vendor_handoff_req() - reset vendor handoff params
+ * command request
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id
+ *
+ * Return: none
+ */
+void ucfg_cm_roam_reset_vendor_handoff_req(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
+
+/**
  * ucfg_cm_roam_is_vendor_handoff_control_enable() - check whether vendor
  * handoff control feature is enable or not in driver
  * @psoc: psoc pointer

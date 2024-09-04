@@ -527,6 +527,12 @@ ucfg_cm_roam_send_vendor_handoff_param_req(struct wlan_objmgr_psoc *psoc,
 						     vendor_handoff_context);
 }
 
+void ucfg_cm_roam_reset_vendor_handoff_req(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	return cm_roam_reset_vendor_handoff_req(psoc, vdev_id);
+}
+
 bool
 ucfg_cm_roam_is_vendor_handoff_control_enable(struct wlan_objmgr_psoc *psoc)
 {

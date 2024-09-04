@@ -2006,6 +2006,7 @@ QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
 	retval = osif_request_wait_for_response(request);
 	if (retval) {
 		hdd_err("Target response timed out");
+		ucfg_cm_roam_reset_vendor_handoff_req(psoc, vdev_id);
 		status = qdf_status_from_os_return(retval);
 	}
 error:
