@@ -13912,6 +13912,12 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		}
 		chan_freq = wlan_reg_chan_opclass_to_freq_auto(chan, op_class,
 							       false);
+
+		if (!chan_freq) {
+			pe_debug_rl("Invalid op_class %d", op_class);
+			continue;
+		}
+
 		is_2g = WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq);
 		if (is_2g) {
 			wlan_populate_basic_rates(&b_rates, false, true);

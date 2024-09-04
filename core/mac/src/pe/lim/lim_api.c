@@ -4844,6 +4844,12 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 									    chan,
 									    op_class);
 
+			if (!chan_freq) {
+				pe_err_rl("Invalid op_class %d", op_class);
+				status = QDF_STATUS_E_FAILURE;
+				goto end;
+			}
+
 			status = lim_add_bcn_probe(session_entry->vdev,
 						   link_probe_rsp.ptr,
 						   link_probe_rsp.len,

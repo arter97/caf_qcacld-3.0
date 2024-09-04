@@ -1380,6 +1380,9 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 			wlan_reg_chan_opclass_to_freq(
 					chan_switch_params->tdls_off_ch,
 					chan_switch_params->oper_class, false);
+		if (!conn_peer->pref_off_chan_freq)
+			tdls_debug_rl("Invalid op_class %d",
+				      chan_switch_params->oper_class);
 		conn_peer->op_class_for_pref_off_chan =
 				chan_switch_params->oper_class;
 

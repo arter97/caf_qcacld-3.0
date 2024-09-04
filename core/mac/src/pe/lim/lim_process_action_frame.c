@@ -225,8 +225,15 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 	wlan_reg_chan_opclass_to_freq(ext_channel_switch_frame->ext_chan_switch_ann_action.new_channel,
 				      ext_channel_switch_frame->ext_chan_switch_ann_action.op_class,
 				      false);
+
 	/* Free ext_channel_switch_frame here as its no longer needed */
 	qdf_mem_free(ext_channel_switch_frame);
+
+	if (!target_freq) {
+		pe_err_rl("Invalid op_class %d",
+			  ext_channel_switch_frame->ext_chan_switch_ann_action.op_class);
+		return;
+	}
 
 	if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
 					 session_entry->vdev_id)) {

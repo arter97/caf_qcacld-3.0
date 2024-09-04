@@ -558,6 +558,8 @@ static void lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
 				wlan_reg_chan_opclass_to_freq_auto(chan,
 								   op_class,
 								   false);
+			if (!rsp_partner_info->partner_link_info[i].chan_freq)
+				pe_debug_rl("Invalid op_class %d", op_class);
 		} else {
 			pe_debug("Failed to get channel info for link ID:%d",
 				 link_id);
@@ -1654,6 +1656,13 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 		cent_freq2 = wlan_reg_chan_opclass_to_freq(
 					csa_params->new_ch_freq_seg2,
 					csa_params->new_op_class, false);
+		if (!cent_freq1 || !cent_freq2) {
+			pe_debug_rl("Invalid op_class %d ch_seg_1 %d ch_seg_2 %d",
+				    csa_params->new_op_class,
+				    csa_params->new_ch_freq_seg1,
+				    csa_params->new_ch_freq_seg2);
+			return QDF_STATUS_E_INVAL;
+		}
 	} else {
 		cent_freq1 = wlan_reg_legacy_chan_to_freq(mac_ctx->pdev,
 					csa_params->new_ch_freq_seg1);

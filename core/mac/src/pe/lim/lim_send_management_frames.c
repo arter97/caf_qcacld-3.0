@@ -1436,8 +1436,11 @@ void lim_send_channel_usage_resp_action_frame(struct mac_context *mac_ctx,
 		freq = wlan_reg_chan_opclass_to_freq(req->channel_usage.channel_entry[idx + 1],
 						     req->channel_usage.channel_entry[idx],
 						     true);
-		if (!freq)
+		if (!freq) {
+			pe_debug_rl("Invalid op_class %d",
+				    req->channel_usage.channel_entry[idx]);
 			continue;
+		}
 
 		for (iter = 0; iter < pcl.pcl_len; iter++) {
 			if (freq == pcl.pcl_list[iter]) {
