@@ -11190,12 +11190,11 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 		if (!link_session) {
 			pe_debug("vdev id %d pe session is not created",
 				 wlan_vdev_get_id(wlan_vdev_list[i]));
+			tmp_count--;
 			goto release_ref;
 		}
 
-		if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
-					     link_session->curr_op_freq) &&
-			mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
+		if (mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
 			pe_debug("link not active if cac running");
 			tmp_count--;
 			goto release_ref;
@@ -11993,14 +11992,19 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 
 		link_session = pe_find_session_by_vdev_id(mac_ctx,
 							  wlan_vdev_get_id(wlan_vdev_list[link]));
+		/*
+		 * In the case like:
+		 * add link done, but start ap still not happen,
+		 * so create session not done yet, but has attached
+		 * to vdev list
+		 */
 		if (!link_session) {
 			pe_debug("vdev id %d pe session is not created",
 				 wlan_vdev_get_id(wlan_vdev_list[link]));
+			tmp_count--;
 			continue;
 		}
-		if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
-					     link_session->curr_op_freq) &&
-		    mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
+		if (mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
 			pe_debug("link not active if cac running");
 			tmp_count--;
 		}
@@ -12332,9 +12336,8 @@ void populate_dot11f_mlo_rnr(struct mac_context *mac_ctx,
 			goto release_ref;
 		}
 
-		if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
-					     link_session->curr_op_freq) &&
-		    mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
+		/* Non DFS primary channel may do CAC as well */
+		if (mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
 			pe_debug("skip rnrie populate if cac running");
 			goto release_ref;
 		}
