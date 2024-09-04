@@ -173,6 +173,7 @@ struct p2p_frame_info {
  * @tx_timer:       RoC timer
  * @frame_info:     Frame type information
  * @nbuf:           Network buffer
+ * @opmode:     Interface type on which tx mgmt came
  */
 struct tx_action_context {
 	qdf_list_node_t node;
@@ -192,6 +193,7 @@ struct tx_action_context {
 	qdf_mc_timer_t tx_timer;
 	struct p2p_frame_info frame_info;
 	qdf_nbuf_t nbuf;
+	enum QDF_OPMODE opmode;
 };
 
 /**

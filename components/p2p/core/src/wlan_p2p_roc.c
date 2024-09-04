@@ -131,9 +131,20 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 	if (roc_ctx->opmode == QDF_P2P_DEVICE_MODE &&
 	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
 						p2p_soc_obj->soc)) {
-		wlan_mlme_get_p2p_device_mac_addr(req->vdev, &mac_addr);
-		qdf_mem_copy(req->scan_req.scan_random.mac_addr,
-			     &mac_addr, QDF_MAC_ADDR_SIZE);
+		/* Fill same mac addr in scan_random.mac_addr which is received
+		 * from supplicant if roc type is OFF_CHANNEL_TX. Otherwise,
+		 * fill p2p interface mac address.
+		 */
+		if (roc_ctx->roc_type == OFF_CHANNEL_TX) {
+			qdf_mem_copy(req->scan_req.scan_random.mac_addr,
+				     roc_ctx->tx_mgmt_mac_addr.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		} else {
+			wlan_mlme_get_p2p_device_mac_addr(req->vdev, &mac_addr);
+			qdf_mem_copy(req->scan_req.scan_random.mac_addr,
+				     &mac_addr,
+				     QDF_MAC_ADDR_SIZE);
+		}
 		req->scan_req.scan_random.randomize = true;
 	}
 

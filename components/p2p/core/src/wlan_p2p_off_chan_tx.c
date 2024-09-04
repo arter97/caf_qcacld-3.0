@@ -171,7 +171,9 @@ static QDF_STATUS p2p_vdev_check_valid(struct tx_action_context *tx_ctx)
 
 	/* drop probe response/disassoc/deauth for sta, go, sap */
 	if ((mode == QDF_STA_MODE &&
-	     tx_ctx->frame_info.sub_type == P2P_MGMT_PROBE_RSP) ||
+	     tx_ctx->frame_info.sub_type == P2P_MGMT_PROBE_RSP &&
+	     (!(tx_ctx->opmode == QDF_P2P_DEVICE_MODE &&
+	      ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)))) ||
 	    ((mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE) &&
 	     ((tx_ctx->frame_info.sub_type == P2P_MGMT_PROBE_RSP) ||
 	     (tx_ctx->frame_info.sub_type == P2P_MGMT_DISASSOC) ||
@@ -3208,6 +3210,7 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 	bool is_vdev_connected = false;
+	uint8_t *src_macaddr;
 
 	status = p2p_tx_context_check_valid(tx_ctx);
 	if (status != QDF_STATUS_SUCCESS) {
@@ -3267,7 +3270,7 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 	}
 
 	mode = wlan_vdev_mlme_get_opmode(vdev);
-	if (mode == QDF_STA_MODE)
+	if (mode == QDF_STA_MODE && tx_ctx->opmode != QDF_P2P_DEVICE_MODE)
 		is_vdev_connected = wlan_cm_is_vdev_connected(vdev);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
@@ -3341,6 +3344,13 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 		p2p_debug("use default wait %d",
 			  P2P_ACTION_FRAME_DEFAULT_WAIT);
 	}
+
+	/* get src mac addr to which TX mgmt has to be sent */
+	src_macaddr = &(tx_ctx->buf[SRC_MAC_ADDR_OFFSET]);
+	if (curr_roc_ctx && src_macaddr)
+		qdf_mem_copy(curr_roc_ctx->tx_mgmt_mac_addr.bytes, src_macaddr,
+			     QDF_MAC_ADDR_SIZE);
+
 	status = p2p_roc_req_for_tx_action(tx_ctx);
 	if (status != QDF_STATUS_SUCCESS) {
 		p2p_err("Failed to request roc before off chan tx");
@@ -3440,6 +3450,7 @@ QDF_STATUS p2p_process_mgmt_tx_ack_cnf(
 	tx_cnf.buf = tx_ctx->buf;
 	tx_cnf.buf_len = tx_ctx->buf_len;
 	tx_cnf.status = tx_cnf_event->status;
+	tx_cnf.opmode = tx_ctx->opmode;
 
 	p2p_debug("soc:%pK, vdev_id:%d, action_cookie:%llx, len:%d, status:%d, buf:%pK",
 		p2p_soc_obj->soc, tx_cnf.vdev_id,

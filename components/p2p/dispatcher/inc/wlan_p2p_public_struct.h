@@ -138,6 +138,7 @@ struct p2p_rx_mgmt_frame {
  * @buf_len:        Frame length
  * @status:         TX status
  * @buf:            Buffer address
+ * @opmode:         interface type on which tx mgmt frame came
  */
 struct p2p_tx_cnf {
 	uint32_t vdev_id;
@@ -145,6 +146,7 @@ struct p2p_tx_cnf {
 	uint32_t buf_len;
 	uint32_t status;
 	uint8_t *buf;
+	enum QDF_OPMODE opmode;
 };
 
 /**
@@ -157,6 +159,7 @@ struct p2p_tx_cnf {
  * @dont_wait_for_ack:   Wait for ack or not
  * @off_chan:            Off channel tx or not
  * @buf:                 TX buffer
+ * @opmode:              Interface type on which mgmt tx came
  */
 struct p2p_mgmt_tx {
 	uint32_t vdev_id;
@@ -167,6 +170,7 @@ struct p2p_mgmt_tx {
 	uint32_t dont_wait_for_ack;
 	uint32_t off_chan;
 	const uint8_t *buf;
+	enum QDF_OPMODE opmode;
 };
 
 /**
