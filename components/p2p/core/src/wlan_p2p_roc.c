@@ -36,6 +36,7 @@
 #include "wlan_p2p_roc.h"
 #include "wlan_p2p_main.h"
 #include "wlan_p2p_off_chan_tx.h"
+#include "wlan_mlme_api.h"
 
 /**
  * p2p_mgmt_rx_ops() - register or unregister rx callback
@@ -87,6 +88,7 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 	struct wlan_objmgr_pdev *pdev;
 	bool is_dbs;
 	enum QDF_OPMODE opmode;
+	struct qdf_mac_addr mac_addr = {0};
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
 			p2p_soc_obj->soc, roc_ctx->vdev_id,
@@ -126,6 +128,15 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 	req->scan_req.num_bssid = 1;
 	qdf_set_macaddr_broadcast(&req->scan_req.bssid_list[0]);
 
+	if (roc_ctx->opmode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+						p2p_soc_obj->soc)) {
+		wlan_mlme_get_p2p_device_mac_addr(req->vdev, &mac_addr);
+		qdf_mem_copy(req->scan_req.scan_random.mac_addr,
+			     &mac_addr, QDF_MAC_ADDR_SIZE);
+		req->scan_req.scan_random.randomize = true;
+	}
+
 	if (req->scan_req.dwell_time_passive < P2P_MAX_ROC_DURATION) {
 		go_num = policy_mgr_mode_specific_connection_count(
 				p2p_soc_obj->soc, PM_P2P_GO_MODE, NULL);
@@ -142,7 +153,10 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 		/* Modify the ROC duration only for P2P modes */
 		if (opmode == QDF_P2P_DEVICE_MODE ||
 		    opmode == QDF_P2P_CLIENT_MODE ||
-		    opmode == QDF_P2P_GO_MODE) {
+		    opmode == QDF_P2P_GO_MODE ||
+		    (roc_ctx->opmode == QDF_P2P_DEVICE_MODE &&
+		     ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+						p2p_soc_obj->soc))) {
 			if (go_num)
 			/* Check any P2P GO is already present or not. If it's
 			 * present then add fixed ROC timer value by 300ms
@@ -292,6 +306,7 @@ static QDF_STATUS p2p_send_roc_event(
 	p2p_evt.cookie = (uint64_t)roc_ctx->id;
 	p2p_evt.chan_freq = roc_ctx->chan_freq;
 	p2p_evt.duration = roc_ctx->duration;
+	p2p_evt.opmode = roc_ctx->opmode;
 
 	p2p_debug("roc_event: %d, cookie:%llx", p2p_evt.roc_event,
 		  p2p_evt.cookie);
@@ -945,9 +960,10 @@ QDF_STATUS p2p_process_cancel_roc_req(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	p2p_debug("roc ctx:%pK vdev_id:%d, scan_id:%d, roc_type:%d, roc_state:%d",
-		curr_roc_ctx, curr_roc_ctx->vdev_id, curr_roc_ctx->scan_id,
-		curr_roc_ctx->roc_type, curr_roc_ctx->roc_state);
+	p2p_debug("roc ctx:%pK vdev_id:%d, scan_id:%d, roc_type:%d, roc_state:%d opmode:%d",
+		  curr_roc_ctx, curr_roc_ctx->vdev_id, curr_roc_ctx->scan_id,
+		  curr_roc_ctx->roc_type, curr_roc_ctx->roc_state,
+		  curr_roc_ctx->opmode);
 
 	if (curr_roc_ctx->roc_state == ROC_STATE_IDLE) {
 		status = p2p_destroy_roc_ctx(curr_roc_ctx, true, true);

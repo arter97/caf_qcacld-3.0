@@ -87,6 +87,46 @@ void wlan_hdd_cleanup_actionframe(struct wlan_hdd_link_info *link_info)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
 }
 
+struct wlan_objmgr_vdev *
+wlan_hdd_get_sta_vdev_for_p2p_dev(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id,
+				  wlan_objmgr_ref_dbgid comp_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *link_info;
+
+	if (wlan_hdd_validate_vdev_id(vdev_id)) {
+		hdd_err("Invalid vdev %d", vdev_id);
+		return NULL;
+	}
+
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("vdev %d invalid link info", vdev_id);
+		return NULL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, comp_id);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return NULL;
+	}
+
+	/**
+	 * Check whether the cached vdev_id is STA vdev or not.
+	 * This is required because there may be chance that STA
+	 * vdev may get delete and same vdev id is assigned to
+	 * other interface.
+	 */
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) {
+		hdd_objmgr_put_vdev_by_user(vdev, comp_id);
+		hdd_err("vdev %d not a sta vdev", vdev_id);
+		return NULL;
+	}
+
+	return vdev;
+}
+
 static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 						 struct wireless_dev *wdev,
 						 struct ieee80211_channel *chan,
@@ -99,6 +139,9 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 	int ret;
+	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
+	enum QDF_OPMODE opmode = QDF_STA_MODE;
+	struct wlan_objmgr_psoc *psoc;
 
 	hdd_enter();
 
@@ -111,16 +154,27 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 		hdd_err("Command not allowed in FTM mode");
 		return -EINVAL;
 	}
+	psoc = hdd_ctx->psoc;
 
 	wlan_hdd_lpc_handle_concurrency(hdd_ctx, false);
-	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc) &&
+	if (policy_mgr_is_sta_mon_concurrency(psoc) &&
 	    !hdd_lpc_is_work_scheduled(hdd_ctx))
 		return -EINVAL;
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
-		return -EINVAL;
+	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
+		opmode = QDF_P2P_DEVICE_MODE;
+		vdev_id = ucfg_p2p_psoc_priv_get_sta_vdev_id(psoc);
+		vdev = wlan_hdd_get_sta_vdev_for_p2p_dev(psoc, vdev_id,
+							 WLAN_OSIF_P2P_ID);
+	} else {
+		if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+			return -EINVAL;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_P2P_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_P2P_ID);
+	}
+
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -135,7 +189,10 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	if (!ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc))
 		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 
-	status = wlan_cfg80211_roc(vdev, chan, duration, cookie);
+	hdd_debug("ROC req: vdev %d adapter device mode %d vdev device mode %d opmode %d",
+		  wlan_vdev_get_id(vdev), adapter->device_mode,
+		  wlan_vdev_mlme_get_opmode(vdev), opmode);
+	status = wlan_cfg80211_roc(vdev, chan, duration, cookie, opmode);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
 	hdd_debug("remain on channel request, status:%d, cookie:0x%llx",
 		  status, *cookie);
@@ -172,6 +229,7 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 
 	hdd_enter();
 
@@ -180,15 +238,29 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
-		return -EINVAL;
+	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+						adapter->hdd_ctx->psoc)) {
+		vdev_id = ucfg_p2p_psoc_priv_get_sta_vdev_id(
+						adapter->hdd_ctx->psoc);
+		vdev = wlan_hdd_get_sta_vdev_for_p2p_dev(adapter->hdd_ctx->psoc,
+							 vdev_id,
+							 WLAN_OSIF_P2P_ID);
+	} else {
+		if (wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id))
+			return -EINVAL;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_P2P_ID);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_P2P_ID);
+	}
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
 	}
 
+	hdd_debug("Cancel RoC req: vdev:%d adapter_device_mode:%d vdev_device_mode:%d",
+		  wlan_vdev_get_id(vdev), adapter->device_mode,
+		  wlan_vdev_mlme_get_opmode(vdev));
 	status = wlan_cfg80211_cancel_roc(vdev, cookie);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
 

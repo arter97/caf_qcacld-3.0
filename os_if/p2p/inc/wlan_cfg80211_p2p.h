@@ -56,6 +56,7 @@ QDF_STATUS p2p_psoc_disable(struct wlan_objmgr_psoc *psoc);
  * @chan: Pointer to channel
  * @duration: Duration for this roc request
  * @cookie: Pointer to return cookie to up layer
+ * @opmode: Interface type
  *
  * API to trigger remain on channel request. It returns cookie
  * as the identifier of roc.
@@ -64,7 +65,7 @@ QDF_STATUS p2p_psoc_disable(struct wlan_objmgr_psoc *psoc);
  */
 int wlan_cfg80211_roc(struct wlan_objmgr_vdev *vdev,
 	struct ieee80211_channel *chan, uint32_t duration,
-	uint64_t *cookie);
+	uint64_t *cookie, enum QDF_OPMODE opmode);
 
 /**
  * wlan_cfg80211_cancel_roc() - API to process cfg80211 cancel remain

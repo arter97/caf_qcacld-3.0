@@ -102,13 +102,15 @@ enum p2p_roc_event {
  * @cookie:      Cookie which is given to supplicant for this roc req
  * @chan_freq:   Chan frequency for which this RoC has been requested
  * @duration:    Duration for the RoC
-  */
+ * @opmode:      Interface type of RoC
+ */
 struct p2p_event {
 	uint32_t vdev_id;
 	enum p2p_roc_event roc_event;
 	uint64_t cookie;
 	qdf_freq_t chan_freq;
 	uint32_t duration;
+	enum QDF_OPMODE opmode;
 };
 
 /**

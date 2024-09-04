@@ -199,13 +199,16 @@ QDF_STATUS ucfg_p2p_psoc_stop(struct wlan_objmgr_psoc *soc);
  * @soc: soc context
  * @roc_req: Roc request parameters
  * @cookie: return cookie to caller
+ * @opmode: interface type
  *
  * This function delivers roc request to P2P component.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS ucfg_p2p_roc_req(struct wlan_objmgr_psoc *soc,
-	struct p2p_roc_req *roc_req, uint64_t *cookie);
+			    struct p2p_roc_req *roc_req,
+			    uint64_t *cookie,
+			    enum QDF_OPMODE opmode);
 
 /**
  * ucfg_p2p_roc_cancel_req() - Cancel roc request

@@ -20577,13 +20577,30 @@ static void hdd_send_scan_done_complete_cb(uint8_t vdev_id)
 	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 }
 
+static void hdd_get_p2p_wdev(struct wireless_dev *wdev)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *p2p_adapter;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("Invalid HDD context");
+		return;
+	}
+	p2p_adapter = hdd_get_adapter(hdd_ctx, QDF_P2P_DEVICE_MODE);
+	if (!p2p_adapter)
+		return;
+
+	qdf_mem_copy(wdev, &p2p_adapter->wdev, sizeof(struct wireless_dev));
+}
+
 struct osif_vdev_mgr_ops osif_vdev_mgrlegacy_ops = {
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	.osif_vdev_mgr_set_mac_addr_response = hdd_set_mac_addr_event_cb,
 #endif
 	.osif_vdev_mgr_send_scan_done_complete_cb =
 					hdd_send_scan_done_complete_cb,
-
+	.osif_vdev_mgr_get_p2p_wdev_cb = hdd_get_p2p_wdev,
 };
 
 static QDF_STATUS hdd_vdev_mgr_register_cb(void)

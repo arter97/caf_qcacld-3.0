@@ -35,6 +35,8 @@
 #include "wlan_cfg80211.h"
 #include "wlan_cfg80211_p2p.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlme_api.h"
+#include "osif_vdev_mgr_util.h"
 
 #define MAX_NO_OF_2_4_CHANNELS 14
 #define MAX_OFFCHAN_TIME_FOR_DNBS 150
@@ -336,9 +338,11 @@ static void wlan_p2p_event_callback(void *user_data,
 	struct vdev_osif_priv *osif_priv;
 	struct wireless_dev *wdev;
 	struct wlan_objmgr_pdev *pdev;
+	struct wireless_dev p2p_wdev = {0};
 
-	osif_debug("user data:%pK, vdev id:%d, event type:%d",
-		   user_data, p2p_event->vdev_id, p2p_event->roc_event);
+	osif_debug("user data:%pK, vdev id:%d, event type:%d opmode:%d",
+		   user_data, p2p_event->vdev_id, p2p_event->roc_event,
+		   p2p_event->opmode);
 
 	psoc = user_data;
 	if (!psoc) {
@@ -353,19 +357,26 @@ static void wlan_p2p_event_callback(void *user_data,
 		return;
 	}
 
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-	if (!osif_priv) {
-		osif_err("osif_priv is null");
-		goto fail;
+	if (p2p_event->opmode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
+		osif_vdev_mgr_get_p2p_wdev(&p2p_wdev);
+		wdev = &p2p_wdev;
+	} else {
+		osif_priv = wlan_vdev_get_ospriv(vdev);
+		if (!osif_priv) {
+			osif_err("osif_priv is null");
+			goto fail;
+		}
+
+		wdev = osif_priv->wdev;
+		if (!wdev) {
+			osif_err("wireless dev is null");
+			goto fail;
+		}
+
+		pdev = wlan_vdev_get_pdev(vdev);
 	}
 
-	wdev = osif_priv->wdev;
-	if (!wdev) {
-		osif_err("wireless dev is null");
-		goto fail;
-	}
-
-	pdev = wlan_vdev_get_pdev(vdev);
 	chan = ieee80211_get_channel(wdev->wiphy, p2p_event->chan_freq);
 	if (!chan) {
 		osif_err("channel conversion failed");
@@ -419,7 +430,7 @@ QDF_STATUS p2p_psoc_disable(struct wlan_objmgr_psoc *psoc)
 
 int wlan_cfg80211_roc(struct wlan_objmgr_vdev *vdev,
 	struct ieee80211_channel *chan, uint32_t duration,
-	uint64_t *cookie)
+	uint64_t *cookie, enum QDF_OPMODE opmode)
 {
 	struct p2p_roc_req roc_req = {0};
 	struct wlan_objmgr_psoc *psoc;
@@ -464,7 +475,7 @@ int wlan_cfg80211_roc(struct wlan_objmgr_vdev *vdev,
 	}
 
 	return qdf_status_to_os_return(
-		ucfg_p2p_roc_req(psoc, &roc_req, cookie));
+		ucfg_p2p_roc_req(psoc, &roc_req, cookie, opmode));
 }
 
 int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev,

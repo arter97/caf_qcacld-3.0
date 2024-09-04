@@ -113,7 +113,9 @@ QDF_STATUS ucfg_p2p_psoc_stop(struct wlan_objmgr_psoc *soc)
 }
 
 QDF_STATUS ucfg_p2p_roc_req(struct wlan_objmgr_psoc *soc,
-	struct p2p_roc_req *roc_req, uint64_t *cookie)
+			    struct p2p_roc_req *roc_req,
+			    uint64_t *cookie,
+			    enum QDF_OPMODE opmode)
 {
 	struct scheduler_msg msg = {0};
 	struct p2p_soc_priv_obj *p2p_soc_obj;
@@ -157,6 +159,7 @@ QDF_STATUS ucfg_p2p_roc_req(struct wlan_objmgr_psoc *soc,
 	roc_ctx->roc_state = ROC_STATE_IDLE;
 	roc_ctx->roc_type = USER_REQUESTED;
 	roc_ctx->id = id;
+	roc_ctx->opmode = opmode;
 	msg.type = P2P_ROC_REQ;
 	msg.bodyptr = roc_ctx;
 	msg.callback = p2p_process_cmd;
