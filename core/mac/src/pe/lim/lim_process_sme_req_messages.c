@@ -6633,13 +6633,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 		num_pwr_levels = MAX_NUM_PWR_LEVELS;
 	}
 
-	ch_params.ch_width = CH_WIDTH_20MHZ;
 
-	for (i = 0;
-		i < num_pwr_levels && (ch_params.ch_width != CH_WIDTH_INVALID);
-		i++) {
-		if (is_tpe_present) {
-			if (is_6ghz_freq) {
+	for (i = 0; i < num_pwr_levels; i++) {
+		if (is_tpe_present && is_6ghz_freq) {
 				if (is_psd_power) {
 					wlan_reg_get_client_power_for_connecting_ap(
 					mac->pdev, ap_power_type_6g,
@@ -6652,7 +6648,6 @@ void lim_calculate_tpc(struct mac_context *mac,
 					is_psd_power, &reg_max,
 					&reg_psd_pwr_max);
 				}
-			}
 		} else {
 			/* center frequency calculation */
 			if (is_psd_power) {
@@ -6715,14 +6710,12 @@ void lim_calculate_tpc(struct mac_context *mac,
 		mlme_obj->reg_tpc_obj.chan_power_info[i].chan_cfreq =
 					mlme_obj->reg_tpc_obj.frequency[i];
 
-		/* max tx power calculation */
-		max_tx_power = mlme_obj->reg_tpc_obj.reg_max[i];
-
 		local_constraint = mlme_obj->reg_tpc_obj.ap_constraint_power;
 		pe_debug("local constraint: %d power constraint absolute %d",
 			 local_constraint,
 			 mlme_obj->reg_tpc_obj.is_power_constraint_abs);
 
+		/* max tx power calculation */
 		if (is_psd_power) {
 			max_tx_power = reg_psd_pwr_max;
 		} else if (mlme_obj->reg_tpc_obj.is_power_constraint_abs) {
