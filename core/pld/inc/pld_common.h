@@ -203,7 +203,6 @@ struct pld_platform_cap {
  * @PLD_FW_HANG_EVENT: firmware update hang event
  * @PLD_BUS_EVENT: update bus/link event
  * @PLD_SMMU_FAULT: SMMU fault
- * @PLD_SYS_REBOOT: system is rebooting
  */
 enum pld_uevent {
 	PLD_FW_DOWN,
@@ -212,7 +211,6 @@ enum pld_uevent {
 	PLD_FW_HANG_EVENT,
 	PLD_BUS_EVENT,
 	PLD_SMMU_FAULT,
-	PLD_SYS_REBOOT,
 };
 
 /**
