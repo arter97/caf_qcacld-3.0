@@ -2538,10 +2538,26 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 			       uint8_t sub_type, tSirMacAddr sa,
 			       struct pe_session *session)
 {
+	if (!session->vdev) {
+		pe_err("vdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	if (LIM_IS_STA_ROLE(session)) {
 		pe_err("Rcvd unexpected ASSOC REQ, sessionid: %d sys sub_type: %d for role: %d from: "
 		       QDF_MAC_ADDR_FMT,
 		       session->peSessionId, sub_type,
+		       GET_LIM_SYSTEM_ROLE(session),
+		       QDF_MAC_ADDR_REF(sa));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (wlan_ser_is_non_scan_cmd_type_in_vdev_queue(
+				session->vdev,
+				WLAN_SER_CMD_VDEV_STOP_BSS)) {
+		pe_err("drop ASSOC REQ on vdev %d role: %d from: "
+		       QDF_MAC_ADDR_FMT " when stop bss pending",
+		       session->vdev_id,
 		       GET_LIM_SYSTEM_ROLE(session),
 		       QDF_MAC_ADDR_REF(sa));
 		return QDF_STATUS_E_INVAL;

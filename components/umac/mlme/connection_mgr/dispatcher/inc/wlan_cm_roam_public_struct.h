@@ -115,6 +115,8 @@
 #define MAX_BSSID_FAVORED      16
 #define WLAN_MAX_BTM_CANDIDATES      8
 
+#define FW_ROAM_SYNC_TIMEOUT 7000
+
 /* Default value of WTC reason code */
 #define DISABLE_VENDOR_BTM_CONFIG 2
 

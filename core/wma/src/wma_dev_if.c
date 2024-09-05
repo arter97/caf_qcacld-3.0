@@ -4013,6 +4013,48 @@ timer_destroy:
 }
 
 /**
+ * wma_adjust_req_timeout() - enlarge sap peer assoc conf timeout
+ * @wma: wma handle
+ * @vdev_id: vdev id
+ * @msg_type: message type
+ * @type: request type
+ * @timeout: original timeout value
+ *
+ * Enlarge sap peer assoc conf timeout if concurrent STA is processing
+ * roam sync.
+ *
+ * Return: adjusted timeout value
+ */
+static uint32_t
+wma_adjust_req_timeout(tp_wma_handle wma,
+		       uint8_t vdev_id,
+		       uint32_t msg_type,
+		       uint8_t type,
+		       uint32_t timeout)
+{
+	enum QDF_OPMODE op_mode;
+	struct wlan_objmgr_vdev *roam_vdev;
+
+	op_mode = wlan_get_opmode_from_vdev_id(wma->pdev, vdev_id);
+	if (op_mode == QDF_SAP_MODE &&
+	    msg_type == WMA_ADD_STA_REQ &&
+	    type == WMA_PEER_ASSOC_CNF_START) {
+		roam_vdev =
+		wlan_objmgr_pdev_get_roam_vdev(wma->pdev,
+					       WLAN_LEGACY_WMA_ID);
+		if (roam_vdev) {
+			wma_debug("Roam active adjust peer assoc conf timeout to %d ms from %d ms",
+				  timeout + FW_ROAM_SYNC_TIMEOUT, timeout);
+			timeout += FW_ROAM_SYNC_TIMEOUT;
+			wlan_objmgr_vdev_release_ref(roam_vdev,
+						     WLAN_LEGACY_WMA_ID);
+		}
+	}
+
+	return timeout;
+}
+
+/**
  * wma_fill_hold_req() - fill wma request
  * @wma: wma handle
  * @vdev_id: vdev id
@@ -4037,7 +4079,8 @@ struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 	if (!req)
 		return NULL;
 
-	wma_debug("vdev_id %d msg %d type %d", vdev_id, msg_type, type);
+	wma_debug("vdev_id %d msg %d type %d timeout %d", vdev_id, msg_type, type,
+		  timeout);
 	qdf_spin_lock_bh(&wma->wma_hold_req_q_lock);
 	req->vdev_id = vdev_id;
 	req->msg_type = msg_type;
@@ -4055,6 +4098,8 @@ struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 		return NULL;
 	}
 	qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
+	timeout = wma_adjust_req_timeout(wma, vdev_id, msg_type, type,
+					 timeout);
 	qdf_mc_timer_init(&req->event_timeout, QDF_TIMER_TYPE_SW,
 			  wma_hold_req_timer, req);
 	qdf_mc_timer_start(&req->event_timeout, timeout);
