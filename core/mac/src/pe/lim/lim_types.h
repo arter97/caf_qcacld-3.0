@@ -1803,7 +1803,6 @@ QDF_STATUS lim_sta_mlme_vdev_disconnect_bss(struct vdev_mlme_obj *vdev_mlme,
  * lim_process_assoc_req_frame()
  * @mac_ctx: pointer to Global MAC structure
  * @session: pointer to pe session entry
- * @assoc_req: pointer to ASSOC/REASSOC Request frame
  * @sta_ds: station dph entry
  * @assoc_req_copied: boolean to indicate if assoc req was copied to tmp above
  *
@@ -1813,7 +1812,6 @@ QDF_STATUS lim_sta_mlme_vdev_disconnect_bss(struct vdev_mlme_obj *vdev_mlme,
  */
 void lim_process_assoc_cleanup(struct mac_context *mac_ctx,
 			       struct pe_session *session,
-			       tpSirAssocReq assoc_req,
 			       tpDphHashNode sta_ds,
 			       bool assoc_req_copied);
 
