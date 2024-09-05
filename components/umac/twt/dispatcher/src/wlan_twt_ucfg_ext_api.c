@@ -42,6 +42,12 @@ ucfg_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
+ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val)
+{
+	return wlan_twt_cfg_set_requestor(psoc, val);
+}
+
+QDF_STATUS
 ucfg_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return wlan_twt_cfg_get_responder(psoc, val);

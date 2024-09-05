@@ -90,6 +90,7 @@
 #include "wlan_vdev_mgr_ucfg_api.h"
 #include "wlan_vdev_mlme_main.h"
 #include "wlan_tdls_api.h"
+#include "wlan_twt_ucfg_ext_api.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -15381,7 +15382,8 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	sme_debug("set HE testbed defaults");
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.htc_he = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.amsdu_in_ampdu = 0;
-	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request = 0;
+	ucfg_twt_cfg_set_requestor(mac_ctx->psoc, false);
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request = false;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.broadcast_twt = 0;
 	mac_ctx->mlme_cfg->twt_cfg.disable_btwt_usr_cfg = true;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_ctrl_frame = 0;
@@ -15501,6 +15503,8 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed not set enable bcast probe resp info, %d",
 			status);
+	ucfg_twt_cfg_set_requestor(mac_ctx->psoc,
+				   cfg_get(mac_ctx->psoc, CFG_TWT_REQUESTOR));
 
 	status = wma_cli_set_command(vdev_id,
 				     wmi_vdev_param_enable_bcast_probe_response,

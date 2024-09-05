@@ -64,6 +64,16 @@ QDF_STATUS
 wlan_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
+ * wlan_twt_cfg_set_requestor() - set cfg requestor
+ * @psoc: Pointer to global psoc
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val);
+
+/**
  * wlan_twt_cfg_get_responder() - get cfg responder
  * @psoc: Pointer to global psoc
  * @val: pointer to output variable

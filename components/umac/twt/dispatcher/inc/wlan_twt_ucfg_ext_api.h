@@ -334,6 +334,16 @@ void ucfg_twt_get_work_params(struct wlan_objmgr_vdev *vdev,
 			      uint32_t *next_action);
 
 /**
+ * ucfg_twt_cfg_set_requestor() - Set TWT requestor capability
+ * @psoc: Pointer to global PSOC object
+ * @val: pointer to value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val);
+
+/**
  * ucfg_twt_cfg_set_responder() - Set TWT responder capability
  * @psoc: Pointer to global PSOC object
  * @val: pointer to value to be set
@@ -475,6 +485,12 @@ ucfg_twt_get_work_params(
 		struct twt_work_params *params,
 		uint32_t *next_action)
 {
+}
+
+static inline
+QDF_STATUS ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline
