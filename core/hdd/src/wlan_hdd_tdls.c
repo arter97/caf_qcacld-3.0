@@ -822,10 +822,21 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 		int ret;
 		bool is_dbs_target = false;
 		struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+		enum tdls_feature_mode mode;
 
 		if (!psoc) {
 			hdd_err("psoc is null");
 			return -EINVAL;
+		}
+		mode = ucfg_tdls_get_current_mode(psoc);
+		if (action_code != TDLS_TEARDOWN) {
+			if (mode == TDLS_SUPPORT_DISABLED ||
+			    mode == TDLS_SUPPORT_SUSPENDED) {
+				hdd_debug_rl("TDLS mode is %d. action %d declined.",
+					     mode,
+					     action_code);
+				return -ENOTSUPP;
+			}
 		}
 
 		link_id = wlan_hdd_get_tdls_link_id(hdd_ctx, link_id);
