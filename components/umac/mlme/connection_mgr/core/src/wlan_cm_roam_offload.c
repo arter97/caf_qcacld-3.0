@@ -7149,8 +7149,7 @@ cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 
 	wlan_vdev_get_bss_peer_mac(cm_ctx->vdev, &connected_bssid);
 	wlan_mlme_get_self_bss_roam(psoc, &enable_self_bss_roam);
-	if ((!enable_self_bss_roam ||
-	     cm_roam_get_roam_score_algo(psoc) == VENDOR_ROAM_SCORE_ALGORITHM_1) &&
+	if (!enable_self_bss_roam &&
 	     cm_is_bssid_present_on_any_assoc_link(cm_ctx->vdev,
 						   &roam_req->req.bssid)) {
 		mlme_err(CM_PREFIX_FMT "self bss roam disabled. invoke_src:%d",
