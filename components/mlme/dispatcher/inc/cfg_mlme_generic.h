@@ -1298,7 +1298,7 @@ enum wlan_epcs_frame {
  */
 #define CFG_REDUCE_PWR_SCAN_MODE CFG_INI_BOOL( \
 	"enable_reduce_pwr_scan", \
-	1, \
+	0, \
 	"Reduce power scan mode")
 
 #define CFG_GENERIC_ALL \
