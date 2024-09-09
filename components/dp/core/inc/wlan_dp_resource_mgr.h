@@ -124,6 +124,7 @@ struct wlan_dp_resource_vote_node {
  * @timer: Resource manager timer handle
  * @max_phymode_nodes: max phymodes selected across system
  * @rsrc_mgr_lock: lock to protect operations from parallel contexts
+ * @refill_thread_deinit: Flag to notify refill thread status
  */
 struct wlan_dp_resource_mgr_ctx {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -138,6 +139,7 @@ struct wlan_dp_resource_mgr_ctx {
 	qdf_timer_t timer;
 	struct wlan_dp_resource_vote_node *max_phymode_nodes[MAX_MAC_RESOURCES];
 	qdf_spinlock_t rsrc_mgr_lock;
+	bool refill_thread_deinit;
 };
 
 #ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
@@ -354,6 +356,14 @@ void
 wlan_dp_resource_mgr_notify_vdev_deletion(
 				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 				struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_dp_resource_mgr_notify_refill_thread_deinit: notify refill thread deinit
+ *
+ * Return: None
+ */
+void
+wlan_dp_resource_mgr_notify_refill_thread_deinit(void);
 #else
 
 static inline
@@ -399,6 +409,11 @@ static inline void
 wlan_dp_resource_mgr_notify_vdev_deletion(
 				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 				struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline void
+wlan_dp_resource_mgr_notify_refill_thread_deinit(void)
 {
 }
 #endif /*WLAN_DP_DYNAMIC_RESOURCE_MGMT*/

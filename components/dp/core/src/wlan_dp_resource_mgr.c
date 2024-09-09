@@ -138,6 +138,15 @@ wlan_dp_resource_mgr_post_downscale_resource_req(
 	struct dp_rx_refill_thread *refill_thread;
 	struct dp_txrx_handle *dp_ext_hdl;
 
+	/*
+	 * Refill thread got de-inited first due to dp cleanup
+	 * so, downscale request can be skipped.
+	 */
+	if (rsrc_ctx->refill_thread_deinit) {
+		dp_info("Downscale not required as refill de-init done");
+		return;
+	}
+
 	if (delay_req) {
 		dp_rsrc_mgr_debug("DP rsrc mgr downscale req dealyed to timer ctx");
 		qdf_timer_mod(&rsrc_ctx->timer,
@@ -1220,6 +1229,27 @@ wlan_dp_resource_mgr_list_detach(struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
 }
 
 void
+wlan_dp_resource_mgr_notify_refill_thread_deinit(void)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_resource_mgr_ctx *rsrc_ctx;
+
+	dp_ctx =  dp_get_context();
+	if (!dp_ctx) {
+		dp_err("DP context is NULL");
+		return;
+	}
+
+	rsrc_ctx = dp_ctx->rsrc_mgr_ctx;
+	if (!rsrc_ctx)
+		return;
+
+	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
+	rsrc_ctx->refill_thread_deinit = true;
+	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
+}
+
+void
 wlan_dp_resource_mgr_notify_vdev_creation(
 				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 				struct wlan_objmgr_vdev *vdev)
@@ -1380,6 +1410,9 @@ void wlan_dp_resource_mgr_detach(struct wlan_dp_psoc_context *dp_ctx)
 			return;
 		}
 
+		/*Remove timer before it expires*/
+		qdf_timer_stop(&dp_ctx->rsrc_mgr_ctx->timer);
+		/*wait for timer which started execution*/
 		qdf_timer_free(&dp_ctx->rsrc_mgr_ctx->timer);
 		wlan_dp_resource_mgr_list_detach(dp_ctx->rsrc_mgr_ctx);
 		qdf_spinlock_destroy(&dp_ctx->rsrc_mgr_ctx->rsrc_mgr_lock);
