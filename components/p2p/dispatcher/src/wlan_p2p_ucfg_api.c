@@ -783,3 +783,28 @@ QDF_STATUS ucfg_p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev)
 {
 	return p2p_check_ap_assist_dfs_group_go(vdev);
 }
+
+bool
+ucfg_is_sta_vdev_for_p2p_device_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_get_sta_vdev_for_p2p_dev_cap(psoc);
+}
+
+bool ucfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(
+					struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(psoc);
+}
+
+void ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(
+					struct wlan_objmgr_psoc *psoc,
+					bool val)
+{
+	p2p_set_sta_vdev_for_p2p_dev_operations(psoc, val);
+}
+
+bool
+ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc);
+}

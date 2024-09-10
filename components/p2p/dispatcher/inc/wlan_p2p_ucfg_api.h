@@ -612,4 +612,47 @@ QDF_STATUS ucfg_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_is_sta_vdev_for_p2p_device_supported() - Check whether use of STA vdev
+ * for P2P device operation allowed or not
+ * @psoc: pointer to psoc
+ *
+ * Return: True/False
+ */
+bool
+ucfg_is_sta_vdev_for_p2p_device_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap()
+ * @psoc: pointer to psoc
+ *
+ * return: True/False
+ */
+bool ucfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(
+					struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_set_sta_vdev_for_p2p_dev_operations()
+ * @psoc: pointer to psoc
+ * @val: value
+ *
+ * ucfg wrapper for p2p_set_sta_vdev_for_p2p_dev_operations
+ *
+ * Return: None
+ */
+void
+ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(struct wlan_objmgr_psoc *psoc,
+					     bool val);
+
+/**
+ * ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev()
+ * @psoc: pointer to psoc
+ *
+ * ucfg wrapper for p2p_is_sta_vdev_usage_allowed_for_p2p_dev()
+ *
+ * Return: True/False
+ */
+bool
+ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_P2P_UCFG_API_H_ */
