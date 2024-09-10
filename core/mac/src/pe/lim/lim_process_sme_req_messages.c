@@ -3236,6 +3236,13 @@ lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
 	}
 }
 
+static
+void lim_disable_ht_dynamic_smps(struct pe_session *session)
+{
+	pe_debug("Disable HT D-SMPS");
+	session->ht_config.mimo_power_save = SMPS_MODE_DISABLED;
+}
+
 #ifdef WLAN_FEATURE_11AX
 static
 void lim_disable_he_dynamic_smps(struct pe_session *session)
@@ -3276,15 +3283,57 @@ lim_disable_dsmps_for_iot_ap(struct mac_context *mac_ctx,
 	if (wlan_action_oui_search(mac_ctx->psoc,
 				   &vendor_ap_search_attr,
 				   ACTION_OUI_DISABLE_DYNAMIC_SMPS)) {
-		mac_ctx->mlme_cfg->ht_caps.enable_smps = 0;
-		/*
-		 * For HT D-SMPS type,
-		 * 0 - Static, 1 - Dynamic, 2 - Reserved/Invalid, 3 - Disabled
-		 */
-		mac_ctx->mlme_cfg->ht_caps.smps = 3;
-		mac_ctx->mlme_cfg->ht_caps.ht_cap_info.mimo_power_save = 3;
+		lim_disable_ht_dynamic_smps(session);
 		lim_disable_he_dynamic_smps(session);
 		pe_debug("Disable HT and HE D-SMPS for this IOT AP");
+	}
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static bool
+lim_is_single_link_mlo_sta(struct pe_session *session)
+{
+	if (session && !session->ml_partner_info.num_partner_links)
+		return true;
+
+	return false;
+}
+#else
+static inline bool
+lim_is_single_link_mlo_sta(struct pe_session *session)
+{
+	return false;
+}
+#endif
+
+/**
+ * lim_disable_ht_he_dynamic_smps() - disable dynamic SMPS for STA/P2P client
+ *@session: pe session
+ *@chan_freq: channel frequency
+ *
+ * When connecting with a 2.4 GHz only STA or a P2P client, disable STA HT and
+ * HE dynamic SMPS capabilities.
+ *
+ * Return: None
+ */
+static void
+lim_disable_ht_he_dynamic_smps(struct pe_session *session,
+			       qdf_freq_t chan_freq)
+{
+	bool is_2g_only_sta = false;
+
+	if (session->opmode == QDF_STA_MODE &&
+	    wlan_reg_is_24ghz_ch_freq(chan_freq)) {
+		if (!IS_DOT11_MODE_EHT(session->dot11mode) ||
+		    (IS_DOT11_MODE_EHT(session->dot11mode) &&
+		     lim_is_single_link_mlo_sta(session))) {
+			is_2g_only_sta = true;
+		}
+	}
+
+	if (is_2g_only_sta || session->opmode == QDF_P2P_CLIENT_MODE) {
+		lim_disable_ht_dynamic_smps(session);
+		lim_disable_he_dynamic_smps(session);
 	}
 }
 
@@ -4693,6 +4742,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	}
 
 	lim_copy_ml_partner_info_to_session(session, req);
+
+	lim_disable_ht_he_dynamic_smps(session, bss_desc->chan_freq);
 
 	pe_debug("Assoc IE len: %d", req->assoc_ie.len);
 	if (req->assoc_ie.len)
