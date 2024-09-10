@@ -7210,3 +7210,10 @@ wlan_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 
 	return set_value;
 }
+
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
+				    uint8_t csa_status)
+{
+	return wlan_mlme_send_csa_event_status_ind_cmd(vdev, csa_status);
+}
