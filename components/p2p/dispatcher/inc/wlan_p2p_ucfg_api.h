@@ -655,4 +655,26 @@ ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(struct wlan_objmgr_psoc *psoc,
  */
 bool
 ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_psoc_priv_set_sta_vdev_id()
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id to set
+ *
+ * ucfg wrapper for p2p_psoc_priv_set_sta_vdev_id()
+ *
+ * Return: None
+ */
+void ucfg_p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+
+/**
+ * ucfg_p2p_psoc_priv_get_sta_vdev_id()
+ * @psoc: pointer to psoc
+ *
+ * ucfg wrapper for p2p_psoc_priv_get_sta_vdev_id()
+ *
+ * Return: vdev_id
+ */
+uint8_t ucfg_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_P2P_UCFG_API_H_ */

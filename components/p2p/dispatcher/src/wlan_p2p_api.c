@@ -193,3 +193,14 @@ QDF_STATUS wlan_p2p_validate_ap_assist_dfs_group(struct wlan_objmgr_vdev *vdev)
 {
 	return p2p_validate_ap_assist_dfs_group(vdev);
 }
+
+void wlan_p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+	p2p_psoc_priv_set_sta_vdev_id(psoc, vdev_id);
+}
+
+uint8_t wlan_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_psoc_priv_get_sta_vdev_id(psoc);
+}

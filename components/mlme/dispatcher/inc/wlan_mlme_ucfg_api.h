@@ -5643,4 +5643,34 @@ uint16_t ucfg_mlme_get_keepalive_period(struct wlan_objmgr_vdev *vdev)
 QDF_STATUS
 ucfg_mlme_get_dfs_discard_mode(struct wlan_objmgr_psoc *psoc,
 			       uint8_t *val);
+
+/**
+ * ucfg_mlme_set_p2p_device_mac_addr - set p2p device interface mac
+ * address to stat vdev mlme object
+ * @vdev: pointer to vdev
+ * @mac_addr: p2p device mac addr
+ *
+ * Return QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+				  struct qdf_mac_addr *mac_addr)
+{
+	return wlan_mlme_set_p2p_device_mac_addr(vdev, mac_addr);
+}
+
+/**
+ * ucfg_mlme_get_p2p_device_mac_addr - get p2p device interface mac
+ * address from sta vdev mlme object
+ * @vdev: pointer to vdev
+ * @mac_addr: p2p device mac addr
+ *
+ * Return QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+				  struct qdf_mac_addr *mac_addr)
+{
+	return wlan_mlme_get_p2p_device_mac_addr(vdev, mac_addr);
+}
 #endif /* _WLAN_MLME_UCFG_API_H_ */

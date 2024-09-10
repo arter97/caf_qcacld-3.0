@@ -5283,5 +5283,26 @@ wlan_mlme_get_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 wlan_mlme_set_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc,
 			       bool enable_sap_dfs_puncture);
-
+/**
+ * wlan_mlme_set_p2p_device_mac_addr() - set p2p device interface mac
+ * address in sta vdev mlme object
+ * @vdev: pointer to vdev
+ * @mac_addr: p2p device mac addr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+				  struct qdf_mac_addr *mac_addr);
+/**
+ * wlan_mlme_get_p2p_device_mac_addr() - get p2p device interface mac
+ * address from sta vdev mlme object
+ * @vdev: pointer to vdev
+ * @mac_addr: mac addr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+				  struct qdf_mac_addr *mac_addr);
 #endif /* _WLAN_MLME_API_H_ */

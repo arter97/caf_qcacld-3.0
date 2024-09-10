@@ -185,4 +185,24 @@ QDF_STATUS wlan_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 					     bool *is_valid_ap_assist,
 					     struct qdf_mac_addr *ap_bssid,
 					     uint8_t *opclass, uint8_t *chan);
+
+/**
+ * wlan_p2p_psoc_priv_set_sta_vdev_id() - Cache STA vdev id
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id to set
+ *
+ * Cache STA vdev_id in psoc p2p priv object.
+ *
+ * Return: None
+ */
+void wlan_p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+
+/**
+ * wlan_p2p_psoc_priv_get_sta_vdev_id() - Get cached STA vdev id
+ * @psoc: pointer to psoc
+ *
+ * Return: uint8_t
+ */
+uint8_t wlan_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc);
 #endif

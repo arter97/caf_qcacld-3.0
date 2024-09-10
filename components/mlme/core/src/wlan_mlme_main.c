@@ -6015,3 +6015,41 @@ QDF_STATUS wlan_find_peer_and_get_mac_and_mld_addr(
 
 	return status;
 }
+
+QDF_STATUS
+mlme_set_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *mac_addr)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!mac_addr) {
+		qdf_mem_set(&vdev_mlme->p2p_dev_data.p2p_dev_addr,
+			    QDF_MAC_ADDR_SIZE, 0);
+	} else {
+		qdf_copy_macaddr(&vdev_mlme->p2p_dev_data.p2p_dev_addr,
+				 mac_addr);
+		mlme_debug("set mac_addr " QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(
+			   vdev_mlme->p2p_dev_data.p2p_dev_addr.bytes));
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *mac_addr)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_copy_macaddr(mac_addr, &vdev_mlme->p2p_dev_data.p2p_dev_addr);
+
+	return QDF_STATUS_SUCCESS;
+}

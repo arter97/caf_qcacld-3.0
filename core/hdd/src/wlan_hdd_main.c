@@ -3868,6 +3868,41 @@ static int hdd_stop_link_adapter(struct hdd_context *hdd_ctx,
 #endif
 
 /**
+ * hdd_cache_p2p_macaddr_in_vdev(): Cache p2p macaddr in sta vdev. This will
+ * be used during p2p device operation
+ * @sta_adapter: STA adapter
+ * @mac_addr: pointer to p2p mac_addr which needs to be store
+ *
+ * Return: None
+ */
+static void hdd_cache_p2p_macaddr_in_vdev(struct hdd_adapter *sta_adapter,
+					  struct qdf_mac_addr *mac_addr)
+{
+	QDF_STATUS status;
+
+	status = ucfg_mlme_set_p2p_device_mac_addr(sta_adapter->deflink->vdev,
+						   mac_addr);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to set p2p mac addr");
+}
+
+/**
+ * hdd_cache_sta_vdev_id_in_p2p_psoc_priv() - Cache sta vdev id in p2p psoc
+ * private object
+ * @psoc: pointer to psoc
+ * @sta_adapter: STA adapter
+ *
+ * Return: None
+ */
+static
+void hdd_cache_sta_vdev_id_in_p2p_psoc_priv(struct wlan_objmgr_psoc *psoc,
+					    struct hdd_adapter *sta_adapter)
+{
+	ucfg_p2p_psoc_priv_set_sta_vdev_id(psoc, sta_adapter->deflink->vdev_id);
+}
+
+/**
  * hdd_start_adapter() - Wrapper function for device specific adapter
  * @adapter: pointer to HDD adapter
  * @rtnl_held: true if rtnl lock is taken, otherwise false
@@ -3882,6 +3917,7 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 
 	int ret;
 	enum QDF_OPMODE device_mode = adapter->device_mode;
+	struct hdd_adapter *sta_adapter;
 
 	hdd_enter_dev(adapter->dev);
 
@@ -3939,6 +3975,15 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 
 	wlan_hdd_update_dbs_scan_and_fw_mode_config(adapter->deflink->vdev_id);
 
+	sta_adapter = hdd_get_adapter(adapter->hdd_ctx, QDF_STA_MODE);
+	if (sta_adapter && hdd_is_interface_up(sta_adapter) &&
+	    device_mode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+						adapter->hdd_ctx->psoc)) {
+		hdd_cache_sta_vdev_id_in_p2p_psoc_priv(adapter->hdd_ctx->psoc,
+						       sta_adapter);
+		hdd_cache_p2p_macaddr_in_vdev(sta_adapter, &adapter->mac_addr);
+	}
 exit_with_success:
 	hdd_create_adapter_sysfs_files(adapter);
 
@@ -10473,11 +10518,25 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 			    struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
+	struct hdd_adapter *sta_adapter;
 
 	if (adapter->device_mode == QDF_STA_MODE)
 		status = hdd_stop_link_adapter(hdd_ctx, adapter);
 
 	status = hdd_stop_adapter_ext(hdd_ctx, adapter);
+
+	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+							hdd_ctx->psoc)) {
+		ucfg_p2p_psoc_priv_set_sta_vdev_id(hdd_ctx->psoc,
+						   WLAN_INVALID_VDEV_ID);
+
+		sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+		if (sta_adapter)
+			ucfg_mlme_set_p2p_device_mac_addr(
+					sta_adapter->deflink->vdev,
+					NULL);
+	}
 
 	return status;
 }

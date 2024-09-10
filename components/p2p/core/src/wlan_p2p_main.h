@@ -266,6 +266,7 @@ struct p2p_param {
  * @mcc_quota_ev_os_if_cb:  callback to OS IF to indicate mcc quota event
  * @mgmt_frm_registration_update: mgmt frame registration update
  * @sta_vdev_for_p2p_dev_operations: Use sta vdev for p2p device operations
+ * @sta_vdev_id: store sta vdev_id to use it for p2p device operation.
  */
 struct p2p_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -289,6 +290,7 @@ struct p2p_soc_priv_obj {
 #endif
 	uint32_t mgmt_frm_registration_update;
 	bool sta_vdev_for_p2p_dev_operations;
+	uint32_t sta_vdev_id;
 };
 
 /**
@@ -893,4 +895,25 @@ void p2p_set_sta_vdev_for_p2p_dev_operations(struct wlan_objmgr_psoc *psoc,
  * Return: True/False
  */
 bool p2p_is_sta_vdev_usage_allowed_for_p2p_dev(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_psoc_priv_set_sta_vdev_id() - Cache STA vdev id
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id to set
+ *
+ * Cache STA vdev_id in psoc p2p priv object.
+ *
+ * Return: None
+ */
+void p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id);
+
+/**
+ * p2p_psoc_priv_get_sta_vdev_id() - Get cached STA vdev id
+ * @psoc: pointer to psoc
+ *
+ * Return: uint8_t
+ */
+uint8_t p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc);
+
 #endif /* _WLAN_P2P_MAIN_H_ */

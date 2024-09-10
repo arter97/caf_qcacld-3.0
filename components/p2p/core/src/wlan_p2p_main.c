@@ -768,6 +768,7 @@ QDF_STATUS p2p_psoc_object_open(struct wlan_objmgr_psoc *soc)
 
 	qdf_runtime_lock_init(&p2p_soc_obj->roc_runtime_lock);
 	p2p_soc_obj->cur_roc_vdev_id = P2P_INVALID_VDEV_ID;
+	p2p_soc_obj->sta_vdev_id = P2P_INVALID_VDEV_ID;
 	qdf_idr_create(&p2p_soc_obj->p2p_idr);
 
 	p2p_debug("p2p psoc object open successful");
@@ -2273,4 +2274,33 @@ p2p_is_sta_vdev_usage_allowed_for_p2p_dev(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return p2p_soc_obj->sta_vdev_for_p2p_dev_operations;
+}
+
+void p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							    WLAN_UMAC_COMP_P2P);
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc context is NULL");
+		return;
+	}
+
+	p2p_soc_obj->sta_vdev_id = vdev_id;
+}
+
+uint8_t p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							    WLAN_UMAC_COMP_P2P);
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc context is NULL");
+		return WLAN_INVALID_VDEV_ID;
+	}
+
+	return p2p_soc_obj->sta_vdev_id;
 }

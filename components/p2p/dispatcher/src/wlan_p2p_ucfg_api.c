@@ -808,3 +808,14 @@ ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(struct wlan_objmgr_psoc *psoc)
 {
 	return p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc);
 }
+
+void ucfg_p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+	p2p_psoc_priv_set_sta_vdev_id(psoc, vdev_id);
+}
+
+uint8_t ucfg_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_psoc_priv_get_sta_vdev_id(psoc);
+}
