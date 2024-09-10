@@ -205,4 +205,36 @@ void wlan_p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
  * Return: uint8_t
  */
 uint8_t wlan_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_p2p_set_rand_mac_for_p2p_dev() - set P2P device mac addr to rx filters
+ * @soc: pointer to psoc
+ * @vdev_id: vdev id to fetch p2p_vdev_priv_obj
+ * @freq: frequency on which the filtering(allow) is expected
+ * @rnd_cookie: cookie value
+ * @duration: duration of the filter validity. p2p_mac_clear_timeout() is called
+ *            and filter would be removed upon timeout, if not removed already
+ *
+ * Return: None
+ */
+QDF_STATUS
+wlan_p2p_set_rand_mac_for_p2p_dev(struct wlan_objmgr_psoc *soc,
+				  uint32_t vdev_id, uint32_t freq,
+				  uint64_t rnd_cookie, uint32_t duration);
+
+/**
+ * wlan_p2p_del_random_mac() - del mac filter from given vdev rand mac list
+ * @soc: soc object
+ * @vdev_id: vdev id
+ * @rnd_cookie: random mac mgmt tx cookie
+ *
+ * This function will del the mac addr filter from vdev random mac addr list.
+ * If there is no reference to mac addr, it will set a clear timer to flush it
+ * in target finally.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_p2p_del_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
+			uint64_t rnd_cookie);
 #endif

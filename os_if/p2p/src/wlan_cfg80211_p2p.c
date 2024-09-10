@@ -531,8 +531,8 @@ int wlan_cfg80211_roc(struct wlan_objmgr_vdev *vdev,
 		ucfg_p2p_roc_req(psoc, &roc_req, cookie, opmode));
 }
 
-int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev,
-		uint64_t cookie)
+int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev, uint64_t cookie,
+			     enum QDF_OPMODE opmode)
 {
 	struct wlan_objmgr_psoc *psoc;
 
@@ -548,7 +548,7 @@ int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev,
 	}
 
 	return qdf_status_to_os_return(
-		ucfg_p2p_roc_cancel_req(psoc, cookie));
+		ucfg_p2p_roc_cancel_req(psoc, vdev, cookie, opmode));
 }
 
 int wlan_cfg80211_mgmt_tx(struct wlan_objmgr_vdev *vdev,

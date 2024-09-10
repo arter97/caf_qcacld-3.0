@@ -528,4 +528,23 @@ const uint8_t *p2p_get_p2pie_ptr(const uint8_t *ie, uint16_t ie_len);
  * Return: Pointer to P2P2 IE
  */
 const uint8_t *p2p_get_p2p2_ie_ptr(const uint8_t *ie, uint16_t ie_len);
+
+/**
+ * p2p_request_random_mac() - request random mac mgmt tx
+ * @soc: soc
+ * @vdev_id: vdev id
+ * @mac: mac addr
+ * @freq: freq
+ * @rnd_cookie: cookie to be returned
+ * @duration: duration of tx timeout
+ *
+ * This function will add/append the random mac addr filter entry to vdev.
+ * If it is new added entry, it will request to set filter in target.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+p2p_request_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
+		       uint8_t *mac, uint32_t freq, uint64_t rnd_cookie,
+		       uint32_t duration);
 #endif /* _WLAN_P2P_OFF_CHAN_TX_H_ */

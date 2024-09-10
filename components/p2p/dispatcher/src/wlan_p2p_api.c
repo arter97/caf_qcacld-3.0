@@ -204,3 +204,19 @@ uint8_t wlan_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc)
 {
 	return p2p_psoc_priv_get_sta_vdev_id(psoc);
 }
+
+QDF_STATUS
+wlan_p2p_del_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
+			uint64_t rnd_cookie)
+{
+	return p2p_del_random_mac(soc, vdev_id, rnd_cookie);
+}
+
+QDF_STATUS
+wlan_p2p_set_rand_mac_for_p2p_dev(struct wlan_objmgr_psoc *soc,
+				  uint32_t vdev_id, uint32_t freq,
+				  uint64_t rnd_cookie, uint32_t duration)
+{
+	return p2p_set_rand_mac_for_p2p_dev(soc, vdev_id, freq, rnd_cookie,
+					    duration);
+}

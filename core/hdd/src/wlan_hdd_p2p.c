@@ -304,7 +304,7 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	hdd_debug("Cancel RoC req: vdev:%d adapter_device_mode:%d vdev_device_mode:%d",
 		  wlan_vdev_get_id(vdev), adapter->device_mode,
 		  wlan_vdev_mlme_get_opmode(vdev));
-	status = wlan_cfg80211_cancel_roc(vdev, cookie);
+	status = wlan_cfg80211_cancel_roc(vdev, cookie, adapter->device_mode);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
 
 	hdd_debug("cancel remain on channel, status:%d", status);

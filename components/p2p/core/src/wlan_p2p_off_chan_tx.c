@@ -3045,22 +3045,7 @@ static void p2p_mac_clear_timeout(void *context)
 			     vdev_id, addr, freq);
 }
 
-/**
- * p2p_request_random_mac() - request random mac mgmt tx
- * @soc: soc
- * @vdev_id: vdev id
- * @mac: mac addr
- * @freq: freq
- * @rnd_cookie: cookie to be returned
- * @duration: duration of tx timeout
- *
- * This function will add/append the random mac addr filter entry to vdev.
- * If it is new added entry, it will request to set filter in target.
- *
- * Return: QDF_STATUS_SUCCESS: request successfully
- *             other: failed
- */
-static QDF_STATUS
+QDF_STATUS
 p2p_request_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 		       uint8_t *mac, uint32_t freq, uint64_t rnd_cookie,
 		       uint32_t duration)
@@ -3119,7 +3104,7 @@ void p2p_rand_mac_tx(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_psoc *soc;
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
-	bool is_vdev_up;
+	bool is_vdev_up, is_p2p_dev_frame;
 
 	if (!tx_action || !tx_action->p2p_soc_obj ||
 	    !tx_action->p2p_soc_obj->soc)
@@ -3140,12 +3125,14 @@ void p2p_rand_mac_tx(struct wlan_objmgr_pdev *pdev,
 	 * vdev is not started to prevent PASN authentication frame drops.
 	 */
 	is_vdev_up = QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev));
-	if (!tx_action->no_ack && tx_action->chan_freq &&
+	is_p2p_dev_frame = (tx_action->opmode == QDF_P2P_DEVICE_MODE &&
+		 ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(soc));
+	if ((!tx_action->no_ack || is_p2p_dev_frame) && tx_action->chan_freq &&
 	    tx_action->buf_len > MIN_MAC_HEADER_LEN &&
 	    p2p_is_vdev_support_rand_mac_by_id(soc, tx_action->vdev_id) &&
-	    (p2p_is_random_mac(soc, tx_action->vdev_id,
-			      &tx_action->buf[SRC_MAC_ADDR_OFFSET]) ||
-	     !is_vdev_up)) {
+	    ((p2p_is_random_mac(soc, tx_action->vdev_id,
+				&tx_action->buf[SRC_MAC_ADDR_OFFSET]) ||
+	      is_p2p_dev_frame) || !is_vdev_up)) {
 		status = p2p_request_random_mac(
 			soc, tx_action->vdev_id,
 			&tx_action->buf[SRC_MAC_ADDR_OFFSET],

@@ -72,13 +72,14 @@ int wlan_cfg80211_roc(struct wlan_objmgr_vdev *vdev,
  * on channel request
  * @vdev: Pointer to vdev object
  * @cookie: Find out the roc request by cookie
+ * @opmode: OPMODE for which the current roc_cancel is issued
  *
  * API to trigger cancel remain on channel request.
  *
  * Return: 0 for success, non zero for failure
  */
-int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev,
-	uint64_t cookie);
+int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev, uint64_t cookie,
+			     enum QDF_OPMODE opmode);
 
 /**
  * wlan_cfg80211_mgmt_tx() - API to process cfg80211 mgmt tx request

@@ -2304,3 +2304,31 @@ uint8_t p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc)
 
 	return p2p_soc_obj->sta_vdev_id;
 }
+
+QDF_STATUS
+p2p_set_rand_mac_for_p2p_dev(struct wlan_objmgr_psoc *soc,
+			     uint32_t vdev_id, uint32_t freq,
+			     uint64_t rnd_cookie, uint32_t duration)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr mac_addr = {0};
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(soc,
+			    p2p_psoc_priv_get_sta_vdev_id(soc), WLAN_P2P_ID);
+	if (!vdev) {
+		p2p_err("Invalid vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wlan_mlme_get_p2p_device_mac_addr(vdev, &mac_addr);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+
+	status = p2p_request_random_mac(soc, vdev_id, mac_addr.bytes,
+					freq, rnd_cookie, duration);
+	if (QDF_IS_STATUS_ERROR(status))
+		p2p_err("vdev %d failed to set rand mac" QDF_MAC_ADDR_FMT " status: %d",
+			vdev_id, QDF_MAC_ADDR_REF(mac_addr.bytes), status);
+
+	return status;
+}
