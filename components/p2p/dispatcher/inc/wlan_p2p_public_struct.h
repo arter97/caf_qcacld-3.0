@@ -385,7 +385,7 @@ enum p2p_attr_id {
 
 #ifdef FEATURE_WLAN_SUPPORT_USD
 #define P2P_USD_SERVICE_LEN                    6
-#define P2P_USD_SSI_LEN                        1024
+#define P2P_USD_SSI_LEN                        1400
 #define P2P_USD_FRAME_LEN                      1024
 #define P2P_USD_CHAN_CONFIG_FREQ_LIST_MAX_SIZE 10
 
@@ -481,7 +481,7 @@ struct p2p_usd_service_info {
  */
 struct p2p_usd_ssi {
 	uint8_t *data;
-	uint8_t len;
+	uint32_t len;
 };
 
 /**
