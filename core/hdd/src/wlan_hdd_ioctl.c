@@ -3508,7 +3508,7 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 	osif_request_put(request);
 }
 
-static uint32_t
+static int
 hdd_get_roam_chan_from_fw(struct hdd_adapter *adapter, uint32_t *chan_list,
 			  uint8_t *num_channels)
 {
@@ -3578,7 +3578,7 @@ hdd_get_roam_scan_freq(struct hdd_adapter *adapter, mac_handle_t mac_handle,
 	if (is_roam_ch_from_fw_supported(adapter->hdd_ctx)) {
 		ret = hdd_get_roam_chan_from_fw(adapter, chan_list,
 						num_channels);
-		if (ret != QDF_STATUS_SUCCESS) {
+		if (ret) {
 			hdd_err("failed to get roam scan channel list from FW");
 			return -EFAULT;
 		}
@@ -6681,12 +6681,16 @@ static bool check_disable_channels(struct hdd_context *hdd_ctx,
 	    !hdd_ctx->original_channels->channel_info)
 		return false;
 
+	qdf_mutex_acquire(&hdd_ctx->cache_channel_lock);
 	num_channels = hdd_ctx->original_channels->num_channels;
 	for (i = 0; i < num_channels; i++) {
 		if (operating_freq ==
-		    hdd_ctx->original_channels->channel_info[i].freq)
+		    hdd_ctx->original_channels->channel_info[i].freq) {
+			qdf_mutex_release(&hdd_ctx->cache_channel_lock);
 			return true;
+		}
 	}
+	qdf_mutex_release(&hdd_ctx->cache_channel_lock);
 
 	return false;
 }

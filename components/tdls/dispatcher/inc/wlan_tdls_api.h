@@ -24,6 +24,7 @@
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
+#include "wlan_tdls_main.h"
 
 #ifdef FEATURE_WLAN_TDLS
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -53,6 +54,16 @@ bool wlan_tdls_is_fw_11be_mlo_capable(struct wlan_objmgr_psoc *psoc)
 void wlan_tdls_get_features_info(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_tdls_features *tdls_feature_set);
 #endif
+
+/**
+ * wlan_tdls_register_lim_callbacks() - Register callbacks for legacy LIM API
+ * @psoc: Pointer to psoc object
+ * @cbs: Pointer to callback struct
+ *
+ * Return: None
+ */
+void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
+				      struct tdls_callbacks *cbs);
 
 /**
  * wlan_tdls_teardown_links() - notify TDLS module to teardown all TDLS links
@@ -215,7 +226,29 @@ void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint8_t *peer_addr);
+/**
+ * wlan_tdls_is_addba_request_allowed() - API to check if Add Block ack request
+ * is allowed for TDLS peer in current state.
+ * @vdev: Vdev object pointer
+ * @mac_addr: Mac address of the peer
+ *
+ * Return: True if ADDBA frame can be allowed
+ */
+bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mac_addr);
+/*
+ * wlan_tdls_delete_all_peers() - Delete all TDLS peers in lim
+ * @vdev: Pointer to vdev object
+ *
+ * Return: None
+ */
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev);
 #else
+
+static inline
+void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
+				      struct tdls_callbacks *cbs)
+{}
 
 #ifdef FEATURE_SET
 static inline
@@ -294,6 +327,17 @@ static inline
 void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint8_t *peer_addr)
+{}
+
+static inline
+bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mac_addr)
+{
+	return false;
+}
+
+static inline
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
 {}
 #endif
 #endif

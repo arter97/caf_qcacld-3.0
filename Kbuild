@@ -3009,11 +3009,14 @@ HAL_OBJS +=	$(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/be/hal_be_generic_api.o
 
 HAL_OBJS +=	$(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/be/hal_be_reo.o \
 
-ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2) $(CONFIG_CNSS_PEACH)))
+ifeq (y,$(findstring y,$(CONFIG_INCLUDE_HAL_PEACH)))
+HAL_INC += -I$(WLAN_COMMON_INC)/$(HAL_DIR)/wifi3.0/peach
+HAL_OBJS += $(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/peach/hal_peach.o
+ccflags-y += -DINCLUDE_HAL_PEACH
+else ifeq (y,$(findstring y,$(CONFIG_INCLUDE_HAL_KIWI)))
 HAL_INC += -I$(WLAN_COMMON_INC)/$(HAL_DIR)/wifi3.0/kiwi
 HAL_OBJS += $(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/kiwi/hal_kiwi.o
-else
-#error "Not Beryllium"
+ccflags-y += -DINCLUDE_HAL_KIWI
 endif
 
 endif #### CONFIG_BERYLLIUM ####
@@ -4695,6 +4698,13 @@ else
 CONFIG_WLAN_MAX_ML_BSS_LINKS ?= 1
 endif
 ccflags-y += -DWLAN_MAX_ML_BSS_LINKS=$(CONFIG_WLAN_MAX_ML_BSS_LINKS)
+
+ifdef CONFIG_WLAN_FEATURE_EMLSR
+CONFIG_WLAN_EMLSR_ENABLE ?= 1
+else
+CONFIG_WLAN_EMLSR_ENABLE ?= 0
+endif
+ccflags-y += -DWLAN_EMLSR_ENABLE=$(CONFIG_WLAN_EMLSR_ENABLE)
 
 #Maximum pending commands for a vdev is calculated in vdev create handler
 #by WLAN_SER_MAX_PENDING_CMDS/WLAN_SER_MAX_VDEVS. For SAP case, we will need

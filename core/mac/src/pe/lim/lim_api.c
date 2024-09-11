@@ -564,6 +564,20 @@ static inline void lim_nan_register_callbacks(struct mac_context *mac_ctx)
 }
 #endif
 
+#ifdef FEATURE_WLAN_TDLS
+static void lim_register_tdls_callbacks(struct mac_context *mac_ctx)
+{
+	struct tdls_callbacks tdls_cb = {0};
+
+	tdls_cb.delete_all_tdls_peers = lim_delete_all_tdls_peers;
+
+	wlan_tdls_register_lim_callbacks(mac_ctx->psoc, &tdls_cb);
+}
+#else
+static inline void lim_register_tdls_callbacks(struct mac_context *mac_ctx)
+{}
+#endif
+
 void lim_stop_pmfcomeback_timer(struct pe_session *session)
 {
 	if (session->opmode != QDF_STA_MODE)
@@ -860,6 +874,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	lim_register_debug_callback();
 	lim_nan_register_callbacks(mac);
 	p2p_register_callbacks(mac);
+	lim_register_tdls_callbacks(mac);
 	lim_register_scan_mbssid_callback(mac);
 	lim_register_sap_bcn_callback(mac);
 	wlan_reg_register_ctry_change_callback(
@@ -2252,8 +2267,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 					roam_synch_ind->is_link_beacon :
 					roam_synch_ind->is_beacon);
 	bss_desc_ptr->rssi = roam_synch_ind->rssi;
-	/* Copy Timestamp */
-	bss_desc_ptr->scansystimensec = qdf_get_monotonic_boottime_ns();
 
 	if (is_multi_link_roam(roam_synch_ind)) {
 		bss_desc_ptr->chan_freq =
@@ -2280,7 +2293,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 					       SIR_MAC_MGMT_FRAME,
 					       parsed_frm_ptr);
 
-	bss_desc_ptr->sinr = 0;
 	bss_desc_ptr->beaconInterval = parsed_frm_ptr->beaconInterval;
 	bss_desc_ptr->timeStamp[0]   = parsed_frm_ptr->timeStamp[0];
 	bss_desc_ptr->timeStamp[1]   = parsed_frm_ptr->timeStamp[1];
@@ -2291,12 +2303,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		     (uint8_t *)&bssid.bytes,
 		     sizeof(tSirMacAddr));
 
-	qdf_mem_copy((uint8_t *)&bss_desc_ptr->seq_ctrl,
-		     (uint8_t *)&mac_hdr->seqControl,
-		     sizeof(tSirMacSeqCtl));
-
-	bss_desc_ptr->received_time =
-		      (uint64_t)qdf_mc_timer_get_system_time();
 	if (parsed_frm_ptr->mdiePresent) {
 		bss_desc_ptr->mdiePresent = parsed_frm_ptr->mdiePresent;
 		qdf_mem_copy((uint8_t *)bss_desc_ptr->mdie,

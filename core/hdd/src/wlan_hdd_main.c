@@ -3022,10 +3022,8 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 
 	status = ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
 							&value);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		status = false;
+	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("set tx_bfee_ant_supp failed");
-	}
 
 	status = ucfg_mlme_set_restricted_80p80_bw_supp(hdd_ctx->psoc,
 							cfg->restricted_80p80_bw_supp);
@@ -3036,10 +3034,8 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	    !cfg->tx_bfee_8ss_enabled) {
 		status = ucfg_mlme_cfg_set_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
 				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			status = false;
+		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("set tx_bfee_ant_supp failed");
-		}
 	}
 
 	hdd_update_tid_to_link_supported(hdd_ctx, &cfg->services);
@@ -6407,7 +6403,7 @@ hdd_set_derived_multicast_list(struct wlan_objmgr_psoc *psoc,
 			       struct pmo_mc_addr_list_params *mc_list_request,
 			       int *mc_count)
 {
-	int i = 0, j = 0, list_count = *mc_count;
+	uint8_t i = 0, j = 0, list_count = *mc_count;
 	struct qdf_mac_addr *peer_mc_addr_list = NULL;
 	uint8_t  driver_mc_cnt = 0;
 	uint32_t max_ndp_sessions = 0;
@@ -6423,7 +6419,8 @@ hdd_set_derived_multicast_list(struct wlan_objmgr_psoc *psoc,
 						 &peer_mc_addr_list[j]))
 				break;
 		}
-		if (i == list_count) {
+		if (i == list_count &&
+		    (list_count + driver_mc_cnt < PMO_MAX_MC_ADDR_LIST)) {
 			qdf_mem_copy(
 			   &(mc_list_request->mc_addr[list_count +
 						driver_mc_cnt].bytes),
@@ -22107,6 +22104,57 @@ int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width)
 
 	hdd_err("Invalid ch_width %d", ch_width);
 	return -EINVAL;
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+bool
+wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool ret = false;
+
+	if (!link_info) {
+		hdd_err_rl("Invalid link info");
+		return ret;
+	}
+
+	if (!wlan_hdd_is_mlo_connection(link_info))
+		return ret;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
+	if (!vdev) {
+		hdd_err("invalid vdev");
+		return ret;
+	}
+
+	ret = mlo_mgr_is_link_switch_in_progress(vdev);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+	return ret;
+}
+#endif
+
+bool wlan_hdd_is_mlo_connection(struct wlan_hdd_link_info *link_info)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool ret = false;
+
+	if (!link_info) {
+		hdd_err("Invalid link_info");
+		return ret;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
+	if (!vdev) {
+		hdd_err("invalid vdev");
+		return ret;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		ret = true;
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+	return ret;
 }
 
 /* Register the module init/exit functions */

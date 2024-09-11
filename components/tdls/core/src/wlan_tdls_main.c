@@ -1651,8 +1651,8 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 	if (notify->user_disconnect)
 		return tdls_delete_all_tdls_peers(notify->vdev, tdls_soc_obj);
 
-	tdls_debug("Check and update TDLS state for vdev:%d",
-		   notify->session_id);
+	tdls_debug("vdev:%d Disable TDLS peer_count:%d",
+		   notify->session_id, tdls_soc_obj->connected_peer_count);
 
 	/* Disassociation event */
 	tdls_send_update_to_fw(tdls_vdev_obj, tdls_soc_obj, false,

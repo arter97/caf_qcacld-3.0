@@ -186,7 +186,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *frame;
 	void *packet;
 	QDF_STATUS qdf_status;
-	struct pe_session *pesession;
+	struct pe_session *pesession = NULL;
 	uint8_t sessionid;
 	const uint8_t *p2pie = NULL;
 	uint8_t txflag = 0;
@@ -202,6 +202,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool is_band_2g;
 	uint16_t mlo_ie_len = 0;
+	tSirMacAddr bcast_mac = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 	if (additional_ielen)
 		addn_ielen = *additional_ielen;
@@ -239,6 +240,16 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		pe_err("memory alloc failed for probe request");
 		return QDF_STATUS_E_NOMEM;
 	}
+
+	/*
+	 * Some IOT APs doesn't respond to unicast probe requests,
+	 * however those APs respond to broadcast probe requests.
+	 * Therefore for hidden ssid connections, after 3 unicast probe
+	 * requests, try the pending probes with broadcast mac.
+	 */
+	if (pesession && !WLAN_REG_IS_6GHZ_CHAN_FREQ(pesession->curr_op_freq) &&
+	    pesession->join_probe_cnt > 2)
+		sir_copy_mac_addr(bssid, bcast_mac);
 
 	/* The scheme here is to fill out a 'tDot11fProbeRequest' structure */
 	/* and then hand it off to 'dot11f_pack_probe_request' (for */
@@ -339,9 +350,12 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 				    &pr->he_6ghz_band_cap);
 
 	if (IS_DOT11_MODE_EHT(dot11mode) && pesession &&
-			pesession->lim_join_req) {
+	    pesession->lim_join_req &&
+	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)bssid)) {
 		lim_update_session_eht_capable(mac_ctx, pesession);
-		mlo_ie_len = lim_send_probe_req_frame_mlo(mac_ctx, pesession);
+
+		if (pesession->lim_join_req->bssDescription.is_ml_ap)
+			mlo_ie_len = lim_send_probe_req_frame_mlo(mac_ctx, pesession);
 	}
 
 	populate_dot11f_eht_caps(mac_ctx, pesession, &pr->eht_cap);
@@ -2399,8 +2413,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool bss_mfp_capable, frag_ie_present = false;
 	int8_t peer_rssi = 0;
-	bool is_band_2g;
-	uint16_t mlo_ie_len, fils_hlp_ie_len = 0;
+	bool is_band_2g, is_ml_ap;
+	uint16_t mlo_ie_len = 0, fils_hlp_ie_len = 0;
 	uint8_t *fils_hlp_ie = NULL;
 	struct cm_roam_values_copy mdie_cfg = {0};
 
@@ -2641,12 +2655,14 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		lim_strip_mlo_ie(mac_ctx, add_ie, &add_ie_len);
 	}
 
-	mlo_ie_len = lim_fill_assoc_req_mlo_ie(mac_ctx, pe_session, frm);
+	is_ml_ap = !!pe_session->lim_join_req->bssDescription.is_ml_ap;
+	if (is_ml_ap)
+		mlo_ie_len = lim_fill_assoc_req_mlo_ie(mac_ctx, pe_session, frm);
 
 	/**
 	 * In case of ML connection, if ML IE length is 0 then return failure.
 	 */
-	if (mlo_is_mld_sta(pe_session->vdev) && !mlo_ie_len) {
+	if (is_ml_ap && mlo_is_mld_sta(pe_session->vdev) && !mlo_ie_len) {
 		pe_err("Failed to add ML IE for vdev:%d", pe_session->vdev_id);
 		goto end;
 	}

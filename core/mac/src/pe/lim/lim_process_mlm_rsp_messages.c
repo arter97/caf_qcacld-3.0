@@ -981,6 +981,7 @@ void lim_process_mlm_disassoc_cnf(struct mac_context *mac_ctx,
 	tSirResultCodes result_code;
 	tLimMlmDisassocCnf *disassoc_cnf;
 	struct pe_session *session_entry;
+	struct qdf_mac_addr mld_mac = QDF_MAC_ADDR_ZERO_INIT;
 
 	disassoc_cnf = (tLimMlmDisassocCnf *) msg;
 
@@ -1033,13 +1034,16 @@ void lim_process_mlm_disassoc_cnf(struct mac_context *mac_ctx,
 				session_entry->peSessionId,
 				session_entry->limSmeState));
 			lim_send_sme_disassoc_ntf(mac_ctx,
-				disassoc_cnf->peerMacAddr, result_code,
+				disassoc_cnf->peerMacAddr,
+				(uint8_t *)mld_mac.bytes, result_code,
 				disassoc_cnf->disassocTrigger,
 				disassoc_cnf->aid, session_entry->smeSessionId,
 				session_entry);
 		}
 	} else if (LIM_IS_AP_ROLE(session_entry)) {
-		lim_send_sme_disassoc_ntf(mac_ctx, disassoc_cnf->peerMacAddr,
+		lim_send_sme_disassoc_ntf(
+			mac_ctx, disassoc_cnf->peerMacAddr,
+			disassoc_cnf->peerMldAddr,
 			result_code, disassoc_cnf->disassocTrigger,
 			disassoc_cnf->aid, session_entry->smeSessionId,
 			session_entry);
@@ -1182,6 +1186,7 @@ void lim_process_mlm_purge_sta_ind(struct mac_context *mac, uint32_t *msg_buf)
 	tSirResultCodes resultCode;
 	tpLimMlmPurgeStaInd pMlmPurgeStaInd;
 	struct pe_session *pe_session;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -1233,6 +1238,7 @@ void lim_process_mlm_purge_sta_ind(struct mac_context *mac, uint32_t *msg_buf)
 		} else
 			lim_send_sme_disassoc_ntf(mac,
 						  pMlmPurgeStaInd->peerMacAddr,
+						  (uint8_t *)mld_addr.bytes,
 						  resultCode,
 						  pMlmPurgeStaInd->purgeTrigger,
 						  pMlmPurgeStaInd->aid,

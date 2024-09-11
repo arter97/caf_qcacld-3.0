@@ -120,6 +120,18 @@ config CNSS_PEACH
 	bool "Enable CNSS_PEACH"
 	default n
 
+config CNSS_PEACH_V2
+	bool "Enable CNSS_PEACH_V2"
+	default n
+
+config INCLUDE_HAL_KIWI
+	bool "Enable INCLUDE_HAL_KIWI"
+	default n
+
+config INCLUDE_HAL_PEACH
+	bool "Enable INCLUDE_HAL_PEACH"
+	default n
+
 config CNSS_UTILS_MODULE
 	bool "Enable CNSS_UTILS_MODULE"
 	default n
@@ -2027,6 +2039,10 @@ config CNSS_ADRASTEA
         bool "Enable CNSS_ADRASTEA"
         default n
 
+config WLAN_FEATURE_EMLSR
+	bool "Enable EMLSR feature"
+	default n
+
 if CNSS_KIWI_V2
 config CFG_BMISS_OFFLOAD_MAX_VDEV
 	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
@@ -2128,5 +2144,13 @@ config WLAN_FASTPATH_LEGACY
 
 config QCA_SUPPORT_TX_THROTTLE_LEGACY
 	bool "Enable QCA_SUPPORT_TX_THROTTLE_LEGACY"
+	default n
+
+config PLD_SNOC_ICNSS_FLAG
+	bool "Enable PLD_SNOC_ICNSS_FLAG"
+	default n
+
+config ICNSS2_HELIUM
+	bool "Enable ICNSS2_HELIUM"
 	default n
 endif # QCA_CLD_WLAN
