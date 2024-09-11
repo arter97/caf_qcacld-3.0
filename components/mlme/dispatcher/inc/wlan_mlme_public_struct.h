@@ -1484,7 +1484,8 @@ struct wlan_mlme_aux_dev_caps {
  * @dual_sta_roam_fw_support: Firmware support for dual sta roaming feature
  * @sae_connect_retries: sae connect retry bitmask
  * @wls_6ghz_capable: wifi location service(WLS) is 6ghz capable
- * @enabled_rf_test_mode: RF test mode config
+ * @enabled_rf_test_mode: Enable/disable the RF test mode config
+ * @rf_mode_force_pwr_type: Force power type for RF mode enabled
  * @monitor_mode_concurrency: Monitor mode concurrency supported
  * @ocv_support: FW supports OCV or not
  * @wds_mode: wds mode supported
@@ -1546,7 +1547,8 @@ struct wlan_mlme_generic {
 	bool dual_sta_roam_fw_support;
 	uint32_t sae_connect_retries;
 	bool wls_6ghz_capable;
-	uint32_t enabled_rf_test_mode;
+	bool enabled_rf_test_mode;
+	int8_t rf_mode_force_pwr_type;
 	enum monitor_mode_concurrency monitor_mode_concurrency;
 	bool ocv_support;
 	enum wlan_wds_mode wds_mode;

@@ -2892,24 +2892,46 @@ QDF_STATUS
 wlan_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 /**
- * wlan_mlme_get_rf_test_mode() - Get the rf test mode
+ * wlan_mlme_is_rf_test_mode_enabled() - Get the rf test mode flag
  * @psoc: psoc context
- * @value: RF test mode value ptr.
+ * @value: Enable/Disable value ptr.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mlme_get_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t *value);
+wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
 
 /**
- * wlan_mlme_set_rf_test_mode() - Set the rf test mode
+ * wlan_mlme_set_rf_test_mode_enabled() - Set the rf test mode flag
  * @psoc: psoc context
- * @value: RF test mode value.
+ * @value: Enable/Disable value.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mlme_set_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t value);
+wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
+
+/**
+ * wlan_mlme_set_rf_mode_force_pwr_type() - Set RF mode force power type
+ * @psoc: psoc context
+ * @value: Enable/Disable value.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_rf_mode_force_pwr_type(struct wlan_objmgr_psoc *psoc,
+				     int8_t value);
+
+/**
+ * wlan_mlme_get_rf_mode_force_pwr_type() - Get RF mode force power type
+ * @psoc: psoc context
+ * @value: Enable/Disable value.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_rf_mode_force_pwr_type(struct wlan_objmgr_psoc *psoc,
+				     int8_t *value);
 
 #ifdef CONFIG_BAND_6GHZ
 /**

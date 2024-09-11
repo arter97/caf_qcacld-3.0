@@ -4017,7 +4017,7 @@ wlan_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 }
 
 QDF_STATUS
-wlan_mlme_get_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t *value)
+wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -4033,7 +4033,7 @@ wlan_mlme_get_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t *value)
 }
 
 QDF_STATUS
-wlan_mlme_set_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t value)
+wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -4042,6 +4042,44 @@ wlan_mlme_set_rf_test_mode(struct wlan_objmgr_psoc *psoc, uint32_t value)
 		return QDF_STATUS_E_FAILURE;
 
 	mlme_obj->cfg.gen.enabled_rf_test_mode = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#define RF_MODE_FORCE_PWR_TYPE_MIN -1
+#define RF_MODE_FORCE_PWR_TYPE_MAX 2
+QDF_STATUS
+wlan_mlme_set_rf_mode_force_pwr_type(struct wlan_objmgr_psoc *psoc,
+				     int8_t value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	if (value > RF_MODE_FORCE_PWR_TYPE_MIN &&
+	    value <= RF_MODE_FORCE_PWR_TYPE_MAX &&
+	    mlme_obj->cfg.gen.enabled_rf_test_mode)
+		mlme_obj->cfg.gen.rf_mode_force_pwr_type = value;
+	else
+		mlme_obj->cfg.gen.rf_mode_force_pwr_type =
+						RF_MODE_FORCE_PWR_TYPE_MIN;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_rf_mode_force_pwr_type(struct wlan_objmgr_psoc *psoc,
+				     int8_t *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.gen.rf_mode_force_pwr_type;
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -328,10 +328,10 @@ enum wlan_epcs_frame {
 /*
  * rf_test_mode_enabled - Enable rf test mode support
  * @Min: 0
- * @Max: 4
+ * @Max: 1
  * @Default: 0
  *
- * This cfg is used to set rf test mode support
+ * This cfg is used to set rf test mode support flag
  * by default 6 G Hz security check will be enabled
  * with rf test mode as disabled.
  *
@@ -339,13 +339,40 @@ enum wlan_epcs_frame {
  *
  * Supported Feature: STA
  */
-#define CFG_RF_TEST_MODE_SUPP_ENABLED CFG_UINT( \
+#define CFG_RF_TEST_MODE_SUPP_ENABLED CFG_BOOL( \
 		"rf_test_mode_enabled", \
 		0, \
-		4, \
-		0, \
-		CFG_VALUE_OR_DEFAULT, \
 		"rf test mode Enable Flag")
+
+/*
+ * rf_mode_force_pwr_type - Force 6 GHz power type for RF mode enabled case
+ * @Min: -1
+ * @Max: 2
+ * @Default: -1
+ *
+ * This cfg is used to set force power type for RF mode enabled case
+ * as below.
+ *
+ * rf_mode_force_pwr_type -> Force power type
+ * -1 -> Use AP and STA intersected power type
+ *  0 -> Force LPI power
+ *  1 -> Force SP power
+ *  2 -> Force VLP power
+ *
+ *  For rf_mode_force_pwr_type 1 and 2 if STA doesn't support SP and VLP
+ *  power respectively for connection frequency try to force LPI power.
+ *
+ *  Related: None
+ *
+ *  Supported Feature: STA
+ */
+#define CFG_RF_MODE_FORCE_PWR_TYPE CFG_INT( \
+		"rf_mode_force_pwr_type", \
+		-1, \
+		2, \
+		-1, \
+		CFG_VALUE_OR_DEFAULT, \
+		"rf test mode force power type")
 
 #ifdef CONFIG_BAND_6GHZ
 /*
@@ -1337,6 +1364,7 @@ enum wlan_epcs_frame {
 	CFG(CFG_WLS_6GHZ_CAPABLE) \
 	CFG(CFG_MONITOR_MODE_CONCURRENCY) \
 	CFG(CFG_RF_TEST_MODE_SUPP_ENABLED) \
+	CFG(CFG_RF_MODE_FORCE_PWR_TYPE) \
 	CFG_WDS_MODE_ALL \
 	CFG(CFG_TX_RETRY_MULTIPLIER) \
 	CFG(CFG_MGMT_FRAME_HW_TX_RETRY_COUNT) \

@@ -611,7 +611,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	uint8_t bpcc;
 	bool cu_flag = true;
 	bool is_power_constraint_abs = false;
-	uint32_t rf_test_mode;
+	int8_t rf_mode_force_pwr_type;
 
 	if (mlo_is_mld_sta(session->vdev)) {
 		cu_flag = false;
@@ -680,17 +680,18 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						REG_CURRENT_MAX_AP_TYPE;
 		}
 
-		status = wlan_mlme_get_rf_test_mode(mac_ctx->psoc,
-						    &rf_test_mode);
+		status = wlan_mlme_get_rf_mode_force_pwr_type(
+						mac_ctx->psoc,
+						&rf_mode_force_pwr_type);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("Failed to get RF test mode value");
+			pe_err("Failed to get RF test mode for power type value");
 			return;
 		}
 
 		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev, &pwr_type_6g,
 				session->ap_defined_power_type_6g,
-				bcn->chan_freq, rf_test_mode);
+				bcn->chan_freq, rf_mode_force_pwr_type);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 

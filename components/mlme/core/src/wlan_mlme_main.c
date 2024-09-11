@@ -1396,6 +1396,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_oem_eht_mlo_cfg(psoc, gen);
 	mlme_init_lpass_support_cfg(psoc, gen);
 	gen->enabled_rf_test_mode = cfg_default(CFG_RF_TEST_MODE_SUPP_ENABLED);
+	gen->rf_mode_force_pwr_type = cfg_default(CFG_RF_MODE_FORCE_PWR_TYPE);
 	gen->enabled_11h = cfg_get(psoc, CFG_11H_SUPPORT_ENABLED);
 	gen->enabled_11d = cfg_get(psoc, CFG_11D_SUPPORT_ENABLED);
 	gen->enable_beacon_reception_stats =

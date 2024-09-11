@@ -14897,10 +14897,11 @@ static int hdd_test_config_6ghz_security_test_mode(struct hdd_context *hdd_ctx,
 
 {
 	uint8_t cfg_val;
-	uint32_t rf_test_mode = 0;
+	bool rf_test_mode = false;
 	QDF_STATUS status;
 
-	status = ucfg_mlme_get_rf_test_mode(hdd_ctx->psoc, &rf_test_mode);
+	status = ucfg_mlme_is_rf_test_mode_enabled(hdd_ctx->psoc,
+						   &rf_test_mode);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Get rf test mode failed");
 		return -EINVAL;
