@@ -401,7 +401,7 @@ QDF_STATUS cm_send_sb_disconnect_req(struct scheduler_msg *msg)
 	status = wlan_mlo_mgr_link_switch_defer_disconnect_req(vdev,
 							       ind->disconnect_param.source,
 							       ind->disconnect_param.reason_code);
-	if (QDF_IS_STATUS_ERROR(status)) {
+	if (status != QDF_STATUS_E_ALREADY && QDF_IS_STATUS_ERROR(status)) {
 		status = mlo_disconnect(vdev, ind->disconnect_param.source,
 					ind->disconnect_param.reason_code,
 					&ind->disconnect_param.bssid);
