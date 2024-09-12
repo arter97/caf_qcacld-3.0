@@ -1050,7 +1050,6 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS qdf_status;
 	struct wlan_channel *bss_chan;
 	uint8_t band;
-	bool is_24ghz_enabled;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -1083,14 +1082,6 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 		band = wlan_reg_freq_to_band((qdf_freq_t)bss_chan->ch_freq);
 		if (band == REG_BAND_UNKNOWN) {
 			osif_err("Invalid bss freq");
-			return -EINVAL;
-		}
-
-		ucfg_twt_cfg_get_24ghz_enabled(psoc, &is_24ghz_enabled);
-
-		if (!is_24ghz_enabled && !wlan_vdev_mlme_is_mlo_vdev(vdev) &&
-		    band == REG_BAND_2G) {
-			osif_err("TWT disabled for 2.4 GHz band");
 			return -EINVAL;
 		}
 
