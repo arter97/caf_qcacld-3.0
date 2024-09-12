@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2315,6 +2315,8 @@ struct roam_pmkid_req_event {
  * scan only on prior discovery of any 6 GHz support in the environment.
  * @send_roam_scan_offload_rssi_params: Set the RSSI parameters for roam
  * offload scan
+ * @send_roam_idle_trigger: Send roam idle params to FW
+ * @send_roam_frequencies: send roam frequencies to FW
  */
 struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_vdev_set_pcl_cmd)(struct wlan_objmgr_vdev *vdev,
@@ -2358,6 +2360,12 @@ struct wlan_cm_roam_tx_ops {
 		struct wlan_objmgr_vdev *vdev,
 		struct wlan_roam_offload_scan_rssi_params *roam_rssi_params);
 #endif
+	QDF_STATUS (*send_roam_idle_trigger)(wmi_unified_t wmi_handle,
+					     uint8_t command,
+					     struct wlan_roam_idle_params *req);
+	QDF_STATUS (*send_roam_frequencies)(
+			struct wlan_objmgr_vdev *vdev,
+			struct wlan_roam_scan_channel_list *rso_ch_info);
 };
 
 /**
