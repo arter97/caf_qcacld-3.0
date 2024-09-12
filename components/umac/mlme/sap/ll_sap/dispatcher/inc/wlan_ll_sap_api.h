@@ -469,6 +469,7 @@ wlan_ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
 					     qdf_freq_t freq,
 					     enum ll_sap_csa_source csa_src)
 {
+
 }
 
 static inline qdf_freq_t

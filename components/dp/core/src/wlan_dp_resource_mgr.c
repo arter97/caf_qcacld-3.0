@@ -16,6 +16,12 @@
 #include <cdp_txrx_ctrl.h>
 #include "cfg_ucfg_api.h"
 
+/*DP resource MAP used in resource level selection*/
+static struct wlan_dp_resource_map dp_resource_map[] = {
+	{RESOURCE_LVL_1, RESOURCE_LVL_1_TPUT_MBPS, RESOURCE_LVL_1_RX_BUFFERS},
+	{RESOURCE_LVL_2, RESOURCE_LVL_2_TPUT_MBPS, RESOURCE_LVL_2_RX_BUFFERS},
+};
+
 static uint64_t
 wlan_dp_resource_mgr_phymode_to_tput(enum wlan_phymode phymode)
 {

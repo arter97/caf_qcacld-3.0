@@ -1631,7 +1631,7 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 	uint8_t *info;
 	struct chan_stats_weight_info weight_info;
 	uint8_t nf_cfg, chan_free_cfg, txpwr_range_cfg, txpwr_tput_cfg;
-	uint32_t weight_config, normalized_weight;
+	uint32_t weight_config, normalized_weight = 0;
 
 	info = qdf_mem_malloc(SAP_MAX_CHANNEL_INFO_LOG);
 	if (!info)

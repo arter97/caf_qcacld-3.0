@@ -57,12 +57,6 @@ struct wlan_dp_resource_map {
 	uint16_t num_rx_buffers;
 };
 
-/*DP resource MAP used in resource level selection*/
-static struct wlan_dp_resource_map dp_resource_map[] = {
-	{RESOURCE_LVL_1, RESOURCE_LVL_1_TPUT_MBPS, RESOURCE_LVL_1_RX_BUFFERS},
-	{RESOURCE_LVL_2, RESOURCE_LVL_2_TPUT_MBPS, RESOURCE_LVL_2_RX_BUFFERS},
-};
-
 /**
  * struct wlan_dp_resource_ml_vote_info - DP Resource ML vote
  * common info

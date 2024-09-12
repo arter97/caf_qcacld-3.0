@@ -677,12 +677,12 @@ struct wlan_diag_mlo_t2lm_teardown {
  */
 struct wlan_diag_mlo_link_status {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
-	uint8_t version;
-	uint16_t active_link:5;
-	uint16_t prev_active_link:5;
-	uint16_t associated_links:5;
-	uint16_t reserved:1;
-	uint8_t reason;
+	uint32_t version;
+	uint32_t active_link:5;
+	uint32_t prev_active_link:5;
+	uint32_t associated_links:5;
+	uint32_t reserved:17;
+	uint32_t reason;
 } qdf_packed;
 
 #define DIAG_NBR_RPT_VERSION 1

@@ -2872,8 +2872,9 @@ lim_del_sta(struct mac_context *mac,
 	MTRACE(mac_trace_msg_tx(mac, pe_session->peSessionId, msgQ.type));
 	retCode = wma_post_ctrl_msg(mac, &msgQ);
 	if (QDF_STATUS_SUCCESS != retCode) {
-		if (fRespReqd)
+		if (fRespReqd) {
 			SET_LIM_PROCESS_DEFD_MESGS(mac, true);
+		}
 		pe_err("Posting DELETE_STA_REQ to HAL failed, reason=%X",
 			retCode);
 		qdf_mem_free(pDelStaParams);
