@@ -1306,7 +1306,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 
 	/* STA should be connected before sending any TDLS frame */
 	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
-		osif_err("STA is not connected");
+		osif_err_rl("STA is not connected");
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 		return -EAGAIN;
 	}
@@ -1320,7 +1320,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 				hdd_objmgr_put_vdev_by_user(vdev,
 							    WLAN_OSIF_TDLS_ID);
 				if (link_id < 0) {
-					osif_err("link id is invalid");
+					osif_err_rl("link id is invalid");
 					return -EINVAL;
 				}
 				/* Get the candidate vdev per link id */
@@ -1329,14 +1329,15 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 							      WLAN_OSIF_TDLS_ID,
 							      link_id);
 				if (!vdev) {
-					osif_err("vdev is null");
+					osif_err_rl("vdev is null");
 					return -EINVAL;
 				}
 			} else if (action_code == TDLS_DISCOVERY_REQUEST) {
 				if (ucfg_tdls_discovery_on_going(vdev)) {
-					osif_err("discovery request is going");
 					hdd_objmgr_put_vdev_by_user(vdev,
 							     WLAN_OSIF_TDLS_ID);
+					osif_err_rl("discovery request is going on vdev %d",
+						    wlan_vdev_get_id(vdev));
 					return -EAGAIN;
 				}
 				dis_req_more = true;
@@ -1353,7 +1354,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 			mlo_vdev = ucfg_tdls_get_mlo_vdev(vdev, i,
 							  WLAN_OSIF_TDLS_ID);
 			if (!mlo_vdev) {
-				osif_err("mlo vdev is NULL");
+				osif_err_rl("mlo vdev is NULL");
 				continue;
 			}
 			ret = wlan_cfg80211_tdls_mgmt(mlo_vdev, peer,
