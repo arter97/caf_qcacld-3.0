@@ -4321,7 +4321,11 @@ policy_mgr_get_ml_sta_info_psoc(struct wlan_objmgr_psoc *psoc,
 					  non_ml_freq_lst);
 }
 
-uint32_t policy_mgr_get_disabled_ml_links_count(struct wlan_objmgr_psoc *psoc)
+uint32_t
+policy_mgr_get_disabled_ml_links_count(struct wlan_objmgr_psoc *psoc,
+				       qdf_freq_t *op_ch_freq_list,
+				       uint8_t *vdev_id_list,
+				       uint32_t list_max_size)
 {
 	uint32_t i, count = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -4334,8 +4338,21 @@ uint32_t policy_mgr_get_disabled_ml_links_count(struct wlan_objmgr_psoc *psoc)
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_DISABLE_LINK; i++) {
-		if (pm_disabled_ml_links[i].in_use)
+		if (!pm_disabled_ml_links[i].in_use)
+			continue;
+		if (op_ch_freq_list && vdev_id_list) {
+			if (count < list_max_size) {
+				op_ch_freq_list[count] =
+					pm_disabled_ml_links[i].freq;
+				vdev_id_list[count] =
+					pm_disabled_ml_links[i].vdev_id;
+				count++;
+			}
+		} else if (op_ch_freq_list || vdev_id_list) {
+			policy_mgr_debug("freq list or vdev list null");
+		} else {
 			count++;
+		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 

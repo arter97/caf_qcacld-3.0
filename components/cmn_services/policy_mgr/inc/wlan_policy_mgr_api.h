@@ -1269,12 +1269,20 @@ bool policy_mgr_is_ml_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
  * policy_mgr_get_disabled_ml_links_count() - provides the count of
  * disabled ml links
  * @psoc: PSOC object information
+ * @op_ch_freq_list: home channel list of disabled vdev
+ * @vdev_id_list: disabled vdev id list
+ * @list_max_size: list max number of items
  *
- * This function provides the count of disabled ml links
+ * This function provides the count of disabled ml links, frequency list
+ * vdev id list.
  *
  * Return: disabled ml links count
  */
-uint32_t policy_mgr_get_disabled_ml_links_count(struct wlan_objmgr_psoc *psoc);
+uint32_t
+policy_mgr_get_disabled_ml_links_count(struct wlan_objmgr_psoc *psoc,
+				       qdf_freq_t *op_ch_freq_list,
+				       uint8_t *vdev_id_list,
+				       uint32_t list_max_size);
 
 /**
  * policy_mgr_move_vdev_from_disabled_to_connection_tbl() - re-enable a ml link
