@@ -8617,8 +8617,11 @@ policy_mgr_handle_ml_sta_links_on_vdev_up_csa(struct wlan_objmgr_psoc *psoc,
 
 /* Add extra buff if any connection is disconnecting */
 #define SET_LINK_TIMEOUT ((STOP_RESPONSE_TIMER) + 6000)
+/* Max retry wait for set link timeout */
+#define SET_LINK_WAIT_RETRY_MAX 2
 
-QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
+static QDF_STATUS
+policy_mgr_single_wait_for_set_link(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	QDF_STATUS status;
@@ -8641,7 +8644,34 @@ QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_set_link_in_progress(pm_ctx, false);
 		policy_mgr_err("wait for set_link_in_progress failed");
+	} else {
+		policy_mgr_debug("complete wait for set_link_in_progress");
 	}
+
+	return status;
+}
+
+QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	QDF_STATUS status;
+	uint8_t retry = SET_LINK_WAIT_RETRY_MAX;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	do {
+		status = policy_mgr_single_wait_for_set_link(psoc);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
+		if (!policy_mgr_get_link_in_progress(pm_ctx))
+			break;
+		policy_mgr_debug("retry %d", retry);
+		status = QDF_STATUS_E_INVAL;
+	} while (retry--);
 
 	return status;
 }

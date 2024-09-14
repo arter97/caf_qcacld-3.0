@@ -5325,7 +5325,9 @@ ml_nlink_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/* Check if any set link is already in progress and thus wait */
-	policy_mgr_wait_for_set_link_update(psoc);
+	status = policy_mgr_wait_for_set_link_update(psoc);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlo_debug("wait for set link completion status %d", status);
 
 	old_emlsr_disable_req =
 	ml_nlink_set_emlsr_mode_disable_req(psoc, ml_vdev, disable_request);
