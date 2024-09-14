@@ -1606,7 +1606,6 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_configure_roam_trigger_parameters
 		trigger_parameters[WMI_ROAM_TRIGGER_EXT_REASON_MAX];
 
-
 	for (i = 0; i < WMI_ROAM_TRIGGER_EXT_REASON_MAX; i++)
 		wmi_fill_default_roam_trigger_parameters(&trigger_parameters[i],
 							 i);
@@ -1653,20 +1652,15 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 				roam_trigger_parameters->enable = 0;
 		}
 
-		wmi_fill_min_rssi_params(roam_trigger_parameters,
+		wmi_fill_min_rssi_params(&trigger_parameters[WMI_ROAM_TRIGGER_REASON_NONE],
 					 triggers,
 					 DEAUTH_MIN_RSSI);
-		roam_trigger_parameters++;
-
-		wmi_fill_min_rssi_params(roam_trigger_parameters,
+		wmi_fill_min_rssi_params(&trigger_parameters[WMI_ROAM_TRIGGER_REASON_NONE],
 					 triggers,
 					 BMISS_MIN_RSSI);
-		roam_trigger_parameters++;
-
-		wmi_fill_min_rssi_params(roam_trigger_parameters,
+		wmi_fill_min_rssi_params(&trigger_parameters[WMI_ROAM_TRIGGER_REASON_NONE],
 					 triggers,
 					 MIN_RSSI_2G_TO_5G_ROAM);
-		roam_trigger_parameters++;
 	}
 
 	if (trigger_reason_bitmask &
@@ -1676,9 +1670,9 @@ static QDF_STATUS send_set_roam_trigger_cmd_tlv(wmi_unified_t wmi_handle,
 		trigger_parameters[WMI_ROAM_TRIGGER_REASON_WTC_BTM].enable = 0;
 
 	if (BIT(ROAM_TRIGGER_REASON_PER) & roam_scan_scheme_bitmap) {
-		trigger_parameters[WMI_ROAM_TRIGGER_REASON_WTC_BTM].scan_mode =
+		trigger_parameters[ROAM_TRIGGER_REASON_PER].scan_mode =
 			ROAM_TRIGGER_SCAN_MODE_PARTIAL;
-		trigger_parameters[WMI_ROAM_TRIGGER_REASON_WTC_BTM].enable = 1;
+		trigger_parameters[ROAM_TRIGGER_REASON_PER].enable = 1;
 	}
 
 	if (BIT(ROAM_TRIGGER_REASON_BTC) & roam_scan_scheme_bitmap) {
