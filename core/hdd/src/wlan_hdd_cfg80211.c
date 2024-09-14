@@ -26951,7 +26951,7 @@ static int wlan_add_key_standby_link(struct hdd_adapter *adapter,
 	mlo_link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx,
 						       link_id);
 	if (!mlo_link_info)
-		return QDF_STATUS_E_FAILURE;
+		return -EINVAL;
 
 	errno = wlan_cfg80211_store_link_key(
 			hdd_ctx->psoc, key_index,
