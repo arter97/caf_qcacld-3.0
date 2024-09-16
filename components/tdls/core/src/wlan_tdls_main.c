@@ -1039,8 +1039,9 @@ bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 	    WLAN_TDLS_MAX_CONCURRENT_VDEV_SUPPORTED)
 		return false;
 
-	if (policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
-						      NULL) > 1) {
+	/* TDLS should be disabled for STA + STA concurrency */
+	if (policy_mgr_mode_specific_connection_count_with_mlo(
+						psoc, PM_STA_MODE) > 1) {
 		tdls_debug("More than one STA exist. Don't allow TDLS");
 		return false;
 	}
@@ -1400,7 +1401,8 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 
 	tdls_feature_flags = tdls_soc_obj->tdls_configs.tdls_feature_flags;
 	if (!TDLS_IS_ENABLED(tdls_feature_flags)) {
-		tdls_debug("TDLS mode is not enabled");
+		tdls_notice_rl("vdev:%d TDLS mode is not enabled",
+			       wlan_vdev_get_id(tdls_vdev_obj->vdev));
 		return;
 	}
 
@@ -1423,8 +1425,8 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 
 	if (!wlan_cm_is_vdev_connected(tdls_vdev_obj->vdev) &&
 	    sta_connect_event && current_mode != TDLS_SUPPORT_DISABLED) {
-		tdls_debug("Vdev:%d is not connected. Don't enable TDLS",
-			   wlan_vdev_get_id(tdls_vdev_obj->vdev));
+		tdls_notice_rl("Vdev:%d is not connected. Don't enable TDLS",
+			       wlan_vdev_get_id(tdls_vdev_obj->vdev));
 		return;
 	}
 
@@ -1964,7 +1966,7 @@ static void tdls_set_current_mode(struct tdls_soc_priv_obj *tdls_soc,
 	if (!tdls_soc)
 		return;
 
-	tdls_debug("mode %d", (int)tdls_mode);
+	tdls_debug("mode %d source %d", (int)tdls_mode, source);
 
 	if (update_last)
 		tdls_soc->tdls_last_mode = tdls_mode;

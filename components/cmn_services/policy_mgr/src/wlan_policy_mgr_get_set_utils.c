@@ -3508,6 +3508,50 @@ policy_mgr_get_connection_count_with_mlo(struct wlan_objmgr_psoc *psoc)
 	return count;
 }
 
+uint32_t
+policy_mgr_mode_specific_connection_count_with_mlo(
+					struct wlan_objmgr_psoc *psoc,
+					enum policy_mgr_con_mode input_mode)
+{
+	uint32_t conn_index, count = 0;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	enum policy_mgr_con_mode mode;
+	bool is_mlo = false, count_mlo = false;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return count;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (!pm_conc_connection_list[conn_index].in_use)
+			continue;
+
+		mode = pm_conc_connection_list[conn_index].mode;
+		if (input_mode != mode)
+			continue;
+
+		is_mlo = policy_mgr_is_ml_vdev_id(
+				psoc,
+				pm_conc_connection_list[conn_index].vdev_id);
+
+		if (is_mlo) {
+			if (!count_mlo) {
+				count_mlo = true;
+				count++;
+			}
+		} else {
+			count++;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return count;
+}
+
 uint32_t policy_mgr_mode_specific_vdev_id(struct wlan_objmgr_psoc *psoc,
 					  enum policy_mgr_con_mode mode)
 {

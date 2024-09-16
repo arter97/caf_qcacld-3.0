@@ -692,6 +692,22 @@ uint32_t
 policy_mgr_get_connection_count_with_mlo(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_mode_specific_connection_count_with_mlo() - provides the
+ * count of given connections
+ * @psoc: PSOC object information
+ * @mode: connection mode
+ *
+ * This function provides the count of given connections, MLD dev count
+ * 1 connection no matter how many links connection.
+ *
+ * Return: connection count
+ */
+uint32_t
+policy_mgr_mode_specific_connection_count_with_mlo(
+				struct wlan_objmgr_psoc *psoc,
+				enum policy_mgr_con_mode mode);
+
+/**
  * policy_mgr_get_concurrency_mode() - return concurrency mode
  * @psoc: PSOC object information
  *
