@@ -1613,6 +1613,16 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 enum wlan_diag_wifi_band
 wlan_convert_freq_to_diag_band(uint16_t ch_freq);
 
+/**
+ * wlan_get_qdf_to_diag_txrx_status() - API to convert qdf_dp_tx_rx_status
+ * to wlan_diag_tx_rx_status
+ * @tx_status: TX status of the frame
+ *
+ * Return: Converted QDF TX status value of Diag TX status of frame
+ */
+enum wlan_diag_tx_rx_status
+wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status);
+
 static inline void wlan_connectivity_logging_stop(void)
 {}
 
@@ -1752,6 +1762,19 @@ enum wlan_diag_wifi_band
 wlan_convert_freq_to_diag_band(uint16_t ch_freq);
 
 /**
+ * wlan_get_qdf_to_diag_txrx_status() - API to convert qdf_dp_tx_rx_status
+ * to wlan_diag_tx_rx_status
+ * @tx_status: TX status of outgoing frame. Refer enum qdf_dp_tx_rx_status
+ *
+ * Return: TX status of the frame.
+ */
+static inline enum wlan_diag_tx_rx_status
+wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status)
+{
+	return WLAN_DIAG_TX_RX_STATUS_INVALID;
+}
+
+/**
  * wlan_populate_vsie() - Populate VSIE field for logging
  * @vdev: vdev pointer
  * @data: Diag packet info data
@@ -1851,6 +1874,12 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      qdf_freq_t freq,
 				      bool is_rx, uint8_t subtype)
 {}
+
+static inline enum wlan_diag_tx_rx_status
+wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status)
+{
+	return WLAN_DIAG_TX_RX_STATUS_INVALID;
+}
 
 static inline void
 wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev)

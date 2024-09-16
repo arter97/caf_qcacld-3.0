@@ -91,6 +91,7 @@ void wlan_connectivity_logging_stop(void)
 	qdf_spin_unlock_bh(&global_cl.write_ptr_lock);
 	qdf_spinlock_destroy(&global_cl.write_ptr_lock);
 }
+
 #endif
 
 #if defined(WLAN_FEATURE_ROAM_OFFLOAD) && \
@@ -819,6 +820,31 @@ wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+enum wlan_diag_tx_rx_status
+wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status)
+{
+	switch (tx_status) {
+	case QDF_TX_RX_STATUS_FW_DISCARD:
+		return WLAN_DIAG_TX_RX_STATUS_FW_DISCARD;
+	case QDF_TX_RX_STATUS_INVALID:
+		return WLAN_DIAG_TX_RX_STATUS_INVALID;
+	case QDF_TX_RX_STATUS_DROP:
+		return WLAN_DIAG_TX_RX_STATUS_DROP;
+	case QDF_TX_RX_STATUS_DOWNLOAD_SUCC:
+		return WLAN_DIAG_TX_RX_STATUS_DOWNLOAD_SUCC;
+	case QDF_TX_RX_STATUS_NO_ACK:
+		return WLAN_DIAG_TX_RX_STATUS_NO_ACK;
+	case QDF_TX_RX_STATUS_OK:
+		return WLAN_DIAG_TX_RX_STATUS_OK;
+	case QDF_TX_RX_STATUS_MAX:
+		return WLAN_DIAG_TX_RX_STATUS_MAX;
+	default:
+		return WLAN_DIAG_TX_RX_STATUS_INVALID;
+	}
+
+	return WLAN_DIAG_TX_RX_STATUS_INVALID;
+}
 
 enum wlan_diag_wifi_band
 wlan_convert_freq_to_diag_band(uint16_t ch_freq)
