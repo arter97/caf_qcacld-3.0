@@ -7841,6 +7841,7 @@ void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
 		he_cap->ops_supp = dot11_cap.ops_supp;
 		he_cap->ndp_feedback_supp = dot11_cap.ndp_feedback_supp;
 		he_cap->amsdu_in_ampdu = dot11_cap.amsdu_in_ampdu;
+		he_cap->he_dynamic_smps = dot11_cap.he_dynamic_smps;
 
 		if (!mac->roam.configParam.channelBondingMode5GHz) {
 			/*

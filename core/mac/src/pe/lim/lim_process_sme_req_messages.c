@@ -3237,6 +3237,11 @@ void lim_disable_he_dynamic_smps(struct pe_session *session)
 	pe_debug("Disable HE D-SMPS");
 	session->he_config.he_dynamic_smps = 0;
 }
+
+bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
+{
+	return session->he_config.he_dynamic_smps;
+}
 #else
 static inline
 void lim_disable_he_dynamic_smps(struct pe_session *session)
