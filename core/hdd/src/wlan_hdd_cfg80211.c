@@ -20642,8 +20642,7 @@ get_usable_channel_policy[QCA_WLAN_VENDOR_ATTR_USABLE_CHANNELS_MAX + 1] = {
 	},
 };
 
-#ifdef WLAN_FEATURE_GET_USABLE_CHAN_LIST
-static enum nl80211_chan_width
+enum nl80211_chan_width
 hdd_convert_phy_bw_to_nl_bw(enum phy_ch_width bw)
 {
 	switch (bw) {
@@ -20676,6 +20675,7 @@ hdd_convert_phy_bw_to_nl_bw(enum phy_ch_width bw)
 	return NL80211_CHAN_WIDTH_20;
 }
 
+#ifdef WLAN_FEATURE_GET_USABLE_CHAN_LIST
 /**
  * hdd_fill_usable_channels_data() - Fill the data requested by userspace
  * @skb: SK buffer

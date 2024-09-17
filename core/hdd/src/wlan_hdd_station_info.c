@@ -143,6 +143,8 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_CH_WIDTH_V2
 #define EHT_OPERATION \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_EHT_OPERATION
+#define ASSOCIATED_BW \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOCIATED_BW
 
 /*
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
@@ -802,6 +804,25 @@ static inline int32_t hdd_add_eht_oper_info(
 }
 #endif
 
+static int32_t hdd_add_associated_bw(struct sk_buff *skb,
+				     struct hdd_station_ctx *hdd_sta_ctx)
+{
+	int32_t ret = 0;
+	struct hdd_connection_info *conn_info;
+	uint32_t bw = 0;
+
+	conn_info = &hdd_sta_ctx->cache_conn_info;
+	bw = hdd_convert_phy_bw_to_nl_bw(conn_info->ch_width);
+
+	if (nla_put_u32(skb, ASSOCIATED_BW,
+			bw)) {
+		hdd_err("Failed to put associated bw");
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
 static uint32_t hdd_get_prev_connected_bss_ies_len(
 					struct hdd_station_ctx *hdd_sta_ctx)
 {
@@ -989,6 +1010,12 @@ hdd_populate_station_info_skb(struct sk_buff *skb,
 		hdd_err("disconnect_reason put fail");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (hdd_add_associated_bw(skb, hdd_sta_ctx)) {
+		hdd_err("associated bw put fail");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 

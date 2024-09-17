@@ -1231,4 +1231,13 @@ int hdd_vdev_send_sta_keep_alive_interval(struct wlan_hdd_link_info *link_info,
  */
 void wlan_hdd_save_sta_keep_alive_interval(struct hdd_adapter *adapter,
 					   uint16_t sta_alive_interval);
+/**
+ * hdd_convert_phy_bw_to_nl_bw - Convert phy bandwidth to nl bandwidth
+ * @bw: phy bandwidth
+ *
+ * Return: nl bandwidth
+ */
+enum nl80211_chan_width
+hdd_convert_phy_bw_to_nl_bw(enum phy_ch_width bw);
+
 #endif
