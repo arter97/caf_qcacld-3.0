@@ -52,6 +52,7 @@
 #include <wma.h>
 #include "wlan_objmgr_vdev_obj.h"
 #include "utils_mlo.h"
+#include "lim_utils.h"
 
 /*
  * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
@@ -1156,9 +1157,18 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_cm_connect_resp *connect_rsp;
 	bool eht_capab = false;
+	struct pe_session *session;
+	struct mac_context *mac_ctx =
+			cds_get_context(QDF_MODULE_ID_PE);
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		/* couldn't find session */
+		pe_err("Session not found for vdev_id: %d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	if (!vdev) {
 		mlme_err("vdev object is NULL");
@@ -1286,6 +1296,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
+	lim_set_tpc_power(mac_ctx, session, NULL);
 
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
