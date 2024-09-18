@@ -793,7 +793,7 @@ int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 						nla_len(tb2[freq_config]);
 
 		usd_param->freq_config.freq_list.freq =
-			qdf_mem_malloc(usd_param->service_info.len);
+			qdf_mem_malloc(usd_param->freq_config.freq_list.len);
 		if (!usd_param->freq_config.freq_list.freq)
 			goto mem_free;
 
