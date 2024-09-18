@@ -264,10 +264,12 @@ struct wlan_mlme_roam_state_info {
  *  used by supplicant to do roam invoke after disabling roam scan in firmware,
  *  it is only effective for current connection, it will be cleared during new
  *  connection.
+ * @roam_policy: Current Roam Policy. refer enum wlan_roam_policy
  */
 struct wlan_mlme_roaming_config {
 	uint32_t roam_trigger_bitmap;
 	bool supplicant_disabled_roaming;
+	enum wlan_roam_policy roam_policy;
 };
 
 /**
@@ -1429,6 +1431,27 @@ mlme_get_roam_trigger_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
  */
 void mlme_set_roam_trigger_bitmap(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id, uint32_t val);
+
+/**
+ * mlme_set_roam_policy() - Set Roam Policy
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev ID
+ * @roam_policy: Roam policy to set. Refer enum wlan_roam_policy
+ *
+ * Return: void
+ */
+void mlme_set_roam_policy(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			  enum wlan_roam_policy roam_policy);
+
+/**
+ * mlme_get_roam_policy() - Get current roam policy
+ * @psoc: Pointer to psoc pointer
+ * @vdev_id: vdev ID
+ *
+ * Return: Current roam_policy. REfer enum wlan_roam_policy
+ */
+enum wlan_roam_policy mlme_get_roam_policy(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
 
 /**
  * mlme_get_roam_state() - Get roam state from vdev object

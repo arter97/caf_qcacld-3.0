@@ -2199,6 +2199,21 @@ enum roam_offload_state {
 	WLAN_MLO_ROAM_SYNCH_IN_PROG,
 };
 
+/**
+ * enum wlan_roam_policy - Represents the policies for roaming.
+ * @WLAN_ROAMING_NOT_ALLOWED: Roaming is not allowed/disabled.
+ * @WLAN_ROAMING_ALLOWED_WITHIN_ESS: Roaming is allowed with in an ESS with
+ * default RSSI thresholds.
+ * @WLAN_ROAMING_MODE_AGGRESSIVE: This mode is an extension of
+ * WLAN_ROAMING_MODE_AGGRESSIVE. The driver/firmware roams on higher RSSI
+ * thresholds when compared to WLAN_ROAMING_ALLOWED_WITHIN_ESS.
+ */
+enum wlan_roam_policy {
+	WLAN_ROAMING_NOT_ALLOWED,
+	WLAN_ROAMING_ALLOWED_WITHIN_ESS,
+	WLAN_ROAMING_MODE_AGGRESSIVE,
+};
+
 #define WLAN_ROAM_SCAN_CANDIDATE_AP 0
 #define WLAN_ROAM_SCAN_CURRENT_AP   1
 #define WLAN_ROAM_SCAN_ROAMED_AP    2

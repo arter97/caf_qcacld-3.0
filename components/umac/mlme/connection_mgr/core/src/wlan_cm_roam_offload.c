@@ -5791,6 +5791,8 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 	}
 
 	cm_roam_control_restore_default_config(pdev, vdev_id);
+	mlme_set_roam_policy(psoc, vdev_id, WLAN_ROAMING_NOT_ALLOWED);
+
 
 	/* Reset to non-aggressive mode */
 	src_config.bool_value = 0;

@@ -55,6 +55,27 @@ ucfg_clear_user_disabled_roaming(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id);
 
 /**
+ * ucfg_set_roam_policy() - Set roam policy
+ * @psoc:  Pointer to psoc
+ * @vdev_id: vdev id
+ * @roam_policy: Roam policy. refer enum wlan_roam_policy
+ *
+ * Return: void
+ */
+void ucfg_set_roam_policy(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			  enum wlan_roam_policy roam_policy);
+
+/**
+ * ucfg_get_roam_policy() - Get roam policy
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ *
+ * Return: current roam policy
+ */
+enum wlan_roam_policy ucfg_get_roam_policy(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
+
+/**
  * ucfg_is_rso_enabled() - Check if rso is enabled
  * @pdev: Pointer to pdev
  * @vdev_id: vdev id

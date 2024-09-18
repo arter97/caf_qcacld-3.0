@@ -19869,6 +19869,15 @@ static int __wlan_hdd_cfg80211_set_roam_policy(struct wiphy *wiphy,
 		return -EAGAIN;
 	}
 
+	if (roam_policy == ucfg_get_roam_policy(hdd_ctx->psoc,
+						adapter->deflink->vdev_id)) {
+		hdd_debug("New roam policy is already in use");
+		return ret;
+	}
+
+	ucfg_set_roam_policy(hdd_ctx->psoc, adapter->deflink->vdev_id,
+			     roam_policy);
+
 	switch (roam_policy) {
 	case QCA_ROAMING_NOT_ALLOWED:
 	case QCA_ROAMING_ALLOWED_WITHIN_ESS:
