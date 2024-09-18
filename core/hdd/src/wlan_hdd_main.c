@@ -10319,7 +10319,7 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 	 * Note to restart sap after SSR driver needs below information
 	 * and is not cleared/freed on purpose in case of SAP SSR
 	 */
-	if (!cds_is_driver_recovering()) {
+	if (!cds_is_driver_recovering() || cds_is_driver_unloading()) {
 		clear_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
 		qdf_mem_free(ap_ctx->beacon);
 		ap_ctx->beacon = NULL;
@@ -20671,7 +20671,7 @@ void hdd_component_psoc_close(struct wlan_objmgr_psoc *psoc)
 	ucfg_dlm_psoc_close(psoc);
 	ucfg_mlme_psoc_close(psoc);
 
-	if (!cds_is_driver_recovering())
+	if (!cds_is_driver_recovering() || cds_is_driver_unloading())
 		ucfg_crypto_flush_entries(psoc);
 }
 
