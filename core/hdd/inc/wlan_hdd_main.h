@@ -5582,4 +5582,29 @@ hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
  */
 bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
 			enum QDF_OPMODE mode);
+
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+/**
+ * wlan_hdd_is_link_switch_in_progress() - Function to check if there is any
+ * link switch in progress
+ * @link_info: Link info pointer in HDD adapter
+ *
+ * Return: true if link switch in progress, false otherwise
+ */
+bool wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info);
+#else
+static inline bool
+wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info)
+{
+	return false;
+}
+#endif
+
+/**
+ * wlan_hdd_is_mlo_connection() - Check if connection is legacy or mlo
+ * @link_info: Link info pointer in HDD adapter
+ *
+ * Return: True if MLO connection, else False
+ */
+bool wlan_hdd_is_mlo_connection(struct wlan_hdd_link_info *link_info);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

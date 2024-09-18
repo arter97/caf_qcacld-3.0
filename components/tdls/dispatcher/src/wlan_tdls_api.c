@@ -33,6 +33,21 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_sta.h"
 
+void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
+				      struct tdls_callbacks *cbs)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							WLAN_UMAC_COMP_TDLS);
+	if (!soc_obj) {
+		tdls_err("Failed to get tdls psoc component");
+		return;
+	}
+
+	soc_obj->tdls_cb.delete_all_tdls_peers = cbs->delete_all_tdls_peers;
+}
+
 static QDF_STATUS tdls_teardown_flush_cb(struct scheduler_msg *msg)
 {
 	struct tdls_link_teardown *tdls_teardown = msg->bodyptr;
@@ -551,4 +566,56 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 		   QDF_MAC_ADDR_REF(peer_addr), peer->discovery_attempt);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+}
+
+static
+struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
+				      const uint8_t *macaddr)
+{
+	return tdls_find_peer(vdev_obj, macaddr);
+}
+
+bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mac_addr)
+{
+	struct tdls_vdev_priv_obj *vdev_obj;
+	struct tdls_peer *curr_peer;
+
+	vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
+	if (!vdev_obj) {
+		tdls_err("vdev_obj: %pK is null", vdev_obj);
+		return false;
+	}
+
+	curr_peer = wlan_tdls_find_peer(vdev_obj, mac_addr->bytes);
+	if (!curr_peer) {
+		tdls_err("tdls peer is null");
+		return false;
+	}
+
+	if (curr_peer->valid_entry &&
+	    curr_peer->link_status ==  TDLS_LINK_CONNECTED)
+		return true;
+
+	return false;
+}
+
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct tdls_soc_priv_obj *soc_obj;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							WLAN_UMAC_COMP_TDLS);
+	if (!soc_obj) {
+		tdls_err("Failed to get tdls psoc component");
+		return;
+	}
+
+	if (soc_obj->tdls_cb.delete_all_tdls_peers)
+		soc_obj->tdls_cb.delete_all_tdls_peers(vdev);
 }

@@ -2928,6 +2928,9 @@ static void lim_update_sae_config(struct mac_context *mac,
 {
 	struct wlan_crypto_pmksa *pmksa;
 	struct qdf_mac_addr bssid;
+	struct bss_description *bss_desc;
+	struct action_oui_search_attr ap_attr = {0};
+	bool is_vendor_ap = false;
 
 	qdf_mem_copy(bssid.bytes, session->bssId,
 		     QDF_MAC_ADDR_SIZE);
@@ -2937,6 +2940,16 @@ static void lim_update_sae_config(struct mac_context *mac,
 
 	pmksa = wlan_crypto_get_pmksa(session->vdev, &bssid);
 	if (!pmksa)
+		return;
+
+	bss_desc = &session->lim_join_req->bssDescription;
+	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	ap_attr.ie_length =
+		wlan_get_ielen_from_bss_description(bss_desc);
+	is_vendor_ap = wlan_action_oui_search(mac->psoc,
+					      &ap_attr,
+					      ACTION_OUI_RESTRICT_MAX_MLO_LINKS);
+	if (is_vendor_ap)
 		return;
 
 	session->sae_pmk_cached = true;
@@ -4162,8 +4175,17 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 		     (uint16_t *)&req->assoc_ie.len, WLAN_ELEMID_RSNXE,
 		     ONE_BYTE, NULL, 0, rsnxe, WLAN_MAX_IE_LEN);
 
-	if (!rsnxe[0])
+	if (!rsnxe[SIR_MAC_IE_TYPE_OFFSET] || !rsnxe[SIR_MAC_IE_LEN_OFFSET])
 		goto end;
+
+	/*
+	 * Do not rebuild the RSNXE with length 1, if none of the caps are set
+	 * in the first octet. It leads to the creation of an empty RSNXE.
+	 */
+	if (!(rsnxe[2] & 0xF0)) {
+		pe_debug("None of the caps are set in 1st octet, strip RSNXE");
+		goto end;
+	}
 
 	switch (ap_rsnxe_len) {
 	case 0:
@@ -4221,11 +4243,23 @@ end:
 }
 
 void
-lim_update_connect_rsn_ie(struct pe_session *session,
+lim_update_connect_rsn_ie(struct mac_context *mac,
+			  struct pe_session *session,
 			  uint8_t *rsn_ie_buf, struct wlan_crypto_pmksa *pmksa)
 {
 	uint8_t *rsn_ie_end;
 	uint16_t rsn_ie_len = 0;
+	struct bss_description *bss_desc =
+					&session->lim_join_req->bssDescription;
+	struct action_oui_search_attr ap_attr = {0};
+
+	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	ap_attr.ie_length =
+		wlan_get_ielen_from_bss_description(bss_desc);
+	if (wlan_action_oui_search(mac->psoc,
+				   &ap_attr,
+				   ACTION_OUI_RESTRICT_MAX_MLO_LINKS))
+		pmksa = NULL;
 
 	rsn_ie_end = wlan_crypto_build_rsnie_with_pmksa(session->vdev,
 							rsn_ie_buf, pmksa);
@@ -4299,7 +4333,7 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	if (pmksa_peer)
 		pe_debug("PMKSA found");
 
-	lim_update_connect_rsn_ie(session, rsn_ie, pmksa_peer);
+	lim_update_connect_rsn_ie(mac_ctx, session, rsn_ie, pmksa_peer);
 	qdf_mem_free(rsn_ie);
 
 	/*
@@ -6457,6 +6491,7 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 	struct pe_session *pe_session = NULL;
 	uint8_t sessionId;
 	uint8_t smesessionId;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -6627,6 +6662,7 @@ sendDisassoc:
 	if (pe_session)
 		lim_send_sme_disassoc_ntf(mac,
 					  smeDisassocReq.peer_macaddr.bytes,
+					  (uint8_t *)mld_addr.bytes,
 					  retCode,
 					  disassocTrigger,
 					  1, smesessionId,
@@ -6634,6 +6670,7 @@ sendDisassoc:
 	else
 		lim_send_sme_disassoc_ntf(mac,
 					  smeDisassocReq.peer_macaddr.bytes,
+					  (uint8_t *)mld_addr.bytes,
 					  retCode, disassocTrigger, 1,
 					  smesessionId, NULL);
 
@@ -7331,6 +7368,7 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 	struct pe_session *session_entry = NULL;
 	uint8_t session_id;
 	tpSirAssocReq assoc_req;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	if (!msg_buf) {
 		pe_err("msg_buf is NULL");
@@ -7368,7 +7406,10 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 		 * send a DISASSOC_IND message to WSM to make sure
 		 * the state in WSM and LIM is the same
 		 */
-		lim_send_sme_disassoc_ntf(mac_ctx, assoc_cnf.peer_macaddr.bytes,
+		lim_send_sme_disassoc_ntf(
+				mac_ctx,
+				assoc_cnf.peer_macaddr.bytes,
+				(uint8_t *)mld_addr.bytes,
 				eSIR_SME_STA_NOT_ASSOCIATED,
 				eLIM_PEER_ENTITY_DISASSOC, assoc_cnf.aid,
 				session_entry->smeSessionId,
@@ -8878,6 +8919,7 @@ static void lim_process_sme_disassoc_req(struct mac_context *mac_ctx,
 	struct disassoc_req disassoc_req;
 	struct pe_session *session;
 	uint8_t session_id;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	qdf_mem_copy(&disassoc_req, msg->bodyptr, sizeof(struct disassoc_req));
 
@@ -8889,6 +8931,7 @@ static void lim_process_sme_disassoc_req(struct mac_context *mac_ctx,
 		       QDF_MAC_ADDR_REF(disassoc_req.bssid.bytes));
 		lim_send_sme_disassoc_ntf(mac_ctx,
 					  disassoc_req.peer_macaddr.bytes,
+					  mld_addr.bytes,
 					  eSIR_SME_INVALID_PARAMETERS,
 					  eLIM_HOST_DISASSOC, 1,
 					  disassoc_req.sessionId, NULL);

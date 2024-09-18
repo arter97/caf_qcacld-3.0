@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -144,8 +144,8 @@ QDF_STATUS tgt_tdls_register_ev_handler(struct wlan_objmgr_psoc *psoc)
 	tdls_ops = wlan_psoc_get_tdls_txops(psoc);
 	if (tdls_ops && tdls_ops->tdls_reg_ev_handler)
 		return tdls_ops->tdls_reg_ev_handler(psoc, NULL);
-	else
-		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS tgt_tdls_unregister_ev_handler(struct wlan_objmgr_psoc *psoc)

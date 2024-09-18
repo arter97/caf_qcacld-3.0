@@ -59,6 +59,7 @@
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_public_structs.h"
 #include "wlan_p2p_api.h"
+#include "wlan_tdls_api.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
@@ -1561,7 +1562,8 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	uint8_t extd_buff_size = 0;
 
 	if (mlo_is_any_link_disconnecting(session->vdev)) {
-		pe_err("Ignore ADDBA, vdev is in not in conncted state");
+		pe_err("Ignore ADDBA, vdev:%d is in not in conncted state",
+		       wlan_vdev_get_id(session->vdev));
 		return;
 	}
 
@@ -1578,7 +1580,6 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	/* Unpack ADDBA request frame */
 	status = dot11f_unpack_addba_req(mac_ctx, body_ptr, frame_len,
 					 addba_req, false);
-
 	if (DOT11F_FAILED(status)) {
 		pe_err("Failed to unpack and parse (0x%08x, %d bytes)",
 			status, frame_len);
@@ -1590,6 +1591,21 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 
 	sta_ds = dph_lookup_hash_entry(mac_ctx, mac_hdr->sa, &aid,
 				       &session->dph.dphHashTable);
+	/*
+	 * TDLS peer addba request for some TID could be received before
+	 * TDLS_CHANGE_STA is received from userspace in some scenario
+	 * for example when the DUT sends TDLS setup response directly
+	 * to an already discovered peer and peer sends the addba request
+	 * immediately for TID 0.
+	 */
+	if (sta_ds && sta_ds->staType == STA_ENTRY_TDLS_PEER &&
+	    !wlan_tdls_is_addba_request_allowed(session->vdev,
+						(struct qdf_mac_addr *)sta_ds->staAddr)) {
+		pe_err("vdev:%d Dropping TDLS peer addba req received before change_sta",
+		       wlan_vdev_get_id(session->vdev));
+		goto error;
+	}
+
 	if (sta_ds &&
 	    (lim_is_session_he_capable(session) ||
 	     sta_ds->staType == STA_ENTRY_TDLS_PEER))

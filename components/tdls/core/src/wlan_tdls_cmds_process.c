@@ -40,6 +40,7 @@
 #include "nan_ucfg_api.h"
 #include "wlan_mlme_main.h"
 #include "wlan_policy_mgr_i.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 static uint16_t tdls_get_connected_peer_count(struct tdls_soc_priv_obj *soc_obj)
 {
@@ -890,6 +891,12 @@ int tdls_validate_mgmt_request(struct tdls_action_frame_request *tdls_mgmt_req)
 		return -EAGAIN;
 	}
 
+	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
+		tdls_notice("vdev:%d Link Switch in progress. TDLS is not allowed",
+			    wlan_vdev_get_id(vdev));
+		return -EAGAIN;
+	}
+
 	/* other than teardown frame, mgmt frames are not sent if disabled */
 	if (TDLS_TEARDOWN != tdls_validate->action_code) {
 		if (!tdls_check_is_tdls_allowed(vdev)) {
@@ -897,6 +904,7 @@ int tdls_validate_mgmt_request(struct tdls_action_frame_request *tdls_mgmt_req)
 				tdls_validate->action_code);
 			return -EPERM;
 		}
+
 		/* if tdls_mode is disabled, then decline the peer's request */
 		if (TDLS_SUPPORT_DISABLED == tdls_soc->tdls_current_mode ||
 		    TDLS_SUPPORT_SUSPENDED == tdls_soc->tdls_current_mode) {
@@ -1029,6 +1037,12 @@ QDF_STATUS tdls_process_add_peer(struct tdls_add_peer_request *req)
 	vdev = req->vdev;
 	if (!tdls_check_is_tdls_allowed(vdev)) {
 		tdls_err("TDLS not allowed, reject add station for vdev: %d",
+			 wlan_vdev_get_id(vdev));
+		goto error;
+	}
+
+	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
+		tdls_err("Link Switch in progress, reject add sta for vdev: %d",
 			 wlan_vdev_get_id(vdev));
 		goto error;
 	}
@@ -2070,6 +2084,13 @@ QDF_STATUS tdls_process_setup_peer(struct tdls_oper_request *req)
 
 	if (!tdls_check_is_tdls_allowed(vdev)) {
 		tdls_err("TDLS not allowed on vdev:%d, Reject setup peer",
+			 wlan_vdev_get_id(vdev));
+		status = QDF_STATUS_E_INVAL;
+		goto error;
+	}
+
+	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
+		tdls_err("TDLS not allowed on vdev:%d, Link switch in progress",
 			 wlan_vdev_get_id(vdev));
 		status = QDF_STATUS_E_INVAL;
 		goto error;
