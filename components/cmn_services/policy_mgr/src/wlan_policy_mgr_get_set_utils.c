@@ -9209,7 +9209,7 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 
 void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id, uint8_t num_links,
-					 struct qdf_mac_addr active_link_addr[2])
+					 struct qdf_mac_addr *active_link_addr)
 {
 	uint8_t *link_mac_addr;
 	struct wlan_objmgr_vdev *vdev;

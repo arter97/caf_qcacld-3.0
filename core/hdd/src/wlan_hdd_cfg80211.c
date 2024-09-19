@@ -12648,7 +12648,7 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 	uint8_t i, num_links = 0;
 	uint16_t vdev_count = 0;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
-	struct qdf_mac_addr active_link_addr[2];
+	struct qdf_mac_addr active_link_addr[WLAN_MLO_MAX_VDEVS];
 
 	mlo_sta_get_vdev_list(adapter->deflink->vdev, &vdev_count,
 			      wlan_vdev_list);
@@ -13090,9 +13090,9 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 {
 	struct hdd_context *hdd_ctx = NULL;
 	struct nlattr *curr_attr;
-	struct qdf_mac_addr active_link_addr[2];
+	struct qdf_mac_addr active_link_addr[WLAN_MLO_MAX_VDEVS];
 	struct qdf_mac_addr *mac_addr_ptr;
-	uint32_t num_links = 0;
+	uint32_t num_links = 0, i = 0;
 	int32_t len;
 	struct hdd_adapter *adapter = link_info->adapter;
 
@@ -13102,6 +13102,12 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 
 	if (attr && adapter->device_mode == QDF_STA_MODE) {
 		nla_for_each_nested(curr_attr, &attr[0], len) {
+			if (++i > WLAN_MLO_MAX_VDEVS) {
+				hdd_err("No. of force active links %d exceeds allowed links",
+					i);
+				return -EINVAL;
+			}
+
 			mac_addr_ptr = &active_link_addr[num_links];
 			qdf_mem_copy(mac_addr_ptr, nla_data(curr_attr),
 				     ETH_ALEN);
