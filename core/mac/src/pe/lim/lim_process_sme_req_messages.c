@@ -6012,9 +6012,10 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	const struct bonded_channel_freq *bonded_freq_non_ext;
 	enum phy_ch_width ch_width_non_ext;
 	uint8_t expect_num;
-	bool use_sp_tpe = false, non_psd_channel = false;
+	bool conn_pwr_type_sp = false, non_psd_channel = false;
 	struct chan_power_info *chan_psd_power_info = NULL;
 	struct chan_power_info *chan_eirp_power_info = NULL;
+	bool addn_non_psd_set = false, addn_psd_set = false;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!vdev_mlme)
@@ -6026,6 +6027,8 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	}
 
 	vdev_mlme->reg_tpc_obj.num_pwr_levels = 0;
+	vdev_mlme->reg_tpc_obj.num_psd_pwr_levels = 0;
+	vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels = 0;
 	*has_tpe_updated = false;
 
 	wlan_reg_get_cur_6g_client_type(mac->pdev, &client_mobility_type);
@@ -6067,11 +6070,13 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 			   ADDITIONAL_REGULATORY_CLIENT_EIRP) {
 			addn_non_psd_index = i;
 			non_psd_set = true;
+			addn_non_psd_set = true;
 			reg_tpe_count++;
 		} else if (single_tpe.max_tx_pwr_interpret ==
 			   ADDITIONAL_REGULATORY_CLIENT_EIRP_PSD) {
 			addn_psd_index = i;
 			psd_set = true;
+			addn_psd_set = true;
 			reg_tpe_count++;
 		}
 	}
@@ -6105,24 +6110,28 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	}
 
 	if (ap_power_type_6g == REG_STANDARD_POWER_AP)
-		use_sp_tpe = true;
+		conn_pwr_type_sp = true;
 	else if (addn_non_psd_index && !non_psd_channel)
 		non_psd_set = false;
 
 	puncture_bit_map = lim_get_punc_chan_bit_map(session);
 
-	pe_debug("psd_set: %d, non_psd_set: %d, reg_count: %d, local_count: %d, use_sp_tpe: %d, freq: %d, seg0: %d, seg1: %d, bw_val: %d, puncture_bit_map: %d, Local: eirp: %d psd: %d, Regulatory: eirp: %d psd %d",
+	pe_debug("psd_set: %d, non_psd_set: %d, reg_count: %d, local_count: %d, conn_pwr_type_sp: %d, freq: %d, seg0: %d, seg1: %d, bw_val: %d, puncture_bit_map: %d, Local: eirp: %d psd: %d, Regulatory: eirp: %d psd %d, Addn Regulatory PSD %d eirp %d",
 		 psd_set, non_psd_set, reg_tpe_count, local_tpe_count,
-		 use_sp_tpe, session->curr_op_freq,
+		 conn_pwr_type_sp, session->curr_op_freq,
 		 session->ch_center_freq_seg0, session->ch_center_freq_seg1,
 		 bw_val, puncture_bit_map, local_eirp_set, local_psd_set,
-		 reg_eirp_set, reg_psd_set);
+		 reg_eirp_set, reg_psd_set, addn_psd_set, addn_non_psd_set);
+	pe_debug("psd_index: %u non_psd_index %u addn_non_psd_index %u addn_psd_index %u",
+		 psd_index, non_psd_index, addn_non_psd_index, addn_psd_index);
 
 	if (non_psd_set) {
-		if (use_sp_tpe)
+		if (conn_pwr_type_sp && addn_non_psd_set)
 			single_tpe = tpe_ies[addn_non_psd_index];
-		else
+		else if (local_eirp_set || reg_eirp_set)
 			single_tpe = tpe_ies[non_psd_index];
+		else
+			goto parse_punctured_psd_tpe;
 		if (single_tpe.max_tx_pwr_count >
 		    MAX_TX_PWR_COUNT_FOR_160MHZ) {
 			pe_debug("Invalid max tx pwr count: %d",
@@ -6130,6 +6139,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 			single_tpe.max_tx_pwr_count =
 				MAX_TX_PWR_COUNT_FOR_160MHZ;
 		}
+
 		expect_num = lim_get_num_pwr_levels(false, session->ch_width);
 		single_tpe.max_tx_pwr_count =
 			QDF_MIN(single_tpe.max_tx_pwr_count, expect_num - 1);
@@ -6172,7 +6182,8 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 			chan_eirp_power_info->chan_cfreq =
 						ch_params.mhz_freq_seg0;
 			vdev_mlme->reg_tpc_obj.tpe[i] = single_tpe.tx_power[i];
-			chan_eirp_power_info->tx_power = single_tpe.tx_power[i];
+			chan_eirp_power_info->tx_power =
+					single_tpe.tx_power[i];
 			if (ch_params.ch_width != CH_WIDTH_INVALID)
 				ch_params.ch_width =
 					get_next_higher_bw[ch_params.ch_width];
@@ -6190,12 +6201,14 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 							ext_power_updated;
 		}
 	}
-
+parse_punctured_psd_tpe:
 	if (psd_set && puncture_bit_map) {
-		if (use_sp_tpe)
+		if (conn_pwr_type_sp && addn_psd_set)
 			single_tpe = tpe_ies[addn_psd_index];
-		else
+		else if (local_psd_set || reg_psd_set)
 			single_tpe = tpe_ies[psd_index];
+		else
+			goto non_punctured_psd_update;
 		if (single_tpe.max_tx_pwr_count >
 		    MAX_TX_PWR_COUNT_FOR_160MHZ_PSD) {
 			pe_debug("Invalid max tx pwr count psd: %d",
@@ -6245,7 +6258,8 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 			chan_psd_power_info->chan_cfreq = curr_freq;
 			curr_freq += 20;
 			vdev_mlme->reg_tpc_obj.tpe[i] = single_tpe.tx_power[i];
-			chan_psd_power_info->tx_power = single_tpe.tx_power[i];
+			chan_psd_power_info->tx_power =
+					single_tpe.tx_power[i];
 		}
 
 		curr_freq = bonded_freq->start_freq;
@@ -6264,10 +6278,12 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 
 non_punctured_psd_update:
 	if (psd_set && !puncture_bit_map) {
-		if (use_sp_tpe)
+		if (conn_pwr_type_sp && addn_psd_set)
 			single_tpe = tpe_ies[addn_psd_index];
-		else
+		else if (local_psd_set || reg_psd_set)
 			single_tpe = tpe_ies[psd_index];
+		else
+			goto parse_eirp_tpe;
 		if (single_tpe.max_tx_pwr_count >
 		    MAX_TX_PWR_COUNT_FOR_160MHZ_PSD) {
 			pe_debug("Invalid max tx pwr count psd: %d",
@@ -6280,9 +6296,11 @@ non_punctured_psd_update:
 		vdev_mlme->reg_tpc_obj.is_psd_power = true;
 		num_octets =
 			lim_get_num_tpe_octets(single_tpe.max_tx_pwr_count);
+
 		num_octets = QDF_MIN(num_octets, expect_num);
 
 		vdev_mlme->reg_tpc_obj.num_pwr_levels = num_octets;
+		vdev_mlme->reg_tpc_obj.num_psd_pwr_levels = num_octets;
 
 		ch_params.ch_width = session->ch_width;
 		ch_params.mhz_freq_seg1 =
@@ -6328,7 +6346,7 @@ non_punctured_psd_update:
 				vdev_mlme->reg_tpc_obj.tpe[i] =
 							single_tpe.tx_power[0];
 				chan_psd_power_info->tx_power =
-							single_tpe.tx_power[0];
+						single_tpe.tx_power[0];
 			}
 		} else {
 			/*
@@ -6351,23 +6369,25 @@ non_punctured_psd_update:
 				vdev_mlme->reg_tpc_obj.tpe[i] =
 							single_tpe.tx_power[i];
 				chan_psd_power_info->tx_power =
-							single_tpe.tx_power[i];
+						single_tpe.tx_power[i];
 			}
 		}
-			ext_power_updated =
+		ext_power_updated =
 			lim_update_ext_tpe_power(mac, session, &single_tpe,
 						 curr_freq, has_tpe_updated,
 						 num_octets, NULL, true);
-			vdev_mlme->reg_tpc_obj.num_pwr_levels =
-							ext_power_updated;
+		vdev_mlme->reg_tpc_obj.num_pwr_levels = ext_power_updated;
+		vdev_mlme->reg_tpc_obj.num_psd_pwr_levels = ext_power_updated;
 	}
 
-
+parse_eirp_tpe:
 	if (non_psd_set) {
-		if (use_sp_tpe)
+		if (conn_pwr_type_sp && addn_non_psd_set)
 			single_tpe = tpe_ies[addn_non_psd_index];
-		else
+		else if (local_eirp_set || reg_eirp_set)
 			single_tpe = tpe_ies[non_psd_index];
+		else
+			goto parse_both_tpe_present;
 		vdev_mlme->reg_tpc_obj.eirp_power =
 			single_tpe.tx_power[single_tpe.max_tx_pwr_count];
 		/*
@@ -6385,6 +6405,7 @@ non_punctured_psd_update:
 			vdev_mlme->reg_tpc_obj.is_psd_power = false;
 	}
 
+parse_both_tpe_present:
 	if (both_tpe_present) {
 		if (local_eirp_set && reg_eirp_set) {
 			local_tpe = tpe_ies[local_eirp_idx];
