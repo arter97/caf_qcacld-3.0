@@ -745,7 +745,8 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 				bool initiator, const uint8_t *buf,
 				size_t len, int link_id)
 
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)) || \
+	defined(CFG80211_TDLS_MGMT_LINK_AWARE)
 static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 				struct net_device *dev,
 				const u8 *peer, int link_id,
@@ -785,7 +786,8 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	bool tdls_support;
 #if !defined(TDLS_MGMT_VERSION5) && \
-	(LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0))
+	(LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && \
+	!defined(CFG80211_TDLS_MGMT_LINK_AWARE)
 	int link_id = -1;
 #endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 15, 0))
@@ -894,7 +896,8 @@ int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 					u32 peer_capability, bool initiator,
 					const u8 *buf, size_t len, int link_id)
 
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)) || \
+	defined(CFG80211_TDLS_MGMT_LINK_AWARE)
 int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 					struct net_device *dev,
 					const u8 *peer, int link_id,
@@ -945,7 +948,8 @@ int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 					      dialog_token, status_code,
 					      peer_capability, initiator,
 					      buf, len, link_id);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)) || \
+	defined(CFG80211_TDLS_MGMT_LINK_AWARE)
 	errno = __wlan_hdd_cfg80211_tdls_mgmt(wiphy, dev, peer, link_id,
 					      action_code, dialog_token,
 					      status_code, peer_capability,
