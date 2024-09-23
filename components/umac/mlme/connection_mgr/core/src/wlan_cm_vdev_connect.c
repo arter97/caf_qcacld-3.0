@@ -1678,6 +1678,8 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 		} else {
 			mlo_debug("MLO: send keys for vdev_id %d link_id %d , key_idx %d, pairwise %d",
 				  vdev_id, link_id, i, pairwise);
+			if (pairwise)
+				mlo_defer_set_keys(vdev, link_id, false);
 		}
 		key_present = true;
 	}
@@ -1685,7 +1687,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 err:
 	wlan_crypto_release_lock();
 
-	if (!key_present && mlo_mgr_is_link_switch_in_progress(vdev)) {
+	if (!key_present) {
 		mlme_err("No key found for link_id %d", link_id);
 		mlo_disconnect(vdev, CM_OSIF_DISCONNECT,
 			       REASON_KEY_FAIL_TO_INSTALL, NULL);

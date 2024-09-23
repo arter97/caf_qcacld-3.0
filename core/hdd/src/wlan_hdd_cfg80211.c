@@ -26671,6 +26671,11 @@ done:
 	if (wlan_hdd_mlo_defer_set_keys(adapter, vdev, &mac_address))
 		return 0;
 
+	if (((wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) ||
+	     (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_CLIENT_MODE)) &&
+	    !pairwise && mlo_is_set_key_defered(vdev, link_id))
+		return 0;
+
 	cipher_cap = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_CIPHER_CAP);
 	if (errno)
 		return errno;
