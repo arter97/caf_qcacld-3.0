@@ -802,6 +802,7 @@ struct wlan_mlme_cfg_sap {
  * @enable_sap_dfs_puncture: Enable sap dfs puncture
  * @sap_tx_leakage_threshold: sap tx leakage threshold
  * @dfs_pri_multiplier: dfs_pri_multiplier for handle missing pulses
+ * @dfs_discard_mode: Modes for which DFS channels need to discard
  */
 struct wlan_mlme_dfs_cfg {
 	bool dfs_master_capable;
@@ -814,6 +815,7 @@ struct wlan_mlme_dfs_cfg {
 	bool enable_sap_dfs_puncture;
 	uint32_t sap_tx_leakage_threshold;
 	uint32_t dfs_pri_multiplier;
+	uint8_t dfs_discard_mode;
 };
 
 /**
