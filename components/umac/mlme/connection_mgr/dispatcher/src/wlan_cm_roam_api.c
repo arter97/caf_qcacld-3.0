@@ -3434,8 +3434,7 @@ cm_roam_stats_print_trigger_info(struct wlan_objmgr_psoc *psoc,
 	/* Update roam trigger info to userspace */
 	cm_roam_trigger_info_event(data, scan_data, vdev_id, is_full_scan);
 
-	mlme_nofl_info("%s [ROAM_TRIGGER]: VDEV[%d] %s",
-		       time, vdev_id, buf);
+	mlme_rl_nofl_info("%s [ROAM_TRIGGER]: VDEV[%d] %s", time, vdev_id, buf);
 	qdf_mem_free(buf);
 
 	status = wlan_cm_update_roam_states(psoc, vdev_id, data->trigger_reason,
@@ -3463,10 +3462,10 @@ cm_roam_stats_print_btm_rsp_info(struct wmi_roam_trigger_info *trigger_info,
 	char time[TIME_STRING_LEN];
 
 	mlme_get_converted_timestamp(data->timestamp, time);
-	mlme_nofl_info("%s [BTM RSP]:VDEV[%d], Status:%d, VSIE reason:%d, BSSID: "
-		       QDF_MAC_ADDR_FMT, time, vdev_id, data->btm_status,
-		       data->vsie_reason,
-		       QDF_MAC_ADDR_REF(data->target_bssid.bytes));
+	mlme_rl_nofl_info("%s [BTM RSP]:VDEV[%d], Status:%d, VSIE reason:%d, BSSID: "
+			  QDF_MAC_ADDR_FMT, time, vdev_id, data->btm_status,
+			  data->vsie_reason,
+			  QDF_MAC_ADDR_REF(data->target_bssid.bytes));
 	cm_roam_btm_resp_event(trigger_info, data, vdev_id, is_wtc);
 }
 
@@ -3484,9 +3483,9 @@ static void
 cm_roam_stats_print_roam_initial_info(struct roam_initial_data *data,
 				      uint8_t vdev_id)
 {
-	mlme_nofl_info("[ROAM INIT INFO]: VDEV[%d], roam_full_scan_count: %d, rssi_th: %d, cu_th: %d, fw_cancel_timer_bitmap: %d",
-		       vdev_id, data->roam_full_scan_count, data->rssi_th,
-		       data->cu_th, data->fw_cancel_timer_bitmap);
+	mlme_rl_nofl_info("[ROAM INIT INFO]: VDEV[%d], roam_full_scan_count: %d, rssi_th: %d, cu_th: %d, fw_cancel_timer_bitmap: %d",
+			  vdev_id, data->roam_full_scan_count, data->rssi_th,
+			  data->cu_th, data->fw_cancel_timer_bitmap);
 }
 
 /**
@@ -3537,9 +3536,9 @@ static void cm_roam_stats_process_roam_msg_info(struct wlan_objmgr_psoc *psoc,
 	if (data->msg_id == WMI_ROAM_MSG_RSSI_RECOVERED ||
 	    data->msg_id == WMI_ROAM_MSG_CONNECTED_IN_POOR_RSSI) {
 		mlme_get_converted_timestamp(data->timestamp, time);
-		mlme_nofl_info("%s [ROAM MSG INFO]: VDEV[%d] %s, Current rssi: %d dbm, next_rssi_threshold: %d dbm",
-			       time, vdev_id, msg_id1_str, data->msg_param1,
-			       data->msg_param2);
+		mlme_rl_nofl_info("%s [ROAM MSG INFO]: VDEV[%d] %s, Current rssi: %d dbm, next_rssi_threshold: %d dbm",
+				  time, vdev_id, msg_id1_str, data->msg_param1,
+				  data->msg_param2);
 		cm_roam_update_next_rssi_threshold(psoc, data->msg_param2,
 						   vdev_id);
 	}
@@ -3563,12 +3562,12 @@ cm_stats_log_roam_scan_candidates(struct wmi_roam_candidate_info *ap,
 	char time[TIME_STRING_LEN], time2[TIME_STRING_LEN];
 
 
-	mlme_nofl_info("%62s%62s", LINE_STR, LINE_STR);
-	mlme_nofl_info("%13s %16s %8s %4s %4s %5s/%3s %3s/%3s %7s %7s %6s %12s %20s",
-		       "AP BSSID", "TSTAMP", "CH", "TY", "ETP", "RSSI",
-		       "SCR", "CU%", "SCR", "TOT_SCR", "BL_RSN", "BL_SRC",
-		       "BL_TSTAMP", "BL_TIMEOUT(ms)");
-	mlme_nofl_info("%62s%62s", LINE_STR, LINE_STR);
+	mlme_rl_nofl_info("%62s%62s", LINE_STR, LINE_STR);
+	mlme_rl_nofl_info("%13s %16s %8s %4s %4s %5s/%3s %3s/%3s %7s %7s %6s %12s %20s",
+			  "AP BSSID", "TSTAMP", "CH", "TY", "ETP", "RSSI",
+			  "SCR", "CU%", "SCR", "TOT_SCR", "BL_RSN", "BL_SRC",
+			  "BL_TSTAMP", "BL_TIMEOUT(ms)");
+	mlme_rl_nofl_info("%62s%62s", LINE_STR, LINE_STR);
 
 	if (num_entries > MAX_ROAM_CANDIDATE_AP)
 		num_entries = MAX_ROAM_CANDIDATE_AP;
@@ -3576,14 +3575,14 @@ cm_stats_log_roam_scan_candidates(struct wmi_roam_candidate_info *ap,
 	for (i = 0; i < num_entries; i++) {
 		mlme_get_converted_timestamp(ap->timestamp, time);
 		mlme_get_converted_timestamp(ap->dl_timestamp, time2);
-		mlme_nofl_info(QDF_MAC_ADDR_FMT " %17s %4d %-4s %4d %3d/%-4d %2d/%-4d %5d %7d %7d %17s %9d",
-			       QDF_MAC_ADDR_REF(ap->bssid.bytes), time,
-			  ap->freq,
-			  ((ap->type == 0) ? "C_AP" :
-			  ((ap->type == 2) ? "R_AP" : "P_AP")),
-			  ap->etp, ap->rssi, ap->rssi_score, ap->cu_load,
-			  ap->cu_score, ap->total_score, ap->dl_reason,
-			  ap->dl_source, time2, ap->dl_original_timeout);
+		mlme_rl_nofl_info(QDF_MAC_ADDR_FMT " %17s %4d %-4s %4d %3d/%-4d %2d/%-4d %5d %7d %7d %17s %9d",
+				  QDF_MAC_ADDR_REF(ap->bssid.bytes), time,
+			ap->freq,
+			((ap->type == 0) ? "C_AP" :
+			((ap->type == 2) ? "R_AP" : "P_AP")),
+			ap->etp, ap->rssi, ap->rssi_score, ap->cu_load,
+			ap->cu_score, ap->total_score, ap->dl_reason,
+			ap->dl_source, time2, ap->dl_original_timeout);
 		/* Update roam candidates info to userspace */
 		cm_roam_candidate_info_event(ap, i);
 		ap++;
@@ -3678,9 +3677,9 @@ cm_roam_stats_print_scan_info(struct wlan_objmgr_psoc *psoc,
 			    scan->next_rssi_threshold);
 
 	mlme_get_converted_timestamp(timestamp, time);
-	mlme_nofl_info("%s [ROAM_SCAN]: VDEV[%d] Scan_type: %s %s %s",
-		       time, vdev_id, cm_get_roam_scan_type_str(scan->type),
-		       buf1, buf);
+	mlme_rl_nofl_info("%s [ROAM_SCAN]: VDEV[%d] Scan_type: %s %s %s",
+			  time, vdev_id, cm_get_roam_scan_type_str(scan->type),
+			  buf1, buf);
 	cm_stats_log_roam_scan_candidates(scan->ap, scan->num_ap);
 
 	qdf_mem_free(buf);
@@ -3724,12 +3723,12 @@ cm_roam_stats_print_roam_result(struct wlan_objmgr_psoc *psoc,
 	mlme_get_converted_timestamp(res->timestamp, time);
 
 	if (res->fail_reason == ROAM_FAIL_REASON_CURR_AP_STILL_OK)
-		mlme_nofl_info("%s [ROAM_RESULT]: VDEV[%d] %s",
-			       time, vdev_id, buf);
+		mlme_rl_nofl_info("%s [ROAM_RESULT]: VDEV[%d] %s",
+				  time, vdev_id, buf);
 	else
-		mlme_nofl_info("%s [ROAM_RESULT]: VDEV[%d] %s %s",
-			       time, vdev_id,
-			       mlme_get_roam_status_str(res->status), buf);
+		mlme_rl_nofl_info("%s [ROAM_RESULT]: VDEV[%d] %s %s",
+				  time, vdev_id,
+				  mlme_get_roam_status_str(res->status), buf);
 	qdf_mem_free(buf);
 
 	status = wlan_cm_update_roam_states(psoc, vdev_id, res->fail_reason,
@@ -3790,9 +3789,9 @@ cm_roam_stats_print_11kv_info(struct wlan_objmgr_psoc *psoc,
 	}
 
 	mlme_get_converted_timestamp(neigh_rpt->req_time, time);
-	mlme_nofl_info("%s [%s] VDEV[%d]", time,
-		       (type == WLAN_ROAM_11KV_REQ_TYPE_BTM) ?
-		       "BTM_QUERY" : "NEIGH_RPT_REQ", vdev_id);
+	mlme_rl_nofl_info("%s [%s] VDEV[%d]", time,
+			  (type == WLAN_ROAM_11KV_REQ_TYPE_BTM) ?
+			  "BTM_QUERY" : "NEIGH_RPT_REQ", vdev_id);
 
 	if (type == WLAN_ROAM_11KV_REQ_TYPE_BTM)
 		cm_roam_btm_query_event(neigh_rpt, vdev_id);
@@ -3811,19 +3810,18 @@ cm_roam_stats_print_11kv_info(struct wlan_objmgr_psoc *psoc,
 
 	if (neigh_rpt->resp_time) {
 		mlme_get_converted_timestamp(neigh_rpt->resp_time, time1);
-		mlme_nofl_info("%s [%s] VDEV[%d] %s", time1,
-			       (type == WLAN_ROAM_11KV_REQ_TYPE_BTM) ?
-			       "BTM_REQ" : "NEIGH_RPT_RSP",
-			       vdev_id,
-			       (num_ch > 0) ? buf : "NO Ch update");
+		mlme_rl_nofl_info("%s [%s] VDEV[%d] %s", time1,
+				  (type == WLAN_ROAM_11KV_REQ_TYPE_BTM) ?
+				  "BTM_REQ" : "NEIGH_RPT_RSP", vdev_id,
+				  (num_ch > 0) ? buf : "NO Ch update");
 
 		if (type == WLAN_ROAM_11KV_REQ_TYPE_NEIGH_RPT)
 			cm_roam_neigh_rpt_resp_event(neigh_rpt, vdev_id);
 
 	} else {
-		mlme_nofl_info("%s No response received from AP",
-			       (type == WLAN_ROAM_11KV_REQ_TYPE_BTM) ?
-			       "BTM" : "NEIGH_RPT");
+		mlme_rl_nofl_info("%s No response received from AP",
+				  (type == WLAN_ROAM_11KV_REQ_TYPE_BTM) ?
+				  "BTM" : "NEIGH_RPT");
 	}
 out:
 	qdf_mem_free(buf);
@@ -3894,15 +3892,14 @@ cm_roam_print_frame_info(struct wlan_objmgr_psoc *psoc,
 
 		/* Log the auth & reassoc frames here to driver log */
 		if (frame_info->type != ROAM_FRAME_INFO_FRAME_TYPE_EXT)
-			mlme_nofl_info("%s [%s%s] VDEV[%d] bssid: " QDF_MAC_ADDR_FMT " status:%d seq_num:%d",
-				       time,
-				       cm_get_frame_subtype_str(frame_info->subtype),
-				       frame_info->subtype ==  MGMT_SUBTYPE_AUTH ?
-				       (frame_info->is_rsp ? " RX" : " TX") : "",
-				       vdev_id,
-				       QDF_MAC_ADDR_REF(frame_info->bssid.bytes),
-				       frame_info->status_code,
-				       frame_info->seq_num);
+			mlme_rl_nofl_info("%s [%s%s] VDEV[%d] bssid: " QDF_MAC_ADDR_FMT " status:%d seq_num:%d",
+				time,
+				cm_get_frame_subtype_str(frame_info->subtype),
+				frame_info->subtype ==  MGMT_SUBTYPE_AUTH ?
+				(frame_info->is_rsp ? " RX" : " TX") : "",
+				vdev_id,
+				QDF_MAC_ADDR_REF(frame_info->bssid.bytes),
+				frame_info->status_code, frame_info->seq_num);
 
 		cm_roam_mgmt_frame_event(vdev, frame_info, scan_data, result);
 	}
@@ -3917,7 +3914,7 @@ void cm_report_roam_rt_stats(struct wlan_objmgr_psoc *psoc,
 	struct roam_stats_event *roam_event = NULL;
 
 	if (!wlan_cm_get_roam_rt_stats(psoc, ROAM_RT_STATS_ENABLE)) {
-		mlme_debug("Roam events stats is disabled");
+		mlme_rl_debug("Roam events stats is disabled");
 		return;
 	}
 
