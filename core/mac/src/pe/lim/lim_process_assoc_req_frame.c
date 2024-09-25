@@ -1075,41 +1075,45 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 					   assoc_req->rsn.length,
 					   &dot11f_ie_rsn, false);
 		if (!DOT11F_SUCCEEDED(ret)) {
-			pe_err("Invalid RSN IE");
-			lim_send_assoc_rsp_mgmt_frame(
-				mac_ctx, STATUS_INVALID_IE, 1,
-				sa, sub_type, 0, session, false);
-			return false;
-		}
+			pe_err("Invalid RSN IE 0x%x", ret);
 
-		/* Check if the RSN version is supported */
-		if (SIR_MAC_OUI_VERSION_1 == dot11f_ie_rsn.version) {
-			/* check the groupwise and pairwise cipher suites */
-			status = lim_check_rsn_ie(session, mac_ctx, assoc_req,
-						  pmf_connection);
-			if (status != STATUS_SUCCESS) {
-				pe_warn("Re/Assoc rejected from: "
-					QDF_MAC_ADDR_FMT,
+			if (ret & DOT11F_BAD_FIXED_VALUE) {
+				pe_err("Re/Assoc rejected from: " QDF_MAC_ADDR_FMT,
 					QDF_MAC_ADDR_REF(sa));
-
-				lim_send_assoc_rsp_mgmt_frame(
-					mac_ctx, status, 1, sa, sub_type,
-					0, session, false);
-				return false;
+				/*
+				 * rcvd Assoc req frame with RSN IE but
+				 * IE version is wrong
+				 */
+				lim_send_assoc_rsp_mgmt_frame(mac_ctx,
+							      STATUS_UNSUPPORTED_RSN_IE_VERSION,
+							      1, sa, sub_type,
+							      0, session,
+							      false);
+			} else {
+				lim_send_assoc_rsp_mgmt_frame(mac_ctx,
+							      STATUS_INVALID_IE,
+							      1, sa, sub_type,
+							      0, session,
+							      false);
 			}
-		} else {
-			pe_warn("Re/Assoc rejected from: " QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(sa));
-			/*
-			 * rcvd Assoc req frame with RSN IE but
-			 * IE version is wrong
-			 */
-			lim_send_assoc_rsp_mgmt_frame(
-				mac_ctx,
-				STATUS_UNSUPPORTED_RSN_IE_VERSION,
-				1, sa, sub_type, 0, session, false);
 			return false;
 		}
+
+		/* check the groupwise and pairwise cipher suites */
+		status = lim_check_rsn_ie(session, mac_ctx, assoc_req,
+					  pmf_connection);
+		if (status != STATUS_SUCCESS) {
+			pe_warn("Re/Assoc rejected from: "
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(sa));
+
+			lim_send_assoc_rsp_mgmt_frame(mac_ctx,
+						      status, 1,
+						      sa, sub_type,
+						      0, session, false);
+			return false;
+		}
+
 		*akm_type = lim_translate_rsn_oui_to_akm_type(
 						    dot11f_ie_rsn.akm_suite[0]);
 
