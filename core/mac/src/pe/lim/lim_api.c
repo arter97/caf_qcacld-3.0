@@ -4223,67 +4223,85 @@ lim_validate_probe_rsp_link_info(struct pe_session *session_entry,
 }
 
 static void
-lim_clear_ml_partner_info(struct pe_session *session_entry)
+lim_clear_ml_partner_info(struct pe_session *session_entry, int8_t idx)
 {
-	uint8_t idx;
+	uint8_t start_idx, end_idx;
 	struct mlo_partner_info *partner_info = NULL;
 
-	if (!session_entry || !session_entry->lim_join_req)
+	if (!session_entry->lim_join_req)
 		return;
 
 	partner_info = &session_entry->lim_join_req->partner_info;
-	if (!partner_info) {
-		pe_err("Partner link info not present");
-		return;
+	if (idx == -1) {
+		start_idx = 0;
+		end_idx = partner_info->num_partner_links;
+		partner_info->num_partner_links = 0;
+	} else {
+		start_idx = idx;
+		end_idx = QDF_MIN(partner_info->num_partner_links, idx + 1);
 	}
-	pe_debug_rl("Clear Partner Link/s information");
-	for (idx = 0; idx < partner_info->num_partner_links; idx++) {
+
+	for (idx = start_idx; idx < end_idx; idx++) {
+		if (partner_info->partner_link_info[idx].link_id ==
+		    WLAN_INVALID_LINK_ID)
+			continue;
+
 		mlo_mgr_clear_ap_link_info(session_entry->vdev,
 			partner_info->partner_link_info[idx].link_addr.bytes);
-
-		partner_info->partner_link_info[idx].link_id = 0;
-		qdf_zero_macaddr(
-			&partner_info->partner_link_info[idx].link_addr);
+		qdf_mem_zero(&partner_info->partner_link_info[idx],
+			     sizeof(struct mlo_link_info));
+		partner_info->partner_link_info[idx].link_id =
+						WLAN_INVALID_LINK_ID;
 	}
-	partner_info->num_partner_links = 0;
+}
+
+static void lim_remove_invalid_partner_links(struct pe_session *session_entry)
+{
+	uint8_t valid_links = 0, idx;
+	struct mlo_partner_info *partner_info;
+
+	partner_info = &session_entry->lim_join_req->partner_info;
+	if (!partner_info->num_partner_links)
+		return;
+
+	for (idx = 0; idx < partner_info->num_partner_links; idx++) {
+		if (partner_info->partner_link_info[idx].link_id ==
+		    WLAN_INVALID_LINK_ID)
+			continue;
+
+		if (valid_links < idx) {
+			qdf_mem_copy(&partner_info->partner_link_info[valid_links],
+				     &partner_info->partner_link_info[idx],
+				     sizeof(struct mlo_link_info));
+			qdf_mem_zero(&partner_info->partner_link_info[idx],
+				     sizeof(struct mlo_link_info));
+			partner_info->partner_link_info[idx].link_id =
+							WLAN_INVALID_LINK_ID;
+		}
+		valid_links++;
+	}
+
+	if (partner_info->num_partner_links != valid_links)
+		pe_debug("Updated partner links %d", valid_links);
+
+	partner_info->num_partner_links = valid_links;
 }
 
 static QDF_STATUS
 lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 					    struct mac_context *mac_ctx)
 {
-	struct join_req *lim_join_req;
-	struct wlan_objmgr_pdev *pdev;
 	struct mlo_partner_info *partner_info;
 	struct mlo_link_info *link_info;
 	uint8_t i;
 	QDF_STATUS status;
 
-	if (!session_entry) {
-		pe_err("session entry is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	if (!mac_ctx) {
-		pe_err("mac context is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	lim_join_req = session_entry->lim_join_req;
-	if (!lim_join_req) {
-		pe_err("join req is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	pdev = mac_ctx->pdev;
-	if (!pdev) {
-		pe_err("pdev is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	partner_info = &lim_join_req->partner_info;
+	partner_info = &session_entry->lim_join_req->partner_info;
 	for (i = 0; i < partner_info->num_partner_links; i++) {
 		link_info = &partner_info->partner_link_info[i];
+		if (link_info->link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
 		status = lim_update_mlo_mgr_info(mac_ctx,
 						 session_entry->vdev,
 						 &link_info->link_addr,
@@ -4293,9 +4311,11 @@ lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
 			pe_err("failed %d to update mlo_mgr link id %d freq %d",
 			       status, link_info->link_id,
 			       link_info->chan_freq);
-			return QDF_STATUS_E_FAILURE;
+			lim_clear_ml_partner_info(session_entry, i);
 		}
 	}
+
+	lim_remove_invalid_partner_links(session_entry);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4337,8 +4357,8 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	if (channel.ch_width == CH_WIDTH_20MHZ)
 		channel.ch_cfreq1 = channel.ch_freq;
 
-	mlo_mgr_update_ap_channel_info(vdev, link_id, (uint8_t *)link_addr,
-				       channel);
+	mlo_mgr_update_ap_link_info(vdev, link_id, (uint8_t *)link_addr,
+				    channel);
 
 	/**
 	 * Reject all the partner link if any partner link  doesn’t pass the
@@ -4361,7 +4381,7 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 }
 #else
 static inline void
-lim_clear_ml_partner_info(struct pe_session *session_entry)
+lim_clear_ml_partner_info(struct pe_session *session_entry, int8_t idx)
 {
 }
 
@@ -4559,7 +4579,7 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 	struct scan_filter *filter;
 	qdf_list_t *scan_list = NULL;
 	struct wlan_objmgr_pdev *pdev;
-	uint8_t idx, num_partner_found = 0;
+	uint8_t idx, num_partner_found = 0, filter_idx = 0;
 	struct mlo_link_info *link_info;
 	struct scan_cache_entry *cur_entry;
 	struct scan_cache_node *link_node;
@@ -4569,17 +4589,23 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
+	partner_info = &session->lim_join_req->partner_info;
+	if (!partner_info->num_partner_links)
+		return QDF_STATUS_SUCCESS;
+
 	pdev =  wlan_vdev_get_pdev(session->vdev);
 	if (!pdev) {
 		pe_err("PDEV NULL");
-		return QDF_STATUS_E_NULL_VALUE;
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto end;
 	}
 
 	cur_entry =
 		wlan_cm_get_curr_candidate_entry(session->vdev, session->cm_id);
 	if (!cur_entry) {
 		pe_err("Current candidate NULL");
-		return QDF_STATUS_E_NULL_VALUE;
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto end;
 	}
 
 	filter = qdf_mem_malloc(sizeof(*filter));
@@ -4587,8 +4613,6 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 		status = QDF_STATUS_E_NOMEM;
 		goto mem_free;
 	}
-
-	partner_info = &session->lim_join_req->partner_info;
 
 	bssid_list = qdf_mem_malloc(partner_info->num_partner_links *
 				    sizeof(struct qdf_mac_addr));
@@ -4600,18 +4624,26 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 
 	for (idx = 0; idx < partner_info->num_partner_links; idx++) {
 		link_info = &partner_info->partner_link_info[idx];
-		qdf_copy_macaddr(&filter->bssid_list[idx],
+		if (link_info->link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		qdf_copy_macaddr(&filter->bssid_list[filter_idx],
 				 &link_info->link_addr);
 		filter->num_of_bssid++;
 
-		filter->chan_freq_list[idx] = link_info->chan_freq;
+		filter->chan_freq_list[filter_idx] = link_info->chan_freq;
 		filter->num_of_channels++;
 		pe_debug("Filter BSSID: " QDF_MAC_ADDR_FMT ", freq: %d",
-			 QDF_MAC_ADDR_REF(filter->bssid_list[idx].bytes),
-			 filter->chan_freq_list[idx]);
+			 QDF_MAC_ADDR_REF(filter->bssid_list[filter_idx].bytes),
+			 filter->chan_freq_list[filter_idx]);
 
-		qdf_copy_macaddr(&bssid_list[idx], &link_info->link_addr);
+		qdf_copy_macaddr(&bssid_list[filter_idx],
+				 &link_info->link_addr);
+		filter_idx++;
 	}
+
+	if (!filter->num_of_bssid)
+		goto mem_free;
 
 	wlan_vdev_get_bss_peer_mld_mac(session->vdev, &mld_addr);
 	filter->match_mld_addr = true;
@@ -4634,12 +4666,11 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 	}
 
 	/*
-	 * If no.of. scan entries fetched is less than no.of partner links
-	 * then fail as common AKM is not determined atleast one link.
+	 * If no scan entries fetched then clear all entries as common AKM
+	 * is not determined for any link.
 	 */
-	if (qdf_list_size(scan_list) < partner_info->num_partner_links) {
-		pe_debug("Can't find all the partner link entries, found %d",
-			 qdf_list_size(scan_list));
+	if (!qdf_list_size(scan_list)) {
+		pe_debug("No partner entries found");
 		status = QDF_STATUS_E_INVAL;
 		goto mem_free;
 	}
@@ -4654,8 +4685,23 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 			 QDF_MAC_ADDR_REF(link_node->entry->bssid.bytes),
 			 link_node->entry->channel.chan_freq);
 
+		if (wlan_scan_entries_contain_cmn_akm(cur_entry,
+						      link_node->entry))
+			goto next_node;
+
 		for (idx = 0; idx < partner_info->num_partner_links; idx++) {
-			if (num_partner_found == partner_info->num_partner_links)
+			link_info = &partner_info->partner_link_info[idx];
+			if (link_info->link_id == WLAN_INVALID_LINK_ID)
+				continue;
+
+			if (qdf_is_macaddr_equal(&link_info->link_addr,
+						 &link_node->entry->bssid))
+				lim_clear_ml_partner_info(session, idx);
+		}
+
+next_node:
+		for (idx = 0; idx < filter->num_of_bssid; idx++) {
+			if (num_partner_found == filter->num_of_bssid)
 				break;
 
 			if (qdf_is_macaddr_equal(&bssid_list[idx],
@@ -4665,24 +4711,33 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 			}
 		}
 
-		if (!wlan_scan_entries_contain_cmn_akm(cur_entry,
-						       link_node->entry)) {
-			status = QDF_STATUS_E_FAILURE;
-			break;
-		}
-
 		cur_node = next_node;
 		next_node = NULL;
 	}
+
+	if (num_partner_found == filter->num_of_bssid)
+		goto mem_free;
 
 	/*
 	 * If no.of unique entries not equal to total partner links, then
 	 * AKM of atleast one partner link is not determined.
 	 */
-	if (num_partner_found != partner_info->num_partner_links) {
-		pe_err("Unique entries found (%d), actual partner links (%d)",
-		       num_partner_found, partner_info->num_partner_links);
-		status = QDF_STATUS_E_INVAL;
+	pe_debug("Unique entries found (%d), actual partner links (%d)",
+		 num_partner_found, filter->num_of_bssid);
+
+	for (filter_idx = 0; filter_idx < filter->num_of_bssid; filter_idx++) {
+		if (qdf_is_macaddr_zero(&bssid_list[filter_idx]))
+			continue;
+
+		for (idx = 0; idx < partner_info->num_partner_links; idx++) {
+			link_info = &partner_info->partner_link_info[idx];
+			if (link_info->link_id == WLAN_INVALID_LINK_ID)
+				continue;
+
+			if (qdf_is_macaddr_equal(&link_info->link_addr,
+						 &bssid_list[filter_idx]))
+				lim_clear_ml_partner_info(session, idx);
+		}
 	}
 
 mem_free:
@@ -4691,6 +4746,11 @@ mem_free:
 	if (scan_list)
 		wlan_scan_purge_results(scan_list);
 	util_scan_free_cache_entry(cur_entry);
+end:
+	/* Clear all entries incase of failure */
+	if (QDF_IS_STATUS_ERROR(status))
+		lim_clear_ml_partner_info(session, -1);
+
 	return status;
 }
 
@@ -4736,14 +4796,8 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 		status = lim_validate_probe_rsp_link_info(session_entry,
 							  probe_rsp,
 							  probe_rsp_len);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			if(QDF_IS_STATUS_ERROR(
-				lim_check_scan_db_for_join_req_partner_info(
-						session_entry,
-						mac_ctx)))
-				lim_clear_ml_partner_info(session_entry);
-			return status;
-		}
+		if (QDF_IS_STATUS_ERROR(status))
+			goto end;
 
 		/*
 		 * When an MLO probe response is received from a link,
@@ -4762,12 +4816,8 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 
 		link_probe_rsp.ptr = qdf_mem_malloc(gen_frame_len);
 		if (!link_probe_rsp.ptr) {
-			if(QDF_IS_STATUS_ERROR(
-				lim_check_scan_db_for_join_req_partner_info(
-					session_entry,
-					mac_ctx)))
-				lim_clear_ml_partner_info(session_entry);
-			return QDF_STATUS_E_NOMEM;
+			status = QDF_STATUS_E_NOMEM;
+			goto end;
 		}
 
 		link_probe_rsp.len = gen_frame_len;
@@ -4797,13 +4847,8 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 			if (QDF_IS_STATUS_ERROR(status)) {
 				pe_err("MLO: Link %d probe resp gen failed %d",
 				       req_link_id, status);
-				status =
-				   lim_check_scan_db_for_join_req_partner_info(
-							session_entry, mac_ctx);
-				if (QDF_IS_STATUS_ERROR(status))
-				       lim_clear_ml_partner_info(session_entry);
-
-				goto end;
+				lim_clear_ml_partner_info(session_entry, idx);
+				continue;
 			}
 
 			link_info = &partner_info->partner_link_info[idx];
@@ -4826,16 +4871,10 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 							&chan, &op_class);
 			if (!chan) {
 				pe_err("Invalid link id %d link mac: " QDF_MAC_ADDR_FMT,
-				  link_info->link_id,
-				  QDF_MAC_ADDR_REF(link_info->link_addr.bytes));
-				status =
-				   lim_check_scan_db_for_join_req_partner_info(
-					session_entry, mac_ctx);
-				if (QDF_IS_STATUS_ERROR(status))
-				       lim_clear_ml_partner_info(session_entry);
-
-				status = QDF_STATUS_E_FAILURE;
-				goto end;
+				       link_info->link_id,
+				       QDF_MAC_ADDR_REF(link_info->link_addr.bytes));
+				lim_clear_ml_partner_info(session_entry, idx);
+				continue;
 			}
 
 			chan_freq =
@@ -4856,51 +4895,30 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 						   chan_freq, rssi, 0, 0);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				pe_err("failed to add bcn probe %d", status);
-				status =
-				   lim_check_scan_db_for_join_req_partner_info(
-					session_entry, mac_ctx);
-				if (QDF_IS_STATUS_ERROR(status))
-				       lim_clear_ml_partner_info(session_entry);
-
-				goto end;
+				lim_clear_ml_partner_info(session_entry, idx);
+				continue;
 			}
 
-			status = lim_update_mlo_mgr_info(mac_ctx,
-							 session_entry->vdev,
-							 &link_info->link_addr,
-							 link_info->link_id,
-							 link_info->chan_freq);
-			if (QDF_IS_STATUS_ERROR(status)) {
-				pe_err("failed to update mlo_mgr %d", status);
-				lim_clear_ml_partner_info(session_entry);
-
-				goto end;
-			}
+			link_info->chan_freq = chan_freq;
 		}
 		/*
-		 * If the partner link's AKM not matching current candidate
-		 * remove the partner links for this association.
+		 * Remove partner links which dont have common AKM or for which
+		 * common AKM is not determined.
 		 */
-		status = lim_check_partner_link_for_cmn_akm(session_entry);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_debug("Non overlapping partner link AKM, status(%d)",
-				 status);
-			lim_clear_ml_partner_info(session_entry);
-			goto end;
-		}
+		lim_check_partner_link_for_cmn_akm(session_entry);
+
+end:
+		lim_check_scan_db_for_join_req_partner_info(session_entry,
+							    mac_ctx);
 	} else if (session_entry->lim_join_req->is_ml_probe_req_sent &&
 		   !rcvd_probe_resp->mlo_ie.mlo_ie_present) {
-		status =
-			lim_check_scan_db_for_join_req_partner_info(
-						session_entry, mac_ctx);
-		if (QDF_IS_STATUS_ERROR(status))
-			lim_clear_ml_partner_info(session_entry);
-
+		lim_check_scan_db_for_join_req_partner_info(session_entry,
+							    mac_ctx);
 		return QDF_STATUS_E_FAILURE;
 	} else {
 		return status;
 	}
-end:
+
 	if (link_probe_rsp.ptr)
 		qdf_mem_free(link_probe_rsp.ptr);
 	link_probe_rsp.ptr = NULL;
