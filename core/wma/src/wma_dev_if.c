@@ -1169,13 +1169,10 @@ static void wma_dcs_clear_vdev_starting(struct mac_context *mac_ctx,
 static void wma_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 			     uint32_t mac_id, uint8_t vdev_id)
 {
-	/* Send DCS command only for low latency sap*/
-	if (policy_mgr_is_vdev_ll_sap(psoc, vdev_id)) {
-		if (target_if_vdev_level_dcs_is_supported(psoc))
-			ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
-		else
-			ucfg_wlan_dcs_cmd(psoc, mac_id, true);
-	}
+	if (target_if_vdev_level_dcs_is_supported(psoc))
+		ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
+	else
+		ucfg_wlan_dcs_cmd(psoc, mac_id, true);
 }
 #else
 static void wma_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
