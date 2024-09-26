@@ -168,4 +168,12 @@ void hdd_update_regdb_offload_config(struct hdd_context *hdd_ctx);
 void hdd_remove_vlp_depriority_channels(struct wlan_objmgr_pdev *pdev,
 					uint16_t *ch_freq_list,
 					uint32_t *num_channels);
+
+/*
+ * hdd_convert_wlan_phy_to_reg_phy() - Convert wlan_phymode to reg_phymode
+ * @wlan_phy: wlan_phymode
+ *
+ * Return: reg_phymode
+ */
+enum reg_phymode hdd_convert_wlan_phy_to_reg_phy(enum wlan_phymode wlan_phy);
 #endif

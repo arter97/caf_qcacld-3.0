@@ -1673,6 +1673,37 @@ hdd_country_change_bw_check(struct wlan_hdd_link_info *link_info,
 }
 #endif
 
+static bool
+hdd_is_phy_mode_changed(struct wlan_objmgr_psoc *psoc,
+			struct hdd_station_ctx *sta_ctx,
+			enum reg_phymode new_max_phy)
+{
+	enum wlan_phymode wlan_phy;
+	enum reg_phymode reg_phy;
+	QDF_STATUS status;
+
+	if (sta_ctx->reg_phymode == new_max_phy)
+		return false;
+
+	sta_ctx->reg_phymode = new_max_phy;
+
+	/* New regulatory domain supports all the dot11 modes */
+	if (new_max_phy == REG_PHYMODE_MAX)
+		return false;
+
+	status = ucfg_mlme_get_peer_phymode(psoc,
+					    (uint8_t *)&sta_ctx->conn_info.bssid,
+					    &wlan_phy);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
+
+	reg_phy = hdd_convert_wlan_phy_to_reg_phy(wlan_phy);
+	if (reg_phy <= new_max_phy)
+		return false;
+
+	return true;
+}
+
 /**
  * hdd_country_change_update_sta() - handle country code change for STA
  * @hdd_ctx: Global HDD context
@@ -1690,7 +1721,6 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	uint32_t new_phy_mode;
 	bool freq_changed, phy_changed, width_changed;
 	qdf_freq_t oper_freq;
-	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_STA;
 	struct wlan_hdd_link_info *link_info;
 	enum qca_wlan_vendor_phy_mode vendor_phy_mode =
@@ -1702,6 +1732,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 					   dbgid) {
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			width_changed = false;
+			phy_changed = false;
 			oper_freq = hdd_get_link_info_home_channel(link_info);
 			if (oper_freq)
 				freq_changed = wlan_reg_is_disable_for_pwrmode(
@@ -1727,10 +1758,6 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 				new_phy_mode = wlan_reg_get_max_phymode(pdev,
 								REG_PHYMODE_MAX,
 								oper_freq);
-				csr_phy_mode =
-					csr_convert_from_reg_phy_mode(new_phy_mode);
-				phy_changed =
-					(sta_ctx->reg_phymode != csr_phy_mode);
 
 				width_changed =
 					hdd_country_change_bw_check(link_info,
@@ -1741,6 +1768,11 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 							      vendor_phy_mode);
 					continue;
 				}
+
+				if (hdd_is_phy_mode_changed(hdd_ctx->psoc,
+							    sta_ctx,
+							    new_phy_mode))
+					phy_changed = true;
 
 				if (phy_changed || freq_changed ||
 				    width_changed) {
@@ -1753,7 +1785,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 							false);
 					hdd_set_vdev_phy_mode(adapter,
 							      vendor_phy_mode);
-					sta_ctx->reg_phymode = csr_phy_mode;
+					sta_ctx->reg_phymode = new_phy_mode;
 				} else {
 					hdd_debug("Remain on current channel but update tx power");
 					wlan_reg_update_tx_power_on_ctry_change(
@@ -2221,3 +2253,107 @@ void hdd_remove_vlp_depriority_channels(struct wlan_objmgr_pdev *pdev,
 	*num_channels = num_chan_temp;
 }
 
+#ifdef WLAN_FEATURE_11BE
+enum reg_phymode hdd_convert_wlan_phy_to_reg_phy(enum wlan_phymode wlan_phy)
+{
+	switch (wlan_phy) {
+	case WLAN_PHYMODE_AUTO:
+		return REG_PHYMODE_MAX;
+	case WLAN_PHYMODE_11A:
+		return REG_PHYMODE_11A;
+	case WLAN_PHYMODE_11B:
+		return REG_PHYMODE_11B;
+	case WLAN_PHYMODE_11G:
+	case WLAN_PHYMODE_11G_ONLY:
+		return REG_PHYMODE_11G;
+	case WLAN_PHYMODE_11NA_HT20:
+	case WLAN_PHYMODE_11NG_HT20:
+	case WLAN_PHYMODE_11NA_HT40:
+	case WLAN_PHYMODE_11NG_HT40PLUS:
+	case WLAN_PHYMODE_11NG_HT40MINUS:
+	case WLAN_PHYMODE_11NG_HT40:
+		return REG_PHYMODE_11N;
+	case WLAN_PHYMODE_11AC_VHT20:
+	case WLAN_PHYMODE_11AC_VHT20_2G:
+	case WLAN_PHYMODE_11AC_VHT40:
+	case WLAN_PHYMODE_11AC_VHT40PLUS_2G:
+	case WLAN_PHYMODE_11AC_VHT40MINUS_2G:
+	case WLAN_PHYMODE_11AC_VHT40_2G:
+	case WLAN_PHYMODE_11AC_VHT80:
+	case WLAN_PHYMODE_11AC_VHT80_2G:
+	case WLAN_PHYMODE_11AC_VHT160:
+	case WLAN_PHYMODE_11AC_VHT80_80:
+		return REG_PHYMODE_11AC;
+	case WLAN_PHYMODE_11AXA_HE20:
+	case WLAN_PHYMODE_11AXG_HE20:
+	case WLAN_PHYMODE_11AXA_HE40:
+	case WLAN_PHYMODE_11AXG_HE40PLUS:
+	case WLAN_PHYMODE_11AXG_HE40MINUS:
+	case WLAN_PHYMODE_11AXG_HE40:
+	case WLAN_PHYMODE_11AXA_HE80:
+	case WLAN_PHYMODE_11AXG_HE80:
+	case WLAN_PHYMODE_11AXA_HE160:
+	case WLAN_PHYMODE_11AXA_HE80_80:
+		return REG_PHYMODE_11AX;
+	case WLAN_PHYMODE_11BEA_EHT20:
+	case WLAN_PHYMODE_11BEG_EHT20:
+	case WLAN_PHYMODE_11BEA_EHT40:
+	case WLAN_PHYMODE_11BEG_EHT40PLUS:
+	case WLAN_PHYMODE_11BEG_EHT40MINUS:
+	case WLAN_PHYMODE_11BEG_EHT40:
+	case WLAN_PHYMODE_11BEA_EHT80:
+	case WLAN_PHYMODE_11BEG_EHT80:
+	case WLAN_PHYMODE_11BEA_EHT160:
+	case WLAN_PHYMODE_11BEA_EHT320:
+		return REG_PHYMODE_11BE;
+	default:
+		return REG_PHYMODE_MAX;
+	}
+}
+#else
+enum reg_phymode hdd_convert_wlan_phy_to_reg_phy(enum wlan_phymode wlan_phy)
+{
+	switch (wlan_phy) {
+	case WLAN_PHYMODE_AUTO:
+		return REG_PHYMODE_MAX;
+	case WLAN_PHYMODE_11A:
+		return REG_PHYMODE_11A;
+	case WLAN_PHYMODE_11B:
+		return REG_PHYMODE_11B;
+	case WLAN_PHYMODE_11G:
+	case WLAN_PHYMODE_11G_ONLY:
+		return REG_PHYMODE_11G;
+	case WLAN_PHYMODE_11NA_HT20:
+	case WLAN_PHYMODE_11NG_HT20:
+	case WLAN_PHYMODE_11NA_HT40:
+	case WLAN_PHYMODE_11NG_HT40PLUS:
+	case WLAN_PHYMODE_11NG_HT40MINUS:
+	case WLAN_PHYMODE_11NG_HT40:
+		return REG_PHYMODE_11N;
+	case WLAN_PHYMODE_11AC_VHT20:
+	case WLAN_PHYMODE_11AC_VHT20_2G:
+	case WLAN_PHYMODE_11AC_VHT40:
+	case WLAN_PHYMODE_11AC_VHT40PLUS_2G:
+	case WLAN_PHYMODE_11AC_VHT40MINUS_2G:
+	case WLAN_PHYMODE_11AC_VHT40_2G:
+	case WLAN_PHYMODE_11AC_VHT80:
+	case WLAN_PHYMODE_11AC_VHT80_2G:
+	case WLAN_PHYMODE_11AC_VHT160:
+	case WLAN_PHYMODE_11AC_VHT80_80:
+		return REG_PHYMODE_11AC;
+	case WLAN_PHYMODE_11AXA_HE20:
+	case WLAN_PHYMODE_11AXG_HE20:
+	case WLAN_PHYMODE_11AXA_HE40:
+	case WLAN_PHYMODE_11AXG_HE40PLUS:
+	case WLAN_PHYMODE_11AXG_HE40MINUS:
+	case WLAN_PHYMODE_11AXG_HE40:
+	case WLAN_PHYMODE_11AXA_HE80:
+	case WLAN_PHYMODE_11AXG_HE80:
+	case WLAN_PHYMODE_11AXA_HE160:
+	case WLAN_PHYMODE_11AXA_HE80_80:
+		return REG_PHYMODE_11AX;
+	default:
+		return REG_PHYMODE_MAX;
+	}
+}
+#endif

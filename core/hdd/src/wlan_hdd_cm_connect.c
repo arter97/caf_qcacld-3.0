@@ -1351,7 +1351,6 @@ static void hdd_cm_save_connect_info(struct wlan_hdd_link_info *link_info,
 	struct s_ext_cap *p_ext_cap = NULL;
 	struct hdd_adapter *adapter = link_info->adapter;
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
-	uint32_t phymode;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	bcn_ie = qdf_mem_malloc(sizeof(*bcn_ie));
@@ -1365,11 +1364,9 @@ static void hdd_cm_save_connect_info(struct wlan_hdd_link_info *link_info,
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	}
 
-	phymode = wlan_reg_get_max_phymode(adapter->hdd_ctx->pdev,
-					   REG_PHYMODE_MAX,
-					   rsp->freq);
-
-	sta_ctx->reg_phymode = csr_convert_from_reg_phy_mode(phymode);
+	sta_ctx->reg_phymode = wlan_reg_get_max_phymode(adapter->hdd_ctx->pdev,
+							REG_PHYMODE_MAX,
+							rsp->freq);
 
 	sta_ctx->conn_info.assoc_status_code = rsp->status_code;
 
