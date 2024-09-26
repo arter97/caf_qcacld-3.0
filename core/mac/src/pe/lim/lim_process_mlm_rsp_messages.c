@@ -3073,6 +3073,62 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 #endif
 
 /**
+ * lim_process_bcn_tpe_and_set_tpc() - Process tpe ie in beacon and calculate
+ * tpc and send to FW
+ * @mac_ctx - A pointer to Global MAC structure
+ * @pe_session - session related information.
+ *
+ * Return: None.
+ */
+static void
+lim_process_bcn_tpe_and_set_tpc(struct mac_context *mac_ctx,
+				struct pe_session *session_entry)
+{
+	struct pe_session *sap_session;
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
+	struct vdev_mlme_obj *mlme_obj;
+	struct bss_description *bss;
+	bool tpe_change = false;
+
+	sap_session = lim_get_concurrent_session(mac_ctx,
+						 session_entry->vdev_id,
+						 session_entry->opmode);
+
+	/*
+	 * STA LPI + SAP VLP is supported. For this, STA should move to
+	 * VLP power.
+	 * If there is a concurrent SAP operating on VLP in the same channel,
+	 * then do not update the TPC if the connecting AP is in LPI.
+	 */
+	if (sap_session &&
+	    lim_is_power_change_required_for_sta(mac_ctx, session_entry,
+						 sap_session))
+		lim_update_tx_power(mac_ctx, sap_session, session_entry,
+				    false);
+
+	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc) &&
+	    !session_entry->sta_follows_sap_power) {
+		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
+
+		bss = &session_entry->lim_join_req->bssDescription;
+		lim_process_tpe_ie_from_beacon(mac_ctx, session_entry, bss,
+					       &tpe_change);
+
+		mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session_entry->vdev);
+		if (!mlme_obj) {
+			pe_err("vdev component object is NULL");
+			return;
+		}
+
+		lim_calculate_tpc(mac_ctx, session_entry);
+
+		if (tx_ops->set_tpc_power)
+			tx_ops->set_tpc_power(mac_ctx->psoc,
+					      session_entry->vdev_id,
+					      &mlme_obj->reg_tpc_obj);
+	}
+}
+/**
  * lim_process_switch_channel_join_req() -Initiates probe request
  *
  * @mac_ctx - A pointer to Global MAC structure
@@ -3092,11 +3148,7 @@ static void lim_process_switch_channel_join_req(
 	tLimMlmJoinCnf join_cnf;
 	uint8_t nontx_bss_id = 0;
 	struct bss_description *bss;
-	struct vdev_mlme_obj *mlme_obj;
-	struct wlan_lmac_if_reg_tx_ops *tx_ops;
-	bool tpe_change = false;
 	QDF_STATUS mlo_status;
-	struct pe_session *sap_session;
 
 	if (status != QDF_STATUS_SUCCESS) {
 		pe_err("Change channel failed!!");
@@ -3137,10 +3189,13 @@ static void lim_process_switch_channel_join_req(
 			mlo_status = lim_process_switch_channel_join_mlo(session_entry,
 									 mac_ctx);
 
-		if (mlo_status == QDF_STATUS_E_INVAL)
+		if (mlo_status == QDF_STATUS_E_INVAL) {
 			goto error;
-		else
+		} else {
+			lim_process_bcn_tpe_and_set_tpc(mac_ctx,
+							session_entry);
 			return;
+		}
 	}
 	/*
 	* If deauth_before_connection is enabled, Send Deauth first to AP if
@@ -3228,40 +3283,8 @@ static void lim_process_switch_channel_join_req(
 		goto error;
 	}
 
-	sap_session =
-		lim_get_concurrent_session(mac_ctx, session_entry->vdev_id,
-					   session_entry->opmode);
+	lim_process_bcn_tpe_and_set_tpc(mac_ctx, session_entry);
 
-	/*
-	 * STA LPI + SAP VLP is supported. For this, STA should move to
-	 * VLP power.
-	 * If there is a concurrent SAP operating on VLP in the same channel,
-	 * then do not update the TPC if the connecting AP is in LPI.
-	 */
-	if (sap_session &&
-	    lim_is_power_change_required_for_sta(mac_ctx, session_entry, sap_session))
-		lim_update_tx_power(mac_ctx, sap_session, session_entry, false);
-
-	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc) &&
-	    !session_entry->sta_follows_sap_power) {
-		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
-
-		lim_process_tpe_ie_from_beacon(mac_ctx, session_entry, bss,
-					       &tpe_change);
-
-		mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session_entry->vdev);
-		if (!mlme_obj) {
-			pe_err("vdev component object is NULL");
-			goto error;
-		}
-
-		lim_calculate_tpc(mac_ctx, session_entry);
-
-		if (tx_ops->set_tpc_power)
-			tx_ops->set_tpc_power(mac_ctx->psoc,
-					      session_entry->vdev_id,
-					      &mlme_obj->reg_tpc_obj);
-	}
 	/* include additional IE if there is */
 	lim_send_probe_req_mgmt_frame(mac_ctx, &ssId,
 		session_entry->pLimMlmJoinReq->bssDescription.bssId,
