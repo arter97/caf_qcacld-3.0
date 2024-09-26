@@ -2081,4 +2081,22 @@ mlme_set_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
 			     struct qdf_mac_addr *mac_addr);
+
+/**
+ * mlme_set_p2p_device_seq_num() - set sequence number for p2p device frame
+ * @vdev: pointer to vdev
+ * @seq_num: sequence number to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_set_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev, uint16_t seq_num);
+
+/**
+ * mlme_get_p2p_device_seq_num() - get p2p device sequence number
+ * @vdev: pointer to vdev
+ *
+ * Return: sequence number
+ */
+uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev);
 #endif

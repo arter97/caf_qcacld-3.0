@@ -592,7 +592,7 @@ static void p2p_set_ht_caps(struct tx_action_context *tx_ctx,
 
 /**
  * p2p_get_next_seq_num() - get next sequence number to fill mac header
- * @peer:   PEER object
+ * @seq_num: Buffer to carry current sequence number and update new one
  * @tx_ctx: tx context
  * @ta : transmitter address
  *
@@ -600,12 +600,12 @@ static void p2p_set_ht_caps(struct tx_action_context *tx_ctx,
  *
  * Return: Next sequence number of the peer
  */
-static uint16_t p2p_get_next_seq_num(struct wlan_objmgr_peer *peer,
+static uint16_t p2p_get_next_seq_num(uint16_t *seq_num,
 				     struct tx_action_context *tx_ctx,
 				     uint8_t *ta)
 {
 	uint16_t random_num, random_num_bitmask = 0x03FF;
-	uint16_t seq_num, seq_num_bitmask = 0x0FFF;
+	uint16_t new_seq_num = 0, seq_num_bitmask = 0x0FFF;
 	struct p2p_vdev_priv_obj *p2p_vdev_obj;
 	struct wlan_objmgr_vdev *vdev;
 	bool is_new_random_ta;
@@ -637,20 +637,19 @@ static uint16_t p2p_get_next_seq_num(struct wlan_objmgr_peer *peer,
 
 		qdf_get_random_bytes(&random_num, sizeof(random_num));
 		random_num &= random_num_bitmask;
-		seq_num = (peer->peer_mlme.seq_num + random_num) &
-			  seq_num_bitmask;
-		peer->peer_mlme.seq_num = seq_num;
+		new_seq_num = (*seq_num + random_num) & seq_num_bitmask;
 
 		qdf_mem_copy(p2p_vdev_obj->prev_action_frame_addr2, ta,
 			     QDF_MAC_ADDR_SIZE);
 
 	} else {
-		seq_num = wlan_peer_mlme_get_next_seq_num(peer);
+		new_seq_num = wlan_peer_mlme_get_next_seq_num(seq_num);
 	}
+	*seq_num = new_seq_num;
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 
-	return seq_num;
+	return new_seq_num;
 }
 
 /**
@@ -669,7 +668,7 @@ static QDF_STATUS p2p_populate_mac_header(
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_psoc *psoc;
 	void *mac_addr;
-	uint16_t seq_num;
+	uint16_t seq_num = WLAN_MAX_SEQ_NUM, seq_num_cur;
 	uint8_t pdev_id;
 	struct wlan_objmgr_vdev *vdev;
 	enum QDF_OPMODE opmode;
@@ -709,15 +708,25 @@ static QDF_STATUS p2p_populate_mac_header(
 							    mac_addr,
 							    WLAN_P2P_ID);
 			}
+			if (tx_ctx->opmode == QDF_P2P_DEVICE_MODE &&
+			    p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
+				seq_num_cur = mlme_get_p2p_device_seq_num(vdev);
+				seq_num = p2p_get_next_seq_num(&seq_num_cur,
+							       tx_ctx,
+							       wh->i_addr2);
+				mlme_set_p2p_device_seq_num(vdev, seq_num_cur);
+			}
 
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 		}
 	}
-	if (!peer) {
+	if (!peer && seq_num == WLAN_MAX_SEQ_NUM) {
 		p2p_err("no valid peer");
 		return QDF_STATUS_E_INVAL;
 	}
-	seq_num = (uint16_t)p2p_get_next_seq_num(peer, tx_ctx, wh->i_addr2);
+	if (peer)
+		seq_num = p2p_get_next_seq_num(&peer->peer_mlme.seq_num, tx_ctx,
+					       wh->i_addr2);
 	seq_ctl = (struct wlan_seq_ctl *)(tx_ctx->buf +
 			WLAN_SEQ_CTL_OFFSET);
 	seq_ctl->seq_num_lo = (seq_num & WLAN_LOW_SEQ_NUM_MASK);
@@ -725,7 +734,8 @@ static QDF_STATUS p2p_populate_mac_header(
 				WLAN_HIGH_SEQ_NUM_OFFSET);
 	p2p_debug("seq num: %d", seq_num);
 
-	wlan_objmgr_peer_release_ref(peer, WLAN_P2P_ID);
+	if (peer)
+		wlan_objmgr_peer_release_ref(peer, WLAN_P2P_ID);
 
 	return QDF_STATUS_SUCCESS;
 }
