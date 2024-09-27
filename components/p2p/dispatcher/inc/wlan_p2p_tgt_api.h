@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,6 +35,9 @@ struct p2p_lo_event;
 struct mgmt_rx_event_params;
 enum mgmt_frame_type;
 struct p2p_set_mac_filter_evt;
+#ifdef FEATURE_WLAN_SUPPORT_USD
+struct p2p_usd_attr_params;
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 
 #ifdef FEATURE_P2P_LISTEN_OFFLOAD
 
@@ -83,6 +87,26 @@ static inline QDF_STATUS tgt_p2p_unregister_lo_ev_handler(
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * tgt_p2p_register_ap_assist_bmiss_ev_handler() - Register AP assist DFS group
+ * bmiss event handler
+ * @psoc: PSOC object manager
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+tgt_p2p_register_ap_assist_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * tgt_p2p_unregister_ap_assist_bmiss_ev_handler() - Unregister AP assist DFS
+ * group bmiss event handler
+ * @psoc: PSOC object manager
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+tgt_p2p_unregister_ap_assist_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc);
 
 /**
  * tgt_p2p_register_macaddr_rx_filter_evt_handler() - register add mac rx
@@ -206,4 +230,30 @@ tgt_p2p_add_mac_addr_status_event_cb(
 	struct wlan_objmgr_psoc *psoc,
 	struct p2p_set_mac_filter_evt *event_info);
 
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * tgt_p2p_send_usd_params() - Sent USD parameters to target
+ * @psoc: pointer to PSOC object
+ * @param: pointer to USD attributes parameters structure
+ *
+ * Return: QDF status
+ */
+QDF_STATUS tgt_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+				   struct p2p_usd_attr_params *param);
+#endif /* FEATURE_WLAN_SUPPORT_USD */
+
+/**
+ * tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler() - Function to handle the
+ * bmiss indication from FW.
+ * @psoc: PSOC object manager
+ * @vdev_id: VDEV ID of p2p entity on which bmiss event is received
+ *
+ * Schedules task to scheduler thread for the bmiss indication received for
+ * the AP assisted DFS group.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
+					     uint8_t vdev_id);
 #endif /* _WLAN_P2P_TGT_API_H_ */

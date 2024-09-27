@@ -832,9 +832,10 @@ uint8_t g_wlan_driver_version[] = QWLAN_VERSIONSTR TIMER_MANAGER_STR MEMORY_DEBU
 #endif
 
 int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
-				       qdf_freq_t chan_freq,
+				       qdf_freq_t chan_freq, uint32_t ccfs1,
 				       enum phy_ch_width chan_bw)
 {
+	int ret = 0;
 	struct ch_params ch_params = {0};
 	struct hdd_context *hdd_ctx;
 
@@ -857,6 +858,7 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 	ch_params.ch_width = CH_WIDTH_MAX;
+	ch_params.mhz_freq_seg1 = ccfs1;
 	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev, chan_freq,
 						0, &ch_params,
 						REG_CURRENT_PWR_MODE);
@@ -865,10 +867,11 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
-		if (chan_bw >= CH_WIDTH_80MHZ) {
+		if (chan_bw != CH_WIDTH_MAX && chan_bw >= CH_WIDTH_80MHZ) {
 			hdd_err("BW %d not possible in 2.4GHz band", chan_bw);
 			return -EINVAL;
 		}
+
 		if ((chan_bw != CH_WIDTH_20MHZ) &&
 		    (chan_freq == wlan_reg_ch_to_freq(CHAN_ENUM_2484)) &&
 		    (chan_bw != CH_WIDTH_MAX) &&
@@ -888,7 +891,42 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 		}
 	}
 
-	return 0;
+	if (adapter->device_mode == QDF_P2P_GO_MODE &&
+	    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, chan_freq)) {
+		bool is_go_dfs_owner = false, is_valid_ap_assist = false;
+		struct wlan_objmgr_vdev *vdev;
+		qdf_freq_t vdev_freq = 0, ap_freq = 0;
+		uint8_t opclass = 0, ap_chan = 0;
+
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_ID);
+		if (!vdev)
+			return -EINVAL;
+
+		vdev_freq = wlan_get_operation_chan_freq(vdev);
+		ucfg_p2p_get_ap_assist_dfs_params(vdev, &is_go_dfs_owner,
+						  &is_valid_ap_assist,
+						  NULL, &opclass, &ap_chan);
+		if (!wlan_reg_is_6ghz_op_class(hdd_ctx->pdev, opclass))
+			ap_freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
+							       ap_chan);
+
+		/* If it is not valid AP assist, it means it has started on
+		 * different channel which is not DFS.
+		 */
+		if (is_go_dfs_owner || !is_valid_ap_assist)
+			goto vdev_ref;
+
+		if (ap_freq != vdev_freq || ap_freq != chan_freq) {
+			hdd_debug("Assist AP freq %d, vdev freq %d, new_freq %d",
+				  ap_freq, vdev_freq, chan_freq);
+			ret = -EINVAL;
+		}
+vdev_ref:
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	}
+
+	return ret;
 }
 
 uint32_t hdd_get_link_info_home_channel(struct wlan_hdd_link_info *link_info)
@@ -2984,6 +3022,14 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 		goto pdev_close;
 	}
 
+	status = ucfg_reg_get_band(hdd_ctx->pdev, &temp_band_cap);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get REG band capability");
+		ret = qdf_status_to_os_return(status);
+		goto pdev_close;
+	}
+
+	band_capability &= temp_band_cap;
 	band_capability =
 		hdd_update_band_cap_from_dot11mode(hdd_ctx, band_capability);
 
@@ -5189,6 +5235,9 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		if (pld_is_ipa_offload_disabled(qdf_dev->dev))
 			ucfg_ipa_set_pld_enable(false);
 
+		if (pld_is_ipa_shared_smmu_enable(qdf_dev->dev))
+			ucfg_ipa_set_shared_smmu_enable(true);
+
 		ucfg_ipa_component_config_update(hdd_ctx->psoc);
 
 		hdd_update_cds_ac_specs_params(hdd_ctx);
@@ -5578,15 +5627,15 @@ static int __hdd_open(struct net_device *dev)
 	if (!test_bit(SME_SESSION_OPENED, &link_info->link_flags)) {
 		ret = hdd_start_adapter(adapter, true);
 		if (ret) {
-			hdd_err("Failed to start adapter :%d",
-				adapter->device_mode);
+			hdd_err("Vdev %d Failed to start adapter :%d",
+				link_info->vdev_id, adapter->device_mode);
 			return ret;
 		}
 	}
 
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 	if (hdd_cm_is_vdev_associated(link_info)) {
-		hdd_debug("Enabling Tx Queues");
+		hdd_debug("vdev %d Enabling queues", link_info->vdev_id);
 		/* Enable TX queues only when we are connected */
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_START_ALL_NETIF_QUEUE,
@@ -5595,7 +5644,7 @@ static int __hdd_open(struct net_device *dev)
 
 	/* Enable carrier and transmit queues for NDI */
 	if (WLAN_HDD_IS_NDI(adapter)) {
-		hdd_debug("Enabling Tx Queues");
+		hdd_debug("vdev %d Enabling queues", link_info->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 			WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
 			WLAN_CONTROL_PATH);
@@ -5674,9 +5723,9 @@ int hdd_stop_no_trans(struct net_device *dev)
 	 * Disable TX on the interface, after this hard_start_xmit() will not
 	 * be called on that interface
 	 */
-	hdd_debug("Disabling queues, adapter device mode: %s(%d)",
+	hdd_debug("vdev %d Disabling queues, adapter device mode: %s(%d)",
+		  adapter->deflink->vdev_id,
 		  qdf_opmode_str(adapter->device_mode), adapter->device_mode);
-
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -6734,7 +6783,7 @@ hdd_set_derived_multicast_list(struct wlan_objmgr_psoc *psoc,
 			       struct pmo_mc_addr_list_params *mc_list_request,
 			       int *mc_count)
 {
-	int i = 0, j = 0, list_count = *mc_count;
+	uint8_t i = 0, j = 0, list_count = *mc_count;
 	struct qdf_mac_addr *peer_mc_addr_list = NULL;
 	uint8_t  driver_mc_cnt = 0;
 	uint32_t max_ndp_sessions = 0;
@@ -6750,7 +6799,8 @@ hdd_set_derived_multicast_list(struct wlan_objmgr_psoc *psoc,
 						 &peer_mc_addr_list[j]))
 				break;
 		}
-		if (i == list_count) {
+		if (i == list_count &&
+		    (list_count + driver_mc_cnt < PMO_MAX_MC_ADDR_LIST)) {
 			qdf_mem_copy(
 			   &(mc_list_request->mc_addr[list_count +
 						driver_mc_cnt].bytes),
@@ -7989,6 +8039,12 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 			qdf_ether_addr_copy(vdev_params->macaddr,
 					    adapter->mac_addr.bytes);
 	}
+
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)vdev_params->macaddr)) {
+		hdd_err_rl("invalid mac addr");
+		return -EINVAL;
+	}
+
 	return 0;
 }
 #elif defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
@@ -8027,6 +8083,11 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 				    adapter->mld_addr.bytes);
 	}
 
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)vdev_params->macaddr)) {
+		hdd_err_rl("invalid mac addr");
+		return -EINVAL;
+	}
+
 	vdev_params->size_vdev_priv = sizeof(struct vdev_osif_priv);
 	hdd_exit();
 
@@ -8042,6 +8103,12 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 	vdev_params->opmode = adapter->device_mode;
 	qdf_ether_addr_copy(vdev_params->macaddr, adapter->mac_addr.bytes);
 	vdev_params->size_vdev_priv = sizeof(struct vdev_osif_priv);
+
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)vdev_params->macaddr)) {
+		hdd_err_rl("invalid mac addr");
+		return -EINVAL;
+	}
+
 	return 0;
 }
 #endif
@@ -9451,7 +9518,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 			if (QDF_STATUS_SUCCESS != status)
 				goto err_destroy_dp_intf;
 			/* Stop the Interface TX queue. */
-			hdd_debug("Disabling queues");
+			hdd_debug("vdev %d Disabling queues",
+				  adapter->deflink->vdev_id);
 			wlan_hdd_netif_queue_control(adapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -9485,7 +9553,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		if (QDF_STATUS_SUCCESS != status)
 			goto err_destroy_dp_intf;
 
-		hdd_debug("Disabling queues");
+		hdd_debug("vdev %d Disabling queues",
+			  adapter->deflink->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -9534,7 +9603,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 			goto err_destroy_dp_intf;
 
 		/* Stop the Interface TX queue. */
-		hdd_debug("Disabling queues");
+		hdd_debug("vdev %d Disabling queues",
+			  adapter->deflink->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -10123,7 +10193,20 @@ wlan_hdd_delete_mon_link(struct hdd_adapter *adapter,
 	status = hdd_monitor_mode_vdev_status(adapter);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("stop failed montior mode");
+
+	status = qdf_event_reset(&adapter->qdf_monitor_mode_vdev_stop_event);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("failed to reinit vdev stop event");
+
 	sme_delete_mon_session(hdd_ctx->mac_handle, link_info->vdev_id);
+
+	/* block until vdev stop success*/
+	status =
+		qdf_wait_for_event_completion(&adapter->qdf_monitor_mode_vdev_stop_event,
+					      WLAN_MONITOR_MODE_VDEV_STOP_EVT);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("monitor vdev stop event time out vdev id: %d status %d",
+			   adapter->deflink->vdev_id, status);
 
 	if (vdev)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
@@ -10187,7 +10270,9 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 		hdd_stop_and_close_pre_cac_adapter(hdd_ctx, vdev);
 	}
 	wlansap_cleanup_cac_timer(sap_ctx);
-	cds_flush_work(&link_info->sap_stop_bss_work);
+
+	if (link_info->sap_stop_bss_work.func)
+		cds_flush_work(&link_info->sap_stop_bss_work);
 
 	if (qdf_atomic_read(&ap_ctx->acs_in_progress)) {
 		hdd_info("ACS in progress, wait for complete");
@@ -10335,7 +10420,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	hdd_stop_tsf_sync(adapter);
 	hdd_flush_scan_block_work(adapter);
 	wlan_hdd_cfg80211_scan_block(adapter);
-	hdd_debug("Disabling queues");
+	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -10831,6 +10916,7 @@ int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
 
 		ret = hdd_validate_channel_and_bandwidth(adapter,
 							 mon_params[index].freq,
+							 0,
 							 mon_params[index].bandwidth);
 		if (ret) {
 			hdd_err("Invalid CH %d and BW %d combo",
@@ -10912,7 +10998,7 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 		}
 
 		ret = hdd_validate_channel_and_bandwidth(adapter,
-							 mon_ctx->freq,
+							 mon_ctx->freq, 0,
 							 mon_ctx->bandwidth);
 		if (ret) {
 			hdd_err("Invalid CH %d and BW %d combo",
@@ -15525,7 +15611,8 @@ hdd_adapter_get_link_mac_addr(struct wlan_hdd_link_info *link_info)
 	adapter = link_info->adapter;
 	if (!hdd_adapter_is_ml_adapter(adapter) ||
 	    qdf_is_macaddr_zero(&link_info->link_addr) ||
-	    !wlan_vdev_mlme_is_mlo_vdev(link_info->vdev))
+	    (link_info->vdev_id != WLAN_INVALID_VDEV_ID &&
+	     !wlan_vdev_mlme_is_mlo_vdev(link_info->vdev)))
 		return &adapter->mac_addr;
 
 	return &link_info->link_addr;
@@ -17099,6 +17186,28 @@ static inline void hdd_cal_fail_send_event(uint8_t cal_type, uint8_t reason)
 }
 #endif
 
+#ifdef IPA_WDI3_VLAN_SUPPORT
+/**
+ * hdd_dp_send_pdev_pkt_routing_vlan() - Initialize pdev pkt routing config to
+ *					 Target
+ * @hdd_ctx: hdd context pointer
+ *
+ * Return: None
+ */
+static void hdd_dp_send_pdev_pkt_routing_vlan(struct hdd_context *hdd_ctx)
+{
+	uint32_t mac_id;
+
+	for (mac_id = 0; mac_id < MAX_MAC; mac_id++)
+		ucfg_dp_send_pdev_pkt_routing_vlan(hdd_ctx->psoc, mac_id);
+}
+#else /* !IPA_WDI3_VLAN_SUPPORT */
+static inline void
+hdd_dp_send_pdev_pkt_routing_vlan(struct hdd_context *hdd_ctx)
+{
+}
+#endif /* IPA_WDI3_VLAN_SUPPORT */
+
 /**
  * hdd_features_init() - Init features
  * @hdd_ctx:	HDD context
@@ -17237,6 +17346,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	hdd_thermal_stats_cmd_init(hdd_ctx);
 	sme_set_cal_failure_event_cb(hdd_ctx->mac_handle,
 				     hdd_cal_fail_send_event);
+	hdd_dp_send_pdev_pkt_routing_vlan(hdd_ctx);
 
 	hdd_exit();
 	return 0;
@@ -18861,12 +18971,15 @@ QDF_STATUS hdd_softap_sta_deauth(struct wlan_hdd_link_info *link_info,
 					       &is_sap_bcast_deauth_enabled);
 
 	hdd_enter();
-
-	hdd_debug("sap_bcast_deauth_enabled %d", is_sap_bcast_deauth_enabled);
 	/* Ignore request to deauth bcmc station */
-	if (!is_sap_bcast_deauth_enabled)
-		if (param->peerMacAddr.bytes[0] & 0x1)
+	if (!is_sap_bcast_deauth_enabled) {
+		if (param->peerMacAddr.bytes[0] & 0x1) {
+			hdd_debug("Vdev %d sap_bcast_deauth_enabled %d, Ignore request to deauth bc/mc station ",
+				  link_info->vdev_id,
+				  is_sap_bcast_deauth_enabled);
 			return qdf_status;
+		}
+	}
 
 	qdf_status =
 		wlansap_deauth_sta(WLAN_HDD_GET_SAP_CTX_PTR(link_info),
@@ -22628,7 +22741,7 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 
-void hdd_sme_monitor_mode_callback(uint8_t vdev_id)
+void hdd_sme_monitor_mode_callback(uint8_t vdev_id, bool is_up)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
@@ -22649,11 +22762,16 @@ void hdd_sme_monitor_mode_callback(uint8_t vdev_id)
 		hdd_err_rl("Invalid magic");
 		return;
 	}
-
-	qdf_event_set(&adapter->qdf_monitor_mode_vdev_up_event);
-
-	hdd_debug("monitor mode vdev up completed");
-	adapter->monitor_mode_vdev_up_in_progress = false;
+	if (is_up) {
+		qdf_event_set(&adapter->qdf_monitor_mode_vdev_up_event);
+		hdd_debug("monitor mode vdev up completed for vdev %d",
+			  vdev_id);
+		adapter->monitor_mode_vdev_up_in_progress = false;
+	} else {
+		qdf_event_set(&adapter->qdf_monitor_mode_vdev_stop_event);
+		hdd_debug("monitor mode vdev stop completed for vdev %d",
+			  vdev_id);
+	}
 }
 
 QDF_STATUS hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
@@ -22664,6 +22782,8 @@ QDF_STATUS hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
 	if (session_type == QDF_MONITOR_MODE) {
 		qdf_status = qdf_event_create(
 				&adapter->qdf_monitor_mode_vdev_up_event);
+		qdf_status = qdf_event_create(
+				&adapter->qdf_monitor_mode_vdev_stop_event);
 	}
 	return qdf_status;
 }

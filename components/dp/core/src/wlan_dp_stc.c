@@ -508,19 +508,19 @@ static inline void
 wlan_dp_stc_check_ping_activity(struct wlan_dp_stc *dp_stc,
 				uint16_t peer_id)
 {
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	uint64_t cur_ts = dp_stc_get_timestamp();
 
-	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[peer_id];
+	if (!peer_tc->valid)
 		return;
 
-	if ((qdf_atomic_read(&active_traffic_map->active_ping) == 1) &&
-	    (cur_ts - active_traffic_map->last_ping_ts >
+	if ((qdf_atomic_read(&peer_tc->active_ping) == 1) &&
+	    (cur_ts - peer_tc->last_ping_ts >
 				WLAN_DP_STC_PING_INACTIVE_TIMEOUT_NS)) {
-		active_traffic_map->last_ping_ts = 0;
-		qdf_atomic_set(&active_traffic_map->active_ping, 0);
-		qdf_atomic_set(&active_traffic_map->send_fw_ind, 1);
+		peer_tc->last_ping_ts = 0;
+		qdf_atomic_set(&peer_tc->active_ping, 0);
+		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 	}
 }
 
@@ -529,7 +529,7 @@ wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 
@@ -559,9 +559,9 @@ wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 		 */
 	}
 
-	active_traffic_map = &dp_stc->peer_traffic_map[c_entry->peer_id];
-	if (active_traffic_map->valid && c_entry->flow_active)
-		wlan_dp_stc_dec_traffic_type(active_traffic_map,
+	peer_tc = &dp_stc->peer_tc[c_entry->peer_id];
+	if (peer_tc->valid && c_entry->flow_active)
+		wlan_dp_stc_dec_traffic_type(peer_tc,
 					     c_entry->traffic_type);
 
 	qdf_mem_zero(c_entry, sizeof(*c_entry));
@@ -586,7 +586,7 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint64_t cur_ts = dp_stc_get_timestamp();
@@ -634,11 +634,11 @@ flow_inactive:
 	 */
 	c_entry->flow_active = 0;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[c_entry->peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[c_entry->peer_id];
+	if (!peer_tc->valid)
 		return;
 
-	wlan_dp_stc_dec_traffic_type(active_traffic_map, c_entry->traffic_type);
+	wlan_dp_stc_dec_traffic_type(peer_tc, c_entry->traffic_type);
 }
 
 static inline void
@@ -646,7 +646,7 @@ wlan_dp_stc_check_flow_resumption(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint64_t cur_ts = dp_stc_get_timestamp();
@@ -687,26 +687,26 @@ flow_active:
 	 */
 	c_entry->flow_active = 1;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[c_entry->peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[c_entry->peer_id];
+	if (!peer_tc->valid)
 		return;
 
-	wlan_dp_stc_inc_traffic_type(active_traffic_map, c_entry->traffic_type);
+	wlan_dp_stc_inc_traffic_type(peer_tc, c_entry->traffic_type);
 }
 
 static inline void
 wlan_dp_stc_process_add_classified_flow(struct wlan_dp_stc *dp_stc,
 					struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	enum qca_traffic_type traffic_type = c_entry->traffic_type;
 	uint16_t peer_id = c_entry->peer_id;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[peer_id];
+	if (!peer_tc->valid)
 		return;
 
-	wlan_dp_stc_inc_traffic_type(active_traffic_map, traffic_type);
+	wlan_dp_stc_inc_traffic_type(peer_tc, traffic_type);
 }
 
 static inline QDF_STATUS
@@ -715,40 +715,40 @@ wlan_dp_stc_send_active_traffic_map_ind(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
 	struct wlan_dp_psoc_sb_ops *sb_ops = &dp_ctx->sb_ops;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct dp_active_traffic_map_params req_buf;
 	uint32_t wmi_active_traffic_map = 0;
 	QDF_STATUS status;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[peer_id];
+	if (!peer_tc->valid)
 		return QDF_STATUS_SUCCESS;
 
-	if (qdf_atomic_read(&active_traffic_map->send_fw_ind) == 0)
+	if (qdf_atomic_read(&peer_tc->send_fw_ind) == 0)
 		return QDF_STATUS_SUCCESS;
 
-	qdf_atomic_set(&active_traffic_map->send_fw_ind, 0);
+	qdf_atomic_set(&peer_tc->send_fw_ind, 0);
 
-	if (qdf_atomic_read(&active_traffic_map->num_streaming))
+	if (qdf_atomic_read(&peer_tc->num_streaming))
 		wmi_active_traffic_map |=
 				WMI_PEER_ACTIVE_TRAFFIC_TYPE_STREAMING_M;
-	if (qdf_atomic_read(&active_traffic_map->active_ping))
+	if (qdf_atomic_read(&peer_tc->active_ping))
 		wmi_active_traffic_map |= WMI_PEER_ACTIVE_TRAFFIC_TYPE_PING_M;
-	if (qdf_atomic_read(&active_traffic_map->active_bk_traffic))
+	if (qdf_atomic_read(&peer_tc->active_bk_traffic))
 		wmi_active_traffic_map |=
 				WMI_PEER_ACTIVE_TRAFFIC_TYPE_BACKGROUND_M;
 
-	if (qdf_atomic_read(&active_traffic_map->num_gaming))
+	if (qdf_atomic_read(&peer_tc->num_gaming))
 		wmi_active_traffic_map |= WMI_PEER_ACTIVE_TRAFFIC_TYPE_GAMING_M;
-	if (qdf_atomic_read(&active_traffic_map->num_voice_call))
+	if (qdf_atomic_read(&peer_tc->num_voice_call))
 		wmi_active_traffic_map |= WMI_PEER_ACTIVE_TRAFFIC_TYPE_VOIP_M;
-	if (qdf_atomic_read(&active_traffic_map->num_video_call))
+	if (qdf_atomic_read(&peer_tc->num_video_call))
 		wmi_active_traffic_map |=
 				WMI_PEER_ACTIVE_TRAFFIC_TYPE_VIDEO_CONF_M;
 
-	req_buf.vdev_id = active_traffic_map->vdev_id;
+	req_buf.vdev_id = peer_tc->vdev_id;
 	qdf_mem_copy(&req_buf.mac.bytes,
-		     active_traffic_map->mac_addr.bytes,
+		     peer_tc->mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
 	req_buf.active_traffic_map = wmi_active_traffic_map;
 	status = sb_ops->dp_send_active_traffic_map(dp_ctx->psoc,
@@ -1641,7 +1641,7 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 
 	if (!dp_stc)
 		return QDF_STATUS_E_NOSUPPORT;
@@ -1649,37 +1649,37 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 	if (peer_id >= DP_STC_MAX_PEERS)
 		return QDF_STATUS_E_INVAL;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
+	peer_tc = &dp_stc->peer_tc[peer_id];
 
 	dp_info("STC: notify for peer %d, event %d, valid %d",
-		peer_id, event, active_traffic_map->valid);
+		peer_id, event, peer_tc->valid);
 	switch (event) {
 	case CDP_PEER_EVENT_MAP:
-		if (active_traffic_map->valid) {
+		if (peer_tc->valid) {
 			dp_info("STC: Peer map notify for active peer");
 			qdf_assert_always(0);
 			return QDF_STATUS_E_BUSY;
 		}
 
-		active_traffic_map->vdev_id = vdev_id;
-		active_traffic_map->peer_id = peer_id;
-		qdf_mem_copy(active_traffic_map->mac_addr.bytes,
+		peer_tc->vdev_id = vdev_id;
+		peer_tc->peer_id = peer_id;
+		qdf_mem_copy(peer_tc->mac_addr.bytes,
 			     peer_mac_addr, QDF_MAC_ADDR_SIZE);
-		active_traffic_map->valid = 1;
+		peer_tc->valid = 1;
 		break;
 	case CDP_PEER_EVENT_UNMAP:
-		if (!active_traffic_map->valid) {
+		if (!peer_tc->valid) {
 			dp_info("STC: Peer unmap notify for inactive peer");
 			qdf_assert_always(0);
 			return QDF_STATUS_E_BUSY;
 		}
 
-		if (qdf_mem_cmp(active_traffic_map->mac_addr.bytes,
+		if (qdf_mem_cmp(peer_tc->mac_addr.bytes,
 				peer_mac_addr, QDF_MAC_ADDR_SIZE) != 0) {
 			dp_err("STC: peer unmap notify: mac addr mismatch");
 			return QDF_STATUS_E_INVAL;
 		}
-		active_traffic_map->valid = 0;
+		peer_tc->valid = 0;
 		break;
 	default:
 		break;

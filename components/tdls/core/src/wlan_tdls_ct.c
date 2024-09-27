@@ -32,6 +32,7 @@
 #include "wlan_reg_services_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_tdls_tgt_api.h"
+#include "wlan_mlo_mgr_link_switch.h"
 
 bool tdls_is_vdev_authenticated(struct wlan_objmgr_vdev *vdev)
 {
@@ -489,6 +490,12 @@ tdls_implicit_send_discovery_request(struct tdls_vdev_priv_obj *tdls_vdev_obj)
 	tdls_psoc = wlan_vdev_get_tdls_soc_obj(tdls_vdev_obj->vdev);
 	if (!tdls_psoc) {
 		tdls_notice("tdls_psoc_obj is NULL");
+		return;
+	}
+
+	if (mlo_mgr_is_link_switch_in_progress(tdls_vdev_obj->vdev)) {
+		tdls_notice("vdev:%d Link Switch in progress. TDLS discovery not allowed",
+			    wlan_vdev_get_id(tdls_vdev_obj->vdev));
 		return;
 	}
 
@@ -1243,7 +1250,7 @@ tdls_update_peer_off_channel_list(struct wlan_objmgr_pdev *pdev,
 		if ((!freq || freq == peer_freq) &&
 		    (!wlan_reg_is_24ghz_ch_freq(peer_freq) ||
 		     (wlan_reg_is_6ghz_chan_freq(peer_freq) &&
-		      tdls_is_6g_freq_allowed(vdev, peer_freq)))) {
+		      tdls_is_6g_freq_allowed(pdev, peer_freq)))) {
 			off_channels[params->num_off_channels] =
 					peer_info->peer_cap.peer_chan[i];
 			tdls_debug("allowd_chan:%d idx:%d",

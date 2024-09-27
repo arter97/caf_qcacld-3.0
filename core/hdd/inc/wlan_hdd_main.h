@@ -329,7 +329,7 @@ enum hdd_nb_cmd_id {
 
 /* Maximum time(ms) to wait for monitor mode vdev up event completion*/
 #define WLAN_MONITOR_MODE_VDEV_UP_EVT      SME_CMD_VDEV_START_BSS_TIMEOUT
-
+#define WLAN_MONITOR_MODE_VDEV_STOP_EVT    SME_CMD_STOP_VDEV_TIMEOUT
 /* Mac Address string length */
 #define MAC_ADDRESS_STR_LEN 18  /* Including null terminator */
 /* Max and min IEs length in bytes */
@@ -1242,6 +1242,7 @@ struct get_station_client_info {
  * @is_ll_stats_req_pending: atomic variable to check active stats req
  * @sta_stats_cached_timestamp: last updated stats timestamp
  * @qdf_monitor_mode_vdev_up_event: QDF event for monitor mode vdev up
+ * @qdf_monitor_mode_vdev_stop_event: QDF event for monitor mode vdev stop rsp
  * @disconnect_comp_var: completion variable for disconnect callback
  * @linkup_event_var: completion variable for Linkup Event
  * @is_link_up_service_needed: Track whether the linkup handling is needed
@@ -1341,6 +1342,8 @@ struct get_station_client_info {
  * @sta_client_info: To store get station user application port_id's
  * @disconnect_link_id: cache disconnect link_id, for legacy link_id will
  *			be @WLAN_INVALID_LINK_ID
+ * @wlm_ll_conn_flag: Indicates if low lateny connection flag set
+ *		      based on wlm mode
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1382,6 +1385,7 @@ struct hdd_adapter {
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 	qdf_event_t qdf_monitor_mode_vdev_up_event;
+	qdf_event_t qdf_monitor_mode_vdev_stop_event;
 #endif
 
 	/* TODO: move these to sta ctx. These may not be used in AP */
@@ -1537,6 +1541,7 @@ struct hdd_adapter {
 	uint16_t keep_alive_interval;
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
 	int32_t disconnect_link_id;
+	bool wlm_ll_conn_flag;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -2608,6 +2613,7 @@ hdd_adapter_ops_record_event(struct hdd_context *hdd_ctx,
  * hdd_validate_channel_and_bandwidth() - Validate the channel-bandwidth combo
  * @adapter: HDD adapter
  * @chan_freq: Channel frequency
+ * @ccfs1: Value of CCFS1 in MHz
  * @chan_bw: Bandwidth
  *
  * Checks if the given bandwidth is valid for the given channel number.
@@ -2615,7 +2621,7 @@ hdd_adapter_ops_record_event(struct hdd_context *hdd_ctx,
  * Return: 0 for success, non-zero for failure
  */
 int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
-				       qdf_freq_t chan_freq,
+				       qdf_freq_t chan_freq, uint32_t ccfs1,
 				       enum phy_ch_width chan_bw);
 
 /**
@@ -5335,14 +5341,14 @@ int hdd_crash_inject(struct hdd_adapter *adapter, uint32_t v1, uint32_t v2)
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 
-void hdd_sme_monitor_mode_callback(uint8_t vdev_id);
+void hdd_sme_monitor_mode_callback(uint8_t vdev_id, bool is_up);
 
 QDF_STATUS hdd_monitor_mode_vdev_status(struct hdd_adapter *adapter);
 
 QDF_STATUS hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
 					     uint8_t session_type);
 #else
-static inline void hdd_sme_monitor_mode_callback(uint8_t vdev_id) {}
+static inline void hdd_sme_monitor_mode_callback(uint8_t vdev_id, bool is_up) {}
 
 static inline QDF_STATUS
 hdd_monitor_mode_vdev_status(struct hdd_adapter *adapter)

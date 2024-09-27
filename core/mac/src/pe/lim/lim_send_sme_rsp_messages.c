@@ -62,6 +62,7 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include "wlan_mlme_public_struct.h"
 #include <wlan_mlo_mgr_link_switch.h>
+#include "wlan_policy_mgr_i.h"
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -1818,16 +1819,11 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	    !policy_mgr_is_interband_mcc_supported(mac_ctx->psoc)) {
 		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, csa_freq);
 	} else if (cnx_count > 2) {
-		is_allowed =
-		policy_mgr_allow_concurrency_csa(
-			mac_ctx->psoc,
-			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
-							     mode,
-							     session_entry->vdev_id),
-			csa_freq,
-			policy_mgr_get_bw(new_ch_width),
-			session_entry->vdev_id, false,
-			CSA_REASON_UNKNOWN);
+		is_allowed = policy_mgr_allow_concurrency_sta_csa(mac_ctx->psoc,
+								  wlan_vdev_get_id(session_entry->vdev),
+								  mode,
+								  csa_freq,
+								  new_ch_width);
 	}
 
 	return is_allowed;
@@ -2693,14 +2689,18 @@ lim_send_sme_ap_channel_switch_resp(struct mac_context *mac,
 	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq))
 		is_ch_dfs = false;
 
-	if (is_ch_dfs) {
+	/* If currently in AP assisted P2P DFS operation then
+	 * don't move to CAC wait state as radar is assisted by
+	 * concurrent STA interface.
+	 */
+	if (is_ch_dfs && !pe_session->dfs_p2p_info.is_assisted_p2p_group) {
 		lim_sap_move_to_cac_wait_state(pe_session);
-
 	} else {
 		lim_apply_configuration(mac, pe_session);
 		lim_send_beacon(mac, pe_session);
 		lim_obss_send_detection_cfg(mac, pe_session, true);
 	}
+
 	return;
 }
 
@@ -2788,7 +2788,8 @@ lim_handle_bss_color_change_ie(struct mac_context *mac_ctx,
 	if (LIM_IS_AP_ROLE(session) &&
 	    session->he_op.bss_col_disabled &&
 	    session->he_bss_color_change.new_color) {
-		pe_debug("countdown: %d, new_color: %d",
+		pe_debug("Vdev %d countdown: %d, new_color: %d",
+			 session->vdev_id,
 			 session->he_bss_color_change.countdown,
 			 session->he_bss_color_change.new_color);
 		if (session->he_bss_color_change.countdown > 0) {
@@ -2856,8 +2857,8 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		wlan_vdev_mlme_set_sap_go_move_before_sta(vdev, false);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 	}
-	pe_debug("role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
-		 GET_LIM_SYSTEM_ROLE(session),
+	pe_debug("Vdev %d role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
+		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
 		 session->dfsIncludeChanSwIe,
 		 session->gLimOperatingMode.present,
 		 session->gLimChannelSwitch.switchCount,

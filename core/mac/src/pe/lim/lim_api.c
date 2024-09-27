@@ -90,6 +90,7 @@
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_cm_api.h"
 #include "wlan_mlme_api.h"
+#include <wlan_p2p_api.h>
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -541,6 +542,20 @@ static inline void lim_nan_register_callbacks(struct mac_context *mac_ctx)
 }
 #endif
 
+#ifdef FEATURE_WLAN_TDLS
+static void lim_register_tdls_callbacks(struct mac_context *mac_ctx)
+{
+	struct tdls_callbacks tdls_cb = {0};
+
+	tdls_cb.delete_all_tdls_peers = lim_delete_all_tdls_peers;
+
+	wlan_tdls_register_lim_callbacks(mac_ctx->psoc, &tdls_cb);
+}
+#else
+static inline void lim_register_tdls_callbacks(struct mac_context *mac_ctx)
+{}
+#endif
+
 #ifdef WLAN_FEATURE_LL_LT_SAP
 QDF_STATUS lim_ll_sap_continue_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {
@@ -698,11 +713,110 @@ bool is_mgmt_protected(uint32_t vdev_id,
 	return protected;
 }
 
+void lim_fill_dfs_p2p_group_params(struct pe_session *pe_session)
+{
+	bool is_dfs_owner, is_valid_ap_assist;
+	struct qdf_mac_addr ap_bssid;
+	struct dfs_p2p_group_info *dfs_p2p_info;
+
+	if (pe_session->opmode != QDF_P2P_CLIENT_MODE &&
+	    pe_session->opmode != QDF_P2P_GO_MODE)
+		return;
+
+	dfs_p2p_info = &pe_session->dfs_p2p_info;
+	qdf_mem_zero(dfs_p2p_info, sizeof(*dfs_p2p_info));
+	if (!wlan_reg_is_dfs_for_freq(wlan_vdev_get_pdev(pe_session->vdev),
+				      pe_session->curr_op_freq)) {
+		return;
+	}
+
+	wlan_p2p_get_ap_assist_dfs_params(pe_session->vdev, &is_dfs_owner,
+					  &is_valid_ap_assist, &ap_bssid,
+					  NULL, NULL);
+
+	if (is_dfs_owner || !is_valid_ap_assist)
+		return;
+
+	dfs_p2p_info->is_assisted_p2p_group = !is_dfs_owner;
+	qdf_copy_macaddr(&dfs_p2p_info->ap_bssid, &ap_bssid);
+}
+
+static void lim_process_p2p_group_chan_switch_req(uint8_t vdev_id,
+						  uint8_t chan,
+						  uint8_t op_class)
+{
+	struct pe_session *session;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac_ctx)
+		return;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("Session not found for vdev_id: %d", vdev_id);
+		return;
+	}
+
+	if (session->opmode != QDF_P2P_CLIENT_MODE)
+		return;
+
+	lim_send_channel_usage_req_action_frame(mac_ctx, session,
+						chan, op_class);
+}
+
+static void lim_process_ap_assist_dfs_group_p2p_bmiss_notify(uint8_t vdev_id)
+{
+	struct pe_session *session;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac_ctx)
+		return;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("Session not found for vdev_id: %d", vdev_id);
+		return;
+	}
+
+	if (session->opmode != QDF_P2P_CLIENT_MODE ||
+	    !session->dfs_p2p_info.is_ap_bcn_monitor_active)
+		return;
+
+	lim_send_channel_usage_req_action_frame(mac_ctx, session, 0, 0);
+}
+
+static void
+lim_process_ap_assist_dfs_group_p2p_fw_monitor_update(uint8_t vdev_id, bool val)
+{
+	struct pe_session *session;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac_ctx)
+		return;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("Session not found for vdev_id: %d", vdev_id);
+		return;
+	}
+
+	if (session->opmode != QDF_P2P_CLIENT_MODE)
+		return;
+
+	session->dfs_p2p_info.is_ap_bcn_monitor_active = val;
+}
+
 static void p2p_register_callbacks(struct mac_context *mac_ctx)
 {
 	struct p2p_protocol_callbacks p2p_cb = {0};
 
 	p2p_cb.is_mgmt_protected = is_mgmt_protected;
+	p2p_cb.ap_assist_dfs_group_bmiss_notify =
+			lim_process_ap_assist_dfs_group_p2p_bmiss_notify;
+	p2p_cb.p2p_group_chan_switch_req =
+			lim_process_p2p_group_chan_switch_req;
+	p2p_cb.ap_assist_dfs_group_fw_monitor_update =
+			lim_process_ap_assist_dfs_group_p2p_fw_monitor_update;
 	ucfg_p2p_register_callbacks(mac_ctx->psoc, &p2p_cb);
 }
 
@@ -800,12 +914,41 @@ lim_unregister_scan_mbssid_callback(struct mac_context *mac_ctx)
 	return status;
 }
 
+void lim_check_ap_assist_dfs_p2p_group(bool is_incr_session)
+{
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	struct pe_session *session;
+	struct wlan_objmgr_pdev *pdev;
+	uint8_t idx;
+
+	if (!mac)
+		return;
+
+	pdev = mac->pdev;
+	for (idx = 0; idx < mac->lim.maxBssId; idx++) {
+		if (!mac->lim.gpSession[idx].valid ||
+		    (mac->lim.gpSession[idx].opmode != QDF_P2P_GO_MODE &&
+		     mac->lim.gpSession[idx].opmode != QDF_P2P_CLIENT_MODE))
+			continue;
+
+		session = &mac->lim.gpSession[idx];
+		if (!wlan_reg_is_dfs_for_freq(pdev, session->curr_op_freq) ||
+		    !session->dfs_p2p_info.is_assisted_p2p_group)
+			continue;
+
+		if (!is_incr_session || session->opmode == QDF_P2P_CLIENT_MODE)
+			wlan_p2p_validate_ap_assist_dfs_group(session->vdev);
+	}
+}
+
 static void lim_register_policy_mgr_callback(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_conc_cbacks conc_cbacks;
 
 	qdf_mem_zero(&conc_cbacks, sizeof(conc_cbacks));
 	conc_cbacks.connection_info_update = lim_send_conc_params_update;
+	conc_cbacks.ap_assist_dfs_group_notify =
+					lim_check_ap_assist_dfs_p2p_group;
 
 	if (QDF_STATUS_SUCCESS != policy_mgr_register_conc_cb(psoc,
 							      &conc_cbacks)) {
@@ -925,6 +1068,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	lim_register_debug_callback();
 	lim_nan_register_callbacks(mac);
 	p2p_register_callbacks(mac);
+	lim_register_tdls_callbacks(mac);
 	lim_register_scan_mbssid_callback(mac);
 	lim_register_sap_bcn_callback(mac);
 	wlan_reg_register_ctry_change_callback(
@@ -934,8 +1078,7 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	wlan_reg_register_is_chan_connected_callback(mac->psoc,
 					lim_get_connected_chan_for_mode);
 
-	if (mac->mlme_cfg->edca_params.enable_edca_params)
-		lim_register_policy_mgr_callback(mac->psoc);
+	lim_register_policy_mgr_callback(mac->psoc);
 
 	if (!QDF_IS_STATUS_SUCCESS(
 	    cds_shutdown_notifier_register(pe_shutdown_notifier_cb, mac))) {
@@ -3404,6 +3547,37 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 
 	}
 
+	if (subType == SIR_MAC_MGMT_AUTH ||
+	    subType == SIR_MAC_MGMT_ASSOC_REQ ||
+	    subType == SIR_MAC_MGMT_REASSOC_REQ) {
+		struct wlan_objmgr_vdev *roam_vdev;
+		uint8_t vdev_id;
+
+		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
+		vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac->pdev,
+								 pHdr->da,
+								 WLAN_LEGACY_MAC_ID);
+		if (!vdev)
+			return eMGMT_DROP_NO_DROP;
+
+		if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+			return eMGMT_DROP_NO_DROP;
+		}
+
+		vdev_id = wlan_vdev_get_id(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+		roam_vdev = wlan_objmgr_pdev_get_roam_vdev(mac->pdev,
+							   WLAN_LEGACY_MAC_ID);
+		if (roam_vdev) {
+			pe_debug("vdev %d roaming in progress, reject client connect to SAP vdev %d",
+				 wlan_vdev_get_id(roam_vdev), vdev_id);
+			wlan_objmgr_vdev_release_ref(roam_vdev, WLAN_LEGACY_MAC_ID);
+			return eMGMT_DROP_CONNECT_DURING_ROAMING;
+		}
+	}
+
 	return eMGMT_DROP_NO_DROP;
 }
 
@@ -3468,8 +3642,12 @@ void lim_mon_deinit_session(struct mac_context *mac_ptr,
 
 	session = pe_find_session_by_vdev_id(mac_ptr, msg->vdev_id);
 
-	if (session && session->bssType == eSIR_MONITOR_MODE)
+	if (session && session->bssType == eSIR_MONITOR_MODE) {
+		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
+					      WLAN_VDEV_SM_EV_DOWN,
+					      0, NULL);
 		pe_delete_session(mac_ptr, session);
+	}
 }
 
 /**
@@ -4263,7 +4441,7 @@ static void lim_derive_link_specific_rnr_ie(struct mac_context *mac_ctx,
 	qdf_freq_t chan_freq = 0;
 	struct wlan_objmgr_pdev *pdev;
 
-	qdf_mem_copy(&assoc_link_addr, session_entry->self_mac_addr,
+	qdf_mem_copy(&assoc_link_addr, session_entry->bssId,
 		     QDF_MAC_ADDR_SIZE);
 
 	rnr_end = rnr + rnr[TAG_LEN_POS] + MIN_IE_LEN;

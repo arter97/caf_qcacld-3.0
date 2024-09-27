@@ -355,6 +355,7 @@ static struct wma_target_req *wma_find_req(tp_wma_handle wma,
 
 struct wma_target_req *wma_find_remove_req_msgtype(tp_wma_handle wma,
 						   uint8_t vdev_id,
+						   struct qdf_mac_addr *macaddr,
 						   uint32_t msg_type)
 {
 	struct wma_target_req *req_msg = NULL;
@@ -377,6 +378,9 @@ struct wma_target_req *wma_find_remove_req_msgtype(tp_wma_handle wma,
 		if (req_msg->vdev_id != vdev_id)
 			continue;
 		if (req_msg->msg_type != msg_type)
+			continue;
+		if (macaddr && !qdf_is_macaddr_zero(&req_msg->addr) &&
+		    !qdf_is_macaddr_equal(macaddr, &req_msg->addr))
 			continue;
 
 		found = true;
@@ -491,27 +495,6 @@ wma_release_vdev_ref(struct wma_txrx_node *iface)
 }
 
 /**
- * wma_handle_monitor_mode_vdev_detach() - Stop and down monitor mode vdev
- * @wma: wma handle
- * @vdev_id: used to get wma interface txrx node
- *
- * Monitor mode is unconneted mode, so do explicit vdev stop and down
- *
- * Return: None
- */
-static void wma_handle_monitor_mode_vdev_detach(tp_wma_handle wma,
-						uint8_t vdev_id)
-{
-	struct wma_txrx_node *iface;
-
-	iface = &wma->interfaces[vdev_id];
-	wlan_vdev_mlme_sm_deliver_evt(iface->vdev,
-				      WLAN_VDEV_SM_EV_DOWN,
-				      0, NULL);
-	iface->vdev_active = false;
-}
-
-/**
  * wma_handle_vdev_detach() - wma vdev detach handler
  * @wma_handle: pointer to wma handle
  * @del_vdev_req_param: pointer to del req param
@@ -527,17 +510,9 @@ static QDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wmi_mgmt_params mgmt_params = {};
 
-	if (!soc) {
+	if (!soc)
 		status = QDF_STATUS_E_FAILURE;
-		goto rel_ref;
-	}
 
-	if ((cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE) ||
-	    (policy_mgr_is_sta_mon_concurrency(wma_handle->psoc) &&
-	    wlan_vdev_mlme_get_opmode(iface->vdev) == QDF_MONITOR_MODE))
-		wma_handle_monitor_mode_vdev_detach(wma_handle, vdev_id);
-
-rel_ref:
 	wma_cdp_vdev_detach(soc, wma_handle, vdev_id);
 	if (qdf_is_recovering())
 		wlan_mgmt_txrx_vdev_drain(iface->vdev,
@@ -579,6 +554,7 @@ static QDF_STATUS wma_self_peer_remove(tp_wma_handle wma_handle,
 		msg = wma_fill_hold_req(wma_handle, vdev_id,
 					WMA_DELETE_STA_REQ,
 					WMA_DEL_P2P_SELF_STA_RSP_START,
+					NULL,
 					sta_self_wmi_rsp,
 					WMA_DELETE_STA_TIMEOUT);
 		if (!msg) {
@@ -2413,7 +2389,7 @@ wma_create_sta_mode_bss_peer(tp_wma_handle wma,
 		     QDF_MAC_ADDR_SIZE);
 
 	msg = wma_fill_hold_req(wma, vdev_id, WMA_PEER_CREATE_REQ,
-				WMA_PEER_CREATE_RESPONSE,
+				WMA_PEER_CREATE_RESPONSE, NULL,
 				(void *)peer_create_rsp,
 				WMA_PEER_CREATE_RESPONSE_TIMEOUT);
 	if (!msg) {
@@ -2492,7 +2468,7 @@ static int wma_remove_bss_peer(tp_wma_handle wma, uint32_t vdev_id,
 		wma_debug("Wait for the peer delete. vdev_id %d", vdev_id);
 		del_req = wma_fill_hold_req(wma, vdev_id,
 					    WMA_DELETE_STA_REQ,
-					    type,
+					    type, mac_addr,
 					    vdev_stop_resp,
 					    WMA_DELETE_STA_TIMEOUT);
 		if (!del_req) {
@@ -3659,6 +3635,7 @@ int wma_peer_create_confirm_handler(void *handle, uint8_t *evt_param_info,
 	wma_debug("vdev:%d Peer create confirm for bssid: " QDF_MAC_ADDR_FMT,
 		  peer_create_rsp->vdev_id, QDF_MAC_ADDR_REF(peer_mac.bytes));
 	req_msg = wma_find_remove_req_msgtype(wma, peer_create_rsp->vdev_id,
+					      NULL,
 					      WMA_PEER_CREATE_REQ);
 	if (!req_msg) {
 		wma_debug("vdev:%d Failed to lookup peer create request msg",
@@ -3766,6 +3743,7 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 	struct wma_target_req *req_msg;
 	tDeleteStaParams *del_sta;
 	uint8_t macaddr[QDF_MAC_ADDR_SIZE];
+	struct qdf_mac_addr peer_mac;
 	int status = 0;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 	struct del_sta_self_rsp_params *data;
@@ -3791,8 +3769,11 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 			event->vdev_id, QDF_MAC_ADDR_REF(macaddr));
 	wlan_roam_debug_log(event->vdev_id, DEBUG_PEER_DELETE_RESP,
 			    DEBUG_INVALID_PEER_ID, macaddr, NULL, 0, 0);
-	req_msg = wma_find_remove_req_msgtype(wma, event->vdev_id,
-					WMA_DELETE_STA_REQ);
+
+	qdf_mem_copy(peer_mac.bytes, macaddr, QDF_MAC_ADDR_SIZE);
+
+	req_msg = wma_find_remove_req_msgtype(wma, event->vdev_id, &peer_mac,
+					      WMA_DELETE_STA_REQ);
 	if (!req_msg) {
 		wma_debug("Peer Delete response is not handled");
 		return -EINVAL;
@@ -4095,6 +4076,7 @@ timer_destroy:
  * @vdev_id: vdev id
  * @msg_type: message type
  * @type: request type
+ * @mac_addr: MAC address
  * @params: request params
  * @timeout: timeout value
  *
@@ -4103,6 +4085,7 @@ timer_destroy:
 struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 					 uint8_t vdev_id,
 					 uint32_t msg_type, uint8_t type,
+					 uint8_t *mac_addr,
 					 void *params, uint32_t timeout)
 {
 	struct wma_target_req *req;
@@ -4118,6 +4101,10 @@ struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 	req->msg_type = msg_type;
 	req->type = type;
 	req->user_data = params;
+
+	if (mac_addr)
+		qdf_mem_copy(req->addr.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
+
 	status = qdf_list_insert_back(&wma->wma_hold_req_queue, &req->node);
 	if (QDF_STATUS_SUCCESS != status) {
 		qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
@@ -4790,7 +4777,7 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 
 	msg = wma_fill_hold_req(wma, vdev_id, WMA_ADD_BSS_REQ,
 				WMA_PEER_ASSOC_CNF_START, NULL,
-				WMA_PEER_ASSOC_TIMEOUT);
+				NULL, WMA_PEER_ASSOC_TIMEOUT);
 	if (!msg) {
 		wma_err("Failed to allocate request for vdev_id %d", vdev_id);
 		wma_remove_req(wma, vdev_id, WMA_PEER_ASSOC_CNF_START);
@@ -5127,7 +5114,8 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 		peer_assoc_cnf = true;
 		msg = wma_fill_hold_req(wma, add_sta->smesessionId,
 				   WMA_ADD_STA_REQ, WMA_PEER_ASSOC_CNF_START,
-				   add_sta, WMA_PEER_ASSOC_TIMEOUT);
+				   NULL, add_sta,
+				   WMA_PEER_ASSOC_TIMEOUT);
 		if (!msg) {
 			wma_err("Failed to alloc request for vdev_id %d",
 				add_sta->smesessionId);
@@ -5266,6 +5254,7 @@ static void wma_add_tdls_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 			peer_assoc_cnf = true;
 			msg = wma_fill_hold_req(wma, add_sta->smesessionId,
 				WMA_ADD_STA_REQ, WMA_PEER_ASSOC_CNF_START,
+				NULL,
 				add_sta, WMA_PEER_ASSOC_TIMEOUT);
 			if (!msg) {
 				wma_err("Failed to alloc request for vdev_id %d",
@@ -5462,6 +5451,7 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			peer_assoc_cnf = true;
 			msg = wma_fill_hold_req(wma, params->smesessionId,
 				WMA_ADD_STA_REQ, WMA_PEER_ASSOC_CNF_START,
+				NULL,
 				params, WMA_PEER_ASSOC_TIMEOUT);
 			if (!msg) {
 				wma_debug("Failed to alloc request for vdev_id %d",
@@ -5717,8 +5707,8 @@ static void wma_delete_sta_req_ap_mode(tp_wma_handle wma,
 				    wmi_service_sync_delete_cmds)) {
 		msg = wma_fill_hold_req(wma, del_sta->smesessionId,
 				   WMA_DELETE_STA_REQ,
-				   WMA_DELETE_STA_RSP_START, del_sta,
-				   WMA_DELETE_STA_TIMEOUT);
+				   WMA_DELETE_STA_RSP_START, del_sta->staMac,
+				   del_sta, WMA_DELETE_STA_TIMEOUT);
 		if (!msg) {
 			wma_err("Failed to allocate request. vdev_id %d",
 				 del_sta->smesessionId);
@@ -5788,8 +5778,8 @@ static void wma_del_tdls_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 		msg = wma_fill_hold_req(wma,
 				del_sta->smesessionId,
 				WMA_DELETE_STA_REQ,
-				WMA_DELETE_STA_RSP_START, del_sta,
-				WMA_DELETE_STA_TIMEOUT);
+				WMA_DELETE_STA_RSP_START, del_sta->staMac,
+				del_sta, WMA_DELETE_STA_TIMEOUT);
 		if (!msg) {
 			wma_err("Failed to allocate vdev_id %d",
 				del_sta->smesessionId);

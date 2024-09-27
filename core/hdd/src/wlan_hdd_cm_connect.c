@@ -401,7 +401,25 @@ hdd_cm_get_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
 	else
 		return sta_ctx->conn_info.ieee_link_id;
 }
-#endif
+
+void hdd_cm_save_conn_info_mld_addr(struct wlan_hdd_link_info *link_info,
+				    struct wlan_cm_connect_resp *rsp)
+{
+	struct hdd_station_ctx *sta_ctx;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(link_info->vdev))
+		return;
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	qdf_copy_macaddr(&sta_ctx->conn_info.mld_addr, &rsp->mld_addr);
+}
+
+void hdd_cm_clear_conn_info_mld_addr(struct hdd_station_ctx *sta_ctx)
+{
+	qdf_mem_zero(&sta_ctx->conn_info.mld_addr, QDF_MAC_ADDR_SIZE);
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 
 #ifdef FEATURE_WLAN_WAPI
 static bool hdd_cm_is_wapi_sta(enum csr_akm_type auth_type)
@@ -810,8 +828,8 @@ def_chan:
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->deflink->vdev_id,
 				    CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
 
-	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq,
-					    ch_bw, false, true);
+	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq, 0,
+					    ch_bw, NO_SCHANS_PUNC, false, true);
 	if (ret) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");
 		return false;
@@ -1040,7 +1058,7 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 	 * netdev queues as it will lead to data stall/NUD failure.
 	 */
 	if (!(rsp->cm_id & CM_ID_LSWITCH_BIT)) {
-		hdd_debug("Disabling queues");
+		hdd_debug("vdev %d Disabling queues", link_info->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					     WLAN_CONTROL_PATH);
@@ -1387,6 +1405,10 @@ static void hdd_cm_save_connect_info(struct wlan_hdd_link_info *link_info,
 				sme_phy_mode_to_dot11mode(des_chan->ch_phymode);
 
 	sta_ctx->conn_info.ch_width = des_chan->ch_width;
+
+	/* Save AP MLD addr for MLO connection */
+	hdd_cm_save_conn_info_mld_addr(link_info, rsp);
+
 	if (!rsp->connect_ies.bcn_probe_rsp.ptr ||
 	    (rsp->connect_ies.bcn_probe_rsp.len <
 	     (sizeof(struct wlan_frame_hdr) +

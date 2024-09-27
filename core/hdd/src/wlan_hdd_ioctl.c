@@ -6603,8 +6603,8 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 		chan_number = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
 							   chan_number);
 
-	status = hdd_softap_set_channel_change(link_info, chan_number,
-					       width, false, true);
+	status = hdd_softap_set_channel_change(link_info, chan_number, 0, width,
+					       NO_SCHANS_PUNC, false, true);
 	if (status) {
 		hdd_err("Set channel change fail");
 		return status;
@@ -6681,12 +6681,16 @@ static bool check_disable_channels(struct hdd_context *hdd_ctx,
 	    !hdd_ctx->original_channels->channel_info)
 		return false;
 
+	qdf_mutex_acquire(&hdd_ctx->cache_channel_lock);
 	num_channels = hdd_ctx->original_channels->num_channels;
 	for (i = 0; i < num_channels; i++) {
 		if (operating_freq ==
-		    hdd_ctx->original_channels->channel_info[i].freq)
+		    hdd_ctx->original_channels->channel_info[i].freq) {
+			qdf_mutex_release(&hdd_ctx->cache_channel_lock);
 			return true;
+		}
 	}
+	qdf_mutex_release(&hdd_ctx->cache_channel_lock);
 
 	return false;
 }

@@ -129,7 +129,6 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		policy_mgr_check_sap_go_force_scc(psoc, vdev,
 						  CSA_REASON_GO_BSS_STARTED);
-	ifmgr_debug("check for SAP restart");
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
 		policy_mgr_ll_lt_sap_restart_concurrent_sap(
@@ -181,12 +180,9 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 	 * is active on any vdev.
 	 */
 	if (cfg_p2p_is_roam_config_disabled(psoc) &&
-	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE) {
-		ifmgr_debug("p2p go disconnected enable roam");
+	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		if_mgr_enable_roaming(pdev, vdev, RSO_START_BSS);
-	}
 
-	ifmgr_debug("SAP/P2P-GO is stopped, re-enable roaming if it's stopped due to SAP/P2P-GO CSA");
 	if_mgr_enable_roaming(pdev, vdev, RSO_SAP_CHANNEL_CHANGE);
 
 	policy_mgr_get_mcc_scc_switch(psoc, &mcc_scc_switch);

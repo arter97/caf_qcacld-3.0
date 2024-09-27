@@ -1694,7 +1694,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 
 	wlan_crypto_aquire_lock();
 	for (i = 0; i < max_key_index; i++) {
-		crypto_key = wlan_crypto_get_key(vdev, i);
+		crypto_key = wlan_crypto_get_key(vdev, NULL, i);
 		if (!crypto_key)
 			continue;
 

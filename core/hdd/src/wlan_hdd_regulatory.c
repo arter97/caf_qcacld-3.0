@@ -1474,6 +1474,22 @@ static inline void hdd_set_dfs_pri_multiplier(struct hdd_context *hdd_ctx,
 }
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+static int
+hdd_regulatory_set_wiphy_regd_sync(struct wiphy *wiphy,
+				   struct ieee80211_regdomain *regd)
+{
+	return regulatory_set_wiphy_regd_sync(wiphy, regd);
+}
+#else
+static int
+hdd_regulatory_set_wiphy_regd_sync(struct wiphy *wiphy,
+				   struct ieee80211_regdomain *regd)
+{
+	return regulatory_set_wiphy_regd_sync_rtnl(wiphy, regd);
+}
+#endif
+
 void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
 				    bool send_sync_event)
 {
@@ -1539,7 +1555,7 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
 	}
 
 	if (send_sync_event && hdd_hold_rtnl_lock()) {
-		regulatory_set_wiphy_regd_sync(hdd_ctx->wiphy, regd);
+		hdd_regulatory_set_wiphy_regd_sync(hdd_ctx->wiphy, regd);
 		hdd_release_rtnl_lock();
 	} else {
 		regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);
@@ -1698,6 +1714,11 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 				 * continue to next statement
 				 */
 			case QDF_STA_MODE:
+				hdd_debug("Update vdev %d CAP IE", link_info->vdev_id);
+				sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+							  link_info->vdev_id,
+							  QDF_STA_MODE);
+
 				sta_ctx =
 					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 				new_phy_mode = wlan_reg_get_max_phymode(pdev,
@@ -1736,9 +1757,6 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 							    pdev,
 							    link_info->vdev_id);
 				}
-				sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
-							  link_info->vdev_id,
-							  QDF_STA_MODE);
 				break;
 			default:
 				break;

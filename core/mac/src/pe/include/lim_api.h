@@ -153,6 +153,7 @@ typedef enum eMgmtFrmDropReason {
 	eMGMT_DROP_DUPLICATE_AUTH_FRAME,
 	eMGMT_DROP_EXCESSIVE_MGMT_FRAME,
 	eMGMT_DROP_DEAUTH_DURING_ROAM_STARTED,
+	eMGMT_DROP_CONNECT_DURING_ROAMING,
 } tMgmtFrmDropReason;
 
 /**
@@ -174,6 +175,27 @@ void pe_stop(struct mac_context *mac);
  * Return: True if RMF enabled and key is installed
  */
 bool is_mgmt_protected(uint32_t vdev_id, const uint8_t *peer_mac_addr);
+
+/**
+ * lim_check_ap_assist_dfs_p2p_group() - Evaluate AP assisted DFS P2P entities
+ *
+ * The API checks if any active AP assisted P2P entities are present and calls
+ * P2P module to re-evaulate the conditions for continued group operation when
+ * any concurrency changes on STA interface.
+ * @is_incr_session: Is callback due to session count increase
+ *
+ * Return: void
+ */
+void lim_check_ap_assist_dfs_p2p_group(bool is_incr_session);
+
+/**
+ * lim_fill_dfs_p2p_group_params() - Fill the params of P2P group operating
+ * in DFS channel.
+ * @pe_session: Session
+ *
+ * Return: void
+ */
+void lim_fill_dfs_p2p_group_params(struct pe_session *pe_session);
 
 /**
  * lim_stop_pmfcomeback_timer() - stop pmf comeback timer

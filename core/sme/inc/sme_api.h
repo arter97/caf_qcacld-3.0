@@ -108,6 +108,7 @@
 /* AP start timeout = vdev start + 2 sec */
 #define SME_CMD_VDEV_START_BSS_TIMEOUT (START_RESPONSE_TIMER + 2000)
 #define SME_CMD_START_BSS_TIMEOUT (SME_CMD_VDEV_START_BSS_TIMEOUT + 1000)
+#define SME_CMD_STOP_VDEV_TIMEOUT (STOP_RESPONSE_TIMER + 1000)
 
 /* AP stop timeout = vdev stop + self peer delete + 1 sec */
 #define SME_CMD_STOP_BSS_CMD_TIMEOUT (STOP_RESPONSE_TIMER + \
@@ -4582,6 +4583,18 @@ QDF_STATUS sme_set_aggressive_roaming(mac_handle_t mac_handle,
 				      bool is_aggressive_roam_mode);
 
 /**
+ * sme_get_aggressive_roaming() - Get Aggressive roaming in SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @is_aggressive_roam_mode: True if roaming mode is set to aggressive
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_get_aggressive_roaming(mac_handle_t mac_handle,
+				      uint8_t vdev_id,
+				      bool *is_aggressive_roam_mode);
+
+/**
  * sme_send_vendor_btm_params - Send vendor btm params to FW
  * @hdd_ctx: HDD context
  * @vdev_id: vdev id
@@ -4691,25 +4704,28 @@ void sme_vdev_del_resp(uint8_t vdev_id);
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id));
+				   void (*monitor_mode_cb)(uint8_t vdev_id,
+							   bool is_up));
 
 /*
- * sme_process_monitor_mode_vdev_up_evt() - Handle vdev up completion
+ * sme_process_monitor_mode_vdev_evt() - Handle vdev up completion
  * @vdev_id: vdev id
+ * @is_up: is vdev up
  *
  * Return: QDF_STATUS.
  */
-QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id);
+QDF_STATUS sme_process_monitor_mode_vdev_evt(uint8_t vdev_id, bool is_up);
 #else
 static inline
 QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id))
+				   void (*monitor_mode_cb)(uint8_t vdev_id,
+							   bool is_up))
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 static inline QDF_STATUS
-sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
+sme_process_monitor_mode_vdev_evt(uint8_t vdev_id, bool is_up)
 {
 	return QDF_STATUS_E_FAILURE;
 }

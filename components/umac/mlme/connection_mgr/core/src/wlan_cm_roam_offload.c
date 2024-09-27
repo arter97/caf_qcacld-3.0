@@ -1802,6 +1802,7 @@ cm_roam_scan_offload_ap_profile(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	struct ap_profile *profile = &params->profile;
+	uint8_t i;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -1839,10 +1840,9 @@ cm_roam_scan_offload_ap_profile(struct wlan_objmgr_psoc *psoc,
 	params->min_rssi_params[MIN_RSSI_2G_TO_5G_ROAM] =
 			mlme_obj->cfg.trig_min_rssi[MIN_RSSI_2G_TO_5G_ROAM];
 
-	params->score_delta_param[IDLE_ROAM_TRIGGER] =
-			mlme_obj->cfg.trig_score_delta[IDLE_ROAM_TRIGGER];
-	params->score_delta_param[BTM_ROAM_TRIGGER] =
-			mlme_obj->cfg.trig_score_delta[BTM_ROAM_TRIGGER];
+	for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++)
+		params->score_delta_param[i] =
+			mlme_obj->cfg.trig_score_delta[i];
 }
 
 static bool
@@ -6380,6 +6380,9 @@ cm_get_diag_roam_sub_reason(enum roam_trigger_sub_reason sub_reason)
 	case ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU:
 		return DIAG_ROAM_SUB_REASON_INACTIVITY_TIMER_CU;
 
+	case ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN:
+		return DIAG_ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN;
+
 	default:
 		break;
 	}
@@ -6690,6 +6693,10 @@ cm_roam_cancel_event(uint8_t vdev_id, enum wlan_roam_failure_reason_code reason,
 	return QDF_STATUS_SUCCESS;
 }
 
+#define ROAM_STATUS_SUCCESS 0
+#define ROAM_STATUS_FAILURE 1
+#define ROAM_STATUS_NO_ROAM 2
+
 void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_trigger_info *trigger,
 			       struct wmi_roam_result *res,
@@ -6746,9 +6753,9 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	 * 2. FW sends res->status == 1 if FW triggered roaming but failed due
 	 *    to the reason other than below reasons
 	 *
-	 * Print NO_ROAM for below reasons where either candidate AP is not
-	 * found or we roamed to current AP itself irrespective of the
-	 * res->status value:
+	 * Print NO_ROAM if res->status == 2 for below reasons where
+	 * either candidate AP is not found or we roamed to current
+	 * AP itself irrespective of the res->status value:
 	 * ROAM_FAIL_REASON_NO_AP_FOUND
 	 * ROAM_FAIL_REASON_NO_CAND_AP_FOUND
 	 * ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT
@@ -6757,7 +6764,8 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	 */
 	wlan_diag_event.is_roam_successful = true;
 
-	if (res->fail_reason == ROAM_FAIL_REASON_NO_AP_FOUND ||
+	if (res->status == ROAM_STATUS_NO_ROAM ||
+	    res->fail_reason == ROAM_FAIL_REASON_NO_AP_FOUND ||
 	    res->fail_reason == ROAM_FAIL_REASON_NO_CAND_AP_FOUND ||
 	    res->fail_reason == ROAM_FAIL_REASON_CURR_AP_STILL_OK ||
 	    res->fail_reason ==
@@ -7435,9 +7443,11 @@ cm_roam_btm_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 	 * is received only once on the device. Restricting the
 	 * BTM req and BTM candidate event to be logged only for partial scan
 	 */
-	if (trigger_info->present &&
-	    trigger_info->scan_type == ROAM_STATS_SCAN_TYPE_FULL &&
-	    btm_data->disassoc_timer)
+	if ((trigger_info->present &&
+	     trigger_info->scan_type == ROAM_STATS_SCAN_TYPE_FULL &&
+	    btm_data->disassoc_timer) ||
+	    trigger_info->trigger_sub_reason ==
+	    ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN)
 		return status;
 
 	if (neigh_rpt->resp_time)
@@ -7543,17 +7553,10 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 		for (i = 0; i < scan_data->num_ap; i++) {
 			if (i >= MAX_ROAM_CANDIDATE_AP)
 				break;
-			if (scan_data->ap[i].type == WLAN_ROAM_SCAN_ROAMED_AP) {
-				wlan_diag_event.rssi =
-						(-1) * scan_data->ap[i].rssi;
 
-				qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
-					     scan_data->ap[i].bssid.bytes,
-					     QDF_MAC_ADDR_SIZE);
-				break;
-			} else if (!memcmp(wlan_diag_event.diag_cmn.bssid,
-					scan_data->ap[i].bssid.bytes,
-					QDF_MAC_ADDR_SIZE)) {
+			if (!qdf_mem_cmp(wlan_diag_event.diag_cmn.bssid,
+					 scan_data->ap[i].bssid.bytes,
+					 QDF_MAC_ADDR_SIZE)) {
 				wlan_diag_event.rssi =
 						(-1) * scan_data->ap[i].rssi;
 				break;

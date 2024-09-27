@@ -260,6 +260,11 @@ const uint8_t *p2p_get_p2pie_ptr(const uint8_t *ie, uint16_t ie_len)
 			P2P_OUI_SIZE, ie, ie_len);
 }
 
+const uint8_t *p2p_get_p2p2_ie_ptr(const uint8_t *ie, uint16_t ie_len)
+{
+	return wlan_get_vendor_ie_ptr_from_oui(P2P2_OUI, P2P2_OUI_SIZE,
+					       ie, ie_len);
+}
 /**
  * p2p_get_p2pie_from_probe_rsp() - get the pointer to p2p ie from
  * probe response

@@ -1745,7 +1745,8 @@ static int hdd_pause_ns(struct hdd_context *hdd_ctx)
 		}
 
 		/* stop all TX queues before suspend */
-		hdd_debug("Disabling queues for dev mode %s",
+		hdd_debug("vdev %d Disabling queues for dev mode %s",
+			  adapter->deflink->vdev_id,
 			  qdf_opmode_str(adapter->device_mode));
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_STOP_ALL_NETIF_QUEUE,
@@ -1891,6 +1892,7 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct wlan_hdd_link_info *link_info;
 	bool ignore_cac_updated = false;
+	bool restart_due_to_cac_pending = false;
 
 	hdd_enter();
 
@@ -1898,16 +1900,24 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 					   NET_DEV_HOLD_SSR_RESTART_SAP) {
 		if (adapter->device_mode != QDF_SAP_MODE)
 			goto next_adapter;
-
+restart_post_cac_links:
+		restart_due_to_cac_pending = false;
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
+				continue;
+
+			if (test_bit(SOFTAP_BSS_STARTED,
+				     &link_info->link_flags))
 				continue;
 
 			if (!ignore_cac_updated) {
 				hdd_restore_ignore_cac(hdd_ctx);
 				ignore_cac_updated = true;
 			}
-
+			if (hdd_ssr_restart_sap_cac_link(adapter, link_info)) {
+				restart_due_to_cac_pending = true;
+				continue;
+			}
 			hdd_debug("Restart prev SAP session(vdev %d), event_flags 0x%lx, link_flags 0x%lx(%s)",
 				  link_info->vdev_id,
 				  adapter->event_flags,
@@ -1917,6 +1927,8 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 			wlan_hdd_start_sap(link_info, true);
 			hdd_apctx_set_ap_suspend(hdd_ctx, link_info);
 		}
+		if (restart_due_to_cac_pending)
+			goto restart_post_cac_links;
 next_adapter:
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_SSR_RESTART_SAP);

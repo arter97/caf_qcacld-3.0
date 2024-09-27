@@ -226,6 +226,32 @@ bool lim_create_peer_idxpool(struct pe_session *pe_session,
  * Return: Void
  */
 void lim_free_peer_idxpool(struct pe_session *pe_session);
+#ifdef WLAN_FEATURE_11BE
+static inline uint16_t lim_get_chan_switch_puncture(struct pe_session *session)
+{
+	return session ? session->gLimChannelSwitch.puncture_bitmap :
+			 NO_SCHANS_PUNC;
+}
+
+static inline void lim_set_chan_switch_puncture(struct pe_session *session,
+						uint16_t punct_bitmap)
+{
+	if (!session)
+		return;
+
+	session->gLimChannelSwitch.puncture_bitmap = punct_bitmap;
+}
+#else
+static inline uint16_t lim_get_chan_switch_puncture(struct pe_session *session)
+{
+	return 0;
+}
+
+static inline void lim_set_chan_switch_puncture(struct pe_session *session,
+						uint16_t punct_bitmap)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
@@ -298,7 +324,23 @@ void lim_strip_mlo_ie(struct mac_context *mac_ctx,
  */
 void lim_set_emlsr_caps(struct mac_context *mac_ctx,
 			struct pe_session *session);
+
+/**
+ * lim_remove_puncture() - Remove the existing puncturing in the regulatory
+ * @mac_ctx: Global mac pointer
+ * @session: PE session of BSS
+ *
+ * Removes the current puncturing bitmap from global regulatory.
+ */
+void lim_remove_puncture(struct mac_context *mac_ctx,
+			 struct pe_session *session);
 #else
+static inline
+void lim_remove_puncture(struct mac_context *mac,
+			 struct pe_session *session)
+{
+}
+
 static inline uint16_t lim_assign_mlo_conn_idx(struct mac_context *mac,
 					       struct pe_session *pe_session,
 					       uint16_t partner_peer_idx)
@@ -478,6 +520,16 @@ uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
 				 qdf_freq_t chan_freq);
 
 /**
+ * lim_get_sta_cb_mode_for_24ghz() - Get cb mode for 2GHz
+ * @mac: pointer to Global MAC structure
+ * @vdev_id: vdev id
+ *
+ * Return: cb mode allowed for the freq
+ */
+uint8_t lim_get_sta_cb_mode_for_24ghz(struct mac_context *mac,
+				      uint8_t vdev_id);
+
+/**
  * lim_update_sta_run_time_ht_switch_chnl_params() - Process change in HT
  * bandwidth
  * @mac: pointer to Global MAC structure
@@ -562,6 +614,7 @@ void lim_update_sta_run_time_ht_info(struct mac_context *mac,
 /**
  * lim_is_channel_valid_for_channel_switch - check channel valid for switching
  * @mac: Global mac context
+ * @session: PE session
  * @channel_freq: channel freq (MHz)
  *
  * This function checks if the channel to which AP is expecting us to switch,
@@ -570,6 +623,7 @@ void lim_update_sta_run_time_ht_info(struct mac_context *mac,
  * Return bool, true if channel is valid
  */
 bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
+					     struct pe_session *session,
 					     uint32_t channel_freq);
 
 QDF_STATUS lim_restore_pre_channel_switch_state(struct mac_context *mac,
@@ -1047,6 +1101,7 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 
 /**
  * lim_update_connect_rsn_ie() - Update the connection RSN IE
+ * @mac_ctx: MAC context
  * @session: PE session
  * @rsn_ie_buf: RSN IE buffer
  * @pmksa: PMKSA entry for the connecting AP
@@ -1054,7 +1109,8 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
  * Return: None
  */
 void
-lim_update_connect_rsn_ie(struct pe_session *session, uint8_t *rsn_ie_buf,
+lim_update_connect_rsn_ie(struct mac_context *mac_ctx,
+			  struct pe_session *session, uint8_t *rsn_ie_buf,
 			  struct wlan_crypto_pmksa *pmksa);
 
 /**
@@ -3057,7 +3113,7 @@ static inline void lim_ap_check_6g_compatible_peer(
 {}
 #endif
 
-#define MAX_TX_PSD_POWER 15
+#define EXT_TX_PSD_POWER 8
 
 /**
  * enum max_tx_power_interpretation
@@ -3428,6 +3484,17 @@ lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
 				enum QDF_OPMODE opmode,
 				qdf_freq_t start_freq,
 				qdf_freq_t end_freq);
+
+/**
+ * @ch_width: phy channel width
+ *
+ * Convert the current PHY channel width to VHT speicifc BW. 320MHz is not
+ * supported in VHT so return 160MHz for 320MHz input.
+ *
+ * Return: phy chwidth
+ */
+uint8_t
+lim_convert_phy_chwidth_to_vht_chwidth(enum phy_ch_width ch_width);
 
 /**
  * lim_update_cu_flag() - Update cu flag in capability information

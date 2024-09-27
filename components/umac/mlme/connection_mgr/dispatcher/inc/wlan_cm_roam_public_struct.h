@@ -164,13 +164,8 @@
 #define NEIGHBOR_REPORT_PARAM_INVALID (0xFFFFFFFFU)
 
 /*
- * Currently roam score delta value is sent for 2 triggers and min rssi
- * values are sent for 3 triggers
+ * Currently  min rssi values are sent for 3 triggers
  */
-#define NUM_OF_ROAM_TRIGGERS 2
-#define IDLE_ROAM_TRIGGER 0
-#define BTM_ROAM_TRIGGER  1
-
 #define NUM_OF_ROAM_MIN_RSSI 3
 #define DEAUTH_MIN_RSSI 0
 #define BMISS_MIN_RSSI  1
@@ -200,6 +195,8 @@
  * @ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU: Roam scan triggered due to
  * first periodic timer exiry when full scan count is 0 and roam scan trigger
  * is CU load
+ * @ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN: Additional partial roam scan
+ * triggered during MLO usecase.
  */
 enum roam_trigger_sub_reason {
 	ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER = 1,
@@ -211,6 +208,7 @@ enum roam_trigger_sub_reason {
 	ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY,
 	ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY_CU,
 	ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU,
+	ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN,
 };
 
 /**
@@ -783,6 +781,12 @@ struct rso_config_params {
  * @ROAM_RSSI_DIFF_6GHZ: roam rssi diff for 6 GHz AP
  * @IS_DISABLE_BTM: disable btm roaming
  * @IS_ROAM_AGGRESSIVE : Aggressive Roaming mode
+ * @ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA: Roam min roam delta in aggressive
+ *                                         mode
+ * @ROAM_AGGRESSIVE_SCORE_DELTA: Roam score delta in aggressive mode
+ * @ROAM_AGGRESSIVE_SCAN_STEP_RSSI: Roam scan step rssi in aggressive mode
+ * @ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD: Roam neighbour lookup
+ *                                                  threshold in aggressive mode
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -817,6 +821,10 @@ enum roam_cfg_param {
 	ROAM_RSSI_DIFF_6GHZ,
 	IS_DISABLE_BTM,
 	IS_ROAM_AGGRESSIVE,
+	ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA,
+	ROAM_AGGRESSIVE_SCORE_DELTA,
+	ROAM_AGGRESSIVE_SCAN_STEP_RSSI,
+	ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD,
 };
 
 /**
@@ -1223,7 +1231,7 @@ struct wlan_roam_triggers {
 	uint32_t roam_scan_scheme_bitmap;
 	struct wlan_cm_roam_vendor_btm_params vendor_btm_param;
 	struct roam_trigger_min_rssi min_rssi_params[NUM_OF_ROAM_MIN_RSSI];
-	struct roam_trigger_score_delta score_delta_param[NUM_OF_ROAM_TRIGGERS];
+	struct roam_trigger_score_delta score_delta_param[ROAM_TRIGGER_REASON_MAX];
 };
 
 /**
@@ -1240,7 +1248,7 @@ struct ap_profile_params {
 	struct ap_profile profile;
 	struct scoring_param param;
 	struct roam_trigger_min_rssi min_rssi_params[NUM_OF_ROAM_MIN_RSSI];
-	struct roam_trigger_score_delta score_delta_param[NUM_OF_ROAM_TRIGGERS];
+	struct roam_trigger_score_delta score_delta_param[ROAM_TRIGGER_REASON_MAX];
 	struct owe_transition_mode_info owe_ap_profile;
 };
 

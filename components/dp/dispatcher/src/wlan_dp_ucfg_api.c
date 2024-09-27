@@ -3298,3 +3298,25 @@ bool ucfg_dp_ipa_ctrl_debug_supported(struct wlan_objmgr_psoc *psoc)
 
 	return false;
 }
+
+#ifdef IPA_WDI3_VLAN_SUPPORT
+void ucfg_dp_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
+					uint8_t pdev_id)
+{
+	struct wlan_dp_psoc_sb_ops *sb_ops = dp_intf_get_tx_ops(psoc);
+
+	if (!ucfg_ipa_is_enabled() || !ucfg_ipa_is_vlan_enabled()) {
+		dp_info("IPA VLAN feature is not enabled");
+		return;
+	}
+
+	if (!sb_ops) {
+		dp_err("Unable to get ops");
+		return;
+	}
+
+	if (sb_ops->dp_send_pdev_pkt_routing_vlan)
+		sb_ops->dp_send_pdev_pkt_routing_vlan(psoc, pdev_id,
+						      cdp_host_reo_dest_ring_3);
+}
+#endif /* IPA_WDI3_VLAN_SUPPORT */

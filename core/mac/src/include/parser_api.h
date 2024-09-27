@@ -660,6 +660,8 @@ struct s_ext_cap {
 	uint8_t dmg_loc_supp_aps:1;
 	uint8_t i2r_lmr_feedback_policy:1;
 	uint8_t reserved13:6;
+	/* Octet 14 */
+	uint8_t cap_notif_support: 1;
 };
 
 void swap_bit_field16(uint16_t in, uint16_t *out);
@@ -694,6 +696,20 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 QDF_STATUS
 wlan_parse_ftie_sha384(uint8_t *frame, uint32_t frame_len,
 		       struct sSirAssocRsp *assoc_rsp);
+
+/**
+ * wlan_parse_wmm_params() - API to parse WMM params from the frame.
+ * @frame: Pointer to IEs section of the beacon/probe resp frame
+ * @frame_len: Length of @frame buffer
+ * @wmm_params: Pointer to save parsed WMM params.
+ *
+ * The API will look for Vendor OUI containing WMM params and converts
+ * the IE data to internal data structure at @wmm_params.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_parse_wmm_params(const uint8_t *frame, uint32_t frame_len,
+				 tDot11fIEWMMParams *wmm_params);
 
 QDF_STATUS
 sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
@@ -1963,12 +1979,14 @@ dot11f_parse_assoc_rsp_mlo_partner_info(struct pe_session *pe_session,
  * @mac_ctx: MAC context
  * @session: reporting session
  * @dot11f: pointer to tDot11fIEreduced_neighbor_report to fill
+ * @num_rnr: number of rnr ie's included
  *
  * Return: none
  */
 void populate_dot11f_6g_rnr(struct mac_context *mac_ctx,
 			    struct pe_session *session,
-			    tDot11fIEreduced_neighbor_report *dot11f);
+			    tDot11fIEreduced_neighbor_report *dot11f,
+			    uint16_t *num_rnr);
 
 /**
  * populate_dot11f_rnr_tbtt_info() - populate rnr for the tbtt_len specified
