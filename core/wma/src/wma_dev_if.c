@@ -927,6 +927,22 @@ static void wma_handle_hidden_ssid_restart(tp_wma_handle wma,
 				      0, NULL);
 }
 
+void
+wma_send_peer_phy_mode(tSirMacAddr bssId, uint8_t vdev_id,
+		       enum wlan_phymode phy_mode)
+{
+	uint32_t fw_phymode;
+	tp_wma_handle wma;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma)
+		return;
+
+	fw_phymode = wmi_host_to_fw_phymode(phy_mode);
+	wma_set_peer_param(wma, bssId, WMI_HOST_PEER_PHYMODE,
+					fw_phymode, vdev_id);
+}
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * wma_get_peer_phymode() - get phy mode and eht puncture
