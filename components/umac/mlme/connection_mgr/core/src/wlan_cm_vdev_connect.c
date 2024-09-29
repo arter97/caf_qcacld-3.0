@@ -1806,11 +1806,15 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 				ml_nlink_link_switch_pre_completion_evt, NULL);
 
 		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
-								false))
+								false) ||
+		    (!policy_mgr_is_hw_dbs_capable(psoc) &&
+		     wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+		     wlan_vdev_mlme_is_mlo_link_vdev(vdev)))
 			policy_mgr_move_vdev_from_connection_to_disabled_tbl(
 								psoc, vdev_id);
 		else
 			policy_mgr_incr_active_session(psoc, op_mode, vdev_id);
+
 		ml_nlink_conn_change_notify(
 			psoc, vdev_id,
 			ml_nlink_connect_completion_evt, NULL);

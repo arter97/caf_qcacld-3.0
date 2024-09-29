@@ -4994,6 +4994,13 @@ policy_mgr_handle_vdev_active_inactive_resp(
 	uint32_t assoc_bitmap = 0;
 	uint16_t dynamic_inactive_bitmap = 0;
 	uint16_t forced_inactive_bitmap = 0;
+	uint16_t inactive_linkid_bitmap = 0;
+
+	inactive_linkid_bitmap = resp->inactive_linkid_bitmap;
+	if (!policy_mgr_is_hw_dbs_capable(psoc) &&
+	    (req->param.force_mode == MLO_LINK_FORCE_MODE_NO_FORCE ||
+	     req->param.force_mode == MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE))
+		inactive_linkid_bitmap = resp->curr_inactive_linkid_bitmap;
 
 	/* convert link id to vdev id and update vdev status based
 	 * on both inactive and active bitmap.
@@ -5006,22 +5013,24 @@ policy_mgr_handle_vdev_active_inactive_resp(
 	ml_nlink_get_dynamic_inactive_links(psoc, vdev,
 					    &dynamic_inactive_bitmap,
 					    &forced_inactive_bitmap);
-	resp->inactive_linkid_bitmap |= dynamic_inactive_bitmap;
+	inactive_linkid_bitmap |= dynamic_inactive_bitmap;
 	ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
-		psoc, vdev, resp->inactive_linkid_bitmap,
+		psoc, vdev, inactive_linkid_bitmap,
 		&assoc_bitmap,
 		&resp->inactive_sz, resp->inactive,
 		&vdev_id_num, vdev_ids);
 
 	ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
 		psoc, vdev,
-		(~resp->inactive_linkid_bitmap) & assoc_bitmap,
+		(~inactive_linkid_bitmap) & assoc_bitmap,
 		NULL,
 		&resp->active_sz, resp->active,
 		&vdev_id_num, vdev_ids);
+
 	for (i = 0; i < resp->inactive_sz; i++)
 		policy_mgr_enable_disable_link_from_vdev_bitmask(
 				psoc, 0, resp->inactive[i], i * 32);
+
 	for (i = 0; i < resp->active_sz; i++)
 		policy_mgr_enable_disable_link_from_vdev_bitmask(
 				psoc, resp->active[i], 0, i * 32);
