@@ -110,13 +110,14 @@ int wlan_cfg80211_mgmt_tx(struct wlan_objmgr_vdev *vdev,
  * wait mgmt tx
  * @vdev: Pointer to vdev object
  * @cookie: Find out the mgmt tx request by cookie
+ * @opmode: OPMODE for which the current mgmt_tx_cancel is issued
  *
  * API to trigger cancel mgmt frame tx request.
  *
  * Return: 0 for success, non zero for failure
  */
 int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
-		uint64_t cookie);
+				 uint64_t cookie, enum QDF_OPMODE opmode);
 
 #ifdef FEATURE_WLAN_SUPPORT_USD
 /**

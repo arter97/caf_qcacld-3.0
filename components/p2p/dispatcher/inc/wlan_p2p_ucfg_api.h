@@ -287,6 +287,7 @@ QDF_STATUS ucfg_p2p_mgmt_tx(struct wlan_objmgr_psoc *soc,
  * @soc: soc context
  * @vdev: vdev object
  * @cookie: Find out the mgmt tx request by cookie
+ * @opmode: OPMODE for which the current mgmt_tx_cancel is issued
  *
  * This function delivers cancel mgmt frame tx request request to P2P
  * component.
@@ -294,7 +295,9 @@ QDF_STATUS ucfg_p2p_mgmt_tx(struct wlan_objmgr_psoc *soc,
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS ucfg_p2p_mgmt_tx_cancel(struct wlan_objmgr_psoc *soc,
-	struct wlan_objmgr_vdev *vdev, uint64_t cookie);
+				   struct wlan_objmgr_vdev *vdev,
+				   uint64_t cookie,
+				   enum QDF_OPMODE opmode);
 
 /**
  * ucfg_p2p_set_ps() - P2P set power save

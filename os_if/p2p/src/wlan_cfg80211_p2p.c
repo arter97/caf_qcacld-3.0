@@ -616,7 +616,7 @@ int wlan_cfg80211_mgmt_tx(struct wlan_objmgr_vdev *vdev,
 }
 
 int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
-	uint64_t cookie)
+				 uint64_t cookie, enum QDF_OPMODE opmode)
 {
 	struct wlan_objmgr_psoc *psoc;
 
@@ -632,7 +632,7 @@ int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
 	}
 
 	return qdf_status_to_os_return(
-		ucfg_p2p_mgmt_tx_cancel(psoc, vdev, cookie));
+		ucfg_p2p_mgmt_tx_cancel(psoc, vdev, cookie, opmode));
 }
 
 #ifdef FEATURE_WLAN_SUPPORT_USD

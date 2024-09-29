@@ -3020,6 +3020,8 @@ static void p2p_mac_clear_timeout(void *context)
 	uint32_t freq;
 	uint8_t addr[QDF_MAC_ADDR_SIZE];
 	uint32_t vdev_id;
+	struct qdf_mac_addr p2p_dev_mac;
+	bool is_p2p_go_running;
 
 	if (!random_mac || !random_mac->p2p_vdev_obj) {
 		p2p_err("invalid context for mac_clear timeout");
@@ -3029,7 +3031,25 @@ static void p2p_mac_clear_timeout(void *context)
 	if (!p2p_vdev_obj || !p2p_vdev_obj->vdev)
 		return;
 
+	is_p2p_go_running = policy_mgr_mode_specific_connection_count(
+				wlan_vdev_get_psoc(p2p_vdev_obj->vdev),
+				PM_P2P_GO_MODE, NULL);
 	qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
+
+	/* Skip mac address flushing from here as it gets flushed as part
+	 * of P2P-GO off
+	 */
+	if (p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+				wlan_vdev_get_psoc(p2p_vdev_obj->vdev)) &&
+	    is_p2p_go_running &&
+	    !wlan_mlme_get_p2p_device_mac_addr(p2p_vdev_obj->vdev,
+					       &p2p_dev_mac) &&
+	    !qdf_mem_cmp(p2p_dev_mac.bytes, random_mac->addr,
+			 QDF_MAC_ADDR_SIZE)) {
+		p2p_debug("Skip random mac timeout as this address is used for P2P device on P2P-GO channel");
+		qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
+		return;
+	}
 
 	delete_all_action_frame_cookie(&random_mac->cookie_list);
 	random_mac->in_use = false;

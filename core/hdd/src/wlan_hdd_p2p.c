@@ -570,7 +570,8 @@ static int __wlan_hdd_cfg80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
 	hdd_debug("cancel mgmt tx, vdev:%d adapter_device_mode:%d vdev_device_mode:%d opmode:%d",
 		  wlan_vdev_get_id(vdev), adapter->device_mode,
 		  wlan_vdev_mlme_get_opmode(vdev), opmode);
-	status = wlan_cfg80211_mgmt_tx_cancel(vdev, cookie);
+	status = wlan_cfg80211_mgmt_tx_cancel(vdev, cookie,
+					      adapter->device_mode);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_P2P_ID);
 
 	hdd_debug("cancel mgmt tx, status:%d", status);

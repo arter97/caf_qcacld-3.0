@@ -35,6 +35,8 @@
 #include "../../core/src/wlan_p2p_roc.h"
 #include "../../core/src/wlan_p2p_off_chan_tx.h"
 #include "target_if_p2p.h"
+#include "wlan_policy_mgr_public_struct.h"
+#include "wlan_policy_mgr_api.h"
 
 #define IEEE80211_FC0_TYPE_MASK              0x0c
 #define P2P_NOISE_FLOOR_DBM_DEFAULT          (-96)
@@ -347,12 +349,24 @@ QDF_STATUS tgt_p2p_mgmt_frame_rx_cb(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (!peer) {
-		if (p2p_soc_obj->cur_roc_vdev_id == P2P_INVALID_VDEV_ID) {
+		/*
+		 * This is to cover,
+		 * 1. P2P ROC response frames(Invitation response,
+		 *    provision discovery response, etc..)
+		 * 2. Asynchrous frames(e.g. Provision discovery frames when DUT
+		 *    is go on GO channel) when P2P-device uses SA vdev. No
+		 *    concern if P2P-device has a vdev as self peer covers this.
+		 */
+		if (p2p_soc_obj->cur_roc_vdev_id != P2P_INVALID_VDEV_ID) {
+			vdev_id = p2p_soc_obj->cur_roc_vdev_id;
+		} else if (p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc) &&
+			   policy_mgr_mode_specific_connection_count(psoc,
+							PM_P2P_GO_MODE, NULL)) {
+			vdev_id = p2p_psoc_priv_get_sta_vdev_id(psoc);
+		} else {
 			p2p_debug("vdev id of current roc invalid");
 			qdf_nbuf_free(buf);
 			return QDF_STATUS_E_FAILURE;
-		} else {
-			vdev_id = p2p_soc_obj->cur_roc_vdev_id;
 		}
 	} else {
 		vdev = wlan_peer_get_vdev(peer);
