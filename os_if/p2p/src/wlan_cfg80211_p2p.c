@@ -98,6 +98,7 @@ p2p_usd_attr_policy[QCA_WLAN_VENDOR_ATTR_USD_MAX + 1] = {
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
 #define DST_MAC_ADDRESS_OFFSET 4
+#define MGMT_FRAME_MATCH_LEN 6
 
 /**
  * wlan_p2p_rx_callback() - Callback for rx mgmt frame
@@ -120,6 +121,8 @@ static void wlan_p2p_rx_callback(void *user_data,
 	struct wireless_dev p2p_wdev = {0};
 	uint8_t *dst_macaddr = NULL;
 	struct qdf_mac_addr p2p_mac_addr = {0};
+	uint8_t match[MGMT_FRAME_MATCH_LEN] = {0}, hdr_len;
+	bool ret = false;
 
 	psoc = user_data;
 	if (!psoc) {
@@ -183,21 +186,29 @@ static void wlan_p2p_rx_callback(void *user_data,
 		osif_err("wdev is null");
 		goto fail;
 	}
-	osif_debug("Indicate frame over nl80211, idx:%d and interface %s",
-		   wdev->netdev->ifindex, wdev->netdev->name);
+
+	hdr_len = ieee80211_hdrlen(rx_frame->buf[0]);
+	qdf_mem_copy(match, rx_frame->buf + hdr_len,
+		     QDF_MIN(MGMT_FRAME_MATCH_LEN,
+			     rx_frame->frame_len - hdr_len));
+	osif_debug("Indicate frame over nl80211, idx:%d and interface %s FC: 0x%x match: %02x%02x%02x%02x%02x%02x",
+		   wdev->netdev->ifindex, wdev->netdev->name, rx_frame->buf[0],
+		   match[0], match[1], match[2], match[3], match[4], match[5]);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-	cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
-			 rx_frame->buf, rx_frame->frame_len,
-			 NL80211_RXMGMT_FLAG_ANSWERED);
+	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
+			       rx_frame->buf, rx_frame->frame_len,
+			       NL80211_RXMGMT_FLAG_ANSWERED);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0))
-	cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
-			 rx_frame->buf, rx_frame->frame_len,
-			 NL80211_RXMGMT_FLAG_ANSWERED, GFP_ATOMIC);
+	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
+			       rx_frame->buf, rx_frame->frame_len,
+			       NL80211_RXMGMT_FLAG_ANSWERED, GFP_ATOMIC);
 #else
-	cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
-			 rx_frame->buf, rx_frame->frame_len, GFP_ATOMIC);
+	ret = cfg80211_rx_mgmt(wdev, rx_frame->rx_freq, rx_frame->rx_rssi * 100,
+			       rx_frame->buf, rx_frame->frame_len, GFP_ATOMIC);
 #endif /* LINUX_VERSION_CODE */
+	osif_debug("indicated frame to userspace: %s",
+		   ret ? "Success" : "Fail");
 fail:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 }

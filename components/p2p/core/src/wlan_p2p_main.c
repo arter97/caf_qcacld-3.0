@@ -1966,8 +1966,6 @@ p2p_set_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc,
 
 	p2p_soc_obj->mgmt_frm_registration_update =
 				mgmt_frm_registration_update;
-	p2p_debug("set mgmt regis update value %u",
-		  p2p_soc_obj->mgmt_frm_registration_update);
 }
 
 uint32_t
