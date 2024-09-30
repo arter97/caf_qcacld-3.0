@@ -252,6 +252,28 @@ hdd_reset_sta_keep_alive_interval(struct wlan_hdd_link_info *link_info,
 					      keep_alive_interval);
 }
 
+/**
+ * hdd_clear_conn_info_roam_count() - clear roam count in conn info.
+ * @adapter: hostapd interface
+ *
+ * This function loop through the link info and clear roam count in
+ * conn info.
+ *
+ * Return: None
+ */
+static void hdd_clear_conn_info_roam_count(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_station_ctx *hdd_sta_ctx;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		if (!hdd_sta_ctx)
+			continue;
+		hdd_sta_ctx->conn_info.roam_count = 0;
+	}
+}
+
 void
 __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_info,
 					     struct wlan_objmgr_vdev *vdev,
@@ -346,6 +368,7 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		hdd_reset_sta_keep_alive_interval(link_info, hdd_ctx);
 
 	hdd_cm_print_bss_info(sta_ctx);
+	hdd_clear_conn_info_roam_count(adapter);
 }
 
 #ifdef WLAN_FEATURE_MSCS
