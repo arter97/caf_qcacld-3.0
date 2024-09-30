@@ -4871,6 +4871,11 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 			     pe_session->bcnLen);
 	}
 
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(pe_session->vdev))
+		lim_send_mlo_caps_ie(mac_ctx, pe_session->vdev,
+				     QDF_STA_MODE,
+				     pe_session->vdev_id);
+
 	status = lim_send_connect_req_to_mlm(pe_session);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to send mlm req vdev id %d",
@@ -4878,10 +4883,11 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 		goto fail;
 	}
 
-	if (!wlan_vdev_mlme_is_mlo_link_vdev(pe_session->vdev))
-		lim_send_mlo_caps_ie(mac_ctx, pe_session->vdev,
-				     QDF_STA_MODE,
-				     pe_session->vdev_id);
+	/* There may be cases where, after sending a connect request to MLME,
+	 * the pe_session gets freed due to a failure.
+	 * To avoid any unexpected behavior, ensure all pe_session
+	 * checks are performed before sending the connect request.
+	 */
 
 	return QDF_STATUS_SUCCESS;
 
