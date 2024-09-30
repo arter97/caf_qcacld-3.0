@@ -13089,7 +13089,7 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 {
 	struct hdd_context *hdd_ctx = NULL;
 	struct nlattr *curr_attr;
-	struct qdf_mac_addr active_link_addr[WLAN_MLO_MAX_VDEVS];
+	struct qdf_mac_addr active_link_addr[WLAN_MAX_ML_BSS_LINKS];
 	struct qdf_mac_addr *mac_addr_ptr;
 	uint32_t num_links = 0, i = 0;
 	int32_t len;
@@ -13101,8 +13101,8 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 
 	if (attr && adapter->device_mode == QDF_STA_MODE) {
 		nla_for_each_nested(curr_attr, &attr[0], len) {
-			if (++i > WLAN_MLO_MAX_VDEVS) {
-				hdd_err("No. of force active links %d exceeds allowed links",
+			if (++i > WLAN_MAX_ML_BSS_LINKS) {
+				hdd_err("No. of force active links %d exceeds max allowed BSS links",
 					i);
 				return -EINVAL;
 			}
