@@ -1825,11 +1825,13 @@ struct policy_mgr_hw_mode_params {
  * @scan_config: Scan configuration
  * @fw_mode_config: FW mode configuration
  * @set_dual_mac_cb: Callback function to be executed on response to the command
+ * @vdev_id: vdev id to serialize the mac config cmd
  */
 struct policy_mgr_dual_mac_config {
 	uint32_t scan_config;
 	uint32_t fw_mode_config;
 	dual_mac_cb set_dual_mac_cb;
+	uint8_t vdev_id;
 };
 
 /**

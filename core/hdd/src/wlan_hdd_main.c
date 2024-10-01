@@ -3660,7 +3660,7 @@ hdd_map_monitor_interface_vdev(struct hdd_adapter *sta_adapter)
 #endif
 
 static QDF_STATUS
-wlan_hdd_update_dbs_scan_and_fw_mode_config(void)
+wlan_hdd_update_dbs_scan_and_fw_mode_config(uint8_t vdev_id)
 {
 	struct policy_mgr_dual_mac_config cfg = {0};
 	QDF_STATUS status;
@@ -3693,6 +3693,8 @@ wlan_hdd_update_dbs_scan_and_fw_mode_config(void)
 	cfg.scan_config = 0;
 	cfg.fw_mode_config = 0;
 	cfg.set_dual_mac_cb = policy_mgr_soc_set_dual_mac_cfg_cb;
+	cfg.vdev_id = vdev_id;
+
 	if (policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc)) {
 		status =
 		ucfg_policy_mgr_get_chnl_select_plcy(hdd_ctx->psoc,
@@ -3935,7 +3937,7 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 		}
 	}
 
-	wlan_hdd_update_dbs_scan_and_fw_mode_config();
+	wlan_hdd_update_dbs_scan_and_fw_mode_config(adapter->deflink->vdev_id);
 
 exit_with_success:
 	hdd_create_adapter_sysfs_files(adapter);
@@ -11247,6 +11249,7 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 			hdd_err("Failed to set adapter FW params after SSR!");
 
 		wlan_hdd_cfg80211_register_frames(adapter);
+		wlan_hdd_update_dbs_scan_and_fw_mode_config(adapter->deflink->vdev_id);
 		hdd_create_adapter_sysfs_files(adapter);
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
