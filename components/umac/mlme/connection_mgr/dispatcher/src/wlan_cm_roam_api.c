@@ -930,7 +930,8 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 		break;
 	case NEXT_RSSI_THRESHOLD:
 		mlme_debug("is_agg: %d, control_enable: %d, alert_rssi_th: %d",
-			   roam_cfg_type, rso_cfg->roam_control_enable,
+			   rso_cfg->is_aggressive_roaming_mode,
+			   rso_cfg->roam_control_enable,
 			   rso_config->alert_rssi_threshold);
 
 		if (rso_cfg->is_aggressive_roaming_mode &&
@@ -941,7 +942,7 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 					rso_config->alert_rssi_threshold;
 		} else {
 			dst_config->uint_value =
-				src_cfg->neighbor_lookup_threshold;
+				src_cfg->next_rssi_threshold;
 		}
 		break;
 	case SCAN_N_PROBE:
