@@ -318,6 +318,20 @@ QDF_STATUS tgt_p2p_mgmt_ota_comp_cb(void *context, qdf_nbuf_t buf,
 	return ret;
 }
 
+static bool
+p2p_is_p2p_discovery_frame(struct wlan_objmgr_psoc *psoc, uint8_t *frame,
+			   uint32_t frame_len)
+{
+	struct p2p_frame_info frame_info;
+
+	p2p_get_frame_info(frame, frame_len, &frame_info);
+
+	if (frame_info.public_action_type == P2P_PUBLIC_ACTION_NOT_SUPPORT)
+		return false;
+
+	return true;
+}
+
 QDF_STATUS tgt_p2p_mgmt_frame_rx_cb(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_peer *peer, qdf_nbuf_t buf,
 	struct mgmt_rx_event_params *mgmt_rx_params,
@@ -354,14 +368,17 @@ QDF_STATUS tgt_p2p_mgmt_frame_rx_cb(struct wlan_objmgr_psoc *psoc,
 		 * 1. P2P ROC response frames(Invitation response,
 		 *    provision discovery response, etc..)
 		 * 2. Asynchrous frames(e.g. Provision discovery frames when DUT
-		 *    is go on GO channel) when P2P-device uses SA vdev. No
+		 *    is go on GO channel) when P2P-device uses STA vdev. No
 		 *    concern if P2P-device has a vdev as self peer covers this.
 		 */
 		if (p2p_soc_obj->cur_roc_vdev_id != P2P_INVALID_VDEV_ID) {
 			vdev_id = p2p_soc_obj->cur_roc_vdev_id;
 		} else if (p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc) &&
 			   policy_mgr_mode_specific_connection_count(psoc,
-							PM_P2P_GO_MODE, NULL)) {
+							PM_P2P_GO_MODE, NULL) &&
+			   p2p_is_p2p_discovery_frame(psoc,
+					(uint8_t *)qdf_nbuf_data(buf),
+					mgmt_rx_params->buf_len)) {
 			vdev_id = p2p_psoc_priv_get_sta_vdev_id(psoc);
 		} else {
 			p2p_debug("vdev id of current roc invalid");

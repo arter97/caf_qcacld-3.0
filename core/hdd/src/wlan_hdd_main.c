@@ -20577,7 +20577,7 @@ static void hdd_send_scan_done_complete_cb(uint8_t vdev_id)
 	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 }
 
-static void hdd_get_p2p_wdev(struct wireless_dev *wdev)
+static struct wireless_dev *hdd_get_p2p_wdev(void)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *p2p_adapter;
@@ -20585,13 +20585,13 @@ static void hdd_get_p2p_wdev(struct wireless_dev *wdev)
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
 		hdd_err("Invalid HDD context");
-		return;
+		return NULL;
 	}
 	p2p_adapter = hdd_get_adapter(hdd_ctx, QDF_P2P_DEVICE_MODE);
 	if (!p2p_adapter)
-		return;
+		return NULL;
 
-	qdf_mem_copy(wdev, &p2p_adapter->wdev, sizeof(struct wireless_dev));
+	return &p2p_adapter->wdev;
 }
 
 struct osif_vdev_mgr_ops osif_vdev_mgrlegacy_ops = {

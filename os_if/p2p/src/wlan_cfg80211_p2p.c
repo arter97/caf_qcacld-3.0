@@ -118,7 +118,6 @@ static void wlan_p2p_rx_callback(void *user_data,
 	struct wireless_dev *wdev;
 	enum QDF_OPMODE opmode;
 	uint32_t mgmt_frm_registration_update = 0;
-	struct wireless_dev p2p_wdev = {0};
 	uint8_t *dst_macaddr = NULL;
 	struct qdf_mac_addr p2p_mac_addr = {0};
 	uint8_t match[MGMT_FRAME_MATCH_LEN] = {0}, hdr_len;
@@ -159,8 +158,7 @@ static void wlan_p2p_rx_callback(void *user_data,
 	    (QDF_IS_ADDR_BROADCAST(dst_macaddr) ||
 	     qdf_mem_cmp(dst_macaddr, p2p_mac_addr.bytes,
 			QDF_MAC_ADDR_SIZE) == 0)) {
-		osif_vdev_mgr_get_p2p_wdev(&p2p_wdev);
-		wdev = &p2p_wdev;
+		wdev = osif_vdev_mgr_get_p2p_wdev();
 	} else {
 		assoc_vdev = vdev;
 		opmode = wlan_vdev_mlme_get_opmode(assoc_vdev);
@@ -232,7 +230,6 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 	struct vdev_osif_priv *osif_priv;
 	struct wireless_dev *wdev;
 	bool is_success;
-	struct wireless_dev p2p_wdev = {0};
 	uint8_t *src_macaddr;
 	struct qdf_mac_addr p2p_mac_addr = {0};
 
@@ -257,8 +254,7 @@ static void wlan_p2p_action_tx_cnf_callback(void *user_data,
 	    src_macaddr &&
 	    (qdf_mem_cmp(src_macaddr, p2p_mac_addr.bytes,
 			 QDF_MAC_ADDR_SIZE) == 0)) {
-		osif_vdev_mgr_get_p2p_wdev(&p2p_wdev);
-		wdev = &p2p_wdev;
+		wdev = osif_vdev_mgr_get_p2p_wdev();
 	} else {
 		osif_priv = wlan_vdev_get_ospriv(vdev);
 		if (!osif_priv) {
@@ -388,7 +384,6 @@ static void wlan_p2p_event_callback(void *user_data,
 	struct vdev_osif_priv *osif_priv;
 	struct wireless_dev *wdev;
 	struct wlan_objmgr_pdev *pdev;
-	struct wireless_dev p2p_wdev = {0};
 	uint8_t flag;
 
 	osif_debug("user data:%pK, vdev id:%d, event type:%d opmode:%d",
@@ -415,8 +410,7 @@ static void wlan_p2p_event_callback(void *user_data,
 	flag = (p2p_event->flag & P2P_SCAN_IN_STA_VDEV_FLAG);
 	if (p2p_event->opmode == QDF_P2P_DEVICE_MODE && flag &&
 	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
-		osif_vdev_mgr_get_p2p_wdev(&p2p_wdev);
-		wdev = &p2p_wdev;
+		wdev = osif_vdev_mgr_get_p2p_wdev();
 	} else {
 		osif_priv = wlan_vdev_get_ospriv(vdev);
 		if (!osif_priv) {
