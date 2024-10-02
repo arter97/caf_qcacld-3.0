@@ -6038,12 +6038,18 @@ static inline void hdd_wiphy_unlock(struct wiphy *wiphy, struct wireless_dev *de
 #else
 static inline void hdd_wiphy_lock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
 {
-	wiphy_lock(wiphy);
+	if (wiphy)
+		wiphy_lock(wiphy);
+	else if (dev_ptr)
+		mutex_lock(&dev_ptr->wiphy->mtx);
 }
 
 static inline void hdd_wiphy_unlock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
 {
-	wiphy_unlock(wiphy);
+	if (wiphy)
+		wiphy_unlock(wiphy);
+	else if (dev_ptr)
+		mutex_unlock(&dev_ptr->wiphy->mtx);
 }
 #endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
