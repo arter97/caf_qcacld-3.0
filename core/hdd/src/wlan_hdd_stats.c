@@ -3248,19 +3248,19 @@ wlan_hdd_set_station_stats_request_pending(struct wlan_hdd_link_info *link_info,
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct wlan_objmgr_psoc *psoc = adapter->hdd_ctx->psoc;
 	bool is_mlo_vdev = false;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	if (!adapter->hdd_ctx->is_get_station_clubbed_in_ll_stats_req)
-		return QDF_STATUS_E_INVAL;
+		return status;
 
 	if (ucfg_mc_cp_stats_is_req_pending(psoc, TYPE_STATION_STATS)) {
 		hdd_debug("Station stats request pending");
-		return QDF_STATUS_E_INVAL;
+		return status;
 	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev)
-		return QDF_STATUS_E_INVAL;
+		return status;
 
 	info.cookie = adapter;
 	info.u.get_station_stats_cb = cache_station_stats_cb;
@@ -3288,10 +3288,12 @@ wlan_hdd_set_station_stats_request_pending(struct wlan_hdd_link_info *link_info,
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 
-	ucfg_mc_cp_stats_set_pending_req(psoc, TYPE_STATION_STATS, &info);
+	status = ucfg_mc_cp_stats_set_pending_req(psoc, TYPE_STATION_STATS,
+						  &info);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-	return QDF_STATUS_SUCCESS;
+
+	return status;
 }
 
 static void
