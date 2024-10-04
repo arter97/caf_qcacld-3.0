@@ -1554,6 +1554,16 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			REASON_UNSPEC_FAILURE,
 			hdr->sa, session_entry, false);
 		goto assocReject;
+	} else if ((IS_DOT11_MODE_EHT(session_entry->dot11mode) &&
+		   !assoc_rsp->eht_cap.present) ||
+		   (IS_DOT11_MODE_HE(session_entry->dot11mode) &&
+		    !assoc_rsp->he_cap.present)) {
+		pe_err("Mandatory cap is missing in assoc response, trigger disconnection");
+		assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
+		assoc_cnf.protStatusCode = STATUS_DENIED_EHT_NOT_SUPPORTED;
+		lim_send_disassoc_mgmt_frame(mac_ctx, REASON_UNSPEC_FAILURE,
+					     hdr->sa, session_entry, false);
+		goto assocReject;
 	}
 
 	/*
