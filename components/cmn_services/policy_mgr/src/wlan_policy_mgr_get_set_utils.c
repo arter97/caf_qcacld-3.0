@@ -4211,8 +4211,7 @@ policy_mgr_validate_conn_info(struct wlan_objmgr_psoc *psoc)
 				if (pm_conc_connection_list[j].in_use &&
 				    pm_conc_connection_list[i].vdev_id ==
 				    pm_conc_connection_list[j].vdev_id) {
-					policy_mgr_debug(
-					"dup entry %d",
+					policy_mgr_err("dup entry %d",
 					pm_conc_connection_list[i].vdev_id);
 					panic = true;
 				}
@@ -4232,9 +4231,6 @@ policy_mgr_validate_conn_info(struct wlan_objmgr_psoc *psoc)
 		panic = true;
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-
-	if (panic)
-		policy_mgr_debug_alert();
 
 	return panic;
 }
