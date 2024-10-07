@@ -15134,6 +15134,39 @@ void hdd_psoc_idle_timer_stop(struct hdd_context *hdd_ctx)
 	hdd_debug("Stopped psoc idle timer");
 }
 
+static void
+wlan_hdd_send_idle_shutdown_event(struct hdd_context *hdd_ctx,
+				  enum qca_wlan_idle_shutdown_status status)
+{
+	struct sk_buff *vendor_event;
+
+	hdd_enter();
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is null");
+		return;
+	}
+
+	vendor_event = wlan_cfg80211_vendor_event_alloc(
+				hdd_ctx->wiphy, NULL, sizeof(uint32_t),
+				QCA_NL80211_VENDOR_SUBCMD_IDLE_SHUTDOWN_INDEX,
+				GFP_KERNEL);
+	if (!vendor_event) {
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
+		return;
+	}
+
+	if (nla_put_u32(vendor_event, QCA_WLAN_VENDOR_ATTR_IDLE_SHUTDOWN_STATUS,
+			status)) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR_IDLE_SHUTDOWN_STATUS put fail");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		return;
+	}
+
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+
+	hdd_exit();
+}
 
 /**
  * __hdd_psoc_idle_shutdown() - perform an idle shutdown on the given psoc
@@ -15154,6 +15187,9 @@ static int __hdd_psoc_idle_shutdown(struct hdd_context *hdd_ctx)
 	hdd_enter();
 
 	hdd_reg_wait_for_country_change(hdd_ctx);
+
+	wlan_hdd_send_idle_shutdown_event(hdd_ctx,
+					  QCA_WLAN_IDLE_SHUTDOWN_STARTED);
 
 	errno = osif_psoc_sync_trans_start(hdd_ctx->parent_dev, &psoc_sync);
 	if (errno) {
@@ -15178,6 +15214,8 @@ static int __hdd_psoc_idle_shutdown(struct hdd_context *hdd_ctx)
 	osif_psoc_sync_trans_stop(psoc_sync);
 
 exit:
+	wlan_hdd_send_idle_shutdown_event(hdd_ctx,
+					  QCA_WLAN_IDLE_SHUTDOWN_COMPLETED);
 	hdd_exit();
 	return errno;
 }
