@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3819,7 +3819,6 @@ static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 
 	/* get module id which cause the leak and release ref */
 	wlan_objmgr_for_each_psoc_vdev(psoc, vdev_id, vdev) {
-		wlan_vdev_obj_lock(vdev);
 		wlan_objmgr_for_each_vdev_peer(vdev, peer) {
 			qdf_atomic_t *ref_id_dbg;
 			int ref_id;
@@ -3829,7 +3828,6 @@ static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 			wlan_objmgr_for_each_refs(ref_id_dbg, ref_id, refs)
 				wlan_objmgr_peer_release_ref(peer, ref_id);
 		}
-		wlan_vdev_obj_unlock(vdev);
 	}
 }
 
@@ -12904,6 +12902,9 @@ static int __hdd_psoc_idle_restart(struct hdd_context *hdd_ctx)
 		return ret;
 
 	ret = hdd_wlan_start_modules(hdd_ctx, false);
+
+	if (!qdf_is_fw_down())
+		cds_set_recovery_in_progress(false);
 
 	hdd_soc_idle_restart_unlock();
 
