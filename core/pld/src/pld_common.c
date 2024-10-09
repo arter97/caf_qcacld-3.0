@@ -2335,8 +2335,9 @@ int pld_qmi_indication(struct device *dev, void *cb_ctx,
 	case PLD_BUS_TYPE_SNOC:
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
-	case PLD_BUS_TYPE_IPCI:
 		return -EINVAL;
+	case PLD_BUS_TYPE_IPCI:
+		return pld_ipci_register_qmi_ind(dev, cb_ctx, cb);
 	default:
 		pr_err("Invalid device type %d\n", bus_type);
 		return -EINVAL;

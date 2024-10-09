@@ -3600,10 +3600,10 @@ wma_wow_wakeup_pagefault_notify(tp_wma_handle wma, void *ev, uint32_t ev_len)
 		return;
 	}
 
-	cur_time = qdf_get_system_uptime();
+	cur_time = (qdf_time_t)qdf_get_monotonic_boottime();
 	pf_wakeup_intv =
 		wlan_pmo_get_interval_for_pagefault_wakeup_counts(psoc);
-	cutoff_time = cur_time - qdf_system_msecs_to_ticks(pf_wakeup_intv);
+	cutoff_time = cur_time - (qdf_time_t)WMA_MSEC_TO_USEC(pf_wakeup_intv);
 
 	status = wma_wow_pagefault_parse_event(psoc, ev, ev_len, &pf_sym_list);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -6149,8 +6149,8 @@ int wma_vdev_obss_detection_info_handler(void *handle, uint8_t *event,
 	return 0;
 }
 
-static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
-				 uint8_t key_index)
+static void wma_send_set_key_rsp(uint8_t vdev_id, const uint8_t *peer_mac,
+				 bool pairwise, uint8_t key_index)
 {
 	tSetStaKeyParams *key_info_uc;
 	tSetBssKeyParams *key_info_mc;
@@ -6162,14 +6162,13 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 	if (!wma)
 		return;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
-						    vdev_id,
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,
 						    WLAN_LEGACY_WMA_ID);
 	if (!vdev) {
 		wma_err("VDEV object not found");
 		return;
 	}
-	crypto_key = wlan_crypto_get_key(vdev, key_index);
+	crypto_key = wlan_crypto_get_key(vdev, peer_mac, key_index);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 	if (!crypto_key) {
@@ -6231,7 +6230,7 @@ void wma_set_peer_ucast_cipher(uint8_t *mac_addr, int32_t uc_cipher,
 }
 
 void wma_update_set_key(uint8_t session_id, bool pairwise,
-			uint8_t key_index,
+			uint8_t key_index, const uint8_t *peer_mac,
 			enum wlan_crypto_cipher_type cipher_type)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -6249,7 +6248,7 @@ void wma_update_set_key(uint8_t session_id, bool pairwise,
 	if (iface)
 		iface->is_waiting_for_key = false;
 
-	wma_send_set_key_rsp(session_id, pairwise, key_index);
+	wma_send_set_key_rsp(session_id, peer_mac, pairwise, key_index);
 }
 
 int wma_vdev_bss_color_collision_info_handler(void *handle,

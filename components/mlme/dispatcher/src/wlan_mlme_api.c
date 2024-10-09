@@ -3784,7 +3784,7 @@ QDF_STATUS mlme_get_wep_key(struct wlan_objmgr_vdev *vdev,
 		mlme_legacy_err("Incorrect wep key index %d", wep_keyid);
 		return QDF_STATUS_E_INVAL;
 	}
-	crypto_key = wlan_crypto_get_key(vdev, wep_keyid);
+	crypto_key = wlan_crypto_get_key(vdev, NULL, wep_keyid);
 	if (!crypto_key) {
 		mlme_legacy_err("Crypto KEY not present");
 		return QDF_STATUS_E_INVAL;
@@ -6193,6 +6193,22 @@ wlan_mlme_get_bss_load_threshold(struct wlan_objmgr_psoc *psoc, uint32_t *val)
 	}
 
 	*val = mlme_obj->cfg.lfr.bss_load_trig.threshold;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_bss_load_alpha(struct wlan_objmgr_psoc *psoc, uint32_t *val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*val = cfg_default(CFG_BSS_LOAD_ALPHA);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = mlme_obj->cfg.lfr.bss_load_trig.bss_load_alpha;
 
 	return QDF_STATUS_SUCCESS;
 }

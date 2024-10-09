@@ -3804,6 +3804,12 @@ static void lim_ht_switch_chnl_req(struct pe_session *session)
 		return;
 	}
 
+	if (mac->lim.stop_roaming_callback)
+		mac->lim.stop_roaming_callback(MAC_HANDLE(mac),
+					       session->smeSessionId,
+					       REASON_VDEV_RESTART_FROM_HOST,
+					       RSO_CHANNEL_SWITCH);
+
 	session->channelChangeReasonCode =
 			LIM_SWITCH_CHANNEL_HT_WIDTH;
 	mlme_set_chan_switch_in_progress(session->vdev, true);
@@ -10354,7 +10360,8 @@ void lim_send_beacon(struct mac_context *mac_ctx, struct pe_session *session)
 					session->vdev,
 					WLAN_VDEV_SM_EV_CHAN_SWITCH_DISABLED,
 					sizeof(*session), session);
-	else
+	else if (wlan_vdev_is_up_active_state(session->vdev) !=
+		 QDF_STATUS_SUCCESS)
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_START_SUCCESS,
 					      sizeof(*session), session);
@@ -11999,8 +12006,13 @@ void lim_cp_stats_cstats_log_assoc_req_evt(struct pe_session *pe_session,
 	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.freq = pe_session->curr_op_freq;
-	stat.ssid_len = ssid_len;
-	qdf_mem_copy(stat.ssid, ssid, ssid_len);
+
+	if (ssid_len > WLAN_SSID_MAX_LEN)
+		stat.ssid_len = WLAN_SSID_MAX_LEN;
+	else
+		stat.ssid_len = ssid_len;
+
+	qdf_mem_copy(stat.ssid, ssid, stat.ssid_len);
 
 	stat.direction = dir;
 	CSTATS_MAC_COPY(stat.bssid, bssid);

@@ -1801,7 +1801,7 @@ static void hdd_hostapd_set_sap_key(struct hdd_adapter *adapter)
 
 	for (key_index = 0; key_index < WLAN_CRYPTO_TOTAL_KEYIDX; ++key_index) {
 		crypto_key = wlan_crypto_get_key(adapter->deflink->vdev,
-						 key_index);
+						 NULL, key_index);
 		if (!crypto_key)
 			continue;
 
@@ -1809,7 +1809,7 @@ static void hdd_hostapd_set_sap_key(struct hdd_adapter *adapter)
 		ucfg_crypto_set_key_req(adapter->deflink->vdev, crypto_key,
 					WLAN_CRYPTO_KEY_TYPE_GROUP);
 		wma_update_set_key(adapter->deflink->vdev_id, false, key_index,
-				   crypto_key->cipher_type);
+				   NULL, crypto_key->cipher_type);
 	}
 }
 
@@ -7087,7 +7087,8 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		hdd_set_connection_in_progress(false);
 		sme_get_command_q_status(mac_handle);
 		wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(link_info));
-		if (!cds_is_driver_recovering())
+		if (!cds_is_driver_recovering() &&
+		    QDF_IS_STATUS_ERROR(qdf_status))
 			QDF_ASSERT(0);
 		ret = -EINVAL;
 		goto error;
