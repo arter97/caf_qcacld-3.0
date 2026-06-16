@@ -4627,7 +4627,7 @@ static int wma_pdev_hw_mode_transition_evt_handler(void *handle,
 			hw_mode_trans_ind->vdev_mac_map,
 			hw_mode_trans_ind->num_freq_map,
 			hw_mode_trans_ind->mac_freq_map,
-			wma->psoc);
+			wma->psoc, false);
 		qdf_mem_free(hw_mode_trans_ind);
 	} else {
 		struct scheduler_msg sme_msg = {0};

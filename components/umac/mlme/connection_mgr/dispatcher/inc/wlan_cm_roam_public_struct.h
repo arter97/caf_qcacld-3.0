@@ -2946,6 +2946,9 @@ struct policy_mgr_pdev_mac_freq_map {
  * @vdev_mac_map: vdev id-mac id map
  * @num_freq_map: Number of frequency map entries
  * @mac_freq_map: Frequency range map
+ * @is_roam_sync: true when transition is part of roam sync processing;
+ *   the mode-change notify callback should be skipped in this case as it
+ *   will fire again after roam connect completes and keys are installed.
  */
 struct cm_hw_mode_trans_ind {
 	uint32_t old_hw_mode_index;
@@ -2954,6 +2957,7 @@ struct cm_hw_mode_trans_ind {
 	struct policy_mgr_vdev_mac_map vdev_mac_map[MAX_VDEV_SUPPORTED];
 	uint32_t num_freq_map;
 	struct policy_mgr_pdev_mac_freq_map mac_freq_map[MAX_FREQ_RANGE_NUM];
+	bool is_roam_sync;
 };
 
 /* If link is disabled, during roam sync */
