@@ -91,7 +91,8 @@ void policy_mgr_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 			struct policy_mgr_vdev_mac_map *vdev_mac_map,
 			uint32_t num_mac_freq,
 			struct policy_mgr_pdev_mac_freq_map *mac_freq_range,
-			struct wlan_objmgr_psoc *context)
+			struct wlan_objmgr_psoc *context,
+			bool skip_mode_change_notify)
 {
 	QDF_STATUS status;
 	struct policy_mgr_hw_mode_params hw_mode;
@@ -132,7 +133,7 @@ void policy_mgr_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 					    vdev_mac_map, hw_mode,
 					    num_mac_freq, mac_freq_range);
 
-	if (pm_ctx->mode_change_cb)
+	if (!skip_mode_change_notify && pm_ctx->mode_change_cb)
 		pm_ctx->mode_change_cb();
 
 	return;
@@ -495,13 +496,14 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint32_t conn_index = 0, ch_freq, cur_freq;
-	bool found = false;
+	bool found = false, conn_update = true;
 	struct policy_mgr_vdev_entry_info conn_table_entry;
 	enum policy_mgr_chain_mode chain_mask = POLICY_MGR_ONE_ONE;
 	uint8_t nss_2g, nss_5g;
 	enum policy_mgr_con_mode mode;
 	uint32_t nss = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct wlan_objmgr_vdev *vdev;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -561,12 +563,21 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 
 	policy_mgr_debug("update PM connection table for vdev:%d", vdev_id);
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pm_ctx->pdev, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (vdev) {
+		if (mlo_is_offload_roam_in_progress(vdev))
+			conn_update = false;
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	}
+
 	/* add the entry */
 	policy_mgr_update_conc_list(
 			psoc, conn_index, mode, ch_freq,
 			policy_mgr_get_bw(conn_table_entry.chan_width),
 			conn_table_entry.mac_id, chain_mask,
-			nss, vdev_id, true, true, conn_table_entry.ch_flagext);
+			nss, vdev_id, true, conn_update,
+			conn_table_entry.ch_flagext);
 	policy_mgr_dump_current_concurrency(psoc);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 

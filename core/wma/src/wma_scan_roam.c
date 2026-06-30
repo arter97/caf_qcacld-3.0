@@ -2997,6 +2997,7 @@ cm_handle_roam_sync_update_hw_mode(struct cm_hw_mode_trans_ind *trans_ind)
 	if (!trans_ind_data)
 		return;
 	qdf_mem_copy(trans_ind_data, trans_ind, sizeof(*trans_ind_data));
+	trans_ind_data->is_roam_sync = true;
 	wma_handle_hw_mode_trans_ind(wma_handle, trans_ind_data);
 }
 

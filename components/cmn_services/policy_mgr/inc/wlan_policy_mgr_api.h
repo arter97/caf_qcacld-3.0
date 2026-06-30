@@ -3267,6 +3267,8 @@ policy_mgr_dump_freq_range_n_vdev_map(uint32_t num_vdev_mac_entries,
  * @num_mac_freq: Number of pdev freq mapping that follows
  * @mac_freq_range: mac_freq_range mapping
  * @context:
+ * @skip_mode_change_notify: if true, skip invoking the mode-change callback
+ * (used during roam sync where the callback fires again after connect complete)
  *
  * Provides the old and new HW mode index set by the FW
  *
@@ -3278,7 +3280,8 @@ void policy_mgr_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 		struct policy_mgr_vdev_mac_map *vdev_mac_map,
 		uint32_t num_mac_freq,
 		struct policy_mgr_pdev_mac_freq_map *mac_freq_range,
-		struct wlan_objmgr_psoc *context);
+		struct wlan_objmgr_psoc *context,
+		bool skip_mode_change_notify);
 
 /**
  * policy_mgr_will_freq_lead_to_mcc() - Check if the given freq can lead to
