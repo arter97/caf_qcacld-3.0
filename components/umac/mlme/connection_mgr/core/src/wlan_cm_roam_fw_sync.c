@@ -1538,7 +1538,7 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		roam_synch_data->hw_mode_trans_ind.num_vdev_mac_entries,
 		roam_synch_data->hw_mode_trans_ind.vdev_mac_map,
 		roam_synch_data->hw_mode_trans_ind.num_freq_map,
-		roam_synch_data->hw_mode_trans_ind.mac_freq_map, psoc);
+		roam_synch_data->hw_mode_trans_ind.mac_freq_map, psoc, true);
 	ml_nlink_conn_change_notify(
 			psoc, vdev_id,
 			ml_nlink_roam_sync_completion_evt, NULL);

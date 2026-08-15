@@ -285,7 +285,8 @@ static QDF_STATUS sme_process_hw_mode_trans_ind(struct mac_context *mac,
 		param->new_hw_mode_index,
 		param->num_vdev_mac_entries,
 		param->vdev_mac_map, param->num_freq_map, param->mac_freq_map,
-		mac->psoc);
+		mac->psoc,
+		param->is_roam_sync);
 
 	return QDF_STATUS_SUCCESS;
 }
